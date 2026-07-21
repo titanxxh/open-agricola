@@ -1,6 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import Database from 'better-sqlite3'
-import { createHash } from 'node:crypto'
 
 vi.mock('../db.ts', () => {
   const db = new Database(':memory:')
@@ -21,6 +20,8 @@ vi.mock('../db.ts', () => {
       created_by TEXT REFERENCES users(id) ON DELETE SET NULL,
       created_at INTEGER NOT NULL,
       expires_at INTEGER,
+      max_uses INTEGER NOT NULL DEFAULT 1,
+      use_count INTEGER NOT NULL DEFAULT 0,
       used_by TEXT REFERENCES users(id) ON DELETE SET NULL,
       used_at INTEGER,
       revoked_at INTEGER
@@ -48,6 +49,8 @@ function insertUser(id: string, username = id): void {
   `).run(id, username, username, 'hash', Date.now())
 }
 
+const future = (days = 7) => Date.now() + days * 24 * 60 * 60 * 1000
+
 describe('invites', () => {
   beforeEach(() => {
     getDb().exec(`
@@ -67,20 +70,34 @@ describe('invites', () => {
   })
 
   it('creates an invite and stores only the code hash', () => {
-    const invite = createInvite('admin', 7)
+    const invite = createInvite('admin', { expiresAt: future(), maxUses: 1 })
     expect(invite.code).toMatch(/^oa_/)
-    expect(invite.expiresAt).toBeGreaterThan(invite.createdAt)
+    expect(invite.expiresAt).not.toBeNull()
+    expect(invite.expiresAt!).toBeGreaterThan(invite.createdAt)
 
     const row = getDb().prepare('SELECT code_hash FROM account_invites WHERE id = ?').get(invite.id) as { code_hash: string }
-    expect(row.code_hash).toBe(createHash('sha256').update(invite.code).digest('hex'))
+    expect(row.code_hash).toBe(hashInviteCode(invite.code))
     expect(row.code_hash).not.toContain(invite.code)
   })
 
+  it('stores a custom code hash and reusable limit without plaintext', () => {
+    const invite = createInvite('admin', { code: '  FARM-2026  ', expiresAt: future(), maxUses: 3 })
+    const row = getDb().prepare(`
+      SELECT code_hash, use_count, max_uses FROM account_invites WHERE id = ?
+    `).get(invite.id)
+    expect(row).toEqual({
+      code_hash: hashInviteCode('FARM-2026'),
+      use_count: 0,
+      max_uses: 3,
+    })
+    expect(JSON.stringify(row)).not.toContain('FARM-2026')
+  })
+
   it('lists invite status without returning plaintext codes', () => {
-    const active = createInvite('admin', 7)
-    const used = createInvite('admin', 7)
-    const revoked = createInvite('admin', 7)
-    const expired = createInvite('admin', 1)
+    const active = createInvite('admin', { expiresAt: future(), maxUses: 1 })
+    const used = createInvite('admin', { expiresAt: future(), maxUses: 1 })
+    const revoked = createInvite('admin', { expiresAt: future(), maxUses: 1 })
+    const expired = createInvite('admin', { expiresAt: future(), maxUses: 1 })
     const now = Date.now()
     expect(consumeInviteCode(getDb(), used.code, 'new-user', now)).toBe(true)
     expect(revokeInvite(revoked.id, now)).toBe(true)
@@ -95,7 +112,7 @@ describe('invites', () => {
   })
 
   it('consumes an invite only once', () => {
-    const invite = createInvite('admin', 7)
+    const invite = createInvite('admin', { expiresAt: future(), maxUses: 1 })
     expect(consumeInviteCode(getDb(), invite.code, 'new-user')).toBe(true)
     expect(consumeInviteCode(getDb(), invite.code, 'new-user')).toBe(false)
 
@@ -105,16 +122,16 @@ describe('invites', () => {
   })
 
   it('checks invite availability without consuming it', () => {
-    const invite = createInvite('admin', 7)
+    const invite = createInvite('admin', { expiresAt: future(), maxUses: 1 })
 
     expect(isInviteCodeAvailable(invite.code)).toBe(true)
     expect(consumeInviteCode(getDb(), invite.code, 'new-user')).toBe(true)
   })
 
   it('checks invite availability rejects used expired and revoked codes', () => {
-    const used = createInvite('admin', 7)
-    const expired = createInvite('admin', 1)
-    const revoked = createInvite('admin', 7)
+    const used = createInvite('admin', { expiresAt: future(), maxUses: 1 })
+    const expired = createInvite('admin', { expiresAt: future(), maxUses: 1 })
+    const revoked = createInvite('admin', { expiresAt: future(), maxUses: 1 })
     const now = Date.now()
 
     insertUser('used-user', 'used-user')
@@ -129,7 +146,7 @@ describe('invites', () => {
   })
 
   it('consumes an invite by hash only once', () => {
-    const invite = createInvite('admin', 7)
+    const invite = createInvite('admin', { expiresAt: future(), maxUses: 1 })
     const hash = hashInviteCode(invite.code)
 
     insertUser('other-user', 'other-user')
@@ -145,14 +162,36 @@ describe('invites', () => {
   })
 
   it('rejects expired and revoked invites', () => {
-    const expired = createInvite('admin', 1)
-    const revoked = createInvite('admin', 7)
+    const expired = createInvite('admin', { expiresAt: future(), maxUses: 1 })
+    const revoked = createInvite('admin', { expiresAt: future(), maxUses: 1 })
     const now = Date.now()
     getDb().prepare('UPDATE account_invites SET expires_at = ? WHERE id = ?').run(now - 1, expired.id)
     expect(revokeInvite(revoked.id, now)).toBe(true)
 
     expect(consumeInviteCode(getDb(), expired.code, 'new-user', now)).toBe(false)
     expect(consumeInviteCode(getDb(), revoked.code, 'new-user', now)).toBe(false)
+  })
+
+  it('remains active until the final allowed use', () => {
+    const invite = createInvite('admin', { code: 'THREE', expiresAt: future(), maxUses: 3 })
+    expect(consumeInviteCode(getDb(), invite.code, 'new-user')).toBe(true)
+    expect(consumeInviteCodeHash(getDb(), hashInviteCode(invite.code), 'admin')).toBe(true)
+    expect(listInvites().find(row => row.id === invite.id)).toMatchObject({
+      status: 'active', useCount: 2, maxUses: 3,
+    })
+    expect(consumeInviteCode(getDb(), invite.code, 'new-user')).toBe(true)
+    expect(consumeInviteCode(getDb(), invite.code, 'new-user')).toBe(false)
+    expect(listInvites().find(row => row.id === invite.id)).toMatchObject({
+      status: 'used', useCount: 3, maxUses: 3,
+    })
+  })
+
+  it('revokes a partially used reusable invite', () => {
+    const invite = createInvite('admin', { code: 'REVOKE', expiresAt: future(), maxUses: 3 })
+    expect(consumeInviteCode(getDb(), invite.code, 'new-user')).toBe(true)
+    expect(revokeInvite(invite.id)).toBe(true)
+    expect(consumeInviteCode(getDb(), invite.code, 'admin')).toBe(false)
+    expect(listInvites().find(row => row.id === invite.id)?.status).toBe('revoked')
   })
 
   it('hashes trimmed invite codes', () => {
