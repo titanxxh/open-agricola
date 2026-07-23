@@ -196,6 +196,26 @@ const canonicalise = (value: unknown): unknown => {
   )
 }
 
+const comparableCardDefinition = (
+  cardJson: Record<string, unknown>,
+): unknown => {
+  const comparable = { ...cardJson }
+  delete comparable._draft
+  delete comparable.locales
+  if (
+    comparable.cost
+    && typeof comparable.cost === 'object'
+    && !Array.isArray(comparable.cost)
+    && Object.keys(comparable.cost).length === 0
+  ) delete comparable.cost
+  if (comparable.vp === 0) delete comparable.vp
+  if (Array.isArray(comparable.desc) && comparable.desc.length === 0) delete comparable.desc
+  if (Array.isArray(comparable.modifiers) && comparable.modifiers.length === 0) {
+    delete comparable.modifiers
+  }
+  return canonicalise(comparable)
+}
+
 const hashVersionContent = (
   cardJson: Record<string, unknown>,
   codeManifest: Record<string, unknown> | null,
@@ -526,14 +546,23 @@ const staticValidation = (
       )
       if (!sourceCardJson) {
         errors.push('Ability source CARD_DEF is missing or invalid')
-      } else if (!Object.entries(sourceCardJson).every(([key, value]) =>
-        JSON.stringify(canonicalise(draft.cardJson[key]))
-          === JSON.stringify(canonicalise(value)),
-      )) {
+      } else if (
+        JSON.stringify(comparableCardDefinition(draft.cardJson))
+        !== JSON.stringify(comparableCardDefinition(sourceCardJson))
+      ) {
         errors.push('Ability source CARD_DEF does not match saved card definition')
       }
     }
   }
+  return { valid: errors.length === 0, errors }
+}
+
+const handoffValidation = (
+  draft: WorkshopDraft,
+): { valid: boolean; errors: string[] } => {
+  const validation = staticValidation(draft)
+  const errors = [...validation.errors]
+  if (!draft.effectCode) errors.push('Ability source is required for PR handoff')
   return { valid: errors.length === 0, errors }
 }
 
@@ -713,7 +742,7 @@ export function getHandoffReadiness(
   publishedVersionId: string | null
 } {
   const current = loadWorkspace(db, cardId, authorId)
-  const validation = staticValidation(current.draft)
+  const validation = handoffValidation(current.draft)
   const publishedVersionMatchesDraft = current.publishedVersionId !== null
     && versionContentHash(loadVersion(db, current.id, current.publishedVersionId)) === contentHash(current.draft)
   const sandboxPassedForPublishedVersion = publishedVersionMatchesDraft
