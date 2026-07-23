@@ -167,7 +167,13 @@ const createPublishedCard = async (
 ): Promise<string> => {
   const createRes = mockRes()
   await handleWorkshopRoute(
-    mockReq('POST', '/api/workshop/cards', body, token),
+    mockReq('POST', '/api/workshop/cards', {
+      ...body,
+      card_json: {
+        ...body.card_json,
+        card_type: body.card_type,
+      },
+    }, token),
     createRes,
   )
   const cardDbId = JSON.parse(createRes.body).id as string
@@ -325,7 +331,7 @@ describe('workshop API', () => {
         card_id: 'CUSTOM_VersionRouteCard',
         card_type: 'minor',
         name: 'Version Route Card',
-        card_json: { id: 'CUSTOM_VersionRouteCard', name: 'Version Route Card', deck: 'CUSTOM', number: 0, desc: ['v1'] },
+        card_json: { id: 'CUSTOM_VersionRouteCard', name: 'Version Route Card', card_type: 'minor', deck: 'CUSTOM', number: 0, desc: ['v1'] },
       }, 'tok-alice')
       const createRes = mockRes()
       await handleWorkshopRoute(createReq, createRes)

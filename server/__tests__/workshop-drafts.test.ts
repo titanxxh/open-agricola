@@ -25,6 +25,7 @@ const baseDraft = (overrides: Partial<WorkshopDraft> = {}): WorkshopDraft => ({
   cardJson: {
     id: 'CUSTOM_FieldKeeper',
     name: 'Field Keeper',
+    card_type: 'occupation',
     deck: 'CUSTOM',
     number: 0,
     desc: ['Keep a field.'],
@@ -349,6 +350,22 @@ describe('workshop draft aggregate', () => {
     expect(adopted.workspace.draft.effectCode).toBe(validCandidate.sourceCode)
     expect(adopted.workspace.draft.compiledCode).toBe(validCandidate.compiledCode)
     expect(adopted.workspace.draft.codeManifest).toEqual(validCandidate.codeManifest)
+  })
+
+  it('rejects publishing when the row type differs from the card definition', () => {
+    const created = createCard(db, {
+      authorId: 'author',
+      draft: baseDraft({ cardType: 'minor' }),
+    })
+
+    expect(() => publish(db, {
+      cardId: created.id,
+      authorId: 'author',
+      baseRevision: 1,
+    })).toThrowError(expect.objectContaining<Partial<WorkshopDraftError>>({
+      code: 'not_ready',
+      message: expect.stringContaining('type'),
+    }))
   })
 
   it('restores by copy-forward without creating a new version', () => {

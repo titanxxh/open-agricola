@@ -692,7 +692,7 @@ function CardDetail({ card, isLoggedIn, apiFetch, onBack, onEdit, onAddSandbox, 
 
 // ── Card Editor ──────────────────────────────────────────────────────────────
 
-function CardEditor({ initial, initialCardId, apiFetch, onCancel, onAddToSandboxAndRestart, sandboxErrors, onSandboxErrorsConsumed, onCardLoaded }: {
+function CardEditor({ initial, initialCardId, apiFetch, onCancel, onAddToSandboxAndRestart, sandboxErrors, onCardLoaded }: {
   initial?: WorkshopCard
   initialCardId?: string
   apiFetch: (path: string, init?: RequestInit) => Promise<Response>
@@ -700,7 +700,6 @@ function CardEditor({ initial, initialCardId, apiFetch, onCancel, onAddToSandbox
   onAddToSandboxAndRestart?: (cardDbId: string, versionId: string) => Promise<boolean>
   t: (key: string, params?: Record<string, string | number>) => string
   sandboxErrors?: string[] | null
-  onSandboxErrorsConsumed?: () => void
   onCardLoaded?: (cardDbId: string) => void
 }) {
   const handleAiImport = (_extracted: ExtractedCard, _importedArtUrl: string | null) => {
@@ -716,7 +715,6 @@ function CardEditor({ initial, initialCardId, apiFetch, onCancel, onAddToSandbox
         onClose={onCancel}
         onAddToSandboxAndRestart={onAddToSandboxAndRestart}
         sandboxErrors={sandboxErrors}
-        onSandboxErrorsConsumed={onSandboxErrorsConsumed}
         onCardLoaded={onCardLoaded}
         apiFetch={apiFetch}
       />
@@ -1599,7 +1597,6 @@ export function WorkshopPage() {
           }}
           t={t}
           sandboxErrors={pendingSandboxErrors}
-          onSandboxErrorsConsumed={() => setPendingSandboxErrors(null)}
         />
         <div className="sandbox-embed">
           <div className="sandbox-embed-toolbar">
