@@ -128,6 +128,49 @@ describe('workshop draft aggregate', () => {
     })).toThrowError(expect.objectContaining<Partial<WorkshopDraftError>>({ code: 'invalid' }))
   })
 
+  it('keeps a published runtime card id reserved after the mutable draft is renamed', () => {
+    const created = createCard(db, { authorId: 'author', draft: baseDraft() })
+    publish(db, {
+      cardId: created.id,
+      authorId: 'author',
+      baseRevision: 1,
+    })
+    checkpointDraft(db, {
+      cardId: created.id,
+      authorId: 'author',
+      baseRevision: 1,
+      draft: baseDraft({
+        cardId: 'CUSTOM_RenamedFieldKeeper',
+        cardJson: {
+          ...baseDraft().cardJson,
+          id: 'CUSTOM_RenamedFieldKeeper',
+        },
+      }),
+    })
+
+    expect(() => createCard(db, {
+      authorId: 'other',
+      draft: baseDraft(),
+    })).toThrowError(expect.objectContaining<Partial<WorkshopDraftError>>({ code: 'conflict' }))
+
+    const other = createCard(db, {
+      authorId: 'other',
+      draft: baseDraft({
+        cardId: 'CUSTOM_OtherCard',
+        cardJson: {
+          ...baseDraft().cardJson,
+          id: 'CUSTOM_OtherCard',
+        },
+      }),
+    })
+    expect(() => checkpointDraft(db, {
+      cardId: other.id,
+      authorId: 'other',
+      baseRevision: 1,
+      draft: baseDraft(),
+    })).toThrowError(expect.objectContaining<Partial<WorkshopDraftError>>({ code: 'conflict' }))
+  })
+
   it('checkpoints a whole draft with optimistic revision conflict protection', () => {
     const created = createCard(db, { authorId: 'author', draft: baseDraft() })
     db.prepare(`
@@ -142,6 +185,10 @@ describe('workshop draft aggregate', () => {
       baseRevision: 1,
       draft: baseDraft({
         name: 'Field Keeper II',
+        cardJson: {
+          ...baseDraft().cardJson,
+          name: 'Field Keeper II',
+        },
         generation: { ability: { prompt: 'gain grain' } },
       }),
     })
@@ -473,5 +520,43 @@ describe('workshop draft aggregate', () => {
       publishedVersionMatchesDraft: false,
       sandboxPassedForPublishedVersion: false,
     })
+  })
+
+  it('keeps an exact-version sandbox pass across private generation checkpoints', () => {
+    const created = createCard(db, { authorId: 'author', draft: baseDraft() })
+    const published = publish(db, {
+      cardId: created.id,
+      authorId: 'author',
+      baseRevision: 1,
+    })
+    markSandboxPass(db, {
+      cardId: created.id,
+      authorId: 'author',
+      versionId: published.versionId,
+      authorConfirmed: true,
+      runtimeErrors: [],
+    })
+
+    const checkpointed = checkpointDraft(db, {
+      cardId: created.id,
+      authorId: 'author',
+      baseRevision: 1,
+      draft: baseDraft({
+        generation: {
+          ability: {
+            lastCompleted: {
+              id: 'unadopted',
+              kind: 'ability',
+              prompt: 'private generation',
+              sourceCode: 'not adopted',
+              createdAt: 100,
+            },
+          },
+        },
+      }),
+    })
+
+    expect(checkpointed.sandboxPassVersionId).toBe(published.versionId)
+    expect(getHandoffReadiness(db, created.id, 'author').ready).toBe(true)
   })
 })

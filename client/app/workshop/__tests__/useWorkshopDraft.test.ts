@@ -97,6 +97,44 @@ describe('useWorkshopDraft', () => {
     expect(JSON.parse(localStorage.getItem(workshopDraftStorageKey('card-1'))!).baseRevision).toBe(4)
   })
 
+  it('preserves edits made while a checkpoint request is in flight', async () => {
+    let finishSave: ((response: Response) => void) | undefined
+    const apiFetch = vi.fn(async (_path: string, init?: RequestInit) => {
+      if (!init) {
+        return new Response(JSON.stringify({ ok: true, workspace: workspace(1) }))
+      }
+      return new Promise<Response>(resolve => {
+        finishSave = resolve
+      })
+    })
+    const { result } = renderHook(() => useWorkshopDraft({
+      cardId: 'card-1',
+      apiFetch,
+    }))
+    await waitFor(() => expect(result.current.state?.baseRevision).toBe(1))
+    act(() => result.current.updateDraft(draft('Checkpoint snapshot')))
+
+    let pendingSave: Promise<boolean> | undefined
+    act(() => {
+      pendingSave = result.current.checkpoint()
+    })
+    await waitFor(() => expect(result.current.state?.save.status).toBe('saving'))
+    act(() => result.current.updateDraft(draft('Typed during save')))
+    finishSave!(new Response(JSON.stringify({
+      ok: true,
+      workspace: workspace(2, 'Checkpoint snapshot'),
+    })))
+
+    await act(async () => {
+      expect(await pendingSave).toBe(true)
+    })
+    expect(result.current.state?.baseRevision).toBe(2)
+    expect(result.current.state?.draft.name).toBe('Typed during save')
+    expect(result.current.state?.save.status).toBe('dirty')
+    expect(localStorage.getItem(workshopDraftStorageKey('card-1')))
+      .toContain('Typed during save')
+  })
+
   it('requires whole-draft conflict choice when the server revision advanced', async () => {
     localStorage.setItem(workshopDraftStorageKey('card-1'), JSON.stringify({
       baseRevision: 2,
