@@ -124,6 +124,7 @@ type WorkshopPrActionInput = {
   status: WorkshopCard['status']
   githubPrUrl?: string | null
   githubPrStatus?: WorkshopCard['github_pr_status']
+  handoffReady?: boolean
   /**
    * Workshop card has at least zh + en filled in. PR submission is blocked
    * until both locales are present so the upstream code file is bilingual.
@@ -150,6 +151,14 @@ export function getWorkshopPrActionState(input: WorkshopPrActionInput): {
       disabled: true,
       buttonLabel: '先发布后可发起 PR',
       secondary: '发布后可以提交到主仓库，等待 maintainer review。',
+    }
+  }
+  if (input.handoffReady === false) {
+    return {
+      visible: true,
+      disabled: true,
+      buttonLabel: '先完成当前版本沙盒确认',
+      secondary: '发布版本、沙盒通过记录和当前草稿必须完全匹配。',
     }
   }
   if (input.localesComplete === false) {
@@ -347,22 +356,51 @@ function CardSourceViewer({ card, t }: { card: WorkshopCard; t: (key: string, pa
 function CardDetailPrSection({
   card,
   currentUserId,
+  apiFetch,
   reloadCard,
 }: {
   card: WorkshopCard
   currentUserId: string | undefined
+  apiFetch: (path: string, init?: RequestInit) => Promise<Response>
   reloadCard: () => void
 }) {
   const [modalOpen, setModalOpen] = useState(false)
   const [refreshing, setRefreshing] = useState(false)
   const [refreshError, setRefreshError] = useState<string | null>(null)
+  const [handoffState, setHandoffState] = useState<{
+    cardId: string
+    ready: boolean
+  } | null>(null)
+  const isAuthor = !!currentUserId && card.author_id === currentUserId
+
+  useEffect(() => {
+    let cancelled = false
+    if (!isAuthor) return
+    void apiFetch(`/api/workshop/cards/${card.id}/workspace`)
+      .then(response => response.json())
+      .then(payload => {
+        if (!cancelled) {
+          setHandoffState({
+            cardId: card.id,
+            ready: payload.ok === true && payload.readiness?.ready === true,
+          })
+        }
+      })
+      .catch(() => {
+        if (!cancelled) setHandoffState({ cardId: card.id, ready: false })
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [apiFetch, card.id, isAuthor])
 
   const action = getWorkshopPrActionState({
     enabled: true,
-    isAuthor: !!currentUserId && card.author_id === currentUserId,
+    isAuthor,
     status: card.status,
     githubPrUrl: card.github_pr_url,
     githubPrStatus: card.github_pr_status,
+    handoffReady: handoffState?.cardId === card.id && handoffState.ready,
     localesComplete: hasZhLocale(card.card_json),
   })
   if (!action.visible) return null
@@ -584,6 +622,7 @@ function CardDetail({ card, isLoggedIn, apiFetch, onBack, onEdit, onAddSandbox, 
           <CardDetailPrSection
             card={card}
             currentUserId={currentUserId}
+            apiFetch={apiFetch}
             reloadCard={() => onRefresh?.()}
           />
         </div>

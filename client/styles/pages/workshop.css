@@ -2774,6 +2774,11 @@
   gap: 12px;
 }
 
+.aicw-reference-record {
+  display: block;
+  overflow-wrap: anywhere;
+}
+
 .aicw-candidate-state {
   width: fit-content;
   padding: 4px 9px;

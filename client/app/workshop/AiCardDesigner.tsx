@@ -482,6 +482,8 @@ function RefImagePicker({ cardType, selected, onToggle }: {
               className={`ai-ref-thumb${isSelected ? ' selected' : ''}${maxed ? ' maxed' : ''}`}
               onClick={() => !maxed && onToggle(url)}
               title={isSelected ? (locale === 'zh' ? '取消选择' : 'Deselect') : (locale === 'zh' ? '选为参考' : 'Use as reference')}
+              aria-label={isSelected ? (locale === 'zh' ? '取消选择参考图' : 'Deselect reference') : (locale === 'zh' ? '选择参考图' : 'Select reference')}
+              aria-pressed={isSelected}
             >
               <img src={url} alt="" />
               {isSelected && <span className="ai-ref-check">✓</span>}
@@ -592,6 +594,11 @@ function ArtPanel({
   const [uploading, setUploading] = useState(false)
   const [artError, setArtError] = useState('')
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const errorRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    if (artError) errorRef.current?.focus()
+  }, [artError])
 
   const selectedCandidate = candidates.find(candidate => candidate.id === selectedCandidateId)
     ?? candidates.at(-1)
@@ -780,7 +787,16 @@ function ArtPanel({
         </div>
       )}
 
-      {artError && <div className="form-error aicw-panel-error">{artError}</div>}
+      {artError && (
+        <div
+          ref={errorRef}
+          className="form-error aicw-panel-error"
+          role="alert"
+          tabIndex={-1}
+        >
+          {artError}
+        </div>
+      )}
 
       {candidates.length > 0 && (
         <section className="aicw-candidate-section">
@@ -821,6 +837,12 @@ function ArtPanel({
                     {[selectedCandidate.provider, selectedCandidate.model].filter(Boolean).join(' · ')
                       || (locale === 'zh' ? '未记录模型' : 'Model not recorded')}
                   </small>
+                  {selectedCandidate.referenceImages?.length ? (
+                    <small className="aicw-reference-record">
+                      {locale === 'zh' ? '参考图' : 'References'}：
+                      {selectedCandidate.referenceImages.join(', ')}
+                    </small>
+                  ) : null}
                 </details>
                 <div className="aicw-candidate-actions">
                   <button type="button" className="aicw-button" onClick={() => { void onCandidateDiscarded(selectedCandidate.id) }}>
@@ -924,6 +946,7 @@ function AbilityPanel({
   const [validatingCandidateId, setValidatingCandidateId] = useState<string | null>(null)
   const messagesRef = useRef(messages)
   const bottomRef = useRef<HTMLDivElement>(null)
+  const errorRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     messagesRef.current = messages
@@ -932,6 +955,10 @@ function AbilityPanel({
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages])
+
+  useEffect(() => {
+    if (chatError) errorRef.current?.focus()
+  }, [chatError])
 
   const selectedCandidate = candidates.find(candidate => candidate.id === selectedCandidateId)
     ?? candidates.at(-1)
@@ -1177,7 +1204,16 @@ function AbilityPanel({
         </div>
       )}
 
-      {chatError && <div className="form-error aicw-panel-error">{chatError}</div>}
+      {chatError && (
+        <div
+          ref={errorRef}
+          className="form-error aicw-panel-error"
+          role="alert"
+          tabIndex={-1}
+        >
+          {chatError}
+        </div>
+      )}
 
       <div className="ai-chat-area">
         {messages.length === 0 && (
@@ -1442,8 +1478,13 @@ export function AiCardDesigner({
   const [versions, setVersions] = useState<WorkshopDraftVersion[]>([])
   const [versionsLoading, setVersionsLoading] = useState(false)
   const [versionsError, setVersionsError] = useState('')
+  const [metadataValidationAttempted, setMetadataValidationAttempted] = useState(false)
   const hydratedWorkspaceRef = useRef('')
   const errorRef = useRef<HTMLDivElement>(null)
+  const recoveryRef = useRef<HTMLElement>(null)
+  const workspaceHeadingRef = useRef<HTMLDivElement>(null)
+  const cardNameRef = useRef<HTMLInputElement>(null)
+  const cardIdRef = useRef<HTMLInputElement>(null)
   const [abilityConfig, setAbilityConfig] = useState<LlmConfig | null>(() => getLlmConfig())
   const [artConfig, setArtConfig] = useState<LlmConfig | null>(() => getLlmConfig(KEY_LLM_CONFIG_ART))
   const {
@@ -1473,6 +1514,14 @@ export function AiCardDesigner({
   useEffect(() => {
     if (error) errorRef.current?.focus()
   }, [error])
+
+  useEffect(() => {
+    if (
+      controllerError
+      || controllerState?.save.status === 'offline'
+      || controllerState?.save.status === 'error'
+    ) recoveryRef.current?.focus()
+  }, [controllerError, controllerState?.save.status])
 
   useEffect(() => {
     let cancelled = false
@@ -1616,19 +1665,16 @@ export function AiCardDesigner({
   })
 
   const createDraft = async (): Promise<string | null> => {
-    const name = extracted?.card.name.trim() || cardName.trim()
+    const name = cardName.trim()
+    setMetadataValidationAttempted(true)
     if (!name) {
-      setError(locale === 'zh' ? '请先设置卡牌名称' : 'Card name is required')
+      cardNameRef.current?.focus()
       return null
     }
-    const nextCardId = isValidCardId(cardIdInput.trim(), locale).valid
-      ? cardIdInput.trim()
-      : autoCardId(name)
+    const nextCardId = cardIdInput.trim() || autoCardId(name)
     const idCheck = isValidCardId(nextCardId, locale)
     if (!idCheck.valid) {
-      setError(locale === 'zh'
-        ? `卡牌 ID 格式错误：${idCheck.reason}`
-        : `Invalid card ID: ${idCheck.reason}`)
+      cardIdRef.current?.focus()
       return null
     }
     setSaving(true)
@@ -1677,6 +1723,16 @@ export function AiCardDesigner({
   }
 
   const handleSaveCard = async (): Promise<string | null> => {
+    setMetadataValidationAttempted(true)
+    if (!cardName.trim()) {
+      cardNameRef.current?.focus()
+      return null
+    }
+    const idCheck = isValidCardId(cardIdInput.trim(), locale)
+    if (!idCheck.valid) {
+      cardIdRef.current?.focus()
+      return null
+    }
     if (workspaceState) {
       setSaving(true)
       setError('')
@@ -1820,7 +1876,9 @@ export function AiCardDesigner({
         ? '这个候选基于旧草稿生成。仍要采用吗？'
         : 'This candidate was generated from an older draft. Adopt it anyway?')
     ) return
-    await adoptDraftCandidate(candidate)
+    if (await adoptDraftCandidate(candidate)) {
+      requestAnimationFrame(() => workspaceHeadingRef.current?.focus())
+    }
   }
 
   const handleStageChange = async (stage: WorkshopStage) => {
@@ -1830,6 +1888,22 @@ export function AiCardDesigner({
     }
     setPendingStage(stage)
     if (!currentCardDbId) await handleSaveCard()
+  }
+
+  const handleClose = async () => {
+    if (workspaceState) await checkpoint()
+    onClose()
+  }
+
+  const handleSwitchDraft = async (card: ApiCard) => {
+    if (workspaceState) await checkpoint()
+    handleLoadCard(card)
+  }
+
+  const handleResolveConflict = async (choice: 'server' | 'local') => {
+    if (await resolveConflict(choice)) {
+      requestAnimationFrame(() => workspaceHeadingRef.current?.focus())
+    }
   }
 
   const handlePublishAndStartSandbox = async () => {
@@ -1956,21 +2030,33 @@ export function AiCardDesigner({
         localization: { label: 'Localization', helper: 'Complete Chinese and English copy' },
         validation: { label: 'Validate & hand off', helper: 'Sandbox test and publish checks' },
       }
-  const saveStatus = saving
+  const syncedTime = controllerState?.save.savedAt
+    ? new Intl.DateTimeFormat(locale === 'zh' ? 'zh-CN' : 'en', {
+        hour: '2-digit',
+        minute: '2-digit',
+      }).format(controllerState.save.savedAt)
+    : null
+  const saveStatus = saving || controllerState?.save.status === 'saving'
     ? (locale === 'zh' ? '正在保存' : 'Saving')
+    : !currentCardDbId
+      ? (locale === 'zh' ? '尚未创建' : 'Not created')
     : controllerState?.save.status === 'dirty'
       ? (locale === 'zh' ? '有未保存修改' : 'Unsaved changes')
       : controllerState?.save.status === 'offline'
         ? (locale === 'zh' ? '离线，已保存在本机' : 'Offline, saved locally')
+        : controllerState?.save.status === 'error'
+          ? (locale === 'zh' ? '同步失败' : 'Sync failed')
         : controllerState?.save.status === 'conflict'
           ? (locale === 'zh' ? '需要选择草稿版本' : 'Draft choice required')
-          : (locale === 'zh' ? '已保存' : 'Saved')
+          : syncedTime
+            ? (locale === 'zh' ? `已同步 ${syncedTime}` : `Synced ${syncedTime}`)
+            : (locale === 'zh' ? '已同步' : 'Synced')
   const descriptionLines = extracted?.card.desc ?? []
 
   return (
     <div className="ai-designer aicw-shell">
       <header className="aicw-header">
-        <div className="aicw-heading">
+        <div ref={workspaceHeadingRef} className="aicw-heading" tabIndex={-1}>
           <span>{locale === 'zh' ? '卡牌工坊 / AI 卡牌设计师' : 'Card Workshop / AI Card Designer'}</span>
           <div>
             <h2>{cardName || (locale === 'zh' ? '新卡牌草稿' : 'New card draft')}</h2>
@@ -1990,13 +2076,13 @@ export function AiCardDesigner({
             type="button"
             className={`aicw-button aicw-button-primary${saveSuccess ? ' is-success' : ''}`}
             onClick={() => { void handleSaveCard() }}
-            disabled={saving || !metadataReady || Boolean(currentCardDbId && controllerLoading)}
+            disabled={saving || Boolean(currentCardDbId && controllerLoading)}
           >
             {saveSuccess
               ? (locale === 'zh' ? '已保存' : 'Saved')
               : (locale === 'zh' ? '保存草稿' : 'Save draft')}
           </button>
-          <button type="button" className="aicw-button" onClick={onClose}>
+          <button type="button" className="aicw-button" onClick={() => { void handleClose() }}>
             {locale === 'zh' ? '关闭' : 'Close'}
           </button>
         </div>
@@ -2065,7 +2151,7 @@ export function AiCardDesigner({
             value={currentCardDbId ?? ''}
             onChange={event => {
               const card = myCards.find(item => item.id === event.target.value)
-              if (card) handleLoadCard(card)
+              if (card) void handleSwitchDraft(card)
             }}
           >
             <option value="">{locale === 'zh' ? '选择已有卡牌' : 'Select a saved card'}</option>
@@ -2091,7 +2177,7 @@ export function AiCardDesigner({
             </span>
           </div>
           <div>
-            <button type="button" className="aicw-button" onClick={() => { void resolveConflict('server') }}>
+            <button type="button" className="aicw-button" onClick={() => { void handleResolveConflict('server') }}>
               {locale === 'zh' ? '使用服务器草稿' : 'Use server draft'}
             </button>
             <button
@@ -2101,7 +2187,7 @@ export function AiCardDesigner({
                 if (window.confirm(locale === 'zh'
                   ? '确认用本机整份草稿覆盖服务器版本？'
                   : 'Replace the complete server draft with this local draft?')) {
-                  void resolveConflict('local')
+                  void handleResolveConflict('local')
                 }
               }}
             >
@@ -2112,7 +2198,12 @@ export function AiCardDesigner({
       )}
 
       {(controllerError || controllerState?.save.status === 'offline' || controllerState?.save.status === 'error') && (
-        <section className="aicw-recovery" role="status">
+        <section
+          ref={recoveryRef}
+          className="aicw-recovery"
+          role="alert"
+          tabIndex={-1}
+        >
           <span>
             {controllerError
               ?? controllerState?.save.error
@@ -2227,11 +2318,27 @@ export function AiCardDesigner({
                 </fieldset>
                 <label>
                   <span>{locale === 'zh' ? '英文卡牌名' : 'Card name'}</span>
-                  <input type="text" value={cardName} onChange={event => updateCardName(event.target.value)} placeholder={locale === 'zh' ? '例如 Medieval Mallet' : 'e.g. Medieval Mallet'} />
+                  <input
+                    ref={cardNameRef}
+                    type="text"
+                    value={cardName}
+                    onChange={event => updateCardName(event.target.value)}
+                    placeholder={locale === 'zh' ? '例如 Medieval Mallet' : 'e.g. Medieval Mallet'}
+                    aria-invalid={metadataValidationAttempted && !cardName.trim()}
+                    aria-describedby={metadataValidationAttempted && !cardName.trim()
+                      ? 'aicw-card-name-error'
+                      : undefined}
+                  />
+                  {metadataValidationAttempted && !cardName.trim() && (
+                    <small id="aicw-card-name-error" className="form-error" role="alert">
+                      {locale === 'zh' ? '请输入卡牌名称' : 'Enter a card name'}
+                    </small>
+                  )}
                 </label>
                 <label>
                   <span>{locale === 'zh' ? '卡牌 ID' : 'Card ID'}</span>
                   <input
+                    ref={cardIdRef}
                     type="text"
                     className="aicw-code-input"
                     value={cardIdInput}

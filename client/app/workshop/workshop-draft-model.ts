@@ -1,46 +1,22 @@
-export type WorkshopClientDraft = {
-  cardId: string
-  cardType: 'minor' | 'occupation'
-  name: string
-  description: string
-  cardJson: Record<string, unknown>
-  effectCode: string | null
-  compiledCode?: string | null
-  codeManifest?: Record<string, unknown> | null
-  artUrl: string | null
-  generation: Record<string, unknown>
-}
+import type {
+  WorkshopAbilityCandidateContract,
+  WorkshopArtCandidateContract,
+  WorkshopDraftContract,
+  WorkshopWorkspaceContract,
+} from '../../../shared/contract/workshop'
 
-export type WorkshopWorkspaceDto = {
-  id: string
-  authorId: string
-  revision: number
-  status: string
-  draft: WorkshopClientDraft
-  publishedVersionId: string | null
-  sandboxPassVersionId: string | null
-  sandboxPassedAt: number | null
-}
+export type WorkshopClientDraft = WorkshopDraftContract
+export type WorkshopWorkspaceDto = WorkshopWorkspaceContract
 
-type CandidateBase = {
-  id: string
-  prompt: string
+type CandidateState = {
   createdAt: number
   baseRevision: number
   stale: boolean
-  provider?: string
-  model?: string
 }
 
-export type ArtCandidate = CandidateBase & {
-  kind: 'art'
-  resultUrl: string
-  referenceImages?: string[]
-}
+export type ArtCandidate = WorkshopArtCandidateContract & CandidateState
 
-export type AbilityCandidate = CandidateBase & {
-  kind: 'ability'
-  sourceCode: string
+export type AbilityCandidate = WorkshopAbilityCandidateContract & CandidateState & {
   validation: { valid: boolean; errors: string[] }
 }
 
@@ -77,7 +53,7 @@ export type WorkshopDraftState = {
   sandboxPassedAt: number | null
   stage: WorkshopStage
   session: WorkshopSessionState
-  save: { status: WorkshopSaveStatus; error?: string }
+  save: { status: WorkshopSaveStatus; error?: string; savedAt?: number }
   conflict: {
     server: WorkshopWorkspaceDto
     local: WorkshopLocalRecovery
@@ -163,7 +139,10 @@ const sessionFromGeneration = (
   const pendingAbility = lastAbility?.id === adoptedAbility?.id ? null : lastAbility
   return {
     ...emptySession(),
-    artPrompt: lastArt?.prompt ?? (typeof art.prompt === 'string' ? art.prompt : ''),
+    artPrompt: lastArt?.prompt
+      ?? (typeof asRecord(art.adopted).prompt === 'string'
+        ? asRecord(art.adopted).prompt as string
+        : typeof art.prompt === 'string' ? art.prompt : ''),
     artCandidates: pendingArt?.kind === 'art' ? [pendingArt] : [],
     abilityCandidates: pendingAbility?.kind === 'ability' ? [pendingAbility] : [],
     ...(pendingArt ? { selectedArtCandidateId: pendingArt.id } : {}),
@@ -205,7 +184,7 @@ export const createWorkshopDraftState = (
     sandboxPassedAt: workspace.sandboxPassedAt,
     stage: 'metadata',
     session: { ...restoredSession, ...session },
-    save: { status: 'saved' },
+    save: { status: 'saved', savedAt: Date.now() },
     conflict: null,
   }
 }
@@ -249,7 +228,7 @@ const applyWorkspace = (
   publishedVersionId: workspace.publishedVersionId,
   sandboxPassVersionId: workspace.sandboxPassVersionId,
   sandboxPassedAt: workspace.sandboxPassedAt,
-  save: { status: 'saved' },
+  save: { status: 'saved', savedAt: Date.now() },
   conflict: null,
 })
 

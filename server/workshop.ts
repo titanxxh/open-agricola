@@ -2,8 +2,6 @@ import type { IncomingMessage, ServerResponse } from 'node:http'
 import { getDb } from './db.ts'
 import { validateSession, extractToken, isAdmin } from './auth.ts'
 import { nanoid } from 'nanoid'
-import { validateAndCompileCustomCodeRemote } from './custom-code/client.ts'
-import type { CustomCodeValidateResult } from '../shared/custom-code/types.ts'
 import { handleOAuthStart, handleOAuthCallback } from './workshop-pr/oauth-handler.ts'
 import { handleProposeRequest, handleRefreshPrStatus } from './workshop-pr/propose-handler.ts'
 import { corsHeaders } from './http-origin.ts'
@@ -22,6 +20,11 @@ import {
   type WorkshopArtCandidate,
   type WorkshopDraft,
 } from './workshop-drafts.ts'
+import {
+  prepareWorkshopAbilityCode,
+  prepareWorkshopDraft,
+  type WorkshopDraftRequest,
+} from './workshop-draft-validation.ts'
 
 const sendJson = (res: ServerResponse, status: number, payload: unknown) => {
   res.writeHead(status, {
@@ -163,80 +166,6 @@ const serialisePublishedCardForApi = (
   github_pr_status: card.githubPrStatus,
   github_pr_last_synced_at: card.githubPrLastSyncedAt,
 })
-
-type WorkshopDraftRequest = {
-  cardId?: unknown
-  cardType?: unknown
-  name?: unknown
-  description?: unknown
-  cardJson?: unknown
-  effectCode?: unknown
-  artUrl?: unknown
-  generation?: unknown
-}
-
-const prepareWorkshopDraft = async (
-  raw: WorkshopDraftRequest | null | undefined,
-): Promise<
-  | { ok: true; draft: WorkshopDraft }
-  | { ok: false; status: number; error: string; errors?: string[] }
-> => {
-  if (
-    !raw
-    || typeof raw.cardId !== 'string'
-    || typeof raw.cardType !== 'string'
-    || typeof raw.name !== 'string'
-    || typeof raw.cardJson !== 'object'
-    || raw.cardJson === null
-    || Array.isArray(raw.cardJson)
-  ) {
-    return { ok: false, status: 400, error: 'Invalid draft payload' }
-  }
-  const effectCode = typeof raw.effectCode === 'string' && raw.effectCode.trim()
-    ? raw.effectCode
-    : null
-  let compiledCode: string | null = null
-  let codeManifest: Record<string, unknown> | null = null
-  if (effectCode) {
-    let validation: CustomCodeValidateResult
-    try {
-      validation = await validateAndCompileCustomCodeRemote(effectCode, raw.cardId)
-    } catch (error) {
-      return {
-        ok: false,
-        status: 502,
-        error: `Executor unavailable: ${error instanceof Error ? error.message : String(error)}`,
-      }
-    }
-    if (!validation.valid) {
-      return {
-        ok: false,
-        status: 400,
-        error: 'Code validation failed',
-        errors: validation.errors,
-      }
-    }
-    compiledCode = validation.compiledCode
-    codeManifest = validation.manifest as unknown as Record<string, unknown>
-  }
-  return {
-    ok: true,
-    draft: {
-      cardId: raw.cardId,
-      cardType: raw.cardType as WorkshopDraft['cardType'],
-      name: raw.name,
-      description: typeof raw.description === 'string' ? raw.description : '',
-      cardJson: raw.cardJson as Record<string, unknown>,
-      effectCode,
-      compiledCode,
-      codeManifest,
-      artUrl: typeof raw.artUrl === 'string' && raw.artUrl ? raw.artUrl : null,
-      generation: raw.generation && typeof raw.generation === 'object' && !Array.isArray(raw.generation)
-        ? raw.generation as Record<string, unknown>
-        : {},
-    },
-  }
-}
 
 type SandboxSettings = {
   player_count: number
@@ -586,20 +515,16 @@ export async function handleWorkshopRoute(
         sendJson(res, 400, { ok: false, error: 'Invalid ability candidate' })
         return true
       }
-      let validation: CustomCodeValidateResult
+      let cardDefinitionId: string
       try {
-        const workspace = loadWorkspace(db, adoptMatch[1]!, user.id)
-        validation = await validateAndCompileCustomCodeRemote(raw.sourceCode, workspace.draft.cardId)
+        cardDefinitionId = loadWorkspace(db, adoptMatch[1]!, user.id).draft.cardId
       } catch (error) {
         if (sendWorkshopDraftError(res, error)) return true
-        sendJson(res, 502, {
-          ok: false,
-          error: `Executor unavailable: ${error instanceof Error ? error.message : String(error)}`,
-        })
-        return true
+        throw error
       }
-      if (!validation.valid) {
-        sendJson(res, 400, { ok: false, error: 'Code validation failed', errors: validation.errors })
+      const prepared = await prepareWorkshopAbilityCode(raw.sourceCode, cardDefinitionId)
+      if (!prepared.ok) {
+        sendJson(res, prepared.status, prepared)
         return true
       }
       candidate = {
@@ -607,8 +532,8 @@ export async function handleWorkshopRoute(
         kind: 'ability',
         prompt: raw.prompt,
         sourceCode: raw.sourceCode,
-        compiledCode: validation.compiledCode,
-        codeManifest: validation.manifest as unknown as Record<string, unknown>,
+        compiledCode: prepared.compiledCode,
+        codeManifest: prepared.codeManifest,
         validation: { valid: true },
         ...(typeof raw.provider === 'string' ? { provider: raw.provider } : {}),
         ...(typeof raw.model === 'string' ? { model: raw.model } : {}),
@@ -724,18 +649,21 @@ export async function handleWorkshopRoute(
     if (!body?.source || typeof body.source !== 'string') {
       sendJson(res, 400, { ok: false, error: 'Missing source' }); return true
     }
-    let result: CustomCodeValidateResult
-    try {
-      result = await validateAndCompileCustomCodeRemote(body.source, 'CUSTOM_ValidateOnly')
-    } catch (error) {
-      sendJson(res, 502, { ok: false, error: `Executor unavailable: ${error instanceof Error ? error.message : String(error)}` })
+    const result = await prepareWorkshopAbilityCode(body.source, 'CUSTOM_ValidateOnly')
+    if (!result.ok) {
+      if (result.status === 400) {
+        sendJson(res, 200, { ok: true, valid: false, errors: result.errors })
+      } else {
+        sendJson(res, result.status, result)
+      }
       return true
     }
-    if (result.valid) {
-      sendJson(res, 200, { ok: true, valid: true, compiled: result.compiledCode, manifest: result.manifest })
-    } else {
-      sendJson(res, 200, { ok: true, valid: false, errors: result.errors })
-    }
+    sendJson(res, 200, {
+      ok: true,
+      valid: true,
+      compiled: result.compiledCode,
+      manifest: result.codeManifest,
+    })
     return true
   }
 
@@ -781,20 +709,14 @@ export async function handleWorkshopRoute(
     let compiledCode: string | null = null
     let codeManifest: string | null = null
     if (body.effect_code && typeof body.effect_code === 'string' && body.effect_code.trim()) {
-      let validation: CustomCodeValidateResult
-      try {
-        validation = await validateAndCompileCustomCodeRemote(body.effect_code, body.card_id)
-      } catch (error) {
-        sendJson(res, 502, { ok: false, error: `Executor unavailable: ${error instanceof Error ? error.message : String(error)}` })
-        return true
-      }
-      if (!validation.valid) {
-        sendJson(res, 400, { ok: false, error: 'Code validation failed', errors: validation.errors })
+      const prepared = await prepareWorkshopAbilityCode(body.effect_code, body.card_id)
+      if (!prepared.ok) {
+        sendJson(res, prepared.status, prepared)
         return true
       }
       effectCode = body.effect_code
-      compiledCode = validation.compiledCode
-      codeManifest = JSON.stringify(validation.manifest)
+      compiledCode = prepared.compiledCode
+      codeManifest = JSON.stringify(prepared.codeManifest)
     }
 
     try {
