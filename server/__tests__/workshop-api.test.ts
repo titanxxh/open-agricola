@@ -28,6 +28,11 @@ db.exec(`
     effect_dsl TEXT, effect_code TEXT, compiled_code TEXT, code_manifest TEXT,
     art_url TEXT, art_prompt TEXT, status TEXT NOT NULL DEFAULT 'draft',
     featured INTEGER NOT NULL DEFAULT 0,
+    draft_revision INTEGER NOT NULL DEFAULT 1,
+    draft_generation_json TEXT NOT NULL DEFAULT '{}',
+    published_version_id TEXT,
+    sandbox_pass_version_id TEXT,
+    sandbox_passed_at INTEGER,
     created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL
   );
   CREATE UNIQUE INDEX idx_workshop_card_id_published
@@ -68,7 +73,9 @@ db.exec(`
     art_url TEXT,
     version_number INTEGER NOT NULL,
     created_by TEXT NOT NULL REFERENCES users(id),
-    created_at INTEGER NOT NULL
+    created_at INTEGER NOT NULL,
+    content_hash TEXT,
+    provenance_json TEXT NOT NULL DEFAULT '{}'
   );
 `)
 
@@ -274,6 +281,7 @@ describe('workshop API', () => {
         card_type: 'minor',
         name: 'Version Route Card v2',
         card_json: { id: 'CUSTOM_VersionRouteCard', name: 'Version Route Card v2', deck: 'CUSTOM', number: 0, desc: ['v2'] },
+        status: 'published',
       }, 'tok-alice')
       const updateRes = mockRes()
       await handleWorkshopRoute(updateReq, updateRes)
