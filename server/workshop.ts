@@ -9,18 +9,24 @@ import { handleProposeRequest, handleRefreshPrStatus } from './workshop-pr/propo
 import { corsHeaders } from './http-origin.ts'
 import {
   WorkshopDraftError,
+  adoptCandidate,
   checkpointDraft,
   createCard,
+  getHandoffReadiness,
+  loadPublishedCard,
   loadWorkspace,
+  markSandboxPass,
   publish,
   restoreVersion,
+  type WorkshopAbilityCandidate,
+  type WorkshopArtCandidate,
   type WorkshopDraft,
 } from './workshop-drafts.ts'
 
 const sendJson = (res: ServerResponse, status: number, payload: unknown) => {
   res.writeHead(status, {
     'Content-Type': 'application/json',
-    ...corsHeaders({ methods: 'GET,POST,DELETE,OPTIONS' }),
+    ...corsHeaders({ methods: 'GET,POST,PUT,DELETE,OPTIONS' }),
   })
   res.end(JSON.stringify(payload))
 }
@@ -65,10 +71,14 @@ type WorkshopCard = {
   code_manifest?: string | null
   art_url: string | null
   status: string
+  featured?: number
   like_count?: number
   liked_by_me?: boolean
   created_at: number
   updated_at: number
+  github_pr_url?: string | null
+  github_pr_status?: string | null
+  github_pr_last_synced_at?: number | null
 }
 
 /**
@@ -96,14 +106,135 @@ const stripCardJsonCode = (cardJson: Record<string, unknown>): Record<string, un
 }
 
 /** Serialise a DB row for the API: parse card_json, surface effect_code / compiled_code. */
-const serialiseCardForApi = (row: WorkshopCard, extras: Record<string, unknown> = {}): Record<string, unknown> => {
+const serialiseCardForApi = (
+  row: WorkshopCard,
+  extras: Record<string, unknown> = {},
+  includePrivateDraft = false,
+): Record<string, unknown> => {
   const { parsed, code, compiled } = extractCodeFromCardJson(row.card_json)
+  const cardJson = stripCardJsonCode(parsed)
+  if (!includePrivateDraft) delete cardJson._draft
   return {
-    ...row,
-    card_json: stripCardJsonCode(parsed),
+    id: row.id,
+    author_id: row.author_id,
+    author_name: row.author_name,
+    card_id: row.card_id,
+    card_type: row.card_type,
+    name: row.name,
+    description: row.description,
+    card_json: cardJson,
     effect_code: code,
     compiled_code: compiled,
+    code_manifest: row.code_manifest ? JSON.parse(row.code_manifest) : null,
+    art_url: row.art_url,
+    status: row.status,
+    featured: row.featured ?? 0,
+    like_count: row.like_count ?? 0,
+    created_at: row.created_at,
+    updated_at: row.updated_at,
+    github_pr_url: row.github_pr_url ?? null,
+    github_pr_status: row.github_pr_status ?? null,
+    github_pr_last_synced_at: row.github_pr_last_synced_at ?? null,
     ...extras,
+  }
+}
+
+const serialisePublishedCardForApi = (
+  card: ReturnType<typeof loadPublishedCard>,
+): Record<string, unknown> => ({
+  id: card.id,
+  author_id: card.authorId,
+  author_name: card.authorName,
+  card_id: card.cardId,
+  card_type: card.cardType,
+  name: card.name,
+  description: card.description,
+  card_json: card.cardJson,
+  effect_code: card.effectCode,
+  art_url: card.artUrl,
+  status: card.status,
+  featured: card.featured,
+  like_count: card.likeCount,
+  liked_by_me: card.likedByMe,
+  created_at: card.createdAt,
+  updated_at: card.updatedAt,
+  published_version_id: card.publishedVersionId,
+  github_pr_url: card.githubPrUrl,
+  github_pr_status: card.githubPrStatus,
+  github_pr_last_synced_at: card.githubPrLastSyncedAt,
+})
+
+type WorkshopDraftRequest = {
+  cardId?: unknown
+  cardType?: unknown
+  name?: unknown
+  description?: unknown
+  cardJson?: unknown
+  effectCode?: unknown
+  artUrl?: unknown
+  generation?: unknown
+}
+
+const prepareWorkshopDraft = async (
+  raw: WorkshopDraftRequest | null | undefined,
+): Promise<
+  | { ok: true; draft: WorkshopDraft }
+  | { ok: false; status: number; error: string; errors?: string[] }
+> => {
+  if (
+    !raw
+    || typeof raw.cardId !== 'string'
+    || typeof raw.cardType !== 'string'
+    || typeof raw.name !== 'string'
+    || typeof raw.cardJson !== 'object'
+    || raw.cardJson === null
+    || Array.isArray(raw.cardJson)
+  ) {
+    return { ok: false, status: 400, error: 'Invalid draft payload' }
+  }
+  const effectCode = typeof raw.effectCode === 'string' && raw.effectCode.trim()
+    ? raw.effectCode
+    : null
+  let compiledCode: string | null = null
+  let codeManifest: Record<string, unknown> | null = null
+  if (effectCode) {
+    let validation: CustomCodeValidateResult
+    try {
+      validation = await validateAndCompileCustomCodeRemote(effectCode, raw.cardId)
+    } catch (error) {
+      return {
+        ok: false,
+        status: 502,
+        error: `Executor unavailable: ${error instanceof Error ? error.message : String(error)}`,
+      }
+    }
+    if (!validation.valid) {
+      return {
+        ok: false,
+        status: 400,
+        error: 'Code validation failed',
+        errors: validation.errors,
+      }
+    }
+    compiledCode = validation.compiledCode
+    codeManifest = validation.manifest as unknown as Record<string, unknown>
+  }
+  return {
+    ok: true,
+    draft: {
+      cardId: raw.cardId,
+      cardType: raw.cardType as WorkshopDraft['cardType'],
+      name: raw.name,
+      description: typeof raw.description === 'string' ? raw.description : '',
+      cardJson: raw.cardJson as Record<string, unknown>,
+      effectCode,
+      compiledCode,
+      codeManifest,
+      artUrl: typeof raw.artUrl === 'string' && raw.artUrl ? raw.artUrl : null,
+      generation: raw.generation && typeof raw.generation === 'object' && !Array.isArray(raw.generation)
+        ? raw.generation as Record<string, unknown>
+        : {},
+    },
   }
 }
 
@@ -285,73 +416,289 @@ export async function handleWorkshopRoute(
     const mineOnly = q.get('scope') === 'mine'
     const featured = q.get('featured') === '1'
 
-    let whereExtra = ''
-    const params: unknown[] = []
-
     if (mineOnly) {
       if (!user) {
         sendJson(res, 401, { ok: false, error: 'Not authenticated' })
         return true
       }
-      whereExtra += ' AND w.author_id = ?'
-      params.push(user.id)
+      let where = 'w.author_id = ?'
+      const params: unknown[] = [user.id]
       if (statusFilter === 'draft' || statusFilter === 'published') {
-        whereExtra += ' AND w.status = ?'
+        where += ' AND w.status = ?'
         params.push(statusFilter)
       }
-    } else {
-      // Only admins/authors can see non-published cards; enforce published for public
-      const effectiveStatus = user ? (statusFilter === 'draft' ? 'draft' : 'published') : 'published'
-      whereExtra += ' AND w.status = ?'
-      params.push(effectiveStatus)
-      if (effectiveStatus === 'draft' && user) {
-        whereExtra += ' AND w.author_id = ?'
-        params.push(user.id)
+      if (featured) where += ' AND w.featured = 1'
+      if (search) {
+        where += ' AND (w.name LIKE ? OR w.description LIKE ?)'
+        params.push(`%${search}%`, `%${search}%`)
       }
+      const orderBy = sort === 'popular'
+        ? 'w.featured DESC, like_count DESC, w.updated_at DESC'
+        : 'w.updated_at DESC'
+      const rows = db.prepare(`
+        SELECT w.*, u.display_name AS author_name,
+               COUNT(DISTINCT l.user_id) AS like_count
+        FROM workshop_cards w
+        LEFT JOIN users u ON w.author_id = u.id
+        LEFT JOIN card_likes l ON l.card_id = w.id
+        WHERE ${where}
+        GROUP BY w.id
+        ORDER BY ${orderBy}
+        LIMIT ? OFFSET ?
+      `).all(...params, limit, offset) as WorkshopCard[]
+      const ids = rows.map(r => r.id)
+      const likedIds = ids.length > 0
+        ? new Set((db.prepare(
+            `SELECT card_id FROM card_likes WHERE user_id = ? AND card_id IN (${ids.map(() => '?').join(',')})`,
+          ).all(user.id, ...ids) as { card_id: string }[]).map(row => row.card_id))
+        : new Set<string>()
+      const cards = rows.map(row => serialiseCardForApi(
+        row,
+        { liked_by_me: likedIds.has(row.id) },
+        true,
+      ))
+      const total = (db.prepare(`SELECT COUNT(*) AS n FROM workshop_cards w WHERE ${where}`)
+        .get(...params) as { n: number }).n
+      sendJson(res, 200, { ok: true, cards, page, total, hasMore: offset + rows.length < total })
+      return true
     }
 
-    if (featured) {
-      whereExtra += ' AND w.featured = 1'
-    }
-
+    let where = "w.status = 'published' AND w.published_version_id IS NOT NULL"
+    const params: unknown[] = []
+    if (featured) where += ' AND w.featured = 1'
     if (search) {
-      whereExtra += ' AND (w.name LIKE ? OR w.description LIKE ?)'
-      params.push(`%${search}%`, `%${search}%`)
+      where += ' AND version.card_json LIKE ?'
+      params.push(`%${search}%`)
     }
-
     const orderBy = sort === 'popular'
-      ? 'w.featured DESC, like_count DESC, w.updated_at DESC'
-      : 'w.updated_at DESC'
-
+      ? 'w.featured DESC, like_count DESC, version.created_at DESC'
+      : 'version.created_at DESC'
     const rows = db.prepare(`
-      SELECT w.*,
-             u.display_name AS author_name,
-             COUNT(DISTINCT l.user_id) AS like_count
+      SELECT w.id, COUNT(DISTINCT likes.user_id) AS like_count
       FROM workshop_cards w
-      LEFT JOIN users u ON w.author_id = u.id
-      LEFT JOIN card_likes l ON l.card_id = w.id
-      WHERE 1 = 1${whereExtra}
+      JOIN workshop_card_versions version ON version.id = w.published_version_id
+      LEFT JOIN card_likes likes ON likes.card_id = w.id
+      WHERE ${where}
       GROUP BY w.id
       ORDER BY ${orderBy}
       LIMIT ? OFFSET ?
-    `).all(...params, limit, offset) as WorkshopCard[]
-
-    // Mark liked by current user
-    let likedIds = new Set<string>()
-    if (user && rows.length > 0) {
-      const ids = rows.map(r => r.id)
-      const liked = db.prepare(
-        `SELECT card_id FROM card_likes WHERE user_id = ? AND card_id IN (${ids.map(() => '?').join(',')})`,
-      ).all(user.id, ...ids) as { card_id: string }[]
-      likedIds = new Set(liked.map(r => r.card_id))
-    }
-
-    const cards = rows.map(r => serialiseCardForApi(r, { liked_by_me: likedIds.has(r.id) }))
-
-    const total = (db.prepare(`SELECT COUNT(*) AS n FROM workshop_cards w WHERE 1 = 1${whereExtra}`)
-      .get(...params) as { n: number }).n
-
+    `).all(...params, limit, offset) as { id: string }[]
+    const cards = rows.map(row => serialisePublishedCardForApi(
+      loadPublishedCard(db, row.id, user?.id),
+    ))
+    const total = (db.prepare(`
+      SELECT COUNT(*) AS n
+      FROM workshop_cards w
+      JOIN workshop_card_versions version ON version.id = w.published_version_id
+      WHERE ${where}
+    `).get(...params) as { n: number }).n
     sendJson(res, 200, { ok: true, cards, page, total, hasMore: offset + rows.length < total })
+    return true
+  }
+
+  const workspaceMatch = /^\/api\/workshop\/cards\/([^/]+)\/workspace$/.exec(url)
+  if (req.method === 'GET' && workspaceMatch) {
+    if (!user) { sendJson(res, 401, { ok: false, error: 'Not authenticated' }); return true }
+    try {
+      const workspace = loadWorkspace(db, workspaceMatch[1]!, user.id)
+      sendJson(res, 200, {
+        ok: true,
+        workspace,
+        readiness: getHandoffReadiness(db, workspace.id, user.id),
+      })
+    } catch (error) {
+      if (!sendWorkshopDraftError(res, error)) throw error
+    }
+    return true
+  }
+
+  const draftMatch = /^\/api\/workshop\/cards\/([^/]+)\/draft$/.exec(url)
+  if (req.method === 'PUT' && draftMatch) {
+    if (!user) { sendJson(res, 401, { ok: false, error: 'Not authenticated' }); return true }
+    const body = await parseBody<{ baseRevision?: unknown; draft?: WorkshopDraftRequest }>(req)
+    const prepared = await prepareWorkshopDraft(body?.draft)
+    if (!prepared.ok) {
+      sendJson(res, prepared.status, {
+        ok: false,
+        error: prepared.error,
+        ...(prepared.errors ? { errors: prepared.errors } : {}),
+      })
+      return true
+    }
+    if (!Number.isInteger(body?.baseRevision)) {
+      sendJson(res, 400, { ok: false, error: 'Missing baseRevision' })
+      return true
+    }
+    try {
+      const workspace = checkpointDraft(db, {
+        cardId: draftMatch[1]!,
+        authorId: user.id,
+        baseRevision: body!.baseRevision as number,
+        draft: prepared.draft,
+      })
+      sendJson(res, 200, { ok: true, workspace })
+    } catch (error) {
+      if (!sendWorkshopDraftError(res, error)) throw error
+    }
+    return true
+  }
+
+  const adoptMatch = /^\/api\/workshop\/cards\/([^/]+)\/adopt$/.exec(url)
+  if (req.method === 'POST' && adoptMatch) {
+    if (!user) { sendJson(res, 401, { ok: false, error: 'Not authenticated' }); return true }
+    const body = await parseBody<{
+      baseRevision?: unknown
+      candidate?: Record<string, unknown>
+    }>(req)
+    if (!Number.isInteger(body?.baseRevision) || !body?.candidate) {
+      sendJson(res, 400, { ok: false, error: 'Missing baseRevision or candidate' })
+      return true
+    }
+    const raw = body.candidate
+    let candidate: WorkshopArtCandidate | WorkshopAbilityCandidate
+    if (raw.kind === 'art') {
+      if (
+        typeof raw.id !== 'string'
+        || typeof raw.prompt !== 'string'
+        || typeof raw.resultUrl !== 'string'
+      ) {
+        sendJson(res, 400, { ok: false, error: 'Invalid art candidate' })
+        return true
+      }
+      candidate = {
+        id: raw.id,
+        kind: 'art',
+        prompt: raw.prompt,
+        resultUrl: raw.resultUrl,
+        ...(typeof raw.provider === 'string' ? { provider: raw.provider } : {}),
+        ...(typeof raw.model === 'string' ? { model: raw.model } : {}),
+        ...(Array.isArray(raw.referenceImages)
+          ? { referenceImages: raw.referenceImages.filter((value): value is string => typeof value === 'string') }
+          : {}),
+        createdAt: typeof raw.createdAt === 'number' ? raw.createdAt : Date.now(),
+      }
+    } else if (raw.kind === 'ability') {
+      if (
+        typeof raw.id !== 'string'
+        || typeof raw.prompt !== 'string'
+        || typeof raw.sourceCode !== 'string'
+      ) {
+        sendJson(res, 400, { ok: false, error: 'Invalid ability candidate' })
+        return true
+      }
+      let validation: CustomCodeValidateResult
+      try {
+        const workspace = loadWorkspace(db, adoptMatch[1]!, user.id)
+        validation = await validateAndCompileCustomCodeRemote(raw.sourceCode, workspace.draft.cardId)
+      } catch (error) {
+        if (sendWorkshopDraftError(res, error)) return true
+        sendJson(res, 502, {
+          ok: false,
+          error: `Executor unavailable: ${error instanceof Error ? error.message : String(error)}`,
+        })
+        return true
+      }
+      if (!validation.valid) {
+        sendJson(res, 400, { ok: false, error: 'Code validation failed', errors: validation.errors })
+        return true
+      }
+      candidate = {
+        id: raw.id,
+        kind: 'ability',
+        prompt: raw.prompt,
+        sourceCode: raw.sourceCode,
+        compiledCode: validation.compiledCode,
+        codeManifest: validation.manifest as unknown as Record<string, unknown>,
+        validation: { valid: true },
+        ...(typeof raw.provider === 'string' ? { provider: raw.provider } : {}),
+        ...(typeof raw.model === 'string' ? { model: raw.model } : {}),
+        createdAt: typeof raw.createdAt === 'number' ? raw.createdAt : Date.now(),
+      }
+    } else {
+      sendJson(res, 400, { ok: false, error: 'Invalid candidate kind' })
+      return true
+    }
+    try {
+      const result = adoptCandidate(db, {
+        cardId: adoptMatch[1]!,
+        authorId: user.id,
+        baseRevision: body.baseRevision as number,
+        candidate,
+      })
+      sendJson(res, 200, { ok: true, ...result })
+    } catch (error) {
+      if (!sendWorkshopDraftError(res, error)) throw error
+    }
+    return true
+  }
+
+  const restoreMatch = /^\/api\/workshop\/cards\/([^/]+)\/restore$/.exec(url)
+  if (req.method === 'POST' && restoreMatch) {
+    if (!user) { sendJson(res, 401, { ok: false, error: 'Not authenticated' }); return true }
+    const body = await parseBody<{ baseRevision?: unknown; versionId?: unknown }>(req)
+    if (!Number.isInteger(body?.baseRevision) || typeof body?.versionId !== 'string') {
+      sendJson(res, 400, { ok: false, error: 'Missing baseRevision or versionId' })
+      return true
+    }
+    try {
+      const workspace = restoreVersion(db, {
+        cardId: restoreMatch[1]!,
+        authorId: user.id,
+        baseRevision: body.baseRevision as number,
+        versionId: body.versionId,
+      })
+      sendJson(res, 200, { ok: true, workspace })
+    } catch (error) {
+      if (!sendWorkshopDraftError(res, error)) throw error
+    }
+    return true
+  }
+
+  const publishMatch = /^\/api\/workshop\/cards\/([^/]+)\/publish$/.exec(url)
+  if (req.method === 'POST' && publishMatch) {
+    if (!user) { sendJson(res, 401, { ok: false, error: 'Not authenticated' }); return true }
+    const body = await parseBody<{ baseRevision?: unknown }>(req)
+    if (!Number.isInteger(body?.baseRevision)) {
+      sendJson(res, 400, { ok: false, error: 'Missing baseRevision' })
+      return true
+    }
+    try {
+      const result = publish(db, {
+        cardId: publishMatch[1]!,
+        authorId: user.id,
+        baseRevision: body!.baseRevision as number,
+      })
+      sendJson(res, 200, { ok: true, ...result })
+    } catch (error) {
+      if (!sendWorkshopDraftError(res, error)) throw error
+    }
+    return true
+  }
+
+  const sandboxPassMatch = /^\/api\/workshop\/cards\/([^/]+)\/sandbox-pass$/.exec(url)
+  if (req.method === 'POST' && sandboxPassMatch) {
+    if (!user) { sendJson(res, 401, { ok: false, error: 'Not authenticated' }); return true }
+    const body = await parseBody<{
+      versionId?: unknown
+      authorConfirmed?: unknown
+      runtimeErrors?: unknown
+    }>(req)
+    if (typeof body?.versionId !== 'string' || body.authorConfirmed !== true || !Array.isArray(body.runtimeErrors)) {
+      sendJson(res, 400, { ok: false, error: 'Invalid sandbox pass' })
+      return true
+    }
+    try {
+      const workspace = markSandboxPass(db, {
+        cardId: sandboxPassMatch[1]!,
+        authorId: user.id,
+        versionId: body.versionId,
+        authorConfirmed: body.authorConfirmed,
+        runtimeErrors: body.runtimeErrors.filter((value): value is string => typeof value === 'string'),
+      })
+      sendJson(res, 200, { ok: true, workspace })
+    } catch (error) {
+      if (!sendWorkshopDraftError(res, error)) throw error
+    }
     return true
   }
 
@@ -359,29 +706,14 @@ export async function handleWorkshopRoute(
   const cardDetailMatch = /^\/api\/workshop\/cards\/([^/]+)$/.exec(url)
   if (req.method === 'GET' && cardDetailMatch) {
     const cardDbId = cardDetailMatch[1]!
-    const row = db.prepare(`
-      SELECT w.*, u.display_name AS author_name,
-             COUNT(DISTINCT l.user_id) AS like_count
-      FROM workshop_cards w
-      LEFT JOIN users u ON w.author_id = u.id
-      LEFT JOIN card_likes l ON l.card_id = w.id
-      WHERE w.id = ?
-      GROUP BY w.id
-    `).get(cardDbId) as WorkshopCard | undefined
-
-    if (!row) { sendJson(res, 404, { ok: false, error: 'Card not found' }); return true }
-    if (row.status === 'draft' && row.author_id !== user?.id) {
-      sendJson(res, 404, { ok: false, error: 'Card not found' }); return true
+    try {
+      sendJson(res, 200, {
+        ok: true,
+        card: serialisePublishedCardForApi(loadPublishedCard(db, cardDbId, user?.id)),
+      })
+    } catch (error) {
+      if (!sendWorkshopDraftError(res, error)) throw error
     }
-
-    const likedByMe = user
-      ? !!(db.prepare('SELECT 1 FROM card_likes WHERE user_id = ? AND card_id = ?').get(user.id, row.id))
-      : false
-
-    sendJson(res, 200, {
-      ok: true,
-      card: serialiseCardForApi(row, { liked_by_me: likedByMe }),
-    })
     return true
   }
 
@@ -735,11 +1067,7 @@ export async function handleWorkshopRoute(
 
     sendJson(res, 200, {
       ok: true,
-      cards: rows.map(r => ({
-        ...r,
-        card_json: typeof r.card_json === 'string' ? JSON.parse(r.card_json as string) : r.card_json,
-        code_manifest: r.code_manifest && typeof r.code_manifest === 'string' ? JSON.parse(r.code_manifest as string) : r.code_manifest,
-      })),
+      cards: rows.map(row => serialiseCardForApi(row as unknown as WorkshopCard)),
       page,
       total,
     })
@@ -758,11 +1086,7 @@ export async function handleWorkshopRoute(
     `).get(cardDbId) as Record<string, unknown> | undefined
     if (!row) { sendJson(res, 404, { ok: false, error: 'Card not found' }); return true }
 
-    const card = {
-      ...row,
-      card_json: typeof row.card_json === 'string' ? JSON.parse(row.card_json as string) : row.card_json,
-      code_manifest: row.code_manifest && typeof row.code_manifest === 'string' ? JSON.parse(row.code_manifest as string) : row.code_manifest,
-    }
+    const card = serialiseCardForApi(row as unknown as WorkshopCard)
     sendJson(res, 200, { ok: true, card })
     return true
   }

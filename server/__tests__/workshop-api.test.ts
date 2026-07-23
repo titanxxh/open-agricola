@@ -28,6 +28,9 @@ db.exec(`
     effect_dsl TEXT, effect_code TEXT, compiled_code TEXT, code_manifest TEXT,
     art_url TEXT, art_prompt TEXT, status TEXT NOT NULL DEFAULT 'draft',
     featured INTEGER NOT NULL DEFAULT 0,
+    github_pr_url TEXT,
+    github_pr_status TEXT,
+    github_pr_last_synced_at INTEGER,
     draft_revision INTEGER NOT NULL DEFAULT 1,
     draft_generation_json TEXT NOT NULL DEFAULT '{}',
     published_version_id TEXT,
@@ -296,6 +299,235 @@ describe('workshop API', () => {
       expect(data.cards).toBeUndefined()
       expect(data.versions).toHaveLength(1)
       expect(data.versions[0].version_number).toBe(1)
+    })
+  })
+
+  describe('revisioned workspace commands', () => {
+    it('loads private generation context only for the author', async () => {
+      const createRes = mockRes()
+      await handleWorkshopRoute(mockReq('POST', '/api/workshop/cards', {
+        card_id: 'CUSTOM_PrivateWorkspace',
+        card_type: 'minor',
+        name: 'Private Workspace',
+        card_json: {
+          id: 'CUSTOM_PrivateWorkspace',
+          name: 'Private Workspace',
+          card_type: 'minor',
+          deck: 'CUSTOM',
+          number: 0,
+          desc: [],
+        },
+      }, 'tok-alice'), createRes)
+      const cardDbId = JSON.parse(createRes.body).id
+
+      const checkpointRes = mockRes()
+      await handleWorkshopRoute(mockReq('PUT', `/api/workshop/cards/${cardDbId}/draft`, {
+        baseRevision: 1,
+        draft: {
+          cardId: 'CUSTOM_PrivateWorkspace',
+          cardType: 'minor',
+          name: 'Private Workspace',
+          description: '',
+          cardJson: {
+            id: 'CUSTOM_PrivateWorkspace',
+            name: 'Private Workspace',
+            card_type: 'minor',
+            deck: 'CUSTOM',
+            number: 0,
+            desc: [],
+          },
+          effectCode: null,
+          artUrl: null,
+          generation: {
+            art: {
+              lastCompleted: {
+                id: 'private-art',
+                kind: 'art',
+                prompt: 'private prompt',
+                resultUrl: '/card-art/private.png',
+                model: 'private-model',
+                createdAt: 100,
+              },
+            },
+          },
+        },
+      }, 'tok-alice'), checkpointRes)
+      expect(JSON.parse(checkpointRes.body).workspace.revision).toBe(2)
+
+      const workspaceRes = mockRes()
+      await handleWorkshopRoute(
+        mockReq('GET', `/api/workshop/cards/${cardDbId}/workspace`, null, 'tok-alice'),
+        workspaceRes,
+      )
+      expect(JSON.parse(workspaceRes.body).workspace.draft.generation.art.lastCompleted.prompt)
+        .toBe('private prompt')
+
+      const otherRes = mockRes()
+      await handleWorkshopRoute(
+        mockReq('GET', `/api/workshop/cards/${cardDbId}/workspace`, null, 'tok-bob'),
+        otherRes,
+      )
+      expect(otherRes.statusCode).toBe(403)
+
+      const publicRes = mockRes()
+      await handleWorkshopRoute(mockReq('GET', `/api/workshop/cards/${cardDbId}`), publicRes)
+      expect(publicRes.statusCode).toBe(404)
+      expect(publicRes.body).not.toContain('private prompt')
+    })
+
+    it('returns the complete server draft on revision conflict', async () => {
+      const createRes = mockRes()
+      await handleWorkshopRoute(mockReq('POST', '/api/workshop/cards', {
+        card_id: 'CUSTOM_ConflictWorkspace',
+        card_type: 'occupation',
+        name: 'Conflict Workspace',
+        card_json: {
+          id: 'CUSTOM_ConflictWorkspace',
+          name: 'Conflict Workspace',
+          card_type: 'occupation',
+          deck: 'CUSTOM',
+          number: 0,
+          desc: [],
+        },
+      }, 'tok-alice'), createRes)
+      const cardDbId = JSON.parse(createRes.body).id
+      const draft = {
+        cardId: 'CUSTOM_ConflictWorkspace',
+        cardType: 'occupation',
+        name: 'Server wins',
+        description: '',
+        cardJson: {
+          id: 'CUSTOM_ConflictWorkspace',
+          name: 'Server wins',
+          card_type: 'occupation',
+          deck: 'CUSTOM',
+          number: 0,
+          desc: [],
+        },
+        effectCode: null,
+        artUrl: null,
+        generation: {},
+      }
+      await handleWorkshopRoute(mockReq('PUT', `/api/workshop/cards/${cardDbId}/draft`, {
+        baseRevision: 1,
+        draft,
+      }, 'tok-alice'), mockRes())
+
+      const conflictRes = mockRes()
+      await handleWorkshopRoute(mockReq('PUT', `/api/workshop/cards/${cardDbId}/draft`, {
+        baseRevision: 1,
+        draft: { ...draft, name: 'Stale client' },
+      }, 'tok-alice'), conflictRes)
+      const conflict = JSON.parse(conflictRes.body)
+      expect(conflictRes.statusCode).toBe(409)
+      expect(conflict.current.revision).toBe(2)
+      expect(conflict.current.draft.name).toBe('Server wins')
+    })
+
+    it('publishes an immutable privacy-safe projection', async () => {
+      const createRes = mockRes()
+      await handleWorkshopRoute(mockReq('POST', '/api/workshop/cards', {
+        card_id: 'CUSTOM_PinnedPublic',
+        card_type: 'minor',
+        name: 'Pinned Public',
+        card_json: {
+          id: 'CUSTOM_PinnedPublic',
+          name: 'Pinned Public',
+          card_type: 'minor',
+          deck: 'CUSTOM',
+          number: 0,
+          desc: ['published text'],
+          _draft: { costInput: '1w' },
+        },
+      }, 'tok-alice'), createRes)
+      const cardDbId = JSON.parse(createRes.body).id
+
+      const adoptRes = mockRes()
+      await handleWorkshopRoute(mockReq('POST', `/api/workshop/cards/${cardDbId}/adopt`, {
+        baseRevision: 1,
+        candidate: {
+          id: 'art-public',
+          kind: 'art',
+          prompt: 'secret prompt',
+          resultUrl: '/card-art/published.png',
+          model: 'secret-model',
+          createdAt: 100,
+        },
+      }, 'tok-alice'), adoptRes)
+      expect(JSON.parse(adoptRes.body).workspace.revision).toBe(2)
+
+      const publishRes = mockRes()
+      await handleWorkshopRoute(mockReq('POST', `/api/workshop/cards/${cardDbId}/publish`, {
+        baseRevision: 2,
+      }, 'tok-alice'), publishRes)
+      const versionId = JSON.parse(publishRes.body).versionId
+      expect(versionId).toBeTruthy()
+
+      const publicBeforeRes = mockRes()
+      await handleWorkshopRoute(mockReq('GET', `/api/workshop/cards/${cardDbId}`), publicBeforeRes)
+      const publicBefore = JSON.parse(publicBeforeRes.body)
+      expect(publicBefore.card.art_url).toBe('/card-art/published.png')
+      expect(publicBefore.card.card_json._draft).toBeUndefined()
+      expect(publicBeforeRes.body).not.toContain('secret prompt')
+      expect(publicBeforeRes.body).not.toContain('secret-model')
+
+      const workspaceRes = mockRes()
+      await handleWorkshopRoute(
+        mockReq('GET', `/api/workshop/cards/${cardDbId}/workspace`, null, 'tok-alice'),
+        workspaceRes,
+      )
+      const workspace = JSON.parse(workspaceRes.body).workspace
+      const changedDraft = {
+        ...workspace.draft,
+        name: 'Unpublished change',
+        artUrl: '/card-art/unpublished.png',
+        cardJson: {
+          ...workspace.draft.cardJson,
+          name: 'Unpublished change',
+          desc: ['unpublished text'],
+        },
+      }
+      await handleWorkshopRoute(mockReq('PUT', `/api/workshop/cards/${cardDbId}/draft`, {
+        baseRevision: workspace.revision,
+        draft: changedDraft,
+      }, 'tok-alice'), mockRes())
+
+      const publicAfterRes = mockRes()
+      await handleWorkshopRoute(mockReq('GET', `/api/workshop/cards/${cardDbId}`), publicAfterRes)
+      const publicAfter = JSON.parse(publicAfterRes.body)
+      expect(publicAfter.card.name).toBe('Pinned Public')
+      expect(publicAfter.card.art_url).toBe('/card-art/published.png')
+      expect(publicAfterRes.body).not.toContain('Unpublished change')
+
+      const publicListRes = mockRes()
+      await handleWorkshopRoute(mockReq('GET', '/api/workshop/cards'), publicListRes)
+      expect(publicListRes.body).not.toContain('secret prompt')
+      expect(publicListRes.body).not.toContain('Unpublished change')
+
+      const restoreRes = mockRes()
+      await handleWorkshopRoute(mockReq('POST', `/api/workshop/cards/${cardDbId}/restore`, {
+        baseRevision: 3,
+        versionId,
+      }, 'tok-alice'), restoreRes)
+      expect(JSON.parse(restoreRes.body).workspace.revision).toBe(4)
+      expect(db.prepare(`
+        SELECT COUNT(*) AS count FROM workshop_card_versions WHERE card_id = ?
+      `).get(cardDbId)).toEqual({ count: 1 })
+
+      const sandboxPassRes = mockRes()
+      await handleWorkshopRoute(mockReq('POST', `/api/workshop/cards/${cardDbId}/sandbox-pass`, {
+        versionId,
+        authorConfirmed: true,
+        runtimeErrors: [],
+      }, 'tok-alice'), sandboxPassRes)
+      expect(JSON.parse(sandboxPassRes.body).workspace.sandboxPassVersionId).toBe(versionId)
+
+      const readyRes = mockRes()
+      await handleWorkshopRoute(
+        mockReq('GET', `/api/workshop/cards/${cardDbId}/workspace`, null, 'tok-alice'),
+        readyRes,
+      )
+      expect(JSON.parse(readyRes.body).readiness.ready).toBe(true)
     })
   })
 
