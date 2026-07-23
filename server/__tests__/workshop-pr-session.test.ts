@@ -410,6 +410,23 @@ describe('workshop PR propose — session', () => {
     ).run(userToken, userId, now + 3_600_000, now)
 
     cardDbId = nanoid()
+    const sourceCode = `const CARD_DEF = { cardType: 'minor', meta: { id: 'CUSTOM_TestCard', deck: 'CUSTOM', number: 0, name: 'Test Card', desc: [], cost: {}, vp: 0 } }\nconst CARD_IMPL = {}`
+    const codeManifest = JSON.stringify({
+      effectHooks: [],
+      listeners: [],
+      cardDefinition: {
+        cardType: 'minor',
+        meta: {
+          id: 'CUSTOM_TestCard',
+          deck: 'CUSTOM',
+          number: 0,
+          name: 'Test Card',
+          desc: [],
+          cost: {},
+          vp: 0,
+        },
+      },
+    })
     const cardJson = JSON.stringify({
       id: 'CUSTOM_TestCard',
       name: 'Test Card',
@@ -417,13 +434,16 @@ describe('workshop PR propose — session', () => {
       deck: 'CUSTOM',
       number: 0,
       desc: [],
+      cost: {},
+      vp: 0,
+      implemented: true,
       locales: {
         zh: {
           name: '测试卡',
           desc: ['测试说明'],
         },
       },
-      _code: `const CARD_DEF = new MinorImprovement({ id: 'CUSTOM_TestCard', deck: 'community', number: 0, name: 'Test Card', desc: [], cost: {}, vp: 0 })\nconst CARD_IMPL = {}`,
+      _code: sourceCode,
       _compiled: '"use strict";',
     })
     db.prepare(
@@ -439,7 +459,7 @@ describe('workshop PR propose — session', () => {
       'Test Card',
       'A test card',
       cardJson,
-      '{}',
+      codeManifest,
       null,
       'published',
       now,
@@ -450,8 +470,8 @@ describe('workshop PR propose — session', () => {
       INSERT INTO workshop_card_versions (
         id, card_id, card_json, code_manifest, art_url, version_number,
         created_by, created_at, content_hash, provenance_json
-      ) VALUES (?, ?, ?, '{}', NULL, 1, ?, ?, NULL, '{}')
-    `).run(versionId, cardDbId, cardJson, userId, now)
+      ) VALUES (?, ?, ?, ?, NULL, 1, ?, ?, NULL, '{}')
+    `).run(versionId, cardDbId, cardJson, codeManifest, userId, now)
     db.prepare(`
       UPDATE workshop_cards
       SET published_version_id = ?, sandbox_pass_version_id = ?, sandbox_passed_at = ?

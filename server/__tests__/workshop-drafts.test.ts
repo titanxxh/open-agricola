@@ -116,6 +116,37 @@ describe('workshop draft aggregate', () => {
     )
   })
 
+  it('normalizes row and card definition names together', () => {
+    const created = createCard(db, {
+      authorId: 'author',
+      draft: baseDraft({
+        name: '  Field Keeper  ',
+        cardJson: {
+          ...baseDraft().cardJson,
+          name: '  Field Keeper  ',
+        },
+      }),
+    })
+    expect(created.draft.name).toBe('Field Keeper')
+    expect(created.draft.cardJson.name).toBe('Field Keeper')
+
+    const checkpointed = checkpointDraft(db, {
+      cardId: created.id,
+      authorId: 'author',
+      baseRevision: created.revision,
+      draft: {
+        ...created.draft,
+        name: '  Renamed Keeper  ',
+        cardJson: {
+          ...created.draft.cardJson,
+          name: '  Renamed Keeper  ',
+        },
+      },
+    })
+    expect(checkpointed.draft.name).toBe('Renamed Keeper')
+    expect(checkpointed.draft.cardJson.name).toBe('Renamed Keeper')
+  })
+
   it('requires a legal globally unique custom card id', () => {
     createCard(db, { authorId: 'author', draft: baseDraft() })
 
@@ -432,6 +463,38 @@ describe('workshop draft aggregate', () => {
     })).toThrowError(expect.objectContaining<Partial<WorkshopDraftError>>({
       code: 'not_ready',
       message: expect.stringContaining('type'),
+    }))
+  })
+
+  it('rejects publishing when compiled source metadata differs from the draft', () => {
+    const created = createCard(db, {
+      authorId: 'author',
+      draft: baseDraft({
+        name: 'Renamed Field Keeper',
+        cardJson: {
+          ...baseDraft().cardJson,
+          name: 'Renamed Field Keeper',
+        },
+        effectCode: 'const CARD_DEF = {}; const CARD_IMPL = {}',
+        compiledCode: '"use strict"; const CARD_DEF = {}; const CARD_IMPL = {};',
+        codeManifest: {
+          effectHooks: [],
+          listeners: [],
+          cardDefinition: {
+            cardType: 'occupation',
+            meta: baseDraft().cardJson,
+          },
+        },
+      }),
+    })
+
+    expect(() => publish(db, {
+      cardId: created.id,
+      authorId: 'author',
+      baseRevision: created.revision,
+    })).toThrowError(expect.objectContaining<Partial<WorkshopDraftError>>({
+      code: 'not_ready',
+      message: expect.stringContaining('source'),
     }))
   })
 
