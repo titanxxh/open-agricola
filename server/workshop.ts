@@ -839,7 +839,16 @@ export async function handleWorkshopRoute(
       WHERE s.user_id = ?
       ORDER BY s.added_at DESC
     `).all(user.id) as WorkshopCard[]
-    const cards = rows.map(r => serialiseCardForApi(r))
+    const cards = rows.flatMap(row => {
+      if (row.status === 'published') {
+        try {
+          return [serialisePublishedCardForApi(loadPublishedCard(db, row.id, user.id))]
+        } catch {
+          return []
+        }
+      }
+      return row.author_id === user.id ? [serialiseCardForApi(row)] : []
+    })
     sendJson(res, 200, { ok: true, cards, settings: getSandboxSettings(user.id) })
     return true
   }

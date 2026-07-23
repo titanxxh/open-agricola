@@ -417,6 +417,12 @@ describe('workshop PR propose — session', () => {
       deck: 'CUSTOM',
       number: 0,
       desc: [],
+      locales: {
+        zh: {
+          name: '测试卡',
+          desc: ['测试说明'],
+        },
+      },
       _code: `const CARD_DEF = new MinorImprovement({ id: 'CUSTOM_TestCard', deck: 'community', number: 0, name: 'Test Card', desc: [], cost: {}, vp: 0 })\nconst CARD_IMPL = {}`,
       _compiled: '"use strict";',
     })
@@ -526,6 +532,36 @@ describe('workshop PR propose — session', () => {
     `).get(cardDbId)).toEqual({
       github_pr_url: '/mock-workshop-pr/1',
       github_pr_status: 'open',
+    })
+  })
+
+  it('rejects proposals without complete Chinese localization before mock handoff', async () => {
+    ;(workshopPrConfig as unknown as { mockMode: boolean }).mockMode = true
+    const current = db.prepare(
+      'SELECT card_json FROM workshop_cards WHERE id = ?',
+    ).get(cardDbId) as { card_json: string }
+    const cardJson = JSON.parse(current.card_json) as Record<string, unknown>
+    delete cardJson.locales
+    const serialised = JSON.stringify(cardJson)
+    db.prepare('UPDATE workshop_cards SET card_json = ? WHERE id = ?')
+      .run(serialised, cardDbId)
+    db.prepare('UPDATE workshop_card_versions SET card_json = ? WHERE id = ?')
+      .run(serialised, versionId)
+
+    const req = fakeReq({
+      method: 'POST',
+      url: `/api/workshop/cards/${cardDbId}/propose`,
+      authHeader: `Bearer ${userToken}`,
+      body: JSON.stringify({}),
+    })
+    const res = fakeRes()
+
+    await handleProposeRequest(req, res, cardDbId)
+
+    expect(res.statusCode).toBe(400)
+    expect(JSON.parse(res.body)).toMatchObject({
+      ok: false,
+      code: 'localization_not_ready',
     })
   })
 

@@ -9,7 +9,7 @@ import { workshopPrConfig, workshopPrEnabled } from './config.ts'
 import { tokenCache } from './token-cache.ts'
 import { GitHubClient, GitHubApiError } from './github-client.ts'
 import { generatePrFiles } from './code-gen.ts'
-import { getHandoffReadiness } from '../workshop-drafts.ts'
+import { getHandoffReadiness, loadPublishedDraft } from '../workshop-drafts.ts'
 
 const RATE_LIMIT_MS = 10 * 60_000 // 10 minutes
 const REFRESH_COOLDOWN_MS = 60_000 // 1 minute
@@ -25,6 +25,18 @@ type WorkshopCardRow = {
   art_url: string | null
   status: string
   author_name?: string
+}
+
+const hasCompleteZhLocale = (cardJson: Record<string, unknown>): boolean => {
+  const locales = cardJson.locales
+  if (!locales || typeof locales !== 'object' || Array.isArray(locales)) return false
+  const zh = (locales as Record<string, unknown>).zh
+  if (!zh || typeof zh !== 'object' || Array.isArray(zh)) return false
+  const entry = zh as Record<string, unknown>
+  return typeof entry.name === 'string'
+    && entry.name.trim().length > 0
+    && Array.isArray(entry.desc)
+    && entry.desc.some(line => typeof line === 'string' && line.trim().length > 0)
 }
 
 function sendJson(res: ServerResponse, status: number, payload: unknown): void {
@@ -85,6 +97,14 @@ export async function handleProposeRequest(
       code: 'handoff_not_ready',
       error: 'published version must pass the exact-version sandbox gate',
       readiness,
+    })
+    return
+  }
+  if (!hasCompleteZhLocale(loadPublishedDraft(db, cardDbId).cardJson)) {
+    sendJson(res, 400, {
+      ok: false,
+      code: 'localization_not_ready',
+      error: 'complete Chinese localization is required',
     })
     return
   }
