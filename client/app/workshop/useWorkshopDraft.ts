@@ -22,10 +22,13 @@ type WorkspaceResponse = {
   error?: string
 }
 
+type HookAction = WorkshopDraftAction | { type: 'reset' }
+
 const nullableReducer = (
   state: WorkshopDraftState | null,
-  action: WorkshopDraftAction,
+  action: HookAction,
 ): WorkshopDraftState | null => {
+  if (action.type === 'reset') return null
   if (action.type === 'serverLoaded') return action.state
   return state ? workshopDraftReducer(state, action) : state
 }
@@ -87,6 +90,15 @@ export const useWorkshopDraft = ({
 
   useEffect(() => {
     let cancelled = false
+    if (!cardId) {
+      stateRef.current = null
+      rawDispatch({ type: 'reset' })
+      setLoading(false)
+      setError(null)
+      return
+    }
+    stateRef.current = null
+    rawDispatch({ type: 'reset' })
     setLoading(true)
     setError(null)
     void apiFetch(`/api/workshop/cards/${encodeURIComponent(cardId)}/workspace`)
@@ -115,12 +127,12 @@ export const useWorkshopDraft = ({
   }, [apiFetch, cardId, dispatch, storageKey])
 
   useEffect(() => {
-    if (state) persist(state)
-  }, [persist, state])
+    if (state?.workspaceId === cardId) persist(state)
+  }, [cardId, persist, state])
 
   useEffect(() => {
     const flush = () => {
-      if (stateRef.current) persist(stateRef.current)
+      if (stateRef.current?.workspaceId === cardId) persist(stateRef.current)
     }
     window.addEventListener('pagehide', flush)
     window.addEventListener('beforeunload', flush)
@@ -128,7 +140,7 @@ export const useWorkshopDraft = ({
       window.removeEventListener('pagehide', flush)
       window.removeEventListener('beforeunload', flush)
     }
-  }, [persist])
+  }, [cardId, persist])
 
   const updateDraft = useCallback((draft: WorkshopClientDraft) => {
     dispatch({ type: 'draftChanged', draft })

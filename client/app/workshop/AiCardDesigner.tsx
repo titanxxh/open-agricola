@@ -28,6 +28,11 @@ import { useLocale } from '../../contexts/LocaleContext'
 import { ResourceText } from '../../components/common/ResourceText'
 import { Section } from '../../components/common/Section'
 import { API_BASE } from '../../config'
+import { useWorkshopDraft } from './useWorkshopDraft'
+import type {
+  WorkshopClientDraft,
+  WorkshopStage,
+} from './workshop-draft-model'
 
 type ApiFetch = (path: string, init?: RequestInit) => Promise<Response>
 
@@ -1039,18 +1044,71 @@ function sampleN<T>(arr: T[], n: number): T[] {
 
 // ── Main AiCardDesigner ───────────────────────────────────────────────────────
 
-export function AiCardDesigner({ initialCard, onImport, onClose, onAddToSandboxAndRestart, sandboxErrors, onSandboxErrorsConsumed, onCardLoaded, apiFetch }: {
+type CardLocaleEntry = {
+  name: string
+  desc: string[]
+  prerequisite?: string
+}
+
+const WORKSHOP_STAGES: WorkshopStage[] = [
+  'metadata',
+  'art',
+  'ability',
+  'localization',
+  'validation',
+]
+
+const readLocales = (value: unknown): Record<string, CardLocaleEntry> =>
+  value && typeof value === 'object' && !Array.isArray(value)
+    ? value as Record<string, CardLocaleEntry>
+    : {}
+
+const draftToExtracted = (draft: WorkshopClientDraft): ExtractedCard => {
+  const cardJson = draft.cardJson
+  const cost = cardJson.cost && typeof cardJson.cost === 'object' && !Array.isArray(cardJson.cost)
+    ? cardJson.cost as Record<string, number>
+    : {}
+  return {
+    card: {
+      id: draft.cardId,
+      name: draft.name,
+      card_type: draft.cardType,
+      cost,
+      vp: typeof cardJson.vp === 'number' ? cardJson.vp : 0,
+      desc: Array.isArray(cardJson.desc)
+        ? cardJson.desc.filter((value): value is string => typeof value === 'string')
+        : [],
+      prerequisite: typeof cardJson.prerequisite === 'string'
+        ? cardJson.prerequisite
+        : undefined,
+      modifiers: Array.isArray(cardJson.modifiers) ? cardJson.modifiers : [],
+      locales: readLocales(cardJson.locales),
+    },
+    sourceCode: draft.effectCode ?? undefined,
+  }
+}
+
+type AiCardDesignerProps = {
   initialCard?: ApiCard
   onImport: (card: ExtractedCard, artUrl: string | null) => void
   onClose: () => void
   onAddToSandboxAndRestart?: (cardDbId: string) => Promise<void>
   sandboxErrors?: string[] | null
   onSandboxErrorsConsumed?: () => void
-  /** Called whenever the user opens an existing card in the editor. Lets
-   *  the parent reflect the active card id in the URL. */
   onCardLoaded?: (cardDbId: string) => void
   apiFetch?: ApiFetch
-}) {
+}
+
+export function AiCardDesigner({
+  initialCard,
+  onImport,
+  onClose,
+  onAddToSandboxAndRestart,
+  sandboxErrors,
+  onSandboxErrorsConsumed,
+  onCardLoaded,
+  apiFetch,
+}: AiCardDesignerProps) {
   const { locale, t } = useLocale()
   const workshopApiFetch = apiFetch ?? cookieApiFetch
   const [cardType, setCardType] = useState<'minor' | 'occupation'>('minor')
@@ -1066,270 +1124,481 @@ export function AiCardDesigner({ initialCard, onImport, onClose, onAddToSandboxA
   const [saveSuccess, setSaveSuccess] = useState(false)
   const [refCache, setRefCache] = useState<Map<string, ReferenceImage>>(new Map())
   const [myCards, setMyCards] = useState<ApiCard[]>([])
-  const [autoSaving, setAutoSaving] = useState(false)
-  const [autoSaveFlash, setAutoSaveFlash] = useState(false)
   const [currentCardDbId, setCurrentCardDbId] = useState<string | null>(null)
-  const autoSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const [showLocalizationModal, setShowLocalizationModal] = useState(false)
-  const [cardLocales, setCardLocales] = useState<Record<string, { name: string; desc: string[]; prerequisite?: string }>>({})
-
-  // Lifted ConfigBar state: AbilityPanel uses default storage key, ArtPanel uses
-  // KEY_LLM_CONFIG_ART. We hold both at the top so the configs are configured
-  // once in a single collapsible section. Bump configVersion to make the panels
-  // re-read from localStorage after the user saves/clears.
+  const [cardLocales, setCardLocales] = useState<Record<string, CardLocaleEntry>>({})
+  const [pendingStage, setPendingStage] = useState<WorkshopStage | null>(null)
+  const hydratedWorkspaceRef = useRef('')
   const [abilityConfig, setAbilityConfig] = useState<LlmConfig | null>(() => getLlmConfig())
   const [artConfig, setArtConfig] = useState<LlmConfig | null>(() => getLlmConfig(KEY_LLM_CONFIG_ART))
   const [configVersion, setConfigVersion] = useState(0)
-  const bumpConfig = () => setConfigVersion((v) => v + 1)
+  const {
+    state: controllerState,
+    loading: controllerLoading,
+    error: controllerError,
+    updateDraft,
+    checkpoint,
+    retryCheckpoint,
+    changeStage,
+    resolveConflict,
+  } = useWorkshopDraft({
+    cardId: currentCardDbId ?? '',
+    apiFetch: workshopApiFetch,
+  })
+  const workspaceState = controllerState?.workspaceId === currentCardDbId
+    ? controllerState
+    : null
 
-  // Pre-fetch 3 random minor + 3 random occupation reference images on mount
   useEffect(() => {
     let cancelled = false
     const prefetchUrls = [
       ...sampleN(MINOR_REF_IMAGES, 3),
       ...sampleN(OCC_REF_IMAGES, 3),
     ]
-    void (async () => {
-      const entries = await Promise.all(
-        prefetchUrls.map(async url => ({ url, img: await fetchRefImage(url) }))
-      )
+    void Promise.all(
+      prefetchUrls.map(async url => ({ url, image: await fetchRefImage(url) })),
+    ).then(entries => {
       if (cancelled) return
-      setRefCache(prev => {
-        const next = new Map(prev)
-        for (const { url, img } of entries) {
-          if (img) next.set(url, img)
+      setRefCache(previous => {
+        const next = new Map(previous)
+        for (const { url, image } of entries) {
+          if (image) next.set(url, image)
         }
         return next
       })
-    })()
+    })
     return () => { cancelled = true }
   }, [])
 
   const refreshMyCards = useCallback(() => {
-    workshopApiFetch('/api/workshop/cards?scope=mine')
-      .then(r => r.json())
-      .then(d => { if (d.ok) setMyCards(d.cards as ApiCard[]) })
-      .catch(err => { console.warn('[AiCardDesigner] Failed to load saved designs:', err) })
+    void workshopApiFetch('/api/workshop/cards?scope=mine')
+      .then(response => response.json())
+      .then(data => {
+        if (data.ok) setMyCards(data.cards as ApiCard[])
+      })
+      .catch(reason => {
+        console.warn('[AiCardDesigner] Failed to load saved designs:', reason)
+      })
   }, [workshopApiFetch])
 
-  // Load user's own cards on mount
   useEffect(() => { refreshMyCards() }, [refreshMyCards])
 
-  // Auto-save when extracted card or art changes
-  useEffect(() => {
-    const card = extracted?.card
-    if (!card?.id?.startsWith('CUSTOM_') || card.id.length < 8 || !card.name?.trim()) return
-    if (autoSaveTimer.current) clearTimeout(autoSaveTimer.current)
-    autoSaveTimer.current = setTimeout(() => {
-      setAutoSaving(true)
-      void saveCardToWorkshop(true).then(dbId => {
-        setAutoSaving(false)
-        if (!dbId) return
-        setCurrentCardDbId(dbId)
-        setAutoSaveFlash(true)
-        setTimeout(() => setAutoSaveFlash(false), 2000)
-        refreshMyCards()
-      })
-    }, 1000)
-    return () => { if (autoSaveTimer.current) clearTimeout(autoSaveTimer.current) }
-  // saveCardToWorkshop reads from closure; refreshMyCards is stable
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [extracted, artUrl])
-
-  // Sync card type/name/id from extracted card
-  useEffect(() => {
-    if (extracted?.card) {
-      if (extracted.card.card_type) setCardType(extracted.card.card_type)
-      if (extracted.card.name) setCardName(extracted.card.name)
-      // If the AI generated a valid English CUSTOM_ ID, use it
-      if (extracted.card.id?.startsWith('CUSTOM_') && isValidCardId(extracted.card.id).valid) {
-        setCardIdInput(extracted.card.id)
-      }
-      // Pull any locales the LLM emitted in the code block into the editor's
-      // cardLocales state so the LocalizationModal can show them. Existing
-      // user-edited entries win — we only fill keys the user hasn't touched.
-      const extractedLocales = extracted.card.locales
-      if (extractedLocales && Object.keys(extractedLocales).length > 0) {
-        setCardLocales((prev) => {
-          const merged = { ...prev }
-          for (const [lang, entry] of Object.entries(extractedLocales)) {
-            if (!merged[lang]) merged[lang] = entry
-          }
-          return merged
-        })
-      }
-    }
-  }, [extracted])
-
-  /** Save card and return the DB ID, or null on failure.
-   *  Pass `silent=true` for auto-save (no UI state changes). */
-  const saveCardToWorkshop = async (silent?: boolean): Promise<string | null> => {
-    const name = extracted?.card?.name?.trim() || cardName.trim()
-    if (!name) { if (!silent) setError(locale === 'zh' ? '请先设置卡牌名称' : 'Card name is required'); return null }
-
-    // Use manually-set card ID, or extracted card ID, or generate from name
-    const cardId = cardIdInput.trim().startsWith('CUSTOM_') && cardIdInput.trim().length >= 8
-      ? cardIdInput.trim()
-      : extracted?.card?.id?.startsWith('CUSTOM_') && extracted.card.id.length >= 8
-        ? extracted.card.id
-        : autoCardId(name) || `CUSTOM_Card_${Date.now().toString(36)}`
-
-    // Validate card ID format (must be ASCII only)
-    const idCheck = isValidCardId(cardId)
-    if (!idCheck.valid) {
-      if (!silent) setError(locale === 'zh'
-        ? `卡牌 ID 格式错误：${idCheck.reason}。请修改 ID 字段（仅限英文字母、数字、下划线）`
-        : `Invalid card ID: ${idCheck.reason}`)
-      return null
-    }
-
-    if (!silent) { setSaving(true); setError(''); setSaveSuccess(false) }
-    try {
-      const card = extracted?.card
-      const cardJson = {
-        id: cardId,
-        name,
-        card_type: card?.card_type ?? cardType,
-        deck: 'CUSTOM',
-        number: 0,
-        desc: card?.desc ?? [],
-        cost: card?.cost ?? {},
-        vp: card?.vp ?? 0,
-        prerequisite: card?.prerequisite ?? (prerequisite || undefined),
-        modifiers: card?.modifiers ?? [],
-        implemented: true,
-        // Save raw form inputs for restoration
-        _draft: {
-          prerequisite: prerequisite || undefined,
-          costInput: costInput || undefined,
-        },
-        ...(Object.keys(cardLocales).length > 0 ? { locales: cardLocales } : {}),
-      }
-
-      const body: Record<string, unknown> = {
-        ...(currentCardDbId ? { id: currentCardDbId } : {}),
-        card_id: cardId,
-        card_type: card?.card_type ?? cardType,
-        name,
-        description: (card?.desc ?? []).join(' '),
-        card_json: cardJson,
-        art_url: artUrl,
-        status: 'draft',
-      }
-
-      // LLM must emit TS source; if missing we simply don't populate effect_code.
-      if (extracted?.sourceCode) {
-        body.effect_code = extracted.sourceCode
-      }
-
-      const r = await workshopApiFetch('/api/workshop/cards', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(body),
-      })
-      const d = await r.json()
-      if (d.ok) {
-        if (!silent) { setSaveSuccess(true); setTimeout(() => setSaveSuccess(false), 3000) }
-        return d.id as string
-      } else {
-        if (!silent) {
-          let errMsg = d.error ?? (locale === 'zh' ? '保存失败' : 'Save failed')
-          // Show detailed validation errors
-          if (Array.isArray(d.errors) && d.errors.length > 0) {
-            const detailStr = (d.errors as string[]).join('\n')
-            errMsg += ':\n' + detailStr
-            setValidationErrors(detailStr)
-          }
-          setError(errMsg)
-        }
-      }
-    } catch {
-      if (!silent) setError(locale === 'zh' ? '网络错误' : 'Network error')
-    } finally {
-      if (!silent) setSaving(false)
-    }
-    return null
-  }
-
-  const handleSaveCard = async () => {
-    const dbId = await saveCardToWorkshop()
-    if (dbId) { setCurrentCardDbId(dbId); refreshMyCards() }
-  }
-
-  const handleSaveAndAddToSandbox = async () => {
-    if (!onAddToSandboxAndRestart) return
-    const dbId = await saveCardToWorkshop()
-    if (dbId) {
-      setCurrentCardDbId(dbId)
-      refreshMyCards()
-      // Don't call onSaved here — it navigates away from the editor
-      await onAddToSandboxAndRestart(dbId)
-    }
-  }
-
-  const handleLoadCard = useCallback((apiCard: ApiCard) => {
-    const cj = apiCard.card_json
-    const ct = ((cj.card_type ?? apiCard.card_type) as string) as 'minor' | 'occupation'
-    const cardData: ExtractedCard['card'] = {
-      id: (cj.id ?? apiCard.card_id) as string,
-      name: apiCard.name,
-      card_type: ct,
-      cost: (cj.cost ?? {}) as Record<string, number>,
-      vp: (cj.vp ?? 0) as number,
-      desc: (cj.desc ?? []) as string[],
-      prerequisite: cj.prerequisite as string | undefined,
-      modifiers: (cj.modifiers ?? []) as unknown[],
-    }
-    setCardType(ct)
-    setCardName(apiCard.name)
-    setCardIdInput(apiCard.card_id)
-    setArtUrl(apiCard.art_url ?? null)
-    setCurrentCardDbId(apiCard.id)
-    // Restore raw form inputs from _draft, or fall back to parsed card_json
-    const draft = (cj._draft ?? {}) as { prerequisite?: string; costInput?: string }
-    setPrerequisite(draft.prerequisite ?? (cj.prerequisite as string) ?? '')
-    if (draft.costInput) {
-      setCostInput(draft.costInput)
-    } else {
-      const costParts = Object.entries((cj.cost ?? {}) as Record<string, number>)
-        .map(([k, v]) => `${v} ${k}`)
-      setCostInput(costParts.join(' '))
-    }
-    setExtracted({
-      card: cardData,
-      sourceCode: apiCard.effect_code ?? undefined,
-    })
-    // Restore locales from card_json
-    const savedLocales = (cj.locales ?? {}) as Record<string, { name: string; desc: string[]; prerequisite?: string }>
-    setCardLocales(savedLocales)
+  const hydrateDraft = useCallback((draft: WorkshopClientDraft) => {
+    const restored = draftToExtracted(draft)
+    const rawDraft = draft.cardJson._draft && typeof draft.cardJson._draft === 'object'
+      ? draft.cardJson._draft as { prerequisite?: string; costInput?: string }
+      : {}
+    setCardType(draft.cardType)
+    setCardName(draft.name)
+    setCardIdInput(draft.cardId)
+    setPrerequisite(rawDraft.prerequisite ?? restored.card.prerequisite ?? '')
+    setCostInput(rawDraft.costInput ?? Object.entries(restored.card.cost)
+      .map(([resource, amount]) => `${amount} ${resource}`)
+      .join(' '))
+    setExtracted(restored)
+    setArtUrl(draft.artUrl)
+    setCardLocales(restored.card.locales ?? {})
   }, [])
 
-  // Mirror the active card id into the URL whenever it changes — covers
-  // both opening an existing card via `handleLoadCard` and the new-card-id
-  // assigned after the first save.
   useEffect(() => {
-    if (currentCardDbId) onCardLoaded?.(currentCardDbId)
-  }, [currentCardDbId, onCardLoaded])
+    if (!workspaceState) return
+    const hydrationKey = `${workspaceState.workspaceId}:${workspaceState.baseRevision}`
+    if (hydratedWorkspaceRef.current === hydrationKey) return
+    hydratedWorkspaceRef.current = hydrationKey
+    hydrateDraft(workspaceState.draft)
+  }, [hydrateDraft, workspaceState])
+
+  const patchDraft = useCallback((
+    apply: (current: WorkshopClientDraft) => WorkshopClientDraft,
+  ) => {
+    if (workspaceState) updateDraft(apply(workspaceState.draft))
+  }, [updateDraft, workspaceState])
+
+  const handleLoadCard = useCallback((apiCard: ApiCard) => {
+    const cardJson = apiCard.card_json
+    const nextType = cardJson.card_type === 'occupation' || apiCard.card_type === 'occupation'
+      ? 'occupation'
+      : 'minor'
+    const nextExtracted: ExtractedCard = {
+      card: {
+        id: typeof cardJson.id === 'string' ? cardJson.id : apiCard.card_id,
+        name: apiCard.name,
+        card_type: nextType,
+        cost: cardJson.cost && typeof cardJson.cost === 'object'
+          ? cardJson.cost as Record<string, number>
+          : {},
+        vp: typeof cardJson.vp === 'number' ? cardJson.vp : 0,
+        desc: Array.isArray(cardJson.desc)
+          ? cardJson.desc.filter((value): value is string => typeof value === 'string')
+          : [],
+        prerequisite: typeof cardJson.prerequisite === 'string'
+          ? cardJson.prerequisite
+          : undefined,
+        modifiers: Array.isArray(cardJson.modifiers) ? cardJson.modifiers : [],
+        locales: readLocales(cardJson.locales),
+      },
+      sourceCode: apiCard.effect_code ?? undefined,
+    }
+    const rawDraft = cardJson._draft && typeof cardJson._draft === 'object'
+      ? cardJson._draft as { prerequisite?: string; costInput?: string }
+      : {}
+    setCardType(nextType)
+    setCardName(apiCard.name)
+    setCardIdInput(apiCard.card_id)
+    setPrerequisite(rawDraft.prerequisite ?? nextExtracted.card.prerequisite ?? '')
+    setCostInput(rawDraft.costInput ?? Object.entries(nextExtracted.card.cost)
+      .map(([resource, amount]) => `${amount} ${resource}`)
+      .join(' '))
+    setExtracted(nextExtracted)
+    setArtUrl(apiCard.art_url)
+    setCardLocales(nextExtracted.card.locales ?? {})
+    setCurrentCardDbId(apiCard.id)
+    onCardLoaded?.(apiCard.id)
+  }, [onCardLoaded])
 
   useEffect(() => {
     if (initialCard) handleLoadCard(initialCard)
   }, [handleLoadCard, initialCard])
 
-  return (
-    <div className="ai-designer">
-      <div className="ai-designer-header">
-        <h2>{locale === 'zh' ? 'AI 卡牌设计师' : 'AI Card Designer'}</h2>
-      </div>
+  useEffect(() => {
+    if (!pendingStage || !workspaceState) return
+    void changeStage(pendingStage).then(changed => {
+      if (changed) setPendingStage(null)
+    })
+  }, [changeStage, pendingStage, workspaceState])
 
-      {/* Lifted AI provider config — collapsible, defaults collapsed once both are configured */}
+  const buildCardJson = (): Record<string, unknown> => ({
+    id: cardIdInput,
+    name: cardName,
+    card_type: cardType,
+    deck: 'CUSTOM',
+    number: 0,
+    desc: extracted?.card.desc ?? [],
+    cost: extracted?.card.cost ?? {},
+    vp: extracted?.card.vp ?? 0,
+    prerequisite: extracted?.card.prerequisite ?? (prerequisite || undefined),
+    modifiers: extracted?.card.modifiers ?? [],
+    implemented: true,
+    _draft: {
+      prerequisite: prerequisite || undefined,
+      costInput: costInput || undefined,
+    },
+    ...(Object.keys(cardLocales).length > 0 ? { locales: cardLocales } : {}),
+  })
+
+  const createDraft = async (): Promise<string | null> => {
+    const name = extracted?.card.name.trim() || cardName.trim()
+    if (!name) {
+      setError(locale === 'zh' ? '请先设置卡牌名称' : 'Card name is required')
+      return null
+    }
+    const nextCardId = isValidCardId(cardIdInput.trim()).valid
+      ? cardIdInput.trim()
+      : autoCardId(name)
+    const idCheck = isValidCardId(nextCardId)
+    if (!idCheck.valid) {
+      setError(locale === 'zh'
+        ? `卡牌 ID 格式错误：${idCheck.reason}`
+        : `Invalid card ID: ${idCheck.reason}`)
+      return null
+    }
+    setSaving(true)
+    setError('')
+    setSaveSuccess(false)
+    try {
+      const response = await workshopApiFetch('/api/workshop/cards', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          card_id: nextCardId,
+          card_type: extracted?.card.card_type ?? cardType,
+          name,
+          description: (extracted?.card.desc ?? []).join(' '),
+          card_json: { ...buildCardJson(), id: nextCardId, name },
+          art_url: artUrl,
+          status: 'draft',
+          ...(extracted?.sourceCode ? { effect_code: extracted.sourceCode } : {}),
+        }),
+      })
+      const data = await response.json() as {
+        ok: boolean
+        id?: string
+        error?: string
+        errors?: string[]
+      }
+      if (!response.ok || !data.ok || !data.id) {
+        const details = data.errors?.join('\n')
+        if (details) setValidationErrors(details)
+        setError([
+          data.error ?? (locale === 'zh' ? '保存失败' : 'Save failed'),
+          details,
+        ].filter(Boolean).join(':\n'))
+        return null
+      }
+      setCardIdInput(nextCardId)
+      setSaveSuccess(true)
+      setTimeout(() => setSaveSuccess(false), 3000)
+      return data.id
+    } catch {
+      setError(locale === 'zh' ? '网络错误' : 'Network error')
+      return null
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const handleSaveCard = async (): Promise<string | null> => {
+    if (workspaceState) {
+      setSaving(true)
+      setError('')
+      const saved = await checkpoint()
+      setSaving(false)
+      if (!saved) return null
+      setSaveSuccess(true)
+      setTimeout(() => setSaveSuccess(false), 3000)
+      refreshMyCards()
+      return workspaceState.workspaceId
+    }
+    if (currentCardDbId) {
+      setError(locale === 'zh'
+        ? '草稿尚未恢复，请稍后重试'
+        : 'Draft is still loading. Try again shortly.')
+      return null
+    }
+    const dbId = await createDraft()
+    if (!dbId) return null
+    setCurrentCardDbId(dbId)
+    onCardLoaded?.(dbId)
+    refreshMyCards()
+    return dbId
+  }
+
+  const updateCardType = (next: 'minor' | 'occupation') => {
+    setCardType(next)
+    patchDraft(current => ({
+      ...current,
+      cardType: next,
+      cardJson: { ...current.cardJson, card_type: next },
+    }))
+  }
+
+  const updateCardName = (next: string) => {
+    const previousAutoId = autoCardId(cardName)
+    const nextAutoId = autoCardId(next)
+    const shouldUpdateId = (!cardIdInput || cardIdInput === previousAutoId) && nextAutoId.length > 7
+    setCardName(next)
+    if (shouldUpdateId) setCardIdInput(nextAutoId)
+    patchDraft(current => ({
+      ...current,
+      name: next,
+      cardId: shouldUpdateId ? nextAutoId : current.cardId,
+      cardJson: {
+        ...current.cardJson,
+        name: next,
+        id: shouldUpdateId ? nextAutoId : current.cardId,
+      },
+    }))
+  }
+
+  const updateCardId = (next: string) => {
+    setCardIdInput(next)
+    patchDraft(current => ({
+      ...current,
+      cardId: next,
+      cardJson: { ...current.cardJson, id: next },
+    }))
+  }
+
+  const updatePrerequisite = (next: string) => {
+    setPrerequisite(next)
+    patchDraft(current => {
+      const rawDraft = current.cardJson._draft && typeof current.cardJson._draft === 'object'
+        ? current.cardJson._draft as Record<string, unknown>
+        : {}
+      return {
+        ...current,
+        cardJson: {
+          ...current.cardJson,
+          prerequisite: next || undefined,
+          _draft: {
+            ...rawDraft,
+            prerequisite: next || undefined,
+            costInput: costInput || undefined,
+          },
+        },
+      }
+    })
+  }
+
+  const updateCost = (next: string) => {
+    setCostInput(next)
+    patchDraft(current => {
+      const rawDraft = current.cardJson._draft && typeof current.cardJson._draft === 'object'
+        ? current.cardJson._draft as Record<string, unknown>
+        : {}
+      return {
+        ...current,
+        cardJson: {
+          ...current.cardJson,
+          _draft: {
+            ...rawDraft,
+            prerequisite: prerequisite || undefined,
+            costInput: next || undefined,
+          },
+        },
+      }
+    })
+  }
+
+  const updateArt = (next: string | null) => {
+    setArtUrl(next)
+    patchDraft(current => ({ ...current, artUrl: next }))
+  }
+
+  const updateLocales = (next: Record<string, CardLocaleEntry>) => {
+    setCardLocales(next)
+    patchDraft(current => ({
+      ...current,
+      cardJson: { ...current.cardJson, locales: next },
+    }))
+  }
+
+  const updateExtracted = (next: ExtractedCard | null) => {
+    setExtracted(next)
+    if (!next) return
+    const nextCardId = isValidCardId(next.card.id).valid ? next.card.id : cardIdInput
+    const nextLocales = { ...cardLocales, ...(next.card.locales ?? {}) }
+    setCardType(next.card.card_type)
+    setCardName(next.card.name)
+    setCardIdInput(nextCardId)
+    setPrerequisite(next.card.prerequisite ?? prerequisite)
+    setCardLocales(nextLocales)
+    patchDraft(current => ({
+      ...current,
+      cardId: nextCardId,
+      cardType: next.card.card_type,
+      name: next.card.name,
+      description: next.card.desc.join(' '),
+      effectCode: next.sourceCode ?? null,
+      compiledCode: null,
+      codeManifest: null,
+      cardJson: {
+        ...current.cardJson,
+        ...next.card,
+        id: nextCardId,
+        name: next.card.name,
+        card_type: next.card.card_type,
+        deck: 'CUSTOM',
+        number: 0,
+        implemented: true,
+        locales: nextLocales,
+        _draft: {
+          prerequisite: (next.card.prerequisite ?? prerequisite) || undefined,
+          costInput: costInput || undefined,
+        },
+      },
+    }))
+  }
+
+  const handleStageChange = async (stage: WorkshopStage) => {
+    if (workspaceState) {
+      await changeStage(stage)
+      return
+    }
+    setPendingStage(stage)
+    if (!currentCardDbId) await handleSaveCard()
+  }
+
+  const handleSaveAndAddToSandbox = async () => {
+    if (!onAddToSandboxAndRestart) return
+    const cardDbId = await handleSaveCard()
+    if (cardDbId) await onAddToSandboxAndRestart(cardDbId)
+  }
+
+  const localizationReady = isLocaleEntryComplete(cardLocales.zh)
+  const metadataReady = Boolean(cardName.trim() && isValidCardId(cardIdInput.trim()).valid)
+  const readiness: Record<WorkshopStage, boolean> = {
+    metadata: metadataReady,
+    art: Boolean(artUrl),
+    ability: Boolean(extracted?.sourceCode),
+    localization: localizationReady,
+    validation: Boolean(
+      metadataReady
+      && artUrl
+      && extracted?.sourceCode
+      && localizationReady
+      && workspaceState?.sandboxPassVersionId,
+    ),
+  }
+  const activeStage = workspaceState?.stage ?? 'metadata'
+  const activeStageIndex = WORKSHOP_STAGES.indexOf(activeStage)
+  const stageCopy: Record<WorkshopStage, { label: string; helper: string }> = locale === 'zh'
+    ? {
+        metadata: { label: '基础信息', helper: '名称、类型与卡牌 ID' },
+        art: { label: '卡面图', helper: '提示词、参考图与候选' },
+        ability: { label: '卡牌能力', helper: '对话、源码与验证' },
+        localization: { label: '本地化', helper: '补齐中英文案' },
+        validation: { label: '验证与交付', helper: '沙盒测试和发布检查' },
+      }
+    : {
+        metadata: { label: 'Card details', helper: 'Name, type, and card ID' },
+        art: { label: 'Card art', helper: 'Prompt, references, and candidates' },
+        ability: { label: 'Card ability', helper: 'Conversation, source, and validation' },
+        localization: { label: 'Localization', helper: 'Complete Chinese and English copy' },
+        validation: { label: 'Validate & hand off', helper: 'Sandbox test and publish checks' },
+      }
+  const saveStatus = saving
+    ? (locale === 'zh' ? '正在保存' : 'Saving')
+    : controllerState?.save.status === 'dirty'
+      ? (locale === 'zh' ? '有未保存修改' : 'Unsaved changes')
+      : controllerState?.save.status === 'offline'
+        ? (locale === 'zh' ? '离线，已保存在本机' : 'Offline, saved locally')
+        : controllerState?.save.status === 'conflict'
+          ? (locale === 'zh' ? '需要选择草稿版本' : 'Draft choice required')
+          : (locale === 'zh' ? '已保存' : 'Saved')
+  const descriptionLines = extracted?.card.desc ?? []
+
+  return (
+    <div className="ai-designer aicw-shell">
+      <header className="aicw-header">
+        <div className="aicw-heading">
+          <span>{locale === 'zh' ? '卡牌工坊 / AI 卡牌设计师' : 'Card Workshop / AI Card Designer'}</span>
+          <div>
+            <h2>{cardName || (locale === 'zh' ? '新卡牌草稿' : 'New card draft')}</h2>
+            <span className="aicw-draft-badge">
+              {workspaceState?.status === 'published'
+                ? (locale === 'zh' ? '已发布' : 'Published')
+                : (locale === 'zh' ? '草稿' : 'Draft')}
+            </span>
+          </div>
+          <code>{cardIdInput || 'CUSTOM_'}</code>
+        </div>
+        <div className="aicw-header-actions">
+          <span className={`aicw-save-state is-${controllerState?.save.status ?? 'saved'}`} aria-live="polite">
+            {saveStatus}
+          </span>
+          <button
+            type="button"
+            className={`aicw-button aicw-button-primary${saveSuccess ? ' is-success' : ''}`}
+            onClick={() => { void handleSaveCard() }}
+            disabled={saving || !metadataReady || Boolean(currentCardDbId && controllerLoading)}
+          >
+            {saveSuccess
+              ? (locale === 'zh' ? '已保存' : 'Saved')
+              : (locale === 'zh' ? '保存草稿' : 'Save draft')}
+          </button>
+          <button type="button" className="aicw-button" onClick={onClose}>
+            {locale === 'zh' ? '关闭' : 'Close'}
+          </button>
+        </div>
+      </header>
+
       <div className="ai-designer-config-section">
         <Section
           collapsible
-          defaultCollapsed={!!(abilityConfig && artConfig)}
+          defaultCollapsed={Boolean(abilityConfig && artConfig)}
           locale={locale}
-          icon="🤖"
+          icon=""
           title={t('platform.aiConfig')}
           actions={
             <ConfigStatusSummary
@@ -1354,8 +1623,14 @@ export function AiCardDesigner({ initialCard, onImport, onClose, onAddToSandboxA
                 storageKey={KEY_LLM_CONFIG_ART}
                 capability="image"
                 config={artConfig}
-                onConfigured={() => { setArtConfig(getLlmConfig(KEY_LLM_CONFIG_ART)); bumpConfig() }}
-                onClear={() => { setArtConfig(null); bumpConfig() }}
+                onConfigured={() => {
+                  setArtConfig(getLlmConfig(KEY_LLM_CONFIG_ART))
+                  setConfigVersion(value => value + 1)
+                }}
+                onClear={() => {
+                  setArtConfig(null)
+                  setConfigVersion(value => value + 1)
+                }}
               />
             </div>
             <div className="ai-config-grid-col">
@@ -1363,246 +1638,299 @@ export function AiCardDesigner({ initialCard, onImport, onClose, onAddToSandboxA
               <ConfigBar
                 capability="chat"
                 config={abilityConfig}
-                onConfigured={() => { setAbilityConfig(getLlmConfig()); bumpConfig() }}
-                onClear={() => { setAbilityConfig(null); bumpConfig() }}
+                onConfigured={() => {
+                  setAbilityConfig(getLlmConfig())
+                  setConfigVersion(value => value + 1)
+                }}
+                onClear={() => {
+                  setAbilityConfig(null)
+                  setConfigVersion(value => value + 1)
+                }}
               />
             </div>
           </div>
         </Section>
       </div>
 
-      {/* Load previous designs */}
       {myCards.length > 0 && (
-        <div className="ai-my-cards-bar">
-          <span className="ai-my-cards-label">{locale === 'zh' ? '加载设计：' : 'Load design:'}</span>
+        <div className="aicw-design-picker">
+          <label htmlFor="aicw-card-picker">{locale === 'zh' ? '切换草稿' : 'Switch draft'}</label>
           <select
-            className="ai-my-cards-select"
+            id="aicw-card-picker"
             value={currentCardDbId ?? ''}
-            onChange={e => {
-              const card = myCards.find(c => c.id === e.target.value)
+            onChange={event => {
+              const card = myCards.find(item => item.id === event.target.value)
               if (card) handleLoadCard(card)
             }}
           >
-            <option value="">{locale === 'zh' ? '-- 选择已有卡牌 --' : '-- Select a card --'}</option>
-            {myCards.map(c => {
-              const hasArt = !!c.art_url
-              const hasCode = !!c.effect_code
-              const missing = [
-                !hasArt && (locale === 'zh' ? '缺图片' : 'no art'),
-                !hasCode && (locale === 'zh' ? '缺代码' : 'no code'),
-              ].filter(Boolean).join(' · ')
-              return (
-                <option key={c.id} value={c.id}>
-                  {c.name} [{c.card_type === 'minor' ? (locale === 'zh' ? '小发展' : 'Minor') : (locale === 'zh' ? '职业' : 'Occ')}]
-                  {missing ? `  ⚠ ${missing}` : '  ✓'}
-                </option>
-              )
-            })}
+            <option value="">{locale === 'zh' ? '选择已有卡牌' : 'Select a saved card'}</option>
+            {myCards.map(card => (
+              <option key={card.id} value={card.id}>
+                {card.name} · {card.card_type === 'minor'
+                  ? (locale === 'zh' ? '小发展' : 'Minor')
+                  : (locale === 'zh' ? '职业' : 'Occupation')}
+              </option>
+            ))}
           </select>
         </div>
       )}
 
-      <div className="ai-card-info-bar ai-designer-toolbar">
-            {/* Group 1: card type tabs */}
-            <div className="ai-designer-toolbar__group">
-              <div className="ai-card-type-toggle">
-                <button
-                  type="button"
-                  className={`ai-type-btn${cardType === 'minor' ? ' active' : ''}`}
-                  onClick={() => setCardType('minor')}
-                >
-                  {locale === 'zh' ? '小发展' : 'Minor'}
-                </button>
-                <button
-                  type="button"
-                  className={`ai-type-btn${cardType === 'occupation' ? ' active' : ''}`}
-                  onClick={() => setCardType('occupation')}
-                >
-                  {locale === 'zh' ? '职业' : 'Occupation'}
-                </button>
+      {controllerState?.conflict && (
+        <section className="aicw-conflict" role="alert">
+          <div>
+            <strong>{locale === 'zh' ? '服务器上已有更新' : 'The server draft changed'}</strong>
+            <span>
+              {locale === 'zh'
+                ? '请选择保留服务器整份草稿，或用本机整份草稿覆盖后继续。'
+                : 'Keep the complete server draft, or retry with the complete local draft.'}
+            </span>
+          </div>
+          <div>
+            <button type="button" className="aicw-button" onClick={() => { void resolveConflict('server') }}>
+              {locale === 'zh' ? '使用服务器草稿' : 'Use server draft'}
+            </button>
+            <button type="button" className="aicw-button aicw-button-primary" onClick={() => { void resolveConflict('local') }}>
+              {locale === 'zh' ? '保留本机草稿' : 'Keep local draft'}
+            </button>
+          </div>
+        </section>
+      )}
+
+      {(controllerError || controllerState?.save.status === 'offline' || controllerState?.save.status === 'error') && (
+        <section className="aicw-recovery" role="status">
+          <span>
+            {controllerError
+              ?? controllerState?.save.error
+              ?? (locale === 'zh' ? '修改已保存在本机。' : 'Changes are saved on this device.')}
+          </span>
+          {controllerState && (
+            <button type="button" className="aicw-button" onClick={() => { void retryCheckpoint() }}>
+              {locale === 'zh' ? '重试保存' : 'Retry save'}
+            </button>
+          )}
+        </section>
+      )}
+
+      <main className="aicw-layout">
+        <aside className="aicw-preview-pane">
+          <div className="aicw-section-heading">
+            <span>{locale === 'zh' ? '实时卡牌' : 'Live card'}</span>
+            <small>{locale === 'zh' ? '当前已采用草稿' : 'Current adopted draft'}</small>
+          </div>
+          <article className={`aicw-card is-${cardType}`}>
+            <div className="aicw-card-meta">
+              <span>{cardType === 'minor'
+                ? (locale === 'zh' ? '小发展' : 'Minor')
+                : (locale === 'zh' ? '职业' : 'Occupation')}</span>
+              <span>{costInput || (locale === 'zh' ? '无费用' : 'No cost')}</span>
+            </div>
+            <div className="aicw-card-art">
+              {artUrl
+                ? <img src={artUrl} alt={cardName || (locale === 'zh' ? '卡牌图片' : 'Card art')} />
+                : <span>{locale === 'zh' ? '尚未采用卡面图' : 'No adopted art yet'}</span>}
+            </div>
+            <div className="aicw-card-copy">
+              <h3>{cardLocales[locale]?.name || cardName || (locale === 'zh' ? '未命名卡牌' : 'Untitled card')}</h3>
+              {prerequisite && <p className="aicw-prerequisite">{prerequisite}</p>}
+              {descriptionLines.length > 0
+                ? descriptionLines.map((line, index) => <ResourceText key={`${line}-${index}`} text={line} />)
+                : <p className="aicw-empty-copy">{locale === 'zh' ? '能力说明会在采用代码后显示。' : 'Ability text appears after code is adopted.'}</p>}
+              <code>{cardIdInput || 'CUSTOM_'}</code>
+            </div>
+          </article>
+          <div className="aicw-readiness" aria-label={locale === 'zh' ? '草稿完整度' : 'Draft completeness'}>
+            {WORKSHOP_STAGES.slice(0, 4).map(stage => (
+              <div key={stage}>
+                <span className={readiness[stage] ? 'is-ready' : ''} aria-hidden="true" />
+                <strong>{stageCopy[stage].label}</strong>
+                <small>{readiness[stage]
+                  ? (locale === 'zh' ? '已就绪' : 'Ready')
+                  : (locale === 'zh' ? '待完成' : 'Incomplete')}</small>
               </div>
-            </div>
+            ))}
+          </div>
+        </aside>
 
-            {/* Group 2: name + ID */}
-            <div className="ai-designer-toolbar__group ai-designer-toolbar__group--grow">
-              {/* Show the localised name under a non-English UI so a Chinese
-                  user reads "中世纪木槌" instead of "Medieval Mallet". The
-                  English `cardName` stays as the source-of-truth for the
-                  generated CARD_DEF, so the upstream PR file stays English. */}
-              {(() => {
-                const editorName = locale === 'zh'
-                  ? (cardLocales.zh?.name?.trim() ? cardLocales.zh.name : cardName)
-                  : cardName
-                const updateEditorName = (v: string) => {
-                  if (locale === 'zh') {
-                    setCardLocales((prev) => ({
-                      ...prev,
-                      zh: {
-                        name: v,
-                        desc: prev.zh?.desc ?? [],
-                        ...(prev.zh?.prerequisite
-                          ? { prerequisite: prev.zh.prerequisite }
-                          : {}),
-                      },
-                    }))
-                  } else {
-                    setCardName(v)
-                  }
-                }
-                return (
-                  <input
-                    type="text"
-                    className="ai-card-name-input"
-                    value={editorName}
-                    onChange={e => {
-                      const v = e.target.value
-                      updateEditorName(v)
-                      // Auto-generate card ID only when editing the English
-                      // (code-side) name — Chinese input would fall through
-                      // `autoCardId` to an empty string anyway.
-                      if (locale !== 'zh') {
-                        const prevAuto = autoCardId(cardName)
-                        if (!cardIdInput || cardIdInput === prevAuto) {
-                          const newAuto = autoCardId(v)
-                          if (newAuto.length > 7) setCardIdInput(newAuto)
-                        }
-                      }
-                    }}
-                    placeholder={locale === 'zh' ? '卡牌名称' : 'Card name'}
-                  />
-                )
-              })()}
-              <input
-                type="text"
-                className="ai-card-id-input"
-                value={cardIdInput}
-                onChange={e => setCardIdInput(e.target.value)}
-                placeholder={locale === 'zh' ? 'CUSTOM_英文ID（AI生成后自动填入）' : 'CUSTOM_EnglishId (auto-filled by AI)'}
-                title={locale === 'zh' ? '卡牌唯一标识，仅限英文字母、数字、下划线' : 'Unique card ID, English letters/digits/underscore only'}
-              />
-            </div>
-
-            {/* Group 3: save / sandbox / localize / close */}
-            <div className="ai-designer-toolbar__group">
+        <section className="aicw-workspace">
+          <nav className="aicw-stage-rail" aria-label={locale === 'zh' ? '设计阶段' : 'Design stages'}>
+            <span className="aicw-stage-title">{locale === 'zh' ? '设计阶段' : 'Design stages'}</span>
+            {WORKSHOP_STAGES.map((stage, index) => (
               <button
                 type="button"
-                className={`btn-primary ai-save-card-btn${saveSuccess ? ' ai-save-success' : ''}`}
-                onClick={handleSaveCard}
-                disabled={saving || !cardName.trim()}
+                key={stage}
+                className={activeStage === stage ? 'is-active' : ''}
+                aria-current={activeStage === stage ? 'step' : undefined}
+                onClick={() => { void handleStageChange(stage) }}
               >
-                {saving
-                  ? (locale === 'zh' ? '保存中…' : 'Saving…')
-                  : saveSuccess
-                    ? (locale === 'zh' ? '已保存' : 'Saved')
-                    : (locale === 'zh' ? '保存到我的卡牌' : 'Save')
-                }
+                <span className={`aicw-stage-marker${readiness[stage] ? ' is-ready' : ''}`}>
+                  {readiness[stage] ? '✓' : index + 1}
+                </span>
+                <span>
+                  <strong>{stageCopy[stage].label}</strong>
+                  <small>{stageCopy[stage].helper}</small>
+                </span>
               </button>
-              {onAddToSandboxAndRestart && (
-                <button
-                  type="button"
-                  className="btn-primary ai-save-card-btn ai-sandbox-btn"
-                  onClick={handleSaveAndAddToSandbox}
-                  disabled={saving || !extracted?.sourceCode}
-                  title={!extracted?.sourceCode ? (locale === 'zh' ? '需要先生成卡牌代码' : 'Generate card code first') : ''}
-                >
-                  {locale === 'zh' ? '加入沙盒并测试' : 'Add to Sandbox & Test'}
+            ))}
+            <div className="aicw-stage-progress">
+              <span>{locale === 'zh' ? '当前步骤' : 'Current step'}</span>
+              <strong>{activeStageIndex + 1} / {WORKSHOP_STAGES.length}</strong>
+            </div>
+          </nav>
+
+          <div className="aicw-stage-content" key={activeStage}>
+            <div className="aicw-stage-heading">
+              <div>
+                <span>{locale === 'zh' ? '当前任务' : 'Current task'}</span>
+                <h2>{stageCopy[activeStage].label}</h2>
+                <p>{stageCopy[activeStage].helper}</p>
+              </div>
+              <span className={`aicw-status-tag${readiness[activeStage] ? ' is-ready' : ''}`}>
+                {readiness[activeStage]
+                  ? (locale === 'zh' ? '已就绪' : 'Ready')
+                  : (locale === 'zh' ? '进行中' : 'In progress')}
+              </span>
+            </div>
+
+            {currentCardDbId && controllerLoading && (
+              <div className="aicw-loading" role="status">
+                {locale === 'zh' ? '正在恢复草稿…' : 'Restoring draft…'}
+              </div>
+            )}
+
+            {!controllerLoading && activeStage === 'metadata' && (
+              <div className="aicw-metadata">
+                <fieldset>
+                  <legend>{locale === 'zh' ? '卡牌类型' : 'Card type'}</legend>
+                  <div className="ai-card-type-toggle">
+                    <button type="button" className={`ai-type-btn${cardType === 'minor' ? ' active' : ''}`} onClick={() => updateCardType('minor')}>
+                      {locale === 'zh' ? '小发展' : 'Minor improvement'}
+                    </button>
+                    <button type="button" className={`ai-type-btn${cardType === 'occupation' ? ' active' : ''}`} onClick={() => updateCardType('occupation')}>
+                      {locale === 'zh' ? '职业' : 'Occupation'}
+                    </button>
+                  </div>
+                </fieldset>
+                <label>
+                  <span>{locale === 'zh' ? '英文卡牌名' : 'Card name'}</span>
+                  <input type="text" value={cardName} onChange={event => updateCardName(event.target.value)} placeholder={locale === 'zh' ? '例如 Medieval Mallet' : 'e.g. Medieval Mallet'} />
+                </label>
+                <label>
+                  <span>{locale === 'zh' ? '卡牌 ID' : 'Card ID'}</span>
+                  <input type="text" className="aicw-code-input" value={cardIdInput} onChange={event => updateCardId(event.target.value)} placeholder="CUSTOM_MedievalMallet" />
+                  {cardIdInput && !isValidCardId(cardIdInput).valid && <small className="form-error">{isValidCardId(cardIdInput).reason}</small>}
+                </label>
+                {cardType === 'minor' && (
+                  <div className="aicw-field-row">
+                    <label>
+                      <span>{t('platform.prerequisite')}</span>
+                      <input id="ai-prerequisite-input" type="text" value={prerequisite} onChange={event => updatePrerequisite(event.target.value)} placeholder={locale === 'zh' ? '可选，如：2 个职业' : 'Optional, e.g. 2 occupations'} />
+                    </label>
+                    <label>
+                      <span>{t('platform.cost')}</span>
+                      <input id="ai-cost-input" type="text" value={costInput} onChange={event => updateCost(event.target.value)} placeholder={locale === 'zh' ? '可选，如：1 木 2 黏土' : 'Optional, e.g. 1 wood 2 clay'} />
+                    </label>
+                  </div>
+                )}
+                <div className="aicw-inline-actions">
+                  <span>{locale === 'zh' ? '保存后即可进入图片、能力和本地化步骤。' : 'Save once to unlock the remaining design stages.'}</span>
+                  <button type="button" className="aicw-button aicw-button-primary" disabled={!metadataReady || saving} onClick={() => { void handleStageChange('art') }}>
+                    {locale === 'zh' ? '保存并继续到卡面图' : 'Save and continue to art'}
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {!controllerLoading && activeStage === 'art' && (
+              <ArtPanel
+                cardType={cardType}
+                cardName={cardName}
+                artUrl={artUrl}
+                setArtUrl={updateArt}
+                refCache={refCache}
+                configVersion={configVersion}
+                apiFetch={workshopApiFetch}
+              />
+            )}
+
+            {!controllerLoading && activeStage === 'ability' && (
+              <AbilityPanel
+                cardType={cardType}
+                cardName={cardName}
+                prerequisite={prerequisite}
+                costHint={costInput}
+                extracted={extracted}
+                setExtracted={updateExtracted}
+                artUrl={artUrl}
+                onImport={onImport}
+                sandboxErrors={sandboxErrors}
+                onSandboxErrorsConsumed={onSandboxErrorsConsumed}
+                validationErrors={validationErrors}
+                onValidationErrorsConsumed={() => setValidationErrors(null)}
+                configVersion={configVersion}
+              />
+            )}
+
+            {!controllerLoading && activeStage === 'localization' && (
+              <div className="aicw-localization">
+                <div>
+                  <strong>{localizationReady
+                    ? (locale === 'zh' ? '中文本地化已完整' : 'Chinese localization is complete')
+                    : (locale === 'zh' ? '中文本地化尚未完成' : 'Chinese localization is incomplete')}</strong>
+                  <p>{locale === 'zh' ? '英文原文保留在卡牌定义中；提交社区 PR 前必须补齐中文名称与说明。' : 'English stays in the card definition; Chinese name and description are required before handoff.'}</p>
+                </div>
+                <button type="button" className="aicw-button aicw-button-primary" onClick={() => setShowLocalizationModal(true)} disabled={!cardName.trim()}>
+                  {localizationReady
+                    ? (locale === 'zh' ? '检查本地化' : 'Review localization')
+                    : (locale === 'zh' ? '开始本地化' : 'Start localization')}
+                </button>
+              </div>
+            )}
+
+            {!controllerLoading && activeStage === 'validation' && (
+              <div className="aicw-validation">
+                <ul>
+                  {WORKSHOP_STAGES.slice(0, 4).map(stage => (
+                    <li key={stage} className={readiness[stage] ? 'is-ready' : ''}>
+                      <span aria-hidden="true">{readiness[stage] ? '✓' : '–'}</span>
+                      <div>
+                        <strong>{stageCopy[stage].label}</strong>
+                        <small>{readiness[stage]
+                          ? (locale === 'zh' ? '已完成' : 'Complete')
+                          : stageCopy[stage].helper}</small>
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+                <div className="aicw-handoff">
+                  <div>
+                    <strong>{locale === 'zh' ? '下一步：固定版本沙盒测试' : 'Next: sandbox-test a fixed version'}</strong>
+                    <span>{locale === 'zh' ? '先保存当前草稿，再进入沙盒验证运行结果。' : 'Save the current draft before validating it in the sandbox.'}</span>
+                  </div>
+                  <div>
+                    <button type="button" className="aicw-button" onClick={() => { void handleSaveCard() }} disabled={saving || !metadataReady}>
+                      {locale === 'zh' ? '保存检查点' : 'Save checkpoint'}
+                    </button>
+                    {onAddToSandboxAndRestart && (
+                      <button type="button" className="aicw-button aicw-button-primary" onClick={() => { void handleSaveAndAddToSandbox() }} disabled={saving || !extracted?.sourceCode}>
+                        {locale === 'zh' ? '加入沙盒并测试' : 'Add to sandbox and test'}
+                      </button>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            <footer className="aicw-stage-footer">
+              <span>{activeStageIndex + 1} / {WORKSHOP_STAGES.length} · {stageCopy[activeStage].label}</span>
+              {activeStageIndex < WORKSHOP_STAGES.length - 1 && (
+                <button type="button" className="aicw-button" onClick={() => { void handleStageChange(WORKSHOP_STAGES[activeStageIndex + 1]!) }}>
+                  {locale === 'zh' ? '下一阶段' : 'Next stage'}
                 </button>
               )}
-              <button
-                type="button"
-                className="btn-primary ai-save-card-btn"
-                onClick={() => setShowLocalizationModal(true)}
-                disabled={!cardName.trim()}
-              >
-                {locale === 'zh' ? '本地化' : 'Localize'}
-              </button>
-              <button type="button" className="btn-link ai-designer-close" onClick={onClose}>
-                {locale === 'zh' ? '关闭' : 'Close'}
-              </button>
-            </div>
+            </footer>
           </div>
-
-          {/* Completeness chips: chip-style with 👁/✏ when present, ✗ when missing */}
-          <div className="ai-completeness-bar">
-            <span className={`card-asset-chip${artUrl ? ' is-active' : ''}`}>
-              {artUrl ? '👁' : '✗'} {t('platform.image')}
-            </span>
-            <span className={`card-asset-chip${extracted?.sourceCode ? ' is-active' : ''}`}>
-              {extracted?.sourceCode ? '✏' : '✗'} {t('platform.code')}
-            </span>
-            {(() => {
-              // Mirror the same predicate the PR submission gate uses
-              // (`hasZhLocale` in WorkshopPage). Code-side `name`/`desc` are
-              // English by design; the missing half that blocks community PRs
-              // is always the zh translation.
-              const zhDone = isLocaleEntryComplete(cardLocales.zh)
-              return (
-                <span className={`card-asset-chip${zhDone ? ' is-active' : ''}`}>
-                  {zhDone ? '🌐' : '✗'} {locale === 'zh' ? '本地化' : 'i18n'}
-                </span>
-              )
-            })()}
-            {autoSaving && (
-              <span className="ai-autosave-status">{locale === 'zh' ? '自动保存…' : 'Saving…'}</span>
-            )}
-            {autoSaveFlash && !autoSaving && (
-              <span className="ai-autosave-ok">✓ {locale === 'zh' ? '已自动保存' : 'Auto-saved'}</span>
-            )}
-          </div>
-
-          {cardType === 'minor' && (
-            <div className="ai-minor-fields">
-              <div className="form-field ai-minor-field">
-                <label htmlFor="ai-prerequisite-input">{t('platform.prerequisite')}</label>
-                <input
-                  id="ai-prerequisite-input"
-                  type="text"
-                  className="ai-minor-input"
-                  value={prerequisite}
-                  onChange={e => setPrerequisite(e.target.value)}
-                  placeholder={locale === 'zh' ? '可选，如：2 个职业、仍住木屋' : 'Optional, e.g., 2 occupations'}
-                />
-              </div>
-              <div className="form-field ai-minor-field">
-                <label htmlFor="ai-cost-input">{t('platform.cost')}</label>
-                <input
-                  id="ai-cost-input"
-                  type="text"
-                  className="ai-minor-input"
-                  value={costInput}
-                  onChange={e => setCostInput(e.target.value)}
-                  placeholder={locale === 'zh' ? '可选，如：1 木 2 黏土' : 'Optional, e.g., 1 wood 2 clay'}
-                />
-              </div>
-            </div>
-          )}
-
-          <div className="ai-designer-panels">
-            <ArtPanel
-              cardType={cardType}
-              cardName={cardName}
-              artUrl={artUrl}
-              setArtUrl={setArtUrl}
-              refCache={refCache}
-              configVersion={configVersion}
-              apiFetch={workshopApiFetch}
-            />
-            <AbilityPanel
-              cardType={cardType}
-              cardName={cardName}
-              prerequisite={prerequisite}
-              costHint={costInput}
-              extracted={extracted}
-              setExtracted={setExtracted}
-              artUrl={artUrl}
-              onImport={onImport}
-              sandboxErrors={sandboxErrors}
-              onSandboxErrorsConsumed={onSandboxErrorsConsumed}
-              validationErrors={validationErrors}
-              onValidationErrorsConsumed={() => setValidationErrors(null)}
-              configVersion={configVersion}
-            />
-          </div>
+        </section>
+      </main>
 
       {showLocalizationModal && (
         <LocalizationModal
@@ -1611,14 +1939,14 @@ export function AiCardDesigner({ initialCard, onImport, onClose, onAddToSandboxA
             cardLocales,
             cardName,
             prerequisite,
-            extractedName: extracted?.card?.name,
-            extractedDesc: extracted?.card?.desc,
-            extractedPrerequisite: extracted?.card?.prerequisite,
+            extractedName: extracted?.card.name,
+            extractedDesc: extracted?.card.desc,
+            extractedPrerequisite: extracted?.card.prerequisite,
           })}
           currentLang={locale}
           locales={cardLocales}
           onSave={(updatedLocales) => {
-            setCardLocales(updatedLocales)
+            updateLocales(updatedLocales)
             setShowLocalizationModal(false)
           }}
           onClose={() => setShowLocalizationModal(false)}
