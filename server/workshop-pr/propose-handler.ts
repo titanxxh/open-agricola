@@ -88,6 +88,16 @@ export async function handleProposeRequest(
     })
     return
   }
+  if (workshopPrConfig.mockMode) {
+    const prUrl = '/mock-workshop-pr/1'
+    db.prepare(`
+      UPDATE workshop_cards
+      SET github_pr_url = ?, github_pr_status = 'open', github_pr_last_synced_at = ?
+      WHERE id = ?
+    `).run(prUrl, Date.now(), cardDbId)
+    sendJson(res, 200, { ok: true, prUrl, prNumber: 1 })
+    return
+  }
 
   const now = Date.now()
   const rate = db.prepare(

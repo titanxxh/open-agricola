@@ -51,10 +51,27 @@ function autoCardId(name: string): string {
 }
 
 /** Check if a card ID is valid (CUSTOM_ prefix, ASCII only, min length) */
-function isValidCardId(id: string): { valid: boolean; reason?: string } {
-  if (!id.startsWith('CUSTOM_')) return { valid: false, reason: 'ID 必须以 CUSTOM_ 开头' }
-  if (id.length < 8) return { valid: false, reason: 'ID 太短，至少 8 个字符' }
-  if (/[^a-zA-Z0-9_]/.test(id)) return { valid: false, reason: 'ID 只能包含英文字母、数字和下划线' }
+function isValidCardId(id: string, locale: 'zh' | 'en' = 'zh'): { valid: boolean; reason?: string } {
+  if (!id.startsWith('CUSTOM_')) {
+    return {
+      valid: false,
+      reason: locale === 'zh' ? 'ID 必须以 CUSTOM_ 开头' : 'ID must start with CUSTOM_',
+    }
+  }
+  if (id.length < 8) {
+    return {
+      valid: false,
+      reason: locale === 'zh' ? 'ID 太短，至少 8 个字符' : 'ID must contain at least 8 characters',
+    }
+  }
+  if (/[^a-zA-Z0-9_]/.test(id)) {
+    return {
+      valid: false,
+      reason: locale === 'zh'
+        ? 'ID 只能包含英文字母、数字和下划线'
+        : 'ID may only contain ASCII letters, numbers, and underscores',
+    }
+  }
   return { valid: true }
 }
 
@@ -142,6 +159,14 @@ export type ApiCard = {
   updated_at: number
 }
 
+type WorkshopDraftVersion = {
+  id: string
+  version_number: number
+  card_json: Record<string, unknown>
+  art_url: string | null
+  created_at: number
+}
+
 // ── Markdown with code copy ─────────────────────────────────────────────────
 
 function CodeBlock({ lang, code }: { lang: string; code: string }) {
@@ -162,7 +187,7 @@ function CodeBlock({ lang, code }: { lang: string; code: string }) {
           {copied ? '✓' : '复制'}
         </button>
       </div>
-      <pre><code>{code}</code></pre>
+      <pre tabIndex={0}><code>{code}</code></pre>
     </div>
   )
 }
@@ -321,7 +346,14 @@ function ConfigBar({ config, onConfigured, onClear, storageKey, capability }: {
             )
           }
           return (
-            <select value={model} onChange={e => setModel(e.target.value)} className="ai-model-select">
+            <select
+              value={model}
+              onChange={e => setModel(e.target.value)}
+              className="ai-model-select"
+              aria-label={capability === 'image'
+                ? '图片生成模型 / Image generation model'
+                : '能力生成模型 / Ability generation model'}
+            >
               {availableModels.map(m => (
                 <option key={m.id} value={m.id}>{m.label}</option>
               ))}
@@ -1133,7 +1165,7 @@ function AbilityPanel({
             <strong>{locale === 'zh' ? '当前已采用源码' : 'Currently adopted source'}</strong>
             <span>{locale === 'zh' ? '新生成结果先进入候选，不会自动覆盖。' : 'New generations stay as candidates until adopted.'}</span>
           </div>
-          <pre><code>{extracted.sourceCode}</code></pre>
+          <pre tabIndex={0}><code>{extracted.sourceCode}</code></pre>
         </section>
       )}
 
@@ -1177,7 +1209,7 @@ function AbilityPanel({
                 <summary className="ai-prompt-summary">
                   {locale === 'zh' ? '查看完整 Prompt' : 'View full prompt'}
                 </summary>
-                <pre className="ai-prompt-text">{message.promptSnapshot}</pre>
+                <pre className="ai-prompt-text" tabIndex={0}>{message.promptSnapshot}</pre>
               </details>
             )}
             <div className={`ai-message-content${message.streaming ? ' ai-streaming' : ''}`}>
@@ -1364,6 +1396,7 @@ const draftToExtracted = (draft: WorkshopClientDraft): ExtractedCard => {
 
 type AiCardDesignerProps = {
   initialCard?: ApiCard
+  initialCardId?: string
   onImport: (card: ExtractedCard, artUrl: string | null) => void
   onClose: () => void
   onAddToSandboxAndRestart?: (cardDbId: string, versionId: string) => Promise<void>
@@ -1375,6 +1408,7 @@ type AiCardDesignerProps = {
 
 export function AiCardDesigner({
   initialCard,
+  initialCardId,
   onImport,
   onClose,
   onAddToSandboxAndRestart,
@@ -1398,12 +1432,18 @@ export function AiCardDesigner({
   const [saveSuccess, setSaveSuccess] = useState(false)
   const [refCache, setRefCache] = useState<Map<string, ReferenceImage>>(new Map())
   const [myCards, setMyCards] = useState<ApiCard[]>([])
-  const [currentCardDbId, setCurrentCardDbId] = useState<string | null>(null)
+  const [currentCardDbId, setCurrentCardDbId] = useState<string | null>(
+    initialCard?.id ?? initialCardId ?? null,
+  )
   const [showLocalizationModal, setShowLocalizationModal] = useState(false)
   const [cardLocales, setCardLocales] = useState<Record<string, CardLocaleEntry>>({})
   const [pendingStage, setPendingStage] = useState<WorkshopStage | null>(null)
   const [sandboxConfirmation, setSandboxConfirmation] = useState(false)
+  const [versions, setVersions] = useState<WorkshopDraftVersion[]>([])
+  const [versionsLoading, setVersionsLoading] = useState(false)
+  const [versionsError, setVersionsError] = useState('')
   const hydratedWorkspaceRef = useRef('')
+  const errorRef = useRef<HTMLDivElement>(null)
   const [abilityConfig, setAbilityConfig] = useState<LlmConfig | null>(() => getLlmConfig())
   const [artConfig, setArtConfig] = useState<LlmConfig | null>(() => getLlmConfig(KEY_LLM_CONFIG_ART))
   const {
@@ -1420,6 +1460,8 @@ export function AiCardDesigner({
     adoptCandidate: adoptDraftCandidate,
     publishDraft,
     confirmSandboxPass,
+    restoreVersion,
+    undoRestore,
   } = useWorkshopDraft({
     cardId: currentCardDbId ?? '',
     apiFetch: workshopApiFetch,
@@ -1427,6 +1469,10 @@ export function AiCardDesigner({
   const workspaceState = controllerState?.workspaceId === currentCardDbId
     ? controllerState
     : null
+
+  useEffect(() => {
+    if (error) errorRef.current?.focus()
+  }, [error])
 
   useEffect(() => {
     let cancelled = false
@@ -1540,6 +1586,10 @@ export function AiCardDesigner({
   }, [handleLoadCard, initialCard])
 
   useEffect(() => {
+    if (!initialCard && initialCardId) setCurrentCardDbId(initialCardId)
+  }, [initialCard, initialCardId])
+
+  useEffect(() => {
     if (!pendingStage || !workspaceState) return
     void changeStage(pendingStage).then(changed => {
       if (changed) setPendingStage(null)
@@ -1571,10 +1621,10 @@ export function AiCardDesigner({
       setError(locale === 'zh' ? '请先设置卡牌名称' : 'Card name is required')
       return null
     }
-    const nextCardId = isValidCardId(cardIdInput.trim()).valid
+    const nextCardId = isValidCardId(cardIdInput.trim(), locale).valid
       ? cardIdInput.trim()
       : autoCardId(name)
-    const idCheck = isValidCardId(nextCardId)
+    const idCheck = isValidCardId(nextCardId, locale)
     if (!idCheck.valid) {
       setError(locale === 'zh'
         ? `卡牌 ID 格式错误：${idCheck.reason}`
@@ -1812,8 +1862,52 @@ export function AiCardDesigner({
     setSandboxConfirmation(false)
   }
 
+  const loadVersionHistory = useCallback(async () => {
+    if (!currentCardDbId) return
+    setVersionsLoading(true)
+    setVersionsError('')
+    try {
+      const response = await workshopApiFetch(
+        `/api/workshop/cards/${encodeURIComponent(currentCardDbId)}/versions`,
+      )
+      const payload = await response.json() as {
+        ok?: boolean
+        versions?: WorkshopDraftVersion[]
+        error?: string
+      }
+      if (!response.ok || !payload.ok || !Array.isArray(payload.versions)) {
+        setVersions([])
+        setVersionsError(payload.error ?? (locale === 'zh'
+          ? '版本历史加载失败'
+          : 'Could not load version history'))
+        return
+      }
+      setVersions(payload.versions)
+    } catch (reason) {
+      setVersions([])
+      setVersionsError(reason instanceof Error ? reason.message : String(reason))
+    } finally {
+      setVersionsLoading(false)
+    }
+  }, [currentCardDbId, locale, workshopApiFetch])
+
+  const handleRestoreVersion = async (versionId: string) => {
+    setSaving(true)
+    setError('')
+    const restored = await restoreVersion(versionId)
+    setSaving(false)
+    if (restored) await loadVersionHistory()
+  }
+
+  const handleUndoRestore = async () => {
+    setSaving(true)
+    setError('')
+    await undoRestore()
+    setSaving(false)
+  }
+
   const localizationReady = isLocaleEntryComplete(cardLocales.zh)
-  const metadataReady = Boolean(cardName.trim() && isValidCardId(cardIdInput.trim()).valid)
+  const metadataReady = Boolean(cardName.trim() && isValidCardId(cardIdInput.trim(), locale).valid)
   const handoffInputsReady = Boolean(
     metadataReady
     && artUrl
@@ -1834,6 +1928,19 @@ export function AiCardDesigner({
   }
   const activeStage = workspaceState?.stage ?? 'metadata'
   const activeStageIndex = WORKSHOP_STAGES.indexOf(activeStage)
+
+  useEffect(() => {
+    if (activeStage === 'validation' && currentCardDbId && !controllerLoading) {
+      void loadVersionHistory()
+    }
+  }, [
+    activeStage,
+    controllerLoading,
+    currentCardDbId,
+    loadVersionHistory,
+    workspaceState?.baseRevision,
+  ])
+
   const stageCopy: Record<WorkshopStage, { label: string; helper: string }> = locale === 'zh'
     ? {
         metadata: { label: '基础信息', helper: '名称、类型与卡牌 ID' },
@@ -1987,7 +2094,17 @@ export function AiCardDesigner({
             <button type="button" className="aicw-button" onClick={() => { void resolveConflict('server') }}>
               {locale === 'zh' ? '使用服务器草稿' : 'Use server draft'}
             </button>
-            <button type="button" className="aicw-button aicw-button-primary" onClick={() => { void resolveConflict('local') }}>
+            <button
+              type="button"
+              className="aicw-button aicw-button-primary"
+              onClick={() => {
+                if (window.confirm(locale === 'zh'
+                  ? '确认用本机整份草稿覆盖服务器版本？'
+                  : 'Replace the complete server draft with this local draft?')) {
+                  void resolveConflict('local')
+                }
+              }}
+            >
               {locale === 'zh' ? '保留本机草稿' : 'Keep local draft'}
             </button>
           </div>
@@ -2114,8 +2231,22 @@ export function AiCardDesigner({
                 </label>
                 <label>
                   <span>{locale === 'zh' ? '卡牌 ID' : 'Card ID'}</span>
-                  <input type="text" className="aicw-code-input" value={cardIdInput} onChange={event => updateCardId(event.target.value)} placeholder="CUSTOM_MedievalMallet" />
-                  {cardIdInput && !isValidCardId(cardIdInput).valid && <small className="form-error">{isValidCardId(cardIdInput).reason}</small>}
+                  <input
+                    type="text"
+                    className="aicw-code-input"
+                    value={cardIdInput}
+                    onChange={event => updateCardId(event.target.value)}
+                    placeholder="CUSTOM_MedievalMallet"
+                    aria-invalid={cardIdInput ? !isValidCardId(cardIdInput, locale).valid : undefined}
+                    aria-describedby={cardIdInput && !isValidCardId(cardIdInput, locale).valid
+                      ? 'aicw-card-id-error'
+                      : undefined}
+                  />
+                  {cardIdInput && !isValidCardId(cardIdInput, locale).valid && (
+                    <small id="aicw-card-id-error" className="form-error" role="alert">
+                      {isValidCardId(cardIdInput, locale).reason}
+                    </small>
+                  )}
                 </label>
                 {cardType === 'minor' && (
                   <div className="aicw-field-row">
@@ -2240,6 +2371,74 @@ export function AiCardDesigner({
                       : (locale === 'zh' ? '尚未确认' : 'Not confirmed')}</strong>
                   </div>
                 </div>
+                <section className="aicw-version-history" aria-labelledby="aicw-version-history-title">
+                  <div className="aicw-version-history-heading">
+                    <div>
+                      <span>{locale === 'zh' ? '不可变快照' : 'Immutable snapshots'}</span>
+                      <h3 id="aicw-version-history-title">
+                        {locale === 'zh' ? '版本历史' : 'Version history'}
+                      </h3>
+                    </div>
+                    {workspaceState?.session.restoreUndoDraft && (
+                      <button
+                        type="button"
+                        className="aicw-button"
+                        onClick={() => { void handleUndoRestore() }}
+                        disabled={saving}
+                      >
+                        {locale === 'zh' ? '撤销恢复' : 'Undo restore'}
+                      </button>
+                    )}
+                  </div>
+                  {versionsLoading ? (
+                    <div className="aicw-version-message" role="status">
+                      {locale === 'zh' ? '正在加载版本…' : 'Loading versions…'}
+                    </div>
+                  ) : versionsError ? (
+                    <div className="aicw-version-message is-error" role="alert">
+                      <span>{versionsError}</span>
+                      <button type="button" className="aicw-button" onClick={() => { void loadVersionHistory() }}>
+                        {locale === 'zh' ? '重试' : 'Retry'}
+                      </button>
+                    </div>
+                  ) : versions.length === 0 ? (
+                    <div className="aicw-version-message">
+                      {locale === 'zh'
+                        ? '采用候选或发布后，版本会出现在这里。'
+                        : 'Versions appear here after adopting a candidate or publishing.'}
+                    </div>
+                  ) : (
+                    <ol>
+                      {versions.map(version => (
+                        <li key={version.id}>
+                          <div>
+                            <strong>
+                              {locale === 'zh'
+                                ? `版本 ${version.version_number}`
+                                : `Version ${version.version_number}`}
+                            </strong>
+                            <span>
+                              {typeof version.card_json.name === 'string'
+                                ? version.card_json.name
+                                : version.id.slice(0, 12)}
+                            </span>
+                          </div>
+                          <button
+                            type="button"
+                            className="aicw-button"
+                            onClick={() => { void handleRestoreVersion(version.id) }}
+                            disabled={saving}
+                            aria-label={locale === 'zh'
+                              ? `恢复版本 ${version.version_number}`
+                              : `Restore version ${version.version_number}`}
+                          >
+                            {locale === 'zh' ? '恢复' : 'Restore'}
+                          </button>
+                        </li>
+                      ))}
+                    </ol>
+                  )}
+                </section>
                 <div className="aicw-handoff">
                   <div>
                     <strong>{locale === 'zh' ? '下一步：固定版本沙盒测试' : 'Next: sandbox-test a fixed version'}</strong>
@@ -2317,7 +2516,17 @@ export function AiCardDesigner({
           onClose={() => setShowLocalizationModal(false)}
         />
       )}
-      {error && <div className="form-error ai-error" style={{ whiteSpace: 'pre-wrap' }}>{error}</div>}
+      {error && (
+        <div
+          ref={errorRef}
+          className="form-error ai-error"
+          role="alert"
+          tabIndex={-1}
+          style={{ whiteSpace: 'pre-wrap' }}
+        >
+          {error}
+        </div>
+      )}
     </div>
   )
 }
