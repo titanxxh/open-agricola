@@ -340,13 +340,14 @@ const CARD_IMPL = {
 
 ### C3. 多轮对话设计
 
-- 对话历史存在 React state 中
+- 对话历史和未发送输入只存在当前浏览器会话，并随本地恢复副本写入 localStorage
 - 每轮追加用户反馈 + LLM 响应
 - LLM 看到完整对话历史，支持迭代：
   - "把费用降低一点"
   - "加一个收获时的效果"
   - "参考官方的 Ale Benches 风格"
-- 前端从每条响应中提取最后一个 JSON 代码块作为当前版本
+- 前端从每条响应中提取最后一个完整源码块作为能力候选，不直接覆盖当前已采用源码
+- 服务端只保存能力最近一次完成请求/结果；完整对话、未发送输入和 API Key 不上传
 
 ### C4. 卡牌美术生成
 
@@ -360,7 +361,7 @@ Card description: "{desc}"
 Single centered illustration, no text, no borders, square format.
 ```
 
-美术 URL 存储为 base64 data URL 或上传到服务器 `/data/card-art/` 目录。
+生成结果先成为图片候选，不直接覆盖当前卡面。当前浏览器会话最多保留三个候选；采用后才原子更新 Design Draft、创建去重 Draft Version，并把图片上传到 `/data/card-art/`。
 
 ### C5. LLM 生成代码的安全验证
 
@@ -449,11 +450,12 @@ WorkshopPage
 │   ├── LikeButton
 │   ├── CommentSection
 │   └── AddToSandbox
-├── CardEditor           创建/编辑自己的卡牌
-│   ├── BasicInfoForm    名称/费用/分数/描述
-│   ├── EffectEditor     TypeScript 代码编辑器
-│   ├── AiCardDesigner   LLM 对话式设计
-│   └── PreviewPanel     实时预览卡牌外观
+├── CardEditor / AiCardDesigner
+│   ├── PreviewPanel     始终锚定当前已采用草稿
+│   ├── StageRail        基础信息/卡面图/能力/本地化/验证与交付
+│   ├── CandidateReview  图片与能力候选比较、验证、采用和丢弃
+│   ├── SaveState        检查点、离线恢复和整份 revision 冲突选择
+│   └── VersionHistory   不可变版本恢复和一次本地撤销
 └── SandboxView          我的沙盒
     ├── SelectedCards     已选的自定义卡牌列表
     └── TestGameButton   "开始沙盒测试" → 创建含自定义卡牌的单人游戏
@@ -464,8 +466,8 @@ WorkshopPage
 卡牌工坊支持把用户发布的设计提交为主仓库的 community card PR。入口在卡牌详情页：
 
 1. 用户必须登录，且是该工坊卡牌作者或管理员。
-2. 卡牌必须先发布；草稿状态只显示提示，不允许发起 PR。
-3. 前端调用 `POST /api/workshop/cards/:id/github/propose`。
+2. 当前 Design Draft 必须与 `published_version_id` 内容一致，且 `sandbox_pass_version_id === published_version_id`。
+3. 前端调用 `POST /api/workshop/cards/:id/propose`。
 4. 如果服务端没有当前会话对应的 GitHub token，会返回 OAuth start URL；前端用 popup 打开，并等待 callback 页面通过 `postMessage({ type: 'workshop-pr-oauth', ... }, '*')` 通知授权完成。
 5. 授权完成后前端重试 propose 请求，服务端创建/更新分支并打开或更新 PR。
 
@@ -505,9 +507,24 @@ WorkshopPage
 
 卡牌详情页使用 URL 参数表达当前卡牌：`?page=workshop&card=<workshop-card-id>`。点击卡牌进入详情时使用 `pushState`，返回列表或切换首页时用 `replaceState`，并监听 `popstate` 支持浏览器前进/后退。
 
-版本历史面板读取 `GET /api/workshop/cards/:id/versions`。该路由必须精确匹配，不能被 `GET /api/workshop/cards` 的列表路由吞掉。前端面板需要有 loading/error/empty 状态，避免接口失败时整页空白。
+编辑器直链使用 `?page=workshop&view=editor&card=<workshop-card-id>`。它直接加载作者私有的 `GET /api/workshop/cards/:id/workspace`，不能通过仅含已发布投影的公共详情接口回填草稿。
 
-详情页点击"编辑"会切到 `CardEditor`，并把选中的 `WorkshopCard` 作为 `initialCard` 传给 `AiCardDesigner`。AI 设计器用该初始卡填充当前设计，用户可以从已有卡牌继续修改。
+版本历史读取 `GET /api/workshop/cards/:id/versions`。恢复必须调用带 `baseRevision` 的 `POST /api/workshop/cards/:id/restore`，把不可变版本复制到当前 Design Draft 并推进 revision；不改写历史、不额外创建版本。浏览器保留恢复前草稿，提供一次本地撤销。
+
+### D7. Design Draft 持久化与命令
+
+`server/workshop-drafts.ts` 是 Workshop Card 聚合的写入边界，集中维护 revision、版本去重、公开投影、精确版本沙盒确认和 PR 交接门槛。HTTP handler 只负责认证、解析和响应映射。
+
+| 命令 | 语义 |
+| --- | --- |
+| `POST /api/workshop/cards` | 只创建名称与唯一合法 `CUSTOM_` ID 完整的新卡；不更新或发布已有卡 |
+| `PUT /api/workshop/cards/:id/draft` | 带 `baseRevision` 保存完整检查点；过期返回 `409` 和服务器完整草稿 |
+| `POST /api/workshop/cards/:id/adopt` | 原子采用 typed candidate、创建内容去重版本并清空该类候选 |
+| `POST /api/workshop/cards/:id/restore` | 复制旧版本到当前草稿并推进 revision，不创建版本 |
+| `POST /api/workshop/cards/:id/publish` | 静态验证并固定引用不可变版本 |
+| `POST /api/workshop/cards/:id/sandbox-pass` | 只记录当前精确发布版本且无运行错误的作者确认 |
+
+普通编辑只在切换阶段、站内离开或显式保存时创建检查点，不创建 Draft Version。刷新或崩溃恢复依赖同步写入的 localStorage 副本；同 revision 恢复为未同步状态，服务器 revision 已前进则要求用户选择整份服务器稿或整份本机稿。
 
 ---
 

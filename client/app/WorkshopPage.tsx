@@ -523,42 +523,10 @@ function CardDetail({ card, isLoggedIn, apiFetch, onBack, onEdit, onAddSandbox, 
     }
   }
 
-  const handleRevert = async (versionId: string) => {
-    const r = await apiFetch(`/api/workshop/cards/${card.id}/revert`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ version_id: versionId }),
-    })
-    const d = await r.json()
-    if (d.ok) { onRefresh?.() }
-  }
-
   const handleFeatureToggle = async () => {
     const r = await apiFetch(`/api/workshop/cards/${card.id}/feature`, { method: 'POST' })
     const d = await r.json()
     if (d.ok) setIsFeatured(d.featured)
-  }
-
-  const [cardStatus, setCardStatus] = useState(card.status)
-
-  const handleTogglePublish = async () => {
-    const newStatus = cardStatus === 'published' ? 'draft' : 'published'
-    const r = await apiFetch('/api/workshop/cards', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        card_id: card.card_id,
-        card_type: card.card_type,
-        name: card.name,
-        description: card.description,
-        card_json: card.card_json,
-        effect_code: card.effect_code,
-        art_url: card.art_url,
-        status: newStatus,
-      }),
-    })
-    const d = await r.json()
-    if (d.ok) { setCardStatus(newStatus); onRefresh?.() }
   }
 
   const cardJson = card.card_json
@@ -575,7 +543,7 @@ function CardDetail({ card, isLoggedIn, apiFetch, onBack, onEdit, onAddSandbox, 
           <h2>{card.name}</h2>
           <div className="ws-badges-row">
             <span className="ws-badge">{card.card_type === 'minor' ? t('platform.minor') : t('platform.occupation')}</span>
-            <span className={`ws-badge ws-badge-${cardStatus}`}>{cardStatus === 'published' ? t('platform.published') : t('platform.draft')}</span>
+            <span className={`ws-badge ws-badge-${card.status}`}>{card.status === 'published' ? t('platform.published') : t('platform.draft')}</span>
             {!!card.featured && <span className="ws-badge ws-badge-featured">{t('platform.featuredBadge')}</span>}
             <span className="ws-author">{t('platform.by', { name: card.author_name })}</span>
           </div>
@@ -600,15 +568,6 @@ function CardDetail({ card, isLoggedIn, apiFetch, onBack, onEdit, onAddSandbox, 
             </button>
             {onEdit && (
               <button type="button" className="btn-secondary ws-btn-sm" onClick={onEdit}>{t('platform.edit')}</button>
-            )}
-            {isOwner && (
-              <button
-                type="button"
-                className={`ws-btn-sm ${cardStatus === 'published' ? 'btn-secondary' : 'btn-primary'}`}
-                onClick={handleTogglePublish}
-              >
-                {cardStatus === 'published' ? t('platform.unpublish') : t('platform.publish')}
-              </button>
             )}
             {isOwner && (
               <button type="button" className="btn-secondary ws-btn-sm" onClick={fetchVersions}>
@@ -650,7 +609,6 @@ function CardDetail({ card, isLoggedIn, apiFetch, onBack, onEdit, onAddSandbox, 
                       <span className="ws-version-num">v{v.version_number}</span>
                       <span className="ws-version-date">{new Date(v.created_at).toLocaleString()}</span>
                       <span className="ws-version-name">{vJson.name as string || '—'}</span>
-                      <button type="button" className="btn-secondary ws-btn-xs" onClick={() => handleRevert(v.id)}>{t('platform.revert')}</button>
                     </div>
                     {vDesc && <p className="ws-version-desc">{vDesc}</p>}
                   </li>
@@ -695,8 +653,9 @@ function CardDetail({ card, isLoggedIn, apiFetch, onBack, onEdit, onAddSandbox, 
 
 // ── Card Editor ──────────────────────────────────────────────────────────────
 
-function CardEditor({ initial, apiFetch, onCancel, onAddToSandboxAndRestart, sandboxErrors, onSandboxErrorsConsumed, onCardLoaded }: {
+function CardEditor({ initial, initialCardId, apiFetch, onCancel, onAddToSandboxAndRestart, sandboxErrors, onSandboxErrorsConsumed, onCardLoaded }: {
   initial?: WorkshopCard
+  initialCardId?: string
   apiFetch: (path: string, init?: RequestInit) => Promise<Response>
   onCancel: () => void
   onAddToSandboxAndRestart?: (cardDbId: string, versionId: string) => Promise<void>
@@ -713,6 +672,7 @@ function CardEditor({ initial, apiFetch, onCancel, onAddToSandboxAndRestart, san
     <div className="ws-editor ws-editor-ai">
       <AiCardDesigner
         initialCard={initial}
+        initialCardId={initialCardId}
         onImport={handleAiImport}
         onClose={onCancel}
         onAddToSandboxAndRestart={onAddToSandboxAndRestart}
@@ -1170,6 +1130,7 @@ export function WorkshopPage() {
   const [sandboxSettings, setSandboxSettings] = useState<SandboxSettings>(DEFAULT_SANDBOX_SETTINGS)
   const [selectedCard, setSelectedCard] = useState<WorkshopCard | null>(null)
   const [editCard, setEditCard] = useState<WorkshopCard | undefined>(undefined)
+  const [editCardId, setEditCardId] = useState<string | undefined>(undefined)
   const [sort, setSort] = useState<'recent' | 'popular'>('recent')
   const [search, setSearch] = useState('')
   const [searchInput, setSearchInput] = useState('')
@@ -1449,6 +1410,7 @@ export function WorkshopPage() {
     if (next === 'home') {
       setSelectedCard(null)
       setEditCard(undefined)
+      setEditCardId(undefined)
     }
     setView(next)
     writeWorkshopUrl({ view: next === 'home' ? null : next, card: null }, mode)
@@ -1463,14 +1425,11 @@ export function WorkshopPage() {
     }
   }, [apiFetch])
 
-  const loadCardForEdit = useCallback(async (cardDbId: string) => {
-    const response = await apiFetch(`/api/workshop/cards/${cardDbId}`)
-    const data = await response.json()
-    if (data.ok) {
-      setEditCard(data.card)
-      setView('editor')
-    }
-  }, [apiFetch])
+  const loadCardForEdit = useCallback((cardDbId: string) => {
+    setEditCard(undefined)
+    setEditCardId(cardDbId)
+    setView('editor')
+  }, [])
 
   useEffect(() => {
     const syncFromUrl = () => {
@@ -1482,9 +1441,10 @@ export function WorkshopPage() {
       if (v === 'editor') {
         setSelectedCard(null)
         if (cardDbId) {
-          void loadCardForEdit(cardDbId)
+          loadCardForEdit(cardDbId)
         } else {
           setEditCard(undefined)
+          setEditCardId(undefined)
           setView('editor')
         }
         return
@@ -1534,7 +1494,12 @@ export function WorkshopPage() {
           apiFetch={apiFetch}
           onBack={goBack}
           onEdit={selectedCard.author_id === user?.id || selectedCard.author_name === user?.displayName || selectedCard.author_name === user?.username
-            ? () => { prevView.current = 'detail'; setEditCard(selectedCard); navigateView('editor') }
+            ? () => {
+                prevView.current = 'detail'
+                setEditCard(selectedCard)
+                setEditCardId(selectedCard.id)
+                navigateView('editor')
+              }
             : undefined}
           onAddSandbox={handleAddSandbox}
           isOwner={selectedCard.author_id === user?.id || selectedCard.author_name === user?.displayName}
@@ -1567,12 +1532,14 @@ export function WorkshopPage() {
         />
         <CardEditor
           initial={editCard}
+          initialCardId={editCardId}
           apiFetch={apiFetch}
           onCancel={() => {
             const target = prevView.current
             const next = target === 'sandbox' || target === 'detail' ? target : 'home'
             if (next === 'detail' && selectedCard) {
               setEditCard(undefined)
+              setEditCardId(undefined)
               setView('detail')
               writeWorkshopUrl({ view: null, card: selectedCard.id }, 'replace')
             } else {
@@ -1580,6 +1547,7 @@ export function WorkshopPage() {
             }
           }}
           onCardLoaded={(cardDbId) => {
+            setEditCardId(cardDbId)
             // Reflect the active card in the URL so the user can copy/share
             // the link or refresh without losing their selection.
             writeWorkshopUrl({ view: 'editor', card: cardDbId }, 'replace')
@@ -1767,6 +1735,7 @@ export function WorkshopPage() {
               onClick={() => {
                 prevView.current = view
                 setEditCard(undefined)
+                setEditCardId(undefined)
                 navigateView('editor')
               }}
             >
@@ -1788,6 +1757,7 @@ export function WorkshopPage() {
                   onClick={() => {
                     prevView.current = view
                     setEditCard(undefined)
+                    setEditCardId(undefined)
                     navigateView('editor')
                   }}
                 >

@@ -474,6 +474,30 @@ _Avoid_: 业务代码直接写 log
 自定义卡和 AI 卡牌设计区域，覆盖卡牌生成、LLM 服务、卡牌美术、工坊 PR 和自定义卡上传。
 _Avoid_: 原版规则主路径
 
+**Workshop Card**:
+Workshop 中由作者拥有、具有稳定身份的自定义卡设计聚合。它只有一个当前 Design Draft，并可产生 Draft Version 和 Published Card。
+_Avoid_: Design Draft、游戏内卡牌定义
+
+**Design Draft**:
+Workshop Card 下作者私有、可变且可恢复的当前工作状态，包含已采用的卡牌内容，以及图片、能力各自最近一次完成生成的请求与结果；未发送输入和完整工作对话不属于服务端可恢复草稿。检查点只更新草稿，不代表创建版本或发布。
+_Avoid_: Draft Version、Published Card、临时表单状态
+
+**Generation Candidate**:
+基于 Design Draft 某一目标分区生成、尚未采用的作者私有提案；图片和能力候选共享生命周期，但内容类型不同。同一分区可在当前会话比较最多三个候选，重新打开只恢复最近一次完成生成的候选；采用或丢弃后不作为第二份内容长期保留。
+_Avoid_: Design Draft、Draft Version、已采用内容副本
+
+**Generation Provenance（生成溯源）**:
+描述候选生成来源的作者私有不可变事实，包括最终请求、provider、model、参考图标识和可用的 seed 或 request ID；它是来源证据，不承诺确定性复现。
+_Avoid_: 可复现信息、API Key、模型凭据
+
+**Draft Version**:
+Design Draft 在采用候选或交接时形成的作者私有不可变快照，只包含已采用的卡牌内容及对应生成溯源；恢复版本只把其内容复制到当前 Design Draft，不改写历史或创建新版本。工作对话、未采用候选和普通检查点不属于版本。
+_Avoid_: 自动保存历史、Design Draft、Published Card
+
+**Published Card**:
+固定引用某个 Draft Version 的公开卡牌投影，只公开最终卡牌定义、图片、能力源码和本地化。后续草稿修改保持私有，直到作者再次发布。
+_Avoid_: 实时 Design Draft、生成记录、Generation Provenance
+
 **Workshop Sandbox（工坊沙盒）**:
 Workshop 中组合自定义卡、配置测试局并启动浏览器内热座游戏的界面与流程。中文界面统一使用“沙盒”；重新选择卡牌和配置称“重新配置沙盒”；启动动作称“开始沙盒测试”。
 _Avoid_: 中文界面中的 Sandbox、Reset Sandbox、Custom Code Sandbox
