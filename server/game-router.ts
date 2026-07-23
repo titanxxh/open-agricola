@@ -15,7 +15,20 @@ import type { CustomCardData } from '../shared/cards/session-card-context.ts'
 import type { CustomCodeManifest } from '../shared/custom-code/types.ts'
 import { defaultSandboxDeckIds, defaultSandboxPlayerNames } from '../shared/session/state-bootstrap.ts'
 import { corsHeaders } from './http-origin.ts'
-import { loadSandboxVersion } from './workshop-drafts.ts'
+import {
+  loadPublishedDraft,
+  loadSandboxVersion,
+  type WorkshopDraft,
+} from './workshop-drafts.ts'
+
+const workshopDraftToCustomCard = (draft: WorkshopDraft): CustomCardData => ({
+  cardType: draft.cardType,
+  cardJson: draft.cardJson as unknown as CustomCardData['cardJson'],
+  effectCode: draft.effectCode,
+  compiledCode: draft.compiledCode,
+  codeManifest: draft.codeManifest as CustomCodeManifest | null,
+  artUrl: draft.artUrl,
+})
 
 /**
  * Per-user HTTP game sessions, keyed by user ID.
@@ -593,14 +606,7 @@ export const handleGameRoute = async (
               authorId: requestUser.id,
               versionId,
             })
-            customCards.push({
-              cardType: draft.cardType,
-              cardJson: draft.cardJson as unknown as CustomCardData['cardJson'],
-              effectCode: draft.effectCode,
-              compiledCode: draft.compiledCode,
-              codeManifest: draft.codeManifest as CustomCodeManifest | null,
-              artUrl: draft.artUrl,
-            })
+            customCards.push(workshopDraftToCustomCard(draft))
             customCardVersionsLoaded.push({ cardId: dbId, versionId })
           } catch (error) {
             sendJson(res, 400, {
@@ -622,10 +628,16 @@ export const handleGameRoute = async (
           status: string; author_id: string
         } | undefined
         if (!row) continue
-        // Allow published cards, or draft cards if requester is the author
+        if (row.status === 'published') {
+          try {
+            customCards.push(workshopDraftToCustomCard(loadPublishedDraft(db, dbId)))
+          } catch (err) {
+            console.warn(`[game-router] failed to load published custom card ${dbId}:`, err)
+          }
+          continue
+        }
         const allowed =
-          row.status === 'published' ||
-          (row.status === 'draft' && requestUser?.id === row.author_id)
+          row.status === 'draft' && requestUser?.id === row.author_id
         if (!allowed) continue
         try {
           const parsed = JSON.parse(row.card_json) as Record<string, unknown>

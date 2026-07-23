@@ -412,6 +412,15 @@ describe('workshop API', () => {
       expect(JSON.parse(workspaceRes.body).workspace.draft.generation.art.lastCompleted.prompt)
         .toBe('private prompt')
 
+      const ownerDetailRes = mockRes()
+      await handleWorkshopRoute(
+        mockReq('GET', `/api/workshop/cards/${cardDbId}`, null, 'tok-alice'),
+        ownerDetailRes,
+      )
+      expect(ownerDetailRes.statusCode).toBe(200)
+      expect(JSON.parse(ownerDetailRes.body).card.name).toBe('Private Workspace')
+      expect(ownerDetailRes.body).not.toContain('private prompt')
+
       const otherRes = mockRes()
       await handleWorkshopRoute(
         mockReq('GET', `/api/workshop/cards/${cardDbId}/workspace`, null, 'tok-bob'),
@@ -578,6 +587,54 @@ describe('workshop API', () => {
         readyRes,
       )
       expect(JSON.parse(readyRes.body).readiness.ready).toBe(true)
+    })
+
+    it('creates a pinned version when an admin publishes a draft', async () => {
+      const createRes = mockRes()
+      await handleWorkshopRoute(mockReq('POST', '/api/workshop/cards', {
+        card_id: 'CUSTOM_AdminPublished',
+        card_type: 'minor',
+        name: 'Admin Published',
+        card_json: {
+          id: 'CUSTOM_AdminPublished',
+          name: 'Admin Published',
+          card_type: 'minor',
+          deck: 'CUSTOM',
+          number: 0,
+          desc: [],
+        },
+      }, 'tok-bob'), createRes)
+      const cardDbId = JSON.parse(createRes.body).id
+      const previousAdmins = process.env.ADMIN_USERS
+      process.env.ADMIN_USERS = 'alice'
+      try {
+        const statusRes = mockRes()
+        await handleWorkshopRoute(mockReq(
+          'POST',
+          `/api/admin/cards/${cardDbId}/status`,
+          { status: 'published' },
+          'tok-alice',
+        ), statusRes)
+
+        expect(statusRes.statusCode).toBe(200)
+        expect(JSON.parse(statusRes.body)).toMatchObject({
+          ok: true,
+          status: 'published',
+          publishedVersionId: expect.any(String),
+        })
+        expect(db.prepare(`
+          SELECT published_version_id FROM workshop_cards WHERE id = ?
+        `).get(cardDbId)).toEqual({
+          published_version_id: expect.any(String),
+        })
+
+        const publicRes = mockRes()
+        await handleWorkshopRoute(mockReq('GET', `/api/workshop/cards/${cardDbId}`), publicRes)
+        expect(publicRes.statusCode).toBe(200)
+      } finally {
+        if (previousAdmins === undefined) delete process.env.ADMIN_USERS
+        else process.env.ADMIN_USERS = previousAdmins
+      }
     })
   })
 

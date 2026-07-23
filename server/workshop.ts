@@ -637,6 +637,28 @@ export async function handleWorkshopRoute(
         card: serialisePublishedCardForApi(loadPublishedCard(db, cardDbId, user?.id)),
       })
     } catch (error) {
+      const ownerCard = user
+        ? db.prepare(`
+            SELECT w.*, u.display_name AS author_name,
+                   COUNT(DISTINCT likes.user_id) AS like_count
+            FROM workshop_cards w
+            LEFT JOIN users u ON u.id = w.author_id
+            LEFT JOIN card_likes likes ON likes.card_id = w.id
+            WHERE w.id = ? AND w.author_id = ? AND w.status = 'draft'
+            GROUP BY w.id
+          `).get(cardDbId, user.id) as WorkshopCard | undefined
+        : undefined
+      if (ownerCard) {
+        sendJson(res, 200, {
+          ok: true,
+          card: serialiseCardForApi(ownerCard, {
+            liked_by_me: Boolean(db.prepare(
+              'SELECT 1 FROM card_likes WHERE user_id = ? AND card_id = ?',
+            ).get(user!.id, cardDbId)),
+          }),
+        })
+        return true
+      }
       if (!sendWorkshopDraftError(res, error)) throw error
     }
     return true
@@ -994,9 +1016,39 @@ export async function handleWorkshopRoute(
     const cardDbId = adminStatusMatch[1]!
     const body = await parseBody<{ status?: string }>(req)
     const newStatus = body?.status === 'published' ? 'published' : 'draft'
-    const row = db.prepare('SELECT id FROM workshop_cards WHERE id = ?').get(cardDbId) as { id: string } | undefined
+    const row = db.prepare(`
+      SELECT id, author_id, draft_revision FROM workshop_cards WHERE id = ?
+    `).get(cardDbId) as {
+      id: string
+      author_id: string
+      draft_revision: number
+    } | undefined
     if (!row) { sendJson(res, 404, { ok: false, error: 'Card not found' }); return true }
-    db.prepare('UPDATE workshop_cards SET status = ?, updated_at = ? WHERE id = ?').run(newStatus, Date.now(), cardDbId)
+    if (newStatus === 'published') {
+      try {
+        const result = publish(db, {
+          cardId: cardDbId,
+          authorId: row.author_id,
+          baseRevision: row.draft_revision,
+        })
+        sendJson(res, 200, {
+          ok: true,
+          status: result.workspace.status,
+          publishedVersionId: result.versionId,
+        })
+      } catch (error) {
+        if (!sendWorkshopDraftError(res, error)) throw error
+      }
+      return true
+    }
+    db.prepare(`
+      UPDATE workshop_cards
+      SET status = 'draft',
+          sandbox_pass_version_id = NULL,
+          sandbox_passed_at = NULL,
+          updated_at = ?
+      WHERE id = ?
+    `).run(Date.now(), cardDbId)
     sendJson(res, 200, { ok: true, status: newStatus })
     return true
   }

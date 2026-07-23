@@ -315,7 +315,8 @@ describe('AiCardDesigner AI config header', () => {
         },
       }))
     })
-    const startSandbox = vi.fn(async () => {})
+    const startSandbox = vi.fn(async () => false)
+    startSandbox.mockResolvedValueOnce(false).mockResolvedValueOnce(true)
 
     render(
       <LocaleProvider>
@@ -336,6 +337,12 @@ describe('AiCardDesigner AI config header', () => {
       completeCard.id,
       'version-2',
     ))
+    expect(screen.queryByRole('checkbox', {
+      name: '我确认这个固定版本在沙盒中没有运行错误',
+    })).not.toBeInTheDocument()
+
+    await userEvent.click(screen.getByRole('button', { name: '发布当前版本并启动沙盒' }))
+    await waitFor(() => expect(startSandbox).toHaveBeenCalledTimes(2))
 
     await userEvent.click(screen.getByRole('checkbox', {
       name: '我确认这个固定版本在沙盒中没有运行错误',

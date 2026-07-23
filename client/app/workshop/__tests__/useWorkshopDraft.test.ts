@@ -176,6 +176,31 @@ describe('useWorkshopDraft', () => {
     expect(localStorage.getItem(workshopDraftStorageKey('card-1'))).toContain('Unsynced work')
   })
 
+  it('stops stage navigation when a checkpoint detects a revision conflict', async () => {
+    const apiFetch = vi.fn(async (_path: string, init?: RequestInit) => {
+      if (!init) {
+        return new Response(JSON.stringify({ ok: true, workspace: workspace(1) }))
+      }
+      return new Response(JSON.stringify({
+        ok: false,
+        current: workspace(2, 'Server work'),
+      }), { status: 409 })
+    })
+    const { result } = renderHook(() => useWorkshopDraft({
+      cardId: 'card-1',
+      apiFetch,
+    }))
+    await waitFor(() => expect(result.current.state?.baseRevision).toBe(1))
+    act(() => result.current.updateDraft(draft('Conflicting work')))
+
+    await act(async () => {
+      expect(await result.current.changeStage('art')).toBe(false)
+    })
+
+    expect(result.current.state?.stage).toBe('metadata')
+    expect(result.current.state?.save.status).toBe('conflict')
+  })
+
   it('checkpoints provenance before adopting a candidate', async () => {
     const calls: { path: string; body?: Record<string, unknown> }[] = []
     const apiFetch = vi.fn(async (path: string, init?: RequestInit) => {
