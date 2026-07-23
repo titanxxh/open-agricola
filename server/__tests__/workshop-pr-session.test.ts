@@ -381,6 +381,7 @@ describe('workshop PR propose — session', () => {
   const origClientId = workshopPrConfig.clientId
   const origSecret = workshopPrConfig.clientSecret
   const origEnabled = workshopPrConfig.enabled
+  const origMockMode = workshopPrConfig.mockMode
   const origCorsOrigin = process.env.CORS_ORIGIN
 
   let userId: string
@@ -392,6 +393,7 @@ describe('workshop PR propose — session', () => {
     ;(workshopPrConfig as unknown as { clientId: string }).clientId = 'test_cid'
     ;(workshopPrConfig as unknown as { clientSecret: string }).clientSecret = 'test_secret'
     ;(workshopPrConfig as unknown as { enabled: boolean }).enabled = true
+    ;(workshopPrConfig as unknown as { mockMode: boolean }).mockMode = false
 
     const now = Date.now()
     userId = nanoid()
@@ -462,6 +464,7 @@ describe('workshop PR propose — session', () => {
     ;(workshopPrConfig as unknown as { clientId: string }).clientId = origClientId
     ;(workshopPrConfig as unknown as { clientSecret: string }).clientSecret = origSecret
     ;(workshopPrConfig as unknown as { enabled: boolean }).enabled = origEnabled
+    ;(workshopPrConfig as unknown as { mockMode: boolean }).mockMode = origMockMode
     if (origCorsOrigin === undefined) delete process.env.CORS_ORIGIN
     else process.env.CORS_ORIGIN = origCorsOrigin
 
@@ -494,6 +497,33 @@ describe('workshop PR propose — session', () => {
         publishedVersionMatchesDraft: true,
         sandboxPassedForPublishedVersion: false,
       },
+    })
+  })
+
+  it('returns a deterministic PR result without OAuth in mock mode', async () => {
+    ;(workshopPrConfig as unknown as { mockMode: boolean }).mockMode = true
+    const req = fakeReq({
+      method: 'POST',
+      url: `/api/workshop/cards/${cardDbId}/propose`,
+      authHeader: `Bearer ${userToken}`,
+      body: JSON.stringify({}),
+    })
+    const res = fakeRes()
+
+    await handleProposeRequest(req, res, cardDbId)
+
+    expect(res.statusCode).toBe(200)
+    expect(JSON.parse(res.body)).toEqual({
+      ok: true,
+      prUrl: '/mock-workshop-pr/1',
+      prNumber: 1,
+    })
+    expect(db.prepare(`
+      SELECT github_pr_url, github_pr_status
+      FROM workshop_cards WHERE id = ?
+    `).get(cardDbId)).toEqual({
+      github_pr_url: '/mock-workshop-pr/1',
+      github_pr_status: 'open',
     })
   })
 

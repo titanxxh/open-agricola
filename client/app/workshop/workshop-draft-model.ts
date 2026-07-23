@@ -57,6 +57,7 @@ export type WorkshopSessionState = {
   selectedArtCandidateId?: string
   selectedAbilityCandidateId?: string
   sandboxTestVersionId?: string
+  restoreUndoDraft?: WorkshopClientDraft
 }
 
 export type WorkshopLocalRecovery = {
@@ -268,6 +269,7 @@ export const workshopDraftReducer = (
           artCandidates: staleCandidates(state.session.artCandidates),
           abilityCandidates: staleCandidates(state.session.abilityCandidates),
           sandboxTestVersionId: undefined,
+          restoreUndoDraft: undefined,
         },
         sandboxPassVersionId: null,
         sandboxPassedAt: null,
@@ -372,12 +374,14 @@ export const workshopDraftReducer = (
               artCandidates: [],
               selectedArtCandidateId: undefined,
               sandboxTestVersionId: undefined,
+              restoreUndoDraft: undefined,
             }
           : {
               ...next.session,
               abilityCandidates: [],
               selectedAbilityCandidateId: undefined,
               sandboxTestVersionId: undefined,
+              restoreUndoDraft: undefined,
             },
       }
     }

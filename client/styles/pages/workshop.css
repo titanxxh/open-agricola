@@ -763,7 +763,7 @@
 }
 .ai-config-bar-hint {
   font-size: 12px;
-  color: #888;
+  color: #666;
   flex: 1;
 }
 .ai-config-bar-fields {
@@ -970,7 +970,7 @@
 }
 .ai-art-border-tag {
   font-size: 11px;
-  color: var(--color-text-muted);
+  color: #66523a;
   background: #f0e6d0;
   padding: 2px 8px;
   border-radius: 8px;
@@ -1613,7 +1613,7 @@
 .ai-prompt-details { margin: 4px 0 6px; }
 .ai-prompt-summary {
   font-size: 11px;
-  color: #888;
+  color: #666;
   cursor: pointer;
   user-select: none;
   list-style: none;
@@ -2290,7 +2290,7 @@
   height: 46%;
   place-items: center;
   overflow: hidden;
-  color: #5e594d;
+  color: #3f3a30;
   background: #c9bda0;
   font-size: 12px;
 }
@@ -2906,7 +2906,7 @@
   list-style: none;
 }
 
-.aicw-validation li {
+.aicw-validation > ul > li {
   display: grid;
   grid-template-columns: 30px 1fr;
   align-items: center;
@@ -2916,7 +2916,7 @@
   background: var(--aicw-paper);
 }
 
-.aicw-validation li > span {
+.aicw-validation > ul > li > span {
   display: grid;
   width: 28px;
   height: 28px;
@@ -2927,17 +2927,17 @@
   font-weight: 800;
 }
 
-.aicw-validation li.is-ready > span {
+.aicw-validation > ul > li.is-ready > span {
   color: #fff;
   background: var(--aicw-green);
 }
 
-.aicw-validation li > div {
+.aicw-validation > ul > li > div {
   display: grid;
   gap: 2px;
 }
 
-.aicw-validation li small {
+.aicw-validation > ul > li small {
   color: var(--aicw-muted);
   font-size: 11px;
 }
@@ -2968,6 +2968,90 @@
 .aicw-version-gate strong {
   color: var(--aicw-green-strong);
   font-size: 13px;
+}
+
+.aicw-version-history {
+  margin-top: 18px;
+  overflow: hidden;
+  border: 1px solid var(--aicw-border);
+  border-radius: 10px;
+  background: var(--aicw-paper);
+}
+
+.aicw-version-history-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--aicw-border);
+}
+
+.aicw-version-history-heading > div {
+  display: grid;
+  gap: 2px;
+}
+
+.aicw-version-history-heading span {
+  color: var(--aicw-muted);
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.aicw-version-history-heading h3 {
+  margin: 0;
+  font-size: 16px;
+}
+
+.aicw-version-history ol {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.aicw-version-history li {
+  display: flex;
+  min-height: 58px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 9px 16px;
+  border-top: 1px solid var(--aicw-border);
+}
+
+.aicw-version-history li:first-child {
+  border-top: 0;
+}
+
+.aicw-version-history li > div {
+  display: grid;
+  min-width: 0;
+  gap: 2px;
+}
+
+.aicw-version-history li span {
+  overflow: hidden;
+  color: var(--aicw-muted);
+  font-size: 11px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.aicw-version-message {
+  display: flex;
+  min-height: 58px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 16px;
+  color: var(--aicw-muted);
+  font-size: 12px;
+}
+
+.aicw-version-message.is-error {
+  color: var(--aicw-red);
 }
 
 .aicw-handoff {
@@ -3153,6 +3237,13 @@
 
   .aicw-version-gate {
     grid-template-columns: 1fr;
+  }
+
+  .aicw-version-history-heading,
+  .aicw-version-history li,
+  .aicw-version-message {
+    align-items: stretch;
+    flex-direction: column;
   }
 
   .aicw-current-asset,

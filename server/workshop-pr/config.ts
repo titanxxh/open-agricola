@@ -5,6 +5,8 @@ export const workshopPrConfig = {
   upstreamOwner: process.env.GITHUB_UPSTREAM_OWNER ?? 'titanxxh',
   upstreamRepo: process.env.GITHUB_UPSTREAM_REPO ?? 'open-agricola',
   callbackPath: '/api/workshop/github/oauth/callback',
+  mockMode: process.env.NODE_ENV !== 'production'
+    && process.env.WORKSHOP_PR_MOCK_MODE === 'true',
 }
 
 /**
@@ -13,7 +15,8 @@ export const workshopPrConfig = {
  * endpoints should return 503. UI shows no "Propose to main repo" button.
  */
 export function workshopPrEnabled(): boolean {
-  return workshopPrConfig.enabled
+  return workshopPrConfig.mockMode
+    || workshopPrConfig.enabled
     && workshopPrConfig.clientId.length > 0
     && workshopPrConfig.clientSecret.length > 0
 }

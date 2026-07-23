@@ -740,7 +740,7 @@ export async function handleWorkshopRoute(
   }
 
   // ── POST /api/workshop/cards ─────────────────────────────────────────────
-  // Create or update a card (auth required)
+  // Create a card (auth required)
   if (req.method === 'POST' && url === '/api/workshop/cards') {
     if (!user) { sendJson(res, 401, { ok: false, error: 'Not authenticated' }); return true }
     const body = await parseBody<{
@@ -756,6 +756,13 @@ export async function handleWorkshopRoute(
     }>(req)
     if (!body?.card_id || !body.card_type || !body.name || !body.card_json) {
       sendJson(res, 400, { ok: false, error: 'Missing required fields: card_id, card_type, name, card_json' })
+      return true
+    }
+    if (body.id || body.status === 'published') {
+      sendJson(res, 400, {
+        ok: false,
+        error: 'Use revisioned draft and publish commands for existing cards',
+      })
       return true
     }
     if (!body.card_id.startsWith('CUSTOM_')) {
@@ -790,20 +797,7 @@ export async function handleWorkshopRoute(
       codeManifest = JSON.stringify(validation.manifest)
     }
 
-    const newStatus = body.status === 'published' ? 'published' : 'draft'
-
-    // Auto-resolve: if no body.id but a draft with this card_id exists for this author, update it
-    if (!body.id && body.card_id) {
-      const existingDraft = db.prepare(
-        'SELECT id FROM workshop_cards WHERE card_id = ? AND author_id = ? LIMIT 1',
-      ).get(body.card_id, user.id) as { id: string } | undefined
-      if (existingDraft) {
-        body.id = existingDraft.id
-      }
-    }
-
     try {
-      const current = body.id ? loadWorkspace(db, body.id, user.id) : null
       const draft: WorkshopDraft = {
         cardId: body.card_id,
         cardType: body.card_type as WorkshopDraft['cardType'],
@@ -814,23 +808,9 @@ export async function handleWorkshopRoute(
         compiledCode,
         codeManifest: codeManifest ? JSON.parse(codeManifest) as Record<string, unknown> : null,
         artUrl: body.art_url ?? null,
-        generation: current?.draft.generation ?? {},
+        generation: {},
       }
-      const workspace = current
-        ? checkpointDraft(db, {
-            cardId: current.id,
-            authorId: user.id,
-            baseRevision: current.revision,
-            draft,
-          })
-        : createCard(db, { authorId: user.id, draft })
-      if (newStatus === 'published') {
-        publish(db, {
-          cardId: workspace.id,
-          authorId: user.id,
-          baseRevision: workspace.revision,
-        })
-      }
+      const workspace = createCard(db, { authorId: user.id, draft })
       sendJson(res, 200, { ok: true, id: workspace.id })
     } catch (error) {
       if (!sendWorkshopDraftError(res, error)) throw error
@@ -996,29 +976,6 @@ export async function handleWorkshopRoute(
       card_json: JSON.parse(r.card_json),
     }))
     sendJson(res, 200, { ok: true, versions })
-    return true
-  }
-
-  // ── POST /api/workshop/cards/:id/revert ─────────────────────────────────
-  const revertMatch = /^\/api\/workshop\/cards\/([^/]+)\/revert$/.exec(url)
-  if (req.method === 'POST' && revertMatch) {
-    if (!user) { sendJson(res, 401, { ok: false, error: 'Not authenticated' }); return true }
-    const cardDbId = revertMatch[1]!
-    const body = await parseBody<{ version_id?: string }>(req)
-    if (!body?.version_id) { sendJson(res, 400, { ok: false, error: 'Missing version_id' }); return true }
-
-    try {
-      const current = loadWorkspace(db, cardDbId, user.id)
-      const restored = restoreVersion(db, {
-        cardId: cardDbId,
-        authorId: user.id,
-        baseRevision: current.revision,
-        versionId: body.version_id,
-      })
-      sendJson(res, 200, { ok: true, revision: restored.revision })
-    } catch (error) {
-      if (!sendWorkshopDraftError(res, error)) throw error
-    }
     return true
   }
 

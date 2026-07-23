@@ -271,4 +271,48 @@ describe('useWorkshopDraft', () => {
         runtimeErrors: [],
       })
   })
+
+  it('restores an immutable version by copy-forward and offers one local undo', async () => {
+    const requests: Array<{ path: string; body?: Record<string, unknown> }> = []
+    const apiFetch = vi.fn(async (path: string, init?: RequestInit) => {
+      const body = init?.body
+        ? JSON.parse(String(init.body)) as Record<string, unknown>
+        : undefined
+      requests.push({ path, body })
+      if (!init) {
+        return new Response(JSON.stringify({ ok: true, workspace: workspace(4, 'Current work') }))
+      }
+      if (path.endsWith('/restore')) {
+        return new Response(JSON.stringify({
+          ok: true,
+          workspace: workspace(5, 'Version one'),
+        }))
+      }
+      return new Response(JSON.stringify({
+        ok: true,
+        workspace: workspace(6, 'Current work'),
+      }))
+    })
+    const { result } = renderHook(() => useWorkshopDraft({
+      cardId: 'card-1',
+      apiFetch,
+    }))
+    await waitFor(() => expect(result.current.state?.baseRevision).toBe(4))
+
+    await act(async () => {
+      expect(await result.current.restoreVersion('version-1')).toBe(true)
+    })
+    expect(result.current.state?.draft.name).toBe('Version one')
+    expect(result.current.state?.session.restoreUndoDraft?.name).toBe('Current work')
+    expect(requests.find(request => request.path.endsWith('/restore'))?.body)
+      .toEqual({ baseRevision: 4, versionId: 'version-1' })
+
+    await act(async () => {
+      expect(await result.current.undoRestore()).toBe(true)
+    })
+    expect(result.current.state?.draft.name).toBe('Current work')
+    expect(result.current.state?.session.restoreUndoDraft).toBeUndefined()
+    expect(requests.find(request => request.path.endsWith('/draft'))?.body)
+      .toMatchObject({ baseRevision: 5, draft: { name: 'Current work' } })
+  })
 })

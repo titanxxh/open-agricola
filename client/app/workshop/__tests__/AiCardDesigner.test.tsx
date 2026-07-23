@@ -130,6 +130,33 @@ describe('AiCardDesigner AI config header', () => {
     })
   })
 
+  it('loads an author workspace directly from an editor card URL', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: false }))
+    const apiFetch = vi.fn(async (path: string) => {
+      if (path.includes('scope=mine')) {
+        return new Response(JSON.stringify({ ok: true, cards: [existingCard] }))
+      }
+      return apiFetchForExistingCard(path)
+    })
+
+    render(
+      <LocaleProvider>
+        <AiCardDesigner
+          initialCardId={existingCard.id}
+          onImport={() => {}}
+          onClose={() => {}}
+          apiFetch={apiFetch}
+        />
+      </LocaleProvider>,
+    )
+
+    await waitFor(() => {
+      expect(screen.getByDisplayValue('中世纪木槌')).toBeInTheDocument()
+      expect(screen.getByDisplayValue('CUSTOM_MedievalMallet')).toBeInTheDocument()
+    })
+    expect(apiFetch).toHaveBeenCalledWith(`/api/workshop/cards/${existingCard.id}/workspace`)
+  })
+
   it('keeps Enter as a newline in the ability chat input', async () => {
     localStorage.setItem(
       'open-agricola-llm-config',
@@ -322,6 +349,84 @@ describe('AiCardDesigner AI config header', () => {
       authorConfirmed: true,
       runtimeErrors: [],
     })
+  })
+
+  it('restores version history and offers one local undo', async () => {
+    const apiFetch = vi.fn(async (path: string, init?: RequestInit) => {
+      if (path.includes('scope=mine')) {
+        return new Response(JSON.stringify({ ok: true, cards: [existingCard] }))
+      }
+      if (path.endsWith('/versions')) {
+        return new Response(JSON.stringify({
+          ok: true,
+          versions: [{
+            id: 'version-1',
+            version_number: 1,
+            card_json: {
+              ...existingCard.card_json,
+              name: 'Version one',
+            },
+            art_url: null,
+            created_at: 100,
+          }],
+        }))
+      }
+      if (path.endsWith('/restore')) {
+        return new Response(JSON.stringify({
+          ok: true,
+          workspace: {
+            ...JSON.parse(await apiFetchForExistingCard(path).then(response => response.text())).workspace,
+            revision: 3,
+            draft: {
+              ...JSON.parse(await apiFetchForExistingCard(path).then(response => response.text())).workspace.draft,
+              name: 'Version one',
+              cardJson: {
+                ...existingCard.card_json,
+                name: 'Version one',
+              },
+            },
+          },
+        }))
+      }
+      if (init?.method === 'PUT') {
+        const body = JSON.parse(String(init.body))
+        return new Response(JSON.stringify({
+          ok: true,
+          workspace: {
+            ...JSON.parse(await apiFetchForExistingCard(path).then(response => response.text())).workspace,
+            revision: 4,
+            draft: body.draft,
+          },
+        }))
+      }
+      return apiFetchForExistingCard(path)
+    })
+
+    render(
+      <LocaleProvider>
+        <AiCardDesigner
+          initialCard={existingCard}
+          onImport={() => {}}
+          onClose={() => {}}
+          apiFetch={apiFetch}
+        />
+      </LocaleProvider>,
+    )
+
+    await waitFor(() => expect(screen.queryByText('正在恢复草稿…')).not.toBeInTheDocument())
+    await userEvent.click(screen.getByRole('button', { name: /验证与交付 沙盒测试和发布检查/ }))
+    await waitFor(() => expect(screen.getByText('版本 1')).toBeInTheDocument())
+    await userEvent.click(screen.getByRole('button', { name: '恢复版本 1' }))
+    await waitFor(() => expect(screen.getByRole('heading', {
+      name: 'Version one',
+      level: 2,
+    })).toBeInTheDocument())
+
+    await userEvent.click(screen.getByRole('button', { name: '撤销恢复' }))
+    await waitFor(() => expect(screen.getByRole('heading', {
+      name: '中世纪木槌',
+      level: 2,
+    })).toBeInTheDocument())
   })
 
   it('checkpoints the complete draft before changing stages', async () => {
