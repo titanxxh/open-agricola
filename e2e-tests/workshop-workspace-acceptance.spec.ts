@@ -943,13 +943,27 @@ const scenarioHandoff = async ({
 
   await openEditor(page, workspace.id)
   await stage(page, variant.locale, '验证与交付', 'Validate & hand off')
-  let sandboxLaunchFails = true
+  let sandboxLaunchMode: 'failure' | 'warning' | 'real' = 'failure'
   await page.route('**/api/game/new-sandbox', route => {
-    if (sandboxLaunchFails) {
+    if (sandboxLaunchMode === 'failure') {
       return route.fulfill({
         status: 503,
         contentType: 'application/json',
         body: JSON.stringify({ ok: false, error: 'deterministic sandbox failure' }),
+      })
+    }
+    if (sandboxLaunchMode === 'warning') {
+      return route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          ok: true,
+          cardWarnings: ['deterministic sandbox warning'],
+          customCardVersionsLoaded: [{
+            cardId: workspace.id,
+            versionId: published.versionId,
+          }],
+        }),
       })
     }
     return route.continue()
@@ -971,7 +985,21 @@ const scenarioHandoff = async ({
     ),
   })).toBeHidden()
 
-  sandboxLaunchFails = false
+  sandboxLaunchMode = 'warning'
+  await launch.click()
+  const sandboxConfirmation = page.getByRole('checkbox', {
+    name: text(
+      variant.locale,
+      '我确认这个固定版本在沙盒中没有运行错误',
+      'I confirm this pinned version has no sandbox runtime errors',
+    ),
+  })
+  await expect(sandboxConfirmation).toBeDisabled()
+  await stage(page, variant.locale, '卡牌能力', 'Card ability')
+  await stage(page, variant.locale, '验证与交付', 'Validate & hand off')
+  await expect(sandboxConfirmation).toBeDisabled()
+
+  sandboxLaunchMode = 'real'
   const sandboxResponse = page.waitForResponse(response =>
     response.url().endsWith('/api/game/new-sandbox') && response.ok(),
   )
@@ -983,13 +1011,6 @@ const scenarioHandoff = async ({
     cardId: workspace.id,
     versionId: published.versionId,
   }])
-  const sandboxConfirmation = page.getByRole('checkbox', {
-    name: text(
-      variant.locale,
-      '我确认这个固定版本在沙盒中没有运行错误',
-      'I confirm this pinned version has no sandbox runtime errors',
-    ),
-  })
   await expect(sandboxConfirmation).toBeEnabled()
   await sandboxConfirmation.check()
   await page.getByRole('button', {

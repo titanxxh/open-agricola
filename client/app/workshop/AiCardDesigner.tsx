@@ -906,7 +906,6 @@ function AbilityPanel({
   onCandidateDiscarded,
   onCandidateAdopted,
   sandboxErrors,
-  onSandboxErrorsConsumed,
   validationErrors,
   onValidationErrorsConsumed,
 }: {
@@ -935,7 +934,6 @@ function AbilityPanel({
   onCandidateDiscarded: (candidateId: string) => Promise<void>
   onCandidateAdopted: (candidate: AbilityCandidate) => Promise<void>
   sandboxErrors?: string[] | null
-  onSandboxErrorsConsumed?: () => void
   validationErrors?: string | null
   onValidationErrorsConsumed?: () => void
 }) {
@@ -947,6 +945,7 @@ function AbilityPanel({
   const messagesRef = useRef(messages)
   const bottomRef = useRef<HTMLDivElement>(null)
   const errorRef = useRef<HTMLDivElement>(null)
+  const injectedSandboxErrorsRef = useRef<string | null>(null)
 
   useEffect(() => {
     messagesRef.current = messages
@@ -1170,10 +1169,15 @@ function AbilityPanel({
   }, [commitMessages, config, sendMessages, streaming])
 
   useEffect(() => {
-    if (!sandboxErrors?.length) return
+    if (!sandboxErrors?.length) {
+      injectedSandboxErrorsRef.current = null
+      return
+    }
+    const signature = JSON.stringify(sandboxErrors)
+    if (injectedSandboxErrorsRef.current === signature || !config || streaming) return
+    injectedSandboxErrorsRef.current = signature
     injectError('沙盒运行报错', sandboxErrors)
-    onSandboxErrorsConsumed?.()
-  }, [injectError, onSandboxErrorsConsumed, sandboxErrors])
+  }, [config, injectError, sandboxErrors, streaming])
 
   return (
     <div className="ai-ability-panel">
@@ -1437,7 +1441,6 @@ type AiCardDesignerProps = {
   onClose: () => void
   onAddToSandboxAndRestart?: (cardDbId: string, versionId: string) => Promise<boolean>
   sandboxErrors?: string[] | null
-  onSandboxErrorsConsumed?: () => void
   onCardLoaded?: (cardDbId: string) => void
   apiFetch?: ApiFetch
 }
@@ -1449,7 +1452,6 @@ export function AiCardDesigner({
   onClose,
   onAddToSandboxAndRestart,
   sandboxErrors,
-  onSandboxErrorsConsumed,
   onCardLoaded,
   apiFetch,
 }: AiCardDesignerProps) {
@@ -2429,7 +2431,6 @@ export function AiCardDesigner({
                 onCandidateDiscarded={candidateId => discardCandidate('ability', candidateId)}
                 onCandidateAdopted={adoptCandidate}
                 sandboxErrors={sandboxErrors}
-                onSandboxErrorsConsumed={onSandboxErrorsConsumed}
                 validationErrors={validationErrors}
                 onValidationErrorsConsumed={() => setValidationErrors(null)}
               />

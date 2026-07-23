@@ -471,6 +471,7 @@ const staticValidation = (
   }
   if (draft.cardJson.id !== draft.cardId) errors.push('Card definition id does not match card id')
   if (draft.cardJson.name !== draft.name) errors.push('Card definition name does not match card name')
+  if (draft.cardJson.card_type !== draft.cardType) errors.push('Card definition type does not match card type')
   if (
     draft.effectCode
     && (!draft.compiledCode || !draft.codeManifest)
