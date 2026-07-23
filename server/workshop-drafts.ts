@@ -459,6 +459,46 @@ const versionContentHash = (version: WorkshopVersionRow): string => version.cont
     version.art_url,
   )
 
+const draftFromVersion = (
+  current: WorkshopWorkspace,
+  version: WorkshopVersionRow,
+): WorkshopDraft => {
+  const cardJson = parseRecord(version.card_json)
+  const effectCode = typeof cardJson._code === 'string' ? cardJson._code : null
+  const compiledCode = typeof cardJson._compiled === 'string' ? cardJson._compiled : null
+  delete cardJson._code
+  delete cardJson._compiled
+  return {
+    ...current.draft,
+    cardId: typeof cardJson.id === 'string' ? cardJson.id : current.draft.cardId,
+    cardType: cardJson.card_type === 'occupation' || cardJson.card_type === 'minor'
+      ? cardJson.card_type
+      : current.draft.cardType,
+    name: typeof cardJson.name === 'string' ? cardJson.name : current.draft.name,
+    description: Array.isArray(cardJson.desc)
+      ? cardJson.desc.filter((value): value is string => typeof value === 'string').join(' ')
+      : current.draft.description,
+    cardJson,
+    effectCode,
+    compiledCode,
+    codeManifest: version.code_manifest ? parseRecord(version.code_manifest) : null,
+    artUrl: version.art_url,
+    generation: parseRecord(version.provenance_json),
+  }
+}
+
+export function loadSandboxVersion(
+  db: Database.Database,
+  input: {
+    cardId: string
+    authorId: string
+    versionId: string
+  },
+): WorkshopDraft {
+  const current = loadWorkspace(db, input.cardId, input.authorId)
+  return draftFromVersion(current, loadVersion(db, input.cardId, input.versionId))
+}
+
 export function restoreVersion(
   db: Database.Database,
   input: {
@@ -474,25 +514,11 @@ export function restoreVersion(
       throw new WorkshopDraftError('conflict', 'Draft revision conflict', current)
     }
     const version = loadVersion(db, input.cardId, input.versionId)
-    const cardJson = parseRecord(version.card_json)
-    const effectCode = typeof cardJson._code === 'string' ? cardJson._code : null
-    const compiledCode = typeof cardJson._compiled === 'string' ? cardJson._compiled : null
-    delete cardJson._code
-    delete cardJson._compiled
     return checkpointDraft(db, {
       cardId: input.cardId,
       authorId: input.authorId,
       baseRevision: input.baseRevision,
-      draft: {
-        ...current.draft,
-        name: typeof cardJson.name === 'string' ? cardJson.name : current.draft.name,
-        cardJson,
-        effectCode,
-        compiledCode,
-        codeManifest: version.code_manifest ? parseRecord(version.code_manifest) : null,
-        artUrl: version.art_url,
-        generation: parseRecord(version.provenance_json),
-      },
+      draft: draftFromVersion(current, version),
     })
   })()
 }
