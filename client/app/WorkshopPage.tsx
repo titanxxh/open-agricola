@@ -699,7 +699,7 @@ function CardEditor({ initial, apiFetch, onCancel, onAddToSandboxAndRestart, san
   initial?: WorkshopCard
   apiFetch: (path: string, init?: RequestInit) => Promise<Response>
   onCancel: () => void
-  onAddToSandboxAndRestart?: (cardDbId: string) => Promise<void>
+  onAddToSandboxAndRestart?: (cardDbId: string, versionId: string) => Promise<void>
   t: (key: string, params?: Record<string, string | number>) => string
   sandboxErrors?: string[] | null
   onSandboxErrorsConsumed?: () => void
@@ -1380,13 +1380,24 @@ export function WorkshopPage() {
     }
   }
 
-  const handleStartSandboxGame = async (extraCardId?: string) => {
+  const handleStartSandboxGame = async (
+    extraCardId?: string,
+    exactVersionId?: string,
+  ) => {
     try {
       const response = await apiFetch('/api/game/new-sandbox', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           customCardIds: buildSandboxCardIds(sandboxCards, extraCardId),
+          ...(extraCardId && exactVersionId
+            ? {
+                customCardVersions: [{
+                  cardId: extraCardId,
+                  versionId: exactVersionId,
+                }],
+              }
+            : {}),
           playerCount: sandboxSettings.player_count,
           deckIds: sandboxSettings.deck_ids,
           enableThroughTheSeasons: sandboxSettings.enable_through_the_seasons,
@@ -1573,9 +1584,9 @@ export function WorkshopPage() {
             // the link or refresh without losing their selection.
             writeWorkshopUrl({ view: 'editor', card: cardDbId }, 'replace')
           }}
-          onAddToSandboxAndRestart={async (cardDbId: string) => {
+          onAddToSandboxAndRestart={async (cardDbId: string, versionId: string) => {
             await handleAddSandbox(cardDbId)
-            await handleStartSandboxGame(cardDbId)
+            await handleStartSandboxGame(cardDbId, versionId)
           }}
           t={t}
           sandboxErrors={pendingSandboxErrors}

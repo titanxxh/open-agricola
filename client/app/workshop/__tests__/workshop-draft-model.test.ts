@@ -58,6 +58,10 @@ describe('workshop draft model', () => {
       'art-3',
       'art-4',
     ])
+    state = workshopDraftReducer(state, {
+      type: 'sessionChanged',
+      session: { sandboxTestVersionId: 'version-1' },
+    })
 
     state = workshopDraftReducer(state, {
       type: 'draftChanged',
@@ -65,6 +69,7 @@ describe('workshop draft model', () => {
     })
     expect(state.save.status).toBe('dirty')
     expect(state.session.artCandidates.every(candidate => candidate.stale)).toBe(true)
+    expect(state.session.sandboxTestVersionId).toBeUndefined()
   })
 
   it('invalidates ability validation when candidate source is edited', () => {

@@ -227,6 +227,103 @@ describe('AiCardDesigner AI config header', () => {
     expect(container.querySelector('.aicw-current-code code')?.textContent).toBe(sourceCode)
   })
 
+  it('publishes, starts, and confirms one exact sandbox version', async () => {
+    const completeCard: ApiCard = {
+      ...existingCard,
+      art_url: '/card-art/complete.png',
+      card_json: {
+        ...existingCard.card_json,
+        locales: {
+          zh: { name: '中世纪木槌', desc: ['建造石屋'] },
+        },
+      },
+    }
+    const baseWorkspace = {
+      id: completeCard.id,
+      authorId: 'author',
+      revision: 2,
+      status: 'draft',
+      draft: {
+        cardId: completeCard.card_id,
+        cardType: 'minor' as const,
+        name: completeCard.name,
+        description: completeCard.description,
+        cardJson: completeCard.card_json,
+        effectCode: completeCard.effect_code,
+        compiledCode: '"use strict";',
+        codeManifest: {},
+        artUrl: completeCard.art_url,
+        generation: {},
+      },
+      publishedVersionId: null,
+      sandboxPassVersionId: null,
+      sandboxPassedAt: null,
+    }
+    const apiFetch = vi.fn(async (path: string, init?: RequestInit) => {
+      if (path.includes('scope=mine')) {
+        return new Response(JSON.stringify({ ok: true, cards: [completeCard] }))
+      }
+      if (!init) {
+        return new Response(JSON.stringify({ ok: true, workspace: baseWorkspace }))
+      }
+      if (path.endsWith('/publish')) {
+        return new Response(JSON.stringify({
+          ok: true,
+          workspace: {
+            ...baseWorkspace,
+            status: 'published',
+            publishedVersionId: 'version-2',
+          },
+          versionId: 'version-2',
+        }))
+      }
+      return new Response(JSON.stringify({
+        ok: true,
+        workspace: {
+          ...baseWorkspace,
+          status: 'published',
+          publishedVersionId: 'version-2',
+          sandboxPassVersionId: 'version-2',
+          sandboxPassedAt: 100,
+        },
+      }))
+    })
+    const startSandbox = vi.fn(async () => {})
+
+    render(
+      <LocaleProvider>
+        <AiCardDesigner
+          initialCard={completeCard}
+          onImport={() => {}}
+          onClose={() => {}}
+          onAddToSandboxAndRestart={startSandbox}
+          apiFetch={apiFetch}
+        />
+      </LocaleProvider>,
+    )
+
+    await waitFor(() => expect(screen.queryByText('正在恢复草稿…')).not.toBeInTheDocument())
+    await userEvent.click(screen.getByRole('button', { name: /验证与交付 沙盒测试和发布检查/ }))
+    await userEvent.click(screen.getByRole('button', { name: '发布当前版本并启动沙盒' }))
+    await waitFor(() => expect(startSandbox).toHaveBeenCalledWith(
+      completeCard.id,
+      'version-2',
+    ))
+
+    await userEvent.click(screen.getByRole('checkbox', {
+      name: '我确认这个固定版本在沙盒中没有运行错误',
+    }))
+    await userEvent.click(screen.getByRole('button', { name: '确认沙盒通过' }))
+    await waitFor(() => expect(screen.getByText('已满足社区 PR 交接门槛')).toBeInTheDocument())
+
+    const passCall = apiFetch.mock.calls.find(([path]) => path.endsWith('/sandbox-pass'))
+    expect(JSON.parse(String(passCall?.[1]?.body))).toEqual({
+      versionId: 'version-2',
+      authorConfirmed: true,
+      runtimeErrors: [],
+    })
+  })
+
   it('checkpoints the complete draft before changing stages', async () => {
     const apiFetch = vi.fn(async (path: string, init?: RequestInit) => {
       if (path.includes('scope=mine')) {

@@ -9,6 +9,7 @@ import { workshopPrConfig, workshopPrEnabled } from './config.ts'
 import { tokenCache } from './token-cache.ts'
 import { GitHubClient, GitHubApiError } from './github-client.ts'
 import { generatePrFiles } from './code-gen.ts'
+import { getHandoffReadiness } from '../workshop-drafts.ts'
 
 const RATE_LIMIT_MS = 10 * 60_000 // 10 minutes
 const REFRESH_COOLDOWN_MS = 60_000 // 1 minute
@@ -75,6 +76,16 @@ export async function handleProposeRequest(
   }
   if (wcard.status !== 'published') {
     sendJson(res, 400, { ok: false, error: 'card must be published' })
+    return
+  }
+  const readiness = getHandoffReadiness(db, cardDbId, user.id)
+  if (!readiness.ready) {
+    sendJson(res, 400, {
+      ok: false,
+      code: 'handoff_not_ready',
+      error: 'published version must pass the exact-version sandbox gate',
+      readiness,
+    })
     return
   }
 

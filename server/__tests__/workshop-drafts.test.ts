@@ -6,6 +6,7 @@ import {
   checkpointDraft,
   createCard,
   getHandoffReadiness,
+  loadSandboxVersion,
   loadWorkspace,
   markSandboxPass,
   publish,
@@ -277,6 +278,47 @@ describe('workshop draft aggregate', () => {
     expect(restored.draft.name).toBe('Field Keeper')
     expect(restored.draft.artUrl).toBe('/card-art/original.png')
     expect(db.prepare('SELECT COUNT(*) AS count FROM workshop_card_versions').get()).toEqual({ count: 1 })
+  })
+
+  it('loads an exact immutable version for the author sandbox', () => {
+    const created = createCard(db, { authorId: 'author', draft: baseDraft() })
+    const adopted = adoptCandidate(db, {
+      cardId: created.id,
+      authorId: 'author',
+      baseRevision: 1,
+      candidate: {
+        id: 'art-original',
+        kind: 'art',
+        prompt: 'original field',
+        resultUrl: '/card-art/original.png',
+        createdAt: 100,
+      },
+    })
+    checkpointDraft(db, {
+      cardId: created.id,
+      authorId: 'author',
+      baseRevision: 2,
+      draft: {
+        ...adopted.workspace.draft,
+        name: 'Changed name',
+        cardJson: { ...adopted.workspace.draft.cardJson, name: 'Changed name' },
+        artUrl: '/card-art/changed.png',
+      },
+    })
+
+    expect(loadSandboxVersion(db, {
+      cardId: created.id,
+      authorId: 'author',
+      versionId: adopted.versionId,
+    })).toMatchObject({
+      name: 'Field Keeper',
+      artUrl: '/card-art/original.png',
+    })
+    expect(() => loadSandboxVersion(db, {
+      cardId: created.id,
+      authorId: 'other',
+      versionId: adopted.versionId,
+    })).toThrowError(expect.objectContaining<Partial<WorkshopDraftError>>({ code: 'forbidden' }))
   })
 
   it('pins publishing and sandbox confirmation to the exact current version', () => {
