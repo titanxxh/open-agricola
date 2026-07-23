@@ -442,8 +442,34 @@ export function adoptCandidate(
       ) {
         throw new WorkshopDraftError('not_ready', 'Ability candidate has not passed validation')
       }
+      const cardJson = { ...input.candidate.cardJson }
+      if (cardJson.locales === undefined && current.draft.cardJson.locales !== undefined) {
+        cardJson.locales = current.draft.cardJson.locales
+      }
+      if (current.draft.cardJson._draft !== undefined) {
+        cardJson._draft = current.draft.cardJson._draft
+      } else {
+        delete cardJson._draft
+      }
+      const cardId = cardJson.id
+      const cardType = cardJson.card_type
+      const name = cardJson.name
+      if (
+        typeof cardId !== 'string'
+        || (cardType !== 'minor' && cardType !== 'occupation')
+        || typeof name !== 'string'
+      ) {
+        throw new WorkshopDraftError('invalid', 'Ability candidate has invalid card definition')
+      }
       draft = {
         ...current.draft,
+        cardId,
+        cardType,
+        name,
+        description: Array.isArray(cardJson.desc)
+          ? cardJson.desc.filter((entry): entry is string => typeof entry === 'string').join(' ')
+          : '',
+        cardJson,
         effectCode: input.candidate.sourceCode,
         compiledCode: input.candidate.compiledCode,
         codeManifest: input.candidate.codeManifest,

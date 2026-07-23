@@ -41,5 +41,6 @@ export type WorkshopArtCandidateContract = WorkshopGenerationCandidateBase & {
 export type WorkshopAbilityCandidateContract = WorkshopGenerationCandidateBase & {
   kind: 'ability'
   sourceCode: string
+  cardJson: Record<string, unknown>
   validation: { valid: boolean; errors?: string[] }
 }

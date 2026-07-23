@@ -115,6 +115,7 @@ const candidateFromGeneration = (
       ...common,
       kind,
       sourceCode: candidate.sourceCode,
+      cardJson: asRecord(candidate.cardJson),
       validation: {
         valid: validation.valid === true,
         errors: Array.isArray(validation.errors)
@@ -194,7 +195,12 @@ export type WorkshopDraftAction =
   | { type: 'draftChanged'; draft: WorkshopClientDraft }
   | { type: 'candidateCompleted'; candidate: WorkshopCandidate }
   | { type: 'candidateDiscarded'; kind: WorkshopCandidate['kind']; candidateId: string }
-  | { type: 'abilityCandidateEdited'; candidateId: string; sourceCode: string }
+  | {
+      type: 'abilityCandidateEdited'
+      candidateId: string
+      sourceCode: string
+      cardJson?: Record<string, unknown>
+    }
   | {
       type: 'abilityCandidateValidated'
       candidateId: string
@@ -317,6 +323,7 @@ export const workshopDraftReducer = (
           ? {
               ...candidate,
               sourceCode: action.sourceCode,
+              ...(action.cardJson ? { cardJson: action.cardJson } : {}),
               validation: { valid: false, errors: [] },
             }
           : candidate,
