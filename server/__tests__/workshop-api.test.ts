@@ -557,8 +557,22 @@ const CARD_IMPL = {}
           deck: 'CUSTOM',
           number: 0,
           desc: ['published text'],
+          implemented: true,
           _draft: { costInput: '1w' },
         },
+        effect_code: `
+const CARD_DEF = {
+  cardType: 'minor',
+  meta: {
+    id: 'CUSTOM_PinnedPublic',
+    name: 'Pinned Public',
+    deck: 'CUSTOM',
+    number: 0,
+    desc: ['published text'],
+  },
+}
+const CARD_IMPL = {}
+        `.trim(),
       }, 'tok-alice'), createRes)
       const cardDbId = JSON.parse(createRes.body).id
 

@@ -106,4 +106,36 @@ const CARD_IMPL = {}
     expect(out).not.toContain('旧描述。')
     expect(out).toContain(`deck: "community"`)
   })
+
+  it('generates handoff source from factory-style card definitions', () => {
+    const out = generateDisplayFile({
+      id: 'wc-factory',
+      card_id: 'CUSTOM_FactoryCard',
+      card_type: 'minor',
+      card_json: JSON.stringify({
+        locales: { zh: { name: '工厂卡', desc: ['工厂说明。'] } },
+      }),
+      effect_code: `
+const CARD_ID = 'CUSTOM_FactoryCard'
+const CARD_DEF = MinorImprovement({
+  id: CARD_ID,
+  name: 'Factory Card',
+  deck: 'CUSTOM',
+  number: 0,
+  desc: ['Factory description.'],
+  cost: { wood: 1 },
+  vp: 1,
+})
+const CARD_IMPL = {}
+      `.trim(),
+    }, {
+      githubLogin: 'gh',
+      iso: '2026-05-09T00:00:00Z',
+    })
+
+    expect(out).toContain(`export const CUSTOM_FactoryCard = defineMinorCard({`)
+    expect(out).toContain(`cost: { wood: 1 }`)
+    expect(out).toContain('工厂卡')
+    expect(out).toContain('工厂说明。')
+  })
 })

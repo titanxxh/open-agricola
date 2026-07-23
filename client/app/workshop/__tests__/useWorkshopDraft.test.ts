@@ -522,6 +522,48 @@ describe('useWorkshopDraft', () => {
       })
   })
 
+  it('preserves edits made while a publish request is in flight', async () => {
+    let finishPublish: ((response: Response) => void) | undefined
+    const apiFetch = vi.fn(async (_path: string, init?: RequestInit) => {
+      if (!init) {
+        return new Response(JSON.stringify({ ok: true, workspace: workspace(1) }))
+      }
+      return new Promise<Response>(resolve => {
+        finishPublish = resolve
+      })
+    })
+    const { result } = renderHook(() => useWorkshopDraft({
+      cardId: 'card-1',
+      apiFetch,
+    }))
+    await waitFor(() => expect(result.current.state?.baseRevision).toBe(1))
+
+    let pendingPublish: Promise<string | null> | undefined
+    act(() => {
+      pendingPublish = result.current.publishDraft()
+    })
+    await waitFor(() => expect(result.current.state?.save.status).toBe('saving'))
+    act(() => result.current.updateDraft(draft('Typed during publish')))
+    finishPublish!(new Response(JSON.stringify({
+      ok: true,
+      workspace: {
+        ...workspace(1),
+        status: 'published',
+        publishedVersionId: 'version-1',
+      },
+      versionId: 'version-1',
+    })))
+
+    await act(async () => {
+      expect(await pendingPublish).toBe('version-1')
+    })
+    expect(result.current.state?.publishedVersionId).toBe('version-1')
+    expect(result.current.state?.draft.name).toBe('Typed during publish')
+    expect(result.current.state?.save.status).toBe('dirty')
+    expect(localStorage.getItem(workshopDraftStorageKey('card-1')))
+      .toContain('Typed during publish')
+  })
+
   it('restores an immutable version by copy-forward and offers one local undo', async () => {
     const requests: Array<{ path: string; body?: Record<string, unknown> }> = []
     const apiFetch = vi.fn(async (path: string, init?: RequestInit) => {
