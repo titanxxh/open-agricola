@@ -1872,6 +1872,16 @@
   }
 }
 @media (max-width: 640px) {
+  .ai-designer-config-section .section__actions {
+    width: 100%;
+    min-width: 0;
+  }
+
+  .ai-designer-config-section .ai-config-status-summary {
+    flex: 1;
+    min-width: 0;
+  }
+
   /* Tighten AI designer on phones — default 20/24px paddings ate ~30% of viewport. */
   .ai-designer-header {
     padding-left: 12px;
@@ -2585,6 +2595,287 @@
   border: 0;
 }
 
+.aicw-current-asset,
+.aicw-current-code {
+  display: grid;
+  gap: 14px;
+  margin: 8px 0 20px;
+  padding: 16px;
+  border: 1px solid var(--aicw-border);
+  border-radius: 10px;
+  background: var(--aicw-paper);
+}
+
+.aicw-current-asset {
+  grid-template-columns: minmax(0, 1fr) 104px;
+  align-items: center;
+}
+
+.aicw-current-asset > div,
+.aicw-current-code > div {
+  display: grid;
+  gap: 4px;
+}
+
+.aicw-current-asset small,
+.aicw-current-code span {
+  color: var(--aicw-muted);
+  font-size: 12px;
+}
+
+.aicw-current-asset img {
+  width: 104px;
+  height: 104px;
+  border-radius: 8px;
+  object-fit: cover;
+}
+
+.aicw-current-code pre {
+  max-height: 260px;
+  margin: 0;
+  padding: 14px;
+  overflow: auto;
+  border-radius: 8px;
+  color: #e9eadf;
+  background: #292b25;
+  font: 12px/1.55 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  white-space: pre;
+}
+
+.aicw-generator-fields {
+  display: grid;
+  gap: 14px;
+  padding: 18px;
+  border: 1px solid var(--aicw-border);
+  border-radius: 10px;
+  background: #f8f4e9;
+}
+
+.aicw-generator-fields label {
+  display: grid;
+  gap: 6px;
+}
+
+.aicw-generator-fields label > span {
+  color: var(--aicw-muted);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.aicw-generator-fields input,
+.aicw-generator-fields textarea {
+  box-sizing: border-box;
+  width: 100%;
+  padding: 9px 11px;
+  border: 1px solid var(--aicw-border-strong);
+  border-radius: 8px;
+  color: var(--aicw-ink);
+  background: #fff;
+}
+
+.aicw-panel-error {
+  margin: 12px 0 0;
+}
+
+.aicw-candidate-section {
+  display: grid;
+  gap: 14px;
+  margin-top: 24px;
+  padding-top: 22px;
+  border-top: 1px solid var(--aicw-border);
+}
+
+.aicw-candidate-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.aicw-candidate-heading > div {
+  display: grid;
+  gap: 3px;
+}
+
+.aicw-candidate-heading span {
+  color: var(--aicw-muted);
+  font-size: 12px;
+}
+
+.aicw-candidate-heading > span {
+  flex: 0 0 auto;
+  padding: 3px 8px;
+  border-radius: 999px;
+  color: var(--aicw-green-strong);
+  background: var(--aicw-green-soft);
+  font-weight: 750;
+}
+
+.aicw-art-candidates {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(92px, 132px));
+  gap: 10px;
+}
+
+.aicw-art-candidates button,
+.aicw-ability-tabs button {
+  min-width: 0;
+  padding: 7px;
+  border: 1px solid var(--aicw-border);
+  border-radius: 9px;
+  color: var(--aicw-ink);
+  background: #fff;
+  cursor: pointer;
+}
+
+.aicw-art-candidates button.is-selected,
+.aicw-ability-tabs button.is-selected {
+  border-color: var(--aicw-green);
+  box-shadow: 0 0 0 2px rgba(53, 93, 54, 0.15);
+}
+
+.aicw-art-candidates img {
+  display: block;
+  width: 100%;
+  aspect-ratio: 1;
+  border-radius: 6px;
+  object-fit: cover;
+}
+
+.aicw-art-candidates span {
+  display: block;
+  margin-top: 6px;
+  overflow: hidden;
+  color: var(--aicw-muted);
+  font-size: 11px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.aicw-art-review {
+  display: grid;
+  grid-template-columns: minmax(180px, 240px) minmax(0, 1fr);
+  gap: 20px;
+  padding: 16px;
+  border-radius: 10px;
+  background: var(--aicw-green-soft);
+}
+
+.aicw-art-review > img {
+  width: 100%;
+  aspect-ratio: 1;
+  border-radius: 8px;
+  object-fit: cover;
+}
+
+.aicw-art-review > div {
+  display: grid;
+  align-content: start;
+  gap: 12px;
+}
+
+.aicw-candidate-state {
+  width: fit-content;
+  padding: 4px 9px;
+  border-radius: 999px;
+  color: var(--aicw-green-strong);
+  background: #d4e3cf;
+  font-size: 11px;
+  font-weight: 750;
+}
+
+.aicw-candidate-state.is-stale {
+  color: #73500e;
+  background: var(--aicw-gold-soft);
+}
+
+.aicw-candidate-section details {
+  color: var(--aicw-muted);
+  font-size: 12px;
+}
+
+.aicw-candidate-section summary {
+  width: fit-content;
+  color: var(--aicw-green-strong);
+  cursor: pointer;
+  font-weight: 700;
+}
+
+.aicw-candidate-section details p {
+  margin: 8px 0 4px;
+  white-space: pre-wrap;
+}
+
+.aicw-candidate-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 2px;
+}
+
+.aicw-ability-tabs {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.aicw-ability-tabs button {
+  display: grid;
+  gap: 3px;
+  text-align: left;
+}
+
+.aicw-ability-tabs strong,
+.aicw-ability-tabs small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.aicw-ability-tabs small {
+  color: var(--aicw-muted);
+}
+
+.aicw-ability-review {
+  display: grid;
+  gap: 12px;
+  padding: 16px;
+  border: 1px solid var(--aicw-border);
+  border-radius: 10px;
+  background: var(--aicw-paper);
+}
+
+.aicw-candidate-toolbar {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.aicw-source-editor {
+  box-sizing: border-box;
+  width: 100%;
+  min-height: 360px;
+  padding: 14px;
+  border: 1px solid #45493f;
+  border-radius: 8px;
+  color: #e9eadf;
+  background: #292b25;
+  font: 12px/1.55 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace !important;
+  resize: vertical;
+  tab-size: 2;
+}
+
+.aicw-validation-errors {
+  margin: 0;
+  padding: 12px 12px 12px 30px;
+  border-radius: 8px;
+  color: #7d2f25;
+  background: #f8dfd8;
+  font: 12px/1.5 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+
 .aicw-localization {
   display: flex;
   align-items: center;
@@ -2800,6 +3091,36 @@
 
   .aicw-field-row {
     grid-template-columns: 1fr;
+  }
+
+  .aicw-current-asset,
+  .aicw-art-review {
+    grid-template-columns: 1fr;
+  }
+
+  .aicw-current-asset img {
+    width: min(160px, 100%);
+    height: auto;
+    aspect-ratio: 1;
+  }
+
+  .aicw-art-review > img {
+    max-width: 260px;
+  }
+
+  .aicw-art-candidates,
+  .aicw-ability-tabs {
+    grid-template-columns: repeat(3, minmax(82px, 1fr));
+  }
+
+  .aicw-candidate-toolbar {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .aicw-candidate-actions {
+    align-items: stretch;
+    flex-direction: column;
   }
 
   .aicw-stage-heading {
