@@ -339,6 +339,19 @@ describe('workshop draft aggregate', () => {
       sourceCode: 'const CARD_IMPL = {}',
       compiledCode: '"use strict"; const CARD_IMPL = {};',
       codeManifest: { listeners: [] },
+      cardJson: {
+        ...baseDraft().cardJson,
+        name: 'Generated Field Keeper',
+        desc: ['Generated effect text.'],
+        cost: { wood: 2 },
+        vp: 2,
+        locales: {
+          zh: {
+            name: '生成的田野管理员',
+            desc: ['生成的效果文本。'],
+          },
+        },
+      },
       validation: { valid: true as const },
     }
     const adopted = adoptCandidate(db, {
@@ -350,6 +363,60 @@ describe('workshop draft aggregate', () => {
     expect(adopted.workspace.draft.effectCode).toBe(validCandidate.sourceCode)
     expect(adopted.workspace.draft.compiledCode).toBe(validCandidate.compiledCode)
     expect(adopted.workspace.draft.codeManifest).toEqual(validCandidate.codeManifest)
+    expect(adopted.workspace.draft.name).toBe('Generated Field Keeper')
+    expect(adopted.workspace.draft.cardJson).toMatchObject({
+      name: 'Generated Field Keeper',
+      desc: ['Generated effect text.'],
+      cost: { wood: 2 },
+      vp: 2,
+      locales: {
+        zh: {
+          name: '生成的田野管理员',
+          desc: ['生成的效果文本。'],
+        },
+      },
+    })
+  })
+
+  it('preserves existing localization when ability metadata omits it', () => {
+    const draft = baseDraft({
+      cardJson: {
+        ...baseDraft().cardJson,
+        locales: {
+          zh: {
+            name: '田野管理员',
+            desc: ['保留一块田。'],
+          },
+        },
+        _draft: { costInput: '2 wood' },
+      },
+    })
+    const created = createCard(db, { authorId: 'author', draft })
+    const adopted = adoptCandidate(db, {
+      cardId: created.id,
+      authorId: 'author',
+      baseRevision: 1,
+      candidate: {
+        id: 'ability-localization',
+        kind: 'ability',
+        prompt: 'gain grain',
+        sourceCode: 'const CARD_IMPL = {}',
+        compiledCode: '"use strict"; const CARD_IMPL = {};',
+        codeManifest: { listeners: [] },
+        cardJson: {
+          ...baseDraft().cardJson,
+          name: 'Generated Field Keeper',
+        },
+        validation: { valid: true },
+        createdAt: 100,
+      },
+    })
+
+    expect(adopted.workspace.draft.cardJson).toMatchObject({
+      name: 'Generated Field Keeper',
+      locales: draft.cardJson.locales,
+      _draft: draft.cardJson._draft,
+    })
   })
 
   it('rejects publishing when the row type differs from the card definition', () => {

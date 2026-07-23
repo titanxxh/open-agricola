@@ -28,6 +28,7 @@ const validateCode = async (
       ok: true
       compiledCode: string
       codeManifest: Record<string, unknown>
+      cardDefinition: Record<string, unknown> | null
     }
   | ValidationFailure
 > => {
@@ -53,10 +54,34 @@ const validateCode = async (
     ok: true,
     compiledCode: validation.compiledCode,
     codeManifest: validation.manifest as unknown as Record<string, unknown>,
+    cardDefinition: validation.cardDefinition,
   }
 }
 
 export const prepareWorkshopAbilityCode = validateCode
+
+export const workshopCardJsonFromDefinition = (
+  definition: Record<string, unknown> | null,
+): Record<string, unknown> | null => {
+  if (!definition) return null
+  const cardType = definition.cardType
+  const meta = definition.meta
+  if (
+    (cardType !== 'minor' && cardType !== 'occupation')
+    || !meta
+    || typeof meta !== 'object'
+    || Array.isArray(meta)
+  ) return null
+  const cardJson = meta as Record<string, unknown>
+  if (typeof cardJson.id !== 'string' || typeof cardJson.name !== 'string') return null
+  return {
+    ...cardJson,
+    card_type: cardType,
+    deck: 'CUSTOM',
+    number: 0,
+    implemented: true,
+  }
+}
 
 export const prepareWorkshopDraft = async (
   raw: WorkshopDraftRequest | null | undefined,

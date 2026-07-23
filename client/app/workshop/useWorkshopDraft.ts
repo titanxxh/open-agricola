@@ -96,6 +96,7 @@ export const useWorkshopDraft = ({
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const stateRef = useRef<WorkshopDraftState | null>(null)
+  const savePromiseRef = useRef<Promise<boolean> | null>(null)
   const storageKey = workshopDraftStorageKey(cardId)
 
   const dispatch = useCallback((action: WorkshopDraftAction) => {
@@ -177,7 +178,7 @@ export const useWorkshopDraft = ({
     dispatch({ type: 'sessionChanged', session })
   }, [dispatch])
 
-  const saveDraft = useCallback(async (
+  const runSaveDraft = useCallback(async (
     current: WorkshopDraftState,
     baseRevision = current.baseRevision,
     draft = current.draft,
@@ -194,13 +195,14 @@ export const useWorkshopDraft = ({
       )
       const payload = await response.json() as WorkspaceResponse
       if (response.status === 409 && payload.current) {
+        const latest = stateRef.current ?? current
         dispatch({
           type: 'conflictDetected',
           server: payload.current,
           local: {
-            ...toLocalRecovery(current),
+            ...toLocalRecovery(latest),
             baseRevision,
-            draft,
+            draft: latest.draft !== current.draft ? latest.draft : draft,
           },
         })
         return false
@@ -239,6 +241,20 @@ export const useWorkshopDraft = ({
       return false
     }
   }, [apiFetch, cardId, dispatch, persist])
+
+  const saveDraft = useCallback((
+    current: WorkshopDraftState,
+    baseRevision = current.baseRevision,
+    draft = current.draft,
+  ): Promise<boolean> => {
+    if (savePromiseRef.current) return savePromiseRef.current
+    const promise = runSaveDraft(current, baseRevision, draft)
+    savePromiseRef.current = promise
+    void promise.finally(() => {
+      if (savePromiseRef.current === promise) savePromiseRef.current = null
+    })
+    return promise
+  }, [runSaveDraft])
 
   const checkpoint = useCallback(async (): Promise<boolean> => {
     const current = stateRef.current

@@ -24,6 +24,42 @@ afterEach(() => {
 })
 
 describe('custom code executor', () => {
+  it('extracts the validated CARD_DEF metadata', () => {
+    const result = validateAndCompileCustomCode(`
+const CARD_ID = 'CUSTOM_MetadataCard'
+const CARD_DEF = {
+  cardType: 'minor',
+  meta: {
+    id: CARD_ID,
+    name: 'Metadata Card',
+    desc: ['Generated metadata.'],
+    cost: { wood: 2 },
+    vp: 1,
+    locales: {
+      zh: { name: '元数据卡', desc: ['生成的元数据。'] },
+    },
+  },
+}
+const CARD_IMPL = {}
+    `, 'CUSTOM_MetadataCard')
+
+    expect(result.valid).toBe(true)
+    if (!result.valid) return
+    expect(result.cardDefinition).toEqual({
+      cardType: 'minor',
+      meta: {
+        id: 'CUSTOM_MetadataCard',
+        name: 'Metadata Card',
+        desc: ['Generated metadata.'],
+        cost: { wood: 2 },
+        vp: 1,
+        locales: {
+          zh: { name: '元数据卡', desc: ['生成的元数据。'] },
+        },
+      },
+    })
+  })
+
   it('validates code and extracts effect/listener manifest', () => {
     const result = validateAndCompileCustomCode(`
 const CARD_ID = 'CUSTOM_ExecutorCard'
