@@ -135,6 +135,104 @@ describe('useWorkshopDraft', () => {
       .toContain('Typed during save')
   })
 
+  it('preserves edits made while a checkpoint conflict is in flight', async () => {
+    let finishSave: ((response: Response) => void) | undefined
+    const saveBodies: Array<{ baseRevision: number; draft: WorkshopClientDraft }> = []
+    const apiFetch = vi.fn(async (_path: string, init?: RequestInit) => {
+      if (!init) {
+        return new Response(JSON.stringify({ ok: true, workspace: workspace(1) }))
+      }
+      const body = JSON.parse(String(init.body)) as {
+        baseRevision: number
+        draft: WorkshopClientDraft
+      }
+      saveBodies.push(body)
+      if (saveBodies.length === 1) {
+        return new Promise<Response>(resolve => {
+          finishSave = resolve
+        })
+      }
+      return new Response(JSON.stringify({
+        ok: true,
+        workspace: workspace(3, body.draft.name),
+      }))
+    })
+    const { result } = renderHook(() => useWorkshopDraft({
+      cardId: 'card-1',
+      apiFetch,
+    }))
+    await waitFor(() => expect(result.current.state?.baseRevision).toBe(1))
+    act(() => result.current.updateDraft(draft('Checkpoint snapshot')))
+
+    let pendingSave: Promise<boolean> | undefined
+    act(() => {
+      pendingSave = result.current.checkpoint()
+    })
+    await waitFor(() => expect(result.current.state?.save.status).toBe('saving'))
+    act(() => result.current.updateDraft(draft('Typed during conflict')))
+    finishSave!(new Response(JSON.stringify({
+      ok: false,
+      current: workspace(2, 'Server work'),
+    }), { status: 409 }))
+
+    await act(async () => {
+      expect(await pendingSave).toBe(false)
+    })
+    expect(result.current.state?.conflict?.local.draft.name).toBe('Typed during conflict')
+
+    await act(async () => {
+      expect(await result.current.resolveConflict('local')).toBe(true)
+    })
+    expect(saveBodies[1]).toMatchObject({
+      baseRevision: 2,
+      draft: { name: 'Typed during conflict' },
+    })
+    expect(result.current.state?.draft.name).toBe('Typed during conflict')
+  })
+
+  it('reuses an in-flight checkpoint instead of issuing a duplicate PUT', async () => {
+    const finishSaves: Array<(response: Response) => void> = []
+    const apiFetch = vi.fn(async (_path: string, init?: RequestInit) => {
+      if (!init) {
+        return new Response(JSON.stringify({ ok: true, workspace: workspace(1) }))
+      }
+      return new Promise<Response>(resolve => {
+        finishSaves.push(resolve)
+      })
+    })
+    const { result } = renderHook(() => useWorkshopDraft({
+      cardId: 'card-1',
+      apiFetch,
+    }))
+    await waitFor(() => expect(result.current.state?.baseRevision).toBe(1))
+    act(() => result.current.updateDraft(draft('One checkpoint')))
+
+    let firstSave: Promise<boolean> | undefined
+    let secondSave: Promise<boolean> | undefined
+    act(() => {
+      firstSave = result.current.checkpoint()
+      secondSave = result.current.checkpoint()
+    })
+    await waitFor(() => expect(finishSaves.length).toBeGreaterThan(0))
+    finishSaves[0]!(new Response(JSON.stringify({
+      ok: true,
+      workspace: workspace(2, 'One checkpoint'),
+    })))
+    if (finishSaves[1]) {
+      finishSaves[1](new Response(JSON.stringify({
+        ok: false,
+        current: workspace(2, 'One checkpoint'),
+      }), { status: 409 }))
+    }
+
+    await act(async () => {
+      expect(await firstSave).toBe(true)
+      expect(await secondSave).toBe(true)
+    })
+    expect(finishSaves).toHaveLength(1)
+    expect(result.current.state?.save.status).toBe('saved')
+  })
+
   it('requires whole-draft conflict choice when the server revision advanced', async () => {
     localStorage.setItem(workshopDraftStorageKey('card-1'), JSON.stringify({
       baseRevision: 2,

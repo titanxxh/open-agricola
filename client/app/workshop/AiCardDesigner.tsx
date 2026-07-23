@@ -75,6 +75,52 @@ function isValidCardId(id: string, locale: 'zh' | 'en' = 'zh'): { valid: boolean
   return { valid: true }
 }
 
+const COST_RESOURCE_ALIASES: Record<string, string> = {
+  wood: 'wood',
+  木材: 'wood',
+  木: 'wood',
+  clay: 'clay',
+  黏土: 'clay',
+  粘土: 'clay',
+  reed: 'reed',
+  芦苇: 'reed',
+  蘆葦: 'reed',
+  stone: 'stone',
+  石材: 'stone',
+  石头: 'stone',
+  石: 'stone',
+  food: 'food',
+  食物: 'food',
+  grain: 'grain',
+  谷物: 'grain',
+  vegetable: 'vegetable',
+  蔬菜: 'vegetable',
+  sheep: 'sheep',
+  羊: 'sheep',
+  boar: 'boar',
+  野猪: 'boar',
+  cattle: 'cattle',
+  牛: 'cattle',
+  fuel: 'fuel',
+  燃料: 'fuel',
+  horse: 'horse',
+  马: 'horse',
+}
+
+function parseWorkshopCostInput(input: string): Record<string, number> {
+  const cost: Record<string, number> = {}
+  const aliases = Object.keys(COST_RESOURCE_ALIASES)
+    .sort((left, right) => right.length - left.length)
+    .join('|')
+  const pattern = new RegExp(`(\\d+)\\s*<?(${aliases})>?`, 'gi')
+  for (const match of input.matchAll(pattern)) {
+    const amount = Number(match[1])
+    const resource = COST_RESOURCE_ALIASES[match[2]!.toLowerCase()]
+    if (resource && amount > 0) cost[resource] = (cost[resource] ?? 0) + amount
+  }
+  return cost
+}
+
 async function uploadArt(
   dataUrl: string,
   apiFetch: ApiFetch,
@@ -101,11 +147,10 @@ async function uploadArt(
  * Build the "current language" content fed to LocalizationModal. The modal
  * shows this read-only as the source for the translate button. Picking the
  * right source matters: if the user has already filled in a translation for
- * the active UI language we want to honour it, otherwise fall back to the
- * editor inputs the user is actually looking at.
+ * English we want to honour it, otherwise fall back to the top-level English
+ * editor inputs.
  */
 export function pickLocalizationCurrentContent(args: {
-  locale: string
   cardLocales: Record<string, { name: string; desc: string[]; prerequisite?: string }>
   cardName: string
   prerequisite: string
@@ -113,7 +158,7 @@ export function pickLocalizationCurrentContent(args: {
   extractedDesc: string[] | undefined
   extractedPrerequisite: string | undefined
 }): { name: string; desc: string[]; prerequisite?: string } {
-  const localeEntry = args.cardLocales[args.locale]
+  const localeEntry = args.cardLocales.en
   const editorPrereq = args.prerequisite || args.extractedPrerequisite
   if (localeEntry?.name && (localeEntry.desc?.length ?? 0) > 0) {
     return {
@@ -1052,6 +1097,7 @@ function AbilityPanel({
         kind: 'ability',
         prompt: request,
         sourceCode: parsed.sourceCode,
+        cardJson: parsed.card,
         validation,
         createdAt: Date.now(),
         baseRevision,
@@ -1654,7 +1700,7 @@ export function AiCardDesigner({
     deck: 'CUSTOM',
     number: 0,
     desc: extracted?.card.desc ?? [],
-    cost: extracted?.card.cost ?? {},
+    cost: parseWorkshopCostInput(costInput),
     vp: extracted?.card.vp ?? 0,
     prerequisite: extracted?.card.prerequisite ?? (prerequisite || undefined),
     modifiers: extracted?.card.modifiers ?? [],
@@ -1688,7 +1734,7 @@ export function AiCardDesigner({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           card_id: nextCardId,
-          card_type: extracted?.card.card_type ?? cardType,
+          card_type: cardType,
           name,
           description: (extracted?.card.desc ?? []).join(' '),
           card_json: { ...buildCardJson(), id: nextCardId, name },
@@ -1827,6 +1873,7 @@ export function AiCardDesigner({
         ...current,
         cardJson: {
           ...current.cardJson,
+          cost: parseWorkshopCostInput(next),
           _draft: {
             ...rawDraft,
             prerequisite: prerequisite || undefined,
@@ -2426,6 +2473,9 @@ export function AiCardDesigner({
                   type: 'abilityCandidateEdited',
                   candidateId,
                   sourceCode,
+                  cardJson: extractCardFromResponse(
+                    `\`\`\`typescript\n${sourceCode}\n\`\`\``,
+                  )?.card,
                 })}
                 onCandidateValidated={validateAbilityCandidate}
                 onCandidateDiscarded={candidateId => discardCandidate('ability', candidateId)}
@@ -2609,7 +2659,6 @@ export function AiCardDesigner({
       {showLocalizationModal && (
         <LocalizationModal
           currentContent={pickLocalizationCurrentContent({
-            locale,
             cardLocales,
             cardName,
             prerequisite,
@@ -2617,7 +2666,7 @@ export function AiCardDesigner({
             extractedDesc: extracted?.card.desc,
             extractedPrerequisite: extracted?.card.prerequisite,
           })}
-          currentLang={locale}
+          currentLang="en"
           locales={cardLocales}
           onSave={(updatedLocales) => {
             updateLocales(updatedLocales)

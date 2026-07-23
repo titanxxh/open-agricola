@@ -23,6 +23,7 @@ import {
 import {
   prepareWorkshopAbilityCode,
   prepareWorkshopDraft,
+  workshopCardJsonFromDefinition,
   type WorkshopDraftRequest,
 } from './workshop-draft-validation.ts'
 
@@ -515,23 +516,41 @@ export async function handleWorkshopRoute(
         sendJson(res, 400, { ok: false, error: 'Invalid ability candidate' })
         return true
       }
-      let cardDefinitionId: string
+      let currentCardDefinitionId: string
       try {
-        cardDefinitionId = loadWorkspace(db, adoptMatch[1]!, user.id).draft.cardId
+        currentCardDefinitionId = loadWorkspace(db, adoptMatch[1]!, user.id).draft.cardId
       } catch (error) {
         if (sendWorkshopDraftError(res, error)) return true
         throw error
       }
-      const prepared = await prepareWorkshopAbilityCode(raw.sourceCode, cardDefinitionId)
+      let prepared = await prepareWorkshopAbilityCode(raw.sourceCode, currentCardDefinitionId)
       if (!prepared.ok) {
         sendJson(res, prepared.status, prepared)
         return true
+      }
+      let cardJson = workshopCardJsonFromDefinition(prepared.cardDefinition)
+      if (!cardJson) {
+        sendJson(res, 400, { ok: false, error: 'Ability candidate has invalid CARD_DEF metadata' })
+        return true
+      }
+      if (cardJson.id !== currentCardDefinitionId) {
+        prepared = await prepareWorkshopAbilityCode(raw.sourceCode, cardJson.id as string)
+        if (!prepared.ok) {
+          sendJson(res, prepared.status, prepared)
+          return true
+        }
+        cardJson = workshopCardJsonFromDefinition(prepared.cardDefinition)
+        if (!cardJson) {
+          sendJson(res, 400, { ok: false, error: 'Ability candidate has invalid CARD_DEF metadata' })
+          return true
+        }
       }
       candidate = {
         id: raw.id,
         kind: 'ability',
         prompt: raw.prompt,
         sourceCode: raw.sourceCode,
+        cardJson,
         compiledCode: prepared.compiledCode,
         codeManifest: prepared.codeManifest,
         validation: { valid: true },

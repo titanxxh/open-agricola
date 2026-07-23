@@ -366,8 +366,7 @@ const versions = async (
 }> }>(await api(request, account, `/api/workshop/cards/${cardId}/versions`))
 
 const withDatabase = <T>(read: (database: Database.Database) => T): T => {
-  const path = process.env.DB_PATH
-  if (!path) throw new Error('DB_PATH is required for the workshop acceptance matrix')
+  const path = process.env.DB_PATH ?? 'data/open-agricola.db'
   const database = new Database(path, { readonly: true })
   try {
     return read(database)
@@ -552,7 +551,28 @@ const scenarioAbilityCandidates = async ({
   variant,
 }: ScenarioContext) => {
   const workspace = await createDraft(request, account)
-  const validSource = sourceFor(workspace.draft.cardId, workspace.draft.name)
+  const generatedId = `CUSTOM_${unique('GeneratedAbility')}`
+  const generatedName = unique('Generated ability card')
+  const validSource = `
+const CARD_ID = '${generatedId}'
+const CARD_DEF = {
+  cardType: 'minor',
+  meta: {
+    id: CARD_ID,
+    name: '${generatedName}',
+    desc: ['Generated ability description'],
+    cost: { wood: 2 },
+    vp: 2,
+    locales: {
+      zh: {
+        name: '生成的能力卡',
+        desc: ['生成的能力说明'],
+      },
+    },
+  },
+}
+const CARD_IMPL = {}
+`.trim()
   const invalidSource = sourceFor(workspace.draft.cardId, workspace.draft.name, true)
   await fakeChatService(page, call =>
     `\`\`\`typescript\n${call === 0 ? invalidSource : validSource}\n\`\`\``,
@@ -607,6 +627,25 @@ const scenarioAbilityCandidates = async ({
 
   const saved = await loadWorkspace(request, account, workspace.id)
   expect(saved.draft.effectCode).toContain('CARD_IMPL')
+  expect(saved.draft).toMatchObject({
+    cardId: generatedId,
+    cardType: 'minor',
+    name: generatedName,
+    cardJson: {
+      id: generatedId,
+      name: generatedName,
+      card_type: 'minor',
+      desc: ['Generated ability description'],
+      cost: { wood: 2 },
+      vp: 2,
+      locales: {
+        zh: {
+          name: '生成的能力卡',
+          desc: ['生成的能力说明'],
+        },
+      },
+    },
+  })
   expect(JSON.stringify(saved.draft.generation)).toContain('openrouter')
   expect((await versions(request, account, workspace.id)).versions).toHaveLength(1)
   await expectAccessibleWorkspace(page)
@@ -690,13 +729,13 @@ const scenarioReopen = async ({
   expect((await closeCheckpoint).ok()).toBe(true)
   const savedWorkspace = await loadWorkspace(request, account, workspace.id)
   const savedRevision = savedWorkspace.revision
-  const targetLocale = variant.locale === 'zh' ? 'en' : 'zh'
   expect(savedWorkspace.draft.cardJson.locales).toMatchObject({
-    [targetLocale]: {
+    zh: {
       name: localizedName,
       desc: [localizedDescription],
     },
   })
+  expect(savedWorkspace.draft.cardJson.cost).toEqual({ wood: 2 })
 
   await openEditor(page, workspace.id)
   await stage(page, variant.locale, '卡面图', 'Card art')

@@ -157,6 +157,75 @@ describe('AiCardDesigner AI config header', () => {
     expect(apiFetch).toHaveBeenCalledWith(`/api/workshop/cards/${existingCard.id}/workspace`)
   })
 
+  it('uses the selected card type when creating from extracted metadata', async () => {
+    const unsavedExtractedCard = {
+      ...existingCard,
+      id: '',
+      card_id: 'CUSTOM_UnsavedExtracted',
+      name: 'Unsaved Extracted',
+    }
+    let createBody: Record<string, unknown> | undefined
+    const apiFetch = vi.fn(async (path: string, init?: RequestInit) => {
+      if (path.includes('scope=mine')) {
+        return new Response(JSON.stringify({ ok: true, cards: [] }))
+      }
+      if (init?.method === 'POST') {
+        createBody = JSON.parse(String(init.body)) as Record<string, unknown>
+        return new Response(JSON.stringify({ ok: true, id: 'created-card' }))
+      }
+      return new Response(JSON.stringify({
+        ok: true,
+        workspace: {
+          id: 'created-card',
+          authorId: 'author',
+          revision: 1,
+          status: 'draft',
+          draft: {
+            cardId: 'CUSTOM_UnsavedExtracted',
+            cardType: 'occupation',
+            name: 'Unsaved Extracted',
+            description: '',
+            cardJson: {
+              ...unsavedExtractedCard.card_json,
+              id: 'CUSTOM_UnsavedExtracted',
+              name: 'Unsaved Extracted',
+              card_type: 'occupation',
+            },
+            effectCode: null,
+            compiledCode: null,
+            codeManifest: null,
+            artUrl: null,
+            generation: {},
+          },
+          publishedVersionId: null,
+          sandboxPassVersionId: null,
+          sandboxPassedAt: null,
+        },
+      }))
+    })
+
+    render(
+      <LocaleProvider>
+        <AiCardDesigner
+          initialCard={unsavedExtractedCard}
+          onImport={() => {}}
+          onClose={() => {}}
+          apiFetch={apiFetch}
+        />
+      </LocaleProvider>,
+    )
+
+    await waitFor(() => expect(screen.getByDisplayValue('Unsaved Extracted')).toBeInTheDocument())
+    await userEvent.click(screen.getByRole('button', { name: '职业' }))
+    await userEvent.click(screen.getByRole('button', { name: '保存草稿' }))
+    await waitFor(() => expect(createBody).toBeDefined())
+
+    expect(createBody).toMatchObject({
+      card_type: 'occupation',
+      card_json: { card_type: 'occupation' },
+    })
+  })
+
   it('keeps Enter as a newline in the ability chat input', async () => {
     localStorage.setItem(
       'open-agricola-llm-config',
@@ -475,6 +544,9 @@ describe('AiCardDesigner AI config header', () => {
     const idInput = screen.getByPlaceholderText('CUSTOM_MedievalMallet')
     await userEvent.clear(idInput)
     await userEvent.type(idInput, 'CUSTOM_ChangedMallet')
+    const costInput = screen.getByLabelText('费用')
+    await userEvent.clear(costInput)
+    await userEvent.type(costInput, '3 黏土')
     expect(screen.getByText('有未保存修改')).toBeInTheDocument()
 
     await userEvent.click(screen.getByRole('button', { name: /卡面图 提示词、参考图与候选/ }))
@@ -487,6 +559,9 @@ describe('AiCardDesigner AI config header', () => {
       draft: {
         cardId: 'CUSTOM_ChangedMallet',
         effectCode: 'const CARD_IMPL = {}',
+        cardJson: {
+          cost: { clay: 3 },
+        },
       },
     })
   })
