@@ -191,7 +191,18 @@ describe('workshop draft aggregate', () => {
       SELECT content_hash, provenance_json FROM workshop_card_versions WHERE id = ?
     `).get(adopted.versionId)).toEqual({
       content_hash: expect.stringMatching(/^[a-f0-9]{64}$/),
-      provenance_json: JSON.stringify(adopted.workspace.draft.generation),
+      provenance_json: JSON.stringify({
+        art: {
+          adopted: {
+            id: candidate.id,
+            kind: candidate.kind,
+            prompt: candidate.prompt,
+            provider: candidate.provider,
+            model: candidate.model,
+            createdAt: candidate.createdAt,
+          },
+        },
+      }),
     })
 
     const repeated = adoptCandidate(db, {
@@ -202,6 +213,57 @@ describe('workshop draft aggregate', () => {
     })
     expect(repeated.versionId).toBe(adopted.versionId)
     expect(db.prepare('SELECT COUNT(*) AS count FROM workshop_card_versions').get()).toEqual({ count: 1 })
+  })
+
+  it('keeps transient form state and unadopted generations out of versions', () => {
+    const draft = baseDraft({
+      cardJson: {
+        ...baseDraft().cardJson,
+        _draft: { costInput: '1 wood' },
+      },
+      generation: {
+        ability: {
+          lastCompleted: {
+            id: 'ability-pending',
+            kind: 'ability',
+            prompt: 'private pending prompt',
+            sourceCode: 'pending source',
+            createdAt: 50,
+          },
+        },
+      },
+    })
+    const created = createCard(db, { authorId: 'author', draft })
+    const adopted = adoptCandidate(db, {
+      cardId: created.id,
+      authorId: 'author',
+      baseRevision: 1,
+      candidate: {
+        id: 'art-final',
+        kind: 'art',
+        prompt: 'final art prompt',
+        resultUrl: '/card-art/final.png',
+        createdAt: 100,
+      },
+    })
+    const version = db.prepare(`
+      SELECT card_json, provenance_json
+      FROM workshop_card_versions WHERE id = ?
+    `).get(adopted.versionId) as { card_json: string; provenance_json: string }
+
+    expect(JSON.parse(version.card_json)).not.toHaveProperty('_draft')
+    expect(version.provenance_json).not.toContain('private pending prompt')
+    expect(version.provenance_json).not.toContain('/card-art/final.png')
+    expect(JSON.parse(version.provenance_json)).toEqual({
+      art: {
+        adopted: {
+          id: 'art-final',
+          kind: 'art',
+          prompt: 'final art prompt',
+          createdAt: 100,
+        },
+      },
+    })
   })
 
   it('only adopts statically validated ability candidates', () => {

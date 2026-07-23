@@ -89,6 +89,23 @@ export async function handleProposeRequest(
     return
   }
   if (workshopPrConfig.mockMode) {
+    const mockResult = req.headers['x-workshop-pr-mock-result']
+    if (mockResult === 'rate-limited') {
+      sendJson(res, 429, {
+        ok: false,
+        code: 'rate_limited',
+        retryAfter: 30,
+      })
+      return
+    }
+    if (mockResult === 'remote-error') {
+      sendJson(res, 503, {
+        ok: false,
+        code: 'github_unavailable',
+        error: 'deterministic GitHub failure',
+      })
+      return
+    }
     const prUrl = '/mock-workshop-pr/1'
     db.prepare(`
       UPDATE workshop_cards

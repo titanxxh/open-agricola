@@ -122,6 +122,22 @@ describe('WorkshopPage PR action state', () => {
     expect(state.secondary).toMatch(/本地化/)
   })
 
+  it('blocks PR submission until the published version passes the sandbox gate', () => {
+    const state = getWorkshopPrActionState({
+      enabled: true,
+      isAuthor: true,
+      status: 'published',
+      handoffReady: false,
+      localesComplete: true,
+    })
+
+    expect(state).toMatchObject({
+      visible: true,
+      disabled: true,
+      buttonLabel: '先完成当前版本沙盒确认',
+    })
+  })
+
   it('treats omitted localesComplete as legacy (allowed) for back-compat', () => {
     const state = getWorkshopPrActionState({
       enabled: true,

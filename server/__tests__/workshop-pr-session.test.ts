@@ -103,6 +103,7 @@ function fakeReq(opts: {
   method: string
   url: string
   authHeader?: string
+  mockResult?: string
   body?: string
 }): IncomingMessage {
   const socket = new Socket()
@@ -111,6 +112,7 @@ function fakeReq(opts: {
   req.url = opts.url
   req.headers = { host: 'localhost:5175' }
   if (opts.authHeader) req.headers.authorization = opts.authHeader
+  if (opts.mockResult) req.headers['x-workshop-pr-mock-result'] = opts.mockResult
   if (opts.body) {
     process.nextTick(() => {
       req.push(opts.body!)
@@ -525,6 +527,29 @@ describe('workshop PR propose — session', () => {
       github_pr_url: '/mock-workshop-pr/1',
       github_pr_status: 'open',
     })
+  })
+
+  it.each([
+    ['rate-limited', 429, 'rate_limited'],
+    ['remote-error', 503, 'github_unavailable'],
+  ])('returns deterministic %s failures in mock mode', async (mockResult, status, code) => {
+    ;(workshopPrConfig as unknown as { mockMode: boolean }).mockMode = true
+    const req = fakeReq({
+      method: 'POST',
+      url: `/api/workshop/cards/${cardDbId}/propose`,
+      authHeader: `Bearer ${userToken}`,
+      mockResult,
+      body: JSON.stringify({}),
+    })
+    const res = fakeRes()
+
+    await handleProposeRequest(req, res, cardDbId)
+
+    expect(res.statusCode).toBe(status)
+    expect(JSON.parse(res.body)).toMatchObject({ ok: false, code })
+    expect(db.prepare(
+      'SELECT github_pr_url FROM workshop_cards WHERE id = ?',
+    ).get(cardDbId)).toEqual({ github_pr_url: null })
   })
 
   it('happy path: first-time propose creates PR, updates DB, audit=success', async () => {

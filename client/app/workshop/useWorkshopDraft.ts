@@ -35,14 +35,37 @@ const nullableReducer = (
   return state ? workshopDraftReducer(state, action) : state
 }
 
-const hasSessionData = (session: WorkshopSessionState): boolean =>
-  session.artCandidates.length > 0
-  || session.abilityCandidates.length > 0
-  || session.artPrompt.length > 0
-  || session.abilityInput.length > 0
-  || session.abilityMessages.length > 0
-  || Boolean(session.sandboxTestVersionId)
-  || Boolean(session.restoreUndoDraft)
+const generationCandidate = (
+  draft: WorkshopClientDraft,
+  kind: WorkshopCandidate['kind'],
+): Record<string, unknown> => {
+  const group = draft.generation[kind]
+  if (!group || typeof group !== 'object' || Array.isArray(group)) return {}
+  const record = group as Record<string, unknown>
+  for (const key of ['lastCompleted', 'adopted']) {
+    const candidate = record[key]
+    if (candidate && typeof candidate === 'object' && !Array.isArray(candidate)) {
+      return candidate as Record<string, unknown>
+    }
+  }
+  return record
+}
+
+const hasSessionData = (state: WorkshopDraftState): boolean => {
+  const art = generationCandidate(state.draft, 'art')
+  const ability = generationCandidate(state.draft, 'ability')
+  const artCandidatesAreRecoverable = state.session.artCandidates.length <= 1
+    && state.session.artCandidates.every(candidate => candidate.id === art.id)
+  const abilityCandidatesAreRecoverable = state.session.abilityCandidates.length <= 1
+    && state.session.abilityCandidates.every(candidate => candidate.id === ability.id)
+  return !artCandidatesAreRecoverable
+    || !abilityCandidatesAreRecoverable
+    || Boolean(state.session.artPrompt && state.session.artPrompt !== art.prompt)
+    || state.session.abilityInput.length > 0
+    || state.session.abilityMessages.length > 0
+    || Boolean(state.session.sandboxTestVersionId)
+    || Boolean(state.session.restoreUndoDraft)
+}
 
 const parseRecovery = (raw: string | null): WorkshopLocalRecovery | null => {
   if (!raw) return null
@@ -82,7 +105,7 @@ export const useWorkshopDraft = ({
 
   const persist = useCallback((next: WorkshopDraftState) => {
     try {
-      if (next.save.status === 'saved' && !hasSessionData(next.session)) {
+      if (next.save.status === 'saved' && !hasSessionData(next)) {
         localStorage.removeItem(storageKey)
       } else {
         localStorage.setItem(storageKey, JSON.stringify(toLocalRecovery(next)))
@@ -221,8 +244,8 @@ export const useWorkshopDraft = ({
     if (
       current.save.status !== 'saved'
       && current.save.status !== 'saving'
-      && !await saveDraft(current)
-    ) return false
+      && current.save.status !== 'conflict'
+    ) await saveDraft(current)
     dispatch({ type: 'stageChanged', stage })
     return true
   }, [dispatch, saveDraft])
