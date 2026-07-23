@@ -1702,7 +1702,7 @@ export function AiCardDesigner({
     desc: extracted?.card.desc ?? [],
     cost: parseWorkshopCostInput(costInput),
     vp: extracted?.card.vp ?? 0,
-    prerequisite: extracted?.card.prerequisite ?? (prerequisite || undefined),
+    prerequisite: prerequisite || undefined,
     modifiers: extracted?.card.modifiers ?? [],
     implemented: true,
     _draft: {

@@ -53,7 +53,10 @@ const validateCode = async (
   return {
     ok: true,
     compiledCode: validation.compiledCode,
-    codeManifest: validation.manifest as unknown as Record<string, unknown>,
+    codeManifest: {
+      ...validation.manifest,
+      cardDefinition: validation.cardDefinition,
+    } as unknown as Record<string, unknown>,
     cardDefinition: validation.cardDefinition,
   }
 }
@@ -76,6 +79,7 @@ export const workshopCardJsonFromDefinition = (
   if (typeof cardJson.id !== 'string' || typeof cardJson.name !== 'string') return null
   return {
     ...cardJson,
+    name: cardJson.name.trim(),
     card_type: cardType,
     deck: 'CUSTOM',
     number: 0,

@@ -8,6 +8,7 @@ import type {
   WorkshopDraftContract,
   WorkshopWorkspaceContract,
 } from '../shared/contract/workshop'
+import { workshopCardJsonFromDefinition } from './workshop-draft-validation.ts'
 
 export type WorkshopDraft = WorkshopDraftContract & {
   compiledCode: string | null
@@ -261,6 +262,17 @@ const validateDraft = (draft: WorkshopDraft): void => {
   }
 }
 
+const normaliseDraftNames = (draft: WorkshopDraft): WorkshopDraft => ({
+  ...draft,
+  name: draft.name.trim(),
+  cardJson: {
+    ...draft.cardJson,
+    ...(typeof draft.cardJson.name === 'string'
+      ? { name: draft.cardJson.name.trim() }
+      : {}),
+  },
+})
+
 export function loadWorkspace(
   db: Database.Database,
   cardId: string,
@@ -276,14 +288,15 @@ export function createCard(
   db: Database.Database,
   input: { authorId: string; draft: WorkshopDraft },
 ): WorkshopWorkspace {
-  validateDraft(input.draft)
+  const draft = normaliseDraftNames(input.draft)
+  validateDraft(draft)
   return db.transaction(() => {
-    if (hasReservedCardId(db, input.draft.cardId)) {
+    if (hasReservedCardId(db, draft.cardId)) {
       throw new WorkshopDraftError('conflict', 'Card id already exists')
     }
     const id = nanoid()
     const now = Date.now()
-    const serialised = serialiseDraft(input.draft)
+    const serialised = serialiseDraft(draft)
     db.prepare(`
       INSERT INTO workshop_cards (
         id, author_id, card_id, card_type, name, description,
@@ -293,13 +306,13 @@ export function createCard(
     `).run(
       id,
       input.authorId,
-      input.draft.cardId,
-      input.draft.cardType,
-      input.draft.name.trim(),
-      input.draft.description,
+      draft.cardId,
+      draft.cardType,
+      draft.name,
+      draft.description,
       serialised.cardJson,
       serialised.codeManifest,
-      input.draft.artUrl,
+      draft.artUrl,
       null,
       serialised.generation,
       now,
@@ -318,18 +331,19 @@ export function checkpointDraft(
     draft: WorkshopDraft
   },
 ): WorkshopWorkspace {
-  validateDraft(input.draft)
+  const draft = normaliseDraftNames(input.draft)
+  validateDraft(draft)
   return db.transaction(() => {
     const current = loadWorkspace(db, input.cardId, input.authorId)
     if (current.revision !== input.baseRevision) {
       throw new WorkshopDraftError('conflict', 'Draft revision conflict', current)
     }
-    if (hasReservedCardId(db, input.draft.cardId, input.cardId)) {
+    if (hasReservedCardId(db, draft.cardId, input.cardId)) {
       throw new WorkshopDraftError('conflict', 'Card id already exists', current)
     }
 
-    const serialised = serialiseDraft(input.draft)
-    const keepSandboxPass = contentHash(current.draft) === contentHash(input.draft)
+    const serialised = serialiseDraft(draft)
+    const keepSandboxPass = contentHash(current.draft) === contentHash(draft)
     db.prepare(`
       UPDATE workshop_cards SET
         card_id = ?,
@@ -346,13 +360,13 @@ export function checkpointDraft(
         updated_at = ?
       WHERE id = ?
     `).run(
-      input.draft.cardId,
-      input.draft.cardType,
-      input.draft.name.trim(),
-      input.draft.description,
+      draft.cardId,
+      draft.cardType,
+      draft.name,
+      draft.description,
       serialised.cardJson,
       serialised.codeManifest,
-      input.draft.artUrl,
+      draft.artUrl,
       serialised.generation,
       keepSandboxPass ? current.sandboxPassVersionId : null,
       keepSandboxPass ? current.sandboxPassedAt : null,
@@ -498,11 +512,27 @@ const staticValidation = (
   if (draft.cardJson.id !== draft.cardId) errors.push('Card definition id does not match card id')
   if (draft.cardJson.name !== draft.name) errors.push('Card definition name does not match card name')
   if (draft.cardJson.card_type !== draft.cardType) errors.push('Card definition type does not match card type')
-  if (
-    draft.effectCode
-    && (!draft.compiledCode || !draft.codeManifest)
-  ) {
-    errors.push('Ability source has not passed validation')
+  if (draft.effectCode) {
+    if (!draft.compiledCode || !draft.codeManifest) {
+      errors.push('Ability source has not passed validation')
+    } else {
+      const rawSourceDefinition = draft.codeManifest.cardDefinition
+      const sourceCardJson = workshopCardJsonFromDefinition(
+        rawSourceDefinition
+        && typeof rawSourceDefinition === 'object'
+        && !Array.isArray(rawSourceDefinition)
+          ? rawSourceDefinition as Record<string, unknown>
+          : null,
+      )
+      if (!sourceCardJson) {
+        errors.push('Ability source CARD_DEF is missing or invalid')
+      } else if (!Object.entries(sourceCardJson).every(([key, value]) =>
+        JSON.stringify(canonicalise(draft.cardJson[key]))
+          === JSON.stringify(canonicalise(value)),
+      )) {
+        errors.push('Ability source CARD_DEF does not match saved card definition')
+      }
+    }
   }
   return { valid: errors.length === 0, errors }
 }

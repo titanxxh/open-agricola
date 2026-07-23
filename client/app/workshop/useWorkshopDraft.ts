@@ -265,14 +265,13 @@ export const useWorkshopDraft = ({
   }, [saveDraft])
 
   const changeStage = useCallback(async (stage: WorkshopStage): Promise<boolean> => {
-    const current = stateRef.current
+    let current = stateRef.current
     if (!current || current.save.status === 'conflict') return false
-    if (
-      current.save.status !== 'saved'
-      && current.save.status !== 'saving'
-    ) {
+    while (current.save.status !== 'saved') {
       const saved = await saveDraft(current)
-      if (!saved && stateRef.current?.save.status === 'conflict') return false
+      current = stateRef.current
+      if (!current || current.save.status === 'conflict') return false
+      if (!saved) break
     }
     dispatch({ type: 'stageChanged', stage })
     return true

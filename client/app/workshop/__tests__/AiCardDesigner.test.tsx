@@ -163,6 +163,10 @@ describe('AiCardDesigner AI config header', () => {
       id: '',
       card_id: 'CUSTOM_UnsavedExtracted',
       name: 'Unsaved Extracted',
+      card_json: {
+        ...existingCard.card_json,
+        prerequisite: 'Old prerequisite',
+      },
     }
     let createBody: Record<string, unknown> | undefined
     const apiFetch = vi.fn(async (path: string, init?: RequestInit) => {
@@ -216,13 +220,19 @@ describe('AiCardDesigner AI config header', () => {
     )
 
     await waitFor(() => expect(screen.getByDisplayValue('Unsaved Extracted')).toBeInTheDocument())
+    const prerequisite = screen.getByLabelText('前置条件')
+    await userEvent.clear(prerequisite)
+    await userEvent.type(prerequisite, 'Edited prerequisite')
     await userEvent.click(screen.getByRole('button', { name: '职业' }))
     await userEvent.click(screen.getByRole('button', { name: '保存草稿' }))
     await waitFor(() => expect(createBody).toBeDefined())
 
     expect(createBody).toMatchObject({
       card_type: 'occupation',
-      card_json: { card_type: 'occupation' },
+      card_json: {
+        card_type: 'occupation',
+        prerequisite: 'Edited prerequisite',
+      },
     })
   })
 
