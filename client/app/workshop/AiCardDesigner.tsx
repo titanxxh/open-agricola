@@ -1366,7 +1366,7 @@ type AiCardDesignerProps = {
   initialCard?: ApiCard
   onImport: (card: ExtractedCard, artUrl: string | null) => void
   onClose: () => void
-  onAddToSandboxAndRestart?: (cardDbId: string) => Promise<void>
+  onAddToSandboxAndRestart?: (cardDbId: string, versionId: string) => Promise<void>
   sandboxErrors?: string[] | null
   onSandboxErrorsConsumed?: () => void
   onCardLoaded?: (cardDbId: string) => void
@@ -1402,6 +1402,7 @@ export function AiCardDesigner({
   const [showLocalizationModal, setShowLocalizationModal] = useState(false)
   const [cardLocales, setCardLocales] = useState<Record<string, CardLocaleEntry>>({})
   const [pendingStage, setPendingStage] = useState<WorkshopStage | null>(null)
+  const [sandboxConfirmation, setSandboxConfirmation] = useState(false)
   const hydratedWorkspaceRef = useRef('')
   const [abilityConfig, setAbilityConfig] = useState<LlmConfig | null>(() => getLlmConfig())
   const [artConfig, setArtConfig] = useState<LlmConfig | null>(() => getLlmConfig(KEY_LLM_CONFIG_ART))
@@ -1417,6 +1418,8 @@ export function AiCardDesigner({
     changeStage,
     resolveConflict,
     adoptCandidate: adoptDraftCandidate,
+    publishDraft,
+    confirmSandboxPass,
   } = useWorkshopDraft({
     cardId: currentCardDbId ?? '',
     apiFetch: workshopApiFetch,
@@ -1779,26 +1782,55 @@ export function AiCardDesigner({
     if (!currentCardDbId) await handleSaveCard()
   }
 
-  const handleSaveAndAddToSandbox = async () => {
-    if (!onAddToSandboxAndRestart) return
-    const cardDbId = await handleSaveCard()
-    if (cardDbId) await onAddToSandboxAndRestart(cardDbId)
+  const handlePublishAndStartSandbox = async () => {
+    if (!onAddToSandboxAndRestart || !currentCardDbId || !workspaceState) return
+    setSaving(true)
+    setError('')
+    try {
+      const versionId = await publishDraft()
+      if (!versionId) return
+      updateSession({ sandboxTestVersionId: versionId })
+      setSandboxConfirmation(false)
+      await onAddToSandboxAndRestart(currentCardDbId, versionId)
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : String(reason))
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const handleConfirmSandboxPass = async () => {
+    const versionId = workspaceState?.session.sandboxTestVersionId
+    if (
+      !versionId
+      || versionId !== workspaceState.publishedVersionId
+      || !sandboxConfirmation
+    ) return
+    setSaving(true)
+    await confirmSandboxPass(versionId, sandboxErrors ?? [])
+    setSaving(false)
+    setSandboxConfirmation(false)
   }
 
   const localizationReady = isLocaleEntryComplete(cardLocales.zh)
   const metadataReady = Boolean(cardName.trim() && isValidCardId(cardIdInput.trim()).valid)
+  const handoffInputsReady = Boolean(
+    metadataReady
+    && artUrl
+    && extracted?.sourceCode
+    && localizationReady
+  )
+  const handoffReady = Boolean(
+    handoffInputsReady
+    && workspaceState?.publishedVersionId
+    && workspaceState.sandboxPassVersionId === workspaceState.publishedVersionId
+  )
   const readiness: Record<WorkshopStage, boolean> = {
     metadata: metadataReady,
     art: Boolean(artUrl),
     ability: Boolean(extracted?.sourceCode),
     localization: localizationReady,
-    validation: Boolean(
-      metadataReady
-      && artUrl
-      && extracted?.sourceCode
-      && localizationReady
-      && workspaceState?.sandboxPassVersionId,
-    ),
+    validation: handoffReady,
   }
   const activeStage = workspaceState?.stage ?? 'metadata'
   const activeStageIndex = WORKSHOP_STAGES.indexOf(activeStage)
@@ -2194,22 +2226,62 @@ export function AiCardDesigner({
                     </li>
                   ))}
                 </ul>
+                <div className="aicw-version-gate">
+                  <div>
+                    <span>{locale === 'zh' ? '固定发布版本' : 'Pinned published version'}</span>
+                    <strong>{workspaceState?.publishedVersionId
+                      ? workspaceState.publishedVersionId.slice(0, 12)
+                      : (locale === 'zh' ? '尚未发布' : 'Not published')}</strong>
+                  </div>
+                  <div>
+                    <span>{locale === 'zh' ? '同版本沙盒确认' : 'Same-version sandbox pass'}</span>
+                    <strong>{handoffReady
+                      ? (locale === 'zh' ? '已满足社区 PR 交接门槛' : 'Community PR gate satisfied')
+                      : (locale === 'zh' ? '尚未确认' : 'Not confirmed')}</strong>
+                  </div>
+                </div>
                 <div className="aicw-handoff">
                   <div>
                     <strong>{locale === 'zh' ? '下一步：固定版本沙盒测试' : 'Next: sandbox-test a fixed version'}</strong>
-                    <span>{locale === 'zh' ? '先保存当前草稿，再进入沙盒验证运行结果。' : 'Save the current draft before validating it in the sandbox.'}</span>
+                    <span>{locale === 'zh' ? '发布会固定当前内容；沙盒只加载这个不可变版本。' : 'Publishing pins the current content; the sandbox loads only that immutable version.'}</span>
                   </div>
                   <div>
                     <button type="button" className="aicw-button" onClick={() => { void handleSaveCard() }} disabled={saving || !metadataReady}>
                       {locale === 'zh' ? '保存检查点' : 'Save checkpoint'}
                     </button>
                     {onAddToSandboxAndRestart && (
-                      <button type="button" className="aicw-button aicw-button-primary" onClick={() => { void handleSaveAndAddToSandbox() }} disabled={saving || !extracted?.sourceCode}>
-                        {locale === 'zh' ? '加入沙盒并测试' : 'Add to sandbox and test'}
+                      <button type="button" className="aicw-button aicw-button-primary" onClick={() => { void handlePublishAndStartSandbox() }} disabled={saving || !workspaceState || !handoffInputsReady}>
+                        {locale === 'zh' ? '发布当前版本并启动沙盒' : 'Publish current version and start sandbox'}
                       </button>
                     )}
                   </div>
                 </div>
+                {workspaceState?.session.sandboxTestVersionId === workspaceState?.publishedVersionId && !handoffReady && (
+                  <div className="aicw-sandbox-confirm">
+                    <label>
+                      <input
+                        type="checkbox"
+                        checked={sandboxConfirmation}
+                        onChange={event => setSandboxConfirmation(event.target.checked)}
+                        disabled={Boolean(sandboxErrors?.length)}
+                      />
+                      <span>{locale === 'zh'
+                        ? '我确认这个固定版本在沙盒中没有运行错误'
+                        : 'I confirm this pinned version has no sandbox runtime errors'}</span>
+                    </label>
+                    {sandboxErrors?.length
+                      ? <small>{locale === 'zh' ? '先修复已知沙盒错误并重新发布。' : 'Fix known sandbox errors and publish again first.'}</small>
+                      : null}
+                    <button
+                      type="button"
+                      className="aicw-button aicw-button-primary"
+                      onClick={() => { void handleConfirmSandboxPass() }}
+                      disabled={!sandboxConfirmation || saving}
+                    >
+                      {locale === 'zh' ? '确认沙盒通过' : 'Confirm sandbox pass'}
+                    </button>
+                  </div>
+                )}
               </div>
             )}
 

@@ -52,8 +52,25 @@ db.exec(`
     github_pr_url TEXT,
     github_pr_status TEXT,
     github_pr_last_synced_at INTEGER,
+    draft_revision INTEGER NOT NULL DEFAULT 1,
+    draft_generation_json TEXT NOT NULL DEFAULT '{}',
+    published_version_id TEXT,
+    sandbox_pass_version_id TEXT,
+    sandbox_passed_at INTEGER,
     created_at INTEGER NOT NULL,
     updated_at INTEGER NOT NULL
+  );
+  CREATE TABLE workshop_card_versions (
+    id TEXT PRIMARY KEY,
+    card_id TEXT NOT NULL REFERENCES workshop_cards(id) ON DELETE CASCADE,
+    card_json TEXT NOT NULL,
+    code_manifest TEXT,
+    art_url TEXT,
+    version_number INTEGER NOT NULL,
+    created_by TEXT NOT NULL REFERENCES users(id),
+    created_at INTEGER NOT NULL,
+    content_hash TEXT,
+    provenance_json TEXT NOT NULL DEFAULT '{}'
   );
   CREATE TABLE github_propose_rate_limit (
     user_id TEXT PRIMARY KEY REFERENCES users(id),
@@ -369,6 +386,7 @@ describe('workshop PR propose — session', () => {
   let userId: string
   let userToken: string
   let cardDbId: string
+  let versionId: string
 
   beforeEach(() => {
     ;(workshopPrConfig as unknown as { clientId: string }).clientId = 'test_cid'
@@ -388,11 +406,21 @@ describe('workshop PR propose — session', () => {
     ).run(userToken, userId, now + 3_600_000, now)
 
     cardDbId = nanoid()
+    const cardJson = JSON.stringify({
+      id: 'CUSTOM_TestCard',
+      name: 'Test Card',
+      card_type: 'minor',
+      deck: 'CUSTOM',
+      number: 0,
+      desc: [],
+      _code: `const CARD_DEF = new MinorImprovement({ id: 'CUSTOM_TestCard', deck: 'community', number: 0, name: 'Test Card', desc: [], cost: {}, vp: 0 })\nconst CARD_IMPL = {}`,
+      _compiled: '"use strict";',
+    })
     db.prepare(
       `INSERT INTO workshop_cards
          (id, author_id, card_id, card_type, name, description, card_json,
-          art_url, status, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          code_manifest, art_url, status, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     ).run(
       cardDbId,
       userId,
@@ -400,15 +428,25 @@ describe('workshop PR propose — session', () => {
       'minor',
       'Test Card',
       'A test card',
-      JSON.stringify({
-        name: 'Test Card',
-        _code: `const CARD_DEF = new MinorImprovement({ id: 'CUSTOM_TestCard', deck: 'community', number: 0, name: 'Test Card', desc: [], cost: {}, vp: 0 })\nconst CARD_IMPL = {}`,
-      }),
+      cardJson,
+      '{}',
       null,
       'published',
       now,
       now,
     )
+    versionId = nanoid()
+    db.prepare(`
+      INSERT INTO workshop_card_versions (
+        id, card_id, card_json, code_manifest, art_url, version_number,
+        created_by, created_at, content_hash, provenance_json
+      ) VALUES (?, ?, ?, '{}', NULL, 1, ?, ?, NULL, '{}')
+    `).run(versionId, cardDbId, cardJson, userId, now)
+    db.prepare(`
+      UPDATE workshop_cards
+      SET published_version_id = ?, sandbox_pass_version_id = ?, sandbox_passed_at = ?
+      WHERE id = ?
+    `).run(versionId, versionId, now, cardDbId)
 
     db.prepare(`DELETE FROM github_propose_rate_limit WHERE user_id = ?`).run(userId)
     db.prepare(`DELETE FROM github_propose_audit WHERE user_id = ?`).run(userId)
@@ -431,6 +469,33 @@ describe('workshop PR propose — session', () => {
   })
 
   // ── C-24: happy path ─────────────────────────────────────────────────────
+
+  it('rejects before OAuth when the published version has no matching sandbox pass', async () => {
+    db.prepare(`
+      UPDATE workshop_cards SET sandbox_pass_version_id = NULL, sandbox_passed_at = NULL
+      WHERE id = ?
+    `).run(cardDbId)
+    const req = fakeReq({
+      method: 'POST',
+      url: `/api/workshop/cards/${cardDbId}/propose`,
+      authHeader: `Bearer ${userToken}`,
+      body: JSON.stringify({}),
+    })
+    const res = fakeRes()
+
+    await handleProposeRequest(req, res, cardDbId)
+
+    expect(res.statusCode).toBe(400)
+    expect(JSON.parse(res.body)).toMatchObject({
+      ok: false,
+      code: 'handoff_not_ready',
+      readiness: {
+        ready: false,
+        publishedVersionMatchesDraft: true,
+        sandboxPassedForPublishedVersion: false,
+      },
+    })
+  })
 
   it('happy path: first-time propose creates PR, updates DB, audit=success', async () => {
     process.env.CORS_ORIGIN = 'https://frontend.example'

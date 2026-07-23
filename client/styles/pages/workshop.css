@@ -2942,6 +2942,34 @@
   font-size: 11px;
 }
 
+.aicw-version-gate {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1px;
+  margin-top: 18px;
+  overflow: hidden;
+  border: 1px solid var(--aicw-border);
+  border-radius: 10px;
+  background: var(--aicw-border);
+}
+
+.aicw-version-gate > div {
+  display: grid;
+  gap: 5px;
+  padding: 16px;
+  background: var(--aicw-paper);
+}
+
+.aicw-version-gate span {
+  color: var(--aicw-muted);
+  font-size: 11px;
+}
+
+.aicw-version-gate strong {
+  color: var(--aicw-green-strong);
+  font-size: 13px;
+}
+
 .aicw-handoff {
   align-items: flex-end;
   margin-top: 28px;
@@ -2962,6 +2990,35 @@
 .aicw-handoff span {
   color: var(--aicw-muted);
   font-size: 12px;
+}
+
+.aicw-sandbox-confirm {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-top: 16px;
+  padding: 16px;
+  border-radius: 10px;
+  background: var(--aicw-gold-soft);
+}
+
+.aicw-sandbox-confirm label {
+  display: flex;
+  flex: 1;
+  align-items: flex-start;
+  gap: 9px;
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+.aicw-sandbox-confirm input {
+  width: 18px;
+  height: 18px;
+  margin: 0;
+}
+
+.aicw-sandbox-confirm small {
+  color: #73500e;
 }
 
 .aicw-stage-footer {
@@ -3070,7 +3127,8 @@
   .aicw-recovery,
   .aicw-inline-actions,
   .aicw-localization,
-  .aicw-handoff {
+  .aicw-handoff,
+  .aicw-sandbox-confirm {
     align-items: stretch;
     flex-direction: column;
   }
@@ -3090,6 +3148,10 @@
   }
 
   .aicw-field-row {
+    grid-template-columns: 1fr;
+  }
+
+  .aicw-version-gate {
     grid-template-columns: 1fr;
   }
 

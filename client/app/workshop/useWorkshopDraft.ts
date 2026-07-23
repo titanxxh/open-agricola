@@ -20,6 +20,7 @@ type WorkspaceResponse = {
   ok: boolean
   workspace?: WorkshopWorkspaceDto
   current?: WorkshopWorkspaceDto
+  versionId?: string
   error?: string
 }
 
@@ -40,6 +41,7 @@ const hasSessionData = (session: WorkshopSessionState): boolean =>
   || session.artPrompt.length > 0
   || session.abilityInput.length > 0
   || session.abilityMessages.length > 0
+  || Boolean(session.sandboxTestVersionId)
 
 const parseRecovery = (raw: string | null): WorkshopLocalRecovery | null => {
   if (!raw) return null
@@ -314,6 +316,104 @@ export const useWorkshopDraft = ({
     }
   }, [apiFetch, cardId, dispatch, persist, saveDraft])
 
+  const publishDraft = useCallback(async (): Promise<string | null> => {
+    let current = stateRef.current
+    if (!current || current.save.status === 'conflict') return null
+    if (current.save.status !== 'saved') {
+      if (!await saveDraft(current)) return null
+      current = stateRef.current
+      if (!current || current.save.status !== 'saved') return null
+    }
+    dispatch({ type: 'saving' })
+    try {
+      const response = await apiFetch(
+        `/api/workshop/cards/${encodeURIComponent(cardId)}/publish`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ baseRevision: current.baseRevision }),
+        },
+      )
+      const payload = await response.json() as WorkspaceResponse
+      if (response.status === 409 && payload.current) {
+        dispatch({
+          type: 'conflictDetected',
+          server: payload.current,
+          local: toLocalRecovery(current),
+        })
+        return null
+      }
+      if (!response.ok || !payload.workspace || !payload.versionId) {
+        dispatch({
+          type: 'saveFailed',
+          status: 'error',
+          error: payload.error ?? `Request failed (${response.status})`,
+        })
+        return null
+      }
+      const published = workshopDraftReducer(current, {
+        type: 'checkpointSaved',
+        workspace: payload.workspace,
+      })
+      dispatch({ type: 'serverLoaded', state: published })
+      persist(published)
+      return payload.versionId
+    } catch (reason) {
+      dispatch({
+        type: 'saveFailed',
+        status: 'offline',
+        error: reason instanceof Error ? reason.message : String(reason),
+      })
+      return null
+    }
+  }, [apiFetch, cardId, dispatch, persist, saveDraft])
+
+  const confirmSandboxPass = useCallback(async (
+    versionId: string,
+    runtimeErrors: string[] = [],
+  ): Promise<boolean> => {
+    const current = stateRef.current
+    if (!current || current.save.status === 'conflict') return false
+    dispatch({ type: 'saving' })
+    try {
+      const response = await apiFetch(
+        `/api/workshop/cards/${encodeURIComponent(cardId)}/sandbox-pass`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            versionId,
+            authorConfirmed: true,
+            runtimeErrors,
+          }),
+        },
+      )
+      const payload = await response.json() as WorkspaceResponse
+      if (!response.ok || !payload.workspace) {
+        dispatch({
+          type: 'saveFailed',
+          status: 'error',
+          error: payload.error ?? `Request failed (${response.status})`,
+        })
+        return false
+      }
+      const confirmed = workshopDraftReducer(current, {
+        type: 'checkpointSaved',
+        workspace: payload.workspace,
+      })
+      dispatch({ type: 'serverLoaded', state: confirmed })
+      persist(confirmed)
+      return true
+    } catch (reason) {
+      dispatch({
+        type: 'saveFailed',
+        status: 'offline',
+        error: reason instanceof Error ? reason.message : String(reason),
+      })
+      return false
+    }
+  }, [apiFetch, cardId, dispatch, persist])
+
   return {
     state,
     loading,
@@ -326,5 +426,7 @@ export const useWorkshopDraft = ({
     changeStage,
     resolveConflict,
     adoptCandidate,
+    publishDraft,
+    confirmSandboxPass,
   }
 }

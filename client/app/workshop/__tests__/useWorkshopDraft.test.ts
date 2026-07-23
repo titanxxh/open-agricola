@@ -212,4 +212,63 @@ describe('useWorkshopDraft', () => {
       candidate: { id: 'art-1', prompt: 'a field' },
     })
   })
+
+  it('publishes and confirms the same immutable sandbox version', async () => {
+    const requests: Array<{ path: string; body?: Record<string, unknown> }> = []
+    const apiFetch = vi.fn(async (path: string, init?: RequestInit) => {
+      const body = init?.body
+        ? JSON.parse(String(init.body)) as Record<string, unknown>
+        : undefined
+      requests.push({ path, body })
+      if (!init) {
+        return new Response(JSON.stringify({ ok: true, workspace: workspace(1) }))
+      }
+      if (path.endsWith('/publish')) {
+        return new Response(JSON.stringify({
+          ok: true,
+          workspace: {
+            ...workspace(1),
+            status: 'published',
+            publishedVersionId: 'version-1',
+          },
+          versionId: 'version-1',
+        }))
+      }
+      return new Response(JSON.stringify({
+        ok: true,
+        workspace: {
+          ...workspace(1),
+          status: 'published',
+          publishedVersionId: 'version-1',
+          sandboxPassVersionId: 'version-1',
+          sandboxPassedAt: 100,
+        },
+      }))
+    })
+    const { result } = renderHook(() => useWorkshopDraft({
+      cardId: 'card-1',
+      apiFetch,
+    }))
+    await waitFor(() => expect(result.current.state?.baseRevision).toBe(1))
+
+    let versionId: string | null = null
+    await act(async () => {
+      versionId = await result.current.publishDraft()
+    })
+    expect(versionId).toBe('version-1')
+    expect(result.current.state?.publishedVersionId).toBe('version-1')
+
+    await act(async () => {
+      expect(await result.current.confirmSandboxPass('version-1')).toBe(true)
+    })
+    expect(result.current.state?.sandboxPassVersionId).toBe('version-1')
+    expect(requests.find(request => request.path.endsWith('/publish'))?.body)
+      .toEqual({ baseRevision: 1 })
+    expect(requests.find(request => request.path.endsWith('/sandbox-pass'))?.body)
+      .toEqual({
+        versionId: 'version-1',
+        authorConfirmed: true,
+        runtimeErrors: [],
+      })
+  })
 })
