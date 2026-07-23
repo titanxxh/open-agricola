@@ -376,10 +376,29 @@ function runMigrations(db: Database.Database): void {
         ALTER TABLE workshop_card_versions ADD COLUMN provenance_json TEXT NOT NULL DEFAULT '{}';
 
         UPDATE workshop_cards
-        SET draft_generation_json = json_object(
-          'art',
-          json_object('prompt', art_prompt, 'resultUrl', art_url)
-        )
+        SET draft_generation_json = CASE
+          WHEN NULLIF(TRIM(art_url), '') IS NOT NULL THEN json_object(
+            'art',
+            json_object(
+              'prompt', art_prompt,
+              'lastCompleted', json_object(
+                'id', 'legacy-art-' || id,
+                'kind', 'art',
+                'prompt', art_prompt,
+                'resultUrl', art_url,
+                'createdAt', updated_at
+              ),
+              'adopted', json_object(
+                'id', 'legacy-art-' || id,
+                'kind', 'art',
+                'prompt', art_prompt,
+                'resultUrl', art_url,
+                'createdAt', updated_at
+              )
+            )
+          )
+          ELSE json_object('art', json_object('prompt', art_prompt))
+        END
         WHERE NULLIF(TRIM(art_prompt), '') IS NOT NULL;
 
         INSERT INTO workshop_card_versions (

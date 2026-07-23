@@ -130,7 +130,23 @@ describe('workshop draft migration', () => {
       SELECT draft_generation_json FROM workshop_cards WHERE id = 'draft'
     `).get() as { draft_generation_json: string }).draft_generation_json)
     expect(generation).toEqual({
-      art: { prompt: 'draw a field', resultUrl: '/draft.png' },
+      art: {
+        prompt: 'draw a field',
+        lastCompleted: {
+          id: 'legacy-art-draft',
+          kind: 'art',
+          prompt: 'draw a field',
+          resultUrl: '/draft.png',
+          createdAt: 1,
+        },
+        adopted: {
+          id: 'legacy-art-draft',
+          kind: 'art',
+          prompt: 'draw a field',
+          resultUrl: '/draft.png',
+          createdAt: 1,
+        },
+      },
     })
 
     expect(db.prepare(`

@@ -156,6 +156,77 @@ describe('AiCardDesigner AI config header', () => {
     expect(screen.queryByText('第一行能力')).not.toBeInTheDocument()
   })
 
+  it('restores the exact last art prompt and adopted ability source', async () => {
+    localStorage.setItem(
+      'open-agricola-llm-config-art',
+      JSON.stringify({ provider: 'gemini', apiKey: 'test', model: 'gemini-3.1-pro-preview' }),
+    )
+    const sourceCode = 'export const CUSTOM_MedievalMallet = {\n  id: "exact-source",\n}'
+    const artGeneration = {
+      id: 'art-adopted',
+      kind: 'art',
+      prompt: 'exact private art prompt',
+      resultUrl: '/card-art/current.png',
+      provider: 'gemini',
+      model: 'gemini-3.1-pro-preview',
+      createdAt: 10,
+      baseRevision: 2,
+      stale: false,
+    }
+    const apiFetch = vi.fn(async (path: string) => {
+      if (path.includes('scope=mine')) {
+        return new Response(JSON.stringify({ ok: true, cards: [existingCard] }))
+      }
+      return new Response(JSON.stringify({
+        ok: true,
+        workspace: {
+          id: existingCard.id,
+          authorId: 'author',
+          revision: 2,
+          status: 'draft',
+          draft: {
+            cardId: existingCard.card_id,
+            cardType: 'minor',
+            name: existingCard.name,
+            description: existingCard.description,
+            cardJson: existingCard.card_json,
+            effectCode: sourceCode,
+            compiledCode: null,
+            codeManifest: null,
+            artUrl: '/card-art/current.png',
+            generation: {
+              art: {
+                lastCompleted: artGeneration,
+                adopted: artGeneration,
+              },
+            },
+          },
+          publishedVersionId: null,
+          sandboxPassVersionId: null,
+          sandboxPassedAt: null,
+        },
+      }))
+    })
+
+    const { container } = render(
+      <LocaleProvider>
+        <AiCardDesigner
+          initialCard={existingCard}
+          onImport={() => {}}
+          onClose={() => {}}
+          apiFetch={apiFetch}
+        />
+      </LocaleProvider>,
+    )
+
+    await waitFor(() => expect(screen.queryByText('正在恢复草稿…')).not.toBeInTheDocument())
+    await userEvent.click(screen.getByRole('button', { name: /卡面图 提示词、参考图与候选/ }))
+    expect(screen.getByDisplayValue('exact private art prompt')).toBeInTheDocument()
+
+    await userEvent.click(screen.getByRole('button', { name: /卡牌能力 对话、源码与验证/ }))
+    expect(container.querySelector('.aicw-current-code code')?.textContent).toBe(sourceCode)
+  })
+
   it('checkpoints the complete draft before changing stages', async () => {
     const apiFetch = vi.fn(async (path: string, init?: RequestInit) => {
       if (path.includes('scope=mine')) {

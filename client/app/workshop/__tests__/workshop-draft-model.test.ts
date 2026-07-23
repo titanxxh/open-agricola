@@ -92,6 +92,49 @@ describe('workshop draft model', () => {
       sourceCode: 'const CARD_IMPL = { changed: true }',
       validation: { valid: false, errors: [] },
     })
+    expect(state.draft.effectCode).toBeNull()
+    expect(state.draft.generation).toMatchObject({
+      ability: {
+        lastCompleted: {
+          sourceCode: 'const CARD_IMPL = { changed: true }',
+          validation: { valid: false, errors: [] },
+        },
+      },
+    })
+    expect(state.save.status).toBe('dirty')
+  })
+
+  it('records validation without adopting an ability candidate', () => {
+    let state = createWorkshopDraftState(workspace())
+    state = workshopDraftReducer(state, {
+      type: 'candidateCompleted',
+      candidate: {
+        id: 'ability-1',
+        kind: 'ability',
+        prompt: 'gain grain',
+        sourceCode: 'const CARD_IMPL = {}',
+        validation: { valid: false, errors: [] },
+        createdAt: 1,
+        baseRevision: 1,
+        stale: false,
+      },
+    })
+    state = workshopDraftReducer(state, {
+      type: 'abilityCandidateValidated',
+      candidateId: 'ability-1',
+      validation: { valid: true, errors: [] },
+    })
+
+    expect(state.session.abilityCandidates[0]?.validation.valid).toBe(true)
+    expect(state.draft.effectCode).toBeNull()
+    expect(state.draft.generation).toMatchObject({
+      ability: {
+        lastCompleted: {
+          id: 'ability-1',
+          validation: { valid: true, errors: [] },
+        },
+      },
+    })
   })
 
   it('clears only the adopted candidate group and accepts the server revision', () => {
@@ -170,5 +213,59 @@ describe('workshop draft model', () => {
       ...local,
       draft: draft(),
     })).toMatchObject({ kind: 'server', clearLocal: true })
+  })
+
+  it('restores the last unadopted server candidates and image prompt', () => {
+    const server = workspace(4)
+    server.draft.generation = {
+      art: {
+        lastCompleted: {
+          id: 'art-latest',
+          kind: 'art',
+          prompt: 'restored image prompt',
+          resultUrl: '/card-art/latest.png',
+          model: 'image-model',
+          createdAt: 10,
+        },
+      },
+      ability: {
+        lastCompleted: {
+          id: 'ability-latest',
+          kind: 'ability',
+          prompt: 'restored ability prompt',
+          sourceCode: 'const CARD_IMPL = { restored: true }',
+          model: 'ability-model',
+          validation: { valid: true, errors: [] },
+          createdAt: 11,
+        },
+      },
+    }
+
+    expect(createWorkshopDraftState(server)).toMatchObject({
+      session: {
+        artPrompt: 'restored image prompt',
+        artCandidates: [{
+          id: 'art-latest',
+          baseRevision: 4,
+          stale: false,
+        }],
+        abilityCandidates: [{
+          id: 'ability-latest',
+          sourceCode: 'const CARD_IMPL = { restored: true }',
+          baseRevision: 4,
+          stale: false,
+        }],
+      },
+    })
+  })
+
+  it('restores a legacy image prompt even when no image completed', () => {
+    const server = workspace(4)
+    server.draft.generation = {
+      art: { prompt: 'legacy prompt without an image' },
+    }
+
+    expect(createWorkshopDraftState(server).session.artPrompt)
+      .toBe('legacy prompt without an image')
   })
 })
