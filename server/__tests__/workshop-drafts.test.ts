@@ -6,6 +6,7 @@ import {
   checkpointDraft,
   createCard,
   getHandoffReadiness,
+  loadPublishedDraft,
   loadSandboxVersion,
   loadWorkspace,
   markSandboxPass,
@@ -381,6 +382,41 @@ describe('workshop draft aggregate', () => {
       authorId: 'other',
       versionId: adopted.versionId,
     })).toThrowError(expect.objectContaining<Partial<WorkshopDraftError>>({ code: 'forbidden' }))
+  })
+
+  it('loads published gameplay data from the pinned version', () => {
+    const created = createCard(db, { authorId: 'author', draft: baseDraft() })
+    const published = publish(db, {
+      cardId: created.id,
+      authorId: 'author',
+      baseRevision: 1,
+    })
+    checkpointDraft(db, {
+      cardId: created.id,
+      authorId: 'author',
+      baseRevision: 1,
+      draft: baseDraft({
+        name: 'Unpublished change',
+        cardJson: {
+          ...baseDraft().cardJson,
+          name: 'Unpublished change',
+        },
+        artUrl: '/card-art/unpublished.png',
+      }),
+    })
+
+    expect(loadPublishedDraft(db, created.id)).toMatchObject({
+      name: 'Field Keeper',
+      artUrl: null,
+    })
+    expect(loadWorkspace(db, created.id, 'author')).toMatchObject({
+      revision: 2,
+      publishedVersionId: published.versionId,
+      draft: {
+        name: 'Unpublished change',
+        artUrl: '/card-art/unpublished.png',
+      },
+    })
   })
 
   it('pins publishing and sandbox confirmation to the exact current version', () => {

@@ -58,6 +58,7 @@ describe('sandbox version binding', () => {
       adoptCandidate,
       checkpointDraft,
       createCard,
+      publish,
     } = await import('../workshop-drafts.ts')
     const db = getDb()
     const now = Date.now()
@@ -106,6 +107,12 @@ describe('sandbox version binding', () => {
         createdAt: now,
       },
     })
+    const published = publish(db, {
+      cardId: original.id,
+      authorId: 'author',
+      baseRevision: 2,
+    })
+    expect(published.versionId).toBe(pinned.versionId)
     checkpointDraft(db, {
       cardId: original.id,
       authorId: 'author',
@@ -148,6 +155,25 @@ describe('sandbox version binding', () => {
       cardId: 'CUSTOM_PinnedVersion',
     }, 'sandbox-token'), drawRes)
     expect(drawRes.statusCode).toBe(200)
+
+    const defaultStartRes = mockRes()
+    await handleGameRoute(mockReq('POST', '/api/game/new-sandbox', {
+      seed: 42,
+      customCardIds: [original.id],
+    }, 'sandbox-token'), defaultStartRes)
+    expect(defaultStartRes.statusCode).toBe(200)
+    expect(JSON.parse(defaultStartRes.body)).toMatchObject({
+      ok: true,
+      customCardsLoaded: 1,
+      customCardVersionsLoaded: [],
+    })
+
+    const defaultDrawRes = mockRes()
+    await handleGameRoute(mockReq('POST', '/api/game/dev/draw-card', {
+      playerIndex: 0,
+      cardId: 'CUSTOM_PinnedVersion',
+    }, 'sandbox-token'), defaultDrawRes)
+    expect(defaultDrawRes.statusCode).toBe(200)
     db.close()
   })
 })

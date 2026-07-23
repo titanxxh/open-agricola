@@ -520,6 +520,22 @@ export function loadSandboxVersion(
   return draftFromVersion(current, loadVersion(db, input.cardId, input.versionId))
 }
 
+export function loadPublishedDraft(
+  db: Database.Database,
+  cardId: string,
+): WorkshopDraft {
+  const row = db.prepare(`
+    SELECT * FROM workshop_cards
+    WHERE id = ? AND status = 'published' AND published_version_id IS NOT NULL
+  `).get(cardId) as WorkshopCardRow | undefined
+  if (!row) throw new WorkshopDraftError('not_found', 'Card not found')
+  const current = rowToWorkspace(row)
+  return draftFromVersion(
+    current,
+    loadVersion(db, cardId, current.publishedVersionId!),
+  )
+}
+
 export function restoreVersion(
   db: Database.Database,
   input: {
