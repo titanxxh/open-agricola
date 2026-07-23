@@ -38,6 +38,37 @@ const baseDraft = (overrides: Partial<WorkshopDraft> = {}): WorkshopDraft => ({
   ...overrides,
 })
 
+const handoffDraft = (overrides: Partial<WorkshopDraft> = {}): WorkshopDraft => {
+  const base = baseDraft()
+  return {
+    ...base,
+    cardJson: {
+      ...base.cardJson,
+      cost: {},
+      vp: 0,
+      modifiers: [],
+      implemented: true,
+    },
+    effectCode: 'const CARD_DEF = {}; const CARD_IMPL = {}',
+    compiledCode: '"use strict"; const CARD_DEF = {}; const CARD_IMPL = {};',
+    codeManifest: {
+      effectHooks: [],
+      listeners: [],
+      cardDefinition: {
+        cardType: 'occupation',
+        meta: {
+          id: base.cardId,
+          name: base.name,
+          deck: 'CUSTOM',
+          number: 0,
+          desc: base.cardJson.desc,
+        },
+      },
+    },
+    ...overrides,
+  }
+}
+
 beforeEach(() => {
   db = new Database(':memory:')
   db.pragma('foreign_keys = ON')
@@ -498,6 +529,29 @@ describe('workshop draft aggregate', () => {
     }))
   })
 
+  it('rejects publishing when the draft adds metadata omitted by the source', () => {
+    const draft = handoffDraft()
+    const created = createCard(db, {
+      authorId: 'author',
+      draft: {
+        ...draft,
+        cardJson: {
+          ...draft.cardJson,
+          cost: { wood: 1 },
+        },
+      },
+    })
+
+    expect(() => publish(db, {
+      cardId: created.id,
+      authorId: 'author',
+      baseRevision: created.revision,
+    })).toThrowError(expect.objectContaining<Partial<WorkshopDraftError>>({
+      code: 'not_ready',
+      message: expect.stringContaining('source'),
+    }))
+  })
+
   it('restores by copy-forward without creating a new version', () => {
     const created = createCard(db, { authorId: 'author', draft: baseDraft() })
     const adopted = adoptCandidate(db, {
@@ -614,7 +668,7 @@ describe('workshop draft aggregate', () => {
   })
 
   it('pins publishing and sandbox confirmation to the exact current version', () => {
-    const created = createCard(db, { authorId: 'author', draft: baseDraft() })
+    const created = createCard(db, { authorId: 'author', draft: handoffDraft() })
     const published = publish(db, {
       cardId: created.id,
       authorId: 'author',
@@ -669,8 +723,34 @@ describe('workshop draft aggregate', () => {
     })
   })
 
-  it('keeps an exact-version sandbox pass across private generation checkpoints', () => {
+  it('does not mark a published metadata-only card ready for PR handoff', () => {
     const created = createCard(db, { authorId: 'author', draft: baseDraft() })
+    const published = publish(db, {
+      cardId: created.id,
+      authorId: 'author',
+      baseRevision: created.revision,
+    })
+    markSandboxPass(db, {
+      cardId: created.id,
+      authorId: 'author',
+      versionId: published.versionId,
+      authorConfirmed: true,
+      runtimeErrors: [],
+    })
+
+    expect(getHandoffReadiness(db, created.id, 'author')).toMatchObject({
+      ready: false,
+      staticValidation: {
+        valid: false,
+        errors: expect.arrayContaining([
+          'Ability source is required for PR handoff',
+        ]),
+      },
+    })
+  })
+
+  it('keeps an exact-version sandbox pass across private generation checkpoints', () => {
+    const created = createCard(db, { authorId: 'author', draft: handoffDraft() })
     const published = publish(db, {
       cardId: created.id,
       authorId: 'author',
@@ -688,7 +768,7 @@ describe('workshop draft aggregate', () => {
       cardId: created.id,
       authorId: 'author',
       baseRevision: 1,
-      draft: baseDraft({
+      draft: handoffDraft({
         generation: {
           ability: {
             lastCompleted: {
