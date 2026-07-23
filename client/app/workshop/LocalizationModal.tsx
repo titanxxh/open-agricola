@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { getLlmConfig, translateCardContent, type LlmConfig } from '../../services/llm'
 import { useLocale } from '../../contexts/LocaleContext'
 
@@ -59,6 +59,15 @@ export function LocalizationModal({
   const [translating, setTranslating] = useState(false)
   const [autoTranslating, setAutoTranslating] = useState(false)
   const [error, setError] = useState('')
+  const dialogRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    const opener = document.activeElement instanceof HTMLElement
+      ? document.activeElement
+      : null
+    dialogRef.current?.querySelector<HTMLElement>('input, textarea, select, button')?.focus()
+    return () => opener?.focus()
+  }, [])
 
   const langLabel = (lang: string) => lang === 'zh' ? '中文' : lang === 'en' ? 'English' : lang
 
@@ -182,11 +191,41 @@ export function LocalizationModal({
     onSave(updated)
   }
 
+  const handleDialogKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
+    if (event.key === 'Escape') {
+      event.preventDefault()
+      onClose()
+      return
+    }
+    if (event.key !== 'Tab' || !dialogRef.current) return
+    const focusable = Array.from(dialogRef.current.querySelectorAll<HTMLElement>(
+      'button:not(:disabled), input:not(:disabled), textarea:not(:disabled), select:not(:disabled), [tabindex]:not([tabindex="-1"])',
+    ))
+    if (focusable.length === 0) return
+    const first = focusable[0]!
+    const last = focusable.at(-1)!
+    if (event.shiftKey && document.activeElement === first) {
+      event.preventDefault()
+      last.focus()
+    } else if (!event.shiftKey && document.activeElement === last) {
+      event.preventDefault()
+      first.focus()
+    }
+  }
+
   return (
     <div className="localization-modal-overlay" onClick={onClose}>
-      <div className="localization-modal" onClick={e => e.stopPropagation()}>
+      <div
+        ref={dialogRef}
+        className="localization-modal"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="localization-dialog-title"
+        onClick={e => e.stopPropagation()}
+        onKeyDown={handleDialogKeyDown}
+      >
         <div className="localization-modal-header">
-          <h3>{locale === 'zh' ? '本地化' : 'Localization'}</h3>
+          <h3 id="localization-dialog-title">{locale === 'zh' ? '本地化' : 'Localization'}</h3>
           <button type="button" className="btn-link" onClick={onClose}>
             {locale === 'zh' ? '关闭' : 'Close'}
           </button>
@@ -225,6 +264,7 @@ export function LocalizationModal({
               value={targetLang}
               onChange={e => handleLangChange(e.target.value)}
               disabled={translating}
+              aria-label={locale === 'zh' ? '目标语言' : 'Target language'}
             >
               {availableLangs.map(l => (
                 <option key={l} value={l}>{langLabel(l)}</option>
@@ -249,8 +289,9 @@ export function LocalizationModal({
               {langLabel(targetLang)}
             </div>
             <div className="localization-field">
-              <label>{locale === 'zh' ? '名称' : 'Name'}</label>
+              <label htmlFor="localization-target-name">{locale === 'zh' ? '名称' : 'Name'}</label>
               <input
+                id="localization-target-name"
                 type="text"
                 value={targetName}
                 onChange={e => setTargetName(e.target.value)}
@@ -258,16 +299,18 @@ export function LocalizationModal({
               />
             </div>
             <div className="localization-field">
-              <label>{locale === 'zh' ? '描述' : 'Description'}</label>
+              <label htmlFor="localization-target-description">{locale === 'zh' ? '描述' : 'Description'}</label>
               <textarea
+                id="localization-target-description"
                 value={targetDesc}
                 onChange={e => setTargetDesc(e.target.value)}
                 placeholder={locale === 'zh' ? '翻译后的描述（每行一条）' : 'Translated description (one per line)'}
               />
             </div>
             <div className="localization-field">
-              <label>{locale === 'zh' ? '前置条件' : 'Prerequisite'}</label>
+              <label htmlFor="localization-target-prerequisite">{locale === 'zh' ? '前置条件' : 'Prerequisite'}</label>
               <input
+                id="localization-target-prerequisite"
                 type="text"
                 value={targetPrerequisite}
                 onChange={e => setTargetPrerequisite(e.target.value)}
@@ -276,7 +319,7 @@ export function LocalizationModal({
             </div>
           </div>
 
-          {error && <div className="localization-error">{error}</div>}
+          {error && <div className="localization-error" role="alert">{error}</div>}
         </div>
         <div className="localization-modal-footer">
           <button type="button" className="btn-link" onClick={onClose}>

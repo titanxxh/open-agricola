@@ -118,6 +118,7 @@ ESLint 三层强制（`eslint.config.js`）：
 | 文件 | 内容 |
 |---|---|
 | `contract/types.ts` | `GameState` / `PlayerState` / `ActionSpace` / `Resource` / `InteractionState` / `InteractionRequest` / `ActionDefinition` |
+| `contract/workshop.ts` | Workshop Design Draft、Workspace 与生成候选的前后端协议 |
 | `contract/protocol/ws.ts` | `ClientCommand` / `ServerEvent` / `RoomSummary` |
 | `contract/protocol/game.ts` | `GameSyncPayload` / `StateUpdateEnvelope` / `StateUpdateCause` / `ActionDetailEffects` |
 | `contract/cards.ts` | `CardDefinition`（卡牌外形） |

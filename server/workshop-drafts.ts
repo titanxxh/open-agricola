@@ -1,55 +1,27 @@
 import type Database from 'better-sqlite3'
 import { createHash } from 'node:crypto'
 import { nanoid } from 'nanoid'
+import type {
+  WorkshopAbilityCandidateContract,
+  WorkshopArtCandidateContract,
+  WorkshopCardType,
+  WorkshopDraftContract,
+  WorkshopWorkspaceContract,
+} from '../shared/contract/workshop'
 
-export type WorkshopCardType = 'minor' | 'occupation'
-
-export type WorkshopDraft = {
-  cardId: string
-  cardType: WorkshopCardType
-  name: string
-  description: string
-  cardJson: Record<string, unknown>
-  effectCode: string | null
+export type WorkshopDraft = WorkshopDraftContract & {
   compiledCode: string | null
   codeManifest: Record<string, unknown> | null
-  artUrl: string | null
-  generation: Record<string, unknown>
 }
-
-export type WorkshopWorkspace = {
-  id: string
-  authorId: string
-  revision: number
-  status: string
+export type WorkshopWorkspace = Omit<WorkshopWorkspaceContract, 'draft'> & {
   draft: WorkshopDraft
-  publishedVersionId: string | null
-  sandboxPassVersionId: string | null
-  sandboxPassedAt: number | null
 }
 
-export type WorkshopArtCandidate = {
-  id: string
-  kind: 'art'
-  prompt: string
-  resultUrl: string
-  provider?: string
-  model?: string
-  referenceImages?: string[]
-  createdAt: number
-}
+export type WorkshopArtCandidate = WorkshopArtCandidateContract
 
-export type WorkshopAbilityCandidate = {
-  id: string
-  kind: 'ability'
-  prompt: string
-  sourceCode: string
+export type WorkshopAbilityCandidate = WorkshopAbilityCandidateContract & {
   compiledCode: string
   codeManifest: Record<string, unknown> | null
-  validation: { valid: boolean; errors?: string[] }
-  provider?: string
-  model?: string
-  createdAt: number
 }
 
 export type WorkshopCandidate = WorkshopArtCandidate | WorkshopAbilityCandidate
@@ -149,6 +121,51 @@ const serialiseDraft = (draft: WorkshopDraft): {
   generation: JSON.stringify(draft.generation),
 })
 
+const versionCardJson = (draft: WorkshopDraft): Record<string, unknown> => {
+  const cardJson = { ...draft.cardJson }
+  delete cardJson._draft
+  return {
+    ...cardJson,
+    ...(draft.effectCode ? { _code: draft.effectCode } : {}),
+    ...(draft.compiledCode ? { _compiled: draft.compiledCode } : {}),
+  }
+}
+
+const provenanceCandidate = (value: unknown): Record<string, unknown> | null => {
+  const candidate = value && typeof value === 'object' && !Array.isArray(value)
+    ? value as Record<string, unknown>
+    : null
+  if (!candidate || typeof candidate.prompt !== 'string') return null
+  const keys = [
+    'id',
+    'kind',
+    'prompt',
+    'provider',
+    'model',
+    'referenceImages',
+    'seed',
+    'requestId',
+    'createdAt',
+    'validation',
+  ]
+  return Object.fromEntries(
+    keys
+      .filter(key => candidate[key] !== undefined)
+      .map(key => [key, candidate[key]]),
+  )
+}
+
+const versionProvenance = (
+  generation: Record<string, unknown>,
+): Record<string, unknown> => Object.fromEntries(
+  ['art', 'ability'].flatMap(kind => {
+    const group = generation[kind]
+    if (!group || typeof group !== 'object' || Array.isArray(group)) return []
+    const adopted = provenanceCandidate((group as Record<string, unknown>).adopted)
+    return adopted ? [[kind, { adopted }]] : []
+  }),
+)
+
 const canonicalise = (value: unknown): unknown => {
   if (Array.isArray(value)) return value.map(canonicalise)
   if (!value || typeof value !== 'object') return value
@@ -163,20 +180,20 @@ const hashVersionContent = (
   cardJson: Record<string, unknown>,
   codeManifest: Record<string, unknown> | null,
   artUrl: string | null,
-): string => createHash('sha256')
-  .update(JSON.stringify(canonicalise({
-    artUrl,
-    cardJson,
-    codeManifest,
-  })))
-  .digest('hex')
+): string => {
+  const finalCardJson = { ...cardJson }
+  delete finalCardJson._draft
+  return createHash('sha256')
+    .update(JSON.stringify(canonicalise({
+      artUrl,
+      cardJson: finalCardJson,
+      codeManifest,
+    })))
+    .digest('hex')
+}
 
 const contentHash = (draft: WorkshopDraft): string => hashVersionContent(
-  {
-    ...draft.cardJson,
-    ...(draft.effectCode ? { _code: draft.effectCode } : {}),
-    ...(draft.compiledCode ? { _compiled: draft.compiledCode } : {}),
-  },
+  versionCardJson(draft),
   draft.codeManifest,
   draft.artUrl,
 )
@@ -340,7 +357,11 @@ const ensureVersion = (
     FROM workshop_card_versions WHERE card_id = ?
   `).get(workspace.id) as { value: number }).value
   const id = nanoid()
-  const serialised = serialiseDraft(workspace.draft)
+  const cardJson = JSON.stringify(versionCardJson(workspace.draft))
+  const codeManifest = workspace.draft.codeManifest
+    ? JSON.stringify(workspace.draft.codeManifest)
+    : null
+  const provenance = JSON.stringify(versionProvenance(workspace.draft.generation))
   db.prepare(`
     INSERT INTO workshop_card_versions (
       id, card_id, card_json, code_manifest, art_url, version_number,
@@ -349,14 +370,14 @@ const ensureVersion = (
   `).run(
     id,
     workspace.id,
-    serialised.cardJson,
-    serialised.codeManifest,
+    cardJson,
+    codeManifest,
     workspace.draft.artUrl,
     versionNumber,
     workspace.authorId,
     Date.now(),
     hash,
-    serialised.generation,
+    provenance,
   )
   return id
 }

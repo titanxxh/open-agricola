@@ -526,6 +526,8 @@ WorkshopPage
 
 普通编辑只在切换阶段、站内离开或显式保存时创建检查点，不创建 Draft Version。刷新或崩溃恢复依赖同步写入的 localStorage 副本；同 revision 恢复为未同步状态，服务器 revision 已前进则要求用户选择整份服务器稿或整份本机稿。
 
+Draft Version 只序列化最终卡牌内容和各分区已采用候选的 provenance；临时 `_draft` 表单字段、未采用候选、完整生成结果副本和工作对话不进入版本。
+
 ---
 
 ## E. 安全设计

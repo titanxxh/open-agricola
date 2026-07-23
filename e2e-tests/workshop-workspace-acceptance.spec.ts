@@ -124,11 +124,18 @@ const api = (
   request: APIRequestContext,
   account: Account | null,
   path: string,
-  options: { method?: string; data?: unknown } = {},
+  options: {
+    method?: string
+    data?: unknown
+    headers?: Record<string, string>
+  } = {},
 ) => request.fetch(`${BACKEND_URL}${path}`, {
   method: options.method ?? 'GET',
   ...(options.data === undefined ? {} : { data: options.data }),
-  headers: { Cookie: account ? `oa_session=${account.cookie}` : '' },
+  headers: {
+    Cookie: account ? `oa_session=${account.cookie}` : '',
+    ...options.headers,
+  },
 })
 
 const responseJson = async <T>(
@@ -315,19 +322,21 @@ const stage = async (page: Page, locale: Locale, zh: string, en: string) => {
   await expect(button).toHaveAttribute('aria-current', 'step')
 }
 
-const saveLabel = (locale: Locale) => text(locale, '已保存', 'Saved')
+const saveLabel = (locale: Locale) => text(locale, '已同步', 'Synced')
 
 const expectSaved = async (page: Page, locale: Locale) => {
-  await expect(page.locator('.aicw-save-state')).toHaveText(saveLabel(locale), {
+  await expect(page.locator('.aicw-save-state')).toContainText(saveLabel(locale), {
     timeout: 30_000,
   })
 }
 
 const expectAccessibleWorkspace = async (page: Page) => {
   await expect(page.locator('.aicw-shell')).toBeVisible()
-  const firstStage = page.locator('.aicw-stage-rail button').first()
-  await firstStage.focus()
-  await expect(firstStage).toBeFocused()
+  const activeStage = page.locator('.aicw-stage-rail button[aria-current="step"]')
+  await activeStage.focus()
+  await expect(activeStage).toBeFocused()
+  await page.keyboard.press('Enter')
+  await expect(activeStage).toHaveAttribute('aria-current', 'step')
   const overflow = await page.evaluate(() => ({
     document: document.documentElement.scrollWidth - document.documentElement.clientWidth,
     shell: (() => {
@@ -418,12 +427,19 @@ const scenarioNewDraft = async ({
     name: text(variant.locale, '保存草稿', 'Save draft'),
   })
 
-  await expect(save).toBeDisabled()
+  await save.click()
+  await expect(name).toBeFocused()
+  await expect(name).toHaveAttribute('aria-invalid', 'true')
+  expect((await responseJson<{ cards: unknown[] }>(
+    await api(request, account, '/api/workshop/cards?scope=mine'),
+  )).cards).toHaveLength(0)
+
   await name.fill('Acceptance card')
   await cardId.fill('INVALID')
   await expect(page.locator('.aicw-metadata .form-error')).toBeVisible()
   await expect(cardId).toHaveAttribute('aria-invalid', 'true')
-  await expect(save).toBeDisabled()
+  await save.click()
+  await expect(cardId).toBeFocused()
 
   await cardId.fill(duplicateId)
   await save.click()
@@ -457,8 +473,15 @@ const scenarioArtCandidates = async ({
   await stage(page, variant.locale, '卡面图', 'Card art')
 
   const prompt = unique('private art prompt')
+  await page.getByLabel(text(variant.locale, '画面主题', 'Image subject')).fill(
+    text(variant.locale, '河谷木匠', 'A valley carpenter'),
+  )
   const promptInput = page.getByLabel(text(variant.locale, '生成提示词', 'Generation prompt'))
   await promptInput.fill(prompt)
+  const referenceButton = page.locator('.ai-ref-thumb').first()
+  const referenceId = await referenceButton.locator('img').getAttribute('src')
+  expect(referenceId).toBeTruthy()
+  await referenceButton.click()
   const generate = page.getByRole('button', {
     name: text(variant.locale, '生成图片候选', 'Generate art candidate'),
   })
@@ -504,11 +527,15 @@ const scenarioArtCandidates = async ({
   await page.locator('.aicw-art-review details').click()
   await expect(page.locator('.aicw-art-review details')).toContainText(prompt)
   await expect(page.locator('.aicw-art-review details')).toContainText('gemini')
+  await expect(page.locator('.aicw-art-review details')).toContainText(referenceId!)
   page.once('dialog', dialog => dialog.accept())
-  await page.getByRole('button', {
+  const adopt = page.getByRole('button', {
     name: text(variant.locale, '采用为当前卡面', 'Adopt as current art'),
-  }).click()
+  })
+  await adopt.focus()
+  await page.keyboard.press('Enter')
   await expect(candidateSection).toBeHidden()
+  await expect(page.locator('.aicw-heading')).toBeFocused()
   await expect(page.locator('.aicw-current-asset')).toBeVisible()
 
   const saved = await loadWorkspace(request, account, workspace.id)
@@ -597,12 +624,14 @@ const scenarioReopen = async ({
   workspace = (await adoptArt(request, account, workspace, artPrompt)).workspace
   const ability = await adoptAbility(request, account, workspace, abilityPrompt)
   workspace = ability.workspace
+  const englishName = unique('Acceptance card')
   workspace = await checkpoint(request, account, workspace, {
     ...workspace.draft,
     cardJson: {
       ...workspace.draft.cardJson,
       locales: {
         zh: { name: '验收卡', desc: ['验收说明'] },
+        en: { name: englishName, desc: ['Acceptance description'] },
       },
       _draft: { prerequisite: '2 occupations', costInput: '1 wood' },
     },
@@ -620,10 +649,55 @@ const scenarioReopen = async ({
     sourceFor(workspace.draft.cardId, workspace.draft.name),
   )
   await stage(page, variant.locale, '本地化', 'Localization')
+  const localizationButton = page.getByRole('button', {
+    name: text(variant.locale, '检查本地化', 'Review localization'),
+  })
+  await localizationButton.focus()
+  await page.keyboard.press('Enter')
+  const localizationDialog = page.getByRole('dialog', {
+    name: text(variant.locale, '本地化', 'Localization'),
+  })
+  await expect(localizationDialog).toBeVisible()
+  await expect(localizationDialog.getByRole('button', {
+    name: text(variant.locale, '关闭', 'Close'),
+  })).toBeFocused()
+  const localizedName = unique('Edited translation')
+  const localizedDescription = unique('Edited description')
+  await localizationDialog.locator('#localization-target-name').fill(localizedName)
+  await localizationDialog.locator('#localization-target-description').fill(localizedDescription)
+  const saveLocalization = localizationDialog.getByRole('button', {
+    name: text(variant.locale, '保存', 'Save'),
+  })
+  await saveLocalization.focus()
+  await page.keyboard.press('Enter')
+  await expect(localizationDialog).toBeHidden()
+  await expect(localizationButton).toBeFocused()
+  const localizationCheckpoint = page.waitForResponse(response =>
+    response.url().endsWith(`/api/workshop/cards/${workspace.id}/draft`)
+    && response.request().method() === 'PUT',
+  )
+  await stage(page, variant.locale, '基础信息', 'Card details')
+  expect((await localizationCheckpoint).ok()).toBe(true)
   await expectSaved(page, variant.locale)
-  const savedRevision = (await loadWorkspace(request, account, workspace.id)).revision
+  await page.getByLabel(text(variant.locale, '费用', 'Cost')).fill('2 wood')
+  const closeCheckpoint = page.waitForResponse(response =>
+    response.url().endsWith(`/api/workshop/cards/${workspace.id}/draft`)
+    && response.request().method() === 'PUT',
+  )
+  await page.locator('.aicw-header-actions').getByRole('button', {
+    name: text(variant.locale, '关闭', 'Close'),
+  }).click()
+  expect((await closeCheckpoint).ok()).toBe(true)
+  const savedWorkspace = await loadWorkspace(request, account, workspace.id)
+  const savedRevision = savedWorkspace.revision
+  const targetLocale = variant.locale === 'zh' ? 'en' : 'zh'
+  expect(savedWorkspace.draft.cardJson.locales).toMatchObject({
+    [targetLocale]: {
+      name: localizedName,
+      desc: [localizedDescription],
+    },
+  })
 
-  await page.goto(`${FRONTEND_URL}/?page=workshop`)
   await openEditor(page, workspace.id)
   await stage(page, variant.locale, '卡面图', 'Card art')
   await expect(page.getByLabel(
@@ -671,7 +745,10 @@ const scenarioLocalRecovery = async ({
 
   const recoveredName = unique('Recovered')
   await page.getByLabel(text(variant.locale, '英文卡牌名', 'Card name')).fill(recoveredName)
-  await stage(page, variant.locale, '卡面图', 'Card art').catch(() => {})
+  await stage(page, variant.locale, '卡面图', 'Card art')
+  await expect(page.locator('.aicw-stage-rail button[aria-current="step"]')).toContainText(
+    text(variant.locale, '卡面图', 'Card art'),
+  )
   await expect(page.locator('.aicw-save-state')).toContainText(
     text(variant.locale, '离线', 'Offline'),
   )
@@ -719,11 +796,13 @@ const scenarioConflict = async ({
     cardJson: { ...workspace.draft.cardJson, name: serverName },
   })
   await nameInput.fill(unique('Local discarded'))
-  await stage(page, variant.locale, '卡面图', 'Card art').catch(() => {})
+  await stage(page, variant.locale, '卡面图', 'Card art')
   await expect(page.locator('.aicw-conflict')).toBeVisible()
   await page.getByRole('button', {
     name: text(variant.locale, '使用服务器草稿', 'Use server draft'),
   }).click()
+  await expect(page.locator('.aicw-heading')).toBeFocused()
+  await stage(page, variant.locale, '基础信息', 'Card details')
   await expect(nameInput).toHaveValue(serverName)
 
   const localName = unique('Local kept')
@@ -734,7 +813,7 @@ const scenarioConflict = async ({
     name: otherName,
     cardJson: { ...workspace.draft.cardJson, name: otherName },
   })
-  await stage(page, variant.locale, '卡面图', 'Card art').catch(() => {})
+  await stage(page, variant.locale, '卡面图', 'Card art')
   await expect(page.locator('.aicw-conflict')).toBeVisible()
   let confirmed = false
   page.once('dialog', dialog => {
@@ -745,6 +824,7 @@ const scenarioConflict = async ({
     name: text(variant.locale, '保留本机草稿', 'Keep local draft'),
   }).click()
   await expect.poll(() => confirmed).toBe(true)
+  await expect(page.locator('.aicw-heading')).toBeFocused()
   await expectSaved(page, variant.locale)
   const resolved = await loadWorkspace(request, account, workspace.id)
   expect(resolved.revision).toBe(workspace.revision + 1)
@@ -840,6 +920,20 @@ const scenarioHandoff = async ({
   )
   workspace = published.workspace
 
+  await responseJson(await api(
+    request,
+    account,
+    `/api/workshop/cards/${workspace.id}/sandbox-pass`,
+    {
+      method: 'POST',
+      data: {
+        versionId: published.versionId,
+        authorConfirmed: true,
+        runtimeErrors: ['deterministic runtime failure'],
+      },
+    },
+  ), 400)
+
   const sandbox = await responseJson<{
     customCardVersionsLoaded: Array<{ cardId: string; versionId: string }>
   }>(await api(request, account, '/api/game/new-sandbox', {
@@ -875,6 +969,32 @@ const scenarioHandoff = async ({
     await api(request, account, `/api/workshop/cards/${workspace.id}/workspace`),
   )
   expect(readiness.readiness.ready).toBe(true)
+  await responseJson(await api(
+    request,
+    null,
+    `/api/workshop/cards/${workspace.id}/propose`,
+    { method: 'POST', data: {} },
+  ), 401)
+  await responseJson(await api(
+    request,
+    account,
+    `/api/workshop/cards/${workspace.id}/propose`,
+    {
+      method: 'POST',
+      data: {},
+      headers: { 'x-workshop-pr-mock-result': 'rate-limited' },
+    },
+  ), 429)
+  await responseJson(await api(
+    request,
+    account,
+    `/api/workshop/cards/${workspace.id}/propose`,
+    {
+      method: 'POST',
+      data: {},
+      headers: { 'x-workshop-pr-mock-result': 'remote-error' },
+    },
+  ), 503)
   const proposed = await responseJson<{ prUrl: string; prNumber: number }>(
     await api(request, account, `/api/workshop/cards/${workspace.id}/propose`, {
       method: 'POST',
@@ -1045,6 +1165,7 @@ const scenarioErrors = async ({
     name: text(variant.locale, '生成能力候选', 'Generate ability candidate'),
   }).click()
   await expect(page.locator('.aicw-panel-error')).toBeVisible()
+  await expect(page.locator('.aicw-panel-error')).toBeFocused()
 
   let validationFailed = true
   await page.route('**/api/workshop/cards/validate-code', route => {
@@ -1084,8 +1205,10 @@ const scenarioErrors = async ({
   await stage(page, variant.locale, '基础信息', 'Card details')
   const retainedName = unique('Retained')
   await page.getByLabel(text(variant.locale, '英文卡牌名', 'Card name')).fill(retainedName)
-  await stage(page, variant.locale, '验证与交付', 'Validate & hand off').catch(() => {})
+  await stage(page, variant.locale, '验证与交付', 'Validate & hand off')
   await expect(page.locator('.aicw-recovery')).toContainText('deterministic checkpoint failure')
+  await expect(page.locator('.aicw-recovery')).toBeFocused()
+  await stage(page, variant.locale, '基础信息', 'Card details')
   await expect(page.getByLabel(
     text(variant.locale, '英文卡牌名', 'Card name'),
   )).toHaveValue(retainedName)
