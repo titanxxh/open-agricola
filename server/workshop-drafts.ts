@@ -54,6 +54,29 @@ export type WorkshopAbilityCandidate = {
 
 export type WorkshopCandidate = WorkshopArtCandidate | WorkshopAbilityCandidate
 
+export type PublishedWorkshopCard = {
+  id: string
+  authorId: string
+  authorName: string
+  cardId: string
+  cardType: WorkshopCardType
+  name: string
+  description: string
+  cardJson: Record<string, unknown>
+  effectCode: string | null
+  artUrl: string | null
+  status: 'published'
+  likeCount: number
+  likedByMe: boolean
+  featured: number
+  createdAt: number
+  updatedAt: number
+  publishedVersionId: string
+  githubPrUrl: string | null
+  githubPrStatus: string | null
+  githubPrLastSyncedAt: number | null
+}
+
 export type WorkshopDraftErrorCode =
   | 'conflict'
   | 'forbidden'
@@ -562,5 +585,92 @@ export function getHandoffReadiness(
     publishedVersionMatchesDraft,
     sandboxPassedForPublishedVersion,
     publishedVersionId: current.publishedVersionId,
+  }
+}
+
+export function loadPublishedCard(
+  db: Database.Database,
+  cardId: string,
+  viewerId?: string,
+): PublishedWorkshopCard {
+  const row = db.prepare(`
+    SELECT
+      card.id,
+      card.author_id,
+      author.display_name AS author_name,
+      card.card_id,
+      card.card_type,
+      card.name,
+      card.description,
+      card.featured,
+      card.created_at,
+      card.github_pr_url,
+      card.github_pr_status,
+      card.github_pr_last_synced_at,
+      card.published_version_id,
+      version.card_json AS version_card_json,
+      version.art_url AS version_art_url,
+      version.created_at AS version_created_at,
+      COUNT(DISTINCT likes.user_id) AS like_count
+    FROM workshop_cards card
+    JOIN workshop_card_versions version ON version.id = card.published_version_id
+    LEFT JOIN users author ON author.id = card.author_id
+    LEFT JOIN card_likes likes ON likes.card_id = card.id
+    WHERE card.id = ? AND card.status = 'published'
+    GROUP BY card.id
+  `).get(cardId) as {
+    id: string
+    author_id: string
+    author_name: string | null
+    card_id: string
+    card_type: string
+    name: string
+    description: string
+    featured: number
+    created_at: number
+    github_pr_url: string | null
+    github_pr_status: string | null
+    github_pr_last_synced_at: number | null
+    published_version_id: string
+    version_card_json: string
+    version_art_url: string | null
+    version_created_at: number
+    like_count: number
+  } | undefined
+  if (!row) throw new WorkshopDraftError('not_found', 'Card not found')
+
+  const cardJson = parseRecord(row.version_card_json)
+  const effectCode = typeof cardJson._code === 'string' ? cardJson._code : null
+  delete cardJson._code
+  delete cardJson._compiled
+  delete cardJson._draft
+  const desc = Array.isArray(cardJson.desc)
+    ? cardJson.desc.filter((line): line is string => typeof line === 'string').join(' ')
+    : row.description
+  return {
+    id: row.id,
+    authorId: row.author_id,
+    authorName: row.author_name ?? '',
+    cardId: typeof cardJson.id === 'string' ? cardJson.id : row.card_id,
+    cardType: cardJson.card_type === 'occupation' || cardJson.card_type === 'minor'
+      ? cardJson.card_type
+      : row.card_type as WorkshopCardType,
+    name: typeof cardJson.name === 'string' ? cardJson.name : row.name,
+    description: desc,
+    cardJson,
+    effectCode,
+    artUrl: row.version_art_url,
+    status: 'published',
+    likeCount: row.like_count,
+    likedByMe: viewerId
+      ? Boolean(db.prepare('SELECT 1 FROM card_likes WHERE user_id = ? AND card_id = ?').get(viewerId, row.id))
+      : false,
+    featured: row.featured,
+    createdAt: row.created_at,
+    updatedAt: row.version_created_at,
+    publishedVersionId: row.published_version_id,
+    githubPrUrl: row.github_pr_url,
+    githubPrStatus: row.github_pr_status,
+    githubPrLastSyncedAt: row.github_pr_last_synced_at,
   }
 }
