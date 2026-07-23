@@ -146,4 +146,70 @@ describe('useWorkshopDraft', () => {
     expect(result.current.state?.conflict?.server.draft.name).toBe('Server work')
     expect(result.current.state?.conflict?.local.draft.name).toBe('Local work')
   })
+
+  it('checkpoints provenance before adopting a candidate', async () => {
+    const calls: { path: string; body?: Record<string, unknown> }[] = []
+    const apiFetch = vi.fn(async (path: string, init?: RequestInit) => {
+      const body = init?.body
+        ? JSON.parse(String(init.body)) as Record<string, unknown>
+        : undefined
+      calls.push({ path, body })
+      if (!init) {
+        return new Response(JSON.stringify({ ok: true, workspace: workspace(1) }))
+      }
+      if (init.method === 'PUT') {
+        return new Response(JSON.stringify({
+          ok: true,
+          workspace: {
+            ...workspace(2),
+            draft: body?.draft,
+          },
+        }))
+      }
+      const adopted = workspace(3)
+      adopted.draft.artUrl = '/card-art/candidate.png'
+      adopted.draft.generation = {
+        art: {
+          lastCompleted: body?.candidate,
+          adopted: body?.candidate,
+        },
+      }
+      return new Response(JSON.stringify({
+        ok: true,
+        workspace: adopted,
+        versionId: 'version-1',
+      }))
+    })
+    const { result } = renderHook(() => useWorkshopDraft({
+      cardId: 'card-1',
+      apiFetch,
+    }))
+    await waitFor(() => expect(result.current.state?.baseRevision).toBe(1))
+    act(() => result.current.dispatch({
+      type: 'candidateCompleted',
+      candidate: {
+        id: 'art-1',
+        kind: 'art',
+        prompt: 'a field',
+        resultUrl: '/card-art/candidate.png',
+        createdAt: 10,
+        baseRevision: 1,
+        stale: false,
+      },
+    }))
+
+    await act(async () => {
+      expect(await result.current.adoptCandidate(
+        result.current.state!.session.artCandidates[0]!,
+      )).toBe(true)
+    })
+
+    expect(result.current.state?.draft.artUrl).toBe('/card-art/candidate.png')
+    expect(result.current.state?.session.artCandidates).toEqual([])
+    expect(calls.filter(call => call.path.endsWith('/draft'))).toHaveLength(1)
+    expect(calls.find(call => call.path.endsWith('/adopt'))?.body).toMatchObject({
+      baseRevision: 2,
+      candidate: { id: 'art-1', prompt: 'a field' },
+    })
+  })
 })

@@ -8,6 +8,7 @@ import {
   type WorkshopDraftAction,
   type WorkshopDraftState,
   type WorkshopLocalRecovery,
+  type WorkshopCandidate,
   type WorkshopSessionState,
   type WorkshopStage,
   type WorkshopWorkspaceDto,
@@ -255,6 +256,64 @@ export const useWorkshopDraft = ({
     )
   }, [dispatch, saveDraft, storageKey])
 
+  const adoptCandidate = useCallback(async (
+    candidate: WorkshopCandidate,
+  ): Promise<boolean> => {
+    let current = stateRef.current
+    if (!current || current.save.status === 'conflict') return false
+    if (current.save.status !== 'saved') {
+      if (!await saveDraft(current)) return false
+      current = stateRef.current
+      if (!current || current.save.status !== 'saved') return false
+    }
+    dispatch({ type: 'saving' })
+    try {
+      const response = await apiFetch(
+        `/api/workshop/cards/${encodeURIComponent(cardId)}/adopt`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            baseRevision: current.baseRevision,
+            candidate,
+          }),
+        },
+      )
+      const payload = await response.json() as WorkspaceResponse
+      if (response.status === 409 && payload.current) {
+        dispatch({
+          type: 'conflictDetected',
+          server: payload.current,
+          local: toLocalRecovery(current),
+        })
+        return false
+      }
+      if (!response.ok || !payload.workspace) {
+        dispatch({
+          type: 'saveFailed',
+          status: 'error',
+          error: payload.error ?? `Request failed (${response.status})`,
+        })
+        return false
+      }
+      const adopted = workshopDraftReducer(current, {
+        type: 'candidateAdopted',
+        kind: candidate.kind,
+        workspace: payload.workspace,
+      })
+      dispatch({ type: 'serverLoaded', state: adopted })
+      persist(adopted)
+      return true
+    } catch (reason) {
+      dispatch({
+        type: 'saveFailed',
+        status: 'offline',
+        error: reason instanceof Error ? reason.message : String(reason),
+      })
+      return false
+    }
+  }, [apiFetch, cardId, dispatch, persist, saveDraft])
+
   return {
     state,
     loading,
@@ -266,5 +325,6 @@ export const useWorkshopDraft = ({
     retryCheckpoint: checkpoint,
     changeStage,
     resolveConflict,
+    adoptCandidate,
   }
 }
