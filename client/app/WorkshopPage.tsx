@@ -697,7 +697,7 @@ function CardEditor({ initial, initialCardId, apiFetch, onCancel, onAddToSandbox
   initialCardId?: string
   apiFetch: (path: string, init?: RequestInit) => Promise<Response>
   onCancel: () => void
-  onAddToSandboxAndRestart?: (cardDbId: string, versionId: string) => Promise<void>
+  onAddToSandboxAndRestart?: (cardDbId: string, versionId: string) => Promise<boolean>
   t: (key: string, params?: Record<string, string | number>) => string
   sandboxErrors?: string[] | null
   onSandboxErrorsConsumed?: () => void
@@ -1383,7 +1383,7 @@ export function WorkshopPage() {
   const handleStartSandboxGame = async (
     extraCardId?: string,
     exactVersionId?: string,
-  ) => {
+  ): Promise<boolean> => {
     try {
       const response = await apiFetch('/api/game/new-sandbox', {
         method: 'POST',
@@ -1415,18 +1415,20 @@ export function WorkshopPage() {
         const warnings: string[] = data.cardWarnings ?? []
         setSandboxActive(true)
         setSandboxKey(k => k + 1)
-        if (warnings.length > 0) {
-          // Cards had registration errors — feed back to AI designer
-          setPendingSandboxErrors(warnings)
-        }
+        setPendingSandboxErrors(warnings.length > 0 ? warnings : null)
+        return true
       } else {
         const errors = [data.error ?? t('platform.sandboxUnknownError')]
         setPendingSandboxErrors(errors)
         alert(errors.join('\n'))
+        return false
       }
     } catch (err) {
       const detail = err instanceof Error && err.message ? `: ${err.message}` : ''
-      alert(`${t('platform.sandboxNetworkError')}${detail}`)
+      const error = `${t('platform.sandboxNetworkError')}${detail}`
+      setPendingSandboxErrors([error])
+      alert(error)
+      return false
     }
   }
 
@@ -1593,7 +1595,7 @@ export function WorkshopPage() {
           }}
           onAddToSandboxAndRestart={async (cardDbId: string, versionId: string) => {
             await handleAddSandbox(cardDbId)
-            await handleStartSandboxGame(cardDbId, versionId)
+            return handleStartSandboxGame(cardDbId, versionId)
           }}
           t={t}
           sandboxErrors={pendingSandboxErrors}

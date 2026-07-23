@@ -1435,7 +1435,7 @@ type AiCardDesignerProps = {
   initialCardId?: string
   onImport: (card: ExtractedCard, artUrl: string | null) => void
   onClose: () => void
-  onAddToSandboxAndRestart?: (cardDbId: string, versionId: string) => Promise<void>
+  onAddToSandboxAndRestart?: (cardDbId: string, versionId: string) => Promise<boolean>
   sandboxErrors?: string[] | null
   onSandboxErrorsConsumed?: () => void
   onCardLoaded?: (cardDbId: string) => void
@@ -1913,9 +1913,11 @@ export function AiCardDesigner({
     try {
       const versionId = await publishDraft()
       if (!versionId) return
-      updateSession({ sandboxTestVersionId: versionId })
+      updateSession({ sandboxTestVersionId: undefined })
       setSandboxConfirmation(false)
-      await onAddToSandboxAndRestart(currentCardDbId, versionId)
+      if (await onAddToSandboxAndRestart(currentCardDbId, versionId)) {
+        updateSession({ sandboxTestVersionId: versionId })
+      }
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : String(reason))
     } finally {

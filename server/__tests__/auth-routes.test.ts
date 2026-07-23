@@ -1741,9 +1741,10 @@ describe('auth routes', () => {
     }
   })
 
-  it('allows PATCH in CORS preflight methods', async () => {
+  it('allows PATCH and PUT in CORS preflight methods', async () => {
     const res = await requestJson('OPTIONS', '/api/auth/profile')
     expect(res.status).toBe(204)
     expect(res.headers['Access-Control-Allow-Methods']).toContain('PATCH')
+    expect(res.headers['Access-Control-Allow-Methods']).toContain('PUT')
   })
 })

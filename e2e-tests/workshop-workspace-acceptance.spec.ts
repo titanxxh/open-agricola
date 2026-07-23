@@ -796,8 +796,13 @@ const scenarioConflict = async ({
     cardJson: { ...workspace.draft.cardJson, name: serverName },
   })
   await nameInput.fill(unique('Local discarded'))
-  await stage(page, variant.locale, '卡面图', 'Card art')
+  await page.locator('.aicw-stage-rail button').filter({
+    hasText: text(variant.locale, '卡面图', 'Card art'),
+  }).click()
   await expect(page.locator('.aicw-conflict')).toBeVisible()
+  await expect(page.locator('.aicw-stage-rail button[aria-current="step"]')).toContainText(
+    text(variant.locale, '基础信息', 'Card details'),
+  )
   await page.getByRole('button', {
     name: text(variant.locale, '使用服务器草稿', 'Use server draft'),
   }).click()
@@ -813,7 +818,9 @@ const scenarioConflict = async ({
     name: otherName,
     cardJson: { ...workspace.draft.cardJson, name: otherName },
   })
-  await stage(page, variant.locale, '卡面图', 'Card art')
+  await page.locator('.aicw-stage-rail button').filter({
+    hasText: text(variant.locale, '卡面图', 'Card art'),
+  }).click()
   await expect(page.locator('.aicw-conflict')).toBeVisible()
   let confirmed = false
   page.once('dialog', dialog => {
@@ -934,37 +941,65 @@ const scenarioHandoff = async ({
     },
   ), 400)
 
-  const sandbox = await responseJson<{
+  await openEditor(page, workspace.id)
+  await stage(page, variant.locale, '验证与交付', 'Validate & hand off')
+  let sandboxLaunchFails = true
+  await page.route('**/api/game/new-sandbox', route => {
+    if (sandboxLaunchFails) {
+      return route.fulfill({
+        status: 503,
+        contentType: 'application/json',
+        body: JSON.stringify({ ok: false, error: 'deterministic sandbox failure' }),
+      })
+    }
+    return route.continue()
+  })
+  const launch = page.getByRole('button', {
+    name: text(
+      variant.locale,
+      '发布当前版本并启动沙盒',
+      'Publish current version and start sandbox',
+    ),
+  })
+  page.once('dialog', dialog => dialog.accept())
+  await launch.click()
+  await expect(page.getByRole('checkbox', {
+    name: text(
+      variant.locale,
+      '我确认这个固定版本在沙盒中没有运行错误',
+      'I confirm this pinned version has no sandbox runtime errors',
+    ),
+  })).toBeHidden()
+
+  sandboxLaunchFails = false
+  const sandboxResponse = page.waitForResponse(response =>
+    response.url().endsWith('/api/game/new-sandbox') && response.ok(),
+  )
+  await launch.click()
+  const sandbox = await (await sandboxResponse).json() as {
     customCardVersionsLoaded: Array<{ cardId: string; versionId: string }>
-  }>(await api(request, account, '/api/game/new-sandbox', {
-    method: 'POST',
-    data: {
-      seed: 562,
-      customCardVersions: [{
-        cardId: workspace.id,
-        versionId: published.versionId,
-      }],
-      playerCount: 2,
-      deckIds: ['A', 'B', 'C', 'D', 'E'],
-    },
-  }))
+  }
   expect(sandbox.customCardVersionsLoaded).toEqual([{
     cardId: workspace.id,
     versionId: published.versionId,
   }])
-  workspace = (await responseJson<{ workspace: Workspace }>(await api(
-    request,
-    account,
-    `/api/workshop/cards/${workspace.id}/sandbox-pass`,
-    {
-      method: 'POST',
-      data: {
-        versionId: published.versionId,
-        authorConfirmed: true,
-        runtimeErrors: [],
-      },
-    },
-  ))).workspace
+  const sandboxConfirmation = page.getByRole('checkbox', {
+    name: text(
+      variant.locale,
+      '我确认这个固定版本在沙盒中没有运行错误',
+      'I confirm this pinned version has no sandbox runtime errors',
+    ),
+  })
+  await expect(sandboxConfirmation).toBeEnabled()
+  await sandboxConfirmation.check()
+  await page.getByRole('button', {
+    name: text(variant.locale, '确认沙盒通过', 'Confirm sandbox pass'),
+  }).click()
+  await expect(page.locator('.aicw-version-gate')).toContainText(
+    text(variant.locale, '已满足社区 PR 交接门槛', 'Community PR gate satisfied'),
+  )
+  await page.unroute('**/api/game/new-sandbox')
+  workspace = await loadWorkspace(request, account, workspace.id)
   const readiness = await responseJson<{ readiness: { ready: boolean } }>(
     await api(request, account, `/api/workshop/cards/${workspace.id}/workspace`),
   )
@@ -1003,8 +1038,6 @@ const scenarioHandoff = async ({
   )
   expect(proposed).toMatchObject({ prUrl: '/mock-workshop-pr/1', prNumber: 1 })
 
-  await openEditor(page, workspace.id)
-  await stage(page, variant.locale, '验证与交付', 'Validate & hand off')
   await expect(page.locator('.aicw-version-gate')).toContainText(
     text(variant.locale, '已满足社区 PR 交接门槛', 'Community PR gate satisfied'),
   )
@@ -1026,6 +1059,9 @@ const scenarioHandoff = async ({
     { method: 'POST', data: {} },
   ), 400)
   await page.reload()
+  await page.getByRole('button', {
+    name: text(variant.locale, '使用服务器草稿', 'Use server draft'),
+  }).click()
   await stage(page, variant.locale, '验证与交付', 'Validate & hand off')
   await expect(page.locator('.aicw-version-gate')).toContainText(
     text(variant.locale, '尚未确认', 'Not confirmed'),

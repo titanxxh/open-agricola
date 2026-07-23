@@ -10,6 +10,10 @@ import { getDb } from '../db.ts'
 import type { CustomCardData } from '../../shared/cards/session-card-context.ts'
 import type { CustomCodeManifest } from '../../shared/custom-code/types.ts'
 import type { ClientCommand } from '../../shared/contract/protocol/ws.ts'
+import {
+  loadPublishedDraft,
+  type WorkshopDraft,
+} from '../workshop-drafts.ts'
 import type { ConnectionCtx } from './connection-ctx.ts'
 
 const DRAFT_POOL_SIZE_DEFAULT = 7
@@ -17,6 +21,15 @@ const DRAFT_POOL_SIZE_MIN = 7
 const DRAFT_POOL_SIZE_MAX = 10
 
 type DraftRoomOptions = { draftMode: 'simultaneous'; draftPoolSize: number }
+
+const workshopDraftToCustomCard = (draft: WorkshopDraft): CustomCardData => ({
+  cardType: draft.cardType,
+  cardJson: draft.cardJson as unknown as CustomCardData['cardJson'],
+  effectCode: draft.effectCode,
+  compiledCode: draft.compiledCode,
+  codeManifest: draft.codeManifest as CustomCodeManifest | null,
+  artUrl: draft.artUrl,
+})
 
 export function parseDraftOptions(
   payload: Record<string, unknown>,
@@ -64,7 +77,15 @@ function loadCustomCardsFromDb(cardDbIds: string[], requestUserId?: string): Cus
       author_id: string
     } | undefined
     if (!row) continue
-    const allowed = row.status === 'published' || (row.status === 'draft' && requestUserId === row.author_id)
+    if (row.status === 'published') {
+      try {
+        result.push(workshopDraftToCustomCard(loadPublishedDraft(db, dbId)))
+      } catch {
+        continue
+      }
+      continue
+    }
+    const allowed = row.status === 'draft' && requestUserId === row.author_id
     if (!allowed) continue
     try {
       const parsed = JSON.parse(row.card_json) as Record<string, unknown>
