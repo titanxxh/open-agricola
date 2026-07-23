@@ -213,12 +213,22 @@ export const useWorkshopDraft = ({
         })
         return false
       }
-      const saved = workshopDraftReducer(current, {
+      const latest = stateRef.current
+      const saved = workshopDraftReducer(latest ?? current, {
         type: 'checkpointSaved',
         workspace: payload.workspace,
       })
-      dispatch({ type: 'serverLoaded', state: saved })
-      persist(saved)
+      const next = latest && latest.draft !== current.draft
+        ? {
+            ...saved,
+            draft: latest.draft,
+            sandboxPassVersionId: latest.sandboxPassVersionId,
+            sandboxPassedAt: latest.sandboxPassedAt,
+            save: { status: 'dirty' as const },
+          }
+        : saved
+      dispatch({ type: 'serverLoaded', state: next })
+      persist(next)
       return true
     } catch (reason) {
       dispatch({

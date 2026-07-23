@@ -563,6 +563,19 @@ describe('workshop API', () => {
       expect(publicListRes.body).not.toContain('secret prompt')
       expect(publicListRes.body).not.toContain('Unpublished change')
 
+      await handleWorkshopRoute(mockReq('POST', '/api/workshop/sandbox', {
+        workshop_card_ids: [cardDbId],
+      }, 'tok-bob'), mockRes())
+      const sandboxRes = mockRes()
+      await handleWorkshopRoute(
+        mockReq('GET', '/api/workshop/sandbox', null, 'tok-bob'),
+        sandboxRes,
+      )
+      const sandboxCard = JSON.parse(sandboxRes.body).cards[0]
+      expect(sandboxCard.name).toBe('Pinned Public')
+      expect(sandboxCard.art_url).toBe('/card-art/published.png')
+      expect(sandboxRes.body).not.toContain('Unpublished change')
+
       const restoreRes = mockRes()
       await handleWorkshopRoute(mockReq('POST', `/api/workshop/cards/${cardDbId}/restore`, {
         baseRevision: 3,

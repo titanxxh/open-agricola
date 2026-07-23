@@ -107,6 +107,25 @@ const parseRecord = (raw: string | null): Record<string, unknown> => {
     : {}
 }
 
+const hasReservedCardId = (
+  db: Database.Database,
+  cardId: string,
+  excludedCardId = '',
+): boolean => {
+  if (db.prepare(
+    'SELECT 1 FROM workshop_cards WHERE card_id = ? AND id != ?',
+  ).get(cardId, excludedCardId)) return true
+  const publishedVersions = db.prepare(`
+    SELECT version.card_json
+    FROM workshop_cards card
+    JOIN workshop_card_versions version ON version.id = card.published_version_id
+    WHERE card.status = 'published' AND card.id != ?
+  `).all(excludedCardId) as Array<{ card_json: string }>
+  return publishedVersions.some(
+    version => parseRecord(version.card_json).id === cardId,
+  )
+}
+
 const serialiseDraft = (draft: WorkshopDraft): {
   cardJson: string
   codeManifest: string | null
@@ -259,7 +278,7 @@ export function createCard(
 ): WorkshopWorkspace {
   validateDraft(input.draft)
   return db.transaction(() => {
-    if (db.prepare('SELECT 1 FROM workshop_cards WHERE card_id = ?').get(input.draft.cardId)) {
+    if (hasReservedCardId(db, input.draft.cardId)) {
       throw new WorkshopDraftError('conflict', 'Card id already exists')
     }
     const id = nanoid()
@@ -305,12 +324,12 @@ export function checkpointDraft(
     if (current.revision !== input.baseRevision) {
       throw new WorkshopDraftError('conflict', 'Draft revision conflict', current)
     }
-    const duplicate = db.prepare(
-      'SELECT 1 FROM workshop_cards WHERE card_id = ? AND id != ?',
-    ).get(input.draft.cardId, input.cardId)
-    if (duplicate) throw new WorkshopDraftError('conflict', 'Card id already exists', current)
+    if (hasReservedCardId(db, input.draft.cardId, input.cardId)) {
+      throw new WorkshopDraftError('conflict', 'Card id already exists', current)
+    }
 
     const serialised = serialiseDraft(input.draft)
+    const keepSandboxPass = contentHash(current.draft) === contentHash(input.draft)
     db.prepare(`
       UPDATE workshop_cards SET
         card_id = ?,
@@ -322,8 +341,8 @@ export function checkpointDraft(
         art_url = ?,
         draft_generation_json = ?,
         draft_revision = draft_revision + 1,
-        sandbox_pass_version_id = NULL,
-        sandbox_passed_at = NULL,
+        sandbox_pass_version_id = ?,
+        sandbox_passed_at = ?,
         updated_at = ?
       WHERE id = ?
     `).run(
@@ -335,6 +354,8 @@ export function checkpointDraft(
       serialised.codeManifest,
       input.draft.artUrl,
       serialised.generation,
+      keepSandboxPass ? current.sandboxPassVersionId : null,
+      keepSandboxPass ? current.sandboxPassedAt : null,
       Date.now(),
       input.cardId,
     )
@@ -577,11 +598,9 @@ export function publish(
     if (!validation.valid) {
       throw new WorkshopDraftError('not_ready', validation.errors.join('; '), current)
     }
-    const duplicate = db.prepare(`
-      SELECT 1 FROM workshop_cards
-      WHERE card_id = ? AND status = 'published' AND id != ?
-    `).get(current.draft.cardId, current.id)
-    if (duplicate) throw new WorkshopDraftError('conflict', 'Published card id already exists', current)
+    if (hasReservedCardId(db, current.draft.cardId, current.id)) {
+      throw new WorkshopDraftError('conflict', 'Published card id already exists', current)
+    }
 
     const versionId = ensureVersion(db, current)
     db.prepare(`
