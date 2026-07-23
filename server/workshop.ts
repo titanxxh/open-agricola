@@ -7,6 +7,15 @@ import type { CustomCodeValidateResult } from '../shared/custom-code/types.ts'
 import { handleOAuthStart, handleOAuthCallback } from './workshop-pr/oauth-handler.ts'
 import { handleProposeRequest, handleRefreshPrStatus } from './workshop-pr/propose-handler.ts'
 import { corsHeaders } from './http-origin.ts'
+import {
+  WorkshopDraftError,
+  checkpointDraft,
+  createCard,
+  loadWorkspace,
+  publish,
+  restoreVersion,
+  type WorkshopDraft,
+} from './workshop-drafts.ts'
 
 const sendJson = (res: ServerResponse, status: number, payload: unknown) => {
   res.writeHead(status, {
@@ -25,6 +34,23 @@ const readBody = (req: IncomingMessage): Promise<string> =>
 
 const parseBody = async <T>(req: IncomingMessage): Promise<T | null> => {
   try { return JSON.parse(await readBody(req)) as T } catch { return null }
+}
+
+const sendWorkshopDraftError = (res: ServerResponse, error: unknown): boolean => {
+  if (!(error instanceof WorkshopDraftError)) return false
+  const status = {
+    conflict: 409,
+    forbidden: 403,
+    invalid: 400,
+    not_found: 404,
+    not_ready: 400,
+  }[error.code]
+  sendJson(res, status, {
+    ok: false,
+    error: error.message,
+    ...(error.current ? { current: error.current } : {}),
+  })
+  return true
 }
 
 type WorkshopCard = {
@@ -432,26 +458,7 @@ export async function handleWorkshopRoute(
       codeManifest = JSON.stringify(validation.manifest)
     }
 
-    // Build the v7 card_json blob: client-supplied def + folded code fields.
-    const cardJsonForDb = JSON.stringify({
-      ...stripCardJsonCode(body.card_json as Record<string, unknown>),
-      ...(effectCode !== null ? { _code: effectCode } : {}),
-      ...(compiledCode !== null ? { _compiled: compiledCode } : {}),
-    })
-
     const newStatus = body.status === 'published' ? 'published' : 'draft'
-    const now = Date.now()
-
-    // If publishing, check uniqueness
-    if (newStatus === 'published') {
-      const conflict = db.prepare(
-        "SELECT id FROM workshop_cards WHERE card_id = ? AND status = 'published' AND id != ?",
-      ).get(body.card_id, body.id ?? '') as { id: string } | undefined
-      if (conflict) {
-        sendJson(res, 409, { ok: false, error: 'A published card with this card_id already exists' })
-        return true
-      }
-    }
 
     // Auto-resolve: if no body.id but a draft with this card_id exists for this author, update it
     if (!body.id && body.card_id) {
@@ -463,55 +470,38 @@ export async function handleWorkshopRoute(
       }
     }
 
-    if (body.id) {
-      // Update existing
-      const existing = db.prepare('SELECT * FROM workshop_cards WHERE id = ?').get(body.id) as
-        | WorkshopCard | undefined
-      if (!existing) { sendJson(res, 404, { ok: false, error: 'Card not found' }); return true }
-      if (existing.author_id !== user.id) { sendJson(res, 403, { ok: false, error: 'Forbidden' }); return true }
-
-      // Save version snapshot before update
-      const versionNum = ((db.prepare(
-        'SELECT COALESCE(MAX(version_number), 0) AS n FROM workshop_card_versions WHERE card_id = ?',
-      ).get(body.id) as { n: number })?.n ?? 0) + 1
-      db.prepare(`
-        INSERT INTO workshop_card_versions (id, card_id, card_json, code_manifest, art_url, version_number, created_by, created_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-      `).run(
-        nanoid(), body.id, existing.card_json,
-        existing.code_manifest ?? null,
-        existing.art_url ?? null, versionNum, user.id, now,
-      )
-
-      db.prepare(`
-        UPDATE workshop_cards SET
-          card_id = ?, card_type = ?, name = ?, description = ?,
-          card_json = ?, code_manifest = ?,
-          art_url = ?, status = ?, updated_at = ?
-        WHERE id = ?
-      `).run(
-        body.card_id, body.card_type, body.name, body.description ?? '',
-        cardJsonForDb,
-        codeManifest,
-        body.art_url ?? null, newStatus, now, body.id,
-      )
-
-      sendJson(res, 200, { ok: true, id: body.id })
-    } else {
-      // Create new
-      const id = nanoid()
-      db.prepare(`
-        INSERT INTO workshop_cards
-          (id, author_id, card_id, card_type, name, description, card_json, code_manifest, art_url, status, created_at, updated_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-      `).run(
-        id, user.id, body.card_id, body.card_type, body.name, body.description ?? '',
-        cardJsonForDb,
-        codeManifest,
-        body.art_url ?? null, newStatus, now, now,
-      )
-
-      sendJson(res, 200, { ok: true, id })
+    try {
+      const current = body.id ? loadWorkspace(db, body.id, user.id) : null
+      const draft: WorkshopDraft = {
+        cardId: body.card_id,
+        cardType: body.card_type as WorkshopDraft['cardType'],
+        name: body.name,
+        description: body.description ?? '',
+        cardJson: stripCardJsonCode(body.card_json as Record<string, unknown>),
+        effectCode,
+        compiledCode,
+        codeManifest: codeManifest ? JSON.parse(codeManifest) as Record<string, unknown> : null,
+        artUrl: body.art_url ?? null,
+        generation: current?.draft.generation ?? {},
+      }
+      const workspace = current
+        ? checkpointDraft(db, {
+            cardId: current.id,
+            authorId: user.id,
+            baseRevision: current.revision,
+            draft,
+          })
+        : createCard(db, { authorId: user.id, draft })
+      if (newStatus === 'published') {
+        publish(db, {
+          cardId: workspace.id,
+          authorId: user.id,
+          baseRevision: workspace.revision,
+        })
+      }
+      sendJson(res, 200, { ok: true, id: workspace.id })
+    } catch (error) {
+      if (!sendWorkshopDraftError(res, error)) throw error
     }
     return true
   }
@@ -685,55 +675,18 @@ export async function handleWorkshopRoute(
     const body = await parseBody<{ version_id?: string }>(req)
     if (!body?.version_id) { sendJson(res, 400, { ok: false, error: 'Missing version_id' }); return true }
 
-    const card = db.prepare('SELECT author_id FROM workshop_cards WHERE id = ?').get(cardDbId) as
-      | { author_id: string } | undefined
-    if (!card) { sendJson(res, 404, { ok: false, error: 'Card not found' }); return true }
-    if (card.author_id !== user.id) { sendJson(res, 403, { ok: false, error: 'Forbidden' }); return true }
-
-    const version = db.prepare('SELECT * FROM workshop_card_versions WHERE id = ? AND card_id = ?')
-      .get(body.version_id, cardDbId) as {
-        card_json: string
-        code_manifest: string | null
-        art_url: string | null
-      } | undefined
-    if (!version) { sendJson(res, 404, { ok: false, error: 'Version not found' }); return true }
-
-    // Save current state as a version before reverting
-    const current = db.prepare('SELECT card_json, code_manifest, art_url FROM workshop_cards WHERE id = ?').get(cardDbId) as WorkshopCard
-    const versionNum = ((db.prepare(
-      'SELECT COALESCE(MAX(version_number), 0) AS n FROM workshop_card_versions WHERE card_id = ?',
-    ).get(cardDbId) as { n: number })?.n ?? 0) + 1
-    const now = Date.now()
-    db.prepare(`
-      INSERT INTO workshop_card_versions (id, card_id, card_json, code_manifest, art_url, version_number, created_by, created_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-    `).run(
-      nanoid(),
-      cardDbId,
-      current.card_json,
-      current.code_manifest ?? null,
-      current.art_url ?? null,
-      versionNum,
-      user.id,
-      now,
-    )
-
-    // Restore from version
-    const restored = JSON.parse(version.card_json)
-    db.prepare(`
-      UPDATE workshop_cards SET
-        card_json = ?, code_manifest = ?, art_url = ?, name = ?, updated_at = ?
-      WHERE id = ?
-    `).run(
-      version.card_json,
-      version.code_manifest,
-      version.art_url,
-      restored.name ?? '',
-      now,
-      cardDbId,
-    )
-
-    sendJson(res, 200, { ok: true })
+    try {
+      const current = loadWorkspace(db, cardDbId, user.id)
+      const restored = restoreVersion(db, {
+        cardId: cardDbId,
+        authorId: user.id,
+        baseRevision: current.revision,
+        versionId: body.version_id,
+      })
+      sendJson(res, 200, { ok: true, revision: restored.revision })
+    } catch (error) {
+      if (!sendWorkshopDraftError(res, error)) throw error
+    }
     return true
   }
 
