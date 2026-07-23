@@ -5,6 +5,7 @@ import { getCardEffect, runCardEffectHook } from '../../shared/cards/card-effect
 import { createInitialState } from '../../shared/session/state-bootstrap.ts'
 import { validateAndCompileCustomCode, invokeCustomCodeEffect } from '../custom-code/engine.ts'
 import { registerExecutorBackedCustomCard } from '../custom-code/runtime.ts'
+import { workshopCardJsonFromDefinition } from '../workshop-draft-validation.ts'
 
 const makeCardData = (compiledCode: string, codeManifest: CustomCardData['codeManifest']): CustomCardData => ({
   cardType: 'minor',
@@ -84,6 +85,18 @@ const CARD_IMPL = {
 
     expect(result.valid).toBe(true)
     if (!result.valid) return
+    expect(result.cardDefinition).toEqual({
+      cardType: 'minor',
+      meta: {
+        id: 'CUSTOM_ExecutorCard',
+        name: 'Executor Card',
+      },
+    })
+    expect(workshopCardJsonFromDefinition(result.cardDefinition)).toMatchObject({
+      id: 'CUSTOM_ExecutorCard',
+      name: 'Executor Card',
+      card_type: 'minor',
+    })
     expect(result.manifest.effectHooks).toContain('onReturnHome')
     expect(result.manifest.listeners).toHaveLength(1)
     expect(result.manifest.listeners[0]?.actions).toEqual(['meeting-place'])

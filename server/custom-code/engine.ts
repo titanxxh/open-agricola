@@ -107,8 +107,9 @@ function runManifestExtraction(compiledCode: string, cardId: string): {
 
     const wrappedCode = `
       var console = { log: function() {}, warn: function() {} };
-      function MinorImprovement(def) { return def; }
-      function Occupation(def) { return def; }
+      var __cardDefinitionType = null;
+      function MinorImprovement(def) { __cardDefinitionType = 'minor'; return def; }
+      function Occupation(def) { __cardDefinitionType = 'occupation'; return def; }
       ${HELPERS_INJECTION_SOURCE}
       var __captured = (function() {
         ${compiledCode}
@@ -153,6 +154,7 @@ function runManifestExtraction(compiledCode: string, cardId: string): {
         effectMetadata: __effectMetadata,
         listeners: __listeners,
         cardDefinition: __captured.CARD_DEF,
+        cardDefinitionType: __cardDefinitionType,
       });
     `
 
@@ -163,11 +165,13 @@ function runManifestExtraction(compiledCode: string, cardId: string): {
       effectMetadata?: CustomCodeEffectMetadata
       listeners: CustomCodeListenerManifest[]
       cardDefinition: Record<string, unknown> | null
+      cardDefinitionType: 'minor' | 'occupation' | null
     } : {
       effectKeys: [],
       effectMetadata: {},
       listeners: [],
       cardDefinition: null,
+      cardDefinitionType: null,
     }
 
     const effectHooks = parsed.effectKeys.filter((hook): hook is CardEffectField =>
@@ -185,7 +189,12 @@ function runManifestExtraction(compiledCode: string, cardId: string): {
 
     return {
       manifest: { effectHooks, effectMetadata, listeners },
-      cardDefinition: parsed.cardDefinition,
+      cardDefinition: parsed.cardDefinition && parsed.cardDefinitionType
+        ? {
+            cardType: parsed.cardDefinitionType,
+            meta: parsed.cardDefinition,
+          }
+        : parsed.cardDefinition,
     }
   } finally {
     isolate.dispose()

@@ -489,6 +489,61 @@ describe('workshop API', () => {
       expect(conflict.current.draft.name).toBe('Server wins')
     })
 
+    it('adopts factory-style ability card definitions', async () => {
+      const createRes = mockRes()
+      await handleWorkshopRoute(mockReq('POST', '/api/workshop/cards', {
+        card_id: 'CUSTOM_FactoryWorkspace',
+        card_type: 'minor',
+        name: 'Factory Workspace',
+        card_json: {
+          id: 'CUSTOM_FactoryWorkspace',
+          name: 'Factory Workspace',
+          card_type: 'minor',
+          deck: 'CUSTOM',
+          number: 0,
+          desc: [],
+        },
+      }, 'tok-alice'), createRes)
+      const cardDbId = JSON.parse(createRes.body).id
+
+      const adoptRes = mockRes()
+      await handleWorkshopRoute(mockReq('POST', `/api/workshop/cards/${cardDbId}/adopt`, {
+        baseRevision: 1,
+        candidate: {
+          id: 'factory-ability',
+          kind: 'ability',
+          prompt: 'factory metadata',
+          sourceCode: `
+const CARD_ID = 'CUSTOM_FactoryWorkspace'
+const CARD_DEF = MinorImprovement({
+  id: CARD_ID,
+  name: 'Factory Ability',
+  desc: ['Factory effect.'],
+  cost: { wood: 1 },
+  vp: 1,
+})
+const CARD_IMPL = {}
+          `.trim(),
+          createdAt: 100,
+        },
+      }, 'tok-alice'), adoptRes)
+
+      expect(adoptRes.statusCode).toBe(200)
+      expect(JSON.parse(adoptRes.body).workspace.draft).toMatchObject({
+        cardId: 'CUSTOM_FactoryWorkspace',
+        cardType: 'minor',
+        name: 'Factory Ability',
+        cardJson: {
+          id: 'CUSTOM_FactoryWorkspace',
+          name: 'Factory Ability',
+          card_type: 'minor',
+          desc: ['Factory effect.'],
+          cost: { wood: 1 },
+          vp: 1,
+        },
+      })
+    })
+
     it('publishes an immutable privacy-safe projection', async () => {
       const createRes = mockRes()
       await handleWorkshopRoute(mockReq('POST', '/api/workshop/cards', {

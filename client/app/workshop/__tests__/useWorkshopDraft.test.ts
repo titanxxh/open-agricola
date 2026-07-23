@@ -233,6 +233,65 @@ describe('useWorkshopDraft', () => {
     expect(result.current.state?.save.status).toBe('saved')
   })
 
+  it('waits for an in-flight checkpoint and saves newer edits before changing stages', async () => {
+    const saves: Array<{
+      body: { baseRevision: number; draft: WorkshopClientDraft }
+      resolve: (response: Response) => void
+    }> = []
+    const apiFetch = vi.fn(async (_path: string, init?: RequestInit) => {
+      if (!init) {
+        return new Response(JSON.stringify({ ok: true, workspace: workspace(1) }))
+      }
+      const body = JSON.parse(String(init.body)) as {
+        baseRevision: number
+        draft: WorkshopClientDraft
+      }
+      return new Promise<Response>(resolve => {
+        saves.push({ body, resolve })
+      })
+    })
+    const { result } = renderHook(() => useWorkshopDraft({
+      cardId: 'card-1',
+      apiFetch,
+    }))
+    await waitFor(() => expect(result.current.state?.baseRevision).toBe(1))
+    act(() => result.current.updateDraft(draft('First checkpoint')))
+
+    let checkpointPromise: Promise<boolean> | undefined
+    let stagePromise: Promise<boolean> | undefined
+    act(() => {
+      checkpointPromise = result.current.checkpoint()
+    })
+    await waitFor(() => expect(saves).toHaveLength(1))
+    act(() => {
+      stagePromise = result.current.changeStage('art')
+      result.current.updateDraft(draft('Edited while saving'))
+    })
+    expect(result.current.state?.stage).toBe('metadata')
+
+    saves[0]!.resolve(new Response(JSON.stringify({
+      ok: true,
+      workspace: workspace(2, 'First checkpoint'),
+    })))
+    await waitFor(() => expect(saves).toHaveLength(2))
+    expect(saves[1]!.body).toMatchObject({
+      baseRevision: 2,
+      draft: { name: 'Edited while saving' },
+    })
+    expect(result.current.state?.stage).toBe('metadata')
+
+    saves[1]!.resolve(new Response(JSON.stringify({
+      ok: true,
+      workspace: workspace(3, 'Edited while saving'),
+    })))
+    await act(async () => {
+      expect(await checkpointPromise).toBe(true)
+      expect(await stagePromise).toBe(true)
+    })
+    expect(result.current.state?.stage).toBe('art')
+    expect(result.current.state?.save.status).toBe('saved')
+  })
+
   it('requires whole-draft conflict choice when the server revision advanced', async () => {
     localStorage.setItem(workshopDraftStorageKey('card-1'), JSON.stringify({
       baseRevision: 2,
