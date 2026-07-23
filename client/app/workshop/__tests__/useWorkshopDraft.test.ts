@@ -44,6 +44,18 @@ beforeEach(() => {
 })
 
 describe('useWorkshopDraft', () => {
+  it('stays idle until a card has been created', async () => {
+    const apiFetch = vi.fn()
+    const { result } = renderHook(() => useWorkshopDraft({
+      cardId: '',
+      apiFetch,
+    }))
+
+    await waitFor(() => expect(result.current.loading).toBe(false))
+    expect(result.current.state).toBeNull()
+    expect(apiFetch).not.toHaveBeenCalled()
+  })
+
   it('restores same-revision local work and checkpoints the whole draft', async () => {
     localStorage.setItem(workshopDraftStorageKey('card-1'), JSON.stringify({
       baseRevision: 3,

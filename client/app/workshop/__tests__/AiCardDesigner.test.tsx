@@ -5,7 +5,59 @@ import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 
 import { LocaleProvider } from '../../../contexts/LocaleContext'
-import { AiCardDesigner } from '../AiCardDesigner'
+import { AiCardDesigner, type ApiCard } from '../AiCardDesigner'
+
+const existingCard: ApiCard = {
+  id: 'db-card-1',
+  card_id: 'CUSTOM_MedievalMallet',
+  card_type: 'minor',
+  name: '中世纪木槌',
+  description: 'desc',
+  art_url: null,
+  effect_code: 'const CARD_IMPL = {}',
+  card_json: {
+    id: 'CUSTOM_MedievalMallet',
+    name: '中世纪木槌',
+    card_type: 'minor',
+    deck: 'CUSTOM',
+    number: 0,
+    desc: ['建造石屋'],
+    cost: { wood: 2 },
+    vp: 1,
+  },
+  status: 'draft',
+  updated_at: 1,
+}
+
+const apiFetchForExistingCard = vi.fn(async (path: string) => {
+  if (path.includes('scope=mine')) {
+    return new Response(JSON.stringify({ ok: true, cards: [existingCard] }))
+  }
+  return new Response(JSON.stringify({
+    ok: true,
+    workspace: {
+      id: existingCard.id,
+      authorId: 'author',
+      revision: 2,
+      status: 'draft',
+      draft: {
+        cardId: existingCard.card_id,
+        cardType: 'minor',
+        name: existingCard.name,
+        description: existingCard.description,
+        cardJson: existingCard.card_json,
+        effectCode: existingCard.effect_code,
+        compiledCode: null,
+        codeManifest: null,
+        artUrl: null,
+        generation: {},
+      },
+      publishedVersionId: null,
+      sandboxPassVersionId: null,
+      sandboxPassedAt: null,
+    },
+  }))
+})
 
 const renderDesigner = () =>
   renderToStaticMarkup(
@@ -18,6 +70,8 @@ describe('AiCardDesigner AI config header', () => {
   beforeEach(() => {
     localStorage.clear()
     vi.restoreAllMocks()
+    vi.unstubAllGlobals()
+    apiFetchForExistingCard.mockClear()
     Element.prototype.scrollIntoView = vi.fn()
   })
 
@@ -62,29 +116,10 @@ describe('AiCardDesigner AI config header', () => {
     render(
       <LocaleProvider>
         <AiCardDesigner
-          initialCard={{
-            id: 'db-card-1',
-            card_id: 'CUSTOM_MedievalMallet',
-            card_type: 'minor',
-            name: '中世纪木槌',
-            description: 'desc',
-            art_url: null,
-            effect_code: 'const CARD_IMPL = {}',
-            card_json: {
-              id: 'CUSTOM_MedievalMallet',
-              name: '中世纪木槌',
-              card_type: 'minor',
-              deck: 'CUSTOM',
-              number: 0,
-              desc: ['建造石屋'],
-              cost: { wood: 2 },
-              vp: 1,
-            },
-            status: 'draft',
-            updated_at: Date.now(),
-          }}
+          initialCard={existingCard}
           onImport={() => {}}
           onClose={() => {}}
+          apiFetch={apiFetchForExistingCard}
         />
       </LocaleProvider>,
     )
@@ -103,15 +138,77 @@ describe('AiCardDesigner AI config header', () => {
 
     render(
       <LocaleProvider>
-        <AiCardDesigner onImport={() => {}} onClose={() => {}} />
+        <AiCardDesigner
+          initialCard={existingCard}
+          onImport={() => {}}
+          onClose={() => {}}
+          apiFetch={apiFetchForExistingCard}
+        />
       </LocaleProvider>,
     )
 
+    await waitFor(() => expect(screen.queryByText('正在恢复草稿…')).not.toBeInTheDocument())
+    await userEvent.click(screen.getByRole('button', { name: /卡牌能力 对话、源码与验证/ }))
     const input = screen.getByPlaceholderText('描述你想要的卡牌效果…')
     await userEvent.type(input, '第一行能力{enter}第二行能力')
 
     expect(input).toHaveValue('第一行能力\n第二行能力')
     expect(screen.queryByText('第一行能力')).not.toBeInTheDocument()
+  })
+
+  it('checkpoints the complete draft before changing stages', async () => {
+    const apiFetch = vi.fn(async (path: string, init?: RequestInit) => {
+      if (path.includes('scope=mine')) {
+        return new Response(JSON.stringify({ ok: true, cards: [existingCard] }))
+      }
+      if (init?.method === 'PUT') {
+        const body = JSON.parse(String(init.body))
+        return new Response(JSON.stringify({
+          ok: true,
+          workspace: {
+            id: existingCard.id,
+            authorId: 'author',
+            revision: 3,
+            status: 'draft',
+            draft: body.draft,
+            publishedVersionId: null,
+            sandboxPassVersionId: null,
+            sandboxPassedAt: null,
+          },
+        }))
+      }
+      return apiFetchForExistingCard(path)
+    })
+
+    render(
+      <LocaleProvider>
+        <AiCardDesigner
+          initialCard={existingCard}
+          onImport={() => {}}
+          onClose={() => {}}
+          apiFetch={apiFetch}
+        />
+      </LocaleProvider>,
+    )
+
+    await waitFor(() => expect(screen.queryByText('正在恢复草稿…')).not.toBeInTheDocument())
+    const idInput = screen.getByPlaceholderText('CUSTOM_MedievalMallet')
+    await userEvent.clear(idInput)
+    await userEvent.type(idInput, 'CUSTOM_ChangedMallet')
+    expect(screen.getByText('有未保存修改')).toBeInTheDocument()
+
+    await userEvent.click(screen.getByRole('button', { name: /卡面图 提示词、参考图与候选/ }))
+    await waitFor(() => expect(screen.getByRole('heading', { name: '卡面图' })).toBeInTheDocument())
+
+    const saveCall = apiFetch.mock.calls.find(([, init]) => init?.method === 'PUT')
+    expect(saveCall).toBeDefined()
+    expect(JSON.parse(String(saveCall?.[1]?.body))).toMatchObject({
+      baseRevision: 2,
+      draft: {
+        cardId: 'CUSTOM_ChangedMallet',
+        effectCode: 'const CARD_IMPL = {}',
+      },
+    })
   })
 
   it('shows a mismatch hint when the saved image-panel provider has no image-capable models', () => {
