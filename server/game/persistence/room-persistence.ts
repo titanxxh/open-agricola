@@ -4,6 +4,7 @@ export type RoomStatus = 'waiting' | 'playing' | 'finished'
 
 export type RoomMeta = {
   createdBy: string | null
+  startedAt?: number | null
   maxPlayers: number
   customCardDbIds: string[]
   enableParentCards?: boolean
@@ -32,6 +33,31 @@ export type RestoreOptions = {
   /** Exclude these ids (typically fixed dev rooms loaded by another path). */
   excludeIds?: ReadonlyArray<string>
 }
+
+export type GameResultPlayer = {
+  playerIndex: number
+  gamePlayerId: string
+  userId: string | null
+  displayName: string
+  score: number
+}
+
+export type GameResult = {
+  roomId: string
+  startedAt: number
+  finishedAt: number
+  roundsPlayed: number
+  playerCount: number
+  communityDeck: boolean
+  parentCards: boolean
+  throughTheSeasons: boolean
+  farmersOfTheMoor: boolean
+  players: GameResultPlayer[]
+}
+
+export type RoomCompletionResult =
+  | { ok: true; archived: boolean }
+  | { ok: false; error: string }
 
 /**
  * Narrow persistence interface for room state + meta. Three adapters:
@@ -65,19 +91,11 @@ export interface RoomPersistence {
    * adapter-specific test helper (e.g., `InMemoryRoomPersistence.__setUpdatedAtForTest`).
    */
   save(id: string, serialized: SerializedGameState | null, meta: RoomMeta): void
-  /** Hard-delete the row. Idempotent — silently no-ops if row absent. */
-  delete(id: string): void
+  discard(id: string): void
+  complete(result: GameResult): RoomCompletionResult
+  hasRoomId(id: string): boolean
   /**
-   * Flip status to 'finished'. Adapter may no-op if status not stored.
-   *
-   * Adapters that track `updatedAt` MUST also update it to `now` so that
-   * subsequent `listRestorable` TTL math is consistent. Adapters that don't
-   * persist `status` (e.g., JSON) MUST no-op entirely.
-   */
-  markFinished(id: string, now: number): void
-  /**
-   * Side-effect: also marks rows older than TTL as 'finished' before listing
-   * (this is the only interface method with a documented write side-effect).
+   * Side-effect: also discards rows older than TTL before listing.
    * Returns non-finished rooms whose updatedAt is within TTL.
    */
   listRestorable(opts: RestoreOptions): RoomSnapshot[]

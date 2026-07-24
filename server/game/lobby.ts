@@ -38,12 +38,11 @@ export function createLobby(deps: {
       }
       registry.delete(roomId)
       registry.clearActivity(roomId)
-      checkpoint.deleteRoom(roomId)
+      checkpoint.discardRoom(roomId)
       return { ok: true }
     },
     endRoomsForUser(userId, affectedRoomIds = []) {
       const endedRoomIds: string[] = []
-      const now = Date.now()
       const affected = new Set(affectedRoomIds)
       for (const room of [...registry.iter()]) {
         if (isFixedDevRoom(room.id)) continue
@@ -55,7 +54,7 @@ export function createLobby(deps: {
         }
         registry.delete(room.id)
         registry.clearActivity(room.id)
-        checkpoint.recordFinished(room.id, now)
+        checkpoint.discardRoom(room.id)
         endedRoomIds.push(room.id)
       }
       return { endedRoomIds }

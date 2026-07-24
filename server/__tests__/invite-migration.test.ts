@@ -22,6 +22,11 @@ describe('account invite migration', () => {
     seed.exec(`
       CREATE TABLE schema_version (version INTEGER PRIMARY KEY);
       INSERT INTO schema_version (version) VALUES (16);
+      CREATE TABLE rooms (
+        id TEXT PRIMARY KEY,
+        status TEXT NOT NULL,
+        created_at INTEGER NOT NULL
+      );
       CREATE TABLE users (id TEXT PRIMARY KEY);
       CREATE TABLE account_invites (
         id TEXT PRIMARY KEY,
@@ -62,7 +67,7 @@ describe('account invite migration', () => {
     vi.resetModules()
     const { getDb } = await import('../db.ts')
     const db = getDb()
-    expect(db.prepare('SELECT MAX(version) AS version FROM schema_version').get()).toEqual({ version: 18 })
+    expect(db.prepare('SELECT MAX(version) AS version FROM schema_version').get()).toEqual({ version: 20 })
     expect(db.prepare('SELECT id, use_count, max_uses FROM account_invites ORDER BY id').all()).toEqual([
       { id: 'unused', use_count: 0, max_uses: 1 },
       { id: 'used', use_count: 1, max_uses: 1 },

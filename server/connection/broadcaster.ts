@@ -36,9 +36,8 @@ export class Broadcaster {
       })
       seat.ws.send(JSON.stringify(env))
     }
-    if ((resp.state as { gameOver?: boolean }).gameOver) {
-      this.checkpoint.flushRoom(room)
-      this.checkpoint.recordFinished(room.id)
+    if (resp.state.gameOver && cause !== 'reconnect') {
+      this.checkpoint.completeGame(room)
     } else {
       this.checkpoint.recordState(room)
     }

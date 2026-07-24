@@ -81,16 +81,17 @@ describe('Broadcaster.broadcastState', () => {
   it('flushes the final state before marking a game finished', () => {
     const persistence = new InMemoryRoomPersistence()
     const saveSpy = vi.spyOn(persistence, 'save')
-    const markSpy = vi.spyOn(persistence, 'markFinished')
+    const completeSpy = vi.spyOn(persistence, 'complete')
     const checkpoint = createRoomPersistenceCheckpoint({ persistence })
     const b = new Broadcaster({ checkpoint })
     const room = makeRoom('r1')
+    room.startedAt = 1
     const resp = room.session.withCtx(() => room.session.getState())
     ;(resp.state as { gameOver?: boolean }).gameOver = true
     b.broadcastState(room, resp, 'action')
     expect(saveSpy).toHaveBeenCalledOnce()
-    expect(markSpy).toHaveBeenCalledWith('r1', expect.any(Number))
-    expect(saveSpy.mock.invocationCallOrder[0]).toBeLessThan(markSpy.mock.invocationCallOrder[0]!)
+    expect(completeSpy).toHaveBeenCalledWith(expect.objectContaining({ roomId: 'r1' }))
+    expect(saveSpy.mock.invocationCallOrder[0]).toBeLessThan(completeSpy.mock.invocationCallOrder[0]!)
     checkpoint.flushAll()
     expect(saveSpy).toHaveBeenCalledOnce()
     checkpoint.shutdown()

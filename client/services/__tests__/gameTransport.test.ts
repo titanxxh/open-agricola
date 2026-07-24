@@ -103,6 +103,21 @@ describe('WsGameTransport request correlation', () => {
     transport.destroy()
   })
 
+  it('switches its room reference from each authoritative state envelope', async () => {
+    const { WsGameTransport } = await import('../gameTransport')
+    const transport = new WsGameTransport('ws://test', 'old-room')
+    const listener = vi.fn()
+    transport.onSnapshot(listener)
+    await transport.connect()
+
+    const socket = FakeWebSocket.instances[0]!
+    socket.emit(buildEnvelope('server-event', 1))
+
+    expect(transport.roomId).toBe('room-1')
+    expect(listener).toHaveBeenCalledWith(expect.any(Object), 'room-1')
+    transport.destroy()
+  })
+
   it('sends dedicated dev commands for setResources and setRound', async () => {
     const { WsGameTransport } = await import('../gameTransport')
     const transport = new WsGameTransport('ws://test')

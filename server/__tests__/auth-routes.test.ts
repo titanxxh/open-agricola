@@ -141,6 +141,7 @@ vi.mock('../db.ts', () => {
       enable_through_the_seasons INTEGER NOT NULL DEFAULT 0,
       enable_farmers_of_the_moor INTEGER NOT NULL DEFAULT 0,
       allow_incomplete_farmers_of_the_moor_minor_deal INTEGER NOT NULL DEFAULT 0,
+      started_at INTEGER,
       created_at INTEGER NOT NULL,
       updated_at INTEGER NOT NULL
     );
@@ -150,6 +151,26 @@ vi.mock('../db.ts', () => {
       player_index INTEGER NOT NULL,
       joined_at INTEGER NOT NULL,
       PRIMARY KEY (room_id, user_id)
+    );
+    CREATE TABLE game_results (
+      room_id TEXT PRIMARY KEY,
+      started_at INTEGER NOT NULL,
+      finished_at INTEGER NOT NULL,
+      rounds_played INTEGER NOT NULL,
+      player_count INTEGER NOT NULL,
+      enable_community_deck INTEGER NOT NULL,
+      enable_parent_cards INTEGER NOT NULL,
+      enable_through_the_seasons INTEGER NOT NULL,
+      enable_farmers_of_the_moor INTEGER NOT NULL
+    );
+    CREATE TABLE game_result_players (
+      room_id TEXT NOT NULL REFERENCES game_results(room_id) ON DELETE CASCADE,
+      player_index INTEGER NOT NULL,
+      game_player_id TEXT NOT NULL,
+      user_id TEXT,
+      display_name TEXT NOT NULL,
+      score INTEGER NOT NULL,
+      PRIMARY KEY (room_id, player_index)
     );
     CREATE TABLE workshop_cards (
       id TEXT PRIMARY KEY,
@@ -421,6 +442,7 @@ describe('auth routes', () => {
     expect(res.headers['Set-Cookie']).toContain(`${SESSION_COOKIE}=;`)
     expect(validateSession(token)).toBeNull()
     expect((getDb().prepare('SELECT COUNT(*) AS n FROM users WHERE id = ?').get(user.id) as { n: number }).n).toBe(0)
+    expect((getDb().prepare('SELECT COUNT(*) AS n FROM rooms WHERE id = ?').get('route-room') as { n: number }).n).toBe(0)
     expect(wsServerMocks.endRoomsForUser).toHaveBeenCalledWith(user.id, ['route-room'])
     expect(wsServerMocks.closeUserConnections).toHaveBeenCalledWith(user.id)
   })

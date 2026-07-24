@@ -49,6 +49,7 @@ const ensureFixedDevRooms = (
     const snap = persistence.load(id)
     if (snap) {
       const room = snapshotToRoom(snap)
+      room.startedAt ??= Date.now()
       room.draftParents = startupOptions.draftParents ?? room.draftParents
       registry.set(room)
     } else {
@@ -64,8 +65,11 @@ const ensureFixedDevRooms = (
         maxPlayers: playerCount,
         version: 0,
         status: 'playing',
+        startedAt: Date.now(),
         enableParentCards: session.state.enableParentCards,
         draftParents: startupOptions.draftParents,
+        draftMode: startupOptions.draftMode,
+        draftPoolSize: startupOptions.draftPoolSize,
         enableThroughTheSeasons: session.state.enableThroughTheSeasons,
         enableFarmersOfTheMoor: session.state.enableFarmersOfTheMoor === true,
         allowIncompleteFarmersOfTheMoorMinorDeal: startupOptions.allowIncompleteFarmersOfTheMoorMinorDeal === true,
@@ -114,7 +118,7 @@ const startRoomCleanup = (
       if (now - lastSeen > emptyRoomTtlMs(room)) {
         registry.delete(room.id)
         registry.clearActivity(room.id)
-        checkpoint.recordFinished(room.id, now)
+        checkpoint.discardRoom(room.id)
         console.log(`[ws-server] cleaned up empty room ${room.id}`)
       }
     }

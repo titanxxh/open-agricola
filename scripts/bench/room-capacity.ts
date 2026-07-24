@@ -231,6 +231,7 @@ const createSchema = (db: Database.Database): void => {
       enable_through_the_seasons INTEGER NOT NULL DEFAULT 0,
       enable_farmers_of_the_moor INTEGER NOT NULL DEFAULT 0,
       allow_incomplete_farmers_of_the_moor_minor_deal INTEGER NOT NULL DEFAULT 0,
+      started_at INTEGER,
       created_at INTEGER NOT NULL,
       updated_at INTEGER NOT NULL
     );
@@ -240,6 +241,26 @@ const createSchema = (db: Database.Database): void => {
       player_index INTEGER NOT NULL,
       joined_at INTEGER NOT NULL,
       PRIMARY KEY (room_id, user_id)
+    );
+    CREATE TABLE game_results (
+      room_id TEXT PRIMARY KEY,
+      started_at INTEGER NOT NULL,
+      finished_at INTEGER NOT NULL,
+      rounds_played INTEGER NOT NULL,
+      player_count INTEGER NOT NULL,
+      enable_community_deck INTEGER NOT NULL,
+      enable_parent_cards INTEGER NOT NULL,
+      enable_through_the_seasons INTEGER NOT NULL,
+      enable_farmers_of_the_moor INTEGER NOT NULL
+    );
+    CREATE TABLE game_result_players (
+      room_id TEXT NOT NULL REFERENCES game_results(room_id) ON DELETE CASCADE,
+      player_index INTEGER NOT NULL,
+      game_player_id TEXT NOT NULL,
+      user_id TEXT,
+      display_name TEXT NOT NULL,
+      score INTEGER NOT NULL,
+      PRIMARY KEY (room_id, player_index)
     );
   `)
 }
@@ -270,12 +291,16 @@ class TimedPersistence implements RoomPersistence {
     }
   }
 
-  delete(id: string): void {
-    this.inner.delete(id)
+  discard(id: string): void {
+    this.inner.discard(id)
   }
 
-  markFinished(id: string, now: number): void {
-    this.inner.markFinished(id, now)
+  complete(result: Parameters<RoomPersistence['complete']>[0]): ReturnType<RoomPersistence['complete']> {
+    return this.inner.complete(result)
+  }
+
+  hasRoomId(id: string): boolean {
+    return this.inner.hasRoomId(id)
   }
 
   listRestorable(opts: RestoreOptions): RoomSnapshot[] {
