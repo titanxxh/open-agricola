@@ -6,6 +6,7 @@ import { RoomRegistry } from '../../game/room-registry.ts'
 import { InMemoryRoomPersistence } from '../../game/persistence/memory-adapter.ts'
 import { createLobby } from '../../game/lobby.ts'
 import { createRoomPersistenceCheckpoint } from '../../game/room-persistence-checkpoint.ts'
+import { snapshotToRoom } from '../../game/room.ts'
 import type { GameState } from '../../../shared/contract/types.ts'
 
 const fakeWs = () => ({ OPEN: 1, readyState: 1, send: vi.fn(), close: vi.fn() })
@@ -134,7 +135,7 @@ describe('handleCreateRoom', () => {
     expect(ctx.currentRoom!.session.state.log.some((entry) => entry.params?.player === 'PlayerA')).toBe(false)
   })
 
-  it('preserves simultaneous draft settings when starting a new game', () => {
+  it('preserves completed simultaneous draft settings across restore and newGame', () => {
     const ctx = newCtx()
     ctx.currentUserId = 'u1'
     dispatch(ctx, {
@@ -143,6 +144,17 @@ describe('handleCreateRoom', () => {
       draftMode: 'simultaneous',
       draftPoolSize: 8,
     })
+
+    const roomId = ctx.currentRoom!.id
+    const players = ctx.currentRoom!.players
+    ctx.currentRoom!.session.state.phase = 'playing'
+    ctx.currentRoom!.session.state.draft = null
+    ctx.checkpoint.flushAll()
+    const restored = snapshotToRoom(ctx.persistence.load(roomId)!)
+    restored.players = players
+    ctx.registry.delete(roomId)
+    ctx.registry.set(restored)
+    ctx.currentRoom = restored
 
     dispatch(ctx, { type: 'newGame', seed: 309 })
 

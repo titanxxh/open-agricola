@@ -385,6 +385,8 @@ function handleNewGame(ctx: ConnectionCtx, msg: Extract<ClientCommand, { type: '
   const customCards = loadCustomCardsFromDb(room.customCardDbIds ?? [], room.createdBy)
   const enableCommunityDeck = room.session.state.enableCommunityDeck
   const enableParentCards = room.enableParentCards ?? room.session.state.enableParentCards
+  const draftMode = room.draftMode ?? room.session.state.draftMode
+  const draftPoolSize = room.draftPoolSize ?? room.session.state.draftPoolSize
   const enableThroughTheSeasons = room.enableThroughTheSeasons ?? room.session.state.enableThroughTheSeasons
   const enableFarmersOfTheMoor = room.enableFarmersOfTheMoor ?? (room.session.state.enableFarmersOfTheMoor === true)
   const allowIncompleteFarmersOfTheMoorMinorDeal = room.allowIncompleteFarmersOfTheMoorMinorDeal ?? false
@@ -398,8 +400,8 @@ function handleNewGame(ctx: ConnectionCtx, msg: Extract<ClientCommand, { type: '
         enableCommunityDeck,
         enableParentCards,
         ...(room.draftParents === false ? { draftParents: false } : {}),
-        ...(room.draftMode === 'simultaneous'
-          ? { draftMode: room.draftMode, draftPoolSize: room.draftPoolSize ?? 7 }
+        ...(draftMode === 'simultaneous'
+          ? { draftMode, draftPoolSize: draftPoolSize ?? 7 }
           : {}),
         enableThroughTheSeasons,
         enableFarmersOfTheMoor,
@@ -420,6 +422,8 @@ function handleNewGame(ctx: ConnectionCtx, msg: Extract<ClientCommand, { type: '
   room.status = room.players.length === room.maxPlayers ? 'playing' : 'waiting'
   room.startedAt = room.status === 'playing' ? Date.now() : undefined
   room.enableParentCards = enableParentCards
+  room.draftMode = draftMode
+  room.draftPoolSize = draftPoolSize
   room.enableThroughTheSeasons = enableThroughTheSeasons
   room.enableFarmersOfTheMoor = enableFarmersOfTheMoor
   room.allowIncompleteFarmersOfTheMoorMinorDeal = allowIncompleteFarmersOfTheMoorMinorDeal

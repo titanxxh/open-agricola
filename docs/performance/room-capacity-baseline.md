@@ -23,7 +23,7 @@
 - Measurement per level: 60s
 - Steady action rate: 0.2 actions/room/s
 - Burst: one synchronized action per room
-- Thresholds: action p99 <= 250ms, event-loop p99 <= 100ms, RSS <= 1843.2 MiB
+- Thresholds: steady action p99 <= 250ms, event-loop p99 <= 100ms, RSS <= 1843.2 MiB
 - Approx. incremental RSS / room is the peak-RSS slope from the preceding ramp level; it is unavailable at the first level.
 
 ## Capacity

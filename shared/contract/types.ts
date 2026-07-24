@@ -560,6 +560,8 @@ export type GameState = {
   roundPhase: RoundPhase
   /** Draft state when `phase === 'draft'`, otherwise null. */
   draft: import('../draft/types').DraftState | null
+  draftMode?: 'simultaneous'
+  draftPoolSize?: number
   parentSelection: ParentSelectionState | null
   currentPlayerIndex: number
   players: PlayerState[]
