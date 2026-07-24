@@ -311,21 +311,21 @@ class TimedPersistence implements RoomPersistence {
 const createState = (targetBytes: number): SerializedGameState => {
   const session = new GameSession(563, undefined, { playerCount: 2 })
   session.state.round = 10
+  const serialized = serializeState(session.state, {
+    engineStack: session.getEngineStack(),
+  })
+  const paddingEntries = [...serialized.log]
   let index = 0
   while (
-    Buffer.byteLength(JSON.stringify(serializeState(session.state, {
-      engineStack: session.getEngineStack(),
-    }))) < targetBytes
+    Buffer.byteLength(JSON.stringify({ ...serialized, log: paddingEntries })) < targetBytes
   ) {
-    session.state.log.push({
+    paddingEntries.push({
       key: 'benchmark.padding',
       params: { index, value: 'x'.repeat(512) },
     })
     index += 1
   }
-  return serializeState(session.state, {
-    engineStack: session.getEngineStack(),
-  })
+  return { ...serialized, log: paddingEntries }
 }
 
 const fakeSocket = (): WebSocket => ({

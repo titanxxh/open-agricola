@@ -95,6 +95,10 @@ describe('GameContainerApi WS player identity', () => {
     expect(isDevModeAllowedFromQuery('?page=game&transport=ws&room=dev2&devMode=1')).toBe(true)
     expect(isDevModeAllowedFromQuery('?page=game&transport=ws&room=dev5&devMode=1')).toBe(true)
     expect(isDevModeAllowedFromQuery('?page=game&transport=ws&room=dev6&devMode=1')).toBe(true)
+    expect(isDevModeAllowedFromQuery(
+      '?page=game&transport=ws&room=dev2-12345678-1234-1234-1234-123456789abc&devMode=1',
+    )).toBe(true)
+    expect(isDevModeAllowedFromQuery('?page=game&transport=ws&room=dev2-not-a-uuid&devMode=1')).toBe(false)
     expect(isDevModeAllowedFromQuery('?page=game&embedded=1&devMode=1')).toBe(true)
     expect(isDevModeAllowedFromQuery('?page=workshop&player=p1&devMode=1')).toBe(true)
     expect(isDevModeAllowedFromQuery('?player=p1&devMode=1')).toBe(true)

@@ -237,6 +237,25 @@ describe('handleCreateRoom', () => {
     }))
   })
 
+  it('preserves fixed dev room privileges under the new game id', () => {
+    const ctx = newCtx()
+    dispatch(ctx, { type: 'createRoom', maxPlayers: 2 })
+    const createdRoomId = ctx.currentRoom!.id
+    ctx.registry.delete(createdRoomId)
+    ctx.checkpoint.discardRoom(createdRoomId)
+    ctx.currentRoom!.id = 'dev2'
+    ctx.registry.set(ctx.currentRoom!)
+
+    dispatch(ctx, { type: 'newGame', seed: 309 })
+    const nextRoomId = ctx.currentRoom!.id
+    const before = sentTypesOf(ctx).length
+    dispatch(ctx, { type: 'devSetResources', playerIndex: 0, resources: { wood: 5 } })
+
+    expect(nextRoomId).toMatch(/^dev2-[0-9a-f-]{36}$/)
+    expect(nextRoomId).not.toBe('dev2')
+    expect(sentTypesOf(ctx).slice(before)).toContain('stateUpdate')
+  })
+
   it('keeps a completed game archive immutable when starting the next game', () => {
     const ctx = newCtx()
     ctx.currentUserId = 'u1'
