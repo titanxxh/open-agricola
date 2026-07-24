@@ -42,7 +42,19 @@ export const FIXED_DEV_ROOMS: ReadonlyArray<{ id: string; playerCount: number }>
 
 export const FIXED_DEV_ROOM_IDS: ReadonlySet<string> = new Set(FIXED_DEV_ROOMS.map((r) => r.id))
 
+const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+
+export const fixedDevRoomRootId = (roomId: string): string | null => {
+  for (const { id } of FIXED_DEV_ROOMS) {
+    if (roomId === id) return id
+    if (roomId.startsWith(`${id}-`) && UUID_PATTERN.test(roomId.slice(id.length + 1))) return id
+  }
+  return null
+}
+
 export const isFixedDevRoom = (roomId: string): boolean => FIXED_DEV_ROOM_IDS.has(roomId)
+
+export const isDevRoom = (roomId: string): boolean => fixedDevRoomRootId(roomId) !== null
 
 export type FixedDevRoomStartupOptions = {
   enableParentCards?: boolean
@@ -148,7 +160,7 @@ export const resolveJoinPlayerIndex = (
     }
     const occupied = room.players.find((p) => p.playerIndex === requestedPlayerIndex)
     if (occupied) {
-      if (!isFixedDevRoom(room.id) && !(userId && occupied.userId === userId)) {
+      if (!isDevRoom(room.id) && !(userId && occupied.userId === userId)) {
         return { ok: false, error: 'player slot occupied' }
       }
       return { ok: true, playerIndex: requestedPlayerIndex, replacedExistingPlayer: true }

@@ -349,6 +349,15 @@ export const shouldSuppressPendingChoiceOptionsInInteractionBar = (
   )
 
 const FIXED_DEV_ROOM_IDS = new Set(['dev2', 'dev3', 'dev4', 'dev5', 'dev6'])
+const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+
+const isDevRoomId = (roomId: string): boolean => {
+  for (const id of FIXED_DEV_ROOM_IDS) {
+    if (roomId === id) return true
+    if (roomId.startsWith(`${id}-`) && UUID_PATTERN.test(roomId.slice(id.length + 1))) return true
+  }
+  return false
+}
 
 export const maxPlayersFromQuery = (search: string): number => {
   const raw = Number(new URLSearchParams(search).get('maxPlayers'))
@@ -384,10 +393,10 @@ export const isDevModeAllowedFromQuery = (search: string): boolean => {
   const page = params.get('page')
   const roomId = params.get('room')
   if (!page) {
-    if (params.get('transport') === 'ws' || roomId) return !!roomId && FIXED_DEV_ROOM_IDS.has(roomId)
+    if (params.get('transport') === 'ws' || roomId) return !!roomId && isDevRoomId(roomId)
     return true
   }
   if (page === 'lobby' || page === 'workshop') return true
-  if (roomId && FIXED_DEV_ROOM_IDS.has(roomId)) return true
+  if (roomId && isDevRoomId(roomId)) return true
   return params.get('embedded') === '1' && params.get('transport') !== 'ws'
 }

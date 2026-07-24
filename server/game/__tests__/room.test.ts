@@ -6,6 +6,7 @@ import {
   FIXED_DEV_ROOM_IDS,
   buildFixedDevRoomInitialStateOptions,
   parseFixedDevRoomStartupOptions,
+  isDevRoom,
   isFixedDevRoom,
   removePlayerFromRoom,
   resolveJoinRequestPlayerIndex,
@@ -185,6 +186,9 @@ describe('room-manager seat assignment', () => {
       expect(FIXED_DEV_ROOM_IDS.has(id)).toBe(true)
       expect(isFixedDevRoom(id)).toBe(true)
     }
+    expect(isDevRoom('dev2-12345678-1234-1234-1234-123456789abc')).toBe(true)
+    expect(isDevRoom('dev2-not-a-uuid')).toBe(false)
+    expect(isFixedDevRoom('dev2-12345678-1234-1234-1234-123456789abc')).toBe(false)
     expect(isFixedDevRoom('dev')).toBe(false)
     expect(isFixedDevRoom('abc123')).toBe(false)
   })
