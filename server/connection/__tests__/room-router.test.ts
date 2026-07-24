@@ -272,6 +272,30 @@ describe('handleCreateRoom', () => {
     expect(ctx.persistence.__getResultForTest(previousRoomId)).toEqual(archived)
   })
 
+  it('keeps the terminal room when completion fails before newGame', () => {
+    const ctx = newCtx()
+    ctx.currentUserId = 'u1'
+    dispatch(ctx, { type: 'createRoom', maxPlayers: 2 })
+    const previousRoomId = ctx.currentRoom!.id
+    ctx.currentRoom!.startedAt = 10
+    ctx.currentRoom!.session.state.gameOver = true
+    vi.spyOn(ctx.persistence, 'complete').mockReturnValue({
+      ok: false,
+      error: 'write failed',
+    })
+
+    dispatch(ctx, { type: 'newGame', seed: 309, requestId: 'new-1' })
+
+    expect(ctx.currentRoom!.id).toBe(previousRoomId)
+    expect(ctx.registry.has(previousRoomId)).toBe(true)
+    expect(ctx.persistence.load(previousRoomId)?.serialized?.gameOver).toBe(true)
+    expect(sentMessagesOf(ctx)).toContainEqual(expect.objectContaining({
+      type: 'error',
+      error: 'unable to archive completed game: write failed',
+      requestId: 'new-1',
+    }))
+  })
+
   it('switches every connected seat to the new game id before broadcasting', () => {
     const deps = newDeps()
     const host = newCtx(deps)

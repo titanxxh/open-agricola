@@ -45,11 +45,12 @@ export class JsonRoomPersistence implements RoomPersistence {
       if (!existsSync(file)) return null
       const raw = readFileSync(file, 'utf-8')
       const serialized = JSON.parse(raw) as SerializedGameState
+      const updatedAt = statSync(file).mtimeMs
       return {
         id,
         serialized,
-        meta: fallbackMeta(serialized),
-        updatedAt: statSync(file).mtimeMs,
+        meta: { ...fallbackMeta(serialized), startedAt: updatedAt },
+        updatedAt,
       }
     } catch (err) {
       console.warn('[json-adapter] load failed:', err)
