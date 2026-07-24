@@ -20,10 +20,13 @@ export type Room = {
   maxPlayers: number
   version: number
   status: RoomStatus
+  startedAt?: number
   createdBy?: string
   customCardDbIds?: string[]
   enableParentCards?: boolean
   draftParents?: boolean
+  draftMode?: 'simultaneous'
+  draftPoolSize?: number
   enableThroughTheSeasons?: boolean
   enableFarmersOfTheMoor?: boolean
   allowIncompleteFarmersOfTheMoorMinorDeal?: boolean
@@ -112,6 +115,7 @@ const getRoomStatus = (room?: Pick<Room, 'players' | 'maxPlayers' | 'status'>): 
 
 export const toRoomMeta = (room: Room): RoomMeta => ({
   createdBy: room.createdBy ?? null,
+  startedAt: room.startedAt ?? null,
   maxPlayers: room.maxPlayers,
   customCardDbIds: room.customCardDbIds ?? [],
   enableParentCards: room.enableParentCards ?? room.session.state.enableParentCards,
@@ -249,10 +253,13 @@ export const snapshotToRoom = (
   maxPlayers: snapshot.meta.maxPlayers,
   version: 0,
   status: snapshot.meta.status,
+  startedAt: snapshot.meta.startedAt ?? undefined,
   createdBy: snapshot.meta.createdBy ?? undefined,
   customCardDbIds: snapshot.meta.customCardDbIds,
   enableParentCards: snapshot.meta.enableParentCards ?? snapshot.serialized?.enableParentCards ?? false,
   draftParents: snapshot.meta.draftParents,
+  draftMode: snapshot.serialized?.draft?.mode,
+  draftPoolSize: snapshot.serialized?.draft?.poolSize,
   enableThroughTheSeasons: snapshot.meta.enableThroughTheSeasons ?? snapshot.serialized?.enableThroughTheSeasons ?? false,
   enableFarmersOfTheMoor: snapshot.meta.enableFarmersOfTheMoor ?? (snapshot.serialized?.enableFarmersOfTheMoor === true),
   allowIncompleteFarmersOfTheMoorMinorDeal: snapshot.meta.allowIncompleteFarmersOfTheMoorMinorDeal ?? false,

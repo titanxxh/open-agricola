@@ -435,6 +435,46 @@ function runMigrations(db: Database.Database): void {
         WHERE status = 'published';
       `,
     },
+    {
+      version: 19,
+      sql: `
+        ALTER TABLE rooms ADD COLUMN started_at INTEGER;
+        UPDATE rooms SET started_at = created_at WHERE status = 'playing';
+
+        CREATE TABLE game_results (
+          room_id TEXT PRIMARY KEY,
+          started_at INTEGER NOT NULL,
+          finished_at INTEGER NOT NULL,
+          rounds_played INTEGER NOT NULL,
+          player_count INTEGER NOT NULL,
+          community_deck INTEGER NOT NULL,
+          parent_cards INTEGER NOT NULL,
+          through_the_seasons INTEGER NOT NULL,
+          farmers_of_the_moor INTEGER NOT NULL
+        );
+
+        CREATE TABLE game_result_players (
+          room_id TEXT NOT NULL REFERENCES game_results(room_id) ON DELETE CASCADE,
+          player_index INTEGER NOT NULL,
+          game_player_id TEXT NOT NULL,
+          user_id TEXT,
+          display_name TEXT NOT NULL,
+          score INTEGER NOT NULL,
+          PRIMARY KEY (room_id, player_index)
+        );
+
+        DELETE FROM rooms WHERE status = 'finished';
+      `,
+    },
+    {
+      version: 20,
+      sql: `
+        ALTER TABLE game_results RENAME COLUMN community_deck TO enable_community_deck;
+        ALTER TABLE game_results RENAME COLUMN parent_cards TO enable_parent_cards;
+        ALTER TABLE game_results RENAME COLUMN through_the_seasons TO enable_through_the_seasons;
+        ALTER TABLE game_results RENAME COLUMN farmers_of_the_moor TO enable_farmers_of_the_moor;
+      `,
+    },
   ]
 
   const insert = db.prepare('INSERT INTO schema_version (version) VALUES (?)')

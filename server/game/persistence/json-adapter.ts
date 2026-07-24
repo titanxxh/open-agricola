@@ -1,6 +1,8 @@
 import { existsSync, mkdirSync, readFileSync, unlinkSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import type {
+  GameResult,
+  RoomCompletionResult,
   RoomMeta,
   RoomPersistence,
   RoomSnapshot,
@@ -67,17 +69,27 @@ export class JsonRoomPersistence implements RoomPersistence {
     }
   }
 
-  delete(id: string): void {
+  discard(id: string): void {
     try {
       const file = this.fileFor(id)
       if (existsSync(file)) unlinkSync(file)
     } catch (err) {
-      console.warn('[json-adapter] delete failed:', err)
+      console.warn('[json-adapter] discard failed:', err)
     }
   }
 
-  markFinished(_id: string, _now: number): void {
-    // JSON adapter doesn't track status; deliberate no-op.
+  complete(result: GameResult): RoomCompletionResult {
+    try {
+      const file = this.fileFor(result.roomId)
+      if (existsSync(file)) unlinkSync(file)
+      return { ok: true, archived: false }
+    } catch (err) {
+      return { ok: false, error: err instanceof Error ? err.message : String(err) }
+    }
+  }
+
+  hasRoomId(id: string): boolean {
+    return existsSync(this.fileFor(id))
   }
 
   listRestorable(_opts: RestoreOptions): RoomSnapshot[] {

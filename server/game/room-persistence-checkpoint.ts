@@ -1,6 +1,11 @@
 import { serializeState } from '../../shared/session/serialization.ts'
+import { Scoring } from '../../shared/domain/scoring.ts'
 import { toRoomMeta, type Room } from './room.ts'
-import type { RoomPersistence } from './persistence/room-persistence.ts'
+import type {
+  GameResult,
+  RoomCompletionResult,
+  RoomPersistence,
+} from './persistence/room-persistence.ts'
 
 const FLUSH_DELAY_MS = 1000
 
@@ -43,7 +48,6 @@ export class RoomPersistenceCheckpoint {
   }
 
   recordCreated(room: Room): void {
-    this.inactiveRoomIds.delete(room.id)
     if (!this.canPersist(room)) return
     this.persistence.save(room.id, null, toRoomMeta(room))
     this.recordState(room)
@@ -89,16 +93,36 @@ export class RoomPersistenceCheckpoint {
     this.cancelTimerIfIdle()
   }
 
-  recordFinished(roomId: string, now: number = this.now()): void {
-    this.cancelRoom(roomId)
-    this.inactiveRoomIds.add(roomId)
-    this.persistence.markFinished(roomId, now)
+  completeGame(room: Room, finishedAt: number = this.now()): RoomCompletionResult {
+    this.cancelRoom(room.id)
+    if (this.inactiveRoomIds.has(room.id)) {
+      return { ok: true, archived: this.persistence.hasRoomId(room.id) }
+    }
+    if (!room.session.state.gameOver) return { ok: false, error: 'game is not over' }
+    let result: RoomCompletionResult
+    try {
+      if (this.shouldPersist(room)) this.saveState(room)
+      if (room.startedAt === undefined) return { ok: false, error: 'game start time is missing' }
+      result = this.persistence.complete(this.buildResult(room, finishedAt))
+    } catch (err) {
+      result = { ok: false, error: err instanceof Error ? err.message : String(err) }
+    }
+    if (result.ok) {
+      this.inactiveRoomIds.add(room.id)
+    } else {
+      console.warn('[room-persistence-checkpoint] completion failed:', result.error)
+    }
+    return result
   }
 
-  deleteRoom(roomId: string): void {
+  discardRoom(roomId: string): void {
     this.cancelRoom(roomId)
     this.inactiveRoomIds.add(roomId)
-    this.persistence.delete(roomId)
+    this.persistence.discard(roomId)
+  }
+
+  hasRoomId(roomId: string): boolean {
+    return this.inactiveRoomIds.has(roomId) || this.persistence.hasRoomId(roomId)
   }
 
   shutdown(): void {
@@ -114,6 +138,29 @@ export class RoomPersistenceCheckpoint {
       serializeState(room.session.state, { engineStack: room.session.getEngineStack() }),
       toRoomMeta(room),
     )
+  }
+
+  private buildResult(room: Room, finishedAt: number): GameResult {
+    const state = room.session.state
+    const scores = Scoring.computeAll(state)
+    return {
+      roomId: room.id,
+      startedAt: room.startedAt!,
+      finishedAt,
+      roundsPlayed: Math.max(0, Math.min(state.round, 14)),
+      playerCount: state.players.length,
+      communityDeck: state.enableCommunityDeck,
+      parentCards: state.enableParentCards,
+      throughTheSeasons: state.enableThroughTheSeasons,
+      farmersOfTheMoor: state.enableFarmersOfTheMoor === true,
+      players: scores.map((score, playerIndex) => ({
+        playerIndex,
+        gamePlayerId: score.playerId,
+        userId: room.players.find((player) => player.playerIndex === playerIndex)?.userId ?? null,
+        displayName: score.playerName,
+        score: score.total,
+      })),
+    }
   }
 
   private canPersist(room: Room): boolean {

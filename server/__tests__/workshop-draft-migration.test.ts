@@ -23,6 +23,11 @@ describe('workshop draft migration', () => {
       PRAGMA foreign_keys = ON;
       CREATE TABLE schema_version (version INTEGER PRIMARY KEY);
       INSERT INTO schema_version (version) VALUES (17);
+      CREATE TABLE rooms (
+        id TEXT PRIMARY KEY,
+        status TEXT NOT NULL,
+        created_at INTEGER NOT NULL
+      );
       CREATE TABLE users (id TEXT PRIMARY KEY);
       INSERT INTO users (id) VALUES ('author');
       CREATE TABLE workshop_cards (
@@ -105,7 +110,7 @@ describe('workshop draft migration', () => {
     const { getDb } = await import('../db.ts')
     const db = getDb()
 
-    expect(db.prepare('SELECT MAX(version) AS version FROM schema_version').get()).toEqual({ version: 18 })
+    expect(db.prepare('SELECT MAX(version) AS version FROM schema_version').get()).toEqual({ version: 20 })
     expect(db.prepare(`
       SELECT id, draft_revision, published_version_id, sandbox_pass_version_id, sandbox_passed_at
       FROM workshop_cards ORDER BY id

@@ -944,7 +944,8 @@ export const GameContainerApi = () => {
     resolveChoice('cancel')
   }, [isAnytimeExchange, pendingChoice, resolveChoice])
 
-  const handleSnapshot = useCallback((payload: GameSyncPayload) => {
+  const handleSnapshot = useCallback((payload: GameSyncPayload, roomId?: string) => {
+    if (roomId) setRoomInUrl(roomId)
     applySnapshot(payload)
     applySnapshotPublicEventCancellations(payload)
     syncAnimalReorgFromInteraction(payload.interaction)

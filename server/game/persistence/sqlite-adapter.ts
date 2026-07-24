@@ -1,5 +1,7 @@
 import type Database from 'better-sqlite3'
 import type {
+  GameResult,
+  RoomCompletionResult,
   RoomMeta,
   RoomPersistence,
   RoomSnapshot,
@@ -21,6 +23,7 @@ type RoomRow = {
   enable_through_the_seasons: number
   enable_farmers_of_the_moor: number
   allow_incomplete_farmers_of_the_moor_minor_deal: number
+  started_at: number | null
   updated_at: number
 }
 
@@ -52,6 +55,7 @@ const toSnapshot = (
   serialized: row.state_json ? (JSON.parse(row.state_json) as SerializedGameState) : null,
   meta: {
     createdBy: row.created_by,
+    startedAt: row.started_at,
     maxPlayers: row.max_players,
     customCardDbIds: parseCustomCardDbIds(row.custom_card_ids),
     enableParentCards: row.enable_parent_cards === 1,
@@ -70,17 +74,22 @@ export class SqliteRoomPersistence implements RoomPersistence {
   private readonly loadPlayers
   private readonly upsertRoom
   private readonly upsertPlayer
+  private readonly clearReplacedSeat
   private readonly deleteRoom
-  private readonly finishRoom
+  private readonly findRoomId
+  private readonly findResult
+  private readonly insertResult
+  private readonly insertResultPlayer
   private readonly pruneRooms
   private readonly restoreRooms
   private readonly saveRoom
+  private readonly completeRoom
 
   constructor(db: SqliteDb) {
     this.loadRoom = db.prepare(
       `SELECT id, created_by, state_json, max_players, status, version, custom_card_ids,
               enable_parent_cards, draft_parents, enable_through_the_seasons, enable_farmers_of_the_moor,
-              allow_incomplete_farmers_of_the_moor_minor_deal, updated_at
+              allow_incomplete_farmers_of_the_moor_minor_deal, started_at, updated_at
        FROM rooms WHERE id = ?`,
     )
     this.loadPlayers = db.prepare(
@@ -90,11 +99,11 @@ export class SqliteRoomPersistence implements RoomPersistence {
       INSERT INTO rooms (
         id, created_by, state_json, max_players, status, version, custom_card_ids,
         enable_parent_cards, draft_parents, enable_through_the_seasons, enable_farmers_of_the_moor,
-        allow_incomplete_farmers_of_the_moor_minor_deal, created_at, updated_at
+        allow_incomplete_farmers_of_the_moor_minor_deal, started_at, created_at, updated_at
       ) VALUES (
         @id, @createdBy, @stateJson, @maxPlayers, @status, 1, @customCardIds,
         @enableParentCards, @draftParents, @enableThroughTheSeasons, @enableFarmersOfTheMoor,
-        @allowIncompleteFarmersOfTheMoorMinorDeal, @now, @now
+        @allowIncompleteFarmersOfTheMoorMinorDeal, @startedAt, @now, @now
       )
       ON CONFLICT(id) DO UPDATE SET
         state_json = COALESCE(excluded.state_json, rooms.state_json),
@@ -105,6 +114,7 @@ export class SqliteRoomPersistence implements RoomPersistence {
         enable_through_the_seasons = excluded.enable_through_the_seasons,
         enable_farmers_of_the_moor = excluded.enable_farmers_of_the_moor,
         allow_incomplete_farmers_of_the_moor_minor_deal = excluded.allow_incomplete_farmers_of_the_moor_minor_deal,
+        started_at = COALESCE(rooms.started_at, excluded.started_at),
         version = rooms.version + 1,
         updated_at = excluded.updated_at
     `)
@@ -114,11 +124,36 @@ export class SqliteRoomPersistence implements RoomPersistence {
       ON CONFLICT(room_id, user_id) DO UPDATE SET
         player_index = excluded.player_index
     `)
+    this.clearReplacedSeat = db.prepare(`
+      DELETE FROM room_players
+      WHERE room_id = @roomId AND player_index = @playerIndex AND user_id != @userId
+    `)
     this.deleteRoom = db.prepare('DELETE FROM rooms WHERE id = ?')
-    this.finishRoom = db.prepare("UPDATE rooms SET status = 'finished', updated_at = ? WHERE id = ?")
+    this.findRoomId = db.prepare(`
+      SELECT id FROM rooms WHERE id = ?
+      UNION ALL
+      SELECT room_id AS id FROM game_results WHERE room_id = ?
+      LIMIT 1
+    `)
+    this.findResult = db.prepare('SELECT room_id FROM game_results WHERE room_id = ?')
+    this.insertResult = db.prepare(`
+      INSERT INTO game_results (
+        room_id, started_at, finished_at, rounds_played, player_count,
+        enable_community_deck, enable_parent_cards, enable_through_the_seasons, enable_farmers_of_the_moor
+      ) VALUES (
+        @roomId, @startedAt, @finishedAt, @roundsPlayed, @playerCount,
+        @communityDeck, @parentCards, @throughTheSeasons, @farmersOfTheMoor
+      )
+    `)
+    this.insertResultPlayer = db.prepare(`
+      INSERT INTO game_result_players (
+        room_id, player_index, game_player_id, user_id, display_name, score
+      ) VALUES (
+        @roomId, @playerIndex, @gamePlayerId, @userId, @displayName, @score
+      )
+    `)
     this.pruneRooms = db.prepare(`
-      UPDATE rooms
-      SET status = 'finished', updated_at = ?
+      DELETE FROM rooms
       WHERE status != 'finished'
         AND (
           (status = 'playing' AND updated_at < ?)
@@ -130,7 +165,7 @@ export class SqliteRoomPersistence implements RoomPersistence {
       SELECT rooms.id, rooms.created_by, rooms.state_json, rooms.max_players, rooms.status,
              rooms.version, rooms.custom_card_ids, rooms.enable_parent_cards, rooms.draft_parents,
              rooms.enable_through_the_seasons, rooms.enable_farmers_of_the_moor,
-             rooms.allow_incomplete_farmers_of_the_moor_minor_deal, rooms.updated_at,
+             rooms.allow_incomplete_farmers_of_the_moor_minor_deal, rooms.started_at, rooms.updated_at,
              room_players.user_id AS player_user_id, room_players.player_index
       FROM rooms
       LEFT JOIN room_players ON room_players.room_id = rooms.id
@@ -144,13 +179,38 @@ export class SqliteRoomPersistence implements RoomPersistence {
     ) => {
       this.upsertRoom.run(values)
       for (const player of players) {
-        this.upsertPlayer.run({
+        const seat = {
           roomId: values.id,
           userId: player.userId,
           playerIndex: player.playerIndex,
           now: values.now,
+        }
+        this.clearReplacedSeat.run(seat)
+        this.upsertPlayer.run(seat)
+      }
+    })
+    this.completeRoom = db.transaction((result: GameResult) => {
+      if (this.findResult.get(result.roomId)) {
+        this.deleteRoom.run(result.roomId)
+        return
+      }
+      const persistedPlayers = this.loadPlayers.all(result.roomId) as RoomMeta['players']
+      const userIds = new Map(persistedPlayers.map((player) => [player.playerIndex, player.userId]))
+      this.insertResult.run({
+        ...result,
+        communityDeck: result.communityDeck ? 1 : 0,
+        parentCards: result.parentCards ? 1 : 0,
+        throughTheSeasons: result.throughTheSeasons ? 1 : 0,
+        farmersOfTheMoor: result.farmersOfTheMoor ? 1 : 0,
+      })
+      for (const player of result.players) {
+        this.insertResultPlayer.run({
+          ...player,
+          roomId: result.roomId,
+          userId: userIds.get(player.playerIndex) ?? player.userId,
         })
       }
+      this.deleteRoom.run(result.roomId)
     })
   }
 
@@ -187,23 +247,36 @@ export class SqliteRoomPersistence implements RoomPersistence {
       enableThroughTheSeasons,
       enableFarmersOfTheMoor,
       allowIncompleteFarmersOfTheMoorMinorDeal,
+      startedAt: meta.startedAt ?? null,
       now,
     }, meta.players)
   }
 
-  delete(id: string): void {
+  discard(id: string): void {
     try {
       this.deleteRoom.run(id)
     } catch (err) {
-      console.warn('[sqlite-adapter] delete failed:', err)
+      console.warn('[sqlite-adapter] discard failed:', err)
     }
   }
 
-  markFinished(id: string, now: number): void {
+  complete(result: GameResult): RoomCompletionResult {
     try {
-      this.finishRoom.run(now, id)
+      this.completeRoom(result)
+      return { ok: true, archived: true }
     } catch (err) {
-      console.warn('[sqlite-adapter] markFinished failed:', err)
+      const error = err instanceof Error ? err.message : String(err)
+      console.warn('[sqlite-adapter] completion failed:', err)
+      return { ok: false, error }
+    }
+  }
+
+  hasRoomId(id: string): boolean {
+    try {
+      return this.findRoomId.get(id, id) !== undefined
+    } catch (err) {
+      console.warn('[sqlite-adapter] room id lookup failed:', err)
+      return true
     }
   }
 
@@ -243,7 +316,7 @@ export class SqliteRoomPersistence implements RoomPersistence {
       const excludeIds = opts.excludeIds ?? []
       const staleWaiting = opts.now - opts.waitingTtlMs
       const stalePlaying = opts.now - opts.playingTtlMs
-      this.pruneRooms.run(opts.now, stalePlaying, staleWaiting, JSON.stringify(excludeIds))
+      this.pruneRooms.run(stalePlaying, staleWaiting, JSON.stringify(excludeIds))
     } catch (err) {
       console.warn('[sqlite-adapter] pruneStale failed:', err)
     }

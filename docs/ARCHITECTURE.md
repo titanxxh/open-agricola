@@ -1059,9 +1059,10 @@ server/connection/
 
 ```
 server/game/
-├── room.ts                    Room { id, session: GameSession, players: RoomPlayer[], maxPlayers }
+├── room.ts                    Room { id, session, players, maxPlayers, startedAt }
 ├── room-registry.ts           RoomRegistry
 ├── lobby.ts                   大厅 / 房间列表 / 自动加入
+├── room-persistence-checkpoint.ts  一秒合并写、完成 / 丢弃生命周期
 ├── authoritative-session.ts   GameSession extends GameCore — 命令执行中心
 └── persistence/
     ├── room-persistence.ts    抽象接口
@@ -1074,7 +1075,9 @@ server/game/
 
 `GameSession` 在 `SessionCore` 之上加：连接绑定、广播、持久化触发、devtool hook、终局判定；签名 `createSessionForRoom(stateOrSeed?, customCardDbIds, requestUserId, playerCount?)`。
 
-固定持久化 dev 房：`dev2` / `dev3` / `dev4`，对应 2/3/4 人。`PERSIST_ROOMS=sqlite`（默认） / `json` 切换 adapter。普通 SQLite 房间："空房先保留、TTL 后回收"，启动恢复覆盖 `waiting` 与 `playing`，`custom_card_ids` 一并恢复。允许同座位重连替换旧连接。
+固定持久化 dev 房：`dev2` 至 `dev6`。`PERSIST_ROOMS=sqlite`（默认） / `json` 切换 adapter。普通 SQLite 房间："空房先保留、TTL 后回收"，启动恢复覆盖 `waiting` 与 `playing`，`custom_card_ids` 一并恢复。允许同座位重连替换旧连接。
+
+`roomId` 唯一标识一局游戏：`newGame` 先创建新 `GameSession` 和 UUID，再把在线座位、人数、custom cards、已持久化变体开关及所有连接引用切到新 Room 记录；旧 id 永不复用。首个 `waiting → playing` 转换写入不可变 `started_at`。只有权威 `gameOver` 会在单个 SQLite 事务内写入 `game_results` / `game_result_players` 标量摘要并删除 `rooms.state_json`；TTL、解散、删号和未完成重开只删除活动房间，不产生结果。归档写失败会回滚，最终全量状态继续保留用于恢复或重试。
 
 ### 11.3 server/custom-code/ — 隔离执行
 

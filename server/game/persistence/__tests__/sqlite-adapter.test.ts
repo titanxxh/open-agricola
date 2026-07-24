@@ -1,7 +1,7 @@
 import Database from 'better-sqlite3'
 import { describe, expect, it, beforeEach } from 'vitest'
 import { SqliteRoomPersistence } from '../sqlite-adapter.ts'
-import type { RoomMeta, RoomSnapshot } from '../room-persistence.ts'
+import type { GameResult, RoomMeta, RoomSnapshot } from '../room-persistence.ts'
 import type { SerializedGameState } from '../../../../shared/session/serialization.ts'
 
 const WAITING_TTL = 30 * 60 * 1000
@@ -10,6 +10,7 @@ const NOW = 1_700_000_000_000
 
 const META: RoomMeta = {
   createdBy: 'u1',
+  startedAt: NOW - 1000,
   maxPlayers: 2,
   customCardDbIds: [],
   status: 'playing',
@@ -17,6 +18,21 @@ const META: RoomMeta = {
 }
 
 const STATE = { _stub: true } as unknown as SerializedGameState
+const RESULT: GameResult = {
+  roomId: 'r1',
+  startedAt: NOW - 1000,
+  finishedAt: NOW,
+  roundsPlayed: 14,
+  playerCount: 2,
+  communityDeck: true,
+  parentCards: false,
+  throughTheSeasons: true,
+  farmersOfTheMoor: false,
+  players: [
+    { playerIndex: 0, gamePlayerId: 'p1', userId: null, displayName: 'Alice', score: 42 },
+    { playerIndex: 1, gamePlayerId: 'p2', userId: 'live-u2', displayName: 'Bob', score: 35 },
+  ],
+}
 
 const setupDb = (options?: Database.Options) => {
   const db = new Database(':memory:', options)
@@ -34,6 +50,7 @@ const setupDb = (options?: Database.Options) => {
       enable_through_the_seasons INTEGER NOT NULL DEFAULT 0,
       enable_farmers_of_the_moor INTEGER NOT NULL DEFAULT 0,
       allow_incomplete_farmers_of_the_moor_minor_deal INTEGER NOT NULL DEFAULT 0,
+      started_at INTEGER,
       created_at INTEGER NOT NULL,
       updated_at INTEGER NOT NULL
     );
@@ -43,6 +60,26 @@ const setupDb = (options?: Database.Options) => {
       player_index INTEGER NOT NULL,
       joined_at INTEGER NOT NULL,
       PRIMARY KEY (room_id, user_id)
+    );
+    CREATE TABLE game_results (
+      room_id TEXT PRIMARY KEY,
+      started_at INTEGER NOT NULL,
+      finished_at INTEGER NOT NULL,
+      rounds_played INTEGER NOT NULL,
+      player_count INTEGER NOT NULL,
+      enable_community_deck INTEGER NOT NULL,
+      enable_parent_cards INTEGER NOT NULL,
+      enable_through_the_seasons INTEGER NOT NULL,
+      enable_farmers_of_the_moor INTEGER NOT NULL
+    );
+    CREATE TABLE game_result_players (
+      room_id TEXT NOT NULL REFERENCES game_results(room_id) ON DELETE CASCADE,
+      player_index INTEGER NOT NULL,
+      game_player_id TEXT NOT NULL,
+      user_id TEXT,
+      display_name TEXT NOT NULL,
+      score INTEGER NOT NULL,
+      PRIMARY KEY (room_id, player_index)
     );
   `)
   return db
@@ -63,6 +100,7 @@ describe('SqliteRoomPersistence', () => {
     expect(snap.id).toBe('r1')
     expect(snap.serialized).toEqual(STATE)
     expect(snap.meta.createdBy).toBe('u1')
+    expect(snap.meta.startedAt).toBe(NOW - 1000)
     expect(snap.meta.status).toBe('playing')
     expect(snap.meta.players).toEqual([{ userId: 'u1', playerIndex: 0 }])
   })
@@ -71,21 +109,56 @@ describe('SqliteRoomPersistence', () => {
     expect(p.load('nope')).toBeNull()
   })
 
-  it('delete removes the row + cascades room_players', () => {
+  it('discard removes the row + cascades room_players without a result', () => {
     p.save('r1', STATE, META)
     expect(p.load('r1')).not.toBeNull()
-    p.delete('r1')
+    p.discard('r1')
     expect(p.load('r1')).toBeNull()
     const rp = db.prepare('SELECT COUNT(*) AS n FROM room_players WHERE room_id = ?').get('r1') as { n: number }
     expect(rp.n).toBe(0)
+    expect(db.prepare('SELECT room_id FROM game_results WHERE room_id = ?').get('r1')).toBeUndefined()
   })
 
-  it('markFinished flips status without changing serialized', () => {
-    p.save('r1', STATE, META)
-    p.markFinished('r1', NOW + 100)
-    const snap = p.load('r1') as RoomSnapshot
-    expect(snap.meta.status).toBe('finished')
-    expect(snap.serialized).toEqual(STATE)
+  it('archives scalar completion data and deletes the full state atomically', () => {
+    p.save('r1', STATE, {
+      ...META,
+      players: [
+        { userId: 'persisted-u1', playerIndex: 0 },
+        { userId: 'persisted-u2', playerIndex: 1 },
+      ],
+    })
+
+    expect(p.complete(RESULT)).toEqual({ ok: true, archived: true })
+    expect(p.load('r1')).toBeNull()
+    expect(db.prepare('SELECT * FROM game_results WHERE room_id = ?').get('r1')).toEqual({
+      room_id: 'r1',
+      started_at: NOW - 1000,
+      finished_at: NOW,
+      rounds_played: 14,
+      player_count: 2,
+      enable_community_deck: 1,
+      enable_parent_cards: 0,
+      enable_through_the_seasons: 1,
+      enable_farmers_of_the_moor: 0,
+    })
+    expect(db.prepare(`
+      SELECT player_index, game_player_id, user_id, display_name, score
+      FROM game_result_players WHERE room_id = ? ORDER BY player_index
+    `).all('r1')).toEqual([
+      { player_index: 0, game_player_id: 'p1', user_id: 'persisted-u1', display_name: 'Alice', score: 42 },
+      { player_index: 1, game_player_id: 'p2', user_id: 'persisted-u2', display_name: 'Bob', score: 35 },
+    ])
+    expect(p.hasRoomId('r1')).toBe(true)
+  })
+
+  it('archives the latest persisted user for a replaced player index', () => {
+    p.save('r1', STATE, { ...META, players: [{ userId: 'old-user', playerIndex: 0 }] })
+    p.save('r1', STATE, { ...META, players: [{ userId: 'new-user', playerIndex: 0 }] })
+
+    expect(p.complete(RESULT)).toEqual({ ok: true, archived: true })
+    expect(db.prepare(`
+      SELECT user_id FROM game_result_players WHERE room_id = ? AND player_index = 0
+    `).get('r1')).toEqual({ user_id: 'new-user' })
   })
 
   it('listRestorable excludes finished + excluded ids + stale rows (and prunes them)', () => {
@@ -109,8 +182,8 @@ describe('SqliteRoomPersistence', () => {
     const ids = restored.map((s) => s.id).sort()
     expect(ids).toEqual(['r-fresh'])
 
-    const stale = db.prepare('SELECT id, status FROM rooms WHERE id LIKE ?').all('r-stale-%') as Array<{ id: string; status: string }>
-    expect(stale.every((r) => r.status === 'finished')).toBe(true)
+    const stale = db.prepare('SELECT id FROM rooms WHERE id LIKE ?').all('r-stale-%')
+    expect(stale).toEqual([])
   })
 
   it('save → load preserves non-empty customCardDbIds', () => {
@@ -148,6 +221,13 @@ describe('SqliteRoomPersistence', () => {
     p.save('r1', STATE, META)
     const v2 = db.prepare('SELECT version FROM rooms WHERE id = ?').get('r1') as { version: number }
     expect(v2.version).toBe(2)
+  })
+
+  it('keeps the first startedAt value', () => {
+    p.save('r1', STATE, { ...META, startedAt: NOW })
+    p.save('r1', STATE, { ...META, startedAt: NOW + 100 })
+
+    expect(p.load('r1')?.meta.startedAt).toBe(NOW)
   })
 
   it('save with null serialized creates placeholder row; load returns snap with null serialized but meta present', () => {
@@ -202,6 +282,41 @@ describe('SqliteRoomPersistence', () => {
 
     expect(db.prepare('SELECT id FROM rooms WHERE id = ?').get('r1')).toBeUndefined()
     expect(db.prepare('SELECT room_id FROM room_players WHERE room_id = ?').all('r1')).toEqual([])
+  })
+
+  it('keeps the final room state when result archival fails', () => {
+    p.save('r1', STATE, META)
+    db.exec(`
+      CREATE TRIGGER reject_result_player
+      BEFORE INSERT ON game_result_players
+      BEGIN
+        SELECT RAISE(ABORT, 'rejected result player');
+      END;
+    `)
+
+    expect(p.complete(RESULT)).toEqual({ ok: false, error: 'rejected result player' })
+    expect(p.load('r1')?.serialized).toEqual(STATE)
+    expect(db.prepare('SELECT * FROM game_results WHERE room_id = ?').get('r1')).toBeUndefined()
+  })
+
+  it('keeps the first archived result on repeated completion', () => {
+    p.save('r1', STATE, META)
+    expect(p.complete(RESULT)).toEqual({ ok: true, archived: true })
+    p.save('r1', STATE, META)
+    expect(p.complete({
+      ...RESULT,
+      finishedAt: NOW + 1,
+      players: RESULT.players.map((player) => ({ ...player, score: 999 })),
+    })).toEqual({ ok: true, archived: true })
+
+    expect(db.prepare('SELECT finished_at FROM game_results WHERE room_id = ?').get('r1')).toEqual({
+      finished_at: NOW,
+    })
+    expect(db.prepare('SELECT score FROM game_result_players WHERE room_id = ? ORDER BY player_index').all('r1')).toEqual([
+      { score: 42 },
+      { score: 35 },
+    ])
+    expect(p.load('r1')).toBeNull()
   })
 
   it('restores healthy rooms when another room has invalid state JSON', () => {

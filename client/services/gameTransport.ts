@@ -9,7 +9,7 @@ export type ValidateResult = {
   error?: unknown
 }
 
-export type SnapshotListener = (payload: GameSyncPayload) => void
+export type SnapshotListener = (payload: GameSyncPayload, roomId?: string) => void
 
 type CommitSelectionPayload = {
   cancel?: boolean
@@ -264,7 +264,7 @@ export class WsGameTransport implements GameTransport {
   }>()
   private reqCounter = 0
   private readonly wsUrl: string
-  readonly roomId: string
+  roomId: string
   readonly playerIndex: number
   private _connected = false
 
@@ -315,7 +315,8 @@ export class WsGameTransport implements GameTransport {
 
         if (msg.type === 'stateUpdate') {
           const envelope = msg as StateUpdateEnvelope
-          this.listeners.forEach((cb) => cb(envelope.payload))
+          this.roomId = envelope.roomId
+          this.listeners.forEach((cb) => cb(envelope.payload, envelope.roomId))
           if (envelope.requestId) {
             const pending = this.pendingResolvers.get(envelope.requestId)
             if (pending) {

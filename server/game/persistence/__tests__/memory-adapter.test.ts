@@ -1,6 +1,6 @@
 import { describe, expect, it, beforeEach } from 'vitest'
 import { InMemoryRoomPersistence } from '../memory-adapter.ts'
-import type { RoomMeta } from '../room-persistence.ts'
+import type { GameResult, RoomMeta } from '../room-persistence.ts'
 import type { SerializedGameState } from '../../../../shared/session/serialization.ts'
 
 const META: RoomMeta = {
@@ -11,6 +11,18 @@ const META: RoomMeta = {
   players: [{ userId: 'u', playerIndex: 0 }],
 }
 const STATE = { _stub: true } as unknown as SerializedGameState
+const RESULT: GameResult = {
+  roomId: 'r1',
+  startedAt: 1,
+  finishedAt: 2,
+  roundsPlayed: 14,
+  playerCount: 1,
+  communityDeck: false,
+  parentCards: false,
+  throughTheSeasons: false,
+  farmersOfTheMoor: false,
+  players: [{ playerIndex: 0, gamePlayerId: 'p1', userId: null, displayName: 'P1', score: 10 }],
+}
 
 describe('InMemoryRoomPersistence', () => {
   let p: InMemoryRoomPersistence
@@ -26,21 +38,25 @@ describe('InMemoryRoomPersistence', () => {
   })
 
   it('save twice updates the existing row (no duplicate on listRestorable)', () => {
-    p.save('r1', STATE, META)
-    p.save('r1', STATE, { ...META, status: 'waiting' })
+    p.save('r1', STATE, { ...META, startedAt: 1 })
+    p.save('r1', STATE, { ...META, status: 'waiting', startedAt: 2 })
     expect(p.load('r1')?.meta.status).toBe('waiting')
+    expect(p.load('r1')?.meta.startedAt).toBe(1)
   })
 
-  it('delete removes the row', () => {
+  it('discard removes the row without archiving', () => {
     p.save('r1', STATE, META)
-    p.delete('r1')
+    p.discard('r1')
     expect(p.load('r1')).toBeNull()
+    expect(p.__getResultForTest('r1')).toBeUndefined()
   })
 
-  it('markFinished flips status', () => {
+  it('complete archives persisted identity and removes full state', () => {
     p.save('r1', STATE, META)
-    p.markFinished('r1', Date.now() + 100)
-    expect(p.load('r1')?.meta.status).toBe('finished')
+    expect(p.complete(RESULT)).toEqual({ ok: true, archived: true })
+    expect(p.load('r1')).toBeNull()
+    expect(p.__getResultForTest('r1')?.players[0]).toMatchObject({ userId: 'u', score: 10 })
+    expect(p.hasRoomId('r1')).toBe(true)
   })
 
   it('listRestorable filters finished + excluded + stale', () => {
@@ -60,7 +76,7 @@ describe('InMemoryRoomPersistence', () => {
     expect(restored.map((s) => s.id).sort()).toEqual(['fresh'])
   })
 
-  it('listRestorable updates updatedAt when marking stale rows as finished', () => {
+  it('listRestorable discards stale rows without archiving', () => {
     const NOW = 10_000_000
     p.save('stale', STATE, { ...META, status: 'playing' })
     p.__setUpdatedAtForTest('stale', NOW - 99_999_999)
@@ -71,9 +87,8 @@ describe('InMemoryRoomPersistence', () => {
       playingTtlMs: 1000,
     })
 
-    const after = p.load('stale')
-    expect(after?.meta.status).toBe('finished')
-    expect(after?.updatedAt).toBe(NOW)
+    expect(p.load('stale')).toBeNull()
+    expect(p.__getResultForTest('stale')).toBeUndefined()
   })
 
   it('save with null serialized creates placeholder row; load returns snap with null serialized but meta present', () => {

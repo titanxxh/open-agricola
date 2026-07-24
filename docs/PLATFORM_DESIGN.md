@@ -49,6 +49,7 @@ CREATE TABLE rooms (
   max_players INTEGER DEFAULT 2,
   status TEXT DEFAULT 'waiting',  -- waiting | playing | finished
   version INTEGER DEFAULT 0,
+  started_at INTEGER,
   created_at INTEGER NOT NULL,
   updated_at INTEGER NOT NULL
 );
@@ -60,6 +61,29 @@ CREATE TABLE room_players (
   player_index INTEGER NOT NULL,
   joined_at INTEGER NOT NULL,
   PRIMARY KEY (room_id, user_id)
+);
+
+-- 正常完赛标量摘要；room_id 永不复用
+CREATE TABLE game_results (
+  room_id TEXT PRIMARY KEY,
+  started_at INTEGER NOT NULL,
+  finished_at INTEGER NOT NULL,
+  rounds_played INTEGER NOT NULL,
+  player_count INTEGER NOT NULL,
+  enable_community_deck INTEGER NOT NULL,
+  enable_parent_cards INTEGER NOT NULL,
+  enable_through_the_seasons INTEGER NOT NULL,
+  enable_farmers_of_the_moor INTEGER NOT NULL
+);
+
+CREATE TABLE game_result_players (
+  room_id TEXT NOT NULL REFERENCES game_results(room_id) ON DELETE CASCADE,
+  player_index INTEGER NOT NULL,
+  game_player_id TEXT NOT NULL,
+  user_id TEXT,
+  display_name TEXT NOT NULL,
+  score INTEGER NOT NULL,
+  PRIMARY KEY (room_id, player_index)
 );
 
 -- 工坊卡牌
@@ -665,8 +689,8 @@ Draft Version 只序列化最终卡牌内容和各分区已采用候选的 prove
 | WS 房间 → SQLite 写入              | `server/room-manager.ts` (ensureRoomRowSqlite, upsertRoomPlayer)                                                             |
 | 服务器重启恢复房间                      | `server/room-manager.ts` (restoreRoomsFromSqlite)                                                                            |
 | 游戏状态持久化（JSON/SQLite）           | `server/room-manager.ts` (PERSIST_ROOMS 环境变量)                                                                                |
-| 游戏结束更新房间状态                     | `server/room-manager.ts` (broadcastState → rooms.status=finished)                                                            |
-| 房间 TTL 清理                      | `server/room-manager.ts` (startRoomCleanup, 30min TTL)                                                                       |
+| 完赛结果归档 + 删除完整状态                 | `server/game/room-persistence-checkpoint.ts`, `server/game/persistence/sqlite-adapter.ts`                                     |
+| 房间 TTL 丢弃                      | `server/connection/ws-server.ts`, `server/game/persistence/sqlite-adapter.ts`                                                 |
 | 大厅页面                           | `client/app/LobbyPage.tsx`, `/api/lobby/my-rooms`                                                                               |
 | 页面路由 (?page=)                  | `client/app/PageRouter.tsx`                                                                                                     |
 | URL params 实时读取                | `client/app/GameContainerApi.tsx` (移出模块级)                                                                                       |
