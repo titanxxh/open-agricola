@@ -1,4 +1,6 @@
 import { describe, expect, it } from 'vitest'
+import { serializeState } from '../../../shared/session/serialization.ts'
+import { GameSession } from '../authoritative-session.ts'
 import {
   FIXED_DEV_ROOMS,
   FIXED_DEV_ROOM_IDS,
@@ -143,6 +145,37 @@ describe('room-manager seat assignment', () => {
 
     expect(room.maxPlayers).toBe(6)
     expect(room.session.state.players).toHaveLength(6)
+  })
+
+  it('defaults a legacy mid-stage Farmers of the Moor draft pool to seven', () => {
+    const session = new GameSession(123, undefined, {
+      playerCount: 2,
+      draftMode: 'simultaneous',
+      draftPoolSize: 7,
+      enableFarmersOfTheMoor: true,
+      allowIncompleteFarmersOfTheMoorMinorDeal: true,
+    })
+    session.state.draftMode = undefined
+    session.state.draftPoolSize = undefined
+    session.state.draft!.stage = 'farmersOfTheMoorMinor'
+    session.state.draft!.poolSize = 4
+    const serialized = serializeState(session.state, { engineStack: session.getEngineStack() })
+
+    const room = snapshotToRoom({
+      id: 'legacy-fom-draft',
+      serialized,
+      meta: {
+        createdBy: null,
+        maxPlayers: 2,
+        customCardDbIds: [],
+        status: 'playing',
+        players: [],
+      },
+      updatedAt: 0,
+    })
+
+    expect(room.draftMode).toBe('simultaneous')
+    expect(room.draftPoolSize).toBe(7)
   })
 
   it('exposes one persistent dev room per supported player count', () => {
