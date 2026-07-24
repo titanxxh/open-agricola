@@ -130,6 +130,35 @@ describe('room-manager seat assignment', () => {
     })
   })
 
+  it('reserves restored seats for their persisted owners', () => {
+    const room = snapshotToRoom({
+      id: 'restored',
+      serialized: null,
+      meta: {
+        createdBy: 'user-1',
+        maxPlayers: 2,
+        customCardDbIds: [],
+        status: 'playing',
+        players: [{ playerIndex: 0, userId: 'user-1' }],
+      },
+      updatedAt: 0,
+    })
+
+    expect(resolveJoinRequestPlayerIndex(room, undefined, 'user-1')).toEqual({
+      ok: true,
+      requestedPlayerIndex: 0,
+    })
+    expect(resolveJoinPlayerIndex(room, 0, 'user-2')).toEqual({
+      ok: false,
+      error: 'player slot occupied',
+    })
+    expect(resolveJoinPlayerIndex(room, 0, 'user-1')).toEqual({
+      ok: true,
+      playerIndex: 0,
+      replacedExistingPlayer: false,
+    })
+  })
+
   it('restores six-player waiting rooms without serialized state', () => {
     const room = snapshotToRoom({
       id: 'waiting6',

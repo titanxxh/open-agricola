@@ -62,6 +62,7 @@ const ensureFixedDevRooms = (
         id,
         session,
         players: [],
+        seatOwners: [],
         maxPlayers: playerCount,
         version: 0,
         status: 'playing',

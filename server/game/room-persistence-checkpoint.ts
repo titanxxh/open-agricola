@@ -89,6 +89,10 @@ export class RoomPersistenceCheckpoint {
     this.dirtyRooms.clear()
     for (const room of rooms) {
       if (!this.canPersist(room)) continue
+      if (room.session.state.gameOver) {
+        this.completeGame(room)
+        continue
+      }
       try {
         this.saveState(room)
       } catch (err) {
@@ -120,6 +124,8 @@ export class RoomPersistenceCheckpoint {
     if (result.ok) {
       this.inactiveRoomIds.add(room.id)
     } else {
+      this.dirtyRooms.set(room.id, room)
+      this.scheduleFlush()
       console.warn('[room-persistence-checkpoint] completion failed:', result.error)
     }
     return result
@@ -159,6 +165,9 @@ export class RoomPersistenceCheckpoint {
   private buildResult(room: Room, finishedAt: number): GameResult {
     const state = room.session.state
     const scores = Scoring.computeAll(state)
+    const seatOwners = new Map(
+      toRoomMeta(room).players.map((player) => [player.playerIndex, player.userId]),
+    )
     return {
       roomId: room.id,
       startedAt: room.startedAt!,
@@ -172,7 +181,7 @@ export class RoomPersistenceCheckpoint {
       players: scores.map((score, playerIndex) => ({
         playerIndex,
         gamePlayerId: score.playerId,
-        userId: room.players.find((player) => player.playerIndex === playerIndex)?.userId ?? null,
+        userId: seatOwners.get(playerIndex) ?? null,
         displayName: score.playerName,
         score: score.total,
       })),

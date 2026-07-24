@@ -234,21 +234,29 @@ describe('Room Persistence Checkpoint', () => {
     checkpoint.shutdown()
   })
 
-  it('retains the final state and leaves completion retryable on archive failure', () => {
+  it('retries a failed completion without another state update', () => {
     const persistence = new InMemoryRoomPersistence()
-    vi.spyOn(persistence, 'complete').mockReturnValue({ ok: false, error: 'write failed' })
+    const complete = vi.spyOn(persistence, 'complete')
+      .mockReturnValueOnce({ ok: false, error: 'write failed' })
     const save = vi.spyOn(persistence, 'save')
-    const checkpoint = createRoomPersistenceCheckpoint({ persistence })
+    const clock = schedulerHarness()
+    const checkpoint = createRoomPersistenceCheckpoint({
+      persistence,
+      scheduler: clock.scheduler,
+    })
     const finished = room('finished')
     finished.startedAt = 10
     finished.session.state.gameOver = true
 
     expect(checkpoint.completeGame(finished, 20)).toEqual({ ok: false, error: 'write failed' })
     expect(persistence.load('finished')?.serialized?.gameOver).toBe(true)
-    checkpoint.recordState(finished)
-    checkpoint.flushAll()
+    expect(clock.pending()).toBe(1)
+    clock.tick()
 
     expect(save).toHaveBeenCalledTimes(2)
+    expect(complete).toHaveBeenCalledTimes(2)
+    expect(persistence.__getResultForTest('finished')).toBeDefined()
+    expect(clock.pending()).toBe(0)
     checkpoint.shutdown()
   })
 

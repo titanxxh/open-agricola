@@ -13,10 +13,16 @@ export type RoomPlayer = {
   userId?: string
 }
 
+export type RoomSeatOwner = {
+  playerIndex: number
+  userId: string
+}
+
 export type Room = {
   id: string
   session: GameSession
   players: RoomPlayer[]
+  seatOwners?: RoomSeatOwner[]
   maxPlayers: number
   version: number
   status: RoomStatus
@@ -125,6 +131,20 @@ export const emptyRoomTtlMs = (room: Pick<Room, 'status'>): number =>
 const getRoomStatus = (room?: Pick<Room, 'players' | 'maxPlayers' | 'status'>): RoomStatus =>
   room?.status ?? ((room && room.players.length >= room.maxPlayers) ? 'playing' : 'waiting')
 
+const roomSeatOwners = (
+  room: Pick<Room, 'players' | 'seatOwners'>,
+): RoomSeatOwner[] => {
+  const owners = new Map(
+    (room.seatOwners ?? []).map((owner) => [owner.playerIndex, owner.userId]),
+  )
+  for (const player of room.players) {
+    if (player.userId) owners.set(player.playerIndex, player.userId)
+  }
+  return [...owners]
+    .sort(([left], [right]) => left - right)
+    .map(([playerIndex, userId]) => ({ playerIndex, userId }))
+}
+
 export const toRoomMeta = (room: Room): RoomMeta => ({
   createdBy: room.createdBy ?? null,
   startedAt: room.startedAt ?? null,
@@ -136,9 +156,7 @@ export const toRoomMeta = (room: Room): RoomMeta => ({
   enableFarmersOfTheMoor: room.enableFarmersOfTheMoor ?? (room.session.state.enableFarmersOfTheMoor === true),
   allowIncompleteFarmersOfTheMoorMinorDeal: room.allowIncompleteFarmersOfTheMoorMinorDeal ?? false,
   status: getRoomStatus(room),
-  players: room.players
-    .filter((p): p is RoomPlayer & { userId: string } => typeof p.userId === 'string')
-    .map((p) => ({ userId: p.userId, playerIndex: p.playerIndex })),
+  players: roomSeatOwners(room),
 })
 
 export type JoinSeatResolution =
@@ -146,7 +164,7 @@ export type JoinSeatResolution =
   | { ok: false; error: string }
 
 export const resolveJoinPlayerIndex = (
-  room: Pick<Room, 'id' | 'maxPlayers' | 'players'>,
+  room: Pick<Room, 'id' | 'maxPlayers' | 'players' | 'seatOwners'>,
   requestedPlayerIndex?: number,
   userId?: string,
 ): JoinSeatResolution => {
@@ -165,9 +183,18 @@ export const resolveJoinPlayerIndex = (
       }
       return { ok: true, playerIndex: requestedPlayerIndex, replacedExistingPlayer: true }
     }
+    const owner = roomSeatOwners(room).find((candidate) =>
+      candidate.playerIndex === requestedPlayerIndex
+    )
+    if (!isDevRoom(room.id) && owner && owner.userId !== userId) {
+      return { ok: false, error: 'player slot occupied' }
+    }
     return { ok: true, playerIndex: requestedPlayerIndex, replacedExistingPlayer: false }
   }
   const taken = new Set(room.players.map((p) => p.playerIndex))
+  if (!isDevRoom(room.id)) {
+    for (const owner of roomSeatOwners(room)) taken.add(owner.playerIndex)
+  }
   for (let i = 0; i < room.maxPlayers; i += 1) {
     if (!taken.has(i)) return { ok: true, playerIndex: i, replacedExistingPlayer: false }
   }
@@ -175,12 +202,12 @@ export const resolveJoinPlayerIndex = (
 }
 
 export const resolveJoinRequestPlayerIndex = (
-  room: Pick<Room, 'players'>,
+  room: Pick<Room, 'players' | 'seatOwners'>,
   requestedPlayerIndex: number | undefined,
   userId: string | undefined,
 ): { ok: true; requestedPlayerIndex: number | undefined } | { ok: false; error: string } => {
   if (!userId) return { ok: true, requestedPlayerIndex }
-  const existingSeat = room.players.find((p) => p.userId === userId)
+  const existingSeat = roomSeatOwners(room).find((owner) => owner.userId === userId)
   if (!existingSeat) return { ok: true, requestedPlayerIndex }
   if (requestedPlayerIndex === undefined) {
     return { ok: true, requestedPlayerIndex: existingSeat.playerIndex }
@@ -264,6 +291,7 @@ export const snapshotToRoom = (
     id: snapshot.id,
     session,
     players: [],
+    seatOwners: snapshot.meta.players.map((owner) => ({ ...owner })),
     maxPlayers: snapshot.meta.maxPlayers,
     version: 0,
     status: snapshot.meta.status,

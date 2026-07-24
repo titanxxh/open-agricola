@@ -46,7 +46,10 @@ export function createLobby(deps: {
       const affected = new Set(affectedRoomIds)
       for (const room of [...registry.iter()]) {
         if (isFixedDevRoom(room.id)) continue
-        const belongsToUser = affected.has(room.id) || room.createdBy === userId || room.players.some((player) => player.userId === userId)
+        const belongsToUser = affected.has(room.id) ||
+          room.createdBy === userId ||
+          room.players.some((player) => player.userId === userId) ||
+          room.seatOwners?.some((owner) => owner.userId === userId)
         if (!belongsToUser) continue
         broadcaster.broadcastEvent(room, { type: 'roomDissolved', roomId: room.id })
         for (const p of room.players) {

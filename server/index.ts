@@ -6,7 +6,7 @@ import { randomUUID } from 'node:crypto'
 import { handleGameRoute } from './game-router.ts'
 import { handleWorkshopRoute } from './workshop.ts'
 import { createWsServer } from './connection/ws-server.ts'
-import { isFixedDevRoom, type Room } from './game/room.ts'
+import { isDevRoom, type Room } from './game/room.ts'
 import { getDb, cleanExpiredSessions } from './db.ts'
 import { SqliteRoomPersistence } from './game/persistence/sqlite-adapter.ts'
 import { JsonRoomPersistence } from './game/persistence/json-adapter.ts'
@@ -157,7 +157,7 @@ const persistence =
     ? new SqliteRoomPersistence(getDb())
     : new JsonRoomPersistence(PERSISTED_ROOMS_DIR)
 const shouldPersist: (room: Room) => boolean =
-  PERSIST_ROOMS === 'sqlite' ? () => true : (room) => isFixedDevRoom(room.id)
+  PERSIST_ROOMS === 'sqlite' ? () => true : (room) => isDevRoom(room.id)
 
 // Periodically clean expired sessions (every hour)
 const sessionCleanupTimer = setInterval(cleanExpiredSessions, 60 * 60 * 1000)

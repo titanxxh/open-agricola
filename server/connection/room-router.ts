@@ -220,6 +220,9 @@ function handleCreateRoom(ctx: ConnectionCtx, msg: Extract<ClientCommand, { type
     id: roomId,
     session,
     players: [],
+    seatOwners: ctx.currentUserId
+      ? [{ playerIndex: 0, userId: ctx.currentUserId }]
+      : [],
     maxPlayers,
     version: 0,
     status: 'waiting',
@@ -276,6 +279,18 @@ function handleJoinRoom(ctx: ConnectionCtx, msg: Extract<ClientCommand, { type: 
   room.players = room.players.filter(
     (player) => player.ws !== ctx.ws && player.playerIndex !== ctx.currentPlayerIndex,
   )
+  const seatOwners = new Map(
+    (room.seatOwners ?? [])
+      .map((owner) => [owner.playerIndex, owner.userId] as const),
+  )
+  for (const player of room.players) {
+    if (player.userId) seatOwners.set(player.playerIndex, player.userId)
+  }
+  seatOwners.delete(ctx.currentPlayerIndex)
+  if (ctx.currentUserId) seatOwners.set(ctx.currentPlayerIndex, ctx.currentUserId)
+  room.seatOwners = [...seatOwners]
+    .sort(([left], [right]) => left - right)
+    .map(([playerIndex, userId]) => ({ playerIndex, userId }))
   room.players.push({ ws: ctx.ws, playerIndex: ctx.currentPlayerIndex, name, userId: ctx.currentUserId })
   room.players.sort((a, b) => a.playerIndex - b.playerIndex)
   room.session.updatePlayerName(ctx.currentPlayerIndex, name)
