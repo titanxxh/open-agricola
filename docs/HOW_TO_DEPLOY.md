@@ -33,8 +33,9 @@
 #### 容量基准规格
 
 单实例容量统一以 **2 vCPU / 2 GiB 内存**为测量锚点，基线数据见
-[`docs/performance/room-capacity-baseline.md`](performance/room-capacity-baseline.md)。
-该规格只是可复现的比较环境；优化后复测完成前，不据此承诺可支持的并发房间数。
+[`docs/performance/room-capacity-baseline.md`](performance/room-capacity-baseline.md)，优化后复测见
+[`docs/performance/room-capacity-after.md`](performance/room-capacity-after.md)。
+在 Node.js 22、双座位房间和报告所述压力模型下，该规格当前支持 **400 个并发活动房间**；500 个房间首先超过 250 ms steady action-to-broadcast p99。部署容量先按 400 个房间封顶，只有相同探针的新报告可以上调。
 
 #### 安装 Docker
 

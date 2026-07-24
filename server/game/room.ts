@@ -246,21 +246,24 @@ const createSessionFromSnapshot = (
 export const snapshotToRoom = (
   snapshot: RoomSnapshot,
   customCards: CustomCardData[] = [],
-): Room => ({
-  id: snapshot.id,
-  session: createSessionFromSnapshot(snapshot, customCards),
-  players: [],
-  maxPlayers: snapshot.meta.maxPlayers,
-  version: 0,
-  status: snapshot.meta.status,
-  startedAt: snapshot.meta.startedAt ?? undefined,
-  createdBy: snapshot.meta.createdBy ?? undefined,
-  customCardDbIds: snapshot.meta.customCardDbIds,
-  enableParentCards: snapshot.meta.enableParentCards ?? snapshot.serialized?.enableParentCards ?? false,
-  draftParents: snapshot.meta.draftParents,
-  draftMode: snapshot.serialized?.draft?.mode,
-  draftPoolSize: snapshot.serialized?.draft?.poolSize,
-  enableThroughTheSeasons: snapshot.meta.enableThroughTheSeasons ?? snapshot.serialized?.enableThroughTheSeasons ?? false,
-  enableFarmersOfTheMoor: snapshot.meta.enableFarmersOfTheMoor ?? (snapshot.serialized?.enableFarmersOfTheMoor === true),
-  allowIncompleteFarmersOfTheMoorMinorDeal: snapshot.meta.allowIncompleteFarmersOfTheMoorMinorDeal ?? false,
-})
+): Room => {
+  const session = createSessionFromSnapshot(snapshot, customCards)
+  return {
+    id: snapshot.id,
+    session,
+    players: [],
+    maxPlayers: snapshot.meta.maxPlayers,
+    version: 0,
+    status: snapshot.meta.status,
+    startedAt: snapshot.meta.startedAt ?? undefined,
+    createdBy: snapshot.meta.createdBy ?? undefined,
+    customCardDbIds: snapshot.meta.customCardDbIds,
+    enableParentCards: snapshot.meta.enableParentCards ?? snapshot.serialized?.enableParentCards ?? false,
+    draftParents: snapshot.meta.draftParents,
+    draftMode: session.state.draftMode,
+    draftPoolSize: session.state.draftPoolSize,
+    enableThroughTheSeasons: snapshot.meta.enableThroughTheSeasons ?? snapshot.serialized?.enableThroughTheSeasons ?? false,
+    enableFarmersOfTheMoor: snapshot.meta.enableFarmersOfTheMoor ?? (snapshot.serialized?.enableFarmersOfTheMoor === true),
+    allowIncompleteFarmersOfTheMoorMinorDeal: snapshot.meta.allowIncompleteFarmersOfTheMoorMinorDeal ?? false,
+  }
+}

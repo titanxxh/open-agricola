@@ -586,7 +586,7 @@ const renderReport = (
 - Measurement per level: ${config.durationSeconds}s
 - Steady action rate: ${config.actionsPerRoomSecond} actions/room/s
 - Burst: one synchronized action per room
-- Thresholds: action p99 <= ${thresholds.actionP99Ms}ms, event-loop p99 <= ${thresholds.eventLoopP99Ms}ms, RSS <= ${formatBytes(thresholds.rssBytes)}
+- Thresholds: steady action p99 <= ${thresholds.actionP99Ms}ms, event-loop p99 <= ${thresholds.eventLoopP99Ms}ms, RSS <= ${formatBytes(thresholds.rssBytes)}
 - Approx. incremental RSS / room is the peak-RSS slope from the preceding ramp level; it is unavailable at the first level.
 
 ## Capacity
