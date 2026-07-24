@@ -25,7 +25,6 @@ services:
       - CORS_ORIGIN=${CORS_ORIGIN:-*}
       - ADMIN_USERS=${ADMIN_USERS:-}
       - ACCOUNT_REGISTRATION_POLICY=${ACCOUNT_REGISTRATION_POLICY:?Set ACCOUNT_REGISTRATION_POLICY explicitly. Use open for first-user bootstrap, then invite_only.}
-      - CUSTOM_CODE_EXECUTOR_URL=http://executor:5181
       - GITHUB_OAUTH_CLIENT_ID=${GITHUB_OAUTH_CLIENT_ID:-}
       - GITHUB_OAUTH_CLIENT_SECRET=${GITHUB_OAUTH_CLIENT_SECRET:-}
       - GITHUB_UPSTREAM_OWNER=${GITHUB_UPSTREAM_OWNER:-titanxxh}
@@ -45,32 +44,6 @@ services:
       - app-data:/app/data
       - app-output:/app/output
     restart: unless-stopped
-    depends_on:
-      - executor
-
-  executor:
-    build:
-      context: .
-      target: production
-    expose:
-      - "5181"
-    environment:
-      - NODE_ENV=production
-      - CUSTOM_CODE_EXECUTOR_PORT=5181
-      - CUSTOM_CODE_EXECUTOR_HOST=0.0.0.0
-    command: ["node", "--import", "tsx", "server/custom-code-executor/index.ts"]
-    healthcheck:
-      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:5181/health || exit 1"]
-      interval: 30s
-      timeout: 5s
-      start_period: 10s
-      retries: 3
-    read_only: true
-    tmpfs:
-      - /tmp
-    restart: unless-stopped
-    mem_limit: 256m
-    cpus: 0.50
 
   caddy:
     image: caddy:alpine
