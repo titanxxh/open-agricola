@@ -130,6 +130,35 @@ describe('AiCardDesigner AI config header', () => {
     })
   })
 
+  it('uses the game card renderer for the live preview', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: false }))
+
+    const { container } = render(
+      <LocaleProvider>
+        <AiCardDesigner
+          initialCard={existingCard}
+          onImport={() => {}}
+          onClose={() => {}}
+          apiFetch={apiFetchForExistingCard}
+        />
+      </LocaleProvider>,
+    )
+
+    await waitFor(() => {
+      expect(screen.getByDisplayValue('CUSTOM_MedievalMallet')).toBeInTheDocument()
+    })
+
+    const preview = container.querySelector('.aicw-preview-pane .player-card')
+    expect(preview).not.toBeNull()
+    expect(preview?.querySelector('.player-card-inner')).toHaveAttribute(
+      'data-id',
+      'CUSTOM_MedievalMallet',
+    )
+    expect(preview?.querySelector('.card-frame')).not.toBeNull()
+    expect(preview?.querySelector('.card-cost .card-res-icon.wood')).not.toBeNull()
+    expect(container.querySelector('.aicw-preview-pane .aicw-card')).toBeNull()
+  })
+
   it('loads an author workspace directly from an editor card URL', async () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: false }))
     const apiFetch = vi.fn(async (path: string) => {

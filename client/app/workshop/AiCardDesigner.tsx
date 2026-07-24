@@ -25,8 +25,9 @@ import {
 import { CARD_DESIGNER_SYSTEM_PROMPT } from '../../services/llmPrompts'
 import { LocalizationModal, isLocaleEntryComplete } from './LocalizationModal'
 import { useLocale } from '../../contexts/LocaleContext'
-import { ResourceText } from '../../components/common/ResourceText'
+import { PlayerCard } from '../../components/common/PlayerCard'
 import { Section } from '../../components/common/Section'
+import type { CardMeta } from '../../services/card-meta'
 import { API_BASE } from '../../config'
 import { useWorkshopDraft } from './useWorkshopDraft'
 import type {
@@ -2116,6 +2117,20 @@ export function AiCardDesigner({
             ? (locale === 'zh' ? `已同步 ${syncedTime}` : `Synced ${syncedTime}`)
             : (locale === 'zh' ? '已同步' : 'Synced')
   const descriptionLines = extracted?.card.desc ?? []
+  const liveCardId = cardIdInput || 'CUSTOM_'
+  const liveCardMeta: CardMeta = {
+    id: liveCardId,
+    name: cardLocales[locale]?.name || cardName || (locale === 'zh' ? '未命名卡牌' : 'Untitled card'),
+    deck: 'CUSTOM',
+    number: 0,
+    type: cardType,
+    desc: descriptionLines.length > 0
+      ? descriptionLines
+      : [locale === 'zh' ? '能力说明会在采用代码后显示。' : 'Ability text appears after code is adopted.'],
+    cost: parseWorkshopCostInput(costInput),
+    prerequisite: prerequisite || undefined,
+    vp: extracted?.card.vp ?? 0,
+  }
 
   return (
     <div className="ai-designer aicw-shell">
@@ -2287,27 +2302,14 @@ export function AiCardDesigner({
             <span>{locale === 'zh' ? '实时卡牌' : 'Live card'}</span>
             <small>{locale === 'zh' ? '当前已采用草稿' : 'Current adopted draft'}</small>
           </div>
-          <article className={`aicw-card is-${cardType}`}>
-            <div className="aicw-card-meta">
-              <span>{cardType === 'minor'
-                ? (locale === 'zh' ? '小发展' : 'Minor')
-                : (locale === 'zh' ? '职业' : 'Occupation')}</span>
-              <span>{costInput || (locale === 'zh' ? '无费用' : 'No cost')}</span>
-            </div>
-            <div className="aicw-card-art">
-              {artUrl
-                ? <img src={artUrl} alt={cardName || (locale === 'zh' ? '卡牌图片' : 'Card art')} />
-                : <span>{locale === 'zh' ? '尚未采用卡面图' : 'No adopted art yet'}</span>}
-            </div>
-            <div className="aicw-card-copy">
-              <h3>{cardLocales[locale]?.name || cardName || (locale === 'zh' ? '未命名卡牌' : 'Untitled card')}</h3>
-              {prerequisite && <p className="aicw-prerequisite">{prerequisite}</p>}
-              {descriptionLines.length > 0
-                ? descriptionLines.map((line, index) => <ResourceText key={`${line}-${index}`} text={line} />)
-                : <p className="aicw-empty-copy">{locale === 'zh' ? '能力说明会在采用代码后显示。' : 'Ability text appears after code is adopted.'}</p>}
-              <code>{cardIdInput || 'CUSTOM_'}</code>
-            </div>
-          </article>
+          <PlayerCard
+            locale={locale}
+            cardId={liveCardId}
+            cardType={cardType}
+            cardMeta={liveCardMeta}
+            artUrl={artUrl}
+            className="aicw-live-card"
+          />
           <div className="aicw-readiness" aria-label={locale === 'zh' ? '草稿完整度' : 'Draft completeness'}>
             {WORKSHOP_STAGES.slice(0, 4).map(stage => (
               <div key={stage}>
