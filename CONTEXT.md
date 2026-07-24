@@ -45,7 +45,7 @@ _Avoid_: RoomPlayer seat/auth 查找、前端视角切换、本地 UI player 选
 _Avoid_: PlayerState
 
 **Room Persistence Checkpoint**:
-房间层在创建、入座、状态广播、重开、载入和结束时保存或终结房间持久化记录的统一口径。它决定写入完整 `GameState` 还是只更新 room meta，并保持持久化 adapter 只负责存取，不负责业务时机。
+房间层保存或终结房间持久化记录的统一口径。创建和 room meta 立即写入；状态广播只把 room 标脏，由一个共享的一秒定时器从最新权威 `GameSession` 合并落盘。断线、game over 和进程关闭强制 flush，删除或终结会取消待写状态；adapter 只负责存取，不负责业务时机。
 _Avoid_: RoomPersistence adapter 实现、WebSocket 广播、GameSession 规则执行
 
 **RoomPlayer**:

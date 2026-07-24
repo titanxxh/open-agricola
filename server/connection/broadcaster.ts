@@ -36,9 +36,11 @@ export class Broadcaster {
       })
       seat.ws.send(JSON.stringify(env))
     }
-    this.checkpoint.recordState(room, resp.state)
     if ((resp.state as { gameOver?: boolean }).gameOver) {
+      this.checkpoint.flushRoom(room)
       this.checkpoint.recordFinished(room.id)
+    } else {
+      this.checkpoint.recordState(room)
     }
   }
 
