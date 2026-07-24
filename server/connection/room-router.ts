@@ -1,7 +1,8 @@
 import { randomUUID } from 'node:crypto'
 import { GameSession } from '../game/authoritative-session.ts'
 import {
-  isFixedDevRoom,
+  fixedDevRoomRootId,
+  isDevRoom,
   resolveJoinPlayerIndex,
   resolveJoinRequestPlayerIndex,
   type Room,
@@ -105,9 +106,10 @@ function loadCustomCardsFromDb(cardDbIds: string[], requestUserId?: string): Cus
   return result
 }
 
-const generateRoomId = (ctx: ConnectionCtx): string | null => {
+const generateRoomId = (ctx: ConnectionCtx, devRoomRootId?: string | null): string | null => {
   for (let attempt = 0; attempt < 8; attempt += 1) {
-    const roomId = randomUUID()
+    const generatedId = randomUUID()
+    const roomId = devRoomRootId ? `${devRoomRootId}-${generatedId}` : generatedId
     if (!ctx.registry.has(roomId) && !ctx.checkpoint.hasRoomId(roomId)) return roomId
   }
   return null
@@ -145,7 +147,7 @@ const assertOwnPlayerId = (ctx: ConnectionCtx, expectedPlayerId: unknown, reques
 }
 
 const assertDevCommandAllowed = (ctx: ConnectionCtx, room: Room, requestId?: string): boolean => {
-  if (isFixedDevRoom(room.id)) return true
+  if (isDevRoom(room.id)) return true
   sendCommandError(ctx, 'dev commands disabled for this room', requestId)
   return false
 }
@@ -413,7 +415,7 @@ function handleNewGame(ctx: ConnectionCtx, msg: Extract<ClientCommand, { type: '
     sendCommandError(ctx, err instanceof Error ? err.message : String(err), msg.requestId)
     return
   }
-  const nextRoomId = generateRoomId(ctx)
+  const nextRoomId = generateRoomId(ctx, fixedDevRoomRootId(previousRoomId))
   if (!nextRoomId) { sendCommandError(ctx, 'unable to allocate room id', msg.requestId); return }
   ctx.checkpoint.discardRoom(previousRoomId)
   ctx.registry.delete(previousRoomId)
