@@ -520,6 +520,7 @@ const CARD_DEF = MinorImprovement({
   name: 'Factory Ability',
   desc: ['Factory effect.'],
   cost: { wood: 1 },
+  prerequisite: { occupation: 2 },
   vp: 1,
 })
 const CARD_IMPL = {}
@@ -539,6 +540,8 @@ const CARD_IMPL = {}
           card_type: 'minor',
           desc: ['Factory effect.'],
           cost: { wood: 1 },
+          prerequisite: '2 Occupations',
+          occupationPrerequisites: { min: 2 },
           vp: 1,
         },
       })
