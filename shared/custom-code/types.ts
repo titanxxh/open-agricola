@@ -48,6 +48,7 @@ export type CustomCodeValidateResult =
     valid: true
     compiledCode: string
     manifest: CustomCodeManifest
+    cardDefinition: Record<string, unknown> | null
   }
   | {
     valid: false

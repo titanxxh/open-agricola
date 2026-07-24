@@ -52,8 +52,25 @@ db.exec(`
     github_pr_url TEXT,
     github_pr_status TEXT,
     github_pr_last_synced_at INTEGER,
+    draft_revision INTEGER NOT NULL DEFAULT 1,
+    draft_generation_json TEXT NOT NULL DEFAULT '{}',
+    published_version_id TEXT,
+    sandbox_pass_version_id TEXT,
+    sandbox_passed_at INTEGER,
     created_at INTEGER NOT NULL,
     updated_at INTEGER NOT NULL
+  );
+  CREATE TABLE workshop_card_versions (
+    id TEXT PRIMARY KEY,
+    card_id TEXT NOT NULL REFERENCES workshop_cards(id) ON DELETE CASCADE,
+    card_json TEXT NOT NULL,
+    code_manifest TEXT,
+    art_url TEXT,
+    version_number INTEGER NOT NULL,
+    created_by TEXT NOT NULL REFERENCES users(id),
+    created_at INTEGER NOT NULL,
+    content_hash TEXT,
+    provenance_json TEXT NOT NULL DEFAULT '{}'
   );
   CREATE TABLE github_propose_rate_limit (
     user_id TEXT PRIMARY KEY REFERENCES users(id),
@@ -86,6 +103,7 @@ function fakeReq(opts: {
   method: string
   url: string
   authHeader?: string
+  mockResult?: string
   body?: string
 }): IncomingMessage {
   const socket = new Socket()
@@ -94,6 +112,7 @@ function fakeReq(opts: {
   req.url = opts.url
   req.headers = { host: 'localhost:5175' }
   if (opts.authHeader) req.headers.authorization = opts.authHeader
+  if (opts.mockResult) req.headers['x-workshop-pr-mock-result'] = opts.mockResult
   if (opts.body) {
     process.nextTick(() => {
       req.push(opts.body!)
@@ -364,16 +383,19 @@ describe('workshop PR propose — session', () => {
   const origClientId = workshopPrConfig.clientId
   const origSecret = workshopPrConfig.clientSecret
   const origEnabled = workshopPrConfig.enabled
+  const origMockMode = workshopPrConfig.mockMode
   const origCorsOrigin = process.env.CORS_ORIGIN
 
   let userId: string
   let userToken: string
   let cardDbId: string
+  let versionId: string
 
   beforeEach(() => {
     ;(workshopPrConfig as unknown as { clientId: string }).clientId = 'test_cid'
     ;(workshopPrConfig as unknown as { clientSecret: string }).clientSecret = 'test_secret'
     ;(workshopPrConfig as unknown as { enabled: boolean }).enabled = true
+    ;(workshopPrConfig as unknown as { mockMode: boolean }).mockMode = false
 
     const now = Date.now()
     userId = nanoid()
@@ -388,11 +410,47 @@ describe('workshop PR propose — session', () => {
     ).run(userToken, userId, now + 3_600_000, now)
 
     cardDbId = nanoid()
+    const sourceCode = `const CARD_DEF = { cardType: 'minor', meta: { id: 'CUSTOM_TestCard', deck: 'CUSTOM', number: 0, name: 'Test Card', desc: [], cost: {}, vp: 0 } }\nconst CARD_IMPL = {}`
+    const codeManifest = JSON.stringify({
+      effectHooks: [],
+      listeners: [],
+      cardDefinition: {
+        cardType: 'minor',
+        meta: {
+          id: 'CUSTOM_TestCard',
+          deck: 'CUSTOM',
+          number: 0,
+          name: 'Test Card',
+          desc: [],
+          cost: {},
+          vp: 0,
+        },
+      },
+    })
+    const cardJson = JSON.stringify({
+      id: 'CUSTOM_TestCard',
+      name: 'Test Card',
+      card_type: 'minor',
+      deck: 'CUSTOM',
+      number: 0,
+      desc: [],
+      cost: {},
+      vp: 0,
+      implemented: true,
+      locales: {
+        zh: {
+          name: '测试卡',
+          desc: ['测试说明'],
+        },
+      },
+      _code: sourceCode,
+      _compiled: '"use strict";',
+    })
     db.prepare(
       `INSERT INTO workshop_cards
          (id, author_id, card_id, card_type, name, description, card_json,
-          art_url, status, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          code_manifest, art_url, status, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     ).run(
       cardDbId,
       userId,
@@ -400,15 +458,25 @@ describe('workshop PR propose — session', () => {
       'minor',
       'Test Card',
       'A test card',
-      JSON.stringify({
-        name: 'Test Card',
-        _code: `const CARD_DEF = new MinorImprovement({ id: 'CUSTOM_TestCard', deck: 'community', number: 0, name: 'Test Card', desc: [], cost: {}, vp: 0 })\nconst CARD_IMPL = {}`,
-      }),
+      cardJson,
+      codeManifest,
       null,
       'published',
       now,
       now,
     )
+    versionId = nanoid()
+    db.prepare(`
+      INSERT INTO workshop_card_versions (
+        id, card_id, card_json, code_manifest, art_url, version_number,
+        created_by, created_at, content_hash, provenance_json
+      ) VALUES (?, ?, ?, ?, NULL, 1, ?, ?, NULL, '{}')
+    `).run(versionId, cardDbId, cardJson, codeManifest, userId, now)
+    db.prepare(`
+      UPDATE workshop_cards
+      SET published_version_id = ?, sandbox_pass_version_id = ?, sandbox_passed_at = ?
+      WHERE id = ?
+    `).run(versionId, versionId, now, cardDbId)
 
     db.prepare(`DELETE FROM github_propose_rate_limit WHERE user_id = ?`).run(userId)
     db.prepare(`DELETE FROM github_propose_audit WHERE user_id = ?`).run(userId)
@@ -424,6 +492,7 @@ describe('workshop PR propose — session', () => {
     ;(workshopPrConfig as unknown as { clientId: string }).clientId = origClientId
     ;(workshopPrConfig as unknown as { clientSecret: string }).clientSecret = origSecret
     ;(workshopPrConfig as unknown as { enabled: boolean }).enabled = origEnabled
+    ;(workshopPrConfig as unknown as { mockMode: boolean }).mockMode = origMockMode
     if (origCorsOrigin === undefined) delete process.env.CORS_ORIGIN
     else process.env.CORS_ORIGIN = origCorsOrigin
 
@@ -431,6 +500,113 @@ describe('workshop PR propose — session', () => {
   })
 
   // ── C-24: happy path ─────────────────────────────────────────────────────
+
+  it('rejects before OAuth when the published version has no matching sandbox pass', async () => {
+    db.prepare(`
+      UPDATE workshop_cards SET sandbox_pass_version_id = NULL, sandbox_passed_at = NULL
+      WHERE id = ?
+    `).run(cardDbId)
+    const req = fakeReq({
+      method: 'POST',
+      url: `/api/workshop/cards/${cardDbId}/propose`,
+      authHeader: `Bearer ${userToken}`,
+      body: JSON.stringify({}),
+    })
+    const res = fakeRes()
+
+    await handleProposeRequest(req, res, cardDbId)
+
+    expect(res.statusCode).toBe(400)
+    expect(JSON.parse(res.body)).toMatchObject({
+      ok: false,
+      code: 'handoff_not_ready',
+      readiness: {
+        ready: false,
+        publishedVersionMatchesDraft: true,
+        sandboxPassedForPublishedVersion: false,
+      },
+    })
+  })
+
+  it('returns a deterministic PR result without OAuth in mock mode', async () => {
+    ;(workshopPrConfig as unknown as { mockMode: boolean }).mockMode = true
+    const req = fakeReq({
+      method: 'POST',
+      url: `/api/workshop/cards/${cardDbId}/propose`,
+      authHeader: `Bearer ${userToken}`,
+      body: JSON.stringify({}),
+    })
+    const res = fakeRes()
+
+    await handleProposeRequest(req, res, cardDbId)
+
+    expect(res.statusCode).toBe(200)
+    expect(JSON.parse(res.body)).toEqual({
+      ok: true,
+      prUrl: '/mock-workshop-pr/1',
+      prNumber: 1,
+    })
+    expect(db.prepare(`
+      SELECT github_pr_url, github_pr_status
+      FROM workshop_cards WHERE id = ?
+    `).get(cardDbId)).toEqual({
+      github_pr_url: '/mock-workshop-pr/1',
+      github_pr_status: 'open',
+    })
+  })
+
+  it('rejects proposals without complete Chinese localization before mock handoff', async () => {
+    ;(workshopPrConfig as unknown as { mockMode: boolean }).mockMode = true
+    const current = db.prepare(
+      'SELECT card_json FROM workshop_cards WHERE id = ?',
+    ).get(cardDbId) as { card_json: string }
+    const cardJson = JSON.parse(current.card_json) as Record<string, unknown>
+    delete cardJson.locales
+    const serialised = JSON.stringify(cardJson)
+    db.prepare('UPDATE workshop_cards SET card_json = ? WHERE id = ?')
+      .run(serialised, cardDbId)
+    db.prepare('UPDATE workshop_card_versions SET card_json = ? WHERE id = ?')
+      .run(serialised, versionId)
+
+    const req = fakeReq({
+      method: 'POST',
+      url: `/api/workshop/cards/${cardDbId}/propose`,
+      authHeader: `Bearer ${userToken}`,
+      body: JSON.stringify({}),
+    })
+    const res = fakeRes()
+
+    await handleProposeRequest(req, res, cardDbId)
+
+    expect(res.statusCode).toBe(400)
+    expect(JSON.parse(res.body)).toMatchObject({
+      ok: false,
+      code: 'localization_not_ready',
+    })
+  })
+
+  it.each([
+    ['rate-limited', 429, 'rate_limited'],
+    ['remote-error', 503, 'github_unavailable'],
+  ])('returns deterministic %s failures in mock mode', async (mockResult, status, code) => {
+    ;(workshopPrConfig as unknown as { mockMode: boolean }).mockMode = true
+    const req = fakeReq({
+      method: 'POST',
+      url: `/api/workshop/cards/${cardDbId}/propose`,
+      authHeader: `Bearer ${userToken}`,
+      mockResult,
+      body: JSON.stringify({}),
+    })
+    const res = fakeRes()
+
+    await handleProposeRequest(req, res, cardDbId)
+
+    expect(res.statusCode).toBe(status)
+    expect(JSON.parse(res.body)).toMatchObject({ ok: false, code })
+    expect(db.prepare(
+      'SELECT github_pr_url FROM workshop_cards WHERE id = ?',
+    ).get(cardDbId)).toEqual({ github_pr_url: null })
+  })
 
   it('happy path: first-time propose creates PR, updates DB, audit=success', async () => {
     process.env.CORS_ORIGIN = 'https://frontend.example'

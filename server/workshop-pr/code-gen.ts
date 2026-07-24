@@ -250,6 +250,23 @@ function normalizeWorkshopEffectCode(
       }
 
       if (
+        ts.isCallExpression(node)
+        && ts.isIdentifier(node.expression)
+        && (node.expression.text === 'MinorImprovement' || node.expression.text === 'Occupation')
+        && node.arguments.length === 1
+      ) {
+        const arg = node.arguments[0]!
+        if (ts.isObjectLiteralExpression(arg)) {
+          const updatedArg = syncLocalesObject(arg)
+          return ts.visitEachChild(
+            factory.updateCallExpression(node, node.expression, node.typeArguments, [updatedArg]),
+            visit,
+            context,
+          )
+        }
+      }
+
+      if (
         ts.isPropertyAssignment(node)
         && propertyNameMatches(node.name, 'meta')
         && ts.isObjectLiteralExpression(node.initializer)
@@ -548,6 +565,15 @@ export function extractCardMetaSource(source: string): string {
   const initializer = unwrapExpression(decl.initializer)
   if (ts.isNewExpression(initializer)) {
     const arg = initializer.arguments?.[0]
+    if (arg && ts.isObjectLiteralExpression(arg)) return expressionToSource(sf, arg)
+  }
+  if (
+    ts.isCallExpression(initializer)
+    && ts.isIdentifier(initializer.expression)
+    && (initializer.expression.text === 'MinorImprovement'
+      || initializer.expression.text === 'Occupation')
+  ) {
+    const arg = initializer.arguments[0]
     if (arg && ts.isObjectLiteralExpression(arg)) return expressionToSource(sf, arg)
   }
   if (ts.isObjectLiteralExpression(initializer)) {

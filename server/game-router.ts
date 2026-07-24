@@ -15,6 +15,20 @@ import type { CustomCardData } from '../shared/cards/session-card-context.ts'
 import type { CustomCodeManifest } from '../shared/custom-code/types.ts'
 import { defaultSandboxDeckIds, defaultSandboxPlayerNames } from '../shared/session/state-bootstrap.ts'
 import { corsHeaders } from './http-origin.ts'
+import {
+  loadPublishedDraft,
+  loadSandboxVersion,
+  type WorkshopDraft,
+} from './workshop-drafts.ts'
+
+const workshopDraftToCustomCard = (draft: WorkshopDraft): CustomCardData => ({
+  cardType: draft.cardType,
+  cardJson: draft.cardJson as unknown as CustomCardData['cardJson'],
+  effectCode: draft.effectCode,
+  compiledCode: draft.compiledCode,
+  codeManifest: draft.codeManifest as CustomCodeManifest | null,
+  artUrl: draft.artUrl,
+})
 
 /**
  * Per-user HTTP game sessions, keyed by user ID.
@@ -528,10 +542,12 @@ export const handleGameRoute = async (
     let enableThroughTheSeasons = false
     let enableFarmersOfTheMoor = false
     let allowIncompleteFarmersOfTheMoorMinorDeal = false
+    const customCardVersions = new Map<string, string>()
     try {
       const body = JSON.parse(await readBody(req)) as {
         seed?: number
         customCardIds?: string[]
+        customCardVersions?: Array<{ cardId?: unknown; versionId?: unknown }>
         playerCount?: number
         deckIds?: string[]
         enableThroughTheSeasons?: boolean
@@ -541,6 +557,13 @@ export const handleGameRoute = async (
       if (typeof body.seed === 'number') seed = body.seed
       if (Array.isArray(body.customCardIds)) {
         customCardDbIds = body.customCardIds.filter((id): id is string => typeof id === 'string')
+      }
+      if (Array.isArray(body.customCardVersions)) {
+        for (const binding of body.customCardVersions) {
+          if (typeof binding.cardId !== 'string' || typeof binding.versionId !== 'string') continue
+          customCardVersions.set(binding.cardId, binding.versionId)
+          if (!customCardDbIds.includes(binding.cardId)) customCardDbIds.push(binding.cardId)
+        }
       }
       if (typeof body.playerCount === 'number') {
         playerCount = Number.isFinite(body.playerCount)
@@ -567,9 +590,33 @@ export const handleGameRoute = async (
     // Load custom card data from the database.
     // Allow: published cards (anyone) OR draft cards owned by the requesting user.
     const customCards: CustomCardData[] = []
+    const customCardVersionsLoaded: Array<{ cardId: string; versionId: string }> = []
     if (customCardDbIds.length > 0) {
       const db = getDb()
       for (const dbId of customCardDbIds) {
+        const versionId = customCardVersions.get(dbId)
+        if (versionId) {
+          if (!requestUser) {
+            sendJson(res, 401, { ok: false, error: 'Authentication required for a draft version' })
+            return true
+          }
+          try {
+            const draft = loadSandboxVersion(db, {
+              cardId: dbId,
+              authorId: requestUser.id,
+              versionId,
+            })
+            customCards.push(workshopDraftToCustomCard(draft))
+            customCardVersionsLoaded.push({ cardId: dbId, versionId })
+          } catch (error) {
+            sendJson(res, 400, {
+              ok: false,
+              error: error instanceof Error ? error.message : 'Unable to load sandbox version',
+            })
+            return true
+          }
+          continue
+        }
         const row = db.prepare(
           `SELECT card_type, card_json, code_manifest, art_url, status, author_id
            FROM workshop_cards WHERE id = ?`,
@@ -581,10 +628,16 @@ export const handleGameRoute = async (
           status: string; author_id: string
         } | undefined
         if (!row) continue
-        // Allow published cards, or draft cards if requester is the author
+        if (row.status === 'published') {
+          try {
+            customCards.push(workshopDraftToCustomCard(loadPublishedDraft(db, dbId)))
+          } catch (err) {
+            console.warn(`[game-router] failed to load published custom card ${dbId}:`, err)
+          }
+          continue
+        }
         const allowed =
-          row.status === 'published' ||
-          (row.status === 'draft' && requestUser?.id === row.author_id)
+          row.status === 'draft' && requestUser?.id === row.author_id
         if (!allowed) continue
         try {
           const parsed = JSON.parse(row.card_json) as Record<string, unknown>
@@ -621,6 +674,7 @@ export const handleGameRoute = async (
     sendJson(res, 200, {
       ...result,
       customCardsLoaded: customCards.length,
+      customCardVersionsLoaded,
       cardWarnings: sandboxSession.cardWarnings.length > 0 ? sandboxSession.cardWarnings : undefined,
     })
     return true

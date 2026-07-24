@@ -4,7 +4,7 @@ import { t } from '../../../shared/i18n'
 import type { ComplexCost, PaymentResourceMap } from '../../../shared/contract/types'
 import { emptyResources } from '../../../shared/contract/state-constants'
 import { getCustomCardArtUrl, getCustomCardNumbering } from '../../../shared/cards/custom-card-metadata'
-import { getCardMeta } from '../../services/card-meta'
+import { getCardMeta, type CardMeta } from '../../services/card-meta'
 import { publicAssetUrl } from '../../utils/public-asset-url'
 import { CardWithCopy } from './CardWithCopy'
 import { ResourceText } from './ResourceText'
@@ -49,6 +49,8 @@ type PlayerCardProps = {
   usable?: boolean
   className?: string
   enablePreview?: boolean
+  cardMeta?: CardMeta
+  artUrl?: string | null
 }
 
 type MoorMajorDisplay = {
@@ -178,9 +180,11 @@ export const PlayerCard = ({
   usable = false,
   className = '',
   enablePreview = true,
+  cardMeta,
+  artUrl,
 }: PlayerCardProps) => {
   const cardData = useMemo(() => {
-    const meta = getCardMeta(cardId)
+    const meta = cardMeta ?? getCardMeta(cardId)
     if (cardType === 'major') {
       if (!meta) return null
       const rawCost = (meta.cost ?? {}) as PaymentResourceMap | ComplexCost
@@ -239,12 +243,12 @@ export const PlayerCard = ({
         isBaking: meta.isBaking,
       }
     }
-  }, [cardId, cardType, locale])
+  }, [cardId, cardMeta, cardType, locale])
 
   const numbering = getCardNumbering(cardId)
   const moorMajor = cardType === 'major' ? getMoorMajorDisplay(cardId) : undefined
   const deck = getDeckFromId(cardId)
-  const customArt = getCustomCardArtUrl(cardId)
+  const customArt = artUrl === undefined ? getCustomCardArtUrl(cardId) : artUrl
   const hasPlayer56Portrait = cardType !== 'major' && !customArt && PLAYER56_PORTRAITS.has(numbering)
 
   const iconStyle = useMemo(() => {
@@ -327,6 +331,8 @@ export const PlayerCard = ({
       infobox={infobox}
       enablePreview={false}
       className="player-card-preview-body"
+      cardMeta={cardMeta}
+      artUrl={artUrl}
     />
   ) : null
 

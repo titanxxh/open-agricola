@@ -363,6 +363,77 @@ function runMigrations(db: Database.Database): void {
         UPDATE account_invites SET use_count = 1 WHERE used_at IS NOT NULL;
       `,
     },
+    {
+      version: 18,
+      sql: `
+        ALTER TABLE workshop_cards ADD COLUMN draft_revision INTEGER NOT NULL DEFAULT 1;
+        ALTER TABLE workshop_cards ADD COLUMN draft_generation_json TEXT NOT NULL DEFAULT '{}';
+        ALTER TABLE workshop_cards ADD COLUMN published_version_id TEXT;
+        ALTER TABLE workshop_cards ADD COLUMN sandbox_pass_version_id TEXT;
+        ALTER TABLE workshop_cards ADD COLUMN sandbox_passed_at INTEGER;
+
+        ALTER TABLE workshop_card_versions ADD COLUMN content_hash TEXT;
+        ALTER TABLE workshop_card_versions ADD COLUMN provenance_json TEXT NOT NULL DEFAULT '{}';
+
+        UPDATE workshop_cards
+        SET draft_generation_json = CASE
+          WHEN NULLIF(TRIM(art_url), '') IS NOT NULL THEN json_object(
+            'art',
+            json_object(
+              'prompt', art_prompt,
+              'lastCompleted', json_object(
+                'id', 'legacy-art-' || id,
+                'kind', 'art',
+                'prompt', art_prompt,
+                'resultUrl', art_url,
+                'createdAt', updated_at
+              ),
+              'adopted', json_object(
+                'id', 'legacy-art-' || id,
+                'kind', 'art',
+                'prompt', art_prompt,
+                'resultUrl', art_url,
+                'createdAt', updated_at
+              )
+            )
+          )
+          ELSE json_object('art', json_object('prompt', art_prompt))
+        END
+        WHERE NULLIF(TRIM(art_prompt), '') IS NOT NULL;
+
+        INSERT INTO workshop_card_versions (
+          id, card_id, card_json, code_manifest, art_url, version_number,
+          created_by, created_at, content_hash, provenance_json
+        )
+        SELECT
+          lower(hex(randomblob(16))),
+          card.id,
+          card.card_json,
+          card.code_manifest,
+          card.art_url,
+          (
+            SELECT COALESCE(MAX(version.version_number), 0) + 1
+            FROM workshop_card_versions version
+            WHERE version.card_id = card.id
+          ),
+          card.author_id,
+          card.updated_at,
+          NULL,
+          '{}'
+        FROM workshop_cards card
+        WHERE card.status = 'published';
+
+        UPDATE workshop_cards
+        SET published_version_id = (
+          SELECT version.id
+          FROM workshop_card_versions version
+          WHERE version.card_id = workshop_cards.id
+          ORDER BY version.version_number DESC
+          LIMIT 1
+        )
+        WHERE status = 'published';
+      `,
+    },
   ]
 
   const insert = db.prepare('INSERT INTO schema_version (version) VALUES (?)')

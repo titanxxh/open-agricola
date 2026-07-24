@@ -12,35 +12,10 @@ services:
       - DB_PATH=./data/open-agricola.db
       - CARD_ART_DIR=./data/card-art
       - CORS_ORIGIN=${CORS_ORIGIN:-*}
-      - CUSTOM_CODE_EXECUTOR_URL=http://executor:5181
     volumes:
       - app-data:/app/data
       - app-output:/app/output
     restart: unless-stopped
-    depends_on:
-      - executor
-
-  executor:
-    build: .
-    expose:
-      - "5181"
-    environment:
-      - NODE_ENV=production
-      - CUSTOM_CODE_EXECUTOR_PORT=5181
-      - CUSTOM_CODE_EXECUTOR_HOST=0.0.0.0
-    command: ["node", "--import", "tsx", "server/custom-code-executor/index.ts"]
-    healthcheck:
-      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:5181/health || exit 1"]
-      interval: 30s
-      timeout: 5s
-      start_period: 10s
-      retries: 3
-    read_only: true
-    tmpfs:
-      - /tmp
-    restart: unless-stopped
-    mem_limit: 256m
-    cpus: 0.50
 
 volumes:
   app-data:

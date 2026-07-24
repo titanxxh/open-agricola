@@ -48,7 +48,7 @@ const BGA_CDN_BASE = process.env.BGA_CDN_BASE_URL || 'https://x.boardgamearena.n
 const BGA_LOCAL_DIR = process.env.BGA_IMAGE_DIR ? join(process.cwd(), process.env.BGA_IMAGE_DIR) : null
 
 const serverCorsHeaders = () => corsHeaders({
-  methods: 'GET,POST,PATCH,DELETE,OPTIONS',
+  methods: 'GET,POST,PUT,PATCH,DELETE,OPTIONS',
   headers: 'Content-Type, Authorization',
 })
 
@@ -133,7 +133,10 @@ function forwardCookieSessionAsBearer(req: IncomingMessage): void {
 }
 
 function isMutatingRequest(req: IncomingMessage): boolean {
-  return req.method === 'POST' || req.method === 'PATCH' || req.method === 'DELETE'
+  return req.method === 'POST'
+    || req.method === 'PUT'
+    || req.method === 'PATCH'
+    || req.method === 'DELETE'
 }
 
 function rejectUntrustedOrigin(req: IncomingMessage, res: ServerResponse): boolean {

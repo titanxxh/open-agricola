@@ -81,6 +81,7 @@ export type GameSyncPayload = {
   actionAvailability?: Record<string, boolean>
   cardAvailability?: Record<string, boolean>
   error?: string
+  cardWarnings?: string[]
   /** Custom card definitions for frontend registration — treated identically to built-in cards. */
   customCardDefs?: CustomCardDef[]
 }

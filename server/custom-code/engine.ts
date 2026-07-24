@@ -96,9 +96,8 @@ function runInIsolate(
  * This uses a lighter execution — just runs the top-level code to capture CARD_IMPL.
  */
 function runManifestExtraction(compiledCode: string, cardId: string): {
-  effectHooks: CardEffectField[]
-  effectMetadata?: CustomCodeEffectMetadata
-  listeners: CustomCodeListenerManifest[]
+  manifest: CustomCodeManifest
+  cardDefinition: Record<string, unknown> | null
 } {
   const isolate = new ivm.Isolate({ memoryLimit: ISOLATE_MEMORY_LIMIT_MB })
   try {
@@ -108,8 +107,9 @@ function runManifestExtraction(compiledCode: string, cardId: string): {
 
     const wrappedCode = `
       var console = { log: function() {}, warn: function() {} };
-      function MinorImprovement(def) { return def; }
-      function Occupation(def) { return def; }
+      var __cardDefinitionType = null;
+      function MinorImprovement(def) { __cardDefinitionType = 'minor'; return def; }
+      function Occupation(def) { __cardDefinitionType = 'occupation'; return def; }
       ${HELPERS_INJECTION_SOURCE}
       var __captured = (function() {
         ${compiledCode}
@@ -153,6 +153,8 @@ function runManifestExtraction(compiledCode: string, cardId: string): {
         effectKeys: __effectKeys,
         effectMetadata: __effectMetadata,
         listeners: __listeners,
+        cardDefinition: __captured.CARD_DEF,
+        cardDefinitionType: __cardDefinitionType,
       });
     `
 
@@ -162,7 +164,15 @@ function runManifestExtraction(compiledCode: string, cardId: string): {
       effectKeys: string[]
       effectMetadata?: CustomCodeEffectMetadata
       listeners: CustomCodeListenerManifest[]
-    } : { effectKeys: [], effectMetadata: {}, listeners: [] }
+      cardDefinition: Record<string, unknown> | null
+      cardDefinitionType: 'minor' | 'occupation' | null
+    } : {
+      effectKeys: [],
+      effectMetadata: {},
+      listeners: [],
+      cardDefinition: null,
+      cardDefinitionType: null,
+    }
 
     const effectHooks = parsed.effectKeys.filter((hook): hook is CardEffectField =>
       cardEffectHooks.includes(hook as CardEffectField),
@@ -177,7 +187,15 @@ function runManifestExtraction(compiledCode: string, cardId: string): {
       ? parsed.effectMetadata
       : undefined
 
-    return { effectHooks, effectMetadata, listeners }
+    return {
+      manifest: { effectHooks, effectMetadata, listeners },
+      cardDefinition: parsed.cardDefinition && parsed.cardDefinitionType
+        ? {
+            cardType: parsed.cardDefinitionType,
+            meta: parsed.cardDefinition,
+          }
+        : parsed.cardDefinition,
+    }
   } finally {
     isolate.dispose()
   }
@@ -194,11 +212,12 @@ export const validateAndCompileCustomCode = (
 
   try {
     const compiledCode = compileCardCode(source)
-    const manifest = extractManifestFromCompiledCode(compiledCode, cardId)
+    const { manifest, cardDefinition } = extractManifestFromCompiledCode(compiledCode, cardId)
     return {
       valid: true,
       compiledCode,
       manifest,
+      cardDefinition,
     }
   } catch (error) {
     return {
@@ -211,7 +230,10 @@ export const validateAndCompileCustomCode = (
 const extractManifestFromCompiledCode = (
   compiledCode: string,
   cardId: string,
-): CustomCodeManifest => {
+): {
+  manifest: CustomCodeManifest
+  cardDefinition: Record<string, unknown> | null
+} => {
   return runManifestExtraction(compiledCode, cardId)
 }
 

@@ -118,6 +118,7 @@ ESLint 三层强制（`eslint.config.js`）：
 | 文件 | 内容 |
 |---|---|
 | `contract/types.ts` | `GameState` / `PlayerState` / `ActionSpace` / `Resource` / `InteractionState` / `InteractionRequest` / `ActionDefinition` |
+| `contract/workshop.ts` | Workshop Design Draft、Workspace 与生成候选的前后端协议 |
 | `contract/protocol/ws.ts` | `ClientCommand` / `ServerEvent` / `RoomSummary` |
 | `contract/protocol/game.ts` | `GameSyncPayload` / `StateUpdateEnvelope` / `StateUpdateCause` / `ActionDetailEffects` |
 | `contract/cards.ts` | `CardDefinition`（卡牌外形） |
@@ -250,11 +251,12 @@ type GameSyncPayload = {
   actionAvailability?: Record<string, boolean>
   cardAvailability?: Record<string, boolean>
   error?: string
+  cardWarnings?: string[]          // 仅 HTTP debug/sandbox
   customCardDefs?: CustomCardDef[]
 }
 ```
 
-**广播 vs 单播**：`stateUpdate` / `gameStarted` / `playerJoined` / `playerDisconnected` / `roomDissolved` 广播；`roomCreated` / `roomJoined` / `authOk` / 请求级 `error` 单播。WS 广播会按连接对应的 `viewerPlayerId` 构造 per-viewer payload：目标玩家收到真实私有 prompt 和 `privateEvents`，其他玩家收到 `private-prompt` redaction。HTTP sandbox 默认无 `X-Viewer-Player` 时保持未过滤多座位开发流；带 `X-Viewer-Player` 时使用同一套 viewer 过滤和 seat guard。
+**广播 vs 单播**：`stateUpdate` / `gameStarted` / `playerJoined` / `playerDisconnected` / `roomDissolved` 广播；`roomCreated` / `roomJoined` / `authOk` / 请求级 `error` 单播。WS 广播会按连接对应的 `viewerPlayerId` 构造 per-viewer payload：目标玩家收到真实私有 prompt 和 `privateEvents`，其他玩家收到 `private-prompt` redaction。HTTP sandbox 默认无 `X-Viewer-Player` 时保持未过滤多座位开发流；带 `X-Viewer-Player` 时使用同一套 viewer 过滤和 seat guard。`cardWarnings` 只进入 HTTP debug/sandbox payload，用于把该局运行期自定义卡异常送回工坊确认门禁，不向 WS viewer 广播。
 
 ### 4.6 InteractionState — 前端唯一渲染真相
 
@@ -1082,11 +1084,11 @@ server/custom-code/
 ├── runtime.ts           沙盒运行时
 ├── engine.ts            hook / phase / scope 校验 + 调度
 ├── isolate-runner.ts    isolate-vm 隔离入口
-├── executor-worker.ts   worker / sidecar 入口
-└── client.ts            主进程 → executor 的 RPC 客户端
+├── executor-worker.ts   Worker Thread 入口
+└── client.ts            主进程 → Worker Thread 同步调用客户端
 ```
 
-主后端只保存 `compiled_code + code_manifest`；运行时 RPC 调用同机 `custom-code-executor` sidecar。沙盒约束唯一真源 → `docs/CUSTOM_CARD_SANDBOX.md`（含 `prompt-sync:begin/end` 标记块，`pnpm run check:prompt-sync` 校验）。
+主后端只保存 `compiled_code + code_manifest`；运行时由 `client.ts` 启动专用 Worker Thread，并在其中通过 isolated-vm 执行自定义代码。沙盒约束唯一真源 → `docs/CUSTOM_CARD_SANDBOX.md`（含 `prompt-sync:begin/end` 标记块，`pnpm run check:prompt-sync` 校验）。
 
 ### 11.4 HTTP 端点（调试通道）
 

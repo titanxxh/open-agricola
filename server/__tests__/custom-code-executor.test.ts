@@ -5,6 +5,8 @@ import { getCardEffect, runCardEffectHook } from '../../shared/cards/card-effect
 import { createInitialState } from '../../shared/session/state-bootstrap.ts'
 import { validateAndCompileCustomCode, invokeCustomCodeEffect } from '../custom-code/engine.ts'
 import { registerExecutorBackedCustomCard } from '../custom-code/runtime.ts'
+import { GameSession } from '../game/authoritative-session.ts'
+import { workshopCardJsonFromDefinition } from '../workshop-draft-validation.ts'
 
 const makeCardData = (compiledCode: string, codeManifest: CustomCardData['codeManifest']): CustomCardData => ({
   cardType: 'minor',
@@ -24,6 +26,42 @@ afterEach(() => {
 })
 
 describe('custom code executor', () => {
+  it('extracts the validated CARD_DEF metadata', () => {
+    const result = validateAndCompileCustomCode(`
+const CARD_ID = 'CUSTOM_MetadataCard'
+const CARD_DEF = {
+  cardType: 'minor',
+  meta: {
+    id: CARD_ID,
+    name: 'Metadata Card',
+    desc: ['Generated metadata.'],
+    cost: { wood: 2 },
+    vp: 1,
+    locales: {
+      zh: { name: '元数据卡', desc: ['生成的元数据。'] },
+    },
+  },
+}
+const CARD_IMPL = {}
+    `, 'CUSTOM_MetadataCard')
+
+    expect(result.valid).toBe(true)
+    if (!result.valid) return
+    expect(result.cardDefinition).toEqual({
+      cardType: 'minor',
+      meta: {
+        id: 'CUSTOM_MetadataCard',
+        name: 'Metadata Card',
+        desc: ['Generated metadata.'],
+        cost: { wood: 2 },
+        vp: 1,
+        locales: {
+          zh: { name: '元数据卡', desc: ['生成的元数据。'] },
+        },
+      },
+    })
+  })
+
   it('validates code and extracts effect/listener manifest', () => {
     const result = validateAndCompileCustomCode(`
 const CARD_ID = 'CUSTOM_ExecutorCard'
@@ -48,6 +86,18 @@ const CARD_IMPL = {
 
     expect(result.valid).toBe(true)
     if (!result.valid) return
+    expect(result.cardDefinition).toEqual({
+      cardType: 'minor',
+      meta: {
+        id: 'CUSTOM_ExecutorCard',
+        name: 'Executor Card',
+      },
+    })
+    expect(workshopCardJsonFromDefinition(result.cardDefinition)).toMatchObject({
+      id: 'CUSTOM_ExecutorCard',
+      name: 'Executor Card',
+      card_type: 'minor',
+    })
     expect(result.manifest.effectHooks).toContain('onReturnHome')
     expect(result.manifest.listeners).toHaveLength(1)
     expect(result.manifest.listeners[0]?.actions).toEqual(['meeting-place'])
@@ -167,6 +217,43 @@ const CARD_IMPL = {
         sourceCard: 'CUSTOM_ExecutorCard',
       },
     })
+  })
+
+  it('records runtime proxy failures on the active sandbox session', () => {
+    const compiled = validateAndCompileCustomCode(`
+const CARD_ID = 'CUSTOM_ExecutorCard'
+const CARD_DEF = MinorImprovement({ id: CARD_ID, name: 'Executor Card' })
+const CARD_IMPL = {
+  effect: {
+    id: CARD_ID,
+    onReturnHome: () => {
+      throw new Error('sandbox boom')
+    },
+  },
+}
+    `, 'CUSTOM_ExecutorCard')
+    expect(compiled.valid).toBe(true)
+    if (!compiled.valid) return
+
+    const session = new GameSession(
+      42,
+      [makeCardData(compiled.compiledCode, compiled.manifest)],
+    )
+    const state = session.withCtx(() => session.getState()).state
+    const result = session.withCtx(() =>
+      runCardEffectHook(
+        state,
+        state.players[0]!,
+        'CUSTOM_ExecutorCard',
+        'onReturnHome',
+      ),
+    )
+
+    expect(result).toBeNull()
+    expect(session.cardWarnings).toEqual([
+      expect.stringContaining('sandbox boom'),
+    ])
+    session.dispose()
   })
 
   it('times out runaway effect execution', () => {

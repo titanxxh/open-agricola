@@ -14,4 +14,16 @@ describe('production deployment config', () => {
     expect(workflow).toContain('ACCOUNT_REGISTRATION_POLICY: ${{ vars.ACCOUNT_REGISTRATION_POLICY }}')
     expect(script).toContain('ACCOUNT_REGISTRATION_POLICY="$ACCOUNT_REGISTRATION_POLICY"')
   })
+
+  it('does not start the obsolete custom-code executor sidecar', () => {
+    for (const composePath of ['docker-compose.yml', 'docker-compose.prod.yml']) {
+      const compose = readFileSync(composePath, 'utf8')
+      expect(compose).not.toContain('CUSTOM_CODE_EXECUTOR')
+      expect(compose).not.toContain('server/custom-code-executor/index.ts')
+      expect(compose).not.toContain('  executor:')
+      expect(compose).not.toContain('      - executor')
+    }
+    const script = readFileSync('deploy-backend.sh', 'utf8')
+    expect(script).toContain('up -d --build --remove-orphans')
+  })
 })

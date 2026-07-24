@@ -45,6 +45,15 @@ export class SessionCardContext {
   readonly customOccupations = new Map<string, CardDefinition>()
   /** Art URLs for custom cards, keyed by card ID. */
   readonly customArtUrls = new Map<string, string>()
+  private readonly warnings: string[]
+
+  constructor(warnings: string[] = []) {
+    this.warnings = warnings
+  }
+
+  reportWarning(warning: string): void {
+    if (!this.warnings.includes(warning)) this.warnings.push(warning)
+  }
 
   registerEffect(effect: CardEffect): void {
     this.customEffects.set(effect.id, effect)
@@ -91,6 +100,7 @@ export class SessionCardContext {
     this.customMinors.clear()
     this.customOccupations.clear()
     this.customArtUrls.clear()
+    this.warnings.length = 0
   }
 }
 

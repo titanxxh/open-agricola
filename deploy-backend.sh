@@ -43,7 +43,7 @@ ssh "$HOST" "${REMOTE_ENV[@]}" bash -s "$REMOTE_DIR" "$BRANCH" << 'REMOTE_SCRIPT
   git reset --hard "origin/$BRANCH"
 
   echo ">>> docker compose build..."
-  docker compose -f docker-compose.prod.yml up -d --build
+  docker compose -f docker-compose.prod.yml up -d --build --remove-orphans
 
   echo ">>> 等待健康检查..."
   for i in $(seq 1 15); do
