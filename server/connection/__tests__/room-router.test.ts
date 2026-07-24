@@ -54,6 +54,22 @@ describe('handleCreateRoom', () => {
     expect(sentTypesOf(ctx)).toContain('roomCreated')
   })
 
+  it('bounds room id allocation retries', () => {
+    const deps = newDeps()
+    vi.spyOn(deps.persistence, 'hasRoomId').mockReturnValue(true)
+    const ctx = newCtx(deps)
+
+    dispatch(ctx, { type: 'createRoom', maxPlayers: 2, requestId: 'create-1' })
+
+    expect(deps.persistence.hasRoomId).toHaveBeenCalledTimes(8)
+    expect(ctx.currentRoom).toBeNull()
+    expect(sentMessagesOf(ctx)).toContainEqual(expect.objectContaining({
+      type: 'error',
+      error: 'unable to allocate room id',
+      requestId: 'create-1',
+    }))
+  })
+
   it('checkpoints created rooms with state and host metadata', () => {
     const ctx = newCtx()
     ctx.currentUserId = 'u1'
