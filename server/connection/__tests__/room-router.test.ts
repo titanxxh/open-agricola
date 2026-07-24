@@ -134,6 +134,22 @@ describe('handleCreateRoom', () => {
     expect(ctx.currentRoom!.session.state.log.some((entry) => entry.params?.player === 'PlayerA')).toBe(false)
   })
 
+  it('preserves simultaneous draft settings when starting a new game', () => {
+    const ctx = newCtx()
+    ctx.currentUserId = 'u1'
+    dispatch(ctx, {
+      type: 'createRoom',
+      maxPlayers: 2,
+      draftMode: 'simultaneous',
+      draftPoolSize: 8,
+    })
+
+    dispatch(ctx, { type: 'newGame', seed: 309 })
+
+    expect(ctx.currentRoom!.session.state.phase).toBe('draft')
+    expect(ctx.currentRoom!.session.state.draft?.poolSize).toBe(8)
+  })
+
   it('uses room display names in direct Parent Card logs', () => {
     const deps = newDeps()
     const host = newCtx(deps)
@@ -169,6 +185,64 @@ describe('handleCreateRoom', () => {
 
     ctx.checkpoint.flushAll()
     expect(ctx.persistence.load(ctx.currentRoom!.id)?.serialized?.gameSeed).toBe(309)
+  })
+
+  it('moves newGame to a fresh room id and discards the unfinished game', () => {
+    const ctx = newCtx()
+    ctx.currentUserId = 'u1'
+    dispatch(ctx, { type: 'createRoom', maxPlayers: 2 })
+    const previousRoomId = ctx.currentRoom!.id
+
+    dispatch(ctx, { type: 'newGame', seed: 309 })
+    ctx.checkpoint.flushAll()
+
+    const nextRoomId = ctx.currentRoom!.id
+    expect(nextRoomId).not.toBe(previousRoomId)
+    expect(ctx.registry.has(previousRoomId)).toBe(false)
+    expect(ctx.registry.has(nextRoomId)).toBe(true)
+    expect(ctx.persistence.load(previousRoomId)).toBeNull()
+    expect(ctx.persistence.__getResultForTest(previousRoomId)).toBeUndefined()
+    expect(ctx.persistence.load(nextRoomId)?.serialized?.gameSeed).toBe(309)
+    expect(sentMessagesOf(ctx)).toContainEqual(expect.objectContaining({
+      type: 'stateUpdate',
+      roomId: nextRoomId,
+    }))
+  })
+
+  it('keeps a completed game archive immutable when starting the next game', () => {
+    const ctx = newCtx()
+    ctx.currentUserId = 'u1'
+    dispatch(ctx, { type: 'createRoom', maxPlayers: 2 })
+    const previousRoomId = ctx.currentRoom!.id
+    ctx.currentRoom!.startedAt = 10
+    ctx.currentRoom!.session.state.gameOver = true
+    expect(ctx.checkpoint.completeGame(ctx.currentRoom!, 20).ok).toBe(true)
+    const archived = ctx.persistence.__getResultForTest(previousRoomId)
+
+    dispatch(ctx, { type: 'newGame', seed: 309 })
+
+    expect(ctx.currentRoom!.id).not.toBe(previousRoomId)
+    expect(ctx.persistence.__getResultForTest(previousRoomId)).toEqual(archived)
+  })
+
+  it('switches every connected seat to the new game id before broadcasting', () => {
+    const deps = newDeps()
+    const host = newCtx(deps)
+    host.currentUserId = 'u1'
+    dispatch(host, { type: 'createRoom', maxPlayers: 2, name: 'host' })
+    const guest = newCtx(deps)
+    guest.currentUserId = 'u2'
+    dispatch(guest, { type: 'joinRoom', roomId: host.currentRoom!.id, name: 'guest' })
+    const previousRoomId = host.currentRoom!.id
+
+    dispatch(host, { type: 'newGame', seed: 309 })
+
+    expect(guest.currentRoom).toBe(host.currentRoom)
+    expect(guest.currentRoom!.id).not.toBe(previousRoomId)
+    expect(sentMessagesOf(guest)).toContainEqual(expect.objectContaining({
+      type: 'stateUpdate',
+      roomId: host.currentRoom!.id,
+    }))
   })
 
   it('checkpoints loadGame state through the broadcast path', () => {
@@ -301,6 +375,7 @@ describe('seat-binding guards', () => {
       { userId: 'u1', playerIndex: 0 },
       { userId: 'u2', playerIndex: 1 },
     ])
+    expect(guest.persistence.load(host.currentRoom!.id)?.meta.startedAt).toEqual(expect.any(Number))
   })
 
   it('devSetResources accepts own seat', () => {

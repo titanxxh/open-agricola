@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto'
 import { GameSession } from '../game/authoritative-session.ts'
 import {
   isFixedDevRoom,
@@ -104,7 +105,13 @@ function loadCustomCardsFromDb(cardDbIds: string[], requestUserId?: string): Cus
   return result
 }
 
-const generateRoomId = () => Math.random().toString(36).slice(2, 8)
+const generateRoomId = (ctx: ConnectionCtx): string => {
+  let roomId: string
+  do {
+    roomId = randomUUID()
+  } while (ctx.registry.has(roomId) || ctx.checkpoint.hasRoomId(roomId))
+  return roomId
+}
 
 const sendCommandError = (ctx: ConnectionCtx, error: string, requestId?: string) => {
   ctx.broadcaster.sendTo(ctx.ws, { type: 'error', error, requestId })
@@ -161,7 +168,7 @@ function handleAuth(ctx: ConnectionCtx, msg: Extract<ClientCommand, { type: 'aut
 }
 
 function handleCreateRoom(ctx: ConnectionCtx, msg: Extract<ClientCommand, { type: 'createRoom' }>): void {
-  const roomId = generateRoomId()
+  const roomId = generateRoomId(ctx)
   const rawMaxPlayers = typeof (msg as Record<string, unknown>).maxPlayers === 'number'
     ? (msg as Record<string, unknown>).maxPlayers as number
     : 2
@@ -217,6 +224,8 @@ function handleCreateRoom(ctx: ConnectionCtx, msg: Extract<ClientCommand, { type
     customCardDbIds,
     enableParentCards,
     draftParents,
+    draftMode: draftOptions.value?.draftMode,
+    draftPoolSize: draftOptions.value?.draftPoolSize,
     enableThroughTheSeasons,
     enableFarmersOfTheMoor,
     allowIncompleteFarmersOfTheMoorMinorDeal,
@@ -267,6 +276,10 @@ function handleJoinRoom(ctx: ConnectionCtx, msg: Extract<ClientCommand, { type: 
   room.players.push({ ws: ctx.ws, playerIndex: ctx.currentPlayerIndex, name, userId: ctx.currentUserId })
   room.players.sort((a, b) => a.playerIndex - b.playerIndex)
   room.session.updatePlayerName(ctx.currentPlayerIndex, name)
+  if (room.players.length === room.maxPlayers) {
+    room.status = 'playing'
+    room.startedAt ??= Date.now()
+  }
   ctx.checkpoint.recordMeta(room)
   ctx.broadcaster.sendTo(ctx.ws, { type: 'roomJoined', roomId, playerIndex: ctx.currentPlayerIndex })
   ctx.broadcaster.broadcastEvent(room, {
@@ -277,7 +290,6 @@ function handleJoinRoom(ctx: ConnectionCtx, msg: Extract<ClientCommand, { type: 
     maxPlayers: room.maxPlayers,
   })
   if (room.players.length === room.maxPlayers) {
-    room.status = 'playing'
     for (const p of room.players) {
       room.session.updatePlayerName(p.playerIndex, p.name)
     }
@@ -369,19 +381,26 @@ function handleUndoAction(ctx: ConnectionCtx, msg: Extract<ClientCommand, { type
 
 function handleNewGame(ctx: ConnectionCtx, msg: Extract<ClientCommand, { type: 'newGame' }>): void {
   const room = requireRoom(ctx, msg.requestId); if (!room) return
+  const previousRoomId = room.id
   const customCards = loadCustomCardsFromDb(room.customCardDbIds ?? [], room.createdBy)
+  const enableCommunityDeck = room.session.state.enableCommunityDeck
   const enableParentCards = room.enableParentCards ?? room.session.state.enableParentCards
   const enableThroughTheSeasons = room.enableThroughTheSeasons ?? room.session.state.enableThroughTheSeasons
   const enableFarmersOfTheMoor = room.enableFarmersOfTheMoor ?? (room.session.state.enableFarmersOfTheMoor === true)
   const allowIncompleteFarmersOfTheMoorMinorDeal = room.allowIncompleteFarmersOfTheMoorMinorDeal ?? false
+  let session: GameSession
   try {
-    room.session = new GameSession(
+    session = new GameSession(
       typeof msg.seed === 'number' ? msg.seed : undefined,
       customCards.length > 0 ? customCards : undefined,
       {
         playerCount: room.maxPlayers,
+        enableCommunityDeck,
         enableParentCards,
         ...(room.draftParents === false ? { draftParents: false } : {}),
+        ...(room.draftMode === 'simultaneous'
+          ? { draftMode: room.draftMode, draftPoolSize: room.draftPoolSize ?? 7 }
+          : {}),
         enableThroughTheSeasons,
         enableFarmersOfTheMoor,
         allowIncompleteFarmersOfTheMoorMinorDeal,
@@ -391,6 +410,15 @@ function handleNewGame(ctx: ConnectionCtx, msg: Extract<ClientCommand, { type: '
     sendCommandError(ctx, err instanceof Error ? err.message : String(err), msg.requestId)
     return
   }
+  const nextRoomId = generateRoomId(ctx)
+  ctx.checkpoint.discardRoom(previousRoomId)
+  ctx.registry.delete(previousRoomId)
+  ctx.registry.clearActivity(previousRoomId)
+  room.id = nextRoomId
+  room.session = session
+  room.version = 0
+  room.status = room.players.length === room.maxPlayers ? 'playing' : 'waiting'
+  room.startedAt = room.status === 'playing' ? Date.now() : undefined
   room.enableParentCards = enableParentCards
   room.enableThroughTheSeasons = enableThroughTheSeasons
   room.enableFarmersOfTheMoor = enableFarmersOfTheMoor
@@ -398,6 +426,9 @@ function handleNewGame(ctx: ConnectionCtx, msg: Extract<ClientCommand, { type: '
   for (const player of room.players) {
     room.session.updatePlayerName(player.playerIndex, player.name)
   }
+  ctx.registry.set(room)
+  ctx.registry.touchActivity(room.id, Date.now())
+  ctx.checkpoint.recordCreated(room)
   const resp = room.session.withCtx(() => room.session.getState())
   ctx.broadcaster.broadcastState(room, resp, 'reconnect', msg.requestId)
 }

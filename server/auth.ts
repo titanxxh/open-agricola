@@ -458,14 +458,8 @@ export function deleteAccount(userId: string): { ok: true } {
     }
 
     if (affectedRoomIds.length > 0) {
-      db.prepare(`
-        UPDATE rooms
-        SET status = 'finished',
-            state_json = NULL,
-            created_by = CASE WHEN created_by = ? THEN NULL ELSE created_by END,
-            updated_at = ?
-        WHERE id IN (${idPlaceholders(affectedRoomIds)})
-      `).run(userId, now, ...affectedRoomIds)
+      db.prepare(`DELETE FROM rooms WHERE id IN (${idPlaceholders(affectedRoomIds)})`)
+        .run(...affectedRoomIds)
     }
 
     db.prepare('DELETE FROM github_propose_audit WHERE user_id = ?').run(userId)

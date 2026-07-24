@@ -150,7 +150,7 @@ describe('Room Persistence Checkpoint', () => {
   it('cancels stale writes for deleted and terminal rooms', () => {
     const persistence = new InMemoryRoomPersistence()
     const save = vi.spyOn(persistence, 'save')
-    const markFinished = vi.spyOn(persistence, 'markFinished')
+    const complete = vi.spyOn(persistence, 'complete')
     const clock = schedulerHarness()
     const checkpoint = createRoomPersistenceCheckpoint({
       persistence,
@@ -159,19 +159,26 @@ describe('Room Persistence Checkpoint', () => {
     })
     const deleted = room('deleted')
     const finished = room('finished')
+    finished.startedAt = 1
+    finished.session.state.gameOver = true
 
     checkpoint.recordState(deleted)
-    checkpoint.deleteRoom(deleted.id)
+    checkpoint.discardRoom(deleted.id)
     checkpoint.flushRoom(deleted)
     checkpoint.recordState(deleted)
     checkpoint.recordState(finished)
-    checkpoint.recordFinished(finished.id)
+    checkpoint.completeGame(finished)
     checkpoint.flushRoom(finished)
     checkpoint.recordState(finished)
     clock.tick()
 
-    expect(save).not.toHaveBeenCalled()
-    expect(markFinished).toHaveBeenCalledWith('finished', 123)
+    expect(save).toHaveBeenCalledOnce()
+    expect(complete).toHaveBeenCalledWith(expect.objectContaining({
+      roomId: 'finished',
+      startedAt: 1,
+      finishedAt: 123,
+      playerCount: 2,
+    }))
     expect(clock.pending()).toBe(0)
   })
 
@@ -195,10 +202,10 @@ describe('Room Persistence Checkpoint', () => {
     expect(save).toHaveBeenCalledTimes(2)
   })
 
-  it('filters dirty saves without filtering completion checkpoints', () => {
+  it('filters dirty saves without filtering discard checkpoints', () => {
     const persistence = new InMemoryRoomPersistence()
     const save = vi.spyOn(persistence, 'save')
-    const markFinished = vi.spyOn(persistence, 'markFinished')
+    const discard = vi.spyOn(persistence, 'discard')
     const checkpoint = createRoomPersistenceCheckpoint({
       persistence,
       shouldPersist: (r) => r.id === 'dev2',
@@ -208,8 +215,26 @@ describe('Room Persistence Checkpoint', () => {
     checkpoint.flushAll()
     expect(save).not.toHaveBeenCalled()
 
-    checkpoint.recordFinished('r1', 123)
-    expect(markFinished).toHaveBeenCalledWith('r1', 123)
+    checkpoint.discardRoom('r1')
+    expect(discard).toHaveBeenCalledWith('r1')
+    checkpoint.shutdown()
+  })
+
+  it('retains the final state and leaves completion retryable on archive failure', () => {
+    const persistence = new InMemoryRoomPersistence()
+    vi.spyOn(persistence, 'complete').mockReturnValue({ ok: false, error: 'write failed' })
+    const save = vi.spyOn(persistence, 'save')
+    const checkpoint = createRoomPersistenceCheckpoint({ persistence })
+    const finished = room('finished')
+    finished.startedAt = 10
+    finished.session.state.gameOver = true
+
+    expect(checkpoint.completeGame(finished, 20)).toEqual({ ok: false, error: 'write failed' })
+    expect(persistence.load('finished')?.serialized?.gameOver).toBe(true)
+    checkpoint.recordState(finished)
+    checkpoint.flushAll()
+
+    expect(save).toHaveBeenCalledTimes(2)
     checkpoint.shutdown()
   })
 

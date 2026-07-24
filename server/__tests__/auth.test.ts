@@ -748,7 +748,7 @@ describe('auth', () => {
     const count = (sql: string, ...params: unknown[]): number =>
       (getDb().prepare(sql).get(...params) as { n: number }).n
 
-    it('removes account-owned data and finishes persisted rooms involving the user', async () => {
+    it('removes account-owned data and discards persisted rooms involving the user', async () => {
       const db = getDb()
       const user = await createLocalUserForTests('deleteme', 'password123', 'Delete Me')
       const other = await createLocalUserForTests('otheruser', 'password123', 'Other User')
@@ -832,16 +832,7 @@ describe('auth', () => {
       expect(count('SELECT COUNT(*) AS n FROM github_propose_rate_limit WHERE user_id = ?', user.id)).toBe(0)
       expect(count('SELECT COUNT(*) AS n FROM github_propose_audit WHERE user_id = ? OR workshop_card_id = ?', user.id, 'owned-card')).toBe(0)
 
-      const rooms = db.prepare('SELECT id, created_by, state_json, status FROM rooms ORDER BY id').all() as Array<{
-        id: string
-        created_by: string | null
-        state_json: string | null
-        status: string
-      }>
-      expect(rooms).toEqual([
-        { id: 'joined-room', created_by: other.id, state_json: null, status: 'finished' },
-        { id: 'owned-room', created_by: null, state_json: null, status: 'finished' },
-      ])
+      expect(count('SELECT COUNT(*) AS n FROM rooms')).toBe(0)
     })
 
     it('reserves deleted admin usernames after removing the user row', async () => {

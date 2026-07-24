@@ -6,7 +6,7 @@ import { afterEach, describe, expect, it } from 'vitest'
 import { SqliteRoomPersistence } from '../sqlite-adapter.ts'
 import { JsonRoomPersistence } from '../json-adapter.ts'
 import { InMemoryRoomPersistence } from '../memory-adapter.ts'
-import type { RoomMeta, RoomPersistence } from '../room-persistence.ts'
+import type { GameResult, RoomMeta, RoomPersistence } from '../room-persistence.ts'
 import type { SerializedGameState } from '../../../../shared/session/serialization.ts'
 
 const META: RoomMeta = {
@@ -17,6 +17,18 @@ const META: RoomMeta = {
   players: [{ userId: 'u', playerIndex: 0 }],
 }
 const STATE = { _stub: true } as unknown as SerializedGameState
+const RESULT: GameResult = {
+  roomId: 'r1',
+  startedAt: 1,
+  finishedAt: 2,
+  roundsPlayed: 14,
+  playerCount: 1,
+  communityDeck: false,
+  parentCards: false,
+  throughTheSeasons: false,
+  farmersOfTheMoor: false,
+  players: [{ playerIndex: 0, gamePlayerId: 'p1', userId: 'u', displayName: 'P1', score: 10 }],
+}
 
 const setupSqlite = (): RoomPersistence => {
   const db = new Database(':memory:')
@@ -29,10 +41,20 @@ const setupSqlite = (): RoomPersistence => {
       enable_through_the_seasons INTEGER NOT NULL DEFAULT 0,
       enable_farmers_of_the_moor INTEGER NOT NULL DEFAULT 0,
       allow_incomplete_farmers_of_the_moor_minor_deal INTEGER NOT NULL DEFAULT 0,
-      created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL);
+      started_at INTEGER, created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL);
     CREATE TABLE room_players (room_id TEXT NOT NULL REFERENCES rooms(id) ON DELETE CASCADE,
       user_id TEXT NOT NULL, player_index INTEGER NOT NULL, joined_at INTEGER NOT NULL,
       PRIMARY KEY (room_id, user_id));
+    CREATE TABLE game_results (
+      room_id TEXT PRIMARY KEY, started_at INTEGER NOT NULL, finished_at INTEGER NOT NULL,
+      rounds_played INTEGER NOT NULL, player_count INTEGER NOT NULL,
+      enable_community_deck INTEGER NOT NULL, enable_parent_cards INTEGER NOT NULL,
+      enable_through_the_seasons INTEGER NOT NULL, enable_farmers_of_the_moor INTEGER NOT NULL);
+    CREATE TABLE game_result_players (
+      room_id TEXT NOT NULL REFERENCES game_results(room_id) ON DELETE CASCADE,
+      player_index INTEGER NOT NULL, game_player_id TEXT NOT NULL, user_id TEXT,
+      display_name TEXT NOT NULL, score INTEGER NOT NULL,
+      PRIMARY KEY (room_id, player_index));
   `)
   return new SqliteRoomPersistence(db)
 }
@@ -74,17 +96,25 @@ for (const [name, factory] of adapters) {
       expect(p.load('r1')?.serialized).toEqual(STATE)
     })
 
-    it('delete removes the row', () => {
+    it('discard removes the row', () => {
       const p = factory(register)
       p.save('r1', STATE, META)
-      p.delete('r1')
+      p.discard('r1')
       expect(p.load('r1')).toBeNull()
     })
 
-    it('markFinished does not throw', () => {
+    it('complete removes the full-state row', () => {
       const p = factory(register)
       p.save('r1', STATE, META)
-      expect(() => p.markFinished('r1', Date.now())).not.toThrow()
+      expect(p.complete(RESULT).ok).toBe(true)
+      expect(p.load('r1')).toBeNull()
+    })
+
+    it('detects active room ids', () => {
+      const p = factory(register)
+      p.save('r1', STATE, META)
+      expect(p.hasRoomId('r1')).toBe(true)
+      expect(p.hasRoomId('missing')).toBe(false)
     })
 
     it('listRestorable returns at most non-finished rooms', () => {
