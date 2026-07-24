@@ -11,6 +11,7 @@ export const registerExecutorBackedCustomCard = (cardData: CustomCardData): void
   if (!compiledCode || !codeManifest) return
 
   const cardId = cardJson.id
+  const sessionCtx = getCurrentSessionContext()
   const effect: CardEffect = { id: cardId }
   for (const hook of codeManifest.effectHooks) {
     ;(effect as Record<string, unknown>)[hook] = (
@@ -27,7 +28,9 @@ export const registerExecutorBackedCustomCard = (cardData: CustomCardData): void
         paymentInfo,
       })
       if (!response.ok) {
-        console.warn(`[custom-code-runtime] custom card ${cardId} hook "${hook}" failed:`, response.error)
+        const warning = `Custom card ${cardId} hook "${hook}" failed: ${response.error}`
+        console.warn(`[custom-code-runtime] ${warning}`)
+        sessionCtx?.reportWarning(warning)
         return undefined
       }
       return response.result ?? undefined
@@ -39,7 +42,6 @@ export const registerExecutorBackedCustomCard = (cardData: CustomCardData): void
 
   // Register into session context when one is active; otherwise write
   // directly to the active CardRegistry (test-only path).
-  const sessionCtx = getCurrentSessionContext()
   if (codeManifest.effectHooks.length > 0) {
     if (sessionCtx) {
       sessionCtx.registerEffect(effect)
@@ -64,7 +66,9 @@ export const registerExecutorBackedCustomCard = (cardData: CustomCardData): void
           context,
         })
         if (!response.ok) {
-          console.warn(`[custom-code-runtime] custom card ${cardId} listener "${listener.registrationId}" failed:`, response.error)
+          const warning = `Custom card ${cardId} listener "${listener.registrationId}" failed: ${response.error}`
+          console.warn(`[custom-code-runtime] ${warning}`)
+          sessionCtx?.reportWarning(warning)
           return undefined
         }
         return response.result ?? undefined

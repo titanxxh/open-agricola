@@ -233,6 +233,64 @@ describe('useWorkshopDraft', () => {
     expect(result.current.state?.save.status).toBe('saved')
   })
 
+  it('queues newer edits behind an in-flight checkpoint', async () => {
+    const saves: Array<{
+      body: { baseRevision: number; draft: WorkshopClientDraft }
+      resolve: (response: Response) => void
+    }> = []
+    const apiFetch = vi.fn(async (_path: string, init?: RequestInit) => {
+      if (!init) {
+        return new Response(JSON.stringify({ ok: true, workspace: workspace(1) }))
+      }
+      const body = JSON.parse(String(init.body)) as {
+        baseRevision: number
+        draft: WorkshopClientDraft
+      }
+      return new Promise<Response>(resolve => {
+        saves.push({ body, resolve })
+      })
+    })
+    const { result } = renderHook(() => useWorkshopDraft({
+      cardId: 'card-1',
+      apiFetch,
+    }))
+    await waitFor(() => expect(result.current.state?.baseRevision).toBe(1))
+    act(() => result.current.updateDraft(draft('First checkpoint')))
+
+    let firstSave: Promise<boolean> | undefined
+    let secondSave: Promise<boolean> | undefined
+    act(() => {
+      firstSave = result.current.checkpoint()
+    })
+    await waitFor(() => expect(saves).toHaveLength(1))
+    act(() => {
+      result.current.updateDraft(draft('Latest checkpoint'))
+      secondSave = result.current.checkpoint()
+    })
+
+    saves[0]!.resolve(new Response(JSON.stringify({
+      ok: true,
+      workspace: workspace(2, 'First checkpoint'),
+    })))
+    await waitFor(() => expect(saves).toHaveLength(2))
+    expect(saves[1]!.body).toMatchObject({
+      baseRevision: 2,
+      draft: { name: 'Latest checkpoint' },
+    })
+
+    saves[1]!.resolve(new Response(JSON.stringify({
+      ok: true,
+      workspace: workspace(3, 'Latest checkpoint'),
+    })))
+    await act(async () => {
+      expect(await firstSave).toBe(true)
+      expect(await secondSave).toBe(true)
+    })
+    expect(result.current.state?.baseRevision).toBe(3)
+    expect(result.current.state?.draft.name).toBe('Latest checkpoint')
+    expect(result.current.state?.save.status).toBe('saved')
+  })
+
   it('waits for an in-flight checkpoint and saves newer edits before changing stages', async () => {
     const saves: Array<{
       body: { baseRevision: number; draft: WorkshopClientDraft }
@@ -315,6 +373,45 @@ describe('useWorkshopDraft', () => {
     await waitFor(() => expect(result.current.state?.save.status).toBe('conflict'))
     expect(result.current.state?.conflict?.server.revision).toBe(3)
     expect(result.current.state?.conflict?.local.draft.name).toBe('Offline work')
+  })
+
+  it('marks local candidates stale when resolving a conflict with the server draft', async () => {
+    localStorage.setItem(workshopDraftStorageKey('card-1'), JSON.stringify({
+      baseRevision: 1,
+      draft: draft('Offline work'),
+      sessionState: {
+        artCandidates: [{
+          id: 'art-1',
+          kind: 'art',
+          prompt: 'old prompt',
+          resultUrl: '/old.png',
+          createdAt: 10,
+          baseRevision: 1,
+          stale: false,
+        }],
+        abilityCandidates: [],
+        artPrompt: 'old prompt',
+        abilityInput: '',
+        abilityMessages: [],
+      },
+    }))
+    const apiFetch = vi.fn(async () =>
+      new Response(JSON.stringify({ ok: true, workspace: workspace(2, 'Server work') })),
+    )
+    const { result } = renderHook(() => useWorkshopDraft({
+      cardId: 'card-1',
+      apiFetch,
+    }))
+    await waitFor(() => expect(result.current.state?.save.status).toBe('conflict'))
+
+    await act(async () => {
+      expect(await result.current.resolveConflict('server')).toBe(true)
+    })
+
+    expect(result.current.state?.draft.name).toBe('Server work')
+    expect(result.current.state?.session.artCandidates).toEqual([
+      expect.objectContaining({ id: 'art-1', stale: true }),
+    ])
   })
 
   it('keeps the local draft when a checkpoint receives 409', async () => {
@@ -461,6 +558,98 @@ describe('useWorkshopDraft', () => {
       candidate: { id: 'art-1', prompt: 'a field' },
     })
     expect(localStorage.getItem(workshopDraftStorageKey('card-1'))).toBeNull()
+  })
+
+  it('preserves edits made while candidate adoption is in flight', async () => {
+    let finishAdopt: ((response: Response) => void) | undefined
+    const apiFetch = vi.fn(async (path: string, init?: RequestInit) => {
+      if (!init) {
+        return new Response(JSON.stringify({ ok: true, workspace: workspace(1) }))
+      }
+      const body = JSON.parse(String(init.body)) as {
+        draft?: WorkshopClientDraft
+        candidate?: Record<string, unknown>
+      }
+      if (init.method === 'PUT') {
+        return new Response(JSON.stringify({
+          ok: true,
+          workspace: {
+            ...workspace(2),
+            draft: body.draft,
+          },
+        }))
+      }
+      if (path.endsWith('/adopt')) {
+        return new Promise<Response>(resolve => {
+          finishAdopt = resolve
+        })
+      }
+      throw new Error(`Unexpected request: ${path}`)
+    })
+    const { result } = renderHook(() => useWorkshopDraft({
+      cardId: 'card-1',
+      apiFetch,
+    }))
+    await waitFor(() => expect(result.current.state?.baseRevision).toBe(1))
+    act(() => result.current.dispatch({
+      type: 'candidateCompleted',
+      candidate: {
+        id: 'art-1',
+        kind: 'art',
+        prompt: 'a field',
+        resultUrl: '/card-art/candidate.png',
+        createdAt: 10,
+        baseRevision: 1,
+        stale: false,
+      },
+    }))
+
+    let adoption: Promise<boolean> | undefined
+    act(() => {
+      adoption = result.current.adoptCandidate(
+        result.current.state!.session.artCandidates[0]!,
+      )
+    })
+    await waitFor(() => expect(finishAdopt).toBeTypeOf('function'))
+    act(() => {
+      const current = result.current.state!.draft
+      result.current.updateDraft({
+        ...current,
+        name: 'Typed during adoption',
+        cardJson: { ...current.cardJson, name: 'Typed during adoption' },
+      })
+    })
+
+    const adopted = workspace(3)
+    adopted.draft.artUrl = '/card-art/candidate.png'
+    adopted.draft.generation = {
+      art: {
+        adopted: {
+          id: 'art-1',
+          kind: 'art',
+          prompt: 'a field',
+          resultUrl: '/card-art/candidate.png',
+          createdAt: 10,
+          baseRevision: 2,
+          stale: false,
+        },
+      },
+    }
+    finishAdopt!(new Response(JSON.stringify({
+      ok: true,
+      workspace: adopted,
+      versionId: 'version-1',
+    })))
+
+    await act(async () => {
+      expect(await adoption).toBe(true)
+    })
+    expect(result.current.state?.draft.name).toBe('Typed during adoption')
+    expect(result.current.state?.draft.artUrl).toBe('/card-art/candidate.png')
+    expect(result.current.state?.session.artCandidates).toEqual([
+      expect.objectContaining({ id: 'art-1', stale: true }),
+    ])
+    expect(result.current.state?.save.status).toBe('dirty')
   })
 
   it('publishes and confirms the same immutable sandbox version', async () => {

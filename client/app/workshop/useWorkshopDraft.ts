@@ -82,6 +82,27 @@ const parseRecovery = (raw: string | null): WorkshopLocalRecovery | null => {
   }
 }
 
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  Boolean(value) && typeof value === 'object' && !Array.isArray(value)
+
+const mergeConcurrentEdits = <T>(base: T, local: T, server: T): T => {
+  if (Object.is(base, local)) return server
+  if (!isRecord(base) || !isRecord(local) || !isRecord(server)) return local
+  const merged: Record<string, unknown> = { ...server }
+  for (const key of new Set([...Object.keys(base), ...Object.keys(local)])) {
+    if (!(key in local)) {
+      delete merged[key]
+    } else if (!(key in base)) {
+      merged[key] = local[key]
+    } else {
+      const value = mergeConcurrentEdits(base[key], local[key], server[key])
+      if (value === undefined && !(key in server)) delete merged[key]
+      else merged[key] = value
+    }
+  }
+  return merged as T
+}
+
 export const workshopDraftStorageKey = (cardId: string): string =>
   `open-agricola-workshop-draft:${cardId}`
 
@@ -96,7 +117,11 @@ export const useWorkshopDraft = ({
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const stateRef = useRef<WorkshopDraftState | null>(null)
-  const savePromiseRef = useRef<Promise<boolean> | null>(null)
+  const saveRequestRef = useRef<{
+    promise: Promise<boolean>
+    baseRevision: number
+    draft: WorkshopClientDraft
+  } | null>(null)
   const storageKey = workshopDraftStorageKey(cardId)
 
   const dispatch = useCallback((action: WorkshopDraftAction) => {
@@ -242,18 +267,33 @@ export const useWorkshopDraft = ({
     }
   }, [apiFetch, cardId, dispatch, persist])
 
-  const saveDraft = useCallback((
+  const saveDraft = useCallback(async function enqueueSave(
     current: WorkshopDraftState,
     baseRevision = current.baseRevision,
     draft = current.draft,
-  ): Promise<boolean> => {
-    if (savePromiseRef.current) return savePromiseRef.current
+  ): Promise<boolean> {
+    const inFlight = saveRequestRef.current
+    if (inFlight) {
+      const sameRequest = inFlight.baseRevision === baseRevision && inFlight.draft === draft
+      const saved = await inFlight.promise
+      if (sameRequest) return saved
+      const latest = stateRef.current
+      if (!latest || latest.save.status === 'conflict') return false
+      const explicitDraft = baseRevision !== current.baseRevision || draft !== current.draft
+      return enqueueSave(
+        latest,
+        latest.baseRevision,
+        explicitDraft ? draft : latest.draft,
+      )
+    }
     const promise = runSaveDraft(current, baseRevision, draft)
-    savePromiseRef.current = promise
-    void promise.finally(() => {
-      if (savePromiseRef.current === promise) savePromiseRef.current = null
-    })
-    return promise
+    const request = { promise, baseRevision, draft }
+    saveRequestRef.current = request
+    try {
+      return await promise
+    } finally {
+      if (saveRequestRef.current === request) saveRequestRef.current = null
+    }
   }, [runSaveDraft])
 
   const checkpoint = useCallback(async (): Promise<boolean> => {
@@ -284,12 +324,24 @@ export const useWorkshopDraft = ({
     if (!current?.conflict) return false
     if (choice === 'server') {
       localStorage.removeItem(storageKey)
+      const serverState = createWorkshopDraftState(
+        current.conflict.server,
+        current.conflict.local.sessionState,
+      )
+      serverState.session = {
+        ...serverState.session,
+        artCandidates: serverState.session.artCandidates.map(candidate => ({
+          ...candidate,
+          stale: true,
+        })),
+        abilityCandidates: serverState.session.abilityCandidates.map(candidate => ({
+          ...candidate,
+          stale: true,
+        })),
+      }
       dispatch({
         type: 'serverLoaded',
-        state: createWorkshopDraftState(
-          current.conflict.server,
-          current.conflict.local.sessionState,
-        ),
+        state: serverState,
       })
       return true
     }
@@ -334,10 +386,11 @@ export const useWorkshopDraft = ({
       )
       const payload = await response.json() as WorkspaceResponse
       if (response.status === 409 && payload.current) {
+        const latest = stateRef.current ?? current
         dispatch({
           type: 'conflictDetected',
           server: payload.current,
-          local: toLocalRecovery(current),
+          local: toLocalRecovery(latest),
         })
         return false
       }
@@ -349,13 +402,31 @@ export const useWorkshopDraft = ({
         })
         return false
       }
-      const adopted = workshopDraftReducer(current, {
+      const latest = stateRef.current ?? current
+      const adopted = workshopDraftReducer(latest, {
         type: 'candidateAdopted',
         kind: candidate.kind,
         workspace: payload.workspace,
       })
-      dispatch({ type: 'serverLoaded', state: adopted })
-      persist(adopted)
+      const concurrentDraft = latest.draft !== current.draft
+      const next = concurrentDraft || latest.session !== current.session
+        ? {
+            ...adopted,
+            draft: mergeConcurrentEdits(current.draft, latest.draft, adopted.draft),
+            session: mergeConcurrentEdits(current.session, latest.session, adopted.session),
+            sandboxPassVersionId: concurrentDraft
+              ? latest.sandboxPassVersionId
+              : adopted.sandboxPassVersionId,
+            sandboxPassedAt: concurrentDraft
+              ? latest.sandboxPassedAt
+              : adopted.sandboxPassedAt,
+            save: concurrentDraft || latest.save.status === 'dirty'
+              ? { status: 'dirty' as const }
+              : adopted.save,
+          }
+        : adopted
+      dispatch({ type: 'serverLoaded', state: next })
+      persist(next)
       return true
     } catch (reason) {
       dispatch({
