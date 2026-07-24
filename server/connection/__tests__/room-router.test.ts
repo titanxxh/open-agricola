@@ -204,6 +204,30 @@ describe('handleCreateRoom', () => {
     expect(new Set(loggedPlayerNames)).toEqual(new Set(['PlayerB', 'Bob']))
   })
 
+  it('starts a full room when a disconnected owner still reserves a seat', () => {
+    const deps = newDeps()
+    const host = newCtx(deps)
+    host.currentUserId = 'u1'
+    dispatch(host, { type: 'createRoom', maxPlayers: 2, name: 'Alice' })
+    host.currentRoom!.players = []
+    const guest = newCtx(deps)
+    guest.currentUserId = 'u2'
+
+    dispatch(guest, {
+      type: 'joinRoom',
+      roomId: host.currentRoom!.id,
+      name: 'Bob',
+    })
+
+    expect(host.currentRoom!.status).toBe('playing')
+    expect(host.currentRoom!.startedAt).toEqual(expect.any(Number))
+    expect(sentMessagesOf(guest)).toContainEqual(expect.objectContaining({
+      type: 'playerJoined',
+      playerCount: 2,
+    }))
+    expect(sentTypesOf(guest)).toContain('gameStarted')
+  })
+
   it('checkpoints newGame state through the broadcast path', () => {
     const ctx = newCtx()
     ctx.currentUserId = 'u1'
@@ -254,6 +278,30 @@ describe('handleCreateRoom', () => {
     expect(nextRoomId).toMatch(/^dev2-[0-9a-f-]{36}$/)
     expect(nextRoomId).not.toBe('dev2')
     expect(sentTypesOf(ctx).slice(before)).toContain('stateUpdate')
+  })
+
+  it('does not carry disconnected seat owners into the new room id', () => {
+    const deps = newDeps()
+    const host = newCtx(deps)
+    host.currentUserId = 'u1'
+    dispatch(host, { type: 'createRoom', maxPlayers: 2 })
+    const guest = newCtx(deps)
+    guest.currentUserId = 'u2'
+    dispatch(guest, { type: 'joinRoom', roomId: host.currentRoom!.id })
+    host.currentRoom!.players = host.currentRoom!.players.filter((player) =>
+      player.userId === 'u1'
+    )
+
+    dispatch(host, { type: 'newGame', seed: 309 })
+
+    expect(host.currentRoom!.seatOwners).toEqual([
+      { playerIndex: 0, userId: 'u1' },
+    ])
+    expect(host.currentRoom!.status).toBe('waiting')
+    const replacement = newCtx(deps)
+    replacement.currentUserId = 'u3'
+    dispatch(replacement, { type: 'joinRoom', roomId: host.currentRoom!.id })
+    expect(replacement.currentPlayerIndex).toBe(1)
   })
 
   it('keeps a completed game archive immutable when starting the next game', () => {

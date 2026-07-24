@@ -8,7 +8,7 @@ import {
   WAITING_EMPTY_ROOM_TTL_MS,
   buildFixedDevRoomInitialStateOptions,
   emptyRoomTtlMs,
-  isFixedDevRoom,
+  isDevRoom,
   parseFixedDevRoomStartupOptions,
   removePlayerFromRoom,
   snapshotToRoom,
@@ -110,7 +110,7 @@ const startRoomCleanup = (
   return setInterval(() => {
     const now = Date.now()
     for (const room of registry.iter()) {
-      if (isFixedDevRoom(room.id)) continue
+      if (isDevRoom(room.id)) continue
       if (room.players.length > 0) {
         registry.touchActivity(room.id, now)
         continue
