@@ -172,15 +172,18 @@ describe('lobby.dissolveRoomById', () => {
     })
   })
 
-  it('rejects fixed dev rooms', () => {
+  it('rejects fixed and rotated dev rooms', () => {
     const registry = new RoomRegistry()
     registry.set(fakeRoom({ id: 'dev2', createdBy: 'u1' }))
+    const rotatedId = 'dev2-12345678-1234-1234-1234-123456789abc'
+    registry.set(fakeRoom({ id: rotatedId }))
     const lobby = createLobby({
       registry,
       checkpoint: checkpoint(),
       broadcaster: fakeBroadcaster(),
     })
     expect(lobby.dissolveRoomById('dev2', 'u1').ok).toBe(false)
+    expect(lobby.dissolveRoomById(rotatedId, undefined).ok).toBe(false)
   })
 
   it('happy path: broadcasts roomDissolved + closes sockets + cleans state', () => {
@@ -213,6 +216,23 @@ describe('lobby.dissolveRoomById', () => {
 })
 
 describe('lobby.endRoomsForUser', () => {
+  it('does not end rotated dev rooms for a deleted participant', () => {
+    const id = 'dev2-12345678-1234-1234-1234-123456789abc'
+    const registry = new RoomRegistry()
+    registry.set(fakeRoom({
+      id,
+      seatOwners: [{ playerIndex: 0, userId: 'u1' }],
+    }))
+    const lobby = createLobby({
+      registry,
+      checkpoint: checkpoint(),
+      broadcaster: fakeBroadcaster(),
+    })
+
+    expect(lobby.endRoomsForUser('u1')).toEqual({ endedRoomIds: [] })
+    expect(registry.has(id)).toBe(true)
+  })
+
   it('ends rooms created by or joined by the deleted user', () => {
     const closeCalls: string[] = []
     const fakeWs = (id: string) => ({ readyState: 1, OPEN: 1, close: () => closeCalls.push(id), send: vi.fn() })
