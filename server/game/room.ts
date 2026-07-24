@@ -228,7 +228,10 @@ export const removePlayerFromRoom = (
   return room.players.length === 0 ? 'empty' : 'remaining'
 }
 
-type RoomLikeForSummary = Pick<Room, 'id' | 'players' | 'maxPlayers' | 'createdBy'>
+type RoomLikeForSummary = Pick<
+  Room,
+  'id' | 'players' | 'seatOwners' | 'maxPlayers' | 'createdBy'
+>
 
 export function summarizeRoomsForLobby(
   source: Iterable<RoomLikeForSummary>,
@@ -238,12 +241,18 @@ export function summarizeRoomsForLobby(
   const list: RoomSummary[] = []
   for (const r of source) {
     if (r.players.length === 0 && !isFixedDev(r.id)) continue
+    const playerCount = isDevRoom(r.id)
+      ? r.players.length
+      : new Set([
+          ...r.players.map((player) => player.playerIndex),
+          ...roomSeatOwners(r).map((owner) => owner.playerIndex),
+        ]).size
     list.push({
       id: r.id,
-      playerCount: r.players.length,
+      playerCount,
       maxPlayers: r.maxPlayers,
       createdBy: r.createdBy,
-      status: r.players.length < r.maxPlayers ? 'waiting' : 'playing',
+      status: playerCount < r.maxPlayers ? 'waiting' : 'playing',
     })
     if (typeof limit === 'number' && list.length >= limit) break
   }

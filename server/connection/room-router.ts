@@ -400,6 +400,14 @@ function handleUndoAction(ctx: ConnectionCtx, msg: Extract<ClientCommand, { type
 function handleNewGame(ctx: ConnectionCtx, msg: Extract<ClientCommand, { type: 'newGame' }>): void {
   const room = requireRoom(ctx, msg.requestId); if (!room) return
   const previousRoomId = room.id
+  const completedGame = room.session.state.gameOver
+  if (completedGame) {
+    const completion = ctx.checkpoint.completeGame(room)
+    if (!completion.ok) {
+      sendCommandError(ctx, `unable to archive completed game: ${completion.error}`, msg.requestId)
+      return
+    }
+  }
   const customCards = loadCustomCardsFromDb(room.customCardDbIds ?? [], room.createdBy)
   const enableCommunityDeck = room.session.state.enableCommunityDeck
   const enableParentCards = room.enableParentCards ?? room.session.state.enableParentCards
@@ -432,7 +440,7 @@ function handleNewGame(ctx: ConnectionCtx, msg: Extract<ClientCommand, { type: '
   }
   const nextRoomId = generateRoomId(ctx, fixedDevRoomRootId(previousRoomId))
   if (!nextRoomId) { sendCommandError(ctx, 'unable to allocate room id', msg.requestId); return }
-  ctx.checkpoint.discardRoom(previousRoomId)
+  if (!completedGame) ctx.checkpoint.discardRoom(previousRoomId)
   ctx.registry.delete(previousRoomId)
   ctx.registry.clearActivity(previousRoomId)
   room.id = nextRoomId

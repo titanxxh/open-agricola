@@ -116,6 +116,36 @@ describe('lobby.getRooms', () => {
       { id: 'half', playerCount: 1, maxPlayers: 4, createdBy: 'u1', status: 'waiting' },
     ])
   })
+
+  it('counts reserved seats so full rooms are not advertised as joinable', () => {
+    const registry = new RoomRegistry()
+    registry.set(fakeRoom({
+      id: 'reserved',
+      players: [{
+        ws: {} as never,
+        playerIndex: 0,
+        name: 'p1',
+        userId: 'u1',
+      }],
+      seatOwners: [
+        { playerIndex: 0, userId: 'u1' },
+        { playerIndex: 1, userId: 'u2' },
+      ],
+    }))
+    const lobby = createLobby({
+      registry,
+      checkpoint: checkpoint(),
+      broadcaster: fakeBroadcaster(),
+    })
+
+    expect(lobby.getRooms()).toEqual([{
+      id: 'reserved',
+      playerCount: 2,
+      maxPlayers: 2,
+      createdBy: 'u1',
+      status: 'playing',
+    }])
+  })
 })
 
 describe('lobby.dissolveRoomById', () => {
