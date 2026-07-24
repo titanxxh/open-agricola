@@ -145,6 +145,15 @@ const roomSeatOwners = (
     .map(([playerIndex, userId]) => ({ playerIndex, userId }))
 }
 
+export const roomOccupiedSeatCount = (
+  room: Pick<Room, 'id' | 'players' | 'seatOwners'>,
+): number => isDevRoom(room.id)
+  ? room.players.length
+  : new Set([
+      ...room.players.map((player) => player.playerIndex),
+      ...roomSeatOwners(room).map((owner) => owner.playerIndex),
+    ]).size
+
 export const toRoomMeta = (room: Room): RoomMeta => ({
   createdBy: room.createdBy ?? null,
   startedAt: room.startedAt ?? null,
@@ -241,12 +250,7 @@ export function summarizeRoomsForLobby(
   const list: RoomSummary[] = []
   for (const r of source) {
     if (r.players.length === 0 && !isFixedDev(r.id)) continue
-    const playerCount = isDevRoom(r.id)
-      ? r.players.length
-      : new Set([
-          ...r.players.map((player) => player.playerIndex),
-          ...roomSeatOwners(r).map((owner) => owner.playerIndex),
-        ]).size
+    const playerCount = roomOccupiedSeatCount(r)
     list.push({
       id: r.id,
       playerCount,

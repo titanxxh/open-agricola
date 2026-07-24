@@ -5,6 +5,7 @@ import {
   isDevRoom,
   resolveJoinPlayerIndex,
   resolveJoinRequestPlayerIndex,
+  roomOccupiedSeatCount,
   type Room,
 } from '../game/room.ts'
 import { validateSession } from '../auth.ts'
@@ -294,7 +295,9 @@ function handleJoinRoom(ctx: ConnectionCtx, msg: Extract<ClientCommand, { type: 
   room.players.push({ ws: ctx.ws, playerIndex: ctx.currentPlayerIndex, name, userId: ctx.currentUserId })
   room.players.sort((a, b) => a.playerIndex - b.playerIndex)
   room.session.updatePlayerName(ctx.currentPlayerIndex, name)
-  if (room.players.length === room.maxPlayers) {
+  const playerCount = roomOccupiedSeatCount(room)
+  const roomFull = playerCount >= room.maxPlayers
+  if (roomFull) {
     room.status = 'playing'
     room.startedAt ??= Date.now()
   }
@@ -304,10 +307,10 @@ function handleJoinRoom(ctx: ConnectionCtx, msg: Extract<ClientCommand, { type: 
     type: 'playerJoined',
     playerIndex: ctx.currentPlayerIndex,
     name,
-    playerCount: room.players.length,
+    playerCount,
     maxPlayers: room.maxPlayers,
   })
-  if (room.players.length === room.maxPlayers) {
+  if (roomFull) {
     for (const p of room.players) {
       room.session.updatePlayerName(p.playerIndex, p.name)
     }
@@ -446,7 +449,12 @@ function handleNewGame(ctx: ConnectionCtx, msg: Extract<ClientCommand, { type: '
   room.id = nextRoomId
   room.session = session
   room.version = 0
-  room.status = room.players.length === room.maxPlayers ? 'playing' : 'waiting'
+  room.seatOwners = room.players.flatMap((player) =>
+    player.userId
+      ? [{ playerIndex: player.playerIndex, userId: player.userId }]
+      : []
+  )
+  room.status = roomOccupiedSeatCount(room) >= room.maxPlayers ? 'playing' : 'waiting'
   room.startedAt = room.status === 'playing' ? Date.now() : undefined
   room.enableParentCards = enableParentCards
   room.draftMode = draftMode
