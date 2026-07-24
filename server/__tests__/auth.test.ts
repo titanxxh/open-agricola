@@ -139,6 +139,26 @@ vi.mock('../db.ts', () => {
       joined_at INTEGER NOT NULL,
       PRIMARY KEY (room_id, user_id)
     );
+    CREATE TABLE game_results (
+      room_id TEXT PRIMARY KEY,
+      started_at INTEGER NOT NULL,
+      finished_at INTEGER NOT NULL,
+      rounds_played INTEGER NOT NULL,
+      player_count INTEGER NOT NULL,
+      enable_community_deck INTEGER NOT NULL,
+      enable_parent_cards INTEGER NOT NULL,
+      enable_through_the_seasons INTEGER NOT NULL,
+      enable_farmers_of_the_moor INTEGER NOT NULL
+    );
+    CREATE TABLE game_result_players (
+      room_id TEXT NOT NULL REFERENCES game_results(room_id) ON DELETE CASCADE,
+      player_index INTEGER NOT NULL,
+      game_player_id TEXT NOT NULL,
+      user_id TEXT,
+      display_name TEXT NOT NULL,
+      score INTEGER NOT NULL,
+      PRIMARY KEY (room_id, player_index)
+    );
     CREATE TABLE workshop_cards (
       id TEXT PRIMARY KEY,
       author_id TEXT NOT NULL REFERENCES users(id),
@@ -778,6 +798,17 @@ describe('auth', () => {
         .run('joined-room', user.id, 1, now)
       db.prepare('INSERT INTO room_players (room_id, user_id, player_index, joined_at) VALUES (?, ?, ?, ?)')
         .run('joined-room', other.id, 0, now)
+      db.prepare(`
+        INSERT INTO game_results (
+          room_id, started_at, finished_at, rounds_played, player_count,
+          enable_community_deck, enable_parent_cards, enable_through_the_seasons, enable_farmers_of_the_moor
+        ) VALUES ('finished-room', ?, ?, 14, 2, 0, 0, 0, 0)
+      `).run(now - 1000, now)
+      db.prepare(`
+        INSERT INTO game_result_players (
+          room_id, player_index, game_player_id, user_id, display_name, score
+        ) VALUES ('finished-room', 0, 'p1', ?, 'Delete Me', 42)
+      `).run(user.id)
 
       db.prepare(`
         INSERT INTO workshop_cards (
@@ -822,6 +853,7 @@ describe('auth', () => {
       expect(count('SELECT COUNT(*) AS n FROM auth_identities WHERE user_id = ?', user.id)).toBe(0)
       expect(count('SELECT COUNT(*) AS n FROM oauth_states WHERE user_id = ?', user.id)).toBe(0)
       expect(count('SELECT COUNT(*) AS n FROM room_players WHERE user_id = ?', user.id)).toBe(0)
+      expect(count('SELECT COUNT(*) AS n FROM game_result_players WHERE user_id IS NULL')).toBe(1)
       expect(count('SELECT COUNT(*) AS n FROM workshop_cards WHERE id = ?', 'owned-card')).toBe(0)
       expect(count('SELECT COUNT(*) AS n FROM workshop_cards WHERE id = ?', 'other-card')).toBe(1)
       expect(count('SELECT COUNT(*) AS n FROM workshop_card_versions WHERE created_by = ?', user.id)).toBe(0)

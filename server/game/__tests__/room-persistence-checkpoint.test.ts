@@ -49,7 +49,7 @@ const schedulerHarness = () => {
 }
 
 describe('Room Persistence Checkpoint', () => {
-  it('keeps creation and metadata immediate while delaying state serialization', () => {
+  it('persists creation state immediately while delaying later state serialization', () => {
     const persistence = new InMemoryRoomPersistence()
     const save = vi.spyOn(persistence, 'save')
     const clock = schedulerHarness()
@@ -58,18 +58,32 @@ describe('Room Persistence Checkpoint', () => {
       scheduler: clock.scheduler,
     })
     const r = room()
+    r.session = new GameSession(undefined, undefined, {
+      playerCount: 2,
+      enableCommunityDeck: true,
+      draftMode: 'simultaneous',
+      draftPoolSize: 8,
+    })
     r.draftParents = false
 
     checkpoint.recordCreated(r)
     expect(save).toHaveBeenCalledOnce()
-    expect(save).toHaveBeenLastCalledWith('r1', null, expect.objectContaining({ status: 'waiting' }))
-    expect(clock.pending()).toBe(1)
+    expect(save).toHaveBeenLastCalledWith('r1', expect.any(Object), expect.objectContaining({ status: 'waiting' }))
+    expect(persistence.load('r1')?.serialized).not.toBeNull()
+    expect(snapshotToRoom(persistence.load('r1')!).session.state).toMatchObject({
+      enableCommunityDeck: true,
+      draftMode: 'simultaneous',
+      draftPoolSize: 8,
+    })
+    expect(clock.pending()).toBe(0)
 
     r.status = 'playing'
     checkpoint.recordMeta(r)
     expect(save).toHaveBeenCalledTimes(2)
     expect(save).toHaveBeenLastCalledWith('r1', null, expect.objectContaining({ status: 'playing' }))
 
+    checkpoint.recordState(r)
+    expect(clock.pending()).toBe(1)
     clock.tick()
     expect(save).toHaveBeenCalledTimes(3)
     expect(persistence.load('r1')?.serialized).not.toBeNull()
@@ -247,5 +261,30 @@ describe('Room Persistence Checkpoint', () => {
 
     expect(save).not.toHaveBeenCalled()
     checkpoint.shutdown()
+  })
+
+  it('contains immediate save failures and retries them later', () => {
+    const persistence = new InMemoryRoomPersistence()
+    const originalSave = persistence.save.bind(persistence)
+    const save = vi.spyOn(persistence, 'save')
+      .mockImplementationOnce(() => { throw new Error('write failed') })
+      .mockImplementationOnce(() => { throw new Error('write failed') })
+      .mockImplementationOnce(() => { throw new Error('write failed') })
+      .mockImplementation(originalSave)
+    const clock = schedulerHarness()
+    const checkpoint = createRoomPersistenceCheckpoint({
+      persistence,
+      scheduler: clock.scheduler,
+    })
+    const r = room()
+
+    expect(() => checkpoint.recordCreated(r)).not.toThrow()
+    expect(() => checkpoint.recordMeta(r)).not.toThrow()
+    expect(() => checkpoint.flushRoom(r)).not.toThrow()
+    expect(clock.pending()).toBe(1)
+    clock.tick()
+
+    expect(save).toHaveBeenCalledTimes(4)
+    expect(persistence.load(r.id)?.serialized).not.toBeNull()
   })
 })
