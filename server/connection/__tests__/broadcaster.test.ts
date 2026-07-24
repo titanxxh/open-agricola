@@ -96,6 +96,25 @@ describe('Broadcaster.broadcastState', () => {
     expect(saveSpy).toHaveBeenCalledOnce()
     checkpoint.shutdown()
   })
+
+  it('retries failed completion on terminal reconnect', () => {
+    const persistence = new InMemoryRoomPersistence()
+    const complete = vi.spyOn(persistence, 'complete')
+      .mockReturnValueOnce({ ok: false, error: 'write failed' })
+    const checkpoint = createRoomPersistenceCheckpoint({ persistence })
+    const b = new Broadcaster({ checkpoint })
+    const room = makeRoom('r1')
+    room.startedAt = 1
+    const resp = room.session.withCtx(() => room.session.getState())
+    ;(resp.state as { gameOver?: boolean }).gameOver = true
+
+    b.broadcastState(room, resp, 'action')
+    b.broadcastState(room, resp, 'reconnect')
+
+    expect(complete).toHaveBeenCalledTimes(2)
+    expect(persistence.__getResultForTest('r1')).toBeDefined()
+    checkpoint.shutdown()
+  })
 })
 
 describe('Broadcaster.sendStateTo / broadcastEvent / sendTo', () => {

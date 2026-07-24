@@ -49,13 +49,20 @@ export class RoomPersistenceCheckpoint {
 
   recordCreated(room: Room): void {
     if (!this.canPersist(room)) return
-    this.persistence.save(room.id, null, toRoomMeta(room))
-    this.recordState(room)
+    try {
+      this.saveState(room)
+    } catch (err) {
+      this.retryLater(room, err)
+    }
   }
 
   recordMeta(room: Room): void {
     if (!this.canPersist(room)) return
-    this.persistence.save(room.id, null, toRoomMeta(room))
+    try {
+      this.persistence.save(room.id, null, toRoomMeta(room))
+    } catch (err) {
+      this.retryLater(room, err)
+    }
   }
 
   recordState(room: Room): void {
@@ -68,7 +75,11 @@ export class RoomPersistenceCheckpoint {
     if (!this.canPersist(room)) return
     this.dirtyRooms.delete(room.id)
     this.cancelTimerIfIdle()
-    this.saveState(room)
+    try {
+      this.saveState(room)
+    } catch (err) {
+      this.retryLater(room, err)
+    }
   }
 
   flushAll(): void {
@@ -81,8 +92,7 @@ export class RoomPersistenceCheckpoint {
       try {
         this.saveState(room)
       } catch (err) {
-        this.dirtyRooms.set(room.id, room)
-        console.warn('[room-persistence-checkpoint] flush failed:', err)
+        this.retryLater(room, err)
       }
     }
     this.scheduleFlush()
@@ -138,6 +148,12 @@ export class RoomPersistenceCheckpoint {
       serializeState(room.session.state, { engineStack: room.session.getEngineStack() }),
       toRoomMeta(room),
     )
+  }
+
+  private retryLater(room: Room, err: unknown): void {
+    this.dirtyRooms.set(room.id, room)
+    console.warn('[room-persistence-checkpoint] save failed:', err)
+    this.scheduleFlush()
   }
 
   private buildResult(room: Room, finishedAt: number): GameResult {

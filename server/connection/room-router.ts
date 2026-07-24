@@ -105,12 +105,12 @@ function loadCustomCardsFromDb(cardDbIds: string[], requestUserId?: string): Cus
   return result
 }
 
-const generateRoomId = (ctx: ConnectionCtx): string => {
-  let roomId: string
-  do {
-    roomId = randomUUID()
-  } while (ctx.registry.has(roomId) || ctx.checkpoint.hasRoomId(roomId))
-  return roomId
+const generateRoomId = (ctx: ConnectionCtx): string | null => {
+  for (let attempt = 0; attempt < 8; attempt += 1) {
+    const roomId = randomUUID()
+    if (!ctx.registry.has(roomId) && !ctx.checkpoint.hasRoomId(roomId)) return roomId
+  }
+  return null
 }
 
 const sendCommandError = (ctx: ConnectionCtx, error: string, requestId?: string) => {
@@ -169,6 +169,7 @@ function handleAuth(ctx: ConnectionCtx, msg: Extract<ClientCommand, { type: 'aut
 
 function handleCreateRoom(ctx: ConnectionCtx, msg: Extract<ClientCommand, { type: 'createRoom' }>): void {
   const roomId = generateRoomId(ctx)
+  if (!roomId) { sendCommandError(ctx, 'unable to allocate room id', msg.requestId); return }
   const rawMaxPlayers = typeof (msg as Record<string, unknown>).maxPlayers === 'number'
     ? (msg as Record<string, unknown>).maxPlayers as number
     : 2
@@ -413,6 +414,7 @@ function handleNewGame(ctx: ConnectionCtx, msg: Extract<ClientCommand, { type: '
     return
   }
   const nextRoomId = generateRoomId(ctx)
+  if (!nextRoomId) { sendCommandError(ctx, 'unable to allocate room id', msg.requestId); return }
   ctx.checkpoint.discardRoom(previousRoomId)
   ctx.registry.delete(previousRoomId)
   ctx.registry.clearActivity(previousRoomId)
