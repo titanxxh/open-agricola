@@ -135,6 +135,11 @@ vi.mock('../db.ts', () => {
       status TEXT NOT NULL DEFAULT 'waiting',
       version INTEGER NOT NULL DEFAULT 0,
       custom_card_ids TEXT NOT NULL DEFAULT '[]',
+      enable_parent_cards INTEGER NOT NULL DEFAULT 0,
+      draft_parents INTEGER,
+      enable_through_the_seasons INTEGER NOT NULL DEFAULT 0,
+      enable_farmers_of_the_moor INTEGER NOT NULL DEFAULT 0,
+      allow_incomplete_farmers_of_the_moor_minor_deal INTEGER NOT NULL DEFAULT 0,
       created_at INTEGER NOT NULL,
       updated_at INTEGER NOT NULL
     );

@@ -18,8 +18,8 @@ const META: RoomMeta = {
 
 const STATE = { _stub: true } as unknown as SerializedGameState
 
-const setupDb = () => {
-  const db = new Database(':memory:')
+const setupDb = (options?: Database.Options) => {
+  const db = new Database(':memory:', options)
   db.exec(`
     CREATE TABLE rooms (
       id TEXT PRIMARY KEY,
@@ -156,5 +156,88 @@ describe('SqliteRoomPersistence', () => {
     expect(snap.serialized).toBeNull()
     expect(snap.meta.createdBy).toBe('u1')
     expect(snap.meta.maxPlayers).toBe(2)
+  })
+
+  it('caches prepared statements instead of preparing on each operation', () => {
+    let prepareCalls = 0
+    const instrumented = {
+      prepare: (sql: string) => {
+        prepareCalls += 1
+        return db.prepare(sql)
+      },
+      transaction: db.transaction.bind(db),
+    }
+    const persistence = new SqliteRoomPersistence(instrumented)
+    const preparedAtConstruction = prepareCalls
+
+    persistence.save('r1', STATE, META)
+    persistence.save('r1', STATE, META)
+    persistence.load('r1')
+    persistence.listRestorable({
+      now: Date.now(),
+      waitingTtlMs: WAITING_TTL,
+      playingTtlMs: PLAYING_TTL,
+    })
+
+    expect(prepareCalls).toBe(preparedAtConstruction)
+  })
+
+  it('rolls back the room and players when one player write fails', () => {
+    db.exec(`
+      CREATE TRIGGER reject_player
+      BEFORE INSERT ON room_players
+      WHEN NEW.user_id = 'reject'
+      BEGIN
+        SELECT RAISE(ABORT, 'rejected player');
+      END;
+    `)
+
+    expect(() => p.save('r1', STATE, {
+      ...META,
+      players: [
+        { userId: 'u1', playerIndex: 0 },
+        { userId: 'reject', playerIndex: 1 },
+      ],
+    })).toThrow('rejected player')
+
+    expect(db.prepare('SELECT id FROM rooms WHERE id = ?').get('r1')).toBeUndefined()
+    expect(db.prepare('SELECT room_id FROM room_players WHERE room_id = ?').all('r1')).toEqual([])
+  })
+
+  it('restores healthy rooms when another room has invalid state JSON', () => {
+    p.save('healthy', STATE, META)
+    p.save('invalid', STATE, META)
+    db.prepare("UPDATE rooms SET state_json = '{' WHERE id = 'invalid'").run()
+
+    expect(p.listRestorable({
+      now: Date.now(),
+      waitingTtlMs: WAITING_TTL,
+      playingTtlMs: PLAYING_TTL,
+    }).map((room) => room.id)).toEqual(['healthy'])
+  })
+
+  it.each([0, 1, 1000])('restores %i rooms with one read query', (roomCount) => {
+    const queries: string[] = []
+    const tracedDb = setupDb({ verbose: (sql) => queries.push(sql) })
+    const persistence = new SqliteRoomPersistence(tracedDb)
+    const players = [
+      { userId: 'u1', playerIndex: 0 },
+      { userId: 'u2', playerIndex: 1 },
+    ]
+    for (let index = 0; index < roomCount; index += 1) {
+      persistence.save(`r${index}`, STATE, { ...META, players })
+    }
+    queries.length = 0
+
+    const restored = persistence.listRestorable({
+      now: Date.now(),
+      waitingTtlMs: WAITING_TTL,
+      playingTtlMs: PLAYING_TTL,
+    })
+
+    expect(restored).toHaveLength(roomCount)
+    if (roomCount > 0) expect(restored[0]?.meta.players).toEqual(players)
+    expect(queries.filter((sql) => /^\s*SELECT/i.test(sql))).toHaveLength(1)
+    tracedDb.close()
   })
 })

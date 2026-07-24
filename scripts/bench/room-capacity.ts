@@ -213,6 +213,7 @@ const sleep = (ms: number): Promise<void> => new Promise((resolve) => setTimeout
 
 const createSchema = (db: Database.Database): void => {
   db.pragma('journal_mode = WAL')
+  db.pragma('synchronous = NORMAL')
   db.pragma('busy_timeout = 5000')
   db.pragma('foreign_keys = ON')
   db.exec(`
