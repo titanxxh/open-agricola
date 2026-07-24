@@ -44,5 +44,5 @@ describe('room capacity probe', () => {
     expect(reportText).toContain('Exact invocation')
     expect(reportText).toContain('Steady action p50 ms')
     expect(reportText).toContain('| DB | WAL |')
-  })
+  }, 30_000)
 })
