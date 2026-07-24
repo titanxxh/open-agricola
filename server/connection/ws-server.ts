@@ -196,6 +196,7 @@ const handleConnection = (ws: WebSocket, req: IncomingMessage, deps: ConnectionD
     clearTimeout(authTimer)
     if (trackedUserId) untrack(trackedUserId)
     if (ctx.currentRoom) {
+      deps.checkpoint.flushRoom(ctx.currentRoom)
       const removal = removePlayerFromRoom(ctx.currentRoom, ws)
       if (removal === 'remaining') {
         deps.broadcaster.broadcastEvent(ctx.currentRoom, {
@@ -216,8 +217,10 @@ export type CreateWsServerResult = {
   registry: RoomRegistry
   broadcaster: Broadcaster
   lobby: Lobby
+  checkpoint: RoomPersistenceCheckpoint
   cleanupTimer: NodeJS.Timeout
   closeUserConnections: (userId: string) => void
+  shutdown: () => void
 }
 
 export function createWsServer(
@@ -261,5 +264,21 @@ export function createWsServer(
     activeUserSockets.delete(userId)
   }
 
-  return { wss, registry, broadcaster, lobby, cleanupTimer, closeUserConnections }
+  const shutdown = (): void => {
+    checkpoint.shutdown()
+    clearInterval(cleanupTimer)
+    for (const client of wss.clients) client.close(1001, 'server shutdown')
+    wss.close()
+  }
+
+  return {
+    wss,
+    registry,
+    broadcaster,
+    lobby,
+    checkpoint,
+    cleanupTimer,
+    closeUserConnections,
+    shutdown,
+  }
 }

@@ -59,6 +59,7 @@ describe('handleCreateRoom', () => {
 
     dispatch(ctx, { type: 'createRoom', maxPlayers: 2, name: 'host' })
 
+    ctx.checkpoint.flushAll()
     const snap = ctx.persistence.load(ctx.currentRoom!.id)
     expect(snap?.serialized).not.toBeNull()
     expect(snap?.meta.players).toEqual([{ userId: 'u1', playerIndex: 0 }])
@@ -166,6 +167,7 @@ describe('handleCreateRoom', () => {
 
     dispatch(ctx, { type: 'newGame', seed: 309 })
 
+    ctx.checkpoint.flushAll()
     expect(ctx.persistence.load(ctx.currentRoom!.id)?.serialized?.gameSeed).toBe(309)
   })
 
@@ -178,6 +180,7 @@ describe('handleCreateRoom', () => {
 
     dispatch(ctx, { type: 'loadGame', state: loaded })
 
+    ctx.checkpoint.flushAll()
     expect(ctx.persistence.load(ctx.currentRoom!.id)?.serialized?.gameSeed).toBe(777)
   })
 
