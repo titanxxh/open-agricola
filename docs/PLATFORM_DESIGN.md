@@ -432,7 +432,7 @@ export function getMinorImprovementCard(id: string) {
 ### D3. 沙盒隔离与容错
 
 - 所有自定义卡牌效果/监听器调用包裹在 try/catch 中
-- 异常时：记录错误、跳过该效果、游戏继续
+- 异常时：记录错误、跳过该效果、游戏继续；当前沙盒会话累计去重后的运行错误，工坊确认门禁提交前重新读取并拒绝带错版本
 - `vm.runInContext()` 设 `timeout: 100ms` 防止死循环
 - 状态快照可回滚（利用现有 undo 基础设施）
 

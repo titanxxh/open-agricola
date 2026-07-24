@@ -81,6 +81,9 @@ export class GameSession extends GameCore {
     if (privateEvents.length > 0) base.privateEvents = privateEvents
     if (publicEventCancellations?.length) base.publicEventCancellations = publicEventCancellations
     if (defs.length > 0) base.customCardDefs = defs
+    if (mode === 'debug' && this.cardWarnings.length > 0) {
+      base.cardWarnings = [...this.cardWarnings]
+    }
     return base
   }
 }

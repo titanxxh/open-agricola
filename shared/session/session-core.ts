@@ -767,7 +767,7 @@ export class GameCore {
 
     // Register custom workshop cards into a per-session context (sandbox mode)
     if (customCards && customCards.length > 0) {
-      this.sessionCardContext = new SessionCardContext()
+      this.sessionCardContext = new SessionCardContext(this.cardWarnings)
       withSessionContext(this.sessionCardContext, () => {
         for (const cardData of customCards!) {
           try {

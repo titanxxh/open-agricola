@@ -145,10 +145,7 @@ async function uploadArt(
 
 /**
  * Build the "current language" content fed to LocalizationModal. The modal
- * shows this read-only as the source for the translate button. Picking the
- * right source matters: if the user has already filled in a translation for
- * English we want to honour it, otherwise fall back to the top-level English
- * editor inputs.
+ * shows this read-only as the source for the translate button.
  */
 export function pickLocalizationCurrentContent(args: {
   cardLocales: Record<string, { name: string; desc: string[]; prerequisite?: string }>
@@ -159,18 +156,12 @@ export function pickLocalizationCurrentContent(args: {
   extractedPrerequisite: string | undefined
 }): { name: string; desc: string[]; prerequisite?: string } {
   const localeEntry = args.cardLocales.en
-  const editorPrereq = args.prerequisite || args.extractedPrerequisite
-  if (localeEntry?.name && (localeEntry.desc?.length ?? 0) > 0) {
-    return {
-      name: localeEntry.name,
-      desc: localeEntry.desc,
-      prerequisite: localeEntry.prerequisite ?? editorPrereq,
-    }
-  }
   return {
-    name: args.cardName || args.extractedName || '',
-    desc: args.extractedDesc ?? [],
-    prerequisite: editorPrereq,
+    name: args.cardName || args.extractedName || localeEntry?.name || '',
+    desc: args.extractedDesc ?? localeEntry?.desc ?? [],
+    prerequisite: args.prerequisite
+      || args.extractedPrerequisite
+      || localeEntry?.prerequisite,
   }
 }
 
@@ -1523,6 +1514,8 @@ export function AiCardDesigner({
   const [cardLocales, setCardLocales] = useState<Record<string, CardLocaleEntry>>({})
   const [pendingStage, setPendingStage] = useState<WorkshopStage | null>(null)
   const [sandboxConfirmation, setSandboxConfirmation] = useState(false)
+  const [runtimeSandboxErrors, setRuntimeSandboxErrors] = useState<string[] | null>(null)
+  const sandboxGateErrors = sandboxErrors?.length ? sandboxErrors : runtimeSandboxErrors
   const [versions, setVersions] = useState<WorkshopDraftVersion[]>([])
   const [versionsLoading, setVersionsLoading] = useState(false)
   const [versionsError, setVersionsError] = useState('')
@@ -1964,6 +1957,7 @@ export function AiCardDesigner({
       if (!versionId) return
       updateSession({ sandboxTestVersionId: undefined })
       setSandboxConfirmation(false)
+      setRuntimeSandboxErrors(null)
       if (await onAddToSandboxAndRestart(currentCardDbId, versionId)) {
         updateSession({ sandboxTestVersionId: versionId })
       }
@@ -1982,9 +1976,28 @@ export function AiCardDesigner({
       || !sandboxConfirmation
     ) return
     setSaving(true)
-    await confirmSandboxPass(versionId, sandboxErrors ?? [])
-    setSaving(false)
-    setSandboxConfirmation(false)
+    setError('')
+    try {
+      const response = await workshopApiFetch('/api/game/state')
+      const payload = await response.json() as {
+        cardWarnings?: unknown
+        error?: string
+      }
+      if (!response.ok) {
+        throw new Error(payload.error ?? `Request failed (${response.status})`)
+      }
+      const errors = Array.isArray(payload.cardWarnings)
+        ? payload.cardWarnings.filter((value): value is string => typeof value === 'string')
+        : []
+      setRuntimeSandboxErrors(errors.length > 0 ? errors : null)
+      if (errors.length > 0) return
+      await confirmSandboxPass(versionId, errors)
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : String(reason))
+    } finally {
+      setSaving(false)
+      setSandboxConfirmation(false)
+    }
   }
 
   const loadVersionHistory = useCallback(async () => {
@@ -2480,7 +2493,7 @@ export function AiCardDesigner({
                 onCandidateValidated={validateAbilityCandidate}
                 onCandidateDiscarded={candidateId => discardCandidate('ability', candidateId)}
                 onCandidateAdopted={adoptCandidate}
-                sandboxErrors={sandboxErrors}
+                sandboxErrors={sandboxGateErrors}
                 validationErrors={validationErrors}
                 onValidationErrorsConsumed={() => setValidationErrors(null)}
               />
@@ -2622,13 +2635,13 @@ export function AiCardDesigner({
                         type="checkbox"
                         checked={sandboxConfirmation}
                         onChange={event => setSandboxConfirmation(event.target.checked)}
-                        disabled={Boolean(sandboxErrors?.length)}
+                        disabled={Boolean(sandboxGateErrors?.length)}
                       />
                       <span>{locale === 'zh'
                         ? '我确认这个固定版本在沙盒中没有运行错误'
                         : 'I confirm this pinned version has no sandbox runtime errors'}</span>
                     </label>
-                    {sandboxErrors?.length
+                    {sandboxGateErrors?.length
                       ? <small>{locale === 'zh' ? '先修复已知沙盒错误并重新发布。' : 'Fix known sandbox errors and publish again first.'}</small>
                       : null}
                     <button

@@ -365,9 +365,17 @@ describe('AiCardDesigner AI config header', () => {
       sandboxPassVersionId: null,
       sandboxPassedAt: null,
     }
+    let sandboxStateReads = 0
     const apiFetch = vi.fn(async (path: string, init?: RequestInit) => {
       if (path.includes('scope=mine')) {
         return new Response(JSON.stringify({ ok: true, cards: [completeCard] }))
+      }
+      if (path === '/api/game/state') {
+        sandboxStateReads += 1
+        return new Response(JSON.stringify({
+          ok: true,
+          cardWarnings: sandboxStateReads === 1 ? ['runtime hook failed'] : [],
+        }))
       }
       if (!init) {
         return new Response(JSON.stringify({ ok: true, workspace: baseWorkspace }))
@@ -395,7 +403,10 @@ describe('AiCardDesigner AI config header', () => {
       }))
     })
     const startSandbox = vi.fn(async () => false)
-    startSandbox.mockResolvedValueOnce(false).mockResolvedValueOnce(true)
+    startSandbox
+      .mockResolvedValueOnce(false)
+      .mockResolvedValueOnce(true)
+      .mockResolvedValueOnce(true)
 
     render(
       <LocaleProvider>
@@ -427,6 +438,15 @@ describe('AiCardDesigner AI config header', () => {
       name: '我确认这个固定版本在沙盒中没有运行错误',
     }))
     await userEvent.click(screen.getByRole('button', { name: '确认沙盒通过' }))
+    await waitFor(() => expect(screen.getByText('先修复已知沙盒错误并重新发布。')).toBeInTheDocument())
+    expect(apiFetch.mock.calls.some(([path]) => path.endsWith('/sandbox-pass'))).toBe(false)
+
+    await userEvent.click(screen.getByRole('button', { name: '发布当前版本并启动沙盒' }))
+    await waitFor(() => expect(startSandbox).toHaveBeenCalledTimes(3))
+    await userEvent.click(screen.getByRole('checkbox', {
+      name: '我确认这个固定版本在沙盒中没有运行错误',
+    }))
+    await userEvent.click(screen.getByRole('button', { name: '确认沙盒通过' }))
     await waitFor(() => expect(screen.getByText('已满足社区 PR 交接门槛')).toBeInTheDocument())
 
     const passCall = apiFetch.mock.calls.find(([path]) => path.endsWith('/sandbox-pass'))
@@ -435,6 +455,7 @@ describe('AiCardDesigner AI config header', () => {
       authorConfirmed: true,
       runtimeErrors: [],
     })
+    expect(sandboxStateReads).toBe(2)
   })
 
   it('restores version history and offers one local undo', async () => {
