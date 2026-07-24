@@ -64,9 +64,16 @@ describe('JsonRoomPersistence', () => {
     expect(p.load('r1')).toBeNull()
   })
 
-  it('listRestorable always returns []', () => {
-    p.save('r1', STATE, META)
-    expect(p.listRestorable({ now: 0, waitingTtlMs: 1, playingTtlMs: 1 })).toEqual([])
+  it('lists rotated dev rooms for startup restore', () => {
+    const id = 'dev2-12345678-1234-1234-1234-123456789abc'
+    p.save(id, STATE, META)
+    expect(p.listRestorable({
+      now: Date.now(),
+      waitingTtlMs: 60_000,
+      playingTtlMs: 60_000,
+    })).toEqual([
+      expect.objectContaining({ id, serialized: STATE }),
+    ])
   })
 
   it('sanitises room ids that contain unsafe chars', () => {
