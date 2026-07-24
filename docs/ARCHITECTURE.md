@@ -251,11 +251,12 @@ type GameSyncPayload = {
   actionAvailability?: Record<string, boolean>
   cardAvailability?: Record<string, boolean>
   error?: string
+  cardWarnings?: string[]          // 仅 HTTP debug/sandbox
   customCardDefs?: CustomCardDef[]
 }
 ```
 
-**广播 vs 单播**：`stateUpdate` / `gameStarted` / `playerJoined` / `playerDisconnected` / `roomDissolved` 广播；`roomCreated` / `roomJoined` / `authOk` / 请求级 `error` 单播。WS 广播会按连接对应的 `viewerPlayerId` 构造 per-viewer payload：目标玩家收到真实私有 prompt 和 `privateEvents`，其他玩家收到 `private-prompt` redaction。HTTP sandbox 默认无 `X-Viewer-Player` 时保持未过滤多座位开发流；带 `X-Viewer-Player` 时使用同一套 viewer 过滤和 seat guard。
+**广播 vs 单播**：`stateUpdate` / `gameStarted` / `playerJoined` / `playerDisconnected` / `roomDissolved` 广播；`roomCreated` / `roomJoined` / `authOk` / 请求级 `error` 单播。WS 广播会按连接对应的 `viewerPlayerId` 构造 per-viewer payload：目标玩家收到真实私有 prompt 和 `privateEvents`，其他玩家收到 `private-prompt` redaction。HTTP sandbox 默认无 `X-Viewer-Player` 时保持未过滤多座位开发流；带 `X-Viewer-Player` 时使用同一套 viewer 过滤和 seat guard。`cardWarnings` 只进入 HTTP debug/sandbox payload，用于把该局运行期自定义卡异常送回工坊确认门禁，不向 WS viewer 广播。
 
 ### 4.6 InteractionState — 前端唯一渲染真相
 

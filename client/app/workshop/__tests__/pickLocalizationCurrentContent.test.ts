@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest'
 import { pickLocalizationCurrentContent } from '../AiCardDesigner'
 
 describe('pickLocalizationCurrentContent', () => {
-  it('uses English source content regardless of the active UI language', () => {
+  it('uses the current English draft instead of a stale saved locale entry', () => {
     const result = pickLocalizationCurrentContent({
       cardLocales: {
         zh: { name: '中文卡', desc: ['中文描述'] },
@@ -15,8 +15,8 @@ describe('pickLocalizationCurrentContent', () => {
       extractedDesc: ['English desc'],
       extractedPrerequisite: undefined,
     })
-    expect(result.name).toBe('Saved English Card')
-    expect(result.desc).toEqual(['Saved English description'])
+    expect(result.name).toBe('Edited English Card')
+    expect(result.desc).toEqual(['English desc'])
   })
 
   it('falls back to top-level English fields when only Chinese localization exists', () => {
@@ -62,7 +62,7 @@ describe('pickLocalizationCurrentContent', () => {
     expect(result.desc).toEqual(['Eng desc'])
   })
 
-  it('prefers the English locale prerequisite when present, otherwise editor input', () => {
+  it('prefers the current draft prerequisite over the English locale entry', () => {
     const result = pickLocalizationCurrentContent({
       cardLocales: {
         en: { name: 'English', desc: ['English description'], prerequisite: 'English prerequisite' },
@@ -73,7 +73,7 @@ describe('pickLocalizationCurrentContent', () => {
       extractedDesc: undefined,
       extractedPrerequisite: 'extracted prereq',
     })
-    expect(result.prerequisite).toBe('English prerequisite')
+    expect(result.prerequisite).toBe('Editor prerequisite')
 
     const result2 = pickLocalizationCurrentContent({
       cardLocales: {

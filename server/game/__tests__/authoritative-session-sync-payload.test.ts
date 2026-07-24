@@ -49,4 +49,15 @@ describe('GameSession.buildSyncPayload', () => {
     ])
     expect(session.buildSyncPayload(waitResp, p0.id, 'viewer')).toEqual(player)
   })
+
+  it('includes custom-card runtime warnings only in HTTP debug payloads', () => {
+    const session = new GameSession()
+    session.cardWarnings.push('runtime hook failed')
+    const resp = session.withCtx(() => session.getState())
+
+    expect(session.buildSyncPayload(resp, null, 'debug').cardWarnings)
+      .toEqual(['runtime hook failed'])
+    expect(session.buildSyncPayload(resp, null, 'viewer').cardWarnings)
+      .toBeUndefined()
+  })
 })
