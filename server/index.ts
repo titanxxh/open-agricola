@@ -6,7 +6,7 @@ import { randomUUID } from 'node:crypto'
 import { handleGameRoute } from './game-router.ts'
 import { handleWorkshopRoute } from './workshop.ts'
 import { createWsServer } from './connection/ws-server.ts'
-import { isFixedDevRoom, type Room } from './game/room.ts'
+import { isDevRoom, type Room } from './game/room.ts'
 import { getDb, cleanExpiredSessions } from './db.ts'
 import { SqliteRoomPersistence } from './game/persistence/sqlite-adapter.ts'
 import { JsonRoomPersistence } from './game/persistence/json-adapter.ts'
@@ -42,6 +42,7 @@ import {
 } from './oauth/handler.ts'
 import { assertOAuthProvider } from './oauth/providers.ts'
 import { createOnboardingTicket, findIdentity } from './oauth/store.ts'
+import { installShutdownHandlers } from './shutdown.ts'
 
 const CARD_ART_DIR = process.env.CARD_ART_DIR ?? join(process.cwd(), 'data', 'card-art')
 const BGA_CDN_BASE = process.env.BGA_CDN_BASE_URL || 'https://x.boardgamearena.net/data/themereleases/current/games/agricola/260329-0408/img'
@@ -156,10 +157,10 @@ const persistence =
     ? new SqliteRoomPersistence(getDb())
     : new JsonRoomPersistence(PERSISTED_ROOMS_DIR)
 const shouldPersist: (room: Room) => boolean =
-  PERSIST_ROOMS === 'sqlite' ? () => true : (room) => isFixedDevRoom(room.id)
+  PERSIST_ROOMS === 'sqlite' ? () => true : (room) => isDevRoom(room.id)
 
 // Periodically clean expired sessions (every hour)
-setInterval(cleanExpiredSessions, 60 * 60 * 1000)
+const sessionCleanupTimer = setInterval(cleanExpiredSessions, 60 * 60 * 1000)
 
 let wssCtx: ReturnType<typeof createWsServer> | null = null
 
@@ -656,4 +657,10 @@ server.listen(PORT, HOST, () => {
   const addr = HOST ? `http://${HOST}:${PORT}` : `http://localhost:${PORT}`
   console.log(`Server listening on ${addr}`)
   console.log(`WebSocket available at ws://${HOST || 'localhost'}:${PORT}/ws`)
+})
+
+installShutdownHandlers(() => {
+  server.close()
+  clearInterval(sessionCleanupTimer)
+  wssCtx?.shutdown()
 })

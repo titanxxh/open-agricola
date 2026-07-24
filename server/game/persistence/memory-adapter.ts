@@ -1,4 +1,6 @@
 import type {
+  GameResult,
+  RoomCompletionResult,
   RoomMeta,
   RoomPersistence,
   RoomSnapshot,
@@ -10,6 +12,7 @@ type Row = { serialized: SerializedGameState | null; meta: RoomMeta; updatedAt: 
 
 export class InMemoryRoomPersistence implements RoomPersistence {
   private rooms = new Map<string, Row>()
+  private results = new Map<string, GameResult>()
 
   load(id: string): RoomSnapshot | null {
     const row = this.rooms.get(id)
@@ -26,20 +29,38 @@ export class InMemoryRoomPersistence implements RoomPersistence {
     const existing = this.rooms.get(id)
     this.rooms.set(id, {
       serialized: serialized === null ? (existing?.serialized ?? null) : serialized,
-      meta: { ...meta, customCardDbIds: [...meta.customCardDbIds], players: meta.players.map((p) => ({ ...p })) },
+      meta: {
+        ...meta,
+        startedAt: existing?.meta.startedAt ?? meta.startedAt,
+        customCardDbIds: [...meta.customCardDbIds],
+        players: meta.players.map((p) => ({ ...p })),
+      },
       updatedAt: Date.now(),
     })
   }
 
-  delete(id: string): void {
+  discard(id: string): void {
     this.rooms.delete(id)
   }
 
-  markFinished(id: string, now: number): void {
-    const row = this.rooms.get(id)
-    if (!row) return
-    row.meta = { ...row.meta, status: 'finished' }
-    row.updatedAt = now
+  complete(result: GameResult): RoomCompletionResult {
+    if (!this.results.has(result.roomId)) {
+      const persistedPlayers = this.rooms.get(result.roomId)?.meta.players ?? []
+      const userIds = new Map(persistedPlayers.map((player) => [player.playerIndex, player.userId]))
+      this.results.set(result.roomId, {
+        ...result,
+        players: result.players.map((player) => ({
+          ...player,
+          userId: userIds.get(player.playerIndex) ?? player.userId,
+        })),
+      })
+    }
+    this.rooms.delete(result.roomId)
+    return { ok: true, archived: true }
+  }
+
+  hasRoomId(id: string): boolean {
+    return this.rooms.has(id) || this.results.has(id)
   }
 
   listRestorable(opts: RestoreOptions): RoomSnapshot[] {
@@ -50,8 +71,7 @@ export class InMemoryRoomPersistence implements RoomPersistence {
       if (row.meta.status === 'finished') continue
       const ttl = row.meta.status === 'playing' ? opts.playingTtlMs : opts.waitingTtlMs
       if (opts.now - row.updatedAt > ttl) {
-        row.meta = { ...row.meta, status: 'finished' }
-        row.updatedAt = opts.now
+        this.rooms.delete(id)
         continue
       }
       out.push({ id, serialized: row.serialized, meta: { ...row.meta, customCardDbIds: [...row.meta.customCardDbIds], players: row.meta.players.map((p) => ({ ...p })) }, updatedAt: row.updatedAt })
@@ -63,5 +83,9 @@ export class InMemoryRoomPersistence implements RoomPersistence {
   __setUpdatedAtForTest(id: string, updatedAt: number): void {
     const row = this.rooms.get(id)
     if (row) row.updatedAt = updatedAt
+  }
+
+  __getResultForTest(id: string): GameResult | undefined {
+    return this.results.get(id)
   }
 }

@@ -13,17 +13,26 @@ export type RoomPlayer = {
   userId?: string
 }
 
+export type RoomSeatOwner = {
+  playerIndex: number
+  userId: string
+}
+
 export type Room = {
   id: string
   session: GameSession
   players: RoomPlayer[]
+  seatOwners?: RoomSeatOwner[]
   maxPlayers: number
   version: number
   status: RoomStatus
+  startedAt?: number
   createdBy?: string
   customCardDbIds?: string[]
   enableParentCards?: boolean
   draftParents?: boolean
+  draftMode?: 'simultaneous'
+  draftPoolSize?: number
   enableThroughTheSeasons?: boolean
   enableFarmersOfTheMoor?: boolean
   allowIncompleteFarmersOfTheMoorMinorDeal?: boolean
@@ -39,7 +48,19 @@ export const FIXED_DEV_ROOMS: ReadonlyArray<{ id: string; playerCount: number }>
 
 export const FIXED_DEV_ROOM_IDS: ReadonlySet<string> = new Set(FIXED_DEV_ROOMS.map((r) => r.id))
 
+const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+
+export const fixedDevRoomRootId = (roomId: string): string | null => {
+  for (const { id } of FIXED_DEV_ROOMS) {
+    if (roomId === id) return id
+    if (roomId.startsWith(`${id}-`) && UUID_PATTERN.test(roomId.slice(id.length + 1))) return id
+  }
+  return null
+}
+
 export const isFixedDevRoom = (roomId: string): boolean => FIXED_DEV_ROOM_IDS.has(roomId)
+
+export const isDevRoom = (roomId: string): boolean => fixedDevRoomRootId(roomId) !== null
 
 export type FixedDevRoomStartupOptions = {
   enableParentCards?: boolean
@@ -110,8 +131,32 @@ export const emptyRoomTtlMs = (room: Pick<Room, 'status'>): number =>
 const getRoomStatus = (room?: Pick<Room, 'players' | 'maxPlayers' | 'status'>): RoomStatus =>
   room?.status ?? ((room && room.players.length >= room.maxPlayers) ? 'playing' : 'waiting')
 
+const roomSeatOwners = (
+  room: Pick<Room, 'players' | 'seatOwners'>,
+): RoomSeatOwner[] => {
+  const owners = new Map(
+    (room.seatOwners ?? []).map((owner) => [owner.playerIndex, owner.userId]),
+  )
+  for (const player of room.players) {
+    if (player.userId) owners.set(player.playerIndex, player.userId)
+  }
+  return [...owners]
+    .sort(([left], [right]) => left - right)
+    .map(([playerIndex, userId]) => ({ playerIndex, userId }))
+}
+
+export const roomOccupiedSeatCount = (
+  room: Pick<Room, 'id' | 'players' | 'seatOwners'>,
+): number => isDevRoom(room.id)
+  ? room.players.length
+  : new Set([
+      ...room.players.map((player) => player.playerIndex),
+      ...roomSeatOwners(room).map((owner) => owner.playerIndex),
+    ]).size
+
 export const toRoomMeta = (room: Room): RoomMeta => ({
   createdBy: room.createdBy ?? null,
+  startedAt: room.startedAt ?? null,
   maxPlayers: room.maxPlayers,
   customCardDbIds: room.customCardDbIds ?? [],
   enableParentCards: room.enableParentCards ?? room.session.state.enableParentCards,
@@ -120,9 +165,7 @@ export const toRoomMeta = (room: Room): RoomMeta => ({
   enableFarmersOfTheMoor: room.enableFarmersOfTheMoor ?? (room.session.state.enableFarmersOfTheMoor === true),
   allowIncompleteFarmersOfTheMoorMinorDeal: room.allowIncompleteFarmersOfTheMoorMinorDeal ?? false,
   status: getRoomStatus(room),
-  players: room.players
-    .filter((p): p is RoomPlayer & { userId: string } => typeof p.userId === 'string')
-    .map((p) => ({ userId: p.userId, playerIndex: p.playerIndex })),
+  players: roomSeatOwners(room),
 })
 
 export type JoinSeatResolution =
@@ -130,7 +173,7 @@ export type JoinSeatResolution =
   | { ok: false; error: string }
 
 export const resolveJoinPlayerIndex = (
-  room: Pick<Room, 'id' | 'maxPlayers' | 'players'>,
+  room: Pick<Room, 'id' | 'maxPlayers' | 'players' | 'seatOwners'>,
   requestedPlayerIndex?: number,
   userId?: string,
 ): JoinSeatResolution => {
@@ -144,14 +187,23 @@ export const resolveJoinPlayerIndex = (
     }
     const occupied = room.players.find((p) => p.playerIndex === requestedPlayerIndex)
     if (occupied) {
-      if (!isFixedDevRoom(room.id) && !(userId && occupied.userId === userId)) {
+      if (!isDevRoom(room.id) && !(userId && occupied.userId === userId)) {
         return { ok: false, error: 'player slot occupied' }
       }
       return { ok: true, playerIndex: requestedPlayerIndex, replacedExistingPlayer: true }
     }
+    const owner = roomSeatOwners(room).find((candidate) =>
+      candidate.playerIndex === requestedPlayerIndex
+    )
+    if (!isDevRoom(room.id) && owner && owner.userId !== userId) {
+      return { ok: false, error: 'player slot occupied' }
+    }
     return { ok: true, playerIndex: requestedPlayerIndex, replacedExistingPlayer: false }
   }
   const taken = new Set(room.players.map((p) => p.playerIndex))
+  if (!isDevRoom(room.id)) {
+    for (const owner of roomSeatOwners(room)) taken.add(owner.playerIndex)
+  }
   for (let i = 0; i < room.maxPlayers; i += 1) {
     if (!taken.has(i)) return { ok: true, playerIndex: i, replacedExistingPlayer: false }
   }
@@ -159,12 +211,12 @@ export const resolveJoinPlayerIndex = (
 }
 
 export const resolveJoinRequestPlayerIndex = (
-  room: Pick<Room, 'players'>,
+  room: Pick<Room, 'players' | 'seatOwners'>,
   requestedPlayerIndex: number | undefined,
   userId: string | undefined,
 ): { ok: true; requestedPlayerIndex: number | undefined } | { ok: false; error: string } => {
   if (!userId) return { ok: true, requestedPlayerIndex }
-  const existingSeat = room.players.find((p) => p.userId === userId)
+  const existingSeat = roomSeatOwners(room).find((owner) => owner.userId === userId)
   if (!existingSeat) return { ok: true, requestedPlayerIndex }
   if (requestedPlayerIndex === undefined) {
     return { ok: true, requestedPlayerIndex: existingSeat.playerIndex }
@@ -185,7 +237,10 @@ export const removePlayerFromRoom = (
   return room.players.length === 0 ? 'empty' : 'remaining'
 }
 
-type RoomLikeForSummary = Pick<Room, 'id' | 'players' | 'maxPlayers' | 'createdBy'>
+type RoomLikeForSummary = Pick<
+  Room,
+  'id' | 'players' | 'seatOwners' | 'maxPlayers' | 'createdBy'
+>
 
 export function summarizeRoomsForLobby(
   source: Iterable<RoomLikeForSummary>,
@@ -195,12 +250,13 @@ export function summarizeRoomsForLobby(
   const list: RoomSummary[] = []
   for (const r of source) {
     if (r.players.length === 0 && !isFixedDev(r.id)) continue
+    const playerCount = roomOccupiedSeatCount(r)
     list.push({
       id: r.id,
-      playerCount: r.players.length,
+      playerCount,
       maxPlayers: r.maxPlayers,
       createdBy: r.createdBy,
-      status: r.players.length < r.maxPlayers ? 'waiting' : 'playing',
+      status: playerCount < r.maxPlayers ? 'waiting' : 'playing',
     })
     if (typeof limit === 'number' && list.length >= limit) break
   }
@@ -242,18 +298,25 @@ const createSessionFromSnapshot = (
 export const snapshotToRoom = (
   snapshot: RoomSnapshot,
   customCards: CustomCardData[] = [],
-): Room => ({
-  id: snapshot.id,
-  session: createSessionFromSnapshot(snapshot, customCards),
-  players: [],
-  maxPlayers: snapshot.meta.maxPlayers,
-  version: 0,
-  status: snapshot.meta.status,
-  createdBy: snapshot.meta.createdBy ?? undefined,
-  customCardDbIds: snapshot.meta.customCardDbIds,
-  enableParentCards: snapshot.meta.enableParentCards ?? snapshot.serialized?.enableParentCards ?? false,
-  draftParents: snapshot.meta.draftParents,
-  enableThroughTheSeasons: snapshot.meta.enableThroughTheSeasons ?? snapshot.serialized?.enableThroughTheSeasons ?? false,
-  enableFarmersOfTheMoor: snapshot.meta.enableFarmersOfTheMoor ?? (snapshot.serialized?.enableFarmersOfTheMoor === true),
-  allowIncompleteFarmersOfTheMoorMinorDeal: snapshot.meta.allowIncompleteFarmersOfTheMoorMinorDeal ?? false,
-})
+): Room => {
+  const session = createSessionFromSnapshot(snapshot, customCards)
+  return {
+    id: snapshot.id,
+    session,
+    players: [],
+    seatOwners: snapshot.meta.players.map((owner) => ({ ...owner })),
+    maxPlayers: snapshot.meta.maxPlayers,
+    version: 0,
+    status: snapshot.meta.status,
+    startedAt: snapshot.meta.startedAt ?? undefined,
+    createdBy: snapshot.meta.createdBy ?? undefined,
+    customCardDbIds: snapshot.meta.customCardDbIds,
+    enableParentCards: snapshot.meta.enableParentCards ?? snapshot.serialized?.enableParentCards ?? false,
+    draftParents: snapshot.meta.draftParents,
+    draftMode: session.state.draftMode,
+    draftPoolSize: session.state.draftPoolSize,
+    enableThroughTheSeasons: snapshot.meta.enableThroughTheSeasons ?? snapshot.serialized?.enableThroughTheSeasons ?? false,
+    enableFarmersOfTheMoor: snapshot.meta.enableFarmersOfTheMoor ?? (snapshot.serialized?.enableFarmersOfTheMoor === true),
+    allowIncompleteFarmersOfTheMoorMinorDeal: snapshot.meta.allowIncompleteFarmersOfTheMoorMinorDeal ?? false,
+  }
+}

@@ -6,6 +6,7 @@ import { RoomRegistry } from '../../game/room-registry.ts'
 import { InMemoryRoomPersistence } from '../../game/persistence/memory-adapter.ts'
 import { createLobby } from '../../game/lobby.ts'
 import { createRoomPersistenceCheckpoint } from '../../game/room-persistence-checkpoint.ts'
+import { snapshotToRoom } from '../../game/room.ts'
 import type { GameState } from '../../../shared/contract/types.ts'
 
 const fakeWs = () => ({ OPEN: 1, readyState: 1, send: vi.fn(), close: vi.fn() })
@@ -53,12 +54,29 @@ describe('handleCreateRoom', () => {
     expect(sentTypesOf(ctx)).toContain('roomCreated')
   })
 
+  it('bounds room id allocation retries', () => {
+    const deps = newDeps()
+    vi.spyOn(deps.persistence, 'hasRoomId').mockReturnValue(true)
+    const ctx = newCtx(deps)
+
+    dispatch(ctx, { type: 'createRoom', maxPlayers: 2, requestId: 'create-1' })
+
+    expect(deps.persistence.hasRoomId).toHaveBeenCalledTimes(8)
+    expect(ctx.currentRoom).toBeNull()
+    expect(sentMessagesOf(ctx)).toContainEqual(expect.objectContaining({
+      type: 'error',
+      error: 'unable to allocate room id',
+      requestId: 'create-1',
+    }))
+  })
+
   it('checkpoints created rooms with state and host metadata', () => {
     const ctx = newCtx()
     ctx.currentUserId = 'u1'
 
     dispatch(ctx, { type: 'createRoom', maxPlayers: 2, name: 'host' })
 
+    ctx.checkpoint.flushAll()
     const snap = ctx.persistence.load(ctx.currentRoom!.id)
     expect(snap?.serialized).not.toBeNull()
     expect(snap?.meta.players).toEqual([{ userId: 'u1', playerIndex: 0 }])
@@ -133,6 +151,33 @@ describe('handleCreateRoom', () => {
     expect(ctx.currentRoom!.session.state.log.some((entry) => entry.params?.player === 'PlayerA')).toBe(false)
   })
 
+  it('preserves completed simultaneous draft settings across restore and newGame', () => {
+    const ctx = newCtx()
+    ctx.currentUserId = 'u1'
+    dispatch(ctx, {
+      type: 'createRoom',
+      maxPlayers: 2,
+      draftMode: 'simultaneous',
+      draftPoolSize: 8,
+    })
+
+    const roomId = ctx.currentRoom!.id
+    const players = ctx.currentRoom!.players
+    ctx.currentRoom!.session.state.phase = 'playing'
+    ctx.currentRoom!.session.state.draft = null
+    ctx.checkpoint.flushAll()
+    const restored = snapshotToRoom(ctx.persistence.load(roomId)!)
+    restored.players = players
+    ctx.registry.delete(roomId)
+    ctx.registry.set(restored)
+    ctx.currentRoom = restored
+
+    dispatch(ctx, { type: 'newGame', seed: 309 })
+
+    expect(ctx.currentRoom!.session.state.phase).toBe('draft')
+    expect(ctx.currentRoom!.session.state.draft?.poolSize).toBe(8)
+  })
+
   it('uses room display names in direct Parent Card logs', () => {
     const deps = newDeps()
     const host = newCtx(deps)
@@ -159,6 +204,30 @@ describe('handleCreateRoom', () => {
     expect(new Set(loggedPlayerNames)).toEqual(new Set(['PlayerB', 'Bob']))
   })
 
+  it('starts a full room when a disconnected owner still reserves a seat', () => {
+    const deps = newDeps()
+    const host = newCtx(deps)
+    host.currentUserId = 'u1'
+    dispatch(host, { type: 'createRoom', maxPlayers: 2, name: 'Alice' })
+    host.currentRoom!.players = []
+    const guest = newCtx(deps)
+    guest.currentUserId = 'u2'
+
+    dispatch(guest, {
+      type: 'joinRoom',
+      roomId: host.currentRoom!.id,
+      name: 'Bob',
+    })
+
+    expect(host.currentRoom!.status).toBe('playing')
+    expect(host.currentRoom!.startedAt).toEqual(expect.any(Number))
+    expect(sentMessagesOf(guest)).toContainEqual(expect.objectContaining({
+      type: 'playerJoined',
+      playerCount: 2,
+    }))
+    expect(sentTypesOf(guest)).toContain('gameStarted')
+  })
+
   it('checkpoints newGame state through the broadcast path', () => {
     const ctx = newCtx()
     ctx.currentUserId = 'u1'
@@ -166,7 +235,133 @@ describe('handleCreateRoom', () => {
 
     dispatch(ctx, { type: 'newGame', seed: 309 })
 
+    ctx.checkpoint.flushAll()
     expect(ctx.persistence.load(ctx.currentRoom!.id)?.serialized?.gameSeed).toBe(309)
+  })
+
+  it('moves newGame to a fresh room id and discards the unfinished game', () => {
+    const ctx = newCtx()
+    ctx.currentUserId = 'u1'
+    dispatch(ctx, { type: 'createRoom', maxPlayers: 2 })
+    const previousRoomId = ctx.currentRoom!.id
+
+    dispatch(ctx, { type: 'newGame', seed: 309 })
+    ctx.checkpoint.flushAll()
+
+    const nextRoomId = ctx.currentRoom!.id
+    expect(nextRoomId).not.toBe(previousRoomId)
+    expect(ctx.registry.has(previousRoomId)).toBe(false)
+    expect(ctx.registry.has(nextRoomId)).toBe(true)
+    expect(ctx.persistence.load(previousRoomId)).toBeNull()
+    expect(ctx.persistence.__getResultForTest(previousRoomId)).toBeUndefined()
+    expect(ctx.persistence.load(nextRoomId)?.serialized?.gameSeed).toBe(309)
+    expect(sentMessagesOf(ctx)).toContainEqual(expect.objectContaining({
+      type: 'stateUpdate',
+      roomId: nextRoomId,
+    }))
+  })
+
+  it('preserves fixed dev room privileges under the new game id', () => {
+    const ctx = newCtx()
+    dispatch(ctx, { type: 'createRoom', maxPlayers: 2 })
+    const createdRoomId = ctx.currentRoom!.id
+    ctx.registry.delete(createdRoomId)
+    ctx.checkpoint.discardRoom(createdRoomId)
+    ctx.currentRoom!.id = 'dev2'
+    ctx.registry.set(ctx.currentRoom!)
+
+    dispatch(ctx, { type: 'newGame', seed: 309 })
+    const nextRoomId = ctx.currentRoom!.id
+    const before = sentTypesOf(ctx).length
+    dispatch(ctx, { type: 'devSetResources', playerIndex: 0, resources: { wood: 5 } })
+
+    expect(nextRoomId).toMatch(/^dev2-[0-9a-f-]{36}$/)
+    expect(nextRoomId).not.toBe('dev2')
+    expect(sentTypesOf(ctx).slice(before)).toContain('stateUpdate')
+  })
+
+  it('does not carry disconnected seat owners into the new room id', () => {
+    const deps = newDeps()
+    const host = newCtx(deps)
+    host.currentUserId = 'u1'
+    dispatch(host, { type: 'createRoom', maxPlayers: 2 })
+    const guest = newCtx(deps)
+    guest.currentUserId = 'u2'
+    dispatch(guest, { type: 'joinRoom', roomId: host.currentRoom!.id })
+    host.currentRoom!.players = host.currentRoom!.players.filter((player) =>
+      player.userId === 'u1'
+    )
+
+    dispatch(host, { type: 'newGame', seed: 309 })
+
+    expect(host.currentRoom!.seatOwners).toEqual([
+      { playerIndex: 0, userId: 'u1' },
+    ])
+    expect(host.currentRoom!.status).toBe('waiting')
+    const replacement = newCtx(deps)
+    replacement.currentUserId = 'u3'
+    dispatch(replacement, { type: 'joinRoom', roomId: host.currentRoom!.id })
+    expect(replacement.currentPlayerIndex).toBe(1)
+  })
+
+  it('keeps a completed game archive immutable when starting the next game', () => {
+    const ctx = newCtx()
+    ctx.currentUserId = 'u1'
+    dispatch(ctx, { type: 'createRoom', maxPlayers: 2 })
+    const previousRoomId = ctx.currentRoom!.id
+    ctx.currentRoom!.startedAt = 10
+    ctx.currentRoom!.session.state.gameOver = true
+    expect(ctx.checkpoint.completeGame(ctx.currentRoom!, 20).ok).toBe(true)
+    const archived = ctx.persistence.__getResultForTest(previousRoomId)
+
+    dispatch(ctx, { type: 'newGame', seed: 309 })
+
+    expect(ctx.currentRoom!.id).not.toBe(previousRoomId)
+    expect(ctx.persistence.__getResultForTest(previousRoomId)).toEqual(archived)
+  })
+
+  it('keeps the terminal room when completion fails before newGame', () => {
+    const ctx = newCtx()
+    ctx.currentUserId = 'u1'
+    dispatch(ctx, { type: 'createRoom', maxPlayers: 2 })
+    const previousRoomId = ctx.currentRoom!.id
+    ctx.currentRoom!.startedAt = 10
+    ctx.currentRoom!.session.state.gameOver = true
+    vi.spyOn(ctx.persistence, 'complete').mockReturnValue({
+      ok: false,
+      error: 'write failed',
+    })
+
+    dispatch(ctx, { type: 'newGame', seed: 309, requestId: 'new-1' })
+
+    expect(ctx.currentRoom!.id).toBe(previousRoomId)
+    expect(ctx.registry.has(previousRoomId)).toBe(true)
+    expect(ctx.persistence.load(previousRoomId)?.serialized?.gameOver).toBe(true)
+    expect(sentMessagesOf(ctx)).toContainEqual(expect.objectContaining({
+      type: 'error',
+      error: 'unable to archive completed game: write failed',
+      requestId: 'new-1',
+    }))
+  })
+
+  it('switches every connected seat to the new game id before broadcasting', () => {
+    const deps = newDeps()
+    const host = newCtx(deps)
+    host.currentUserId = 'u1'
+    dispatch(host, { type: 'createRoom', maxPlayers: 2, name: 'host' })
+    const guest = newCtx(deps)
+    guest.currentUserId = 'u2'
+    dispatch(guest, { type: 'joinRoom', roomId: host.currentRoom!.id, name: 'guest' })
+    const previousRoomId = host.currentRoom!.id
+
+    dispatch(host, { type: 'newGame', seed: 309 })
+
+    expect(guest.currentRoom).toBe(host.currentRoom)
+    expect(guest.currentRoom!.id).not.toBe(previousRoomId)
+    expect(sentMessagesOf(guest)).toContainEqual(expect.objectContaining({
+      type: 'stateUpdate',
+      roomId: host.currentRoom!.id,
+    }))
   })
 
   it('checkpoints loadGame state through the broadcast path', () => {
@@ -178,6 +373,7 @@ describe('handleCreateRoom', () => {
 
     dispatch(ctx, { type: 'loadGame', state: loaded })
 
+    ctx.checkpoint.flushAll()
     expect(ctx.persistence.load(ctx.currentRoom!.id)?.serialized?.gameSeed).toBe(777)
   })
 
@@ -298,6 +494,7 @@ describe('seat-binding guards', () => {
       { userId: 'u1', playerIndex: 0 },
       { userId: 'u2', playerIndex: 1 },
     ])
+    expect(guest.persistence.load(host.currentRoom!.id)?.meta.startedAt).toEqual(expect.any(Number))
   })
 
   it('devSetResources accepts own seat', () => {

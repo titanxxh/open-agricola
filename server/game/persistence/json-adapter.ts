@@ -1,6 +1,16 @@
-import { existsSync, mkdirSync, readFileSync, unlinkSync, writeFileSync } from 'node:fs'
+import {
+  existsSync,
+  mkdirSync,
+  readFileSync,
+  readdirSync,
+  statSync,
+  unlinkSync,
+  writeFileSync,
+} from 'node:fs'
 import { join } from 'node:path'
 import type {
+  GameResult,
+  RoomCompletionResult,
   RoomMeta,
   RoomPersistence,
   RoomSnapshot,
@@ -10,19 +20,13 @@ import type { SerializedGameState } from '../../../shared/session/serialization.
 
 const sanitise = (id: string) => id.replace(/[^a-zA-Z0-9._-]/g, '_')
 
-/**
- * Fallback metadata returned by `load`. JSON files only persist the serialized
- * state; meta fields are reconstructed with safe defaults. Status defaults to
- * `'playing'` because the JSON adapter does not participate in startup restore
- * (`listRestorable` returns `[]`), so this value is informational only.
- */
-const FALLBACK_META: RoomMeta = {
+const fallbackMeta = (serialized: SerializedGameState): RoomMeta => ({
   createdBy: null,
-  maxPlayers: 2,
+  maxPlayers: Array.isArray(serialized.players) ? serialized.players.length : 2,
   customCardDbIds: [],
   status: 'playing',
   players: [],
-}
+})
 
 export class JsonRoomPersistence implements RoomPersistence {
   private readonly dir: string
@@ -41,7 +45,13 @@ export class JsonRoomPersistence implements RoomPersistence {
       if (!existsSync(file)) return null
       const raw = readFileSync(file, 'utf-8')
       const serialized = JSON.parse(raw) as SerializedGameState
-      return { id, serialized, meta: { ...FALLBACK_META }, updatedAt: 0 }
+      const updatedAt = statSync(file).mtimeMs
+      return {
+        id,
+        serialized,
+        meta: { ...fallbackMeta(serialized), startedAt: updatedAt },
+        updatedAt,
+      }
     } catch (err) {
       console.warn('[json-adapter] load failed:', err)
       return null
@@ -67,22 +77,48 @@ export class JsonRoomPersistence implements RoomPersistence {
     }
   }
 
-  delete(id: string): void {
+  discard(id: string): void {
     try {
       const file = this.fileFor(id)
       if (existsSync(file)) unlinkSync(file)
     } catch (err) {
-      console.warn('[json-adapter] delete failed:', err)
+      console.warn('[json-adapter] discard failed:', err)
     }
   }
 
-  markFinished(_id: string, _now: number): void {
-    // JSON adapter doesn't track status; deliberate no-op.
+  complete(result: GameResult): RoomCompletionResult {
+    try {
+      const file = this.fileFor(result.roomId)
+      if (existsSync(file)) unlinkSync(file)
+      return { ok: true, archived: false }
+    } catch (err) {
+      return { ok: false, error: err instanceof Error ? err.message : String(err) }
+    }
   }
 
-  listRestorable(_opts: RestoreOptions): RoomSnapshot[] {
-    // JSON files are not enumerated for startup restore — fixed dev rooms
-    // call `load(id)` directly. Returning empty preserves current behaviour.
-    return []
+  hasRoomId(id: string): boolean {
+    return existsSync(this.fileFor(id))
+  }
+
+  listRestorable(opts: RestoreOptions): RoomSnapshot[] {
+    if (!existsSync(this.dir)) return []
+    const excludeIds = new Set(opts.excludeIds ?? [])
+    const snapshots: RoomSnapshot[] = []
+    for (const entry of readdirSync(this.dir, { withFileTypes: true })) {
+      if (!entry.isFile() || !entry.name.endsWith('.json')) continue
+      const id = entry.name.slice(0, -'.json'.length)
+      if (excludeIds.has(id)) continue
+      const snapshot = this.load(id)
+      if (!snapshot) continue
+      const ttl = snapshot.meta.status === 'playing'
+        ? opts.playingTtlMs
+        : opts.waitingTtlMs
+      if (opts.now - snapshot.updatedAt > ttl) {
+        this.discard(id)
+        continue
+      }
+      snapshots.push(snapshot)
+    }
+    return snapshots
   }
 }

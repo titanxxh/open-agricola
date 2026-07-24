@@ -8,7 +8,7 @@ import {
   WAITING_EMPTY_ROOM_TTL_MS,
   buildFixedDevRoomInitialStateOptions,
   emptyRoomTtlMs,
-  isFixedDevRoom,
+  isDevRoom,
   parseFixedDevRoomStartupOptions,
   removePlayerFromRoom,
   snapshotToRoom,
@@ -49,6 +49,7 @@ const ensureFixedDevRooms = (
     const snap = persistence.load(id)
     if (snap) {
       const room = snapshotToRoom(snap)
+      room.startedAt ??= Date.now()
       room.draftParents = startupOptions.draftParents ?? room.draftParents
       registry.set(room)
     } else {
@@ -61,11 +62,15 @@ const ensureFixedDevRooms = (
         id,
         session,
         players: [],
+        seatOwners: [],
         maxPlayers: playerCount,
         version: 0,
         status: 'playing',
+        startedAt: Date.now(),
         enableParentCards: session.state.enableParentCards,
         draftParents: startupOptions.draftParents,
+        draftMode: startupOptions.draftMode,
+        draftPoolSize: startupOptions.draftPoolSize,
         enableThroughTheSeasons: session.state.enableThroughTheSeasons,
         enableFarmersOfTheMoor: session.state.enableFarmersOfTheMoor === true,
         allowIncompleteFarmersOfTheMoorMinorDeal: startupOptions.allowIncompleteFarmersOfTheMoorMinorDeal === true,
@@ -105,7 +110,7 @@ const startRoomCleanup = (
   return setInterval(() => {
     const now = Date.now()
     for (const room of registry.iter()) {
-      if (isFixedDevRoom(room.id)) continue
+      if (isDevRoom(room.id)) continue
       if (room.players.length > 0) {
         registry.touchActivity(room.id, now)
         continue
@@ -114,7 +119,7 @@ const startRoomCleanup = (
       if (now - lastSeen > emptyRoomTtlMs(room)) {
         registry.delete(room.id)
         registry.clearActivity(room.id)
-        checkpoint.recordFinished(room.id, now)
+        checkpoint.discardRoom(room.id)
         console.log(`[ws-server] cleaned up empty room ${room.id}`)
       }
     }
@@ -196,6 +201,7 @@ const handleConnection = (ws: WebSocket, req: IncomingMessage, deps: ConnectionD
     clearTimeout(authTimer)
     if (trackedUserId) untrack(trackedUserId)
     if (ctx.currentRoom) {
+      deps.checkpoint.flushRoom(ctx.currentRoom)
       const removal = removePlayerFromRoom(ctx.currentRoom, ws)
       if (removal === 'remaining') {
         deps.broadcaster.broadcastEvent(ctx.currentRoom, {
@@ -216,8 +222,10 @@ export type CreateWsServerResult = {
   registry: RoomRegistry
   broadcaster: Broadcaster
   lobby: Lobby
+  checkpoint: RoomPersistenceCheckpoint
   cleanupTimer: NodeJS.Timeout
   closeUserConnections: (userId: string) => void
+  shutdown: () => void
 }
 
 export function createWsServer(
@@ -261,5 +269,21 @@ export function createWsServer(
     activeUserSockets.delete(userId)
   }
 
-  return { wss, registry, broadcaster, lobby, cleanupTimer, closeUserConnections }
+  const shutdown = (): void => {
+    checkpoint.shutdown()
+    clearInterval(cleanupTimer)
+    for (const client of wss.clients) client.close(1001, 'server shutdown')
+    wss.close()
+  }
+
+  return {
+    wss,
+    registry,
+    broadcaster,
+    lobby,
+    checkpoint,
+    cleanupTimer,
+    closeUserConnections,
+    shutdown,
+  }
 }

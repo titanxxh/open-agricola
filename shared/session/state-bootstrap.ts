@@ -571,6 +571,12 @@ export const normalizeState = (raw: GameState): GameState => {
   )
   const ordinaryCardDecks = normalizeOrdinaryCardDecks(raw, players, createSeed())
   const enableThroughTheSeasons = raw.enableThroughTheSeasons ?? false
+  const rawDraftPoolSize = raw.draftPoolSize ?? raw.draft?.poolSize
+  const draftPoolSize = rawDraftPoolSize === undefined
+    ? undefined
+    : Number.isInteger(rawDraftPoolSize) && rawDraftPoolSize >= 7 && rawDraftPoolSize <= 10
+      ? rawDraftPoolSize
+      : 7
   const normalizedState: GameState = {
     ...raw,
     players,
@@ -582,6 +588,8 @@ export const normalizeState = (raw: GameState): GameState => {
     phase: raw.phase ?? 'playing',
     roundPhase: raw.roundPhase ?? 'work',
     draft: raw.draft ?? null,
+    draftMode: raw.draftMode ?? raw.draft?.mode,
+    draftPoolSize,
     parentSelection: raw.parentSelection ?? null,
     events,
     nextEventSeq,
@@ -899,6 +907,8 @@ export const createInitialState = (
     phase,
     roundPhase: 'work',
     draft,
+    draftMode: useDraft ? 'simultaneous' : undefined,
+    draftPoolSize: draft?.poolSize,
     parentSelection: null,
     currentPlayerIndex: 0,
     players,

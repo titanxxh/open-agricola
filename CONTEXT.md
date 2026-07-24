@@ -41,12 +41,16 @@ _Avoid_: RoomPlayer、浏览器连接、登录用户
 _Avoid_: RoomPlayer seat/auth 查找、前端视角切换、本地 UI player 选择
 
 **Room**:
-多人对局容器，持有一个 `GameSession`、座位连接、最大人数、房间状态和持久化元数据。
+单局多人游戏容器，持有一个 `GameSession`、座位连接、最大人数、房间状态和持久化元数据。`roomId` 同时是一局游戏及其结果的永久标识；`newGame` 迁移人数、在线座位、custom cards 和已持久化变体开关到新 UUID，不复用旧 `roomId`。
 _Avoid_: PlayerState
 
 **Room Persistence Checkpoint**:
-房间层在创建、入座、状态广播、重开、载入和结束时保存或终结房间持久化记录的统一口径。它决定写入完整 `GameState` 还是只更新 room meta，并保持持久化 adapter 只负责存取，不负责业务时机。
+房间层保存、完成或丢弃房间持久化记录的统一口径。创建和 room meta 立即写入；状态广播只把 room 标脏，由一个共享的一秒定时器从最新权威 `GameSession` 合并落盘。断线、game over 和进程关闭强制 flush；只有权威 `gameOver` 走 `complete`，TTL、解散、删号和未完成 `newGame` 走 `discard`。
 _Avoid_: RoomPersistence adapter 实现、WebSocket 广播、GameSession 规则执行
+
+**Game Result Archive**:
+正常完赛后保留的不可变标量摘要，包含 `roomId`、起止时间、回合数、人数、变体开关，以及按 `playerIndex` 对齐的游戏玩家 id、持久化用户 id、显示名和最终得分。归档不包含 `GameState`、手牌或其他隐藏信息。
+_Avoid_: 可恢复房间快照、未完成房间、完整 GameState
 
 **RoomPlayer**:
 房间里的连接席位，包含 `ws`、`playerIndex`、显示名和可选用户身份；不是规则层玩家状态。
@@ -540,7 +544,7 @@ _Avoid_: 永久放弃、全局出局名单
 
 ## Relationships
 
-- 一个 **Room** 持有一个 **GameSession**；一个 **GameSession** 持有并写入一个 **GameState**。
+- 一个 **Room** 只持有一局 **GameSession**；`newGame` 创建新 `roomId`，旧局只能成为 **Game Result Archive** 或被丢弃。
 - 浏览器通过 **Services** 里的 `WsGameTransport` 发送 **ClientCommand**；**Connection** 层路由到 **GameSession**；**Broadcaster** 构造 **StateUpdateEnvelope** 并广播。
 - **GameState** 描述游戏规则事实；**RoomPlayer** 描述连接席位；两者不要混用。
 - **GameCore.buildInteraction** 从 **GameState**、**EngineStack**、当前 **Pending Envelope** 和 anytime policy 派生 **InteractionState**。

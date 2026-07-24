@@ -116,6 +116,36 @@ describe('lobby.getRooms', () => {
       { id: 'half', playerCount: 1, maxPlayers: 4, createdBy: 'u1', status: 'waiting' },
     ])
   })
+
+  it('counts reserved seats so full rooms are not advertised as joinable', () => {
+    const registry = new RoomRegistry()
+    registry.set(fakeRoom({
+      id: 'reserved',
+      players: [{
+        ws: {} as never,
+        playerIndex: 0,
+        name: 'p1',
+        userId: 'u1',
+      }],
+      seatOwners: [
+        { playerIndex: 0, userId: 'u1' },
+        { playerIndex: 1, userId: 'u2' },
+      ],
+    }))
+    const lobby = createLobby({
+      registry,
+      checkpoint: checkpoint(),
+      broadcaster: fakeBroadcaster(),
+    })
+
+    expect(lobby.getRooms()).toEqual([{
+      id: 'reserved',
+      playerCount: 2,
+      maxPlayers: 2,
+      createdBy: 'u1',
+      status: 'playing',
+    }])
+  })
 })
 
 describe('lobby.dissolveRoomById', () => {
@@ -142,15 +172,18 @@ describe('lobby.dissolveRoomById', () => {
     })
   })
 
-  it('rejects fixed dev rooms', () => {
+  it('rejects fixed and rotated dev rooms', () => {
     const registry = new RoomRegistry()
     registry.set(fakeRoom({ id: 'dev2', createdBy: 'u1' }))
+    const rotatedId = 'dev2-12345678-1234-1234-1234-123456789abc'
+    registry.set(fakeRoom({ id: rotatedId }))
     const lobby = createLobby({
       registry,
       checkpoint: checkpoint(),
       broadcaster: fakeBroadcaster(),
     })
     expect(lobby.dissolveRoomById('dev2', 'u1').ok).toBe(false)
+    expect(lobby.dissolveRoomById(rotatedId, undefined).ok).toBe(false)
   })
 
   it('happy path: broadcasts roomDissolved + closes sockets + cleans state', () => {
@@ -183,6 +216,23 @@ describe('lobby.dissolveRoomById', () => {
 })
 
 describe('lobby.endRoomsForUser', () => {
+  it('does not end rotated dev rooms for a deleted participant', () => {
+    const id = 'dev2-12345678-1234-1234-1234-123456789abc'
+    const registry = new RoomRegistry()
+    registry.set(fakeRoom({
+      id,
+      seatOwners: [{ playerIndex: 0, userId: 'u1' }],
+    }))
+    const lobby = createLobby({
+      registry,
+      checkpoint: checkpoint(),
+      broadcaster: fakeBroadcaster(),
+    })
+
+    expect(lobby.endRoomsForUser('u1')).toEqual({ endedRoomIds: [] })
+    expect(registry.has(id)).toBe(true)
+  })
+
   it('ends rooms created by or joined by the deleted user', () => {
     const closeCalls: string[] = []
     const fakeWs = (id: string) => ({ readyState: 1, OPEN: 1, close: () => closeCalls.push(id), send: vi.fn() })
@@ -240,8 +290,10 @@ describe('lobby.endRoomsForUser', () => {
     expect(registry.has('unrelated-room')).toBe(true)
     expect(registry.lastActivityOf('owned-room')).toBeUndefined()
     expect(registry.lastActivityOf('joined-room')).toBeUndefined()
-    expect(persistence.load('owned-room')?.meta.status).toBe('finished')
-    expect(persistence.load('joined-room')?.meta.status).toBe('finished')
+    expect(persistence.load('owned-room')).toBeNull()
+    expect(persistence.load('joined-room')).toBeNull()
+    expect(persistence.__getResultForTest('owned-room')).toBeUndefined()
+    expect(persistence.__getResultForTest('joined-room')).toBeUndefined()
     expect(persistence.load('unrelated-room')?.meta.status).toBe('playing')
   })
 
@@ -288,7 +340,8 @@ describe('lobby.endRoomsForUser', () => {
     expect(registry.has('disconnected-joined-room')).toBe(false)
     expect(registry.has('unrelated-room')).toBe(true)
     expect(registry.lastActivityOf('disconnected-joined-room')).toBeUndefined()
-    expect(persistence.load('disconnected-joined-room')?.meta.status).toBe('finished')
+    expect(persistence.load('disconnected-joined-room')).toBeNull()
+    expect(persistence.__getResultForTest('disconnected-joined-room')).toBeUndefined()
     expect(persistence.load('unrelated-room')?.meta.status).toBe('playing')
   })
 })

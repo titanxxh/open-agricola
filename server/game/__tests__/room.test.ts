@@ -1,9 +1,12 @@
 import { describe, expect, it } from 'vitest'
+import { serializeState } from '../../../shared/session/serialization.ts'
+import { GameSession } from '../authoritative-session.ts'
 import {
   FIXED_DEV_ROOMS,
   FIXED_DEV_ROOM_IDS,
   buildFixedDevRoomInitialStateOptions,
   parseFixedDevRoomStartupOptions,
+  isDevRoom,
   isFixedDevRoom,
   removePlayerFromRoom,
   resolveJoinRequestPlayerIndex,
@@ -127,6 +130,35 @@ describe('room-manager seat assignment', () => {
     })
   })
 
+  it('reserves restored seats for their persisted owners', () => {
+    const room = snapshotToRoom({
+      id: 'restored',
+      serialized: null,
+      meta: {
+        createdBy: 'user-1',
+        maxPlayers: 2,
+        customCardDbIds: [],
+        status: 'playing',
+        players: [{ playerIndex: 0, userId: 'user-1' }],
+      },
+      updatedAt: 0,
+    })
+
+    expect(resolveJoinRequestPlayerIndex(room, undefined, 'user-1')).toEqual({
+      ok: true,
+      requestedPlayerIndex: 0,
+    })
+    expect(resolveJoinPlayerIndex(room, 0, 'user-2')).toEqual({
+      ok: false,
+      error: 'player slot occupied',
+    })
+    expect(resolveJoinPlayerIndex(room, 0, 'user-1')).toEqual({
+      ok: true,
+      playerIndex: 0,
+      replacedExistingPlayer: false,
+    })
+  })
+
   it('restores six-player waiting rooms without serialized state', () => {
     const room = snapshotToRoom({
       id: 'waiting6',
@@ -145,6 +177,37 @@ describe('room-manager seat assignment', () => {
     expect(room.session.state.players).toHaveLength(6)
   })
 
+  it('defaults a legacy mid-stage Farmers of the Moor draft pool to seven', () => {
+    const session = new GameSession(123, undefined, {
+      playerCount: 2,
+      draftMode: 'simultaneous',
+      draftPoolSize: 7,
+      enableFarmersOfTheMoor: true,
+      allowIncompleteFarmersOfTheMoorMinorDeal: true,
+    })
+    session.state.draftMode = undefined
+    session.state.draftPoolSize = undefined
+    session.state.draft!.stage = 'farmersOfTheMoorMinor'
+    session.state.draft!.poolSize = 4
+    const serialized = serializeState(session.state, { engineStack: session.getEngineStack() })
+
+    const room = snapshotToRoom({
+      id: 'legacy-fom-draft',
+      serialized,
+      meta: {
+        createdBy: null,
+        maxPlayers: 2,
+        customCardDbIds: [],
+        status: 'playing',
+        players: [],
+      },
+      updatedAt: 0,
+    })
+
+    expect(room.draftMode).toBe('simultaneous')
+    expect(room.draftPoolSize).toBe(7)
+  })
+
   it('exposes one persistent dev room per supported player count', () => {
     expect(FIXED_DEV_ROOMS.map((r) => r.id)).toEqual(['dev2', 'dev3', 'dev4', 'dev5', 'dev6'])
     expect(FIXED_DEV_ROOMS.map((r) => r.playerCount)).toEqual([2, 3, 4, 5, 6])
@@ -152,6 +215,9 @@ describe('room-manager seat assignment', () => {
       expect(FIXED_DEV_ROOM_IDS.has(id)).toBe(true)
       expect(isFixedDevRoom(id)).toBe(true)
     }
+    expect(isDevRoom('dev2-12345678-1234-1234-1234-123456789abc')).toBe(true)
+    expect(isDevRoom('dev2-not-a-uuid')).toBe(false)
+    expect(isFixedDevRoom('dev2-12345678-1234-1234-1234-123456789abc')).toBe(false)
     expect(isFixedDevRoom('dev')).toBe(false)
     expect(isFixedDevRoom('abc123')).toBe(false)
   })
