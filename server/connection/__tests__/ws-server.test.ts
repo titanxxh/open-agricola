@@ -64,6 +64,7 @@ describe('fixed dev room startup persistence', () => {
     const wsServerResult = createWsServer(server, { persistence })
 
     try {
+      wsServerResult.checkpoint.flushAll()
       const snap = persistence.load('dev2')
       expect(snap?.serialized).toMatchObject({
         enableFarmersOfTheMoor: true,
@@ -94,6 +95,7 @@ describe('fixed dev room startup persistence', () => {
       process.env.DEV_DRAFT_PARENTS = 'false'
       const first = createWsServer(createServer(), { persistence })
       try {
+        first.checkpoint.flushAll()
         expect(first.registry.get('dev2')?.draftParents).toBe(false)
         expect(persistence.load('dev2')?.meta.draftParents).toBe(false)
       } finally {
@@ -157,13 +159,15 @@ const waitForEvent = async <T extends ServerEvent>(
 describe('room-manager ws sync', () => {
   let server: ReturnType<typeof createServer>
   let wsServerResult: ReturnType<typeof createWsServer>
+  let persistence: InMemoryRoomPersistence
   let baseUrl: string
   const sockets: TestSocket[] = []
 
   beforeEach(async () => {
-    const persistence = new InMemoryRoomPersistence()
+    persistence = new InMemoryRoomPersistence()
     server = createServer()
     wsServerResult = createWsServer(server, { persistence })
+    wsServerResult.checkpoint.flushAll()
     await new Promise<void>((resolve) => {
       server.listen(0, '127.0.0.1', () => resolve())
     })
@@ -193,6 +197,7 @@ describe('room-manager ws sync', () => {
           }),
       ),
     )
+    wsServerResult.checkpoint.shutdown()
     clearInterval(wsServerResult.cleanupTimer)
     await new Promise<void>((resolve, reject) => {
       wsServerResult.wss.close((err) => {
@@ -206,6 +211,35 @@ describe('room-manager ws sync', () => {
         else resolve()
       })
     })
+  })
+
+  it('flushes the room once before removing the last disconnected seat', async () => {
+    const ws = new WebSocket(baseUrl) as TestSocket
+    ws.received = []
+    attachCollector(ws)
+    sockets.push(ws)
+    await waitForOpen(ws)
+    ws.send(JSON.stringify({ type: 'createRoom', name: 'P1', maxPlayers: 2 }))
+    const created = await waitForEvent(
+      ws,
+      (event): event is Extract<ServerEvent, { type: 'roomCreated' }> => event.type === 'roomCreated',
+    )
+    const originalSave = persistence.save.bind(persistence)
+    const playerCounts: number[] = []
+    const save = vi.spyOn(persistence, 'save').mockImplementation((...args) => {
+      playerCounts.push(wsServerResult.registry.get(created.roomId)?.players.length ?? -1)
+      originalSave(...args)
+    })
+
+    const closed = new Promise<void>((resolve) => ws.once('close', () => resolve()))
+    ws.close()
+    await closed
+
+    expect(save).toHaveBeenCalledOnce()
+    expect(save).toHaveBeenLastCalledWith(created.roomId, expect.any(Object), expect.any(Object))
+    expect(playerCounts).toEqual([1])
+    wsServerResult.checkpoint.flushAll()
+    expect(save).toHaveBeenCalledOnce()
   })
 
   it('accepts createRoom over websocket when oa_session cookie is valid', async () => {

@@ -619,6 +619,7 @@ export const runRoomCapacityProbe = async (config: Config): Promise<{
       levels.push(result)
       if (!result.passed && !config.smoke) break
     }
+    checkpoint.shutdown()
     const environment: Environment = {
       commit: process.env.ROOM_CAPACITY_COMMIT ??
         execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' }).trim(),

@@ -46,42 +46,54 @@ describe('Broadcaster.broadcastState', () => {
     }
   })
 
-  it('persists state on each broadcast (default shouldPersist=true)', () => {
+  it('marks state dirty and persists it on checkpoint flush', () => {
     const persistence = new InMemoryRoomPersistence()
     const saveSpy = vi.spyOn(persistence, 'save')
-    const b = new Broadcaster({ checkpoint: createRoomPersistenceCheckpoint({ persistence }) })
+    const checkpoint = createRoomPersistenceCheckpoint({ persistence })
+    const b = new Broadcaster({ checkpoint })
     const room = makeRoom('r1')
     const resp = room.session.withCtx(() => room.session.getState())
     b.broadcastState(room, resp, 'action')
+    expect(saveSpy).not.toHaveBeenCalled()
+    checkpoint.flushAll()
     expect(saveSpy).toHaveBeenCalledTimes(1)
+    checkpoint.shutdown()
   })
 
   it('respects custom shouldPersist predicate', () => {
     const persistence = new InMemoryRoomPersistence()
     const saveSpy = vi.spyOn(persistence, 'save')
-    const b = new Broadcaster({
-      checkpoint: createRoomPersistenceCheckpoint({
-        persistence,
-        shouldPersist: (room) => isFixedDevRoom(room.id),
-      }),
+    const checkpoint = createRoomPersistenceCheckpoint({
+      persistence,
+      shouldPersist: (room) => isFixedDevRoom(room.id),
     })
+    const b = new Broadcaster({ checkpoint })
     const r1 = makeRoom('r1')
     b.broadcastState(r1, r1.session.withCtx(() => r1.session.getState()), 'action')
-    expect(saveSpy).not.toHaveBeenCalled()
     const dev = makeRoom('dev2')
     b.broadcastState(dev, dev.session.withCtx(() => dev.session.getState()), 'action')
+    expect(saveSpy).not.toHaveBeenCalled()
+    checkpoint.flushAll()
     expect(saveSpy).toHaveBeenCalledTimes(1)
+    checkpoint.shutdown()
   })
 
-  it('marks finished when game ends', () => {
+  it('flushes the final state before marking a game finished', () => {
     const persistence = new InMemoryRoomPersistence()
+    const saveSpy = vi.spyOn(persistence, 'save')
     const markSpy = vi.spyOn(persistence, 'markFinished')
-    const b = new Broadcaster({ checkpoint: createRoomPersistenceCheckpoint({ persistence }) })
+    const checkpoint = createRoomPersistenceCheckpoint({ persistence })
+    const b = new Broadcaster({ checkpoint })
     const room = makeRoom('r1')
     const resp = room.session.withCtx(() => room.session.getState())
     ;(resp.state as { gameOver?: boolean }).gameOver = true
     b.broadcastState(room, resp, 'action')
+    expect(saveSpy).toHaveBeenCalledOnce()
     expect(markSpy).toHaveBeenCalledWith('r1', expect.any(Number))
+    expect(saveSpy.mock.invocationCallOrder[0]).toBeLessThan(markSpy.mock.invocationCallOrder[0]!)
+    checkpoint.flushAll()
+    expect(saveSpy).toHaveBeenCalledOnce()
+    checkpoint.shutdown()
   })
 })
 

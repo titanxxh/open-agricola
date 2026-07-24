@@ -29,6 +29,7 @@ vi.mock('../connection/ws-server.ts', () => ({
       endRoomsForUser: wsServerMocks.endRoomsForUser,
     },
     closeUserConnections: wsServerMocks.closeUserConnections,
+    shutdown: vi.fn(),
   }),
 }))
 
