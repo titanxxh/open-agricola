@@ -30,6 +30,12 @@
 
 ### 1. 基础步骤（两种情况通用）
 
+#### 容量基准规格
+
+单实例容量统一以 **2 vCPU / 2 GiB 内存**为测量锚点，基线数据见
+[`docs/performance/room-capacity-baseline.md`](performance/room-capacity-baseline.md)。
+该规格只是可复现的比较环境；优化后复测完成前，不据此承诺可支持的并发房间数。
+
 #### 安装 Docker
 
 ```bash
