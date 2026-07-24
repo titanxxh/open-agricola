@@ -1084,11 +1084,11 @@ server/custom-code/
 ├── runtime.ts           沙盒运行时
 ├── engine.ts            hook / phase / scope 校验 + 调度
 ├── isolate-runner.ts    isolate-vm 隔离入口
-├── executor-worker.ts   worker / sidecar 入口
-└── client.ts            主进程 → executor 的 RPC 客户端
+├── executor-worker.ts   Worker Thread 入口
+└── client.ts            主进程 → Worker Thread 同步调用客户端
 ```
 
-主后端只保存 `compiled_code + code_manifest`；运行时 RPC 调用同机 `custom-code-executor` sidecar。沙盒约束唯一真源 → `docs/CUSTOM_CARD_SANDBOX.md`（含 `prompt-sync:begin/end` 标记块，`pnpm run check:prompt-sync` 校验）。
+主后端只保存 `compiled_code + code_manifest`；运行时由 `client.ts` 启动专用 Worker Thread，并在其中通过 isolated-vm 执行自定义代码。沙盒约束唯一真源 → `docs/CUSTOM_CARD_SANDBOX.md`（含 `prompt-sync:begin/end` 标记块，`pnpm run check:prompt-sync` 校验）。
 
 ### 11.4 HTTP 端点（调试通道）
 
