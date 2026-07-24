@@ -77,8 +77,20 @@ export const workshopCardJsonFromDefinition = (
   ) return null
   const cardJson = meta as Record<string, unknown>
   if (typeof cardJson.id !== 'string' || typeof cardJson.name !== 'string') return null
+  const prerequisite = cardJson.prerequisite
+  let normalizedPrerequisite: Record<string, unknown> = {}
+  if (prerequisite !== undefined && typeof prerequisite !== 'string') {
+    if (!prerequisite || typeof prerequisite !== 'object' || Array.isArray(prerequisite)) return null
+    const occupationCount = (prerequisite as Record<string, unknown>).occupation
+    if (typeof occupationCount !== 'number' || !Number.isInteger(occupationCount) || occupationCount < 0) return null
+    normalizedPrerequisite = {
+      prerequisite: `${occupationCount} Occupations`,
+      occupationPrerequisites: { min: occupationCount },
+    }
+  }
   return {
     ...cardJson,
+    ...normalizedPrerequisite,
     name: cardJson.name.trim(),
     card_type: cardType,
     deck: 'CUSTOM',
