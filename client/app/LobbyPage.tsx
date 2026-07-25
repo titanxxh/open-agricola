@@ -4,6 +4,7 @@ import { useLocale } from '../contexts/LocaleContext'
 import { setPage } from './PageRouter'
 import { LocaleSwitcher } from '../components/common/LocaleSwitcher'
 import { BrandMark } from '../components/common/BrandMark'
+import { DonateWidgets } from '../components/common/DonateWidgets'
 import { Section } from '../components/common/Section'
 import { EmptyState } from '../components/common/EmptyState'
 import { API_BASE } from '../config'
@@ -404,6 +405,7 @@ export function LobbyPage() {
         )}
       </Section>
 
+      <DonateWidgets />
     </div>
   )
 }
