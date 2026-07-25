@@ -3,6 +3,7 @@ import { useAuth } from '../contexts/AuthContext'
 import { useLocale } from '../contexts/LocaleContext'
 import { LocaleSwitcher } from '../components/common/LocaleSwitcher'
 import { BrandMark } from '../components/common/BrandMark'
+import { DonateWidgets } from '../components/common/DonateWidgets'
 import { authErrorMessage } from './auth-errors'
 import { API_BASE } from '../config'
 
@@ -443,6 +444,7 @@ export function LoginPage() {
           </div>
         )}
       </div>
+      <DonateWidgets />
     </div>
   )
 }
