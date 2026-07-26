@@ -49,8 +49,28 @@ _Avoid_: PlayerState
 _Avoid_: RoomPersistence adapter 实现、WebSocket 广播、GameSession 规则执行
 
 **Game Result Archive**:
-正常完赛后保留的不可变标量摘要，包含 `roomId`、起止时间、回合数、人数、变体开关，以及按 `playerIndex` 对齐的游戏玩家 id、持久化用户 id、显示名和最终得分。归档不包含 `GameState`、手牌或其他隐藏信息。
+正常完赛后保留的标量摘要，包含 `roomId`、起止时间、回合数、人数、变体开关，以及按 `playerIndex` 对齐的游戏玩家 id、内部用户关联、显示名和最终得分。规则与得分字段不可变，用户关联和显示名可因数据删除而匿名化；归档不包含 `GameState`、手牌或其他隐藏信息。
 _Avoid_: 可恢复房间快照、未完成房间、完整 GameState
+
+**Game Replay Archive**:
+正常完赛后以 `roomId` 永久公开的逐步对局记录，可按任一座位视角或全开视角查看每个 Replay Step 的规则相关状态。它与 Game Result Archive 分离，不保存原始 Private Event payload、临时通知、生成溯源或可执行源码。
+_Avoid_: 活动 Room 快照、Public Event timeline、Game Result Archive
+
+**Replay Step**:
+回放中一个玩家可感知的推进单位，对应服务端已接受的 ClientCommand 或显式选择；引擎内部 action leaf 不单独成为步骤。
+_Avoid_: Public Event、引擎节点、动画帧
+
+**Replay Participant**:
+Game Replay Archive 中按 `playerIndex` 固定的座位身份，公开显示该局记录的显示名但不公开站点 `userId`。账号删除后保留座位并显示“已删除玩家（座位 N）”，同时清除内部用户关联。
+_Avoid_: 当前登录用户、GitHub 作者、RoomPlayer 连接
+
+**Replay Tombstone**:
+回放因管理员、违规内容或法律删除而下架后，以原 `roomId` 永久保留的匿名占位记录。它只公开粗粒度下架原因，不包含回放 payload、玩家身份或被移除内容，且 `roomId` 永不复用。
+_Avoid_: 404、可恢复软删除、Game Replay Archive payload
+
+**Game Bug Reporter**:
+在对局内提交现象说明的已登录、已入座站点用户；公开 Issue 固定记录其站点 `userId` 和 `playerIndex`，GitHub 作者可以是玩家本人或托管身份。邮箱和可变显示名不作为 Reporter 身份。
+_Avoid_: GitHub Issue 作者、当前回合玩家、匿名访客
 
 **RoomPlayer**:
 房间里的连接席位，包含 `ws`、`playerIndex`、显示名和可选用户身份；不是规则层玩家状态。
@@ -467,7 +487,7 @@ _Avoid_: 直接写 state.log
 _Avoid_: 前端调用点各自解释 public event payload
 
 **Private Event**:
-只发给特定 viewer 的私有同步附加层，例如私有 prompt、手牌变化、draft 信息；不进入公共 replay 事件流。
+只发给特定 viewer 的私有同步附加层，例如私有 prompt、手牌变化、draft 信息；不进入公共事件流或 Game Replay Archive。结束局回放从 Replay Step 和归档规则状态展示手牌、draft 与已接受选择，不复制 Private Event envelope。
 _Avoid_: public event
 
 **Action Log**:
@@ -501,6 +521,10 @@ _Avoid_: 自动保存历史、Design Draft、Published Card
 **Published Card**:
 固定引用某个 Draft Version 的公开卡牌投影，只公开最终卡牌定义、图片、能力源码和本地化。后续草稿修改保持私有，直到作者再次发布。
 _Avoid_: 实时 Design Draft、生成记录、Generation Provenance
+
+**Replay Card Snapshot**:
+正式多人局把实际使用的自定义卡名称、说明、美术和规则参数固化进 Game Replay Archive，使回放不依赖后续 Workshop Card。它不包含 LLM prompt、编辑历史、Generation Provenance、能力源码或编译产物；未发布卡只有在开局前确认公开后才能进入正式多人局。
+_Avoid_: Published Card、Draft Version、可执行卡牌实现
 
 **Workshop Sandbox（工坊沙盒）**:
 Workshop 中组合自定义卡、配置测试局并启动浏览器内热座游戏的界面与流程。中文界面统一使用“沙盒”；重新选择卡牌和配置称“重新配置沙盒”；启动动作称“开始沙盒测试”。
@@ -544,7 +568,7 @@ _Avoid_: 永久放弃、全局出局名单
 
 ## Relationships
 
-- 一个 **Room** 只持有一局 **GameSession**；`newGame` 创建新 `roomId`，旧局只能成为 **Game Result Archive** 或被丢弃。
+- 一个 **Room** 只持有一局 **GameSession**；`newGame` 创建新 `roomId`，旧局正常完赛后成为 **Game Result Archive** 和 **Game Replay Archive**，未完成则被丢弃。
 - 浏览器通过 **Services** 里的 `WsGameTransport` 发送 **ClientCommand**；**Connection** 层路由到 **GameSession**；**Broadcaster** 构造 **StateUpdateEnvelope** 并广播。
 - **GameState** 描述游戏规则事实；**RoomPlayer** 描述连接席位；两者不要混用。
 - **GameCore.buildInteraction** 从 **GameState**、**EngineStack**、当前 **Pending Envelope** 和 anytime policy 派生 **InteractionState**。
@@ -563,8 +587,10 @@ _Avoid_: 永久放弃、全局出局名单
 - **Harvest Field Phase** 可能触发 harvest-scoped card effects；**Private Field Phase** 和 **Private Breeding Phase** 不能触发这些效果，除非卡牌明确说明。
 - **Card Field** 在 Reap 时参与田地收获，但其副作用是否属于 Harvest 取决于触发上下文。
 - 规则事实先写 **Public Event**，再派生 **Action Log**、notification、highlight、animation 和 replay。
-- 私有手牌、私有 prompt 和 draft 选择通过 **Private Event** 或 viewer 过滤传输，不写入公共事件流。
+- 进行局的私有手牌、私有 prompt 和 draft 选择通过 **Private Event** 或 viewer 过滤传输；结束局的 **Game Replay Archive** 可按座位视角或全开视角展示归档规则状态，但不保存 Private Event envelope。
+- **Game Replay Archive** 由 **Replay Step** 组织，并用 **Replay Participant** 表达座位身份；内容删除后原 `roomId` 只解析为 **Replay Tombstone**。
 - **Workshop** 生成或上传自定义卡；**Custom Code Sandbox** 校验、编译并隔离执行这些卡的 impl。
+- 未发布 Workshop Card 进入正式多人局前必须确认其 **Replay Card Snapshot** 会永久公开；不同意时只允许在 **Workshop Sandbox** 使用。
 - 主 client bundle 只渲染和发命令；sandbox client bundle 可以在浏览器内运行完整 shared engine。
 - 规则正确性优先用 **Session Test**；前端视觉和多人连接行为再用 E2E。
 - **Promote** 一个 **Newborn** 使其成为可放置工人，是 **Adoptive Available** 玩家把后代换成一次 **Extra Turn** 的前提；**Forfeit** 则让该玩家放弃 **Extra Turn** 并退出本轮后续行动。
@@ -588,6 +614,7 @@ _Avoid_: 永久放弃、全局出局名单
 - “hook” 可能指 **Action Hook** 或 **Card Effect Hook**；“listener” 是另一套 action/event 反应机制，不要混称。
 - “card” 可能指 **Card Definition**、**Card Display**、**Card Impl**、玩家手牌、已打出卡或 **Card State**。改规则时通常指 Card Impl；改 UI 文案时通常指 Card Display。
 - “field phase” 可能指 **Harvest Field Phase** 或 **Private Field Phase**；卡牌文本写“this is not a harvest”时使用 Private Field Phase。
+- “replay” 可能指活动状态中的 Public Event timeline，也可能指完赛后的 **Game Replay Archive**；涉及持久化、权限或删除时必须使用完整术语。
 - “reap” 只是收作物动作，不等同于完整 **Harvest**。
 - “snapshot” 是当前同步方式；不要假设存在增量 patch，除非架构文档明确变更。
 - “log” 是 UI 缓存，不是规则事实来源；新增规则事实应先考虑 public event。
