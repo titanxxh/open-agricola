@@ -60,6 +60,26 @@ _Avoid_: 活动 Room 快照、Public Event timeline、Game Result Archive
 回放中一个玩家可感知的推进单位，对应服务端已接受的 ClientCommand 或显式选择；引擎内部 action leaf 不单独成为步骤。
 _Avoid_: Public Event、引擎节点、动画帧
 
+**Replay Step Metadata**:
+描述 Replay Step 的操作者座位和已接受游戏意图，用于定位与调试但不参与状态还原；它不包含传输凭据、站点用户身份或原始 ClientCommand。
+_Avoid_: 回放真相、命令日志、原始 WebSocket 消息
+
+**Replay Frame**:
+紧随一个 Replay Step 固化的逻辑完整权威规则状态，是历史回放和 Bug 取证的播放真相。它从 Replay Segment 的完整 checkpoint 与 Replay State Delta 无损还原；ClientCommand 只作为步骤元数据保存。
+_Avoid_: 命令日志重算、Game Sync Snapshot、undo history entry
+
+**Replay State Delta**:
+同一 Replay Segment 内从前一个 Replay Frame 到下一个 Replay Frame 的无损状态差异；应用 delta 不执行 ClientCommand、规则代码或自定义卡源码。
+_Avoid_: 命令日志、Public Event、近似 UI patch
+
+**Replay Segment**:
+一个完整权威 checkpoint 加其后有界数量 Replay State Delta 组成的独立回放存储区段。随机定位和损坏恢复只依赖目标区段，不从整局初始状态重建。
+_Avoid_: 无限 delta 链、回合、SQLite transaction
+
+**Replay Viewer Build**:
+Game Replay Archive 固定关联的不可变只读查看器版本，按对应归档结构展示 Replay Frame；它不裁定规则、不发送 ClientCommand，也不运行历史后端。
+_Avoid_: 当前对局客户端、历史后端、命令重放
+
 **Replay Participant**:
 Game Replay Archive 中按 `playerIndex` 固定的座位身份，公开显示该局记录的显示名但不公开站点 `userId`。账号删除后保留座位并显示“已删除玩家（座位 N）”，同时清除内部用户关联。
 _Avoid_: 当前登录用户、GitHub 作者、RoomPlayer 连接
@@ -71,6 +91,10 @@ _Avoid_: 404、可恢复软删除、Game Replay Archive payload
 **Game Bug Reporter**:
 在对局内提交现象说明的已登录、已入座站点用户；公开 Issue 固定记录其站点 `userId` 和 `playerIndex`，GitHub 作者可以是玩家本人或托管身份。邮箱和可变显示名不作为 Reporter 身份。
 _Avoid_: GitHub Issue 作者、当前回合玩家、匿名访客
+
+**Bug Report Anchor**:
+Game Bug Reporter 提交现象时固定到特定 Replay Frame 的稳定引用，由 `roomId`、`stepNo` 和 Frame 指纹共同标识，不随房间继续推进或观看视角改变。
+_Avoid_: 最新状态、可变播放位置、GitHub Issue 编号
 
 **RoomPlayer**:
 房间里的连接席位，包含 `ws`、`playerIndex`、显示名和可选用户身份；不是规则层玩家状态。
