@@ -6,6 +6,8 @@
 [![Pages Deploy](https://github.com/titanxxh/open-agricola/actions/workflows/deploy-pages.yml/badge.svg)](https://github.com/titanxxh/open-agricola/actions/workflows/deploy-pages.yml)
 [![License: Apache 2.0](https://img.shields.io/github/license/titanxxh/open-agricola)](LICENSE)
 [![Live Demo](https://img.shields.io/badge/demo-live-success)](https://titanxxh.github.io/open-agricola/)
+[![Ko-fi](https://img.shields.io/badge/Ko--fi-Support%20Me-FF5E5B?logo=ko-fi&logoColor=white)](https://ko-fi.com/titanxxh)
+[![爱发电](https://img.shields.io/badge/爱发电-支持titanxxh-946ce6)](https://afdian.com/a/titanxxh)
 
 > **Disclaimer**: Open Agricola is a fan-made implementation. Agricola is © Uwe Rosenberg / Lookout Spiele / Z-Man Games. This project is not affiliated with or endorsed by the rights holders.
 
@@ -96,6 +98,14 @@ docs/      架构、部署、平台设计、卡牌进度
 ## Contributing
 
 PRs welcome. Commit 标题规范：`feat: ...` / `fix: ...` / `refactor: ...` / `docs: ...`，message 用英文。AI 协作约束（卡牌实现规范、文档同步硬规则、测试边界）见 [AGENTS.md](AGENTS.md)。
+
+## 支持项目
+
+如果这个项目对你有帮助，可以请开发者喝杯咖啡：
+
+[![ko-fi](https://ko-fi.com/img/githubbutton_sm.svg)](https://ko-fi.com/titanxxh)
+
+<a href="https://afdian.com/a/titanxxh"><img width="180" src="https://pic1.afdiancdn.com/static/img/welcome/button-sponsorme.png" alt="爱发电"></a>
 
 ## License
 
