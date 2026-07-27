@@ -1,7 +1,9 @@
 import { useEffect, useMemo, useState } from 'react'
 import type { ClientInteractionState } from '../../shared/contract/protocol/game'
+import type { GameState } from '../../shared/contract/types'
 import type { SerializedGameState } from '../../shared/session/serialization'
 import type { Locale } from '../../shared/i18n'
+import type { ParentCardId } from '../../shared/parents'
 import { positionKey } from '../../shared/domain/farm'
 import { rehydrateStateForClient } from '../../client/services/rehydrate'
 import {
@@ -13,6 +15,8 @@ import { ActionBoard } from '../../client/components/board/ActionBoard'
 import { PlayerFarmPanel } from '../../client/components/board/PlayerFarmPanel'
 import { PlayerTabs } from '../../client/components/board/PlayerTabs'
 import { StageBar } from '../../client/components/board/StageBar'
+import { ParentCardFace } from '../../client/components/common/ParentCardFace'
+import { PlayerCard } from '../../client/components/common/PlayerCard'
 import type { ReplayPerspective } from './types'
 
 const idleInteraction: ClientInteractionState = {
@@ -22,6 +26,165 @@ const idleInteraction: ClientInteractionState = {
 }
 
 const noOp = () => {}
+
+const setupText = {
+  en: {
+    draft: 'Card draft replay',
+    parent: 'Parent Card selection replay',
+    round: 'Round',
+    pool: 'Available cards',
+    kept: 'Already kept',
+    submitted: 'Submitted choice',
+    mothers: 'Mother candidates',
+    fathers: 'Father candidates',
+    waiting: 'Not submitted',
+    hidden: 'Hidden card',
+  },
+  zh: {
+    draft: '卡牌轮抽回放',
+    parent: '父母卡选择回放',
+    round: '轮次',
+    pool: '当前候选',
+    kept: '已经保留',
+    submitted: '已提交选择',
+    mothers: '母亲卡候选',
+    fathers: '父亲卡候选',
+    waiting: '尚未提交',
+    hidden: '隐藏卡牌',
+  },
+} as const
+
+function SetupCards({
+  ids,
+  kind,
+  locale,
+}: {
+  ids: readonly string[]
+  kind: 'occupation' | 'minor' | 'parent'
+  locale: Locale
+}) {
+  if (ids.length === 0) return <span className="replay-setup__empty">—</span>
+  return (
+    <ul className="replay-setup__cards">
+      {ids.map((id, index) => (
+        <li
+          key={`${id}:${index}`}
+          data-card-id={id}
+          aria-label={id === '?' ? setupText[locale].hidden : id}
+        >
+          {id === '?'
+            ? <span className="replay-setup__hidden">?</span>
+            : kind === 'parent'
+              ? <ParentCardFace id={id as ParentCardId} locale={locale} />
+              : (
+                  <PlayerCard
+                    locale={locale}
+                    cardId={id}
+                    cardType={kind}
+                    enablePreview={false}
+                  />
+                )}
+        </li>
+      ))}
+    </ul>
+  )
+}
+
+function ReplayDraftPhase({
+  state,
+  locale,
+}: {
+  state: GameState
+  locale: Locale
+}) {
+  const draft = state.draft!
+  const text = setupText[locale]
+  return (
+    <section className="replay-setup" data-phase="draft" aria-label={text.draft}>
+      <header>
+        <h2>{text.draft}</h2>
+        <p>{text.round} {draft.round} / {draft.totalRounds}</p>
+      </header>
+      <div className="replay-setup__players">
+        {draft.seatOrder.map((playerId) => {
+          const player = state.players.find((candidate) => candidate.id === playerId)
+          const pool = draft.pools[playerId] ?? { occ: [], minor: [] }
+          const kept = draft.kept[playerId] ?? { occ: [], minor: [] }
+          const pending = draft.pendingPicks[playerId]
+          return (
+            <article key={playerId}>
+              <h3>{player?.name ?? playerId}</h3>
+              <h4>{text.pool}</h4>
+              <SetupCards ids={pool.occ} kind="occupation" locale={locale} />
+              <SetupCards ids={pool.minor} kind="minor" locale={locale} />
+              <h4>{text.kept}</h4>
+              <SetupCards ids={kept.occ} kind="occupation" locale={locale} />
+              <SetupCards ids={kept.minor} kind="minor" locale={locale} />
+              <h4>{text.submitted}</h4>
+              {pending?.occ || pending?.minor
+                ? (
+                    <>
+                      <SetupCards ids={pending.occ ? [pending.occ] : []} kind="occupation" locale={locale} />
+                      <SetupCards ids={pending.minor ? [pending.minor] : []} kind="minor" locale={locale} />
+                    </>
+                  )
+                : <p>{text.waiting}</p>}
+            </article>
+          )
+        })}
+      </div>
+    </section>
+  )
+}
+
+function ReplayParentSelectionPhase({
+  state,
+  locale,
+}: {
+  state: GameState
+  locale: Locale
+}) {
+  const selection = state.parentSelection!
+  const text = setupText[locale]
+  return (
+    <section className="replay-setup" data-phase="parent-selection" aria-label={text.parent}>
+      <header><h2>{text.parent}</h2></header>
+      <div className="replay-setup__players">
+        {state.players.map((player) => {
+          const candidates = selection.candidates[player.id]
+          const submission = selection.submissions[player.id]
+          return (
+            <article key={player.id}>
+              <h3>{player.name}</h3>
+              <h4>{text.mothers}</h4>
+              <SetupCards
+                ids={(candidates?.mother ?? []) as readonly string[]}
+                kind="parent"
+                locale={locale}
+              />
+              <h4>{text.fathers}</h4>
+              <SetupCards
+                ids={(candidates?.father ?? []) as readonly string[]}
+                kind="parent"
+                locale={locale}
+              />
+              <h4>{text.submitted}</h4>
+              {submission
+                ? (
+                    <SetupCards
+                      ids={[submission.mother, submission.father] as readonly string[]}
+                      kind="parent"
+                      locale={locale}
+                    />
+                  )
+                : <p>{text.waiting}</p>}
+            </article>
+          )
+        })}
+      </div>
+    </section>
+  )
+}
 
 export function ReplayBoard({
   frame,
@@ -90,6 +253,12 @@ export function ReplayBoard({
     [baseActions, locale, roundSlots, state.players, state.round],
   )
 
+  if (state.phase === 'draft' && state.draft) {
+    return <ReplayDraftPhase state={state} locale={locale} />
+  }
+  if (state.phase === 'parent-selection' && state.parentSelection) {
+    return <ReplayParentSelectionPhase state={state} locale={locale} />
+  }
   if (!displayPlayer || !currentPlayer) return null
 
   const farmView = {

@@ -12,6 +12,7 @@ import { ReplayBoard } from './ReplayBoard'
 import {
   frameForPerspective,
   intentForPerspective,
+  replayAssetUrl,
   resolveLayout,
   segmentForStep,
   validPerspective,
@@ -113,7 +114,10 @@ export function ReplayViewer() {
           setError(response)
           return
         }
-        response.customCards.forEach(registerCustomCardMetadata)
+        response.customCards.forEach((card) => registerCustomCardMetadata({
+          ...card,
+          artUrl: replayAssetUrl(card.artUrl, apiBase),
+        }))
         setManifest(response)
         setPerspective(validPerspective(params.get('perspective'), response))
         setStepNo(readInitialStep(response))
@@ -281,33 +285,37 @@ export function ReplayViewer() {
         </div>
       </header>
 
-      {manifest.missingPrefix && <div className="replay-warning">{text.missingPrefix}</div>}
-      {manifest.corruptRanges.map((range) => (
-        <div
-          key={`${range.firstStepNo}-${range.lastStepNo}`}
-          className="replay-warning replay-warning--error"
-        >
-          {text.unavailable} {range.firstStepNo}–{range.lastStepNo}
-          {range.nextCheckpointStepNo !== undefined && (
-            <button
-              type="button"
-              onClick={() => selectStep(range.nextCheckpointStepNo!)}
+      {(manifest.missingPrefix || manifest.corruptRanges.length > 0 || error) && (
+        <div className="replay-warning-stack">
+          {manifest.missingPrefix && <div className="replay-warning">{text.missingPrefix}</div>}
+          {manifest.corruptRanges.map((range) => (
+            <div
+              key={`${range.firstStepNo}-${range.lastStepNo}`}
+              className="replay-warning replay-warning--error"
             >
-              {text.continue}
-            </button>
-          )}
-        </div>
-      ))}
-      {error && (
-        <div className="replay-warning replay-warning--error">
-          <strong>{error.code}</strong> {error.message || text.unavailable}
-          {unavailable?.nextCheckpointStepNo !== undefined && (
-            <button
-              type="button"
-              onClick={() => selectStep(unavailable.nextCheckpointStepNo!)}
-            >
-              {text.continue}
-            </button>
+              {text.unavailable} {range.firstStepNo}–{range.lastStepNo}
+              {range.nextCheckpointStepNo !== undefined && (
+                <button
+                  type="button"
+                  onClick={() => selectStep(range.nextCheckpointStepNo!)}
+                >
+                  {text.continue}
+                </button>
+              )}
+            </div>
+          ))}
+          {error && (
+            <div className="replay-warning replay-warning--error">
+              <strong>{error.code}</strong> {error.message || text.unavailable}
+              {unavailable?.nextCheckpointStepNo !== undefined && (
+                <button
+                  type="button"
+                  onClick={() => selectStep(unavailable.nextCheckpointStepNo!)}
+                >
+                  {text.continue}
+                </button>
+              )}
+            </div>
           )}
         </div>
       )}
