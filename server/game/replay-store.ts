@@ -5,6 +5,7 @@ import type {
   ReplayAnchorResponse,
   ReplayFrameStep,
   ReplayJsonValue,
+  ReplayManifest,
   ReplayManifestResponse,
   ReplaySegmentDescriptor,
   ReplaySegmentResponse,
@@ -165,9 +166,18 @@ export class ReplayStore {
       ORDER BY checkpoint_step_no
     `).all(roomId) as ReplaySegmentRow[]).map((row) => ({
       checkpointStepNo: row.checkpoint_step_no,
-      firstStepNo: row.first_step_no,
+      firstStepNo: Math.min(row.checkpoint_step_no, row.first_step_no),
       lastStepNo: row.last_step_no,
     }))
+  }
+
+  private participants(roomId: string): ReplayParticipantRow[] {
+    return this.db.prepare(`
+      SELECT player_index, display_name
+      FROM game_result_players
+      WHERE room_id = ?
+      ORDER BY player_index
+    `).all(roomId) as ReplayParticipantRow[]
   }
 
   manifest(roomId: string): ReplayManifestResponse {
@@ -181,12 +191,7 @@ export class ReplayStore {
         'completed',
       )
     }
-    const participants = this.db.prepare(`
-      SELECT player_index, display_name
-      FROM game_result_players
-      WHERE room_id = ?
-      ORDER BY player_index
-    `).all(roomId) as ReplayParticipantRow[]
+    const participants = this.participants(roomId)
     let steps: ReplayStepSummary[]
     try {
       steps = (this.db.prepare(`
@@ -218,6 +223,28 @@ export class ReplayStore {
         'completed',
       )
     }
+    const corruptRanges: ReplayManifest['corruptRanges'] = []
+    let expectedStepNo = segments[0]!.firstStepNo
+    for (const step of steps) {
+      if (step.stepNo > expectedStepNo) {
+        const lastStepNo = step.stepNo - 1
+        const nextCheckpointStepNo = segments.find(
+          (segment) => segment.checkpointStepNo > lastStepNo,
+        )?.checkpointStepNo
+        corruptRanges.push({
+          firstStepNo: expectedStepNo,
+          lastStepNo,
+          ...(nextCheckpointStepNo === undefined ? {} : { nextCheckpointStepNo }),
+        })
+      }
+      expectedStepNo = step.stepNo + 1
+    }
+    if (expectedStepNo <= header.latestStepNo) {
+      corruptRanges.push({
+        firstStepNo: expectedStepNo,
+        lastStepNo: header.latestStepNo,
+      })
+    }
     return {
       ok: true,
       kind: 'replayManifest',
@@ -235,7 +262,7 @@ export class ReplayStore {
       })),
       segments,
       steps,
-      corruptRanges: [],
+      corruptRanges,
       customCards: header.customCards,
     }
   }
@@ -267,6 +294,12 @@ export class ReplayStore {
       WHERE room_id = ? AND checkpoint_step_no = ?
       ORDER BY step_no
     `).all(roomId, checkpointStepNo) as ReplayStepRow[]
+    const participantNames = new Map(
+      this.participants(roomId).map((participant) => [
+        participant.player_index,
+        participant.display_name,
+      ]),
+    )
     let previousFrame: JsonValue | null = null
     const steps: ReplayFrameStep[] = []
     try {
@@ -285,6 +318,7 @@ export class ReplayStore {
           frameHash: row.frame_hash,
         })
         previousFrame = frame
+        const serializedFrame = frame as unknown as SerializedGameState
         steps.push({
           stepNo: row.step_no,
           roomVersion: row.room_version,
@@ -294,7 +328,13 @@ export class ReplayStore {
           intent: parseIntent(row.intent_json),
           frameHash: row.frame_hash,
           createdAt: row.created_at,
-          frame: frame as unknown as SerializedGameState,
+          frame: {
+            ...serializedFrame,
+            players: serializedFrame.players.map((player, playerIndex) => ({
+              ...player,
+              name: participantNames.get(playerIndex) ?? player.name,
+            })),
+          },
         })
       }
     } catch {

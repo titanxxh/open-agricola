@@ -15,6 +15,20 @@ describe('production deployment config', () => {
     expect(script).toContain('ACCOUNT_REGISTRATION_POLICY="$ACCOUNT_REGISTRATION_POLICY"')
   })
 
+  it('forwards replay recording settings into production', () => {
+    const compose = readFileSync('docker-compose.prod.yml', 'utf8')
+    for (const name of [
+      'REPLAY_NEW_ROOMS_ENABLED',
+      'REPLAY_VIEWER_BUILD_ID',
+      'REPLAY_VIEWER_ROOT',
+      'REPLAY_ASSET_ROOT',
+      'GAME_BUILD_ID',
+    ]) {
+      expect(compose).toContain(`${name}=\${${name}`)
+    }
+    expect(compose).toContain('app-data:/app/data')
+  })
+
   it('does not start the obsolete custom-code executor sidecar', () => {
     for (const composePath of ['docker-compose.yml', 'docker-compose.prod.yml']) {
       const compose = readFileSync(composePath, 'utf8')

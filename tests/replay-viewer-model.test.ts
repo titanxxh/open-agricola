@@ -5,6 +5,7 @@ import { serializeState } from '../shared/session/serialization'
 import type { ReplayManifest } from '../shared/contract/protocol/replay'
 import {
   frameForPerspective,
+  intentForPerspective,
   resolveLayout,
   segmentForStep,
   validPerspective,
@@ -50,5 +51,22 @@ describe('replay viewer model', () => {
     expect(open.players.map((player) => player.occupationHand)).toEqual(
       frame.players.map((player) => player.occupationHand),
     )
+  })
+
+  it('shows command intents only to the acting seat or the open perspective', () => {
+    const step = {
+      stepNo: 1,
+      roomVersion: 1,
+      checkpointStepNo: 0,
+      playerIndex: 1,
+      commandType: 'draftSubmit',
+      intent: { pick: { occCardId: 'A001' } },
+      frameHash: 'a'.repeat(64),
+      createdAt: 1,
+    }
+
+    expect(intentForPerspective(step, 'p1')).toBeUndefined()
+    expect(intentForPerspective(step, 'p2')).toEqual(step.intent)
+    expect(intentForPerspective(step, 'open')).toEqual(step.intent)
   })
 })

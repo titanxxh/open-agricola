@@ -11,6 +11,7 @@ import { registerCustomCardMetadata } from '../../shared/cards/custom-card-metad
 import { ReplayBoard } from './ReplayBoard'
 import {
   frameForPerspective,
+  intentForPerspective,
   resolveLayout,
   segmentForStep,
   validPerspective,
@@ -39,6 +40,7 @@ const labels = {
     round: 'Round',
     step: 'Step',
     frameHash: 'Frame hash',
+    hiddenIntent: 'Hidden for this perspective',
   },
   zh: {
     title: '对局档案',
@@ -61,6 +63,7 @@ const labels = {
     round: '轮次',
     step: '步骤',
     frameHash: '帧哈希',
+    hiddenIntent: '当前视角不可见',
   },
 } as const
 
@@ -220,6 +223,9 @@ export function ReplayViewer() {
     ? '—'
     : manifest?.participants.find((player) => player.playerIndex === current.playerIndex)
       ?.displayName ?? `P${current.playerIndex + 1}`
+  const visibleIntent = current && perspective
+    ? intentForPerspective(current, perspective)
+    : undefined
 
   if (!manifest && !error) {
     return <main className="replay-loading">{text.loading}</main>
@@ -276,6 +282,22 @@ export function ReplayViewer() {
       </header>
 
       {manifest.missingPrefix && <div className="replay-warning">{text.missingPrefix}</div>}
+      {manifest.corruptRanges.map((range) => (
+        <div
+          key={`${range.firstStepNo}-${range.lastStepNo}`}
+          className="replay-warning replay-warning--error"
+        >
+          {text.unavailable} {range.firstStepNo}–{range.lastStepNo}
+          {range.nextCheckpointStepNo !== undefined && (
+            <button
+              type="button"
+              onClick={() => selectStep(range.nextCheckpointStepNo!)}
+            >
+              {text.continue}
+            </button>
+          )}
+        </div>
+      ))}
       {error && (
         <div className="replay-warning replay-warning--error">
           <strong>{error.code}</strong> {error.message || text.unavailable}
@@ -336,7 +358,15 @@ export function ReplayViewer() {
           <div><dt>{text.command}</dt><dd>{current?.commandType ?? '—'}</dd></div>
           <div className="replay-evidence__wide">
             <dt>{text.intent}</dt>
-            <dd><code>{current ? JSON.stringify(current.intent) : '—'}</code></dd>
+            <dd>
+              <code>
+                {current
+                  ? visibleIntent === undefined
+                    ? text.hiddenIntent
+                    : JSON.stringify(visibleIntent)
+                  : '—'}
+              </code>
+            </dd>
           </div>
           <div className="replay-evidence__wide">
             <dt>{text.frameHash}</dt>

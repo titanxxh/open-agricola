@@ -180,10 +180,23 @@ describe('GameContextRouter', () => {
       corruptRanges: [],
       customCards: [],
     }
+    const frameHash = '1'.repeat(64)
     const fetch = vi.fn(async (input: RequestInfo | URL) => {
       const url = String(input)
       if (url.includes('/game-contexts/')) {
         return new Response(JSON.stringify(context))
+      }
+      if (url.includes(`/anchors/0?frame=${frameHash}`)) {
+        return new Response(JSON.stringify({
+          ok: true,
+          kind: 'replayAnchor',
+          apiVersion: 1,
+          roomId: 'completed-room',
+          schemaVersion: 1,
+          viewerBuildId,
+          anchor: { stepNo: 0, frameHash },
+          step: {},
+        }))
       }
       if (url.endsWith('/manifest.json')) {
         return new Response(viewerManifest)
@@ -191,7 +204,11 @@ describe('GameContextRouter', () => {
       return new Response(JSON.stringify(replayManifest))
     })
     vi.stubGlobal('fetch', fetch)
-    window.history.replaceState(null, '', '/?context=completed-room')
+    window.history.replaceState(
+      null,
+      '',
+      `/?context=completed-room&step=0&frame=${frameHash}`,
+    )
 
     render(<GameContextRouter><div>active app</div></GameContextRouter>)
 
@@ -208,11 +225,52 @@ describe('GameContextRouter', () => {
       'src',
       expect.stringContaining(`/replay-viewers/${viewerBuildId}/index.html?`),
     )
+    expect(
+      new URL(iframe.getAttribute('src')!, window.location.href).searchParams.get('api'),
+    ).toBe(window.location.origin)
     expect(window.location.search).toContain('perspective=p1')
     expect(fetch).toHaveBeenCalledWith(
       '/api/v1/replays/completed-room/manifest',
       expect.objectContaining({ credentials: 'omit' }),
     )
+    expect(fetch).toHaveBeenCalledWith(
+      `/api/v1/replays/completed-room/anchors/0?frame=${frameHash}`,
+      expect.objectContaining({ credentials: 'omit' }),
+    )
+  })
+
+  it('keeps completed results visible when replay verification fails', async () => {
+    window.history.replaceState(null, '', '/?context=completed-room')
+    const context = {
+      ok: true,
+      roomId: 'completed-room',
+      lifecycle: 'completed',
+      replayStatus: 'available',
+      result: {
+        players: [{ playerIndex: 0, displayName: 'Alice', score: 42 }],
+      },
+      replay: {
+        firstStepNo: 0,
+        lastStepNo: 1,
+        missingPrefix: false,
+        schemaVersion: 1,
+        viewerBuildId: 'a'.repeat(64),
+      },
+    }
+    const fetch = vi.fn(async (input: RequestInfo | URL) =>
+      new Response(JSON.stringify(
+        String(input).includes('/game-contexts/')
+          ? context
+          : { ok: false, code: 'viewer_unavailable', message: 'Unavailable' },
+      ))
+    )
+    vi.stubGlobal('fetch', fetch)
+
+    render(<GameContextRouter><div>active app</div></GameContextRouter>)
+
+    expect(await screen.findByRole('alert')).toBeVisible()
+    expect(screen.getByText('Alice')).toBeVisible()
+    expect(screen.getByText('platform.gameContext.score')).toBeVisible()
   })
 
   it.each([

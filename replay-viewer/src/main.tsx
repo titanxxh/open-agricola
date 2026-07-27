@@ -9,10 +9,14 @@ import { loadCardsManifest } from '../../client/services/card-meta'
 import { ReplayViewer } from './ReplayViewer'
 import './styles.css'
 
-void loadCardsManifest()
+const root = createRoot(document.getElementById('root')!)
 
-createRoot(document.getElementById('root')!).render(
-  <StrictMode>
-    <ReplayViewer />
-  </StrictMode>,
-)
+void loadCardsManifest()
+  .then(() => root.render(
+    <StrictMode>
+      <ReplayViewer />
+    </StrictMode>,
+  ))
+  .catch(() => root.render(
+    <main className="replay-loading replay-error">Card metadata is unavailable.</main>,
+  ))
