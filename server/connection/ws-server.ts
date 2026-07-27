@@ -155,11 +155,16 @@ const restoreRooms = (
       snap.meta.createdBy ?? undefined,
     )
     const room = snapshotToRoom(snap, customCards)
-    if (room.status === 'waiting' && room.replayRecording === undefined) {
+    let metaChanged = snap.meta.customCards === undefined
+    if (room.replayRecording === undefined && customCards.length > 0) {
+      room.replayRecording = false
+      metaChanged = true
+    } else if (room.status === 'waiting' && room.replayRecording === undefined) {
       committer?.lockNewRoom(room)
+      metaChanged = true
     }
     registry.set(room)
-    if (snap.meta.customCards === undefined) checkpoint.recordMeta(room)
+    if (metaChanged) checkpoint.recordMeta(room)
     const prepared = committer?.prepareRoom(room, {
       missingPrefix: room.status === 'playing',
     })

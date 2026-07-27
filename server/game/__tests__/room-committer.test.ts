@@ -1,4 +1,4 @@
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -270,6 +270,7 @@ describe('RoomCommitter', () => {
       artUrl: '/card-art/custom.webp',
     }], { playerCount: 2 })
     const committer = createCommitter({ assetRoot, cardArtRoot })
+    committer.lockNewRoom(room)
 
     expect(committer.prepareRoom(room, { missingPrefix: false })).toMatchObject({
       kind: 'committed',
@@ -283,6 +284,134 @@ describe('RoomCommitter', () => {
     const hash = definition!.artUrl.slice('/replay-assets/'.length)
     expect(hash).toMatch(/^[a-f0-9]{64}$/)
     expect(readFileSync(join(assetRoot, hash))).toEqual(Buffer.from('custom-art'))
+  })
+
+  it('retries transient custom card art archival failures', () => {
+    const cardArtRoot = join(tempDir, 'card-art')
+    const assetRoot = join(tempDir, 'replay-assets')
+    mkdirSync(cardArtRoot)
+    const room = makeRoom()
+    room.session = new GameSession(587, [{
+      cardType: 'minor',
+      cardJson: {
+        id: 'CUSTOM_LateArt',
+        name: 'Late Art',
+        deck: 'CUSTOM',
+        number: 1,
+        desc: [],
+      },
+      artUrl: '/card-art/late.webp',
+    }], { playerCount: 2 })
+    const { scheduler, tasks } = fakeScheduler()
+    const committer = createCommitter({ assetRoot, cardArtRoot, scheduler })
+    const ready: number[] = []
+    committer.lockNewRoom(room)
+
+    const result = committer.prepareRoom(room, {
+      missingPrefix: false,
+      onReady: (prepared) => {
+        if (prepared.kind === 'committed') ready.push(prepared.stepNo)
+      },
+    })
+
+    expect(result.kind).toBe('blocked')
+    expect(committer.isRetrying(room.id)).toBe(true)
+    expect(tasks.map(({ delay }) => delay)).toEqual([1_000])
+
+    writeFileSync(join(cardArtRoot, 'late.webp'), Buffer.from('late-art'))
+    tasks.shift()!.callback()
+
+    expect(ready).toEqual([0])
+    expect(committer.isBlocked(room.id)).toBe(false)
+    expect(persistence.loadReplayHead(room.id)?.latestStepNo).toBe(0)
+  })
+
+  it('permanently rejects invalid custom card art URLs', () => {
+    const room = makeRoom()
+    room.session = new GameSession(587, [{
+      cardType: 'minor',
+      cardJson: {
+        id: 'CUSTOM_InvalidArt',
+        name: 'Invalid Art',
+        deck: 'CUSTOM',
+        number: 1,
+        desc: [],
+      },
+      artUrl: 'https://example.invalid/art.webp',
+    }], { playerCount: 2 })
+    const { scheduler, tasks } = fakeScheduler()
+    const committer = createCommitter({ scheduler })
+    committer.lockNewRoom(room)
+
+    expect(committer.prepareRoom(room, { missingPrefix: false })).toEqual({
+      kind: 'blocked',
+      error: 'unable to archive custom card art: unsupported custom card art URL',
+    })
+    expect(committer.isRetrying(room.id)).toBe(false)
+    expect(tasks).toEqual([])
+  })
+
+  it('does not enroll legacy custom-card rooms without replay consent', () => {
+    const room = makeRoom()
+    room.session = new GameSession(587, [{
+      cardType: 'minor',
+      cardJson: {
+        id: 'CUSTOM_Legacy',
+        name: 'Legacy',
+        deck: 'CUSTOM',
+        number: 1,
+        desc: [],
+      },
+    }], { playerCount: 2 })
+    const committer = createCommitter()
+
+    expect(committer.prepareRoom(room, { missingPrefix: true })).toEqual({
+      kind: 'unchanged',
+    })
+    expect(persistence.loadReplayHead(room.id)).toBeNull()
+  })
+
+  it('removes replay card art after its final replay reference is discarded', () => {
+    const cardArtRoot = join(tempDir, 'card-art')
+    const assetRoot = join(tempDir, 'replay-assets')
+    mkdirSync(cardArtRoot)
+    writeFileSync(join(cardArtRoot, 'shared.webp'), Buffer.from('shared-art'))
+    const customCards = [{
+      cardType: 'minor' as const,
+      cardJson: {
+        id: 'CUSTOM_SharedArt',
+        name: 'Shared Art',
+        deck: 'CUSTOM',
+        number: 1,
+        desc: [],
+      },
+      artUrl: '/card-art/shared.webp',
+    }]
+    const first = makeRoom('asset-room-1')
+    first.session = new GameSession(587, customCards, { playerCount: 2 })
+    const second = makeRoom('asset-room-2')
+    second.session = new GameSession(587, customCards, { playerCount: 2 })
+    const committer = createCommitter({ assetRoot, cardArtRoot })
+    committer.lockNewRoom(first)
+    committer.lockNewRoom(second)
+    committer.prepareRoom(first, { missingPrefix: false })
+    committer.prepareRoom(second, { missingPrefix: false })
+
+    const row = db.prepare(`
+      SELECT custom_cards_json FROM game_replays WHERE room_id = ?
+    `).get(first.id) as { custom_cards_json: string }
+    const [definition] = JSON.parse(row.custom_cards_json) as Array<{ artUrl: string }>
+    const hash = definition!.artUrl.slice('/replay-assets/'.length)
+    const assetPath = join(assetRoot, hash)
+    expect(existsSync(assetPath)).toBe(true)
+
+    persistence.discard(first.id)
+    committer.retireRoom(first.id)
+    expect(existsSync(assetPath)).toBe(true)
+
+    persistence.discard(second.id)
+    committer.retireRoom(second.id)
+    expect(existsSync(assetPath)).toBe(false)
   })
 
   it('serializes simultaneous player submissions and includes automatic resolution in the last Step', () => {
@@ -518,6 +647,31 @@ describe('RoomCommitter', () => {
 
     expect(committer.isRecording(room.id)).toBe(false)
     expect(committer.hasReplay(room.id)).toBe(false)
+  })
+
+  it('notifies queued reconnects when a blocked room retires', () => {
+    const room = makeRoom()
+    const { scheduler, tasks } = fakeScheduler()
+    const committer = createCommitter({ scheduler })
+    committer.prepareRoom(room, { missingPrefix: false })
+    db.exec(`
+      CREATE TRIGGER reject_retired_step
+      BEFORE INSERT ON game_replay_steps
+      WHEN NEW.step_no = 1
+      BEGIN
+        SELECT RAISE(ABORT, 'disk unavailable');
+      END;
+    `)
+    const response = room.session.devSetResources(0, { food: 1 })
+    committer.commit(room, response, actionIntent!, 0)
+    const errors: Array<string | undefined> = []
+
+    expect(committer.waitUntilReady(room.id, (error) => errors.push(error))).toBe(true)
+    committer.retireRoom(room.id)
+
+    expect(errors).toEqual(['room retired'])
+    expect(tasks).toEqual([])
+    expect(committer.isBlocked(room.id)).toBe(false)
   })
 
   it('whitelists intent fields and excludes request and arbitrary payload data', () => {
