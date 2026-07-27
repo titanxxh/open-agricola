@@ -76,6 +76,7 @@ describe('serializeStateForPlayer', () => {
     const restored = rehydrateState(JSON.parse(JSON.stringify(serialized))).state
 
     expect(restored.players).toHaveLength(6)
+    expect(restored.players.every((player) => !('pastureCapacities' in player))).toBe(true)
     expect(restored.players.map((player) => player.id)).toEqual(['p1', 'p2', 'p3', 'p4', 'p5', 'p6'])
     expect(restored.players.map((player) => player.name)).toEqual(['playerA', 'playerB', 'playerC', 'playerD', 'playerE', 'playerF'])
     expect(restored.players.map((player) => player.color)).toEqual(['red', 'blue', 'black', 'yellow', 'green', 'purple'])

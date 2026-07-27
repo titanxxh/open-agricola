@@ -771,6 +771,7 @@ export const rehydrateState = (raw: SerializedGameState): RehydratedState => {
       playedCardAnimalZones: _playedCardAnimalZones,
       farmCardAnimalZones: _farmCardAnimalZones,
       borrowedPlayedCardAnimalZones: _borrowedPlayedCardAnimalZones,
+      pastureCapacities: _pastureCapacities,
       ...player
     }) => player),
   }
