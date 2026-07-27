@@ -41,11 +41,27 @@ _Avoid_: RoomPlayer、浏览器连接、登录用户
 _Avoid_: RoomPlayer seat/auth 查找、前端视角切换、本地 UI player 选择
 
 **Room**:
-单局多人游戏容器，持有一个 `GameSession`、座位连接、最大人数、房间状态和持久化元数据。`roomId` 同时是一局游戏及其结果的永久标识；`newGame` 迁移人数、在线座位、custom cards 和已持久化变体开关到新 UUID，不复用旧 `roomId`。
+单局多人游戏容器，持有一个 `GameSession`、座位连接、最大人数、房间状态和持久化元数据。`roomId` 同时是该局 Game Context 的永久标识；`newGame` 迁移人数、在线座位、custom cards 和已持久化变体开关到新 UUID，不复用旧 `roomId`。
 _Avoid_: PlayerState
 
+**Game Context**:
+由 `roomId` 永久标识的一局游戏及其生命周期上下文，只可能处于活动、已完成、已过期或已下架状态。可恢复状态或回放内容消失后，其身份仍保留；从未存在的 `roomId` 不属于 Game Context。
+_Avoid_: 可复用房间号、GameState、Room Invite
+
+**Game Context Link**:
+定位一个 Game Context 的永久链接，可额外固定 Bug Report Anchor 和 Replay Perspective。它不是邀请、座位凭据或活动对局的观看权限。
+_Avoid_: Room Invite Link、登录回调、恢复令牌
+
+**Active Game Recovery**:
+已认证且已拥有座位的玩家返回仍处于活动状态的 Room，并从当前权威状态继续游戏。恢复身份来自玩家与座位的既有绑定，不来自链接参数。
+_Avoid_: 加入空座位、活动局观战、回到历史步骤继续操作
+
+**Expired Game Context**:
+未正常完赛且已不能恢复的 Game Context；它永久保留 `roomId` 身份，但不提供活动 Room 或完整 Game Replay Archive。
+_Avoid_: 未知 roomId、Replay Tombstone、正常完赛
+
 **Room Persistence Checkpoint**:
-房间层保存、完成或丢弃房间持久化记录的统一口径。创建和 room meta 立即写入；状态广播只把 room 标脏，由一个共享的一秒定时器从最新权威 `GameSession` 合并落盘。断线、game over 和进程关闭强制 flush；只有权威 `gameOver` 走 `complete`，TTL、解散、删号和未完成 `newGame` 走 `discard`。
+房间层保存、完成或丢弃可恢复 Room 快照的统一口径。创建和 room meta 立即写入；状态广播只把 room 标脏，由一个共享的一秒定时器从最新权威 `GameSession` 合并落盘。断线、game over 和进程关闭强制 flush；只有权威 `gameOver` 走 `complete`，TTL、解散、删号和未完成 `newGame` 走 `discard`，但 `discard` 不删除对应 Game Context 的永久身份。
 _Avoid_: RoomPersistence adapter 实现、WebSocket 广播、GameSession 规则执行
 
 **Game Result Archive**:
@@ -84,6 +100,10 @@ _Avoid_: 当前对局客户端、历史后端、命令重放
 Game Replay Archive 中按 `playerIndex` 固定的座位身份，公开显示该局记录的显示名但不公开站点 `userId`。账号删除后保留座位并显示“已删除玩家（座位 N）”，同时清除内部用户关联。
 _Avoid_: 当前登录用户、GitHub 作者、RoomPlayer 连接
 
+**Replay Perspective**:
+Game Replay Archive 的展示视角，可以是某个 Replay Participant 当时可见的信息，也可以是全部规则状态。它是公开归档的展示选择，不是访问权限或活动 Room 座位身份。
+_Avoid_: Active Game Recovery 身份、独立座位归档、权限角色
+
 **Replay Tombstone**:
 回放因管理员、违规内容或法律删除而下架后，以原 `roomId` 永久保留的匿名占位记录。它只公开粗粒度下架原因，不包含回放 payload、玩家身份或被移除内容，且 `roomId` 永不复用。
 _Avoid_: 404、可恢复软删除、Game Replay Archive payload
@@ -107,6 +127,10 @@ _Avoid_: 浏览器临时表单、GitHub Issue、Workshop Design Draft
 **Bug Report Anchor**:
 Game Bug Reporter 提交现象时固定到特定 Replay Frame 的稳定引用，由 `roomId`、`stepNo` 和 Frame 指纹共同标识，不随房间继续推进或观看视角改变。
 _Avoid_: 最新状态、可变播放位置、GitHub Issue 编号
+
+**Reported Game Evidence**:
+为已提交 Bug Report Anchor 暂时保留、足以只读还原该 Replay Frame 的取证记录。它不延长 Active Game Recovery，也不等同于正常完赛后的永久 Game Replay Archive。
+_Avoid_: 活动 Room 快照、完整未完成局归档、永久 Replay
 
 **RoomPlayer**:
 房间里的连接席位，包含 `ws`、`playerIndex`、显示名和可选用户身份；不是规则层玩家状态。
@@ -604,7 +628,8 @@ _Avoid_: 永久放弃、全局出局名单
 
 ## Relationships
 
-- 一个 **Room** 只持有一局 **GameSession**；`newGame` 创建新 `roomId`，旧局正常完赛后成为 **Game Result Archive** 和 **Game Replay Archive**，未完成则被丢弃。
+- 一个 **Room** 只持有一局 **GameSession**；`newGame` 创建新 `roomId`，旧局正常完赛后成为 **Game Result Archive** 和 **Game Replay Archive**，未完成则成为 **Expired Game Context**。
+- **Game Context Link** 按 **Game Context** 生命周期解析为 **Active Game Recovery**、**Game Replay Archive**、**Expired Game Context** 或 **Replay Tombstone**，但不能替代 Room Invite。
 - 浏览器通过 **Services** 里的 `WsGameTransport` 发送 **ClientCommand**；**Connection** 层路由到 **GameSession**；**Broadcaster** 构造 **StateUpdateEnvelope** 并广播。
 - **GameState** 描述游戏规则事实；**RoomPlayer** 描述连接席位；两者不要混用。
 - **GameCore.buildInteraction** 从 **GameState**、**EngineStack**、当前 **Pending Envelope** 和 anytime policy 派生 **InteractionState**。
@@ -624,8 +649,8 @@ _Avoid_: 永久放弃、全局出局名单
 - **Card Field** 在 Reap 时参与田地收获，但其副作用是否属于 Harvest 取决于触发上下文。
 - 规则事实先写 **Public Event**，再派生 **Action Log**、notification、highlight、animation 和 replay。
 - 进行局的私有手牌、私有 prompt 和 draft 选择通过 **Private Event** 或 viewer 过滤传输；结束局的 **Game Replay Archive** 可按座位视角或全开视角展示归档规则状态，但不保存 Private Event envelope。
-- **Game Replay Archive** 由 **Replay Step** 组织，并用 **Replay Participant** 表达座位身份；内容删除后原 `roomId` 只解析为 **Replay Tombstone**。
-- **Game Bug Reporter** 可以用自己的 **Issue Submission Connection** 提交，也可以明确选择 **Hosted Issue Identity**；两者都从同一 **Bug Report Draft** 和 **Bug Report Anchor** 创建公开 Issue。
+- **Game Replay Archive** 由 **Replay Step** 组织，用 **Replay Participant** 表达座位身份，并由 **Replay Perspective** 决定展示遮蔽；内容删除后原 `roomId` 只解析为 **Replay Tombstone**。
+- **Game Bug Reporter** 可以用自己的 **Issue Submission Connection** 提交，也可以明确选择 **Hosted Issue Identity**；两者都从同一 **Bug Report Draft** 和 **Bug Report Anchor** 创建公开 Issue，未完成局可用 **Reported Game Evidence** 暂时还原该 Anchor。
 - **Workshop** 生成或上传自定义卡；**Custom Code Sandbox** 校验、编译并隔离执行这些卡的 impl。
 - 未发布 Workshop Card 进入正式多人局前必须确认其 **Replay Card Snapshot** 会永久公开；不同意时只允许在 **Workshop Sandbox** 使用。
 - 主 client bundle 只渲染和发命令；sandbox client bundle 可以在浏览器内运行完整 shared engine。
@@ -652,6 +677,7 @@ _Avoid_: 永久放弃、全局出局名单
 - “card” 可能指 **Card Definition**、**Card Display**、**Card Impl**、玩家手牌、已打出卡或 **Card State**。改规则时通常指 Card Impl；改 UI 文案时通常指 Card Display。
 - “field phase” 可能指 **Harvest Field Phase** 或 **Private Field Phase**；卡牌文本写“this is not a harvest”时使用 Private Field Phase。
 - “replay” 可能指活动状态中的 Public Event timeline，也可能指完赛后的 **Game Replay Archive**；涉及持久化、权限或删除时必须使用完整术语。
+- “Game Context Link” 只负责定位既有 **Game Context**；需要让新玩家占座时应明确使用 Room Invite。
 - “reap” 只是收作物动作，不等同于完整 **Harvest**。
 - “snapshot” 是当前同步方式；不要假设存在增量 patch，除非架构文档明确变更。
 - “log” 是 UI 缓存，不是规则事实来源；新增规则事实应先考虑 public event。
