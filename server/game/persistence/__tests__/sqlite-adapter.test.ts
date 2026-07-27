@@ -45,6 +45,7 @@ const setupDb = (options?: Database.Options) => {
       status TEXT NOT NULL DEFAULT 'waiting',
       version INTEGER NOT NULL DEFAULT 0,
       custom_card_ids TEXT NOT NULL DEFAULT '[]',
+      custom_cards_runtime_json TEXT,
       replay_recording INTEGER,
       replay_viewer_build_id TEXT,
       replay_game_build_id TEXT,
@@ -230,6 +231,24 @@ describe('SqliteRoomPersistence', () => {
     p.save('r1', STATE, meta)
     const snap = p.load('r1') as RoomSnapshot
     expect(snap.meta.customCardDbIds).toEqual(['card-1', 'card-2'])
+  })
+
+  it('save → load freezes custom card runtime data', () => {
+    const customCards = [{
+      cardType: 'minor' as const,
+      cardJson: {
+        id: 'CUSTOM_Pinned',
+        name: 'Pinned',
+        deck: 'CUSTOM',
+        number: 1,
+        desc: [],
+      },
+      effectCode: 'source',
+      compiledCode: 'compiled',
+    }]
+    p.save('r1', STATE, { ...META, customCards: customCards as never })
+
+    expect(p.load('r1')?.meta.customCards).toEqual(customCards)
   })
 
   it('save → load preserves room expansion flags', () => {

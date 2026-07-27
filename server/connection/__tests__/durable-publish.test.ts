@@ -60,6 +60,18 @@ describe('durable publish', () => {
     const guest = createConnectionCtx(guestWs as never, deps, true, 'u2')
 
     dispatch(host, { type: 'createRoom', maxPlayers: 2, name: 'Host' })
+    hostWs.send.mockClear()
+    dispatch(host, {
+      type: 'action',
+      spaceId: 'forest',
+      requestId: 'waiting-action',
+    })
+    expect(messages(hostWs)).toContainEqual(expect.objectContaining({
+      type: 'error',
+      requestId: 'waiting-action',
+    }))
+    expect(persistence.loadReplayHead(host.currentRoom!.id)).toBeNull()
+    hostWs.send.mockClear()
     dispatch(guest, {
       type: 'joinRoom',
       roomId: host.currentRoom!.id,

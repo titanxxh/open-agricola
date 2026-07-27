@@ -43,6 +43,11 @@ const sentMessagesOf = (ctx: ReturnType<typeof newCtx>): Array<Record<string, un
   return send.mock.calls.map(([raw]) => JSON.parse(raw as string) as Record<string, unknown>)
 }
 
+const markRoomStarted = (ctx: ReturnType<typeof newCtx>) => {
+  ctx.currentRoom!.status = 'playing'
+  ctx.currentRoom!.startedAt ??= 1
+}
+
 describe('handleCreateRoom', () => {
   it('creates a room + sets ctx.currentRoom + sends roomCreated', () => {
     const ctx = newCtx()
@@ -145,6 +150,7 @@ describe('handleCreateRoom', () => {
     const ctx = newCtx()
     ctx.currentUserId = 'u1'
     dispatch(ctx, { type: 'createRoom', maxPlayers: 2, enableParentCards: true })
+    markRoomStarted(ctx)
 
     dispatch(ctx, { type: 'newGame', seed: 309 })
 
@@ -166,6 +172,7 @@ describe('handleCreateRoom', () => {
 
     expect(ctx.currentRoom!.draftParents).toBe(false)
     expect(ctx.currentRoom!.session.state.phase).toBe('playing')
+    markRoomStarted(ctx)
 
     dispatch(ctx, { type: 'newGame', seed: 309 })
 
@@ -196,6 +203,7 @@ describe('handleCreateRoom', () => {
     ctx.registry.delete(roomId)
     ctx.registry.set(restored)
     ctx.currentRoom = restored
+    markRoomStarted(ctx)
 
     dispatch(ctx, { type: 'newGame', seed: 309 })
 
@@ -257,6 +265,7 @@ describe('handleCreateRoom', () => {
     const ctx = newCtx()
     ctx.currentUserId = 'u1'
     dispatch(ctx, { type: 'createRoom', maxPlayers: 2, enableParentCards: true })
+    markRoomStarted(ctx)
 
     dispatch(ctx, { type: 'newGame', seed: 309 })
 
@@ -269,6 +278,7 @@ describe('handleCreateRoom', () => {
     ctx.currentUserId = 'u1'
     dispatch(ctx, { type: 'createRoom', maxPlayers: 2 })
     const previousRoomId = ctx.currentRoom!.id
+    markRoomStarted(ctx)
 
     dispatch(ctx, { type: 'newGame', seed: 309 })
     ctx.checkpoint.flushAll()
@@ -294,6 +304,7 @@ describe('handleCreateRoom', () => {
     ctx.checkpoint.discardRoom(createdRoomId)
     ctx.currentRoom!.id = 'dev2'
     ctx.registry.set(ctx.currentRoom!)
+    markRoomStarted(ctx)
 
     dispatch(ctx, { type: 'newGame', seed: 309 })
     const nextRoomId = ctx.currentRoom!.id
@@ -334,6 +345,7 @@ describe('handleCreateRoom', () => {
     ctx.currentUserId = 'u1'
     dispatch(ctx, { type: 'createRoom', maxPlayers: 2 })
     const previousRoomId = ctx.currentRoom!.id
+    markRoomStarted(ctx)
     ctx.currentRoom!.startedAt = 10
     ctx.currentRoom!.session.state.gameOver = true
     expect(ctx.checkpoint.completeGame(ctx.currentRoom!, 20).ok).toBe(true)
@@ -350,6 +362,7 @@ describe('handleCreateRoom', () => {
     ctx.currentUserId = 'u1'
     dispatch(ctx, { type: 'createRoom', maxPlayers: 2 })
     const previousRoomId = ctx.currentRoom!.id
+    markRoomStarted(ctx)
     ctx.currentRoom!.startedAt = 10
     ctx.currentRoom!.session.state.gameOver = true
     vi.spyOn(ctx.persistence, 'complete').mockReturnValue({
@@ -393,6 +406,7 @@ describe('handleCreateRoom', () => {
     const ctx = newCtx()
     ctx.currentUserId = 'u1'
     dispatch(ctx, { type: 'createRoom', maxPlayers: 2 })
+    markRoomStarted(ctx)
     const loaded = JSON.parse(JSON.stringify(ctx.currentRoom!.session.getState().state)) as GameState
     loaded.gameSeed = 777
 
@@ -415,6 +429,7 @@ describe('handleCreateRoom', () => {
     const ctx = newCtx()
     ctx.currentUserId = 'u1'
     dispatch(ctx, { type: 'createRoom', maxPlayers: 2, enableThroughTheSeasons: true } as never)
+    markRoomStarted(ctx)
 
     dispatch(ctx, { type: 'newGame', seed: 309 })
 
@@ -458,6 +473,7 @@ describe('handleCreateRoom', () => {
       enableFarmersOfTheMoor: true,
       allowIncompleteFarmersOfTheMoorMinorDeal: true,
     } as never)
+    markRoomStarted(ctx)
 
     dispatch(ctx, { type: 'newGame', seed: 309 })
 
@@ -470,6 +486,7 @@ describe('handleCreateRoom', () => {
     const ctx = newCtx()
     ctx.currentUserId = 'u1'
     dispatch(ctx, { type: 'createRoom', maxPlayers: 6 })
+    markRoomStarted(ctx)
 
     dispatch(ctx, { type: 'newGame', seed: 309 })
 
@@ -492,6 +509,7 @@ describe('seat-binding guards', () => {
     const ctx = newCtx()
     ctx.currentUserId = 'u1'
     dispatch(ctx, { type: 'createRoom', maxPlayers: 2, name: 'host' })
+    markRoomStarted(ctx)
     return ctx
   }
 
@@ -550,6 +568,7 @@ describe('seat-binding guards', () => {
     const ctx = newCtx()
     ctx.currentUserId = 'u1'
     dispatch(ctx, { type: 'createRoom', maxPlayers: 2, enableParentCards: true })
+    markRoomStarted(ctx)
     const p1Candidates = ctx.currentRoom!.session.state.parentSelection!.candidates.p1
 
     dispatch(ctx, {
@@ -569,6 +588,7 @@ describe('seat-binding guards', () => {
     const ctx = newCtx()
     ctx.currentUserId = 'u1'
     dispatch(ctx, { type: 'createRoom', maxPlayers: 2, enableParentCards: true })
+    markRoomStarted(ctx)
     const p1Candidates = ctx.currentRoom!.session.state.parentSelection!.candidates.p1
 
     dispatch(ctx, {

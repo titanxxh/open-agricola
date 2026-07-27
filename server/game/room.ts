@@ -29,6 +29,7 @@ export type Room = {
   startedAt?: number
   createdBy?: string
   customCardDbIds?: string[]
+  customCards?: CustomCardData[]
   replayRecording?: boolean
   replayViewerBuildId?: string
   replayGameBuildId?: string
@@ -162,6 +163,7 @@ export const toRoomMeta = (room: Room): RoomMeta => ({
   startedAt: room.startedAt ?? null,
   maxPlayers: room.maxPlayers,
   customCardDbIds: room.customCardDbIds ?? [],
+  ...(room.customCards === undefined ? {} : { customCards: room.customCards }),
   ...(room.replayRecording === undefined
     ? {}
     : { replayRecording: room.replayRecording }),
@@ -309,7 +311,7 @@ const createSessionFromSnapshot = (
 
 export const snapshotToRoom = (
   snapshot: RoomSnapshot,
-  customCards: CustomCardData[] = [],
+  customCards: CustomCardData[] = snapshot.meta.customCards ?? [],
 ): Room => {
   const session = createSessionFromSnapshot(snapshot, customCards)
   return {
@@ -323,6 +325,7 @@ export const snapshotToRoom = (
     startedAt: snapshot.meta.startedAt ?? undefined,
     createdBy: snapshot.meta.createdBy ?? undefined,
     customCardDbIds: snapshot.meta.customCardDbIds,
+    customCards,
     replayRecording: snapshot.meta.replayRecording,
     replayViewerBuildId: snapshot.meta.replayViewerBuildId,
     replayGameBuildId: snapshot.meta.replayGameBuildId,

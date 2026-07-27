@@ -1,4 +1,5 @@
 import type { SerializedGameState } from '../../../shared/session/serialization.ts'
+import type { CustomCardData } from '../../../shared/cards/session-card-context.ts'
 
 export type RoomStatus = 'waiting' | 'playing' | 'finished'
 
@@ -7,6 +8,7 @@ export type RoomMeta = {
   startedAt?: number | null
   maxPlayers: number
   customCardDbIds: string[]
+  customCards?: CustomCardData[]
   replayRecording?: boolean
   replayViewerBuildId?: string
   replayGameBuildId?: string

@@ -9,6 +9,7 @@ import type {
   RestoreOptions,
 } from './room-persistence.ts'
 import type { SerializedGameState } from '../../../shared/session/serialization.ts'
+import type { CustomCardData } from '../../../shared/cards/session-card-context.ts'
 
 type RoomRow = {
   id: string
@@ -18,6 +19,7 @@ type RoomRow = {
   status: string
   version: number
   custom_card_ids: string | null
+  custom_cards_runtime_json: string | null
   replay_recording: number | null
   replay_viewer_build_id: string | null
   replay_game_build_id: string | null
@@ -109,6 +111,15 @@ const parseCustomCardDbIds = (raw: string | null): string[] => {
   }
 }
 
+const parseCustomCards = (raw: string): CustomCardData[] => {
+  try {
+    const parsed = JSON.parse(raw) as unknown
+    return Array.isArray(parsed) ? parsed as CustomCardData[] : []
+  } catch {
+    return []
+  }
+}
+
 const toStatus = (raw: string): RoomStatus =>
   raw === 'playing' || raw === 'finished' || raw === 'waiting' ? raw : 'waiting'
 
@@ -126,6 +137,7 @@ const roomValues = (
   status: meta.status,
   version,
   customCardIds: JSON.stringify(meta.customCardDbIds),
+  customCards: meta.customCards === undefined ? null : JSON.stringify(meta.customCards),
   replayRecording: meta.replayRecording === undefined ? null : (meta.replayRecording ? 1 : 0),
   replayViewerBuildId: meta.replayViewerBuildId ?? null,
   replayGameBuildId: meta.replayGameBuildId ?? null,
@@ -150,6 +162,9 @@ const toSnapshot = (
     startedAt: row.started_at,
     maxPlayers: row.max_players,
     customCardDbIds: parseCustomCardDbIds(row.custom_card_ids),
+    ...(row.custom_cards_runtime_json === null
+      ? {}
+      : { customCards: parseCustomCards(row.custom_cards_runtime_json) }),
     ...(row.replay_recording === null
       ? {}
       : { replayRecording: row.replay_recording === 1 }),
@@ -200,6 +215,7 @@ export class SqliteRoomPersistence implements RoomPersistence {
   constructor(db: SqliteDb) {
     this.loadRoom = db.prepare(
       `SELECT id, created_by, state_json, max_players, status, version, custom_card_ids,
+              custom_cards_runtime_json,
               replay_recording, replay_viewer_build_id, replay_game_build_id,
               enable_parent_cards, draft_parents, enable_through_the_seasons, enable_farmers_of_the_moor,
               allow_incomplete_farmers_of_the_moor_minor_deal, started_at, updated_at
@@ -211,11 +227,13 @@ export class SqliteRoomPersistence implements RoomPersistence {
     this.upsertRoom = db.prepare(`
       INSERT INTO rooms (
         id, created_by, state_json, max_players, status, version, custom_card_ids,
+        custom_cards_runtime_json,
         replay_recording, replay_viewer_build_id, replay_game_build_id,
         enable_parent_cards, draft_parents, enable_through_the_seasons, enable_farmers_of_the_moor,
         allow_incomplete_farmers_of_the_moor_minor_deal, started_at, created_at, updated_at
       ) VALUES (
         @id, @createdBy, @stateJson, @maxPlayers, @status, COALESCE(@version, 1), @customCardIds,
+        @customCards,
         @replayRecording, @replayViewerBuildId, @replayGameBuildId,
         @enableParentCards, @draftParents, @enableThroughTheSeasons, @enableFarmersOfTheMoor,
         @allowIncompleteFarmersOfTheMoorMinorDeal, @startedAt, @now, @now
@@ -224,6 +242,7 @@ export class SqliteRoomPersistence implements RoomPersistence {
         state_json = COALESCE(excluded.state_json, rooms.state_json),
         status = excluded.status,
         custom_card_ids = excluded.custom_card_ids,
+        custom_cards_runtime_json = COALESCE(rooms.custom_cards_runtime_json, excluded.custom_cards_runtime_json),
         replay_recording = COALESCE(rooms.replay_recording, excluded.replay_recording),
         replay_viewer_build_id = COALESCE(rooms.replay_viewer_build_id, excluded.replay_viewer_build_id),
         replay_game_build_id = COALESCE(rooms.replay_game_build_id, excluded.replay_game_build_id),
@@ -283,7 +302,7 @@ export class SqliteRoomPersistence implements RoomPersistence {
     `)
     this.restoreRooms = db.prepare(`
       SELECT rooms.id, rooms.created_by, rooms.state_json, rooms.max_players, rooms.status,
-             rooms.version, rooms.custom_card_ids,
+             rooms.version, rooms.custom_card_ids, rooms.custom_cards_runtime_json,
              rooms.replay_recording, rooms.replay_viewer_build_id, rooms.replay_game_build_id,
              rooms.enable_parent_cards, rooms.draft_parents,
              rooms.enable_through_the_seasons, rooms.enable_farmers_of_the_moor,

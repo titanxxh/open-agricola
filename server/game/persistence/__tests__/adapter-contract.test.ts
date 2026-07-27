@@ -36,6 +36,7 @@ const setupSqlite = (): RoomPersistence => {
     CREATE TABLE rooms (id TEXT PRIMARY KEY, created_by TEXT, state_json TEXT,
       max_players INTEGER NOT NULL DEFAULT 2, status TEXT NOT NULL DEFAULT 'waiting',
       version INTEGER NOT NULL DEFAULT 0, custom_card_ids TEXT NOT NULL DEFAULT '[]',
+      custom_cards_runtime_json TEXT,
       replay_recording INTEGER, replay_viewer_build_id TEXT, replay_game_build_id TEXT,
       enable_parent_cards INTEGER NOT NULL DEFAULT 0,
       draft_parents INTEGER,
