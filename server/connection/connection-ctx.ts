@@ -5,6 +5,7 @@ import type { RoomPersistenceCheckpoint } from '../game/room-persistence-checkpo
 import type { Broadcaster } from './broadcaster.ts'
 import type { Lobby } from '../game/lobby.ts'
 import type { RoomCommitter } from '../game/room-committer.ts'
+import type { GameContextStore } from '../game/game-context-store.ts'
 
 export type ConnectionDeps = {
   registry: RoomRegistry
@@ -12,6 +13,7 @@ export type ConnectionDeps = {
   broadcaster: Broadcaster
   lobby: Lobby
   committer?: RoomCommitter
+  gameContextStore?: GameContextStore
 }
 
 export type ConnectionCtx = {

@@ -194,7 +194,7 @@ type ClientCommand = (
       enableParentCards?, draftParents?, enableThroughTheSeasons?,
       enableFarmersOfTheMoor?, allowIncompleteFarmersOfTheMoorMinorDeal?,
       draftMode?, draftPoolSize? }
-  | { type: 'joinRoom'; roomId; requestedPlayerIndex?; name? }
+  | { type: 'joinRoom'; roomId; intent?: 'join' | 'resume'; requestedPlayerIndex?; name? }
   | { type: 'dissolveRoom' }
   | { type: 'getState' }
   | { type: 'action'; spaceId }              // 放置工人 / 启动 anytime
@@ -1074,15 +1074,15 @@ server/game/
 
 `RoomPlayer { ws, playerIndex, name, userId? }` 是连接实例，非领域 `PlayerState`。`GameSession` 是 `GameCore` 的薄服务端包装，只注入服务端 custom-code executor；连接绑定、广播和持久化不属于它。
 
-固定持久化 dev 房：`dev2` 至 `dev6`。`PERSIST_ROOMS=sqlite`（默认） / `json` 切换 adapter。普通 SQLite 房间："空房先保留、TTL 后回收"，启动恢复覆盖 `waiting` 与 `playing`，`custom_card_ids` 一并恢复。允许同座位重连替换旧连接。
+固定持久化 dev 房：`dev2` 至 `dev6`。`PERSIST_ROOMS=sqlite`（默认） / `json` 切换 adapter。普通 SQLite 房间在全部玩家离线后，`waiting` 保留 30 分钟、`playing` 保留 7 天；启动恢复覆盖未过期的两种状态，`custom_card_ids` 一并恢复。允许同座位重连替换旧连接。
 
-`roomId` 唯一标识一局游戏：`newGame` 先创建新 `GameSession` 和 UUID，再把在线座位、人数、custom cards、已持久化变体开关及所有连接引用切到新 Room 记录；旧 id 永不复用。首个 `waiting → playing` 转换写入不可变 `started_at`。只有权威 `gameOver` 会在单个 SQLite 事务内写入 `game_results` / `game_result_players` 标量摘要并删除 `rooms.state_json`；TTL、解散、删号和未完成重开只删除活动房间，不产生结果。归档写失败会回滚，最终全量状态继续保留用于恢复或重试。
+`roomId` 唯一标识一局游戏：`newGame` 先创建新 `GameSession` 和 UUID，再把在线座位、人数、custom cards、已持久化变体开关及所有连接引用切到新 Room 记录；旧 id 永不复用。首个 `waiting → playing` 转换写入不可变 `started_at`。只有权威 `gameOver` 会在单个 SQLite 事务内写入 `game_results` / `game_result_players` 标量摘要并删除 `rooms.state_json`；TTL、解散、删号和未完成重开只删除可恢复快照，把永久 Game Context 置为 `expired`，不产生结果。归档写失败会回滚，最终全量状态继续保留用于恢复或重试。
 
 `RoomPersistenceCheckpoint` 继续处理等待态、未启用 Replay 的 Room 和非 SQLite adapter。SQLite Replay Room 的成功游戏命令改走 Durable Room Commit：同一事务先写 Room snapshot 与 Replay Step，提交后才广播；WebSocket 关闭时不再为这种 Room 补写旧 checkpoint。
 
 ### 11.3 Game Context、Replay 与 Bug Report
 
-本节是跨任务实现契约。`room-committer.ts`、`replay-codec.ts`、七表迁移和 SQLite 原子写已落地；Context 读取、Replay Viewer 与 Bug Report 模块由后续任务补齐。
+本节是跨任务实现契约。`room-committer.ts`、`replay-codec.ts`、七表迁移、SQLite 原子写、Game Context resolver 与活动局原座位恢复已落地；Replay Viewer、Anchor 读取与 Bug Report 模块由后续任务补齐。
 
 目标模块：
 
@@ -1157,7 +1157,7 @@ server/custom-code/
 
 不变量：HTTP 仅运维 / 测试 / 调试，不是实时同步主路径；返回结构与 `SessionResponse` 一致；`validate` 接口纯校验，不写权威状态。WS 房间内 dev 命令优先走 `ClientCommand`。
 
-Game Context 和 Bug Report 是产品读取/集成接口，不替代 WS 实时游戏同步。目标端点在独立 route module 中实现：
+Game Context 和 Bug Report 是产品读取/集成接口，不替代 WS 实时游戏同步。resolver 已在独立 route module 中实现，其余端点沿用同一边界：
 
 ```
 GET    /api/v1/game-contexts/:roomId
