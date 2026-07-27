@@ -184,14 +184,21 @@ export function ReplayShell({
           { credentials: 'omit', signal: controller.signal },
         )
         const anchor = await anchorResponse.json() as ReplayAnchorResponse
-        if (
-          !anchor.ok
-          || anchor.roomId !== context.roomId
+        if (!anchor.ok) {
+          if (
+            anchor.code !== 'replay_segment_unavailable'
+            || anchor.verifiedAnchor?.stepNo !== anchorStep
+            || anchor.verifiedAnchor.frameHash !== frameHash
+          ) throw new Error('replay_anchor_mismatch')
+        } else if (
+          anchor.roomId !== context.roomId
           || anchor.schemaVersion !== replay.schemaVersion
           || anchor.viewerBuildId !== replay.viewerBuildId
           || anchor.anchor.stepNo !== anchorStep
           || anchor.anchor.frameHash !== frameHash
-        ) throw new Error('replay_anchor_mismatch')
+        ) {
+          throw new Error('replay_anchor_mismatch')
+        }
       }
 
       const viewerResponse = await fetch(
