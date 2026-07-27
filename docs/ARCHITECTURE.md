@@ -1050,10 +1050,11 @@ server/connection/
 
 不变量：
 
-- 房间内同房间一个 `GameSession`，命令串行处理。
-- `room-router` 只路由不写状态。
+- 一个 Room 只持有一个 `GameSession`；当前 WS `message` handler 同步调用 `dispatch()`，同一 Node 进程内的命令自然串行。
+- `room-router` 负责验证、座位授权和调用 `GameSession`，不直接写 `GameState`。
 - `payload-validation.ts` 纯校验（`validateResourcePayload` / `validateSingleTilePayload` / `validateMultiTilePayload`），返合法/规范化结果，不写 `GameSession`。
-- 单房间命令队列：异步入口必须排队，避免乱序写入。
+- ADR-0014 实施后，Room 的 `ready | blocked` 写入状态门必须位于命令入口；不增加通用异步命令队列。Durable Room Commit 同步完成，保存重试只能在 Room blocked 时运行。
+- 规则命令 `resp.ok=false` 只回发起连接，不增加 `roomVersion` 或 Replay Step，也不向其他座位广播错误。
 
 ### 11.2 server/game/ — Room + GameSession
 
@@ -1071,15 +1072,63 @@ server/game/
     └── memory-adapter.ts      测试注入
 ```
 
-`RoomPlayer { ws, playerIndex, displayName, connectionState, reconnectToken... }` —— 连接实例，非领域 `PlayerState`。
-
-`GameSession` 在 `SessionCore` 之上加：连接绑定、广播、持久化触发、devtool hook、终局判定；签名 `createSessionForRoom(stateOrSeed?, customCardDbIds, requestUserId, playerCount?)`。
+`RoomPlayer { ws, playerIndex, name, userId? }` 是连接实例，非领域 `PlayerState`。`GameSession` 是 `GameCore` 的薄服务端包装，只注入服务端 custom-code executor；连接绑定、广播和持久化不属于它。
 
 固定持久化 dev 房：`dev2` 至 `dev6`。`PERSIST_ROOMS=sqlite`（默认） / `json` 切换 adapter。普通 SQLite 房间："空房先保留、TTL 后回收"，启动恢复覆盖 `waiting` 与 `playing`，`custom_card_ids` 一并恢复。允许同座位重连替换旧连接。
 
 `roomId` 唯一标识一局游戏：`newGame` 先创建新 `GameSession` 和 UUID，再把在线座位、人数、custom cards、已持久化变体开关及所有连接引用切到新 Room 记录；旧 id 永不复用。首个 `waiting → playing` 转换写入不可变 `started_at`。只有权威 `gameOver` 会在单个 SQLite 事务内写入 `game_results` / `game_result_players` 标量摘要并删除 `rooms.state_json`；TTL、解散、删号和未完成重开只删除活动房间，不产生结果。归档写失败会回滚，最终全量状态继续保留用于恢复或重试。
 
-### 11.3 server/custom-code/ — 隔离执行
+当前 `RoomPersistenceCheckpoint` 在广播后把 Room 标脏，并用一个共享定时器延迟约一秒写最新状态。它是 ADR-0014 实施前的旧进行局写路径；目标架构只允许它继续处理等待态 meta 和旧 adapter，成功游戏步骤必须改走 Durable Room Commit。
+
+### 11.3 Game Context、Replay 与 Bug Report 目标架构
+
+> 本节是实现契约，尚未表示下列目标文件已经存在。
+
+目标模块：
+
+```
+server/game/
+├── room-committer.ts          Durable Room Commit 的唯一外部 seam
+├── replay-codec.ts            canonical JSON、delta、gzip、Frame Hash
+├── game-context-store.ts      lifecycle resolver、Replay/Anchor read model
+└── persistence/
+    └── sqlite-adapter.ts      Room + Replay + Result 的原子事务
+server/game-context-routes.ts  resolver、manifest、Segment、evidence
+server/bug-report-routes.ts    draft、GitHub connection、submit/status、audit
+server/bug-report/
+├── bug-report-store.ts        SQLite draft/attempt/claim 状态机
+└── github-issue-client.ts     GitHub App 唯一外部 adapter
+```
+
+`RoomCommitter` 是具体深模块，不增加单实现 interface 或 factory。它的外部 interface 只暴露一个提交操作，返回：
+
+```ts
+type RoomCommitResult =
+  | { kind: 'committed'; roomVersion: number; stepNo: number; frameHash: string }
+  | { kind: 'unchanged' }
+  | { kind: 'blocked'; error: string }
+```
+
+主链路：
+
+```text
+ClientCommand
+  → room-router：验证座位与 payload
+  → GameSession：同步产生 SessionResponse
+  → RoomCommitter：序列化一次，原子写 Room snapshot + Replay Step
+  → Broadcaster：提交成功后生成各座位遮蔽 envelope 并发送
+```
+
+- `resp.ok=false` 绕过提交并只回发起者。成功但 Frame Hash 未变化返回 `unchanged`，只给发起者确认当前状态；重连和补拉也不创建 Step。
+- Replay Step 使用 Room 全局单调 `stepNo`，与 `roomVersion` 分离。多个玩家在同一交互阶段提交时仍串行占用连续 Step；最后一次提交触发的自动引擎结算包含在该 Step 内，规则结果不得依赖提交到达顺序。
+- Step 0 在第一个互动命令前建立。classic deal 已包含在 Frame 中；互动 draft、Parent Selection 和显式多人提交从 Step 1 起记录。
+- Replay Intent 由协议边界的穷尽 switch 白名单化；不保存 `requestId`、token、站点 `userId`、任意原始 WebSocket 消息或未校验 payload。
+- 写失败冻结同一 Frame/Intent，Room 进入 blocked 并拒绝新游戏命令；按 1/2/5/10/30 秒、随后每 30 秒重试。暂停期间重连者等待，不读取未提交内存状态。幂等键相同但 Hash 不同永久阻断并报警。
+- 单实例上限为 100 个普通内存 Room，`waiting` 与 `playing` 都计数，固定 dev Room 排除。达到上限只拒绝新建；已有 Room 恢复和净数量不变的 `newGame` 继续允许。首版不增加 Worker、房间分片、Redis 或外部队列。
+
+完成 Replay 与 Bug Report 使用 ADR-0013 的公开/私有读取契约。GitHub 提交以 SQLite draft、稳定 `submissionId`、attempt 行和原子 claim 实现可恢复执行；生产 GitHub App client 与测试 fake 是 true-external seam 的两个 adapter。
+
+### 11.4 server/custom-code/ — 隔离执行
 
 ```
 server/custom-code/
@@ -1093,7 +1142,7 @@ server/custom-code/
 
 主后端只保存 `compiled_code + code_manifest`；运行时由 `client.ts` 启动专用 Worker Thread，并在其中通过 isolated-vm 执行自定义代码。沙盒约束唯一真源 → `docs/CUSTOM_CARD_SANDBOX.md`（含 `prompt-sync:begin/end` 标记块，`pnpm run check:prompt-sync` 校验）。
 
-### 11.4 HTTP 端点（调试通道）
+### 11.5 HTTP 端点
 
 `server/game-router.ts` + `server/index.ts`：
 
@@ -1108,13 +1157,110 @@ server/custom-code/
 
 不变量：HTTP 仅运维 / 测试 / 调试，不是实时同步主路径；返回结构与 `SessionResponse` 一致；`validate` 接口纯校验，不写权威状态。WS 房间内 dev 命令优先走 `ClientCommand`。
 
-### 11.5 server/workshop.ts + server/workshop-pr/
+Game Context 和 Bug Report 是产品读取/集成接口，不替代 WS 实时游戏同步。目标端点在独立 route module 中实现：
+
+```
+GET    /api/v1/game-contexts/:roomId
+GET    /api/v1/game-contexts/:roomId/replay
+GET    /api/v1/game-contexts/:roomId/replay/segments/:checkpointStepNo
+GET    /api/v1/game-contexts/:roomId/evidence/:stepNo?frame=<sha256>
+POST   /api/v1/game-contexts/:roomId/bug-reports
+GET    /api/v1/bug-reports/:submissionId
+PATCH  /api/v1/bug-reports/:submissionId
+POST   /api/v1/bug-reports/:submissionId/submit
+DELETE /api/v1/bug-reports/:submissionId
+POST   /api/v1/bug-reports/:submissionId/evidence/inspect
+GET    /api/v1/issue-submission-connection
+DELETE /api/v1/issue-submission-connection
+GET    /api/v1/issue-submission-connection/github/start
+GET    /api/v1/issue-submission-connection/github/callback
+POST   /api/v1/github-app/webhook
+```
+
+公开 Replay API 返回版本化 JSON，不暴露 SQLite gzip/BLOB 编码。completed、expired、removed resolver 与公开 Replay 在登录门外；active descriptor、恢复、Bug Report、临时证据和维护者取证分别执行 ADR-0013 的座位或管理员授权。外部错误继续使用 ADR-0013 的 `{ ok:false, code, lifecycle?, message }` 判别式结构。
+
+### 11.6 server/workshop.ts + server/workshop-pr/
 
 Workshop / Sandbox 后端（自定义卡上传、编译、PR 集成）。沙盒配置由 SQLite 表 `sandbox_settings` / `sandbox_cards` 持久化，覆盖 `playerCount`、`deckIds`、Through the Seasons、Farmers of the Moor 和 FoM 小改良不足时是否允许开局；`POST /api/game/new-sandbox` 读取这些配置并把 `playerCount` / `deckIds` / `customCardIds` / variant flags 交给 `createInitialState()` 统一处理。
 
-### 11.6 数据库
+### 11.7 数据库
 
 `server/db.ts` —— SQLite 连接（`better-sqlite3`，按 Node 22 ABI 编译）。表：`rooms` / `users` / `sandbox_settings` / `sandbox_cards` / `custom_cards` / `pr_proposals` 等。
+
+ADR-0014 使用下一可用迁移一次增加七张表；首个正式 Replay `schemaVersion=1`，不保留未上线实验格式：
+
+| 表 | 所有事实 |
+|---|---|
+| `game_contexts` | 永久 `roomId`、`active/completed/expired/removed`、phase、过期时间、Tombstone 原因 |
+| `game_replays` | `schemaVersion`、`viewerBuildId`、`gameBuildId`、recording/completed 状态、最新 Step、`missingPrefix`、自定义卡快照 |
+| `game_replay_steps` | `roomId + stepNo`、`roomVersion`、`checkpointStepNo`、玩家座位、白名单 intent、payload kind/gzip、Frame Hash |
+| `issue_submission_connections` | GitHub 数字用户 id、AES-256-GCM token/refresh token、nonce/tag、`keyId`、过期与撤销状态 |
+| `bug_reports` | 稳定 `submissionId`、Reporter 关联、Anchor、草稿、作者选择、交付状态、Issue 编号/URL、证据到期时间 |
+| `bug_report_attempts` | 30 天交付/对账/限流尝试元数据；不保存 token、现象副本或原始 GitHub 响应 |
+| `bug_report_evidence_audit` | 维护者、时间、Anchor、视角和非空理由，永久保留 |
+
+继续复用：
+
+- `rooms` / `room_players`：活动恢复 snapshot 与站点座位所有权。
+- `game_results` / `game_result_players`：完成局标量结果、Replay Participant 显示名和内部用户关联。
+- `oauth_states`：增加加密 PKCE verifier，复用短期 state/returnTo 生命周期。
+
+不增加 Replay Segment、Reported Evidence payload、quota counter 或 webhook delivery 表。Segment 由 `checkpointStepNo` 表达；`bug_reports.evidence_expires_at` 保护共享 Segment；额度和全站 20 次/分钟 GitHub 发送窗口从 report/attempt 行查询；撤销 webhook 操作本身幂等。
+
+### 11.8 GitHub 交付、安全与删除
+
+- 创建 draft 时由服务端确认 Reporter 是 active `room_players` 或 completed `game_result_players` 中的原座位，并固定 `roomId + stepNo + frameHash`。现象 trim 后必须为 1–2000 个 Unicode 字符；不做语法或句号判断。
+- `github-issue-client` 的 production adapter 只接受服务端固定 Repository ID / Installation ID，不接受客户端 owner、repo、labels 或 URL。测试使用 fake adapter，覆盖成功、401、权限 403、限流 403/429、410/422、网络错误、5xx 和不确定结果对账。
+- 本人提交使用加密的 GitHub App user token；Hosted Issue Identity 使用不落盘的 installation token。连接失效绝不自动换作者。token/refresh token 使用 AES-256-GCM、每行独立 nonce/tag 和 `keyId`；PKCE verifier 同样加密且只活到 OAuth state 到期。
+- SQLite executor 原子 claim 一个 `submissionId`。不确定响应先按正文稳定标记对账；重试和限流遵守 ADR-0012。客户端只轮询站内状态，不直接调用 GitHub。
+- Issue 标题为清洗并截断的 `Game bug: <现象首行>`，正文不包含截图、日志、Frame payload、其他玩家身份或隐藏信息。issues-only 仓库自动化统一添加 `needs-triage`；通知使用 GitHub 原生 watching。
+- 主动断开立即删除令牌。删号先撤销 session/连接、匿名化站内数据并进入 `deletion_pending`，再由同一 installation adapter 修改已知 Issue 正文；全部外部脱敏成功后才清除最终内部关联。
+- 维护者全开 evidence 读取必须提供非空理由并写 `bug_report_evidence_audit`。Replay 下架由审计化运维 CLI 删除 Step payload 和内容寻址自定义资源、把 Context 改为 removed，并追加数据库外删除 ledger；首版不做管理 UI。
+- public resolver/manifest/Segment 使用独立 IP 读取额度和响应大小上限；active evidence、Bug Report 和维护者接口按账号限流。任何日志都不得输出 token、Frame payload、现象原文或原始 GitHub 响应。
+
+### 11.9 部署、回滚与观测
+
+生产除现有 SQLite 持久卷外，还必须有三个不会被镜像部署覆盖的位置：
+
+```
+replay-viewers/<viewerBuildId>/  不可变历史 Viewer Build
+replay-assets/<sha256>           Replay Card Snapshot 内容资源
+replay-removals.jsonl            数据库外删除 ledger
+```
+
+目标配置：
+
+```
+REPLAY_NEW_ROOMS_ENABLED
+REPLAY_VIEWER_BUILD_ID
+REPLAY_VIEWER_ROOT
+REPLAY_ASSET_ROOT
+REPLAY_REMOVAL_LEDGER_PATH
+GAME_BUILD_ID
+BUG_REPORTS_ENABLED
+BUG_REPORT_GITHUB_APP_ID
+BUG_REPORT_GITHUB_CLIENT_ID
+BUG_REPORT_GITHUB_CLIENT_SECRET
+BUG_REPORT_GITHUB_PRIVATE_KEY
+BUG_REPORT_GITHUB_WEBHOOK_SECRET
+BUG_REPORT_GITHUB_INSTALLATION_ID
+BUG_REPORT_GITHUB_REPOSITORY_ID
+BUG_REPORT_TOKEN_ENCRYPTION_KEYS
+BUG_REPORT_TOKEN_ACTIVE_KEY_ID
+```
+
+部署顺序固定为：
+
+1. 追加并校验内容寻址 Viewer Build，旧目录不删除。
+2. 备份 SQLite、Replay 资源和删除 ledger，运行数据库迁移，部署 recorder-compatible 后端；两个功能开关保持关闭。
+3. 启动时为恢复出的旧活动 Room 建立 `missingPrefix=true` 的 Step 0，再开始接受命令。
+4. 设置已存在的 `REPLAY_VIEWER_BUILD_ID` 并启用新 Room 录制；任何已有 Replay header 的 Room 此后无条件继续记录。
+5. 部署顶层 Game Context Router 和公开 Replay UI。
+6. 配置并实测 GitHub App 后启用 Bug Report。
+
+启用录制后，应用只能回滚到支持所有活动 Room `schemaVersion` 的 recorder-compatible 构建；不能回滚到功能上线前后端。Viewer Build 必须先存在，后端才能把其 id 锁进新 Room。缺少 Viewer、持久化不可写或 Room 数达到 100 时，readiness 进入 degraded 并拒绝新建 Room，不牺牲已有 Room。
+
+首版不引入新的 metrics 后端。结构化日志和健康状态至少暴露：普通 Room 数、容量拒绝、Durable Room Commit latency/error/retry、blocked Room 数、Hash 冲突、Replay payload 大小/损坏、GitHub queue/attempt/rate-limit、缺失 Viewer Build。日志字段只含稳定 id 和数值，不含受保护 payload。
 
 ---
 
@@ -1152,7 +1298,7 @@ Workshop / Sandbox 后端（自定义卡上传、编译、PR 集成）。沙盒�
 
 ### 12.5 contexts
 
-- `AuthContext` —— GitHub OAuth 登录状态。
+- `AuthContext` —— 站点登录 session（密码 / GitHub / Google）；不保存 Bug Issue 写权限。
 - `LocaleContext` —— 多语言切换。
 
 ### 12.6 ESLint 三层强制
@@ -1164,6 +1310,29 @@ Workshop / Sandbox 后端（自定义卡上传、编译、PR 集成）。沙盒�
 - `no-restricted-syntax` 禁动态字符串 `import('shared/session/...')` / `import('shared/engine/...')` / card impl-bootstrap 字面量绕过。
 - `package.json` 已声明 `sideEffects` 给 bundler tree-shaking 基线。
 - violation = CI error。
+
+### 12.7 Game Context、Replay Viewer 与 Bug Report 目标 seam
+
+> 本节是 ADR-0014 的前端实现契约，尚未表示目标页面已经存在。
+
+启动顺序改为：
+
+```text
+GameContextRouter
+  ├─ active → AuthProvider → 现有 PageRouter / GameContainerApi
+  ├─ completed → ReplayShell → credentialless Replay Viewer iframe
+  ├─ expired → Expired Game Context 页面
+  └─ removed → Replay Tombstone 页面
+```
+
+- `?context=<roomId>` 必须在当前卡牌 manifest 与全局登录门前解析。active 未登录时保留完整 returnTo；completed、expired、removed 不加载登录依赖。
+- active 恢复继续使用现有 WebSocket，但 `joinRoom` 必须携带 `intent:'resume'`；服务端只按持久化站点 `userId → playerIndex` 恢复原座位。保存暂停时所有在线座位显示同一状态提示，新命令控件禁用。
+- `ReplayShell` 只解析 manifest、选择 `viewerBuildId` 和承载 iframe。历史 Viewer 是无登录、无 WS、无 ClientCommand 的独立只读 bundle，直接读取公开 JSON Segment，并用当时编译的遮蔽逻辑切换 `p1…pN | open`。
+- 直接打开 completed 且 URL 没有 perspective 时，任何 Frame 展示前先选座位或全开。桌面 auto 默认时间线优先双栏，手机 auto 默认棋盘优先；900px 是自动断点，手动布局写入 URL 并覆盖响应式默认。“本步证据”固定展示 Step、轮次、操作者、白名单 intent 和 Frame Hash。
+- 播放默认停在 Step 0，提供播放/暂停、前后步、滑杆跳转和键盘控制；损坏 Segment 显示不可用区间并允许从下一 checkpoint 继续，不尝试静默修复。
+- Bug Report 使用已定稿的三步引导式底栏：必填现象 → 自动上下文 → 作者身份。创建 GitHub OAuth 跳转前必须先保存 server draft；取消授权返回同一 `submissionId`，提交后通过 status endpoint 轮询，成功态禁止重复创建。
+- active Reporter 从当前最新已提交 Step 建 Anchor；completed Reporter 必须是历史原参赛者，并从当前播放 Step 建 Anchor。公开 Issue 不嵌入 Frame、截图、日志或其他玩家隐藏信息。
+- Issue Submission Connection 与 `AuthContext` 分离：报告底栏负责首次连接，Settings 只显示连接状态和断开操作；连接失效不得自动切换到 Hosted Issue Identity。
 
 ---
 
@@ -1215,6 +1384,33 @@ pnpm run build              # tsc + vite build
 
 本地开发统一 Node.js 22；`better-sqlite3` 等原生依赖按 Node ABI 编译。
 
+### 13.4 Replay、恢复与 Bug Report 上线门槛
+
+实现按以下可独立验证的切片推进：
+
+1. 数据库迁移、canonical JSON / delta / gzip / Hash codec。
+2. Durable Room Commit、失败暂停/重试、100 Room 容量限制。
+3. Game Context resolver、active 原座位恢复、evidence 权限。
+4. Replay manifest/Segment、历史 Viewer Build、桌面/手机回放 UI。
+5. Bug Report draft、GitHub App connection/queue、三步报告 UI。
+6. 匿名化、Tombstone、删除 ledger、部署和生产验收。
+
+自动化必须覆盖：
+
+- codec round-trip、最多 15 delta、提前 checkpoint、Hash mismatch 和损坏 Segment 后续恢复；
+- snapshot + Step 原子事务、gameOver 原子完成、相同 Hash 幂等、不同 Hash 阻断、数据库故障暂停与重启恢复；
+- 两个同时提交玩家得到连续 `stepNo`，最后提交触发结算且交换到达顺序不改变结果；
+- `ok=false` 和 unchanged 只回发起者；提交成功前任何座位都收不到未落盘状态；
+- active Room 双座位恢复、座位替换、他人隐藏信息遮蔽、暂停期间重连等待；
+- completed/expired/removed/unknown resolver、无登录公开 Replay、Anchor mismatch、缓存与错误码；
+- 桌面 auto 时间线布局、手机 auto 棋盘布局、手动 URL 覆盖、视角选择、播放/暂停/前后步/跳转、键盘和 axe；
+- OAuth 取消保留草稿、本人/Hosted 作者、稳定标记对账、限流与三次失败、重复点击、断开/撤销；
+- 删号 Issue 脱敏、Replay Participant 匿名化、Tombstone、维护者全开理由与永久审计。
+
+最终性能探针在 2 CPU / 2 GiB、183,742-byte 代表状态、每 Room 每秒 0.45125 Step 下重跑 100/110/120：100 Room 必须满足 action p99 ≤250ms、event-loop p99 ≤100ms、RSS ≤1.8GiB；110/120 只用于观察安全余量和首个失败点。
+
+生产验收必须由两个真实站点账号完成一局：双方在进行中分别恢复且只能看见自己的隐藏信息；完赛后在未登录浏览器选择两个座位视角和全开视角；再分别用本人 GitHub 和 Hosted Issue Identity 创建 smoke Issue、核对 Anchor/Reporter 字段并关闭。地图在 CI、前后端部署、这些线上步骤和删除/回滚演练全部通过前不关闭。
+
 ---
 
 ## 14. 关键不变量速查
@@ -1222,7 +1418,7 @@ pnpm run build              # tsc + vite build
 1. **后端权威**：规则在 `shared/` + `server/`；前端不裁定。
 2. **三层物理边界**：`shared/` ⇄ `server/` ⇄ `client/`；ESLint CI error 强制。
 3. **双 client bundle**：`client-app` 不引 `shared/{engine,session,actions,cards,custom-code,draft}`；`client/sandbox` 全开。
-4. **WS 主链路**：`/ws` 收 `ClientCommand`，发 `StateUpdateEnvelope`；HTTP 仅调试。
+4. **WS 游戏主链路**：`/ws` 收 `ClientCommand`，发 `StateUpdateEnvelope`；Game Context、Replay 和 Bug Report 使用版本化 HTTP 产品接口。
 5. **InteractionState 是前端唯一真相**：`stateId ∈ {idle, wait, gameover}`；`wait` 下用 `request.kind` 分流。
 6. **节点树是唯一状态机**：`PendingAction` union 已消除；"等什么"由 `engine.peekPendingEnvelope()` / pending host 派生。
 7. **EngineStack.push / pop**：hook / anytime / 嵌套子流程唯一注入路径，不直接改 `pending`。
@@ -1234,6 +1430,11 @@ pnpm run build              # tsc + vite build
 13. **前端不做乐观提交**：等 `stateUpdate` 到达再改 UI。
 14. **ActionFlow 对齐 BGA 小代数**：卡牌 DSL 只暴露 `leaf / seq / parallel / xor / or` + metadata；runtime-only node 不进入卡牌 flow。
 15. **listener handler 不改 state**：listener / preview / doable 路径只 build flow 或返回结构化结果；状态修改必须落在 action leaf 执行阶段。
+16. **Durable Room Commit**：成功且改变 Frame 的命令先原子写 Room snapshot + Replay Step，随后才按座位视角发送。
+17. **Replay 全局 Step**：多人同时提交仍占用连续 `stepNo`；自动结算属于最后触发输入，结果不得依赖到达顺序。
+18. **失败不扩散**：`resp.ok=false` 只回发起者；持久化失败冻结同一 Frame 并阻断 Room，不覆盖或继续推进。
+19. **100 Room 上限**：单实例统计普通 `waiting + playing` Room；只拒绝新建，不影响恢复。
+20. **历史 Viewer 不可变**：Room 锁定 schema/build，完成回放由 credentialless 只读 Viewer 读取，不执行历史规则代码。
 
 ---
 
