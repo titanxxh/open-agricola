@@ -89,22 +89,7 @@ const parseCustomCards = (raw: string): CustomCardDef[] => {
 const parseIntent = (raw: string): ReplayJsonValue =>
   JSON.parse(raw) as ReplayJsonValue
 
-const replaceArchivedNames = (
-  value: unknown,
-  replacements: ReadonlyMap<string, string>,
-): unknown => {
-  if (typeof value === 'string') return replacements.get(value) ?? value
-  if (Array.isArray(value)) {
-    return value.map((entry) => replaceArchivedNames(entry, replacements))
-  }
-  if (!value || typeof value !== 'object') return value
-  return Object.fromEntries(
-    Object.entries(value).map(([key, entry]) => [
-      key,
-      replaceArchivedNames(entry, replacements),
-    ]),
-  )
-}
+const logPlayerNameKeys = ['player', 'playerName', 'fromPlayer', 'toPlayer'] as const
 
 const projectParticipantNames = (
   frame: SerializedGameState,
@@ -112,19 +97,64 @@ const projectParticipantNames = (
 ): SerializedGameState => {
   const currentNames = new Set(participantNames.values())
   const replacements = new Map<string, string>()
+  const namesByPlayerId = new Map<string, string>()
   frame.players.forEach((player, playerIndex) => {
     const name = participantNames.get(playerIndex) ?? player.name
+    namesByPlayerId.set(player.id, name)
     if (name !== player.name && !currentNames.has(player.name)) {
       replacements.set(player.name, name)
     }
   })
-  const projected = replaceArchivedNames(frame, replacements) as SerializedGameState
+  const projectZones = (
+    zones: SerializedGameState['players'][number]['borrowedPlayedCardAnimalZones'] | undefined,
+  ) => zones?.map((zone) => {
+    const name = zone.ownerPlayerId
+      ? namesByPlayerId.get(zone.ownerPlayerId)
+      : undefined
+    return name && zone.displayOwnerName !== name
+      ? { ...zone, displayOwnerName: name }
+      : zone
+  })
+  const frameWithScores = frame as SerializedGameState & {
+    scores?: Array<{ playerId: string; playerName: string }>
+  }
   return {
-    ...projected,
-    players: projected.players.map((player, playerIndex) => ({
+    ...frame,
+    players: frame.players.map((player, playerIndex) => ({
       ...player,
       name: participantNames.get(playerIndex) ?? player.name,
+      ...(player.playedCardAnimalZones
+        ? { playedCardAnimalZones: projectZones(player.playedCardAnimalZones) }
+        : {}),
+      ...(player.farmCardAnimalZones
+        ? { farmCardAnimalZones: projectZones(player.farmCardAnimalZones) }
+        : {}),
+      ...(player.borrowedPlayedCardAnimalZones
+        ? { borrowedPlayedCardAnimalZones: projectZones(player.borrowedPlayedCardAnimalZones) }
+        : {}),
     })),
+    ...(frame.log
+      ? {
+          log: frame.log.map((entry) => {
+            if (!entry.params) return entry
+            const params = { ...entry.params }
+            logPlayerNameKeys.forEach((key) => {
+              if (typeof params[key] === 'string') {
+                params[key] = replacements.get(params[key]) ?? params[key]
+              }
+            })
+            return { ...entry, params }
+          }),
+        }
+      : {}),
+    ...(frameWithScores.scores
+      ? {
+          scores: frameWithScores.scores.map((score) => ({
+            ...score,
+            playerName: namesByPlayerId.get(score.playerId) ?? score.playerName,
+          })),
+        }
+      : {}),
   }
 }
 
