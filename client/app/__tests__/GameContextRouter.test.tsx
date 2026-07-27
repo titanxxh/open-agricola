@@ -7,6 +7,7 @@ import { GameContextRouter } from '../GameContextRouter'
 vi.mock('../../contexts/LocaleContext', () => ({
   useLocale: () => ({
     locale: 'en',
+    setLocale: vi.fn(),
     t: (key: string, params?: Record<string, string | number>) =>
       params
         ? Object.entries(params).reduce(
@@ -243,6 +244,8 @@ describe('GameContextRouter', () => {
     const perspectiveButtons = await screen.findAllByRole('button', {
       name: 'platform.gameContext.watchAs',
     })
+    expect(screen.getByRole('button', { name: 'Display language' }))
+      .toBeVisible()
     expect(screen.queryByTitle('platform.gameContext.replayFrameTitle')).not.toBeInTheDocument()
     fireEvent.click(perspectiveButtons[0]!)
 

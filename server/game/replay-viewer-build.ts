@@ -27,11 +27,13 @@ const viewerFiles = (root: string, relative = ''): string[] => {
 export const loadReplayViewerBuild = (
   root: string,
   buildId: string,
+  revalidate = false,
 ): ReplayViewerBuild | null => {
   if (!/^[a-f0-9]{64}$/.test(buildId)) return null
   const directory = join(root, buildId)
   const cached = verifiedBuilds.get(directory)
-  if (cached) return cached
+  if (cached && !revalidate) return cached
+  if (revalidate) verifiedBuilds.delete(directory)
   try {
     if (!lstatSync(directory).isDirectory()) return null
     const manifestPath = join(directory, 'manifest.json')
@@ -71,4 +73,4 @@ export const loadReplayViewerBuild = (
 }
 
 export const viewerBuildExists = (root: string, buildId: string): boolean =>
-  loadReplayViewerBuild(root, buildId) !== null
+  loadReplayViewerBuild(root, buildId, true) !== null
