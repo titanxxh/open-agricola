@@ -95,6 +95,7 @@ import {
   mobilePresentationRoute,
   type GamePresentation,
 } from './game-presentation-routing'
+import { GAME_CONTEXT_CHANGED_EVENT } from './GameContextRouter'
 
 type RoundSlot = { round: number; action?: ActionSpace }
 type SelectedSpecialAction = { cardId: string; actionId: MoorSpecialActionId } | null
@@ -113,7 +114,12 @@ const setRoomInUrl = (roomId: string) => {
   if (typeof window === 'undefined') return
   const params = new URLSearchParams(window.location.search)
   params.delete('card')
-  params.set('room', roomId)
+  if (params.has('context')) {
+    params.set('context', roomId)
+    params.delete('room')
+  } else {
+    params.set('room', roomId)
+  }
   const newSearch = params.toString()
   const newUrl = `${window.location.pathname}${newSearch ? '?' + newSearch : ''}${window.location.hash || ''}`
   window.history.replaceState(null, '', newUrl)
@@ -163,7 +169,9 @@ const useTransportSetup = (
       }
       setWsTransport(ws)
 
-      const roomParam = new URLSearchParams(window.location.search).get('room')
+      const searchParams = new URLSearchParams(window.location.search)
+      const contextRoomId = searchParams.get('context')
+      const roomParam = contextRoomId ?? searchParams.get('room')
       const isCreator = !roomParam && (!playerParam || playerParam === 'p1')
 
       if (isCreator) {
@@ -265,7 +273,9 @@ const useTransportSetup = (
         rawWs.addEventListener('message', handler)
       } else {
         const roomId = roomParam
-        const requestedPlayerIndex = toRequestedPlayerIndex(playerParam)
+        const requestedPlayerIndex = contextRoomId
+          ? undefined
+          : toRequestedPlayerIndex(playerParam)
         if (!roomId) {
           setWsStatus({
             phase: 'error',
@@ -284,6 +294,9 @@ const useTransportSetup = (
                 resolve({ roomId: msg.roomId, playerIndex: msg.playerIndex })
               } else if (msg.type === 'error') {
                 rawWs.removeEventListener('message', handler)
+                if (contextRoomId && msg.code === 'context_changed') {
+                  window.dispatchEvent(new Event(GAME_CONTEXT_CHANGED_EVENT))
+                }
                 resolve({ error: msg.error })
               }
             } catch { /* skip */ }
@@ -291,6 +304,7 @@ const useTransportSetup = (
           rawWs.addEventListener('message', handler)
           ws.sendRoomCommand('joinRoom', {
             roomId: roomId!,
+            intent: contextRoomId ? 'resume' : 'join',
             name: displayName ?? playerParam ?? 'Player 2',
             requestedPlayerIndex,
           })
@@ -322,11 +336,13 @@ const getIsMobileViewport = () =>
 export const GameContainerApi = () => {
   // Read URL params fresh on each render (navigated here from lobby — don't use module-level stale values)
   const currentUrlParams = new URLSearchParams(window.location.search)
-  const isWsMode = currentUrlParams.get('transport') === 'ws'
+  const contextRoomId = currentUrlParams.get('context')
+  const isWsMode = contextRoomId !== null || currentUrlParams.get('transport') === 'ws'
   const isEmbedded = currentUrlParams.get('embedded') === '1'
 
   const lockedViewPlayerId = useMemo(() => {
     const p = new URLSearchParams(window.location.search)
+    if (p.has('context')) return null
     const raw = p.get('player') ?? p.get('playerId')
     if (!raw) return null
     if (/^p[1-6]$/.test(raw)) return raw

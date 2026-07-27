@@ -297,9 +297,13 @@ export class SqliteRoomPersistence implements RoomPersistence {
     this.pruneRooms = db.prepare(`
       DELETE FROM rooms
       WHERE status != 'finished'
-        AND (
-          (status = 'playing' AND updated_at < ?)
-          OR (status != 'playing' AND updated_at < ?)
+        AND EXISTS (
+          SELECT 1
+          FROM game_contexts
+          WHERE game_contexts.room_id = rooms.id
+            AND game_contexts.lifecycle = 'active'
+            AND game_contexts.expires_at IS NOT NULL
+            AND game_contexts.expires_at <= ?
         )
         AND id NOT IN (SELECT value FROM json_each(?))
     `)
@@ -663,9 +667,7 @@ export class SqliteRoomPersistence implements RoomPersistence {
   private pruneStale(opts: RestoreOptions): void {
     try {
       const excludeIds = opts.excludeIds ?? []
-      const staleWaiting = opts.now - opts.waitingTtlMs
-      const stalePlaying = opts.now - opts.playingTtlMs
-      this.pruneRooms.run(stalePlaying, staleWaiting, JSON.stringify(excludeIds))
+      this.pruneRooms.run(opts.now, JSON.stringify(excludeIds))
     } catch (err) {
       console.warn('[sqlite-adapter] pruneStale failed:', err)
     }

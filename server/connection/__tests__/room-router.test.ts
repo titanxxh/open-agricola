@@ -12,8 +12,7 @@ import type { CustomCardData } from '../../../shared/cards/session-card-context.
 
 const fakeWs = () => ({ OPEN: 1, readyState: 1, send: vi.fn(), close: vi.fn() })
 
-const newDeps = () => {
-  const persistence = new InMemoryRoomPersistence()
+const newDeps = (persistence = new InMemoryRoomPersistence()) => {
   const registry = new RoomRegistry()
   const checkpoint = createRoomPersistenceCheckpoint({ persistence })
   const broadcaster = new Broadcaster({ checkpoint })
@@ -521,6 +520,122 @@ describe('handleCreateRoom', () => {
     expect(ctx.currentRoom!.maxPlayers).toBe(6)
     expect(ctx.currentRoom!.session.state.gameSeed).toBe(309)
     expect(ctx.currentRoom!.session.state.players).toHaveLength(6)
+  })
+})
+
+describe('active room recovery', () => {
+  it('restores every original seat after restart with only its own hidden information', () => {
+    const deps = newDeps()
+    const host = newCtx(deps)
+    host.currentUserId = 'u1'
+    dispatch(host, { type: 'createRoom', maxPlayers: 2, name: 'Alice' })
+    const guest = newCtx(deps)
+    guest.currentUserId = 'u2'
+    dispatch(guest, {
+      type: 'joinRoom',
+      roomId: host.currentRoom!.id,
+      name: 'Bob',
+    })
+    const roomId = host.currentRoom!.id
+    const authoritativeHands = [
+      {
+        occupationHand: ['occ-a'],
+        minorHand: ['minor-a'],
+      },
+      {
+        occupationHand: ['occ-b'],
+        minorHand: ['minor-b'],
+      },
+    ]
+    host.currentRoom!.session.state.players.forEach((player, playerIndex) => {
+      player.occupationHand = [...authoritativeHands[playerIndex]!.occupationHand]
+      player.minorHand = [...authoritativeHands[playerIndex]!.minorHand]
+    })
+    deps.checkpoint.recordState(host.currentRoom!)
+    deps.checkpoint.flushAll()
+
+    const restarted = newDeps(deps.persistence)
+    restarted.registry.set(snapshotToRoom(deps.persistence.load(roomId)!))
+    const recoveredHost = newCtx(restarted)
+    recoveredHost.currentUserId = 'u1'
+    dispatch(recoveredHost, {
+      type: 'joinRoom',
+      roomId,
+      intent: 'resume',
+      requestedPlayerIndex: 1,
+      name: 'Alice',
+    })
+    const recoveredGuest = newCtx(restarted)
+    recoveredGuest.currentUserId = 'u2'
+    dispatch(recoveredGuest, {
+      type: 'joinRoom',
+      roomId,
+      intent: 'resume',
+      requestedPlayerIndex: 0,
+      name: 'Bob',
+    })
+
+    expect(recoveredHost.currentPlayerIndex).toBe(0)
+    expect(recoveredGuest.currentPlayerIndex).toBe(1)
+    const hostState = sentMessagesOf(recoveredHost)
+      .findLast((message) => message.type === 'stateUpdate')!
+      .payload as { state: GameState }
+    const guestState = sentMessagesOf(recoveredGuest)
+      .findLast((message) => message.type === 'stateUpdate')!
+      .payload as { state: GameState }
+    expect(hostState.state.players[0]!.minorHand).toEqual(['minor-a'])
+    expect(hostState.state.players[1]!.minorHand).toEqual(['?'])
+    expect(guestState.state.players[0]!.minorHand).toEqual(['?'])
+    expect(guestState.state.players[1]!.minorHand).toEqual(['minor-b'])
+    expect(recoveredHost.currentRoom!.session.state.players.map((player) => ({
+      occupationHand: player.occupationHand,
+      minorHand: player.minorHand,
+    }))).toEqual(authoritativeHands)
+  })
+
+  it('rejects non-participants and revokes a replaced seat immediately', () => {
+    const deps = newDeps()
+    const original = newCtx(deps)
+    original.currentUserId = 'u1'
+    dispatch(original, { type: 'createRoom', maxPlayers: 2, name: 'Alice' })
+    const roomId = original.currentRoom!.id
+
+    const outsider = newCtx(deps)
+    outsider.currentUserId = 'u2'
+    dispatch(outsider, {
+      type: 'joinRoom',
+      roomId,
+      intent: 'resume',
+      requestedPlayerIndex: 1,
+    })
+    expect(outsider.currentRoom).toBeNull()
+    expect(sentMessagesOf(outsider)).toContainEqual(expect.objectContaining({
+      type: 'error',
+      code: 'not_participant',
+    }))
+
+    const replacement = newCtx(deps)
+    replacement.currentUserId = 'u1'
+    dispatch(replacement, {
+      type: 'joinRoom',
+      roomId,
+      intent: 'resume',
+      requestedPlayerIndex: 1,
+    })
+    expect(replacement.currentPlayerIndex).toBe(0)
+    expect(sentMessagesOf(original)).toContainEqual({
+      type: 'seat_replaced',
+      roomId,
+      playerIndex: 0,
+    })
+    expect(original.ws.close).toHaveBeenCalledWith(4001, 'seat replaced')
+
+    dispatch(original, { type: 'getState', requestId: 'stale-seat' })
+    expect(sentMessagesOf(original)).toContainEqual(expect.objectContaining({
+      type: 'error',
+      code: 'seat_replaced',
+      requestId: 'stale-seat',
+    }))
   })
 })
 

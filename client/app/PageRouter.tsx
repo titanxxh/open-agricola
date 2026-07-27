@@ -43,12 +43,17 @@ const PAGE_SCOPED_QUERY_KEYS = [
   'embedded',
   'devMode',
   'authMode',
+  'context',
+  'step',
+  'frame',
+  'perspective',
 ]
 
 function getPage(): Page {
   const params = new URLSearchParams(window.location.search)
   const page = params.get('page')
   if (page === 'game' || page === 'workshop' || page === 'lobby' || page === 'settings' || page === 'login' || page === 'onboarding') return page
+  if (params.get('context')) return 'game'
   if (params.get('room') || params.get('transport') === 'ws') return 'game'
   return 'lobby'
 }
