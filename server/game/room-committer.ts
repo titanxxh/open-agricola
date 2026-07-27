@@ -21,7 +21,7 @@ import {
 } from './persistence/sqlite-adapter.ts'
 
 const RETRY_DELAYS_MS = [1_000, 2_000, 5_000, 10_000, 30_000] as const
-const REPLAY_SCHEMA_VERSION = 1
+export const REPLAY_SCHEMA_VERSION = 1
 const REPLAY_ASSET_URL_PATTERN = /^\/replay-assets\/([a-f0-9]{64})$/
 
 class ReplayAssetValidationError extends Error {}

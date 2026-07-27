@@ -1363,6 +1363,12 @@ export const en = {
       unknownBody: 'This Room ID was never created.',
       unavailableTitle: 'Game temporarily unavailable',
       unavailableBody: 'Please try again later.',
+      verifyingReplay: 'Verifying replay archive…',
+      viewerUnavailable: 'The pinned replay viewer is missing or failed its integrity check.',
+      choosePerspective: 'Choose a replay perspective. Open view reveals all hidden information.',
+      watchAs: 'Replay as {player}',
+      watchOpen: 'Replay with open information',
+      replayFrameTitle: 'Open Agricola game replay',
     },
 
     tabLobby: 'Lobby',

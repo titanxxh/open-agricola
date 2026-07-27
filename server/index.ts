@@ -45,8 +45,16 @@ import { createOnboardingTicket, findIdentity } from './oauth/store.ts'
 import { installShutdownHandlers } from './shutdown.ts'
 import { GameContextStore } from './game/game-context-store.ts'
 import { handleGameContextRoute } from './game-context-routes.ts'
+import { ReplayStore } from './game/replay-store.ts'
+import { handleReplayRoute, ReplayReadLimiter } from './replay-routes.ts'
+import { GameSession } from './game/authoritative-session.ts'
+import { encodeReplayFrame, type JsonValue } from './game/replay-codec.ts'
+import { viewerBuildExists } from './game/replay-viewer-build.ts'
+import { REPLAY_SCHEMA_VERSION } from './game/room-committer.ts'
 
 const CARD_ART_DIR = process.env.CARD_ART_DIR ?? join(process.cwd(), 'data', 'card-art')
+const REPLAY_VIEWER_ROOT = process.env.REPLAY_VIEWER_ROOT ?? join(process.cwd(), 'data', 'replay-viewers')
+const REPLAY_ASSET_ROOT = process.env.REPLAY_ASSET_ROOT ?? join(process.cwd(), 'data', 'replay-assets')
 const BGA_CDN_BASE = process.env.BGA_CDN_BASE_URL || 'https://x.boardgamearena.net/data/themereleases/current/games/agricola/260329-0408/img'
 const BGA_LOCAL_DIR = process.env.BGA_IMAGE_DIR ? join(process.cwd(), process.env.BGA_IMAGE_DIR) : null
 
@@ -161,6 +169,112 @@ const persistence =
 const shouldPersist: (room: Room) => boolean =
   PERSIST_ROOMS === 'sqlite' ? () => true : (room) => isDevRoom(room.id)
 const gameContextStore = new GameContextStore(getDb())
+const replayStore = new ReplayStore(getDb())
+const replayReadLimiter = new ReplayReadLimiter()
+
+const createCompletedReplayFixture = () => {
+  const viewerBuildId = process.env.REPLAY_VIEWER_BUILD_ID ?? ''
+  if (!viewerBuildExists(REPLAY_VIEWER_ROOT, viewerBuildId)) {
+    throw new Error('Replay viewer build is unavailable')
+  }
+  const roomId = `replay-${randomUUID()}`
+  const session = new GameSession(42, undefined, {
+    playerCount: 2,
+    playerNames: ['Alice', 'Bob'],
+  })
+  const capture = (): JsonValue =>
+    JSON.parse(JSON.stringify(
+      session.buildSyncPayload(session.getState(), null, 'debug').state,
+    )) as JsonValue
+  const frames = [capture()]
+  session.state.players[0]!.resources.wood += 3
+  frames.push(capture())
+  session.state.currentPlayerIndex = 1
+  session.state.players[1]!.resources.food += 2
+  session.state.gameOver = true
+  frames.push(capture())
+
+  let checkpointStepNo = 0
+  const encoded = frames.map((frame, stepNo) => {
+    const step = encodeReplayFrame({
+      frame,
+      previousFrame: frames[stepNo - 1] ?? null,
+      stepNo,
+      previousCheckpointStepNo: checkpointStepNo,
+    })
+    checkpointStepNo = step.checkpointStepNo
+    return step
+  })
+  const now = Date.now()
+  const db = getDb()
+  db.transaction(() => {
+    db.prepare(`
+      INSERT INTO game_contexts (
+        room_id, lifecycle, phase, replay_status, expires_at,
+        removal_reason, created_at, updated_at
+      ) VALUES (?, 'completed', NULL, 'available', NULL, NULL, ?, ?)
+    `).run(roomId, now, now)
+    db.prepare(`
+      INSERT INTO game_replays (
+        room_id, schema_version, viewer_build_id, game_build_id, status,
+        latest_step_no, missing_prefix, custom_cards_json, created_at, completed_at
+      ) VALUES (?, ?, ?, ?, 'completed', ?, 0, '[]', ?, ?)
+    `).run(
+      roomId,
+      REPLAY_SCHEMA_VERSION,
+      viewerBuildId,
+      process.env.GAME_BUILD_ID ?? 'test-build',
+      frames.length - 1,
+      now,
+      now,
+    )
+    const insertStep = db.prepare(`
+      INSERT INTO game_replay_steps (
+        room_id, step_no, room_version, checkpoint_step_no, player_index,
+        command_type, intent_json, payload_kind, payload_gzip, frame_hash, created_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `)
+    const commandTypes = ['initial', 'takeAction', 'resolveChoice']
+    encoded.forEach((step, stepNo) => insertStep.run(
+      roomId,
+      stepNo,
+      stepNo,
+      step.checkpointStepNo,
+      stepNo === 0 ? null : stepNo - 1,
+      commandTypes[stepNo],
+      JSON.stringify(stepNo === 0 ? {} : { value: stepNo }),
+      step.payloadKind,
+      step.payloadGzip,
+      step.frameHash,
+      now + stepNo,
+    ))
+    db.prepare(`
+      INSERT INTO game_results (
+        room_id, started_at, finished_at, rounds_played, player_count,
+        enable_community_deck, enable_parent_cards, enable_through_the_seasons,
+        enable_farmers_of_the_moor
+      ) VALUES (?, ?, ?, 1, 2, 0, 0, 0, 0)
+    `).run(roomId, now - 1000, now)
+    const scores = session.getState().scores ?? []
+    const insertPlayer = db.prepare(`
+      INSERT INTO game_result_players (
+        room_id, player_index, game_player_id, user_id, display_name, score
+      ) VALUES (?, ?, ?, NULL, ?, ?)
+    `)
+    session.state.players.forEach((player, playerIndex) => insertPlayer.run(
+      roomId,
+      playerIndex,
+      player.id,
+      player.name,
+      scores.find((score) => score.playerId === player.id)?.total ?? 0,
+    ))
+  })()
+  return {
+    ok: true,
+    roomId,
+    firstStepHash: encoded[0]!.frameHash,
+  }
+}
 
 let wssCtx: ReturnType<typeof createWsServer> | null = null
 
@@ -189,6 +303,18 @@ const server = createServer(async (req, res) => {
   if (req.method === 'GET' && req.url === '/api/health') {
     sendJson(res, 200, { ok: true })
     return
+  }
+
+  if (
+    req.url.startsWith('/api/v1/replays/')
+    || req.url.startsWith('/replay-viewers/')
+    || req.url.startsWith('/replay-assets/')
+  ) {
+    if (handleReplayRoute(req, res, replayStore, {
+      viewerRoot: REPLAY_VIEWER_ROOT,
+      assetRoot: REPLAY_ASSET_ROOT,
+      limiter: replayReadLimiter,
+    })) return
   }
 
   if (req.url.startsWith('/api/v1/game-contexts/')) {
@@ -436,6 +562,22 @@ const server = createServer(async (req, res) => {
 
     const ticket = createOnboardingTicket(profile)
     sendJson(res, 200, { ok: true, provider, mode: 'onboarding' }, { 'Set-Cookie': serializeOnboardingCookie(ticket, { backendOrigin: getRequestOrigin(req) }) })
+    return
+  }
+
+  if (req.url === '/api/test/replays/completed' && req.method === 'POST') {
+    if (process.env.NODE_ENV === 'production' || process.env.ENABLE_AUTH_TEST_HELPERS !== '1') {
+      sendJson(res, 404, { error: 'Not found' })
+      return
+    }
+    try {
+      sendJson(res, 201, createCompletedReplayFixture())
+    } catch (error) {
+      sendJson(res, 503, {
+        ok: false,
+        error: error instanceof Error ? error.message : 'Unable to create replay fixture',
+      })
+    }
     return
   }
 

@@ -1,6 +1,4 @@
-import { createHash } from 'node:crypto'
 import type { IncomingMessage, Server as HttpServer } from 'node:http'
-import { lstatSync, readFileSync, readdirSync } from 'node:fs'
 import { join } from 'node:path'
 import { WebSocketServer, type WebSocket } from 'ws'
 import { GameSession } from '../game/authoritative-session.ts'
@@ -30,57 +28,11 @@ import { isTrustedOrigin } from '../http-origin.ts'
 import { RoomCommitter } from '../game/room-committer.ts'
 import { SqliteRoomPersistence } from '../game/persistence/sqlite-adapter.ts'
 import type { GameContextStore } from '../game/game-context-store.ts'
+export { viewerBuildExists } from '../game/replay-viewer-build.ts'
+import { viewerBuildExists } from '../game/replay-viewer-build.ts'
 
 const WS_AUTH_TIMEOUT_MS = 5000
 const ROOM_CLEANUP_INTERVAL_MS = 5 * 60 * 1000
-
-const fileHash = (path: string): string =>
-  createHash('sha256').update(readFileSync(path)).digest('hex')
-
-const viewerFiles = (root: string, relative = ''): string[] => {
-  const files: string[] = []
-  for (const entry of readdirSync(join(root, relative), { withFileTypes: true })) {
-    const path = relative ? `${relative}/${entry.name}` : entry.name
-    if (entry.isDirectory()) files.push(...viewerFiles(root, path))
-    else if (entry.isFile() && path !== 'manifest.json') files.push(path)
-    else if (!entry.isFile()) throw new Error('viewer build contains unsupported entries')
-  }
-  return files.sort()
-}
-
-export const viewerBuildExists = (root: string, buildId: string): boolean => {
-  if (!/^[a-f0-9]{64}$/.test(buildId)) return false
-  try {
-    const directory = join(root, buildId)
-    if (!lstatSync(directory).isDirectory()) return false
-    const manifestPath = join(directory, 'manifest.json')
-    const manifestRaw = readFileSync(manifestPath)
-    if (createHash('sha256').update(manifestRaw).digest('hex') !== buildId) return false
-    const manifest = JSON.parse(manifestRaw.toString('utf8')) as {
-      entrypoint?: unknown
-      files?: unknown
-    }
-    if (
-      manifest.entrypoint !== 'index.html'
-      || !manifest.files
-      || typeof manifest.files !== 'object'
-      || Array.isArray(manifest.files)
-    ) return false
-    const expected = manifest.files as Record<string, unknown>
-    const files = viewerFiles(directory)
-    if (
-      files.length !== Object.keys(expected).length
-      || !files.every((path) => typeof expected[path] === 'string')
-      || !files.includes('index.html')
-    ) return false
-    return files.every((path) =>
-      /^[a-f0-9]{64}$/.test(expected[path] as string)
-      && fileHash(join(directory, path)) === expected[path]
-    )
-  } catch {
-    return false
-  }
-}
 
 const ALLOW_ANONYMOUS_WS: boolean = (() => {
   if (process.env.ALLOW_ANONYMOUS_WS !== undefined) {
