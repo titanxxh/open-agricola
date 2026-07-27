@@ -9,49 +9,64 @@ import {
 } from '../replay-codec.ts'
 import { ReplayStore } from '../replay-store.ts'
 
+const cachedIdentityFields = {
+  scores: [{ playerId: 'p1', playerName: 'wood', total: 0 }],
+  log: [{
+    key: 'log.test',
+    params: {
+      player: 'wood',
+      nested: ['wood', 'Bob'],
+      resource: 'wood',
+    },
+  }],
+}
+
 const frames = [
   {
     round: 1,
     players: [
-      { id: 'p1', name: 'Alice', minorHand: ['A'], occupationHand: ['B'], resources: { food: 0 } },
+      {
+        id: 'p1',
+        name: 'wood',
+        houseType: 'wood',
+        minorHand: ['A'],
+        occupationHand: ['B'],
+        resources: { food: 0 },
+      },
       {
         id: 'p2',
         name: 'Bob',
         minorHand: ['C'],
         occupationHand: ['D'],
         resources: { food: 0 },
-        borrowedPlayedCardAnimalZones: [{ displayOwnerName: 'Alice' }],
+        borrowedPlayedCardAnimalZones: [{ ownerPlayerId: 'p1', displayOwnerName: 'wood' }],
       },
     ],
-    scores: [{ playerId: 'p1', playerName: 'Alice', total: 0 }],
-    log: [{
-      key: 'log.test',
-      params: {
-        player: 'Alice',
-        nested: ['Alice', 'Bob'],
-      },
-    }],
+    ...cachedIdentityFields,
   },
   {
     round: 1,
     players: [
-      { id: 'p1', name: 'Alice', minorHand: ['A'], occupationHand: ['B'], resources: { food: 1 } },
-      { id: 'p2', name: 'Bob', minorHand: ['C'], occupationHand: ['D'], resources: { food: 0 } },
+      { id: 'p1', name: 'wood', houseType: 'wood', minorHand: ['A'], occupationHand: ['B'], resources: { food: 1 } },
+      { id: 'p2', name: 'Bob', minorHand: ['C'], occupationHand: ['D'], resources: { food: 0 }, borrowedPlayedCardAnimalZones: [{ ownerPlayerId: 'p1', displayOwnerName: 'wood' }] },
     ],
+    ...cachedIdentityFields,
   },
   {
     round: 2,
     players: [
-      { id: 'p1', name: 'Alice', minorHand: ['A'], occupationHand: ['B'], resources: { food: 1 } },
-      { id: 'p2', name: 'Bob', minorHand: ['C'], occupationHand: ['D'], resources: { food: 2 } },
+      { id: 'p1', name: 'wood', houseType: 'wood', minorHand: ['A'], occupationHand: ['B'], resources: { food: 1 } },
+      { id: 'p2', name: 'Bob', minorHand: ['C'], occupationHand: ['D'], resources: { food: 2 }, borrowedPlayedCardAnimalZones: [{ ownerPlayerId: 'p1', displayOwnerName: 'wood' }] },
     ],
+    ...cachedIdentityFields,
   },
   {
     round: 2,
     players: [
-      { id: 'p1', name: 'Alice', minorHand: [], occupationHand: ['B'], resources: { food: 1 } },
-      { id: 'p2', name: 'Bob', minorHand: ['C'], occupationHand: ['D'], resources: { food: 2 } },
+      { id: 'p1', name: 'wood', houseType: 'wood', minorHand: [], occupationHand: ['B'], resources: { food: 1 } },
+      { id: 'p2', name: 'Bob', minorHand: ['C'], occupationHand: ['D'], resources: { food: 2 }, borrowedPlayedCardAnimalZones: [{ ownerPlayerId: 'p1', displayOwnerName: 'wood' }] },
     ],
+    ...cachedIdentityFields,
   },
 ] satisfies JsonValue[]
 
@@ -105,7 +120,7 @@ describe('ReplayStore', () => {
         cardJson: { id: 'CUSTOM_1', name: 'Custom', deck: 'X', number: 1 },
       }]))
     db.prepare('INSERT INTO game_result_players VALUES (?, 0, ?)')
-      .run('room-1', 'Alice')
+      .run('room-1', 'wood')
     db.prepare('INSERT INTO game_result_players VALUES (?, 1, ?)')
       .run('room-1', 'Bob')
 
@@ -168,7 +183,7 @@ describe('ReplayStore', () => {
       lastStepNo: 3,
       missingPrefix: false,
       participants: [
-        { playerIndex: 0, displayName: 'Alice' },
+        { playerIndex: 0, displayName: 'wood' },
         { playerIndex: 1, displayName: 'Bob' },
       ],
       segments: [
@@ -301,6 +316,8 @@ describe('ReplayStore', () => {
     expect(segment.ok).toBe(true)
     if (!segment.ok) return
     expect(segment.steps[0]?.frame.players[0]?.name).toBe('Deleted player (seat 1)')
+    expect(segment.steps[0]?.frame.players[0]?.id).toBe('p1')
+    expect(segment.steps[0]?.frame.players[0]?.houseType).toBe('wood')
     expect(segment.steps[0]?.frame.players[1]?.name).toBe('Bob')
     expect(segment.steps[0]?.frame.scores?.[0]?.playerName).toBe('Deleted player (seat 1)')
     expect(
@@ -309,7 +326,8 @@ describe('ReplayStore', () => {
     ).toBe('Deleted player (seat 1)')
     expect(segment.steps[0]?.frame.log[0]?.params).toEqual({
       player: 'Deleted player (seat 1)',
-      nested: ['Deleted player (seat 1)', 'Bob'],
+      nested: ['wood', 'Bob'],
+      resource: 'wood',
     })
   })
 
