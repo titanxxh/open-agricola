@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type {
   ActionDefinition,
   ActionSpace,
@@ -99,6 +99,43 @@ describe('Hook dispatch merge order', () => {
   beforeEach(() => {
     clearActionHooks()
     setActiveCardRegistry(new CardRegistry())
+  })
+
+  afterEach(() => {
+    vi.restoreAllMocks()
+  })
+
+  it('does not clone state when a cost preview has no compute-cost handlers', () => {
+    const player = createPlayer()
+    const action = {
+      ...createAction(),
+      costPreview: { canExecute: () => true },
+    }
+    const state = {
+      round: 1,
+      currentPlayerIndex: 0,
+      players: [player],
+      actionSpaces: [],
+      log: [],
+      roundStartSnapshot: null,
+      roundActionOrder: [],
+      gameSeed: 1,
+      availableMajorImprovements: [],
+      futureMeeples: [],
+      pendingFutureMeeples: [],
+      gameOver: false,
+    } as GameState
+    const clone = vi.spyOn(globalThis, 'structuredClone')
+
+    const doable = new HookDispatcher().applyIsDoable({
+      state,
+      player,
+      space: createSpace(action),
+      actionId: action.id,
+    }, action, true)
+
+    expect(doable).toBe(true)
+    expect(clone).not.toHaveBeenCalled()
   })
 
   it('action hooks run before card listeners in same phase', () => {

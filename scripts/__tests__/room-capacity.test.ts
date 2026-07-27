@@ -45,4 +45,38 @@ describe('room capacity probe', () => {
     expect(reportText).toContain('Steady action p50 ms')
     expect(reportText).toContain('| DB | WAL |')
   }, 30_000)
+
+  it('writes bounded replay checkpoints and deltas in the action-to-broadcast path', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'oa-room-capacity-replay-'))
+    tempDirs.push(dir)
+    const report = join(dir, 'replay.md')
+    const stdout = execFileSync(process.execPath, [
+      '--import',
+      'tsx',
+      'scripts/bench/room-capacity.ts',
+      '--smoke',
+      '--allow-unconstrained',
+      '--replay-archive',
+      '--label',
+      'replay',
+      '--report',
+      report,
+    ], {
+      cwd: root,
+      encoding: 'utf8',
+    })
+    const summary = JSON.parse(stdout.trim().split('\n').at(-1)!)
+    const replay = summary.levels[0].replay
+
+    expect(summary.config.replayArchive).toBe(true)
+    expect(replay.writes).toBeGreaterThan(0)
+    expect(replay.acceptedCommands).toBe(replay.writes)
+    expect(replay.deltas).toBeGreaterThan(0)
+    expect(replay.checkpoints + replay.deltas).toBe(replay.writes)
+    const reportText = readFileSync(report, 'utf8')
+    expect(reportText).toContain('# Room Capacity Replay')
+    expect(reportText).toContain('State fixture: deterministic played session')
+    expect(reportText).toContain('## Replay archive writes')
+    expect(reportText).toContain('WAL auto-checkpoint tail candidates')
+  }, 30_000)
 })

@@ -24,7 +24,7 @@ Single-context layout: read root `CONTEXT.md` and any ADRs under `docs/adr/`. Se
 
 - 三层 `shared/` + `server/` + `client/`，前端只负责渲染、输入收集、视角化展示，不做规则裁定。
 - 后端 `GameSession`（`server/game-session.ts`）是 `GameState` 的**唯一写入者**。
-- WebSocket 房间对局是主链路；HTTP 仅用于调试、补拉快照、测试辅助。
+- WebSocket 房间对局是实时同步主链路；HTTP 用于调试、补拉快照、测试辅助，以及版本化的 Game Context、Replay 和 Bug Report 产品接口，不通过 HTTP 另建规则写入主链路。
 - 与游戏规则相关的实现优先放在 `shared/` + `server/`，不要在前端 UI 补规则逻辑。
 - 遇到不确定的实现，优先参考 `../bga-agricola`，除非架构文档已明确给出不同设计。
 - 详细架构（节点树引擎、Hook 系统、协议层、Pending 模型、房间系统）→ `docs/ARCHITECTURE.md`。

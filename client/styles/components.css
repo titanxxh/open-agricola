@@ -420,3 +420,68 @@
     padding-bottom: calc(56px + var(--safe-area-inset-bottom, env(safe-area-inset-bottom)));
   }
 }
+
+.afdian-float-btn {
+  position: fixed;
+  right: 16px;
+  bottom: 16px;
+  z-index: 200;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 16px;
+  border-radius: 100px;
+  background: #946ce6;
+  color: #fff;
+  font-size: 14px;
+  font-weight: 700;
+  text-decoration: none;
+  box-shadow: 1px 3px 6px rgba(0, 0, 0, 0.3);
+  transition: opacity 0.25s, transform 0.25s;
+}
+.afdian-float-btn:hover {
+  background: #7d54d4;
+}
+.afdian-float-btn.is-hidden {
+  opacity: 0;
+  transform: translateY(8px);
+  pointer-events: none;
+}
+.donate-sentinel {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  width: 1px;
+  height: 1px;
+  visibility: hidden;
+}
+body.kofi-widget-hidden .floatingchat-container-wrap,
+body.kofi-widget-hidden .floatingchat-container-wrap-mobi,
+body.kofi-widget-hidden .floating-chat-kofi-popup-iframe,
+body.kofi-widget-hidden .floating-chat-kofi-popup-iframe-mobi {
+  display: none !important;
+}
+.afdian-float-btn__icon {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+}
+@media (max-width: 640px) {
+  .afdian-float-btn {
+    height: 50px;
+    box-sizing: border-box;
+    padding: 0 18px;
+    font-size: 16px;
+  }
+  .afdian-float-btn__icon {
+    width: 24px;
+    height: 24px;
+  }
+  body:has(.mobile-tab-bar) .afdian-float-btn {
+    bottom: calc(72px + var(--safe-area-inset-bottom, env(safe-area-inset-bottom)));
+  }
+  body:has(.mobile-tab-bar) .floatingchat-container-wrap,
+  body:has(.mobile-tab-bar) .floatingchat-container-wrap-mobi {
+    bottom: calc(72px + var(--safe-area-inset-bottom, env(safe-area-inset-bottom))) !important;
+  }
+}
