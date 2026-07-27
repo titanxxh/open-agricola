@@ -11,7 +11,8 @@
   "packageManager": "pnpm@10.33.0",
   "scripts": {
     "dev": "vite",
-    "build": "tsc -b && vite build",
+    "build": "tsc -b && vite build && pnpm run build:replay-viewer",
+    "build:replay-viewer": "pnpm run build:cards-manifest && vite build --config replay-viewer/vite.config.ts && tsx scripts/publish-replay-viewer.ts",
     "lint": "eslint .",
     "lint:i18n": "tsx scripts/i18n-audit.ts",
     "test": "vitest run --exclude e2e-tests --exclude scripts/test-actions.spec.ts",
