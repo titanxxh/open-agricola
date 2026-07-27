@@ -13,7 +13,10 @@ import { validateSession } from '../auth.ts'
 import { getDb } from '../db.ts'
 import type { CustomCardData } from '../../shared/cards/session-card-context.ts'
 import type { CustomCodeManifest } from '../../shared/custom-code/types.ts'
-import type { ClientCommand } from '../../shared/contract/protocol/ws.ts'
+import {
+  REPLAY_CARD_SNAPSHOT_CONSENT_REQUIRED,
+  type ClientCommand,
+} from '../../shared/contract/protocol/ws.ts'
 import type { StateUpdateCause } from '../../shared/contract/protocol/game.ts'
 import {
   loadPublishedDraft,
@@ -383,7 +386,7 @@ function handleCreateRoom(ctx: ConnectionCtx, msg: Extract<ClientCommand, { type
     && loadedCustomCards.hasUnpublished
     && (msg as Record<string, unknown>).confirmReplayCardSnapshotPublic !== true
   ) {
-    sendCommandError(ctx, 'unpublished custom cards require replay snapshot consent', msg.requestId)
+    sendCommandError(ctx, REPLAY_CARD_SNAPSHOT_CONSENT_REQUIRED, msg.requestId)
     return
   }
   ctx.registry.set(room)
