@@ -1,13 +1,16 @@
 // @vitest-environment jsdom
 import { cleanup, render, screen } from '@testing-library/react'
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { ReplayBoard } from '../../../replay-viewer/src/ReplayBoard'
 import { frameForPerspective } from '../../../replay-viewer/src/model'
 import { EngineStack } from '../../../shared/engine'
 import { serializeState } from '../../../shared/session/serialization'
 import { createInitialState } from '../../../shared/session/state-bootstrap'
 
-afterEach(cleanup)
+afterEach(() => {
+  cleanup()
+  vi.unstubAllGlobals()
+})
 
 describe('replay setup phases', () => {
   it('renders draft pools and submissions with perspective filtering', () => {
@@ -81,5 +84,32 @@ describe('replay setup phases', () => {
       <ReplayBoard frame={frameForPerspective(frame, 'open')} locale="en" perspective="open" />,
     )
     expect(screen.getAllByLabelText('PR02').length).toBeGreaterThan(0)
+  })
+
+  it('renders both expansion action boards read-only', () => {
+    vi.stubGlobal('ResizeObserver', class {
+      observe() {}
+      disconnect() {}
+    })
+    const state = createInitialState(42, {
+      playerCount: 2,
+      enableThroughTheSeasons: true,
+      enableFarmersOfTheMoor: true,
+      allowIncompleteFarmersOfTheMoorMinorDeal: true,
+    })
+    const frame = serializeState(state, { engineStack: new EngineStack() })
+    const { container } = render(
+      <ReplayBoard frame={frameForPerspective(frame, 'open')} locale="en" perspective="open" />,
+    )
+
+    expect(container.querySelector('.seasons-board')).toBeVisible()
+    expect(container.querySelectorAll('.seasons-board__space-button')).toHaveLength(4)
+    expect(container.querySelector('.special-actions-panel')).toBeVisible()
+    expect(container.querySelectorAll('.special-action-card')).toHaveLength(
+      state.farmersOfTheMoor!.specialActionCards.length,
+    )
+    expect(container.querySelectorAll(
+      '.seasons-board__space-button:not(:disabled), .special-action-card button:not(:disabled)',
+    )).toHaveLength(0)
   })
 })

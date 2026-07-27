@@ -14,6 +14,8 @@ import { splitBoardActionSpaces } from '../../client/app/game-container-helpers'
 import { ActionBoard } from '../../client/components/board/ActionBoard'
 import { PlayerFarmPanel } from '../../client/components/board/PlayerFarmPanel'
 import { PlayerTabs } from '../../client/components/board/PlayerTabs'
+import { SeasonsBoard } from '../../client/components/board/SeasonsBoard'
+import { SpecialActionsPanel } from '../../client/components/board/SpecialActionsPanel'
 import { StageBar } from '../../client/components/board/StageBar'
 import { ParentCardFace } from '../../client/components/common/ParentCardFace'
 import { PlayerCard } from '../../client/components/common/PlayerCard'
@@ -225,7 +227,7 @@ export function ReplayBoard({
     })),
     [actionMap, state.roundActionOrder],
   )
-  const { baseActions } = useMemo(
+  const { baseActions, seasonActions } = useMemo(
     () => splitBoardActionSpaces(state.actionSpaces, state.roundActionOrder),
     [state.actionSpaces, state.roundActionOrder],
   )
@@ -322,6 +324,30 @@ export function ReplayBoard({
           leftActionNames={actionProjection.leftActionNames}
         />
       </section>
+      {state.enableThroughTheSeasons && state.throughTheSeasons ? (
+        <section className="replay-board__action">
+          <SeasonsBoard
+            locale={locale}
+            throughTheSeasons={state.throughTheSeasons}
+            seasonActions={seasonActions}
+            players={state.players}
+            canTakeAction={() => false}
+            takeAction={noOp}
+          />
+        </section>
+      ) : null}
+      {state.enableFarmersOfTheMoor && state.farmersOfTheMoor ? (
+        <section className="replay-board__action">
+          <SpecialActionsPanel
+            locale={locale}
+            cards={state.farmersOfTheMoor.specialActionCards}
+            currentPlayerId={currentPlayer.id}
+            canTakeSpecialAction={() => false}
+            selected={null}
+            onTakeAction={noOp}
+          />
+        </section>
+      ) : null}
       <section className="replay-board__farm" aria-label="Player farm">
         <StageBar currentRound={state.round} locale={locale} />
         <PlayerTabs
