@@ -82,13 +82,15 @@ describe('SqliteRoomPersistence replay commit', () => {
   let tempDir = ''
   let db: Database.Database
   let persistence: SqliteRoomPersistence
+  let cleanExpiredSessions: () => void
 
   beforeEach(async () => {
     tempDir = mkdtempSync(join(tmpdir(), 'open-agricola-sqlite-replay-'))
     process.env.DB_PATH = join(tempDir, 'test.db')
     vi.resetModules()
-    const { getDb } = await import('../../../db.ts')
-    db = getDb()
+    const database = await import('../../../db.ts')
+    db = database.getDb()
+    cleanExpiredSessions = database.cleanExpiredSessions
     persistence = new SqliteRoomPersistence(db)
   })
 
@@ -222,5 +224,13 @@ describe('SqliteRoomPersistence replay commit', () => {
     expect(db.prepare(`
       SELECT step_no, payload_gzip FROM game_replay_steps WHERE room_id = 'room-1'
     `).all()).toEqual([{ step_no: 0, payload_gzip: Buffer.from('step-0') }])
+
+    db.prepare(`
+      UPDATE bug_reports SET evidence_expires_at = ? WHERE submission_id = 'report-1'
+    `).run(Date.now() - 1)
+    cleanExpiredSessions()
+
+    expect(db.prepare('SELECT COUNT(*) AS count FROM game_replays').get()).toEqual({ count: 0 })
+    expect(db.prepare('SELECT COUNT(*) AS count FROM game_replay_steps').get()).toEqual({ count: 0 })
   })
 })

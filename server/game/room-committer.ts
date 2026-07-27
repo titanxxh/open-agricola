@@ -130,7 +130,12 @@ export const replayIntentFromCommand = (command: ClientCommand): ReplayIntent | 
         selectionKeys: Object.keys(command.payload).sort(),
       })
     case 'parentSubmit':
-      return intent(command.type, { selection: command.selection } as unknown as JsonValue)
+      return intent(command.type, {
+        selection: {
+          mother: command.selection.mother,
+          father: command.selection.father,
+        },
+      })
     case 'devSetResources':
       return intent(command.type, { resources: command.resources })
     case 'devSetRound':
@@ -334,7 +339,7 @@ export class RoomCommitter {
     this.heads.delete(roomId)
     this.knownReplayIds.delete(roomId)
     this.updateStorageFailed()
-    this.cleanupUnreferencedAssets()
+    this.cleanupReplayAssets()
   }
 
   prepareRoom(
@@ -724,7 +729,7 @@ export class RoomCommitter {
     this.storageFailed = this.pending.size > 0 || this.pendingReplayLoads.size > 0
   }
 
-  private cleanupUnreferencedAssets(): void {
+  cleanupReplayAssets(): void {
     try {
       const referenced = this.persistence.referencedReplayAssetHashes()
       for (const pending of this.pending.values()) {

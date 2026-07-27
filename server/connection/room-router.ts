@@ -3,7 +3,6 @@ import { GameSession, type SessionResponse } from '../game/authoritative-session
 import {
   fixedDevRoomRootId,
   isDevRoom,
-  isFixedDevRoom,
   resolveJoinPlayerIndex,
   resolveJoinRequestPlayerIndex,
   roomOccupiedSeatCount,
@@ -215,9 +214,12 @@ const publishInitialState = (
   room: Room,
   response: SessionResponse,
   requestId: string | undefined,
+  beforePublish: () => void,
   onReady: () => void,
 ): void => {
   const publishReady = (result: Exclude<RoomCommitResult, { kind: 'blocked' }>): void => {
+    if (ctx.committer?.hasReplay(room.id)) ctx.checkpoint.markInactive(room.id)
+    beforePublish()
     if (result.kind === 'committed') {
       ctx.broadcaster.broadcastCommitted(room, response, 'reconnect', requestId)
     } else {
@@ -230,6 +232,7 @@ const publishInitialState = (
     onReady()
   }
   if (!ctx.committer) {
+    beforePublish()
     ctx.broadcaster.broadcastState(room, response, 'reconnect', requestId)
     onReady()
     return
@@ -246,6 +249,7 @@ const publishInitialState = (
     }
     return
   }
+  beforePublish()
   if (ctx.committer.isRecording(room.id)) {
     ctx.broadcaster.broadcastCommitted(room, response, 'reconnect', requestId)
   } else {
@@ -301,7 +305,7 @@ function handleAuth(ctx: ConnectionCtx, msg: Extract<ClientCommand, { type: 'aut
 
 function handleCreateRoom(ctx: ConnectionCtx, msg: Extract<ClientCommand, { type: 'createRoom' }>): void {
   const ordinaryRoomCount = [...ctx.registry.iter()]
-    .filter((room) => !isFixedDevRoom(room.id))
+    .filter((room) => !isDevRoom(room.id))
     .length
   if (ordinaryRoomCount >= MAX_ORDINARY_ROOMS) {
     sendCommandError(ctx, 'room capacity reached', msg.requestId)
@@ -483,24 +487,32 @@ function handleJoinRoom(ctx: ConnectionCtx, msg: Extract<ClientCommand, { type: 
     room.status = 'playing'
     room.startedAt ??= Date.now()
   }
-  ctx.checkpoint.recordMeta(room)
-  ctx.broadcaster.sendTo(ctx.ws, { type: 'roomJoined', roomId, playerIndex: ctx.currentPlayerIndex })
-  ctx.broadcaster.broadcastEvent(room, {
-    type: 'playerJoined',
-    playerIndex: ctx.currentPlayerIndex,
-    name,
-    playerCount,
-    maxPlayers: room.maxPlayers,
-  })
+  const publishJoin = (): void => {
+    ctx.broadcaster.sendTo(ctx.ws, { type: 'roomJoined', roomId, playerIndex: ctx.currentPlayerIndex })
+    ctx.broadcaster.broadcastEvent(room, {
+      type: 'playerJoined',
+      playerIndex: ctx.currentPlayerIndex,
+      name,
+      playerCount,
+      maxPlayers: room.maxPlayers,
+    })
+  }
   if (starting) {
     for (const p of room.players) {
       room.session.updatePlayerName(p.playerIndex, p.name)
     }
     const resp = room.session.withCtx(() => room.session.getState())
     publishInitialState(ctx, room, resp, undefined, () => {
+      ctx.checkpoint.recordMeta(room)
+      publishJoin()
+    }, () => {
       ctx.broadcaster.broadcastEvent(room, { type: 'gameStarted' })
     })
-  } else if (wasPlaying) {
+    return
+  }
+  ctx.checkpoint.recordMeta(room)
+  publishJoin()
+  if (wasPlaying) {
     const resp = room.session.withCtx(() => room.session.getState())
     ctx.broadcaster.sendStateTo(ctx.ws, room, resp, msg.requestId)
   }
@@ -675,7 +687,7 @@ function handleNewGame(ctx: ConnectionCtx, msg: Extract<ClientCommand, { type: '
   ctx.checkpoint.recordCreated(room)
   const resp = room.session.withCtx(() => room.session.getState())
   if (room.status === 'playing') {
-    publishInitialState(ctx, room, resp, msg.requestId, () => {})
+    publishInitialState(ctx, room, resp, msg.requestId, () => {}, () => {})
   } else {
     ctx.broadcaster.broadcastState(room, resp, 'reconnect', msg.requestId)
   }
