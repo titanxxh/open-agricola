@@ -92,6 +92,18 @@ _Avoid_: 404、可恢复软删除、Game Replay Archive payload
 在对局内提交现象说明的已登录、已入座站点用户；公开 Issue 固定记录其站点 `userId` 和 `playerIndex`，GitHub 作者可以是玩家本人或托管身份。邮箱和可变显示名不作为 Reporter 身份。
 _Avoid_: GitHub Issue 作者、当前回合玩家、匿名访客
 
+**Issue Submission Connection**:
+Game Bug Reporter 为以本人 GitHub 身份提交公开 Issue 而单独建立的可撤销连接，绑定不可变的 GitHub 用户 id；它不承担站点登录或 Workshop 提案授权。
+_Avoid_: 站点登录身份、Workshop GitHub OAuth、托管代提身份
+
+**Hosted Issue Identity**:
+没有可用 Issue Submission Connection 时，代表 Game Bug Reporter 创建公开 Issue 的站点服务身份；Issue 正文仍以站点 `userId` 和 `playerIndex` 标识实际 Reporter。
+_Avoid_: Game Bug Reporter、个人维护者账号、匿名提交者
+
+**Bug Report Draft**:
+Game Bug Reporter 在站内保存、尚未对应到公开 Issue 的现象说明与 Bug Report Anchor；连接 GitHub、提交失败或等待对账时都保留同一份草稿。
+_Avoid_: 浏览器临时表单、GitHub Issue、Workshop Design Draft
+
 **Bug Report Anchor**:
 Game Bug Reporter 提交现象时固定到特定 Replay Frame 的稳定引用，由 `roomId`、`stepNo` 和 Frame 指纹共同标识，不随房间继续推进或观看视角改变。
 _Avoid_: 最新状态、可变播放位置、GitHub Issue 编号
@@ -613,6 +625,7 @@ _Avoid_: 永久放弃、全局出局名单
 - 规则事实先写 **Public Event**，再派生 **Action Log**、notification、highlight、animation 和 replay。
 - 进行局的私有手牌、私有 prompt 和 draft 选择通过 **Private Event** 或 viewer 过滤传输；结束局的 **Game Replay Archive** 可按座位视角或全开视角展示归档规则状态，但不保存 Private Event envelope。
 - **Game Replay Archive** 由 **Replay Step** 组织，并用 **Replay Participant** 表达座位身份；内容删除后原 `roomId` 只解析为 **Replay Tombstone**。
+- **Game Bug Reporter** 可以用自己的 **Issue Submission Connection** 提交，也可以明确选择 **Hosted Issue Identity**；两者都从同一 **Bug Report Draft** 和 **Bug Report Anchor** 创建公开 Issue。
 - **Workshop** 生成或上传自定义卡；**Custom Code Sandbox** 校验、编译并隔离执行这些卡的 impl。
 - 未发布 Workshop Card 进入正式多人局前必须确认其 **Replay Card Snapshot** 会永久公开；不同意时只允许在 **Workshop Sandbox** 使用。
 - 主 client bundle 只渲染和发命令；sandbox client bundle 可以在浏览器内运行完整 shared engine。
