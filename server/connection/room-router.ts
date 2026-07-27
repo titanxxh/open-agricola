@@ -71,10 +71,14 @@ export function parseDraftOptions(
   return { ok: true, value: { draftMode: 'simultaneous', draftPoolSize: poolSize } }
 }
 
-export function loadCustomCardsFromDb(cardDbIds: string[], requestUserId?: string): CustomCardData[] {
-  if (!cardDbIds.length) return []
+const loadCustomCards = (
+  cardDbIds: string[],
+  requestUserId?: string,
+): { cards: CustomCardData[]; hasUnpublished: boolean } => {
+  if (!cardDbIds.length) return { cards: [], hasUnpublished: false }
   const db = getDb()
   const result: CustomCardData[] = []
+  let hasUnpublished = false
   for (const dbId of cardDbIds) {
     const row = db.prepare(
       'SELECT card_type, card_json, code_manifest, art_url, status, author_id FROM workshop_cards WHERE id = ?',
@@ -109,10 +113,16 @@ export function loadCustomCardsFromDb(cardDbIds: string[], requestUserId?: strin
         codeManifest: row.code_manifest ? JSON.parse(row.code_manifest) as CustomCodeManifest : null,
         artUrl: row.art_url ?? null,
       })
+      hasUnpublished = true
     } catch { /* skip malformed */ }
   }
-  return result
+  return { cards: result, hasUnpublished }
 }
+
+export const loadCustomCardsFromDb = (
+  cardDbIds: string[],
+  requestUserId?: string,
+): CustomCardData[] => loadCustomCards(cardDbIds, requestUserId).cards
 
 const generateRoomId = (ctx: ConnectionCtx, devRoomRootId?: string | null): string | null => {
   for (let attempt = 0; attempt < 8; attempt += 1) {
@@ -319,7 +329,8 @@ function handleCreateRoom(ctx: ConnectionCtx, msg: Extract<ClientCommand, { type
   const enableFarmersOfTheMoor = (msg as Record<string, unknown>).enableFarmersOfTheMoor === true
   const allowIncompleteFarmersOfTheMoorMinorDeal =
     (msg as Record<string, unknown>).allowIncompleteFarmersOfTheMoorMinorDeal === true
-  const customCards = loadCustomCardsFromDb(customCardDbIds, ctx.currentUserId)
+  const loadedCustomCards = loadCustomCards(customCardDbIds, ctx.currentUserId)
+  const customCards = loadedCustomCards.cards
   let session: GameSession
   try {
     session = new GameSession(
@@ -367,6 +378,14 @@ function handleCreateRoom(ctx: ConnectionCtx, msg: Extract<ClientCommand, { type
     allowIncompleteFarmersOfTheMoorMinorDeal,
   }
   ctx.committer?.lockNewRoom(room)
+  if (
+    room.replayRecording === true
+    && loadedCustomCards.hasUnpublished
+    && (msg as Record<string, unknown>).confirmReplayCardSnapshotPublic !== true
+  ) {
+    sendCommandError(ctx, 'unpublished custom cards require replay snapshot consent', msg.requestId)
+    return
+  }
   ctx.registry.set(room)
   ctx.currentRoom = room
   ctx.currentPlayerIndex = 0
@@ -590,7 +609,8 @@ function handleNewGame(ctx: ConnectionCtx, msg: Extract<ClientCommand, { type: '
       return
     }
   }
-  const customCards = loadCustomCardsFromDb(room.customCardDbIds ?? [], room.createdBy)
+  const customCards = room.customCards
+    ?? loadCustomCardsFromDb(room.customCardDbIds ?? [], room.createdBy)
   const enableCommunityDeck = room.session.state.enableCommunityDeck
   const enableParentCards = room.enableParentCards ?? room.session.state.enableParentCards
   const draftMode = room.draftMode ?? room.session.state.draftMode

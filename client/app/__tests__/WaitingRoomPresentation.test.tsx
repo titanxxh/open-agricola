@@ -8,6 +8,7 @@ import { GameContainerApi } from '../GameContainerApi'
 
 class WaitingRoomWebSocket {
   static readonly OPEN = 1
+  static sent: Array<Record<string, unknown>> = []
   readonly readyState = WaitingRoomWebSocket.OPEN
   onopen: ((event: Event) => void) | null = null
   onerror: ((event: Event) => void) | null = null
@@ -28,7 +29,8 @@ class WaitingRoomWebSocket {
   }
 
   send(raw: string) {
-    const message = JSON.parse(raw) as { type?: string }
+    const message = JSON.parse(raw) as Record<string, unknown>
+    WaitingRoomWebSocket.sent.push(message)
     if (message.type !== 'createRoom') return
     queueMicrotask(() => {
       const event = new MessageEvent('message', {
@@ -71,11 +73,46 @@ afterEach(() => {
   cleanup()
   window.localStorage.clear()
   window.history.replaceState(null, '', '/')
+  WaitingRoomWebSocket.sent = []
   Object.defineProperty(navigator, 'clipboard', { configurable: true, value: undefined })
   vi.unstubAllGlobals()
 })
 
 describe('waiting room presentation', () => {
+  it('confirms permanent custom-card replay publication before room creation', async () => {
+    const confirm = vi.fn(() => true)
+    window.localStorage.setItem('open-agricola-locale-v2', 'en')
+    window.history.replaceState(
+      null,
+      '',
+      '/?page=game&transport=ws&maxPlayers=2&customCards=card-1',
+    )
+    vi.stubGlobal('confirm', confirm)
+    vi.stubGlobal('WebSocket', WaitingRoomWebSocket)
+    vi.stubGlobal('fetch', vi.fn(async () =>
+      new Response(JSON.stringify({
+        ok: true,
+        user: { id: 'u1', username: 'host', displayName: 'Host' },
+      })),
+    ))
+
+    render(
+      <LocaleProvider>
+        <AuthProvider>
+          <AuthenticatedGame />
+        </AuthProvider>
+      </LocaleProvider>,
+    )
+
+    expect(await screen.findByRole('button', { name: 'Copy' })).toBeVisible()
+    expect(confirm).toHaveBeenCalledOnce()
+    expect(WaitingRoomWebSocket.sent).toContainEqual(expect.objectContaining({
+      type: 'createRoom',
+      customCardIds: ['card-1'],
+      confirmReplayCardSnapshotPublic: true,
+    }))
+  })
+
   it('announces successful invitation-link copying', async () => {
     const user = userEvent.setup()
     const writeText = vi.fn(async () => {})

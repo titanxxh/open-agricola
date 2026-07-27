@@ -69,11 +69,12 @@ ALLOW_ANONYMOUS_WS=false
 REPLAY_NEW_ROOMS_ENABLED=false
 REPLAY_VIEWER_BUILD_ID=
 REPLAY_VIEWER_ROOT=./data/replay-viewers
+REPLAY_ASSET_ROOT=./data/replay-assets
 GAME_BUILD_ID=
 # CORS_ORIGIN 等后续根据情况设置
 ```
 
-首次启用 Replay 时，先把不可变 Viewer Build 部署到 `${REPLAY_VIEWER_ROOT}/${REPLAY_VIEWER_BUILD_ID}`，再填写两个 Build ID，最后把 `REPLAY_NEW_ROOMS_ENABLED` 改为 `true`。目录不存在时拒绝创建新 Room。开关、Build ID 和自定义卡运行时版本在 Room 创建时锁定；已有 Replay Room 会继续按锁定值记录，开关关闭期间不会迁移旧进行局。
+首次启用 Replay 时必须使用 `PERSIST_ROOMS=sqlite`。Viewer Build 根目录的 `manifest.json` 固定 `entrypoint: "index.html"` 和目录内全部文件的 SHA-256，`REPLAY_VIEWER_BUILD_ID` 是该清单文件本身的 SHA-256；把完整目录部署到 `${REPLAY_VIEWER_ROOT}/${REPLAY_VIEWER_BUILD_ID}` 后，再填写两个 Build ID，最后把 `REPLAY_NEW_ROOMS_ENABLED` 改为 `true`。清单、内容 Hash 或入口校验失败时拒绝创建新 Room。开关、Build ID 和自定义卡运行时版本在 Room 创建时锁定；卡图复制到 `REPLAY_ASSET_ROOT` 的内容寻址文件。已有 Replay Room 会继续按锁定值记录，开关关闭期间不会迁移旧进行局。
 
 #### 构建并启动
 
