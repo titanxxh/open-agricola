@@ -16,6 +16,13 @@ const frames = [
       { id: 'p1', name: 'Alice', minorHand: ['A'], occupationHand: ['B'], resources: { food: 0 } },
       { id: 'p2', name: 'Bob', minorHand: ['C'], occupationHand: ['D'], resources: { food: 0 } },
     ],
+    log: [{
+      key: 'log.test',
+      params: {
+        player: 'Alice',
+        nested: ['Alice', 'Bob'],
+      },
+    }],
   },
   {
     round: 1,
@@ -279,6 +286,10 @@ describe('ReplayStore', () => {
     if (!segment.ok) return
     expect(segment.steps[0]?.frame.players[0]?.name).toBe('Deleted player (seat 1)')
     expect(segment.steps[0]?.frame.players[1]?.name).toBe('Bob')
+    expect(segment.steps[0]?.frame.log[0]?.params).toEqual({
+      player: 'Deleted player (seat 1)',
+      nested: ['Deleted player (seat 1)', 'Bob'],
+    })
   })
 
   it('never exposes active or legacy replay payloads', () => {

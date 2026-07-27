@@ -31,6 +31,7 @@ test('anonymous completed replay supports perspectives, playback, layout, and an
   const replay = page.frameLocator('iframe')
   await expect(replay.locator('.replay-app')).toBeVisible()
   await expect.poll(() => new URL(page.url()).searchParams.get('layout')).toBe('timeline')
+  await expect.poll(() => new URL(page.url()).searchParams.get('frame')).toMatch(/^[a-f0-9]{64}$/)
   await expect(replay.locator('[data-hand-anchor="p1"] .player-card-inner')).toHaveCount(14)
   await expect(replay.locator('[data-hand-anchor="p1"] .card-title').first()).not.toHaveText('')
   const cardFrameImage = await replay.locator('.card-frame').first().evaluate(
@@ -45,9 +46,16 @@ test('anonymous completed replay supports perspectives, playback, layout, and an
   await replay.locator('button[data-player="p2"]').click()
   await expect(replay.locator('[data-hand-anchor="p2"] .player-card-inner')).toHaveCount(14)
 
+  await replay.locator('.replay-play').click()
+  await expect(replay.locator('.replay-transport output')).toContainText('2 / 2', { timeout: 5000 })
+  await expect.poll(() => new URL(page.url()).searchParams.get('step')).toBe('2')
+  await replay.locator('.replay-timeline button').first().click()
+  await expect(replay.locator('.replay-transport output')).toContainText('0 / 2')
+
   await replay.locator('.replay-transport button').nth(2).click()
   await expect(replay.locator('.replay-transport output')).toContainText('1 / 2')
   await expect.poll(() => new URL(page.url()).searchParams.get('step')).toBe('1')
+  await expect.poll(() => new URL(page.url()).searchParams.get('frame')).toMatch(/^[a-f0-9]{64}$/)
   await replay.locator('.replay-header select').selectOption('p2')
   await expect(replay.getByText('当前视角不可见')).toBeVisible()
 

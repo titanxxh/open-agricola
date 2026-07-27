@@ -124,8 +124,12 @@ input {
   background: #365039;
 }
 
-.replay-warning {
+.replay-warning-stack {
   grid-area: warning;
+  display: grid;
+}
+
+.replay-warning {
   padding: 9px 22px;
   color: #36270d;
   background: #e6c56c;
@@ -206,6 +210,89 @@ input {
 .replay-board {
   display: grid;
   gap: 14px;
+}
+
+.replay-setup {
+  min-height: 70vh;
+  padding: 18px;
+  color: #352b1b;
+  border: 1px solid #b89e68;
+  border-radius: 5px;
+  background: #eee0bb;
+}
+
+.replay-setup > header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.replay-setup h2,
+.replay-setup h3,
+.replay-setup h4,
+.replay-setup p {
+  margin: 0;
+}
+
+.replay-setup h2,
+.replay-setup h3 {
+  font-family: 'Dominican', Georgia, serif;
+}
+
+.replay-setup h4 {
+  margin-top: 12px;
+  color: #765c35;
+  font-size: 12px;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+}
+
+.replay-setup__players {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 14px;
+  margin-top: 16px;
+}
+
+.replay-setup__players > article {
+  min-width: 0;
+  padding: 14px;
+  border: 1px solid #c3aa79;
+  border-radius: 4px;
+  background: rgb(255 250 229 / 70%);
+}
+
+.replay-setup__cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(82px, 1fr));
+  gap: 8px;
+  padding: 0;
+  margin: 6px 0 0;
+  list-style: none;
+}
+
+.replay-setup__cards li {
+  min-width: 0;
+}
+
+.replay-setup__cards .player-card {
+  width: 100%;
+}
+
+.replay-setup__hidden {
+  display: grid;
+  aspect-ratio: 188 / 299;
+  place-content: center;
+  color: #d5cdb7;
+  border: 1px solid #6d765d;
+  border-radius: 8px;
+  background: #293b2c;
+  font: 700 28px/1 ui-monospace, monospace;
+}
+
+.replay-setup__empty {
+  color: #8a795b;
 }
 
 .replay-board__action,
