@@ -60,9 +60,9 @@ _Avoid_: 加入空座位、活动局观战、回到历史步骤继续操作
 未正常完赛且已不能恢复的 Game Context；它永久保留 `roomId` 身份，但不提供活动 Room 或完整 Game Replay Archive。
 _Avoid_: 未知 roomId、Replay Tombstone、正常完赛
 
-**Room Persistence Checkpoint**:
-房间层保存、完成或丢弃可恢复 Room 快照的统一口径。创建和 room meta 立即写入；状态广播只把 room 标脏，由一个共享的一秒定时器从最新权威 `GameSession` 合并落盘。断线、game over 和进程关闭强制 flush；只有权威 `gameOver` 走 `complete`，TTL、解散、删号和未完成 `newGame` 走 `discard`，但 `discard` 不删除对应 Game Context 的永久身份。
-_Avoid_: RoomPersistence adapter 实现、WebSocket 广播、GameSession 规则执行
+**Durable Room Commit**:
+一次玩家可感知的权威状态推进在对局参与者看见前成为可恢复事实的提交点；它同时固定 Room 快照和对应 Replay Step，失败时该 Room 不能继续推进。
+_Avoid_: Room Persistence Checkpoint、延迟保存、WebSocket 广播
 
 **Game Result Archive**:
 正常完赛后保留的标量摘要，包含 `roomId`、起止时间、回合数、人数、变体开关，以及按 `playerIndex` 对齐的游戏玩家 id、内部用户关联、显示名和最终得分。规则与得分字段不可变，用户关联和显示名可因数据删除而匿名化；归档不包含 `GameState`、手牌或其他隐藏信息。
@@ -73,7 +73,7 @@ _Avoid_: 可恢复房间快照、未完成房间、完整 GameState
 _Avoid_: 活动 Room 快照、Public Event timeline、Game Result Archive
 
 **Replay Step**:
-回放中一个玩家可感知的推进单位，对应服务端已接受的 ClientCommand 或显式选择；引擎内部 action leaf 不单独成为步骤。
+回放中按 Room 全局串行编号的玩家可感知推进单位，对应服务端已接受且改变权威状态的 ClientCommand 或显式选择。多人同时提交时占用连续 Step；最后一份输入触发的自动结算属于该 Step，结果不得依赖提交到达顺序。
 _Avoid_: Public Event、引擎节点、动画帧
 
 **Replay Step Metadata**:
@@ -630,6 +630,7 @@ _Avoid_: 永久放弃、全局出局名单
 
 - 一个 **Room** 只持有一局 **GameSession**；`newGame` 创建新 `roomId`，旧局正常完赛后成为 **Game Result Archive** 和 **Game Replay Archive**，未完成则成为 **Expired Game Context**。
 - **Game Context Link** 按 **Game Context** 生命周期解析为 **Active Game Recovery**、**Game Replay Archive**、**Expired Game Context** 或 **Replay Tombstone**，但不能替代 Room Invite。
+- **GameSession** 产生的成功状态先经过 **Durable Room Commit**，成为可恢复的 Room 快照和 **Replay Step**，随后才按 **RoomPlayer** 视角发送。
 - 浏览器通过 **Services** 里的 `WsGameTransport` 发送 **ClientCommand**；**Connection** 层路由到 **GameSession**；**Broadcaster** 构造 **StateUpdateEnvelope** 并广播。
 - **GameState** 描述游戏规则事实；**RoomPlayer** 描述连接席位；两者不要混用。
 - **GameCore.buildInteraction** 从 **GameState**、**EngineStack**、当前 **Pending Envelope** 和 anytime policy 派生 **InteractionState**。

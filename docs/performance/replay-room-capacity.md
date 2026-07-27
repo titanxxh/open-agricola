@@ -2,7 +2,7 @@
 
 ## Result
 
-选定的同步 Replay 写入路径不能保住 2 CPU / 2 GiB 上的 400 个双人活动房间门槛。六个代表性状态与 Replay Step 到达率组合全部超过 steady action p99 <= 250ms 的门槛；失败由单线程 action-to-broadcast 队列饱和导致，不是内存、event loop 或 WAL 自动 checkpoint 尾停导致。
+选定的同步 Replay 写入路径不能保住 2 CPU / 2 GiB 上的 400 个双人活动房间门槛。六个代表性状态与 Replay Step 到达率组合全部超过 steady action p99 <= 250ms 的门槛；失败由单线程 action-to-broadcast 队列饱和导致，不是内存、event loop 或 WAL 自动 checkpoint 尾停导致。后续边界复测据此把首发单实例上限定为 100 个普通内存 Room。
 
 ## Environment
 
@@ -94,10 +94,24 @@ The minimum representative state was also run at 80 actions/s with Replay disabl
 
 The old 400-Room anchor used a 50 KiB state and passed with action p99 146.6ms. A 98.7 KiB representative state already invalidates that anchor without Replay; the synchronous Replay path increases the same scenario’s queueing delay further.
 
+## Accepted launch boundary
+
+ADR-0014 选择降低首发单实例容量而不增加 Worker 或房间分片。边界复测使用 commit `91472481b4d423ffd158dcfceac573d640c77a67`、实际 183,742-byte 状态、每 Room 每秒 0.45125 Replay Step，以及相同 15 秒预热、60 秒稳态和 2 CPU / 2 GiB cgroup：
+
+| Rooms | Requested Steps/s | Actions | Action p50 | Action p95 | Action p99 | Event-loop p99 | CPU | Peak RSS | Result |
+|---:|---:|---:|---:|---:|---:|---:|---:|---:|:---|
+| 100 | 45.1 | 2,808 | 18.5ms | 25.0ms | 38.3ms | 42.0ms | 93.0% | 313.4 MiB | PASS |
+| 110 | 49.6 | 3,088 | 19.5ms | 41.4ms | 54.8ms | 40.9ms | 98.7% | 301.3 MiB | PASS, insufficient CPU headroom |
+| 120 | 54.2 | 3,120 | 2,401.4ms | 4,349.2ms | 4,571.7ms | 43.2ms | 101.6% | 309.0 MiB | FAIL |
+
+100 Room 在所有门槛内并保留约 7% 单核 CPU 余量；110 Room 虽未越过 latency 门槛，但 98.7% CPU 不适合作为生产硬上限；120 Room 已进入排队崩塌。单实例因此限制为 100 个普通 `waiting + playing` 内存 Room，固定 dev Room 不计数，只拒绝新建，不影响恢复或净数量不变的 `newGame`。
+
+有效复测命令分别使用 `--levels 100,110` 与 `--levels 120,140`；探针在首个失败档自动停止，因此第二次只执行并报告 120 Room。实施完成后必须用同一参数重新运行 100/110/120 门槛，不能把本次候选路径数据当作最终代码验收。
+
 ## Decision input
 
 - The selected bounded delta format is storage-efficient for this mutation shape: gzip payloads average 0.59–0.65 KiB and measured DB growth is 2.4–3.1 MiB per 60-second run.
 - Memory remains far below 1.8 GiB and event-loop p99 remains below 100ms.
 - No >=100ms SQLite transaction was observed, so WAL automatic checkpoint stalls are not the binding failure.
 - The binding failure is synchronous main-thread throughput. The measured path cannot promise 400 concurrent Rooms at either required Replay Step interpretation.
-- “锁定对局报告与回放的端到端架构” must either reduce or move the serialization/diff/hash/gzip work off the main action path, reduce the promised Room capacity, or define another write-before-broadcast design and rerun this same gate before implementation.
+- “锁定对局报告与回放的端到端架构”选择 100 Room 上限与同步 Durable Room Commit，不在首版增加 Worker 或分片；最终实现仍须重跑相同门槛。
