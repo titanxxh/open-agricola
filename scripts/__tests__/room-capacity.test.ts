@@ -70,10 +70,12 @@ describe('room capacity probe', () => {
 
     expect(summary.config.replayArchive).toBe(true)
     expect(replay.writes).toBeGreaterThan(0)
+    expect(replay.acceptedCommands).toBe(replay.writes)
     expect(replay.deltas).toBeGreaterThan(0)
     expect(replay.checkpoints + replay.deltas).toBe(replay.writes)
     const reportText = readFileSync(report, 'utf8')
     expect(reportText).toContain('# Room Capacity Replay')
+    expect(reportText).toContain('State fixture: deterministic played session')
     expect(reportText).toContain('## Replay archive writes')
     expect(reportText).toContain('WAL auto-checkpoint tail candidates')
   }, 30_000)

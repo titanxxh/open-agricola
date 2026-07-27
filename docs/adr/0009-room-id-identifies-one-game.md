@@ -15,7 +15,7 @@
 4. 持久化生命周期拆为 `complete(result)` 与 `discard(id)`。只有权威 `gameOver` 可完成；TTL、解散、账号删除和未完成重开只能丢弃。
 5. `game_results` 与 `game_result_players` 只保存标量字段，玩家用户身份按持久化 `room_players.player_index` 对齐。ADR-0011 与 ADR-0014 后续把最终 Replay Frame 和 Replay completed 状态加入同一完成事务；事务成功才删除活动房间及 `state_json`，失败则整体回滚并保留最终全量状态。
 6. v19 迁移删除既有 `status='finished'` 房间，不从无法证明正常完赛的旧行补造结果；v20 将四个结果变体列统一为 `enable_*` 命名。
-7. 旧 50 KiB 状态容量探针曾在 2 vCPU / 2 GiB 上测得 400 个双人活动房间通过、500 个首先失败；代表性 98.7–179.4 KiB 状态与 Replay 写入复测已推翻该容量锚点。ADR-0014 将当前单实例上限改为 100 个普通内存 Room，旧 400 只保留为历史基线。
+7. 代表性真实命令与 Replay 写入探针把 2 vCPU / 2 GiB 单实例上限设为 30 个普通内存 Room；提高上限必须使用同一探针复测。
 
 ## Consequences
 
@@ -23,7 +23,7 @@
 - 完赛后的 `rooms.state_json` 仍删除；ADR-0010 与 ADR-0011 另行允许权威隐藏状态只存在于永久 Game Replay Archive，Game Result Archive 继续保持标量。未完成清理不会污染统计。
 - JSON adapter 仍只删除状态文件，不提供结果统计。
 - 已断线玩家可以通过此前持久化的座位身份进入结果摘要。
-- 当前部署按 ADR-0014 限制为 100 个普通内存 Room；若未来需要恢复 400 目标，必须另行设计并复测 Worker 或房间分片，而不能引用旧 50 KiB 基线。
+- 当前部署按 ADR-0014 限制为 30 个普通内存 Room。
 
 ## Alternatives considered
 

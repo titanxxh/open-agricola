@@ -8,6 +8,7 @@ import type { ActionHookResult } from '../actions/hooks'
 import {
   applyComputeReplaceHooks,
   applyIsDoableHooksDetailed,
+  hasMatchingActionHooks,
   runActionHooks,
 } from '../actions/hooks'
 import {
@@ -47,6 +48,13 @@ const cloneValue = <T>(value: T): T => {
 
 export class HookDispatcher {
   private previewComputeCosts(context: ActionExecutionContext & { actionId: string }) {
+    const computeContext = { ...context, phase: 'computeCosts' as const }
+    if (
+      !hasMatchingActionHooks(computeContext) &&
+      getMatchingListeners(computeContext).length === 0
+    ) {
+      return []
+    }
     const clonedState = cloneValue(context.state)
     const clonedPlayer =
       clonedState.players?.find((player) => player.id === context.player.id) ??

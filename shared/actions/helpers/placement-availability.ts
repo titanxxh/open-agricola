@@ -15,6 +15,7 @@ export type AllowedPlacement = {
 
 type PlacementContextOverrides = Partial<CardListenerContextInput> & {
   ignoreWorkerAvailability?: boolean
+  isActionDoable?: (space: ActionSpace, baseDoable: boolean) => boolean
 }
 
 const createPlaceFarmerVirtualSpace = (): ActionSpace => ({
@@ -55,9 +56,21 @@ const canExecutePlacementSpace = (
   state: GameState,
   player: PlayerState,
   space: ActionSpace,
-  contextOverrides: Partial<CardListenerContextInput>,
-): boolean =>
-  isActionDoableInFlowContext({
+  contextOverrides: PlacementContextOverrides,
+): boolean => {
+  if (contextOverrides.isActionDoable) {
+    const baseDoable = space.canBeExecutedByPlayer.call(
+      space,
+      state,
+      player,
+      {
+        sourceCard: contextOverrides.sourceCard,
+        actionContext: contextOverrides.actionContext,
+      },
+    )
+    return contextOverrides.isActionDoable(space, baseDoable)
+  }
+  return isActionDoableInFlowContext({
     actionId: space.id,
     action: space,
     state,
@@ -67,6 +80,7 @@ const canExecutePlacementSpace = (
     actionContext: contextOverrides.actionContext,
     resolveAction: (actionId) => findActionSpaceById(state, actionId),
   })
+}
 
 export function computeAllowedPlacementSpaces(
   state: GameState,

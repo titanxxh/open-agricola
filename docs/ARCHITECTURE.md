@@ -1124,7 +1124,7 @@ ClientCommand
 - Step 0 在第一个互动命令前建立。classic deal 已包含在 Frame 中；互动 draft、Parent Selection 和显式多人提交从 Step 1 起记录。
 - Replay Intent 由协议边界的穷尽 switch 白名单化；不保存 `requestId`、token、站点 `userId`、任意原始 WebSocket 消息或未校验 payload。
 - 写失败冻结同一 Frame/Intent，Room 进入 blocked 并拒绝新游戏命令；按 1/2/5/10/30 秒、随后每 30 秒重试。暂停期间重连者等待，不读取未提交内存状态。幂等键相同但 Hash 不同永久阻断并报警。
-- 单实例上限为 100 个普通内存 Room，`waiting` 与 `playing` 都计数，固定 dev Room 排除。达到上限只拒绝新建；已有 Room 恢复和净数量不变的 `newGame` 继续允许。首版不增加 Worker、房间分片、Redis 或外部队列。
+- 单实例上限为 30 个普通内存 Room，`waiting` 与 `playing` 都计数，固定 dev Room 排除。达到上限只拒绝新建；已有 Room 恢复和净数量不变的 `newGame` 继续允许。首版不增加 Worker、房间分片、Redis 或外部队列。
 
 完成 Replay 与 Bug Report 使用 ADR-0013 的公开/私有读取契约。GitHub 提交以 SQLite draft、稳定 `submissionId`、attempt 行和原子 claim 实现可恢复执行；生产 GitHub App client 与测试 fake 是 true-external seam 的两个 adapter。
 
@@ -1191,7 +1191,7 @@ ADR-0014 使用下一可用迁移一次增加七张表；首个正式 Replay `sc
 
 | 表 | 所有事实 |
 |---|---|
-| `game_contexts` | 永久 `roomId`、`active/completed/expired/removed`、phase、过期时间、Tombstone 原因 |
+| `game_contexts` | 永久 `roomId`、`active/completed/expired/removed`、phase、`available/legacy_no_replay`、过期时间、Tombstone 原因 |
 | `game_replays` | `schemaVersion`、`viewerBuildId`、`gameBuildId`、recording/completed 状态、最新 Step、`missingPrefix`、自定义卡快照 |
 | `game_replay_steps` | `roomId + stepNo`、`roomVersion`、`checkpointStepNo`、玩家座位、白名单 intent、payload kind/gzip、Frame Hash |
 | `issue_submission_connections` | GitHub 数字用户 id、AES-256-GCM token/refresh token、nonce/tag、`keyId`、过期与撤销状态 |
@@ -1207,6 +1207,8 @@ ADR-0014 使用下一可用迁移一次增加七张表；首个正式 Replay `sc
 
 不增加 Replay Segment、Reported Evidence payload、quota counter 或 webhook delivery 表。Segment 由 `checkpointStepNo` 表达；`bug_reports.evidence_expires_at` 保护共享 Segment；额度和全站 20 次/分钟 GitHub 发送窗口从 report/attempt 行查询；撤销 webhook 操作本身幂等。
 
+迁移必须幂等回填现有数据：`rooms` 生成 active `game_contexts`，`game_results` 生成 completed `game_contexts`，同一 `roomId` 同时存在时 completed 优先。上线前完成局标记 `legacy_no_replay`，不创建 `game_replays` header、Replay Frame、`schemaVersion` 或 `viewerBuildId`；completed descriptor 仍返回 Game Result Archive 摘要，只有 `replayStatus=available` 才返回 manifest 与 Segment。因此只有两个既有来源都不存在的 id 才返回 `unknown_context`。
+
 ### 11.8 GitHub 交付、安全与删除
 
 - 创建 draft 时由服务端确认 Reporter 是 active `room_players` 或 completed `game_result_players` 中的原座位，并固定 `roomId + stepNo + frameHash`。现象 trim 后必须为 1–2000 个 Unicode 字符；不做语法或句号判断。
@@ -1215,7 +1217,7 @@ ADR-0014 使用下一可用迁移一次增加七张表；首个正式 Replay `sc
 - SQLite executor 原子 claim 一个 `submissionId`。不确定响应先按正文稳定标记对账；重试和限流遵守 ADR-0012。客户端只轮询站内状态，不直接调用 GitHub。
 - Issue 标题为清洗并截断的 `Game bug: <现象首行>`，正文不包含截图、日志、Frame payload、其他玩家身份或隐藏信息。issues-only 仓库自动化统一添加 `needs-triage`；通知使用 GitHub 原生 watching。
 - 主动断开立即删除令牌。删号先撤销 session/连接、匿名化站内数据并进入 `deletion_pending`，再由同一 installation adapter 修改已知 Issue 正文；全部外部脱敏成功后才清除最终内部关联。
-- 维护者全开 evidence 读取必须提供非空理由并写 `bug_report_evidence_audit`。Replay 下架由审计化运维 CLI 删除 Step payload 和内容寻址自定义资源、把 Context 改为 removed，并追加数据库外删除 ledger；首版不做管理 UI。
+- 维护者全开 evidence 读取必须提供非空理由并写 `bug_report_evidence_audit`。Replay 下架由审计化运维 CLI 删除 Step payload、把 Context 改为 removed，并追加数据库外删除 ledger；共享内容资源仅在没有其他未下架 Replay 引用时删除，资源本身违规时先下架所有引用局。首版不做管理 UI。
 - public resolver/manifest/Segment 使用独立 IP 读取额度和响应大小上限；active evidence、Bug Report 和维护者接口按账号限流。任何日志都不得输出 token、Frame payload、现象原文或原始 GitHub 响应。
 
 ### 11.9 部署、回滚与观测
@@ -1252,13 +1254,13 @@ BUG_REPORT_TOKEN_ACTIVE_KEY_ID
 部署顺序固定为：
 
 1. 追加并校验内容寻址 Viewer Build，旧目录不删除。
-2. 备份 SQLite、Replay 资源和删除 ledger，运行数据库迁移，部署 recorder-compatible 后端；两个功能开关保持关闭。
+2. 备份 SQLite、Replay 资源和删除 ledger，运行数据库迁移并核对既有 `rooms` / `game_results` 的 Context 回填数量，部署 recorder-compatible 后端；两个功能开关保持关闭。
 3. 启动时为恢复出的旧活动 Room 建立 `missingPrefix=true` 的 Step 0，再开始接受命令。
 4. 设置已存在的 `REPLAY_VIEWER_BUILD_ID` 并启用新 Room 录制；任何已有 Replay header 的 Room 此后无条件继续记录。
 5. 部署顶层 Game Context Router 和公开 Replay UI。
 6. 配置并实测 GitHub App 后启用 Bug Report。
 
-启用录制后，应用只能回滚到支持所有活动 Room `schemaVersion` 的 recorder-compatible 构建；不能回滚到功能上线前后端。Viewer Build 必须先存在，后端才能把其 id 锁进新 Room。缺少 Viewer、持久化不可写或 Room 数达到 100 时，readiness 进入 degraded 并拒绝新建 Room，不牺牲已有 Room。
+启用录制后，应用只能回滚到支持所有活动 Room `schemaVersion` 的 recorder-compatible 构建；不能回滚到功能上线前后端。Viewer Build 必须先存在，后端才能把其 id 锁进新 Room。缺少 Viewer、持久化不可写或 Room 数达到 30 时，readiness 进入 degraded 并拒绝新建 Room，不牺牲已有 Room。
 
 首版不引入新的 metrics 后端。结构化日志和健康状态至少暴露：普通 Room 数、容量拒绝、Durable Room Commit latency/error/retry、blocked Room 数、Hash 冲突、Replay payload 大小/损坏、GitHub queue/attempt/rate-limit、缺失 Viewer Build。日志字段只含稳定 id 和数值，不含受保护 payload。
 
@@ -1389,7 +1391,7 @@ pnpm run build              # tsc + vite build
 实现按以下可独立验证的切片推进：
 
 1. 数据库迁移、canonical JSON / delta / gzip / Hash codec。
-2. Durable Room Commit、失败暂停/重试、100 Room 容量限制。
+2. Durable Room Commit、失败暂停/重试、30 Room 容量限制。
 3. Game Context resolver、active 原座位恢复、evidence 权限。
 4. Replay manifest/Segment、历史 Viewer Build、桌面/手机回放 UI。
 5. Bug Report draft、GitHub App connection/queue、三步报告 UI。
@@ -1407,7 +1409,7 @@ pnpm run build              # tsc + vite build
 - OAuth 取消保留草稿、本人/Hosted 作者、稳定标记对账、限流与三次失败、重复点击、断开/撤销；
 - 删号 Issue 脱敏、Replay Participant 匿名化、Tombstone、维护者全开理由与永久审计。
 
-最终性能探针在 2 CPU / 2 GiB、183,742-byte 代表状态、每 Room 每秒 0.45125 Step 下重跑 100/110/120：100 Room 必须满足 action p99 ≤250ms、event-loop p99 ≤100ms、RSS ≤1.8GiB；110/120 只用于观察安全余量和首个失败点。
+最终性能探针在 2 CPU / 2 GiB、真实命令与 Replay 写入负载下重跑 25/30/35，并补跑 30 Room late-state：30 Room 必须满足 action p99 ≤250ms、event-loop p99 ≤100ms、RSS ≤1.8GiB；35 Room 用于确认首个失败点。
 
 生产验收必须由两个真实站点账号完成一局：双方在进行中分别恢复且只能看见自己的隐藏信息；完赛后在未登录浏览器选择两个座位视角和全开视角；再分别用本人 GitHub 和 Hosted Issue Identity 创建 smoke Issue、核对 Anchor/Reporter 字段并关闭。地图在 CI、前后端部署、这些线上步骤和删除/回滚演练全部通过前不关闭。
 
@@ -1433,7 +1435,7 @@ pnpm run build              # tsc + vite build
 16. **Durable Room Commit**：成功且改变 Frame 的命令先原子写 Room snapshot + Replay Step，随后才按座位视角发送。
 17. **Replay 全局 Step**：多人同时提交仍占用连续 `stepNo`；自动结算属于最后触发输入，结果不得依赖到达顺序。
 18. **失败不扩散**：`resp.ok=false` 只回发起者；持久化失败冻结同一 Frame 并阻断 Room，不覆盖或继续推进。
-19. **100 Room 上限**：单实例统计普通 `waiting + playing` Room；只拒绝新建，不影响恢复。
+19. **30 Room 上限**：单实例统计普通 `waiting + playing` Room；只拒绝新建，不影响恢复。
 20. **历史 Viewer 不可变**：Room 锁定 schema/build，完成回放由 credentialless 只读 Viewer 读取，不执行历史规则代码。
 
 ---
