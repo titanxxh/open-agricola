@@ -37,6 +37,8 @@ DB_PATH="${DB_PATH:-$DB_DIR/open-agricola.db}"
 PERSISTED_ROOMS_DIR="${PERSISTED_ROOMS_DIR:-$SHARED_OUTPUT_DIR}"
 CUSTOM_CARD_DIR="${CUSTOM_CARD_DIR:-$SHARED_DATA_DIR/custom-cards}"
 CARD_ART_DIR="${CARD_ART_DIR:-$SHARED_DATA_DIR/card-art}"
+REPLAY_VIEWER_ROOT="${REPLAY_VIEWER_ROOT:-$SHARED_DATA_DIR/replay-viewers}"
+REPLAY_ASSET_ROOT="${REPLAY_ASSET_ROOT:-$SHARED_DATA_DIR/replay-assets}"
 # BGA images live as a sibling of the MAIN repo, not the worktree.
 if [ -z "${BGA_IMAGE_DIR:-}" ]; then
   BGA_IMAGE_DIR="$(cd "$MAIN_REPO_DIR/.." 2>/dev/null && pwd)/bga-agricola/img"
@@ -449,8 +451,11 @@ if [ "$KILL_ONLY" -eq 1 ]; then
   exit 0
 fi
 
-echo "Ensuring cards manifest..."
-"$BACKEND_BIN" "$SCRIPT_DIR/scripts/build-cards-manifest.ts" >/dev/null
+echo "Ensuring immutable replay viewer..."
+REPLAY_VIEWER_BUILD_ID="${REPLAY_VIEWER_BUILD_ID:-$(
+  env REPLAY_VIEWER_ROOT="$REPLAY_VIEWER_ROOT" "$PNPM_BIN" run build:replay-viewer | tail -n 1
+)}"
+GAME_BUILD_ID="${GAME_BUILD_ID:-$(git -C "$SCRIPT_DIR" rev-parse HEAD)}"
 
 LAN_IP=$(get_lan_ip)
 if [ -z "$LAN_IP" ]; then
@@ -555,6 +560,11 @@ start_and_wait "backend" "$BACKEND_PORT" "$BACKEND_LOG" env \
   PERSISTED_ROOMS_DIR="$PERSISTED_ROOMS_DIR" \
   CUSTOM_CARD_DIR="$CUSTOM_CARD_DIR" \
   CARD_ART_DIR="$CARD_ART_DIR" \
+  REPLAY_NEW_ROOMS_ENABLED="${REPLAY_NEW_ROOMS_ENABLED:-true}" \
+  REPLAY_VIEWER_BUILD_ID="$REPLAY_VIEWER_BUILD_ID" \
+  REPLAY_VIEWER_ROOT="$REPLAY_VIEWER_ROOT" \
+  REPLAY_ASSET_ROOT="$REPLAY_ASSET_ROOT" \
+  GAME_BUILD_ID="$GAME_BUILD_ID" \
   "$BACKEND_BIN" "$SCRIPT_DIR/server/index.ts"
 
 if [ "$PREVIEW_ENABLED" -eq 1 ]; then
@@ -580,6 +590,9 @@ echo "  DB_DIR             = $DB_DIR"
 echo "  DB_PATH            = $DB_PATH"
 echo "  PERSISTED_ROOMS_DIR= $PERSISTED_ROOMS_DIR"
 echo "  CARD_ART_DIR       = $CARD_ART_DIR"
+echo "  REPLAY_VIEWER_ROOT = $REPLAY_VIEWER_ROOT"
+echo "  REPLAY_VIEWER_ID   = $REPLAY_VIEWER_BUILD_ID"
+echo "  REPLAY_ASSET_ROOT  = $REPLAY_ASSET_ROOT"
 echo "  BGA_IMAGE_DIR      = $BGA_IMAGE_DIR"
 echo "  FRONTEND_MODE      = $([ "$PREVIEW_ENABLED" -eq 1 ] && echo preview || echo dev)"
 [ "$SCRIPT_DIR" != "$MAIN_REPO_DIR" ] && echo "  (running from worktree; anchored to main repo: $MAIN_REPO_DIR)"

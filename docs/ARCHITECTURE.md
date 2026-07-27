@@ -1082,18 +1082,21 @@ server/game/
 
 ### 11.3 Game Context、Replay 与 Bug Report
 
-本节是跨任务实现契约。`room-committer.ts`、`replay-codec.ts`、七表迁移、SQLite 原子写、Game Context resolver 与活动局原座位恢复已落地；Replay Viewer、Anchor 读取与 Bug Report 模块由后续任务补齐。
+本节是跨任务实现契约。`room-committer.ts`、`replay-codec.ts`、七表迁移、SQLite 原子写、Game Context resolver、活动局原座位恢复、公开 Replay/Anchor 读取与不可变 Replay Viewer 已落地；Bug Report 模块由后续任务补齐。
 
-目标模块：
+模块：
 
 ```
 server/game/
 ├── room-committer.ts          Durable Room Commit 的唯一外部 seam
 ├── replay-codec.ts            canonical JSON、delta、gzip、Frame Hash
-├── game-context-store.ts      lifecycle resolver、Replay/Anchor read model
+├── game-context-store.ts      lifecycle resolver
+├── replay-store.ts            公开 manifest、Segment、Anchor read model
+├── replay-viewer-build.ts     Viewer Build 完整性校验
 └── persistence/
     └── sqlite-adapter.ts      Room + Replay + Result 的原子事务
-server/game-context-routes.ts  resolver、manifest、Segment、evidence
+server/game-context-routes.ts  lifecycle resolver
+server/replay-routes.ts        manifest、Segment、Anchor、Viewer/Asset 静态读取
 server/bug-report-routes.ts    draft、GitHub connection、submit/status、audit
 server/bug-report/
 ├── bug-report-store.ts        SQLite draft/attempt/claim 状态机
@@ -1157,13 +1160,15 @@ server/custom-code/
 
 不变量：HTTP 仅运维 / 测试 / 调试，不是实时同步主路径；返回结构与 `SessionResponse` 一致；`validate` 接口纯校验，不写权威状态。WS 房间内 dev 命令优先走 `ClientCommand`。
 
-Game Context 和 Bug Report 是产品读取/集成接口，不替代 WS 实时游戏同步。resolver 已在独立 route module 中实现，其余端点沿用同一边界：
+Game Context、Replay 和 Bug Report 是产品读取/集成接口，不替代 WS 实时游戏同步：
 
 ```
 GET    /api/v1/game-contexts/:roomId
-GET    /api/v1/game-contexts/:roomId/replay
-GET    /api/v1/game-contexts/:roomId/replay/segments/:checkpointStepNo
-GET    /api/v1/game-contexts/:roomId/evidence/:stepNo?frame=<sha256>
+GET    /api/v1/replays/:roomId/manifest
+GET    /api/v1/replays/:roomId/segments/:checkpointStepNo
+GET    /api/v1/replays/:roomId/anchors/:stepNo?frame=<sha256>
+GET    /replay-viewers/:viewerBuildId/*
+GET    /replay-assets/:sha256
 POST   /api/v1/game-contexts/:roomId/bug-reports
 GET    /api/v1/bug-reports/:submissionId
 PATCH  /api/v1/bug-reports/:submissionId
@@ -1177,7 +1182,7 @@ GET    /api/v1/issue-submission-connection/github/callback
 POST   /api/v1/github-app/webhook
 ```
 
-公开 Replay API 返回版本化 JSON，不暴露 SQLite gzip/BLOB 编码。completed、expired、removed resolver 与公开 Replay 在登录门外；active descriptor、恢复、Bug Report、临时证据和维护者取证分别执行 ADR-0013 的座位或管理员授权。外部错误继续使用 ADR-0013 的 `{ ok:false, code, lifecycle?, message }` 判别式结构。
+公开 Replay API 返回版本化 JSON，不暴露 SQLite gzip/BLOB 编码。Segment 每次最多展开一个 checkpoint 链并在服务端逐帧验 Hash；Anchor 必须精确匹配 `stepNo + frameHash`。completed、expired、removed resolver 与公开 Replay 在登录门外；active descriptor、恢复、Bug Report、临时证据和维护者取证分别执行 ADR-0013 的座位或管理员授权。外部错误继续使用 ADR-0013 的 `{ ok:false, code, lifecycle?, message }` 判别式结构。
 
 ### 11.6 server/workshop.ts + server/workshop-pr/
 
@@ -1270,12 +1275,13 @@ BUG_REPORT_TOKEN_ACTIVE_KEY_ID
 
 ## 12. client/ — 前端
 
-### 12.1 双 bundle 边界
+### 12.1 客户端 bundle 边界
 
 | Bundle | 入口 | 路径 | 约束 |
 |---|---|---|---|
 | `client-app` | `client/main.tsx` | `client/{app,components,services,hooks,contexts,utils}/` | 走 WS；`shared/*` 只准用 `contract` / `domain` / `i18n`，卡牌展示走 manifest-backed `card-meta` + `custom-card-metadata` |
 | `client-sandbox` | `client/sandbox/index.tsx` | `client/sandbox/` | 浏览器内直接 `new SessionCore(...)` 跑完整 in-process 引擎；可 import 任意 `shared/*`（含 `engine` / `session` / `actions` / `cards` / `custom-code` / `draft`） |
+| `replay-viewer` | `replay-viewer/src/main.tsx` | `replay-viewer/` | 无登录、Cookie、WS 或命令发送；只读取公开 Replay JSON，并复用归档时编译进去的显示过滤与棋盘投影 |
 
 主 bundle 预算：`scripts/check-bundle-size.ts` strict（main ≤ 550KB raw / ≤ 170KB gzip）。
 
@@ -1315,9 +1321,7 @@ BUG_REPORT_TOKEN_ACTIVE_KEY_ID
 - `package.json` 已声明 `sideEffects` 给 bundler tree-shaking 基线。
 - violation = CI error。
 
-### 12.7 Game Context、Replay Viewer 与 Bug Report 目标 seam
-
-> 本节是 ADR-0014 的前端实现契约，尚未表示目标页面已经存在。
+### 12.7 Game Context、Replay Viewer 与 Bug Report seam
 
 启动顺序改为：
 
@@ -1331,7 +1335,7 @@ GameContextRouter
 
 - `?context=<roomId>` 必须在当前卡牌 manifest 与全局登录门前解析。active 未登录时保留完整 returnTo；completed、expired、removed 不加载登录依赖。
 - active 恢复继续使用现有 WebSocket，但 `joinRoom` 必须携带 `intent:'resume'`；服务端只按持久化站点 `userId → playerIndex` 恢复原座位。保存暂停时所有在线座位显示同一状态提示，新命令控件禁用。
-- `ReplayShell` 只解析 manifest、选择 `viewerBuildId` 和承载 iframe。历史 Viewer 是无登录、无 WS、无 ClientCommand 的独立只读 bundle，直接读取公开 JSON Segment，并用当时编译的遮蔽逻辑切换 `p1…pN | open`。
+- `ReplayShell` 校验 Replay header 与内容寻址 Viewer manifest，选择 `viewerBuildId`，并只在选定视角后创建 `credentialless`、`sandbox="allow-scripts"` iframe。历史 Viewer 是无登录、无 Cookie、无 WS、无 ClientCommand 的独立只读 bundle，直接读取公开 JSON Segment，并用当时编译的遮蔽逻辑切换 `p1…pN | open`。
 - 直接打开 completed 且 URL 没有 perspective 时，任何 Frame 展示前先选座位或全开。桌面 auto 默认时间线优先双栏，手机 auto 默认棋盘优先；900px 是自动断点，手动布局写入 URL 并覆盖响应式默认。“本步证据”固定展示 Step、轮次、操作者、白名单 intent 和 Frame Hash。
 - 播放默认停在 Step 0，提供播放/暂停、前后步、滑杆跳转和键盘控制；损坏 Segment 显示不可用区间并允许从下一 checkpoint 继续，不尝试静默修复。
 - Bug Report 使用已定稿的三步引导式底栏：必填现象 → 自动上下文 → 作者身份。创建 GitHub OAuth 跳转前必须先保存 server draft；取消授权返回同一 `submissionId`，提交后通过 status endpoint 轮询，成功态禁止重复创建。

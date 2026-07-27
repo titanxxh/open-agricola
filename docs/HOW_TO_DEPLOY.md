@@ -74,7 +74,14 @@ GAME_BUILD_ID=
 # CORS_ORIGIN 等后续根据情况设置
 ```
 
-首次启用 Replay 时必须使用 `PERSIST_ROOMS=sqlite`。Viewer Build 根目录的 `manifest.json` 固定 `entrypoint: "index.html"` 和目录内全部文件的 SHA-256，`REPLAY_VIEWER_BUILD_ID` 是该清单文件本身的 SHA-256；把完整目录部署到 `${REPLAY_VIEWER_ROOT}/${REPLAY_VIEWER_BUILD_ID}` 后，再填写两个 Build ID，最后把 `REPLAY_NEW_ROOMS_ENABLED` 改为 `true`。清单、内容 Hash 或入口校验失败时拒绝创建新 Room。开关、Build ID 和自定义卡运行时版本在 Room 创建时锁定；卡图复制到 `REPLAY_ASSET_ROOT` 的内容寻址文件。已有 Replay Room 会继续按锁定值记录，开关关闭期间不会迁移旧进行局。
+首次启用 Replay 时必须使用 `PERSIST_ROOMS=sqlite`。先生成并追加发布 Viewer Build：
+
+```bash
+REPLAY_VIEWER_ROOT="$PWD/data/replay-viewers" pnpm run build:replay-viewer
+# stdout 最后一行是 REPLAY_VIEWER_BUILD_ID
+```
+
+命令会构建独立只读 Viewer、复制其固定静态资源、生成逐文件 SHA-256 清单，以清单本身的 SHA-256 作为目录名，并在发布后重新校验完整目录；已存在的同 ID 目录不会覆盖。把完整目录追加到生产持久卷的 `${REPLAY_VIEWER_ROOT}/${REPLAY_VIEWER_BUILD_ID}` 后，再填写 `REPLAY_VIEWER_BUILD_ID` 与 `GAME_BUILD_ID`，最后把 `REPLAY_NEW_ROOMS_ENABLED` 改为 `true`。清单、内容 Hash 或入口校验失败时拒绝创建新 Room。开关、Build ID 和自定义卡运行时版本在 Room 创建时锁定；卡图复制到 `REPLAY_ASSET_ROOT` 的内容寻址文件。已有 Replay Room 会继续按锁定值记录，开关关闭期间不会迁移旧进行局。
 
 #### 构建并启动
 

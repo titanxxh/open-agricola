@@ -1343,6 +1343,12 @@ export const zh = {
       unknownBody: '这个 Room ID 从未创建过。',
       unavailableTitle: '暂时无法读取对局',
       unavailableBody: '请稍后重试。',
+      verifyingReplay: '正在验证回放档案…',
+      viewerUnavailable: '这局的回放查看器缺失或未通过完整性校验。',
+      choosePerspective: '选择回放视角。全开视角会显示所有隐藏信息。',
+      watchAs: '以 {player} 视角回放',
+      watchOpen: '全开视角回放',
+      replayFrameTitle: 'Open Agricola 对局回放',
     },
 
     tabLobby: '大厅',

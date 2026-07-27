@@ -34,6 +34,7 @@ export type SerializedPlayerState = PlayerState & {
   playedCardAnimalZones: InteractionAnimalReorgZone[]
   farmCardAnimalZones: InteractionAnimalReorgZone[]
   borrowedPlayedCardAnimalZones: InteractionAnimalReorgZone[]
+  pastureCapacities: Record<string, number>
 }
 
 export type SerializedParentSelectionCandidates = {
@@ -102,6 +103,16 @@ const collectBorrowedPlayedCardAnimalZones = (
     )
     .map(serializeAnimalZone)
 
+const collectPastureCapacities = (
+  state: GameState,
+  player: PlayerState,
+): Record<string, number> =>
+  Object.fromEntries(
+    computeAnimalZones(player, state)
+      .filter((zone) => zone.zoneType === 'pasture')
+      .map((zone) => [zone.id, zone.capacity]),
+  )
+
 const collectPlayedCardAnimalZones = (
   state: GameState,
   player: PlayerState,
@@ -136,6 +147,7 @@ export const serializeState = (
       playedCardAnimalZones: collectPlayedCardAnimalZones(state, player),
       farmCardAnimalZones: collectFarmCardAnimalZones(state, player),
       borrowedPlayedCardAnimalZones: collectBorrowedPlayedCardAnimalZones(state, player),
+      pastureCapacities: collectPastureCapacities(state, player),
     })),
     actionSpaces: actionSpaces.map(
       // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -397,11 +409,9 @@ const createVisibleEventSeqView = (
 }
 
 const createHiddenHandVisibility = (
-  state: GameState,
+  base: SerializedGameState,
   viewerPlayerId: string | null,
-  ctx: SerializeStateContext,
 ): HiddenHandVisibility => {
-  const base = serializeState(state, ctx)
   const hiddenCardIds = hiddenHandCardIdsByPlayer(base.players, viewerPlayerId)
   const hiddenRefs = createHiddenHandEventRefs(base, hiddenCardIds)
   const seqView = createVisibleEventSeqView(base, hiddenRefs)
@@ -568,7 +578,10 @@ export const filterPublicEventCancellationsForPlayer = (
   cancellations: readonly PublicEventCancellation[] | undefined,
 ): PublicEventCancellation[] | undefined => {
   if (!cancellations?.length) return undefined
-  const { base, hiddenRefs, seqView } = createHiddenHandVisibility(state, viewerPlayerId, ctx)
+  const { base, hiddenRefs, seqView } = createHiddenHandVisibility(
+    serializeState(state, ctx),
+    viewerPlayerId,
+  )
   const filtered = cancellations
     .map((cancellation) => filterPublicEventCancellation(
       cancellation,
@@ -609,12 +622,14 @@ const maskDraftPoolForViewer = (
  * Pass `viewerPlayerId = null` (or an unknown id) to produce a spectator
  * view where every player's hand and pool is masked.
  */
-export const serializeStateForPlayer = (
-  state: GameState,
+export const filterSerializedStateForPlayer = (
+  base: SerializedGameState,
   viewerPlayerId: string | null,
-  ctx: SerializeStateContext,
 ): SerializedGameState => {
-  const { base, hiddenCardIds, hiddenRefs, seqView } = createHiddenHandVisibility(state, viewerPlayerId, ctx)
+  const { hiddenCardIds, hiddenRefs, seqView } = createHiddenHandVisibility(
+    base,
+    viewerPlayerId,
+  )
   const filteredPlayers = base.players.map((p) =>
     p.id === viewerPlayerId
       ? p
@@ -706,6 +721,13 @@ export const serializeStateForPlayer = (
     ordinaryCardDrawChoices: filteredOrdinaryCardDrawChoices,
   }
 }
+
+export const serializeStateForPlayer = (
+  state: GameState,
+  viewerPlayerId: string | null,
+  ctx: SerializeStateContext,
+): SerializedGameState =>
+  filterSerializedStateForPlayer(serializeState(state, ctx), viewerPlayerId)
 
 export const rebuildActiveModifiers = (state: GameState): GameState => {
   state.players.forEach((player) => {

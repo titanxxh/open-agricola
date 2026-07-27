@@ -1,10 +1,12 @@
 // @vitest-environment jsdom
-import { cleanup, render, screen } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen } from '@testing-library/react'
+import { createHash } from 'node:crypto'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { GameContextRouter } from '../GameContextRouter'
 
 vi.mock('../../contexts/LocaleContext', () => ({
   useLocale: () => ({
+    locale: 'en',
     t: (key: string, params?: Record<string, string | number>) =>
       params
         ? Object.entries(params).reduce(
@@ -112,6 +114,105 @@ describe('GameContextRouter', () => {
     expect(await screen.findByText('platform.gameContext.completedTitle')).toBeVisible()
     expect(screen.getByText('Alice: platform.gameContext.score')).toBeVisible()
     expect(screen.queryByText('active app')).not.toBeInTheDocument()
+  })
+
+  it('verifies the pinned viewer and requires a perspective before mounting it', async () => {
+    const viewerManifest = JSON.stringify({
+      entrypoint: 'index.html',
+      files: { 'index.html': '0'.repeat(64) },
+    })
+    const viewerBuildId = createHash('sha256').update(viewerManifest).digest('hex')
+    const context = {
+      ok: true,
+      roomId: 'completed-room',
+      lifecycle: 'completed',
+      replayStatus: 'available',
+      result: {
+        startedAt: 1,
+        finishedAt: 2,
+        roundsPlayed: 14,
+        playerCount: 2,
+        enableCommunityDeck: false,
+        enableParentCards: false,
+        enableThroughTheSeasons: false,
+        enableFarmersOfTheMoor: false,
+        players: [
+          { playerIndex: 0, displayName: 'Alice', score: 42 },
+          { playerIndex: 1, displayName: 'Bob', score: 35 },
+        ],
+      },
+      replay: {
+        firstStepNo: 0,
+        lastStepNo: 1,
+        missingPrefix: false,
+        schemaVersion: 1,
+        viewerBuildId,
+      },
+    }
+    const replayManifest = {
+      ok: true,
+      kind: 'replayManifest',
+      apiVersion: 1,
+      roomId: 'completed-room',
+      schemaVersion: 1,
+      viewerBuildId,
+      gameBuildId: 'game-build',
+      firstStepNo: 0,
+      lastStepNo: 1,
+      missingPrefix: false,
+      participants: [
+        { playerIndex: 0, displayName: 'Alice' },
+        { playerIndex: 1, displayName: 'Bob' },
+      ],
+      segments: [{ checkpointStepNo: 0, firstStepNo: 0, lastStepNo: 1 }],
+      steps: [
+        {
+          stepNo: 0,
+          roomVersion: 1,
+          checkpointStepNo: 0,
+          playerIndex: null,
+          commandType: 'initial',
+          intent: {},
+          frameHash: '1'.repeat(64),
+          createdAt: 1,
+        },
+      ],
+      corruptRanges: [],
+      customCards: [],
+    }
+    const fetch = vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input)
+      if (url.includes('/game-contexts/')) {
+        return new Response(JSON.stringify(context))
+      }
+      if (url.endsWith('/manifest.json')) {
+        return new Response(viewerManifest)
+      }
+      return new Response(JSON.stringify(replayManifest))
+    })
+    vi.stubGlobal('fetch', fetch)
+    window.history.replaceState(null, '', '/?context=completed-room')
+
+    render(<GameContextRouter><div>active app</div></GameContextRouter>)
+
+    const perspectiveButtons = await screen.findAllByRole('button', {
+      name: 'platform.gameContext.watchAs',
+    })
+    expect(screen.queryByTitle('platform.gameContext.replayFrameTitle')).not.toBeInTheDocument()
+    fireEvent.click(perspectiveButtons[0]!)
+
+    const iframe = await screen.findByTitle('platform.gameContext.replayFrameTitle')
+    expect(iframe).toHaveAttribute('sandbox', 'allow-scripts')
+    expect(iframe).toHaveAttribute('credentialless')
+    expect(iframe).toHaveAttribute(
+      'src',
+      expect.stringContaining(`/replay-viewers/${viewerBuildId}/index.html?`),
+    )
+    expect(window.location.search).toContain('perspective=p1')
+    expect(fetch).toHaveBeenCalledWith(
+      '/api/v1/replays/completed-room/manifest',
+      expect.objectContaining({ credentials: 'omit' }),
+    )
   })
 
   it.each([
