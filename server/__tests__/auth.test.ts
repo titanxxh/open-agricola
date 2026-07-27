@@ -853,7 +853,14 @@ describe('auth', () => {
       expect(count('SELECT COUNT(*) AS n FROM auth_identities WHERE user_id = ?', user.id)).toBe(0)
       expect(count('SELECT COUNT(*) AS n FROM oauth_states WHERE user_id = ?', user.id)).toBe(0)
       expect(count('SELECT COUNT(*) AS n FROM room_players WHERE user_id = ?', user.id)).toBe(0)
-      expect(count('SELECT COUNT(*) AS n FROM game_result_players WHERE user_id IS NULL')).toBe(1)
+      expect(db.prepare(`
+        SELECT user_id, display_name
+        FROM game_result_players
+        WHERE room_id = 'finished-room' AND player_index = 0
+      `).get()).toEqual({
+        user_id: null,
+        display_name: 'Deleted player (seat 1)',
+      })
       expect(count('SELECT COUNT(*) AS n FROM workshop_cards WHERE id = ?', 'owned-card')).toBe(0)
       expect(count('SELECT COUNT(*) AS n FROM workshop_cards WHERE id = ?', 'other-card')).toBe(1)
       expect(count('SELECT COUNT(*) AS n FROM workshop_card_versions WHERE created_by = ?', user.id)).toBe(0)

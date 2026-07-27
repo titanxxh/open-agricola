@@ -124,6 +124,22 @@ test('two original players recover their own seats without hidden-info leakage',
   expect(second.players[1]!.minorHand).not.toContain('?')
   expect(second.players[1]!.occupationHand).not.toContain('?')
 
+  const outsiderContext = await browser.newContext()
+  const outsiderName = `context_outsider_${suffix}`
+  await authenticate(outsiderContext, request, outsiderName)
+  await outsiderContext.clearCookies()
+  const outsiderPage = await outsiderContext.newPage()
+  await outsiderPage.goto(`${FRONTEND_URL}/?context=${roomId}`)
+  await outsiderPage.fill('#username', outsiderName)
+  await outsiderPage.fill('#password', 'context-pass-550')
+  await outsiderPage.click('button[type="submit"]')
+  await expect(
+    outsiderPage.getByRole('heading', {
+      name: /无法恢复这局|Unable to resume this game/,
+    }),
+  ).toBeVisible({ timeout: 15_000 })
+
+  await outsiderContext.close()
   await firstContext.close()
   await secondContext.close()
 })
