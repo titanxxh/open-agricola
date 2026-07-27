@@ -8,6 +8,7 @@ import { createLobby } from '../../game/lobby.ts'
 import { createRoomPersistenceCheckpoint } from '../../game/room-persistence-checkpoint.ts'
 import { snapshotToRoom } from '../../game/room.ts'
 import type { GameState } from '../../../shared/contract/types.ts'
+import type { CustomCardData } from '../../../shared/cards/session-card-context.ts'
 
 const fakeWs = () => ({ OPEN: 1, readyState: 1, send: vi.fn(), close: vi.fn() })
 
@@ -43,6 +44,11 @@ const sentMessagesOf = (ctx: ReturnType<typeof newCtx>): Array<Record<string, un
   return send.mock.calls.map(([raw]) => JSON.parse(raw as string) as Record<string, unknown>)
 }
 
+const markRoomStarted = (ctx: ReturnType<typeof newCtx>) => {
+  ctx.currentRoom!.status = 'playing'
+  ctx.currentRoom!.startedAt ??= 1
+}
+
 describe('handleCreateRoom', () => {
   it('creates a room + sets ctx.currentRoom + sends roomCreated', () => {
     const ctx = newCtx()
@@ -68,6 +74,31 @@ describe('handleCreateRoom', () => {
       error: 'unable to allocate room id',
       requestId: 'create-1',
     }))
+  })
+
+  it('caps ordinary waiting and playing rooms at 30 while excluding development rooms', () => {
+    const ctx = newCtx()
+    dispatch(ctx, { type: 'createRoom', maxPlayers: 2 })
+    const devRoom = ctx.currentRoom!
+    ctx.registry.delete(devRoom.id)
+    devRoom.id = 'dev2-00000000-0000-4000-8000-000000000000'
+    ctx.registry.set(devRoom)
+    for (let index = 0; index < 30; index += 1) {
+      dispatch(ctx, { type: 'createRoom', maxPlayers: 2 })
+    }
+
+    dispatch(ctx, {
+      type: 'createRoom',
+      maxPlayers: 2,
+      requestId: 'over-capacity',
+    })
+
+    expect(ctx.registry.size()).toBe(31)
+    expect(sentMessagesOf(ctx)).toContainEqual({
+      type: 'error',
+      error: 'room capacity reached',
+      requestId: 'over-capacity',
+    })
   })
 
   it('checkpoints created rooms with state and host metadata', () => {
@@ -120,12 +151,40 @@ describe('handleCreateRoom', () => {
     const ctx = newCtx()
     ctx.currentUserId = 'u1'
     dispatch(ctx, { type: 'createRoom', maxPlayers: 2, enableParentCards: true })
+    markRoomStarted(ctx)
 
     dispatch(ctx, { type: 'newGame', seed: 309 })
 
     expect(ctx.currentRoom!.session.state.gameSeed).toBe(309)
     expect(ctx.currentRoom!.session.state.enableParentCards).toBe(true)
     expect(ctx.currentRoom!.session.state.phase).toBe('parent-selection')
+  })
+
+  it('reuses pinned custom cards when starting a new game', () => {
+    const ctx = newCtx()
+    ctx.currentUserId = 'u1'
+    dispatch(ctx, { type: 'createRoom', maxPlayers: 2 })
+    ctx.currentRoom!.customCardDbIds = ['deleted-card']
+    ctx.currentRoom!.customCards = [{
+      cardType: 'minor',
+      cardJson: {
+        id: 'CUSTOM_Pinned',
+        name: 'Pinned',
+        deck: 'CUSTOM',
+        number: 1,
+        desc: [],
+      },
+    } satisfies CustomCardData]
+    markRoomStarted(ctx)
+
+    dispatch(ctx, { type: 'newGame', seed: 309 })
+
+    expect(ctx.currentRoom!.session.getCustomCardDefs()).toEqual([
+      expect.objectContaining({
+        cardType: 'minor',
+        cardJson: expect.objectContaining({ id: 'CUSTOM_Pinned' }),
+      }),
+    ])
   })
 
   it('preserves direct Parent Card dealing when starting a new game', () => {
@@ -141,6 +200,7 @@ describe('handleCreateRoom', () => {
 
     expect(ctx.currentRoom!.draftParents).toBe(false)
     expect(ctx.currentRoom!.session.state.phase).toBe('playing')
+    markRoomStarted(ctx)
 
     dispatch(ctx, { type: 'newGame', seed: 309 })
 
@@ -171,6 +231,7 @@ describe('handleCreateRoom', () => {
     ctx.registry.delete(roomId)
     ctx.registry.set(restored)
     ctx.currentRoom = restored
+    markRoomStarted(ctx)
 
     dispatch(ctx, { type: 'newGame', seed: 309 })
 
@@ -232,6 +293,7 @@ describe('handleCreateRoom', () => {
     const ctx = newCtx()
     ctx.currentUserId = 'u1'
     dispatch(ctx, { type: 'createRoom', maxPlayers: 2, enableParentCards: true })
+    markRoomStarted(ctx)
 
     dispatch(ctx, { type: 'newGame', seed: 309 })
 
@@ -244,6 +306,7 @@ describe('handleCreateRoom', () => {
     ctx.currentUserId = 'u1'
     dispatch(ctx, { type: 'createRoom', maxPlayers: 2 })
     const previousRoomId = ctx.currentRoom!.id
+    markRoomStarted(ctx)
 
     dispatch(ctx, { type: 'newGame', seed: 309 })
     ctx.checkpoint.flushAll()
@@ -269,6 +332,7 @@ describe('handleCreateRoom', () => {
     ctx.checkpoint.discardRoom(createdRoomId)
     ctx.currentRoom!.id = 'dev2'
     ctx.registry.set(ctx.currentRoom!)
+    markRoomStarted(ctx)
 
     dispatch(ctx, { type: 'newGame', seed: 309 })
     const nextRoomId = ctx.currentRoom!.id
@@ -309,6 +373,7 @@ describe('handleCreateRoom', () => {
     ctx.currentUserId = 'u1'
     dispatch(ctx, { type: 'createRoom', maxPlayers: 2 })
     const previousRoomId = ctx.currentRoom!.id
+    markRoomStarted(ctx)
     ctx.currentRoom!.startedAt = 10
     ctx.currentRoom!.session.state.gameOver = true
     expect(ctx.checkpoint.completeGame(ctx.currentRoom!, 20).ok).toBe(true)
@@ -325,6 +390,7 @@ describe('handleCreateRoom', () => {
     ctx.currentUserId = 'u1'
     dispatch(ctx, { type: 'createRoom', maxPlayers: 2 })
     const previousRoomId = ctx.currentRoom!.id
+    markRoomStarted(ctx)
     ctx.currentRoom!.startedAt = 10
     ctx.currentRoom!.session.state.gameOver = true
     vi.spyOn(ctx.persistence, 'complete').mockReturnValue({
@@ -368,6 +434,7 @@ describe('handleCreateRoom', () => {
     const ctx = newCtx()
     ctx.currentUserId = 'u1'
     dispatch(ctx, { type: 'createRoom', maxPlayers: 2 })
+    markRoomStarted(ctx)
     const loaded = JSON.parse(JSON.stringify(ctx.currentRoom!.session.getState().state)) as GameState
     loaded.gameSeed = 777
 
@@ -390,6 +457,7 @@ describe('handleCreateRoom', () => {
     const ctx = newCtx()
     ctx.currentUserId = 'u1'
     dispatch(ctx, { type: 'createRoom', maxPlayers: 2, enableThroughTheSeasons: true } as never)
+    markRoomStarted(ctx)
 
     dispatch(ctx, { type: 'newGame', seed: 309 })
 
@@ -433,6 +501,7 @@ describe('handleCreateRoom', () => {
       enableFarmersOfTheMoor: true,
       allowIncompleteFarmersOfTheMoorMinorDeal: true,
     } as never)
+    markRoomStarted(ctx)
 
     dispatch(ctx, { type: 'newGame', seed: 309 })
 
@@ -445,6 +514,7 @@ describe('handleCreateRoom', () => {
     const ctx = newCtx()
     ctx.currentUserId = 'u1'
     dispatch(ctx, { type: 'createRoom', maxPlayers: 6 })
+    markRoomStarted(ctx)
 
     dispatch(ctx, { type: 'newGame', seed: 309 })
 
@@ -467,6 +537,7 @@ describe('seat-binding guards', () => {
     const ctx = newCtx()
     ctx.currentUserId = 'u1'
     dispatch(ctx, { type: 'createRoom', maxPlayers: 2, name: 'host' })
+    markRoomStarted(ctx)
     return ctx
   }
 
@@ -525,6 +596,7 @@ describe('seat-binding guards', () => {
     const ctx = newCtx()
     ctx.currentUserId = 'u1'
     dispatch(ctx, { type: 'createRoom', maxPlayers: 2, enableParentCards: true })
+    markRoomStarted(ctx)
     const p1Candidates = ctx.currentRoom!.session.state.parentSelection!.candidates.p1
 
     dispatch(ctx, {
@@ -544,6 +616,7 @@ describe('seat-binding guards', () => {
     const ctx = newCtx()
     ctx.currentUserId = 'u1'
     dispatch(ctx, { type: 'createRoom', maxPlayers: 2, enableParentCards: true })
+    markRoomStarted(ctx)
     const p1Candidates = ctx.currentRoom!.session.state.parentSelection!.candidates.p1
 
     dispatch(ctx, {

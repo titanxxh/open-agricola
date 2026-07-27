@@ -10,6 +10,7 @@ export type ValidateResult = {
 }
 
 export type SnapshotListener = (payload: GameSyncPayload, roomId?: string) => void
+export type PersistenceStatusListener = (paused: boolean) => void
 
 type CommitSelectionPayload = {
   cancel?: boolean
@@ -258,6 +259,7 @@ export class HttpGameTransport implements GameTransport {
 export class WsGameTransport implements GameTransport {
   private ws: WebSocket | null = null
   private listeners = new Set<SnapshotListener>()
+  private persistenceStatusListeners = new Set<PersistenceStatusListener>()
   private pendingResolvers = new Map<string, {
     resolve: (payload: GameSyncPayload) => void
     reject: (err: Error) => void
@@ -267,6 +269,7 @@ export class WsGameTransport implements GameTransport {
   roomId: string
   readonly playerIndex: number
   private _connected = false
+  private persistencePaused = false
 
   constructor(
     wsUrl: string = WS_BASE,
@@ -324,6 +327,12 @@ export class WsGameTransport implements GameTransport {
               this.pendingResolvers.delete(envelope.requestId)
             }
           }
+        } else if (msg.type === 'roomPersistencePaused') {
+          this.persistencePaused = true
+          this.persistenceStatusListeners.forEach((cb) => cb(true))
+        } else if (msg.type === 'roomPersistenceResumed') {
+          this.persistencePaused = false
+          this.persistenceStatusListeners.forEach((cb) => cb(false))
         } else if (msg.type === 'error') {
           if (msg.requestId) {
             const pending = this.pendingResolvers.get(msg.requestId)
@@ -470,7 +479,13 @@ export class WsGameTransport implements GameTransport {
     return () => { this.listeners.delete(cb) }
   }
 
-  sendRoomCommand(type: 'createRoom', opts: { maxPlayers?: number; name?: string; customCardIds?: string[]; enableCommunityDeck?: boolean; enableParentCards?: boolean; draftParents?: boolean; enableThroughTheSeasons?: boolean; enableFarmersOfTheMoor?: boolean; allowIncompleteFarmersOfTheMoorMinorDeal?: boolean; draftMode?: 'none' | 'simultaneous'; draftPoolSize?: number }): void
+  onPersistenceStatus(cb: PersistenceStatusListener): () => void {
+    this.persistenceStatusListeners.add(cb)
+    cb(this.persistencePaused)
+    return () => { this.persistenceStatusListeners.delete(cb) }
+  }
+
+  sendRoomCommand(type: 'createRoom', opts: { maxPlayers?: number; name?: string; customCardIds?: string[]; confirmReplayCardSnapshotPublic?: boolean; enableCommunityDeck?: boolean; enableParentCards?: boolean; draftParents?: boolean; enableThroughTheSeasons?: boolean; enableFarmersOfTheMoor?: boolean; allowIncompleteFarmersOfTheMoorMinorDeal?: boolean; draftMode?: 'none' | 'simultaneous'; draftPoolSize?: number }): void
   sendRoomCommand(type: 'joinRoom', opts: { roomId: string; name?: string; requestedPlayerIndex?: number }): void
   sendRoomCommand(type: 'dissolveRoom', opts?: Record<string, unknown>): void
   sendRoomCommand(type: string, opts?: Record<string, unknown>): void {
@@ -480,6 +495,8 @@ export class WsGameTransport implements GameTransport {
 
   destroy() {
     this.listeners.clear()
+    this.persistenceStatusListeners.clear()
+    this.persistencePaused = false
     this.pendingResolvers.clear()
     if (this.ws) {
       this.ws.close()

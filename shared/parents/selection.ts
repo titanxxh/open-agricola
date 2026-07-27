@@ -167,7 +167,10 @@ export const submitParentSelection = (
   if (!candidates.father.includes(submission.father)) {
     return { ok: false, error: 'father parent card not in candidates' }
   }
-  state.parentSelection.submissions[playerId] = submission
+  state.parentSelection.submissions[playerId] = {
+    mother: submission.mother,
+    father: submission.father,
+  }
   completeParentSelectionIfReady(state)
   return { ok: true }
 }

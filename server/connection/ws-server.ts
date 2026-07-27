@@ -1,4 +1,7 @@
+import { createHash } from 'node:crypto'
 import type { IncomingMessage, Server as HttpServer } from 'node:http'
+import { lstatSync, readFileSync, readdirSync } from 'node:fs'
+import { join } from 'node:path'
 import { WebSocketServer, type WebSocket } from 'ws'
 import { GameSession } from '../game/authoritative-session.ts'
 import { RoomRegistry } from '../game/room-registry.ts'
@@ -19,14 +22,64 @@ import type { RoomPersistence } from '../game/persistence/room-persistence.ts'
 import { createRoomPersistenceCheckpoint, type RoomPersistenceCheckpoint } from '../game/room-persistence-checkpoint.ts'
 import { Broadcaster } from './broadcaster.ts'
 import { createConnectionCtx } from './connection-ctx.ts'
-import { dispatch } from './room-router.ts'
+import { dispatch, loadCustomCardsFromDb } from './room-router.ts'
 import type { ClientCommand } from '../../shared/contract/protocol/ws.ts'
 import { readCookies, SESSION_COOKIE } from '../auth-cookies.ts'
 import { validateSession } from '../auth.ts'
 import { isTrustedOrigin } from '../http-origin.ts'
+import { RoomCommitter } from '../game/room-committer.ts'
+import { SqliteRoomPersistence } from '../game/persistence/sqlite-adapter.ts'
 
 const WS_AUTH_TIMEOUT_MS = 5000
 const ROOM_CLEANUP_INTERVAL_MS = 5 * 60 * 1000
+
+const fileHash = (path: string): string =>
+  createHash('sha256').update(readFileSync(path)).digest('hex')
+
+const viewerFiles = (root: string, relative = ''): string[] => {
+  const files: string[] = []
+  for (const entry of readdirSync(join(root, relative), { withFileTypes: true })) {
+    const path = relative ? `${relative}/${entry.name}` : entry.name
+    if (entry.isDirectory()) files.push(...viewerFiles(root, path))
+    else if (entry.isFile() && path !== 'manifest.json') files.push(path)
+    else if (!entry.isFile()) throw new Error('viewer build contains unsupported entries')
+  }
+  return files.sort()
+}
+
+export const viewerBuildExists = (root: string, buildId: string): boolean => {
+  if (!/^[a-f0-9]{64}$/.test(buildId)) return false
+  try {
+    const directory = join(root, buildId)
+    if (!lstatSync(directory).isDirectory()) return false
+    const manifestPath = join(directory, 'manifest.json')
+    const manifestRaw = readFileSync(manifestPath)
+    if (createHash('sha256').update(manifestRaw).digest('hex') !== buildId) return false
+    const manifest = JSON.parse(manifestRaw.toString('utf8')) as {
+      entrypoint?: unknown
+      files?: unknown
+    }
+    if (
+      manifest.entrypoint !== 'index.html'
+      || !manifest.files
+      || typeof manifest.files !== 'object'
+      || Array.isArray(manifest.files)
+    ) return false
+    const expected = manifest.files as Record<string, unknown>
+    const files = viewerFiles(directory)
+    if (
+      files.length !== Object.keys(expected).length
+      || !files.every((path) => typeof expected[path] === 'string')
+      || !files.includes('index.html')
+    ) return false
+    return files.every((path) =>
+      /^[a-f0-9]{64}$/.test(expected[path] as string)
+      && fileHash(join(directory, path)) === expected[path]
+    )
+  } catch {
+    return false
+  }
+}
 
 const ALLOW_ANONYMOUS_WS: boolean = (() => {
   if (process.env.ALLOW_ANONYMOUS_WS !== undefined) {
@@ -84,6 +137,8 @@ const ensureFixedDevRooms = (
 const restoreRooms = (
   registry: RoomRegistry,
   persistence: RoomPersistence,
+  checkpoint: RoomPersistenceCheckpoint,
+  committer: RoomCommitter | undefined,
   now: number,
 ): void => {
   const fixedIds = FIXED_DEV_ROOMS.map((r) => r.id)
@@ -93,10 +148,35 @@ const restoreRooms = (
     playingTtlMs: PLAYING_EMPTY_ROOM_TTL_MS,
     excludeIds: fixedIds,
   })
+  committer?.cleanupReplayAssets()
   for (const snap of snapshots) {
     if (registry.has(snap.id)) continue
-    const room = snapshotToRoom(snap)
+    const customCards = snap.meta.customCards ?? loadCustomCardsFromDb(
+      snap.meta.customCardDbIds,
+      snap.meta.createdBy ?? undefined,
+    )
+    const room = snapshotToRoom(snap, customCards)
+    let metaChanged = snap.meta.customCards === undefined
+    if (room.replayRecording === undefined && customCards.length > 0) {
+      room.replayRecording = false
+      metaChanged = true
+    } else if (room.status === 'waiting' && room.replayRecording === undefined) {
+      committer?.lockNewRoom(room)
+      metaChanged = true
+    }
     registry.set(room)
+    if (metaChanged) checkpoint.recordMeta(room)
+    const prepared = committer?.prepareRoom(room, {
+      missingPrefix: room.status === 'playing',
+    })
+    if (committer?.hasReplay(room.id)) checkpoint.markInactive(room.id)
+    if (prepared?.kind === 'blocked') {
+      console.warn(JSON.stringify({
+        event: 'restored_room_replay_blocked',
+        roomId: room.id,
+        error: prepared.error,
+      }))
+    }
     if (snap.updatedAt > 0) registry.touchActivity(snap.id, snap.updatedAt)
     console.log(`[ws-server] restored room ${snap.id}`)
   }
@@ -105,12 +185,14 @@ const restoreRooms = (
 const startRoomCleanup = (
   registry: RoomRegistry,
   checkpoint: RoomPersistenceCheckpoint,
+  committer: RoomCommitter | undefined,
   intervalMs: number = ROOM_CLEANUP_INTERVAL_MS,
 ): NodeJS.Timeout => {
   return setInterval(() => {
     const now = Date.now()
     for (const room of registry.iter()) {
       if (isDevRoom(room.id)) continue
+      if (committer?.isRetrying(room.id)) continue
       if (room.players.length > 0) {
         registry.touchActivity(room.id, now)
         continue
@@ -120,6 +202,7 @@ const startRoomCleanup = (
         registry.delete(room.id)
         registry.clearActivity(room.id)
         checkpoint.discardRoom(room.id)
+        committer?.retireRoom(room.id)
         console.log(`[ws-server] cleaned up empty room ${room.id}`)
       }
     }
@@ -134,6 +217,7 @@ type ConnectionDeps = {
   checkpoint: RoomPersistenceCheckpoint
   broadcaster: Broadcaster
   lobby: Lobby
+  committer?: RoomCommitter
   activeUserSockets: Map<string, Set<WebSocket>>
 }
 
@@ -201,7 +285,9 @@ const handleConnection = (ws: WebSocket, req: IncomingMessage, deps: ConnectionD
     clearTimeout(authTimer)
     if (trackedUserId) untrack(trackedUserId)
     if (ctx.currentRoom) {
-      deps.checkpoint.flushRoom(ctx.currentRoom)
+      if (!deps.committer?.hasReplay(ctx.currentRoom.id)) {
+        deps.checkpoint.flushRoom(ctx.currentRoom)
+      }
       const removal = removePlayerFromRoom(ctx.currentRoom, ws)
       if (removal === 'remaining') {
         deps.broadcaster.broadcastEvent(ctx.currentRoom, {
@@ -223,6 +309,7 @@ export type CreateWsServerResult = {
   broadcaster: Broadcaster
   lobby: Lobby
   checkpoint: RoomPersistenceCheckpoint
+  committer?: RoomCommitter
   cleanupTimer: NodeJS.Timeout
   closeUserConnections: (userId: string) => void
   shutdown: () => void
@@ -233,6 +320,14 @@ export function createWsServer(
   deps: {
     persistence: RoomPersistence
     shouldPersist?: (room: Room) => boolean
+    replay?: {
+      enabled: boolean
+      viewerBuildId: string
+      gameBuildId: string
+      viewerRoot: string
+      assetRoot?: string
+      cardArtRoot?: string
+    }
   },
 ): CreateWsServerResult {
   const registry = new RoomRegistry()
@@ -240,13 +335,42 @@ export function createWsServer(
     persistence: deps.persistence,
     shouldPersist: deps.shouldPersist,
   })
+  const replay = deps.replay ?? {
+    enabled:
+      process.env.REPLAY_NEW_ROOMS_ENABLED === 'true' ||
+      process.env.REPLAY_NEW_ROOMS_ENABLED === '1',
+    viewerBuildId: process.env.REPLAY_VIEWER_BUILD_ID ?? '',
+    gameBuildId: process.env.GAME_BUILD_ID ?? '',
+    viewerRoot: process.env.REPLAY_VIEWER_ROOT ?? './data/replay-viewers',
+    assetRoot: process.env.REPLAY_ASSET_ROOT ?? './data/replay-assets',
+    cardArtRoot: process.env.CARD_ART_DIR ?? join(process.cwd(), 'data', 'card-art'),
+  }
+  if (replay.enabled && !(deps.persistence instanceof SqliteRoomPersistence)) {
+    throw new Error('Replay recording requires SQLite persistence')
+  }
+  const committer = deps.persistence instanceof SqliteRoomPersistence
+    ? new RoomCommitter({
+        persistence: deps.persistence,
+        enabled: replay.enabled,
+        viewerBuildId: replay.viewerBuildId,
+        gameBuildId: replay.gameBuildId,
+        viewerBuildExists: (buildId) => viewerBuildExists(replay.viewerRoot, buildId),
+        assetRoot: replay.assetRoot,
+        cardArtRoot: replay.cardArtRoot,
+      })
+    : undefined
   const broadcaster = new Broadcaster({ checkpoint })
   const activeUserSockets = new Map<string, Set<WebSocket>>()
-  const lobby = createLobby({ registry, checkpoint, broadcaster })
+  const lobby = createLobby({
+    registry,
+    checkpoint,
+    broadcaster,
+    onRoomRetired: (roomId) => committer?.retireRoom(roomId),
+  })
 
   ensureFixedDevRooms(registry, deps.persistence, checkpoint)
-  restoreRooms(registry, deps.persistence, Date.now())
-  const cleanupTimer = startRoomCleanup(registry, checkpoint)
+  restoreRooms(registry, deps.persistence, checkpoint, committer, Date.now())
+  const cleanupTimer = startRoomCleanup(registry, checkpoint, committer)
 
   const wss = new WebSocketServer({ server, path: '/ws' })
   wss.on('connection', (ws, req) =>
@@ -254,6 +378,7 @@ export function createWsServer(
       registry,
       persistence: deps.persistence,
       checkpoint,
+      committer,
       broadcaster,
       lobby,
       activeUserSockets,
@@ -270,6 +395,7 @@ export function createWsServer(
   }
 
   const shutdown = (): void => {
+    committer?.shutdown()
     checkpoint.shutdown()
     clearInterval(cleanupTimer)
     for (const client of wss.clients) client.close(1001, 'server shutdown')
@@ -282,6 +408,7 @@ export function createWsServer(
     broadcaster,
     lobby,
     checkpoint,
+    committer,
     cleanupTimer,
     closeUserConnections,
     shutdown,

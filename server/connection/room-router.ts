@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto'
-import { GameSession } from '../game/authoritative-session.ts'
+import { GameSession, type SessionResponse } from '../game/authoritative-session.ts'
 import {
   fixedDevRoomRootId,
   isDevRoom,
@@ -12,16 +12,25 @@ import { validateSession } from '../auth.ts'
 import { getDb } from '../db.ts'
 import type { CustomCardData } from '../../shared/cards/session-card-context.ts'
 import type { CustomCodeManifest } from '../../shared/custom-code/types.ts'
-import type { ClientCommand } from '../../shared/contract/protocol/ws.ts'
+import {
+  REPLAY_CARD_SNAPSHOT_CONSENT_REQUIRED,
+  type ClientCommand,
+} from '../../shared/contract/protocol/ws.ts'
+import type { StateUpdateCause } from '../../shared/contract/protocol/game.ts'
 import {
   loadPublishedDraft,
   type WorkshopDraft,
 } from '../workshop-drafts.ts'
 import type { ConnectionCtx } from './connection-ctx.ts'
+import {
+  replayIntentFromCommand,
+  type RoomCommitResult,
+} from '../game/room-committer.ts'
 
 const DRAFT_POOL_SIZE_DEFAULT = 7
 const DRAFT_POOL_SIZE_MIN = 7
 const DRAFT_POOL_SIZE_MAX = 10
+const MAX_ORDINARY_ROOMS = 30
 
 type DraftRoomOptions = { draftMode: 'simultaneous'; draftPoolSize: number }
 
@@ -64,10 +73,14 @@ export function parseDraftOptions(
   return { ok: true, value: { draftMode: 'simultaneous', draftPoolSize: poolSize } }
 }
 
-function loadCustomCardsFromDb(cardDbIds: string[], requestUserId?: string): CustomCardData[] {
-  if (!cardDbIds.length) return []
+const loadCustomCards = (
+  cardDbIds: string[],
+  requestUserId?: string,
+): { cards: CustomCardData[]; hasUnpublished: boolean } => {
+  if (!cardDbIds.length) return { cards: [], hasUnpublished: false }
   const db = getDb()
   const result: CustomCardData[] = []
+  let hasUnpublished = false
   for (const dbId of cardDbIds) {
     const row = db.prepare(
       'SELECT card_type, card_json, code_manifest, art_url, status, author_id FROM workshop_cards WHERE id = ?',
@@ -102,10 +115,16 @@ function loadCustomCardsFromDb(cardDbIds: string[], requestUserId?: string): Cus
         codeManifest: row.code_manifest ? JSON.parse(row.code_manifest) as CustomCodeManifest : null,
         artUrl: row.art_url ?? null,
       })
+      hasUnpublished = true
     } catch { /* skip malformed */ }
   }
-  return result
+  return { cards: result, hasUnpublished }
 }
+
+export const loadCustomCardsFromDb = (
+  cardDbIds: string[],
+  requestUserId?: string,
+): CustomCardData[] => loadCustomCards(cardDbIds, requestUserId).cards
 
 const generateRoomId = (ctx: ConnectionCtx, devRoomRootId?: string | null): string | null => {
   for (let attempt = 0; attempt < 8; attempt += 1) {
@@ -123,6 +142,120 @@ const sendCommandError = (ctx: ConnectionCtx, error: string, requestId?: string)
 const requireRoom = (ctx: ConnectionCtx, requestId?: string): Room | null => {
   if (!ctx.currentRoom) { sendCommandError(ctx, 'not in a room', requestId); return null }
   return ctx.currentRoom
+}
+
+const requireWritableRoom = (ctx: ConnectionCtx, requestId?: string): Room | null => {
+  const room = requireRoom(ctx, requestId)
+  if (!room) return null
+  if (room.status === 'waiting' && room.replayRecording === true) {
+    sendCommandError(ctx, 'game has not started', requestId)
+    return null
+  }
+  const blocked = ctx.committer?.blockedError(room.id)
+  if (!blocked) return room
+  sendCommandError(ctx, `room saving is paused: ${blocked}`, requestId)
+  return null
+}
+
+const notifyPersistencePaused = (ctx: ConnectionCtx, room: Room): void => {
+  ctx.broadcaster.broadcastEvent(room, {
+    type: 'roomPersistencePaused',
+    roomId: room.id,
+  })
+}
+
+const publishCommandResponse = (
+  ctx: ConnectionCtx,
+  room: Room,
+  response: SessionResponse,
+  command: ClientCommand,
+  cause: StateUpdateCause,
+): void => {
+  if (!response.ok) {
+    ctx.broadcaster.sendStateTo(ctx.ws, room, response, command.requestId, cause)
+    return
+  }
+  const replayIntent = replayIntentFromCommand(command)
+  if (!ctx.committer || !ctx.committer.isRecording(room.id) || !replayIntent) {
+    ctx.broadcaster.broadcastState(room, response, cause, command.requestId)
+    return
+  }
+  const publishCommitted = (): void => {
+    if (response.state.gameOver) ctx.checkpoint.markInactive(room.id)
+    ctx.broadcaster.broadcastCommitted(room, response, cause, command.requestId)
+  }
+  const result = ctx.committer.commit(
+    room,
+    response,
+    replayIntent,
+    ctx.currentPlayerIndex,
+    () => {
+      publishCommitted()
+      ctx.broadcaster.broadcastEvent(room, {
+        type: 'roomPersistenceResumed',
+        roomId: room.id,
+      })
+    },
+  )
+  if (result.kind === 'committed') {
+    publishCommitted()
+  } else if (result.kind === 'unchanged') {
+    ctx.broadcaster.sendStateTo(ctx.ws, room, response, command.requestId, cause)
+  } else {
+    notifyPersistencePaused(ctx, room)
+    if (!ctx.committer.isRetrying(room.id)) {
+      sendCommandError(ctx, result.error, command.requestId)
+    }
+  }
+}
+
+const publishInitialState = (
+  ctx: ConnectionCtx,
+  room: Room,
+  response: SessionResponse,
+  requestId: string | undefined,
+  beforePublish: () => void,
+  onReady: () => void,
+): void => {
+  const publishReady = (result: Exclude<RoomCommitResult, { kind: 'blocked' }>): void => {
+    if (ctx.committer?.hasReplay(room.id)) ctx.checkpoint.markInactive(room.id)
+    beforePublish()
+    if (result.kind === 'committed') {
+      ctx.broadcaster.broadcastCommitted(room, response, 'reconnect', requestId)
+    } else {
+      ctx.broadcaster.broadcastState(room, response, 'reconnect', requestId)
+    }
+    ctx.broadcaster.broadcastEvent(room, {
+      type: 'roomPersistenceResumed',
+      roomId: room.id,
+    })
+    onReady()
+  }
+  if (!ctx.committer) {
+    beforePublish()
+    ctx.broadcaster.broadcastState(room, response, 'reconnect', requestId)
+    onReady()
+    return
+  }
+  const result = ctx.committer.prepareRoom(room, {
+    missingPrefix: false,
+    onReady: publishReady,
+  })
+  if (ctx.committer.hasReplay(room.id)) ctx.checkpoint.markInactive(room.id)
+  if (result.kind === 'blocked') {
+    notifyPersistencePaused(ctx, room)
+    if (!ctx.committer.isRetrying(room.id)) {
+      sendCommandError(ctx, result.error, requestId)
+    }
+    return
+  }
+  beforePublish()
+  if (ctx.committer.isRecording(room.id)) {
+    ctx.broadcaster.broadcastCommitted(room, response, 'reconnect', requestId)
+  } else {
+    ctx.broadcaster.broadcastState(room, response, 'reconnect', requestId)
+  }
+  onReady()
 }
 
 const assertOwnSeat = (ctx: ConnectionCtx, expectedPlayerIndex: unknown, requestId?: string): boolean => {
@@ -171,6 +304,18 @@ function handleAuth(ctx: ConnectionCtx, msg: Extract<ClientCommand, { type: 'aut
 }
 
 function handleCreateRoom(ctx: ConnectionCtx, msg: Extract<ClientCommand, { type: 'createRoom' }>): void {
+  const ordinaryRoomCount = [...ctx.registry.iter()]
+    .filter((room) => !isDevRoom(room.id))
+    .length
+  if (ordinaryRoomCount >= MAX_ORDINARY_ROOMS) {
+    sendCommandError(ctx, 'room capacity reached', msg.requestId)
+    return
+  }
+  const persistence = ctx.committer?.canCreateRoom()
+  if (persistence && !persistence.ok) {
+    sendCommandError(ctx, persistence.error, msg.requestId)
+    return
+  }
   const roomId = generateRoomId(ctx)
   if (!roomId) { sendCommandError(ctx, 'unable to allocate room id', msg.requestId); return }
   const rawMaxPlayers = typeof (msg as Record<string, unknown>).maxPlayers === 'number'
@@ -191,7 +336,8 @@ function handleCreateRoom(ctx: ConnectionCtx, msg: Extract<ClientCommand, { type
   const enableFarmersOfTheMoor = (msg as Record<string, unknown>).enableFarmersOfTheMoor === true
   const allowIncompleteFarmersOfTheMoorMinorDeal =
     (msg as Record<string, unknown>).allowIncompleteFarmersOfTheMoorMinorDeal === true
-  const customCards = loadCustomCardsFromDb(customCardDbIds, ctx.currentUserId)
+  const loadedCustomCards = loadCustomCards(customCardDbIds, ctx.currentUserId)
+  const customCards = loadedCustomCards.cards
   let session: GameSession
   try {
     session = new GameSession(
@@ -229,6 +375,7 @@ function handleCreateRoom(ctx: ConnectionCtx, msg: Extract<ClientCommand, { type
     status: 'waiting',
     createdBy: ctx.currentUserId,
     customCardDbIds,
+    customCards,
     enableParentCards,
     draftParents,
     draftMode: draftOptions.value?.draftMode,
@@ -236,6 +383,15 @@ function handleCreateRoom(ctx: ConnectionCtx, msg: Extract<ClientCommand, { type
     enableThroughTheSeasons,
     enableFarmersOfTheMoor,
     allowIncompleteFarmersOfTheMoorMinorDeal,
+  }
+  ctx.committer?.lockNewRoom(room)
+  if (
+    room.replayRecording === true
+    && loadedCustomCards.hasUnpublished
+    && (msg as Record<string, unknown>).confirmReplayCardSnapshotPublic !== true
+  ) {
+    sendCommandError(ctx, REPLAY_CARD_SNAPSHOT_CONSENT_REQUIRED, msg.requestId)
+    return
   }
   ctx.registry.set(room)
   ctx.currentRoom = room
@@ -253,6 +409,32 @@ function handleJoinRoom(ctx: ConnectionCtx, msg: Extract<ClientCommand, { type: 
   const roomId = msg.roomId
   const room = ctx.registry.get(roomId)
   if (!room) { sendCommandError(ctx, 'room not found', msg.requestId); return }
+  const blocked = ctx.committer?.blockedError(room.id)
+  if (blocked) {
+    const waiting = ctx.committer?.waitUntilReady(room.id, (error) => {
+      if (ctx.ws.readyState !== ctx.ws.OPEN) return
+      if (ctx.currentRoom) return
+      if (error) {
+        sendCommandError(ctx, `room saving is paused: ${error}`, msg.requestId)
+        return
+      }
+      ctx.broadcaster.sendTo(ctx.ws, {
+        type: 'roomPersistenceResumed',
+        roomId: room.id,
+      })
+      handleJoinRoom(ctx, msg)
+    })
+    if (waiting) {
+      ctx.broadcaster.sendTo(ctx.ws, {
+        type: 'roomPersistencePaused',
+        roomId: room.id,
+      })
+      return
+    }
+    sendCommandError(ctx, `room saving is paused: ${blocked}`, msg.requestId)
+    return
+  }
+  const wasPlaying = room.status === 'playing'
   const rawRequestedPlayerIndex =
     typeof msg.requestedPlayerIndex === 'number'
       ? msg.requestedPlayerIndex
@@ -266,9 +448,12 @@ function handleJoinRoom(ctx: ConnectionCtx, msg: Extract<ClientCommand, { type: 
   if (!seat.ok) { sendCommandError(ctx, seat.error, msg.requestId); return }
   ctx.currentRoom = room
   ctx.currentPlayerIndex = seat.playerIndex
-  const name = typeof (msg as Record<string, unknown>).name === 'string'
+  const requestedName = typeof (msg as Record<string, unknown>).name === 'string'
     ? (msg as Record<string, unknown>).name as string
     : `Player ${ctx.currentPlayerIndex + 1}`
+  const name = wasPlaying
+    ? room.session.state.players[ctx.currentPlayerIndex]?.name ?? requestedName
+    : requestedName
   if (seat.replacedExistingPlayer) {
     const existingPlayer = room.players.find(
       (player) => player.playerIndex === ctx.currentPlayerIndex,
@@ -294,34 +479,52 @@ function handleJoinRoom(ctx: ConnectionCtx, msg: Extract<ClientCommand, { type: 
     .map(([playerIndex, userId]) => ({ playerIndex, userId }))
   room.players.push({ ws: ctx.ws, playerIndex: ctx.currentPlayerIndex, name, userId: ctx.currentUserId })
   room.players.sort((a, b) => a.playerIndex - b.playerIndex)
-  room.session.updatePlayerName(ctx.currentPlayerIndex, name)
+  if (!wasPlaying) room.session.updatePlayerName(ctx.currentPlayerIndex, name)
   const playerCount = roomOccupiedSeatCount(room)
   const roomFull = playerCount >= room.maxPlayers
+  const starting = !wasPlaying && roomFull
   if (roomFull) {
     room.status = 'playing'
     room.startedAt ??= Date.now()
   }
-  ctx.checkpoint.recordMeta(room)
-  ctx.broadcaster.sendTo(ctx.ws, { type: 'roomJoined', roomId, playerIndex: ctx.currentPlayerIndex })
-  ctx.broadcaster.broadcastEvent(room, {
-    type: 'playerJoined',
-    playerIndex: ctx.currentPlayerIndex,
-    name,
-    playerCount,
-    maxPlayers: room.maxPlayers,
-  })
-  if (roomFull) {
+  const publishJoin = (): void => {
+    ctx.broadcaster.sendTo(ctx.ws, { type: 'roomJoined', roomId, playerIndex: ctx.currentPlayerIndex })
+    ctx.broadcaster.broadcastEvent(room, {
+      type: 'playerJoined',
+      playerIndex: ctx.currentPlayerIndex,
+      name,
+      playerCount,
+      maxPlayers: room.maxPlayers,
+    })
+  }
+  if (starting) {
     for (const p of room.players) {
       room.session.updatePlayerName(p.playerIndex, p.name)
     }
     const resp = room.session.withCtx(() => room.session.getState())
-    ctx.broadcaster.broadcastState(room, resp, 'reconnect')
-    ctx.broadcaster.broadcastEvent(room, { type: 'gameStarted' })
+    publishInitialState(ctx, room, resp, undefined, () => {
+      ctx.checkpoint.recordMeta(room)
+      publishJoin()
+    }, () => {
+      ctx.broadcaster.broadcastEvent(room, { type: 'gameStarted' })
+    })
+    return
+  }
+  ctx.checkpoint.recordMeta(room)
+  publishJoin()
+  if (wasPlaying) {
+    const resp = room.session.withCtx(() => room.session.getState())
+    ctx.broadcaster.sendStateTo(ctx.ws, room, resp, msg.requestId)
   }
 }
 
 function handleDissolveRoom(ctx: ConnectionCtx, msg: Extract<ClientCommand, { type: 'dissolveRoom' }>): void {
   if (!ctx.currentRoom) { sendCommandError(ctx, 'not in a room', msg.requestId); return }
+  const blocked = ctx.committer?.blockedError(ctx.currentRoom.id)
+  if (blocked) {
+    sendCommandError(ctx, `room saving is paused: ${blocked}`, msg.requestId)
+    return
+  }
   const result = ctx.lobby.dissolveRoomById(ctx.currentRoom.id, ctx.currentUserId)
   if (!result.ok) { sendCommandError(ctx, result.error ?? 'dissolve failed', msg.requestId); return }
   ctx.currentRoom = null
@@ -329,89 +532,100 @@ function handleDissolveRoom(ctx: ConnectionCtx, msg: Extract<ClientCommand, { ty
 
 function handleGetState(ctx: ConnectionCtx, msg: Extract<ClientCommand, { type: 'getState' }>): void {
   const room = requireRoom(ctx, msg.requestId); if (!room) return
+  const blocked = ctx.committer?.blockedError(room.id)
+  if (blocked) {
+    sendCommandError(ctx, `room saving is paused: ${blocked}`, msg.requestId)
+    return
+  }
   const resp = room.session.withCtx(() => room.session.getState())
   ctx.broadcaster.sendStateTo(ctx.ws, room, resp, msg.requestId)
 }
 
 function handleAction(ctx: ConnectionCtx, msg: Extract<ClientCommand, { type: 'action' }>): void {
-  const room = requireRoom(ctx, msg.requestId); if (!room) return
+  const room = requireWritableRoom(ctx, msg.requestId); if (!room) return
   const resp = room.session.withCtx(() => room.session.takeAction(ctx.currentPlayerIndex, msg.spaceId))
-  ctx.broadcaster.broadcastState(room, resp, 'action', msg.requestId)
+  publishCommandResponse(ctx, room, resp, msg, 'action')
 }
 
 function handleSpecialAction(ctx: ConnectionCtx, msg: Extract<ClientCommand, { type: 'specialAction' }>): void {
-  const room = requireRoom(ctx, msg.requestId); if (!room) return
+  const room = requireWritableRoom(ctx, msg.requestId); if (!room) return
   const resp = room.session.withCtx(() =>
     room.session.takeSpecialAction(ctx.currentPlayerIndex, msg.cardId, msg.actionId, msg.payload),
   )
-  ctx.broadcaster.broadcastState(room, resp, 'action', msg.requestId)
+  publishCommandResponse(ctx, room, resp, msg, 'action')
 }
 
 function handleChoice(ctx: ConnectionCtx, msg: Extract<ClientCommand, { type: 'choice' }>): void {
-  const room = requireRoom(ctx, msg.requestId); if (!room) return
+  const room = requireWritableRoom(ctx, msg.requestId); if (!room) return
   const resp = room.session.withCtx(() => room.session.resolveChoice(ctx.currentPlayerIndex, msg.value, msg.payload))
-  ctx.broadcaster.broadcastState(room, resp, 'choice', msg.requestId)
+  publishCommandResponse(ctx, room, resp, msg, 'choice')
 }
 
 function handleAnytime(ctx: ConnectionCtx, msg: Extract<ClientCommand, { type: 'anytime' }>): void {
-  const room = requireRoom(ctx, msg.requestId); if (!room) return
+  const room = requireWritableRoom(ctx, msg.requestId); if (!room) return
   const resp = room.session.withCtx(() => room.session.takeAnytimeAction(ctx.currentPlayerIndex, msg.actionId))
-  ctx.broadcaster.broadcastState(room, resp, 'anytime', msg.requestId)
+  publishCommandResponse(ctx, room, resp, msg, 'anytime')
 }
 
 function handleOrdinaryDrawKeep(ctx: ConnectionCtx, msg: Extract<ClientCommand, { type: 'ordinaryDrawKeep' }>): void {
-  const room = requireRoom(ctx, msg.requestId); if (!room) return
+  const room = requireWritableRoom(ctx, msg.requestId); if (!room) return
   if (!assertOwnSeat(ctx, msg.playerIndex, msg.requestId)) return
   const resp = room.session.withCtx(() =>
     room.session.resolveOrdinaryCardDrawChoice(ctx.currentPlayerIndex, msg.choiceId, msg.keepCardId),
   )
-  ctx.broadcaster.broadcastState(room, resp, 'choice', msg.requestId)
+  publishCommandResponse(ctx, room, resp, msg, 'choice')
 }
 
 function handleRoundEnd(ctx: ConnectionCtx, msg: Extract<ClientCommand, { type: 'roundEnd' }>): void {
-  const room = requireRoom(ctx, msg.requestId); if (!room) return
+  const room = requireWritableRoom(ctx, msg.requestId); if (!room) return
   const resp = room.session.withCtx(() => room.session.performRoundEnd())
-  ctx.broadcaster.broadcastState(room, resp, 'action', msg.requestId)
+  publishCommandResponse(ctx, room, resp, msg, 'action')
 }
 
 function handleCommitSelection(ctx: ConnectionCtx, msg: Extract<ClientCommand, { type: 'commitSelection' }>): void {
-  const room = requireRoom(ctx, msg.requestId); if (!room) return
+  const room = requireWritableRoom(ctx, msg.requestId); if (!room) return
   if (!assertOwnSeat(ctx, msg.playerIndex, msg.requestId)) return
   const resp = room.session.withCtx(() => room.session.commitSelectionChoice(ctx.currentPlayerIndex, msg.payload))
-  ctx.broadcaster.broadcastState(room, resp, 'choice', msg.requestId)
+  publishCommandResponse(ctx, room, resp, msg, 'choice')
 }
 
 function handleParentSubmit(ctx: ConnectionCtx, msg: Extract<ClientCommand, { type: 'parentSubmit' }>): void {
-  const room = requireRoom(ctx, msg.requestId); if (!room) return
+  const room = requireWritableRoom(ctx, msg.requestId); if (!room) return
   if (!assertOwnSeat(ctx, msg.playerIndex, msg.requestId)) return
   const resp = room.session.withCtx(() => room.session.submitParentSelection(ctx.currentPlayerIndex, msg.selection))
-  ctx.broadcaster.broadcastState(room, resp, 'choice', msg.requestId)
+  publishCommandResponse(ctx, room, resp, msg, 'choice')
 }
 
 function handleUndoStep(ctx: ConnectionCtx, msg: Extract<ClientCommand, { type: 'undoStep' }>): void {
-  const room = requireRoom(ctx, msg.requestId); if (!room) return
+  const room = requireWritableRoom(ctx, msg.requestId); if (!room) return
   const resp = room.session.withCtx(() => room.session.undoStep())
-  ctx.broadcaster.broadcastState(room, resp, 'undo', msg.requestId)
+  publishCommandResponse(ctx, room, resp, msg, 'undo')
 }
 
 function handleUndoAction(ctx: ConnectionCtx, msg: Extract<ClientCommand, { type: 'undoAction' }>): void {
-  const room = requireRoom(ctx, msg.requestId); if (!room) return
+  const room = requireWritableRoom(ctx, msg.requestId); if (!room) return
   const resp = room.session.withCtx(() => room.session.undoAction())
-  ctx.broadcaster.broadcastState(room, resp, 'undo', msg.requestId)
+  publishCommandResponse(ctx, room, resp, msg, 'undo')
 }
 
 function handleNewGame(ctx: ConnectionCtx, msg: Extract<ClientCommand, { type: 'newGame' }>): void {
-  const room = requireRoom(ctx, msg.requestId); if (!room) return
+  const room = requireWritableRoom(ctx, msg.requestId); if (!room) return
+  const persistence = ctx.committer?.canCreateRoom()
+  if (persistence && !persistence.ok) {
+    sendCommandError(ctx, persistence.error, msg.requestId)
+    return
+  }
   const previousRoomId = room.id
   const completedGame = room.session.state.gameOver
-  if (completedGame) {
+  if (completedGame && !ctx.committer?.hasReplay(previousRoomId)) {
     const completion = ctx.checkpoint.completeGame(room)
     if (!completion.ok) {
       sendCommandError(ctx, `unable to archive completed game: ${completion.error}`, msg.requestId)
       return
     }
   }
-  const customCards = loadCustomCardsFromDb(room.customCardDbIds ?? [], room.createdBy)
+  const customCards = room.customCards
+    ?? loadCustomCardsFromDb(room.customCardDbIds ?? [], room.createdBy)
   const enableCommunityDeck = room.session.state.enableCommunityDeck
   const enableParentCards = room.enableParentCards ?? room.session.state.enableParentCards
   const draftMode = room.draftMode ?? room.session.state.draftMode
@@ -446,6 +660,7 @@ function handleNewGame(ctx: ConnectionCtx, msg: Extract<ClientCommand, { type: '
   if (!completedGame) ctx.checkpoint.discardRoom(previousRoomId)
   ctx.registry.delete(previousRoomId)
   ctx.registry.clearActivity(previousRoomId)
+  ctx.committer?.retireRoom(previousRoomId)
   room.id = nextRoomId
   room.session = session
   room.version = 0
@@ -462,6 +677,8 @@ function handleNewGame(ctx: ConnectionCtx, msg: Extract<ClientCommand, { type: '
   room.enableThroughTheSeasons = enableThroughTheSeasons
   room.enableFarmersOfTheMoor = enableFarmersOfTheMoor
   room.allowIncompleteFarmersOfTheMoorMinorDeal = allowIncompleteFarmersOfTheMoorMinorDeal
+  room.customCards = customCards
+  ctx.committer?.lockNewRoom(room)
   for (const player of room.players) {
     room.session.updatePlayerName(player.playerIndex, player.name)
   }
@@ -469,57 +686,61 @@ function handleNewGame(ctx: ConnectionCtx, msg: Extract<ClientCommand, { type: '
   ctx.registry.touchActivity(room.id, Date.now())
   ctx.checkpoint.recordCreated(room)
   const resp = room.session.withCtx(() => room.session.getState())
-  ctx.broadcaster.broadcastState(room, resp, 'reconnect', msg.requestId)
+  if (room.status === 'playing') {
+    publishInitialState(ctx, room, resp, msg.requestId, () => {}, () => {})
+  } else {
+    ctx.broadcaster.broadcastState(room, resp, 'reconnect', msg.requestId)
+  }
 }
 
 function handleLoadGame(ctx: ConnectionCtx, msg: Extract<ClientCommand, { type: 'loadGame' }>): void {
-  const room = requireRoom(ctx, msg.requestId); if (!room) return
+  const room = requireWritableRoom(ctx, msg.requestId); if (!room) return
   const resp = room.session.withCtx(() => room.session.loadState(msg.state))
-  ctx.broadcaster.broadcastState(room, resp, 'reconnect', msg.requestId)
+  publishCommandResponse(ctx, room, resp, msg, 'reconnect')
 }
 
 function handleDevSetResources(ctx: ConnectionCtx, msg: Extract<ClientCommand, { type: 'devSetResources' }>): void {
-  const room = requireRoom(ctx, msg.requestId); if (!room) return
+  const room = requireWritableRoom(ctx, msg.requestId); if (!room) return
   if (!assertOwnSeat(ctx, msg.playerIndex, msg.requestId)) return
   if (!assertDevCommandAllowed(ctx, room, msg.requestId)) return
   const resp = room.session.withCtx(() => room.session.devSetResources(msg.playerIndex, msg.resources))
-  ctx.broadcaster.broadcastState(room, resp, 'dev', msg.requestId)
+  publishCommandResponse(ctx, room, resp, msg, 'dev')
 }
 
 function handleDevSetRound(ctx: ConnectionCtx, msg: Extract<ClientCommand, { type: 'devSetRound' }>): void {
-  const room = requireRoom(ctx, msg.requestId); if (!room) return
+  const room = requireWritableRoom(ctx, msg.requestId); if (!room) return
   if (!assertDevCommandAllowed(ctx, room, msg.requestId)) return
   const resp = room.session.withCtx(() => room.session.devSetRound(msg.round))
-  ctx.broadcaster.broadcastState(room, resp, 'dev', msg.requestId)
+  publishCommandResponse(ctx, room, resp, msg, 'dev')
 }
 
 function handleDevDrawCard(ctx: ConnectionCtx, msg: Extract<ClientCommand, { type: 'devDrawCard' }>): void {
-  const room = requireRoom(ctx, msg.requestId); if (!room) return
+  const room = requireWritableRoom(ctx, msg.requestId); if (!room) return
   if (!assertOwnSeat(ctx, msg.playerIndex, msg.requestId)) return
   if (!assertDevCommandAllowed(ctx, room, msg.requestId)) return
   const resp = room.session.withCtx(() => room.session.devDrawCard(msg.playerIndex, msg.cardId))
-  ctx.broadcaster.broadcastState(room, resp, 'dev', msg.requestId)
+  publishCommandResponse(ctx, room, resp, msg, 'dev')
 }
 
 function handleDevPlayCard(ctx: ConnectionCtx, msg: Extract<ClientCommand, { type: 'devPlayCard' }>): void {
-  const room = requireRoom(ctx, msg.requestId); if (!room) return
+  const room = requireWritableRoom(ctx, msg.requestId); if (!room) return
   if (!assertDevCommandAllowed(ctx, room, msg.requestId)) return
   const resp = room.session.withCtx(() => room.session.devPlayCard(msg.playerIndex, msg.cardId))
-  ctx.broadcaster.broadcastState(room, resp, 'dev', msg.requestId)
+  publishCommandResponse(ctx, room, resp, msg, 'dev')
 }
 
 function handleDevCreatePasture(ctx: ConnectionCtx, msg: Extract<ClientCommand, { type: 'devCreatePasture' }>): void {
-  const room = requireRoom(ctx, msg.requestId); if (!room) return
+  const room = requireWritableRoom(ctx, msg.requestId); if (!room) return
   if (!assertDevCommandAllowed(ctx, room, msg.requestId)) return
   const resp = room.session.withCtx(() => room.session.startDevFenceSelect(ctx.currentPlayerIndex))
-  ctx.broadcaster.broadcastState(room, resp, 'action', msg.requestId)
+  publishCommandResponse(ctx, room, resp, msg, 'action')
 }
 
 function handleDraftSubmit(ctx: ConnectionCtx, msg: Extract<ClientCommand, { type: 'draftSubmit' }>): void {
-  const room = requireRoom(ctx, msg.requestId); if (!room) return
+  const room = requireWritableRoom(ctx, msg.requestId); if (!room) return
   if (!assertOwnPlayerId(ctx, msg.playerId, msg.requestId)) return
   const resp = room.session.withCtx(() => room.session.submitDraftPick(msg.playerId, msg.pick))
-  ctx.broadcaster.broadcastState(room, resp, 'draftSubmit', msg.requestId)
+  publishCommandResponse(ctx, room, resp, msg, 'draftSubmit')
 }
 
 const handlers: { [K in ClientCommand['type']]: Handler<Extract<ClientCommand, { type: K }>> } = {

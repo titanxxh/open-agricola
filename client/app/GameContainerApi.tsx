@@ -3,13 +3,14 @@ import { useAuth } from '../contexts/AuthContext'
 import { useLocale } from '../contexts/LocaleContext'
 import { setPage } from './PageRouter'
 import type { ActionSpace, FarmTilePosition, InteractionCommand, PlayerState, Resource } from '../../shared/contract/types'
-import { t } from '../../shared/i18n'
+import { t, type Locale } from '../../shared/i18n'
 import {
   positionKey,
 } from '../../shared/domain/farm'
 import { useGameSync } from '../hooks/useGameSync'
 import { HttpGameTransport, WsGameTransport, parseDraftParamsFromQuery, type GameTransport } from '../services/gameTransport'
 import type { GameSyncPayload } from '../../shared/contract/protocol/game'
+import { REPLAY_CARD_SNAPSHOT_CONSENT_REQUIRED } from '../../shared/contract/protocol/ws'
 import type { MoorSpecialActionCardState, MoorSpecialActionId } from '../../shared/moor/types'
 import { isMoorTerrainAction } from '../../shared/moor/special-actions'
 import { playerCanBuildPalisades } from '../utils/player-palisades'
@@ -128,7 +129,12 @@ const toRequestedPlayerIndex = (playerParam: string | null) => {
     : undefined
 }
 
-const useTransportSetup = (playerParam: string | null, displayName?: string, isWsMode = false) => {
+const useTransportSetup = (
+  playerParam: string | null,
+  displayName: string | undefined,
+  isWsMode: boolean,
+  locale: Locale,
+) => {
   const [wsStatus, setWsStatus] = useState<WsStatus>({ phase: 'idle' })
   const [wsTransport, setWsTransport] = useState<WsGameTransport | null>(null)
   const [wsReady, setWsReady] = useState(false)
@@ -163,19 +169,6 @@ const useTransportSetup = (playerParam: string | null, displayName?: string, isW
       if (isCreator) {
         setWsStatus({ phase: 'creating' })
         const resp = await new Promise<{ roomId: string; playerIndex: number; maxPlayers: number } | { error: string }>((resolve) => {
-          const handler = (event: MessageEvent) => {
-            try {
-              const msg = JSON.parse(event.data as string)
-              if (msg.type === 'roomCreated') {
-                rawWs.removeEventListener('message', handler)
-                resolve({ roomId: msg.roomId, playerIndex: msg.playerIndex, maxPlayers: msg.maxPlayers ?? 2 })
-              } else if (msg.type === 'error') {
-                rawWs.removeEventListener('message', handler)
-                resolve({ error: msg.error })
-              }
-            } catch { /* skip */ }
-          }
-          rawWs.addEventListener('message', handler)
           const searchParams = new URLSearchParams(window.location.search)
           const customCardsParam = searchParams.get('customCards')
           const customCardIds = customCardsParam ? customCardsParam.split(',').filter(Boolean) : undefined
@@ -188,18 +181,49 @@ const useTransportSetup = (playerParam: string | null, displayName?: string, isW
           const enableFarmersOfTheMoor = enableFarmersOfTheMoorFromQuery(window.location.search) || undefined
           const allowIncompleteFarmersOfTheMoorMinorDeal =
             allowIncompleteFarmersOfTheMoorMinorDealFromQuery(window.location.search) || undefined
-          ws.sendRoomCommand('createRoom', {
-            maxPlayers,
-            name: displayName ?? playerParam ?? 'Player 1',
-            customCardIds,
-            enableCommunityDeck,
-            enableParentCards,
-            draftParents,
-            enableThroughTheSeasons,
-            enableFarmersOfTheMoor,
-            allowIncompleteFarmersOfTheMoorMinorDeal,
-            ...(draftParams ?? {}),
-          })
+          const sendCreateRoom = (confirmReplayCardSnapshotPublic?: true) => {
+            ws.sendRoomCommand('createRoom', {
+              maxPlayers,
+              name: displayName ?? playerParam ?? 'Player 1',
+              customCardIds,
+              confirmReplayCardSnapshotPublic,
+              enableCommunityDeck,
+              enableParentCards,
+              draftParents,
+              enableThroughTheSeasons,
+              enableFarmersOfTheMoor,
+              allowIncompleteFarmersOfTheMoorMinorDeal,
+              ...(draftParams ?? {}),
+            })
+          }
+          let replayConsentRequested = false
+          const handler = (event: MessageEvent) => {
+            try {
+              const msg = JSON.parse(event.data as string)
+              if (msg.type === 'roomCreated') {
+                rawWs.removeEventListener('message', handler)
+                resolve({ roomId: msg.roomId, playerIndex: msg.playerIndex, maxPlayers: msg.maxPlayers ?? 2 })
+              } else if (msg.type === 'error') {
+                if (
+                  msg.error === REPLAY_CARD_SNAPSHOT_CONSENT_REQUIRED
+                  && !replayConsentRequested
+                ) {
+                  replayConsentRequested = true
+                  if (window.confirm(t(locale, 'platform.replayCardSnapshotConsent'))) {
+                    sendCreateRoom(true)
+                    return
+                  }
+                  rawWs.removeEventListener('message', handler)
+                  resolve({ error: t(locale, 'platform.replayCardSnapshotDeclined') })
+                  return
+                }
+                rawWs.removeEventListener('message', handler)
+                resolve({ error: msg.error })
+              }
+            } catch { /* skip */ }
+          }
+          rawWs.addEventListener('message', handler)
+          sendCreateRoom()
         })
 
         if ('error' in resp) {
@@ -283,7 +307,7 @@ const useTransportSetup = (playerParam: string | null, displayName?: string, isW
     }
 
     init()
-  }, [displayName, isWsMode, playerParam])
+  }, [displayName, isWsMode, locale, playerParam])
 
   const transport: GameTransport = isWsMode && wsReady && wsTransport ? wsTransport : httpTransportSingleton
   const isReady = !isWsMode || wsReady
@@ -310,14 +334,20 @@ export const GameContainerApi = () => {
     if (Number.isFinite(index) && index >= 1 && index <= 6) return `p${index}`
     return null
   }, [])
+  const { locale } = useLocale()
   const { user } = useAuth()
-  const { transport, wsStatus, isWs, isReady, wsTransport } = useTransportSetup(lockedViewPlayerId, user?.displayName, isWsMode)
+  const { transport, wsStatus, isWs, isReady, wsTransport } = useTransportSetup(
+    lockedViewPlayerId,
+    user?.displayName,
+    isWsMode,
+    locale,
+  )
   const { state, interaction, scores, pastureCapacities, historyLength, hasActionStartSnapshot, actionAvailability, cardAvailability, privateEvents, applySnapshot } =
     useGameSync()
   const privateEventNotificationBatchSeqRef = useRef(0)
   const privateEventNotificationTimersRef = useRef<number[]>([])
-  const { locale } = useLocale()
   const [privateEventNotifications, setPrivateEventNotifications] = useState<PrivateEventNotification[]>([])
+  const [persistencePaused, setPersistencePaused] = useState(false)
   const [replayFilter, setReplayFilter] = useState<ReplayTimelineFilter>('all')
   const [selectedReplayKey, setSelectedReplayKey] = useState<string | null>(null)
   const [isReplayPlaying, setIsReplayPlaying] = useState(false)
@@ -423,7 +453,7 @@ export const GameContainerApi = () => {
   const isMyTurn = !!(activePlayer && selfPlayer && activePlayer.id === selfPlayer.id)
   // In HTTP (non-WS) mode, one human controls all players — always interactive
   const isInteractive = isWs
-    ? !!(activePlayer && selfPlayer && displayPlayer &&
+    ? !persistencePaused && !!(activePlayer && selfPlayer && displayPlayer &&
          activePlayer.id === selfPlayer.id && displayPlayer.id === selfPlayer.id)
     : !!(activePlayer && displayPlayer)
   const hasGameView = !!(state && currentPlayer && displayPlayer)
@@ -962,6 +992,10 @@ export const GameContainerApi = () => {
     transport.getState().catch((e) => { console.error("fetchState failed:", e) })
     return unsub
   }, [transport, handleSnapshot, isReady])
+  useEffect(() => {
+    if (!wsTransport) return
+    return wsTransport.onPersistenceStatus(setPersistencePaused)
+  }, [wsTransport])
   const confirmHarvestFeed = useCallback(() => {
     if (!isInteractive) return
     if (interactionPresentationPlan.kind !== 'harvest-feed') return
@@ -1202,6 +1236,11 @@ export const GameContainerApi = () => {
       const { percent, labelKey } = getGameLoadProgress(wsProgressPhase)
       return (
         <GameLoadScreen percent={percent} label={t(locale, labelKey)}>
+          {persistencePaused ? (
+            <div className="ws-status-text" role="alert">
+              {t(locale, 'ui.roomPersistencePaused')}
+            </div>
+          ) : null}
           <button type="button" className="btn-link ws-status-back" onClick={() => setPage('lobby')}>
             {t(locale, 'platform.backToLobby')}
           </button>
@@ -1256,6 +1295,11 @@ export const GameContainerApi = () => {
           <div className="ws-status-text" role={wsStatus.phase === 'error' ? 'alert' : undefined}>
             {statusText}
           </div>
+          {persistencePaused ? (
+            <div className="ws-status-text" role="alert">
+              {t(locale, 'ui.roomPersistencePaused')}
+            </div>
+          ) : null}
 
           {wsStatus.phase === 'waiting' && inviteUrl && (
             <div className="ws-invite-panel">
@@ -1321,8 +1365,13 @@ export const GameContainerApi = () => {
     return <GameLoadScreen percent={percent} label={t(locale, labelKey)} />
   }
 
-  const notificationStack = privateEventNotifications.length > 0 || displayPublicEventNotifications.length > 0 ? (
+  const notificationStack = persistencePaused || privateEventNotifications.length > 0 || displayPublicEventNotifications.length > 0 ? (
     <div className="event-notifications" role="status" aria-live="polite">
+      {persistencePaused ? (
+        <div className="public-event-notification" data-kind="future" role="alert">
+          {t(locale, 'ui.roomPersistencePaused')}
+        </div>
+      ) : null}
       {buildEventNotificationStackItems(privateEventNotifications, displayPublicEventNotifications).map((notification) => (
         <div
           key={notification.id}

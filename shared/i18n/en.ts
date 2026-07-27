@@ -13,6 +13,7 @@ export const en = {
     boardOverview: 'Board overview',
     gamePresentationNavigation: 'Game presentation',
     gamePresentationChanged: 'Current request: {presentation}',
+    roomPersistencePaused: 'Saving is paused. The game will resume automatically after storage recovers.',
     gamePresentation: {
       action: 'Action',
       farm: 'Farm',
@@ -1553,6 +1554,8 @@ export const en = {
     createGame: 'Create Game',
     dissolveRoom: 'Dissolve Room',
     dissolveConfirm: 'Are you sure you want to dissolve the room? All waiting players will be removed.',
+    replayCardSnapshotConsent: 'If any selected custom card is unpublished, its card face, art, and rule parameters will become permanently public with the completed replay. Continue?',
+    replayCardSnapshotDeclined: 'The room was not created because publishing the custom-card snapshot was not confirmed.',
     roomDissolved: 'Room has been dissolved',
     roomNetworkError: 'Could not connect to the game server. Check your network and try again.',
     waitingForPlayers: 'Room {roomId} — Waiting for players ({current}/{max})',

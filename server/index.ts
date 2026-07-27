@@ -159,10 +159,13 @@ const persistence =
 const shouldPersist: (room: Room) => boolean =
   PERSIST_ROOMS === 'sqlite' ? () => true : (room) => isDevRoom(room.id)
 
-// Periodically clean expired sessions (every hour)
-const sessionCleanupTimer = setInterval(cleanExpiredSessions, 60 * 60 * 1000)
-
 let wssCtx: ReturnType<typeof createWsServer> | null = null
+
+// Periodically clean expired sessions and replay evidence (every hour)
+const sessionCleanupTimer = setInterval(() => {
+  cleanExpiredSessions()
+  wssCtx?.committer?.cleanupReplayAssets()
+}, 60 * 60 * 1000)
 
 const server = createServer(async (req, res) => {
   if (!req.url) {

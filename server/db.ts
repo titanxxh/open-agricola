@@ -19,7 +19,7 @@ export function getDb(): Database.Database {
   return _db
 }
 
-function runMigrations(db: Database.Database): void {
+export function runMigrations(db: Database.Database): void {
   db.exec(`
     CREATE TABLE IF NOT EXISTS schema_version (
       version INTEGER PRIMARY KEY
@@ -475,6 +475,258 @@ function runMigrations(db: Database.Database): void {
         ALTER TABLE game_results RENAME COLUMN farmers_of_the_moor TO enable_farmers_of_the_moor;
       `,
     },
+    {
+      version: 21,
+      sql: `
+        CREATE TABLE game_contexts (
+          room_id TEXT PRIMARY KEY,
+          lifecycle TEXT NOT NULL CHECK (lifecycle IN ('active', 'completed', 'expired', 'removed')),
+          phase TEXT CHECK (phase IS NULL OR phase IN ('waiting', 'playing')),
+          replay_status TEXT CHECK (replay_status IS NULL OR replay_status IN ('available', 'legacy_no_replay')),
+          expires_at INTEGER,
+          removal_reason TEXT,
+          created_at INTEGER NOT NULL,
+          updated_at INTEGER NOT NULL
+        );
+        CREATE INDEX idx_game_contexts_lifecycle ON game_contexts(lifecycle);
+
+        CREATE TABLE game_replays (
+          room_id TEXT PRIMARY KEY REFERENCES game_contexts(room_id),
+          schema_version INTEGER NOT NULL,
+          viewer_build_id TEXT NOT NULL,
+          game_build_id TEXT NOT NULL,
+          status TEXT NOT NULL CHECK (status IN ('recording', 'completed')),
+          latest_step_no INTEGER NOT NULL,
+          missing_prefix INTEGER NOT NULL DEFAULT 0,
+          custom_cards_json TEXT NOT NULL DEFAULT '[]',
+          created_at INTEGER NOT NULL,
+          completed_at INTEGER
+        );
+
+        CREATE TABLE game_replay_steps (
+          room_id TEXT NOT NULL REFERENCES game_replays(room_id) ON DELETE CASCADE,
+          step_no INTEGER NOT NULL,
+          room_version INTEGER NOT NULL,
+          checkpoint_step_no INTEGER NOT NULL,
+          player_index INTEGER,
+          command_type TEXT NOT NULL,
+          intent_json TEXT NOT NULL,
+          payload_kind TEXT NOT NULL CHECK (payload_kind IN ('checkpoint', 'delta')),
+          payload_gzip BLOB NOT NULL,
+          frame_hash TEXT NOT NULL,
+          created_at INTEGER NOT NULL,
+          PRIMARY KEY (room_id, step_no)
+        );
+        CREATE INDEX idx_game_replay_steps_checkpoint
+          ON game_replay_steps(room_id, checkpoint_step_no, step_no);
+
+        CREATE TABLE issue_submission_connections (
+          user_id TEXT PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+          github_user_id TEXT NOT NULL UNIQUE,
+          access_token_ciphertext BLOB NOT NULL,
+          access_token_nonce BLOB NOT NULL,
+          access_token_tag BLOB NOT NULL,
+          refresh_token_ciphertext BLOB,
+          refresh_token_nonce BLOB,
+          refresh_token_tag BLOB,
+          key_id TEXT NOT NULL,
+          access_token_expires_at INTEGER NOT NULL,
+          refresh_token_expires_at INTEGER,
+          revoked_at INTEGER,
+          created_at INTEGER NOT NULL,
+          updated_at INTEGER NOT NULL
+        );
+
+        CREATE TABLE bug_reports (
+          submission_id TEXT PRIMARY KEY,
+          reporter_user_id TEXT REFERENCES users(id) ON DELETE SET NULL,
+          room_id TEXT NOT NULL REFERENCES game_contexts(room_id),
+          player_index INTEGER NOT NULL,
+          lifecycle TEXT NOT NULL,
+          room_version INTEGER NOT NULL,
+          step_no INTEGER NOT NULL,
+          frame_hash TEXT NOT NULL,
+          phenomenon TEXT,
+          author_identity TEXT CHECK (author_identity IS NULL OR author_identity IN ('github_user', 'hosted')),
+          status TEXT NOT NULL DEFAULT 'draft',
+          github_issue_number INTEGER,
+          github_issue_url TEXT,
+          evidence_expires_at INTEGER,
+          claim_token TEXT,
+          claimed_at INTEGER,
+          next_attempt_at INTEGER,
+          submitted_at INTEGER,
+          created_at INTEGER NOT NULL,
+          updated_at INTEGER NOT NULL
+        );
+        CREATE INDEX idx_bug_reports_reporter_created
+          ON bug_reports(reporter_user_id, created_at);
+        CREATE INDEX idx_bug_reports_room_created
+          ON bug_reports(room_id, created_at);
+        CREATE INDEX idx_bug_reports_delivery
+          ON bug_reports(status, next_attempt_at);
+
+        CREATE TABLE bug_report_attempts (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          submission_id TEXT NOT NULL REFERENCES bug_reports(submission_id) ON DELETE CASCADE,
+          kind TEXT NOT NULL,
+          outcome TEXT NOT NULL,
+          http_status INTEGER,
+          github_request_id TEXT,
+          started_at INTEGER NOT NULL,
+          finished_at INTEGER,
+          retry_at INTEGER,
+          expires_at INTEGER NOT NULL
+        );
+        CREATE INDEX idx_bug_report_attempts_submission
+          ON bug_report_attempts(submission_id, started_at);
+        CREATE INDEX idx_bug_report_attempts_expires
+          ON bug_report_attempts(expires_at);
+
+        CREATE TABLE bug_report_evidence_audit (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          submission_id TEXT NOT NULL REFERENCES bug_reports(submission_id),
+          maintainer_user_id TEXT REFERENCES users(id) ON DELETE SET NULL,
+          room_id TEXT NOT NULL,
+          step_no INTEGER NOT NULL,
+          frame_hash TEXT NOT NULL,
+          perspective TEXT NOT NULL,
+          reason TEXT NOT NULL,
+          created_at INTEGER NOT NULL
+        );
+        CREATE INDEX idx_bug_report_evidence_audit_submission
+          ON bug_report_evidence_audit(submission_id, created_at);
+
+        INSERT INTO game_contexts (
+          room_id, lifecycle, phase, replay_status, expires_at, removal_reason, created_at, updated_at
+        )
+        SELECT
+          id,
+          'active',
+          CASE WHEN status = 'waiting' THEN 'waiting' ELSE 'playing' END,
+          NULL,
+          NULL,
+          NULL,
+          created_at,
+          updated_at
+        FROM rooms
+        WHERE status != 'finished'
+        ON CONFLICT(room_id) DO NOTHING;
+
+        INSERT INTO game_contexts (
+          room_id, lifecycle, phase, replay_status, expires_at, removal_reason, created_at, updated_at
+        )
+        SELECT
+          room_id,
+          'completed',
+          NULL,
+          'legacy_no_replay',
+          NULL,
+          NULL,
+          started_at,
+          finished_at
+        FROM game_results
+        WHERE 1
+        ON CONFLICT(room_id) DO UPDATE SET
+          lifecycle = 'completed',
+          phase = NULL,
+          replay_status = 'legacy_no_replay',
+          expires_at = NULL,
+          removal_reason = NULL,
+          created_at = excluded.created_at,
+          updated_at = excluded.updated_at;
+
+        DELETE FROM rooms
+        WHERE id IN (SELECT room_id FROM game_results);
+      `,
+    },
+    {
+      version: 22,
+      sql: `
+        ALTER TABLE rooms ADD COLUMN replay_recording INTEGER;
+        ALTER TABLE rooms ADD COLUMN replay_viewer_build_id TEXT;
+        ALTER TABLE rooms ADD COLUMN replay_game_build_id TEXT;
+
+        CREATE TRIGGER expire_game_context_after_room_delete
+        AFTER DELETE ON rooms
+        BEGIN
+          UPDATE game_contexts
+          SET lifecycle = 'expired',
+              phase = NULL,
+              expires_at = CAST(strftime('%s', 'now') AS INTEGER) * 1000,
+              updated_at = CAST(strftime('%s', 'now') AS INTEGER) * 1000
+          WHERE room_id = OLD.id AND lifecycle = 'active';
+        END;
+      `,
+    },
+    {
+      version: 23,
+      sql: `
+        ALTER TABLE rooms ADD COLUMN custom_cards_runtime_json TEXT;
+      `,
+    },
+    {
+      version: 24,
+      sql: `
+        DROP TRIGGER IF EXISTS expire_game_context_after_room_delete;
+        CREATE TRIGGER expire_game_context_after_room_delete
+        AFTER DELETE ON rooms
+        BEGIN
+          DELETE FROM game_replay_steps
+          WHERE room_id = OLD.id
+            AND EXISTS (
+              SELECT 1 FROM game_contexts
+              WHERE room_id = OLD.id AND lifecycle = 'active'
+            )
+            AND NOT EXISTS (
+              SELECT 1
+              FROM bug_reports AS report
+              JOIN game_replay_steps AS anchor
+                ON anchor.room_id = report.room_id
+               AND anchor.step_no = report.step_no
+              WHERE report.room_id = OLD.id
+                AND report.evidence_expires_at >
+                  CAST(strftime('%s', 'now') AS INTEGER) * 1000
+                AND game_replay_steps.step_no
+                  BETWEEN anchor.checkpoint_step_no AND report.step_no
+            );
+
+          UPDATE game_replays
+          SET latest_step_no = (
+            SELECT MAX(step_no)
+            FROM game_replay_steps
+            WHERE room_id = OLD.id
+          )
+          WHERE room_id = OLD.id
+            AND EXISTS (
+              SELECT 1 FROM game_contexts
+              WHERE room_id = OLD.id AND lifecycle = 'active'
+            )
+            AND EXISTS (
+              SELECT 1 FROM game_replay_steps
+              WHERE room_id = OLD.id
+            );
+
+          DELETE FROM game_replays
+          WHERE room_id = OLD.id
+            AND EXISTS (
+              SELECT 1 FROM game_contexts
+              WHERE room_id = OLD.id AND lifecycle = 'active'
+            )
+            AND NOT EXISTS (
+              SELECT 1 FROM game_replay_steps
+              WHERE room_id = OLD.id
+            );
+
+          UPDATE game_contexts
+          SET lifecycle = 'expired',
+              phase = NULL,
+              expires_at = CAST(strftime('%s', 'now') AS INTEGER) * 1000,
+              updated_at = CAST(strftime('%s', 'now') AS INTEGER) * 1000
+          WHERE room_id = OLD.id AND lifecycle = 'active';
+        END;
+      `,
+    },
   ]
 
   const insert = db.prepare('INSERT INTO schema_version (version) VALUES (?)')
@@ -489,8 +741,53 @@ function runMigrations(db: Database.Database): void {
   }
 }
 
-/** Clean up expired sessions periodically. */
+/** Clean up expired sessions and replay evidence periodically. */
 export function cleanExpiredSessions(): void {
   const db = getDb()
-  db.prepare('DELETE FROM sessions WHERE expires_at < ?').run(Date.now())
+  const now = Date.now()
+  db.transaction(() => {
+    db.prepare('DELETE FROM sessions WHERE expires_at < ?').run(now)
+    db.prepare(`
+      DELETE FROM game_replay_steps
+      WHERE room_id IN (
+        SELECT room_id FROM game_contexts WHERE lifecycle = 'expired'
+      )
+        AND NOT EXISTS (
+          SELECT 1
+          FROM bug_reports AS report
+          JOIN game_replay_steps AS anchor
+            ON anchor.room_id = report.room_id
+           AND anchor.step_no = report.step_no
+          WHERE report.room_id = game_replay_steps.room_id
+            AND report.evidence_expires_at > ?
+            AND game_replay_steps.step_no
+              BETWEEN anchor.checkpoint_step_no AND report.step_no
+        )
+    `).run(now)
+    db.prepare(`
+      UPDATE game_replays
+      SET latest_step_no = (
+        SELECT MAX(step_no)
+        FROM game_replay_steps
+        WHERE room_id = game_replays.room_id
+      )
+      WHERE room_id IN (
+        SELECT room_id FROM game_contexts WHERE lifecycle = 'expired'
+      )
+        AND EXISTS (
+          SELECT 1 FROM game_replay_steps
+          WHERE room_id = game_replays.room_id
+        )
+    `).run()
+    db.prepare(`
+      DELETE FROM game_replays
+      WHERE room_id IN (
+        SELECT room_id FROM game_contexts WHERE lifecycle = 'expired'
+      )
+        AND NOT EXISTS (
+          SELECT 1 FROM game_replay_steps
+          WHERE room_id = game_replays.room_id
+        )
+    `).run()
+  })()
 }

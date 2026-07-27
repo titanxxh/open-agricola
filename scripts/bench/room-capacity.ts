@@ -1,5 +1,4 @@
 import { execFileSync } from 'node:child_process'
-import { createHash } from 'node:crypto'
 import {
   mkdirSync,
   mkdtempSync,
@@ -11,7 +10,6 @@ import {
 import { cpus } from 'node:os'
 import { dirname, join } from 'node:path'
 import { monitorEventLoopDelay, performance } from 'node:perf_hooks'
-import { gzipSync } from 'node:zlib'
 import Database from 'better-sqlite3'
 import type { WebSocket } from 'ws'
 import '../../shared/cards/register-all.ts'
@@ -36,6 +34,11 @@ import { buildEnvelope } from '../../server/connection/envelope-builder.ts'
 import { SqliteRoomPersistence } from '../../server/game/persistence/sqlite-adapter.ts'
 import type { Room } from '../../server/game/room.ts'
 import { createRoomPersistenceCheckpoint } from '../../server/game/room-persistence-checkpoint.ts'
+import {
+  RoomCommitter,
+  type ReplayIntent,
+} from '../../server/game/room-committer.ts'
+import { runMigrations } from '../../server/db.ts'
 
 type Config = {
   levels: number[]
@@ -74,10 +77,6 @@ type ReplayMetrics = {
   archiveP95Ms: number
   archiveP99Ms: number
   archiveMaxMs: number
-  sqliteP99Ms: number
-  sqliteMaxMs: number
-  sqliteTailPauses: number
-  walAutoCheckpointPages: number
 }
 
 type LevelResult = {
@@ -113,26 +112,6 @@ type Environment = {
   synchronous: number
   walAutoCheckpointPages: number
   invocation: string
-}
-
-type JsonValue = null | boolean | number | string | JsonValue[] | {
-  [key: string]: JsonValue
-}
-
-type ReplayPatchOperation =
-  | { op: 'add' | 'replace'; path: string; value: JsonValue }
-  | { op: 'remove'; path: string }
-
-type ReplayStepWrite = {
-  roomId: string
-  stateJson: string
-  stepNo: number
-  roomVersion: number
-  payloadKind: 'checkpoint' | 'delta'
-  payload: Buffer
-  frameHash: string
-  actorPlayerIndex: number | null
-  commandType: string
 }
 
 const thresholds: Thresholds = {
@@ -261,203 +240,57 @@ const sizeOf = (path: string): number => {
 
 const sleep = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms))
 
-const jsonPointerPart = (value: string): string => value.replaceAll('~', '~0').replaceAll('/', '~1')
-
-const isJsonObject = (value: JsonValue): value is { [key: string]: JsonValue } =>
-  value !== null && typeof value === 'object' && !Array.isArray(value)
-
-const buildReplayPatch = (
-  before: JsonValue,
-  after: JsonValue,
-  path: string = '',
-): ReplayPatchOperation[] => {
-  if (Object.is(before, after)) return []
-  if (Array.isArray(before) && Array.isArray(after)) {
-    const operations: ReplayPatchOperation[] = []
-    const sharedLength = Math.min(before.length, after.length)
-    for (let index = 0; index < sharedLength; index += 1) {
-      operations.push(...buildReplayPatch(before[index]!, after[index]!, `${path}/${index}`))
-    }
-    for (let index = before.length - 1; index >= after.length; index -= 1) {
-      operations.push({ op: 'remove', path: `${path}/${index}` })
-    }
-    for (let index = before.length; index < after.length; index += 1) {
-      operations.push({ op: 'add', path: `${path}/${index}`, value: after[index]! })
-    }
-    return operations
-  }
-  if (isJsonObject(before) && isJsonObject(after)) {
-    const operations: ReplayPatchOperation[] = []
-    const beforeKeys = Object.keys(before).sort()
-    const afterKeys = Object.keys(after).sort()
-    for (const key of beforeKeys) {
-      if (!(key in after)) {
-        operations.push({ op: 'remove', path: `${path}/${jsonPointerPart(key)}` })
-      }
-    }
-    for (const key of afterKeys) {
-      const nextPath = `${path}/${jsonPointerPart(key)}`
-      if (!(key in before)) {
-        operations.push({ op: 'add', path: nextPath, value: after[key]! })
-      } else {
-        operations.push(...buildReplayPatch(before[key]!, after[key]!, nextPath))
-      }
-    }
-    return operations
-  }
-  return [{ op: 'replace', path, value: after }]
-}
-
-const canonicalizeJson = (value: JsonValue): JsonValue => {
-  if (Array.isArray(value)) return value.map(canonicalizeJson)
-  if (!isJsonObject(value)) return value
-  return Object.fromEntries(
-    Object.keys(value).sort().map((key) => [key, canonicalizeJson(value[key]!)]),
-  )
-}
-
-const createReplaySchema = (db: Database.Database): void => {
-  db.exec(`
-    CREATE TABLE replay_headers (
-      room_id TEXT PRIMARY KEY,
-      schema_version INTEGER NOT NULL,
-      viewer_build_id TEXT NOT NULL,
-      status TEXT NOT NULL,
-      missing_prefix INTEGER NOT NULL DEFAULT 0
-    );
-    CREATE TABLE replay_steps (
-      room_id TEXT NOT NULL,
-      step_no INTEGER NOT NULL,
-      room_version INTEGER NOT NULL,
-      payload_kind TEXT NOT NULL,
-      payload BLOB NOT NULL,
-      frame_hash TEXT NOT NULL,
-      actor_player_index INTEGER,
-      command_type TEXT NOT NULL,
-      params_json TEXT NOT NULL,
-      PRIMARY KEY (room_id, step_no)
-    );
-  `)
-}
-
-const createSchema = (db: Database.Database): void => {
-  db.pragma('journal_mode = WAL')
-  db.pragma('synchronous = NORMAL')
-  db.pragma('busy_timeout = 5000')
-  db.pragma('foreign_keys = ON')
-  db.exec(`
-    CREATE TABLE users (id TEXT PRIMARY KEY);
-    CREATE TABLE rooms (
-      id TEXT PRIMARY KEY,
-      created_by TEXT REFERENCES users(id),
-      state_json TEXT,
-      max_players INTEGER NOT NULL DEFAULT 2,
-      status TEXT NOT NULL DEFAULT 'waiting',
-      version INTEGER NOT NULL DEFAULT 0,
-      custom_card_ids TEXT NOT NULL DEFAULT '[]',
-      enable_parent_cards INTEGER NOT NULL DEFAULT 0,
-      draft_parents INTEGER,
-      enable_through_the_seasons INTEGER NOT NULL DEFAULT 0,
-      enable_farmers_of_the_moor INTEGER NOT NULL DEFAULT 0,
-      allow_incomplete_farmers_of_the_moor_minor_deal INTEGER NOT NULL DEFAULT 0,
-      started_at INTEGER,
-      created_at INTEGER NOT NULL,
-      updated_at INTEGER NOT NULL
-    );
-    CREATE TABLE room_players (
-      room_id TEXT NOT NULL REFERENCES rooms(id) ON DELETE CASCADE,
-      user_id TEXT NOT NULL REFERENCES users(id),
-      player_index INTEGER NOT NULL,
-      joined_at INTEGER NOT NULL,
-      PRIMARY KEY (room_id, user_id)
-    );
-    CREATE TABLE game_results (
-      room_id TEXT PRIMARY KEY,
-      started_at INTEGER NOT NULL,
-      finished_at INTEGER NOT NULL,
-      rounds_played INTEGER NOT NULL,
-      player_count INTEGER NOT NULL,
-      enable_community_deck INTEGER NOT NULL,
-      enable_parent_cards INTEGER NOT NULL,
-      enable_through_the_seasons INTEGER NOT NULL,
-      enable_farmers_of_the_moor INTEGER NOT NULL
-    );
-    CREATE TABLE game_result_players (
-      room_id TEXT NOT NULL REFERENCES game_results(room_id) ON DELETE CASCADE,
-      player_index INTEGER NOT NULL,
-      game_player_id TEXT NOT NULL,
-      user_id TEXT,
-      display_name TEXT NOT NULL,
-      score INTEGER NOT NULL,
-      PRIMARY KEY (room_id, player_index)
-    );
-  `)
-}
-
 class ReplayArchiveProbe {
-  private readonly previousFrames = new Map<string, JsonValue>()
-  private readonly nextStepNo = new Map<string, number>()
+  private readonly committer: RoomCommitter
+  private readonly loadStep
   private readonly archiveSamples: number[] = []
-  private readonly sqliteSamples: number[] = []
-  private readonly writeStep: (args: ReplayStepWrite) => void
   private writes = 0
   private acceptedCommands = 0
   private checkpoints = 0
   private deltas = 0
   private payloadBytes = 0
-  readonly walAutoCheckpointPages: number
 
-  constructor(db: Database.Database) {
-    const insertHeader = db.prepare(`
-      INSERT OR IGNORE INTO replay_headers (
-        room_id, schema_version, viewer_build_id, status, missing_prefix
-      ) VALUES (?, 1, 'benchmark-viewer', 'recording', 0)
-    `)
-    const updateRoom = db.prepare(`
-      UPDATE rooms
-      SET state_json = ?, version = version + 1, updated_at = ?
-      WHERE id = ?
-    `)
-    const insertStep = db.prepare(`
-      INSERT INTO replay_steps (
-        room_id, step_no, room_version, payload_kind, payload, frame_hash,
-        actor_player_index, command_type, params_json
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, '{}')
-    `)
-    this.writeStep = db.transaction((args: ReplayStepWrite) => {
-      insertHeader.run(args.roomId)
-      updateRoom.run(args.stateJson, Date.now(), args.roomId)
-      insertStep.run(
-        args.roomId,
-        args.stepNo,
-        args.roomVersion,
-        args.payloadKind,
-        args.payload,
-        args.frameHash,
-        args.actorPlayerIndex,
-        args.commandType,
-      )
+  constructor(db: Database.Database, persistence: SqliteRoomPersistence) {
+    this.committer = new RoomCommitter({
+      persistence,
+      enabled: true,
+      viewerBuildId: 'benchmark-viewer',
+      gameBuildId: 'benchmark-game',
+      viewerBuildExists: () => true,
     })
-    this.walAutoCheckpointPages = Number(db.pragma('wal_autocheckpoint', { simple: true }))
+    this.loadStep = db.prepare(`
+      SELECT payload_kind, length(payload_gzip) AS payload_bytes
+      FROM game_replay_steps
+      WHERE room_id = ? AND step_no = ?
+    `)
   }
 
   recordInitial(room: Room): void {
-    this.record(room, room.version, null, 'initial')
+    const startedAt = performance.now()
+    const result = this.committer.prepareRoom(room, { missingPrefix: false })
+    this.recordResult(room, result, startedAt, false)
   }
 
-  recordStep(room: Room, actorPlayerIndex: number, commandType: string): void {
-    this.record(
+  recordStep(
+    room: Room,
+    response: SessionResponse,
+    actorPlayerIndex: number,
+    commandType: string,
+  ): void {
+    const startedAt = performance.now()
+    const replayIntent: ReplayIntent = { commandType, intentJson: '{}' }
+    const result = this.committer.commit(
       room,
-      room.version + 1,
+      response,
+      replayIntent,
       actorPlayerIndex,
-      commandType,
     )
     this.acceptedCommands += 1
+    this.recordResult(room, result, startedAt, true)
   }
 
   resetMetrics(): void {
     this.archiveSamples.length = 0
-    this.sqliteSamples.length = 0
     this.writes = 0
     this.acceptedCommands = 0
     this.checkpoints = 0
@@ -476,58 +309,34 @@ class ReplayArchiveProbe {
       archiveP95Ms: percentile(this.archiveSamples, 0.95),
       archiveP99Ms: percentile(this.archiveSamples, 0.99),
       archiveMaxMs: Math.max(0, ...this.archiveSamples),
-      sqliteP99Ms: percentile(this.sqliteSamples, 0.99),
-      sqliteMaxMs: Math.max(0, ...this.sqliteSamples),
-      sqliteTailPauses: this.sqliteSamples.filter((sample) => sample >= 100).length,
-      walAutoCheckpointPages: this.walAutoCheckpointPages,
     }
   }
 
-  private record(
+  shutdown(): void {
+    this.committer.shutdown()
+  }
+
+  private recordResult(
     room: Room,
-    roomVersion: number,
-    actorPlayerIndex: number | null,
-    commandType: string,
+    result: ReturnType<RoomCommitter['commit']>,
+    startedAt: number,
+    command: boolean,
   ): void {
-    const startedAt = performance.now()
-    const serialized = serializeState(room.session.state, {
-      engineStack: room.session.getEngineStack(),
-    })
-    const stateJson = JSON.stringify(serialized)
-    const frame = JSON.parse(stateJson) as JsonValue
-    const previous = this.previousFrames.get(room.id)
-    const stepNo = this.nextStepNo.get(room.id) ?? 0
-    const patchJson = previous === undefined || stepNo % 16 === 0
-      ? null
-      : JSON.stringify(buildReplayPatch(previous, frame))
-    const payloadKind = patchJson === null ||
-      Buffer.byteLength(patchJson!) >= Buffer.byteLength(stateJson)
-      ? 'checkpoint'
-      : 'delta'
-    const payloadText = payloadKind === 'checkpoint' ? stateJson : patchJson!
-    const payload = gzipSync(payloadText)
-    const frameHash = createHash('sha256')
-      .update(JSON.stringify(canonicalizeJson(frame)))
-      .digest('hex')
-    const sqliteStartedAt = performance.now()
-    this.writeStep({
-      roomId: room.id,
-      stateJson,
-      stepNo,
-      roomVersion,
-      payloadKind,
-      payload,
-      frameHash,
-      actorPlayerIndex,
-      commandType,
-    })
-    this.sqliteSamples.push(performance.now() - sqliteStartedAt)
-    this.archiveSamples.push(performance.now() - startedAt)
-    this.previousFrames.set(room.id, frame)
-    this.nextStepNo.set(room.id, stepNo + 1)
+    const elapsed = performance.now() - startedAt
+    this.archiveSamples.push(elapsed)
+    if (result.kind === 'blocked') throw new Error(result.error)
+    if (result.kind === 'unchanged') {
+      if (command) throw new Error('benchmark command did not change Replay Frame')
+      return
+    }
+    const row = this.loadStep.get(room.id, result.stepNo) as {
+      payload_kind: 'checkpoint' | 'delta'
+      payload_bytes: number
+    } | undefined
+    if (!row) throw new Error(`Replay Step ${result.stepNo} is missing`)
     this.writes += 1
-    this.payloadBytes += payload.length
-    if (payloadKind === 'checkpoint') this.checkpoints += 1
+    this.payloadBytes += row.payload_bytes
+    if (row.payload_kind === 'checkpoint') this.checkpoints += 1
     else this.deltas += 1
   }
 }
@@ -773,9 +582,12 @@ const addRoom = (
 ): Room => {
   const firstUserId = `room-${index}-user-0`
   const secondUserId = `room-${index}-user-1`
-  const insertUser = db.prepare('INSERT INTO users (id) VALUES (?)')
-  insertUser.run(firstUserId)
-  insertUser.run(secondUserId)
+  const insertUser = db.prepare(`
+    INSERT INTO users (id, username, display_name, password_hash, created_at)
+    VALUES (?, ?, ?, 'benchmark', 1)
+  `)
+  insertUser.run(firstUserId, firstUserId, 'Player 1')
+  insertUser.run(secondUserId, secondUserId, 'Player 2')
   const session = new GameSession(rehydrateState(structuredClone(state)))
   const room: Room = {
     id: `bench-${index}`,
@@ -787,6 +599,7 @@ const addRoom = (
     maxPlayers: 2,
     version: 0,
     status: 'playing',
+    startedAt: Date.now(),
     createdBy: firstUserId,
   }
   checkpoint.recordCreated(room)
@@ -828,9 +641,13 @@ const mutateAndBroadcast = (
   try {
     const { resp, actorPlayerIndex, commandType } = executeBenchmarkCommand(room)
     if (!resp.ok) return resp.error ?? 'response ok=false'
-    replay?.recordStep(room, actorPlayerIndex, commandType)
-    broadcaster.broadcastState(room, resp, 'action')
-    if (replay) checkpoint.cancelRoom(room.id)
+    if (replay) {
+      replay.recordStep(room, resp, actorPlayerIndex, commandType)
+      broadcaster.broadcastCommitted(room, resp, 'action')
+      checkpoint.cancelRoom(room.id)
+    } else {
+      broadcaster.broadcastState(room, resp, 'action')
+    }
     return null
   } catch (err) {
     return err instanceof Error ? err.message : String(err)
@@ -1066,7 +883,7 @@ const renderReport = (
     .filter((level): level is LevelResult & { replay: ReplayMetrics } => level.replay !== null)
     .map((level) => {
       const replay = level.replay
-      return `| ${level.roomCount} | ${replay.writes} | ${replay.checkpoints} | ${replay.deltas} | ${(replay.payloadBytes / Math.max(1, replay.writes) / 1024).toFixed(2)} | ${replay.archiveP50Ms.toFixed(3)} | ${replay.archiveP95Ms.toFixed(3)} | ${replay.archiveP99Ms.toFixed(3)} | ${replay.archiveMaxMs.toFixed(3)} | ${replay.sqliteP99Ms.toFixed(3)} | ${replay.sqliteMaxMs.toFixed(3)} | ${replay.sqliteTailPauses} |`
+      return `| ${level.roomCount} | ${replay.writes} | ${replay.checkpoints} | ${replay.deltas} | ${(replay.payloadBytes / Math.max(1, replay.writes) / 1024).toFixed(2)} | ${replay.archiveP50Ms.toFixed(3)} | ${replay.archiveP95Ms.toFixed(3)} | ${replay.archiveP99Ms.toFixed(3)} | ${replay.archiveMaxMs.toFixed(3)} |`
     })
     .join('\n')
   return `# Room Capacity ${title}
@@ -1089,7 +906,7 @@ const renderReport = (
 ## Workload
 
 - Active two-player rooms with two open WebSocket seats
-- Late-game state; production viewer envelopes and persistence checkpoint path
+- Late-game state; production viewer envelopes and durable Room Commit path
 - Replay archive: ${config.replayArchive ? 'bounded authoritative state delta chain with atomic Room snapshot + Replay Step writes' : 'disabled'}
 - In-process socket sink; network transport latency is excluded
 - Levels: ${config.levels.join(', ')}
@@ -1106,13 +923,11 @@ const renderReport = (
 | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | :--- |
 ${rows}
 
-${config.replayArchive ? `## Replay archive writes
+${config.replayArchive ? `## Durable Replay commits
 
-| Rooms | Writes | Checkpoints | Deltas | Avg. gzip payload KiB | Archive p50 ms | Archive p95 ms | Archive p99 ms | Archive max ms | SQLite tx p99 ms | SQLite tx max ms | SQLite tx >= 100ms |
-| ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| Rooms | Writes | Checkpoints | Deltas | Avg. gzip payload KiB | Commit p50 ms | Commit p95 ms | Commit p99 ms | Commit max ms |
+| ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
 ${replayRows}
-
-Transactions at or above 100ms are reported as WAL auto-checkpoint tail candidates; the probe does not claim every such pause was caused by checkpointing.
 
 ` : ''}## Cost attribution
 
@@ -1141,13 +956,16 @@ export const runRoomCapacityProbe = async (config: Config): Promise<{
   const dbPath = join(tempDir, 'capacity.db')
   const db = new Database(dbPath)
   try {
-    createSchema(db)
-    if (config.replayArchive) createReplaySchema(db)
+    db.pragma('journal_mode = WAL')
+    db.pragma('synchronous = NORMAL')
+    db.pragma('busy_timeout = 5000')
+    db.pragma('foreign_keys = ON')
+    runMigrations(db)
     const sqlite = new SqliteRoomPersistence(db)
     const persistence = new TimedPersistence(sqlite)
     const checkpoint = createRoomPersistenceCheckpoint({ persistence })
     const broadcaster = new Broadcaster({ checkpoint })
-    const replay = config.replayArchive ? new ReplayArchiveProbe(db) : null
+    const replay = config.replayArchive ? new ReplayArchiveProbe(db, sqlite) : null
     const requiredCommands = config.levels.length * (
       Math.ceil(config.warmupSeconds * config.actionsPerRoomSecond) +
       Math.ceil(config.durationSeconds * config.actionsPerRoomSecond) +
@@ -1178,6 +996,7 @@ export const runRoomCapacityProbe = async (config: Config): Promise<{
       levels.push(result)
       if (!result.passed && !config.smoke) break
     }
+    replay?.shutdown()
     checkpoint.shutdown()
     const environment: Environment = {
       commit: process.env.ROOM_CAPACITY_COMMIT ??

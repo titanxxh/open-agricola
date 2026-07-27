@@ -29,6 +29,10 @@ export type Room = {
   startedAt?: number
   createdBy?: string
   customCardDbIds?: string[]
+  customCards?: CustomCardData[]
+  replayRecording?: boolean
+  replayViewerBuildId?: string
+  replayGameBuildId?: string
   enableParentCards?: boolean
   draftParents?: boolean
   draftMode?: 'simultaneous'
@@ -159,6 +163,16 @@ export const toRoomMeta = (room: Room): RoomMeta => ({
   startedAt: room.startedAt ?? null,
   maxPlayers: room.maxPlayers,
   customCardDbIds: room.customCardDbIds ?? [],
+  ...(room.customCards === undefined ? {} : { customCards: room.customCards }),
+  ...(room.replayRecording === undefined
+    ? {}
+    : { replayRecording: room.replayRecording }),
+  ...(room.replayViewerBuildId === undefined
+    ? {}
+    : { replayViewerBuildId: room.replayViewerBuildId }),
+  ...(room.replayGameBuildId === undefined
+    ? {}
+    : { replayGameBuildId: room.replayGameBuildId }),
   enableParentCards: room.enableParentCards ?? room.session.state.enableParentCards,
   draftParents: room.draftParents,
   enableThroughTheSeasons: room.enableThroughTheSeasons ?? room.session.state.enableThroughTheSeasons,
@@ -297,7 +311,7 @@ const createSessionFromSnapshot = (
 
 export const snapshotToRoom = (
   snapshot: RoomSnapshot,
-  customCards: CustomCardData[] = [],
+  customCards: CustomCardData[] = snapshot.meta.customCards ?? [],
 ): Room => {
   const session = createSessionFromSnapshot(snapshot, customCards)
   return {
@@ -311,6 +325,10 @@ export const snapshotToRoom = (
     startedAt: snapshot.meta.startedAt ?? undefined,
     createdBy: snapshot.meta.createdBy ?? undefined,
     customCardDbIds: snapshot.meta.customCardDbIds,
+    customCards,
+    replayRecording: snapshot.meta.replayRecording,
+    replayViewerBuildId: snapshot.meta.replayViewerBuildId,
+    replayGameBuildId: snapshot.meta.replayGameBuildId,
     enableParentCards: snapshot.meta.enableParentCards ?? snapshot.serialized?.enableParentCards ?? false,
     draftParents: snapshot.meta.draftParents,
     draftMode: session.state.draftMode,
