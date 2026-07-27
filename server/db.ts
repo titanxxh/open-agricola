@@ -246,6 +246,10 @@ export function runMigrations(db: Database.Database): void {
           intent TEXT NOT NULL,
           user_id TEXT,
           return_to TEXT,
+          pkce_verifier_ciphertext BLOB,
+          pkce_verifier_nonce BLOB,
+          pkce_verifier_tag BLOB,
+          pkce_verifier_key_id TEXT,
           expires_at INTEGER NOT NULL,
           created_at INTEGER NOT NULL,
           used_at INTEGER
@@ -556,6 +560,7 @@ export function runMigrations(db: Database.Database): void {
           claimed_at INTEGER,
           next_attempt_at INTEGER,
           submitted_at INTEGER,
+          last_error_code TEXT,
           created_at INTEGER NOT NULL,
           updated_at INTEGER NOT NULL
         );
@@ -747,6 +752,7 @@ export function cleanExpiredSessions(): void {
   const now = Date.now()
   db.transaction(() => {
     db.prepare('DELETE FROM sessions WHERE expires_at < ?').run(now)
+    db.prepare('DELETE FROM bug_report_attempts WHERE expires_at < ?').run(now)
     db.prepare(`
       DELETE FROM game_replay_steps
       WHERE room_id IN (

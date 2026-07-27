@@ -8,6 +8,7 @@ import type {
 import { LocaleSwitcher } from '../components/common/LocaleSwitcher'
 import { API_BASE } from '../config'
 import { useLocale } from '../contexts/LocaleContext'
+import { BugReportBar } from './BugReportBar'
 import '../styles/pages/replay.css'
 
 type Perspective = 'open' | `p${number}`
@@ -278,6 +279,10 @@ export function ReplayShell({
     setLocation(next)
     updateLocation(next.perspective, next.layout, next.step, frameHash)
   }
+  const reportStepNo = location.step ?? manifest?.firstStepNo ?? null
+  const reportFrameHash = manifest?.steps.find(
+    (step) => step.stepNo === reportStepNo,
+  )?.frameHash
 
   if (!replay || error) {
     return (
@@ -334,6 +339,13 @@ export function ReplayShell({
         >
           {t('platform.gameContext.watchOpen')}
         </button>
+        {reportStepNo !== null && reportFrameHash ? (
+          <BugReportBar
+            roomId={context.roomId}
+            stepNo={reportStepNo}
+            frameHash={reportFrameHash}
+          />
+        ) : null}
       </main>
     )
   }
@@ -350,6 +362,13 @@ export function ReplayShell({
         setFrame={setIframe}
         title={t('platform.gameContext.replayFrameTitle')}
       />
+      {reportStepNo !== null && reportFrameHash ? (
+        <BugReportBar
+          roomId={context.roomId}
+          stepNo={reportStepNo}
+          frameHash={reportFrameHash}
+        />
+      ) : null}
     </main>
   )
 }

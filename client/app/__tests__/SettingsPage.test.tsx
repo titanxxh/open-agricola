@@ -30,6 +30,12 @@ const labels: Record<string, string> = {
   'platform.linkGithub': '绑定 GitHub',
   'platform.linkGoogle': '绑定 Google',
   'platform.adminInvites': '邀请注册',
+  'platform.bugReport.settingsTitle': 'GitHub Issue 提交',
+  'platform.bugReport.settingsConnected': '已连接 Issue 提交身份',
+  'platform.bugReport.settingsDisconnected': '尚未连接',
+  'platform.bugReport.settingsHint': '独立连接',
+  'platform.bugReport.disconnect': '断开 Issue 提交连接',
+  'platform.bugReport.disconnected': 'Issue 提交连接已移除。',
   'platform.inviteCode': '邀请码',
   'platform.inviteCodeHint': '留空则自动生成',
   'platform.generateInvite': '创建邀请码',
@@ -97,6 +103,7 @@ vi.mock('../../components/common/LocaleSwitcher', () => ({
 afterEach(() => {
   cleanup()
   vi.clearAllMocks()
+  vi.unstubAllGlobals()
   mockUser = { id: 'u1', username: 'testuser', displayName: 'Test User', isAdmin: false }
   window.history.replaceState(null, '', '/?page=settings')
 })
@@ -155,6 +162,36 @@ describe('SettingsPage', () => {
       expect(apiFetchMock).toHaveBeenCalledWith('/api/auth/account', expect.objectContaining({ method: 'DELETE' }))
     })
     expect(logoutMock).toHaveBeenCalled()
+  })
+
+  it('shows and disconnects the separate Issue submission connection', async () => {
+    const user = userEvent.setup()
+    apiFetchMock.mockResolvedValueOnce(
+      new Response(JSON.stringify({ ok: true, identities: [] })),
+    )
+    const fetchMock = vi.fn(async (_input: string | URL | Request, init?: RequestInit) =>
+      init?.method === 'DELETE'
+        ? new Response(JSON.stringify({ ok: true }))
+        : new Response(JSON.stringify({
+            ok: true,
+            enabled: true,
+            connected: true,
+            githubUserId: '12345',
+          })))
+    vi.stubGlobal('fetch', fetchMock)
+
+    render(<SettingsPage />)
+
+    expect(await screen.findByText('已连接 Issue 提交身份')).toBeInTheDocument()
+    expect(screen.getByText('GitHub ID 12345')).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: '断开 Issue 提交连接' }))
+
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledWith(
+      '/api/v1/issue-submission-connection',
+      expect.objectContaining({ method: 'DELETE', credentials: 'include' }),
+    ))
+    expect(await screen.findByText('尚未连接')).toBeInTheDocument()
+    expect(screen.getByText('Issue 提交连接已移除。')).toBeInTheDocument()
   })
 
   it('hides invite admin tools from non-admin users', async () => {
