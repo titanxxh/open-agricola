@@ -61,3 +61,11 @@ export const intentForPerspective = (
   || step.playerIndex === Number(perspective.slice(1)) - 1
     ? step.intent
     : undefined
+
+export const replayAssetUrl = (
+  artUrl: string | null | undefined,
+  apiBase: string,
+): string | null | undefined =>
+  artUrl?.startsWith('/replay-assets/')
+    ? `${apiBase.replace(/\/$/, '')}${artUrl}`
+    : artUrl

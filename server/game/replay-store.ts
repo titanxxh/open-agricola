@@ -89,6 +89,57 @@ const parseCustomCards = (raw: string): CustomCardDef[] => {
 const parseIntent = (raw: string): ReplayJsonValue =>
   JSON.parse(raw) as ReplayJsonValue
 
+const replaceArchivedNames = (
+  value: unknown,
+  replacements: ReadonlyMap<string, string>,
+): unknown => {
+  if (typeof value === 'string') return replacements.get(value) ?? value
+  if (Array.isArray(value)) {
+    return value.map((entry) => replaceArchivedNames(entry, replacements))
+  }
+  if (!value || typeof value !== 'object') return value
+  return Object.fromEntries(
+    Object.entries(value).map(([key, entry]) => [
+      key,
+      replaceArchivedNames(entry, replacements),
+    ]),
+  )
+}
+
+const projectParticipantNames = (
+  frame: SerializedGameState,
+  participantNames: ReadonlyMap<number, string>,
+): SerializedGameState => {
+  const currentNames = new Set(participantNames.values())
+  const replacements = new Map<string, string>()
+  const players = frame.players.map((player, playerIndex) => {
+    const name = participantNames.get(playerIndex) ?? player.name
+    if (name !== player.name && !currentNames.has(player.name)) {
+      replacements.set(player.name, name)
+    }
+    return { ...player, name }
+  })
+  return {
+    ...frame,
+    players,
+    ...(frame.log
+      ? {
+          log: frame.log.map((entry) => ({
+            ...entry,
+            ...(entry.params
+              ? {
+                  params: replaceArchivedNames(
+                    entry.params,
+                    replacements,
+                  ) as Record<string, unknown>,
+                }
+              : {}),
+          })),
+        }
+      : {}),
+  }
+}
+
 export class ReplayStore {
   private readonly db: SqliteDb
 
@@ -328,13 +379,7 @@ export class ReplayStore {
           intent: parseIntent(row.intent_json),
           frameHash: row.frame_hash,
           createdAt: row.created_at,
-          frame: {
-            ...serializedFrame,
-            players: serializedFrame.players.map((player, playerIndex) => ({
-              ...player,
-              name: participantNames.get(playerIndex) ?? player.name,
-            })),
-          },
+          frame: projectParticipantNames(serializedFrame, participantNames),
         })
       }
     } catch {

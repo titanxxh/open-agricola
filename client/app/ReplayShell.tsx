@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type { CompletedGameContextDescriptor } from '../../shared/contract/protocol/game-context'
 import type {
   ReplayAnchorResponse,
@@ -11,6 +11,11 @@ import '../styles/pages/replay.css'
 
 type Perspective = 'open' | `p${number}`
 type Layout = 'timeline' | 'board'
+type ReplayLocation = {
+  perspective: Perspective
+  layout: Layout | null
+  step: number | null
+}
 
 type ViewerManifest = {
   entrypoint: 'index.html'
@@ -77,16 +82,61 @@ const updateLocation = (
   perspective: Perspective,
   layout: Layout | null,
   step: number | null,
+  frameHash: string | null,
 ) => {
   const url = new URL(window.location.href)
-  const previousStep = url.searchParams.get('step')
   url.searchParams.set('perspective', perspective)
   if (layout) url.searchParams.set('layout', layout)
   else url.searchParams.delete('layout')
-  if (step !== null) url.searchParams.set('step', String(step))
-  else url.searchParams.delete('step')
-  if (step === null || previousStep !== String(step)) url.searchParams.delete('frame')
+  if (step !== null && frameHash) {
+    url.searchParams.set('step', String(step))
+    url.searchParams.set('frame', frameHash)
+  } else {
+    url.searchParams.delete('step')
+    url.searchParams.delete('frame')
+  }
   window.history.replaceState(null, '', url)
+}
+
+function ReplayFrame({
+  roomId,
+  viewerBuildId,
+  locale,
+  initialLocation,
+  setFrame,
+  title,
+}: {
+  roomId: string
+  viewerBuildId: string
+  locale: string
+  initialLocation: ReplayLocation
+  setFrame: (node: HTMLIFrameElement | null) => void
+  title: string
+}) {
+  const [src] = useState(() => {
+    const params = new URLSearchParams({
+      room: roomId,
+      perspective: initialLocation.perspective,
+      locale,
+      api: API_BASE || window.location.origin,
+    })
+    if (initialLocation.layout) params.set('layout', initialLocation.layout)
+    if (initialLocation.step !== null) params.set('step', String(initialLocation.step))
+    return `${API_BASE}/replay-viewers/${viewerBuildId}/index.html?${params}`
+  })
+
+  return (
+    <iframe
+      ref={(node) => {
+        setFrame(node)
+        node?.setAttribute('credentialless', '')
+      }}
+      src={src}
+      title={title}
+      sandbox="allow-scripts"
+      referrerPolicy="no-referrer"
+    />
+  )
 }
 
 export function ReplayShell({
@@ -194,25 +244,14 @@ export function ReplayShell({
         layout: data.layout as Layout,
         step: data.step as number,
       }
+      const frameHash = manifest?.steps.find((step) => step.stepNo === next.step)?.frameHash
+      if (!frameHash) return
       setLocation(next)
-      updateLocation(next.perspective, next.layout, next.step)
+      updateLocation(next.perspective, next.layout, next.step, frameHash)
     }
     window.addEventListener('message', onMessage)
     return () => window.removeEventListener('message', onMessage)
   }, [manifest])
-
-  const iframeSrc = useMemo(() => {
-    if (!verified || !replay || !location.perspective) return null
-    const params = new URLSearchParams({
-      room: context.roomId,
-      perspective: location.perspective,
-      locale,
-      api: API_BASE || window.location.origin,
-    })
-    if (location.layout) params.set('layout', location.layout)
-    if (location.step !== null) params.set('step', String(location.step))
-    return `${API_BASE}/replay-viewers/${replay.viewerBuildId}/index.html?${params}`
-  }, [context.roomId, locale, location, replay, verified])
 
   const choosePerspective = (perspective: Perspective) => {
     const next = {
@@ -220,16 +259,16 @@ export function ReplayShell({
       layout: location.layout,
       step: location.step ?? manifest?.firstStepNo ?? null,
     }
+    const frameHash = manifest?.steps.find((step) => step.stepNo === next.step)?.frameHash ?? null
     setLocation(next)
-    updateLocation(next.perspective, next.layout, next.step)
+    updateLocation(next.perspective, next.layout, next.step, frameHash)
   }
 
-  const displayError = replay ? error : t('platform.gameContext.viewerUnavailable')
-  if (displayError) {
+  if (!replay || error) {
     return (
       <main className="replay-shell replay-shell--status">
         <h1>{t('platform.gameContext.completedTitle')}</h1>
-        <p role="alert">{displayError}</p>
+        <p role="alert">{error ?? t('platform.gameContext.viewerUnavailable')}</p>
         <ol className="replay-results">
           {context.result.players.map((player) => (
             <li key={player.playerIndex}>
@@ -283,15 +322,14 @@ export function ReplayShell({
 
   return (
     <main className="replay-shell replay-shell--viewer">
-      <iframe
-        ref={(node) => {
-          iframeRef.current = node
-          node?.setAttribute('credentialless', '')
-        }}
-        src={iframeSrc ?? undefined}
+      <ReplayFrame
+        key={`${context.roomId}:${replay.viewerBuildId}`}
+        roomId={context.roomId}
+        viewerBuildId={replay.viewerBuildId}
+        locale={locale}
+        initialLocation={location as ReplayLocation}
+        setFrame={(node) => { iframeRef.current = node }}
         title={t('platform.gameContext.replayFrameTitle')}
-        sandbox="allow-scripts"
-        referrerPolicy="no-referrer"
       />
     </main>
   )

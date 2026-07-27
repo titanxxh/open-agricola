@@ -176,6 +176,16 @@ describe('GameContextRouter', () => {
           frameHash: '1'.repeat(64),
           createdAt: 1,
         },
+        {
+          stepNo: 1,
+          roomVersion: 2,
+          checkpointStepNo: 0,
+          playerIndex: 0,
+          commandType: 'action',
+          intent: {},
+          frameHash: '2'.repeat(64),
+          createdAt: 2,
+        },
       ],
       corruptRanges: [],
       customCards: [],
@@ -229,6 +239,8 @@ describe('GameContextRouter', () => {
       new URL(iframe.getAttribute('src')!, window.location.href).searchParams.get('api'),
     ).toBe(window.location.origin)
     expect(window.location.search).toContain('perspective=p1')
+    expect(new URLSearchParams(window.location.search).get('step')).toBe('0')
+    expect(new URLSearchParams(window.location.search).get('frame')).toBe(frameHash)
     expect(fetch).toHaveBeenCalledWith(
       '/api/v1/replays/completed-room/manifest',
       expect.objectContaining({ credentials: 'omit' }),
@@ -237,6 +249,20 @@ describe('GameContextRouter', () => {
       `/api/v1/replays/completed-room/anchors/0?frame=${frameHash}`,
       expect.objectContaining({ credentials: 'omit' }),
     )
+
+    const initialSrc = iframe.getAttribute('src')
+    fireEvent(window, new MessageEvent('message', {
+      source: (iframe as HTMLIFrameElement).contentWindow,
+      data: {
+        type: 'open-agricola-replay-location',
+        perspective: 'p1',
+        layout: 'timeline',
+        step: 1,
+      },
+    }))
+    expect(new URLSearchParams(window.location.search).get('step')).toBe('1')
+    expect(new URLSearchParams(window.location.search).get('frame')).toBe('2'.repeat(64))
+    expect(iframe).toHaveAttribute('src', initialSrc)
   })
 
   it('keeps completed results visible when replay verification fails', async () => {

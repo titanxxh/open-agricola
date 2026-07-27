@@ -6,6 +6,7 @@ import type { ReplayManifest } from '../shared/contract/protocol/replay'
 import {
   frameForPerspective,
   intentForPerspective,
+  replayAssetUrl,
   resolveLayout,
   segmentForStep,
   validPerspective,
@@ -68,5 +69,15 @@ describe('replay viewer model', () => {
     expect(intentForPerspective(step, 'p1')).toBeUndefined()
     expect(intentForPerspective(step, 'p2')).toEqual(step.intent)
     expect(intentForPerspective(step, 'open')).toEqual(step.intent)
+  })
+
+  it('resolves archived custom art through the runtime API base', () => {
+    expect(replayAssetUrl(
+      '/replay-assets/abc',
+      'https://example.test/agricola-api/',
+    )).toBe('https://example.test/agricola-api/replay-assets/abc')
+    expect(replayAssetUrl('https://cdn.example/art.webp', '/api')).toBe(
+      'https://cdn.example/art.webp',
+    )
   })
 })
