@@ -14,8 +14,16 @@ const frames = [
     round: 1,
     players: [
       { id: 'p1', name: 'Alice', minorHand: ['A'], occupationHand: ['B'], resources: { food: 0 } },
-      { id: 'p2', name: 'Bob', minorHand: ['C'], occupationHand: ['D'], resources: { food: 0 } },
+      {
+        id: 'p2',
+        name: 'Bob',
+        minorHand: ['C'],
+        occupationHand: ['D'],
+        resources: { food: 0 },
+        borrowedPlayedCardAnimalZones: [{ displayOwnerName: 'Alice' }],
+      },
     ],
+    scores: [{ playerId: 'p1', playerName: 'Alice', total: 0 }],
     log: [{
       key: 'log.test',
       params: {
@@ -258,6 +266,14 @@ describe('ReplayStore', () => {
         nextCheckpointStepNo: 2,
       },
     })
+    expect(store.anchor('room-1', 1, frameHash(frames[1]))).toMatchObject({
+      ok: false,
+      code: 'replay_segment_unavailable',
+      verifiedAnchor: {
+        stepNo: 1,
+        frameHash: frameHash(frames[1]),
+      },
+    })
     const next = store.segment('room-1', 2)
     expect(next.ok).toBe(true)
   })
@@ -286,6 +302,11 @@ describe('ReplayStore', () => {
     if (!segment.ok) return
     expect(segment.steps[0]?.frame.players[0]?.name).toBe('Deleted player (seat 1)')
     expect(segment.steps[0]?.frame.players[1]?.name).toBe('Bob')
+    expect(segment.steps[0]?.frame.scores?.[0]?.playerName).toBe('Deleted player (seat 1)')
+    expect(
+      segment.steps[0]?.frame.players[1]?.borrowedPlayedCardAnimalZones?.[0]
+        ?.displayOwnerName,
+    ).toBe('Deleted player (seat 1)')
     expect(segment.steps[0]?.frame.log[0]?.params).toEqual({
       player: 'Deleted player (seat 1)',
       nested: ['Deleted player (seat 1)', 'Bob'],
