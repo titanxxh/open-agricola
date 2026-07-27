@@ -1,14 +1,10 @@
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 
 const KOFI_SCRIPT_SRC = 'https://storage.ko-fi.com/cdn/scripts/overlay-widget.js'
-const KOFI_WIDGET_SELECTOR = [
-  '.floatingchat-container-wrap',
-  '.floatingchat-container-wrap-mobi',
-  '.floating-chat-kofi-popup-iframe',
-  '.floating-chat-kofi-popup-iframe-mobi',
-].join(', ')
 
 const AFDIAN_ICON_SRC = `${import.meta.env.BASE_URL}afdian.png`
+const MOBILE_QUERY = '(max-width: 640px)'
+const NEAR_BOTTOM_PX = 48
 
 declare global {
   interface Window {
@@ -18,16 +14,11 @@ declare global {
 }
 
 function setKofiWidgetVisible(visible: boolean) {
-  document.querySelectorAll<HTMLElement>(KOFI_WIDGET_SELECTOR).forEach(el => {
-    el.style.display = visible ? '' : 'none'
-  })
+  document.body.classList.toggle('kofi-widget-hidden', !visible)
 }
 
 function drawKofiWidget() {
-  if (window.__kofiWidgetDrawn) {
-    setKofiWidgetVisible(true)
-    return
-  }
+  if (window.__kofiWidgetDrawn) return
   if (!window.kofiWidgetOverlay) return
   window.kofiWidgetOverlay.draw('titanxxh', {
     'type': 'floating-chat',
@@ -38,10 +29,43 @@ function drawKofiWidget() {
   window.__kofiWidgetDrawn = true
 }
 
-export function DonateWidgets() {
+function useDonateVisible() {
+  const [visible, setVisible] = useState(false)
+
   useEffect(() => {
-    if (window.kofiWidgetOverlay || window.__kofiWidgetDrawn) {
+    const mql = window.matchMedia(MOBILE_QUERY)
+    const update = () => {
+      if (!mql.matches) {
+        setVisible(true)
+        return
+      }
+      const el = document.scrollingElement || document.documentElement
+      setVisible(el.scrollHeight - el.scrollTop - el.clientHeight <= NEAR_BOTTOM_PX)
+    }
+    update()
+    window.addEventListener('scroll', update, { passive: true })
+    window.addEventListener('resize', update)
+    mql.addEventListener('change', update)
+    return () => {
+      window.removeEventListener('scroll', update)
+      window.removeEventListener('resize', update)
+      mql.removeEventListener('change', update)
+    }
+  }, [])
+
+  return visible
+}
+
+export function DonateWidgets() {
+  const visible = useDonateVisible()
+
+  useEffect(() => {
+    const apply = () => {
       drawKofiWidget()
+      setKofiWidgetVisible(visible)
+    }
+    if (window.kofiWidgetOverlay || window.__kofiWidgetDrawn) {
+      apply()
       return () => setKofiWidgetVisible(false)
     }
     let script = document.querySelector<HTMLScriptElement>(`script[src="${KOFI_SCRIPT_SRC}"]`)
@@ -51,16 +75,16 @@ export function DonateWidgets() {
       script.async = true
       document.head.appendChild(script)
     }
-    script.addEventListener('load', drawKofiWidget)
+    script.addEventListener('load', apply)
     return () => {
-      script.removeEventListener('load', drawKofiWidget)
+      script.removeEventListener('load', apply)
       setKofiWidgetVisible(false)
     }
-  }, [])
+  }, [visible])
 
   return (
     <a
-      className="afdian-float-btn"
+      className={`afdian-float-btn${visible ? '' : ' is-hidden'}`}
       href="https://afdian.com/a/titanxxh"
       target="_blank"
       rel="noreferrer"
