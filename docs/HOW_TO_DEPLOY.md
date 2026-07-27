@@ -303,7 +303,7 @@ docker compose logs -f app
 
            proxy_set_header Host $host;
            proxy_set_header X-Real-IP $remote_addr;
-           proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+           proxy_set_header X-Forwarded-For $remote_addr;
            proxy_set_header X-Forwarded-Proto $scheme;
 
            # WebSocket 超时设长一些
@@ -332,6 +332,7 @@ docker compose logs -f app
        proxy_set_header Connection "upgrade";
        proxy_set_header Host $host;
        proxy_set_header X-Real-IP $remote_addr;
+       proxy_set_header X-Forwarded-For $remote_addr;
        proxy_read_timeout 86400s;
        proxy_send_timeout 86400s;
    }
