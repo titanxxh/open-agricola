@@ -294,7 +294,10 @@ const useTransportSetup = (
                 resolve({ roomId: msg.roomId, playerIndex: msg.playerIndex })
               } else if (msg.type === 'error') {
                 rawWs.removeEventListener('message', handler)
-                if (contextRoomId && msg.code === 'context_changed') {
+                if (
+                  contextRoomId &&
+                  (msg.code === 'context_changed' || msg.code === 'not_participant')
+                ) {
                   window.dispatchEvent(new Event(GAME_CONTEXT_CHANGED_EVENT))
                 }
                 resolve({ error: msg.error })
