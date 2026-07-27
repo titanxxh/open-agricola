@@ -24,6 +24,8 @@ import type { ClientCommand } from '../../shared/contract/protocol/ws.ts'
 import { readCookies, SESSION_COOKIE } from '../auth-cookies.ts'
 import { validateSession } from '../auth.ts'
 import { isTrustedOrigin } from '../http-origin.ts'
+import { RoomCommitter } from '../game/room-committer.ts'
+import { SqliteRoomPersistence } from '../game/persistence/sqlite-adapter.ts'
 
 const WS_AUTH_TIMEOUT_MS = 5000
 const ROOM_CLEANUP_INTERVAL_MS = 5 * 60 * 1000
@@ -84,6 +86,8 @@ const ensureFixedDevRooms = (
 const restoreRooms = (
   registry: RoomRegistry,
   persistence: RoomPersistence,
+  checkpoint: RoomPersistenceCheckpoint,
+  committer: RoomCommitter | undefined,
   now: number,
 ): void => {
   const fixedIds = FIXED_DEV_ROOMS.map((r) => r.id)
@@ -97,6 +101,17 @@ const restoreRooms = (
     if (registry.has(snap.id)) continue
     const room = snapshotToRoom(snap)
     registry.set(room)
+    const prepared = committer?.prepareRoom(room, {
+      missingPrefix: room.status === 'playing',
+    })
+    if (committer?.hasReplay(room.id)) checkpoint.markInactive(room.id)
+    if (prepared?.kind === 'blocked') {
+      console.warn(JSON.stringify({
+        event: 'restored_room_replay_blocked',
+        roomId: room.id,
+        error: prepared.error,
+      }))
+    }
     if (snap.updatedAt > 0) registry.touchActivity(snap.id, snap.updatedAt)
     console.log(`[ws-server] restored room ${snap.id}`)
   }
@@ -105,12 +120,14 @@ const restoreRooms = (
 const startRoomCleanup = (
   registry: RoomRegistry,
   checkpoint: RoomPersistenceCheckpoint,
+  committer: RoomCommitter | undefined,
   intervalMs: number = ROOM_CLEANUP_INTERVAL_MS,
 ): NodeJS.Timeout => {
   return setInterval(() => {
     const now = Date.now()
     for (const room of registry.iter()) {
       if (isDevRoom(room.id)) continue
+      if (committer?.isBlocked(room.id)) continue
       if (room.players.length > 0) {
         registry.touchActivity(room.id, now)
         continue
@@ -134,6 +151,7 @@ type ConnectionDeps = {
   checkpoint: RoomPersistenceCheckpoint
   broadcaster: Broadcaster
   lobby: Lobby
+  committer?: RoomCommitter
   activeUserSockets: Map<string, Set<WebSocket>>
 }
 
@@ -201,7 +219,9 @@ const handleConnection = (ws: WebSocket, req: IncomingMessage, deps: ConnectionD
     clearTimeout(authTimer)
     if (trackedUserId) untrack(trackedUserId)
     if (ctx.currentRoom) {
-      deps.checkpoint.flushRoom(ctx.currentRoom)
+      if (!deps.committer?.hasReplay(ctx.currentRoom.id)) {
+        deps.checkpoint.flushRoom(ctx.currentRoom)
+      }
       const removal = removePlayerFromRoom(ctx.currentRoom, ws)
       if (removal === 'remaining') {
         deps.broadcaster.broadcastEvent(ctx.currentRoom, {
@@ -223,6 +243,7 @@ export type CreateWsServerResult = {
   broadcaster: Broadcaster
   lobby: Lobby
   checkpoint: RoomPersistenceCheckpoint
+  committer?: RoomCommitter
   cleanupTimer: NodeJS.Timeout
   closeUserConnections: (userId: string) => void
   shutdown: () => void
@@ -233,6 +254,11 @@ export function createWsServer(
   deps: {
     persistence: RoomPersistence
     shouldPersist?: (room: Room) => boolean
+    replay?: {
+      enabled: boolean
+      viewerBuildId: string
+      gameBuildId: string
+    }
   },
 ): CreateWsServerResult {
   const registry = new RoomRegistry()
@@ -240,13 +266,28 @@ export function createWsServer(
     persistence: deps.persistence,
     shouldPersist: deps.shouldPersist,
   })
+  const replay = deps.replay ?? {
+    enabled:
+      process.env.REPLAY_NEW_ROOMS_ENABLED === 'true' ||
+      process.env.REPLAY_NEW_ROOMS_ENABLED === '1',
+    viewerBuildId: process.env.REPLAY_VIEWER_BUILD_ID ?? '',
+    gameBuildId: process.env.GAME_BUILD_ID ?? '',
+  }
+  const committer = deps.persistence instanceof SqliteRoomPersistence
+    ? new RoomCommitter({
+        persistence: deps.persistence,
+        enabled: replay.enabled,
+        viewerBuildId: replay.viewerBuildId,
+        gameBuildId: replay.gameBuildId,
+      })
+    : undefined
   const broadcaster = new Broadcaster({ checkpoint })
   const activeUserSockets = new Map<string, Set<WebSocket>>()
   const lobby = createLobby({ registry, checkpoint, broadcaster })
 
   ensureFixedDevRooms(registry, deps.persistence, checkpoint)
-  restoreRooms(registry, deps.persistence, Date.now())
-  const cleanupTimer = startRoomCleanup(registry, checkpoint)
+  restoreRooms(registry, deps.persistence, checkpoint, committer, Date.now())
+  const cleanupTimer = startRoomCleanup(registry, checkpoint, committer)
 
   const wss = new WebSocketServer({ server, path: '/ws' })
   wss.on('connection', (ws, req) =>
@@ -254,6 +295,7 @@ export function createWsServer(
       registry,
       persistence: deps.persistence,
       checkpoint,
+      committer,
       broadcaster,
       lobby,
       activeUserSockets,
@@ -270,6 +312,7 @@ export function createWsServer(
   }
 
   const shutdown = (): void => {
+    committer?.shutdown()
     checkpoint.shutdown()
     clearInterval(cleanupTimer)
     for (const client of wss.clients) client.close(1001, 'server shutdown')
@@ -282,6 +325,7 @@ export function createWsServer(
     broadcaster,
     lobby,
     checkpoint,
+    committer,
     cleanupTimer,
     closeUserConnections,
     shutdown,

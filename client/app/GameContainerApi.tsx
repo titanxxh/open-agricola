@@ -318,6 +318,7 @@ export const GameContainerApi = () => {
   const privateEventNotificationTimersRef = useRef<number[]>([])
   const { locale } = useLocale()
   const [privateEventNotifications, setPrivateEventNotifications] = useState<PrivateEventNotification[]>([])
+  const [persistencePaused, setPersistencePaused] = useState(false)
   const [replayFilter, setReplayFilter] = useState<ReplayTimelineFilter>('all')
   const [selectedReplayKey, setSelectedReplayKey] = useState<string | null>(null)
   const [isReplayPlaying, setIsReplayPlaying] = useState(false)
@@ -423,7 +424,7 @@ export const GameContainerApi = () => {
   const isMyTurn = !!(activePlayer && selfPlayer && activePlayer.id === selfPlayer.id)
   // In HTTP (non-WS) mode, one human controls all players — always interactive
   const isInteractive = isWs
-    ? !!(activePlayer && selfPlayer && displayPlayer &&
+    ? !persistencePaused && !!(activePlayer && selfPlayer && displayPlayer &&
          activePlayer.id === selfPlayer.id && displayPlayer.id === selfPlayer.id)
     : !!(activePlayer && displayPlayer)
   const hasGameView = !!(state && currentPlayer && displayPlayer)
@@ -962,6 +963,10 @@ export const GameContainerApi = () => {
     transport.getState().catch((e) => { console.error("fetchState failed:", e) })
     return unsub
   }, [transport, handleSnapshot, isReady])
+  useEffect(() => {
+    if (!wsTransport) return
+    return wsTransport.onPersistenceStatus(setPersistencePaused)
+  }, [wsTransport])
   const confirmHarvestFeed = useCallback(() => {
     if (!isInteractive) return
     if (interactionPresentationPlan.kind !== 'harvest-feed') return
@@ -1202,6 +1207,11 @@ export const GameContainerApi = () => {
       const { percent, labelKey } = getGameLoadProgress(wsProgressPhase)
       return (
         <GameLoadScreen percent={percent} label={t(locale, labelKey)}>
+          {persistencePaused ? (
+            <div className="ws-status-text" role="alert">
+              {t(locale, 'ui.roomPersistencePaused')}
+            </div>
+          ) : null}
           <button type="button" className="btn-link ws-status-back" onClick={() => setPage('lobby')}>
             {t(locale, 'platform.backToLobby')}
           </button>
@@ -1256,6 +1266,11 @@ export const GameContainerApi = () => {
           <div className="ws-status-text" role={wsStatus.phase === 'error' ? 'alert' : undefined}>
             {statusText}
           </div>
+          {persistencePaused ? (
+            <div className="ws-status-text" role="alert">
+              {t(locale, 'ui.roomPersistencePaused')}
+            </div>
+          ) : null}
 
           {wsStatus.phase === 'waiting' && inviteUrl && (
             <div className="ws-invite-panel">
@@ -1321,8 +1336,13 @@ export const GameContainerApi = () => {
     return <GameLoadScreen percent={percent} label={t(locale, labelKey)} />
   }
 
-  const notificationStack = privateEventNotifications.length > 0 || displayPublicEventNotifications.length > 0 ? (
+  const notificationStack = persistencePaused || privateEventNotifications.length > 0 || displayPublicEventNotifications.length > 0 ? (
     <div className="event-notifications" role="status" aria-live="polite">
+      {persistencePaused ? (
+        <div className="public-event-notification" data-kind="future" role="alert">
+          {t(locale, 'ui.roomPersistencePaused')}
+        </div>
+      ) : null}
       {buildEventNotificationStackItems(privateEventNotifications, displayPublicEventNotifications).map((notification) => (
         <div
           key={notification.id}

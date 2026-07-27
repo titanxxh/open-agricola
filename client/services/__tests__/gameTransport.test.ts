@@ -118,6 +118,21 @@ describe('WsGameTransport request correlation', () => {
     transport.destroy()
   })
 
+  it('reports room persistence pause and resume events', async () => {
+    const { WsGameTransport } = await import('../gameTransport')
+    const transport = new WsGameTransport('ws://test', 'room-1')
+    await transport.connect()
+
+    const socket = FakeWebSocket.instances[0]!
+    socket.emit({ type: 'roomPersistencePaused', roomId: 'room-1' })
+    const listener = vi.fn()
+    transport.onPersistenceStatus(listener)
+    socket.emit({ type: 'roomPersistenceResumed', roomId: 'room-1' })
+
+    expect(listener.mock.calls).toEqual([[true], [false]])
+    transport.destroy()
+  })
+
   it('sends dedicated dev commands for setResources and setRound', async () => {
     const { WsGameTransport } = await import('../gameTransport')
     const transport = new WsGameTransport('ws://test')
