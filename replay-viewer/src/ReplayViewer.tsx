@@ -97,6 +97,7 @@ export function ReplayViewer() {
   )
   const [stepNo, setStepNo] = useState(0)
   const [playing, setPlaying] = useState(false)
+  const [segmentRetry, setSegmentRetry] = useState(0)
 
   useEffect(() => {
     if (!roomId) {
@@ -156,7 +157,7 @@ export function ReplayViewer() {
         setPlaying(false)
       })
     return () => controller.abort()
-  }, [apiBase, descriptor, roomId, segments])
+  }, [apiBase, descriptor, roomId, segmentRetry, segments])
 
   const current = descriptor
     ? segments[descriptor.checkpointStepNo]?.steps.find((step) => step.stepNo === stepNo)
@@ -165,9 +166,10 @@ export function ReplayViewer() {
 
   const selectStep = useCallback((nextStepNo: number) => {
     if (!manifest?.steps.some((step) => step.stepNo === nextStepNo)) return
+    if (nextStepNo === stepNo) setSegmentRetry((value) => value + 1)
     setError(null)
     setStepNo(nextStepNo)
-  }, [manifest])
+  }, [manifest, stepNo])
   const move = useCallback((delta: number) => {
     if (!manifest) return
     const index = manifest.steps.findIndex((step) => step.stepNo === stepNo)
@@ -178,13 +180,13 @@ export function ReplayViewer() {
   useEffect(() => {
     if (!playing || !manifest || !current) return
     const next = manifest.steps[stepIndex + 1]
-    if (!next) {
+    if (!next || next.stepNo !== stepNo + 1) {
       setPlaying(false)
       return
     }
     const timer = window.setTimeout(() => selectStep(next.stepNo), 1200)
     return () => window.clearTimeout(timer)
-  }, [current, manifest, playing, selectStep, stepIndex])
+  }, [current, manifest, playing, selectStep, stepIndex, stepNo])
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {

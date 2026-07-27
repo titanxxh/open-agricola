@@ -13,6 +13,7 @@ const cachedIdentityFields = {
   scores: [{ playerId: 'p1', playerName: 'wood', total: 0 }],
   log: [{
     key: 'log.test',
+    playerId: 'p1',
     params: {
       player: 'wood',
       nested: ['wood', 'Bob'],
@@ -308,9 +309,26 @@ describe('ReplayStore', () => {
     }])
   })
 
+  it('reports a missing initial segment and its recovery checkpoint', () => {
+    db.prepare('DELETE FROM game_replay_steps WHERE room_id = ? AND step_no < ?')
+      .run('room-1', 2)
+
+    const manifest = store.manifest('room-1')
+    expect(manifest.ok).toBe(true)
+    if (!manifest.ok) return
+    expect(manifest.firstStepNo).toBe(0)
+    expect(manifest.corruptRanges).toEqual([{
+      firstStepNo: 0,
+      lastStepNo: 1,
+      nextCheckpointStepNo: 2,
+    }])
+  })
+
   it('uses current participant names in archived frames', () => {
     db.prepare('UPDATE game_result_players SET display_name = ? WHERE room_id = ? AND player_index = 0')
       .run('Deleted player (seat 1)', 'room-1')
+    db.prepare('UPDATE game_result_players SET display_name = ? WHERE room_id = ? AND player_index = 1')
+      .run('wood', 'room-1')
 
     const segment = store.segment('room-1', 0)
     expect(segment.ok).toBe(true)
@@ -318,7 +336,7 @@ describe('ReplayStore', () => {
     expect(segment.steps[0]?.frame.players[0]?.name).toBe('Deleted player (seat 1)')
     expect(segment.steps[0]?.frame.players[0]?.id).toBe('p1')
     expect(segment.steps[0]?.frame.players[0]?.houseType).toBe('wood')
-    expect(segment.steps[0]?.frame.players[1]?.name).toBe('Bob')
+    expect(segment.steps[0]?.frame.players[1]?.name).toBe('wood')
     expect(segment.steps[0]?.frame.scores?.[0]?.playerName).toBe('Deleted player (seat 1)')
     expect(
       segment.steps[0]?.frame.players[1]?.borrowedPlayedCardAnimalZones?.[0]
@@ -329,6 +347,41 @@ describe('ReplayStore', () => {
       nested: ['wood', 'Bob'],
       resource: 'wood',
     })
+  })
+
+  it('redacts ambiguous name-only log fields when participant names collide', () => {
+    const collisionFrame = {
+      ...frames[0],
+      players: [
+        { ...frames[0].players[0], name: 'Alice' },
+        { ...frames[0].players[1], name: 'Alice' },
+      ],
+      log: [{ key: 'log.test', params: { player: 'Alice' } }],
+    } satisfies JsonValue
+    const encoded = encodeReplayFrame({
+      frame: collisionFrame,
+      previousFrame: null,
+      stepNo: 0,
+      previousCheckpointStepNo: 0,
+    })
+    db.prepare('DELETE FROM game_replay_steps WHERE room_id = ? AND step_no > 0')
+      .run('room-1')
+    db.prepare(`
+      UPDATE game_replay_steps
+      SET payload_kind = ?, payload_gzip = ?, frame_hash = ?
+      WHERE room_id = ? AND step_no = 0
+    `).run(encoded.payloadKind, encoded.payloadGzip, encoded.frameHash, 'room-1')
+    db.prepare('UPDATE game_replays SET latest_step_no = 0 WHERE room_id = ?')
+      .run('room-1')
+    db.prepare('UPDATE game_result_players SET display_name = ? WHERE room_id = ? AND player_index = 0')
+      .run('Deleted player (seat 1)', 'room-1')
+    db.prepare('UPDATE game_result_players SET display_name = ? WHERE room_id = ? AND player_index = 1')
+      .run('Alice', 'room-1')
+
+    const segment = store.segment('room-1', 0)
+    expect(segment.ok).toBe(true)
+    if (!segment.ok) return
+    expect(segment.steps[0]?.frame.log[0]?.params?.player).toBe('Deleted player')
   })
 
   it('never exposes active or legacy replay payloads', () => {
