@@ -110,12 +110,16 @@ const restoreRooms = (
   })
   for (const snap of snapshots) {
     if (registry.has(snap.id)) continue
-    const customCards = loadCustomCardsFromDb(
+    const customCards = snap.meta.customCards ?? loadCustomCardsFromDb(
       snap.meta.customCardDbIds,
       snap.meta.createdBy ?? undefined,
     )
     const room = snapshotToRoom(snap, customCards)
+    if (room.status === 'waiting' && room.replayRecording === undefined) {
+      committer?.lockNewRoom(room)
+    }
     registry.set(room)
+    if (snap.meta.customCards === undefined) checkpoint.recordMeta(room)
     const prepared = committer?.prepareRoom(room, {
       missingPrefix: room.status === 'playing',
     })
@@ -142,7 +146,7 @@ const startRoomCleanup = (
     const now = Date.now()
     for (const room of registry.iter()) {
       if (isDevRoom(room.id)) continue
-      if (committer?.isBlocked(room.id)) continue
+      if (committer?.isRetrying(room.id)) continue
       if (room.players.length > 0) {
         registry.touchActivity(room.id, now)
         continue

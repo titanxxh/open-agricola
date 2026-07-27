@@ -10,6 +10,13 @@ import type { SerializedGameState } from '../../../shared/session/serialization.
 
 type Row = { serialized: SerializedGameState | null; meta: RoomMeta; updatedAt: number }
 
+const copyMeta = (meta: RoomMeta): RoomMeta => ({
+  ...meta,
+  customCardDbIds: [...meta.customCardDbIds],
+  ...(meta.customCards === undefined ? {} : { customCards: structuredClone(meta.customCards) }),
+  players: meta.players.map((player) => ({ ...player })),
+})
+
 export class InMemoryRoomPersistence implements RoomPersistence {
   private rooms = new Map<string, Row>()
   private results = new Map<string, GameResult>()
@@ -20,7 +27,7 @@ export class InMemoryRoomPersistence implements RoomPersistence {
     return {
       id,
       serialized: row.serialized,
-      meta: { ...row.meta, customCardDbIds: [...row.meta.customCardDbIds], players: row.meta.players.map((p) => ({ ...p })) },
+      meta: copyMeta(row.meta),
       updatedAt: row.updatedAt,
     }
   }
@@ -30,10 +37,8 @@ export class InMemoryRoomPersistence implements RoomPersistence {
     this.rooms.set(id, {
       serialized: serialized === null ? (existing?.serialized ?? null) : serialized,
       meta: {
-        ...meta,
+        ...copyMeta(meta),
         startedAt: existing?.meta.startedAt ?? meta.startedAt,
-        customCardDbIds: [...meta.customCardDbIds],
-        players: meta.players.map((p) => ({ ...p })),
       },
       updatedAt: Date.now(),
     })
@@ -74,7 +79,7 @@ export class InMemoryRoomPersistence implements RoomPersistence {
         this.rooms.delete(id)
         continue
       }
-      out.push({ id, serialized: row.serialized, meta: { ...row.meta, customCardDbIds: [...row.meta.customCardDbIds], players: row.meta.players.map((p) => ({ ...p })) }, updatedAt: row.updatedAt })
+      out.push({ id, serialized: row.serialized, meta: copyMeta(row.meta), updatedAt: row.updatedAt })
     }
     return out
   }

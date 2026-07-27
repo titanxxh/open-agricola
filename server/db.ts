@@ -657,6 +657,12 @@ export function runMigrations(db: Database.Database): void {
         END;
       `,
     },
+    {
+      version: 23,
+      sql: `
+        ALTER TABLE rooms ADD COLUMN custom_cards_runtime_json TEXT;
+      `,
+    },
   ]
 
   const insert = db.prepare('INSERT INTO schema_version (version) VALUES (?)')
