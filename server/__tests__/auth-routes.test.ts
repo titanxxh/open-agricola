@@ -142,6 +142,9 @@ vi.mock('../db.ts', () => {
       enable_farmers_of_the_moor INTEGER NOT NULL DEFAULT 0,
       allow_incomplete_farmers_of_the_moor_minor_deal INTEGER NOT NULL DEFAULT 0,
       started_at INTEGER,
+      replay_recording INTEGER,
+      replay_viewer_build_id TEXT,
+      replay_game_build_id TEXT,
       created_at INTEGER NOT NULL,
       updated_at INTEGER NOT NULL
     );

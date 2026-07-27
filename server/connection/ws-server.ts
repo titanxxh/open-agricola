@@ -1,4 +1,6 @@
 import type { IncomingMessage, Server as HttpServer } from 'node:http'
+import { statSync } from 'node:fs'
+import { join } from 'node:path'
 import { WebSocketServer, type WebSocket } from 'ws'
 import { GameSession } from '../game/authoritative-session.ts'
 import { RoomRegistry } from '../game/room-registry.ts'
@@ -19,7 +21,7 @@ import type { RoomPersistence } from '../game/persistence/room-persistence.ts'
 import { createRoomPersistenceCheckpoint, type RoomPersistenceCheckpoint } from '../game/room-persistence-checkpoint.ts'
 import { Broadcaster } from './broadcaster.ts'
 import { createConnectionCtx } from './connection-ctx.ts'
-import { dispatch } from './room-router.ts'
+import { dispatch, loadCustomCardsFromDb } from './room-router.ts'
 import type { ClientCommand } from '../../shared/contract/protocol/ws.ts'
 import { readCookies, SESSION_COOKIE } from '../auth-cookies.ts'
 import { validateSession } from '../auth.ts'
@@ -29,6 +31,15 @@ import { SqliteRoomPersistence } from '../game/persistence/sqlite-adapter.ts'
 
 const WS_AUTH_TIMEOUT_MS = 5000
 const ROOM_CLEANUP_INTERVAL_MS = 5 * 60 * 1000
+
+const viewerBuildExists = (root: string, buildId: string): boolean => {
+  if (!/^[A-Za-z0-9._-]+$/.test(buildId)) return false
+  try {
+    return statSync(join(root, buildId)).isDirectory()
+  } catch {
+    return false
+  }
+}
 
 const ALLOW_ANONYMOUS_WS: boolean = (() => {
   if (process.env.ALLOW_ANONYMOUS_WS !== undefined) {
@@ -99,7 +110,11 @@ const restoreRooms = (
   })
   for (const snap of snapshots) {
     if (registry.has(snap.id)) continue
-    const room = snapshotToRoom(snap)
+    const customCards = loadCustomCardsFromDb(
+      snap.meta.customCardDbIds,
+      snap.meta.createdBy ?? undefined,
+    )
+    const room = snapshotToRoom(snap, customCards)
     registry.set(room)
     const prepared = committer?.prepareRoom(room, {
       missingPrefix: room.status === 'playing',
@@ -137,6 +152,7 @@ const startRoomCleanup = (
         registry.delete(room.id)
         registry.clearActivity(room.id)
         checkpoint.discardRoom(room.id)
+        committer?.retireRoom(room.id)
         console.log(`[ws-server] cleaned up empty room ${room.id}`)
       }
     }
@@ -258,6 +274,7 @@ export function createWsServer(
       enabled: boolean
       viewerBuildId: string
       gameBuildId: string
+      viewerRoot: string
     }
   },
 ): CreateWsServerResult {
@@ -272,6 +289,7 @@ export function createWsServer(
       process.env.REPLAY_NEW_ROOMS_ENABLED === '1',
     viewerBuildId: process.env.REPLAY_VIEWER_BUILD_ID ?? '',
     gameBuildId: process.env.GAME_BUILD_ID ?? '',
+    viewerRoot: process.env.REPLAY_VIEWER_ROOT ?? './data/replay-viewers',
   }
   const committer = deps.persistence instanceof SqliteRoomPersistence
     ? new RoomCommitter({
@@ -279,11 +297,17 @@ export function createWsServer(
         enabled: replay.enabled,
         viewerBuildId: replay.viewerBuildId,
         gameBuildId: replay.gameBuildId,
+        viewerBuildExists: (buildId) => viewerBuildExists(replay.viewerRoot, buildId),
       })
     : undefined
   const broadcaster = new Broadcaster({ checkpoint })
   const activeUserSockets = new Map<string, Set<WebSocket>>()
-  const lobby = createLobby({ registry, checkpoint, broadcaster })
+  const lobby = createLobby({
+    registry,
+    checkpoint,
+    broadcaster,
+    onRoomRetired: (roomId) => committer?.retireRoom(roomId),
+  })
 
   ensureFixedDevRooms(registry, deps.persistence, checkpoint)
   restoreRooms(registry, deps.persistence, checkpoint, committer, Date.now())

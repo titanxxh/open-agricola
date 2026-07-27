@@ -32,7 +32,16 @@ export type CustomCardData = {
 }
 
 const displayOnlyCardJson = (cardJson: CustomCardData['cardJson']): CardDefinition => {
-  const { modifier: _modifier, modifiers: _modifiers, ...display } = cardJson
+  const {
+    modifier: _modifier,
+    modifiers: _modifiers,
+    _code: _code,
+    _compiled: _compiled,
+    ...display
+  } = cardJson as CustomCardData['cardJson'] & {
+    _code?: unknown
+    _compiled?: unknown
+  }
   return display
 }
 

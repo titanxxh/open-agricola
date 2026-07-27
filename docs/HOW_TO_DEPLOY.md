@@ -68,11 +68,12 @@ PERSIST_ROOMS=sqlite
 ALLOW_ANONYMOUS_WS=false
 REPLAY_NEW_ROOMS_ENABLED=false
 REPLAY_VIEWER_BUILD_ID=
+REPLAY_VIEWER_ROOT=./data/replay-viewers
 GAME_BUILD_ID=
 # CORS_ORIGIN 等后续根据情况设置
 ```
 
-首次启用 Replay 时，先部署对应的不可变 Viewer Build，再填写两个 Build ID，最后把 `REPLAY_NEW_ROOMS_ENABLED` 改为 `true`。开关只影响新 Room；已有 Replay Room 会继续记录。
+首次启用 Replay 时，先把不可变 Viewer Build 部署到 `${REPLAY_VIEWER_ROOT}/${REPLAY_VIEWER_BUILD_ID}`，再填写两个 Build ID，最后把 `REPLAY_NEW_ROOMS_ENABLED` 改为 `true`。目录不存在时拒绝创建新 Room。开关和 Build ID 在 Room 创建时锁定；已有 Replay Room 会继续按锁定值记录。
 
 #### 构建并启动
 

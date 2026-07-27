@@ -204,7 +204,13 @@ describe('lobby.dissolveRoomById', () => {
       players: [{ userId: 'u1', playerIndex: 0 }],
     })
     const broadcaster = fakeBroadcaster()
-    const lobby = createLobby({ registry, checkpoint: checkpoint(persistence), broadcaster })
+    const onRoomRetired = vi.fn()
+    const lobby = createLobby({
+      registry,
+      checkpoint: checkpoint(persistence),
+      broadcaster,
+      onRoomRetired,
+    })
 
     expect(lobby.dissolveRoomById('r1', 'u1')).toEqual({ ok: true })
     expect(broadcaster.calls.find((e) => e.type === 'roomDissolved')).toBeTruthy()
@@ -212,6 +218,7 @@ describe('lobby.dissolveRoomById', () => {
     expect(registry.has('r1')).toBe(false)
     expect(registry.lastActivityOf('r1')).toBeUndefined()
     expect(persistence.load('r1')).toBeNull()
+    expect(onRoomRetired).toHaveBeenCalledWith('r1')
   })
 })
 
@@ -279,7 +286,13 @@ describe('lobby.endRoomsForUser', () => {
       })
     }
     const broadcaster = fakeBroadcaster()
-    const lobby = createLobby({ registry, checkpoint: checkpoint(persistence), broadcaster })
+    const onRoomRetired = vi.fn()
+    const lobby = createLobby({
+      registry,
+      checkpoint: checkpoint(persistence),
+      broadcaster,
+      onRoomRetired,
+    })
 
     expect(lobby.endRoomsForUser('u1')).toEqual({ endedRoomIds: ['owned-room', 'joined-room'] })
     expect(closeCalls.sort()).toEqual(['joined-u1', 'joined-u2', 'owned-u1', 'owned-u2'])
@@ -295,6 +308,10 @@ describe('lobby.endRoomsForUser', () => {
     expect(persistence.__getResultForTest('owned-room')).toBeUndefined()
     expect(persistence.__getResultForTest('joined-room')).toBeUndefined()
     expect(persistence.load('unrelated-room')?.meta.status).toBe('playing')
+    expect(onRoomRetired.mock.calls).toEqual([
+      ['owned-room'],
+      ['joined-room'],
+    ])
   })
 
   it('ends rooms by persisted affected ids when the deleted user is disconnected', () => {

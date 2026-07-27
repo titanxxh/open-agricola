@@ -1251,7 +1251,7 @@ BUG_REPORT_TOKEN_ENCRYPTION_KEYS
 BUG_REPORT_TOKEN_ACTIVE_KEY_ID
 ```
 
-当前 Durable Room Commit 只读取 `REPLAY_NEW_ROOMS_ENABLED`、`REPLAY_VIEWER_BUILD_ID` 和 `GAME_BUILD_ID`。新 Room 开关关闭时不创建 Replay；已有 Replay header 不受开关影响并继续记录。恢复出的旧进行局会以 `missingPrefix=true` 建立 Step 0。
+当前 Durable Room Commit 读取 `REPLAY_NEW_ROOMS_ENABLED`、`REPLAY_VIEWER_BUILD_ID`、`REPLAY_VIEWER_ROOT` 和 `GAME_BUILD_ID`。创建 Room 时持久化录制决定和两个 Build ID；Viewer Build 目录不存在时拒绝创建。已有 Replay header 不受后续配置变化影响并继续记录；恢复出的旧进行局会以 `missingPrefix=true` 建立 Step 0。
 
 部署顺序固定为：
 
