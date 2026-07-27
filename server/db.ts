@@ -635,6 +635,26 @@ export function runMigrations(db: Database.Database): void {
           removal_reason = NULL,
           created_at = excluded.created_at,
           updated_at = excluded.updated_at;
+
+      `,
+    },
+    {
+      version: 22,
+      sql: `
+        ALTER TABLE rooms ADD COLUMN replay_recording INTEGER;
+        ALTER TABLE rooms ADD COLUMN replay_viewer_build_id TEXT;
+        ALTER TABLE rooms ADD COLUMN replay_game_build_id TEXT;
+
+        CREATE TRIGGER expire_game_context_after_room_delete
+        AFTER DELETE ON rooms
+        BEGIN
+          UPDATE game_contexts
+          SET lifecycle = 'expired',
+              phase = NULL,
+              expires_at = CAST(strftime('%s', 'now') AS INTEGER) * 1000,
+              updated_at = CAST(strftime('%s', 'now') AS INTEGER) * 1000
+          WHERE room_id = OLD.id AND lifecycle = 'active';
+        END;
       `,
     },
   ]

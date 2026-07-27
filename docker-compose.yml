@@ -11,6 +11,7 @@ services:
       - ALLOW_ANONYMOUS_WS=false
       - REPLAY_NEW_ROOMS_ENABLED=${REPLAY_NEW_ROOMS_ENABLED:-false}
       - REPLAY_VIEWER_BUILD_ID=${REPLAY_VIEWER_BUILD_ID:-}
+      - REPLAY_VIEWER_ROOT=${REPLAY_VIEWER_ROOT:-./data/replay-viewers}
       - GAME_BUILD_ID=${GAME_BUILD_ID:-}
       - DB_PATH=./data/open-agricola.db
       - CARD_ART_DIR=./data/card-art

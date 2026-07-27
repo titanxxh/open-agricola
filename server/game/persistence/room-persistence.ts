@@ -7,6 +7,9 @@ export type RoomMeta = {
   startedAt?: number | null
   maxPlayers: number
   customCardDbIds: string[]
+  replayRecording?: boolean
+  replayViewerBuildId?: string
+  replayGameBuildId?: string
   enableParentCards?: boolean
   draftParents?: boolean
   enableThroughTheSeasons?: boolean

@@ -69,11 +69,15 @@ describe('RoomCommitter', () => {
   const createCommitter = (options: {
     enabled?: boolean
     scheduler?: RoomCommitScheduler
+    viewerBuildExists?: (viewerBuildId: string) => boolean
+    viewerBuildId?: string
+    gameBuildId?: string
   } = {}) => new RoomCommitter({
     persistence,
     enabled: options.enabled ?? true,
-    viewerBuildId: 'viewer-1',
-    gameBuildId: 'game-1',
+    viewerBuildId: options.viewerBuildId ?? 'viewer-1',
+    gameBuildId: options.gameBuildId ?? 'game-1',
+    viewerBuildExists: options.viewerBuildExists ?? (() => true),
     scheduler: options.scheduler,
     now: () => 1_000,
   })
@@ -95,6 +99,85 @@ describe('RoomCommitter', () => {
       kind: 'committed',
       stepNo: 0,
     })
+  })
+
+  it('rejects new replay rooms when the configured Viewer Build does not exist', () => {
+    const committer = createCommitter({ viewerBuildExists: () => false })
+
+    expect(committer.canCreateRoom()).toEqual({
+      ok: false,
+      error: 'replay viewer build not found',
+    })
+  })
+
+  it('locks the replay decision and build ids into room metadata', () => {
+    const enabledRoom = makeRoom('enabled-room')
+    const enabled = createCommitter()
+    enabled.lockNewRoom(enabledRoom)
+    persistence.save(
+      enabledRoom.id,
+      enabledRoom.session.getState().state as never,
+      {
+        createdBy: null,
+        startedAt: enabledRoom.startedAt,
+        maxPlayers: 2,
+        customCardDbIds: [],
+        status: 'playing',
+        players: [],
+        replayRecording: enabledRoom.replayRecording,
+        replayViewerBuildId: enabledRoom.replayViewerBuildId,
+        replayGameBuildId: enabledRoom.replayGameBuildId,
+      },
+    )
+    const restoredEnabled = snapshotToRoom(persistence.load(enabledRoom.id)!)
+    const changedDeployment = createCommitter({
+      enabled: false,
+      viewerBuildId: 'viewer-2',
+      gameBuildId: 'game-2',
+    })
+
+    expect(changedDeployment.prepareRoom(restoredEnabled, { missingPrefix: true }))
+      .toMatchObject({ kind: 'committed', stepNo: 0 })
+    expect(db.prepare(`
+      SELECT viewer_build_id, game_build_id, missing_prefix
+      FROM game_replays WHERE room_id = ?
+    `).get(enabledRoom.id)).toEqual({
+      viewer_build_id: 'viewer-1',
+      game_build_id: 'game-1',
+      missing_prefix: 0,
+    })
+
+    const disabledRoom = makeRoom('disabled-room')
+    changedDeployment.lockNewRoom(disabledRoom)
+    expect(disabledRoom.replayRecording).toBe(false)
+    expect(changedDeployment.prepareRoom(disabledRoom, { missingPrefix: true }))
+      .toEqual({ kind: 'unchanged' })
+  })
+
+  it('pauses and retries replay-head reads', () => {
+    const room = makeRoom()
+    const { scheduler, tasks } = fakeScheduler()
+    const committer = createCommitter({ scheduler })
+    const load = vi.spyOn(persistence, 'loadReplayHead')
+    load.mockImplementationOnce(() => {
+      throw new Error('read unavailable')
+    })
+    const ready: number[] = []
+
+    expect(committer.prepareRoom(room, {
+      missingPrefix: false,
+      onReady: (result) => {
+        if (result.kind === 'committed') ready.push(result.stepNo)
+      },
+    })).toEqual({ kind: 'blocked', error: 'read unavailable' })
+    expect(committer.isRetrying(room.id)).toBe(true)
+    expect(tasks.map(({ delay }) => delay)).toEqual([1_000])
+
+    tasks.shift()!.callback()
+
+    expect(ready).toEqual([0])
+    expect(committer.isBlocked(room.id)).toBe(false)
+    expect(persistence.loadReplayHead(room.id)?.latestStepNo).toBe(0)
   })
 
   it('creates Step 0, skips unchanged responses, and assigns consecutive global Steps', () => {
@@ -368,6 +451,20 @@ describe('RoomCommitter', () => {
     })
     expect(committer.isBlocked(room.id)).toBe(true)
     expect(tasks).toEqual([])
+  })
+
+  it('releases the in-memory replay head when a room retires', () => {
+    const room = makeRoom()
+    const committer = createCommitter()
+    committer.prepareRoom(room, { missingPrefix: false })
+
+    expect(committer.isRecording(room.id)).toBe(true)
+    expect(committer.hasReplay(room.id)).toBe(true)
+
+    committer.retireRoom(room.id)
+
+    expect(committer.isRecording(room.id)).toBe(false)
+    expect(committer.hasReplay(room.id)).toBe(false)
   })
 
   it('whitelists intent fields and excludes request and arbitrary payload data', () => {

@@ -50,6 +50,7 @@ describe('durable publish', () => {
       enabled: true,
       viewerBuildId: 'viewer-1',
       gameBuildId: 'game-1',
+      viewerBuildExists: () => true,
       scheduler,
     })
     const deps = { registry, checkpoint, broadcaster, lobby, committer }
@@ -136,6 +137,33 @@ describe('durable publish', () => {
     expect(reconnect.currentRoom!.session.state.players[1]?.name).toBe('Guest')
     expect(persistence.loadReplayHead(host.currentRoom!.id)?.latestStepNo).toBe(1)
     expect(host.currentRoom!.version).toBe(1)
+
+    dispatch(host, {
+      type: 'choice',
+      value: 'confirm',
+      requestId: 'confirm-turn',
+    })
+    expect(persistence.loadReplayHead(host.currentRoom!.id)?.latestStepNo).toBe(2)
+
+    hostWs.send.mockClear()
+    guestWs.send.mockClear()
+    db.prepare(`
+      INSERT INTO game_replay_steps (
+        room_id, step_no, room_version, checkpoint_step_no, player_index,
+        command_type, intent_json, payload_kind, payload_gzip, frame_hash, created_at
+      ) VALUES (?, 3, 3, 0, 1, 'action', '{}', 'delta', X'00', ?, 1003)
+    `).run(host.currentRoom!.id, 'f'.repeat(64))
+
+    dispatch(guest, {
+      type: 'action',
+      spaceId: 'reed-bank',
+      requestId: 'action-conflict',
+    })
+
+    expect(messages(guestWs)).toContainEqual(expect.objectContaining({
+      type: 'error',
+      requestId: 'action-conflict',
+    }))
 
     committer.shutdown()
     checkpoint.shutdown()

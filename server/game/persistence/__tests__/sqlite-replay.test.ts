@@ -181,4 +181,20 @@ describe('SqliteRoomPersistence replay commit', () => {
     })
     expect(db.prepare('SELECT room_id FROM game_results').get()).toEqual({ room_id: 'room-1' })
   })
+
+  it('expires the permanent context when an active room is discarded', () => {
+    expect(persistence.commitReplay(step0())).toEqual({ kind: 'committed' })
+
+    persistence.discard('room-1')
+
+    expect(persistence.load('room-1')).toBeNull()
+    expect(db.prepare(`
+      SELECT lifecycle, phase, replay_status
+      FROM game_contexts WHERE room_id = ?
+    `).get('room-1')).toEqual({
+      lifecycle: 'expired',
+      phase: null,
+      replay_status: null,
+    })
+  })
 })
