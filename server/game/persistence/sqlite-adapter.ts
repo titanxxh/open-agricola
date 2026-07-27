@@ -34,6 +34,68 @@ type RestorableRoomRow = RoomRow & {
 
 type SqliteDb = Pick<Database.Database, 'prepare' | 'transaction'>
 
+export type ReplayCommit = {
+  roomId: string
+  serialized: SerializedGameState
+  meta: RoomMeta
+  header?: {
+    schemaVersion: number
+    viewerBuildId: string
+    gameBuildId: string
+    missingPrefix: boolean
+    customCardsJson: string
+  }
+  step: {
+    stepNo: number
+    roomVersion: number
+    checkpointStepNo: number
+    playerIndex: number | null
+    commandType: string
+    intentJson: string
+    payloadKind: 'checkpoint' | 'delta'
+    payloadGzip: Buffer
+    frameHash: string
+    createdAt: number
+  }
+  result?: GameResult
+}
+
+export type ReplayCommitResult =
+  | { kind: 'committed' }
+  | { kind: 'idempotent' }
+  | { kind: 'conflict'; error: string }
+
+export type ReplayHead = {
+  schemaVersion: number
+  viewerBuildId: string
+  gameBuildId: string
+  status: 'recording' | 'completed'
+  latestStepNo: number
+  roomVersion: number
+  checkpointStepNo: number
+  frameHash: string
+  missingPrefix: boolean
+}
+
+type ReplayHeaderRow = {
+  schema_version: number
+  viewer_build_id: string
+  game_build_id: string
+  status: 'recording' | 'completed'
+  latest_step_no: number
+  missing_prefix: number
+}
+
+type ReplayHeadRow = ReplayHeaderRow & {
+  room_version: number
+  checkpoint_step_no: number
+  frame_hash: string
+}
+
+type ReplayStepHashRow = { frame_hash: string }
+
+class ReplayConflictError extends Error {}
+
 const parseCustomCardDbIds = (raw: string | null): string[] => {
   if (!raw) return []
   try {
@@ -46,6 +108,30 @@ const parseCustomCardDbIds = (raw: string | null): string[] => {
 
 const toStatus = (raw: string): RoomStatus =>
   raw === 'playing' || raw === 'finished' || raw === 'waiting' ? raw : 'waiting'
+
+const roomValues = (
+  id: string,
+  serialized: SerializedGameState | null,
+  meta: RoomMeta,
+  now: number,
+  version: number | null,
+): Record<string, string | number | null> => ({
+  id,
+  createdBy: meta.createdBy,
+  stateJson: serialized === null ? null : JSON.stringify(serialized),
+  maxPlayers: meta.maxPlayers,
+  status: meta.status,
+  version,
+  customCardIds: JSON.stringify(meta.customCardDbIds),
+  enableParentCards: meta.enableParentCards === true ? 1 : 0,
+  draftParents: typeof meta.draftParents === 'boolean' ? (meta.draftParents ? 1 : 0) : null,
+  enableThroughTheSeasons: meta.enableThroughTheSeasons === true ? 1 : 0,
+  enableFarmersOfTheMoor: meta.enableFarmersOfTheMoor === true ? 1 : 0,
+  allowIncompleteFarmersOfTheMoorMinorDeal:
+    meta.allowIncompleteFarmersOfTheMoorMinorDeal === true ? 1 : 0,
+  startedAt: meta.startedAt ?? null,
+  now,
+})
 
 const toSnapshot = (
   row: RoomRow,
@@ -82,8 +168,19 @@ export class SqliteRoomPersistence implements RoomPersistence {
   private readonly insertResultPlayer
   private readonly pruneRooms
   private readonly restoreRooms
+  private readonly upsertActiveContext
+  private readonly loadReplayHeader
+  private readonly loadReplayHeadRow
+  private readonly loadReplayStepHash
+  private readonly insertReplayHeader
+  private readonly insertReplayStep
+  private readonly advanceReplay
+  private readonly completeReplay
+  private readonly completeContext
+  private readonly completeLegacyContext
   private readonly saveRoom
   private readonly completeRoom
+  private readonly commitReplayTransaction
 
   constructor(db: SqliteDb) {
     this.loadRoom = db.prepare(
@@ -101,7 +198,7 @@ export class SqliteRoomPersistence implements RoomPersistence {
         enable_parent_cards, draft_parents, enable_through_the_seasons, enable_farmers_of_the_moor,
         allow_incomplete_farmers_of_the_moor_minor_deal, started_at, created_at, updated_at
       ) VALUES (
-        @id, @createdBy, @stateJson, @maxPlayers, @status, 1, @customCardIds,
+        @id, @createdBy, @stateJson, @maxPlayers, @status, COALESCE(@version, 1), @customCardIds,
         @enableParentCards, @draftParents, @enableThroughTheSeasons, @enableFarmersOfTheMoor,
         @allowIncompleteFarmersOfTheMoorMinorDeal, @startedAt, @now, @now
       )
@@ -115,7 +212,7 @@ export class SqliteRoomPersistence implements RoomPersistence {
         enable_farmers_of_the_moor = excluded.enable_farmers_of_the_moor,
         allow_incomplete_farmers_of_the_moor_minor_deal = excluded.allow_incomplete_farmers_of_the_moor_minor_deal,
         started_at = COALESCE(rooms.started_at, excluded.started_at),
-        version = rooms.version + 1,
+        version = COALESCE(@version, rooms.version + 1),
         updated_at = excluded.updated_at
     `)
     this.upsertPlayer = db.prepare(`
@@ -133,6 +230,8 @@ export class SqliteRoomPersistence implements RoomPersistence {
       SELECT id FROM rooms WHERE id = ?
       UNION ALL
       SELECT room_id AS id FROM game_results WHERE room_id = ?
+      UNION ALL
+      SELECT room_id AS id FROM game_contexts WHERE room_id = ?
       LIMIT 1
     `)
     this.findResult = db.prepare('SELECT room_id FROM game_results WHERE room_id = ?')
@@ -173,27 +272,101 @@ export class SqliteRoomPersistence implements RoomPersistence {
         AND rooms.id NOT IN (SELECT value FROM json_each(?))
       ORDER BY rooms.id, room_players.player_index
     `)
-    this.saveRoom = db.transaction((
-      values: Record<string, string | number | null>,
+    this.upsertActiveContext = db.prepare(`
+      INSERT INTO game_contexts (
+        room_id, lifecycle, phase, replay_status, expires_at, removal_reason, created_at, updated_at
+      ) VALUES (
+        @roomId, 'active', @phase, NULL, NULL, NULL, @now, @now
+      )
+      ON CONFLICT(room_id) DO UPDATE SET
+        phase = excluded.phase,
+        expires_at = NULL,
+        updated_at = excluded.updated_at
+      WHERE game_contexts.lifecycle = 'active'
+    `)
+    this.loadReplayHeader = db.prepare(`
+      SELECT schema_version, viewer_build_id, game_build_id, status, latest_step_no, missing_prefix
+      FROM game_replays
+      WHERE room_id = ?
+    `)
+    this.loadReplayHeadRow = db.prepare(`
+      SELECT replay.schema_version, replay.viewer_build_id, replay.game_build_id,
+             replay.status, replay.latest_step_no, replay.missing_prefix,
+             step.room_version, step.checkpoint_step_no, step.frame_hash
+      FROM game_replays replay
+      JOIN game_replay_steps step
+        ON step.room_id = replay.room_id AND step.step_no = replay.latest_step_no
+      WHERE replay.room_id = ?
+    `)
+    this.loadReplayStepHash = db.prepare(`
+      SELECT frame_hash FROM game_replay_steps WHERE room_id = ? AND step_no = ?
+    `)
+    this.insertReplayHeader = db.prepare(`
+      INSERT INTO game_replays (
+        room_id, schema_version, viewer_build_id, game_build_id, status,
+        latest_step_no, missing_prefix, custom_cards_json, created_at, completed_at
+      ) VALUES (
+        @roomId, @schemaVersion, @viewerBuildId, @gameBuildId, 'recording',
+        -1, @missingPrefix, @customCardsJson, @createdAt, NULL
+      )
+      ON CONFLICT(room_id) DO NOTHING
+    `)
+    this.insertReplayStep = db.prepare(`
+      INSERT INTO game_replay_steps (
+        room_id, step_no, room_version, checkpoint_step_no, player_index,
+        command_type, intent_json, payload_kind, payload_gzip, frame_hash, created_at
+      ) VALUES (
+        @roomId, @stepNo, @roomVersion, @checkpointStepNo, @playerIndex,
+        @commandType, @intentJson, @payloadKind, @payloadGzip, @frameHash, @createdAt
+      )
+    `)
+    this.advanceReplay = db.prepare(`
+      UPDATE game_replays
+      SET latest_step_no = @stepNo
+      WHERE room_id = @roomId AND status = 'recording' AND latest_step_no = @previousStepNo
+    `)
+    this.completeReplay = db.prepare(`
+      UPDATE game_replays
+      SET status = 'completed', completed_at = @completedAt
+      WHERE room_id = @roomId AND status = 'recording'
+    `)
+    this.completeContext = db.prepare(`
+      UPDATE game_contexts
+      SET lifecycle = 'completed',
+          phase = NULL,
+          replay_status = 'available',
+          expires_at = NULL,
+          removal_reason = NULL,
+          updated_at = @completedAt
+      WHERE room_id = @roomId
+    `)
+    this.completeLegacyContext = db.prepare(`
+      UPDATE game_contexts
+      SET lifecycle = 'completed',
+          phase = NULL,
+          replay_status = 'legacy_no_replay',
+          expires_at = NULL,
+          removal_reason = NULL,
+          updated_at = @completedAt
+      WHERE room_id = @roomId
+    `)
+    const savePlayers = (
+      roomId: string,
+      now: number,
       players: RoomMeta['players'],
-    ) => {
-      this.upsertRoom.run(values)
+    ): void => {
       for (const player of players) {
         const seat = {
-          roomId: values.id,
+          roomId,
           userId: player.userId,
           playerIndex: player.playerIndex,
-          now: values.now,
+          now,
         }
         this.clearReplacedSeat.run(seat)
         this.upsertPlayer.run(seat)
       }
-    })
-    this.completeRoom = db.transaction((result: GameResult) => {
-      if (this.findResult.get(result.roomId)) {
-        this.deleteRoom.run(result.roomId)
-        return
-      }
+    }
+    const saveResult = (result: GameResult): void => {
       const persistedPlayers = this.loadPlayers.all(result.roomId) as RoomMeta['players']
       const userIds = new Map(persistedPlayers.map((player) => [player.playerIndex, player.userId]))
       this.insertResult.run({
@@ -210,7 +383,109 @@ export class SqliteRoomPersistence implements RoomPersistence {
           userId: userIds.get(player.playerIndex) ?? player.userId,
         })
       }
+    }
+    this.saveRoom = db.transaction((
+      values: Record<string, string | number | null>,
+      players: RoomMeta['players'],
+    ) => {
+      this.upsertActiveContext.run({
+        roomId: values.id,
+        phase: values.status === 'waiting' ? 'waiting' : 'playing',
+        now: values.now,
+      })
+      this.upsertRoom.run(values)
+      savePlayers(String(values.id), Number(values.now), players)
+    })
+    this.completeRoom = db.transaction((result: GameResult) => {
+      if (this.findResult.get(result.roomId)) {
+        this.deleteRoom.run(result.roomId)
+        return
+      }
+      saveResult(result)
+      this.completeLegacyContext.run({ roomId: result.roomId, completedAt: result.finishedAt })
       this.deleteRoom.run(result.roomId)
+    })
+    this.commitReplayTransaction = db.transaction((commit: ReplayCommit): ReplayCommitResult => {
+      const existingStep = this.loadReplayStepHash.get(
+        commit.roomId,
+        commit.step.stepNo,
+      ) as ReplayStepHashRow | undefined
+      if (existingStep) {
+        return existingStep.frame_hash === commit.step.frameHash
+          ? { kind: 'idempotent' }
+          : {
+              kind: 'conflict',
+              error: `replay hash conflict at ${commit.roomId} step ${commit.step.stepNo}`,
+            }
+      }
+
+      this.upsertActiveContext.run({
+        roomId: commit.roomId,
+        phase: commit.meta.status === 'waiting' ? 'waiting' : 'playing',
+        now: commit.step.createdAt,
+      })
+      if (commit.header) {
+        this.insertReplayHeader.run({
+          roomId: commit.roomId,
+          ...commit.header,
+          missingPrefix: commit.header.missingPrefix ? 1 : 0,
+          createdAt: commit.step.createdAt,
+        })
+      }
+      const header = this.loadReplayHeader.get(commit.roomId) as ReplayHeaderRow | undefined
+      if (!header) {
+        throw new ReplayConflictError(`replay header missing for ${commit.roomId}`)
+      }
+      if (
+        commit.header &&
+        (
+          header.schema_version !== commit.header.schemaVersion ||
+          header.viewer_build_id !== commit.header.viewerBuildId ||
+          header.game_build_id !== commit.header.gameBuildId ||
+          header.missing_prefix !== (commit.header.missingPrefix ? 1 : 0)
+        )
+      ) {
+        throw new ReplayConflictError(`replay header conflict for ${commit.roomId}`)
+      }
+      if (header.status !== 'recording' || header.latest_step_no !== commit.step.stepNo - 1) {
+        throw new ReplayConflictError(
+          `replay sequence conflict at ${commit.roomId} step ${commit.step.stepNo}`,
+        )
+      }
+
+      const values = roomValues(
+        commit.roomId,
+        commit.serialized,
+        commit.meta,
+        commit.step.createdAt,
+        commit.step.roomVersion,
+      )
+      this.upsertRoom.run(values)
+      savePlayers(commit.roomId, commit.step.createdAt, commit.meta.players)
+      this.insertReplayStep.run({ roomId: commit.roomId, ...commit.step })
+      const advanced = this.advanceReplay.run({
+        roomId: commit.roomId,
+        stepNo: commit.step.stepNo,
+        previousStepNo: commit.step.stepNo - 1,
+      })
+      if (advanced.changes !== 1) {
+        throw new ReplayConflictError(
+          `replay sequence conflict at ${commit.roomId} step ${commit.step.stepNo}`,
+        )
+      }
+      if (commit.result) {
+        if (!this.findResult.get(commit.roomId)) saveResult(commit.result)
+        this.completeReplay.run({
+          roomId: commit.roomId,
+          completedAt: commit.result.finishedAt,
+        })
+        this.completeContext.run({
+          roomId: commit.roomId,
+          completedAt: commit.result.finishedAt,
+        })
+        this.deleteRoom.run(commit.roomId)
+      }
+      return { kind: 'committed' }
     })
   }
 
@@ -228,28 +503,34 @@ export class SqliteRoomPersistence implements RoomPersistence {
 
   save(id: string, serialized: SerializedGameState | null, meta: RoomMeta): void {
     const now = Date.now()
-    const stateJson = serialized === null ? null : JSON.stringify(serialized)
-    const customCardIdsJson = JSON.stringify(meta.customCardDbIds)
-    const enableParentCards = meta.enableParentCards === true ? 1 : 0
-    const draftParents = typeof meta.draftParents === 'boolean' ? (meta.draftParents ? 1 : 0) : null
-    const enableThroughTheSeasons = meta.enableThroughTheSeasons === true ? 1 : 0
-    const enableFarmersOfTheMoor = meta.enableFarmersOfTheMoor === true ? 1 : 0
-    const allowIncompleteFarmersOfTheMoorMinorDeal = meta.allowIncompleteFarmersOfTheMoorMinorDeal === true ? 1 : 0
-    this.saveRoom({
-      id,
-      createdBy: meta.createdBy,
-      stateJson,
-      maxPlayers: meta.maxPlayers,
-      status: meta.status,
-      customCardIds: customCardIdsJson,
-      enableParentCards,
-      draftParents,
-      enableThroughTheSeasons,
-      enableFarmersOfTheMoor,
-      allowIncompleteFarmersOfTheMoorMinorDeal,
-      startedAt: meta.startedAt ?? null,
-      now,
-    }, meta.players)
+    this.saveRoom(roomValues(id, serialized, meta, now, null), meta.players)
+  }
+
+  commitReplay(commit: ReplayCommit): ReplayCommitResult {
+    try {
+      return this.commitReplayTransaction(commit)
+    } catch (error) {
+      if (error instanceof ReplayConflictError) {
+        return { kind: 'conflict', error: error.message }
+      }
+      throw error
+    }
+  }
+
+  loadReplayHead(id: string): ReplayHead | null {
+    const row = this.loadReplayHeadRow.get(id) as ReplayHeadRow | undefined
+    if (!row) return null
+    return {
+      schemaVersion: row.schema_version,
+      viewerBuildId: row.viewer_build_id,
+      gameBuildId: row.game_build_id,
+      status: row.status,
+      latestStepNo: row.latest_step_no,
+      roomVersion: row.room_version,
+      checkpointStepNo: row.checkpoint_step_no,
+      frameHash: row.frame_hash,
+      missingPrefix: row.missing_prefix === 1,
+    }
   }
 
   discard(id: string): void {
@@ -273,7 +554,7 @@ export class SqliteRoomPersistence implements RoomPersistence {
 
   hasRoomId(id: string): boolean {
     try {
-      return this.findRoomId.get(id, id) !== undefined
+      return this.findRoomId.get(id, id, id) !== undefined
     } catch (err) {
       console.warn('[sqlite-adapter] room id lookup failed:', err)
       return true

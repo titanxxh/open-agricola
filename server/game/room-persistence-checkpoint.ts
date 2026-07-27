@@ -25,6 +25,32 @@ const scheduler: RoomCheckpointScheduler = {
   },
 }
 
+export const buildGameResult = (room: Room, finishedAt: number): GameResult => {
+  const state = room.session.state
+  const scores = Scoring.computeAll(state)
+  const seatOwners = new Map(
+    toRoomMeta(room).players.map((player) => [player.playerIndex, player.userId]),
+  )
+  return {
+    roomId: room.id,
+    startedAt: room.startedAt!,
+    finishedAt,
+    roundsPlayed: Math.max(0, Math.min(state.round, 14)),
+    playerCount: state.players.length,
+    communityDeck: state.enableCommunityDeck,
+    parentCards: state.enableParentCards,
+    throughTheSeasons: state.enableThroughTheSeasons,
+    farmersOfTheMoor: state.enableFarmersOfTheMoor === true,
+    players: scores.map((score, playerIndex) => ({
+      playerIndex,
+      gamePlayerId: score.playerId,
+      userId: seatOwners.get(playerIndex) ?? null,
+      displayName: score.playerName,
+      score: score.total,
+    })),
+  }
+}
+
 export class RoomPersistenceCheckpoint {
   private readonly persistence: RoomPersistence
   private readonly shouldPersist: (room: Room) => boolean
@@ -107,6 +133,11 @@ export class RoomPersistenceCheckpoint {
     this.cancelTimerIfIdle()
   }
 
+  markInactive(roomId: string): void {
+    this.cancelRoom(roomId)
+    this.inactiveRoomIds.add(roomId)
+  }
+
   completeGame(room: Room, finishedAt: number = this.now()): RoomCompletionResult {
     this.cancelRoom(room.id)
     if (this.inactiveRoomIds.has(room.id)) {
@@ -117,12 +148,12 @@ export class RoomPersistenceCheckpoint {
     try {
       if (this.shouldPersist(room)) this.saveState(room)
       if (room.startedAt === undefined) return { ok: false, error: 'game start time is missing' }
-      result = this.persistence.complete(this.buildResult(room, finishedAt))
+      result = this.persistence.complete(buildGameResult(room, finishedAt))
     } catch (err) {
       result = { ok: false, error: err instanceof Error ? err.message : String(err) }
     }
     if (result.ok) {
-      this.inactiveRoomIds.add(room.id)
+      this.markInactive(room.id)
     } else {
       this.dirtyRooms.set(room.id, room)
       this.scheduleFlush()
@@ -160,32 +191,6 @@ export class RoomPersistenceCheckpoint {
     this.dirtyRooms.set(room.id, room)
     console.warn('[room-persistence-checkpoint] save failed:', err)
     this.scheduleFlush()
-  }
-
-  private buildResult(room: Room, finishedAt: number): GameResult {
-    const state = room.session.state
-    const scores = Scoring.computeAll(state)
-    const seatOwners = new Map(
-      toRoomMeta(room).players.map((player) => [player.playerIndex, player.userId]),
-    )
-    return {
-      roomId: room.id,
-      startedAt: room.startedAt!,
-      finishedAt,
-      roundsPlayed: Math.max(0, Math.min(state.round, 14)),
-      playerCount: state.players.length,
-      communityDeck: state.enableCommunityDeck,
-      parentCards: state.enableParentCards,
-      throughTheSeasons: state.enableThroughTheSeasons,
-      farmersOfTheMoor: state.enableFarmersOfTheMoor === true,
-      players: scores.map((score, playerIndex) => ({
-        playerIndex,
-        gamePlayerId: score.playerId,
-        userId: seatOwners.get(playerIndex) ?? null,
-        displayName: score.playerName,
-        score: score.total,
-      })),
-    }
   }
 
   private canPersist(room: Room): boolean {

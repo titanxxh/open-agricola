@@ -1,0 +1,466 @@
+import type { ClientCommand } from '../../shared/contract/protocol/ws.ts'
+import { serializeState, type SerializedGameState } from '../../shared/session/serialization.ts'
+import type { SessionResponse } from './authoritative-session.ts'
+import {
+  canonicalJson,
+  encodeReplayFrame,
+  frameHash,
+  type EncodedReplayFrame,
+  type JsonValue,
+} from './replay-codec.ts'
+import { buildGameResult } from './room-persistence-checkpoint.ts'
+import { toRoomMeta, type Room } from './room.ts'
+import {
+  SqliteRoomPersistence,
+  type ReplayCommit,
+  type ReplayHead,
+} from './persistence/sqlite-adapter.ts'
+
+const RETRY_DELAYS_MS = [1_000, 2_000, 5_000, 10_000, 30_000] as const
+const REPLAY_SCHEMA_VERSION = 1
+
+export type ReplayIntent = {
+  commandType: string
+  intentJson: string
+}
+
+export type RoomCommitResult =
+  | { kind: 'committed'; roomVersion: number; stepNo: number; frameHash: string }
+  | { kind: 'unchanged' }
+  | { kind: 'blocked'; error: string }
+
+export type RoomCommitScheduler = {
+  setTimeout(callback: () => void, delay: number): unknown
+  clearTimeout(handle: unknown): void
+}
+
+type RoomHead = {
+  frame: JsonValue
+  frameHash: string
+  stepNo: number
+  roomVersion: number
+  checkpointStepNo: number
+  completed: boolean
+}
+
+type PendingCommit = {
+  room: Room
+  commit: ReplayCommit
+  frame: JsonValue
+  encoded: EncodedReplayFrame
+  retryIndex: number
+  error: string
+  timer: unknown | null
+  onCommitted?: (result: Extract<RoomCommitResult, { kind: 'committed' }>) => void
+  waiters: Array<(error?: string) => void>
+}
+
+const defaultScheduler: RoomCommitScheduler = {
+  setTimeout(callback, delay) {
+    const timer = setTimeout(callback, delay)
+    timer.unref()
+    return timer
+  },
+  clearTimeout(handle) {
+    clearTimeout(handle as ReturnType<typeof setTimeout>)
+  },
+}
+
+const intent = (commandType: string, params: JsonValue = {}): ReplayIntent => ({
+  commandType,
+  intentJson: canonicalJson(params),
+})
+
+export const replayIntentFromCommand = (command: ClientCommand): ReplayIntent | null => {
+  switch (command.type) {
+    case 'auth':
+    case 'createRoom':
+    case 'joinRoom':
+    case 'dissolveRoom':
+    case 'getState':
+    case 'newGame':
+      return null
+    case 'action':
+      return intent(command.type, { spaceId: command.spaceId })
+    case 'specialAction':
+      return intent(command.type, {
+        actionId: command.actionId,
+        cardId: command.cardId,
+        ...(command.payload?.tile ? { tile: command.payload.tile } : {}),
+      })
+    case 'choice':
+      return intent(command.type, { value: command.value })
+    case 'anytime':
+      return intent(command.type, { actionId: command.actionId })
+    case 'ordinaryDrawKeep':
+      return intent(command.type, {
+        choiceId: command.choiceId,
+        keepCardId: command.keepCardId,
+      })
+    case 'roundEnd':
+    case 'undoStep':
+    case 'undoAction':
+    case 'loadGame':
+    case 'devCreatePasture':
+      return intent(command.type)
+    case 'commitSelection':
+      return intent(command.type, {
+        selectionKeys: Object.keys(command.payload).sort(),
+      })
+    case 'parentSubmit':
+      return intent(command.type, { selection: command.selection } as unknown as JsonValue)
+    case 'devSetResources':
+      return intent(command.type, { resources: command.resources })
+    case 'devSetRound':
+      return intent(command.type, { round: command.round })
+    case 'devDrawCard':
+    case 'devPlayCard':
+      return intent(command.type, { cardId: command.cardId })
+    case 'draftSubmit':
+      return intent(command.type, { pick: command.pick } as unknown as JsonValue)
+  }
+}
+
+const replayFrame = (room: Room): {
+  serialized: SerializedGameState
+  frame: JsonValue
+} => {
+  const serialized = serializeState(room.session.state, {
+    engineStack: room.session.getEngineStack(),
+  })
+  const frame = JSON.parse(JSON.stringify(serialized)) as JsonValue
+  return { serialized: frame as unknown as SerializedGameState, frame }
+}
+
+const errorMessage = (error: unknown): string =>
+  error instanceof Error ? error.message : String(error)
+
+export class RoomCommitter {
+  private readonly persistence: SqliteRoomPersistence
+  private readonly enabled: boolean
+  private readonly viewerBuildId: string
+  private readonly gameBuildId: string
+  private readonly scheduler: RoomCommitScheduler
+  private readonly now: () => number
+  private readonly heads = new Map<string, RoomHead>()
+  private readonly knownReplayIds = new Set<string>()
+  private readonly pending = new Map<string, PendingCommit>()
+  private readonly permanentErrors = new Map<string, string>()
+  private storageFailed = false
+
+  constructor(deps: {
+    persistence: SqliteRoomPersistence
+    enabled: boolean
+    viewerBuildId: string
+    gameBuildId: string
+    scheduler?: RoomCommitScheduler
+    now?: () => number
+  }) {
+    this.persistence = deps.persistence
+    this.enabled = deps.enabled
+    this.viewerBuildId = deps.viewerBuildId.trim()
+    this.gameBuildId = deps.gameBuildId.trim()
+    this.scheduler = deps.scheduler ?? defaultScheduler
+    this.now = deps.now ?? Date.now
+  }
+
+  canCreateRoom(): { ok: true } | { ok: false; error: string } {
+    if (this.storageFailed) return { ok: false, error: 'replay storage unavailable' }
+    if (!this.enabled) return { ok: true }
+    if (!this.viewerBuildId) return { ok: false, error: 'replay viewer build is missing' }
+    if (!this.gameBuildId) return { ok: false, error: 'game build id is missing' }
+    return { ok: true }
+  }
+
+  hasReplay(roomId: string): boolean {
+    return this.knownReplayIds.has(roomId) ||
+      this.pending.has(roomId) ||
+      this.permanentErrors.has(roomId)
+  }
+
+  isRecording(roomId: string): boolean {
+    const head = this.heads.get(roomId)
+    return !!head && !head.completed
+  }
+
+  isBlocked(roomId: string): boolean {
+    return this.pending.has(roomId) || this.permanentErrors.has(roomId)
+  }
+
+  blockedError(roomId: string): string | undefined {
+    return this.permanentErrors.get(roomId) ?? this.pending.get(roomId)?.error
+  }
+
+  waitUntilReady(roomId: string, callback: (error?: string) => void): boolean {
+    const pending = this.pending.get(roomId)
+    if (!pending) return false
+    pending.waiters.push(callback)
+    return true
+  }
+
+  prepareRoom(
+    room: Room,
+    options: {
+      missingPrefix: boolean
+      onCommitted?: (result: Extract<RoomCommitResult, { kind: 'committed' }>) => void
+    },
+  ): RoomCommitResult {
+    const blocked = this.blockedError(room.id)
+    if (blocked) return { kind: 'blocked', error: blocked }
+    const persisted = this.persistence.loadReplayHead(room.id)
+    if (!persisted && room.status === 'waiting') return { kind: 'unchanged' }
+    const { serialized, frame } = replayFrame(room)
+    const hash = frameHash(frame)
+    if (persisted) return this.restoreHead(room, frame, hash, persisted)
+    if (!this.enabled && !options.missingPrefix) return { kind: 'unchanged' }
+    if (!this.viewerBuildId) {
+      return this.blockPermanently(room.id, 'replay viewer build is missing')
+    }
+    if (!this.gameBuildId) {
+      return this.blockPermanently(room.id, 'game build id is missing')
+    }
+
+    const encoded = encodeReplayFrame({
+      frame,
+      previousFrame: null,
+      stepNo: 0,
+      previousCheckpointStepNo: 0,
+    })
+    const createdAt = this.now()
+    const commit: ReplayCommit = {
+      roomId: room.id,
+      serialized,
+      meta: toRoomMeta(room),
+      header: {
+        schemaVersion: REPLAY_SCHEMA_VERSION,
+        viewerBuildId: this.viewerBuildId,
+        gameBuildId: this.gameBuildId,
+        missingPrefix: options.missingPrefix,
+        customCardsJson: canonicalJson(room.session.getCustomCardDefs()),
+      },
+      step: {
+        stepNo: 0,
+        roomVersion: 0,
+        checkpointStepNo: 0,
+        playerIndex: null,
+        commandType: 'initial',
+        intentJson: '{}',
+        payloadKind: encoded.payloadKind,
+        payloadGzip: encoded.payloadGzip,
+        frameHash: encoded.frameHash,
+        createdAt,
+      },
+    }
+    return this.persist(room, commit, frame, encoded, options.onCommitted)
+  }
+
+  commit(
+    room: Room,
+    response: SessionResponse,
+    replayIntent: ReplayIntent,
+    playerIndex: number,
+    onCommitted?: (result: Extract<RoomCommitResult, { kind: 'committed' }>) => void,
+  ): RoomCommitResult {
+    const blocked = this.blockedError(room.id)
+    if (blocked) return { kind: 'blocked', error: blocked }
+    if (!response.ok) return { kind: 'unchanged' }
+    const head = this.heads.get(room.id)
+    if (!head || head.completed) {
+      return { kind: 'blocked', error: `replay is not recording for ${room.id}` }
+    }
+    const { serialized, frame } = replayFrame(room)
+    const stepNo = head.stepNo + 1
+    const roomVersion = head.roomVersion + 1
+    const encoded = encodeReplayFrame({
+      frame,
+      previousFrame: head.frame,
+      stepNo,
+      previousCheckpointStepNo: head.checkpointStepNo,
+    })
+    if (encoded.frameHash === head.frameHash) return { kind: 'unchanged' }
+    if (response.state.gameOver && room.startedAt === undefined) {
+      return this.blockPermanently(room.id, 'game start time is missing')
+    }
+    const createdAt = this.now()
+    const commit: ReplayCommit = {
+      roomId: room.id,
+      serialized,
+      meta: toRoomMeta(room),
+      step: {
+        stepNo,
+        roomVersion,
+        checkpointStepNo: encoded.checkpointStepNo,
+        playerIndex,
+        commandType: replayIntent.commandType,
+        intentJson: replayIntent.intentJson,
+        payloadKind: encoded.payloadKind,
+        payloadGzip: encoded.payloadGzip,
+        frameHash: encoded.frameHash,
+        createdAt,
+      },
+      ...(response.state.gameOver
+        ? { result: buildGameResult(room, createdAt) }
+        : {}),
+    }
+    return this.persist(room, commit, frame, encoded, onCommitted)
+  }
+
+  shutdown(): void {
+    for (const pending of this.pending.values()) {
+      if (pending.timer !== null) this.scheduler.clearTimeout(pending.timer)
+    }
+    this.pending.clear()
+  }
+
+  private restoreHead(
+    room: Room,
+    frame: JsonValue,
+    hash: string,
+    persisted: ReplayHead,
+  ): RoomCommitResult {
+    this.knownReplayIds.add(room.id)
+    if (persisted.schemaVersion !== REPLAY_SCHEMA_VERSION) {
+      return this.blockPermanently(
+        room.id,
+        `unsupported replay schema ${persisted.schemaVersion} for ${room.id}`,
+      )
+    }
+    if (hash !== persisted.frameHash) {
+      return this.blockPermanently(
+        room.id,
+        `replay frame hash mismatch at ${room.id} step ${persisted.latestStepNo}`,
+      )
+    }
+    room.version = persisted.roomVersion
+    this.heads.set(room.id, {
+      frame,
+      frameHash: hash,
+      stepNo: persisted.latestStepNo,
+      roomVersion: persisted.roomVersion,
+      checkpointStepNo: persisted.checkpointStepNo,
+      completed: persisted.status === 'completed',
+    })
+    return persisted.status === 'completed'
+      ? { kind: 'unchanged' }
+      : {
+          kind: 'committed',
+          roomVersion: persisted.roomVersion,
+          stepNo: persisted.latestStepNo,
+          frameHash: persisted.frameHash,
+        }
+  }
+
+  private persist(
+    room: Room,
+    commit: ReplayCommit,
+    frame: JsonValue,
+    encoded: EncodedReplayFrame,
+    onCommitted?: (result: Extract<RoomCommitResult, { kind: 'committed' }>) => void,
+  ): RoomCommitResult {
+    try {
+      const persisted = this.persistence.commitReplay(commit)
+      if (persisted.kind === 'conflict') {
+        return this.blockPermanently(room.id, persisted.error)
+      }
+      return this.acceptCommit(room, commit, frame, encoded)
+    } catch (error) {
+      const message = errorMessage(error)
+      const pending: PendingCommit = {
+        room,
+        commit,
+        frame,
+        encoded,
+        retryIndex: 0,
+        error: message,
+        timer: null,
+        onCommitted,
+        waiters: [],
+      }
+      this.pending.set(room.id, pending)
+      this.storageFailed = true
+      console.warn(JSON.stringify({
+        event: 'durable_room_commit_failed',
+        roomId: room.id,
+        stepNo: commit.step.stepNo,
+        error: message,
+      }))
+      this.scheduleRetry(pending)
+      return { kind: 'blocked', error: message }
+    }
+  }
+
+  private acceptCommit(
+    room: Room,
+    commit: ReplayCommit,
+    frame: JsonValue,
+    encoded: EncodedReplayFrame,
+  ): Extract<RoomCommitResult, { kind: 'committed' }> {
+    room.version = commit.step.roomVersion
+    this.knownReplayIds.add(room.id)
+    this.heads.set(room.id, {
+      frame,
+      frameHash: encoded.frameHash,
+      stepNo: commit.step.stepNo,
+      roomVersion: commit.step.roomVersion,
+      checkpointStepNo: encoded.checkpointStepNo,
+      completed: commit.result !== undefined,
+    })
+    return {
+      kind: 'committed',
+      roomVersion: commit.step.roomVersion,
+      stepNo: commit.step.stepNo,
+      frameHash: encoded.frameHash,
+    }
+  }
+
+  private scheduleRetry(pending: PendingCommit): void {
+    const delay = RETRY_DELAYS_MS[Math.min(pending.retryIndex, RETRY_DELAYS_MS.length - 1)]!
+    pending.retryIndex += 1
+    pending.timer = this.scheduler.setTimeout(() => {
+      pending.timer = null
+      this.retry(pending)
+    }, delay)
+  }
+
+  private retry(pending: PendingCommit): void {
+    try {
+      const persisted = this.persistence.commitReplay(pending.commit)
+      if (persisted.kind === 'conflict') {
+        this.blockPermanently(pending.room.id, persisted.error)
+        this.storageFailed = this.pending.size > 0
+        return
+      }
+      this.pending.delete(pending.room.id)
+      this.storageFailed = this.pending.size > 0
+      const result = this.acceptCommit(
+        pending.room,
+        pending.commit,
+        pending.frame,
+        pending.encoded,
+      )
+      pending.onCommitted?.(result)
+      pending.waiters.forEach((waiter) => waiter())
+    } catch (error) {
+      pending.error = errorMessage(error)
+      console.warn(JSON.stringify({
+        event: 'durable_room_commit_retry_failed',
+        roomId: pending.room.id,
+        stepNo: pending.commit.step.stepNo,
+        error: pending.error,
+      }))
+      this.scheduleRetry(pending)
+    }
+  }
+
+  private blockPermanently(roomId: string, error: string): Extract<RoomCommitResult, { kind: 'blocked' }> {
+    const pending = this.pending.get(roomId)
+    if (pending?.timer !== null && pending?.timer !== undefined) {
+      this.scheduler.clearTimeout(pending.timer)
+    }
+    this.pending.delete(roomId)
+    this.permanentErrors.set(roomId, error)
+    console.error(JSON.stringify({ event: 'durable_room_commit_blocked', roomId, error }))
+    pending?.waiters.forEach((waiter) => waiter(error))
+    return { kind: 'blocked', error }
+  }
+}

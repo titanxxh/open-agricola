@@ -730,6 +730,7 @@ const createInitialPlayers = (
       startPlayer: info.startPlayer,
       activeModifiers: [],
       cardStates: {},
+      farmyardSpaceStates: [],
       stats: createInitialPlayerStats({ isFirstPlayer: info.startPlayer }),
       parentCards: { mother: null, father: null },
       supplyTokensConsumed: {},

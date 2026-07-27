@@ -172,6 +172,42 @@ vi.mock('../db.ts', () => {
       score INTEGER NOT NULL,
       PRIMARY KEY (room_id, player_index)
     );
+    CREATE TABLE game_contexts (
+      room_id TEXT PRIMARY KEY,
+      lifecycle TEXT NOT NULL,
+      phase TEXT,
+      replay_status TEXT,
+      expires_at INTEGER,
+      removal_reason TEXT,
+      created_at INTEGER NOT NULL,
+      updated_at INTEGER NOT NULL
+    );
+    CREATE TABLE game_replays (
+      room_id TEXT PRIMARY KEY REFERENCES game_contexts(room_id),
+      schema_version INTEGER NOT NULL,
+      viewer_build_id TEXT NOT NULL,
+      game_build_id TEXT NOT NULL,
+      status TEXT NOT NULL,
+      latest_step_no INTEGER NOT NULL,
+      missing_prefix INTEGER NOT NULL DEFAULT 0,
+      custom_cards_json TEXT NOT NULL DEFAULT '[]',
+      created_at INTEGER NOT NULL,
+      completed_at INTEGER
+    );
+    CREATE TABLE game_replay_steps (
+      room_id TEXT NOT NULL REFERENCES game_replays(room_id) ON DELETE CASCADE,
+      step_no INTEGER NOT NULL,
+      room_version INTEGER NOT NULL,
+      checkpoint_step_no INTEGER NOT NULL,
+      player_index INTEGER,
+      command_type TEXT NOT NULL,
+      intent_json TEXT NOT NULL,
+      payload_kind TEXT NOT NULL,
+      payload_gzip BLOB NOT NULL,
+      frame_hash TEXT NOT NULL,
+      created_at INTEGER NOT NULL,
+      PRIMARY KEY (room_id, step_no)
+    );
     CREATE TABLE workshop_cards (
       id TEXT PRIMARY KEY,
       author_id TEXT NOT NULL REFERENCES users(id),
