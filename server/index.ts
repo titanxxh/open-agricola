@@ -51,6 +51,13 @@ import { GameSession } from './game/authoritative-session.ts'
 import { encodeReplayFrame, type JsonValue } from './game/replay-codec.ts'
 import { viewerBuildExists } from './game/replay-viewer-build.ts'
 import { REPLAY_SCHEMA_VERSION } from './game/room-committer.ts'
+import { handleBugReportRoute } from './bug-report-routes.ts'
+import {
+  BugReportDelivery,
+  BugReportStore,
+  TokenCipher,
+} from './bug-report/bug-report-store.ts'
+import { GitHubIssueClient } from './bug-report/github-issue-client.ts'
 
 const CARD_ART_DIR = process.env.CARD_ART_DIR ?? join(process.cwd(), 'data', 'card-art')
 const REPLAY_VIEWER_ROOT = process.env.REPLAY_VIEWER_ROOT ?? join(process.cwd(), 'data', 'replay-viewers')
@@ -171,6 +178,26 @@ const shouldPersist: (room: Room) => boolean =
 const gameContextStore = new GameContextStore(getDb())
 const replayStore = new ReplayStore(getDb())
 const replayReadLimiter = new ReplayReadLimiter()
+const bugReportCipher = TokenCipher.fromEnv()
+const bugReportGithub = GitHubIssueClient.fromEnv()
+const bugReportStore = bugReportCipher
+  ? new BugReportStore(getDb(), bugReportCipher)
+  : null
+const bugReportDelivery = bugReportStore && bugReportGithub
+  ? new BugReportDelivery(
+      bugReportStore,
+      bugReportGithub,
+      process.env.PUBLIC_APP_ORIGIN ?? '',
+    )
+  : null
+const bugReportRuntime = bugReportStore
+  ? {
+      db: getDb(),
+      store: bugReportStore,
+      delivery: bugReportDelivery,
+      github: bugReportGithub,
+    }
+  : null
 
 const createCompletedReplayFixture = () => {
   const viewerBuildId = process.env.REPLAY_VIEWER_BUILD_ID ?? ''
@@ -286,6 +313,11 @@ const sessionCleanupTimer = setInterval(() => {
   cleanExpiredSessions()
   wssCtx?.committer?.cleanupReplayAssets()
 }, 60 * 60 * 1000)
+const bugReportDeliveryTimer = setInterval(() => {
+  void bugReportDelivery?.deliverDue().catch(() => {
+    console.error('[bug-report-delivery] delivery loop failed')
+  })
+}, 5_000)
 
 const server = createServer(async (req, res) => {
   if (!req.url) {
@@ -325,9 +357,17 @@ const server = createServer(async (req, res) => {
     })) return
   }
 
+  const requestUser = validateSession(getAuthToken(req))
+  if (await handleBugReportRoute(
+    req,
+    res,
+    bugReportRuntime,
+    requestUser,
+    requestUser ? isAdmin(requestUser.username) : false,
+  )) return
+
   if (req.url.startsWith('/api/v1/game-contexts/')) {
-    const user = validateSession(getAuthToken(req))
-    if (handleGameContextRoute(req, res, gameContextStore, user)) return
+    if (handleGameContextRoute(req, res, gameContextStore, requestUser)) return
   }
 
   // ── Auth routes ────────────────────────────────────────
@@ -827,5 +867,6 @@ server.listen(PORT, HOST, () => {
 installShutdownHandlers(() => {
   server.close()
   clearInterval(sessionCleanupTimer)
+  clearInterval(bugReportDeliveryTimer)
   wssCtx?.shutdown()
 })
