@@ -3,6 +3,7 @@
 
 /* ══════════ LOBBY PAGE ══════════ */
 .lobby-page {
+  position: relative;
   min-height: 100vh;
   padding: 20px clamp(20px, 4vw, 48px);
   max-width: 1200px;

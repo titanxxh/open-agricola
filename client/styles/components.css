@@ -447,6 +447,14 @@
   transform: translateY(8px);
   pointer-events: none;
 }
+.donate-sentinel {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  width: 1px;
+  height: 1px;
+  visibility: hidden;
+}
 body.kofi-widget-hidden .floatingchat-container-wrap,
 body.kofi-widget-hidden .floatingchat-container-wrap-mobi,
 body.kofi-widget-hidden .floating-chat-kofi-popup-iframe,

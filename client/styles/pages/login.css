@@ -2,6 +2,7 @@
 
 /* .login-page — seasonal backdrop inherited from body + center card */
 .login-page {
+  position: relative;
   display: flex;
   align-items: center;
   justify-content: center;
