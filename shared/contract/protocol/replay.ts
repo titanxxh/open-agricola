@@ -89,6 +89,10 @@ export type ReplayUnavailableError = GameContextError & {
     lastStepNo: number
     nextCheckpointStepNo?: number
   }
+  verifiedAnchor?: {
+    stepNo: number
+    frameHash: string
+  }
 }
 
 export type ReplayManifestResponse = ReplayManifest | ReplayUnavailableError

@@ -112,31 +112,19 @@ const projectParticipantNames = (
 ): SerializedGameState => {
   const currentNames = new Set(participantNames.values())
   const replacements = new Map<string, string>()
-  const players = frame.players.map((player, playerIndex) => {
+  frame.players.forEach((player, playerIndex) => {
     const name = participantNames.get(playerIndex) ?? player.name
     if (name !== player.name && !currentNames.has(player.name)) {
       replacements.set(player.name, name)
     }
-    return { ...player, name }
   })
+  const projected = replaceArchivedNames(frame, replacements) as SerializedGameState
   return {
-    ...frame,
-    players,
-    ...(frame.log
-      ? {
-          log: frame.log.map((entry) => ({
-            ...entry,
-            ...(entry.params
-              ? {
-                  params: replaceArchivedNames(
-                    entry.params,
-                    replacements,
-                  ) as Record<string, unknown>,
-                }
-              : {}),
-          })),
-        }
-      : {}),
+    ...projected,
+    players: projected.players.map((player, playerIndex) => ({
+      ...player,
+      name: participantNames.get(playerIndex) ?? player.name,
+    })),
   }
 }
 
@@ -427,7 +415,12 @@ export class ReplayStore {
       )
     }
     const segment = this.segment(roomId, row.checkpoint_step_no)
-    if (!segment.ok) return segment
+    if (!segment.ok) {
+      return {
+        ...segment,
+        verifiedAnchor: { stepNo, frameHash: expectedHash },
+      }
+    }
     const step = segment.steps.find((candidate) => candidate.stepNo === stepNo)
     if (!step) {
       return replayError(

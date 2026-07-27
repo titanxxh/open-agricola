@@ -3,9 +3,11 @@ import { createHash } from 'node:crypto'
 import {
   cpSync,
   existsSync,
+  mkdtempSync,
   mkdirSync,
   readFileSync,
   readdirSync,
+  renameSync,
   rmSync,
   writeFileSync,
 } from 'node:fs'
@@ -29,8 +31,8 @@ const filesUnder = (root: string, current = root): string[] =>
 
 export const publishReplayViewer = (
   targetRoot = resolve(process.env.REPLAY_VIEWER_ROOT ?? join(repoRoot, 'data', 'replay-viewers')),
+  staging = resolve(repoRoot, 'replay-viewer', '.build'),
 ): { buildId: string; directory: string } => {
-  const staging = resolve(repoRoot, 'replay-viewer', '.build')
   if (!existsSync(join(staging, 'index.html'))) throw new Error('replay viewer bundle is missing')
   if (!existsSync(join(staging, 'cards-manifest.json'))) throw new Error('cards manifest is missing')
   const files = filesUnder(staging)
@@ -44,7 +46,19 @@ export const publishReplayViewer = (
   writeFileSync(join(staging, 'manifest.json'), manifest)
   mkdirSync(targetRoot, { recursive: true })
   const directory = join(targetRoot, buildId)
-  if (!existsSync(directory)) cpSync(staging, directory, { recursive: true, errorOnExist: true })
+  if (!existsSync(directory)) {
+    const temporaryRoot = mkdtempSync(join(targetRoot, '.publish-'))
+    try {
+      const temporaryDirectory = join(temporaryRoot, buildId)
+      cpSync(staging, temporaryDirectory, { recursive: true, errorOnExist: true })
+      if (!loadReplayViewerBuild(temporaryRoot, buildId)) {
+        throw new Error(`staged replay viewer failed verification: ${buildId}`)
+      }
+      renameSync(temporaryDirectory, directory)
+    } finally {
+      rmSync(temporaryRoot, { recursive: true, force: true })
+    }
+  }
   if (!loadReplayViewerBuild(targetRoot, buildId)) {
     throw new Error(`published replay viewer failed verification: ${buildId}`)
   }

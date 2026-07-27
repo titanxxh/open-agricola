@@ -116,7 +116,9 @@ describe('GameContextRouter', () => {
     expect(screen.queryByText('active app')).not.toBeInTheDocument()
   })
 
-  it('verifies the pinned viewer and requires a perspective before mounting it', async () => {
+  it.each(['available', 'corrupt'] as const)(
+    'verifies the pinned viewer and requires a perspective before mounting it (%s anchor)',
+    async (anchorState) => {
     const viewerManifest = JSON.stringify({
       entrypoint: 'index.html',
       files: { 'index.html': '0'.repeat(64) },
@@ -197,16 +199,32 @@ describe('GameContextRouter', () => {
         return new Response(JSON.stringify(context))
       }
       if (url.includes(`/anchors/0?frame=${frameHash}`)) {
-        return new Response(JSON.stringify({
-          ok: true,
-          kind: 'replayAnchor',
-          apiVersion: 1,
-          roomId: 'completed-room',
-          schemaVersion: 1,
-          viewerBuildId,
-          anchor: { stepNo: 0, frameHash },
-          step: {},
-        }))
+        const body = anchorState === 'available'
+          ? {
+              ok: true,
+              kind: 'replayAnchor',
+              apiVersion: 1,
+              roomId: 'completed-room',
+              schemaVersion: 1,
+              viewerBuildId,
+              anchor: { stepNo: 0, frameHash },
+              step: {},
+            }
+          : {
+              ok: false,
+              code: 'replay_segment_unavailable',
+              lifecycle: 'completed',
+              message: 'Replay segment failed its integrity check',
+              verifiedAnchor: { stepNo: 0, frameHash },
+              unavailableRange: {
+                firstStepNo: 0,
+                lastStepNo: 0,
+                nextCheckpointStepNo: 1,
+              },
+            }
+        return new Response(JSON.stringify(body), {
+          status: anchorState === 'available' ? 200 : 503,
+        })
       }
       if (url.endsWith('/manifest.json')) {
         return new Response(viewerManifest)
@@ -263,7 +281,8 @@ describe('GameContextRouter', () => {
     expect(new URLSearchParams(window.location.search).get('step')).toBe('1')
     expect(new URLSearchParams(window.location.search).get('frame')).toBe('2'.repeat(64))
     expect(iframe).toHaveAttribute('src', initialSrc)
-  })
+    },
+  )
 
   it('keeps completed results visible when replay verification fails', async () => {
     window.history.replaceState(null, '', '/?context=completed-room')
