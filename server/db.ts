@@ -663,6 +663,68 @@ export function runMigrations(db: Database.Database): void {
         ALTER TABLE rooms ADD COLUMN custom_cards_runtime_json TEXT;
       `,
     },
+    {
+      version: 24,
+      sql: `
+        DROP TRIGGER IF EXISTS expire_game_context_after_room_delete;
+        CREATE TRIGGER expire_game_context_after_room_delete
+        AFTER DELETE ON rooms
+        BEGIN
+          DELETE FROM game_replay_steps
+          WHERE room_id = OLD.id
+            AND EXISTS (
+              SELECT 1 FROM game_contexts
+              WHERE room_id = OLD.id AND lifecycle = 'active'
+            )
+            AND NOT EXISTS (
+              SELECT 1
+              FROM bug_reports AS report
+              JOIN game_replay_steps AS anchor
+                ON anchor.room_id = report.room_id
+               AND anchor.step_no = report.step_no
+              WHERE report.room_id = OLD.id
+                AND report.evidence_expires_at >
+                  CAST(strftime('%s', 'now') AS INTEGER) * 1000
+                AND game_replay_steps.step_no
+                  BETWEEN anchor.checkpoint_step_no AND report.step_no
+            );
+
+          UPDATE game_replays
+          SET latest_step_no = (
+            SELECT MAX(step_no)
+            FROM game_replay_steps
+            WHERE room_id = OLD.id
+          )
+          WHERE room_id = OLD.id
+            AND EXISTS (
+              SELECT 1 FROM game_contexts
+              WHERE room_id = OLD.id AND lifecycle = 'active'
+            )
+            AND EXISTS (
+              SELECT 1 FROM game_replay_steps
+              WHERE room_id = OLD.id
+            );
+
+          DELETE FROM game_replays
+          WHERE room_id = OLD.id
+            AND EXISTS (
+              SELECT 1 FROM game_contexts
+              WHERE room_id = OLD.id AND lifecycle = 'active'
+            )
+            AND NOT EXISTS (
+              SELECT 1 FROM game_replay_steps
+              WHERE room_id = OLD.id
+            );
+
+          UPDATE game_contexts
+          SET lifecycle = 'expired',
+              phase = NULL,
+              expires_at = CAST(strftime('%s', 'now') AS INTEGER) * 1000,
+              updated_at = CAST(strftime('%s', 'now') AS INTEGER) * 1000
+          WHERE room_id = OLD.id AND lifecycle = 'active';
+        END;
+      `,
+    },
   ]
 
   const insert = db.prepare('INSERT INTO schema_version (version) VALUES (?)')

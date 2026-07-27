@@ -196,5 +196,31 @@ describe('SqliteRoomPersistence replay commit', () => {
       phase: null,
       replay_status: null,
     })
+    expect(db.prepare('SELECT COUNT(*) AS count FROM game_replays').get()).toEqual({ count: 0 })
+    expect(db.prepare('SELECT COUNT(*) AS count FROM game_replay_steps').get()).toEqual({ count: 0 })
+  })
+
+  it('keeps only a reported evidence segment when discarding an active room', () => {
+    expect(persistence.commitReplay(step0())).toEqual({ kind: 'committed' })
+    expect(persistence.commitReplay(nextStep())).toEqual({ kind: 'committed' })
+    db.prepare(`
+      INSERT INTO bug_reports (
+        submission_id, reporter_user_id, room_id, player_index, lifecycle,
+        room_version, step_no, frame_hash, status, evidence_expires_at,
+        created_at, updated_at
+      ) VALUES (
+        'report-1', NULL, 'room-1', 0, 'active',
+        0, 0, ?, 'submitted', ?, 100, 100
+      )
+    `).run('0'.repeat(64), Date.now() + 60_000)
+
+    persistence.discard('room-1')
+
+    expect(db.prepare(`
+      SELECT latest_step_no FROM game_replays WHERE room_id = 'room-1'
+    `).get()).toEqual({ latest_step_no: 0 })
+    expect(db.prepare(`
+      SELECT step_no, payload_gzip FROM game_replay_steps WHERE room_id = 'room-1'
+    `).all()).toEqual([{ step_no: 0, payload_gzip: Buffer.from('step-0') }])
   })
 })

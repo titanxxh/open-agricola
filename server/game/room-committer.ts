@@ -1,3 +1,7 @@
+import { createHash } from 'node:crypto'
+import { mkdirSync, readFileSync, writeFileSync } from 'node:fs'
+import { basename, join } from 'node:path'
+import type { CustomCardDef } from '../../shared/contract/protocol/game.ts'
 import type { ClientCommand } from '../../shared/contract/protocol/ws.ts'
 import { serializeState, type SerializedGameState } from '../../shared/session/serialization.ts'
 import type { SessionResponse } from './authoritative-session.ts'
@@ -159,12 +163,57 @@ const replayFrame = (room: Room): {
 const errorMessage = (error: unknown): string =>
   error instanceof Error ? error.message : String(error)
 
+const sha256 = (value: Buffer): string =>
+  createHash('sha256').update(value).digest('hex')
+
+const archiveReplayAsset = (
+  artUrl: string,
+  assetRoot: string,
+  cardArtRoot: string,
+): string => {
+  const archived = /^\/replay-assets\/([a-f0-9]{64})$/.exec(artUrl)
+  if (archived) {
+    const content = readFileSync(join(assetRoot, archived[1]!))
+    if (sha256(content) !== archived[1]) throw new Error('archived custom card art is corrupt')
+    return artUrl
+  }
+  if (!artUrl.startsWith('/card-art/')) throw new Error('unsupported custom card art URL')
+  const filename = artUrl.slice('/card-art/'.length)
+  if (!filename || basename(filename) !== filename || !/^[A-Za-z0-9._-]+$/.test(filename)) {
+    throw new Error('invalid custom card art URL')
+  }
+  const content = readFileSync(join(cardArtRoot, filename))
+  const hash = sha256(content)
+  mkdirSync(assetRoot, { recursive: true })
+  const target = join(assetRoot, hash)
+  try {
+    writeFileSync(target, content, { flag: 'wx' })
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code !== 'EEXIST') throw error
+    if (sha256(readFileSync(target)) !== hash) throw new Error('replay asset hash conflict')
+  }
+  return `/replay-assets/${hash}`
+}
+
+const archiveCustomCardDefs = (
+  definitions: CustomCardDef[],
+  assetRoot: string,
+  cardArtRoot: string,
+): CustomCardDef[] => definitions.map((definition) => ({
+  ...definition,
+  ...(definition.artUrl
+    ? { artUrl: archiveReplayAsset(definition.artUrl, assetRoot, cardArtRoot) }
+    : {}),
+}))
+
 export class RoomCommitter {
   private readonly persistence: SqliteRoomPersistence
   private readonly enabled: boolean
   private readonly viewerBuildId: string
   private readonly gameBuildId: string
   private readonly viewerBuildExists: (viewerBuildId: string) => boolean
+  private readonly assetRoot: string
+  private readonly cardArtRoot: string
   private readonly scheduler: RoomCommitScheduler
   private readonly now: () => number
   private readonly heads = new Map<string, RoomHead>()
@@ -180,6 +229,8 @@ export class RoomCommitter {
     viewerBuildId: string
     gameBuildId: string
     viewerBuildExists: (viewerBuildId: string) => boolean
+    assetRoot?: string
+    cardArtRoot?: string
     scheduler?: RoomCommitScheduler
     now?: () => number
   }) {
@@ -188,6 +239,8 @@ export class RoomCommitter {
     this.viewerBuildId = deps.viewerBuildId.trim()
     this.gameBuildId = deps.gameBuildId.trim()
     this.viewerBuildExists = deps.viewerBuildExists
+    this.assetRoot = deps.assetRoot ?? join(process.cwd(), 'data', 'replay-assets')
+    this.cardArtRoot = deps.cardArtRoot ?? join(process.cwd(), 'data', 'card-art')
     this.scheduler = deps.scheduler ?? defaultScheduler
     this.now = deps.now ?? Date.now
   }
@@ -312,6 +365,19 @@ export class RoomCommitter {
       previousCheckpointStepNo: 0,
     })
     const createdAt = this.now()
+    let customCardsJson: string
+    try {
+      customCardsJson = canonicalJson(archiveCustomCardDefs(
+        room.session.getCustomCardDefs(),
+        this.assetRoot,
+        this.cardArtRoot,
+      ))
+    } catch (error) {
+      return this.blockPermanently(
+        room.id,
+        `unable to archive custom card art: ${errorMessage(error)}`,
+      )
+    }
     const commit: ReplayCommit = {
       roomId: room.id,
       serialized,
@@ -321,7 +387,7 @@ export class RoomCommitter {
         viewerBuildId,
         gameBuildId,
         missingPrefix: legacyRoom && options.missingPrefix,
-        customCardsJson: canonicalJson(room.session.getCustomCardDefs()),
+        customCardsJson,
       },
       step: {
         stepNo: 0,

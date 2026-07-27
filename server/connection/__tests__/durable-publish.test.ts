@@ -1,6 +1,6 @@
 import Database from 'better-sqlite3'
 import { describe, expect, it, vi } from 'vitest'
-import { runMigrations } from '../../db.ts'
+import * as database from '../../db.ts'
 import { RoomRegistry } from '../../game/room-registry.ts'
 import { SqliteRoomPersistence } from '../../game/persistence/sqlite-adapter.ts'
 import { createRoomPersistenceCheckpoint } from '../../game/room-persistence-checkpoint.ts'
@@ -9,6 +9,7 @@ import { createLobby } from '../../game/lobby.ts'
 import { Broadcaster } from '../broadcaster.ts'
 import { createConnectionCtx } from '../connection-ctx.ts'
 import { dispatch } from '../room-router.ts'
+import { createCard } from '../../workshop-drafts.ts'
 
 const fakeWs = () => ({ OPEN: 1, readyState: 1, send: vi.fn(), close: vi.fn() })
 
@@ -19,7 +20,8 @@ describe('durable publish', () => {
   it('does not publish a successful state until its replay transaction commits', () => {
     const db = new Database(':memory:')
     db.pragma('foreign_keys = ON')
-    runMigrations(db)
+    database.runMigrations(db)
+    vi.spyOn(database, 'getDb').mockReturnValue(db)
     db.prepare(`
       INSERT INTO users (id, username, display_name, password_hash, created_at)
       VALUES (?, ?, ?, 'hash', 1)
@@ -54,6 +56,49 @@ describe('durable publish', () => {
       scheduler,
     })
     const deps = { registry, checkpoint, broadcaster, lobby, committer }
+    const unpublished = createCard(db, {
+      authorId: 'u1',
+      draft: {
+        cardId: 'CUSTOM_Unpublished',
+        cardType: 'minor',
+        name: 'Unpublished',
+        description: 'Unpublished',
+        cardJson: {
+          id: 'CUSTOM_Unpublished',
+          name: 'Unpublished',
+          deck: 'CUSTOM',
+          number: 1,
+          desc: [],
+        },
+        effectCode: null,
+        compiledCode: null,
+        codeManifest: null,
+        artUrl: null,
+        generation: {},
+      } as never,
+    })
+    const consentWs = fakeWs()
+    const consent = createConnectionCtx(consentWs as never, deps, true, 'u1')
+    dispatch(consent, {
+      type: 'createRoom',
+      maxPlayers: 2,
+      customCardIds: [unpublished.id],
+      requestId: 'without-consent',
+    })
+    expect(consent.currentRoom).toBeNull()
+    expect(messages(consentWs)).toContainEqual(expect.objectContaining({
+      type: 'error',
+      requestId: 'without-consent',
+    }))
+    dispatch(consent, {
+      type: 'createRoom',
+      maxPlayers: 2,
+      customCardIds: [unpublished.id],
+      confirmReplayCardSnapshotPublic: true,
+    })
+    expect(consent.currentRoom?.customCards).toHaveLength(1)
+    dispatch(consent, { type: 'dissolveRoom' })
+
     const hostWs = fakeWs()
     const guestWs = fakeWs()
     const host = createConnectionCtx(hostWs as never, deps, true, 'u1')
@@ -180,5 +225,6 @@ describe('durable publish', () => {
     committer.shutdown()
     checkpoint.shutdown()
     db.close()
+    vi.restoreAllMocks()
   })
 })

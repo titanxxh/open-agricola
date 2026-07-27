@@ -1,9 +1,13 @@
+import { createHash } from 'node:crypto'
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { createServer } from 'node:http'
 import type { AddressInfo } from 'node:net'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import Database from 'better-sqlite3'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import WebSocket from 'ws'
-import { createWsServer } from '../ws-server.ts'
+import { createWsServer, viewerBuildExists } from '../ws-server.ts'
 import { InMemoryRoomPersistence } from '../../game/persistence/memory-adapter.ts'
 import type { ServerEvent } from '../../../shared/contract/protocol/ws.ts'
 import type { StateUpdateEnvelope } from '../../../shared/contract/protocol/game.ts'
@@ -52,6 +56,45 @@ const attachCollector = (ws: TestSocket) => {
     ws.received.push(JSON.parse(raw.toString()) as ServerEvent)
   })
 }
+
+describe('replay startup validation', () => {
+  it('requires SQLite persistence when replay recording is enabled', () => {
+    expect(() => createWsServer(createServer(), {
+      persistence: new InMemoryRoomPersistence(),
+      replay: {
+        enabled: true,
+        viewerBuildId: '0'.repeat(64),
+        gameBuildId: 'game-1',
+        viewerRoot: '/unused',
+      },
+    })).toThrow('Replay recording requires SQLite persistence')
+  })
+
+  it('accepts only content-addressed viewer builds with a complete manifest', () => {
+    const root = mkdtempSync(join(tmpdir(), 'open-agricola-viewer-build-'))
+    try {
+      const index = Buffer.from('<!doctype html>')
+      const manifest = Buffer.from(JSON.stringify({
+        entrypoint: 'index.html',
+        files: {
+          'index.html': createHash('sha256').update(index).digest('hex'),
+        },
+      }))
+      const buildId = createHash('sha256').update(manifest).digest('hex')
+      const directory = join(root, buildId)
+      mkdirSync(directory)
+      writeFileSync(join(directory, 'index.html'), index)
+      writeFileSync(join(directory, 'manifest.json'), manifest)
+
+      expect(viewerBuildExists(root, buildId)).toBe(true)
+      writeFileSync(join(directory, 'index.html'), 'changed')
+      expect(viewerBuildExists(root, buildId)).toBe(false)
+      expect(viewerBuildExists(root, 'current')).toBe(false)
+    } finally {
+      rmSync(root, { recursive: true, force: true })
+    }
+  })
+})
 
 describe('fixed dev room startup persistence', () => {
   it('persists serialized Farmers of the Moor state for fixed dev rooms at startup', () => {
