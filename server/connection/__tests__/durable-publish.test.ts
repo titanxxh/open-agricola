@@ -210,7 +210,9 @@ describe('durable publish', () => {
       'roomPersistencePaused',
       'stateUpdate',
       'roomPersistenceResumed',
+      'seat_replaced',
     ])
+    expect(guestWs.close).toHaveBeenCalledWith(4001, 'seat replaced')
     expect(messages(reconnectWs).map(({ type }) => type)).toEqual([
       'roomPersistencePaused',
       'roomPersistenceResumed',
@@ -231,7 +233,7 @@ describe('durable publish', () => {
     expect(persistence.loadReplayHead(host.currentRoom!.id)?.latestStepNo).toBe(2)
 
     hostWs.send.mockClear()
-    guestWs.send.mockClear()
+    reconnectWs.send.mockClear()
     db.prepare(`
       INSERT INTO game_replay_steps (
         room_id, step_no, room_version, checkpoint_step_no, player_index,
@@ -239,13 +241,13 @@ describe('durable publish', () => {
       ) VALUES (?, 3, 3, 0, 1, 'action', '{}', 'delta', X'00', ?, 1003)
     `).run(host.currentRoom!.id, 'f'.repeat(64))
 
-    dispatch(guest, {
+    dispatch(reconnect, {
       type: 'action',
       spaceId: 'reed-bank',
       requestId: 'action-conflict',
     })
 
-    expect(messages(guestWs)).toContainEqual(expect.objectContaining({
+    expect(messages(reconnectWs)).toContainEqual(expect.objectContaining({
       type: 'error',
       requestId: 'action-conflict',
     }))

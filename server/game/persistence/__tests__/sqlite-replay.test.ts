@@ -169,6 +169,18 @@ describe('SqliteRoomPersistence replay commit', () => {
       .toEqual({ updated_at: 100 })
   })
 
+  it('preserves an empty-room expiry through a later replay commit', () => {
+    expect(persistence.commitReplay(step0())).toEqual({ kind: 'committed' })
+    db.prepare(`
+      UPDATE game_contexts SET expires_at = 500 WHERE room_id = 'room-1'
+    `).run()
+
+    expect(persistence.commitReplay(nextStep())).toEqual({ kind: 'committed' })
+    expect(db.prepare(`
+      SELECT expires_at FROM game_contexts WHERE room_id = 'room-1'
+    `).get()).toEqual({ expires_at: 500 })
+  })
+
   it('commits the final Step, result, completed context, and room deletion together', () => {
     expect(persistence.commitReplay(step0())).toEqual({ kind: 'committed' })
 

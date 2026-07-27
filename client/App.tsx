@@ -4,6 +4,7 @@ import { LocaleProvider, useLocale } from './contexts/LocaleContext'
 import { loadCardsManifest } from './services/card-meta'
 import { GameLoadScreen } from './components/common/GameLoadScreen'
 import { getGameLoadProgress } from './app/game-load-progress'
+import { GameContextRouter } from './app/GameContextRouter'
 import './styles/bootstrap-shell.css'
 
 const PageRouterLazy = lazy(() =>
@@ -60,7 +61,9 @@ function AppContent() {
 function App() {
   return (
     <LocaleProvider>
-      <AppContent />
+      <GameContextRouter>
+        <AppContent />
+      </GameContextRouter>
     </LocaleProvider>
   )
 }

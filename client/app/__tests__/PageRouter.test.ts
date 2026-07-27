@@ -75,4 +75,16 @@ describe('setPage URL hygiene', () => {
 
     expect(window.location.pathname + window.location.search).toBe('/open-agricola/?page=settings')
   })
+
+  it('leaves a permanent context link when navigating back to the lobby', () => {
+    window.history.replaceState(
+      null,
+      '',
+      '/open-agricola/?context=room-1&step=4&frame=hash&perspective=p1',
+    )
+
+    setPage('lobby')
+
+    expect(window.location.pathname + window.location.search).toBe('/open-agricola/')
+  })
 })

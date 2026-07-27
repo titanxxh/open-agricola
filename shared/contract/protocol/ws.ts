@@ -1,4 +1,5 @@
 import type { StateUpdateEnvelope } from './game'
+import type { GameContextErrorCode, GameContextLifecycle } from './game-context'
 import type { DraftMode, DraftPickPayload } from '../../draft/types'
 import type { ParentSelectionSubmission, Resource, ResourceBatchExchangePayload } from '../types'
 import type { MoorSpecialActionId } from '../../moor/types'
@@ -73,7 +74,13 @@ type ClientCommandBody =
       /** Pool size per card type (7..10). Only applied when draftMode === 'simultaneous'. */
       draftPoolSize?: number
     }
-  | { type: 'joinRoom'; roomId: string; name?: string; requestedPlayerIndex?: number }
+  | {
+      type: 'joinRoom'
+      roomId: string
+      intent?: 'join' | 'resume'
+      name?: string
+      requestedPlayerIndex?: number
+    }
   | { type: 'dissolveRoom' }
   | { type: 'draftSubmit'; playerId: string; pick: DraftPickPayload }
 
@@ -81,7 +88,13 @@ export type ClientCommand = ClientCommandBody & { requestId?: string }
 
 export type ServerEvent =
   | StateUpdateEnvelope
-  | { type: 'error'; error: string; requestId?: string }
+  | {
+      type: 'error'
+      error: string
+      code?: GameContextErrorCode | 'seat_replaced'
+      lifecycle?: GameContextLifecycle
+      requestId?: string
+    }
   | { type: 'authOk'; userId: string; username: string }
   | { type: 'roomCreated'; roomId: string; playerIndex: number; maxPlayers: number }
   | { type: 'roomJoined'; roomId: string; playerIndex: number }
@@ -91,6 +104,7 @@ export type ServerEvent =
   | { type: 'roomDissolved'; roomId: string }
   | { type: 'roomPersistencePaused'; roomId: string }
   | { type: 'roomPersistenceResumed'; roomId: string }
+  | { type: 'seat_replaced'; roomId: string; playerIndex: number }
 
 export type RoomSummary = {
   id: string
