@@ -423,13 +423,28 @@ describe('RoomCommitter', () => {
         players: [],
       },
     )
-    const committer = createCommitter({ enabled: false })
+    const committer = createCommitter()
 
     expect(committer.prepareRoom(room, { missingPrefix: true })).toMatchObject({
       kind: 'committed',
       stepNo: 0,
     })
     expect(persistence.loadReplayHead(room.id)?.missingPrefix).toBe(true)
+  })
+
+  it('leaves old active rooms writable while replay rollout is disabled', () => {
+    const room = makeRoom()
+    const committer = createCommitter({
+      enabled: false,
+      viewerBuildId: '',
+      gameBuildId: '',
+    })
+
+    expect(committer.prepareRoom(room, { missingPrefix: true })).toEqual({
+      kind: 'unchanged',
+    })
+    expect(committer.isBlocked(room.id)).toBe(false)
+    expect(persistence.loadReplayHead(room.id)).toBeNull()
   })
 
   it('permanently blocks a different Hash at the same Step', () => {
@@ -450,6 +465,7 @@ describe('RoomCommitter', () => {
       error: `replay hash conflict at ${room.id} step 1`,
     })
     expect(committer.isBlocked(room.id)).toBe(true)
+    expect(committer.isRetrying(room.id)).toBe(false)
     expect(tasks).toEqual([])
   })
 
@@ -480,6 +496,18 @@ describe('RoomCommitter', () => {
     })).toEqual({
       commandType: 'choice',
       intentJson: '{"value":"confirm"}',
+    })
+    expect(replayIntentFromCommand({
+      type: 'draftSubmit',
+      playerId: 'p1',
+      pick: {
+        occCardId: 'A001',
+        minorCardId: 'B001',
+        secret: 'must-not-persist',
+      } as never,
+    })).toEqual({
+      commandType: 'draftSubmit',
+      intentJson: '{"pick":{"minorCardId":"B001","occCardId":"A001"}}',
     })
     expect(replayIntentFromCommand({ type: 'auth', token: 'secret' })).toBeNull()
   })

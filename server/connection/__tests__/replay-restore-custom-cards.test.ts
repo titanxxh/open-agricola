@@ -16,7 +16,7 @@ afterEach(() => {
 })
 
 describe('replay room restoration', () => {
-  it('loads custom cards before creating a missing-prefix replay', async () => {
+  it('loads and pins custom cards before creating a missing-prefix replay', async () => {
     tempDir = mkdtempSync(join(tmpdir(), 'open-agricola-replay-restore-'))
     process.env.DB_PATH = join(tempDir, 'test.db')
     vi.resetModules()
@@ -72,7 +72,7 @@ describe('replay room restoration', () => {
     const result = createWsServer(server, {
       persistence,
       replay: {
-        enabled: false,
+        enabled: true,
         viewerBuildId: 'viewer-1',
         gameBuildId: 'game-1',
         viewerRoot,
@@ -94,6 +94,34 @@ describe('replay room restoration', () => {
           cardJson: expect.objectContaining({ id: 'CUSTOM_Restored' }),
         }),
       ])
+      expect(persistence.load('custom-room')?.meta.customCards).toEqual([
+        expect.objectContaining({
+          cardType: 'minor',
+          cardJson: expect.objectContaining({ id: 'CUSTOM_Restored' }),
+        }),
+      ])
+
+      db.prepare('DELETE FROM workshop_cards WHERE id = ?').run(card.id)
+      const restoredServer = createServer()
+      const restored = createWsServer(restoredServer, {
+        persistence,
+        replay: {
+          enabled: true,
+          viewerBuildId: 'viewer-2',
+          gameBuildId: 'game-2',
+          viewerRoot,
+        },
+      })
+      try {
+        expect(restored.registry.get('custom-room')?.session.getCustomCardDefs())
+          .toEqual([expect.objectContaining({
+            cardType: 'minor',
+            cardJson: expect.objectContaining({ id: 'CUSTOM_Restored' }),
+          })])
+      } finally {
+        restored.shutdown()
+        restoredServer.close()
+      }
     } finally {
       result.shutdown()
       server.close()

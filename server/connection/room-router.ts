@@ -135,6 +135,10 @@ const requireRoom = (ctx: ConnectionCtx, requestId?: string): Room | null => {
 const requireWritableRoom = (ctx: ConnectionCtx, requestId?: string): Room | null => {
   const room = requireRoom(ctx, requestId)
   if (!room) return null
+  if (room.status === 'waiting' && room.replayRecording === true) {
+    sendCommandError(ctx, 'game has not started', requestId)
+    return null
+  }
   const blocked = ctx.committer?.blockedError(room.id)
   if (!blocked) return room
   sendCommandError(ctx, `room saving is paused: ${blocked}`, requestId)
@@ -353,6 +357,7 @@ function handleCreateRoom(ctx: ConnectionCtx, msg: Extract<ClientCommand, { type
     status: 'waiting',
     createdBy: ctx.currentUserId,
     customCardDbIds,
+    customCards,
     enableParentCards,
     draftParents,
     draftMode: draftOptions.value?.draftMode,
@@ -637,6 +642,7 @@ function handleNewGame(ctx: ConnectionCtx, msg: Extract<ClientCommand, { type: '
   room.enableThroughTheSeasons = enableThroughTheSeasons
   room.enableFarmersOfTheMoor = enableFarmersOfTheMoor
   room.allowIncompleteFarmersOfTheMoorMinorDeal = allowIncompleteFarmersOfTheMoorMinorDeal
+  room.customCards = customCards
   ctx.committer?.lockNewRoom(room)
   for (const player of room.players) {
     room.session.updatePlayerName(player.playerIndex, player.name)

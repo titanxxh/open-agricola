@@ -132,7 +132,16 @@ export const replayIntentFromCommand = (command: ClientCommand): ReplayIntent | 
     case 'devPlayCard':
       return intent(command.type, { cardId: command.cardId })
     case 'draftSubmit':
-      return intent(command.type, { pick: command.pick } as unknown as JsonValue)
+      return intent(command.type, {
+        pick: {
+          ...(typeof command.pick.occCardId === 'string'
+            ? { occCardId: command.pick.occCardId }
+            : {}),
+          ...(typeof command.pick.minorCardId === 'string'
+            ? { minorCardId: command.pick.minorCardId }
+            : {}),
+        },
+      })
   }
 }
 
@@ -277,7 +286,7 @@ export class RoomCommitter {
     if (persisted) return this.restoreHead(room, frame, hash, persisted)
     const legacyRoom = room.replayRecording === undefined
     const shouldRecord = legacyRoom
-      ? this.enabled || options.missingPrefix
+      ? this.enabled
       : room.replayRecording
     if (!shouldRecord) return { kind: 'unchanged' }
     const viewerBuildId = legacyRoom

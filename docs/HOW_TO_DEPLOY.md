@@ -73,7 +73,7 @@ GAME_BUILD_ID=
 # CORS_ORIGIN 等后续根据情况设置
 ```
 
-首次启用 Replay 时，先把不可变 Viewer Build 部署到 `${REPLAY_VIEWER_ROOT}/${REPLAY_VIEWER_BUILD_ID}`，再填写两个 Build ID，最后把 `REPLAY_NEW_ROOMS_ENABLED` 改为 `true`。目录不存在时拒绝创建新 Room。开关和 Build ID 在 Room 创建时锁定；已有 Replay Room 会继续按锁定值记录。
+首次启用 Replay 时，先把不可变 Viewer Build 部署到 `${REPLAY_VIEWER_ROOT}/${REPLAY_VIEWER_BUILD_ID}`，再填写两个 Build ID，最后把 `REPLAY_NEW_ROOMS_ENABLED` 改为 `true`。目录不存在时拒绝创建新 Room。开关、Build ID 和自定义卡运行时版本在 Room 创建时锁定；已有 Replay Room 会继续按锁定值记录，开关关闭期间不会迁移旧进行局。
 
 #### 构建并启动
 
