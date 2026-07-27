@@ -8,6 +8,7 @@ import { createLobby } from '../../game/lobby.ts'
 import { createRoomPersistenceCheckpoint } from '../../game/room-persistence-checkpoint.ts'
 import { snapshotToRoom } from '../../game/room.ts'
 import type { GameState } from '../../../shared/contract/types.ts'
+import type { CustomCardData } from '../../../shared/cards/session-card-context.ts'
 
 const fakeWs = () => ({ OPEN: 1, readyState: 1, send: vi.fn(), close: vi.fn() })
 
@@ -157,6 +158,33 @@ describe('handleCreateRoom', () => {
     expect(ctx.currentRoom!.session.state.gameSeed).toBe(309)
     expect(ctx.currentRoom!.session.state.enableParentCards).toBe(true)
     expect(ctx.currentRoom!.session.state.phase).toBe('parent-selection')
+  })
+
+  it('reuses pinned custom cards when starting a new game', () => {
+    const ctx = newCtx()
+    ctx.currentUserId = 'u1'
+    dispatch(ctx, { type: 'createRoom', maxPlayers: 2 })
+    ctx.currentRoom!.customCardDbIds = ['deleted-card']
+    ctx.currentRoom!.customCards = [{
+      cardType: 'minor',
+      cardJson: {
+        id: 'CUSTOM_Pinned',
+        name: 'Pinned',
+        deck: 'CUSTOM',
+        number: 1,
+        desc: [],
+      },
+    } satisfies CustomCardData]
+    markRoomStarted(ctx)
+
+    dispatch(ctx, { type: 'newGame', seed: 309 })
+
+    expect(ctx.currentRoom!.session.getCustomCardDefs()).toEqual([
+      expect.objectContaining({
+        cardType: 'minor',
+        cardJson: expect.objectContaining({ id: 'CUSTOM_Pinned' }),
+      }),
+    ])
   })
 
   it('preserves direct Parent Card dealing when starting a new game', () => {

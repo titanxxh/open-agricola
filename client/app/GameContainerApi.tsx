@@ -3,7 +3,7 @@ import { useAuth } from '../contexts/AuthContext'
 import { useLocale } from '../contexts/LocaleContext'
 import { setPage } from './PageRouter'
 import type { ActionSpace, FarmTilePosition, InteractionCommand, PlayerState, Resource } from '../../shared/contract/types'
-import { t } from '../../shared/i18n'
+import { t, type Locale } from '../../shared/i18n'
 import {
   positionKey,
 } from '../../shared/domain/farm'
@@ -128,7 +128,12 @@ const toRequestedPlayerIndex = (playerParam: string | null) => {
     : undefined
 }
 
-const useTransportSetup = (playerParam: string | null, displayName?: string, isWsMode = false) => {
+const useTransportSetup = (
+  playerParam: string | null,
+  displayName: string | undefined,
+  isWsMode: boolean,
+  locale: Locale,
+) => {
   const [wsStatus, setWsStatus] = useState<WsStatus>({ phase: 'idle' })
   const [wsTransport, setWsTransport] = useState<WsGameTransport | null>(null)
   const [wsReady, setWsReady] = useState(false)
@@ -179,6 +184,14 @@ const useTransportSetup = (playerParam: string | null, displayName?: string, isW
           const searchParams = new URLSearchParams(window.location.search)
           const customCardsParam = searchParams.get('customCards')
           const customCardIds = customCardsParam ? customCardsParam.split(',').filter(Boolean) : undefined
+          const confirmReplayCardSnapshotPublic = customCardIds?.length
+            ? window.confirm(t(locale, 'platform.replayCardSnapshotConsent'))
+            : undefined
+          if (confirmReplayCardSnapshotPublic === false) {
+            rawWs.removeEventListener('message', handler)
+            resolve({ error: t(locale, 'platform.replayCardSnapshotDeclined') })
+            return
+          }
           const maxPlayers = maxPlayersFromQuery(window.location.search)
           const draftParams = parseDraftParamsFromQuery(window.location.search)
           const enableCommunityDeck = searchParams.get('enableCommunityDeck') === 'true' || undefined
@@ -192,6 +205,7 @@ const useTransportSetup = (playerParam: string | null, displayName?: string, isW
             maxPlayers,
             name: displayName ?? playerParam ?? 'Player 1',
             customCardIds,
+            confirmReplayCardSnapshotPublic,
             enableCommunityDeck,
             enableParentCards,
             draftParents,
@@ -283,7 +297,7 @@ const useTransportSetup = (playerParam: string | null, displayName?: string, isW
     }
 
     init()
-  }, [displayName, isWsMode, playerParam])
+  }, [displayName, isWsMode, locale, playerParam])
 
   const transport: GameTransport = isWsMode && wsReady && wsTransport ? wsTransport : httpTransportSingleton
   const isReady = !isWsMode || wsReady
@@ -310,13 +324,18 @@ export const GameContainerApi = () => {
     if (Number.isFinite(index) && index >= 1 && index <= 6) return `p${index}`
     return null
   }, [])
+  const { locale } = useLocale()
   const { user } = useAuth()
-  const { transport, wsStatus, isWs, isReady, wsTransport } = useTransportSetup(lockedViewPlayerId, user?.displayName, isWsMode)
+  const { transport, wsStatus, isWs, isReady, wsTransport } = useTransportSetup(
+    lockedViewPlayerId,
+    user?.displayName,
+    isWsMode,
+    locale,
+  )
   const { state, interaction, scores, pastureCapacities, historyLength, hasActionStartSnapshot, actionAvailability, cardAvailability, privateEvents, applySnapshot } =
     useGameSync()
   const privateEventNotificationBatchSeqRef = useRef(0)
   const privateEventNotificationTimersRef = useRef<number[]>([])
-  const { locale } = useLocale()
   const [privateEventNotifications, setPrivateEventNotifications] = useState<PrivateEventNotification[]>([])
   const [persistencePaused, setPersistencePaused] = useState(false)
   const [replayFilter, setReplayFilter] = useState<ReplayTimelineFilter>('all')

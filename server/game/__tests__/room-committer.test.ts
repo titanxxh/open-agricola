@@ -1,4 +1,4 @@
-import { mkdtempSync, rmSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -72,12 +72,16 @@ describe('RoomCommitter', () => {
     viewerBuildExists?: (viewerBuildId: string) => boolean
     viewerBuildId?: string
     gameBuildId?: string
+    assetRoot?: string
+    cardArtRoot?: string
   } = {}) => new RoomCommitter({
     persistence,
     enabled: options.enabled ?? true,
     viewerBuildId: options.viewerBuildId ?? 'viewer-1',
     gameBuildId: options.gameBuildId ?? 'game-1',
     viewerBuildExists: options.viewerBuildExists ?? (() => true),
+    assetRoot: options.assetRoot,
+    cardArtRoot: options.cardArtRoot,
     scheduler: options.scheduler,
     now: () => 1_000,
   })
@@ -246,6 +250,39 @@ describe('RoomCommitter', () => {
         intent_json: '{"resources":{"food":3}}',
       },
     ])
+  })
+
+  it('copies custom card art into content-addressed replay storage', () => {
+    const cardArtRoot = join(tempDir, 'card-art')
+    const assetRoot = join(tempDir, 'replay-assets')
+    mkdirSync(cardArtRoot)
+    writeFileSync(join(cardArtRoot, 'custom.webp'), Buffer.from('custom-art'))
+    const room = makeRoom()
+    room.session = new GameSession(587, [{
+      cardType: 'minor',
+      cardJson: {
+        id: 'CUSTOM_Art',
+        name: 'Art',
+        deck: 'CUSTOM',
+        number: 1,
+        desc: [],
+      },
+      artUrl: '/card-art/custom.webp',
+    }], { playerCount: 2 })
+    const committer = createCommitter({ assetRoot, cardArtRoot })
+
+    expect(committer.prepareRoom(room, { missingPrefix: false })).toMatchObject({
+      kind: 'committed',
+      stepNo: 0,
+    })
+
+    const row = db.prepare(`
+      SELECT custom_cards_json FROM game_replays WHERE room_id = ?
+    `).get(room.id) as { custom_cards_json: string }
+    const [definition] = JSON.parse(row.custom_cards_json) as Array<{ artUrl: string }>
+    const hash = definition!.artUrl.slice('/replay-assets/'.length)
+    expect(hash).toMatch(/^[a-f0-9]{64}$/)
+    expect(readFileSync(join(assetRoot, hash))).toEqual(Buffer.from('custom-art'))
   })
 
   it('serializes simultaneous player submissions and includes automatic resolution in the last Step', () => {

@@ -53,6 +53,7 @@ type ClientCommandBody =
       maxPlayers?: number
       name?: string
       customCardIds?: string[]
+      confirmReplayCardSnapshotPublic?: boolean
       /** When true, include community-deck cards in the deal pool. Default false. */
       enableCommunityDeck?: boolean
       /** When true, start the Parent Cards expansion selection phase before play. Default false. */

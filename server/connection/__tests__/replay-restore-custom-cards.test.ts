@@ -1,11 +1,28 @@
+import { createHash } from 'node:crypto'
 import { createServer } from 'node:http'
-import { mkdirSync, mkdtempSync, rmSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 const originalDbPath = process.env.DB_PATH
 let tempDir = ''
+
+const createViewerBuild = (root: string): string => {
+  const index = Buffer.from('<!doctype html>')
+  const manifest = Buffer.from(JSON.stringify({
+    entrypoint: 'index.html',
+    files: {
+      'index.html': createHash('sha256').update(index).digest('hex'),
+    },
+  }))
+  const buildId = createHash('sha256').update(manifest).digest('hex')
+  const directory = join(root, buildId)
+  mkdirSync(directory, { recursive: true })
+  writeFileSync(join(directory, 'index.html'), index)
+  writeFileSync(join(directory, 'manifest.json'), manifest)
+  return buildId
+}
 
 afterEach(() => {
   if (originalDbPath === undefined) delete process.env.DB_PATH
@@ -66,14 +83,14 @@ describe('replay room restoration', () => {
       },
     )
     const viewerRoot = join(tempDir, 'viewers')
-    mkdirSync(join(viewerRoot, 'viewer-1'), { recursive: true })
+    const viewerBuildId = createViewerBuild(viewerRoot)
     const { createWsServer } = await import('../ws-server.ts')
     const server = createServer()
     const result = createWsServer(server, {
       persistence,
       replay: {
         enabled: true,
-        viewerBuildId: 'viewer-1',
+        viewerBuildId,
         gameBuildId: 'game-1',
         viewerRoot,
       },
@@ -107,7 +124,7 @@ describe('replay room restoration', () => {
         persistence,
         replay: {
           enabled: true,
-          viewerBuildId: 'viewer-2',
+          viewerBuildId,
           gameBuildId: 'game-2',
           viewerRoot,
         },
