@@ -1,10 +1,9 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState, type RefObject } from 'react'
 
 const KOFI_SCRIPT_SRC = 'https://storage.ko-fi.com/cdn/scripts/overlay-widget.js'
 
 const AFDIAN_ICON_SRC = `${import.meta.env.BASE_URL}afdian.png`
 const MOBILE_QUERY = '(max-width: 640px)'
-const NEAR_BOTTOM_PX = 48
 
 declare global {
   interface Window {
@@ -29,35 +28,38 @@ function drawKofiWidget() {
   window.__kofiWidgetDrawn = true
 }
 
-function useDonateVisible() {
+function useDonateVisible(sentinelRef: RefObject<HTMLElement | null>) {
   const [visible, setVisible] = useState(false)
 
   useEffect(() => {
     const mql = window.matchMedia(MOBILE_QUERY)
-    const update = () => {
-      if (!mql.matches) {
+    let observer: IntersectionObserver | undefined
+    const setup = () => {
+      observer?.disconnect()
+      observer = undefined
+      if (!mql.matches || !sentinelRef.current) {
         setVisible(true)
         return
       }
-      const el = document.scrollingElement || document.documentElement
-      setVisible(el.scrollHeight - el.scrollTop - el.clientHeight <= NEAR_BOTTOM_PX)
+      observer = new IntersectionObserver(entries => {
+        setVisible(entries[0].isIntersecting)
+      })
+      observer.observe(sentinelRef.current)
     }
-    update()
-    window.addEventListener('scroll', update, { passive: true })
-    window.addEventListener('resize', update)
-    mql.addEventListener('change', update)
+    setup()
+    mql.addEventListener('change', setup)
     return () => {
-      window.removeEventListener('scroll', update)
-      window.removeEventListener('resize', update)
-      mql.removeEventListener('change', update)
+      observer?.disconnect()
+      mql.removeEventListener('change', setup)
     }
-  }, [])
+  }, [sentinelRef])
 
   return visible
 }
 
 export function DonateWidgets() {
-  const visible = useDonateVisible()
+  const sentinelRef = useRef<HTMLSpanElement>(null)
+  const visible = useDonateVisible(sentinelRef)
 
   useEffect(() => {
     const apply = () => {
@@ -83,14 +85,17 @@ export function DonateWidgets() {
   }, [visible])
 
   return (
-    <a
-      className={`afdian-float-btn${visible ? '' : ' is-hidden'}`}
-      href="https://afdian.com/a/titanxxh"
-      target="_blank"
-      rel="noreferrer"
-    >
-      <img className="afdian-float-btn__icon" src={AFDIAN_ICON_SRC} alt="" />
-      <span>支持titanxxh</span>
-    </a>
+    <>
+      <span ref={sentinelRef} className="donate-sentinel" aria-hidden />
+      <a
+        className={`afdian-float-btn${visible ? '' : ' is-hidden'}`}
+        href="https://afdian.com/a/titanxxh"
+        target="_blank"
+        rel="noreferrer"
+      >
+        <img className="afdian-float-btn__icon" src={AFDIAN_ICON_SRC} alt="" />
+        <span>支持titanxxh</span>
+      </a>
+    </>
   )
 }
