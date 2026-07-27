@@ -91,6 +91,12 @@ jobs:
           BGA_IMAGE_DIR: bga-agricola/img
         run: pnpm run build
 
+      - name: Build immutable replay viewer
+        env:
+          BGA_IMAGE_DIR: bga-agricola/img
+          REPLAY_VIEWER_ROOT: ${{ runner.temp }}/replay-viewers
+        run: pnpm run build:replay-viewer
+
       - name: Check reaches (strict)
         run: pnpm run check:reaches -- --strict
 
