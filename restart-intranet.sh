@@ -452,6 +452,7 @@ if [ "$KILL_ONLY" -eq 1 ]; then
 fi
 
 echo "Ensuring immutable replay viewer..."
+"$PNPM_BIN" run build:cards-manifest
 REPLAY_VIEWER_ALLOW_MISSING_BGA_ART=0
 if [ ! -d "$BGA_IMAGE_DIR" ]; then
   REPLAY_VIEWER_ALLOW_MISSING_BGA_ART=1
