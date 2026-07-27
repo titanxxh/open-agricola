@@ -43,6 +43,8 @@ import {
 import { assertOAuthProvider } from './oauth/providers.ts'
 import { createOnboardingTicket, findIdentity } from './oauth/store.ts'
 import { installShutdownHandlers } from './shutdown.ts'
+import { GameContextStore } from './game/game-context-store.ts'
+import { handleGameContextRoute } from './game-context-routes.ts'
 
 const CARD_ART_DIR = process.env.CARD_ART_DIR ?? join(process.cwd(), 'data', 'card-art')
 const BGA_CDN_BASE = process.env.BGA_CDN_BASE_URL || 'https://x.boardgamearena.net/data/themereleases/current/games/agricola/260329-0408/img'
@@ -158,6 +160,7 @@ const persistence =
     : new JsonRoomPersistence(PERSISTED_ROOMS_DIR)
 const shouldPersist: (room: Room) => boolean =
   PERSIST_ROOMS === 'sqlite' ? () => true : (room) => isDevRoom(room.id)
+const gameContextStore = new GameContextStore(getDb())
 
 let wssCtx: ReturnType<typeof createWsServer> | null = null
 
@@ -186,6 +189,11 @@ const server = createServer(async (req, res) => {
   if (req.method === 'GET' && req.url === '/api/health') {
     sendJson(res, 200, { ok: true })
     return
+  }
+
+  if (req.url.startsWith('/api/v1/game-contexts/')) {
+    const user = validateSession(getAuthToken(req))
+    if (handleGameContextRoute(req, res, gameContextStore, user)) return
   }
 
   // ── Auth routes ────────────────────────────────────────
@@ -652,7 +660,11 @@ const server = createServer(async (req, res) => {
   sendJson(res, 404, { error: 'Not found' })
 })
 
-wssCtx = createWsServer(server, { persistence, shouldPersist })
+wssCtx = createWsServer(server, {
+  persistence,
+  shouldPersist,
+  gameContextStore: PERSIST_ROOMS === 'sqlite' ? gameContextStore : undefined,
+})
 
 const PORT = Number(process.env.BACKEND_PORT) || 5175
 const HOST = process.env.BACKEND_HOST || undefined

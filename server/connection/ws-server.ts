@@ -29,6 +29,7 @@ import { validateSession } from '../auth.ts'
 import { isTrustedOrigin } from '../http-origin.ts'
 import { RoomCommitter } from '../game/room-committer.ts'
 import { SqliteRoomPersistence } from '../game/persistence/sqlite-adapter.ts'
+import type { GameContextStore } from '../game/game-context-store.ts'
 
 const WS_AUTH_TIMEOUT_MS = 5000
 const ROOM_CLEANUP_INTERVAL_MS = 5 * 60 * 1000
@@ -139,6 +140,7 @@ const restoreRooms = (
   persistence: RoomPersistence,
   checkpoint: RoomPersistenceCheckpoint,
   committer: RoomCommitter | undefined,
+  gameContextStore: GameContextStore | undefined,
   now: number,
 ): void => {
   const fixedIds = FIXED_DEV_ROOMS.map((r) => r.id)
@@ -177,7 +179,13 @@ const restoreRooms = (
         error: prepared.error,
       }))
     }
-    if (snap.updatedAt > 0) registry.touchActivity(snap.id, snap.updatedAt)
+    const ttl = emptyRoomTtlMs(room)
+    const persistedExpiry = gameContextStore?.activeExpiresAt(room.id)
+    const expiresAt = persistedExpiry ?? now + ttl
+    if (persistedExpiry === null) {
+      gameContextStore?.setActiveExpiry(room.id, expiresAt)
+    }
+    registry.touchActivity(snap.id, expiresAt - ttl)
     console.log(`[ws-server] restored room ${snap.id}`)
   }
 }
@@ -218,6 +226,7 @@ type ConnectionDeps = {
   broadcaster: Broadcaster
   lobby: Lobby
   committer?: RoomCommitter
+  gameContextStore?: GameContextStore
   activeUserSockets: Map<string, Set<WebSocket>>
 }
 
@@ -295,7 +304,12 @@ const handleConnection = (ws: WebSocket, req: IncomingMessage, deps: ConnectionD
           playerIndex: ctx.currentPlayerIndex,
         })
       } else if (removal === 'empty') {
-        deps.registry.touchActivity(ctx.currentRoom.id, Date.now())
+        const now = Date.now()
+        deps.registry.touchActivity(ctx.currentRoom.id, now)
+        deps.gameContextStore?.setActiveExpiry(
+          ctx.currentRoom.id,
+          now + emptyRoomTtlMs(ctx.currentRoom),
+        )
       }
     }
   })
@@ -328,6 +342,7 @@ export function createWsServer(
       assetRoot?: string
       cardArtRoot?: string
     }
+    gameContextStore?: GameContextStore
   },
 ): CreateWsServerResult {
   const registry = new RoomRegistry()
@@ -369,7 +384,14 @@ export function createWsServer(
   })
 
   ensureFixedDevRooms(registry, deps.persistence, checkpoint)
-  restoreRooms(registry, deps.persistence, checkpoint, committer, Date.now())
+  restoreRooms(
+    registry,
+    deps.persistence,
+    checkpoint,
+    committer,
+    deps.gameContextStore,
+    Date.now(),
+  )
   const cleanupTimer = startRoomCleanup(registry, checkpoint, committer)
 
   const wss = new WebSocketServer({ server, path: '/ws' })
@@ -379,6 +401,7 @@ export function createWsServer(
       persistence: deps.persistence,
       checkpoint,
       committer,
+      gameContextStore: deps.gameContextStore,
       broadcaster,
       lobby,
       activeUserSockets,

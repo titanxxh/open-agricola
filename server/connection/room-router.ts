@@ -17,6 +17,10 @@ import {
   type ClientCommand,
 } from '../../shared/contract/protocol/ws.ts'
 import type { StateUpdateCause } from '../../shared/contract/protocol/game.ts'
+import type {
+  GameContextErrorCode,
+  GameContextLifecycle,
+} from '../../shared/contract/protocol/game-context.ts'
 import {
   loadPublishedDraft,
   type WorkshopDraft,
@@ -135,12 +139,31 @@ const generateRoomId = (ctx: ConnectionCtx, devRoomRootId?: string | null): stri
   return null
 }
 
-const sendCommandError = (ctx: ConnectionCtx, error: string, requestId?: string) => {
-  ctx.broadcaster.sendTo(ctx.ws, { type: 'error', error, requestId })
+const sendCommandError = (
+  ctx: ConnectionCtx,
+  error: string,
+  requestId?: string,
+  code?: GameContextErrorCode | 'seat_replaced',
+  lifecycle?: GameContextLifecycle,
+) => {
+  ctx.broadcaster.sendTo(ctx.ws, {
+    type: 'error',
+    error,
+    requestId,
+    ...(code ? { code } : {}),
+    ...(lifecycle ? { lifecycle } : {}),
+  })
 }
 
 const requireRoom = (ctx: ConnectionCtx, requestId?: string): Room | null => {
   if (!ctx.currentRoom) { sendCommandError(ctx, 'not in a room', requestId); return null }
+  const activeSeat = ctx.currentRoom.players.some((player) =>
+    player.ws === ctx.ws && player.playerIndex === ctx.currentPlayerIndex
+  )
+  if (!activeSeat) {
+    sendCommandError(ctx, 'seat was replaced', requestId, 'seat_replaced')
+    return null
+  }
   return ctx.currentRoom
 }
 
@@ -407,8 +430,26 @@ function handleCreateRoom(ctx: ConnectionCtx, msg: Extract<ClientCommand, { type
 
 function handleJoinRoom(ctx: ConnectionCtx, msg: Extract<ClientCommand, { type: 'joinRoom' }>): void {
   const roomId = msg.roomId
+  if (msg.intent !== undefined && msg.intent !== 'join' && msg.intent !== 'resume') {
+    sendCommandError(ctx, 'invalid join intent', msg.requestId)
+    return
+  }
+  const lifecycle = ctx.gameContextStore?.lifecycle(roomId)
+  if (lifecycle && lifecycle !== 'active') {
+    sendCommandError(
+      ctx,
+      'game context changed',
+      msg.requestId,
+      'context_changed',
+      lifecycle,
+    )
+    return
+  }
   const room = ctx.registry.get(roomId)
-  if (!room) { sendCommandError(ctx, 'room not found', msg.requestId); return }
+  if (!room) {
+    sendCommandError(ctx, 'room not found', msg.requestId)
+    return
+  }
   const blocked = ctx.committer?.blockedError(room.id)
   if (blocked) {
     const waiting = ctx.committer?.waitUntilReady(room.id, (error) => {
@@ -435,11 +476,36 @@ function handleJoinRoom(ctx: ConnectionCtx, msg: Extract<ClientCommand, { type: 
     return
   }
   const wasPlaying = room.status === 'playing'
-  const rawRequestedPlayerIndex =
-    typeof msg.requestedPlayerIndex === 'number'
+  let requestedPlayerIndex: number | undefined
+  if (msg.intent === 'resume') {
+    if (!ctx.currentUserId) {
+      sendCommandError(ctx, 'login required', msg.requestId, 'login_required', 'active')
+      return
+    }
+    const owner = room.seatOwners?.find((candidate) =>
+      candidate.userId === ctx.currentUserId
+    )
+    if (!owner) {
+      sendCommandError(
+        ctx,
+        'only original participants can resume this game',
+        msg.requestId,
+        'not_participant',
+        'active',
+      )
+      return
+    }
+    requestedPlayerIndex = owner.playerIndex
+  } else {
+    requestedPlayerIndex = typeof msg.requestedPlayerIndex === 'number'
       ? msg.requestedPlayerIndex
       : undefined
-  const requested = resolveJoinRequestPlayerIndex(room, rawRequestedPlayerIndex, ctx.currentUserId)
+  }
+  const requested = resolveJoinRequestPlayerIndex(
+    room,
+    requestedPlayerIndex,
+    ctx.currentUserId,
+  )
   if (!requested.ok) {
     sendCommandError(ctx, requested.error, msg.requestId)
     return
@@ -459,7 +525,12 @@ function handleJoinRoom(ctx: ConnectionCtx, msg: Extract<ClientCommand, { type: 
       (player) => player.playerIndex === ctx.currentPlayerIndex,
     )
     if (existingPlayer) {
-      try { existingPlayer.ws.close() } catch { /* ignore */ }
+      ctx.broadcaster.sendTo(existingPlayer.ws, {
+        type: 'seat_replaced',
+        roomId,
+        playerIndex: ctx.currentPlayerIndex,
+      })
+      try { existingPlayer.ws.close(4001, 'seat replaced') } catch { /* ignore */ }
     }
   }
   room.players = room.players.filter(
@@ -479,6 +550,8 @@ function handleJoinRoom(ctx: ConnectionCtx, msg: Extract<ClientCommand, { type: 
     .map(([playerIndex, userId]) => ({ playerIndex, userId }))
   room.players.push({ ws: ctx.ws, playerIndex: ctx.currentPlayerIndex, name, userId: ctx.currentUserId })
   room.players.sort((a, b) => a.playerIndex - b.playerIndex)
+  ctx.gameContextStore?.clearActiveExpiry(room.id)
+  ctx.registry.touchActivity(room.id, Date.now())
   if (!wasPlaying) room.session.updatePlayerName(ctx.currentPlayerIndex, name)
   const playerCount = roomOccupiedSeatCount(room)
   const roomFull = playerCount >= room.maxPlayers
@@ -519,13 +592,14 @@ function handleJoinRoom(ctx: ConnectionCtx, msg: Extract<ClientCommand, { type: 
 }
 
 function handleDissolveRoom(ctx: ConnectionCtx, msg: Extract<ClientCommand, { type: 'dissolveRoom' }>): void {
-  if (!ctx.currentRoom) { sendCommandError(ctx, 'not in a room', msg.requestId); return }
-  const blocked = ctx.committer?.blockedError(ctx.currentRoom.id)
+  const room = requireRoom(ctx, msg.requestId)
+  if (!room) return
+  const blocked = ctx.committer?.blockedError(room.id)
   if (blocked) {
     sendCommandError(ctx, `room saving is paused: ${blocked}`, msg.requestId)
     return
   }
-  const result = ctx.lobby.dissolveRoomById(ctx.currentRoom.id, ctx.currentUserId)
+  const result = ctx.lobby.dissolveRoomById(room.id, ctx.currentUserId)
   if (!result.ok) { sendCommandError(ctx, result.error ?? 'dissolve failed', msg.requestId); return }
   ctx.currentRoom = null
 }

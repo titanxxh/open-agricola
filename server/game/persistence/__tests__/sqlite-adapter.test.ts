@@ -5,7 +5,7 @@ import type { GameResult, RoomMeta, RoomSnapshot } from '../room-persistence.ts'
 import type { SerializedGameState } from '../../../../shared/session/serialization.ts'
 
 const WAITING_TTL = 30 * 60 * 1000
-const PLAYING_TTL = 24 * 60 * 60 * 1000
+const PLAYING_TTL = 7 * 24 * 60 * 60 * 1000
 const NOW = 1_700_000_000_000
 
 const META: RoomMeta = {
@@ -211,6 +211,11 @@ describe('SqliteRoomPersistence', () => {
     db.prepare('UPDATE rooms SET updated_at = ? WHERE id IN (?, ?)').run(
       NOW - PLAYING_TTL - 1, 'r-stale-playing', 'r-stale-waiting',
     )
+    db.prepare(`
+      UPDATE game_contexts
+      SET expires_at = ?
+      WHERE room_id IN (?, ?)
+    `).run(NOW - 1, 'r-stale-playing', 'r-stale-waiting')
 
     const restored = p.listRestorable({
       now: NOW,
