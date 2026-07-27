@@ -148,6 +148,7 @@ const restoreRooms = (
     playingTtlMs: PLAYING_EMPTY_ROOM_TTL_MS,
     excludeIds: fixedIds,
   })
+  committer?.cleanupReplayAssets()
   for (const snap of snapshots) {
     if (registry.has(snap.id)) continue
     const customCards = snap.meta.customCards ?? loadCustomCardsFromDb(

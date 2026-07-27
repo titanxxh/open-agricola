@@ -117,11 +117,39 @@ describe('durable publish', () => {
     }))
     expect(persistence.loadReplayHead(host.currentRoom!.id)).toBeNull()
     hostWs.send.mockClear()
+    const joinPublications: Array<{ stepNo?: number; names?: string[] }> = []
+    const captureJoinPublication = () => {
+      const snapshot = persistence.load(host.currentRoom!.id)
+      joinPublications.push({
+        stepNo: persistence.loadReplayHead(host.currentRoom!.id)?.latestStepNo,
+        names: snapshot?.serialized?.players.map((player) => player.name),
+      })
+    }
+    const sendTo = broadcaster.sendTo.bind(broadcaster)
+    vi.spyOn(broadcaster, 'sendTo').mockImplementation((ws, event) => {
+      if (event.type === 'roomJoined') captureJoinPublication()
+      sendTo(ws, event)
+    })
+    const broadcastEvent = broadcaster.broadcastEvent.bind(broadcaster)
+    vi.spyOn(broadcaster, 'broadcastEvent').mockImplementation((room, event) => {
+      if (event.type === 'playerJoined') captureJoinPublication()
+      broadcastEvent(room, event)
+    })
     dispatch(guest, {
       type: 'joinRoom',
       roomId: host.currentRoom!.id,
       name: 'Guest',
     })
+    expect(joinPublications).toEqual([
+      { stepNo: 0, names: ['Host', 'Guest'] },
+      { stepNo: 0, names: ['Host', 'Guest'] },
+    ])
+    expect(messages(guestWs).map(({ type }) => type)).toEqual([
+      'roomJoined',
+      'playerJoined',
+      'stateUpdate',
+      'gameStarted',
+    ])
     expect(persistence.loadReplayHead(host.currentRoom!.id)?.latestStepNo).toBe(0)
     checkpoint.flushAll()
     expect(db.prepare('SELECT version FROM rooms WHERE id = ?').get(host.currentRoom!.id))

@@ -636,6 +636,8 @@ export function runMigrations(db: Database.Database): void {
           created_at = excluded.created_at,
           updated_at = excluded.updated_at;
 
+        DELETE FROM rooms
+        WHERE id IN (SELECT room_id FROM game_results);
       `,
     },
     {
@@ -739,8 +741,53 @@ export function runMigrations(db: Database.Database): void {
   }
 }
 
-/** Clean up expired sessions periodically. */
+/** Clean up expired sessions and replay evidence periodically. */
 export function cleanExpiredSessions(): void {
   const db = getDb()
-  db.prepare('DELETE FROM sessions WHERE expires_at < ?').run(Date.now())
+  const now = Date.now()
+  db.transaction(() => {
+    db.prepare('DELETE FROM sessions WHERE expires_at < ?').run(now)
+    db.prepare(`
+      DELETE FROM game_replay_steps
+      WHERE room_id IN (
+        SELECT room_id FROM game_contexts WHERE lifecycle = 'expired'
+      )
+        AND NOT EXISTS (
+          SELECT 1
+          FROM bug_reports AS report
+          JOIN game_replay_steps AS anchor
+            ON anchor.room_id = report.room_id
+           AND anchor.step_no = report.step_no
+          WHERE report.room_id = game_replay_steps.room_id
+            AND report.evidence_expires_at > ?
+            AND game_replay_steps.step_no
+              BETWEEN anchor.checkpoint_step_no AND report.step_no
+        )
+    `).run(now)
+    db.prepare(`
+      UPDATE game_replays
+      SET latest_step_no = (
+        SELECT MAX(step_no)
+        FROM game_replay_steps
+        WHERE room_id = game_replays.room_id
+      )
+      WHERE room_id IN (
+        SELECT room_id FROM game_contexts WHERE lifecycle = 'expired'
+      )
+        AND EXISTS (
+          SELECT 1 FROM game_replay_steps
+          WHERE room_id = game_replays.room_id
+        )
+    `).run()
+    db.prepare(`
+      DELETE FROM game_replays
+      WHERE room_id IN (
+        SELECT room_id FROM game_contexts WHERE lifecycle = 'expired'
+      )
+        AND NOT EXISTS (
+          SELECT 1 FROM game_replay_steps
+          WHERE room_id = game_replays.room_id
+        )
+    `).run()
+  })()
 }

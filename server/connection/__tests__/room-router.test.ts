@@ -76,12 +76,12 @@ describe('handleCreateRoom', () => {
     }))
   })
 
-  it('caps ordinary waiting and playing rooms at 30 while excluding fixed dev rooms', () => {
+  it('caps ordinary waiting and playing rooms at 30 while excluding development rooms', () => {
     const ctx = newCtx()
     dispatch(ctx, { type: 'createRoom', maxPlayers: 2 })
     const devRoom = ctx.currentRoom!
     ctx.registry.delete(devRoom.id)
-    devRoom.id = 'dev2'
+    devRoom.id = 'dev2-00000000-0000-4000-8000-000000000000'
     ctx.registry.set(devRoom)
     for (let index = 0; index < 30; index += 1) {
       dispatch(ctx, { type: 'createRoom', maxPlayers: 2 })

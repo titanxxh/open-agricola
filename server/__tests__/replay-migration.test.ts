@@ -19,6 +19,7 @@ describe('replay migration', () => {
     tempDir = mkdtempSync(join(tmpdir(), 'open-agricola-replay-migration-'))
     const path = join(tempDir, 'migration.db')
     const seed = new Database(path)
+    seed.pragma('foreign_keys = ON')
     seed.exec(`
       CREATE TABLE schema_version (version INTEGER PRIMARY KEY);
       INSERT INTO schema_version VALUES (20);
@@ -28,6 +29,13 @@ describe('replay migration', () => {
         created_at INTEGER NOT NULL,
         updated_at INTEGER NOT NULL
       );
+      CREATE TABLE room_players (
+        room_id TEXT NOT NULL REFERENCES rooms(id) ON DELETE CASCADE,
+        user_id TEXT NOT NULL,
+        player_index INTEGER NOT NULL,
+        joined_at INTEGER NOT NULL,
+        PRIMARY KEY (room_id, user_id)
+      );
       CREATE TABLE game_results (
         room_id TEXT PRIMARY KEY,
         started_at INTEGER NOT NULL,
@@ -36,6 +44,7 @@ describe('replay migration', () => {
       INSERT INTO rooms VALUES ('waiting-room', 'waiting', 10, 11);
       INSERT INTO rooms VALUES ('playing-room', 'playing', 20, 21);
       INSERT INTO rooms VALUES ('completed-wins', 'playing', 30, 31);
+      INSERT INTO room_players VALUES ('completed-wins', 'legacy-user', 0, 30);
       INSERT INTO game_results VALUES ('legacy-result', 40, 41);
       INSERT INTO game_results VALUES ('completed-wins', 50, 51);
     `)
@@ -98,6 +107,11 @@ describe('replay migration', () => {
         updated_at: 11,
       },
     ])
+    expect(db.prepare('SELECT id FROM rooms ORDER BY id').all()).toEqual([
+      { id: 'playing-room' },
+      { id: 'waiting-room' },
+    ])
+    expect(db.prepare('SELECT COUNT(*) AS count FROM room_players').get()).toEqual({ count: 0 })
     expect(db.prepare('SELECT COUNT(*) AS count FROM game_replays').get()).toEqual({ count: 0 })
     expect(db.prepare('SELECT COUNT(*) AS count FROM game_replay_steps').get()).toEqual({ count: 0 })
     db.close()
