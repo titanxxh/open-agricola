@@ -448,6 +448,13 @@
 }
 @media (max-width: 640px) {
   .afdian-float-btn {
-    bottom: calc(72px + var(--safe-area-inset-bottom, env(safe-area-inset-bottom)));
+    height: 50px;
+    box-sizing: border-box;
+    padding: 0 18px;
+    font-size: 16px;
+  }
+  .afdian-float-btn__icon {
+    width: 24px;
+    height: 24px;
   }
 }
