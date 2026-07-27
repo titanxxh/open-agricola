@@ -437,9 +437,21 @@
   font-weight: 700;
   text-decoration: none;
   box-shadow: 1px 3px 6px rgba(0, 0, 0, 0.3);
+  transition: opacity 0.25s, transform 0.25s;
 }
 .afdian-float-btn:hover {
   background: #7d54d4;
+}
+.afdian-float-btn.is-hidden {
+  opacity: 0;
+  transform: translateY(8px);
+  pointer-events: none;
+}
+body.kofi-widget-hidden .floatingchat-container-wrap,
+body.kofi-widget-hidden .floatingchat-container-wrap-mobi,
+body.kofi-widget-hidden .floating-chat-kofi-popup-iframe,
+body.kofi-widget-hidden .floating-chat-kofi-popup-iframe-mobi {
+  display: none !important;
 }
 .afdian-float-btn__icon {
   width: 20px;
@@ -456,5 +468,11 @@
   .afdian-float-btn__icon {
     width: 24px;
     height: 24px;
+  }
+  body:has(.mobile-tab-bar) .afdian-float-btn {
+    bottom: calc(72px + var(--safe-area-inset-bottom, env(safe-area-inset-bottom)));
+  }
+  body:has(.mobile-tab-bar) .floatingchat-container-wrap-mobi {
+    bottom: calc(72px + var(--safe-area-inset-bottom, env(safe-area-inset-bottom))) !important;
   }
 }
