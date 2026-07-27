@@ -84,7 +84,7 @@ describe('ReplayStore', () => {
     `)
     db.prepare('INSERT INTO game_contexts VALUES (?, ?, ?)')
       .run('room-1', 'completed', 'available')
-    db.prepare("INSERT INTO game_replays VALUES (?, 1, ?, ?, 'completed', 17, 0, ?)")
+    db.prepare("INSERT INTO game_replays VALUES (?, 1, ?, ?, 'completed', 3, 0, ?)")
       .run('room-1', 'a'.repeat(64), 'game-1', JSON.stringify([{
         cardType: 'minor',
         cardJson: { id: 'CUSTOM_1', name: 'Custom', deck: 'X', number: 1 },
@@ -106,17 +106,17 @@ describe('ReplayStore', () => {
       stepNo: 1,
       previousCheckpointStepNo: 0,
     })
-    const encoded16 = {
+    const encoded2 = {
       payloadKind: 'checkpoint' as const,
       payloadGzip: gzipSync(canonicalJson(frames[2])),
-      checkpointStepNo: 16,
+      checkpointStepNo: 2,
       frameHash: frameHash(frames[2]),
     }
-    const encoded17 = encodeReplayFrame({
+    const encoded3 = encodeReplayFrame({
       frame: frames[3],
       previousFrame: frames[2],
-      stepNo: 17,
-      previousCheckpointStepNo: 16,
+      stepNo: 3,
+      previousCheckpointStepNo: 2,
     })
     const insert = db.prepare(`
       INSERT INTO game_replay_steps VALUES (
@@ -127,8 +127,8 @@ describe('ReplayStore', () => {
     ;[
       { stepNo: 0, playerIndex: null, commandType: 'initial', intentJson: '{}', ...encoded0 },
       { stepNo: 1, playerIndex: 0, commandType: 'action', intentJson: '{"spaceId":"forest"}', ...encoded1 },
-      { stepNo: 16, playerIndex: 1, commandType: 'action', intentJson: '{"spaceId":"fishing"}', ...encoded16 },
-      { stepNo: 17, playerIndex: 0, commandType: 'choice', intentJson: '{"value":"confirm"}', ...encoded17 },
+      { stepNo: 2, playerIndex: 1, commandType: 'action', intentJson: '{"spaceId":"fishing"}', ...encoded2 },
+      { stepNo: 3, playerIndex: 0, commandType: 'choice', intentJson: '{"value":"confirm"}', ...encoded3 },
     ].forEach((step) => insert.run({
       roomId: 'room-1',
       roomVersion: step.stepNo,
@@ -150,7 +150,7 @@ describe('ReplayStore', () => {
       viewerBuildId: 'a'.repeat(64),
       gameBuildId: 'game-1',
       firstStepNo: 0,
-      lastStepNo: 17,
+      lastStepNo: 3,
       missingPrefix: false,
       participants: [
         { playerIndex: 0, displayName: 'Alice' },
@@ -158,7 +158,7 @@ describe('ReplayStore', () => {
       ],
       segments: [
         { checkpointStepNo: 0, firstStepNo: 0, lastStepNo: 1 },
-        { checkpointStepNo: 16, firstStepNo: 16, lastStepNo: 17 },
+        { checkpointStepNo: 2, firstStepNo: 2, lastStepNo: 3 },
       ],
       steps: [
         {
@@ -182,24 +182,24 @@ describe('ReplayStore', () => {
           createdAt: 1_001,
         },
         {
-          stepNo: 16,
-          roomVersion: 16,
-          checkpointStepNo: 16,
+          stepNo: 2,
+          roomVersion: 2,
+          checkpointStepNo: 2,
           playerIndex: 1,
           commandType: 'action',
           intent: { spaceId: 'fishing' },
           frameHash: frameHash(frames[2]),
-          createdAt: 1_016,
+          createdAt: 1_002,
         },
         {
-          stepNo: 17,
-          roomVersion: 17,
-          checkpointStepNo: 16,
+          stepNo: 3,
+          roomVersion: 3,
+          checkpointStepNo: 2,
           playerIndex: 0,
           commandType: 'choice',
           intent: { value: 'confirm' },
           frameHash: frameHash(frames[3]),
-          createdAt: 1_017,
+          createdAt: 1_003,
         },
       ],
       corruptRanges: [],
@@ -222,11 +222,11 @@ describe('ReplayStore', () => {
   })
 
   it('requires an exact step and frame hash for anchor evidence', () => {
-    const exact = store.anchor('room-1', 17, frameHash(frames[3]))
+    const exact = store.anchor('room-1', 3, frameHash(frames[3]))
     expect(exact.ok).toBe(true)
     if (exact.ok) expect(exact.step.frame).toEqual(frames[3])
 
-    expect(store.anchor('room-1', 17, 'f'.repeat(64))).toMatchObject({
+    expect(store.anchor('room-1', 3, 'f'.repeat(64))).toMatchObject({
       ok: false,
       code: 'anchor_mismatch',
     })
@@ -248,11 +248,37 @@ describe('ReplayStore', () => {
       unavailableRange: {
         firstStepNo: 0,
         lastStepNo: 1,
-        nextCheckpointStepNo: 16,
+        nextCheckpointStepNo: 2,
       },
     })
-    const next = store.segment('room-1', 16)
+    const next = store.segment('room-1', 2)
     expect(next.ok).toBe(true)
+  })
+
+  it('reports missing final rows instead of silently truncating the timeline', () => {
+    db.prepare('DELETE FROM game_replay_steps WHERE room_id = ? AND step_no = ?')
+      .run('room-1', 3)
+
+    const manifest = store.manifest('room-1')
+    expect(manifest.ok).toBe(true)
+    if (!manifest.ok) return
+    expect(manifest.lastStepNo).toBe(3)
+    expect(manifest.steps.at(-1)?.stepNo).toBe(2)
+    expect(manifest.corruptRanges).toEqual([{
+      firstStepNo: 3,
+      lastStepNo: 3,
+    }])
+  })
+
+  it('uses current participant names in archived frames', () => {
+    db.prepare('UPDATE game_result_players SET display_name = ? WHERE room_id = ? AND player_index = 0')
+      .run('Deleted player (seat 1)', 'room-1')
+
+    const segment = store.segment('room-1', 0)
+    expect(segment.ok).toBe(true)
+    if (!segment.ok) return
+    expect(segment.steps[0]?.frame.players[0]?.name).toBe('Deleted player (seat 1)')
+    expect(segment.steps[0]?.frame.players[1]?.name).toBe('Bob')
   })
 
   it('never exposes active or legacy replay payloads', () => {

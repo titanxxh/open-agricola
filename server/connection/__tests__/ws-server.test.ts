@@ -86,9 +86,10 @@ describe('replay startup validation', () => {
       writeFileSync(join(directory, 'index.html'), index)
       writeFileSync(join(directory, 'manifest.json'), manifest)
 
-      expect(viewerBuildExists(root, buildId)).toBe(true)
       writeFileSync(join(directory, 'index.html'), 'changed')
       expect(viewerBuildExists(root, buildId)).toBe(false)
+      writeFileSync(join(directory, 'index.html'), index)
+      expect(viewerBuildExists(root, buildId)).toBe(true)
       expect(viewerBuildExists(root, 'current')).toBe(false)
     } finally {
       rmSync(root, { recursive: true, force: true })

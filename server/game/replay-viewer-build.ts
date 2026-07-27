@@ -8,6 +8,8 @@ export type ReplayViewerBuild = {
   files: Record<string, string>
 }
 
+const verifiedBuilds = new Map<string, ReplayViewerBuild>()
+
 const fileHash = (path: string): string =>
   createHash('sha256').update(readFileSync(path)).digest('hex')
 
@@ -27,8 +29,10 @@ export const loadReplayViewerBuild = (
   buildId: string,
 ): ReplayViewerBuild | null => {
   if (!/^[a-f0-9]{64}$/.test(buildId)) return null
+  const directory = join(root, buildId)
+  const cached = verifiedBuilds.get(directory)
+  if (cached) return cached
   try {
-    const directory = join(root, buildId)
     if (!lstatSync(directory).isDirectory()) return null
     const manifestPath = join(directory, 'manifest.json')
     const manifestRaw = readFileSync(manifestPath)
@@ -54,11 +58,13 @@ export const loadReplayViewerBuild = (
       /^[a-f0-9]{64}$/.test(expected[path] as string)
       && fileHash(join(directory, path)) === expected[path]
     )) return null
-    return {
+    const build: ReplayViewerBuild = {
       directory,
       entrypoint: 'index.html',
       files: expected as Record<string, string>,
     }
+    verifiedBuilds.set(directory, build)
+    return build
   } catch {
     return null
   }

@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type { CompletedGameContextDescriptor } from '../../shared/contract/protocol/game-context'
 import type {
+  ReplayAnchorResponse,
   ReplayManifest,
   ReplayManifestResponse,
 } from '../../shared/contract/protocol/replay'
@@ -78,11 +79,13 @@ const updateLocation = (
   step: number | null,
 ) => {
   const url = new URL(window.location.href)
+  const previousStep = url.searchParams.get('step')
   url.searchParams.set('perspective', perspective)
   if (layout) url.searchParams.set('layout', layout)
   else url.searchParams.delete('layout')
   if (step !== null) url.searchParams.set('step', String(step))
   else url.searchParams.delete('step')
+  if (step === null || previousStep !== String(step)) url.searchParams.delete('frame')
   window.history.replaceState(null, '', url)
 }
 
@@ -114,6 +117,32 @@ export function ReplayShell({
         || replayManifest.schemaVersion !== replay.schemaVersion
         || replayManifest.viewerBuildId !== replay.viewerBuildId
       ) throw new Error('replay_manifest_mismatch')
+
+      const params = new URLSearchParams(window.location.search)
+      const rawAnchorStep = params.get('step')
+      const frameHash = params.get('frame')
+      if ((rawAnchorStep === null) !== (frameHash === null)) {
+        throw new Error('incomplete_replay_anchor')
+      }
+      if (rawAnchorStep !== null && frameHash !== null) {
+        if (!/^(0|[1-9]\d*)$/.test(rawAnchorStep) || !/^[a-f0-9]{64}$/.test(frameHash)) {
+          throw new Error('invalid_replay_anchor')
+        }
+        const anchorStep = Number(rawAnchorStep)
+        const anchorResponse = await fetch(
+          `${API_BASE}/api/v1/replays/${encodeURIComponent(context.roomId)}/anchors/${anchorStep}?frame=${frameHash}`,
+          { credentials: 'omit', signal: controller.signal },
+        )
+        const anchor = await anchorResponse.json() as ReplayAnchorResponse
+        if (
+          !anchor.ok
+          || anchor.roomId !== context.roomId
+          || anchor.schemaVersion !== replay.schemaVersion
+          || anchor.viewerBuildId !== replay.viewerBuildId
+          || anchor.anchor.stepNo !== anchorStep
+          || anchor.anchor.frameHash !== frameHash
+        ) throw new Error('replay_anchor_mismatch')
+      }
 
       const viewerResponse = await fetch(
         `${API_BASE}/replay-viewers/${replay.viewerBuildId}/manifest.json`,
@@ -178,6 +207,7 @@ export function ReplayShell({
       room: context.roomId,
       perspective: location.perspective,
       locale,
+      api: API_BASE || window.location.origin,
     })
     if (location.layout) params.set('layout', location.layout)
     if (location.step !== null) params.set('step', String(location.step))
@@ -200,6 +230,14 @@ export function ReplayShell({
       <main className="replay-shell replay-shell--status">
         <h1>{t('platform.gameContext.completedTitle')}</h1>
         <p role="alert">{displayError}</p>
+        <ol className="replay-results">
+          {context.result.players.map((player) => (
+            <li key={player.playerIndex}>
+              <span>{player.displayName}</span>
+              <strong>{t('platform.gameContext.score', { score: player.score })}</strong>
+            </li>
+          ))}
+        </ol>
       </main>
     )
   }

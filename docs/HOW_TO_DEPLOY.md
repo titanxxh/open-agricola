@@ -77,11 +77,31 @@ GAME_BUILD_ID=
 首次启用 Replay 时必须使用 `PERSIST_ROOMS=sqlite`。先生成并追加发布 Viewer Build：
 
 ```bash
-REPLAY_VIEWER_ROOT="$PWD/data/replay-viewers" pnpm run build:replay-viewer
+REPLAY_VIEWER_ROOT="$PWD/data/replay-viewers" \
+BGA_IMAGE_DIR="../bga-agricola/img" \
+pnpm run build:replay-viewer
 # stdout 最后一行是 REPLAY_VIEWER_BUILD_ID
 ```
 
-命令会构建独立只读 Viewer、复制其固定静态资源、生成逐文件 SHA-256 清单，以清单本身的 SHA-256 作为目录名，并在发布后重新校验完整目录；已存在的同 ID 目录不会覆盖。把完整目录追加到生产持久卷的 `${REPLAY_VIEWER_ROOT}/${REPLAY_VIEWER_BUILD_ID}` 后，再填写 `REPLAY_VIEWER_BUILD_ID` 与 `GAME_BUILD_ID`，最后把 `REPLAY_NEW_ROOMS_ENABLED` 改为 `true`。清单、内容 Hash 或入口校验失败时拒绝创建新 Room。开关、Build ID 和自定义卡运行时版本在 Room 创建时锁定；卡图复制到 `REPLAY_ASSET_ROOT` 的内容寻址文件。已有 Replay Room 会继续按锁定值记录，开关关闭期间不会迁移旧进行局。
+`BGA_IMAGE_DIR` 必须指向固定版本的完整 `img/`；CI 使用 `bga-devs/bga-agricola@20397289f6b82ec9667a13e7803ca3038eeb6bb6`。命令会把棋盘图、卡图、字体和其他静态资源一起复制进独立只读 Viewer，再生成逐文件 SHA-256 清单，以清单本身的 SHA-256 作为目录名，并在发布后重新校验完整目录；运行时不再依赖 BGA CDN，已存在的同 ID 目录不会覆盖。
+
+`docker-compose.prod.yml` 使用 `app-data:/app/data` named volume。保持 `REPLAY_NEW_ROOMS_ENABLED=false` 启动一次后，把 Build 追加进去，再启用录制：
+
+```bash
+set -a
+source .env
+set +a
+docker compose -f docker-compose.prod.yml up -d --build
+docker compose -f docker-compose.prod.yml exec app \
+  mkdir -p "/app/data/replay-viewers/$REPLAY_VIEWER_BUILD_ID"
+docker compose -f docker-compose.prod.yml cp \
+  "data/replay-viewers/$REPLAY_VIEWER_BUILD_ID/." \
+  "app:/app/data/replay-viewers/$REPLAY_VIEWER_BUILD_ID"
+# 在 .env 填写 REPLAY_VIEWER_BUILD_ID / GAME_BUILD_ID，并改为 REPLAY_NEW_ROOMS_ENABLED=true
+docker compose -f docker-compose.prod.yml up -d --force-recreate app
+```
+
+清单、内容 Hash 或入口校验失败时拒绝创建新 Room。开关、Build ID 和自定义卡运行时版本在 Room 创建时锁定；自定义卡图复制到 `REPLAY_ASSET_ROOT` 的内容寻址文件。已有 Replay Room 会继续按锁定值记录，开关关闭期间不会迁移旧进行局。
 
 #### 构建并启动
 
@@ -179,6 +199,11 @@ docker compose logs -f app
          - ALLOW_ANONYMOUS_WS=false
          - DB_PATH=./data/open-agricola.db
          - CARD_ART_DIR=./data/card-art
+         - REPLAY_NEW_ROOMS_ENABLED=${REPLAY_NEW_ROOMS_ENABLED:-false}
+         - REPLAY_VIEWER_BUILD_ID=${REPLAY_VIEWER_BUILD_ID:-}
+         - REPLAY_VIEWER_ROOT=${REPLAY_VIEWER_ROOT:-./data/replay-viewers}
+         - REPLAY_ASSET_ROOT=${REPLAY_ASSET_ROOT:-./data/replay-assets}
+         - GAME_BUILD_ID=${GAME_BUILD_ID:-}
          - CORS_ORIGIN=https://YOUR_USER.github.io
        volumes:
          - app-data:/app/data

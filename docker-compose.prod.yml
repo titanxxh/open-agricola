@@ -22,6 +22,11 @@ services:
       - ALLOW_ANONYMOUS_WS=false
       - DB_PATH=./data/open-agricola.db
       - CARD_ART_DIR=./data/card-art
+      - REPLAY_NEW_ROOMS_ENABLED=${REPLAY_NEW_ROOMS_ENABLED:-false}
+      - REPLAY_VIEWER_BUILD_ID=${REPLAY_VIEWER_BUILD_ID:-}
+      - REPLAY_VIEWER_ROOT=${REPLAY_VIEWER_ROOT:-./data/replay-viewers}
+      - REPLAY_ASSET_ROOT=${REPLAY_ASSET_ROOT:-./data/replay-assets}
+      - GAME_BUILD_ID=${GAME_BUILD_ID:-}
       - CORS_ORIGIN=${CORS_ORIGIN:-*}
       - ADMIN_USERS=${ADMIN_USERS:-}
       - ACCOUNT_REGISTRATION_POLICY=${ACCOUNT_REGISTRATION_POLICY:?Set ACCOUNT_REGISTRATION_POLICY explicitly. Use open for first-user bootstrap, then invite_only.}
