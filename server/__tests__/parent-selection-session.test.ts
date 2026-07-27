@@ -191,8 +191,13 @@ describe('Parent Card selection setup', () => {
     const first = session.submitParentSelection(0, {
       mother: p1Candidates.mother[0],
       father: p1Candidates.father[0],
-    })
+      secret: 'must-not-persist',
+    } as never)
     expect(first.ok).toBe(true)
+    expect(session.state.parentSelection!.submissions.p1).toEqual({
+      mother: p1Candidates.mother[0],
+      father: p1Candidates.father[0],
+    })
     expect(session.submitParentSelection(0, {
       mother: p1Candidates.mother[1],
       father: p1Candidates.father[1],

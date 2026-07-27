@@ -410,7 +410,7 @@ describe('RoomCommitter', () => {
     expect(existsSync(assetPath)).toBe(true)
 
     persistence.discard(second.id)
-    committer.retireRoom(second.id)
+    committer.cleanupReplayAssets()
     expect(existsSync(assetPath)).toBe(false)
   })
 
@@ -699,6 +699,18 @@ describe('RoomCommitter', () => {
     })).toEqual({
       commandType: 'draftSubmit',
       intentJson: '{"pick":{"minorCardId":"B001","occCardId":"A001"}}',
+    })
+    expect(replayIntentFromCommand({
+      type: 'parentSubmit',
+      playerIndex: 0,
+      selection: {
+        mother: 'PR01',
+        father: 'PS01',
+        secret: 'must-not-persist',
+      } as never,
+    })).toEqual({
+      commandType: 'parentSubmit',
+      intentJson: '{"selection":{"father":"PS01","mother":"PR01"}}',
     })
     expect(replayIntentFromCommand({ type: 'auth', token: 'secret' })).toBeNull()
   })
