@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto'
-import { mkdirSync, readFileSync, writeFileSync } from 'node:fs'
+import { mkdirSync, readFileSync, readdirSync, unlinkSync, writeFileSync } from 'node:fs'
 import { basename, join } from 'node:path'
 import type { CustomCardDef } from '../../shared/contract/protocol/game.ts'
 import type { ClientCommand } from '../../shared/contract/protocol/ws.ts'
@@ -22,6 +22,9 @@ import {
 
 const RETRY_DELAYS_MS = [1_000, 2_000, 5_000, 10_000, 30_000] as const
 const REPLAY_SCHEMA_VERSION = 1
+const REPLAY_ASSET_URL_PATTERN = /^\/replay-assets\/([a-f0-9]{64})$/
+
+class ReplayAssetValidationError extends Error {}
 
 export type ReplayIntent = {
   commandType: string
@@ -171,16 +174,20 @@ const archiveReplayAsset = (
   assetRoot: string,
   cardArtRoot: string,
 ): string => {
-  const archived = /^\/replay-assets\/([a-f0-9]{64})$/.exec(artUrl)
+  const archived = REPLAY_ASSET_URL_PATTERN.exec(artUrl)
   if (archived) {
     const content = readFileSync(join(assetRoot, archived[1]!))
-    if (sha256(content) !== archived[1]) throw new Error('archived custom card art is corrupt')
+    if (sha256(content) !== archived[1]) {
+      throw new ReplayAssetValidationError('archived custom card art is corrupt')
+    }
     return artUrl
   }
-  if (!artUrl.startsWith('/card-art/')) throw new Error('unsupported custom card art URL')
+  if (!artUrl.startsWith('/card-art/')) {
+    throw new ReplayAssetValidationError('unsupported custom card art URL')
+  }
   const filename = artUrl.slice('/card-art/'.length)
   if (!filename || basename(filename) !== filename || !/^[A-Za-z0-9._-]+$/.test(filename)) {
-    throw new Error('invalid custom card art URL')
+    throw new ReplayAssetValidationError('invalid custom card art URL')
   }
   const content = readFileSync(join(cardArtRoot, filename))
   const hash = sha256(content)
@@ -190,7 +197,9 @@ const archiveReplayAsset = (
     writeFileSync(target, content, { flag: 'wx' })
   } catch (error) {
     if ((error as NodeJS.ErrnoException).code !== 'EEXIST') throw error
-    if (sha256(readFileSync(target)) !== hash) throw new Error('replay asset hash conflict')
+    if (sha256(readFileSync(target)) !== hash) {
+      throw new ReplayAssetValidationError('replay asset hash conflict')
+    }
   }
   return `/replay-assets/${hash}`
 }
@@ -205,6 +214,18 @@ const archiveCustomCardDefs = (
     ? { artUrl: archiveReplayAsset(definition.artUrl, assetRoot, cardArtRoot) }
     : {}),
 }))
+
+const replayAssetHashes = (customCardsJson: string): string[] => {
+  const definitions = JSON.parse(customCardsJson) as unknown
+  if (!Array.isArray(definitions)) throw new Error('invalid replay custom card archive')
+  return definitions.flatMap((definition) => {
+    if (!definition || typeof definition !== 'object') return []
+    const artUrl = (definition as { artUrl?: unknown }).artUrl
+    if (typeof artUrl !== 'string') return []
+    const match = REPLAY_ASSET_URL_PATTERN.exec(artUrl)
+    return match ? [match[1]!] : []
+  })
+}
 
 export class RoomCommitter {
   private readonly persistence: SqliteRoomPersistence
@@ -305,12 +326,15 @@ export class RoomCommitter {
     if (pendingLoad?.timer !== null && pendingLoad?.timer !== undefined) {
       this.scheduler.clearTimeout(pendingLoad.timer)
     }
+    pending?.waiters.forEach((waiter) => waiter('room retired'))
+    pendingLoad?.waiters.forEach((waiter) => waiter('room retired'))
     this.pending.delete(roomId)
     this.pendingReplayLoads.delete(roomId)
     this.permanentErrors.delete(roomId)
     this.heads.delete(roomId)
     this.knownReplayIds.delete(roomId)
     this.updateStorageFailed()
+    this.cleanupUnreferencedAssets()
   }
 
   prepareRoom(
@@ -325,7 +349,14 @@ export class RoomCommitter {
     } catch (error) {
       return this.deferReplayLoad(room, options, errorMessage(error))
     }
-    return this.prepareLoadedRoom(room, options, persisted)
+    try {
+      return this.prepareLoadedRoom(room, options, persisted)
+    } catch (error) {
+      const message = `unable to archive custom card art: ${errorMessage(error)}`
+      return error instanceof ReplayAssetValidationError
+        ? this.blockPermanently(room.id, message)
+        : this.deferReplayLoad(room, options, message)
+    }
   }
 
   private prepareLoadedRoom(
@@ -334,6 +365,13 @@ export class RoomCommitter {
     persisted: ReplayHead | null,
   ): RoomCommitResult {
     if (!persisted && room.status === 'waiting') return { kind: 'unchanged' }
+    if (
+      !persisted
+      && room.replayRecording === undefined
+      && room.session.getCustomCardDefs().length > 0
+    ) {
+      return { kind: 'unchanged' }
+    }
     const { serialized, frame } = replayFrame(room)
     const hash = frameHash(frame)
     if (persisted) return this.restoreHead(room, frame, hash, persisted)
@@ -365,19 +403,11 @@ export class RoomCommitter {
       previousCheckpointStepNo: 0,
     })
     const createdAt = this.now()
-    let customCardsJson: string
-    try {
-      customCardsJson = canonicalJson(archiveCustomCardDefs(
-        room.session.getCustomCardDefs(),
-        this.assetRoot,
-        this.cardArtRoot,
-      ))
-    } catch (error) {
-      return this.blockPermanently(
-        room.id,
-        `unable to archive custom card art: ${errorMessage(error)}`,
-      )
-    }
+    const customCardsJson = canonicalJson(archiveCustomCardDefs(
+      room.session.getCustomCardDefs(),
+      this.assetRoot,
+      this.cardArtRoot,
+    ))
     const commit: ReplayCommit = {
       roomId: room.id,
       serialized,
@@ -655,6 +685,13 @@ export class RoomCommitter {
       const persisted = this.persistence.loadReplayHead(pending.room.id)
       result = this.prepareLoadedRoom(pending.room, pending.options, persisted)
     } catch (error) {
+      if (error instanceof ReplayAssetValidationError) {
+        this.blockPermanently(
+          pending.room.id,
+          `unable to archive custom card art: ${errorMessage(error)}`,
+        )
+        return
+      }
       pending.error = errorMessage(error)
       console.warn(JSON.stringify({
         event: 'replay_head_load_retry_failed',
@@ -685,6 +722,27 @@ export class RoomCommitter {
 
   private updateStorageFailed(): void {
     this.storageFailed = this.pending.size > 0 || this.pendingReplayLoads.size > 0
+  }
+
+  private cleanupUnreferencedAssets(): void {
+    try {
+      const referenced = this.persistence.referencedReplayAssetHashes()
+      for (const pending of this.pending.values()) {
+        const customCardsJson = pending.commit.header?.customCardsJson
+        if (!customCardsJson) continue
+        replayAssetHashes(customCardsJson).forEach((hash) => referenced.add(hash))
+      }
+      for (const entry of readdirSync(this.assetRoot, { withFileTypes: true })) {
+        if (!entry.isFile() || !/^[a-f0-9]{64}$/.test(entry.name)) continue
+        if (!referenced.has(entry.name)) unlinkSync(join(this.assetRoot, entry.name))
+      }
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code === 'ENOENT') return
+      console.warn(JSON.stringify({
+        event: 'replay_asset_cleanup_failed',
+        error: errorMessage(error),
+      }))
+    }
   }
 
   private blockPermanently(roomId: string, error: string): Extract<RoomCommitResult, { kind: 'blocked' }> {

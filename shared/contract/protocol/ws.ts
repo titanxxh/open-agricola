@@ -3,6 +3,9 @@ import type { DraftMode, DraftPickPayload } from '../../draft/types'
 import type { ParentSelectionSubmission, Resource, ResourceBatchExchangePayload } from '../types'
 import type { MoorSpecialActionId } from '../../moor/types'
 
+export const REPLAY_CARD_SNAPSHOT_CONSENT_REQUIRED =
+  'unpublished custom cards require replay snapshot consent'
+
 type CommitSelectionPayload = {
   cancel?: boolean
   positions?: { row: number; col: number }[]

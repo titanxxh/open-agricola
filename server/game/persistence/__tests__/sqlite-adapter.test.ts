@@ -226,6 +226,21 @@ describe('SqliteRoomPersistence', () => {
     expect(stale).toEqual([])
   })
 
+  it('listRestorable excludes rooms whose Game Context is already completed', () => {
+    p.save('r1', STATE, META)
+    db.prepare(`
+      UPDATE game_contexts
+      SET lifecycle = 'completed', phase = NULL
+      WHERE room_id = ?
+    `).run('r1')
+
+    expect(p.listRestorable({
+      now: NOW,
+      waitingTtlMs: WAITING_TTL,
+      playingTtlMs: PLAYING_TTL,
+    })).toEqual([])
+  })
+
   it('save → load preserves non-empty customCardDbIds', () => {
     const meta: RoomMeta = { ...META, customCardDbIds: ['card-1', 'card-2'] }
     p.save('r1', STATE, meta)

@@ -33,7 +33,7 @@ afterEach(() => {
 })
 
 describe('replay room restoration', () => {
-  it('loads and pins custom cards before creating a missing-prefix replay', async () => {
+  it('loads and pins consented custom cards before creating a missing-prefix replay', async () => {
     tempDir = mkdtempSync(join(tmpdir(), 'open-agricola-replay-restore-'))
     process.env.DB_PATH = join(tempDir, 'test.db')
     vi.resetModules()
@@ -70,6 +70,8 @@ describe('replay room restoration', () => {
     const { SqliteRoomPersistence } = await import('../../game/persistence/sqlite-adapter.ts')
     const persistence = new SqliteRoomPersistence(db)
     const session = new GameSession(587, undefined, { playerCount: 2 })
+    const viewerRoot = join(tempDir, 'viewers')
+    const viewerBuildId = createViewerBuild(viewerRoot)
     persistence.save(
       'custom-room',
       serializeState(session.state, { engineStack: session.getEngineStack() }),
@@ -80,10 +82,11 @@ describe('replay room restoration', () => {
         customCardDbIds: [card.id],
         status: 'playing',
         players: [],
+        replayRecording: true,
+        replayViewerBuildId: viewerBuildId,
+        replayGameBuildId: 'game-1',
       },
     )
-    const viewerRoot = join(tempDir, 'viewers')
-    const viewerBuildId = createViewerBuild(viewerRoot)
     const { createWsServer } = await import('../ws-server.ts')
     const server = createServer()
     const result = createWsServer(server, {

@@ -10,6 +10,7 @@ import {
 import { useGameSync } from '../hooks/useGameSync'
 import { HttpGameTransport, WsGameTransport, parseDraftParamsFromQuery, type GameTransport } from '../services/gameTransport'
 import type { GameSyncPayload } from '../../shared/contract/protocol/game'
+import { REPLAY_CARD_SNAPSHOT_CONSENT_REQUIRED } from '../../shared/contract/protocol/ws'
 import type { MoorSpecialActionCardState, MoorSpecialActionId } from '../../shared/moor/types'
 import { isMoorTerrainAction } from '../../shared/moor/special-actions'
 import { playerCanBuildPalisades } from '../utils/player-palisades'
@@ -168,30 +169,9 @@ const useTransportSetup = (
       if (isCreator) {
         setWsStatus({ phase: 'creating' })
         const resp = await new Promise<{ roomId: string; playerIndex: number; maxPlayers: number } | { error: string }>((resolve) => {
-          const handler = (event: MessageEvent) => {
-            try {
-              const msg = JSON.parse(event.data as string)
-              if (msg.type === 'roomCreated') {
-                rawWs.removeEventListener('message', handler)
-                resolve({ roomId: msg.roomId, playerIndex: msg.playerIndex, maxPlayers: msg.maxPlayers ?? 2 })
-              } else if (msg.type === 'error') {
-                rawWs.removeEventListener('message', handler)
-                resolve({ error: msg.error })
-              }
-            } catch { /* skip */ }
-          }
-          rawWs.addEventListener('message', handler)
           const searchParams = new URLSearchParams(window.location.search)
           const customCardsParam = searchParams.get('customCards')
           const customCardIds = customCardsParam ? customCardsParam.split(',').filter(Boolean) : undefined
-          const confirmReplayCardSnapshotPublic = customCardIds?.length
-            ? window.confirm(t(locale, 'platform.replayCardSnapshotConsent'))
-            : undefined
-          if (confirmReplayCardSnapshotPublic === false) {
-            rawWs.removeEventListener('message', handler)
-            resolve({ error: t(locale, 'platform.replayCardSnapshotDeclined') })
-            return
-          }
           const maxPlayers = maxPlayersFromQuery(window.location.search)
           const draftParams = parseDraftParamsFromQuery(window.location.search)
           const enableCommunityDeck = searchParams.get('enableCommunityDeck') === 'true' || undefined
@@ -201,19 +181,49 @@ const useTransportSetup = (
           const enableFarmersOfTheMoor = enableFarmersOfTheMoorFromQuery(window.location.search) || undefined
           const allowIncompleteFarmersOfTheMoorMinorDeal =
             allowIncompleteFarmersOfTheMoorMinorDealFromQuery(window.location.search) || undefined
-          ws.sendRoomCommand('createRoom', {
-            maxPlayers,
-            name: displayName ?? playerParam ?? 'Player 1',
-            customCardIds,
-            confirmReplayCardSnapshotPublic,
-            enableCommunityDeck,
-            enableParentCards,
-            draftParents,
-            enableThroughTheSeasons,
-            enableFarmersOfTheMoor,
-            allowIncompleteFarmersOfTheMoorMinorDeal,
-            ...(draftParams ?? {}),
-          })
+          const sendCreateRoom = (confirmReplayCardSnapshotPublic?: true) => {
+            ws.sendRoomCommand('createRoom', {
+              maxPlayers,
+              name: displayName ?? playerParam ?? 'Player 1',
+              customCardIds,
+              confirmReplayCardSnapshotPublic,
+              enableCommunityDeck,
+              enableParentCards,
+              draftParents,
+              enableThroughTheSeasons,
+              enableFarmersOfTheMoor,
+              allowIncompleteFarmersOfTheMoorMinorDeal,
+              ...(draftParams ?? {}),
+            })
+          }
+          let replayConsentRequested = false
+          const handler = (event: MessageEvent) => {
+            try {
+              const msg = JSON.parse(event.data as string)
+              if (msg.type === 'roomCreated') {
+                rawWs.removeEventListener('message', handler)
+                resolve({ roomId: msg.roomId, playerIndex: msg.playerIndex, maxPlayers: msg.maxPlayers ?? 2 })
+              } else if (msg.type === 'error') {
+                if (
+                  msg.error === REPLAY_CARD_SNAPSHOT_CONSENT_REQUIRED
+                  && !replayConsentRequested
+                ) {
+                  replayConsentRequested = true
+                  if (window.confirm(t(locale, 'platform.replayCardSnapshotConsent'))) {
+                    sendCreateRoom(true)
+                    return
+                  }
+                  rawWs.removeEventListener('message', handler)
+                  resolve({ error: t(locale, 'platform.replayCardSnapshotDeclined') })
+                  return
+                }
+                rawWs.removeEventListener('message', handler)
+                resolve({ error: msg.error })
+              }
+            } catch { /* skip */ }
+          }
+          rawWs.addEventListener('message', handler)
+          sendCreateRoom()
         })
 
         if ('error' in resp) {

@@ -98,8 +98,10 @@ type ReplayHeadRow = ReplayHeaderRow & {
 }
 
 type ReplayStepHashRow = { frame_hash: string }
+type ReplayCustomCardsRow = { custom_cards_json: string }
 
 class ReplayConflictError extends Error {}
+const REPLAY_ASSET_URL_PATTERN = /^\/replay-assets\/([a-f0-9]{64})$/
 
 const parseCustomCardDbIds = (raw: string | null): string[] => {
   if (!raw) return []
@@ -202,6 +204,7 @@ export class SqliteRoomPersistence implements RoomPersistence {
   private readonly loadReplayHeader
   private readonly loadReplayHeadRow
   private readonly loadReplayStepHash
+  private readonly listReplayCustomCards
   private readonly insertReplayHeader
   private readonly insertReplayStep
   private readonly advanceReplay
@@ -309,6 +312,9 @@ export class SqliteRoomPersistence implements RoomPersistence {
              rooms.allow_incomplete_farmers_of_the_moor_minor_deal, rooms.started_at, rooms.updated_at,
              room_players.user_id AS player_user_id, room_players.player_index
       FROM rooms
+      JOIN game_contexts
+        ON game_contexts.room_id = rooms.id
+       AND game_contexts.lifecycle = 'active'
       LEFT JOIN room_players ON room_players.room_id = rooms.id
       WHERE rooms.status != 'finished'
         AND rooms.id NOT IN (SELECT value FROM json_each(?))
@@ -330,6 +336,9 @@ export class SqliteRoomPersistence implements RoomPersistence {
       SELECT schema_version, viewer_build_id, game_build_id, status, latest_step_no, missing_prefix
       FROM game_replays
       WHERE room_id = ?
+    `)
+    this.listReplayCustomCards = db.prepare(`
+      SELECT custom_cards_json FROM game_replays
     `)
     this.loadReplayHeadRow = db.prepare(`
       SELECT replay.schema_version, replay.viewer_build_id, replay.game_build_id,
@@ -573,6 +582,23 @@ export class SqliteRoomPersistence implements RoomPersistence {
       frameHash: row.frame_hash,
       missingPrefix: row.missing_prefix === 1,
     }
+  }
+
+  referencedReplayAssetHashes(): Set<string> {
+    const hashes = new Set<string>()
+    const rows = this.listReplayCustomCards.all() as ReplayCustomCardsRow[]
+    for (const row of rows) {
+      const definitions = JSON.parse(row.custom_cards_json) as unknown
+      if (!Array.isArray(definitions)) throw new Error('invalid replay custom card archive')
+      for (const definition of definitions) {
+        if (!definition || typeof definition !== 'object') continue
+        const artUrl = (definition as { artUrl?: unknown }).artUrl
+        if (typeof artUrl !== 'string') continue
+        const match = REPLAY_ASSET_URL_PATTERN.exec(artUrl)
+        if (match) hashes.add(match[1]!)
+      }
+    }
+    return hashes
   }
 
   discard(id: string): void {
