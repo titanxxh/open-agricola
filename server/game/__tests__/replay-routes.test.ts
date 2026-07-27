@@ -61,16 +61,19 @@ describe('public replay routes', () => {
     mkdirSync(viewerRoot)
     mkdirSync(assetRoot)
     const index = Buffer.from('<!doctype html><title>Replay</title>')
+    const app = Buffer.from('console.log("replay")')
     const manifest = Buffer.from(JSON.stringify({
       entrypoint: 'index.html',
       files: {
         'index.html': createHash('sha256').update(index).digest('hex'),
+        'app.js': createHash('sha256').update(app).digest('hex'),
       },
     }))
     buildId = createHash('sha256').update(manifest).digest('hex')
     const directory = join(viewerRoot, buildId)
     mkdirSync(directory)
     writeFileSync(join(directory, 'index.html'), index)
+    writeFileSync(join(directory, 'app.js'), app)
     writeFileSync(join(directory, 'manifest.json'), manifest)
     store = {
       manifest: vi.fn(() => ({
@@ -146,10 +149,14 @@ describe('public replay routes', () => {
     expect(first.status).toBe(200)
     expect(first.headers['Cache-Control']).toContain('immutable')
     expect(first.headers['Content-Security-Policy']).toContain("form-action 'none'")
+    expect(first.headers['Content-Security-Policy']).not.toContain('https:')
+
+    writeFileSync(join(viewerRoot, buildId, 'app.js'), 'tampered')
+    expect(handle(request(`/replay-viewers/${buildId}/index.html`)).status).toBe(200)
+    expect(handle(request(`/replay-viewers/${buildId}/app.js`)).status).toBe(503)
 
     writeFileSync(join(viewerRoot, buildId, 'index.html'), 'tampered')
-    const second = handle(request(`/replay-viewers/${buildId}/index.html`))
-    expect(second.status).toBe(404)
+    expect(handle(request(`/replay-viewers/${buildId}/index.html`)).status).toBe(503)
   })
 
   it('serves content-addressed replay images and rejects corruption', () => {
@@ -168,6 +175,24 @@ describe('public replay routes', () => {
     const limiter = new ReplayReadLimiter(1, () => 1_000)
     expect(handle(request('/api/v1/replays/room-1/manifest'), limiter).status).toBe(200)
     expect(handle(request('/api/v1/replays/room-1/manifest'), limiter).status).toBe(429)
+  })
+
+  it('uses the proxy-appended address and evicts expired rate-limit keys', () => {
+    let now = 0
+    const limiter = new ReplayReadLimiter(1, () => now)
+    expect(handle(request('/api/v1/replays/room-1/manifest', {
+      'x-forwarded-for': 'spoofed-a, 203.0.113.5',
+    }), limiter).status).toBe(200)
+    expect(handle(request('/api/v1/replays/room-1/manifest', {
+      'x-forwarded-for': 'spoofed-b, 203.0.113.5',
+    }), limiter).status).toBe(429)
+
+    now = 60_001
+    limiter.allow('fresh')
+    const reads = (limiter as unknown as {
+      reads: Map<string, { count: number; resetAt: number }>
+    }).reads
+    expect(reads.has('203.0.113.5')).toBe(false)
   })
 
   it('rejects malformed exact-anchor links before reading evidence', () => {

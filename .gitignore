@@ -37,6 +37,7 @@ test-results/
 deploy/Caddyfile
 __pycache__/
 .worktree/
+bga-agricola/
 
 # Build product from scripts/build-cards-manifest.ts
 public/cards-manifest.json

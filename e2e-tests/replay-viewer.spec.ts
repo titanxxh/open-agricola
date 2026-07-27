@@ -32,6 +32,12 @@ test('anonymous completed replay supports perspectives, playback, layout, and an
   await expect(replay.locator('.replay-app')).toBeVisible()
   await expect.poll(() => new URL(page.url()).searchParams.get('layout')).toBe('timeline')
   await expect(replay.locator('[data-hand-anchor="p1"] .player-card-inner')).toHaveCount(14)
+  await expect(replay.locator('[data-hand-anchor="p1"] .card-title').first()).not.toHaveText('')
+  const cardFrameImage = await replay.locator('.card-frame').first().evaluate(
+    (element) => getComputedStyle(element).backgroundImage,
+  )
+  expect(cardFrameImage).toContain('/replay-viewers/')
+  expect(cardFrameImage).not.toContain('boardgamearena')
 
   await replay.locator('button[data-player="p2"]').click()
   await expect(replay.locator('[data-hand-anchor="p2"]')).toHaveCount(0)
@@ -42,6 +48,8 @@ test('anonymous completed replay supports perspectives, playback, layout, and an
   await replay.locator('.replay-transport button').nth(2).click()
   await expect(replay.locator('.replay-transport output')).toContainText('1 / 2')
   await expect.poll(() => new URL(page.url()).searchParams.get('step')).toBe('1')
+  await replay.locator('.replay-header select').selectOption('p2')
+  await expect(replay.getByText('当前视角不可见')).toBeVisible()
 
   await replay.locator('.replay-layout-toggle').click()
   await expect.poll(() => new URL(page.url()).searchParams.get('layout')).toBe('board')
@@ -54,6 +62,16 @@ test('anonymous completed replay supports perspectives, playback, layout, and an
     `${backend}/api/v1/replays/${fixture.roomId}/anchors/0?frame=${'0'.repeat(64)}`,
   )
   expect(mismatch.status()).toBe(409)
+
+  await page.goto(
+    `/?context=${fixture.roomId}&step=0&frame=${fixture.firstStepHash}`,
+  )
+  await expect(page.getByRole('button', { name: /Alice/ })).toBeVisible()
+  await page.goto(
+    `/?context=${fixture.roomId}&step=0&frame=${'0'.repeat(64)}`,
+  )
+  await expect(page.getByRole('alert')).toBeVisible()
+  await expect(page.locator('iframe')).toHaveCount(0)
 })
 
 test('mobile replay defaults to board first and preserves an explicit toggle', async ({

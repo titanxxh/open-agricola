@@ -110,7 +110,9 @@ const parseStepNo = (raw: string): number | null => {
 
 const clientIp = (req: IncomingMessage): string => {
   const forwarded = req.headers['x-forwarded-for']
-  if (typeof forwarded === 'string') return forwarded.split(',')[0]!.trim()
+  if (typeof forwarded === 'string') {
+    return forwarded.split(',').at(-1)?.trim() || req.socket.remoteAddress || 'unknown'
+  }
   return req.socket.remoteAddress ?? 'unknown'
 }
 
@@ -118,6 +120,7 @@ export class ReplayReadLimiter {
   private readonly reads = new Map<string, { count: number; resetAt: number }>()
   private readonly max: number
   private readonly now: () => number
+  private nextCleanupAt = 0
 
   constructor(
     max = READ_LIMIT_PER_MINUTE,
@@ -130,6 +133,12 @@ export class ReplayReadLimiter {
   allow(ip: string): boolean {
     if (process.env.DISABLE_RATE_LIMIT === '1') return true
     const now = this.now()
+    if (now >= this.nextCleanupAt) {
+      for (const [key, entry] of this.reads) {
+        if (entry.resetAt <= now) this.reads.delete(key)
+      }
+      this.nextCleanupAt = now + 60_000
+    }
     const current = this.reads.get(ip)
     if (!current || current.resetAt <= now) {
       this.reads.set(ip, { count: 1, resetAt: now + 60_000 })
@@ -199,16 +208,28 @@ const serveViewerFile = (
     res.end(JSON.stringify({ ok: false, code: 'viewer_unavailable', message: 'Replay viewer not found' }))
     return
   }
-  const body = readFileSync(join(build.directory, path))
+  const filePath = join(build.directory, path)
+  if (!existsSync(filePath)) {
+    res.writeHead(404, publicHeaders('application/json; charset=utf-8', 'no-cache'))
+    res.end(JSON.stringify({ ok: false, code: 'viewer_unavailable', message: 'Replay viewer not found' }))
+    return
+  }
+  const body = readFileSync(filePath)
+  const hash = createHash('sha256').update(body).digest('hex')
+  if (hash !== (path === 'manifest.json' ? buildId : build.files[path])) {
+    res.writeHead(503, publicHeaders('application/json; charset=utf-8', 'no-cache'))
+    res.end(JSON.stringify({ ok: false, code: 'viewer_unavailable', message: 'Replay viewer failed its integrity check' }))
+    return
+  }
   const headers = publicHeaders(mimeType(path), 'public, max-age=31536000, immutable')
-  headers.ETag = `"${createHash('sha256').update(body).digest('hex')}"`
+  headers.ETag = `"${hash}"`
   if (path === 'index.html') {
     headers['Content-Security-Policy'] = [
       "default-src 'none'",
       "script-src 'self'",
       "style-src 'self' 'unsafe-inline'",
-      "img-src 'self' data: https:",
-      "font-src 'self' https:",
+      "img-src 'self' data:",
+      "font-src 'self'",
       "connect-src 'self'",
       "frame-ancestors *",
       "base-uri 'none'",
