@@ -13,6 +13,7 @@ const bgaImageCandidates = process.env.BGA_IMAGE_DIR
       resolve(repoRoot, '../../../bga-agricola/img'),
     ]
 const bgaImageDir = bgaImageCandidates.find(existsSync) ?? bgaImageCandidates[0]!
+const allowMissingBgaArt = process.env.REPLAY_VIEWER_ALLOW_MISSING_BGA_ART === '1'
 
 const bundleBgaAssets = (): PluginOption => ({
   name: 'bundle-bga-assets',
@@ -34,6 +35,7 @@ const bundleBgaAssets = (): PluginOption => ({
   },
   closeBundle() {
     if (!existsSync(bgaImageDir)) {
+      if (allowMissingBgaArt) return
       throw new Error(`BGA image directory is unavailable: ${bgaImageDir}`)
     }
     cpSync(bgaImageDir, resolve(root, '.build', 'bga-img'), { recursive: true })

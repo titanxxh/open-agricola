@@ -95,14 +95,23 @@ const projectParticipantNames = (
   frame: SerializedGameState,
   participantNames: ReadonlyMap<number, string>,
 ): SerializedGameState => {
-  const currentNames = new Set(participantNames.values())
   const replacements = new Map<string, string>()
+  const ambiguousNames = new Set<string>()
+  const projectedNames = new Map<string, Set<string>>()
   const namesByPlayerId = new Map<string, string>()
   frame.players.forEach((player, playerIndex) => {
     const name = participantNames.get(playerIndex) ?? player.name
     namesByPlayerId.set(player.id, name)
-    if (name !== player.name && !currentNames.has(player.name)) {
-      replacements.set(player.name, name)
+    const targets = projectedNames.get(player.name) ?? new Set<string>()
+    targets.add(name)
+    projectedNames.set(player.name, targets)
+  })
+  projectedNames.forEach((targets, originalName) => {
+    if (targets.size === 1) {
+      const [name] = targets
+      if (name !== originalName) replacements.set(originalName, name!)
+    } else if ([...targets].some((name) => name !== originalName)) {
+      ambiguousNames.add(originalName)
     }
   })
   const projectZones = (
@@ -140,7 +149,21 @@ const projectParticipantNames = (
             const params = { ...entry.params }
             logPlayerNameKeys.forEach((key) => {
               if (typeof params[key] === 'string') {
-                params[key] = replacements.get(params[key]) ?? params[key]
+                const idKey = key === 'fromPlayer'
+                  ? 'fromPlayerId'
+                  : key === 'toPlayer'
+                    ? 'toPlayerId'
+                    : 'playerId'
+                const playerId = typeof params[idKey] === 'string'
+                  ? params[idKey]
+                  : (key === 'player' || key === 'playerName')
+                      ? entry.playerId
+                      : undefined
+                params[key] = (
+                  playerId ? namesByPlayerId.get(playerId) : undefined
+                ) ?? replacements.get(params[key]) ?? (
+                  ambiguousNames.has(params[key]) ? 'Deleted player' : params[key]
+                )
               }
             })
             return { ...entry, params }
@@ -293,7 +316,7 @@ export class ReplayStore {
       )
     }
     const corruptRanges: ReplayManifest['corruptRanges'] = []
-    let expectedStepNo = segments[0]!.firstStepNo
+    let expectedStepNo = 0
     for (const step of steps) {
       if (step.stepNo > expectedStepNo) {
         const lastStepNo = step.stepNo - 1
@@ -322,7 +345,7 @@ export class ReplayStore {
       schemaVersion: header.schemaVersion,
       viewerBuildId: header.viewerBuildId,
       gameBuildId: header.gameBuildId,
-      firstStepNo: segments[0]!.firstStepNo,
+      firstStepNo: 0,
       lastStepNo: header.latestStepNo,
       missingPrefix: header.missingPrefix,
       participants: participants.map((participant) => ({
