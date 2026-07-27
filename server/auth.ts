@@ -461,7 +461,12 @@ export function deleteAccount(userId: string): { ok: true } {
       db.prepare(`DELETE FROM rooms WHERE id IN (${idPlaceholders(affectedRoomIds)})`)
         .run(...affectedRoomIds)
     }
-    db.prepare('UPDATE game_result_players SET user_id = NULL WHERE user_id = ?').run(userId)
+    db.prepare(`
+      UPDATE game_result_players
+      SET user_id = NULL,
+          display_name = 'Deleted player (seat ' || (player_index + 1) || ')'
+      WHERE user_id = ?
+    `).run(userId)
 
     db.prepare('DELETE FROM github_propose_audit WHERE user_id = ?').run(userId)
     db.prepare('DELETE FROM github_propose_rate_limit WHERE user_id = ?').run(userId)

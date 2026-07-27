@@ -332,7 +332,6 @@ export class SqliteRoomPersistence implements RoomPersistence {
       )
       ON CONFLICT(room_id) DO UPDATE SET
         phase = excluded.phase,
-        expires_at = NULL,
         updated_at = excluded.updated_at
       WHERE game_contexts.lifecycle = 'active'
     `)
