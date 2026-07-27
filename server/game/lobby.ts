@@ -21,8 +21,9 @@ export function createLobby(deps: {
   registry: RoomRegistry
   checkpoint: RoomPersistenceCheckpoint
   broadcaster: RoomBroadcaster
+  onRoomRetired?: (roomId: string) => void
 }): Lobby {
-  const { registry, checkpoint, broadcaster } = deps
+  const { registry, checkpoint, broadcaster, onRoomRetired } = deps
   return {
     getRooms(limit?: number) {
       return summarizeRoomsForLobby(registry.iter(), limit)
@@ -39,6 +40,7 @@ export function createLobby(deps: {
       registry.delete(roomId)
       registry.clearActivity(roomId)
       checkpoint.discardRoom(roomId)
+      onRoomRetired?.(roomId)
       return { ok: true }
     },
     endRoomsForUser(userId, affectedRoomIds = []) {
@@ -58,6 +60,7 @@ export function createLobby(deps: {
         registry.delete(room.id)
         registry.clearActivity(room.id)
         checkpoint.discardRoom(room.id)
+        onRoomRetired?.(room.id)
         endedRoomIds.push(room.id)
       }
       return { endedRoomIds }

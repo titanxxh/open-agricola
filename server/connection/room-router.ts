@@ -20,7 +20,10 @@ import {
   type WorkshopDraft,
 } from '../workshop-drafts.ts'
 import type { ConnectionCtx } from './connection-ctx.ts'
-import { replayIntentFromCommand } from '../game/room-committer.ts'
+import {
+  replayIntentFromCommand,
+  type RoomCommitResult,
+} from '../game/room-committer.ts'
 
 const DRAFT_POOL_SIZE_DEFAULT = 7
 const DRAFT_POOL_SIZE_MIN = 7
@@ -68,7 +71,7 @@ export function parseDraftOptions(
   return { ok: true, value: { draftMode: 'simultaneous', draftPoolSize: poolSize } }
 }
 
-function loadCustomCardsFromDb(cardDbIds: string[], requestUserId?: string): CustomCardData[] {
+export function loadCustomCardsFromDb(cardDbIds: string[], requestUserId?: string): CustomCardData[] {
   if (!cardDbIds.length) return []
   const db = getDb()
   const result: CustomCardData[] = []
@@ -184,6 +187,9 @@ const publishCommandResponse = (
     ctx.broadcaster.sendStateTo(ctx.ws, room, response, command.requestId, cause)
   } else {
     notifyPersistencePaused(ctx, room)
+    if (!ctx.committer.isRetrying(room.id)) {
+      sendCommandError(ctx, result.error, command.requestId)
+    }
   }
 }
 
@@ -194,6 +200,18 @@ const publishInitialState = (
   requestId: string | undefined,
   onReady: () => void,
 ): void => {
+  const publishReady = (result: Exclude<RoomCommitResult, { kind: 'blocked' }>): void => {
+    if (result.kind === 'committed') {
+      ctx.broadcaster.broadcastCommitted(room, response, 'reconnect', requestId)
+    } else {
+      ctx.broadcaster.broadcastState(room, response, 'reconnect', requestId)
+    }
+    ctx.broadcaster.broadcastEvent(room, {
+      type: 'roomPersistenceResumed',
+      roomId: room.id,
+    })
+    onReady()
+  }
   if (!ctx.committer) {
     ctx.broadcaster.broadcastState(room, response, 'reconnect', requestId)
     onReady()
@@ -201,18 +219,14 @@ const publishInitialState = (
   }
   const result = ctx.committer.prepareRoom(room, {
     missingPrefix: false,
-    onCommitted: () => {
-      ctx.broadcaster.broadcastCommitted(room, response, 'reconnect', requestId)
-      ctx.broadcaster.broadcastEvent(room, {
-        type: 'roomPersistenceResumed',
-        roomId: room.id,
-      })
-      onReady()
-    },
+    onReady: publishReady,
   })
   if (ctx.committer.hasReplay(room.id)) ctx.checkpoint.markInactive(room.id)
   if (result.kind === 'blocked') {
     notifyPersistencePaused(ctx, room)
+    if (!ctx.committer.isRetrying(room.id)) {
+      sendCommandError(ctx, result.error, requestId)
+    }
     return
   }
   if (ctx.committer.isRecording(room.id)) {
@@ -347,6 +361,7 @@ function handleCreateRoom(ctx: ConnectionCtx, msg: Extract<ClientCommand, { type
     enableFarmersOfTheMoor,
     allowIncompleteFarmersOfTheMoorMinorDeal,
   }
+  ctx.committer?.lockNewRoom(room)
   ctx.registry.set(room)
   ctx.currentRoom = room
   ctx.currentPlayerIndex = 0
@@ -556,6 +571,11 @@ function handleUndoAction(ctx: ConnectionCtx, msg: Extract<ClientCommand, { type
 
 function handleNewGame(ctx: ConnectionCtx, msg: Extract<ClientCommand, { type: 'newGame' }>): void {
   const room = requireWritableRoom(ctx, msg.requestId); if (!room) return
+  const persistence = ctx.committer?.canCreateRoom()
+  if (persistence && !persistence.ok) {
+    sendCommandError(ctx, persistence.error, msg.requestId)
+    return
+  }
   const previousRoomId = room.id
   const completedGame = room.session.state.gameOver
   if (completedGame && !ctx.committer?.hasReplay(previousRoomId)) {
@@ -600,6 +620,7 @@ function handleNewGame(ctx: ConnectionCtx, msg: Extract<ClientCommand, { type: '
   if (!completedGame) ctx.checkpoint.discardRoom(previousRoomId)
   ctx.registry.delete(previousRoomId)
   ctx.registry.clearActivity(previousRoomId)
+  ctx.committer?.retireRoom(previousRoomId)
   room.id = nextRoomId
   room.session = session
   room.version = 0
@@ -616,6 +637,7 @@ function handleNewGame(ctx: ConnectionCtx, msg: Extract<ClientCommand, { type: '
   room.enableThroughTheSeasons = enableThroughTheSeasons
   room.enableFarmersOfTheMoor = enableFarmersOfTheMoor
   room.allowIncompleteFarmersOfTheMoorMinorDeal = allowIncompleteFarmersOfTheMoorMinorDeal
+  ctx.committer?.lockNewRoom(room)
   for (const player of room.players) {
     room.session.updatePlayerName(player.playerIndex, player.name)
   }

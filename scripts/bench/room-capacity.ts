@@ -256,6 +256,7 @@ class ReplayArchiveProbe {
       enabled: true,
       viewerBuildId: 'benchmark-viewer',
       gameBuildId: 'benchmark-game',
+      viewerBuildExists: () => true,
     })
     this.loadStep = db.prepare(`
       SELECT payload_kind, length(payload_gzip) AS payload_bytes
