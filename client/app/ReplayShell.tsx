@@ -5,6 +5,7 @@ import type {
   ReplayManifest,
   ReplayManifestResponse,
 } from '../../shared/contract/protocol/replay'
+import { LocaleSwitcher } from '../components/common/LocaleSwitcher'
 import { API_BASE } from '../config'
 import { useLocale } from '../contexts/LocaleContext'
 import '../styles/pages/replay.css'
@@ -280,6 +281,7 @@ export function ReplayShell({
   if (!replay || error) {
     return (
       <main className="replay-shell replay-shell--status">
+        <LocaleSwitcher className="replay-locale-switcher" />
         <h1>{t('platform.gameContext.completedTitle')}</h1>
         <p role="alert">{error ?? t('platform.gameContext.viewerUnavailable')}</p>
         <ol className="replay-results">
@@ -296,6 +298,7 @@ export function ReplayShell({
   if (!verified || !manifest) {
     return (
       <main className="replay-shell replay-shell--status">
+        <LocaleSwitcher className="replay-locale-switcher" />
         <p>{t('platform.gameContext.verifyingReplay')}</p>
       </main>
     )
@@ -303,6 +306,7 @@ export function ReplayShell({
   if (!location.perspective) {
     return (
       <main className="replay-shell replay-shell--chooser">
+        <LocaleSwitcher className="replay-locale-switcher" />
         <header>
           <p>{t('platform.gameContext.room', { id: context.roomId })}</p>
           <h1>{t('platform.gameContext.completedTitle')}</h1>
@@ -335,8 +339,9 @@ export function ReplayShell({
 
   return (
     <main className="replay-shell replay-shell--viewer">
+      <LocaleSwitcher className="replay-locale-switcher" />
       <ReplayFrame
-        key={`${context.roomId}:${replay.viewerBuildId}`}
+        key={`${context.roomId}:${replay.viewerBuildId}:${locale}`}
         roomId={context.roomId}
         viewerBuildId={replay.viewerBuildId}
         locale={locale}

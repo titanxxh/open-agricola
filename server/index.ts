@@ -301,6 +301,11 @@ const server = createServer(async (req, res) => {
 
   // ── Health ─────────────────────────────────────────────
   if (req.method === 'GET' && req.url === '/api/health') {
+    const readiness = wssCtx?.committer?.canCreateRoom()
+    if (readiness && !readiness.ok) {
+      sendJson(res, 503, { ok: false, error: readiness.error })
+      return
+    }
     sendJson(res, 200, { ok: true })
     return
   }

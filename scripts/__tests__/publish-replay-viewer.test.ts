@@ -3,13 +3,17 @@ import {
   mkdtempSync,
   readdirSync,
   rmSync,
+  unlinkSync,
   writeFileSync,
 } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
 import { publishReplayViewer } from '../publish-replay-viewer.ts'
-import { loadReplayViewerBuild } from '../../server/game/replay-viewer-build.ts'
+import {
+  loadReplayViewerBuild,
+  viewerBuildExists,
+} from '../../server/game/replay-viewer-build.ts'
 
 const roots: string[] = []
 
@@ -38,5 +42,9 @@ describe('publishReplayViewer', () => {
     const second = publishReplayViewer(target, createStaging(root))
     expect(second.buildId).toBe(first.buildId)
     expect(readdirSync(target)).toEqual([first.buildId])
+
+    unlinkSync(join(target, first.buildId, 'index.html'))
+    expect(viewerBuildExists(target, first.buildId)).toBe(false)
+    expect(loadReplayViewerBuild(target, first.buildId)).toBeNull()
   })
 })
