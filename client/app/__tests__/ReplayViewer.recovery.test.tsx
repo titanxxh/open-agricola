@@ -103,6 +103,9 @@ describe('ReplayViewer recovery', () => {
 
     render(<ReplayViewer />)
     await screen.findByText('visible replay frame')
+    expect(screen.getByRole('button', { name: 'Next' })).toBeDisabled()
+    fireEvent.keyDown(window, { key: 'ArrowRight' })
+    expect(new URLSearchParams(window.location.search).get('step')).toBe('0')
     fireEvent.click(screen.getByRole('button', { name: 'Play' }))
 
     await waitFor(() => {

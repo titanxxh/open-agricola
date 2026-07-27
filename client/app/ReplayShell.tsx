@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import type { CompletedGameContextDescriptor } from '../../shared/contract/protocol/game-context'
 import type {
   ReplayAnchorResponse,
@@ -124,14 +124,17 @@ function ReplayFrame({
     if (initialLocation.step !== null) params.set('step', String(initialLocation.step))
     return `${API_BASE}/replay-viewers/${viewerBuildId}/index.html?${params}`
   })
+  const attachFrame = useCallback((node: HTMLIFrameElement | null) => {
+    if (node) {
+      node.setAttribute('credentialless', '')
+      node.src = src
+    }
+    setFrame(node)
+  }, [setFrame, src])
 
   return (
     <iframe
-      ref={(node) => {
-        setFrame(node)
-        node?.setAttribute('credentialless', '')
-      }}
-      src={src}
+      ref={attachFrame}
       title={title}
       sandbox="allow-scripts"
       referrerPolicy="no-referrer"
@@ -150,6 +153,9 @@ export function ReplayShell({
   const [error, setError] = useState<string | null>(null)
   const [location, setLocation] = useState(() => readLocation(null))
   const iframeRef = useRef<HTMLIFrameElement | null>(null)
+  const setIframe = useCallback((node: HTMLIFrameElement | null) => {
+    iframeRef.current = node
+  }, [])
   const replay = context.replay
 
   useEffect(() => {
@@ -335,7 +341,7 @@ export function ReplayShell({
         viewerBuildId={replay.viewerBuildId}
         locale={locale}
         initialLocation={location as ReplayLocation}
-        setFrame={(node) => { iframeRef.current = node }}
+        setFrame={setIframe}
         title={t('platform.gameContext.replayFrameTitle')}
       />
     </main>

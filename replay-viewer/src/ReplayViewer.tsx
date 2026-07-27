@@ -163,6 +163,10 @@ export function ReplayViewer() {
     ? segments[descriptor.checkpointStepNo]?.steps.find((step) => step.stepNo === stepNo)
     : undefined
   const stepIndex = manifest?.steps.findIndex((step) => step.stepNo === stepNo) ?? -1
+  const previousStep = manifest?.steps[stepIndex - 1]
+  const nextStep = manifest?.steps[stepIndex + 1]
+  const canMovePrevious = previousStep?.stepNo === stepNo - 1
+  const canMoveNext = nextStep?.stepNo === stepNo + 1
 
   const selectStep = useCallback((nextStepNo: number) => {
     if (!manifest?.steps.some((step) => step.stepNo === nextStepNo)) return
@@ -174,19 +178,18 @@ export function ReplayViewer() {
     if (!manifest) return
     const index = manifest.steps.findIndex((step) => step.stepNo === stepNo)
     const next = manifest.steps[index + delta]
-    if (next) selectStep(next.stepNo)
+    if (next?.stepNo === stepNo + delta) selectStep(next.stepNo)
   }, [manifest, selectStep, stepNo])
 
   useEffect(() => {
     if (!playing || !manifest || !current) return
-    const next = manifest.steps[stepIndex + 1]
-    if (!next || next.stepNo !== stepNo + 1) {
+    if (!nextStep || !canMoveNext) {
       setPlaying(false)
       return
     }
-    const timer = window.setTimeout(() => selectStep(next.stepNo), 1200)
+    const timer = window.setTimeout(() => selectStep(nextStep.stepNo), 1200)
     return () => window.clearTimeout(timer)
-  }, [current, manifest, playing, selectStep, stepIndex, stepNo])
+  }, [canMoveNext, current, manifest, nextStep, playing, selectStep])
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
@@ -386,7 +389,7 @@ export function ReplayViewer() {
       </aside>
 
       <footer className="replay-transport">
-        <button type="button" onClick={() => move(-1)} disabled={stepIndex <= 0}>
+        <button type="button" onClick={() => move(-1)} disabled={!canMovePrevious}>
           {text.previous}
         </button>
         <button type="button" className="replay-play" onClick={() => setPlaying((value) => !value)}>
@@ -395,7 +398,7 @@ export function ReplayViewer() {
         <button
           type="button"
           onClick={() => move(1)}
-          disabled={stepIndex < 0 || stepIndex >= manifest.steps.length - 1}
+          disabled={!canMoveNext}
         >
           {text.next}
         </button>
