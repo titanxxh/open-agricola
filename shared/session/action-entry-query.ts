@@ -55,10 +55,16 @@ export const computeActionEntryAvailability = (
   state: GameState,
   player: PlayerState,
   options: ActionEntryAvailabilityOptions,
-): Record<string, boolean> =>
-  Object.fromEntries(
+): Record<string, boolean> => {
+  const allowedPlacementSpaceIds = new Set(
+    computeAllowedPlacementSpaces(state, player, {
+      isActionDoable: options.isActionDoable,
+    }).map((entry) => entry.spaceId),
+  )
+  return Object.fromEntries(
     state.actionSpaces.map((space) => [
       space.id,
-      canProjectActionEntry(state, player, space, options),
+      allowedPlacementSpaceIds.has(space.id),
     ]),
   )
+}

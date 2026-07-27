@@ -69,7 +69,7 @@ _Avoid_: Room Persistence Checkpoint、延迟保存、WebSocket 广播
 _Avoid_: 可恢复房间快照、未完成房间、完整 GameState
 
 **Game Replay Archive**:
-正常完赛后以 `roomId` 永久公开的逐步对局记录，可按任一座位视角或全开视角查看每个 Replay Step 的规则相关状态。它与 Game Result Archive 分离，不保存原始 Private Event payload、临时通知、生成溯源或可执行源码。
+正式录制上线后正常完赛并以 `roomId` 永久公开的逐步对局记录，可按任一座位视角或全开视角查看每个 Replay Step 的规则相关状态。它与 Game Result Archive 分离，不保存原始 Private Event payload、临时通知、生成溯源或可执行源码；上线前完成局只有 Game Result Archive。
 _Avoid_: 活动 Room 快照、Public Event timeline、Game Result Archive
 
 **Replay Step**:
@@ -628,7 +628,7 @@ _Avoid_: 永久放弃、全局出局名单
 
 ## Relationships
 
-- 一个 **Room** 只持有一局 **GameSession**；`newGame` 创建新 `roomId`，旧局正常完赛后成为 **Game Result Archive** 和 **Game Replay Archive**，未完成则成为 **Expired Game Context**。
+- 一个 **Room** 只持有一局 **GameSession**；`newGame` 创建新 `roomId`。正式录制上线后的正常完赛局成为 **Game Result Archive** 和 **Game Replay Archive**，上线前完成局只有结果摘要，未完成局成为 **Expired Game Context**。
 - **Game Context Link** 按 **Game Context** 生命周期解析为 **Active Game Recovery**、**Game Replay Archive**、**Expired Game Context** 或 **Replay Tombstone**，但不能替代 Room Invite。
 - **GameSession** 产生的成功状态先经过 **Durable Room Commit**，成为可恢复的 Room 快照和 **Replay Step**，随后才按 **RoomPlayer** 视角发送。
 - 浏览器通过 **Services** 里的 `WsGameTransport` 发送 **ClientCommand**；**Connection** 层路由到 **GameSession**；**Broadcaster** 构造 **StateUpdateEnvelope** 并广播。

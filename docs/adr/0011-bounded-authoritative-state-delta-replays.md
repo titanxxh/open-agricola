@@ -28,7 +28,7 @@ Game Replay Archive 必须永久精确播放正常完赛的对局，同时支持
 
 - Replay 不执行旧命令、旧规则或自定义卡源码；规则和 schema 演进不会改变已归档 Frame 的含义。
 - 有界 Segment 支持最多 15 次 patch 的随机定位，并把 delta 损坏限制在一个 Segment。
-- Room 快照与 Replay Step 的同步事务取代当前一秒 debounce，保证已广播步骤不会在崩溃后丢失；ADR-0014 根据代表性复测把 2 CPU / 2 GiB 单实例上限设为 100 个普通内存 Room，实施后仍须复验相同门槛。
+- Room 快照与 Replay Step 的同步事务取代当前一秒 debounce，保证已广播步骤不会在崩溃后丢失；ADR-0014 根据代表性复测把 2 CPU / 2 GiB 单实例上限设为 30 个普通内存 Room，实施后仍须复验相同门槛。
 - 永久 Replay 同时要求永久保留其 Replay Viewer Build；旧前端只承担无凭据、只读展示职责。
 - 未完成或已解散 recording 在 Bug Report 后的保留与访问策略，由“确定永久 Game Context Link 与访问契约”继续决定。
 

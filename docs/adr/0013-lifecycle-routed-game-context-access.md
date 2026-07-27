@@ -24,10 +24,10 @@ ADR-0009 让一个 `roomId` 永久标识一局游戏，ADR-0010 固定正常完�
 6. 现有多人 WebSocket 连接和 `joinRoom` 消息继续复用，但恢复必须发送 `{ type: "joinRoom", roomId, intent: "resume" }`。服务端只按已持久化的站点 `userId → playerIndex` 绑定恢复座位，忽略 URL 或客户端声明的座位；同一站点用户在同一 Room 最多拥有一个座位。Game Context Link 不能加入空座位，也不能进入活动局旁观；Room Invite 继续走独立加入流程。
 7. 同一座位的新连接接管该座位，旧连接收到类型化的 `seat_replaced` 后失去命令权限。服务端不允许两个设备同时控制同一座位。
 8. 完成局通过 HTTP 读取：
-   - `GET /api/v1/game-contexts/:roomId/replay` 返回 manifest；
+   - `GET /api/v1/game-contexts/:roomId/replay` 对正式归档返回 manifest，对上线前结果返回 `{ status: "legacy_no_replay" }`；
    - `GET /api/v1/game-contexts/:roomId/replay/segments/:checkpointStepNo` 返回从指定 checkpoint 开始的 Replay Segment。
 
-   Manifest 至少包含 `schemaVersion`、`viewerBuildId`、Replay Participant、Step 边界、完整性与损坏区间。Replay Viewer Build 由外层应用按 manifest 选择，并在不携带登录凭据的 `credentialless` iframe 中运行。
+   只有正式归档存在 manifest 和 Segment。Manifest 至少包含 `schemaVersion`、`viewerBuildId`、Replay Participant、Step 边界、完整性与损坏区间。Replay Viewer Build 由外层应用按 manifest 选择，并在不携带登录凭据的 `credentialless` iframe 中运行。
 9. 活动局或已过期未完成局的精确 Anchor 通过 `GET /api/v1/game-contexts/:roomId/evidence/:stepNo?frame=<full-sha256>` 读取。它只接受已经保留的完整 Anchor，不提供按步枚举或任意历史浏览。已入座玩家只能得到自己座位遮蔽后的只读 Frame。
 10. 维护者只能从已提交 Bug Report 进入取证：`POST /api/v1/bug-reports/:submissionId/evidence/inspect` 默认返回报告者座位视角。请求全开视角必须同时提交非空理由；每次访问都永久审计操作者、时间、Anchor、视角和理由。该入口不能浏览 Anchor 以外的活动步骤。
 
@@ -45,12 +45,12 @@ ADR-0009 让一个 `roomId` 永久标识一局游戏，ADR-0010 固定正常完�
 
 ### Replay completeness and integrity
 
-17. 回放功能正式上线后创建的新 Room 必须从真实 Step 0 开始，`missingPrefix=false`。上线时已经活动的 Room 以当时完整 checkpoint 作为归档 Step 0，并标记 `missingPrefix=true`，不伪造原始 Step 编号。上线前已结束的结果只返回 `legacy_no_replay`，不补造 Replay；`schemaVersion` 和 `viewerBuildId` 仍按 ADR-0011 永久保留并随 manifest 返回。
+17. 回放功能正式上线后创建的新 Room 必须从真实 Step 0 开始，`missingPrefix=false`。迁移必须幂等回填既有 `rooms` 为 `active` Game Context，并在启动恢复时以当时完整 checkpoint 建立归档 Step 0、标记 `missingPrefix=true`，不伪造原始 Step 编号；既有 `game_results` 回填为 `completed`，若同一 `roomId` 仍有 Room 记录则完成结果优先。上线前已结束的结果标记 `legacy_no_replay`，不创建 Replay header、Frame、`schemaVersion` 或 `viewerBuildId`。只有两个既有来源都不存在的 id 才是 `unknown_context`。
 18. `step` 与完整 Frame Hash 必须精确匹配；不匹配返回 `anchor_mismatch`，绝不静默移动到最近 Step。损坏 Segment 显示不可用区间，并允许从下一完整 checkpoint 继续；Viewer Build 缺失或损坏时仍展示 Game Result Archive 摘要。
 
 ### Public descriptors, errors, and retention states
 
-19. `active` descriptor 只向已授权座位返回 `roomId`、`lifecycle`、`phase`、自己的 `playerIndex`、当前 `stepNo` 和可选 `expiresAt`。`completed` descriptor 可公开 Replay Participant 的历史显示名、座位、得分、变体、Step 边界、完整性、`schemaVersion` 和 `viewerBuildId`，但不公开站点 `userId`。`expired` 只公开 `roomId` 与生命周期；`removed` 另可公开 ADR-0010 允许的粗粒度原因。
+19. `active` descriptor 只向已授权座位返回 `roomId`、`lifecycle`、`phase`、自己的 `playerIndex`、当前 `stepNo` 和可选 `expiresAt`。`completed` descriptor 可公开 Replay Participant 的历史显示名、座位、得分和变体，但不公开站点 `userId`；其 `replayStatus` 为 `available` 或 `legacy_no_replay`，只有 `available` 才附带 Step 边界、完整性、`schemaVersion` 和 `viewerBuildId`。`expired` 只公开 `roomId` 与生命周期；`removed` 另可公开 ADR-0010 允许的粗粒度原因。
 20. `expired` 不向公众区分 TTL、解散、未完成 `newGame` 或删号，也不公开玩家名、站点 `userId` 或内部原因。只有持有完整 Anchor 的链接才能验证仍保留的 Anchor 元数据；不提供 expired Room、Anchor 或玩家的列表与搜索接口。
 21. 错误统一为 `{ ok: false, code, lifecycle?, message }`：
 
