@@ -452,8 +452,16 @@ if [ "$KILL_ONLY" -eq 1 ]; then
 fi
 
 echo "Ensuring immutable replay viewer..."
+REPLAY_VIEWER_ALLOW_MISSING_BGA_ART=0
+if [ ! -d "$BGA_IMAGE_DIR" ]; then
+  REPLAY_VIEWER_ALLOW_MISSING_BGA_ART=1
+fi
 REPLAY_VIEWER_BUILD_ID="${REPLAY_VIEWER_BUILD_ID:-$(
-  env REPLAY_VIEWER_ROOT="$REPLAY_VIEWER_ROOT" "$PNPM_BIN" run build:replay-viewer | tail -n 1
+  env \
+    BGA_IMAGE_DIR="$BGA_IMAGE_DIR" \
+    REPLAY_VIEWER_ALLOW_MISSING_BGA_ART="$REPLAY_VIEWER_ALLOW_MISSING_BGA_ART" \
+    REPLAY_VIEWER_ROOT="$REPLAY_VIEWER_ROOT" \
+    "$PNPM_BIN" run build:replay-viewer | tail -n 1
 )}"
 GAME_BUILD_ID="${GAME_BUILD_ID:-$(git -C "$SCRIPT_DIR" rev-parse HEAD)}"
 
