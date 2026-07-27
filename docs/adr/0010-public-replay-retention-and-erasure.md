@@ -26,6 +26,8 @@ ADR-0009 让一个 `roomId` 永久对应一局游戏，但正常完赛目前只�
 
 Replay Tombstone 只公开原 `roomId` 和粗粒度下架原因，不保留玩家身份或被移除内容，且 `roomId` 永不复用。线上删除请求成功返回时，公开端点必须已停止提供目标数据；备份中的副本最多保留 30 天，任何旧备份恢复上线前必须重放删除清单。
 
+`replay-assets/<sha256>` 是跨 Replay 共享的内容寻址资源。普通整局删除先移除该 Replay 的资源引用，只在没有任何未下架 Replay 引用时删除资源文件；若资源本身违规或必须删除，则先在同一运维操作中把所有引用它的 Replay 置为 Tombstone，再删除资源。删除 ledger 必须列出每个受影响的 `roomId` 和资源 Hash。
+
 GitHub 个人账号提交产生的 GitHub 作者身份由 GitHub 管理，本站无法随站点删号匿名化，因此首次连接和提交确认必须明确提示。站点仍负责删除 Issue 正文中的站点 `userId`；目标 Issues 仓库所有者负责需要永久删除的 Issue。
 
 ## Consequences

@@ -155,6 +155,11 @@ const normalizeActionHookContext = (
   }
 }
 
+export const hasMatchingActionHooks = (context: ActionHookContextInput): boolean => {
+  const hookContext = normalizeActionHookContext(context)
+  return actionHooks.some((registration) => matchesHook(registration, hookContext))
+}
+
 export const runActionHooks = (context: ActionHookContextInput) => {
   const hookContext = normalizeActionHookContext(context)
   const results: ActionHookResult[] = []

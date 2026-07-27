@@ -15,13 +15,17 @@ import { gzipSync } from 'node:zlib'
 import Database from 'better-sqlite3'
 import type { WebSocket } from 'ws'
 import '../../shared/cards/register-all.ts'
+import { familySize, workersAvailable } from '../../shared/domain/player.ts'
 import {
   rehydrateState,
   serializeState,
   type SerializedGameState,
 } from '../../shared/session/serialization.ts'
 import { Broadcaster } from '../../server/connection/broadcaster.ts'
-import { GameSession } from '../../server/game/authoritative-session.ts'
+import {
+  GameSession,
+  type SessionResponse,
+} from '../../server/game/authoritative-session.ts'
 import type {
   RoomMeta,
   RoomPersistence,
@@ -62,6 +66,7 @@ type CostProfile = {
 
 type ReplayMetrics = {
   writes: number
+  acceptedCommands: number
   checkpoints: number
   deltas: number
   payloadBytes: number
@@ -396,6 +401,7 @@ class ReplayArchiveProbe {
   private readonly sqliteSamples: number[] = []
   private readonly writeStep: (args: ReplayStepWrite) => void
   private writes = 0
+  private acceptedCommands = 0
   private checkpoints = 0
   private deltas = 0
   private payloadBytes = 0
@@ -439,28 +445,21 @@ class ReplayArchiveProbe {
     this.record(room, room.version, null, 'initial')
   }
 
-  recordStep(room: Room): void {
-    const stepNo = this.nextStepNo.get(room.id) ?? 0
+  recordStep(room: Room, actorPlayerIndex: number, commandType: string): void {
     this.record(
       room,
       room.version + 1,
-      stepNo % room.session.state.players.length,
-      'benchmark-action',
+      actorPlayerIndex,
+      commandType,
     )
-  }
-
-  seedPhase(room: Room, steps: number): void {
-    for (let index = 0; index < steps; index += 1) {
-      room.session.state.rngTick = (room.session.state.rngTick ?? 0) + 1
-      this.recordStep(room)
-      room.version += 1
-    }
+    this.acceptedCommands += 1
   }
 
   resetMetrics(): void {
     this.archiveSamples.length = 0
     this.sqliteSamples.length = 0
     this.writes = 0
+    this.acceptedCommands = 0
     this.checkpoints = 0
     this.deltas = 0
     this.payloadBytes = 0
@@ -469,6 +468,7 @@ class ReplayArchiveProbe {
   metrics(): ReplayMetrics {
     return {
       writes: this.writes,
+      acceptedCommands: this.acceptedCommands,
       checkpoints: this.checkpoints,
       deltas: this.deltas,
       payloadBytes: this.payloadBytes,
@@ -575,24 +575,188 @@ class TimedPersistence implements RoomPersistence {
   }
 }
 
-const createState = (targetBytes: number): SerializedGameState => {
-  const session = new GameSession(563, undefined, { playerCount: 2 })
-  session.state.round = 10
-  const serialized = serializeState(session.state, {
-    engineStack: session.getEngineStack(),
-  })
-  const paddingEntries = [...serialized.log]
-  let index = 0
-  while (
-    Buffer.byteLength(JSON.stringify({ ...serialized, log: paddingEntries })) < targetBytes
-  ) {
-    paddingEntries.push({
-      key: 'benchmark.padding',
-      params: { index, value: 'x'.repeat(512) },
-    })
-    index += 1
+const SAFE_ACTIONS = [
+  'forest',
+  'reed-bank',
+  'fishing',
+  'day-laborer',
+  'clay-pit',
+  'grain-seeds',
+  'western-quarry',
+  'vegetable-seeds',
+  'eastern-quarry',
+] as const
+
+type StateFixture = {
+  state: SerializedGameState
+  trajectorySteps: number
+  candidateFrames: number
+  remainingCommands: number
+}
+
+const availableBenchmarkAction = (session: GameSession): string | undefined => {
+  const playerIndex = session.state.currentPlayerIndex
+  const player = session.state.players[playerIndex]
+  if (!player || workersAvailable(session.state, player) <= 0) return undefined
+  const availability = session.getActionAvailability(playerIndex)
+  return SAFE_ACTIONS.find((id) => availability[id]) ??
+    Object.keys(availability).sort().find((id) => availability[id])
+}
+
+const resolveBenchmarkWait = (
+  session: GameSession,
+  interaction: Extract<SessionResponse['interaction'], { stateId: 'wait' }>,
+): {
+  resp: SessionResponse
+  actorPlayerIndex: number
+  commandType: 'resolveChoice' | 'commitSelection'
+} => {
+  const { request, playerIndex } = interaction
+  if (request.kind === 'confirm-next-player') {
+    return {
+      resp: session.resolveChoice(request.nextPlayerIndex, 'confirm'),
+      actorPlayerIndex: request.nextPlayerIndex,
+      commandType: 'resolveChoice',
+    }
   }
-  return { ...serialized, log: paddingEntries }
+  if (request.kind === 'confirm-player-switch') {
+    return {
+      resp: session.resolveChoice(request.toPlayerIndex, 'confirm'),
+      actorPlayerIndex: request.toPlayerIndex,
+      commandType: 'resolveChoice',
+    }
+  }
+  if (request.kind === 'feed') {
+    return {
+      resp: session.resolveChoice(playerIndex, 'confirm', { selections: [] }),
+      actorPlayerIndex: playerIndex,
+      commandType: 'resolveChoice',
+    }
+  }
+  if (request.kind === 'choice') {
+    const player = session.state.players[playerIndex]!
+    const choice = request.options.find((option) =>
+      familySize(player) < 4 &&
+      player.rooms < 4 &&
+      option.labelKey === 'actions.construct.name'
+    ) ?? request.options.find((option) => option.value === '__skip__')
+      ?? request.options.find((option) => option.value === '__done__')
+      ?? request.options[0]
+    if (!choice) throw new Error(`empty choice at round ${session.state.round}`)
+    return {
+      resp: session.resolveChoice(playerIndex, choice.value),
+      actorPlayerIndex: playerIndex,
+      commandType: 'resolveChoice',
+    }
+  }
+  if (request.kind === 'farm-select' && request.farm.farmType === 'room') {
+    const tile = request.farm.selectableTiles[0]
+    if (!tile) throw new Error(`no room tile at round ${session.state.round}`)
+    return {
+      resp: session.commitSelectionChoice(playerIndex, { rooms: [tile] }),
+      actorPlayerIndex: playerIndex,
+      commandType: 'commitSelection',
+    }
+  }
+  throw new Error(`unhandled ${request.kind} at round ${session.state.round}`)
+}
+
+const createStateFixture = (
+  targetBytes: number,
+  requiredCommands: number,
+): StateFixture => {
+  const session = new GameSession(563, undefined, { playerCount: 2 })
+  const candidates: Array<{
+    state: SerializedGameState
+    bytes: number
+    stepNo: number
+  }> = []
+  let resp = session.getState()
+  let trajectorySteps = 0
+
+  const captureCandidate = (): void => {
+    const player = session.state.players[session.state.currentPlayerIndex]
+    if (
+      resp.interaction.stateId !== 'idle' ||
+      session.state.gameOver ||
+      !player ||
+      workersAvailable(session.state, player) < 2 ||
+      !availableBenchmarkAction(session)
+    ) return
+    const serialized = serializeState(session.state, {
+      engineStack: session.getEngineStack(),
+    })
+    const stateJson = JSON.stringify(serialized)
+    candidates.push({
+      state: JSON.parse(stateJson) as SerializedGameState,
+      bytes: Buffer.byteLength(stateJson),
+      stepNo: trajectorySteps,
+    })
+  }
+
+  const accepted = (next: SessionResponse): void => {
+    if (!next.ok) throw new Error(next.error ?? 'representative command rejected')
+    resp = next
+    trajectorySteps += 1
+    captureCandidate()
+  }
+
+  captureCandidate()
+  while (!session.state.gameOver && trajectorySteps < 500) {
+    if (resp.interaction.stateId === 'wait') {
+      accepted(resolveBenchmarkWait(session, resp.interaction).resp)
+      continue
+    }
+
+    const playerIndex = session.state.currentPlayerIndex
+    const player = session.state.players[playerIndex]!
+    const availability = session.getActionAvailability(playerIndex)
+    const size = familySize(player)
+    const growthAction = ['wish-children', 'urgent-wish-children']
+      .find((id) => size < 4 && player.rooms > size && availability[id])
+    const canBuildRoom =
+      size < 4 &&
+      player.rooms <= size &&
+      player.resources.wood >= 5 &&
+      player.resources.reed >= 2 &&
+      availability['farm-expansion']
+    const deficits = size < 4 && player.rooms <= size
+      ? [
+          { id: 'forest', value: Math.max(0, 5 - player.resources.wood) / 5 },
+          { id: 'reed-bank', value: Math.max(0, 2 - player.resources.reed) / 2 },
+        ].sort((left, right) => right.value - left.value)
+      : []
+    const neededResource = deficits.find(({ id, value }) =>
+      value > 0 && availability[id]
+    )?.id
+    const actionId = growthAction ??
+      (canBuildRoom ? 'farm-expansion' : undefined) ??
+      neededResource ??
+      availableBenchmarkAction(session)
+    if (!actionId) {
+      throw new Error(`no safe action for player ${playerIndex} at round ${session.state.round}`)
+    }
+    accepted(session.takeAction(playerIndex, actionId))
+  }
+
+  if (!session.state.gameOver) throw new Error('representative game did not finish')
+  const eligible = candidates.filter(
+    (candidate) => trajectorySteps - candidate.stepNo >= requiredCommands,
+  )
+  if (eligible.length === 0) {
+    throw new Error(`no representative state has ${requiredCommands} remaining commands`)
+  }
+  const selected = eligible.reduce((best, candidate) =>
+    Math.abs(candidate.bytes - targetBytes) < Math.abs(best.bytes - targetBytes)
+      ? candidate
+      : best
+  )
+  return {
+    state: selected.state,
+    trajectorySteps,
+    candidateFrames: candidates.length,
+    remainingCommands: trajectorySteps - selected.stepNo,
+  }
 }
 
 const fakeSocket = (): WebSocket => ({
@@ -629,6 +793,32 @@ const addRoom = (
   return room
 }
 
+const executeBenchmarkCommand = (
+  room: Room,
+): {
+  resp: SessionResponse
+  actorPlayerIndex: number
+  commandType: string
+} => {
+  const before = room.session.getState()
+  if (before.interaction.stateId === 'wait') {
+    return resolveBenchmarkWait(room.session, before.interaction)
+  }
+  if (before.interaction.stateId !== 'idle') {
+    throw new Error(`benchmark room is ${before.interaction.stateId}`)
+  }
+  const actorPlayerIndex = room.session.state.currentPlayerIndex
+  const actionId = availableBenchmarkAction(room.session)
+  if (!actionId) {
+    const player = room.session.state.players[actorPlayerIndex]!
+    throw new Error(
+      `no benchmark action at round ${room.session.state.round}, player ${actorPlayerIndex}, workers ${workersAvailable(room.session.state, player)}`,
+    )
+  }
+  const resp = room.session.takeAction(actorPlayerIndex, actionId)
+  return { resp, actorPlayerIndex, commandType: 'takeAction' }
+}
+
 const mutateAndBroadcast = (
   room: Room,
   broadcaster: Broadcaster,
@@ -636,10 +826,9 @@ const mutateAndBroadcast = (
   replay: ReplayArchiveProbe | null,
 ): string | null => {
   try {
-    room.session.state.rngTick = (room.session.state.rngTick ?? 0) + 1
-    const resp = room.session.getState()
+    const { resp, actorPlayerIndex, commandType } = executeBenchmarkCommand(room)
     if (!resp.ok) return resp.error ?? 'response ok=false'
-    replay?.recordStep(room)
+    replay?.recordStep(room, actorPlayerIndex, commandType)
     broadcaster.broadcastState(room, resp, 'action')
     if (replay) checkpoint.cancelRoom(room.id)
     return null
@@ -849,6 +1038,7 @@ const renderReport = (
   config: Config,
   environment: Environment,
   stateBytes: number,
+  stateFixture: StateFixture,
   levels: LevelResult[],
 ): string => {
   const title = config.label === 'baseline'
@@ -893,6 +1083,7 @@ const renderReport = (
 - synchronous: ${environment.synchronous}
 - WAL auto-checkpoint: ${environment.walAutoCheckpointPages} pages
 - Serialized state: ${(stateBytes / 1024).toFixed(1)} KiB
+- State fixture: deterministic played session (seed 563, ${stateFixture.trajectorySteps} accepted commands, ${stateFixture.candidateFrames} action-ready frames, ${stateFixture.remainingCommands} commands remaining)
 - Exact invocation: ${environment.invocation}
 
 ## Workload
@@ -941,6 +1132,7 @@ export const runRoomCapacityProbe = async (config: Config): Promise<{
   config: Config
   environment: Environment
   stateBytes: number
+  stateFixture: Omit<StateFixture, 'state'>
   levels: LevelResult[]
 }> => {
   const limits = readCgroupLimits()
@@ -956,7 +1148,13 @@ export const runRoomCapacityProbe = async (config: Config): Promise<{
     const checkpoint = createRoomPersistenceCheckpoint({ persistence })
     const broadcaster = new Broadcaster({ checkpoint })
     const replay = config.replayArchive ? new ReplayArchiveProbe(db) : null
-    const baseState = createState(config.targetStateBytes)
+    const requiredCommands = config.levels.length * (
+      Math.ceil(config.warmupSeconds * config.actionsPerRoomSecond) +
+      Math.ceil(config.durationSeconds * config.actionsPerRoomSecond) +
+      11
+    )
+    const stateFixture = createStateFixture(config.targetStateBytes, requiredCommands)
+    const baseState = stateFixture.state
     const stateBytes = Buffer.byteLength(JSON.stringify(baseState))
     const rooms: Room[] = []
     const levels: LevelResult[] = []
@@ -966,7 +1164,6 @@ export const runRoomCapacityProbe = async (config: Config): Promise<{
         const room = addRoom(roomIndex, baseState, db, checkpoint)
         rooms.push(room)
         replay?.recordInitial(room)
-        replay?.seedPhase(room, roomIndex % 16)
       }
       const result = await runLevel({
         rooms,
@@ -996,8 +1193,21 @@ export const runRoomCapacityProbe = async (config: Config): Promise<{
         `pnpm exec tsx scripts/bench/room-capacity.ts ${process.argv.slice(2).join(' ')}`,
     }
     mkdirSync(dirname(config.reportPath), { recursive: true })
-    writeFileSync(config.reportPath, renderReport(config, environment, stateBytes, levels))
-    return { config, environment, stateBytes, levels }
+    writeFileSync(
+      config.reportPath,
+      renderReport(config, environment, stateBytes, stateFixture, levels),
+    )
+    return {
+      config,
+      environment,
+      stateBytes,
+      stateFixture: {
+        trajectorySteps: stateFixture.trajectorySteps,
+        candidateFrames: stateFixture.candidateFrames,
+        remainingCommands: stateFixture.remainingCommands,
+      },
+      levels,
+    }
   } finally {
     db.close()
     rmSync(tempDir, { recursive: true, force: true })
