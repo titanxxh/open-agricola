@@ -9,6 +9,9 @@ services:
       - BACKEND_HOST=0.0.0.0
       - PERSIST_ROOMS=sqlite
       - ALLOW_ANONYMOUS_WS=false
+      - REPLAY_NEW_ROOMS_ENABLED=${REPLAY_NEW_ROOMS_ENABLED:-false}
+      - REPLAY_VIEWER_BUILD_ID=${REPLAY_VIEWER_BUILD_ID:-}
+      - GAME_BUILD_ID=${GAME_BUILD_ID:-}
       - DB_PATH=./data/open-agricola.db
       - CARD_ART_DIR=./data/card-art
       - CORS_ORIGIN=${CORS_ORIGIN:-*}

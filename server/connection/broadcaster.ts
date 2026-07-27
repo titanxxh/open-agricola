@@ -22,6 +22,20 @@ export class Broadcaster {
 
   broadcastState(room: Room, resp: SessionResponse, cause: StateUpdateCause, requestId?: string): void {
     room.version += 1
+    this.broadcastCommitted(room, resp, cause, requestId)
+    if (resp.state.gameOver) {
+      this.checkpoint.completeGame(room)
+    } else {
+      this.checkpoint.recordState(room)
+    }
+  }
+
+  broadcastCommitted(
+    room: Room,
+    resp: SessionResponse,
+    cause: StateUpdateCause,
+    requestId?: string,
+  ): void {
     const emittedAt = Date.now()
     for (const seat of room.players) {
       if (seat.ws.readyState !== seat.ws.OPEN) continue
@@ -36,21 +50,22 @@ export class Broadcaster {
       })
       seat.ws.send(JSON.stringify(env))
     }
-    if (resp.state.gameOver) {
-      this.checkpoint.completeGame(room)
-    } else {
-      this.checkpoint.recordState(room)
-    }
   }
 
-  sendStateTo(ws: WebSocket, room: Room, resp: SessionResponse, requestId?: string): void {
+  sendStateTo(
+    ws: WebSocket,
+    room: Room,
+    resp: SessionResponse,
+    requestId?: string,
+    cause: StateUpdateCause = 'reconnect',
+  ): void {
     const seat = room.players.find((p) => p.ws === ws)
     const env = buildEnvelope({
       room,
       resp,
       viewerPlayerId: viewerIdForSeat(resp, seat?.playerIndex),
       version: room.version,
-      cause: 'reconnect',
+      cause,
       requestId,
       emittedAt: Date.now(),
     })

@@ -85,6 +85,8 @@ export type ServerEvent =
   | { type: 'playerJoined'; playerIndex: number; name: string; playerCount: number; maxPlayers: number }
   | { type: 'playerDisconnected'; playerIndex: number }
   | { type: 'roomDissolved'; roomId: string }
+  | { type: 'roomPersistencePaused'; roomId: string }
+  | { type: 'roomPersistenceResumed'; roomId: string }
 
 export type RoomSummary = {
   id: string

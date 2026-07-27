@@ -13,6 +13,7 @@ export const zh = {
     boardOverview: '棋盘总览',
     gamePresentationNavigation: '游戏视图',
     gamePresentationChanged: '当前操作：{presentation}',
+    roomPersistencePaused: '保存已暂停，存储恢复后对局会自动继续。',
     gamePresentation: {
       action: '行动',
       farm: '农场',

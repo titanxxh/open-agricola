@@ -25,17 +25,18 @@ describe('room result migration', () => {
       CREATE TABLE rooms (
         id TEXT PRIMARY KEY,
         status TEXT NOT NULL,
-        created_at INTEGER NOT NULL
+        created_at INTEGER NOT NULL,
+        updated_at INTEGER NOT NULL
       );
-      INSERT INTO rooms VALUES ('waiting', 'waiting', 10);
-      INSERT INTO rooms VALUES ('playing', 'playing', 20);
+      INSERT INTO rooms VALUES ('waiting', 'waiting', 10, 10);
+      INSERT INTO rooms VALUES ('playing', 'playing', 20, 20);
       WITH RECURSIVE ids(value) AS (
         SELECT 1
         UNION ALL
         SELECT value + 1 FROM ids WHERE value < 2265
       )
       INSERT INTO rooms
-      SELECT 'finished-' || value, 'finished', value FROM ids;
+      SELECT 'finished-' || value, 'finished', value, value FROM ids;
     `)
     seed.close()
 
@@ -44,7 +45,7 @@ describe('room result migration', () => {
     const { getDb } = await import('../db.ts')
     const db = getDb()
 
-    expect(db.prepare('SELECT MAX(version) AS version FROM schema_version').get()).toEqual({ version: 20 })
+    expect(db.prepare('SELECT MAX(version) AS version FROM schema_version').get()).toEqual({ version: 21 })
     expect(db.prepare("SELECT COUNT(*) AS count FROM rooms WHERE status = 'finished'").get()).toEqual({ count: 0 })
     expect(db.prepare('SELECT id, started_at FROM rooms ORDER BY id').all()).toEqual([
       { id: 'playing', started_at: 20 },
