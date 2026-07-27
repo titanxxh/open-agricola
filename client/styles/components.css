@@ -472,6 +472,7 @@ body.kofi-widget-hidden .floating-chat-kofi-popup-iframe-mobi {
   body:has(.mobile-tab-bar) .afdian-float-btn {
     bottom: calc(72px + var(--safe-area-inset-bottom, env(safe-area-inset-bottom)));
   }
+  body:has(.mobile-tab-bar) .floatingchat-container-wrap,
   body:has(.mobile-tab-bar) .floatingchat-container-wrap-mobi {
     bottom: calc(72px + var(--safe-area-inset-bottom, env(safe-area-inset-bottom))) !important;
   }
