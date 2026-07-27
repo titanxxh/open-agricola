@@ -47,6 +47,8 @@ const PAGE_SCOPED_QUERY_KEYS = [
   'step',
   'frame',
   'perspective',
+  'bugReport',
+  'bugReportConnection',
 ]
 
 function getPage(): Page {

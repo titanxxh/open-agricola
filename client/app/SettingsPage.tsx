@@ -4,6 +4,7 @@ import { useLocale } from '../contexts/LocaleContext'
 import { LocaleSwitcher } from '../components/common/LocaleSwitcher'
 import { Section } from '../components/common/Section'
 import { DangerButton } from '../components/common/DangerButton'
+import { API_BASE } from '../config'
 import { authErrorMessage } from './auth-errors'
 import { setPage } from './PageRouter'
 
@@ -24,6 +25,12 @@ type AdminInvite = {
   useCount: number
   maxUses: number
   status: 'active' | 'used' | 'expired' | 'revoked'
+}
+
+type IssueSubmissionConnection = {
+  enabled: boolean
+  connected: boolean
+  githubUserId?: string
 }
 
 const DAY_MS = 24 * 60 * 60 * 1000
@@ -61,6 +68,9 @@ export function SettingsPage() {
   const [nameMsg, setNameMsg] = useState<{ ok: boolean; text: string } | null>(null)
   const [pwMsg, setPwMsg] = useState<{ ok: boolean; text: string } | null>(null)
   const [deleteMsg, setDeleteMsg] = useState<{ ok: boolean; text: string } | null>(null)
+  const [issueConnection, setIssueConnection] = useState<IssueSubmissionConnection | null>(null)
+  const [issueConnectionMsg, setIssueConnectionMsg] = useState<string | null>(null)
+  const [disconnectingIssueConnection, setDisconnectingIssueConnection] = useState(false)
   const [saving, setSaving] = useState(false)
   const [deleting, setDeleting] = useState(false)
 
@@ -74,6 +84,19 @@ export function SettingsPage() {
       .catch(() => {})
     return () => { cancelled = true }
   }, [apiFetch])
+
+  useEffect(() => {
+    let cancelled = false
+    void fetch(`${API_BASE}/api/v1/issue-submission-connection`, {
+      credentials: 'include',
+    })
+      .then(async (resp) => {
+        const data = await resp.json() as IssueSubmissionConnection & { ok?: boolean }
+        if (!cancelled && resp.ok && data.ok) setIssueConnection(data)
+      })
+      .catch(() => {})
+    return () => { cancelled = true }
+  }, [])
 
   const loadInvites = useCallback(async () => {
     try {
@@ -234,6 +257,28 @@ export function SettingsPage() {
     }
   }
 
+  const handleDisconnectIssueConnection = async () => {
+    setIssueConnectionMsg(null)
+    setDisconnectingIssueConnection(true)
+    try {
+      const resp = await fetch(`${API_BASE}/api/v1/issue-submission-connection`, {
+        method: 'DELETE',
+        credentials: 'include',
+      })
+      const data = await resp.json() as { ok?: boolean }
+      if (!resp.ok || !data.ok) throw new Error('disconnect_failed')
+      setIssueConnection((current) => ({
+        enabled: current?.enabled ?? true,
+        connected: false,
+      }))
+      setIssueConnectionMsg(t('platform.bugReport.disconnected'))
+    } catch {
+      setIssueConnectionMsg(t('platform.networkError'))
+    } finally {
+      setDisconnectingIssueConnection(false)
+    }
+  }
+
   const githubIdentity = identities.find(identity => identity.provider === 'github')
   const googleIdentity = identities.find(identity => identity.provider === 'google')
 
@@ -335,6 +380,44 @@ export function SettingsPage() {
           </div>
         </div>
       </Section>
+
+      {issueConnection && (issueConnection.enabled || issueConnection.connected) ? (
+        <Section title={t('platform.bugReport.settingsTitle')} variant="parchment">
+          <div className="settings-form">
+            <p className="settings-readonly">
+              {issueConnection.connected
+                ? t('platform.bugReport.settingsConnected')
+                : t('platform.bugReport.settingsDisconnected')}
+              {issueConnection.githubUserId ? (
+                <span className="settings-readonly-chip">
+                  GitHub ID {issueConnection.githubUserId}
+                </span>
+              ) : null}
+            </p>
+            <p className="settings-hint">{t('platform.bugReport.settingsHint')}</p>
+            {issueConnection.connected ? (
+              <div className="settings-actions">
+                <button
+                  type="button"
+                  className="btn-secondary"
+                  disabled={disconnectingIssueConnection}
+                  onClick={() => { void handleDisconnectIssueConnection() }}
+                >
+                  {t('platform.bugReport.disconnect')}
+                </button>
+              </div>
+            ) : null}
+            {issueConnectionMsg ? (
+              <div
+                className={issueConnection.connected ? 'form-error' : 'settings-success'}
+                role="status"
+              >
+                {issueConnectionMsg}
+              </div>
+            ) : null}
+          </div>
+        </Section>
+      ) : null}
 
       {user?.isAdmin && (
         <Section icon="🎟️" title={t('platform.adminInvites')} variant="parchment">
