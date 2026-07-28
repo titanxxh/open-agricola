@@ -140,7 +140,9 @@ export function GameContextRouter({ children }: { children: ReactNode }) {
     const state = fragment.get('bugReportOAuthState')
     const code = fragment.get('bugReportOAuthCode')
     if (!state || !code) return
-    const controller = new AbortController()
+    const url = new URL(window.location.href)
+    url.hash = ''
+    window.history.replaceState(null, '', url)
     void fetch(
       `${API_BASE}/api/v1/issue-submission-connection/github/complete`,
       {
@@ -148,7 +150,6 @@ export function GameContextRouter({ children }: { children: ReactNode }) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ state, code }),
         credentials: 'include',
-        signal: controller.signal,
       },
     )
       .then(async (response) => {
@@ -156,11 +157,7 @@ export function GameContextRouter({ children }: { children: ReactNode }) {
         if (!response.ok || body.ok !== true) throw new Error('request_failed')
         finishBugReportOAuth('connected')
       })
-      .catch((error: unknown) => {
-        if (error instanceof DOMException && error.name === 'AbortError') return
-        finishBugReportOAuth('error')
-      })
-    return () => controller.abort()
+      .catch(() => finishBugReportOAuth('error'))
   }, [])
 
   useEffect(() => {
