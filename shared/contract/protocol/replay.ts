@@ -99,6 +99,16 @@ export type ReportedEvidence = {
   frameHash: string
   perspective: `p${number}`
   frame: SerializedGameState
+  customCards: CustomCardDef[]
+}
+
+export type ReportedEvidenceViewerReadyMessage = {
+  type: 'open-agricola-reported-evidence-ready'
+}
+
+export type ReportedEvidenceViewerDataMessage = {
+  type: 'open-agricola-reported-evidence'
+  evidence: ReportedEvidence
 }
 
 export type ReplayUnavailableError = GameContextError & {

@@ -356,11 +356,15 @@ describe('serializeStateForPlayer', () => {
     expect(p2.minorHand).toEqual([])
   })
 
-  it('masks cardStates and card-state events for cards still hidden in opponent hands', () => {
+  it('masks card state, draft history, and events for hidden opponent cards', () => {
     const state = makePlayingState()
     const p2 = state.players[1]!
     p2.minorHand = ['D036_BreedRegistry']
     p2.minorPlayed = ['B021_HayloftBarn']
+    p2.stats.draftHistory = [
+      { cardId: 'D036_BreedRegistry', draftTurn: 1 },
+      { cardId: 'B021_HayloftBarn', draftTurn: 2, playedTurn: 3 },
+    ]
     p2.cardStates = {
       D036_BreedRegistry: { extraData: { boardSheep: 1 } },
       B021_HayloftBarn: { extraData: { foodCount: 2 } },
@@ -444,6 +448,11 @@ describe('serializeStateForPlayer', () => {
     const ownerP2 = ownerView.players.find((player) => player.id === p2.id)!
 
     expect(filteredP2.minorHand).toEqual(['?'])
+    expect(filteredP2.stats.draftHistory).toEqual([
+      { cardId: '?', draftTurn: 1 },
+      { cardId: 'B021_HayloftBarn', draftTurn: 2, playedTurn: 3 },
+    ])
+    expect(ownerP2.stats.draftHistory).toEqual(p2.stats.draftHistory)
     expect(filteredP2.cardStates.D036_BreedRegistry).toBeUndefined()
     expect(filteredP2.cardStates.B021_HayloftBarn).toEqual(p2.cardStates.B021_HayloftBarn)
     expect(opponentView.events.map((event) => event.id)).toEqual(['102'])

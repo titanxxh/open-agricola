@@ -1158,7 +1158,11 @@ export class BugReportStore {
       UPDATE bug_reports
       SET github_issue_state = ?, updated_at = ?
       WHERE github_issue_number = ?
-    `).run(state, this.now(), issueNumber)
+        AND (
+          ? = 'deleted'
+          OR COALESCE(github_issue_state, 'open') != 'deleted'
+        )
+    `).run(state, this.now(), issueNumber, state)
   }
 
   reporterDeletionPlan(userId: string): {

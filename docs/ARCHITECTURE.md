@@ -1168,6 +1168,7 @@ GET    /api/v1/game-contexts/:roomId
 GET    /api/v1/replays/:roomId/manifest
 GET    /api/v1/replays/:roomId/segments/:checkpointStepNo
 GET    /api/v1/replays/:roomId/anchors/:stepNo?frame=<sha256>
+GET    /api/v1/game-contexts/:roomId/evidence/:stepNo?frame=<sha256>
 GET    /replay-viewers/:viewerBuildId/*
 GET    /replay-assets/:sha256
 POST   /api/v1/game-contexts/:roomId/bug-reports
@@ -1336,6 +1337,7 @@ BUG_REPORT_TOKEN_ACTIVE_KEY_ID
 GameContextRouter
   ├─ active → AuthProvider → 现有 PageRouter / GameContainerApi
   ├─ completed → ReplayShell → credentialless Replay Viewer iframe
+  ├─ expired + retained Anchor → credentialless 历史 Viewer 单帧证据
   ├─ expired → Expired Game Context 页面
   └─ removed → Replay Tombstone 页面
 ```
@@ -1343,6 +1345,7 @@ GameContextRouter
 - `?context=<roomId>` 必须在当前卡牌 manifest 与全局登录门前解析。active 未登录时保留完整 returnTo；completed、expired、removed 不加载登录依赖。
 - active 恢复继续使用现有 WebSocket，但 `joinRoom` 必须携带 `intent:'resume'`；服务端只按持久化站点 `userId → playerIndex` 恢复原座位。保存暂停时所有在线座位显示同一状态提示，新命令控件禁用。
 - `ReplayShell` 校验 Replay header 与内容寻址 Viewer manifest，选择 `viewerBuildId`，并只在选定视角后创建 `credentialless`、`sandbox="allow-scripts"` iframe。历史 Viewer 是无登录、无 Cookie、无 WS、无 ClientCommand 的独立只读 bundle，直接读取公开 JSON Segment，并用当时编译的遮蔽逻辑切换 `p1…pN | open`。
+- retained evidence 由父页面携带站点 Cookie 鉴权并按原座位投影，再把单帧及 Replay header 中的自定义卡快照通过 `postMessage` 交给校验过 `viewerBuildId` 的 credentialless 历史 Viewer；历史 Viewer 不自行读取鉴权接口。
 - 直接打开 completed 且 URL 没有 perspective 时，任何 Frame 展示前先选座位或全开。桌面 auto 默认时间线优先双栏，手机 auto 默认棋盘优先；900px 是自动断点，手动布局写入 URL 并覆盖响应式默认。“本步证据”固定展示 Step、轮次、操作者、白名单 intent 和 Frame Hash。
 - 播放默认停在 Step 0，提供播放/暂停、前后步、滑杆跳转和键盘控制；损坏 Segment 显示不可用区间并允许从下一 checkpoint 继续，不尝试静默修复。
 - Bug Report 使用已定稿的三步引导式底栏：必填现象 → 自动上下文 → 作者身份。创建 GitHub OAuth 跳转前必须先保存 server draft；取消授权返回同一 `submissionId`，提交后通过 status endpoint 轮询。提交响应丢失时立即回读权威状态并恢复轮询，成功态禁止重复创建。
