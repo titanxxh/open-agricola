@@ -366,13 +366,6 @@ const server = createServer(async (req, res) => {
   }
 
   const requestUser = validateSession(getAuthToken(req))
-  if (await handleBugReportRoute(
-    req,
-    res,
-    bugReportRuntime,
-    requestUser,
-    requestUser ? isAdmin(requestUser.username) : false,
-  )) return
 
   if (req.url.startsWith('/api/v1/game-contexts/')) {
     if (handleGameContextRoute(req, res, gameContextStore, requestUser)) return
@@ -854,6 +847,14 @@ const server = createServer(async (req, res) => {
     const handled = await handleGameRoute(req, res)
     if (handled) return
   }
+
+  if (await handleBugReportRoute(
+    req,
+    res,
+    bugReportRuntime,
+    requestUser,
+    requestUser ? isAdmin(requestUser.username) : false,
+  )) return
 
   sendJson(res, 404, { error: 'Not found' })
 })
