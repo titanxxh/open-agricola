@@ -7,6 +7,7 @@ import {
   waitFor,
 } from '@testing-library/react'
 import { createHash } from 'node:crypto'
+import { StrictMode } from 'react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { GameContextRouter } from '../GameContextRouter'
 
@@ -414,7 +415,11 @@ describe('GameContextRouter', () => {
     })
     vi.stubGlobal('fetch', fetch)
 
-    render(<GameContextRouter><div>active app</div></GameContextRouter>)
+    render(
+      <StrictMode>
+        <GameContextRouter><div>active app</div></GameContextRouter>
+      </StrictMode>,
+    )
 
     expect(await screen.findByText('platform.gameContext.expiredTitle'))
       .toBeVisible()
@@ -428,5 +433,10 @@ describe('GameContextRouter', () => {
       '/api/v1/issue-submission-connection/github/complete',
       expect.objectContaining({ credentials: 'include' }),
     )
+    expect(fetch.mock.calls.filter(([input]) =>
+      String(input).endsWith(
+        '/api/v1/issue-submission-connection/github/complete',
+      ),
+    )).toHaveLength(1)
   })
 })
