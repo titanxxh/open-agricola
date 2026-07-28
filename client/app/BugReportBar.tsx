@@ -66,6 +66,7 @@ const errorKeys: Record<string, string> = {
   bug_report_draft_limit: 'platform.bugReport.errors.rate_limited',
   bug_report_room_limit: 'platform.bugReport.errors.rate_limited',
   github_connection_required: 'platform.bugReport.errors.github_connection_required',
+  github_identity_confirmation_required: 'platform.bugReport.errors.github_identity_confirmation_required',
   existing_issue_confirmation_required: 'platform.bugReport.errors.existing_issue_confirmation_required',
 }
 
@@ -166,7 +167,8 @@ export function BugReportBar({
           setPhenomenon(saved.phenomenon ?? '')
           setIdentity(saved.authorIdentity)
           setConfirmGitHub(
-            saved.authorIdentity === 'github_user' && saved.status !== 'draft',
+            saved.authorIdentity === 'github_user'
+              && !['draft', 'needs_reconnect', 'failed'].includes(saved.status),
           )
           setConfirmHosted(saved.authorIdentity === 'hosted')
           setStage(
@@ -206,10 +208,13 @@ export function BugReportBar({
           setReport(current)
           setExistingIssues(existing ?? [])
           if (current.status === 'needs_reconnect') {
-            setConnection((value) => ({
-              enabled: value?.enabled ?? true,
-              connected: false,
-            }))
+            setConfirmGitHub(false)
+            if (current.lastErrorCode !== 'github_identity_confirmation_required') {
+              setConnection((value) => ({
+                enabled: value?.enabled ?? true,
+                connected: false,
+              }))
+            }
           }
         })
         .catch(() => {})
@@ -326,16 +331,24 @@ export function BugReportBar({
     setBusy(true)
     setError(null)
     try {
-      if (report.status === 'draft') {
+      if (
+        report.status === 'draft'
+        || (
+          identity === 'github_user'
+          && ['needs_reconnect', 'failed'].includes(report.status)
+        )
+      ) {
         const selected = await requestJson<ReportResponse>(
           `/api/v1/bug-reports/${encodeURIComponent(report.submissionId)}`,
           {
             method: 'PATCH',
-            body: JSON.stringify({
-              authorIdentity: identity,
-              ...(identity === 'github_user' ? { confirmGitHub } : {}),
-              ...(identity === 'hosted' ? { confirmHosted } : {}),
-            }),
+            body: JSON.stringify(report.status === 'draft'
+              ? {
+                  authorIdentity: identity,
+                  ...(identity === 'github_user' ? { confirmGitHub } : {}),
+                  ...(identity === 'hosted' ? { confirmHosted } : {}),
+                }
+              : { confirmGitHub }),
           },
         )
         setReport(selected.report)
@@ -346,10 +359,16 @@ export function BugReportBar({
       )
       setReport(submitted.report)
       if (submitted.report.status === 'needs_reconnect') {
-        setConnection((current) => ({
-          enabled: current?.enabled ?? true,
-          connected: false,
-        }))
+        setConfirmGitHub(false)
+        if (
+          submitted.report.lastErrorCode
+          !== 'github_identity_confirmation_required'
+        ) {
+          setConnection((current) => ({
+            enabled: current?.enabled ?? true,
+            connected: false,
+          }))
+        }
       }
     } catch (reason) {
       const recovered = await requestJson<ReportResponse>(
@@ -360,10 +379,16 @@ export function BugReportBar({
         setReport(recovered.report)
         setExistingIssues(recovered.existingIssues ?? [])
         if (recovered.report.status === 'needs_reconnect') {
-          setConnection((current) => ({
-            enabled: current?.enabled ?? true,
-            connected: false,
-          }))
+          setConfirmGitHub(false)
+          if (
+            recovered.report.lastErrorCode
+            !== 'github_identity_confirmation_required'
+          ) {
+            setConnection((current) => ({
+              enabled: current?.enabled ?? true,
+              connected: false,
+            }))
+          }
         }
         if (recovered.report.status !== 'draft') return
       }
@@ -376,6 +401,12 @@ export function BugReportBar({
           enabled: current?.enabled ?? true,
           connected: false,
         }))
+      }
+      if (
+        reason instanceof Error
+        && reason.message === 'github_identity_confirmation_required'
+      ) {
+        setConfirmGitHub(false)
       }
     } finally {
       setBusy(false)
@@ -617,7 +648,13 @@ export function BugReportBar({
                     <input
                       type="checkbox"
                       checked={confirmGitHub}
-                      disabled={!editable || busy}
+                      disabled={
+                        busy
+                        || (
+                          !editable
+                          && !['needs_reconnect', 'failed'].includes(report.status)
+                        )
+                      }
                       onChange={(event) => setConfirmGitHub(event.target.checked)}
                     />
                     <span>{t('platform.bugReport.githubUserConfirm')}</span>
@@ -656,7 +693,11 @@ export function BugReportBar({
                   </p>
                 ) : report.status === 'needs_reconnect' ? (
                   <p className="bug-report-error" role="alert">
-                    {t('platform.bugReport.errors.github_connection_required')}
+                    {t(
+                      report.lastErrorCode === 'github_identity_confirmation_required'
+                        ? 'platform.bugReport.errors.github_identity_confirmation_required'
+                        : 'platform.bugReport.errors.github_connection_required',
+                    )}
                   </p>
                 ) : report.status === 'failed' ? (
                   <p className="bug-report-error" role="alert">

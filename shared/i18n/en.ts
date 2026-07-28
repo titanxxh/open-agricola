@@ -1425,6 +1425,7 @@ export const en = {
         anchor_mismatch: 'This replay position changed or is unavailable. Reopen the report from the current game position.',
         rate_limited: 'Too many reports were submitted. Please try again later.',
         github_connection_required: 'Reconnect GitHub to keep this report under your GitHub identity.',
+        github_identity_confirmation_required: 'The connected GitHub account changed. Confirm the public author identity again.',
         existing_issue_confirmation_required: 'Review the matching open Issue before continuing with a new one.',
         request_failed: 'The report could not be saved ({code}). Please try again.',
       },

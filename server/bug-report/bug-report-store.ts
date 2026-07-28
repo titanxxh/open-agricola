@@ -76,6 +76,7 @@ type ReportRow = {
   frame_hash: string
   phenomenon: string | null
   author_identity: 'github_user' | 'hosted' | null
+  confirmed_github_user_id: string | null
   status: BugReportStatus
   github_issue_number: number | null
   github_issue_url: string | null
@@ -238,7 +239,8 @@ const reportColumns = `
   room_version, step_no, frame_hash, phenomenon, author_identity, status,
   github_issue_number, github_issue_url, evidence_expires_at, claim_token,
   claimed_at, next_attempt_at, submitted_at, last_error_code, created_at,
-  updated_at, discarded_at, github_issue_state, duplicate_confirmed_at
+  updated_at, discarded_at, github_issue_state, duplicate_confirmed_at,
+  confirmed_github_user_id
 `
 
 export class BugReportStore {
@@ -343,7 +345,9 @@ export class BugReportStore {
     )
   }
 
-  connectionTokens(userId: string): GitHubUserTokens | null {
+  connectionTokens(
+    userId: string,
+  ): (GitHubUserTokens & { githubUserId: string }) | null {
     const row = this.db.prepare(`
       SELECT user_id, github_user_id,
              access_token_ciphertext, access_token_nonce, access_token_tag,
@@ -363,6 +367,7 @@ export class BugReportStore {
       && row.refresh_token_nonce
       && row.refresh_token_tag
     return {
+      githubUserId: row.github_user_id,
       accessToken,
       accessTokenExpiresAt: row.access_token_expires_at,
       ...(hasRefresh
@@ -505,8 +510,8 @@ export class BugReportStore {
       SELECT COUNT(*) AS count
       FROM bug_reports
       WHERE reporter_user_id = ?
-        AND status = 'draft'
         AND discarded_at IS NULL
+        AND github_issue_number IS NULL
     `).get(input.userId) as { count: number }
     if (unfinished.count >= MAX_UNFINISHED_DRAFTS) {
       throw new BugReportError('bug_report_draft_limit', 429)
@@ -661,11 +666,28 @@ export class BugReportStore {
     if (row.status === 'submitted') {
       throw new BugReportError('bug_report_already_submitted', 409)
     }
-    if (row.status !== 'draft') {
+    const githubReconfirmation = (
+      (row.status === 'needs_reconnect' || row.status === 'failed')
+      && row.author_identity === 'github_user'
+      && input.confirmGitHub === true
+      && input.phenomenon === undefined
+      && input.authorIdentity === undefined
+      && input.confirmHosted === undefined
+      && input.confirmExisting === undefined
+    )
+    if (row.status !== 'draft' && !githubReconfirmation) {
       throw new BugReportError('bug_report_update_conflict', 409)
     }
     let phenomenon = row.phenomenon
     let author = row.author_identity
+    let confirmedGitHubUserId = row.confirmed_github_user_id
+    if (githubReconfirmation) {
+      const connection = this.connectionStatus(userId)
+      if (!connection.connected || !connection.githubUserId) {
+        throw new BugReportError('github_connection_required', 409)
+      }
+      confirmedGitHubUserId = connection.githubUserId
+    }
     if (input.phenomenon !== undefined) {
       phenomenon = cleanPhenomenon(input.phenomenon)
     }
@@ -687,9 +709,14 @@ export class BugReportStore {
       }
       if (
         input.authorIdentity === 'github_user'
-        && !this.connectionStatus(userId).connected
       ) {
-        throw new BugReportError('github_connection_required', 409)
+        const connection = this.connectionStatus(userId)
+        if (!connection.connected || !connection.githubUserId) {
+          throw new BugReportError('github_connection_required', 409)
+        }
+        confirmedGitHubUserId = connection.githubUserId
+      } else {
+        confirmedGitHubUserId = null
       }
       author = input.authorIdentity
     }
@@ -704,6 +731,7 @@ export class BugReportStore {
       UPDATE bug_reports
       SET phenomenon = ?,
           author_identity = ?,
+          confirmed_github_user_id = ?,
           duplicate_confirmed_at = ?,
           updated_at = ?,
           last_error_code = NULL
@@ -711,6 +739,7 @@ export class BugReportStore {
     `).run(
       phenomenon,
       author,
+      confirmedGitHubUserId,
       input.confirmExisting === true ? now : row.duplicate_confirmed_at,
       now,
       submissionId,
@@ -729,11 +758,23 @@ export class BugReportStore {
     if (!row.author_identity) {
       throw new BugReportError('author_identity_required', 400)
     }
-    if (
-      row.author_identity === 'github_user'
-      && !this.connectionStatus(userId).connected
-    ) {
-      throw new BugReportError('github_connection_required', 409)
+    if (row.author_identity === 'github_user') {
+      const connection = this.connectionStatus(userId)
+      if (!connection.connected || !connection.githubUserId) {
+        throw new BugReportError('github_connection_required', 409)
+      }
+      if (connection.githubUserId !== row.confirmed_github_user_id) {
+        if (row.status !== 'draft') {
+          this.db.prepare(`
+            UPDATE bug_reports
+            SET status = 'needs_reconnect',
+                last_error_code = 'github_identity_confirmation_required',
+                updated_at = ?
+            WHERE submission_id = ? AND reporter_user_id = ?
+          `).run(this.now(), submissionId, userId)
+        }
+        throw new BugReportError('github_identity_confirmation_required', 409)
+      }
     }
     if (row.submitted_at === null) {
       const latestExisting = this.matchingOpenIssues(row)[0]
@@ -775,6 +816,7 @@ export class BugReportStore {
         UPDATE bug_reports
         SET phenomenon = NULL,
             author_identity = NULL,
+            confirmed_github_user_id = NULL,
             status = 'failed',
             discarded_at = ?,
             claim_token = NULL,
@@ -907,6 +949,7 @@ export class BugReportStore {
       UPDATE bug_reports
       SET status = 'submitted',
           phenomenon = NULL,
+          confirmed_github_user_id = NULL,
           github_issue_number = ?,
           github_issue_url = ?,
           github_issue_state = 'open',
@@ -1020,6 +1063,7 @@ export class BugReportStore {
         SET reporter_user_id = NULL,
             phenomenon = NULL,
             author_identity = NULL,
+            confirmed_github_user_id = NULL,
             status = CASE WHEN status = 'submitted' THEN status ELSE 'failed' END,
             discarded_at = COALESCE(discarded_at, ?),
             claim_token = NULL,
@@ -1331,6 +1375,14 @@ export class BugReportDelivery {
         this.store.defer(claim, 'needs_reconnect', 'github_connection_required')
         return
       }
+      if (tokens.githubUserId !== report.confirmed_github_user_id) {
+        this.store.defer(
+          claim,
+          'needs_reconnect',
+          'github_identity_confirmation_required',
+        )
+        return
+      }
       if (tokens.accessTokenExpiresAt <= this.now() + 60_000) {
         if (
           !tokens.refreshToken
@@ -1342,12 +1394,20 @@ export class BugReportDelivery {
         }
         try {
           const refreshed = await this.client.refreshUserToken(tokens.refreshToken)
-          const githubUserId = this.store.connectionStatus(report.reporter_user_id)
-            .githubUserId
-          if (!githubUserId) throw new Error('github connection missing')
+          if (
+            this.store.connectionStatus(report.reporter_user_id).githubUserId
+            !== tokens.githubUserId
+          ) {
+            this.store.defer(
+              claim,
+              'needs_reconnect',
+              'github_identity_confirmation_required',
+            )
+            return
+          }
           this.store.saveConnection(
             report.reporter_user_id,
-            githubUserId,
+            tokens.githubUserId,
             refreshed,
           )
           userToken = refreshed.accessToken

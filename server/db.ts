@@ -792,6 +792,25 @@ export function runMigrations(db: Database.Database): void {
         END;
       `,
     },
+    {
+      version: 27,
+      sql: `
+        ALTER TABLE bug_reports ADD COLUMN confirmed_github_user_id TEXT;
+        CREATE INDEX IF NOT EXISTS idx_bug_report_evidence_audit_maintainer
+          ON bug_report_evidence_audit(maintainer_user_id, created_at);
+      `,
+    },
+    {
+      version: 29,
+      sql: `
+        ALTER TABLE bug_report_evidence_audit
+          ADD COLUMN maintainer_identity TEXT NOT NULL
+          DEFAULT 'deleted-maintainer';
+        UPDATE bug_report_evidence_audit
+        SET maintainer_identity = maintainer_user_id
+        WHERE maintainer_user_id IS NOT NULL;
+      `,
+    },
   ]
 
   const insert = db.prepare('INSERT INTO schema_version (version) VALUES (?)')

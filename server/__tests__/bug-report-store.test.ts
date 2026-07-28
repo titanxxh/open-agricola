@@ -261,6 +261,16 @@ describe('BugReportStore', () => {
         roomId,
         phenomenon: `Problem ${index}`,
       }))
+    db.prepare(`
+      UPDATE bug_reports
+      SET status = ?
+      WHERE submission_id = ?
+    `).run('failed', drafts[0]!.submissionId)
+    db.prepare(`
+      UPDATE bug_reports
+      SET status = ?
+      WHERE submission_id = ?
+    `).run('needs_reconnect', drafts[1]!.submissionId)
 
     expectBugReportError(
       () => store.createDraft({
@@ -298,6 +308,7 @@ describe('BugReportStore', () => {
     expect(raw.access_token_ciphertext.toString()).not.toContain('access-secret')
     expect(raw.refresh_token_ciphertext.toString()).not.toContain('refresh-secret')
     expect(store.connectionTokens('u1')).toEqual({
+      githubUserId: '99',
       accessToken: 'access-secret',
       accessTokenExpiresAt: now + 3_600_000,
       refreshToken: 'refresh-secret',
@@ -429,6 +440,53 @@ describe('BugReportStore', () => {
       'github_user',
       expect.any(Object),
       'user-token',
+    )
+  })
+
+  it('requires new confirmation when the connected GitHub account changes', async () => {
+    const roomId = insertContext('active')
+    const report = store.createDraft({
+      userId: 'u1',
+      roomId,
+      phenomenon: 'Action did not resolve',
+    })
+    store.saveConnection('u1', '99', {
+      accessToken: 'user-token-a',
+      accessTokenExpiresAt: now + 3_600_000,
+    })
+    store.updateDraft(report.submissionId, 'u1', {
+      authorIdentity: 'github_user',
+      confirmGitHub: true,
+    })
+    store.queue(report.submissionId, 'u1')
+    store.saveConnection('u1', '100', {
+      accessToken: 'user-token-b',
+      accessTokenExpiresAt: now + 3_600_000,
+    })
+    const adapter = successAdapter()
+    const delivery = new BugReportDelivery(
+      store,
+      adapter,
+      'https://game.example',
+      () => now,
+    )
+
+    await delivery.deliver(report.submissionId)
+
+    expect(adapter.createIssue).not.toHaveBeenCalled()
+    expect(store.getOwned(report.submissionId, 'u1')).toMatchObject({
+      status: 'needs_reconnect',
+      lastErrorCode: 'github_identity_confirmation_required',
+    })
+
+    store.updateDraft(report.submissionId, 'u1', { confirmGitHub: true })
+    store.queue(report.submissionId, 'u1')
+    await delivery.deliver(report.submissionId)
+
+    expect(adapter.createIssue).toHaveBeenCalledWith(
+      'github_user',
+      expect.any(Object),
+      'user-token-b',
     )
   })
 
