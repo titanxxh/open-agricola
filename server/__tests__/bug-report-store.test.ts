@@ -583,6 +583,65 @@ describe('BugReportStore', () => {
     )
   })
 
+  it('queues a refreshed token for revocation when account deletion wins the refresh race', async () => {
+    const roomId = insertContext('active')
+    const report = store.createDraft({
+      userId: 'u1',
+      roomId,
+      phenomenon: 'Action did not resolve',
+    })
+    store.saveConnection('u1', '99', {
+      accessToken: 'expired-token',
+      accessTokenExpiresAt: now,
+      refreshToken: 'refresh-token',
+      refreshTokenExpiresAt: now + 3_600_000,
+    })
+    store.updateDraft(report.submissionId, 'u1', {
+      authorIdentity: 'github_user',
+      confirmGitHub: true,
+    })
+    store.queue(report.submissionId, 'u1')
+    const adapter = successAdapter()
+    let resolveRefresh!: (tokens: {
+      accessToken: string
+      accessTokenExpiresAt: number
+    }) => void
+    vi.mocked(adapter.refreshUserToken).mockImplementationOnce(() =>
+      new Promise((resolve) => {
+        resolveRefresh = resolve
+      }))
+    const delivery = new BugReportDelivery(
+      store,
+      adapter,
+      'https://game.example',
+      () => now,
+    )
+
+    const delivering = delivery.deliver(report.submissionId)
+    await vi.waitFor(() => {
+      expect(adapter.refreshUserToken).toHaveBeenCalledWith('refresh-token')
+    })
+    db.prepare(`
+      INSERT INTO account_deletion_requests (
+        user_id, requested_at, next_attempt_at, last_error_code
+      ) VALUES ('u1', ?, ?, NULL)
+    `).run(now, now)
+    resolveRefresh({
+      accessToken: 'refreshed-after-deletion',
+      accessTokenExpiresAt: now + 3_600_000,
+    })
+    await delivering
+
+    expect(adapter.createIssue).not.toHaveBeenCalled()
+    expect(store.nextGrantRevocation()).toMatchObject({
+      accessToken: 'refreshed-after-deletion',
+    })
+    expect(store.getOwned(report.submissionId, 'u1')).toMatchObject({
+      status: 'needs_reconnect',
+      lastErrorCode: 'github_connection_required',
+    })
+  })
+
   it('requires new confirmation when the connected GitHub account changes', async () => {
     const roomId = insertContext('active')
     const report = store.createDraft({
