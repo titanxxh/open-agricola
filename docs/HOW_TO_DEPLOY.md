@@ -91,17 +91,21 @@ pnpm run build:replay-viewer
 
 `docker-compose.prod.yml` 使用 `app-data:/app/data` named volume。保持 `REPLAY_NEW_ROOMS_ENABLED=false` 启动一次后，把 Build 追加进去，再启用录制：
 
+运行下方命令前，把上一步 stdout 最后一行填入 `.env` 的 `REPLAY_VIEWER_BUILD_ID`，并把 `git rev-parse HEAD` 的输出填入 `GAME_BUILD_ID`。
+
 ```bash
 set -a
 source .env
 set +a
+test -n "$REPLAY_VIEWER_BUILD_ID"
+test -n "$GAME_BUILD_ID"
 docker compose -f docker-compose.prod.yml up -d --build
 docker compose -f docker-compose.prod.yml exec app \
   mkdir -p "/app/data/replay-viewers/$REPLAY_VIEWER_BUILD_ID"
 docker compose -f docker-compose.prod.yml cp \
   "data/replay-viewers/$REPLAY_VIEWER_BUILD_ID/." \
   "app:/app/data/replay-viewers/$REPLAY_VIEWER_BUILD_ID"
-# 在 .env 填写 REPLAY_VIEWER_BUILD_ID / GAME_BUILD_ID，并改为 REPLAY_NEW_ROOMS_ENABLED=true
+# 复制完成后，在 .env 改为 REPLAY_NEW_ROOMS_ENABLED=true
 docker compose -f docker-compose.prod.yml up -d --force-recreate app
 ```
 
