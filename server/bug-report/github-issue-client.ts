@@ -71,6 +71,7 @@ type InstallationTokenResponse = {
 type IssueResponse = {
   number?: number
   html_url?: string
+  title?: string
   body?: string | null
   created_at?: string
   performed_via_github_app?: {
@@ -298,7 +299,7 @@ export class GitHubIssueClient {
     const authorization = await this.issueToken(identity, userAccessToken)
     if (!authorization.ok) return authorization
     const sinceSecond = Math.floor(since / 1000) * 1000
-    for (let page = 1; page <= 100; page += 1) {
+    for (let page = 1; ; page += 1) {
       let response: Response
       try {
         const url = new URL(`${API}/repos/${OWNER}/${REPOSITORY}/issues`)
@@ -348,14 +349,16 @@ export class GitHubIssueClient {
       }
       if (issues.length < 100) return { ok: true, found: false }
       const oldest = Date.parse(issues.at(-1)?.created_at ?? '')
-      if (Number.isFinite(oldest) && oldest < sinceSecond) {
+      if (!Number.isFinite(oldest)) {
+        return {
+          ok: false,
+          kind: 'uncertain',
+          code: 'github_reconciliation_uncertain',
+        }
+      }
+      if (oldest < sinceSecond) {
         return { ok: true, found: false }
       }
-    }
-    return {
-      ok: false,
-      kind: 'uncertain',
-      code: 'github_reconciliation_uncertain',
     }
   }
 
@@ -418,8 +421,10 @@ export class GitHubIssueClient {
     }
     if (!response.ok) return failureFromResponse(response, this.now())
     const issue = await parseJson<IssueResponse>(response)
-    if (issue.body === null) return { ok: true }
-    if (typeof issue.body !== 'string') {
+    if (
+      typeof issue.title !== 'string'
+      || (issue.body !== null && typeof issue.body !== 'string')
+    ) {
       return {
         ok: false,
         kind: 'terminal',
@@ -427,13 +432,20 @@ export class GitHubIssueClient {
       }
     }
     const publicReporterId = reporterUserId.replaceAll('`', "'")
-    if (!issue.body.includes(publicReporterId)) return { ok: true }
+    if (
+      !issue.title.includes(publicReporterId)
+      && !issue.body?.includes(publicReporterId)
+    ) return { ok: true }
     const reporterLine = `- Reporter site ID: \`${publicReporterId}\``
-    const anonymized = issue.body.replaceAll(
+    const anonymizedTitle = issue.title.replaceAll(publicReporterId, '')
+    const anonymizedBody = issue.body?.replaceAll(
       reporterLine,
       '- Reporter site ID: `deleted reporter`',
-    ).replaceAll(publicReporterId, '')
-    if (anonymized.includes(publicReporterId)) {
+    ).replaceAll(publicReporterId, '') ?? null
+    if (
+      anonymizedTitle.includes(publicReporterId)
+      || anonymizedBody?.includes(publicReporterId)
+    ) {
       return {
         ok: false,
         kind: 'terminal',
@@ -447,7 +459,10 @@ export class GitHubIssueClient {
           ...apiHeaders(authorization.token),
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ body: anonymized }),
+        body: JSON.stringify({
+          title: anonymizedTitle,
+          body: anonymizedBody,
+        }),
       })
     } catch {
       return {
@@ -458,10 +473,14 @@ export class GitHubIssueClient {
     }
     if (!response.ok) return failureFromResponse(response, this.now())
     const updated = await parseJson<IssueResponse>(response)
-    return updated.body === null
-      || (
-        typeof updated.body === 'string'
-        && !updated.body.includes(publicReporterId)
+    return typeof updated.title === 'string'
+      && !updated.title.includes(publicReporterId)
+      && (
+        updated.body === null
+        || (
+          typeof updated.body === 'string'
+          && !updated.body.includes(publicReporterId)
+        )
       )
       ? { ok: true }
       : {

@@ -202,6 +202,37 @@ describe('GitHubIssueClient', () => {
     )).resolves.toEqual({ ok: true, found: false })
   })
 
+  it('continues reconciliation past ten thousand newer Issues', async () => {
+    const marker = '<!-- open-agricola-report:id -->'
+    const newerIssues = Array.from({ length: 100 }, (_, index) => ({
+      number: 20_000 - index,
+      html_url: `https://github.com/titanxxh/open-agricola-issues/issues/${20_000 - index}`,
+      body: 'newer issue',
+      created_at: new Date(NOW + 1_000).toISOString(),
+      performed_via_github_app: { id: 1 },
+    }))
+    const fetchImpl = vi.fn(async (input: string | URL | Request) => {
+      const page = Number(new URL(String(input)).searchParams.get('page'))
+      return response(page === 101
+        ? [{
+            number: 17,
+            html_url: 'https://github.com/titanxxh/open-agricola-issues/issues/17',
+            body: `details\n\n${marker}`,
+            created_at: new Date(NOW).toISOString(),
+            performed_via_github_app: { id: 1 },
+          }]
+        : newerIssues)
+    }) as unknown as typeof fetch
+
+    await expect(client(fetchImpl).findIssueByMarker(
+      'github_user',
+      marker,
+      NOW,
+      'user-token',
+    )).resolves.toMatchObject({ ok: true, number: 17 })
+    expect(fetchImpl).toHaveBeenCalledTimes(101)
+  })
+
   it('restricts a hosted installation token to the configured repository and issues permission', async () => {
     const fetchImpl = vi.fn()
       .mockResolvedValueOnce(response({
@@ -271,10 +302,12 @@ describe('GitHubIssueClient', () => {
       }))
       .mockResolvedValueOnce(response({
         number: 17,
+        title: 'Game bug: site-user froze',
         body: '## Phenomenon\n\nsite-user froze\n\n- Reporter site ID: `site-user`\n',
       }))
       .mockResolvedValueOnce(response({
         number: 17,
+        title: 'Game bug:  froze',
         body: '## Phenomenon\n\n froze\n\n- Reporter site ID: `deleted reporter`\n',
       })) as unknown as typeof fetch
 
@@ -289,6 +322,7 @@ describe('GitHubIssueClient', () => {
     expect(JSON.parse(String(init?.body)).body).toBe(
       '## Phenomenon\n\n froze\n\n- Reporter site ID: `deleted reporter`\n',
     )
+    expect(JSON.parse(String(init?.body)).title).toBe('Game bug:  froze')
   })
 
   it('anonymizes reporter IDs outside the injected metadata line', async () => {
@@ -299,10 +333,12 @@ describe('GitHubIssueClient', () => {
       }))
       .mockResolvedValueOnce(response({
         number: 17,
+        title: 'Game bug',
         body: 'Reporter: site-user',
       }))
       .mockResolvedValueOnce(response({
         number: 17,
+        title: 'Game bug',
         body: 'Reporter: ',
       })) as unknown as typeof fetch
 
@@ -320,8 +356,8 @@ describe('GitHubIssueClient', () => {
         token: 'installation-token',
         expires_at: new Date(NOW + 3_600_000).toISOString(),
       }))
-      .mockResolvedValueOnce(response({ number: 17, body }))
-      .mockResolvedValueOnce(response({ number: 17, body })) as unknown as typeof fetch
+      .mockResolvedValueOnce(response({ number: 17, title: 'Game bug', body }))
+      .mockResolvedValueOnce(response({ number: 17, title: 'Game bug', body })) as unknown as typeof fetch
 
     await expect(hostedClient(fetchImpl).anonymizeIssue(17, 'site-user'))
       .resolves.toEqual({
