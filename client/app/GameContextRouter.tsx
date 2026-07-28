@@ -1,7 +1,7 @@
 import {
-  lazy,
-  Suspense,
+  useCallback,
   useEffect,
+  useRef,
   useState,
   type ReactNode,
 } from 'react'
@@ -11,21 +11,23 @@ import type {
   GameContextResponse,
   RemovedGameContextDescriptor,
 } from '../../shared/contract/protocol/game-context'
-import type { ReportedEvidenceResponse } from '../../shared/contract/protocol/replay'
+import type {
+  ReportedEvidenceResponse,
+  ReportedEvidenceViewerDataMessage,
+  ReportedEvidenceViewerReadyMessage,
+} from '../../shared/contract/protocol/replay'
 import { API_BASE } from '../config'
 import { useLocale } from '../contexts/LocaleContext'
 import { BrandMark } from '../components/common/BrandMark'
 import { GameLoadScreen } from '../components/common/GameLoadScreen'
-import { loadCardsManifest } from '../services/card-meta'
 import { BugReportBar } from './BugReportBar'
-import { ReplayShell } from './ReplayShell'
+import {
+  ReplayFrame,
+  ReplayShell,
+} from './ReplayShell'
+import { verifyReplayViewerBuild } from './replay-viewer-build'
 
 export const GAME_CONTEXT_CHANGED_EVENT = 'open-agricola:game-context-changed'
-
-const ReplayBoard = lazy(() =>
-  import('../../replay-viewer/src/ReplayBoard')
-    .then((module) => ({ default: module.ReplayBoard })),
-)
 
 const finishBugReportOAuth = (result: 'connected' | 'error'): void => {
   const url = new URL(window.location.href)
@@ -74,6 +76,10 @@ function ReportedEvidenceContext({
     key: string
     evidence: ReportedEvidenceResponse
   } | null>(null)
+  const iframeRef = useRef<HTMLIFrameElement | null>(null)
+  const setIframe = useCallback((node: HTMLIFrameElement | null) => {
+    iframeRef.current = node
+  }, [])
 
   useEffect(() => {
     const controller = new AbortController()
@@ -91,7 +97,9 @@ function ReportedEvidenceContext({
           window.dispatchEvent(new PopStateEvent('popstate'))
           return
         }
-        if (body.ok) await loadCardsManifest()
+        if (body.ok) {
+          await verifyReplayViewerBuild(body.viewerBuildId, controller.signal)
+        }
         setResolution({ key: evidenceKey, evidence: body })
       })
       .catch((error: unknown) => {
@@ -111,6 +119,21 @@ function ReportedEvidenceContext({
   const evidence = resolution?.key === evidenceKey
     ? resolution.evidence
     : null
+  useEffect(() => {
+    if (!evidence?.ok) return
+    const onMessage = (event: MessageEvent) => {
+      if (event.source !== iframeRef.current?.contentWindow) return
+      const message = event.data as Partial<ReportedEvidenceViewerReadyMessage>
+      if (message.type !== 'open-agricola-reported-evidence-ready') return
+      iframeRef.current?.contentWindow?.postMessage({
+        type: 'open-agricola-reported-evidence',
+        evidence,
+      } satisfies ReportedEvidenceViewerDataMessage, '*')
+    }
+    window.addEventListener('message', onMessage)
+    return () => window.removeEventListener('message', onMessage)
+  }, [evidence])
+
   if (!evidence) {
     return <GameLoadScreen percent={10} label={t('platform.loading')} />
   }
@@ -132,13 +155,20 @@ function ReportedEvidenceContext({
           </div>
         </dl>
       </header>
-      <Suspense fallback={<GameLoadScreen percent={70} label={t('platform.loading')} />}>
-        <ReplayBoard
-          frame={evidence.frame}
-          locale={locale}
-          perspective={evidence.perspective}
-        />
-      </Suspense>
+      <ReplayFrame
+        key={`${roomId}:${evidence.viewerBuildId}:${locale}`}
+        roomId={roomId}
+        viewerBuildId={evidence.viewerBuildId}
+        locale={locale}
+        initialLocation={{
+          perspective: evidence.perspective,
+          layout: 'board',
+          step: evidence.stepNo,
+        }}
+        setFrame={setIframe}
+        title={t('platform.gameContext.replayFrameTitle')}
+        mode="reported-evidence"
+      />
       {new URLSearchParams(window.location.search).has('bugReport')
         ? <BugReportBar roomId={roomId} />
         : null}

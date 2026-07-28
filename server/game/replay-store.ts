@@ -80,7 +80,7 @@ const replayError = (
   ...(lifecycle ? { lifecycle } : {}),
 })
 
-const parseCustomCards = (raw: string): CustomCardDef[] => {
+export const parseCustomCards = (raw: string): CustomCardDef[] => {
   const value = JSON.parse(raw) as unknown
   if (!Array.isArray(value)) throw new Error('invalid replay custom cards')
   return value as CustomCardDef[]

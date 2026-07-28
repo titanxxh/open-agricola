@@ -12,7 +12,10 @@ import {
   verifyGitHubWebhook,
 } from './bug-report/github-issue-client.ts'
 import { decodeReplayFrame, type JsonValue } from './game/replay-codec.ts'
-import { projectReplayParticipantNames } from './game/replay-store.ts'
+import {
+  parseCustomCards,
+  projectReplayParticipantNames,
+} from './game/replay-store.ts'
 import type { ReplayGameState } from '../shared/contract/protocol/replay.ts'
 import type { SerializedGameState } from '../shared/session/serialization.ts'
 import { filterSerializedStateForPlayer } from '../shared/session/serialization.ts'
@@ -459,12 +462,13 @@ const participantEvidence = (
   `).get(roomId, stepNo, frameHash) as EvidenceAnchor | undefined
   if (!report) throw new BugReportError('anchor_mismatch', 409)
   const replay = runtime.db.prepare(`
-    SELECT schema_version, viewer_build_id
+    SELECT schema_version, viewer_build_id, custom_cards_json
     FROM game_replays
     WHERE room_id = ?
   `).get(roomId) as {
     schema_version: number
     viewer_build_id: string
+    custom_cards_json: string
   } | undefined
   if (!replay) throw new BugReportError('replay_segment_unavailable', 503)
   return {
@@ -478,6 +482,7 @@ const participantEvidence = (
     frameHash,
     perspective: `p${seat.player_index + 1}`,
     frame: loadEvidenceFrame(runtime, report, seat.player_index),
+    customCards: parseCustomCards(replay.custom_cards_json),
   }
 }
 
