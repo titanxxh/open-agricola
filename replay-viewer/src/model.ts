@@ -4,11 +4,11 @@ import type {
 } from './types'
 import type {
   ReplayJsonValue,
+  ReplayGameState,
   ReplayManifest,
   ReplaySegmentDescriptor,
   ReplayStepSummary,
 } from '../../shared/contract/protocol/replay'
-import type { SerializedGameState } from '../../shared/session/serialization'
 import { filterSerializedStateForPlayer } from '../../shared/session/serialization'
 
 export const validPerspective = (
@@ -43,13 +43,13 @@ export const segmentForStep = (
   ) ?? null
 
 export const frameForPerspective = (
-  frame: SerializedGameState,
+  frame: ReplayGameState,
   perspective: ReplayPerspective,
-): SerializedGameState => {
+): ReplayGameState => {
   if (perspective === 'open') return frame
   const playerIndex = Number(perspective.slice(1)) - 1
   const playerId = frame.players[playerIndex]?.id ?? null
-  return filterSerializedStateForPlayer(frame, playerId)
+  return filterSerializedStateForPlayer(frame, playerId) as ReplayGameState
 }
 
 export const intentForPerspective = (
