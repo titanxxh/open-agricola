@@ -222,6 +222,31 @@ describe('bug report routes', () => {
     }
   })
 
+  it('disables reporting for a room without a replay anchor', async () => {
+    expect(json(await invoke(
+      'GET',
+      '/api/v1/issue-submission-connection?roomId=active-room',
+    ))).toMatchObject({ enabled: true })
+
+    db.prepare(`
+      DELETE FROM game_replay_steps WHERE room_id = 'active-room'
+    `).run()
+
+    expect(json(await invoke(
+      'GET',
+      '/api/v1/issue-submission-connection?roomId=active-room',
+    ))).toMatchObject({ enabled: false })
+    const created = await invoke(
+      'POST',
+      '/api/v1/game-contexts/active-room/bug-reports',
+      { phenomenon: 'The game froze' },
+    )
+    expect(created.statusCode).toBe(503)
+    expect(json(created)).toMatchObject({
+      code: 'bug_report_anchor_unavailable',
+    })
+  })
+
   it('rejects client authority fields and fixes the active anchor on the server', async () => {
     const forged = await invoke(
       'POST',
@@ -398,6 +423,7 @@ describe('bug report routes', () => {
   })
 
   it('preserves a draft when GitHub connection authorization is cancelled', async () => {
+    vi.stubEnv('NODE_ENV', 'production')
     const created = await invoke(
       'POST',
       '/api/v1/game-contexts/active-room/bug-reports',
@@ -411,6 +437,13 @@ describe('bug report routes', () => {
     expect(start.statusCode).toBe(302)
     const state = new URL(start.headers.Location).searchParams.get('state')
     expect(state).toBeTruthy()
+    expect(start.headers['Set-Cookie']).toContain(
+      'oa_bug_report_oauth_state=',
+    )
+    expect(start.headers['Set-Cookie']).toContain('SameSite=Lax')
+    expect(start.headers['Set-Cookie']).toContain('Secure')
+    expect(start.headers['Set-Cookie']).not.toContain('Partitioned')
+    const callbackCookie = start.headers['Set-Cookie']!.split(';', 1)[0]!
 
     const stolen = await invoke(
       'GET',
@@ -425,9 +458,11 @@ describe('bug report routes', () => {
       'GET',
       `/api/v1/issue-submission-connection/github/callback?state=${state}&error=access_denied`,
       null,
-      USER,
+      null,
+      { cookie: callbackCookie },
     )
     expect(cancelled.statusCode).toBe(302)
+    expect(cancelled.headers['Set-Cookie']).toContain('Max-Age=0')
     const returnTo = new URL(cancelled.headers.Location)
     expect(returnTo.origin).toBe('https://game.example')
     expect(returnTo.searchParams.get('bugReport')).toBe(submissionId)
@@ -438,7 +473,8 @@ describe('bug report routes', () => {
       'GET',
       `/api/v1/issue-submission-connection/github/callback?state=${state}&error=access_denied`,
       null,
-      USER,
+      null,
+      { cookie: callbackCookie },
     )
     expect(replayed.statusCode).toBe(400)
     expect(json(replayed)).toMatchObject({ code: 'oauth_state_invalid' })

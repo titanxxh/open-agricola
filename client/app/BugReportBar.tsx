@@ -60,6 +60,7 @@ const errorKeys: Record<string, string> = {
   phenomenon_too_long: 'platform.bugReport.errors.phenomenon_too_long',
   not_participant: 'platform.bugReport.errors.not_participant',
   bug_report_forbidden: 'platform.bugReport.errors.not_participant',
+  bug_report_anchor_unavailable: 'platform.bugReport.errors.anchor_unavailable',
   anchor_mismatch: 'platform.bugReport.errors.anchor_mismatch',
   bug_report_rate_limited: 'platform.bugReport.errors.rate_limited',
   bug_report_draft_limit: 'platform.bugReport.errors.rate_limited',
@@ -139,7 +140,9 @@ export function BugReportBar({
 
   useEffect(() => {
     let cancelled = false
-    void requestJson<Connection>('/api/v1/issue-submission-connection')
+    void requestJson<Connection>(
+      `/api/v1/issue-submission-connection?roomId=${encodeURIComponent(roomId)}`,
+    )
       .then((result) => {
         if (!cancelled) setConnection(result)
       })

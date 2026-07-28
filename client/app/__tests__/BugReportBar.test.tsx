@@ -13,6 +13,10 @@ const response = (body: unknown, status = 200) =>
     headers: { 'Content-Type': 'application/json' },
   })
 
+const isConnectionStatusRequest = (url: string): boolean =>
+  new URL(url, 'http://localhost').pathname
+    === '/api/v1/issue-submission-connection'
+
 const report = (overrides: Record<string, unknown> = {}) => ({
   submissionId: 'submission-1',
   roomId: 'room-1',
@@ -57,7 +61,7 @@ describe('BugReportBar', () => {
       const method = init?.method ?? 'GET'
       const body = init?.body ? JSON.parse(String(init.body)) : null
       calls.push({ url, method, body })
-      if (url.endsWith('/api/v1/issue-submission-connection')) {
+      if (isConnectionStatusRequest(url)) {
         return response({ ok: true, enabled: true, connected: false })
       }
       if (url.endsWith('/api/v1/game-contexts/room-1/bug-reports')) {
@@ -118,7 +122,7 @@ describe('BugReportBar', () => {
     let createBody: unknown
     const fetchMock = vi.fn(async (input: string | URL | Request, init?: RequestInit) => {
       const url = String(input)
-      if (url.endsWith('/api/v1/issue-submission-connection')) {
+      if (isConnectionStatusRequest(url)) {
         return response({ ok: true, enabled: true, connected: false })
       }
       if (url.endsWith('/api/v1/game-contexts/room-1/bug-reports')) {
@@ -161,14 +165,21 @@ describe('BugReportBar', () => {
   })
 
   it('does not expose an entry when new reports are disabled', async () => {
-    vi.stubGlobal('fetch', vi.fn(async () =>
-      response({ ok: true, enabled: false, connected: false })))
+    const fetchMock = vi.fn(async () =>
+      response({ ok: true, enabled: false, connected: false }))
+    vi.stubGlobal('fetch', fetchMock)
     renderBar({ roomId: 'room-1' })
 
     await waitFor(() => {
       expect(screen.queryByRole('button', { name: 'Report a bug' }))
         .not.toBeInTheDocument()
     })
+    expect(fetchMock).toHaveBeenCalledWith(
+      expect.stringContaining(
+        '/api/v1/issue-submission-connection?roomId=room-1',
+      ),
+      expect.objectContaining({ credentials: 'include' }),
+    )
   })
 
   it('offers GitHub reconnection when an in-flight user report loses authentication', async () => {
@@ -177,7 +188,7 @@ describe('BugReportBar', () => {
     let reportReads = 0
     vi.stubGlobal('fetch', vi.fn(async (input: string | URL | Request) => {
       const url = String(input)
-      if (url.endsWith('/api/v1/issue-submission-connection')) {
+      if (isConnectionStatusRequest(url)) {
         return response({
           ok: true,
           enabled: true,
@@ -216,7 +227,7 @@ describe('BugReportBar', () => {
       init?: RequestInit,
     ) => {
       const url = String(input)
-      if (url.endsWith('/api/v1/issue-submission-connection')) {
+      if (isConnectionStatusRequest(url)) {
         return response({
           ok: true,
           enabled: true,
@@ -277,7 +288,7 @@ describe('BugReportBar', () => {
       const method = init?.method ?? 'GET'
       const body = init?.body ? JSON.parse(String(init.body)) : null
       calls.push({ method, body })
-      if (url.endsWith('/api/v1/issue-submission-connection')) {
+      if (isConnectionStatusRequest(url)) {
         return response({ ok: true, enabled: true, connected: false })
       }
       if (url.endsWith('/api/v1/game-contexts/room-1/bug-reports')) {
@@ -342,7 +353,7 @@ describe('BugReportBar', () => {
       const url = String(input)
       const method = init?.method ?? 'GET'
       methods.push(method)
-      if (url.endsWith('/api/v1/issue-submission-connection')) {
+      if (isConnectionStatusRequest(url)) {
         return response({ ok: true, enabled: true, connected: false })
       }
       if (
@@ -391,7 +402,7 @@ describe('BugReportBar', () => {
     ) => {
       const url = String(input)
       const method = init?.method ?? 'GET'
-      if (url.endsWith('/api/v1/issue-submission-connection')) {
+      if (isConnectionStatusRequest(url)) {
         return response({ ok: true, enabled: true, connected: false })
       }
       if (url.endsWith('/api/v1/bug-reports/submission-1/submit')) {

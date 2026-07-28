@@ -719,6 +719,7 @@ export const filterSerializedStateForPlayer = (
     parentSelection: filterParentSelectionForPlayer(base.parentSelection, viewerPlayerId),
     ordinaryCardDecks: filteredOrdinaryCardDecks,
     ordinaryCardDrawChoices: filteredOrdinaryCardDrawChoices,
+    engineStack: { frames: [] },
   }
 }
 
