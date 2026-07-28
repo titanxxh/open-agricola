@@ -463,6 +463,24 @@ describe('bug report routes', () => {
     expect(store.connectionStatus('u1')).toEqual({ connected: false })
   })
 
+  it('queues revocation and disconnects locally when delivery is unavailable', async () => {
+    store.saveConnection('u1', '99', {
+      accessToken: 'token',
+      accessTokenExpiresAt: 1_700_003_600_000,
+    })
+    runtime = { ...runtime!, delivery: null, github: null }
+
+    const removed = await invoke(
+      'DELETE',
+      '/api/v1/issue-submission-connection',
+    )
+
+    expect(removed.statusCode).toBe(200)
+    expect(store.connectionStatus('u1')).toEqual({ connected: false })
+    expect(store.nextGrantRevocation()).toMatchObject({ accessToken: 'token' })
+    expect(revokeUserGrant).not.toHaveBeenCalled()
+  })
+
   it('finishes GitHub OAuth only from the initiating app session', async () => {
     const created = await invoke(
       'POST',

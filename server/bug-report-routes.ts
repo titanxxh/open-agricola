@@ -664,8 +664,15 @@ export async function handleBugReportRoute(
 
     if (pathname === CONNECTION_ROUTE && req.method === 'DELETE') {
       const current = requireAccountRequest(res, user, 'mutation')
-      if (!runtime?.delivery) {
+      if (!runtime) {
         throw new BugReportError('bug_report_unavailable', 503)
+      }
+      if (!runtime.delivery) {
+        const tokens = runtime.store.connectionTokens(current.id)
+        if (tokens) runtime.store.queueGrantRevocation(tokens.accessToken)
+        runtime.store.disconnect(current.id)
+        send(res, 200, { ok: true })
+        return true
       }
       await runtime.delivery.disconnectUser(current.id)
       send(res, 200, { ok: true })
