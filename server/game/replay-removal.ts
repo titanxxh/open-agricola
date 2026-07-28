@@ -1,6 +1,7 @@
 import {
   closeSync,
   existsSync,
+  ftruncateSync,
   fsyncSync,
   mkdirSync,
   openSync,
@@ -146,11 +147,29 @@ const validateEntry = (value: unknown): ReplayRemovalLedgerEntry => {
 
 const readLedger = (path: string): ReplayRemovalLedgerEntry[] => {
   if (!existsSync(path)) return []
-  const raw = readFileSync(path, 'utf8')
-  if (!raw.trim()) return []
-  return raw.trim().split('\n').map((line) => {
+  const raw = readFileSync(path)
+  if (raw.length === 0) return []
+  let committedLength = raw.length
+  if (raw[raw.length - 1] !== 0x0a) {
+    committedLength = raw.lastIndexOf(0x0a) + 1
+    const fd = openSync(path, 'r+')
     try {
-      return validateEntry(JSON.parse(line) as unknown)
+      ftruncateSync(fd, committedLength)
+      fsyncSync(fd)
+    } finally {
+      closeSync(fd)
+    }
+  }
+  if (committedLength === 0) return []
+  const lines = raw.subarray(0, committedLength).toString('utf8').split('\n')
+  lines.pop()
+  return lines.flatMap((line) => {
+    try {
+      const batch = JSON.parse(line) as unknown
+      if (!Array.isArray(batch) || batch.length === 0) {
+        throw new Error('invalid replay removal ledger batch')
+      }
+      return batch.map(validateEntry)
     } catch {
       throw new Error('invalid replay removal ledger')
     }
@@ -165,7 +184,7 @@ const appendLedger = (
   mkdirSync(dirname(path), { recursive: true })
   const fd = openSync(path, 'a')
   try {
-    writeFileSync(fd, `${entries.map((entry) => JSON.stringify(entry)).join('\n')}\n`)
+    writeFileSync(fd, `${JSON.stringify(entries)}\n`)
     fsyncSync(fd)
   } finally {
     closeSync(fd)
@@ -185,27 +204,33 @@ const applyEntries = (
   const removedRoomIds: string[] = []
   for (const entry of entries) {
     const current = loadReplay(db, entry.roomId)
-    if (!current || current.lifecycle === 'removed') continue
-    db.prepare('DELETE FROM rooms WHERE id = ?').run(entry.roomId)
-    db.prepare('DELETE FROM game_replay_steps WHERE room_id = ?').run(entry.roomId)
-    db.prepare('DELETE FROM game_replays WHERE room_id = ?').run(entry.roomId)
+    if (!current) continue
+    if (current.lifecycle !== 'removed') {
+      db.prepare('DELETE FROM rooms WHERE id = ?').run(entry.roomId)
+      db.prepare('DELETE FROM game_replay_steps WHERE room_id = ?').run(entry.roomId)
+      db.prepare('DELETE FROM game_replays WHERE room_id = ?').run(entry.roomId)
+      db.prepare(`
+        UPDATE game_result_players
+        SET user_id = NULL,
+            display_name = 'Deleted player (seat ' || (player_index + 1) || ')'
+        WHERE room_id = ?
+      `).run(entry.roomId)
+      db.prepare(`
+        UPDATE game_contexts
+        SET lifecycle = 'removed',
+            phase = NULL,
+            replay_status = NULL,
+            expires_at = NULL,
+            removal_reason = ?,
+            updated_at = ?
+        WHERE room_id = ?
+      `).run(entry.reason, entry.removedAt, entry.roomId)
+      removedRoomIds.push(entry.roomId)
+    }
     db.prepare(`
-      UPDATE game_result_players
-      SET user_id = NULL,
-          display_name = 'Deleted player (seat ' || (player_index + 1) || ')'
+      DELETE FROM game_context_participants
       WHERE room_id = ?
     `).run(entry.roomId)
-    db.prepare(`
-      UPDATE game_contexts
-      SET lifecycle = 'removed',
-          phase = NULL,
-          replay_status = NULL,
-          expires_at = NULL,
-          removal_reason = ?,
-          updated_at = ?
-      WHERE room_id = ?
-    `).run(entry.reason, entry.removedAt, entry.roomId)
-    removedRoomIds.push(entry.roomId)
   }
   return removedRoomIds
 })()
