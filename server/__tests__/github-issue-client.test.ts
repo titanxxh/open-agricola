@@ -271,11 +271,11 @@ describe('GitHubIssueClient', () => {
       }))
       .mockResolvedValueOnce(response({
         number: 17,
-        body: '## Phenomenon\n\nFrozen\n\n- Reporter site ID: `site-user`\n',
+        body: '## Phenomenon\n\nsite-user froze\n\n- Reporter site ID: `site-user`\n',
       }))
       .mockResolvedValueOnce(response({
         number: 17,
-        body: '## Phenomenon\n\nFrozen\n\n- Reporter site ID: `deleted reporter`\n',
+        body: '## Phenomenon\n\n froze\n\n- Reporter site ID: `deleted reporter`\n',
       })) as unknown as typeof fetch
 
     await expect(hostedClient(fetchImpl).anonymizeIssue(17, 'site-user'))
@@ -287,11 +287,11 @@ describe('GitHubIssueClient', () => {
     )
     expect(init).toMatchObject({ method: 'PATCH' })
     expect(JSON.parse(String(init?.body)).body).toBe(
-      '## Phenomenon\n\nFrozen\n\n- Reporter site ID: `deleted reporter`\n',
+      '## Phenomenon\n\n froze\n\n- Reporter site ID: `deleted reporter`\n',
     )
   })
 
-  it('fails anonymization while the reporter ID remains in the Issue body', async () => {
+  it('anonymizes reporter IDs outside the injected metadata line', async () => {
     const fetchImpl = vi.fn()
       .mockResolvedValueOnce(response({
         token: 'installation-token',
@@ -300,15 +300,17 @@ describe('GitHubIssueClient', () => {
       .mockResolvedValueOnce(response({
         number: 17,
         body: 'Reporter: site-user',
+      }))
+      .mockResolvedValueOnce(response({
+        number: 17,
+        body: 'Reporter: ',
       })) as unknown as typeof fetch
 
     await expect(hostedClient(fetchImpl).anonymizeIssue(17, 'site-user'))
-      .resolves.toEqual({
-        ok: false,
-        kind: 'terminal',
-        code: 'github_anonymization_incomplete',
-      })
-    expect(fetchImpl).toHaveBeenCalledTimes(2)
+      .resolves.toEqual({ ok: true })
+    expect(JSON.parse(String(
+      vi.mocked(fetchImpl).mock.calls[2]![1]?.body,
+    )).body).toBe('Reporter: ')
   })
 
   it('verifies the updated Issue body before accepting anonymization', async () => {
