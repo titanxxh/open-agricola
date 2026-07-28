@@ -435,6 +435,19 @@ export class BugReportStore {
     return { state, codeChallenge: createCodeChallenge(verifier) }
   }
 
+  connectionStateReturnTo(state: string): string | null {
+    const row = this.db.prepare(`
+      SELECT return_to
+      FROM oauth_states
+      WHERE state_hash = ?
+        AND provider = 'github'
+        AND intent = 'bug_report'
+        AND used_at IS NULL
+        AND expires_at > ?
+    `).get(hashState(state), this.now()) as { return_to: string | null } | undefined
+    return row?.return_to ?? null
+  }
+
   consumeConnectionState(state: string, expectedUserId?: string): {
     userId: string
     returnTo: string

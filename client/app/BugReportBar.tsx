@@ -106,6 +106,13 @@ const clearResumeId = (): void => {
   window.history.replaceState(null, '', url)
 }
 
+const setConnectionResult = (result: 'connected' | 'error'): void => {
+  const url = new URL(window.location.href)
+  url.hash = ''
+  url.searchParams.set('bugReportConnection', result)
+  window.history.replaceState(null, '', url)
+}
+
 export function BugReportBar({
   roomId,
   stepNo,
@@ -140,14 +147,34 @@ export function BugReportBar({
 
   useEffect(() => {
     let cancelled = false
-    void requestJson<Connection>(
-      `/api/v1/issue-submission-connection?roomId=${encodeURIComponent(roomId)}`,
-    )
+    const fragment = new URLSearchParams(window.location.hash.slice(1))
+    const oauthState = fragment.get('bugReportOAuthState')
+    const oauthCode = fragment.get('bugReportOAuthCode')
+    const completingConnection = Boolean(oauthState && oauthCode)
+    const connectionRequest = completingConnection
+      ? requestJson<Connection>(
+          '/api/v1/issue-submission-connection/github/complete',
+          {
+            method: 'POST',
+            body: JSON.stringify({ state: oauthState, code: oauthCode }),
+          },
+        )
+      : requestJson<Connection>(
+          `/api/v1/issue-submission-connection?roomId=${encodeURIComponent(roomId)}`,
+        )
+    void connectionRequest
       .then((result) => {
-        if (!cancelled) setConnection(result)
+        if (cancelled) return
+        if (completingConnection) setConnectionResult('connected')
+        setConnection(result)
       })
       .catch(() => {
-        if (!cancelled) setConnection({ enabled: false, connected: false })
+        if (cancelled) return
+        if (completingConnection) setConnectionResult('error')
+        setConnection({
+          enabled: completingConnection,
+          connected: false,
+        })
       })
     const submissionId = resumeId()
     if (submissionId) {
@@ -291,6 +318,25 @@ export function BugReportBar({
       setReport(confirmed.report)
       setExistingIssues(confirmed.existingIssues ?? existingIssues)
       setStage(3)
+    } catch (reason) {
+      showError(reason)
+    } finally {
+      setBusy(false)
+    }
+  }
+  const startGitHubConnection = async () => {
+    if (!report) return
+    setBusy(true)
+    setError(null)
+    try {
+      const result = await requestJson<{ authorizationUrl: string }>(
+        '/api/v1/issue-submission-connection/github/start',
+        {
+          method: 'POST',
+          body: JSON.stringify({ submissionId: report.submissionId }),
+        },
+      )
+      window.location.assign(result.authorizationUrl)
     } catch (reason) {
       showError(reason)
     } finally {
@@ -579,12 +625,14 @@ export function BugReportBar({
                   </span>
                 </label>
                 {!connection?.connected ? (
-                  <a
+                  <button
+                    type="button"
                     className="bug-report-connect"
-                    href={`${API_BASE}/api/v1/issue-submission-connection/github/start?submissionId=${encodeURIComponent(report.submissionId)}`}
+                    disabled={busy}
+                    onClick={() => { void startGitHubConnection() }}
                   >
                     {t('platform.bugReport.connectGithub')}
-                  </a>
+                  </button>
                 ) : null}
                 {identity === 'github_user' ? (
                   <label className="bug-report-confirm">
