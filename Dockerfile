@@ -26,6 +26,7 @@ COPY --from=deps /app/node_modules ./node_modules
 # Copy server + shared source (tsx runs TS directly)
 COPY shared/ ./shared/
 COPY server/ ./server/
+COPY scripts/replay-removal.ts ./scripts/
 COPY tsconfig*.json ./
 
 # Data directories

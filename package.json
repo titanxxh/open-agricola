@@ -13,6 +13,8 @@
     "dev": "vite",
     "build": "tsc -b && vite build",
     "build:replay-viewer": "pnpm run build:cards-manifest && vite build --config replay-viewer/vite.config.ts && tsx scripts/publish-replay-viewer.ts",
+    "replay:remove": "tsx scripts/replay-removal.ts remove",
+    "replay:apply-removals": "tsx scripts/replay-removal.ts apply-ledger",
     "lint": "eslint .",
     "lint:i18n": "tsx scripts/i18n-audit.ts",
     "test": "vitest run --exclude e2e-tests --exclude scripts/test-actions.spec.ts",
