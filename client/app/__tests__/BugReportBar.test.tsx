@@ -188,6 +188,29 @@ describe('BugReportBar', () => {
     )
   })
 
+  it('offers anchor-preserving sign in when a replay participant is logged out', async () => {
+    window.history.replaceState(
+      null,
+      '',
+      `/?context=completed-room&step=21&frame=${FRAME_HASH}&perspective=p1`,
+    )
+    vi.stubGlobal('fetch', vi.fn(async () =>
+      response({ ok: false, code: 'not_authenticated' }, 401)))
+    renderBar({
+      roomId: 'completed-room',
+      stepNo: 21,
+      frameHash: FRAME_HASH,
+    })
+
+    const link = await screen.findByRole('link', { name: 'Sign In' })
+    const url = new URL(link.getAttribute('href')!)
+    expect(url.searchParams.get('page')).toBe('login')
+    expect(url.searchParams.get('context')).toBe('completed-room')
+    expect(url.searchParams.get('step')).toBe('21')
+    expect(url.searchParams.get('frame')).toBe(FRAME_HASH)
+    expect(url.searchParams.get('perspective')).toBe('p1')
+  })
+
   it('offers GitHub reconnection when an in-flight user report loses authentication', async () => {
     vi.useFakeTimers()
     window.history.replaceState(null, '', '/?bugReport=submission-1')

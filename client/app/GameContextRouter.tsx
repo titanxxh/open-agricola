@@ -13,6 +13,7 @@ import { API_BASE } from '../config'
 import { useLocale } from '../contexts/LocaleContext'
 import { BrandMark } from '../components/common/BrandMark'
 import { GameLoadScreen } from '../components/common/GameLoadScreen'
+import { BugReportBar } from './BugReportBar'
 import { ReplayShell } from './ReplayShell'
 
 export const GAME_CONTEXT_CHANGED_EVENT = 'open-agricola:game-context-changed'
@@ -95,6 +96,9 @@ function PublicContext({
       t('platform.gameContext.room', { id: response.roomId }),
       t('platform.gameContext.expiredTitle'),
       t('platform.gameContext.expiredBody'),
+      new URLSearchParams(window.location.search).has('bugReport')
+        ? <BugReportBar roomId={response.roomId} />
+        : undefined,
     )
   }
   if (response.ok && response.lifecycle === 'removed') {
@@ -127,7 +131,7 @@ export function GameContextRouter({ children }: { children: ReactNode }) {
   const { t } = useLocale()
   const [locationVersion, setLocationVersion] = useState(0)
   const params = new URLSearchParams(window.location.search)
-  const hasContext = params.has('context')
+  const hasContext = params.has('context') && params.get('page') !== 'login'
   const roomId = params.get('context') ?? ''
   const resolutionKey = `${locationVersion}:${roomId}`
   const [resolution, setResolution] = useState<{

@@ -143,7 +143,7 @@ describe('GitHubIssueClient', () => {
     const fetchImpl = vi.fn(async () => response([{
       number: 17,
       html_url: 'https://github.com/titanxxh/open-agricola-issues/issues/17',
-      body: 'details\n<!-- open-agricola-report:id -->',
+      body: 'details\n\n<!-- open-agricola-report:id -->',
       created_at: new Date(NOW).toISOString(),
       performed_via_github_app: { id: 1 },
     }])) as unknown as typeof fetch
@@ -164,6 +164,20 @@ describe('GitHubIssueClient', () => {
   it('ignores copied markers and Issues predating the delivery attempt', async () => {
     const marker = '<!-- open-agricola-report:id -->'
     const fetchImpl = vi.fn(async () => response([
+      {
+        number: 20,
+        html_url: 'https://github.com/titanxxh/open-agricola-issues/issues/20',
+        body: `copied ${marker}\n\n<!-- open-agricola-report:attacker -->`,
+        created_at: new Date(NOW).toISOString(),
+        performed_via_github_app: { id: 1 },
+      },
+      {
+        number: 19,
+        html_url: 'https://github.com/titanxxh/open-agricola-issues/issues/19',
+        body: `${marker}\n\n${marker}`,
+        created_at: new Date(NOW).toISOString(),
+        performed_via_github_app: { id: 1 },
+      },
       {
         number: 18,
         html_url: 'https://github.com/titanxxh/open-agricola-issues/issues/18',

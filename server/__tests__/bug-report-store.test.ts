@@ -357,7 +357,8 @@ describe('BugReportStore', () => {
     const report = store.createDraft({
       userId: 'u1',
       roomId,
-      phenomenon: '@alice UI\u0001 froze after taking wood',
+      phenomenon: '@alice UI\u0001 froze after taking wood\n'
+        + 'https://host/@bob user@example.com @scope/pkg',
     })
     expectBugReportError(
       () => store.updateDraft(report.submissionId, 'u1', {
@@ -391,6 +392,9 @@ describe('BugReportStore', () => {
     expect(issue.body).toContain('Reporter site ID: `u1`')
     expect(issue.body).toContain('Reporter seat: `p1`')
     expect(issue.body).toContain(`<!-- open-agricola-report:${report.submissionId} -->`)
+    expect(issue.body).toContain('https://host/@bob')
+    expect(issue.body).toContain('user@example.com')
+    expect(issue.body).toContain('@scope/pkg')
     expect(issue.body).not.toContain('\u0001')
     expect(store.getOwned(report.submissionId, 'u1')).toMatchObject({
       status: 'submitted',

@@ -327,7 +327,10 @@ export class GitHubIssueClient {
         }
       }
       const match = issues.find((issue) => (
-        issue.body?.includes(marker)
+        typeof issue.body === 'string'
+        && issue.body.endsWith(`\n\n${marker}`)
+        && issue.body.indexOf(marker) === issue.body.lastIndexOf(marker)
+        && issue.body.match(/<!-- open-agricola-report:[^>\r\n]+ -->/g)?.length === 1
         && String(issue.performed_via_github_app?.id) === this.options.appId
         && Date.parse(issue.created_at ?? '') >= sinceSecond
       ))
