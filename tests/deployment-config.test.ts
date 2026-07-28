@@ -23,13 +23,16 @@ describe('production deployment config', () => {
         'REPLAY_VIEWER_BUILD_ID',
         'REPLAY_VIEWER_ROOT',
         'REPLAY_ASSET_ROOT',
-        'REPLAY_TRUST_PROXY',
         'GAME_BUILD_ID',
       ]) {
         expect(compose).toContain(`${name}=\${${name}`)
       }
     }
+    expect(readFileSync('docker-compose.yml', 'utf8')).toContain(
+      'REPLAY_TRUST_PROXY=${REPLAY_TRUST_PROXY:-false}',
+    )
     const compose = readFileSync('docker-compose.prod.yml', 'utf8')
+    expect(compose).toContain('REPLAY_TRUST_PROXY=true')
     expect(compose).toContain('app-data:/app/data')
   })
 

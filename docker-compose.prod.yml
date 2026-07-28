@@ -26,7 +26,7 @@ services:
       - REPLAY_VIEWER_BUILD_ID=${REPLAY_VIEWER_BUILD_ID:-}
       - REPLAY_VIEWER_ROOT=${REPLAY_VIEWER_ROOT:-./data/replay-viewers}
       - REPLAY_ASSET_ROOT=${REPLAY_ASSET_ROOT:-./data/replay-assets}
-      - REPLAY_TRUST_PROXY=${REPLAY_TRUST_PROXY:-false}
+      - REPLAY_TRUST_PROXY=true
       - GAME_BUILD_ID=${GAME_BUILD_ID:-}
       - CORS_ORIGIN=${CORS_ORIGIN:-*}
       - ADMIN_USERS=${ADMIN_USERS:-}
