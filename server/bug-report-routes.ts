@@ -41,9 +41,21 @@ type ReplayStepRow = {
   frame_hash: string
 }
 
-const enabled = (): boolean =>
+export const bugReportsEnabled = (): boolean =>
   process.env.BUG_REPORTS_ENABLED === '1'
   || process.env.BUG_REPORTS_ENABLED === 'true'
+
+export const isBugReportRuntimeReady = (
+  runtime: {
+    delivery: BugReportDelivery | null
+    github: GitHubIssueClient | null
+  } | null,
+): boolean =>
+  Boolean(
+    runtime?.delivery
+    && runtime.github
+    && process.env.BUG_REPORT_GITHUB_WEBHOOK_SECRET?.trim(),
+  )
 
 const headers = (): Record<string, string> => ({
   'Content-Type': 'application/json',
@@ -359,7 +371,7 @@ export async function handleBugReportRoute(
       }
       send(res, 200, {
         ok: true,
-        enabled: enabled() && runtime.github !== null,
+        enabled: bugReportsEnabled() && isBugReportRuntimeReady(runtime),
         ...runtime.store.connectionStatus(current.id),
       })
       return true
@@ -398,7 +410,7 @@ export async function handleBugReportRoute(
     const current = requireUser(res, user)
     const draftMatch = DRAFT_ROUTE.exec(pathname)
     if (draftMatch && req.method === 'POST') {
-      if (!enabled() || !runtime.github) {
+      if (!bugReportsEnabled() || !isBugReportRuntimeReady(runtime)) {
         throw new BugReportError('bug_reports_disabled', 503)
       }
       const body = await readJson(req)
