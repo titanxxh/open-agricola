@@ -621,7 +621,8 @@ docker compose -f docker-compose.prod.yml stop app
 docker compose -f docker-compose.prod.yml run --rm --no-deps \
   -e OA_RESTORE_ARCHIVE="$OA_RESTORE_ARCHIVE" \
   -v "$PWD/backups:/backup:ro" app sh -c \
-  'find /app/data -mindepth 1 -maxdepth 1 -exec rm -rf -- {} \; &&
+  'tar -tzf "/backup/$OA_RESTORE_ARCHIVE" >/dev/null &&
+   find /app/data -mindepth 1 -maxdepth 1 -exec rm -rf -- {} \; &&
    tar -C /app/data -xzf "/backup/$OA_RESTORE_ARCHIVE" &&
    cp /backup/replay-removals.latest.jsonl /app/data/replay-removals.jsonl &&
    node --import tsx scripts/replay-removal.ts apply-ledger'
