@@ -788,7 +788,17 @@ export class BugReportStore {
       && input.confirmHosted === undefined
       && input.confirmExisting === undefined
     )
-    if (row.status !== 'draft' && !githubReconfirmation) {
+    const retryIdentityChange = (
+      (row.status === 'needs_reconnect' || row.status === 'failed')
+      && input.authorIdentity !== undefined
+      && input.phenomenon === undefined
+      && input.confirmExisting === undefined
+    )
+    if (
+      row.status !== 'draft'
+      && !githubReconfirmation
+      && !retryIdentityChange
+    ) {
       throw new BugReportError('bug_report_update_conflict', 409)
     }
     let phenomenon = row.phenomenon
@@ -921,15 +931,17 @@ export class BugReportStore {
       WHERE submission_id = ? AND reporter_user_id = ?
         AND (
           submitted_at IS NOT NULL
-          OR lifecycle != 'active'
           OR EXISTS (
             SELECT 1
-            FROM game_replay_steps AS anchor
+            FROM game_contexts AS current_context
+            JOIN game_replay_steps AS anchor
+              ON anchor.room_id = current_context.room_id
             JOIN game_replay_steps AS checkpoint
               ON checkpoint.room_id = anchor.room_id
              AND checkpoint.step_no = anchor.checkpoint_step_no
              AND checkpoint.payload_kind = 'checkpoint'
-            WHERE anchor.room_id = bug_reports.room_id
+            WHERE current_context.room_id = bug_reports.room_id
+              AND current_context.lifecycle IN ('active', 'completed')
               AND anchor.step_no = bug_reports.step_no
               AND anchor.frame_hash = bug_reports.frame_hash
               AND (
@@ -1118,6 +1130,28 @@ export class BugReportStore {
       claim.report.submission_id,
       claim.token,
     )
+  }
+
+  finishDiscardedReconciliation(
+    submissionId: string,
+    result: GitHubIssueResult,
+  ): void {
+    if (!result.ok) throw new Error('successful GitHub issue result required')
+    this.db.prepare(`
+      UPDATE bug_reports
+      SET status = 'submitted',
+          phenomenon = NULL,
+          confirmed_github_user_id = NULL,
+          github_issue_number = ?,
+          github_issue_url = ?,
+          github_issue_state = 'open',
+          claim_token = NULL,
+          claimed_at = NULL,
+          next_attempt_at = NULL,
+          last_error_code = NULL,
+          updated_at = ?
+      WHERE submission_id = ? AND submitted_at IS NOT NULL
+    `).run(result.number, result.url, this.now(), submissionId)
   }
 
   defer(
@@ -1521,7 +1555,10 @@ export class BugReportDelivery {
         if (!result.ok) {
           throw new BugReportError(result.code, 503, result.retryAt)
         }
-        if (!('found' in result)) issueNumbers.add(result.number)
+        if (!('found' in result)) {
+          this.store.finishDiscardedReconciliation(report.submissionId, result)
+          issueNumbers.add(result.number)
+        }
       }
       for (const issueNumber of issueNumbers) {
         const result = await this.client.anonymizeIssue(issueNumber, userId)
