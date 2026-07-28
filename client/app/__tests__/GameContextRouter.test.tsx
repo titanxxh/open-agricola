@@ -4,19 +4,25 @@ import { createHash } from 'node:crypto'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { GameContextRouter } from '../GameContextRouter'
 
-vi.mock('../../contexts/LocaleContext', () => ({
-  useLocale: () => ({
+const localeContext = vi.hoisted(() => {
+  const t = (key: string, params?: Record<string, string | number>) =>
+    params
+      ? Object.entries(params).reduce(
+          (value, [name, replacement]) =>
+            value.replace(`{${name}}`, String(replacement)),
+          key,
+        )
+      : key
+  return {
     locale: 'en',
     setLocale: vi.fn(),
-    t: (key: string, params?: Record<string, string | number>) =>
-      params
-        ? Object.entries(params).reduce(
-            (value, [name, replacement]) =>
-              value.replace(`{${name}}`, String(replacement)),
-            key,
-          )
-        : key,
-  }),
+    t,
+    defaultT: t,
+  }
+})
+
+vi.mock('../../contexts/LocaleContext', () => ({
+  useLocale: () => localeContext,
 }))
 
 vi.mock('../../components/common/BrandMark', () => ({
@@ -30,6 +36,9 @@ vi.mock('../../components/common/GameLoadScreen', () => ({
 afterEach(() => {
   cleanup()
   vi.unstubAllGlobals()
+  localeContext.locale = 'en'
+  localeContext.t = localeContext.defaultT
+  localeContext.setLocale.mockReset()
   window.history.replaceState(null, '', '/')
 })
 
@@ -239,7 +248,9 @@ describe('GameContextRouter', () => {
       `/?context=completed-room&step=0&frame=${frameHash}`,
     )
 
-    render(<GameContextRouter><div>active app</div></GameContextRouter>)
+    const { rerender } = render(
+      <GameContextRouter><div>active app</div></GameContextRouter>,
+    )
 
     const perspectiveButtons = await screen.findAllByRole('button', {
       name: 'platform.gameContext.watchAs',
@@ -284,6 +295,14 @@ describe('GameContextRouter', () => {
     expect(new URLSearchParams(window.location.search).get('step')).toBe('1')
     expect(new URLSearchParams(window.location.search).get('frame')).toBe('2'.repeat(64))
     expect(iframe).toHaveAttribute('src', initialSrc)
+
+    const fetchCount = fetch.mock.calls.length
+    localeContext.locale = 'zh'
+    localeContext.t = (key, params) => `zh:${localeContext.defaultT(key, params)}`
+    rerender(<GameContextRouter><div>active app</div></GameContextRouter>)
+    expect(fetch).toHaveBeenCalledTimes(fetchCount)
+    expect(await screen.findByTitle('zh:platform.gameContext.replayFrameTitle'))
+      .toHaveAttribute('src', expect.stringContaining('locale=zh'))
     },
   )
 

@@ -16,16 +16,20 @@ describe('production deployment config', () => {
   })
 
   it('forwards replay recording settings into production', () => {
-    const compose = readFileSync('docker-compose.prod.yml', 'utf8')
-    for (const name of [
-      'REPLAY_NEW_ROOMS_ENABLED',
-      'REPLAY_VIEWER_BUILD_ID',
-      'REPLAY_VIEWER_ROOT',
-      'REPLAY_ASSET_ROOT',
-      'GAME_BUILD_ID',
-    ]) {
-      expect(compose).toContain(`${name}=\${${name}`)
+    for (const composePath of ['docker-compose.yml', 'docker-compose.prod.yml']) {
+      const compose = readFileSync(composePath, 'utf8')
+      for (const name of [
+        'REPLAY_NEW_ROOMS_ENABLED',
+        'REPLAY_VIEWER_BUILD_ID',
+        'REPLAY_VIEWER_ROOT',
+        'REPLAY_ASSET_ROOT',
+        'REPLAY_TRUST_PROXY',
+        'GAME_BUILD_ID',
+      ]) {
+        expect(compose).toContain(`${name}=\${${name}`)
+      }
     }
+    const compose = readFileSync('docker-compose.prod.yml', 'utf8')
     expect(compose).toContain('app-data:/app/data')
   })
 
