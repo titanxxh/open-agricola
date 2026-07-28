@@ -113,8 +113,7 @@
   background: var(--bg-parchment);
 }
 
-.reported-evidence__header,
-.reported-evidence .replay-board {
+.reported-evidence__header {
   width: min(1440px, 100%);
   margin-inline: auto;
 }
@@ -142,19 +141,10 @@
   overflow-wrap: anywhere;
 }
 
-.reported-evidence .replay-board {
-  display: grid;
-  gap: 14px;
-}
-
-.reported-evidence .replay-board__action,
-.reported-evidence .replay-board__farm,
-.reported-evidence .replay-setup {
-  min-width: 0;
-  padding: 10px;
-  border: 1px solid #6d765d;
-  border-radius: 5px;
-  background: #c8ad78;
+.reported-evidence iframe {
+  width: 100%;
+  min-height: 70vh;
+  border: 0;
 }
 
 @media (max-width: 600px) {

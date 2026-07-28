@@ -1,6 +1,9 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import type { Locale } from '../../shared/i18n'
 import type {
+  ReportedEvidence,
+  ReportedEvidenceViewerDataMessage,
+  ReportedEvidenceViewerReadyMessage,
   ReplayManifest,
   ReplayManifestResponse,
   ReplaySegment,
@@ -85,7 +88,80 @@ const readInitialStep = (manifest: ReplayManifest): number => {
     : manifest.firstStepNo
 }
 
-export function ReplayViewer() {
+function ReportedEvidenceViewer() {
+  const params = new URLSearchParams(window.location.search)
+  const roomId = params.get('room') ?? ''
+  const viewerBuildId = params.get('viewer') ?? ''
+  const perspective = params.get('perspective') ?? ''
+  const stepNo = Number(params.get('step'))
+  const apiBase = (params.get('api') ?? window.location.origin).replace(/\/$/, '')
+  const locale: Locale = params.get('locale') === 'en' ? 'en' : 'zh'
+  const text = labels[locale]
+  const [evidence, setEvidence] = useState<ReportedEvidence | null>(null)
+  let parentOrigin = ''
+  try {
+    parentOrigin = new URL(params.get('parentOrigin') ?? '').origin
+  } catch {
+    parentOrigin = ''
+  }
+
+  useEffect(() => {
+    if (!parentOrigin) return
+    const onMessage = (event: MessageEvent) => {
+      if (event.source !== window.parent || event.origin !== parentOrigin) return
+      const message = event.data as Partial<ReportedEvidenceViewerDataMessage>
+      const next = message.evidence
+      if (
+        message.type !== 'open-agricola-reported-evidence'
+        || !next?.ok
+        || next.kind !== 'reportedEvidence'
+        || next.roomId !== roomId
+        || next.viewerBuildId !== viewerBuildId
+        || next.perspective !== perspective
+        || next.stepNo !== stepNo
+        || !/^[a-f0-9]{64}$/.test(next.frameHash)
+        || !Array.isArray(next.customCards)
+      ) return
+      next.customCards.forEach((card) => registerCustomCardMetadata({
+        ...card,
+        artUrl: replayAssetUrl(card.artUrl, apiBase),
+      }))
+      setEvidence(next)
+    }
+    window.addEventListener('message', onMessage)
+    window.parent.postMessage({
+      type: 'open-agricola-reported-evidence-ready',
+    } satisfies ReportedEvidenceViewerReadyMessage, parentOrigin)
+    return () => window.removeEventListener('message', onMessage)
+  }, [apiBase, parentOrigin, perspective, roomId, stepNo, viewerBuildId])
+
+  if (!evidence) {
+    return <main className="replay-loading">{text.loading}</main>
+  }
+  return (
+    <main className="replay-app replay-app--board">
+      <section className="replay-stage">
+        <ReplayBoard
+          frame={evidence.frame}
+          locale={locale}
+          perspective={evidence.perspective}
+        />
+      </section>
+      <aside className="replay-evidence" aria-label={text.evidence}>
+        <h2>{text.evidence}</h2>
+        <dl>
+          <div><dt>{text.step}</dt><dd>{evidence.stepNo}</dd></div>
+          <div className="replay-evidence__wide">
+            <dt>{text.frameHash}</dt>
+            <dd><code>{evidence.frameHash}</code></dd>
+          </div>
+        </dl>
+      </aside>
+    </main>
+  )
+}
+
+function ArchiveReplayViewer() {
   const params = new URLSearchParams(window.location.search)
   const roomId = params.get('room') ?? ''
   const apiBase = (params.get('api') ?? window.location.origin).replace(/\/$/, '')
@@ -437,4 +513,10 @@ export function ReplayViewer() {
       ) : null}
     </main>
   )
+}
+
+export function ReplayViewer() {
+  return new URLSearchParams(window.location.search).get('mode') === 'reported-evidence'
+    ? <ReportedEvidenceViewer />
+    : <ArchiveReplayViewer />
 }

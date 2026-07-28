@@ -613,6 +613,7 @@ const maskDraftPoolForViewer = (
  *     player other than the viewer.
  *   - `players[i].cardStates[cardId]` and card-state events for cards that
  *     are still hidden in another player's hand.
+ *   - draft-history card ids that are still hidden in another player's hand.
  *   - `draft.pools[pid].occ`, `draft.pools[pid].minor`,
  *     `draft.kept[pid]`, and `draft.pendingPicks[pid]` for every
  *     player other than the viewer.
@@ -638,6 +639,13 @@ export const filterSerializedStateForPlayer = (
           occupationHand: Array(p.occupationHand.length).fill('?'),
           minorHand: Array(p.minorHand.length).fill('?'),
           cardStates: filterHiddenHandCardStates(p.cardStates, hiddenCardIds.get(p.id)),
+          stats: {
+            ...p.stats,
+            draftHistory: p.stats.draftHistory.map((entry) =>
+              hiddenCardIds.get(p.id)?.has(entry.cardId)
+                ? { ...entry, cardId: '?' }
+                : entry),
+          },
         },
   )
   const filteredDraft = !base.draft

@@ -736,6 +736,12 @@ describe('bug report routes', () => {
       SELECT github_issue_state AS state
       FROM bug_reports WHERE submission_id = ?
     `).get(submissionId) as { state: string }).state).toBe('deleted')
+
+    await webhook('reopened', 'titanxxh/open-agricola-issues')
+    expect((db.prepare(`
+      SELECT github_issue_state AS state
+      FROM bug_reports WHERE submission_id = ?
+    `).get(submissionId) as { state: string }).state).toBe('deleted')
     expect(store.reporterDeletionPlan('u1').issueNumbers).toEqual([])
   })
 
@@ -762,6 +768,9 @@ describe('bug report routes', () => {
         cardStates: {
           OwnCard: { extraData: { secret: 'own secret' } },
         },
+        stats: {
+          draftHistory: [{ cardId: 'A', draftTurn: 1 }],
+        },
       }, {
         id: 'p2',
         name: 'Other Name',
@@ -769,6 +778,9 @@ describe('bug report routes', () => {
         occupationHand: ['D'],
         cardStates: {
           B003_Moonshine: { extraData: { occ: 'SECRET_OCC' } },
+        },
+        stats: {
+          draftHistory: [{ cardId: 'C', draftTurn: 1 }],
         },
       }],
       log: [{
@@ -802,6 +814,21 @@ describe('bug report routes', () => {
       SET payload_kind = ?, payload_gzip = ?, frame_hash = ?
       WHERE room_id = 'active-room' AND step_no = 5
     `).run(encoded.payloadKind, encoded.payloadGzip, encoded.frameHash)
+    const customCards = [{
+      cardType: 'minor',
+      cardJson: {
+        id: 'CUSTOM_1',
+        name: 'Custom',
+        deck: 'X',
+        number: 1,
+      },
+      artUrl: `/replay-assets/${'f'.repeat(64)}`,
+    }]
+    db.prepare(`
+      UPDATE game_replays
+      SET custom_cards_json = ?
+      WHERE room_id = 'active-room'
+    `).run(JSON.stringify(customCards))
     db.prepare(`
       UPDATE bug_reports
       SET frame_hash = ?, evidence_expires_at = ?
@@ -844,14 +871,20 @@ describe('bug report routes', () => {
       stepNo: 5,
       frameHash: encoded.frameHash,
       perspective: 'p2',
+      customCards,
     })
     const participantFrame = json(participantRead).frame as {
-      players: Array<{ cardStates: Record<string, { extraData?: unknown }> }>
+      players: Array<{
+        cardStates: Record<string, { extraData?: unknown }>
+        stats: { draftHistory: Array<{ cardId: string }> }
+      }>
     }
     expect(participantFrame.players[0]!.cardStates.OwnCard!.extraData)
       .toBeUndefined()
     expect(participantFrame.players[1]!.cardStates.B003_Moonshine!.extraData)
       .toEqual({ occ: 'SECRET_OCC' })
+    expect(participantFrame.players[0]!.stats.draftHistory[0]!.cardId).toBe('?')
+    expect(participantFrame.players[1]!.stats.draftHistory[0]!.cardId).toBe('C')
 
     const inspected = await invoke(
       'POST',

@@ -3,8 +3,20 @@ import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/re
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { ReplayViewer } from '../../../replay-viewer/src/ReplayViewer'
 
+const viewerMocks = vi.hoisted(() => ({
+  registerCustomCardMetadata: vi.fn(),
+  replayBoardProps: null as Record<string, unknown> | null,
+}))
+
+vi.mock('../../../shared/cards/custom-card-metadata', () => ({
+  registerCustomCardMetadata: viewerMocks.registerCustomCardMetadata,
+}))
+
 vi.mock('../../../replay-viewer/src/ReplayBoard', () => ({
-  ReplayBoard: () => <div>visible replay frame</div>,
+  ReplayBoard: (props: Record<string, unknown>) => {
+    viewerMocks.replayBoardProps = props
+    return <div>visible replay frame</div>
+  },
 }))
 
 const step = (stepNo: number, checkpointStepNo = stepNo) => ({
@@ -50,10 +62,69 @@ const response = (body: unknown) =>
 afterEach(() => {
   cleanup()
   vi.restoreAllMocks()
+  viewerMocks.registerCustomCardMetadata.mockReset()
+  viewerMocks.replayBoardProps = null
   window.history.replaceState(null, '', '/')
 })
 
 describe('ReplayViewer recovery', () => {
+  it('renders reported evidence supplied by the verified parent', async () => {
+    const parentOrigin = window.location.origin
+    window.history.replaceState(
+      null,
+      '',
+      '/?mode=reported-evidence&room=room-1&viewer=viewer-1'
+        + '&perspective=p2&step=5&locale=en'
+        + '&api=https%3A%2F%2Fapi.test'
+        + `&parentOrigin=${encodeURIComponent(parentOrigin)}`,
+    )
+    const fetchMock = vi.spyOn(globalThis, 'fetch')
+    const evidence = {
+      ok: true,
+      kind: 'reportedEvidence',
+      apiVersion: 1,
+      roomId: 'room-1',
+      schemaVersion: 1,
+      viewerBuildId: 'viewer-1',
+      stepNo: 5,
+      frameHash: 'a'.repeat(64),
+      perspective: 'p2',
+      frame: { players: [{ id: 'p1' }, { id: 'p2' }] },
+      customCards: [{
+        cardType: 'minor',
+        cardJson: {
+          id: 'CUSTOM_1',
+          name: 'Custom',
+          deck: 'X',
+          number: 1,
+        },
+        artUrl: `/replay-assets/${'f'.repeat(64)}`,
+      }],
+    }
+
+    render(<ReplayViewer />)
+    fireEvent(window, new MessageEvent('message', {
+      source: window.parent,
+      origin: parentOrigin,
+      data: {
+        type: 'open-agricola-reported-evidence',
+        evidence,
+      },
+    }))
+
+    expect(await screen.findByText('visible replay frame')).toBeVisible()
+    expect(viewerMocks.replayBoardProps).toMatchObject({
+      frame: evidence.frame,
+      locale: 'en',
+      perspective: 'p2',
+    })
+    expect(viewerMocks.registerCustomCardMetadata).toHaveBeenCalledWith({
+      ...evidence.customCards[0],
+      artUrl: `https://api.test/replay-assets/${'f'.repeat(64)}`,
+    })
+    expect(fetchMock).not.toHaveBeenCalled()
+  })
+
   it('retries a failed segment when the current timeline step is selected again', async () => {
     window.history.replaceState(
       null,
