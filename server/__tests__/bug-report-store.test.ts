@@ -416,6 +416,15 @@ describe('BugReportStore', () => {
       refreshTokenExpiresAt: now + 86_400_000,
     })
     expectBugReportError(
+      () => store.saveConnection('u1', '101', {
+        accessToken: 'replacement-secret',
+        accessTokenExpiresAt: now + 3_600_000,
+      }),
+      'github_identity_mismatch',
+      409,
+    )
+    expect(store.connectionTokens('u1')?.accessToken).toBe('access-secret')
+    expectBugReportError(
       () => store.saveConnection('u2', '99', {
         accessToken: 'other',
         accessTokenExpiresAt: now + 3_600_000,
@@ -689,6 +698,7 @@ describe('BugReportStore', () => {
       confirmGitHub: true,
     })
     store.queue(report.submissionId, 'u1')
+    store.disconnect('u1')
     store.saveConnection('u1', '100', {
       accessToken: 'user-token-b',
       accessTokenExpiresAt: now + 3_600_000,

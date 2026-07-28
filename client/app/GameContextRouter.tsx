@@ -38,6 +38,19 @@ const finishBugReportOAuth = (result: 'connected' | 'error'): void => {
   window.dispatchEvent(new PopStateEvent('popstate'))
 }
 
+const reportedEvidenceAnchor = (): {
+  stepNo: number
+  frameHash: string
+} | null => {
+  const params = new URLSearchParams(window.location.search)
+  const rawStep = params.get('step') ?? ''
+  const frameHash = params.get('frame') ?? ''
+  if (!/^(0|[1-9]\d*)$/.test(rawStep) || !/^[a-f0-9]{64}$/.test(frameHash)) {
+    return null
+  }
+  return { stepNo: Number(rawStep), frameHash }
+}
+
 const statusPage = (
   roomId: string,
   title: string,
@@ -65,11 +78,13 @@ function ReportedEvidenceContext({
   stepNo,
   frameHash,
   fallback,
+  embedded = false,
 }: {
   roomId: string
   stepNo: number
   frameHash: string
   fallback: ReactNode
+  embedded?: boolean
 }) {
   const { locale, t } = useLocale()
   const evidenceKey = `${roomId}:${stepNo}:${frameHash}`
@@ -144,8 +159,11 @@ function ReportedEvidenceContext({
     return <GameLoadScreen percent={10} label={t('platform.loading')} />
   }
   if (!evidence.ok) return fallback
+  const Root = embedded ? 'section' : 'main'
   return (
-    <main className="reported-evidence">
+    <Root
+      className={`reported-evidence${embedded ? ' reported-evidence--drawer' : ''}`}
+    >
       <header className="reported-evidence__header">
         <p>{t('platform.gameContext.room', { id: roomId })}</p>
         <h1>{t('platform.gameContext.reportedEvidenceTitle')}</h1>
@@ -178,7 +196,7 @@ function ReportedEvidenceContext({
       {new URLSearchParams(window.location.search).has('bugReport')
         ? <BugReportBar roomId={roomId} />
         : null}
-    </main>
+    </Root>
   )
 }
 
@@ -234,15 +252,13 @@ function PublicContext({
         ? <BugReportBar roomId={response.roomId} />
         : undefined,
     )
-    const params = new URLSearchParams(window.location.search)
-    const rawStep = params.get('step') ?? ''
-    const frameHash = params.get('frame') ?? ''
-    if (/^(0|[1-9]\d*)$/.test(rawStep) && /^[a-f0-9]{64}$/.test(frameHash)) {
+    const anchor = reportedEvidenceAnchor()
+    if (anchor) {
       return (
         <ReportedEvidenceContext
           roomId={response.roomId}
-          stepNo={Number(rawStep)}
-          frameHash={frameHash}
+          stepNo={anchor.stepNo}
+          frameHash={anchor.frameHash}
           fallback={expired}
         />
       )
@@ -281,6 +297,7 @@ function PublicContext({
 export function GameContextRouter({ children }: { children: ReactNode }) {
   const { t } = useLocale()
   const [locationVersion, setLocationVersion] = useState(0)
+  const [closedEvidenceKey, setClosedEvidenceKey] = useState<string | null>(null)
   const params = new URLSearchParams(window.location.search)
   const hasContext = params.has('context') && params.get('page') !== 'login'
   const roomId = params.get('context') ?? ''
@@ -316,7 +333,10 @@ export function GameContextRouter({ children }: { children: ReactNode }) {
   }, [])
 
   useEffect(() => {
-    const refresh = () => setLocationVersion((version) => version + 1)
+    const refresh = () => {
+      setClosedEvidenceKey(null)
+      setLocationVersion((version) => version + 1)
+    }
     window.addEventListener('popstate', refresh)
     window.addEventListener(GAME_CONTEXT_CHANGED_EVENT, refresh)
     return () => {
@@ -363,8 +383,56 @@ export function GameContextRouter({ children }: { children: ReactNode }) {
     return <GameLoadScreen percent={10} label={t('platform.loading')} />
   }
   if (
-    (response.ok && response.lifecycle === 'active') ||
-    (!response.ok && response.code === 'login_required' && response.lifecycle === 'active')
+    response.ok
+    && response.lifecycle === 'active'
+  ) {
+    const anchor = reportedEvidenceAnchor()
+    const evidenceKey = anchor
+      ? `${response.roomId}:${anchor.stepNo}:${anchor.frameHash}`
+      : null
+    if (!anchor || evidenceKey === closedEvidenceKey) return children
+    const closeEvidence = () => {
+      const url = new URL(window.location.href)
+      url.searchParams.delete('step')
+      url.searchParams.delete('frame')
+      window.history.replaceState(null, '', url)
+      setClosedEvidenceKey(evidenceKey)
+    }
+    return (
+      <>
+        {children}
+        <aside
+          className="reported-evidence-drawer"
+          aria-label={t('platform.gameContext.reportedEvidenceTitle')}
+        >
+          <button
+            type="button"
+            className="reported-evidence-drawer__close"
+            aria-label={t('platform.bugReport.close')}
+            onClick={closeEvidence}
+          >
+            ×
+          </button>
+          <ReportedEvidenceContext
+            roomId={response.roomId}
+            stepNo={anchor.stepNo}
+            frameHash={anchor.frameHash}
+            embedded
+            fallback={(
+              <section className="reported-evidence-drawer__status">
+                <h2>{t('platform.gameContext.unavailableTitle')}</h2>
+                <p>{t('platform.gameContext.unavailableBody')}</p>
+              </section>
+            )}
+          />
+        </aside>
+      </>
+    )
+  }
+  if (
+    !response.ok
+    && response.code === 'login_required'
+    && response.lifecycle === 'active'
   ) {
     return children
   }
