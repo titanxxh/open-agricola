@@ -295,6 +295,37 @@ describe('BugReportStore', () => {
     )
   })
 
+  it('revalidates a completed context before its first queue', () => {
+    const roomId = insertContext('completed')
+    const report = store.createDraft({
+      userId: 'u1',
+      roomId,
+      phenomenon: 'The score changed',
+      stepNo: 12,
+      frameHash: COMPLETED_HASH,
+    })
+    store.updateDraft(report.submissionId, 'u1', {
+      authorIdentity: 'hosted',
+      confirmHosted: true,
+    })
+    db.prepare(`
+      UPDATE game_contexts SET lifecycle = 'expired' WHERE room_id = ?
+    `).run(roomId)
+
+    expectBugReportError(
+      () => store.queue(report.submissionId, 'u1'),
+      'replay_segment_unavailable',
+      503,
+    )
+    expect(store.getOwned(report.submissionId, 'u1').status).toBe('draft')
+    store.deleteDraft(report.submissionId, 'u1')
+    expectBugReportError(
+      () => store.getOwned(report.submissionId, 'u1'),
+      'bug_report_not_found',
+      404,
+    )
+  })
+
   it('validates one Unicode phenomenon sentence up to 2000 code points', () => {
     const roomId = insertContext('active')
     expectBugReportError(
@@ -689,6 +720,41 @@ describe('BugReportStore', () => {
     )
   })
 
+  it('allows an explicit hosted retry after a GitHub connection failure', () => {
+    const roomId = insertContext('active')
+    const report = store.createDraft({
+      userId: 'u1',
+      roomId,
+      phenomenon: 'Action did not resolve',
+    })
+    store.saveConnection('u1', '99', {
+      accessToken: 'user-token',
+      accessTokenExpiresAt: now + 3_600_000,
+    })
+    store.updateDraft(report.submissionId, 'u1', {
+      authorIdentity: 'github_user',
+      confirmGitHub: true,
+    })
+    store.queue(report.submissionId, 'u1')
+    const claim = store.claim(report.submissionId)!
+    store.defer(claim, 'needs_reconnect', 'github_connection_required')
+
+    const changed = store.updateDraft(report.submissionId, 'u1', {
+      authorIdentity: 'hosted',
+      confirmHosted: true,
+    })
+
+    expect(changed).toMatchObject({
+      submissionId: report.submissionId,
+      status: 'needs_reconnect',
+      authorIdentity: 'hosted',
+      lastErrorCode: null,
+    })
+    store.disconnect('u1')
+    store.queue(report.submissionId, 'u1')
+    expect(store.claim(report.submissionId)?.mode).toBe('reconcile')
+  })
+
   it('reconciles an uncertain create by marker instead of creating a duplicate', async () => {
     const roomId = insertContext('active')
     const report = store.createDraft({
@@ -999,6 +1065,11 @@ describe('BugReportStore', () => {
     store.recordAttempt(report.submissionId, 'create', 'uncertain', now)
     store.deleteDraft(report.submissionId, 'u1')
     const adapter = successAdapter()
+    vi.mocked(adapter.anonymizeIssue).mockResolvedValueOnce({
+      ok: false,
+      kind: 'uncertain',
+      code: 'github_anonymization_uncertain',
+    })
     vi.mocked(adapter.findIssueByMarker)
       .mockResolvedValueOnce({
         ok: false,
@@ -1024,9 +1095,21 @@ describe('BugReportStore', () => {
     expect(store.reportForEvidence(report.submissionId)?.reporter_user_id)
       .toBe('u1')
 
+    await expect(delivery.deleteReporter('u1')).rejects.toMatchObject({
+      code: 'github_anonymization_uncertain',
+      status: 503,
+    })
+    expect(store.reportForEvidence(report.submissionId)).toMatchObject({
+      reporter_user_id: 'u1',
+      status: 'submitted',
+      github_issue_number: 9,
+      github_issue_url: 'https://github.com/titanxxh/open-agricola-issues/issues/9',
+    })
+
     await delivery.deleteReporter('u1')
 
     expect(adapter.anonymizeIssue).toHaveBeenCalledWith(9, 'u1')
+    expect(adapter.findIssueByMarker).toHaveBeenCalledTimes(2)
     expect(store.reportForEvidence(report.submissionId)?.reporter_user_id)
       .toBeNull()
   })
