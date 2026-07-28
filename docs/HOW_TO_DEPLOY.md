@@ -115,7 +115,7 @@ Bug Report 使用独立 GitHub App，只安装到 `titanxxh/open-agricola-issues
 
 1. Repository permissions 只开启 `Issues: Read and write`，安装范围只选 issues-only 仓库。
 2. Callback URL 设为 `<PUBLIC_API_BASE>/api/v1/issue-submission-connection/github/callback`。
-3. Webhook URL 设为 `<PUBLIC_API_BASE>/api/v1/github-app/webhook`，配置独立 webhook secret，并订阅 GitHub App authorization 撤销事件。
+3. Webhook URL 设为 `<PUBLIC_API_BASE>/api/v1/github-app/webhook`，配置独立 webhook secret，并订阅 GitHub App authorization 和 Issues 事件。
 4. 在 `.env` 填写 App ID、Client ID/secret、单行 `\n` 转义的 private key、webhook secret、installation ID 和 issues-only repository ID。
 5. 生成 32 字节随机加密密钥，使用 JSON key ring 配置 `BUG_REPORT_TOKEN_ENCRYPTION_KEYS`，并让 `BUG_REPORT_TOKEN_ACTIVE_KEY_ID` 指向其中一个 key。
 6. 保持 `BUG_REPORTS_ENABLED=false` 启动并完成迁移；验证 Hosted 与本人 GitHub 两条链路后再改为 `true`。关闭开关只隐藏新入口，不会丢弃既有草稿或交付队列。

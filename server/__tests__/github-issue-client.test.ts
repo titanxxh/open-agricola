@@ -10,6 +10,9 @@ import {
 } from '../bug-report/github-issue-client.ts'
 
 const NOW = 1_700_000_000_000
+const { privateKey: appPrivateKey } = generateKeyPairSync('rsa', {
+  modulusLength: 2048,
+})
 
 const response = (
   body: unknown,
@@ -26,6 +29,21 @@ const client = (fetchImpl: typeof fetch): GitHubIssueClient =>
     clientId: 'client',
     clientSecret: 'secret',
     privateKey: 'unused',
+    installationId: '2',
+    repositoryId: '3',
+    fetchImpl,
+    now: () => NOW,
+  })
+
+const hostedClient = (fetchImpl: typeof fetch): GitHubIssueClient =>
+  new GitHubIssueClient({
+    appId: '1',
+    clientId: 'client',
+    clientSecret: 'secret',
+    privateKey: appPrivateKey.export({
+      type: 'pkcs8',
+      format: 'pem',
+    }).toString(),
     installationId: '2',
     repositoryId: '3',
     fetchImpl,
@@ -121,7 +139,6 @@ describe('GitHubIssueClient', () => {
   })
 
   it('restricts a hosted installation token to the configured repository and issues permission', async () => {
-    const { privateKey } = generateKeyPairSync('rsa', { modulusLength: 2048 })
     const fetchImpl = vi.fn()
       .mockResolvedValueOnce(response({
         token: 'installation-token',
@@ -131,18 +148,8 @@ describe('GitHubIssueClient', () => {
         number: 17,
         html_url: 'https://github.com/titanxxh/open-agricola-issues/issues/17',
       })) as unknown as typeof fetch
-    const github = new GitHubIssueClient({
-      appId: '1',
-      clientId: 'client',
-      clientSecret: 'secret',
-      privateKey: privateKey.export({ type: 'pkcs8', format: 'pem' }).toString(),
-      installationId: '2',
-      repositoryId: '3',
-      fetchImpl,
-      now: () => NOW,
-    })
 
-    await expect(github.createIssue(
+    await expect(hostedClient(fetchImpl).createIssue(
       'hosted',
       { title: 'Game bug', body: 'details' },
     )).resolves.toMatchObject({ ok: true, number: 17 })
@@ -156,6 +163,65 @@ describe('GitHubIssueClient', () => {
     expect(vi.mocked(fetchImpl).mock.calls[1]![1]?.headers).toMatchObject({
       Authorization: 'Bearer installation-token',
     })
+  })
+
+  it.each([
+    ['network error', () => Promise.reject(new Error('offline')), 'github_app_token_uncertain'],
+    ['server error', () => Promise.resolve(response({}, 500)), 'github_result_uncertain'],
+  ])('retries a transient installation-token %s', async (_name, tokenResponse, code) => {
+    const fetchImpl = vi.fn(tokenResponse) as unknown as typeof fetch
+
+    await expect(hostedClient(fetchImpl).createIssue(
+      'hosted',
+      { title: 'Game bug', body: 'details' },
+    )).resolves.toMatchObject({
+      ok: false,
+      kind: 'uncertain',
+      code,
+    })
+  })
+
+  it('revokes the whole GitHub App user grant before local disconnect', async () => {
+    const fetchImpl = vi.fn(async () =>
+      new Response(null, { status: 204 })) as unknown as typeof fetch
+
+    await expect(client(fetchImpl).revokeUserGrant('user-token'))
+      .resolves.toEqual({ ok: true })
+
+    const [url, init] = vi.mocked(fetchImpl).mock.calls[0]!
+    expect(url).toBe('https://api.github.com/applications/client/grant')
+    expect(init).toMatchObject({ method: 'DELETE' })
+    expect(init?.headers).toMatchObject({
+      Authorization: `Basic ${Buffer.from('client:secret').toString('base64')}`,
+    })
+    expect(JSON.parse(String(init?.body))).toEqual({
+      access_token: 'user-token',
+    })
+  })
+
+  it('anonymizes the injected reporter line with the installation identity', async () => {
+    const fetchImpl = vi.fn()
+      .mockResolvedValueOnce(response({
+        token: 'installation-token',
+        expires_at: new Date(NOW + 3_600_000).toISOString(),
+      }))
+      .mockResolvedValueOnce(response({
+        number: 17,
+        body: '## Phenomenon\n\nFrozen\n\n- Reporter site ID: `site-user`\n',
+      }))
+      .mockResolvedValueOnce(response({})) as unknown as typeof fetch
+
+    await expect(hostedClient(fetchImpl).anonymizeIssue(17, 'site-user'))
+      .resolves.toEqual({ ok: true })
+
+    const [url, init] = vi.mocked(fetchImpl).mock.calls[2]!
+    expect(url).toBe(
+      'https://api.github.com/repos/titanxxh/open-agricola-issues/issues/17',
+    )
+    expect(init).toMatchObject({ method: 'PATCH' })
+    expect(JSON.parse(String(init?.body)).body).toBe(
+      '## Phenomenon\n\nFrozen\n\n- Reporter site ID: `deleted reporter`\n',
+    )
   })
 
   it('uses PKCE and validates webhook signatures', () => {

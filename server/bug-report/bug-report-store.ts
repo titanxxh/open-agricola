@@ -84,6 +84,9 @@ type ReportRow = {
   next_attempt_at: number | null
   submitted_at: number | null
   last_error_code: string | null
+  discarded_at: number | null
+  github_issue_state: 'open' | 'closed' | null
+  duplicate_confirmed_at: number | null
   created_at: number
   updated_at: number
 }
@@ -121,6 +124,11 @@ export type BugReportView = {
   lastErrorCode: string | null
   createdAt: number
   updatedAt: number
+}
+
+export type ExistingBugIssue = {
+  number: number
+  url: string
 }
 
 export class BugReportError extends Error {
@@ -229,7 +237,7 @@ const reportColumns = `
   room_version, step_no, frame_hash, phenomenon, author_identity, status,
   github_issue_number, github_issue_url, evidence_expires_at, claim_token,
   claimed_at, next_attempt_at, submitted_at, last_error_code, created_at,
-  updated_at
+  updated_at, discarded_at, github_issue_state, duplicate_confirmed_at
 `
 
 export class BugReportStore {
@@ -546,12 +554,12 @@ export class BugReportStore {
   }
 
   getOwned(submissionId: string, userId: string): BugReportView {
-    const row = this.report(submissionId)
-    if (!row) throw new BugReportError('bug_report_not_found', 404)
-    if (row.reporter_user_id !== userId) {
-      throw new BugReportError('bug_report_forbidden', 403)
-    }
-    return toView(row)
+    return toView(this.ownedRow(submissionId, userId))
+  }
+
+  openIssuesFor(submissionId: string, userId: string): ExistingBugIssue[] {
+    return this.matchingOpenIssues(this.ownedRow(submissionId, userId))
+      .map(({ number, url }) => ({ number, url }))
   }
 
   updateDraft(
@@ -561,13 +569,14 @@ export class BugReportStore {
       phenomenon?: unknown
       authorIdentity?: unknown
       confirmHosted?: unknown
+      confirmExisting?: unknown
     },
   ): BugReportView {
     const row = this.ownedRow(submissionId, userId)
     if (row.status === 'submitted') {
       throw new BugReportError('bug_report_already_submitted', 409)
     }
-    if (!['draft', 'needs_reconnect', 'failed'].includes(row.status)) {
+    if (row.status !== 'draft') {
       throw new BugReportError('bug_report_update_conflict', 409)
     }
     let phenomenon = row.phenomenon
@@ -593,15 +602,29 @@ export class BugReportStore {
       }
       author = input.authorIdentity
     }
+    if (
+      input.confirmExisting !== undefined
+      && input.confirmExisting !== true
+    ) {
+      throw new BugReportError('invalid_existing_issue_confirmation', 400)
+    }
     const now = this.now()
     this.db.prepare(`
       UPDATE bug_reports
       SET phenomenon = ?,
           author_identity = ?,
+          duplicate_confirmed_at = ?,
           updated_at = ?,
           last_error_code = NULL
       WHERE submission_id = ? AND reporter_user_id = ?
-    `).run(phenomenon, author, now, submissionId, userId)
+    `).run(
+      phenomenon,
+      author,
+      input.confirmExisting === true ? now : row.duplicate_confirmed_at,
+      now,
+      submissionId,
+      userId,
+    )
     return this.getOwned(submissionId, userId)
   }
 
@@ -621,7 +644,19 @@ export class BugReportStore {
     ) {
       throw new BugReportError('github_connection_required', 409)
     }
-    if (row.submitted_at === null) this.assertQuota(row)
+    if (row.submitted_at === null) {
+      const latestExisting = this.matchingOpenIssues(row)[0]
+      if (
+        latestExisting
+        && (
+          row.duplicate_confirmed_at === null
+          || row.duplicate_confirmed_at < latestExisting.updatedAt
+        )
+      ) {
+        throw new BugReportError('existing_issue_confirmation_required', 409)
+      }
+      this.assertQuota(row)
+    }
     const now = this.now()
     const status = row.status === 'draft' ? 'queued' : 'reconcile'
     this.db.prepare(`
@@ -643,6 +678,23 @@ export class BugReportStore {
     if (!['draft', 'needs_reconnect', 'failed'].includes(row.status)) {
       throw new BugReportError('bug_report_delete_conflict', 409)
     }
+    if (row.submitted_at !== null) {
+      const now = this.now()
+      this.db.prepare(`
+        UPDATE bug_reports
+        SET phenomenon = NULL,
+            author_identity = NULL,
+            status = 'failed',
+            discarded_at = ?,
+            claim_token = NULL,
+            claimed_at = NULL,
+            next_attempt_at = NULL,
+            last_error_code = 'bug_report_discarded',
+            updated_at = ?
+        WHERE submission_id = ? AND reporter_user_id = ?
+      `).run(now, now, submissionId, userId)
+      return
+    }
     this.db.prepare(`
       DELETE FROM bug_reports
       WHERE submission_id = ? AND reporter_user_id = ?
@@ -661,12 +713,14 @@ export class BugReportStore {
             last_error_code = 'delivery_interrupted',
             updated_at = ?
         WHERE status = 'submitting'
+          AND discarded_at IS NULL
           AND claimed_at < ?
       `).run(now, now, now - CLAIM_TTL_MS)
       const row = this.db.prepare(`
         SELECT ${reportColumns}
         FROM bug_reports
         WHERE status IN ('queued', 'retry', 'reconcile')
+          AND discarded_at IS NULL
           AND claim_token IS NULL
           AND COALESCE(next_attempt_at, 0) <= ?
           ${submissionId ? 'AND submission_id = ?' : ''}
@@ -764,6 +818,7 @@ export class BugReportStore {
           phenomenon = NULL,
           github_issue_number = ?,
           github_issue_url = ?,
+          github_issue_state = 'open',
           claim_token = NULL,
           claimed_at = NULL,
           next_attempt_at = NULL,
@@ -809,6 +864,66 @@ export class BugReportStore {
     return this.report(submissionId)
   }
 
+  setIssueState(issueNumber: number, state: 'open' | 'closed'): void {
+    this.db.prepare(`
+      UPDATE bug_reports
+      SET github_issue_state = ?, updated_at = ?
+      WHERE github_issue_number = ?
+    `).run(state, this.now(), issueNumber)
+  }
+
+  reporterDeletionPlan(userId: string): {
+    issueNumbers: number[]
+    tokens: GitHubUserTokens | null
+  } {
+    const unresolved = this.db.prepare(`
+      SELECT 1
+      FROM bug_reports
+      WHERE reporter_user_id = ?
+        AND submitted_at IS NOT NULL
+        AND github_issue_number IS NULL
+      LIMIT 1
+    `).get(userId)
+    if (unresolved) {
+      throw new BugReportError('bug_report_deletion_pending', 409)
+    }
+    const issues = this.db.prepare(`
+      SELECT DISTINCT github_issue_number AS issue_number
+      FROM bug_reports
+      WHERE reporter_user_id = ?
+        AND github_issue_number IS NOT NULL
+      ORDER BY github_issue_number
+    `).all(userId) as Array<{ issue_number: number }>
+    return {
+      issueNumbers: issues.map(({ issue_number }) => issue_number),
+      tokens: this.connectionTokens(userId),
+    }
+  }
+
+  anonymizeReporter(userId: string): void {
+    const now = this.now()
+    this.db.transaction(() => {
+      this.db.prepare(`
+        UPDATE bug_reports
+        SET reporter_user_id = NULL,
+            phenomenon = NULL,
+            author_identity = NULL,
+            status = CASE WHEN status = 'submitted' THEN status ELSE 'failed' END,
+            discarded_at = COALESCE(discarded_at, ?),
+            claim_token = NULL,
+            claimed_at = NULL,
+            next_attempt_at = NULL,
+            last_error_code = CASE
+              WHEN status = 'submitted' THEN NULL
+              ELSE 'reporter_deleted'
+            END,
+            updated_at = ?
+        WHERE reporter_user_id = ?
+      `).run(now, now, userId)
+      this.disconnect(userId)
+    })()
+  }
+
   private report(submissionId: string): ReportRow | null {
     return (this.db.prepare(`
       SELECT ${reportColumns}
@@ -819,11 +934,37 @@ export class BugReportStore {
 
   private ownedRow(submissionId: string, userId: string): ReportRow {
     const row = this.report(submissionId)
-    if (!row) throw new BugReportError('bug_report_not_found', 404)
+    if (!row || row.discarded_at !== null) {
+      throw new BugReportError('bug_report_not_found', 404)
+    }
     if (row.reporter_user_id !== userId) {
       throw new BugReportError('bug_report_forbidden', 403)
     }
     return row
+  }
+
+  private matchingOpenIssues(report: ReportRow): Array<
+    ExistingBugIssue & { updatedAt: number }
+  > {
+    return this.db.prepare(`
+      SELECT github_issue_number AS number,
+             github_issue_url AS url,
+             updated_at AS updatedAt
+      FROM bug_reports
+      WHERE submission_id != ?
+        AND room_id = ?
+        AND step_no = ?
+        AND frame_hash = ?
+        AND github_issue_state = 'open'
+        AND github_issue_number IS NOT NULL
+        AND github_issue_url IS NOT NULL
+      ORDER BY updated_at DESC, github_issue_number
+    `).all(
+      report.submission_id,
+      report.room_id,
+      report.step_no,
+      report.frame_hash,
+    ) as Array<ExistingBugIssue & { updatedAt: number }>
   }
 
   private assertQuota(report: ReportRow): void {
@@ -883,7 +1024,11 @@ export class BugReportStore {
 
 export type IssueDeliveryAdapter = Pick<
   GitHubIssueClient,
-  'createIssue' | 'findIssueByMarker' | 'refreshUserToken'
+  | 'createIssue'
+  | 'findIssueByMarker'
+  | 'refreshUserToken'
+  | 'revokeUserGrant'
+  | 'anonymizeIssue'
 >
 
 const neutralizeMentions = (value: string): string =>
@@ -987,6 +1132,50 @@ export class BugReportDelivery {
         if (!claim) return
         await this.deliverClaim(claim)
       }
+    } finally {
+      this.running = false
+    }
+  }
+
+  async disconnectUser(userId: string): Promise<void> {
+    if (this.running) {
+      throw new BugReportError('bug_report_delivery_busy', 409)
+    }
+    this.running = true
+    try {
+      const tokens = this.store.connectionTokens(userId)
+      if (tokens) {
+        const result = await this.client.revokeUserGrant(tokens.accessToken)
+        if (!result.ok) {
+          throw new BugReportError(result.code, 503, result.retryAt)
+        }
+      }
+      this.store.disconnect(userId)
+    } finally {
+      this.running = false
+    }
+  }
+
+  async deleteReporter(userId: string): Promise<void> {
+    if (this.running) {
+      throw new BugReportError('bug_report_delivery_busy', 409)
+    }
+    this.running = true
+    try {
+      const plan = this.store.reporterDeletionPlan(userId)
+      for (const issueNumber of plan.issueNumbers) {
+        const result = await this.client.anonymizeIssue(issueNumber, userId)
+        if (!result.ok) {
+          throw new BugReportError(result.code, 503, result.retryAt)
+        }
+      }
+      if (plan.tokens) {
+        const result = await this.client.revokeUserGrant(plan.tokens.accessToken)
+        if (!result.ok) {
+          throw new BugReportError(result.code, 503, result.retryAt)
+        }
+      }
+      this.store.anonymizeReporter(userId)
     } finally {
       this.running = false
     }
