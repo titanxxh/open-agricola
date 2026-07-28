@@ -4,6 +4,7 @@ import type { GameContextLifecycle } from '../../shared/contract/protocol/game-c
 import type {
   ReplayAnchorResponse,
   ReplayFrameStep,
+  ReplayGameState,
   ReplayJsonValue,
   ReplayManifest,
   ReplayManifestResponse,
@@ -12,7 +13,6 @@ import type {
   ReplayStepSummary,
   ReplayUnavailableError,
 } from '../../shared/contract/protocol/replay.ts'
-import type { SerializedGameState } from '../../shared/session/serialization.ts'
 import { decodeReplayFrame, type JsonValue } from './replay-codec.ts'
 
 type SqliteDb = Pick<Database.Database, 'prepare'>
@@ -92,9 +92,9 @@ const parseIntent = (raw: string): ReplayJsonValue =>
 const logPlayerNameKeys = ['player', 'playerName', 'fromPlayer', 'toPlayer'] as const
 
 const projectParticipantNames = (
-  frame: SerializedGameState,
+  frame: ReplayGameState,
   participantNames: ReadonlyMap<number, string>,
-): SerializedGameState => {
+): ReplayGameState => {
   const replacements = new Map<string, string>()
   const ambiguousNames = new Set<string>()
   const projectedNames = new Map<string, Set<string>>()
@@ -115,7 +115,7 @@ const projectParticipantNames = (
     }
   })
   const projectZones = (
-    zones: SerializedGameState['players'][number]['borrowedPlayedCardAnimalZones'] | undefined,
+    zones: ReplayGameState['players'][number]['borrowedPlayedCardAnimalZones'] | undefined,
   ) => zones?.map((zone) => {
     const name = zone.ownerPlayerId
       ? namesByPlayerId.get(zone.ownerPlayerId)
@@ -124,9 +124,6 @@ const projectParticipantNames = (
       ? { ...zone, displayOwnerName: name }
       : zone
   })
-  const frameWithScores = frame as SerializedGameState & {
-    scores?: Array<{ playerId: string; playerName: string }>
-  }
   return {
     ...frame,
     players: frame.players.map((player, playerIndex) => ({
@@ -170,9 +167,9 @@ const projectParticipantNames = (
           }),
         }
       : {}),
-    ...(frameWithScores.scores
+    ...(frame.scores
       ? {
-          scores: frameWithScores.scores.map((score) => ({
+          scores: frame.scores.map((score) => ({
             ...score,
             playerName: namesByPlayerId.get(score.playerId) ?? score.playerName,
           })),
@@ -410,7 +407,7 @@ export class ReplayStore {
           frameHash: row.frame_hash,
         })
         previousFrame = frame
-        const serializedFrame = frame as unknown as SerializedGameState
+        const serializedFrame = frame as unknown as ReplayGameState
         steps.push({
           stepNo: row.step_no,
           roomVersion: row.room_version,

@@ -106,11 +106,56 @@ describe('ReplayViewer recovery', () => {
     expect(screen.getByRole('button', { name: 'Next' })).toBeDisabled()
     fireEvent.keyDown(window, { key: 'ArrowRight' })
     expect(new URLSearchParams(window.location.search).get('step')).toBe('0')
+    fireEvent.change(screen.getByRole('slider', { name: 'Step' }), {
+      target: { value: '1' },
+    })
+    expect(new URLSearchParams(window.location.search).get('step')).toBe('0')
     fireEvent.click(screen.getByRole('button', { name: 'Play' }))
 
     await waitFor(() => {
       expect(screen.getByRole('button', { name: 'Play' })).toBeVisible()
       expect(new URLSearchParams(window.location.search).get('step')).toBe('0')
     })
+  })
+
+  it('shows archived scoring on a game-over frame', async () => {
+    window.history.replaceState(
+      null,
+      '',
+      '/?room=room-1&perspective=open&locale=en&api=https%3A%2F%2Fapi.test',
+    )
+    const final = step(0)
+    vi.spyOn(globalThis, 'fetch')
+      .mockImplementationOnce(() => response(manifest([final])))
+      .mockImplementationOnce(() => response({
+        ok: true,
+        kind: 'replaySegment',
+        apiVersion: 1,
+        roomId: 'room-1',
+        schemaVersion: 1,
+        viewerBuildId: 'a'.repeat(64),
+        checkpointStepNo: 0,
+        steps: [{
+          ...final,
+          frame: {
+            players: [],
+            gameOver: true,
+            scores: [{
+              playerId: 'p1',
+              playerName: 'Alice',
+              categories: [],
+              total: 12,
+            }],
+          },
+        }],
+      }))
+
+    render(<ReplayViewer />)
+    await screen.findByText('Scoring Pad')
+    expect(screen.getByText('+12')).toBeVisible()
+    fireEvent.click(screen.getByRole('button', { name: 'Close' }))
+    expect(screen.queryByText('Scoring Pad')).not.toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Final scores' }))
+    expect(screen.getByText('Scoring Pad')).toBeVisible()
   })
 })
