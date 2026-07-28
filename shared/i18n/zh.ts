@@ -1405,6 +1405,7 @@ export const zh = {
         anchor_mismatch: '当前回放位置已变化或不可用，请从最新的对局位置重新报告。',
         rate_limited: '提交过于频繁，请稍后再试。',
         github_connection_required: '请重新连接 GitHub，才能继续使用自己的 GitHub 身份。',
+        github_identity_confirmation_required: '已连接的 GitHub 账号发生变化，请重新确认公开作者身份。',
         existing_issue_confirmation_required: '请先查看对应的未关闭 Issue，再决定是否新建。',
         request_failed: '问题报告未能保存（{code}），请重试。',
       },

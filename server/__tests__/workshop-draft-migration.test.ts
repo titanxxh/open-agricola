@@ -121,7 +121,7 @@ describe('workshop draft migration', () => {
     const { getDb } = await import('../db.ts')
     const db = getDb()
 
-    expect(db.prepare('SELECT MAX(version) AS version FROM schema_version').get()).toEqual({ version: 26 })
+    expect(db.prepare('SELECT MAX(version) AS version FROM schema_version').get()).toEqual({ version: 29 })
     expect(db.prepare(`
       SELECT id, draft_revision, published_version_id, sandbox_pass_version_id, sandbox_passed_at
       FROM workshop_cards ORDER BY id

@@ -22,6 +22,17 @@ describe('bug report migration', () => {
         submission_id TEXT PRIMARY KEY,
         github_issue_number INTEGER
       );
+      CREATE TABLE bug_report_evidence_audit (
+        id INTEGER PRIMARY KEY,
+        submission_id TEXT NOT NULL REFERENCES bug_reports(submission_id),
+        maintainer_user_id TEXT REFERENCES users(id) ON DELETE SET NULL,
+        room_id TEXT NOT NULL,
+        step_no INTEGER NOT NULL,
+        frame_hash TEXT NOT NULL,
+        perspective TEXT NOT NULL,
+        reason TEXT NOT NULL,
+        created_at INTEGER NOT NULL
+      );
       CREATE TABLE users (id TEXT PRIMARY KEY);
       CREATE TABLE rooms (id TEXT PRIMARY KEY);
       CREATE TABLE room_players (
@@ -34,12 +45,17 @@ describe('bug report migration', () => {
         lifecycle TEXT NOT NULL
       );
       INSERT INTO bug_reports VALUES ('submitted', 7);
+      INSERT INTO users VALUES ('maintainer-1');
+      INSERT INTO bug_report_evidence_audit
+      VALUES (
+        1, 'submitted', 'maintainer-1', 'room-1', 5, 'hash', 'open', 'reason', 1
+      );
     `)
 
     runMigrations(db)
 
     expect(db.prepare('SELECT MAX(version) AS version FROM schema_version').get())
-      .toEqual({ version: 26 })
+      .toEqual({ version: 29 })
     expect((db.pragma('table_info(oauth_states)') as Array<{ name: string }>)
       .map(({ name }) => name)).toEqual(expect.arrayContaining([
       'pkce_verifier_ciphertext',
@@ -53,7 +69,16 @@ describe('bug report migration', () => {
       'discarded_at',
       'github_issue_state',
       'duplicate_confirmed_at',
+      'confirmed_github_user_id',
     ]))
+    expect((db.pragma('index_list(bug_report_evidence_audit)') as Array<{
+      name: string
+    }>).map(({ name }) => name)).toContain(
+      'idx_bug_report_evidence_audit_maintainer',
+    )
+    expect(db.prepare(`
+      SELECT maintainer_identity FROM bug_report_evidence_audit WHERE id = 1
+    `).get()).toEqual({ maintainer_identity: 'maintainer-1' })
     expect(db.prepare(`
       SELECT github_issue_state FROM bug_reports WHERE submission_id = 'submitted'
     `).get()).toEqual({ github_issue_state: 'open' })

@@ -644,7 +644,7 @@ describe('bug report routes', () => {
     `).get(submissionId) as { state: string }).state).toBe('open')
   })
 
-  it('applies deleted participant tombstones to retained active-game evidence', async () => {
+  it('applies participant tombstones and retains the evidence auditor identity', async () => {
     const created = await invoke(
       'POST',
       '/api/v1/game-contexts/active-room/bug-reports',
@@ -714,6 +714,15 @@ describe('bug report routes', () => {
       players: [{ name: 'Deleted player (seat 1)' }],
       log: [{ params: { player: 'Deleted player (seat 1)' } }],
       scores: [{ playerName: 'Deleted player (seat 1)' }],
+    })
+    db.prepare('DELETE FROM users WHERE id = ?').run(USER.id)
+    expect(db.prepare(`
+      SELECT maintainer_user_id, maintainer_identity
+      FROM bug_report_evidence_audit
+      WHERE submission_id = ?
+    `).get(submissionId)).toEqual({
+      maintainer_user_id: null,
+      maintainer_identity: USER.id,
     })
   })
 

@@ -73,6 +73,9 @@ type IssueResponse = {
   html_url?: string
   body?: string | null
   created_at?: string
+  performed_via_github_app?: {
+    id?: number | string
+  } | null
 }
 
 const apiHeaders = (token: string): Record<string, string> => ({
@@ -294,6 +297,7 @@ export class GitHubIssueClient {
   ): Promise<GitHubIssueResult | { ok: true; found: false }> {
     const authorization = await this.issueToken(identity, userAccessToken)
     if (!authorization.ok) return authorization
+    const sinceSecond = Math.floor(since / 1000) * 1000
     for (let page = 1; page <= 100; page += 1) {
       let response: Response
       try {
@@ -322,7 +326,11 @@ export class GitHubIssueClient {
           code: 'github_reconciliation_uncertain',
         }
       }
-      const match = issues.find((issue) => issue.body?.includes(marker))
+      const match = issues.find((issue) => (
+        issue.body?.includes(marker)
+        && String(issue.performed_via_github_app?.id) === this.options.appId
+        && Date.parse(issue.created_at ?? '') >= sinceSecond
+      ))
       if (
         match
         && Number.isSafeInteger(match.number)
@@ -337,7 +345,7 @@ export class GitHubIssueClient {
       }
       if (issues.length < 100) return { ok: true, found: false }
       const oldest = Date.parse(issues.at(-1)?.created_at ?? '')
-      if (Number.isFinite(oldest) && oldest < since) {
+      if (Number.isFinite(oldest) && oldest < sinceSecond) {
         return { ok: true, found: false }
       }
     }

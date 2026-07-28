@@ -240,12 +240,13 @@ const inspectEvidence = (
   }
   runtime.db.prepare(`
     INSERT INTO bug_report_evidence_audit (
-      submission_id, maintainer_user_id, room_id, step_no, frame_hash,
-      perspective, reason, created_at
+      submission_id, maintainer_user_id, maintainer_identity, room_id, step_no,
+      frame_hash, perspective, reason, created_at
     )
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
   `).run(
     submissionId,
+    maintainer.id,
     maintainer.id,
     report.room_id,
     report.step_no,
