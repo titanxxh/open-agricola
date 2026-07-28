@@ -1,7 +1,7 @@
 import type Database from 'better-sqlite3'
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import type { AuthUser } from './auth.ts'
-import { corsHeaders, getRequestOrigin } from './http-origin.ts'
+import { corsHeaders, getRequestOrigin, normalizeOrigin } from './http-origin.ts'
 import {
   BugReportDelivery,
   BugReportError,
@@ -45,6 +45,12 @@ export const bugReportsEnabled = (): boolean =>
   process.env.BUG_REPORTS_ENABLED === '1'
   || process.env.BUG_REPORTS_ENABLED === 'true'
 
+const publicAppOrigin = (): string | null => {
+  const configured = process.env.PUBLIC_APP_ORIGIN?.trim()
+  if (!configured || !normalizeOrigin(configured)) return null
+  return configured
+}
+
 export const isBugReportRuntimeReady = (
   runtime: {
     delivery: BugReportDelivery | null
@@ -54,6 +60,7 @@ export const isBugReportRuntimeReady = (
   Boolean(
     runtime?.delivery
     && runtime.github
+    && publicAppOrigin()
     && process.env.BUG_REPORT_GITHUB_WEBHOOK_SECRET?.trim(),
   )
 
@@ -156,9 +163,9 @@ const callbackUrl = (req: IncomingMessage): string => {
 
 const connectionReturnTo = (
   report: ReturnType<BugReportStore['getOwned']>,
-  req: IncomingMessage,
 ): string => {
-  const base = process.env.PUBLIC_APP_ORIGIN?.trim() || getRequestOrigin(req)
+  const base = publicAppOrigin()
+  if (!base) throw new BugReportError('bug_report_unavailable', 503)
   const url = new URL(base)
   url.searchParams.set('context', report.roomId)
   url.searchParams.set('step', String(report.stepNo))
@@ -201,8 +208,12 @@ const inspectEvidence = (
   if (report.status !== 'submitted') {
     throw new BugReportError('evidence_requires_submitted_report', 409)
   }
+  const context = runtime.db.prepare(`
+    SELECT lifecycle FROM game_contexts WHERE room_id = ?
+  `).get(report.room_id) as { lifecycle: string } | undefined
   if (
-    report.evidence_expires_at !== null
+    context?.lifecycle !== 'completed'
+    && report.evidence_expires_at !== null
     && report.evidence_expires_at <= Date.now()
   ) {
     throw new BugReportError('replay_segment_unavailable', 503)
@@ -406,15 +417,18 @@ export async function handleBugReportRoute(
 
     if (pathname === CONNECTION_START_ROUTE && req.method === 'GET') {
       const current = requireUser(res, user)
-      if (!runtime?.github) throw new BugReportError('bug_report_unavailable', 503)
+      const github = runtime?.github
+      if (!runtime || !github || !isBugReportRuntimeReady(runtime)) {
+        throw new BugReportError('bug_report_unavailable', 503)
+      }
       const submissionId = url.searchParams.get('submissionId') ?? ''
       const report = runtime.store.getOwned(submissionId, current.id)
       const state = runtime.store.createConnectionState(
         current.id,
-        connectionReturnTo(report, req),
+        connectionReturnTo(report),
       )
       res.writeHead(302, {
-        Location: runtime.github.authorizationUrl({
+        Location: github.authorizationUrl({
           state: state.state,
           codeChallenge: state.codeChallenge,
           redirectUri: callbackUrl(req),
@@ -473,6 +487,7 @@ export async function handleBugReportRoute(
       assertKeys(body, [
         'phenomenon',
         'authorIdentity',
+        'confirmGitHub',
         'confirmHosted',
         'confirmExisting',
       ])
@@ -499,6 +514,9 @@ export async function handleBugReportRoute(
 
     const submitMatch = SUBMIT_ROUTE.exec(pathname)
     if (submitMatch && req.method === 'POST') {
+      if (!isBugReportRuntimeReady(runtime)) {
+        throw new BugReportError('bug_report_unavailable', 503)
+      }
       const body = await readJson(req)
       assertKeys(body, [])
       const submissionId = decodeId(submitMatch[1]!)

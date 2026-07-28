@@ -20,6 +20,7 @@ const ATTEMPT_TTL_MS = 30 * DAY_MS
 const OAUTH_STATE_TTL_MS = 10 * 60 * 1000
 const CLAIM_TTL_MS = 5 * 60 * 1000
 const RETRY_DELAYS = [30_000, 120_000, 600_000] as const
+const MAX_UNFINISHED_DRAFTS = 5
 
 type SqliteDb = Pick<Database.Database, 'prepare' | 'transaction'>
 
@@ -470,6 +471,16 @@ export class BugReportStore {
     frameHash?: unknown
   }): BugReportView {
     const phenomenon = cleanPhenomenon(input.phenomenon)
+    const unfinished = this.db.prepare(`
+      SELECT COUNT(*) AS count
+      FROM bug_reports
+      WHERE reporter_user_id = ?
+        AND status = 'draft'
+        AND discarded_at IS NULL
+    `).get(input.userId) as { count: number }
+    if (unfinished.count >= MAX_UNFINISHED_DRAFTS) {
+      throw new BugReportError('bug_report_draft_limit', 429)
+    }
     const context = this.db.prepare(`
       SELECT lifecycle FROM game_contexts WHERE room_id = ?
     `).get(input.roomId) as ContextRow | undefined
@@ -568,6 +579,7 @@ export class BugReportStore {
     input: {
       phenomenon?: unknown
       authorIdentity?: unknown
+      confirmGitHub?: unknown
       confirmHosted?: unknown
       confirmExisting?: unknown
     },
@@ -593,6 +605,12 @@ export class BugReportStore {
       }
       if (input.authorIdentity === 'hosted' && input.confirmHosted !== true) {
         throw new BugReportError('hosted_identity_confirmation_required', 400)
+      }
+      if (
+        input.authorIdentity === 'github_user'
+        && input.confirmGitHub !== true
+      ) {
+        throw new BugReportError('github_identity_confirmation_required', 400)
       }
       if (
         input.authorIdentity === 'github_user'
@@ -882,6 +900,7 @@ export class BugReportStore {
       WHERE reporter_user_id = ?
         AND submitted_at IS NOT NULL
         AND github_issue_number IS NULL
+        AND discarded_at IS NULL
       LIMIT 1
     `).get(userId)
     if (unresolved) {

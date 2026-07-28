@@ -319,6 +319,7 @@ const sessionCleanupTimer = setInterval(() => {
   wssCtx?.committer?.cleanupReplayAssets()
 }, 60 * 60 * 1000)
 const bugReportDeliveryTimer = setInterval(() => {
+  if (!isBugReportRuntimeReady(bugReportRuntime)) return
   void bugReportDelivery?.deliverDue().catch(() => {
     console.error('[bug-report-delivery] delivery loop failed')
   })
