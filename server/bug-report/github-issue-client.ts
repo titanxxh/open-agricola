@@ -429,14 +429,11 @@ export class GitHubIssueClient {
     const publicReporterId = reporterUserId.replaceAll('`', "'")
     if (!issue.body.includes(publicReporterId)) return { ok: true }
     const reporterLine = `- Reporter site ID: \`${publicReporterId}\``
-    const anonymized = issue.body.replace(
+    const anonymized = issue.body.replaceAll(
       reporterLine,
       '- Reporter site ID: `deleted reporter`',
-    )
-    if (
-      anonymized === issue.body
-      || anonymized.includes(publicReporterId)
-    ) {
+    ).replaceAll(publicReporterId, '')
+    if (anonymized.includes(publicReporterId)) {
       return {
         ok: false,
         kind: 'terminal',
