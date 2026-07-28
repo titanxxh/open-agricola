@@ -85,6 +85,29 @@ describe('PageRouter auth routes', () => {
     expect(screen.getByText('Mobile Tab Bar')).toBeInTheDocument()
   })
 
+  it('returns authenticated replay login to the preserved anchor', async () => {
+    stubMe({ ok: true, user: { id: 'u1', username: 'host', displayName: 'Host' } })
+    window.history.replaceState(
+      null,
+      '',
+      '/?page=login&context=completed-room&step=4&frame=hash'
+        + '&perspective=p1&bugReport=draft-1',
+    )
+
+    renderWithAuth()
+
+    await waitFor(() => {
+      expect(Object.fromEntries(new URLSearchParams(window.location.search)))
+        .toEqual({
+          context: 'completed-room',
+          step: '4',
+          frame: 'hash',
+          perspective: 'p1',
+          bugReport: 'draft-1',
+        })
+    })
+  })
+
   it('does not bypass login for arbitrary ws rooms with player and devMode params', async () => {
     stubMe({ ok: false })
     window.history.replaceState(null, '', '/?page=game&transport=ws&room=abc123&player=p1&devMode=1')
