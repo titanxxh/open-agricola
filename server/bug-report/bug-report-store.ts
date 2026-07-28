@@ -1575,6 +1575,7 @@ export class BugReportDelivery {
             this.store.connectionStatus(report.reporter_user_id).githubUserId
             !== tokens.githubUserId
           ) {
+            this.store.queueGrantRevocation(refreshed.accessToken)
             this.store.defer(
               claim,
               'needs_reconnect',
@@ -1582,11 +1583,16 @@ export class BugReportDelivery {
             )
             return
           }
-          this.store.saveConnection(
-            report.reporter_user_id,
-            tokens.githubUserId,
-            refreshed,
-          )
+          try {
+            this.store.saveConnection(
+              report.reporter_user_id,
+              tokens.githubUserId,
+              refreshed,
+            )
+          } catch {
+            this.store.queueGrantRevocation(refreshed.accessToken)
+            throw new BugReportError('github_connection_required', 409)
+          }
           userToken = refreshed.accessToken
         } catch {
           this.store.disconnect(report.reporter_user_id)

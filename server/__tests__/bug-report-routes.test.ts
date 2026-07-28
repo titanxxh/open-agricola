@@ -766,7 +766,7 @@ describe('bug report routes', () => {
         minorHand: ['A'],
         occupationHand: ['B'],
         cardStates: {
-          OwnCard: { extraData: { secret: 'own secret' } },
+          B003_Moonshine: { extraData: { occ: 'OWN_SECRET_OCC' } },
         },
         stats: {
           draftHistory: [{ cardId: 'A', draftTurn: 1 }],
@@ -778,6 +778,11 @@ describe('bug report routes', () => {
         occupationHand: ['D'],
         cardStates: {
           B003_Moonshine: { extraData: { occ: 'SECRET_OCC' } },
+          B068_Beanfield: {
+            extraData: {
+              cardFieldStacks: [{ crop: 'vegetable', remaining: 2 }],
+            },
+          },
         },
         stats: {
           draftHistory: [{ cardId: 'C', draftTurn: 1 }],
@@ -853,10 +858,14 @@ describe('bug report routes', () => {
     const reporterFrame = json(reporterInspected).frame as {
       players: Array<{ cardStates: Record<string, { extraData?: unknown }> }>
     }
-    expect(reporterFrame.players[0]!.cardStates.OwnCard!.extraData)
-      .toEqual({ secret: 'own secret' })
+    expect(reporterFrame.players[0]!.cardStates.B003_Moonshine!.extraData)
+      .toEqual({ occ: 'OWN_SECRET_OCC' })
     expect(reporterFrame.players[1]!.cardStates.B003_Moonshine!.extraData)
       .toBeUndefined()
+    expect(reporterFrame.players[1]!.cardStates.B068_Beanfield!.extraData)
+      .toEqual({
+        cardFieldStacks: [{ crop: 'vegetable', remaining: 2 }],
+      })
 
     const participantRead = await invoke(
       'GET',
@@ -879,7 +888,7 @@ describe('bug report routes', () => {
         stats: { draftHistory: Array<{ cardId: string }> }
       }>
     }
-    expect(participantFrame.players[0]!.cardStates.OwnCard!.extraData)
+    expect(participantFrame.players[0]!.cardStates.B003_Moonshine!.extraData)
       .toBeUndefined()
     expect(participantFrame.players[1]!.cardStates.B003_Moonshine!.extraData)
       .toEqual({ occ: 'SECRET_OCC' })
