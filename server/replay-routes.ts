@@ -1,5 +1,6 @@
 import { createHash } from 'node:crypto'
-import { existsSync, readFileSync } from 'node:fs'
+import { createReadStream, lstatSync } from 'node:fs'
+import { readFile } from 'node:fs/promises'
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import { extname, join } from 'node:path'
 import type { GameContextErrorCode } from '../shared/contract/protocol/game-context.ts'
@@ -19,6 +20,11 @@ const ASSET_ROUTE = /^\/replay-assets\/([a-f0-9]{64})$/
 const CONTEXT_ID = /^[A-Za-z0-9]+(?:-[A-Za-z0-9]+)*$/
 const MAX_RESPONSE_BYTES = 8 * 1024 * 1024
 const READ_LIMIT_PER_MINUTE = 240
+const verifiedReplayAssets = new Map<string, {
+  size: number
+  mtimeMs: number
+  contentType: string
+}>()
 
 type ReplayResponse = ReplayManifestResponse | ReplaySegmentResponse | ReplayAnchorResponse
 
@@ -196,6 +202,37 @@ const safeViewerPath = (raw: string): string | null => {
   }
 }
 
+const fileMetadata = (path: string): {
+  size: number
+  mtimeMs: number
+} | null => {
+  try {
+    const stat = lstatSync(path)
+    return stat.isFile()
+      ? { size: stat.size, mtimeMs: stat.mtimeMs }
+      : null
+  } catch {
+    return null
+  }
+}
+
+const metadataMatches = (
+  actual: { size: number; mtimeMs: number },
+  expected: { size: number; mtimeMs: number },
+): boolean =>
+  actual.size === expected.size && actual.mtimeMs === expected.mtimeMs
+
+const streamFile = (
+  res: ServerResponse,
+  path: string,
+  headers: Record<string, string>,
+): void => {
+  res.writeHead(200, headers)
+  const stream = createReadStream(path)
+  stream.on('error', () => res.destroy())
+  stream.pipe(res)
+}
+
 const serveViewerFile = (
   res: ServerResponse,
   root: string,
@@ -220,18 +257,18 @@ const serveViewerFile = (
     return
   }
   const filePath = join(build.directory, path)
-  if (!existsSync(filePath)) {
+  const metadata = fileMetadata(filePath)
+  const expectedMetadata = build.fileMetadata[path]
+  if (
+    !metadata
+    || !expectedMetadata
+    || !metadataMatches(metadata, expectedMetadata)
+  ) {
     res.writeHead(503, publicHeaders('application/json; charset=utf-8', 'no-cache'))
     res.end(JSON.stringify({ ok: false, code: 'viewer_unavailable', message: 'Replay viewer not found' }))
     return
   }
-  const body = readFileSync(filePath)
-  const hash = createHash('sha256').update(body).digest('hex')
-  if (hash !== (path === 'manifest.json' ? buildId : build.files[path])) {
-    res.writeHead(503, publicHeaders('application/json; charset=utf-8', 'no-cache'))
-    res.end(JSON.stringify({ ok: false, code: 'viewer_unavailable', message: 'Replay viewer failed its integrity check' }))
-    return
-  }
+  const hash = path === 'manifest.json' ? buildId : build.files[path]!
   const headers = publicHeaders(mimeType(path), 'public, max-age=31536000, immutable')
   headers.ETag = `"${hash}"`
   if (path === 'index.html') {
@@ -247,8 +284,7 @@ const serveViewerFile = (
       "form-action 'none'",
     ].join('; ')
   }
-  res.writeHead(200, headers)
-  res.end(body)
+  streamFile(res, filePath, headers)
 }
 
 const assetMimeType = (body: Buffer): string => {
@@ -263,27 +299,63 @@ const assetMimeType = (body: Buffer): string => {
 }
 
 const serveReplayAsset = (
+  req: IncomingMessage,
   res: ServerResponse,
   root: string,
   hash: string,
 ): void => {
   const path = join(root, hash)
-  if (!existsSync(path)) {
+  const metadata = fileMetadata(path)
+  if (!metadata) {
+    verifiedReplayAssets.delete(path)
     res.writeHead(404, publicHeaders('application/json; charset=utf-8', 'no-cache'))
     res.end(JSON.stringify({ ok: false, code: 'replay_segment_unavailable', message: 'Replay asset not found' }))
     return
   }
-  const body = readFileSync(path)
-  if (createHash('sha256').update(body).digest('hex') !== hash) {
-    res.writeHead(503, publicHeaders('application/json; charset=utf-8', 'no-cache'))
-    res.end(JSON.stringify({ ok: false, code: 'replay_segment_unavailable', message: 'Replay asset failed its integrity check' }))
+  const sendVerified = (
+    contentType: string,
+    body?: Buffer,
+  ): void => {
+    const headers = {
+      ...publicHeaders(contentType, 'public, max-age=0, must-revalidate'),
+      ETag: `"${hash}"`,
+    }
+    if (req.headers['if-none-match'] === headers.ETag) {
+      res.writeHead(304, headers)
+      res.end()
+      return
+    }
+    if (body) {
+      res.writeHead(200, headers)
+      res.end(body)
+    } else {
+      streamFile(res, path, headers)
+    }
+  }
+  const cached = verifiedReplayAssets.get(path)
+  if (cached && metadataMatches(metadata, cached)) {
+    sendVerified(cached.contentType)
     return
   }
-  res.writeHead(200, {
-    ...publicHeaders(assetMimeType(body), 'public, max-age=31536000, immutable'),
-    ETag: `"${hash}"`,
+  verifiedReplayAssets.delete(path)
+  void readFile(path).then((body) => {
+    const current = fileMetadata(path)
+    if (
+      !current
+      || !metadataMatches(current, metadata)
+      || createHash('sha256').update(body).digest('hex') !== hash
+    ) {
+      res.writeHead(503, publicHeaders('application/json; charset=utf-8', 'no-cache'))
+      res.end(JSON.stringify({ ok: false, code: 'replay_segment_unavailable', message: 'Replay asset failed its integrity check' }))
+      return
+    }
+    const contentType = assetMimeType(body)
+    verifiedReplayAssets.set(path, { ...current, contentType })
+    sendVerified(contentType, body)
+  }).catch(() => {
+    res.writeHead(503, publicHeaders('application/json; charset=utf-8', 'no-cache'))
+    res.end(JSON.stringify({ ok: false, code: 'replay_segment_unavailable', message: 'Replay asset failed its integrity check' }))
   })
-  res.end(body)
 }
 
 export function handleReplayRoute(
@@ -299,26 +371,31 @@ export function handleReplayRoute(
   if (req.method !== 'GET' || !req.url) return false
   const url = new URL(req.url, `http://${req.headers.host ?? 'localhost'}`)
   const viewerMatch = VIEWER_ROUTE.exec(url.pathname)
-  if (viewerMatch) {
-    serveViewerFile(res, options.viewerRoot, viewerMatch[1]!, viewerMatch[2]!)
-    return true
-  }
   const assetMatch = ASSET_ROUTE.exec(url.pathname)
-  if (assetMatch) {
-    serveReplayAsset(res, options.assetRoot, assetMatch[1]!)
-    return true
-  }
-
   const manifestMatch = MANIFEST_ROUTE.exec(url.pathname)
   const segmentMatch = SEGMENT_ROUTE.exec(url.pathname)
   const anchorMatch = ANCHOR_ROUTE.exec(url.pathname)
-  if (!manifestMatch && !segmentMatch && !anchorMatch) return false
+  if (
+    !viewerMatch
+    && !assetMatch
+    && !manifestMatch
+    && !segmentMatch
+    && !anchorMatch
+  ) return false
   if (!options.limiter.allow(clientIp(req))) {
     sendJson(req, res, {
       ok: false,
       code: 'rate_limited',
       message: 'Too many replay requests',
     })
+    return true
+  }
+  if (viewerMatch) {
+    serveViewerFile(res, options.viewerRoot, viewerMatch[1]!, viewerMatch[2]!)
+    return true
+  }
+  if (assetMatch) {
+    serveReplayAsset(req, res, options.assetRoot, assetMatch[1]!)
     return true
   }
   const match = manifestMatch ?? segmentMatch ?? anchorMatch
