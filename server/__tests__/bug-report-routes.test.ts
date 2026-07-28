@@ -406,7 +406,7 @@ describe('bug report routes', () => {
     expect(createIssue).toHaveBeenCalledTimes(2)
   })
 
-  it('revokes the GitHub grant before removing the local connection', async () => {
+  it('removes the local connection even when GitHub revocation fails', async () => {
     store.saveConnection('u1', '99', {
       accessToken: 'token',
       accessTokenExpiresAt: 1_700_003_600_000,
@@ -422,14 +422,15 @@ describe('bug report routes', () => {
       '/api/v1/issue-submission-connection',
     )
     expect(failed.statusCode).toBe(503)
-    expect(store.connectionStatus('u1').connected).toBe(true)
+    expect(store.connectionStatus('u1').connected).toBe(false)
 
     const removed = await invoke(
       'DELETE',
       '/api/v1/issue-submission-connection',
     )
     expect(removed.statusCode).toBe(200)
-    expect(revokeUserGrant).toHaveBeenLastCalledWith('token')
+    expect(revokeUserGrant).toHaveBeenCalledTimes(1)
+    expect(revokeUserGrant).toHaveBeenCalledWith('token')
     expect(store.connectionStatus('u1')).toEqual({ connected: false })
   })
 
@@ -664,6 +665,11 @@ describe('bug report routes', () => {
         name: 'Original Name',
         minorHand: ['A'],
         occupationHand: ['B'],
+      }, {
+        id: 'p2',
+        name: 'Other Name',
+        minorHand: ['C'],
+        occupationHand: ['D'],
       }],
       log: [{
         key: 'log.test',
@@ -711,9 +717,29 @@ describe('bug report routes', () => {
 
     expect(inspected.statusCode).toBe(200)
     expect(json(inspected).frame).toMatchObject({
-      players: [{ name: 'Deleted player (seat 1)' }],
+      players: [
+        { name: 'Deleted player (seat 1)' },
+        { name: 'Other Name' },
+      ],
       log: [{ params: { player: 'Deleted player (seat 1)' } }],
       scores: [{ playerName: 'Deleted player (seat 1)' }],
+    })
+    db.prepare(`
+      DELETE FROM game_context_participants WHERE room_id = 'active-room'
+    `).run()
+    const legacyInspected = await invoke(
+      'POST',
+      `/api/v1/bug-reports/${submissionId}/evidence/inspect`,
+      { perspective: 'open', reason: 'Inspecting legacy retained evidence' },
+      USER,
+      {},
+      true,
+    )
+    expect(json(legacyInspected).frame).toMatchObject({
+      players: [
+        { name: 'Deleted player (seat 1)' },
+        { name: 'Deleted player (seat 2)' },
+      ],
     })
     db.prepare('DELETE FROM users WHERE id = ?').run(USER.id)
     expect(db.prepare(`
@@ -741,12 +767,12 @@ describe('bug report routes', () => {
     await invoke('POST', `/api/v1/bug-reports/${submissionId}/submit`, {})
     const insertAudit = db.prepare(`
       INSERT INTO bug_report_evidence_audit (
-        submission_id, maintainer_user_id, room_id, step_no, frame_hash,
-        perspective, reason, created_at
-      ) VALUES (?, ?, 'active-room', 5, ?, 'reporter', 'test', ?)
+        submission_id, maintainer_user_id, maintainer_identity, room_id,
+        step_no, frame_hash, perspective, reason, created_at
+      ) VALUES (?, ?, ?, 'active-room', 5, ?, 'reporter', 'test', ?)
     `)
     for (let index = 0; index < 30; index += 1) {
-      insertAudit.run(submissionId, USER.id, FRAME_HASH, Date.now())
+      insertAudit.run(submissionId, USER.id, USER.id, FRAME_HASH, Date.now())
     }
 
     const inspected = await invoke(
