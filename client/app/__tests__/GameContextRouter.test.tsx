@@ -396,19 +396,28 @@ describe('GameContextRouter', () => {
     expect(screen.queryByText('active app')).not.toBeInTheDocument()
   })
 
-  it('reopens a saved draft after its active context expires', async () => {
+  it.each([
+    ['expired', undefined, 'platform.gameContext.expiredTitle'],
+    ['removed', 'legal', 'platform.gameContext.removedTitle'],
+  ] as const)('reopens a saved draft on a %s context', async (
+    lifecycle,
+    reason,
+    title,
+  ) => {
+    const roomId = `${lifecycle}-room`
     window.history.replaceState(
       null,
       '',
-      '/?context=expired-room&bugReport=submission-1',
+      `/?context=${roomId}&bugReport=submission-1`,
     )
     const fetch = vi.fn(async (input: string | URL | Request) => {
       const url = String(input)
-      if (url.endsWith('/api/v1/game-contexts/expired-room')) {
+      if (url.endsWith(`/api/v1/game-contexts/${roomId}`)) {
         return new Response(JSON.stringify({
           ok: true,
-          roomId: 'expired-room',
-          lifecycle: 'expired',
+          roomId,
+          lifecycle,
+          ...(reason ? { reason } : {}),
         }))
       }
       if (url.includes('/api/v1/issue-submission-connection?')) {
@@ -423,7 +432,7 @@ describe('GameContextRouter', () => {
           ok: true,
           report: {
             submissionId: 'submission-1',
-            roomId: 'expired-room',
+            roomId,
             reporterUserId: 'u1',
             playerIndex: 0,
             lifecycle: 'active',
@@ -445,7 +454,7 @@ describe('GameContextRouter', () => {
 
     render(<GameContextRouter><div>active app</div></GameContextRouter>)
 
-    expect(await screen.findByText('platform.gameContext.expiredTitle'))
+    expect(await screen.findByText(title))
       .toBeVisible()
     expect(await screen.findByText('platform.bugReport.title')).toBeVisible()
     expect(screen.getByDisplayValue('The game froze')).toBeVisible()

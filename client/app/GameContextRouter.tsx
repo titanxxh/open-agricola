@@ -106,6 +106,9 @@ function PublicContext({
       t('platform.gameContext.room', { id: response.roomId }),
       t('platform.gameContext.removedTitle'),
       t(removedBodyKey(response.reason)),
+      new URLSearchParams(window.location.search).has('bugReport')
+        ? <BugReportBar roomId={response.roomId} />
+        : undefined,
     )
   }
   const error = response as GameContextError

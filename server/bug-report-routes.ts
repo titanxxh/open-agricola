@@ -315,15 +315,24 @@ const inspectEvidence = (
       display_name: string
     }>).map(({ player_index, display_name }) => [player_index, display_name]),
   )
-  const deletedParticipants = runtime.db.prepare(`
-    SELECT player_index
+  const participants = runtime.db.prepare(`
+    SELECT player_index, user_id
     FROM game_context_participants
-    WHERE room_id = ? AND user_id IS NULL
-  `).all(report.room_id) as Array<{ player_index: number }>
-  for (const { player_index } of deletedParticipants) {
+    WHERE room_id = ?
+  `).all(report.room_id) as Array<{
+    player_index: number
+    user_id: string | null
+  }>
+  const deletedPlayerIndexes = context?.lifecycle === 'expired'
+    && participants.length === 0
+    ? serialized.players.map((_, playerIndex) => playerIndex)
+    : participants
+        .filter(({ user_id }) => user_id === null)
+        .map(({ player_index }) => player_index)
+  for (const playerIndex of deletedPlayerIndexes) {
     participantNames.set(
-      player_index,
-      `Deleted player (seat ${player_index + 1})`,
+      playerIndex,
+      `Deleted player (seat ${playerIndex + 1})`,
     )
   }
   const projected = projectReplayParticipantNames(
