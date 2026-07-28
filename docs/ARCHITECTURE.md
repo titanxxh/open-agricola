@@ -168,7 +168,7 @@ Undo 的 runtime `publicEventCancellations` 是同步响应 metadata，不写入
 
 首版只允许 `visibility: 'public'` 的规则事件进入 `GameState.events`。私有 prompt、手牌、draft、living-hand 等 per-recipient 信息不写入公共事件流，仍通过 snapshot/privacy/pending 通道处理。`privateEvents` 是独立的 per-viewer 同步附加层：只描述当前快照中目标玩家可见的私有提示和私有手牌/draft 更新（例如 `private.promptShown`、`private.handChanged`、`private.draftUpdated`），由客户端消费为短暂 UI 通知，不进入公共 replay 事件流，也不作为规则来源。卡牌效果导致的手牌变化通过 runtime-only response buffer 发出 `private.handChanged`，不写入 `ActionExecutionResult`、engine snapshot/history 或 `GameState.events`。
 
-`SerializedGameState` 是 `GameState` 的 JSON 网络/持久化形态，额外携带 `engineStack: EngineStackCursor` 便于跨进程恢复引擎光标。同步版本号 / 历史 / 房间连接 **不进** `GameState`。
+`SerializedGameState` 是 `GameState` 的 JSON 网络/持久化形态，权威持久化快照携带 `engineStack: EngineStackCursor` 便于跨进程恢复引擎光标。任何 `filterSerializedStateForPlayer` 玩家/旁观者视图都把 `engineStack` 清为空；客户端不消费该恢复游标，交互请求走独立的 viewer-safe pending 协议，避免 cursor 内的其他玩家 choice 数据泄漏。同步版本号 / 历史 / 房间连接 **不进** `GameState`。
 
 ### 4.3 PlayerState（按职责分组）
 
@@ -1219,8 +1219,9 @@ ADR-0014 使用下一可用迁移一次增加七张表；首个正式 Replay `sc
 
 - 创建 draft 时由服务端确认 Reporter 是 active `room_players` 或 completed `game_result_players` 中的原座位，并固定 `roomId + stepNo + frameHash`。现象 trim 后必须为 1–2000 个 Unicode 字符；不做语法或句号判断；每用户最多保留 5 个未提交草稿。
 - `github-issue-client` 的 production adapter 只接受服务端固定 Repository ID / Installation ID，不接受客户端 owner、repo、labels 或 URL。测试使用 fake adapter，覆盖成功、401、权限 403、限流 403/429、410/422、网络错误、5xx 和不确定结果对账。
-- 本人提交使用加密的 GitHub App user token，并要求玩家确认 GitHub 公开作者身份无法由站点删号匿名化；Hosted Issue Identity 使用不落盘的 installation token。连接失效绝不自动换作者。token/refresh token 使用 AES-256-GCM、每行独立 nonce/tag 和 `keyId`；PKCE verifier 同样加密且只活到 OAuth state 到期。每用户只保留一个 live Bug Report state，回调必须匹配发起授权的站点 session。
+- 本人提交使用加密的 GitHub App user token，并要求玩家确认 GitHub 公开作者身份无法由站点删号匿名化；Hosted Issue Identity 使用不落盘的 installation token。连接失效绝不自动换作者。token/refresh token 使用 AES-256-GCM、每行独立 nonce/tag 和 `keyId`；PKCE verifier 同样加密且只活到 OAuth state 到期。每用户只保留一个 live Bug Report state，回调通过 API 域独立、非 Partitioned 的 Lax cookie 绑定发起浏览器，不依赖跨顶层站点不可见的分区 session。
 - SQLite executor 原子 claim 一个 `submissionId`。不确定响应先按正文稳定标记对账；重试和限流遵守 ADR-0012。客户端只轮询站内状态，不直接调用 GitHub。
+- Bug Report 底栏请求带当前 `roomId` 的 connection status；只有该用户是原参与者且 Room 已存在 Replay Step 时才启用入口。等待局、未录制局和 legacy no-replay 局返回明确的 anchor unavailable，不伪装成非参与者。
 - Issue 标题为清洗并截断的 `Game bug: <现象首行>`，正文不包含截图、日志、Frame payload、其他玩家身份或隐藏信息。issues-only 仓库自动化统一添加 `needs-triage`；通知使用 GitHub 原生 watching。
 - 主动断开立即删除令牌。删号先撤销 session/连接、匿名化站内数据并进入 `deletion_pending`，再由同一 installation adapter 修改已知 Issue 正文；已放弃但曾提交且 Issue 编号未知的报告先按 marker 对账。GitHub 回包确认正文不再含站点用户 id 后才清除最终内部关联。
 - 维护者全开 evidence 读取必须提供非空理由并写 `bug_report_evidence_audit`。Replay 下架由审计化运维 CLI 删除 Step payload、把 Context 改为 removed，并追加数据库外删除 ledger；共享内容资源仅在没有其他未下架 Replay 引用时删除，资源本身违规时先下架所有引用局。首版不做管理 UI。

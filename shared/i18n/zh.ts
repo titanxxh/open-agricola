@@ -1401,6 +1401,7 @@ export const zh = {
         phenomenon_required: '请先描述发生了什么。',
         phenomenon_too_long: '现象描述不能超过 2000 个字符。',
         not_participant: '只有这局的原参与者可以提交问题。',
+        anchor_unavailable: '该房间记录首个回放步骤后才能报告问题。',
         anchor_mismatch: '当前回放位置已变化或不可用，请从最新的对局位置重新报告。',
         rate_limited: '提交过于频繁，请稍后再试。',
         github_connection_required: '请重新连接 GitHub，才能继续使用自己的 GitHub 身份。',

@@ -66,6 +66,50 @@ describe('serializeStateForPlayer', () => {
     )
   })
 
+  it('removes engine cursors from a player-filtered frame', () => {
+    const serialized = serializeState(makePlayingState(), emptyCtx())
+    serialized.engineStack = {
+      frames: [{
+        source: {
+          kind: 'flow',
+          flow: { type: 'leaf', actionId: 'gain', params: {} },
+        },
+        engineSnapshot: {
+          nodeStates: [{ id: 'secret-choice', state: 'waiting' }],
+          pendingData: [{
+            nodeId: 'secret-choice',
+            pending: {
+              hostNodeId: 'secret-choice',
+              request: {
+                kind: 'choice',
+                options: [{
+                  value: 'secret-card',
+                  labelKey: 'ui.cursorTestChoice',
+                }],
+              },
+              choices: [{
+                value: 'secret-card',
+                labelKey: 'ui.cursorTestChoice',
+              }],
+              effectiveOwnerPlayerId: 'p2',
+            },
+          }],
+          compositeEmit: null,
+        },
+        ownerPlayerIndex: 1,
+        spaceId: 'secret-space',
+        stageResume: null,
+        deferredPlayerSwitch: null,
+        reason: 'top-level',
+      }],
+    }
+
+    const filtered = filterSerializedStateForPlayer(serialized, 'p1')
+
+    expect(JSON.stringify(serialized.engineStack)).toContain('secret-card')
+    expect(filtered.engineStack).toEqual({ frames: [] })
+  })
+
   it('round-trips six players through serialize and rehydrate', () => {
     const state = createInitialState(42, {
       playerCount: 6,

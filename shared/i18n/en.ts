@@ -1421,6 +1421,7 @@ export const en = {
         phenomenon_required: 'Describe what happened before continuing.',
         phenomenon_too_long: 'Keep the description within 2,000 characters.',
         not_participant: 'Only an original player in this game can submit a report.',
+        anchor_unavailable: 'Bug reports become available after this room records its first replay step.',
         anchor_mismatch: 'This replay position changed or is unavailable. Reopen the report from the current game position.',
         rate_limited: 'Too many reports were submitted. Please try again later.',
         github_connection_required: 'Reconnect GitHub to keep this report under your GitHub identity.',
