@@ -316,9 +316,15 @@ const createCompletedReplayFixture = () => {
 
 let wssCtx: ReturnType<typeof createWsServer> | null = null
 
+const retireAccountRooms = (userId: string): void => {
+  wssCtx?.lobby.endRoomsForUser(userId, getAccountDeletionRoomIds(userId))
+  wssCtx?.closeUserConnections(userId)
+}
+
 const retryPendingAccountDeletion = async (): Promise<void> => {
   const userId = nextPendingAccountDeletion()
   if (!userId || !bugReportDelivery) return
+  retireAccountRooms(userId)
   try {
     await bugReportDelivery.deleteReporter(userId)
     deleteAccount(userId)
@@ -339,9 +345,10 @@ const sessionCleanupTimer = setInterval(() => {
   wssCtx?.committer?.cleanupReplayAssets()
 }, 60 * 60 * 1000)
 const bugReportDeliveryTimer = setInterval(() => {
-  if (!isBugReportRuntimeReady(bugReportRuntime)) return
   void retryPendingAccountDeletion().then(
-    () => bugReportDelivery?.deliverDue(),
+    () => isBugReportRuntimeReady(bugReportRuntime)
+      ? bugReportDelivery?.deliverDue()
+      : undefined,
   ).catch(() => {
     console.error('[bug-report-delivery] delivery loop failed')
   })
@@ -536,11 +543,7 @@ const server = createServer(async (req, res) => {
     )
     if (hasExternalBugReportData) {
       requestAccountDeletion(user.id)
-      wssCtx?.lobby.endRoomsForUser(
-        user.id,
-        getAccountDeletionRoomIds(user.id),
-      )
-      wssCtx?.closeUserConnections(user.id)
+      retireAccountRooms(user.id)
       if (!bugReportDelivery) {
         sendJson(res, 202, { ok: true, pending: true }, {
           'Set-Cookie': clearSessionCookie({
@@ -584,9 +587,8 @@ const server = createServer(async (req, res) => {
           AND github_issue_number IS NULL
       `).run(user.id)
     }
-    wssCtx?.lobby.endRoomsForUser(user.id, getAccountDeletionRoomIds(user.id))
+    retireAccountRooms(user.id)
     const result = deleteAccount(user.id)
-    wssCtx?.closeUserConnections(user.id)
     sendJson(res, 200, result, { 'Set-Cookie': clearSessionCookie({ backendOrigin: getRequestOrigin(req), requestOrigin: req.headers.origin }) })
     return
   }
@@ -707,6 +709,10 @@ const server = createServer(async (req, res) => {
     const existing = findIdentity(provider, body.providerUserId)
     if (existing) {
       const token = createSession(existing.userId)
+      if (!token) {
+        sendJson(res, 401, authError('not_authenticated', 'Not authenticated'))
+        return
+      }
       sendJson(res, 200, { ok: true, provider, mode: 'login' }, { 'Set-Cookie': serializeSessionCookie(token, { backendOrigin: getRequestOrigin(req), requestOrigin: req.headers.origin }) })
       return
     }
