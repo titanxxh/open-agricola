@@ -182,10 +182,13 @@ const createCompletedReplayFixture = () => {
     playerCount: 2,
     playerNames: ['Alice', 'Bob'],
   })
-  const capture = (): JsonValue =>
-    JSON.parse(JSON.stringify(
-      session.buildSyncPayload(session.getState(), null, 'debug').state,
-    )) as JsonValue
+  const capture = (): JsonValue => {
+    const payload = session.buildSyncPayload(session.getState(), null, 'debug')
+    return JSON.parse(JSON.stringify({
+      ...payload.state,
+      ...(payload.state.gameOver ? { scores: payload.scores ?? [] } : {}),
+    })) as JsonValue
+  }
   const frames = [capture()]
   session.state.players[0]!.resources.wood += 3
   frames.push(capture())

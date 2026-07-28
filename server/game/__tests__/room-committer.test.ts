@@ -4,6 +4,7 @@ import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type Database from 'better-sqlite3'
 import { GameSession } from '../authoritative-session.ts'
+import { ReplayStore } from '../replay-store.ts'
 import {
   RoomCommitter,
   replayIntentFromCommand,
@@ -250,6 +251,24 @@ describe('RoomCommitter', () => {
         intent_json: '{"resources":{"food":3}}',
       },
     ])
+  })
+
+  it('archives the authoritative score breakdown in the game-over frame', () => {
+    const room = makeRoom()
+    const committer = createCommitter()
+    committer.prepareRoom(room, { missingPrefix: false })
+    room.session.state.gameOver = true
+    const response = room.session.getState()
+
+    expect(committer.commit(room, response, actionIntent!, 0)).toMatchObject({
+      kind: 'committed',
+      stepNo: 1,
+    })
+    const replay = new ReplayStore(db).segment(room.id, 0)
+    expect(replay.ok).toBe(true)
+    if (!replay.ok) return
+    expect(replay.steps.at(-1)?.frame.scores)
+      .toEqual(JSON.parse(JSON.stringify(response.scores)))
   })
 
   it('copies custom card art into content-addressed replay storage', () => {

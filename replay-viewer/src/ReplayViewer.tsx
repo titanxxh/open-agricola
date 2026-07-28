@@ -8,6 +8,7 @@ import type {
   ReplayUnavailableError,
 } from '../../shared/contract/protocol/replay'
 import { registerCustomCardMetadata } from '../../shared/cards/custom-card-metadata'
+import { ScoringPad } from '../../client/components/board/ScoringPad'
 import { ReplayBoard } from './ReplayBoard'
 import {
   frameForPerspective,
@@ -42,6 +43,7 @@ const labels = {
     step: 'Step',
     frameHash: 'Frame hash',
     hiddenIntent: 'Hidden for this perspective',
+    scores: 'Final scores',
   },
   zh: {
     title: '对局档案',
@@ -65,6 +67,7 @@ const labels = {
     step: '步骤',
     frameHash: '帧哈希',
     hiddenIntent: '当前视角不可见',
+    scores: '终局计分',
   },
 } as const
 
@@ -97,6 +100,7 @@ export function ReplayViewer() {
   )
   const [stepNo, setStepNo] = useState(0)
   const [playing, setPlaying] = useState(false)
+  const [showScores, setShowScores] = useState(true)
   const [segmentRetry, setSegmentRetry] = useState(0)
 
   useEffect(() => {
@@ -235,6 +239,7 @@ export function ReplayViewer() {
   const visibleIntent = current && perspective
     ? intentForPerspective(current, perspective)
     : undefined
+  const scores = visibleFrame?.gameOver ? visibleFrame.scores : undefined
 
   if (!manifest && !error) {
     return <main className="replay-loading">{text.loading}</main>
@@ -287,6 +292,11 @@ export function ReplayViewer() {
           >
             {layout === 'timeline' ? text.board : text.timeline}
           </button>
+          {scores?.length ? (
+            <button type="button" onClick={() => setShowScores(true)}>
+              {text.scores}
+            </button>
+          ) : null}
         </div>
       </header>
 
@@ -409,12 +419,22 @@ export function ReplayViewer() {
           max={Math.max(0, manifest.steps.length - 1)}
           value={Math.max(0, stepIndex)}
           onChange={(event) => {
-            const step = manifest.steps[Number(event.target.value)]
-            if (step) selectStep(step.stepNo)
+            const index = Number(event.target.value)
+            const step = manifest.steps[index]
+            if (step && step.stepNo - stepNo === index - stepIndex) selectStep(step.stepNo)
           }}
         />
         <output>{stepNo} / {manifest.lastStepNo}</output>
       </footer>
+      {scores?.length && showScores ? (
+        <ScoringPad
+          locale={locale}
+          scores={scores}
+          players={visibleFrame?.players ?? []}
+          onClose={() => setShowScores(false)}
+          showDraftHistory
+        />
+      ) : null}
     </main>
   )
 }

@@ -48,6 +48,8 @@ test('anonymous completed replay supports perspectives, playback, layout, and an
 
   await replay.locator('.replay-play').click()
   await expect(replay.locator('.replay-transport output')).toContainText('2 / 2', { timeout: 5000 })
+  await expect(replay.getByText('计分板')).toBeVisible()
+  await replay.getByRole('button', { name: '关闭' }).click()
   await expect.poll(() => new URL(page.url()).searchParams.get('step')).toBe('2')
   await replay.locator('.replay-timeline button').first().click()
   await expect(replay.locator('.replay-transport output')).toContainText('0 / 2')

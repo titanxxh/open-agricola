@@ -1,4 +1,5 @@
 import type { SerializedGameState } from '../../session/serialization'
+import type { PlayerScoreSummary } from '../../domain'
 import type { CustomCardDef } from './game'
 import type { GameContextError } from './game-context'
 
@@ -32,6 +33,10 @@ export type ReplayStepSummary = {
   createdAt: number
 }
 
+export type ReplayGameState = SerializedGameState & {
+  scores?: PlayerScoreSummary[]
+}
+
 export type ReplayManifest = {
   ok: true
   kind: 'replayManifest'
@@ -55,7 +60,7 @@ export type ReplayManifest = {
 }
 
 export type ReplayFrameStep = ReplayStepSummary & {
-  frame: SerializedGameState
+  frame: ReplayGameState
 }
 
 export type ReplaySegment = {
