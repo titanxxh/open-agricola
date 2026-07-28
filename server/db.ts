@@ -773,6 +773,20 @@ export function runMigrations(db: Database.Database): void {
           CREATE INDEX IF NOT EXISTS idx_account_deletion_requests_due
             ON account_deletion_requests(next_attempt_at);
 
+          CREATE TABLE IF NOT EXISTS github_grant_revocations (
+            token_hash TEXT PRIMARY KEY,
+            access_token_ciphertext BLOB NOT NULL,
+            access_token_nonce BLOB NOT NULL,
+            access_token_tag BLOB NOT NULL,
+            key_id TEXT NOT NULL,
+            next_attempt_at INTEGER NOT NULL,
+            last_error_code TEXT,
+            created_at INTEGER NOT NULL,
+            updated_at INTEGER NOT NULL
+          );
+          CREATE INDEX IF NOT EXISTS idx_github_grant_revocations_due
+            ON github_grant_revocations(next_attempt_at);
+
           CREATE TABLE IF NOT EXISTS game_context_participants (
             room_id TEXT NOT NULL REFERENCES game_contexts(room_id) ON DELETE CASCADE,
             player_index INTEGER NOT NULL,

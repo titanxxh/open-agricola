@@ -1,4 +1,6 @@
 import {
+  lazy,
+  Suspense,
   useEffect,
   useState,
   type ReactNode,
@@ -9,14 +11,21 @@ import type {
   GameContextResponse,
   RemovedGameContextDescriptor,
 } from '../../shared/contract/protocol/game-context'
+import type { ReportedEvidenceResponse } from '../../shared/contract/protocol/replay'
 import { API_BASE } from '../config'
 import { useLocale } from '../contexts/LocaleContext'
 import { BrandMark } from '../components/common/BrandMark'
 import { GameLoadScreen } from '../components/common/GameLoadScreen'
+import { loadCardsManifest } from '../services/card-meta'
 import { BugReportBar } from './BugReportBar'
 import { ReplayShell } from './ReplayShell'
 
 export const GAME_CONTEXT_CHANGED_EVENT = 'open-agricola:game-context-changed'
+
+const ReplayBoard = lazy(() =>
+  import('../../replay-viewer/src/ReplayBoard')
+    .then((module) => ({ default: module.ReplayBoard })),
+)
 
 const finishBugReportOAuth = (result: 'connected' | 'error'): void => {
   const url = new URL(window.location.href)
@@ -47,6 +56,95 @@ const statusPage = (
     </section>
   </main>
 )
+
+function ReportedEvidenceContext({
+  roomId,
+  stepNo,
+  frameHash,
+  fallback,
+}: {
+  roomId: string
+  stepNo: number
+  frameHash: string
+  fallback: ReactNode
+}) {
+  const { locale, t } = useLocale()
+  const evidenceKey = `${roomId}:${stepNo}:${frameHash}`
+  const [resolution, setResolution] = useState<{
+    key: string
+    evidence: ReportedEvidenceResponse
+  } | null>(null)
+
+  useEffect(() => {
+    const controller = new AbortController()
+    void fetch(
+      `${API_BASE}/api/v1/game-contexts/${encodeURIComponent(roomId)}`
+        + `/evidence/${stepNo}?frame=${frameHash}`,
+      { credentials: 'include', signal: controller.signal },
+    )
+      .then(async (response) => {
+        const body = await response.json() as ReportedEvidenceResponse
+        if (response.status === 401) {
+          const url = new URL(window.location.href)
+          url.searchParams.set('page', 'login')
+          window.history.replaceState(null, '', url)
+          window.dispatchEvent(new PopStateEvent('popstate'))
+          return
+        }
+        if (body.ok) await loadCardsManifest()
+        setResolution({ key: evidenceKey, evidence: body })
+      })
+      .catch((error: unknown) => {
+        if (error instanceof DOMException && error.name === 'AbortError') return
+        setResolution({
+          key: evidenceKey,
+          evidence: {
+            ok: false,
+            code: 'viewer_unavailable',
+            message: 'Reported evidence is unavailable',
+          },
+        })
+      })
+    return () => controller.abort()
+  }, [evidenceKey, frameHash, roomId, stepNo])
+
+  const evidence = resolution?.key === evidenceKey
+    ? resolution.evidence
+    : null
+  if (!evidence) {
+    return <GameLoadScreen percent={10} label={t('platform.loading')} />
+  }
+  if (!evidence.ok) return fallback
+  return (
+    <main className="reported-evidence">
+      <header className="reported-evidence__header">
+        <p>{t('platform.gameContext.room', { id: roomId })}</p>
+        <h1>{t('platform.gameContext.reportedEvidenceTitle')}</h1>
+        <p>{t('platform.gameContext.reportedEvidenceBody')}</p>
+        <dl>
+          <div>
+            <dt>{t('platform.bugReport.step')}</dt>
+            <dd>{evidence.stepNo}</dd>
+          </div>
+          <div>
+            <dt>{t('platform.bugReport.frameHash')}</dt>
+            <dd><code>{evidence.frameHash}</code></dd>
+          </div>
+        </dl>
+      </header>
+      <Suspense fallback={<GameLoadScreen percent={70} label={t('platform.loading')} />}>
+        <ReplayBoard
+          frame={evidence.frame}
+          locale={locale}
+          perspective={evidence.perspective}
+        />
+      </Suspense>
+      {new URLSearchParams(window.location.search).has('bugReport')
+        ? <BugReportBar roomId={roomId} />
+        : null}
+    </main>
+  )
+}
 
 function CompletedContext({
   context,
@@ -92,7 +190,7 @@ function PublicContext({
     return <CompletedContext context={response} />
   }
   if (response.ok && response.lifecycle === 'expired') {
-    return statusPage(
+    const expired = statusPage(
       t('platform.gameContext.room', { id: response.roomId }),
       t('platform.gameContext.expiredTitle'),
       t('platform.gameContext.expiredBody'),
@@ -100,6 +198,20 @@ function PublicContext({
         ? <BugReportBar roomId={response.roomId} />
         : undefined,
     )
+    const params = new URLSearchParams(window.location.search)
+    const rawStep = params.get('step') ?? ''
+    const frameHash = params.get('frame') ?? ''
+    if (/^(0|[1-9]\d*)$/.test(rawStep) && /^[a-f0-9]{64}$/.test(frameHash)) {
+      return (
+        <ReportedEvidenceContext
+          roomId={response.roomId}
+          stepNo={Number(rawStep)}
+          frameHash={frameHash}
+          fallback={expired}
+        />
+      )
+    }
+    return expired
   }
   if (response.ok && response.lifecycle === 'removed') {
     return statusPage(

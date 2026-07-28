@@ -1345,6 +1345,8 @@ export const zh = {
       unavailableBody: '请稍后重试。',
       verifyingReplay: '正在验证回放档案…',
       viewerUnavailable: '这局的回放查看器缺失或未通过完整性校验。',
+      reportedEvidenceTitle: '已报告的对局证据',
+      reportedEvidenceBody: '这个保留位置只读，并且只显示你所在座位当时可见的信息。',
       choosePerspective: '选择回放视角。全开视角会显示所有隐藏信息。',
       watchAs: '以 {player} 视角回放',
       watchOpen: '全开视角回放',

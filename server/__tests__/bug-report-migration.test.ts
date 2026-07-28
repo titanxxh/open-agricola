@@ -79,6 +79,19 @@ describe('bug report migration', () => {
       'next_attempt_at',
       'last_error_code',
     ])
+    expect((db.pragma('table_info(github_grant_revocations)') as Array<{
+      name: string
+    }>).map(({ name }) => name)).toEqual([
+      'token_hash',
+      'access_token_ciphertext',
+      'access_token_nonce',
+      'access_token_tag',
+      'key_id',
+      'next_attempt_at',
+      'last_error_code',
+      'created_at',
+      'updated_at',
+    ])
     expect((db.pragma('index_list(bug_report_evidence_audit)') as Array<{
       name: string
     }>).map(({ name }) => name)).toContain(

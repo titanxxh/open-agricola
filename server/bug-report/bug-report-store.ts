@@ -45,6 +45,14 @@ type ConnectionRow = {
   refresh_token_expires_at: number | null
 }
 
+type GrantRevocationRow = {
+  token_hash: string
+  access_token_ciphertext: Buffer
+  access_token_nonce: Buffer
+  access_token_tag: Buffer
+  key_id: string
+}
+
 type OAuthStateRow = {
   user_id: string
   return_to: string | null
@@ -416,6 +424,79 @@ export class BugReportStore {
     }
   }
 
+  queueGrantRevocation(accessToken: string): string {
+    const tokenHash = hashState(accessToken)
+    const encrypted = this.cipher.encrypt(accessToken)
+    const now = this.now()
+    this.db.prepare(`
+      INSERT INTO github_grant_revocations (
+        token_hash, access_token_ciphertext, access_token_nonce,
+        access_token_tag, key_id, next_attempt_at, last_error_code,
+        created_at, updated_at
+      )
+      VALUES (?, ?, ?, ?, ?, ?, NULL, ?, ?)
+      ON CONFLICT(token_hash) DO UPDATE SET
+        next_attempt_at = excluded.next_attempt_at,
+        last_error_code = NULL,
+        updated_at = excluded.updated_at
+    `).run(
+      tokenHash,
+      encrypted.ciphertext,
+      encrypted.nonce,
+      encrypted.tag,
+      encrypted.keyId,
+      now,
+      now,
+      now,
+    )
+    return tokenHash
+  }
+
+  nextGrantRevocation(): {
+    tokenHash: string
+    accessToken: string
+  } | null {
+    const row = this.db.prepare(`
+      SELECT token_hash, access_token_ciphertext, access_token_nonce,
+             access_token_tag, key_id
+      FROM github_grant_revocations
+      WHERE next_attempt_at <= ?
+      ORDER BY next_attempt_at, created_at
+      LIMIT 1
+    `).get(this.now()) as GrantRevocationRow | undefined
+    if (!row) return null
+    return {
+      tokenHash: row.token_hash,
+      accessToken: this.cipher.decrypt({
+        ciphertext: row.access_token_ciphertext,
+        nonce: row.access_token_nonce,
+        tag: row.access_token_tag,
+        keyId: row.key_id,
+      }),
+    }
+  }
+
+  finishGrantRevocation(tokenHash: string): void {
+    this.db.prepare(`
+      DELETE FROM github_grant_revocations WHERE token_hash = ?
+    `).run(tokenHash)
+  }
+
+  deferGrantRevocation(
+    tokenHash: string,
+    code: string,
+    retryAt?: number,
+  ): void {
+    const now = this.now()
+    this.db.prepare(`
+      UPDATE github_grant_revocations
+      SET next_attempt_at = ?,
+          last_error_code = ?,
+          updated_at = ?
+      WHERE token_hash = ?
+    `).run(retryAt ?? now + RETRY_DELAYS[0], code, now, tokenHash)
+  }
+
   disconnect(userId: string): void {
     this.db.prepare(`
       DELETE FROM issue_submission_connections WHERE user_id = ?
@@ -638,7 +719,7 @@ export class BugReportStore {
       anchor.step_no,
       anchor.frame_hash,
       phenomenon,
-      context.lifecycle === 'active' ? now + EVIDENCE_TTL_MS : null,
+      null,
       now,
       now,
     )
@@ -823,17 +904,56 @@ export class BugReportStore {
     }
     const now = this.now()
     const status = row.status === 'draft' ? 'queued' : 'reconcile'
-    this.db.prepare(`
+    const queued = this.db.prepare(`
       UPDATE bug_reports
       SET status = ?,
           submitted_at = COALESCE(submitted_at, ?),
+          evidence_expires_at = CASE
+            WHEN submitted_at IS NULL AND lifecycle = 'active'
+              THEN ?
+            ELSE evidence_expires_at
+          END,
           next_attempt_at = ?,
           claim_token = NULL,
           claimed_at = NULL,
           last_error_code = NULL,
           updated_at = ?
       WHERE submission_id = ? AND reporter_user_id = ?
-    `).run(status, now, now, now, submissionId, userId)
+        AND (
+          submitted_at IS NOT NULL
+          OR lifecycle != 'active'
+          OR EXISTS (
+            SELECT 1
+            FROM game_replay_steps AS anchor
+            JOIN game_replay_steps AS checkpoint
+              ON checkpoint.room_id = anchor.room_id
+             AND checkpoint.step_no = anchor.checkpoint_step_no
+             AND checkpoint.payload_kind = 'checkpoint'
+            WHERE anchor.room_id = bug_reports.room_id
+              AND anchor.step_no = bug_reports.step_no
+              AND anchor.frame_hash = bug_reports.frame_hash
+              AND (
+                SELECT COUNT(*)
+                FROM game_replay_steps AS segment
+                WHERE segment.room_id = anchor.room_id
+                  AND segment.checkpoint_step_no = anchor.checkpoint_step_no
+                  AND segment.step_no
+                    BETWEEN anchor.checkpoint_step_no AND anchor.step_no
+              ) = anchor.step_no - anchor.checkpoint_step_no + 1
+          )
+        )
+    `).run(
+      status,
+      now,
+      now + EVIDENCE_TTL_MS,
+      now,
+      now,
+      submissionId,
+      userId,
+    )
+    if (queued.changes !== 1) {
+      throw new BugReportError('replay_segment_unavailable', 503)
+    }
     return this.getOwned(submissionId, userId)
   }
 
@@ -1334,16 +1454,38 @@ export class BugReportDelivery {
     this.running = true
     try {
       const tokens = this.store.connectionTokens(userId)
+      if (tokens) this.store.queueGrantRevocation(tokens.accessToken)
       this.store.disconnect(userId)
-      if (tokens) {
-        const result = await this.client.revokeUserGrant(tokens.accessToken)
-        if (!result.ok) {
-          throw new BugReportError(result.code, 503, result.retryAt)
-        }
-      }
+      if (tokens) await this.revokeGrant(tokens.accessToken)
     } finally {
       this.running = false
     }
+  }
+
+  async revokeGrant(accessToken: string): Promise<void> {
+    const tokenHash = this.store.queueGrantRevocation(accessToken)
+    const result = await this.client.revokeUserGrant(accessToken)
+    if (result.ok) {
+      this.store.finishGrantRevocation(tokenHash)
+      return
+    }
+    this.store.deferGrantRevocation(tokenHash, result.code, result.retryAt)
+    throw new BugReportError(result.code, 503, result.retryAt)
+  }
+
+  async retryGrantRevocation(): Promise<void> {
+    const pending = this.store.nextGrantRevocation()
+    if (!pending) return
+    const result = await this.client.revokeUserGrant(pending.accessToken)
+    if (result.ok) {
+      this.store.finishGrantRevocation(pending.tokenHash)
+      return
+    }
+    this.store.deferGrantRevocation(
+      pending.tokenHash,
+      result.code,
+      result.retryAt,
+    )
   }
 
   async deleteReporter(userId: string): Promise<void> {
@@ -1384,10 +1526,7 @@ export class BugReportDelivery {
         }
       }
       if (plan.tokens) {
-        const result = await this.client.revokeUserGrant(plan.tokens.accessToken)
-        if (!result.ok) {
-          throw new BugReportError(result.code, 503, result.retryAt)
-        }
+        await this.revokeGrant(plan.tokens.accessToken)
       }
       this.store.anonymizeReporter(userId)
     } finally {

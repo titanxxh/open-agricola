@@ -190,6 +190,71 @@ describe('BugReportStore', () => {
     )
   })
 
+  it('starts active evidence retention at the first submission', () => {
+    const roomId = insertContext('active')
+    const report = store.createDraft({
+      userId: 'u1',
+      roomId,
+      phenomenon: 'The game froze',
+    })
+    expect(db.prepare(`
+      SELECT evidence_expires_at FROM bug_reports WHERE submission_id = ?
+    `).get(report.submissionId)).toEqual({ evidence_expires_at: null })
+    store.updateDraft(report.submissionId, 'u1', {
+      authorIdentity: 'hosted',
+      confirmHosted: true,
+    })
+    now += 7 * 24 * 60 * 60 * 1000
+
+    store.queue(report.submissionId, 'u1')
+
+    expect(db.prepare(`
+      SELECT submitted_at, evidence_expires_at
+      FROM bug_reports WHERE submission_id = ?
+    `).get(report.submissionId)).toEqual({
+      submitted_at: now,
+      evidence_expires_at: now + 30 * 24 * 60 * 60 * 1000,
+    })
+  })
+
+  it('refuses to submit active evidence after its segment prefix is gone', () => {
+    const roomId = insertContext('active')
+    db.prepare(`
+      INSERT INTO game_replay_steps (
+        room_id, step_no, room_version, checkpoint_step_no, player_index,
+        command_type, intent_json, payload_kind, payload_gzip, frame_hash,
+        created_at
+      )
+      VALUES (?, 6, 9, 5, 0, 'test', '{}', 'delta', ?, ?, ?)
+    `).run(roomId, Buffer.from('delta'), 'c'.repeat(64), now)
+    const report = store.createDraft({
+      userId: 'u1',
+      roomId,
+      phenomenon: 'The game froze',
+    })
+    store.updateDraft(report.submissionId, 'u1', {
+      authorIdentity: 'hosted',
+      confirmHosted: true,
+    })
+    db.prepare(`
+      DELETE FROM game_replay_steps WHERE room_id = ? AND step_no = ?
+    `).run(roomId, 5)
+
+    expectBugReportError(
+      () => store.queue(report.submissionId, 'u1'),
+      'replay_segment_unavailable',
+      503,
+    )
+    expect(db.prepare(`
+      SELECT status, submitted_at, evidence_expires_at
+      FROM bug_reports WHERE submission_id = ?
+    `).get(report.submissionId)).toEqual({
+      status: 'draft',
+      submitted_at: null,
+      evidence_expires_at: null,
+    })
+  })
+
   it('requires an exact archived anchor and original participant for completed games', () => {
     const roomId = insertContext('completed')
     const report = store.createDraft({
@@ -449,18 +514,30 @@ describe('BugReportStore', () => {
       code: 'github_revocation_uncertain',
     })
 
-    await expect(new BugReportDelivery(
+    const delivery = new BugReportDelivery(
       store,
       adapter,
       'https://game.example',
       () => now,
-    ).disconnectUser('u1')).rejects.toMatchObject({
+    )
+    await expect(delivery.disconnectUser('u1')).rejects.toMatchObject({
       code: 'github_revocation_uncertain',
       status: 503,
     })
 
     expect(store.connectionStatus('u1')).toEqual({ connected: false })
     expect(store.connectionTokens('u1')).toBeNull()
+    expect(db.prepare(`
+      SELECT COUNT(*) AS count FROM github_grant_revocations
+    `).get()).toEqual({ count: 1 })
+
+    now += 30_000
+    vi.mocked(adapter.revokeUserGrant).mockResolvedValueOnce({ ok: true })
+    await delivery.retryGrantRevocation()
+
+    expect(db.prepare(`
+      SELECT COUNT(*) AS count FROM github_grant_revocations
+    `).get()).toEqual({ count: 0 })
   })
 
   it('requires and uses the reporter GitHub connection without hosted fallback', async () => {
