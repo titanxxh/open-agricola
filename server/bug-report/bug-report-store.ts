@@ -206,9 +206,17 @@ export class TokenCipher {
 const hashState = (state: string): string =>
   createHash('sha256').update(state).digest('hex')
 
+const stripUnsafeControls = (value: string): string =>
+  value.replace(/\p{Cc}/gu, (character) =>
+    character === '\n' || character === '\r' || character === '\t'
+      ? character
+      : '')
+
 const cleanPhenomenon = (value: unknown): string => {
   if (typeof value !== 'string') throw new BugReportError('phenomenon_required', 400)
-  const phenomenon = value.trim()
+  const phenomenon = stripUnsafeControls(value)
+    .replaceAll('<!-- open-agricola-report:', '&lt;!-- open-agricola-report:')
+    .trim()
   const length = Array.from(phenomenon).length
   if (length === 0) throw new BugReportError('phenomenon_required', 400)
   if (length > 2000) throw new BugReportError('phenomenon_too_long', 400)
@@ -1202,15 +1210,10 @@ export type IssueDeliveryAdapter = Pick<
 >
 
 const neutralizeMentions = (value: string): string =>
-  value
-    .replace(/\p{Cc}/gu, (character) =>
-      character === '\n' || character === '\r' || character === '\t'
-        ? character
-        : '')
-    .replace(
-      /(?<![A-Za-z0-9_/:=?&#%+-])@([A-Za-z0-9](?:[A-Za-z0-9-]{0,38}))(?![A-Za-z0-9-])/g,
-      '@\u200B$1',
-    )
+  value.replace(
+    /(?<![A-Za-z0-9_/:=?&#%+-])@([A-Za-z0-9](?:[A-Za-z0-9-]{0,38}))(?![A-Za-z0-9-])/g,
+    '@\u200B$1',
+  )
 
 const code = (value: string | number): string =>
   `\`${String(value).replaceAll('`', "'")}\``

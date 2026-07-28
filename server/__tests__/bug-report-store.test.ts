@@ -238,6 +238,11 @@ describe('BugReportStore', () => {
       400,
     )
     expectBugReportError(
+      () => store.createDraft({ userId: 'u1', roomId, phenomenon: '\u0001' }),
+      'phenomenon_required',
+      400,
+    )
+    expectBugReportError(
       () => store.createDraft({
         userId: 'u1',
         roomId,
@@ -382,7 +387,8 @@ describe('BugReportStore', () => {
       userId: 'u1',
       roomId,
       phenomenon: '@alice UI\u0001 froze after taking wood\n'
-        + 'https://host/@bob user@example.com @scope/pkg @org/team',
+        + 'https://host/@bob user@example.com @scope/pkg @org/team\n'
+        + '<!-- open-agricola-report:forged -->',
     })
     expectBugReportError(
       () => store.updateDraft(report.submissionId, 'u1', {
@@ -420,6 +426,8 @@ describe('BugReportStore', () => {
     expect(issue.body).toContain('user@example.com')
     expect(issue.body).toContain('@\u200Bscope/pkg')
     expect(issue.body).toContain('@\u200Borg/team')
+    expect(issue.body).toContain('&lt;!-- open-agricola-report:forged -->')
+    expect(issue.body.match(/<!-- open-agricola-report:[^>\r\n]+ -->/g)).toHaveLength(1)
     expect(issue.body).not.toContain('\u0001')
     expect(store.getOwned(report.submissionId, 'u1')).toMatchObject({
       status: 'submitted',

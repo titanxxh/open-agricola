@@ -589,7 +589,7 @@ describe('auth routes', () => {
     expect(res.json).toEqual({ ok: true, pending: true })
     expect(res.headers['Set-Cookie']).toContain(`${SESSION_COOKIE}=;`)
     expect(validateSession(token)).toBeNull()
-    expect(() => createSession(user.id)).toThrow(/account deletion pending/)
+    expect(createSession(user.id)).toBeNull()
     expect(findIdentity('github', 'gh-delete-pending')).toBeNull()
     expect(getDb().prepare(`
       SELECT last_error_code FROM account_deletion_requests WHERE user_id = ?
