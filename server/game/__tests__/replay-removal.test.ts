@@ -181,13 +181,13 @@ describe('replay removal', () => {
 
     const ledger = readFileSync(ledgerPath, 'utf8').trim().split('\n')
     expect(ledger).toHaveLength(1)
-    expect(JSON.parse(ledger[0]!)).toEqual({
+    expect(JSON.parse(ledger[0]!)).toEqual([{
       version: 1,
       roomId: 'room-one',
       reason: 'legal',
       removedAt: 200,
       assetHashes: [hash],
-    })
+    }])
 
     expect(removeReplay(db, {
       roomId: 'room-one',
@@ -251,8 +251,55 @@ describe('replay removal', () => {
       { room_id: 'room-one', lifecycle: 'removed' },
       { room_id: 'room-two', lifecycle: 'removed' },
     ])
-    expect(readFileSync(ledgerPath, 'utf8').trim().split('\n')).toHaveLength(2)
+    const batches = readFileSync(ledgerPath, 'utf8').trim().split('\n')
+    expect(batches).toHaveLength(1)
+    expect(JSON.parse(batches[0]!)).toHaveLength(2)
     expect(existsSync(join(assetRoot, sharedHash))).toBe(false)
+  })
+
+  it('clears participant identities when an asset sweep removes an active replay', () => {
+    const db = createDb()
+    const hash = writeAsset('active-sensitive-art')
+    seedReplay(db, 'active-room', [hash])
+    db.prepare(`
+      INSERT INTO users (
+        id, username, display_name, password_hash, created_at
+      ) VALUES ('active-user', 'active_user', 'Active User', 'hash', 100)
+    `).run()
+    db.prepare(`
+      UPDATE game_contexts
+      SET lifecycle = 'active', phase = 'playing'
+      WHERE room_id = 'active-room'
+    `).run()
+    db.prepare(`
+      UPDATE game_replays
+      SET status = 'recording', completed_at = NULL
+      WHERE room_id = 'active-room'
+    `).run()
+    db.prepare(`
+      INSERT INTO rooms (
+        id, created_by, state_json, status, version, created_at, updated_at
+      ) VALUES ('active-room', 'active-user', '{}', 'playing', 1, 100, 100)
+    `).run()
+    db.prepare(`
+      INSERT INTO room_players (room_id, user_id, player_index, joined_at)
+      VALUES ('active-room', 'active-user', 0, 100)
+    `).run()
+
+    removeReplay(db, {
+      roomId: 'active-room',
+      reason: 'legal',
+      assetHash: hash,
+      assetRoot,
+      ledgerPath,
+      now: () => 200,
+    })
+
+    expect(db.prepare(`
+      SELECT COUNT(*) AS count
+      FROM game_context_participants
+      WHERE room_id = 'active-room'
+    `).get()).toEqual({ count: 0 })
   })
 
   it('replays the external ledger before a restored backup can expose deleted data', () => {
@@ -300,5 +347,36 @@ describe('replay removal', () => {
       code: 'context_removed',
     })
     expect(existsSync(join(assetRoot, hash))).toBe(false)
+  })
+
+  it('rolls back a torn final batch and rejects corrupt committed batches', () => {
+    const live = createDb()
+    const restored = createDb()
+    seedReplay(live, 'room-one')
+    seedReplay(restored, 'room-one')
+    removeReplay(live, {
+      roomId: 'room-one',
+      reason: 'legal',
+      assetRoot,
+      ledgerPath,
+      now: () => 200,
+    })
+    const committed = readFileSync(ledgerPath, 'utf8')
+    writeFileSync(ledgerPath, `${committed}[{"version":1`)
+
+    expect(applyReplayRemovalLedger(restored, {
+      assetRoot,
+      ledgerPath,
+    })).toMatchObject({
+      entries: 1,
+      removedRoomIds: ['room-one'],
+    })
+    expect(readFileSync(ledgerPath, 'utf8')).toBe(committed)
+
+    writeFileSync(ledgerPath, `${committed}not-json\n`)
+    expect(() => applyReplayRemovalLedger(restored, {
+      assetRoot,
+      ledgerPath,
+    })).toThrow('invalid replay removal ledger')
   })
 })
