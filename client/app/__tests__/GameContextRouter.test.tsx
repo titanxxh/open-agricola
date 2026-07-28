@@ -103,6 +103,80 @@ describe('GameContextRouter', () => {
     )
   })
 
+  it('opens pinned active evidence without replacing the live game', async () => {
+    const frameHash = 'a'.repeat(64)
+    const viewerManifest = JSON.stringify({
+      entrypoint: 'index.html',
+      files: { 'index.html': '0'.repeat(64) },
+    })
+    const viewerBuildId = createHash('sha256').update(viewerManifest).digest('hex')
+    window.history.replaceState(
+      null,
+      '',
+      `/?context=active-room&step=5&frame=${frameHash}&perspective=open`,
+    )
+    const fetch = vi.fn(async (input: string | URL | Request) => {
+      const url = String(input)
+      if (url.endsWith('/api/v1/game-contexts/active-room')) {
+        return new Response(JSON.stringify({
+          ok: true,
+          roomId: 'active-room',
+          lifecycle: 'active',
+          phase: 'playing',
+          playerIndex: 0,
+          roomVersion: 8,
+          stepNo: 6,
+        }))
+      }
+      if (url.endsWith(
+        `/api/v1/game-contexts/active-room/evidence/5?frame=${frameHash}`,
+      )) {
+        return new Response(JSON.stringify({
+          ok: true,
+          kind: 'reportedEvidence',
+          apiVersion: 1,
+          roomId: 'active-room',
+          schemaVersion: 1,
+          viewerBuildId,
+          stepNo: 5,
+          frameHash,
+          perspective: 'p1',
+          frame: { round: 1, players: [{ id: 'p1' }] },
+          customCards: [],
+        }))
+      }
+      if (url.endsWith(`/replay-viewers/${viewerBuildId}/manifest.json`)) {
+        return new Response(viewerManifest)
+      }
+      throw new Error(`Unexpected request: ${url}`)
+    })
+    vi.stubGlobal('fetch', fetch)
+
+    render(<GameContextRouter><div>active app</div></GameContextRouter>)
+
+    expect(await screen.findByText('active app')).toBeVisible()
+    const iframe = await screen.findByTitle(
+      'platform.gameContext.replayFrameTitle',
+    )
+    expect(screen.getByRole('complementary', {
+      name: 'platform.gameContext.reportedEvidenceTitle',
+    })).toContainElement(iframe)
+    expect(new URL(iframe.getAttribute('src')!, window.location.href)
+      .searchParams.get('perspective')).toBe('p1')
+    expect(fetch).toHaveBeenCalledWith(
+      `/api/v1/game-contexts/active-room/evidence/5?frame=${frameHash}`,
+      expect.objectContaining({ credentials: 'include' }),
+    )
+
+    fireEvent.click(screen.getByRole('button', {
+      name: 'platform.bugReport.close',
+    }))
+
+    expect(screen.queryByRole('complementary')).not.toBeInTheDocument()
+    expect(screen.getByText('active app')).toBeVisible()
+    expect(window.location.search).toBe('?context=active-room&perspective=open')
+  })
+
   it('keeps the full active context link behind login', async () => {
     window.history.replaceState(null, '', '/?context=active-room')
     stubResponse({
