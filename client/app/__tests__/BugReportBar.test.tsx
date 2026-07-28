@@ -260,4 +260,119 @@ describe('BugReportBar', () => {
     expect(await screen.findByRole('link', { name: 'Connect GitHub' }))
       .toBeInTheDocument()
   })
+
+  it('shows a matching open Issue and records the explicit new-Issue choice', async () => {
+    const user = userEvent.setup()
+    const calls: Array<{ method: string; body: unknown }> = []
+    vi.stubGlobal('fetch', vi.fn(async (
+      input: string | URL | Request,
+      init?: RequestInit,
+    ) => {
+      const url = String(input)
+      const method = init?.method ?? 'GET'
+      const body = init?.body ? JSON.parse(String(init.body)) : null
+      calls.push({ method, body })
+      if (url.endsWith('/api/v1/issue-submission-connection')) {
+        return response({ ok: true, enabled: true, connected: false })
+      }
+      if (url.endsWith('/api/v1/game-contexts/room-1/bug-reports')) {
+        return response({
+          ok: true,
+          report: report({ phenomenon: 'The game froze' }),
+          existingIssues: [{
+            number: 7,
+            url: 'https://github.com/titanxxh/open-agricola-issues/issues/7',
+          }],
+        }, 201)
+      }
+      if (
+        url.endsWith('/api/v1/bug-reports/submission-1')
+        && method === 'PATCH'
+      ) {
+        return response({
+          ok: true,
+          report: report({ phenomenon: 'The game froze' }),
+          existingIssues: [{
+            number: 7,
+            url: 'https://github.com/titanxxh/open-agricola-issues/issues/7',
+          }],
+        })
+      }
+      throw new Error(`Unexpected request: ${method} ${url}`)
+    }))
+    renderBar({ roomId: 'room-1' })
+
+    await user.click(await screen.findByRole('button', { name: 'Report a bug' }))
+    await user.type(
+      screen.getByLabelText('Describe what happened in one sentence'),
+      'The game froze',
+    )
+    await user.click(screen.getByRole('button', { name: 'Continue' }))
+
+    expect(await screen.findByRole('link', { name: 'Open Issue #7' }))
+      .toHaveAttribute(
+        'href',
+        'https://github.com/titanxxh/open-agricola-issues/issues/7',
+      )
+    await user.click(screen.getByRole('button', {
+      name: 'Continue with a new Issue',
+    }))
+
+    expect(calls).toContainEqual({
+      method: 'PATCH',
+      body: { confirmExisting: true },
+    })
+    expect(await screen.findByText('Choose the Issue author'))
+      .toBeInTheDocument()
+  })
+
+  it('retries a frozen failed report without patching public fields', async () => {
+    const user = userEvent.setup()
+    window.history.replaceState(null, '', '/?bugReport=submission-1')
+    const methods: string[] = []
+    vi.stubGlobal('fetch', vi.fn(async (
+      input: string | URL | Request,
+      init?: RequestInit,
+    ) => {
+      const url = String(input)
+      const method = init?.method ?? 'GET'
+      methods.push(method)
+      if (url.endsWith('/api/v1/issue-submission-connection')) {
+        return response({ ok: true, enabled: true, connected: false })
+      }
+      if (
+        url.endsWith('/api/v1/bug-reports/submission-1')
+        && method === 'GET'
+      ) {
+        return response({
+          ok: true,
+          report: report({
+            authorIdentity: 'hosted',
+            status: 'failed',
+            lastErrorCode: 'github_permission_denied',
+          }),
+          existingIssues: [],
+        })
+      }
+      if (url.endsWith('/api/v1/bug-reports/submission-1/submit')) {
+        return response({
+          ok: true,
+          report: report({
+            authorIdentity: 'hosted',
+            status: 'submitted',
+            issueNumber: 8,
+            issueUrl: 'https://github.com/titanxxh/open-agricola-issues/issues/8',
+          }),
+        })
+      }
+      throw new Error(`Unexpected request: ${method} ${url}`)
+    }))
+    renderBar({ roomId: 'room-1' })
+
+    await user.click(await screen.findByRole('button', { name: 'Submit Issue' }))
+
+    expect(await screen.findByRole('link', { name: 'Open Issue #8' }))
+      .toBeInTheDocument()
+    expect(methods).not.toContain('PATCH')
+  })
 })

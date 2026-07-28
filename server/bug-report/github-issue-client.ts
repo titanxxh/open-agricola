@@ -27,6 +27,10 @@ export type GitHubIssueResult =
   | ({ ok: true } & GitHubIssue & { requestId?: string })
   | GitHubFailure
 
+export type GitHubOperationResult =
+  | { ok: true }
+  | GitHubFailure
+
 export type GitHubUserTokens = {
   accessToken: string
   accessTokenExpiresAt: number
@@ -227,21 +231,8 @@ export class GitHubIssueClient {
     issue: IssueBody,
     userAccessToken?: string,
   ): Promise<GitHubIssueResult> {
-    let token: string
-    try {
-      token = identity === 'github_user'
-        ? userAccessToken ?? ''
-        : await this.installationToken()
-      if (!token) {
-        return { ok: false, kind: 'auth', code: 'github_auth_invalid' }
-      }
-    } catch {
-      return {
-        ok: false,
-        kind: 'terminal',
-        code: 'github_app_configuration_invalid',
-      }
-    }
+    const authorization = await this.issueToken(identity, userAccessToken)
+    if (!authorization.ok) return authorization
     let response: Response
     try {
       response = await this.fetchImpl(
@@ -249,7 +240,7 @@ export class GitHubIssueClient {
         {
           method: 'POST',
           headers: {
-            ...apiHeaders(token),
+            ...apiHeaders(authorization.token),
             'Content-Type': 'application/json',
           },
           body: JSON.stringify({
@@ -290,21 +281,8 @@ export class GitHubIssueClient {
     since: number,
     userAccessToken?: string,
   ): Promise<GitHubIssueResult | { ok: true; found: false }> {
-    let token: string
-    try {
-      token = identity === 'github_user'
-        ? userAccessToken ?? ''
-        : await this.installationToken()
-      if (!token) {
-        return { ok: false, kind: 'auth', code: 'github_auth_invalid' }
-      }
-    } catch {
-      return {
-        ok: false,
-        kind: 'terminal',
-        code: 'github_app_configuration_invalid',
-      }
-    }
+    const authorization = await this.issueToken(identity, userAccessToken)
+    if (!authorization.ok) return authorization
     for (let page = 1; page <= 100; page += 1) {
       let response: Response
       try {
@@ -314,7 +292,9 @@ export class GitHubIssueClient {
         url.searchParams.set('direction', 'desc')
         url.searchParams.set('per_page', '100')
         url.searchParams.set('page', String(page))
-        response = await this.fetchImpl(url, { headers: apiHeaders(token) })
+        response = await this.fetchImpl(url, {
+          headers: apiHeaders(authorization.token),
+        })
       } catch {
         return {
           ok: false,
@@ -355,6 +335,93 @@ export class GitHubIssueClient {
       kind: 'uncertain',
       code: 'github_reconciliation_uncertain',
     }
+  }
+
+  async revokeUserGrant(accessToken: string): Promise<GitHubOperationResult> {
+    let response: Response
+    try {
+      response = await this.fetchImpl(
+        `${API}/applications/${encodeURIComponent(this.options.clientId)}/grant`,
+        {
+          method: 'DELETE',
+          headers: {
+            Accept: 'application/vnd.github+json',
+            Authorization: `Basic ${Buffer.from(
+              `${this.options.clientId}:${this.options.clientSecret}`,
+            ).toString('base64')}`,
+            'Content-Type': 'application/json',
+            'X-GitHub-Api-Version': '2022-11-28',
+          },
+          body: JSON.stringify({ access_token: accessToken }),
+        },
+      )
+    } catch {
+      return {
+        ok: false,
+        kind: 'uncertain',
+        code: 'github_revocation_uncertain',
+      }
+    }
+    if (response.ok || response.status === 404 || response.status === 422) {
+      return { ok: true }
+    }
+    return failureFromResponse(response, this.now())
+  }
+
+  async anonymizeIssue(
+    issueNumber: number,
+    reporterUserId: string,
+  ): Promise<GitHubOperationResult> {
+    if (!Number.isSafeInteger(issueNumber) || issueNumber <= 0) {
+      return {
+        ok: false,
+        kind: 'terminal',
+        code: 'github_issue_reference_invalid',
+      }
+    }
+    const authorization = await this.installationToken()
+    if (!authorization.ok) return authorization
+    const issueUrl = `${API}/repos/${OWNER}/${REPOSITORY}/issues/${issueNumber}`
+    let response: Response
+    try {
+      response = await this.fetchImpl(issueUrl, {
+        headers: apiHeaders(authorization.token),
+      })
+    } catch {
+      return {
+        ok: false,
+        kind: 'uncertain',
+        code: 'github_anonymization_uncertain',
+      }
+    }
+    if (!response.ok) return failureFromResponse(response, this.now())
+    const issue = await parseJson<IssueResponse>(response)
+    if (typeof issue.body !== 'string') return { ok: true }
+    const reporterLine = `- Reporter site ID: \`${reporterUserId.replaceAll('`', "'")}\``
+    const anonymized = issue.body.replace(
+      reporterLine,
+      '- Reporter site ID: `deleted reporter`',
+    )
+    if (anonymized === issue.body) return { ok: true }
+    try {
+      response = await this.fetchImpl(issueUrl, {
+        method: 'PATCH',
+        headers: {
+          ...apiHeaders(authorization.token),
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ body: anonymized }),
+      })
+    } catch {
+      return {
+        ok: false,
+        kind: 'uncertain',
+        code: 'github_anonymization_uncertain',
+      }
+    }
+    return response.ok
+      ? { ok: true }
+      : failureFromResponse(response, this.now())
   }
 
   private async exchangeToken(fields: Record<string, string>): Promise<GitHubUserTokens> {
@@ -405,39 +472,79 @@ export class GitHubIssueClient {
     return `${unsigned}.${signature}`
   }
 
-  private async installationToken(): Promise<string> {
+  private async issueToken(
+    identity: 'github_user' | 'hosted',
+    userAccessToken?: string,
+  ): Promise<{ ok: true; token: string } | GitHubFailure> {
+    if (identity === 'hosted') return this.installationToken()
+    return userAccessToken
+      ? { ok: true, token: userAccessToken }
+      : { ok: false, kind: 'auth', code: 'github_auth_invalid' }
+  }
+
+  private async installationToken(): Promise<
+    { ok: true; token: string } | GitHubFailure
+  > {
     const now = this.now()
     if (
       this.installationTokenCache
       && this.installationTokenCache.expiresAt - 60_000 > now
     ) {
-      return this.installationTokenCache.token
+      return { ok: true, token: this.installationTokenCache.token }
     }
     const repositoryId = Number(this.options.repositoryId)
     if (!Number.isSafeInteger(repositoryId) || repositoryId <= 0) {
-      throw new Error('invalid_repository_id')
+      return {
+        ok: false,
+        kind: 'terminal',
+        code: 'github_app_configuration_invalid',
+      }
     }
-    const response = await this.fetchImpl(
-      `${API}/app/installations/${encodeURIComponent(this.options.installationId)}/access_tokens`,
-      {
-        method: 'POST',
-        headers: {
-          ...apiHeaders(this.appJwt()),
-          'Content-Type': 'application/json',
+    let jwt: string
+    try {
+      jwt = this.appJwt()
+    } catch {
+      return {
+        ok: false,
+        kind: 'terminal',
+        code: 'github_app_configuration_invalid',
+      }
+    }
+    let response: Response
+    try {
+      response = await this.fetchImpl(
+        `${API}/app/installations/${encodeURIComponent(this.options.installationId)}/access_tokens`,
+        {
+          method: 'POST',
+          headers: {
+            ...apiHeaders(jwt),
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            repository_ids: [repositoryId],
+            permissions: { issues: 'write' },
+          }),
         },
-        body: JSON.stringify({
-          repository_ids: [repositoryId],
-          permissions: { issues: 'write' },
-        }),
-      },
-    )
+      )
+    } catch {
+      return {
+        ok: false,
+        kind: 'uncertain',
+        code: 'github_app_token_uncertain',
+      }
+    }
+    if (!response.ok) return failureFromResponse(response, now)
     const body = await parseJson<InstallationTokenResponse>(response)
     const expiresAt = Date.parse(body.expires_at ?? '')
-    if (!response.ok || !body.token || !Number.isFinite(expiresAt)) {
-      throw new Error('installation_token_failed')
+    if (!body.token || !Number.isFinite(expiresAt)) {
+      return {
+        ok: false,
+        kind: 'terminal',
+        code: 'github_app_configuration_invalid',
+      }
     }
     this.installationTokenCache = { token: body.token, expiresAt }
-    return body.token
+    return { ok: true, token: body.token }
   }
 }
 

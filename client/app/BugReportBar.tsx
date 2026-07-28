@@ -36,6 +36,16 @@ type Connection = {
   githubUserId?: string
 }
 
+type ExistingIssue = {
+  number: number
+  url: string
+}
+
+type ReportResponse = {
+  report: BugReport
+  existingIssues?: ExistingIssue[]
+}
+
 type ApiResponse<T extends object> = { ok: true } & T
 
 const inFlightStatuses = new Set<ReportStatus>([
@@ -54,6 +64,7 @@ const errorKeys: Record<string, string> = {
   bug_report_rate_limited: 'platform.bugReport.errors.rate_limited',
   bug_report_room_limit: 'platform.bugReport.errors.rate_limited',
   github_connection_required: 'platform.bugReport.errors.github_connection_required',
+  existing_issue_confirmation_required: 'platform.bugReport.errors.existing_issue_confirmation_required',
 }
 
 const requestJson = async <T extends object>(
@@ -105,6 +116,7 @@ export function BugReportBar({
   const { t } = useLocale()
   const [connection, setConnection] = useState<Connection | null>(null)
   const [report, setReport] = useState<BugReport | null>(null)
+  const [existingIssues, setExistingIssues] = useState<ExistingIssue[]>([])
   const [phenomenon, setPhenomenon] = useState('')
   const [identity, setIdentity] = useState<'github_user' | 'hosted' | null>(null)
   const [confirmHosted, setConfirmHosted] = useState(false)
@@ -134,14 +146,16 @@ export function BugReportBar({
       })
     const submissionId = resumeId()
     if (submissionId) {
-      void requestJson<{ report: BugReport }>(
+      void requestJson<ReportResponse>(
         `/api/v1/bug-reports/${encodeURIComponent(submissionId)}`,
       )
-        .then(({ report: saved }) => {
+        .then(({ report: saved, existingIssues: existing }) => {
           if (cancelled || saved.roomId !== roomId) return
           setReport(saved)
+          setExistingIssues(existing ?? [])
           setPhenomenon(saved.phenomenon ?? '')
           setIdentity(saved.authorIdentity)
+          setConfirmHosted(saved.authorIdentity === 'hosted')
           setStage(
             connectionResult || saved.authorIdentity || saved.status !== 'draft'
               ? 3
@@ -172,11 +186,12 @@ export function BugReportBar({
   useEffect(() => {
     if (!inFlightSubmissionId) return
     const timer = window.setInterval(() => {
-      void requestJson<{ report: BugReport }>(
+      void requestJson<ReportResponse>(
         `/api/v1/bug-reports/${encodeURIComponent(inFlightSubmissionId)}`,
       )
-        .then(({ report: current }) => {
+        .then(({ report: current, existingIssues: existing }) => {
           setReport(current)
+          setExistingIssues(existing ?? [])
           if (current.status === 'needs_reconnect') {
             setConnection((value) => ({
               enabled: value?.enabled ?? true,
@@ -192,13 +207,14 @@ export function BugReportBar({
   if (!roomId || (!connection?.enabled && !report)) return null
 
   const phenomenonLength = Array.from(phenomenon.trim()).length
-  const editable = !report || ['draft', 'needs_reconnect', 'failed'].includes(report.status)
+  const editable = !report || report.status === 'draft'
   const close = () => {
     setOpen(false)
     setError(null)
     if (report?.status === 'submitted') {
       clearResumeId()
       setReport(null)
+      setExistingIssues([])
       setPhenomenon('')
       setIdentity(null)
       setConfirmHosted(false)
@@ -218,14 +234,14 @@ export function BugReportBar({
     setError(null)
     try {
       const result = report
-        ? await requestJson<{ report: BugReport }>(
+        ? await requestJson<ReportResponse>(
             `/api/v1/bug-reports/${encodeURIComponent(report.submissionId)}`,
             {
               method: 'PATCH',
               body: JSON.stringify({ phenomenon }),
             },
           )
-        : await requestJson<{ report: BugReport }>(
+        : await requestJson<ReportResponse>(
             `/api/v1/game-contexts/${encodeURIComponent(roomId)}/bug-reports`,
             {
               method: 'POST',
@@ -237,9 +253,35 @@ export function BugReportBar({
             },
           )
       setReport(result.report)
+      setExistingIssues(result.existingIssues ?? [])
       setPhenomenon(result.report.phenomenon ?? phenomenon)
       setResumeId(result.report.submissionId)
       setStage(2)
+    } catch (reason) {
+      showError(reason)
+    } finally {
+      setBusy(false)
+    }
+  }
+  const continueFromContext = async () => {
+    if (!report) return
+    if (existingIssues.length === 0 || report.status !== 'draft') {
+      setStage(3)
+      return
+    }
+    setBusy(true)
+    setError(null)
+    try {
+      const confirmed = await requestJson<ReportResponse>(
+        `/api/v1/bug-reports/${encodeURIComponent(report.submissionId)}`,
+        {
+          method: 'PATCH',
+          body: JSON.stringify({ confirmExisting: true }),
+        },
+      )
+      setReport(confirmed.report)
+      setExistingIssues(confirmed.existingIssues ?? existingIssues)
+      setStage(3)
     } catch (reason) {
       showError(reason)
     } finally {
@@ -251,17 +293,19 @@ export function BugReportBar({
     setBusy(true)
     setError(null)
     try {
-      const selected = await requestJson<{ report: BugReport }>(
-        `/api/v1/bug-reports/${encodeURIComponent(report.submissionId)}`,
-        {
-          method: 'PATCH',
-          body: JSON.stringify({
-            authorIdentity: identity,
-            ...(identity === 'hosted' ? { confirmHosted } : {}),
-          }),
-        },
-      )
-      setReport(selected.report)
+      if (report.status === 'draft') {
+        const selected = await requestJson<ReportResponse>(
+          `/api/v1/bug-reports/${encodeURIComponent(report.submissionId)}`,
+          {
+            method: 'PATCH',
+            body: JSON.stringify({
+              authorIdentity: identity,
+              ...(identity === 'hosted' ? { confirmHosted } : {}),
+            }),
+          },
+        )
+        setReport(selected.report)
+      }
       const submitted = await requestJson<{ report: BugReport }>(
         `/api/v1/bug-reports/${encodeURIComponent(report.submissionId)}/submit`,
         { method: 'POST', body: '{}' },
@@ -301,6 +345,7 @@ export function BugReportBar({
       )
       clearResumeId()
       setReport(null)
+      setExistingIssues([])
       setPhenomenon('')
       setIdentity(null)
       setConfirmHosted(false)
@@ -442,12 +487,42 @@ export function BugReportBar({
                   <div><dt>{t('platform.bugReport.step')}</dt><dd>{report.stepNo}</dd></div>
                   <div><dt>{t('platform.bugReport.frameHash')}</dt><dd><code>{report.frameHash}</code></dd></div>
                 </dl>
+                {existingIssues.length > 0 ? (
+                  <div className="bug-report-notice" role="status">
+                    <strong>{t('platform.bugReport.existingIssuesTitle')}</strong>
+                    <p>{t('platform.bugReport.existingIssuesBody')}</p>
+                    <ul>
+                      {existingIssues.map((issue) => (
+                        <li key={issue.number}>
+                          <a
+                            href={issue.url}
+                            target="_blank"
+                            rel="noreferrer"
+                          >
+                            {t('platform.bugReport.openIssue', {
+                              number: issue.number,
+                            })}
+                          </a>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                ) : null}
                 <div className="bug-report-actions">
-                  <button type="button" className="btn-secondary" onClick={() => setStage(1)}>
-                    {t('platform.back')}
-                  </button>
-                  <button type="button" className="btn-primary" onClick={() => setStage(3)}>
-                    {t('platform.bugReport.continue')}
+                  {editable ? (
+                    <button type="button" className="btn-secondary" onClick={() => setStage(1)}>
+                      {t('platform.back')}
+                    </button>
+                  ) : null}
+                  <button
+                    type="button"
+                    className="btn-primary"
+                    disabled={busy}
+                    onClick={() => { void continueFromContext() }}
+                  >
+                    {t(existingIssues.length > 0
+                      ? 'platform.bugReport.continueNewIssue'
+                      : 'platform.bugReport.continue')}
                   </button>
                 </div>
               </div>
@@ -460,7 +535,7 @@ export function BugReportBar({
                     type="radio"
                     name={`bug-report-identity-${report.submissionId}`}
                     checked={identity === 'github_user'}
-                    disabled={!connection?.connected || busy}
+                    disabled={!editable || !connection?.connected || busy}
                     onChange={() => {
                       setIdentity('github_user')
                       setConfirmHosted(false)
@@ -490,7 +565,7 @@ export function BugReportBar({
                     type="radio"
                     name={`bug-report-identity-${report.submissionId}`}
                     checked={identity === 'hosted'}
-                    disabled={busy}
+                    disabled={!editable || busy}
                     onChange={() => setIdentity('hosted')}
                   />
                   <span>
@@ -503,7 +578,7 @@ export function BugReportBar({
                     <input
                       type="checkbox"
                       checked={confirmHosted}
-                      disabled={busy}
+                      disabled={!editable || busy}
                       onChange={(event) => setConfirmHosted(event.target.checked)}
                     />
                     <span>{t('platform.bugReport.hostedConfirm')}</span>
@@ -525,6 +600,16 @@ export function BugReportBar({
                   </p>
                 ) : null}
                 <div className="bug-report-actions">
+                  {['needs_reconnect', 'failed'].includes(report.status) ? (
+                    <button
+                      type="button"
+                      className="btn-secondary"
+                      disabled={busy}
+                      onClick={() => { void discard() }}
+                    >
+                      {t('platform.bugReport.discard')}
+                    </button>
+                  ) : null}
                   <button
                     type="button"
                     className="btn-secondary"

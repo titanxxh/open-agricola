@@ -29,7 +29,11 @@ export function runMigrations(db: Database.Database): void {
   const row = db.prepare('SELECT MAX(version) AS v FROM schema_version').get() as { v: number | null } | undefined
   const currentVersion = row?.v ?? 0
 
-  const migrations: { version: number; sql: string }[] = [
+  const migrations: {
+    version: number
+    sql?: string
+    run?: (database: Database.Database) => void
+  }[] = [
     {
       version: 1,
       sql: `
@@ -246,10 +250,6 @@ export function runMigrations(db: Database.Database): void {
           intent TEXT NOT NULL,
           user_id TEXT,
           return_to TEXT,
-          pkce_verifier_ciphertext BLOB,
-          pkce_verifier_nonce BLOB,
-          pkce_verifier_tag BLOB,
-          pkce_verifier_key_id TEXT,
           expires_at INTEGER NOT NULL,
           created_at INTEGER NOT NULL,
           used_at INTEGER
@@ -560,7 +560,6 @@ export function runMigrations(db: Database.Database): void {
           claimed_at INTEGER,
           next_attempt_at INTEGER,
           submitted_at INTEGER,
-          last_error_code TEXT,
           created_at INTEGER NOT NULL,
           updated_at INTEGER NOT NULL
         );
@@ -732,6 +731,37 @@ export function runMigrations(db: Database.Database): void {
         END;
       `,
     },
+    {
+      version: 25,
+      run: (database) => {
+        const additions = [
+          ['oauth_states', 'pkce_verifier_ciphertext', 'pkce_verifier_ciphertext BLOB'],
+          ['oauth_states', 'pkce_verifier_nonce', 'pkce_verifier_nonce BLOB'],
+          ['oauth_states', 'pkce_verifier_tag', 'pkce_verifier_tag BLOB'],
+          ['oauth_states', 'pkce_verifier_key_id', 'pkce_verifier_key_id TEXT'],
+          ['bug_reports', 'last_error_code', 'last_error_code TEXT'],
+          ['bug_reports', 'discarded_at', 'discarded_at INTEGER'],
+          [
+            'bug_reports',
+            'github_issue_state',
+            "github_issue_state TEXT CHECK (github_issue_state IS NULL OR github_issue_state IN ('open', 'closed'))",
+          ],
+          ['bug_reports', 'duplicate_confirmed_at', 'duplicate_confirmed_at INTEGER'],
+        ] as const
+        for (const [table, column, definition] of additions) {
+          const columns = database.pragma(`table_info(${table})`) as Array<{ name: string }>
+          if (!columns.some(({ name }) => name === column)) {
+            database.exec(`ALTER TABLE ${table} ADD COLUMN ${definition}`)
+          }
+        }
+        database.exec(`
+          UPDATE bug_reports
+          SET github_issue_state = 'open'
+          WHERE github_issue_number IS NOT NULL
+            AND github_issue_state IS NULL;
+        `)
+      },
+    },
   ]
 
   const insert = db.prepare('INSERT INTO schema_version (version) VALUES (?)')
@@ -739,7 +769,8 @@ export function runMigrations(db: Database.Database): void {
   for (const m of migrations) {
     if (m.version <= currentVersion) continue
     db.transaction(() => {
-      db.exec(m.sql)
+      if (m.sql) db.exec(m.sql)
+      m.run?.(db)
       insert.run(m.version)
     })()
     console.log(`[db] migration v${m.version} applied`)

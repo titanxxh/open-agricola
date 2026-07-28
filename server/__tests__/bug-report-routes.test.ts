@@ -25,6 +25,7 @@ type MockResponse = ServerResponse & {
 let db: Database.Database
 let store: BugReportStore
 let createIssue: ReturnType<typeof vi.fn>
+let revokeUserGrant: ReturnType<typeof vi.fn>
 let runtime: Parameters<typeof handleBugReportRoute>[2]
 
 const request = (
@@ -152,10 +153,13 @@ beforeEach(() => {
     number: 7,
     url: 'https://github.com/titanxxh/open-agricola-issues/issues/7',
   }))
+  revokeUserGrant = vi.fn(async () => ({ ok: true as const }))
   const adapter: IssueDeliveryAdapter = {
     createIssue,
     findIssueByMarker: vi.fn(async () => ({ ok: true as const, found: false as const })),
     refreshUserToken: vi.fn(),
+    revokeUserGrant,
+    anonymizeIssue: vi.fn(async () => ({ ok: true as const })),
   }
   runtime = {
     db,
@@ -288,6 +292,86 @@ describe('bug report routes', () => {
     expect(createIssue).toHaveBeenCalledTimes(1)
   })
 
+  it('surfaces a matching open Issue and requires an explicit new-Issue choice', async () => {
+    const first = await invoke(
+      'POST',
+      '/api/v1/game-contexts/active-room/bug-reports',
+      { phenomenon: 'The game froze' },
+    )
+    const firstId = (json(first).report as { submissionId: string }).submissionId
+    await invoke(
+      'PATCH',
+      `/api/v1/bug-reports/${firstId}`,
+      { authorIdentity: 'hosted', confirmHosted: true },
+    )
+    await invoke('POST', `/api/v1/bug-reports/${firstId}/submit`, {})
+
+    const second = await invoke(
+      'POST',
+      '/api/v1/game-contexts/active-room/bug-reports',
+      { phenomenon: 'The same position is broken' },
+    )
+    expect(json(second).existingIssues).toEqual([{
+      number: 7,
+      url: 'https://github.com/titanxxh/open-agricola-issues/issues/7',
+    }])
+    const secondId = (json(second).report as { submissionId: string }).submissionId
+    await invoke(
+      'PATCH',
+      `/api/v1/bug-reports/${secondId}`,
+      { authorIdentity: 'hosted', confirmHosted: true },
+    )
+
+    const blocked = await invoke(
+      'POST',
+      `/api/v1/bug-reports/${secondId}/submit`,
+      {},
+    )
+    expect(blocked.statusCode).toBe(409)
+    expect(json(blocked)).toMatchObject({
+      code: 'existing_issue_confirmation_required',
+    })
+
+    await invoke(
+      'PATCH',
+      `/api/v1/bug-reports/${secondId}`,
+      { confirmExisting: true },
+    )
+    expect((await invoke(
+      'POST',
+      `/api/v1/bug-reports/${secondId}/submit`,
+      {},
+    )).statusCode).toBe(200)
+    expect(createIssue).toHaveBeenCalledTimes(2)
+  })
+
+  it('revokes the GitHub grant before removing the local connection', async () => {
+    store.saveConnection('u1', '99', {
+      accessToken: 'token',
+      accessTokenExpiresAt: 1_700_003_600_000,
+    })
+    revokeUserGrant.mockResolvedValueOnce({
+      ok: false,
+      kind: 'uncertain',
+      code: 'github_revocation_uncertain',
+    })
+
+    const failed = await invoke(
+      'DELETE',
+      '/api/v1/issue-submission-connection',
+    )
+    expect(failed.statusCode).toBe(503)
+    expect(store.connectionStatus('u1').connected).toBe(true)
+
+    const removed = await invoke(
+      'DELETE',
+      '/api/v1/issue-submission-connection',
+    )
+    expect(removed.statusCode).toBe(200)
+    expect(revokeUserGrant).toHaveBeenLastCalledWith('token')
+    expect(store.connectionStatus('u1')).toEqual({ connected: false })
+  })
+
   it('preserves a draft when GitHub connection authorization is cancelled', async () => {
     const created = await invoke(
       'POST',
@@ -379,6 +463,59 @@ describe('bug report routes', () => {
     )
     expect(malformed.statusCode).toBe(400)
     expect(json(malformed)).toMatchObject({ code: 'invalid_webhook_payload' })
+  })
+
+  it('tracks open and closed Issues only for the fixed issues repository', async () => {
+    const created = await invoke(
+      'POST',
+      '/api/v1/game-contexts/active-room/bug-reports',
+      { phenomenon: 'The game froze' },
+    )
+    const submissionId = (json(created).report as { submissionId: string })
+      .submissionId
+    db.prepare(`
+      UPDATE bug_reports
+      SET github_issue_number = 7, github_issue_state = 'open'
+      WHERE submission_id = ?
+    `).run(submissionId)
+    const webhook = async (action: string, repository: string) => {
+      const payload = JSON.stringify({
+        action,
+        issue: { number: 7 },
+        repository: { full_name: repository },
+      })
+      return invoke(
+        'POST',
+        '/api/v1/github-app/webhook',
+        payload,
+        null,
+        {
+          'x-github-event': 'issues',
+          'x-hub-signature-256': `sha256=${createHmac(
+            'sha256',
+            'webhook-secret',
+          ).update(payload).digest('hex')}`,
+        },
+      )
+    }
+
+    await webhook('closed', 'attacker/repository')
+    expect((db.prepare(`
+      SELECT github_issue_state AS state
+      FROM bug_reports WHERE submission_id = ?
+    `).get(submissionId) as { state: string }).state).toBe('open')
+
+    await webhook('closed', 'titanxxh/open-agricola-issues')
+    expect((db.prepare(`
+      SELECT github_issue_state AS state
+      FROM bug_reports WHERE submission_id = ?
+    `).get(submissionId) as { state: string }).state).toBe('closed')
+
+    await webhook('reopened', 'titanxxh/open-agricola-issues')
+    expect((db.prepare(`
+      SELECT github_issue_state AS state
+      FROM bug_reports WHERE submission_id = ?
+    `).get(submissionId) as { state: string }).state).toBe('open')
   })
 
   it('rejects expired active-game evidence before reading its replay frame', async () => {

@@ -127,6 +127,8 @@ const successAdapter = (): IssueDeliveryAdapter => ({
     accessToken: 'refreshed',
     accessTokenExpiresAt: now + 3_600_000,
   })),
+  revokeUserGrant: vi.fn(async () => ({ ok: true as const })),
+  anonymizeIssue: vi.fn(async () => ({ ok: true as const })),
 })
 
 beforeEach(() => {
@@ -399,6 +401,8 @@ describe('BugReportStore', () => {
         url: ISSUE_URL,
       })),
       refreshUserToken: vi.fn(),
+      revokeUserGrant: vi.fn(),
+      anonymizeIssue: vi.fn(),
     }
 
     await new BugReportDelivery(store, adapter, 'https://game.example', () => now)
@@ -433,6 +437,8 @@ describe('BugReportStore', () => {
       })),
       findIssueByMarker: vi.fn(),
       refreshUserToken: vi.fn(),
+      revokeUserGrant: vi.fn(),
+      anonymizeIssue: vi.fn(),
     }
 
     await new BugReportDelivery(store, adapter, 'https://game.example', () => now)
@@ -447,9 +453,6 @@ describe('BugReportStore', () => {
     store.saveConnection('u1', '99', {
       accessToken: 'new-user-token',
       accessTokenExpiresAt: now + 3_600_000,
-    })
-    store.updateDraft(report.submissionId, 'u1', {
-      authorIdentity: 'github_user',
     })
     store.queue(report.submissionId, 'u1')
     expect(store.claim(report.submissionId)?.mode).toBe('reconcile')
@@ -476,6 +479,8 @@ describe('BugReportStore', () => {
       })),
       findIssueByMarker: vi.fn(),
       refreshUserToken: vi.fn(),
+      revokeUserGrant: vi.fn(),
+      anonymizeIssue: vi.fn(),
     }
 
     await new BugReportDelivery(store, adapter, 'https://game.example', () => now)
@@ -519,7 +524,7 @@ describe('BugReportStore', () => {
     )
   })
 
-  it('does not let a queued report change under an active delivery claim', () => {
+  it('freezes public fields after delivery starts, including terminal failure', () => {
     const roomId = insertContext('active')
     const report = store.createDraft({
       userId: 'u1',
@@ -539,9 +544,18 @@ describe('BugReportStore', () => {
       'bug_report_update_conflict',
       409,
     )
+    const claim = store.claim(report.submissionId)!
+    store.defer(claim, 'failed', 'github_permission_denied')
+    expectBugReportError(
+      () => store.updateDraft(report.submissionId, 'u1', {
+        phenomenon: 'Changed after failure',
+      }),
+      'bug_report_update_conflict',
+      409,
+    )
   })
 
-  it('lets the reporter abandon a failed draft but not an active claim', () => {
+  it('soft-deletes a failed submission without releasing its quota or attempts', () => {
     const roomId = insertContext('active')
     const report = store.createDraft({
       userId: 'u1',
@@ -560,6 +574,12 @@ describe('BugReportStore', () => {
     )
     const claim = store.claim(report.submissionId)!
     store.defer(claim, 'failed', 'github_permission_denied')
+    store.recordAttempt(
+      report.submissionId,
+      'create',
+      'permission',
+      now,
+    )
 
     store.deleteDraft(report.submissionId, 'u1')
     expectBugReportError(
@@ -567,6 +587,100 @@ describe('BugReportStore', () => {
       'bug_report_not_found',
       404,
     )
+    expect(db.prepare(`
+      SELECT reporter_user_id, phenomenon, submitted_at, discarded_at
+      FROM bug_reports WHERE submission_id = ?
+    `).get(report.submissionId)).toMatchObject({
+      reporter_user_id: 'u1',
+      phenomenon: null,
+      submitted_at: now,
+      discarded_at: now,
+    })
+    expect((db.prepare(`
+      SELECT COUNT(*) AS count
+      FROM bug_report_attempts WHERE submission_id = ?
+    `).get(report.submissionId) as { count: number }).count).toBe(1)
+
+    for (const phenomenon of ['Second problem', 'Third problem']) {
+      const next = store.createDraft({ userId: 'u1', roomId, phenomenon })
+      store.updateDraft(next.submissionId, 'u1', {
+        authorIdentity: 'hosted',
+        confirmHosted: true,
+      })
+      store.queue(next.submissionId, 'u1')
+    }
+    const fourth = store.createDraft({
+      userId: 'u1',
+      roomId,
+      phenomenon: 'Fourth problem',
+    })
+    store.updateDraft(fourth.submissionId, 'u1', {
+      authorIdentity: 'hosted',
+      confirmHosted: true,
+    })
+    expectBugReportError(
+      () => store.queue(fourth.submissionId, 'u1'),
+      'bug_report_rate_limited',
+      429,
+    )
+  })
+
+  it('anonymizes known Issues and revokes GitHub before account deletion', async () => {
+    const roomId = insertContext('active')
+    const submitted = store.createDraft({
+      userId: 'u1',
+      roomId,
+      phenomenon: 'Published problem',
+    })
+    store.updateDraft(submitted.submissionId, 'u1', {
+      authorIdentity: 'hosted',
+      confirmHosted: true,
+    })
+    store.queue(submitted.submissionId, 'u1')
+    const adapter = successAdapter()
+    const delivery = new BugReportDelivery(
+      store,
+      adapter,
+      'https://game.example',
+      () => now,
+    )
+    await delivery.deliver(submitted.submissionId)
+    store.createDraft({
+      userId: 'u1',
+      roomId,
+      phenomenon: 'Unsubmitted private draft',
+    })
+    store.saveConnection('u1', '99', {
+      accessToken: 'user-token',
+      accessTokenExpiresAt: now + 3_600_000,
+    })
+
+    vi.mocked(adapter.anonymizeIssue).mockResolvedValueOnce({
+      ok: false,
+      kind: 'uncertain',
+      code: 'github_anonymization_uncertain',
+    })
+    await expect(delivery.deleteReporter('u1')).rejects.toMatchObject({
+      code: 'github_anonymization_uncertain',
+      status: 503,
+    })
+    expect(store.connectionStatus('u1').connected).toBe(true)
+    expect(store.getOwned(submitted.submissionId, 'u1').reporterUserId)
+      .toBe('u1')
+
+    await delivery.deleteReporter('u1')
+
+    expect(adapter.anonymizeIssue).toHaveBeenCalledWith(7, 'u1')
+    expect(adapter.revokeUserGrant).toHaveBeenCalledWith('user-token')
+    expect(store.connectionStatus('u1')).toEqual({ connected: false })
+    expect(db.prepare(`
+      SELECT COUNT(*) AS count
+      FROM bug_reports
+      WHERE reporter_user_id IS NOT NULL OR phenomenon IS NOT NULL
+    `).get()).toEqual({ count: 0 })
+    expect((db.prepare(`
+      SELECT COUNT(*) AS count FROM bug_report_attempts
+    `).get() as { count: number }).count).toBeGreaterThan(0)
   })
 
   it('reconciles an interrupted delivery before creating another Issue', () => {
@@ -612,6 +726,8 @@ describe('BugReportStore', () => {
         code: 'github_reconciliation_uncertain',
       })),
       refreshUserToken: vi.fn(),
+      revokeUserGrant: vi.fn(),
+      anonymizeIssue: vi.fn(),
     }
     const delivery = new BugReportDelivery(store, adapter, 'https://game.example', () => now)
 
