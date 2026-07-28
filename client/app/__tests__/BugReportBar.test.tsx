@@ -380,4 +380,55 @@ describe('BugReportBar', () => {
       .toBeInTheDocument()
     expect(methods).not.toContain('PATCH')
   })
+
+  it('recovers the authoritative queued report after a lost submit response', async () => {
+    const user = userEvent.setup()
+    window.history.replaceState(null, '', '/?bugReport=submission-1')
+    let reportReads = 0
+    vi.stubGlobal('fetch', vi.fn(async (
+      input: string | URL | Request,
+      init?: RequestInit,
+    ) => {
+      const url = String(input)
+      const method = init?.method ?? 'GET'
+      if (url.endsWith('/api/v1/issue-submission-connection')) {
+        return response({ ok: true, enabled: true, connected: false })
+      }
+      if (url.endsWith('/api/v1/bug-reports/submission-1/submit')) {
+        throw new Error('response lost')
+      }
+      if (
+        url.endsWith('/api/v1/bug-reports/submission-1')
+        && method === 'GET'
+      ) {
+        reportReads += 1
+        return response({
+          ok: true,
+          report: report({
+            authorIdentity: 'hosted',
+            status: reportReads === 1 ? 'draft' : 'queued',
+          }),
+          existingIssues: [],
+        })
+      }
+      if (
+        url.endsWith('/api/v1/bug-reports/submission-1')
+        && method === 'PATCH'
+      ) {
+        return response({
+          ok: true,
+          report: report({ authorIdentity: 'hosted' }),
+          existingIssues: [],
+        })
+      }
+      throw new Error(`Unexpected request: ${method} ${url}`)
+    }))
+    renderBar({ roomId: 'room-1' })
+
+    await user.click(await screen.findByRole('button', { name: 'Submit Issue' }))
+
+    await waitFor(() => expect(reportReads).toBe(2))
+    expect(screen.getByText('Submitting…')).toBeInTheDocument()
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+  })
 })

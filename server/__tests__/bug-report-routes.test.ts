@@ -412,11 +412,20 @@ describe('bug report routes', () => {
     const state = new URL(start.headers.Location).searchParams.get('state')
     expect(state).toBeTruthy()
 
+    const stolen = await invoke(
+      'GET',
+      `/api/v1/issue-submission-connection/github/callback?state=${state}&error=access_denied`,
+      null,
+      OTHER,
+    )
+    expect(stolen.statusCode).toBe(400)
+    expect(json(stolen)).toMatchObject({ code: 'oauth_state_invalid' })
+
     const cancelled = await invoke(
       'GET',
       `/api/v1/issue-submission-connection/github/callback?state=${state}&error=access_denied`,
       null,
-      null,
+      USER,
     )
     expect(cancelled.statusCode).toBe(302)
     const returnTo = new URL(cancelled.headers.Location)
@@ -429,7 +438,7 @@ describe('bug report routes', () => {
       'GET',
       `/api/v1/issue-submission-connection/github/callback?state=${state}&error=access_denied`,
       null,
-      null,
+      USER,
     )
     expect(replayed.statusCode).toBe(400)
     expect(json(replayed)).toMatchObject({ code: 'oauth_state_invalid' })

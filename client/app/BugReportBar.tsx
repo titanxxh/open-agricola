@@ -325,6 +325,21 @@ export function BugReportBar({
         }))
       }
     } catch (reason) {
+      const recovered = await requestJson<ReportResponse>(
+        `/api/v1/bug-reports/${encodeURIComponent(report.submissionId)}`,
+      )
+        .catch(() => null)
+      if (recovered) {
+        setReport(recovered.report)
+        setExistingIssues(recovered.existingIssues ?? [])
+        if (recovered.report.status === 'needs_reconnect') {
+          setConnection((current) => ({
+            enabled: current?.enabled ?? true,
+            connected: false,
+          }))
+        }
+        if (recovered.report.status !== 'draft') return
+      }
       showError(reason)
       if (
         reason instanceof Error
