@@ -12,7 +12,7 @@ Game Bug Reporter 必须能从对局内把现象和 Bug Report Anchor 提交到�
 ## Decision
 
 1. 单独注册一个公开 GitHub App，只安装到 `titanxxh/open-agricola-issues`，唯一可写仓库权限是 `Issues: write`。目标 owner、repository id 和 installation id 是服务端固定配置，不接受客户端传入；不使用现有登录 OAuth、Workshop OAuth 或个人 PAT。
-2. 玩家本人提交使用 GitHub App user access token，因此 Issue 作者是玩家并同时归因于 App。没有可用 Issue Submission Connection 时，玩家可以明确选择 Hosted Issue Identity，由同一 App 的 installation access token 代提，Issue 作者显示为 App `[bot]`；连接失效时不得自动切换作者身份。
+2. 玩家本人提交使用 GitHub App user access token，因此 Issue 作者是玩家并同时归因于 App；提交前必须明确确认 GitHub 会公开该账号为作者，且站点删号无法匿名化这项 GitHub 作者身份。没有可用 Issue Submission Connection 时，玩家可以明确选择 Hosted Issue Identity，由同一 App 的 installation access token 代提，Issue 作者显示为 App `[bot]`；连接失效时不得自动切换作者身份。
 3. Issue Submission Connection 独立于站点登录身份，绑定当前站点用户和 GitHub 返回的不可变数字用户 id。一个 GitHub 用户 id 只能连接一个站点用户；若站点账号已有 GitHub 登录身份，两者 id 必须一致。首次连接不自动增加 GitHub 登录方式。
 4. GitHub 授权使用随机 `state` 和 PKCE `S256`。回调在服务端换取令牌并读取 GitHub 数字用户 id，访问令牌和刷新令牌只在后端 SQLite 中用独立部署密钥加密保存，不进入浏览器、URL、日志、Issue 或仓库。启用过期令牌：user access token 默认 8 小时，refresh token 默认 6 个月并按需原子轮换。
 5. GitHub App client secret、webhook secret、令牌加密密钥和 App 私钥只作为部署密钥提供。App 私钥不入库；installation access token 按需生成且不落盘，最多使用其 GitHub 返回的一小时生命周期。用户主动断开、刷新失败、`github_app_authorization` 撤销 webhook 或 `401` 都使连接失效并删除本地令牌。
@@ -20,10 +20,10 @@ Game Bug Reporter 必须能从对局内把现象和 Bug Report Anchor 提交到�
 7. Issue 正文只包含玩家现象、`submissionId` 的无身份随机标记，以及已批准公开的站点 `userId`、`playerIndex`、`roomId`、房间生命周期、版本、`stepNo` 和 Frame Hash。它不包含其他玩家隐藏信息、完整状态、token、邮箱、可变显示名、原始命令或传输 payload。
 8. 同一 `submissionId` 在站内只能有一个执行者。Issue 正文嵌入 `<!-- open-agricola-report:{submissionId} -->`；成功响应保存 Issue 编号和 URL。网络错误或 `5xx` 产生不确定结果时，执行者先从目标仓库最新 Issue 向前分页到本次尝试开始时间并匹配该标记，找到即视为成功，未找到才继续同一提交。
 9. 自动失败处理固定为：`401` 或刷新失败要求玩家重连；带 `Retry-After` 或明确 rate-limit reset 的 `403`、`429` 按指定时间排队，其他 `403` 作为权限错误停止；网络错误和 `5xx` 在对账后按 30 秒、2 分钟、10 分钟重试；`410`、`422` 不自动重试。三次仍失败转为需手动重试，继续使用原 `submissionId` 和原草稿。
-10. 新提交共享站内滥用额度，不因本人或托管身份而分开计算：每用户 10 分钟最多 3 个、24 小时最多 10 个；每用户每房间最多 5 个；每房间最多 30 个。同一 `submissionId` 的对账和重试不重复计数。GitHub 创建队列全站最多发出 20 次每分钟，超出只排队；站内额度拒绝时保留草稿并显示原因或下次可提交时间。
+10. 新提交共享站内滥用额度，不因本人或托管身份而分开计算：每用户最多保留 5 个未提交草稿，每用户 10 分钟最多提交 3 个、24 小时最多 10 个；每用户每房间最多提交 5 个；每房间最多提交 30 个。同一 `submissionId` 的对账和重试不重复计数。GitHub 创建队列全站最多发出 20 次每分钟，超出只排队；站内额度拒绝时保留草稿并显示原因或下次可提交时间。
 11. 只有同一 `submissionId` 被硬去重。同一 Bug Report Anchor 已有未关闭 Issue 时，界面展示已有 Issue，但不自动合并或阻止新提交；玩家必须明确选择打开已有 Issue 或继续提交，因为同一 Replay Frame 可能有不同现象。
 12. 用户改用 Hosted Issue Identity 必须再次明确确认，正文始终记录实际 Game Bug Reporter 的站点 `userId` 和 `playerIndex`。只有已登录且服务器确认在目标 Room 入座的用户可以创建或重试该 Room 的 Bug Report Draft。
-13. 主动断开或删号立即撤销并删除加密令牌。删号先按 ADR-0010 把已知 Issue 正文中的站点 `userId` 改为“已删除报告者”，再清除内部用户关联。提交成功后不在站内重复保存现象，只长期保留 `submissionId`、`roomId`、Issue 编号、状态及账号存在期间的内部报告者关联；未完成草稿保留到玩家主动放弃或删号，提交尝试日志保留 30 天且不得包含令牌或原始 GitHub 响应。
+13. 主动断开或删号立即撤销并删除加密令牌。删号先按 ADR-0010 把已知 Issue 正文中的站点 `userId` 改为“已删除报告者”，再清除内部用户关联；玩家已明确放弃的失败提交是终态，不再阻塞删号，但提交配额和尝试账本仍保留。提交成功后不在站内重复保存现象，只长期保留 `submissionId`、`roomId`、Issue 编号、状态及账号存在期间的内部报告者关联；未完成草稿保留到玩家主动放弃或删号，提交尝试日志保留 30 天且不得包含令牌或原始 GitHub 响应。
 
 ## Consequences
 
