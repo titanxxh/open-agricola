@@ -314,6 +314,17 @@ const inspectEvidence = (
       display_name: string
     }>).map(({ player_index, display_name }) => [player_index, display_name]),
   )
+  const deletedParticipants = runtime.db.prepare(`
+    SELECT player_index
+    FROM game_context_participants
+    WHERE room_id = ? AND user_id IS NULL
+  `).all(report.room_id) as Array<{ player_index: number }>
+  for (const { player_index } of deletedParticipants) {
+    participantNames.set(
+      player_index,
+      `Deleted player (seat ${player_index + 1})`,
+    )
+  }
   const projected = projectReplayParticipantNames(
     serialized as unknown as ReplayGameState,
     participantNames,

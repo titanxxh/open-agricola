@@ -106,13 +106,6 @@ const clearResumeId = (): void => {
   window.history.replaceState(null, '', url)
 }
 
-const setConnectionResult = (result: 'connected' | 'error'): void => {
-  const url = new URL(window.location.href)
-  url.hash = ''
-  url.searchParams.set('bugReportConnection', result)
-  window.history.replaceState(null, '', url)
-}
-
 export function BugReportBar({
   roomId,
   stepNo,
@@ -147,32 +140,17 @@ export function BugReportBar({
 
   useEffect(() => {
     let cancelled = false
-    const fragment = new URLSearchParams(window.location.hash.slice(1))
-    const oauthState = fragment.get('bugReportOAuthState')
-    const oauthCode = fragment.get('bugReportOAuthCode')
-    const completingConnection = Boolean(oauthState && oauthCode)
-    const connectionRequest = completingConnection
-      ? requestJson<Connection>(
-          '/api/v1/issue-submission-connection/github/complete',
-          {
-            method: 'POST',
-            body: JSON.stringify({ state: oauthState, code: oauthCode }),
-          },
-        )
-      : requestJson<Connection>(
-          `/api/v1/issue-submission-connection?roomId=${encodeURIComponent(roomId)}`,
-        )
-    void connectionRequest
+    void requestJson<Connection>(
+      `/api/v1/issue-submission-connection?roomId=${encodeURIComponent(roomId)}`,
+    )
       .then((result) => {
         if (cancelled) return
-        if (completingConnection) setConnectionResult('connected')
         setConnection(result)
       })
       .catch(() => {
         if (cancelled) return
-        if (completingConnection) setConnectionResult('error')
         setConnection({
-          enabled: completingConnection,
+          enabled: false,
           connected: false,
         })
       })

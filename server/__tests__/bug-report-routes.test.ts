@@ -644,7 +644,7 @@ describe('bug report routes', () => {
     `).get(submissionId) as { state: string }).state).toBe('open')
   })
 
-  it('applies current replay participant tombstones to inspected evidence', async () => {
+  it('applies deleted participant tombstones to retained active-game evidence', async () => {
     const created = await invoke(
       'POST',
       '/api/v1/game-contexts/active-room/bug-reports',
@@ -689,30 +689,15 @@ describe('bug report routes', () => {
       WHERE room_id = 'active-room' AND step_no = 5
     `).run(encoded.payloadKind, encoded.payloadGzip, encoded.frameHash)
     db.prepare(`
-      UPDATE bug_reports SET frame_hash = ? WHERE submission_id = ?
-    `).run(encoded.frameHash, submissionId)
+      UPDATE bug_reports
+      SET frame_hash = ?, evidence_expires_at = ?
+      WHERE submission_id = ?
+    `).run(encoded.frameHash, Date.now() + 60_000, submissionId)
+    db.prepare("DELETE FROM rooms WHERE id = 'active-room'").run()
     db.prepare(`
-      UPDATE game_contexts
-      SET lifecycle = 'completed', phase = NULL, replay_status = 'available'
-      WHERE room_id = 'active-room'
-    `).run()
-    db.prepare(`
-      UPDATE game_replays SET status = 'completed'
-      WHERE room_id = 'active-room'
-    `).run()
-    db.prepare(`
-      INSERT INTO game_results (
-        room_id, started_at, finished_at, rounds_played, player_count,
-        enable_community_deck, enable_parent_cards,
-        enable_through_the_seasons, enable_farmers_of_the_moor
-      ) VALUES ('active-room', 1, 2, 14, 1, 0, 0, 0, 0)
-    `).run()
-    db.prepare(`
-      INSERT INTO game_result_players (
-        room_id, player_index, game_player_id, user_id, display_name, score
-      ) VALUES (
-        'active-room', 0, 'p1', NULL, 'Deleted player (seat 1)', 42
-      )
+      UPDATE game_context_participants
+      SET user_id = NULL
+      WHERE room_id = 'active-room' AND player_index = 0
     `).run()
 
     const inspected = await invoke(

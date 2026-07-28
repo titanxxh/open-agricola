@@ -2,7 +2,7 @@ import {
   createHmac,
   generateKeyPairSync,
 } from 'node:crypto'
-import { describe, expect, it, vi } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import {
   createCodeChallenge,
   GitHubIssueClient,
@@ -50,6 +50,10 @@ const hostedClient = (fetchImpl: typeof fetch): GitHubIssueClient =>
     now: () => NOW,
   })
 
+afterEach(() => {
+  vi.restoreAllMocks()
+})
+
 describe('GitHubIssueClient', () => {
   it('creates a labeled issue only in the fixed issues-only repository', async () => {
     const fetchImpl = vi.fn(async () => response({
@@ -68,6 +72,7 @@ describe('GitHubIssueClient', () => {
     const [url, init] = vi.mocked(fetchImpl).mock.calls[0]!
     expect(url).toBe('https://api.github.com/repos/titanxxh/open-agricola-issues/issues')
     expect(init?.headers).toMatchObject({ Authorization: 'Bearer user-token' })
+    expect(init?.signal).toBeInstanceOf(AbortSignal)
     expect(JSON.parse(String(init?.body))).toEqual({
       title: 'Game bug',
       body: 'details',
@@ -115,6 +120,23 @@ describe('GitHubIssueClient', () => {
       kind: 'uncertain',
       code: 'github_result_uncertain',
     })
+  })
+
+  it('bounds GitHub requests with a timeout signal', async () => {
+    const signal = new AbortController().signal
+    const timeout = vi.spyOn(AbortSignal, 'timeout').mockReturnValue(signal)
+    const fetchImpl = vi.fn(async () => {
+      throw new Error('timed out')
+    }) as unknown as typeof fetch
+
+    await client(fetchImpl).createIssue(
+      'github_user',
+      { title: 'Game bug', body: 'details' },
+      'user-token',
+    )
+
+    expect(timeout).toHaveBeenCalledWith(15_000)
+    expect(vi.mocked(fetchImpl).mock.calls[0]![1]?.signal).toBe(signal)
   })
 
   it('reconciles a marker against the fixed repository', async () => {
