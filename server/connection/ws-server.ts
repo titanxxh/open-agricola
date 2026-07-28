@@ -295,6 +295,7 @@ export function createWsServer(
       cardArtRoot?: string
     }
     gameContextStore?: GameContextStore
+    removedReplayAssetHashes?: ReadonlySet<string>
   },
 ): CreateWsServerResult {
   const registry = new RoomRegistry()
@@ -324,6 +325,7 @@ export function createWsServer(
         viewerBuildExists: (buildId) => viewerBuildExists(replay.viewerRoot, buildId),
         assetRoot: replay.assetRoot,
         cardArtRoot: replay.cardArtRoot,
+        removedAssetHashes: deps.removedReplayAssetHashes,
       })
     : undefined
   const broadcaster = new Broadcaster({ checkpoint })

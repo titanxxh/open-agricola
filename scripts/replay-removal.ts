@@ -13,6 +13,7 @@ export type ReplayRemovalCliArgs =
       roomId: string
       reason: ReplayRemovalReason
       assetHash?: string
+      eraseResult?: true
       dryRun: boolean
     }
   | {
@@ -36,12 +37,18 @@ export function parseReplayRemovalArgs(args: string[]): ReplayRemovalCliArgs {
   let roomId: string | undefined
   let reason: ReplayRemovalReason | undefined
   let assetHash: string | undefined
+  let eraseResult = false
   let dryRun = false
   for (let index = 1; index < args.length; index += 1) {
     const arg = args[index]
     if (arg === '--dry-run') {
       if (dryRun) throw new Error('duplicate --dry-run')
       dryRun = true
+      continue
+    }
+    if (arg === '--erase-result') {
+      if (eraseResult) throw new Error('duplicate --erase-result')
+      eraseResult = true
       continue
     }
     if (
@@ -74,11 +81,18 @@ export function parseReplayRemovalArgs(args: string[]): ReplayRemovalCliArgs {
   if (assetHash !== undefined && !ASSET_HASH.test(assetHash)) {
     throw new Error('invalid replay asset hash')
   }
+  if (eraseResult && reason !== 'legal') {
+    throw new Error('--erase-result requires legal reason')
+  }
+  if (eraseResult && assetHash !== undefined) {
+    throw new Error('--erase-result cannot be combined with --asset-hash')
+  }
   return {
     command: 'remove',
     roomId,
     reason,
     ...(assetHash === undefined ? {} : { assetHash }),
+    ...(eraseResult ? { eraseResult: true as const } : {}),
     dryRun,
   }
 }
@@ -101,6 +115,7 @@ export function runReplayRemovalCli(
     assetRoot,
     ledgerPath,
     ...(parsed.assetHash === undefined ? {} : { assetHash: parsed.assetHash }),
+    ...(parsed.eraseResult ? { eraseResult: true } : {}),
     dryRun: parsed.dryRun,
   })
 }

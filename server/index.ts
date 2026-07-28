@@ -176,12 +176,12 @@ function rejectUntrustedOrigin(req: IncomingMessage, res: ServerResponse): boole
 
 // Initialize database on import
 getDb()
-if (process.env.NODE_ENV !== 'test') {
-  applyReplayRemovalLedger(getDb(), {
+const replayRemovalState = process.env.NODE_ENV !== 'test'
+  ? applyReplayRemovalLedger(getDb(), {
     assetRoot: REPLAY_ASSET_ROOT,
     ledgerPath: REPLAY_REMOVAL_LEDGER_PATH,
   })
-}
+  : { assetTakedownHashes: [] }
 
 // Wire up room persistence adapter before creating the WS server
 const PERSIST_ROOMS = (process.env.PERSIST_ROOMS ?? 'sqlite') as 'json' | 'sqlite'
@@ -982,6 +982,7 @@ wssCtx = createWsServer(server, {
   persistence,
   shouldPersist,
   gameContextStore: PERSIST_ROOMS === 'sqlite' ? gameContextStore : undefined,
+  removedReplayAssetHashes: new Set(replayRemovalState.assetTakedownHashes),
 })
 
 const PORT = Number(process.env.BACKEND_PORT) || 5175
