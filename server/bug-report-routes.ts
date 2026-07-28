@@ -365,7 +365,10 @@ export async function handleBugReportRoute(
     if (pathname === CONNECTION_CALLBACK_ROUTE && req.method === 'GET') {
       if (!runtime?.github) throw new BugReportError('bug_report_unavailable', 503)
       const state = url.searchParams.get('state') ?? ''
-      const consumed = runtime.store.consumeConnectionState(state)
+      const consumed = runtime.store.consumeConnectionState(
+        state,
+        user?.id ?? '',
+      )
       if (!consumed) throw new BugReportError('oauth_state_invalid', 400)
       if (url.searchParams.get('error')) {
         redirectConnection(res, consumed.returnTo, 'cancelled')

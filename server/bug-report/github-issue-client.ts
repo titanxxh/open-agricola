@@ -396,13 +396,31 @@ export class GitHubIssueClient {
     }
     if (!response.ok) return failureFromResponse(response, this.now())
     const issue = await parseJson<IssueResponse>(response)
-    if (typeof issue.body !== 'string') return { ok: true }
-    const reporterLine = `- Reporter site ID: \`${reporterUserId.replaceAll('`', "'")}\``
+    if (issue.body === null) return { ok: true }
+    if (typeof issue.body !== 'string') {
+      return {
+        ok: false,
+        kind: 'terminal',
+        code: 'github_anonymization_incomplete',
+      }
+    }
+    const publicReporterId = reporterUserId.replaceAll('`', "'")
+    if (!issue.body.includes(publicReporterId)) return { ok: true }
+    const reporterLine = `- Reporter site ID: \`${publicReporterId}\``
     const anonymized = issue.body.replace(
       reporterLine,
       '- Reporter site ID: `deleted reporter`',
     )
-    if (anonymized === issue.body) return { ok: true }
+    if (
+      anonymized === issue.body
+      || anonymized.includes(publicReporterId)
+    ) {
+      return {
+        ok: false,
+        kind: 'terminal',
+        code: 'github_anonymization_incomplete',
+      }
+    }
     try {
       response = await this.fetchImpl(issueUrl, {
         method: 'PATCH',
@@ -419,9 +437,19 @@ export class GitHubIssueClient {
         code: 'github_anonymization_uncertain',
       }
     }
-    return response.ok
+    if (!response.ok) return failureFromResponse(response, this.now())
+    const updated = await parseJson<IssueResponse>(response)
+    return updated.body === null
+      || (
+        typeof updated.body === 'string'
+        && !updated.body.includes(publicReporterId)
+      )
       ? { ok: true }
-      : failureFromResponse(response, this.now())
+      : {
+          ok: false,
+          kind: 'terminal',
+          code: 'github_anonymization_incomplete',
+        }
   }
 
   private async exchangeToken(fields: Record<string, string>): Promise<GitHubUserTokens> {
