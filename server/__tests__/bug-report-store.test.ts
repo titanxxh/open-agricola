@@ -322,6 +322,30 @@ describe('BugReportStore', () => {
       'github_identity_already_connected',
       409,
     )
+    db.prepare(`
+      INSERT INTO auth_identities (
+        id, user_id, provider, provider_user_id,
+        provider_email_verified, linked_at
+      ) VALUES ('identity-u2', 'u2', 'github', '100', 0, ?)
+    `).run(now)
+    expectBugReportError(
+      () => store.saveConnection('u1', '100', {
+        accessToken: 'other-identity',
+        accessTokenExpiresAt: now + 3_600_000,
+      }),
+      'github_identity_already_connected',
+      409,
+    )
+    db.prepare(`
+      UPDATE issue_submission_connections
+      SET revoked_at = ?
+      WHERE user_id = 'u1'
+    `).run(now)
+    expect(store.connectionStatus('u1')).toEqual({ connected: false })
+    expect(store.reporterDeletionPlan('u1').tokens).toMatchObject({
+      githubUserId: '99',
+      accessToken: 'access-secret',
+    })
 
     const connection = store.createConnectionState('u1', '/resume')
     expect(store.consumeConnectionState(connection.state, 'u2')).toBeNull()

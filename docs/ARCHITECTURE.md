@@ -1194,7 +1194,7 @@ Workshop / Sandbox 后端（自定义卡上传、编译、PR 集成）。沙盒�
 
 `server/db.ts` —— SQLite 连接（`better-sqlite3`，按 Node 22 ABI 编译）。表：`rooms` / `users` / `sandbox_settings` / `sandbox_cards` / `custom_cards` / `pr_proposals` 等。
 
-ADR-0014 使用下一可用迁移增加八张表；首个正式 Replay `schemaVersion=1`，不保留未上线实验格式：
+ADR-0014 使用下一可用迁移增加九张表；首个正式 Replay `schemaVersion=1`，不保留未上线实验格式：
 
 | 表 | 所有事实 |
 |---|---|
@@ -1203,6 +1203,7 @@ ADR-0014 使用下一可用迁移增加八张表；首个正式 Replay `schemaVe
 | `game_replays` | `schemaVersion`、`viewerBuildId`、`gameBuildId`、recording/completed 状态、最新 Step、`missingPrefix`、自定义卡快照 |
 | `game_replay_steps` | `roomId + stepNo`、`roomVersion`、`checkpointStepNo`、玩家座位、白名单 intent、payload kind/gzip、Frame Hash |
 | `issue_submission_connections` | GitHub 数字用户 id、AES-256-GCM token/refresh token、nonce/tag、`keyId`、过期与撤销状态 |
+| `account_deletion_requests` | 已提交删号请求、下一次外部清理时间和最后错误；账号先失效，GitHub 清理失败后由后台重试 |
 | `bug_reports` | 稳定 `submissionId`、Reporter 关联、Anchor、草稿、作者选择、交付状态、Issue 编号/URL、证据到期时间 |
 | `bug_report_attempts` | 30 天交付/对账/限流尝试元数据；不保存 token、现象副本或原始 GitHub 响应 |
 | `bug_report_evidence_audit` | 维护者、时间、Anchor、视角和非空理由，永久保留 |
@@ -1225,7 +1226,7 @@ ADR-0014 使用下一可用迁移增加八张表；首个正式 Replay `schemaVe
 - SQLite executor 原子 claim 一个 `submissionId`。不确定响应先按正文稳定标记对账；重试和限流遵守 ADR-0012。客户端只轮询站内状态，不直接调用 GitHub。
 - Bug Report 底栏请求带当前 `roomId` 的 connection status；只有该用户是原参与者且 Room 已存在 Replay Step 时才启用新建入口。完成局未登录时保留当前 Replay anchor 进入登录，已保存草稿在关联活动局过期或下架后仍可恢复或丢弃。等待局、未录制局和 legacy no-replay 局返回明确的 anchor unavailable，不伪装成非参与者。
 - Issue 标题为清洗并截断的 `Game bug: <现象首行>`，正文不包含截图、日志、Frame payload、其他玩家身份或隐藏信息。issues-only 仓库自动化统一添加 `needs-triage`；通知使用 GitHub 原生 watching。
-- 主动断开立即删除令牌。只有本地未提交草稿的账号可直接删除草稿和账号；存在连接、公开 Issue 或已进入交付的报告时，删号先撤销连接、匿名化站内数据并进入 `deletion_pending`，再由同一 installation adapter 修改已知 Issue 正文；已放弃但曾提交且 Issue 编号未知的报告先按 marker 对账。GitHub 回包确认正文不再含站点用户 id 后才清除最终内部关联。
+- 主动断开立即删除令牌。只有本地未提交草稿的账号可直接删除草稿和账号；存在连接、公开 Issue 或已进入交付的报告时，删号先持久化 `deletion_pending`、注销全部会话并禁用本地连接，再由同一 installation adapter 修改已知 Issue 正文；失败时后台按持久化状态重试。已放弃但曾提交且 Issue 编号未知的报告先按 marker 对账；GitHub `issues.deleted` webhook 使已删除 Issue 直接完成该项清理。GitHub 回包确认正文不再含站点用户 id 后才清除最终内部关联。
 - 维护者全开 evidence 读取必须提供非空理由并写 `bug_report_evidence_audit`，审计行同时保存不受账号外键删除影响的维护者身份快照；每个维护者账号每小时最多读取 30 次。返回证据前复用当前 Participant tombstone 投影；上线前已过期且没有座位快照的证据按全部座位已匿名化处理。Replay 下架由审计化运维 CLI 删除 Step payload、把 Context 改为 removed，并追加数据库外删除 ledger；共享内容资源仅在没有其他未下架 Replay 引用时删除，资源本身违规时先下架所有引用局。首版不做管理 UI。
 - public resolver/manifest/Segment 使用独立 IP 读取额度和响应大小上限；active evidence、Bug Report 和维护者接口按账号限流。任何日志都不得输出 token、Frame payload、现象原文或原始 GitHub 响应。
 

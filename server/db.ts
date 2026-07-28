@@ -747,7 +747,7 @@ export function runMigrations(db: Database.Database): void {
           [
             'bug_reports',
             'github_issue_state',
-            "github_issue_state TEXT CHECK (github_issue_state IS NULL OR github_issue_state IN ('open', 'closed'))",
+            "github_issue_state TEXT CHECK (github_issue_state IS NULL OR github_issue_state IN ('open', 'closed', 'deleted'))",
           ],
           ['bug_reports', 'duplicate_confirmed_at', 'duplicate_confirmed_at INTEGER'],
           ['bug_reports', 'confirmed_github_user_id', 'confirmed_github_user_id TEXT'],
@@ -764,6 +764,15 @@ export function runMigrations(db: Database.Database): void {
           }
         }
         database.exec(`
+          CREATE TABLE IF NOT EXISTS account_deletion_requests (
+            user_id TEXT PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+            requested_at INTEGER NOT NULL,
+            next_attempt_at INTEGER NOT NULL,
+            last_error_code TEXT
+          );
+          CREATE INDEX IF NOT EXISTS idx_account_deletion_requests_due
+            ON account_deletion_requests(next_attempt_at);
+
           CREATE TABLE IF NOT EXISTS game_context_participants (
             room_id TEXT NOT NULL REFERENCES game_contexts(room_id) ON DELETE CASCADE,
             player_index INTEGER NOT NULL,

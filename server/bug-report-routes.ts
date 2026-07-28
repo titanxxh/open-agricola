@@ -412,6 +412,8 @@ export async function handleBugReportRoute(
       ) {
         if (payload.action === 'closed') {
           runtime.store.setIssueState(payload.issue.number, 'closed')
+        } else if (payload.action === 'deleted') {
+          runtime.store.setIssueState(payload.issue.number, 'deleted')
         } else if (
           payload.action === 'opened'
           || payload.action === 'reopened'

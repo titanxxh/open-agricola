@@ -8,6 +8,7 @@ const SCRYPT_KEYLEN = 64
 const SESSION_TTL_MS = 7 * 24 * 60 * 60 * 1000 // 7 days
 const EMAIL_VERIFICATION_TTL_MS = 24 * 60 * 60 * 1000
 const EMAIL_VERIFICATION_RESEND_COOLDOWN_MS = 5 * 60 * 1000
+const ACCOUNT_DELETION_RETRY_MS = 30_000
 
 export type AuthUser = {
   id: string
@@ -376,9 +377,14 @@ export function createSession(userId: string): string {
   const now = Date.now()
   const token = randomUUID()
   const db = getDb()
-  db.prepare(
-    'INSERT INTO sessions (token, user_id, expires_at, created_at) VALUES (?, ?, ?, ?)',
-  ).run(token, userId, now + SESSION_TTL_MS, now)
+  const result = db.prepare(`
+    INSERT INTO sessions (token, user_id, expires_at, created_at)
+    SELECT ?, ?, ?, ?
+    WHERE NOT EXISTS (
+      SELECT 1 FROM account_deletion_requests WHERE user_id = ?
+    )
+  `).run(token, userId, now + SESSION_TTL_MS, now, userId)
+  if (result.changes !== 1) throw new Error('account deletion pending')
   return token
 }
 
@@ -437,6 +443,91 @@ export function logout(token: string): void {
 export function logoutAll(userId: string): void {
   const db = getDb()
   db.prepare('DELETE FROM sessions WHERE user_id = ?').run(userId)
+}
+
+export function requestAccountDeletion(userId: string): void {
+  const db = getDb()
+  const now = Date.now()
+  const disabledPasswordHash = `${randomBytes(16).toString('hex')}:${randomBytes(SCRYPT_KEYLEN).toString('hex')}`
+  db.transaction(() => {
+    db.prepare(`
+      INSERT INTO account_deletion_requests (
+        user_id, requested_at, next_attempt_at, last_error_code
+      ) VALUES (?, ?, ?, NULL)
+      ON CONFLICT(user_id) DO UPDATE SET
+        next_attempt_at = MIN(
+          account_deletion_requests.next_attempt_at,
+          excluded.next_attempt_at
+        ),
+        last_error_code = NULL
+    `).run(userId, now, now)
+    db.prepare('DELETE FROM sessions WHERE user_id = ?').run(userId)
+    db.prepare('DELETE FROM email_verification_tokens WHERE user_id = ?').run(userId)
+    db.prepare('DELETE FROM oauth_states WHERE user_id = ?').run(userId)
+    db.prepare('DELETE FROM auth_identities WHERE user_id = ?').run(userId)
+    db.prepare(`
+      UPDATE users
+      SET password_hash = ?, password_updated_at = ?
+      WHERE id = ?
+    `).run(disabledPasswordHash, now, userId)
+    db.prepare(`
+      UPDATE issue_submission_connections
+      SET revoked_at = COALESCE(revoked_at, ?), updated_at = ?
+      WHERE user_id = ?
+    `).run(now, now, userId)
+    db.prepare(`
+      DELETE FROM bug_reports
+      WHERE reporter_user_id = ?
+        AND submitted_at IS NULL
+        AND github_issue_number IS NULL
+    `).run(userId)
+    db.prepare(`
+      UPDATE bug_reports
+      SET phenomenon = NULL,
+          author_identity = NULL,
+          confirmed_github_user_id = NULL,
+          status = CASE
+            WHEN github_issue_number IS NULL THEN 'failed'
+            ELSE status
+          END,
+          discarded_at = CASE
+            WHEN github_issue_number IS NULL THEN COALESCE(discarded_at, ?)
+            ELSE discarded_at
+          END,
+          claim_token = NULL,
+          claimed_at = NULL,
+          next_attempt_at = NULL,
+          last_error_code = CASE
+            WHEN github_issue_number IS NULL THEN 'reporter_deleted'
+            ELSE last_error_code
+          END,
+          updated_at = ?
+      WHERE reporter_user_id = ?
+    `).run(now, now, userId)
+  })()
+}
+
+export function nextPendingAccountDeletion(): string | null {
+  const row = getDb().prepare(`
+    SELECT user_id
+    FROM account_deletion_requests
+    WHERE next_attempt_at <= ?
+    ORDER BY requested_at, user_id
+    LIMIT 1
+  `).get(Date.now()) as { user_id: string } | undefined
+  return row?.user_id ?? null
+}
+
+export function deferAccountDeletion(
+  userId: string,
+  errorCode: string,
+  retryAt = Date.now() + ACCOUNT_DELETION_RETRY_MS,
+): void {
+  getDb().prepare(`
+    UPDATE account_deletion_requests
+    SET next_attempt_at = ?, last_error_code = ?
+    WHERE user_id = ?
+  `).run(Math.max(retryAt, Date.now() + 1_000), errorCode, userId)
 }
 
 const idPlaceholders = (ids: string[]): string => ids.map(() => '?').join(', ')
