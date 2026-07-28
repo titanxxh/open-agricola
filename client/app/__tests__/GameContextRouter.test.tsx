@@ -113,7 +113,8 @@ describe('GameContextRouter', () => {
     window.history.replaceState(
       null,
       '',
-      `/?context=active-room&step=5&frame=${frameHash}&perspective=open`,
+      `/?context=active-room&step=5&frame=${frameHash}`
+        + '&perspective=open&bugReport=draft-1',
     )
     const fetch = vi.fn(async (input: string | URL | Request) => {
       const url = String(input)
@@ -167,6 +168,9 @@ describe('GameContextRouter', () => {
       `/api/v1/game-contexts/active-room/evidence/5?frame=${frameHash}`,
       expect.objectContaining({ credentials: 'include' }),
     )
+    expect(fetch.mock.calls.some(([input]) =>
+      String(input).includes('/api/v1/bug-reports/draft-1')
+    )).toBe(false)
 
     fireEvent.click(screen.getByRole('button', {
       name: 'platform.bugReport.close',
@@ -174,7 +178,8 @@ describe('GameContextRouter', () => {
 
     expect(screen.queryByRole('complementary')).not.toBeInTheDocument()
     expect(screen.getByText('active app')).toBeVisible()
-    expect(window.location.search).toBe('?context=active-room&perspective=open')
+    expect(window.location.search)
+      .toBe('?context=active-room&perspective=open&bugReport=draft-1')
   })
 
   it('keeps the full active context link behind login', async () => {
