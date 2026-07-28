@@ -6,6 +6,10 @@ export type ReplayViewerBuild = {
   directory: string
   entrypoint: 'index.html'
   files: Record<string, string>
+  fileMetadata: Record<string, {
+    size: number
+    mtimeMs: number
+  }>
 }
 
 const REVALIDATE_INTERVAL_MS = 60_000
@@ -72,14 +76,27 @@ export const loadReplayViewerBuild = (
       || !files.every((path) => typeof expected[path] === 'string')
       || !files.includes('index.html')
     ) return null
-    if (!files.every((path) =>
-      /^[a-f0-9]{64}$/.test(expected[path] as string)
-      && fileHash(join(directory, path)) === expected[path]
-    )) return null
+    const fileMetadata: ReplayViewerBuild['fileMetadata'] = {}
+    if (!files.every((path) => {
+      const filePath = join(directory, path)
+      const stat = lstatSync(filePath)
+      fileMetadata[path] = {
+        size: stat.size,
+        mtimeMs: stat.mtimeMs,
+      }
+      return /^[a-f0-9]{64}$/.test(expected[path] as string)
+        && fileHash(filePath) === expected[path]
+    })) return null
+    const manifestStat = lstatSync(manifestPath)
+    fileMetadata['manifest.json'] = {
+      size: manifestStat.size,
+      mtimeMs: manifestStat.mtimeMs,
+    }
     const build: ReplayViewerBuild = {
       directory,
       entrypoint: 'index.html',
       files: expected as Record<string, string>,
+      fileMetadata,
     }
     verifiedBuilds.set(directory, { build, verifiedAt: Date.now() })
     return build
