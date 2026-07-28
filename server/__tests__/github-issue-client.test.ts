@@ -145,6 +145,7 @@ describe('GitHubIssueClient', () => {
       html_url: 'https://github.com/titanxxh/open-agricola-issues/issues/17',
       body: 'details\n<!-- open-agricola-report:id -->',
       created_at: new Date(NOW).toISOString(),
+      performed_via_github_app: { id: 1 },
     }])) as unknown as typeof fetch
 
     const result = await client(fetchImpl).findIssueByMarker(
@@ -158,6 +159,33 @@ describe('GitHubIssueClient', () => {
     expect(String(vi.mocked(fetchImpl).mock.calls[0]![0])).toContain(
       '/repos/titanxxh/open-agricola-issues/issues?',
     )
+  })
+
+  it('ignores copied markers and Issues predating the delivery attempt', async () => {
+    const marker = '<!-- open-agricola-report:id -->'
+    const fetchImpl = vi.fn(async () => response([
+      {
+        number: 18,
+        html_url: 'https://github.com/titanxxh/open-agricola-issues/issues/18',
+        body: marker,
+        created_at: new Date(NOW).toISOString(),
+        performed_via_github_app: null,
+      },
+      {
+        number: 17,
+        html_url: 'https://github.com/titanxxh/open-agricola-issues/issues/17',
+        body: marker,
+        created_at: new Date(NOW - 2_000).toISOString(),
+        performed_via_github_app: { id: 1 },
+      },
+    ])) as unknown as typeof fetch
+
+    await expect(client(fetchImpl).findIssueByMarker(
+      'github_user',
+      marker,
+      NOW,
+      'user-token',
+    )).resolves.toEqual({ ok: true, found: false })
   })
 
   it('restricts a hosted installation token to the configured repository and issues permission', async () => {

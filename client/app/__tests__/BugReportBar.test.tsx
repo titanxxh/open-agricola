@@ -283,6 +283,71 @@ describe('BugReportBar', () => {
       .toBeInTheDocument()
   })
 
+  it('requires confirmation again after the connected GitHub account changes', async () => {
+    const user = userEvent.setup()
+    const patches: unknown[] = []
+    window.history.replaceState(null, '', '/?bugReport=submission-1')
+    vi.stubGlobal('fetch', vi.fn(async (
+      input: string | URL | Request,
+      init?: RequestInit,
+    ) => {
+      const url = String(input)
+      const method = init?.method ?? 'GET'
+      const changed = report({
+        authorIdentity: 'github_user',
+        status: 'needs_reconnect',
+        lastErrorCode: 'github_identity_confirmation_required',
+      })
+      if (isConnectionStatusRequest(url)) {
+        return response({
+          ok: true,
+          enabled: true,
+          connected: true,
+          githubUserId: '100',
+        })
+      }
+      if (
+        url.endsWith('/api/v1/bug-reports/submission-1')
+        && method === 'GET'
+      ) {
+        return response({ ok: true, report: changed })
+      }
+      if (
+        url.endsWith('/api/v1/bug-reports/submission-1')
+        && method === 'PATCH'
+      ) {
+        patches.push(JSON.parse(String(init?.body)))
+        return response({ ok: true, report: changed })
+      }
+      if (url.endsWith('/api/v1/bug-reports/submission-1/submit')) {
+        return response({
+          ok: true,
+          report: report({
+            authorIdentity: 'github_user',
+            status: 'submitted',
+            issueNumber: 7,
+            issueUrl: 'https://github.com/titanxxh/open-agricola-issues/issues/7',
+          }),
+        })
+      }
+      throw new Error(`Unexpected request: ${method} ${url}`)
+    }))
+    renderBar({ roomId: 'room-1' })
+
+    const confirmation = await screen.findByRole('checkbox', {
+      name: /GitHub will show my GitHub account/,
+    })
+    expect(confirmation).not.toBeChecked()
+    expect(confirmation).toBeEnabled()
+    expect(screen.queryByRole('button', { name: 'Connect GitHub' }))
+      .not.toBeInTheDocument()
+
+    await user.click(confirmation)
+    await user.click(screen.getByRole('button', { name: 'Submit Issue' }))
+
+    expect(patches).toEqual([{ confirmGitHub: true }])
+  })
+
   it('shows a matching open Issue and records the explicit new-Issue choice', async () => {
     const user = userEvent.setup()
     const calls: Array<{ method: string; body: unknown }> = []
