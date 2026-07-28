@@ -88,6 +88,19 @@ export type ReplayAnchorEvidence = {
   step: ReplayFrameStep
 }
 
+export type ReportedEvidence = {
+  ok: true
+  kind: 'reportedEvidence'
+  apiVersion: 1
+  roomId: string
+  schemaVersion: number
+  viewerBuildId: string
+  stepNo: number
+  frameHash: string
+  perspective: `p${number}`
+  frame: SerializedGameState
+}
+
 export type ReplayUnavailableError = GameContextError & {
   unavailableRange?: {
     firstStepNo: number
@@ -103,3 +116,4 @@ export type ReplayUnavailableError = GameContextError & {
 export type ReplayManifestResponse = ReplayManifest | ReplayUnavailableError
 export type ReplaySegmentResponse = ReplaySegment | ReplayUnavailableError
 export type ReplayAnchorResponse = ReplayAnchorEvidence | ReplayUnavailableError
+export type ReportedEvidenceResponse = ReportedEvidence | ReplayUnavailableError

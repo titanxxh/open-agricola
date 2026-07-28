@@ -346,6 +346,8 @@ const sessionCleanupTimer = setInterval(() => {
 }, 60 * 60 * 1000)
 const bugReportDeliveryTimer = setInterval(() => {
   void retryPendingAccountDeletion().then(
+    () => bugReportDelivery?.retryGrantRevocation(),
+  ).then(
     () => isBugReportRuntimeReady(bugReportRuntime)
       ? bugReportDelivery?.deliverDue()
       : undefined,

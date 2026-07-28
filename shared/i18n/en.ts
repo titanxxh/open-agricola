@@ -1365,6 +1365,8 @@ export const en = {
       unavailableBody: 'Please try again later.',
       verifyingReplay: 'Verifying replay archive…',
       viewerUnavailable: 'The pinned replay viewer is missing or failed its integrity check.',
+      reportedEvidenceTitle: 'Reported game evidence',
+      reportedEvidenceBody: 'This retained position is read-only and shows only information visible from your seat.',
       choosePerspective: 'Choose a replay perspective. Open view reveals all hidden information.',
       watchAs: 'Replay as {player}',
       watchOpen: 'Replay with open information',
