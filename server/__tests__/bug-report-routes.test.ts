@@ -643,6 +643,13 @@ describe('bug report routes', () => {
       SELECT github_issue_state AS state
       FROM bug_reports WHERE submission_id = ?
     `).get(submissionId) as { state: string }).state).toBe('open')
+
+    await webhook('deleted', 'titanxxh/open-agricola-issues')
+    expect((db.prepare(`
+      SELECT github_issue_state AS state
+      FROM bug_reports WHERE submission_id = ?
+    `).get(submissionId) as { state: string }).state).toBe('deleted')
+    expect(store.reporterDeletionPlan('u1').issueNumbers).toEqual([])
   })
 
   it('applies participant tombstones and retains the evidence auditor identity', async () => {

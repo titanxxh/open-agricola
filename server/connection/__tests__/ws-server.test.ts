@@ -34,6 +34,12 @@ vi.mock('../../db.ts', () => {
       expires_at INTEGER NOT NULL,
       created_at INTEGER NOT NULL
     );
+    CREATE TABLE account_deletion_requests (
+      user_id TEXT PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+      requested_at INTEGER NOT NULL,
+      next_attempt_at INTEGER NOT NULL,
+      last_error_code TEXT
+    );
   `)
   return { getDb: () => db, cleanExpiredSessions: () => {} }
 })

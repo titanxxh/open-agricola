@@ -22,8 +22,11 @@ import {
   isAdmin,
   createSession,
   deleteAccount,
+  deferAccountDeletion,
   getAccountDeletionRoomIds,
+  nextPendingAccountDeletion,
   registerPasswordUser,
+  requestAccountDeletion,
   resendVerificationEmail,
   sendVerificationEmail,
   verifyEmailToken,
@@ -313,6 +316,23 @@ const createCompletedReplayFixture = () => {
 
 let wssCtx: ReturnType<typeof createWsServer> | null = null
 
+const retryPendingAccountDeletion = async (): Promise<void> => {
+  const userId = nextPendingAccountDeletion()
+  if (!userId || !bugReportDelivery) return
+  try {
+    await bugReportDelivery.deleteReporter(userId)
+    deleteAccount(userId)
+  } catch (error) {
+    if (error instanceof BugReportError && error.code === 'bug_report_delivery_busy') {
+      return
+    }
+    const failure = error instanceof BugReportError
+      ? error
+      : new BugReportError('bug_report_deletion_failed', 503)
+    deferAccountDeletion(userId, failure.code, failure.retryAt)
+  }
+}
+
 // Periodically clean expired sessions and replay evidence (every hour)
 const sessionCleanupTimer = setInterval(() => {
   cleanExpiredSessions()
@@ -320,7 +340,9 @@ const sessionCleanupTimer = setInterval(() => {
 }, 60 * 60 * 1000)
 const bugReportDeliveryTimer = setInterval(() => {
   if (!isBugReportRuntimeReady(bugReportRuntime)) return
-  void bugReportDelivery?.deliverDue().catch(() => {
+  void retryPendingAccountDeletion().then(
+    () => bugReportDelivery?.deliverDue(),
+  ).catch(() => {
     console.error('[bug-report-delivery] delivery loop failed')
   })
 }, 5_000)
@@ -513,11 +535,18 @@ const server = createServer(async (req, res) => {
       `).get(user.id))
     )
     if (hasExternalBugReportData) {
+      requestAccountDeletion(user.id)
+      wssCtx?.lobby.endRoomsForUser(
+        user.id,
+        getAccountDeletionRoomIds(user.id),
+      )
+      wssCtx?.closeUserConnections(user.id)
       if (!bugReportDelivery) {
-        sendJson(res, 503, {
-          ok: false,
-          code: 'bug_report_unavailable',
-          error: 'bug_report_unavailable',
+        sendJson(res, 202, { ok: true, pending: true }, {
+          'Set-Cookie': clearSessionCookie({
+            backendOrigin: getRequestOrigin(req),
+            requestOrigin: req.headers.origin,
+          }),
         })
         return
       }
@@ -527,14 +556,27 @@ const server = createServer(async (req, res) => {
         const failure = error instanceof BugReportError
           ? error
           : new BugReportError('bug_report_deletion_failed', 503)
-        sendJson(res, failure.status, {
-          ok: false,
-          code: failure.code,
-          error: failure.code,
+        if (failure.code !== 'bug_report_delivery_busy') {
+          deferAccountDeletion(user.id, failure.code, failure.retryAt)
+        }
+        sendJson(res, 202, { ok: true, pending: true }, {
+          'Set-Cookie': clearSessionCookie({
+            backendOrigin: getRequestOrigin(req),
+            requestOrigin: req.headers.origin,
+          }),
         })
         return
       }
-    } else if (bugReportTables.has('bug_reports')) {
+      const result = deleteAccount(user.id)
+      sendJson(res, 200, result, {
+        'Set-Cookie': clearSessionCookie({
+          backendOrigin: getRequestOrigin(req),
+          requestOrigin: req.headers.origin,
+        }),
+      })
+      return
+    }
+    if (bugReportTables.has('bug_reports')) {
       database.prepare(`
         DELETE FROM bug_reports
         WHERE reporter_user_id = ?

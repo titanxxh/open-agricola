@@ -71,6 +71,14 @@ describe('bug report migration', () => {
       'duplicate_confirmed_at',
       'confirmed_github_user_id',
     ]))
+    expect((db.pragma('table_info(account_deletion_requests)') as Array<{
+      name: string
+    }>).map(({ name }) => name)).toEqual([
+      'user_id',
+      'requested_at',
+      'next_attempt_at',
+      'last_error_code',
+    ])
     expect((db.pragma('index_list(bug_report_evidence_audit)') as Array<{
       name: string
     }>).map(({ name }) => name)).toContain(
@@ -82,6 +90,14 @@ describe('bug report migration', () => {
     expect(db.prepare(`
       SELECT github_issue_state FROM bug_reports WHERE submission_id = 'submitted'
     `).get()).toEqual({ github_issue_state: 'open' })
+    db.prepare(`
+      UPDATE bug_reports
+      SET github_issue_state = 'deleted'
+      WHERE submission_id = 'submitted'
+    `).run()
+    expect(db.prepare(`
+      SELECT github_issue_state FROM bug_reports WHERE submission_id = 'submitted'
+    `).get()).toEqual({ github_issue_state: 'deleted' })
     expect((db.pragma('table_info(game_context_participants)') as Array<{
       name: string
     }>).map(({ name }) => name)).toEqual([

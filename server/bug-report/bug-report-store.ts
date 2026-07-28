@@ -87,7 +87,7 @@ type ReportRow = {
   submitted_at: number | null
   last_error_code: string | null
   discarded_at: number | null
-  github_issue_state: 'open' | 'closed' | null
+  github_issue_state: 'open' | 'closed' | 'deleted' | null
   duplicate_confirmed_at: number | null
   created_at: number
   updated_at: number
@@ -293,6 +293,14 @@ export class BugReportStore {
     if (linked && linked.provider_user_id !== githubUserId) {
       throw new BugReportError('github_identity_mismatch', 409)
     }
+    const identityOwner = this.db.prepare(`
+      SELECT user_id
+      FROM auth_identities
+      WHERE provider = 'github' AND provider_user_id = ?
+    `).get(githubUserId) as { user_id: string } | undefined
+    if (identityOwner && identityOwner.user_id !== userId) {
+      throw new BugReportError('github_identity_already_connected', 409)
+    }
     const owner = this.db.prepare(`
       SELECT user_id
       FROM issue_submission_connections
@@ -347,6 +355,7 @@ export class BugReportStore {
 
   connectionTokens(
     userId: string,
+    includeRevoked = false,
   ): (GitHubUserTokens & { githubUserId: string }) | null {
     const row = this.db.prepare(`
       SELECT user_id, github_user_id,
@@ -354,8 +363,9 @@ export class BugReportStore {
              refresh_token_ciphertext, refresh_token_nonce, refresh_token_tag,
              key_id, access_token_expires_at, refresh_token_expires_at
       FROM issue_submission_connections
-      WHERE user_id = ? AND revoked_at IS NULL
-    `).get(userId) as ConnectionRow | undefined
+      WHERE user_id = ?
+        AND (? = 1 OR revoked_at IS NULL)
+    `).get(userId, includeRevoked ? 1 : 0) as ConnectionRow | undefined
     if (!row) return null
     const accessToken = this.cipher.decrypt({
       ciphertext: row.access_token_ciphertext,
@@ -998,7 +1008,10 @@ export class BugReportStore {
     return this.report(submissionId)
   }
 
-  setIssueState(issueNumber: number, state: 'open' | 'closed'): void {
+  setIssueState(
+    issueNumber: number,
+    state: 'open' | 'closed' | 'deleted',
+  ): void {
     this.db.prepare(`
       UPDATE bug_reports
       SET github_issue_state = ?, updated_at = ?
@@ -1031,6 +1044,7 @@ export class BugReportStore {
       FROM bug_reports
       WHERE reporter_user_id = ?
         AND github_issue_number IS NOT NULL
+        AND COALESCE(github_issue_state, 'open') != 'deleted'
       ORDER BY github_issue_number
     `).all(userId) as Array<{ issue_number: number }>
     const discarded = this.db.prepare(`
@@ -1051,7 +1065,7 @@ export class BugReportStore {
         submissionId: report.submission_id,
         submittedAt: report.submitted_at,
       })),
-      tokens: this.connectionTokens(userId),
+      tokens: this.connectionTokens(userId, true),
     }
   }
 
