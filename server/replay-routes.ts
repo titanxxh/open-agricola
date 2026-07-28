@@ -20,11 +20,13 @@ const ASSET_ROUTE = /^\/replay-assets\/([a-f0-9]{64})$/
 const CONTEXT_ID = /^[A-Za-z0-9]+(?:-[A-Za-z0-9]+)*$/
 const MAX_RESPONSE_BYTES = 8 * 1024 * 1024
 const READ_LIMIT_PER_MINUTE = 240
-const verifiedReplayAssets = new Map<string, {
+type VerifiedReplayAsset = {
   size: number
   mtimeMs: number
   contentType: string
-}>()
+}
+const verifiedReplayAssets = new Map<string, VerifiedReplayAsset>()
+const replayAssetVerifications = new Map<string, Promise<VerifiedReplayAsset | null>>()
 
 type ReplayResponse = ReplayManifestResponse | ReplaySegmentResponse | ReplayAnchorResponse
 
@@ -312,10 +314,7 @@ const serveReplayAsset = (
     res.end(JSON.stringify({ ok: false, code: 'replay_segment_unavailable', message: 'Replay asset not found' }))
     return
   }
-  const sendVerified = (
-    contentType: string,
-    body?: Buffer,
-  ): void => {
+  const sendVerified = (contentType: string): void => {
     const headers = {
       ...publicHeaders(contentType, 'public, max-age=0, must-revalidate'),
       ETag: `"${hash}"`,
@@ -325,12 +324,7 @@ const serveReplayAsset = (
       res.end()
       return
     }
-    if (body) {
-      res.writeHead(200, headers)
-      res.end(body)
-    } else {
-      streamFile(res, path, headers)
-    }
+    streamFile(res, path, headers)
   }
   const cached = verifiedReplayAssets.get(path)
   if (cached && metadataMatches(metadata, cached)) {
@@ -338,23 +332,29 @@ const serveReplayAsset = (
     return
   }
   verifiedReplayAssets.delete(path)
-  void readFile(path).then((body) => {
-    const current = fileMetadata(path)
-    if (
-      !current
-      || !metadataMatches(current, metadata)
-      || createHash('sha256').update(body).digest('hex') !== hash
-    ) {
+  let verification = replayAssetVerifications.get(path)
+  if (!verification) {
+    verification = readFile(path).then((body): VerifiedReplayAsset | null => {
+      const current = fileMetadata(path)
+      if (
+        !current
+        || !metadataMatches(current, metadata)
+        || createHash('sha256').update(body).digest('hex') !== hash
+      ) return null
+      const verified = { ...current, contentType: assetMimeType(body) }
+      verifiedReplayAssets.set(path, verified)
+      return verified
+    }).catch(() => null)
+    replayAssetVerifications.set(path, verification)
+    void verification.then(() => replayAssetVerifications.delete(path))
+  }
+  void verification.then((verified) => {
+    if (!verified) {
       res.writeHead(503, publicHeaders('application/json; charset=utf-8', 'no-cache'))
       res.end(JSON.stringify({ ok: false, code: 'replay_segment_unavailable', message: 'Replay asset failed its integrity check' }))
       return
     }
-    const contentType = assetMimeType(body)
-    verifiedReplayAssets.set(path, { ...current, contentType })
-    sendVerified(contentType, body)
-  }).catch(() => {
-    res.writeHead(503, publicHeaders('application/json; charset=utf-8', 'no-cache'))
-    res.end(JSON.stringify({ ok: false, code: 'replay_segment_unavailable', message: 'Replay asset failed its integrity check' }))
+    sendVerified(verified.contentType)
   })
 }
 
