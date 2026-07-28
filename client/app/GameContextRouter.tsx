@@ -193,7 +193,7 @@ function ReportedEvidenceContext({
         title={t('platform.gameContext.replayFrameTitle')}
         mode="reported-evidence"
       />
-      {new URLSearchParams(window.location.search).has('bugReport')
+      {!embedded && new URLSearchParams(window.location.search).has('bugReport')
         ? <BugReportBar roomId={roomId} />
         : null}
     </Root>
