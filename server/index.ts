@@ -58,6 +58,7 @@ import {
 } from './bug-report-routes.ts'
 import {
   BugReportDelivery,
+  BugReportError,
   BugReportStore,
   TokenCipher,
 } from './bug-report/bug-report-store.ts'
@@ -482,6 +483,53 @@ const server = createServer(async (req, res) => {
     const token = getAuthToken(req)
     const user = validateSession(token)
     if (!user) { sendJson(res, 401, authError('not_authenticated', 'Not authenticated')); return }
+    const database = getDb()
+    const bugReportTables = new Set((database.prepare(`
+      SELECT name
+      FROM sqlite_master
+      WHERE type = 'table'
+        AND name IN ('bug_reports', 'issue_submission_connections')
+    `).all() as Array<{ name: string }>).map(({ name }) => name))
+    const hasBugReportData = (
+      bugReportTables.has('bug_reports')
+      && Boolean(database.prepare(`
+        SELECT 1
+        FROM bug_reports
+        WHERE reporter_user_id = ?
+        LIMIT 1
+      `).get(user.id))
+    ) || (
+      bugReportTables.has('issue_submission_connections')
+      && Boolean(database.prepare(`
+        SELECT 1
+        FROM issue_submission_connections
+        WHERE user_id = ?
+        LIMIT 1
+      `).get(user.id))
+    )
+    if (hasBugReportData) {
+      if (!bugReportDelivery) {
+        sendJson(res, 503, {
+          ok: false,
+          code: 'bug_report_unavailable',
+          error: 'bug_report_unavailable',
+        })
+        return
+      }
+      try {
+        await bugReportDelivery.deleteReporter(user.id)
+      } catch (error) {
+        const failure = error instanceof BugReportError
+          ? error
+          : new BugReportError('bug_report_deletion_failed', 503)
+        sendJson(res, failure.status, {
+          ok: false,
+          code: failure.code,
+          error: failure.code,
+        })
+        return
+      }
+    }
     wssCtx?.lobby.endRoomsForUser(user.id, getAccountDeletionRoomIds(user.id))
     const result = deleteAccount(user.id)
     wssCtx?.closeUserConnections(user.id)

@@ -313,6 +313,8 @@ export async function handleBugReportRoute(
       let payload: {
         action?: string
         sender?: { id?: number | string }
+        issue?: { number?: number }
+        repository?: { full_name?: string }
       }
       try {
         const value = JSON.parse(body.toString('utf8')) as unknown
@@ -329,6 +331,21 @@ export async function handleBugReportRoute(
         && payload.sender?.id !== undefined
       ) {
         runtime.store.disconnectGithubUser(String(payload.sender.id))
+      }
+      if (
+        req.headers['x-github-event'] === 'issues'
+        && payload.repository?.full_name === 'titanxxh/open-agricola-issues'
+        && typeof payload.issue?.number === 'number'
+        && Number.isSafeInteger(payload.issue.number)
+      ) {
+        if (payload.action === 'closed') {
+          runtime.store.setIssueState(payload.issue.number, 'closed')
+        } else if (
+          payload.action === 'opened'
+          || payload.action === 'reopened'
+        ) {
+          runtime.store.setIssueState(payload.issue.number, 'open')
+        }
       }
       send(res, 202, { ok: true })
       return true
@@ -379,8 +396,10 @@ export async function handleBugReportRoute(
 
     if (pathname === CONNECTION_ROUTE && req.method === 'DELETE') {
       const current = requireUser(res, user)
-      if (!runtime) throw new BugReportError('bug_report_unavailable', 503)
-      runtime.store.disconnect(current.id)
+      if (!runtime?.delivery) {
+        throw new BugReportError('bug_report_unavailable', 503)
+      }
+      await runtime.delivery.disconnectUser(current.id)
       send(res, 200, { ok: true })
       return true
     }
@@ -422,7 +441,14 @@ export async function handleBugReportRoute(
         ...(body.stepNo === undefined ? {} : { stepNo: body.stepNo }),
         ...(body.frameHash === undefined ? {} : { frameHash: body.frameHash }),
       })
-      send(res, 201, { ok: true, report })
+      send(res, 201, {
+        ok: true,
+        report,
+        existingIssues: runtime.store.openIssuesFor(
+          report.submissionId,
+          current.id,
+        ),
+      })
       return true
     }
 
@@ -432,18 +458,37 @@ export async function handleBugReportRoute(
         decodeId(reportMatch[1]!),
         current.id,
       )
-      send(res, 200, { ok: true, report })
+      send(res, 200, {
+        ok: true,
+        report,
+        existingIssues: runtime.store.openIssuesFor(
+          report.submissionId,
+          current.id,
+        ),
+      })
       return true
     }
     if (reportMatch && req.method === 'PATCH') {
       const body = await readJson(req)
-      assertKeys(body, ['phenomenon', 'authorIdentity', 'confirmHosted'])
+      assertKeys(body, [
+        'phenomenon',
+        'authorIdentity',
+        'confirmHosted',
+        'confirmExisting',
+      ])
       const report = runtime.store.updateDraft(
         decodeId(reportMatch[1]!),
         current.id,
         body,
       )
-      send(res, 200, { ok: true, report })
+      send(res, 200, {
+        ok: true,
+        report,
+        existingIssues: runtime.store.openIssuesFor(
+          report.submissionId,
+          current.id,
+        ),
+      })
       return true
     }
     if (reportMatch && req.method === 'DELETE') {

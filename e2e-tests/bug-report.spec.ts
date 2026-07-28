@@ -14,6 +14,7 @@ test('completed replay submits one hosted bug report with the current anchor', a
   }
   let createBody: Record<string, unknown> | null = null
   let submitCount = 0
+  let duplicateConfirmed = false
 
   await page.addInitScript(() => {
     window.localStorage.setItem('open-agricola-locale-v2', 'en')
@@ -49,6 +50,10 @@ test('completed replay submits one hosted bug report with the current anchor', a
             issueUrl: null,
             lastErrorCode: null,
           },
+          existingIssues: [{
+            number: 98,
+            url: 'https://github.com/titanxxh/open-agricola-issues/issues/98',
+          }],
         },
       })
       return
@@ -57,6 +62,8 @@ test('completed replay submits one hosted bug report with the current anchor', a
       url.pathname === '/api/v1/bug-reports/submission-e2e'
       && request.method() === 'PATCH'
     ) {
+      const patch = request.postDataJSON() as Record<string, unknown>
+      duplicateConfirmed ||= patch.confirmExisting === true
       await route.fulfill({
         json: {
           ok: true,
@@ -70,12 +77,16 @@ test('completed replay submits one hosted bug report with the current anchor', a
             stepNo: createBody?.stepNo,
             frameHash: createBody?.frameHash,
             phenomenon: createBody?.phenomenon,
-            authorIdentity: 'hosted',
+            authorIdentity: patch.authorIdentity === 'hosted' ? 'hosted' : null,
             status: 'draft',
             issueNumber: null,
             issueUrl: null,
             lastErrorCode: null,
           },
+          existingIssues: [{
+            number: 98,
+            url: 'https://github.com/titanxxh/open-agricola-issues/issues/98',
+          }],
         },
       })
       return
@@ -113,7 +124,8 @@ test('completed replay submits one hosted bug report with the current anchor', a
   await page.getByLabel('Describe what happened in one sentence')
     .fill('The final score is wrong')
   await page.getByRole('button', { name: 'Continue' }).click()
-  await page.getByRole('button', { name: 'Continue' }).click()
+  await expect(page.getByRole('link', { name: 'Open Issue #98' })).toBeVisible()
+  await page.getByRole('button', { name: 'Continue with a new Issue' }).click()
   await page.getByRole('radio', { name: /Hosted Issue Identity/ }).click()
   await page.getByRole('checkbox', { name: /public Issue/ }).click()
   await page.getByRole('button', { name: 'Submit Issue' }).click()
@@ -124,5 +136,6 @@ test('completed replay submits one hosted bug report with the current anchor', a
     stepNo: 0,
     frameHash: fixture.firstStepHash,
   })
+  expect(duplicateConfirmed).toBe(true)
   expect(submitCount).toBe(1)
 })
