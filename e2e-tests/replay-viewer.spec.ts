@@ -30,6 +30,10 @@ test('anonymous completed replay supports perspectives, playback, layout, and an
 
   const replay = page.frameLocator('iframe')
   await expect(replay.locator('.replay-app')).toBeVisible()
+  const majorSupply = replay.locator('.major-improvements')
+  await expect(majorSupply).toBeVisible()
+  await majorSupply.locator('h2').click()
+  await expect(majorSupply.locator('[data-card-anchor="Major_Well"]')).toBeVisible()
   await expect.poll(() => new URL(page.url()).searchParams.get('layout')).toBe('timeline')
   await expect.poll(() => new URL(page.url()).searchParams.get('frame')).toMatch(/^[a-f0-9]{64}$/)
   await expect(replay.locator('[data-hand-anchor="p1"] .player-card-inner')).toHaveCount(14)

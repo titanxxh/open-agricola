@@ -15,6 +15,12 @@ describe('production deployment config', () => {
     expect(script).toContain('ACCOUNT_REGISTRATION_POLICY="$ACCOUNT_REGISTRATION_POLICY"')
   })
 
+  it('records the deployed remote commit as the game build ID', () => {
+    const script = readFileSync('deploy-backend.sh', 'utf8')
+    expect(script).toContain('GAME_BUILD_ID="$(git rev-parse HEAD)"')
+    expect(script).toContain('GAME_BUILD_ID="$GAME_BUILD_ID" docker compose')
+  })
+
   it('forwards replay recording settings into production', () => {
     for (const composePath of ['docker-compose.yml', 'docker-compose.prod.yml']) {
       const compose = readFileSync(composePath, 'utf8')
