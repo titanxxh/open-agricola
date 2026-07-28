@@ -209,7 +209,10 @@ describe('GitHubIssueClient', () => {
         number: 17,
         body: '## Phenomenon\n\nFrozen\n\n- Reporter site ID: `site-user`\n',
       }))
-      .mockResolvedValueOnce(response({})) as unknown as typeof fetch
+      .mockResolvedValueOnce(response({
+        number: 17,
+        body: '## Phenomenon\n\nFrozen\n\n- Reporter site ID: `deleted reporter`\n',
+      })) as unknown as typeof fetch
 
     await expect(hostedClient(fetchImpl).anonymizeIssue(17, 'site-user'))
       .resolves.toEqual({ ok: true })
@@ -222,6 +225,44 @@ describe('GitHubIssueClient', () => {
     expect(JSON.parse(String(init?.body)).body).toBe(
       '## Phenomenon\n\nFrozen\n\n- Reporter site ID: `deleted reporter`\n',
     )
+  })
+
+  it('fails anonymization while the reporter ID remains in the Issue body', async () => {
+    const fetchImpl = vi.fn()
+      .mockResolvedValueOnce(response({
+        token: 'installation-token',
+        expires_at: new Date(NOW + 3_600_000).toISOString(),
+      }))
+      .mockResolvedValueOnce(response({
+        number: 17,
+        body: 'Reporter: site-user',
+      })) as unknown as typeof fetch
+
+    await expect(hostedClient(fetchImpl).anonymizeIssue(17, 'site-user'))
+      .resolves.toEqual({
+        ok: false,
+        kind: 'terminal',
+        code: 'github_anonymization_incomplete',
+      })
+    expect(fetchImpl).toHaveBeenCalledTimes(2)
+  })
+
+  it('verifies the updated Issue body before accepting anonymization', async () => {
+    const body = '- Reporter site ID: `site-user`'
+    const fetchImpl = vi.fn()
+      .mockResolvedValueOnce(response({
+        token: 'installation-token',
+        expires_at: new Date(NOW + 3_600_000).toISOString(),
+      }))
+      .mockResolvedValueOnce(response({ number: 17, body }))
+      .mockResolvedValueOnce(response({ number: 17, body })) as unknown as typeof fetch
+
+    await expect(hostedClient(fetchImpl).anonymizeIssue(17, 'site-user'))
+      .resolves.toEqual({
+        ok: false,
+        kind: 'terminal',
+        code: 'github_anonymization_incomplete',
+      })
   })
 
   it('uses PKCE and validates webhook signatures', () => {

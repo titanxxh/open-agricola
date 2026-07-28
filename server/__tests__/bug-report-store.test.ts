@@ -313,13 +313,32 @@ describe('BugReportStore', () => {
     )
 
     const connection = store.createConnectionState('u1', '/resume')
-    const consumed = store.consumeConnectionState(connection.state)
+    expect(store.consumeConnectionState(connection.state, 'u2')).toBeNull()
+    const consumed = store.consumeConnectionState(connection.state, 'u1')
     expect(consumed).toMatchObject({ userId: 'u1', returnTo: '/resume' })
     expect(consumed?.verifier).not.toBe(connection.state)
-    expect(store.consumeConnectionState(connection.state)).toBeNull()
+    expect(store.consumeConnectionState(connection.state, 'u1')).toBeNull()
     expect(JSON.stringify(db.prepare(`
       SELECT * FROM oauth_states
     `).get())).not.toContain(consumed?.verifier)
+  })
+
+  it('keeps only one live bug-report OAuth state per user and prunes stale states', () => {
+    const used = store.createConnectionState('u1', '/used')
+    expect(store.consumeConnectionState(used.state, 'u1')).not.toBeNull()
+    const expired = store.createConnectionState('u2', '/expired')
+    now += 10 * 60_000 + 1
+
+    const replaced = store.createConnectionState('u1', '/replaced')
+    const current = store.createConnectionState('u1', '/current')
+
+    expect(store.consumeConnectionState(expired.state, 'u2')).toBeNull()
+    expect(store.consumeConnectionState(replaced.state, 'u1')).toBeNull()
+    expect(store.consumeConnectionState(current.state, 'u1'))
+      .toMatchObject({ returnTo: '/current' })
+    expect(db.prepare(`
+      SELECT COUNT(*) AS count FROM oauth_states
+    `).get()).toEqual({ count: 1 })
   })
 
   it('submits once through the hosted identity and stores no phenomenon afterward', async () => {
@@ -679,13 +698,19 @@ describe('BugReportStore', () => {
     store.recordAttempt(report.submissionId, 'create', 'permission', now)
     store.deleteDraft(report.submissionId, 'u1')
 
+    const adapter = successAdapter()
     await new BugReportDelivery(
       store,
-      successAdapter(),
+      adapter,
       'https://game.example',
       () => now,
     ).deleteReporter('u1')
 
+    expect(adapter.findIssueByMarker).toHaveBeenCalledWith(
+      'hosted',
+      `<!-- open-agricola-report:${report.submissionId} -->`,
+      now,
+    )
     expect(db.prepare(`
       SELECT reporter_user_id, submitted_at, discarded_at
       FROM bug_reports WHERE submission_id = ?
@@ -697,7 +722,56 @@ describe('BugReportStore', () => {
     expect(db.prepare(`
       SELECT COUNT(*) AS count
       FROM bug_report_attempts WHERE submission_id = ?
-    `).get(report.submissionId)).toEqual({ count: 1 })
+    `).get(report.submissionId)).toEqual({ count: 2 })
+  })
+
+  it('finds and anonymizes an Issue from a discarded uncertain submission', async () => {
+    const roomId = insertContext('active')
+    const report = store.createDraft({
+      userId: 'u1',
+      roomId,
+      phenomenon: 'The game froze',
+    })
+    store.updateDraft(report.submissionId, 'u1', {
+      authorIdentity: 'hosted',
+      confirmHosted: true,
+    })
+    store.queue(report.submissionId, 'u1')
+    const claim = store.claim(report.submissionId)!
+    store.defer(claim, 'failed', 'github_result_uncertain')
+    store.recordAttempt(report.submissionId, 'create', 'uncertain', now)
+    store.deleteDraft(report.submissionId, 'u1')
+    const adapter = successAdapter()
+    vi.mocked(adapter.findIssueByMarker)
+      .mockResolvedValueOnce({
+        ok: false,
+        kind: 'uncertain',
+        code: 'github_reconciliation_uncertain',
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        number: 9,
+        url: 'https://github.com/titanxxh/open-agricola-issues/issues/9',
+      })
+    const delivery = new BugReportDelivery(
+      store,
+      adapter,
+      'https://game.example',
+      () => now,
+    )
+
+    await expect(delivery.deleteReporter('u1')).rejects.toMatchObject({
+      code: 'github_reconciliation_uncertain',
+      status: 503,
+    })
+    expect(store.reportForEvidence(report.submissionId)?.reporter_user_id)
+      .toBe('u1')
+
+    await delivery.deleteReporter('u1')
+
+    expect(adapter.anonymizeIssue).toHaveBeenCalledWith(9, 'u1')
+    expect(store.reportForEvidence(report.submissionId)?.reporter_user_id)
+      .toBeNull()
   })
 
   it('anonymizes known Issues and revokes GitHub before account deletion', async () => {

@@ -402,28 +402,40 @@ export class BugReportStore {
     const verifier = randomBytes(48).toString('base64url')
     const encrypted = this.cipher.encrypt(verifier)
     const now = this.now()
-    this.db.prepare(`
-      INSERT INTO oauth_states (
-        state_hash, provider, intent, user_id, return_to, expires_at, created_at,
-        pkce_verifier_ciphertext, pkce_verifier_nonce, pkce_verifier_tag,
-        pkce_verifier_key_id
+    this.db.transaction(() => {
+      this.db.prepare(`
+        DELETE FROM oauth_states
+        WHERE used_at IS NOT NULL OR expires_at <= ?
+      `).run(now)
+      this.db.prepare(`
+        DELETE FROM oauth_states
+        WHERE provider = 'github'
+          AND intent = 'bug_report'
+          AND user_id = ?
+      `).run(userId)
+      this.db.prepare(`
+        INSERT INTO oauth_states (
+          state_hash, provider, intent, user_id, return_to, expires_at, created_at,
+          pkce_verifier_ciphertext, pkce_verifier_nonce, pkce_verifier_tag,
+          pkce_verifier_key_id
+        )
+        VALUES (?, 'github', 'bug_report', ?, ?, ?, ?, ?, ?, ?, ?)
+      `).run(
+        hashState(state),
+        userId,
+        returnTo,
+        now + OAUTH_STATE_TTL_MS,
+        now,
+        encrypted.ciphertext,
+        encrypted.nonce,
+        encrypted.tag,
+        encrypted.keyId,
       )
-      VALUES (?, 'github', 'bug_report', ?, ?, ?, ?, ?, ?, ?, ?)
-    `).run(
-      hashState(state),
-      userId,
-      returnTo,
-      now + OAUTH_STATE_TTL_MS,
-      now,
-      encrypted.ciphertext,
-      encrypted.nonce,
-      encrypted.tag,
-      encrypted.keyId,
-    )
+    })()
     return { state, codeChallenge: createCodeChallenge(verifier) }
   }
 
-  consumeConnectionState(state: string): {
+  consumeConnectionState(state: string, expectedUserId: string): {
     userId: string
     returnTo: string
     verifier: string
@@ -439,15 +451,16 @@ export class BugReportStore {
         WHERE state_hash = ?
           AND provider = 'github'
           AND intent = 'bug_report'
+          AND user_id = ?
           AND used_at IS NULL
           AND expires_at > ?
-      `).get(stateHash, now) as OAuthStateRow | undefined
+      `).get(stateHash, expectedUserId, now) as OAuthStateRow | undefined
       if (!found) return null
       const changed = this.db.prepare(`
         UPDATE oauth_states
         SET used_at = ?
-        WHERE state_hash = ? AND used_at IS NULL
-      `).run(now, stateHash)
+        WHERE state_hash = ? AND user_id = ? AND used_at IS NULL
+      `).run(now, stateHash, expectedUserId)
       return changed.changes === 1 ? found : null
     })()
     if (!row) return null
@@ -892,6 +905,10 @@ export class BugReportStore {
 
   reporterDeletionPlan(userId: string): {
     issueNumbers: number[]
+    discardedReports: Array<{
+      submissionId: string
+      submittedAt: number
+    }>
     tokens: GitHubUserTokens | null
   } {
     const unresolved = this.db.prepare(`
@@ -913,8 +930,24 @@ export class BugReportStore {
         AND github_issue_number IS NOT NULL
       ORDER BY github_issue_number
     `).all(userId) as Array<{ issue_number: number }>
+    const discarded = this.db.prepare(`
+      SELECT submission_id, submitted_at
+      FROM bug_reports
+      WHERE reporter_user_id = ?
+        AND submitted_at IS NOT NULL
+        AND github_issue_number IS NULL
+        AND discarded_at IS NOT NULL
+      ORDER BY submitted_at, submission_id
+    `).all(userId) as Array<{
+      submission_id: string
+      submitted_at: number
+    }>
     return {
       issueNumbers: issues.map(({ issue_number }) => issue_number),
+      discardedReports: discarded.map((report) => ({
+        submissionId: report.submission_id,
+        submittedAt: report.submitted_at,
+      })),
       tokens: this.connectionTokens(userId),
     }
   }
@@ -1182,7 +1215,31 @@ export class BugReportDelivery {
     this.running = true
     try {
       const plan = this.store.reporterDeletionPlan(userId)
-      for (const issueNumber of plan.issueNumbers) {
+      const issueNumbers = new Set(plan.issueNumbers)
+      for (const report of plan.discardedReports) {
+        const startedAt = this.now()
+        const result = await this.client.findIssueByMarker(
+          'hosted',
+          `<!-- open-agricola-report:${report.submissionId} -->`,
+          report.submittedAt,
+        )
+        this.store.recordAttempt(
+          report.submissionId,
+          'reconcile',
+          result.ok
+            ? ('found' in result && result.found === false
+                ? 'not_found'
+                : 'found')
+            : result.kind,
+          startedAt,
+          result.ok ? undefined : result,
+        )
+        if (!result.ok) {
+          throw new BugReportError(result.code, 503, result.retryAt)
+        }
+        if (!('found' in result)) issueNumbers.add(result.number)
+      }
+      for (const issueNumber of issueNumbers) {
         const result = await this.client.anonymizeIssue(issueNumber, userId)
         if (!result.ok) {
           throw new BugReportError(result.code, 503, result.retryAt)
