@@ -358,7 +358,7 @@ describe('BugReportStore', () => {
       userId: 'u1',
       roomId,
       phenomenon: '@alice UI\u0001 froze after taking wood\n'
-        + 'https://host/@bob user@example.com @scope/pkg',
+        + 'https://host/@bob user@example.com @scope/pkg @org/team',
     })
     expectBugReportError(
       () => store.updateDraft(report.submissionId, 'u1', {
@@ -394,7 +394,8 @@ describe('BugReportStore', () => {
     expect(issue.body).toContain(`<!-- open-agricola-report:${report.submissionId} -->`)
     expect(issue.body).toContain('https://host/@bob')
     expect(issue.body).toContain('user@example.com')
-    expect(issue.body).toContain('@scope/pkg')
+    expect(issue.body).toContain('@\u200Bscope/pkg')
+    expect(issue.body).toContain('@\u200Borg/team')
     expect(issue.body).not.toContain('\u0001')
     expect(store.getOwned(report.submissionId, 'u1')).toMatchObject({
       status: 'submitted',
@@ -402,6 +403,32 @@ describe('BugReportStore', () => {
       issueNumber: 7,
       issueUrl: ISSUE_URL,
     })
+  })
+
+  it('disconnects locally when GitHub revocation is unavailable', async () => {
+    store.saveConnection('u1', '99', {
+      accessToken: 'user-token',
+      accessTokenExpiresAt: now + 3_600_000,
+    })
+    const adapter = successAdapter()
+    vi.mocked(adapter.revokeUserGrant).mockResolvedValueOnce({
+      ok: false,
+      kind: 'uncertain',
+      code: 'github_revocation_uncertain',
+    })
+
+    await expect(new BugReportDelivery(
+      store,
+      adapter,
+      'https://game.example',
+      () => now,
+    ).disconnectUser('u1')).rejects.toMatchObject({
+      code: 'github_revocation_uncertain',
+      status: 503,
+    })
+
+    expect(store.connectionStatus('u1')).toEqual({ connected: false })
+    expect(store.connectionTokens('u1')).toBeNull()
   })
 
   it('requires and uses the reporter GitHub connection without hosted fallback', async () => {

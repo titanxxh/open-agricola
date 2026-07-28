@@ -1194,7 +1194,7 @@ const neutralizeMentions = (value: string): string =>
         ? character
         : '')
     .replace(
-      /(?<![A-Za-z0-9_/:=?&#%+-])@([A-Za-z0-9](?:[A-Za-z0-9-]{0,38}))(?![A-Za-z0-9/-])/g,
+      /(?<![A-Za-z0-9_/:=?&#%+-])@([A-Za-z0-9](?:[A-Za-z0-9-]{0,38}))(?![A-Za-z0-9-])/g,
       '@\u200B$1',
     )
 
@@ -1303,13 +1303,13 @@ export class BugReportDelivery {
     this.running = true
     try {
       const tokens = this.store.connectionTokens(userId)
+      this.store.disconnect(userId)
       if (tokens) {
         const result = await this.client.revokeUserGrant(tokens.accessToken)
         if (!result.ok) {
           throw new BugReportError(result.code, 503, result.retryAt)
         }
       }
-      this.store.disconnect(userId)
     } finally {
       this.running = false
     }
