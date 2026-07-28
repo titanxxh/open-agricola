@@ -554,6 +554,47 @@ describe('bug report routes', () => {
     expect(json(replayed)).toMatchObject({ code: 'oauth_state_invalid' })
   })
 
+  it('revokes a replacement grant instead of overwriting another GitHub identity', async () => {
+    store.saveConnection(USER.id, '99', {
+      accessToken: 'existing-token',
+      accessTokenExpiresAt: 1_700_003_600_000,
+    })
+    const created = await invoke(
+      'POST',
+      '/api/v1/game-contexts/active-room/bug-reports',
+      { phenomenon: 'The game froze' },
+    )
+    const submissionId = (json(created).report as { submissionId: string })
+      .submissionId
+    const start = await invoke(
+      'POST',
+      '/api/v1/issue-submission-connection/github/start',
+      { submissionId },
+    )
+    const state = new URL(
+      (json(start) as { authorizationUrl: string }).authorizationUrl,
+    ).searchParams.get('state')
+    exchangeCode.mockResolvedValueOnce({
+      accessToken: 'replacement-token',
+      accessTokenExpiresAt: 1_700_003_600_000,
+    })
+    githubUserId.mockResolvedValueOnce('100')
+
+    const completed = await invoke(
+      'POST',
+      '/api/v1/issue-submission-connection/github/complete',
+      { state, code: 'oauth-code' },
+    )
+
+    expect(completed.statusCode).toBe(502)
+    expect(json(completed)).toMatchObject({ code: 'github_connection_failed' })
+    expect(revokeUserGrant).toHaveBeenCalledWith('replacement-token')
+    expect(store.connectionTokens(USER.id)).toMatchObject({
+      githubUserId: '99',
+      accessToken: 'existing-token',
+    })
+  })
+
   it('preserves a draft when GitHub connection authorization is cancelled', async () => {
     const created = await invoke(
       'POST',

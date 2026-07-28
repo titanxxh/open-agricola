@@ -1335,7 +1335,7 @@ BUG_REPORT_TOKEN_ACTIVE_KEY_ID
 
 ```text
 GameContextRouter
-  ├─ active → AuthProvider → 现有 PageRouter / GameContainerApi
+  ├─ active → AuthProvider → 现有 PageRouter / GameContainerApi + 可选只读 Anchor 抽屉
   ├─ completed → ReplayShell → credentialless Replay Viewer iframe
   ├─ expired + retained Anchor → credentialless 历史 Viewer 单帧证据
   ├─ expired → Expired Game Context 页面

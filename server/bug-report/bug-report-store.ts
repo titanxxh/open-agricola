@@ -325,6 +325,14 @@ export class BugReportStore {
     if (owner && owner.user_id !== userId) {
       throw new BugReportError('github_identity_already_connected', 409)
     }
+    const existing = this.db.prepare(`
+      SELECT github_user_id
+      FROM issue_submission_connections
+      WHERE user_id = ?
+    `).get(userId) as { github_user_id: string } | undefined
+    if (existing && existing.github_user_id !== githubUserId) {
+      throw new BugReportError('github_identity_mismatch', 409)
+    }
     const access = this.cipher.encrypt(tokens.accessToken)
     const refresh = tokens.refreshToken
       ? this.cipher.encrypt(tokens.refreshToken)

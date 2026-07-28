@@ -147,7 +147,47 @@
   border: 0;
 }
 
+.reported-evidence-drawer {
+  position: fixed;
+  z-index: 1900;
+  inset: 0 0 0 auto;
+  width: min(760px, 52vw);
+  overflow: auto;
+  border-left: 1px solid var(--color-border);
+  background: var(--bg-parchment);
+  box-shadow: -12px 0 36px rgb(0 0 0 / 38%);
+}
+
+.reported-evidence--drawer {
+  min-height: 100%;
+  padding-top: 68px;
+}
+
+.reported-evidence-drawer__close {
+  position: absolute;
+  z-index: 1;
+  top: 14px;
+  right: 14px;
+  width: 40px;
+  height: 40px;
+  color: var(--color-text-secondary);
+  font-size: 26px;
+  line-height: 1;
+  border: 1px solid var(--color-border);
+  border-radius: 50%;
+  background: var(--bg-parchment);
+  cursor: pointer;
+}
+
+.reported-evidence-drawer__status {
+  padding: 80px 24px 24px;
+}
+
 @media (max-width: 600px) {
+  .reported-evidence-drawer {
+    width: 100%;
+  }
+
   .replay-results li {
     grid-template-columns: 1fr auto;
   }
