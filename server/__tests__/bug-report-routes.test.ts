@@ -178,6 +178,7 @@ beforeEach(() => {
         `https://github.test/authorize?state=${encodeURIComponent(state)}`,
       exchangeCode,
       githubUserId,
+      revokeUserGrant,
     },
   } as never
 })
@@ -535,6 +536,46 @@ describe('bug report routes', () => {
       'bugReportConnection',
     )).toBe('cancelled')
     expect(store.getOwned(submissionId, 'u1').status).toBe('draft')
+  })
+
+  it('revokes a GitHub grant when account deletion wins OAuth completion', async () => {
+    const created = await invoke(
+      'POST',
+      '/api/v1/game-contexts/active-room/bug-reports',
+      { phenomenon: 'The game froze' },
+    )
+    const submissionId = (json(created).report as { submissionId: string }).submissionId
+    const start = await invoke(
+      'POST',
+      '/api/v1/issue-submission-connection/github/start',
+      { submissionId },
+    )
+    const state = new URL(
+      (json(start) as { authorizationUrl: string }).authorizationUrl,
+    ).searchParams.get('state')
+    exchangeCode.mockImplementationOnce(async () => {
+      const now = Date.now()
+      db.prepare(`
+        INSERT INTO account_deletion_requests (
+          user_id, requested_at, next_attempt_at, last_error_code
+        ) VALUES (?, ?, ?, NULL)
+      `).run(USER.id, now, now)
+      return {
+        accessToken: 'late-token',
+        accessTokenExpiresAt: now + 3_600_000,
+      }
+    })
+
+    const completed = await invoke(
+      'POST',
+      '/api/v1/issue-submission-connection/github/complete',
+      { state, code: 'oauth-code' },
+    )
+
+    expect(completed.statusCode).toBe(502)
+    expect(json(completed)).toMatchObject({ code: 'github_connection_failed' })
+    expect(revokeUserGrant).toHaveBeenCalledWith('late-token')
+    expect(store.connectionStatus(USER.id)).toEqual({ connected: false })
   })
 
   it('validates signed webhooks and revokes the matching connection', async () => {
