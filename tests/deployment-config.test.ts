@@ -29,6 +29,19 @@ describe('production deployment config', () => {
     expect(compose).toContain('app-data:/app/data')
   })
 
+  it('authenticates private BGA image checkouts without persisting credentials', () => {
+    for (const workflowPath of [
+      '.github/workflows/ci.yml',
+      '.github/workflows/ci-full.yml',
+      '.github/workflows/deploy-pages.yml',
+    ]) {
+      const workflow = readFileSync(workflowPath, 'utf8')
+      expect(workflow).toMatch(
+        /repository: bga-devs\/bga-agricola\n\s+token: \$\{\{ secrets\.GH_TOKEN \}\}\n\s+persist-credentials: false/,
+      )
+    }
+  })
+
   it('does not start the obsolete custom-code executor sidecar', () => {
     for (const composePath of ['docker-compose.yml', 'docker-compose.prod.yml']) {
       const compose = readFileSync(composePath, 'utf8')

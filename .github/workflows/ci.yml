@@ -82,6 +82,8 @@ jobs:
       - uses: actions/checkout@v6
         with:
           repository: bga-devs/bga-agricola
+          token: ${{ secrets.GH_TOKEN }}
+          persist-credentials: false
           ref: 20397289f6b82ec9667a13e7803ca3038eeb6bb6
           path: bga-agricola
           sparse-checkout: img
