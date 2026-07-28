@@ -435,7 +435,7 @@ export class BugReportStore {
     return { state, codeChallenge: createCodeChallenge(verifier) }
   }
 
-  consumeConnectionState(state: string, expectedUserId: string): {
+  consumeConnectionState(state: string, expectedUserId?: string): {
     userId: string
     returnTo: string
     verifier: string
@@ -451,16 +451,20 @@ export class BugReportStore {
         WHERE state_hash = ?
           AND provider = 'github'
           AND intent = 'bug_report'
-          AND user_id = ?
           AND used_at IS NULL
           AND expires_at > ?
-      `).get(stateHash, expectedUserId, now) as OAuthStateRow | undefined
-      if (!found) return null
+      `).get(stateHash, now) as OAuthStateRow | undefined
+      if (
+        !found
+        || (expectedUserId !== undefined && found.user_id !== expectedUserId)
+      ) {
+        return null
+      }
       const changed = this.db.prepare(`
         UPDATE oauth_states
         SET used_at = ?
-        WHERE state_hash = ? AND user_id = ? AND used_at IS NULL
-      `).run(now, stateHash, expectedUserId)
+        WHERE state_hash = ? AND used_at IS NULL
+      `).run(now, stateHash)
       return changed.changes === 1 ? found : null
     })()
     if (!row) return null
@@ -498,6 +502,22 @@ export class BugReportStore {
       SELECT lifecycle FROM game_contexts WHERE room_id = ?
     `).get(input.roomId) as ContextRow | undefined
     if (!context) throw new BugReportError('unknown_context', 404)
+    if (context.lifecycle !== 'active' && context.lifecycle !== 'completed') {
+      throw new BugReportError(`context_${context.lifecycle}`, 410)
+    }
+    const participant = context.lifecycle === 'active'
+      ? this.db.prepare(`
+          SELECT 1 FROM room_players
+          WHERE room_id = ? AND user_id = ?
+        `).get(input.roomId, input.userId)
+      : this.db.prepare(`
+          SELECT 1 FROM game_result_players
+          WHERE room_id = ? AND user_id = ?
+        `).get(input.roomId, input.userId)
+    if (!participant) throw new BugReportError('not_participant', 403)
+    if (!this.hasReplayAnchor(input.userId, input.roomId)) {
+      throw new BugReportError('bug_report_anchor_unavailable', 503)
+    }
     let anchor: AnchorRow | undefined
     if (context.lifecycle === 'active') {
       if (input.stepNo !== undefined || input.frameHash !== undefined) {
@@ -547,10 +567,8 @@ export class BugReportStore {
         input.roomId,
         input.userId,
       ) as AnchorRow | undefined
-    } else {
-      throw new BugReportError(`context_${context.lifecycle}`, 410)
     }
-    if (!anchor) throw new BugReportError('not_participant', 403)
+    if (!anchor) throw new BugReportError('anchor_mismatch', 409)
     const submissionId = randomUUID()
     const now = this.now()
     this.db.prepare(`
@@ -575,6 +593,35 @@ export class BugReportStore {
       now,
     )
     return this.getOwned(submissionId, input.userId)
+  }
+
+  hasReplayAnchor(userId: string, roomId: string): boolean {
+    return Boolean(this.db.prepare(`
+      SELECT 1
+      FROM game_contexts AS context
+      WHERE context.room_id = ?
+        AND EXISTS (
+          SELECT 1 FROM game_replay_steps
+          WHERE room_id = context.room_id
+        )
+        AND (
+          (
+            context.lifecycle = 'active'
+            AND EXISTS (
+              SELECT 1 FROM room_players
+              WHERE room_id = context.room_id AND user_id = ?
+            )
+          )
+          OR (
+            context.lifecycle = 'completed'
+            AND EXISTS (
+              SELECT 1 FROM game_result_players
+              WHERE room_id = context.room_id AND user_id = ?
+            )
+          )
+        )
+      LIMIT 1
+    `).get(roomId, userId, userId))
   }
 
   getOwned(submissionId: string, userId: string): BugReportView {

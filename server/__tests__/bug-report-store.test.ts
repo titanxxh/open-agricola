@@ -214,8 +214,8 @@ describe('BugReportStore', () => {
         stepNo: 12,
         frameHash: ACTIVE_HASH,
       }),
-      'not_participant',
-      403,
+      'anchor_mismatch',
+      409,
     )
     expectBugReportError(
       () => store.createDraft({

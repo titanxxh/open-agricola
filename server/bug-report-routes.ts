@@ -1,6 +1,12 @@
 import type Database from 'better-sqlite3'
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import type { AuthUser } from './auth.ts'
+import {
+  BUG_REPORT_OAUTH_STATE_COOKIE,
+  clearBugReportOAuthStateCookie,
+  readCookie,
+  serializeBugReportOAuthStateCookie,
+} from './auth-cookies.ts'
 import { corsHeaders, getRequestOrigin, normalizeOrigin } from './http-origin.ts'
 import {
   BugReportDelivery,
@@ -77,8 +83,9 @@ const send = (
   res: ServerResponse,
   status: number,
   payload: unknown,
+  extraHeaders: Record<string, string | string[]> = {},
 ): void => {
-  res.writeHead(status, headers())
+  res.writeHead(status, { ...headers(), ...extraHeaders })
   res.end(JSON.stringify(payload))
 }
 
@@ -179,12 +186,14 @@ const redirectConnection = (
   res: ServerResponse,
   returnTo: string,
   status: 'connected' | 'cancelled' | 'error',
+  extraHeaders: Record<string, string | string[]> = {},
 ): void => {
   const url = new URL(returnTo)
   url.searchParams.set('bugReportConnection', status)
   res.writeHead(302, {
     Location: url.toString(),
     'Cache-Control': 'no-store',
+    ...extraHeaders,
   })
   res.end()
 }
@@ -365,18 +374,46 @@ export async function handleBugReportRoute(
     if (pathname === CONNECTION_CALLBACK_ROUTE && req.method === 'GET') {
       if (!runtime?.github) throw new BugReportError('bug_report_unavailable', 503)
       const state = url.searchParams.get('state') ?? ''
+      const cookieState = readCookie(
+        req.headers.cookie,
+        BUG_REPORT_OAUTH_STATE_COOKIE,
+      )
+      const clearCookie = clearBugReportOAuthStateCookie({
+        backendOrigin: getRequestOrigin(req),
+      })
+      if (!state || cookieState !== state) {
+        send(
+          res,
+          400,
+          errorPayload(new BugReportError('oauth_state_invalid', 400)),
+          { 'Set-Cookie': clearCookie },
+        )
+        return true
+      }
       const consumed = runtime.store.consumeConnectionState(
         state,
-        user?.id ?? '',
+        user?.id,
       )
-      if (!consumed) throw new BugReportError('oauth_state_invalid', 400)
+      if (!consumed) {
+        send(
+          res,
+          400,
+          errorPayload(new BugReportError('oauth_state_invalid', 400)),
+          { 'Set-Cookie': clearCookie },
+        )
+        return true
+      }
       if (url.searchParams.get('error')) {
-        redirectConnection(res, consumed.returnTo, 'cancelled')
+        redirectConnection(res, consumed.returnTo, 'cancelled', {
+          'Set-Cookie': clearCookie,
+        })
         return true
       }
       const code = url.searchParams.get('code')
       if (!code) {
-        redirectConnection(res, consumed.returnTo, 'error')
+        redirectConnection(res, consumed.returnTo, 'error', {
+          'Set-Cookie': clearCookie,
+        })
         return true
       }
       try {
@@ -387,9 +424,13 @@ export async function handleBugReportRoute(
         )
         const githubUserId = await runtime.github.githubUserId(tokens.accessToken)
         runtime.store.saveConnection(consumed.userId, githubUserId, tokens)
-        redirectConnection(res, consumed.returnTo, 'connected')
+        redirectConnection(res, consumed.returnTo, 'connected', {
+          'Set-Cookie': clearCookie,
+        })
       } catch {
-        redirectConnection(res, consumed.returnTo, 'error')
+        redirectConnection(res, consumed.returnTo, 'error', {
+          'Set-Cookie': clearCookie,
+        })
       }
       return true
     }
@@ -402,7 +443,15 @@ export async function handleBugReportRoute(
       }
       send(res, 200, {
         ok: true,
-        enabled: bugReportsEnabled() && isBugReportRuntimeReady(runtime),
+        enabled: bugReportsEnabled()
+          && isBugReportRuntimeReady(runtime)
+          && (
+            !url.searchParams.has('roomId')
+            || runtime.store.hasReplayAnchor(
+              current.id,
+              decodeId(url.searchParams.get('roomId') ?? ''),
+            )
+          ),
         ...runtime.store.connectionStatus(current.id),
       })
       return true
@@ -437,6 +486,9 @@ export async function handleBugReportRoute(
           redirectUri: callbackUrl(req),
         }),
         'Cache-Control': 'no-store',
+        'Set-Cookie': serializeBugReportOAuthStateCookie(state.state, {
+          backendOrigin: getRequestOrigin(req),
+        }),
       })
       res.end()
       return true
