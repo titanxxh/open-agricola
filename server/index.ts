@@ -51,7 +51,11 @@ import { GameSession } from './game/authoritative-session.ts'
 import { encodeReplayFrame, type JsonValue } from './game/replay-codec.ts'
 import { viewerBuildExists } from './game/replay-viewer-build.ts'
 import { REPLAY_SCHEMA_VERSION } from './game/room-committer.ts'
-import { handleBugReportRoute } from './bug-report-routes.ts'
+import {
+  bugReportsEnabled,
+  handleBugReportRoute,
+  isBugReportRuntimeReady,
+} from './bug-report-routes.ts'
 import {
   BugReportDelivery,
   BugReportStore,
@@ -336,6 +340,10 @@ const server = createServer(async (req, res) => {
 
   // ── Health ─────────────────────────────────────────────
   if (req.method === 'GET' && req.url === '/api/health') {
+    if (bugReportsEnabled() && !isBugReportRuntimeReady(bugReportRuntime)) {
+      sendJson(res, 503, { ok: false, error: 'bug report delivery is unavailable' })
+      return
+    }
     const readiness = wssCtx?.committer?.canCreateRoom()
     if (readiness && !readiness.ok) {
       sendJson(res, 503, { ok: false, error: readiness.error })
