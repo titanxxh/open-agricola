@@ -109,9 +109,14 @@ const parseStepNo = (raw: string): number | null => {
 }
 
 const clientIp = (req: IncomingMessage): string => {
-  const forwarded = req.headers['x-forwarded-for']
-  if (typeof forwarded === 'string') {
-    return forwarded.split(',').at(-1)?.trim() || req.socket.remoteAddress || 'unknown'
+  if (
+    process.env.REPLAY_TRUST_PROXY === '1'
+    || process.env.REPLAY_TRUST_PROXY === 'true'
+  ) {
+    const forwarded = req.headers['x-forwarded-for']
+    if (typeof forwarded === 'string') {
+      return forwarded.split(',').at(-1)?.trim() || req.socket.remoteAddress || 'unknown'
+    }
   }
   return req.socket.remoteAddress ?? 'unknown'
 }
@@ -197,20 +202,26 @@ const serveViewerFile = (
   buildId: string,
   rawPath: string,
 ): void => {
-  const build = loadReplayViewerBuild(root, buildId)
   const path = safeViewerPath(rawPath)
-  if (
-    !build
-    || !path
-    || (path !== 'manifest.json' && !(path in build.files))
-  ) {
+  if (!path) {
+    res.writeHead(404, publicHeaders('application/json; charset=utf-8', 'no-cache'))
+    res.end(JSON.stringify({ ok: false, code: 'viewer_unavailable', message: 'Replay viewer not found' }))
+    return
+  }
+  const build = loadReplayViewerBuild(root, buildId)
+  if (!build) {
+    res.writeHead(503, publicHeaders('application/json; charset=utf-8', 'no-cache'))
+    res.end(JSON.stringify({ ok: false, code: 'viewer_unavailable', message: 'Replay viewer not found' }))
+    return
+  }
+  if (path !== 'manifest.json' && !(path in build.files)) {
     res.writeHead(404, publicHeaders('application/json; charset=utf-8', 'no-cache'))
     res.end(JSON.stringify({ ok: false, code: 'viewer_unavailable', message: 'Replay viewer not found' }))
     return
   }
   const filePath = join(build.directory, path)
   if (!existsSync(filePath)) {
-    res.writeHead(404, publicHeaders('application/json; charset=utf-8', 'no-cache'))
+    res.writeHead(503, publicHeaders('application/json; charset=utf-8', 'no-cache'))
     res.end(JSON.stringify({ ok: false, code: 'viewer_unavailable', message: 'Replay viewer not found' }))
     return
   }

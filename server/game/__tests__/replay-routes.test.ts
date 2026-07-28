@@ -75,6 +75,7 @@ describe('public replay routes', () => {
     writeFileSync(join(directory, 'index.html'), index)
     writeFileSync(join(directory, 'app.js'), app)
     writeFileSync(join(directory, 'manifest.json'), manifest)
+    vi.stubEnv('REPLAY_TRUST_PROXY', 'false')
     store = {
       manifest: vi.fn(() => ({
         ok: true,
@@ -112,7 +113,10 @@ describe('public replay routes', () => {
     } as unknown as ReplayStore
   })
 
-  afterEach(() => rmSync(root, { recursive: true, force: true }))
+  afterEach(() => {
+    vi.unstubAllEnvs()
+    rmSync(root, { recursive: true, force: true })
+  })
 
   const handle = (
     req: IncomingMessage,
@@ -157,6 +161,10 @@ describe('public replay routes', () => {
 
     writeFileSync(join(viewerRoot, buildId, 'index.html'), 'tampered')
     expect(handle(request(`/replay-viewers/${buildId}/index.html`)).status).toBe(503)
+    expect(handle(request(`/replay-viewers/${buildId}/unknown.js`)).status).toBe(404)
+
+    rmSync(join(viewerRoot, buildId, 'index.html'))
+    expect(handle(request(`/replay-viewers/${buildId}/index.html`)).status).toBe(503)
   })
 
   it('serves content-addressed replay images and rejects corruption', () => {
@@ -178,6 +186,7 @@ describe('public replay routes', () => {
   })
 
   it('uses the proxy-appended address and evicts expired rate-limit keys', () => {
+    vi.stubEnv('REPLAY_TRUST_PROXY', 'true')
     let now = 0
     const limiter = new ReplayReadLimiter(1, () => now)
     expect(handle(request('/api/v1/replays/room-1/manifest', {
@@ -193,6 +202,16 @@ describe('public replay routes', () => {
       reads: Map<string, { count: number; resetAt: number }>
     }).reads
     expect(reads.has('203.0.113.5')).toBe(false)
+  })
+
+  it('ignores forwarded addresses unless the proxy is trusted', () => {
+    const limiter = new ReplayReadLimiter(1, () => 1_000)
+    expect(handle(request('/api/v1/replays/room-1/manifest', {
+      'x-forwarded-for': '203.0.113.1',
+    }), limiter).status).toBe(200)
+    expect(handle(request('/api/v1/replays/room-1/manifest', {
+      'x-forwarded-for': '203.0.113.2',
+    }), limiter).status).toBe(429)
   })
 
   it('rejects malformed exact-anchor links before reading evidence', () => {

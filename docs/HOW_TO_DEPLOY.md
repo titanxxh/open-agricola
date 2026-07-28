@@ -70,9 +70,12 @@ REPLAY_NEW_ROOMS_ENABLED=false
 REPLAY_VIEWER_BUILD_ID=
 REPLAY_VIEWER_ROOT=./data/replay-viewers
 REPLAY_ASSET_ROOT=./data/replay-assets
+REPLAY_TRUST_PROXY=false
 GAME_BUILD_ID=
 # CORS_ORIGIN 等后续根据情况设置
 ```
+
+后端直接暴露端口时保持 `REPLAY_TRUST_PROXY=false`。只有后端仅能经可信 Caddy/Nginx 到达，且代理会覆盖 `X-Forwarded-For` 时才设为 `true`。
 
 首次启用 Replay 时必须使用 `PERSIST_ROOMS=sqlite`。先生成并追加发布 Viewer Build：
 
@@ -203,6 +206,7 @@ docker compose logs -f app
          - REPLAY_VIEWER_BUILD_ID=${REPLAY_VIEWER_BUILD_ID:-}
          - REPLAY_VIEWER_ROOT=${REPLAY_VIEWER_ROOT:-./data/replay-viewers}
          - REPLAY_ASSET_ROOT=${REPLAY_ASSET_ROOT:-./data/replay-assets}
+         - REPLAY_TRUST_PROXY=${REPLAY_TRUST_PROXY:-false}
          - GAME_BUILD_ID=${GAME_BUILD_ID:-}
          - CORS_ORIGIN=https://YOUR_USER.github.io
        volumes:
@@ -274,6 +278,8 @@ docker compose logs -f app
    ```
 
 4. 为后端 API 添加一个 Nginx server block 或 location。
+
+   因为下面配置会覆盖 `X-Forwarded-For`，同时在后端 `.env` 设置 `REPLAY_TRUST_PROXY=true`。
 
    **方式一：子域名（推荐）**，如 `api.your-domain.com`
 
@@ -485,6 +491,7 @@ https://<backend-origin>/api/auth/oauth/google/callback
 | `ENABLE_AUTH_TEST_HELPERS` | — | 仅本地/E2E 可设 `1`，生产禁止设置 |
 | `DB_PATH` | `./data/open-agricola.db` | SQLite 文件路径 |
 | `CARD_ART_DIR` | `./data/card-art` | 上传的卡牌图片存储路径 |
+| `REPLAY_TRUST_PROXY` | `false` | 仅当后端只能经会覆盖 `X-Forwarded-For` 的可信反向代理访问时设为 `true` |
 | `ADMIN_USERS` | — | 管理员用户名，逗号分隔 |
 | `ACCOUNT_REGISTRATION_POLICY` | 必填 | 账号注册策略：首次部署用 `open` 创建第一个管理员，之后改为 `invite_only`；`disabled` 禁止新账号注册 |
 

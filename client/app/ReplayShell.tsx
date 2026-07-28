@@ -151,7 +151,7 @@ export function ReplayShell({
   const { locale, t } = useLocale()
   const [manifest, setManifest] = useState<ReplayManifest | null>(null)
   const [verified, setVerified] = useState(false)
-  const [error, setError] = useState<string | null>(null)
+  const [error, setError] = useState(false)
   const [location, setLocation] = useState(() => readLocation(null))
   const iframeRef = useRef<HTMLIFrameElement | null>(null)
   const setIframe = useCallback((node: HTMLIFrameElement | null) => {
@@ -221,14 +221,15 @@ export function ReplayShell({
 
       setManifest(replayManifest)
       setLocation(readLocation(replayManifest))
+      setError(false)
       setVerified(true)
     }
     void verify().catch((reason: unknown) => {
       if (reason instanceof DOMException && reason.name === 'AbortError') return
-      setError(t('platform.gameContext.viewerUnavailable'))
+      setError(true)
     })
     return () => controller.abort()
-  }, [context.roomId, replay, t])
+  }, [context.roomId, replay])
 
   useEffect(() => {
     const sync = () => setLocation(readLocation(manifest))
@@ -283,7 +284,7 @@ export function ReplayShell({
       <main className="replay-shell replay-shell--status">
         <LocaleSwitcher className="replay-locale-switcher" />
         <h1>{t('platform.gameContext.completedTitle')}</h1>
-        <p role="alert">{error ?? t('platform.gameContext.viewerUnavailable')}</p>
+        <p role="alert">{t('platform.gameContext.viewerUnavailable')}</p>
         <ol className="replay-results">
           {context.result.players.map((player) => (
             <li key={player.playerIndex}>
