@@ -484,12 +484,14 @@ export async function handleBugReportRoute(
       }
       const consumed = runtime.store.consumeConnectionState(state, current.id)
       if (!consumed) throw new BugReportError('oauth_state_invalid', 400)
+      let accessToken: string | null = null
       try {
         const tokens = await runtime.github.exchangeCode(
           code,
           consumed.verifier,
           callbackUrl(req),
         )
+        accessToken = tokens.accessToken
         const githubUserId = await runtime.github.githubUserId(tokens.accessToken)
         runtime.store.saveConnection(consumed.userId, githubUserId, tokens)
         send(res, 200, {
@@ -497,7 +499,14 @@ export async function handleBugReportRoute(
           enabled: true,
           ...runtime.store.connectionStatus(current.id),
         })
-      } catch {
+      } catch (error) {
+        if (
+          accessToken
+          && error instanceof BugReportError
+          && error.code === 'account_deletion_pending'
+        ) {
+          await runtime.github.revokeUserGrant(accessToken)
+        }
         throw new BugReportError('github_connection_failed', 502)
       }
       return true

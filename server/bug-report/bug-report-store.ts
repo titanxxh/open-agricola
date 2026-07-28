@@ -322,7 +322,7 @@ export class BugReportStore {
       ? this.cipher.encrypt(tokens.refreshToken)
       : null
     const now = this.now()
-    this.db.prepare(`
+    const saved = this.db.prepare(`
       INSERT INTO issue_submission_connections (
         user_id, github_user_id,
         access_token_ciphertext, access_token_nonce, access_token_tag,
@@ -330,7 +330,17 @@ export class BugReportStore {
         key_id, access_token_expires_at, refresh_token_expires_at,
         revoked_at, created_at, updated_at
       )
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, ?, ?)
+      SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, ?, ?
+      WHERE EXISTS (
+        SELECT 1
+        FROM users
+        WHERE id = ?
+          AND NOT EXISTS (
+            SELECT 1
+            FROM account_deletion_requests
+            WHERE user_id = users.id
+          )
+      )
       ON CONFLICT(user_id) DO UPDATE SET
         github_user_id = excluded.github_user_id,
         access_token_ciphertext = excluded.access_token_ciphertext,
@@ -358,7 +368,11 @@ export class BugReportStore {
       tokens.refreshTokenExpiresAt ?? null,
       now,
       now,
+      userId,
     )
+    if (saved.changes !== 1) {
+      throw new BugReportError('account_deletion_pending', 409)
+    }
   }
 
   connectionTokens(
