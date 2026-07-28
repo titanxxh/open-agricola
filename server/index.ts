@@ -66,10 +66,13 @@ import {
   TokenCipher,
 } from './bug-report/bug-report-store.ts'
 import { GitHubIssueClient } from './bug-report/github-issue-client.ts'
+import { applyReplayRemovalLedger } from './game/replay-removal.ts'
 
 const CARD_ART_DIR = process.env.CARD_ART_DIR ?? join(process.cwd(), 'data', 'card-art')
 const REPLAY_VIEWER_ROOT = process.env.REPLAY_VIEWER_ROOT ?? join(process.cwd(), 'data', 'replay-viewers')
 const REPLAY_ASSET_ROOT = process.env.REPLAY_ASSET_ROOT ?? join(process.cwd(), 'data', 'replay-assets')
+const REPLAY_REMOVAL_LEDGER_PATH = process.env.REPLAY_REMOVAL_LEDGER_PATH
+  ?? join(process.cwd(), 'data', 'replay-removals.jsonl')
 const BGA_CDN_BASE = process.env.BGA_CDN_BASE_URL || 'https://x.boardgamearena.net/data/themereleases/current/games/agricola/260329-0408/img'
 const BGA_LOCAL_DIR = process.env.BGA_IMAGE_DIR ? join(process.cwd(), process.env.BGA_IMAGE_DIR) : null
 
@@ -173,6 +176,12 @@ function rejectUntrustedOrigin(req: IncomingMessage, res: ServerResponse): boole
 
 // Initialize database on import
 getDb()
+const replayRemovalState = process.env.NODE_ENV !== 'test'
+  ? applyReplayRemovalLedger(getDb(), {
+    assetRoot: REPLAY_ASSET_ROOT,
+    ledgerPath: REPLAY_REMOVAL_LEDGER_PATH,
+  })
+  : { assetTakedownHashes: [] }
 
 // Wire up room persistence adapter before creating the WS server
 const PERSIST_ROOMS = (process.env.PERSIST_ROOMS ?? 'sqlite') as 'json' | 'sqlite'
@@ -973,6 +982,7 @@ wssCtx = createWsServer(server, {
   persistence,
   shouldPersist,
   gameContextStore: PERSIST_ROOMS === 'sqlite' ? gameContextStore : undefined,
+  removedReplayAssetHashes: new Set(replayRemovalState.assetTakedownHashes),
 })
 
 const PORT = Number(process.env.BACKEND_PORT) || 5175

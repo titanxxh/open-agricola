@@ -70,6 +70,7 @@ REPLAY_NEW_ROOMS_ENABLED=false
 REPLAY_VIEWER_BUILD_ID=
 REPLAY_VIEWER_ROOT=./data/replay-viewers
 REPLAY_ASSET_ROOT=./data/replay-assets
+REPLAY_REMOVAL_LEDGER_PATH=./data/replay-removals.jsonl
 REPLAY_TRUST_PROXY=false
 GAME_BUILD_ID=
 # CORS_ORIGIN 等后续根据情况设置
@@ -533,6 +534,9 @@ https://<backend-origin>/api/auth/oauth/google/callback
 | `ENABLE_AUTH_TEST_HELPERS` | — | 仅本地/E2E 可设 `1`，生产禁止设置 |
 | `DB_PATH` | `./data/open-agricola.db` | SQLite 文件路径 |
 | `CARD_ART_DIR` | `./data/card-art` | 上传的卡牌图片存储路径 |
+| `REPLAY_VIEWER_ROOT` | `./data/replay-viewers` | 不可变 Replay Viewer Build 目录 |
+| `REPLAY_ASSET_ROOT` | `./data/replay-assets` | 内容寻址的 Replay 自定义卡资源目录 |
+| `REPLAY_REMOVAL_LEDGER_PATH` | `./data/replay-removals.jsonl` | SQLite 外、只追加的 Replay 删除 ledger；恢复旧备份时必须使用最新副本 |
 | `REPLAY_TRUST_PROXY` | `false` | 仅当后端只能经会覆盖 `X-Forwarded-For` 的可信反向代理访问时设为 `true` |
 | `ADMIN_USERS` | — | 管理员用户名，逗号分隔 |
 | `ACCOUNT_REGISTRATION_POLICY` | 必填 | 账号注册策略：首次部署用 `open` 创建第一个管理员，之后改为 `invite_only`；`disabled` 禁止新账号注册 |
@@ -588,16 +592,108 @@ https://<backend-origin>/api/auth/oauth/google/callback
 
 ### 数据备份
 
-SQLite 数据库存储在 Docker volume `app-data` 中：
+备份必须同时包含 SQLite、Viewer、Replay assets、card art 和 deletion ledger。以下命令假定 ledger 保持默认的 `/app/data/replay-removals.jsonl`；先停后端，避免备份跨越一次 Room Commit：
 
 ```bash
-# 备份
-docker compose cp app:/app/data/open-agricola.db ./backup.db
-
-# 恢复
-docker compose cp ./backup.db app:/app/data/open-agricola.db
-docker compose restart app
+mkdir -p backups
+OA_BACKUP_NAME="open-agricola-$(date -u +%Y%m%dT%H%M%SZ).tgz"
+docker compose -f docker-compose.prod.yml stop app
+docker compose -f docker-compose.prod.yml run --rm --no-deps \
+  -v "$PWD/backups:/backup" app sh -c \
+  "tar -C /app/data -czf /backup/$OA_BACKUP_NAME . && \
+   if [ -f /app/data/replay-removals.jsonl ]; then \
+     cp /app/data/replay-removals.jsonl /backup/replay-removals.latest.jsonl; \
+   else \
+     : > /backup/replay-removals.latest.jsonl; \
+   fi"
+docker compose -f docker-compose.prod.yml up -d app
 ```
+
+`replay-removals.latest.jsonl` 是只追加的最新删除事实，必须与普通备份分开保留；每次 Replay 下架后立即更新其异机副本，不能随旧数据备份回滚。
+
+恢复前准备目标归档和最新 ledger，然后在后端停止期间替换数据。恢复命令会显式重放 ledger；服务启动也会再次幂等重放：
+
+```bash
+OA_RESTORE_ARCHIVE=open-agricola-YYYYMMDDTHHMMSSZ.tgz
+test -f "backups/$OA_RESTORE_ARCHIVE"
+test -f backups/replay-removals.latest.jsonl
+docker compose -f docker-compose.prod.yml stop app
+docker compose -f docker-compose.prod.yml run --rm --no-deps \
+  -e OA_RESTORE_ARCHIVE="$OA_RESTORE_ARCHIVE" \
+  -v "$PWD/backups:/backup:ro" app sh -c \
+  'tar -tzf "/backup/$OA_RESTORE_ARCHIVE" >/dev/null &&
+   find /app/data -mindepth 1 -maxdepth 1 -exec rm -rf -- {} \; &&
+   tar -C /app/data -xzf "/backup/$OA_RESTORE_ARCHIVE" &&
+   cp /backup/replay-removals.latest.jsonl /app/data/replay-removals.jsonl &&
+   node --import tsx scripts/replay-removal.ts apply-ledger'
+docker compose -f docker-compose.prod.yml up -d app
+```
+
+恢复后逐个抽查 ledger 中的 Room ID：Game Context 只能返回 `removed` Tombstone，manifest/segment 不可读取；无其他 Replay 引用的资源 Hash 必须返回 404。
+
+### Replay 下架
+
+CLI 只接受精确 Room ID 和 `removed`、`moderation`、`legal` 三种原因。先停后端并 dry-run，确认输出的 Room 与资源 Hash 后再执行：
+
+```bash
+OA_ROOM_ID=replace-with-exact-room-id
+docker compose -f docker-compose.prod.yml stop app
+docker compose -f docker-compose.prod.yml run --rm --no-deps app \
+  node --import tsx scripts/replay-removal.ts remove \
+  --room-id "$OA_ROOM_ID" --reason moderation --dry-run
+docker compose -f docker-compose.prod.yml run --rm --no-deps app \
+  node --import tsx scripts/replay-removal.ts remove \
+  --room-id "$OA_ROOM_ID" --reason moderation
+mkdir -p backups
+docker compose -f docker-compose.prod.yml cp \
+  app:/app/data/replay-removals.jsonl backups/replay-removals.latest.jsonl
+docker compose -f docker-compose.prod.yml up -d app
+```
+
+法律请求明确要求删除 Game Result Archive 时，仅可使用 `legal` 原因并追加 `--erase-result`；该模式不能和 `--asset-hash` 组合：
+
+```bash
+OA_ROOM_ID=replace-with-exact-room-id
+docker compose -f docker-compose.prod.yml stop app
+docker compose -f docker-compose.prod.yml run --rm --no-deps app \
+  node --import tsx scripts/replay-removal.ts remove \
+  --room-id "$OA_ROOM_ID" --reason legal --erase-result --dry-run
+docker compose -f docker-compose.prod.yml run --rm --no-deps app \
+  node --import tsx scripts/replay-removal.ts remove \
+  --room-id "$OA_ROOM_ID" --reason legal --erase-result
+mkdir -p backups
+docker compose -f docker-compose.prod.yml cp \
+  app:/app/data/replay-removals.jsonl backups/replay-removals.latest.jsonl
+docker compose -f docker-compose.prod.yml up -d app
+```
+
+若违规对象是自定义卡图片本身，再传精确的 64 位内容 Hash；dry-run 会列出所有引用该资源、将一并 Tombstone 的 Room：
+
+```bash
+OA_ASSET_HASH=replace-with-64-character-sha256
+docker compose -f docker-compose.prod.yml stop app
+docker compose -f docker-compose.prod.yml run --rm --no-deps app \
+  node --import tsx scripts/replay-removal.ts remove \
+  --room-id "$OA_ROOM_ID" --reason legal \
+  --asset-hash "$OA_ASSET_HASH" --dry-run
+docker compose -f docker-compose.prod.yml run --rm --no-deps app \
+  node --import tsx scripts/replay-removal.ts remove \
+  --room-id "$OA_ROOM_ID" --reason legal \
+  --asset-hash "$OA_ASSET_HASH"
+mkdir -p backups
+docker compose -f docker-compose.prod.yml cp \
+  app:/app/data/replay-removals.jsonl backups/replay-removals.latest.jsonl
+docker compose -f docker-compose.prod.yml up -d app
+```
+
+资产下架可使用 ledger 已证明引用关系的既有 Tombstone Room 作为入口。违规 Hash 会作为永久规则写入 ledger：旧备份恢复时自动下架新增引用，后续 Room 也不能重新归档同一内容。操作幂等；普通整局下架只删除不再被其他 Replay 引用的资源。成功后立即异机备份最新 `replay-removals.jsonl`。
+
+### Bug Report token 密钥轮换
+
+1. 生成新的 32 字节随机 key，加入 `BUG_REPORT_TOKEN_ENCRYPTION_KEYS`，保留旧 key。
+2. 把 `BUG_REPORT_TOKEN_ACTIVE_KEY_ID` 改为新 key id，重启后端；新连接和后续 token refresh 会使用新 key。
+3. 旧 key 仍用于解密尚未刷新连接，不能提前删除。检查 `issue_submission_connections.key_id`，并等待旧 key 行数归零；仍有效的旧 `oauth_states.pkce_verifier_key_id` 也必须归零或过期。
+4. 确认 Hosted 与本人 GitHub 提交都成功后，才从 key ring 删除旧 key 并再次重启。轮换期间不要修改已有 key id 对应的 key 内容。
 
 ### 本地开发（不需要 Docker）
 

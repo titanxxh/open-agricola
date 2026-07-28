@@ -39,6 +39,7 @@ CUSTOM_CARD_DIR="${CUSTOM_CARD_DIR:-$SHARED_DATA_DIR/custom-cards}"
 CARD_ART_DIR="${CARD_ART_DIR:-$SHARED_DATA_DIR/card-art}"
 REPLAY_VIEWER_ROOT="${REPLAY_VIEWER_ROOT:-$SHARED_DATA_DIR/replay-viewers}"
 REPLAY_ASSET_ROOT="${REPLAY_ASSET_ROOT:-$SHARED_DATA_DIR/replay-assets}"
+REPLAY_REMOVAL_LEDGER_PATH="${REPLAY_REMOVAL_LEDGER_PATH:-$SHARED_DATA_DIR/replay-removals.jsonl}"
 # BGA images live as a sibling of the MAIN repo, not the worktree.
 if [ -z "${BGA_IMAGE_DIR:-}" ]; then
   BGA_IMAGE_DIR="$(cd "$MAIN_REPO_DIR/.." 2>/dev/null && pwd)/bga-agricola/img"
@@ -573,6 +574,7 @@ start_and_wait "backend" "$BACKEND_PORT" "$BACKEND_LOG" env \
   REPLAY_VIEWER_BUILD_ID="$REPLAY_VIEWER_BUILD_ID" \
   REPLAY_VIEWER_ROOT="$REPLAY_VIEWER_ROOT" \
   REPLAY_ASSET_ROOT="$REPLAY_ASSET_ROOT" \
+  REPLAY_REMOVAL_LEDGER_PATH="$REPLAY_REMOVAL_LEDGER_PATH" \
   GAME_BUILD_ID="$GAME_BUILD_ID" \
   "$BACKEND_BIN" "$SCRIPT_DIR/server/index.ts"
 
@@ -602,6 +604,7 @@ echo "  CARD_ART_DIR       = $CARD_ART_DIR"
 echo "  REPLAY_VIEWER_ROOT = $REPLAY_VIEWER_ROOT"
 echo "  REPLAY_VIEWER_ID   = $REPLAY_VIEWER_BUILD_ID"
 echo "  REPLAY_ASSET_ROOT  = $REPLAY_ASSET_ROOT"
+echo "  REPLAY_REMOVAL_LEDGER_PATH = $REPLAY_REMOVAL_LEDGER_PATH"
 echo "  BGA_IMAGE_DIR      = $BGA_IMAGE_DIR"
 echo "  FRONTEND_MODE      = $([ "$PREVIEW_ENABLED" -eq 1 ] && echo preview || echo dev)"
 [ "$SCRIPT_DIR" != "$MAIN_REPO_DIR" ] && echo "  (running from worktree; anchored to main repo: $MAIN_REPO_DIR)"
