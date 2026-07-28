@@ -3,6 +3,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import { Writable } from 'node:stream'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { handleReplayRoute, ReplayReadLimiter } from '../../replay-routes.ts'
 import type { ReplayStore } from '../replay-store.ts'
@@ -34,6 +35,42 @@ const response = (): { captured: CapturedResponse; res: ServerResponse } => {
         return this
       },
     } as unknown as ServerResponse,
+  }
+}
+
+const streamingResponse = (): {
+  captured: CapturedResponse
+  res: ServerResponse
+  done: Promise<void>
+} => {
+  const captured: CapturedResponse = {
+    status: 0,
+    headers: {},
+    body: Buffer.alloc(0),
+  }
+  const chunks: Buffer[] = []
+  const stream = new Writable({
+    write(chunk: Buffer | string, _encoding, callback) {
+      chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk))
+      callback()
+    },
+  })
+  Object.assign(stream, {
+    writeHead(status: number, headers: Record<string, string>) {
+      captured.status = status
+      captured.headers = headers
+      return this
+    },
+  })
+  return {
+    captured,
+    res: stream as unknown as ServerResponse,
+    done: new Promise((resolve) => {
+      stream.on('finish', () => {
+        captured.body = Buffer.concat(chunks)
+        resolve()
+      })
+    }),
   }
 }
 
@@ -131,6 +168,20 @@ describe('public replay routes', () => {
     return captured
   }
 
+  const handleStream = async (
+    req: IncomingMessage,
+    limiter = new ReplayReadLimiter(),
+  ): Promise<CapturedResponse> => {
+    const { captured, res, done } = streamingResponse()
+    expect(handleReplayRoute(req, res, store, {
+      viewerRoot,
+      assetRoot,
+      limiter,
+    })).toBe(true)
+    await done
+    return captured
+  }
+
   it('serves an ETag-revalidated public manifest without credential headers', () => {
     const first = handle(request('/api/v1/replays/room-1/manifest'))
     expect(first.status).toBe(200)
@@ -148,41 +199,58 @@ describe('public replay routes', () => {
     expect(second.body).toHaveLength(0)
   })
 
-  it('serves only hash-verified immutable viewer files', () => {
-    const first = handle(request(`/replay-viewers/${buildId}/index.html`))
+  it('serves only hash-verified immutable viewer files', async () => {
+    const first = await handleStream(request(`/replay-viewers/${buildId}/index.html`))
     expect(first.status).toBe(200)
     expect(first.headers['Cache-Control']).toContain('immutable')
     expect(first.headers['Content-Security-Policy']).toContain("form-action 'none'")
     expect(first.headers['Content-Security-Policy']).not.toContain('https:')
 
     writeFileSync(join(viewerRoot, buildId, 'app.js'), 'tampered')
-    expect(handle(request(`/replay-viewers/${buildId}/index.html`)).status).toBe(200)
-    expect(handle(request(`/replay-viewers/${buildId}/app.js`)).status).toBe(503)
+    expect((await handleStream(request(`/replay-viewers/${buildId}/index.html`))).status).toBe(200)
+    expect((await handleStream(request(`/replay-viewers/${buildId}/app.js`))).status).toBe(503)
 
     writeFileSync(join(viewerRoot, buildId, 'index.html'), 'tampered')
-    expect(handle(request(`/replay-viewers/${buildId}/index.html`)).status).toBe(503)
-    expect(handle(request(`/replay-viewers/${buildId}/unknown.js`)).status).toBe(404)
+    expect((await handleStream(request(`/replay-viewers/${buildId}/index.html`))).status).toBe(503)
+    expect((await handleStream(request(`/replay-viewers/${buildId}/unknown.js`))).status).toBe(404)
 
     rmSync(join(viewerRoot, buildId, 'index.html'))
-    expect(handle(request(`/replay-viewers/${buildId}/index.html`)).status).toBe(503)
+    expect((await handleStream(request(`/replay-viewers/${buildId}/index.html`))).status).toBe(503)
   })
 
-  it('serves content-addressed replay images and rejects corruption', () => {
+  it('revalidates content-addressed replay images and rejects corruption', async () => {
     const image = Buffer.from([137, 80, 78, 71, 13, 10, 26, 10, 1])
     const hash = createHash('sha256').update(image).digest('hex')
     writeFileSync(join(assetRoot, hash), image)
-    const first = handle(request(`/replay-assets/${hash}`))
+    const first = await handleStream(request(`/replay-assets/${hash}`))
     expect(first.status).toBe(200)
     expect(first.headers['Content-Type']).toBe('image/png')
+    expect(first.headers['Cache-Control']).toBe('public, max-age=0, must-revalidate')
 
+    rmSync(join(assetRoot, hash))
+    expect((await handleStream(request(`/replay-assets/${hash}`, {
+      'if-none-match': first.headers.ETag!,
+    }))).status).toBe(404)
     writeFileSync(join(assetRoot, hash), 'tampered')
-    expect(handle(request(`/replay-assets/${hash}`)).status).toBe(503)
+    expect((await handleStream(request(`/replay-assets/${hash}`))).status).toBe(503)
   })
 
   it('applies an independent per-IP replay read limit', () => {
     const limiter = new ReplayReadLimiter(1, () => 1_000)
     expect(handle(request('/api/v1/replays/room-1/manifest'), limiter).status).toBe(200)
     expect(handle(request('/api/v1/replays/room-1/manifest'), limiter).status).toBe(429)
+  })
+
+  it('rate-limits immutable viewer files before opening them', async () => {
+    const limiter = new ReplayReadLimiter(1, () => 1_000)
+    expect((await handleStream(
+      request(`/replay-viewers/${buildId}/index.html`),
+      limiter,
+    )).status).toBe(200)
+    expect((await handleStream(
+      request(`/replay-viewers/${buildId}/index.html`),
+      limiter,
+    )).status).toBe(429)
   })
 
   it('uses the proxy-appended address and evicts expired rate-limit keys', () => {
