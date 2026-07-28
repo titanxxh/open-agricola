@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto'
-import { lstatSync, readFileSync, readdirSync } from 'node:fs'
+import { existsSync, lstatSync, readFileSync, readdirSync } from 'node:fs'
 import { join } from 'node:path'
 
 export type ReplayViewerBuild = {
@@ -8,7 +8,11 @@ export type ReplayViewerBuild = {
   files: Record<string, string>
 }
 
-const verifiedBuilds = new Map<string, ReplayViewerBuild>()
+const REVALIDATE_INTERVAL_MS = 60_000
+const verifiedBuilds = new Map<string, {
+  build: ReplayViewerBuild
+  verifiedAt: number
+}>()
 
 const fileHash = (path: string): string =>
   createHash('sha256').update(readFileSync(path)).digest('hex')
@@ -32,8 +36,20 @@ export const loadReplayViewerBuild = (
   if (!/^[a-f0-9]{64}$/.test(buildId)) return null
   const directory = join(root, buildId)
   const cached = verifiedBuilds.get(directory)
-  if (cached && !revalidate) return cached
-  if (revalidate) verifiedBuilds.delete(directory)
+  if (cached) {
+    if (
+      !existsSync(join(directory, 'manifest.json'))
+      || !existsSync(join(directory, cached.build.entrypoint))
+    ) {
+      verifiedBuilds.delete(directory)
+      return null
+    }
+    if (
+      !revalidate
+      || Date.now() - cached.verifiedAt < REVALIDATE_INTERVAL_MS
+    ) return cached.build
+    verifiedBuilds.delete(directory)
+  }
   try {
     if (!lstatSync(directory).isDirectory()) return null
     const manifestPath = join(directory, 'manifest.json')
@@ -65,7 +81,7 @@ export const loadReplayViewerBuild = (
       entrypoint: 'index.html',
       files: expected as Record<string, string>,
     }
-    verifiedBuilds.set(directory, build)
+    verifiedBuilds.set(directory, { build, verifiedAt: Date.now() })
     return build
   } catch {
     return null

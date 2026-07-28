@@ -71,19 +71,24 @@ describe('replay startup validation', () => {
   })
 
   it('accepts only content-addressed viewer builds with a complete manifest', () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(0)
     const root = mkdtempSync(join(tmpdir(), 'open-agricola-viewer-build-'))
     try {
       const index = Buffer.from('<!doctype html>')
+      const app = Buffer.from('console.log("replay")')
       const manifest = Buffer.from(JSON.stringify({
         entrypoint: 'index.html',
         files: {
           'index.html': createHash('sha256').update(index).digest('hex'),
+          'app.js': createHash('sha256').update(app).digest('hex'),
         },
       }))
       const buildId = createHash('sha256').update(manifest).digest('hex')
       const directory = join(root, buildId)
       mkdirSync(directory)
       writeFileSync(join(directory, 'index.html'), index)
+      writeFileSync(join(directory, 'app.js'), app)
       writeFileSync(join(directory, 'manifest.json'), manifest)
 
       writeFileSync(join(directory, 'index.html'), 'changed')
@@ -91,7 +96,18 @@ describe('replay startup validation', () => {
       writeFileSync(join(directory, 'index.html'), index)
       expect(viewerBuildExists(root, buildId)).toBe(true)
       expect(viewerBuildExists(root, 'current')).toBe(false)
+
+      writeFileSync(join(directory, 'app.js'), 'changed')
+      expect(viewerBuildExists(root, buildId)).toBe(true)
+      vi.setSystemTime(60_001)
+      expect(viewerBuildExists(root, buildId)).toBe(false)
+
+      writeFileSync(join(directory, 'app.js'), app)
+      expect(viewerBuildExists(root, buildId)).toBe(true)
+      rmSync(join(directory, 'index.html'))
+      expect(viewerBuildExists(root, buildId)).toBe(false)
     } finally {
+      vi.useRealTimers()
       rmSync(root, { recursive: true, force: true })
     }
   })
