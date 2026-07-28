@@ -174,6 +174,25 @@ afterEach(() => {
 })
 
 describe('bug report routes', () => {
+  it('advertises and creates reports only with complete delivery configuration', async () => {
+    expect(json(await invoke(
+      'GET',
+      '/api/v1/issue-submission-connection',
+    ))).toMatchObject({ enabled: true })
+
+    vi.stubEnv('BUG_REPORT_GITHUB_WEBHOOK_SECRET', '')
+
+    expect(json(await invoke(
+      'GET',
+      '/api/v1/issue-submission-connection',
+    ))).toMatchObject({ enabled: false })
+    expect((await invoke(
+      'POST',
+      '/api/v1/game-contexts/active-room/bug-reports',
+      { phenomenon: 'The game froze' },
+    )).statusCode).toBe(503)
+  })
+
   it('rejects client authority fields and fixes the active anchor on the server', async () => {
     const forged = await invoke(
       'POST',
