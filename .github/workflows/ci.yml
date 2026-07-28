@@ -79,7 +79,9 @@ jobs:
       - name: Check generated card catalog sync
         run: pnpm run check:generated-cards-sync
 
-      - uses: actions/checkout@v6
+      - name: Checkout private BGA artwork
+        if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+        uses: actions/checkout@v6
         with:
           repository: bga-devs/bga-agricola
           token: ${{ secrets.GH_TOKEN }}
@@ -96,6 +98,7 @@ jobs:
       - name: Build immutable replay viewer
         env:
           BGA_IMAGE_DIR: bga-agricola/img
+          REPLAY_VIEWER_ALLOW_MISSING_BGA_ART: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository && '1' || '0' }}
           REPLAY_VIEWER_ROOT: ${{ runner.temp }}/replay-viewers
         run: pnpm run build:replay-viewer
 

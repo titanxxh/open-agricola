@@ -47,6 +47,13 @@ describe('production deployment config', () => {
         /repository: bga-devs\/bga-agricola\n\s+token: \$\{\{ secrets\.GH_TOKEN \}\}\n\s+persist-credentials: false/,
       )
     }
+    const ci = readFileSync('.github/workflows/ci.yml', 'utf8')
+    expect(ci).toContain(
+      "if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository",
+    )
+    expect(ci).toContain(
+      "REPLAY_VIEWER_ALLOW_MISSING_BGA_ART: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository && '1' || '0' }}",
+    )
   })
 
   it('does not start the obsolete custom-code executor sidecar', () => {
