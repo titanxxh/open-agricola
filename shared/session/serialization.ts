@@ -613,7 +613,8 @@ const maskDraftPoolForViewer = (
  *     player other than the viewer.
  *   - `players[i].cardStates[cardId]` and card-state events for cards that
  *     are still hidden in another player's hand.
- *   - draft-history card ids that are still hidden in another player's hand.
+ *   - draft-history card ids that are still hidden in another player's hand
+ *     or private draft data.
  *   - `draft.pools[pid].occ`, `draft.pools[pid].minor`,
  *     `draft.kept[pid]`, and `draft.pendingPicks[pid]` for every
  *     player other than the viewer.
@@ -631,6 +632,26 @@ export const filterSerializedStateForPlayer = (
     base,
     viewerPlayerId,
   )
+  const hiddenDraftHistoryCardIds = new Map(
+    base.players
+      .filter((player) => player.id !== viewerPlayerId)
+      .map((player) => [
+        player.id,
+        new Set([
+          ...(hiddenCardIds.get(player.id) ?? []),
+          ...(base.draft?.pools[player.id]?.occ ?? []),
+          ...(base.draft?.pools[player.id]?.minor ?? []),
+          ...(base.draft?.kept[player.id]?.occ ?? []),
+          ...(base.draft?.kept[player.id]?.minor ?? []),
+          ...(base.draft?.stages ?? []).flatMap((stage) => [
+            ...(stage.pools[player.id]?.occ ?? []),
+            ...(stage.pools[player.id]?.minor ?? []),
+          ]),
+          ...Object.values(base.draft?.pendingPicks[player.id] ?? {})
+            .filter((cardId): cardId is string => typeof cardId === 'string'),
+        ].filter((cardId) => cardId !== '?')),
+      ]),
+  )
   const filteredPlayers = base.players.map((p) =>
     p.id === viewerPlayerId
       ? p
@@ -642,7 +663,7 @@ export const filterSerializedStateForPlayer = (
           stats: {
             ...p.stats,
             draftHistory: p.stats.draftHistory.map((entry) =>
-              hiddenCardIds.get(p.id)?.has(entry.cardId)
+              hiddenDraftHistoryCardIds.get(p.id)?.has(entry.cardId)
                 ? { ...entry, cardId: '?' }
                 : entry),
           },
