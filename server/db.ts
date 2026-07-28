@@ -764,6 +764,34 @@ export function runMigrations(db: Database.Database): void {
         `)
       },
     },
+    {
+      version: 26,
+      sql: `
+        CREATE TABLE game_context_participants (
+          room_id TEXT NOT NULL REFERENCES game_contexts(room_id) ON DELETE CASCADE,
+          player_index INTEGER NOT NULL,
+          user_id TEXT REFERENCES users(id) ON DELETE SET NULL,
+          PRIMARY KEY (room_id, player_index)
+        );
+        CREATE INDEX idx_game_context_participants_user
+          ON game_context_participants(user_id);
+
+        CREATE TRIGGER preserve_game_context_participants_before_room_delete
+        BEFORE DELETE ON rooms
+        WHEN EXISTS (
+          SELECT 1 FROM game_contexts
+          WHERE room_id = OLD.id AND lifecycle = 'active'
+        )
+        BEGIN
+          INSERT OR IGNORE INTO game_context_participants (
+            room_id, player_index, user_id
+          )
+          SELECT OLD.id, player_index, user_id
+          FROM room_players
+          WHERE room_id = OLD.id;
+        END;
+      `,
+    },
   ]
 
   const insert = db.prepare('INSERT INTO schema_version (version) VALUES (?)')
@@ -826,6 +854,16 @@ export function cleanExpiredSessions(): void {
         AND NOT EXISTS (
           SELECT 1 FROM game_replay_steps
           WHERE room_id = game_replays.room_id
+        )
+    `).run()
+    db.prepare(`
+      DELETE FROM game_context_participants
+      WHERE room_id IN (
+        SELECT room_id FROM game_contexts WHERE lifecycle = 'expired'
+      )
+        AND NOT EXISTS (
+          SELECT 1 FROM game_replays
+          WHERE room_id = game_context_participants.room_id
         )
     `).run()
   })()

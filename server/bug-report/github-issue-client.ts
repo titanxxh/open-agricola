@@ -8,6 +8,7 @@ import {
 const API = 'https://api.github.com'
 const OWNER = 'titanxxh'
 const REPOSITORY = 'open-agricola-issues'
+const GITHUB_REQUEST_TIMEOUT_MS = 15_000
 
 export type GitHubIssue = {
   number: number
@@ -161,6 +162,16 @@ export class GitHubIssueClient {
     this.now = options.now ?? Date.now
   }
 
+  private request(
+    input: string | URL,
+    init?: RequestInit,
+  ): Promise<Response> {
+    return this.fetchImpl(input, {
+      ...init,
+      signal: AbortSignal.timeout(GITHUB_REQUEST_TIMEOUT_MS),
+    })
+  }
+
   static fromEnv(fetchImpl: typeof fetch = fetch): GitHubIssueClient | null {
     const options = {
       appId: process.env.BUG_REPORT_GITHUB_APP_ID?.trim() ?? '',
@@ -216,7 +227,7 @@ export class GitHubIssueClient {
   }
 
   async githubUserId(accessToken: string): Promise<string> {
-    const response = await this.fetchImpl(`${API}/user`, {
+    const response = await this.request(`${API}/user`, {
       headers: apiHeaders(accessToken),
     })
     const body = await parseJson<{ id?: number | string }>(response)
@@ -235,7 +246,7 @@ export class GitHubIssueClient {
     if (!authorization.ok) return authorization
     let response: Response
     try {
-      response = await this.fetchImpl(
+      response = await this.request(
         `${API}/repos/${OWNER}/${REPOSITORY}/issues`,
         {
           method: 'POST',
@@ -292,7 +303,7 @@ export class GitHubIssueClient {
         url.searchParams.set('direction', 'desc')
         url.searchParams.set('per_page', '100')
         url.searchParams.set('page', String(page))
-        response = await this.fetchImpl(url, {
+        response = await this.request(url, {
           headers: apiHeaders(authorization.token),
         })
       } catch {
@@ -340,7 +351,7 @@ export class GitHubIssueClient {
   async revokeUserGrant(accessToken: string): Promise<GitHubOperationResult> {
     let response: Response
     try {
-      response = await this.fetchImpl(
+      response = await this.request(
         `${API}/applications/${encodeURIComponent(this.options.clientId)}/grant`,
         {
           method: 'DELETE',
@@ -384,7 +395,7 @@ export class GitHubIssueClient {
     const issueUrl = `${API}/repos/${OWNER}/${REPOSITORY}/issues/${issueNumber}`
     let response: Response
     try {
-      response = await this.fetchImpl(issueUrl, {
+      response = await this.request(issueUrl, {
         headers: apiHeaders(authorization.token),
       })
     } catch {
@@ -422,7 +433,7 @@ export class GitHubIssueClient {
       }
     }
     try {
-      response = await this.fetchImpl(issueUrl, {
+      response = await this.request(issueUrl, {
         method: 'PATCH',
         headers: {
           ...apiHeaders(authorization.token),
@@ -453,7 +464,7 @@ export class GitHubIssueClient {
   }
 
   private async exchangeToken(fields: Record<string, string>): Promise<GitHubUserTokens> {
-    const response = await this.fetchImpl('https://github.com/login/oauth/access_token', {
+    const response = await this.request('https://github.com/login/oauth/access_token', {
       method: 'POST',
       headers: {
         Accept: 'application/json',
@@ -540,7 +551,7 @@ export class GitHubIssueClient {
     }
     let response: Response
     try {
-      response = await this.fetchImpl(
+      response = await this.request(
         `${API}/app/installations/${encodeURIComponent(this.options.installationId)}/access_tokens`,
         {
           method: 'POST',

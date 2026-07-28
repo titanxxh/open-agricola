@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest'
 import { runMigrations } from '../db.ts'
 
 describe('bug report migration', () => {
-  it('upgrades a v24 database with PKCE and delivery lifecycle columns', () => {
+  it('upgrades a v24 database with bug-report security state', () => {
     const db = new Database(':memory:')
     db.exec(`
       CREATE TABLE schema_version (version INTEGER PRIMARY KEY);
@@ -22,13 +22,24 @@ describe('bug report migration', () => {
         submission_id TEXT PRIMARY KEY,
         github_issue_number INTEGER
       );
+      CREATE TABLE users (id TEXT PRIMARY KEY);
+      CREATE TABLE rooms (id TEXT PRIMARY KEY);
+      CREATE TABLE room_players (
+        room_id TEXT NOT NULL,
+        user_id TEXT NOT NULL,
+        player_index INTEGER NOT NULL
+      );
+      CREATE TABLE game_contexts (
+        room_id TEXT PRIMARY KEY,
+        lifecycle TEXT NOT NULL
+      );
       INSERT INTO bug_reports VALUES ('submitted', 7);
     `)
 
     runMigrations(db)
 
     expect(db.prepare('SELECT MAX(version) AS version FROM schema_version').get())
-      .toEqual({ version: 25 })
+      .toEqual({ version: 26 })
     expect((db.pragma('table_info(oauth_states)') as Array<{ name: string }>)
       .map(({ name }) => name)).toEqual(expect.arrayContaining([
       'pkce_verifier_ciphertext',
@@ -46,6 +57,13 @@ describe('bug report migration', () => {
     expect(db.prepare(`
       SELECT github_issue_state FROM bug_reports WHERE submission_id = 'submitted'
     `).get()).toEqual({ github_issue_state: 'open' })
+    expect((db.pragma('table_info(game_context_participants)') as Array<{
+      name: string
+    }>).map(({ name }) => name)).toEqual([
+      'room_id',
+      'player_index',
+      'user_id',
+    ])
     db.close()
   })
 })

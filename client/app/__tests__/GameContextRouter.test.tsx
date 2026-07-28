@@ -1,5 +1,11 @@
 // @vitest-environment jsdom
-import { cleanup, fireEvent, render, screen } from '@testing-library/react'
+import {
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from '@testing-library/react'
 import { createHash } from 'node:crypto'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { GameContextRouter } from '../GameContextRouter'
@@ -371,5 +377,56 @@ describe('GameContextRouter', () => {
 
     expect(await screen.findByText(title)).toBeVisible()
     expect(screen.queryByText('active app')).not.toBeInTheDocument()
+  })
+
+  it('completes bug-report OAuth before routing an expired context', async () => {
+    window.history.replaceState(
+      null,
+      '',
+      '/?context=expired-room&bugReportConnection=pending'
+        + '#bugReportOAuthState=state-1&bugReportOAuthCode=code-1',
+    )
+    const fetch = vi.fn(async (
+      input: string | URL | Request,
+      init?: RequestInit,
+    ) => {
+      const url = String(input)
+      if (url.endsWith('/api/v1/issue-submission-connection/github/complete')) {
+        expect(init).toMatchObject({
+          method: 'POST',
+          credentials: 'include',
+        })
+        expect(JSON.parse(String(init?.body))).toEqual({
+          state: 'state-1',
+          code: 'code-1',
+        })
+        return new Response(JSON.stringify({
+          ok: true,
+          enabled: true,
+          connected: true,
+        }))
+      }
+      return new Response(JSON.stringify({
+        ok: true,
+        roomId: 'expired-room',
+        lifecycle: 'expired',
+      }))
+    })
+    vi.stubGlobal('fetch', fetch)
+
+    render(<GameContextRouter><div>active app</div></GameContextRouter>)
+
+    expect(await screen.findByText('platform.gameContext.expiredTitle'))
+      .toBeVisible()
+    await waitFor(() => {
+      expect(window.location.hash).toBe('')
+      expect(window.location.search).toContain(
+        'bugReportConnection=connected',
+      )
+    })
+    expect(fetch).toHaveBeenCalledWith(
+      '/api/v1/issue-submission-connection/github/complete',
+      expect.objectContaining({ credentials: 'include' }),
+    )
   })
 })
