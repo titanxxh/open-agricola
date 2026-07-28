@@ -1,0 +1,456 @@
+:root {
+  color: #f1ead9;
+  background: #172319;
+  font-family: 'CalibriB', 'PingFang SC', sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-width: 320px;
+  min-height: 100vh;
+  background:
+    linear-gradient(90deg, rgb(255 255 255 / 2%) 1px, transparent 1px) 0 0 / 28px 28px,
+    radial-gradient(circle at 70% -20%, #46613d 0, transparent 42%),
+    #172319;
+}
+
+button,
+select,
+input {
+  font: inherit;
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.replay-loading {
+  min-height: 100vh;
+  display: grid;
+  place-content: center;
+  gap: 10px;
+  padding: 24px;
+  text-align: center;
+}
+
+.replay-error strong {
+  color: #e3a178;
+}
+
+.replay-app {
+  --rail-width: 250px;
+  min-height: 100vh;
+  display: grid;
+  grid-template-columns: var(--rail-width) minmax(0, 1fr) 310px;
+  grid-template-areas:
+    "header header header"
+    "warning warning warning"
+    "timeline stage evidence"
+    "transport transport transport";
+  align-items: start;
+}
+
+.replay-app--board {
+  grid-template-columns: minmax(0, 1fr) 250px 310px;
+  grid-template-areas:
+    "header header header"
+    "warning warning warning"
+    "stage timeline evidence"
+    "transport transport transport";
+}
+
+.replay-header {
+  grid-area: header;
+  min-height: 78px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  padding: 14px 22px;
+  border-bottom: 1px solid #708266;
+  background: rgb(13 26 16 / 92%);
+}
+
+.replay-header h1 {
+  margin: 0;
+  color: #f3d681;
+  font-family: 'Dominican', Georgia, serif;
+  font-size: clamp(22px, 3vw, 34px);
+  letter-spacing: .02em;
+}
+
+.replay-kicker {
+  margin: 0 0 3px;
+  color: #a7b69e;
+  font-size: 11px;
+  letter-spacing: .18em;
+  text-transform: uppercase;
+}
+
+.replay-header__controls {
+  display: flex;
+  gap: 8px;
+}
+
+.replay-header select,
+.replay-header button,
+.replay-transport button,
+.replay-warning button {
+  min-height: 38px;
+  padding: 8px 13px;
+  color: #f7f1df;
+  border: 1px solid #708266;
+  border-radius: 4px;
+  background: #283c2b;
+  cursor: pointer;
+}
+
+.replay-header button:hover,
+.replay-transport button:hover:not(:disabled),
+.replay-warning button:hover {
+  border-color: #e0b850;
+  background: #365039;
+}
+
+.replay-warning-stack {
+  grid-area: warning;
+  display: grid;
+}
+
+.replay-warning {
+  padding: 9px 22px;
+  color: #36270d;
+  background: #e6c56c;
+}
+
+.replay-warning--error {
+  color: #fff4e7;
+  background: #87432f;
+}
+
+.replay-warning button {
+  margin-left: 12px;
+}
+
+.replay-timeline {
+  grid-area: timeline;
+  height: calc(100vh - 144px);
+  overflow: auto;
+  border-right: 1px solid #53634e;
+  border-left: 1px solid #53634e;
+  background: #1d2b20;
+}
+
+.replay-timeline ol {
+  list-style: none;
+  padding: 12px 0 80px;
+  margin: 0;
+}
+
+.replay-timeline button {
+  width: 100%;
+  display: grid;
+  grid-template-columns: 42px minmax(0, 1fr);
+  gap: 2px 10px;
+  padding: 10px 14px;
+  color: #d8dfd3;
+  text-align: left;
+  border: 0;
+  border-left: 3px solid transparent;
+  background: transparent;
+  cursor: pointer;
+}
+
+.replay-timeline button:hover {
+  background: #2b3c2d;
+}
+
+.replay-timeline button.is-current {
+  color: #fff7db;
+  border-left-color: #e0b850;
+  background: #3b4d35;
+}
+
+.replay-timeline button span {
+  grid-row: 1 / 3;
+  color: #d7b762;
+  font-family: ui-monospace, monospace;
+}
+
+.replay-timeline button strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-size: 13px;
+  white-space: nowrap;
+}
+
+.replay-timeline button small {
+  color: #8fa088;
+}
+
+.replay-stage {
+  grid-area: stage;
+  min-width: 0;
+  padding: 14px;
+  overflow: hidden;
+}
+
+.replay-board {
+  display: grid;
+  gap: 14px;
+}
+
+.replay-setup {
+  min-height: 70vh;
+  padding: 18px;
+  color: #352b1b;
+  border: 1px solid #b89e68;
+  border-radius: 5px;
+  background: #eee0bb;
+}
+
+.replay-setup > header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.replay-setup h2,
+.replay-setup h3,
+.replay-setup h4,
+.replay-setup p {
+  margin: 0;
+}
+
+.replay-setup h2,
+.replay-setup h3 {
+  font-family: 'Dominican', Georgia, serif;
+}
+
+.replay-setup h4 {
+  margin-top: 12px;
+  color: #765c35;
+  font-size: 12px;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+}
+
+.replay-setup__players {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 14px;
+  margin-top: 16px;
+}
+
+.replay-setup__players > article {
+  min-width: 0;
+  padding: 14px;
+  border: 1px solid #c3aa79;
+  border-radius: 4px;
+  background: rgb(255 250 229 / 70%);
+}
+
+.replay-setup__cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(82px, 1fr));
+  gap: 8px;
+  padding: 0;
+  margin: 6px 0 0;
+  list-style: none;
+}
+
+.replay-setup__cards li {
+  min-width: 0;
+}
+
+.replay-setup__cards .player-card {
+  width: 100%;
+}
+
+.replay-setup__hidden {
+  display: grid;
+  aspect-ratio: 188 / 299;
+  place-content: center;
+  color: #d5cdb7;
+  border: 1px solid #6d765d;
+  border-radius: 8px;
+  background: #293b2c;
+  font: 700 28px/1 ui-monospace, monospace;
+}
+
+.replay-setup__empty {
+  color: #8a795b;
+}
+
+.replay-board__action,
+.replay-board__farm {
+  min-width: 0;
+  padding: 10px;
+  border: 1px solid #6d765d;
+  border-radius: 5px;
+  background: #c8ad78;
+  box-shadow: 0 12px 26px rgb(0 0 0 / 25%);
+}
+
+.replay-board .action-card,
+.replay-board .farm-cell,
+.replay-board .player-card {
+  pointer-events: none;
+}
+
+.replay-evidence {
+  grid-area: evidence;
+  margin: 14px 14px 80px 0;
+  padding: 16px;
+  color: #352b1b;
+  border: 1px solid #b89e68;
+  background:
+    repeating-linear-gradient(0deg, transparent 0 27px, rgb(116 85 44 / 12%) 28px),
+    #eee0bb;
+  box-shadow: 5px 7px 0 #101c13;
+}
+
+.replay-evidence h2 {
+  margin: 0 0 12px;
+  color: #712f25;
+  font-family: 'Dominican', Georgia, serif;
+}
+
+.replay-evidence dl,
+.replay-evidence dl div {
+  display: grid;
+  gap: 6px;
+}
+
+.replay-evidence dl {
+  grid-template-columns: 1fr 1fr;
+  margin: 0;
+}
+
+.replay-evidence dl div {
+  align-content: start;
+}
+
+.replay-evidence__wide {
+  grid-column: 1 / -1;
+}
+
+.replay-evidence dt {
+  color: #765c35;
+  font-size: 11px;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+}
+
+.replay-evidence dd {
+  min-width: 0;
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.replay-evidence code {
+  font-size: 11px;
+}
+
+.replay-frame-loading {
+  min-height: 60vh;
+  display: grid;
+  place-content: center;
+  color: #213221;
+}
+
+.replay-transport {
+  position: fixed;
+  z-index: 20;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  grid-area: transport;
+  display: grid;
+  grid-template-columns: auto auto auto minmax(120px, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 18px;
+  border-top: 1px solid #687762;
+  background: rgb(15 27 17 / 96%);
+}
+
+.replay-transport button:disabled {
+  opacity: .4;
+  cursor: not-allowed;
+}
+
+.replay-transport .replay-play {
+  color: #1e2a1d;
+  border-color: #e0b850;
+  background: #e0b850;
+}
+
+.replay-transport output {
+  min-width: 78px;
+  color: #d7b762;
+  font-family: ui-monospace, monospace;
+  text-align: right;
+}
+
+@media (max-width: 900px) {
+  .replay-app,
+  .replay-app--board {
+    display: block;
+    padding-bottom: 68px;
+  }
+
+  .replay-header {
+    align-items: flex-start;
+    padding: 12px;
+  }
+
+  .replay-header__controls {
+    flex-direction: column;
+  }
+
+  .replay-stage {
+    padding: 8px;
+  }
+
+  .replay-app--timeline .replay-timeline {
+    display: block;
+    height: 42vh;
+  }
+
+  .replay-app--board .replay-timeline {
+    height: 34vh;
+  }
+
+  .replay-evidence {
+    margin: 8px 8px 12px;
+  }
+
+  .replay-transport {
+    grid-template-columns: auto auto auto 1fr;
+    padding: 8px;
+  }
+
+  .replay-transport input {
+    grid-column: 1 / -1;
+    grid-row: 2;
+  }
+
+  .replay-transport output {
+    grid-column: 4;
+    grid-row: 1;
+  }
+}

@@ -26,6 +26,7 @@ describe('restart-intranet preview mode', () => {
     expect(script).toContain('BGA_CDN_BASE_URL="$BGA_CDN_BASE_URL"')
     expect(script).toContain('"$SCRIPT_DIR/dist/bga-img"')
     expect(script).toContain('cp -R "$BGA_IMAGE_DIR"/. "$SCRIPT_DIR/dist/bga-img"/')
+    expect(script).toContain('REPLAY_VIEWER_ALLOW_MISSING_BGA_ART=1')
   })
 
   it('documents and wires --moor for fixed dev rooms', () => {

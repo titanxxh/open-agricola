@@ -61,12 +61,22 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      - uses: actions/checkout@v6
+        with:
+          repository: bga-devs/bga-agricola
+          token: ${{ secrets.GH_TOKEN }}
+          persist-credentials: false
+          ref: 20397289f6b82ec9667a13e7803ca3038eeb6bb6
+          path: bga-agricola
+          sparse-checkout: img
+
       - name: Build frontend
         env:
           VITE_API_BASE: ${{ vars.VITE_API_BASE }}
           VITE_WS_BASE: ${{ vars.VITE_WS_BASE }}
           VITE_BASE_PATH: /open-agricola/
           BGA_CDN_BASE_URL: ${{ vars.BGA_CDN_BASE_URL }}
+          BGA_IMAGE_DIR: bga-agricola/img
         run: pnpm run build
 
       - uses: actions/upload-pages-artifact@v5

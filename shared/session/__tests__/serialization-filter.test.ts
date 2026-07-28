@@ -3,7 +3,12 @@ import type { GameEvent } from '../../contract/events'
 import type { GameState } from '../../contract/types'
 import type { DraftState } from '../../draft/types'
 import { createInitialState } from '../state-bootstrap'
-import { rehydrateState, serializeState, serializeStateForPlayer } from '../serialization'
+import {
+  filterSerializedStateForPlayer,
+  rehydrateState,
+  serializeState,
+  serializeStateForPlayer,
+} from '../serialization'
 import { EngineStack } from '../../engine'
 
 const emptyCtx = () => ({ engineStack: new EngineStack() })
@@ -52,6 +57,15 @@ function makeDraftState(): GameState {
 // ---------- tests ----------
 
 describe('serializeStateForPlayer', () => {
+  it('applies the same visibility rules to an archived serialized frame', () => {
+    const state = makePlayingState()
+    const serialized = serializeState(state, emptyCtx())
+
+    expect(filterSerializedStateForPlayer(serialized, 'p1')).toEqual(
+      serializeStateForPlayer(state, 'p1', emptyCtx()),
+    )
+  })
+
   it('round-trips six players through serialize and rehydrate', () => {
     const state = createInitialState(42, {
       playerCount: 6,
@@ -62,6 +76,7 @@ describe('serializeStateForPlayer', () => {
     const restored = rehydrateState(JSON.parse(JSON.stringify(serialized))).state
 
     expect(restored.players).toHaveLength(6)
+    expect(restored.players.every((player) => !('pastureCapacities' in player))).toBe(true)
     expect(restored.players.map((player) => player.id)).toEqual(['p1', 'p2', 'p3', 'p4', 'p5', 'p6'])
     expect(restored.players.map((player) => player.name)).toEqual(['playerA', 'playerB', 'playerC', 'playerD', 'playerE', 'playerF'])
     expect(restored.players.map((player) => player.color)).toEqual(['red', 'blue', 'black', 'yellow', 'green', 'purple'])

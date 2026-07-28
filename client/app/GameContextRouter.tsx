@@ -13,6 +13,7 @@ import { API_BASE } from '../config'
 import { useLocale } from '../contexts/LocaleContext'
 import { BrandMark } from '../components/common/BrandMark'
 import { GameLoadScreen } from '../components/common/GameLoadScreen'
+import { ReplayShell } from './ReplayShell'
 
 export const GAME_CONTEXT_CHANGED_EVENT = 'open-agricola:game-context-changed'
 
@@ -44,12 +45,13 @@ function CompletedContext({
   context: CompletedGameContextDescriptor
 }) {
   const { t } = useLocale()
+  if (context.replayStatus === 'available') {
+    return <ReplayShell context={context} />
+  }
   return statusPage(
     t('platform.gameContext.room', { id: context.roomId }),
     t('platform.gameContext.completedTitle'),
-    t(context.replayStatus === 'available'
-      ? 'platform.gameContext.replayAvailable'
-      : 'platform.gameContext.legacyNoReplay'),
+    t('platform.gameContext.legacyNoReplay'),
     <div>
       <h2 className="ws-status-title">{t('platform.gameContext.players')}</h2>
       <ul>

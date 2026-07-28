@@ -1,19 +1,28 @@
 // @vitest-environment jsdom
-import { cleanup, render, screen } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen } from '@testing-library/react'
+import { createHash } from 'node:crypto'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { GameContextRouter } from '../GameContextRouter'
 
+const localeContext = vi.hoisted(() => {
+  const t = (key: string, params?: Record<string, string | number>) =>
+    params
+      ? Object.entries(params).reduce(
+          (value, [name, replacement]) =>
+            value.replace(`{${name}}`, String(replacement)),
+          key,
+        )
+      : key
+  return {
+    locale: 'en',
+    setLocale: vi.fn(),
+    t,
+    defaultT: t,
+  }
+})
+
 vi.mock('../../contexts/LocaleContext', () => ({
-  useLocale: () => ({
-    t: (key: string, params?: Record<string, string | number>) =>
-      params
-        ? Object.entries(params).reduce(
-            (value, [name, replacement]) =>
-              value.replace(`{${name}}`, String(replacement)),
-            key,
-          )
-        : key,
-  }),
+  useLocale: () => localeContext,
 }))
 
 vi.mock('../../components/common/BrandMark', () => ({
@@ -27,6 +36,9 @@ vi.mock('../../components/common/GameLoadScreen', () => ({
 afterEach(() => {
   cleanup()
   vi.unstubAllGlobals()
+  localeContext.locale = 'en'
+  localeContext.t = localeContext.defaultT
+  localeContext.setLocale.mockReset()
   window.history.replaceState(null, '', '/')
 })
 
@@ -112,6 +124,220 @@ describe('GameContextRouter', () => {
     expect(await screen.findByText('platform.gameContext.completedTitle')).toBeVisible()
     expect(screen.getByText('Alice: platform.gameContext.score')).toBeVisible()
     expect(screen.queryByText('active app')).not.toBeInTheDocument()
+  })
+
+  it.each(['available', 'corrupt'] as const)(
+    'verifies the pinned viewer and requires a perspective before mounting it (%s anchor)',
+    async (anchorState) => {
+    const viewerManifest = JSON.stringify({
+      entrypoint: 'index.html',
+      files: { 'index.html': '0'.repeat(64) },
+    })
+    const viewerBuildId = createHash('sha256').update(viewerManifest).digest('hex')
+    const context = {
+      ok: true,
+      roomId: 'completed-room',
+      lifecycle: 'completed',
+      replayStatus: 'available',
+      result: {
+        startedAt: 1,
+        finishedAt: 2,
+        roundsPlayed: 14,
+        playerCount: 2,
+        enableCommunityDeck: false,
+        enableParentCards: false,
+        enableThroughTheSeasons: false,
+        enableFarmersOfTheMoor: false,
+        players: [
+          { playerIndex: 0, displayName: 'Alice', score: 42 },
+          { playerIndex: 1, displayName: 'Bob', score: 35 },
+        ],
+      },
+      replay: {
+        firstStepNo: 0,
+        lastStepNo: 1,
+        missingPrefix: false,
+        schemaVersion: 1,
+        viewerBuildId,
+      },
+    }
+    const replayManifest = {
+      ok: true,
+      kind: 'replayManifest',
+      apiVersion: 1,
+      roomId: 'completed-room',
+      schemaVersion: 1,
+      viewerBuildId,
+      gameBuildId: 'game-build',
+      firstStepNo: 0,
+      lastStepNo: 1,
+      missingPrefix: false,
+      participants: [
+        { playerIndex: 0, displayName: 'Alice' },
+        { playerIndex: 1, displayName: 'Bob' },
+      ],
+      segments: [{ checkpointStepNo: 0, firstStepNo: 0, lastStepNo: 1 }],
+      steps: [
+        {
+          stepNo: 0,
+          roomVersion: 1,
+          checkpointStepNo: 0,
+          playerIndex: null,
+          commandType: 'initial',
+          intent: {},
+          frameHash: '1'.repeat(64),
+          createdAt: 1,
+        },
+        {
+          stepNo: 1,
+          roomVersion: 2,
+          checkpointStepNo: 0,
+          playerIndex: 0,
+          commandType: 'action',
+          intent: {},
+          frameHash: '2'.repeat(64),
+          createdAt: 2,
+        },
+      ],
+      corruptRanges: [],
+      customCards: [],
+    }
+    const frameHash = '1'.repeat(64)
+    const fetch = vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input)
+      if (url.includes('/game-contexts/')) {
+        return new Response(JSON.stringify(context))
+      }
+      if (url.includes(`/anchors/0?frame=${frameHash}`)) {
+        const body = anchorState === 'available'
+          ? {
+              ok: true,
+              kind: 'replayAnchor',
+              apiVersion: 1,
+              roomId: 'completed-room',
+              schemaVersion: 1,
+              viewerBuildId,
+              anchor: { stepNo: 0, frameHash },
+              step: {},
+            }
+          : {
+              ok: false,
+              code: 'replay_segment_unavailable',
+              lifecycle: 'completed',
+              message: 'Replay segment failed its integrity check',
+              verifiedAnchor: { stepNo: 0, frameHash },
+              unavailableRange: {
+                firstStepNo: 0,
+                lastStepNo: 0,
+                nextCheckpointStepNo: 1,
+              },
+            }
+        return new Response(JSON.stringify(body), {
+          status: anchorState === 'available' ? 200 : 503,
+        })
+      }
+      if (url.endsWith('/manifest.json')) {
+        return new Response(viewerManifest)
+      }
+      return new Response(JSON.stringify(replayManifest))
+    })
+    vi.stubGlobal('fetch', fetch)
+    window.history.replaceState(
+      null,
+      '',
+      `/?context=completed-room&step=0&frame=${frameHash}`,
+    )
+
+    const { rerender } = render(
+      <GameContextRouter><div>active app</div></GameContextRouter>,
+    )
+
+    const perspectiveButtons = await screen.findAllByRole('button', {
+      name: 'platform.gameContext.watchAs',
+    })
+    expect(screen.getByRole('button', { name: 'Display language' }))
+      .toBeVisible()
+    expect(screen.queryByTitle('platform.gameContext.replayFrameTitle')).not.toBeInTheDocument()
+    fireEvent.click(perspectiveButtons[0]!)
+
+    const iframe = await screen.findByTitle('platform.gameContext.replayFrameTitle')
+    expect(iframe).toHaveAttribute('sandbox', 'allow-scripts')
+    expect(iframe).toHaveAttribute('credentialless')
+    expect(iframe).toHaveAttribute(
+      'src',
+      expect.stringContaining(`/replay-viewers/${viewerBuildId}/index.html?`),
+    )
+    expect(
+      new URL(iframe.getAttribute('src')!, window.location.href).searchParams.get('api'),
+    ).toBe(window.location.origin)
+    expect(window.location.search).toContain('perspective=p1')
+    expect(new URLSearchParams(window.location.search).get('step')).toBe('0')
+    expect(new URLSearchParams(window.location.search).get('frame')).toBe(frameHash)
+    expect(fetch).toHaveBeenCalledWith(
+      '/api/v1/replays/completed-room/manifest',
+      expect.objectContaining({ credentials: 'omit' }),
+    )
+    expect(fetch).toHaveBeenCalledWith(
+      `/api/v1/replays/completed-room/anchors/0?frame=${frameHash}`,
+      expect.objectContaining({ credentials: 'omit' }),
+    )
+
+    const initialSrc = iframe.getAttribute('src')
+    fireEvent(window, new MessageEvent('message', {
+      source: (iframe as HTMLIFrameElement).contentWindow,
+      data: {
+        type: 'open-agricola-replay-location',
+        perspective: 'p1',
+        layout: 'timeline',
+        step: 1,
+      },
+    }))
+    expect(new URLSearchParams(window.location.search).get('step')).toBe('1')
+    expect(new URLSearchParams(window.location.search).get('frame')).toBe('2'.repeat(64))
+    expect(iframe).toHaveAttribute('src', initialSrc)
+
+    const fetchCount = fetch.mock.calls.length
+    localeContext.locale = 'zh'
+    localeContext.t = (key, params) => `zh:${localeContext.defaultT(key, params)}`
+    rerender(<GameContextRouter><div>active app</div></GameContextRouter>)
+    expect(fetch).toHaveBeenCalledTimes(fetchCount)
+    expect(await screen.findByTitle('zh:platform.gameContext.replayFrameTitle'))
+      .toHaveAttribute('src', expect.stringContaining('locale=zh'))
+    },
+  )
+
+  it('keeps completed results visible when replay verification fails', async () => {
+    window.history.replaceState(null, '', '/?context=completed-room')
+    const context = {
+      ok: true,
+      roomId: 'completed-room',
+      lifecycle: 'completed',
+      replayStatus: 'available',
+      result: {
+        players: [{ playerIndex: 0, displayName: 'Alice', score: 42 }],
+      },
+      replay: {
+        firstStepNo: 0,
+        lastStepNo: 1,
+        missingPrefix: false,
+        schemaVersion: 1,
+        viewerBuildId: 'a'.repeat(64),
+      },
+    }
+    const fetch = vi.fn(async (input: RequestInfo | URL) =>
+      new Response(JSON.stringify(
+        String(input).includes('/game-contexts/')
+          ? context
+          : { ok: false, code: 'viewer_unavailable', message: 'Unavailable' },
+      ))
+    )
+    vi.stubGlobal('fetch', fetch)
+
+    render(<GameContextRouter><div>active app</div></GameContextRouter>)
+
+    expect(await screen.findByRole('alert')).toBeVisible()
+    expect(screen.getByText('Alice')).toBeVisible()
+    expect(screen.getByText('platform.gameContext.score')).toBeVisible()
   })
 
   it.each([

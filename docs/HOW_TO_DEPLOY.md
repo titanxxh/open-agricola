@@ -70,11 +70,46 @@ REPLAY_NEW_ROOMS_ENABLED=false
 REPLAY_VIEWER_BUILD_ID=
 REPLAY_VIEWER_ROOT=./data/replay-viewers
 REPLAY_ASSET_ROOT=./data/replay-assets
+REPLAY_TRUST_PROXY=false
 GAME_BUILD_ID=
 # CORS_ORIGIN 等后续根据情况设置
 ```
 
-首次启用 Replay 时必须使用 `PERSIST_ROOMS=sqlite`。Viewer Build 根目录的 `manifest.json` 固定 `entrypoint: "index.html"` 和目录内全部文件的 SHA-256，`REPLAY_VIEWER_BUILD_ID` 是该清单文件本身的 SHA-256；把完整目录部署到 `${REPLAY_VIEWER_ROOT}/${REPLAY_VIEWER_BUILD_ID}` 后，再填写两个 Build ID，最后把 `REPLAY_NEW_ROOMS_ENABLED` 改为 `true`。清单、内容 Hash 或入口校验失败时拒绝创建新 Room。开关、Build ID 和自定义卡运行时版本在 Room 创建时锁定；卡图复制到 `REPLAY_ASSET_ROOT` 的内容寻址文件。已有 Replay Room 会继续按锁定值记录，开关关闭期间不会迁移旧进行局。
+后端直接暴露端口时保持 `REPLAY_TRUST_PROXY=false`。只有后端仅能经可信 Caddy/Nginx 到达，且代理会覆盖 `X-Forwarded-For` 时才设为 `true`。
+仓库的 `docker-compose.prod.yml` 使用隔离的 Caddy 作为唯一入口，因此已固定为 `REPLAY_TRUST_PROXY=true`。
+
+首次启用 Replay 时必须使用 `PERSIST_ROOMS=sqlite`。先生成并追加发布 Viewer Build：
+
+```bash
+REPLAY_VIEWER_ROOT="$PWD/data/replay-viewers" \
+BGA_IMAGE_DIR="../bga-agricola/img" \
+pnpm run build:replay-viewer
+# stdout 最后一行是 REPLAY_VIEWER_BUILD_ID
+```
+
+`BGA_IMAGE_DIR` 必须指向固定版本的完整 `img/`；CI 使用 `bga-devs/bga-agricola@20397289f6b82ec9667a13e7803ca3038eeb6bb6`。命令会把棋盘图、卡图、字体和其他静态资源一起复制进独立只读 Viewer，再生成逐文件 SHA-256 清单，以清单本身的 SHA-256 作为目录名，并在发布后重新校验完整目录；运行时不再依赖 BGA CDN，已存在的同 ID 目录不会覆盖。
+
+`docker-compose.prod.yml` 使用 `app-data:/app/data` named volume。保持 `REPLAY_NEW_ROOMS_ENABLED=false` 启动一次后，把 Build 追加进去，再启用录制：
+
+运行下方命令前，把上一步 stdout 最后一行填入 `.env` 的 `REPLAY_VIEWER_BUILD_ID`，并把 `git rev-parse HEAD` 的输出填入 `GAME_BUILD_ID`。
+
+```bash
+set -a
+source .env
+set +a
+test -n "$REPLAY_VIEWER_BUILD_ID"
+test -n "$GAME_BUILD_ID"
+docker compose -f docker-compose.prod.yml up -d --build
+docker compose -f docker-compose.prod.yml exec app \
+  mkdir -p "/app/data/replay-viewers/$REPLAY_VIEWER_BUILD_ID"
+docker compose -f docker-compose.prod.yml cp \
+  "data/replay-viewers/$REPLAY_VIEWER_BUILD_ID/." \
+  "app:/app/data/replay-viewers/$REPLAY_VIEWER_BUILD_ID"
+# 复制完成后，在 .env 改为 REPLAY_NEW_ROOMS_ENABLED=true
+docker compose -f docker-compose.prod.yml up -d --force-recreate app
+```
+
+清单、内容 Hash 或入口校验失败时拒绝创建新 Room。开关、Build ID 和自定义卡运行时版本在 Room 创建时锁定；自定义卡图复制到 `REPLAY_ASSET_ROOT` 的内容寻址文件。已有 Replay Room 会继续按锁定值记录，开关关闭期间不会迁移旧进行局。
 
 #### 构建并启动
 
@@ -172,6 +207,12 @@ docker compose logs -f app
          - ALLOW_ANONYMOUS_WS=false
          - DB_PATH=./data/open-agricola.db
          - CARD_ART_DIR=./data/card-art
+         - REPLAY_NEW_ROOMS_ENABLED=${REPLAY_NEW_ROOMS_ENABLED:-false}
+         - REPLAY_VIEWER_BUILD_ID=${REPLAY_VIEWER_BUILD_ID:-}
+         - REPLAY_VIEWER_ROOT=${REPLAY_VIEWER_ROOT:-./data/replay-viewers}
+         - REPLAY_ASSET_ROOT=${REPLAY_ASSET_ROOT:-./data/replay-assets}
+         - REPLAY_TRUST_PROXY=true
+         - GAME_BUILD_ID=${GAME_BUILD_ID:-}
          - CORS_ORIGIN=https://YOUR_USER.github.io
        volumes:
          - app-data:/app/data
@@ -243,6 +284,8 @@ docker compose logs -f app
 
 4. 为后端 API 添加一个 Nginx server block 或 location。
 
+   因为下面配置会覆盖 `X-Forwarded-For`，同时在后端 `.env` 设置 `REPLAY_TRUST_PROXY=true`。
+
    **方式一：子域名（推荐）**，如 `api.your-domain.com`
 
    先申请子域名证书：
@@ -271,7 +314,7 @@ docker compose logs -f app
 
            proxy_set_header Host $host;
            proxy_set_header X-Real-IP $remote_addr;
-           proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+           proxy_set_header X-Forwarded-For $remote_addr;
            proxy_set_header X-Forwarded-Proto $scheme;
 
            # WebSocket 超时设长一些
@@ -300,6 +343,7 @@ docker compose logs -f app
        proxy_set_header Connection "upgrade";
        proxy_set_header Host $host;
        proxy_set_header X-Real-IP $remote_addr;
+       proxy_set_header X-Forwarded-For $remote_addr;
        proxy_read_timeout 86400s;
        proxy_send_timeout 86400s;
    }
@@ -452,6 +496,7 @@ https://<backend-origin>/api/auth/oauth/google/callback
 | `ENABLE_AUTH_TEST_HELPERS` | — | 仅本地/E2E 可设 `1`，生产禁止设置 |
 | `DB_PATH` | `./data/open-agricola.db` | SQLite 文件路径 |
 | `CARD_ART_DIR` | `./data/card-art` | 上传的卡牌图片存储路径 |
+| `REPLAY_TRUST_PROXY` | `false` | 仅当后端只能经会覆盖 `X-Forwarded-For` 的可信反向代理访问时设为 `true` |
 | `ADMIN_USERS` | — | 管理员用户名，逗号分隔 |
 | `ACCOUNT_REGISTRATION_POLICY` | 必填 | 账号注册策略：首次部署用 `open` 创建第一个管理员，之后改为 `invite_only`；`disabled` 禁止新账号注册 |
 

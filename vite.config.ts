@@ -80,6 +80,14 @@ export default defineConfig({
         target: `http://${process.env.BACKEND_HOST || 'localhost'}:${process.env.BACKEND_PORT || '5175'}`,
         changeOrigin: true,
       },
+      '/replay-viewers': {
+        target: `http://${process.env.BACKEND_HOST || 'localhost'}:${process.env.BACKEND_PORT || '5175'}`,
+        changeOrigin: true,
+      },
+      '/replay-assets': {
+        target: `http://${process.env.BACKEND_HOST || 'localhost'}:${process.env.BACKEND_PORT || '5175'}`,
+        changeOrigin: true,
+      },
       '/ws': {
         target: `ws://${process.env.BACKEND_HOST || 'localhost'}:${process.env.BACKEND_PORT || '5175'}`,
         ws: true,

@@ -21,7 +21,7 @@ import {
 } from './persistence/sqlite-adapter.ts'
 
 const RETRY_DELAYS_MS = [1_000, 2_000, 5_000, 10_000, 30_000] as const
-const REPLAY_SCHEMA_VERSION = 1
+export const REPLAY_SCHEMA_VERSION = 1
 const REPLAY_ASSET_URL_PATTERN = /^\/replay-assets\/([a-f0-9]{64})$/
 
 class ReplayAssetValidationError extends Error {}
@@ -157,15 +157,20 @@ export const replayIntentFromCommand = (command: ClientCommand): ReplayIntent | 
   }
 }
 
-const replayFrame = (room: Room): {
+const replayFrame = (
+  room: Room,
+  scores?: SessionResponse['scores'],
+): {
   serialized: SerializedGameState
   frame: JsonValue
 } => {
   const serialized = serializeState(room.session.state, {
     engineStack: room.session.getEngineStack(),
   })
-  const frame = JSON.parse(JSON.stringify(serialized)) as JsonValue
-  return { serialized: frame as unknown as SerializedGameState, frame }
+  const frame = JSON.parse(JSON.stringify(
+    scores === undefined ? serialized : { ...serialized, scores },
+  )) as JsonValue
+  return { serialized, frame }
 }
 
 const errorMessage = (error: unknown): string =>
@@ -454,7 +459,10 @@ export class RoomCommitter {
     if (!head) {
       return { kind: 'blocked', error: `replay is not recording for ${room.id}` }
     }
-    const { serialized, frame } = replayFrame(room)
+    const { serialized, frame } = replayFrame(
+      room,
+      response.state.gameOver ? response.scores ?? [] : undefined,
+    )
     const stepNo = head.stepNo + 1
     const roomVersion = head.roomVersion + 1
     const encoded = encodeReplayFrame({
