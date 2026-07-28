@@ -245,6 +245,8 @@ export function BugReportBar({
 
   const phenomenonLength = Array.from(phenomenon.trim()).length
   const editable = !report || report.status === 'draft'
+  const identityEditable = !report
+    || ['draft', 'needs_reconnect', 'failed'].includes(report.status)
   const close = () => {
     setOpen(false)
     setError(null)
@@ -350,18 +352,18 @@ export function BugReportBar({
     setBusy(true)
     setError(null)
     try {
+      const retrying = ['needs_reconnect', 'failed'].includes(report.status)
+      const changingIdentity = retrying && identity !== report.authorIdentity
       if (
         report.status === 'draft'
-        || (
-          identity === 'github_user'
-          && ['needs_reconnect', 'failed'].includes(report.status)
-        )
+        || changingIdentity
+        || (identity === 'github_user' && retrying)
       ) {
         const selected = await requestJson<ReportResponse>(
           `/api/v1/bug-reports/${encodeURIComponent(report.submissionId)}`,
           {
             method: 'PATCH',
-            body: JSON.stringify(report.status === 'draft'
+            body: JSON.stringify(report.status === 'draft' || changingIdentity
               ? {
                   authorIdentity: identity,
                   ...(identity === 'github_user' ? { confirmGitHub } : {}),
@@ -635,7 +637,7 @@ export function BugReportBar({
                     type="radio"
                     name={`bug-report-identity-${report.submissionId}`}
                     checked={identity === 'github_user'}
-                    disabled={!editable || !connection?.connected || busy}
+                    disabled={!identityEditable || !connection?.connected || busy}
                     onChange={() => {
                       setIdentity('github_user')
                       setConfirmHosted(false)
@@ -669,10 +671,7 @@ export function BugReportBar({
                       checked={confirmGitHub}
                       disabled={
                         busy
-                        || (
-                          !editable
-                          && !['needs_reconnect', 'failed'].includes(report.status)
-                        )
+                        || !identityEditable
                       }
                       onChange={(event) => setConfirmGitHub(event.target.checked)}
                     />
@@ -684,7 +683,7 @@ export function BugReportBar({
                     type="radio"
                     name={`bug-report-identity-${report.submissionId}`}
                     checked={identity === 'hosted'}
-                    disabled={!editable || busy}
+                    disabled={!identityEditable || busy}
                     onChange={() => {
                       setIdentity('hosted')
                       setConfirmGitHub(false)
@@ -700,7 +699,7 @@ export function BugReportBar({
                     <input
                       type="checkbox"
                       checked={confirmHosted}
-                      disabled={!editable || busy}
+                      disabled={!identityEditable || busy}
                       onChange={(event) => setConfirmHosted(event.target.checked)}
                     />
                     <span>{t('platform.bugReport.hostedConfirm')}</span>

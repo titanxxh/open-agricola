@@ -161,6 +161,24 @@ describe('GitHubIssueClient', () => {
     )
   })
 
+  it('allows bounded clock skew when reconciling a marker', async () => {
+    const marker = '<!-- open-agricola-report:id -->'
+    const fetchImpl = vi.fn(async () => response([{
+      number: 17,
+      html_url: 'https://github.com/titanxxh/open-agricola-issues/issues/17',
+      body: `details\n\n${marker}`,
+      created_at: new Date(NOW - 60_000).toISOString(),
+      performed_via_github_app: { id: 1 },
+    }])) as unknown as typeof fetch
+
+    await expect(client(fetchImpl).findIssueByMarker(
+      'github_user',
+      marker,
+      NOW,
+      'user-token',
+    )).resolves.toMatchObject({ ok: true, number: 17 })
+  })
+
   it('ignores copied markers and Issues predating the delivery attempt', async () => {
     const marker = '<!-- open-agricola-report:id -->'
     const fetchImpl = vi.fn(async () => response([

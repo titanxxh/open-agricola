@@ -9,6 +9,7 @@ const API = 'https://api.github.com'
 const OWNER = 'titanxxh'
 const REPOSITORY = 'open-agricola-issues'
 const GITHUB_REQUEST_TIMEOUT_MS = 15_000
+const GITHUB_CREATED_AT_SKEW_MS = 5 * 60_000
 
 export type GitHubIssue = {
   number: number
@@ -298,7 +299,8 @@ export class GitHubIssueClient {
   ): Promise<GitHubIssueResult | { ok: true; found: false }> {
     const authorization = await this.issueToken(identity, userAccessToken)
     if (!authorization.ok) return authorization
-    const sinceSecond = Math.floor(since / 1000) * 1000
+    const earliestCreatedAt = Math.floor(since / 1000) * 1000
+      - GITHUB_CREATED_AT_SKEW_MS
     for (let page = 1; ; page += 1) {
       let response: Response
       try {
@@ -333,7 +335,7 @@ export class GitHubIssueClient {
         && issue.body.indexOf(marker) === issue.body.lastIndexOf(marker)
         && issue.body.match(/<!-- open-agricola-report:[^>\r\n]+ -->/g)?.length === 1
         && String(issue.performed_via_github_app?.id) === this.options.appId
-        && Date.parse(issue.created_at ?? '') >= sinceSecond
+        && Date.parse(issue.created_at ?? '') >= earliestCreatedAt
       ))
       if (
         match
@@ -356,7 +358,7 @@ export class GitHubIssueClient {
           code: 'github_reconciliation_uncertain',
         }
       }
-      if (oldest < sinceSecond) {
+      if (oldest < earliestCreatedAt) {
         return { ok: true, found: false }
       }
     }

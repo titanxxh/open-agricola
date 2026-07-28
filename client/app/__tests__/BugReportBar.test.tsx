@@ -306,6 +306,78 @@ describe('BugReportBar', () => {
       .toBeInTheDocument()
   })
 
+  it('allows an explicit hosted retry after GitHub authentication fails', async () => {
+    const user = userEvent.setup()
+    const patches: unknown[] = []
+    window.history.replaceState(null, '', '/?bugReport=submission-1')
+    vi.stubGlobal('fetch', vi.fn(async (
+      input: string | URL | Request,
+      init?: RequestInit,
+    ) => {
+      const url = String(input)
+      const method = init?.method ?? 'GET'
+      if (isConnectionStatusRequest(url)) {
+        return response({ ok: true, enabled: true, connected: false })
+      }
+      if (
+        url.endsWith('/api/v1/bug-reports/submission-1')
+        && method === 'GET'
+      ) {
+        return response({
+          ok: true,
+          report: report({
+            authorIdentity: 'github_user',
+            status: 'needs_reconnect',
+            lastErrorCode: 'github_connection_required',
+          }),
+        })
+      }
+      if (
+        url.endsWith('/api/v1/bug-reports/submission-1')
+        && method === 'PATCH'
+      ) {
+        patches.push(JSON.parse(String(init?.body)))
+        return response({
+          ok: true,
+          report: report({
+            authorIdentity: 'hosted',
+            status: 'needs_reconnect',
+          }),
+        })
+      }
+      if (url.endsWith('/api/v1/bug-reports/submission-1/submit')) {
+        return response({
+          ok: true,
+          report: report({
+            authorIdentity: 'hosted',
+            status: 'submitted',
+            issueNumber: 8,
+            issueUrl: 'https://github.com/titanxxh/open-agricola-issues/issues/8',
+          }),
+        })
+      }
+      throw new Error(`Unexpected request: ${method} ${url}`)
+    }))
+    renderBar({ roomId: 'room-1' })
+
+    const hosted = await screen.findByRole('radio', {
+      name: /Hosted Issue Identity/,
+    })
+    expect(hosted).toBeEnabled()
+    await user.click(hosted)
+    await user.click(screen.getByRole('checkbox', {
+      name: /public Issue will identify me/,
+    }))
+    await user.click(screen.getByRole('button', { name: 'Submit Issue' }))
+
+    expect(patches).toEqual([{
+      authorIdentity: 'hosted',
+      confirmHosted: true,
+    }])
+    expect(await screen.findByRole('link', { name: 'Open Issue #8' }))
+      .toBeInTheDocument()
+  })
+
   it('requires confirmation again after the connected GitHub account changes', async () => {
     const user = userEvent.setup()
     const patches: unknown[] = []

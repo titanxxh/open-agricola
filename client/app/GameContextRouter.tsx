@@ -1,6 +1,7 @@
 import {
   useCallback,
   useEffect,
+  useLayoutEffect,
   useRef,
   useState,
   type ReactNode,
@@ -77,6 +78,7 @@ function ReportedEvidenceContext({
     evidence: ReportedEvidenceResponse
   } | null>(null)
   const iframeRef = useRef<HTMLIFrameElement | null>(null)
+  const evidenceRef = useRef<ReportedEvidenceResponse | null>(null)
   const setIframe = useCallback((node: HTMLIFrameElement | null) => {
     iframeRef.current = node
   }, [])
@@ -119,20 +121,24 @@ function ReportedEvidenceContext({
   const evidence = resolution?.key === evidenceKey
     ? resolution.evidence
     : null
+  useLayoutEffect(() => {
+    evidenceRef.current = evidence
+  }, [evidence])
   useEffect(() => {
-    if (!evidence?.ok) return
     const onMessage = (event: MessageEvent) => {
       if (event.source !== iframeRef.current?.contentWindow) return
       const message = event.data as Partial<ReportedEvidenceViewerReadyMessage>
       if (message.type !== 'open-agricola-reported-evidence-ready') return
+      const currentEvidence = evidenceRef.current
+      if (!currentEvidence?.ok) return
       iframeRef.current?.contentWindow?.postMessage({
         type: 'open-agricola-reported-evidence',
-        evidence,
+        evidence: currentEvidence,
       } satisfies ReportedEvidenceViewerDataMessage, '*')
     }
     window.addEventListener('message', onMessage)
     return () => window.removeEventListener('message', onMessage)
-  }, [evidence])
+  }, [])
 
   if (!evidence) {
     return <GameLoadScreen percent={10} label={t('platform.loading')} />
