@@ -1194,7 +1194,7 @@ Workshop / Sandbox 后端（自定义卡上传、编译、PR 集成）。沙盒�
 
 `server/db.ts` —— SQLite 连接（`better-sqlite3`，按 Node 22 ABI 编译）。表：`rooms` / `users` / `sandbox_settings` / `sandbox_cards` / `custom_cards` / `pr_proposals` 等。
 
-ADR-0014 使用下一可用迁移增加九张表；首个正式 Replay `schemaVersion=1`，不保留未上线实验格式：
+ADR-0014 使用下一可用迁移增加十张表；首个正式 Replay `schemaVersion=1`，不保留未上线实验格式：
 
 | 表 | 所有事实 |
 |---|---|
@@ -1204,6 +1204,7 @@ ADR-0014 使用下一可用迁移增加九张表；首个正式 Replay `schemaVe
 | `game_replay_steps` | `roomId + stepNo`、`roomVersion`、`checkpointStepNo`、玩家座位、白名单 intent、payload kind/gzip、Frame Hash |
 | `issue_submission_connections` | GitHub 数字用户 id、AES-256-GCM token/refresh token、nonce/tag、`keyId`、过期与撤销状态 |
 | `account_deletion_requests` | 已提交删号请求、下一次外部清理时间和最后错误；账号先失效，GitHub 清理失败后由后台重试 |
+| `github_grant_revocations` | 删除竞态或临时失败后待重试的加密 GitHub grant |
 | `bug_reports` | 稳定 `submissionId`、Reporter 关联、Anchor、草稿、作者选择、交付状态、Issue 编号/URL、证据到期时间 |
 | `bug_report_attempts` | 30 天交付/对账/限流尝试元数据；不保存 token、现象副本或原始 GitHub 响应 |
 | `bug_report_evidence_audit` | 维护者、时间、Anchor、视角和非空理由，永久保留 |

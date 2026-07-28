@@ -11,6 +11,10 @@ import { StrictMode } from 'react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { GameContextRouter } from '../GameContextRouter'
 
+const replayBoardProps = vi.hoisted(() => ({
+  current: null as Record<string, unknown> | null,
+}))
+
 const localeContext = vi.hoisted(() => {
   const t = (key: string, params?: Record<string, string | number>) =>
     params
@@ -40,12 +44,24 @@ vi.mock('../../components/common/GameLoadScreen', () => ({
   GameLoadScreen: () => <div>loading</div>,
 }))
 
+vi.mock('../../services/card-meta', () => ({
+  loadCardsManifest: vi.fn(async () => {}),
+}))
+
+vi.mock('../../../replay-viewer/src/ReplayBoard', () => ({
+  ReplayBoard: (props: Record<string, unknown>) => {
+    replayBoardProps.current = props
+    return <div>reported evidence board</div>
+  },
+}))
+
 afterEach(() => {
   cleanup()
   vi.unstubAllGlobals()
   localeContext.locale = 'en'
   localeContext.t = localeContext.defaultT
   localeContext.setLocale.mockReset()
+  replayBoardProps.current = null
   window.history.replaceState(null, '', '/')
 })
 
@@ -394,6 +410,59 @@ describe('GameContextRouter', () => {
 
     expect(await screen.findByText(title)).toBeVisible()
     expect(screen.queryByText('active app')).not.toBeInTheDocument()
+  })
+
+  it('opens retained expired evidence in the authenticated participant view', async () => {
+    const frameHash = 'a'.repeat(64)
+    window.history.replaceState(
+      null,
+      '',
+      `/?context=expired-room&step=5&frame=${frameHash}&perspective=open`,
+    )
+    const frame = { round: 1, players: [{ id: 'p2' }] }
+    const fetch = vi.fn(async (input: string | URL | Request) => {
+      const url = String(input)
+      if (url.endsWith('/api/v1/game-contexts/expired-room')) {
+        return new Response(JSON.stringify({
+          ok: true,
+          roomId: 'expired-room',
+          lifecycle: 'expired',
+        }))
+      }
+      if (url.endsWith(
+        `/api/v1/game-contexts/expired-room/evidence/5?frame=${frameHash}`,
+      )) {
+        return new Response(JSON.stringify({
+          ok: true,
+          kind: 'reportedEvidence',
+          apiVersion: 1,
+          roomId: 'expired-room',
+          schemaVersion: 1,
+          viewerBuildId: 'viewer',
+          stepNo: 5,
+          frameHash,
+          perspective: 'p2',
+          frame,
+        }))
+      }
+      throw new Error(`Unexpected request: ${url}`)
+    })
+    vi.stubGlobal('fetch', fetch)
+
+    render(<GameContextRouter><div>active app</div></GameContextRouter>)
+
+    expect(await screen.findByText('reported evidence board')).toBeVisible()
+    expect(screen.getByText('platform.gameContext.reportedEvidenceTitle'))
+      .toBeVisible()
+    expect(replayBoardProps.current).toMatchObject({
+      frame,
+      locale: 'en',
+      perspective: 'p2',
+    })
+    expect(fetch).toHaveBeenCalledWith(
+      `/api/v1/game-contexts/expired-room/evidence/5?frame=${frameHash}`,
+      expect.objectContaining({ credentials: 'include' }),
+    )
   })
 
   it.each([

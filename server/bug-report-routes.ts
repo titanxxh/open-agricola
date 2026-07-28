@@ -16,8 +16,11 @@ import { projectReplayParticipantNames } from './game/replay-store.ts'
 import type { ReplayGameState } from '../shared/contract/protocol/replay.ts'
 import type { SerializedGameState } from '../shared/session/serialization.ts'
 import { filterSerializedStateForPlayer } from '../shared/session/serialization.ts'
+import { checkRateLimit } from './rate-limit.ts'
 
 const DRAFT_ROUTE = /^\/api\/v1\/game-contexts\/([^/]+)\/bug-reports$/
+const PARTICIPANT_EVIDENCE_ROUTE =
+  /^\/api\/v1\/game-contexts\/([^/]+)\/evidence\/(0|[1-9]\d*)$/
 const REPORT_ROUTE = /^\/api\/v1\/bug-reports\/([^/]+)$/
 const SUBMIT_ROUTE = /^\/api\/v1\/bug-reports\/([^/]+)\/submit$/
 const EVIDENCE_ROUTE = /^\/api\/v1\/bug-reports\/([^/]+)\/evidence\/inspect$/
@@ -30,6 +33,8 @@ const MAX_BODY_BYTES = 32 * 1024
 const MAX_WEBHOOK_BYTES = 1024 * 1024
 const EVIDENCE_INSPECTION_LIMIT = 30
 const EVIDENCE_INSPECTION_WINDOW_MS = 60 * 60 * 1000
+const ACCOUNT_REQUEST_LIMIT = 60
+const ACCOUNT_REQUEST_WINDOW_MS = 60 * 1000
 
 type BugReportRuntime = {
   db: Database.Database
@@ -44,6 +49,13 @@ type ReplayStepRow = {
   payload_kind: 'checkpoint' | 'delta'
   payload_gzip: Buffer
   frame_hash: string
+}
+
+type EvidenceAnchor = {
+  room_id: string
+  step_no: number
+  frame_hash: string
+  evidence_expires_at: number | null
 }
 
 const redactOpponentCardStateExtraData = (
@@ -158,6 +170,21 @@ const requireUser = (
   return user
 }
 
+const requireAccountRequest = (
+  res: ServerResponse,
+  user: AuthUser | null,
+  kind: 'mutation' | 'evidence',
+): AuthUser => {
+  const current = requireUser(res, user)
+  if (!checkRateLimit(`bug-report:${kind}:${current.id}`, {
+    windowMs: ACCOUNT_REQUEST_WINDOW_MS,
+    max: ACCOUNT_REQUEST_LIMIT,
+  })) {
+    throw new BugReportError('bug_report_rate_limited', 429)
+  }
+  return current
+}
+
 const decodeId = (raw: string): string => {
   try {
     const value = decodeURIComponent(raw)
@@ -228,59 +255,21 @@ const errorPayload = (error: BugReportError) => ({
   ...(error.retryAt === undefined ? {} : { retryAt: error.retryAt }),
 })
 
-const inspectEvidence = (
+const loadEvidenceFrame = (
   runtime: BugReportRuntime,
-  submissionId: string,
-  maintainer: AuthUser,
-  input: Record<string, unknown>,
-): unknown => {
-  assertKeys(input, ['perspective', 'reason'])
-  const report = runtime.store.reportForEvidence(submissionId)
-  if (!report) throw new BugReportError('bug_report_not_found', 404)
-  if (report.status !== 'submitted') {
-    throw new BugReportError('evidence_requires_submitted_report', 409)
-  }
+  report: EvidenceAnchor,
+  playerIndex: number | null,
+): SerializedGameState => {
   const now = Date.now()
-  const recentInspections = runtime.db.prepare(`
-    SELECT COUNT(*) AS count
-    FROM bug_report_evidence_audit
-    WHERE maintainer_user_id = ? AND created_at >= ?
-  `).get(
-    maintainer.id,
-    now - EVIDENCE_INSPECTION_WINDOW_MS,
-  ) as { count: number }
-  if (recentInspections.count >= EVIDENCE_INSPECTION_LIMIT) {
-    throw new BugReportError('rate_limited', 429)
-  }
-  const perspective = input.perspective === 'open' ? 'open' : 'reporter'
-  const reason = typeof input.reason === 'string' ? input.reason.trim() : ''
-  if (perspective === 'open' && !reason) {
-    throw new BugReportError('evidence_reason_required', 400)
-  }
-  runtime.db.prepare(`
-    INSERT INTO bug_report_evidence_audit (
-      submission_id, maintainer_user_id, maintainer_identity, room_id, step_no,
-      frame_hash, perspective, reason, created_at
-    )
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-  `).run(
-    submissionId,
-    maintainer.id,
-    maintainer.id,
-    report.room_id,
-    report.step_no,
-    report.frame_hash,
-    perspective,
-    reason || 'reporter perspective inspection',
-    now,
-  )
   const context = runtime.db.prepare(`
     SELECT lifecycle FROM game_contexts WHERE room_id = ?
   `).get(report.room_id) as { lifecycle: string } | undefined
   if (
     context?.lifecycle !== 'completed'
-    && report.evidence_expires_at !== null
-    && report.evidence_expires_at <= now
+    && (
+      report.evidence_expires_at === null
+      || report.evidence_expires_at <= now
+    )
   ) {
     throw new BugReportError('replay_segment_unavailable', 503)
   }
@@ -358,13 +347,66 @@ const inspectEvidence = (
     serialized as unknown as ReplayGameState,
     participantNames,
   ) as unknown as SerializedGameState
-  const reporterPlayerId = projected.players[report.player_index]?.id ?? null
-  const visible = perspective === 'open'
-    ? projected
-    : redactOpponentCardStateExtraData(
-        filterSerializedStateForPlayer(projected, reporterPlayerId),
-        reporterPlayerId,
-      )
+  if (playerIndex === null) return projected
+  const playerId = projected.players[playerIndex]?.id ?? null
+  if (!playerId) throw new BugReportError('not_participant', 403)
+  return redactOpponentCardStateExtraData(
+    filterSerializedStateForPlayer(projected, playerId),
+    playerId,
+  )
+}
+
+const inspectEvidence = (
+  runtime: BugReportRuntime,
+  submissionId: string,
+  maintainer: AuthUser,
+  input: Record<string, unknown>,
+): unknown => {
+  assertKeys(input, ['perspective', 'reason'])
+  const report = runtime.store.reportForEvidence(submissionId)
+  if (!report) throw new BugReportError('bug_report_not_found', 404)
+  if (report.status !== 'submitted') {
+    throw new BugReportError('evidence_requires_submitted_report', 409)
+  }
+  const now = Date.now()
+  const recentInspections = runtime.db.prepare(`
+    SELECT COUNT(*) AS count
+    FROM bug_report_evidence_audit
+    WHERE maintainer_user_id = ? AND created_at >= ?
+  `).get(
+    maintainer.id,
+    now - EVIDENCE_INSPECTION_WINDOW_MS,
+  ) as { count: number }
+  if (recentInspections.count >= EVIDENCE_INSPECTION_LIMIT) {
+    throw new BugReportError('rate_limited', 429)
+  }
+  const perspective = input.perspective === 'open' ? 'open' : 'reporter'
+  const reason = typeof input.reason === 'string' ? input.reason.trim() : ''
+  if (perspective === 'open' && !reason) {
+    throw new BugReportError('evidence_reason_required', 400)
+  }
+  runtime.db.prepare(`
+    INSERT INTO bug_report_evidence_audit (
+      submission_id, maintainer_user_id, maintainer_identity, room_id, step_no,
+      frame_hash, perspective, reason, created_at
+    )
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `).run(
+    submissionId,
+    maintainer.id,
+    maintainer.id,
+    report.room_id,
+    report.step_no,
+    report.frame_hash,
+    perspective,
+    reason || 'reporter perspective inspection',
+    now,
+  )
+  const visible = loadEvidenceFrame(
+    runtime,
+    report,
+    perspective === 'open' ? null : report.player_index,
+  )
   return {
     ok: true,
     submissionId,
@@ -373,6 +415,69 @@ const inspectEvidence = (
     frameHash: report.frame_hash,
     perspective,
     frame: visible,
+  }
+}
+
+const participantEvidence = (
+  runtime: BugReportRuntime,
+  roomId: string,
+  stepNo: number,
+  frameHash: string,
+  participant: AuthUser,
+): unknown => {
+  const context = runtime.db.prepare(`
+    SELECT lifecycle FROM game_contexts WHERE room_id = ?
+  `).get(roomId) as { lifecycle: string } | undefined
+  if (!context) throw new BugReportError('unknown_context', 404)
+  if (context.lifecycle !== 'active' && context.lifecycle !== 'expired') {
+    throw new BugReportError(`context_${context.lifecycle}`, 410)
+  }
+  const seat = (
+    context.lifecycle === 'active'
+      ? runtime.db.prepare(`
+          SELECT player_index
+          FROM room_players
+          WHERE room_id = ? AND user_id = ?
+        `).get(roomId, participant.id)
+      : runtime.db.prepare(`
+          SELECT player_index
+          FROM game_context_participants
+          WHERE room_id = ? AND user_id = ?
+        `).get(roomId, participant.id)
+  ) as { player_index: number } | undefined
+  if (!seat) throw new BugReportError('not_participant', 403)
+  const report = runtime.db.prepare(`
+    SELECT room_id, step_no, frame_hash, evidence_expires_at
+    FROM bug_reports
+    WHERE room_id = ?
+      AND step_no = ?
+      AND frame_hash = ?
+      AND lifecycle = 'active'
+      AND submitted_at IS NOT NULL
+    ORDER BY evidence_expires_at DESC
+    LIMIT 1
+  `).get(roomId, stepNo, frameHash) as EvidenceAnchor | undefined
+  if (!report) throw new BugReportError('anchor_mismatch', 409)
+  const replay = runtime.db.prepare(`
+    SELECT schema_version, viewer_build_id
+    FROM game_replays
+    WHERE room_id = ?
+  `).get(roomId) as {
+    schema_version: number
+    viewer_build_id: string
+  } | undefined
+  if (!replay) throw new BugReportError('replay_segment_unavailable', 503)
+  return {
+    ok: true,
+    kind: 'reportedEvidence',
+    apiVersion: 1,
+    roomId,
+    schemaVersion: replay.schema_version,
+    viewerBuildId: replay.viewer_build_id,
+    stepNo,
+    frameHash,
+    perspective: `p${seat.player_index + 1}`,
+    frame: loadEvidenceFrame(runtime, report, seat.player_index),
   }
 }
 
@@ -387,6 +492,7 @@ export async function handleBugReportRoute(
   const url = new URL(req.url, `http://${req.headers.host ?? 'localhost'}`)
   const pathname = url.pathname
   const isBugReportPath = pathname.includes('/bug-reports')
+    || PARTICIPANT_EVIDENCE_ROUTE.test(pathname)
     || pathname.startsWith('/api/v1/issue-submission-connection')
     || pathname === WEBHOOK_ROUTE
   if (!isBugReportPath) return false
@@ -473,8 +579,10 @@ export async function handleBugReportRoute(
     }
 
     if (pathname === CONNECTION_COMPLETE_ROUTE && req.method === 'POST') {
-      const current = requireUser(res, user)
-      if (!runtime?.github) throw new BugReportError('bug_report_unavailable', 503)
+      const current = requireAccountRequest(res, user, 'mutation')
+      if (!runtime?.github || !runtime.delivery) {
+        throw new BugReportError('bug_report_unavailable', 503)
+      }
       const body = await readJson(req)
       assertKeys(body, ['state', 'code'])
       const state = typeof body.state === 'string' ? body.state : ''
@@ -485,6 +593,7 @@ export async function handleBugReportRoute(
       const consumed = runtime.store.consumeConnectionState(state, current.id)
       if (!consumed) throw new BugReportError('oauth_state_invalid', 400)
       let accessToken: string | null = null
+      let connectionSaved = false
       try {
         const tokens = await runtime.github.exchangeCode(
           code,
@@ -494,18 +603,21 @@ export async function handleBugReportRoute(
         accessToken = tokens.accessToken
         const githubUserId = await runtime.github.githubUserId(tokens.accessToken)
         runtime.store.saveConnection(consumed.userId, githubUserId, tokens)
+        connectionSaved = true
         send(res, 200, {
           ok: true,
           enabled: true,
           ...runtime.store.connectionStatus(current.id),
         })
-      } catch (error) {
-        if (
-          accessToken
-          && error instanceof BugReportError
-          && error.code === 'account_deletion_pending'
-        ) {
-          await runtime.github.revokeUserGrant(accessToken)
+      } catch {
+        if (accessToken && !connectionSaved) {
+          try {
+            await runtime.delivery.revokeGrant(accessToken)
+          } catch (revocationError) {
+            if (!(revocationError instanceof BugReportError)) {
+              throw revocationError
+            }
+          }
         }
         throw new BugReportError('github_connection_failed', 502)
       }
@@ -535,7 +647,7 @@ export async function handleBugReportRoute(
     }
 
     if (pathname === CONNECTION_ROUTE && req.method === 'DELETE') {
-      const current = requireUser(res, user)
+      const current = requireAccountRequest(res, user, 'mutation')
       if (!runtime?.delivery) {
         throw new BugReportError('bug_report_unavailable', 503)
       }
@@ -545,7 +657,7 @@ export async function handleBugReportRoute(
     }
 
     if (pathname === CONNECTION_START_ROUTE && req.method === 'POST') {
-      const current = requireUser(res, user)
+      const current = requireAccountRequest(res, user, 'mutation')
       const github = runtime?.github
       if (!runtime || !github || !isBugReportRuntimeReady(runtime)) {
         throw new BugReportError('bug_report_unavailable', 503)
@@ -572,7 +684,29 @@ export async function handleBugReportRoute(
     }
 
     if (!runtime) throw new BugReportError('bug_report_unavailable', 503)
-    const current = requireUser(res, user)
+    const participantEvidenceMatch = PARTICIPANT_EVIDENCE_ROUTE.exec(pathname)
+    if (participantEvidenceMatch && req.method === 'GET') {
+      const current = requireAccountRequest(res, user, 'evidence')
+      const frameHash = url.searchParams.get('frame') ?? ''
+      if (!/^[a-f0-9]{64}$/.test(frameHash)) {
+        throw new BugReportError('anchor_mismatch', 409)
+      }
+      send(
+        res,
+        200,
+        participantEvidence(
+          runtime,
+          decodeId(participantEvidenceMatch[1]!),
+          Number(participantEvidenceMatch[2]),
+          frameHash,
+          current,
+        ),
+      )
+      return true
+    }
+    const current = req.method === 'GET'
+      ? requireUser(res, user)
+      : requireAccountRequest(res, user, 'mutation')
     const draftMatch = DRAFT_ROUTE.exec(pathname)
     if (draftMatch && req.method === 'POST') {
       if (!bugReportsEnabled() || !isBugReportRuntimeReady(runtime)) {

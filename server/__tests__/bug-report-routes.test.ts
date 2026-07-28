@@ -12,6 +12,7 @@ import {
 import { handleBugReportRoute } from '../bug-report-routes.ts'
 import { runMigrations } from '../db.ts'
 import { encodeReplayFrame } from '../game/replay-codec.ts'
+import { resetRateLimitsForTests } from '../rate-limit.ts'
 
 const FRAME_HASH = 'a'.repeat(64)
 const USER: AuthUser = { id: 'u1', username: 'u1', displayName: 'User 1' }
@@ -101,6 +102,7 @@ const invoke = async (
 const json = (res: MockResponse) => JSON.parse(res.body) as Record<string, unknown>
 
 beforeEach(() => {
+  resetRateLimitsForTests()
   vi.stubEnv('BUG_REPORTS_ENABLED', 'true')
   vi.stubEnv('PUBLIC_APP_ORIGIN', 'https://game.example/')
   vi.stubEnv('PUBLIC_API_BASE', 'https://api.example')
@@ -308,6 +310,32 @@ describe('bug report routes', () => {
     )
     expect(foreign.statusCode).toBe(403)
     expect(json(foreign)).toMatchObject({ code: 'bug_report_forbidden' })
+  })
+
+  it('rate-limits all bug-report mutations per account', async () => {
+    const created = await invoke(
+      'POST',
+      '/api/v1/game-contexts/active-room/bug-reports',
+      { phenomenon: 'The game froze' },
+    )
+    const submissionId = (json(created).report as { submissionId: string })
+      .submissionId
+    for (let index = 0; index < 59; index += 1) {
+      expect((await invoke(
+        'PATCH',
+        `/api/v1/bug-reports/${submissionId}`,
+        { phenomenon: `Problem ${index}` },
+      )).statusCode).toBe(200)
+    }
+
+    const limited = await invoke(
+      'PATCH',
+      `/api/v1/bug-reports/${submissionId}`,
+      { phenomenon: 'One mutation too many' },
+    )
+
+    expect(limited.statusCode).toBe(429)
+    expect(json(limited)).toMatchObject({ code: 'bug_report_rate_limited' })
   })
 
   it('finishes an existing draft with the flag off and remains idempotent', async () => {
@@ -565,6 +593,11 @@ describe('bug report routes', () => {
         accessTokenExpiresAt: now + 3_600_000,
       }
     })
+    revokeUserGrant.mockResolvedValueOnce({
+      ok: false,
+      kind: 'uncertain',
+      code: 'github_revocation_uncertain',
+    })
 
     const completed = await invoke(
       'POST',
@@ -576,6 +609,19 @@ describe('bug report routes', () => {
     expect(json(completed)).toMatchObject({ code: 'github_connection_failed' })
     expect(revokeUserGrant).toHaveBeenCalledWith('late-token')
     expect(store.connectionStatus(USER.id)).toEqual({ connected: false })
+    expect(db.prepare(`
+      SELECT COUNT(*) AS count FROM github_grant_revocations
+    `).get()).toEqual({ count: 1 })
+
+    db.prepare(`
+      UPDATE github_grant_revocations SET next_attempt_at = 0
+    `).run()
+    revokeUserGrant.mockResolvedValueOnce({ ok: true })
+    await runtime?.delivery?.retryGrantRevocation()
+
+    expect(db.prepare(`
+      SELECT COUNT(*) AS count FROM github_grant_revocations
+    `).get()).toEqual({ count: 0 })
   })
 
   it('validates signed webhooks and revokes the matching connection', async () => {
@@ -748,6 +794,10 @@ describe('bug report routes', () => {
       previousCheckpointStepNo: 5,
     })
     db.prepare(`
+      INSERT INTO room_players (room_id, user_id, player_index, joined_at)
+      VALUES ('active-room', ?, 1, ?)
+    `).run(OTHER.id, Date.now())
+    db.prepare(`
       UPDATE game_replay_steps
       SET payload_kind = ?, payload_gzip = ?, frame_hash = ?
       WHERE room_id = 'active-room' AND step_no = 5
@@ -780,6 +830,28 @@ describe('bug report routes', () => {
       .toEqual({ secret: 'own secret' })
     expect(reporterFrame.players[1]!.cardStates.B003_Moonshine!.extraData)
       .toBeUndefined()
+
+    const participantRead = await invoke(
+      'GET',
+      `/api/v1/game-contexts/active-room/evidence/5?frame=${encoded.frameHash}`,
+      null,
+      OTHER,
+    )
+    expect(participantRead.statusCode).toBe(200)
+    expect(json(participantRead)).toMatchObject({
+      kind: 'reportedEvidence',
+      roomId: 'active-room',
+      stepNo: 5,
+      frameHash: encoded.frameHash,
+      perspective: 'p2',
+    })
+    const participantFrame = json(participantRead).frame as {
+      players: Array<{ cardStates: Record<string, { extraData?: unknown }> }>
+    }
+    expect(participantFrame.players[0]!.cardStates.OwnCard!.extraData)
+      .toBeUndefined()
+    expect(participantFrame.players[1]!.cardStates.B003_Moonshine!.extraData)
+      .toEqual({ occ: 'SECRET_OCC' })
 
     const inspected = await invoke(
       'POST',
