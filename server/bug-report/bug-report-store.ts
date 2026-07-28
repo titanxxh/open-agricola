@@ -1193,7 +1193,10 @@ const neutralizeMentions = (value: string): string =>
       character === '\n' || character === '\r' || character === '\t'
         ? character
         : '')
-    .replace(/@(?=[A-Za-z0-9])/g, '@\u200B')
+    .replace(
+      /(?<![A-Za-z0-9_/:=?&#%+-])@([A-Za-z0-9](?:[A-Za-z0-9-]{0,38}))(?![A-Za-z0-9/-])/g,
+      '@\u200B$1',
+    )
 
 const code = (value: string | number): string =>
   `\`${String(value).replaceAll('`', "'")}\``

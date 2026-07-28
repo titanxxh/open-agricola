@@ -107,6 +107,12 @@ const clearResumeId = (): void => {
   window.history.replaceState(null, '', url)
 }
 
+const loginHref = (): string => {
+  const url = new URL(window.location.href)
+  url.searchParams.set('page', 'login')
+  return url.toString()
+}
+
 export function BugReportBar({
   roomId,
   stepNo,
@@ -128,6 +134,7 @@ export function BugReportBar({
   const [open, setOpen] = useState(false)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [authenticationRequired, setAuthenticationRequired] = useState(false)
   const connectionResult = new URLSearchParams(window.location.search)
     .get('bugReportConnection')
 
@@ -146,10 +153,14 @@ export function BugReportBar({
     )
       .then((result) => {
         if (cancelled) return
+        setAuthenticationRequired(false)
         setConnection(result)
       })
-      .catch(() => {
+      .catch((reason: unknown) => {
         if (cancelled) return
+        setAuthenticationRequired(
+          reason instanceof Error && reason.message === 'not_authenticated',
+        )
         setConnection({
           enabled: false,
           connected: false,
@@ -222,7 +233,15 @@ export function BugReportBar({
     return () => window.clearInterval(timer)
   }, [inFlightSubmissionId])
 
-  if (!roomId || (!connection?.enabled && !report)) return null
+  if (!roomId) return null
+  if (authenticationRequired) {
+    return (
+      <a className="bug-report-trigger" href={loginHref()}>
+        {t('platform.loginBtn')}
+      </a>
+    )
+  }
+  if (!connection?.enabled && !report) return null
 
   const phenomenonLength = Array.from(phenomenon.trim()).length
   const editable = !report || report.status === 'draft'

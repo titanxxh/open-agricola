@@ -79,10 +79,16 @@ function stripBasePath(pathname: string): string {
 }
 
 function currentReturnTo(): string | undefined {
-  const current = `${stripBasePath(window.location.pathname)}${window.location.search}${window.location.hash}`
   const params = new URLSearchParams(window.location.search)
   const page = params.get('page')
-  if (page === 'login' || page === 'onboarding') return undefined
+  if (page === 'onboarding') return undefined
+  if (page === 'login') {
+    if (!params.has('context')) return undefined
+    params.delete('page')
+    const search = params.toString()
+    return `${stripBasePath(window.location.pathname)}${search ? `?${search}` : ''}${window.location.hash}`
+  }
+  const current = `${stripBasePath(window.location.pathname)}${window.location.search}${window.location.hash}`
   return current.startsWith('/') ? current : undefined
 }
 

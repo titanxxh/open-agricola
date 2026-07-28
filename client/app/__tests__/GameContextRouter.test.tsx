@@ -66,6 +66,22 @@ describe('GameContextRouter', () => {
     expect(fetch).not.toHaveBeenCalled()
   })
 
+  it('mounts login without resolving the preserved replay context', () => {
+    window.history.replaceState(
+      null,
+      '',
+      '/?page=login&context=completed-room&step=4&bugReport=draft-1',
+    )
+    const fetch = vi.fn()
+    vi.stubGlobal('fetch', fetch)
+
+    render(<GameContextRouter><div>login app</div></GameContextRouter>)
+
+    expect(screen.getByText('login app')).toBeVisible()
+    expect(fetch).not.toHaveBeenCalled()
+    expect(window.location.search).toContain('context=completed-room')
+  })
+
   it('routes active contexts through the authenticated app', async () => {
     window.history.replaceState(null, '', '/?context=active-room')
     stubResponse({
@@ -378,6 +394,61 @@ describe('GameContextRouter', () => {
 
     expect(await screen.findByText(title)).toBeVisible()
     expect(screen.queryByText('active app')).not.toBeInTheDocument()
+  })
+
+  it('reopens a saved draft after its active context expires', async () => {
+    window.history.replaceState(
+      null,
+      '',
+      '/?context=expired-room&bugReport=submission-1',
+    )
+    const fetch = vi.fn(async (input: string | URL | Request) => {
+      const url = String(input)
+      if (url.endsWith('/api/v1/game-contexts/expired-room')) {
+        return new Response(JSON.stringify({
+          ok: true,
+          roomId: 'expired-room',
+          lifecycle: 'expired',
+        }))
+      }
+      if (url.includes('/api/v1/issue-submission-connection?')) {
+        return new Response(JSON.stringify({
+          ok: true,
+          enabled: false,
+          connected: false,
+        }))
+      }
+      if (url.endsWith('/api/v1/bug-reports/submission-1')) {
+        return new Response(JSON.stringify({
+          ok: true,
+          report: {
+            submissionId: 'submission-1',
+            roomId: 'expired-room',
+            reporterUserId: 'u1',
+            playerIndex: 0,
+            lifecycle: 'active',
+            roomVersion: 8,
+            stepNo: 5,
+            frameHash: 'a'.repeat(64),
+            phenomenon: 'The game froze',
+            authorIdentity: null,
+            status: 'draft',
+            issueNumber: null,
+            issueUrl: null,
+            lastErrorCode: null,
+          },
+        }))
+      }
+      throw new Error(`Unexpected request: ${url}`)
+    })
+    vi.stubGlobal('fetch', fetch)
+
+    render(<GameContextRouter><div>active app</div></GameContextRouter>)
+
+    expect(await screen.findByText('platform.gameContext.expiredTitle'))
+      .toBeVisible()
+    expect(await screen.findByText('platform.bugReport.title')).toBeVisible()
+    expect(screen.getByDisplayValue('The game froze')).toBeVisible()
   })
 
   it('completes bug-report OAuth before routing an expired context', async () => {
