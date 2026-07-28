@@ -181,13 +181,18 @@ describe('replay removal', () => {
 
     const ledger = readFileSync(ledgerPath, 'utf8').trim().split('\n')
     expect(ledger).toHaveLength(1)
-    expect(JSON.parse(ledger[0]!)).toEqual([{
+    expect(JSON.parse(ledger[0]!)).toEqual({
       version: 1,
-      roomId: 'room-one',
-      reason: 'legal',
-      removedAt: 200,
-      assetHashes: [hash],
-    }])
+      entries: [{
+        version: 1,
+        roomId: 'room-one',
+        reason: 'legal',
+        removedAt: 200,
+        assetHashes: [hash],
+        eraseResult: false,
+      }],
+      assetTakedowns: [],
+    })
 
     expect(removeReplay(db, {
       roomId: 'room-one',
@@ -253,8 +258,84 @@ describe('replay removal', () => {
     ])
     const batches = readFileSync(ledgerPath, 'utf8').trim().split('\n')
     expect(batches).toHaveLength(1)
-    expect(JSON.parse(batches[0]!)).toHaveLength(2)
+    expect(JSON.parse(batches[0]!)).toMatchObject({
+      assetTakedowns: [{
+        hash: sharedHash,
+        reason: 'legal',
+        removedAt: 200,
+      }],
+    })
+    expect(JSON.parse(batches[0]!).entries).toHaveLength(2)
     expect(existsSync(join(assetRoot, sharedHash))).toBe(false)
+  })
+
+  it('uses a tombstoned room to take down every remaining reference to an offending asset', () => {
+    const db = createDb()
+    const sharedHash = writeAsset('later-offending-art')
+    seedReplay(db, 'room-one', [sharedHash])
+    seedReplay(db, 'room-two', [sharedHash])
+    removeReplay(db, {
+      roomId: 'room-one',
+      reason: 'moderation',
+      assetRoot,
+      ledgerPath,
+      now: () => 100,
+    })
+
+    expect(removeReplay(db, {
+      roomId: 'room-one',
+      reason: 'legal',
+      assetHash: sharedHash,
+      assetRoot,
+      ledgerPath,
+      now: () => 200,
+    })).toMatchObject({
+      alreadyRemoved: false,
+      roomIds: ['room-one', 'room-two'],
+      deletedAssetHashes: [sharedHash],
+    })
+    expect(db.prepare(`
+      SELECT lifecycle FROM game_contexts WHERE room_id = 'room-two'
+    `).get()).toEqual({ lifecycle: 'removed' })
+    const batches = readFileSync(ledgerPath, 'utf8').trim().split('\n')
+      .map((line) => JSON.parse(line))
+    expect(batches[1].assetTakedowns).toEqual([{
+      hash: sharedHash,
+      reason: 'legal',
+      removedAt: 200,
+    }])
+  })
+
+  it('durably deletes the result archive for an explicit full-record legal erasure', () => {
+    const live = createDb()
+    const restored = createDb()
+    seedReplay(live, 'room-one')
+    seedReplay(restored, 'room-one')
+
+    removeReplay(live, {
+      roomId: 'room-one',
+      reason: 'legal',
+      assetRoot,
+      ledgerPath,
+      now: () => 100,
+    })
+    live.prepare("DELETE FROM game_results WHERE room_id = 'room-one'").run()
+    removeReplay(live, {
+      roomId: 'room-one',
+      reason: 'legal',
+      eraseResult: true,
+      assetRoot,
+      ledgerPath,
+      now: () => 200,
+    })
+    expect(live.prepare(`
+      SELECT COUNT(*) AS count FROM game_results WHERE room_id = 'room-one'
+    `).get()).toEqual({ count: 0 })
+
+    applyReplayRemovalLedger(restored, { assetRoot, ledgerPath })
+    expect(restored.prepare(`
+      SELECT COUNT(*) AS count FROM game_results WHERE room_id = 'room-one'
+    `).get()).toEqual({ count: 0 })
   })
 
   it('clears participant identities when an asset sweep removes an active replay', () => {
@@ -325,6 +406,7 @@ describe('replay removal', () => {
       entries: 1,
       removedRoomIds: ['room-one'],
       deletedAssetHashes: [hash],
+      assetTakedownHashes: [],
     })
     expect(restored.prepare(`
       SELECT lifecycle, removal_reason
@@ -347,6 +429,71 @@ describe('replay removal', () => {
       code: 'context_removed',
     })
     expect(existsSync(join(assetRoot, hash))).toBe(false)
+  })
+
+  it('applies asset takedown rules to extra restored replays and records them', () => {
+    const live = createDb()
+    const restored = createDb()
+    const hash = writeAsset('durably-offending-art')
+    seedReplay(live, 'room-one', [hash])
+    seedReplay(restored, 'room-one', [hash])
+    seedReplay(restored, 'room-restored-only', [hash])
+    removeReplay(live, {
+      roomId: 'room-one',
+      reason: 'legal',
+      assetHash: hash,
+      assetRoot,
+      ledgerPath,
+      now: () => 200,
+    })
+    writeFileSync(join(assetRoot, hash), 'durably-offending-art')
+
+    expect(applyReplayRemovalLedger(restored, {
+      assetRoot,
+      ledgerPath,
+    })).toMatchObject({
+      entries: 2,
+      removedRoomIds: ['room-one', 'room-restored-only'],
+      deletedAssetHashes: [hash],
+      assetTakedownHashes: [hash],
+    })
+    expect(restored.prepare(`
+      SELECT room_id, lifecycle FROM game_contexts ORDER BY room_id
+    `).all()).toEqual([
+      { room_id: 'room-one', lifecycle: 'removed' },
+      { room_id: 'room-restored-only', lifecycle: 'removed' },
+    ])
+    expect(readFileSync(ledgerPath, 'utf8').trim().split('\n')).toHaveLength(2)
+  })
+
+  it('does not let unrelated corrupt replay metadata block ledger replay', () => {
+    const live = createDb()
+    const restored = createDb()
+    seedReplay(live, 'room-one')
+    seedReplay(restored, 'room-one')
+    seedReplay(restored, 'corrupt-room')
+    restored.prepare(`
+      UPDATE game_replays SET custom_cards_json = '{bad'
+      WHERE room_id = 'corrupt-room'
+    `).run()
+    removeReplay(live, {
+      roomId: 'room-one',
+      reason: 'moderation',
+      assetRoot,
+      ledgerPath,
+      now: () => 200,
+    })
+
+    expect(applyReplayRemovalLedger(restored, {
+      assetRoot,
+      ledgerPath,
+    })).toMatchObject({
+      entries: 1,
+      removedRoomIds: ['room-one'],
+    })
+    expect(restored.prepare(`
+      SELECT lifecycle FROM game_contexts WHERE room_id = 'corrupt-room'
+    `).get()).toEqual({ lifecycle: 'completed' })
   })
 
   it('rolls back a torn final batch and rejects corrupt committed batches', () => {

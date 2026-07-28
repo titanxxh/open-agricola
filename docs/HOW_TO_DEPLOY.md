@@ -650,6 +650,23 @@ docker compose -f docker-compose.prod.yml cp \
 docker compose -f docker-compose.prod.yml up -d app
 ```
 
+法律请求明确要求删除 Game Result Archive 时，仅可使用 `legal` 原因并追加 `--erase-result`；该模式不能和 `--asset-hash` 组合：
+
+```bash
+OA_ROOM_ID=replace-with-exact-room-id
+docker compose -f docker-compose.prod.yml stop app
+docker compose -f docker-compose.prod.yml run --rm --no-deps app \
+  node --import tsx scripts/replay-removal.ts remove \
+  --room-id "$OA_ROOM_ID" --reason legal --erase-result --dry-run
+docker compose -f docker-compose.prod.yml run --rm --no-deps app \
+  node --import tsx scripts/replay-removal.ts remove \
+  --room-id "$OA_ROOM_ID" --reason legal --erase-result
+mkdir -p backups
+docker compose -f docker-compose.prod.yml cp \
+  app:/app/data/replay-removals.jsonl backups/replay-removals.latest.jsonl
+docker compose -f docker-compose.prod.yml up -d app
+```
+
 若违规对象是自定义卡图片本身，再传精确的 64 位内容 Hash；dry-run 会列出所有引用该资源、将一并 Tombstone 的 Room：
 
 ```bash
@@ -669,7 +686,7 @@ docker compose -f docker-compose.prod.yml cp \
 docker compose -f docker-compose.prod.yml up -d app
 ```
 
-操作幂等；普通整局下架只删除不再被其他 Replay 引用的资源。成功后立即异机备份最新 `replay-removals.jsonl`。
+资产下架可使用 ledger 已证明引用关系的既有 Tombstone Room 作为入口。违规 Hash 会作为永久规则写入 ledger：旧备份恢复时自动下架新增引用，后续 Room 也不能重新归档同一内容。操作幂等；普通整局下架只删除不再被其他 Replay 引用的资源。成功后立即异机备份最新 `replay-removals.jsonl`。
 
 ### Bug Report token 密钥轮换
 

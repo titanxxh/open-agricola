@@ -54,6 +54,28 @@ describe('replay removal CLI', () => {
     ])).toThrow('invalid replay asset hash')
   })
 
+  it('accepts explicit full-record erasure only for a legal room removal', () => {
+    expect(parseReplayRemovalArgs([
+      'remove',
+      '--room-id',
+      'room-one',
+      '--reason',
+      'legal',
+      '--erase-result',
+    ])).toMatchObject({
+      command: 'remove',
+      eraseResult: true,
+    })
+    expect(() => parseReplayRemovalArgs([
+      'remove',
+      '--room-id',
+      'room-one',
+      '--reason',
+      'moderation',
+      '--erase-result',
+    ])).toThrow('--erase-result requires legal reason')
+  })
+
   it('keeps ledger replay as a separate no-target command', () => {
     expect(parseReplayRemovalArgs(['apply-ledger'])).toEqual({
       command: 'apply-ledger',
