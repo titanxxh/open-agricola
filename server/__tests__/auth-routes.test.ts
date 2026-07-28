@@ -63,6 +63,12 @@ vi.mock('../db.ts', () => {
       expires_at INTEGER NOT NULL,
       created_at INTEGER NOT NULL
     );
+    CREATE TABLE account_deletion_requests (
+      user_id TEXT PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+      requested_at INTEGER NOT NULL,
+      next_attempt_at INTEGER NOT NULL,
+      last_error_code TEXT
+    );
     CREATE TABLE email_verification_tokens (
       token_hash TEXT PRIMARY KEY,
       user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -192,7 +198,21 @@ vi.mock('../db.ts', () => {
       room_id TEXT NOT NULL REFERENCES game_contexts(room_id),
       github_issue_number INTEGER,
       submitted_at INTEGER,
-      phenomenon TEXT
+      phenomenon TEXT,
+      author_identity TEXT,
+      confirmed_github_user_id TEXT,
+      status TEXT NOT NULL DEFAULT 'draft',
+      discarded_at INTEGER,
+      claim_token TEXT,
+      claimed_at INTEGER,
+      next_attempt_at INTEGER,
+      last_error_code TEXT,
+      updated_at INTEGER
+    );
+    CREATE TABLE issue_submission_connections (
+      user_id TEXT PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+      revoked_at INTEGER,
+      updated_at INTEGER NOT NULL DEFAULT 0
     );
     CREATE TABLE game_replays (
       room_id TEXT PRIMARY KEY REFERENCES game_contexts(room_id),
@@ -527,6 +547,63 @@ describe('auth routes', () => {
     expect(
       (getDb().prepare('SELECT COUNT(*) AS n FROM users WHERE id = ?').get(user.id) as { n: number }).n,
     ).toBe(0)
+  })
+
+  it('persists and disables account deletion while GitHub cleanup is unavailable', async () => {
+    const user = await createLocalUserForTests('delete_pending', 'password123', 'Delete Pending')
+    linkIdentity(user.id, {
+      provider: 'github',
+      providerUserId: 'gh-delete-pending',
+      emailVerified: true,
+    })
+    const token = createSession(user.id)
+    const now = Date.now()
+    getDb().prepare(`
+      INSERT INTO game_contexts (
+        room_id, lifecycle, phase, replay_status, created_at, updated_at
+      ) VALUES (?, 'completed', NULL, 'available', ?, ?)
+    `).run('pending-room', now, now)
+    getDb().prepare(`
+      INSERT INTO bug_reports (
+        submission_id, reporter_user_id, room_id, github_issue_number,
+        submitted_at, phenomenon, status, updated_at
+      ) VALUES (?, ?, ?, 7, ?, ?, 'submitted', ?)
+    `).run(
+      'pending-submission',
+      user.id,
+      'pending-room',
+      now,
+      'The game froze',
+      now,
+    )
+    getDb().prepare(`
+      INSERT INTO issue_submission_connections (user_id, updated_at)
+      VALUES (?, ?)
+    `).run(user.id, now)
+
+    const res = await requestJson('DELETE', '/api/auth/account', undefined, {
+      Cookie: `${SESSION_COOKIE}=${token}`,
+    })
+
+    expect(res.status).toBe(202)
+    expect(res.json).toEqual({ ok: true, pending: true })
+    expect(res.headers['Set-Cookie']).toContain(`${SESSION_COOKIE}=;`)
+    expect(validateSession(token)).toBeNull()
+    expect(() => createSession(user.id)).toThrow(/account deletion pending/)
+    expect(findIdentity('github', 'gh-delete-pending')).toBeNull()
+    expect(getDb().prepare(`
+      SELECT last_error_code FROM account_deletion_requests WHERE user_id = ?
+    `).get(user.id)).toEqual({ last_error_code: null })
+    expect(getDb().prepare(`
+      SELECT revoked_at FROM issue_submission_connections WHERE user_id = ?
+    `).get(user.id)).toMatchObject({ revoked_at: expect.any(Number) })
+    expect(getDb().prepare(`
+      SELECT reporter_user_id, phenomenon
+      FROM bug_reports WHERE submission_id = 'pending-submission'
+    `).get()).toEqual({
+      reporter_user_id: user.id,
+      phenomenon: null,
+    })
   })
 
   it('uses cross-site cookie attributes for production frontend and backend origins', async () => {
