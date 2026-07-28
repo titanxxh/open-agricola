@@ -17,6 +17,14 @@ import { ReplayShell } from './ReplayShell'
 
 export const GAME_CONTEXT_CHANGED_EVENT = 'open-agricola:game-context-changed'
 
+const finishBugReportOAuth = (result: 'connected' | 'error'): void => {
+  const url = new URL(window.location.href)
+  url.hash = ''
+  url.searchParams.set('bugReportConnection', result)
+  window.history.replaceState(null, '', url)
+  window.dispatchEvent(new PopStateEvent('popstate'))
+}
+
 const statusPage = (
   roomId: string,
   title: string,
@@ -126,6 +134,34 @@ export function GameContextRouter({ children }: { children: ReactNode }) {
     key: string
     response: GameContextResponse
   } | null>(null)
+
+  useEffect(() => {
+    const fragment = new URLSearchParams(window.location.hash.slice(1))
+    const state = fragment.get('bugReportOAuthState')
+    const code = fragment.get('bugReportOAuthCode')
+    if (!state || !code) return
+    const controller = new AbortController()
+    void fetch(
+      `${API_BASE}/api/v1/issue-submission-connection/github/complete`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ state, code }),
+        credentials: 'include',
+        signal: controller.signal,
+      },
+    )
+      .then(async (response) => {
+        const body = await response.json().catch(() => ({})) as { ok?: boolean }
+        if (!response.ok || body.ok !== true) throw new Error('request_failed')
+        finishBugReportOAuth('connected')
+      })
+      .catch((error: unknown) => {
+        if (error instanceof DOMException && error.name === 'AbortError') return
+        finishBugReportOAuth('error')
+      })
+    return () => controller.abort()
+  }, [])
 
   useEffect(() => {
     const refresh = () => setLocationVersion((version) => version + 1)
