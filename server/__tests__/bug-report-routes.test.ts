@@ -672,11 +672,17 @@ describe('bug report routes', () => {
         name: 'Original Name',
         minorHand: ['A'],
         occupationHand: ['B'],
+        cardStates: {
+          OwnCard: { extraData: { secret: 'own secret' } },
+        },
       }, {
         id: 'p2',
         name: 'Other Name',
         minorHand: ['C'],
         occupationHand: ['D'],
+        cardStates: {
+          B003_Moonshine: { extraData: { occ: 'SECRET_OCC' } },
+        },
       }],
       log: [{
         key: 'log.test',
@@ -688,6 +694,10 @@ describe('bug report routes', () => {
         playerName: 'Original Name',
         total: 42,
       }],
+      events: [],
+      publicEventArchive: [],
+      ordinaryCardDecks: { occupation: [], minor: [] },
+      ordinaryCardDrawChoices: {},
       engineStack: { frames: [] },
     }
     const encoded = encodeReplayFrame({
@@ -713,6 +723,23 @@ describe('bug report routes', () => {
       WHERE room_id = 'active-room' AND player_index = 0
     `).run()
 
+    const reporterInspected = await invoke(
+      'POST',
+      `/api/v1/bug-reports/${submissionId}/evidence/inspect`,
+      { perspective: 'reporter' },
+      USER,
+      {},
+      true,
+    )
+    expect(reporterInspected.statusCode).toBe(200)
+    const reporterFrame = json(reporterInspected).frame as {
+      players: Array<{ cardStates: Record<string, { extraData?: unknown }> }>
+    }
+    expect(reporterFrame.players[0]!.cardStates.OwnCard!.extraData)
+      .toEqual({ secret: 'own secret' })
+    expect(reporterFrame.players[1]!.cardStates.B003_Moonshine!.extraData)
+      .toBeUndefined()
+
     const inspected = await invoke(
       'POST',
       `/api/v1/bug-reports/${submissionId}/evidence/inspect`,
@@ -731,6 +758,10 @@ describe('bug report routes', () => {
       log: [{ params: { player: 'Deleted player (seat 1)' } }],
       scores: [{ playerName: 'Deleted player (seat 1)' }],
     })
+    expect((json(inspected).frame as {
+      players: Array<{ cardStates: Record<string, { extraData?: unknown }> }>
+    }).players[1]!.cardStates.B003_Moonshine!.extraData)
+      .toEqual({ occ: 'SECRET_OCC' })
     db.prepare(`
       DELETE FROM game_context_participants WHERE room_id = 'active-room'
     `).run()

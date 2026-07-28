@@ -46,6 +46,25 @@ type ReplayStepRow = {
   frame_hash: string
 }
 
+const redactOpponentCardStateExtraData = (
+  state: SerializedGameState,
+  viewerPlayerId: string | null,
+): SerializedGameState => ({
+  ...state,
+  players: state.players.map((player) =>
+    player.id === viewerPlayerId
+      ? player
+      : {
+          ...player,
+          cardStates: Object.fromEntries(
+            Object.entries(player.cardStates ?? {}).map(([cardId, cardState]) => [
+              cardId,
+              { ...cardState, extraData: undefined },
+            ]),
+          ),
+        }),
+})
+
 export const bugReportsEnabled = (): boolean =>
   process.env.BUG_REPORTS_ENABLED === '1'
   || process.env.BUG_REPORTS_ENABLED === 'true'
@@ -339,11 +358,12 @@ const inspectEvidence = (
     serialized as unknown as ReplayGameState,
     participantNames,
   ) as unknown as SerializedGameState
+  const reporterPlayerId = projected.players[report.player_index]?.id ?? null
   const visible = perspective === 'open'
     ? projected
-    : filterSerializedStateForPlayer(
-        projected,
-        projected.players[report.player_index]?.id ?? null,
+    : redactOpponentCardStateExtraData(
+        filterSerializedStateForPlayer(projected, reporterPlayerId),
+        reporterPlayerId,
       )
   return {
     ok: true,

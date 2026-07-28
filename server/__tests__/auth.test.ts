@@ -581,6 +581,24 @@ describe('auth', () => {
       expect(result.ok).toBe(false)
     })
 
+    it('rejects login when account deletion wins the session race', async () => {
+      const pending = login('logintest', 'correctpass')
+      const user = getDb().prepare(
+        'SELECT id FROM users WHERE username = ?',
+      ).get('logintest') as { id: string }
+      const now = Date.now()
+      getDb().prepare(`
+        INSERT INTO account_deletion_requests (
+          user_id, requested_at, next_attempt_at, last_error_code
+        ) VALUES (?, ?, ?, NULL)
+      `).run(user.id, now, now)
+
+      await expect(pending).resolves.toMatchObject({
+        ok: false,
+        code: 'invalid_login',
+      })
+    })
+
     it('is case-insensitive for username', async () => {
       const result = await login('LOGINTEST', 'correctpass')
       expect(result.ok).toBe(true)

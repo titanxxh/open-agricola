@@ -245,6 +245,9 @@ export function verifyEmailToken(rawToken: string): LoginResult {
     db.prepare('UPDATE users SET email_verified_at = ?, last_login_at = ? WHERE id = ?').run(now, now, row.user_id)
     return createSession(row.user_id)
   })()
+  if (!session) {
+    return { ok: false, code: 'invalid_or_expired_token', error: 'Invalid or expired token' }
+  }
 
   return {
     ok: true,
@@ -373,7 +376,7 @@ export async function createLocalUserForTests(
   return { id, username, displayName: name }
 }
 
-export function createSession(userId: string): string {
+export function createSession(userId: string): string | null {
   const now = Date.now()
   const token = randomUUID()
   const db = getDb()
@@ -384,8 +387,7 @@ export function createSession(userId: string): string {
       SELECT 1 FROM account_deletion_requests WHERE user_id = ?
     )
   `).run(token, userId, now + SESSION_TTL_MS, now, userId)
-  if (result.changes !== 1) throw new Error('account deletion pending')
-  return token
+  return result.changes === 1 ? token : null
 }
 
 export async function login(username: string, password: string): Promise<LoginResult> {
@@ -419,6 +421,9 @@ export async function login(username: string, password: string): Promise<LoginRe
 
   const now = Date.now()
   const token = createSession(row.id)
+  if (!token) {
+    return { ok: false, code: 'invalid_login', error: 'Invalid username or password' }
+  }
   db.prepare('UPDATE users SET last_login_at = ? WHERE id = ?').run(now, row.id)
 
   return {
