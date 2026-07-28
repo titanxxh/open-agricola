@@ -1,5 +1,6 @@
 import { createHash } from 'node:crypto'
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { readFile } from 'node:fs/promises'
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -7,6 +8,11 @@ import { Writable } from 'node:stream'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { handleReplayRoute, ReplayReadLimiter } from '../../replay-routes.ts'
 import type { ReplayStore } from '../replay-store.ts'
+
+vi.mock('node:fs/promises', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('node:fs/promises')>()
+  return { ...actual, readFile: vi.fn(actual.readFile) }
+})
 
 type CapturedResponse = {
   status: number
@@ -233,6 +239,21 @@ describe('public replay routes', () => {
     }))).status).toBe(404)
     writeFileSync(join(assetRoot, hash), 'tampered')
     expect((await handleStream(request(`/replay-assets/${hash}`))).status).toBe(503)
+  })
+
+  it('coalesces concurrent cold replay asset verification', async () => {
+    const image = Buffer.from([137, 80, 78, 71, 13, 10, 26, 10, 2])
+    const hash = createHash('sha256').update(image).digest('hex')
+    writeFileSync(join(assetRoot, hash), image)
+    const readsBefore = vi.mocked(readFile).mock.calls.length
+
+    const results = await Promise.all([
+      handleStream(request(`/replay-assets/${hash}`)),
+      handleStream(request(`/replay-assets/${hash}`)),
+    ])
+
+    expect(results.map(({ status }) => status)).toEqual([200, 200])
+    expect(vi.mocked(readFile).mock.calls.length - readsBefore).toBe(1)
   })
 
   it('applies an independent per-IP replay read limit', () => {

@@ -76,6 +76,7 @@ GAME_BUILD_ID=
 ```
 
 后端直接暴露端口时保持 `REPLAY_TRUST_PROXY=false`。只有后端仅能经可信 Caddy/Nginx 到达，且代理会覆盖 `X-Forwarded-For` 时才设为 `true`。
+仓库的 `docker-compose.prod.yml` 使用隔离的 Caddy 作为唯一入口，因此已固定为 `REPLAY_TRUST_PROXY=true`。
 
 首次启用 Replay 时必须使用 `PERSIST_ROOMS=sqlite`。先生成并追加发布 Viewer Build：
 
@@ -206,7 +207,7 @@ docker compose logs -f app
          - REPLAY_VIEWER_BUILD_ID=${REPLAY_VIEWER_BUILD_ID:-}
          - REPLAY_VIEWER_ROOT=${REPLAY_VIEWER_ROOT:-./data/replay-viewers}
          - REPLAY_ASSET_ROOT=${REPLAY_ASSET_ROOT:-./data/replay-assets}
-         - REPLAY_TRUST_PROXY=${REPLAY_TRUST_PROXY:-false}
+         - REPLAY_TRUST_PROXY=true
          - GAME_BUILD_ID=${GAME_BUILD_ID:-}
          - CORS_ORIGIN=https://YOUR_USER.github.io
        volumes:
