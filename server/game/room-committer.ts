@@ -183,9 +183,13 @@ const archiveReplayAsset = (
   artUrl: string,
   assetRoot: string,
   cardArtRoot: string,
+  removedAssetHashes: ReadonlySet<string>,
 ): string => {
   const archived = REPLAY_ASSET_URL_PATTERN.exec(artUrl)
   if (archived) {
+    if (removedAssetHashes.has(archived[1]!)) {
+      throw new ReplayAssetValidationError('replay asset has been removed')
+    }
     const content = readFileSync(join(assetRoot, archived[1]!))
     if (sha256(content) !== archived[1]) {
       throw new ReplayAssetValidationError('archived custom card art is corrupt')
@@ -201,6 +205,9 @@ const archiveReplayAsset = (
   }
   const content = readFileSync(join(cardArtRoot, filename))
   const hash = sha256(content)
+  if (removedAssetHashes.has(hash)) {
+    throw new ReplayAssetValidationError('replay asset has been removed')
+  }
   mkdirSync(assetRoot, { recursive: true })
   const target = join(assetRoot, hash)
   try {
@@ -218,10 +225,18 @@ const archiveCustomCardDefs = (
   definitions: CustomCardDef[],
   assetRoot: string,
   cardArtRoot: string,
+  removedAssetHashes: ReadonlySet<string>,
 ): CustomCardDef[] => definitions.map((definition) => ({
   ...definition,
   ...(definition.artUrl
-    ? { artUrl: archiveReplayAsset(definition.artUrl, assetRoot, cardArtRoot) }
+    ? {
+        artUrl: archiveReplayAsset(
+          definition.artUrl,
+          assetRoot,
+          cardArtRoot,
+          removedAssetHashes,
+        ),
+      }
     : {}),
 }))
 
@@ -245,6 +260,7 @@ export class RoomCommitter {
   private readonly viewerBuildExists: (viewerBuildId: string) => boolean
   private readonly assetRoot: string
   private readonly cardArtRoot: string
+  private readonly removedAssetHashes: ReadonlySet<string>
   private readonly scheduler: RoomCommitScheduler
   private readonly now: () => number
   private readonly heads = new Map<string, RoomHead>()
@@ -262,6 +278,7 @@ export class RoomCommitter {
     viewerBuildExists: (viewerBuildId: string) => boolean
     assetRoot?: string
     cardArtRoot?: string
+    removedAssetHashes?: ReadonlySet<string>
     scheduler?: RoomCommitScheduler
     now?: () => number
   }) {
@@ -272,6 +289,7 @@ export class RoomCommitter {
     this.viewerBuildExists = deps.viewerBuildExists
     this.assetRoot = deps.assetRoot ?? join(process.cwd(), 'data', 'replay-assets')
     this.cardArtRoot = deps.cardArtRoot ?? join(process.cwd(), 'data', 'card-art')
+    this.removedAssetHashes = deps.removedAssetHashes ?? new Set()
     this.scheduler = deps.scheduler ?? defaultScheduler
     this.now = deps.now ?? Date.now
   }
@@ -417,6 +435,7 @@ export class RoomCommitter {
       room.session.getCustomCardDefs(),
       this.assetRoot,
       this.cardArtRoot,
+      this.removedAssetHashes,
     ))
     const commit: ReplayCommit = {
       roomId: room.id,

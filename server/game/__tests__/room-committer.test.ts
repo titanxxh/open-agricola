@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto'
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -75,6 +76,7 @@ describe('RoomCommitter', () => {
     gameBuildId?: string
     assetRoot?: string
     cardArtRoot?: string
+    removedAssetHashes?: ReadonlySet<string>
   } = {}) => new RoomCommitter({
     persistence,
     enabled: options.enabled ?? true,
@@ -83,6 +85,7 @@ describe('RoomCommitter', () => {
     viewerBuildExists: options.viewerBuildExists ?? (() => true),
     assetRoot: options.assetRoot,
     cardArtRoot: options.cardArtRoot,
+    removedAssetHashes: options.removedAssetHashes,
     scheduler: options.scheduler,
     now: () => 1_000,
   })
@@ -303,6 +306,39 @@ describe('RoomCommitter', () => {
     const hash = definition!.artUrl.slice('/replay-assets/'.length)
     expect(hash).toMatch(/^[a-f0-9]{64}$/)
     expect(readFileSync(join(assetRoot, hash))).toEqual(Buffer.from('custom-art'))
+  })
+
+  it('rejects custom card art whose content hash has been taken down', () => {
+    const cardArtRoot = join(tempDir, 'card-art')
+    const assetRoot = join(tempDir, 'replay-assets')
+    const art = Buffer.from('removed-art')
+    const hash = createHash('sha256').update(art).digest('hex')
+    mkdirSync(cardArtRoot)
+    writeFileSync(join(cardArtRoot, 'removed.webp'), art)
+    const room = makeRoom()
+    room.session = new GameSession(587, [{
+      cardType: 'minor',
+      cardJson: {
+        id: 'CUSTOM_RemovedArt',
+        name: 'Removed Art',
+        deck: 'CUSTOM',
+        number: 1,
+        desc: [],
+      },
+      artUrl: '/card-art/removed.webp',
+    }], { playerCount: 2 })
+    const committer = createCommitter({
+      assetRoot,
+      cardArtRoot,
+      removedAssetHashes: new Set([hash]),
+    })
+    committer.lockNewRoom(room)
+
+    expect(committer.prepareRoom(room, { missingPrefix: false })).toEqual({
+      kind: 'blocked',
+      error: 'unable to archive custom card art: replay asset has been removed',
+    })
+    expect(existsSync(join(assetRoot, hash))).toBe(false)
   })
 
   it('retries transient custom card art archival failures', () => {
