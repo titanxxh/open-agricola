@@ -1,0 +1,611 @@
+// @vitest-environment jsdom
+import { act, cleanup, render, screen, waitFor } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
+import { afterEach, describe, expect, it, vi } from 'vitest'
+import { LocaleProvider } from '../../contexts/LocaleContext'
+import { BugReportBar } from '../BugReportBar'
+
+const FRAME_HASH = 'a'.repeat(64)
+
+const response = (body: unknown, status = 200) =>
+  new Response(JSON.stringify(body), {
+    status,
+    headers: { 'Content-Type': 'application/json' },
+  })
+
+const isConnectionStatusRequest = (url: string): boolean =>
+  new URL(url, 'http://localhost').pathname
+    === '/api/v1/issue-submission-connection'
+
+const report = (overrides: Record<string, unknown> = {}) => ({
+  submissionId: 'submission-1',
+  roomId: 'room-1',
+  reporterUserId: 'site-user-1',
+  playerIndex: 0,
+  lifecycle: 'active',
+  roomVersion: 8,
+  stepNo: 5,
+  frameHash: FRAME_HASH,
+  phenomenon: 'The game froze',
+  authorIdentity: null,
+  status: 'draft',
+  issueNumber: null,
+  issueUrl: null,
+  lastErrorCode: null,
+  ...overrides,
+})
+
+const renderBar = (props: { roomId: string; stepNo?: number; frameHash?: string }) => {
+  window.localStorage.setItem('open-agricola-locale-v2', 'en')
+  return render(
+    <LocaleProvider>
+      <BugReportBar {...props} />
+    </LocaleProvider>,
+  )
+}
+
+afterEach(() => {
+  cleanup()
+  vi.useRealTimers()
+  vi.unstubAllGlobals()
+  window.localStorage.clear()
+  window.history.replaceState(null, '', '/')
+})
+
+describe('BugReportBar', () => {
+  it('requires a phenomenon and submits one hosted Issue from a server-fixed active anchor', async () => {
+    const user = userEvent.setup()
+    const calls: Array<{ url: string; method: string; body: unknown }> = []
+    const fetchMock = vi.fn(async (input: string | URL | Request, init?: RequestInit) => {
+      const url = String(input)
+      const method = init?.method ?? 'GET'
+      const body = init?.body ? JSON.parse(String(init.body)) : null
+      calls.push({ url, method, body })
+      if (isConnectionStatusRequest(url)) {
+        return response({ ok: true, enabled: true, connected: false })
+      }
+      if (url.endsWith('/api/v1/game-contexts/room-1/bug-reports')) {
+        return response({ ok: true, report: report({ phenomenon: body.phenomenon }) }, 201)
+      }
+      if (url.endsWith('/api/v1/bug-reports/submission-1') && method === 'PATCH') {
+        return response({
+          ok: true,
+          report: report({ authorIdentity: body.authorIdentity }),
+        })
+      }
+      if (url.endsWith('/api/v1/bug-reports/submission-1/submit')) {
+        return response({
+          ok: true,
+          report: report({
+            authorIdentity: 'hosted',
+            status: 'submitted',
+            issueNumber: 7,
+            issueUrl: 'https://github.com/titanxxh/open-agricola-issues/issues/7',
+          }),
+        })
+      }
+      throw new Error(`Unexpected request: ${method} ${url}`)
+    })
+    vi.stubGlobal('fetch', fetchMock)
+    renderBar({ roomId: 'room-1' })
+
+    await user.click(await screen.findByRole('button', { name: 'Report a bug' }))
+    const next = screen.getByRole('button', { name: 'Continue' })
+    expect(next).toBeDisabled()
+    await user.type(
+      screen.getByLabelText('Describe what happened in one sentence'),
+      'The game froze',
+    )
+    await user.click(next)
+
+    expect(await screen.findByText('Automatic game context')).toBeInTheDocument()
+    expect(screen.getByText('site-user-1')).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Continue' }))
+    await user.click(screen.getByRole('radio', { name: /Hosted Issue Identity/ }))
+    await user.click(screen.getByRole('checkbox', { name: /public Issue/ }))
+    await user.click(screen.getByRole('button', { name: 'Submit Issue' }))
+
+    expect(await screen.findByRole('link', { name: 'Open Issue #7' }))
+      .toHaveAttribute(
+        'href',
+        'https://github.com/titanxxh/open-agricola-issues/issues/7',
+      )
+    const create = calls.find(({ url }) =>
+      url.endsWith('/api/v1/game-contexts/room-1/bug-reports'))
+    expect(create?.body).toEqual({ phenomenon: 'The game froze' })
+    expect(calls.filter(({ url }) =>
+      url.endsWith('/api/v1/bug-reports/submission-1/submit'))).toHaveLength(1)
+  })
+
+  it('sends the exact completed replay anchor and preserves the draft for GitHub connection', async () => {
+    const user = userEvent.setup()
+    let createBody: unknown
+    const fetchMock = vi.fn(async (input: string | URL | Request, init?: RequestInit) => {
+      const url = String(input)
+      if (isConnectionStatusRequest(url)) {
+        return response({ ok: true, enabled: true, connected: false })
+      }
+      if (url.endsWith('/api/v1/game-contexts/room-1/bug-reports')) {
+        createBody = JSON.parse(String(init?.body))
+        return response({
+          ok: true,
+          report: report({
+            lifecycle: 'completed',
+            roomVersion: 12,
+            stepNo: 21,
+            phenomenon: 'Wrong score',
+          }),
+        }, 201)
+      }
+      if (url.endsWith('/api/v1/issue-submission-connection/github/start')) {
+        expect(init?.method).toBe('POST')
+        expect(JSON.parse(String(init?.body))).toEqual({
+          submissionId: 'submission-1',
+        })
+        return response({
+          ok: true,
+          authorizationUrl: '#github-authorize',
+        })
+      }
+      throw new Error(`Unexpected request: ${url}`)
+    })
+    vi.stubGlobal('fetch', fetchMock)
+    renderBar({ roomId: 'room-1', stepNo: 21, frameHash: FRAME_HASH })
+
+    await user.click(await screen.findByRole('button', { name: 'Report a bug' }))
+    await user.type(
+      screen.getByLabelText('Describe what happened in one sentence'),
+      'Wrong score',
+    )
+    await user.click(screen.getByRole('button', { name: 'Continue' }))
+    await user.click(await screen.findByRole('button', { name: 'Continue' }))
+
+    await user.click(screen.getByRole('button', { name: 'Connect GitHub' }))
+    expect(createBody).toEqual({
+      phenomenon: 'Wrong score',
+      stepNo: 21,
+      frameHash: FRAME_HASH,
+    })
+    expect(window.location.search).toContain('bugReport=submission-1')
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(3))
+  })
+
+  it('does not expose an entry when new reports are disabled', async () => {
+    const fetchMock = vi.fn(async () =>
+      response({ ok: true, enabled: false, connected: false }))
+    vi.stubGlobal('fetch', fetchMock)
+    renderBar({ roomId: 'room-1' })
+
+    await waitFor(() => {
+      expect(screen.queryByRole('button', { name: 'Report a bug' }))
+        .not.toBeInTheDocument()
+    })
+    expect(fetchMock).toHaveBeenCalledWith(
+      expect.stringContaining(
+        '/api/v1/issue-submission-connection?roomId=room-1',
+      ),
+      expect.objectContaining({ credentials: 'include' }),
+    )
+  })
+
+  it('offers anchor-preserving sign in when a replay participant is logged out', async () => {
+    window.history.replaceState(
+      null,
+      '',
+      `/?context=completed-room&step=21&frame=${FRAME_HASH}&perspective=p1`,
+    )
+    vi.stubGlobal('fetch', vi.fn(async () =>
+      response({ ok: false, code: 'not_authenticated' }, 401)))
+    renderBar({
+      roomId: 'completed-room',
+      stepNo: 21,
+      frameHash: FRAME_HASH,
+    })
+
+    const link = await screen.findByRole('link', { name: 'Sign In' })
+    const url = new URL(link.getAttribute('href')!)
+    expect(url.searchParams.get('page')).toBe('login')
+    expect(url.searchParams.get('context')).toBe('completed-room')
+    expect(url.searchParams.get('step')).toBe('21')
+    expect(url.searchParams.get('frame')).toBe(FRAME_HASH)
+    expect(url.searchParams.get('perspective')).toBe('p1')
+  })
+
+  it('offers GitHub reconnection when an in-flight user report loses authentication', async () => {
+    vi.useFakeTimers()
+    window.history.replaceState(null, '', '/?bugReport=submission-1')
+    let reportReads = 0
+    vi.stubGlobal('fetch', vi.fn(async (input: string | URL | Request) => {
+      const url = String(input)
+      if (isConnectionStatusRequest(url)) {
+        return response({
+          ok: true,
+          enabled: true,
+          connected: true,
+          githubUserId: '99',
+        })
+      }
+      if (url.endsWith('/api/v1/bug-reports/submission-1')) {
+        reportReads += 1
+        return response({
+          ok: true,
+          report: report({
+            authorIdentity: 'github_user',
+            status: reportReads === 1 ? 'queued' : 'needs_reconnect',
+          }),
+        })
+      }
+      throw new Error(`Unexpected request: ${url}`)
+    }))
+    renderBar({ roomId: 'room-1' })
+
+    await act(async () => {})
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(3000)
+    })
+
+    expect(screen.getByRole('button', { name: 'Connect GitHub' }))
+      .toBeInTheDocument()
+  })
+
+  it('offers GitHub reconnection when submission immediately loses authentication', async () => {
+    const user = userEvent.setup()
+    window.history.replaceState(null, '', '/?bugReport=submission-1')
+    vi.stubGlobal('fetch', vi.fn(async (
+      input: string | URL | Request,
+      init?: RequestInit,
+    ) => {
+      const url = String(input)
+      if (isConnectionStatusRequest(url)) {
+        return response({
+          ok: true,
+          enabled: true,
+          connected: true,
+          githubUserId: '99',
+        })
+      }
+      if (
+        url.endsWith('/api/v1/bug-reports/submission-1')
+        && (init?.method ?? 'GET') === 'GET'
+      ) {
+        return response({
+          ok: true,
+          report: report({ authorIdentity: 'github_user' }),
+        })
+      }
+      if (url.endsWith('/api/v1/bug-reports/submission-1')) {
+        return response({
+          ok: true,
+          report: report({ authorIdentity: 'github_user' }),
+        })
+      }
+      if (url.endsWith('/api/v1/bug-reports/submission-1/submit')) {
+        return response({
+          ok: true,
+          report: report({
+            authorIdentity: 'github_user',
+            status: 'needs_reconnect',
+            lastErrorCode: 'github_auth_invalid',
+          }),
+        }, 202)
+      }
+      throw new Error(`Unexpected request: ${url}`)
+    }))
+    renderBar({ roomId: 'room-1' })
+
+    const submit = await screen.findByRole('button', {
+      name: 'Submit Issue',
+    })
+    expect(submit).toBeDisabled()
+    await user.click(screen.getByRole('checkbox', {
+      name: /GitHub will show my GitHub account/,
+    }))
+    await user.click(submit)
+
+    expect(await screen.findByRole('button', { name: 'Connect GitHub' }))
+      .toBeInTheDocument()
+  })
+
+  it('allows an explicit hosted retry after GitHub authentication fails', async () => {
+    const user = userEvent.setup()
+    const patches: unknown[] = []
+    window.history.replaceState(null, '', '/?bugReport=submission-1')
+    vi.stubGlobal('fetch', vi.fn(async (
+      input: string | URL | Request,
+      init?: RequestInit,
+    ) => {
+      const url = String(input)
+      const method = init?.method ?? 'GET'
+      if (isConnectionStatusRequest(url)) {
+        return response({ ok: true, enabled: true, connected: false })
+      }
+      if (
+        url.endsWith('/api/v1/bug-reports/submission-1')
+        && method === 'GET'
+      ) {
+        return response({
+          ok: true,
+          report: report({
+            authorIdentity: 'github_user',
+            status: 'needs_reconnect',
+            lastErrorCode: 'github_connection_required',
+          }),
+        })
+      }
+      if (
+        url.endsWith('/api/v1/bug-reports/submission-1')
+        && method === 'PATCH'
+      ) {
+        patches.push(JSON.parse(String(init?.body)))
+        return response({
+          ok: true,
+          report: report({
+            authorIdentity: 'hosted',
+            status: 'needs_reconnect',
+          }),
+        })
+      }
+      if (url.endsWith('/api/v1/bug-reports/submission-1/submit')) {
+        return response({
+          ok: true,
+          report: report({
+            authorIdentity: 'hosted',
+            status: 'submitted',
+            issueNumber: 8,
+            issueUrl: 'https://github.com/titanxxh/open-agricola-issues/issues/8',
+          }),
+        })
+      }
+      throw new Error(`Unexpected request: ${method} ${url}`)
+    }))
+    renderBar({ roomId: 'room-1' })
+
+    const hosted = await screen.findByRole('radio', {
+      name: /Hosted Issue Identity/,
+    })
+    expect(hosted).toBeEnabled()
+    await user.click(hosted)
+    await user.click(screen.getByRole('checkbox', {
+      name: /public Issue will identify me/,
+    }))
+    await user.click(screen.getByRole('button', { name: 'Submit Issue' }))
+
+    expect(patches).toEqual([{
+      authorIdentity: 'hosted',
+      confirmHosted: true,
+    }])
+    expect(await screen.findByRole('link', { name: 'Open Issue #8' }))
+      .toBeInTheDocument()
+  })
+
+  it('requires confirmation again after the connected GitHub account changes', async () => {
+    const user = userEvent.setup()
+    const patches: unknown[] = []
+    window.history.replaceState(null, '', '/?bugReport=submission-1')
+    vi.stubGlobal('fetch', vi.fn(async (
+      input: string | URL | Request,
+      init?: RequestInit,
+    ) => {
+      const url = String(input)
+      const method = init?.method ?? 'GET'
+      const changed = report({
+        authorIdentity: 'github_user',
+        status: 'needs_reconnect',
+        lastErrorCode: 'github_identity_confirmation_required',
+      })
+      if (isConnectionStatusRequest(url)) {
+        return response({
+          ok: true,
+          enabled: true,
+          connected: true,
+          githubUserId: '100',
+        })
+      }
+      if (
+        url.endsWith('/api/v1/bug-reports/submission-1')
+        && method === 'GET'
+      ) {
+        return response({ ok: true, report: changed })
+      }
+      if (
+        url.endsWith('/api/v1/bug-reports/submission-1')
+        && method === 'PATCH'
+      ) {
+        patches.push(JSON.parse(String(init?.body)))
+        return response({ ok: true, report: changed })
+      }
+      if (url.endsWith('/api/v1/bug-reports/submission-1/submit')) {
+        return response({
+          ok: true,
+          report: report({
+            authorIdentity: 'github_user',
+            status: 'submitted',
+            issueNumber: 7,
+            issueUrl: 'https://github.com/titanxxh/open-agricola-issues/issues/7',
+          }),
+        })
+      }
+      throw new Error(`Unexpected request: ${method} ${url}`)
+    }))
+    renderBar({ roomId: 'room-1' })
+
+    const confirmation = await screen.findByRole('checkbox', {
+      name: /GitHub will show my GitHub account/,
+    })
+    expect(confirmation).not.toBeChecked()
+    expect(confirmation).toBeEnabled()
+    expect(screen.queryByRole('button', { name: 'Connect GitHub' }))
+      .not.toBeInTheDocument()
+
+    await user.click(confirmation)
+    await user.click(screen.getByRole('button', { name: 'Submit Issue' }))
+
+    expect(patches).toEqual([{ confirmGitHub: true }])
+  })
+
+  it('shows a matching open Issue and records the explicit new-Issue choice', async () => {
+    const user = userEvent.setup()
+    const calls: Array<{ method: string; body: unknown }> = []
+    vi.stubGlobal('fetch', vi.fn(async (
+      input: string | URL | Request,
+      init?: RequestInit,
+    ) => {
+      const url = String(input)
+      const method = init?.method ?? 'GET'
+      const body = init?.body ? JSON.parse(String(init.body)) : null
+      calls.push({ method, body })
+      if (isConnectionStatusRequest(url)) {
+        return response({ ok: true, enabled: true, connected: false })
+      }
+      if (url.endsWith('/api/v1/game-contexts/room-1/bug-reports')) {
+        return response({
+          ok: true,
+          report: report({ phenomenon: 'The game froze' }),
+          existingIssues: [{
+            number: 7,
+            url: 'https://github.com/titanxxh/open-agricola-issues/issues/7',
+          }],
+        }, 201)
+      }
+      if (
+        url.endsWith('/api/v1/bug-reports/submission-1')
+        && method === 'PATCH'
+      ) {
+        return response({
+          ok: true,
+          report: report({ phenomenon: 'The game froze' }),
+          existingIssues: [{
+            number: 7,
+            url: 'https://github.com/titanxxh/open-agricola-issues/issues/7',
+          }],
+        })
+      }
+      throw new Error(`Unexpected request: ${method} ${url}`)
+    }))
+    renderBar({ roomId: 'room-1' })
+
+    await user.click(await screen.findByRole('button', { name: 'Report a bug' }))
+    await user.type(
+      screen.getByLabelText('Describe what happened in one sentence'),
+      'The game froze',
+    )
+    await user.click(screen.getByRole('button', { name: 'Continue' }))
+
+    expect(await screen.findByRole('link', { name: 'Open Issue #7' }))
+      .toHaveAttribute(
+        'href',
+        'https://github.com/titanxxh/open-agricola-issues/issues/7',
+      )
+    await user.click(screen.getByRole('button', {
+      name: 'Continue with a new Issue',
+    }))
+
+    expect(calls).toContainEqual({
+      method: 'PATCH',
+      body: { confirmExisting: true },
+    })
+    expect(await screen.findByText('Choose the Issue author'))
+      .toBeInTheDocument()
+  })
+
+  it('retries a frozen failed report without patching public fields', async () => {
+    const user = userEvent.setup()
+    window.history.replaceState(null, '', '/?bugReport=submission-1')
+    const methods: string[] = []
+    vi.stubGlobal('fetch', vi.fn(async (
+      input: string | URL | Request,
+      init?: RequestInit,
+    ) => {
+      const url = String(input)
+      const method = init?.method ?? 'GET'
+      methods.push(method)
+      if (isConnectionStatusRequest(url)) {
+        return response({ ok: true, enabled: true, connected: false })
+      }
+      if (
+        url.endsWith('/api/v1/bug-reports/submission-1')
+        && method === 'GET'
+      ) {
+        return response({
+          ok: true,
+          report: report({
+            authorIdentity: 'hosted',
+            status: 'failed',
+            lastErrorCode: 'github_permission_denied',
+          }),
+          existingIssues: [],
+        })
+      }
+      if (url.endsWith('/api/v1/bug-reports/submission-1/submit')) {
+        return response({
+          ok: true,
+          report: report({
+            authorIdentity: 'hosted',
+            status: 'submitted',
+            issueNumber: 8,
+            issueUrl: 'https://github.com/titanxxh/open-agricola-issues/issues/8',
+          }),
+        })
+      }
+      throw new Error(`Unexpected request: ${method} ${url}`)
+    }))
+    renderBar({ roomId: 'room-1' })
+
+    await user.click(await screen.findByRole('button', { name: 'Submit Issue' }))
+
+    expect(await screen.findByRole('link', { name: 'Open Issue #8' }))
+      .toBeInTheDocument()
+    expect(methods).not.toContain('PATCH')
+  })
+
+  it('recovers the authoritative queued report after a lost submit response', async () => {
+    const user = userEvent.setup()
+    window.history.replaceState(null, '', '/?bugReport=submission-1')
+    let reportReads = 0
+    vi.stubGlobal('fetch', vi.fn(async (
+      input: string | URL | Request,
+      init?: RequestInit,
+    ) => {
+      const url = String(input)
+      const method = init?.method ?? 'GET'
+      if (isConnectionStatusRequest(url)) {
+        return response({ ok: true, enabled: true, connected: false })
+      }
+      if (url.endsWith('/api/v1/bug-reports/submission-1/submit')) {
+        throw new Error('response lost')
+      }
+      if (
+        url.endsWith('/api/v1/bug-reports/submission-1')
+        && method === 'GET'
+      ) {
+        reportReads += 1
+        return response({
+          ok: true,
+          report: report({
+            authorIdentity: 'hosted',
+            status: reportReads === 1 ? 'draft' : 'queued',
+          }),
+          existingIssues: [],
+        })
+      }
+      if (
+        url.endsWith('/api/v1/bug-reports/submission-1')
+        && method === 'PATCH'
+      ) {
+        return response({
+          ok: true,
+          report: report({ authorIdentity: 'hosted' }),
+          existingIssues: [],
+        })
+      }
+      throw new Error(`Unexpected request: ${method} ${url}`)
+    }))
+    renderBar({ roomId: 'room-1' })
+
+    await user.click(await screen.findByRole('button', { name: 'Submit Issue' }))
+
+    await waitFor(() => expect(reportReads).toBe(2))
+    expect(screen.getByText('Submitting…')).toBeInTheDocument()
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+  })
+})

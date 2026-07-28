@@ -53,6 +53,12 @@ vi.mock('../db.ts', () => {
       expires_at INTEGER NOT NULL,
       created_at INTEGER NOT NULL
     );
+    CREATE TABLE account_deletion_requests (
+      user_id TEXT PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+      requested_at INTEGER NOT NULL,
+      next_attempt_at INTEGER NOT NULL,
+      last_error_code TEXT
+    );
     CREATE TABLE email_verification_tokens (
       token_hash TEXT PRIMARY KEY,
       user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -139,6 +145,30 @@ vi.mock('../db.ts', () => {
       joined_at INTEGER NOT NULL,
       PRIMARY KEY (room_id, user_id)
     );
+    CREATE TABLE game_contexts (
+      room_id TEXT PRIMARY KEY,
+      lifecycle TEXT NOT NULL
+    );
+    CREATE TABLE game_context_participants (
+      room_id TEXT NOT NULL REFERENCES game_contexts(room_id) ON DELETE CASCADE,
+      player_index INTEGER NOT NULL,
+      user_id TEXT REFERENCES users(id) ON DELETE SET NULL,
+      PRIMARY KEY (room_id, player_index)
+    );
+    CREATE TRIGGER preserve_game_context_participants_before_room_delete
+    BEFORE DELETE ON rooms
+    WHEN EXISTS (
+      SELECT 1 FROM game_contexts
+      WHERE room_id = OLD.id AND lifecycle = 'active'
+    )
+    BEGIN
+      INSERT OR IGNORE INTO game_context_participants (
+        room_id, player_index, user_id
+      )
+      SELECT OLD.id, player_index, user_id
+      FROM room_players
+      WHERE room_id = OLD.id;
+    END;
     CREATE TABLE game_results (
       room_id TEXT PRIMARY KEY,
       started_at INTEGER NOT NULL,
@@ -551,6 +581,24 @@ describe('auth', () => {
       expect(result.ok).toBe(false)
     })
 
+    it('rejects login when account deletion wins the session race', async () => {
+      const pending = login('logintest', 'correctpass')
+      const user = getDb().prepare(
+        'SELECT id FROM users WHERE username = ?',
+      ).get('logintest') as { id: string }
+      const now = Date.now()
+      getDb().prepare(`
+        INSERT INTO account_deletion_requests (
+          user_id, requested_at, next_attempt_at, last_error_code
+        ) VALUES (?, ?, ?, NULL)
+      `).run(user.id, now, now)
+
+      await expect(pending).resolves.toMatchObject({
+        ok: false,
+        code: 'invalid_login',
+      })
+    })
+
     it('is case-insensitive for username', async () => {
       const result = await login('LOGINTEST', 'correctpass')
       expect(result.ok).toBe(true)
@@ -799,6 +847,10 @@ describe('auth', () => {
       db.prepare('INSERT INTO room_players (room_id, user_id, player_index, joined_at) VALUES (?, ?, ?, ?)')
         .run('joined-room', other.id, 0, now)
       db.prepare(`
+        INSERT INTO game_contexts (room_id, lifecycle)
+        VALUES ('owned-room', 'active'), ('joined-room', 'active')
+      `).run()
+      db.prepare(`
         INSERT INTO game_results (
           room_id, started_at, finished_at, rounds_played, player_count,
           enable_community_deck, enable_parent_cards, enable_through_the_seasons, enable_farmers_of_the_moor
@@ -853,6 +905,15 @@ describe('auth', () => {
       expect(count('SELECT COUNT(*) AS n FROM auth_identities WHERE user_id = ?', user.id)).toBe(0)
       expect(count('SELECT COUNT(*) AS n FROM oauth_states WHERE user_id = ?', user.id)).toBe(0)
       expect(count('SELECT COUNT(*) AS n FROM room_players WHERE user_id = ?', user.id)).toBe(0)
+      expect(db.prepare(`
+        SELECT room_id, player_index, user_id
+        FROM game_context_participants
+        ORDER BY room_id, player_index
+      `).all()).toEqual([
+        { room_id: 'joined-room', player_index: 0, user_id: other.id },
+        { room_id: 'joined-room', player_index: 1, user_id: null },
+        { room_id: 'owned-room', player_index: 0, user_id: null },
+      ])
       expect(db.prepare(`
         SELECT user_id, display_name
         FROM game_result_players

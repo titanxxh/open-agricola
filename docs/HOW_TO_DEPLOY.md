@@ -111,6 +111,30 @@ docker compose -f docker-compose.prod.yml up -d --force-recreate app
 
 清单、内容 Hash 或入口校验失败时拒绝创建新 Room。开关、Build ID 和自定义卡运行时版本在 Room 创建时锁定；自定义卡图复制到 `REPLAY_ASSET_ROOT` 的内容寻址文件。已有 Replay Room 会继续按锁定值记录，开关关闭期间不会迁移旧进行局。
 
+Bug Report 使用独立 GitHub App，只安装到 `titanxxh/open-agricola-issues`：
+
+1. Repository permissions 只开启 `Issues: Read and write`，安装范围只选 issues-only 仓库。
+2. Callback URL 设为 `<PUBLIC_API_BASE>/api/v1/issue-submission-connection/github/callback`。
+3. Webhook URL 设为 `<PUBLIC_API_BASE>/api/v1/github-app/webhook`，配置独立 webhook secret，并订阅 GitHub App authorization 和 Issues 事件。
+4. 在 `.env` 填写 App ID、Client ID/secret、单行 `\n` 转义的 private key、webhook secret、installation ID 和 issues-only repository ID。
+5. 生成 32 字节随机加密密钥，使用 JSON key ring 配置 `BUG_REPORT_TOKEN_ENCRYPTION_KEYS`，并让 `BUG_REPORT_TOKEN_ACTIVE_KEY_ID` 指向其中一个 key。
+6. 保持 `BUG_REPORTS_ENABLED=false` 启动并完成迁移；验证 Hosted 与本人 GitHub 两条链路后再改为 `true`。关闭开关只隐藏新入口，不会丢弃既有草稿或交付队列。
+
+启用后，`PUBLIC_APP_ORIGIN` 缺失或不是有效的 HTTP(S) 前端地址会让健康检查返回 `503`，并暂停 OAuth、新草稿和交付，避免创建缺少对局链接的 Issue。
+
+```env
+BUG_REPORTS_ENABLED=false
+BUG_REPORT_GITHUB_APP_ID=
+BUG_REPORT_GITHUB_CLIENT_ID=
+BUG_REPORT_GITHUB_CLIENT_SECRET=
+BUG_REPORT_GITHUB_PRIVATE_KEY="-----BEGIN RSA PRIVATE KEY-----\n...\n-----END RSA PRIVATE KEY-----"
+BUG_REPORT_GITHUB_WEBHOOK_SECRET=
+BUG_REPORT_GITHUB_INSTALLATION_ID=
+BUG_REPORT_GITHUB_REPOSITORY_ID=
+BUG_REPORT_TOKEN_ENCRYPTION_KEYS={"v1":"<32-byte-base64-key>"}
+BUG_REPORT_TOKEN_ACTIVE_KEY_ID=v1
+```
+
 #### 构建并启动
 
 ```bash
@@ -465,6 +489,9 @@ https://<backend-origin>/api/auth/oauth/google/callback
 - [ ] 创建房间，开始游戏
 - [ ] WebSocket 连接正常（浏览器 Console 无 WS 错误）
 - [ ] 双人模式：两个浏览器窗口加入同一房间
+- [ ] 进行局与结束局原参与者都能打开三步 Bug Report，非参与者被拒绝
+- [ ] 本人 GitHub 与 Hosted Identity 各创建一个 Issue，正文只含现象、Reporter ID 和对局锚点
+- [ ] Settings 能断开 Issue Submission Connection，GitHub 撤销授权后连接状态失效
 - [ ] Workshop：创建/浏览自定义卡牌
 - [ ] Card art 上传和显示正常
 - [ ] `docker compose down && docker compose up -d` 后数据仍在（SQLite 持久化）
@@ -493,6 +520,16 @@ https://<backend-origin>/api/auth/oauth/google/callback
 | `ACCOUNT_GITHUB_OAUTH_CLIENT_SECRET` | — | 账号 GitHub OAuth App client secret |
 | `ACCOUNT_GOOGLE_OAUTH_CLIENT_ID` | — | 账号 Google OAuth client id |
 | `ACCOUNT_GOOGLE_OAUTH_CLIENT_SECRET` | — | 账号 Google OAuth client secret |
+| `BUG_REPORTS_ENABLED` | `false` | 是否允许创建新的 Bug Report 草稿 |
+| `BUG_REPORT_GITHUB_APP_ID` | — | issues-only GitHub App ID |
+| `BUG_REPORT_GITHUB_CLIENT_ID` | — | GitHub App Client ID |
+| `BUG_REPORT_GITHUB_CLIENT_SECRET` | — | GitHub App Client secret |
+| `BUG_REPORT_GITHUB_PRIVATE_KEY` | — | GitHub App private key，使用单行 `\n` 转义 |
+| `BUG_REPORT_GITHUB_WEBHOOK_SECRET` | — | GitHub App webhook secret |
+| `BUG_REPORT_GITHUB_INSTALLATION_ID` | — | issues-only 仓库的 App installation ID |
+| `BUG_REPORT_GITHUB_REPOSITORY_ID` | — | `titanxxh/open-agricola-issues` 数字 repository ID |
+| `BUG_REPORT_TOKEN_ENCRYPTION_KEYS` | — | AES-256-GCM key ring JSON；每个值为 32 字节 base64 |
+| `BUG_REPORT_TOKEN_ACTIVE_KEY_ID` | — | 新令牌使用的 key ring key ID |
 | `ENABLE_AUTH_TEST_HELPERS` | — | 仅本地/E2E 可设 `1`，生产禁止设置 |
 | `DB_PATH` | `./data/open-agricola.db` | SQLite 文件路径 |
 | `CARD_ART_DIR` | `./data/card-art` | 上传的卡牌图片存储路径 |

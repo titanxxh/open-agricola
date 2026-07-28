@@ -80,7 +80,7 @@ const replayError = (
   ...(lifecycle ? { lifecycle } : {}),
 })
 
-const parseCustomCards = (raw: string): CustomCardDef[] => {
+export const parseCustomCards = (raw: string): CustomCardDef[] => {
   const value = JSON.parse(raw) as unknown
   if (!Array.isArray(value)) throw new Error('invalid replay custom cards')
   return value as CustomCardDef[]
@@ -91,7 +91,7 @@ const parseIntent = (raw: string): ReplayJsonValue =>
 
 const logPlayerNameKeys = ['player', 'playerName', 'fromPlayer', 'toPlayer'] as const
 
-const projectParticipantNames = (
+export const projectReplayParticipantNames = (
   frame: ReplayGameState,
   participantNames: ReadonlyMap<number, string>,
 ): ReplayGameState => {
@@ -417,7 +417,7 @@ export class ReplayStore {
           intent: parseIntent(row.intent_json),
           frameHash: row.frame_hash,
           createdAt: row.created_at,
-          frame: projectParticipantNames(serializedFrame, participantNames),
+          frame: projectReplayParticipantNames(serializedFrame, participantNames),
         })
       }
     } catch {

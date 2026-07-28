@@ -29,7 +29,11 @@ export function runMigrations(db: Database.Database): void {
   const row = db.prepare('SELECT MAX(version) AS v FROM schema_version').get() as { v: number | null } | undefined
   const currentVersion = row?.v ?? 0
 
-  const migrations: { version: number; sql: string }[] = [
+  const migrations: {
+    version: number
+    sql?: string
+    run?: (database: Database.Database) => void
+  }[] = [
     {
       version: 1,
       sql: `
@@ -587,6 +591,7 @@ export function runMigrations(db: Database.Database): void {
           id INTEGER PRIMARY KEY AUTOINCREMENT,
           submission_id TEXT NOT NULL REFERENCES bug_reports(submission_id),
           maintainer_user_id TEXT REFERENCES users(id) ON DELETE SET NULL,
+          maintainer_identity TEXT NOT NULL,
           room_id TEXT NOT NULL,
           step_no INTEGER NOT NULL,
           frame_hash TEXT NOT NULL,
@@ -596,6 +601,8 @@ export function runMigrations(db: Database.Database): void {
         );
         CREATE INDEX idx_bug_report_evidence_audit_submission
           ON bug_report_evidence_audit(submission_id, created_at);
+        CREATE INDEX idx_bug_report_evidence_audit_maintainer
+          ON bug_report_evidence_audit(maintainer_user_id, created_at);
 
         INSERT INTO game_contexts (
           room_id, lifecycle, phase, replay_status, expires_at, removal_reason, created_at, updated_at
@@ -727,6 +734,100 @@ export function runMigrations(db: Database.Database): void {
         END;
       `,
     },
+    {
+      version: 25,
+      run: (database) => {
+        const additions = [
+          ['oauth_states', 'pkce_verifier_ciphertext', 'pkce_verifier_ciphertext BLOB'],
+          ['oauth_states', 'pkce_verifier_nonce', 'pkce_verifier_nonce BLOB'],
+          ['oauth_states', 'pkce_verifier_tag', 'pkce_verifier_tag BLOB'],
+          ['oauth_states', 'pkce_verifier_key_id', 'pkce_verifier_key_id TEXT'],
+          ['bug_reports', 'last_error_code', 'last_error_code TEXT'],
+          ['bug_reports', 'discarded_at', 'discarded_at INTEGER'],
+          [
+            'bug_reports',
+            'github_issue_state',
+            "github_issue_state TEXT CHECK (github_issue_state IS NULL OR github_issue_state IN ('open', 'closed', 'deleted'))",
+          ],
+          ['bug_reports', 'duplicate_confirmed_at', 'duplicate_confirmed_at INTEGER'],
+          ['bug_reports', 'confirmed_github_user_id', 'confirmed_github_user_id TEXT'],
+          [
+            'bug_report_evidence_audit',
+            'maintainer_identity',
+            "maintainer_identity TEXT NOT NULL DEFAULT 'pre-feature-audit'",
+          ],
+        ] as const
+        for (const [table, column, definition] of additions) {
+          const columns = database.pragma(`table_info(${table})`) as Array<{ name: string }>
+          if (!columns.some(({ name }) => name === column)) {
+            database.exec(`ALTER TABLE ${table} ADD COLUMN ${definition}`)
+          }
+        }
+        database.exec(`
+          CREATE TABLE IF NOT EXISTS account_deletion_requests (
+            user_id TEXT PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+            requested_at INTEGER NOT NULL,
+            next_attempt_at INTEGER NOT NULL,
+            last_error_code TEXT
+          );
+          CREATE INDEX IF NOT EXISTS idx_account_deletion_requests_due
+            ON account_deletion_requests(next_attempt_at);
+
+          CREATE TABLE IF NOT EXISTS github_grant_revocations (
+            token_hash TEXT PRIMARY KEY,
+            access_token_ciphertext BLOB NOT NULL,
+            access_token_nonce BLOB NOT NULL,
+            access_token_tag BLOB NOT NULL,
+            key_id TEXT NOT NULL,
+            next_attempt_at INTEGER NOT NULL,
+            last_error_code TEXT,
+            created_at INTEGER NOT NULL,
+            updated_at INTEGER NOT NULL
+          );
+          CREATE INDEX IF NOT EXISTS idx_github_grant_revocations_due
+            ON github_grant_revocations(next_attempt_at);
+
+          CREATE TABLE IF NOT EXISTS game_context_participants (
+            room_id TEXT NOT NULL REFERENCES game_contexts(room_id) ON DELETE CASCADE,
+            player_index INTEGER NOT NULL,
+            user_id TEXT REFERENCES users(id) ON DELETE SET NULL,
+            PRIMARY KEY (room_id, player_index)
+          );
+          CREATE INDEX IF NOT EXISTS idx_game_context_participants_user
+            ON game_context_participants(user_id);
+
+          CREATE TRIGGER IF NOT EXISTS preserve_game_context_participants_before_room_delete
+          BEFORE DELETE ON rooms
+          WHEN EXISTS (
+            SELECT 1 FROM game_contexts
+            WHERE room_id = OLD.id AND lifecycle = 'active'
+          )
+          BEGIN
+            INSERT OR IGNORE INTO game_context_participants (
+              room_id, player_index, user_id
+            )
+            SELECT OLD.id, player_index, user_id
+            FROM room_players
+            WHERE room_id = OLD.id;
+          END;
+
+          CREATE INDEX IF NOT EXISTS idx_bug_report_evidence_audit_maintainer
+            ON bug_report_evidence_audit(maintainer_user_id, created_at);
+
+          UPDATE bug_reports
+          SET github_issue_state = 'open'
+          WHERE github_issue_number IS NOT NULL
+            AND github_issue_state IS NULL;
+
+          UPDATE bug_report_evidence_audit
+          SET maintainer_identity = COALESCE(
+            maintainer_user_id,
+            'pre-feature-audit-' || id
+          )
+          WHERE maintainer_identity = 'pre-feature-audit';
+        `)
+      },
+    },
   ]
 
   const insert = db.prepare('INSERT INTO schema_version (version) VALUES (?)')
@@ -734,7 +835,8 @@ export function runMigrations(db: Database.Database): void {
   for (const m of migrations) {
     if (m.version <= currentVersion) continue
     db.transaction(() => {
-      db.exec(m.sql)
+      if (m.sql) db.exec(m.sql)
+      m.run?.(db)
       insert.run(m.version)
     })()
     console.log(`[db] migration v${m.version} applied`)
@@ -747,6 +849,7 @@ export function cleanExpiredSessions(): void {
   const now = Date.now()
   db.transaction(() => {
     db.prepare('DELETE FROM sessions WHERE expires_at < ?').run(now)
+    db.prepare('DELETE FROM bug_report_attempts WHERE expires_at < ?').run(now)
     db.prepare(`
       DELETE FROM game_replay_steps
       WHERE room_id IN (
@@ -787,6 +890,16 @@ export function cleanExpiredSessions(): void {
         AND NOT EXISTS (
           SELECT 1 FROM game_replay_steps
           WHERE room_id = game_replays.room_id
+        )
+    `).run()
+    db.prepare(`
+      DELETE FROM game_context_participants
+      WHERE room_id IN (
+        SELECT room_id FROM game_contexts WHERE lifecycle = 'expired'
+      )
+        AND NOT EXISTS (
+          SELECT 1 FROM game_replays
+          WHERE room_id = game_context_participants.room_id
         )
     `).run()
   })()

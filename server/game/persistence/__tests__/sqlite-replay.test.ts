@@ -236,6 +236,10 @@ describe('SqliteRoomPersistence replay commit', () => {
     expect(db.prepare(`
       SELECT step_no, payload_gzip FROM game_replay_steps WHERE room_id = 'room-1'
     `).all()).toEqual([{ step_no: 0, payload_gzip: Buffer.from('step-0') }])
+    db.prepare(`
+      INSERT INTO game_context_participants (room_id, player_index, user_id)
+      VALUES ('room-1', 0, NULL)
+    `).run()
 
     db.prepare(`
       UPDATE bug_reports SET evidence_expires_at = ? WHERE submission_id = 'report-1'
@@ -244,5 +248,8 @@ describe('SqliteRoomPersistence replay commit', () => {
 
     expect(db.prepare('SELECT COUNT(*) AS count FROM game_replays').get()).toEqual({ count: 0 })
     expect(db.prepare('SELECT COUNT(*) AS count FROM game_replay_steps').get()).toEqual({ count: 0 })
+    expect(db.prepare(`
+      SELECT COUNT(*) AS count FROM game_context_participants
+    `).get()).toEqual({ count: 0 })
   })
 })

@@ -155,6 +155,33 @@ describe('AuthProvider', () => {
     expect(url.searchParams.has('returnTo')).toBe(false)
   })
 
+  it('preserves a replay anchor when OAuth starts from its login page', async () => {
+    window.history.pushState(
+      null,
+      '',
+      '/?page=login&context=completed-room&step=4&frame=hash&bugReport=draft-1',
+    )
+    vi.stubGlobal('fetch', vi.fn(async (url: string) => {
+      if (url.endsWith('/api/auth/me')) {
+        return new Response(JSON.stringify({ ok: false }), { status: 401 })
+      }
+      return new Response(JSON.stringify({ ok: true }))
+    }))
+
+    function Probe() {
+      const { oauthStartUrl } = useAuth()
+      return <a href={oauthStartUrl('github', 'login')}>github</a>
+    }
+
+    render(<AuthProvider><Probe /></AuthProvider>)
+
+    const link = await screen.findByRole('link', { name: 'github' })
+    const url = new URL(link.getAttribute('href')!, window.location.origin)
+    expect(url.searchParams.get('returnTo')).toBe(
+      '/?context=completed-room&step=4&frame=hash&bugReport=draft-1',
+    )
+  })
+
   it('keeps documented non-game dev shortcuts authenticated', async () => {
     window.history.pushState(null, '', '/?page=workshop&player=p1&devMode=1')
     const fetchMock = vi.fn()

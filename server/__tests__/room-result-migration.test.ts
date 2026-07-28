@@ -22,6 +22,16 @@ describe('room result migration', () => {
     seed.exec(`
       CREATE TABLE schema_version (version INTEGER PRIMARY KEY);
       INSERT INTO schema_version (version) VALUES (18);
+      CREATE TABLE oauth_states (
+        state_hash TEXT PRIMARY KEY,
+        provider TEXT NOT NULL,
+        intent TEXT NOT NULL,
+        user_id TEXT,
+        return_to TEXT,
+        expires_at INTEGER NOT NULL,
+        created_at INTEGER NOT NULL,
+        used_at INTEGER
+      );
       CREATE TABLE rooms (
         id TEXT PRIMARY KEY,
         status TEXT NOT NULL,
@@ -45,7 +55,7 @@ describe('room result migration', () => {
     const { getDb } = await import('../db.ts')
     const db = getDb()
 
-    expect(db.prepare('SELECT MAX(version) AS version FROM schema_version').get()).toEqual({ version: 24 })
+    expect(db.prepare('SELECT MAX(version) AS version FROM schema_version').get()).toEqual({ version: 25 })
     expect(db.prepare("SELECT COUNT(*) AS count FROM rooms WHERE status = 'finished'").get()).toEqual({ count: 0 })
     expect(db.prepare('SELECT id, started_at FROM rooms ORDER BY id').all()).toEqual([
       { id: 'playing', started_at: 20 },

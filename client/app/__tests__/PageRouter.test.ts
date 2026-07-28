@@ -87,4 +87,22 @@ describe('setPage URL hygiene', () => {
 
     expect(window.location.pathname + window.location.search).toBe('/open-agricola/')
   })
+
+  it('preserves a saved bug report while changing pages', () => {
+    window.history.replaceState(
+      null,
+      '',
+      '/open-agricola/?page=game&room=room-1&bugReport=draft-1&bugReportConnection=connected',
+    )
+
+    setPage('settings')
+    expect(Object.fromEntries(new URLSearchParams(window.location.search))).toEqual({
+      bugReport: 'draft-1',
+      page: 'settings',
+    })
+
+    setPage('lobby')
+    expect(window.location.pathname + window.location.search)
+      .toBe('/open-agricola/?bugReport=draft-1')
+  })
 })

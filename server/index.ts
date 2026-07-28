@@ -22,8 +22,11 @@ import {
   isAdmin,
   createSession,
   deleteAccount,
+  deferAccountDeletion,
   getAccountDeletionRoomIds,
+  nextPendingAccountDeletion,
   registerPasswordUser,
+  requestAccountDeletion,
   resendVerificationEmail,
   sendVerificationEmail,
   verifyEmailToken,
@@ -51,6 +54,18 @@ import { GameSession } from './game/authoritative-session.ts'
 import { encodeReplayFrame, type JsonValue } from './game/replay-codec.ts'
 import { viewerBuildExists } from './game/replay-viewer-build.ts'
 import { REPLAY_SCHEMA_VERSION } from './game/room-committer.ts'
+import {
+  bugReportsEnabled,
+  handleBugReportRoute,
+  isBugReportRuntimeReady,
+} from './bug-report-routes.ts'
+import {
+  BugReportDelivery,
+  BugReportError,
+  BugReportStore,
+  TokenCipher,
+} from './bug-report/bug-report-store.ts'
+import { GitHubIssueClient } from './bug-report/github-issue-client.ts'
 
 const CARD_ART_DIR = process.env.CARD_ART_DIR ?? join(process.cwd(), 'data', 'card-art')
 const REPLAY_VIEWER_ROOT = process.env.REPLAY_VIEWER_ROOT ?? join(process.cwd(), 'data', 'replay-viewers')
@@ -171,6 +186,26 @@ const shouldPersist: (room: Room) => boolean =
 const gameContextStore = new GameContextStore(getDb())
 const replayStore = new ReplayStore(getDb())
 const replayReadLimiter = new ReplayReadLimiter()
+const bugReportCipher = TokenCipher.fromEnv()
+const bugReportGithub = GitHubIssueClient.fromEnv()
+const bugReportStore = bugReportCipher
+  ? new BugReportStore(getDb(), bugReportCipher)
+  : null
+const bugReportDelivery = bugReportStore && bugReportGithub
+  ? new BugReportDelivery(
+      bugReportStore,
+      bugReportGithub,
+      process.env.PUBLIC_APP_ORIGIN ?? '',
+    )
+  : null
+const bugReportRuntime = bugReportStore
+  ? {
+      db: getDb(),
+      store: bugReportStore,
+      delivery: bugReportDelivery,
+      github: bugReportGithub,
+    }
+  : null
 
 const createCompletedReplayFixture = () => {
   const viewerBuildId = process.env.REPLAY_VIEWER_BUILD_ID ?? ''
@@ -281,11 +316,45 @@ const createCompletedReplayFixture = () => {
 
 let wssCtx: ReturnType<typeof createWsServer> | null = null
 
+const retireAccountRooms = (userId: string): void => {
+  wssCtx?.lobby.endRoomsForUser(userId, getAccountDeletionRoomIds(userId))
+  wssCtx?.closeUserConnections(userId)
+}
+
+const retryPendingAccountDeletion = async (): Promise<void> => {
+  const userId = nextPendingAccountDeletion()
+  if (!userId || !bugReportDelivery) return
+  retireAccountRooms(userId)
+  try {
+    await bugReportDelivery.deleteReporter(userId)
+    deleteAccount(userId)
+  } catch (error) {
+    if (error instanceof BugReportError && error.code === 'bug_report_delivery_busy') {
+      return
+    }
+    const failure = error instanceof BugReportError
+      ? error
+      : new BugReportError('bug_report_deletion_failed', 503)
+    deferAccountDeletion(userId, failure.code, failure.retryAt)
+  }
+}
+
 // Periodically clean expired sessions and replay evidence (every hour)
 const sessionCleanupTimer = setInterval(() => {
   cleanExpiredSessions()
   wssCtx?.committer?.cleanupReplayAssets()
 }, 60 * 60 * 1000)
+const bugReportDeliveryTimer = setInterval(() => {
+  void retryPendingAccountDeletion().then(
+    () => bugReportDelivery?.retryGrantRevocation(),
+  ).then(
+    () => isBugReportRuntimeReady(bugReportRuntime)
+      ? bugReportDelivery?.deliverDue()
+      : undefined,
+  ).catch(() => {
+    console.error('[bug-report-delivery] delivery loop failed')
+  })
+}, 5_000)
 
 const server = createServer(async (req, res) => {
   if (!req.url) {
@@ -304,6 +373,10 @@ const server = createServer(async (req, res) => {
 
   // ── Health ─────────────────────────────────────────────
   if (req.method === 'GET' && req.url === '/api/health') {
+    if (bugReportsEnabled() && !isBugReportRuntimeReady(bugReportRuntime)) {
+      sendJson(res, 503, { ok: false, error: 'bug report delivery is unavailable' })
+      return
+    }
     const readiness = wssCtx?.committer?.canCreateRoom()
     if (readiness && !readiness.ok) {
       sendJson(res, 503, { ok: false, error: readiness.error })
@@ -325,9 +398,10 @@ const server = createServer(async (req, res) => {
     })) return
   }
 
+  const requestUser = validateSession(getAuthToken(req))
+
   if (req.url.startsWith('/api/v1/game-contexts/')) {
-    const user = validateSession(getAuthToken(req))
-    if (handleGameContextRoute(req, res, gameContextStore, user)) return
+    if (handleGameContextRoute(req, res, gameContextStore, requestUser)) return
   }
 
   // ── Auth routes ────────────────────────────────────────
@@ -441,9 +515,82 @@ const server = createServer(async (req, res) => {
     const token = getAuthToken(req)
     const user = validateSession(token)
     if (!user) { sendJson(res, 401, authError('not_authenticated', 'Not authenticated')); return }
-    wssCtx?.lobby.endRoomsForUser(user.id, getAccountDeletionRoomIds(user.id))
+    const database = getDb()
+    const bugReportTables = new Set((database.prepare(`
+      SELECT name
+      FROM sqlite_master
+      WHERE type = 'table'
+        AND name IN ('bug_reports', 'issue_submission_connections')
+    `).all() as Array<{ name: string }>).map(({ name }) => name))
+    const hasExternalBugReportData = (
+      bugReportTables.has('bug_reports')
+      && Boolean(database.prepare(`
+        SELECT 1
+        FROM bug_reports
+        WHERE reporter_user_id = ?
+          AND (
+            submitted_at IS NOT NULL
+            OR github_issue_number IS NOT NULL
+          )
+        LIMIT 1
+      `).get(user.id))
+    ) || (
+      bugReportTables.has('issue_submission_connections')
+      && Boolean(database.prepare(`
+        SELECT 1
+        FROM issue_submission_connections
+        WHERE user_id = ?
+        LIMIT 1
+      `).get(user.id))
+    )
+    if (hasExternalBugReportData) {
+      requestAccountDeletion(user.id)
+      retireAccountRooms(user.id)
+      if (!bugReportDelivery) {
+        sendJson(res, 202, { ok: true, pending: true }, {
+          'Set-Cookie': clearSessionCookie({
+            backendOrigin: getRequestOrigin(req),
+            requestOrigin: req.headers.origin,
+          }),
+        })
+        return
+      }
+      try {
+        await bugReportDelivery.deleteReporter(user.id)
+      } catch (error) {
+        const failure = error instanceof BugReportError
+          ? error
+          : new BugReportError('bug_report_deletion_failed', 503)
+        if (failure.code !== 'bug_report_delivery_busy') {
+          deferAccountDeletion(user.id, failure.code, failure.retryAt)
+        }
+        sendJson(res, 202, { ok: true, pending: true }, {
+          'Set-Cookie': clearSessionCookie({
+            backendOrigin: getRequestOrigin(req),
+            requestOrigin: req.headers.origin,
+          }),
+        })
+        return
+      }
+      const result = deleteAccount(user.id)
+      sendJson(res, 200, result, {
+        'Set-Cookie': clearSessionCookie({
+          backendOrigin: getRequestOrigin(req),
+          requestOrigin: req.headers.origin,
+        }),
+      })
+      return
+    }
+    if (bugReportTables.has('bug_reports')) {
+      database.prepare(`
+        DELETE FROM bug_reports
+        WHERE reporter_user_id = ?
+          AND submitted_at IS NULL
+          AND github_issue_number IS NULL
+      `).run(user.id)
+    }
+    retireAccountRooms(user.id)
     const result = deleteAccount(user.id)
-    wssCtx?.closeUserConnections(user.id)
     sendJson(res, 200, result, { 'Set-Cookie': clearSessionCookie({ backendOrigin: getRequestOrigin(req), requestOrigin: req.headers.origin }) })
     return
   }
@@ -564,6 +711,10 @@ const server = createServer(async (req, res) => {
     const existing = findIdentity(provider, body.providerUserId)
     if (existing) {
       const token = createSession(existing.userId)
+      if (!token) {
+        sendJson(res, 401, authError('not_authenticated', 'Not authenticated'))
+        return
+      }
       sendJson(res, 200, { ok: true, provider, mode: 'login' }, { 'Set-Cookie': serializeSessionCookie(token, { backendOrigin: getRequestOrigin(req), requestOrigin: req.headers.origin }) })
       return
     }
@@ -807,6 +958,14 @@ const server = createServer(async (req, res) => {
     if (handled) return
   }
 
+  if (await handleBugReportRoute(
+    req,
+    res,
+    bugReportRuntime,
+    requestUser,
+    requestUser ? isAdmin(requestUser.username) : false,
+  )) return
+
   sendJson(res, 404, { error: 'Not found' })
 })
 
@@ -827,5 +986,6 @@ server.listen(PORT, HOST, () => {
 installShutdownHandlers(() => {
   server.close()
   clearInterval(sessionCleanupTimer)
+  clearInterval(bugReportDeliveryTimer)
   wssCtx?.shutdown()
 })

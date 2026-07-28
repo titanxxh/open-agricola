@@ -66,6 +66,50 @@ describe('serializeStateForPlayer', () => {
     )
   })
 
+  it('removes engine cursors from a player-filtered frame', () => {
+    const serialized = serializeState(makePlayingState(), emptyCtx())
+    serialized.engineStack = {
+      frames: [{
+        source: {
+          kind: 'flow',
+          flow: { type: 'leaf', actionId: 'gain', params: {} },
+        },
+        engineSnapshot: {
+          nodeStates: [{ id: 'secret-choice', state: 'waiting' }],
+          pendingData: [{
+            nodeId: 'secret-choice',
+            pending: {
+              hostNodeId: 'secret-choice',
+              request: {
+                kind: 'choice',
+                options: [{
+                  value: 'secret-card',
+                  labelKey: 'ui.cursorTestChoice',
+                }],
+              },
+              choices: [{
+                value: 'secret-card',
+                labelKey: 'ui.cursorTestChoice',
+              }],
+              effectiveOwnerPlayerId: 'p2',
+            },
+          }],
+          compositeEmit: null,
+        },
+        ownerPlayerIndex: 1,
+        spaceId: 'secret-space',
+        stageResume: null,
+        deferredPlayerSwitch: null,
+        reason: 'top-level',
+      }],
+    }
+
+    const filtered = filterSerializedStateForPlayer(serialized, 'p1')
+
+    expect(JSON.stringify(serialized.engineStack)).toContain('secret-card')
+    expect(filtered.engineStack).toEqual({ frames: [] })
+  })
+
   it('round-trips six players through serialize and rehydrate', () => {
     const state = createInitialState(42, {
       playerCount: 6,
@@ -220,6 +264,12 @@ describe('serializeStateForPlayer', () => {
       occ: [state.draft!.pools.p2.occ[0]!],
       minor: [state.draft!.pools.p2.minor[0]!, state.draft!.pools.p2.minor[1]!],
     }
+    state.players[0]!.stats.draftHistory = [
+      { cardId: state.draft!.kept.p1.occ[0]!, draftTurn: 1 },
+    ]
+    state.players[1]!.stats.draftHistory = [
+      { cardId: state.draft!.kept.p2.occ[0]!, draftTurn: 1 },
+    ]
     const raw = serializeState(state, emptyCtx())
     const filtered = serializeStateForPlayer(state, 'p1', emptyCtx())
     const spectator = serializeStateForPlayer(state, null, emptyCtx())
@@ -238,6 +288,11 @@ describe('serializeStateForPlayer', () => {
     expect(f.pendingPicks.p2).toEqual({ occ: '?', minor: '?' })
     expect(s.pendingPicks.p1).toEqual({ occ: '?', minor: '?' })
     expect(s.pendingPicks.p2).toEqual({ occ: '?', minor: '?' })
+    expect(filtered.players[0]!.stats.draftHistory[0]!.cardId)
+      .toBe(state.draft!.kept.p1.occ[0])
+    expect(filtered.players[1]!.stats.draftHistory[0]!.cardId).toBe('?')
+    expect(spectator.players[0]!.stats.draftHistory[0]!.cardId).toBe('?')
+    expect(spectator.players[1]!.stats.draftHistory[0]!.cardId).toBe('?')
     expect(f.round).toBe(r.round)
     expect(f.totalRounds).toBe(r.totalRounds)
     expect(f.poolSize).toBe(r.poolSize)
@@ -312,11 +367,15 @@ describe('serializeStateForPlayer', () => {
     expect(p2.minorHand).toEqual([])
   })
 
-  it('masks cardStates and card-state events for cards still hidden in opponent hands', () => {
+  it('masks card state, draft history, and events for hidden opponent cards', () => {
     const state = makePlayingState()
     const p2 = state.players[1]!
     p2.minorHand = ['D036_BreedRegistry']
     p2.minorPlayed = ['B021_HayloftBarn']
+    p2.stats.draftHistory = [
+      { cardId: 'D036_BreedRegistry', draftTurn: 1 },
+      { cardId: 'B021_HayloftBarn', draftTurn: 2, playedTurn: 3 },
+    ]
     p2.cardStates = {
       D036_BreedRegistry: { extraData: { boardSheep: 1 } },
       B021_HayloftBarn: { extraData: { foodCount: 2 } },
@@ -400,6 +459,11 @@ describe('serializeStateForPlayer', () => {
     const ownerP2 = ownerView.players.find((player) => player.id === p2.id)!
 
     expect(filteredP2.minorHand).toEqual(['?'])
+    expect(filteredP2.stats.draftHistory).toEqual([
+      { cardId: '?', draftTurn: 1 },
+      { cardId: 'B021_HayloftBarn', draftTurn: 2, playedTurn: 3 },
+    ])
+    expect(ownerP2.stats.draftHistory).toEqual(p2.stats.draftHistory)
     expect(filteredP2.cardStates.D036_BreedRegistry).toBeUndefined()
     expect(filteredP2.cardStates.B021_HayloftBarn).toEqual(p2.cardStates.B021_HayloftBarn)
     expect(opponentView.events.map((event) => event.id)).toEqual(['102'])

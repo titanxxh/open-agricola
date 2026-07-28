@@ -8,6 +8,8 @@ import type {
 import { LocaleSwitcher } from '../components/common/LocaleSwitcher'
 import { API_BASE } from '../config'
 import { useLocale } from '../contexts/LocaleContext'
+import { BugReportBar } from './BugReportBar'
+import { verifyReplayViewerBuild } from './replay-viewer-build'
 import '../styles/pages/replay.css'
 
 type Perspective = 'open' | `p${number}`
@@ -16,40 +18,6 @@ type ReplayLocation = {
   perspective: Perspective
   layout: Layout | null
   step: number | null
-}
-
-type ViewerManifest = {
-  entrypoint: 'index.html'
-  files: Record<string, string>
-}
-
-const sha256 = async (bytes: ArrayBuffer): Promise<string> => {
-  const digest = await crypto.subtle.digest('SHA-256', bytes)
-  return Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, '0')).join('')
-}
-
-const responseHash = async (response: Response, bytes: ArrayBuffer): Promise<string> =>
-  crypto.subtle
-    ? sha256(bytes)
-    : response.headers.get('etag')?.replaceAll('"', '') ?? ''
-
-const parseViewerManifest = (bytes: ArrayBuffer): ViewerManifest | null => {
-  try {
-    const value = JSON.parse(new TextDecoder().decode(bytes)) as Partial<ViewerManifest>
-    if (
-      value.entrypoint !== 'index.html'
-      || !value.files
-      || typeof value.files !== 'object'
-      || Array.isArray(value.files)
-      || !('index.html' in value.files)
-      || !Object.values(value.files).every(
-        (hash) => typeof hash === 'string' && /^[a-f0-9]{64}$/.test(hash),
-      )
-    ) return null
-    return value as ViewerManifest
-  } catch {
-    return null
-  }
 }
 
 const readLocation = (manifest: ReplayManifest | null): {
@@ -99,13 +67,14 @@ const updateLocation = (
   window.history.replaceState(null, '', url)
 }
 
-function ReplayFrame({
+export function ReplayFrame({
   roomId,
   viewerBuildId,
   locale,
   initialLocation,
   setFrame,
   title,
+  mode,
 }: {
   roomId: string
   viewerBuildId: string
@@ -113,6 +82,7 @@ function ReplayFrame({
   initialLocation: ReplayLocation
   setFrame: (node: HTMLIFrameElement | null) => void
   title: string
+  mode?: 'reported-evidence'
 }) {
   const [src] = useState(() => {
     const params = new URLSearchParams({
@@ -123,6 +93,11 @@ function ReplayFrame({
     })
     if (initialLocation.layout) params.set('layout', initialLocation.layout)
     if (initialLocation.step !== null) params.set('step', String(initialLocation.step))
+    if (mode) {
+      params.set('mode', mode)
+      params.set('parentOrigin', window.location.origin)
+      params.set('viewer', viewerBuildId)
+    }
     return `${API_BASE}/replay-viewers/${viewerBuildId}/index.html?${params}`
   })
   const attachFrame = useCallback((node: HTMLIFrameElement | null) => {
@@ -208,16 +183,7 @@ export function ReplayShell({
         }
       }
 
-      const viewerResponse = await fetch(
-        `${API_BASE}/replay-viewers/${replay.viewerBuildId}/manifest.json`,
-        { credentials: 'omit', signal: controller.signal },
-      )
-      const bytes = await viewerResponse.arrayBuffer()
-      if (
-        !viewerResponse.ok
-        || await responseHash(viewerResponse, bytes) !== replay.viewerBuildId
-        || !parseViewerManifest(bytes)
-      ) throw new Error('viewer_manifest_mismatch')
+      await verifyReplayViewerBuild(replay.viewerBuildId, controller.signal)
 
       setManifest(replayManifest)
       setLocation(readLocation(replayManifest))
@@ -278,6 +244,10 @@ export function ReplayShell({
     setLocation(next)
     updateLocation(next.perspective, next.layout, next.step, frameHash)
   }
+  const reportStepNo = location.step ?? manifest?.firstStepNo ?? null
+  const reportFrameHash = manifest?.steps.find(
+    (step) => step.stepNo === reportStepNo,
+  )?.frameHash
 
   if (!replay || error) {
     return (
@@ -293,6 +263,9 @@ export function ReplayShell({
             </li>
           ))}
         </ol>
+        {new URLSearchParams(window.location.search).has('bugReport')
+          ? <BugReportBar roomId={context.roomId} />
+          : null}
       </main>
     )
   }
@@ -334,6 +307,13 @@ export function ReplayShell({
         >
           {t('platform.gameContext.watchOpen')}
         </button>
+        {reportStepNo !== null && reportFrameHash ? (
+          <BugReportBar
+            roomId={context.roomId}
+            stepNo={reportStepNo}
+            frameHash={reportFrameHash}
+          />
+        ) : null}
       </main>
     )
   }
@@ -350,6 +330,13 @@ export function ReplayShell({
         setFrame={setIframe}
         title={t('platform.gameContext.replayFrameTitle')}
       />
+      {reportStepNo !== null && reportFrameHash ? (
+        <BugReportBar
+          roomId={context.roomId}
+          stepNo={reportStepNo}
+          frameHash={reportFrameHash}
+        />
+      ) : null}
     </main>
   )
 }

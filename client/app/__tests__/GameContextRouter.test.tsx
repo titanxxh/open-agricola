@@ -1,6 +1,13 @@
 // @vitest-environment jsdom
-import { cleanup, fireEvent, render, screen } from '@testing-library/react'
+import {
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from '@testing-library/react'
 import { createHash } from 'node:crypto'
+import { StrictMode } from 'react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { GameContextRouter } from '../GameContextRouter'
 
@@ -59,6 +66,22 @@ describe('GameContextRouter', () => {
     expect(fetch).not.toHaveBeenCalled()
   })
 
+  it('mounts login without resolving the preserved replay context', () => {
+    window.history.replaceState(
+      null,
+      '',
+      '/?page=login&context=completed-room&step=4&bugReport=draft-1',
+    )
+    const fetch = vi.fn()
+    vi.stubGlobal('fetch', fetch)
+
+    render(<GameContextRouter><div>login app</div></GameContextRouter>)
+
+    expect(screen.getByText('login app')).toBeVisible()
+    expect(fetch).not.toHaveBeenCalled()
+    expect(window.location.search).toContain('context=completed-room')
+  })
+
   it('routes active contexts through the authenticated app', async () => {
     window.history.replaceState(null, '', '/?context=active-room')
     stubResponse({
@@ -78,6 +101,85 @@ describe('GameContextRouter', () => {
       '/api/v1/game-contexts/active-room',
       expect.objectContaining({ credentials: 'include' }),
     )
+  })
+
+  it('opens pinned active evidence without replacing the live game', async () => {
+    const frameHash = 'a'.repeat(64)
+    const viewerManifest = JSON.stringify({
+      entrypoint: 'index.html',
+      files: { 'index.html': '0'.repeat(64) },
+    })
+    const viewerBuildId = createHash('sha256').update(viewerManifest).digest('hex')
+    window.history.replaceState(
+      null,
+      '',
+      `/?context=active-room&step=5&frame=${frameHash}`
+        + '&perspective=open&bugReport=draft-1',
+    )
+    const fetch = vi.fn(async (input: string | URL | Request) => {
+      const url = String(input)
+      if (url.endsWith('/api/v1/game-contexts/active-room')) {
+        return new Response(JSON.stringify({
+          ok: true,
+          roomId: 'active-room',
+          lifecycle: 'active',
+          phase: 'playing',
+          playerIndex: 0,
+          roomVersion: 8,
+          stepNo: 6,
+        }))
+      }
+      if (url.endsWith(
+        `/api/v1/game-contexts/active-room/evidence/5?frame=${frameHash}`,
+      )) {
+        return new Response(JSON.stringify({
+          ok: true,
+          kind: 'reportedEvidence',
+          apiVersion: 1,
+          roomId: 'active-room',
+          schemaVersion: 1,
+          viewerBuildId,
+          stepNo: 5,
+          frameHash,
+          perspective: 'p1',
+          frame: { round: 1, players: [{ id: 'p1' }] },
+          customCards: [],
+        }))
+      }
+      if (url.endsWith(`/replay-viewers/${viewerBuildId}/manifest.json`)) {
+        return new Response(viewerManifest)
+      }
+      throw new Error(`Unexpected request: ${url}`)
+    })
+    vi.stubGlobal('fetch', fetch)
+
+    render(<GameContextRouter><div>active app</div></GameContextRouter>)
+
+    expect(await screen.findByText('active app')).toBeVisible()
+    const iframe = await screen.findByTitle(
+      'platform.gameContext.replayFrameTitle',
+    )
+    expect(screen.getByRole('complementary', {
+      name: 'platform.gameContext.reportedEvidenceTitle',
+    })).toContainElement(iframe)
+    expect(new URL(iframe.getAttribute('src')!, window.location.href)
+      .searchParams.get('perspective')).toBe('p1')
+    expect(fetch).toHaveBeenCalledWith(
+      `/api/v1/game-contexts/active-room/evidence/5?frame=${frameHash}`,
+      expect.objectContaining({ credentials: 'include' }),
+    )
+    expect(fetch.mock.calls.some(([input]) =>
+      String(input).includes('/api/v1/bug-reports/draft-1')
+    )).toBe(false)
+
+    fireEvent.click(screen.getByRole('button', {
+      name: 'platform.bugReport.close',
+    }))
+
+    expect(screen.queryByRole('complementary')).not.toBeInTheDocument()
+    expect(screen.getByText('active app')).toBeVisible()
+    expect(window.location.search)
+      .toBe('?context=active-room&perspective=open&bugReport=draft-1')
   })
 
   it('keeps the full active context link behind login', async () => {
@@ -306,8 +408,12 @@ describe('GameContextRouter', () => {
     },
   )
 
-  it('keeps completed results visible when replay verification fails', async () => {
-    window.history.replaceState(null, '', '/?context=completed-room')
+  it('keeps completed results and a saved draft visible when replay verification fails', async () => {
+    window.history.replaceState(
+      null,
+      '',
+      '/?context=completed-room&bugReport=draft-1',
+    )
     const context = {
       ok: true,
       roomId: 'completed-room',
@@ -324,13 +430,45 @@ describe('GameContextRouter', () => {
         viewerBuildId: 'a'.repeat(64),
       },
     }
-    const fetch = vi.fn(async (input: RequestInfo | URL) =>
-      new Response(JSON.stringify(
-        String(input).includes('/game-contexts/')
-          ? context
-          : { ok: false, code: 'viewer_unavailable', message: 'Unavailable' },
-      ))
-    )
+    const fetch = vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input)
+      if (url.endsWith('/api/v1/game-contexts/completed-room')) {
+        return new Response(JSON.stringify(context))
+      }
+      if (url.includes('/api/v1/issue-submission-connection?')) {
+        return new Response(JSON.stringify({
+          ok: true,
+          enabled: false,
+          connected: false,
+        }))
+      }
+      if (url.endsWith('/api/v1/bug-reports/draft-1')) {
+        return new Response(JSON.stringify({
+          ok: true,
+          report: {
+            submissionId: 'draft-1',
+            roomId: 'completed-room',
+            reporterUserId: 'u1',
+            playerIndex: 0,
+            lifecycle: 'completed',
+            roomVersion: 2,
+            stepNo: 1,
+            frameHash: 'b'.repeat(64),
+            phenomenon: 'The replay is unavailable',
+            authorIdentity: null,
+            status: 'draft',
+            issueNumber: null,
+            issueUrl: null,
+            lastErrorCode: null,
+          },
+        }))
+      }
+      return new Response(JSON.stringify({
+        ok: false,
+        code: 'viewer_unavailable',
+        message: 'Unavailable',
+      }))
+    })
     vi.stubGlobal('fetch', fetch)
 
     render(<GameContextRouter><div>active app</div></GameContextRouter>)
@@ -338,6 +476,7 @@ describe('GameContextRouter', () => {
     expect(await screen.findByRole('alert')).toBeVisible()
     expect(screen.getByText('Alice')).toBeVisible()
     expect(screen.getByText('platform.gameContext.score')).toBeVisible()
+    expect(await screen.findByDisplayValue('The replay is unavailable')).toBeVisible()
   })
 
   it.each([
@@ -371,5 +510,214 @@ describe('GameContextRouter', () => {
 
     expect(await screen.findByText(title)).toBeVisible()
     expect(screen.queryByText('active app')).not.toBeInTheDocument()
+  })
+
+  it('opens retained expired evidence in the authenticated participant view', async () => {
+    const frameHash = 'a'.repeat(64)
+    const viewerManifest = JSON.stringify({
+      entrypoint: 'index.html',
+      files: { 'index.html': '0'.repeat(64) },
+    })
+    const viewerBuildId = createHash('sha256').update(viewerManifest).digest('hex')
+    window.history.replaceState(
+      null,
+      '',
+      `/?context=expired-room&step=5&frame=${frameHash}&perspective=open`,
+    )
+    const frame = { round: 1, players: [{ id: 'p2' }] }
+    const evidence = {
+      ok: true as const,
+      kind: 'reportedEvidence' as const,
+      apiVersion: 1 as const,
+      roomId: 'expired-room',
+      schemaVersion: 1,
+      viewerBuildId,
+      stepNo: 5,
+      frameHash,
+      perspective: 'p2' as const,
+      frame,
+      customCards: [{
+        cardType: 'minor' as const,
+        cardJson: {
+          id: 'CUSTOM_1',
+          name: 'Custom',
+          deck: 'X',
+          number: 1,
+        },
+        artUrl: `/replay-assets/${'f'.repeat(64)}`,
+      }],
+    }
+    const fetch = vi.fn(async (input: string | URL | Request) => {
+      const url = String(input)
+      if (url.endsWith('/api/v1/game-contexts/expired-room')) {
+        return new Response(JSON.stringify({
+          ok: true,
+          roomId: 'expired-room',
+          lifecycle: 'expired',
+        }))
+      }
+      if (url.endsWith(
+        `/api/v1/game-contexts/expired-room/evidence/5?frame=${frameHash}`,
+      )) {
+        return new Response(JSON.stringify(evidence))
+      }
+      if (url.endsWith(`/replay-viewers/${viewerBuildId}/manifest.json`)) {
+        return new Response(viewerManifest)
+      }
+      throw new Error(`Unexpected request: ${url}`)
+    })
+    vi.stubGlobal('fetch', fetch)
+
+    render(<GameContextRouter><div>active app</div></GameContextRouter>)
+
+    const iframe = await screen.findByTitle('platform.gameContext.replayFrameTitle')
+    expect(screen.getByText('platform.gameContext.reportedEvidenceTitle'))
+      .toBeVisible()
+    expect(iframe).toHaveAttribute('sandbox', 'allow-scripts')
+    const src = new URL(iframe.getAttribute('src')!, window.location.href)
+    expect(src.pathname).toBe(`/replay-viewers/${viewerBuildId}/index.html`)
+    expect(src.searchParams.get('mode')).toBe('reported-evidence')
+    expect(src.searchParams.get('perspective')).toBe('p2')
+    expect(src.searchParams.get('parentOrigin')).toBe(window.location.origin)
+    const postMessage = vi.spyOn(
+      (iframe as HTMLIFrameElement).contentWindow!,
+      'postMessage',
+    )
+    fireEvent(window, new MessageEvent('message', {
+      source: (iframe as HTMLIFrameElement).contentWindow,
+      data: { type: 'open-agricola-reported-evidence-ready' },
+    }))
+    expect(postMessage).toHaveBeenCalledWith({
+      type: 'open-agricola-reported-evidence',
+      evidence,
+    }, '*')
+    expect(fetch).toHaveBeenCalledWith(
+      `/api/v1/game-contexts/expired-room/evidence/5?frame=${frameHash}`,
+      expect.objectContaining({ credentials: 'include' }),
+    )
+  })
+
+  it.each([
+    ['expired', undefined, 'platform.gameContext.expiredTitle'],
+    ['removed', 'legal', 'platform.gameContext.removedTitle'],
+  ] as const)('reopens a saved draft on a %s context', async (
+    lifecycle,
+    reason,
+    title,
+  ) => {
+    const roomId = `${lifecycle}-room`
+    window.history.replaceState(
+      null,
+      '',
+      `/?context=${roomId}&bugReport=submission-1`,
+    )
+    const fetch = vi.fn(async (input: string | URL | Request) => {
+      const url = String(input)
+      if (url.endsWith(`/api/v1/game-contexts/${roomId}`)) {
+        return new Response(JSON.stringify({
+          ok: true,
+          roomId,
+          lifecycle,
+          ...(reason ? { reason } : {}),
+        }))
+      }
+      if (url.includes('/api/v1/issue-submission-connection?')) {
+        return new Response(JSON.stringify({
+          ok: true,
+          enabled: false,
+          connected: false,
+        }))
+      }
+      if (url.endsWith('/api/v1/bug-reports/submission-1')) {
+        return new Response(JSON.stringify({
+          ok: true,
+          report: {
+            submissionId: 'submission-1',
+            roomId,
+            reporterUserId: 'u1',
+            playerIndex: 0,
+            lifecycle: 'active',
+            roomVersion: 8,
+            stepNo: 5,
+            frameHash: 'a'.repeat(64),
+            phenomenon: 'The game froze',
+            authorIdentity: null,
+            status: 'draft',
+            issueNumber: null,
+            issueUrl: null,
+            lastErrorCode: null,
+          },
+        }))
+      }
+      throw new Error(`Unexpected request: ${url}`)
+    })
+    vi.stubGlobal('fetch', fetch)
+
+    render(<GameContextRouter><div>active app</div></GameContextRouter>)
+
+    expect(await screen.findByText(title))
+      .toBeVisible()
+    expect(await screen.findByText('platform.bugReport.title')).toBeVisible()
+    expect(screen.getByDisplayValue('The game froze')).toBeVisible()
+  })
+
+  it('completes bug-report OAuth before routing an expired context', async () => {
+    window.history.replaceState(
+      null,
+      '',
+      '/?context=expired-room&bugReportConnection=pending'
+        + '#bugReportOAuthState=state-1&bugReportOAuthCode=code-1',
+    )
+    const fetch = vi.fn(async (
+      input: string | URL | Request,
+      init?: RequestInit,
+    ) => {
+      const url = String(input)
+      if (url.endsWith('/api/v1/issue-submission-connection/github/complete')) {
+        expect(init).toMatchObject({
+          method: 'POST',
+          credentials: 'include',
+        })
+        expect(JSON.parse(String(init?.body))).toEqual({
+          state: 'state-1',
+          code: 'code-1',
+        })
+        return new Response(JSON.stringify({
+          ok: true,
+          enabled: true,
+          connected: true,
+        }))
+      }
+      return new Response(JSON.stringify({
+        ok: true,
+        roomId: 'expired-room',
+        lifecycle: 'expired',
+      }))
+    })
+    vi.stubGlobal('fetch', fetch)
+
+    render(
+      <StrictMode>
+        <GameContextRouter><div>active app</div></GameContextRouter>
+      </StrictMode>,
+    )
+
+    expect(await screen.findByText('platform.gameContext.expiredTitle'))
+      .toBeVisible()
+    await waitFor(() => {
+      expect(window.location.hash).toBe('')
+      expect(window.location.search).toContain(
+        'bugReportConnection=connected',
+      )
+    })
+    expect(fetch).toHaveBeenCalledWith(
+      '/api/v1/issue-submission-connection/github/complete',
+      expect.objectContaining({ credentials: 'include' }),
+    )
+    expect(fetch.mock.calls.filter(([input]) =>
+      String(input).endsWith(
+        '/api/v1/issue-submission-connection/github/complete',
+      ),
+    )).toHaveLength(1)
   })
 })

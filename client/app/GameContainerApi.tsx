@@ -96,6 +96,7 @@ import {
   type GamePresentation,
 } from './game-presentation-routing'
 import { GAME_CONTEXT_CHANGED_EVENT } from './GameContextRouter'
+import { BugReportBar } from './BugReportBar'
 
 type RoundSlot = { round: number; action?: ActionSpace }
 type SelectedSpecialAction = { cardId: string; actionId: MoorSpecialActionId } | null
@@ -476,6 +477,12 @@ export const GameContainerApi = () => {
          activePlayer.id === selfPlayer.id && displayPlayer.id === selfPlayer.id)
     : !!(activePlayer && displayPlayer)
   const hasGameView = !!(state && currentPlayer && displayPlayer)
+  const bugReportRoomId = isWs && wsStatus.phase === 'ready'
+    ? wsStatus.roomId
+    : null
+  const bugReportBar = bugReportRoomId
+    ? <BugReportBar roomId={bugReportRoomId} />
+    : null
 
   useLayoutEffect(() => {
     if (!hasGameView) return
@@ -1411,6 +1418,7 @@ export const GameContainerApi = () => {
     return (
       <div className={`app${isEmbedded ? ' app--embedded' : ''}`}>
         {notificationStack}
+        {bugReportBar}
         <DraftOverlay
           state={state}
           meId={meId}
@@ -1434,6 +1442,7 @@ export const GameContainerApi = () => {
     return (
       <div className={`app${isEmbedded ? ' app--embedded' : ''}`}>
         {notificationStack}
+        {bugReportBar}
         <ParentSelectionOverlay
           state={state}
           meId={meId}
@@ -1893,6 +1902,7 @@ export const GameContainerApi = () => {
       </div>
       </div>
 
+      {bugReportBar}
       <InteractionBar model={interactionBarModel} actions={interactionBarActions} />
     </div>
   )

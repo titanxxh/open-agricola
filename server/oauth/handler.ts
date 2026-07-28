@@ -326,6 +326,10 @@ export async function handleOAuthCallback(req: IncomingMessage, res: ServerRespo
   const existing = findIdentity(profile.provider, profile.providerUserId)
   if (existing) {
     const token = createSession(existing.userId)
+    if (!token) {
+      redirect(res, appLocation('/?page=login&authError=not_authenticated'), oauthStateClearHeaders(req))
+      return
+    }
     redirect(res, appLocation(safeReturnTo(state.returnTo) ?? '/'), oauthStateClearHeaders(req, {
       'Set-Cookie': serializeSessionCookie(token, { backendOrigin: getRequestOrigin(req) }),
     }))
@@ -369,6 +373,13 @@ export async function handleOnboardingComplete(req: IncomingMessage, res: Server
   }
 
   const token = createSession(result.user.id)
+  if (!token) {
+    consumeOnboardingTicket(ticket)
+    sendJson(res, 401, { ok: false, code: 'not_authenticated', error: 'Not authenticated' }, {
+      'Set-Cookie': clearOnboardingCookie({ backendOrigin: getRequestOrigin(req) }),
+    })
+    return
+  }
   consumeOnboardingTicket(ticket)
   sendJson(res, 200, {
     ok: true,

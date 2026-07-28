@@ -1,0 +1,280 @@
+.bug-report-trigger {
+  position: fixed;
+  z-index: 70;
+  right: 16px;
+  bottom: calc(84px + env(safe-area-inset-bottom));
+  min-height: 42px;
+  padding: 9px 16px;
+  color: #fff9e9;
+  font-weight: 700;
+  text-decoration: none;
+  border: 1px solid #dfbd61;
+  border-radius: var(--radius-pill);
+  background: #334d2d;
+  box-shadow: 0 5px 18px rgb(0 0 0 / 35%);
+  cursor: pointer;
+}
+
+.bug-report-trigger:hover,
+.bug-report-trigger:focus-visible {
+  background: #416139;
+}
+
+.bug-report-overlay {
+  position: fixed;
+  z-index: 2000;
+  inset: 0;
+  display: grid;
+  align-items: end;
+  padding: 24px;
+  background: rgb(12 20 11 / 64%);
+}
+
+.bug-report-sheet {
+  width: min(720px, 100%);
+  max-height: min(84vh, 760px);
+  padding: 20px;
+  margin: 0 auto;
+  overflow: auto;
+  color: var(--color-text);
+  border: 1px solid #a88752;
+  border-radius: 18px 18px 8px 8px;
+  background: var(--bg-parchment);
+  box-shadow: 0 -10px 40px rgb(0 0 0 / 42%);
+}
+
+.bug-report-header,
+.bug-report-actions,
+.bug-report-counter {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.bug-report-header {
+  padding-bottom: 14px;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.bug-report-header p,
+.bug-report-header h2,
+.bug-report-step h3,
+.bug-report-step p,
+.bug-report-success h3,
+.bug-report-success p {
+  margin: 0;
+}
+
+.bug-report-header p {
+  color: var(--color-text-muted);
+  font-size: var(--fs-small);
+  font-weight: 700;
+  letter-spacing: .08em;
+}
+
+.bug-report-header h2,
+.bug-report-step h3,
+.bug-report-success h3 {
+  color: var(--color-primary);
+  font-family: var(--agricola-font);
+}
+
+.bug-report-close {
+  width: 40px;
+  height: 40px;
+  color: var(--color-text-secondary);
+  font-size: 26px;
+  line-height: 1;
+  border: 1px solid var(--color-border);
+  border-radius: 50%;
+  background: rgb(255 255 255 / 48%);
+  cursor: pointer;
+}
+
+.bug-report-step,
+.bug-report-success {
+  display: grid;
+  gap: 16px;
+  padding-top: 18px;
+}
+
+.bug-report-step > label:first-child {
+  font-weight: 700;
+}
+
+.bug-report-step textarea {
+  width: 100%;
+  min-height: 132px;
+  padding: 12px;
+  color: var(--color-text);
+  font: inherit;
+  line-height: 1.5;
+  resize: vertical;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: rgb(255 255 255 / 72%);
+}
+
+.bug-report-step textarea:focus,
+.bug-report-identity:focus-within,
+.bug-report-confirm:focus-within {
+  outline: 3px solid rgb(212 160 23 / 34%);
+  outline-offset: 2px;
+}
+
+.bug-report-counter {
+  align-items: flex-start;
+  color: var(--color-text-muted);
+  font-size: var(--fs-small);
+}
+
+.bug-report-counter output {
+  flex: 0 0 auto;
+  font-variant-numeric: tabular-nums;
+}
+
+.bug-report-counter output.is-error,
+.bug-report-error {
+  color: var(--color-error);
+}
+
+.bug-report-error,
+.bug-report-notice {
+  padding: 10px 12px;
+  margin: 14px 0 0;
+  border-radius: var(--radius-sm);
+}
+
+.bug-report-error {
+  background: var(--color-error-bg);
+}
+
+.bug-report-notice {
+  color: var(--color-primary);
+  background: var(--color-success-bg);
+}
+
+.bug-report-context {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  margin: 0;
+}
+
+.bug-report-context > div {
+  min-width: 0;
+  padding: 10px;
+  border: 1px solid var(--color-border-light);
+  border-radius: var(--radius-sm);
+  background: rgb(255 255 255 / 48%);
+}
+
+.bug-report-context dt {
+  color: var(--color-text-muted);
+  font-size: var(--fs-small);
+}
+
+.bug-report-context dd {
+  margin: 4px 0 0;
+  overflow-wrap: anywhere;
+  font-weight: 700;
+}
+
+.bug-report-context code {
+  font-size: 11px;
+}
+
+.bug-report-identity,
+.bug-report-confirm {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 13px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: rgb(255 255 255 / 48%);
+}
+
+.bug-report-identity.is-selected {
+  border-color: var(--color-accent);
+  box-shadow: inset 0 0 0 1px var(--color-accent);
+}
+
+.bug-report-identity input,
+.bug-report-confirm input {
+  margin-top: 3px;
+}
+
+.bug-report-identity span {
+  display: grid;
+  gap: 4px;
+}
+
+.bug-report-identity small {
+  color: var(--color-text-muted);
+}
+
+.bug-report-connect,
+.bug-report-success a {
+  justify-self: start;
+  color: var(--color-primary);
+  font-weight: 700;
+}
+
+.bug-report-connect {
+  padding: 0;
+  border: 0;
+  background: none;
+  cursor: pointer;
+  font: inherit;
+}
+
+.bug-report-actions {
+  padding-top: 4px;
+}
+
+.bug-report-actions button,
+.bug-report-success button {
+  min-width: 132px;
+}
+
+.bug-report-success a {
+  padding: 12px;
+  border: 1px solid var(--color-accent);
+  border-radius: var(--radius-sm);
+  background: var(--color-accent-bg);
+}
+
+@media (max-width: 640px) {
+  .bug-report-trigger {
+    right: 10px;
+    bottom: calc(76px + env(safe-area-inset-bottom));
+  }
+
+  .bug-report-overlay {
+    padding: 0;
+  }
+
+  .bug-report-sheet {
+    max-height: 92vh;
+    padding: 16px;
+    border-right: 0;
+    border-bottom: 0;
+    border-left: 0;
+    border-radius: 18px 18px 0 0;
+  }
+
+  .bug-report-context {
+    grid-template-columns: 1fr;
+  }
+
+  .bug-report-actions {
+    align-items: stretch;
+  }
+
+  .bug-report-actions button {
+    flex: 1;
+    min-width: 0;
+  }
+}

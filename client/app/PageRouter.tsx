@@ -47,6 +47,7 @@ const PAGE_SCOPED_QUERY_KEYS = [
   'step',
   'frame',
   'perspective',
+  'bugReportConnection',
 ]
 
 function getPage(): Page {
@@ -93,7 +94,22 @@ export function PageRouter() {
   const page = getPage()
 
   useEffect(() => {
-    if (!loading && user && (page === 'onboarding' || page === 'login')) {
+    if (loading || !user) return
+    if (page === 'login') {
+      const params = new URLSearchParams(window.location.search)
+      if (params.has('context')) {
+        params.delete('page')
+        const search = params.toString()
+        window.history.replaceState(
+          null,
+          '',
+          `${window.location.pathname}${search ? `?${search}` : ''}${window.location.hash}`,
+        )
+        window.dispatchEvent(new PopStateEvent('popstate'))
+        return
+      }
+    }
+    if (page === 'onboarding' || page === 'login') {
       setPage('lobby')
     }
   }, [loading, page, user])
