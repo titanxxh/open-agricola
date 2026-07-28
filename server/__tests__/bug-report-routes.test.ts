@@ -11,6 +11,7 @@ import {
 } from '../bug-report/bug-report-store.ts'
 import { handleBugReportRoute } from '../bug-report-routes.ts'
 import { runMigrations } from '../db.ts'
+import { encodeReplayFrame } from '../game/replay-codec.ts'
 
 const FRAME_HASH = 'a'.repeat(64)
 const USER: AuthUser = { id: 'u1', username: 'u1', displayName: 'User 1' }
@@ -26,6 +27,8 @@ let db: Database.Database
 let store: BugReportStore
 let createIssue: ReturnType<typeof vi.fn>
 let revokeUserGrant: ReturnType<typeof vi.fn>
+let exchangeCode: ReturnType<typeof vi.fn>
+let githubUserId: ReturnType<typeof vi.fn>
 let runtime: Parameters<typeof handleBugReportRoute>[2]
 
 const request = (
@@ -154,6 +157,11 @@ beforeEach(() => {
     url: 'https://github.com/titanxxh/open-agricola-issues/issues/7',
   }))
   revokeUserGrant = vi.fn(async () => ({ ok: true as const }))
+  exchangeCode = vi.fn(async () => ({
+    accessToken: 'github-user-token',
+    accessTokenExpiresAt: now + 60 * 60 * 1000,
+  }))
+  githubUserId = vi.fn(async () => '99')
   const adapter: IssueDeliveryAdapter = {
     createIssue,
     findIssueByMarker: vi.fn(async () => ({ ok: true as const, found: false as const })),
@@ -168,6 +176,8 @@ beforeEach(() => {
     github: {
       authorizationUrl: ({ state }: { state: string }) =>
         `https://github.test/authorize?state=${encodeURIComponent(state)}`,
+      exchangeCode,
+      githubUserId,
     },
   } as never
 })
@@ -211,8 +221,9 @@ describe('bug report routes', () => {
         '/api/v1/issue-submission-connection',
       ))).toMatchObject({ enabled: false })
       expect((await invoke(
-        'GET',
-        `/api/v1/issue-submission-connection/github/start?submissionId=${submissionId}`,
+        'POST',
+        '/api/v1/issue-submission-connection/github/start',
+        { submissionId },
       )).statusCode).toBe(503)
       expect((await invoke(
         'POST',
@@ -422,8 +433,7 @@ describe('bug report routes', () => {
     expect(store.connectionStatus('u1')).toEqual({ connected: false })
   })
 
-  it('preserves a draft when GitHub connection authorization is cancelled', async () => {
-    vi.stubEnv('NODE_ENV', 'production')
+  it('finishes GitHub OAuth only from the initiating app session', async () => {
     const created = await invoke(
       'POST',
       '/api/v1/game-contexts/active-room/bug-reports',
@@ -431,53 +441,99 @@ describe('bug report routes', () => {
     )
     const submissionId = (json(created).report as { submissionId: string }).submissionId
     const start = await invoke(
-      'GET',
-      `/api/v1/issue-submission-connection/github/start?submissionId=${submissionId}`,
+      'POST',
+      '/api/v1/issue-submission-connection/github/start',
+      { submissionId },
     )
-    expect(start.statusCode).toBe(302)
-    const state = new URL(start.headers.Location).searchParams.get('state')
+    expect(start.statusCode).toBe(200)
+    const authorizationUrl = (json(start) as { authorizationUrl: string })
+      .authorizationUrl
+    const state = new URL(authorizationUrl).searchParams.get('state')
     expect(state).toBeTruthy()
-    expect(start.headers['Set-Cookie']).toContain(
-      'oa_bug_report_oauth_state=',
+
+    const callback = await invoke(
+      'GET',
+      `/api/v1/issue-submission-connection/github/callback?state=${state}&code=oauth-code`,
+      null,
+      null,
     )
-    expect(start.headers['Set-Cookie']).toContain('SameSite=Lax')
-    expect(start.headers['Set-Cookie']).toContain('Secure')
-    expect(start.headers['Set-Cookie']).not.toContain('Partitioned')
-    const callbackCookie = start.headers['Set-Cookie']!.split(';', 1)[0]!
+    expect(callback.statusCode).toBe(302)
+    const returnTo = new URL(callback.headers.Location)
+    expect(returnTo.origin).toBe('https://game.example')
+    expect(returnTo.searchParams.get('bugReport')).toBe(submissionId)
+    expect(returnTo.searchParams.get('bugReportConnection')).toBe('pending')
+    const handoff = new URLSearchParams(returnTo.hash.slice(1))
+    expect(handoff.get('bugReportOAuthState')).toBe(state)
+    expect(handoff.get('bugReportOAuthCode')).toBe('oauth-code')
+    expect(exchangeCode).not.toHaveBeenCalled()
 
     const stolen = await invoke(
-      'GET',
-      `/api/v1/issue-submission-connection/github/callback?state=${state}&error=access_denied`,
-      null,
+      'POST',
+      '/api/v1/issue-submission-connection/github/complete',
+      { state, code: 'oauth-code' },
       OTHER,
     )
     expect(stolen.statusCode).toBe(400)
     expect(json(stolen)).toMatchObject({ code: 'oauth_state_invalid' })
+    expect(exchangeCode).not.toHaveBeenCalled()
+
+    const completed = await invoke(
+      'POST',
+      '/api/v1/issue-submission-connection/github/complete',
+      { state, code: 'oauth-code' },
+    )
+    expect(completed.statusCode).toBe(200)
+    expect(json(completed)).toMatchObject({
+      connected: true,
+      githubUserId: '99',
+    })
+    expect(exchangeCode).toHaveBeenCalledWith(
+      'oauth-code',
+      expect.any(String),
+      'https://api.example/api/v1/issue-submission-connection/github/callback',
+    )
+    expect(store.connectionStatus('u1')).toMatchObject({
+      connected: true,
+      githubUserId: '99',
+    })
+
+    const replayed = await invoke(
+      'POST',
+      '/api/v1/issue-submission-connection/github/complete',
+      { state, code: 'oauth-code' },
+    )
+    expect(replayed.statusCode).toBe(400)
+    expect(json(replayed)).toMatchObject({ code: 'oauth_state_invalid' })
+  })
+
+  it('preserves a draft when GitHub connection authorization is cancelled', async () => {
+    const created = await invoke(
+      'POST',
+      '/api/v1/game-contexts/active-room/bug-reports',
+      { phenomenon: 'The game froze' },
+    )
+    const submissionId = (json(created).report as { submissionId: string }).submissionId
+    const start = await invoke(
+      'POST',
+      '/api/v1/issue-submission-connection/github/start',
+      { submissionId },
+    )
+    const state = new URL(
+      (json(start) as { authorizationUrl: string }).authorizationUrl,
+    ).searchParams.get('state')
 
     const cancelled = await invoke(
       'GET',
       `/api/v1/issue-submission-connection/github/callback?state=${state}&error=access_denied`,
       null,
       null,
-      { cookie: callbackCookie },
     )
-    expect(cancelled.statusCode).toBe(302)
-    expect(cancelled.headers['Set-Cookie']).toContain('Max-Age=0')
-    const returnTo = new URL(cancelled.headers.Location)
-    expect(returnTo.origin).toBe('https://game.example')
-    expect(returnTo.searchParams.get('bugReport')).toBe(submissionId)
-    expect(returnTo.searchParams.get('bugReportConnection')).toBe('cancelled')
-    expect(store.getOwned(submissionId, 'u1').status).toBe('draft')
 
-    const replayed = await invoke(
-      'GET',
-      `/api/v1/issue-submission-connection/github/callback?state=${state}&error=access_denied`,
-      null,
-      null,
-      { cookie: callbackCookie },
-    )
-    expect(replayed.statusCode).toBe(400)
-    expect(json(replayed)).toMatchObject({ code: 'oauth_state_invalid' })
+    expect(cancelled.statusCode).toBe(302)
+    expect(new URL(cancelled.headers.Location).searchParams.get(
+      'bugReportConnection',
+    )).toBe('cancelled')
+    expect(store.getOwned(submissionId, 'u1').status).toBe('draft')
   })
 
   it('validates signed webhooks and revokes the matching connection', async () => {
@@ -586,6 +642,134 @@ describe('bug report routes', () => {
       SELECT github_issue_state AS state
       FROM bug_reports WHERE submission_id = ?
     `).get(submissionId) as { state: string }).state).toBe('open')
+  })
+
+  it('applies current replay participant tombstones to inspected evidence', async () => {
+    const created = await invoke(
+      'POST',
+      '/api/v1/game-contexts/active-room/bug-reports',
+      { phenomenon: 'The game froze' },
+    )
+    const submissionId = (json(created).report as { submissionId: string }).submissionId
+    await invoke(
+      'PATCH',
+      `/api/v1/bug-reports/${submissionId}`,
+      { authorIdentity: 'hosted', confirmHosted: true },
+    )
+    await invoke('POST', `/api/v1/bug-reports/${submissionId}/submit`, {})
+    const frame = {
+      round: 1,
+      players: [{
+        id: 'p1',
+        name: 'Original Name',
+        minorHand: ['A'],
+        occupationHand: ['B'],
+      }],
+      log: [{
+        key: 'log.test',
+        playerId: 'p1',
+        params: { player: 'Original Name' },
+      }],
+      scores: [{
+        playerId: 'p1',
+        playerName: 'Original Name',
+        total: 42,
+      }],
+      engineStack: { frames: [] },
+    }
+    const encoded = encodeReplayFrame({
+      frame,
+      previousFrame: null,
+      stepNo: 5,
+      previousCheckpointStepNo: 5,
+    })
+    db.prepare(`
+      UPDATE game_replay_steps
+      SET payload_kind = ?, payload_gzip = ?, frame_hash = ?
+      WHERE room_id = 'active-room' AND step_no = 5
+    `).run(encoded.payloadKind, encoded.payloadGzip, encoded.frameHash)
+    db.prepare(`
+      UPDATE bug_reports SET frame_hash = ? WHERE submission_id = ?
+    `).run(encoded.frameHash, submissionId)
+    db.prepare(`
+      UPDATE game_contexts
+      SET lifecycle = 'completed', phase = NULL, replay_status = 'available'
+      WHERE room_id = 'active-room'
+    `).run()
+    db.prepare(`
+      UPDATE game_replays SET status = 'completed'
+      WHERE room_id = 'active-room'
+    `).run()
+    db.prepare(`
+      INSERT INTO game_results (
+        room_id, started_at, finished_at, rounds_played, player_count,
+        enable_community_deck, enable_parent_cards,
+        enable_through_the_seasons, enable_farmers_of_the_moor
+      ) VALUES ('active-room', 1, 2, 14, 1, 0, 0, 0, 0)
+    `).run()
+    db.prepare(`
+      INSERT INTO game_result_players (
+        room_id, player_index, game_player_id, user_id, display_name, score
+      ) VALUES (
+        'active-room', 0, 'p1', NULL, 'Deleted player (seat 1)', 42
+      )
+    `).run()
+
+    const inspected = await invoke(
+      'POST',
+      `/api/v1/bug-reports/${submissionId}/evidence/inspect`,
+      { perspective: 'open', reason: 'Investigating reported state' },
+      USER,
+      {},
+      true,
+    )
+
+    expect(inspected.statusCode).toBe(200)
+    expect(json(inspected).frame).toMatchObject({
+      players: [{ name: 'Deleted player (seat 1)' }],
+      log: [{ params: { player: 'Deleted player (seat 1)' } }],
+      scores: [{ playerName: 'Deleted player (seat 1)' }],
+    })
+  })
+
+  it('rate-limits maintainer evidence inspection before replay decoding', async () => {
+    const created = await invoke(
+      'POST',
+      '/api/v1/game-contexts/active-room/bug-reports',
+      { phenomenon: 'The game froze' },
+    )
+    const submissionId = (json(created).report as { submissionId: string }).submissionId
+    await invoke(
+      'PATCH',
+      `/api/v1/bug-reports/${submissionId}`,
+      { authorIdentity: 'hosted', confirmHosted: true },
+    )
+    await invoke('POST', `/api/v1/bug-reports/${submissionId}/submit`, {})
+    const insertAudit = db.prepare(`
+      INSERT INTO bug_report_evidence_audit (
+        submission_id, maintainer_user_id, room_id, step_no, frame_hash,
+        perspective, reason, created_at
+      ) VALUES (?, ?, 'active-room', 5, ?, 'reporter', 'test', ?)
+    `)
+    for (let index = 0; index < 30; index += 1) {
+      insertAudit.run(submissionId, USER.id, FRAME_HASH, Date.now())
+    }
+
+    const inspected = await invoke(
+      'POST',
+      `/api/v1/bug-reports/${submissionId}/evidence/inspect`,
+      { perspective: 'reporter' },
+      USER,
+      {},
+      true,
+    )
+
+    expect(inspected.statusCode).toBe(429)
+    expect(json(inspected)).toMatchObject({ code: 'rate_limited' })
+    expect((db.prepare(`
+      SELECT COUNT(*) AS count FROM bug_report_evidence_audit
+      WHERE maintainer_user_id = ?
+    `).get(USER.id) as { count: number }).count).toBe(30)
   })
 
   it('expires evidence only while the game context remains active', async () => {

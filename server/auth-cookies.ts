@@ -1,7 +1,6 @@
 export const SESSION_COOKIE = 'oa_session'
 export const ONBOARDING_COOKIE = 'oa_onboarding'
 export const OAUTH_STATE_COOKIE = 'oa_oauth_state'
-export const BUG_REPORT_OAUTH_STATE_COOKIE = 'oa_bug_report_oauth_state'
 
 type CookieOptions = {
   backendOrigin?: string
@@ -78,10 +77,6 @@ export function serializeOAuthStateCookie(state: string, options: CookieOptions 
   return `${OAUTH_STATE_COOKIE}=${encodeURIComponent(state)}; HttpOnly; ${sameSiteAttribute(options)}; Path=/; Max-Age=600${secureSuffix(options)}`
 }
 
-export function serializeBugReportOAuthStateCookie(state: string, options: CookieOptions = {}): string {
-  return `${BUG_REPORT_OAUTH_STATE_COOKIE}=${encodeURIComponent(state)}; HttpOnly; SameSite=Lax; Path=/api/v1/issue-submission-connection/github/callback; Max-Age=600${secureSuffix(options)}`
-}
-
 export function clearSessionCookie(options: CookieOptions = {}): string {
   return `${SESSION_COOKIE}=; HttpOnly; ${sameSiteAttribute(options)}; Path=/; Max-Age=0${secureSuffix(options)}${partitionedSuffix(options)}`
 }
@@ -92,8 +87,4 @@ export function clearOnboardingCookie(options: CookieOptions = {}): string {
 
 export function clearOAuthStateCookie(options: CookieOptions = {}): string {
   return `${OAUTH_STATE_COOKIE}=; HttpOnly; ${sameSiteAttribute(options)}; Path=/; Max-Age=0${secureSuffix(options)}`
-}
-
-export function clearBugReportOAuthStateCookie(options: CookieOptions = {}): string {
-  return `${BUG_REPORT_OAUTH_STATE_COOKIE}=; HttpOnly; SameSite=Lax; Path=/api/v1/issue-submission-connection/github/callback; Max-Age=0${secureSuffix(options)}`
 }

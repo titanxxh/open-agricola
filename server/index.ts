@@ -491,12 +491,16 @@ const server = createServer(async (req, res) => {
       WHERE type = 'table'
         AND name IN ('bug_reports', 'issue_submission_connections')
     `).all() as Array<{ name: string }>).map(({ name }) => name))
-    const hasBugReportData = (
+    const hasExternalBugReportData = (
       bugReportTables.has('bug_reports')
       && Boolean(database.prepare(`
         SELECT 1
         FROM bug_reports
         WHERE reporter_user_id = ?
+          AND (
+            submitted_at IS NOT NULL
+            OR github_issue_number IS NOT NULL
+          )
         LIMIT 1
       `).get(user.id))
     ) || (
@@ -508,7 +512,7 @@ const server = createServer(async (req, res) => {
         LIMIT 1
       `).get(user.id))
     )
-    if (hasBugReportData) {
+    if (hasExternalBugReportData) {
       if (!bugReportDelivery) {
         sendJson(res, 503, {
           ok: false,
@@ -530,6 +534,13 @@ const server = createServer(async (req, res) => {
         })
         return
       }
+    } else if (bugReportTables.has('bug_reports')) {
+      database.prepare(`
+        DELETE FROM bug_reports
+        WHERE reporter_user_id = ?
+          AND submitted_at IS NULL
+          AND github_issue_number IS NULL
+      `).run(user.id)
     }
     wssCtx?.lobby.endRoomsForUser(user.id, getAccountDeletionRoomIds(user.id))
     const result = deleteAccount(user.id)

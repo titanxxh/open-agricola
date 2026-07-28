@@ -600,6 +600,8 @@ export function runMigrations(db: Database.Database): void {
         );
         CREATE INDEX idx_bug_report_evidence_audit_submission
           ON bug_report_evidence_audit(submission_id, created_at);
+        CREATE INDEX idx_bug_report_evidence_audit_maintainer
+          ON bug_report_evidence_audit(maintainer_user_id, created_at);
 
         INSERT INTO game_contexts (
           room_id, lifecycle, phase, replay_status, expires_at, removal_reason, created_at, updated_at

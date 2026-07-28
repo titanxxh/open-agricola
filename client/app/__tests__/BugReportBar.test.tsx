@@ -137,6 +137,16 @@ describe('BugReportBar', () => {
           }),
         }, 201)
       }
+      if (url.endsWith('/api/v1/issue-submission-connection/github/start')) {
+        expect(init?.method).toBe('POST')
+        expect(JSON.parse(String(init?.body))).toEqual({
+          submissionId: 'submission-1',
+        })
+        return response({
+          ok: true,
+          authorizationUrl: '#github-authorize',
+        })
+      }
       throw new Error(`Unexpected request: ${url}`)
     })
     vi.stubGlobal('fetch', fetchMock)
@@ -150,18 +160,70 @@ describe('BugReportBar', () => {
     await user.click(screen.getByRole('button', { name: 'Continue' }))
     await user.click(await screen.findByRole('button', { name: 'Continue' }))
 
-    const connect = screen.getByRole('link', { name: 'Connect GitHub' })
-    expect(connect).toHaveAttribute(
-      'href',
-      '/api/v1/issue-submission-connection/github/start?submissionId=submission-1',
-    )
+    await user.click(screen.getByRole('button', { name: 'Connect GitHub' }))
     expect(createBody).toEqual({
       phenomenon: 'Wrong score',
       stepNo: 21,
       frameHash: FRAME_HASH,
     })
     expect(window.location.search).toContain('bugReport=submission-1')
-    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2))
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(3))
+  })
+
+  it('finishes GitHub connection from the app session after the OAuth callback', async () => {
+    window.history.replaceState(
+      null,
+      '',
+      '/?bugReport=submission-1&bugReportConnection=pending'
+        + '#bugReportOAuthState=state-1&bugReportOAuthCode=code-1',
+    )
+    const calls: Array<{ url: string; method: string; body: unknown }> = []
+    vi.stubGlobal('fetch', vi.fn(async (
+      input: string | URL | Request,
+      init?: RequestInit,
+    ) => {
+      const url = String(input)
+      const method = init?.method ?? 'GET'
+      const body = init?.body ? JSON.parse(String(init.body)) : null
+      calls.push({ url, method, body })
+      if (url.endsWith('/api/v1/issue-submission-connection/github/complete')) {
+        return response({
+          ok: true,
+          enabled: true,
+          connected: true,
+          githubUserId: '99',
+        })
+      }
+      if (isConnectionStatusRequest(url)) {
+        return response({
+          ok: true,
+          enabled: true,
+          connected: true,
+          githubUserId: '99',
+        })
+      }
+      if (url.endsWith('/api/v1/bug-reports/submission-1')) {
+        return response({
+          ok: true,
+          report: report(),
+          existingIssues: [],
+        })
+      }
+      throw new Error(`Unexpected request: ${method} ${url}`)
+    }))
+
+    renderBar({ roomId: 'room-1' })
+
+    expect(await screen.findByText(/Connected as GitHub user ID 99/))
+      .toBeInTheDocument()
+    expect(calls).toContainEqual({
+      url: expect.stringContaining(
+        '/api/v1/issue-submission-connection/github/complete',
+      ),
+      method: 'POST',
+      body: { state: 'state-1', code: 'code-1' },
+    })
+    expect(window.location.hash).toBe('')
   })
 
   it('does not expose an entry when new reports are disabled', async () => {
@@ -215,7 +277,7 @@ describe('BugReportBar', () => {
       await vi.advanceTimersByTimeAsync(3000)
     })
 
-    expect(screen.getByRole('link', { name: 'Connect GitHub' }))
+    expect(screen.getByRole('button', { name: 'Connect GitHub' }))
       .toBeInTheDocument()
   })
 
@@ -273,7 +335,7 @@ describe('BugReportBar', () => {
     }))
     await user.click(submit)
 
-    expect(await screen.findByRole('link', { name: 'Connect GitHub' }))
+    expect(await screen.findByRole('button', { name: 'Connect GitHub' }))
       .toBeInTheDocument()
   })
 

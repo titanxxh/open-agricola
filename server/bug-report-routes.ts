@@ -1,12 +1,6 @@
 import type Database from 'better-sqlite3'
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import type { AuthUser } from './auth.ts'
-import {
-  BUG_REPORT_OAUTH_STATE_COOKIE,
-  clearBugReportOAuthStateCookie,
-  readCookie,
-  serializeBugReportOAuthStateCookie,
-} from './auth-cookies.ts'
 import { corsHeaders, getRequestOrigin, normalizeOrigin } from './http-origin.ts'
 import {
   BugReportDelivery,
@@ -18,6 +12,8 @@ import {
   verifyGitHubWebhook,
 } from './bug-report/github-issue-client.ts'
 import { decodeReplayFrame, type JsonValue } from './game/replay-codec.ts'
+import { projectReplayParticipantNames } from './game/replay-store.ts'
+import type { ReplayGameState } from '../shared/contract/protocol/replay.ts'
 import type { SerializedGameState } from '../shared/session/serialization.ts'
 import { filterSerializedStateForPlayer } from '../shared/session/serialization.ts'
 
@@ -28,9 +24,12 @@ const EVIDENCE_ROUTE = /^\/api\/v1\/bug-reports\/([^/]+)\/evidence\/inspect$/
 const CONNECTION_ROUTE = '/api/v1/issue-submission-connection'
 const CONNECTION_START_ROUTE = '/api/v1/issue-submission-connection/github/start'
 const CONNECTION_CALLBACK_ROUTE = '/api/v1/issue-submission-connection/github/callback'
+const CONNECTION_COMPLETE_ROUTE = '/api/v1/issue-submission-connection/github/complete'
 const WEBHOOK_ROUTE = '/api/v1/github-app/webhook'
 const MAX_BODY_BYTES = 32 * 1024
 const MAX_WEBHOOK_BYTES = 1024 * 1024
+const EVIDENCE_INSPECTION_LIMIT = 30
+const EVIDENCE_INSPECTION_WINDOW_MS = 60 * 60 * 1000
 
 type BugReportRuntime = {
   db: Database.Database
@@ -185,15 +184,20 @@ const connectionReturnTo = (
 const redirectConnection = (
   res: ServerResponse,
   returnTo: string,
-  status: 'connected' | 'cancelled' | 'error',
-  extraHeaders: Record<string, string | string[]> = {},
+  status: 'pending' | 'cancelled' | 'error',
+  handoff?: { state: string; code: string },
 ): void => {
   const url = new URL(returnTo)
   url.searchParams.set('bugReportConnection', status)
+  if (handoff) {
+    url.hash = new URLSearchParams({
+      bugReportOAuthState: handoff.state,
+      bugReportOAuthCode: handoff.code,
+    }).toString()
+  }
   res.writeHead(302, {
     Location: url.toString(),
     'Cache-Control': 'no-store',
-    ...extraHeaders,
   })
   res.end()
 }
@@ -217,20 +221,48 @@ const inspectEvidence = (
   if (report.status !== 'submitted') {
     throw new BugReportError('evidence_requires_submitted_report', 409)
   }
+  const now = Date.now()
+  const recentInspections = runtime.db.prepare(`
+    SELECT COUNT(*) AS count
+    FROM bug_report_evidence_audit
+    WHERE maintainer_user_id = ? AND created_at >= ?
+  `).get(
+    maintainer.id,
+    now - EVIDENCE_INSPECTION_WINDOW_MS,
+  ) as { count: number }
+  if (recentInspections.count >= EVIDENCE_INSPECTION_LIMIT) {
+    throw new BugReportError('rate_limited', 429)
+  }
+  const perspective = input.perspective === 'open' ? 'open' : 'reporter'
+  const reason = typeof input.reason === 'string' ? input.reason.trim() : ''
+  if (perspective === 'open' && !reason) {
+    throw new BugReportError('evidence_reason_required', 400)
+  }
+  runtime.db.prepare(`
+    INSERT INTO bug_report_evidence_audit (
+      submission_id, maintainer_user_id, room_id, step_no, frame_hash,
+      perspective, reason, created_at
+    )
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+  `).run(
+    submissionId,
+    maintainer.id,
+    report.room_id,
+    report.step_no,
+    report.frame_hash,
+    perspective,
+    reason || 'reporter perspective inspection',
+    now,
+  )
   const context = runtime.db.prepare(`
     SELECT lifecycle FROM game_contexts WHERE room_id = ?
   `).get(report.room_id) as { lifecycle: string } | undefined
   if (
     context?.lifecycle !== 'completed'
     && report.evidence_expires_at !== null
-    && report.evidence_expires_at <= Date.now()
+    && report.evidence_expires_at <= now
   ) {
     throw new BugReportError('replay_segment_unavailable', 503)
-  }
-  const perspective = input.perspective === 'open' ? 'open' : 'reporter'
-  const reason = typeof input.reason === 'string' ? input.reason.trim() : ''
-  if (perspective === 'open' && !reason) {
-    throw new BugReportError('evidence_reason_required', 400)
   }
   const anchor = runtime.db.prepare(`
     SELECT checkpoint_step_no
@@ -271,28 +303,27 @@ const inspectEvidence = (
   if (!serialized || rows.at(-1)?.step_no !== report.step_no) {
     throw new BugReportError('replay_segment_unavailable', 503)
   }
-  const visible = perspective === 'open'
-    ? serialized
-    : filterSerializedStateForPlayer(
-        serialized,
-        serialized.players[report.player_index]?.id ?? null,
-      )
-  runtime.db.prepare(`
-    INSERT INTO bug_report_evidence_audit (
-      submission_id, maintainer_user_id, room_id, step_no, frame_hash,
-      perspective, reason, created_at
-    )
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-  `).run(
-    submissionId,
-    maintainer.id,
-    report.room_id,
-    report.step_no,
-    report.frame_hash,
-    perspective,
-    reason || 'reporter perspective inspection',
-    Date.now(),
+  const participantNames = new Map(
+    (runtime.db.prepare(`
+      SELECT player_index, display_name
+      FROM game_result_players
+      WHERE room_id = ?
+      ORDER BY player_index
+    `).all(report.room_id) as Array<{
+      player_index: number
+      display_name: string
+    }>).map(({ player_index, display_name }) => [player_index, display_name]),
   )
+  const projected = projectReplayParticipantNames(
+    serialized as unknown as ReplayGameState,
+    participantNames,
+  ) as unknown as SerializedGameState
+  const visible = perspective === 'open'
+    ? projected
+    : filterSerializedStateForPlayer(
+        projected,
+        projected.players[report.player_index]?.id ?? null,
+      )
   return {
     ok: true,
     submissionId,
@@ -374,48 +405,42 @@ export async function handleBugReportRoute(
     if (pathname === CONNECTION_CALLBACK_ROUTE && req.method === 'GET') {
       if (!runtime?.github) throw new BugReportError('bug_report_unavailable', 503)
       const state = url.searchParams.get('state') ?? ''
-      const cookieState = readCookie(
-        req.headers.cookie,
-        BUG_REPORT_OAUTH_STATE_COOKIE,
-      )
-      const clearCookie = clearBugReportOAuthStateCookie({
-        backendOrigin: getRequestOrigin(req),
-      })
-      if (!state || cookieState !== state) {
-        send(
-          res,
-          400,
-          errorPayload(new BugReportError('oauth_state_invalid', 400)),
-          { 'Set-Cookie': clearCookie },
-        )
-        return true
-      }
-      const consumed = runtime.store.consumeConnectionState(
-        state,
-        user?.id,
-      )
-      if (!consumed) {
-        send(
-          res,
-          400,
-          errorPayload(new BugReportError('oauth_state_invalid', 400)),
-          { 'Set-Cookie': clearCookie },
-        )
+      const returnTo = state
+        ? runtime.store.connectionStateReturnTo(state)
+        : null
+      if (!returnTo) {
+        send(res, 400, errorPayload(new BugReportError('oauth_state_invalid', 400)))
         return true
       }
       if (url.searchParams.get('error')) {
-        redirectConnection(res, consumed.returnTo, 'cancelled', {
-          'Set-Cookie': clearCookie,
-        })
+        const consumed = runtime.store.consumeConnectionState(state)
+        if (!consumed) throw new BugReportError('oauth_state_invalid', 400)
+        redirectConnection(res, consumed.returnTo, 'cancelled')
         return true
       }
       const code = url.searchParams.get('code')
-      if (!code) {
-        redirectConnection(res, consumed.returnTo, 'error', {
-          'Set-Cookie': clearCookie,
-        })
+      if (!code || code.length > 2048) {
+        const consumed = runtime.store.consumeConnectionState(state)
+        if (!consumed) throw new BugReportError('oauth_state_invalid', 400)
+        redirectConnection(res, consumed.returnTo, 'error')
         return true
       }
+      redirectConnection(res, returnTo, 'pending', { state, code })
+      return true
+    }
+
+    if (pathname === CONNECTION_COMPLETE_ROUTE && req.method === 'POST') {
+      const current = requireUser(res, user)
+      if (!runtime?.github) throw new BugReportError('bug_report_unavailable', 503)
+      const body = await readJson(req)
+      assertKeys(body, ['state', 'code'])
+      const state = typeof body.state === 'string' ? body.state : ''
+      const code = typeof body.code === 'string' ? body.code : ''
+      if (!state || state.length > 128 || !code || code.length > 2048) {
+        throw new BugReportError('oauth_state_invalid', 400)
+      }
+      const consumed = runtime.store.consumeConnectionState(state, current.id)
+      if (!consumed) throw new BugReportError('oauth_state_invalid', 400)
       try {
         const tokens = await runtime.github.exchangeCode(
           code,
@@ -424,13 +449,13 @@ export async function handleBugReportRoute(
         )
         const githubUserId = await runtime.github.githubUserId(tokens.accessToken)
         runtime.store.saveConnection(consumed.userId, githubUserId, tokens)
-        redirectConnection(res, consumed.returnTo, 'connected', {
-          'Set-Cookie': clearCookie,
+        send(res, 200, {
+          ok: true,
+          enabled: true,
+          ...runtime.store.connectionStatus(current.id),
         })
       } catch {
-        redirectConnection(res, consumed.returnTo, 'error', {
-          'Set-Cookie': clearCookie,
-        })
+        throw new BugReportError('github_connection_failed', 502)
       }
       return true
     }
@@ -467,30 +492,30 @@ export async function handleBugReportRoute(
       return true
     }
 
-    if (pathname === CONNECTION_START_ROUTE && req.method === 'GET') {
+    if (pathname === CONNECTION_START_ROUTE && req.method === 'POST') {
       const current = requireUser(res, user)
       const github = runtime?.github
       if (!runtime || !github || !isBugReportRuntimeReady(runtime)) {
         throw new BugReportError('bug_report_unavailable', 503)
       }
-      const submissionId = url.searchParams.get('submissionId') ?? ''
+      const body = await readJson(req)
+      assertKeys(body, ['submissionId'])
+      const submissionId = typeof body.submissionId === 'string'
+        ? body.submissionId
+        : ''
       const report = runtime.store.getOwned(submissionId, current.id)
       const state = runtime.store.createConnectionState(
         current.id,
         connectionReturnTo(report),
       )
-      res.writeHead(302, {
-        Location: github.authorizationUrl({
+      send(res, 200, {
+        ok: true,
+        authorizationUrl: github.authorizationUrl({
           state: state.state,
           codeChallenge: state.codeChallenge,
           redirectUri: callbackUrl(req),
         }),
-        'Cache-Control': 'no-store',
-        'Set-Cookie': serializeBugReportOAuthStateCookie(state.state, {
-          backendOrigin: getRequestOrigin(req),
-        }),
       })
-      res.end()
       return true
     }
 

@@ -186,6 +186,14 @@ vi.mock('../db.ts', () => {
       created_at INTEGER NOT NULL,
       updated_at INTEGER NOT NULL
     );
+    CREATE TABLE bug_reports (
+      submission_id TEXT PRIMARY KEY,
+      reporter_user_id TEXT REFERENCES users(id) ON DELETE SET NULL,
+      room_id TEXT NOT NULL REFERENCES game_contexts(room_id),
+      github_issue_number INTEGER,
+      submitted_at INTEGER,
+      phenomenon TEXT
+    );
     CREATE TABLE game_replays (
       room_id TEXT PRIMARY KEY REFERENCES game_contexts(room_id),
       schema_version INTEGER NOT NULL,
@@ -401,6 +409,12 @@ describe('auth routes', () => {
       DELETE FROM card_comments;
       DELETE FROM card_likes;
       DELETE FROM workshop_cards;
+      DELETE FROM bug_reports;
+      DELETE FROM game_replay_steps;
+      DELETE FROM game_replays;
+      DELETE FROM game_result_players;
+      DELETE FROM game_results;
+      DELETE FROM game_contexts;
       DELETE FROM room_players;
       DELETE FROM rooms;
       DELETE FROM account_invites;
@@ -485,6 +499,34 @@ describe('auth routes', () => {
     expect((getDb().prepare('SELECT COUNT(*) AS n FROM rooms WHERE id = ?').get('route-room') as { n: number }).n).toBe(0)
     expect(wsServerMocks.endRoomsForUser).toHaveBeenCalledWith(user.id, ['route-room'])
     expect(wsServerMocks.closeUserConnections).toHaveBeenCalledWith(user.id)
+  })
+
+  it('deletes an unsubmitted local bug report draft without GitHub delivery', async () => {
+    const user = await createLocalUserForTests('delete_draft', 'password123', 'Delete Draft')
+    const token = createSession(user.id)
+    const now = Date.now()
+    getDb().prepare(`
+      INSERT INTO game_contexts (
+        room_id, lifecycle, phase, replay_status, created_at, updated_at
+      ) VALUES (?, 'completed', NULL, 'available', ?, ?)
+    `).run('draft-room', now, now)
+    getDb().prepare(`
+      INSERT INTO bug_reports (
+        submission_id, reporter_user_id, room_id, phenomenon
+      ) VALUES (?, ?, ?, ?)
+    `).run('draft-submission', user.id, 'draft-room', 'The game froze')
+
+    const res = await requestJson('DELETE', '/api/auth/account', undefined, {
+      Cookie: `${SESSION_COOKIE}=${token}`,
+    })
+
+    expect(res.status).toBe(200)
+    expect(
+      (getDb().prepare('SELECT COUNT(*) AS n FROM bug_reports').get() as { n: number }).n,
+    ).toBe(0)
+    expect(
+      (getDb().prepare('SELECT COUNT(*) AS n FROM users WHERE id = ?').get(user.id) as { n: number }).n,
+    ).toBe(0)
   })
 
   it('uses cross-site cookie attributes for production frontend and backend origins', async () => {
