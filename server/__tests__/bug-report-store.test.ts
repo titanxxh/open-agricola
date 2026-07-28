@@ -253,6 +253,33 @@ describe('BugReportStore', () => {
     }).phenomenon).toHaveLength(2000)
   })
 
+  it('limits each user to five unfinished drafts', () => {
+    const roomId = insertContext('active')
+    const drafts = Array.from({ length: 5 }, (_, index) =>
+      store.createDraft({
+        userId: 'u1',
+        roomId,
+        phenomenon: `Problem ${index}`,
+      }))
+
+    expectBugReportError(
+      () => store.createDraft({
+        userId: 'u1',
+        roomId,
+        phenomenon: 'One draft too many',
+      }),
+      'bug_report_draft_limit',
+      429,
+    )
+
+    store.deleteDraft(drafts[0]!.submissionId, 'u1')
+    expect(store.createDraft({
+      userId: 'u1',
+      roomId,
+      phenomenon: 'Replacement draft',
+    }).status).toBe('draft')
+  })
+
   it('encrypts GitHub tokens and one-time PKCE state at rest', () => {
     store.saveConnection('u1', '99', {
       accessToken: 'access-secret',
@@ -353,6 +380,7 @@ describe('BugReportStore', () => {
     expectBugReportError(
       () => store.updateDraft(report.submissionId, 'u1', {
         authorIdentity: 'github_user',
+        confirmGitHub: true,
       }),
       'github_connection_required',
       409,
@@ -361,8 +389,16 @@ describe('BugReportStore', () => {
       accessToken: 'user-token',
       accessTokenExpiresAt: now + 3_600_000,
     })
+    expectBugReportError(
+      () => store.updateDraft(report.submissionId, 'u1', {
+        authorIdentity: 'github_user',
+      }),
+      'github_identity_confirmation_required',
+      400,
+    )
     store.updateDraft(report.submissionId, 'u1', {
       authorIdentity: 'github_user',
+      confirmGitHub: true,
     })
     store.queue(report.submissionId, 'u1')
     const adapter = successAdapter()
@@ -426,6 +462,7 @@ describe('BugReportStore', () => {
     })
     store.updateDraft(report.submissionId, 'u1', {
       authorIdentity: 'github_user',
+      confirmGitHub: true,
     })
     store.queue(report.submissionId, 'u1')
     const adapter: IssueDeliveryAdapter = {
@@ -623,6 +660,44 @@ describe('BugReportStore', () => {
       'bug_report_rate_limited',
       429,
     )
+  })
+
+  it('allows account deletion after a failed submission is discarded', async () => {
+    const roomId = insertContext('active')
+    const report = store.createDraft({
+      userId: 'u1',
+      roomId,
+      phenomenon: 'The game froze',
+    })
+    store.updateDraft(report.submissionId, 'u1', {
+      authorIdentity: 'hosted',
+      confirmHosted: true,
+    })
+    store.queue(report.submissionId, 'u1')
+    const claim = store.claim(report.submissionId)!
+    store.defer(claim, 'failed', 'github_permission_denied')
+    store.recordAttempt(report.submissionId, 'create', 'permission', now)
+    store.deleteDraft(report.submissionId, 'u1')
+
+    await new BugReportDelivery(
+      store,
+      successAdapter(),
+      'https://game.example',
+      () => now,
+    ).deleteReporter('u1')
+
+    expect(db.prepare(`
+      SELECT reporter_user_id, submitted_at, discarded_at
+      FROM bug_reports WHERE submission_id = ?
+    `).get(report.submissionId)).toMatchObject({
+      reporter_user_id: null,
+      submitted_at: now,
+      discarded_at: now,
+    })
+    expect(db.prepare(`
+      SELECT COUNT(*) AS count
+      FROM bug_report_attempts WHERE submission_id = ?
+    `).get(report.submissionId)).toEqual({ count: 1 })
   })
 
   it('anonymizes known Issues and revokes GitHub before account deletion', async () => {

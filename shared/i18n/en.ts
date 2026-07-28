@@ -1397,6 +1397,7 @@ export const en = {
       identityIntro: 'Choose your GitHub account or let the site GitHub App submit it for you.',
       githubUser: 'My GitHub account',
       githubUserBody: 'Connect GitHub before using this identity.',
+      githubUserConfirm: 'I understand GitHub will show my GitHub account as the public Issue author, and deleting my site account cannot anonymize that GitHub authorship.',
       connectedAs: 'Connected as GitHub user ID {id}',
       connectGithub: 'Connect GitHub',
       hosted: 'Hosted Issue Identity',

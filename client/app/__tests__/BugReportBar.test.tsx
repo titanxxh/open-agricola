@@ -253,9 +253,14 @@ describe('BugReportBar', () => {
     }))
     renderBar({ roomId: 'room-1' })
 
-    await user.click(await screen.findByRole('button', {
+    const submit = await screen.findByRole('button', {
       name: 'Submit Issue',
+    })
+    expect(submit).toBeDisabled()
+    await user.click(screen.getByRole('checkbox', {
+      name: /GitHub will show my GitHub account/,
     }))
+    await user.click(submit)
 
     expect(await screen.findByRole('link', { name: 'Connect GitHub' }))
       .toBeInTheDocument()

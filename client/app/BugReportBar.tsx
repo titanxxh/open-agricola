@@ -62,6 +62,7 @@ const errorKeys: Record<string, string> = {
   bug_report_forbidden: 'platform.bugReport.errors.not_participant',
   anchor_mismatch: 'platform.bugReport.errors.anchor_mismatch',
   bug_report_rate_limited: 'platform.bugReport.errors.rate_limited',
+  bug_report_draft_limit: 'platform.bugReport.errors.rate_limited',
   bug_report_room_limit: 'platform.bugReport.errors.rate_limited',
   github_connection_required: 'platform.bugReport.errors.github_connection_required',
   existing_issue_confirmation_required: 'platform.bugReport.errors.existing_issue_confirmation_required',
@@ -119,6 +120,7 @@ export function BugReportBar({
   const [existingIssues, setExistingIssues] = useState<ExistingIssue[]>([])
   const [phenomenon, setPhenomenon] = useState('')
   const [identity, setIdentity] = useState<'github_user' | 'hosted' | null>(null)
+  const [confirmGitHub, setConfirmGitHub] = useState(false)
   const [confirmHosted, setConfirmHosted] = useState(false)
   const [stage, setStage] = useState<1 | 2 | 3>(1)
   const [open, setOpen] = useState(false)
@@ -155,6 +157,9 @@ export function BugReportBar({
           setExistingIssues(existing ?? [])
           setPhenomenon(saved.phenomenon ?? '')
           setIdentity(saved.authorIdentity)
+          setConfirmGitHub(
+            saved.authorIdentity === 'github_user' && saved.status !== 'draft',
+          )
           setConfirmHosted(saved.authorIdentity === 'hosted')
           setStage(
             connectionResult || saved.authorIdentity || saved.status !== 'draft'
@@ -217,6 +222,7 @@ export function BugReportBar({
       setExistingIssues([])
       setPhenomenon('')
       setIdentity(null)
+      setConfirmGitHub(false)
       setConfirmHosted(false)
       setStage(1)
     }
@@ -300,6 +306,7 @@ export function BugReportBar({
             method: 'PATCH',
             body: JSON.stringify({
               authorIdentity: identity,
+              ...(identity === 'github_user' ? { confirmGitHub } : {}),
               ...(identity === 'hosted' ? { confirmHosted } : {}),
             }),
           },
@@ -348,6 +355,7 @@ export function BugReportBar({
       setExistingIssues([])
       setPhenomenon('')
       setIdentity(null)
+      setConfirmGitHub(false)
       setConfirmHosted(false)
       setStage(1)
       setOpen(false)
@@ -560,13 +568,27 @@ export function BugReportBar({
                     {t('platform.bugReport.connectGithub')}
                   </a>
                 ) : null}
+                {identity === 'github_user' ? (
+                  <label className="bug-report-confirm">
+                    <input
+                      type="checkbox"
+                      checked={confirmGitHub}
+                      disabled={!editable || busy}
+                      onChange={(event) => setConfirmGitHub(event.target.checked)}
+                    />
+                    <span>{t('platform.bugReport.githubUserConfirm')}</span>
+                  </label>
+                ) : null}
                 <label className={`bug-report-identity${identity === 'hosted' ? ' is-selected' : ''}`}>
                   <input
                     type="radio"
                     name={`bug-report-identity-${report.submissionId}`}
                     checked={identity === 'hosted'}
                     disabled={!editable || busy}
-                    onChange={() => setIdentity('hosted')}
+                    onChange={() => {
+                      setIdentity('hosted')
+                      setConfirmGitHub(false)
+                    }}
                   />
                   <span>
                     <strong>{t('platform.bugReport.hosted')}</strong>
@@ -626,6 +648,7 @@ export function BugReportBar({
                       || inFlightStatuses.has(report.status)
                       || !identity
                       || (identity === 'github_user' && !connection?.connected)
+                      || (identity === 'github_user' && !confirmGitHub)
                       || (identity === 'hosted' && !confirmHosted)
                     }
                     onClick={() => { void submit() }}

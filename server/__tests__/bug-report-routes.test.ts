@@ -183,6 +183,13 @@ describe('bug report routes', () => {
       'GET',
       '/api/v1/issue-submission-connection',
     ))).toMatchObject({ enabled: true })
+    const created = await invoke(
+      'POST',
+      '/api/v1/game-contexts/active-room/bug-reports',
+      { phenomenon: 'The game froze' },
+    )
+    const submissionId = (json(created).report as { submissionId: string })
+      .submissionId
 
     vi.stubEnv('BUG_REPORT_GITHUB_WEBHOOK_SECRET', '')
 
@@ -195,6 +202,24 @@ describe('bug report routes', () => {
       '/api/v1/game-contexts/active-room/bug-reports',
       { phenomenon: 'The game froze' },
     )).statusCode).toBe(503)
+
+    vi.stubEnv('BUG_REPORT_GITHUB_WEBHOOK_SECRET', 'webhook-secret')
+    for (const origin of ['', 'not-a-url']) {
+      vi.stubEnv('PUBLIC_APP_ORIGIN', origin)
+      expect(json(await invoke(
+        'GET',
+        '/api/v1/issue-submission-connection',
+      ))).toMatchObject({ enabled: false })
+      expect((await invoke(
+        'GET',
+        `/api/v1/issue-submission-connection/github/start?submissionId=${submissionId}`,
+      )).statusCode).toBe(503)
+      expect((await invoke(
+        'POST',
+        `/api/v1/bug-reports/${submissionId}/submit`,
+        {},
+      )).statusCode).toBe(503)
+    }
   })
 
   it('rejects client authority fields and fixes the active anchor on the server', async () => {
@@ -518,7 +543,7 @@ describe('bug report routes', () => {
     `).get(submissionId) as { state: string }).state).toBe('open')
   })
 
-  it('rejects expired active-game evidence before reading its replay frame', async () => {
+  it('expires evidence only while the game context remains active', async () => {
     const created = await invoke(
       'POST',
       '/api/v1/game-contexts/active-room/bug-reports',
@@ -546,5 +571,23 @@ describe('bug report routes', () => {
 
     expect(inspected.statusCode).toBe(503)
     expect(json(inspected)).toMatchObject({ code: 'replay_segment_unavailable' })
+
+    db.prepare(`
+      UPDATE game_contexts SET lifecycle = 'completed' WHERE room_id = 'active-room'
+    `).run()
+    db.prepare(`
+      DELETE FROM game_replay_steps WHERE room_id = 'active-room'
+    `).run()
+    const completed = await invoke(
+      'POST',
+      `/api/v1/bug-reports/${submissionId}/evidence/inspect`,
+      { perspective: 'reporter' },
+      USER,
+      {},
+      true,
+    )
+
+    expect(completed.statusCode).toBe(409)
+    expect(json(completed)).toMatchObject({ code: 'anchor_mismatch' })
   })
 })
