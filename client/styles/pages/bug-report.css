@@ -221,6 +221,14 @@
   font-weight: 700;
 }
 
+.bug-report-connect {
+  padding: 0;
+  border: 0;
+  background: none;
+  cursor: pointer;
+  font: inherit;
+}
+
 .bug-report-actions {
   padding-top: 4px;
 }

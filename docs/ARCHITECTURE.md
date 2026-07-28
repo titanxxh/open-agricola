@@ -1178,8 +1178,9 @@ DELETE /api/v1/bug-reports/:submissionId
 POST   /api/v1/bug-reports/:submissionId/evidence/inspect
 GET    /api/v1/issue-submission-connection
 DELETE /api/v1/issue-submission-connection
-GET    /api/v1/issue-submission-connection/github/start
+POST   /api/v1/issue-submission-connection/github/start
 GET    /api/v1/issue-submission-connection/github/callback
+POST   /api/v1/issue-submission-connection/github/complete
 POST   /api/v1/github-app/webhook
 ```
 
@@ -1219,12 +1220,12 @@ ADR-0014 使用下一可用迁移一次增加七张表；首个正式 Replay `sc
 
 - 创建 draft 时由服务端确认 Reporter 是 active `room_players` 或 completed `game_result_players` 中的原座位，并固定 `roomId + stepNo + frameHash`。现象 trim 后必须为 1–2000 个 Unicode 字符；不做语法或句号判断；每用户最多保留 5 个未提交草稿。
 - `github-issue-client` 的 production adapter 只接受服务端固定 Repository ID / Installation ID，不接受客户端 owner、repo、labels 或 URL。测试使用 fake adapter，覆盖成功、401、权限 403、限流 403/429、410/422、网络错误、5xx 和不确定结果对账。
-- 本人提交使用加密的 GitHub App user token，并要求玩家确认 GitHub 公开作者身份无法由站点删号匿名化；Hosted Issue Identity 使用不落盘的 installation token。连接失效绝不自动换作者。token/refresh token 使用 AES-256-GCM、每行独立 nonce/tag 和 `keyId`；PKCE verifier 同样加密且只活到 OAuth state 到期。每用户只保留一个 live Bug Report state，回调通过 API 域独立、非 Partitioned 的 Lax cookie 绑定发起浏览器，不依赖跨顶层站点不可见的分区 session。
+- 本人提交使用加密的 GitHub App user token，并要求玩家确认 GitHub 公开作者身份无法由站点删号匿名化；Hosted Issue Identity 使用不落盘的 installation token。连接失效绝不自动换作者。token/refresh token 使用 AES-256-GCM、每行独立 nonce/tag 和 `keyId`；PKCE verifier 同样加密且只活到 OAuth state 到期。每用户只保留一个 live Bug Report state；GitHub callback 只把 state/code 放进前端 URL fragment，前端回到原顶层上下文后用分区 session 调用 complete，服务端按当前站点用户消费 state 后才换取令牌。
 - SQLite executor 原子 claim 一个 `submissionId`。不确定响应先按正文稳定标记对账；重试和限流遵守 ADR-0012。客户端只轮询站内状态，不直接调用 GitHub。
 - Bug Report 底栏请求带当前 `roomId` 的 connection status；只有该用户是原参与者且 Room 已存在 Replay Step 时才启用入口。等待局、未录制局和 legacy no-replay 局返回明确的 anchor unavailable，不伪装成非参与者。
 - Issue 标题为清洗并截断的 `Game bug: <现象首行>`，正文不包含截图、日志、Frame payload、其他玩家身份或隐藏信息。issues-only 仓库自动化统一添加 `needs-triage`；通知使用 GitHub 原生 watching。
-- 主动断开立即删除令牌。删号先撤销 session/连接、匿名化站内数据并进入 `deletion_pending`，再由同一 installation adapter 修改已知 Issue 正文；已放弃但曾提交且 Issue 编号未知的报告先按 marker 对账。GitHub 回包确认正文不再含站点用户 id 后才清除最终内部关联。
-- 维护者全开 evidence 读取必须提供非空理由并写 `bug_report_evidence_audit`。Replay 下架由审计化运维 CLI 删除 Step payload、把 Context 改为 removed，并追加数据库外删除 ledger；共享内容资源仅在没有其他未下架 Replay 引用时删除，资源本身违规时先下架所有引用局。首版不做管理 UI。
+- 主动断开立即删除令牌。只有本地未提交草稿的账号可直接删除草稿和账号；存在连接、公开 Issue 或已进入交付的报告时，删号先撤销连接、匿名化站内数据并进入 `deletion_pending`，再由同一 installation adapter 修改已知 Issue 正文；已放弃但曾提交且 Issue 编号未知的报告先按 marker 对账。GitHub 回包确认正文不再含站点用户 id 后才清除最终内部关联。
+- 维护者全开 evidence 读取必须提供非空理由并写 `bug_report_evidence_audit`，每个维护者账号每小时最多读取 30 次；返回完成局证据前复用公开 Replay 的当前 Participant tombstone 投影。Replay 下架由审计化运维 CLI 删除 Step payload、把 Context 改为 removed，并追加数据库外删除 ledger；共享内容资源仅在没有其他未下架 Replay 引用时删除，资源本身违规时先下架所有引用局。首版不做管理 UI。
 - public resolver/manifest/Segment 使用独立 IP 读取额度和响应大小上限；active evidence、Bug Report 和维护者接口按账号限流。任何日志都不得输出 token、Frame payload、现象原文或原始 GitHub 响应。
 
 ### 11.9 部署、回滚与观测
