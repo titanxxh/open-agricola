@@ -1646,6 +1646,7 @@ export const en = {
     replayCardSnapshotDeclined: 'The room was not created because publishing the custom-card snapshot was not confirmed.',
     roomDissolved: 'Room has been dissolved',
     roomNetworkError: 'Could not connect to the game server. Check your network and try again.',
+    appLoadFailed: 'Page failed to load. A new version may be available. Reload to continue.',
     waitingForPlayers: 'Room {roomId} — Waiting for players ({current}/{max})',
     inviteLabel: 'Share this link to invite opponents:',
     copy: 'Copy',
