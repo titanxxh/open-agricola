@@ -14,7 +14,7 @@
 > 1. 本文件是 hook / phase / scope / actionId 的**人读镜像**：名字白名单由源码常量拥有（`cardEffectHooks` / `sandboxListenerPhases` / `sandboxListenerScopes` / `SANDBOX_ALLOWED_ACTION_IDS`），描述由穷尽 map 拥有；`CARD_DESIGNER_SYSTEM_PROMPT` 运行时渲染，**不再手工同步 prompt**。CI `pnpm run check:prompt-sync` 只校验本文件的 `prompt-sync` 块与源码名字一致。
 > 2. 让 `docs/CARD_DESIGN_PROMPT.md` / `docs/ARCHITECTURE.md` 引用本文件而不是各自维护一份
 
-> **官方卡作者**（在 `shared/cards/<deck>/<id>.ts` 里写 TS 模块）**不受**本文件约束 —— 直接 import `shared/game/player.ts` 等任意 helper。本文件只覆盖 Workshop 自定义卡。
+> **官方卡作者**（在 `shared/cards/<deck>/<id>.ts` 里写 TS 模块）**不受**本文件约束 —— 直接 import `shared/domain/player.ts` 等任意 helper。本文件只覆盖 Workshop 自定义卡。
 
 ---
 
@@ -44,7 +44,7 @@
 
 **不注入**任何项目内 helper。下面这一组在沙盒里调用会抛 `ReferenceError`：
 
-`familySize`, `workersAvailable`, `workersAtHome`, `getFenceCount`, `getPalisadeCount`, `countFields`, `countOccupations`, `countPeopleOnSpace`, `fieldHasCrop`, `fieldHasGrain`, `fieldHasVegetable`, `cardCountsAs`, `isEffectivelyMajor`, `holdWorkerOnCard`, `releaseWorkerFromCard`, `initCardState`, `incCounter`, `setCounter`, `setFlag`, ...（即 `shared/game/player.ts` / `shared/cards/__stubs__/helpers.ts` / `shared/cards/helpers/`* 里所有导出）。
+`familySize`, `workersAvailable`, `workersAtHome`, `getFenceCount`, `getPalisadeCount`, `countFields`, `countOccupations`, `countPeopleOnSpace`, `fieldHasCrop`, `fieldHasGrain`, `fieldHasVegetable`, `cardCountsAs`, `isEffectivelyMajor`, `holdWorkerOnCard`, `releaseWorkerFromCard`, `initCardState`, `incCounter`, `setCounter`, `setFlag`, ...（即 `shared/domain/player.ts` / `shared/cards/__stubs__/helpers.ts` / `shared/cards/helpers/`* 里所有导出）。
 
 **替代方案**：使用上述注入的 helper 函数，或直接读 `state` / `player` 字段（见 §4）。
 
@@ -131,7 +131,7 @@ const jsonSafe = JSON.parse(JSON.stringify(value ?? null))
 
 ### 2.1 `context.space` (ActionSpace) 可读字段
 
-`context.space` 的运行时形状是 `ActionDefinition + resources + takenBy`（见 `shared/game/types.ts:407`）。Listener handler 只应读以下字段：
+`context.space` 的运行时形状是 `ActionDefinition + resources + takenBy`（见 `shared/contract/types.ts` 的 `ActionDefinition`）。Listener handler 只应读以下字段：
 
 | 字段 | 类型 | 用途 |
 |------|------|------|
@@ -301,7 +301,7 @@ return {
 
 ## 4. `PlayerState` / `cardStates` 字段口径
 
-下面这些是 prompt / 文档高频踩坑点，已与 `shared/game/types.ts` 校准。
+下面这些是 prompt / 文档高频踩坑点，已与 `shared/contract/types.ts` 的 `PlayerState` 校准。
 
 ### 4.1 玩家字段
 
@@ -508,7 +508,7 @@ return {
 }
 ```
 
-`futureMeeplesAction.execute()` 识别 `params.__futureMeepleRequest`，把 entry 入队到 `state.pendingFutureMeeples`，下一回合开始时落到当回合行动卡格上。`FutureMeepleRequest` 还有 `{ startRound, count, resources }` 形式（多个回合连续放），见 `shared/game/types.ts:189`。
+`futureMeeplesAction.execute()` 识别 `params.__futureMeepleRequest`，把 entry 入队到 `state.pendingFutureMeeples`，下一回合开始时落到当回合行动卡格上。`FutureMeepleRequest` 还有 `{ startRound, count, resources }` 形式（多个回合连续放），见 `shared/contract/types.ts` 的 `FutureMeepleRequest`。
 
 ---
 

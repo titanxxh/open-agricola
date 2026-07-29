@@ -42,12 +42,17 @@ curl -sL -H "Authorization: Bearer $GH_TOKEN" \
 gh run view <RUN_ID> --log-failed
 ```
 
-## 手动触发 deploy-pages workflow
+## 手动触发部署 workflow
 
 ```bash
 curl -X POST -H "Authorization: Bearer $GH_TOKEN" \
   -H "Accept: application/vnd.github+json" \
   https://api.github.com/repos/titanxxh/open-agricola/actions/workflows/deploy-pages.yml/dispatches \
+  -d '{"ref":"main"}'
+
+curl -X POST -H "Authorization: Bearer $GH_TOKEN" \
+  -H "Accept: application/vnd.github+json" \
+  https://api.github.com/repos/titanxxh/open-agricola/actions/workflows/deploy-backend.yml/dispatches \
   -d '{"ref":"main"}'
 ```
 
@@ -64,7 +69,9 @@ curl -s -H "Authorization: Bearer $GH_TOKEN" \
   https://api.github.com/repos/titanxxh/open-agricola/actions/variables/VITE_API_BASE
 ```
 
-关键 variable：`VITE_API_BASE`（HTTPS 后端 base，如 `https://open-agricola.duckdns.org`）、`VITE_WS_BASE`（`wss://.../ws`）、`BGA_CDN_BASE_URL`。
+前端关键 variable：`VITE_API_BASE`（HTTPS 后端 base，如 `https://open-agricola.duckdns.org`）、`VITE_WS_BASE`（`wss://.../ws`）、`BGA_CDN_BASE_URL`。
+
+后端部署关键 variable：`DEPLOY_HOST`、`DEPLOY_USER`、`DEPLOY_REMOTE_DIR`、`ACCOUNT_REGISTRATION_POLICY`；还需 Actions secret `DEPLOY_SSH_PRIVATE_KEY`。
 
 ## 切换 GitHub Actions runner
 

@@ -8,7 +8,7 @@
 
 - 游戏逻辑测试优先站在前后端交互边界上做
 - 测试代码优先通过调用后端接口或后端命令驱动流程
-- 断言以服务端返回的 `state`、`pending`、`log`、`scores` 为主
+- 断言以服务端返回的 `state`、`interaction`、`state.log`、`scores` 为主
 - 前端渲染、控件展示、界面截图，单独作为渲染测试或 E2E 测试处理
 
 换句话说：
@@ -25,7 +25,7 @@
 - 大改良附带的卡牌效果
 - 行动触发型被动卡
 - 回合阶段触发型卡
-- 会引入 `pending`、follow-up action、额外选择、延迟效果的卡
+- 会引入等待交互、follow-up action、额外选择、延迟效果的卡
 
 不适用于：
 
@@ -46,19 +46,18 @@
 
 - 验证后端规则是否正确执行
 - 验证服务端状态变更是否符合预期
-- 验证 `pending`、`log`、卡牌局部状态是否正确
+- 验证 `interaction`、`state.log`、卡牌局部状态是否正确
 
 驱动方式：
 
 - 直接调用 `GameSession`
-- 或调用 `/api/game/*`
 - 或通过 WebSocket 发送命令消息
 
 断言对象：
 
 - `state`
-- `pending`
-- `log`
+- `interaction`
+- `state.log`
 - `scores`
 
 ### 3.2 前端渲染测试
@@ -101,7 +100,7 @@
 - 卡牌类型：职业 / 小改良 / 大改良附带效果
 - 触发时机
 - 生效对象：自己 / 对手 / 任意玩家
-- 是否会产生 `pending`
+- 是否会产生等待交互
 - 是否会修改 `cardStates`
 
 ### 4.2 测试目标
@@ -112,7 +111,7 @@
 - 这张卡在什么前置条件下会触发
 - 这张卡在什么情况下不应触发
 - 这张卡是否会写日志
-- 这张卡是否会改变后续 action / flow / pending
+- 这张卡是否会改变后续 action / flow / interaction
 
 ### 4.3 初始状态准备
 
@@ -137,24 +136,24 @@ Session 测试必须在首次行动前显式固定所有玩家的 `minorHand` �
 如果卡牌属于 action reaction listener、harvest field stage card-effect、before-end card-effect 或 extra-turn provider，且同一时机可能与另一张卡同时触发，测试必须覆盖 `trigger-select`：
 
 - 构造至少两张同一时机可触发的卡
-- 断言 pending / interaction 展示的是可选择的来源卡，而不是直接按打出区顺序执行
+- 断言 `interaction` 展示的是可选择的来源卡，而不是直接按打出区顺序执行
 - 分别选择不同来源卡，断言后续 flow、状态、日志和剩余 trigger 的重算符合预期
 - 覆盖 `undoStep` 或 `undoAction` 后重新派生同一 trigger-select 的场景
 
 ## 5. 推荐的后端入口清单
 
-卡牌测试优先使用后端边界驱动。当前架构下没有任何可用的 HTTP API（除 `/api/auth/*` 与极少量只读端点外）；所有规则相关的命令都走 WebSocket 或者直接调 `GameSession` / `RoomManager` 方法。
+卡牌测试优先使用后端边界驱动。房间规则主链路走 WebSocket；HTTP `game-router` 只用于 dev / sandbox / 测试辅助；Session 测试直接调用 `GameSession`。
 
 ### 5.1 三种推荐驱动方式
 
 按从轻到重排序：
 
-1. **直接 `new GameSession(seed?, customCards?)` + 调方法**（绝大多数 `server/__tests__/*.test.ts` 的写法）
+1. **直接 `new GameSession(stateOrSeed?, customCards?, initialStateOptions?)` + 调方法**（绝大多数 `server/__tests__/*.test.ts` 的写法）
    - 不经网络，跑得最快；最适合"卡牌效果是否触发、状态怎么变"这类断言
    - 入口方法见 §5.3
-2. **`server/test-utils/createTestRoomManager()` 起一个内存 `RoomManager`**
+2. **通过 `server/connection/room-router.ts` 驱动内存房间**
    - 当需要验证多窗口同步、`stateUpdate` 广播、断线重连时使用
-   - 收发的就是真实 `ClientCommand` / `ServerEvent`
+   - 复用 `server/connection/__tests__/room-router.test.ts` 的 `RoomRegistry`、`Broadcaster`、内存 persistence 与 `dispatch` 组合
 3. **Playwright E2E（`e2e-tests/*.spec.ts`）**
    - 仅在需要验证浏览器 UI 主路径或多窗口同步时用；规则断言不放在这层
 
@@ -162,13 +161,12 @@ Session 测试必须在首次行动前显式固定所有玩家的 `minorHand` �
 
 不要假设存在 `POST /api/game/dev/*`。当前可用的状态预设方式有：
 
-- **`GameSession.loadGame(state)`** —— 直接灌入一份手工构造的 `SerializedGameState`（`shared/game/serialization.ts`）；测试里最常用
+- **`GameSession.loadState(state)`** —— 加载一份 `SerializedGameState`（`shared/session/serialization.ts`）
 - **WS `devSetResources` / `devSetRound` / `devDrawCard` / `devPlayCard` / `devCreatePasture`** —— 在 dev 房间里按需调整
 - **直接在 GameSession 实例上 mutate**（仅限单测，不要在跨网络场景使用）：
   - 改 `session.state.players[i].resources`
   - `session.state.players[i].minorPlayed.push(CARD_ID)`
   - `session.state.actionSpaces[k].takenBy.push({ playerId, workerId })`
-- **`shared/test-utils/*` helper**（如 `playMinorImprovementForTest`、`giveCardToHandForTest`）—— 用于让"卡牌已经打出 / 已经在手"成立
 
 ### 5.3 GameSession 主入口（最常用）
 
@@ -176,16 +174,16 @@ Session 测试必须在首次行动前显式固定所有玩家的 `minorHand` �
 |---|---|---|---|
 | `takeAction(playerIndex, spaceId)` | `takeAction` | `action` | 放工人 / 触发主行动 |
 | `takeAnytimeAction(playerIndex, actionId)` | `takeAnytimeAction` | `anytime` | 触发 anytime 卡牌效果 |
-| `resolveChoice(playerIndex, value)` | `resolveChoice` | `choice` | 在 `interaction.stateId === 'choice'` 时回应 |
+| `resolveChoice(playerIndex, value, payload?)` | `resolveChoice` | `choice` | 回应 `interaction.stateId === 'wait'` 下的 choice / confirm / feed / animal-reorg |
 | `commitSelectionChoice(playerIndex, payload)` | `commitSelection` | `commitSelection` | 围栏 / 房间 / 马厩 / 犁地 / 播种 / farm-position / occupation-hand / resource selection 提交 |
 | `performRoundEnd()` | — | `roundEnd` | 推进回合（一般由引擎自动触发） |
 | `undoStep()` / `undoAction()` | `undoStep` / `undoAction` | `undoStep` / `undoAction` | 单步 / 整动作回退 |
 
 > **协议名 vs 引擎名**：WS `ClientCommand.type` 与 `interaction.allowedCommands` 字符串并不完全相同（详见 `ARCHITECTURE.md §7.2`）。测试里如果直接调 `GameSession`，用左一列；如果走 WS，用右一列。
 
-### 5.4 WebSocket 命令（若走 RoomManager 路径）
+### 5.4 WebSocket 命令（若走房间路径）
 
-以 `shared/protocol/ws.ts` 中 `ClientCommand` 定义为准。常用：
+以 `shared/contract/protocol/ws.ts` 中 `ClientCommand` 定义为准。常用：
 
 - `createRoom` / `joinRoom` / `dissolveRoom`
 - `getState`
@@ -196,7 +194,7 @@ Session 测试必须在首次行动前显式固定所有玩家的 `minorHand` �
 - `newGame` / `loadGame`
 - `devSetResources` / `devSetRound` / `devDrawCard` / `devPlayCard` / `devCreatePasture`
 
-服务端事件（`ServerEvent`）主要看 `stateUpdate`（包含 `state` / `pending` / `interaction` / `log` / `scores` 等），其它握手事件不在卡牌规则断言的关心范围内。
+服务端事件（`ServerEvent`）主要看 `stateUpdate.payload`（包含 `state` / `interaction` / `scores` 等；日志在 `state.log`），其它握手事件不在卡牌规则断言的关心范围内。
 
 ## 6. 每一步必须断言哪些字段
 
@@ -207,11 +205,11 @@ Session 测试必须在首次行动前显式固定所有玩家的 `minorHand` �
 - `state.players[n].resources`
 - `state.players[n].minorPlayed` / `occupationPlayed` / `improvements`
 - `getPlayedCardKeys(state.players[n])`（聚合上述三类）
-- `state.players[n].cardStates[CARD_ID]?.{ flags, counts, extraData, ... }`
+- `state.players[n].cardStates[CARD_ID]?.{ flagged, counters, extraData, stack, ... }`
 - `state.players[n].workers`（Worker 身份模型，每个槽含 `id` / `isActive` / `isNewborn`）
-- `familySize(player)` / `workersAvailable(state, player)` / `workersAtHome(state, player)`（`shared/game/player.ts` helper，**不是字段**——直接读 `player.workers` 数组得到的是含 supply slot 的全部槽位，必须走 helper 才能得到游戏意义上的"家庭人数 / 在家可用人数"）
+- `familySize(player)` / `workersAvailable(state, player)` / `workersAtHome(state, player)`（`shared/domain/player.ts` helper，**不是字段**——直接读 `player.workers` 数组得到的是含 supply slot 的全部槽位，必须走 helper 才能得到游戏意义上的"家庭人数 / 在家可用人数"）
 - `state.players[n].fields` / `pastures` / `stableTiles` / `roomTiles`
-- `state.players[n].fences`（**`FenceSegment[]` 数组**，2026-04-17 由数值字段升级）
+- `state.players[n].fenceSegments`（`FenceSegment[]` 数组）
 - `getFenceCount(player)` / `getPalisadeCount(player)`（fence 计数 helper）
 - `countFields(player)` / `countOccupations(player)`（聚合自有 + 卡牌虚拟身份；用于 prereq）
 - `countPeopleOnSpace(state, spaceId)`（`shared/cards/helpers/space-occupancy.ts`，A25 等卡用到）
@@ -228,16 +226,16 @@ Session 测试必须在首次行动前显式固定所有玩家的 `minorHand` �
 
 ### 6.3 交互状态
 
-旧版 `PendingAction` 顶层字段已经被拆成 `pending` + `interaction` 两层，断言时优先看 `interaction`：
+`InteractionState` 是前端交互真相：
 
-- `pending.type`：`none` / `choice` / `confirmNextPlayer` / `confirmPlayerSwitch` 等粗粒度阶段
-- `pending.playerIndex`：当前需要响应交互的玩家
-- `pending.sourceCard`：（2026-04-19 新增）触发本次 choice/farmSelect/selection 的来源卡 id；前端 `InteractionBar` 据此显示"由 {card} 触发"
-- `interaction.stateId`：细粒度——`idle` / `choice` / `farmSelect` / `selection` / `animalReorg` / `harvestFeed` / `confirmNextPlayer` / `confirmPlayerSwitch`
+- `interaction.stateId`：`idle` / `wait` / `gameover`
+- `interaction.playerIndex`（`wait`）：当前需要响应的玩家
+- `interaction.sourceCard`（`wait`）：触发本次交互的来源卡 id
+- `interaction.request.kind`（`wait`）：`choice` / `farm-select` / `selection` / `animal-reorg` / `feed` / `confirm-next-player` / `confirm-player-switch` 等具体请求
 - `interaction.allowedCommands`：当前 player 允许调用的引擎命令名白名单（不在白名单里的会被拒）
-- `interaction.options`（choice 模式）：候选项数组，每项含 `value` / `labelKey` / `effectPreview?` / `sourceCard?`
-- `interaction.farmSelect`（farmSelect 模式）：farmType + payload schema
-- `interaction.selection`（selection 模式）：`selectionKind` / `positionFilter` / `selectableTiles`
+- `interaction.request.options`（choice 模式）：候选项数组
+- `interaction.request.farm`（farm-select 模式）：farmType + payload schema
+- `interaction.request.selection`（selection 模式）：选择类型与候选项
 - `interaction.promptKey` / `promptParams`：i18n key 与参数
 
 ### 6.4 日志与分数
@@ -245,7 +243,7 @@ Session 测试必须在首次行动前显式固定所有玩家的 `minorHand` �
 - `log[0].key`
 - `log[0].params`
 - 是否新增了目标日志（避免误触发别的 listener 也写了日志）
-- `scores`（`server/game-session.ts` 的 `getScores()` / `getFinalScores()`）
+- `resp.scores`（WS 路径为 `stateUpdate.payload.scores`）
 
 ## 7. 卡牌测试模板
 
@@ -262,10 +260,10 @@ Session 测试必须在首次行动前显式固定所有玩家的 `minorHand` �
 - 类型：职业 / 小改良 / 大改良附带效果
 - 触发时机：`TRIGGER_TIMING`（hook phase 或 listener `actions` + `phases`）
 - 生效范围：自己 / 对手 / 任意玩家（对应 `registerCardListener` 的 `scope`）
-- 是否产生 `pending`：是 / 否（若是，说明 `interaction.stateId` 走的是 `choice` / `farmSelect` / `selection` 哪一种）
-- 是否写 `cardStates`：是 / 否（若是，列出 `flags` / `counts` / `extraData` 的 key）
+- 是否产生等待交互：是 / 否（若是，说明 `interaction.request.kind`）
+- 是否写 `cardStates`：是 / 否（若是，列出 `flagged` / `counters` / `extraData` / `stack` 的 key）
 - 是否声明 `handHooks`：是 / 否（在手牌时也触发的 hook 列表，目前仅 E96 Elder 用到）
-- 是否需要透传 `sourceCard`：是 / 否（卡牌触发的 choice/farmSelect/selection 都应在 pending/interaction 里带 sourceCard）
+- 是否需要透传 `sourceCard`：是 / 否（卡牌触发的 choice / farm-select / selection 应在 `interaction` 里带 `sourceCard`）
 
 ### B. 测试目标
 
@@ -278,7 +276,7 @@ Session 测试必须在首次行动前显式固定所有玩家的 `minorHand` �
 
 #### C.1 开局
 
-1. `const session = new GameSession(seed)`（默认 2 人；如需 3/4 人传 `customCards` 之外的初始配置或用 `createSessionForRoom(maxPlayers)`）
+1. `const session = new GameSession(seed)`（默认 2 人；如需 3/4 人使用 `new GameSession(seed, undefined, { playerCount })`）
 2. 确认 `session.state.players.length === expectedPlayerCount`
 
 #### C.2 设置当前玩家 / 推进到目标阶段
@@ -292,27 +290,26 @@ Session 测试必须在首次行动前显式固定所有玩家的 `minorHand` �
 
 ```ts
 state.players[0].resources = {
-  wood: 0, clay: 0, reed: 0, stone: 0,
-  food: 0, grain: 0, vegetable: 0,
-  sheep: 0, boar: 0, cattle: 0,
+  ...state.players[0].resources,
+  food: 0,
 }
 ```
 
-如果走 RoomManager / WS，则发 `devSetResources` 命令。
+如果走 WS，则发 `devSetResources` 命令。
 
 #### C.4 设置卡牌
 
 - 单测：`state.players[X].minorPlayed.push(CARD_ID)` 或 `occupationPlayed.push(...)` / `improvements.push(...)`
-- 如果需要触发 `onBuy`，用 `playMinorImprovementForTest` 之类 helper 或者通过 `takeAction` 走真实路径
+- 如果需要触发 `onBuy`，通过 `takeAction` 走真实购买路径
 - 走 WS：`devPlayCard` / `devDrawCard`
 
 #### C.5 设置版图 / 行动格 / 特殊前置条件
 
 按需要补充：
 
-- 行动格占用：`state.actionSpaces[k].takenBy.push({ playerIndex: X, workerId: state.players[X].workers[i].id })`
+- 行动格占用：`state.actionSpaces[k].takenBy.push({ playerId: state.players[X].id, workerId: state.players[X].workers[i].id })`
 - 圈地 / 田地 / 马厩 / 房间：直接 mutate `pastures` / `fields` / `stableTiles` / `roomTiles`，或调 `commitSelectionChoice` 走真实路径
-- 预置 `cardStates`：`state.players[X].cardStates[CARD_ID] = { flags: {...}, counts: {...}, extraData: {...} }`
+- 预置 `cardStates`：`state.players[X].cardStates[CARD_ID] = { flagged: true, counters: {...}, extraData: {...} }`
 - 预设回合 / 阶段：`state.round = R` + `performRoundEnd()`
 
 #### C.6 Reading global `completedFeedingPhases` in tests
@@ -321,13 +318,12 @@ state.players[0].resources = {
 
 ```ts
 const session = new GameSession(SEED)
-const core = (session as unknown as { core: { state: GameState } }).core
-core.state.completedFeedingPhases = 3   // 模拟玩家已经经历 3 次收获
-core.state.players[0].minorPlayed.push('A148_Woolgrower')
+session.state.completedFeedingPhases = 3
+session.state.players[0].occupationPlayed.push('A148_Woolgrower')
 // 之后 onComputeAnimalZones(player, zones, state) 读到 cap = 3
 ```
 
-如果测试要验证"feeding phase 真正 +1"，跑完整收获 phase（`runHarvestPhase` 或多次 `confirmHarvestFeed`）后断言 `core.state.completedFeedingPhases` 单调递增。
+如果测试要验证"feeding phase 真正 +1"，通过 `performRoundEnd()` 和后续 `resolveChoice()` 跑完整收获流程，再断言 `session.state.completedFeedingPhases` 单调递增。
 
 ### D. 测试步骤
 
@@ -343,43 +339,36 @@ const resp = session.takeAction(X, 'ACTION_ID')
 - `resp.state.players[X].resources`
 - `resp.state.players[X].cardStates[CARD_ID]`
 - `resp.state.actionSpaces[*].takenBy`
-- `resp.pending` / `resp.interaction`
-- `resp.log`
+- `resp.interaction`
+- `resp.state.log`
 
-#### D.2 步骤 2：如果产生选择，则提交 choice / farmSelect / selection
+#### D.2 步骤 2：如果产生等待交互，则按 request kind 提交
 
-按 `interaction.stateId` 调对应方法：
+先断言 `interaction.stateId === 'wait'`，再按 `interaction.request.kind` 调对应方法：
 
-```ts
-// stateId === 'choice'
-session.resolveChoice(X, 'CHOICE_VALUE')
-
-// farm-select / selection / resource selection
-session.commitSelectionChoice(X, { edges: [...] })
-session.commitSelectionChoice(X, { tile: { row, col } })
-session.commitSelectionChoice(X, { positions: [{ row, col }, ...] })
-```
+- `choice`：`session.resolveChoice(X, 'CHOICE_VALUE')`
+- `animal-reorg`：`session.resolveChoice(X, 'confirm', interaction.request.zones)`
+- `feed`：`session.resolveChoice(X, 'confirm', { selections: [...] })`
+- `confirm-next-player`：`session.resolveChoice(interaction.request.nextPlayerIndex, 'confirm')`
+- `confirm-player-switch`：`session.resolveChoice(interaction.request.toPlayerIndex, 'confirm')`
+- `farm-select` / `selection`：`session.commitSelectionChoice(X, payload)`
 
 断言：
 
-- `interaction.stateId` 是否回到 `idle` 或进入下一个交互状态
+- `interaction.stateId` 是否回到 `idle` 或进入下一个 `wait`
 - `state.players[X].resources` / `cardStates`
-- `log`
+- `state.log`
 
-#### D.3 步骤 3：动物重整 / 喂食 / 下一玩家确认 / 回合结束
+#### D.3 步骤 3：回合结束
 
 按需调用：
 
-- `confirmAnimalReorg(X, zones)`
-- `confirmHarvestFeed(X, selections)`
-- `confirmNextPlayer()`
-- `confirmPlayerSwitch()`
 - `performRoundEnd()`（一般引擎自动触发，测试里手动调用主要用于断言"回合结束 hook 是否触发"）
 
 每一步都要记录：
 
 - 请求参数
-- 响应中的 `pending` / `interaction`
+- 响应中的 `interaction`
 - 响应中的关键状态变化
 - 新增日志
 
@@ -391,7 +380,7 @@ session.commitSelectionChoice(X, { positions: [{ row, col }, ...] })
 - 哪个行动格状态变化
 - 是否新增 / 移除某张卡
 - `cardStates[cardId]` 如何变化
-- `pending` 如何变化
+- `interaction` 如何变化
 - `log` 增加了哪些条目
 
 ### F. 日志断言
@@ -421,7 +410,7 @@ session.commitSelectionChoice(X, { positions: [{ row, col }, ...] })
 
 - 前端是否展示正确的按钮 / 提示 / 日志
 - 当前玩家与非当前玩家是否正确区分为可交互 / 只读
-- 如果有 `pending`，对应控件是否正确显示
+- 如果有 `wait` interaction，对应控件是否正确显示
 
 ### I. E2E 测试
 
@@ -439,7 +428,7 @@ session.commitSelectionChoice(X, { positions: [{ row, col }, ...] })
 每一步推荐按下面顺序断言：
 
 1. `resp.ok`
-2. `resp.pending`
+2. `resp.interaction`
 3. `resp.state.currentPlayerIndex`
 4. `resp.state.players[targetPlayerIndex]`
 5. `resp.state.actionSpaces`
@@ -464,7 +453,7 @@ session.commitSelectionChoice(X, { positions: [{ row, col }, ...] })
   - 站在 `GameSession` 边界的集成测试（**主战场**——目前 `server/__tests__/` 下绝大多数卡牌测试都是这种命名）
 
 - `e2e-tests/CARD_ID.spec.ts`
-  - Playwright，只在需要验证真实 UI / 多窗口同步时增加（如 `e2e-tests/C022_BasketChair.spec.ts`）
+  - Playwright，只在需要验证真实 UI / 多窗口同步时增加（如 `e2e-tests/C22_BasketChair.spec.ts`）
 
 并不是每张卡都必须三层都写满，但至少要满足：
 
@@ -478,7 +467,7 @@ session.commitSelectionChoice(X, { positions: [{ row, col }, ...] })
 ```ts
 // server/__tests__/CXX_SomeCard-session.test.ts
 import { describe, it, expect } from 'vitest'
-import { GameSession } from '../game-session'
+import { GameSession } from '../game/authoritative-session'
 
 describe('CXX_SomeCard', () => {
   it('在 fishing 后给玩家额外 1 食物', () => {
@@ -494,8 +483,8 @@ describe('CXX_SomeCard', () => {
     expect(resp.ok).toBe(true)
     expect(resp.state.players[0].resources.food).toBe(EXPECTED_FOOD)
     expect(resp.state.players[0].cardStates.CXX_SomeCard).toBeDefined()
-    expect(resp.interaction.stateId === 'idle' || resp.interaction.stateId === 'confirmNextPlayer').toBe(true)
-    expect(resp.log[0].key).toBe('EXPECTED_LOG_KEY')
+    expect(['idle', 'wait']).toContain(resp.interaction.stateId)
+    expect(resp.state.log[0].key).toBe('EXPECTED_LOG_KEY')
   })
 
   it('未打出该卡时 fishing 不触发额外效果（负向）', () => {

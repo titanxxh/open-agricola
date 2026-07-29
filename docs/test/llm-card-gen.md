@@ -110,7 +110,7 @@ interface CardFixture {
   // 驱动场景（takeAction / resolveChoice / performRoundEnd / …）
   trigger: (session, ctx) => TriggerResult
 
-  // 断言 state / pending / scores
+  // 断言 state / interaction / scores
   assert: (session, ctx, result) => FixtureResult
 }
 ```
@@ -135,10 +135,12 @@ interface CardFixture {
 
 ### 多步骤行动
 
-连续 `takeAction` 之间可能进 `confirmNextPlayer` pending（比如轮到对手但对手没工人）。fixture trigger 内循环处理：
+连续 `takeAction` 之间可能进入 `interaction.request.kind === 'confirm-next-player'`（比如轮到对手但对手没工人）。fixture trigger 内循环处理：
 
 ```ts
-if (resp.pending.type === 'confirmNextPlayer') resp = session.confirmNextPlayer()
+if (resp.interaction.stateId === 'wait' && resp.interaction.request.kind === 'confirm-next-player') {
+  resp = confirmNextPlayer(session)
+}
 ```
 
 单回合内同一玩家多次 action 还需要：
@@ -151,7 +153,7 @@ setActiveWorkerCount(p1, 0)          // 对手零工人，避免轮转
 
 ### 末回合 scoring（M4 模式）
 
-`autoAdvanceRoundEnd(session, { maxIterations })` helper 把 `performRoundEnd` / `confirmHarvestFeed` / `confirmAnimalReorg` / `confirmNextPlayer` / `confirmPlayerSwitch` pendings 全消化到 `gameOver`。**会自动把 supply 里的动物放到 pasture/house/stable**（贪心 greedy），保证 `cattle` / `sheep` / `boar` 不被丢失。
+`autoAdvanceRoundEnd(session, { maxIterations })` helper 用 `performRoundEnd` 和 `resolveChoice` 消化 feed / animal-reorg / confirm-next-player / confirm-player-switch 等等待交互，直到 `gameOver`。**会自动把 supply 里的动物放到 pasture/house/stable**（贪心 greedy），保证 `cattle` / `sheep` / `boar` 不被丢失。
 
 读 per-card bonus VP 要用 `getBonusBreakdownForSession(session, playerIndex)`（wraps `runBonusSolver` in `withCtx`）——直接跑 `computeScores(state).categories.cardStateBonusVp` 只拿到总和，丢失 cardId。
 
@@ -176,5 +178,4 @@ setActiveWorkerCount(p1, 0)          // 对手零工人，避免轮转
 ## 历史
 
 - 2026-04-23 套件初版（9 fixture，hook-level 断言：`invokeCustomCodeEffect` / `invokeCustomCodeListener` 验证 LLM 代码形状）
-- 2026-04-24 重写到 session-driven：每个 fixture 真的装进 `GameSession` 里跑起来断 `state` / `pending` / `scores`，能验"游戏中跑起来是否符合预期"而不是"编出来的 ActionFlow 是不是预期形状"
-
+- 2026-04-24 重写到 session-driven：每个 fixture 真的装进 `GameSession` 里跑起来断 `state` / `interaction` / `scores`，能验"游戏中跑起来是否符合预期"而不是"编出来的 ActionFlow 是不是预期形状"

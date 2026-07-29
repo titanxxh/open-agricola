@@ -50,7 +50,7 @@ sudo usermod -aG docker $USER
 ```bash
 git clone https://github.com/YOUR_USER/open-agricola.git
 cd open-agricola
-git checkout platform
+git checkout main
 ```
 
 #### 配置环境变量
@@ -401,7 +401,7 @@ docker compose logs -f app
 ### 前置条件
 
 - GitHub 仓库 Settings → Pages → Source 选 **GitHub Actions**
-- 仓库 Settings → Environments → `github-pages` → Deployment branches 允许你的分支（如 `platform`）
+- 仓库 Settings → Environments → `github-pages` → Deployment branches 允许 `main` / `ui`
 
 ### 配置
 
@@ -411,10 +411,11 @@ docker compose logs -f app
 |----------|---|------|
 | `VITE_API_BASE` | 后端完整 URL | `https://api.your-domain.com` 或 `http://VPS_IP:5175`（仅 HTTP 方案） |
 | `VITE_WS_BASE` | WebSocket URL（可选，自动推导） | `wss://api.your-domain.com/ws` |
+| `BGA_CDN_BASE_URL` | BGA 图片 CDN 根地址 | 与 `.env.example` 保持一致 |
 
 ### 触发部署
 
-Push 到 `platform` 分支会自动触发 `.github/workflows/deploy-pages.yml`。也可以在 Actions 页面手动触发（workflow_dispatch）。
+`main` / `ui` 的 CI 成功且前端相关路径变化后，`.github/workflows/deploy-pages.yml` 自动部署。也可以在 Actions 页面手动触发。
 
 部署成功后访问：`https://YOUR_USER.github.io/open-agricola/`
 
@@ -435,6 +436,10 @@ pnpm dlx gh-pages -d dist
 
 ### 后端
 
+`main` 的 CI 成功且后端相关路径变化后，`.github/workflows/deploy-backend.yml` 自动调用 `deploy-backend.sh`。需要配置 Actions variables `DEPLOY_HOST`、`DEPLOY_USER`、`DEPLOY_REMOTE_DIR`、`ACCOUNT_REGISTRATION_POLICY`，以及 secret `DEPLOY_SSH_PRIVATE_KEY`。
+
+手动更新：
+
 ```bash
 cd open-agricola
 git pull
@@ -447,15 +452,15 @@ docker compose -f docker-compose.prod.yml up -d --build
 
 ### 前端
 
-Push 到 `platform` 分支即可自动重新部署。
+`main` / `ui` 的 CI 成功且前端相关路径变化后自动重新部署。
 
 ---
 
 ## Auth OAuth
 
-生产环境必须配置 OAuth 登录/注册。直接调用 `/api/auth/register` 已禁用。
+生产环境可启用密码注册（需要 Resend 邮箱验证）和 GitHub / Google OAuth；`ACCOUNT_REGISTRATION_POLICY` 统一控制注册入口。
 
-必需后端环境变量：
+OAuth 所需后端环境变量：
 
 - `PUBLIC_APP_ORIGIN`：用户在浏览器中打开的前端地址；GitHub Pages 子路径部署要包含 base path，例如 `https://your-user.github.io/open-agricola/`。
 - `PUBLIC_API_BASE`：用户浏览器可访问的后端 origin，例如 `https://api.your-domain.com`，用于 OAuth provider callback URL 和邮箱验证链接；生产环境必填。
@@ -535,11 +540,17 @@ https://<backend-origin>/api/auth/oauth/google/callback
 | `DB_PATH` | `./data/open-agricola.db` | SQLite 文件路径 |
 | `CARD_ART_DIR` | `./data/card-art` | 上传的卡牌图片存储路径 |
 | `REPLAY_VIEWER_ROOT` | `./data/replay-viewers` | 不可变 Replay Viewer Build 目录 |
+| `REPLAY_VIEWER_BUILD_ID` | — | 新 Room 锁定的不可变 Viewer Build ID |
 | `REPLAY_ASSET_ROOT` | `./data/replay-assets` | 内容寻址的 Replay 自定义卡资源目录 |
 | `REPLAY_REMOVAL_LEDGER_PATH` | `./data/replay-removals.jsonl` | SQLite 外、只追加的 Replay 删除 ledger；恢复旧备份时必须使用最新副本 |
+| `REPLAY_NEW_ROOMS_ENABLED` | `false` | 是否为新 Room 启用 Replay 录制；启用前必须准备 Viewer Build |
 | `REPLAY_TRUST_PROXY` | `false` | 仅当后端只能经会覆盖 `X-Forwarded-For` 的可信反向代理访问时设为 `true` |
+| `GAME_BUILD_ID` | — | 当前后端 Git commit；自动部署脚本会填入 |
 | `ADMIN_USERS` | — | 管理员用户名，逗号分隔 |
 | `ACCOUNT_REGISTRATION_POLICY` | 必填 | 账号注册策略：首次部署用 `open` 创建第一个管理员，之后改为 `invite_only`；`disabled` 禁止新账号注册 |
+| `GITHUB_OAUTH_CLIENT_ID` / `GITHUB_OAUTH_CLIENT_SECRET` | — | Workshop → PR 使用的 GitHub OAuth App 凭据 |
+| `GITHUB_UPSTREAM_OWNER` / `GITHUB_UPSTREAM_REPO` | `titanxxh` / `open-agricola` | Workshop PR 目标仓库 |
+| `WORKSHOP_PR_ENABLED` | `false` | 是否开放 Workshop → PR |
 
 ### Resend 邮箱验证
 
@@ -561,6 +572,7 @@ https://<backend-origin>/api/auth/oauth/google/callback
 |------|--------|------|
 | `VITE_API_BASE` | `''`（空=同源） | 后端 API 地址 |
 | `VITE_WS_BASE` | 从 API_BASE 推导 | WebSocket 地址 |
+| `BGA_CDN_BASE_URL` | — | 卡牌图片 CDN 根地址 |
 | `BGA_IMAGE_DIR` | `../bga-agricola/img` | BGA 卡牌图片目录（构建时复制） |
 
 ---

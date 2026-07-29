@@ -1,12 +1,9 @@
 # client/sandbox
 
-Boundary: this directory is the only place in `client/` that may import
-`shared/session/`, `shared/engine/`, or `shared/cards/<deck>/...` impl files
-(for the workshop hot-seat single-player mode).
+`index.tsx` is the lazy entry for the Workshop sandbox UI. The sandbox starts
+its test room through `POST /api/game/new-sandbox`; game rules remain
+server-authoritative.
 
-ESLint rule (`eslint.config.js`, S6c) enforces this — main `client/**` files
-outside `client/sandbox/` get a lint error if they reach into session/engine.
-
-The lazy import boundary at `index.tsx` ensures Rollup splits
-session+engine+cards-impl into a separate chunk so the main bundle stays small.
-Workshop users incur a one-time async download when entering the workshop.
+ESLint rule S6c reserves this directory as the only client boundary allowed to
+import full `shared/session`, `shared/engine`, or card implementation modules.
+The current entry does not use those imports.
