@@ -2,7 +2,9 @@ import { lazy, Suspense, useEffect, useState } from 'react'
 import { AuthProvider } from './contexts/AuthContext'
 import { LocaleProvider, useLocale } from './contexts/LocaleContext'
 import { loadCardsManifest } from './services/card-meta'
+import { BrandMark } from './components/common/BrandMark'
 import { GameLoadScreen } from './components/common/GameLoadScreen'
+import { AppErrorBoundary } from './app/AppErrorBoundary'
 import { getGameLoadProgress } from './app/game-load-progress'
 import { GameContextRouter } from './app/GameContextRouter'
 import './styles/bootstrap-shell.css'
@@ -15,6 +17,31 @@ function RouterShellFallback() {
   const { t } = useLocale()
   const { percent, labelKey } = getGameLoadProgress('appShell')
   return <GameLoadScreen percent={percent} label={t(labelKey)} />
+}
+
+function AppLoadFailure() {
+  const { t } = useLocale()
+  return (
+    <div className="ws-status-screen">
+      <div className="ws-status-card">
+        <BrandMark
+          title="Open Agricola"
+          titleAs="h2"
+          className="brand-mark-centered ws-status-brand"
+          titleClassName="ws-status-title"
+        />
+        <div className="ws-status-text" role="alert">{t('platform.appLoadFailed')}</div>
+        <div className="ws-error-actions">
+          <button type="button" className="btn-primary" onClick={() => window.location.reload()}>
+            {t('platform.retry')}
+          </button>
+          <button type="button" className="btn-secondary" onClick={() => window.location.assign(import.meta.env.BASE_URL)}>
+            {t('platform.backToLobbyPlain')}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
 }
 
 function AppContent() {
@@ -50,11 +77,13 @@ function AppContent() {
   }
 
   return (
-    <AuthProvider>
-      <Suspense fallback={<RouterShellFallback />}>
-        <PageRouterLazy />
-      </Suspense>
-    </AuthProvider>
+    <AppErrorBoundary fallback={<AppLoadFailure />}>
+      <AuthProvider>
+        <Suspense fallback={<RouterShellFallback />}>
+          <PageRouterLazy />
+        </Suspense>
+      </AuthProvider>
+    </AppErrorBoundary>
   )
 }
 
