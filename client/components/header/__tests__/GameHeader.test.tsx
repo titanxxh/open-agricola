@@ -63,4 +63,41 @@ describe('GameHeader', () => {
 
     expect(screen.queryByText('开发者模式')).toBeNull()
   })
+
+  it('uses the Open Agricola wordmark as the home link only outside embedded games', () => {
+    const { rerender } = render(
+      <LocaleProvider>
+        <GameHeader
+          locale="en"
+          state={state}
+          currentPlayer={currentPlayer}
+          devMode={false}
+          setDevMode={() => {}}
+          myPlayerName="Player A"
+          isMyTurn={true}
+        />
+      </LocaleProvider>,
+    )
+
+    expect(screen.getByRole('link', { name: 'Back to Lobby' }))
+      .toHaveTextContent('Open Agricola')
+    expect(screen.queryByRole('button', { name: 'Back to Lobby' })).toBeNull()
+
+    rerender(
+      <LocaleProvider>
+        <GameHeader
+          locale="en"
+          state={state}
+          currentPlayer={currentPlayer}
+          devMode={false}
+          setDevMode={() => {}}
+          myPlayerName="Player A"
+          isMyTurn={true}
+          embedded
+        />
+      </LocaleProvider>,
+    )
+
+    expect(screen.queryByRole('link', { name: 'Back to Lobby' })).toBeNull()
+  })
 })

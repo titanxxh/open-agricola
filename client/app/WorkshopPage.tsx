@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import { useAuth } from '../contexts/AuthContext'
 import { useLocale } from '../contexts/LocaleContext'
-import { setPage } from './PageRouter'
 import { AiCardDesigner, type ExtractedCard } from './workshop/AiCardDesigner'
 import { ProposeModal } from './workshop/ProposeModal'
+import { BrandMark } from '../components/common/BrandMark'
 import { LocaleSwitcher } from '../components/common/LocaleSwitcher'
 import { ResourceText } from '../components/common/ResourceText'
 import { Section } from '../components/common/Section'
@@ -1952,23 +1952,24 @@ function WorkshopNav({
   t: (key: string, params?: Record<string, string | number>) => string
 }) {
   const isHome = view === 'home'
-  const handleBack = isHome ? () => setPage('lobby') : onOpenHome
-  const backLabel = isHome ? t('platform.backToLobbyShort') : t('platform.backToWorkshopHome')
   return (
     <div className="ws-nav">
       <div className="ws-nav-left">
-        <button type="button" className="ws-back-home" onClick={handleBack}>
-          <span aria-hidden="true">‹</span>
-          {backLabel}
-        </button>
+        <BrandMark
+          title="Open Agricola"
+          className="site-home-brand"
+          titleClassName="site-home-brand__title"
+          homeLinkLabel={t('platform.backToLobbyPlain')}
+        />
+        {!isHome && (
+          <button type="button" className="ws-back-home" onClick={onOpenHome}>
+            <span aria-hidden="true">‹</span>
+            {t('platform.backToWorkshopHome')}
+          </button>
+        )}
         <h1>{t('platform.workshopTitle')}</h1>
       </div>
       <div className="ws-nav-actions">
-        {!isHome && (
-          <button type="button" className="btn-link ws-nav-link" onClick={() => setPage('lobby')}>
-            {t('platform.backToLobbyPlain')}
-          </button>
-        )}
         <LocaleSwitcher />
       </div>
     </div>

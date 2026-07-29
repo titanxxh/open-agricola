@@ -40,6 +40,24 @@
   align-items: center;
   gap: 12px;
 }
+.brand-mark-home {
+  color: inherit;
+  text-decoration: none;
+  border-radius: 8px;
+  -webkit-tap-highlight-color: transparent;
+}
+.brand-mark-home:hover .brand-mark-image {
+  filter: brightness(1.08);
+  transform: translateY(-1px);
+}
+.brand-mark-home:active .brand-mark-image {
+  filter: brightness(0.96);
+  transform: translateY(0);
+}
+.brand-mark-home:focus-visible {
+  outline: 3px solid var(--color-accent-strong);
+  outline-offset: 3px;
+}
 .brand-mark-centered {
   width: 100%;
   justify-content: center;
@@ -49,6 +67,34 @@
   height: 44px;
   object-fit: contain;
   flex-shrink: 0;
+}
+.site-home-brand {
+  gap: 10px;
+  min-height: 44px;
+  padding-right: 18px;
+  border-right: 1px solid rgba(90, 58, 32, 0.24);
+  flex-shrink: 0;
+}
+.site-home-brand__title {
+  margin: 0;
+  color: var(--color-primary);
+  font-family: var(--agricola-font);
+  font-size: 18px;
+  font-weight: 800;
+  line-height: 1;
+  white-space: nowrap;
+}
+@media (max-width: 480px) {
+  .site-home-brand {
+    gap: 7px;
+    padding-right: 10px;
+  }
+  .site-home-brand__title {
+    max-width: 70px;
+    font-size: 15px;
+    line-height: 0.95;
+    white-space: normal;
+  }
 }
 .form-field {
   display: flex;

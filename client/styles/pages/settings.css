@@ -29,6 +29,13 @@
   letter-spacing: 0.5px;
 }
 
+.settings-nav-left {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  min-width: 0;
+}
+
 .settings-form {
   display: flex;
   flex-direction: column;
@@ -95,6 +102,10 @@
   .settings-page header {
     flex-wrap: wrap;
     gap: 8px;
+  }
+
+  .settings-nav-left {
+    flex-wrap: wrap;
   }
 }
 

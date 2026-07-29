@@ -3,7 +3,7 @@ import type { Locale } from '../../../shared/i18n'
 import { t } from '../../../shared/i18n'
 import type { GameState, PlayerState, RoundPhase } from '../../../shared/contract/types'
 import { harvestRounds } from '../../../shared/contract/state-constants'
-import { setPage } from '../../app/PageRouter'
+import { BrandMark } from '../common/BrandMark'
 import { LocaleSwitcher } from '../common/LocaleSwitcher'
 
 const PHASES_NORMAL: RoundPhase[] = ['preparation', 'work', 'returning-home']
@@ -27,6 +27,7 @@ type Props = {
   setDevMode: (value: boolean) => void
   myPlayerName: string | null
   isMyTurn: boolean
+  embedded?: boolean
 }
 
 export const GameHeader = ({
@@ -37,6 +38,7 @@ export const GameHeader = ({
   setDevMode,
   myPlayerName,
   isMyTurn,
+  embedded = false,
 }: Props) => {
   const [menuOpen, setMenuOpen] = useState(false)
   const menuContainerRef = useRef<HTMLDivElement | null>(null)
@@ -67,9 +69,14 @@ export const GameHeader = ({
   return (
     <header className={`header-compact ${isMyTurn ? 'my-turn' : 'not-my-turn'}`}>
       <div className="header-left">
-        <button type="button" className="header-lobby-btn" onClick={() => setPage('lobby')} title={locale === 'zh' ? '返回大厅' : 'Back to Lobby'}>
-          ←
-        </button>
+        {!embedded && (
+          <BrandMark
+            title="Open Agricola"
+            className="site-home-brand header-home-brand"
+            titleClassName="site-home-brand__title"
+            homeLinkLabel={t(locale, 'platform.backToLobbyPlain')}
+          />
+        )}
         <span className="header-round">R{state.round}/14</span>
         <span className="header-phase-pills">
           {phases.map((phase) => (

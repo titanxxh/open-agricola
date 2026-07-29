@@ -36,6 +36,7 @@
   display: flex;
   align-items: center;
   gap: 14px;
+  min-width: 0;
 }
 .ws-nav-left h1 {
   font-size: 22px;
@@ -1306,6 +1307,10 @@
 @media (max-width: 640px) {
   .ws-nav {
     padding: 12px;
+    flex-wrap: wrap;
+  }
+
+  .ws-nav-left {
     flex-wrap: wrap;
   }
 
