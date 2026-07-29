@@ -1,3 +1,5 @@
+import { buildPlatformPageUrl } from '../../utils/platform-page-url'
+
 type BrandMarkProps = {
   title: string
   titleAs?: 'h1' | 'h2' | 'div'
@@ -33,7 +35,7 @@ export function BrandMark({
     return (
       <a
         className={`brand-mark brand-mark-home ${className}`.trim()}
-        href={import.meta.env.BASE_URL}
+        href={buildPlatformPageUrl('lobby')}
         aria-label={homeLinkLabel}
         title={homeLinkLabel}
       >
