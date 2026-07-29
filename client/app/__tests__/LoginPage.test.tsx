@@ -39,6 +39,7 @@ vi.mock('../../contexts/AuthContext', () => ({
 vi.mock('../../contexts/LocaleContext', () => {
   const labels: Record<string, string> = {
     'platform.loginTitle': 'Open Agricola',
+    'platform.backToLobbyPlain': '返回大厅',
     'platform.subtitle': '在线 Agricola 对局平台',
     'platform.loginBtn': '登录',
     'platform.registerBtn': '注册',
@@ -96,6 +97,15 @@ afterEach(() => {
 })
 
 describe('LoginPage auth UI', () => {
+  it('uses the brand as a native lobby link', () => {
+    window.history.replaceState(null, '', '/?page=login&room=stale')
+
+    render(<LoginPage />)
+
+    expect(screen.getByRole('link', { name: '返回大厅' }))
+      .toHaveAttribute('href', '/')
+  })
+
   it('renders provider logos inside OAuth login links', () => {
     render(<LoginPage />)
 

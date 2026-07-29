@@ -208,6 +208,7 @@ export function LoginPage() {
           titleAs="h1"
           className="login-brand"
           titleClassName="login-title"
+          homeLinkLabel={t('platform.backToLobbyPlain')}
         />
         <p className="login-subtitle">{t('platform.subtitle')}</p>
 

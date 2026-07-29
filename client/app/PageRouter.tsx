@@ -7,6 +7,7 @@ import { OnboardingPage } from './OnboardingPage'
 import { SettingsPage } from './SettingsPage'
 import { MobileTabBar } from '../components/common/MobileTabBar'
 import { GameLoadScreen } from '../components/common/GameLoadScreen'
+import { AppShellLoadScreen } from './AppShellLoadScreen'
 import { getGameLoadProgress } from './game-load-progress'
 import { SandboxAppLazy } from '../sandbox'
 import { buildPlatformPageUrl, type PlatformPage } from '../utils/platform-page-url'
@@ -15,12 +16,6 @@ import '../App.css'
 const GameContainerApiLazy = lazy(() =>
   import('./GameContainerApi').then((m) => ({ default: m.GameContainerApi })),
 )
-
-function GameShellFallback() {
-  const { t } = useLocale()
-  const { percent, labelKey } = getGameLoadProgress('appShell')
-  return <GameLoadScreen percent={percent} label={t(labelKey)} />
-}
 
 function getPage(): PlatformPage {
   const params = new URLSearchParams(window.location.search)
@@ -85,14 +80,14 @@ export function PageRouter() {
   switch (page) {
     case 'game':
       pageNode = (
-        <Suspense fallback={<GameShellFallback />}>
+        <Suspense fallback={<AppShellLoadScreen />}>
           <GameContainerApiLazy />
         </Suspense>
       )
       break
     case 'workshop':
       pageNode = (
-        <Suspense fallback={<div className="loading-screen">{t('platform.loading')}</div>}>
+        <Suspense fallback={<AppShellLoadScreen />}>
           <SandboxAppLazy />
         </Suspense>
       )

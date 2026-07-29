@@ -52,6 +52,7 @@ const reportedEvidenceAnchor = (): {
 }
 
 const statusPage = (
+  homeLinkLabel: string,
   roomId: string,
   title: string,
   body: string,
@@ -64,6 +65,7 @@ const statusPage = (
         titleAs="h2"
         className="brand-mark-centered ws-status-brand"
         titleClassName="ws-status-title"
+        homeLinkLabel={homeLinkLabel}
       />
       <p className="ws-status-text">{roomId}</p>
       <h1 id="game-context-title" className="ws-status-title">{title}</h1>
@@ -156,7 +158,13 @@ function ReportedEvidenceContext({
   }, [])
 
   if (!evidence) {
-    return <GameLoadScreen percent={10} label={t('platform.loading')} />
+    return (
+      <GameLoadScreen
+        percent={10}
+        label={t('platform.loading')}
+        showHomeLink={!embedded}
+      />
+    )
   }
   if (!evidence.ok) return fallback
   const Root = embedded ? 'section' : 'main'
@@ -164,6 +172,14 @@ function ReportedEvidenceContext({
     <Root
       className={`reported-evidence${embedded ? ' reported-evidence--drawer' : ''}`}
     >
+      {!embedded ? (
+        <BrandMark
+          title="Open Agricola"
+          className="site-home-brand reported-evidence__brand"
+          titleClassName="site-home-brand__title"
+          homeLinkLabel={t('platform.backToLobbyPlain')}
+        />
+      ) : null}
       <header className="reported-evidence__header">
         <p>{t('platform.gameContext.room', { id: roomId })}</p>
         <h1>{t('platform.gameContext.reportedEvidenceTitle')}</h1>
@@ -210,6 +226,7 @@ function CompletedContext({
     return <ReplayShell context={context} />
   }
   return statusPage(
+    t('platform.backToLobbyPlain'),
     t('platform.gameContext.room', { id: context.roomId }),
     t('platform.gameContext.completedTitle'),
     t('platform.gameContext.legacyNoReplay'),
@@ -245,6 +262,7 @@ function PublicContext({
   }
   if (response.ok && response.lifecycle === 'expired') {
     const expired = statusPage(
+      t('platform.backToLobbyPlain'),
       t('platform.gameContext.room', { id: response.roomId }),
       t('platform.gameContext.expiredTitle'),
       t('platform.gameContext.expiredBody'),
@@ -267,6 +285,7 @@ function PublicContext({
   }
   if (response.ok && response.lifecycle === 'removed') {
     return statusPage(
+      t('platform.backToLobbyPlain'),
       t('platform.gameContext.room', { id: response.roomId }),
       t('platform.gameContext.removedTitle'),
       t(removedBodyKey(response.reason)),
@@ -280,6 +299,7 @@ function PublicContext({
   const unknown = error.code === 'unknown_context' ||
     error.code === 'invalid_context_link'
   return statusPage(
+    t('platform.backToLobbyPlain'),
     '',
     t(notParticipant
       ? 'platform.gameContext.notParticipantTitle'

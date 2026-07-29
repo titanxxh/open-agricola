@@ -136,11 +136,12 @@ export function OnboardingPage() {
           <LocaleSwitcher />
         </div>
         <BrandMark
-          title={t('platform.onboardingTitle')}
-          titleAs="h1"
+          title={t('platform.loginTitle')}
           className="login-brand"
           titleClassName="login-title"
+          homeLinkLabel={t('platform.backToLobbyPlain')}
         />
+        <h1 className="login-context-title">{t('platform.onboardingTitle')}</h1>
         <p className="login-subtitle">{t('platform.onboardingSubtitle')}</p>
 
         {expired ? (
