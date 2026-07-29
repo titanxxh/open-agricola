@@ -10,6 +10,7 @@ const logoutAllMock = vi.fn()
 let mockUser = { id: 'u1', username: 'testuser', displayName: 'Test User', isAdmin: false }
 const labels: Record<string, string> = {
   'platform.backToLobby': '返回大厅',
+  'platform.backToLobbyPlain': '返回大厅',
   'platform.settingsTitle': '设置',
   'platform.basicInfo': '基本信息',
   'platform.notEditable': '不可编辑',
@@ -109,6 +110,23 @@ afterEach(() => {
 })
 
 describe('SettingsPage', () => {
+  it('uses the Open Agricola wordmark as the home link', () => {
+    apiFetchMock.mockResolvedValueOnce(
+      new Response(JSON.stringify({ ok: true, identities: [] })),
+    )
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({
+      ok: true,
+      enabled: false,
+      connected: false,
+    }))))
+
+    render(<SettingsPage />)
+
+    const link = screen.getByRole('link', { name: '返回大厅' })
+    expect(link).toHaveTextContent('Open Agricola')
+    expect(link).toHaveAttribute('href', import.meta.env.BASE_URL)
+  })
+
   it('localizes profile backend error codes instead of showing raw English', async () => {
     const user = userEvent.setup()
     apiFetchMock
