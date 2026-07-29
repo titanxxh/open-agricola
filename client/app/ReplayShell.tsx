@@ -5,6 +5,7 @@ import type {
   ReplayManifest,
   ReplayManifestResponse,
 } from '../../shared/contract/protocol/replay'
+import { BrandMark } from '../components/common/BrandMark'
 import { LocaleSwitcher } from '../components/common/LocaleSwitcher'
 import { API_BASE } from '../config'
 import { useLocale } from '../contexts/LocaleContext'
@@ -248,11 +249,22 @@ export function ReplayShell({
   const reportFrameHash = manifest?.steps.find(
     (step) => step.stepNo === reportStepNo,
   )?.frameHash
+  const navigation = (
+    <div className="replay-shell-nav">
+      <BrandMark
+        title="Open Agricola"
+        className="site-home-brand replay-home-brand"
+        titleClassName="site-home-brand__title replay-home-brand__title"
+        homeLinkLabel={t('platform.backToLobbyPlain')}
+      />
+      <LocaleSwitcher className="replay-locale-switcher" />
+    </div>
+  )
 
   if (!replay || error) {
     return (
       <main className="replay-shell replay-shell--status">
-        <LocaleSwitcher className="replay-locale-switcher" />
+        {navigation}
         <h1>{t('platform.gameContext.completedTitle')}</h1>
         <p role="alert">{t('platform.gameContext.viewerUnavailable')}</p>
         <ol className="replay-results">
@@ -272,7 +284,7 @@ export function ReplayShell({
   if (!verified || !manifest) {
     return (
       <main className="replay-shell replay-shell--status">
-        <LocaleSwitcher className="replay-locale-switcher" />
+        {navigation}
         <p>{t('platform.gameContext.verifyingReplay')}</p>
       </main>
     )
@@ -280,7 +292,7 @@ export function ReplayShell({
   if (!location.perspective) {
     return (
       <main className="replay-shell replay-shell--chooser">
-        <LocaleSwitcher className="replay-locale-switcher" />
+        {navigation}
         <header>
           <p>{t('platform.gameContext.room', { id: context.roomId })}</p>
           <h1>{t('platform.gameContext.completedTitle')}</h1>
@@ -320,7 +332,7 @@ export function ReplayShell({
 
   return (
     <main className="replay-shell replay-shell--viewer">
-      <LocaleSwitcher className="replay-locale-switcher" />
+      {navigation}
       <ReplayFrame
         key={`${context.roomId}:${replay.viewerBuildId}:${locale}`}
         roomId={context.roomId}

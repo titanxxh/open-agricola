@@ -88,6 +88,18 @@ describe('setPage URL hygiene', () => {
     expect(window.location.pathname + window.location.search).toBe('/open-agricola/')
   })
 
+  it('drops replay layout when returning to the lobby', () => {
+    window.history.replaceState(
+      null,
+      '',
+      '/open-agricola/?context=room-1&perspective=p1&layout=board',
+    )
+
+    setPage('lobby')
+
+    expect(window.location.pathname + window.location.search).toBe('/open-agricola/')
+  })
+
   it('preserves a saved bug report while changing pages', () => {
     window.history.replaceState(
       null,

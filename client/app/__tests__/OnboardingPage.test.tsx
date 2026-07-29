@@ -15,6 +15,7 @@ vi.mock('../../contexts/AuthContext', () => ({
 vi.mock('../../contexts/LocaleContext', () => {
   const labels: Record<string, string> = {
     'platform.loginTitle': 'Open Agricola',
+    'platform.backToLobbyPlain': '返回大厅',
     'platform.onboardingTitle': '完成注册',
     'platform.onboardingSubtitle': '设置你的 Open Agricola 用户名和本地密码',
     'platform.username': '用户名',
@@ -71,6 +72,16 @@ afterEach(() => {
 })
 
 describe('OnboardingPage', () => {
+  it('keeps onboarding context separate from the native home brand', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValueOnce(policyResponse('open')))
+
+    render(<OnboardingPage />)
+
+    expect(screen.getByRole('link', { name: '返回大厅' }))
+      .toHaveTextContent('Open Agricola')
+    expect(screen.getByRole('heading', { name: '完成注册' })).toBeVisible()
+  })
+
   it('validates password confirmation before submitting onboarding', async () => {
     const user = userEvent.setup()
     const fetchMock = vi.fn().mockResolvedValueOnce(policyResponse('open'))

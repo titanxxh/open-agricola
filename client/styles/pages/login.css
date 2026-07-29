@@ -53,6 +53,12 @@
   font-family: var(--agricola-font);
   letter-spacing: 1px;
 }
+.login-context-title {
+  margin: 0 0 8px;
+  color: var(--color-text);
+  font-size: var(--fs-title);
+  text-align: center;
+}
 .login-subtitle {
   text-align: center;
   color: var(--color-text-secondary);

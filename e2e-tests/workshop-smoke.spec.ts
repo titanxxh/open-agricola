@@ -16,14 +16,21 @@ import { test, expect } from '@playwright/test'
 test('workshop opens with lazy-loaded sandbox bundle', async ({ page }) => {
   const errors: string[] = []
   page.on('pageerror', (err) => errors.push(err.message))
+  await page.route('**/client/app/WorkshopPage.tsx*', async route => {
+    await new Promise(resolve => setTimeout(resolve, 800))
+    await route.continue()
+  })
+  const workshopRequest = page.waitForRequest(request =>
+    request.url().includes('/client/app/WorkshopPage.tsx')
+  )
 
   // `?player=p1&devMode=1` triggers AuthContext's dev shortcut so PageRouter
   // routes to workshop instead of forcing LoginPage. The sandbox lazy chunk
   // is still fetched on first navigation, not at app boot.
   await page.goto('/?page=workshop&player=p1&devMode=1')
 
-  // The sandbox-loading fallback may or may not be observable depending on how
-  // fast the lazy chunk resolves. We only require the workshop root to land.
+  await workshopRequest
+  await expect(page.getByRole('link', { name: '返回大厅' })).toBeVisible()
   await expect(page.getByTestId('workshop-root')).toBeVisible({ timeout: 30_000 })
 
   // Allow a brief grace period for any deferred imports to settle, then assert

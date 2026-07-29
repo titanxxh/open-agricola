@@ -114,6 +114,7 @@ describe('waiting room presentation', () => {
     )
 
     expect(await screen.findByRole('button', { name: 'Copy' })).toBeVisible()
+    expect(screen.getByRole('link', { name: 'Back to Lobby' })).toBeVisible()
     expect(confirm).toHaveBeenCalledOnce()
     const createCommands = WaitingRoomWebSocket.sent.filter(({ type }) => type === 'createRoom')
     expect(createCommands).toHaveLength(2)

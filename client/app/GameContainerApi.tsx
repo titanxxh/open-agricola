@@ -1267,9 +1267,6 @@ export const GameContainerApi = () => {
               {t(locale, 'ui.roomPersistencePaused')}
             </div>
           ) : null}
-          <button type="button" className="btn-link ws-status-back" onClick={() => setPage('lobby')}>
-            {t(locale, 'platform.backToLobby')}
-          </button>
         </GameLoadScreen>
       )
     }
@@ -1312,12 +1309,15 @@ export const GameContainerApi = () => {
     return (
       <div className="ws-status-screen">
         <div className="ws-status-card">
-          <BrandMark
-            title="Open Agricola"
-            titleAs="h2"
-            className="brand-mark-centered ws-status-brand"
-            titleClassName="ws-status-title"
-          />
+          {!isEmbedded ? (
+            <BrandMark
+              title="Open Agricola"
+              titleAs="h2"
+              className="brand-mark-centered ws-status-brand"
+              titleClassName="ws-status-title"
+              homeLinkLabel={t(locale, 'platform.backToLobbyPlain')}
+            />
+          ) : null}
           <div className="ws-status-text" role={wsStatus.phase === 'error' ? 'alert' : undefined}>
             {statusText}
           </div>
@@ -1370,15 +1370,8 @@ export const GameContainerApi = () => {
               <button type="button" className="btn-primary" onClick={() => window.location.reload()}>
                 {t(locale, 'platform.retry')}
               </button>
-              <button type="button" className="btn-secondary" onClick={() => setPage('lobby')}>
-                {t(locale, 'platform.backToLobby')}
-              </button>
             </div>
           )}
-
-          <button type="button" className="btn-link ws-status-back" onClick={() => setPage('lobby')}>
-            {t(locale, 'platform.backToLobby')}
-          </button>
         </div>
       </div>
     )

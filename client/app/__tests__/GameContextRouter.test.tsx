@@ -33,11 +33,17 @@ vi.mock('../../contexts/LocaleContext', () => ({
 }))
 
 vi.mock('../../components/common/BrandMark', () => ({
-  BrandMark: () => <div>Open Agricola</div>,
+  BrandMark: ({ homeLinkLabel }: { homeLinkLabel?: string }) => homeLinkLabel
+    ? <a href="/" aria-label={homeLinkLabel}>Open Agricola</a>
+    : <div>Open Agricola</div>,
 }))
 
 vi.mock('../../components/common/GameLoadScreen', () => ({
-  GameLoadScreen: () => <div>loading</div>,
+  GameLoadScreen: ({ showHomeLink }: { showHomeLink?: boolean }) => (
+    <div data-testid="game-load-screen" data-show-home-link={String(showHomeLink)}>
+      loading
+    </div>
+  ),
 }))
 
 afterEach(() => {
@@ -180,6 +186,35 @@ describe('GameContextRouter', () => {
     expect(screen.getByText('active app')).toBeVisible()
     expect(window.location.search)
       .toBe('?context=active-room&perspective=open&bugReport=draft-1')
+  })
+
+  it('hides the home link while embedded evidence is loading', async () => {
+    const frameHash = 'a'.repeat(64)
+    window.history.replaceState(
+      null,
+      '',
+      `/?context=active-room&step=5&frame=${frameHash}`,
+    )
+    vi.stubGlobal('fetch', vi.fn(async (input: string | URL | Request) => {
+      if (String(input).endsWith('/api/v1/game-contexts/active-room')) {
+        return new Response(JSON.stringify({
+          ok: true,
+          roomId: 'active-room',
+          lifecycle: 'active',
+          phase: 'playing',
+          playerIndex: 0,
+          roomVersion: 8,
+          stepNo: 6,
+        }))
+      }
+      return await new Promise<Response>(() => {})
+    }))
+
+    render(<GameContextRouter><div>active app</div></GameContextRouter>)
+
+    expect(await screen.findByRole('complementary')).toBeVisible()
+    expect(screen.getByTestId('game-load-screen'))
+      .toHaveAttribute('data-show-home-link', 'false')
   })
 
   it('keeps the full active context link behind login', async () => {
@@ -359,6 +394,8 @@ describe('GameContextRouter', () => {
     })
     expect(screen.getByRole('button', { name: 'Display language' }))
       .toBeVisible()
+    expect(screen.getByRole('link', { name: 'platform.backToLobbyPlain' }))
+      .toBeVisible()
     expect(screen.queryByTitle('platform.gameContext.replayFrameTitle')).not.toBeInTheDocument()
     fireEvent.click(perspectiveButtons[0]!)
 
@@ -509,6 +546,8 @@ describe('GameContextRouter', () => {
     render(<GameContextRouter><div>active app</div></GameContextRouter>)
 
     expect(await screen.findByText(title)).toBeVisible()
+    expect(screen.getByRole('link', { name: 'platform.backToLobbyPlain' }))
+      .toBeVisible()
     expect(screen.queryByText('active app')).not.toBeInTheDocument()
   })
 

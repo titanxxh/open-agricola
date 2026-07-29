@@ -119,6 +119,47 @@ async function expectNoHorizontalPageScroll(page: Page) {
 }
 
 test.describe('Platform: auth', () => {
+  test('anonymous auth pages expose a mobile-safe native home brand', async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 })
+    await page.goto(`${FRONTEND_URL}/?page=login&room=stale&context=old-game`)
+
+    const loginHome = page.getByRole('link', { name: '返回大厅' })
+    await expect(loginHome).toContainText('Open Agricola')
+    await expectNoHorizontalPageScroll(page)
+    await loginHome.click()
+    expect(new URL(page.url()).search).toBe('')
+
+    await page.goto(`${FRONTEND_URL}/?page=onboarding`)
+    await expect(page.getByRole('link', { name: '返回大厅' }))
+      .toContainText('Open Agricola')
+    await expect(page.getByRole('heading', { name: '完成注册' })).toBeVisible()
+    await expectNoHorizontalPageScroll(page)
+  })
+
+  test('bootstrap loading and failure keep a native home route', async ({ page }) => {
+    await page.route('**/cards-manifest.json', async route => {
+      await new Promise(resolve => setTimeout(resolve, 800))
+      await route.continue()
+    })
+    await page.goto(`${FRONTEND_URL}/?page=login`)
+    await expect(page.getByRole('progressbar')).toBeVisible()
+    await expect(page.getByRole('link', { name: '返回大厅' })).toBeVisible()
+    await expect(page.locator('#username')).toBeVisible()
+
+    await page.unroute('**/cards-manifest.json')
+    await page.route('**/cards-manifest.json', route => route.abort())
+    await page.setViewportSize({ width: 390, height: 844 })
+    await page.reload()
+
+    await expect(page.getByRole('alert')).toContainText('页面加载失败')
+    await expect(page.getByRole('button', { name: '重试' })).toBeVisible()
+    await expectNoHorizontalPageScroll(page)
+    const failureHome = page.getByRole('link', { name: '返回大厅' })
+    await expect(failureHome).toHaveAttribute('href', '/')
+    await failureHome.click()
+    expect(new URL(page.url()).search).toBe('')
+  })
+
   test('new user registers through GitHub helper, completes onboarding, then logs in with password', async ({ page, request }) => {
     const username = `e2e_oauth_${RUN_ID}`
     const { cookies } = await callOAuthHelper(request, 'github', {
@@ -314,6 +355,10 @@ test.describe('Platform: lobby page', () => {
     await page.getByRole('button', { name: '创建游戏' }).click()
     await page.getByRole('button', { name: '复制' }).click()
 
+    await expect(page.getByRole('link', { name: '返回大厅' }))
+      .toContainText('Open Agricola')
+    await page.setViewportSize({ width: 390, height: 844 })
+    await expectNoHorizontalPageScroll(page)
     const feedback = page.getByRole('status').or(page.getByRole('alert'))
     await expect(feedback).toHaveText(/邀请链接已复制。|无法复制邀请链接，请手动复制后重试。/)
   })
