@@ -24,6 +24,13 @@ const interactionContentBottomGap = (page: Page) => page.evaluate(() => {
   return window.innerHeight - content.getBoundingClientRect().bottom
 })
 
+const reportTriggerGap = (page: Page) => page.evaluate(() => {
+  const trigger = document.querySelector('.bug-report-trigger')
+  const interactionBar = document.querySelector('.interaction-bar')
+  if (!trigger || !interactionBar) throw new Error('Report trigger layout is not ready')
+  return interactionBar.getBoundingClientRect().top - trigger.getBoundingClientRect().bottom
+})
+
 test.describe('Interaction bar layout', () => {
   test.use({ viewport: { width: 768, height: 1024 } })
 
@@ -64,5 +71,19 @@ test.describe('Interaction bar layout', () => {
   test('keeps controls above the bottom safe area without adding a gap above the bar', async ({ page }) => {
     await expect.poll(() => interactionContentBottomGap(page)).toBeGreaterThanOrEqual(34)
     await expectPageMarginAboveInteractionBar(page)
+  })
+
+  test('keeps the report trigger above an expanded interaction bar', async ({ page }) => {
+    await page.evaluate(() => {
+      const app = document.querySelector('.app')
+      if (!app) throw new Error('Game app is not ready')
+      const trigger = document.createElement('button')
+      trigger.className = 'bug-report-trigger'
+      trigger.textContent = 'Report a bug'
+      app.append(trigger)
+    })
+    await page.addStyleTag({ content: '.interaction-bar { min-height: 180px; }' })
+
+    await expect.poll(() => reportTriggerGap(page)).toBeGreaterThanOrEqual(8)
   })
 })
