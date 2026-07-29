@@ -1740,6 +1740,7 @@ export const GameContainerApi = () => {
           setDevMode={setDevMode}
           myPlayerName={selfPlayer?.name ?? null}
           isMyTurn={isMyTurn}
+          embedded={isEmbedded}
         />
       </div>
 

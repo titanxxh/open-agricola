@@ -123,10 +123,11 @@ export function LobbyPage() {
     <div className="lobby-page">
       <header className="lobby-header">
         <BrandMark
-          title={t('platform.lobbyTitle')}
+          title="Open Agricola"
           titleAs="h1"
-          className="lobby-brand"
-          titleClassName="lobby-title"
+          className="site-home-brand"
+          titleClassName="site-home-brand__title"
+          homeLinkLabel={t('platform.backToLobbyPlain')}
         />
         <div className="lobby-header__right">
           <LocaleSwitcher />

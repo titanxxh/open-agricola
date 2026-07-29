@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useAuth } from '../contexts/AuthContext'
 import { useLocale } from '../contexts/LocaleContext'
+import { BrandMark } from '../components/common/BrandMark'
 import { LocaleSwitcher } from '../components/common/LocaleSwitcher'
 import { Section } from '../components/common/Section'
 import { DangerButton } from '../components/common/DangerButton'
@@ -285,11 +286,15 @@ export function SettingsPage() {
   return (
     <div className="settings-page">
       <header>
-        <button type="button" className="ws-back-home" onClick={() => setPage('lobby')}>
-          <span aria-hidden="true">‹</span>
-          {t('platform.backToLobby')}
-        </button>
-        <h1>{t('platform.settingsTitle')}</h1>
+        <div className="settings-nav-left">
+          <BrandMark
+            title="Open Agricola"
+            className="site-home-brand"
+            titleClassName="site-home-brand__title"
+            homeLinkLabel={t('platform.backToLobbyPlain')}
+          />
+          <h1>{t('platform.settingsTitle')}</h1>
+        </div>
         <LocaleSwitcher />
       </header>
 

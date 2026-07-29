@@ -15,6 +15,7 @@ vi.mock('../../contexts/AuthContext', () => ({
 vi.mock('../../contexts/LocaleContext', () => {
   const labels: Record<string, string> = {
     'platform.lobbyTitle': 'Lobby',
+    'platform.backToLobbyPlain': 'Back to Lobby',
     'platform.tabSettings': 'Settings',
     'platform.logout': 'Logout',
     'platform.startGame': 'Start Game',
@@ -60,6 +61,16 @@ afterEach(() => {
 })
 
 describe('LobbyPage player count selection', () => {
+  it('uses the Open Agricola wordmark as the home link', () => {
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({ ok: true, rooms: [] }))))
+
+    render(<LobbyPage />)
+
+    const link = screen.getByRole('link', { name: 'Back to Lobby' })
+    expect(link).toHaveTextContent('Open Agricola')
+    expect(link).toHaveAttribute('href', import.meta.env.BASE_URL)
+  })
+
   it('offers 2-6 player rooms and sends the selected count to game setup', () => {
     vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({ ok: true, rooms: [] }))))
 
