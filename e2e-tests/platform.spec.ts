@@ -318,12 +318,12 @@ test.describe('Platform: lobby page', () => {
     await expect(feedback).toHaveText(/邀请链接已复制。|无法复制邀请链接，请手动复制后重试。/)
   })
 
-  test('settings brand returns to lobby and clears page parameters', async ({ page, request }) => {
+  test('settings brand returns to lobby while preserving a saved bug report', async ({ page, request }) => {
     const username = `e2e_settings_${RUN_ID}`
     await createUserViaOAuth(request, username, { password: 'settings123' })
     await loginThroughPage(page, username, 'settings123')
 
-    await page.goto(`${FRONTEND_URL}/?page=settings&room=stale&view=profile`)
+    await page.goto(`${FRONTEND_URL}/?page=settings&room=stale&view=profile&bugReport=draft-e2e`)
     await expect(page.getByRole('heading', { name: '账户设置' })).toBeVisible({ timeout: 15000 })
 
     const homeLink = page.getByRole('link', { name: '返回大厅' })
@@ -335,7 +335,9 @@ test.describe('Platform: lobby page', () => {
     await expect(page.getByText('单人模式')).toBeVisible()
     await expect(page.getByRole('link', { name: '返回大厅' })).toBeVisible()
     await expectNoHorizontalPageScroll(page)
-    expect(new URL(page.url()).search).toBe('')
+    expect(Object.fromEntries(new URL(page.url()).searchParams)).toEqual({
+      bugReport: 'draft-e2e',
+    })
   })
 })
 
