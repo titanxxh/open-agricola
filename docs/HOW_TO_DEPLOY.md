@@ -401,7 +401,7 @@ docker compose logs -f app
 ### 前置条件
 
 - GitHub 仓库 Settings → Pages → Source 选 **GitHub Actions**
-- 仓库 Settings → Environments → `github-pages` → Deployment branches 允许 `main` / `ui`
+- 仓库 Settings → Environments → `github-pages` → Deployment branches and tags：允许 `main` 和 tag 模式 `v*`（release 部署以 tag 为 ref 运行，缺 tag 规则会被拒绝部署）
 
 ### 配置
 
@@ -415,7 +415,13 @@ docker compose logs -f app
 
 ### 触发部署
 
-`main` / `ui` 的 CI 成功且前端相关路径变化后，`.github/workflows/deploy-pages.yml` 自动部署。也可以在 Actions 页面手动触发。
+发布 GitHub Release 后自动部署（`.github/workflows/deploy-pages.yml`，`on: release: published`）：
+
+```bash
+gh release create v0.3.0 --generate-notes
+```
+
+也可以在 GitHub UI 操作：Releases → Draft a new release → 新建 tag（`vX.Y.Z`）→ Generate release notes → Publish。一次 release 会同时触发前端与后端部署。Actions 页面手动触发（workflow_dispatch）时部署 `main` 最新。
 
 部署成功后访问：`https://YOUR_USER.github.io/open-agricola/`
 
@@ -436,7 +442,7 @@ pnpm dlx gh-pages -d dist
 
 ### 后端
 
-`main` 的 CI 成功且后端相关路径变化后，`.github/workflows/deploy-backend.yml` 自动调用 `deploy-backend.sh`。需要配置 Actions variables `DEPLOY_HOST`、`DEPLOY_USER`、`DEPLOY_REMOTE_DIR`、`ACCOUNT_REGISTRATION_POLICY`，以及 secret `DEPLOY_SSH_PRIVATE_KEY`。
+发布 GitHub Release 后，`.github/workflows/deploy-backend.yml` 自动调用 `deploy-backend.sh` 部署 release tag 对应的 commit（Actions 页面手动触发时部署 `main` 最新）。需要配置 Actions variables `DEPLOY_HOST`、`DEPLOY_USER`、`DEPLOY_REMOTE_DIR`、`ACCOUNT_REGISTRATION_POLICY`，以及 secret `DEPLOY_SSH_PRIVATE_KEY`。
 
 手动更新：
 
@@ -452,7 +458,7 @@ docker compose -f docker-compose.prod.yml up -d --build
 
 ### 前端
 
-`main` / `ui` 的 CI 成功且前端相关路径变化后自动重新部署。
+发布 GitHub Release 后自动重新部署（见上文「触发部署」）。
 
 ---
 

@@ -1,10 +1,8 @@
 name: Deploy Backend
 
 on:
-  workflow_run:
-    workflows: ["CI"]
-    types: [completed]
-    branches: [main]
+  release:
+    types: [published]
   workflow_dispatch:
 
 permissions:
@@ -18,44 +16,15 @@ env:
   DEPLOY_HOST: ${{ vars.DEPLOY_HOST || 'open-agricola.duckdns.org' }}
   DEPLOY_USER: ${{ vars.DEPLOY_USER || 'root' }}
   DEPLOY_REMOTE_DIR: ${{ vars.DEPLOY_REMOTE_DIR || '/root/open-agricola' }}
-  DEPLOY_BRANCH: main
+  DEPLOY_REF: ${{ github.event.release.tag_name || 'main' }}
   ACCOUNT_REGISTRATION_POLICY: ${{ vars.ACCOUNT_REGISTRATION_POLICY }}
 
 jobs:
-  check:
-    runs-on: ${{ vars.RUNNER_LABEL || 'ubuntu-latest' }}
-    if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
-    outputs:
-      should_deploy: ${{ steps.filter.outputs.changed }}
-      head_sha: ${{ steps.filter.outputs.head_sha }}
-    steps:
-      - uses: actions/checkout@v6
-        with:
-          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
-          fetch-depth: 2
-      - id: filter
-        run: |
-          HEAD_SHA="${{ github.event.workflow_run.head_sha || github.sha }}"
-          echo "head_sha=$HEAD_SHA" >> "$GITHUB_OUTPUT"
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            echo "changed=true" >> "$GITHUB_OUTPUT"
-            exit 0
-          fi
-          if git diff --name-only HEAD^ HEAD | grep -E '^(server/|shared/|Dockerfile|docker-compose\.prod\.yml|deploy-backend\.sh|package\.json|pnpm-lock\.yaml|\.github/workflows/deploy-backend\.yml)' > /dev/null; then
-            echo "changed=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "changed=false" >> "$GITHUB_OUTPUT"
-          fi
-
   deploy:
-    needs: check
-    if: ${{ needs.check.outputs.should_deploy == 'true' }}
     runs-on: ${{ vars.RUNNER_LABEL || 'ubuntu-latest' }}
 
     steps:
       - uses: actions/checkout@v6
-        with:
-          ref: ${{ needs.check.outputs.head_sha }}
 
       - name: Configure SSH
         env:
@@ -75,4 +44,4 @@ jobs:
       - name: Deploy backend
         run: |
           chmod +x ./deploy-backend.sh
-          ./deploy-backend.sh "$DEPLOY_USER@$DEPLOY_HOST" "$DEPLOY_BRANCH" "$DEPLOY_REMOTE_DIR"
+          ./deploy-backend.sh "$DEPLOY_USER@$DEPLOY_HOST" "$DEPLOY_REF" "$DEPLOY_REMOTE_DIR"

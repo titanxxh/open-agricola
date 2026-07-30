@@ -1,8 +1,9 @@
 #!/bin/bash
 # 一键更新并重新部署后端 Docker
-# 用法: ./deploy-backend.sh <ssh-host> [branch] [remote-dir]
+# 用法: ./deploy-backend.sh <ssh-host> [ref] [remote-dir]
+# ref 可以是分支名或 release tag
 # 示例: ./deploy-backend.sh 1.2.3.4
-#       ./deploy-backend.sh 1.2.3.4 ui
+#       ./deploy-backend.sh 1.2.3.4 v0.3.0
 #       ./deploy-backend.sh root@1.2.3.4 main /home/user/open-agricola
 
 set -e
@@ -14,33 +15,33 @@ if [[ "$_HOST" != *@* ]]; then
 else
   HOST="$_HOST"
 fi
-BRANCH="${2:-main}"
+REF="${2:-main}"
 REMOTE_DIR="${3:-/root/open-agricola}"
 
 if [ -z "$HOST" ]; then
-  echo "用法: ./deploy-backend.sh <ssh-host> [branch] [remote-dir]"
+  echo "用法: ./deploy-backend.sh <ssh-host> [ref] [remote-dir]"
   echo "示例: ./deploy-backend.sh 1.2.3.4              # 部署 main"
-  echo "      ./deploy-backend.sh 1.2.3.4 ui           # 部署 ui 分支"
+  echo "      ./deploy-backend.sh 1.2.3.4 v0.3.0       # 部署 release tag"
   echo "      ./deploy-backend.sh root@1.2.3.4 main /home/user/open-agricola"
   exit 1
 fi
 
-echo ">>> 部署后端到 $HOST:$REMOTE_DIR (分支: $BRANCH)"
+echo ">>> 部署后端到 $HOST:$REMOTE_DIR (ref: $REF)"
 
 REMOTE_ENV=()
 if [ -n "${ACCOUNT_REGISTRATION_POLICY:-}" ]; then
   REMOTE_ENV+=(ACCOUNT_REGISTRATION_POLICY="$ACCOUNT_REGISTRATION_POLICY")
 fi
 
-ssh "$HOST" "${REMOTE_ENV[@]}" bash -s "$REMOTE_DIR" "$BRANCH" << 'REMOTE_SCRIPT'
+ssh "$HOST" "${REMOTE_ENV[@]}" bash -s "$REMOTE_DIR" "$REF" << 'REMOTE_SCRIPT'
   set -e
   REMOTE_DIR="$1"
-  BRANCH="$2"
+  REF="$2"
   cd "$REMOTE_DIR"
 
-  echo ">>> git fetch + checkout $BRANCH..."
-  git fetch origin "$BRANCH"
-  git reset --hard "origin/$BRANCH"
+  echo ">>> git fetch + checkout $REF..."
+  git fetch origin "$REF"
+  git reset --hard FETCH_HEAD
   GAME_BUILD_ID="$(git rev-parse HEAD)"
 
   echo ">>> docker compose build..."
