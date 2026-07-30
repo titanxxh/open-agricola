@@ -53,6 +53,45 @@ class WaitingRoomWebSocket {
   }
 }
 
+class JoinErrorWebSocket {
+  static readonly OPEN = 1
+  static errorMessage: Record<string, unknown> = {}
+  readonly readyState = JoinErrorWebSocket.OPEN
+  onopen: ((event: Event) => void) | null = null
+  onerror: ((event: Event) => void) | null = null
+  onclose: ((event: Event) => void) | null = null
+  onmessage: ((event: MessageEvent) => void) | null = null
+  private readonly messageListeners = new Set<(event: MessageEvent) => void>()
+
+  constructor(_url: string) {
+    queueMicrotask(() => this.onopen?.(new Event('open')))
+  }
+
+  addEventListener(type: string, listener: (event: MessageEvent) => void) {
+    if (type === 'message') this.messageListeners.add(listener)
+  }
+
+  removeEventListener(type: string, listener: (event: MessageEvent) => void) {
+    if (type === 'message') this.messageListeners.delete(listener)
+  }
+
+  send(raw: string) {
+    const message = JSON.parse(raw) as Record<string, unknown>
+    if (message.type !== 'joinRoom') return
+    queueMicrotask(() => {
+      const event = new MessageEvent('message', {
+        data: JSON.stringify(JoinErrorWebSocket.errorMessage),
+      })
+      this.onmessage?.(event)
+      this.messageListeners.forEach(listener => listener(event))
+    })
+  }
+
+  close() {
+    this.onclose?.(new Event('close'))
+  }
+}
+
 class FailingWebSocket {
   static readonly OPEN = 1
   readonly readyState = 0
@@ -82,6 +121,7 @@ afterEach(() => {
   window.history.replaceState(null, '', '/')
   WaitingRoomWebSocket.sent = []
   WaitingRoomWebSocket.requiresReplayConsent = false
+  JoinErrorWebSocket.errorMessage = {}
   Object.defineProperty(navigator, 'clipboard', { configurable: true, value: undefined })
   vi.unstubAllGlobals()
 })
@@ -213,6 +253,66 @@ describe('waiting room presentation', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent(
       'Could not copy the invite link. Copy it manually and try again.',
     )
+  })
+
+  it('offers a lobby exit instead of retry when the game context changed', async () => {
+    const user = userEvent.setup()
+    JoinErrorWebSocket.errorMessage = {
+      type: 'error',
+      error: 'game context changed',
+      code: 'context_changed',
+      lifecycle: 'archived',
+    }
+    window.localStorage.setItem('open-agricola-locale-v2', 'en')
+    window.history.replaceState(null, '', '/?page=game&transport=ws&room=room-stale')
+    vi.stubGlobal('WebSocket', JoinErrorWebSocket)
+    vi.stubGlobal('fetch', vi.fn(async () =>
+      new Response(JSON.stringify({
+        ok: true,
+        user: { id: 'u1', username: 'host', displayName: 'Host' },
+      })),
+    ))
+
+    render(
+      <LocaleProvider>
+        <AuthProvider>
+          <AuthenticatedGame />
+        </AuthProvider>
+      </LocaleProvider>,
+    )
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('game context changed')
+    const lobbyButton = screen.getByRole('button', { name: 'Back to Lobby' })
+    expect(screen.queryByRole('button', { name: 'Retry' })).toBeNull()
+
+    await user.click(lobbyButton)
+
+    expect(window.location.search).toBe('')
+  })
+
+  it('keeps the retry action for errors without a context code', async () => {
+    JoinErrorWebSocket.errorMessage = { type: 'error', error: 'room not found' }
+    window.localStorage.setItem('open-agricola-locale-v2', 'en')
+    window.history.replaceState(null, '', '/?page=game&transport=ws&room=room-x')
+    vi.stubGlobal('WebSocket', JoinErrorWebSocket)
+    vi.stubGlobal('fetch', vi.fn(async () =>
+      new Response(JSON.stringify({
+        ok: true,
+        user: { id: 'u1', username: 'host', displayName: 'Host' },
+      })),
+    ))
+
+    render(
+      <LocaleProvider>
+        <AuthProvider>
+          <AuthenticatedGame />
+        </AuthProvider>
+      </LocaleProvider>,
+    )
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('room not found')
+    expect(screen.getByRole('button', { name: 'Retry' })).toBeVisible()
+    expect(screen.queryByRole('button', { name: 'Back to Lobby' })).toBeNull()
   })
 
   it.each([
