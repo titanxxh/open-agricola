@@ -61,9 +61,16 @@ export class IndexedDbGameStore implements LocalGameStore {
     const db = await this.openDb()
     try {
       return await new Promise<T>((resolve, reject) => {
-        const request = run(db.transaction(STORE_NAME, mode).objectStore(STORE_NAME))
-        request.onsuccess = () => resolve(request.result)
+        const tx = db.transaction(STORE_NAME, mode)
+        const request = run(tx.objectStore(STORE_NAME))
+        let result: T
+        request.onsuccess = () => { result = request.result }
         request.onerror = () => reject(request.error ?? new Error('indexedDB request failed'))
+        // Resolve on commit, not on request success — a write request can
+        // succeed before the transaction later aborts and loses the data.
+        tx.oncomplete = () => resolve(result)
+        tx.onabort = () => reject(tx.error ?? new Error('indexedDB transaction aborted'))
+        tx.onerror = () => reject(tx.error ?? new Error('indexedDB transaction failed'))
       })
     } finally {
       db.close()

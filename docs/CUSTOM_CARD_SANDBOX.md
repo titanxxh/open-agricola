@@ -381,6 +381,11 @@ AST validator 还会检查 `CARD_IMPL.effect` 中的键是否在 `cardEffectHook
 - `document`
 - `__dirname`
 - `__filename`
+- `self`
+- `importScripts`
+- `postMessage`
+- `WorkerGlobalScope`
+- `indexedDB`
 - `fetch`
 - `XMLHttpRequest`
 - `WebSocket`

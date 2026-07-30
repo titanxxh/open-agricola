@@ -90,6 +90,15 @@ describe('browser executor parity with server executor', () => {
     expect(server.valid).toBe(false)
   })
 
+  it('rejects worker-global escapes (self / importScripts) identically', () => {
+    for (const src of ['self.fetch("/x")', 'importScripts("/x")', 'self.indexedDB.open("x")']) {
+      const server = validateAndCompileCustomCode(src, 'CUSTOM_BadCard')
+      const local = validateAndCompileCustomCodeLocal(src, 'CUSTOM_BadCard')
+      expect(local).toEqual(server)
+      expect(server.valid, `${src} should be rejected`).toBe(false)
+    }
+  })
+
   it('invokes effect hooks with identical results and input isolation', () => {
     const compiled = validateAndCompileCustomCode(CARD_SOURCE, 'CUSTOM_ParityCard')
     expect(compiled.valid).toBe(true)

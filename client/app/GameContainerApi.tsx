@@ -174,9 +174,14 @@ const useTransportSetup = (
     })
     window.addEventListener('pagehide', () => { void saver.flush() })
 
+    // An explicit "restart" (freshSandbox=1) drops any saved slot and starts
+    // clean instead of offering to resume the previous game.
+    const forceFresh = new URLSearchParams(window.location.search).get('freshSandbox') === '1'
+
     const init = async () => {
       try {
-        const persisted = await loadResumable(store)
+        const persisted = forceFresh ? null : await loadResumable(store)
+        if (forceFresh) await store.clear()
         if (persisted && window.confirm(t(locale, 'platform.localSandboxResume'))) {
           try {
             await transport.startFromPersisted(persisted)
