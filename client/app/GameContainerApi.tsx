@@ -10,7 +10,7 @@ import {
 import { useGameSync } from '../hooks/useGameSync'
 import { HttpGameTransport, WsGameTransport, parseDraftParamsFromQuery, type GameTransport } from '../services/gameTransport'
 import { LocalGameTransport } from '../local-sandbox/local-transport'
-import { readLocalSandboxConfig } from '../local-sandbox/workshop-launch'
+import { isBrowserSandbox, readLocalSandboxConfig } from '../local-sandbox/workshop-launch'
 import { createDebouncedSaver, loadResumable, openLocalGameStore } from '../local-sandbox/persistence'
 import type { GameSyncPayload } from '../../shared/contract/protocol/game'
 import { REPLAY_CARD_SNAPSHOT_CONSENT_REQUIRED } from '../../shared/contract/protocol/ws'
@@ -183,7 +183,16 @@ const useTransportSetup = (
       try {
         // Clearing the optional slot is best-effort: a storage-disabled context
         // must not block starting a fresh in-memory game.
-        if (forceFresh) { try { await store.clear() } catch { /* ignore */ } }
+        if (forceFresh) {
+          try { await store.clear() } catch { /* ignore */ }
+          // Consume the flag so a later reload of this frame (manual or the
+          // stale-chunk recovery path) resumes the restarted game instead of
+          // clearing its snapshots again.
+          const params = new URLSearchParams(window.location.search)
+          params.delete('freshSandbox')
+          const q = params.toString()
+          window.history.replaceState(null, '', `${window.location.pathname}${q ? '?' + q : ''}${window.location.hash}`)
+        }
         const persisted = forceFresh ? null : await loadResumable(store)
         if (persisted && window.confirm(t(locale, 'platform.localSandboxResume'))) {
           try {
@@ -447,7 +456,10 @@ export const GameContainerApi = () => {
   // Read URL params fresh on each render (navigated here from lobby — don't use module-level stale values)
   const currentUrlParams = new URLSearchParams(window.location.search)
   const contextRoomId = currentUrlParams.get('context')
-  const isLocalMode = currentUrlParams.get('localSandbox') === '1'
+  // Gate on the configured executor too, so flipping VITE_SANDBOX_EXECUTOR back
+  // to 'server' is an effective kill switch: a reload of an already-open
+  // localSandbox=1 tab (new bundle) no longer runs custom code in the browser.
+  const isLocalMode = currentUrlParams.get('localSandbox') === '1' && isBrowserSandbox()
   const isWsMode = !isLocalMode && (contextRoomId !== null || currentUrlParams.get('transport') === 'ws')
   const isEmbedded = currentUrlParams.get('embedded') === '1'
 

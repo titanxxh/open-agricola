@@ -76,6 +76,19 @@ describe('LocalSandboxCore', () => {
     expect(persist.serializedState.players[0]?.resources.food).toBe(9)
   })
 
+  it('dispatches commands inside the session card context', () => {
+    // Custom-card effects/hooks resolve from SessionCardContext only while a
+    // withCtx scope is active; every dispatch must run inside one (like the
+    // server router's session.withCtx), not just methods that self-wrap.
+    const core = new LocalSandboxCore()
+    core.init({ cards: [localCard], playerCount: 2, seed: 42 }, DEBUG_VIEWER)
+    const internalCore = (core as unknown as { core: { withCtx: (fn: () => unknown) => unknown } }).core
+    const spy = vi.spyOn(internalCore, 'withCtx')
+    core.call('devSetResources', [0, { food: 1 }], DEBUG_VIEWER)
+    expect(spy).toHaveBeenCalled()
+    spy.mockRestore()
+  })
+
   it('throws on unknown dispatch methods and before init', () => {
     const core = new LocalSandboxCore()
     expect(() => core.call('getState', [], DEBUG_VIEWER)).toThrow(/not initialized/)
