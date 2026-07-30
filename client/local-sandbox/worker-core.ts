@@ -17,12 +17,19 @@ import {
 } from '../../shared/session/state-bootstrap.ts'
 import type { CustomCardData } from '../../shared/cards/session-card-context.ts'
 import type { GameSyncPayload } from '../../shared/contract/protocol/game.ts'
+import {
+  validateFarmChoice,
+  type FarmChoiceType,
+  type FarmChoiceValidation,
+} from '../../shared/session/farm-choice-validation.ts'
 import { registerBrowserBackedCustomCard } from './browser-runtime.ts'
 import { validateAndCompileCustomCodeLocal } from './browser-executor.ts'
 import {
   LOCAL_SANDBOX_SCHEMA_VERSION,
   type LocalCardInput,
   type LocalGameConfig,
+  type LocalSandboxRequest,
+  type LocalSandboxResponse,
   type PersistedLocalGame,
   type ViewerSpec,
 } from './protocol.ts'
@@ -105,6 +112,11 @@ export class LocalSandboxCore {
     return this.respond(this.dispatch(core, method, args), viewer)
   }
 
+  validateFarmChoice(type: FarmChoiceType, playerId: string, payload: Record<string, unknown>): FarmChoiceValidation {
+    const core = this.requireCore()
+    return core.withCtx(() => validateFarmChoice(core.getStateForRead(), type, playerId, payload))
+  }
+
   private dispatch(core: GameCore, method: string, args: unknown[]): SessionResponse {
     const a = args as never[]
     switch (method) {
@@ -169,5 +181,35 @@ export class LocalSandboxCore {
   private requireCore(): GameCore {
     if (!this.core) throw new Error('Local sandbox not initialized')
     return this.core
+  }
+}
+
+/**
+ * Maps one protocol request onto a `LocalSandboxCore`. Shared by the real
+ * worker shell (`worker.ts`) and the in-process fake worker used in tests so
+ * both paths run the exact same logic.
+ */
+export const handleLocalSandboxRequest = (
+  core: LocalSandboxCore,
+  request: LocalSandboxRequest,
+): LocalSandboxResponse => {
+  try {
+    if (request.kind === 'call' && request.method === 'validateFarmChoice') {
+      const [type, playerId, payload] = request.args as [FarmChoiceType, string, Record<string, unknown>]
+      return { kind: 'result', id: request.id, ok: true, raw: core.validateFarmChoice(type, playerId, payload) }
+    }
+    const result = request.kind === 'init'
+      ? core.init(request.config, request.viewer)
+      : request.kind === 'restore'
+        ? core.restore(request.persisted, request.viewer)
+        : core.call(request.method, request.args, request.viewer)
+    return { kind: 'result', id: request.id, ok: true, ...result }
+  } catch (error) {
+    return {
+      kind: 'result',
+      id: request.id,
+      ok: false,
+      error: error instanceof Error ? error.message : String(error),
+    }
   }
 }
