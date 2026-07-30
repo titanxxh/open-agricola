@@ -67,6 +67,7 @@ import {
   type FarmCommitType,
   type WsStatus,
 } from './game-container-helpers'
+import type { WsErrorCode } from './ws-status'
 import {
   collectPrivateEventNotifications,
   type PrivateEventNotification,
@@ -147,6 +148,7 @@ const useTransportSetup = (
   const [wsReady, setWsReady] = useState(false)
 
   const initRef = useRef(false)
+  const playerIndexRef = useRef(0)
 
   useEffect(() => {
     if (!isWsMode || initRef.current) return
@@ -169,6 +171,54 @@ const useTransportSetup = (
         return
       }
       setWsTransport(ws)
+
+      const waitForPlayers = (
+        roomId: string,
+        playerIndex: number,
+        players: Array<{ playerIndex: number; name: string }>,
+        maxPlayers: number,
+      ) => {
+        setWsStatus({ phase: 'waiting', roomId, players, maxPlayers })
+        const handler = (event: MessageEvent) => {
+          try {
+            const msg = JSON.parse(event.data as string)
+            if (msg.type === 'gameStarted') {
+              rawWs.removeEventListener('message', handler)
+              setWsReady(true)
+              setWsStatus({ phase: 'ready', roomId, playerIndex })
+            } else if (msg.type === 'playerJoined') {
+              setWsStatus(prev => {
+                if (prev.phase !== 'waiting') return prev
+                const existing = prev.players.filter(p => p.playerIndex !== msg.playerIndex)
+                return {
+                  ...prev,
+                  players: [...existing, { playerIndex: msg.playerIndex, name: msg.name }].sort((a, b) => a.playerIndex - b.playerIndex),
+                  maxPlayers: msg.maxPlayers,
+                }
+              })
+            } else if (msg.type === 'roomDissolved') {
+              rawWs.removeEventListener('message', handler)
+              setWsStatus({ phase: 'error', message: 'roomDissolved' })
+            }
+          } catch { /* skip */ }
+        }
+        rawWs.addEventListener('message', handler)
+      }
+
+      rawWs.addEventListener('message', (event) => {
+        try {
+          const msg = JSON.parse(event.data as string)
+          if (msg.type !== 'roomWaiting') return
+          setRoomInUrl(msg.roomId)
+          setWsReady(false)
+          waitForPlayers(
+            msg.roomId,
+            playerIndexRef.current,
+            msg.players,
+            msg.maxPlayers,
+          )
+        } catch { /* skip */ }
+      })
 
       const searchParams = new URLSearchParams(window.location.search)
       const contextRoomId = searchParams.get('context')
@@ -240,38 +290,14 @@ const useTransportSetup = (
           return
         }
         setRoomInUrl(resp.roomId)
+        playerIndexRef.current = resp.playerIndex
         const creatorName = displayName ?? playerParam ?? 'Player 1'
-        setWsStatus({
-          phase: 'waiting',
-          roomId: resp.roomId,
-          players: [{ playerIndex: resp.playerIndex, name: creatorName }],
-          maxPlayers: resp.maxPlayers,
-        })
-
-        const handler = (event: MessageEvent) => {
-          try {
-            const msg = JSON.parse(event.data as string)
-            if (msg.type === 'gameStarted') {
-              rawWs.removeEventListener('message', handler)
-              setWsReady(true)
-              setWsStatus({ phase: 'ready', roomId: resp.roomId, playerIndex: resp.playerIndex })
-            } else if (msg.type === 'playerJoined') {
-              setWsStatus(prev => {
-                if (prev.phase !== 'waiting') return prev
-                const existing = prev.players.filter(p => p.playerIndex !== msg.playerIndex)
-                return {
-                  ...prev,
-                  players: [...existing, { playerIndex: msg.playerIndex, name: msg.name }].sort((a, b) => a.playerIndex - b.playerIndex),
-                  maxPlayers: msg.maxPlayers,
-                }
-              })
-            } else if (msg.type === 'roomDissolved') {
-              rawWs.removeEventListener('message', handler)
-              setWsStatus({ phase: 'error', message: 'roomDissolved' })
-            }
-          } catch { /* skip */ }
-        }
-        rawWs.addEventListener('message', handler)
+        waitForPlayers(
+          resp.roomId,
+          resp.playerIndex,
+          [{ playerIndex: resp.playerIndex, name: creatorName }],
+          resp.maxPlayers,
+        )
       } else {
         const roomId = roomParam
         const requestedPlayerIndex = contextRoomId
@@ -286,13 +312,25 @@ const useTransportSetup = (
         }
 
         setWsStatus({ phase: 'joining', roomId })
-        const resp = await new Promise<{ roomId: string; playerIndex: number } | { error: string }>((resolve) => {
+        const resp = await new Promise<{
+          roomId: string
+          playerIndex: number
+          status: 'waiting' | 'playing'
+          players: Array<{ playerIndex: number; name: string }>
+          maxPlayers: number
+        } | { error: string; code?: WsErrorCode }>((resolve) => {
           const handler = (event: MessageEvent) => {
             try {
               const msg = JSON.parse(event.data as string)
               if (msg.type === 'roomJoined') {
                 rawWs.removeEventListener('message', handler)
-                resolve({ roomId: msg.roomId, playerIndex: msg.playerIndex })
+                resolve({
+                  roomId: msg.roomId,
+                  playerIndex: msg.playerIndex,
+                  status: msg.status,
+                  players: msg.players,
+                  maxPlayers: msg.maxPlayers,
+                })
               } else if (msg.type === 'error') {
                 rawWs.removeEventListener('message', handler)
                 if (
@@ -301,7 +339,7 @@ const useTransportSetup = (
                 ) {
                   window.dispatchEvent(new Event(GAME_CONTEXT_CHANGED_EVENT))
                 }
-                resolve({ error: msg.error })
+                resolve({ error: msg.error, code: msg.code })
               }
             } catch { /* skip */ }
           }
@@ -315,10 +353,20 @@ const useTransportSetup = (
         })
 
         if ('error' in resp) {
-          setWsStatus({ phase: 'error', message: resp.error })
+          setWsStatus({ phase: 'error', message: resp.error, code: resp.code })
           return
         }
         setRoomInUrl(resp.roomId)
+        playerIndexRef.current = resp.playerIndex
+        if (resp.status === 'waiting') {
+          waitForPlayers(
+            resp.roomId,
+            resp.playerIndex,
+            resp.players,
+            resp.maxPlayers,
+          )
+          return
+        }
         setWsReady(true)
         setWsStatus({ phase: 'ready', roomId: resp.roomId, playerIndex: resp.playerIndex })
       }
@@ -1012,12 +1060,15 @@ export const GameContainerApi = () => {
     }
   }, [applySnapshot, applySnapshotPublicEventCancellations, resetExchangeDraft, resetFarmSelectionDraft, syncAnimalReorgFromInteraction])
 
+  const snapshotTransport = isWs ? wsTransport : transport
+  useEffect(() => {
+    if (!snapshotTransport) return
+    return snapshotTransport.onSnapshot(handleSnapshot)
+  }, [handleSnapshot, snapshotTransport])
   useEffect(() => {
     if (!isReady) return
-    const unsub = transport.onSnapshot(handleSnapshot)
     transport.getState().catch((e) => { console.error("fetchState failed:", e) })
-    return unsub
-  }, [transport, handleSnapshot, isReady])
+  }, [transport, isReady])
   useEffect(() => {
     if (!wsTransport) return
     return wsTransport.onPersistenceStatus(setPersistencePaused)
@@ -1253,7 +1304,7 @@ export const GameContainerApi = () => {
     reader.readAsText(file)
   }, [transport])
 
-  if (isWs && wsStatus.phase !== 'ready' && !state) {
+  if (isWs && wsStatus.phase !== 'ready' && (!state || wsStatus.phase === 'waiting' || wsStatus.phase === 'error')) {
     const wsProgressPhase =
       resolveGameLoadPhase({ wsStatus, hasGameView: false }) ??
       (wsStatus.phase === 'idle' ? 'wsConnecting' : null)
@@ -1267,9 +1318,6 @@ export const GameContainerApi = () => {
               {t(locale, 'ui.roomPersistencePaused')}
             </div>
           ) : null}
-          <button type="button" className="btn-link ws-status-back" onClick={() => setPage('lobby')}>
-            {t(locale, 'platform.backToLobby')}
-          </button>
         </GameLoadScreen>
       )
     }
@@ -1312,12 +1360,15 @@ export const GameContainerApi = () => {
     return (
       <div className="ws-status-screen">
         <div className="ws-status-card">
-          <BrandMark
-            title="Open Agricola"
-            titleAs="h2"
-            className="brand-mark-centered ws-status-brand"
-            titleClassName="ws-status-title"
-          />
+          {!isEmbedded ? (
+            <BrandMark
+              title="Open Agricola"
+              titleAs="h2"
+              className="brand-mark-centered ws-status-brand"
+              titleClassName="ws-status-title"
+              homeLinkLabel={t(locale, 'platform.backToLobbyPlain')}
+            />
+          ) : null}
           <div className="ws-status-text" role={wsStatus.phase === 'error' ? 'alert' : undefined}>
             {statusText}
           </div>
@@ -1367,18 +1418,17 @@ export const GameContainerApi = () => {
 
           {wsStatus.phase === 'error' && (
             <div className="ws-error-actions">
-              <button type="button" className="btn-primary" onClick={() => window.location.reload()}>
-                {t(locale, 'platform.retry')}
-              </button>
-              <button type="button" className="btn-secondary" onClick={() => setPage('lobby')}>
-                {t(locale, 'platform.backToLobby')}
-              </button>
+              {wsStatus.code === 'context_changed' ? (
+                <button type="button" className="btn-primary" onClick={() => setPage('lobby')}>
+                  {t(locale, 'platform.backToLobbyPlain')}
+                </button>
+              ) : (
+                <button type="button" className="btn-primary" onClick={() => window.location.reload()}>
+                  {t(locale, 'platform.retry')}
+                </button>
+              )}
             </div>
           )}
-
-          <button type="button" className="btn-link ws-status-back" onClick={() => setPage('lobby')}>
-            {t(locale, 'platform.backToLobby')}
-          </button>
         </div>
       </div>
     )
@@ -1740,6 +1790,7 @@ export const GameContainerApi = () => {
           setDevMode={setDevMode}
           myPlayerName={selfPlayer?.name ?? null}
           isMyTurn={isMyTurn}
+          embedded={isEmbedded}
         />
       </div>
 

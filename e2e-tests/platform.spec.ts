@@ -112,7 +112,54 @@ async function loginThroughPage(page: Page, username: string, password = PASSWOR
   await expect(page.locator('text=创建多人游戏')).toBeVisible({ timeout: 15000 })
 }
 
+async function expectNoHorizontalPageScroll(page: Page) {
+  await expect.poll(() => page.evaluate(() => (
+    document.documentElement.scrollWidth <= document.documentElement.clientWidth
+  ))).toBe(true)
+}
+
 test.describe('Platform: auth', () => {
+  test('anonymous auth pages expose a mobile-safe native home brand', async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 })
+    await page.goto(`${FRONTEND_URL}/?page=login&room=stale&context=old-game`)
+
+    const loginHome = page.getByRole('link', { name: '返回大厅' })
+    await expect(loginHome).toContainText('Open Agricola')
+    await expectNoHorizontalPageScroll(page)
+    await loginHome.click()
+    expect(new URL(page.url()).search).toBe('')
+
+    await page.goto(`${FRONTEND_URL}/?page=onboarding`)
+    await expect(page.getByRole('link', { name: '返回大厅' }))
+      .toContainText('Open Agricola')
+    await expect(page.getByRole('heading', { name: '完成注册' })).toBeVisible()
+    await expectNoHorizontalPageScroll(page)
+  })
+
+  test('bootstrap loading and failure keep a native home route', async ({ page }) => {
+    await page.route('**/cards-manifest.json', async route => {
+      await new Promise(resolve => setTimeout(resolve, 800))
+      await route.continue()
+    })
+    await page.goto(`${FRONTEND_URL}/?page=login`)
+    await expect(page.getByRole('progressbar')).toBeVisible()
+    await expect(page.getByRole('link', { name: '返回大厅' })).toBeVisible()
+    await expect(page.locator('#username')).toBeVisible()
+
+    await page.unroute('**/cards-manifest.json')
+    await page.route('**/cards-manifest.json', route => route.abort())
+    await page.setViewportSize({ width: 390, height: 844 })
+    await page.reload()
+
+    await expect(page.getByRole('alert')).toContainText('页面加载失败')
+    await expect(page.getByRole('button', { name: '重试' })).toBeVisible()
+    await expectNoHorizontalPageScroll(page)
+    const failureHome = page.getByRole('link', { name: '返回大厅' })
+    await expect(failureHome).toHaveAttribute('href', '/')
+    await failureHome.click()
+    expect(new URL(page.url()).search).toBe('')
+  })
+
   test('new user registers through GitHub helper, completes onboarding, then logs in with password', async ({ page, request }) => {
     const username = `e2e_oauth_${RUN_ID}`
     const { cookies } = await callOAuthHelper(request, 'github', {
@@ -308,8 +355,34 @@ test.describe('Platform: lobby page', () => {
     await page.getByRole('button', { name: '创建游戏' }).click()
     await page.getByRole('button', { name: '复制' }).click()
 
+    await expect(page.getByRole('link', { name: '返回大厅' }))
+      .toContainText('Open Agricola')
+    await page.setViewportSize({ width: 390, height: 844 })
+    await expectNoHorizontalPageScroll(page)
     const feedback = page.getByRole('status').or(page.getByRole('alert'))
     await expect(feedback).toHaveText(/邀请链接已复制。|无法复制邀请链接，请手动复制后重试。/)
+  })
+
+  test('settings brand returns to lobby while preserving a saved bug report', async ({ page, request }) => {
+    const username = `e2e_settings_${RUN_ID}`
+    await createUserViaOAuth(request, username, { password: 'settings123' })
+    await loginThroughPage(page, username, 'settings123')
+
+    await page.goto(`${FRONTEND_URL}/?page=settings&room=stale&view=profile&bugReport=draft-e2e`)
+    await expect(page.getByRole('heading', { name: '账户设置' })).toBeVisible({ timeout: 15000 })
+
+    const homeLink = page.getByRole('link', { name: '返回大厅' })
+    await expect(homeLink).toContainText('Open Agricola')
+    await page.setViewportSize({ width: 390, height: 844 })
+    await expectNoHorizontalPageScroll(page)
+    await homeLink.click()
+
+    await expect(page.getByText('单人模式')).toBeVisible()
+    await expect(page.getByRole('link', { name: '返回大厅' })).toBeVisible()
+    await expectNoHorizontalPageScroll(page)
+    expect(Object.fromEntries(new URL(page.url()).searchParams)).toEqual({
+      bugReport: 'draft-e2e',
+    })
   })
 })
 
@@ -321,7 +394,34 @@ test.describe('Platform: single-player game', () => {
 
     await page.click('text=单人模式')
     await expect(page.locator('.header-compact')).toBeVisible({ timeout: 15000 })
-    await expect(page.locator('.header-lobby-btn')).toBeVisible()
+    const homeLink = page.getByRole('link', { name: '返回大厅' })
+    await expect(homeLink).toContainText('Open Agricola')
+    await expect(page.locator('.header-lobby-btn')).toHaveCount(0)
+    await expect(page.locator('.header-round')).toBeVisible()
+    await expect(page.locator('.header-phase-pill.active')).toBeVisible()
+    await expect(page.locator('.status-badge')).toBeVisible()
+    await expect(page.getByRole('button', { name: '菜单' })).toBeVisible()
+    expect(await page.locator('.header-compact').evaluate((header) => {
+      const rect = (selector: string) => header.querySelector(selector)?.getBoundingClientRect()
+      const brand = rect('.site-home-brand')
+      const round = rect('.header-round')
+      const left = rect('.header-left')
+      const right = rect('.header-right')
+      const status = rect('.status-badge')
+      const actions = rect('.header-actions')
+      return Boolean(
+        brand && round && left && right && status && actions
+        && brand.right <= round.left
+        && left.right <= right.left
+        && status.right <= actions.left,
+      )
+    })).toBe(true)
+    await page.setViewportSize({ width: 390, height: 844 })
+    await expectNoHorizontalPageScroll(page)
+    await homeLink.click()
+
+    await expect(page.getByText('单人模式')).toBeVisible()
+    expect(new URL(page.url()).search).toBe('')
   })
 })
 
@@ -371,6 +471,19 @@ test.describe('Platform: workshop', () => {
     await page.click('text=进入卡牌工坊')
     await expect(page.locator('text=卡牌工坊')).toBeVisible({ timeout: 10000 })
     await expect(page.getByRole('heading', { name: '浏览' })).toBeVisible()
+
+    const homeLink = page.getByRole('link', { name: '返回大厅' })
+    await expect(homeLink).toContainText('Open Agricola')
+
+    await page.getByRole('button', { name: '沙盒' }).click()
+    await expect(page.getByRole('button', { name: '工坊主页' })).toBeVisible()
+    await expect(page.getByRole('button', { name: '返回大厅' })).toHaveCount(0)
+    await page.setViewportSize({ width: 390, height: 844 })
+    await expectNoHorizontalPageScroll(page)
+    await homeLink.click()
+
+    await expect(page.getByText('单人模式')).toBeVisible()
+    expect(new URL(page.url()).search).toBe('')
   })
 })
 

@@ -1,8 +1,10 @@
-# Open Agricola 平台扩展 — 设计文档
+# Open Agricola 平台扩展 — 设计与演进
 
 ## Context
 
-当前 Open Agricola 是一个纯游戏引擎：无用户系统、无数据库、无大厅、无自定义卡牌。目标是将其扩展为一个完整平台，支持注册登录、游戏大厅、数据库持久化、卡牌工坊（含 LLM 辅助设计），同时保持现有的后端权威架构和代码风格。
+本项目已从纯游戏引擎扩展为包含账号、游戏大厅、数据库持久化和卡牌工坊（含 LLM 辅助设计）的完整平台，同时保持后端权威架构。
+
+> A–G 记录最初的设计取舍与后续演进，SQL 和路由片段只作设计说明；当前实现状态与文件入口见 §J，运行时契约以代码为准。
 
 ---
 
@@ -142,12 +144,12 @@ CREATE TABLE sandbox_settings (
 
 ### A2. 认证：服务端 Session Token
 
-**不用 JWT，不用 OAuth — 保持简单：**
+**不用 JWT，使用服务端 Session：**
 
-- 注册：username + password，`crypto.scrypt` 哈希（Node.js 内置，不加依赖）
-- 登录：返回不透明 session token（`crypto.randomUUID()`），存入 `sessions` 表，7 天过期
-- Token 通过 `Authorization: Bearer <token>` 发送
-- WebSocket 连接后首条消息必须是 `{ type: 'auth', token: '...' }`
+- 支持密码注册（邮箱验证）与 GitHub / Google OAuth
+- 登录创建不透明 session token（`crypto.randomUUID()`），存入 `sessions` 表，7 天过期
+- 浏览器通过 HttpOnly session cookie 访问 HTTP 与 WebSocket
+- WebSocket 协议仍支持 `{ type: 'auth', token: '...' }` 显式认证
 - 单服务器不需要 JWT 的无状态优势；服务端 session 支持即时吊销
 
 ### A3. 前端路由：URL 参数 + PageRouter 组件
@@ -173,9 +175,9 @@ App.tsx
 
 不引入 Redux/Zustand：
 
-- 新增 `AuthContext`：提供 `{ user, token, login, logout, register }`
+- `AuthContext` 提供用户状态、登录/登出、密码注册/验证邮件和 OAuth 入口
 - 工坊页面用 `useState` + fetch，和游戏现有风格一致
-- `GameTransport` 构造器加可选 `token` 参数
+- HTTP fetch 使用 `credentials: 'include'`，浏览器 WebSocket 自动携带 session cookie
 
 ---
 
@@ -422,42 +424,25 @@ AST 验证通过后，`ts.transpileModule()` 将 TypeScript 编译为 CommonJS J
 
 ### D1. 自定义卡牌注册
 
-`shared/cards/custom-registry.ts`：
-
-```typescript
-const customCards = new Map<string, CardBase>()
-
-export function registerCustomCard(card: CardBase) {
-  customCards.set(card.id, card)
-  // effect 和 listener 通过 server/custom-code/runtime.ts 在加载时动态注入，不在此处注册
-}
-
-export function getCustomCard(id: string): CardBase | undefined {
-  return customCards.get(id)
-}
-```
-
-`shared/cards/catalog.ts` 的查找函数 fallback 到 custom registry：
-
-```typescript
-export function getMinorImprovementCard(id: string) {
-  return officialCards.get(id) ?? getCustomCard(id)
-}
-```
+`shared/cards/custom-registry.ts` 把 `CustomCardData` 注册进当前
+`SessionCardContext`；仅测试和显式全局路径使用按 minor / occupation
+分开的 fallback map。`shared/cards/catalog.ts` 的
+`getMinorImprovementCard()` / `getOccupationCard()` 会按卡牌类型回退到该
+registry。
 
 ### D2. 游戏中加载自定义卡牌
 
 1. 创建房间时可选 "启用工坊卡牌"（WS `createRoom.customCardIds` / HTTP `/api/game/new-sandbox`）
-2. `GameSession` 构造时从数据库加载房间关联的自定义卡牌
-3. 从 `card_json` 反序列化为 `MinorImprovement`/`Occupation` 实例，调用 `registerCustomCard()`
-4. `server/custom-code/runtime.ts` 的 `registerExecutorBackedCustomCard()` 从 `card_json` 中的编译产物 + manifest 注入 effect hook 和 listener，通过 `invokeCustomCodeEffectSync` / `invokeCustomCodeListenerSync` 委托给 Worker Thread + isolated-vm 执行
+2. `server/connection/room-router.ts` 或 `server/game-router.ts` 从数据库构造 `CustomCardData[]`
+3. `GameSession` 构造时把卡牌定义和运行时实现注册到本局 `SessionCardContext`
+4. `server/custom-code/runtime.ts` 的 `registerExecutorBackedCustomCard()` 从编译产物 + manifest 注入 effect hook 和 listener，通过 `invokeCustomCodeEffectSync` / `invokeCustomCodeListenerSync` 委托给 Worker Thread + isolated-vm 执行
 5. 将自定义卡牌 ID 加入发牌池
 
 ### D3. 沙盒隔离与容错
 
 - 所有自定义卡牌效果/监听器调用包裹在 try/catch 中
 - 异常时：记录错误、跳过该效果、游戏继续；当前沙盒会话累计去重后的运行错误，工坊确认门禁提交前重新读取并拒绝带错版本
-- `vm.runInContext()` 设 `timeout: 100ms` 防止死循环
+- isolated-vm 单次执行 CPU 超时 100 ms
 - 状态快照可回滚（利用现有 undo 基础设施）
 
 ### D4. 工坊 UI 页面结构
@@ -482,7 +467,7 @@ WorkshopPage
 │   └── VersionHistory   不可变版本恢复和一次本地撤销
 └── SandboxView          我的沙盒
     ├── SelectedCards     已选的自定义卡牌列表
-    └── TestGameButton   "开始沙盒测试" → 创建含自定义卡牌的单人游戏
+    └── TestGameButton   "开始沙盒测试" → 创建含自定义卡牌的可配置人数测试游戏
 ```
 
 ### D5. Workshop → GitHub PR 流程
@@ -563,11 +548,11 @@ Draft Version 只序列化最终卡牌内容和各分区已采用候选的 prove
 | ------------- | -------------------------------------------- |
 | API Key 泄露    | 仅存 localStorage，绝不发送到游戏服务器，UI 明确标示           |
 | 密码泄露          | `crypto.scrypt` 哈希，不存明文                      |
-| Session 劫持    | HTTPS（生产）+ HttpOnly 考虑（当前 Bearer token 简单可行） |
+| Session 劫持    | HTTPS（生产）+ HttpOnly / Secure / SameSite session cookie |
 | 暴力破解          | 登录 API 限流：5 次/分钟/IP                          |
 | 恶意卡牌代码        | AST 白名单（拒绝 import/export/eval/process/fetch/setTimeout/Proxy/Reflect/class 等 20+ 标识符）+ isolated-vm（独立 V8 堆，非 node:vm）+ Worker Thread + 执行超时 100 ms / 内存上限 8 MB + 状态快照可回滚 |
 | XSS via 卡牌描述  | React 默认转义 HTML；不用 dangerouslySetInnerHTML   |
-| WebSocket 未认证 | 连接后 5 秒内必须发 auth 消息，否则断开                     |
+| WebSocket 未认证 | 优先校验 session cookie；未认证连接需在 5 秒内发 auth 消息，否则断开 |
 
 
 ---
@@ -628,43 +613,19 @@ Draft Version 只序列化最终卡牌内容和各分区已采用候选的 prove
 
 ## H. 关键文件清单
 
-**需修改：**
-
-- `server/index.ts` — 添加新路由、认证中间件
-- `server/room-manager.ts` — JSON 持久化 → SQLite、认证集成
-- `shared/cards/card-effects.ts` — 自定义卡牌 try/catch 包裹
-- `shared/cards/catalog.ts` — fallback 到 custom registry
-- `client/App.tsx` — 包裹 AuthProvider + PageRouter
-- `client/app/GameContainerApi.tsx` — transport 添加 auth token
-
-**需新建：**
-
-- `server/db.ts` — 数据库初始化与迁移
-- `server/auth.ts` — 认证逻辑
-- `server/workshop.ts` — 工坊 API
-- `server/lobby.ts` — 大厅 API
-- `shared/cards/custom-registry.ts` — 自定义卡牌注册
-- `shared/custom-code/ast-validator.ts` — TypeScript AST 白名单验证
-- `shared/custom-code/types.ts` — custom card source / compiled 类型契约（`CustomCodeManifest`、`CustomCodeValidateResult` 等）
-- `server/custom-code/compiler.ts` — TS 源码 → CommonJS JS 编译（`ts.transpileModule`）
-- `server/custom-code/engine.ts` — 验证 + 编译 + manifest 提取；isolated-vm 执行（主线程路径）
-- `server/custom-code/client.ts` — Worker Thread 客户端；`SharedArrayBuffer + Atomics` 同步调用
-- `server/custom-code/executor-worker.ts` — Worker Thread 入口；处理 `invokeEffect` / `invokeListener` 消息
-- `server/custom-code/isolate-runner.ts` — isolated-vm 执行核心（Worker Thread 内，无项目模块依赖）
-- `server/custom-code/runtime.ts` — `registerExecutorBackedCustomCard()`：挂载 effect hook + listener 到 CardRegistry
-- `server/custom-code/injected-helpers.ts` — 注入沙盒的辅助 API（`gainLeaf`、`payLeaf` 等）
-- `client/app/LoginPage.tsx` — 登录/注册页
-- `client/app/LobbyPage.tsx` — 大厅页
-- `client/app/WorkshopPage.tsx` — 工坊页
-- `client/app/PageRouter.tsx` — 页面路由
-- `client/contexts/AuthContext.tsx` — 认证 Context
-- `client/services/llmService.ts` — 浏览器端 LLM 调用
+- HTTP / 认证 / 数据库：`server/index.ts`、`server/auth.ts`、`server/db.ts`
+- WebSocket：`server/connection/{ws-server,room-router,broadcaster}.ts`
+- 房间 / 持久化：`server/game/{room,room-registry,room-committer,room-persistence-checkpoint}.ts`、`server/game/persistence/`
+- 协议：`shared/contract/protocol/ws.ts`
+- 工坊 / 沙盒：`server/workshop.ts`、`server/game-router.ts`、`shared/cards/{custom-registry,catalog}.ts`、`shared/custom-code/`、`server/custom-code/`
+- 前端平台：`client/app/{LoginPage,LobbyPage,WorkshopPage,PageRouter}.tsx`、`client/contexts/AuthContext.tsx`
+- 浏览器 LLM：`client/services/llm/`
 
 ---
 
 ## I. 验证方式
 
-- **认证**：手动注册 → 登录 → 检查 session token → 刷新页面保持登录
+- **认证**：注册并验证邮箱或 OAuth 登录 → 检查 HttpOnly session cookie → 刷新页面保持登录
 - **大厅**：创建房间 → 另一浏览器加入 → 游戏开始
 - **持久化**：游戏中途刷新 → 状态恢复 → 重启服务器 → 状态恢复
 - **工坊**：创建自定义卡牌 → 发布 → 另一用户浏览/点赞/评论 → 加入沙盒
@@ -674,21 +635,21 @@ Draft Version 只序列化最终卡牌内容和各分区已采用候选的 prove
 
 ---
 
-## J. 实现状态（platform 分支）
+## J. 实现状态（main）
 
-> 更新于 2026-05-09
+> 更新于 2026-07-29
 
 ### 已完成
 
 
 | 功能                             | 文件                                                                                                                           |
 | ------------------------------ | ---------------------------------------------------------------------------------------------------------------------------- |
-| 注册/登录/登出/会话验证                  | `server/auth.ts`, `client/app/LoginPage.tsx`, `client/contexts/AuthContext.tsx`                                                    |
-| SQLite 数据库 + migration (v1-v3) | `server/db.ts`                                                                                                               |
-| WebSocket 认证握手                 | `server/room-manager.ts`, `shared/protocol/ws.ts`                                                                            |
-| WS 房间 → SQLite 写入              | `server/room-manager.ts` (ensureRoomRowSqlite, upsertRoomPlayer)                                                             |
-| 服务器重启恢复房间                      | `server/room-manager.ts` (restoreRoomsFromSqlite)                                                                            |
-| 游戏状态持久化（JSON/SQLite）           | `server/room-manager.ts` (PERSIST_ROOMS 环境变量)                                                                                |
+| 注册/登录/登出/会话验证、邮箱验证与 OAuth       | `server/auth.ts`, `server/auth-cookies.ts`, `server/oauth/`, `client/app/LoginPage.tsx`, `client/contexts/AuthContext.tsx`            |
+| SQLite 数据库 + migration          | `server/db.ts`                                                                                                               |
+| WebSocket 认证握手                 | `server/connection/ws-server.ts`, `server/connection/room-router.ts`, `shared/contract/protocol/ws.ts`                         |
+| WS 房间 → SQLite 写入              | `server/game/room-persistence-checkpoint.ts`, `server/game/room-committer.ts`, `server/game/persistence/sqlite-adapter.ts`      |
+| 服务器重启恢复房间                      | `server/connection/ws-server.ts`, `server/game/persistence/sqlite-adapter.ts`                                                  |
+| 游戏状态持久化（JSON/SQLite）           | `server/game/persistence/` (`PERSIST_ROOMS` 环境变量)                                                                            |
 | 完赛结果归档 + 删除完整状态                 | `server/game/room-persistence-checkpoint.ts`, `server/game/persistence/sqlite-adapter.ts`                                     |
 | 房间 TTL 丢弃                      | `server/connection/ws-server.ts`, `server/game/persistence/sqlite-adapter.ts`                                                 |
 | 大厅页面                           | `client/app/LobbyPage.tsx`, `/api/lobby/my-rooms`                                                                               |
@@ -697,14 +658,14 @@ Draft Version 只序列化最终卡牌内容和各分区已采用候选的 prove
 | 返回大厅按钮                         | `client/components/header/GameHeader.tsx`                                                                                       |
 | Dev 模式默认关闭                     | `client/app/GameContainerApi.tsx` (?devMode=1)                                                                                  |
 | Auth 401 自动登出                  | `client/contexts/AuthContext.tsx` (apiFetch)                                                                                    |
-| 游戏中玩家名与登录用户同步                  | `server/game-session.ts` (updatePlayerName), `server/room-manager.ts`, `server/game-router.ts`                               |
+| 游戏中玩家名与登录用户同步                  | `shared/session/session-core.ts` (`updatePlayerName`), `server/connection/room-router.ts`, `server/game-router.ts`             |
 | 工坊卡牌 CRUD                      | `server/workshop.ts`, `client/app/WorkshopPage.tsx`                                                                             |
 | 工坊社交（点赞/评论）                    | `server/workshop.ts`                                                                                                         |
 | 工坊沙盒                           | `server/workshop.ts`, WorkshopPage SandboxView                                                                               |
 | 自定义卡牌注册表 + catalog fallback    | `shared/cards/custom-registry.ts`, `shared/cards/catalog.ts`                                                                 |
 | 自定义卡牌 try-catch 容错             | `shared/cards/card-effects.ts` (CUSTOM_ 前缀卡牌异常时跳过)                                                                           |
-| 单人沙盒游戏（含自定义卡牌）                 | `/api/game/new-sandbox`, `server/game-router.ts`                                                                             |
-| WS 多人游戏含自定义卡牌                  | `shared/protocol/ws.ts` (createRoom.customCardIds), `server/room-manager.ts`                                                 |
+| 可配置人数沙盒游戏（含自定义卡牌）              | `/api/game/new-sandbox`, `server/game-router.ts`                                                                             |
+| WS 多人游戏含自定义卡牌                  | `shared/contract/protocol/ws.ts` (`createRoom.customCardIds`), `server/connection/room-router.ts`                              |
 | LLM 卡牌设计师                      | `client/app/workshop/AiCardDesigner.tsx`, `client/services/llm/`（多 provider 聚合层）                                            |
 | 多 LLM Provider 支持              | Gemini / OpenRouter / DeepSeek / AiHubMix；完整模型表见 §C1.1                                                                       |
 | API Key 浏览器隔离                  | localStorage 存储，绝不发往服务器                                                                                                      |
@@ -712,17 +673,9 @@ Draft Version 只序列化最终卡牌内容和各分区已采用候选的 prove
 | 资源图标解析                         | `client/components/common/ResourceText.tsx`                                                                                     |
 | auth/workshop 单元测试             | `server/__tests__/auth.test.ts`, `workshop-api.test.ts`                                                                      |
 | TypeScript AST 验证 + isolated-vm 沙盒 | `shared/custom-code/ast-validator.ts`, `server/custom-code/{compiler, engine, client, executor-worker, isolate-runner, runtime, injected-helpers}.ts` |
-| 卡牌版本历史                         | `workshop_card_versions` 表, versions/revert API, WorkshopPage 版本面板                                                           |
+| 卡牌版本历史                         | `workshop_card_versions` 表, versions/restore API, WorkshopPage 版本面板                                                          |
 | 工坊精选页面                         | `workshop_cards.featured` 列, admin 精选切换, Featured 标签页                                                                        |
-| 生产部署 (Docker + GitHub Pages)   | `Dockerfile`, `docker-compose.yml`, `.github/workflows/deploy-pages.yml`, `client/config.ts`                                    |
+| 生产部署 (Docker + GitHub Pages)   | `Dockerfile`, `docker-compose.prod.yml`, `deploy-backend.sh`, `.github/workflows/{deploy-pages,deploy-backend}.yml`, `client/config.ts` |
 | 管理员角色                          | `server/auth.ts` isAdmin(), `ADMIN_USERS` 环境变量                                                                               |
 | 管理员 API                        | `GET/DELETE /api/admin/cards`, `GET /api/admin/cards/:id/export`, `POST /api/admin/cards/:id/status`, `GET /api/admin/users` |
 | 卡牌发布/取消发布                      | `server/workshop.ts` draft→published 状态切换, 详情页发布按钮, 非作者只能看到已发布卡牌                                                             |
-
-
-### 未完成（可选）
-
-
-| 功能   | 说明                |
-| ---- | ----------------- |
-| 邮箱验证 | 注册后验证邮件（需要外部邮件服务） |

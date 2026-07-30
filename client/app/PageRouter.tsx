@@ -7,50 +7,17 @@ import { OnboardingPage } from './OnboardingPage'
 import { SettingsPage } from './SettingsPage'
 import { MobileTabBar } from '../components/common/MobileTabBar'
 import { GameLoadScreen } from '../components/common/GameLoadScreen'
+import { AppShellLoadScreen } from './AppShellLoadScreen'
 import { getGameLoadProgress } from './game-load-progress'
 import { SandboxAppLazy } from '../sandbox'
+import { buildPlatformPageUrl, type PlatformPage } from '../utils/platform-page-url'
 import '../App.css'
 
 const GameContainerApiLazy = lazy(() =>
   import('./GameContainerApi').then((m) => ({ default: m.GameContainerApi })),
 )
 
-function GameShellFallback() {
-  const { t } = useLocale()
-  const { percent, labelKey } = getGameLoadProgress('appShell')
-  return <GameLoadScreen percent={percent} label={t(labelKey)} />
-}
-
-type Page = 'login' | 'lobby' | 'workshop' | 'game' | 'settings' | 'onboarding'
-
-const PAGE_SCOPED_QUERY_KEYS = [
-  'card',
-  'view',
-  'room',
-  'player',
-  'playerId',
-  'transport',
-  'maxPlayers',
-  'draftMode',
-  'draftPoolSize',
-  'enableCommunityDeck',
-  'enableParentCards',
-  'draftParents',
-  'enableThroughTheSeasons',
-  'enableFarmersOfTheMoor',
-  'allowIncompleteFarmersOfTheMoorMinorDeal',
-  'customCards',
-  'embedded',
-  'devMode',
-  'authMode',
-  'context',
-  'step',
-  'frame',
-  'perspective',
-  'bugReportConnection',
-]
-
-function getPage(): Page {
+function getPage(): PlatformPage {
   const params = new URLSearchParams(window.location.search)
   const page = params.get('page')
   if (page === 'game' || page === 'workshop' || page === 'lobby' || page === 'settings' || page === 'login' || page === 'onboarding') return page
@@ -59,23 +26,8 @@ function getPage(): Page {
   return 'lobby'
 }
 
-export function setPage(page: Page, extraParams?: Record<string, string>) {
-  const params = new URLSearchParams(window.location.search)
-  for (const key of PAGE_SCOPED_QUERY_KEYS) {
-    params.delete(key)
-  }
-  if (page === 'lobby') {
-    params.delete('page')
-  } else {
-    params.set('page', page)
-  }
-  if (extraParams) {
-    for (const [k, v] of Object.entries(extraParams)) {
-      params.set(k, v)
-    }
-  }
-  const search = params.toString()
-  const newUrl = `${window.location.pathname}${search ? '?' + search : ''}`
+export function setPage(page: PlatformPage, extraParams?: Record<string, string>) {
+  const newUrl = buildPlatformPageUrl(page, extraParams)
   window.history.pushState(null, '', newUrl)
   window.dispatchEvent(new PopStateEvent('popstate'))
 }
@@ -128,14 +80,14 @@ export function PageRouter() {
   switch (page) {
     case 'game':
       pageNode = (
-        <Suspense fallback={<GameShellFallback />}>
+        <Suspense fallback={<AppShellLoadScreen />}>
           <GameContainerApiLazy />
         </Suspense>
       )
       break
     case 'workshop':
       pageNode = (
-        <Suspense fallback={<div className="loading-screen">{t('platform.loading')}</div>}>
+        <Suspense fallback={<AppShellLoadScreen />}>
           <SandboxAppLazy />
         </Suspense>
       )

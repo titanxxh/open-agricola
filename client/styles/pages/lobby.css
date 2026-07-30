@@ -23,20 +23,6 @@
   border-radius: var(--radius-md);
   box-shadow: var(--shadow-paper);
 }
-.lobby-brand {
-  gap: 16px;
-}
-.lobby-brand .brand-mark-image {
-  width: 48px;
-  height: 48px;
-}
-.lobby-title {
-  font-size: 28px;
-  color: var(--color-primary);
-  margin: 0;
-  font-family: var(--agricola-font);
-  letter-spacing: 0.5px;
-}
 .lobby-header__right {
   display: flex;
   align-items: center;

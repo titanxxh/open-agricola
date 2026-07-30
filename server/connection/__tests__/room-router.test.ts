@@ -361,6 +361,12 @@ describe('handleCreateRoom', () => {
       { playerIndex: 0, userId: 'u1' },
     ])
     expect(host.currentRoom!.status).toBe('waiting')
+    expect(sentMessagesOf(host)).toContainEqual({
+      type: 'roomWaiting',
+      roomId: host.currentRoom!.id,
+      players: [{ playerIndex: 0, name: 'Player 1' }],
+      maxPlayers: 2,
+    })
     const replacement = newCtx(deps)
     replacement.currentUserId = 'u3'
     dispatch(replacement, { type: 'joinRoom', roomId: host.currentRoom!.id })
@@ -524,6 +530,32 @@ describe('handleCreateRoom', () => {
 })
 
 describe('active room recovery', () => {
+  it('returns the authoritative waiting-room state when its owner reconnects', () => {
+    const deps = newDeps()
+    const host = newCtx(deps)
+    host.currentUserId = 'u1'
+    dispatch(host, { type: 'createRoom', maxPlayers: 4, name: 'Alice' })
+    const roomId = host.currentRoom!.id
+    const replacement = newCtx(deps)
+    replacement.currentUserId = 'u1'
+
+    dispatch(replacement, {
+      type: 'joinRoom',
+      roomId,
+      intent: 'resume',
+      name: 'Alice',
+    })
+
+    expect(sentMessagesOf(replacement)).toContainEqual({
+      type: 'roomJoined',
+      roomId,
+      playerIndex: 0,
+      status: 'waiting',
+      players: [{ playerIndex: 0, name: 'Alice' }],
+      maxPlayers: 4,
+    })
+  })
+
   it('restores every original seat after restart with only its own hidden information', () => {
     const deps = newDeps()
     const host = newCtx(deps)
@@ -644,6 +676,24 @@ describe('handleAction guard: no-room', () => {
     const ctx = newCtx()
     dispatch(ctx, { type: 'action', spaceId: 'whatever' })
     expect(sentTypesOf(ctx)).toContain('error')
+  })
+})
+
+describe('waiting-room write guard', () => {
+  it('rejects game commands before the room starts without replay recording', () => {
+    const ctx = newCtx()
+    ctx.currentUserId = 'u1'
+    dispatch(ctx, { type: 'createRoom', maxPlayers: 4, name: 'Alice' })
+    const takeAction = vi.spyOn(ctx.currentRoom!.session, 'takeAction')
+
+    dispatch(ctx, { type: 'action', spaceId: 'forest', requestId: 'waiting-action' })
+
+    expect(takeAction).not.toHaveBeenCalled()
+    expect(sentMessagesOf(ctx)).toContainEqual({
+      type: 'error',
+      error: 'game has not started',
+      requestId: 'waiting-action',
+    })
   })
 })
 

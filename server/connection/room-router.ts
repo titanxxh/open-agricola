@@ -170,7 +170,7 @@ const requireRoom = (ctx: ConnectionCtx, requestId?: string): Room | null => {
 const requireWritableRoom = (ctx: ConnectionCtx, requestId?: string): Room | null => {
   const room = requireRoom(ctx, requestId)
   if (!room) return null
-  if (room.status === 'waiting' && room.replayRecording === true) {
+  if (room.status === 'waiting') {
     sendCommandError(ctx, 'game has not started', requestId)
     return null
   }
@@ -560,8 +560,26 @@ function handleJoinRoom(ctx: ConnectionCtx, msg: Extract<ClientCommand, { type: 
     room.status = 'playing'
     room.startedAt ??= Date.now()
   }
+  const players = [...new Set([
+    ...room.players.map((player) => player.playerIndex),
+    ...(room.seatOwners ?? []).map((owner) => owner.playerIndex),
+  ])]
+    .sort((left, right) => left - right)
+    .map((playerIndex) => ({
+      playerIndex,
+      name: room.players.find((player) => player.playerIndex === playerIndex)?.name
+        ?? room.session.state.players[playerIndex]?.name
+        ?? `Player ${playerIndex + 1}`,
+    }))
   const publishJoin = (): void => {
-    ctx.broadcaster.sendTo(ctx.ws, { type: 'roomJoined', roomId, playerIndex: ctx.currentPlayerIndex })
+    ctx.broadcaster.sendTo(ctx.ws, {
+      type: 'roomJoined',
+      roomId,
+      playerIndex: ctx.currentPlayerIndex,
+      status: room.status === 'waiting' ? 'waiting' : 'playing',
+      players,
+      maxPlayers: room.maxPlayers,
+    })
     ctx.broadcaster.broadcastEvent(room, {
       type: 'playerJoined',
       playerIndex: ctx.currentPlayerIndex,
@@ -743,7 +761,7 @@ function handleNewGame(ctx: ConnectionCtx, msg: Extract<ClientCommand, { type: '
       ? [{ playerIndex: player.playerIndex, userId: player.userId }]
       : []
   )
-  room.status = roomOccupiedSeatCount(room) >= room.maxPlayers ? 'playing' : 'waiting'
+  room.status = isDevRoom(room.id) || roomOccupiedSeatCount(room) >= room.maxPlayers ? 'playing' : 'waiting'
   room.startedAt = room.status === 'playing' ? Date.now() : undefined
   room.enableParentCards = enableParentCards
   room.draftMode = draftMode
@@ -763,6 +781,12 @@ function handleNewGame(ctx: ConnectionCtx, msg: Extract<ClientCommand, { type: '
   if (room.status === 'playing') {
     publishInitialState(ctx, room, resp, msg.requestId, () => {}, () => {})
   } else {
+    ctx.broadcaster.broadcastEvent(room, {
+      type: 'roomWaiting',
+      roomId: room.id,
+      players: room.players.map(({ playerIndex, name }) => ({ playerIndex, name })),
+      maxPlayers: room.maxPlayers,
+    })
     ctx.broadcaster.broadcastState(room, resp, 'reconnect', msg.requestId)
   }
 }

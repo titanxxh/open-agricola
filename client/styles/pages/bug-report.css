@@ -1,8 +1,11 @@
 .bug-report-trigger {
+  --bug-report-bottom-fallback: calc(
+    72px + var(--safe-area-inset-bottom, env(safe-area-inset-bottom))
+  );
   position: fixed;
   z-index: 70;
   right: 16px;
-  bottom: calc(84px + env(safe-area-inset-bottom));
+  bottom: calc(var(--interaction-bar-height, var(--bug-report-bottom-fallback)) + 12px);
   min-height: 42px;
   padding: 9px 16px;
   color: #fff9e9;
@@ -248,8 +251,10 @@
 
 @media (max-width: 640px) {
   .bug-report-trigger {
+    --bug-report-bottom-fallback: calc(
+      64px + var(--safe-area-inset-bottom, env(safe-area-inset-bottom))
+    );
     right: 10px;
-    bottom: calc(76px + env(safe-area-inset-bottom));
   }
 
   .bug-report-overlay {

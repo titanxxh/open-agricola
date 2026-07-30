@@ -33,7 +33,15 @@ vi.mock('../../components/common/MobileTabBar', () => ({
 }))
 
 vi.mock('../../components/common/GameLoadScreen', () => ({
-  GameLoadScreen: ({ label }: { label: string }) => <div>{label}</div>,
+  GameLoadScreen: ({ label }: { label: string }) => (
+    <a href="/" aria-label="platform.backToLobbyPlain">{label}</a>
+  ),
+}))
+
+vi.mock('../../sandbox', () => ({
+  SandboxAppLazy: () => {
+    throw new Promise(() => {})
+  },
 }))
 
 afterEach(() => {
@@ -83,6 +91,18 @@ describe('PageRouter auth routes', () => {
     expect(await screen.findByText('Lobby Page')).toBeInTheDocument()
     await waitFor(() => expect(window.location.pathname + window.location.search).toBe('/'))
     expect(screen.getByText('Mobile Tab Bar')).toBeInTheDocument()
+  })
+
+  it('keeps the native home link while the workshop chunk loads', async () => {
+    stubMe({ ok: true, user: { id: 'u1', username: 'host', displayName: 'Host' } })
+    window.history.replaceState(null, '', '/?page=workshop')
+
+    renderWithAuth()
+
+    expect(await screen.findByText('Mobile Tab Bar')).toBeVisible()
+    expect(screen.getByRole('link', {
+      name: 'platform.backToLobbyPlain',
+    })).toBeVisible()
   })
 
   it('returns authenticated replay login to the preserved anchor', async () => {

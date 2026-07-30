@@ -30,6 +30,17 @@ https://titanxxh.github.io/open-agricola/
 
 前置：Node.js 22 + pnpm（项目 `package.json` 的 `packageManager` 字段已锁定 pnpm 版本）。`better-sqlite3` 等原生依赖按 Node ABI 编译，Node 20 启动会出现 `NODE_MODULE_VERSION` 不匹配。
 
+`canvas` 从源码编译，需要先装系统库与编译工具链，否则 `pnpm install` 会失败：
+
+```bash
+# Debian / Ubuntu
+sudo apt-get install -y build-essential pkg-config python3 \
+  libcairo2-dev libpango1.0-dev libjpeg-dev libgif-dev librsvg2-dev libpixman-1-dev
+
+# macOS
+brew install pkg-config cairo pango libpng jpeg giflib librsvg pixman
+```
+
 ```bash
 pnpm install
 ./restart-intranet.sh    # 同时启动后端 (5175) + 前端 (5173)
@@ -97,7 +108,7 @@ docs/      架构、部署、平台设计、卡牌进度
 
 ## Contributing
 
-PRs welcome. Commit 标题规范：`feat: ...` / `fix: ...` / `refactor: ...` / `docs: ...`，message 用英文。AI 协作约束（卡牌实现规范、文档同步硬规则、测试边界）见 [AGENTS.md](AGENTS.md)。
+PRs welcome. 开发环境、测试、commit 与 PR 规范见 [CONTRIBUTING.md](CONTRIBUTING.md)。AI 协作约束（卡牌实现规范、文档同步硬规则、测试边界）见 [AGENTS.md](AGENTS.md)。安全漏洞请按 [SECURITY.md](SECURITY.md) 私下报告。
 
 ## 支持项目
 

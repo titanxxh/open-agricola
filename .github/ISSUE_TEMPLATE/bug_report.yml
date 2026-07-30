@@ -1,0 +1,50 @@
+name: Bug report
+description: 报告一个 bug（游戏规则、界面、平台功能）
+labels: ["needs-triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        感谢反馈！对局中发现的**规则 bug** 优先使用游戏内的 Bug Report 按钮提交——它会自动附带对局 replay，定位效率高得多。
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: 发生了什么
+      description: 清晰描述 bug 现象
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: 期望行为
+    validations:
+      required: true
+  - type: textarea
+    id: repro
+    attributes:
+      label: 复现步骤
+      placeholder: |
+        1. 创建 2 人房间
+        2. ...
+    validations:
+      required: true
+  - type: dropdown
+    id: environment
+    attributes:
+      label: 环境
+      options:
+        - 线上 demo（titanxxh.github.io）
+        - 自部署
+        - 本地开发环境
+    validations:
+      required: true
+  - type: input
+    id: browser
+    attributes:
+      label: 浏览器 / 系统
+      placeholder: 例如 Chrome 126 / macOS 14
+  - type: textarea
+    id: extra
+    attributes:
+      label: 补充信息
+      description: 截图、房间号、replay 链接、控制台报错等

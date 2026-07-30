@@ -22,6 +22,8 @@ test('anonymous completed replay supports perspectives, playback, layout, and an
   await expect(page.locator('iframe')).toHaveCount(0)
   const alicePerspective = page.getByRole('button', { name: /Alice/ })
   await expect(alicePerspective).toBeVisible()
+  await expect(page.getByRole('link', { name: '返回大厅' }))
+    .toContainText('Open Agricola')
   const accessibility = await new AxeBuilder({ page })
     .include('.replay-shell--chooser')
     .analyze()
@@ -67,6 +69,10 @@ test('anonymous completed replay supports perspectives, playback, layout, and an
 
   await replay.locator('.replay-layout-toggle').click()
   await expect.poll(() => new URL(page.url()).searchParams.get('layout')).toBe('board')
+  expect(new URL(
+    await page.getByRole('link', { name: '返回大厅' }).getAttribute('href') ?? '',
+    page.url(),
+  ).search).toBe('')
 
   const anchor = await request.get(
     `${backend}/api/v1/replays/${fixture.roomId}/anchors/0?frame=${fixture.firstStepHash}`,
@@ -86,6 +92,9 @@ test('anonymous completed replay supports perspectives, playback, layout, and an
   )
   await expect(page.getByRole('alert')).toBeVisible()
   await expect(page.locator('iframe')).toHaveCount(0)
+  await page.getByRole('link', { name: '返回大厅' }).click()
+  await expect(page.locator('#username')).toBeVisible()
+  expect(new URL(page.url()).searchParams.has('context')).toBe(false)
 })
 
 test('mobile replay defaults to board first and preserves an explicit toggle', async ({
@@ -95,10 +104,19 @@ test('mobile replay defaults to board first and preserves an explicit toggle', a
   const fixture = await createReplay(request)
   await page.setViewportSize({ width: 390, height: 844 })
   await page.goto(`/?context=${fixture.roomId}`)
+  await expect(page.getByRole('link', { name: '返回大厅' })).toBeVisible()
+  await expect.poll(() => page.evaluate(() => (
+    document.documentElement.scrollWidth <= document.documentElement.clientWidth
+  ))).toBe(true)
   await page.getByRole('button', { name: /Alice/ }).click()
 
   const replay = page.frameLocator('iframe')
   await expect(replay.locator('.replay-app--board')).toBeVisible()
+  const navigationBox = await page.locator('.replay-shell-nav').boundingBox()
+  const frameBox = await page.locator('iframe').boundingBox()
+  expect(navigationBox).not.toBeNull()
+  expect(frameBox).not.toBeNull()
+  expect(navigationBox!.y + navigationBox!.height).toBeLessThanOrEqual(frameBox!.y)
   await expect.poll(() => new URL(page.url()).searchParams.get('layout')).toBe('board')
   await replay.locator('.replay-layout-toggle').click()
   await expect(replay.locator('.replay-app--timeline')).toBeVisible()

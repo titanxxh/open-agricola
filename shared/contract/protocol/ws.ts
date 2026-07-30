@@ -97,7 +97,20 @@ export type ServerEvent =
     }
   | { type: 'authOk'; userId: string; username: string }
   | { type: 'roomCreated'; roomId: string; playerIndex: number; maxPlayers: number }
-  | { type: 'roomJoined'; roomId: string; playerIndex: number }
+  | {
+      type: 'roomJoined'
+      roomId: string
+      playerIndex: number
+      status: 'waiting' | 'playing'
+      players: Array<{ playerIndex: number; name: string }>
+      maxPlayers: number
+    }
+  | {
+      type: 'roomWaiting'
+      roomId: string
+      players: Array<{ playerIndex: number; name: string }>
+      maxPlayers: number
+    }
   | { type: 'gameStarted' }
   | { type: 'playerJoined'; playerIndex: number; name: string; playerCount: number; maxPlayers: number }
   | { type: 'playerDisconnected'; playerIndex: number }

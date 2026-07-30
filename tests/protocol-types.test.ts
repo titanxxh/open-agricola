@@ -114,11 +114,24 @@ describe('shared protocol types', () => {
     const events: ServerEvent[] = [
       { type: 'error', error: 'test' },
       { type: 'roomCreated', roomId: 'abc', playerIndex: 0, maxPlayers: 2 },
-      { type: 'roomJoined', roomId: 'abc', playerIndex: 1 },
+      {
+        type: 'roomJoined',
+        roomId: 'abc',
+        playerIndex: 1,
+        status: 'waiting',
+        players: [{ playerIndex: 1, name: 'Bob' }],
+        maxPlayers: 2,
+      },
+      {
+        type: 'roomWaiting',
+        roomId: 'def',
+        players: [{ playerIndex: 0, name: 'Alice' }],
+        maxPlayers: 2,
+      },
       { type: 'gameStarted' },
       { type: 'playerDisconnected', playerIndex: 0 },
     ]
-    expect(events.length).toBe(5)
+    expect(events.length).toBe(6)
   })
 
   it('StateUpdateCause has all expected values', () => {

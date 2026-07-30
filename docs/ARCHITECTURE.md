@@ -40,11 +40,11 @@ server/game/{room.ts, room-registry.ts, lobby.ts}
         ▼
 server/game/authoritative-session.ts (GameSession extends GameCore)
   ├─ 命令执行中心（唯一写入 GameState）
-  ├─ 持有 SessionCore + EngineStack
+  ├─ 继承 GameCore（GameCore 持有 EngineStack）
   ├─ undo 历史 / 行动起点快照
   └─ 计算 InteractionState、scores
         │
-        ├─→ shared/session/ (SessionCore, phases/)
+        ├─→ shared/session/ (GameCore, phases/)
         ├─→ shared/engine/  (Engine, EngineStack, nodes/)
         ├─→ shared/actions/ (effects/, payment/, hooks)
         ├─→ shared/cards/   (deck A..E + major + community)
@@ -67,7 +67,7 @@ HTTP 入口 `server/game-router.ts`（`/api/*`）保留：健康检查 / 房间�
 shared/        零 React，前后端 + sandbox 共用
 ├── contract/      协议层（GameState、InteractionState、ClientCommand、StateUpdateEnvelope）
 ├── engine/        节点树引擎 + EngineStack
-├── session/       SessionCore + phases/（setup, round, harvest, draft）
+├── session/       GameCore + phases/（setup, round, harvest, draft）
 ├── actions/       行动定义、effects/、payment/、Hook 系统
 ├── cards/         Card Source（按 deck A/B/C/D/E + major + community 分目录，单卡 meta + impl）
 ├── domain/        领域聚合层（PlayerBoard、farmyard、pasture、scoring、...）
@@ -225,8 +225,10 @@ type ServerEvent =
   | StateUpdateEnvelope
   | { type: 'error'; error; requestId? }
   | { type: 'authOk'; userId; username }
-  | { type: 'roomCreated' | 'roomJoined' | 'gameStarted'
+  | { type: 'roomCreated' | 'gameStarted'
       | 'playerJoined' | 'playerDisconnected' | 'roomDissolved'; ... }
+  | { type: 'roomJoined'; roomId; playerIndex; status; players; maxPlayers }
+  | { type: 'roomWaiting'; roomId; players; maxPlayers }
 
 type StateUpdateEnvelope = {
   type: 'stateUpdate'
@@ -256,7 +258,7 @@ type GameSyncPayload = {
 }
 ```
 
-**广播 vs 单播**：`stateUpdate` / `gameStarted` / `playerJoined` / `playerDisconnected` / `roomDissolved` 广播；`roomCreated` / `roomJoined` / `authOk` / 请求级 `error` 单播。WS 广播会按连接对应的 `viewerPlayerId` 构造 per-viewer payload：目标玩家收到真实私有 prompt 和 `privateEvents`，其他玩家收到 `private-prompt` redaction。HTTP sandbox 默认无 `X-Viewer-Player` 时保持未过滤多座位开发流；带 `X-Viewer-Player` 时使用同一套 viewer 过滤和 seat guard。`cardWarnings` 只进入 HTTP debug/sandbox payload，用于把该局运行期自定义卡异常送回工坊确认门禁，不向 WS viewer 广播。
+**广播 vs 单播**：`stateUpdate` / `roomWaiting` / `gameStarted` / `playerJoined` / `playerDisconnected` / `roomDissolved` 广播；`roomCreated` / `roomJoined` / `authOk` / 请求级 `error` 单播。WS 广播会按连接对应的 `viewerPlayerId` 构造 per-viewer payload：目标玩家收到真实私有 prompt 和 `privateEvents`，其他玩家收到 `private-prompt` redaction。HTTP sandbox 默认无 `X-Viewer-Player` 时保持未过滤多座位开发流；带 `X-Viewer-Player` 时使用同一套 viewer 过滤和 seat guard。`cardWarnings` 只进入 HTTP debug/sandbox payload，用于把该局运行期自定义卡异常送回工坊确认门禁，不向 WS viewer 广播。
 
 ### 4.6 InteractionState — 前端唯一渲染真相
 
@@ -368,7 +370,7 @@ listener activation 是 internal action leaf：`ActionNode(actionId='activate-ca
 
 ### 5.3 Engine 公共 API
 
-`Engine` class 暴露给 `SessionCore` 的接口（小集合）：
+`Engine` class 暴露给 `GameCore` 的接口（小集合）：
 
 - `step(ctx)` —— 推进到下一个 unresolved 节点；遇到 node pending 暂停，返回 envelope。
 - `resolveChoice(value, ctx, payload?)` —— 提供玩家选择，继续推进。
@@ -407,8 +409,7 @@ API：`push / pop / current / depth / peekPendingEnvelope / peekPendingHost / to
 
 ```
 shared/session/
-├── session-core.ts        SessionCore（命令执行入口，~3400 行）
-├── round.ts               回合推进
+├── session-core.ts        GameCore（命令执行入口）
 ├── serialization.ts       SerializedGameState 序列化
 ├── state-bootstrap.ts     初始 state 构造
 ├── stats.ts               统计/日志
@@ -419,11 +420,11 @@ shared/session/
     └── draft.ts
 ```
 
-`shared/session/phases/` 是按阶段拆分的纯函数集合（`startBreedPhase` / `continueAfterFeed` / `startNewRound` 等），不是 mixin / trait class。逻辑都在 `SessionCore` 主 class 上汇合。
+`shared/session/phases/` 是按阶段拆分的纯函数集合（`startBreedPhase` / `continueAfterFeed` / `startNewRound` 等），不是 mixin / trait class。逻辑都在 `GameCore` 主 class 上汇合。
 
-### 6.2 SessionCore 入口
+### 6.2 GameCore 入口
 
-`SessionCore` 持有：
+`GameCore` 持有：
 
 - `state: GameState`
 - `engineStack: EngineStack`
@@ -433,37 +434,36 @@ shared/session/
 命令方法（被 `GameSession` / `authoritative-session.ts` 包装后导出给 server）：
 
 ```
-takeAction(spaceId, playerIndex)
-takeAnytimeAction(actionId, playerIndex)
+takeAction(playerIndex, spaceId)
+takeSpecialAction(playerIndex, cardId, actionId, payload?)
+takeAnytimeAction(playerIndex, actionId)
 resolveChoice(playerIndex, value, payload?)
 commitSelectionChoice(playerIndex, payload)
-confirmAnimalReorg(zones)            // 前端归并到 'choice'，但 session 内部仍走专用入口
-confirmHarvestFeed(selections)
-confirmNextPlayer() / confirmPlayerSwitch()
+resolveOrdinaryCardDrawChoice(playerIndex, choiceId, keepCardId)
 performRoundEnd()
+loadState(raw)
 undoStep() / undoAction()
 ```
 
-`SessionCore` 是 `GameSession` 的领域引擎；`GameSession`（`server/game/authoritative-session.ts`）在外层加：连接绑定、广播、SQLite 持久化触发、devtool hook、终局判定。两者都不直接管理 WS 连接 —— 那由 `server/connection/` 完成。
+`GameCore` 是领域引擎；`GameSession`（`server/game/authoritative-session.ts`）是薄包装，只注入隔离的自定义卡执行器，并生成按 viewer 裁剪或 debug 模式的同步 payload。连接、广播与持久化由 `server/connection/` 和 `server/game/` 管理。
 
 ### 6.3 统一返回 SessionResponse
 
 ```ts
 type SessionResponse = {
   ok: boolean
-  state: SerializedGameState
-  pending: ...        // 兼容字段（仅 server-side 内部 + 测试断言用）
+  state: GameState
   interaction: InteractionState
   historyLength: number
   hasActionStartSnapshot: boolean
-  scores?: PlayerScoreSummary[] | null
+  scores?: PlayerScoreSummary[]
   actionAvailability?: Record<string, boolean>
   cardAvailability?: Record<string, boolean>
   error?: string
 }
 ```
 
-WS 广播、HTTP 查询、单测断言同一结构。`pending` 字段已不是前端真相（`InteractionState` 取代），但为 undo 历史与会话内部保留。
+单测直接断言该结构；WS 由 `GameSession.buildSyncPayload()` 序列化并按 viewer 裁剪后广播。`InteractionState` 是前端交互真相。
 
 ---
 
@@ -630,7 +630,7 @@ trigger frame 必须随 trailing `activate-card` node 持久化：`ActivateCardA
 
 当前事件覆盖已包括资源主干（collect/gain/pay/exchange）、农场主干（sow/plow/construct/stables/fencing/reap/breed/reorganize）、worker 放置/返家/新生儿、round/work/return-home/harvest phase、action reveal/accumulate、future meeple、legacy action detail 以及 `special-effect` mutation 分支。`state.log` 作为 UI 缓存保留，由事件 mapper 和 session cache writer 派生；业务代码不再通过旧日志字段记录规则事实。
 
-`sourceCard` 兜底：`ActionHookResult.flow` 顶层 `sourceCard` 递归补到缺失 child leaf；组合 pending / leaf request 写入 `PendingEnvelope.sourceCard`，`SessionCore` 透传到 `interaction`。
+`sourceCard` 兜底：`ActionHookResult.flow` 顶层 `sourceCard` 递归补到缺失 child leaf；组合 pending / leaf request 写入 `PendingEnvelope.sourceCard`，`GameCore` 透传到 `interaction`。
 
 ### 7.5.1 Public ActionNode 执行顺序
 
@@ -942,7 +942,7 @@ B113 / B141。
 ### 8.6 命名 & 约束
 
 - 卡牌文件 `{Deck}_{Number}_{Name}.ts`（例 `A123_FrameBuilder.ts`），导出常量名同卡牌名。
-- 卡牌能力**尽量在卡牌文件内部闭环**，不能扩散到 `pay.ts` / `improvement.ts` / `game-session.ts` 等核心文件。
+- 卡牌能力**尽量在卡牌文件内部闭环**，不能扩散到 `shared/actions/effects/pay.ts` / `shared/actions/effects/improvement.ts` / `shared/session/session-core.ts` / `server/game/authoritative-session.ts` 等核心文件。
 - 优先用 Hook 系统、`CardDefinition` 通用字段（`cost` / `reward` / `prerequisite`）、`cardStates`。
 - 禁止：核心文件内针对单卡的 `if-else`；集中式卡牌效果注册表；前端硬编码卡牌特定规则。
 
@@ -1288,7 +1288,7 @@ BUG_REPORT_TOKEN_ACTIVE_KEY_ID
 | Bundle | 入口 | 路径 | 约束 |
 |---|---|---|---|
 | `client-app` | `client/main.tsx` | `client/{app,components,services,hooks,contexts,utils}/` | 走 WS；`shared/*` 只准用 `contract` / `domain` / `i18n`，卡牌展示走 manifest-backed `card-meta` + `custom-card-metadata` |
-| `client-sandbox` | `client/sandbox/index.tsx` | `client/sandbox/` | 浏览器内直接 `new SessionCore(...)` 跑完整 in-process 引擎；可 import 任意 `shared/*`（含 `engine` / `session` / `actions` / `cards` / `custom-code` / `draft`） |
+| `client-sandbox` | `client/sandbox/index.tsx` | `client/sandbox/` | 懒加载 Workshop sandbox UI；规则仍由后端 sandbox 路径执行。该目录是前端唯一允许引入完整 `shared/*` 的边界 |
 | `replay-viewer` | `replay-viewer/src/main.tsx` | `replay-viewer/` | 无登录、Cookie、WS 或命令发送；只读取公开 Replay JSON，并复用归档时编译进去的显示过滤与棋盘投影 |
 
 主 bundle 预算：`scripts/check-bundle-size.ts` strict（main ≤ 550KB raw / ≤ 170KB gzip）。
@@ -1306,7 +1306,7 @@ BUG_REPORT_TOKEN_ACTIVE_KEY_ID
 - 收到 `stateUpdate` 处理顺序：`normalizeState()` → `createActionSpaces()` → 用服务端 `resources` / `takenBy` 覆盖模板字段 → 替换 store。
 - 前端**不做乐观提交**：点完发命令，等 `stateUpdate` 到达再改 UI。
 - 本地 UI 临时态（hover / 临时选择 / 输入框）独立管理；新快照到达后检查本地选择是否仍合法，不合法清空。
-- 断线重连：`socket reconnect → joinRoom → getState → stateUpdate → 整体替换`，前端不依赖本地缓存恢复。
+- 断线重连：`socket reconnect → joinRoom → roomJoined(status, players, maxPlayers)`；`waiting` 恢复等待页，`playing` 才继续 `getState → stateUpdate → 整体替换`。已连接玩家在 `newGame` 因缺席座位回到等待态时，服务端广播 `roomWaiting(roomId, players, maxPlayers)`，前端立即隐藏旧棋盘并恢复等待页。
 
 ### 12.4 视图编排
 
@@ -1440,7 +1440,7 @@ pnpm run build              # tsc + vite build
 5. **InteractionState 是前端唯一真相**：`stateId ∈ {idle, wait, gameover}`；`wait` 下用 `request.kind` 分流。
 6. **节点树是唯一状态机**：`PendingAction` union 已消除；"等什么"由 `engine.peekPendingEnvelope()` / pending host 派生。
 7. **EngineStack.push / pop**：hook / anytime / 嵌套子流程唯一注入路径，不直接改 `pending`。
-8. **卡牌就地闭环**：`shared/cards/{Deck}/{Card}.ts` 内部完成；不改 `pay.ts` / `improvement.ts` / `game-session.ts` 等核心文件。新增 Hook 点必须同时补测试和文档。
+8. **卡牌就地闭环**：`shared/cards/{Deck}/{Card}.ts` 内部完成；不改 `shared/actions/effects/pay.ts` / `shared/actions/effects/improvement.ts` / `shared/session/session-core.ts` / `server/game/authoritative-session.ts` 等核心文件。新增 Hook 点必须同时补测试和文档。
 9. **cardStates 局部状态**：持续计数 / 标记写 `player.cardStates[cardId]`；后续选择走显式 `pending` / continuation。
 10. **不引入循环依赖**。
 11. **不为单卡改主路径**。

@@ -1,4 +1,5 @@
 import { Suspense, lazy } from 'react'
+import { AppShellLoadScreen } from '../app/AppShellLoadScreen'
 
 const WorkshopPage = lazy(() =>
   import('../app/WorkshopPage').then(m => ({ default: m.WorkshopPage })),
@@ -6,7 +7,7 @@ const WorkshopPage = lazy(() =>
 
 export default function SandboxApp() {
   return (
-    <Suspense fallback={<div data-testid="sandbox-loading">Loading sandbox…</div>}>
+    <Suspense fallback={<AppShellLoadScreen />}>
       <WorkshopPage />
     </Suspense>
   )

@@ -1626,6 +1626,7 @@ export const zh = {
     replayCardSnapshotDeclined: '未确认公开自定义卡快照，未创建房间。',
     roomDissolved: '房间已被解散',
     roomNetworkError: '无法连接游戏服务器，请检查网络后重试。',
+    appLoadFailed: '页面加载失败，可能已发布新版本。请重新加载后继续。',
     waitingForPlayers: '房间 {roomId} — 等待玩家加入 ({current}/{max})',
     inviteLabel: '分享此链接邀请对手加入：',
     copy: '复制',

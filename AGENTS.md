@@ -23,7 +23,7 @@ Single-context layout: read root `CONTEXT.md` and any ADRs under `docs/adr/`. Se
 ## Architecture Boundaries
 
 - 三层 `shared/` + `server/` + `client/`，前端只负责渲染、输入收集、视角化展示，不做规则裁定。
-- 后端 `GameSession`（`server/game-session.ts`）是 `GameState` 的**唯一写入者**。
+- 后端 `GameSession`（`server/game/authoritative-session.ts`）是 `GameState` 的**唯一写入者**。
 - WebSocket 房间对局是实时同步主链路；HTTP 用于调试、补拉快照、测试辅助，以及版本化的 Game Context、Replay 和 Bug Report 产品接口，不通过 HTTP 另建规则写入主链路。
 - 与游戏规则相关的实现优先放在 `shared/` + `server/`，不要在前端 UI 补规则逻辑。
 - 遇到不确定的实现，优先参考 `../bga-agricola`，除非架构文档已明确给出不同设计。
@@ -61,7 +61,7 @@ pnpm run build              # tsc + vite build
 
 **总规范：卡牌能力尽量在卡牌文件内部闭环，不能扩散。卡牌文件行数尽量贴近 BGA，甚至更少。**
 
-扩展原则：无特殊原因不要改动主路径（`pay.ts`、`improvement.ts`、`game-session.ts` 等核心文件）。
+扩展原则：无特殊原因不要改动主路径（`shared/actions/effects/pay.ts`、`shared/actions/effects/improvement.ts`、`shared/session/session-core.ts`、`server/game/authoritative-session.ts` 等核心文件）。
 
 **优先使用：** Hook 系统（`shared/actions/hooks.ts`）、Card Definition 通用字段（`cost`、`reward`、`prerequisite`）、卡牌局部状态（`player.cardStates[cardId]`）。
 
@@ -113,7 +113,7 @@ pnpm run build              # tsc + vite build
 - 不引入循环依赖。
 - 卡牌相关能力尽可能在卡牌文件内部闭环，不要把单卡逻辑扩散到主路径。
 - **后端权威**：规则在 `shared/` + `server/`；不在前端 UI 加规则。
-- 不为单卡改动主路径（`pay.ts`、`improvement.ts`、`game-session.ts`）。用现有扩展点（hooks、modifiers、卡牌定义字段）。
+- 不为单卡改动主路径（`shared/actions/effects/pay.ts`、`shared/actions/effects/improvement.ts`、`shared/session/session-core.ts`、`server/game/authoritative-session.ts`）。用现有扩展点（hooks、modifiers、卡牌定义字段）。
 - 项目仍处于开发阶段，不需要维护旧存档、旧 `engineStack` / pending cursor、旧 action id 的向后兼容；除非用户明确要求，不要把缺少兼容迁移作为 PR review blocker。
 - 测试时**默认 2 人游戏**。
 
@@ -140,13 +140,13 @@ Commit 标题规范：`feat: ...` / `fix: ...` / `refactor: ...` / `docs: ...`�
 
 ## Deployment
 
-前端 GitHub Pages 自动部署（`.github/workflows/deploy-pages.yml`，触发分支 `main` / `ui`）；后端用 `./deploy-backend.sh <ssh-host> [branch] [remote-dir]` 手动部署 Docker。完整步骤、环境变量、TLS、CORS、常见问题 → `docs/HOW_TO_DEPLOY.md`。
+前端在 `main` / `ui` 的 CI 成功后由 `.github/workflows/deploy-pages.yml` 自动部署；后端在 `main` 的 CI 成功且后端相关路径变化时由 `.github/workflows/deploy-backend.yml` 自动部署，也可用 `./deploy-backend.sh <ssh-host> [branch] [remote-dir]` 手动部署 Docker。完整步骤、环境变量、TLS、CORS、常见问题 → `docs/HOW_TO_DEPLOY.md`。
 
 ## Common Pitfalls
 
 - **不要 commit `docs/superpowers/*`**：superpowers skill 产出的 spec / plan / working notes 不进 git。这是会话/PR 中间产物，污染 git history。即使 brainstorming / executing-plans skill 默认要求 commit spec，**违反默认行为，等用户明确要求才 commit**。每次 `git add` 必须显式排除 `docs/superpowers/`。
 - **`./restart-intranet.sh` 不仅是"启动方式"**：它是本地开发 / 运行 / 测试的统一入口。每次代码改完，先重启，再用浏览器 / Playwright / 命令行验真实行为，再考虑 `pnpm test:fast` 等单元测试。
-- **Session 测试里卡牌不要随机，必须显式设置 hand**：`new GameSession()` 不传 seed 时 `createSeed()` 用 `Math.random()`（`shared/utils/rng.ts:1`），每次跑都给玩家发不同 7 张 minor / 7 张 occupation。Hand 内容会影响 `improvement-any` / `minor-improvement` / `wrapOptional(...)` 等节点的"是否 doable / 是 single auto-resolve 还是 multi-option wait"判定 → 测试断言对应的等待节点 / option 数随机生效，整体跑时偶发 fail。修法：setup 里显式覆盖所有玩家的 `minorHand` + `occupationHand`，最简洁用占位 id `['__test_placeholder__']`（在 `getMinorImprovement` 返回 undefined，被 buyable 列表过滤），既能避免 `normalizeState` 第 161 行因为空 hand 触发 re-deal，又让"任意可买 minor"的路径稳定为空。注意：放任 `player.minorHand = []` **不**等于 placeholder——它会触发 re-deal 重新发随机 7 张。
+- **Session 测试里卡牌不要随机，必须显式设置 hand**：`new GameSession()` 不传 seed 时 `createSeed()` 用 `Math.random()`（`shared/utils/rng.ts:1`），每次跑都给玩家发不同 7 张 minor / 7 张 occupation。Hand 内容会影响 `improvement-any` / `minor-improvement` / `wrapOptional(...)` 等节点的"是否 doable / 是 single auto-resolve 还是 multi-option wait"判定 → 测试断言对应的等待节点 / option 数随机生效，整体跑时偶发 fail。修法：setup 里显式覆盖所有玩家的 `minorHand` + `occupationHand`，最简洁用占位 id `['__test_placeholder__']`（在 `getMinorImprovement` 返回 undefined，被 buyable 列表过滤），既能避免 `normalizeState()` 因为空 hand 触发 re-deal，又让"任意可买 minor"的路径稳定为空。注意：放任 `player.minorHand = []` **不**等于 placeholder——它会触发 re-deal 重新发随机 7 张。
 
 ## Docs Map
 

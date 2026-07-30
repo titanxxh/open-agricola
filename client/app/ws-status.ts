@@ -1,3 +1,7 @@
+import type { GameContextErrorCode } from '../../shared/contract/protocol/game-context'
+
+export type WsErrorCode = GameContextErrorCode | 'seat_replaced'
+
 export type WsStatus =
   | { phase: 'idle' }
   | { phase: 'connecting' }
@@ -5,4 +9,4 @@ export type WsStatus =
   | { phase: 'joining'; roomId: string }
   | { phase: 'waiting'; roomId: string; players: Array<{ playerIndex: number; name: string }>; maxPlayers: number }
   | { phase: 'ready'; roomId: string; playerIndex: number }
-  | { phase: 'error'; message: string }
+  | { phase: 'error'; message: string; code?: WsErrorCode }
