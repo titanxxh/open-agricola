@@ -101,13 +101,14 @@ export class LocalSandboxCore {
   init(config: LocalGameConfig, viewer: ViewerSpec): LocalSandboxResult {
     const customCards = compileCards(config.cards)
     this.config = config
-    this.core = new GameCore({
+    const core = new GameCore({
       stateOrSeed: config.seed,
       customCards: customCards.length > 0 ? customCards : undefined,
       initialStateOptions: toInitialStateOptions(config),
       registerCustomCardImpl: registerBrowserBackedCustomCard,
     })
-    return this.respond(this.core.getState(), viewer)
+    this.core = core
+    return this.respond(core.withCtx(() => core.getState()), viewer)
   }
 
   restore(persisted: PersistedLocalGame, viewer: ViewerSpec): LocalSandboxResult {
@@ -118,17 +119,21 @@ export class LocalSandboxCore {
     }
     const customCards = compileCards(persisted.config.cards)
     this.config = persisted.config
-    this.core = new GameCore({
+    const core = new GameCore({
       stateOrSeed: rehydrateState(persisted.serializedState),
       customCards: customCards.length > 0 ? customCards : undefined,
       registerCustomCardImpl: registerBrowserBackedCustomCard,
     })
-    return this.respond(this.core.getState(), viewer)
+    this.core = core
+    return this.respond(core.withCtx(() => core.getState()), viewer)
   }
 
   call(method: string, args: unknown[], viewer: ViewerSpec): LocalSandboxResult {
     const core = this.requireCore()
-    return this.respond(this.dispatch(core, method, args), viewer)
+    // Run inside the session card context (like the server router's
+    // session.withCtx) so custom-card effects/hooks resolve from
+    // SessionCardContext for every command, not just the ones that self-wrap.
+    return this.respond(core.withCtx(() => this.dispatch(core, method, args)), viewer)
   }
 
   validateFarmChoice(type: FarmChoiceType, playerId: string, payload: Record<string, unknown>): FarmChoiceValidation {
@@ -176,13 +181,14 @@ export class LocalSandboxCore {
   private reinit(config: LocalGameConfig): SessionResponse {
     const customCards = compileCards(config.cards)
     this.config = config
-    this.core = new GameCore({
+    const core = new GameCore({
       stateOrSeed: config.seed,
       customCards: customCards.length > 0 ? customCards : undefined,
       initialStateOptions: toInitialStateOptions(config),
       registerCustomCardImpl: registerBrowserBackedCustomCard,
     })
-    return this.core.getState()
+    this.core = core
+    return core.withCtx(() => core.getState())
   }
 
   private respond(resp: SessionResponse, viewer: ViewerSpec): LocalSandboxResult {

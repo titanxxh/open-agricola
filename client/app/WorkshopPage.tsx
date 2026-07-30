@@ -1389,15 +1389,24 @@ export function WorkshopPage() {
     // Editor flows that pin an extra card / exact draft version still go
     // through the server sandbox (card data isn't in workshop state yet).
     if (isBrowserSandbox() && !extraCardId && !exactVersionId) {
-      stashLocalSandboxConfig(buildLocalGameConfig(sandboxCards, sandboxSettings), user?.id ?? 'anon')
-      setSandboxLocalMode(true)
-      // A restart (sandbox already active) must start fresh, not resume the
-      // persisted slot; the first launch may still offer to resume.
-      setSandboxLocalFresh(sandboxActive)
-      setSandboxActive(true)
-      setSandboxKey(k => k + 1)
-      setPendingSandboxErrors(null)
-      return true
+      let stashed = true
+      try {
+        stashLocalSandboxConfig(buildLocalGameConfig(sandboxCards, sandboxSettings), user?.id ?? 'anon')
+      } catch {
+        // sessionStorage disabled or over quota — fall through to the server
+        // sandbox path below instead of leaving an unhandled rejection.
+        stashed = false
+      }
+      if (stashed) {
+        setSandboxLocalMode(true)
+        // A restart (sandbox already active) must start fresh, not resume the
+        // persisted slot; the first launch may still offer to resume.
+        setSandboxLocalFresh(sandboxActive)
+        setSandboxActive(true)
+        setSandboxKey(k => k + 1)
+        setPendingSandboxErrors(null)
+        return true
+      }
     }
     setSandboxLocalMode(false)
     try {
