@@ -140,7 +140,7 @@ Commit 标题规范：`feat: ...` / `fix: ...` / `refactor: ...` / `docs: ...`�
 
 ## Deployment
 
-前端在 `main` / `ui` 的 CI 成功后由 `.github/workflows/deploy-pages.yml` 自动部署；后端在 `main` 的 CI 成功且后端相关路径变化时由 `.github/workflows/deploy-backend.yml` 自动部署，也可用 `./deploy-backend.sh <ssh-host> [branch] [remote-dir]` 手动部署 Docker。完整步骤、环境变量、TLS、CORS、常见问题 → `docs/HOW_TO_DEPLOY.md`。
+前后端在发布 GitHub Release 后（`gh release create vX.Y.Z --generate-notes`）由 `.github/workflows/deploy-pages.yml` / `.github/workflows/deploy-backend.yml` 自动部署；合入 `main` 只跑 CI 不部署。也可在 Actions 页面手动触发（部署 `main` 最新），或用 `./deploy-backend.sh <ssh-host> [ref] [remote-dir]` 手动部署 Docker。完整步骤、环境变量、TLS、CORS、常见问题 → `docs/HOW_TO_DEPLOY.md`。
 
 ## Common Pitfalls
 
