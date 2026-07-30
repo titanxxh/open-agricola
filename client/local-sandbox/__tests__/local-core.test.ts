@@ -143,4 +143,37 @@ const CARD_IMPL = {
     })
     expect(result).toEqual({ ok: false, error: expect.stringContaining('local boom') })
   })
+
+  it('runs card code under strict mode so `this` cannot reach worker globals', () => {
+    // `this.fetch` passes the AST validator (property access, not an identifier)
+    // but must resolve to nothing: strict mode makes the handler `this`
+    // undefined instead of binding it to the global scope.
+    const compiled = validateAndCompileCustomCodeLocal(`
+const CARD_ID = 'CUSTOM_ThisEscape'
+const CARD_DEF = MinorImprovement({ id: CARD_ID, name: 'This Escape' })
+const CARD_IMPL = {
+  effect: {
+    id: CARD_ID,
+    onReturnHome: function () {
+      const g = this
+      return gainLeaf(CARD_ID, { food: (g && g.fetch) ? 999 : 1 })
+    },
+  },
+}
+    `, 'CUSTOM_ThisEscape')
+    expect(compiled.valid).toBe(true)
+    if (!compiled.valid) return
+
+    const result = invokeCustomCodeEffectLocal({
+      compiledCode: compiled.compiledCode,
+      cardId: 'CUSTOM_ThisEscape',
+      hook: 'onReturnHome',
+      state: {} as never,
+      player: {} as never,
+    })
+    expect(result).toEqual({
+      ok: true,
+      result: { type: 'leaf', actionId: 'gain', params: { food: 1 }, sourceCard: 'CUSTOM_ThisEscape' },
+    })
+  })
 })
