@@ -9,7 +9,7 @@
  * string constant with no transitive deps.
  */
 import ivm from 'isolated-vm'
-import { HELPERS_INJECTION_SOURCE } from './injected-helpers.ts'
+import { HELPERS_INJECTION_SOURCE } from '../../shared/custom-code/injected-helpers.ts'
 
 const EXECUTION_TIMEOUT_MS = 100
 const ISOLATE_MEMORY_LIMIT_MB = 8

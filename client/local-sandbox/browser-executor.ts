@@ -1,0 +1,259 @@
+/**
+ * Browser-local custom-card executor — the browser counterpart of
+ * `server/custom-code/engine.ts`.
+ *
+ * Runs compiled card code via `new Function` instead of an isolated-vm
+ * isolate: in the local sandbox the code is the author's own and runs in
+ * their own browser, so the only risk is an accidental infinite loop —
+ * handled by the worker-level timeout + terminate (see T3), not here.
+ *
+ * Semantics kept identical to the server executor:
+ * - the whole compiled module re-runs on every invocation (no state carries over)
+ * - inputs are JSON-deep-copied before injection
+ * - results round-trip through JSON (functions stripped)
+ * - same injected environment: console shim, MinorImprovement/Occupation
+ *   identity decorators, HELPERS_INJECTION_SOURCE
+ */
+import { validateCardCode } from '../../shared/custom-code/ast-validator.ts'
+import { compileCardCode } from '../../shared/custom-code/compiler.ts'
+import { HELPERS_INJECTION_SOURCE } from '../../shared/custom-code/injected-helpers.ts'
+import { cardEffectHooks, type CardEffectField } from '../../shared/cards/card-effects.ts'
+import type { ActionFlow } from '../../shared/contract/types.ts'
+import type { ActionHookResult } from '../../shared/actions/hooks.ts'
+import { isSandboxListenerPhase } from '../../shared/custom-code/sandbox-listener-phases.ts'
+import { isSandboxListenerScope } from '../../shared/custom-code/sandbox-listener-scopes.ts'
+import type {
+  CustomCodeEffectMetadata,
+  CustomCodeEffectInvocation,
+  CustomCodeEffectResult,
+  CustomCodeListenerInvocation,
+  CustomCodeListenerManifest,
+  CustomCodeListenerResult,
+  CustomCodeManifest,
+  CustomCodeValidateResult,
+} from '../../shared/custom-code/types.ts'
+
+function runCardCode(
+  compiledCode: string,
+  cardId: string,
+  postlude: string,
+  inputs: Record<string, unknown>,
+): unknown {
+  const inputNames = Object.keys(inputs)
+  const inputValues = inputNames.map((key) =>
+    JSON.parse(JSON.stringify(inputs[key] ?? null)),
+  )
+
+  const wrappedCode = `
+    var console = {
+      log: function() { var args = Array.prototype.slice.call(arguments); __log.apply(undefined, args.map(function(a) { return typeof a === 'object' ? JSON.stringify(a) : String(a); })); },
+      warn: function() { var args = Array.prototype.slice.call(arguments); __warn.apply(undefined, args.map(function(a) { return typeof a === 'object' ? JSON.stringify(a) : String(a); })); },
+    };
+    function MinorImprovement(def) { return def; }
+    function Occupation(def) { return def; }
+    ${HELPERS_INJECTION_SOURCE}
+    var __captured = (function() {
+      ${compiledCode}
+      return {
+        CARD_DEF: typeof CARD_DEF !== 'undefined' ? CARD_DEF : null,
+        CARD_IMPL: typeof CARD_IMPL !== 'undefined' ? CARD_IMPL : null,
+      };
+    })();
+    var __result = null;
+    ${postlude}
+    return JSON.stringify(__result);
+  `
+
+  const fn = new Function('__log', '__warn', ...inputNames, wrappedCode)
+  const resultJson = fn(
+    (...args: unknown[]) => { console.log(`[local-executor:${cardId}]`, ...args) },
+    (...args: unknown[]) => { console.warn(`[local-executor:${cardId}]`, ...args) },
+    ...inputValues,
+  ) as string | undefined
+  return resultJson ? JSON.parse(resultJson) : null
+}
+
+function runManifestExtraction(compiledCode: string, cardId: string): {
+  manifest: CustomCodeManifest
+  cardDefinition: Record<string, unknown> | null
+} {
+  const wrappedCode = `
+    var console = { log: function() {}, warn: function() {} };
+    var __cardDefinitionType = null;
+    function MinorImprovement(def) { __cardDefinitionType = 'minor'; return def; }
+    function Occupation(def) { __cardDefinitionType = 'occupation'; return def; }
+    ${HELPERS_INJECTION_SOURCE}
+    var __captured = (function() {
+      ${compiledCode}
+      return {
+        CARD_DEF: typeof CARD_DEF !== 'undefined' ? CARD_DEF : null,
+        CARD_IMPL: typeof CARD_IMPL !== 'undefined' ? CARD_IMPL : null,
+      };
+    })();
+    var __effectKeys = [];
+    var __effectMetadata = {};
+    var __listeners = [];
+    if (__captured.CARD_IMPL && __captured.CARD_IMPL.effect) {
+      var eff = __captured.CARD_IMPL.effect;
+      for (var k in eff) {
+        if (Object.prototype.hasOwnProperty.call(eff, k) && typeof eff[k] === 'function') {
+          __effectKeys.push(k);
+        }
+      }
+      if (eff.beforeEndGameScope === 'owner' || eff.beforeEndGameScope === 'allPlayers') {
+        __effectMetadata.beforeEndGameScope = eff.beforeEndGameScope;
+      }
+      if (typeof eff.beforeEndGameMandatory === 'boolean') {
+        __effectMetadata.beforeEndGameMandatory = eff.beforeEndGameMandatory;
+      }
+    }
+    if (__captured.CARD_IMPL && Array.isArray(__captured.CARD_IMPL.listeners)) {
+      for (var i = 0; i < __captured.CARD_IMPL.listeners.length; i++) {
+        var listener = __captured.CARD_IMPL.listeners[i];
+        var registrationId = ${JSON.stringify(cardId)} + ':listener:' + i;
+        __listeners.push({
+          registrationId: registrationId,
+          cardIds: Array.isArray(listener.cardIds) ? listener.cardIds.filter(function(x) { return typeof x === 'string'; }) : undefined,
+          actions: Array.isArray(listener.actions) ? listener.actions.filter(function(x) { return typeof x === 'string'; }) : undefined,
+          phases: Array.isArray(listener.phases) ? listener.phases : undefined,
+          order: typeof listener.order === 'number' ? listener.order : undefined,
+          scope: typeof listener.scope === 'string' ? listener.scope : undefined,
+        });
+      }
+    }
+    return JSON.stringify({
+      effectKeys: __effectKeys,
+      effectMetadata: __effectMetadata,
+      listeners: __listeners,
+      cardDefinition: __captured.CARD_DEF,
+      cardDefinitionType: __cardDefinitionType,
+    });
+  `
+
+  const fn = new Function(wrappedCode)
+  const resultJson = fn() as string | undefined
+  const parsed = resultJson ? JSON.parse(resultJson) as {
+    effectKeys: string[]
+    effectMetadata?: CustomCodeEffectMetadata
+    listeners: CustomCodeListenerManifest[]
+    cardDefinition: Record<string, unknown> | null
+    cardDefinitionType: 'minor' | 'occupation' | null
+  } : {
+    effectKeys: [],
+    effectMetadata: {},
+    listeners: [],
+    cardDefinition: null,
+    cardDefinitionType: null,
+  }
+
+  const effectHooks = parsed.effectKeys.filter((hook): hook is CardEffectField =>
+    cardEffectHooks.includes(hook as CardEffectField),
+  )
+  const listeners = parsed.listeners.map((l) => ({
+    ...l,
+    phases: l.phases?.filter(isSandboxListenerPhase),
+    scope: isSandboxListenerScope(l.scope) ? l.scope : undefined,
+  }))
+
+  const effectMetadata = parsed.effectMetadata && Object.keys(parsed.effectMetadata).length > 0
+    ? parsed.effectMetadata
+    : undefined
+
+  return {
+    manifest: { effectHooks, effectMetadata, listeners },
+    cardDefinition: parsed.cardDefinition && parsed.cardDefinitionType
+      ? {
+          cardType: parsed.cardDefinitionType,
+          meta: parsed.cardDefinition,
+        }
+      : parsed.cardDefinition,
+  }
+}
+
+export const validateAndCompileCustomCodeLocal = (
+  source: string,
+  cardId: string,
+): CustomCodeValidateResult => {
+  const validation = validateCardCode(source)
+  if (!validation.valid) {
+    return validation
+  }
+
+  try {
+    const compiledCode = compileCardCode(source)
+    const { manifest, cardDefinition } = runManifestExtraction(compiledCode, cardId)
+    return {
+      valid: true,
+      compiledCode,
+      manifest,
+      cardDefinition,
+    }
+  } catch (error) {
+    return {
+      valid: false,
+      errors: [`Compilation failed: ${error instanceof Error ? error.message : String(error)}`],
+    }
+  }
+}
+
+export const invokeCustomCodeEffectLocal = (
+  request: CustomCodeEffectInvocation,
+): CustomCodeEffectResult => {
+  try {
+    const postlude = `
+var __eff = __captured.CARD_IMPL && __captured.CARD_IMPL.effect;
+var __handler = __eff && __eff[${JSON.stringify(request.hook)}];
+__result = typeof __handler === 'function'
+  ? __handler(__input_state, __input_player, __input_paymentInfo)
+  : null;
+    `
+    const result = runCardCode(
+      request.compiledCode,
+      request.cardId,
+      postlude,
+      {
+        __input_state: request.state,
+        __input_player: request.player,
+        __input_paymentInfo: request.paymentInfo ?? null,
+      },
+    )
+    return { ok: true, result: (result ?? null) as ActionFlow | null }
+  } catch (error) {
+    return {
+      ok: false,
+      error: error instanceof Error ? error.message : String(error),
+    }
+  }
+}
+
+export const invokeCustomCodeListenerLocal = (
+  request: CustomCodeListenerInvocation,
+): CustomCodeListenerResult => {
+  try {
+    const postlude = `
+var __listeners = __captured.CARD_IMPL && Array.isArray(__captured.CARD_IMPL.listeners) ? __captured.CARD_IMPL.listeners : [];
+var __listenerIdx = -1;
+var __regPrefix = ${JSON.stringify(request.registrationId)};
+var __parts = __regPrefix.split(':listener:');
+if (__parts.length === 2) { __listenerIdx = parseInt(__parts[1], 10); }
+var __listener = __listenerIdx >= 0 && __listenerIdx < __listeners.length ? __listeners[__listenerIdx] : null;
+__result = __listener && typeof __listener.handler === 'function'
+  ? __listener.handler(__input_context)
+  : null;
+    `
+    const result = runCardCode(
+      request.compiledCode,
+      request.cardId,
+      postlude,
+      {
+        __input_context: request.context,
+      },
+    )
+    return { ok: true, result: (result ?? null) as ActionHookResult | null }
+  } catch (error) {
+    return {
+      ok: false,
+      error: error instanceof Error ? error.message : String(error),
+    }
+  }
+}
