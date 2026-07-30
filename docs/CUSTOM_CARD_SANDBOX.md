@@ -381,6 +381,11 @@ AST validator 还会检查 `CARD_IMPL.effect` 中的键是否在 `cardEffectHook
 - `document`
 - `__dirname`
 - `__filename`
+- `self`
+- `importScripts`
+- `postMessage`
+- `WorkerGlobalScope`
+- `indexedDB`
 - `fetch`
 - `XMLHttpRequest`
 - `WebSocket`
@@ -626,14 +631,16 @@ const CARD_IMPL = {
 
 ---
 
-## 8. `LocalBrowserExecutor` 的语义对齐
+## 8. 浏览器本地执行器的语义对齐
 
-`LocalBrowserExecutor` 在浏览器里跑用户自己的代码（"用户只能攻击自己"），不进 isolate。**注入清单必须与 `ServerIsolateExecutor` 完全一致**：
+浏览器本地执行器（`client/local-sandbox/browser-executor.ts`，`VITE_SANDBOX_EXECUTOR=browser` 时的工坊试玩路径）在浏览器里跑用户自己的代码（"用户只能攻击自己"），不进 isolate。**注入清单与服务端 `server/custom-code/engine.ts` 完全一致**：
 
-- 同样暴露 `MinorImprovement(def) => def` / `Occupation(def) => def` / 简化 `console` / 所有 §1 中列出的 helper 函数
-- 同样对输入做 `JSON.parse(JSON.stringify(...))` 拷贝
-- 同样按本文件 §3 的白名单过滤 hook / phase
+- 同样暴露 `MinorImprovement(def) => def` / `Occupation(def) => def` / 简化 `console` / 所有 §1 中列出的 helper 函数（复用同一份 `shared/custom-code/injected-helpers.ts` 字符串常量）
+- 同样对输入做 `JSON.parse(JSON.stringify(...))` 拷贝、输出 JSON round-trip
+- 同样按本文件 §3 的白名单过滤 hook / phase（复用 shared 的同一组过滤函数）
 - 同样使用 `CARD_DEF` / `CARD_IMPL` 双常量捕获
+
+等价性由 `server/__tests__/local-sandbox-parity.test.ts` 钉死：同一卡源码在双端的 validate/compile 结果、effect/listener 调用结果、错误容忍行为逐项断言相等。
 
 **理由**：本地沙盒是多人对局的 dry-run；语义不等价就违背"先在本地跑通、再提交多人"的核心定位。
 

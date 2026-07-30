@@ -9,6 +9,9 @@ import {
 } from '../../shared/domain/farm'
 import { useGameSync } from '../hooks/useGameSync'
 import { HttpGameTransport, WsGameTransport, parseDraftParamsFromQuery, type GameTransport } from '../services/gameTransport'
+import { LocalGameTransport } from '../local-sandbox/local-transport'
+import { isBrowserSandbox, readLocalSandboxConfig } from '../local-sandbox/workshop-launch'
+import { createDebouncedSaver, loadResumable, openLocalGameStore } from '../local-sandbox/persistence'
 import type { GameSyncPayload } from '../../shared/contract/protocol/game'
 import { REPLAY_CARD_SNAPSHOT_CONSENT_REQUIRED } from '../../shared/contract/protocol/ws'
 import type { MoorSpecialActionCardState, MoorSpecialActionId } from '../../shared/moor/types'
@@ -142,16 +145,78 @@ const useTransportSetup = (
   displayName: string | undefined,
   isWsMode: boolean,
   locale: Locale,
+  isLocalMode: boolean,
+  ownerKey: string,
 ) => {
   const [wsStatus, setWsStatus] = useState<WsStatus>({ phase: 'idle' })
   const [wsTransport, setWsTransport] = useState<WsGameTransport | null>(null)
   const [wsReady, setWsReady] = useState(false)
+  const [localTransport, setLocalTransport] = useState<LocalGameTransport | null>(null)
+  const [localReady, setLocalReady] = useState(false)
 
   const initRef = useRef(false)
   const playerIndexRef = useRef(0)
 
   useEffect(() => {
-    if (!isWsMode || initRef.current) return
+    if (!isLocalMode || initRef.current) return
+    initRef.current = true
+
+    const config = readLocalSandboxConfig(ownerKey)
+    if (!config) {
+      window.alert(t(locale, 'platform.localSandboxMissingConfig'))
+      return
+    }
+    const store = openLocalGameStore(ownerKey)
+    const saver = createDebouncedSaver(store)
+    const transport = new LocalGameTransport(config, {
+      viewer: { viewerPlayerId: null, mode: 'debug' },
+      onPersist: saver.push,
+      onRecovered: () => { window.alert(t(locale, 'platform.localSandboxTimeout')) },
+    })
+    window.addEventListener('pagehide', () => { void saver.flush() })
+
+    // An explicit "restart" (freshSandbox=1) drops any saved slot and starts
+    // clean instead of offering to resume the previous game.
+    const forceFresh = new URLSearchParams(window.location.search).get('freshSandbox') === '1'
+
+    const init = async () => {
+      try {
+        // Clearing the optional slot is best-effort: a storage-disabled context
+        // must not block starting a fresh in-memory game.
+        if (forceFresh) {
+          try { await store.clear() } catch { /* ignore */ }
+          // Consume the flag so a later reload of this frame (manual or the
+          // stale-chunk recovery path) resumes the restarted game instead of
+          // clearing its snapshots again.
+          const params = new URLSearchParams(window.location.search)
+          params.delete('freshSandbox')
+          const q = params.toString()
+          window.history.replaceState(null, '', `${window.location.pathname}${q ? '?' + q : ''}${window.location.hash}`)
+        }
+        const persisted = forceFresh ? null : await loadResumable(store)
+        if (persisted && window.confirm(t(locale, 'platform.localSandboxResume'))) {
+          try {
+            await transport.startFromPersisted(persisted)
+          } catch {
+            await store.clear()
+            await transport.start()
+          }
+        } else {
+          if (persisted) await store.clear()
+          await transport.start()
+        }
+        setLocalTransport(transport)
+        setLocalReady(true)
+      } catch (err) {
+        console.error('[local-sandbox] failed to start:', err)
+        window.alert(err instanceof Error ? err.message : String(err))
+      }
+    }
+    void init()
+  }, [isLocalMode, locale])
+
+  useEffect(() => {
+    if (isLocalMode || !isWsMode || initRef.current) return
     initRef.current = true
 
     const init = async () => {
@@ -375,8 +440,10 @@ const useTransportSetup = (
     init()
   }, [displayName, isWsMode, locale, playerParam])
 
-  const transport: GameTransport = isWsMode && wsReady && wsTransport ? wsTransport : httpTransportSingleton
-  const isReady = !isWsMode || wsReady
+  const transport: GameTransport = isLocalMode
+    ? (localTransport ?? httpTransportSingleton)
+    : isWsMode && wsReady && wsTransport ? wsTransport : httpTransportSingleton
+  const isReady = isLocalMode ? localReady : (!isWsMode || wsReady)
   return { transport, wsStatus, isWs: isWsMode, isReady, wsTransport }
 }
 
@@ -389,7 +456,11 @@ export const GameContainerApi = () => {
   // Read URL params fresh on each render (navigated here from lobby — don't use module-level stale values)
   const currentUrlParams = new URLSearchParams(window.location.search)
   const contextRoomId = currentUrlParams.get('context')
-  const isWsMode = contextRoomId !== null || currentUrlParams.get('transport') === 'ws'
+  // Gate on the configured executor too, so flipping VITE_SANDBOX_EXECUTOR back
+  // to 'server' is an effective kill switch: a reload of an already-open
+  // localSandbox=1 tab (new bundle) no longer runs custom code in the browser.
+  const isLocalMode = currentUrlParams.get('localSandbox') === '1' && isBrowserSandbox()
+  const isWsMode = !isLocalMode && (contextRoomId !== null || currentUrlParams.get('transport') === 'ws')
   const isEmbedded = currentUrlParams.get('embedded') === '1'
 
   const lockedViewPlayerId = useMemo(() => {
@@ -409,6 +480,8 @@ export const GameContainerApi = () => {
     user?.displayName,
     isWsMode,
     locale,
+    isLocalMode,
+    user?.id ?? 'anon',
   )
   const { state, interaction, scores, pastureCapacities, historyLength, hasActionStartSnapshot, actionAvailability, cardAvailability, privateEvents, applySnapshot } =
     useGameSync()

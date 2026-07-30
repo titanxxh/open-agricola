@@ -10,6 +10,7 @@ import { Section } from '../components/common/Section'
 import { EmptyState } from '../components/common/EmptyState'
 import { API_BASE } from '../config'
 import { refreshPrStatus, extractPrNumber } from '../services/workshop-pr'
+import { buildLocalGameConfig, isBrowserSandbox, stashLocalSandboxConfig } from '../local-sandbox/workshop-launch'
 
 type WorkshopCard = {
   id: string
@@ -1180,6 +1181,8 @@ export function WorkshopPage() {
   const [pendingSandboxErrors, setPendingSandboxErrors] = useState<string[] | null>(null)
   const [sandboxActive, setSandboxActive] = useState(false)
   const [sandboxKey, setSandboxKey] = useState(0)
+  const [sandboxLocalMode, setSandboxLocalMode] = useState(false)
+  const [sandboxLocalFresh, setSandboxLocalFresh] = useState(false)
   const prevView = useRef<View>('home')
   const prevBrowseQuery = useRef({ search: '', sort: 'recent' as 'recent' | 'popular' })
 
@@ -1382,6 +1385,30 @@ export function WorkshopPage() {
     extraCardId?: string,
     exactVersionId?: string,
   ): Promise<boolean> => {
+    // Browser-local executor: the playtest runs entirely in this browser.
+    // Editor flows that pin an extra card / exact draft version still go
+    // through the server sandbox (card data isn't in workshop state yet).
+    if (isBrowserSandbox() && !extraCardId && !exactVersionId) {
+      let stashed = true
+      try {
+        stashLocalSandboxConfig(buildLocalGameConfig(sandboxCards, sandboxSettings), user?.id ?? 'anon')
+      } catch {
+        // sessionStorage disabled or over quota — fall through to the server
+        // sandbox path below instead of leaving an unhandled rejection.
+        stashed = false
+      }
+      if (stashed) {
+        setSandboxLocalMode(true)
+        // A restart (sandbox already active) must start fresh, not resume the
+        // persisted slot; the first launch may still offer to resume.
+        setSandboxLocalFresh(sandboxActive)
+        setSandboxActive(true)
+        setSandboxKey(k => k + 1)
+        setPendingSandboxErrors(null)
+        return true
+      }
+    }
+    setSandboxLocalMode(false)
     try {
       const response = await apiFetch('/api/game/new-sandbox', {
         method: 'POST',
@@ -1623,7 +1650,7 @@ export function WorkshopPage() {
             <iframe
               key={sandboxKey}
               className="sandbox-embed-frame"
-              src={`?page=game&player=p1&embedded=1&devMode=1`}
+              src={`?page=game&player=p1&embedded=1&devMode=1${sandboxLocalMode ? '&localSandbox=1' : ''}${sandboxLocalMode && sandboxLocalFresh ? '&freshSandbox=1' : ''}`}
               title={t('platform.sandbox')}
             />
           )}
@@ -1685,7 +1712,7 @@ export function WorkshopPage() {
             <iframe
               key={sandboxKey}
               className="sandbox-embed-frame"
-              src={`?page=game&player=p1&embedded=1&devMode=1`}
+              src={`?page=game&player=p1&embedded=1&devMode=1${sandboxLocalMode ? '&localSandbox=1' : ''}${sandboxLocalMode && sandboxLocalFresh ? '&freshSandbox=1' : ''}`}
               title={t('platform.sandbox')}
             />
           )}

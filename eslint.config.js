@@ -191,9 +191,19 @@ export default defineConfig([
     },
   },
   // S6c: main client may not import session/engine or card impl/bootstrap modules. Use client/sandbox/ for hot-seat.
+  // The local-sandbox engine worker files run in a dedicated Worker chunk (never the main bundle),
+  // so they get the same exemption; local-transport/persistence/workshop-launch stay restricted
+  // (type-only imports) to keep the engine out of the main bundle.
   {
     files: ['client/**/*.{ts,tsx}'],
-    ignores: ['client/sandbox/**', 'client/**/__tests__/**'],
+    ignores: [
+      'client/sandbox/**',
+      'client/local-sandbox/worker.ts',
+      'client/local-sandbox/worker-core.ts',
+      'client/local-sandbox/browser-runtime.ts',
+      'client/local-sandbox/browser-executor.ts',
+      'client/**/__tests__/**',
+    ],
     rules: {
       '@typescript-eslint/no-restricted-imports': ['error', {
         patterns: [
