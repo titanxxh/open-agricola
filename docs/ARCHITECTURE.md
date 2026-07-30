@@ -228,6 +228,7 @@ type ServerEvent =
   | { type: 'roomCreated' | 'gameStarted'
       | 'playerJoined' | 'playerDisconnected' | 'roomDissolved'; ... }
   | { type: 'roomJoined'; roomId; playerIndex; status; players; maxPlayers }
+  | { type: 'roomWaiting'; roomId; players; maxPlayers }
 
 type StateUpdateEnvelope = {
   type: 'stateUpdate'
@@ -257,7 +258,7 @@ type GameSyncPayload = {
 }
 ```
 
-**广播 vs 单播**：`stateUpdate` / `gameStarted` / `playerJoined` / `playerDisconnected` / `roomDissolved` 广播；`roomCreated` / `roomJoined` / `authOk` / 请求级 `error` 单播。WS 广播会按连接对应的 `viewerPlayerId` 构造 per-viewer payload：目标玩家收到真实私有 prompt 和 `privateEvents`，其他玩家收到 `private-prompt` redaction。HTTP sandbox 默认无 `X-Viewer-Player` 时保持未过滤多座位开发流；带 `X-Viewer-Player` 时使用同一套 viewer 过滤和 seat guard。`cardWarnings` 只进入 HTTP debug/sandbox payload，用于把该局运行期自定义卡异常送回工坊确认门禁，不向 WS viewer 广播。
+**广播 vs 单播**：`stateUpdate` / `roomWaiting` / `gameStarted` / `playerJoined` / `playerDisconnected` / `roomDissolved` 广播；`roomCreated` / `roomJoined` / `authOk` / 请求级 `error` 单播。WS 广播会按连接对应的 `viewerPlayerId` 构造 per-viewer payload：目标玩家收到真实私有 prompt 和 `privateEvents`，其他玩家收到 `private-prompt` redaction。HTTP sandbox 默认无 `X-Viewer-Player` 时保持未过滤多座位开发流；带 `X-Viewer-Player` 时使用同一套 viewer 过滤和 seat guard。`cardWarnings` 只进入 HTTP debug/sandbox payload，用于把该局运行期自定义卡异常送回工坊确认门禁，不向 WS viewer 广播。
 
 ### 4.6 InteractionState — 前端唯一渲染真相
 
@@ -1305,7 +1306,7 @@ BUG_REPORT_TOKEN_ACTIVE_KEY_ID
 - 收到 `stateUpdate` 处理顺序：`normalizeState()` → `createActionSpaces()` → 用服务端 `resources` / `takenBy` 覆盖模板字段 → 替换 store。
 - 前端**不做乐观提交**：点完发命令，等 `stateUpdate` 到达再改 UI。
 - 本地 UI 临时态（hover / 临时选择 / 输入框）独立管理；新快照到达后检查本地选择是否仍合法，不合法清空。
-- 断线重连：`socket reconnect → joinRoom → roomJoined(status, players, maxPlayers)`；`waiting` 恢复等待页，`playing` 才继续 `getState → stateUpdate → 整体替换`，前端不依赖本地缓存恢复。
+- 断线重连：`socket reconnect → joinRoom → roomJoined(status, players, maxPlayers)`；`waiting` 恢复等待页，`playing` 才继续 `getState → stateUpdate → 整体替换`。已连接玩家在 `newGame` 因缺席座位回到等待态时，服务端广播 `roomWaiting(roomId, players, maxPlayers)`，前端立即隐藏旧棋盘并恢复等待页。
 
 ### 12.4 视图编排
 
