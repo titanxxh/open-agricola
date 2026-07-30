@@ -138,29 +138,31 @@ export type DebouncedSaver = {
 export const createDebouncedSaver = (store: LocalGameStore, delayMs = 500): DebouncedSaver => {
   let timer: ReturnType<typeof setTimeout> | null = null
   let latest: PersistedLocalGame | null = null
+  // Chain writes so a slow older save (each opens its own IndexedDB
+  // connection) can't commit after a newer one and overwrite the slot —
+  // e.g. a pagehide flush racing an in-flight debounce write.
+  let inflight: Promise<void> = Promise.resolve()
 
-  const write = async () => {
-    timer = null
+  const flushLatest = (): Promise<void> => {
     const pending = latest
     latest = null
-    if (!pending) return
-    try {
-      await store.save(pending)
-    } catch (error) {
+    if (!pending) return inflight
+    inflight = inflight.then(() => store.save(pending)).catch((error) => {
       console.warn('[local-sandbox] failed to persist game:', error)
-    }
+    })
+    return inflight
   }
 
   return {
     push: (persisted) => {
       latest = persisted
       if (timer === null) {
-        timer = setTimeout(() => { void write() }, delayMs)
+        timer = setTimeout(() => { timer = null; void flushLatest() }, delayMs)
       }
     },
     flush: () => {
-      if (timer !== null) clearTimeout(timer)
-      return write()
+      if (timer !== null) { clearTimeout(timer); timer = null }
+      return flushLatest()
     },
     cancel: () => {
       if (timer !== null) clearTimeout(timer)
