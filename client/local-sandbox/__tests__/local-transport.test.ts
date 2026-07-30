@@ -80,4 +80,34 @@ describe('LocalGameTransport', () => {
     await expect(transport.start()).rejects.toThrow(/timed out/)
     transport.destroy()
   })
+
+  it('rejects start() when the worker errors before ready', async () => {
+    const transport = new LocalGameTransport(CONFIG, {
+      timeoutMs: 5_000,
+      workerFactory: () => new FakeWorker(() => false, { failOnStart: true }),
+    })
+    await expect(transport.start()).rejects.toThrow(/worker failed to load/)
+    transport.destroy()
+  })
+
+  it('serializes mutating commands — a concurrent second command is rejected', async () => {
+    let swallow = false
+    const transport = new LocalGameTransport(CONFIG, {
+      workerFactory: () => new FakeWorker(
+        (req) => swallow && req.kind === 'call' && req.method === 'takeAction',
+      ),
+    })
+    await transport.start()
+
+    swallow = true
+    const first = transport.takeAction(0, 'meeting-place') // swallowed → stays in flight
+    const firstSettled = first.catch(() => 'rejected')
+    await expect(transport.takeAction(0, 'grove')).rejects.toThrow(/in flight/)
+
+    // getState is a read and must not be blocked by the in-flight guard.
+    await expect(transport.getState()).resolves.toBeTruthy()
+
+    transport.destroy() // rejects the still-pending first command
+    await expect(firstSettled).resolves.toBe('rejected')
+  })
 })

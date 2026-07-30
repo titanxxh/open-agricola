@@ -6,6 +6,14 @@
  * The dispatch table mirrors `server/game-router.ts` endpoint → session
  * method mappings so browser-local games behave identically to server
  * sandbox games.
+ *
+ * SCOPE / server-authoritative boundary: this runs ONLY the single-player
+ * workshop playtest (a dry-run of the author's own cards, in the author's own
+ * browser). It is not a multiplayer game and never writes any shared/server
+ * `GameState` — real multiplayer rooms stay fully server-authoritative through
+ * `GameSession`. This is the accepted divergence recorded in wayfinder map #605
+ * (real-match card execution stays server-side; only the workshop dry-run is
+ * local). Do not route multiplayer rule decisions through this path.
  */
 import { GameCore, type SessionResponse } from '../../shared/session/session-core.ts'
 import { buildSyncPayload } from '../../shared/session/sync-payload.ts'

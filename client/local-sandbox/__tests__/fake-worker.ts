@@ -9,13 +9,21 @@ import type { WorkerLike } from '../local-transport.ts'
  */
 export class FakeWorker implements WorkerLike {
   onmessage: ((event: { data: LocalSandboxResponse }) => void) | null = null
+  onerror: ((event: unknown) => void) | null = null
   terminated = false
   private readonly core = new LocalSandboxCore()
   private readonly swallow: (request: LocalSandboxRequest) => boolean
 
-  constructor(swallow: (request: LocalSandboxRequest) => boolean = () => false) {
+  constructor(
+    swallow: (request: LocalSandboxRequest) => boolean = () => false,
+    opts: { failOnStart?: boolean } = {},
+  ) {
     this.swallow = swallow
-    queueMicrotask(() => this.onmessage?.({ data: { kind: 'ready' } }))
+    if (opts.failOnStart) {
+      queueMicrotask(() => this.onerror?.({ message: 'worker failed to load' }))
+    } else {
+      queueMicrotask(() => this.onmessage?.({ data: { kind: 'ready' } }))
+    }
   }
 
   postMessage(request: LocalSandboxRequest): void {

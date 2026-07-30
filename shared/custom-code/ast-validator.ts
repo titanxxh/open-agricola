@@ -19,6 +19,10 @@ const DENIED_IDENTIFIERS = new Set([
   // Sandbox escapes
   'eval', 'Function', 'process', 'require', 'globalThis', 'global',
   'window', 'document', '__dirname', '__filename',
+  // Worker globals — reachable in the browser-local executor (which runs card
+  // code with `new Function`, not an isolate); block the self/importScripts
+  // path to fetch/IndexedDB/postMessage with the page's origin privileges.
+  'self', 'importScripts', 'postMessage', 'WorkerGlobalScope', 'indexedDB',
   // Network / IO
   'fetch', 'XMLHttpRequest', 'WebSocket',
   // Timers (not available in sandbox)

@@ -1182,6 +1182,7 @@ export function WorkshopPage() {
   const [sandboxActive, setSandboxActive] = useState(false)
   const [sandboxKey, setSandboxKey] = useState(0)
   const [sandboxLocalMode, setSandboxLocalMode] = useState(false)
+  const [sandboxLocalFresh, setSandboxLocalFresh] = useState(false)
   const prevView = useRef<View>('home')
   const prevBrowseQuery = useRef({ search: '', sort: 'recent' as 'recent' | 'popular' })
 
@@ -1390,6 +1391,9 @@ export function WorkshopPage() {
     if (isBrowserSandbox() && !extraCardId && !exactVersionId) {
       stashLocalSandboxConfig(buildLocalGameConfig(sandboxCards, sandboxSettings))
       setSandboxLocalMode(true)
+      // A restart (sandbox already active) must start fresh, not resume the
+      // persisted slot; the first launch may still offer to resume.
+      setSandboxLocalFresh(sandboxActive)
       setSandboxActive(true)
       setSandboxKey(k => k + 1)
       setPendingSandboxErrors(null)
@@ -1637,7 +1641,7 @@ export function WorkshopPage() {
             <iframe
               key={sandboxKey}
               className="sandbox-embed-frame"
-              src={`?page=game&player=p1&embedded=1&devMode=1${sandboxLocalMode ? '&localSandbox=1' : ''}`}
+              src={`?page=game&player=p1&embedded=1&devMode=1${sandboxLocalMode ? '&localSandbox=1' : ''}${sandboxLocalMode && sandboxLocalFresh ? '&freshSandbox=1' : ''}`}
               title={t('platform.sandbox')}
             />
           )}
@@ -1699,7 +1703,7 @@ export function WorkshopPage() {
             <iframe
               key={sandboxKey}
               className="sandbox-embed-frame"
-              src={`?page=game&player=p1&embedded=1&devMode=1${sandboxLocalMode ? '&localSandbox=1' : ''}`}
+              src={`?page=game&player=p1&embedded=1&devMode=1${sandboxLocalMode ? '&localSandbox=1' : ''}${sandboxLocalMode && sandboxLocalFresh ? '&freshSandbox=1' : ''}`}
               title={t('platform.sandbox')}
             />
           )}

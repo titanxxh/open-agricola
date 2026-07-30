@@ -26,6 +26,7 @@ export type WorkerLike = {
   postMessage(message: LocalSandboxRequest): void
   terminate(): void
   onmessage: ((event: { data: LocalSandboxResponse }) => void) | null
+  onerror?: ((event: unknown) => void) | null
 }
 
 export type LocalTransportOptions = {
@@ -62,6 +63,7 @@ export class LocalGameTransport implements GameTransport {
   private viewer: ViewerSpec
   private recovering = false
   private destroyed = false
+  private inflight = false
 
   private readonly config: LocalGameConfig
   private readonly opts: LocalTransportOptions
@@ -90,7 +92,7 @@ export class LocalGameTransport implements GameTransport {
     this.viewer = viewer
   }
 
-  getState() { return this.call('getState', []) }
+  getState() { return this.call('getState', [], false) }
   takeAction(playerIndex: number, spaceId: string) { return this.call('takeAction', [playerIndex, spaceId]) }
   takeSpecialAction(
     playerIndex: number,
@@ -153,9 +155,20 @@ export class LocalGameTransport implements GameTransport {
     this.worker = null
   }
 
-  private async call(method: string, args: unknown[]): Promise<GameSyncPayload> {
-    const response = await this.request({ kind: 'call', method, args, viewer: this.viewer })
-    return this.accept(response)
+  private async call(method: string, args: unknown[], guard = true): Promise<GameSyncPayload> {
+    // Serialize mutating commands (match the HTTP transport's in-flight guard):
+    // a double-click must not post two commands that resolve against different
+    // states. Reads (getState) pass guard=false and stay concurrent.
+    if (guard && this.inflight) {
+      return Promise.reject(new Error('request already in flight'))
+    }
+    if (guard) this.inflight = true
+    try {
+      const response = await this.request({ kind: 'call', method, args, viewer: this.viewer })
+      return this.accept(response)
+    } finally {
+      if (guard) this.inflight = false
+    }
   }
 
   private accept(response: LocalSandboxResponse & { ok: true }): GameSyncPayload {
@@ -178,9 +191,22 @@ export class LocalGameTransport implements GameTransport {
     this.worker = worker
     this.isReady = false
     worker.onmessage = (event) => this.handleMessage(event.data)
-    return new Promise((resolve) => {
-      if (this.isReady) { resolve(); return }
-      this.readyResolvers.push(resolve)
+    return new Promise((resolve, reject) => {
+      // Reject on worker error or a startup deadline so a chunk that fails to
+      // fetch (or a blocked worker) surfaces instead of hanging on the loading
+      // screen forever — the request-level timeout only arms after start().
+      const timer = setTimeout(
+        () => reject(new Error('local sandbox worker failed to start')),
+        this.opts.timeoutMs ?? DEFAULT_TIMEOUT_MS,
+      )
+      const settleReady = () => { clearTimeout(timer); resolve() }
+      worker.onerror = (event) => {
+        clearTimeout(timer)
+        const message = (event as { message?: string })?.message ?? 'local sandbox worker error'
+        reject(new Error(message))
+      }
+      if (this.isReady) { settleReady(); return }
+      this.readyResolvers.push(settleReady)
     })
   }
 
