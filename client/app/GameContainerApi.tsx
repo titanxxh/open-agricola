@@ -1060,12 +1060,15 @@ export const GameContainerApi = () => {
     }
   }, [applySnapshot, applySnapshotPublicEventCancellations, resetExchangeDraft, resetFarmSelectionDraft, syncAnimalReorgFromInteraction])
 
+  const snapshotTransport = isWs ? wsTransport : transport
+  useEffect(() => {
+    if (!snapshotTransport) return
+    return snapshotTransport.onSnapshot(handleSnapshot)
+  }, [handleSnapshot, snapshotTransport])
   useEffect(() => {
     if (!isReady) return
-    const unsub = transport.onSnapshot(handleSnapshot)
     transport.getState().catch((e) => { console.error("fetchState failed:", e) })
-    return unsub
-  }, [transport, handleSnapshot, isReady])
+  }, [transport, isReady])
   useEffect(() => {
     if (!wsTransport) return
     return wsTransport.onPersistenceStatus(setPersistencePaused)

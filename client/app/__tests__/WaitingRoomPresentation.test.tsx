@@ -11,17 +11,21 @@ import { AuthProvider, useAuth } from '../../contexts/AuthContext'
 import { LocaleProvider } from '../../contexts/LocaleContext'
 import { GameContainerApi } from '../GameContainerApi'
 
-const playingPayload: GameSyncPayload = {
-  state: serializeState(createInitialState(42), { engineStack: new EngineStack() }),
-  interaction: {
-    stateId: 'idle',
-    allowedCommands: ['takeAction'],
-    anytimeActions: [],
-  },
-  scores: null,
-  historyLength: 0,
-  hasActionStartSnapshot: false,
-  ok: true,
+const playingPayload = (round: number): GameSyncPayload => {
+  const state = createInitialState(42)
+  state.round = round
+  return {
+    state: serializeState(state, { engineStack: new EngineStack() }),
+    interaction: {
+      stateId: 'idle',
+      allowedCommands: ['takeAction'],
+      anytimeActions: [],
+    },
+    scores: null,
+    historyLength: 0,
+    hasActionStartSnapshot: false,
+    ok: true,
+  }
 }
 
 class WaitingRoomWebSocket {
@@ -29,6 +33,7 @@ class WaitingRoomWebSocket {
   static sent: Array<Record<string, unknown>> = []
   static requiresReplayConsent = false
   static joinStatus: 'waiting' | 'playing' = 'waiting'
+  static respondToGetState = true
   static latest: WaitingRoomWebSocket | null = null
   readonly readyState = WaitingRoomWebSocket.OPEN
   onopen: ((event: Event) => void) | null = null
@@ -80,6 +85,7 @@ class WaitingRoomWebSocket {
       return
     }
     if (message.type === 'getState') {
+      if (!WaitingRoomWebSocket.respondToGetState) return
       queueMicrotask(() => {
         WaitingRoomWebSocket.emit({
           type: 'stateUpdate',
@@ -88,7 +94,7 @@ class WaitingRoomWebSocket {
           sync: 'snapshot',
           cause: 'reconnect',
           requestId: message.requestId,
-          payload: playingPayload,
+          payload: playingPayload(1),
           emittedAt: Date.now(),
         })
       })
@@ -183,6 +189,7 @@ afterEach(() => {
   WaitingRoomWebSocket.sent = []
   WaitingRoomWebSocket.requiresReplayConsent = false
   WaitingRoomWebSocket.joinStatus = 'waiting'
+  WaitingRoomWebSocket.respondToGetState = true
   WaitingRoomWebSocket.latest = null
   JoinErrorWebSocket.errorMessage = {}
   Object.defineProperty(navigator, 'clipboard', { configurable: true, value: undefined })
@@ -327,6 +334,24 @@ describe('waiting room presentation', () => {
     expect(await screen.findByText('Room room-2 — Waiting for players (1/2)')).toBeVisible()
     expect(screen.getByText('Player 1: Host')).toBeVisible()
     expect(document.querySelector('.game-layout')).toBeNull()
+
+    WaitingRoomWebSocket.respondToGetState = false
+    act(() => {
+      WaitingRoomWebSocket.emit({
+        type: 'stateUpdate',
+        roomId: 'room-2',
+        version: 2,
+        sync: 'snapshot',
+        cause: 'reconnect',
+        payload: playingPayload(2),
+        emittedAt: Date.now(),
+      })
+      WaitingRoomWebSocket.emit({ type: 'gameStarted' })
+    })
+
+    await waitFor(() => {
+      expect(document.querySelector('.header-round')).toHaveTextContent('R2/14')
+    })
   })
 
   it('announces successful invitation-link copying', async () => {
