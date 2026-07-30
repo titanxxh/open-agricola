@@ -79,6 +79,29 @@ describe('createDebouncedSaver', () => {
     await sleep(20)
     expect(writes).toHaveLength(1)
   })
+
+  it('serializes overlapping saves so the latest snapshot commits last', async () => {
+    // save(playerCount=2) is slow (30ms), save(3) is fast (5ms). If writes ran
+    // concurrently the faster one would commit first and be overwritten; chained
+    // writes must commit in submission order → [2, 3].
+    const committed: number[] = []
+    const store: LocalGameStore = {
+      save: async (p) => {
+        await sleep(p.config.playerCount === 2 ? 30 : 5)
+        committed.push(p.config.playerCount)
+      },
+      load: () => Promise.resolve(null),
+      clear: () => Promise.resolve(),
+    }
+    const saver = createDebouncedSaver(store, 5)
+
+    saver.push(fakePersisted({ config: { cards: [], playerCount: 2, seed: 1 } }))
+    await sleep(10) // debounce fires; the slow save(2) is now in flight
+    saver.push(fakePersisted({ config: { cards: [], playerCount: 3, seed: 1 } }))
+    await saver.flush()
+
+    expect(committed).toEqual([2, 3])
+  })
 })
 
 describe('end-to-end resume through the transport', () => {
