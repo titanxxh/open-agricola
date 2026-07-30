@@ -67,6 +67,7 @@ import {
   type FarmCommitType,
   type WsStatus,
 } from './game-container-helpers'
+import type { WsErrorCode } from './ws-status'
 import {
   collectPrivateEventNotifications,
   type PrivateEventNotification,
@@ -286,7 +287,7 @@ const useTransportSetup = (
         }
 
         setWsStatus({ phase: 'joining', roomId })
-        const resp = await new Promise<{ roomId: string; playerIndex: number } | { error: string }>((resolve) => {
+        const resp = await new Promise<{ roomId: string; playerIndex: number } | { error: string; code?: WsErrorCode }>((resolve) => {
           const handler = (event: MessageEvent) => {
             try {
               const msg = JSON.parse(event.data as string)
@@ -301,7 +302,7 @@ const useTransportSetup = (
                 ) {
                   window.dispatchEvent(new Event(GAME_CONTEXT_CHANGED_EVENT))
                 }
-                resolve({ error: msg.error })
+                resolve({ error: msg.error, code: msg.code })
               }
             } catch { /* skip */ }
           }
@@ -315,7 +316,7 @@ const useTransportSetup = (
         })
 
         if ('error' in resp) {
-          setWsStatus({ phase: 'error', message: resp.error })
+          setWsStatus({ phase: 'error', message: resp.error, code: resp.code })
           return
         }
         setRoomInUrl(resp.roomId)
@@ -1367,9 +1368,15 @@ export const GameContainerApi = () => {
 
           {wsStatus.phase === 'error' && (
             <div className="ws-error-actions">
-              <button type="button" className="btn-primary" onClick={() => window.location.reload()}>
-                {t(locale, 'platform.retry')}
-              </button>
+              {wsStatus.code === 'context_changed' ? (
+                <button type="button" className="btn-primary" onClick={() => setPage('lobby')}>
+                  {t(locale, 'platform.backToLobbyPlain')}
+                </button>
+              ) : (
+                <button type="button" className="btn-primary" onClick={() => window.location.reload()}>
+                  {t(locale, 'platform.retry')}
+                </button>
+              )}
             </div>
           )}
         </div>
