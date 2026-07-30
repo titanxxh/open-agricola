@@ -12,7 +12,7 @@
  *   - shared/custom-code/sandbox-listener-phases.ts (sandboxListenerPhases)
  *   - shared/custom-code/sandbox-listener-scopes.ts (sandboxListenerScopes)
  *   - shared/custom-code/ast-validator.ts (DENIED_IDENTIFIERS, DENIED_PROPERTY_ACCESS)
- *   - server/custom-code/injected-helpers.ts (sandbox injections; S9)
+ *   - shared/custom-code/injected-helpers.ts (sandbox injections; S9)
  *   - shared/custom-code/sandbox-action-ids.ts (SANDBOX_ALLOWED_ACTION_IDS)
  */
 

@@ -45,6 +45,7 @@ jobs:
           VITE_WS_BASE: ${{ vars.VITE_WS_BASE }}
           VITE_BASE_PATH: /open-agricola/
           BGA_CDN_BASE_URL: ${{ vars.BGA_CDN_BASE_URL }}
+          VITE_SANDBOX_EXECUTOR: ${{ vars.VITE_SANDBOX_EXECUTOR }}
           BGA_IMAGE_DIR: bga-agricola/img
         run: pnpm run build
 

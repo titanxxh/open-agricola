@@ -40,7 +40,7 @@ const SOURCES = {
   sandboxListenerPhases: 'shared/custom-code/sandbox-listener-phases.ts',
   sandboxListenerScopes: 'shared/custom-code/sandbox-listener-scopes.ts',
   astValidator: 'shared/custom-code/ast-validator.ts',
-  injectedHelpers: 'server/custom-code/injected-helpers.ts',
+  injectedHelpers: 'shared/custom-code/injected-helpers.ts',
 }
 
 const TARGETS = {
@@ -107,7 +107,7 @@ function parseStringArray(body: string): string[] {
 }
 
 /**
- * Scan `server/custom-code/injected-helpers.ts` for top-level `function NAME(...)`
+ * Scan `shared/custom-code/injected-helpers.ts` for top-level `function NAME(...)`
  * declarations. These are the helpers the sandbox injects into user code.
  */
 export function extractInjectedHelpers(): string[] {

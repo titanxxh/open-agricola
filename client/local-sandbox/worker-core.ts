@@ -41,6 +41,17 @@ export type LocalSandboxResult = {
 
 const compileCards = (cards: LocalCardInput[]): CustomCardData[] =>
   cards.map((card) => {
+    if (!card.source) {
+      // Data-only card: GameCore registers the cardJson, no code to run.
+      return {
+        cardType: card.cardType,
+        cardJson: card.cardJson,
+        effectCode: null,
+        compiledCode: null,
+        codeManifest: null,
+        artUrl: card.artUrl ?? null,
+      }
+    }
     const result = validateAndCompileCustomCodeLocal(card.source, card.cardJson.id)
     if (!result.valid) {
       throw new Error(`Card ${card.cardJson.id} failed to compile: ${result.errors.join('; ')}`)
