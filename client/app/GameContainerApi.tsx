@@ -1301,7 +1301,7 @@ export const GameContainerApi = () => {
     reader.readAsText(file)
   }, [transport])
 
-  if (isWs && wsStatus.phase !== 'ready' && !state) {
+  if (isWs && wsStatus.phase !== 'ready' && (!state || wsStatus.phase === 'waiting' || wsStatus.phase === 'error')) {
     const wsProgressPhase =
       resolveGameLoadPhase({ wsStatus, hasGameView: false }) ??
       (wsStatus.phase === 'idle' ? 'wsConnecting' : null)
