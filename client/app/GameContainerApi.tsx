@@ -146,6 +146,7 @@ const useTransportSetup = (
   isWsMode: boolean,
   locale: Locale,
   isLocalMode: boolean,
+  ownerKey: string,
 ) => {
   const [wsStatus, setWsStatus] = useState<WsStatus>({ phase: 'idle' })
   const [wsTransport, setWsTransport] = useState<WsGameTransport | null>(null)
@@ -165,7 +166,7 @@ const useTransportSetup = (
       window.alert(t(locale, 'platform.localSandboxMissingConfig'))
       return
     }
-    const store = openLocalGameStore()
+    const store = openLocalGameStore(ownerKey)
     const saver = createDebouncedSaver(store)
     const transport = new LocalGameTransport(config, {
       viewer: { viewerPlayerId: null, mode: 'debug' },
@@ -180,8 +181,10 @@ const useTransportSetup = (
 
     const init = async () => {
       try {
+        // Clearing the optional slot is best-effort: a storage-disabled context
+        // must not block starting a fresh in-memory game.
+        if (forceFresh) { try { await store.clear() } catch { /* ignore */ } }
         const persisted = forceFresh ? null : await loadResumable(store)
-        if (forceFresh) await store.clear()
         if (persisted && window.confirm(t(locale, 'platform.localSandboxResume'))) {
           try {
             await transport.startFromPersisted(persisted)
@@ -466,6 +469,7 @@ export const GameContainerApi = () => {
     isWsMode,
     locale,
     isLocalMode,
+    user?.id ?? 'anon',
   )
   const { state, interaction, scores, pastureCapacities, historyLength, hasActionStartSnapshot, actionAvailability, cardAvailability, privateEvents, applySnapshot } =
     useGameSync()

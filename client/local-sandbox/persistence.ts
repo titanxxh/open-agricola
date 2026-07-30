@@ -14,7 +14,6 @@ import { LOCAL_SANDBOX_SCHEMA_VERSION, type PersistedLocalGame } from './protoco
 const DB_NAME = 'open-agricola-local-sandbox'
 const DB_VERSION = 1
 const STORE_NAME = 'games'
-const SLOT_KEY = 'current'
 
 export interface LocalGameStore {
   save(persisted: PersistedLocalGame): Promise<void>
@@ -41,6 +40,12 @@ export class MemoryGameStore implements LocalGameStore {
 }
 
 export class IndexedDbGameStore implements LocalGameStore {
+  private readonly slotKey: string
+
+  constructor(slotKey: string) {
+    this.slotKey = slotKey
+  }
+
   private openDb(): Promise<IDBDatabase> {
     return new Promise((resolve, reject) => {
       const request = indexedDB.open(DB_NAME, DB_VERSION)
@@ -78,21 +83,29 @@ export class IndexedDbGameStore implements LocalGameStore {
   }
 
   async save(persisted: PersistedLocalGame): Promise<void> {
-    await this.transact('readwrite', (store) => store.put(persisted, SLOT_KEY))
+    await this.transact('readwrite', (store) => store.put(persisted, this.slotKey))
   }
 
   async load(): Promise<PersistedLocalGame | null> {
-    const value = await this.transact<unknown>('readonly', (store) => store.get(SLOT_KEY))
+    const value = await this.transact<unknown>('readonly', (store) => store.get(this.slotKey))
     return (value as PersistedLocalGame | undefined) ?? null
   }
 
   async clear(): Promise<void> {
-    await this.transact('readwrite', (store) => store.delete(SLOT_KEY))
+    await this.transact('readwrite', (store) => store.delete(this.slotKey))
   }
 }
 
-export const openLocalGameStore = (): LocalGameStore =>
-  typeof indexedDB === 'undefined' ? new MemoryGameStore() : new IndexedDbGameStore()
+/**
+ * Open the per-owner store. The slot is namespaced by an immutable owner key
+ * (the authenticated user id, or 'anon') so a later account on a shared browser
+ * can't resume — and read the unpublished card source of — an earlier user's
+ * playtest.
+ */
+export const openLocalGameStore = (ownerKey = 'anon'): LocalGameStore => {
+  const slotKey = `current:${ownerKey}`
+  return typeof indexedDB === 'undefined' ? new MemoryGameStore() : new IndexedDbGameStore(slotKey)
+}
 
 /**
  * Load the saved game if it is safe to resume. A record from another schema

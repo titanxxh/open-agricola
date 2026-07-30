@@ -157,6 +157,8 @@ BGA PHP 路径默认相对 `/data00/home/xuxinhao.titan/raw/bga-agricola/modules
 
 当前没有开放的基础设施 umbrella 待办。已完成的 Before-End Player Dispatch、Scoring Reserve、printed-cost helper、extra-turn 轮转、family token supply、Major Improvement stack supply、card boundary guard、single-layer terrain selection flow、FoM immediate resource minor helper、pasture / harvest / breeding / scoring / stable / special-stable 等历史条目已按需归并到 §5 架构约束或 §12 单卡备注，不再在本节保留完成清单。
 
+**浏览器本地工坊试玩沙盒**（PR #619 / wayfinder #605，已完成）：新增 `client/local-sandbox/` 的浏览器端自定义卡编译 + 执行基础设施，`VITE_SANDBOX_EXECUTOR=browser` 时工坊试玩全程在浏览器运行。复用 shared 的 AST validator + compiler，在 Web Worker 内用 `new Function` 执行卡代码，执行语义与服务端 isolated-vm executor 由 `server/__tests__/local-sandbox-parity.test.ts` 钉死等价。**边界**：仅服务单人工坊试玩 dry-run（作者自己的卡），不服务真实多人对局——真实对局卡代码执行仍走服务端 isolated-vm，后端权威不变（accepted divergence，见 §3）。**安全**：浏览器执行器非硬隔离，用 strict mode + shadow globals + worker capability removal 三层深度防御；第三方 published 卡的权威隔离由服务端保证。详见 `docs/ARCHITECTURE.md` §12.5 与 `docs/CUSTOM_CARD_SANDBOX.md` §8。
+
 后续若发现需要跨多张卡的新机制，先在本节新增待办；实现完成并有测试或守卫后，从本节移除并同步 §5 / §9 / §10 / §12。
 
 ## 7. Log 系统对比
