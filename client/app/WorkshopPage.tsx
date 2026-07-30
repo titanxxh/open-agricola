@@ -10,6 +10,7 @@ import { Section } from '../components/common/Section'
 import { EmptyState } from '../components/common/EmptyState'
 import { API_BASE } from '../config'
 import { refreshPrStatus, extractPrNumber } from '../services/workshop-pr'
+import { buildLocalGameConfig, isBrowserSandbox, stashLocalSandboxConfig } from '../local-sandbox/workshop-launch'
 
 type WorkshopCard = {
   id: string
@@ -1180,6 +1181,7 @@ export function WorkshopPage() {
   const [pendingSandboxErrors, setPendingSandboxErrors] = useState<string[] | null>(null)
   const [sandboxActive, setSandboxActive] = useState(false)
   const [sandboxKey, setSandboxKey] = useState(0)
+  const [sandboxLocalMode, setSandboxLocalMode] = useState(false)
   const prevView = useRef<View>('home')
   const prevBrowseQuery = useRef({ search: '', sort: 'recent' as 'recent' | 'popular' })
 
@@ -1382,6 +1384,18 @@ export function WorkshopPage() {
     extraCardId?: string,
     exactVersionId?: string,
   ): Promise<boolean> => {
+    // Browser-local executor: the playtest runs entirely in this browser.
+    // Editor flows that pin an extra card / exact draft version still go
+    // through the server sandbox (card data isn't in workshop state yet).
+    if (isBrowserSandbox() && !extraCardId && !exactVersionId) {
+      stashLocalSandboxConfig(buildLocalGameConfig(sandboxCards, sandboxSettings))
+      setSandboxLocalMode(true)
+      setSandboxActive(true)
+      setSandboxKey(k => k + 1)
+      setPendingSandboxErrors(null)
+      return true
+    }
+    setSandboxLocalMode(false)
     try {
       const response = await apiFetch('/api/game/new-sandbox', {
         method: 'POST',
@@ -1623,7 +1637,7 @@ export function WorkshopPage() {
             <iframe
               key={sandboxKey}
               className="sandbox-embed-frame"
-              src={`?page=game&player=p1&embedded=1&devMode=1`}
+              src={`?page=game&player=p1&embedded=1&devMode=1${sandboxLocalMode ? '&localSandbox=1' : ''}`}
               title={t('platform.sandbox')}
             />
           )}
@@ -1685,7 +1699,7 @@ export function WorkshopPage() {
             <iframe
               key={sandboxKey}
               className="sandbox-embed-frame"
-              src={`?page=game&player=p1&embedded=1&devMode=1`}
+              src={`?page=game&player=p1&embedded=1&devMode=1${sandboxLocalMode ? '&localSandbox=1' : ''}`}
               title={t('platform.sandbox')}
             />
           )}

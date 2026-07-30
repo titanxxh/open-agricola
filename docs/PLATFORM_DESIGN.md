@@ -404,7 +404,7 @@ LLM 输出 **TypeScript 源码**（包含 `CARD_DEF` 定义、`CARD_IMPL.effect`
 
 **注**：AST 验证是用户友好的错误提示层；真正的安全边界是 isolated-vm（独立 V8 堆）。
 
-**2. 编译** — `server/custom-code/compiler.ts`
+**2. 编译** — `shared/custom-code/compiler.ts`
 
 AST 验证通过后，`ts.transpileModule()` 将 TypeScript 编译为 CommonJS JS。数据库 `card_json` 列存所有自定义代码相关数据（CARD_DEF 元数据 + TypeScript 源码 + 编译后 JS + manifest）。早期 v1-v3 schema 有独立的 `effect_dsl` / `effect_code` / `compiled_code` 列（V1 DSL 设计遗留），migration v7 已全部 DROP，统一聚合到 `card_json`。
 
