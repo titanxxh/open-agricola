@@ -33,6 +33,24 @@ import type {
   CustomCodeValidateResult,
 } from '../../shared/custom-code/types.ts'
 
+// Defence-in-depth for the browser executor (which is NOT a hard isolate):
+// shadow the dangerous worker/DOM globals as `undefined` parameters so card
+// code can't reach them lexically even if the AST deny-list is ever bypassed,
+// and run under `'use strict'` with a null-prototype `this` so the classic
+// `const root = this; root.fetch(...)` escape (non-strict top-level `this`
+// binds to WorkerGlobalScope) resolves to a frozen empty object instead.
+// The AST validator remains the first line; the real security boundary for
+// third-party published cards is the server isolated-vm executor.
+// NOTE: `eval` and `arguments` can't appear here — strict-mode functions forbid
+// them as parameter names. Both are already blocked by the AST deny-list.
+const SHADOWED_GLOBALS = [
+  'self', 'globalThis', 'window', 'top', 'parent', 'frames', 'WorkerGlobalScope',
+  'fetch', 'XMLHttpRequest', 'WebSocket', 'importScripts', 'postMessage',
+  'indexedDB', 'localStorage', 'sessionStorage', 'caches', 'navigator',
+  'Function',
+]
+const HARMLESS_THIS = Object.freeze(Object.create(null))
+
 function runCardCode(
   compiledCode: string,
   cardId: string,
@@ -44,7 +62,7 @@ function runCardCode(
     JSON.parse(JSON.stringify(inputs[key] ?? null)),
   )
 
-  const wrappedCode = `
+  const wrappedCode = `'use strict';
     var console = {
       log: function() { var args = Array.prototype.slice.call(arguments); __log.apply(undefined, args.map(function(a) { return typeof a === 'object' ? JSON.stringify(a) : String(a); })); },
       warn: function() { var args = Array.prototype.slice.call(arguments); __warn.apply(undefined, args.map(function(a) { return typeof a === 'object' ? JSON.stringify(a) : String(a); })); },
@@ -64,10 +82,12 @@ function runCardCode(
     return JSON.stringify(__result);
   `
 
-  const fn = new Function('__log', '__warn', ...inputNames, wrappedCode)
-  const resultJson = fn(
+  const fn = new Function('__log', '__warn', ...SHADOWED_GLOBALS, ...inputNames, wrappedCode)
+  const resultJson = fn.call(
+    HARMLESS_THIS,
     (...args: unknown[]) => { console.log(`[local-executor:${cardId}]`, ...args) },
     (...args: unknown[]) => { console.warn(`[local-executor:${cardId}]`, ...args) },
+    ...SHADOWED_GLOBALS.map(() => undefined),
     ...inputValues,
   ) as string | undefined
   return resultJson ? JSON.parse(resultJson) : null
@@ -77,7 +97,7 @@ function runManifestExtraction(compiledCode: string, cardId: string): {
   manifest: CustomCodeManifest
   cardDefinition: Record<string, unknown> | null
 } {
-  const wrappedCode = `
+  const wrappedCode = `'use strict';
     var console = { log: function() {}, warn: function() {} };
     var __cardDefinitionType = null;
     function MinorImprovement(def) { __cardDefinitionType = 'minor'; return def; }
@@ -130,8 +150,8 @@ function runManifestExtraction(compiledCode: string, cardId: string): {
     });
   `
 
-  const fn = new Function(wrappedCode)
-  const resultJson = fn() as string | undefined
+  const fn = new Function(...SHADOWED_GLOBALS, wrappedCode)
+  const resultJson = fn.call(HARMLESS_THIS, ...SHADOWED_GLOBALS.map(() => undefined)) as string | undefined
   const parsed = resultJson ? JSON.parse(resultJson) as {
     effectKeys: string[]
     effectMetadata?: CustomCodeEffectMetadata

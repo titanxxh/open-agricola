@@ -20,8 +20,8 @@ const DENIED_IDENTIFIERS = new Set([
   'eval', 'Function', 'process', 'require', 'globalThis', 'global',
   'window', 'document', '__dirname', '__filename',
   // Worker globals — reachable in the browser-local executor (which runs card
-  // code with `new Function`, not an isolate); block the self/importScripts
-  // path to fetch/IndexedDB/postMessage with the page's origin privileges.
+  // code with new Function, not an isolate); block the self/importScripts path
+  // to fetch/IndexedDB/postMessage with same-origin privileges.
   'self', 'importScripts', 'postMessage', 'WorkerGlobalScope', 'indexedDB',
   // Network / IO
   'fetch', 'XMLHttpRequest', 'WebSocket',
