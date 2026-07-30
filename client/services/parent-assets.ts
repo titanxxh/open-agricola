@@ -5,8 +5,6 @@ const DEFAULT_PARENT_ASSETS_BASE_URL = '/assets/parents'
 
 const trimTrailingSlashes = (value: string): string => value.replace(/\/+$/, '')
 
-const getParentAssetsBaseUrl = (): string => publicAssetUrl(DEFAULT_PARENT_ASSETS_BASE_URL)
-
 export type ResolvedParentCardAssetUrls = {
   portraitUrl: string
   backUrl: string
@@ -14,12 +12,11 @@ export type ResolvedParentCardAssetUrls = {
 
 export const resolveParentCardAssetUrls = (
   assets: ParentCardAsset,
-  baseUrl = getParentAssetsBaseUrl(),
 ): ResolvedParentCardAssetUrls => {
-  const normalizedBaseUrl = trimTrailingSlashes(publicAssetUrl(baseUrl))
+  const normalizedBaseUrl = trimTrailingSlashes(DEFAULT_PARENT_ASSETS_BASE_URL)
 
   return {
-    portraitUrl: `${normalizedBaseUrl}/portrait/${assets.front}`,
-    backUrl: `${normalizedBaseUrl}/backs/${assets.back}.png`,
+    portraitUrl: publicAssetUrl(`${normalizedBaseUrl}/portrait/${assets.front}`),
+    backUrl: publicAssetUrl(`${normalizedBaseUrl}/backs/${assets.back}.png`),
   }
 }

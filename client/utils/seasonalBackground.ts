@@ -1,3 +1,5 @@
+import { publicAssetUrl } from './public-asset-url';
+
 /**
  * Pick the seasonal background variant for a given month, then apply it
  * to <body> via a CSS custom property.
@@ -51,7 +53,6 @@ function resolveSeasonalVariant(date: Date = new Date()): string | null {
 export function applyMonthlyBackground(date: Date = new Date()): void {
   const variant = resolveSeasonalVariant(date);
   if (!variant) return;
-  const base = import.meta.env.BASE_URL || '/';
-  const url = `${base}assets/website-bg/${variant}.webp`;
+  const url = publicAssetUrl(`/assets/website-bg/${variant}.webp`);
   document.documentElement.style.setProperty('--bg-monthly', `url("${url}")`);
 }

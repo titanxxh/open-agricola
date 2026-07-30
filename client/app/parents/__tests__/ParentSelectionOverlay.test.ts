@@ -13,6 +13,7 @@ import {
   type ParentSelectionViewModel,
 } from '../ParentSelectionOverlay'
 import type { GameState, ParentSelectionState } from '../../../../shared/contract/types'
+import { publicAssetUrl } from '../../../utils/public-asset-url'
 
 afterEach(() => cleanup())
 
@@ -266,11 +267,11 @@ describe('ParentSelectionOverlay', () => {
 
     expect(screen.getByRole('img', { name: 'Mother PR01' })).toHaveAttribute(
       'src',
-      '/assets/parents/portrait/PR01.png',
+      publicAssetUrl('/assets/parents/portrait/PR01.png'),
     )
     expect(screen.getByRole('img', { name: 'Father PS01' })).toHaveAttribute(
       'src',
-      '/assets/parents/portrait/PS01.png',
+      publicAssetUrl('/assets/parents/portrait/PS01.png'),
     )
   })
 

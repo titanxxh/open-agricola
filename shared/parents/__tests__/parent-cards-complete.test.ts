@@ -1,4 +1,4 @@
-import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs'
+import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 
 import { describe, expect, it } from 'vitest'
@@ -19,17 +19,12 @@ import type {
   ParentCardDefinition,
 } from '../types'
 
-const PNG_SIGNATURE = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a])
-
 const repoPath = (relativePath: string): string =>
   fileURLToPath(new URL(`../../../${relativePath}`, import.meta.url))
 
-const assertPngExists = (relativePath: string) => {
-  const path = repoPath(relativePath)
-  expect(existsSync(path), relativePath).toBe(true)
-  expect(statSync(path).size, relativePath).toBeGreaterThan(0)
-  expect(readFileSync(path).subarray(0, PNG_SIGNATURE.length), relativePath).toEqual(PNG_SIGNATURE)
-}
+const requiredPublicAssets = new Set(
+  (JSON.parse(readFileSync(repoPath('public-assets.required.json'), 'utf8')) as { files: string[] }).files,
+)
 
 const assertMotherGainShape = (gain: MotherRoundGain, id: string) => {
   if (gain.type === 'resource') {
@@ -105,22 +100,16 @@ describe('complete parent card extraction', () => {
     }
   })
 
-  it('keeps runtime asset references logical and backed by public assets', () => {
-    const cardFiles = readdirSync(repoPath('public/assets/parents/portrait'))
-      .filter(file => file.endsWith('.png'))
-      .sort()
-
-    expect(cardFiles).toEqual(PARENT_CARD_IDS.map(id => `${id}.png`).sort())
-    expect(existsSync(repoPath('public/assets/parents/cards'))).toBe(false)
-    assertPngExists('public/assets/parents/backs/mother.png')
-    assertPngExists('public/assets/parents/backs/father.png')
+  it('keeps runtime asset references logical and backed by the public asset contract', () => {
+    expect(requiredPublicAssets.has('assets/parents/backs/mother.png')).toBe(true)
+    expect(requiredPublicAssets.has('assets/parents/backs/father.png')).toBe(true)
 
     for (const card of parentCards) {
       expect(card.assets).toEqual({
         front: `${card.id}.png`,
         back: card.kind,
       })
-      assertPngExists(`public/assets/parents/portrait/${card.assets.front}`)
+      expect(requiredPublicAssets.has(`assets/parents/portrait/${card.assets.front}`), card.id).toBe(true)
     }
   })
 

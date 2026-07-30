@@ -1,9 +1,10 @@
 // @vitest-environment jsdom
 
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { render, screen, fireEvent } from '@testing-library/react'
 import { SpecialActionsPanel } from '../SpecialActionsPanel'
 import type { MoorSpecialActionCardState } from '../../../../shared/moor/types'
+import { publicAssetUrl } from '../../../utils/public-asset-url'
 
 const cards: MoorSpecialActionCardState[] = [
   {
@@ -23,10 +24,6 @@ const cards: MoorSpecialActionCardState[] = [
 ]
 
 describe('SpecialActionsPanel', () => {
-  afterEach(() => {
-    vi.unstubAllEnvs()
-  })
-
   it('renders available Farmers of the Moor special actions on the card image and sends card/action ids', () => {
     const onTake = vi.fn()
 
@@ -45,7 +42,7 @@ describe('SpecialActionsPanel', () => {
     expect(screen.getByRole('button', { name: 'Hiring Fair' })).toBeTruthy()
     expect(screen.getByAltText('Cut Peat')).toHaveAttribute(
       'src',
-      '/assets/moor/special-action-card/moor-special-cut-peat.webp',
+      publicAssetUrl('/assets/moor/special-action-card/moor-special-cut-peat.webp'),
     )
     expect(container.querySelector('.special-action-card__actions')).toBeNull()
 
@@ -56,26 +53,6 @@ describe('SpecialActionsPanel', () => {
     fireEvent.click(imageAction!)
 
     expect(onTake).toHaveBeenCalledWith('moor-special-hiring-fair', 'hiring-fair')
-  })
-
-  it('prefixes root asset paths with the Vite base URL', () => {
-    vi.stubEnv('BASE_URL', '/open-agricola/')
-
-    render(
-      <SpecialActionsPanel
-        locale="en"
-        cards={[cards[0]!]}
-        currentPlayerId="p1"
-        canTakeSpecialAction={() => true}
-        selected={null}
-        onTakeAction={() => {}}
-      />,
-    )
-
-    expect(screen.getByAltText('Cut Peat')).toHaveAttribute(
-      'src',
-      '/open-agricola/assets/moor/special-action-card/moor-special-cut-peat.webp',
-    )
   })
 
   it('marks own face-up and face-down cards unavailable', () => {

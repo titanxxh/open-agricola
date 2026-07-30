@@ -3,10 +3,75 @@ import react from '@vitejs/plugin-react'
 import path from 'path'
 import fs from 'fs'
 import type { IncomingMessage, ServerResponse } from 'node:http'
+import {
+  loadPublicAssetConfig,
+  rewriteCssPublicAssetUrls,
+  type PublicAssetConfig,
+} from './scripts/public-assets'
 
 const BGA_IMAGE_DIR = process.env.BGA_IMAGE_DIR || '../bga-agricola/img'
 const bgaImagePath = path.resolve(__dirname, BGA_IMAGE_DIR)
 const BGA_CDN_BASE = process.env.BGA_CDN_BASE_URL || 'https://x.boardgamearena.net/data/themereleases/current/games/agricola/260329-0408/img'
+const publicAssets = await loadPublicAssetConfig({
+  allowLocal: !process.argv.includes('build') && !process.env.CI,
+})
+
+const publicAssetUrls = (config: PublicAssetConfig) => ({
+  name: 'public-asset-urls',
+  enforce: 'post' as const,
+  transform(code: string, id: string) {
+    if (!id.split('?', 1)[0].endsWith('.css')) return null
+    const transformed = rewriteCssPublicAssetUrls(code, '/', config)
+    return transformed === code ? null : { code: transformed, map: null }
+  },
+  transformIndexHtml(html: string) {
+    return html
+      .replaceAll('"__PUBLIC_ASSET_BASE_URL__"', JSON.stringify(config.baseUrl))
+      .replaceAll('"__PUBLIC_ASSET_VERSION__"', JSON.stringify(config.version))
+  },
+  generateBundle(
+    _options: unknown,
+    bundle: Record<string, { type: string; fileName: string; source?: string | Uint8Array }>,
+  ) {
+    const base = process.env.VITE_BASE_PATH ?? '/'
+    for (const file of Object.values(bundle)) {
+      if (file.type !== 'asset' || !file.fileName.endsWith('.css') || typeof file.source !== 'string') continue
+      file.source = rewriteCssPublicAssetUrls(file.source, base, config)
+      file.source = rewriteCssPublicAssetUrls(file.source, '/', config)
+    }
+  },
+})
+
+const servePublicAssets = (assetRoot: string) => {
+  const contentTypes: Record<string, string> = {
+    '.jpg': 'image/jpeg',
+    '.jpeg': 'image/jpeg',
+    '.png': 'image/png',
+    '.webp': 'image/webp',
+  }
+  return {
+    name: 'serve-public-assets',
+    configureServer(server: ViteDevServer) {
+      server.middlewares.use(
+        '/__public-assets__',
+        (req: IncomingMessage, res: ServerResponse, next: (err?: unknown) => void) => {
+          const pathname = decodeURIComponent(new URL(req.url || '/', 'http://localhost').pathname)
+          const filePath = path.resolve(assetRoot, `.${pathname}`)
+          if (
+            !filePath.startsWith(`${assetRoot}${path.sep}`)
+            || !fs.existsSync(filePath)
+            || !fs.statSync(filePath).isFile()
+          ) {
+            next()
+            return
+          }
+          res.setHeader('Content-Type', contentTypes[path.extname(filePath)] || 'application/octet-stream')
+          fs.createReadStream(filePath).pipe(res)
+        },
+      )
+    },
+  }
+}
 
 const serveBgaImages = (imageDir: string) => ({
   name: 'serve-bga-images',
@@ -63,7 +128,14 @@ const replaceBgaBase = (cdnBase: string) => {
   }
 }
 
-const plugins: PluginOption[] = [react(), serveBgaImages(bgaImagePath)]
+const plugins: PluginOption[] = [
+  react(),
+  publicAssetUrls(publicAssets),
+  serveBgaImages(bgaImagePath),
+]
+if (publicAssets.localDir) {
+  plugins.push(servePublicAssets(publicAssets.localDir))
+}
 if (process.env.BGA_CDN_BASE_URL) {
   plugins.push(replaceBgaBase(process.env.BGA_CDN_BASE_URL))
 }
@@ -95,6 +167,8 @@ export default defineConfig({
     },
   },
   define: {
+    'import.meta.env.VITE_PUBLIC_ASSET_BASE_URL': JSON.stringify(publicAssets.baseUrl),
+    'import.meta.env.VITE_PUBLIC_ASSET_VERSION': JSON.stringify(publicAssets.version),
     'import.meta.env.VITE_BGA_IMAGE_DIR': JSON.stringify(
       process.env.BGA_CDN_BASE_URL || '/bga-img'
     ),
