@@ -2,10 +2,27 @@
 import { act, cleanup, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import type { GameSyncPayload } from '../../../shared/contract/protocol/game'
+import { EngineStack } from '../../../shared/engine'
+import { REPLAY_CARD_SNAPSHOT_CONSENT_REQUIRED } from '../../../shared/contract/protocol/ws'
+import { createInitialState } from '../../../shared/session/state-bootstrap'
+import { serializeState } from '../../../shared/session/serialization'
 import { AuthProvider, useAuth } from '../../contexts/AuthContext'
 import { LocaleProvider } from '../../contexts/LocaleContext'
-import { REPLAY_CARD_SNAPSHOT_CONSENT_REQUIRED } from '../../../shared/contract/protocol/ws'
 import { GameContainerApi } from '../GameContainerApi'
+
+const playingPayload: GameSyncPayload = {
+  state: serializeState(createInitialState(42), { engineStack: new EngineStack() }),
+  interaction: {
+    stateId: 'idle',
+    allowedCommands: ['takeAction'],
+    anytimeActions: [],
+  },
+  scores: null,
+  historyLength: 0,
+  hasActionStartSnapshot: false,
+  ok: true,
+}
 
 class WaitingRoomWebSocket {
   static readonly OPEN = 1
@@ -58,6 +75,21 @@ class WaitingRoomWebSocket {
             ? [{ playerIndex: 0, name: 'Host' }, { playerIndex: 1, name: 'Guest' }]
             : [{ playerIndex: 0, name: 'Host' }],
           maxPlayers: playing ? 2 : 4,
+        })
+      })
+      return
+    }
+    if (message.type === 'getState') {
+      queueMicrotask(() => {
+        WaitingRoomWebSocket.emit({
+          type: 'stateUpdate',
+          roomId: 'room-1',
+          version: 1,
+          sync: 'snapshot',
+          cause: 'reconnect',
+          requestId: message.requestId,
+          payload: playingPayload,
+          emittedAt: Date.now(),
         })
       })
       return
@@ -259,6 +291,10 @@ describe('waiting room presentation', () => {
     WaitingRoomWebSocket.joinStatus = 'playing'
     window.localStorage.setItem('open-agricola-locale-v2', 'en')
     window.history.replaceState(null, '', '/?page=game&transport=ws&room=room-1')
+    vi.stubGlobal('ResizeObserver', class {
+      observe() {}
+      disconnect() {}
+    })
     vi.stubGlobal('WebSocket', WaitingRoomWebSocket)
     vi.stubGlobal('fetch', vi.fn(async () =>
       new Response(JSON.stringify({
@@ -276,9 +312,7 @@ describe('waiting room presentation', () => {
     )
 
     await waitFor(() => {
-      expect(WaitingRoomWebSocket.sent).toContainEqual(expect.objectContaining({
-        type: 'getState',
-      }))
+      expect(document.querySelector('.game-layout')).not.toBeNull()
     })
 
     act(() => {
