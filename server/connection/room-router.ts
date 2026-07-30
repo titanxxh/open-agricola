@@ -781,6 +781,12 @@ function handleNewGame(ctx: ConnectionCtx, msg: Extract<ClientCommand, { type: '
   if (room.status === 'playing') {
     publishInitialState(ctx, room, resp, msg.requestId, () => {}, () => {})
   } else {
+    ctx.broadcaster.broadcastEvent(room, {
+      type: 'roomWaiting',
+      roomId: room.id,
+      players: room.players.map(({ playerIndex, name }) => ({ playerIndex, name })),
+      maxPlayers: room.maxPlayers,
+    })
     ctx.broadcaster.broadcastState(room, resp, 'reconnect', msg.requestId)
   }
 }

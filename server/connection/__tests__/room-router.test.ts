@@ -361,6 +361,12 @@ describe('handleCreateRoom', () => {
       { playerIndex: 0, userId: 'u1' },
     ])
     expect(host.currentRoom!.status).toBe('waiting')
+    expect(sentMessagesOf(host)).toContainEqual({
+      type: 'roomWaiting',
+      roomId: host.currentRoom!.id,
+      players: [{ playerIndex: 0, name: 'Player 1' }],
+      maxPlayers: 2,
+    })
     const replacement = newCtx(deps)
     replacement.currentUserId = 'u3'
     dispatch(replacement, { type: 'joinRoom', roomId: host.currentRoom!.id })

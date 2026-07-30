@@ -105,6 +105,12 @@ export type ServerEvent =
       players: Array<{ playerIndex: number; name: string }>
       maxPlayers: number
     }
+  | {
+      type: 'roomWaiting'
+      roomId: string
+      players: Array<{ playerIndex: number; name: string }>
+      maxPlayers: number
+    }
   | { type: 'gameStarted' }
   | { type: 'playerJoined'; playerIndex: number; name: string; playerCount: number; maxPlayers: number }
   | { type: 'playerDisconnected'; playerIndex: number }

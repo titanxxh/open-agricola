@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { cleanup, render, screen } from '@testing-library/react'
+import { act, cleanup, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { AuthProvider, useAuth } from '../../contexts/AuthContext'
@@ -11,6 +11,8 @@ class WaitingRoomWebSocket {
   static readonly OPEN = 1
   static sent: Array<Record<string, unknown>> = []
   static requiresReplayConsent = false
+  static joinStatus: 'waiting' | 'playing' = 'waiting'
+  static latest: WaitingRoomWebSocket | null = null
   readonly readyState = WaitingRoomWebSocket.OPEN
   onopen: ((event: Event) => void) | null = null
   onerror: ((event: Event) => void) | null = null
@@ -19,7 +21,18 @@ class WaitingRoomWebSocket {
   private readonly messageListeners = new Set<(event: MessageEvent) => void>()
 
   constructor(_url: string) {
+    WaitingRoomWebSocket.latest = this
     queueMicrotask(() => this.onopen?.(new Event('open')))
+  }
+
+  static emit(message: Record<string, unknown>) {
+    const socket = WaitingRoomWebSocket.latest
+    if (!socket) throw new Error('WebSocket not connected')
+    const event = new MessageEvent('message', {
+      data: JSON.stringify(message),
+    })
+    socket.onmessage?.(event)
+    socket.messageListeners.forEach(listener => listener(event))
   }
 
   addEventListener(type: string, listener: (event: MessageEvent) => void) {
@@ -35,18 +48,17 @@ class WaitingRoomWebSocket {
     WaitingRoomWebSocket.sent.push(message)
     if (message.type === 'joinRoom') {
       queueMicrotask(() => {
-        const event = new MessageEvent('message', {
-          data: JSON.stringify({
-            type: 'roomJoined',
-            roomId: 'room-1',
-            playerIndex: 0,
-            status: 'waiting',
-            players: [{ playerIndex: 0, name: 'Host' }],
-            maxPlayers: 4,
-          }),
+        const playing = WaitingRoomWebSocket.joinStatus === 'playing'
+        WaitingRoomWebSocket.emit({
+          type: 'roomJoined',
+          roomId: 'room-1',
+          playerIndex: 0,
+          status: WaitingRoomWebSocket.joinStatus,
+          players: playing
+            ? [{ playerIndex: 0, name: 'Host' }, { playerIndex: 1, name: 'Guest' }]
+            : [{ playerIndex: 0, name: 'Host' }],
+          maxPlayers: playing ? 2 : 4,
         })
-        this.onmessage?.(event)
-        this.messageListeners.forEach(listener => listener(event))
       })
       return
     }
@@ -138,6 +150,8 @@ afterEach(() => {
   window.history.replaceState(null, '', '/')
   WaitingRoomWebSocket.sent = []
   WaitingRoomWebSocket.requiresReplayConsent = false
+  WaitingRoomWebSocket.joinStatus = 'waiting'
+  WaitingRoomWebSocket.latest = null
   JoinErrorWebSocket.errorMessage = {}
   Object.defineProperty(navigator, 'clipboard', { configurable: true, value: undefined })
   vi.unstubAllGlobals()
@@ -239,6 +253,46 @@ describe('waiting room presentation', () => {
     expect(WaitingRoomWebSocket.sent).not.toContainEqual(expect.objectContaining({
       type: 'getState',
     }))
+  })
+
+  it('returns an already-ready client to the waiting room after a reset', async () => {
+    WaitingRoomWebSocket.joinStatus = 'playing'
+    window.localStorage.setItem('open-agricola-locale-v2', 'en')
+    window.history.replaceState(null, '', '/?page=game&transport=ws&room=room-1')
+    vi.stubGlobal('WebSocket', WaitingRoomWebSocket)
+    vi.stubGlobal('fetch', vi.fn(async () =>
+      new Response(JSON.stringify({
+        ok: true,
+        user: { id: 'u1', username: 'host', displayName: 'Host' },
+      })),
+    ))
+
+    render(
+      <LocaleProvider>
+        <AuthProvider>
+          <AuthenticatedGame />
+        </AuthProvider>
+      </LocaleProvider>,
+    )
+
+    await waitFor(() => {
+      expect(WaitingRoomWebSocket.sent).toContainEqual(expect.objectContaining({
+        type: 'getState',
+      }))
+    })
+
+    act(() => {
+      WaitingRoomWebSocket.emit({
+        type: 'roomWaiting',
+        roomId: 'room-2',
+        players: [{ playerIndex: 0, name: 'Host' }],
+        maxPlayers: 2,
+      })
+    })
+
+    expect(await screen.findByText('Room room-2 — Waiting for players (1/2)')).toBeVisible()
+    expect(screen.getByText('Player 1: Host')).toBeVisible()
+    expect(document.querySelector('.game-layout')).toBeNull()
   })
 
   it('announces successful invitation-link copying', async () => {

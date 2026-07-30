@@ -122,10 +122,16 @@ describe('shared protocol types', () => {
         players: [{ playerIndex: 1, name: 'Bob' }],
         maxPlayers: 2,
       },
+      {
+        type: 'roomWaiting',
+        roomId: 'def',
+        players: [{ playerIndex: 0, name: 'Alice' }],
+        maxPlayers: 2,
+      },
       { type: 'gameStarted' },
       { type: 'playerDisconnected', playerIndex: 0 },
     ]
-    expect(events.length).toBe(5)
+    expect(events.length).toBe(6)
   })
 
   it('StateUpdateCause has all expected values', () => {

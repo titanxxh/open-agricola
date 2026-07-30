@@ -148,6 +148,7 @@ const useTransportSetup = (
   const [wsReady, setWsReady] = useState(false)
 
   const initRef = useRef(false)
+  const playerIndexRef = useRef(0)
 
   useEffect(() => {
     if (!isWsMode || initRef.current) return
@@ -203,6 +204,21 @@ const useTransportSetup = (
         }
         rawWs.addEventListener('message', handler)
       }
+
+      rawWs.addEventListener('message', (event) => {
+        try {
+          const msg = JSON.parse(event.data as string)
+          if (msg.type !== 'roomWaiting') return
+          setRoomInUrl(msg.roomId)
+          setWsReady(false)
+          waitForPlayers(
+            msg.roomId,
+            playerIndexRef.current,
+            msg.players,
+            msg.maxPlayers,
+          )
+        } catch { /* skip */ }
+      })
 
       const searchParams = new URLSearchParams(window.location.search)
       const contextRoomId = searchParams.get('context')
@@ -274,6 +290,7 @@ const useTransportSetup = (
           return
         }
         setRoomInUrl(resp.roomId)
+        playerIndexRef.current = resp.playerIndex
         const creatorName = displayName ?? playerParam ?? 'Player 1'
         waitForPlayers(
           resp.roomId,
@@ -340,6 +357,7 @@ const useTransportSetup = (
           return
         }
         setRoomInUrl(resp.roomId)
+        playerIndexRef.current = resp.playerIndex
         if (resp.status === 'waiting') {
           waitForPlayers(
             resp.roomId,
