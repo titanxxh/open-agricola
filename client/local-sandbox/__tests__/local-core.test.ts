@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { LocalSandboxCore } from '../worker-core.ts'
 import { LOCAL_SANDBOX_SCHEMA_VERSION, type LocalCardInput, type ViewerSpec } from '../protocol.ts'
 import {
@@ -175,5 +175,36 @@ const CARD_IMPL = {
       ok: true,
       result: { type: 'leaf', actionId: 'gain', params: { food: 1 }, sourceCard: 'CUSTOM_ThisEscape' },
     })
+  })
+
+  it('warns when a hook runs over the server 100ms budget', () => {
+    const compiled = validateAndCompileCustomCodeLocal(`
+const CARD_ID = 'CUSTOM_SlowCard'
+const CARD_DEF = MinorImprovement({ id: CARD_ID, name: 'Slow Card' })
+const CARD_IMPL = { effect: { id: CARD_ID, onReturnHome: () => gainLeaf(CARD_ID, { food: 1 }) } }
+    `, 'CUSTOM_SlowCard')
+    expect(compiled.valid).toBe(true)
+    if (!compiled.valid) return
+
+    // Fake the clock so the invocation looks like it took 200ms.
+    const nowSpy = vi.spyOn(performance, 'now').mockReturnValueOnce(0).mockReturnValueOnce(200)
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
+
+    const result = invokeCustomCodeEffectLocal({
+      compiledCode: compiled.compiledCode,
+      cardId: 'CUSTOM_SlowCard',
+      hook: 'onReturnHome',
+      state: {} as never,
+      player: {} as never,
+    })
+
+    expect(result).toEqual({
+      ok: true,
+      result: { type: 'leaf', actionId: 'gain', params: { food: 1 }, sourceCard: 'CUSTOM_SlowCard' },
+    })
+    expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('over the server 100ms budget'))
+
+    nowSpy.mockRestore()
+    warnSpy.mockRestore()
   })
 })

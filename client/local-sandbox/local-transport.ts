@@ -186,6 +186,10 @@ export class LocalGameTransport implements GameTransport {
   }
 
   private spawn(): Promise<void> {
+    // Terminate any previous worker first — e.g. a failed startFromPersisted()
+    // has already spawned one before rejecting, and the fallback start() must
+    // not leak it as an idle GameCore worker for the life of the page.
+    this.worker?.terminate()
     const factory = this.opts.workerFactory ?? defaultWorkerFactory
     const worker = factory()
     this.worker = worker

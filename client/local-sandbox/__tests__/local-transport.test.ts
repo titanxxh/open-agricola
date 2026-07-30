@@ -110,4 +110,23 @@ describe('LocalGameTransport', () => {
     transport.destroy() // rejects the still-pending first command
     await expect(firstSettled).resolves.toBe('rejected')
   })
+
+  it('terminates the previous worker when a failed restore falls back to start', async () => {
+    const workers: FakeWorker[] = []
+    const transport = new LocalGameTransport(CONFIG, {
+      workerFactory: () => { const w = new FakeWorker(); workers.push(w); return w },
+    })
+
+    // A schema mismatch makes restore reject after the worker was already spawned.
+    await expect(transport.startFromPersisted({
+      schemaVersion: 999,
+      config: CONFIG,
+      serializedState: {} as never,
+    })).rejects.toThrow(/schema/)
+
+    await transport.start() // fallback
+    expect(workers).toHaveLength(2)
+    expect(workers[0]?.terminated, 'the failed-restore worker must be terminated').toBe(true)
+    transport.destroy()
+  })
 })
