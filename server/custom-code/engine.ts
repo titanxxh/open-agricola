@@ -1,6 +1,6 @@
 import ivm from 'isolated-vm'
 import { validateCardCode } from '../../shared/custom-code/ast-validator.ts'
-import { compileCardCode } from './compiler.ts'
+import { compileCardCode } from '../../shared/custom-code/compiler.ts'
 import { cardEffectHooks, type CardEffectField } from '../../shared/cards/card-effects.ts'
 import type { ActionFlow } from '../../shared/contract/types.ts'
 import type { ActionHookResult } from '../../shared/actions/hooks.ts'
@@ -16,7 +16,7 @@ import type {
   CustomCodeManifest,
   CustomCodeValidateResult,
 } from '../../shared/custom-code/types.ts'
-import { HELPERS_INJECTION_SOURCE } from './injected-helpers.ts'
+import { HELPERS_INJECTION_SOURCE } from '../../shared/custom-code/injected-helpers.ts'
 
 const EXECUTION_TIMEOUT_MS = 100
 const ISOLATE_MEMORY_LIMIT_MB = 8
