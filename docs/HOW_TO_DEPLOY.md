@@ -6,14 +6,15 @@
 
 ```
 ┌──────────────────────────────┐      ┌───────────────────────────────┐
-│  GitHub Pages (CDN)          │      │  VPS (你的服务器)               │
-│                              │      │                               │
+│  GitHub Pages（主站）          │      │  VPS（你的服务器）              │
 │  index.html + JS/CSS         │─────▶│  Node.js 后端                  │
-│  bga-img/ (卡牌图片)          │      │    ├── HTTP API  /api/*       │
-│                              │      │    ├── WebSocket /ws          │
-└──────────────────────────────┘      │    ├── Card art  /card-art/*  │
-                                      │    └── SQLite    ./data/*.db  │
-                                      └───────────────────────────────┘
+└──────────────┬───────────────┘      │    ├── HTTP API  /api/*       │
+               │                      │    ├── WebSocket /ws          │
+               ▼                      │    ├── Card art  /card-art/*  │
+┌──────────────────────────────┐      │    └── SQLite    ./data/*.db  │
+│  GitHub Pages（图片资源站）    │      └───────────────────────────────┘
+│  open-agricola-assets        │
+└──────────────────────────────┘
 ```
 
 前端和后端完全分离——前端是纯静态文件（GitHub Pages），后端是一个 Docker 容器（VPS）。
@@ -433,9 +434,19 @@ VITE_API_BASE=https://api.your-domain.com pnpm run build
 pnpm dlx gh-pages -d dist
 ```
 
-### BGA 卡牌图片
+### 主站图片资源
 
-构建时自动从 `$BGA_IMAGE_DIR`（默认 `../bga-agricola/img`）复制图片。如果目录不存在，构建仍然成功，只是游戏内不显示卡牌图片（不影响规则）。
+`public-assets.ref` 固定图片仓的 Git commit，`public-assets.required.json` 声明主站需要的全部路径。构建和默认本地启动只读取图片站的 `asset-version.txt` 与 `asset-manifest.json`；版本不一致、格式无效或缺少必需路径时立即失败，图片本身不再打进主站 Pages artifact。运行时 URL 指向 `https://titanxxh.github.io/open-agricola-assets/` 并带固定版本查询参数。
+
+本地修改图片时可全量切到一个资产仓 checkout：
+
+```bash
+PUBLIC_ASSET_LOCAL_DIR=../open-agricola-assets pnpm dev
+```
+
+启动前会检查全部必需文件；缺少任一文件即失败，不会混用或回退到远端。该覆盖仅用于本地开发服务器，CI 和生产构建不接受它。
+
+更新图片时先在 `open-agricola-assets` 发布并验证 Pages，再把主仓 `public-assets.ref` 更新为已验证 commit，并同步 `public-assets.required.json`；随后再走主仓的正常 Release。不要先发布依赖尚未上线图片的主站版本。
 
 ---
 
@@ -580,7 +591,7 @@ https://<backend-origin>/api/auth/oauth/google/callback
 | `VITE_API_BASE` | `''`（空=同源） | 后端 API 地址 |
 | `VITE_WS_BASE` | 从 API_BASE 推导 | WebSocket 地址 |
 | `BGA_CDN_BASE_URL` | — | 卡牌图片 CDN 根地址 |
-| `BGA_IMAGE_DIR` | `../bga-agricola/img` | BGA 卡牌图片目录（构建时复制） |
+| `PUBLIC_ASSET_LOCAL_DIR` | — | 仅本地开发：完整图片仓 checkout；设置后禁止远端混用或回退 |
 
 ---
 

@@ -42,17 +42,21 @@ describe('production deployment config', () => {
     expect(compose).toContain('app-data:/app/data')
   })
 
-  it('authenticates private BGA image checkouts without persisting credentials', () => {
+  it('limits private BGA image checkouts to Replay Viewer CI', () => {
     for (const workflowPath of [
       '.github/workflows/ci.yml',
       '.github/workflows/ci-full.yml',
-      '.github/workflows/deploy-pages.yml',
     ]) {
       const workflow = readFileSync(workflowPath, 'utf8')
       expect(workflow).toMatch(
         /repository: bga-devs\/bga-agricola\n\s+token: \$\{\{ secrets\.GH_TOKEN \}\}\n\s+persist-credentials: false/,
       )
     }
+    const pages = readFileSync('.github/workflows/deploy-pages.yml', 'utf8')
+    expect(pages).not.toContain('bga-devs/bga-agricola')
+    expect(pages).not.toContain('BGA_IMAGE_DIR')
+    expect(pages).not.toContain('PUBLIC_ASSET_LOCAL_DIR')
+
     const ci = readFileSync('.github/workflows/ci.yml', 'utf8')
     expect(ci).toContain(
       "if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository",

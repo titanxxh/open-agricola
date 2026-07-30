@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { beforeEach, describe, expect, it } from 'vitest'
 import { renderToStaticMarkup } from 'react-dom/server'
 
 import { PlayerCard } from '../PlayerCard'
@@ -7,15 +7,12 @@ import {
   registerCustomCardMetadata,
 } from '../../../../shared/cards/custom-card-metadata'
 import { loadCardsManifest } from '../../../services/card-meta'
+import { publicAssetUrl } from '../../../utils/public-asset-url'
 // Cards-manifest is preloaded by `client/__tests__/setup-card-manifest.ts`.
 
 describe('PlayerCard dual-type rendering (alsoCountsAs)', () => {
   beforeEach(() => {
     clearCustomCardMetadata()
-  })
-
-  afterEach(() => {
-    vi.unstubAllEnvs()
   })
 
   it('marks D060_LargePottery with data-also-counts-as="major"', () => {
@@ -120,22 +117,22 @@ describe('PlayerCard dual-type rendering (alsoCountsAs)', () => {
     expect(html).not.toContain('horses')
   })
 
-  it('uses a local player56 portrait when the card numbering has one', () => {
+  it('uses a public player56 portrait when the card numbering has one', () => {
     const html = renderToStaticMarkup(
       <PlayerCard locale="en" cardId="A169_OffSiter" cardType="occupation" />,
     )
 
-    expect(html).toContain('/assets/player56/A169.png')
+    expect(html).toContain(publicAssetUrl('/assets/player56/A169.png'))
     expect(html).not.toContain('/bga-img/deckA/A169.png')
     expect(html).toContain('data-n="5+"')
   })
 
-  it('uses the local player56 portrait range beyond A169 on first render', () => {
+  it('uses the public player56 portrait range beyond A169 on first render', () => {
     const html = renderToStaticMarkup(
       <PlayerCard locale="en" cardId="B180_GameTeaser" cardType="occupation" />,
     )
 
-    expect(html).toContain('/assets/player56/B180.png')
+    expect(html).toContain(publicAssetUrl('/assets/player56/B180.png'))
     expect(html).not.toContain('/bga-img/deckB/B180.png')
   })
 
@@ -190,7 +187,7 @@ describe('PlayerCard dual-type rendering (alsoCountsAs)', () => {
     expect(html).toContain('card-cost-separator">/</span>')
   })
 
-  it('renders Moor major cards with local Moor art and M numbering', () => {
+  it('renders Moor major cards with public Moor art and M numbering', () => {
     const html = renderToStaticMarkup(
       <PlayerCard locale="en" cardId="Major_Moor_HorseSlaughterhouse1" cardType="major" />,
     )
@@ -198,33 +195,31 @@ describe('PlayerCard dual-type rendering (alsoCountsAs)', () => {
     expect(html).toContain('data-numbering="M001"')
     expect(html).toContain('data-moor-major="true"')
     expect(html).toContain('data-deck="M"')
-    expect(html).toContain('/assets/moor/major/M001.png')
+    expect(html).toContain(publicAssetUrl('/assets/moor/major/M001.png'))
   })
 
-  it('renders Forester Lodge with local Moor art and terrain icon text', () => {
+  it('renders Forester Lodge with public Moor art and terrain icon text', () => {
     const html = renderToStaticMarkup(
       <PlayerCard locale="en" cardId="Major_Moor_ForestersLodge" cardType="major" />,
     )
 
     expect(html).toContain('data-numbering="M012"')
-    expect(html).toContain('/assets/moor/major/M012.png')
+    expect(html).toContain(publicAssetUrl('/assets/moor/major/M012.png'))
     expect(html).toContain('res-icon-forest')
     expect(html).not.toContain('each forest')
   })
 
-  it('renders Moor minor cards with local Moor art and M numbering', () => {
+  it('renders Moor minor cards with public Moor art and M numbering', () => {
     const html = renderToStaticMarkup(
       <PlayerCard locale="en" cardId="M068_Church" cardType="minor" />,
     )
 
     expect(html).toContain('data-numbering="M068"')
     expect(html).toContain('data-deck="M"')
-    expect(html).toContain('/assets/moor/minor/M068.png')
+    expect(html).toContain(publicAssetUrl('/assets/moor/minor/M068.png'))
   })
 
-  it('prefixes local public card art with the Vite base URL', () => {
-    vi.stubEnv('BASE_URL', '/open-agricola/')
-
+  it('routes all public card art through the pinned source', () => {
     const moorMajor = renderToStaticMarkup(
       <PlayerCard locale="en" cardId="Major_Moor_HorseSlaughterhouse1" cardType="major" />,
     )
@@ -235,9 +230,9 @@ describe('PlayerCard dual-type rendering (alsoCountsAs)', () => {
       <PlayerCard locale="en" cardId="A169_OffSiter" cardType="occupation" />,
     )
 
-    expect(moorMajor).toContain('/open-agricola/assets/moor/major/M001.png')
-    expect(moorMinor).toContain('/open-agricola/assets/moor/minor/M068.png')
-    expect(player56).toContain('/open-agricola/assets/player56/A169.png')
+    expect(moorMajor).toContain(publicAssetUrl('/assets/moor/major/M001.png'))
+    expect(moorMinor).toContain(publicAssetUrl('/assets/moor/minor/M068.png'))
+    expect(player56).toContain(publicAssetUrl('/assets/player56/A169.png'))
   })
 
   it.each([
