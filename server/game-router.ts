@@ -1,12 +1,7 @@
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import { GameSession } from './game/authoritative-session.ts'
-import {
-  playerBoard,
-  type SowSelection,
-  normalizePlayerFarm,
-} from '../shared/domain/index.ts'
-import { playerCanBuildPalisades } from '../shared/cards/helpers/card-type.ts'
-import { collectLockedFarmTileKeys } from '../shared/cards/card-effects.ts'
+import type { SowSelection } from '../shared/domain/index.ts'
+import { validateFarmChoice, type FarmChoiceType } from '../shared/session/farm-choice-validation.ts'
 import type { FarmTilePosition } from '../shared/contract/types.ts'
 import type { MoorSpecialActionId } from '../shared/moor/types.ts'
 import { getDb } from './db.ts'
@@ -444,80 +439,13 @@ export const handleGameRoute = async (
 
   if (req.method === 'POST' && req.url === '/api/game/validate') {
     const body = JSON.parse(await readBody(req)) as {
-      type: 'fence' | 'room' | 'stable' | 'plow' | 'sow'
+      type: FarmChoiceType
       playerId: string
       payload: Record<string, unknown>
     }
     const state = callSession(req, s => s.getStateForRead())
-    const playerIndex = state.players.findIndex((p) => p.id === body.playerId)
-    if (playerIndex === -1) {
-      sendJson(res, 400, { valid: false, error: 'Player not found' })
-      return true
-    }
-    const player = normalizePlayerFarm(state.players[playerIndex]!)
-    // Validate against the normalized player by swapping it into a
-    // shallow state clone — preserves the current router behavior of
-    // running validators on the normalized view, not the raw state.
-    const normalizedPlayers = state.players.slice()
-    normalizedPlayers[playerIndex] = player
-    const normalizedState = { ...state, players: normalizedPlayers }
-    const board = playerBoard(normalizedState, playerIndex)
-
-    if (body.type === 'fence') {
-      const fp = body.payload as {
-        edges?: string[]
-        palisadeEdges?: string[]
-        extraWood?: number
-        fenceSources?: Record<string, string>
-      }
-      const edges = Array.isArray(fp.edges) ? fp.edges : []
-      const palisadeEdges = Array.isArray(fp.palisadeEdges) ? fp.palisadeEdges : []
-      const extraWood = fp.extraWood ?? 0
-      const lockedKeys = collectLockedFarmTileKeys(state.players[playerIndex]!)
-      const result = board.farmyard.canBuildFence({
-        edges,
-        palisadeEdges,
-        extraWood,
-        fenceSources: fp.fenceSources,
-        freeFences: 0,
-        options: { skipPayment: true, allowPalisades: playerCanBuildPalisades(player) },
-        lockedKeys,
-      })
-      sendJson(res, 200, { valid: result.ok, error: result.ok ? null : result.error?.code ?? 'validation failed' })
-      return true
-    }
-    if (body.type === 'room') {
-      const rooms = (body.payload as { rooms?: FarmTilePosition[] }).rooms
-      const lockedKeys = collectLockedFarmTileKeys(state.players[playerIndex]!)
-      const result = board.farmyard.canBuildRoom(Array.isArray(rooms) ? rooms : [], lockedKeys)
-      sendJson(res, 200, { valid: result.ok, error: result.ok ? null : result.code })
-      return true
-    }
-    if (body.type === 'stable') {
-      const stables = (body.payload as { stables?: FarmTilePosition[] }).stables ?? []
-      const lockedKeys = collectLockedFarmTileKeys(state.players[playerIndex]!)
-      const result = board.farmyard.canBuildStable(stables, lockedKeys)
-      sendJson(res, 200, { valid: result.ok, error: result.ok ? null : result.code ?? 'validation failed' })
-      return true
-    }
-    if (body.type === 'plow') {
-      const tile = (body.payload as { tile?: FarmTilePosition }).tile
-      const lockedKeys = collectLockedFarmTileKeys(state.players[playerIndex]!)
-      const result = board.farmyard.canPlow(tile, lockedKeys)
-      sendJson(res, 200, { valid: result.ok, error: result.ok ? null : result.error?.code ?? 'validation failed' })
-      return true
-    }
-    if (body.type === 'sow') {
-      const crops = (body.payload as { crops?: unknown }).crops
-      if (!Array.isArray(crops)) {
-        sendJson(res, 200, { valid: false, error: 'NO_SELECTION' })
-        return true
-      }
-      const result = board.farmyard.canSow({ fields: crops as SowSelection[] })
-      sendJson(res, 200, { valid: result.ok, error: result.ok ? null : result.error?.code ?? 'validation failed' })
-      return true
-    }
-    sendJson(res, 400, { valid: false, error: 'Unknown validation type' })
+    const result = validateFarmChoice(state, body.type, body.playerId, body.payload)
+    sendJson(res, 200, result)
     return true
   }
 
