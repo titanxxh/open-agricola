@@ -26,6 +26,13 @@ describe('stripWorkerCapabilities', () => {
     for (const key of ['fetch', 'XMLHttpRequest', 'indexedDB', 'caches', 'navigator', 'Worker', 'Blob', 'URL']) {
       expect(scope[key], `${key} should be gone`).toBeUndefined()
     }
+
+    // The shadow must be non-configurable so card code can't `delete` it to
+    // re-expose the inherited getter.
+    expect(Object.getOwnPropertyDescriptor(scope, 'indexedDB')?.configurable).toBe(false)
+    const deleted = Reflect.deleteProperty(scope, 'indexedDB')
+    expect(deleted).toBe(false)
+    expect(scope.indexedDB).toBeUndefined()
   })
 })
 

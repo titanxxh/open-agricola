@@ -23,7 +23,9 @@ export function stripWorkerCapabilities(scope: Record<string, unknown>): string[
   const failures: string[] = []
   for (const key of DANGEROUS_WORKER_GLOBALS) {
     try {
-      Object.defineProperty(scope, key, { value: undefined, writable: false, configurable: true })
+      // non-configurable + non-writable: card code can't `delete scope[key]` to
+      // re-expose the inherited WorkerGlobalScope getter, nor redefine it.
+      Object.defineProperty(scope, key, { value: undefined, writable: false, configurable: false })
     } catch {
       try { scope[key] = undefined } catch { /* ignore */ }
     }
