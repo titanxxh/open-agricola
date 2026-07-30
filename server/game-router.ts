@@ -444,8 +444,10 @@ export const handleGameRoute = async (
       payload: Record<string, unknown>
     }
     const state = callSession(req, s => s.getStateForRead())
-    const result = validateFarmChoice(state, body.type, body.playerId, body.payload)
-    sendJson(res, 200, result)
+    const { requestError, ...result } = validateFarmChoice(state, body.type, body.playerId, body.payload)
+    // Preserve the pre-extraction contract: malformed requests (missing player /
+    // unknown type) are 400; ordinary invalid placements are 200 valid:false.
+    sendJson(res, requestError ? 400 : 200, result)
     return true
   }
 

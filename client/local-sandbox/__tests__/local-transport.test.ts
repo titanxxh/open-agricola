@@ -27,7 +27,7 @@ describe('LocalGameTransport', () => {
     const playerId = initial.state.players[0]!.id
 
     const missing = await transport.validateFarmChoice('room', 'nobody', {})
-    expect(missing).toEqual({ valid: false, error: 'Player not found' })
+    expect(missing).toEqual({ valid: false, error: 'Player not found', requestError: true })
 
     const noSelection = await transport.validateFarmChoice('sow', playerId, {})
     expect(noSelection).toEqual({ valid: false, error: 'NO_SELECTION' })

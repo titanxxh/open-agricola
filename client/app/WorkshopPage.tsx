@@ -1389,7 +1389,7 @@ export function WorkshopPage() {
     // Editor flows that pin an extra card / exact draft version still go
     // through the server sandbox (card data isn't in workshop state yet).
     if (isBrowserSandbox() && !extraCardId && !exactVersionId) {
-      stashLocalSandboxConfig(buildLocalGameConfig(sandboxCards, sandboxSettings))
+      stashLocalSandboxConfig(buildLocalGameConfig(sandboxCards, sandboxSettings), user?.id ?? 'anon')
       setSandboxLocalMode(true)
       // A restart (sandbox already active) must start fresh, not resume the
       // persisted slot; the first launch may still offer to resume.

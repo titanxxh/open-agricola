@@ -10,6 +10,7 @@ import { runCardEffectHook } from '../../shared/cards/card-effects.ts'
 import { createInitialState } from '../../shared/session/state-bootstrap.ts'
 import { GameCore } from '../../shared/session/session-core.ts'
 import type { CustomCardData } from '../../shared/cards/session-card-context.ts'
+import { validateFarmChoice } from '../../shared/session/farm-choice-validation.ts'
 import {
   invokeCustomCodeEffect,
   invokeCustomCodeListener,
@@ -241,5 +242,16 @@ describe('browser executor parity with server executor', () => {
       params: { food: 2 },
       sourceCard: 'CUSTOM_ParityCard',
     })
+  })
+})
+
+describe('validateFarmChoice request-level errors', () => {
+  it('flags missing player / unknown type so the endpoint can return 400', () => {
+    const state = createInitialState(42)
+    const playerId = state.players[0]!.id
+    expect(validateFarmChoice(state, 'room', 'nobody', {}).requestError).toBe(true)
+    expect(validateFarmChoice(state, 'bogus' as never, playerId, {}).requestError).toBe(true)
+    // An ordinary invalid placement is a well-formed 200 response, not a 400.
+    expect(validateFarmChoice(state, 'sow', playerId, {}).requestError).toBeUndefined()
   })
 })
