@@ -15,11 +15,15 @@ describe('stripWorkerCapabilities', () => {
     const scope: Record<string, unknown> = Object.create(proto)
     scope.fetch = () => {}
     scope.XMLHttpRequest = function () {}
+    // Nested-worker construction primitives must go too.
+    scope.Worker = function () {}
+    scope.Blob = function () {}
+    scope.URL = function () {}
 
     const failures = stripWorkerCapabilities(scope)
 
     expect(failures).toEqual([])
-    for (const key of ['fetch', 'XMLHttpRequest', 'indexedDB', 'caches', 'navigator']) {
+    for (const key of ['fetch', 'XMLHttpRequest', 'indexedDB', 'caches', 'navigator', 'Worker', 'Blob', 'URL']) {
       expect(scope[key], `${key} should be gone`).toBeUndefined()
     }
   })

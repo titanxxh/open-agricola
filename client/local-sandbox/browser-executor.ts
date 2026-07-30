@@ -51,6 +51,9 @@ const SHADOWED_GLOBALS = [
 ]
 const HARMLESS_THIS = Object.freeze(Object.create(null))
 
+// Matches EXECUTION_TIMEOUT_MS in server/custom-code/engine.ts.
+const SERVER_EXECUTION_BUDGET_MS = 100
+
 function runCardCode(
   compiledCode: string,
   cardId: string,
@@ -83,6 +86,7 @@ function runCardCode(
   `
 
   const fn = new Function('__log', '__warn', ...SHADOWED_GLOBALS, ...inputNames, wrappedCode)
+  const start = performance.now()
   const resultJson = fn.call(
     HARMLESS_THIS,
     (...args: unknown[]) => { console.log(`[local-executor:${cardId}]`, ...args) },
@@ -90,6 +94,14 @@ function runCardCode(
     ...SHADOWED_GLOBALS.map(() => undefined),
     ...inputValues,
   ) as string | undefined
+  // Synchronous card code can't be interrupted mid-run, so the browser dry-run
+  // can't hard-enforce the server's per-invocation budget; warn instead so a
+  // card that would time out in multiplayer (server engine.ts caps at 100 ms)
+  // is flagged during playtesting rather than silently "passing" locally.
+  const elapsed = performance.now() - start
+  if (elapsed > SERVER_EXECUTION_BUDGET_MS) {
+    console.warn(`[local-executor:${cardId}] execution took ${Math.round(elapsed)}ms, over the server ${SERVER_EXECUTION_BUDGET_MS}ms budget — this card may time out in multiplayer`)
+  }
   return resultJson ? JSON.parse(resultJson) : null
 }
 

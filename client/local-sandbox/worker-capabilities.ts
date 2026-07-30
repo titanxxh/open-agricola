@@ -14,6 +14,9 @@
 export const DANGEROUS_WORKER_GLOBALS = [
   'fetch', 'XMLHttpRequest', 'WebSocket', 'importScripts', 'indexedDB',
   'caches', 'navigator', 'Request', 'Response', 'Headers', 'EventSource',
+  // Nested-worker construction: a fresh worker global would resurrect the
+  // capabilities removed here, so deny the ways to spin one up.
+  'Worker', 'SharedWorker', 'Blob', 'URL', 'MessageChannel', 'BroadcastChannel',
 ]
 
 export function stripWorkerCapabilities(scope: Record<string, unknown>): string[] {
