@@ -33,6 +33,23 @@ class WaitingRoomWebSocket {
   send(raw: string) {
     const message = JSON.parse(raw) as Record<string, unknown>
     WaitingRoomWebSocket.sent.push(message)
+    if (message.type === 'joinRoom') {
+      queueMicrotask(() => {
+        const event = new MessageEvent('message', {
+          data: JSON.stringify({
+            type: 'roomJoined',
+            roomId: 'room-1',
+            playerIndex: 0,
+            status: 'waiting',
+            players: [{ playerIndex: 0, name: 'Host' }],
+            maxPlayers: 4,
+          }),
+        })
+        this.onmessage?.(event)
+        this.messageListeners.forEach(listener => listener(event))
+      })
+      return
+    }
     if (message.type !== 'createRoom') return
     queueMicrotask(() => {
       const event = new MessageEvent('message', {
@@ -196,6 +213,32 @@ describe('waiting room presentation', () => {
     const createCommands = WaitingRoomWebSocket.sent.filter(({ type }) => type === 'createRoom')
     expect(createCommands).toHaveLength(1)
     expect(createCommands[0]).not.toHaveProperty('confirmReplayCardSnapshotPublic')
+  })
+
+  it('restores the authoritative waiting room after a refresh', async () => {
+    window.localStorage.setItem('open-agricola-locale-v2', 'en')
+    window.history.replaceState(null, '', '/?page=game&transport=ws&room=room-1')
+    vi.stubGlobal('WebSocket', WaitingRoomWebSocket)
+    vi.stubGlobal('fetch', vi.fn(async () =>
+      new Response(JSON.stringify({
+        ok: true,
+        user: { id: 'u1', username: 'host', displayName: 'Host' },
+      })),
+    ))
+
+    render(
+      <LocaleProvider>
+        <AuthProvider>
+          <AuthenticatedGame />
+        </AuthProvider>
+      </LocaleProvider>,
+    )
+
+    expect(await screen.findByText('Room room-1 — Waiting for players (1/4)')).toBeVisible()
+    expect(screen.getByText('Player 1: Host')).toBeVisible()
+    expect(WaitingRoomWebSocket.sent).not.toContainEqual(expect.objectContaining({
+      type: 'getState',
+    }))
   })
 
   it('announces successful invitation-link copying', async () => {

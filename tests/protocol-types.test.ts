@@ -114,7 +114,14 @@ describe('shared protocol types', () => {
     const events: ServerEvent[] = [
       { type: 'error', error: 'test' },
       { type: 'roomCreated', roomId: 'abc', playerIndex: 0, maxPlayers: 2 },
-      { type: 'roomJoined', roomId: 'abc', playerIndex: 1 },
+      {
+        type: 'roomJoined',
+        roomId: 'abc',
+        playerIndex: 1,
+        status: 'waiting',
+        players: [{ playerIndex: 1, name: 'Bob' }],
+        maxPlayers: 2,
+      },
       { type: 'gameStarted' },
       { type: 'playerDisconnected', playerIndex: 0 },
     ]

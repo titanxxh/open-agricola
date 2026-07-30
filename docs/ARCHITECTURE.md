@@ -225,8 +225,9 @@ type ServerEvent =
   | StateUpdateEnvelope
   | { type: 'error'; error; requestId? }
   | { type: 'authOk'; userId; username }
-  | { type: 'roomCreated' | 'roomJoined' | 'gameStarted'
+  | { type: 'roomCreated' | 'gameStarted'
       | 'playerJoined' | 'playerDisconnected' | 'roomDissolved'; ... }
+  | { type: 'roomJoined'; roomId; playerIndex; status; players; maxPlayers }
 
 type StateUpdateEnvelope = {
   type: 'stateUpdate'
@@ -1304,7 +1305,7 @@ BUG_REPORT_TOKEN_ACTIVE_KEY_ID
 - 收到 `stateUpdate` 处理顺序：`normalizeState()` → `createActionSpaces()` → 用服务端 `resources` / `takenBy` 覆盖模板字段 → 替换 store。
 - 前端**不做乐观提交**：点完发命令，等 `stateUpdate` 到达再改 UI。
 - 本地 UI 临时态（hover / 临时选择 / 输入框）独立管理；新快照到达后检查本地选择是否仍合法，不合法清空。
-- 断线重连：`socket reconnect → joinRoom → getState → stateUpdate → 整体替换`，前端不依赖本地缓存恢复。
+- 断线重连：`socket reconnect → joinRoom → roomJoined(status, players, maxPlayers)`；`waiting` 恢复等待页，`playing` 才继续 `getState → stateUpdate → 整体替换`，前端不依赖本地缓存恢复。
 
 ### 12.4 视图编排
 

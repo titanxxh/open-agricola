@@ -171,6 +171,39 @@ const useTransportSetup = (
       }
       setWsTransport(ws)
 
+      const waitForPlayers = (
+        roomId: string,
+        playerIndex: number,
+        players: Array<{ playerIndex: number; name: string }>,
+        maxPlayers: number,
+      ) => {
+        setWsStatus({ phase: 'waiting', roomId, players, maxPlayers })
+        const handler = (event: MessageEvent) => {
+          try {
+            const msg = JSON.parse(event.data as string)
+            if (msg.type === 'gameStarted') {
+              rawWs.removeEventListener('message', handler)
+              setWsReady(true)
+              setWsStatus({ phase: 'ready', roomId, playerIndex })
+            } else if (msg.type === 'playerJoined') {
+              setWsStatus(prev => {
+                if (prev.phase !== 'waiting') return prev
+                const existing = prev.players.filter(p => p.playerIndex !== msg.playerIndex)
+                return {
+                  ...prev,
+                  players: [...existing, { playerIndex: msg.playerIndex, name: msg.name }].sort((a, b) => a.playerIndex - b.playerIndex),
+                  maxPlayers: msg.maxPlayers,
+                }
+              })
+            } else if (msg.type === 'roomDissolved') {
+              rawWs.removeEventListener('message', handler)
+              setWsStatus({ phase: 'error', message: 'roomDissolved' })
+            }
+          } catch { /* skip */ }
+        }
+        rawWs.addEventListener('message', handler)
+      }
+
       const searchParams = new URLSearchParams(window.location.search)
       const contextRoomId = searchParams.get('context')
       const roomParam = contextRoomId ?? searchParams.get('room')
@@ -242,37 +275,12 @@ const useTransportSetup = (
         }
         setRoomInUrl(resp.roomId)
         const creatorName = displayName ?? playerParam ?? 'Player 1'
-        setWsStatus({
-          phase: 'waiting',
-          roomId: resp.roomId,
-          players: [{ playerIndex: resp.playerIndex, name: creatorName }],
-          maxPlayers: resp.maxPlayers,
-        })
-
-        const handler = (event: MessageEvent) => {
-          try {
-            const msg = JSON.parse(event.data as string)
-            if (msg.type === 'gameStarted') {
-              rawWs.removeEventListener('message', handler)
-              setWsReady(true)
-              setWsStatus({ phase: 'ready', roomId: resp.roomId, playerIndex: resp.playerIndex })
-            } else if (msg.type === 'playerJoined') {
-              setWsStatus(prev => {
-                if (prev.phase !== 'waiting') return prev
-                const existing = prev.players.filter(p => p.playerIndex !== msg.playerIndex)
-                return {
-                  ...prev,
-                  players: [...existing, { playerIndex: msg.playerIndex, name: msg.name }].sort((a, b) => a.playerIndex - b.playerIndex),
-                  maxPlayers: msg.maxPlayers,
-                }
-              })
-            } else if (msg.type === 'roomDissolved') {
-              rawWs.removeEventListener('message', handler)
-              setWsStatus({ phase: 'error', message: 'roomDissolved' })
-            }
-          } catch { /* skip */ }
-        }
-        rawWs.addEventListener('message', handler)
+        waitForPlayers(
+          resp.roomId,
+          resp.playerIndex,
+          [{ playerIndex: resp.playerIndex, name: creatorName }],
+          resp.maxPlayers,
+        )
       } else {
         const roomId = roomParam
         const requestedPlayerIndex = contextRoomId
@@ -287,13 +295,25 @@ const useTransportSetup = (
         }
 
         setWsStatus({ phase: 'joining', roomId })
-        const resp = await new Promise<{ roomId: string; playerIndex: number } | { error: string; code?: WsErrorCode }>((resolve) => {
+        const resp = await new Promise<{
+          roomId: string
+          playerIndex: number
+          status: 'waiting' | 'playing'
+          players: Array<{ playerIndex: number; name: string }>
+          maxPlayers: number
+        } | { error: string; code?: WsErrorCode }>((resolve) => {
           const handler = (event: MessageEvent) => {
             try {
               const msg = JSON.parse(event.data as string)
               if (msg.type === 'roomJoined') {
                 rawWs.removeEventListener('message', handler)
-                resolve({ roomId: msg.roomId, playerIndex: msg.playerIndex })
+                resolve({
+                  roomId: msg.roomId,
+                  playerIndex: msg.playerIndex,
+                  status: msg.status,
+                  players: msg.players,
+                  maxPlayers: msg.maxPlayers,
+                })
               } else if (msg.type === 'error') {
                 rawWs.removeEventListener('message', handler)
                 if (
@@ -320,6 +340,15 @@ const useTransportSetup = (
           return
         }
         setRoomInUrl(resp.roomId)
+        if (resp.status === 'waiting') {
+          waitForPlayers(
+            resp.roomId,
+            resp.playerIndex,
+            resp.players,
+            resp.maxPlayers,
+          )
+          return
+        }
         setWsReady(true)
         setWsStatus({ phase: 'ready', roomId: resp.roomId, playerIndex: resp.playerIndex })
       }
