@@ -31,8 +31,10 @@ const seedAndOpen = async (page: Page): Promise<string[]> => {
   page.on('request', (req) => {
     if (req.url().includes('/api/game/')) gameApiCalls.push(req.url())
   })
+  // devMode + player=p1 → the dev auth shortcut sets user.id to 'p1', so the
+  // owner-scoped stash key must match (GameContainerApi uses user?.id ?? 'anon').
   await page.addInitScript((config) => {
-    sessionStorage.setItem('open-agricola-local-sandbox-config', JSON.stringify(config))
+    sessionStorage.setItem('open-agricola-local-sandbox-config', JSON.stringify({ owner: 'p1', config }))
   }, CONFIG)
   await page.goto('/?page=game&player=p1&embedded=1&devMode=1&localSandbox=1')
   await expect(page.locator('.action-board, [class*="ActionBoard"]').first())

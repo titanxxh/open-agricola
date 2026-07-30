@@ -42,14 +42,23 @@ export const buildLocalGameConfig = (
   allowIncompleteFarmersOfTheMoorMinorDeal: settings.allow_incomplete_farmers_of_the_moor_minor_deal,
 })
 
-export const stashLocalSandboxConfig = (config: LocalGameConfig): void => {
-  sessionStorage.setItem(STASH_KEY, JSON.stringify(config))
+export const stashLocalSandboxConfig = (config: LocalGameConfig, ownerKey: string): void => {
+  sessionStorage.setItem(STASH_KEY, JSON.stringify({ owner: ownerKey, config }))
 }
 
-export const readLocalSandboxConfig = (): LocalGameConfig | null => {
+// Reject a stash left by a different account on a shared browser (the config
+// carries unpublished effect_code source). Same-origin sessionStorage survives
+// logout within a tab, so ownership is verified on read rather than trusted.
+export const readLocalSandboxConfig = (ownerKey: string): LocalGameConfig | null => {
   try {
     const raw = sessionStorage.getItem(STASH_KEY)
-    return raw ? JSON.parse(raw) as LocalGameConfig : null
+    if (!raw) return null
+    const parsed = JSON.parse(raw) as { owner?: string; config?: LocalGameConfig }
+    if (parsed.owner !== ownerKey || !parsed.config) {
+      sessionStorage.removeItem(STASH_KEY)
+      return null
+    }
+    return parsed.config
   } catch {
     return null
   }

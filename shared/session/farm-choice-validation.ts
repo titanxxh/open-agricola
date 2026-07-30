@@ -10,7 +10,10 @@ import type { FarmTilePosition, GameState } from '../contract/types.ts'
 
 export type FarmChoiceType = 'fence' | 'room' | 'stable' | 'plow' | 'sow'
 
-export type FarmChoiceValidation = { valid: boolean; error: string | null }
+// `requestError` marks a malformed request (missing player / unknown type) that
+// the HTTP endpoint should answer with 400, versus an ordinary invalid farm
+// placement which is a well-formed 200 response with `valid: false`.
+export type FarmChoiceValidation = { valid: boolean; error: string | null; requestError?: boolean }
 
 export const validateFarmChoice = (
   state: Readonly<GameState>,
@@ -20,7 +23,7 @@ export const validateFarmChoice = (
 ): FarmChoiceValidation => {
   const playerIndex = state.players.findIndex((p) => p.id === playerId)
   if (playerIndex === -1) {
-    return { valid: false, error: 'Player not found' }
+    return { valid: false, error: 'Player not found', requestError: true }
   }
   const player = normalizePlayerFarm(state.players[playerIndex]!)
   // Validate against the normalized player by swapping it into a shallow
@@ -78,5 +81,5 @@ export const validateFarmChoice = (
     const result = board.farmyard.canSow({ fields: crops as SowSelection[] })
     return { valid: result.ok, error: result.ok ? null : result.error?.code ?? 'validation failed' }
   }
-  return { valid: false, error: 'Unknown validation type' }
+  return { valid: false, error: 'Unknown validation type', requestError: true }
 }

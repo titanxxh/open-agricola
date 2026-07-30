@@ -161,7 +161,7 @@ const useTransportSetup = (
     if (!isLocalMode || initRef.current) return
     initRef.current = true
 
-    const config = readLocalSandboxConfig()
+    const config = readLocalSandboxConfig(ownerKey)
     if (!config) {
       window.alert(t(locale, 'platform.localSandboxMissingConfig'))
       return
