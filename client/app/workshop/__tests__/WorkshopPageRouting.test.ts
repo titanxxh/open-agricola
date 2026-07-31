@@ -81,21 +81,21 @@ describe('WorkshopPage PR action state', () => {
     const state = getWorkshopPrActionState({
       enabled: true,
       isAuthor: true,
-      status: 'draft',
+      live: false,
       githubPrUrl: null,
       githubPrStatus: null,
     })
 
     expect(state.visible).toBe(true)
     expect(state.disabled).toBe(true)
-    expect(state.buttonLabel).toBe('先发布后可发起 PR')
+    expect(state.buttonLabel).toBe('先过审并上线后可发起 PR')
   })
 
   it('allows published author cards to start a PR', () => {
     const state = getWorkshopPrActionState({
       enabled: true,
       isAuthor: true,
-      status: 'published',
+      live: true,
       githubPrUrl: null,
       githubPrStatus: null,
       localesComplete: true,
@@ -110,7 +110,7 @@ describe('WorkshopPage PR action state', () => {
     const state = getWorkshopPrActionState({
       enabled: true,
       isAuthor: true,
-      status: 'published',
+      live: true,
       githubPrUrl: null,
       githubPrStatus: null,
       localesComplete: false,
@@ -126,7 +126,7 @@ describe('WorkshopPage PR action state', () => {
     const state = getWorkshopPrActionState({
       enabled: true,
       isAuthor: true,
-      status: 'published',
+      live: true,
       handoffReady: false,
       localesComplete: true,
     })
@@ -142,7 +142,7 @@ describe('WorkshopPage PR action state', () => {
     const state = getWorkshopPrActionState({
       enabled: true,
       isAuthor: true,
-      status: 'published',
+      live: true,
       githubPrUrl: null,
       githubPrStatus: null,
     })

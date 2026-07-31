@@ -13,13 +13,16 @@ export type WorkshopDraftContract = {
   generation: Record<string, unknown>
 }
 
+export type WorkshopReviewStatus = 'unsubmitted' | 'in_review' | 'approved' | 'stale' | 'merged'
+
 export type WorkshopWorkspaceContract = {
   id: string
   authorId: string
   revision: number
-  status: string
+  reviewStatus: WorkshopReviewStatus
+  live: boolean
   draft: WorkshopDraftContract
-  publishedVersionId: string | null
+  approvedVersionId: string | null
   sandboxPassVersionId: string | null
   sandboxPassedAt: number | null
 }

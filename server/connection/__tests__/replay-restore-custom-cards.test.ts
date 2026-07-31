@@ -43,7 +43,7 @@ describe('replay room restoration', () => {
       INSERT INTO users (id, username, display_name, password_hash, created_at)
       VALUES ('author', 'author', 'Author', 'hash', 1)
     `).run()
-    const { createCard, publish } = await import('../../workshop-drafts.ts')
+    const { approveCurrentDraft, createCard, publish } = await import('../../workshop-drafts.ts')
     const card = createCard(db, {
       authorId: 'author',
       draft: {
@@ -66,6 +66,7 @@ describe('replay room restoration', () => {
         generation: {},
       } as never,
     })
+    approveCurrentDraft(db, { cardId: card.id, authorId: 'author' })
     publish(db, { cardId: card.id, authorId: 'author', baseRevision: card.revision })
     const { GameSession } = await import('../../game/authoritative-session.ts')
     const { serializeState } = await import('../../../shared/session/serialization.ts')

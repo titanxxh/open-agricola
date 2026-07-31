@@ -348,6 +348,11 @@
 }
 .ws-badge-published { background: var(--color-success-bg); color: var(--color-success); }
 .ws-badge-draft { background: #fff3cd; color: #856404; }
+.ws-badge-in-review { background: #cfe2ff; color: #084298; }
+.ws-badge-approved { background: #d1e7dd; color: #0f5132; }
+.ws-badge-live { background: var(--color-success-bg); color: var(--color-success); }
+.ws-badge-stale { background: #f8d7da; color: #842029; }
+.ws-badge-merged { background: #e2d9f3; color: #59359a; }
 .ws-version-item { border-bottom: 1px solid var(--color-border-light); padding: 8px 0; }
 .ws-version-header { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
 .ws-version-desc { margin: 4px 0 0; font-size: 13px; color: var(--color-text-muted); }

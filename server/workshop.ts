@@ -20,6 +20,7 @@ import {
   type WorkshopArtCandidate,
   type WorkshopDraft,
 } from './workshop-drafts.ts'
+import { isLoadableLive, isReviewStatus } from './workshop-status.ts'
 import {
   prepareWorkshopAbilityCode,
   prepareWorkshopDraft,
@@ -74,7 +75,8 @@ type WorkshopCard = {
   card_json: string
   code_manifest?: string | null
   art_url: string | null
-  status: string
+  review_status: string
+  live: number
   featured?: number
   like_count?: number
   liked_by_me?: boolean
@@ -131,7 +133,8 @@ const serialiseCardForApi = (
     compiled_code: compiled,
     code_manifest: row.code_manifest ? JSON.parse(row.code_manifest) : null,
     art_url: row.art_url,
-    status: row.status,
+    review_status: row.review_status,
+    live: row.live === 1,
     featured: row.featured ?? 0,
     like_count: row.like_count ?? 0,
     created_at: row.created_at,
@@ -156,13 +159,14 @@ const serialisePublishedCardForApi = (
   card_json: card.cardJson,
   effect_code: card.effectCode,
   art_url: card.artUrl,
-  status: card.status,
+  review_status: card.reviewStatus,
+  live: card.live,
   featured: card.featured,
   like_count: card.likeCount,
   liked_by_me: card.likedByMe,
   created_at: card.createdAt,
   updated_at: card.updatedAt,
-  published_version_id: card.publishedVersionId,
+  approved_version_id: card.approvedVersionId,
   github_pr_url: card.githubPrUrl,
   github_pr_status: card.githubPrStatus,
   github_pr_last_synced_at: card.githubPrLastSyncedAt,
@@ -353,8 +357,10 @@ export async function handleWorkshopRoute(
       }
       let where = 'w.author_id = ?'
       const params: unknown[] = [user.id]
-      if (statusFilter === 'draft' || statusFilter === 'published') {
-        where += ' AND w.status = ?'
+      if (statusFilter === 'live') {
+        where += ' AND w.live = 1'
+      } else if (statusFilter && isReviewStatus(statusFilter)) {
+        where += ' AND w.review_status = ?'
         params.push(statusFilter)
       }
       if (featured) where += ' AND w.featured = 1'
@@ -393,7 +399,7 @@ export async function handleWorkshopRoute(
       return true
     }
 
-    let where = "w.status = 'published' AND w.published_version_id IS NOT NULL"
+    let where = "w.review_status = 'approved' AND w.live = 1 AND w.approved_version_id IS NOT NULL"
     const params: unknown[] = []
     if (featured) where += ' AND w.featured = 1'
     if (search) {
@@ -406,7 +412,7 @@ export async function handleWorkshopRoute(
     const rows = db.prepare(`
       SELECT w.id, COUNT(DISTINCT likes.user_id) AS like_count
       FROM workshop_cards w
-      JOIN workshop_card_versions version ON version.id = w.published_version_id
+      JOIN workshop_card_versions version ON version.id = w.approved_version_id
       LEFT JOIN card_likes likes ON likes.card_id = w.id
       WHERE ${where}
       GROUP BY w.id
@@ -419,7 +425,7 @@ export async function handleWorkshopRoute(
     const total = (db.prepare(`
       SELECT COUNT(*) AS n
       FROM workshop_cards w
-      JOIN workshop_card_versions version ON version.id = w.published_version_id
+      JOIN workshop_card_versions version ON version.id = w.approved_version_id
       WHERE ${where}
     `).get(...params) as { n: number }).n
     sendJson(res, 200, { ok: true, cards, page, total, hasMore: offset + rows.length < total })
@@ -663,7 +669,7 @@ export async function handleWorkshopRoute(
             FROM workshop_cards w
             LEFT JOIN users u ON u.id = w.author_id
             LEFT JOIN card_likes likes ON likes.card_id = w.id
-            WHERE w.id = ? AND w.author_id = ? AND w.status = 'draft'
+            WHERE w.id = ? AND w.author_id = ?
             GROUP BY w.id
           `).get(cardDbId, user.id) as WorkshopCard | undefined
         : undefined
@@ -800,8 +806,8 @@ export async function handleWorkshopRoute(
   if (req.method === 'POST' && likeMatch) {
     if (!user) { sendJson(res, 401, { ok: false, error: 'Not authenticated' }); return true }
     const cardDbId = likeMatch[1]!
-    const cardRow = db.prepare('SELECT status, author_id FROM workshop_cards WHERE id = ?').get(cardDbId) as { status: string; author_id: string } | undefined
-    if (!cardRow || (cardRow.status !== 'published' && cardRow.author_id !== user.id)) {
+    const cardRow = db.prepare('SELECT review_status, live, author_id FROM workshop_cards WHERE id = ?').get(cardDbId) as { review_status: string; live: number; author_id: string } | undefined
+    if (!cardRow || (!isLoadableLive(cardRow) && cardRow.author_id !== user.id)) {
       sendJson(res, 404, { ok: false, error: 'Card not found' }); return true
     }
     const existing = db.prepare('SELECT 1 FROM card_likes WHERE user_id = ? AND card_id = ?').get(user.id, cardDbId)
@@ -859,7 +865,7 @@ export async function handleWorkshopRoute(
       ORDER BY s.added_at DESC
     `).all(user.id) as WorkshopCard[]
     const cards = rows.flatMap(row => {
-      if (row.status === 'published') {
+      if (isLoadableLive(row)) {
         try {
           return [serialisePublishedCardForApi(loadPublishedCard(db, row.id, user.id))]
         } catch {
@@ -982,7 +988,8 @@ export async function handleWorkshopRoute(
     let where = '1=1'
     const params: unknown[] = []
     if (search) { where += ' AND (w.name LIKE ? OR w.card_id LIKE ?)'; params.push(`%${search}%`, `%${search}%`) }
-    if (status === 'draft' || status === 'published') { where += ' AND w.status = ?'; params.push(status) }
+    if (status === 'live') { where += ' AND w.live = 1' }
+    else if (status && isReviewStatus(status)) { where += ' AND w.review_status = ?'; params.push(status) }
     if (author) { where += ' AND u.username = ?'; params.push(author) }
 
     const rows = db.prepare(`
@@ -1034,50 +1041,6 @@ export async function handleWorkshopRoute(
     db.prepare('DELETE FROM sandbox_cards WHERE workshop_card_id = ?').run(cardDbId)
     db.prepare('DELETE FROM workshop_cards WHERE id = ?').run(cardDbId)
     sendJson(res, 200, { ok: true, deleted: { id: cardDbId, card_id: row.card_id, name: row.name } })
-    return true
-  }
-
-  // ── POST /api/admin/cards/:id/status — admin set card status ──────────
-  const adminStatusMatch = /^\/api\/admin\/cards\/([^/]+)\/status$/.exec(url)
-  if (req.method === 'POST' && adminStatusMatch) {
-    if (!user || !isAdmin(user.username)) { sendJson(res, 403, { ok: false, error: 'Admin only' }); return true }
-    const cardDbId = adminStatusMatch[1]!
-    const body = await parseBody<{ status?: string }>(req)
-    const newStatus = body?.status === 'published' ? 'published' : 'draft'
-    const row = db.prepare(`
-      SELECT id, author_id, draft_revision FROM workshop_cards WHERE id = ?
-    `).get(cardDbId) as {
-      id: string
-      author_id: string
-      draft_revision: number
-    } | undefined
-    if (!row) { sendJson(res, 404, { ok: false, error: 'Card not found' }); return true }
-    if (newStatus === 'published') {
-      try {
-        const result = publish(db, {
-          cardId: cardDbId,
-          authorId: row.author_id,
-          baseRevision: row.draft_revision,
-        })
-        sendJson(res, 200, {
-          ok: true,
-          status: result.workspace.status,
-          publishedVersionId: result.versionId,
-        })
-      } catch (error) {
-        if (!sendWorkshopDraftError(res, error)) throw error
-      }
-      return true
-    }
-    db.prepare(`
-      UPDATE workshop_cards
-      SET status = 'draft',
-          sandbox_pass_version_id = NULL,
-          sandbox_passed_at = NULL,
-          updated_at = ?
-      WHERE id = ?
-    `).run(Date.now(), cardDbId)
-    sendJson(res, 200, { ok: true, status: newStatus })
     return true
   }
 

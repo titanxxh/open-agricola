@@ -47,14 +47,19 @@ db.exec(`
     code_manifest TEXT,
     art_url TEXT,
     art_prompt TEXT,
-    status TEXT NOT NULL DEFAULT 'draft',
+    review_status TEXT NOT NULL DEFAULT 'unsubmitted',
+    live INTEGER NOT NULL DEFAULT 0,
     featured INTEGER NOT NULL DEFAULT 0,
     github_pr_url TEXT,
     github_pr_status TEXT,
     github_pr_last_synced_at INTEGER,
     draft_revision INTEGER NOT NULL DEFAULT 1,
     draft_generation_json TEXT NOT NULL DEFAULT '{}',
-    published_version_id TEXT,
+    approved_commit_sha TEXT,
+    approved_review_id TEXT,
+    approved_at INTEGER,
+    approved_version_id TEXT,
+    built_in INTEGER NOT NULL DEFAULT 0,
     sandbox_pass_version_id TEXT,
     sandbox_passed_at INTEGER,
     created_at INTEGER NOT NULL,
@@ -449,8 +454,8 @@ describe('workshop PR propose — session', () => {
     db.prepare(
       `INSERT INTO workshop_cards
          (id, author_id, card_id, card_type, name, description, card_json,
-          code_manifest, art_url, status, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          code_manifest, art_url, review_status, live, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'approved', 1, ?, ?)`,
     ).run(
       cardDbId,
       userId,
@@ -461,7 +466,6 @@ describe('workshop PR propose — session', () => {
       cardJson,
       codeManifest,
       null,
-      'published',
       now,
       now,
     )
@@ -474,7 +478,7 @@ describe('workshop PR propose — session', () => {
     `).run(versionId, cardDbId, cardJson, codeManifest, userId, now)
     db.prepare(`
       UPDATE workshop_cards
-      SET published_version_id = ?, sandbox_pass_version_id = ?, sandbox_passed_at = ?
+      SET approved_version_id = ?, sandbox_pass_version_id = ?, sandbox_passed_at = ?
       WHERE id = ?
     `).run(versionId, versionId, now, cardDbId)
 
@@ -522,8 +526,7 @@ describe('workshop PR propose — session', () => {
       code: 'handoff_not_ready',
       readiness: {
         ready: false,
-        publishedVersionMatchesDraft: true,
-        sandboxPassedForPublishedVersion: false,
+        sandboxPassedForDraft: false,
       },
     })
   })

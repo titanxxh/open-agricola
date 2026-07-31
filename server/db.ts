@@ -828,6 +828,36 @@ export function runMigrations(db: Database.Database): void {
         `)
       },
     },
+    {
+      version: 26,
+      run: (database) => {
+        // Guard in the v25 pragma style: partially-seeded upgrade fixtures may
+        // lack workshop_cards entirely; real databases always have it (v2).
+        const columns = database.pragma('table_info(workshop_cards)') as Array<{ name: string }>
+        if (columns.length === 0) return
+        database.exec(`
+          -- PR-gated publish (#634): two-axis card status (review_status x live)
+          -- replaces the single draft/published status column.
+          ALTER TABLE workshop_cards ADD COLUMN review_status TEXT NOT NULL DEFAULT 'unsubmitted';
+          ALTER TABLE workshop_cards ADD COLUMN live INTEGER NOT NULL DEFAULT 0;
+          ALTER TABLE workshop_cards ADD COLUMN approved_commit_sha TEXT;
+          ALTER TABLE workshop_cards ADD COLUMN approved_review_id TEXT;
+          ALTER TABLE workshop_cards ADD COLUMN approved_at INTEGER;
+          ALTER TABLE workshop_cards ADD COLUMN approved_version_id TEXT;
+          ALTER TABLE workshop_cards ADD COLUMN built_in INTEGER NOT NULL DEFAULT 0;
+          -- One-shot legacy migration (#632): the column defaults already put every
+          -- existing card back to unsubmitted/offline; no data carry-over.
+          DROP INDEX IF EXISTS idx_workshop_status;
+          DROP INDEX IF EXISTS idx_workshop_card_id_published;
+          ALTER TABLE workshop_cards DROP COLUMN status;
+          ALTER TABLE workshop_cards DROP COLUMN published_version_id;
+          CREATE INDEX idx_workshop_review_status ON workshop_cards(review_status);
+          -- 同一个 card_id 只能有一张过审（approved/merged）卡牌（全局唯一）
+          CREATE UNIQUE INDEX idx_workshop_card_id_gated
+            ON workshop_cards(card_id) WHERE review_status IN ('approved', 'merged');
+        `)
+      },
+    },
   ]
 
   const insert = db.prepare('INSERT INTO schema_version (version) VALUES (?)')

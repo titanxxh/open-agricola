@@ -32,9 +32,10 @@ const workspace = (revision: number, name = 'Field Keeper'): WorkshopWorkspaceDt
   id: 'card-1',
   authorId: 'author',
   revision,
-  status: 'draft',
+  reviewStatus: 'unsubmitted',
+  live: false,
   draft: draft(name),
-  publishedVersionId: null,
+  approvedVersionId: null,
   sandboxPassVersionId: null,
   sandboxPassedAt: null,
 })
@@ -667,8 +668,9 @@ describe('useWorkshopDraft', () => {
           ok: true,
           workspace: {
             ...workspace(1),
-            status: 'published',
-            publishedVersionId: 'version-1',
+            reviewStatus: 'approved',
+            live: true,
+            approvedVersionId: 'version-1',
           },
           versionId: 'version-1',
         }))
@@ -677,8 +679,9 @@ describe('useWorkshopDraft', () => {
         ok: true,
         workspace: {
           ...workspace(1),
-          status: 'published',
-          publishedVersionId: 'version-1',
+          reviewStatus: 'approved',
+          live: true,
+          approvedVersionId: 'version-1',
           sandboxPassVersionId: 'version-1',
           sandboxPassedAt: 100,
         },
@@ -695,7 +698,7 @@ describe('useWorkshopDraft', () => {
       versionId = await result.current.publishDraft()
     })
     expect(versionId).toBe('version-1')
-    expect(result.current.state?.publishedVersionId).toBe('version-1')
+    expect(result.current.state?.approvedVersionId).toBe('version-1')
 
     await act(async () => {
       expect(await result.current.confirmSandboxPass('version-1')).toBe(true)
@@ -737,8 +740,9 @@ describe('useWorkshopDraft', () => {
       ok: true,
       workspace: {
         ...workspace(1),
-        status: 'published',
-        publishedVersionId: 'version-1',
+        reviewStatus: 'approved',
+        live: true,
+        approvedVersionId: 'version-1',
       },
       versionId: 'version-1',
     })))
@@ -746,7 +750,7 @@ describe('useWorkshopDraft', () => {
     await act(async () => {
       expect(await pendingPublish).toBe('version-1')
     })
-    expect(result.current.state?.publishedVersionId).toBe('version-1')
+    expect(result.current.state?.approvedVersionId).toBe('version-1')
     expect(result.current.state?.draft.name).toBe('Typed during publish')
     expect(result.current.state?.save.status).toBe('dirty')
     expect(localStorage.getItem(workshopDraftStorageKey('card-1')))

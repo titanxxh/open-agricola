@@ -3,10 +3,11 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import {
   WorkshopDraftError,
   adoptCandidate,
+  approveCurrentDraft,
   checkpointDraft,
   createCard,
   getHandoffReadiness,
-  loadPublishedDraft,
+  loadLiveDraft,
   loadSandboxVersion,
   loadWorkspace,
   markSandboxPass,
@@ -86,14 +87,19 @@ beforeEach(() => {
       code_manifest TEXT,
       art_url TEXT,
       art_prompt TEXT,
-      status TEXT NOT NULL DEFAULT 'draft',
+      review_status TEXT NOT NULL DEFAULT 'unsubmitted',
+      live INTEGER NOT NULL DEFAULT 0,
       featured INTEGER NOT NULL DEFAULT 0,
       github_pr_url TEXT,
       github_pr_status TEXT,
       github_pr_last_synced_at INTEGER,
       draft_revision INTEGER NOT NULL DEFAULT 1,
       draft_generation_json TEXT NOT NULL DEFAULT '{}',
-      published_version_id TEXT,
+      approved_commit_sha TEXT,
+      approved_review_id TEXT,
+      approved_at INTEGER,
+      approved_version_id TEXT,
+      built_in INTEGER NOT NULL DEFAULT 0,
       sandbox_pass_version_id TEXT,
       sandbox_passed_at INTEGER,
       created_at INTEGER NOT NULL,
@@ -133,7 +139,8 @@ describe('workshop draft aggregate', () => {
     })
 
     expect(created.revision).toBe(1)
-    expect(created.status).toBe('draft')
+    expect(created.reviewStatus).toBe('unsubmitted')
+    expect(created.live).toBe(false)
     expect(created.draft.effectCode).toBeNull()
     expect(created.draft.generation).toEqual({
       art: {
@@ -191,13 +198,9 @@ describe('workshop draft aggregate', () => {
     })).toThrowError(expect.objectContaining<Partial<WorkshopDraftError>>({ code: 'invalid' }))
   })
 
-  it('keeps a published runtime card id reserved after the mutable draft is renamed', () => {
+  it('keeps an approved runtime card id reserved after the mutable draft is renamed', () => {
     const created = createCard(db, { authorId: 'author', draft: baseDraft() })
-    publish(db, {
-      cardId: created.id,
-      authorId: 'author',
-      baseRevision: 1,
-    })
+    approveCurrentDraft(db, { cardId: created.id, authorId: 'author' })
     checkpointDraft(db, {
       cardId: created.id,
       authorId: 'author',
@@ -481,23 +484,22 @@ describe('workshop draft aggregate', () => {
     })
   })
 
-  it('rejects publishing when the row type differs from the card definition', () => {
+  it('rejects approval when the row type differs from the card definition', () => {
     const created = createCard(db, {
       authorId: 'author',
       draft: baseDraft({ cardType: 'minor' }),
     })
 
-    expect(() => publish(db, {
+    expect(() => approveCurrentDraft(db, {
       cardId: created.id,
       authorId: 'author',
-      baseRevision: 1,
     })).toThrowError(expect.objectContaining<Partial<WorkshopDraftError>>({
       code: 'not_ready',
       message: expect.stringContaining('type'),
     }))
   })
 
-  it('rejects publishing when compiled source metadata differs from the draft', () => {
+  it('rejects approval when compiled source metadata differs from the draft', () => {
     const created = createCard(db, {
       authorId: 'author',
       draft: baseDraft({
@@ -519,17 +521,16 @@ describe('workshop draft aggregate', () => {
       }),
     })
 
-    expect(() => publish(db, {
+    expect(() => approveCurrentDraft(db, {
       cardId: created.id,
       authorId: 'author',
-      baseRevision: created.revision,
     })).toThrowError(expect.objectContaining<Partial<WorkshopDraftError>>({
       code: 'not_ready',
       message: expect.stringContaining('source'),
     }))
   })
 
-  it('rejects publishing when the draft adds metadata omitted by the source', () => {
+  it('rejects approval when the draft adds metadata omitted by the source', () => {
     const draft = handoffDraft()
     const created = createCard(db, {
       authorId: 'author',
@@ -542,10 +543,9 @@ describe('workshop draft aggregate', () => {
       },
     })
 
-    expect(() => publish(db, {
+    expect(() => approveCurrentDraft(db, {
       cardId: created.id,
       authorId: 'author',
-      baseRevision: created.revision,
     })).toThrowError(expect.objectContaining<Partial<WorkshopDraftError>>({
       code: 'not_ready',
       message: expect.stringContaining('source'),
@@ -632,9 +632,10 @@ describe('workshop draft aggregate', () => {
     })).toThrowError(expect.objectContaining<Partial<WorkshopDraftError>>({ code: 'forbidden' }))
   })
 
-  it('loads published gameplay data from the pinned version', () => {
+  it('loads live gameplay data from the pinned approved version', () => {
     const created = createCard(db, { authorId: 'author', draft: baseDraft() })
-    const published = publish(db, {
+    const approved = approveCurrentDraft(db, { cardId: created.id, authorId: 'author' })
+    publish(db, {
       cardId: created.id,
       authorId: 'author',
       baseRevision: 1,
@@ -653,13 +654,13 @@ describe('workshop draft aggregate', () => {
       }),
     })
 
-    expect(loadPublishedDraft(db, created.id)).toMatchObject({
+    expect(loadLiveDraft(db, created.id)).toMatchObject({
       name: 'Field Keeper',
       artUrl: null,
     })
     expect(loadWorkspace(db, created.id, 'author')).toMatchObject({
       revision: 2,
-      publishedVersionId: published.versionId,
+      approvedVersionId: approved.versionId,
       draft: {
         name: 'Unpublished change',
         artUrl: '/card-art/unpublished.png',
@@ -667,34 +668,43 @@ describe('workshop draft aggregate', () => {
     })
   })
 
-  it('pins publishing and sandbox confirmation to the exact current version', () => {
+  it('gates publishing on review approval and pins sandbox confirmation to the exact version', () => {
     const created = createCard(db, { authorId: 'author', draft: handoffDraft() })
+    expect(() => publish(db, {
+      cardId: created.id,
+      authorId: 'author',
+      baseRevision: 1,
+    })).toThrowError(expect.objectContaining<Partial<WorkshopDraftError>>({ code: 'not_ready' }))
+
+    const approved = approveCurrentDraft(db, { cardId: created.id, authorId: 'author' })
+    expect(approved.workspace.reviewStatus).toBe('approved')
+    expect(approved.workspace.live).toBe(false)
+    expect(approved.workspace.approvedVersionId).toBe(approved.versionId)
+
     const published = publish(db, {
       cardId: created.id,
       authorId: 'author',
       baseRevision: 1,
     })
+    expect(published.workspace.live).toBe(true)
+    expect(published.versionId).toBe(approved.versionId)
 
-    expect(published.workspace.status).toBe('published')
-    expect(published.workspace.publishedVersionId).toBe(published.versionId)
     expect(getHandoffReadiness(db, created.id, 'author')).toEqual({
       ready: false,
       staticValidation: { valid: true, errors: [] },
-      publishedVersionMatchesDraft: true,
-      sandboxPassedForPublishedVersion: false,
-      publishedVersionId: published.versionId,
+      sandboxPassedForDraft: false,
     })
     expect(() => markSandboxPass(db, {
       cardId: created.id,
       authorId: 'author',
-      versionId: published.versionId,
+      versionId: approved.versionId,
       authorConfirmed: false,
       runtimeErrors: [],
     })).toThrowError(expect.objectContaining<Partial<WorkshopDraftError>>({ code: 'not_ready' }))
     expect(() => markSandboxPass(db, {
       cardId: created.id,
       authorId: 'author',
-      versionId: published.versionId,
+      versionId: approved.versionId,
       authorConfirmed: true,
       runtimeErrors: ['boom'],
     })).toThrowError(expect.objectContaining<Partial<WorkshopDraftError>>({ code: 'not_ready' }))
@@ -702,7 +712,7 @@ describe('workshop draft aggregate', () => {
     markSandboxPass(db, {
       cardId: created.id,
       authorId: 'author',
-      versionId: published.versionId,
+      versionId: approved.versionId,
       authorConfirmed: true,
       runtimeErrors: [],
     })
@@ -718,22 +728,17 @@ describe('workshop draft aggregate', () => {
     })
     expect(getHandoffReadiness(db, created.id, 'author')).toMatchObject({
       ready: false,
-      publishedVersionMatchesDraft: false,
-      sandboxPassedForPublishedVersion: false,
+      sandboxPassedForDraft: false,
     })
   })
 
-  it('does not mark a published metadata-only card ready for PR handoff', () => {
+  it('does not mark an approved metadata-only card ready for PR handoff', () => {
     const created = createCard(db, { authorId: 'author', draft: baseDraft() })
-    const published = publish(db, {
-      cardId: created.id,
-      authorId: 'author',
-      baseRevision: created.revision,
-    })
+    const approved = approveCurrentDraft(db, { cardId: created.id, authorId: 'author' })
     markSandboxPass(db, {
       cardId: created.id,
       authorId: 'author',
-      versionId: published.versionId,
+      versionId: approved.versionId,
       authorConfirmed: true,
       runtimeErrors: [],
     })
@@ -751,15 +756,11 @@ describe('workshop draft aggregate', () => {
 
   it('keeps an exact-version sandbox pass across private generation checkpoints', () => {
     const created = createCard(db, { authorId: 'author', draft: handoffDraft() })
-    const published = publish(db, {
-      cardId: created.id,
-      authorId: 'author',
-      baseRevision: 1,
-    })
+    const approved = approveCurrentDraft(db, { cardId: created.id, authorId: 'author' })
     markSandboxPass(db, {
       cardId: created.id,
       authorId: 'author',
-      versionId: published.versionId,
+      versionId: approved.versionId,
       authorConfirmed: true,
       runtimeErrors: [],
     })
@@ -783,7 +784,7 @@ describe('workshop draft aggregate', () => {
       }),
     })
 
-    expect(checkpointed.sandboxPassVersionId).toBe(published.versionId)
+    expect(checkpointed.sandboxPassVersionId).toBe(approved.versionId)
     expect(getHandoffReadiness(db, created.id, 'author').ready).toBe(true)
   })
 })

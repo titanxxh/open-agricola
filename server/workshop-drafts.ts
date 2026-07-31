@@ -9,6 +9,7 @@ import type {
   WorkshopWorkspaceContract,
 } from '../shared/contract/workshop'
 import { workshopCardJsonFromDefinition } from './workshop-draft-validation.ts'
+import { canGoLive, isReviewStatus, type ReviewStatus } from './workshop-status.ts'
 
 export type WorkshopDraft = WorkshopDraftContract & {
   compiledCode: string | null
@@ -38,13 +39,14 @@ export type PublishedWorkshopCard = {
   cardJson: Record<string, unknown>
   effectCode: string | null
   artUrl: string | null
-  status: 'published'
+  reviewStatus: ReviewStatus
+  live: boolean
   likeCount: number
   likedByMe: boolean
   featured: number
   createdAt: number
   updatedAt: number
-  publishedVersionId: string
+  approvedVersionId: string
   githubPrUrl: string | null
   githubPrStatus: string | null
   githubPrLastSyncedAt: number | null
@@ -82,10 +84,15 @@ type WorkshopCardRow = {
   card_json: string
   code_manifest: string | null
   art_url: string | null
-  status: string
+  review_status: string
+  live: number
   draft_revision: number
   draft_generation_json: string
-  published_version_id: string | null
+  approved_commit_sha: string | null
+  approved_review_id: string | null
+  approved_at: number | null
+  approved_version_id: string | null
+  built_in: number
   sandbox_pass_version_id: string | null
   sandbox_passed_at: number | null
 }
@@ -116,13 +123,13 @@ const hasReservedCardId = (
   if (db.prepare(
     'SELECT 1 FROM workshop_cards WHERE card_id = ? AND id != ?',
   ).get(cardId, excludedCardId)) return true
-  const publishedVersions = db.prepare(`
+  const approvedVersions = db.prepare(`
     SELECT version.card_json
     FROM workshop_cards card
-    JOIN workshop_card_versions version ON version.id = card.published_version_id
-    WHERE card.status = 'published' AND card.id != ?
+    JOIN workshop_card_versions version ON version.id = card.approved_version_id
+    WHERE card.review_status IN ('approved', 'merged') AND card.id != ?
   `).all(excludedCardId) as Array<{ card_json: string }>
-  return publishedVersions.some(
+  return approvedVersions.some(
     version => parseRecord(version.card_json).id === cardId,
   )
 }
@@ -248,7 +255,8 @@ const rowToWorkspace = (row: WorkshopCardRow): WorkshopWorkspace => {
     id: row.id,
     authorId: row.author_id,
     revision: row.draft_revision,
-    status: row.status,
+    reviewStatus: isReviewStatus(row.review_status) ? row.review_status : 'unsubmitted',
+    live: row.live === 1,
     draft: {
       cardId: row.card_id,
       cardType: row.card_type as WorkshopCardType,
@@ -261,7 +269,7 @@ const rowToWorkspace = (row: WorkshopCardRow): WorkshopWorkspace => {
       artUrl: row.art_url,
       generation: parseRecord(row.draft_generation_json),
     },
-    publishedVersionId: row.published_version_id,
+    approvedVersionId: row.approved_version_id,
     sandboxPassVersionId: row.sandbox_pass_version_id,
     sandboxPassedAt: row.sandbox_passed_at,
   }
@@ -320,9 +328,9 @@ export function createCard(
     db.prepare(`
       INSERT INTO workshop_cards (
         id, author_id, card_id, card_type, name, description,
-        card_json, code_manifest, art_url, art_prompt, status,
+        card_json, code_manifest, art_url, art_prompt,
         draft_generation_json, created_at, updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'draft', ?, ?, ?)
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
       id,
       input.authorId,
@@ -627,19 +635,20 @@ export function loadSandboxVersion(
   return draftFromVersion(current, loadVersion(db, input.cardId, input.versionId))
 }
 
-export function loadPublishedDraft(
+export function loadLiveDraft(
   db: Database.Database,
   cardId: string,
 ): WorkshopDraft {
   const row = db.prepare(`
     SELECT * FROM workshop_cards
-    WHERE id = ? AND status = 'published' AND published_version_id IS NOT NULL
+    WHERE id = ? AND review_status = 'approved' AND live = 1
+      AND approved_version_id IS NOT NULL
   `).get(cardId) as WorkshopCardRow | undefined
   if (!row) throw new WorkshopDraftError('not_found', 'Card not found')
   const current = rowToWorkspace(row)
   return draftFromVersion(
     current,
-    loadVersion(db, cardId, current.publishedVersionId!),
+    loadVersion(db, cardId, current.approvedVersionId!),
   )
 }
 
@@ -667,6 +676,54 @@ export function restoreVersion(
   })()
 }
 
+/**
+ * Record a passing review (PRD #634): pin the current draft as the approved
+ * version and enter review_status 'approved'. This is the only doorway to
+ * 'approved' — driven by the GitHub review-approval sync (#640); until that
+ * lands it is exercised directly by tests.
+ */
+export function approveCurrentDraft(
+  db: Database.Database,
+  input: {
+    cardId: string
+    authorId: string
+    commitSha?: string
+    reviewId?: string
+  },
+): { workspace: WorkshopWorkspace; versionId: string } {
+  return db.transaction(() => {
+    const current = loadWorkspace(db, input.cardId, input.authorId)
+    const validation = staticValidation(current.draft)
+    if (!validation.valid) {
+      throw new WorkshopDraftError('not_ready', validation.errors.join('; '), current)
+    }
+    if (hasReservedCardId(db, current.draft.cardId, current.id)) {
+      throw new WorkshopDraftError('conflict', 'Approved card id already exists', current)
+    }
+    const versionId = ensureVersion(db, current)
+    const now = Date.now()
+    db.prepare(`
+      UPDATE workshop_cards
+      SET review_status = 'approved',
+          approved_version_id = ?,
+          approved_commit_sha = ?,
+          approved_review_id = ?,
+          approved_at = ?,
+          updated_at = ?
+      WHERE id = ?
+    `).run(versionId, input.commitSha ?? null, input.reviewId ?? null, now, now, current.id)
+    return {
+      workspace: loadWorkspace(db, current.id, input.authorId),
+      versionId,
+    }
+  })()
+}
+
+/**
+ * Toggle an approved card live (PRD #634): publishing no longer snapshots the
+ * draft — it only flips the live switch on the review-approved version. The
+ * review gate itself (approveCurrentDraft) fills approved_version_id.
+ */
 export function publish(
   db: Database.Database,
   input: {
@@ -680,23 +737,19 @@ export function publish(
     if (current.revision !== input.baseRevision) {
       throw new WorkshopDraftError('conflict', 'Draft revision conflict', current)
     }
-    const validation = staticValidation(current.draft)
-    if (!validation.valid) {
-      throw new WorkshopDraftError('not_ready', validation.errors.join('; '), current)
+    if (!canGoLive(current.reviewStatus) || !current.approvedVersionId) {
+      throw new WorkshopDraftError(
+        'not_ready',
+        'Card must pass PR review approval before it can be published',
+        current,
+      )
     }
-    if (hasReservedCardId(db, current.draft.cardId, current.id)) {
-      throw new WorkshopDraftError('conflict', 'Published card id already exists', current)
-    }
-
-    const versionId = ensureVersion(db, current)
     db.prepare(`
-      UPDATE workshop_cards
-      SET status = 'published', published_version_id = ?, updated_at = ?
-      WHERE id = ?
-    `).run(versionId, Date.now(), current.id)
+      UPDATE workshop_cards SET live = 1, updated_at = ? WHERE id = ?
+    `).run(Date.now(), current.id)
     return {
       workspace: loadWorkspace(db, current.id, input.authorId),
-      versionId,
+      versionId: current.approvedVersionId,
     }
   })()
 }
@@ -737,22 +790,17 @@ export function getHandoffReadiness(
 ): {
   ready: boolean
   staticValidation: { valid: boolean; errors: string[] }
-  publishedVersionMatchesDraft: boolean
-  sandboxPassedForPublishedVersion: boolean
-  publishedVersionId: string | null
+  sandboxPassedForDraft: boolean
 } {
   const current = loadWorkspace(db, cardId, authorId)
   const validation = handoffValidation(current.draft)
-  const publishedVersionMatchesDraft = current.publishedVersionId !== null
-    && versionContentHash(loadVersion(db, current.id, current.publishedVersionId)) === contentHash(current.draft)
-  const sandboxPassedForPublishedVersion = publishedVersionMatchesDraft
-    && current.sandboxPassVersionId === current.publishedVersionId
+  const sandboxPassedForDraft = current.sandboxPassVersionId !== null
+    && versionContentHash(loadVersion(db, current.id, current.sandboxPassVersionId))
+      === contentHash(current.draft)
   return {
-    ready: validation.valid && publishedVersionMatchesDraft && sandboxPassedForPublishedVersion,
+    ready: validation.valid && sandboxPassedForDraft,
     staticValidation: validation,
-    publishedVersionMatchesDraft,
-    sandboxPassedForPublishedVersion,
-    publishedVersionId: current.publishedVersionId,
+    sandboxPassedForDraft,
   }
 }
 
@@ -775,16 +823,18 @@ export function loadPublishedCard(
       card.github_pr_url,
       card.github_pr_status,
       card.github_pr_last_synced_at,
-      card.published_version_id,
+      card.review_status,
+      card.live,
+      card.approved_version_id,
       version.card_json AS version_card_json,
       version.art_url AS version_art_url,
       version.created_at AS version_created_at,
       COUNT(DISTINCT likes.user_id) AS like_count
     FROM workshop_cards card
-    JOIN workshop_card_versions version ON version.id = card.published_version_id
+    JOIN workshop_card_versions version ON version.id = card.approved_version_id
     LEFT JOIN users author ON author.id = card.author_id
     LEFT JOIN card_likes likes ON likes.card_id = card.id
-    WHERE card.id = ? AND card.status = 'published'
+    WHERE card.id = ? AND card.review_status = 'approved' AND card.live = 1
     GROUP BY card.id
   `).get(cardId) as {
     id: string
@@ -799,7 +849,9 @@ export function loadPublishedCard(
     github_pr_url: string | null
     github_pr_status: string | null
     github_pr_last_synced_at: number | null
-    published_version_id: string
+    review_status: string
+    live: number
+    approved_version_id: string
     version_card_json: string
     version_art_url: string | null
     version_created_at: number
@@ -828,7 +880,8 @@ export function loadPublishedCard(
     cardJson,
     effectCode,
     artUrl: row.version_art_url,
-    status: 'published',
+    reviewStatus: isReviewStatus(row.review_status) ? row.review_status : 'approved',
+    live: row.live === 1,
     likeCount: row.like_count,
     likedByMe: viewerId
       ? Boolean(db.prepare('SELECT 1 FROM card_likes WHERE user_id = ? AND card_id = ?').get(viewerId, row.id))
@@ -836,7 +889,7 @@ export function loadPublishedCard(
     featured: row.featured,
     createdAt: row.created_at,
     updatedAt: row.version_created_at,
-    publishedVersionId: row.published_version_id,
+    approvedVersionId: row.approved_version_id,
     githubPrUrl: row.github_pr_url,
     githubPrStatus: row.github_pr_status,
     githubPrLastSyncedAt: row.github_pr_last_synced_at,

@@ -9,7 +9,7 @@ import { createLobby } from '../../game/lobby.ts'
 import { Broadcaster } from '../broadcaster.ts'
 import { createConnectionCtx } from '../connection-ctx.ts'
 import { dispatch } from '../room-router.ts'
-import { createCard, publish } from '../../workshop-drafts.ts'
+import { approveCurrentDraft, createCard, publish } from '../../workshop-drafts.ts'
 
 const fakeWs = () => ({ OPEN: 1, readyState: 1, send: vi.fn(), close: vi.fn() })
 
@@ -113,6 +113,7 @@ describe('durable publish', () => {
         generation: {},
       } as never,
     })
+    approveCurrentDraft(db, { cardId: publishedCard.id, authorId: 'u1' })
     publish(db, { cardId: publishedCard.id, authorId: 'u1', baseRevision: publishedCard.revision })
     const publishedWs = fakeWs()
     const publishedAuthor = createConnectionCtx(publishedWs as never, deps, true, 'u1')

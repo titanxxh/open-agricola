@@ -19,9 +19,10 @@ import type {
   GameContextLifecycle,
 } from '../../shared/contract/protocol/game-context.ts'
 import {
-  loadPublishedDraft,
+  loadLiveDraft,
   type WorkshopDraft,
 } from '../workshop-drafts.ts'
+import { isLoadableLive } from '../workshop-status.ts'
 import type { ConnectionCtx } from './connection-ctx.ts'
 import {
   replayIntentFromCommand,
@@ -77,37 +78,38 @@ export function parseDraftOptions(
 const loadCustomCards = (
   cardDbIds: string[],
   requestUserId?: string,
-  opts?: { publishedOnly?: boolean },
-): { cards: CustomCardData[]; hasUnpublished: boolean } => {
-  if (!cardDbIds.length) return { cards: [], hasUnpublished: false }
+  opts?: { liveOnly?: boolean },
+): { cards: CustomCardData[]; hasNotLive: boolean } => {
+  if (!cardDbIds.length) return { cards: [], hasNotLive: false }
   const db = getDb()
   const result: CustomCardData[] = []
-  let hasUnpublished = false
+  let hasNotLive = false
   for (const dbId of cardDbIds) {
     const row = db.prepare(
-      'SELECT card_type, card_json, code_manifest, art_url, status, author_id FROM workshop_cards WHERE id = ?',
+      'SELECT card_type, card_json, code_manifest, art_url, review_status, live, author_id FROM workshop_cards WHERE id = ?',
     ).get(dbId) as {
       card_type: string
       card_json: string
       code_manifest: string | null
       art_url: string | null
-      status: string
+      review_status: string
+      live: number
       author_id: string
     } | undefined
     if (!row) continue
-    if (row.status === 'published') {
+    if (isLoadableLive(row)) {
       try {
-        result.push(workshopDraftToCustomCard(loadPublishedDraft(db, dbId)))
+        result.push(workshopDraftToCustomCard(loadLiveDraft(db, dbId)))
       } catch {
         continue
       }
       continue
     }
-    if (opts?.publishedOnly) {
-      if (row.status === 'draft' && requestUserId === row.author_id) hasUnpublished = true
+    if (opts?.liveOnly) {
+      if (requestUserId === row.author_id) hasNotLive = true
       continue
     }
-    const allowed = row.status === 'draft' && requestUserId === row.author_id
+    const allowed = requestUserId === row.author_id
     if (!allowed) continue
     try {
       const parsed = JSON.parse(row.card_json) as Record<string, unknown>
@@ -121,16 +123,16 @@ const loadCustomCards = (
         codeManifest: row.code_manifest ? JSON.parse(row.code_manifest) as CustomCodeManifest : null,
         artUrl: row.art_url ?? null,
       })
-      hasUnpublished = true
+      hasNotLive = true
     } catch { /* skip malformed */ }
   }
-  return { cards: result, hasUnpublished }
+  return { cards: result, hasNotLive }
 }
 
 export const loadCustomCardsFromDb = (
   cardDbIds: string[],
   requestUserId?: string,
-): CustomCardData[] => loadCustomCards(cardDbIds, requestUserId, { publishedOnly: true }).cards
+): CustomCardData[] => loadCustomCards(cardDbIds, requestUserId, { liveOnly: true }).cards
 
 const generateRoomId = (ctx: ConnectionCtx, devRoomRootId?: string | null): string | null => {
   for (let attempt = 0; attempt < 8; attempt += 1) {
@@ -361,9 +363,9 @@ function handleCreateRoom(ctx: ConnectionCtx, msg: Extract<ClientCommand, { type
   const enableFarmersOfTheMoor = (msg as Record<string, unknown>).enableFarmersOfTheMoor === true
   const allowIncompleteFarmersOfTheMoorMinorDeal =
     (msg as Record<string, unknown>).allowIncompleteFarmersOfTheMoorMinorDeal === true
-  const loadedCustomCards = loadCustomCards(customCardDbIds, ctx.currentUserId, { publishedOnly: true })
-  if (loadedCustomCards.hasUnpublished) {
-    sendCommandError(ctx, 'draft cards can only be used in the workshop sandbox; publish them before using them in a room', msg.requestId)
+  const loadedCustomCards = loadCustomCards(customCardDbIds, ctx.currentUserId, { liveOnly: true })
+  if (loadedCustomCards.hasNotLive) {
+    sendCommandError(ctx, 'cards must pass review approval and be published live before they can be used in a room; unreviewed cards are only playable in the workshop sandbox', msg.requestId)
     return
   }
   const customCards = loadedCustomCards.cards

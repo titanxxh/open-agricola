@@ -39,6 +39,13 @@ describe('workshop draft migration', () => {
         created_at INTEGER NOT NULL,
         updated_at INTEGER NOT NULL
       );
+      CREATE TABLE room_players (
+        room_id TEXT NOT NULL REFERENCES rooms(id) ON DELETE CASCADE,
+        user_id TEXT NOT NULL,
+        player_index INTEGER NOT NULL,
+        joined_at INTEGER NOT NULL,
+        PRIMARY KEY (room_id, user_id)
+      );
       CREATE TABLE users (id TEXT PRIMARY KEY);
       INSERT INTO users (id) VALUES ('author');
       CREATE TABLE workshop_cards (
@@ -121,22 +128,28 @@ describe('workshop draft migration', () => {
     const { getDb } = await import('../db.ts')
     const db = getDb()
 
-    expect(db.prepare('SELECT MAX(version) AS version FROM schema_version').get()).toEqual({ version: 25 })
+    expect(db.prepare('SELECT MAX(version) AS version FROM schema_version').get()).toEqual({ version: 26 })
+    // v26 (#632): every legacy card is forced back to unsubmitted/offline.
     expect(db.prepare(`
-      SELECT id, draft_revision, published_version_id, sandbox_pass_version_id, sandbox_passed_at
+      SELECT id, draft_revision, review_status, live, approved_version_id,
+             sandbox_pass_version_id, sandbox_passed_at
       FROM workshop_cards ORDER BY id
     `).all()).toEqual([
       {
         id: 'draft',
         draft_revision: 1,
-        published_version_id: null,
+        review_status: 'unsubmitted',
+        live: 0,
+        approved_version_id: null,
         sandbox_pass_version_id: null,
         sandbox_passed_at: null,
       },
       {
         id: 'published',
         draft_revision: 1,
-        published_version_id: expect.any(String),
+        review_status: 'unsubmitted',
+        live: 0,
+        approved_version_id: null,
         sandbox_pass_version_id: null,
         sandbox_passed_at: null,
       },
@@ -168,7 +181,7 @@ describe('workshop draft migration', () => {
     expect(db.prepare(`
       SELECT card_json, code_manifest, art_url, version_number, content_hash, provenance_json
       FROM workshop_card_versions
-      WHERE id = (SELECT published_version_id FROM workshop_cards WHERE id = 'published')
+      WHERE card_id = 'published' AND version_number = 2
     `).get()).toEqual({
       card_json: '{"id":"CUSTOM_Published","desc":["final"]}',
       code_manifest: '{"effect":true}',
