@@ -4,7 +4,6 @@ import userEvent from '@testing-library/user-event'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { GameSyncPayload } from '../../../shared/contract/protocol/game'
 import { EngineStack } from '../../../shared/engine'
-import { REPLAY_CARD_SNAPSHOT_CONSENT_REQUIRED } from '../../../shared/contract/protocol/ws'
 import { createInitialState } from '../../../shared/session/state-bootstrap'
 import { serializeState } from '../../../shared/session/serialization'
 import { AuthProvider, useAuth } from '../../contexts/AuthContext'
@@ -31,7 +30,6 @@ const playingPayload = (round: number): GameSyncPayload => {
 class WaitingRoomWebSocket {
   static readonly OPEN = 1
   static sent: Array<Record<string, unknown>> = []
-  static requiresReplayConsent = false
   static joinStatus: 'waiting' | 'playing' = 'waiting'
   static respondToGetState = true
   static latest: WaitingRoomWebSocket | null = null
@@ -103,12 +101,7 @@ class WaitingRoomWebSocket {
     if (message.type !== 'createRoom') return
     queueMicrotask(() => {
       const event = new MessageEvent('message', {
-        data: JSON.stringify(
-          WaitingRoomWebSocket.requiresReplayConsent
-          && message.confirmReplayCardSnapshotPublic !== true
-            ? { type: 'error', error: REPLAY_CARD_SNAPSHOT_CONSENT_REQUIRED }
-            : { type: 'roomCreated', roomId: 'room-1', playerIndex: 0, maxPlayers: 2 },
-        ),
+        data: JSON.stringify({ type: 'roomCreated', roomId: 'room-1', playerIndex: 0, maxPlayers: 2 }),
       })
       this.onmessage?.(event)
       this.messageListeners.forEach(listener => listener(event))
@@ -187,7 +180,6 @@ afterEach(() => {
   window.localStorage.clear()
   window.history.replaceState(null, '', '/')
   WaitingRoomWebSocket.sent = []
-  WaitingRoomWebSocket.requiresReplayConsent = false
   WaitingRoomWebSocket.joinStatus = 'waiting'
   WaitingRoomWebSocket.respondToGetState = true
   WaitingRoomWebSocket.latest = null
@@ -197,46 +189,7 @@ afterEach(() => {
 })
 
 describe('waiting room presentation', () => {
-  it('confirms permanent custom-card replay publication before room creation', async () => {
-    const confirm = vi.fn(() => true)
-    WaitingRoomWebSocket.requiresReplayConsent = true
-    window.localStorage.setItem('open-agricola-locale-v2', 'en')
-    window.history.replaceState(
-      null,
-      '',
-      '/?page=game&transport=ws&maxPlayers=2&customCards=card-1',
-    )
-    vi.stubGlobal('confirm', confirm)
-    vi.stubGlobal('WebSocket', WaitingRoomWebSocket)
-    vi.stubGlobal('fetch', vi.fn(async () =>
-      new Response(JSON.stringify({
-        ok: true,
-        user: { id: 'u1', username: 'host', displayName: 'Host' },
-      })),
-    ))
-
-    render(
-      <LocaleProvider>
-        <AuthProvider>
-          <AuthenticatedGame />
-        </AuthProvider>
-      </LocaleProvider>,
-    )
-
-    expect(await screen.findByRole('button', { name: 'Copy' })).toBeVisible()
-    expect(screen.getByRole('link', { name: 'Back to Lobby' })).toBeVisible()
-    expect(confirm).toHaveBeenCalledOnce()
-    const createCommands = WaitingRoomWebSocket.sent.filter(({ type }) => type === 'createRoom')
-    expect(createCommands).toHaveLength(2)
-    expect(createCommands[0]).not.toHaveProperty('confirmReplayCardSnapshotPublic')
-    expect(createCommands[1]).toEqual(expect.objectContaining({
-      type: 'createRoom',
-      customCardIds: ['card-1'],
-      confirmReplayCardSnapshotPublic: true,
-    }))
-  })
-
-  it('does not request replay consent when the server accepts custom cards without it', async () => {
+  it('creates the room from a customCards URL without any consent round-trip', async () => {
     const confirm = vi.fn(() => false)
     window.localStorage.setItem('open-agricola-locale-v2', 'en')
     window.history.replaceState(

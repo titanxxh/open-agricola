@@ -1625,8 +1625,6 @@ export const zh = {
     createGame: '创建游戏',
     dissolveRoom: '解散房间',
     dissolveConfirm: '确定要解散房间吗？所有等待中的玩家将被移出。',
-    replayCardSnapshotConsent: '所选自定义卡中如有未发布卡，其卡面、美术和规则参数会随完成局回放永久公开。是否确认？',
-    replayCardSnapshotDeclined: '未确认公开自定义卡快照，未创建房间。',
     roomDissolved: '房间已被解散',
     roomNetworkError: '无法连接游戏服务器，请检查网络后重试。',
     appLoadFailed: '页面加载失败，可能已发布新版本。请重新加载后继续。',
