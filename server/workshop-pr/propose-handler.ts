@@ -315,6 +315,17 @@ export async function handleSubmitReviewRequest(
       commitSha: commit2.commitSha,
     })
     if (reviewProvider) {
+      const expectedBinding = db.prepare(`
+        SELECT review_commit_sha AS reviewCommitSha,
+               review_version_id AS reviewVersionId,
+               updated_at AS updatedAt
+        FROM workshop_cards
+        WHERE id = ? AND github_pr_url = ?
+      `).get(cardDbId, pr.url) as {
+        reviewCommitSha: string
+        reviewVersionId: string
+        updatedAt: number
+      }
       const snapshot = await reviewProvider.getPullRequestSnapshot(pr.number)
       const approvedReview = findApprovedHeadReview(snapshot)
       if (approvedReview) {
@@ -322,7 +333,7 @@ export async function handleSubmitReviewRequest(
           prUrl: pr.url,
           commitSha: snapshot.headRefOid,
           reviewId: approvedReview.id,
-          expectedCardId: cardDbId,
+          expectedBinding: { cardId: cardDbId, ...expectedBinding },
         })
       }
     }

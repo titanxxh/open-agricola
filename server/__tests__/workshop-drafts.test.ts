@@ -5,6 +5,7 @@ import {
   WorkshopDraftError,
   adoptCandidate,
   approveCurrentDraft,
+  approveReviewedVersion,
   checkpointDraft,
   createCard,
   enterReview,
@@ -821,6 +822,54 @@ describe('workshop draft aggregate', () => {
       prUrl,
       expectedRevision: 1,
     })).toThrowError(expect.objectContaining<Partial<WorkshopDraftError>>({ code: 'conflict' }))
+  })
+
+  it('does not let an older approval invalidate a newer submission', () => {
+    const created = createCard(db, { authorId: 'author', draft: baseDraft() })
+    const prUrl = 'https://github.com/x/y/pull/11'
+    enterReview(db, {
+      cardId: created.id,
+      authorId: 'author',
+      prUrl,
+      expectedRevision: 1,
+      commitSha: 'head-a',
+    })
+    const binding = db.prepare(`
+      SELECT review_commit_sha, review_version_id, updated_at
+      FROM workshop_cards WHERE id = ?
+    `).get(created.id) as {
+      review_commit_sha: string
+      review_version_id: string
+      updated_at: number
+    }
+
+    enterReview(db, {
+      cardId: created.id,
+      authorId: 'author',
+      prUrl,
+      expectedRevision: 1,
+      commitSha: 'head-b',
+    })
+    const approved = approveReviewedVersion(db, {
+      prUrl,
+      commitSha: 'head-a',
+      reviewId: 'review-a',
+      expectedBinding: {
+        cardId: created.id,
+        reviewCommitSha: binding.review_commit_sha,
+        reviewVersionId: binding.review_version_id,
+        updatedAt: binding.updated_at,
+      },
+    })
+
+    expect(approved).toBe(0)
+    expect(db.prepare(`
+      SELECT review_status, review_commit_sha
+      FROM workshop_cards WHERE id = ?
+    `).get(created.id)).toEqual({
+      review_status: 'in_review',
+      review_commit_sha: 'head-b',
+    })
   })
 
   it('blocks editing a live card, keeps approval across unpublish, voids it on edit', () => {
