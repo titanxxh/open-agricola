@@ -169,6 +169,8 @@ const reviewProvider = vi.fn(async () => ({
   reviewDecision: 'APPROVED',
   headRefOid: 'approved-head',
   baseRefName: 'main',
+  state: 'OPEN',
+  isDraft: false,
   reviews: [{
     id: 'approved-review',
     state: 'APPROVED',
@@ -423,6 +425,8 @@ describe('workshop API', () => {
           reviewDecision: 'APPROVED',
           headRefOid: 'new-head',
           baseRefName: 'main',
+          state: 'OPEN',
+          isDraft: false,
           reviews: [{
             id: 'new-review',
             state: 'APPROVED',
@@ -438,6 +442,8 @@ describe('workshop API', () => {
           reviewDecision: 'APPROVED',
           headRefOid: 'approved-head',
           baseRefName: 'main',
+          state: 'OPEN',
+          isDraft: false,
           reviews: [{
             id: 'read-only-review',
             state: 'APPROVED',
@@ -453,8 +459,44 @@ describe('workshop API', () => {
           reviewDecision: 'APPROVED',
           headRefOid: 'approved-head',
           baseRefName: 'release',
+          state: 'OPEN',
+          isDraft: false,
           reviews: [{
             id: 'retargeted-review',
+            state: 'APPROVED',
+            commitOid: 'approved-head',
+            authorCanPushToRepository: true,
+          }],
+        },
+      ],
+      [
+        'a closed PR',
+        'CUSTOM_ClosedReviewPr',
+        {
+          reviewDecision: 'APPROVED',
+          headRefOid: 'approved-head',
+          baseRefName: 'main',
+          state: 'CLOSED',
+          isDraft: false,
+          reviews: [{
+            id: 'closed-review',
+            state: 'APPROVED',
+            commitOid: 'approved-head',
+            authorCanPushToRepository: true,
+          }],
+        },
+      ],
+      [
+        'a draft PR',
+        'CUSTOM_DraftReviewPr',
+        {
+          reviewDecision: 'APPROVED',
+          headRefOid: 'approved-head',
+          baseRefName: 'main',
+          state: 'OPEN',
+          isDraft: true,
+          reviews: [{
+            id: 'draft-review',
             state: 'APPROVED',
             commitOid: 'approved-head',
             authorCanPushToRepository: true,
@@ -492,6 +534,10 @@ describe('workshop API', () => {
       expect(JSON.parse(publishRes.body)).toMatchObject({
         ok: false,
         code: 'review_stale',
+        current: {
+          reviewStatus: 'stale',
+          live: false,
+        },
       })
       const workspaceRes = mockRes()
       await handleWorkshopRoute(

@@ -7,6 +7,7 @@ import {
 } from '../workshop-drafts.ts'
 import {
   findApprovedHeadReview,
+  isReviewTargetEligible,
   type WorkshopReviewSnapshot,
 } from './github-review-provider.ts'
 
@@ -138,6 +139,12 @@ export async function handleWorkshopReviewWebhook(
     sendJson(res, 200, { ok: true, ignored: true })
     return true
   }
+  if (db.prepare(`
+    SELECT 1 FROM github_webhook_events WHERE delivery_id = ?
+  `).get(deliveryId)) {
+    sendJson(res, 200, { ok: true, duplicate: true })
+    return true
+  }
 
   const invalidatesReview =
     eventName === 'pull_request' && payload.action === 'synchronize'
@@ -146,6 +153,17 @@ export async function handleWorkshopReviewWebhook(
       && payload.pull_request?.merged !== true
     || eventName === 'pull_request_review' && payload.action === 'dismissed'
   if (invalidatesReview) {
+    let synchronizedHead: string | undefined
+    if (eventName === 'pull_request' && payload.action === 'synchronize') {
+      try {
+        synchronizedHead = (await runtime.provider.getPullRequestSnapshot(
+          prNumber as number,
+        )).headRefOid
+      } catch {
+        sendJson(res, 503, { ok: false, code: 'github_review_unavailable' })
+        return true
+      }
+    }
     const result = db.transaction(() => {
       const inserted = db.prepare(`
         INSERT OR IGNORE INTO github_webhook_events (
@@ -153,11 +171,6 @@ export async function handleWorkshopReviewWebhook(
         ) VALUES (?, ?, ?)
       `).run(deliveryId, eventName, Date.now())
       if (inserted.changes === 0) return { duplicate: true as const }
-      const synchronizedHead = eventName === 'pull_request'
-        && payload.action === 'synchronize'
-        && typeof payload.after === 'string'
-        ? payload.after
-        : undefined
       const invalidated = invalidateReviewedCard(db, {
         prUrl,
         ...(payload.action === 'closed' ? { prStatus: 'closed' } : {}),
@@ -192,9 +205,15 @@ export async function handleWorkshopReviewWebhook(
             reviewId: approvedReview.id,
           })
         : 0
-      return approvedReview
-        ? { approved }
-        : { approved, invalidated: invalidateReviewedCard(db, { prUrl }) }
+      if (approvedReview) return { approved }
+      const breaksReview = !isReviewTargetEligible(snapshot)
+        || snapshot.reviewDecision === 'CHANGES_REQUESTED'
+        || snapshot.reviewDecision === 'APPROVED'
+      const invalidated = invalidateReviewedCard(db, {
+        prUrl,
+        ...(!breaksReview ? { preserveCommitSha: snapshot.headRefOid } : {}),
+      })
+      return { approved, invalidated }
     })()
     sendJson(res, 200, { ok: true, ...result })
     return true

@@ -81,7 +81,7 @@ Private key 中的换行以 `\n` 保存。private key 和 webhook secret 只能�
   - 生成 community card 文件、smoke test、注册表、community docs、可选 card art。
   - 先提交占位 PR number 的 V1 commit，打开或更新 PR。
   - 再提交带真实 PR number 的 V2 commit。
-8. Review App 接收 webhook；approved review 经 GraphQL 快照确认 base=`main` 后固定被审版本，不同 head 的 `synchronize`、`dismissed`、`CHANGES_REQUESTED` 或未合并关闭 PR 使旧资格变为 stale。
+8. Review App 接收 webhook；approved review 经 GraphQL 快照确认 PR 为 open、非 draft 且 base=`main` 后固定被审版本；GitHub 当前 head 不同、`dismissed`、`CHANGES_REQUESTED` 或未合并关闭 PR 使旧资格变为 stale。
 9. 作者调用 `POST /api/workshop/cards/:id/publish` 时再次即时查询 GraphQL，一致才置 live。
 
 ## CI Requirements for Generated PRs

@@ -711,7 +711,8 @@ export async function handleWorkshopRoute(
         || binding.approved_version_id !== binding.review_version_id
       ) {
         invalidateReviewedCard(db, { prUrl })
-        sendJson(res, 409, { ok: false, code: 'review_stale' })
+        const current = loadWorkspace(db, publishMatch[1]!, user.id)
+        sendJson(res, 409, { ok: false, code: 'review_stale', current })
         return true
       }
       const result = publish(db, {

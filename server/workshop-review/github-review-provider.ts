@@ -7,6 +7,8 @@ export type WorkshopReviewSnapshot = {
   reviewDecision: string | null
   headRefOid: string
   baseRefName: string
+  state: string
+  isDraft: boolean
   reviews: Array<{
     id: string
     state: string
@@ -15,10 +17,16 @@ export type WorkshopReviewSnapshot = {
   }>
 }
 
+export const isReviewTargetEligible = (
+  snapshot: WorkshopReviewSnapshot,
+): boolean => snapshot.state === 'OPEN'
+  && !snapshot.isDraft
+  && snapshot.baseRefName === 'main'
+
 export const findApprovedHeadReview = (
   snapshot: WorkshopReviewSnapshot,
 ): WorkshopReviewSnapshot['reviews'][number] | undefined =>
-  snapshot.reviewDecision === 'APPROVED' && snapshot.baseRefName === 'main'
+  snapshot.reviewDecision === 'APPROVED' && isReviewTargetEligible(snapshot)
     ? snapshot.reviews.find(review =>
         review.state === 'APPROVED'
         && review.authorCanPushToRepository
@@ -48,6 +56,8 @@ type ReviewQueryResponse = {
         reviewDecision?: string | null
         headRefOid?: string
         baseRefName?: string
+        state?: string
+        isDraft?: boolean
         latestOpinionatedReviews?: {
           nodes?: Array<{
             id?: string
@@ -121,6 +131,8 @@ export class GitHubReviewProvider {
               reviewDecision
               headRefOid
               baseRefName
+              state
+              isDraft
               latestOpinionatedReviews(first: 100) {
                 nodes {
                   id
@@ -147,6 +159,8 @@ export class GitHubReviewProvider {
       || !pullRequest
       || typeof pullRequest.headRefOid !== 'string'
       || typeof pullRequest.baseRefName !== 'string'
+      || typeof pullRequest.state !== 'string'
+      || typeof pullRequest.isDraft !== 'boolean'
     ) {
       throw new Error('github_review_snapshot_failed')
     }
@@ -169,6 +183,8 @@ export class GitHubReviewProvider {
         : null,
       headRefOid: pullRequest.headRefOid,
       baseRefName: pullRequest.baseRefName,
+      state: pullRequest.state,
+      isDraft: pullRequest.isDraft,
       reviews,
     }
   }
