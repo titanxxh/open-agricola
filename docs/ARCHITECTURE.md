@@ -217,6 +217,7 @@ type ClientCommand = (
 - 没有独立的 `reorg` / `feed` / `nextPlayer` / `confirmPlayerSwitch` 命令。这些等待形态全部归并到 `choice` 命令，由 `payload` 携带具体形状（按 `InteractionRequest.kind` 决定）。
 - `commitSelection` 只为 farm-position / occupation-hand / resource-quantity / resource-batch-exchange 这类带结构化 payload 的定向选择保留单独入口。farm-position 可通过 `validPositionGroups` 表达服务端校验的合法坐标组合，例如 FoM Farmyard Extension 的相邻二格选择。
 - `enableParentCards: true` 启用父母牌；同时传 `draftParents: false` 时直接为每位玩家发一对父母牌，不进入 `parent-selection`。该选择保存在房间元数据中，`newGame` 与后端重启后继续沿用。
+- `customCardIds` 只接受**已发布（published）**的 workshop 卡。真实房间创建（`createRoom`）与房间恢复（`loadCustomCardsFromDb`）都强制 published-only：草稿卡一律在 `GameSession` 创建前被拒，只能在 workshop sandbox（`POST /api/game/new-sandbox` + 浏览器本地 executor）里试玩，不进实时同步主链路。旧的 replay-snapshot 同意往返（`confirmReplayCardSnapshotPublic` / `REPLAY_CARD_SNAPSHOT_CONSENT_REQUIRED`）随之移除——草稿卡不再进真实房间，该机制失去存在理由。
 
 ### 4.5 ServerEvent / StateUpdateEnvelope
 
