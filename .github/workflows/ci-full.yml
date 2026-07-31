@@ -53,11 +53,13 @@ jobs:
       - name: Build (includes cards manifest)
         env:
           BGA_IMAGE_DIR: bga-agricola/img
+          GH_TOKEN: ${{ github.token }}
         run: pnpm run build
 
       - name: Build immutable replay viewer
         env:
           BGA_IMAGE_DIR: bga-agricola/img
+          GH_TOKEN: ${{ github.token }}
           REPLAY_VIEWER_ROOT: ${{ runner.temp }}/replay-viewers
         run: pnpm run build:replay-viewer
 

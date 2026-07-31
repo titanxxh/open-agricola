@@ -2,16 +2,19 @@ import { readFile, stat } from 'node:fs/promises'
 import path from 'node:path'
 
 export const LOCAL_PUBLIC_ASSET_BASE_URL = '/__public-assets__/'
-const PUBLIC_ASSET_METADATA_URL = 'https://titanxxh.github.io/open-agricola-assets/'
+const PUBLIC_ASSET_REPOSITORY = 'titanxxh/open-agricola-assets'
 
 const SHA_PATTERN = /^[0-9a-f]{40}$/
 const ASSET_PATH_PATTERN = /^assets\/(?:[A-Za-z0-9._-]+\/)*[A-Za-z0-9._-]+$/
 
 type Fetcher = (input: string | URL, init?: RequestInit) => Promise<Response>
 
-type PublicAssetManifest = {
-  version: string
-  files: string[]
+type PublicAssetTree = {
+  truncated: boolean
+  tree: Array<{
+    path: string
+    type: string
+  }>
 }
 
 export type PublicAssetConfig = {
@@ -48,18 +51,24 @@ const parseFileList = (value: unknown, label: string): string[] => {
   return files
 }
 
-const parseManifest = (value: unknown, label: string): PublicAssetManifest => {
+const parseTree = (value: unknown, label: string): PublicAssetTree => {
   if (!value || typeof value !== 'object') {
     throw new Error(`${label} must be an object`)
   }
-  const manifest = value as Record<string, unknown>
-  if (typeof manifest.version !== 'string' || !SHA_PATTERN.test(manifest.version)) {
-    throw new Error(`${label} version must be a 40-character lowercase Git SHA`)
+  const inventory = value as Record<string, unknown>
+  if (inventory.truncated !== false || !Array.isArray(inventory.tree)) {
+    throw new Error(`${label} must contain a complete tree`)
   }
-  return {
-    version: manifest.version,
-    files: parseFileList(manifest.files, label),
+  const tree = inventory.tree
+  if (tree.some(entry => (
+    !entry
+    || typeof entry !== 'object'
+    || typeof (entry as Record<string, unknown>).path !== 'string'
+    || typeof (entry as Record<string, unknown>).type !== 'string'
+  ))) {
+    throw new Error(`${label} contains an invalid entry`)
   }
+  return { truncated: false, tree: tree as PublicAssetTree['tree'] }
 }
 
 const readJson = async (filePath: string, label: string): Promise<unknown> => {
@@ -70,15 +79,15 @@ const readJson = async (filePath: string, label: string): Promise<unknown> => {
   }
 }
 
-const fetchText = async (url: URL, fetcher: Fetcher): Promise<string> => {
+const fetchText = async (url: URL, fetcher: Fetcher, init?: RequestInit): Promise<string> => {
   let response: Response
   try {
-    response = await fetcher(url)
+    response = await fetcher(url, init)
   } catch (error) {
-    throw new Error(`Cannot fetch public asset metadata: ${url}`, { cause: error })
+    throw new Error(`Cannot fetch public asset inventory: ${url}`, { cause: error })
   }
   if (!response.ok) {
-    throw new Error(`Cannot fetch public asset metadata: ${url} returned ${response.status}`)
+    throw new Error(`Cannot fetch public asset inventory: ${url} returned ${response.status}`)
   }
   return response.text()
 }
@@ -88,11 +97,13 @@ export const loadPublicAssetConfig = async ({
   env = process.env,
   fetcher = fetch,
   allowLocal = !env.CI,
+  validateRemote = true,
 }: {
   rootDir?: string
   env?: NodeJS.ProcessEnv
   fetcher?: Fetcher
   allowLocal?: boolean
+  validateRemote?: boolean
 } = {}): Promise<PublicAssetConfig> => {
   const version = (await readFile(path.join(rootDir, 'public-assets.ref'), 'utf8')).trim()
   if (!SHA_PATTERN.test(version)) {
@@ -123,31 +134,37 @@ export const loadPublicAssetConfig = async ({
     return { baseUrl: LOCAL_PUBLIC_ASSET_BASE_URL, version, requiredFiles, localDir }
   }
 
-  const remoteVersion = (await fetchText(
-    new URL('asset-version.txt', PUBLIC_ASSET_METADATA_URL),
-    fetcher,
-  )).trim()
-  if (!SHA_PATTERN.test(remoteVersion) || remoteVersion !== version) {
-    throw new Error(`Public asset version mismatch: expected ${version}, received ${remoteVersion}`)
+  if (!validateRemote) {
+    return { baseUrl: publicAssetBaseUrl(version), version, requiredFiles }
   }
 
-  let manifestValue: unknown
+  let inventoryValue: unknown
   try {
-    manifestValue = JSON.parse(await fetchText(
-      new URL('asset-manifest.json', PUBLIC_ASSET_METADATA_URL),
+    inventoryValue = JSON.parse(await fetchText(
+      new URL(`https://api.github.com/repos/${PUBLIC_ASSET_REPOSITORY}/git/trees/${version}?recursive=1`),
       fetcher,
+      {
+        headers: {
+          Accept: 'application/vnd.github+json',
+          'X-GitHub-Api-Version': '2022-11-28',
+          ...(env.GITHUB_TOKEN || env.GH_TOKEN
+            ? { Authorization: `Bearer ${env.GITHUB_TOKEN || env.GH_TOKEN}` }
+            : {}),
+        },
+      },
     ))
   } catch (error) {
-    throw new Error('Invalid public asset manifest JSON', { cause: error })
+    throw new Error('Invalid public asset inventory JSON', { cause: error })
   }
-  const manifest = parseManifest(manifestValue, 'asset-manifest.json')
-  if (manifest.version !== version) {
-    throw new Error(`Public asset manifest version mismatch: expected ${version}, received ${manifest.version}`)
-  }
-  const available = new Set(manifest.files)
+  const inventory = parseTree(inventoryValue, 'public asset inventory')
+  const available = new Set(
+    inventory.tree
+      .filter(entry => entry.type === 'blob')
+      .map(entry => entry.path),
+  )
   const missing = requiredFiles.find(file => !available.has(file))
   if (missing) {
-    throw new Error(`Public asset manifest is missing required file: ${missing}`)
+    throw new Error(`Public asset inventory is missing required file: ${missing}`)
   }
 
   return { baseUrl: publicAssetBaseUrl(version), version, requiredFiles }
