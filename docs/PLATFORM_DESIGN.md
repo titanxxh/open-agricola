@@ -479,8 +479,8 @@ WorkshopPage
 2. 卡牌必须处于 `unsubmitted / stale / in_review`（`in_review` 再次提交 = 更新 PR 分支）；质量门：静态校验 + `sandbox_pass_version_id` 内容与草稿一致（`getHandoffReadiness`）+ 完整中文本地化 + `card_id` 未被 approved/merged 卡占用。
 3. 前端调用 `POST /api/workshop/cards/:id/submit-review`。
 4. 如果服务端没有当前会话对应的 GitHub token，会返回 OAuth start URL；前端用 popup 打开，并等待 callback 页面通过 `postMessage({ type: 'workshop-pr-oauth', ... }, '*')` 通知授权完成。
-5. 授权完成后前端重试请求，服务端创建/更新分支并打开或更新 PR，成功后卡牌转入 `in_review`（`enterReview`），同时固定 PR head SHA 与对应 Draft Version。
-6. Workshop Review GitHub App 接收 `pull_request_review` / `pull_request` webhook；验签和 delivery 幂等通过后，approved review 必须经 GraphQL 原子快照确认。GitHub 当前 head 不同、PR 关闭/转 draft/改离 `main`、有效审批被 `dismissed` 或 `CHANGES_REQUESTED` 都把卡转为 `stale·offline`；未绑定 Workshop 卡的 PR 不查询 GitHub，可能乱序的事件重读当前快照且只在含 lifecycle/更新时间的 review binding 未变时提交，GraphQL 不可用则记录 delivery 并保守下线；comment-only review 不改变状态。
+5. 授权完成后前端重试请求，服务端创建/更新分支并打开或更新 PR，成功后卡牌转入 `in_review`（`enterReview`），同时固定 PR head SHA 与对应 Draft Version；一个 PR URL 只绑定一张卡，复用 PR 时原子转移绑定，并在绑定后补查一次当前 review 快照以覆盖先到的审批 webhook。
+6. Workshop Review GitHub App 接收 `pull_request_review` / `pull_request` webhook；验签和 delivery 幂等通过后，approved review 必须经 GraphQL 原子快照确认。GitHub 当前 head 不同、PR 关闭/转 draft/改离 `main`、有效审批被 `dismissed` 或 `CHANGES_REQUESTED` 都把卡转为 `stale·offline`；未绑定或绑定歧义的 PR 不查询 GitHub，可能乱序的事件重读当前快照且只在含 lifecycle/更新时间的 review binding 未变时提交，已 merge PR 的迟到 review 事件保留同 head 绑定，GraphQL 不可用则记录 delivery 并保守下线；comment-only review 不改变状态。
 7. 作者发布时服务端再次即时查询 GraphQL，只有 state=`OPEN`、非 draft、base=`main`、reviewer 可 push、review commit、PR head、平台 approved commit、固定版本和查询前后的 live-state token 全部一致才置 live。
 
 服务端核心模块：

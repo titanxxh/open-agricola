@@ -745,7 +745,35 @@ export function enterReview(
         current,
       )
     }
+    if (db.prepare(`
+      SELECT 1 FROM workshop_cards
+      WHERE github_pr_url = ?
+        AND id != ?
+        AND review_status IN ('approved', 'merged')
+    `).get(input.prUrl, current.id)) {
+      throw new WorkshopDraftError(
+        'conflict',
+        'PR is already bound to an approved card',
+        current,
+      )
+    }
     const reviewVersionId = input.commitSha ? ensureVersion(db, current) : null
+    const now = Date.now()
+    db.prepare(`
+      UPDATE workshop_cards
+      SET review_status = CASE
+            WHEN review_status = 'in_review' THEN 'stale'
+            ELSE review_status
+          END,
+          live = 0,
+          github_pr_url = NULL,
+          github_pr_status = NULL,
+          github_pr_last_synced_at = NULL,
+          review_commit_sha = NULL,
+          review_version_id = NULL,
+          updated_at = MAX(updated_at + 1, ?)
+      WHERE github_pr_url = ? AND id != ?
+    `).run(now, input.prUrl, current.id)
     db.prepare(`
       UPDATE workshop_cards
       SET review_status = 'in_review',
@@ -754,14 +782,14 @@ export function enterReview(
           github_pr_last_synced_at = ?,
           review_commit_sha = ?,
           review_version_id = ?,
-          updated_at = ?
+          updated_at = MAX(updated_at + 1, ?)
       WHERE id = ?
     `).run(
       input.prUrl,
-      Date.now(),
+      now,
       input.commitSha ?? null,
       reviewVersionId,
-      Date.now(),
+      now,
       current.id,
     )
     return loadWorkspace(db, current.id, input.authorId)
@@ -864,13 +892,29 @@ export function invalidateReviewedCard(
 
 export function approveReviewedVersion(
   db: Database.Database,
-  input: { prUrl: string; commitSha: string; reviewId: string },
+  input: {
+    prUrl: string
+    commitSha: string
+    reviewId: string
+    expectedCardId?: string
+  },
 ): number {
   return db.transaction(() => {
-    const row = db.prepare(`
-      SELECT * FROM workshop_cards WHERE github_pr_url = ?
-    `).get(input.prUrl) as WorkshopCardRow | undefined
-    if (!row || !['in_review', 'stale', 'approved'].includes(row.review_status)) return 0
+    const matches = db.prepare(`
+      SELECT * FROM workshop_cards
+      WHERE github_pr_url = ?
+        AND (? IS NULL OR id = ?)
+      LIMIT 2
+    `).all(
+      input.prUrl,
+      input.expectedCardId ?? null,
+      input.expectedCardId ?? null,
+    ) as WorkshopCardRow[]
+    if (
+      matches.length !== 1
+      || !['in_review', 'stale', 'approved'].includes(matches[0]!.review_status)
+    ) return 0
+    const row = matches[0]!
     if (
       row.review_commit_sha !== input.commitSha
       || !row.review_version_id

@@ -771,6 +771,58 @@ describe('workshop draft aggregate', () => {
     })).toThrowError(expect.objectContaining<Partial<WorkshopDraftError>>({ code: 'conflict' }))
   })
 
+  it('moves a reused PR binding to the latest review submission', () => {
+    const first = createCard(db, { authorId: 'author', draft: baseDraft() })
+    const second = createCard(db, {
+      authorId: 'author',
+      draft: baseDraft({
+        cardId: 'CUSTOM_SecondFieldKeeper',
+        cardJson: {
+          ...baseDraft().cardJson,
+          id: 'CUSTOM_SecondFieldKeeper',
+        },
+      }),
+    })
+    const prUrl = 'https://github.com/x/y/pull/10'
+
+    enterReview(db, {
+      cardId: first.id,
+      authorId: 'author',
+      prUrl,
+      expectedRevision: 1,
+    })
+    enterReview(db, {
+      cardId: second.id,
+      authorId: 'author',
+      prUrl,
+      expectedRevision: 1,
+    })
+
+    expect(db.prepare(`
+      SELECT review_status, live, github_pr_url
+      FROM workshop_cards WHERE id = ?
+    `).get(first.id)).toEqual({
+      review_status: 'stale',
+      live: 0,
+      github_pr_url: null,
+    })
+    expect(db.prepare(`
+      SELECT review_status, github_pr_url
+      FROM workshop_cards WHERE id = ?
+    `).get(second.id)).toEqual({
+      review_status: 'in_review',
+      github_pr_url: prUrl,
+    })
+
+    approveCurrentDraft(db, { cardId: second.id, authorId: 'author' })
+    expect(() => enterReview(db, {
+      cardId: first.id,
+      authorId: 'author',
+      prUrl,
+      expectedRevision: 1,
+    })).toThrowError(expect.objectContaining<Partial<WorkshopDraftError>>({ code: 'conflict' }))
+  })
+
   it('blocks editing a live card, keeps approval across unpublish, voids it on edit', () => {
     const created = createCard(db, { authorId: 'author', draft: baseDraft() })
     approveCurrentDraft(db, { cardId: created.id, authorId: 'author' })

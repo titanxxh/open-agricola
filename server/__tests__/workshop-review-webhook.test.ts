@@ -505,6 +505,68 @@ describe('workshop review webhook', () => {
     })
   })
 
+  it.each([
+    ['submitted', 58],
+    ['dismissed', 59],
+  ])('preserves an approved live card when a delayed %s review arrives after merge', async (action, prNumber) => {
+    const id = `card-merged-${action}`
+    const head = `head-${prNumber}`
+    insertReviewedCard({ id, prNumber, reviewCommitSha: head })
+    const reviewRuntime = runtime()
+    vi.mocked(reviewRuntime.provider.getPullRequestSnapshot).mockResolvedValue({
+      ...openSnapshot(head),
+      state: 'MERGED',
+    })
+
+    const res = await deliver({
+      action,
+      review: { commit_id: head },
+      repository: { full_name: 'titanxxh/open-agricola' },
+      pull_request: {
+        number: prNumber,
+        html_url: `https://github.com/titanxxh/open-agricola/pull/${prNumber}`,
+      },
+    }, 'pull_request_review', `delivery-merged-${action}`, reviewRuntime)
+
+    expect(JSON.parse(res.body)).toMatchObject({ ok: true, invalidated: 0 })
+    expect(loadWorkspace(db, id, 'author')).toMatchObject({
+      reviewStatus: 'approved',
+      live: true,
+    })
+  })
+
+  it('ignores an ambiguous legacy PR binding instead of selecting a row', async () => {
+    insertReviewedCard({
+      id: 'card-duplicate-a',
+      prNumber: 60,
+      reviewStatus: 'in_review',
+      live: false,
+      reviewCommitSha: 'head-60',
+    })
+    insertReviewedCard({
+      id: 'card-duplicate-b',
+      prNumber: 60,
+      reviewStatus: 'in_review',
+      live: false,
+      reviewCommitSha: 'head-60',
+    })
+    const reviewRuntime = runtime()
+    vi.mocked(reviewRuntime.provider.getPullRequestSnapshot)
+      .mockResolvedValue(openSnapshot('head-60'))
+
+    const res = await deliver({
+      action: 'submitted',
+      repository: { full_name: 'titanxxh/open-agricola' },
+      pull_request: {
+        number: 60,
+        html_url: 'https://github.com/titanxxh/open-agricola/pull/60',
+      },
+    }, 'pull_request_review', 'delivery-duplicate-binding', reviewRuntime)
+
+    expect(JSON.parse(res.body)).toEqual({ ok: true, ignored: true })
+    expect(reviewRuntime.provider.getPullRequestSnapshot).not.toHaveBeenCalled()
+  })
+
   it('invalidates a live card when its PR closes without merging', async () => {
     insertReviewedCard({ id: 'card-closed-pr', prNumber: 46 })
     const reviewRuntime = runtime()
