@@ -667,7 +667,7 @@ export async function handleWorkshopRoute(
       }
       const binding = db.prepare(`
         SELECT github_pr_url, approved_commit_sha, approved_version_id,
-               review_commit_sha, review_version_id
+               review_commit_sha, review_version_id, updated_at
         FROM workshop_cards WHERE id = ?
       `).get(publishMatch[1]!) as {
         github_pr_url: string | null
@@ -675,6 +675,7 @@ export async function handleWorkshopRoute(
         approved_version_id: string | null
         review_commit_sha: string | null
         review_version_id: string | null
+        updated_at: number
       }
       const prUrl = binding.github_pr_url
       let prNumber: number | null = null
@@ -729,6 +730,7 @@ export async function handleWorkshopRoute(
         cardId: publishMatch[1]!,
         authorId: user.id,
         baseRevision: baseRevision as number,
+        expectedUpdatedAt: binding.updated_at,
       })
       sendJson(res, 200, { ok: true, ...result })
     } catch (error) {
