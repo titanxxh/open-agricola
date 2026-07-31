@@ -436,7 +436,7 @@ pnpm dlx gh-pages -d dist
 
 ### 主站图片资源
 
-`public-assets.ref` 固定图片仓的 Git commit，`public-assets.required.json` 声明主站需要的全部路径。构建和默认本地启动只读取图片站的 `asset-version.txt` 与 `asset-manifest.json`；版本不一致、格式无效或缺少必需路径时立即失败，图片本身不再打进主站 Pages artifact。运行时 URL 指向 `https://titanxxh.github.io/open-agricola-assets/` 并带固定版本查询参数。
+`public-assets.ref` 固定图片仓的 Git commit，`public-assets.required.json` 声明主站需要的全部路径。构建和默认本地启动读取图片站的 `asset-version.txt` 与 `asset-manifest.json`；版本不一致、格式无效或缺少必需路径时立即失败。运行时从 `raw.githubusercontent.com/titanxxh/open-agricola-assets/<commit>/` 读取对应 commit 的图片，主站和不可变 Replay Viewer 使用同一固定来源，图片本身不再打进主站 Pages artifact。
 
 本地修改图片时可全量切到一个资产仓 checkout：
 
@@ -446,7 +446,7 @@ PUBLIC_ASSET_LOCAL_DIR=../open-agricola-assets pnpm dev
 
 启动前会检查全部必需文件；缺少任一文件即失败，不会混用或回退到远端。该覆盖仅用于本地开发服务器，CI 和生产构建不接受它。
 
-更新图片时先在 `open-agricola-assets` 发布并验证 Pages，再把主仓 `public-assets.ref` 更新为已验证 commit，并同步 `public-assets.required.json`；随后再走主仓的正常 Release。不要先发布依赖尚未上线图片的主站版本。
+更新图片时先在 `open-agricola-assets` 发布并验证 Pages metadata 与 commit-addressed raw URL，再把主仓 `public-assets.ref` 更新为该 commit，并同步 `public-assets.required.json`；随后再走主仓的正常 Release。旧版本通过 Git 历史中的 commit 继续读取原图片，不需要在当前目录保留旧文件。
 
 ---
 

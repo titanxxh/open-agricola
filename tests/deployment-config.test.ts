@@ -66,6 +66,19 @@ describe('production deployment config', () => {
     )
   })
 
+  it('uses commit-addressed public assets in both frontend builds', () => {
+    const publicAssets = readFileSync('scripts/public-assets.ts', 'utf8')
+    const site = readFileSync('vite.config.ts', 'utf8')
+    const replayViewer = readFileSync('replay-viewer/vite.config.ts', 'utf8')
+    expect(publicAssets).toContain(
+      'raw.githubusercontent.com/titanxxh/open-agricola-assets/',
+    )
+    expect(site).toContain('publicAssetUrls(publicAssets')
+    expect(replayViewer).toContain('loadPublicAssetConfig')
+    expect(replayViewer).toContain('publicAssetUrls(publicAssets')
+    expect(replayViewer).toContain('VITE_PUBLIC_ASSET_BASE_URL')
+  })
+
   it('does not start the obsolete custom-code executor sidecar', () => {
     for (const composePath of ['docker-compose.yml', 'docker-compose.prod.yml']) {
       const compose = readFileSync(composePath, 'utf8')
