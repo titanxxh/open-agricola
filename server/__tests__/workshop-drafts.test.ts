@@ -1,5 +1,6 @@
 import Database from 'better-sqlite3'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { setReviewDecisionProvider } from '../workshop-review-provider.ts'
 import {
   WorkshopDraftError,
   adoptCandidate,
@@ -7,6 +8,7 @@ import {
   checkpointDraft,
   createCard,
   enterReview,
+  unpublish,
   getHandoffReadiness,
   loadLiveDraft,
   loadSandboxVersion,
@@ -122,6 +124,7 @@ beforeEach(() => {
 })
 
 afterEach(() => {
+  setReviewDecisionProvider(null)
   db.close()
 })
 
@@ -199,9 +202,17 @@ describe('workshop draft aggregate', () => {
     })).toThrowError(expect.objectContaining<Partial<WorkshopDraftError>>({ code: 'invalid' }))
   })
 
-  it('keeps an approved runtime card id reserved after the mutable draft is renamed', () => {
+  it('keeps an approved runtime card id reserved until an edit voids the approval', () => {
     const created = createCard(db, { authorId: 'author', draft: baseDraft() })
     approveCurrentDraft(db, { cardId: created.id, authorId: 'author' })
+
+    // while approved, the runtime card id is reserved for everyone else
+    expect(() => createCard(db, {
+      authorId: 'other',
+      draft: baseDraft(),
+    })).toThrowError(expect.objectContaining<Partial<WorkshopDraftError>>({ code: 'conflict' }))
+
+    // renaming the draft voids the approval (stale) and releases the old id
     checkpointDraft(db, {
       cardId: created.id,
       authorId: 'author',
@@ -214,28 +225,14 @@ describe('workshop draft aggregate', () => {
         },
       }),
     })
-
-    expect(() => createCard(db, {
-      authorId: 'other',
-      draft: baseDraft(),
-    })).toThrowError(expect.objectContaining<Partial<WorkshopDraftError>>({ code: 'conflict' }))
-
+    expect(loadWorkspace(db, created.id, 'author').reviewStatus).toBe('stale')
+    // mutable rows still reserve their card_id against other mutable rows,
+    // so the old id stays blocked only via the renamed row disappearing
     const other = createCard(db, {
       authorId: 'other',
-      draft: baseDraft({
-        cardId: 'CUSTOM_OtherCard',
-        cardJson: {
-          ...baseDraft().cardJson,
-          id: 'CUSTOM_OtherCard',
-        },
-      }),
-    })
-    expect(() => checkpointDraft(db, {
-      cardId: other.id,
-      authorId: 'other',
-      baseRevision: 1,
       draft: baseDraft(),
-    })).toThrowError(expect.objectContaining<Partial<WorkshopDraftError>>({ code: 'conflict' }))
+    })
+    expect(other.reviewStatus).toBe('unsubmitted')
   })
 
   it('checkpoints a whole draft with optimistic revision conflict protection', () => {
@@ -641,6 +638,18 @@ describe('workshop draft aggregate', () => {
       authorId: 'author',
       baseRevision: 1,
     })
+
+    expect(loadLiveDraft(db, created.id)).toMatchObject({
+      name: 'Field Keeper',
+      artUrl: null,
+    })
+    expect(loadWorkspace(db, created.id, 'author')).toMatchObject({
+      revision: 1,
+      approvedVersionId: approved.versionId,
+    })
+
+    // offline edits fork the draft, void the approval and stop live loading
+    unpublish(db, { cardId: created.id, authorId: 'author', baseRevision: 1 })
     checkpointDraft(db, {
       cardId: created.id,
       authorId: 'author',
@@ -654,19 +663,8 @@ describe('workshop draft aggregate', () => {
         artUrl: '/card-art/unpublished.png',
       }),
     })
-
-    expect(loadLiveDraft(db, created.id)).toMatchObject({
-      name: 'Field Keeper',
-      artUrl: null,
-    })
-    expect(loadWorkspace(db, created.id, 'author')).toMatchObject({
-      revision: 2,
-      approvedVersionId: approved.versionId,
-      draft: {
-        name: 'Unpublished change',
-        artUrl: '/card-art/unpublished.png',
-      },
-    })
+    expect(() => loadLiveDraft(db, created.id))
+      .toThrowError(expect.objectContaining<Partial<WorkshopDraftError>>({ code: 'not_found' }))
   })
 
   it('gates publishing on review approval and pins sandbox confirmation to the exact version', () => {
@@ -719,6 +717,7 @@ describe('workshop draft aggregate', () => {
     })
     expect(getHandoffReadiness(db, created.id, 'author').ready).toBe(true)
 
+    unpublish(db, { cardId: created.id, authorId: 'author', baseRevision: 1 })
     checkpointDraft(db, {
       cardId: created.id,
       authorId: 'author',
@@ -731,6 +730,7 @@ describe('workshop draft aggregate', () => {
       ready: false,
       sandboxPassedForDraft: false,
     })
+    expect(loadWorkspace(db, created.id, 'author').reviewStatus).toBe('stale')
   })
 
   it('enters review from unsubmitted and blocks re-entry after approval', () => {
@@ -767,6 +767,138 @@ describe('workshop draft aggregate', () => {
       prUrl: 'https://github.com/x/y/pull/9',
       expectedRevision: 1,
     })).toThrowError(expect.objectContaining<Partial<WorkshopDraftError>>({ code: 'conflict' }))
+  })
+
+  it('blocks editing a live card, keeps approval across unpublish, voids it on edit', () => {
+    const created = createCard(db, { authorId: 'author', draft: baseDraft() })
+    approveCurrentDraft(db, { cardId: created.id, authorId: 'author' })
+    publish(db, { cardId: created.id, authorId: 'author', baseRevision: 1 })
+
+    // live card edits are blocked until an explicit unpublish
+    expect(() => checkpointDraft(db, {
+      cardId: created.id,
+      authorId: 'author',
+      baseRevision: 1,
+      draft: baseDraft({
+        cardJson: { ...baseDraft().cardJson, desc: ['edited'] },
+      }),
+    })).toThrowError(expect.objectContaining<Partial<WorkshopDraftError>>({
+      code: 'conflict',
+      message: expect.stringContaining('unpublish'),
+    }))
+
+    // unpublish keeps the approval — an unchanged card re-publishes freely
+    const offline = unpublish(db, { cardId: created.id, authorId: 'author', baseRevision: 1 })
+    expect(offline.live).toBe(false)
+    expect(offline.reviewStatus).toBe('approved')
+    expect(publish(db, {
+      cardId: created.id,
+      authorId: 'author',
+      baseRevision: 1,
+    }).workspace.live).toBe(true)
+
+    // editing content after unpublish voids the approval
+    unpublish(db, { cardId: created.id, authorId: 'author', baseRevision: 1 })
+    const edited = checkpointDraft(db, {
+      cardId: created.id,
+      authorId: 'author',
+      baseRevision: 1,
+      draft: baseDraft({
+        cardJson: { ...baseDraft().cardJson, desc: ['edited for real'] },
+      }),
+    })
+    expect(edited.reviewStatus).toBe('stale')
+    expect(edited.approvedVersionId).toBeNull()
+    expect(() => publish(db, {
+      cardId: created.id,
+      authorId: 'author',
+      baseRevision: 2,
+    })).toThrowError(expect.objectContaining<Partial<WorkshopDraftError>>({ code: 'not_ready' }))
+  })
+
+  it('re-verifies the atomic review snapshot at publish time', () => {
+    const created = createCard(db, { authorId: 'author', draft: baseDraft() })
+    approveCurrentDraft(db, {
+      cardId: created.id,
+      authorId: 'author',
+      commitSha: 'sha-reviewed',
+    })
+
+    setReviewDecisionProvider({
+      getSnapshot: () => ({
+        decision: 'approved',
+        approvedCommitSha: 'sha-reviewed',
+        headCommitSha: 'sha-reviewed',
+      }),
+    })
+    expect(publish(db, {
+      cardId: created.id,
+      authorId: 'author',
+      baseRevision: 1,
+    }).workspace.live).toBe(true)
+
+    // author pushed a new commit after approval: head diverges -> reject + stale
+    unpublish(db, { cardId: created.id, authorId: 'author', baseRevision: 1 })
+    setReviewDecisionProvider({
+      getSnapshot: () => ({
+        decision: 'approved',
+        approvedCommitSha: 'sha-reviewed',
+        headCommitSha: 'sha-new-push',
+      }),
+    })
+    expect(() => publish(db, {
+      cardId: created.id,
+      authorId: 'author',
+      baseRevision: 1,
+    })).toThrowError(expect.objectContaining<Partial<WorkshopDraftError>>({ code: 'not_ready' }))
+    const after = loadWorkspace(db, created.id, 'author')
+    expect(after.reviewStatus).toBe('stale')
+    expect(after.live).toBe(false)
+    expect(after.approvedVersionId).toBeNull()
+  })
+
+  it('keeps the approval when the review snapshot is temporarily unavailable', () => {
+    const created = createCard(db, { authorId: 'author', draft: baseDraft() })
+    approveCurrentDraft(db, {
+      cardId: created.id,
+      authorId: 'author',
+      commitSha: 'sha-reviewed',
+    })
+    setReviewDecisionProvider({
+      getSnapshot: () => ({
+        decision: 'unknown',
+        approvedCommitSha: null,
+        headCommitSha: null,
+      }),
+    })
+    expect(() => publish(db, {
+      cardId: created.id,
+      authorId: 'author',
+      baseRevision: 1,
+    })).toThrowError(expect.objectContaining<Partial<WorkshopDraftError>>({
+      code: 'not_ready',
+      message: expect.stringContaining('try again'),
+    }))
+    const after = loadWorkspace(db, created.id, 'author')
+    expect(after.reviewStatus).toBe('approved')
+    expect(after.approvedVersionId).not.toBeNull()
+  })
+
+  it('treats merged cards as read-only in the workshop', () => {
+    const created = createCard(db, { authorId: 'author', draft: baseDraft() })
+    approveCurrentDraft(db, { cardId: created.id, authorId: 'author' })
+    db.prepare(`UPDATE workshop_cards SET review_status = 'merged' WHERE id = ?`).run(created.id)
+    expect(() => checkpointDraft(db, {
+      cardId: created.id,
+      authorId: 'author',
+      baseRevision: 1,
+      draft: baseDraft({
+        cardJson: { ...baseDraft().cardJson, desc: ['edited'] },
+      }),
+    })).toThrowError(expect.objectContaining<Partial<WorkshopDraftError>>({
+      code: 'conflict',
+      message: expect.stringContaining('read-only'),
+    }))
   })
 
   it('does not mark an approved metadata-only card ready for PR handoff', () => {

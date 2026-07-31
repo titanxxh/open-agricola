@@ -461,11 +461,33 @@ export const useWorkshopDraft = ({
         dispatch({
           type: 'conflictDetected',
           server: payload.current,
-          local: toLocalRecovery(current),
+          local: toLocalRecovery(stateRef.current ?? current),
         })
         return null
       }
       if (!response.ok || !payload.workspace || !payload.versionId) {
+        // A rejected publish may have downgraded the card (e.g. stale after a
+        // failed snapshot re-check) — hydrate the server state so the UI
+        // reflects the new review status, but keep any edits typed while the
+        // request was in flight (same merge as the success path).
+        if (payload.current) {
+          const latest = stateRef.current
+          const applied = workshopDraftReducer(latest ?? current, {
+            type: 'checkpointSaved',
+            workspace: payload.current,
+          })
+          const next = latest && latest.draft !== current.draft
+            ? {
+                ...applied,
+                draft: latest.draft,
+                sandboxPassVersionId: latest.sandboxPassVersionId,
+                sandboxPassedAt: latest.sandboxPassedAt,
+                save: { status: 'dirty' as const },
+              }
+            : applied
+          dispatch({ type: 'serverLoaded', state: next })
+          persist(next)
+        }
         dispatch({
           type: 'saveFailed',
           status: 'error',
@@ -499,6 +521,140 @@ export const useWorkshopDraft = ({
       return null
     }
   }, [apiFetch, cardId, dispatch, persist, saveDraft])
+
+  const pinDraftVersion = useCallback(async (): Promise<string | null> => {
+    let current = stateRef.current
+    if (!current || current.save.status === 'conflict') return null
+    if (current.save.status !== 'saved') {
+      if (!await saveDraft(current)) return null
+      current = stateRef.current
+      if (!current || current.save.status !== 'saved') return null
+    }
+    try {
+      const response = await apiFetch(
+        `/api/workshop/cards/${encodeURIComponent(cardId)}/pin-version`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ baseRevision: current.baseRevision }),
+        },
+      )
+      const payload = await response.json() as WorkspaceResponse
+      if (response.status === 409 && payload.current) {
+        dispatch({
+          type: 'conflictDetected',
+          server: payload.current,
+          local: toLocalRecovery(stateRef.current ?? current),
+        })
+        return null
+      }
+      if (!response.ok || !payload.versionId) {
+        dispatch({
+          type: 'saveFailed',
+          status: 'error',
+          error: payload.error ?? `Request failed (${response.status})`,
+        })
+        return null
+      }
+      // Edits typed while the pin request was in flight mean the returned
+      // version no longer matches what the author sees — make them pin again
+      // instead of sandbox-testing obsolete content.
+      const latest = stateRef.current
+      if (latest && latest.draft !== current.draft) {
+        dispatch({
+          type: 'saveFailed',
+          status: 'error',
+          error: 'Draft changed while pinning; pin the current version again',
+        })
+        return null
+      }
+      return payload.versionId
+    } catch (reason) {
+      dispatch({
+        type: 'saveFailed',
+        status: 'offline',
+        error: reason instanceof Error ? reason.message : String(reason),
+      })
+      return null
+    }
+  }, [apiFetch, cardId, dispatch, saveDraft])
+
+  const unpublishDraft = useCallback(async (): Promise<boolean> => {
+    const current = stateRef.current
+    if (!current) return false
+    // Unpublish is the escape hatch from the live edit block, and the author
+    // may arrive here from a live-save conflict. Only bypass the conflict
+    // when it is the live-guard 409 (server revision has NOT advanced) — a
+    // genuine concurrent checkpoint must go through normal resolution or the
+    // stale local draft would silently overwrite the other tab's work.
+    if (current.save.status === 'conflict'
+      && current.conflict
+      && current.conflict.server.revision !== current.baseRevision) {
+      return false
+    }
+    const baseRevision = current.baseRevision
+    dispatch({ type: 'saving' })
+    try {
+      const response = await apiFetch(
+        `/api/workshop/cards/${encodeURIComponent(cardId)}/unpublish`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ baseRevision }),
+        },
+      )
+      const payload = await response.json() as WorkspaceResponse
+      if (response.status === 409 && payload.current) {
+        dispatch({
+          type: 'conflictDetected',
+          server: payload.current,
+          local: toLocalRecovery(stateRef.current ?? current),
+        })
+        return false
+      }
+      if (!response.ok || !payload.workspace) {
+        dispatch({
+          type: 'saveFailed',
+          status: 'error',
+          error: payload.error ?? `Request failed (${response.status})`,
+        })
+        return false
+      }
+      // Unpublishing is the escape hatch from the live edit block, so the
+      // author may have unsaved edits right now — apply the new live state
+      // without discarding the dirty local draft.
+      const latest = stateRef.current
+      const applied = workshopDraftReducer(latest ?? current, {
+        type: 'checkpointSaved',
+        workspace: payload.workspace,
+      })
+      // Keep the local draft when the author had unsaved edits BEFORE the
+      // request (dirty/conflict — the very edits that motivated unpublishing)
+      // or typed while it was in flight.
+      const hadLocalEdits = current.save.status === 'dirty'
+        || current.save.status === 'conflict'
+        || (latest !== null && latest.draft !== current.draft)
+      const next = latest && hadLocalEdits
+        ? {
+            ...applied,
+            draft: latest.draft,
+            sandboxPassVersionId: latest.sandboxPassVersionId,
+            sandboxPassedAt: latest.sandboxPassedAt,
+            save: { status: 'dirty' as const },
+          }
+        : applied
+      dispatch({ type: 'serverLoaded', state: next })
+      persist(next)
+      return true
+    } catch (reason) {
+      dispatch({
+        type: 'saveFailed',
+        status: 'offline',
+        error: reason instanceof Error ? reason.message : String(reason),
+      })
+      return false
+    }
+  }, [apiFetch, cardId, dispatch])
 
   const confirmSandboxPass = useCallback(async (
     versionId: string,
@@ -573,7 +729,7 @@ export const useWorkshopDraft = ({
         dispatch({
           type: 'conflictDetected',
           server: payload.current,
-          local: toLocalRecovery(current),
+          local: toLocalRecovery(stateRef.current ?? current),
         })
         return false
       }
@@ -632,6 +788,8 @@ export const useWorkshopDraft = ({
     resolveConflict,
     adoptCandidate,
     publishDraft,
+    unpublishDraft,
+    pinDraftVersion,
     confirmSandboxPass,
     restoreVersion,
     undoRestore,

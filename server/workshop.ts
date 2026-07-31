@@ -14,7 +14,9 @@ import {
   loadPublishedCard,
   loadWorkspace,
   markSandboxPass,
+  pinCurrentDraftVersion,
   publish,
+  unpublish,
   restoreVersion,
   type WorkshopAbilityCandidate,
   type WorkshopArtCandidate,
@@ -620,6 +622,48 @@ export async function handleWorkshopRoute(
         baseRevision: body!.baseRevision as number,
       })
       sendJson(res, 200, { ok: true, ...result })
+    } catch (error) {
+      if (!sendWorkshopDraftError(res, error)) throw error
+    }
+    return true
+  }
+
+  const pinVersionMatch = /^\/api\/workshop\/cards\/([^/]+)\/pin-version$/.exec(url)
+  if (req.method === 'POST' && pinVersionMatch) {
+    if (!user) { sendJson(res, 401, { ok: false, error: 'Not authenticated' }); return true }
+    const body = await parseBody<{ baseRevision?: unknown }>(req)
+    if (!Number.isInteger(body?.baseRevision)) {
+      sendJson(res, 400, { ok: false, error: 'Missing baseRevision' })
+      return true
+    }
+    try {
+      const result = pinCurrentDraftVersion(db, {
+        cardId: pinVersionMatch[1]!,
+        authorId: user.id,
+        baseRevision: body!.baseRevision as number,
+      })
+      sendJson(res, 200, { ok: true, ...result })
+    } catch (error) {
+      if (!sendWorkshopDraftError(res, error)) throw error
+    }
+    return true
+  }
+
+  const unpublishMatch = /^\/api\/workshop\/cards\/([^/]+)\/unpublish$/.exec(url)
+  if (req.method === 'POST' && unpublishMatch) {
+    if (!user) { sendJson(res, 401, { ok: false, error: 'Not authenticated' }); return true }
+    const body = await parseBody<{ baseRevision?: unknown }>(req)
+    if (!Number.isInteger(body?.baseRevision)) {
+      sendJson(res, 400, { ok: false, error: 'Missing baseRevision' })
+      return true
+    }
+    try {
+      const workspace = unpublish(db, {
+        cardId: unpublishMatch[1]!,
+        authorId: user.id,
+        baseRevision: body!.baseRevision as number,
+      })
+      sendJson(res, 200, { ok: true, workspace })
     } catch (error) {
       if (!sendWorkshopDraftError(res, error)) throw error
     }

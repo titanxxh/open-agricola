@@ -366,7 +366,7 @@ describe('AiCardDesigner AI config header', () => {
     expect(container.querySelector('.aicw-current-code code')?.textContent).toBe(sourceCode)
   })
 
-  it('publishes, starts, and confirms one exact sandbox version', async () => {
+  it('pins, starts, and confirms one exact sandbox version', async () => {
     const completeCard: ApiCard = {
       ...existingCard,
       art_url: '/card-art/complete.png',
@@ -414,15 +414,10 @@ describe('AiCardDesigner AI config header', () => {
       if (!init) {
         return new Response(JSON.stringify({ ok: true, workspace: baseWorkspace }))
       }
-      if (path.endsWith('/publish')) {
+      if (path.endsWith('/pin-version')) {
         return new Response(JSON.stringify({
           ok: true,
-          workspace: {
-            ...baseWorkspace,
-            reviewStatus: 'approved',
-            live: true,
-            approvedVersionId: 'version-2',
-          },
+          workspace: baseWorkspace,
           versionId: 'version-2',
         }))
       }
@@ -430,9 +425,6 @@ describe('AiCardDesigner AI config header', () => {
         ok: true,
         workspace: {
           ...baseWorkspace,
-          reviewStatus: 'approved',
-          live: true,
-          approvedVersionId: 'version-2',
           sandboxPassVersionId: 'version-2',
           sandboxPassedAt: 100,
         },
@@ -458,7 +450,7 @@ describe('AiCardDesigner AI config header', () => {
 
     await waitFor(() => expect(screen.queryByText('正在恢复草稿…')).not.toBeInTheDocument())
     await userEvent.click(screen.getByRole('button', { name: /验证与交付 沙盒测试和发布检查/ }))
-    await userEvent.click(screen.getByRole('button', { name: '发布当前版本并启动沙盒' }))
+    await userEvent.click(screen.getByRole('button', { name: '固化当前版本并启动沙盒' }))
     await waitFor(() => expect(startSandbox).toHaveBeenCalledWith(
       completeCard.id,
       'version-2',
@@ -467,17 +459,17 @@ describe('AiCardDesigner AI config header', () => {
       name: '我确认这个固定版本在沙盒中没有运行错误',
     })).not.toBeInTheDocument()
 
-    await userEvent.click(screen.getByRole('button', { name: '发布当前版本并启动沙盒' }))
+    await userEvent.click(screen.getByRole('button', { name: '固化当前版本并启动沙盒' }))
     await waitFor(() => expect(startSandbox).toHaveBeenCalledTimes(2))
 
     await userEvent.click(screen.getByRole('checkbox', {
       name: '我确认这个固定版本在沙盒中没有运行错误',
     }))
     await userEvent.click(screen.getByRole('button', { name: '确认沙盒通过' }))
-    await waitFor(() => expect(screen.getByText('先修复已知沙盒错误并重新发布。')).toBeInTheDocument())
+    await waitFor(() => expect(screen.getByText('先修复已知沙盒错误并重新固化。')).toBeInTheDocument())
     expect(apiFetch.mock.calls.some(([path]) => path.endsWith('/sandbox-pass'))).toBe(false)
 
-    await userEvent.click(screen.getByRole('button', { name: '发布当前版本并启动沙盒' }))
+    await userEvent.click(screen.getByRole('button', { name: '固化当前版本并启动沙盒' }))
     await waitFor(() => expect(startSandbox).toHaveBeenCalledTimes(3))
     await userEvent.click(screen.getByRole('checkbox', {
       name: '我确认这个固定版本在沙盒中没有运行错误',

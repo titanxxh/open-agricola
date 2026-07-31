@@ -531,7 +531,9 @@ WorkshopPage
 | `PUT /api/workshop/cards/:id/draft` | 带 `baseRevision` 保存完整检查点；过期返回 `409` 和服务器完整草稿 |
 | `POST /api/workshop/cards/:id/adopt` | 原子采用 typed candidate、创建内容去重版本并清空该类候选 |
 | `POST /api/workshop/cards/:id/restore` | 复制旧版本到当前草稿并推进 revision，不创建版本 |
-| `POST /api/workshop/cards/:id/publish` | 仅 review approved 的卡置 live（PRD #634；不再固化草稿版本） |
+| `POST /api/workshop/cards/:id/publish` | 仅 review approved 的卡置 live（PRD #634；publish 时刻重验原子快照，provider 不一致 → 拒绝并转 stale） |
+| `POST /api/workshop/cards/:id/unpublish` | live → offline；不作废过审资格，未改动可直接再发布（#638） |
+| `POST /api/workshop/cards/:id/pin-version` | 固化当前草稿为不可变版本（沙盒确认流的版本来源；不动 review 轴） |
 | `POST /api/workshop/cards/:id/sandbox-pass` | 只记录当前精确发布版本且无运行错误的作者确认 |
 
 每次能力源码验证都会把 isolated-vm 提取的 `CARD_DEF` 快照写入服务端 manifest；发布静态门禁会双向比较该快照与当前 `card_json` 的可交付字段，PR handoff 还必须存在已验证源码，避免沙盒运行、已发布定义与最终提交源码不一致。

@@ -10,6 +10,7 @@ import type {
 } from '../shared/contract/workshop'
 import { workshopCardJsonFromDefinition } from './workshop-draft-validation.ts'
 import { canGoLive, isReviewStatus, type ReviewStatus } from './workshop-status.ts'
+import { getReviewDecisionProvider } from './workshop-review-provider.ts'
 
 export type WorkshopDraft = WorkshopDraftContract & {
   compiledCode: string | null
@@ -363,6 +364,20 @@ export function checkpointDraft(
   validateDraft(draft)
   return db.transaction(() => {
     const current = loadWorkspace(db, input.cardId, input.authorId)
+    if (current.reviewStatus === 'merged') {
+      throw new WorkshopDraftError(
+        'conflict',
+        'Merged cards are read-only; contribute changes via the main repository',
+        current,
+      )
+    }
+    if (current.live) {
+      throw new WorkshopDraftError(
+        'conflict',
+        'Card is live; unpublish it before editing',
+        current,
+      )
+    }
     if (current.revision !== input.baseRevision) {
       throw new WorkshopDraftError('conflict', 'Draft revision conflict', current)
     }
@@ -401,6 +416,19 @@ export function checkpointDraft(
       Date.now(),
       input.cardId,
     )
+    // Editing the content of an approved card voids the approval (#628):
+    // the pinned snapshot no longer matches what the author intends to ship.
+    if (current.reviewStatus === 'approved' && !keepSandboxPass) {
+      db.prepare(`
+        UPDATE workshop_cards
+        SET review_status = 'stale',
+            approved_commit_sha = NULL,
+            approved_review_id = NULL,
+            approved_at = NULL,
+            approved_version_id = NULL
+        WHERE id = ?
+      `).run(input.cardId)
+    }
     return loadWorkspace(db, input.cardId, input.authorId)
   })()
 }
@@ -787,25 +815,126 @@ export function publish(
     baseRevision: number
   },
 ): { workspace: WorkshopWorkspace; versionId: string } {
+  // Deliberately not wrapped in one transaction: the stale downgrade below
+  // must survive the thrown error (a transaction would roll it back), and the
+  // synchronous better-sqlite3 driver leaves no interleaving window between
+  // the checks and the final live flip.
+  const current = loadWorkspace(db, input.cardId, input.authorId)
+  if (current.revision !== input.baseRevision) {
+    throw new WorkshopDraftError('conflict', 'Draft revision conflict', current)
+  }
+  if (!canGoLive(current.reviewStatus) || !current.approvedVersionId) {
+    throw new WorkshopDraftError(
+      'not_ready',
+      'Card must pass PR review approval before it can be published',
+      current,
+    )
+  }
+  // Atomic snapshot rule (#629, #638): at the moment the card goes live the
+  // approving review's commit, the PR head and the platform-pinned commit
+  // must agree. Without a provider (production until #640) only the local
+  // state check above applies.
+  const provider = getReviewDecisionProvider()
+  if (provider) {
+    const row = db.prepare(
+      'SELECT approved_commit_sha, github_pr_url FROM workshop_cards WHERE id = ?',
+    ).get(current.id) as { approved_commit_sha: string | null; github_pr_url: string | null }
+    const snapshot = provider.getSnapshot({ cardDbId: current.id, prUrl: row.github_pr_url })
+    // A transient lookup failure (rate limit, outage) is not evidence of a
+    // mismatch: fail retryably without touching the approval.
+    if (snapshot.decision === 'unknown' || snapshot.headCommitSha === null) {
+      throw new WorkshopDraftError(
+        'not_ready',
+        'Cannot verify the review approval right now; try again later',
+        current,
+      )
+    }
+    const consistent = snapshot.decision === 'approved'
+      && snapshot.approvedCommitSha !== null
+      && snapshot.approvedCommitSha === snapshot.headCommitSha
+      && snapshot.approvedCommitSha === row.approved_commit_sha
+    if (!consistent) {
+      db.prepare(`
+        UPDATE workshop_cards
+        SET review_status = 'stale',
+            live = 0,
+            approved_commit_sha = NULL,
+            approved_review_id = NULL,
+            approved_at = NULL,
+            approved_version_id = NULL,
+            updated_at = ?
+        WHERE id = ?
+      `).run(Date.now(), current.id)
+      throw new WorkshopDraftError(
+        'not_ready',
+        'Review approval no longer matches the reviewed commit; re-submit for review',
+        loadWorkspace(db, current.id, input.authorId),
+      )
+    }
+  }
+  db.prepare(`
+    UPDATE workshop_cards SET live = 1, updated_at = ? WHERE id = ?
+  `).run(Date.now(), current.id)
+  return {
+    workspace: loadWorkspace(db, current.id, input.authorId),
+    versionId: current.approvedVersionId,
+  }
+}
+
+/**
+ * Pin the current draft as an immutable version without touching the review
+ * axis (#638). This is the author-side version source for the sandbox
+ * confirmation flow: the sandbox loads exactly this version and
+ * markSandboxPass later verifies the same content hash. (The old self-publish
+ * used to play this role before the PR review gate.)
+ */
+export function pinCurrentDraftVersion(
+  db: Database.Database,
+  input: {
+    cardId: string
+    authorId: string
+    baseRevision: number
+  },
+): { workspace: WorkshopWorkspace; versionId: string } {
   return db.transaction(() => {
     const current = loadWorkspace(db, input.cardId, input.authorId)
     if (current.revision !== input.baseRevision) {
       throw new WorkshopDraftError('conflict', 'Draft revision conflict', current)
     }
-    if (!canGoLive(current.reviewStatus) || !current.approvedVersionId) {
-      throw new WorkshopDraftError(
-        'not_ready',
-        'Card must pass PR review approval before it can be published',
-        current,
-      )
+    const validation = staticValidation(current.draft)
+    if (!validation.valid) {
+      throw new WorkshopDraftError('not_ready', validation.errors.join('; '), current)
+    }
+    return {
+      workspace: current,
+      versionId: ensureVersion(db, current),
+    }
+  })()
+}
+
+/**
+ * Take a live card offline (PRD #634, #638). Explicit author action that does
+ * NOT void the approval: an unchanged card can be re-published without
+ * another review round. Running games keep their embedded snapshot; only new
+ * rooms stop offering the card.
+ */
+export function unpublish(
+  db: Database.Database,
+  input: {
+    cardId: string
+    authorId: string
+    baseRevision: number
+  },
+): WorkshopWorkspace {
+  return db.transaction(() => {
+    const current = loadWorkspace(db, input.cardId, input.authorId)
+    if (current.revision !== input.baseRevision) {
+      throw new WorkshopDraftError('conflict', 'Draft revision conflict', current)
     }
     db.prepare(`
-      UPDATE workshop_cards SET live = 1, updated_at = ? WHERE id = ?
+      UPDATE workshop_cards SET live = 0, updated_at = ? WHERE id = ?
     `).run(Date.now(), current.id)
-    return {
-      workspace: loadWorkspace(db, current.id, input.authorId),
-      versionId: current.approvedVersionId,
-    }
+    return loadWorkspace(db, current.id, input.authorId)
   })()
 }
 
