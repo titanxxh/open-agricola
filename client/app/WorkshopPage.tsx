@@ -138,12 +138,12 @@ export function buildWorkshopUrl(
 type WorkshopPrActionInput = {
   enabled: boolean
   isAuthor: boolean
-  live: boolean
+  reviewStatus: WorkshopCard['review_status']
   githubPrUrl?: string | null
   githubPrStatus?: WorkshopCard['github_pr_status']
   handoffReady?: boolean
   /**
-   * Workshop card has at least zh + en filled in. PR submission is blocked
+   * Workshop card has at least zh + en filled in. Review submission is blocked
    * until both locales are present so the upstream code file is bilingual.
    * Optional for back-compat; when omitted, treated as `true`.
    */
@@ -162,12 +162,21 @@ export function getWorkshopPrActionState(input: WorkshopPrActionInput): {
   if (!input.enabled) {
     return { visible: true, disabled: true, buttonLabel: 'PR 功能未开启', secondary: null }
   }
-  if (!input.live) {
+  if (input.reviewStatus === 'merged') {
+    const prNum = extractPrNumber(input.githubPrUrl)
     return {
       visible: true,
       disabled: true,
-      buttonLabel: '先过审并上线后可发起 PR',
-      secondary: '卡牌通过 review 并上线后可以提交到主仓库。',
+      buttonLabel: '已合并 ✓',
+      secondary: prNum ? `PR #${prNum} · 社区卡已收录` : '社区卡已收录',
+    }
+  }
+  if (input.reviewStatus === 'approved') {
+    return {
+      visible: true,
+      disabled: true,
+      buttonLabel: '已通过审核',
+      secondary: '可以发布上线；修改草稿后需重新提交审核。',
     }
   }
   if (input.handoffReady === false) {
@@ -175,7 +184,7 @@ export function getWorkshopPrActionState(input: WorkshopPrActionInput): {
       visible: true,
       disabled: true,
       buttonLabel: '先完成当前版本沙盒确认',
-      secondary: '发布版本、沙盒通过记录和当前草稿必须完全匹配。',
+      secondary: '静态校验、沙盒通过记录和当前草稿必须完全匹配。',
     }
   }
   if (input.localesComplete === false) {
@@ -188,31 +197,33 @@ export function getWorkshopPrActionState(input: WorkshopPrActionInput): {
   }
 
   const prNum = extractPrNumber(input.githubPrUrl)
-  if (!input.githubPrUrl) {
-    return { visible: true, disabled: false, buttonLabel: '发起 PR 到主仓库', secondary: null }
-  }
-  if (input.githubPrStatus === 'merged') {
-    return {
-      visible: true,
-      disabled: true,
-      buttonLabel: '已合并 ✓',
-      secondary: `PR #${prNum} · 社区卡已上线`,
+  if (input.reviewStatus === 'in_review' && input.githubPrUrl) {
+    if (input.githubPrStatus === 'merged') {
+      // refresh-pr-status may learn about the merge before the review sync
+      // (#640/#642) moves review_status to merged — never offer re-submission.
+      return {
+        visible: true,
+        disabled: true,
+        buttonLabel: '已合并 ✓',
+        secondary: `PR #${prNum} · 等待收录同步`,
+      }
     }
-  }
-  if (input.githubPrStatus === 'closed') {
+    if (input.githubPrStatus === 'closed') {
+      return {
+        visible: true,
+        disabled: false,
+        buttonLabel: '重新提交审核',
+        secondary: `上次 PR #${prNum} 已关闭 · 点击重开`,
+      }
+    }
     return {
       visible: true,
       disabled: false,
-      buttonLabel: '重新发起 PR',
-      secondary: `上次 PR #${prNum} 已关闭 · 点击重开`,
+      buttonLabel: '更新审核 PR',
+      secondary: `#${prNum} 等待 review · 点击重发最新版（会重置已有审核进度）`,
     }
   }
-  return {
-    visible: true,
-    disabled: false,
-    buttonLabel: '更新已有 PR',
-    secondary: `#${prNum} 等待 review · 点击重发最新版`,
-  }
+  return { visible: true, disabled: false, buttonLabel: '提交审核（发起 PR）', secondary: '通过 review 后才能发布进入房间。' }
 }
 
 /**
@@ -414,7 +425,7 @@ function CardDetailPrSection({
   const action = getWorkshopPrActionState({
     enabled: true,
     isAuthor,
-    live: card.live,
+    reviewStatus: card.review_status,
     githubPrUrl: card.github_pr_url,
     githubPrStatus: card.github_pr_status,
     handoffReady: handoffState?.cardId === card.id && handoffState.ready,

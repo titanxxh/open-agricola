@@ -115,7 +115,7 @@ const parseRecord = (raw: string | null): Record<string, unknown> => {
     : {}
 }
 
-const hasReservedCardId = (
+export const hasReservedCardId = (
   db: Database.Database,
   cardId: string,
   excludedCardId = '',
@@ -673,6 +673,56 @@ export function restoreVersion(
       baseRevision: input.baseRevision,
       draft: draftFromVersion(current, version),
     })
+  })()
+}
+
+/**
+ * Enter (or refresh) review (PRD #634, #637): record that the card's review
+ * PR is open and move the review axis to 'in_review'. Called by the
+ * submit-review handler after the PR is created or its branch updated.
+ * Re-submitting while already in_review is the "update the PR" path.
+ */
+export function enterReview(
+  db: Database.Database,
+  input: {
+    cardId: string
+    authorId: string
+    prUrl: string
+    /**
+     * Revision the quality gate was checked against. The PR content is
+     * generated from that revision, so a concurrent checkpoint (e.g. a save
+     * from another tab while the GitHub requests run) must fail the
+     * transition instead of marking never-submitted content in_review.
+     */
+    expectedRevision: number
+  },
+): WorkshopWorkspace {
+  return db.transaction(() => {
+    const current = loadWorkspace(db, input.cardId, input.authorId)
+    if (current.revision !== input.expectedRevision) {
+      throw new WorkshopDraftError(
+        'conflict',
+        'Draft changed while the review submission was in flight; re-submit',
+        current,
+      )
+    }
+    if (current.reviewStatus === 'approved' || current.reviewStatus === 'merged') {
+      throw new WorkshopDraftError(
+        'conflict',
+        `Card is already ${current.reviewStatus}; edit the draft to restart review`,
+        current,
+      )
+    }
+    db.prepare(`
+      UPDATE workshop_cards
+      SET review_status = 'in_review',
+          github_pr_url = ?,
+          github_pr_status = 'open',
+          github_pr_last_synced_at = ?,
+          updated_at = ?
+      WHERE id = ?
+    `).run(input.prUrl, Date.now(), Date.now(), current.id)
+    return loadWorkspace(db, current.id, input.authorId)
   })()
 }
 

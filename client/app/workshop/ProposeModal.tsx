@@ -223,7 +223,7 @@ function ProposePreview({
   const hasArt = !!card.art_url
   return (
     <div style={{ padding: 16 }}>
-      <h3 style={{ marginTop: 0 }}>预览 PR 内容</h3>
+      <h3 style={{ marginTop: 0 }}>预览审核 PR 内容</h3>
       <p>
         将在主仓库 fork 上创建 <strong>{hasArt ? 5 : 4}</strong> 个文件的 commit，然后开启 Pull Request。
       </p>
@@ -265,7 +265,7 @@ function ProposeProgress({
 }) {
   return (
     <div style={{ padding: 16 }}>
-      <h3 style={{ marginTop: 0 }}>{prUrl ? 'PR 已创建 ✓' : '正在提交 PR'}</h3>
+      <h3 style={{ marginTop: 0 }}>{prUrl ? '审核 PR 已创建 ✓' : '正在提交审核 PR'}</h3>
       <ol style={{ listStyle: 'none', padding: 0 }}>
         {steps.map((s) => {
           const icon = s.done ? '✓' : s.error ? '✗' : '…'

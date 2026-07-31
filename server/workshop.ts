@@ -3,7 +3,7 @@ import { getDb } from './db.ts'
 import { validateSession, extractToken, isAdmin } from './auth.ts'
 import { nanoid } from 'nanoid'
 import { handleOAuthStart, handleOAuthCallback } from './workshop-pr/oauth-handler.ts'
-import { handleProposeRequest, handleRefreshPrStatus } from './workshop-pr/propose-handler.ts'
+import { handleSubmitReviewRequest, handleRefreshPrStatus } from './workshop-pr/propose-handler.ts'
 import { corsHeaders } from './http-origin.ts'
 import {
   WorkshopDraftError,
@@ -322,11 +322,12 @@ export async function handleWorkshopRoute(
     return true
   }
 
-  // ── POST /api/workshop/cards/:id/propose ────────────────────────────────
-  // Opens or updates a GitHub PR against upstream from the author's fork.
-  const proposeMatch = /^\/api\/workshop\/cards\/([^/]+)\/propose$/.exec(url)
-  if (req.method === 'POST' && proposeMatch) {
-    await handleProposeRequest(req, res, proposeMatch[1]!)
+  // ── POST /api/workshop/cards/:id/submit-review ──────────────────────────
+  // Entry to in_review (#637): opens or updates the review PR against
+  // upstream from the author's fork, after the quality gate passes.
+  const submitReviewMatch = /^\/api\/workshop\/cards\/([^/]+)\/submit-review$/.exec(url)
+  if (req.method === 'POST' && submitReviewMatch) {
+    await handleSubmitReviewRequest(req, res, submitReviewMatch[1]!)
     return true
   }
 

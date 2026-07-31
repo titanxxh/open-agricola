@@ -1067,13 +1067,13 @@ const scenarioHandoff = async ({
   await responseJson(await api(
     request,
     null,
-    `/api/workshop/cards/${workspace.id}/propose`,
+    `/api/workshop/cards/${workspace.id}/submit-review`,
     { method: 'POST', data: {} },
   ), 401)
   await responseJson(await api(
     request,
     account,
-    `/api/workshop/cards/${workspace.id}/propose`,
+    `/api/workshop/cards/${workspace.id}/submit-review`,
     {
       method: 'POST',
       data: {},
@@ -1083,7 +1083,7 @@ const scenarioHandoff = async ({
   await responseJson(await api(
     request,
     account,
-    `/api/workshop/cards/${workspace.id}/propose`,
+    `/api/workshop/cards/${workspace.id}/submit-review`,
     {
       method: 'POST',
       data: {},
@@ -1091,7 +1091,7 @@ const scenarioHandoff = async ({
     },
   ), 503)
   const proposed = await responseJson<{ prUrl: string; prNumber: number }>(
-    await api(request, account, `/api/workshop/cards/${workspace.id}/propose`, {
+    await api(request, account, `/api/workshop/cards/${workspace.id}/submit-review`, {
       method: 'POST',
       data: {},
     }),
@@ -1115,7 +1115,7 @@ const scenarioHandoff = async ({
   await responseJson(await api(
     request,
     account,
-    `/api/workshop/cards/${workspace.id}/propose`,
+    `/api/workshop/cards/${workspace.id}/submit-review`,
     { method: 'POST', data: {} },
   ), 400)
   await page.reload()

@@ -6,6 +6,7 @@ import {
   approveCurrentDraft,
   checkpointDraft,
   createCard,
+  enterReview,
   getHandoffReadiness,
   loadLiveDraft,
   loadSandboxVersion,
@@ -730,6 +731,42 @@ describe('workshop draft aggregate', () => {
       ready: false,
       sandboxPassedForDraft: false,
     })
+  })
+
+  it('enters review from unsubmitted and blocks re-entry after approval', () => {
+    const created = createCard(db, { authorId: 'author', draft: baseDraft() })
+    const inReview = enterReview(db, {
+      cardId: created.id,
+      authorId: 'author',
+      prUrl: 'https://github.com/x/y/pull/9',
+      expectedRevision: 1,
+    })
+    expect(inReview.reviewStatus).toBe('in_review')
+    expect(inReview.live).toBe(false)
+
+    // re-submission while in_review is the update-PR path
+    expect(enterReview(db, {
+      cardId: created.id,
+      authorId: 'author',
+      prUrl: 'https://github.com/x/y/pull/9',
+      expectedRevision: 1,
+    }).reviewStatus).toBe('in_review')
+
+    // a checkpoint racing the GitHub round-trip invalidates the transition
+    expect(() => enterReview(db, {
+      cardId: created.id,
+      authorId: 'author',
+      prUrl: 'https://github.com/x/y/pull/9',
+      expectedRevision: 0,
+    })).toThrowError(expect.objectContaining<Partial<WorkshopDraftError>>({ code: 'conflict' }))
+
+    approveCurrentDraft(db, { cardId: created.id, authorId: 'author' })
+    expect(() => enterReview(db, {
+      cardId: created.id,
+      authorId: 'author',
+      prUrl: 'https://github.com/x/y/pull/9',
+      expectedRevision: 1,
+    })).toThrowError(expect.objectContaining<Partial<WorkshopDraftError>>({ code: 'conflict' }))
   })
 
   it('does not mark an approved metadata-only card ready for PR handoff', () => {

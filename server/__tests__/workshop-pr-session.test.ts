@@ -1,7 +1,7 @@
 /**
  * Workshop -> GitHub PR integration: session-style tests.
  *
- * These tests exercise the full `/api/workshop/cards/:id/propose` flow end to
+ * These tests exercise the full `/api/workshop/cards/:id/submit-review` flow end to
  * end through the real propose-handler / github-client / code-gen composition,
  * with the GitHub API stubbed via `vi.stubGlobal('fetch', ...)`. The database
  * is an in-memory SQLite instance.
@@ -97,7 +97,7 @@ vi.mock('../db.ts', () => ({ getDb: () => db, cleanExpiredSessions: () => {} }))
 
 // ── After mocks are in place, import the modules under test ────────────────
 
-import { handleProposeRequest, handleRefreshPrStatus } from '../workshop-pr/propose-handler.ts'
+import { handleSubmitReviewRequest, handleRefreshPrStatus } from '../workshop-pr/propose-handler.ts'
 import { handleOAuthCallback } from '../workshop-pr/oauth-handler.ts'
 import { tokenCache } from '../workshop-pr/token-cache.ts'
 import { workshopPrConfig } from '../workshop-pr/config.ts'
@@ -455,7 +455,7 @@ describe('workshop PR propose — session', () => {
       `INSERT INTO workshop_cards
          (id, author_id, card_id, card_type, name, description, card_json,
           code_manifest, art_url, review_status, live, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'approved', 1, ?, ?)`,
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'unsubmitted', 0, ?, ?)`,
     ).run(
       cardDbId,
       userId,
@@ -478,9 +478,9 @@ describe('workshop PR propose — session', () => {
     `).run(versionId, cardDbId, cardJson, codeManifest, userId, now)
     db.prepare(`
       UPDATE workshop_cards
-      SET approved_version_id = ?, sandbox_pass_version_id = ?, sandbox_passed_at = ?
+      SET sandbox_pass_version_id = ?, sandbox_passed_at = ?
       WHERE id = ?
-    `).run(versionId, versionId, now, cardDbId)
+    `).run(versionId, now, cardDbId)
 
     db.prepare(`DELETE FROM github_propose_rate_limit WHERE user_id = ?`).run(userId)
     db.prepare(`DELETE FROM github_propose_audit WHERE user_id = ?`).run(userId)
@@ -512,13 +512,13 @@ describe('workshop PR propose — session', () => {
     `).run(cardDbId)
     const req = fakeReq({
       method: 'POST',
-      url: `/api/workshop/cards/${cardDbId}/propose`,
+      url: `/api/workshop/cards/${cardDbId}/submit-review`,
       authHeader: `Bearer ${userToken}`,
       body: JSON.stringify({}),
     })
     const res = fakeRes()
 
-    await handleProposeRequest(req, res, cardDbId)
+    await handleSubmitReviewRequest(req, res, cardDbId)
 
     expect(res.statusCode).toBe(400)
     expect(JSON.parse(res.body)).toMatchObject({
@@ -535,13 +535,13 @@ describe('workshop PR propose — session', () => {
     ;(workshopPrConfig as unknown as { mockMode: boolean }).mockMode = true
     const req = fakeReq({
       method: 'POST',
-      url: `/api/workshop/cards/${cardDbId}/propose`,
+      url: `/api/workshop/cards/${cardDbId}/submit-review`,
       authHeader: `Bearer ${userToken}`,
       body: JSON.stringify({}),
     })
     const res = fakeRes()
 
-    await handleProposeRequest(req, res, cardDbId)
+    await handleSubmitReviewRequest(req, res, cardDbId)
 
     expect(res.statusCode).toBe(200)
     expect(JSON.parse(res.body)).toEqual({
@@ -550,12 +550,53 @@ describe('workshop PR propose — session', () => {
       prNumber: 1,
     })
     expect(db.prepare(`
-      SELECT github_pr_url, github_pr_status
+      SELECT github_pr_url, github_pr_status, review_status, live
       FROM workshop_cards WHERE id = ?
     `).get(cardDbId)).toEqual({
       github_pr_url: '/mock-workshop-pr/1',
       github_pr_status: 'open',
+      review_status: 'in_review',
+      live: 0,
     })
+  })
+
+  it('rejects submission for approved and merged cards until the draft is edited', async () => {
+    ;(workshopPrConfig as unknown as { mockMode: boolean }).mockMode = true
+    db.prepare(`UPDATE workshop_cards SET review_status = 'approved' WHERE id = ?`).run(cardDbId)
+    const res = fakeRes()
+    await handleSubmitReviewRequest(fakeReq({
+      method: 'POST',
+      url: `/api/workshop/cards/${cardDbId}/submit-review`,
+      authHeader: `Bearer ${userToken}`,
+      body: JSON.stringify({}),
+    }), res, cardDbId)
+    expect(res.statusCode).toBe(400)
+    expect(JSON.parse(res.body)).toMatchObject({ ok: false, code: 'already_reviewed' })
+  })
+
+  it('rejects submission when the card id is reserved by an approved card', async () => {
+    ;(workshopPrConfig as unknown as { mockMode: boolean }).mockMode = true
+    const now = Date.now()
+    db.prepare(`
+      INSERT INTO workshop_cards
+        (id, author_id, card_id, card_type, name, description, card_json,
+         review_status, live, created_at, updated_at)
+      VALUES ('rival-card', ?, 'CUSTOM_TestCard', 'minor', 'Rival', '', '{"id":"CUSTOM_TestCard"}',
+              'approved', 0, ?, ?)
+    `).run(userId, now, now)
+    try {
+      const res = fakeRes()
+      await handleSubmitReviewRequest(fakeReq({
+        method: 'POST',
+        url: `/api/workshop/cards/${cardDbId}/submit-review`,
+        authHeader: `Bearer ${userToken}`,
+        body: JSON.stringify({}),
+      }), res, cardDbId)
+      expect(res.statusCode).toBe(409)
+      expect(JSON.parse(res.body)).toMatchObject({ ok: false, code: 'card_id_taken' })
+    } finally {
+      db.prepare(`DELETE FROM workshop_cards WHERE id = 'rival-card'`).run()
+    }
   })
 
   it('rejects proposals without complete Chinese localization before mock handoff', async () => {
@@ -573,13 +614,13 @@ describe('workshop PR propose — session', () => {
 
     const req = fakeReq({
       method: 'POST',
-      url: `/api/workshop/cards/${cardDbId}/propose`,
+      url: `/api/workshop/cards/${cardDbId}/submit-review`,
       authHeader: `Bearer ${userToken}`,
       body: JSON.stringify({}),
     })
     const res = fakeRes()
 
-    await handleProposeRequest(req, res, cardDbId)
+    await handleSubmitReviewRequest(req, res, cardDbId)
 
     expect(res.statusCode).toBe(400)
     expect(JSON.parse(res.body)).toMatchObject({
@@ -595,14 +636,14 @@ describe('workshop PR propose — session', () => {
     ;(workshopPrConfig as unknown as { mockMode: boolean }).mockMode = true
     const req = fakeReq({
       method: 'POST',
-      url: `/api/workshop/cards/${cardDbId}/propose`,
+      url: `/api/workshop/cards/${cardDbId}/submit-review`,
       authHeader: `Bearer ${userToken}`,
       mockResult,
       body: JSON.stringify({}),
     })
     const res = fakeRes()
 
-    await handleProposeRequest(req, res, cardDbId)
+    await handleSubmitReviewRequest(req, res, cardDbId)
 
     expect(res.statusCode).toBe(status)
     expect(JSON.parse(res.body)).toMatchObject({ ok: false, code })
@@ -616,12 +657,12 @@ describe('workshop PR propose — session', () => {
     // Phase 1 — no handshakeId yet → 200 { needsAuth: true, handshakeId }
     const req1 = fakeReq({
       method: 'POST',
-      url: `/api/workshop/cards/${cardDbId}/propose`,
+      url: `/api/workshop/cards/${cardDbId}/submit-review`,
       authHeader: `Bearer ${userToken}`,
       body: JSON.stringify({}),
     })
     const res1 = fakeRes()
-    await handleProposeRequest(req1, res1, cardDbId)
+    await handleSubmitReviewRequest(req1, res1, cardDbId)
     expect(res1.statusCode).toBe(200)
     expect(res1.headers['Access-Control-Allow-Origin']).toBe('https://frontend.example')
     expect(res1.headers['Access-Control-Allow-Credentials']).toBe('true')
@@ -670,12 +711,12 @@ describe('workshop PR propose — session', () => {
 
     const req2 = fakeReq({
       method: 'POST',
-      url: `/api/workshop/cards/${cardDbId}/propose`,
+      url: `/api/workshop/cards/${cardDbId}/submit-review`,
       authHeader: `Bearer ${userToken}`,
       body: JSON.stringify({ handshakeId: j1.handshakeId }),
     })
     const res2 = fakeRes()
-    await handleProposeRequest(req2, res2, cardDbId)
+    await handleSubmitReviewRequest(req2, res2, cardDbId)
     expect(res2.statusCode).toBe(200)
     const j2 = JSON.parse(res2.body) as {
       ok: boolean
@@ -748,12 +789,12 @@ describe('workshop PR propose — session', () => {
 
     const req = fakeReq({
       method: 'POST',
-      url: `/api/workshop/cards/${cardDbId}/propose`,
+      url: `/api/workshop/cards/${cardDbId}/submit-review`,
       authHeader: `Bearer ${userToken}`,
       body: JSON.stringify({ handshakeId: hs }),
     })
     const res = fakeRes()
-    await handleProposeRequest(req, res, cardDbId)
+    await handleSubmitReviewRequest(req, res, cardDbId)
     expect(res.statusCode).toBe(200)
     const j = JSON.parse(res.body) as {
       ok: boolean
@@ -796,12 +837,12 @@ describe('workshop PR propose — session', () => {
 
     const req = fakeReq({
       method: 'POST',
-      url: `/api/workshop/cards/${cardDbId}/propose`,
+      url: `/api/workshop/cards/${cardDbId}/submit-review`,
       authHeader: `Bearer ${userToken}`,
       body: JSON.stringify({}),
     })
     const res = fakeRes()
-    await handleProposeRequest(req, res, cardDbId)
+    await handleSubmitReviewRequest(req, res, cardDbId)
     expect(res.statusCode).toBe(429)
     const j = JSON.parse(res.body) as {
       ok: boolean

@@ -9,7 +9,7 @@ import { workshopPrConfig, workshopPrEnabled } from './config.ts'
 import { tokenCache } from './token-cache.ts'
 import { GitHubClient, GitHubApiError } from './github-client.ts'
 import { generatePrFiles } from './code-gen.ts'
-import { getHandoffReadiness, loadLiveDraft } from '../workshop-drafts.ts'
+import { enterReview, getHandoffReadiness, hasReservedCardId, loadWorkspace } from '../workshop-drafts.ts'
 
 const RATE_LIMIT_MS = 10 * 60_000 // 10 minutes
 const REFRESH_COOLDOWN_MS = 60_000 // 1 minute
@@ -25,6 +25,7 @@ type WorkshopCardRow = {
   art_url: string | null
   review_status: string
   live: number
+  draft_revision: number
   author_name?: string
 }
 
@@ -55,7 +56,7 @@ async function readJsonBody<T>(req: IncomingMessage): Promise<T | null> {
   try { return JSON.parse(data) as T } catch { return null }
 }
 
-export async function handleProposeRequest(
+export async function handleSubmitReviewRequest(
   req: IncomingMessage,
   res: ServerResponse,
   cardDbId: string,
@@ -87,8 +88,15 @@ export async function handleProposeRequest(
     sendJson(res, 403, { ok: false, error: 'not your card' })
     return
   }
-  if (wcard.review_status !== 'approved' || wcard.live !== 1) {
-    sendJson(res, 400, { ok: false, error: 'card must pass review approval and be published live' })
+  // #637 timing inversion: review submission is the entry to in_review — it
+  // must happen *before* approval, so unsubmitted/stale/in_review may submit
+  // (in_review re-submission updates the PR branch).
+  if (wcard.review_status === 'approved' || wcard.review_status === 'merged') {
+    sendJson(res, 400, {
+      ok: false,
+      code: 'already_reviewed',
+      error: `card is already ${wcard.review_status}; edit the draft to restart review`,
+    })
     return
   }
   const readiness = getHandoffReadiness(db, cardDbId, user.id)
@@ -96,16 +104,24 @@ export async function handleProposeRequest(
     sendJson(res, 400, {
       ok: false,
       code: 'handoff_not_ready',
-      error: 'draft must pass the exact-version sandbox gate',
+      error: 'draft must pass static validation and the exact-version sandbox gate',
       readiness,
     })
     return
   }
-  if (!hasCompleteZhLocale(loadLiveDraft(db, cardDbId).cardJson)) {
+  if (!hasCompleteZhLocale(loadWorkspace(db, cardDbId, user.id).draft.cardJson)) {
     sendJson(res, 400, {
       ok: false,
       code: 'localization_not_ready',
       error: 'complete Chinese localization is required',
+    })
+    return
+  }
+  if (hasReservedCardId(db, wcard.card_id, cardDbId)) {
+    sendJson(res, 409, {
+      ok: false,
+      code: 'card_id_taken',
+      error: 'card id is already reserved by an approved or merged card',
     })
     return
   }
@@ -128,11 +144,7 @@ export async function handleProposeRequest(
       return
     }
     const prUrl = '/mock-workshop-pr/1'
-    db.prepare(`
-      UPDATE workshop_cards
-      SET github_pr_url = ?, github_pr_status = 'open', github_pr_last_synced_at = ?
-      WHERE id = ?
-    `).run(prUrl, Date.now(), cardDbId)
+    enterReview(db, { cardId: cardDbId, authorId: user.id, prUrl, expectedRevision: wcard.draft_revision })
     sendJson(res, 200, { ok: true, prUrl, prNumber: 1 })
     return
   }
@@ -276,11 +288,7 @@ export async function handleProposeRequest(
       commitSha: commit2.commitSha,
     })
 
-    db.prepare(
-      `UPDATE workshop_cards
-       SET github_pr_url = ?, github_pr_status = 'open', github_pr_last_synced_at = ?
-       WHERE id = ?`,
-    ).run(pr.url, now, cardDbId)
+    enterReview(db, { cardId: cardDbId, authorId: user.id, prUrl: pr.url, expectedRevision: wcard.draft_revision })
     db.prepare(
       `INSERT OR REPLACE INTO github_propose_rate_limit
         (user_id, last_propose_at)
