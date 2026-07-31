@@ -857,6 +857,50 @@ describe('workshop draft aggregate', () => {
     expect(after.approvedVersionId).toBeNull()
   })
 
+  it('keeps the approval when the review snapshot is temporarily unavailable', () => {
+    const created = createCard(db, { authorId: 'author', draft: baseDraft() })
+    approveCurrentDraft(db, {
+      cardId: created.id,
+      authorId: 'author',
+      commitSha: 'sha-reviewed',
+    })
+    setReviewDecisionProvider({
+      getSnapshot: () => ({
+        decision: 'unknown',
+        approvedCommitSha: null,
+        headCommitSha: null,
+      }),
+    })
+    expect(() => publish(db, {
+      cardId: created.id,
+      authorId: 'author',
+      baseRevision: 1,
+    })).toThrowError(expect.objectContaining<Partial<WorkshopDraftError>>({
+      code: 'not_ready',
+      message: expect.stringContaining('try again'),
+    }))
+    const after = loadWorkspace(db, created.id, 'author')
+    expect(after.reviewStatus).toBe('approved')
+    expect(after.approvedVersionId).not.toBeNull()
+  })
+
+  it('treats merged cards as read-only in the workshop', () => {
+    const created = createCard(db, { authorId: 'author', draft: baseDraft() })
+    approveCurrentDraft(db, { cardId: created.id, authorId: 'author' })
+    db.prepare(`UPDATE workshop_cards SET review_status = 'merged' WHERE id = ?`).run(created.id)
+    expect(() => checkpointDraft(db, {
+      cardId: created.id,
+      authorId: 'author',
+      baseRevision: 1,
+      draft: baseDraft({
+        cardJson: { ...baseDraft().cardJson, desc: ['edited'] },
+      }),
+    })).toThrowError(expect.objectContaining<Partial<WorkshopDraftError>>({
+      code: 'conflict',
+      message: expect.stringContaining('read-only'),
+    }))
+  })
+
   it('does not mark an approved metadata-only card ready for PR handoff', () => {
     const created = createCard(db, { authorId: 'author', draft: baseDraft() })
     const approved = approveCurrentDraft(db, { cardId: created.id, authorId: 'author' })

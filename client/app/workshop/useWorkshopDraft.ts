@@ -466,6 +466,12 @@ export const useWorkshopDraft = ({
         return null
       }
       if (!response.ok || !payload.workspace || !payload.versionId) {
+        // A rejected publish may have downgraded the card (e.g. stale after a
+        // failed snapshot re-check) — hydrate the server state so the UI
+        // reflects the new review status instead of a phantom 'approved'.
+        if (payload.current) {
+          dispatch({ type: 'checkpointSaved', workspace: payload.current })
+        }
         dispatch({
           type: 'saveFailed',
           status: 'error',
@@ -567,7 +573,25 @@ export const useWorkshopDraft = ({
         })
         return false
       }
-      dispatch({ type: 'checkpointSaved', workspace: payload.workspace })
+      // Unpublishing is the escape hatch from the live edit block, so the
+      // author may have unsaved edits right now — apply the new live state
+      // without discarding the dirty local draft.
+      const latest = stateRef.current
+      const applied = workshopDraftReducer(latest ?? current, {
+        type: 'checkpointSaved',
+        workspace: payload.workspace,
+      })
+      const next = latest && latest.draft !== applied.draft
+        ? {
+            ...applied,
+            draft: latest.draft,
+            sandboxPassVersionId: latest.sandboxPassVersionId,
+            sandboxPassedAt: latest.sandboxPassedAt,
+            save: { status: 'dirty' as const },
+          }
+        : applied
+      dispatch({ type: 'serverLoaded', state: next })
+      persist(next)
       return true
     } catch (reason) {
       dispatch({
