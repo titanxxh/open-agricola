@@ -461,7 +461,7 @@ export const useWorkshopDraft = ({
         dispatch({
           type: 'conflictDetected',
           server: payload.current,
-          local: toLocalRecovery(current),
+          local: toLocalRecovery(stateRef.current ?? current),
         })
         return null
       }
@@ -544,7 +544,7 @@ export const useWorkshopDraft = ({
         dispatch({
           type: 'conflictDetected',
           server: payload.current,
-          local: toLocalRecovery(current),
+          local: toLocalRecovery(stateRef.current ?? current),
         })
         return null
       }
@@ -608,7 +608,7 @@ export const useWorkshopDraft = ({
         dispatch({
           type: 'conflictDetected',
           server: payload.current,
-          local: toLocalRecovery(current),
+          local: toLocalRecovery(stateRef.current ?? current),
         })
         return false
       }
@@ -628,7 +628,13 @@ export const useWorkshopDraft = ({
         type: 'checkpointSaved',
         workspace: payload.workspace,
       })
-      const next = latest && latest.draft !== current.draft
+      // Keep the local draft when the author had unsaved edits BEFORE the
+      // request (dirty/conflict — the very edits that motivated unpublishing)
+      // or typed while it was in flight.
+      const hadLocalEdits = current.save.status === 'dirty'
+        || current.save.status === 'conflict'
+        || (latest !== null && latest.draft !== current.draft)
+      const next = latest && hadLocalEdits
         ? {
             ...applied,
             draft: latest.draft,
@@ -723,7 +729,7 @@ export const useWorkshopDraft = ({
         dispatch({
           type: 'conflictDetected',
           server: payload.current,
-          local: toLocalRecovery(current),
+          local: toLocalRecovery(stateRef.current ?? current),
         })
         return false
       }
