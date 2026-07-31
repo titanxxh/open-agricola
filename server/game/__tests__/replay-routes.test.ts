@@ -96,6 +96,7 @@ describe('public replay routes', () => {
   let assetRoot: string
   let buildId: string
   let store: ReplayStore
+  let bgaCdnOrigin: string
 
   beforeEach(() => {
     root = mkdtempSync(join(tmpdir(), 'open-agricola-replay-routes-'))
@@ -119,6 +120,7 @@ describe('public replay routes', () => {
     writeFileSync(join(directory, 'app.js'), app)
     writeFileSync(join(directory, 'manifest.json'), manifest)
     vi.stubEnv('REPLAY_TRUST_PROXY', 'false')
+    bgaCdnOrigin = 'https://x.boardgamearena.net'
     store = {
       manifest: vi.fn(() => ({
         ok: true,
@@ -170,6 +172,7 @@ describe('public replay routes', () => {
       viewerRoot,
       assetRoot,
       limiter,
+      bgaCdnOrigin,
     })).toBe(true)
     return captured
   }
@@ -183,6 +186,7 @@ describe('public replay routes', () => {
       viewerRoot,
       assetRoot,
       limiter,
+      bgaCdnOrigin,
     })).toBe(true)
     await done
     return captured
@@ -206,16 +210,18 @@ describe('public replay routes', () => {
   })
 
   it('serves only hash-verified immutable viewer files', async () => {
+    bgaCdnOrigin = 'https://assets.example.test'
     const first = await handleStream(request(`/replay-viewers/${buildId}/index.html`))
     expect(first.status).toBe(200)
     expect(first.headers['Cache-Control']).toContain('immutable')
     expect(first.headers['Content-Security-Policy']).toContain("form-action 'none'")
     expect(first.headers['Content-Security-Policy']).toContain(
-      "img-src 'self' data: https://raw.githubusercontent.com https://x.boardgamearena.net",
+      "img-src 'self' data: https://raw.githubusercontent.com https://assets.example.test",
     )
     expect(first.headers['Content-Security-Policy']).toContain(
-      "font-src 'self' https://x.boardgamearena.net",
+      "font-src 'self' https://assets.example.test",
     )
+    expect(first.headers['Content-Security-Policy']).not.toContain('x.boardgamearena.net')
     expect(first.headers['Content-Security-Policy']).not.toContain(
       "script-src 'self' https:",
     )

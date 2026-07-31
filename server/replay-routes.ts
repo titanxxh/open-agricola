@@ -240,6 +240,7 @@ const serveViewerFile = (
   root: string,
   buildId: string,
   rawPath: string,
+  bgaCdnOrigin: string,
 ): void => {
   const path = safeViewerPath(rawPath)
   if (!path) {
@@ -278,8 +279,8 @@ const serveViewerFile = (
       "default-src 'none'",
       "script-src 'self'",
       "style-src 'self' 'unsafe-inline'",
-      "img-src 'self' data: https://raw.githubusercontent.com https://x.boardgamearena.net",
-      "font-src 'self' https://x.boardgamearena.net",
+      `img-src 'self' data: https://raw.githubusercontent.com ${bgaCdnOrigin}`,
+      `font-src 'self' ${bgaCdnOrigin}`,
       "connect-src 'self'",
       "frame-ancestors *",
       "base-uri 'none'",
@@ -366,6 +367,7 @@ export function handleReplayRoute(
     viewerRoot: string
     assetRoot: string
     limiter: ReplayReadLimiter
+    bgaCdnOrigin: string
   },
 ): boolean {
   if (req.method !== 'GET' || !req.url) return false
@@ -391,7 +393,13 @@ export function handleReplayRoute(
     return true
   }
   if (viewerMatch) {
-    serveViewerFile(res, options.viewerRoot, viewerMatch[1]!, viewerMatch[2]!)
+    serveViewerFile(
+      res,
+      options.viewerRoot,
+      viewerMatch[1]!,
+      viewerMatch[2]!,
+      options.bgaCdnOrigin,
+    )
     return true
   }
   if (assetMatch) {
