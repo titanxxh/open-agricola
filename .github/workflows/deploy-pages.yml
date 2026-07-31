@@ -32,6 +32,7 @@ jobs:
 
       - name: Build frontend
         env:
+          GH_TOKEN: ${{ github.token }}
           VITE_API_BASE: ${{ vars.VITE_API_BASE }}
           VITE_WS_BASE: ${{ vars.VITE_WS_BASE }}
           VITE_BASE_PATH: /open-agricola/

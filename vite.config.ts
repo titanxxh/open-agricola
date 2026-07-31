@@ -13,6 +13,7 @@ const bgaImagePath = path.resolve(__dirname, BGA_IMAGE_DIR)
 const BGA_CDN_BASE = process.env.BGA_CDN_BASE_URL || 'https://x.boardgamearena.net/data/themereleases/current/games/agricola/260329-0408/img'
 const publicAssets = await loadPublicAssetConfig({
   allowLocal: !process.argv.includes('build') && !process.env.CI,
+  validateRemote: process.env.VITEST !== 'true',
 })
 
 const servePublicAssets = (assetRoot: string) => {

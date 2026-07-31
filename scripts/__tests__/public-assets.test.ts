@@ -26,43 +26,62 @@ const createContract = async (files = REQUIRED_FILES): Promise<string> => {
   return rootDir
 }
 
-const metadataFetcher = (
+const inventoryFetcher = (
   files = [...REQUIRED_FILES, 'assets/z.jpg'],
-  version = VERSION,
-) => vi.fn(async (input: string | URL) => {
-  const name = new URL(input).pathname.split('/').at(-1)
-  if (name === 'asset-version.txt') return new Response(`${version}\n`)
-  return new Response(JSON.stringify({ version, files }))
-})
+) => vi.fn(async () => new Response(JSON.stringify({
+  truncated: false,
+  tree: files.map(file => ({ path: file, type: 'blob' })),
+})))
 
 describe('public asset contract', () => {
   afterEach(async () => {
     await Promise.all(tempDirs.splice(0).map(dir => rm(dir, { recursive: true, force: true })))
   })
 
-  it('accepts matching metadata and returns a commit-addressed base URL', async () => {
+  it('validates the pinned commit tree and returns a commit-addressed base URL', async () => {
     const rootDir = await createContract()
-    const fetcher = metadataFetcher()
+    const fetcher = inventoryFetcher()
     const baseUrl = publicAssetBaseUrl(VERSION)
 
-    await expect(loadPublicAssetConfig({ rootDir, fetcher })).resolves.toEqual({
+    await expect(loadPublicAssetConfig({
+      rootDir,
+      env: { GH_TOKEN: 'test-token' },
+      fetcher,
+    })).resolves.toEqual({
       baseUrl,
       version: VERSION,
       requiredFiles: REQUIRED_FILES,
     })
-    expect(fetcher).toHaveBeenCalledTimes(2)
-    expect(fetcher.mock.calls.map(([input]) => new URL(input).pathname)).toEqual([
-      '/open-agricola-assets/asset-version.txt',
-      '/open-agricola-assets/asset-manifest.json',
-    ])
+    expect(fetcher).toHaveBeenCalledTimes(1)
+    const [input, init] = fetcher.mock.calls[0]!
+    expect(new URL(input).pathname).toBe(
+      `/repos/titanxxh/open-agricola-assets/git/trees/${VERSION}`,
+    )
+    expect(new URL(input).searchParams.get('recursive')).toBe('1')
+    expect(init?.headers).toMatchObject({
+      Accept: 'application/vnd.github+json',
+      Authorization: 'Bearer test-token',
+      'X-GitHub-Api-Version': '2022-11-28',
+    })
   })
 
-  it('fails closed when remote metadata omits a required asset', async () => {
+  it('fails closed when the pinned commit omits a required asset', async () => {
     const rootDir = await createContract()
 
     await expect(
-      loadPublicAssetConfig({ rootDir, fetcher: metadataFetcher(['assets/a.png']) }),
+      loadPublicAssetConfig({ rootDir, fetcher: inventoryFetcher(['assets/a.png']) }),
     ).rejects.toThrow('missing required file: assets/b.webp')
+  })
+
+  it('rejects a truncated pinned commit tree', async () => {
+    const rootDir = await createContract()
+    const fetcher = vi.fn(async () => new Response(JSON.stringify({
+      truncated: true,
+      tree: REQUIRED_FILES.map(file => ({ path: file, type: 'blob' })),
+    })))
+
+    await expect(loadPublicAssetConfig({ rootDir, fetcher }))
+      .rejects.toThrow('must contain a complete tree')
   })
 
   it.each([
@@ -74,17 +93,24 @@ describe('public asset contract', () => {
 
     await expect(loadPublicAssetConfig({
       rootDir,
-      fetcher: metadataFetcher(),
+      fetcher: inventoryFetcher(),
     })).rejects.toThrow(message)
   })
 
-  it('rejects mismatched remote metadata', async () => {
+  it('keeps Vitest-style config loading network-free', async () => {
     const rootDir = await createContract()
+    const fetcher = vi.fn(() => Promise.reject(new Error('unexpected fetch')))
 
     await expect(loadPublicAssetConfig({
       rootDir,
-      fetcher: metadataFetcher(REQUIRED_FILES, '0'.repeat(40)),
-    })).rejects.toThrow('version mismatch')
+      fetcher,
+      validateRemote: false,
+    })).resolves.toEqual({
+      baseUrl: publicAssetBaseUrl(VERSION),
+      version: VERSION,
+      requiredFiles: REQUIRED_FILES,
+    })
+    expect(fetcher).not.toHaveBeenCalled()
   })
 
   it('uses a complete local source without contacting the remote host', async () => {
