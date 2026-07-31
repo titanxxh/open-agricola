@@ -198,6 +198,16 @@ export function getWorkshopPrActionState(input: WorkshopPrActionInput): {
 
   const prNum = extractPrNumber(input.githubPrUrl)
   if (input.reviewStatus === 'in_review' && input.githubPrUrl) {
+    if (input.githubPrStatus === 'merged') {
+      // refresh-pr-status may learn about the merge before the review sync
+      // (#640/#642) moves review_status to merged — never offer re-submission.
+      return {
+        visible: true,
+        disabled: true,
+        buttonLabel: '已合并 ✓',
+        secondary: `PR #${prNum} · 等待收录同步`,
+      }
+    }
     if (input.githubPrStatus === 'closed') {
       return {
         visible: true,

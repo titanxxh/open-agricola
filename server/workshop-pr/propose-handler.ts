@@ -25,6 +25,7 @@ type WorkshopCardRow = {
   art_url: string | null
   review_status: string
   live: number
+  draft_revision: number
   author_name?: string
 }
 
@@ -143,7 +144,7 @@ export async function handleSubmitReviewRequest(
       return
     }
     const prUrl = '/mock-workshop-pr/1'
-    enterReview(db, { cardId: cardDbId, authorId: user.id, prUrl })
+    enterReview(db, { cardId: cardDbId, authorId: user.id, prUrl, expectedRevision: wcard.draft_revision })
     sendJson(res, 200, { ok: true, prUrl, prNumber: 1 })
     return
   }
@@ -287,7 +288,7 @@ export async function handleSubmitReviewRequest(
       commitSha: commit2.commitSha,
     })
 
-    enterReview(db, { cardId: cardDbId, authorId: user.id, prUrl: pr.url })
+    enterReview(db, { cardId: cardDbId, authorId: user.id, prUrl: pr.url, expectedRevision: wcard.draft_revision })
     db.prepare(
       `INSERT OR REPLACE INTO github_propose_rate_limit
         (user_id, last_propose_at)

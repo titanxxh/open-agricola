@@ -688,10 +688,24 @@ export function enterReview(
     cardId: string
     authorId: string
     prUrl: string
+    /**
+     * Revision the quality gate was checked against. The PR content is
+     * generated from that revision, so a concurrent checkpoint (e.g. a save
+     * from another tab while the GitHub requests run) must fail the
+     * transition instead of marking never-submitted content in_review.
+     */
+    expectedRevision: number
   },
 ): WorkshopWorkspace {
   return db.transaction(() => {
     const current = loadWorkspace(db, input.cardId, input.authorId)
+    if (current.revision !== input.expectedRevision) {
+      throw new WorkshopDraftError(
+        'conflict',
+        'Draft changed while the review submission was in flight; re-submit',
+        current,
+      )
+    }
     if (current.reviewStatus === 'approved' || current.reviewStatus === 'merged') {
       throw new WorkshopDraftError(
         'conflict',
