@@ -4,9 +4,6 @@ import type { DraftMode, DraftPickPayload } from '../../draft/types'
 import type { ParentSelectionSubmission, Resource, ResourceBatchExchangePayload } from '../types'
 import type { MoorSpecialActionId } from '../../moor/types'
 
-export const REPLAY_CARD_SNAPSHOT_CONSENT_REQUIRED =
-  'unpublished custom cards require replay snapshot consent'
-
 type CommitSelectionPayload = {
   cancel?: boolean
   positions?: { row: number; col: number }[]
@@ -57,7 +54,6 @@ type ClientCommandBody =
       maxPlayers?: number
       name?: string
       customCardIds?: string[]
-      confirmReplayCardSnapshotPublic?: boolean
       /** When true, include community-deck cards in the deal pool. Default false. */
       enableCommunityDeck?: boolean
       /** When true, start the Parent Cards expansion selection phase before play. Default false. */

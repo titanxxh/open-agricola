@@ -12,10 +12,7 @@ import { validateSession } from '../auth.ts'
 import { getDb } from '../db.ts'
 import type { CustomCardData } from '../../shared/cards/session-card-context.ts'
 import type { CustomCodeManifest } from '../../shared/custom-code/types.ts'
-import {
-  REPLAY_CARD_SNAPSHOT_CONSENT_REQUIRED,
-  type ClientCommand,
-} from '../../shared/contract/protocol/ws.ts'
+import type { ClientCommand } from '../../shared/contract/protocol/ws.ts'
 import type { StateUpdateCause } from '../../shared/contract/protocol/game.ts'
 import type {
   GameContextErrorCode,
@@ -80,6 +77,7 @@ export function parseDraftOptions(
 const loadCustomCards = (
   cardDbIds: string[],
   requestUserId?: string,
+  opts?: { publishedOnly?: boolean },
 ): { cards: CustomCardData[]; hasUnpublished: boolean } => {
   if (!cardDbIds.length) return { cards: [], hasUnpublished: false }
   const db = getDb()
@@ -105,6 +103,10 @@ const loadCustomCards = (
       }
       continue
     }
+    if (opts?.publishedOnly) {
+      if (row.status === 'draft' && requestUserId === row.author_id) hasUnpublished = true
+      continue
+    }
     const allowed = row.status === 'draft' && requestUserId === row.author_id
     if (!allowed) continue
     try {
@@ -128,7 +130,7 @@ const loadCustomCards = (
 export const loadCustomCardsFromDb = (
   cardDbIds: string[],
   requestUserId?: string,
-): CustomCardData[] => loadCustomCards(cardDbIds, requestUserId).cards
+): CustomCardData[] => loadCustomCards(cardDbIds, requestUserId, { publishedOnly: true }).cards
 
 const generateRoomId = (ctx: ConnectionCtx, devRoomRootId?: string | null): string | null => {
   for (let attempt = 0; attempt < 8; attempt += 1) {
@@ -359,7 +361,11 @@ function handleCreateRoom(ctx: ConnectionCtx, msg: Extract<ClientCommand, { type
   const enableFarmersOfTheMoor = (msg as Record<string, unknown>).enableFarmersOfTheMoor === true
   const allowIncompleteFarmersOfTheMoorMinorDeal =
     (msg as Record<string, unknown>).allowIncompleteFarmersOfTheMoorMinorDeal === true
-  const loadedCustomCards = loadCustomCards(customCardDbIds, ctx.currentUserId)
+  const loadedCustomCards = loadCustomCards(customCardDbIds, ctx.currentUserId, { publishedOnly: true })
+  if (loadedCustomCards.hasUnpublished) {
+    sendCommandError(ctx, 'draft cards can only be used in the workshop sandbox; publish them before using them in a room', msg.requestId)
+    return
+  }
   const customCards = loadedCustomCards.cards
   let session: GameSession
   try {
@@ -408,14 +414,6 @@ function handleCreateRoom(ctx: ConnectionCtx, msg: Extract<ClientCommand, { type
     allowIncompleteFarmersOfTheMoorMinorDeal,
   }
   ctx.committer?.lockNewRoom(room)
-  if (
-    room.replayRecording === true
-    && loadedCustomCards.hasUnpublished
-    && (msg as Record<string, unknown>).confirmReplayCardSnapshotPublic !== true
-  ) {
-    sendCommandError(ctx, REPLAY_CARD_SNAPSHOT_CONSENT_REQUIRED, msg.requestId)
-    return
-  }
   ctx.registry.set(room)
   ctx.currentRoom = room
   ctx.currentPlayerIndex = 0

@@ -13,7 +13,6 @@ import { LocalGameTransport } from '../local-sandbox/local-transport'
 import { isBrowserSandbox, readLocalSandboxConfig } from '../local-sandbox/workshop-launch'
 import { createDebouncedSaver, loadResumable, openLocalGameStore } from '../local-sandbox/persistence'
 import type { GameSyncPayload } from '../../shared/contract/protocol/game'
-import { REPLAY_CARD_SNAPSHOT_CONSENT_REQUIRED } from '../../shared/contract/protocol/ws'
 import type { MoorSpecialActionCardState, MoorSpecialActionId } from '../../shared/moor/types'
 import { isMoorTerrainAction } from '../../shared/moor/special-actions'
 import { playerCanBuildPalisades } from '../utils/player-palisades'
@@ -305,12 +304,11 @@ const useTransportSetup = (
           const enableFarmersOfTheMoor = enableFarmersOfTheMoorFromQuery(window.location.search) || undefined
           const allowIncompleteFarmersOfTheMoorMinorDeal =
             allowIncompleteFarmersOfTheMoorMinorDealFromQuery(window.location.search) || undefined
-          const sendCreateRoom = (confirmReplayCardSnapshotPublic?: true) => {
+          const sendCreateRoom = () => {
             ws.sendRoomCommand('createRoom', {
               maxPlayers,
               name: displayName ?? playerParam ?? 'Player 1',
               customCardIds,
-              confirmReplayCardSnapshotPublic,
               enableCommunityDeck,
               enableParentCards,
               draftParents,
@@ -320,7 +318,6 @@ const useTransportSetup = (
               ...(draftParams ?? {}),
             })
           }
-          let replayConsentRequested = false
           const handler = (event: MessageEvent) => {
             try {
               const msg = JSON.parse(event.data as string)
@@ -328,19 +325,6 @@ const useTransportSetup = (
                 rawWs.removeEventListener('message', handler)
                 resolve({ roomId: msg.roomId, playerIndex: msg.playerIndex, maxPlayers: msg.maxPlayers ?? 2 })
               } else if (msg.type === 'error') {
-                if (
-                  msg.error === REPLAY_CARD_SNAPSHOT_CONSENT_REQUIRED
-                  && !replayConsentRequested
-                ) {
-                  replayConsentRequested = true
-                  if (window.confirm(t(locale, 'platform.replayCardSnapshotConsent'))) {
-                    sendCreateRoom(true)
-                    return
-                  }
-                  rawWs.removeEventListener('message', handler)
-                  resolve({ error: t(locale, 'platform.replayCardSnapshotDeclined') })
-                  return
-                }
                 rawWs.removeEventListener('message', handler)
                 resolve({ error: msg.error })
               }

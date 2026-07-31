@@ -9,7 +9,7 @@ import { createLobby } from '../../game/lobby.ts'
 import { Broadcaster } from '../broadcaster.ts'
 import { createConnectionCtx } from '../connection-ctx.ts'
 import { dispatch } from '../room-router.ts'
-import { createCard } from '../../workshop-drafts.ts'
+import { createCard, publish } from '../../workshop-drafts.ts'
 
 const fakeWs = () => ({ OPEN: 1, readyState: 1, send: vi.fn(), close: vi.fn() })
 
@@ -77,27 +77,52 @@ describe('durable publish', () => {
         generation: {},
       } as never,
     })
-    const consentWs = fakeWs()
-    const consent = createConnectionCtx(consentWs as never, deps, true, 'u1')
-    dispatch(consent, {
+    const draftWs = fakeWs()
+    const draftAuthor = createConnectionCtx(draftWs as never, deps, true, 'u1')
+    dispatch(draftAuthor, {
       type: 'createRoom',
       maxPlayers: 2,
       customCardIds: [unpublished.id],
-      requestId: 'without-consent',
+      requestId: 'draft-rejected',
     })
-    expect(consent.currentRoom).toBeNull()
-    expect(messages(consentWs)).toContainEqual(expect.objectContaining({
+    expect(draftAuthor.currentRoom).toBeNull()
+    expect(messages(draftWs)).toContainEqual(expect.objectContaining({
       type: 'error',
-      requestId: 'without-consent',
+      requestId: 'draft-rejected',
     }))
-    dispatch(consent, {
+
+    const publishedCard = createCard(db, {
+      authorId: 'u1',
+      draft: {
+        cardId: 'CUSTOM_Published',
+        cardType: 'minor',
+        name: 'Published',
+        description: 'Published',
+        cardJson: {
+          id: 'CUSTOM_Published',
+          name: 'Published',
+          card_type: 'minor',
+          deck: 'CUSTOM',
+          number: 1,
+          desc: ['Published'],
+        },
+        effectCode: null,
+        compiledCode: null,
+        codeManifest: null,
+        artUrl: null,
+        generation: {},
+      } as never,
+    })
+    publish(db, { cardId: publishedCard.id, authorId: 'u1', baseRevision: publishedCard.revision })
+    const publishedWs = fakeWs()
+    const publishedAuthor = createConnectionCtx(publishedWs as never, deps, true, 'u1')
+    dispatch(publishedAuthor, {
       type: 'createRoom',
       maxPlayers: 2,
-      customCardIds: [unpublished.id],
-      confirmReplayCardSnapshotPublic: true,
+      customCardIds: [publishedCard.id],
     })
-    expect(consent.currentRoom?.customCards).toHaveLength(1)
-    dispatch(consent, { type: 'dissolveRoom' })
+    expect(publishedAuthor.currentRoom?.customCards).toHaveLength(1)
+    dispatch(publishedAuthor, { type: 'dissolveRoom' })
 
     const hostWs = fakeWs()
     const guestWs = fakeWs()

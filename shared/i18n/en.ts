@@ -1645,8 +1645,6 @@ export const en = {
     createGame: 'Create Game',
     dissolveRoom: 'Dissolve Room',
     dissolveConfirm: 'Are you sure you want to dissolve the room? All waiting players will be removed.',
-    replayCardSnapshotConsent: 'If any selected custom card is unpublished, its card face, art, and rule parameters will become permanently public with the completed replay. Continue?',
-    replayCardSnapshotDeclined: 'The room was not created because publishing the custom-card snapshot was not confirmed.',
     roomDissolved: 'Room has been dissolved',
     roomNetworkError: 'Could not connect to the game server. Check your network and try again.',
     appLoadFailed: 'Page failed to load. A new version may be available. Reload to continue.',
