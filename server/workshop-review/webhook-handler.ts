@@ -60,6 +60,9 @@ type PullRequestWebhook = {
 type ReviewBinding = {
   id: string
   revision: number
+  reviewStatus: string
+  live: number
+  updatedAt: number
   approvedCommitSha: string | null
   approvedVersionId: string | null
   reviewCommitSha: string | null
@@ -73,6 +76,9 @@ const getReviewBinding = (
   return db.prepare(`
     SELECT id,
            draft_revision AS revision,
+           review_status AS reviewStatus,
+           live,
+           updated_at AS updatedAt,
            approved_commit_sha AS approvedCommitSha,
            approved_version_id AS approvedVersionId,
            review_commit_sha AS reviewCommitSha,
@@ -89,6 +95,9 @@ const sameReviewBinding = (
 ): boolean => current !== null
   && current.id === expected.id
   && current.revision === expected.revision
+  && current.reviewStatus === expected.reviewStatus
+  && current.live === expected.live
+  && current.updatedAt === expected.updatedAt
   && current.approvedCommitSha === expected.approvedCommitSha
   && current.approvedVersionId === expected.approvedVersionId
   && current.reviewCommitSha === expected.reviewCommitSha
@@ -206,6 +215,28 @@ export async function handleWorkshopReviewWebhook(
     sendJson(res, 200, { ok: true, ignored: true })
     return true
   }
+  const recordDelivery = (): boolean => db.prepare(`
+    INSERT OR IGNORE INTO github_webhook_events (
+      delivery_id, event_name, received_at
+    ) VALUES (?, ?, ?)
+  `).run(deliveryId, eventName, Date.now()).changes > 0
+  const failClosed = (): true => {
+    const result = db.transaction(() => {
+      if (!recordDelivery()) return { duplicate: true as const }
+      if (!sameReviewBinding(getReviewBinding(db, prUrl), binding)) {
+        return { ignored: true as const }
+      }
+      return {
+        invalidated: invalidateReviewedCard(db, {
+          prUrl,
+          ...(payload.action === 'closed' ? { prStatus: 'closed' } : {}),
+          expectedBinding: binding,
+        }),
+      }
+    })()
+    sendJson(res, 200, { ok: true, conservative: true, ...result })
+    return true
+  }
 
   if (revalidatesReview) {
     let preserveCommitSha: string | undefined
@@ -216,22 +247,20 @@ export async function handleWorkshopReviewWebhook(
         : null
       const supersededDismissal = dismissedCommit !== null
         && dismissedCommit !== snapshot.headRefOid
+      const reviewStillPending = snapshot.reviewDecision === null
+        || snapshot.reviewDecision === 'REVIEW_REQUIRED'
       const remainsValid = eventName === 'pull_request_review'
         ? Boolean(findApprovedHeadReview(snapshot))
-          || isReviewTargetEligible(snapshot) && supersededDismissal
+          || isReviewTargetEligible(snapshot)
+            && reviewStillPending
+            && (supersededDismissal || binding.reviewStatus === 'in_review')
         : isReviewTargetEligible(snapshot)
       if (remainsValid) preserveCommitSha = snapshot.headRefOid
     } catch {
-      sendJson(res, 503, { ok: false, code: 'github_review_unavailable' })
-      return true
+      return failClosed()
     }
     const result = db.transaction(() => {
-      const inserted = db.prepare(`
-        INSERT OR IGNORE INTO github_webhook_events (
-          delivery_id, event_name, received_at
-        ) VALUES (?, ?, ?)
-      `).run(deliveryId, eventName, Date.now())
-      if (inserted.changes === 0) return { duplicate: true as const }
+      if (!recordDelivery()) return { duplicate: true as const }
       if (!sameReviewBinding(getReviewBinding(db, prUrl), binding)) {
         return { ignored: true as const }
       }
@@ -252,17 +281,11 @@ export async function handleWorkshopReviewWebhook(
     try {
       snapshot = await runtime.provider.getPullRequestSnapshot(prNumber as number)
     } catch {
-      sendJson(res, 503, { ok: false, code: 'github_review_unavailable' })
-      return true
+      return failClosed()
     }
     const approvedReview = findApprovedHeadReview(snapshot)
     const result = db.transaction(() => {
-      const inserted = db.prepare(`
-        INSERT OR IGNORE INTO github_webhook_events (
-          delivery_id, event_name, received_at
-        ) VALUES (?, ?, ?)
-      `).run(deliveryId, eventName, Date.now())
-      if (inserted.changes === 0) return { duplicate: true as const }
+      if (!recordDelivery()) return { duplicate: true as const }
       if (!sameReviewBinding(getReviewBinding(db, prUrl), binding)) {
         return { ignored: true as const }
       }
