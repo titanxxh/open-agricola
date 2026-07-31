@@ -1233,18 +1233,19 @@ const scenarioErrors = async ({
   variant,
 }: ScenarioContext) => {
   const workspace = await createDraft(request, account)
-  let delayed = true
+  let releaseWorkspaceLoad: (() => void) | undefined
+  const workspaceLoadBlocked = new Promise<void>(resolve => {
+    releaseWorkspaceLoad = resolve
+  })
   await page.route(`**/api/workshop/cards/${workspace.id}/workspace`, async route => {
-    if (delayed) {
-      delayed = false
-      await new Promise(resolve => setTimeout(resolve, 300))
-    }
+    await workspaceLoadBlocked
     await route.continue()
   })
   await page.goto(
     `${FRONTEND_URL}/?page=workshop&view=editor&card=${encodeURIComponent(workspace.id)}`,
   )
   await expect(page.locator('.aicw-loading')).toBeVisible()
+  releaseWorkspaceLoad?.()
   await expect(page.locator('.aicw-loading')).toBeHidden({ timeout: 30_000 })
 
   await fakeChatService(page, call =>
