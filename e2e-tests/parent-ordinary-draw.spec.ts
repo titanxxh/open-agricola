@@ -20,7 +20,7 @@ test.describe('Parent Cards ordinary draw UI', () => {
     }
     await postJson(request, `${BACKEND_URL}/api/game/load`, { state })
 
-    await page.goto(`${FRONTEND_URL}/?page=game&player=p1&devMode=1`)
+    await page.goto(`${FRONTEND_URL}/?page=game&player=p1&embedded=1&devMode=1`)
     await page.waitForLoadState('networkidle')
 
     await expect(page.getByRole('dialog', { name: 'Ordinary card draw choice' })).toBeVisible()

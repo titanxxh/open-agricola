@@ -1,7 +1,53 @@
-import { test, expect, type Page } from '@playwright/test'
-import { saveScreenshot, saveState, FRONTEND_URL } from './fixtures'
+import {
+  test,
+  expect,
+  type APIRequestContext,
+  type APIResponse,
+  type BrowserContext,
+  type Page,
+} from '@playwright/test'
+import { BACKEND_URL, saveScreenshot, saveState, FRONTEND_URL } from './fixtures'
 
 test.use({ viewport: { width: 1920, height: 1080 } })
+
+const cookieValue = (response: APIResponse, name: string) => {
+  const header = response.headersArray().find(({ name: headerName, value }) =>
+    headerName.toLowerCase() === 'set-cookie' && value.startsWith(`${name}=`),
+  )
+  if (!header) throw new Error(`missing ${name} cookie`)
+  return header.value.split(';')[0]!.slice(name.length + 1)
+}
+
+const authenticate = async (
+  context: BrowserContext,
+  request: APIRequestContext,
+  username: string,
+) => {
+  const oauth = await request.post(`${BACKEND_URL}/api/test/oauth/github/callback`, {
+    data: {
+      providerUserId: `ws-${username}`,
+      providerLogin: username,
+      email: `${username}@example.com`,
+      displayName: username,
+    },
+  })
+  expect(oauth.ok()).toBe(true)
+  const complete = await request.post(`${BACKEND_URL}/api/auth/onboarding/complete`, {
+    headers: { Cookie: `oa_onboarding=${cookieValue(oauth, 'oa_onboarding')}` },
+    data: {
+      username,
+      displayName: username,
+      password: 'ws-pass-550',
+      confirmPassword: 'ws-pass-550',
+    },
+  })
+  expect(complete.ok(), `${complete.status()} ${await complete.text()}`).toBe(true)
+  await context.addCookies([{
+    name: 'oa_session',
+    value: cookieValue(complete, 'oa_session'),
+    url: FRONTEND_URL,
+  }])
+}
 
 test.describe('WS dual-player sync', () => {
   const countTaken = (page: Page) =>
@@ -9,11 +55,15 @@ test.describe('WS dual-player sync', () => {
   const takenHolderByText = (page: Page, text: string) =>
     page.locator('.action-card-holder.taken', { hasText: text })
 
-  test('full game flow: create room, sync actions, confirm next player, undo', async ({ browser }) => {
+  test('full game flow: create room, sync actions, confirm next player, undo', async ({ browser, request }) => {
     test.setTimeout(120_000)
 
     const ctx1 = await browser.newContext({ viewport: { width: 1920, height: 1080 } })
     let ctx2 = await browser.newContext({ viewport: { width: 1920, height: 1080 } })
+    const suffix = Date.now().toString(36)
+    await authenticate(ctx1, request, `ws_a_${suffix}`)
+    await authenticate(ctx2, request, `ws_b_${suffix}`)
+    const ctx2Storage = await ctx2.storageState()
     const p1 = await ctx1.newPage()
     let p2 = await ctx2.newPage()
 
@@ -23,9 +73,7 @@ test.describe('WS dual-player sync', () => {
     await p1.waitForSelector('text=/等待玩家加入|waiting for other player/i', { timeout: 15000 })
     await saveScreenshot(p1, '01-p1-waiting')
 
-    const bodyText = await p1.textContent('body')
-    const roomMatch = bodyText?.match(/(?:Room|房间)\s+(\w+)/)
-    const roomId = roomMatch?.[1]
+    const roomId = await p1.locator('.ws-invite-roomid strong').textContent()
     console.log(`Room ID: ${roomId}`)
     expect(roomId).toBeTruthy()
     saveState('ws-room', { roomId })
@@ -34,8 +82,8 @@ test.describe('WS dual-player sync', () => {
     console.log('\n=== Step 2: P2 joins room ===')
     await p2.goto(`${FRONTEND_URL}/?player=p2&transport=ws&room=${roomId}`)
 
-    await p1.waitForSelector('.board', { timeout: 15000 })
-    await p2.waitForSelector('.board', { timeout: 15000 })
+    await p2.waitForSelector('.game-layout', { timeout: 15000 })
+    await p1.waitForSelector('.game-layout', { timeout: 15000 })
     console.log('Both boards loaded')
     await saveScreenshot(p1, '02-p1-board')
     await saveScreenshot(p2, '02-p2-board')
@@ -44,7 +92,7 @@ test.describe('WS dual-player sync', () => {
     console.log('\n=== Step 3: P1 action -> P2 sync ===')
     const initialTaken = await countTaken(p2)
 
-    const forestBtn = p1.locator('main .action-card-holder button:not([disabled])').first()
+    const forestBtn = p1.locator('.action-card-holder button:not([disabled])').first()
     await expect(forestBtn).toBeVisible()
     const actionName = (await forestBtn.textContent())?.trim() ?? 'unknown'
     console.log(`P1 clicking: ${actionName}`)
@@ -72,7 +120,7 @@ test.describe('WS dual-player sync', () => {
 
     // Step 5: Make one new action, then reconnect P2 and assert snapshot convergence
     console.log('\n=== Step 5: Reconnect sync ===')
-    const replayBtn = p1.locator('main .action-card-holder button:not([disabled])').first()
+    const replayBtn = p1.locator('.action-card-holder button:not([disabled])').first()
     await expect(replayBtn).toBeVisible()
     const replayActionName = (await replayBtn.textContent())?.trim() ?? 'unknown'
     await replayBtn.evaluate((button: HTMLButtonElement) => button.click())
@@ -80,10 +128,13 @@ test.describe('WS dual-player sync', () => {
     const expectedTakenAfterReconnect = await countTaken(p1)
 
     await ctx2.close()
-    ctx2 = await browser.newContext({ viewport: { width: 1920, height: 1080 } })
+    ctx2 = await browser.newContext({
+      viewport: { width: 1920, height: 1080 },
+      storageState: ctx2Storage,
+    })
     p2 = await ctx2.newPage()
     await p2.goto(`${FRONTEND_URL}/?player=p2&transport=ws&room=${roomId}`)
-    await p2.waitForSelector('.board', { timeout: 15000 })
+    await p2.waitForSelector('.game-layout', { timeout: 15000 })
     await expect.poll(() => countTaken(p2), { timeout: 10000 }).toBe(expectedTakenAfterReconnect)
     await expect(takenHolderByText(p2, replayActionName)).toHaveCount(1)
     await saveScreenshot(p2, '05-p2-after-reconnect')
