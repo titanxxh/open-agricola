@@ -636,17 +636,14 @@ const CARD_IMPL = {}
           desc: ['unpublished text'],
         },
       }
+      // live cards cannot be edited (#638): the projection stays immutable
+      const blockedRes = mockRes()
       await handleWorkshopRoute(mockReq('PUT', `/api/workshop/cards/${cardDbId}/draft`, {
         baseRevision: workspace.revision,
         draft: changedDraft,
-      }, 'tok-alice'), mockRes())
-
-      const publicAfterRes = mockRes()
-      await handleWorkshopRoute(mockReq('GET', `/api/workshop/cards/${cardDbId}`), publicAfterRes)
-      const publicAfter = JSON.parse(publicAfterRes.body)
-      expect(publicAfter.card.name).toBe('Pinned Public')
-      expect(publicAfter.card.art_url).toBe('/card-art/published.png')
-      expect(publicAfterRes.body).not.toContain('Unpublished change')
+      }, 'tok-alice'), blockedRes)
+      expect(blockedRes.statusCode).toBe(409)
+      expect(JSON.parse(blockedRes.body).error).toContain('unpublish')
 
       const publicListRes = mockRes()
       await handleWorkshopRoute(mockReq('GET', '/api/workshop/cards'), publicListRes)
@@ -665,6 +662,18 @@ const CARD_IMPL = {}
       expect(sandboxCard.name).toBe('Pinned Public')
       expect(sandboxCard.art_url).toBe('/card-art/published.png')
       expect(sandboxRes.body).not.toContain('Unpublished change')
+
+      // taking the card offline unlocks editing; the fork voids the approval
+      await handleWorkshopRoute(mockReq('POST', `/api/workshop/cards/${cardDbId}/unpublish`, {
+        baseRevision: workspace.revision,
+      }, 'tok-alice'), mockRes())
+      await handleWorkshopRoute(mockReq('PUT', `/api/workshop/cards/${cardDbId}/draft`, {
+        baseRevision: workspace.revision,
+        draft: changedDraft,
+      }, 'tok-alice'), mockRes())
+      const publicAfterRes = mockRes()
+      await handleWorkshopRoute(mockReq('GET', `/api/workshop/cards/${cardDbId}`), publicAfterRes)
+      expect(publicAfterRes.statusCode).toBe(404)
 
       const restoreRes = mockRes()
       await handleWorkshopRoute(mockReq('POST', `/api/workshop/cards/${cardDbId}/restore`, {

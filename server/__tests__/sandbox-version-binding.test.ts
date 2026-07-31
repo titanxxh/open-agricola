@@ -59,7 +59,6 @@ describe('sandbox version binding', () => {
       checkpointDraft,
       createCard,
       approveCurrentDraft,
-      publish,
     } = await import('../workshop-drafts.ts')
     const db = getDb()
     const now = Date.now()
@@ -108,13 +107,10 @@ describe('sandbox version binding', () => {
         createdAt: now,
       },
     })
-    approveCurrentDraft(db, { cardId: original.id, authorId: 'author' })
-    const published = publish(db, {
-      cardId: original.id,
-      authorId: 'author',
-      baseRevision: 2,
-    })
-    expect(published.versionId).toBe(pinned.versionId)
+    const approved = approveCurrentDraft(db, { cardId: original.id, authorId: 'author' })
+    expect(approved.versionId).toBe(pinned.versionId)
+    // author keeps editing offline; the approval goes stale but the pinned
+    // immutable version stays loadable for the author sandbox
     checkpointDraft(db, {
       cardId: original.id,
       authorId: 'author',
