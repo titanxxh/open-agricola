@@ -46,9 +46,10 @@ export type WorkshopDraftState = {
   workspaceId: string
   authorId: string
   baseRevision: number
-  status: string
+  reviewStatus: WorkshopWorkspaceContract['reviewStatus']
+  live: boolean
   draft: WorkshopClientDraft
-  publishedVersionId: string | null
+  approvedVersionId: string | null
   sandboxPassVersionId: string | null
   sandboxPassedAt: number | null
   stage: WorkshopStage
@@ -178,9 +179,10 @@ export const createWorkshopDraftState = (
     workspaceId: workspace.id,
     authorId: workspace.authorId,
     baseRevision: workspace.revision,
-    status: workspace.status,
+    reviewStatus: workspace.reviewStatus,
+    live: workspace.live,
     draft: workspace.draft,
-    publishedVersionId: workspace.publishedVersionId,
+    approvedVersionId: workspace.approvedVersionId,
     sandboxPassVersionId: workspace.sandboxPassVersionId,
     sandboxPassedAt: workspace.sandboxPassedAt,
     stage: 'metadata',
@@ -229,9 +231,10 @@ const applyWorkspace = (
   workspaceId: workspace.id,
   authorId: workspace.authorId,
   baseRevision: workspace.revision,
-  status: workspace.status,
+  reviewStatus: workspace.reviewStatus,
+  live: workspace.live,
   draft: workspace.draft,
-  publishedVersionId: workspace.publishedVersionId,
+  approvedVersionId: workspace.approvedVersionId,
   sandboxPassVersionId: workspace.sandboxPassVersionId,
   sandboxPassedAt: workspace.sandboxPassedAt,
   save: { status: 'saved', savedAt: Date.now() },

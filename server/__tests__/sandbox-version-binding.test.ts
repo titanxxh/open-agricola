@@ -58,6 +58,7 @@ describe('sandbox version binding', () => {
       adoptCandidate,
       checkpointDraft,
       createCard,
+      approveCurrentDraft,
       publish,
     } = await import('../workshop-drafts.ts')
     const db = getDb()
@@ -107,6 +108,7 @@ describe('sandbox version binding', () => {
         createdAt: now,
       },
     })
+    approveCurrentDraft(db, { cardId: original.id, authorId: 'author' })
     const published = publish(db, {
       cardId: original.id,
       authorId: 'author',
