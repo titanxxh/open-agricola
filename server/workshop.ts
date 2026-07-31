@@ -710,7 +710,17 @@ export async function handleWorkshopRoute(
         || snapshot.headRefOid !== binding.review_commit_sha
         || binding.approved_version_id !== binding.review_version_id
       ) {
-        invalidateReviewedCard(db, { prUrl })
+        invalidateReviewedCard(db, {
+          prUrl,
+          expectedBinding: {
+            id: workspace.id,
+            revision: workspace.revision,
+            approvedCommitSha: binding.approved_commit_sha,
+            approvedVersionId: binding.approved_version_id,
+            reviewCommitSha: binding.review_commit_sha,
+            reviewVersionId: binding.review_version_id,
+          },
+        })
         const current = loadWorkspace(db, publishMatch[1]!, user.id)
         sendJson(res, 409, { ok: false, code: 'review_stale', current })
         return true

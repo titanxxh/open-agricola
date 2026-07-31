@@ -332,6 +332,10 @@ describe('workshop review webhook', () => {
     }))
     const res = mockRes()
 
+    const reviewRuntime = runtime()
+    vi.mocked(reviewRuntime.provider.getPullRequestSnapshot)
+      .mockResolvedValue(openSnapshot('head-43'))
+
     await handleWorkshopReviewWebhook(
       mockReq(body, {
         'x-github-delivery': 'delivery-3',
@@ -342,13 +346,47 @@ describe('workshop review webhook', () => {
       }),
       res,
       db,
-      runtime(),
+      reviewRuntime,
     )
 
     expect(JSON.parse(res.body)).toEqual({ ok: true, invalidated: 1 })
     expect(loadWorkspace(db, 'card-2', 'author')).toMatchObject({
       reviewStatus: 'stale',
       live: false,
+    })
+  })
+
+  it('keeps a newer valid approval when an older dismissal arrives late', async () => {
+    insertReviewedCard({
+      id: 'card-delayed-dismissal',
+      prNumber: 50,
+      reviewCommitSha: 'head-50',
+    })
+    const reviewRuntime = runtime()
+    vi.mocked(reviewRuntime.provider.getPullRequestSnapshot).mockResolvedValue({
+      ...openSnapshot('head-50'),
+      reviewDecision: 'APPROVED',
+      reviews: [{
+        id: 'review-50',
+        state: 'APPROVED',
+        commitOid: 'head-50',
+        authorCanPushToRepository: true,
+      }],
+    })
+
+    const res = await deliver({
+      action: 'dismissed',
+      repository: { full_name: 'titanxxh/open-agricola' },
+      pull_request: {
+        number: 50,
+        html_url: 'https://github.com/titanxxh/open-agricola/pull/50',
+      },
+    }, 'pull_request_review', 'delivery-delayed-dismissal', reviewRuntime)
+
+    expect(JSON.parse(res.body)).toEqual({ ok: true, invalidated: 0 })
+    expect(loadWorkspace(db, 'card-delayed-dismissal', 'author')).toMatchObject({
+      reviewStatus: 'approved',
+      live: true,
     })
   })
 
@@ -367,6 +405,34 @@ describe('workshop review webhook', () => {
 
     expect(JSON.parse(res.body)).toEqual({ ok: true, invalidated: 1 })
     expect(loadWorkspace(db, 'card-closed-pr', 'author')).toMatchObject({
+      reviewStatus: 'stale',
+      live: false,
+    })
+  })
+
+  it.each([
+    ['edited', { ...openSnapshot('head-51'), baseRefName: 'release' }],
+    ['converted_to_draft', { ...openSnapshot('head-51'), isDraft: true }],
+  ])('invalidates a live card when %s makes its PR ineligible', async (action, snapshot) => {
+    insertReviewedCard({
+      id: `card-ineligible-${action}`,
+      prNumber: 51,
+      reviewCommitSha: 'head-51',
+    })
+    const reviewRuntime = runtime()
+    vi.mocked(reviewRuntime.provider.getPullRequestSnapshot).mockResolvedValue(snapshot)
+
+    const res = await deliver({
+      action,
+      repository: { full_name: 'titanxxh/open-agricola' },
+      pull_request: {
+        number: 51,
+        html_url: 'https://github.com/titanxxh/open-agricola/pull/51',
+      },
+    }, 'pull_request', `delivery-ineligible-${action}`, reviewRuntime)
+
+    expect(JSON.parse(res.body)).toEqual({ ok: true, invalidated: 1 })
+    expect(loadWorkspace(db, `card-ineligible-${action}`, 'author')).toMatchObject({
       reviewStatus: 'stale',
       live: false,
     })

@@ -480,7 +480,7 @@ WorkshopPage
 3. 前端调用 `POST /api/workshop/cards/:id/submit-review`。
 4. 如果服务端没有当前会话对应的 GitHub token，会返回 OAuth start URL；前端用 popup 打开，并等待 callback 页面通过 `postMessage({ type: 'workshop-pr-oauth', ... }, '*')` 通知授权完成。
 5. 授权完成后前端重试请求，服务端创建/更新分支并打开或更新 PR，成功后卡牌转入 `in_review`（`enterReview`），同时固定 PR head SHA 与对应 Draft Version。
-6. Workshop Review GitHub App 接收 `pull_request_review` / `pull_request` webhook；验签和 delivery 幂等通过后，approved review 必须经 GraphQL 原子快照确认。GitHub 当前 head 不同、`dismissed`、`CHANGES_REQUESTED` 或未合并关闭 PR 都把卡转为 `stale·offline`；comment-only review 不改变状态。
+6. Workshop Review GitHub App 接收 `pull_request_review` / `pull_request` webhook；验签和 delivery 幂等通过后，approved review 必须经 GraphQL 原子快照确认。GitHub 当前 head 不同、PR 关闭/转 draft/改离 `main`、有效审批被 `dismissed` 或 `CHANGES_REQUESTED` 都把卡转为 `stale·offline`；可能乱序的失效事件重读当前快照，comment-only review 不改变状态。
 7. 作者发布时服务端再次即时查询 GraphQL，只有 state=`OPEN`、非 draft、base=`main`、reviewer 可 push、review commit、PR head、平台 approved commit 和固定版本全部一致才置 live。
 
 服务端核心模块：
@@ -538,7 +538,7 @@ WorkshopPage
 | `POST /api/workshop/cards/:id/publish` | 仅 review approved 的卡置 live（PRD #634；publish 时刻重验原子快照，provider 不一致 → 拒绝并转 stale） |
 | `POST /api/workshop/cards/:id/unpublish` | live → offline；不作废过审资格，未改动可直接再发布（#638） |
 | `POST /api/workshop/cards/:id/pin-version` | 固化当前草稿为不可变版本（沙盒确认流的版本来源；不动 review 轴） |
-| `POST /api/github/webhook` | GitHub App HMAC 验签；处理 review submitted/dismissed、PR synchronize/closed，delivery 幂等 |
+| `POST /api/github/webhook` | GitHub App HMAC 验签；处理 review submitted/dismissed、PR synchronize/edited/converted-to-draft/closed，delivery 幂等 |
 | `POST /api/workshop/cards/:id/sandbox-pass` | 只记录当前精确发布版本且无运行错误的作者确认 |
 
 每次能力源码验证都会把 isolated-vm 提取的 `CARD_DEF` 快照写入服务端 manifest；发布静态门禁会双向比较该快照与当前 `card_json` 的可交付字段，PR handoff 还必须存在已验证源码，避免沙盒运行、已发布定义与最终提交源码不一致。

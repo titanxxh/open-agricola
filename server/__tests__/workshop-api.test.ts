@@ -6,8 +6,14 @@
 import { describe, it, expect, vi, beforeAll } from 'vitest'
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import Database from 'better-sqlite3'
-import { approveCurrentDraft, enterReview } from '../workshop-drafts.ts'
+import {
+  approveCurrentDraft,
+  checkpointDraft,
+  enterReview,
+  loadWorkspace,
+} from '../workshop-drafts.ts'
 import type { WorkshopReviewRuntime } from '../workshop-review/webhook-handler.ts'
+import type { WorkshopReviewSnapshot } from '../workshop-review/github-review-provider.ts'
 
 // ── Mock DB ──────────────────────────────────────────────────────────────────
 
@@ -546,6 +552,91 @@ describe('workshop API', () => {
       )
       expect(JSON.parse(workspaceRes.body).workspace).toMatchObject({
         reviewStatus: 'stale',
+        live: false,
+      })
+    })
+
+    it('does not stale a newer review submitted while publish revalidation is pending', async () => {
+      const createRes = mockRes()
+      await handleWorkshopRoute(mockReq('POST', '/api/workshop/cards', {
+        card_id: 'CUSTOM_ConcurrentReview',
+        card_type: 'minor',
+        name: 'Concurrent Review',
+        card_json: {
+          id: 'CUSTOM_ConcurrentReview',
+          name: 'Concurrent Review',
+          card_type: 'minor',
+          deck: 'CUSTOM',
+          number: 0,
+          desc: ['reviewed text'],
+        },
+      }, 'tok-alice'), createRes)
+      const cardDbId = JSON.parse(createRes.body).id as string
+      approveForPublish(cardDbId, 'u1', 1)
+      let resolveSnapshot!: (snapshot: WorkshopReviewSnapshot) => void
+      reviewProvider.mockReturnValueOnce(new Promise(resolve => {
+        resolveSnapshot = resolve
+      }))
+      const callsBefore = reviewProvider.mock.calls.length
+      const publishRes = mockRes()
+      const publishing = handleWorkshopRoute(mockReq(
+        'POST',
+        `/api/workshop/cards/${cardDbId}/publish`,
+        { baseRevision: 1 },
+        'tok-alice',
+      ), publishRes)
+      await vi.waitFor(() => expect(reviewProvider).toHaveBeenCalledTimes(callsBefore + 1))
+
+      const current = loadWorkspace(db, cardDbId, 'u1')
+      const edited = checkpointDraft(db, {
+        cardId: cardDbId,
+        authorId: 'u1',
+        baseRevision: 1,
+        draft: {
+          ...current.draft,
+          name: 'Concurrent Review v2',
+          cardJson: {
+            ...current.draft.cardJson,
+            name: 'Concurrent Review v2',
+            desc: ['new review text'],
+          },
+        },
+      })
+      enterReview(db, {
+        cardId: cardDbId,
+        authorId: 'u1',
+        prUrl: 'https://github.com/titanxxh/open-agricola/pull/1',
+        expectedRevision: edited.revision,
+        commitSha: 'new-head',
+      })
+      resolveSnapshot({
+        reviewDecision: 'APPROVED',
+        headRefOid: 'superseded-head',
+        baseRefName: 'main',
+        state: 'OPEN',
+        isDraft: false,
+        reviews: [{
+          id: 'superseded-review',
+          state: 'APPROVED',
+          commitOid: 'superseded-head',
+          authorCanPushToRepository: true,
+        }],
+      })
+      await publishing
+
+      expect(publishRes.statusCode).toBe(409)
+      expect(JSON.parse(publishRes.body)).toMatchObject({
+        ok: false,
+        code: 'review_stale',
+        current: {
+          revision: 2,
+          reviewStatus: 'in_review',
+          live: false,
+        },
+      })
+      expect(loadWorkspace(db, cardDbId, 'u1')).toMatchObject({
+        revision: 2,
+        reviewStatus: 'in_review',
         live: false,
       })
     })
