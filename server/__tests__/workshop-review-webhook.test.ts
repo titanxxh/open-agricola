@@ -8,7 +8,7 @@ import {
   type WorkshopReviewRuntime,
 } from '../workshop-review/webhook-handler.ts'
 import type { WorkshopReviewSnapshot } from '../workshop-review/github-review-provider.ts'
-import { enterReview, loadWorkspace } from '../workshop-drafts.ts'
+import { enterReview, invalidateReviewedCard, loadWorkspace } from '../workshop-drafts.ts'
 
 let db: Database.Database
 
@@ -502,6 +502,53 @@ describe('workshop review webhook', () => {
     expect(loadWorkspace(db, 'card-delayed-dismissal', 'author')).toMatchObject({
       reviewStatus: 'approved',
       live: true,
+    })
+  })
+
+  it('restores a stale card when dismissal reveals a valid head approval', async () => {
+    const now = Date.now()
+    const prUrl = 'https://github.com/titanxxh/open-agricola/pull/62'
+    db.prepare(`
+      INSERT INTO workshop_cards (
+        id, author_id, card_id, card_type, name, card_json,
+        review_status, live, created_at, updated_at
+      ) VALUES ('card-restored-dismissal', 'author', 'CUSTOM_RestoredDismissal',
+                'occupation', 'Restored Dismissal', '{}', 'unsubmitted', 0, ?, ?)
+    `).run(now, now)
+    enterReview(db, {
+      cardId: 'card-restored-dismissal',
+      authorId: 'author',
+      prUrl,
+      expectedRevision: 1,
+      commitSha: 'head-62',
+    })
+    invalidateReviewedCard(db, { prUrl })
+    const reviewRuntime = runtime()
+    vi.mocked(reviewRuntime.provider.getPullRequestSnapshot).mockResolvedValue({
+      ...openSnapshot('head-62'),
+      reviewDecision: 'APPROVED',
+      reviews: [{
+        id: 'review-62',
+        state: 'APPROVED',
+        commitOid: 'head-62',
+        authorCanPushToRepository: true,
+      }],
+    })
+
+    const res = await deliver({
+      action: 'dismissed',
+      review: { commit_id: 'head-62' },
+      repository: { full_name: 'titanxxh/open-agricola' },
+      pull_request: {
+        number: 62,
+        html_url: prUrl,
+      },
+    }, 'pull_request_review', 'delivery-restored-dismissal', reviewRuntime)
+
+    expect(JSON.parse(res.body)).toEqual({ ok: true, approved: 1, invalidated: 0 })
+    expect(loadWorkspace(db, 'card-restored-dismissal', 'author')).toMatchObject({
+      reviewStatus: 'approved',
+      live: false,
     })
   })
 

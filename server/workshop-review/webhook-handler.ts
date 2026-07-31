@@ -6,6 +6,7 @@ import {
   invalidateReviewedCard,
 } from '../workshop-drafts.ts'
 import {
+  breaksReviewGateWithoutApproval,
   findApprovedHeadReview,
   isReviewTargetEligible,
   type WorkshopReviewSnapshot,
@@ -242,8 +243,9 @@ export async function handleWorkshopReviewWebhook(
 
   if (revalidatesReview) {
     let preserveCommitSha: string | undefined
+    let snapshot: WorkshopReviewSnapshot
     try {
-      const snapshot = await runtime.provider.getPullRequestSnapshot(prNumber as number)
+      snapshot = await runtime.provider.getPullRequestSnapshot(prNumber as number)
       const dismissedCommit = typeof payload.review?.commit_id === 'string'
         ? payload.review.commit_id
         : null
@@ -266,6 +268,21 @@ export async function handleWorkshopReviewWebhook(
       if (!recordDelivery()) return { duplicate: true as const }
       if (!sameReviewBinding(getReviewBinding(db, prUrl), binding)) {
         return { ignored: true as const }
+      }
+      const approvedReview = payload.action === 'dismissed'
+        && binding.reviewStatus !== 'approved'
+        ? findApprovedHeadReview(snapshot)
+        : undefined
+      if (approvedReview) {
+        return {
+          approved: approveReviewedVersion(db, {
+            prUrl,
+            commitSha: snapshot.headRefOid,
+            reviewId: approvedReview.id,
+            expectedBinding: binding,
+          }),
+          invalidated: 0,
+        }
       }
       const invalidated = invalidateReviewedCard(db, {
         prUrl,
@@ -297,13 +314,11 @@ export async function handleWorkshopReviewWebhook(
             prUrl,
             commitSha: snapshot.headRefOid,
             reviewId: approvedReview.id,
+            expectedBinding: binding,
           })
         : 0
       if (approvedReview) return { approved }
-      const breaksReview = snapshot.state !== 'MERGED'
-        && (!isReviewTargetEligible(snapshot)
-          || snapshot.reviewDecision === 'CHANGES_REQUESTED'
-          || snapshot.reviewDecision === 'APPROVED')
+      const breaksReview = breaksReviewGateWithoutApproval(snapshot)
       const invalidated = invalidateReviewedCard(db, {
         prUrl,
         ...(!breaksReview ? { preserveCommitSha: snapshot.headRefOid } : {}),

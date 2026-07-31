@@ -898,9 +898,9 @@ export function approveReviewedVersion(
     commitSha: string
     reviewId: string
     expectedBinding?: {
-      cardId: string
-      reviewCommitSha: string
-      reviewVersionId: string
+      id: string
+      reviewCommitSha: string | null
+      reviewVersionId: string | null
       updatedAt: number
     }
   },
@@ -913,8 +913,8 @@ export function approveReviewedVersion(
       LIMIT 2
     `).all(
       input.prUrl,
-      input.expectedBinding?.cardId ?? null,
-      input.expectedBinding?.cardId ?? null,
+      input.expectedBinding?.id ?? null,
+      input.expectedBinding?.id ?? null,
     ) as WorkshopCardRow[]
     if (
       matches.length !== 1

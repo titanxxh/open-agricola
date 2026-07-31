@@ -14,9 +14,11 @@ import {
   enterReview,
   getHandoffReadiness,
   hasReservedCardId,
+  invalidateReviewedCard,
   loadWorkspace,
 } from '../workshop-drafts.ts'
 import {
+  breaksReviewGateWithoutApproval,
   findApprovedHeadReview,
   type WorkshopReviewSnapshot,
 } from '../workshop-review/github-review-provider.ts'
@@ -316,14 +318,22 @@ export async function handleSubmitReviewRequest(
     })
     if (reviewProvider) {
       const expectedBinding = db.prepare(`
-        SELECT review_commit_sha AS reviewCommitSha,
+        SELECT id,
+               draft_revision AS revision,
+               approved_commit_sha AS approvedCommitSha,
+               approved_version_id AS approvedVersionId,
+               review_commit_sha AS reviewCommitSha,
                review_version_id AS reviewVersionId,
                updated_at AS updatedAt
         FROM workshop_cards
         WHERE id = ? AND github_pr_url = ?
       `).get(cardDbId, pr.url) as {
-        reviewCommitSha: string
-        reviewVersionId: string
+        id: string
+        revision: number
+        approvedCommitSha: string | null
+        approvedVersionId: string | null
+        reviewCommitSha: string | null
+        reviewVersionId: string | null
         updatedAt: number
       }
       const snapshot = await reviewProvider.getPullRequestSnapshot(pr.number)
@@ -333,7 +343,13 @@ export async function handleSubmitReviewRequest(
           prUrl: pr.url,
           commitSha: snapshot.headRefOid,
           reviewId: approvedReview.id,
-          expectedBinding: { cardId: cardDbId, ...expectedBinding },
+          expectedBinding,
+        })
+      } else if (breaksReviewGateWithoutApproval(snapshot)) {
+        invalidateReviewedCard(db, {
+          prUrl: pr.url,
+          ...(snapshot.state === 'CLOSED' ? { prStatus: 'closed' } : {}),
+          expectedBinding,
         })
       }
     }

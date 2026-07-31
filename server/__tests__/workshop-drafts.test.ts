@@ -855,7 +855,7 @@ describe('workshop draft aggregate', () => {
       commitSha: 'head-a',
       reviewId: 'review-a',
       expectedBinding: {
-        cardId: created.id,
+        id: created.id,
         reviewCommitSha: binding.review_commit_sha,
         reviewVersionId: binding.review_version_id,
         updatedAt: binding.updated_at,

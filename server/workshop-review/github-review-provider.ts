@@ -23,6 +23,13 @@ export const isReviewTargetEligible = (
   && !snapshot.isDraft
   && snapshot.baseRefName === 'main'
 
+export const breaksReviewGateWithoutApproval = (
+  snapshot: WorkshopReviewSnapshot,
+): boolean => snapshot.state !== 'MERGED'
+  && (!isReviewTargetEligible(snapshot)
+    || snapshot.reviewDecision === 'CHANGES_REQUESTED'
+    || snapshot.reviewDecision === 'APPROVED')
+
 export const findApprovedHeadReview = (
   snapshot: WorkshopReviewSnapshot,
 ): WorkshopReviewSnapshot['reviews'][number] | undefined =>
