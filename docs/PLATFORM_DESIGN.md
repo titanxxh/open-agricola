@@ -479,7 +479,9 @@ WorkshopPage
 2. 卡牌必须处于 `unsubmitted / stale / in_review`（`in_review` 再次提交 = 更新 PR 分支）；质量门：静态校验 + `sandbox_pass_version_id` 内容与草稿一致（`getHandoffReadiness`）+ 完整中文本地化 + `card_id` 未被 approved/merged 卡占用。
 3. 前端调用 `POST /api/workshop/cards/:id/submit-review`。
 4. 如果服务端没有当前会话对应的 GitHub token，会返回 OAuth start URL；前端用 popup 打开，并等待 callback 页面通过 `postMessage({ type: 'workshop-pr-oauth', ... }, '*')` 通知授权完成。
-5. 授权完成后前端重试请求，服务端创建/更新分支并打开或更新 PR，成功后卡牌转入 `in_review`（`enterReview`）。管理员在 GitHub approve 后（#640 同步）卡牌才能发布上线。
+5. 授权完成后前端重试请求，服务端创建/更新分支并打开或更新 PR，成功后卡牌转入 `in_review`（`enterReview`），同时固定 PR head SHA 与对应 Draft Version。
+6. Workshop Review GitHub App 接收 `pull_request_review` / `pull_request` webhook；验签和 delivery 幂等通过后，approved review 必须经 GraphQL 原子快照确认，`synchronize` / `dismissed` 则把卡转为 `stale·offline`。
+7. 作者发布时服务端再次即时查询 GraphQL，只有 reviewer 可 push、review commit、PR head、平台 approved commit 和固定版本全部一致才置 live。
 
 服务端核心模块：
 
@@ -490,6 +492,8 @@ WorkshopPage
 | `server/workshop-pr/oauth-handler.ts`   | GitHub OAuth start/callback；请求 `repo` scope 以支持 private upstream           |
 | `server/workshop-pr/github-client.ts`   | GitHub REST API 封装；授权用户等于 upstream owner 时跳过 fork，直接推 upstream 分支          |
 | `server/workshop-pr/code-gen.ts`        | 纯生成器：把 workshop card 转成 community card 文件、测试、注册表和文档                        |
+| `server/workshop-review/github-review-provider.ts` | GitHub App installation token 与 GraphQL review 原子快照 |
+| `server/workshop-review/webhook-handler.ts` | `/api/github/webhook` 验签、delivery 幂等及 review 失效/批准 |
 | `client/services/workshop-pr.ts`        | 前端 submit-review/OAuth popup helper；relative auth URL 会按 `VITE_API_BASE` 解析到后端域名 |
 
 
@@ -534,6 +538,7 @@ WorkshopPage
 | `POST /api/workshop/cards/:id/publish` | 仅 review approved 的卡置 live（PRD #634；publish 时刻重验原子快照，provider 不一致 → 拒绝并转 stale） |
 | `POST /api/workshop/cards/:id/unpublish` | live → offline；不作废过审资格，未改动可直接再发布（#638） |
 | `POST /api/workshop/cards/:id/pin-version` | 固化当前草稿为不可变版本（沙盒确认流的版本来源；不动 review 轴） |
+| `POST /api/github/webhook` | GitHub App HMAC 验签；处理 review submitted/dismissed 与 PR synchronize，delivery 幂等 |
 | `POST /api/workshop/cards/:id/sandbox-pass` | 只记录当前精确发布版本且无运行错误的作者确认 |
 
 每次能力源码验证都会把 isolated-vm 提取的 `CARD_DEF` 快照写入服务端 manifest；发布静态门禁会双向比较该快照与当前 `card_json` 的可交付字段，PR handoff 还必须存在已验证源码，避免沙盒运行、已发布定义与最终提交源码不一致。
@@ -681,4 +686,4 @@ Draft Version 只序列化最终卡牌内容和各分区已采用候选的 prove
 | 生产部署 (Docker + GitHub Pages)   | `Dockerfile`, `docker-compose.prod.yml`, `deploy-backend.sh`, `.github/workflows/{deploy-pages,deploy-backend}.yml`, `client/config.ts` |
 | 管理员角色                          | `server/auth.ts` isAdmin(), `ADMIN_USERS` 环境变量                                                                               |
 | 管理员 API                        | `GET/DELETE /api/admin/cards`, `GET /api/admin/cards/:id/export`, `GET /api/admin/users`（自证发布的 status 切换端点已随 PRD #634 移除） |
-| 卡牌发布/取消发布                      | PR-gated（PRD #634）：`approveCurrentDraft` 过审 pin 版本 → 作者 publish 置 live；非作者只能看到 live 卡                                                             |
+| 卡牌发布/取消发布                      | PR-gated（PRD #634）：GitHub App GraphQL 定论 pin 被审版本 → 作者 publish 再校验后置 live；非作者只能看到 live 卡                                                             |

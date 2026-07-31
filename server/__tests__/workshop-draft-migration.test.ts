@@ -128,7 +128,13 @@ describe('workshop draft migration', () => {
     const { getDb } = await import('../db.ts')
     const db = getDb()
 
-    expect(db.prepare('SELECT MAX(version) AS version FROM schema_version').get()).toEqual({ version: 26 })
+    expect(db.prepare('SELECT MAX(version) AS version FROM schema_version').get()).toEqual({ version: 27 })
+    expect(db.prepare(`
+      SELECT review_commit_sha, review_version_id FROM workshop_cards WHERE id = 'draft'
+    `).get()).toEqual({ review_commit_sha: null, review_version_id: null })
+    expect(db.prepare(`
+      SELECT COUNT(*) AS count FROM github_webhook_events
+    `).get()).toEqual({ count: 0 })
     // v26 (#632): every legacy card is forced back to unsubmitted/offline.
     expect(db.prepare(`
       SELECT id, draft_revision, review_status, live, approved_version_id,

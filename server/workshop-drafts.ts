@@ -85,6 +85,9 @@ type WorkshopCardRow = {
   card_json: string
   code_manifest: string | null
   art_url: string | null
+  github_pr_url: string | null
+  review_commit_sha: string | null
+  review_version_id: string | null
   review_status: string
   live: number
   draft_revision: number
@@ -716,6 +719,7 @@ export function enterReview(
     cardId: string
     authorId: string
     prUrl: string
+    commitSha?: string
     /**
      * Revision the quality gate was checked against. The PR content is
      * generated from that revision, so a concurrent checkpoint (e.g. a save
@@ -741,30 +745,29 @@ export function enterReview(
         current,
       )
     }
+    const reviewVersionId = input.commitSha ? ensureVersion(db, current) : null
     db.prepare(`
       UPDATE workshop_cards
       SET review_status = 'in_review',
           github_pr_url = ?,
           github_pr_status = 'open',
           github_pr_last_synced_at = ?,
+          review_commit_sha = ?,
+          review_version_id = ?,
           updated_at = ?
       WHERE id = ?
-    `).run(input.prUrl, Date.now(), Date.now(), current.id)
+    `).run(
+      input.prUrl,
+      Date.now(),
+      input.commitSha ?? null,
+      reviewVersionId,
+      Date.now(),
+      current.id,
+    )
     return loadWorkspace(db, current.id, input.authorId)
   })()
 }
 
-/**
- * Record a passing review (PRD #634): pin the current draft as the approved
- * version and enter review_status 'approved'. This is the only doorway to
- * 'approved' — driven by the GitHub review-approval sync (#640); until that
- * lands it is exercised directly by tests.
- *
- * The caller owns the commit↔content binding: the #640 sync must verify the
- * atomic snapshot rule (#629 — approved review commit oid == PR head ==
- * content this call pins) before invoking, or reject the approval when the
- * current draft no longer matches the reviewed commit.
- */
 export function approveCurrentDraft(
   db: Database.Database,
   input: {
@@ -802,11 +805,72 @@ export function approveCurrentDraft(
   })()
 }
 
-/**
- * Toggle an approved card live (PRD #634): publishing no longer snapshots the
- * draft — it only flips the live switch on the review-approved version. The
- * review gate itself (approveCurrentDraft) fills approved_version_id.
- */
+export function invalidateReviewedCard(
+  db: Database.Database,
+  input: { prUrl: string; prStatus?: string },
+): number {
+  const now = Date.now()
+  return db.prepare(`
+    UPDATE workshop_cards
+    SET review_status = 'stale',
+        live = 0,
+        github_pr_status = ?,
+        github_pr_last_synced_at = ?,
+        updated_at = ?
+    WHERE github_pr_url = ?
+      AND review_status IN ('in_review', 'approved')
+  `).run(input.prStatus ?? 'open', now, now, input.prUrl).changes
+}
+
+export function approveReviewedVersion(
+  db: Database.Database,
+  input: { prUrl: string; commitSha: string; reviewId: string },
+): number {
+  return db.transaction(() => {
+    const row = db.prepare(`
+      SELECT * FROM workshop_cards WHERE github_pr_url = ?
+    `).get(input.prUrl) as WorkshopCardRow | undefined
+    if (!row || !['in_review', 'stale', 'approved'].includes(row.review_status)) return 0
+    if (
+      row.review_commit_sha !== input.commitSha
+      || !row.review_version_id
+    ) {
+      invalidateReviewedCard(db, { prUrl: input.prUrl })
+      return 0
+    }
+    const current = rowToWorkspace(row)
+    const reviewedVersion = loadVersion(db, current.id, row.review_version_id)
+    if (
+      contentHash(current.draft) !== versionContentHash(reviewedVersion)
+      || hasReservedCardId(db, current.draft.cardId, current.id)
+    ) {
+      invalidateReviewedCard(db, { prUrl: input.prUrl })
+      return 0
+    }
+    const now = Date.now()
+    return db.prepare(`
+      UPDATE workshop_cards
+      SET review_status = 'approved',
+          approved_version_id = ?,
+          approved_commit_sha = ?,
+          approved_review_id = ?,
+          approved_at = ?,
+          github_pr_status = 'open',
+          github_pr_last_synced_at = ?,
+          updated_at = ?
+      WHERE id = ?
+    `).run(
+      row.review_version_id,
+      input.commitSha,
+      input.reviewId,
+      now,
+      now,
+      now,
+      current.id,
+    ).changes
+  })()
+}
+
 export function publish(
   db: Database.Database,
   input: {

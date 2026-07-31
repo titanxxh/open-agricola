@@ -53,6 +53,8 @@ db.exec(`
     github_pr_url TEXT,
     github_pr_status TEXT,
     github_pr_last_synced_at INTEGER,
+    review_commit_sha TEXT,
+    review_version_id TEXT,
     draft_revision INTEGER NOT NULL DEFAULT 1,
     draft_generation_json TEXT NOT NULL DEFAULT '{}',
     approved_commit_sha TEXT,

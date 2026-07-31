@@ -60,12 +60,12 @@ WORKSHOP_REVIEW_GITHUB_INSTALLATION_ID=<Installation ID>
 WORKSHOP_REVIEW_GITHUB_WEBHOOK_SECRET=<Webhook secret>
 ```
 
-Private key 中的换行以 `\n` 保存。private key 和 webhook secret 只能进入后端部署密钥，不得提交到仓库、写入日志或粘贴到 issue；issue 只记录变量名、配置位置和安装仓库。代码接入时还需把这四项显式传入后端容器。
+Private key 中的换行以 `\n` 保存。private key 和 webhook secret 只能进入后端部署密钥，不得提交到仓库、写入日志或粘贴到 issue；issue 只记录变量名、配置位置和安装仓库。`docker-compose.prod.yml` 会把这四项显式传入后端容器。
 
 ## Runtime Flow
 
-1. 前端卡牌详情页点击"发起 PR 到主仓库"。
-2. 前端调用 `POST /api/workshop/cards/:id/github/propose`。
+1. 前端卡牌详情页点击“提交审核”。
+2. 前端调用 `POST /api/workshop/cards/:id/submit-review`。
 3. 服务端若缺 GitHub token，返回 OAuth start URL。
 4. 前端 popup 打开 OAuth URL。生产环境下 popup URL 必须解析到后端域名，而不是 GitHub Pages 路径；前端通过 `VITE_API_BASE` 做 base URL。
 5. GitHub callback 页面由后端返回一段 HTML，执行：
@@ -73,7 +73,7 @@ Private key 中的换行以 `\n` 保存。private key 和 webhook secret 只能�
    window.opener.postMessage({ type: 'workshop-pr-oauth', result }, '*')
   ```
    这里必须用 `'*'`，因为 callback 页面在后端域名，opener 在 GitHub Pages 域名。
-6. 前端收到消息后关闭 popup 并重试 propose。
+6. 前端收到消息后关闭 popup 并重试 submit-review。
 7. 服务端：
   - 若授权用户与 upstream owner 相同，跳过 fork，直接使用 upstream repo。
   - 否则确保 fork 存在。
@@ -81,6 +81,8 @@ Private key 中的换行以 `\n` 保存。private key 和 webhook secret 只能�
   - 生成 community card 文件、smoke test、注册表、community docs、可选 card art。
   - 先提交占位 PR number 的 V1 commit，打开或更新 PR。
   - 再提交带真实 PR number 的 V2 commit。
+8. Review App 接收 webhook；approved review 经 GraphQL 快照确认后固定被审版本，`synchronize` / `dismissed` 使旧资格变为 stale。
+9. 作者调用 `POST /api/workshop/cards/:id/publish` 时再次即时查询 GraphQL，一致才置 live。
 
 ## CI Requirements for Generated PRs
 
