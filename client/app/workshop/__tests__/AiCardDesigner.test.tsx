@@ -592,7 +592,7 @@ describe('AiCardDesigner AI config header', () => {
     render(
       <LocaleProvider>
         <AiCardDesigner
-          initialCard={existingCard}
+          initialCardId={existingCard.id}
           onImport={() => {}}
           onClose={() => {}}
           apiFetch={apiFetch}
@@ -600,8 +600,7 @@ describe('AiCardDesigner AI config header', () => {
       </LocaleProvider>,
     )
 
-    await waitFor(() => expect(screen.queryByText('正在恢复草稿…')).not.toBeInTheDocument())
-    const idInput = screen.getByPlaceholderText('CUSTOM_MedievalMallet')
+    const idInput = await screen.findByDisplayValue(existingCard.card_id)
     await userEvent.clear(idInput)
     await userEvent.type(idInput, 'CUSTOM_ChangedMallet')
     const costInput = screen.getByLabelText('费用')
