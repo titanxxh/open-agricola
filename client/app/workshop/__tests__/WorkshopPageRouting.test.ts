@@ -138,6 +138,20 @@ describe('WorkshopPage PR action state', () => {
     })
   })
 
+  it('locks the action when the PR merged before review sync catches up', () => {
+    const state = getWorkshopPrActionState({
+      enabled: true,
+      isAuthor: true,
+      reviewStatus: 'in_review',
+      githubPrUrl: 'https://github.com/x/y/pull/7',
+      githubPrStatus: 'merged',
+      localesComplete: true,
+    })
+
+    expect(state.disabled).toBe(true)
+    expect(state.buttonLabel).toBe('已合并 ✓')
+  })
+
   it('treats omitted localesComplete as legacy (allowed) for back-compat', () => {
     const state = getWorkshopPrActionState({
       enabled: true,

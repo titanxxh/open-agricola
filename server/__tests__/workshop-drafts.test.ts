@@ -739,6 +739,7 @@ describe('workshop draft aggregate', () => {
       cardId: created.id,
       authorId: 'author',
       prUrl: 'https://github.com/x/y/pull/9',
+      expectedRevision: 1,
     })
     expect(inReview.reviewStatus).toBe('in_review')
     expect(inReview.live).toBe(false)
@@ -748,13 +749,23 @@ describe('workshop draft aggregate', () => {
       cardId: created.id,
       authorId: 'author',
       prUrl: 'https://github.com/x/y/pull/9',
+      expectedRevision: 1,
     }).reviewStatus).toBe('in_review')
+
+    // a checkpoint racing the GitHub round-trip invalidates the transition
+    expect(() => enterReview(db, {
+      cardId: created.id,
+      authorId: 'author',
+      prUrl: 'https://github.com/x/y/pull/9',
+      expectedRevision: 0,
+    })).toThrowError(expect.objectContaining<Partial<WorkshopDraftError>>({ code: 'conflict' }))
 
     approveCurrentDraft(db, { cardId: created.id, authorId: 'author' })
     expect(() => enterReview(db, {
       cardId: created.id,
       authorId: 'author',
       prUrl: 'https://github.com/x/y/pull/9',
+      expectedRevision: 1,
     })).toThrowError(expect.objectContaining<Partial<WorkshopDraftError>>({ code: 'conflict' }))
   })
 
