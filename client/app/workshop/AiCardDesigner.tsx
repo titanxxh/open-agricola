@@ -2138,11 +2138,13 @@ export function AiCardDesigner({
           <div>
             <h2>{cardName || (locale === 'zh' ? '新卡牌草稿' : 'New card draft')}</h2>
             <span className="aicw-draft-badge">
-              {workspaceState?.live
-                ? (locale === 'zh' ? '已上线' : 'Live')
-                : workspaceState?.reviewStatus === 'approved'
-                  ? (locale === 'zh' ? '已过审' : 'Approved')
-                  : (locale === 'zh' ? '草稿' : 'Draft')}
+              {workspaceState?.reviewStatus === 'merged'
+                ? (locale === 'zh' ? '已收录（只读）' : 'Merged (read-only)')
+                : workspaceState?.live
+                  ? (locale === 'zh' ? '已上线' : 'Live')
+                  : workspaceState?.reviewStatus === 'approved'
+                    ? (locale === 'zh' ? '已过审' : 'Approved')
+                    : (locale === 'zh' ? '草稿' : 'Draft')}
             </span>
             {workspaceState?.reviewStatus === 'approved' && !workspaceState.live && (
               <button
@@ -2175,7 +2177,7 @@ export function AiCardDesigner({
             type="button"
             className={`aicw-button aicw-button-primary${saveSuccess ? ' is-success' : ''}`}
             onClick={() => { void handleSaveCard() }}
-            disabled={saving || Boolean(currentCardDbId && controllerLoading)}
+            disabled={saving || workspaceState?.reviewStatus === 'merged' || Boolean(currentCardDbId && controllerLoading)}
           >
             {saveSuccess
               ? (locale === 'zh' ? '已保存' : 'Saved')
