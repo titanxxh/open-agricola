@@ -1,0 +1,42 @@
+name: E2E
+
+on:
+  push:
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: e2e-${{ github.event.pull_request.head.sha || github.sha }}
+  cancel-in-progress: true
+
+jobs:
+  e2e:
+    runs-on: ${{ vars.RUNNER_LABEL || 'ubuntu-latest' }}
+    timeout-minutes: 30
+    env:
+      BGA_CDN_BASE_URL: ${{ vars.BGA_CDN_BASE_URL }}
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22
+
+      - name: Enable pnpm
+        run: corepack enable
+
+      - name: Install deps
+        run: pnpm install --frozen-lockfile
+
+      - name: Install browsers
+        run: pnpm exec playwright install --with-deps chromium webkit
+
+      - name: E2E (Chromium)
+        run: pnpm run verify
+
+      - name: Browser-local sandbox
+        run: pnpm run verify:e2e:browser-sandbox
+
+      - name: iOS Safari smoke (WebKit)
+        run: pnpm run verify:e2e:webkit

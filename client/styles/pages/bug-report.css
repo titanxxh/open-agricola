@@ -283,3 +283,9 @@
     min-width: 0;
   }
 }
+
+@media (min-width: 641px) and (max-width: 900px) {
+  .bug-report-trigger {
+    right: 64px;
+  }
+}
