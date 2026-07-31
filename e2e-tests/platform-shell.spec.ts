@@ -83,7 +83,7 @@ test('button-styled links stay undecorated across interaction states', async ({ 
 
 test('the first seasonal background request uses the runtime asset path', async ({ page }) => {
   await mockPlatformApis(page)
-  const assetUrl = 'https://titanxxh.github.io/open-agricola-assets/assets/website-bg/summer-1.webp?v=452535ad419b8ea546ef73d9a410847bfae08e25'
+  const assetUrl = 'https://raw.githubusercontent.com/titanxxh/open-agricola-assets/452535ad419b8ea546ef73d9a410847bfae08e25/assets/website-bg/summer-1.webp?v=452535ad419b8ea546ef73d9a410847bfae08e25'
   const seasonalRequests: string[] = []
   page.on('request', (request) => {
     const pathname = new URL(request.url()).pathname
@@ -95,7 +95,7 @@ test('the first seasonal background request uses the runtime asset path', async 
     page.evaluate(() => document.documentElement.style.getPropertyValue('--bg-monthly')),
   ).toContain(assetUrl)
 
-  expect(seasonalRequests[0]).toBe('/open-agricola-assets/assets/website-bg/summer-1.webp')
+  expect(seasonalRequests[0]).toBe('/titanxxh/open-agricola-assets/452535ad419b8ea546ef73d9a410847bfae08e25/assets/website-bg/summer-1.webp')
   await expect(page.locator('link[rel="preload"][as="image"]')).toHaveAttribute(
     'href',
     assetUrl,

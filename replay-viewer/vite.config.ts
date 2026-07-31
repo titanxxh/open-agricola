@@ -3,9 +3,11 @@ import { dirname, resolve } from 'node:path'
 import { cpSync, existsSync } from 'node:fs'
 import react from '@vitejs/plugin-react'
 import { defineConfig, type PluginOption } from 'vite'
+import { loadPublicAssetConfig, publicAssetUrls } from '../scripts/public-assets'
 
 const root = dirname(fileURLToPath(import.meta.url))
 const repoRoot = resolve(root, '..')
+const publicAssets = await loadPublicAssetConfig({ rootDir: repoRoot, allowLocal: false })
 const bgaImageCandidates = process.env.BGA_IMAGE_DIR
   ? [resolve(repoRoot, process.env.BGA_IMAGE_DIR)]
   : [
@@ -46,7 +48,15 @@ export default defineConfig({
   root,
   base: './',
   publicDir: resolve(root, '../public'),
-  plugins: [react(), bundleBgaAssets()],
+  plugins: [
+    react(),
+    publicAssetUrls(publicAssets, ['/', './', '../']),
+    bundleBgaAssets(),
+  ],
+  define: {
+    'import.meta.env.VITE_PUBLIC_ASSET_BASE_URL': JSON.stringify(publicAssets.baseUrl),
+    'import.meta.env.VITE_PUBLIC_ASSET_VERSION': JSON.stringify(publicAssets.version),
+  },
   build: {
     outDir: resolve(root, '.build'),
     emptyOutDir: true,

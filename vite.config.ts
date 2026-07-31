@@ -5,8 +5,7 @@ import fs from 'fs'
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import {
   loadPublicAssetConfig,
-  rewriteCssPublicAssetUrls,
-  type PublicAssetConfig,
+  publicAssetUrls,
 } from './scripts/public-assets'
 
 const BGA_IMAGE_DIR = process.env.BGA_IMAGE_DIR || '../bga-agricola/img'
@@ -14,32 +13,6 @@ const bgaImagePath = path.resolve(__dirname, BGA_IMAGE_DIR)
 const BGA_CDN_BASE = process.env.BGA_CDN_BASE_URL || 'https://x.boardgamearena.net/data/themereleases/current/games/agricola/260329-0408/img'
 const publicAssets = await loadPublicAssetConfig({
   allowLocal: !process.argv.includes('build') && !process.env.CI,
-})
-
-const publicAssetUrls = (config: PublicAssetConfig) => ({
-  name: 'public-asset-urls',
-  enforce: 'post' as const,
-  transform(code: string, id: string) {
-    if (!id.split('?', 1)[0].endsWith('.css')) return null
-    const transformed = rewriteCssPublicAssetUrls(code, '/', config)
-    return transformed === code ? null : { code: transformed, map: null }
-  },
-  transformIndexHtml(html: string) {
-    return html
-      .replaceAll('"__PUBLIC_ASSET_BASE_URL__"', JSON.stringify(config.baseUrl))
-      .replaceAll('"__PUBLIC_ASSET_VERSION__"', JSON.stringify(config.version))
-  },
-  generateBundle(
-    _options: unknown,
-    bundle: Record<string, { type: string; fileName: string; source?: string | Uint8Array }>,
-  ) {
-    const base = process.env.VITE_BASE_PATH ?? '/'
-    for (const file of Object.values(bundle)) {
-      if (file.type !== 'asset' || !file.fileName.endsWith('.css') || typeof file.source !== 'string') continue
-      file.source = rewriteCssPublicAssetUrls(file.source, base, config)
-      file.source = rewriteCssPublicAssetUrls(file.source, '/', config)
-    }
-  },
 })
 
 const servePublicAssets = (assetRoot: string) => {
@@ -130,7 +103,7 @@ const replaceBgaBase = (cdnBase: string) => {
 
 const plugins: PluginOption[] = [
   react(),
-  publicAssetUrls(publicAssets),
+  publicAssetUrls(publicAssets, [process.env.VITE_BASE_PATH ?? '/', '/']),
   serveBgaImages(bgaImagePath),
 ]
 if (publicAssets.localDir) {

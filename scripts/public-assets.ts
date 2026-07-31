@@ -1,8 +1,8 @@
 import { readFile, stat } from 'node:fs/promises'
 import path from 'node:path'
 
-export const PUBLIC_ASSET_BASE_URL = 'https://titanxxh.github.io/open-agricola-assets/'
 export const LOCAL_PUBLIC_ASSET_BASE_URL = '/__public-assets__/'
+const PUBLIC_ASSET_METADATA_URL = 'https://titanxxh.github.io/open-agricola-assets/'
 
 const SHA_PATTERN = /^[0-9a-f]{40}$/
 const ASSET_PATH_PATTERN = /^assets\/(?:[A-Za-z0-9._-]+\/)*[A-Za-z0-9._-]+$/
@@ -20,6 +20,9 @@ export type PublicAssetConfig = {
   requiredFiles: string[]
   localDir?: string
 }
+
+export const publicAssetBaseUrl = (version: string): string =>
+  `https://raw.githubusercontent.com/titanxxh/open-agricola-assets/${version}/`
 
 const parseFileList = (value: unknown, label: string): string[] => {
   if (!Array.isArray(value) || value.some(file => typeof file !== 'string')) {
@@ -120,14 +123,20 @@ export const loadPublicAssetConfig = async ({
     return { baseUrl: LOCAL_PUBLIC_ASSET_BASE_URL, version, requiredFiles, localDir }
   }
 
-  const remoteVersion = (await fetchText(new URL('asset-version.txt', PUBLIC_ASSET_BASE_URL), fetcher)).trim()
+  const remoteVersion = (await fetchText(
+    new URL('asset-version.txt', PUBLIC_ASSET_METADATA_URL),
+    fetcher,
+  )).trim()
   if (!SHA_PATTERN.test(remoteVersion) || remoteVersion !== version) {
     throw new Error(`Public asset version mismatch: expected ${version}, received ${remoteVersion}`)
   }
 
   let manifestValue: unknown
   try {
-    manifestValue = JSON.parse(await fetchText(new URL('asset-manifest.json', PUBLIC_ASSET_BASE_URL), fetcher))
+    manifestValue = JSON.parse(await fetchText(
+      new URL('asset-manifest.json', PUBLIC_ASSET_METADATA_URL),
+      fetcher,
+    ))
   } catch (error) {
     throw new Error('Invalid public asset manifest JSON', { cause: error })
   }
@@ -141,7 +150,7 @@ export const loadPublicAssetConfig = async ({
     throw new Error(`Public asset manifest is missing required file: ${missing}`)
   }
 
-  return { baseUrl: PUBLIC_ASSET_BASE_URL, version, requiredFiles }
+  return { baseUrl: publicAssetBaseUrl(version), version, requiredFiles }
 }
 
 const escapeRegExp = (value: string): string => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
@@ -160,4 +169,41 @@ export const rewriteCssPublicAssetUrls = (
     (_match: string, quote: string, relative: string) =>
       `url(${quote}${config.baseUrl}assets/${relative}?v=${encodeURIComponent(config.version)}${quote})`,
   )
+}
+
+export const publicAssetUrls = (
+  config: PublicAssetConfig,
+  prefixes = ['/'],
+) => {
+  const rewrite = (code: string): string =>
+    [...new Set(prefixes)].reduce(
+      (result, prefix) => rewriteCssPublicAssetUrls(result, prefix, config),
+      code,
+    )
+
+  return {
+    name: 'public-asset-urls',
+    enforce: 'post' as const,
+    transform(code: string, id: string) {
+      if (!id.split('?', 1)[0].endsWith('.css')) return null
+      const transformed = rewrite(code)
+      return transformed === code ? null : { code: transformed, map: null }
+    },
+    transformIndexHtml(html: string) {
+      return html
+        .replaceAll('"__PUBLIC_ASSET_BASE_URL__"', JSON.stringify(config.baseUrl))
+        .replaceAll('"__PUBLIC_ASSET_VERSION__"', JSON.stringify(config.version))
+    },
+    generateBundle(
+      _options: unknown,
+      bundle: Record<string, { type: string; fileName: string; source?: string | Uint8Array }>,
+    ) {
+      for (const file of Object.values(bundle)) {
+        if (file.type !== 'asset' || !file.fileName.endsWith('.css') || typeof file.source !== 'string') {
+          continue
+        }
+        file.source = rewrite(file.source)
+      }
+    },
+  }
 }
