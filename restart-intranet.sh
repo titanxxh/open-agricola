@@ -454,14 +454,8 @@ fi
 
 echo "Ensuring immutable replay viewer..."
 "$PNPM_BIN" run build:cards-manifest
-REPLAY_VIEWER_ALLOW_MISSING_BGA_ART=0
-if [ ! -d "$BGA_IMAGE_DIR" ]; then
-  REPLAY_VIEWER_ALLOW_MISSING_BGA_ART=1
-fi
 REPLAY_VIEWER_BUILD_ID="${REPLAY_VIEWER_BUILD_ID:-$(
   env \
-    BGA_IMAGE_DIR="$BGA_IMAGE_DIR" \
-    REPLAY_VIEWER_ALLOW_MISSING_BGA_ART="$REPLAY_VIEWER_ALLOW_MISSING_BGA_ART" \
     REPLAY_VIEWER_ROOT="$REPLAY_VIEWER_ROOT" \
     "$PNPM_BIN" run build:replay-viewer | tail -n 1
 )}"

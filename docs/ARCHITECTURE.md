@@ -1237,7 +1237,7 @@ ADR-0014 使用下一可用迁移增加十张表；首个正式 Replay `schemaVe
 生产除现有 SQLite 持久卷外，还必须有三个不会被镜像部署覆盖的位置：
 
 ```
-replay-viewers/<viewerBuildId>/  不可变历史 Viewer Build
+replay-viewers/<viewerBuildId>/  不可变历史 Viewer 代码 Build
 replay-assets/<sha256>           Replay Card Snapshot 内容资源
 replay-removals.jsonl            数据库外删除 ledger
 ```
@@ -1264,7 +1264,7 @@ BUG_REPORT_TOKEN_ENCRYPTION_KEYS
 BUG_REPORT_TOKEN_ACTIVE_KEY_ID
 ```
 
-当前 Durable Room Commit 读取 `REPLAY_NEW_ROOMS_ENABLED`、`REPLAY_VIEWER_BUILD_ID`、`REPLAY_VIEWER_ROOT`、`REPLAY_ASSET_ROOT` 和 `GAME_BUILD_ID`，启用录制时只接受 SQLite 持久化。创建 Room 时持久化录制决定、两个 Build ID 和自定义卡运行时快照；未发布自定义卡要求玩家明确确认永久公开。Viewer Build ID 必须是完整 `manifest.json` 的 SHA-256，清单固定 `index.html` 入口及目录内每个文件的 SHA-256；BGA 棋盘图、卡图和字体复制进同一内容寻址 Build，运行时不读取外部 CDN；校验失败时拒绝创建。自定义卡图在 Step 0 前复制到内容寻址资源目录并把 Replay header 改写为不可变 URL。录制开启的等待局在 Step 0 建立前拒绝游戏写入。未完成局过期时删除未被有效 Bug Report Anchor 保护的 Replay payload；小时级清理会在 evidence 到期后再次裁剪 Segment、空 header 和无引用内容资源。已有 Replay header 不受后续配置变化影响并继续记录，开关开启后恢复出的旧进行局会以 `missingPrefix=true` 建立 Step 0。
+当前 Durable Room Commit 读取 `REPLAY_NEW_ROOMS_ENABLED`、`REPLAY_VIEWER_BUILD_ID`、`REPLAY_VIEWER_ROOT`、`REPLAY_ASSET_ROOT` 和 `GAME_BUILD_ID`，启用录制时只接受 SQLite 持久化。创建 Room 时持久化录制决定、两个 Build ID 和自定义卡运行时快照；未发布自定义卡要求玩家明确确认永久公开。Viewer Build ID 必须是完整 `manifest.json` 的 SHA-256，清单固定 `index.html` 入口及目录内每个文件的 SHA-256；Build 只保存 Viewer 代码、样式和卡牌 manifest，BGA 棋盘图、卡图和字体与主站使用同一 `BGA_CDN_BASE_URL`，不归档图片历史；校验失败时拒绝创建。自定义卡图在 Step 0 前复制到内容寻址资源目录并把 Replay header 改写为不可变 URL。录制开启的等待局在 Step 0 建立前拒绝游戏写入。未完成局过期时删除未被有效 Bug Report Anchor 保护的 Replay payload；小时级清理会在 evidence 到期后再次裁剪 Segment、空 header 和无引用内容资源。已有 Replay header 不受后续配置变化影响并继续记录，开关开启后恢复出的旧进行局会以 `missingPrefix=true` 建立 Step 0。
 
 部署顺序固定为：
 
