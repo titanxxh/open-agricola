@@ -473,13 +473,13 @@ WorkshopPage
 
 ### D5. Workshop → GitHub PR 流程
 
-卡牌工坊支持把用户发布的设计提交为主仓库的 community card PR。入口在卡牌详情页：
+提交审核（submit-review）是进入 `in_review` 的唯一入口（PRD #634 #637）：GitHub PR 是审核载体，审核发生在 approve **之前**。入口在卡牌详情页：
 
-1. 用户必须登录，且是该工坊卡牌作者或管理员。
-2. 卡牌必须处于 `approved` 且 `live=1`；当前 Design Draft 通过静态校验且 `sandbox_pass_version_id` 内容与草稿一致（`getHandoffReadiness`）。
-3. 前端调用 `POST /api/workshop/cards/:id/propose`。
+1. 用户必须登录，且是该工坊卡牌作者。
+2. 卡牌必须处于 `unsubmitted / stale / in_review`（`in_review` 再次提交 = 更新 PR 分支）；质量门：静态校验 + `sandbox_pass_version_id` 内容与草稿一致（`getHandoffReadiness`）+ 完整中文本地化 + `card_id` 未被 approved/merged 卡占用。
+3. 前端调用 `POST /api/workshop/cards/:id/submit-review`。
 4. 如果服务端没有当前会话对应的 GitHub token，会返回 OAuth start URL；前端用 popup 打开，并等待 callback 页面通过 `postMessage({ type: 'workshop-pr-oauth', ... }, '*')` 通知授权完成。
-5. 授权完成后前端重试 propose 请求，服务端创建/更新分支并打开或更新 PR。
+5. 授权完成后前端重试请求，服务端创建/更新分支并打开或更新 PR，成功后卡牌转入 `in_review`（`enterReview`）。管理员在 GitHub approve 后（#640 同步）卡牌才能发布上线。
 
 服务端核心模块：
 
@@ -490,7 +490,7 @@ WorkshopPage
 | `server/workshop-pr/oauth-handler.ts`   | GitHub OAuth start/callback；请求 `repo` scope 以支持 private upstream           |
 | `server/workshop-pr/github-client.ts`   | GitHub REST API 封装；授权用户等于 upstream owner 时跳过 fork，直接推 upstream 分支          |
 | `server/workshop-pr/code-gen.ts`        | 纯生成器：把 workshop card 转成 community card 文件、测试、注册表和文档                        |
-| `client/services/workshop-pr.ts`        | 前端 propose/OAuth popup helper；relative auth URL 会按 `VITE_API_BASE` 解析到后端域名 |
+| `client/services/workshop-pr.ts`        | 前端 submit-review/OAuth popup helper；relative auth URL 会按 `VITE_API_BASE` 解析到后端域名 |
 
 
 生成的 PR 文件固定包含：
