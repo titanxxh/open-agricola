@@ -6,6 +6,7 @@
 import { describe, it, expect, vi, beforeAll } from 'vitest'
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import Database from 'better-sqlite3'
+import { approveCurrentDraft } from '../workshop-drafts.ts'
 
 // ── Mock DB ──────────────────────────────────────────────────────────────────
 
@@ -26,20 +27,26 @@ db.exec(`
     card_id TEXT NOT NULL, card_type TEXT NOT NULL, name TEXT NOT NULL,
     description TEXT NOT NULL DEFAULT '', card_json TEXT NOT NULL,
     effect_dsl TEXT, effect_code TEXT, compiled_code TEXT, code_manifest TEXT,
-    art_url TEXT, art_prompt TEXT, status TEXT NOT NULL DEFAULT 'draft',
+    art_url TEXT, art_prompt TEXT,
+    review_status TEXT NOT NULL DEFAULT 'unsubmitted',
+    live INTEGER NOT NULL DEFAULT 0,
     featured INTEGER NOT NULL DEFAULT 0,
     github_pr_url TEXT,
     github_pr_status TEXT,
     github_pr_last_synced_at INTEGER,
     draft_revision INTEGER NOT NULL DEFAULT 1,
     draft_generation_json TEXT NOT NULL DEFAULT '{}',
-    published_version_id TEXT,
+    approved_commit_sha TEXT,
+    approved_review_id TEXT,
+    approved_at INTEGER,
+    approved_version_id TEXT,
+    built_in INTEGER NOT NULL DEFAULT 0,
     sandbox_pass_version_id TEXT,
     sandbox_passed_at INTEGER,
     created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL
   );
-  CREATE UNIQUE INDEX idx_workshop_card_id_published
-    ON workshop_cards(card_id) WHERE status = 'published';
+  CREATE UNIQUE INDEX idx_workshop_card_id_gated
+    ON workshop_cards(card_id) WHERE review_status IN ('approved', 'merged');
   CREATE TABLE card_likes (
     user_id TEXT NOT NULL REFERENCES users(id),
     card_id TEXT NOT NULL REFERENCES workshop_cards(id) ON DELETE CASCADE,
@@ -177,6 +184,9 @@ const createPublishedCard = async (
     createRes,
   )
   const cardDbId = JSON.parse(createRes.body).id as string
+  const authorId = (db.prepare('SELECT user_id FROM sessions WHERE token = ?')
+    .get(token) as { user_id: string }).user_id
+  approveCurrentDraft(db, { cardId: cardDbId, authorId })
   const publishRes = mockRes()
   await handleWorkshopRoute(
     mockReq('POST', `/api/workshop/cards/${cardDbId}/publish`, {
@@ -319,8 +329,8 @@ describe('workshop API', () => {
       const d = JSON.parse(res.body)
 
       expect(d.ok).toBe(true)
-      expect(d.cards.some((card: { name: string; status: string }) => card.name === 'My Draft Card' && card.status === 'draft')).toBe(true)
-      expect(d.cards.some((card: { name: string; status: string }) => card.name === 'My Published Card' && card.status === 'published')).toBe(true)
+      expect(d.cards.some((card: { name: string; review_status: string }) => card.name === 'My Draft Card' && card.review_status === 'unsubmitted')).toBe(true)
+      expect(d.cards.some((card: { name: string; live: boolean }) => card.name === 'My Published Card' && card.live === true)).toBe(true)
       expect(d.cards.some((card: { name: string }) => card.name === 'Other Published Card')).toBe(false)
     })
   })
@@ -337,6 +347,7 @@ describe('workshop API', () => {
       await handleWorkshopRoute(createReq, createRes)
       const cardDbId = JSON.parse(createRes.body).id
 
+      approveCurrentDraft(db, { cardId: cardDbId, authorId: 'u1' })
       const publishRes = mockRes()
       await handleWorkshopRoute(mockReq(
         'POST',
@@ -593,6 +604,7 @@ const CARD_IMPL = {}
       }, 'tok-alice'), adoptRes)
       expect(JSON.parse(adoptRes.body).workspace.revision).toBe(2)
 
+      approveCurrentDraft(db, { cardId: cardDbId, authorId: 'u1' })
       const publishRes = mockRes()
       await handleWorkshopRoute(mockReq('POST', `/api/workshop/cards/${cardDbId}/publish`, {
         baseRevision: 2,
@@ -678,54 +690,6 @@ const CARD_IMPL = {}
         readyRes,
       )
       expect(JSON.parse(readyRes.body).readiness.ready).toBe(true)
-    })
-
-    it('creates a pinned version when an admin publishes a draft', async () => {
-      const createRes = mockRes()
-      await handleWorkshopRoute(mockReq('POST', '/api/workshop/cards', {
-        card_id: 'CUSTOM_AdminPublished',
-        card_type: 'minor',
-        name: 'Admin Published',
-        card_json: {
-          id: 'CUSTOM_AdminPublished',
-          name: 'Admin Published',
-          card_type: 'minor',
-          deck: 'CUSTOM',
-          number: 0,
-          desc: [],
-        },
-      }, 'tok-bob'), createRes)
-      const cardDbId = JSON.parse(createRes.body).id
-      const previousAdmins = process.env.ADMIN_USERS
-      process.env.ADMIN_USERS = 'alice'
-      try {
-        const statusRes = mockRes()
-        await handleWorkshopRoute(mockReq(
-          'POST',
-          `/api/admin/cards/${cardDbId}/status`,
-          { status: 'published' },
-          'tok-alice',
-        ), statusRes)
-
-        expect(statusRes.statusCode).toBe(200)
-        expect(JSON.parse(statusRes.body)).toMatchObject({
-          ok: true,
-          status: 'published',
-          publishedVersionId: expect.any(String),
-        })
-        expect(db.prepare(`
-          SELECT published_version_id FROM workshop_cards WHERE id = ?
-        `).get(cardDbId)).toEqual({
-          published_version_id: expect.any(String),
-        })
-
-        const publicRes = mockRes()
-        await handleWorkshopRoute(mockReq('GET', `/api/workshop/cards/${cardDbId}`), publicRes)
-        expect(publicRes.statusCode).toBe(200)
-      } finally {
-        if (previousAdmins === undefined) delete process.env.ADMIN_USERS
-        else process.env.ADMIN_USERS = previousAdmins
-      }
     })
   })
 

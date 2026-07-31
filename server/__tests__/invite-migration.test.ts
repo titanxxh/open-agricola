@@ -38,6 +38,13 @@ describe('account invite migration', () => {
         created_at INTEGER NOT NULL,
         updated_at INTEGER NOT NULL
       );
+      CREATE TABLE room_players (
+        room_id TEXT NOT NULL REFERENCES rooms(id) ON DELETE CASCADE,
+        user_id TEXT NOT NULL,
+        player_index INTEGER NOT NULL,
+        joined_at INTEGER NOT NULL,
+        PRIMARY KEY (room_id, user_id)
+      );
       CREATE TABLE users (id TEXT PRIMARY KEY);
       CREATE TABLE account_invites (
         id TEXT PRIMARY KEY,
@@ -52,6 +59,7 @@ describe('account invite migration', () => {
       CREATE TABLE workshop_cards (
         id TEXT PRIMARY KEY,
         author_id TEXT NOT NULL REFERENCES users(id),
+        card_id TEXT NOT NULL DEFAULT '',
         card_json TEXT NOT NULL,
         code_manifest TEXT,
         art_url TEXT,
@@ -78,7 +86,7 @@ describe('account invite migration', () => {
     vi.resetModules()
     const { getDb } = await import('../db.ts')
     const db = getDb()
-    expect(db.prepare('SELECT MAX(version) AS version FROM schema_version').get()).toEqual({ version: 25 })
+    expect(db.prepare('SELECT MAX(version) AS version FROM schema_version').get()).toEqual({ version: 26 })
     expect(db.prepare('SELECT id, use_count, max_uses FROM account_invites ORDER BY id').all()).toEqual([
       { id: 'unused', use_count: 0, max_uses: 1 },
       { id: 'used', use_count: 1, max_uses: 1 },

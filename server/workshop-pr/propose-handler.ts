@@ -9,7 +9,7 @@ import { workshopPrConfig, workshopPrEnabled } from './config.ts'
 import { tokenCache } from './token-cache.ts'
 import { GitHubClient, GitHubApiError } from './github-client.ts'
 import { generatePrFiles } from './code-gen.ts'
-import { getHandoffReadiness, loadPublishedDraft } from '../workshop-drafts.ts'
+import { getHandoffReadiness, loadLiveDraft } from '../workshop-drafts.ts'
 
 const RATE_LIMIT_MS = 10 * 60_000 // 10 minutes
 const REFRESH_COOLDOWN_MS = 60_000 // 1 minute
@@ -23,7 +23,8 @@ type WorkshopCardRow = {
   description: string
   card_json: string
   art_url: string | null
-  status: string
+  review_status: string
+  live: number
   author_name?: string
 }
 
@@ -86,8 +87,8 @@ export async function handleProposeRequest(
     sendJson(res, 403, { ok: false, error: 'not your card' })
     return
   }
-  if (wcard.status !== 'published') {
-    sendJson(res, 400, { ok: false, error: 'card must be published' })
+  if (wcard.review_status !== 'approved' || wcard.live !== 1) {
+    sendJson(res, 400, { ok: false, error: 'card must pass review approval and be published live' })
     return
   }
   const readiness = getHandoffReadiness(db, cardDbId, user.id)
@@ -95,12 +96,12 @@ export async function handleProposeRequest(
     sendJson(res, 400, {
       ok: false,
       code: 'handoff_not_ready',
-      error: 'published version must pass the exact-version sandbox gate',
+      error: 'draft must pass the exact-version sandbox gate',
       readiness,
     })
     return
   }
-  if (!hasCompleteZhLocale(loadPublishedDraft(db, cardDbId).cardJson)) {
+  if (!hasCompleteZhLocale(loadLiveDraft(db, cardDbId).cardJson)) {
     sendJson(res, 400, {
       ok: false,
       code: 'localization_not_ready',

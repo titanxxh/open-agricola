@@ -192,7 +192,8 @@ export type ApiCard = {
   art_url: string | null
   effect_code: string | null
   card_json: Record<string, unknown>  // already parsed by server
-  status: string
+  review_status: string
+  live: boolean
   updated_at: number
 }
 
@@ -1973,7 +1974,7 @@ export function AiCardDesigner({
     const versionId = workspaceState?.session.sandboxTestVersionId
     if (
       !versionId
-      || versionId !== workspaceState.publishedVersionId
+      || versionId !== workspaceState.approvedVersionId
       || !sandboxConfirmation
     ) return
     setSaving(true)
@@ -2055,8 +2056,8 @@ export function AiCardDesigner({
   )
   const handoffReady = Boolean(
     handoffInputsReady
-    && workspaceState?.publishedVersionId
-    && workspaceState.sandboxPassVersionId === workspaceState.publishedVersionId
+    && workspaceState?.approvedVersionId
+    && workspaceState.sandboxPassVersionId === workspaceState.approvedVersionId
   )
   const readiness: Record<WorkshopStage, boolean> = {
     metadata: metadataReady,
@@ -2140,8 +2141,8 @@ export function AiCardDesigner({
           <div>
             <h2>{cardName || (locale === 'zh' ? '新卡牌草稿' : 'New card draft')}</h2>
             <span className="aicw-draft-badge">
-              {workspaceState?.status === 'published'
-                ? (locale === 'zh' ? '已发布' : 'Published')
+              {workspaceState?.live
+                ? (locale === 'zh' ? '已上线' : 'Live')
                 : (locale === 'zh' ? '草稿' : 'Draft')}
             </span>
           </div>
@@ -2535,8 +2536,8 @@ export function AiCardDesigner({
                 <div className="aicw-version-gate">
                   <div>
                     <span>{locale === 'zh' ? '固定发布版本' : 'Pinned published version'}</span>
-                    <strong>{workspaceState?.publishedVersionId
-                      ? workspaceState.publishedVersionId.slice(0, 12)
+                    <strong>{workspaceState?.approvedVersionId
+                      ? workspaceState.approvedVersionId.slice(0, 12)
                       : (locale === 'zh' ? '尚未发布' : 'Not published')}</strong>
                   </div>
                   <div>
@@ -2630,7 +2631,7 @@ export function AiCardDesigner({
                     )}
                   </div>
                 </div>
-                {workspaceState?.session.sandboxTestVersionId === workspaceState?.publishedVersionId && !handoffReady && (
+                {workspaceState?.session.sandboxTestVersionId === workspaceState?.approvedVersionId && !handoffReady && (
                   <div className="aicw-sandbox-confirm">
                     <label>
                       <input

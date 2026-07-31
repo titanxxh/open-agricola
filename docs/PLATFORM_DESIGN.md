@@ -100,7 +100,8 @@ CREATE TABLE workshop_cards (
   -- effect_dsl / effect_code / compiled_code 历史字段，migration v7 已 DROP
   art_url TEXT,
   art_prompt TEXT,
-  status TEXT DEFAULT 'draft',    -- draft | published | flagged
+  review_status TEXT DEFAULT 'unsubmitted',  -- unsubmitted | in_review | approved | stale | merged（PRD #634）
+  live INTEGER DEFAULT 0,         -- 仅 approved 卡可置 1；房间只装载 live 卡的 approved_version_id 快照
   created_at INTEGER NOT NULL,
   updated_at INTEGER NOT NULL
 );
@@ -475,7 +476,7 @@ WorkshopPage
 卡牌工坊支持把用户发布的设计提交为主仓库的 community card PR。入口在卡牌详情页：
 
 1. 用户必须登录，且是该工坊卡牌作者或管理员。
-2. 当前 Design Draft 必须与 `published_version_id` 内容一致，且 `sandbox_pass_version_id === published_version_id`。
+2. 卡牌必须处于 `approved` 且 `live=1`；当前 Design Draft 通过静态校验且 `sandbox_pass_version_id` 内容与草稿一致（`getHandoffReadiness`）。
 3. 前端调用 `POST /api/workshop/cards/:id/propose`。
 4. 如果服务端没有当前会话对应的 GitHub token，会返回 OAuth start URL；前端用 popup 打开，并等待 callback 页面通过 `postMessage({ type: 'workshop-pr-oauth', ... }, '*')` 通知授权完成。
 5. 授权完成后前端重试 propose 请求，服务端创建/更新分支并打开或更新 PR。
@@ -530,7 +531,7 @@ WorkshopPage
 | `PUT /api/workshop/cards/:id/draft` | 带 `baseRevision` 保存完整检查点；过期返回 `409` 和服务器完整草稿 |
 | `POST /api/workshop/cards/:id/adopt` | 原子采用 typed candidate、创建内容去重版本并清空该类候选 |
 | `POST /api/workshop/cards/:id/restore` | 复制旧版本到当前草稿并推进 revision，不创建版本 |
-| `POST /api/workshop/cards/:id/publish` | 静态验证并固定引用不可变版本 |
+| `POST /api/workshop/cards/:id/publish` | 仅 review approved 的卡置 live（PRD #634；不再固化草稿版本） |
 | `POST /api/workshop/cards/:id/sandbox-pass` | 只记录当前精确发布版本且无运行错误的作者确认 |
 
 每次能力源码验证都会把 isolated-vm 提取的 `CARD_DEF` 快照写入服务端 manifest；发布静态门禁会双向比较该快照与当前 `card_json` 的可交付字段，PR handoff 还必须存在已验证源码，避免沙盒运行、已发布定义与最终提交源码不一致。
@@ -677,5 +678,5 @@ Draft Version 只序列化最终卡牌内容和各分区已采用候选的 prove
 | 工坊精选页面                         | `workshop_cards.featured` 列, admin 精选切换, Featured 标签页                                                                        |
 | 生产部署 (Docker + GitHub Pages)   | `Dockerfile`, `docker-compose.prod.yml`, `deploy-backend.sh`, `.github/workflows/{deploy-pages,deploy-backend}.yml`, `client/config.ts` |
 | 管理员角色                          | `server/auth.ts` isAdmin(), `ADMIN_USERS` 环境变量                                                                               |
-| 管理员 API                        | `GET/DELETE /api/admin/cards`, `GET /api/admin/cards/:id/export`, `POST /api/admin/cards/:id/status`, `GET /api/admin/users` |
-| 卡牌发布/取消发布                      | `server/workshop.ts` draft→published 状态切换, 详情页发布按钮, 非作者只能看到已发布卡牌                                                             |
+| 管理员 API                        | `GET/DELETE /api/admin/cards`, `GET /api/admin/cards/:id/export`, `GET /api/admin/users`（自证发布的 status 切换端点已随 PRD #634 移除） |
+| 卡牌发布/取消发布                      | PR-gated（PRD #634）：`approveCurrentDraft` 过审 pin 版本 → 作者 publish 置 live；非作者只能看到 live 卡                                                             |

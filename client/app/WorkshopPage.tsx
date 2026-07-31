@@ -23,7 +23,8 @@ type WorkshopCard = {
   compiled_code?: string | null
   code_manifest?: Record<string, unknown> | null
   art_url: string | null
-  status: 'draft' | 'published'
+  review_status: 'unsubmitted' | 'in_review' | 'approved' | 'stale' | 'merged'
+  live: boolean
   author_id?: string
   author_name: string
   like_count: number
@@ -36,6 +37,21 @@ type WorkshopCard = {
   github_pr_status?: 'open' | 'merged' | 'closed' | null
   github_pr_last_synced_at?: number | null
 }
+
+const workshopBadge = (
+  card: { review_status: WorkshopCard['review_status']; live: boolean },
+): { cls: string; key: string } =>
+  card.review_status === 'approved'
+    ? (card.live
+        ? { cls: 'ws-badge-live', key: 'platform.reviewLive' }
+        : { cls: 'ws-badge-approved', key: 'platform.reviewApproved' })
+    : card.review_status === 'in_review'
+      ? { cls: 'ws-badge-in-review', key: 'platform.reviewInReview' }
+      : card.review_status === 'stale'
+        ? { cls: 'ws-badge-stale', key: 'platform.reviewStale' }
+        : card.review_status === 'merged'
+          ? { cls: 'ws-badge-merged', key: 'platform.reviewMerged' }
+          : { cls: 'ws-badge-draft', key: 'platform.draft' }
 
 type CardVersion = {
   id: string
@@ -122,7 +138,7 @@ export function buildWorkshopUrl(
 type WorkshopPrActionInput = {
   enabled: boolean
   isAuthor: boolean
-  status: WorkshopCard['status']
+  live: boolean
   githubPrUrl?: string | null
   githubPrStatus?: WorkshopCard['github_pr_status']
   handoffReady?: boolean
@@ -146,12 +162,12 @@ export function getWorkshopPrActionState(input: WorkshopPrActionInput): {
   if (!input.enabled) {
     return { visible: true, disabled: true, buttonLabel: 'PR 功能未开启', secondary: null }
   }
-  if (input.status !== 'published') {
+  if (!input.live) {
     return {
       visible: true,
       disabled: true,
-      buttonLabel: '先发布后可发起 PR',
-      secondary: '发布后可以提交到主仓库，等待 maintainer review。',
+      buttonLabel: '先过审并上线后可发起 PR',
+      secondary: '卡牌通过 review 并上线后可以提交到主仓库。',
     }
   }
   if (input.handoffReady === false) {
@@ -317,7 +333,7 @@ function CardTile({ card, onSelect, onLike, mine, t }: {
         <div className="ws-card-tile-meta">
           <span className="ws-badge">{card.card_type === 'minor' ? t('platform.minor') : t('platform.occupation')}</span>
           {!!card.featured && <span className="ws-badge ws-badge-featured">{t('platform.featuredBadge')}</span>}
-          {mine && <span className={`ws-badge ws-badge-${card.status}`}>{card.status === 'published' ? t('platform.published') : t('platform.draft')}</span>}
+          {mine && <span className={`ws-badge ${workshopBadge(card).cls}`}>{t(workshopBadge(card).key)}</span>}
           <span className="ws-author">{t('platform.by', { name: card.author_name })}</span>
         </div>
         <div className="ws-card-desc">
@@ -398,7 +414,7 @@ function CardDetailPrSection({
   const action = getWorkshopPrActionState({
     enabled: true,
     isAuthor,
-    status: card.status,
+    live: card.live,
     githubPrUrl: card.github_pr_url,
     githubPrStatus: card.github_pr_status,
     handoffReady: handoffState?.cardId === card.id && handoffState.ready,
@@ -582,7 +598,7 @@ function CardDetail({ card, isLoggedIn, apiFetch, onBack, onEdit, onAddSandbox, 
           <h2>{card.name}</h2>
           <div className="ws-badges-row">
             <span className="ws-badge">{card.card_type === 'minor' ? t('platform.minor') : t('platform.occupation')}</span>
-            <span className={`ws-badge ws-badge-${card.status}`}>{card.status === 'published' ? t('platform.published') : t('platform.draft')}</span>
+            <span className={`ws-badge ${workshopBadge(card).cls}`}>{t(workshopBadge(card).key)}</span>
             {!!card.featured && <span className="ws-badge ws-badge-featured">{t('platform.featuredBadge')}</span>}
             <span className="ws-author">{t('platform.by', { name: card.author_name })}</span>
           </div>
@@ -613,7 +629,7 @@ function CardDetail({ card, isLoggedIn, apiFetch, onBack, onEdit, onAddSandbox, 
                 {showVersions ? t('platform.hideVersions') : t('platform.versionHistory')}
               </button>
             )}
-            {isUserAdmin && card.status === 'published' && (
+            {isUserAdmin && card.live && (
               <button type="button" className={`btn-secondary ws-btn-sm${isFeatured ? ' liked' : ''}`} onClick={handleFeatureToggle}>
                 {isFeatured ? t('platform.unfeature') : t('platform.setFeatured')}
               </button>
@@ -773,7 +789,7 @@ function SelectableSandboxCard({
         <div className="ws-select-card-meta">
           <span className="ws-badge">{card.card_type === 'minor' ? t('platform.minor') : t('platform.occupation')}</span>
           {!!card.featured && <span className="ws-badge ws-badge-featured">{t('platform.featuredBadge')}</span>}
-          <span className={`ws-badge ws-badge-${card.status}`}>{card.status === 'published' ? t('platform.published') : t('platform.draft')}</span>
+          <span className={`ws-badge ${workshopBadge(card).cls}`}>{t(workshopBadge(card).key)}</span>
           <span className="ws-author">{t('platform.by', { name: card.author_name })}</span>
         </div>
       </div>
@@ -847,7 +863,6 @@ function SandboxResetModal({
     setLoadingPublished(true)
     try {
       const params = new URLSearchParams({
-        status: 'published',
         sort: 'popular',
         page: '1',
         search: publishedSearch,
@@ -1132,7 +1147,7 @@ function SandboxView({
                   <div className="ws-card-tile-meta">
                     <span className="ws-badge">{card.card_type === 'minor' ? t('platform.minor') : t('platform.occupation')}</span>
                     {!!card.featured && <span className="ws-badge ws-badge-featured">{t('platform.featuredBadge')}</span>}
-                    <span className={`ws-badge ws-badge-${card.status}`}>{card.status === 'published' ? t('platform.published') : t('platform.draft')}</span>
+                    <span className={`ws-badge ${workshopBadge(card).cls}`}>{t(workshopBadge(card).key)}</span>
                     <span className="ws-author">{t('platform.by', { name: card.author_name })}</span>
                   </div>
                 </div>
@@ -1204,7 +1219,6 @@ export function WorkshopPage() {
         sort: sortValue,
         search: searchValue,
         page: String(pageToLoad),
-        status: 'published',
       })
       const data = await fetchCardList(params)
       if (data.ok) {
@@ -1221,7 +1235,6 @@ export function WorkshopPage() {
     try {
       const params = new URLSearchParams({
         featured: '1',
-        status: 'published',
         sort: 'popular',
         page: '1',
       })

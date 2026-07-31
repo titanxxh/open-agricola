@@ -217,11 +217,12 @@ type ClientCommand = (
 - 没有独立的 `reorg` / `feed` / `nextPlayer` / `confirmPlayerSwitch` 命令。这些等待形态全部归并到 `choice` 命令，由 `payload` 携带具体形状（按 `InteractionRequest.kind` 决定）。
 - `commitSelection` 只为 farm-position / occupation-hand / resource-quantity / resource-batch-exchange 这类带结构化 payload 的定向选择保留单独入口。farm-position 可通过 `validPositionGroups` 表达服务端校验的合法坐标组合，例如 FoM Farmyard Extension 的相邻二格选择。
 - `enableParentCards: true` 启用父母牌；同时传 `draftParents: false` 时直接为每位玩家发一对父母牌，不进入 `parent-selection`。该选择保存在房间元数据中，`newGame` 与后端重启后继续沿用。
-- `customCardIds` 在真实房间只接受**已发布（published）**的 workshop 卡；草稿卡的自定义代码只能在 workshop sandbox（`POST /api/game/new-sandbox` + 浏览器本地 executor）里试玩，绝不进实时同步主链路。真实房间创建（`createRoom`）与房间恢复（`loadCustomCardsFromDb`）都走 `loadCustomCards(..., { publishedOnly: true })`，加载时按 id 逐个裁定：
-  - 请求者**自己**的未发布草稿卡 → 置 `hasUnpublished`，`handleCreateRoom` 直接报错拒绝建房（引导作者先发布）。
-  - 其余无法加载的 id（**他人**的草稿卡、未认证请求、id 不存在）→ 静默从卡池过滤，房间仍照常创建，只是不含这些卡。之所以不对他人草稿卡报错，是为了不泄露"某 id 是否为某人草稿卡"的存在性。
-  - 无论哪种情形，草稿卡的代码都不会被加载进 `GameSession` 的 executor——安全边界一致，差异仅在给作者本人的错误反馈。
-- 旧的 replay-snapshot 同意往返（`confirmReplayCardSnapshotPublic` / `REPLAY_CARD_SNAPSHOT_CONSENT_REQUIRED`）随之移除——草稿卡不再进真实房间，该机制失去存在理由。
+- Workshop 卡采用**二维状态**（PRD #634，`server/workshop-status.ts`）：review 轴 `unsubmitted / in_review / approved / stale / merged`（唯一入 `approved` 的门是 `approveCurrentDraft`，它把当前草稿 pin 成 `approved_version_id` 不可变版本）× 上线轴 `live`（仅 `approved` 卡可由作者 `publish` 置 live；publish 不再固化草稿，只翻 live 开关）。旧单列 `status`（draft/published）已由 migration v26 移除，存量卡一刀切回 `unsubmitted·offline`（#632）。
+- `customCardIds` 在真实房间只接受 **live（approved 且已上线）** 的 workshop 卡，运行的是被审的 `approved_version_id` 快照（`loadLiveDraft`）；未过审卡的自定义代码只能在 workshop sandbox（`POST /api/game/new-sandbox` + 浏览器本地 executor）里由作者本人试玩，绝不进实时同步主链路。真实房间创建（`createRoom`）与房间恢复（`loadCustomCardsFromDb`）都走 `loadCustomCards(..., { liveOnly: true })`，加载时按 id 逐个裁定：
+  - 请求者**自己**的非 live 卡 → 置 `hasNotLive`，`handleCreateRoom` 直接报错拒绝建房（引导作者走 review → publish）。
+  - 其余无法加载的 id（**他人**的非 live 卡、未认证请求、id 不存在）→ 静默从卡池过滤，房间仍照常创建，只是不含这些卡。之所以不对他人卡报错，是为了不泄露"某 id 是否为某人草稿卡"的存在性。
+  - 无论哪种情形，未过审代码都不会被加载进 `GameSession` 的 executor——安全边界一致，差异仅在给作者本人的错误反馈。
+- 旧的 replay-snapshot 同意往返（`confirmReplayCardSnapshotPublic` / `REPLAY_CARD_SNAPSHOT_CONSENT_REQUIRED`）已移除——非 live 卡不再进真实房间，该机制失去存在理由。
 
 ### 4.5 ServerEvent / StateUpdateEnvelope
 

@@ -11,10 +11,11 @@ import type { CustomCodeManifest } from '../shared/custom-code/types.ts'
 import { defaultSandboxDeckIds, defaultSandboxPlayerNames } from '../shared/session/state-bootstrap.ts'
 import { corsHeaders } from './http-origin.ts'
 import {
-  loadPublishedDraft,
+  loadLiveDraft,
   loadSandboxVersion,
   type WorkshopDraft,
 } from './workshop-drafts.ts'
+import { isLoadableLive } from './workshop-status.ts'
 
 const workshopDraftToCustomCard = (draft: WorkshopDraft): CustomCardData => ({
   cardType: draft.cardType,
@@ -548,26 +549,25 @@ export const handleGameRoute = async (
           continue
         }
         const row = db.prepare(
-          `SELECT card_type, card_json, code_manifest, art_url, status, author_id
+          `SELECT card_type, card_json, code_manifest, art_url, review_status, live, author_id
            FROM workshop_cards WHERE id = ?`,
         ).get(dbId) as {
           card_type: string
           card_json: string
           code_manifest: string | null
           art_url: string | null
-          status: string; author_id: string
+          review_status: string; live: number; author_id: string
         } | undefined
         if (!row) continue
-        if (row.status === 'published') {
+        if (isLoadableLive(row)) {
           try {
-            customCards.push(workshopDraftToCustomCard(loadPublishedDraft(db, dbId)))
+            customCards.push(workshopDraftToCustomCard(loadLiveDraft(db, dbId)))
           } catch (err) {
-            console.warn(`[game-router] failed to load published custom card ${dbId}:`, err)
+            console.warn(`[game-router] failed to load live custom card ${dbId}:`, err)
           }
           continue
         }
-        const allowed =
-          row.status === 'draft' && requestUser?.id === row.author_id
+        const allowed = requestUser?.id === row.author_id
         if (!allowed) continue
         try {
           const parsed = JSON.parse(row.card_json) as Record<string, unknown>
