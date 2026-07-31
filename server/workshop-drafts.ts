@@ -904,8 +904,8 @@ export function publish(
   }
   // Atomic snapshot rule (#629, #638): at the moment the card goes live the
   // approving review's commit, the PR head and the platform-pinned commit
-  // must agree. Without a provider (production until #640) only the local
-  // state check above applies.
+  // must agree. Direct aggregate callers use the synchronous provider seam;
+  // the production HTTP route performs the asynchronous GitHub check first.
   const provider = getReviewDecisionProvider()
   if (provider) {
     const row = db.prepare(
