@@ -175,15 +175,30 @@ export class GitHubClient {
   async findOpenPr(opts: {
     forkOwner: string
     branchName: string
-  }): Promise<{ number: number; url: string } | null> {
+  }): Promise<{
+    number: number
+    url: string
+    baseRefName: string
+    isDraft: boolean
+  } | null> {
     const head = `${opts.forkOwner}:${opts.branchName}`
     const r = await this.fetch(
       `/repos/${this.opts.upstreamOwner}/${this.opts.upstreamRepo}/pulls?head=${encodeURIComponent(head)}&state=open`,
     )
     if (!r.ok) throw new GitHubApiError('pr lookup failed', 'pr_lookup_failed', r.status)
-    const list = (await r.json()) as Array<{ number: number; html_url: string }>
+    const list = (await r.json()) as Array<{
+      number: number
+      html_url: string
+      base: { ref: string }
+      draft: boolean
+    }>
     if (list.length === 0) return null
-    return { number: list[0]!.number, url: list[0]!.html_url }
+    return {
+      number: list[0]!.number,
+      url: list[0]!.html_url,
+      baseRefName: list[0]!.base.ref,
+      isDraft: list[0]!.draft,
+    }
   }
 
   async openPr(opts: {
@@ -191,7 +206,12 @@ export class GitHubClient {
     branchName: string
     title: string
     body: string
-  }): Promise<{ number: number; url: string }> {
+  }): Promise<{
+    number: number
+    url: string
+    baseRefName: string
+    isDraft: boolean
+  }> {
     const r = await this.fetch(
       `/repos/${this.opts.upstreamOwner}/${this.opts.upstreamRepo}/pulls`,
       {
@@ -208,7 +228,24 @@ export class GitHubClient {
     )
     if (!r.ok) throw new GitHubApiError('pr create failed', 'pr_create_failed', r.status)
     const pr = (await r.json()) as { number: number; html_url: string }
-    return { number: pr.number, url: pr.html_url }
+    return {
+      number: pr.number,
+      url: pr.html_url,
+      baseRefName: 'main',
+      isDraft: false,
+    }
+  }
+
+  async closePr(prNumber: number): Promise<void> {
+    const r = await this.fetch(
+      `/repos/${this.opts.upstreamOwner}/${this.opts.upstreamRepo}/pulls/${prNumber}`,
+      {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ state: 'closed' }),
+      },
+    )
+    if (!r.ok) throw new GitHubApiError('pr close failed', 'pr_close_failed', r.status)
   }
 
   async commentOnPr(opts: { prNumber: number; body: string }): Promise<void> {

@@ -372,10 +372,10 @@ export async function handleWorkshopRoute(
   }
 
   // ── POST /api/workshop/cards/:id/refresh-pr-status ──────────────────────
-  // Queries GitHub (anonymously) to sync cached PR state.
+  // Queries the GitHub App to sync cached PR and review state.
   const refreshMatch = /^\/api\/workshop\/cards\/([^/]+)\/refresh-pr-status$/.exec(url)
   if (req.method === 'POST' && refreshMatch) {
-    await handleRefreshPrStatus(req, res, refreshMatch[1]!)
+    await handleRefreshPrStatus(req, res, refreshMatch[1]!, reviewRuntime?.provider)
     return true
   }
 
