@@ -34,6 +34,34 @@
 
 应用请求 `repo` scope，以便在主仓库是 private repository 时读取内容、创建分支并提交 PR。若主仓库改为 public repository，可再收紧为 `public_repo`。
 
+## Workshop Review GitHub App
+
+PR 审批读取和 webhook 使用独立的 GitHub App，不复用 Workshop OAuth App 或 issues-only Bug Report App。
+
+### 注册与安装
+
+1. 在 GitHub App 设置页创建 `open-agricola-workshop-review`，Homepage URL 指向主仓库。
+2. Repository permissions 仅设置 `Pull requests: Read-only`；其余权限保持 `No access`，GitHub 自动附带的 `Metadata: Read-only` 除外。
+3. Webhook URL 设置为 `<PUBLIC_API_BASE>/api/github/webhook`，用 `openssl rand -hex 32` 生成独立 secret。
+4. Subscribe to events 仅勾选 `Pull request` 和 `Pull request review`。
+5. 安装范围选择 `Only on this account`，并只安装到 `titanxxh/open-agricola`。
+6. 记录 App ID，生成并下载 private key，再从安装页面地址记录 Installation ID。
+
+此 App 不参与用户 OAuth，不需要配置 callback URL、Client ID 或 Client Secret。`POST /api/github/webhook` 上线前关闭 Webhook Active；上线后重新开启并检查 Recent deliveries 返回 2xx。
+
+### 后端配置
+
+把以下变量写入后端部署环境；当前生产配置位置是 `/root/open-agricola/.env`：
+
+```env
+WORKSHOP_REVIEW_GITHUB_APP_ID=<App ID>
+WORKSHOP_REVIEW_GITHUB_PRIVATE_KEY="-----BEGIN RSA PRIVATE KEY-----\n...\n-----END RSA PRIVATE KEY-----"
+WORKSHOP_REVIEW_GITHUB_INSTALLATION_ID=<Installation ID>
+WORKSHOP_REVIEW_GITHUB_WEBHOOK_SECRET=<Webhook secret>
+```
+
+Private key 中的换行以 `\n` 保存。private key 和 webhook secret 只能进入后端部署密钥，不得提交到仓库、写入日志或粘贴到 issue；issue 只记录变量名、配置位置和安装仓库。代码接入时还需把这四项显式传入后端容器。
+
 ## Runtime Flow
 
 1. 前端卡牌详情页点击"发起 PR 到主仓库"。
