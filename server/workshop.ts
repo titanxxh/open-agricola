@@ -720,6 +720,7 @@ export async function handleWorkshopRoute(
             approvedVersionId: binding.approved_version_id,
             reviewCommitSha: binding.review_commit_sha,
             reviewVersionId: binding.review_version_id,
+            updatedAt: binding.updated_at,
           },
         })
         const current = loadWorkspace(db, publishMatch[1]!, user.id)

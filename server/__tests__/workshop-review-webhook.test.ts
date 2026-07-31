@@ -203,6 +203,39 @@ describe('workshop review webhook', () => {
       .toEqual({ count: 0 })
   })
 
+  it('fails closed and records the delivery when GitHub is unavailable', async () => {
+    insertReviewedCard({
+      id: 'card-provider-unavailable',
+      prNumber: 55,
+      reviewCommitSha: 'head-55',
+    })
+    const reviewRuntime = runtime()
+    vi.mocked(reviewRuntime.provider.getPullRequestSnapshot)
+      .mockRejectedValue(new Error('github unavailable'))
+
+    const res = await deliver({
+      action: 'edited',
+      repository: { full_name: 'titanxxh/open-agricola' },
+      pull_request: {
+        number: 55,
+        html_url: 'https://github.com/titanxxh/open-agricola/pull/55',
+      },
+    }, 'pull_request', 'delivery-provider-unavailable', reviewRuntime)
+
+    expect(res.statusCode).toBe(200)
+    expect(JSON.parse(res.body)).toEqual({
+      ok: true,
+      conservative: true,
+      invalidated: 1,
+    })
+    expect(loadWorkspace(db, 'card-provider-unavailable', 'author')).toMatchObject({
+      reviewStatus: 'stale',
+      live: false,
+    })
+    expect(db.prepare('SELECT COUNT(*) AS count FROM github_webhook_events').get())
+      .toEqual({ count: 1 })
+  })
+
   it('invalidates a synchronized live card once per delivery', async () => {
     const now = Date.now()
     db.prepare(`
@@ -402,6 +435,37 @@ describe('workshop review webhook', () => {
 
     expect(JSON.parse(res.body)).toEqual({ ok: true, invalidated: 0 })
     expect(loadWorkspace(db, 'card-unapproved-after-dismissal', 'author')).toMatchObject({
+      reviewStatus: 'in_review',
+      live: false,
+    })
+  })
+
+  it('keeps a current in-review head when one nonfinal approval is dismissed', async () => {
+    insertReviewedCard({
+      id: 'card-nonfinal-dismissal',
+      prNumber: 56,
+      reviewStatus: 'in_review',
+      live: false,
+      reviewCommitSha: 'head-56',
+    })
+    const reviewRuntime = runtime()
+    vi.mocked(reviewRuntime.provider.getPullRequestSnapshot).mockResolvedValue({
+      ...openSnapshot('head-56'),
+      reviewDecision: 'REVIEW_REQUIRED',
+    })
+
+    const res = await deliver({
+      action: 'dismissed',
+      review: { commit_id: 'head-56' },
+      repository: { full_name: 'titanxxh/open-agricola' },
+      pull_request: {
+        number: 56,
+        html_url: 'https://github.com/titanxxh/open-agricola/pull/56',
+      },
+    }, 'pull_request_review', 'delivery-nonfinal-dismissal', reviewRuntime)
+
+    expect(JSON.parse(res.body)).toEqual({ ok: true, invalidated: 0 })
+    expect(loadWorkspace(db, 'card-nonfinal-dismissal', 'author')).toMatchObject({
       reviewStatus: 'in_review',
       live: false,
     })
@@ -707,6 +771,71 @@ describe('workshop review webhook', () => {
     expect(JSON.parse(res.body)).toEqual({ ok: true, ignored: true })
     expect(loadWorkspace(db, 'card-concurrent-approval', 'author')).toMatchObject({
       reviewStatus: 'in_review',
+      live: false,
+    })
+  })
+
+  it('does not restore an older approval after a newer invalidation', async () => {
+    insertReviewedCard({
+      id: 'card-overlapping-webhooks',
+      prNumber: 57,
+      reviewStatus: 'in_review',
+      live: false,
+      reviewCommitSha: 'head-57',
+    })
+    const olderRuntime = runtime()
+    let resolveOlder!: (snapshot: WorkshopReviewSnapshot) => void
+    vi.mocked(olderRuntime.provider.getPullRequestSnapshot).mockReturnValueOnce(
+      new Promise(resolve => { resolveOlder = resolve }),
+    )
+    const olderDelivery = deliver({
+      action: 'submitted',
+      repository: { full_name: 'titanxxh/open-agricola' },
+      pull_request: {
+        number: 57,
+        html_url: 'https://github.com/titanxxh/open-agricola/pull/57',
+      },
+    }, 'pull_request_review', 'delivery-older-approval', olderRuntime)
+    await vi.waitFor(() => {
+      expect(olderRuntime.provider.getPullRequestSnapshot).toHaveBeenCalledWith(57)
+    })
+
+    const newerRuntime = runtime()
+    vi.mocked(newerRuntime.provider.getPullRequestSnapshot).mockResolvedValue({
+      ...openSnapshot('head-57'),
+      reviewDecision: 'CHANGES_REQUESTED',
+      reviews: [{
+        id: 'changes-57',
+        state: 'CHANGES_REQUESTED',
+        commitOid: 'head-57',
+        authorCanPushToRepository: true,
+      }],
+    })
+    const newerRes = await deliver({
+      action: 'submitted',
+      repository: { full_name: 'titanxxh/open-agricola' },
+      pull_request: {
+        number: 57,
+        html_url: 'https://github.com/titanxxh/open-agricola/pull/57',
+      },
+    }, 'pull_request_review', 'delivery-newer-invalidation', newerRuntime)
+    expect(JSON.parse(newerRes.body)).toEqual({ ok: true, approved: 0, invalidated: 1 })
+
+    resolveOlder({
+      ...openSnapshot('head-57'),
+      reviewDecision: 'APPROVED',
+      reviews: [{
+        id: 'approval-57',
+        state: 'APPROVED',
+        commitOid: 'head-57',
+        authorCanPushToRepository: true,
+      }],
+    })
+    const olderRes = await olderDelivery
+
+    expect(JSON.parse(olderRes.body)).toEqual({ ok: true, ignored: true })
+    expect(loadWorkspace(db, 'card-overlapping-webhooks', 'author')).toMatchObject({
+      reviewStatus: 'stale',
       live: false,
     })
   })

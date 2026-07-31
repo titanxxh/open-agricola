@@ -818,6 +818,7 @@ export function invalidateReviewedCard(
       approvedVersionId: string | null
       reviewCommitSha: string | null
       reviewVersionId: string | null
+      updatedAt: number
     }
   },
 ): number {
@@ -828,7 +829,7 @@ export function invalidateReviewedCard(
         live = 0,
         github_pr_status = ?,
         github_pr_last_synced_at = ?,
-        updated_at = ?
+        updated_at = MAX(updated_at + 1, ?)
     WHERE github_pr_url = ?
       AND review_status IN ('in_review', 'approved')
       AND (? IS NULL OR review_commit_sha IS NULL OR review_commit_sha <> ?)
@@ -840,6 +841,7 @@ export function invalidateReviewedCard(
           AND approved_version_id IS ?
           AND review_commit_sha IS ?
           AND review_version_id IS ?
+          AND updated_at = ?
         )
       )
   `).run(
@@ -856,6 +858,7 @@ export function invalidateReviewedCard(
     input.expectedBinding?.approvedVersionId ?? null,
     input.expectedBinding?.reviewCommitSha ?? null,
     input.expectedBinding?.reviewVersionId ?? null,
+    input.expectedBinding?.updatedAt ?? null,
   ).changes
 }
 
@@ -894,7 +897,7 @@ export function approveReviewedVersion(
           approved_at = ?,
           github_pr_status = 'open',
           github_pr_last_synced_at = ?,
-          updated_at = ?
+          updated_at = MAX(updated_at + 1, ?)
       WHERE id = ?
     `).run(
       row.review_version_id,
