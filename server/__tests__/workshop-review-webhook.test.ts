@@ -7,6 +7,7 @@ import {
   handleWorkshopReviewWebhook,
   type WorkshopReviewRuntime,
 } from '../workshop-review/webhook-handler.ts'
+import type { WorkshopReviewSnapshot } from '../workshop-review/github-review-provider.ts'
 import { enterReview, loadWorkspace } from '../workshop-drafts.ts'
 
 let db: Database.Database
@@ -182,6 +183,26 @@ describe('workshop review webhook', () => {
     })
   })
 
+  it('ignores an unbound PR without querying GitHub or recording the delivery', async () => {
+    const reviewRuntime = runtime()
+    vi.mocked(reviewRuntime.provider.getPullRequestSnapshot)
+      .mockResolvedValue(openSnapshot('head-unbound'))
+
+    const res = await deliver({
+      action: 'submitted',
+      repository: { full_name: 'titanxxh/open-agricola' },
+      pull_request: {
+        number: 999,
+        html_url: 'https://github.com/titanxxh/open-agricola/pull/999',
+      },
+    }, 'pull_request_review', 'delivery-unbound-pr', reviewRuntime)
+
+    expect(JSON.parse(res.body)).toEqual({ ok: true, ignored: true })
+    expect(reviewRuntime.provider.getPullRequestSnapshot).not.toHaveBeenCalled()
+    expect(db.prepare('SELECT COUNT(*) AS count FROM github_webhook_events').get())
+      .toEqual({ count: 0 })
+  })
+
   it('invalidates a synchronized live card once per delivery', async () => {
     const now = Date.now()
     db.prepare(`
@@ -324,6 +345,7 @@ describe('workshop review webhook', () => {
     )
     const body = Buffer.from(JSON.stringify({
       action: 'dismissed',
+      review: { commit_id: 'head-43' },
       repository: { full_name: 'titanxxh/open-agricola' },
       pull_request: {
         number: 43,
@@ -352,6 +374,35 @@ describe('workshop review webhook', () => {
     expect(JSON.parse(res.body)).toEqual({ ok: true, invalidated: 1 })
     expect(loadWorkspace(db, 'card-2', 'author')).toMatchObject({
       reviewStatus: 'stale',
+      live: false,
+    })
+  })
+
+  it('keeps an unapproved newer head when an older dismissal arrives late', async () => {
+    insertReviewedCard({
+      id: 'card-unapproved-after-dismissal',
+      prNumber: 52,
+      reviewStatus: 'in_review',
+      live: false,
+      reviewCommitSha: 'head-52-b',
+    })
+    const reviewRuntime = runtime()
+    vi.mocked(reviewRuntime.provider.getPullRequestSnapshot)
+      .mockResolvedValue(openSnapshot('head-52-b'))
+
+    const res = await deliver({
+      action: 'dismissed',
+      review: { commit_id: 'head-52-a' },
+      repository: { full_name: 'titanxxh/open-agricola' },
+      pull_request: {
+        number: 52,
+        html_url: 'https://github.com/titanxxh/open-agricola/pull/52',
+      },
+    }, 'pull_request_review', 'delivery-old-dismissal', reviewRuntime)
+
+    expect(JSON.parse(res.body)).toEqual({ ok: true, invalidated: 0 })
+    expect(loadWorkspace(db, 'card-unapproved-after-dismissal', 'author')).toMatchObject({
+      reviewStatus: 'in_review',
       live: false,
     })
   })
@@ -392,6 +443,11 @@ describe('workshop review webhook', () => {
 
   it('invalidates a live card when its PR closes without merging', async () => {
     insertReviewedCard({ id: 'card-closed-pr', prNumber: 46 })
+    const reviewRuntime = runtime()
+    vi.mocked(reviewRuntime.provider.getPullRequestSnapshot).mockResolvedValue({
+      ...openSnapshot('head-46'),
+      state: 'CLOSED',
+    })
 
     const res = await deliver({
       action: 'closed',
@@ -401,11 +457,40 @@ describe('workshop review webhook', () => {
         html_url: 'https://github.com/titanxxh/open-agricola/pull/46',
         merged: false,
       },
-    }, 'pull_request', 'delivery-closed-pr')
+    }, 'pull_request', 'delivery-closed-pr', reviewRuntime)
 
     expect(JSON.parse(res.body)).toEqual({ ok: true, invalidated: 1 })
     expect(loadWorkspace(db, 'card-closed-pr', 'author')).toMatchObject({
       reviewStatus: 'stale',
+      live: false,
+    })
+  })
+
+  it('keeps a reopened PR when its older close delivery arrives late', async () => {
+    insertReviewedCard({
+      id: 'card-reopened-pr',
+      prNumber: 53,
+      reviewStatus: 'in_review',
+      live: false,
+      reviewCommitSha: 'head-53-b',
+    })
+    const reviewRuntime = runtime()
+    vi.mocked(reviewRuntime.provider.getPullRequestSnapshot)
+      .mockResolvedValue(openSnapshot('head-53-b'))
+
+    const res = await deliver({
+      action: 'closed',
+      repository: { full_name: 'titanxxh/open-agricola' },
+      pull_request: {
+        number: 53,
+        html_url: 'https://github.com/titanxxh/open-agricola/pull/53',
+        merged: false,
+      },
+    }, 'pull_request', 'delivery-old-close', reviewRuntime)
+
+    expect(JSON.parse(res.body)).toEqual({ ok: true, invalidated: 0 })
+    expect(loadWorkspace(db, 'card-reopened-pr', 'author')).toMatchObject({
+      reviewStatus: 'in_review',
       live: false,
     })
   })
@@ -576,6 +661,52 @@ describe('workshop review webhook', () => {
     expect(loadWorkspace(db, 'card-3', 'author')).toMatchObject({
       reviewStatus: 'approved',
       approvedVersionId: expect.any(String),
+      live: false,
+    })
+  })
+
+  it('ignores an approval snapshot captured before a concurrent resubmission', async () => {
+    insertReviewedCard({
+      id: 'card-concurrent-approval',
+      prNumber: 54,
+      reviewStatus: 'in_review',
+      live: false,
+      reviewCommitSha: 'head-54-a',
+    })
+    const reviewRuntime = runtime()
+    let resolveSnapshot!: (snapshot: WorkshopReviewSnapshot) => void
+    vi.mocked(reviewRuntime.provider.getPullRequestSnapshot).mockReturnValueOnce(
+      new Promise(resolve => { resolveSnapshot = resolve }),
+    )
+    const delivering = deliver({
+      action: 'submitted',
+      repository: { full_name: 'titanxxh/open-agricola' },
+      pull_request: {
+        number: 54,
+        html_url: 'https://github.com/titanxxh/open-agricola/pull/54',
+      },
+    }, 'pull_request_review', 'delivery-concurrent-approval', reviewRuntime)
+    await vi.waitFor(() => {
+      expect(reviewRuntime.provider.getPullRequestSnapshot).toHaveBeenCalledWith(54)
+    })
+    db.prepare(`
+      UPDATE workshop_cards SET review_commit_sha = 'head-54-b' WHERE id = ?
+    `).run('card-concurrent-approval')
+    resolveSnapshot({
+      ...openSnapshot('head-54-a'),
+      reviewDecision: 'APPROVED',
+      reviews: [{
+        id: 'review-54-a',
+        state: 'APPROVED',
+        commitOid: 'head-54-a',
+        authorCanPushToRepository: true,
+      }],
+    })
+
+    const res = await delivering
+    expect(JSON.parse(res.body)).toEqual({ ok: true, ignored: true })
+    expect(loadWorkspace(db, 'card-concurrent-approval', 'author')).toMatchObject({
+      reviewStatus: 'in_review',
       live: false,
     })
   })

@@ -54,7 +54,45 @@ type PullRequestWebhook = {
   after?: unknown
   repository?: { full_name?: unknown }
   pull_request?: { number?: unknown; html_url?: unknown; merged?: unknown }
+  review?: { commit_id?: unknown }
 }
+
+type ReviewBinding = {
+  id: string
+  revision: number
+  approvedCommitSha: string | null
+  approvedVersionId: string | null
+  reviewCommitSha: string | null
+  reviewVersionId: string | null
+}
+
+const getReviewBinding = (
+  db: Database.Database,
+  prUrl: string,
+): ReviewBinding | null => {
+  return db.prepare(`
+    SELECT id,
+           draft_revision AS revision,
+           approved_commit_sha AS approvedCommitSha,
+           approved_version_id AS approvedVersionId,
+           review_commit_sha AS reviewCommitSha,
+           review_version_id AS reviewVersionId
+    FROM workshop_cards
+    WHERE github_pr_url = ?
+      AND review_status IN ('in_review', 'stale', 'approved')
+  `).get(prUrl) as ReviewBinding | undefined ?? null
+}
+
+const sameReviewBinding = (
+  current: ReviewBinding | null,
+  expected: ReviewBinding,
+): boolean => current !== null
+  && current.id === expected.id
+  && current.revision === expected.revision
+  && current.approvedCommitSha === expected.approvedCommitSha
+  && current.approvedVersionId === expected.approvedVersionId
+  && current.reviewCommitSha === expected.reviewCommitSha
+  && current.reviewVersionId === expected.reviewVersionId
 
 const parsePayload = (body: Buffer): PullRequestWebhook | null => {
   try {
@@ -146,6 +184,9 @@ export async function handleWorkshopReviewWebhook(
     return true
   }
 
+  const closesUnmerged = eventName === 'pull_request'
+    && payload.action === 'closed'
+    && payload.pull_request?.merged !== true
   const revalidatesReview =
     eventName === 'pull_request' && (
       payload.action === 'synchronize'
@@ -153,23 +194,36 @@ export async function handleWorkshopReviewWebhook(
       || payload.action === 'converted_to_draft'
     )
     || eventName === 'pull_request_review' && payload.action === 'dismissed'
-  const invalidatesReview = revalidatesReview
-    || eventName === 'pull_request'
-      && payload.action === 'closed'
-      && payload.pull_request?.merged !== true
-  if (invalidatesReview) {
+    || closesUnmerged
+  const submitsReview = eventName === 'pull_request_review'
+    && payload.action === 'submitted'
+  if (!revalidatesReview && !submitsReview) {
+    sendJson(res, 200, { ok: true, ignored: true })
+    return true
+  }
+  const binding = getReviewBinding(db, prUrl)
+  if (!binding) {
+    sendJson(res, 200, { ok: true, ignored: true })
+    return true
+  }
+
+  if (revalidatesReview) {
     let preserveCommitSha: string | undefined
-    if (revalidatesReview) {
-      try {
-        const snapshot = await runtime.provider.getPullRequestSnapshot(prNumber as number)
-        const remainsValid = eventName === 'pull_request_review'
-          ? Boolean(findApprovedHeadReview(snapshot))
-          : isReviewTargetEligible(snapshot)
-        if (remainsValid) preserveCommitSha = snapshot.headRefOid
-      } catch {
-        sendJson(res, 503, { ok: false, code: 'github_review_unavailable' })
-        return true
-      }
+    try {
+      const snapshot = await runtime.provider.getPullRequestSnapshot(prNumber as number)
+      const dismissedCommit = typeof payload.review?.commit_id === 'string'
+        ? payload.review.commit_id
+        : null
+      const supersededDismissal = dismissedCommit !== null
+        && dismissedCommit !== snapshot.headRefOid
+      const remainsValid = eventName === 'pull_request_review'
+        ? Boolean(findApprovedHeadReview(snapshot))
+          || isReviewTargetEligible(snapshot) && supersededDismissal
+        : isReviewTargetEligible(snapshot)
+      if (remainsValid) preserveCommitSha = snapshot.headRefOid
+    } catch {
+      sendJson(res, 503, { ok: false, code: 'github_review_unavailable' })
+      return true
     }
     const result = db.transaction(() => {
       const inserted = db.prepare(`
@@ -178,10 +232,14 @@ export async function handleWorkshopReviewWebhook(
         ) VALUES (?, ?, ?)
       `).run(deliveryId, eventName, Date.now())
       if (inserted.changes === 0) return { duplicate: true as const }
+      if (!sameReviewBinding(getReviewBinding(db, prUrl), binding)) {
+        return { ignored: true as const }
+      }
       const invalidated = invalidateReviewedCard(db, {
         prUrl,
         ...(payload.action === 'closed' ? { prStatus: 'closed' } : {}),
         ...(preserveCommitSha ? { preserveCommitSha } : {}),
+        expectedBinding: binding,
       })
       return { invalidated }
     })()
@@ -189,7 +247,7 @@ export async function handleWorkshopReviewWebhook(
     return true
   }
 
-  if (eventName === 'pull_request_review' && payload.action === 'submitted') {
+  if (submitsReview) {
     let snapshot: WorkshopReviewSnapshot
     try {
       snapshot = await runtime.provider.getPullRequestSnapshot(prNumber as number)
@@ -205,6 +263,9 @@ export async function handleWorkshopReviewWebhook(
         ) VALUES (?, ?, ?)
       `).run(deliveryId, eventName, Date.now())
       if (inserted.changes === 0) return { duplicate: true as const }
+      if (!sameReviewBinding(getReviewBinding(db, prUrl), binding)) {
+        return { ignored: true as const }
+      }
       const approved = approvedReview
         ? approveReviewedVersion(db, {
             prUrl,
@@ -219,6 +280,7 @@ export async function handleWorkshopReviewWebhook(
       const invalidated = invalidateReviewedCard(db, {
         prUrl,
         ...(!breaksReview ? { preserveCommitSha: snapshot.headRefOid } : {}),
+        expectedBinding: binding,
       })
       return { approved, invalidated }
     })()
@@ -226,6 +288,5 @@ export async function handleWorkshopReviewWebhook(
     return true
   }
 
-  sendJson(res, 200, { ok: true, ignored: true })
   return true
 }

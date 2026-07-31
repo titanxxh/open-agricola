@@ -11,6 +11,8 @@ import {
   checkpointDraft,
   enterReview,
   loadWorkspace,
+  publish,
+  unpublish,
 } from '../workshop-drafts.ts'
 import type { WorkshopReviewRuntime } from '../workshop-review/webhook-handler.ts'
 import type { WorkshopReviewSnapshot } from '../workshop-review/github-review-provider.ts'
@@ -639,6 +641,60 @@ describe('workshop API', () => {
         reviewStatus: 'in_review',
         live: false,
       })
+    })
+
+    it('does not republish after a newer publish and unpublish complete', async () => {
+      const cardDbId = await createPublishedCard({
+        card_id: 'CUSTOM_ConcurrentUnpublish',
+        card_type: 'minor',
+        name: 'Concurrent Unpublish',
+        card_json: {
+          id: 'CUSTOM_ConcurrentUnpublish',
+          name: 'Concurrent Unpublish',
+          card_type: 'minor',
+          deck: 'CUSTOM',
+          number: 0,
+          desc: ['reviewed text'],
+        },
+      }, 'tok-alice')
+      unpublish(db, { cardId: cardDbId, authorId: 'u1', baseRevision: 1 })
+      let resolveSnapshot!: (snapshot: WorkshopReviewSnapshot) => void
+      reviewProvider.mockReturnValueOnce(new Promise(resolve => {
+        resolveSnapshot = resolve
+      }))
+      const callsBefore = reviewProvider.mock.calls.length
+      const publishRes = mockRes()
+      const publishing = handleWorkshopRoute(mockReq(
+        'POST',
+        `/api/workshop/cards/${cardDbId}/publish`,
+        { baseRevision: 1 },
+        'tok-alice',
+      ), publishRes)
+      await vi.waitFor(() => expect(reviewProvider).toHaveBeenCalledTimes(callsBefore + 1))
+
+      publish(db, { cardId: cardDbId, authorId: 'u1', baseRevision: 1 })
+      unpublish(db, { cardId: cardDbId, authorId: 'u1', baseRevision: 1 })
+      resolveSnapshot({
+        reviewDecision: 'APPROVED',
+        headRefOid: 'approved-head',
+        baseRefName: 'main',
+        state: 'OPEN',
+        isDraft: false,
+        reviews: [{
+          id: 'approved-review',
+          state: 'APPROVED',
+          commitOid: 'approved-head',
+          authorCanPushToRepository: true,
+        }],
+      })
+      await publishing
+
+      expect(publishRes.statusCode).toBe(409)
+      expect(JSON.parse(publishRes.body)).toMatchObject({
+        ok: false,
+        current: { live: false },
+      })
+      expect(loadWorkspace(db, cardDbId, 'u1').live).toBe(false)
     })
   })
 

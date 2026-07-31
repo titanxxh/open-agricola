@@ -914,6 +914,7 @@ export function publish(
     cardId: string
     authorId: string
     baseRevision: number
+    expectedUpdatedAt?: number
   },
 ): { workspace: WorkshopWorkspace; versionId: string } {
   // Deliberately not wrapped in one transaction: the stale downgrade below
@@ -931,15 +932,30 @@ export function publish(
       current,
     )
   }
+  const row = db.prepare(`
+    SELECT approved_commit_sha, github_pr_url, updated_at
+    FROM workshop_cards WHERE id = ?
+  `).get(current.id) as {
+    approved_commit_sha: string | null
+    github_pr_url: string | null
+    updated_at: number
+  }
+  if (
+    input.expectedUpdatedAt !== undefined
+    && row.updated_at !== input.expectedUpdatedAt
+  ) {
+    throw new WorkshopDraftError(
+      'conflict',
+      'Card state changed while publish validation was in flight',
+      current,
+    )
+  }
   // Atomic snapshot rule (#629, #638): at the moment the card goes live the
   // approving review's commit, the PR head and the platform-pinned commit
   // must agree. Direct aggregate callers use the synchronous provider seam;
   // the production HTTP route performs the asynchronous GitHub check first.
   const provider = getReviewDecisionProvider()
   if (provider) {
-    const row = db.prepare(
-      'SELECT approved_commit_sha, github_pr_url FROM workshop_cards WHERE id = ?',
-    ).get(current.id) as { approved_commit_sha: string | null; github_pr_url: string | null }
     const snapshot = provider.getSnapshot({ cardDbId: current.id, prUrl: row.github_pr_url })
     // A transient lookup failure (rate limit, outage) is not evidence of a
     // mismatch: fail retryably without touching the approval.
@@ -963,7 +979,7 @@ export function publish(
             approved_review_id = NULL,
             approved_at = NULL,
             approved_version_id = NULL,
-            updated_at = ?
+            updated_at = MAX(updated_at + 1, ?)
         WHERE id = ?
       `).run(Date.now(), current.id)
       throw new WorkshopDraftError(
@@ -973,9 +989,23 @@ export function publish(
       )
     }
   }
-  db.prepare(`
-    UPDATE workshop_cards SET live = 1, updated_at = ? WHERE id = ?
-  `).run(Date.now(), current.id)
+  const updated = db.prepare(`
+    UPDATE workshop_cards
+    SET live = 1, updated_at = MAX(updated_at + 1, ?)
+    WHERE id = ? AND (? IS NULL OR updated_at = ?)
+  `).run(
+    Date.now(),
+    current.id,
+    input.expectedUpdatedAt ?? null,
+    input.expectedUpdatedAt ?? null,
+  )
+  if (updated.changes === 0) {
+    throw new WorkshopDraftError(
+      'conflict',
+      'Card state changed while publish validation was in flight',
+      loadWorkspace(db, current.id, input.authorId),
+    )
+  }
   return {
     workspace: loadWorkspace(db, current.id, input.authorId),
     versionId: current.approvedVersionId,
@@ -1033,7 +1063,9 @@ export function unpublish(
       throw new WorkshopDraftError('conflict', 'Draft revision conflict', current)
     }
     db.prepare(`
-      UPDATE workshop_cards SET live = 0, updated_at = ? WHERE id = ?
+      UPDATE workshop_cards
+      SET live = 0, updated_at = MAX(updated_at + 1, ?)
+      WHERE id = ?
     `).run(Date.now(), current.id)
     return loadWorkspace(db, current.id, input.authorId)
   })()
