@@ -278,7 +278,7 @@ const serveViewerFile = (
       "default-src 'none'",
       "script-src 'self'",
       "style-src 'self' 'unsafe-inline'",
-      "img-src 'self' data:",
+      "img-src 'self' data: https://raw.githubusercontent.com",
       "font-src 'self'",
       "connect-src 'self'",
       "frame-ancestors *",
