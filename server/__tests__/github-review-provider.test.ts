@@ -23,6 +23,7 @@ describe('GitHubReviewProvider', () => {
             pullRequest: {
               reviewDecision: 'APPROVED',
               headRefOid: 'head-42',
+              baseRefName: 'main',
               latestOpinionatedReviews: {
                 nodes: [{
                   id: 'review-42',
@@ -48,6 +49,7 @@ describe('GitHubReviewProvider', () => {
     await expect(provider.getPullRequestSnapshot(42)).resolves.toEqual({
       reviewDecision: 'APPROVED',
       headRefOid: 'head-42',
+      baseRefName: 'main',
       reviews: [{
         id: 'review-42',
         state: 'APPROVED',
@@ -60,6 +62,7 @@ describe('GitHubReviewProvider', () => {
       'https://api.github.com/app/installations/456/access_tokens',
     )
     const graphQlBody = JSON.parse(String(fetchImpl.mock.calls[1]![1]?.body))
+    expect(graphQlBody.query).toContain('baseRefName')
     expect(graphQlBody.variables).toEqual({
       owner: 'titanxxh',
       name: 'open-agricola',

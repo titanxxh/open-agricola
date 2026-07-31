@@ -6,6 +6,7 @@ const REQUEST_TIMEOUT_MS = 15_000
 export type WorkshopReviewSnapshot = {
   reviewDecision: string | null
   headRefOid: string
+  baseRefName: string
   reviews: Array<{
     id: string
     state: string
@@ -17,7 +18,7 @@ export type WorkshopReviewSnapshot = {
 export const findApprovedHeadReview = (
   snapshot: WorkshopReviewSnapshot,
 ): WorkshopReviewSnapshot['reviews'][number] | undefined =>
-  snapshot.reviewDecision === 'APPROVED'
+  snapshot.reviewDecision === 'APPROVED' && snapshot.baseRefName === 'main'
     ? snapshot.reviews.find(review =>
         review.state === 'APPROVED'
         && review.authorCanPushToRepository
@@ -46,6 +47,7 @@ type ReviewQueryResponse = {
       pullRequest?: {
         reviewDecision?: string | null
         headRefOid?: string
+        baseRefName?: string
         latestOpinionatedReviews?: {
           nodes?: Array<{
             id?: string
@@ -118,6 +120,7 @@ export class GitHubReviewProvider {
             pullRequest(number: $number) {
               reviewDecision
               headRefOid
+              baseRefName
               latestOpinionatedReviews(first: 100) {
                 nodes {
                   id
@@ -143,6 +146,7 @@ export class GitHubReviewProvider {
       || body.errors?.length
       || !pullRequest
       || typeof pullRequest.headRefOid !== 'string'
+      || typeof pullRequest.baseRefName !== 'string'
     ) {
       throw new Error('github_review_snapshot_failed')
     }
@@ -164,6 +168,7 @@ export class GitHubReviewProvider {
         ? pullRequest.reviewDecision
         : null,
       headRefOid: pullRequest.headRefOid,
+      baseRefName: pullRequest.baseRefName,
       reviews,
     }
   }

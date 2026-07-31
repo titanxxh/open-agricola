@@ -50,8 +50,9 @@ const sendJson = (
 
 type PullRequestWebhook = {
   action?: unknown
+  after?: unknown
   repository?: { full_name?: unknown }
-  pull_request?: { number?: unknown; html_url?: unknown }
+  pull_request?: { number?: unknown; html_url?: unknown; merged?: unknown }
 }
 
 const parsePayload = (body: Buffer): PullRequestWebhook | null => {
@@ -140,6 +141,9 @@ export async function handleWorkshopReviewWebhook(
 
   const invalidatesReview =
     eventName === 'pull_request' && payload.action === 'synchronize'
+    || eventName === 'pull_request'
+      && payload.action === 'closed'
+      && payload.pull_request?.merged !== true
     || eventName === 'pull_request_review' && payload.action === 'dismissed'
   if (invalidatesReview) {
     const result = db.transaction(() => {
@@ -149,7 +153,16 @@ export async function handleWorkshopReviewWebhook(
         ) VALUES (?, ?, ?)
       `).run(deliveryId, eventName, Date.now())
       if (inserted.changes === 0) return { duplicate: true as const }
-      const invalidated = invalidateReviewedCard(db, { prUrl })
+      const synchronizedHead = eventName === 'pull_request'
+        && payload.action === 'synchronize'
+        && typeof payload.after === 'string'
+        ? payload.after
+        : undefined
+      const invalidated = invalidateReviewedCard(db, {
+        prUrl,
+        ...(payload.action === 'closed' ? { prStatus: 'closed' } : {}),
+        ...(synchronizedHead ? { preserveCommitSha: synchronizedHead } : {}),
+      })
       return { invalidated }
     })()
     sendJson(res, 200, { ok: true, ...result })
@@ -179,7 +192,9 @@ export async function handleWorkshopReviewWebhook(
             reviewId: approvedReview.id,
           })
         : 0
-      return { approved }
+      return approvedReview
+        ? { approved }
+        : { approved, invalidated: invalidateReviewedCard(db, { prUrl }) }
     })()
     sendJson(res, 200, { ok: true, ...result })
     return true
