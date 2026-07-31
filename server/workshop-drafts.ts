@@ -99,6 +99,7 @@ type WorkshopCardRow = {
   built_in: number
   sandbox_pass_version_id: string | null
   sandbox_passed_at: number | null
+  updated_at: number
 }
 
 type WorkshopVersionRow = {
@@ -896,7 +897,12 @@ export function approveReviewedVersion(
     prUrl: string
     commitSha: string
     reviewId: string
-    expectedCardId?: string
+    expectedBinding?: {
+      cardId: string
+      reviewCommitSha: string
+      reviewVersionId: string
+      updatedAt: number
+    }
   },
 ): number {
   return db.transaction(() => {
@@ -907,14 +913,19 @@ export function approveReviewedVersion(
       LIMIT 2
     `).all(
       input.prUrl,
-      input.expectedCardId ?? null,
-      input.expectedCardId ?? null,
+      input.expectedBinding?.cardId ?? null,
+      input.expectedBinding?.cardId ?? null,
     ) as WorkshopCardRow[]
     if (
       matches.length !== 1
       || !['in_review', 'stale', 'approved'].includes(matches[0]!.review_status)
     ) return 0
     const row = matches[0]!
+    if (input.expectedBinding && (
+      row.review_commit_sha !== input.expectedBinding.reviewCommitSha
+      || row.review_version_id !== input.expectedBinding.reviewVersionId
+      || row.updated_at !== input.expectedBinding.updatedAt
+    )) return 0
     if (
       row.review_commit_sha !== input.commitSha
       || !row.review_version_id
