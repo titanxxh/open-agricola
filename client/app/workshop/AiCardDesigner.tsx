@@ -1543,6 +1543,8 @@ export function AiCardDesigner({
     resolveConflict,
     adoptCandidate: adoptDraftCandidate,
     publishDraft,
+    unpublishDraft,
+    pinDraftVersion,
     confirmSandboxPass,
     restoreVersion,
     undoRestore,
@@ -1955,7 +1957,7 @@ export function AiCardDesigner({
     setSaving(true)
     setError('')
     try {
-      const versionId = await publishDraft()
+      const versionId = await pinDraftVersion()
       if (!versionId) return
       updateSession({ sandboxTestVersionId: undefined })
       setSandboxConfirmation(false)
@@ -1972,11 +1974,7 @@ export function AiCardDesigner({
 
   const handleConfirmSandboxPass = async () => {
     const versionId = workspaceState?.session.sandboxTestVersionId
-    if (
-      !versionId
-      || versionId !== workspaceState.approvedVersionId
-      || !sandboxConfirmation
-    ) return
+    if (!versionId || !sandboxConfirmation) return
     setSaving(true)
     setError('')
     try {
@@ -2056,8 +2054,8 @@ export function AiCardDesigner({
   )
   const handoffReady = Boolean(
     handoffInputsReady
-    && workspaceState?.approvedVersionId
-    && workspaceState.sandboxPassVersionId === workspaceState.approvedVersionId
+    && workspaceState?.sandboxPassVersionId
+    && workspaceState.sandboxPassVersionId === workspaceState.session.sandboxTestVersionId
   )
   const readiness: Record<WorkshopStage, boolean> = {
     metadata: metadataReady,
@@ -2143,8 +2141,30 @@ export function AiCardDesigner({
             <span className="aicw-draft-badge">
               {workspaceState?.live
                 ? (locale === 'zh' ? '已上线' : 'Live')
-                : (locale === 'zh' ? '草稿' : 'Draft')}
+                : workspaceState?.reviewStatus === 'approved'
+                  ? (locale === 'zh' ? '已过审' : 'Approved')
+                  : (locale === 'zh' ? '草稿' : 'Draft')}
             </span>
+            {workspaceState?.reviewStatus === 'approved' && !workspaceState.live && (
+              <button
+                type="button"
+                className="aicw-button aicw-button-primary"
+                onClick={() => { void publishDraft() }}
+                disabled={saving}
+              >
+                {locale === 'zh' ? '发布上线' : 'Publish live'}
+              </button>
+            )}
+            {workspaceState?.live && (
+              <button
+                type="button"
+                className="aicw-button"
+                onClick={() => { void unpublishDraft() }}
+                disabled={saving}
+              >
+                {locale === 'zh' ? '下架' : 'Unpublish'}
+              </button>
+            )}
           </div>
           <code>{cardIdInput || 'CUSTOM_'}</code>
         </div>
@@ -2535,10 +2555,10 @@ export function AiCardDesigner({
                 </ul>
                 <div className="aicw-version-gate">
                   <div>
-                    <span>{locale === 'zh' ? '固定发布版本' : 'Pinned published version'}</span>
+                    <span>{locale === 'zh' ? '已过审版本' : 'Approved version'}</span>
                     <strong>{workspaceState?.approvedVersionId
                       ? workspaceState.approvedVersionId.slice(0, 12)
-                      : (locale === 'zh' ? '尚未发布' : 'Not published')}</strong>
+                      : (locale === 'zh' ? '尚未过审' : 'Not approved yet')}</strong>
                   </div>
                   <div>
                     <span>{locale === 'zh' ? '同版本沙盒确认' : 'Same-version sandbox pass'}</span>
@@ -2618,7 +2638,7 @@ export function AiCardDesigner({
                 <div className="aicw-handoff">
                   <div>
                     <strong>{locale === 'zh' ? '下一步：固定版本沙盒测试' : 'Next: sandbox-test a fixed version'}</strong>
-                    <span>{locale === 'zh' ? '发布会固定当前内容；沙盒只加载这个不可变版本。' : 'Publishing pins the current content; the sandbox loads only that immutable version.'}</span>
+                    <span>{locale === 'zh' ? '固化会锁定当前内容；沙盒只加载这个不可变版本。' : 'Pinning locks the current content; the sandbox loads only that immutable version.'}</span>
                   </div>
                   <div>
                     <button type="button" className="aicw-button" onClick={() => { void handleSaveCard() }} disabled={saving || !metadataReady}>
@@ -2626,12 +2646,12 @@ export function AiCardDesigner({
                     </button>
                     {onAddToSandboxAndRestart && (
                       <button type="button" className="aicw-button aicw-button-primary" onClick={() => { void handlePublishAndStartSandbox() }} disabled={saving || !workspaceState || !handoffInputsReady}>
-                        {locale === 'zh' ? '发布当前版本并启动沙盒' : 'Publish current version and start sandbox'}
+                        {locale === 'zh' ? '固化当前版本并启动沙盒' : 'Pin current version and start sandbox'}
                       </button>
                     )}
                   </div>
                 </div>
-                {workspaceState?.session.sandboxTestVersionId === workspaceState?.approvedVersionId && !handoffReady && (
+                {workspaceState?.session.sandboxTestVersionId && !handoffReady && (
                   <div className="aicw-sandbox-confirm">
                     <label>
                       <input
@@ -2645,7 +2665,7 @@ export function AiCardDesigner({
                         : 'I confirm this pinned version has no sandbox runtime errors'}</span>
                     </label>
                     {sandboxGateErrors?.length
-                      ? <small>{locale === 'zh' ? '先修复已知沙盒错误并重新发布。' : 'Fix known sandbox errors and publish again first.'}</small>
+                      ? <small>{locale === 'zh' ? '先修复已知沙盒错误并重新固化。' : 'Fix known sandbox errors and publish again first.'}</small>
                       : null}
                     <button
                       type="button"
