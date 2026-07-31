@@ -364,6 +364,13 @@ export function checkpointDraft(
   validateDraft(draft)
   return db.transaction(() => {
     const current = loadWorkspace(db, input.cardId, input.authorId)
+    if (current.reviewStatus === 'merged') {
+      throw new WorkshopDraftError(
+        'conflict',
+        'Merged cards are read-only; contribute changes via the main repository',
+        current,
+      )
+    }
     if (current.live) {
       throw new WorkshopDraftError(
         'conflict',
@@ -833,6 +840,15 @@ export function publish(
       'SELECT approved_commit_sha, github_pr_url FROM workshop_cards WHERE id = ?',
     ).get(current.id) as { approved_commit_sha: string | null; github_pr_url: string | null }
     const snapshot = provider.getSnapshot({ cardDbId: current.id, prUrl: row.github_pr_url })
+    // A transient lookup failure (rate limit, outage) is not evidence of a
+    // mismatch: fail retryably without touching the approval.
+    if (snapshot.decision === 'unknown' || snapshot.headCommitSha === null) {
+      throw new WorkshopDraftError(
+        'not_ready',
+        'Cannot verify the review approval right now; try again later',
+        current,
+      )
+    }
     const consistent = snapshot.decision === 'approved'
       && snapshot.approvedCommitSha !== null
       && snapshot.approvedCommitSha === snapshot.headCommitSha
