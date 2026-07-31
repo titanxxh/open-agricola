@@ -20,6 +20,15 @@ const runtime = (): WorkshopReviewRuntime => ({
   },
 })
 
+const openSnapshot = (headRefOid: string) => ({
+  reviewDecision: null,
+  headRefOid,
+  baseRefName: 'main',
+  state: 'OPEN',
+  isDraft: false,
+  reviews: [],
+})
+
 const mockReq = (
   body: Buffer,
   headers: Record<string, string>,
@@ -210,6 +219,8 @@ describe('workshop review webhook', () => {
     }
     const firstRes = mockRes()
     const reviewRuntime = runtime()
+    vi.mocked(reviewRuntime.provider.getPullRequestSnapshot)
+      .mockResolvedValue(openSnapshot('new-head-42'))
 
     await handleWorkshopReviewWebhook(mockReq(body, headers), firstRes, db, reviewRuntime)
 
@@ -232,7 +243,7 @@ describe('workshop review webhook', () => {
       reviewStatus: 'approved',
       live: true,
     })
-    expect(reviewRuntime.provider.getPullRequestSnapshot).not.toHaveBeenCalled()
+    expect(reviewRuntime.provider.getPullRequestSnapshot).toHaveBeenCalledTimes(1)
   })
 
   it('keeps the freshly submitted head in review when its synchronize event arrives late', async () => {
@@ -243,6 +254,9 @@ describe('workshop review webhook', () => {
       live: false,
       reviewCommitSha: 'head-45',
     })
+    const reviewRuntime = runtime()
+    vi.mocked(reviewRuntime.provider.getPullRequestSnapshot)
+      .mockResolvedValue(openSnapshot('head-45'))
 
     const res = await deliver({
       action: 'synchronize',
@@ -252,10 +266,39 @@ describe('workshop review webhook', () => {
         number: 45,
         html_url: 'https://github.com/titanxxh/open-agricola/pull/45',
       },
-    }, 'pull_request', 'delivery-current-head')
+    }, 'pull_request', 'delivery-current-head', reviewRuntime)
 
     expect(JSON.parse(res.body)).toEqual({ ok: true, invalidated: 0 })
     expect(loadWorkspace(db, 'card-current-head', 'author')).toMatchObject({
+      reviewStatus: 'in_review',
+      live: false,
+    })
+  })
+
+  it('keeps a newer submitted head when an older synchronize event arrives late', async () => {
+    insertReviewedCard({
+      id: 'card-newer-head',
+      prNumber: 48,
+      reviewStatus: 'in_review',
+      live: false,
+      reviewCommitSha: 'head-48-c',
+    })
+    const reviewRuntime = runtime()
+    vi.mocked(reviewRuntime.provider.getPullRequestSnapshot)
+      .mockResolvedValue(openSnapshot('head-48-c'))
+
+    const res = await deliver({
+      action: 'synchronize',
+      after: 'head-48-b',
+      repository: { full_name: 'titanxxh/open-agricola' },
+      pull_request: {
+        number: 48,
+        html_url: 'https://github.com/titanxxh/open-agricola/pull/48',
+      },
+    }, 'pull_request', 'delivery-older-head', reviewRuntime)
+
+    expect(JSON.parse(res.body)).toEqual({ ok: true, invalidated: 0 })
+    expect(loadWorkspace(db, 'card-newer-head', 'author')).toMatchObject({
       reviewStatus: 'in_review',
       live: false,
     })
@@ -340,6 +383,8 @@ describe('workshop review webhook', () => {
       reviewDecision: 'CHANGES_REQUESTED',
       headRefOid: 'head-47',
       baseRefName: 'main',
+      state: 'OPEN',
+      isDraft: false,
       reviews: [{
         id: 'review-47',
         state: 'CHANGES_REQUESTED',
@@ -360,6 +405,41 @@ describe('workshop review webhook', () => {
     expect(JSON.parse(res.body)).toEqual({ ok: true, approved: 0, invalidated: 1 })
     expect(loadWorkspace(db, 'card-changes-requested', 'author')).toMatchObject({
       reviewStatus: 'stale',
+      live: false,
+    })
+  })
+
+  it('keeps an unchanged PR in review after a comment-only review', async () => {
+    insertReviewedCard({
+      id: 'card-comment-review',
+      prNumber: 49,
+      reviewStatus: 'in_review',
+      live: false,
+      reviewCommitSha: 'head-49',
+    })
+    const reviewRuntime = runtime()
+    vi.mocked(reviewRuntime.provider.getPullRequestSnapshot).mockResolvedValue({
+      ...openSnapshot('head-49'),
+      reviews: [{
+        id: 'review-49',
+        state: 'COMMENTED',
+        commitOid: 'head-49',
+        authorCanPushToRepository: true,
+      }],
+    })
+
+    const res = await deliver({
+      action: 'submitted',
+      repository: { full_name: 'titanxxh/open-agricola' },
+      pull_request: {
+        number: 49,
+        html_url: 'https://github.com/titanxxh/open-agricola/pull/49',
+      },
+    }, 'pull_request_review', 'delivery-comment-review', reviewRuntime)
+
+    expect(JSON.parse(res.body)).toEqual({ ok: true, approved: 0, invalidated: 0 })
+    expect(loadWorkspace(db, 'card-comment-review', 'author')).toMatchObject({
+      reviewStatus: 'in_review',
       live: false,
     })
   })
@@ -401,6 +481,8 @@ describe('workshop review webhook', () => {
       reviewDecision: 'APPROVED',
       headRefOid: 'head-44',
       baseRefName: 'main',
+      state: 'OPEN',
+      isDraft: false,
       reviews: [{
         id: 'review-44',
         state: 'APPROVED',

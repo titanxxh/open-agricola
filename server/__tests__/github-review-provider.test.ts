@@ -24,6 +24,8 @@ describe('GitHubReviewProvider', () => {
               reviewDecision: 'APPROVED',
               headRefOid: 'head-42',
               baseRefName: 'main',
+              state: 'OPEN',
+              isDraft: false,
               latestOpinionatedReviews: {
                 nodes: [{
                   id: 'review-42',
@@ -50,6 +52,8 @@ describe('GitHubReviewProvider', () => {
       reviewDecision: 'APPROVED',
       headRefOid: 'head-42',
       baseRefName: 'main',
+      state: 'OPEN',
+      isDraft: false,
       reviews: [{
         id: 'review-42',
         state: 'APPROVED',
@@ -63,6 +67,8 @@ describe('GitHubReviewProvider', () => {
     )
     const graphQlBody = JSON.parse(String(fetchImpl.mock.calls[1]![1]?.body))
     expect(graphQlBody.query).toContain('baseRefName')
+    expect(graphQlBody.query).toContain('isDraft')
+    expect(graphQlBody.query).toContain('state')
     expect(graphQlBody.variables).toEqual({
       owner: 'titanxxh',
       name: 'open-agricola',
