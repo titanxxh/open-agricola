@@ -476,7 +476,7 @@ export const useWorkshopDraft = ({
             type: 'checkpointSaved',
             workspace: payload.current,
           })
-          const next = latest && latest.draft !== applied.draft
+          const next = latest && latest.draft !== current.draft
             ? {
                 ...applied,
                 draft: latest.draft,
@@ -556,6 +556,18 @@ export const useWorkshopDraft = ({
         })
         return null
       }
+      // Edits typed while the pin request was in flight mean the returned
+      // version no longer matches what the author sees — make them pin again
+      // instead of sandbox-testing obsolete content.
+      const latest = stateRef.current
+      if (latest && latest.draft !== current.draft) {
+        dispatch({
+          type: 'saveFailed',
+          status: 'error',
+          error: 'Draft changed while pinning; pin the current version again',
+        })
+        return null
+      }
       return payload.versionId
     } catch (reason) {
       dispatch({
@@ -571,11 +583,16 @@ export const useWorkshopDraft = ({
     const current = stateRef.current
     if (!current) return false
     // Unpublish is the escape hatch from the live edit block, and the author
-    // may arrive here from a live-save conflict: use the freshest known
-    // server revision instead of refusing to act.
-    const baseRevision = current.save.status === 'conflict' && current.conflict
-      ? current.conflict.server.revision
-      : current.baseRevision
+    // may arrive here from a live-save conflict. Only bypass the conflict
+    // when it is the live-guard 409 (server revision has NOT advanced) — a
+    // genuine concurrent checkpoint must go through normal resolution or the
+    // stale local draft would silently overwrite the other tab's work.
+    if (current.save.status === 'conflict'
+      && current.conflict
+      && current.conflict.server.revision !== current.baseRevision) {
+      return false
+    }
+    const baseRevision = current.baseRevision
     dispatch({ type: 'saving' })
     try {
       const response = await apiFetch(
@@ -611,7 +628,7 @@ export const useWorkshopDraft = ({
         type: 'checkpointSaved',
         workspace: payload.workspace,
       })
-      const next = latest && latest.draft !== applied.draft
+      const next = latest && latest.draft !== current.draft
         ? {
             ...applied,
             draft: latest.draft,
