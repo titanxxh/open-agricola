@@ -40,30 +40,34 @@ describe('production deployment config', () => {
     const compose = readFileSync('docker-compose.prod.yml', 'utf8')
     expect(compose).toContain('REPLAY_TRUST_PROXY=true')
     expect(compose).toContain('app-data:/app/data')
+    for (const composePath of ['docker-compose.yml', 'docker-compose.prod.yml']) {
+      expect(readFileSync(composePath, 'utf8')).toContain(
+        'BGA_CDN_BASE_URL=${BGA_CDN_BASE_URL:-}',
+      )
+    }
   })
 
-  it('limits private BGA image checkouts to Replay Viewer CI', () => {
+  it('builds both frontends from the configured BGA CDN without checking out artwork', () => {
     for (const workflowPath of [
       '.github/workflows/ci.yml',
       '.github/workflows/ci-full.yml',
     ]) {
       const workflow = readFileSync(workflowPath, 'utf8')
-      expect(workflow).toMatch(
-        /repository: bga-devs\/bga-agricola\n\s+token: \$\{\{ secrets\.GH_TOKEN \}\}\n\s+persist-credentials: false/,
-      )
+      expect(workflow).toContain('BGA_CDN_BASE_URL: ${{ vars.BGA_CDN_BASE_URL }}')
+      expect(workflow).not.toContain('bga-devs/bga-agricola')
+      expect(workflow).not.toContain('BGA_IMAGE_DIR')
+      expect(workflow).not.toContain('REPLAY_VIEWER_ALLOW_MISSING_BGA_ART')
     }
     const pages = readFileSync('.github/workflows/deploy-pages.yml', 'utf8')
     expect(pages).not.toContain('bga-devs/bga-agricola')
     expect(pages).not.toContain('BGA_IMAGE_DIR')
     expect(pages).not.toContain('PUBLIC_ASSET_LOCAL_DIR')
+    expect(pages).toContain('BGA_CDN_BASE_URL: ${{ vars.BGA_CDN_BASE_URL }}')
 
-    const ci = readFileSync('.github/workflows/ci.yml', 'utf8')
-    expect(ci).toContain(
-      "if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository",
-    )
-    expect(ci).toContain(
-      "REPLAY_VIEWER_ALLOW_MISSING_BGA_ART: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository && '1' || '0' }}",
-    )
+    const replayViewer = readFileSync('replay-viewer/vite.config.ts', 'utf8')
+    expect(replayViewer).toContain('bgaAssetUrls(bgaCdnBaseUrl)')
+    expect(replayViewer).not.toContain('cpSync')
+    expect(replayViewer).not.toContain('BGA_IMAGE_DIR')
   })
 
   it('uses commit-addressed public assets in both frontend builds', () => {

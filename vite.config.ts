@@ -7,10 +7,14 @@ import {
   loadPublicAssetConfig,
   publicAssetUrls,
 } from './scripts/public-assets'
+import {
+  bgaAssetUrls,
+  DEFAULT_BGA_CDN_BASE_URL,
+} from './scripts/bga-asset-urls'
 
 const BGA_IMAGE_DIR = process.env.BGA_IMAGE_DIR || '../bga-agricola/img'
 const bgaImagePath = path.resolve(__dirname, BGA_IMAGE_DIR)
-const BGA_CDN_BASE = process.env.BGA_CDN_BASE_URL || 'https://x.boardgamearena.net/data/themereleases/current/games/agricola/260329-0408/img'
+const BGA_CDN_BASE = process.env.BGA_CDN_BASE_URL || DEFAULT_BGA_CDN_BASE_URL
 const publicAssets = await loadPublicAssetConfig({
   allowLocal: !process.argv.includes('build') && !process.env.CI,
   validateRemote: process.env.VITEST !== 'true',
@@ -77,31 +81,6 @@ const serveBgaImages = (imageDir: string) => ({
   },
 })
 
-// Build-time plugin: replace /bga-img with CDN URL.
-// `transform` covers JS modules and CSS imported via JS. CSS pulled in via
-// `@import` (e.g. App.css aggregator) is inlined by postcss-import without
-// going through `transform`, so we also patch the final bundled .css assets
-// in `generateBundle`.
-const replaceBgaBase = (cdnBase: string) => {
-  const NEEDLE = '/bga-img'
-  return {
-    name: 'replace-bga-base',
-    apply: 'build' as const,
-    enforce: 'pre' as const,
-    transform(code: string) {
-      if (!code.includes(NEEDLE)) return null
-      return { code: code.replaceAll(NEEDLE, cdnBase), map: null }
-    },
-    generateBundle(_options: unknown, bundle: Record<string, { type: string; fileName: string; source?: string | Uint8Array }>) {
-      for (const file of Object.values(bundle)) {
-        if (file.type !== 'asset' || !file.fileName.endsWith('.css')) continue
-        if (typeof file.source !== 'string' || !file.source.includes(NEEDLE)) continue
-        file.source = file.source.replaceAll(NEEDLE, cdnBase)
-      }
-    },
-  }
-}
-
 const plugins: PluginOption[] = [
   react(),
   publicAssetUrls(publicAssets, [process.env.VITE_BASE_PATH ?? '/', '/']),
@@ -111,7 +90,7 @@ if (publicAssets.localDir) {
   plugins.push(servePublicAssets(publicAssets.localDir))
 }
 if (process.env.BGA_CDN_BASE_URL) {
-  plugins.push(replaceBgaBase(process.env.BGA_CDN_BASE_URL))
+  plugins.push(bgaAssetUrls(process.env.BGA_CDN_BASE_URL))
 }
 
 export default defineConfig({

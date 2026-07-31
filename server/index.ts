@@ -74,6 +74,7 @@ const REPLAY_ASSET_ROOT = process.env.REPLAY_ASSET_ROOT ?? join(process.cwd(), '
 const REPLAY_REMOVAL_LEDGER_PATH = process.env.REPLAY_REMOVAL_LEDGER_PATH
   ?? join(process.cwd(), 'data', 'replay-removals.jsonl')
 const BGA_CDN_BASE = process.env.BGA_CDN_BASE_URL || 'https://x.boardgamearena.net/data/themereleases/current/games/agricola/260329-0408/img'
+const BGA_CDN_ORIGIN = new URL(BGA_CDN_BASE).origin
 const BGA_LOCAL_DIR = process.env.BGA_IMAGE_DIR ? join(process.cwd(), process.env.BGA_IMAGE_DIR) : null
 
 const serverCorsHeaders = () => corsHeaders({
@@ -404,6 +405,7 @@ const server = createServer(async (req, res) => {
       viewerRoot: REPLAY_VIEWER_ROOT,
       assetRoot: REPLAY_ASSET_ROOT,
       limiter: replayReadLimiter,
+      bgaCdnOrigin: BGA_CDN_ORIGIN,
     })) return
   }
 
