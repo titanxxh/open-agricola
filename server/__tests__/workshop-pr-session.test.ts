@@ -323,7 +323,7 @@ function createGitHubApiStub(opts: StubOpts): {
       counts.commitCalls++
       return Promise.resolve(
         new Response(
-          JSON.stringify({ sha: `commit_${Math.random().toString(36).slice(2, 8)}` }),
+          JSON.stringify({ sha: `commit_${counts.commitCalls}` }),
           { status: 201 },
         ),
       )
@@ -654,7 +654,7 @@ describe('workshop PR propose — session', () => {
     ).get(cardDbId)).toEqual({ github_pr_url: null })
   })
 
-  it('happy path: first-time propose creates PR, updates DB, audit=success', async () => {
+  it('happy path: first-time propose creates PR and reconciles an early approval', async () => {
     process.env.CORS_ORIGIN = 'https://frontend.example'
     // Phase 1 — no handshakeId yet → 200 { needsAuth: true, handshakeId }
     const req1 = fakeReq({
@@ -718,7 +718,27 @@ describe('workshop PR propose — session', () => {
       body: JSON.stringify({ handshakeId: j1.handshakeId }),
     })
     const res2 = fakeRes()
-    await handleSubmitReviewRequest(req2, res2, cardDbId)
+    const reviewProvider = {
+      getPullRequestSnapshot: vi.fn().mockResolvedValue({
+        reviewDecision: 'APPROVED',
+        headRefOid: 'commit_2',
+        baseRefName: 'main',
+        state: 'OPEN',
+        isDraft: false,
+        reviews: [{
+          id: 'early-review',
+          state: 'APPROVED',
+          commitOid: 'commit_2',
+          authorCanPushToRepository: true,
+        }],
+      }),
+    }
+    await handleSubmitReviewRequest(
+      req2,
+      res2,
+      cardDbId,
+      reviewProvider,
+    )
     expect(res2.statusCode).toBe(200)
     const j2 = JSON.parse(res2.body) as {
       ok: boolean
@@ -741,11 +761,18 @@ describe('workshop PR propose — session', () => {
     // DB state: PR URL + status set.
     const row = db
       .prepare(
-        `SELECT github_pr_url, github_pr_status FROM workshop_cards WHERE id = ?`,
+        `SELECT github_pr_url, github_pr_status, review_status
+         FROM workshop_cards WHERE id = ?`,
       )
-      .get(cardDbId) as { github_pr_url: string; github_pr_status: string }
+      .get(cardDbId) as {
+        github_pr_url: string
+        github_pr_status: string
+        review_status: string
+      }
     expect(row.github_pr_url).toContain('/pull/42')
     expect(row.github_pr_status).toBe('open')
+    expect(row.review_status).toBe('approved')
+    expect(reviewProvider.getPullRequestSnapshot).toHaveBeenCalledWith(42)
 
     // Audit log: start + success.
     const audits = db

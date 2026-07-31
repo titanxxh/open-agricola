@@ -73,7 +73,7 @@ const getReviewBinding = (
   db: Database.Database,
   prUrl: string,
 ): ReviewBinding | null => {
-  return db.prepare(`
+  const matches = db.prepare(`
     SELECT id,
            draft_revision AS revision,
            review_status AS reviewStatus,
@@ -86,7 +86,9 @@ const getReviewBinding = (
     FROM workshop_cards
     WHERE github_pr_url = ?
       AND review_status IN ('in_review', 'stale', 'approved')
-  `).get(prUrl) as ReviewBinding | undefined ?? null
+    LIMIT 2
+  `).all(prUrl) as ReviewBinding[]
+  return matches.length === 1 ? matches[0]! : null
 }
 
 const sameReviewBinding = (
@@ -249,12 +251,13 @@ export async function handleWorkshopReviewWebhook(
         && dismissedCommit !== snapshot.headRefOid
       const reviewStillPending = snapshot.reviewDecision === null
         || snapshot.reviewDecision === 'REVIEW_REQUIRED'
-      const remainsValid = eventName === 'pull_request_review'
-        ? Boolean(findApprovedHeadReview(snapshot))
-          || isReviewTargetEligible(snapshot)
-            && reviewStillPending
-            && (supersededDismissal || binding.reviewStatus === 'in_review')
-        : isReviewTargetEligible(snapshot)
+      const remainsValid = snapshot.state === 'MERGED'
+        || (eventName === 'pull_request_review'
+          ? Boolean(findApprovedHeadReview(snapshot))
+            || isReviewTargetEligible(snapshot)
+              && reviewStillPending
+              && (supersededDismissal || binding.reviewStatus === 'in_review')
+          : isReviewTargetEligible(snapshot))
       if (remainsValid) preserveCommitSha = snapshot.headRefOid
     } catch {
       return failClosed()
@@ -297,9 +300,10 @@ export async function handleWorkshopReviewWebhook(
           })
         : 0
       if (approvedReview) return { approved }
-      const breaksReview = !isReviewTargetEligible(snapshot)
-        || snapshot.reviewDecision === 'CHANGES_REQUESTED'
-        || snapshot.reviewDecision === 'APPROVED'
+      const breaksReview = snapshot.state !== 'MERGED'
+        && (!isReviewTargetEligible(snapshot)
+          || snapshot.reviewDecision === 'CHANGES_REQUESTED'
+          || snapshot.reviewDecision === 'APPROVED')
       const invalidated = invalidateReviewedCard(db, {
         prUrl,
         ...(!breaksReview ? { preserveCommitSha: snapshot.headRefOid } : {}),

@@ -9,7 +9,17 @@ import { workshopPrConfig, workshopPrEnabled } from './config.ts'
 import { tokenCache } from './token-cache.ts'
 import { GitHubClient, GitHubApiError } from './github-client.ts'
 import { generatePrFiles } from './code-gen.ts'
-import { enterReview, getHandoffReadiness, hasReservedCardId, loadWorkspace } from '../workshop-drafts.ts'
+import {
+  approveReviewedVersion,
+  enterReview,
+  getHandoffReadiness,
+  hasReservedCardId,
+  loadWorkspace,
+} from '../workshop-drafts.ts'
+import {
+  findApprovedHeadReview,
+  type WorkshopReviewSnapshot,
+} from '../workshop-review/github-review-provider.ts'
 
 const RATE_LIMIT_MS = 10 * 60_000 // 10 minutes
 const REFRESH_COOLDOWN_MS = 60_000 // 1 minute
@@ -60,6 +70,9 @@ export async function handleSubmitReviewRequest(
   req: IncomingMessage,
   res: ServerResponse,
   cardDbId: string,
+  reviewProvider?: {
+    getPullRequestSnapshot(prNumber: number): Promise<WorkshopReviewSnapshot>
+  },
 ): Promise<void> {
   if (!workshopPrEnabled()) {
     sendJson(res, 503, { ok: false, error: 'workshop PR integration disabled' })
@@ -301,6 +314,18 @@ export async function handleSubmitReviewRequest(
       expectedRevision: wcard.draft_revision,
       commitSha: commit2.commitSha,
     })
+    if (reviewProvider) {
+      const snapshot = await reviewProvider.getPullRequestSnapshot(pr.number)
+      const approvedReview = findApprovedHeadReview(snapshot)
+      if (approvedReview) {
+        approveReviewedVersion(db, {
+          prUrl: pr.url,
+          commitSha: snapshot.headRefOid,
+          reviewId: approvedReview.id,
+          expectedCardId: cardDbId,
+        })
+      }
+    }
     db.prepare(
       `INSERT OR REPLACE INTO github_propose_rate_limit
         (user_id, last_propose_at)

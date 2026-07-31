@@ -192,6 +192,7 @@ const reviewRuntime: WorkshopReviewRuntime = {
   repositoryName: 'open-agricola',
   provider: { getPullRequestSnapshot: reviewProvider },
 }
+let nextReviewPrNumber = 1
 
 beforeAll(async () => {
   const mod = await import('../workshop.ts')
@@ -206,7 +207,7 @@ const approveForPublish = (
   enterReview(db, {
     cardId,
     authorId,
-    prUrl: 'https://github.com/titanxxh/open-agricola/pull/1',
+    prUrl: `https://github.com/titanxxh/open-agricola/pull/${nextReviewPrNumber++}`,
     expectedRevision: revision,
     commitSha: 'approved-head',
   })
@@ -607,7 +608,9 @@ describe('workshop API', () => {
       enterReview(db, {
         cardId: cardDbId,
         authorId: 'u1',
-        prUrl: 'https://github.com/titanxxh/open-agricola/pull/1',
+        prUrl: (db.prepare(`
+          SELECT github_pr_url FROM workshop_cards WHERE id = ?
+        `).get(cardDbId) as { github_pr_url: string }).github_pr_url,
         expectedRevision: edited.revision,
         commitSha: 'new-head',
       })

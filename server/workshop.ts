@@ -362,7 +362,12 @@ export async function handleWorkshopRoute(
   // upstream from the author's fork, after the quality gate passes.
   const submitReviewMatch = /^\/api\/workshop\/cards\/([^/]+)\/submit-review$/.exec(url)
   if (req.method === 'POST' && submitReviewMatch) {
-    await handleSubmitReviewRequest(req, res, submitReviewMatch[1]!)
+    await handleSubmitReviewRequest(
+      req,
+      res,
+      submitReviewMatch[1]!,
+      reviewRuntime?.provider,
+    )
     return true
   }
 
