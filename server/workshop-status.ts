@@ -29,6 +29,11 @@ export const canGoLive = (reviewStatus: string): boolean => reviewStatus === 'ap
 /**
  * Whether a card row may be loaded into a real room (or shown in the public
  * gallery). Rooms only ever run the approved snapshot of a live card.
+ *
+ * 'merged' is not loadable yet: the merge transition does not exist until the
+ * GitHub review sync (#640), and the merged-window serving rule (keep serving
+ * the approved snapshot until built_in takes over) lands together with it in
+ * #642 — extending this predicate ahead of that would ship untested behaviour.
  */
 export const isLoadableLive = (
   row: { review_status: string; live: number },
