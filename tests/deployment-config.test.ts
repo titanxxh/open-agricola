@@ -42,17 +42,21 @@ describe('production deployment config', () => {
     expect(compose).toContain('app-data:/app/data')
   })
 
-  it('authenticates private BGA image checkouts without persisting credentials', () => {
+  it('limits private BGA image checkouts to Replay Viewer CI', () => {
     for (const workflowPath of [
       '.github/workflows/ci.yml',
       '.github/workflows/ci-full.yml',
-      '.github/workflows/deploy-pages.yml',
     ]) {
       const workflow = readFileSync(workflowPath, 'utf8')
       expect(workflow).toMatch(
         /repository: bga-devs\/bga-agricola\n\s+token: \$\{\{ secrets\.GH_TOKEN \}\}\n\s+persist-credentials: false/,
       )
     }
+    const pages = readFileSync('.github/workflows/deploy-pages.yml', 'utf8')
+    expect(pages).not.toContain('bga-devs/bga-agricola')
+    expect(pages).not.toContain('BGA_IMAGE_DIR')
+    expect(pages).not.toContain('PUBLIC_ASSET_LOCAL_DIR')
+
     const ci = readFileSync('.github/workflows/ci.yml', 'utf8')
     expect(ci).toContain(
       "if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository",
@@ -60,6 +64,19 @@ describe('production deployment config', () => {
     expect(ci).toContain(
       "REPLAY_VIEWER_ALLOW_MISSING_BGA_ART: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository && '1' || '0' }}",
     )
+  })
+
+  it('uses commit-addressed public assets in both frontend builds', () => {
+    const publicAssets = readFileSync('scripts/public-assets.ts', 'utf8')
+    const site = readFileSync('vite.config.ts', 'utf8')
+    const replayViewer = readFileSync('replay-viewer/vite.config.ts', 'utf8')
+    expect(publicAssets).toContain(
+      'raw.githubusercontent.com/titanxxh/open-agricola-assets/',
+    )
+    expect(site).toContain('publicAssetUrls(publicAssets')
+    expect(replayViewer).toContain('loadPublicAssetConfig')
+    expect(replayViewer).toContain('publicAssetUrls(publicAssets')
+    expect(replayViewer).toContain('VITE_PUBLIC_ASSET_BASE_URL')
   })
 
   it('does not start the obsolete custom-code executor sidecar', () => {

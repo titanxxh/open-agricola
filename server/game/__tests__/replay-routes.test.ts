@@ -210,7 +210,12 @@ describe('public replay routes', () => {
     expect(first.status).toBe(200)
     expect(first.headers['Cache-Control']).toContain('immutable')
     expect(first.headers['Content-Security-Policy']).toContain("form-action 'none'")
-    expect(first.headers['Content-Security-Policy']).not.toContain('https:')
+    expect(first.headers['Content-Security-Policy']).toContain(
+      "img-src 'self' data: https://raw.githubusercontent.com",
+    )
+    expect(first.headers['Content-Security-Policy']).not.toContain(
+      "script-src 'self' https:",
+    )
 
     writeFileSync(join(viewerRoot, buildId, 'app.js'), 'tampered')
     expect((await handleStream(request(`/replay-viewers/${buildId}/index.html`))).status).toBe(200)

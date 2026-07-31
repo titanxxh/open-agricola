@@ -1,11 +1,9 @@
-import { existsSync, readFileSync, statSync } from 'node:fs'
+import { existsSync } from 'node:fs'
 import { join } from 'node:path'
 
 import { describe, expect, it } from 'vitest'
 
 import { MOTHER_PARENT_CARD_IDS, getParentCardDefinition, motherParentCards } from '../index'
-
-const PNG_SIGNATURE = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a])
 
 const expectedMotherCards = [
   {
@@ -94,12 +92,6 @@ const expectedMotherCards = [
   },
 ] as const
 
-const assertPngExists = (path: string) => {
-  expect(existsSync(path), path).toBe(true)
-  expect(statSync(path).size, path).toBeGreaterThan(0)
-  expect(readFileSync(path).subarray(0, PNG_SIGNATURE.length), path).toEqual(PNG_SIGNATURE)
-}
-
 describe('mother parent cards', () => {
   it('keeps each mother definition in its own source file', () => {
     for (const id of MOTHER_PARENT_CARD_IDS) {
@@ -138,17 +130,6 @@ describe('mother parent cards', () => {
         expect(card.gain.resource, card.id).not.toBe('begging')
         expect(card.gain.amount, card.id).toBeGreaterThan(0)
       }
-    }
-  })
-
-  it('resolves all runtime mother assets from the public asset tree', () => {
-    const assetRoot = join(process.cwd(), 'public/assets/parents')
-
-    assertPngExists(join(assetRoot, 'backs/mother.png'))
-
-    for (const card of motherParentCards) {
-      assertPngExists(join(assetRoot, 'portrait', card.assets.front))
-      expect(card.assets.back).toBe('mother')
     }
   })
 })

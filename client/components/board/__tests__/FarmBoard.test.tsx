@@ -12,6 +12,7 @@ import {
   type CardsManifestPayload,
 } from '../../../services/card-meta'
 import { buildFarmBoardProjection } from '../../../app/farm-board-projection'
+import { publicAssetUrl } from '../../../utils/public-asset-url'
 
 const manifestEntry = (
   id: string,
@@ -658,10 +659,10 @@ describe('FarmBoard', () => {
 
     expect(html).toContain('class="parent-cards-row"')
     expect(html).toContain('data-card-id="PR01"')
-    expect(html).toContain('/assets/parents/portrait/PR01.png')
+    expect(html).toContain(publicAssetUrl('/assets/parents/portrait/PR01.png'))
     expect(html).not.toContain('/assets/parents/cards/PR01.png')
     expect(html).toContain('data-card-id="PS01"')
-    expect(html).toContain('/assets/parents/portrait/PS01.png')
+    expect(html).toContain(publicAssetUrl('/assets/parents/portrait/PS01.png'))
     expect(html).not.toContain('/assets/parents/cards/PS01.png')
     expect(html).toContain('Completed')
     expect(html.match(/parent-card-face__slash-segment is-completed/g)).toHaveLength(2)
@@ -704,7 +705,7 @@ describe('FarmBoard', () => {
       expect(preview).toBeTruthy()
       expect(preview?.style.width).toBe('320px')
       expect(preview?.querySelector('img')?.getAttribute('src')).toContain(
-        '/assets/parents/portrait/PR01.png',
+        publicAssetUrl('/assets/parents/portrait/PR01.png'),
       )
 
       fireEvent.pointerOut(tile!, { pointerType: 'mouse' })

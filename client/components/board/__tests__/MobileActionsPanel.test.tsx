@@ -5,6 +5,7 @@ import { describe, expect, it, vi } from 'vitest'
 import type { ActionSpace } from '../../../../shared/contract/types'
 import { emptyResources } from '../../../../shared/contract/state-constants'
 import type { MoorSpecialActionCardState } from '../../../../shared/moor/types'
+import { publicAssetUrl } from '../../../utils/public-asset-url'
 import { MobileActionsPanel } from '../MobileActionsPanel'
 
 const action = (id: string): ActionSpace => ({
@@ -116,7 +117,7 @@ describe('MobileActionsPanel', () => {
 
     expect(screen.getByAltText('Cut Peat / Hiring Fair')).toHaveAttribute(
       'src',
-      '/assets/moor/special-action-card/moor-special-mixed.webp',
+      publicAssetUrl('/assets/moor/special-action-card/moor-special-mixed.webp'),
     )
 
     fireEvent.click(screen.getByRole('button', { name: 'Cut Peat' }))

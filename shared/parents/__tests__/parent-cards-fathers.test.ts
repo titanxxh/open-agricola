@@ -9,9 +9,6 @@ import {
 } from '../index'
 import type { FatherRewardEffect, FatherRequirement } from '../types'
 
-const assetPath = (relativePath: string): string =>
-  fileURLToPath(new URL(`../../../public/assets/parents/${relativePath}`, import.meta.url))
-
 const cardSourcePath = (id: string): string =>
   fileURLToPath(new URL(`../cards/${id}.ts`, import.meta.url))
 
@@ -376,13 +373,5 @@ describe('father parent cards', () => {
       const card = fatherParentCards.find(candidate => candidate.id === id)
       expect(card?.rewards.map(reward => reward.requirement.type)).toEqual([type, type, type])
     }
-  })
-
-  it('keeps father runtime assets available under the resolved public asset paths', () => {
-    for (const id of FATHER_PARENT_CARD_IDS) {
-      expect(existsSync(assetPath(`portrait/${id}.png`))).toBe(true)
-    }
-
-    expect(existsSync(assetPath('backs/father.png'))).toBe(true)
   })
 })
