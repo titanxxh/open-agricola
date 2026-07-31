@@ -9,7 +9,19 @@ import { workshopPrConfig, workshopPrEnabled } from './config.ts'
 import { tokenCache } from './token-cache.ts'
 import { GitHubClient, GitHubApiError } from './github-client.ts'
 import { generatePrFiles } from './code-gen.ts'
-import { enterReview, getHandoffReadiness, hasReservedCardId, loadWorkspace } from '../workshop-drafts.ts'
+import {
+  approveReviewedVersion,
+  enterReview,
+  getHandoffReadiness,
+  hasReservedCardId,
+  invalidateReviewedCard,
+  loadWorkspace,
+} from '../workshop-drafts.ts'
+import {
+  breaksReviewGateWithoutApproval,
+  findApprovedHeadReview,
+  type WorkshopReviewSnapshot,
+} from '../workshop-review/github-review-provider.ts'
 
 const RATE_LIMIT_MS = 10 * 60_000 // 10 minutes
 const REFRESH_COOLDOWN_MS = 60_000 // 1 minute
@@ -27,6 +39,75 @@ type WorkshopCardRow = {
   live: number
   draft_revision: number
   author_name?: string
+}
+
+type ReviewProvider = {
+  getPullRequestSnapshot(prNumber: number): Promise<WorkshopReviewSnapshot>
+}
+
+type ReviewBinding = {
+  id: string
+  revision: number
+  approvedCommitSha: string | null
+  approvedVersionId: string | null
+  reviewCommitSha: string | null
+  reviewVersionId: string | null
+  updatedAt: number
+}
+
+const loadReviewBinding = (
+  db: ReturnType<typeof getDb>,
+  cardId: string,
+  prUrl: string,
+): ReviewBinding | undefined => db.prepare(`
+  SELECT id,
+         draft_revision AS revision,
+         approved_commit_sha AS approvedCommitSha,
+         approved_version_id AS approvedVersionId,
+         review_commit_sha AS reviewCommitSha,
+         review_version_id AS reviewVersionId,
+         updated_at AS updatedAt
+  FROM workshop_cards
+  WHERE id = ? AND github_pr_url = ?
+`).get(cardId, prUrl) as ReviewBinding | undefined
+
+const githubPrStatus = (
+  snapshot: WorkshopReviewSnapshot,
+): 'open' | 'merged' | 'closed' => snapshot.state === 'MERGED'
+  ? 'merged'
+  : snapshot.state === 'CLOSED'
+    ? 'closed'
+    : 'open'
+
+const reconcileReviewSnapshot = (
+  db: ReturnType<typeof getDb>,
+  prUrl: string,
+  snapshot: WorkshopReviewSnapshot,
+  expectedBinding: ReviewBinding,
+): number => {
+  if (snapshot.headRefOid !== expectedBinding.reviewCommitSha) {
+    return invalidateReviewedCard(db, {
+      prUrl,
+      prStatus: githubPrStatus(snapshot),
+      expectedBinding,
+    })
+  }
+  const approvedReview = findApprovedHeadReview(snapshot)
+  if (approvedReview) {
+    return approveReviewedVersion(db, {
+      prUrl,
+      commitSha: snapshot.headRefOid,
+      reviewId: approvedReview.id,
+      expectedBinding,
+    })
+  }
+  return breaksReviewGateWithoutApproval(snapshot)
+    ? invalidateReviewedCard(db, {
+        prUrl,
+        prStatus: githubPrStatus(snapshot),
+        expectedBinding,
+      })
+    : 0
 }
 
 const hasCompleteZhLocale = (cardJson: Record<string, unknown>): boolean => {
@@ -60,6 +141,7 @@ export async function handleSubmitReviewRequest(
   req: IncomingMessage,
   res: ServerResponse,
   cardDbId: string,
+  reviewProvider?: ReviewProvider,
 ): Promise<void> {
   if (!workshopPrEnabled()) {
     sendJson(res, 503, { ok: false, error: 'workshop PR integration disabled' })
@@ -144,8 +226,19 @@ export async function handleSubmitReviewRequest(
       return
     }
     const prUrl = '/mock-workshop-pr/1'
-    enterReview(db, { cardId: cardDbId, authorId: user.id, prUrl, expectedRevision: wcard.draft_revision })
+    enterReview(db, {
+      cardId: cardDbId,
+      authorId: user.id,
+      prUrl,
+      expectedRevision: wcard.draft_revision,
+      commitSha: 'mock-workshop-head',
+    })
     sendJson(res, 200, { ok: true, prUrl, prNumber: 1 })
+    return
+  }
+
+  if (!reviewProvider) {
+    sendJson(res, 503, { ok: false, code: 'github_review_unavailable' })
     return
   }
 
@@ -248,6 +341,10 @@ export async function handleSubmitReviewRequest(
 
     // Find or open PR
     let pr = await client.findOpenPr({ forkOwner: githubLogin, branchName })
+    if (pr && (pr.baseRefName !== 'main' || pr.isDraft)) {
+      await client.closePr(pr.number)
+      pr = null
+    }
     if (!pr) {
       pr = await client.openPr({
         forkOwner: githubLogin,
@@ -288,7 +385,26 @@ export async function handleSubmitReviewRequest(
       commitSha: commit2.commitSha,
     })
 
-    enterReview(db, { cardId: cardDbId, authorId: user.id, prUrl: pr.url, expectedRevision: wcard.draft_revision })
+    enterReview(db, {
+      cardId: cardDbId,
+      authorId: user.id,
+      prUrl: pr.url,
+      expectedRevision: wcard.draft_revision,
+      commitSha: commit2.commitSha,
+    })
+    const expectedBinding = loadReviewBinding(db, cardDbId, pr.url)!
+    let reconciliationPending = false
+    try {
+      const snapshot = await reviewProvider.getPullRequestSnapshot(pr.number)
+      reconcileReviewSnapshot(db, pr.url, snapshot, expectedBinding)
+    } catch {
+      reconciliationPending = true
+      db.prepare(`
+        UPDATE workshop_cards
+        SET github_pr_last_synced_at = NULL
+        WHERE id = ? AND github_pr_url = ? AND updated_at = ?
+      `).run(expectedBinding.id, pr.url, expectedBinding.updatedAt)
+    }
     db.prepare(
       `INSERT OR REPLACE INTO github_propose_rate_limit
         (user_id, last_propose_at)
@@ -300,7 +416,12 @@ export async function handleSubmitReviewRequest(
        VALUES (?, ?, ?, 'success', ?, ?)`,
     ).run(nanoid(), user.id, cardDbId, pr.url, now)
 
-    sendJson(res, 200, { ok: true, prUrl: pr.url, prNumber: pr.number })
+    sendJson(res, 200, {
+      ok: true,
+      prUrl: pr.url,
+      prNumber: pr.number,
+      ...(reconciliationPending ? { reconciliationPending: true } : {}),
+    })
   } catch (err) {
     const code = err instanceof GitHubApiError ? err.code : 'unknown'
     const message = err instanceof Error ? err.message : String(err)
@@ -317,6 +438,7 @@ export async function handleRefreshPrStatus(
   req: IncomingMessage,
   res: ServerResponse,
   cardDbId: string,
+  reviewProvider?: ReviewProvider,
 ): Promise<void> {
   const user = validateSession(extractToken(req.headers.authorization))
   if (!user) {
@@ -343,6 +465,10 @@ export async function handleRefreshPrStatus(
     sendJson(res, 404, { ok: false, error: 'no PR' })
     return
   }
+  if (!reviewProvider) {
+    sendJson(res, 503, { ok: false, code: 'github_review_unavailable' })
+    return
+  }
 
   const now = Date.now()
   if (
@@ -361,33 +487,23 @@ export async function handleRefreshPrStatus(
     sendJson(res, 500, { ok: false, error: 'malformed PR URL' })
     return
   }
-  const prNum = match[1]!
+  const prNum = Number(match[1])
+  const expectedBinding = loadReviewBinding(db, cardDbId, wcard.github_pr_url)!
 
   try {
-    const resp = await fetch(
-      `https://api.github.com/repos/${workshopPrConfig.upstreamOwner}/${workshopPrConfig.upstreamRepo}/pulls/${prNum}`,
-      { headers: { Accept: 'application/vnd.github+json' } },
+    const snapshot = await reviewProvider.getPullRequestSnapshot(prNum)
+    const status = githubPrStatus(snapshot)
+    const reconciled = reconcileReviewSnapshot(
+      db,
+      wcard.github_pr_url,
+      snapshot,
+      expectedBinding,
     )
-    if (resp.status === 429 || resp.status === 403) {
-      sendJson(res, 429, { ok: false, code: 'github_rate_limit' })
-      return
-    }
-    if (!resp.ok) {
-      sendJson(res, 502, { ok: false, status: resp.status })
-      return
-    }
-
-    const pr = (await resp.json()) as { state: string; merged: boolean }
-    let status: 'open' | 'merged' | 'closed' = 'open'
-    if (pr.state === 'open') status = 'open'
-    else if (pr.merged) status = 'merged'
-    else status = 'closed'
-
-    db.prepare(
+    if (reconciled === 0) db.prepare(
       `UPDATE workshop_cards
        SET github_pr_status = ?, github_pr_last_synced_at = ?
-       WHERE id = ?`,
-    ).run(status, now, cardDbId)
+       WHERE id = ? AND github_pr_url = ? AND updated_at = ?`,
+    ).run(status, now, cardDbId, wcard.github_pr_url, expectedBinding.updatedAt)
 
     sendJson(res, 200, { ok: true, status })
   } catch (err) {

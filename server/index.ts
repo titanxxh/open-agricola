@@ -956,7 +956,11 @@ const server = createServer(async (req, res) => {
   }
 
   // ── Workshop routes ────────────────────────────────────
-  if (req.url?.startsWith('/api/workshop/') || req.url?.startsWith('/api/admin/')) {
+  if (
+    req.url === '/api/github/webhook'
+    || req.url?.startsWith('/api/workshop/')
+    || req.url?.startsWith('/api/admin/')
+  ) {
     forwardCookieSessionAsBearer(req)
     const handled = await handleWorkshopRoute(req, res)
     if (handled) return

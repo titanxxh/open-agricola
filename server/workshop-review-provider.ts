@@ -3,13 +3,9 @@
  *
  * publish() re-verifies the atomic snapshot rule at the moment the card goes
  * live: the approving review's commit, the PR head and the platform-pinned
- * content must agree (#629). Where that data comes from is provider-specific:
- * the GitHub GraphQL implementation arrives with the review sync (#640);
- * tests inject deterministic providers.
- *
- * Without a provider (production until #640) publish falls back to the local
- * state check only — harmless because 'approved' itself is unreachable until
- * the sync exists.
+ * content must agree (#629). Direct aggregate callers can inject a synchronous
+ * provider; the production HTTP route performs the asynchronous GitHub check
+ * before calling publish().
  */
 export type ReviewSnapshot = {
   /** GitHub-side aggregated decision for the card's review PR. */

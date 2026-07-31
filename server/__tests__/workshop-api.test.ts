@@ -6,7 +6,16 @@
 import { describe, it, expect, vi, beforeAll } from 'vitest'
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import Database from 'better-sqlite3'
-import { approveCurrentDraft } from '../workshop-drafts.ts'
+import {
+  approveCurrentDraft,
+  checkpointDraft,
+  enterReview,
+  loadWorkspace,
+  publish,
+  unpublish,
+} from '../workshop-drafts.ts'
+import type { WorkshopReviewRuntime } from '../workshop-review/webhook-handler.ts'
+import type { WorkshopReviewSnapshot } from '../workshop-review/github-review-provider.ts'
 
 // ── Mock DB ──────────────────────────────────────────────────────────────────
 
@@ -34,6 +43,8 @@ db.exec(`
     github_pr_url TEXT,
     github_pr_status TEXT,
     github_pr_last_synced_at INTEGER,
+    review_commit_sha TEXT,
+    review_version_id TEXT,
     draft_revision INTEGER NOT NULL DEFAULT 1,
     draft_generation_json TEXT NOT NULL DEFAULT '{}',
     approved_commit_sha TEXT,
@@ -86,6 +97,11 @@ db.exec(`
     created_at INTEGER NOT NULL,
     content_hash TEXT,
     provenance_json TEXT NOT NULL DEFAULT '{}'
+  );
+  CREATE TABLE github_webhook_events (
+    delivery_id TEXT PRIMARY KEY,
+    event_name TEXT NOT NULL,
+    received_at INTEGER NOT NULL
   );
 `)
 
@@ -157,11 +173,51 @@ function mockRes(): ServerResponse & { statusCode: number; body: string } {
 
 // Imported lazily after mocks are set up
 let handleWorkshopRoute: (req: IncomingMessage, res: ServerResponse) => Promise<boolean>
+const reviewProvider = vi.fn(async () => ({
+  reviewDecision: 'APPROVED',
+  headRefOid: 'approved-head',
+  baseRefName: 'main',
+  state: 'OPEN',
+  isDraft: false,
+  reviews: [{
+    id: 'approved-review',
+    state: 'APPROVED',
+    commitOid: 'approved-head',
+    authorCanPushToRepository: true,
+  }],
+}))
+const reviewRuntime: WorkshopReviewRuntime = {
+  webhookSecret: 'webhook-secret',
+  repositoryOwner: 'titanxxh',
+  repositoryName: 'open-agricola',
+  provider: { getPullRequestSnapshot: reviewProvider },
+}
+let nextReviewPrNumber = 1
 
 beforeAll(async () => {
   const mod = await import('../workshop.ts')
-  handleWorkshopRoute = mod.handleWorkshopRoute
+  handleWorkshopRoute = (req, res) => mod.handleWorkshopRoute(req, res, reviewRuntime)
 })
+
+const approveForPublish = (
+  cardId: string,
+  authorId: string,
+  revision: number,
+): void => {
+  enterReview(db, {
+    cardId,
+    authorId,
+    prUrl: `https://github.com/titanxxh/open-agricola/pull/${nextReviewPrNumber++}`,
+    expectedRevision: revision,
+    commitSha: 'approved-head',
+  })
+  approveCurrentDraft(db, {
+    cardId,
+    authorId,
+    commitSha: 'approved-head',
+    reviewId: 'approved-review',
+  })
+}
 
 const createPublishedCard = async (
   body: {
@@ -186,7 +242,7 @@ const createPublishedCard = async (
   const cardDbId = JSON.parse(createRes.body).id as string
   const authorId = (db.prepare('SELECT user_id FROM sessions WHERE token = ?')
     .get(token) as { user_id: string }).user_id
-  approveCurrentDraft(db, { cardId: cardDbId, authorId })
+  approveForPublish(cardDbId, authorId, 1)
   const publishRes = mockRes()
   await handleWorkshopRoute(
     mockReq('POST', `/api/workshop/cards/${cardDbId}/publish`, {
@@ -347,7 +403,7 @@ describe('workshop API', () => {
       await handleWorkshopRoute(createReq, createRes)
       const cardDbId = JSON.parse(createRes.body).id
 
-      approveCurrentDraft(db, { cardId: cardDbId, authorId: 'u1' })
+      approveForPublish(cardDbId, 'u1', 1)
       const publishRes = mockRes()
       await handleWorkshopRoute(mockReq(
         'POST',
@@ -366,6 +422,282 @@ describe('workshop API', () => {
       expect(data.cards).toBeUndefined()
       expect(data.versions).toHaveLength(1)
       expect(data.versions[0].version_number).toBe(1)
+    })
+  })
+
+  describe('POST /api/workshop/cards/:id/publish', () => {
+    it.each([
+      [
+        'a changed PR head',
+        'CUSTOM_ChangedReviewHead',
+        {
+          reviewDecision: 'APPROVED',
+          headRefOid: 'new-head',
+          baseRefName: 'main',
+          state: 'OPEN',
+          isDraft: false,
+          reviews: [{
+            id: 'new-review',
+            state: 'APPROVED',
+            commitOid: 'new-head',
+            authorCanPushToRepository: true,
+          }],
+        },
+      ],
+      [
+        'an approver without push permission',
+        'CUSTOM_ReadOnlyApprover',
+        {
+          reviewDecision: 'APPROVED',
+          headRefOid: 'approved-head',
+          baseRefName: 'main',
+          state: 'OPEN',
+          isDraft: false,
+          reviews: [{
+            id: 'read-only-review',
+            state: 'APPROVED',
+            commitOid: 'approved-head',
+            authorCanPushToRepository: false,
+          }],
+        },
+      ],
+      [
+        'a PR retargeted away from main',
+        'CUSTOM_RetargetedReview',
+        {
+          reviewDecision: 'APPROVED',
+          headRefOid: 'approved-head',
+          baseRefName: 'release',
+          state: 'OPEN',
+          isDraft: false,
+          reviews: [{
+            id: 'retargeted-review',
+            state: 'APPROVED',
+            commitOid: 'approved-head',
+            authorCanPushToRepository: true,
+          }],
+        },
+      ],
+      [
+        'a closed PR',
+        'CUSTOM_ClosedReviewPr',
+        {
+          reviewDecision: 'APPROVED',
+          headRefOid: 'approved-head',
+          baseRefName: 'main',
+          state: 'CLOSED',
+          isDraft: false,
+          reviews: [{
+            id: 'closed-review',
+            state: 'APPROVED',
+            commitOid: 'approved-head',
+            authorCanPushToRepository: true,
+          }],
+        },
+      ],
+      [
+        'a draft PR',
+        'CUSTOM_DraftReviewPr',
+        {
+          reviewDecision: 'APPROVED',
+          headRefOid: 'approved-head',
+          baseRefName: 'main',
+          state: 'OPEN',
+          isDraft: true,
+          reviews: [{
+            id: 'draft-review',
+            state: 'APPROVED',
+            commitOid: 'approved-head',
+            authorCanPushToRepository: true,
+          }],
+        },
+      ],
+    ])('rejects %s and makes the approval stale', async (_case, cardId, snapshot) => {
+      const createRes = mockRes()
+      await handleWorkshopRoute(mockReq('POST', '/api/workshop/cards', {
+        card_id: cardId,
+        card_type: 'minor',
+        name: cardId,
+        card_json: {
+          id: cardId,
+          name: cardId,
+          card_type: 'minor',
+          deck: 'CUSTOM',
+          number: 0,
+          desc: ['reviewed text'],
+        },
+      }, 'tok-alice'), createRes)
+      const cardDbId = JSON.parse(createRes.body).id as string
+      approveForPublish(cardDbId, 'u1', 1)
+      reviewProvider.mockResolvedValueOnce(snapshot)
+      const publishRes = mockRes()
+
+      await handleWorkshopRoute(mockReq(
+        'POST',
+        `/api/workshop/cards/${cardDbId}/publish`,
+        { baseRevision: 1 },
+        'tok-alice',
+      ), publishRes)
+
+      expect(publishRes.statusCode).toBe(409)
+      expect(JSON.parse(publishRes.body)).toMatchObject({
+        ok: false,
+        code: 'review_stale',
+        current: {
+          reviewStatus: 'stale',
+          live: false,
+        },
+      })
+      const workspaceRes = mockRes()
+      await handleWorkshopRoute(
+        mockReq('GET', `/api/workshop/cards/${cardDbId}/workspace`, null, 'tok-alice'),
+        workspaceRes,
+      )
+      expect(JSON.parse(workspaceRes.body).workspace).toMatchObject({
+        reviewStatus: 'stale',
+        live: false,
+      })
+    })
+
+    it('does not stale a newer review submitted while publish revalidation is pending', async () => {
+      const createRes = mockRes()
+      await handleWorkshopRoute(mockReq('POST', '/api/workshop/cards', {
+        card_id: 'CUSTOM_ConcurrentReview',
+        card_type: 'minor',
+        name: 'Concurrent Review',
+        card_json: {
+          id: 'CUSTOM_ConcurrentReview',
+          name: 'Concurrent Review',
+          card_type: 'minor',
+          deck: 'CUSTOM',
+          number: 0,
+          desc: ['reviewed text'],
+        },
+      }, 'tok-alice'), createRes)
+      const cardDbId = JSON.parse(createRes.body).id as string
+      approveForPublish(cardDbId, 'u1', 1)
+      let resolveSnapshot!: (snapshot: WorkshopReviewSnapshot) => void
+      reviewProvider.mockReturnValueOnce(new Promise(resolve => {
+        resolveSnapshot = resolve
+      }))
+      const callsBefore = reviewProvider.mock.calls.length
+      const publishRes = mockRes()
+      const publishing = handleWorkshopRoute(mockReq(
+        'POST',
+        `/api/workshop/cards/${cardDbId}/publish`,
+        { baseRevision: 1 },
+        'tok-alice',
+      ), publishRes)
+      await vi.waitFor(() => expect(reviewProvider).toHaveBeenCalledTimes(callsBefore + 1))
+
+      const current = loadWorkspace(db, cardDbId, 'u1')
+      const edited = checkpointDraft(db, {
+        cardId: cardDbId,
+        authorId: 'u1',
+        baseRevision: 1,
+        draft: {
+          ...current.draft,
+          name: 'Concurrent Review v2',
+          cardJson: {
+            ...current.draft.cardJson,
+            name: 'Concurrent Review v2',
+            desc: ['new review text'],
+          },
+        },
+      })
+      enterReview(db, {
+        cardId: cardDbId,
+        authorId: 'u1',
+        prUrl: (db.prepare(`
+          SELECT github_pr_url FROM workshop_cards WHERE id = ?
+        `).get(cardDbId) as { github_pr_url: string }).github_pr_url,
+        expectedRevision: edited.revision,
+        commitSha: 'new-head',
+      })
+      resolveSnapshot({
+        reviewDecision: 'APPROVED',
+        headRefOid: 'superseded-head',
+        baseRefName: 'main',
+        state: 'OPEN',
+        isDraft: false,
+        reviews: [{
+          id: 'superseded-review',
+          state: 'APPROVED',
+          commitOid: 'superseded-head',
+          authorCanPushToRepository: true,
+        }],
+      })
+      await publishing
+
+      expect(publishRes.statusCode).toBe(409)
+      expect(JSON.parse(publishRes.body)).toMatchObject({
+        ok: false,
+        code: 'review_stale',
+        current: {
+          revision: 2,
+          reviewStatus: 'in_review',
+          live: false,
+        },
+      })
+      expect(loadWorkspace(db, cardDbId, 'u1')).toMatchObject({
+        revision: 2,
+        reviewStatus: 'in_review',
+        live: false,
+      })
+    })
+
+    it('does not republish after a newer publish and unpublish complete', async () => {
+      const cardDbId = await createPublishedCard({
+        card_id: 'CUSTOM_ConcurrentUnpublish',
+        card_type: 'minor',
+        name: 'Concurrent Unpublish',
+        card_json: {
+          id: 'CUSTOM_ConcurrentUnpublish',
+          name: 'Concurrent Unpublish',
+          card_type: 'minor',
+          deck: 'CUSTOM',
+          number: 0,
+          desc: ['reviewed text'],
+        },
+      }, 'tok-alice')
+      unpublish(db, { cardId: cardDbId, authorId: 'u1', baseRevision: 1 })
+      let resolveSnapshot!: (snapshot: WorkshopReviewSnapshot) => void
+      reviewProvider.mockReturnValueOnce(new Promise(resolve => {
+        resolveSnapshot = resolve
+      }))
+      const callsBefore = reviewProvider.mock.calls.length
+      const publishRes = mockRes()
+      const publishing = handleWorkshopRoute(mockReq(
+        'POST',
+        `/api/workshop/cards/${cardDbId}/publish`,
+        { baseRevision: 1 },
+        'tok-alice',
+      ), publishRes)
+      await vi.waitFor(() => expect(reviewProvider).toHaveBeenCalledTimes(callsBefore + 1))
+
+      publish(db, { cardId: cardDbId, authorId: 'u1', baseRevision: 1 })
+      unpublish(db, { cardId: cardDbId, authorId: 'u1', baseRevision: 1 })
+      resolveSnapshot({
+        reviewDecision: 'APPROVED',
+        headRefOid: 'approved-head',
+        baseRefName: 'main',
+        state: 'OPEN',
+        isDraft: false,
+        reviews: [{
+          id: 'approved-review',
+          state: 'APPROVED',
+          commitOid: 'approved-head',
+          authorCanPushToRepository: true,
+        }],
+      })
+      await publishing
+
+      expect(publishRes.statusCode).toBe(409)
+      expect(JSON.parse(publishRes.body)).toMatchObject({
+        ok: false,
+        current: { live: false },
+      })
+      expect(loadWorkspace(db, cardDbId, 'u1').live).toBe(false)
     })
   })
 
@@ -604,7 +936,7 @@ const CARD_IMPL = {}
       }, 'tok-alice'), adoptRes)
       expect(JSON.parse(adoptRes.body).workspace.revision).toBe(2)
 
-      approveCurrentDraft(db, { cardId: cardDbId, authorId: 'u1' })
+      approveForPublish(cardDbId, 'u1', 2)
       const publishRes = mockRes()
       await handleWorkshopRoute(mockReq('POST', `/api/workshop/cards/${cardDbId}/publish`, {
         baseRevision: 2,

@@ -234,12 +234,17 @@ describe('GitHubClient', () => {
     })
   })
 
-  describe('findOpenPr / openPr / commentOnPr', () => {
+  describe('findOpenPr / openPr / closePr / commentOnPr', () => {
     it('findOpenPr returns first open PR matching head', async () => {
       fetchHandler = (url) => {
         if (url.includes('/pulls?head='))
           return okJson([
-            { number: 42, html_url: 'https://github.com/t/r/pull/42' },
+            {
+              number: 42,
+              html_url: 'https://github.com/t/r/pull/42',
+              base: { ref: 'release' },
+              draft: true,
+            },
           ])
         return new Response('', { status: 404 })
       }
@@ -249,7 +254,12 @@ describe('GitHubClient', () => {
         upstreamRepo: 'open-agricola',
       })
       const pr = await c.findOpenPr({ forkOwner: 'alice', branchName: 'workshop/CUSTOM_X' })
-      expect(pr).toEqual({ number: 42, url: 'https://github.com/t/r/pull/42' })
+      expect(pr).toEqual({
+        number: 42,
+        url: 'https://github.com/t/r/pull/42',
+        baseRefName: 'release',
+        isDraft: true,
+      })
     })
 
     it('findOpenPr returns null when no open PR', async () => {
@@ -280,7 +290,26 @@ describe('GitHubClient', () => {
         title: 'T',
         body: 'B',
       })
-      expect(pr).toEqual({ number: 99, url: 'https://github.com/t/r/pull/99' })
+      expect(pr).toEqual({
+        number: 99,
+        url: 'https://github.com/t/r/pull/99',
+        baseRefName: 'main',
+        isDraft: false,
+      })
+    })
+
+    it('closePr closes the existing PR', async () => {
+      fetchHandler = (_url, init) => {
+        expect(init?.method).toBe('PATCH')
+        expect(JSON.parse(String(init?.body))).toEqual({ state: 'closed' })
+        return okJson({}, 200)
+      }
+      const c = new GitHubClient({
+        token: 't',
+        upstreamOwner: 'titanxxh',
+        upstreamRepo: 'open-agricola',
+      })
+      await expect(c.closePr(42)).resolves.toBeUndefined()
     })
 
     it('commentOnPr posts a comment (best effort, no throw on failure)', async () => {

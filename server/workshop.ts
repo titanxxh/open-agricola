@@ -11,6 +11,7 @@ import {
   checkpointDraft,
   createCard,
   getHandoffReadiness,
+  invalidateReviewedCard,
   loadPublishedCard,
   loadWorkspace,
   markSandboxPass,
@@ -29,6 +30,26 @@ import {
   workshopCardJsonFromDefinition,
   type WorkshopDraftRequest,
 } from './workshop-draft-validation.ts'
+import {
+  GitHubReviewProvider,
+  findApprovedHeadReview,
+  type WorkshopReviewSnapshot,
+} from './workshop-review/github-review-provider.ts'
+import {
+  handleWorkshopReviewWebhook,
+  type WorkshopReviewRuntime,
+} from './workshop-review/webhook-handler.ts'
+
+const defaultReviewProvider = GitHubReviewProvider.fromEnv()
+const defaultReviewRuntime: WorkshopReviewRuntime | null = defaultReviewProvider
+  && process.env.WORKSHOP_REVIEW_GITHUB_WEBHOOK_SECRET?.trim()
+  ? {
+      webhookSecret: process.env.WORKSHOP_REVIEW_GITHUB_WEBHOOK_SECRET.trim(),
+      repositoryOwner: process.env.GITHUB_UPSTREAM_OWNER?.trim() || 'titanxxh',
+      repositoryName: process.env.GITHUB_UPSTREAM_REPO?.trim() || 'open-agricola',
+      provider: defaultReviewProvider,
+    }
+  : null
 
 const sendJson = (res: ServerResponse, status: number, payload: unknown) => {
   res.writeHead(status, {
@@ -301,9 +322,21 @@ const saveSandboxSettings = (userId: string, settings?: SandboxSettingsInput): S
 export async function handleWorkshopRoute(
   req: IncomingMessage,
   res: ServerResponse,
+  reviewRuntime: WorkshopReviewRuntime | null = defaultReviewRuntime,
 ): Promise<boolean> {
   const url = req.url ?? ''
-  if (!url.startsWith('/api/workshop/') && !url.startsWith('/api/admin/')) return false
+  if (
+    url !== '/api/github/webhook'
+    && !url.startsWith('/api/workshop/')
+    && !url.startsWith('/api/admin/')
+  ) return false
+  if (url === '/api/github/webhook') {
+    if (!reviewRuntime) {
+      sendJson(res, 503, { ok: false, code: 'github_review_unavailable' })
+      return true
+    }
+    return handleWorkshopReviewWebhook(req, res, getDb(), reviewRuntime)
+  }
   const routeUrl = new URL(url, 'http://localhost')
 
   const token = extractToken(req.headers.authorization)
@@ -329,15 +362,20 @@ export async function handleWorkshopRoute(
   // upstream from the author's fork, after the quality gate passes.
   const submitReviewMatch = /^\/api\/workshop\/cards\/([^/]+)\/submit-review$/.exec(url)
   if (req.method === 'POST' && submitReviewMatch) {
-    await handleSubmitReviewRequest(req, res, submitReviewMatch[1]!)
+    await handleSubmitReviewRequest(
+      req,
+      res,
+      submitReviewMatch[1]!,
+      reviewRuntime?.provider,
+    )
     return true
   }
 
   // ── POST /api/workshop/cards/:id/refresh-pr-status ──────────────────────
-  // Queries GitHub (anonymously) to sync cached PR state.
+  // Queries the GitHub App to sync cached PR and review state.
   const refreshMatch = /^\/api\/workshop\/cards\/([^/]+)\/refresh-pr-status$/.exec(url)
   if (req.method === 'POST' && refreshMatch) {
-    await handleRefreshPrStatus(req, res, refreshMatch[1]!)
+    await handleRefreshPrStatus(req, res, refreshMatch[1]!, reviewRuntime?.provider)
     return true
   }
 
@@ -611,15 +649,94 @@ export async function handleWorkshopRoute(
   if (req.method === 'POST' && publishMatch) {
     if (!user) { sendJson(res, 401, { ok: false, error: 'Not authenticated' }); return true }
     const body = await parseBody<{ baseRevision?: unknown }>(req)
-    if (!Number.isInteger(body?.baseRevision)) {
+    const baseRevision = body?.baseRevision
+    if (!Number.isInteger(baseRevision)) {
       sendJson(res, 400, { ok: false, error: 'Missing baseRevision' })
       return true
     }
     try {
+      const workspace = loadWorkspace(db, publishMatch[1]!, user.id)
+      if (workspace.revision !== baseRevision) {
+        throw new WorkshopDraftError('conflict', 'Draft revision conflict', workspace)
+      }
+      if (workspace.reviewStatus !== 'approved' || !workspace.approvedVersionId) {
+        throw new WorkshopDraftError(
+          'not_ready',
+          'Card must pass PR review approval before it can be published',
+          workspace,
+        )
+      }
+      if (!reviewRuntime) {
+        sendJson(res, 503, { ok: false, code: 'github_review_unavailable' })
+        return true
+      }
+      const binding = db.prepare(`
+        SELECT github_pr_url, approved_commit_sha, approved_version_id,
+               review_commit_sha, review_version_id, updated_at
+        FROM workshop_cards WHERE id = ?
+      `).get(publishMatch[1]!) as {
+        github_pr_url: string | null
+        approved_commit_sha: string | null
+        approved_version_id: string | null
+        review_commit_sha: string | null
+        review_version_id: string | null
+        updated_at: number
+      }
+      const prUrl = binding.github_pr_url
+      let prNumber: number | null = null
+      if (prUrl) {
+        try {
+          const parsed = new URL(prUrl)
+          const match = /^\/([^/]+)\/([^/]+)\/pull\/(\d+)$/.exec(parsed.pathname)
+          if (
+            parsed.protocol === 'https:'
+            && parsed.hostname === 'github.com'
+            && match?.[1]?.toLowerCase() === reviewRuntime.repositoryOwner.toLowerCase()
+            && match[2]?.toLowerCase() === reviewRuntime.repositoryName.toLowerCase()
+          ) prNumber = Number(match[3])
+        } catch {
+          prNumber = null
+        }
+      }
+      if (!prUrl || !Number.isSafeInteger(prNumber) || prNumber! <= 0) {
+        sendJson(res, 409, { ok: false, code: 'review_stale' })
+        return true
+      }
+      let snapshot: WorkshopReviewSnapshot
+      try {
+        snapshot = await reviewRuntime.provider.getPullRequestSnapshot(prNumber!)
+      } catch {
+        sendJson(res, 503, { ok: false, code: 'github_review_unavailable' })
+        return true
+      }
+      const approvedReview = findApprovedHeadReview(snapshot)
+      if (
+        !approvedReview
+        || snapshot.headRefOid !== binding.approved_commit_sha
+        || snapshot.headRefOid !== binding.review_commit_sha
+        || binding.approved_version_id !== binding.review_version_id
+      ) {
+        invalidateReviewedCard(db, {
+          prUrl,
+          expectedBinding: {
+            id: workspace.id,
+            revision: workspace.revision,
+            approvedCommitSha: binding.approved_commit_sha,
+            approvedVersionId: binding.approved_version_id,
+            reviewCommitSha: binding.review_commit_sha,
+            reviewVersionId: binding.review_version_id,
+            updatedAt: binding.updated_at,
+          },
+        })
+        const current = loadWorkspace(db, publishMatch[1]!, user.id)
+        sendJson(res, 409, { ok: false, code: 'review_stale', current })
+        return true
+      }
       const result = publish(db, {
         cardId: publishMatch[1]!,
         authorId: user.id,
-        baseRevision: body!.baseRevision as number,
+        baseRevision: baseRevision as number,
+        expectedUpdatedAt: binding.updated_at,
       })
       sendJson(res, 200, { ok: true, ...result })
     } catch (error) {

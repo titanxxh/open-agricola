@@ -53,6 +53,8 @@ db.exec(`
     github_pr_url TEXT,
     github_pr_status TEXT,
     github_pr_last_synced_at INTEGER,
+    review_commit_sha TEXT,
+    review_version_id TEXT,
     draft_revision INTEGER NOT NULL DEFAULT 1,
     draft_generation_json TEXT NOT NULL DEFAULT '{}',
     approved_commit_sha TEXT,
@@ -101,6 +103,7 @@ import { handleSubmitReviewRequest, handleRefreshPrStatus } from '../workshop-pr
 import { handleOAuthCallback } from '../workshop-pr/oauth-handler.ts'
 import { tokenCache } from '../workshop-pr/token-cache.ts'
 import { workshopPrConfig } from '../workshop-pr/config.ts'
+import { enterReview } from '../workshop-drafts.ts'
 
 // ── HTTP mock helpers ──────────────────────────────────────────────────────
 
@@ -199,13 +202,19 @@ export const catalogCardDefinitions = [
 type StubOpts = {
   githubLogin: string
   /** If given, findOpenPr returns this PR; openPr call should NOT happen. */
-  existingPr?: { number: number; url: string } | null
+  existingPr?: {
+    number: number
+    url: string
+    baseRefName?: string
+    isDraft?: boolean
+  } | null
   /** Used when openPr is invoked. */
   openedPr?: { number: number; url: string }
 }
 
 type StubCounts = {
   openPrCalls: number
+  closePrCalls: number
   findPrCalls: number
   blobCalls: number
   commitCalls: number
@@ -220,6 +229,7 @@ function createGitHubApiStub(opts: StubOpts): {
   const upstream = `${workshopPrConfig.upstreamOwner}/${workshopPrConfig.upstreamRepo}`
   const counts: StubCounts = {
     openPrCalls: 0,
+    closePrCalls: 0,
     findPrCalls: 0,
     blobCalls: 0,
     commitCalls: 0,
@@ -321,7 +331,7 @@ function createGitHubApiStub(opts: StubOpts): {
       counts.commitCalls++
       return Promise.resolve(
         new Response(
-          JSON.stringify({ sha: `commit_${Math.random().toString(36).slice(2, 8)}` }),
+          JSON.stringify({ sha: `commit_${counts.commitCalls}` }),
           { status: 201 },
         ),
       )
@@ -350,11 +360,21 @@ function createGitHubApiStub(opts: StubOpts): {
       return Promise.resolve(
         new Response(
           JSON.stringify(
-            list.map((p) => ({ number: p.number, html_url: p.url })),
+            list.map((p) => ({
+              number: p.number,
+              html_url: p.url,
+              base: { ref: p.baseRefName ?? 'main' },
+              draft: p.isDraft ?? false,
+            })),
           ),
           { status: 200 },
         ),
       )
+    }
+
+    if (url.match(/\/pulls\/\d+$/) && method === 'PATCH') {
+      counts.closePrCalls++
+      return Promise.resolve(new Response(JSON.stringify({}), { status: 200 }))
     }
 
     // Comment on existing PR (issues/:n/comments)
@@ -381,6 +401,17 @@ function createGitHubApiStub(opts: StubOpts): {
 
   return { fn, counts }
 }
+
+const reviewRequiredProvider = (headRefOid = 'commit_2') => ({
+  getPullRequestSnapshot: vi.fn().mockResolvedValue({
+    reviewDecision: null,
+    headRefOid,
+    baseRefName: 'main',
+    state: 'OPEN',
+    isDraft: false,
+    reviews: [],
+  }),
+})
 
 // ── Test scaffolding ───────────────────────────────────────────────────────
 
@@ -652,7 +683,7 @@ describe('workshop PR propose — session', () => {
     ).get(cardDbId)).toEqual({ github_pr_url: null })
   })
 
-  it('happy path: first-time propose creates PR, updates DB, audit=success', async () => {
+  it('happy path: first-time propose creates PR and reconciles an early approval', async () => {
     process.env.CORS_ORIGIN = 'https://frontend.example'
     // Phase 1 — no handshakeId yet → 200 { needsAuth: true, handshakeId }
     const req1 = fakeReq({
@@ -662,7 +693,7 @@ describe('workshop PR propose — session', () => {
       body: JSON.stringify({}),
     })
     const res1 = fakeRes()
-    await handleSubmitReviewRequest(req1, res1, cardDbId)
+    await handleSubmitReviewRequest(req1, res1, cardDbId, reviewRequiredProvider())
     expect(res1.statusCode).toBe(200)
     expect(res1.headers['Access-Control-Allow-Origin']).toBe('https://frontend.example')
     expect(res1.headers['Access-Control-Allow-Credentials']).toBe('true')
@@ -716,7 +747,27 @@ describe('workshop PR propose — session', () => {
       body: JSON.stringify({ handshakeId: j1.handshakeId }),
     })
     const res2 = fakeRes()
-    await handleSubmitReviewRequest(req2, res2, cardDbId)
+    const reviewProvider = {
+      getPullRequestSnapshot: vi.fn().mockResolvedValue({
+        reviewDecision: 'APPROVED',
+        headRefOid: 'commit_2',
+        baseRefName: 'main',
+        state: 'OPEN',
+        isDraft: false,
+        reviews: [{
+          id: 'early-review',
+          state: 'APPROVED',
+          commitOid: 'commit_2',
+          authorCanPushToRepository: true,
+        }],
+      }),
+    }
+    await handleSubmitReviewRequest(
+      req2,
+      res2,
+      cardDbId,
+      reviewProvider,
+    )
     expect(res2.statusCode).toBe(200)
     const j2 = JSON.parse(res2.body) as {
       ok: boolean
@@ -739,11 +790,18 @@ describe('workshop PR propose — session', () => {
     // DB state: PR URL + status set.
     const row = db
       .prepare(
-        `SELECT github_pr_url, github_pr_status FROM workshop_cards WHERE id = ?`,
+        `SELECT github_pr_url, github_pr_status, review_status
+         FROM workshop_cards WHERE id = ?`,
       )
-      .get(cardDbId) as { github_pr_url: string; github_pr_status: string }
+      .get(cardDbId) as {
+        github_pr_url: string
+        github_pr_status: string
+        review_status: string
+      }
     expect(row.github_pr_url).toContain('/pull/42')
     expect(row.github_pr_status).toBe('open')
+    expect(row.review_status).toBe('approved')
+    expect(reviewProvider.getPullRequestSnapshot).toHaveBeenCalledWith(42)
 
     // Audit log: start + success.
     const audits = db
@@ -761,6 +819,58 @@ describe('workshop PR propose — session', () => {
       )
       .get(userId) as { last_propose_at: number } | undefined
     expect(rate?.last_propose_at).toBeGreaterThan(0)
+  })
+
+  it('rejects a real submission when the review runtime is unavailable', async () => {
+    const res = fakeRes()
+    await handleSubmitReviewRequest(fakeReq({
+      method: 'POST',
+      url: `/api/workshop/cards/${cardDbId}/submit-review`,
+      authHeader: `Bearer ${userToken}`,
+      body: JSON.stringify({}),
+    }), res, cardDbId)
+
+    expect(res.statusCode).toBe(503)
+    expect(JSON.parse(res.body)).toMatchObject({
+      ok: false,
+      code: 'github_review_unavailable',
+    })
+  })
+
+  it('keeps the PR submission successful when post-bind reconciliation fails', async () => {
+    const hs = tokenCache.allocateHandshakeId(userId)
+    tokenCache.bind(hs, 'ghp_mock')
+    const { fn: gh } = createGitHubApiStub({
+      githubLogin: 'workshopuser',
+      openedPr: {
+        number: 42,
+        url: 'https://github.com/titanxxh/open-agricola/pull/42',
+      },
+    })
+    vi.stubGlobal('fetch', gh)
+    const res = fakeRes()
+
+    await handleSubmitReviewRequest(fakeReq({
+      method: 'POST',
+      url: `/api/workshop/cards/${cardDbId}/submit-review`,
+      authHeader: `Bearer ${userToken}`,
+      body: JSON.stringify({ handshakeId: hs }),
+    }), res, cardDbId, {
+      getPullRequestSnapshot: vi.fn().mockRejectedValue(new Error('temporary failure')),
+    })
+
+    expect(JSON.parse(res.body)).toMatchObject({
+      ok: true,
+      prNumber: 42,
+      reconciliationPending: true,
+    })
+    expect(db.prepare(
+      'SELECT review_status FROM workshop_cards WHERE id = ?',
+    ).get(cardDbId)).toEqual({ review_status: 'in_review' })
+    expect(db.prepare(
+      `SELECT action FROM github_propose_audit
+       WHERE workshop_card_id = ? ORDER BY rowid`,
+    ).all(cardDbId)).toEqual([{ action: 'start' }, { action: 'success' }])
   })
 
   // ── C-25: upsert path ────────────────────────────────────────────────────
@@ -794,7 +904,7 @@ describe('workshop PR propose — session', () => {
       body: JSON.stringify({ handshakeId: hs }),
     })
     const res = fakeRes()
-    await handleSubmitReviewRequest(req, res, cardDbId)
+    await handleSubmitReviewRequest(req, res, cardDbId, reviewRequiredProvider())
     expect(res.statusCode).toBe(200)
     const j = JSON.parse(res.body) as {
       ok: boolean
@@ -826,6 +936,105 @@ describe('workshop PR propose — session', () => {
     expect(audits.map((a) => a.action)).toEqual(['start', 'success'])
   })
 
+  it.each([
+    ['draft', { isDraft: true }],
+    ['non-main', { baseRefName: 'release' }],
+  ])('replaces an existing %s PR before rebinding', async (_case, existingPrState) => {
+    const hs = tokenCache.allocateHandshakeId(userId)
+    tokenCache.bind(hs, 'ghp_mock')
+    const { fn: gh, counts } = createGitHubApiStub({
+      githubLogin: 'workshopuser',
+      existingPr: {
+        number: 99,
+        url: 'https://github.com/titanxxh/open-agricola/pull/99',
+        ...existingPrState,
+      },
+      openedPr: {
+        number: 100,
+        url: 'https://github.com/titanxxh/open-agricola/pull/100',
+      },
+    })
+    vi.stubGlobal('fetch', gh)
+    const res = fakeRes()
+
+    await handleSubmitReviewRequest(fakeReq({
+      method: 'POST',
+      url: `/api/workshop/cards/${cardDbId}/submit-review`,
+      authHeader: `Bearer ${userToken}`,
+      body: JSON.stringify({ handshakeId: hs }),
+    }), res, cardDbId, reviewRequiredProvider())
+
+    expect(JSON.parse(res.body)).toMatchObject({ ok: true, prNumber: 100 })
+    expect(counts.closePrCalls).toBe(1)
+    expect(counts.openPrCalls).toBe(1)
+  })
+
+  it('reconciles a missed approval through the existing refresh endpoint', async () => {
+    const prUrl = 'https://github.com/titanxxh/open-agricola/pull/42'
+    enterReview(db, {
+      cardId: cardDbId,
+      authorId: userId,
+      prUrl,
+      expectedRevision: 1,
+      commitSha: 'review-head',
+    })
+    db.prepare(
+      'UPDATE workshop_cards SET github_pr_last_synced_at = NULL WHERE id = ?',
+    ).run(cardDbId)
+    const res = fakeRes()
+
+    await handleRefreshPrStatus(fakeReq({
+      method: 'POST',
+      url: `/api/workshop/cards/${cardDbId}/refresh-pr-status`,
+      authHeader: `Bearer ${userToken}`,
+    }), res, cardDbId, {
+      getPullRequestSnapshot: vi.fn().mockResolvedValue({
+        reviewDecision: 'APPROVED',
+        headRefOid: 'review-head',
+        baseRefName: 'main',
+        state: 'OPEN',
+        isDraft: false,
+        reviews: [{
+          id: 'missed-approval',
+          state: 'APPROVED',
+          commitOid: 'review-head',
+          authorCanPushToRepository: true,
+        }],
+      }),
+    })
+
+    expect(JSON.parse(res.body)).toEqual({ ok: true, status: 'open' })
+    expect(db.prepare(
+      'SELECT review_status FROM workshop_cards WHERE id = ?',
+    ).get(cardDbId)).toEqual({ review_status: 'approved' })
+  })
+
+  it('invalidates a moved review head through the existing refresh endpoint', async () => {
+    const prUrl = 'https://github.com/titanxxh/open-agricola/pull/42'
+    enterReview(db, {
+      cardId: cardDbId,
+      authorId: userId,
+      prUrl,
+      expectedRevision: 1,
+      commitSha: 'review-head',
+    })
+    db.prepare(
+      'UPDATE workshop_cards SET github_pr_last_synced_at = NULL WHERE id = ?',
+    ).run(cardDbId)
+    const res = fakeRes()
+
+    await handleRefreshPrStatus(fakeReq({
+      method: 'POST',
+      url: `/api/workshop/cards/${cardDbId}/refresh-pr-status`,
+      authHeader: `Bearer ${userToken}`,
+    }), res, cardDbId, reviewRequiredProvider('moved-head'))
+
+    expect(JSON.parse(res.body)).toEqual({ ok: true, status: 'open' })
+    expect(db.prepare(
+      'SELECT review_status FROM workshop_cards WHERE id = ?',
+    ).get(cardDbId)).toEqual({ review_status: 'stale' })
+  })
+
   // ── C-26: rate limit ─────────────────────────────────────────────────────
 
   it('rate limit: second propose within 10 minutes returns 429', async () => {
@@ -842,7 +1051,7 @@ describe('workshop PR propose — session', () => {
       body: JSON.stringify({}),
     })
     const res = fakeRes()
-    await handleSubmitReviewRequest(req, res, cardDbId)
+    await handleSubmitReviewRequest(req, res, cardDbId, reviewRequiredProvider())
     expect(res.statusCode).toBe(429)
     const j = JSON.parse(res.body) as {
       ok: boolean
