@@ -49,6 +49,8 @@ const addWoodToPlayerA = async (page: Page, amount: number) => {
 }
 
 test.describe('browser-local sandbox', () => {
+  test.skip(process.env.VITE_SANDBOX_EXECUTOR !== 'browser', 'run with VITE_SANDBOX_EXECUTOR=browser')
+
   test('boots locally with zero server calls and both seats visible', async ({ page }) => {
     const gameApiCalls = await seedAndOpen(page)
     // Debug viewer renders every seat — a single player drives all of them.

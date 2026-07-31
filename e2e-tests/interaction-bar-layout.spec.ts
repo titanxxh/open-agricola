@@ -1,8 +1,5 @@
 import { expect, test, type Page } from '@playwright/test'
 
-const actionCard = (page: Page, name: string) =>
-  page.locator('.action-card', { hasText: name })
-
 const bottomGap = async (page: Page) => {
   await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight))
   return page.evaluate(() => {
@@ -45,7 +42,7 @@ test.describe('Interaction bar layout', () => {
     })
     await page.goto('/?page=game&player=p1&embedded=1&devMode=1')
     await page.getByRole('button', { name: 'Reset' }).click()
-    await expect(actionCard(page, 'Farmland')).toBeEnabled()
+    await expect(page.locator('[data-mobile-action-id="farmland"]')).toBeEnabled()
   })
 
   test('keeps the last game content above a compact interaction bar at 768px', async ({ page }) => {
@@ -53,7 +50,7 @@ test.describe('Interaction bar layout', () => {
   })
 
   test('updates the reserved space when the interaction bar expands and shrinks', async ({ page }) => {
-    await actionCard(page, 'Farmland').click()
+    await page.locator('[data-mobile-action-id="farmland"]').click()
     await expect(page.locator('.interaction-bar__body')).toContainText('Select a tile to plow')
 
     await expectPageMarginAboveInteractionBar(page)
