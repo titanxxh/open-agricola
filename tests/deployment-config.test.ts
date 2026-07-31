@@ -40,6 +40,11 @@ describe('production deployment config', () => {
     const compose = readFileSync('docker-compose.prod.yml', 'utf8')
     expect(compose).toContain('REPLAY_TRUST_PROXY=true')
     expect(compose).toContain('app-data:/app/data')
+    for (const composePath of ['docker-compose.yml', 'docker-compose.prod.yml']) {
+      expect(readFileSync(composePath, 'utf8')).toContain(
+        'BGA_CDN_BASE_URL=${BGA_CDN_BASE_URL:-}',
+      )
+    }
   })
 
   it('builds both frontends from the configured BGA CDN without checking out artwork', () => {
