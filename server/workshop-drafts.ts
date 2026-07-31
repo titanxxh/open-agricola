@@ -807,7 +807,19 @@ export function approveCurrentDraft(
 
 export function invalidateReviewedCard(
   db: Database.Database,
-  input: { prUrl: string; prStatus?: string; preserveCommitSha?: string },
+  input: {
+    prUrl: string
+    prStatus?: string
+    preserveCommitSha?: string
+    expectedBinding?: {
+      id: string
+      revision: number
+      approvedCommitSha: string | null
+      approvedVersionId: string | null
+      reviewCommitSha: string | null
+      reviewVersionId: string | null
+    }
+  },
 ): number {
   const now = Date.now()
   return db.prepare(`
@@ -820,6 +832,16 @@ export function invalidateReviewedCard(
     WHERE github_pr_url = ?
       AND review_status IN ('in_review', 'approved')
       AND (? IS NULL OR review_commit_sha IS NULL OR review_commit_sha <> ?)
+      AND (
+        ? IS NULL OR (
+          id = ?
+          AND draft_revision = ?
+          AND approved_commit_sha IS ?
+          AND approved_version_id IS ?
+          AND review_commit_sha IS ?
+          AND review_version_id IS ?
+        )
+      )
   `).run(
     input.prStatus ?? 'open',
     now,
@@ -827,6 +849,13 @@ export function invalidateReviewedCard(
     input.prUrl,
     input.preserveCommitSha ?? null,
     input.preserveCommitSha ?? null,
+    input.expectedBinding?.id ?? null,
+    input.expectedBinding?.id ?? null,
+    input.expectedBinding?.revision ?? null,
+    input.expectedBinding?.approvedCommitSha ?? null,
+    input.expectedBinding?.approvedVersionId ?? null,
+    input.expectedBinding?.reviewCommitSha ?? null,
+    input.expectedBinding?.reviewVersionId ?? null,
   ).changes
 }
 

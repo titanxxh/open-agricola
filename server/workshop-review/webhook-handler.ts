@@ -146,19 +146,26 @@ export async function handleWorkshopReviewWebhook(
     return true
   }
 
-  const invalidatesReview =
-    eventName === 'pull_request' && payload.action === 'synchronize'
+  const revalidatesReview =
+    eventName === 'pull_request' && (
+      payload.action === 'synchronize'
+      || payload.action === 'edited'
+      || payload.action === 'converted_to_draft'
+    )
+    || eventName === 'pull_request_review' && payload.action === 'dismissed'
+  const invalidatesReview = revalidatesReview
     || eventName === 'pull_request'
       && payload.action === 'closed'
       && payload.pull_request?.merged !== true
-    || eventName === 'pull_request_review' && payload.action === 'dismissed'
   if (invalidatesReview) {
-    let synchronizedHead: string | undefined
-    if (eventName === 'pull_request' && payload.action === 'synchronize') {
+    let preserveCommitSha: string | undefined
+    if (revalidatesReview) {
       try {
-        synchronizedHead = (await runtime.provider.getPullRequestSnapshot(
-          prNumber as number,
-        )).headRefOid
+        const snapshot = await runtime.provider.getPullRequestSnapshot(prNumber as number)
+        const remainsValid = eventName === 'pull_request_review'
+          ? Boolean(findApprovedHeadReview(snapshot))
+          : isReviewTargetEligible(snapshot)
+        if (remainsValid) preserveCommitSha = snapshot.headRefOid
       } catch {
         sendJson(res, 503, { ok: false, code: 'github_review_unavailable' })
         return true
@@ -174,7 +181,7 @@ export async function handleWorkshopReviewWebhook(
       const invalidated = invalidateReviewedCard(db, {
         prUrl,
         ...(payload.action === 'closed' ? { prStatus: 'closed' } : {}),
-        ...(synchronizedHead ? { preserveCommitSha: synchronizedHead } : {}),
+        ...(preserveCommitSha ? { preserveCommitSha } : {}),
       })
       return { invalidated }
     })()
