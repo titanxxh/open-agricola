@@ -2055,7 +2055,6 @@ export function AiCardDesigner({
   const handoffReady = Boolean(
     handoffInputsReady
     && workspaceState?.sandboxPassVersionId
-    && workspaceState.sandboxPassVersionId === workspaceState.session.sandboxTestVersionId
   )
   const readiness: Record<WorkshopStage, boolean> = {
     metadata: metadataReady,

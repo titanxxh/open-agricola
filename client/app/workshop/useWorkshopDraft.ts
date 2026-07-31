@@ -468,9 +468,25 @@ export const useWorkshopDraft = ({
       if (!response.ok || !payload.workspace || !payload.versionId) {
         // A rejected publish may have downgraded the card (e.g. stale after a
         // failed snapshot re-check) — hydrate the server state so the UI
-        // reflects the new review status instead of a phantom 'approved'.
+        // reflects the new review status, but keep any edits typed while the
+        // request was in flight (same merge as the success path).
         if (payload.current) {
-          dispatch({ type: 'checkpointSaved', workspace: payload.current })
+          const latest = stateRef.current
+          const applied = workshopDraftReducer(latest ?? current, {
+            type: 'checkpointSaved',
+            workspace: payload.current,
+          })
+          const next = latest && latest.draft !== applied.draft
+            ? {
+                ...applied,
+                draft: latest.draft,
+                sandboxPassVersionId: latest.sandboxPassVersionId,
+                sandboxPassedAt: latest.sandboxPassedAt,
+                save: { status: 'dirty' as const },
+              }
+            : applied
+          dispatch({ type: 'serverLoaded', state: next })
+          persist(next)
         }
         dispatch({
           type: 'saveFailed',
@@ -553,7 +569,13 @@ export const useWorkshopDraft = ({
 
   const unpublishDraft = useCallback(async (): Promise<boolean> => {
     const current = stateRef.current
-    if (!current || current.save.status === 'conflict') return false
+    if (!current) return false
+    // Unpublish is the escape hatch from the live edit block, and the author
+    // may arrive here from a live-save conflict: use the freshest known
+    // server revision instead of refusing to act.
+    const baseRevision = current.save.status === 'conflict' && current.conflict
+      ? current.conflict.server.revision
+      : current.baseRevision
     dispatch({ type: 'saving' })
     try {
       const response = await apiFetch(
@@ -561,10 +583,18 @@ export const useWorkshopDraft = ({
         {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ baseRevision: current.baseRevision }),
+          body: JSON.stringify({ baseRevision }),
         },
       )
       const payload = await response.json() as WorkspaceResponse
+      if (response.status === 409 && payload.current) {
+        dispatch({
+          type: 'conflictDetected',
+          server: payload.current,
+          local: toLocalRecovery(current),
+        })
+        return false
+      }
       if (!response.ok || !payload.workspace) {
         dispatch({
           type: 'saveFailed',
