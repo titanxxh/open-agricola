@@ -1,6 +1,6 @@
 // Workshop → Main Repo PR integration: client-side helpers.
 //
-// Wraps the three backend endpoints (/api/workshop/cards/:id/propose,
+// Wraps the backend endpoints (/api/workshop/cards/:id/submit-review,
 // /api/workshop/cards/:id/refresh-pr-status) plus an OAuth popup helper
 // that listens for the callback's postMessage.
 
@@ -35,7 +35,7 @@ export type ProposeFailure = {
 export type ProposeResponse = ProposeNeedsAuth | ProposeSuccess | ProposeFailure
 
 export async function startPropose(cardDbId: string): Promise<ProposeResponse> {
-  const r = await apiFetch(`/api/workshop/cards/${cardDbId}/propose`, {
+  const r = await apiFetch(`/api/workshop/cards/${cardDbId}/submit-review`, {
     method: 'POST',
     body: JSON.stringify({}),
     headers: { 'Content-Type': 'application/json' },
@@ -44,7 +44,7 @@ export async function startPropose(cardDbId: string): Promise<ProposeResponse> {
 }
 
 export async function completePropose(cardDbId: string, handshakeId: string): Promise<ProposeResponse> {
-  const r = await apiFetch(`/api/workshop/cards/${cardDbId}/propose`, {
+  const r = await apiFetch(`/api/workshop/cards/${cardDbId}/submit-review`, {
     method: 'POST',
     body: JSON.stringify({ handshakeId }),
     headers: { 'Content-Type': 'application/json' },

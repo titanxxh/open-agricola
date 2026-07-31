@@ -81,21 +81,21 @@ describe('WorkshopPage PR action state', () => {
     const state = getWorkshopPrActionState({
       enabled: true,
       isAuthor: true,
-      live: false,
+      reviewStatus: 'unsubmitted',
       githubPrUrl: null,
       githubPrStatus: null,
     })
 
     expect(state.visible).toBe(true)
-    expect(state.disabled).toBe(true)
-    expect(state.buttonLabel).toBe('先过审并上线后可发起 PR')
+    expect(state.disabled).toBe(false)
+    expect(state.buttonLabel).toBe('提交审核（发起 PR）')
   })
 
-  it('allows published author cards to start a PR', () => {
+  it('allows unsubmitted author cards to start review', () => {
     const state = getWorkshopPrActionState({
       enabled: true,
       isAuthor: true,
-      live: true,
+      reviewStatus: 'unsubmitted',
       githubPrUrl: null,
       githubPrStatus: null,
       localesComplete: true,
@@ -103,14 +103,14 @@ describe('WorkshopPage PR action state', () => {
 
     expect(state.visible).toBe(true)
     expect(state.disabled).toBe(false)
-    expect(state.buttonLabel).toBe('发起 PR 到主仓库')
+    expect(state.buttonLabel).toBe('提交审核（发起 PR）')
   })
 
   it('blocks PR submission when zh locale is missing', () => {
     const state = getWorkshopPrActionState({
       enabled: true,
       isAuthor: true,
-      live: true,
+      reviewStatus: 'unsubmitted',
       githubPrUrl: null,
       githubPrStatus: null,
       localesComplete: false,
@@ -126,7 +126,7 @@ describe('WorkshopPage PR action state', () => {
     const state = getWorkshopPrActionState({
       enabled: true,
       isAuthor: true,
-      live: true,
+      reviewStatus: 'unsubmitted',
       handoffReady: false,
       localesComplete: true,
     })
@@ -142,7 +142,7 @@ describe('WorkshopPage PR action state', () => {
     const state = getWorkshopPrActionState({
       enabled: true,
       isAuthor: true,
-      live: true,
+      reviewStatus: 'unsubmitted',
       githubPrUrl: null,
       githubPrStatus: null,
     })
