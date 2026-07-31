@@ -95,6 +95,27 @@ const parseJson = async <T>(response: Response): Promise<T> => {
   }
 }
 
+export const createGitHubAppJwt = (
+  appId: string,
+  privateKey: string,
+  nowMs: number,
+): string => {
+  const now = Math.floor(nowMs / 1000)
+  const encode = (value: unknown) =>
+    Buffer.from(JSON.stringify(value)).toString('base64url')
+  const unsigned = `${encode({ alg: 'RS256', typ: 'JWT' })}.${encode({
+    iat: now - 60,
+    exp: now + 540,
+    iss: appId,
+  })}`
+  const signature = sign(
+    'RSA-SHA256',
+    Buffer.from(unsigned),
+    privateKey,
+  ).toString('base64url')
+  return `${unsigned}.${signature}`
+}
+
 const retryAt = (response: Response, now: number): number | undefined => {
   const rawRetryAfter = response.headers.get('retry-after')
   if (rawRetryAfter) {
@@ -524,20 +545,11 @@ export class GitHubIssueClient {
   }
 
   private appJwt(): string {
-    const now = Math.floor(this.now() / 1000)
-    const encode = (value: unknown) =>
-      Buffer.from(JSON.stringify(value)).toString('base64url')
-    const unsigned = `${encode({ alg: 'RS256', typ: 'JWT' })}.${encode({
-      iat: now - 60,
-      exp: now + 540,
-      iss: this.options.appId,
-    })}`
-    const signature = sign(
-      'RSA-SHA256',
-      Buffer.from(unsigned),
+    return createGitHubAppJwt(
+      this.options.appId,
       this.options.privateKey,
-    ).toString('base64url')
-    return `${unsigned}.${signature}`
+      this.now(),
+    )
   }
 
   private async issueToken(

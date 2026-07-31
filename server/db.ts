@@ -858,6 +858,22 @@ export function runMigrations(db: Database.Database): void {
         `)
       },
     },
+    {
+      version: 27,
+      run: (database) => {
+        const columns = database.pragma('table_info(workshop_cards)') as Array<{ name: string }>
+        if (columns.length === 0) return
+        database.exec(`
+          ALTER TABLE workshop_cards ADD COLUMN review_commit_sha TEXT;
+          ALTER TABLE workshop_cards ADD COLUMN review_version_id TEXT;
+          CREATE TABLE github_webhook_events (
+            delivery_id TEXT PRIMARY KEY,
+            event_name TEXT NOT NULL,
+            received_at INTEGER NOT NULL
+          );
+        `)
+      },
+    },
   ]
 
   const insert = db.prepare('INSERT INTO schema_version (version) VALUES (?)')
