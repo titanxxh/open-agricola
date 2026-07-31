@@ -681,6 +681,11 @@ export function restoreVersion(
  * version and enter review_status 'approved'. This is the only doorway to
  * 'approved' — driven by the GitHub review-approval sync (#640); until that
  * lands it is exercised directly by tests.
+ *
+ * The caller owns the commit↔content binding: the #640 sync must verify the
+ * atomic snapshot rule (#629 — approved review commit oid == PR head ==
+ * content this call pins) before invoking, or reject the approval when the
+ * current draft no longer matches the reviewed commit.
  */
 export function approveCurrentDraft(
   db: Database.Database,
