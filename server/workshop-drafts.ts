@@ -807,7 +807,7 @@ export function approveCurrentDraft(
 
 export function invalidateReviewedCard(
   db: Database.Database,
-  input: { prUrl: string; prStatus?: string },
+  input: { prUrl: string; prStatus?: string; preserveCommitSha?: string },
 ): number {
   const now = Date.now()
   return db.prepare(`
@@ -819,7 +819,15 @@ export function invalidateReviewedCard(
         updated_at = ?
     WHERE github_pr_url = ?
       AND review_status IN ('in_review', 'approved')
-  `).run(input.prStatus ?? 'open', now, now, input.prUrl).changes
+      AND (? IS NULL OR review_commit_sha IS NULL OR review_commit_sha <> ?)
+  `).run(
+    input.prStatus ?? 'open',
+    now,
+    now,
+    input.prUrl,
+    input.preserveCommitSha ?? null,
+    input.preserveCommitSha ?? null,
+  ).changes
 }
 
 export function approveReviewedVersion(

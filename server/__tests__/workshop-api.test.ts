@@ -168,6 +168,7 @@ let handleWorkshopRoute: (req: IncomingMessage, res: ServerResponse) => Promise<
 const reviewProvider = vi.fn(async () => ({
   reviewDecision: 'APPROVED',
   headRefOid: 'approved-head',
+  baseRefName: 'main',
   reviews: [{
     id: 'approved-review',
     state: 'APPROVED',
@@ -421,6 +422,7 @@ describe('workshop API', () => {
         {
           reviewDecision: 'APPROVED',
           headRefOid: 'new-head',
+          baseRefName: 'main',
           reviews: [{
             id: 'new-review',
             state: 'APPROVED',
@@ -435,11 +437,27 @@ describe('workshop API', () => {
         {
           reviewDecision: 'APPROVED',
           headRefOid: 'approved-head',
+          baseRefName: 'main',
           reviews: [{
             id: 'read-only-review',
             state: 'APPROVED',
             commitOid: 'approved-head',
             authorCanPushToRepository: false,
+          }],
+        },
+      ],
+      [
+        'a PR retargeted away from main',
+        'CUSTOM_RetargetedReview',
+        {
+          reviewDecision: 'APPROVED',
+          headRefOid: 'approved-head',
+          baseRefName: 'release',
+          reviews: [{
+            id: 'retargeted-review',
+            state: 'APPROVED',
+            commitOid: 'approved-head',
+            authorCanPushToRepository: true,
           }],
         },
       ],
