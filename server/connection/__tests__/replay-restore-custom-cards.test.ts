@@ -33,7 +33,7 @@ afterEach(() => {
 })
 
 describe('replay room restoration', () => {
-  it('loads and pins consented custom cards before creating a missing-prefix replay', async () => {
+  it('loads and pins published custom cards before creating a missing-prefix replay', async () => {
     tempDir = mkdtempSync(join(tmpdir(), 'open-agricola-replay-restore-'))
     process.env.DB_PATH = join(tempDir, 'test.db')
     vi.resetModules()
@@ -43,7 +43,7 @@ describe('replay room restoration', () => {
       INSERT INTO users (id, username, display_name, password_hash, created_at)
       VALUES ('author', 'author', 'Author', 'hash', 1)
     `).run()
-    const { createCard } = await import('../../workshop-drafts.ts')
+    const { createCard, publish } = await import('../../workshop-drafts.ts')
     const card = createCard(db, {
       authorId: 'author',
       draft: {
@@ -54,6 +54,7 @@ describe('replay room restoration', () => {
         cardJson: {
           id: 'CUSTOM_Restored',
           name: 'Restored',
+          card_type: 'minor',
           deck: 'CUSTOM',
           number: 1,
           desc: ['Restored card'],
@@ -65,6 +66,7 @@ describe('replay room restoration', () => {
         generation: {},
       } as never,
     })
+    publish(db, { cardId: card.id, authorId: 'author', baseRevision: card.revision })
     const { GameSession } = await import('../../game/authoritative-session.ts')
     const { serializeState } = await import('../../../shared/session/serialization.ts')
     const { SqliteRoomPersistence } = await import('../../game/persistence/sqlite-adapter.ts')
