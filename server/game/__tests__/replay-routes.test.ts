@@ -211,7 +211,10 @@ describe('public replay routes', () => {
     expect(first.headers['Cache-Control']).toContain('immutable')
     expect(first.headers['Content-Security-Policy']).toContain("form-action 'none'")
     expect(first.headers['Content-Security-Policy']).toContain(
-      "img-src 'self' data: https://raw.githubusercontent.com",
+      "img-src 'self' data: https://raw.githubusercontent.com https://x.boardgamearena.net",
+    )
+    expect(first.headers['Content-Security-Policy']).toContain(
+      "font-src 'self' https://x.boardgamearena.net",
     )
     expect(first.headers['Content-Security-Policy']).not.toContain(
       "script-src 'self' https:",

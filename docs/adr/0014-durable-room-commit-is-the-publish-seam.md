@@ -30,7 +30,7 @@ ADR-0010 至 ADR-0013 已固定公开回放、delta 链、GitHub 身份和 Game 
 
 10. 下一可用数据库迁移一次性增加 Game Context、Replay 与 Bug Report 表；首个正式 Replay 格式使用 `schemaVersion=1`，不保留未上线实验格式兼容代码。迁移幂等回填既有 `rooms` 为 active Context、既有 `game_results` 为 completed Context，并让完成结果在冲突时优先；旧完成局标记 `legacy_no_replay`，不创建 Replay header 或 Frame。活动恢复继续使用 `rooms` / `room_players`，完成参与者继续使用 `game_results` / `game_result_players`，不复制这些事实。
 11. Replay 只增加 header 与 Step 表，不增加 Segment 表；`checkpointStepNo` 表达逻辑 Segment。Reported Game Evidence 也不增加 payload 表，由 Bug Report 的保留期限保护对应 Segment。
-12. `gameBuildId`、`schemaVersion` 和 `viewerBuildId` 在 Room 建立时锁定。标准卡展示随 Viewer Build 固定；自定义卡公开快照写入 Replay header，图片复制到内容寻址的持久资源目录，不归档可执行源码。
+12. `gameBuildId`、`schemaVersion` 和 `viewerBuildId` 在 Room 建立时锁定。标准卡展示逻辑随 Viewer Build 固定，BGA 图片与主站使用同一 CDN，不归档图片历史；自定义卡公开快照写入 Replay header，图片复制到内容寻址的持久资源目录，不归档可执行源码。
 13. 完成 Replay 的存储 gzip/BLOB 不成为外部契约。公开 Replay API 返回判别式版本化 JSON；只有 `replayStatus=available` 返回 manifest 和 Segment，`legacy_no_replay` 只返回状态与 Game Result Archive 摘要。内容寻址的只读 Viewer Build 永久追加到后端持久卷，并在 `credentialless` iframe 内无 cookie 地直接读取公开 manifest 和 Segment。
 14. 顶层客户端先解析 Game Context，再决定是否加载当前卡牌 manifest 与 `AuthProvider`。活动局进入现有登录和 WebSocket 恢复链路；completed、expired 和 removed 页面在登录门外可用。结束局仅允许经历史 `userId → playerIndex` 证明的原参赛者创建 Bug Report。
 
