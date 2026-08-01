@@ -784,6 +784,12 @@ const server = createServer(async (req, res) => {
           'SELECT 1 FROM bug_reports WHERE room_id = ? LIMIT 1',
         ).get(roomId)
         if (hasReport) continue
+        // Only half-recorded replays are dropped; a completed archive
+        // (lifecycle 'completed', replay_status 'available') stays intact.
+        const replay = db.prepare(
+          'SELECT status FROM game_replays WHERE room_id = ?',
+        ).get(roomId) as { status: string } | undefined
+        if (!replay || replay.status !== 'recording') continue
         db.prepare('DELETE FROM game_replay_steps WHERE room_id = ?').run(roomId)
         db.prepare('DELETE FROM game_replays WHERE room_id = ?').run(roomId)
       }
