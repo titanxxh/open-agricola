@@ -1,6 +1,6 @@
 import type Database from 'better-sqlite3'
 import type { IncomingMessage, ServerResponse } from 'node:http'
-import { markBuiltInMergedCards, markCardMerged } from '../workshop-drafts.ts'
+import { markBuiltInMergedCards, markCardMerged, reconcilePendingMerges } from '../workshop-drafts.ts'
 import { ALL_CARD_IMPLS } from '../../shared/cards/register-all.ts'
 import { verifyGitHubWebhook } from '../bug-report/github-issue-client.ts'
 import {
@@ -207,18 +207,25 @@ export async function handleWorkshopReviewWebhook(
     && payload.action === 'closed'
     && payload.pull_request?.merged === true) {
     const result = db.transaction(() => {
-      // Graduate only an approved binding. An out-of-order delivery (merge
-      // before the approval webhook / enterReview binding lands) matches
-      // zero rows — leave the delivery unconsumed so GitHub's redelivery
-      // can complete the graduation once the binding exists.
-      const merged = markCardMerged(db, { prUrl })
-      if (merged === 0) return { deferred: true as const }
       const inserted = db.prepare(`
         INSERT OR IGNORE INTO github_webhook_events (
           delivery_id, event_name, received_at
         ) VALUES (?, ?, ?)
       `).run(deliveryId, eventName, Date.now()).changes > 0
       if (!inserted) return { duplicate: true as const }
+      const merged = markCardMerged(db, { prUrl })
+      if (merged === 0) {
+        // Out-of-order delivery: the approval binding has not landed yet.
+        // GitHub does not redeliver acknowledged hooks, so persist the merge
+        // fact — reconcilePendingMerges graduates the card once the approval
+        // arrives (approval webhook, refresh, or startup).
+        db.prepare(`
+          UPDATE workshop_cards
+          SET github_pr_status = 'merged', github_pr_last_synced_at = ?
+          WHERE github_pr_url = ? AND review_status != 'merged'
+        `).run(Date.now(), prUrl)
+        return { pendingMerge: true as const }
+      }
       // A late merge delivery may arrive after the release already shipped:
       // reconcile the built-in takeover immediately instead of waiting for
       // the next restart.
@@ -345,7 +352,12 @@ export async function handleWorkshopReviewWebhook(
             expectedBinding: binding,
           })
         : 0
-      if (approvedReview) return { approved }
+      if (approvedReview) {
+        // The merge event may have arrived first (persisted as pending):
+        // graduate immediately now that the approval binding exists.
+        const graduated = approved > 0 ? reconcilePendingMerges(db) : 0
+        return graduated > 0 ? { approved, graduated } : { approved }
+      }
       const breaksReview = breaksReviewGateWithoutApproval(snapshot)
       const invalidated = invalidateReviewedCard(db, {
         prUrl,

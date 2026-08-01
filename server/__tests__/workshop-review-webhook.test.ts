@@ -8,7 +8,7 @@ import {
   type WorkshopReviewRuntime,
 } from '../workshop-review/webhook-handler.ts'
 import type { WorkshopReviewSnapshot } from '../workshop-review/github-review-provider.ts'
-import { enterReview, invalidateReviewedCard, loadWorkspace } from '../workshop-drafts.ts'
+import { enterReview, invalidateReviewedCard, loadWorkspace, reconcilePendingMerges } from '../workshop-drafts.ts'
 
 let db: Database.Database
 
@@ -652,9 +652,10 @@ describe('workshop review webhook', () => {
     expect(JSON.parse(dup.body)).toEqual({ ok: true, duplicate: true })
   })
 
-  it('defers an out-of-order merge delivery until the approval binding exists', async () => {
+  it('persists an out-of-order merge and graduates once the approval lands', async () => {
     // approved_version_id is still null: the merge arrived before the
-    // approval landed. The delivery must stay unconsumed for redelivery.
+    // approval landed. GitHub does not redeliver acknowledged hooks, so the
+    // merge fact is persisted and reconciled later.
     insertReviewedCard({ id: 'card-early-merge', prNumber: 48, reviewStatus: 'in_review', live: false })
     const payload = {
       action: 'closed',
@@ -666,18 +667,25 @@ describe('workshop review webhook', () => {
       },
     }
     const res = await deliver(payload, 'pull_request', 'delivery-early-merge', runtime())
-    expect(JSON.parse(res.body)).toEqual({ ok: true, deferred: true })
-    expect(loadWorkspace(db, 'card-early-merge', 'author').reviewStatus).toBe('in_review')
+    expect(JSON.parse(res.body)).toEqual({ ok: true, pendingMerge: true })
+    const pending = loadWorkspace(db, 'card-early-merge', 'author')
+    expect(pending.reviewStatus).toBe('in_review')
+    expect(db.prepare(`
+      SELECT github_pr_status FROM workshop_cards WHERE id = 'card-early-merge'
+    `).get()).toEqual({ github_pr_status: 'merged' })
 
-    // the approval lands, then GitHub redelivers the merge: graduation completes
+    // the approval lands: the next reconciliation point graduates the card
     db.prepare(`
       UPDATE workshop_cards
       SET review_status = 'approved', approved_version_id = 'ver-48'
       WHERE id = 'card-early-merge'
     `).run()
-    const retry = await deliver(payload, 'pull_request', 'delivery-early-merge', runtime())
-    expect(JSON.parse(retry.body)).toEqual({ ok: true, merged: 1, builtIn: 0 })
+    expect(reconcilePendingMerges(db)).toBe(1)
     expect(loadWorkspace(db, 'card-early-merge', 'author').reviewStatus).toBe('merged')
+
+    // duplicate delivery of the original hook is idempotent
+    const dup = await deliver(payload, 'pull_request', 'delivery-early-merge', runtime())
+    expect(JSON.parse(dup.body)).toEqual({ ok: true, duplicate: true })
   })
 
   it('invalidates a live card when its PR closes without merging', async () => {

@@ -726,8 +726,13 @@ function handleNewGame(ctx: ConnectionCtx, msg: Extract<ClientCommand, { type: '
   }
   // A rematch is a new game: reload through the current gate instead of
   // reusing the embedded snapshot, so takeover (#642) and unpublish apply
-  // to the fresh room while the finished game stays untouched.
-  const customCards = loadCustomCardsFromDb(room.customCardDbIds ?? [], room.createdBy)
+  // to the fresh room while the finished game stays untouched. The id list
+  // is refreshed alongside so a stale id cannot mark this room for a later
+  // takedown it does not deserve.
+  const reloaded = loadCustomCards(room.customCardDbIds ?? [], room.createdBy, { liveOnly: true })
+  const customCards = reloaded.cards
+  room.customCardDbIds = reloaded.loadedDbIds
+  room.customCards = customCards
   const enableCommunityDeck = room.session.state.enableCommunityDeck
   const enableParentCards = room.enableParentCards ?? room.session.state.enableParentCards
   const draftMode = room.draftMode ?? room.session.state.draftMode
