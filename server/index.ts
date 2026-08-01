@@ -769,21 +769,15 @@ const server = createServer(async (req, res) => {
         return
       }
       const db = getDb()
-      // Fail closed: make the card stale/offline FIRST — if any of the room
-      // cleanup below fails or the process dies, the unsafe card must not
-      // remain approved and loadable after a restart.
+      // Fail closed AND atomic: the card invalidation and the deletion of
+      // every persisted room row embedding it commit in one transaction —
+      // a crash can never leave the card taken down but a restorable
+      // snapshot alive (restoreRooms trusts the embedded card snapshot).
       const card = adminTakedownCard(db, cardDbId)
       const { endedRoomIds } = wssCtx?.lobby.endRoomsUsingCard(cardDbId) ?? { endedRoomIds: [] }
-      // Durable cleanup: delete every persisted room row that embeds the
-      // card — this backs up the in-memory kill (whose checkpoint discard
-      // only logs deletion failures) AND covers snapshots not currently
-      // loaded, so a restart can never resurrect the embedded card code.
-      const persistedRows = db.prepare(
-        "SELECT id FROM rooms WHERE custom_card_ids LIKE '%' || ? || '%'",
-      ).all(JSON.stringify(cardDbId)) as Array<{ id: string }>
       const affectedRoomIds = [...new Set([
         ...endedRoomIds,
-        ...persistedRows.map((row) => row.id),
+        ...card.removedRoomIds,
       ])]
       for (const roomId of affectedRoomIds) {
         db.prepare('DELETE FROM rooms WHERE id = ?').run(roomId)
