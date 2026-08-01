@@ -405,7 +405,7 @@ describe('lobby.endRoomsUsingCard', () => {
     ]))
   })
 
-  it('spares finished games so their completed replays survive', () => {
+  it('ends finished rooms too — their completed archives are protected at the cleanup layer', () => {
     const registry = new RoomRegistry()
     registry.set(fakeRoom({
       id: 'finished',
@@ -417,8 +417,8 @@ describe('lobby.endRoomsUsingCard', () => {
       checkpoint: checkpoint(),
       broadcaster: fakeBroadcaster(),
     })
-    expect(lobby.endRoomsUsingCard('card-db-1')).toEqual({ endedRoomIds: [] })
-    expect(registry.has('finished')).toBe(true)
+    expect(lobby.endRoomsUsingCard('card-db-1')).toEqual({ endedRoomIds: ['finished'] })
+    expect(registry.has('finished')).toBe(false)
   })
 
   it('is a safe no-op when no room uses the card', () => {
