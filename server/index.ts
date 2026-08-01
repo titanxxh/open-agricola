@@ -3,7 +3,7 @@ import type { IncomingMessage, ServerResponse } from 'node:http'
 import { writeFileSync, mkdirSync, existsSync, readFileSync } from 'node:fs'
 import { join, extname } from 'node:path'
 import { randomUUID } from 'node:crypto'
-import { handleGameRoute } from './game-router.ts'
+import { handleGameRoute, disposeSandboxSessionsUsingCard } from './game-router.ts'
 import { handleWorkshopRoute } from './workshop.ts'
 import { createWsServer } from './connection/ws-server.ts'
 import { isDevRoom, type Room } from './game/room.ts'
@@ -775,6 +775,9 @@ const server = createServer(async (req, res) => {
       // snapshot alive (restoreRooms trusts the embedded card snapshot).
       const card = adminTakedownCard(db, cardDbId)
       const { endedRoomIds } = wssCtx?.lobby.endRoomsUsingCard(cardDbId) ?? { endedRoomIds: [] }
+      // HTTP sandbox sessions embed the same executable snapshot and refresh
+      // their TTL on every access — dispose them too.
+      const disposedSandboxSessions = disposeSandboxSessionsUsingCard(cardDbId)
       const affectedRoomIds = [...new Set([
         ...endedRoomIds,
         ...card.removedRoomIds,
@@ -797,7 +800,7 @@ const server = createServer(async (req, res) => {
         db.prepare('DELETE FROM game_replay_steps WHERE room_id = ?').run(roomId)
         db.prepare('DELETE FROM game_replays WHERE room_id = ?').run(roomId)
       }
-      sendJson(res, 200, { ok: true, card, endedRoomIds: affectedRoomIds })
+      sendJson(res, 200, { ok: true, card, endedRoomIds: affectedRoomIds, disposedSandboxSessions })
     } catch (error) {
       const notFound = error instanceof Error && error.message === 'Card not found'
       sendJson(res, notFound ? 404 : 500, {
