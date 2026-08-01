@@ -19,6 +19,7 @@ const buildSelectionChoice = (needed: number) => ({
       labelKey: `resources.${r}`,
       sourceCard: CARD_ID,
     })),
+    structuredChoicePrefixes: [...RESOURCE_TYPES],
   },
   promptKey: 'ui.interactionCollectorSelect' as const,
   promptParams: { needed },
