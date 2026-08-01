@@ -67,7 +67,7 @@ import {
 } from './bug-report/bug-report-store.ts'
 import { GitHubIssueClient } from './bug-report/github-issue-client.ts'
 import { applyReplayRemovalLedger } from './game/replay-removal.ts'
-import { adminTakedownCard, markBuiltInMergedCards } from './workshop-drafts.ts'
+import { adminTakedownCard, markBuiltInMergedCards, reconcilePendingMerges } from './workshop-drafts.ts'
 import { ALL_CARD_IMPLS } from '../shared/cards/register-all.ts'
 
 const CARD_ART_DIR = process.env.CARD_ART_DIR ?? join(process.cwd(), 'data', 'card-art')
@@ -182,6 +182,8 @@ getDb()
 // Release-window takeover (#642): merged workshop cards now present in the
 // built-in registry switch to the built-in definition.
 {
+  const graduated = reconcilePendingMerges(getDb())
+  if (graduated > 0) console.log(`[workshop] ${graduated} pending merge(s) graduated`)
   const { flagged, unflagged } = markBuiltInMergedCards(getDb(), Object.keys(ALL_CARD_IMPLS))
   if (flagged > 0) console.log(`[workshop] ${flagged} merged card(s) now served by the built-in registry`)
   if (unflagged > 0) console.log(`[workshop] ${unflagged} merged card(s) fell back to their workshop snapshot (registry rollback)`)

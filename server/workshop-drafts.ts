@@ -1159,6 +1159,28 @@ export function markCardMerged(
 }
 
 /**
+ * Complete graduations whose merge event arrived before the approval binding
+ * (#642): the merge fact is persisted as github_pr_status='merged'; once the
+ * approval lands, the next reconciliation point graduates the card.
+ */
+export function reconcilePendingMerges(db: Database.Database): number {
+  const columns = db.pragma('table_info(workshop_cards)') as Array<{ name: string }>
+  if (!columns.some(({ name }) => name === 'review_status')) return 0
+  const rows = db.prepare(`
+    SELECT github_pr_url FROM workshop_cards
+    WHERE github_pr_status = 'merged'
+      AND review_status != 'merged'
+      AND approved_version_id IS NOT NULL
+      AND github_pr_url IS NOT NULL
+  `).all() as Array<{ github_pr_url: string }>
+  let graduated = 0
+  for (const row of rows) {
+    graduated += markCardMerged(db, { prUrl: row.github_pr_url })
+  }
+  return graduated
+}
+
+/**
  * Release-window takeover (#642): at startup, flag merged cards whose card_id
  * is now present in the built-in registry. From then on rooms use the
  * built-in definition and the workshop snapshot retires (isLoadableLive).
