@@ -1,5 +1,6 @@
 import type Database from 'better-sqlite3'
 import type { IncomingMessage, ServerResponse } from 'node:http'
+import { markCardMerged } from '../workshop-drafts.ts'
 import { verifyGitHubWebhook } from '../bug-report/github-issue-client.ts'
 import {
   approveReviewedVersion,
@@ -199,6 +200,23 @@ export async function handleWorkshopReviewWebhook(
   const closesUnmerged = eventName === 'pull_request'
     && payload.action === 'closed'
     && payload.pull_request?.merged !== true
+  // Graduation (#642): the PR merged — terminal transition, no binding or
+  // SHA verification needed (GitHub's merge is the fact to reflect).
+  if (eventName === 'pull_request'
+    && payload.action === 'closed'
+    && payload.pull_request?.merged === true) {
+    const result = db.transaction(() => {
+      const inserted = db.prepare(`
+        INSERT OR IGNORE INTO github_webhook_events (
+          delivery_id, event_name, received_at
+        ) VALUES (?, ?, ?)
+      `).run(deliveryId, eventName, Date.now()).changes > 0
+      if (!inserted) return { duplicate: true as const }
+      return { merged: markCardMerged(db, { prUrl }) }
+    })()
+    sendJson(res, 200, { ok: true, ...result })
+    return true
+  }
   const revalidatesReview =
     eventName === 'pull_request' && (
       payload.action === 'synchronize'

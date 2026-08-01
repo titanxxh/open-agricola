@@ -614,6 +614,41 @@ describe('workshop review webhook', () => {
     expect(reviewRuntime.provider.getPullRequestSnapshot).not.toHaveBeenCalled()
   })
 
+  it('graduates a live card to merged when its PR merges', async () => {
+    insertReviewedCard({ id: 'card-merged-pr', prNumber: 47 })
+    const reviewRuntime = runtime()
+
+    const res = await deliver({
+      action: 'closed',
+      repository: { full_name: 'titanxxh/open-agricola' },
+      pull_request: {
+        number: 47,
+        html_url: 'https://github.com/titanxxh/open-agricola/pull/47',
+        merged: true,
+      },
+    }, 'pull_request', 'delivery-merged-pr', reviewRuntime)
+
+    expect(JSON.parse(res.body)).toEqual({ ok: true, merged: 1 })
+    expect(loadWorkspace(db, 'card-merged-pr', 'author')).toMatchObject({
+      reviewStatus: 'merged',
+      live: true,
+    })
+    // the graduation transition needs no GitHub round-trip
+    expect(reviewRuntime.provider.getPullRequestSnapshot).not.toHaveBeenCalled()
+
+    // duplicate delivery is idempotent
+    const dup = await deliver({
+      action: 'closed',
+      repository: { full_name: 'titanxxh/open-agricola' },
+      pull_request: {
+        number: 47,
+        html_url: 'https://github.com/titanxxh/open-agricola/pull/47',
+        merged: true,
+      },
+    }, 'pull_request', 'delivery-merged-pr', reviewRuntime)
+    expect(JSON.parse(dup.body)).toEqual({ ok: true, duplicate: true })
+  })
+
   it('invalidates a live card when its PR closes without merging', async () => {
     insertReviewedCard({ id: 'card-closed-pr', prNumber: 46 })
     const reviewRuntime = runtime()

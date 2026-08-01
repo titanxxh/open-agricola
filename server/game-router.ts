@@ -579,14 +579,14 @@ export const handleGameRoute = async (
           continue
         }
         const row = db.prepare(
-          `SELECT card_type, card_json, code_manifest, art_url, review_status, live, author_id
+          `SELECT card_type, card_json, code_manifest, art_url, review_status, live, built_in, author_id
            FROM workshop_cards WHERE id = ?`,
         ).get(dbId) as {
           card_type: string
           card_json: string
           code_manifest: string | null
           art_url: string | null
-          review_status: string; live: number; author_id: string
+          review_status: string; live: number; built_in: number; author_id: string
         } | undefined
         if (!row) continue
         if (isLoadableLive(row)) {
