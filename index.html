@@ -6,7 +6,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <title>Open Agricola</title>
     <script>
-      // Resolve seasonal background URL synchronously so the browser can start
+      // Resolve the website background URL synchronously so the browser can start
       // fetching the image while the JS bundle is still being downloaded.
       // Mirrors logic in client/utils/seasonalBackground.ts.
       (function () {
@@ -17,13 +17,38 @@
           5: "spring-3", 6: "summer-2", 7: "summer-1", 8: "summer-3",
           9: "autumn-1", 10: "autumn-2", 11: "autumn-3", 12: "winter-1",
         };
+        var terms = [
+          [105, "23xiaohan"], [120, "24dahan"], [204, "01lichun"], [219, "02yushui"],
+          [305, "03jingzhe"], [320, "04chunfeng"], [404, "05qingming"], [420, "06guyu"],
+          [505, "07lixia"], [521, "08xiaoman"], [605, "09mangzhong"], [621, "10xiazhi"],
+          [707, "11xiaoshu"], [723, "12dashu"], [807, "13liqiu"], [823, "14chushu"],
+          [907, "15bailu"], [923, "16qiufen"], [1008, "17hanlu"], [1023, "18shuangjiang"],
+          [1107, "19lidong"], [1122, "20xiaoxue"], [1207, "21daxue"], [1222, "22dongzhi"],
+        ];
+        var locale = "zh";
+        try {
+          var savedLocale = localStorage.getItem("open-agricola-locale-v2");
+          if (savedLocale === "zh" || savedLocale === "en") locale = savedLocale;
+        } catch (_) {}
         var p = new URLSearchParams(location.search);
         var override = p.get("bg");
         var variant = null;
-        if (override === "none") variant = null;
-        else if (override && /^\d+$/.test(override)) variant = map[+override] || null;
-        else if (override && /^(spring|summer|autumn|winter)-[1-3]$/.test(override)) variant = override;
-        else variant = map[new Date().getMonth() + 1];
+        var now = new Date();
+        if (override !== "none") {
+          if (override && /^\d+$/.test(override)) variant = map[+override] || null;
+          else if (override && /^(spring|summer|autumn|winter)-[1-3]$/.test(override)) variant = override;
+          if (!variant && locale === "zh") {
+            var utc8 = new Date(now.getTime() + 8 * 60 * 60 * 1000);
+            var day = (utc8.getUTCMonth() + 1) * 100 + utc8.getUTCDate();
+            variant = "22dongzhi";
+            for (var i = 0; i < terms.length; i += 1) {
+              if (day < terms[i][0]) break;
+              variant = terms[i][1];
+            }
+          } else if (!variant) {
+            variant = map[now.getMonth() + 1];
+          }
+        }
         if (variant) {
           var href = base + "assets/website-bg/" + variant + ".webp?v=" + encodeURIComponent(version);
           document.documentElement.style.setProperty("--bg-monthly", 'url("' + href + '")');

@@ -1,6 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from 'react'
 import type { Locale } from '../../shared/i18n'
 import { t as translate } from '../../shared/i18n'
+import { applyWebsiteBackground, millisecondsUntilNextUtc8Midnight } from '../utils/seasonalBackground'
 
 const LOCALE_STORAGE_KEY = 'open-agricola-locale-v2'
 
@@ -32,6 +33,20 @@ export function LocaleProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     document.documentElement.lang = locale
     try { window.localStorage.setItem(LOCALE_STORAGE_KEY, locale) } catch { /* ignore */ }
+
+    let timeout: number | undefined
+    const refreshBackground = () => {
+      const now = new Date()
+      applyWebsiteBackground(locale, now)
+      if (locale === 'zh') {
+        timeout = window.setTimeout(refreshBackground, millisecondsUntilNextUtc8Midnight(now))
+      }
+    }
+    refreshBackground()
+
+    return () => {
+      if (timeout !== undefined) window.clearTimeout(timeout)
+    }
   }, [locale])
 
   const t = useCallback(
