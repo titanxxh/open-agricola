@@ -7,6 +7,7 @@ import {
   approveCurrentDraft,
   approveReviewedVersion,
   checkpointDraft,
+  adminTakedownCard,
   createCard,
   enterReview,
   unpublish,
@@ -985,6 +986,29 @@ describe('workshop draft aggregate', () => {
     const after = loadWorkspace(db, created.id, 'author')
     expect(after.reviewStatus).toBe('approved')
     expect(after.approvedVersionId).not.toBeNull()
+  })
+
+  it('admin takedown forces a live approved card to stale offline', () => {
+    const created = createCard(db, { authorId: 'author', draft: baseDraft() })
+    approveCurrentDraft(db, { cardId: created.id, authorId: 'author' })
+    publish(db, { cardId: created.id, authorId: 'author', baseRevision: 1 })
+
+    expect(adminTakedownCard(db, created.id)).toEqual({ reviewStatus: 'stale', live: false })
+    const after = loadWorkspace(db, created.id, 'author')
+    expect(after.approvedVersionId).toBeNull()
+    // republishing requires another review round
+    expect(() => publish(db, {
+      cardId: created.id,
+      authorId: 'author',
+      baseRevision: 1,
+    })).toThrowError(expect.objectContaining<Partial<WorkshopDraftError>>({ code: 'not_ready' }))
+  })
+
+  it('admin takedown is a safe no-op for cards without approval', () => {
+    const created = createCard(db, { authorId: 'author', draft: baseDraft() })
+    expect(adminTakedownCard(db, created.id)).toEqual({ reviewStatus: 'unsubmitted', live: false })
+    expect(() => adminTakedownCard(db, 'missing-card'))
+      .toThrowError(expect.objectContaining<Partial<WorkshopDraftError>>({ code: 'not_found' }))
   })
 
   it('treats merged cards as read-only in the workshop', () => {
