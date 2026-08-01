@@ -480,7 +480,7 @@ WorkshopPage
 3. 前端调用 `POST /api/workshop/cards/:id/submit-review`。
 4. 如果服务端没有当前会话对应的 GitHub token，会返回 OAuth start URL；前端用 popup 打开，并等待 callback 页面通过 `postMessage({ type: 'workshop-pr-oauth', ... }, '*')` 通知授权完成。
 5. 授权完成后前端重试请求，服务端创建/更新分支并打开或更新 PR，成功后卡牌转入 `in_review`（`enterReview`），同时固定 PR head SHA 与对应 Draft Version；一个 PR URL 只绑定一张卡，复用 PR 时原子转移绑定，draft 或 base 非 `main` 的旧 PR 关闭后重开，并在绑定后补查一次当前 review 快照以覆盖先到的审批 webhook。补查暂时失败不回滚已建立的 PR/绑定，清空同步时间后由现有 `refresh-pr-status` 入口重试协调。
-6. Workshop Review GitHub App 接收 `pull_request_review` / `pull_request` webhook；验签和 delivery 幂等通过后，approved review 必须经 GraphQL 原子快照确认。GitHub 当前 head 不同、PR 关闭/转 draft/改离 `main`、有效审批被 `dismissed` 或 `CHANGES_REQUESTED` 都把卡转为 `stale·offline`；未绑定或绑定歧义的 PR 不查询 GitHub，可能乱序的事件重读当前快照且只在含 lifecycle/更新时间的 review binding 未变时提交，已 merge PR 的迟到 review 事件保留同 head 绑定，GraphQL 不可用则记录 delivery 并保守下线；comment-only review 不改变状态。
+6. Workshop Review GitHub App 接收 `pull_request_review` / `pull_request` webhook；验签和 delivery 幂等通过后，approved review 必须经 GraphQL 原子快照确认。GitHub 当前 head 不同、PR 关闭/转 draft/改离 `main`、有效审批被 `dismissed` 或 `CHANGES_REQUESTED` 都把卡转为 `stale·offline`；未绑定或绑定歧义的 PR 不查询 GitHub，可能乱序的事件重读当前快照且只在含 lifecycle/更新时间的 review binding 未变时提交，已 merge 进 `main` 的 PR 的迟到 review 事件保留同 head 绑定（合入非 `main` 分支不享有此豁免，视同未 merge 关闭），GraphQL 不可用则记录 delivery 并保守下线且不覆盖已记录的 PR 关闭状态；comment-only review 不改变状态。
 7. 作者发布时服务端再次即时查询 GraphQL，只有 state=`OPEN`、非 draft、base=`main`、reviewer 可 push、review commit、PR head、平台 approved commit、固定版本和查询前后的 live-state token 全部一致才置 live。
 
 服务端核心模块：
@@ -538,7 +538,7 @@ WorkshopPage
 | `POST /api/workshop/cards/:id/publish` | 仅 review approved 的卡置 live（PRD #634；publish 时刻重验原子快照，provider 不一致 → 拒绝并转 stale） |
 | `POST /api/workshop/cards/:id/unpublish` | live → offline；不作废过审资格，未改动可直接再发布（#638） |
 | `POST /api/admin/cards/:id/takedown` | 管理员 kill switch（#641）：强制 stale·offline + 终止所有嵌入此卡的进行中对局（无计分/无 completed replay） |
-| webhook `pull_request` closed+merged | 毕业（#642）：卡转 merged 终态，空窗期供快照，发版后 built_in 切内置定义 |
+| webhook `pull_request` closed+merged | 毕业（#642）：仅 base=`main` 的 merge 触发；卡转 merged 终态，空窗期供快照，发版后 built_in 切内置定义。改离 `main` 后 merge 视同未 merge 关闭（stale·offline，状态记 `closed`）。merge 事件先于审批到达时持久化 merge 事实，待审批 webhook 或 `refresh-pr-status` 读到 approved MERGED 快照（head 在 merge 后冻结、SHA 绑定仍可验）时补毕业并即时对账 built_in |
 | `POST /api/workshop/cards/:id/pin-version` | 固化当前草稿为不可变版本（沙盒确认流的版本来源；不动 review 轴） |
 | `POST /api/github/webhook` | GitHub App HMAC 验签；处理 review submitted/dismissed、PR synchronize/edited/converted-to-draft/closed，delivery 幂等 |
 | `POST /api/workshop/cards/:id/sandbox-pass` | 只记录当前精确发布版本且无运行错误的作者确认 |

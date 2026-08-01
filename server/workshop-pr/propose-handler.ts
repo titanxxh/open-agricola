@@ -25,6 +25,7 @@ import {
   breaksReviewGateWithoutApproval,
   findApprovedHeadReview,
   findApprovedMergedHeadReview,
+  githubPrStatus,
   type WorkshopReviewSnapshot,
 } from '../workshop-review/github-review-provider.ts'
 
@@ -75,17 +76,6 @@ const loadReviewBinding = (
   FROM workshop_cards
   WHERE id = ? AND github_pr_url = ?
 `).get(cardId, prUrl) as ReviewBinding | undefined
-
-const githubPrStatus = (
-  snapshot: WorkshopReviewSnapshot,
-): 'open' | 'merged' | 'closed' => snapshot.state === 'MERGED'
-  // 'merged' means "a graduation-relevant merge fact": a PR retargeted away
-  // from main and merged never enters the built-in registry, so reporting it
-  // as 'merged' would arm reconcilePendingMerges with a false graduation.
-  ? (snapshot.baseRefName === 'main' ? 'merged' : 'closed')
-  : snapshot.state === 'CLOSED'
-    ? 'closed'
-    : 'open'
 
 const reconcileReviewSnapshot = (
   db: ReturnType<typeof getDb>,
