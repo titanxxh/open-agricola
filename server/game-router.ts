@@ -33,6 +33,9 @@ const workshopDraftToCustomCard = (draft: WorkshopDraft): CustomCardData => ({
  */
 const userSessions = new Map<string, GameSession>()
 const sessionLastAccess = new Map<string, number>()
+// Workshop card db ids embedded in each sandbox session, so the admin kill
+// switch (#641) can dispose sessions still executing a taken-down card.
+const sessionCardDbIds = new Map<string, string[]>()
 const SESSION_TTL_MS = 30 * 60 * 1000 // 30 minutes
 
 // Periodically clean up idle sessions
@@ -44,6 +47,7 @@ setInterval(() => {
       session?.dispose()
       userSessions.delete(key)
       sessionLastAccess.delete(key)
+      sessionCardDbIds.delete(key)
     }
   }
 }, 60_000)
@@ -62,11 +66,35 @@ const getSessionForRequest = (req: IncomingMessage): GameSession => {
   return userSessions.get(key)!
 }
 
-const setSessionForRequest = (req: IncomingMessage, s: GameSession): void => {
+const setSessionForRequest = (
+  req: IncomingMessage,
+  s: GameSession,
+  cardDbIds: string[] = [],
+): void => {
   const key = getSessionKey(req)
   const old = userSessions.get(key)
   if (old && old !== s) old.dispose()
   userSessions.set(key, s)
+  if (cardDbIds.length > 0) sessionCardDbIds.set(key, cardDbIds)
+  else sessionCardDbIds.delete(key)
+}
+
+/**
+ * Admin kill switch (#641): dispose every HTTP sandbox session that embeds
+ * the card, so its executable snapshot stops running (the TTL refresh would
+ * otherwise keep it alive indefinitely).
+ */
+export const disposeSandboxSessionsUsingCard = (cardDbId: string): number => {
+  let disposed = 0
+  for (const [key, ids] of [...sessionCardDbIds]) {
+    if (!ids.includes(cardDbId)) continue
+    userSessions.get(key)?.dispose()
+    userSessions.delete(key)
+    sessionLastAccess.delete(key)
+    sessionCardDbIds.delete(key)
+    disposed += 1
+  }
+  return disposed
 }
 
 /** Call a session method with its card context active. */
@@ -521,6 +549,7 @@ export const handleGameRoute = async (
     // Load custom card data from the database.
     // Allow: published cards (anyone) OR draft cards owned by the requesting user.
     const customCards: CustomCardData[] = []
+    const loadedCardDbIds: string[] = []
     const customCardVersionsLoaded: Array<{ cardId: string; versionId: string }> = []
     if (customCardDbIds.length > 0) {
       const db = getDb()
@@ -538,6 +567,7 @@ export const handleGameRoute = async (
               versionId,
             })
             customCards.push(workshopDraftToCustomCard(draft))
+            loadedCardDbIds.push(dbId)
             customCardVersionsLoaded.push({ cardId: dbId, versionId })
           } catch (error) {
             sendJson(res, 400, {
@@ -562,6 +592,7 @@ export const handleGameRoute = async (
         if (isLoadableLive(row)) {
           try {
             customCards.push(workshopDraftToCustomCard(loadLiveDraft(db, dbId)))
+            loadedCardDbIds.push(dbId)
           } catch (err) {
             console.warn(`[game-router] failed to load live custom card ${dbId}:`, err)
           }
@@ -581,6 +612,7 @@ export const handleGameRoute = async (
             codeManifest: row.code_manifest ? JSON.parse(row.code_manifest) as CustomCodeManifest : null,
             artUrl: row.art_url ?? null,
           })
+          loadedCardDbIds.push(dbId)
         } catch (err) {
           console.warn(`[game-router] failed to parse custom card ${dbId}:`, err)
         }
@@ -599,7 +631,7 @@ export const handleGameRoute = async (
         allowIncompleteFarmersOfTheMoorMinorDeal,
       },
     )
-    setSessionForRequest(req, sandboxSession)
+    setSessionForRequest(req, sandboxSession, loadedCardDbIds)
     const { result } = callAndRespond(req, s => s.getState())
     sendJson(res, 200, {
       ...result,
