@@ -1057,6 +1057,26 @@
   overflow: hidden;
 }
 
+.action-board-precision-toggle {
+  display: block;
+  min-height: 44px;
+  margin: 0 0 8px auto;
+  padding: 8px 12px;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.92);
+  color: var(--color-text);
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.action-board-wrapper--precision {
+  overflow-x: auto;
+  overflow-y: hidden;
+  overscroll-behavior-x: contain;
+  touch-action: pan-x pan-y pinch-zoom;
+}
+
 .seasons-board {
   --season-ink: #241909;
   --season-brown: #5a3519;
