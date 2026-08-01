@@ -60,6 +60,7 @@ ssh "$HOST" "${REMOTE_ENV[@]}" bash -s "$REMOTE_DIR" "$REF" << 'REMOTE_SCRIPT'
     if [ "$RESTART_ON_EXIT" = "1" ]; then
       echo ">>> 部署未完成，恢复旧版本 app"
       docker compose -f docker-compose.prod.yml start app || true
+      exit 1
     fi
   }
   trap on_exit EXIT
@@ -78,7 +79,7 @@ ssh "$HOST" "${REMOTE_ENV[@]}" bash -s "$REMOTE_DIR" "$REF" << 'REMOTE_SCRIPT'
        cp /app/data/replay-removals.jsonl /backup/replay-removals.latest.jsonl; \
      elif [ ! -f /backup/replay-removals.latest.jsonl ]; then \
        : > /backup/replay-removals.latest.jsonl; \
-     fi" || backup_failed
+     fi" < /dev/null || backup_failed
   tar -tzf "backups/$BACKUP_STEM.tgz" > /dev/null || backup_failed
   chmod 600 "backups/$BACKUP_STEM.tgz" backups/replay-removals.latest.jsonl || backup_failed
   { cp .env "backups/env-$BACKUP_STEM" && chmod 600 "backups/env-$BACKUP_STEM"; } || backup_failed
