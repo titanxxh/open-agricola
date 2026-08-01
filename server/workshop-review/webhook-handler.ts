@@ -10,6 +10,7 @@ import {
 import {
   breaksReviewGateWithoutApproval,
   findApprovedHeadReview,
+  findApprovedMergedHeadReview,
   isReviewTargetEligible,
   type WorkshopReviewSnapshot,
 } from './github-review-provider.ts'
@@ -56,7 +57,12 @@ type PullRequestWebhook = {
   action?: unknown
   after?: unknown
   repository?: { full_name?: unknown }
-  pull_request?: { number?: unknown; html_url?: unknown; merged?: unknown }
+  pull_request?: {
+    number?: unknown
+    html_url?: unknown
+    merged?: unknown
+    base?: { ref?: unknown }
+  }
   review?: { commit_id?: unknown }
 }
 
@@ -198,14 +204,19 @@ export async function handleWorkshopReviewWebhook(
     return true
   }
 
+  // Graduation only follows a merge into main: a PR retargeted to another
+  // branch and merged never reaches the built-in registry, so it is handled
+  // below like an unmerged close (stale·offline) instead of terminalizing.
+  const mergedIntoMain = eventName === 'pull_request'
+    && payload.action === 'closed'
+    && payload.pull_request?.merged === true
+    && payload.pull_request?.base?.ref === 'main'
   const closesUnmerged = eventName === 'pull_request'
     && payload.action === 'closed'
-    && payload.pull_request?.merged !== true
+    && !mergedIntoMain
   // Graduation (#642): the PR merged — terminal transition, no binding or
   // SHA verification needed (GitHub's merge is the fact to reflect).
-  if (eventName === 'pull_request'
-    && payload.action === 'closed'
-    && payload.pull_request?.merged === true) {
+  if (mergedIntoMain) {
     const result = db.transaction(() => {
       const inserted = db.prepare(`
         INSERT OR IGNORE INTO github_webhook_events (
@@ -288,7 +299,7 @@ export async function handleWorkshopReviewWebhook(
         && dismissedCommit !== snapshot.headRefOid
       const reviewStillPending = snapshot.reviewDecision === null
         || snapshot.reviewDecision === 'REVIEW_REQUIRED'
-      const remainsValid = snapshot.state === 'MERGED'
+      const remainsValid = (snapshot.state === 'MERGED' && snapshot.baseRefName === 'main')
         || (eventName === 'pull_request_review'
           ? Boolean(findApprovedHeadReview(snapshot))
             || isReviewTargetEligible(snapshot)
@@ -341,15 +352,8 @@ export async function handleWorkshopReviewWebhook(
     // A merged PR can still receive its (delayed) approval delivery: the
     // head is frozen after merge, so the #629 SHA binding stays verifiable —
     // without this the pending graduation (#642) could never complete.
-    const approvedOnMergedHead = snapshot.state === 'MERGED'
-      && snapshot.reviewDecision === 'APPROVED'
-      ? snapshot.reviews.find(review =>
-          review.state === 'APPROVED'
-          && review.authorCanPushToRepository
-          && review.commitOid === snapshot.headRefOid,
-        )
-      : undefined
-    const approvedReview = findApprovedHeadReview(snapshot) ?? approvedOnMergedHead
+    const approvedReview = findApprovedHeadReview(snapshot)
+      ?? findApprovedMergedHeadReview(snapshot)
     const result = db.transaction(() => {
       if (!recordDelivery()) return { duplicate: true as const }
       if (!sameReviewBinding(getReviewBinding(db, prUrl), binding)) {
@@ -377,7 +381,14 @@ export async function handleWorkshopReviewWebhook(
         const graduated = approved > 0 && wasPendingMerge
           ? markCardMerged(db, { prUrl })
           : 0
-        return graduated > 0 ? { approved, graduated } : { approved }
+        if (graduated > 0) {
+          // The release containing the card may already be running (it
+          // shipped between the merge delivery and this delayed approval):
+          // reconcile the built-in takeover now instead of at next restart.
+          const builtIn = markBuiltInMergedCards(db, Object.keys(ALL_CARD_IMPLS)).flagged
+          return { approved, graduated, builtIn }
+        }
+        return { approved }
       }
       const breaksReview = breaksReviewGateWithoutApproval(snapshot)
       const invalidated = invalidateReviewedCard(db, {
