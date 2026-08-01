@@ -936,7 +936,7 @@ Action reaction listener 的同一 owner / phase 默认进入 `trigger-select`�
 | `C101_StallHolder` | 已对齐 | #186 “未围畜栏数”改用 `getUnfencedStableCountForCards`（含 B85，对齐 BGA `countUnfencedStablesForCards`） |
 | `C102_TreeGuard` | 已接受差异 | BGA banned，但 OA 按产品策略保留 |
 | `C103_GreenGrocer` | 已对齐 |  |
-| `C104_Collector` | 已对齐 |  |
+| `C104_Collector` | 已对齐 | choice 请求通过 `structuredChoicePrefixes` 接受前端逗号拼接的多选值，再由卡牌 resolver 校验资源种类、去重和 6/7/8/9 数量；GameSession 回归测试覆盖 #659。 |
 | `C105_BasketCarrier` | 已对齐 |  |
 | `C106_PotatoHarvester` | 已对齐 |  |
 | `C107_Baker` | 已对齐 |  |

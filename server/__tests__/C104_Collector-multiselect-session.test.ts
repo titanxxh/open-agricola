@@ -4,6 +4,8 @@ import '../../shared/cards/C/C104_Collector'
 
 import { createPlayerActionSpaces } from '../../shared/cards/player-action-space'
 import { writeCardExtraData } from '../../shared/cards/helpers/card-state'
+import { GameSession } from '../game/authoritative-session'
+import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 import type {
   ActionExecutionContext,
   ActionFlow,
@@ -64,6 +66,22 @@ const buildSpaceForPlayer = (state: GameState, ownerId: string): ActionSpace => 
     throw new Error(`expected player action space for ${CARD_ID} (owner=${ownerId})`)
   }
   return space
+}
+
+const createSession = () => {
+  const session = new GameSession(42)
+  stabilizeRandomHands(session.state.players)
+  const state = session.getState().state
+  state.currentPlayerIndex = 0
+  state.round = 1
+  state.players[0]!.occupationPlayed.push(CARD_ID)
+  for (const space of createPlayerActionSpaces(state)) {
+    if (!state.actionSpaces.some((entry) => entry.id === space.id)) {
+      state.actionSpaces.push(space)
+    }
+  }
+  session.loadState(state)
+  return session
 }
 
 describe('C104 — multi-select session (player action space)', () => {
@@ -138,28 +156,53 @@ describe('C104 — multi-select session (player action space)', () => {
     })
   })
 
-  it('insufficient selections: re-emits same choice (needed unchanged, no flow)', () => {
-    const player = createPlayer()
-    const state = createState([player])
-    const space = buildSpaceForPlayer(state, player.id)
-    const ctx = {
-      state,
-      player,
-      space,
-      params: {},
-    } as unknown as ActionExecutionContext
+  it('resolves the browser multi-select value through GameSession', () => {
+    const session = createSession()
+    const before = { ...session.state.players[0]!.resources }
 
-    // 1st use needs 6, but submit only 5 distinct
-    const reEmit = space.resolveChoice!(ctx, 'wood,clay,reed,stone,food')
-    expect(reEmit.type).toBe('request')
-    if (reEmit.type !== 'request') return
-    expect(reEmit.request.kind).toBe('choice')
-    if (reEmit.request.kind !== 'choice') return
-    expect(reEmit.promptKey).toBe('ui.interactionCollectorSelect')
-    expect(reEmit.promptParams).toEqual({ needed: 6 })
-    expect(reEmit.request.options).toHaveLength(10)
-    // Player resources untouched (mutation deferred to engine via flow)
-    expect(player.resources.wood).toBe(0)
-    expect(player.resources.begging).toBe(0)
+    const started = session.takeAction(0, CARD_ID)
+    expect(started.ok).toBe(true)
+    expect(started.interaction).toMatchObject({
+      stateId: 'wait',
+      playerIndex: 0,
+      request: { kind: 'choice' },
+      promptParams: { needed: 6 },
+    })
+    expect(started.interaction.allowedCommands).toContain('resolveChoice')
+    if (started.interaction.stateId !== 'wait' || started.interaction.request.kind !== 'choice') return
+    expect(started.interaction.request.options).toHaveLength(10)
+
+    const resolved = session.resolveChoice(0, 'wood,clay,reed,stone,food,grain')
+    expect(resolved.ok).toBe(true)
+    expect(resolved.state.players[0]!.resources).toMatchObject({
+      wood: before.wood + 1,
+      clay: before.clay + 1,
+      reed: before.reed + 1,
+      stone: before.stone + 1,
+      food: before.food + 1,
+      grain: before.grain + 1,
+      begging: before.begging + 1,
+    })
+    expect(resolved.state.players[0]!.cardStates[CARD_ID]?.extraData?.used).toBe(1)
+    expect(resolved.state.actionSpaces.find((space) => space.id === CARD_ID)?.takenBy).toHaveLength(1)
+    expect(resolved.state.log).toEqual(started.state.log)
+    expect(resolved.scores).toHaveLength(2)
+  })
+
+  it('keeps waiting when fewer than six distinct goods are submitted through GameSession', () => {
+    const session = createSession()
+    const before = { ...session.state.players[0]!.resources }
+    expect(session.takeAction(0, CARD_ID).ok).toBe(true)
+
+    const resolved = session.resolveChoice(0, 'wood,clay,reed,stone,food')
+    expect(resolved.ok).toBe(true)
+    expect(resolved.interaction).toMatchObject({
+      stateId: 'wait',
+      playerIndex: 0,
+      request: { kind: 'choice' },
+      promptParams: { needed: 6 },
+    })
+    expect(resolved.state.players[0]!.resources).toEqual(before)
+    expect(resolved.state.players[0]!.cardStates[CARD_ID]?.extraData?.used).toBeUndefined()
   })
 })
