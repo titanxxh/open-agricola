@@ -1,6 +1,6 @@
 import type Database from 'better-sqlite3'
 import type { IncomingMessage, ServerResponse } from 'node:http'
-import { markBuiltInMergedCards, markCardMerged, reconcilePendingMerges } from '../workshop-drafts.ts'
+import { markBuiltInMergedCards, markCardMerged } from '../workshop-drafts.ts'
 import { ALL_CARD_IMPLS } from '../../shared/cards/register-all.ts'
 import { verifyGitHubWebhook } from '../bug-report/github-issue-client.ts'
 import {
@@ -355,6 +355,14 @@ export async function handleWorkshopReviewWebhook(
       if (!sameReviewBinding(getReviewBinding(db, prUrl), binding)) {
         return { ignored: true as const }
       }
+      // Capture the pending-merge fact BEFORE the approval overwrites
+      // github_pr_status with 'open' — otherwise the reconciliation below
+      // would read zero pending rows and the card would stay 'approved'.
+      const wasPendingMerge = snapshot.state === 'MERGED'
+        || (db.prepare(
+          'SELECT github_pr_status FROM workshop_cards WHERE github_pr_url = ?',
+        ).get(prUrl) as { github_pr_status: string | null } | undefined)
+          ?.github_pr_status === 'merged'
       const approved = approvedReview
         ? approveReviewedVersion(db, {
             prUrl,
@@ -364,9 +372,11 @@ export async function handleWorkshopReviewWebhook(
           })
         : 0
       if (approvedReview) {
-        // The merge event may have arrived first (persisted as pending):
-        // graduate immediately now that the approval binding exists.
-        const graduated = approved > 0 ? reconcilePendingMerges(db) : 0
+        // The merge event may have arrived first: graduate immediately now
+        // that the approval binding exists.
+        const graduated = approved > 0 && wasPendingMerge
+          ? markCardMerged(db, { prUrl })
+          : 0
         return graduated > 0 ? { approved, graduated } : { approved }
       }
       const breaksReview = breaksReviewGateWithoutApproval(snapshot)

@@ -1153,7 +1153,7 @@ export function markCardMerged(
         github_pr_last_synced_at = ?,
         updated_at = MAX(updated_at + 1, ?)
     WHERE github_pr_url = ?
-      AND review_status != 'merged'
+      AND review_status = 'approved'
       AND approved_version_id IS NOT NULL
   `).run(now, now, input.prUrl).changes
 }
