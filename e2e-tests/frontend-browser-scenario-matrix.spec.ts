@@ -12,10 +12,7 @@ import { BACKEND_URL, FRONTEND_URL } from './fixtures'
 
 type LocaleScenario = {
   locale: 'en' | 'zh'
-  navigation: string
-  action: string
-  farm: string
-  information: string
+  actionArea: string
   score: string
   log: string
   expand: string
@@ -31,10 +28,7 @@ type VariantScenario = {
 
 const ENGLISH: LocaleScenario = {
   locale: 'en',
-  navigation: 'Game presentation',
-  action: 'Action',
-  farm: 'Farm',
-  information: 'Information',
+  actionArea: 'Action Spaces',
   score: 'Scoring Pad',
   log: 'Action Log',
   expand: 'expand',
@@ -45,10 +39,7 @@ const ENGLISH: LocaleScenario = {
 
 const CHINESE: LocaleScenario = {
   locale: 'zh',
-  navigation: '游戏视图',
-  action: '行动',
-  farm: '农场',
-  information: '信息',
+  actionArea: '行动区',
   score: '计分板',
   log: '行动记录',
   expand: '展开',
@@ -138,7 +129,7 @@ const openStandaloneSandbox = async (
   await page.goto(
     `${FRONTEND_URL}/?page=game&player=p1&embedded=1&devMode=1&bg=summer-1&sandboxRun=55000`,
   )
-  await expect(page.locator('.game-presentations')).toBeVisible({ timeout: 30_000 })
+  await expect(page.locator('.game-layout')).toBeVisible({ timeout: 30_000 })
 }
 
 const openWorkshopSandbox = async (
@@ -194,7 +185,7 @@ const openWorkshopSandbox = async (
   await page.locator('.ws-sandbox-btns').getByRole('button', { name: 'Start Sandbox' }).click()
 
   const sandbox = page.frameLocator('iframe[title="Sandbox"]')
-  await expect(sandbox.locator('.game-presentations')).toBeVisible({ timeout: 30_000 })
+  await expect(sandbox.locator('.game-layout')).toBeVisible({ timeout: 30_000 })
   return sandbox
 }
 
@@ -225,29 +216,28 @@ const openFixedRoom = async (
   await page.goto(
     `${FRONTEND_URL}/?player=${player}&transport=ws&room=${room}&devMode=1&bg=summer-1`,
   )
-  await expect(page.locator('.game-presentations')).toBeVisible({ timeout: 30_000 })
+  await expect(page.locator('.game-layout')).toBeVisible({ timeout: 30_000 })
 }
 
 const resetFixedRoom = async (page: Page, seed: number) => {
   await page.locator('.dev-panel .seed-input input').fill(String(seed))
   await page.getByRole('button', { name: /Reset|重开/ }).click()
-  await expect(page.locator('[data-mobile-action-id="farmland"]')).toBeEnabled()
+  await expect(page.locator('[data-action-id="farmland"] button').first()).toBeEnabled()
 }
 
-const expectTouchTarget = async (locator: Locator) => {
+const expectTouchTarget = async (locator: Locator, minSize = 44) => {
   const box = await locator.boundingBox()
   expect(box).not.toBeNull()
-  expect(box!.width).toBeGreaterThanOrEqual(44)
-  expect(box!.height).toBeGreaterThanOrEqual(44)
+  expect(box!.width).toBeGreaterThanOrEqual(minSize)
+  expect(box!.height).toBeGreaterThanOrEqual(minSize)
 }
 
 const completePlowInteraction = async (page: Page, locale: LocaleScenario) => {
-  const navigation = page.getByRole('navigation', { name: locale.navigation })
-  await navigation.getByRole('button', { name: locale.action, exact: true }).click()
-  const farmland = page.locator('[data-mobile-action-id="farmland"]')
-  await expectTouchTarget(farmland)
+  const farmland = page.locator('[data-action-id="farmland"] button').first()
+  await expectTouchTarget(farmland, 24)
   await farmland.click()
-  await expect(page.locator('.game-presentations')).toHaveAttribute('data-presentation', 'farm')
+  await expect(page.locator('.action-board')).toBeVisible()
+  await expect(page.locator('.farm-grid')).toBeVisible()
   await expect(page.locator('.interaction-bar__body')).toContainText(locale.plowPrompt)
   const tile = page.locator('.farm-tile.selectable').first()
   await expectTouchTarget(tile)
@@ -263,10 +253,7 @@ const inspectMobileInformation = async (
   locale: LocaleScenario,
   playerCount: number,
 ) => {
-  const navigation = page.getByRole('navigation', { name: locale.navigation })
-  await navigation.getByRole('button', { name: locale.farm, exact: true }).click()
   await expect(page.locator('.farm-grid')).toBeVisible()
-  await navigation.getByRole('button', { name: locale.information, exact: true }).click()
 
   const information = page.locator('.game-layout__right')
   const scoreSection = information.locator('.section', {
@@ -318,16 +305,13 @@ for (const viewport of GAMEPLAY_VIEWPORTS) {
     await page.setViewportSize(viewport)
     await openStandaloneSandbox(page, ENGLISH)
 
+    await expect(page.locator('.action-board')).toBeVisible()
+    await expect(page.locator('.farm-grid')).toBeVisible()
+    await expect(page.locator('.played-cards')).toBeVisible()
     if (viewport.width <= 900) {
-      const navigation = page.getByRole('navigation', { name: ENGLISH.navigation })
-      await expect(navigation).toBeVisible()
-      await navigation.getByRole('button', { name: ENGLISH.farm, exact: true }).click()
-      await expect(page.locator('.farm-grid')).toBeVisible()
-      await navigation.getByRole('button', { name: ENGLISH.information, exact: true }).click()
+      await expect(page.getByRole('navigation', { name: 'Game presentation' })).toHaveCount(0)
       await expect(page.locator('.game-layout__right')).toBeVisible()
     } else {
-      await expect(page.locator('.action-board')).toBeVisible()
-      await expect(page.locator('.farm-grid')).toBeVisible()
       await expect(page.locator('.score-panel')).toBeVisible()
       await expect(page.locator('.action-log')).toBeVisible()
     }
@@ -348,7 +332,7 @@ for (const variants of WORKSHOP_VARIANTS) {
       seasons: variants.seasons,
       moor: variants.moor,
     })
-    await expect(sandbox.locator('.mobile-actions-panel')).toBeVisible()
+    await expect(sandbox.locator('.action-board')).toBeVisible()
     await expect(sandbox.locator('[aria-label="Seasons Board"]')).toHaveCount(
       variants.seasons ? 1 : 0,
     )
@@ -356,10 +340,7 @@ for (const variants of WORKSHOP_VARIANTS) {
       variants.moor ? 1 : 0,
     )
 
-    const navigation = sandbox.getByRole('navigation', { name: ENGLISH.navigation })
-    await navigation.getByRole('button', { name: ENGLISH.farm, exact: true }).click()
     await expect(sandbox.locator('.farm-grid')).toBeVisible()
-    await navigation.getByRole('button', { name: ENGLISH.information, exact: true }).click()
     await expect(sandbox.locator('.game-layout__right')).toBeVisible()
   })
 }
@@ -372,9 +353,7 @@ for (const locale of [CHINESE, ENGLISH]) {
     await openStandaloneSandbox(page, locale)
     await expect(page.locator('html')).toHaveAttribute('lang', locale.locale)
 
-    const navigation = page.getByRole('navigation', { name: locale.navigation })
-    const actionButton = navigation.getByRole('button', { name: locale.action, exact: true })
-    await expect(actionButton).toHaveText(locale.action)
+    await expect(page.getByRole('region', { name: locale.actionArea })).toBeVisible()
     await completePlowInteraction(page, locale)
     await inspectMobileInformation(page, locale, 2)
   })
@@ -384,10 +363,7 @@ test('rule-critical mobile information stays text and asset based @no-emoji', as
   await page.setViewportSize({ width: 390, height: 844 })
   await openStandaloneSandbox(page, ENGLISH)
 
-  const navigation = page.getByRole('navigation', { name: ENGLISH.navigation })
-  const actions = page.locator('.mobile-actions-panel')
-  const criticalText = [await navigation.innerText(), await actions.innerText()]
-  await navigation.getByRole('button', { name: ENGLISH.farm, exact: true }).click()
+  const criticalText = await page.locator('.action-board .action-header').allInnerTexts()
   const resourceLabels = await page.locator('.player-resources-compact [aria-label]')
     .evaluateAll(elements => elements.map(element => element.getAttribute('aria-label') ?? ''))
   const resourceImages = await page.locator('.player-resources-compact .res-icon')
@@ -434,10 +410,9 @@ test.describe('iOS Safari browser smoke @webkit @ios-safari', () => {
     expect(shell.backgroundAttachment).toBe('scroll')
     expect(shell.farmTouchAction).toMatch(/pinch-zoom|manipulation/)
 
-    const navigation = page.getByRole('navigation', { name: ENGLISH.navigation })
-    await navigation.getByRole('button', { name: ENGLISH.action, exact: true }).click()
-    await page.locator('[data-mobile-action-id="farmland"]').click()
-    await expect(page.locator('.game-presentations')).toHaveAttribute('data-presentation', 'farm')
+    await page.locator('[data-action-id="farmland"] button').first().click()
+    await expect(page.locator('.action-board')).toBeVisible()
+    await expect(page.locator('.farm-grid')).toBeVisible()
     await expect(page.locator('.interaction-bar__body')).toContainText(ENGLISH.plowPrompt)
     expect(await page.locator('.interaction-bar').evaluate(element =>
       Number.parseFloat(getComputedStyle(element).paddingBottom),

@@ -42,7 +42,7 @@ test.describe('Interaction bar layout', () => {
     })
     await page.goto('/?page=game&player=p1&embedded=1&devMode=1')
     await page.getByRole('button', { name: 'Reset' }).click()
-    await expect(page.locator('[data-mobile-action-id="farmland"]')).toBeEnabled()
+    await expect(page.locator('[data-action-id="farmland"] button').first()).toBeEnabled()
   })
 
   test('keeps the last game content above a compact interaction bar at 768px', async ({ page }) => {
@@ -50,7 +50,7 @@ test.describe('Interaction bar layout', () => {
   })
 
   test('updates the reserved space when the interaction bar expands and shrinks', async ({ page }) => {
-    await page.locator('[data-mobile-action-id="farmland"]').click()
+    await page.locator('[data-action-id="farmland"] button').first().click()
     await expect(page.locator('.interaction-bar__body')).toContainText('Select a tile to plow')
 
     await expectPageMarginAboveInteractionBar(page)
