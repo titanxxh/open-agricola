@@ -727,6 +727,40 @@ describe('workshop review webhook', () => {
     `).get()).toEqual({ github_pr_status: 'closed' })
   })
 
+  it('records closure when a non-main merge closes an already-stale card', async () => {
+    // The earlier `edited` webhook already demoted the retargeted PR's card:
+    // the subsequent close must still land github_pr_status = 'closed'.
+    insertReviewedCard({
+      id: 'card-stale-retarget',
+      prNumber: 51,
+      reviewStatus: 'stale',
+      live: false,
+      reviewCommitSha: 'head-51',
+    })
+    const reviewRuntime = runtime()
+    vi.mocked(reviewRuntime.provider.getPullRequestSnapshot).mockResolvedValue({
+      ...openSnapshot('head-51'),
+      state: 'MERGED',
+      baseRefName: 'release',
+    })
+
+    const res = await deliver({
+      action: 'closed',
+      repository: { full_name: 'titanxxh/open-agricola' },
+      pull_request: {
+        number: 51,
+        html_url: 'https://github.com/titanxxh/open-agricola/pull/51',
+        merged: true,
+        base: { ref: 'release' },
+      },
+    }, 'pull_request', 'delivery-stale-retarget-close', reviewRuntime)
+
+    expect(JSON.parse(res.body)).toEqual({ ok: true, invalidated: 1 })
+    expect(db.prepare(`
+      SELECT review_status, github_pr_status FROM workshop_cards WHERE id = 'card-stale-retarget'
+    `).get()).toEqual({ review_status: 'stale', github_pr_status: 'closed' })
+  })
+
   it('reconciles the built-in takeover when a delayed approval graduates the card', async () => {
     const builtInCardId = Object.keys(ALL_CARD_IMPLS)[0]!
     const now = Date.now()

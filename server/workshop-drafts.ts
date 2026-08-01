@@ -852,6 +852,8 @@ export function invalidateReviewedCard(
   },
 ): number {
   const now = Date.now()
+  // 'stale' rows are included so a later PR-status change (e.g. the close of
+  // an already-demoted retargeted PR) is still recorded on the binding.
   return db.prepare(`
     UPDATE workshop_cards
     SET review_status = 'stale',
@@ -860,7 +862,7 @@ export function invalidateReviewedCard(
         github_pr_last_synced_at = ?,
         updated_at = MAX(updated_at + 1, ?)
     WHERE github_pr_url = ?
-      AND review_status IN ('in_review', 'approved')
+      AND review_status IN ('in_review', 'approved', 'stale')
       AND (? IS NULL OR review_commit_sha IS NULL OR review_commit_sha <> ?)
       AND (
         ? IS NULL OR (
