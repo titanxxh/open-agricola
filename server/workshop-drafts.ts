@@ -1152,7 +1152,9 @@ export function markCardMerged(
         github_pr_status = 'merged',
         github_pr_last_synced_at = ?,
         updated_at = MAX(updated_at + 1, ?)
-    WHERE github_pr_url = ? AND review_status != 'merged'
+    WHERE github_pr_url = ?
+      AND review_status != 'merged'
+      AND approved_version_id IS NOT NULL
   `).run(now, now, input.prUrl).changes
 }
 
@@ -1164,25 +1166,32 @@ export function markCardMerged(
 export function markBuiltInMergedCards(
   db: Database.Database,
   builtInCardIds: readonly string[],
-): number {
+): { flagged: number; unflagged: number } {
   // Guard in the v25/v26 pragma style: partially-seeded test fixtures may
   // lack the two-axis columns; real databases always have them post-v26.
   const columns = db.pragma('table_info(workshop_cards)') as Array<{ name: string }>
-  if (!columns.some(({ name }) => name === 'review_status')) return 0
+  if (!columns.some(({ name }) => name === 'review_status')) return { flagged: 0, unflagged: 0 }
   const rows = db.prepare(`
-    SELECT id, card_id FROM workshop_cards
-    WHERE review_status = 'merged' AND built_in = 0
-  `).all() as Array<{ id: string; card_id: string }>
+    SELECT id, card_id, built_in FROM workshop_cards
+    WHERE review_status = 'merged'
+  `).all() as Array<{ id: string; card_id: string; built_in: number }>
   let flagged = 0
+  let unflagged = 0
   const now = Date.now()
   for (const row of rows) {
-    if (!builtInCardIds.includes(row.card_id)) continue
+    const inRegistry = builtInCardIds.includes(row.card_id)
+    // Reconcile in BOTH directions: a rollback deployment whose registry
+    // does not contain the card must fall back to the workshop snapshot,
+    // otherwise the card would vanish for the whole rollback window.
+    const next = inRegistry ? 1 : 0
+    if (row.built_in === next) continue
     db.prepare(`
-      UPDATE workshop_cards SET built_in = 1, updated_at = MAX(updated_at + 1, ?) WHERE id = ?
-    `).run(now, row.id)
-    flagged += 1
+      UPDATE workshop_cards SET built_in = ?, updated_at = MAX(updated_at + 1, ?) WHERE id = ?
+    `).run(next, now, row.id)
+    if (next === 1) flagged += 1
+    else unflagged += 1
   }
-  return flagged
+  return { flagged, unflagged }
 }
 
 /**

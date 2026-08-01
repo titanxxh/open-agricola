@@ -182,8 +182,9 @@ getDb()
 // Release-window takeover (#642): merged workshop cards now present in the
 // built-in registry switch to the built-in definition.
 {
-  const flagged = markBuiltInMergedCards(getDb(), Object.keys(ALL_CARD_IMPLS))
+  const { flagged, unflagged } = markBuiltInMergedCards(getDb(), Object.keys(ALL_CARD_IMPLS))
   if (flagged > 0) console.log(`[workshop] ${flagged} merged card(s) now served by the built-in registry`)
+  if (unflagged > 0) console.log(`[workshop] ${unflagged} merged card(s) fell back to their workshop snapshot (registry rollback)`)
 }
 const replayRemovalState = process.env.NODE_ENV !== 'test'
   ? applyReplayRemovalLedger(getDb(), {

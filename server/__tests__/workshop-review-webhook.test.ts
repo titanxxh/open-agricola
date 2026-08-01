@@ -616,6 +616,9 @@ describe('workshop review webhook', () => {
 
   it('graduates a live card to merged when its PR merges', async () => {
     insertReviewedCard({ id: 'card-merged-pr', prNumber: 47 })
+    db.prepare(`
+      UPDATE workshop_cards SET approved_version_id = 'ver-47' WHERE id = 'card-merged-pr'
+    `).run()
     const reviewRuntime = runtime()
 
     const res = await deliver({
@@ -647,6 +650,34 @@ describe('workshop review webhook', () => {
       },
     }, 'pull_request', 'delivery-merged-pr', reviewRuntime)
     expect(JSON.parse(dup.body)).toEqual({ ok: true, duplicate: true })
+  })
+
+  it('defers an out-of-order merge delivery until the approval binding exists', async () => {
+    // approved_version_id is still null: the merge arrived before the
+    // approval landed. The delivery must stay unconsumed for redelivery.
+    insertReviewedCard({ id: 'card-early-merge', prNumber: 48, reviewStatus: 'in_review', live: false })
+    const payload = {
+      action: 'closed',
+      repository: { full_name: 'titanxxh/open-agricola' },
+      pull_request: {
+        number: 48,
+        html_url: 'https://github.com/titanxxh/open-agricola/pull/48',
+        merged: true,
+      },
+    }
+    const res = await deliver(payload, 'pull_request', 'delivery-early-merge', runtime())
+    expect(JSON.parse(res.body)).toEqual({ ok: true, deferred: true })
+    expect(loadWorkspace(db, 'card-early-merge', 'author').reviewStatus).toBe('in_review')
+
+    // the approval lands, then GitHub redelivers the merge: graduation completes
+    db.prepare(`
+      UPDATE workshop_cards
+      SET review_status = 'approved', approved_version_id = 'ver-48'
+      WHERE id = 'card-early-merge'
+    `).run()
+    const retry = await deliver(payload, 'pull_request', 'delivery-early-merge', runtime())
+    expect(JSON.parse(retry.body)).toEqual({ ok: true, merged: 1, builtIn: 0 })
+    expect(loadWorkspace(db, 'card-early-merge', 'author').reviewStatus).toBe('merged')
   })
 
   it('invalidates a live card when its PR closes without merging', async () => {
