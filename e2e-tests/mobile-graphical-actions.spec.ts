@@ -151,6 +151,19 @@ test('narrow 6-player board keeps its overview and offers touch-size graphical c
   await sandbox.getByRole('button', { name: 'Enlarge action controls' }).click()
   await expect(sandbox.getByRole('button', { name: 'Show full board' })).toHaveAttribute('aria-pressed', 'true')
 
+  const precisionWrapper = sandbox.locator('.action-board-wrapper')
+  const scrollState = await precisionWrapper.evaluate((element) => ({
+    overflowX: getComputedStyle(element).overflowX,
+    scrollWidth: element.scrollWidth,
+    clientWidth: element.clientWidth,
+  }))
+  expect(scrollState.overflowX).toBe('auto')
+  expect(scrollState.scrollWidth).toBeGreaterThan(scrollState.clientWidth)
+  expect(await precisionWrapper.evaluate((element) => {
+    element.scrollLeft = element.scrollWidth
+    return element.scrollLeft
+  })).toBeGreaterThan(0)
+
   const precisionTarget = await copse.boundingBox()
   expect(precisionTarget?.width).toBeGreaterThanOrEqual(44)
   expect(precisionTarget?.height).toBeGreaterThanOrEqual(44)

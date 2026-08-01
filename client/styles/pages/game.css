@@ -1070,7 +1070,7 @@
   cursor: pointer;
 }
 
-.action-board-wrapper--precision {
+.action-board-wrapper.action-board-wrapper--precision {
   overflow-x: auto;
   overflow-y: hidden;
   overscroll-behavior-x: contain;
