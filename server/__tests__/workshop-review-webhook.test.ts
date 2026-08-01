@@ -9,6 +9,7 @@ import {
 } from '../workshop-review/webhook-handler.ts'
 import type { WorkshopReviewSnapshot } from '../workshop-review/github-review-provider.ts'
 import { enterReview, invalidateReviewedCard, loadWorkspace, reconcilePendingMerges } from '../workshop-drafts.ts'
+import { ALL_CARD_IMPLS } from '../../shared/cards/register-all.ts'
 
 let db: Database.Database
 
@@ -628,6 +629,7 @@ describe('workshop review webhook', () => {
         number: 47,
         html_url: 'https://github.com/titanxxh/open-agricola/pull/47',
         merged: true,
+        base: { ref: 'main' },
       },
     }, 'pull_request', 'delivery-merged-pr', reviewRuntime)
 
@@ -647,6 +649,7 @@ describe('workshop review webhook', () => {
         number: 47,
         html_url: 'https://github.com/titanxxh/open-agricola/pull/47',
         merged: true,
+        base: { ref: 'main' },
       },
     }, 'pull_request', 'delivery-merged-pr', reviewRuntime)
     expect(JSON.parse(dup.body)).toEqual({ ok: true, duplicate: true })
@@ -664,6 +667,7 @@ describe('workshop review webhook', () => {
         number: 48,
         html_url: 'https://github.com/titanxxh/open-agricola/pull/48',
         merged: true,
+        base: { ref: 'main' },
       },
     }
     const res = await deliver(payload, 'pull_request', 'delivery-early-merge', runtime())
@@ -686,6 +690,101 @@ describe('workshop review webhook', () => {
     // duplicate delivery of the original hook is idempotent
     const dup = await deliver(payload, 'pull_request', 'delivery-early-merge', runtime())
     expect(JSON.parse(dup.body)).toEqual({ ok: true, duplicate: true })
+  })
+
+  it('demotes a live card when its PR merges into a branch other than main', async () => {
+    insertReviewedCard({ id: 'card-retargeted-merge', prNumber: 49, reviewCommitSha: 'head-49' })
+    db.prepare(`
+      UPDATE workshop_cards SET approved_version_id = 'ver-49' WHERE id = 'card-retargeted-merge'
+    `).run()
+    const reviewRuntime = runtime()
+    vi.mocked(reviewRuntime.provider.getPullRequestSnapshot).mockResolvedValue({
+      ...openSnapshot('head-49'),
+      state: 'MERGED',
+      baseRefName: 'release',
+    })
+
+    const res = await deliver({
+      action: 'closed',
+      repository: { full_name: 'titanxxh/open-agricola' },
+      pull_request: {
+        number: 49,
+        html_url: 'https://github.com/titanxxh/open-agricola/pull/49',
+        merged: true,
+        base: { ref: 'release' },
+      },
+    }, 'pull_request', 'delivery-retargeted-merge', reviewRuntime)
+
+    // merged outside main never reaches the built-in registry: the card must
+    // not terminalize, and no false pending-merge fact may be left behind
+    expect(JSON.parse(res.body)).toEqual({ ok: true, invalidated: 1 })
+    expect(loadWorkspace(db, 'card-retargeted-merge', 'author')).toMatchObject({
+      reviewStatus: 'stale',
+      live: false,
+    })
+    expect(db.prepare(`
+      SELECT github_pr_status FROM workshop_cards WHERE id = 'card-retargeted-merge'
+    `).get()).toEqual({ github_pr_status: 'closed' })
+  })
+
+  it('reconciles the built-in takeover when a delayed approval graduates the card', async () => {
+    const builtInCardId = Object.keys(ALL_CARD_IMPLS)[0]!
+    const now = Date.now()
+    db.prepare(`
+      INSERT INTO workshop_cards (
+        id, author_id, card_id, card_type, name, card_json,
+        review_status, live, created_at, updated_at
+      ) VALUES ('card-late-approval', 'author', ?, 'occupation', 'Late Approval', '{}', 'unsubmitted', 0, ?, ?)
+    `).run(builtInCardId, now, now)
+    enterReview(db, {
+      cardId: 'card-late-approval',
+      authorId: 'author',
+      prUrl: 'https://github.com/titanxxh/open-agricola/pull/50',
+      expectedRevision: 1,
+      commitSha: 'head-50',
+    })
+
+    // merge delivery arrives first: only the merge fact is persisted
+    const mergeRes = await deliver({
+      action: 'closed',
+      repository: { full_name: 'titanxxh/open-agricola' },
+      pull_request: {
+        number: 50,
+        html_url: 'https://github.com/titanxxh/open-agricola/pull/50',
+        merged: true,
+        base: { ref: 'main' },
+      },
+    }, 'pull_request', 'delivery-late-approval-merge', runtime())
+    expect(JSON.parse(mergeRes.body)).toEqual({ ok: true, pendingMerge: true })
+
+    // the release containing the card is already running when the delayed
+    // approval lands: graduation must reconcile the takeover immediately
+    const reviewRuntime = runtime()
+    vi.mocked(reviewRuntime.provider.getPullRequestSnapshot).mockResolvedValue({
+      ...openSnapshot('head-50'),
+      state: 'MERGED',
+      reviewDecision: 'APPROVED',
+      reviews: [{
+        id: 'review-50',
+        state: 'APPROVED',
+        commitOid: 'head-50',
+        authorCanPushToRepository: true,
+      }],
+    })
+    const res = await deliver({
+      action: 'submitted',
+      repository: { full_name: 'titanxxh/open-agricola' },
+      pull_request: {
+        number: 50,
+        html_url: 'https://github.com/titanxxh/open-agricola/pull/50',
+      },
+    }, 'pull_request_review', 'delivery-late-approval-review', reviewRuntime)
+
+    expect(JSON.parse(res.body)).toEqual({ ok: true, approved: 1, graduated: 1, builtIn: 1 })
+    expect(loadWorkspace(db, 'card-late-approval', 'author').reviewStatus).toBe('merged')
+    expect(db.prepare(`
+      SELECT built_in FROM workshop_cards WHERE id = 'card-late-approval'
+    `).get()).toEqual({ built_in: 1 })
   })
 
   it('invalidates a live card when its PR closes without merging', async () => {
