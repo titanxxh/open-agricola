@@ -854,11 +854,14 @@ export function invalidateReviewedCard(
   const now = Date.now()
   // 'stale' rows are included so a later PR-status change (e.g. the close of
   // an already-demoted retargeted PR) is still recorded on the binding.
+  // Without an explicit prStatus the recorded status is preserved: callers
+  // that lack a snapshot (fail-closed, approve-validation failures) must not
+  // overwrite a persisted 'closed'/'merged' fact with a default.
   return db.prepare(`
     UPDATE workshop_cards
     SET review_status = 'stale',
         live = 0,
-        github_pr_status = ?,
+        github_pr_status = COALESCE(?, github_pr_status),
         github_pr_last_synced_at = ?,
         updated_at = MAX(updated_at + 1, ?)
     WHERE github_pr_url = ?
@@ -876,7 +879,7 @@ export function invalidateReviewedCard(
         )
       )
   `).run(
-    input.prStatus ?? 'open',
+    input.prStatus ?? null,
     now,
     now,
     input.prUrl,

@@ -11,6 +11,7 @@ import {
   breaksReviewGateWithoutApproval,
   findApprovedHeadReview,
   findApprovedMergedHeadReview,
+  githubPrStatus,
   isReviewTargetEligible,
   type WorkshopReviewSnapshot,
 } from './github-review-provider.ts'
@@ -332,7 +333,7 @@ export async function handleWorkshopReviewWebhook(
       }
       const invalidated = invalidateReviewedCard(db, {
         prUrl,
-        ...(payload.action === 'closed' ? { prStatus: 'closed' } : {}),
+        prStatus: githubPrStatus(snapshot),
         ...(preserveCommitSha ? { preserveCommitSha } : {}),
         expectedBinding: binding,
       })
@@ -393,6 +394,7 @@ export async function handleWorkshopReviewWebhook(
       const breaksReview = breaksReviewGateWithoutApproval(snapshot)
       const invalidated = invalidateReviewedCard(db, {
         prUrl,
+        prStatus: githubPrStatus(snapshot),
         ...(!breaksReview ? { preserveCommitSha: snapshot.headRefOid } : {}),
         expectedBinding: binding,
       })

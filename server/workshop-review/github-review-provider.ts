@@ -23,6 +23,17 @@ export const isReviewTargetEligible = (
   && !snapshot.isDraft
   && snapshot.baseRefName === 'main'
 
+export const githubPrStatus = (
+  snapshot: WorkshopReviewSnapshot,
+): 'open' | 'merged' | 'closed' => snapshot.state === 'MERGED'
+  // 'merged' means "a graduation-relevant merge fact": a PR retargeted away
+  // from main and merged never enters the built-in registry, so reporting it
+  // as 'merged' would arm reconcilePendingMerges with a false graduation.
+  ? (snapshot.baseRefName === 'main' ? 'merged' : 'closed')
+  : snapshot.state === 'CLOSED'
+    ? 'closed'
+    : 'open'
+
 export const breaksReviewGateWithoutApproval = (
   snapshot: WorkshopReviewSnapshot,
 ): boolean => snapshot.state === 'MERGED'

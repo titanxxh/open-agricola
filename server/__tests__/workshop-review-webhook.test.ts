@@ -761,6 +761,56 @@ describe('workshop review webhook', () => {
     `).get()).toEqual({ review_status: 'stale', github_pr_status: 'closed' })
   })
 
+  it('preserves the recorded closure when out-of-order deliveries revisit a stale binding', async () => {
+    insertReviewedCard({
+      id: 'card-closed-stale',
+      prNumber: 52,
+      reviewStatus: 'stale',
+      live: false,
+      reviewCommitSha: 'head-52',
+    })
+    db.prepare(`
+      UPDATE workshop_cards SET github_pr_status = 'closed' WHERE id = 'card-closed-stale'
+    `).run()
+
+    // snapshot available: the status is re-derived, never defaulted to 'open'
+    const reviewRuntime = runtime()
+    vi.mocked(reviewRuntime.provider.getPullRequestSnapshot).mockResolvedValue({
+      ...openSnapshot('head-52-b'),
+      state: 'MERGED',
+      baseRefName: 'release',
+    })
+    const edited = await deliver({
+      action: 'edited',
+      repository: { full_name: 'titanxxh/open-agricola' },
+      pull_request: {
+        number: 52,
+        html_url: 'https://github.com/titanxxh/open-agricola/pull/52',
+      },
+    }, 'pull_request', 'delivery-stale-edited', reviewRuntime)
+    expect(JSON.parse(edited.body)).toMatchObject({ ok: true })
+    expect(db.prepare(`
+      SELECT github_pr_status FROM workshop_cards WHERE id = 'card-closed-stale'
+    `).get()).toEqual({ github_pr_status: 'closed' })
+
+    // GitHub unavailable: fail-closed has no snapshot and must not overwrite
+    const failingRuntime = runtime()
+    vi.mocked(failingRuntime.provider.getPullRequestSnapshot)
+      .mockRejectedValue(new Error('github down'))
+    const failed = await deliver({
+      action: 'synchronize',
+      repository: { full_name: 'titanxxh/open-agricola' },
+      pull_request: {
+        number: 52,
+        html_url: 'https://github.com/titanxxh/open-agricola/pull/52',
+      },
+    }, 'pull_request', 'delivery-stale-failclosed', failingRuntime)
+    expect(JSON.parse(failed.body)).toMatchObject({ ok: true, conservative: true })
+    expect(db.prepare(`
+      SELECT github_pr_status FROM workshop_cards WHERE id = 'card-closed-stale'
+    `).get()).toEqual({ github_pr_status: 'closed' })
+  })
+
   it('reconciles the built-in takeover when a delayed approval graduates the card', async () => {
     const builtInCardId = Object.keys(ALL_CARD_IMPLS)[0]!
     const now = Date.now()
