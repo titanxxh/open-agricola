@@ -9,6 +9,8 @@ import {
   checkpointDraft,
   adminTakedownCard,
   createCard,
+  markBuiltInMergedCards,
+  markCardMerged,
   enterReview,
   unpublish,
   getHandoffReadiness,
@@ -1027,6 +1029,38 @@ describe('workshop draft aggregate', () => {
     expect(adminTakedownCard(db, created.id)).toEqual({ reviewStatus: 'unsubmitted', live: false, removedRoomIds: [] })
     expect(() => adminTakedownCard(db, 'missing-card'))
       .toThrowError(expect.objectContaining<Partial<WorkshopDraftError>>({ code: 'not_found' }))
+  })
+
+  it('graduates a merged PR: live snapshot serves the release window, then built_in retires it', () => {
+    const created = createCard(db, { authorId: 'author', draft: baseDraft() })
+    enterReview(db, {
+      cardId: created.id,
+      authorId: 'author',
+      prUrl: 'https://github.com/x/y/pull/42',
+      expectedRevision: 1,
+    })
+    approveCurrentDraft(db, { cardId: created.id, authorId: 'author' })
+    publish(db, { cardId: created.id, authorId: 'author', baseRevision: 1 })
+
+    expect(markCardMerged(db, { prUrl: 'https://github.com/x/y/pull/42' })).toBe(1)
+    const merged = loadWorkspace(db, created.id, 'author')
+    expect(merged.reviewStatus).toBe('merged')
+    expect(merged.live).toBe(true)
+    // release window: the approved snapshot keeps serving rooms
+    expect(loadLiveDraft(db, created.id)).toMatchObject({ name: 'Field Keeper' })
+    // merged cards cannot be unpublished or edited in the workshop
+    expect(() => unpublish(db, { cardId: created.id, authorId: 'author', baseRevision: 1 }))
+      .toThrowError(expect.objectContaining<Partial<WorkshopDraftError>>({ code: 'conflict' }))
+
+    // a release containing the card ships: built-in registry takes over
+    expect(markBuiltInMergedCards(db, ['CUSTOM_FieldKeeper'])).toEqual({ flagged: 1, unflagged: 0 })
+    expect(() => loadLiveDraft(db, created.id))
+      .toThrowError(expect.objectContaining<Partial<WorkshopDraftError>>({ code: 'not_found' }))
+    // idempotent: second startup flags nothing new
+    expect(markBuiltInMergedCards(db, ['CUSTOM_FieldKeeper'])).toEqual({ flagged: 0, unflagged: 0 })
+    // rollback deployment without the card: fall back to the workshop snapshot
+    expect(markBuiltInMergedCards(db, [])).toEqual({ flagged: 0, unflagged: 1 })
+    expect(loadLiveDraft(db, created.id)).toMatchObject({ name: 'Field Keeper' })
   })
 
   it('treats merged cards as read-only in the workshop', () => {

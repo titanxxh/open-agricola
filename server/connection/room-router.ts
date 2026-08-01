@@ -87,7 +87,7 @@ const loadCustomCards = (
   let hasNotLive = false
   for (const dbId of cardDbIds) {
     const row = db.prepare(
-      'SELECT card_type, card_json, code_manifest, art_url, review_status, live, author_id FROM workshop_cards WHERE id = ?',
+      'SELECT card_type, card_json, code_manifest, art_url, review_status, live, built_in, author_id FROM workshop_cards WHERE id = ?',
     ).get(dbId) as {
       card_type: string
       card_json: string
@@ -95,9 +95,14 @@ const loadCustomCards = (
       art_url: string | null
       review_status: string
       live: number
+      built_in: number
       author_id: string
     } | undefined
     if (!row) continue
+    // A graduated card taken over by the built-in registry (#642) is no
+    // longer injected per-room: it lives in the community deck like any
+    // built-in card. Skip it without rejecting the room.
+    if (row.review_status === 'merged' && row.built_in === 1) continue
     if (isLoadableLive(row)) {
       try {
         result.push(workshopDraftToCustomCard(loadLiveDraft(db, dbId)))
@@ -719,8 +724,15 @@ function handleNewGame(ctx: ConnectionCtx, msg: Extract<ClientCommand, { type: '
       return
     }
   }
-  const customCards = room.customCards
-    ?? loadCustomCardsFromDb(room.customCardDbIds ?? [], room.createdBy)
+  // A rematch is a new game: reload through the current gate instead of
+  // reusing the embedded snapshot, so takeover (#642) and unpublish apply
+  // to the fresh room while the finished game stays untouched. The id list
+  // is refreshed alongside so a stale id cannot mark this room for a later
+  // takedown it does not deserve.
+  const reloaded = loadCustomCards(room.customCardDbIds ?? [], room.createdBy, { liveOnly: true })
+  const customCards = reloaded.cards
+  room.customCardDbIds = reloaded.loadedDbIds
+  room.customCards = customCards
   const enableCommunityDeck = room.session.state.enableCommunityDeck
   const enableParentCards = room.enableParentCards ?? room.session.state.enableParentCards
   const draftMode = room.draftMode ?? room.session.state.draftMode

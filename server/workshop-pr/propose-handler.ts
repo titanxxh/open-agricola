@@ -3,6 +3,7 @@ import { readFileSync, existsSync } from 'node:fs'
 import { join } from 'node:path'
 import { nanoid } from 'nanoid'
 import { getDb } from '../db.ts'
+import { ALL_CARD_IMPLS } from '../../shared/cards/register-all.ts'
 import { validateSession, extractToken } from '../auth.ts'
 import { corsHeaders } from '../http-origin.ts'
 import { workshopPrConfig, workshopPrEnabled } from './config.ts'
@@ -16,6 +17,8 @@ import {
   hasReservedCardId,
   invalidateReviewedCard,
   loadWorkspace,
+  markBuiltInMergedCards,
+  reconcilePendingMerges,
 } from '../workshop-drafts.ts'
 import {
   breaksReviewGateWithoutApproval,
@@ -504,6 +507,12 @@ export async function handleRefreshPrStatus(
        SET github_pr_status = ?, github_pr_last_synced_at = ?
        WHERE id = ? AND github_pr_url = ? AND updated_at = ?`,
     ).run(status, now, cardDbId, wcard.github_pr_url, expectedBinding.updatedAt)
+    // A missed merge webhook is repaired here: once the PR reads as merged
+    // and the approval binding exists, the pending graduation completes —
+    // including the built-in takeover if the running release has the card.
+    if (status === 'merged' && reconcilePendingMerges(db) > 0) {
+      markBuiltInMergedCards(db, Object.keys(ALL_CARD_IMPLS))
+    }
 
     sendJson(res, 200, { ok: true, status })
   } catch (err) {

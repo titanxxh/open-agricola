@@ -440,7 +440,7 @@ export async function handleWorkshopRoute(
       return true
     }
 
-    let where = "w.review_status = 'approved' AND w.live = 1 AND w.approved_version_id IS NOT NULL"
+    let where = "((w.review_status = 'approved' AND w.live = 1) OR w.review_status = 'merged') AND w.approved_version_id IS NOT NULL"
     const params: unknown[] = []
     if (featured) where += ' AND w.featured = 1'
     if (search) {
@@ -954,10 +954,14 @@ export async function handleWorkshopRoute(
   if (req.method === 'DELETE' && cardDeleteMatch) {
     if (!user) { sendJson(res, 401, { ok: false, error: 'Not authenticated' }); return true }
     const cardDbId = cardDeleteMatch[1]!
-    const row = db.prepare('SELECT author_id FROM workshop_cards WHERE id = ?').get(cardDbId) as
-      | { author_id: string } | undefined
+    const row = db.prepare('SELECT author_id, review_status FROM workshop_cards WHERE id = ?').get(cardDbId) as
+      | { author_id: string; review_status: string } | undefined
     if (!row) { sendJson(res, 404, { ok: false, error: 'Card not found' }); return true }
     if (row.author_id !== user.id && !isAdmin(user.username)) { sendJson(res, 403, { ok: false, error: 'Forbidden' }); return true }
+    if (row.review_status === 'merged' && !isAdmin(user.username)) {
+      sendJson(res, 403, { ok: false, error: 'Merged cards are permanent memorials; contact an admin' })
+      return true
+    }
     db.prepare('DELETE FROM workshop_cards WHERE id = ?').run(cardDbId)
     sendJson(res, 200, { ok: true })
     return true
@@ -968,8 +972,10 @@ export async function handleWorkshopRoute(
   if (req.method === 'POST' && likeMatch) {
     if (!user) { sendJson(res, 401, { ok: false, error: 'Not authenticated' }); return true }
     const cardDbId = likeMatch[1]!
-    const cardRow = db.prepare('SELECT review_status, live, author_id FROM workshop_cards WHERE id = ?').get(cardDbId) as { review_status: string; live: number; author_id: string } | undefined
-    if (!cardRow || (!isLoadableLive(cardRow) && cardRow.author_id !== user.id)) {
+    const cardRow = db.prepare('SELECT review_status, live, built_in, author_id FROM workshop_cards WHERE id = ?').get(cardDbId) as { review_status: string; live: number; built_in: number; author_id: string } | undefined
+    const publiclyVisible = cardRow
+      && (isLoadableLive(cardRow) || cardRow.review_status === 'merged')
+    if (!cardRow || (!publiclyVisible && cardRow.author_id !== user.id)) {
       sendJson(res, 404, { ok: false, error: 'Card not found' }); return true
     }
     const existing = db.prepare('SELECT 1 FROM card_likes WHERE user_id = ? AND card_id = ?').get(user.id, cardDbId)

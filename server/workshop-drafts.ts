@@ -673,8 +673,8 @@ export function loadLiveDraft(
 ): WorkshopDraft {
   const row = db.prepare(`
     SELECT * FROM workshop_cards
-    WHERE id = ? AND review_status = 'approved' AND live = 1
-      AND approved_version_id IS NOT NULL
+    WHERE id = ? AND live = 1 AND approved_version_id IS NOT NULL
+      AND (review_status = 'approved' OR (review_status = 'merged' AND built_in = 0))
   `).get(cardId) as WorkshopCardRow | undefined
   if (!row) throw new WorkshopDraftError('not_found', 'Card not found')
   const current = rowToWorkspace(row)
@@ -1117,6 +1117,13 @@ export function unpublish(
 ): WorkshopWorkspace {
   return db.transaction(() => {
     const current = loadWorkspace(db, input.cardId, input.authorId)
+    if (current.reviewStatus === 'merged') {
+      throw new WorkshopDraftError(
+        'conflict',
+        'Merged cards are managed by the main repository',
+        current,
+      )
+    }
     if (current.revision !== input.baseRevision) {
       throw new WorkshopDraftError('conflict', 'Draft revision conflict', current)
     }
@@ -1127,6 +1134,86 @@ export function unpublish(
     `).run(Date.now(), current.id)
     return loadWorkspace(db, current.id, input.authorId)
   })()
+}
+
+/**
+ * Graduation (#642, PRD #634): the review PR merged into the main repository.
+ * The card enters the read-only 'merged' terminal state; a live card keeps
+ * its live flag so the approved snapshot serves through the release window.
+ */
+export function markCardMerged(
+  db: Database.Database,
+  input: { prUrl: string },
+): number {
+  const now = Date.now()
+  return db.prepare(`
+    UPDATE workshop_cards
+    SET review_status = 'merged',
+        github_pr_status = 'merged',
+        github_pr_last_synced_at = ?,
+        updated_at = MAX(updated_at + 1, ?)
+    WHERE github_pr_url = ?
+      AND review_status = 'approved'
+      AND approved_version_id IS NOT NULL
+  `).run(now, now, input.prUrl).changes
+}
+
+/**
+ * Complete graduations whose merge event arrived before the approval binding
+ * (#642): the merge fact is persisted as github_pr_status='merged'; once the
+ * approval lands, the next reconciliation point graduates the card.
+ */
+export function reconcilePendingMerges(db: Database.Database): number {
+  const columns = db.pragma('table_info(workshop_cards)') as Array<{ name: string }>
+  if (!columns.some(({ name }) => name === 'review_status')) return 0
+  const rows = db.prepare(`
+    SELECT github_pr_url FROM workshop_cards
+    WHERE github_pr_status = 'merged'
+      AND review_status != 'merged'
+      AND approved_version_id IS NOT NULL
+      AND github_pr_url IS NOT NULL
+  `).all() as Array<{ github_pr_url: string }>
+  let graduated = 0
+  for (const row of rows) {
+    graduated += markCardMerged(db, { prUrl: row.github_pr_url })
+  }
+  return graduated
+}
+
+/**
+ * Release-window takeover (#642): at startup, flag merged cards whose card_id
+ * is now present in the built-in registry. From then on rooms use the
+ * built-in definition and the workshop snapshot retires (isLoadableLive).
+ */
+export function markBuiltInMergedCards(
+  db: Database.Database,
+  builtInCardIds: readonly string[],
+): { flagged: number; unflagged: number } {
+  // Guard in the v25/v26 pragma style: partially-seeded test fixtures may
+  // lack the two-axis columns; real databases always have them post-v26.
+  const columns = db.pragma('table_info(workshop_cards)') as Array<{ name: string }>
+  if (!columns.some(({ name }) => name === 'review_status')) return { flagged: 0, unflagged: 0 }
+  const rows = db.prepare(`
+    SELECT id, card_id, built_in FROM workshop_cards
+    WHERE review_status = 'merged'
+  `).all() as Array<{ id: string; card_id: string; built_in: number }>
+  let flagged = 0
+  let unflagged = 0
+  const now = Date.now()
+  for (const row of rows) {
+    const inRegistry = builtInCardIds.includes(row.card_id)
+    // Reconcile in BOTH directions: a rollback deployment whose registry
+    // does not contain the card must fall back to the workshop snapshot,
+    // otherwise the card would vanish for the whole rollback window.
+    const next = inRegistry ? 1 : 0
+    if (row.built_in === next) continue
+    db.prepare(`
+      UPDATE workshop_cards SET built_in = ?, updated_at = MAX(updated_at + 1, ?) WHERE id = ?
+    `).run(next, now, row.id)
+    if (next === 1) flagged += 1
+    else unflagged += 1
+  }
+  return { flagged, unflagged }
 }
 
 /**
@@ -1274,7 +1361,10 @@ export function loadPublishedCard(
     JOIN workshop_card_versions version ON version.id = card.approved_version_id
     LEFT JOIN users author ON author.id = card.author_id
     LEFT JOIN card_likes likes ON likes.card_id = card.id
-    WHERE card.id = ? AND card.review_status = 'approved' AND card.live = 1
+    WHERE card.id = ? AND (
+      (card.review_status = 'approved' AND card.live = 1)
+      OR card.review_status = 'merged'
+    )
     GROUP BY card.id
   `).get(cardId) as {
     id: string

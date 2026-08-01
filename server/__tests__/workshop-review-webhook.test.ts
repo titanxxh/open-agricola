@@ -8,7 +8,7 @@ import {
   type WorkshopReviewRuntime,
 } from '../workshop-review/webhook-handler.ts'
 import type { WorkshopReviewSnapshot } from '../workshop-review/github-review-provider.ts'
-import { enterReview, invalidateReviewedCard, loadWorkspace } from '../workshop-drafts.ts'
+import { enterReview, invalidateReviewedCard, loadWorkspace, reconcilePendingMerges } from '../workshop-drafts.ts'
 
 let db: Database.Database
 
@@ -612,6 +612,80 @@ describe('workshop review webhook', () => {
 
     expect(JSON.parse(res.body)).toEqual({ ok: true, ignored: true })
     expect(reviewRuntime.provider.getPullRequestSnapshot).not.toHaveBeenCalled()
+  })
+
+  it('graduates a live card to merged when its PR merges', async () => {
+    insertReviewedCard({ id: 'card-merged-pr', prNumber: 47 })
+    db.prepare(`
+      UPDATE workshop_cards SET approved_version_id = 'ver-47' WHERE id = 'card-merged-pr'
+    `).run()
+    const reviewRuntime = runtime()
+
+    const res = await deliver({
+      action: 'closed',
+      repository: { full_name: 'titanxxh/open-agricola' },
+      pull_request: {
+        number: 47,
+        html_url: 'https://github.com/titanxxh/open-agricola/pull/47',
+        merged: true,
+      },
+    }, 'pull_request', 'delivery-merged-pr', reviewRuntime)
+
+    expect(JSON.parse(res.body)).toEqual({ ok: true, merged: 1, builtIn: 0 })
+    expect(loadWorkspace(db, 'card-merged-pr', 'author')).toMatchObject({
+      reviewStatus: 'merged',
+      live: true,
+    })
+    // the graduation transition needs no GitHub round-trip
+    expect(reviewRuntime.provider.getPullRequestSnapshot).not.toHaveBeenCalled()
+
+    // duplicate delivery is idempotent
+    const dup = await deliver({
+      action: 'closed',
+      repository: { full_name: 'titanxxh/open-agricola' },
+      pull_request: {
+        number: 47,
+        html_url: 'https://github.com/titanxxh/open-agricola/pull/47',
+        merged: true,
+      },
+    }, 'pull_request', 'delivery-merged-pr', reviewRuntime)
+    expect(JSON.parse(dup.body)).toEqual({ ok: true, duplicate: true })
+  })
+
+  it('persists an out-of-order merge and graduates once the approval lands', async () => {
+    // approved_version_id is still null: the merge arrived before the
+    // approval landed. GitHub does not redeliver acknowledged hooks, so the
+    // merge fact is persisted and reconciled later.
+    insertReviewedCard({ id: 'card-early-merge', prNumber: 48, reviewStatus: 'in_review', live: false })
+    const payload = {
+      action: 'closed',
+      repository: { full_name: 'titanxxh/open-agricola' },
+      pull_request: {
+        number: 48,
+        html_url: 'https://github.com/titanxxh/open-agricola/pull/48',
+        merged: true,
+      },
+    }
+    const res = await deliver(payload, 'pull_request', 'delivery-early-merge', runtime())
+    expect(JSON.parse(res.body)).toEqual({ ok: true, pendingMerge: true })
+    const pending = loadWorkspace(db, 'card-early-merge', 'author')
+    expect(pending.reviewStatus).toBe('in_review')
+    expect(db.prepare(`
+      SELECT github_pr_status FROM workshop_cards WHERE id = 'card-early-merge'
+    `).get()).toEqual({ github_pr_status: 'merged' })
+
+    // the approval lands: the next reconciliation point graduates the card
+    db.prepare(`
+      UPDATE workshop_cards
+      SET review_status = 'approved', approved_version_id = 'ver-48'
+      WHERE id = 'card-early-merge'
+    `).run()
+    expect(reconcilePendingMerges(db)).toBe(1)
+    expect(loadWorkspace(db, 'card-early-merge', 'author').reviewStatus).toBe('merged')
+
+    // duplicate delivery of the original hook is idempotent
+    const dup = await deliver(payload, 'pull_request', 'delivery-early-merge', runtime())
+    expect(JSON.parse(dup.body)).toEqual({ ok: true, duplicate: true })
   })
 
   it('invalidates a live card when its PR closes without merging', async () => {
