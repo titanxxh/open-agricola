@@ -3943,8 +3943,6 @@
   .player-public-card-markers {
     grid-column: 1 / -1;
   }
-  .played-row,
-  .hand-row,
   .major-row {
     flex-wrap: nowrap;
     justify-content: flex-start;
@@ -3954,8 +3952,6 @@
     touch-action: pan-x pan-y pinch-zoom;
     padding-bottom: 8px;
   }
-  .played-row > *,
-  .hand-row > *,
   .major-row > * {
     flex: 0 0 min(72vw, 188px);
     min-width: 140px;

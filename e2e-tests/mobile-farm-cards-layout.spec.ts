@@ -1,10 +1,11 @@
 import { readFile } from 'node:fs/promises'
 import { expect, test } from '@playwright/test'
 
-test('mobile farm and cards keep readable native-scroll and zoom behavior', async ({ page }) => {
+test('mobile farm and cards keep seven-card rows and zoom behavior', async ({ page }) => {
   const styles = await Promise.all([
     readFile('client/styles/tokens.css', 'utf8'),
     readFile('client/styles/base.css', 'utf8'),
+    readFile('client/styles/card-sprite.css', 'utf8'),
     readFile('client/styles/pages/game.css', 'utf8'),
   ])
 
@@ -33,10 +34,17 @@ test('mobile farm and cards keep readable native-scroll and zoom behavior', asyn
             </span>
           </div>
           <div class="farm-grid"></div>
-          <div class="hand-row">
-            <div class="player-card">Occupation one</div>
-            <div class="player-card">Occupation two</div>
-            <div class="player-card">Occupation three</div>
+          <div class="played-cards">
+            <div class="played-row">
+              ${Array.from({ length: 8 }, () => '<div class="player-card"></div>').join('')}
+            </div>
+          </div>
+          <div class="hand-cards">
+            <div class="hand-section">
+              <div class="hand-row">
+                ${Array.from({ length: 8 }, () => '<div class="player-card"></div>').join('')}
+              </div>
+            </div>
           </div>
         </main>
       </body>
@@ -44,17 +52,25 @@ test('mobile farm and cards keep readable native-scroll and zoom behavior', asyn
   `)
 
   const layout = await page.evaluate(() => {
-    const cards = [...document.querySelectorAll<HTMLElement>('.hand-row > *')]
     const resources = [...document.querySelectorAll<HTMLElement>('.res-compact-item')]
-    const handStyle = getComputedStyle(document.querySelector('.hand-row')!)
     const farmStyle = getComputedStyle(document.querySelector('.farm-grid')!)
     const zeroStyle = getComputedStyle(document.querySelector('.res-compact-item.is-zero')!)
     const nonzeroStyle = getComputedStyle(document.querySelector('.res-compact-item.is-nonzero')!)
+    const measureRow = (selector: string) => {
+      const row = document.querySelector<HTMLElement>(selector)!
+      const cards = [...row.children].map((card) => card.getBoundingClientRect())
+      return {
+        firstRowCards: cards.filter((card) => Math.abs(card.top - cards[0].top) < 1).length,
+        firstTop: cards[0].top,
+        eighthTop: cards[7].top,
+        maxCardWidth: Math.max(...cards.map((card) => card.width)),
+        horizontalOverflow: row.scrollWidth - row.clientWidth,
+      }
+    }
     return {
-      minCardWidth: Math.min(...cards.map((card) => card.getBoundingClientRect().width)),
+      played: measureRow('.played-row'),
+      hand: measureRow('.hand-row'),
       minResourceWidth: Math.min(...resources.map((resource) => resource.getBoundingClientRect().width)),
-      handOverflow: handStyle.overflowX,
-      handTouchAction: handStyle.touchAction,
       farmTouchAction: farmStyle.touchAction,
       zeroOpacity: zeroStyle.opacity,
       nonzeroBackground: nonzeroStyle.backgroundColor,
@@ -62,13 +78,13 @@ test('mobile farm and cards keep readable native-scroll and zoom behavior', asyn
     }
   })
 
-  expect(layout.minCardWidth).toBeGreaterThanOrEqual(140)
+  for (const row of [layout.played, layout.hand]) {
+    expect(row.firstRowCards).toBe(7)
+    expect(row.eighthTop).toBeGreaterThan(row.firstTop)
+    expect(row.maxCardWidth).toBeLessThan(50)
+    expect(row.horizontalOverflow).toBeLessThanOrEqual(0)
+  }
   expect(layout.minResourceWidth).toBeGreaterThanOrEqual(40)
-  expect(layout.handOverflow).toBe('auto')
-  expect(
-    layout.handTouchAction === 'manipulation' ||
-    ['pan-x', 'pan-y', 'pinch-zoom'].every((value) => layout.handTouchAction.includes(value)),
-  ).toBe(true)
   expect(layout.farmTouchAction).toMatch(/pinch-zoom|manipulation/)
   expect(layout.zeroOpacity).toBe('1')
   expect(layout.nonzeroBackground).not.toBe('rgba(0, 0, 0, 0)')
