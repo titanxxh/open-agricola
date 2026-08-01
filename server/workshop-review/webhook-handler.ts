@@ -338,7 +338,18 @@ export async function handleWorkshopReviewWebhook(
     } catch {
       return failClosed()
     }
-    const approvedReview = findApprovedHeadReview(snapshot)
+    // A merged PR can still receive its (delayed) approval delivery: the
+    // head is frozen after merge, so the #629 SHA binding stays verifiable —
+    // without this the pending graduation (#642) could never complete.
+    const approvedOnMergedHead = snapshot.state === 'MERGED'
+      && snapshot.reviewDecision === 'APPROVED'
+      ? snapshot.reviews.find(review =>
+          review.state === 'APPROVED'
+          && review.authorCanPushToRepository
+          && review.commitOid === snapshot.headRefOid,
+        )
+      : undefined
+    const approvedReview = findApprovedHeadReview(snapshot) ?? approvedOnMergedHead
     const result = db.transaction(() => {
       if (!recordDelivery()) return { duplicate: true as const }
       if (!sameReviewBinding(getReviewBinding(db, prUrl), binding)) {
