@@ -8141,6 +8141,31 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "kind": "minor"
   },
   {
+    "id": "CUSTOM_MedievalMallet",
+    "name": "Medieval Mallet",
+    "deck": "community",
+    "number": 0,
+    "prerequisite": "2 occupations played",
+    "desc": [
+      "When you build a room, the cost is reduced by 2 <WOOD>. When you play an Improvement, the cost is reduced by 2 <WOOD>."
+    ],
+    "cost": {
+      "wood": 2
+    },
+    "vp": 0,
+    "implemented": true,
+    "locales": {
+      "zh": {
+        "name": "中世纪木槌",
+        "desc": [
+          "建造房间时，木材费用减少2 <WOOD>。打出改良卡时，木材费用也减少2 <WOOD>。"
+        ],
+        "prerequisite": "已打出2个职业"
+      }
+    },
+    "kind": "minor"
+  },
+  {
     "id": "D001_ZigzagHarrow",
     "name": "Zigzag Harrow",
     "deck": "D",
