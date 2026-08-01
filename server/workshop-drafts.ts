@@ -1129,6 +1129,71 @@ export function unpublish(
   })()
 }
 
+/**
+ * Admin kill switch (#641, PRD #634): force a card offline and void its
+ * approval regardless of author consent. Unlike the author's unpublish this
+ * downgrades approved -> stale (re-publishing requires another review round).
+ * Safe no-op for cards that are neither live nor approved; merged cards only
+ * lose the live flag (their review axis belongs to the main repository).
+ */
+export function adminTakedownCard(
+  db: Database.Database,
+  cardDbId: string,
+): { reviewStatus: string; live: boolean; removedRoomIds: string[] } {
+  return db.transaction(() => {
+    const row = db.prepare(
+      'SELECT review_status FROM workshop_cards WHERE id = ?',
+    ).get(cardDbId) as { review_status: string } | undefined
+    if (!row) throw new WorkshopDraftError('not_found', 'Card not found')
+    // Atomic with the card invalidation: delete every persisted room row
+    // that embeds the card (exact JSON element match — LIKE would treat _
+    // in nanoid ids as a wildcard). A crash can then never leave the card
+    // taken down but a restorable snapshot alive, or vice versa.
+    const persistedRows = db.prepare(`
+      SELECT id FROM rooms
+      WHERE EXISTS (
+        SELECT 1 FROM json_each(rooms.custom_card_ids)
+        WHERE json_each.value = ?
+      )
+    `).all(cardDbId) as Array<{ id: string }>
+    const removedRoomIds = persistedRows.map((r) => r.id)
+    for (const roomId of removedRoomIds) {
+      db.prepare('DELETE FROM rooms WHERE id = ?').run(roomId)
+    }
+    if (row.review_status === 'approved') {
+      db.prepare(`
+        UPDATE workshop_cards
+        SET review_status = 'stale',
+            live = 0,
+            approved_commit_sha = NULL,
+            approved_review_id = NULL,
+            approved_at = NULL,
+            approved_version_id = NULL,
+            review_commit_sha = NULL,
+            review_version_id = NULL,
+            updated_at = ?
+        WHERE id = ?
+      `).run(Date.now(), cardDbId)
+    } else {
+      // Also sever any surviving review binding: reconcileReviewSnapshot
+      // accepts stale rows, so a stale GitHub approval snapshot could
+      // otherwise re-approve the card without a fresh review round.
+      db.prepare(`
+        UPDATE workshop_cards
+        SET live = 0,
+            review_commit_sha = NULL,
+            review_version_id = NULL,
+            updated_at = ?
+        WHERE id = ?
+      `).run(Date.now(), cardDbId)
+    }
+    const after = db.prepare(
+      'SELECT review_status, live FROM workshop_cards WHERE id = ?',
+    ).get(cardDbId) as { review_status: string; live: number }
+    return { reviewStatus: after.review_status, live: after.live === 1, removedRoomIds }
+  })()
+}
+
 export function markSandboxPass(
   db: Database.Database,
   input: {

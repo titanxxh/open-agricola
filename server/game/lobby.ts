@@ -15,6 +15,7 @@ export type Lobby = {
   getRooms(limit?: number): RoomSummary[]
   dissolveRoomById(roomId: string, userId: string | undefined): { ok: boolean; error?: string }
   endRoomsForUser(userId: string, affectedRoomIds?: readonly string[]): { endedRoomIds: string[] }
+  endRoomsUsingCard(cardDbId: string): { endedRoomIds: string[] }
 }
 
 export function createLobby(deps: {
@@ -42,6 +43,35 @@ export function createLobby(deps: {
       checkpoint.discardRoom(roomId)
       onRoomRetired?.(roomId)
       return { ok: true }
+    },
+    endRoomsUsingCard(cardDbId) {
+      // Admin kill switch (#641): terminate every running game that embeds
+      // the card. Dev rooms are not spared — the whole point is that the
+      // card's code must stop executing.
+      const endedRoomIds: string[] = []
+      for (const room of [...registry.iter()]) {
+        if (!room.customCardDbIds?.includes(cardDbId)) continue
+        broadcaster.broadcastEvent(room, {
+          type: 'roomDissolved',
+          roomId: room.id,
+          reason: 'card_takedown',
+        })
+        // Retire the seats synchronously BEFORE closing: a client command
+        // already buffered on the socket could otherwise dispatch against
+        // this room (requireRoom checks room.players) and execute the
+        // taken-down card code one more time.
+        const players = [...room.players]
+        room.players = []
+        for (const p of players) {
+          try { p.ws.close() } catch { /* ignore close errors */ }
+        }
+        registry.delete(room.id)
+        registry.clearActivity(room.id)
+        checkpoint.discardRoom(room.id)
+        onRoomRetired?.(room.id)
+        endedRoomIds.push(room.id)
+      }
+      return { endedRoomIds }
     },
     endRoomsForUser(userId, affectedRoomIds = []) {
       const endedRoomIds: string[] = []

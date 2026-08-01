@@ -260,14 +260,26 @@ const useTransportSetup = (
                   maxPlayers: msg.maxPlayers,
                 }
               })
-            } else if (msg.type === 'roomDissolved') {
-              rawWs.removeEventListener('message', handler)
-              setWsStatus({ phase: 'error', message: 'roomDissolved' })
             }
           } catch { /* skip */ }
         }
         rawWs.addEventListener('message', handler)
       }
+
+      // Stays attached for the whole WebSocket session: a takedown can
+      // dissolve the room mid-game, long after the waiting-room handler
+      // removed itself on gameStarted.
+      rawWs.addEventListener('message', (event) => {
+        try {
+          const msg = JSON.parse(event.data as string)
+          if (msg.type !== 'roomDissolved') return
+          setWsReady(false)
+          setWsStatus({
+            phase: 'error',
+            message: msg.reason === 'card_takedown' ? 'roomTerminatedCardTakedown' : 'roomDissolved',
+          })
+        } catch { /* skip */ }
+      })
 
       rawWs.addEventListener('message', (event) => {
         try {
@@ -1386,7 +1398,9 @@ export const GameContainerApi = () => {
       : wsStatus.phase === 'error'
         ? wsStatus.message === 'roomDissolved'
           ? t(locale, 'platform.roomDissolved')
-          : isNetworkError
+          : wsStatus.message === 'roomTerminatedCardTakedown'
+            ? t(locale, 'platform.roomTerminatedCardTakedown')
+            : isNetworkError
             ? t(locale, 'platform.roomNetworkError')
             : `Error: ${wsStatus.message}`
         : ''

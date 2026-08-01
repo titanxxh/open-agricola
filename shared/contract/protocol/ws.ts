@@ -110,7 +110,7 @@ export type ServerEvent =
   | { type: 'gameStarted' }
   | { type: 'playerJoined'; playerIndex: number; name: string; playerCount: number; maxPlayers: number }
   | { type: 'playerDisconnected'; playerIndex: number }
-  | { type: 'roomDissolved'; roomId: string }
+  | { type: 'roomDissolved'; roomId: string; reason?: 'card_takedown' }
   | { type: 'roomPersistencePaused'; roomId: string }
   | { type: 'roomPersistenceResumed'; roomId: string }
   | { type: 'seat_replaced'; roomId: string; playerIndex: number }

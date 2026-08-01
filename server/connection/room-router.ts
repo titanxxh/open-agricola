@@ -79,10 +79,11 @@ const loadCustomCards = (
   cardDbIds: string[],
   requestUserId?: string,
   opts?: { liveOnly?: boolean },
-): { cards: CustomCardData[]; hasNotLive: boolean } => {
-  if (!cardDbIds.length) return { cards: [], hasNotLive: false }
+): { cards: CustomCardData[]; hasNotLive: boolean; loadedDbIds: string[] } => {
+  if (!cardDbIds.length) return { cards: [], hasNotLive: false, loadedDbIds: [] }
   const db = getDb()
   const result: CustomCardData[] = []
+  const loadedDbIds: string[] = []
   let hasNotLive = false
   for (const dbId of cardDbIds) {
     const row = db.prepare(
@@ -100,6 +101,7 @@ const loadCustomCards = (
     if (isLoadableLive(row)) {
       try {
         result.push(workshopDraftToCustomCard(loadLiveDraft(db, dbId)))
+        loadedDbIds.push(dbId)
       } catch {
         continue
       }
@@ -123,10 +125,11 @@ const loadCustomCards = (
         codeManifest: row.code_manifest ? JSON.parse(row.code_manifest) as CustomCodeManifest : null,
         artUrl: row.art_url ?? null,
       })
+      loadedDbIds.push(dbId)
       hasNotLive = true
     } catch { /* skip malformed */ }
   }
-  return { cards: result, hasNotLive }
+  return { cards: result, hasNotLive, loadedDbIds }
 }
 
 export const loadCustomCardsFromDb = (
@@ -405,7 +408,7 @@ function handleCreateRoom(ctx: ConnectionCtx, msg: Extract<ClientCommand, { type
     version: 0,
     status: 'waiting',
     createdBy: ctx.currentUserId,
-    customCardDbIds,
+    customCardDbIds: loadedCustomCards.loadedDbIds,
     customCards,
     enableParentCards,
     draftParents,

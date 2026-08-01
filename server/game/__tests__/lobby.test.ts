@@ -8,7 +8,7 @@ import { createRoomPersistenceCheckpoint } from '../room-persistence-checkpoint.
 
 const fakeRoom = (overrides: Partial<Room> = {}): Room => ({
   id: 'r1',
-  session: {} as never,
+  session: { state: {} } as never,
   players: [],
   maxPlayers: 2,
   version: 0,
@@ -360,5 +360,76 @@ describe('lobby.endRoomsForUser', () => {
     expect(persistence.load('disconnected-joined-room')).toBeNull()
     expect(persistence.__getResultForTest('disconnected-joined-room')).toBeUndefined()
     expect(persistence.load('unrelated-room')?.meta.status).toBe('playing')
+  })
+})
+
+describe('lobby.endRoomsUsingCard', () => {
+  it('terminates every room embedding the card and leaves others alone', () => {
+    const registry = new RoomRegistry()
+    const closeA = vi.fn()
+    const closeB = vi.fn()
+    registry.set(fakeRoom({
+      id: 'using-a',
+      customCardDbIds: ['card-db-1'],
+      players: [{ ws: { close: closeA } as never, playerIndex: 0, name: 'p1' }],
+    }))
+    registry.set(fakeRoom({
+      id: 'using-b',
+      customCardDbIds: ['other', 'card-db-1'],
+      players: [{ ws: { close: closeB } as never, playerIndex: 0, name: 'p2' }],
+    }))
+    registry.set(fakeRoom({ id: 'unrelated', customCardDbIds: ['other'] }))
+    registry.set(fakeRoom({ id: 'no-cards' }))
+    const broadcaster = fakeBroadcaster()
+    const retired: string[] = []
+    const lobby = createLobby({
+      registry,
+      checkpoint: checkpoint(),
+      broadcaster,
+      onRoomRetired: (roomId) => retired.push(roomId),
+    })
+
+    const { endedRoomIds } = lobby.endRoomsUsingCard('card-db-1')
+
+    expect(endedRoomIds.sort()).toEqual(['using-a', 'using-b'])
+    expect(registry.has('using-a')).toBe(false)
+    expect(registry.has('using-b')).toBe(false)
+    expect(registry.has('unrelated')).toBe(true)
+    expect(registry.has('no-cards')).toBe(true)
+    expect(closeA).toHaveBeenCalled()
+    expect(closeB).toHaveBeenCalled()
+    expect(retired.sort()).toEqual(['using-a', 'using-b'])
+    expect(broadcaster.calls).toEqual(expect.arrayContaining([
+      { type: 'roomDissolved', roomId: 'using-a', reason: 'card_takedown' },
+      { type: 'roomDissolved', roomId: 'using-b', reason: 'card_takedown' },
+    ]))
+  })
+
+  it('ends finished rooms too — their completed archives are protected at the cleanup layer', () => {
+    const registry = new RoomRegistry()
+    registry.set(fakeRoom({
+      id: 'finished',
+      customCardDbIds: ['card-db-1'],
+      session: { state: { gameOver: true } } as never,
+    }))
+    const lobby = createLobby({
+      registry,
+      checkpoint: checkpoint(),
+      broadcaster: fakeBroadcaster(),
+    })
+    expect(lobby.endRoomsUsingCard('card-db-1')).toEqual({ endedRoomIds: ['finished'] })
+    expect(registry.has('finished')).toBe(false)
+  })
+
+  it('is a safe no-op when no room uses the card', () => {
+    const registry = new RoomRegistry()
+    registry.set(fakeRoom({ id: 'r1', customCardDbIds: ['other'] }))
+    const lobby = createLobby({
+      registry,
+      checkpoint: checkpoint(),
+      broadcaster: fakeBroadcaster(),
+    })
+    expect(lobby.endRoomsUsingCard('card-db-1')).toEqual({ endedRoomIds: [] })
+    expect(registry.has('r1')).toBe(true)
   })
 })

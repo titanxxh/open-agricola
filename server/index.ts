@@ -3,7 +3,7 @@ import type { IncomingMessage, ServerResponse } from 'node:http'
 import { writeFileSync, mkdirSync, existsSync, readFileSync } from 'node:fs'
 import { join, extname } from 'node:path'
 import { randomUUID } from 'node:crypto'
-import { handleGameRoute } from './game-router.ts'
+import { handleGameRoute, disposeSandboxSessionsUsingCard } from './game-router.ts'
 import { handleWorkshopRoute } from './workshop.ts'
 import { createWsServer } from './connection/ws-server.ts'
 import { isDevRoom, type Room } from './game/room.ts'
@@ -67,6 +67,7 @@ import {
 } from './bug-report/bug-report-store.ts'
 import { GitHubIssueClient } from './bug-report/github-issue-client.ts'
 import { applyReplayRemovalLedger } from './game/replay-removal.ts'
+import { adminTakedownCard } from './workshop-drafts.ts'
 
 const CARD_ART_DIR = process.env.CARD_ART_DIR ?? join(process.cwd(), 'data', 'card-art')
 const REPLAY_VIEWER_ROOT = process.env.REPLAY_VIEWER_ROOT ?? join(process.cwd(), 'data', 'replay-viewers')
@@ -746,6 +747,65 @@ const server = createServer(async (req, res) => {
       sendJson(res, 503, {
         ok: false,
         error: error instanceof Error ? error.message : 'Unable to create replay fixture',
+      })
+    }
+    return
+  }
+
+  // Admin kill switch (#641): force a card offline, void its approval and
+  // terminate every running game that embeds it. Games end without scores,
+  // game_results or a completed replay (their recording rows are removed).
+  if (req.method === 'POST' && req.url?.startsWith('/api/admin/cards/') && req.url.endsWith('/takedown')) {
+    const adminUser = requireAdmin(req, res)
+    if (!adminUser) return
+    try {
+      let cardDbId: string
+      try {
+        cardDbId = decodeURIComponent(
+          req.url.slice('/api/admin/cards/'.length, req.url.length - '/takedown'.length),
+        )
+      } catch {
+        sendJson(res, 400, { ok: false, error: 'Malformed card id' })
+        return
+      }
+      const db = getDb()
+      // Fail closed AND atomic: the card invalidation and the deletion of
+      // every persisted room row embedding it commit in one transaction —
+      // a crash can never leave the card taken down but a restorable
+      // snapshot alive (restoreRooms trusts the embedded card snapshot).
+      const card = adminTakedownCard(db, cardDbId)
+      const { endedRoomIds } = wssCtx?.lobby.endRoomsUsingCard(cardDbId) ?? { endedRoomIds: [] }
+      // HTTP sandbox sessions embed the same executable snapshot and refresh
+      // their TTL on every access — dispose them too.
+      const disposedSandboxSessions = disposeSandboxSessionsUsingCard(cardDbId)
+      const affectedRoomIds = [...new Set([
+        ...endedRoomIds,
+        ...card.removedRoomIds,
+      ])]
+      for (const roomId of affectedRoomIds) {
+        db.prepare('DELETE FROM rooms WHERE id = ?').run(roomId)
+        // Drop half-recorded replays so no 'recording' orphans survive —
+        // but keep rooms referenced by a bug report: their retained
+        // evidence segment (ADR-0011) must stay reconstructible.
+        const hasReport = db.prepare(
+          'SELECT 1 FROM bug_reports WHERE room_id = ? LIMIT 1',
+        ).get(roomId)
+        if (hasReport) continue
+        // Only half-recorded replays are dropped; a completed archive
+        // (lifecycle 'completed', replay_status 'available') stays intact.
+        const replay = db.prepare(
+          'SELECT status FROM game_replays WHERE room_id = ?',
+        ).get(roomId) as { status: string } | undefined
+        if (!replay || replay.status !== 'recording') continue
+        db.prepare('DELETE FROM game_replay_steps WHERE room_id = ?').run(roomId)
+        db.prepare('DELETE FROM game_replays WHERE room_id = ?').run(roomId)
+      }
+      sendJson(res, 200, { ok: true, card, endedRoomIds: affectedRoomIds, disposedSandboxSessions })
+    } catch (error) {
+      const notFound = error instanceof Error && error.message === 'Card not found'
+      sendJson(res, notFound ? 404 : 500, {
+        ok: false,
+        error: error instanceof Error ? error.message : String(error),
       })
     }
     return
