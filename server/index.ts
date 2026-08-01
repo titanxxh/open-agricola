@@ -764,13 +764,31 @@ const server = createServer(async (req, res) => {
     try {
       const db = getDb()
       const { endedRoomIds } = wssCtx?.lobby.endRoomsUsingCard(cardDbId) ?? { endedRoomIds: [] }
-      // Drop half-recorded replays so no 'recording' orphans survive the kill.
-      for (const roomId of endedRoomIds) {
+      // Durable cleanup: delete every persisted room row that embeds the
+      // card — this backs up the in-memory kill (whose checkpoint discard
+      // only logs deletion failures) AND covers snapshots not currently
+      // loaded, so a restart can never resurrect the embedded card code.
+      const persistedRows = db.prepare(
+        "SELECT id FROM rooms WHERE custom_card_ids LIKE '%' || ? || '%'",
+      ).all(JSON.stringify(cardDbId)) as Array<{ id: string }>
+      const affectedRoomIds = [...new Set([
+        ...endedRoomIds,
+        ...persistedRows.map((row) => row.id),
+      ])]
+      for (const roomId of affectedRoomIds) {
+        db.prepare('DELETE FROM rooms WHERE id = ?').run(roomId)
+        // Drop half-recorded replays so no 'recording' orphans survive —
+        // but keep rooms referenced by a bug report: their retained
+        // evidence segment (ADR-0011) must stay reconstructible.
+        const hasReport = db.prepare(
+          'SELECT 1 FROM bug_reports WHERE room_id = ? LIMIT 1',
+        ).get(roomId)
+        if (hasReport) continue
         db.prepare('DELETE FROM game_replay_steps WHERE room_id = ?').run(roomId)
         db.prepare('DELETE FROM game_replays WHERE room_id = ?').run(roomId)
       }
       const card = adminTakedownCard(db, cardDbId)
-      sendJson(res, 200, { ok: true, card, endedRoomIds })
+      sendJson(res, 200, { ok: true, card, endedRoomIds: affectedRoomIds })
     } catch (error) {
       const notFound = error instanceof Error && error.message === 'Card not found'
       sendJson(res, notFound ? 404 : 500, {
