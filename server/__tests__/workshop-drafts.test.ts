@@ -1053,11 +1053,14 @@ describe('workshop draft aggregate', () => {
       .toThrowError(expect.objectContaining<Partial<WorkshopDraftError>>({ code: 'conflict' }))
 
     // a release containing the card ships: built-in registry takes over
-    expect(markBuiltInMergedCards(db, ['CUSTOM_FieldKeeper'])).toBe(1)
+    expect(markBuiltInMergedCards(db, ['CUSTOM_FieldKeeper'])).toEqual({ flagged: 1, unflagged: 0 })
     expect(() => loadLiveDraft(db, created.id))
       .toThrowError(expect.objectContaining<Partial<WorkshopDraftError>>({ code: 'not_found' }))
     // idempotent: second startup flags nothing new
-    expect(markBuiltInMergedCards(db, ['CUSTOM_FieldKeeper'])).toBe(0)
+    expect(markBuiltInMergedCards(db, ['CUSTOM_FieldKeeper'])).toEqual({ flagged: 0, unflagged: 0 })
+    // rollback deployment without the card: fall back to the workshop snapshot
+    expect(markBuiltInMergedCards(db, [])).toEqual({ flagged: 0, unflagged: 1 })
+    expect(loadLiveDraft(db, created.id)).toMatchObject({ name: 'Field Keeper' })
   })
 
   it('treats merged cards as read-only in the workshop', () => {

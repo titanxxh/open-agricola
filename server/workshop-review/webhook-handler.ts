@@ -207,20 +207,22 @@ export async function handleWorkshopReviewWebhook(
     && payload.action === 'closed'
     && payload.pull_request?.merged === true) {
     const result = db.transaction(() => {
+      // Graduate only an approved binding. An out-of-order delivery (merge
+      // before the approval webhook / enterReview binding lands) matches
+      // zero rows — leave the delivery unconsumed so GitHub's redelivery
+      // can complete the graduation once the binding exists.
+      const merged = markCardMerged(db, { prUrl })
+      if (merged === 0) return { deferred: true as const }
       const inserted = db.prepare(`
         INSERT OR IGNORE INTO github_webhook_events (
           delivery_id, event_name, received_at
         ) VALUES (?, ?, ?)
       `).run(deliveryId, eventName, Date.now()).changes > 0
       if (!inserted) return { duplicate: true as const }
-      const merged = markCardMerged(db, { prUrl })
       // A late merge delivery may arrive after the release already shipped:
       // reconcile the built-in takeover immediately instead of waiting for
       // the next restart.
-      const builtIn = merged > 0
-        ? markBuiltInMergedCards(db, Object.keys(ALL_CARD_IMPLS))
-        : 0
-      return { merged, builtIn }
+      return { merged, builtIn: markBuiltInMergedCards(db, Object.keys(ALL_CARD_IMPLS)).flagged }
     })()
     sendJson(res, 200, { ok: true, ...result })
     return true

@@ -159,7 +159,10 @@ describe('handleCreateRoom', () => {
     expect(ctx.currentRoom!.session.state.phase).toBe('parent-selection')
   })
 
-  it('reuses pinned custom cards when starting a new game', () => {
+  it('reloads custom cards through the current gate when starting a new game', () => {
+    // A rematch is a new game (#642): the embedded snapshot is NOT reused —
+    // cards deleted, taken down or graduated to built-in since the original
+    // game must not resurrect in the fresh room.
     const ctx = newCtx()
     ctx.currentUserId = 'u1'
     dispatch(ctx, { type: 'createRoom', maxPlayers: 2 })
@@ -178,12 +181,7 @@ describe('handleCreateRoom', () => {
 
     dispatch(ctx, { type: 'newGame', seed: 309 })
 
-    expect(ctx.currentRoom!.session.getCustomCardDefs()).toEqual([
-      expect.objectContaining({
-        cardType: 'minor',
-        cardJson: expect.objectContaining({ id: 'CUSTOM_Pinned' }),
-      }),
-    ])
+    expect(ctx.currentRoom!.session.getCustomCardDefs()).toEqual([])
   })
 
   it('preserves direct Parent Card dealing when starting a new game', () => {
