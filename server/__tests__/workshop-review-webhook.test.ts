@@ -628,7 +628,7 @@ describe('workshop review webhook', () => {
       },
     }, 'pull_request', 'delivery-merged-pr', reviewRuntime)
 
-    expect(JSON.parse(res.body)).toEqual({ ok: true, merged: 1 })
+    expect(JSON.parse(res.body)).toEqual({ ok: true, merged: 1, builtIn: 0 })
     expect(loadWorkspace(db, 'card-merged-pr', 'author')).toMatchObject({
       reviewStatus: 'merged',
       live: true,
