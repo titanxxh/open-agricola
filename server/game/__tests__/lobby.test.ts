@@ -8,7 +8,7 @@ import { createRoomPersistenceCheckpoint } from '../room-persistence-checkpoint.
 
 const fakeRoom = (overrides: Partial<Room> = {}): Room => ({
   id: 'r1',
-  session: {} as never,
+  session: { state: {} } as never,
   players: [],
   maxPlayers: 2,
   version: 0,
@@ -403,6 +403,22 @@ describe('lobby.endRoomsUsingCard', () => {
       { type: 'roomDissolved', roomId: 'using-a', reason: 'card_takedown' },
       { type: 'roomDissolved', roomId: 'using-b', reason: 'card_takedown' },
     ]))
+  })
+
+  it('spares finished games so their completed replays survive', () => {
+    const registry = new RoomRegistry()
+    registry.set(fakeRoom({
+      id: 'finished',
+      customCardDbIds: ['card-db-1'],
+      session: { state: { gameOver: true } } as never,
+    }))
+    const lobby = createLobby({
+      registry,
+      checkpoint: checkpoint(),
+      broadcaster: fakeBroadcaster(),
+    })
+    expect(lobby.endRoomsUsingCard('card-db-1')).toEqual({ endedRoomIds: [] })
+    expect(registry.has('finished')).toBe(true)
   })
 
   it('is a safe no-op when no room uses the card', () => {

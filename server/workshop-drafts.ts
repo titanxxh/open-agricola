@@ -1154,12 +1154,22 @@ export function adminTakedownCard(
             approved_review_id = NULL,
             approved_at = NULL,
             approved_version_id = NULL,
+            review_commit_sha = NULL,
+            review_version_id = NULL,
             updated_at = ?
         WHERE id = ?
       `).run(Date.now(), cardDbId)
     } else {
+      // Also sever any surviving review binding: reconcileReviewSnapshot
+      // accepts stale rows, so a stale GitHub approval snapshot could
+      // otherwise re-approve the card without a fresh review round.
       db.prepare(`
-        UPDATE workshop_cards SET live = 0, updated_at = ? WHERE id = ?
+        UPDATE workshop_cards
+        SET live = 0,
+            review_commit_sha = NULL,
+            review_version_id = NULL,
+            updated_at = ?
+        WHERE id = ?
       `).run(Date.now(), cardDbId)
     }
     const after = db.prepare(
