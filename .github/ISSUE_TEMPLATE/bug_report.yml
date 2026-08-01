@@ -33,7 +33,7 @@ body:
     attributes:
       label: 环境
       options:
-        - 线上 demo（titanxxh.github.io）
+        - 线上环境
         - 自部署
         - 本地开发环境
     validations:
