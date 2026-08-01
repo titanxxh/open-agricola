@@ -92,6 +92,6 @@ describe('production deployment config', () => {
       expect(compose).not.toContain('      - executor')
     }
     const script = readFileSync('deploy-backend.sh', 'utf8')
-    expect(script).toContain('up -d --build --remove-orphans')
+    expect(script).toContain('up -d --remove-orphans')
   })
 })
