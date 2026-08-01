@@ -24,21 +24,21 @@ const readSandboxVariants = async (sandbox: FrameLocator) =>
 
 const configureAndStartSandbox = async (
   page: Page,
-  variants: { seasons: boolean; moor: boolean },
+  variants: { seasons: boolean; moor: boolean; playerCount?: number },
 ) => {
   await page.goto(`${FRONTEND_URL}/?page=workshop&player=p1&devMode=1`)
   await expect(page.getByTestId('workshop-root')).toBeVisible({ timeout: 30_000 })
   await page.getByRole('button', { name: 'Enter Sandbox' }).click()
   await page.locator('.ws-sandbox-btns').getByRole('button', { name: 'Start Sandbox' }).click()
 
-  const configured = await page.evaluate(async ({ seasons, moor }) => {
+  const configured = await page.evaluate(async ({ seasons, moor, playerCount }) => {
     const response = await fetch('/api/game/new-sandbox', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         seed: 4242,
         customCardIds: [],
-        playerCount: 2,
+        playerCount: playerCount ?? 2,
         deckIds: ['A', 'B', 'C', 'D', 'E'],
         enableThroughTheSeasons: seasons,
         enableFarmersOfTheMoor: moor,
@@ -133,4 +133,29 @@ test('workshop variants expose every action family as graphical boards', async (
   await expect(combinedSandbox.locator('[data-action-id="meeting-place"]')).toBeVisible()
   await expect(combinedSandbox.locator('.farm-grid')).toBeVisible()
   await expect(combinedSandbox.locator('.major-improvements')).toBeVisible()
+})
+
+test('narrow 6-player board keeps its overview and offers touch-size graphical controls', async ({ page }) => {
+  await page.setViewportSize({ width: 375, height: 844 })
+  await setEnglish(page)
+  const sandbox = await configureAndStartSandbox(page, {
+    seasons: false,
+    moor: false,
+    playerCount: 6,
+  })
+
+  const copse = sandbox.locator('[data-action-id="copse-56"] button')
+  const overviewTarget = await copse.boundingBox()
+  expect(overviewTarget?.width).toBeLessThan(44)
+
+  await sandbox.getByRole('button', { name: 'Enlarge action controls' }).click()
+  await expect(sandbox.getByRole('button', { name: 'Show full board' })).toHaveAttribute('aria-pressed', 'true')
+
+  const precisionTarget = await copse.boundingBox()
+  expect(precisionTarget?.width).toBeGreaterThanOrEqual(44)
+  expect(precisionTarget?.height).toBeGreaterThanOrEqual(44)
+  const actionRequestPromise = page.waitForRequest((requestEvent) =>
+    requestEvent.url().endsWith('/api/game/action') && requestEvent.method() === 'POST')
+  await copse.click()
+  expect((await actionRequestPromise).postDataJSON()).toMatchObject({ spaceId: 'copse-56' })
 })

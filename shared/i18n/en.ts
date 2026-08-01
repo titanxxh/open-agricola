@@ -8,6 +8,8 @@ export const en = {
     statusRoundReady: 'Ready to End Round',
     statusWaiting: 'Waiting',
     actionArea: 'Action Spaces',
+    enlargeActionBoard: 'Enlarge action controls',
+    fitActionBoard: 'Show full board',
     expandSection: 'expand',
     collapseSection: 'collapse',
     roomPersistencePaused: 'Saving is paused. The game will resume automatically after storage recovers.',

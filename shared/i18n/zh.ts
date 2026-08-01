@@ -8,6 +8,8 @@ export const zh = {
     statusRoundReady: '可结算回合',
     statusWaiting: '等待行动',
     actionArea: '行动区',
+    enlargeActionBoard: '放大行动区',
+    fitActionBoard: '显示完整版图',
     expandSection: '展开',
     collapseSection: '收起',
     roomPersistencePaused: '保存已暂停，存储恢复后对局会自动继续。',
