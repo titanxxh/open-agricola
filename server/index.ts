@@ -758,11 +758,21 @@ const server = createServer(async (req, res) => {
   if (req.method === 'POST' && req.url?.startsWith('/api/admin/cards/') && req.url.endsWith('/takedown')) {
     const adminUser = requireAdmin(req, res)
     if (!adminUser) return
-    const cardDbId = decodeURIComponent(
-      req.url.slice('/api/admin/cards/'.length, req.url.length - '/takedown'.length),
-    )
     try {
+      let cardDbId: string
+      try {
+        cardDbId = decodeURIComponent(
+          req.url.slice('/api/admin/cards/'.length, req.url.length - '/takedown'.length),
+        )
+      } catch {
+        sendJson(res, 400, { ok: false, error: 'Malformed card id' })
+        return
+      }
       const db = getDb()
+      // Fail closed: make the card stale/offline FIRST — if any of the room
+      // cleanup below fails or the process dies, the unsafe card must not
+      // remain approved and loadable after a restart.
+      const card = adminTakedownCard(db, cardDbId)
       const { endedRoomIds } = wssCtx?.lobby.endRoomsUsingCard(cardDbId) ?? { endedRoomIds: [] }
       // Durable cleanup: delete every persisted room row that embeds the
       // card — this backs up the in-memory kill (whose checkpoint discard
@@ -793,7 +803,6 @@ const server = createServer(async (req, res) => {
         db.prepare('DELETE FROM game_replay_steps WHERE room_id = ?').run(roomId)
         db.prepare('DELETE FROM game_replays WHERE room_id = ?').run(roomId)
       }
-      const card = adminTakedownCard(db, cardDbId)
       sendJson(res, 200, { ok: true, card, endedRoomIds: affectedRoomIds })
     } catch (error) {
       const notFound = error instanceof Error && error.message === 'Card not found'

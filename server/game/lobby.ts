@@ -51,9 +51,6 @@ export function createLobby(deps: {
       const endedRoomIds: string[] = []
       for (const room of [...registry.iter()]) {
         if (!room.customCardDbIds?.includes(cardDbId)) continue
-        // A finished game executes no further card code and its replay is
-        // already archived as completed — leave it to the empty-room TTL.
-        if (room.session.state.gameOver) continue
         broadcaster.broadcastEvent(room, {
           type: 'roomDissolved',
           roomId: room.id,
