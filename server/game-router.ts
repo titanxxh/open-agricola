@@ -589,6 +589,9 @@ export const handleGameRoute = async (
           review_status: string; live: number; built_in: number; author_id: string
         } | undefined
         if (!row) continue
+        // Graduated + built-in (#642): served by the built-in registry, not
+        // injected per-session.
+        if (row.review_status === 'merged' && row.built_in === 1) continue
         if (isLoadableLive(row)) {
           try {
             customCards.push(workshopDraftToCustomCard(loadLiveDraft(db, dbId)))

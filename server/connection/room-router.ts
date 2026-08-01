@@ -99,6 +99,10 @@ const loadCustomCards = (
       author_id: string
     } | undefined
     if (!row) continue
+    // A graduated card taken over by the built-in registry (#642) is no
+    // longer injected per-room: it lives in the community deck like any
+    // built-in card. Skip it without rejecting the room.
+    if (row.review_status === 'merged' && row.built_in === 1) continue
     if (isLoadableLive(row)) {
       try {
         result.push(workshopDraftToCustomCard(loadLiveDraft(db, dbId)))

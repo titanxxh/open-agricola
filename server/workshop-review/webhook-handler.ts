@@ -1,6 +1,7 @@
 import type Database from 'better-sqlite3'
 import type { IncomingMessage, ServerResponse } from 'node:http'
-import { markCardMerged } from '../workshop-drafts.ts'
+import { markBuiltInMergedCards, markCardMerged } from '../workshop-drafts.ts'
+import { ALL_CARD_IMPLS } from '../../shared/cards/register-all.ts'
 import { verifyGitHubWebhook } from '../bug-report/github-issue-client.ts'
 import {
   approveReviewedVersion,
@@ -212,7 +213,14 @@ export async function handleWorkshopReviewWebhook(
         ) VALUES (?, ?, ?)
       `).run(deliveryId, eventName, Date.now()).changes > 0
       if (!inserted) return { duplicate: true as const }
-      return { merged: markCardMerged(db, { prUrl }) }
+      const merged = markCardMerged(db, { prUrl })
+      // A late merge delivery may arrive after the release already shipped:
+      // reconcile the built-in takeover immediately instead of waiting for
+      // the next restart.
+      const builtIn = merged > 0
+        ? markBuiltInMergedCards(db, Object.keys(ALL_CARD_IMPLS))
+        : 0
+      return { merged, builtIn }
     })()
     sendJson(res, 200, { ok: true, ...result })
     return true

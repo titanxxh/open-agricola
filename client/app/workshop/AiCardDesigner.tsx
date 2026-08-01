@@ -2156,7 +2156,7 @@ export function AiCardDesigner({
                 {locale === 'zh' ? '发布上线' : 'Publish live'}
               </button>
             )}
-            {workspaceState?.live && (
+            {workspaceState?.live && workspaceState.reviewStatus !== 'merged' && (
               <button
                 type="button"
                 className="aicw-button"
