@@ -23,17 +23,50 @@ export const isReviewTargetEligible = (
   && !snapshot.isDraft
   && snapshot.baseRefName === 'main'
 
+export const githubPrStatus = (
+  snapshot: WorkshopReviewSnapshot,
+): 'open' | 'merged' | 'closed' => snapshot.state === 'MERGED'
+  // 'merged' means "a graduation-relevant merge fact": a PR retargeted away
+  // from main and merged never enters the built-in registry, so reporting it
+  // as 'merged' would arm reconcilePendingMerges with a false graduation.
+  ? (snapshot.baseRefName === 'main' ? 'merged' : 'closed')
+  : snapshot.state === 'CLOSED'
+    ? 'closed'
+    : 'open'
+
 export const breaksReviewGateWithoutApproval = (
   snapshot: WorkshopReviewSnapshot,
-): boolean => snapshot.state !== 'MERGED'
-  && (!isReviewTargetEligible(snapshot)
+): boolean => snapshot.state === 'MERGED'
+  // A merge into any branch other than main never reaches the built-in
+  // registry, so it cannot graduate — treat it like an unmerged close.
+  ? snapshot.baseRefName !== 'main'
+  : !isReviewTargetEligible(snapshot)
     || snapshot.reviewDecision === 'CHANGES_REQUESTED'
-    || snapshot.reviewDecision === 'APPROVED')
+    || snapshot.reviewDecision === 'APPROVED'
 
 export const findApprovedHeadReview = (
   snapshot: WorkshopReviewSnapshot,
 ): WorkshopReviewSnapshot['reviews'][number] | undefined =>
   snapshot.reviewDecision === 'APPROVED' && isReviewTargetEligible(snapshot)
+    ? snapshot.reviews.find(review =>
+        review.state === 'APPROVED'
+        && review.authorCanPushToRepository
+        && review.commitOid === snapshot.headRefOid,
+      )
+    : undefined
+
+/**
+ * Delayed approval on an already-merged PR (#642): the head ref freezes at
+ * merge, so the #629 SHA binding stays verifiable. Only merges into main
+ * count — a PR retargeted away from main never lands in the built-in
+ * registry and must not graduate.
+ */
+export const findApprovedMergedHeadReview = (
+  snapshot: WorkshopReviewSnapshot,
+): WorkshopReviewSnapshot['reviews'][number] | undefined =>
+  snapshot.state === 'MERGED'
+  && snapshot.baseRefName === 'main'
+  && snapshot.reviewDecision === 'APPROVED'
     ? snapshot.reviews.find(review =>
         review.state === 'APPROVED'
         && review.authorCanPushToRepository

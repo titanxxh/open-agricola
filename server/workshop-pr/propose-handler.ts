@@ -18,11 +18,14 @@ import {
   invalidateReviewedCard,
   loadWorkspace,
   markBuiltInMergedCards,
+  markCardMerged,
   reconcilePendingMerges,
 } from '../workshop-drafts.ts'
 import {
   breaksReviewGateWithoutApproval,
   findApprovedHeadReview,
+  findApprovedMergedHeadReview,
+  githubPrStatus,
   type WorkshopReviewSnapshot,
 } from '../workshop-review/github-review-provider.ts'
 
@@ -74,14 +77,6 @@ const loadReviewBinding = (
   WHERE id = ? AND github_pr_url = ?
 `).get(cardId, prUrl) as ReviewBinding | undefined
 
-const githubPrStatus = (
-  snapshot: WorkshopReviewSnapshot,
-): 'open' | 'merged' | 'closed' => snapshot.state === 'MERGED'
-  ? 'merged'
-  : snapshot.state === 'CLOSED'
-    ? 'closed'
-    : 'open'
-
 const reconcileReviewSnapshot = (
   db: ReturnType<typeof getDb>,
   prUrl: string,
@@ -96,13 +91,22 @@ const reconcileReviewSnapshot = (
     })
   }
   const approvedReview = findApprovedHeadReview(snapshot)
+    ?? findApprovedMergedHeadReview(snapshot)
   if (approvedReview) {
-    return approveReviewedVersion(db, {
+    const approved = approveReviewedVersion(db, {
       prUrl,
       commitSha: snapshot.headRefOid,
       reviewId: approvedReview.id,
       expectedBinding,
     })
+    // Both the approval and merge webhooks may have been missed: the snapshot
+    // already reads MERGED. Graduate right here — approveReviewedVersion just
+    // reset github_pr_status to 'open', so reconcilePendingMerges would never
+    // see this row as pending.
+    if (approved > 0 && snapshot.state === 'MERGED') {
+      markCardMerged(db, { prUrl })
+    }
+    return approved
   }
   return breaksReviewGateWithoutApproval(snapshot)
     ? invalidateReviewedCard(db, {
@@ -510,7 +514,10 @@ export async function handleRefreshPrStatus(
     // A missed merge webhook is repaired here: once the PR reads as merged
     // and the approval binding exists, the pending graduation completes —
     // including the built-in takeover if the running release has the card.
-    if (status === 'merged' && reconcilePendingMerges(db) > 0) {
+    // The graduation may have happened inside reconcileReviewSnapshot (both
+    // webhooks missed), so the takeover reconcile runs unconditionally.
+    if (status === 'merged') {
+      reconcilePendingMerges(db)
       markBuiltInMergedCards(db, Object.keys(ALL_CARD_IMPLS))
     }
 

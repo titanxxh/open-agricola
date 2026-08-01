@@ -223,7 +223,7 @@ type ClientCommand = (
   - 其余无法加载的 id（**他人**的非 live 卡、未认证请求、id 不存在）→ 静默从卡池过滤，房间仍照常创建，只是不含这些卡。之所以不对他人卡报错，是为了不泄露"某 id 是否为某人草稿卡"的存在性。
   - 无论哪种情形，未过审代码都不会被加载进 `GameSession` 的 executor——安全边界一致，差异仅在给作者本人的错误反馈。
 - 旧的 replay-snapshot 同意往返（`confirmReplayCardSnapshotPublic` / `REPLAY_CARD_SNAPSHOT_CONSENT_REQUIRED`）已移除——非 live 卡不再进真实房间，该机制失去存在理由。
-- 毕业切轨（#642）：review PR 合入（webhook `closed+merged`）→ 卡转 `merged` 终态（工坊只读，`unpublish`/编辑均拒绝）；live 的 merged 卡在发版空窗期继续供给被审快照，服务启动时对照内置注册表（`markBuiltInMergedCards`）置 `built_in=1` 后由内置卡定义接管、工坊快照退役。
+- 毕业切轨（#642）：review PR 合入 `main`（webhook `closed+merged` 且 base=`main`）→ 卡转 `merged` 终态（工坊只读，`unpublish`/编辑均拒绝）；改离 `main` 后 merge 不毕业，视同未 merge 关闭转 `stale·offline`。merge 事件先于审批到达时持久化 merge 事实（`github_pr_status='merged'`），审批 webhook 或 `refresh-pr-status` 读到 approved MERGED 快照（head 在 merge 后冻结、SHA 绑定仍可验）时补毕业并即时对账 built_in。live 的 merged 卡在发版空窗期继续供给被审快照，服务启动时对照内置注册表（`markBuiltInMergedCards`）置 `built_in=1` 后由内置卡定义接管、工坊快照退役。
 - 下架双轨（#631/#641）：作者 `unpublish` 温和（存量对局用嵌入快照跑完，仅挡新房间）；管理员 `POST /api/admin/cards/:id/takedown` 为 kill switch——强制卡 `stale·offline` 并经 `lobby.endRoomsUsingCard` 终止所有嵌入该卡的进行中房间（广播 `roomDissolved reason:'card_takedown'`，对局不计分、不产 completed replay，半截录制行被清除）。GitHub review dismissed 不自动杀局，只走温和失效。
 
 ### 4.5 ServerEvent / StateUpdateEnvelope
