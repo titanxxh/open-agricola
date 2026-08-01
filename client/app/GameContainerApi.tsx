@@ -262,7 +262,10 @@ const useTransportSetup = (
               })
             } else if (msg.type === 'roomDissolved') {
               rawWs.removeEventListener('message', handler)
-              setWsStatus({ phase: 'error', message: 'roomDissolved' })
+              setWsStatus({
+                phase: 'error',
+                message: msg.reason === 'card_takedown' ? 'roomTerminatedCardTakedown' : 'roomDissolved',
+              })
             }
           } catch { /* skip */ }
         }

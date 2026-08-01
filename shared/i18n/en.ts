@@ -1651,6 +1651,7 @@ export const en = {
     dissolveRoom: 'Dissolve Room',
     dissolveConfirm: 'Are you sure you want to dissolve the room? All waiting players will be removed.',
     roomDissolved: 'Room has been dissolved',
+    roomTerminatedCardTakedown: 'This game was terminated due to a card safety issue',
     roomNetworkError: 'Could not connect to the game server. Check your network and try again.',
     appLoadFailed: 'Page failed to load. A new version may be available. Reload to continue.',
     waitingForPlayers: 'Room {roomId} — Waiting for players ({current}/{max})',

@@ -67,6 +67,7 @@ import {
 } from './bug-report/bug-report-store.ts'
 import { GitHubIssueClient } from './bug-report/github-issue-client.ts'
 import { applyReplayRemovalLedger } from './game/replay-removal.ts'
+import { adminTakedownCard } from './workshop-drafts.ts'
 
 const CARD_ART_DIR = process.env.CARD_ART_DIR ?? join(process.cwd(), 'data', 'card-art')
 const REPLAY_VIEWER_ROOT = process.env.REPLAY_VIEWER_ROOT ?? join(process.cwd(), 'data', 'replay-viewers')
@@ -746,6 +747,35 @@ const server = createServer(async (req, res) => {
       sendJson(res, 503, {
         ok: false,
         error: error instanceof Error ? error.message : 'Unable to create replay fixture',
+      })
+    }
+    return
+  }
+
+  // Admin kill switch (#641): force a card offline, void its approval and
+  // terminate every running game that embeds it. Games end without scores,
+  // game_results or a completed replay (their recording rows are removed).
+  if (req.method === 'POST' && req.url?.startsWith('/api/admin/cards/') && req.url.endsWith('/takedown')) {
+    const adminUser = requireAdmin(req, res)
+    if (!adminUser) return
+    const cardDbId = decodeURIComponent(
+      req.url.slice('/api/admin/cards/'.length, req.url.length - '/takedown'.length),
+    )
+    try {
+      const db = getDb()
+      const { endedRoomIds } = wssCtx?.lobby.endRoomsUsingCard(cardDbId) ?? { endedRoomIds: [] }
+      // Drop half-recorded replays so no 'recording' orphans survive the kill.
+      for (const roomId of endedRoomIds) {
+        db.prepare('DELETE FROM game_replay_steps WHERE room_id = ?').run(roomId)
+        db.prepare('DELETE FROM game_replays WHERE room_id = ?').run(roomId)
+      }
+      const card = adminTakedownCard(db, cardDbId)
+      sendJson(res, 200, { ok: true, card, endedRoomIds })
+    } catch (error) {
+      const notFound = error instanceof Error && error.message === 'Card not found'
+      sendJson(res, notFound ? 404 : 500, {
+        ok: false,
+        error: error instanceof Error ? error.message : String(error),
       })
     }
     return

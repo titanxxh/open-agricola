@@ -1631,6 +1631,7 @@ export const zh = {
     dissolveRoom: '解散房间',
     dissolveConfirm: '确定要解散房间吗？所有等待中的玩家将被移出。',
     roomDissolved: '房间已被解散',
+    roomTerminatedCardTakedown: '本局因卡牌安全问题被终止',
     roomNetworkError: '无法连接游戏服务器，请检查网络后重试。',
     appLoadFailed: '页面加载失败，可能已发布新版本。请重新加载后继续。',
     waitingForPlayers: '房间 {roomId} — 等待玩家加入 ({current}/{max})',
