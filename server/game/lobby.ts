@@ -56,7 +56,13 @@ export function createLobby(deps: {
           roomId: room.id,
           reason: 'card_takedown',
         })
-        for (const p of room.players) {
+        // Retire the seats synchronously BEFORE closing: a client command
+        // already buffered on the socket could otherwise dispatch against
+        // this room (requireRoom checks room.players) and execute the
+        // taken-down card code one more time.
+        const players = [...room.players]
+        room.players = []
+        for (const p of players) {
           try { p.ws.close() } catch { /* ignore close errors */ }
         }
         registry.delete(room.id)

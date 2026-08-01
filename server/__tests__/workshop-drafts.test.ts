@@ -112,6 +112,10 @@ beforeEach(() => {
       created_at INTEGER NOT NULL,
       updated_at INTEGER NOT NULL
     );
+    CREATE TABLE rooms (
+      id TEXT PRIMARY KEY,
+      custom_card_ids TEXT NOT NULL DEFAULT '[]'
+    );
     CREATE TABLE workshop_card_versions (
       id TEXT PRIMARY KEY,
       card_id TEXT NOT NULL REFERENCES workshop_cards(id) ON DELETE CASCADE,
@@ -993,7 +997,7 @@ describe('workshop draft aggregate', () => {
     approveCurrentDraft(db, { cardId: created.id, authorId: 'author' })
     publish(db, { cardId: created.id, authorId: 'author', baseRevision: 1 })
 
-    expect(adminTakedownCard(db, created.id)).toEqual({ reviewStatus: 'stale', live: false })
+    expect(adminTakedownCard(db, created.id)).toEqual({ reviewStatus: 'stale', live: false, removedRoomIds: [] })
     const after = loadWorkspace(db, created.id, 'author')
     expect(after.approvedVersionId).toBeNull()
     // republishing requires another review round
@@ -1004,9 +1008,23 @@ describe('workshop draft aggregate', () => {
     })).toThrowError(expect.objectContaining<Partial<WorkshopDraftError>>({ code: 'not_ready' }))
   })
 
+  it('admin takedown atomically deletes persisted rooms embedding the card, exact-match only', () => {
+    const created = createCard(db, { authorId: 'author', draft: baseDraft() })
+    db.prepare(`INSERT INTO rooms (id, custom_card_ids) VALUES ('embeds', ?)`)
+      .run(JSON.stringify([created.id]))
+    // an id differing only where nanoid uses '_' must NOT match (LIKE would)
+    const lookalike = created.id.replace(/./, 'X')
+    db.prepare(`INSERT INTO rooms (id, custom_card_ids) VALUES ('lookalike', ?)`)
+      .run(JSON.stringify([lookalike]))
+    const result = adminTakedownCard(db, created.id)
+    expect(result.removedRoomIds).toEqual(['embeds'])
+    expect(db.prepare(`SELECT COUNT(*) AS n FROM rooms WHERE id = 'embeds'`).get()).toEqual({ n: 0 })
+    expect(db.prepare(`SELECT COUNT(*) AS n FROM rooms WHERE id = 'lookalike'`).get()).toEqual({ n: 1 })
+  })
+
   it('admin takedown is a safe no-op for cards without approval', () => {
     const created = createCard(db, { authorId: 'author', draft: baseDraft() })
-    expect(adminTakedownCard(db, created.id)).toEqual({ reviewStatus: 'unsubmitted', live: false })
+    expect(adminTakedownCard(db, created.id)).toEqual({ reviewStatus: 'unsubmitted', live: false, removedRoomIds: [] })
     expect(() => adminTakedownCard(db, 'missing-card'))
       .toThrowError(expect.objectContaining<Partial<WorkshopDraftError>>({ code: 'not_found' }))
   })
