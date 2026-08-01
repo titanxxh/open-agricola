@@ -202,7 +202,7 @@ describe('FarmBoard', () => {
     expect(screen.getByLabelText('Begging: 0')).toHaveClass('is-zero')
   })
 
-  it('shows played-card statistics inline in the Cards presentation', () => {
+  it('shows played-card statistics inline when requested for mobile', () => {
     const player = createPlayer('p1', 'Player 1', 'red')
     player.minorPlayed = ['B034_SpecialFood']
     player.cardStates = {
@@ -223,7 +223,7 @@ describe('FarmBoard', () => {
     const { container } = render(
       <FarmBoard
         {...createFarmBoardProps(player)}
-        presentation="cards"
+        inlineCardStats
       />,
     )
 
@@ -233,7 +233,7 @@ describe('FarmBoard', () => {
       .toHaveAttribute('data-amount', '2')
   })
 
-  it('keeps the active farm-selection draft visible and operable in the Farm presentation', () => {
+  it('keeps the active farm-selection draft visible alongside cards', () => {
     const player = createPlayer('p1', 'Player 1', 'red')
     const togglePositionSelection = vi.fn()
 
@@ -253,21 +253,20 @@ describe('FarmBoard', () => {
         }, {
           togglePositionSelection,
         })}
-        presentation="farm"
       />,
     )
 
     const tile = container.querySelector('[data-farm-tile-key="0-0"]')
     expect(tile).toBeVisible()
     expect(tile).toHaveClass('position-selected')
-    expect(container.querySelector('.hand-cards')).not.toBeVisible()
+    expect(container.querySelector('.hand-cards')).toBeVisible()
 
     fireEvent.click(tile!)
 
     expect(togglePositionSelection).toHaveBeenCalledWith({ row: 0, col: 0 })
   })
 
-  it('keeps interaction-relevant hand cards operable in the Cards presentation', () => {
+  it('keeps interaction-relevant hand cards operable alongside the farm', () => {
     const player = {
       ...createPlayer('p1', 'Player 1', 'red'),
       minorHand: ['B034_SpecialFood'],
@@ -283,11 +282,10 @@ describe('FarmBoard', () => {
         }, {
           resolveChoice,
         })}
-        presentation="cards"
       />,
     )
 
-    expect(container.querySelector('.farm-grid')).not.toBeVisible()
+    expect(container.querySelector('.farm-grid')).toBeVisible()
     const card = container.querySelector('[data-id="B034_SpecialFood"]')
     expect(card).toBeVisible()
 

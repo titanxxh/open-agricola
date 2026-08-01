@@ -45,7 +45,7 @@ export function SpecialActionsPanel({
   if (cards.length === 0) return null
 
   return (
-    <div className="special-actions-panel">
+    <div className="special-actions-panel" aria-label={t(locale, 'moor.specialActions.title')}>
       <div className="special-actions-panel__title">{t(locale, 'moor.specialActions.title')}</div>
       <div className="special-actions-panel__grid">
         {cards.map((card) => {

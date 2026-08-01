@@ -785,6 +785,49 @@ describe('ActionBoard', () => {
     expect(html).not.toContain('player-action-cards-row')
   })
 
+  it('offers 44px precision targets while keeping the full 6p board overview', () => {
+    const clientWidth = vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockReturnValue(360)
+    vi.stubGlobal('ResizeObserver', class {
+      observe() {}
+      disconnect() {}
+    })
+    const players = [
+      createPlayer('p1', 'PlayerA', 'red'),
+      createPlayer('p2', 'PlayerB', 'blue'),
+      createPlayer('p3', 'PlayerC', 'yellow'),
+      createPlayer('p4', 'PlayerD', 'black'),
+      createPlayer('p5', 'PlayerE', 'green'),
+      createPlayer('p6', 'PlayerF', 'purple'),
+    ]
+
+    const { container } = render(
+      <ActionBoard
+        locale="en"
+        baseActions={[createAction('copse-56', 'actions.copse-56.name')]}
+        roundSlots={[]}
+        currentPlayer={players[0]!}
+        players={players}
+        futureMeeples={[]}
+        canTakeAction={() => true}
+        takeAction={() => {}}
+        currentRound={1}
+        devMode={false}
+        enablePrecisionMode={true}
+      />,
+    )
+
+    const wrapper = container.querySelector('.action-board-wrapper') as HTMLElement
+    const board = container.querySelector('.action-board') as HTMLElement
+    expect(board.style.transform).toBe(`scale(${360 / 1370})`)
+
+    fireEvent.click(screen.getByRole('button', { name: 'Enlarge action controls' }))
+
+    expect(screen.getByRole('button', { name: 'Show full board' })).toHaveAttribute('aria-pressed', 'true')
+    expect(wrapper).toHaveClass('action-board-wrapper--precision')
+    expect(Number(board.style.transform.match(/scale\(([^)]+)\)/)?.[1]) * 60).toBeCloseTo(44)
+    clientWidth.mockRestore()
+  })
+
   it('renders 5p animal market with compact icon lines that fit the original frame', () => {
     const players = [
       createPlayer('p1', 'PlayerA', 'red'),

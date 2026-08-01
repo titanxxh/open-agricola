@@ -521,7 +521,7 @@ export type FarmBoardActions = {
 export type FarmBoardProps = {
   view: FarmBoardView
   actions: FarmBoardActions
-  presentation?: 'farm' | 'cards'
+  inlineCardStats?: boolean
 }
 
 type TooltipPosition = {
@@ -815,7 +815,7 @@ const ParentCardTile = ({
   )
 }
 
-export const FarmBoard = ({ view, actions, presentation }: FarmBoardProps) => {
+export const FarmBoard = ({ view, actions, inlineCardStats = false }: FarmBoardProps) => {
   const {
     locale,
     players,
@@ -1005,7 +1005,7 @@ export const FarmBoard = ({ view, actions, presentation }: FarmBoardProps) => {
 
   return (
     <section className="center">
-    <div className="farm-header" hidden={presentation === 'cards'}>
+    <div className="farm-header">
       <div>
         <h2>{t(locale, 'ui.farmTitle')}</h2>
         <div className="player-summary">{displayPlayer.name}</div>
@@ -1119,7 +1119,7 @@ export const FarmBoard = ({ view, actions, presentation }: FarmBoardProps) => {
         </div>
       </div>
     </div>
-    <div className="farm-grid" style={farmGridStyle} hidden={presentation === 'cards'}>
+    <div className="farm-grid" style={farmGridStyle}>
       {farmCells.map((cell) => {
         if (cell.type === 'void') {
           return <div key={cell.key} className="farm-cell farm-void" />
@@ -1596,7 +1596,7 @@ export const FarmBoard = ({ view, actions, presentation }: FarmBoardProps) => {
       })}
     </div>
     {isInteractive && extraSowTargets.length > 0 ? (
-      <div className="extra-sow-tray" aria-label="extra-sow-tray" hidden={presentation === 'cards'}>
+      <div className="extra-sow-tray" aria-label="extra-sow-tray">
         <div className="extra-sow-targets">
           {(() => {
             const counts = new Map<string, number>()
@@ -1644,7 +1644,7 @@ export const FarmBoard = ({ view, actions, presentation }: FarmBoardProps) => {
         </div>
       </div>
     ) : null}
-    <div className="played-cards" hidden={presentation === 'farm'}>
+    <div className="played-cards">
       <h3>{t(locale, 'ui.playedCards')}</h3>
       {parentCardDisplays.length > 0 ? (
         <div className="parent-cards-row">
@@ -1681,7 +1681,7 @@ export const FarmBoard = ({ view, actions, presentation }: FarmBoardProps) => {
                 cardStacks={card.cardStacks}
                 heldWorkerId={card.heldWorkerId}
                 playerColor={displayPlayer.color}
-                inlineStats={presentation === 'cards'}
+                inlineStats={inlineCardStats}
               />
               {card.m084LyingHorses > 0 ? (
                 <div
@@ -1748,7 +1748,7 @@ export const FarmBoard = ({ view, actions, presentation }: FarmBoardProps) => {
         </div>
       ) : null}
     </div>
-    <div className="hand-cards" hidden={presentation === 'farm'}>
+    <div className="hand-cards">
       <h3>{t(locale, 'ui.handCards')}</h3>
       {displayPlayer.id === activeFarmPlayerId || devMode ? (
         <div className="hand-sections" data-hand-anchor={displayPlayer.id}>

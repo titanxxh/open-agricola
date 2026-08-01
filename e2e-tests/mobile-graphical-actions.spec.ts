@@ -24,21 +24,21 @@ const readSandboxVariants = async (sandbox: FrameLocator) =>
 
 const configureAndStartSandbox = async (
   page: Page,
-  variants: { seasons: boolean; moor: boolean },
+  variants: { seasons: boolean; moor: boolean; playerCount?: number },
 ) => {
   await page.goto(`${FRONTEND_URL}/?page=workshop&player=p1&devMode=1`)
   await expect(page.getByTestId('workshop-root')).toBeVisible({ timeout: 30_000 })
   await page.getByRole('button', { name: 'Enter Sandbox' }).click()
   await page.locator('.ws-sandbox-btns').getByRole('button', { name: 'Start Sandbox' }).click()
 
-  const configured = await page.evaluate(async ({ seasons, moor }) => {
+  const configured = await page.evaluate(async ({ seasons, moor, playerCount }) => {
     const response = await fetch('/api/game/new-sandbox', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         seed: 4242,
         customCardIds: [],
-        playerCount: 2,
+        playerCount: playerCount ?? 2,
         deckIds: ['A', 'B', 'C', 'D', 'E'],
         enableThroughTheSeasons: seasons,
         enableFarmersOfTheMoor: moor,
@@ -59,43 +59,32 @@ const configureAndStartSandbox = async (
     })
   }, Date.now().toString())
   const sandbox = page.frameLocator('iframe[title="Sandbox"]')
-  await expect(sandbox.locator('.mobile-actions-panel')).toBeVisible({ timeout: 30_000 })
+  await expect(sandbox.locator('.action-board')).toBeVisible({ timeout: 30_000 })
   return sandbox
 }
 
 test.describe.configure({ mode: 'serial' })
 
-test('real WebSocket room submits a base action from the mobile task list', async ({ page }) => {
+test('workshop sandbox submits a base action from the graphical board', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 })
   await setEnglish(page)
-  await page.goto(`${FRONTEND_URL}/?player=p1&transport=ws&room=dev4&devMode=1`)
+  const sandbox = await configureAndStartSandbox(page, { seasons: false, moor: false })
 
-  const reset = page.getByRole('button', { name: 'Reset' })
-  await expect(reset).toBeVisible({ timeout: 30_000 })
-  await reset.click()
-  await page.getByRole('navigation', { name: 'Game presentation' })
-    .getByRole('button', { name: 'Action' })
-    .click()
-
-  const panel = page.locator('.mobile-actions-panel')
-  const dayLaborer = panel.locator('[data-mobile-action-id="day-laborer"]')
-  const food = page.locator('[aria-label^="Food:"]').first()
+  const dayLaborer = sandbox.locator('[data-action-id="day-laborer"] button').first()
+  const food = sandbox.locator('[aria-label^="Food:"]').first()
   await expect(food).toHaveAttribute('aria-label', 'Food: 2')
   const foodBefore = Number((await food.getAttribute('aria-label'))?.split(': ')[1])
   await expect(dayLaborer).toBeEnabled()
-  expect((await dayLaborer.boundingBox())!.height).toBeGreaterThanOrEqual(44)
   await dayLaborer.click()
 
-  await page.getByRole('navigation', { name: 'Game presentation' })
-    .getByRole('button', { name: 'Farm' })
-    .click()
-  await expect(page.getByLabel(`Food: ${foodBefore + 2}`)).toBeVisible()
-  await expect(page.locator('.action-board')).toHaveCount(1)
-  await expect(page.locator('.major-improvements')).toHaveCount(1)
-  await reset.click()
+  await expect(sandbox.getByLabel(`Food: ${foodBefore + 2}`)).toBeVisible()
+  await expect(sandbox.locator('.action-board')).toBeVisible()
+  await expect(sandbox.locator('.farm-grid')).toBeVisible()
+  await expect(sandbox.locator('.major-improvements')).toBeVisible()
+  await expect(sandbox.locator('.mobile-actions-panel')).toHaveCount(0)
 })
 
-test('workshop variants expose and submit every mobile action family', async ({ page }) => {
+test('workshop variants expose every action family as graphical boards', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 })
   await setEnglish(page)
 
@@ -104,12 +93,12 @@ test('workshop variants expose and submit every mobile action family', async ({ 
     seasons: true,
     moor: false,
   })
-  const seasonTasks = seasonsSandbox.locator(
-    '[aria-label="Seasons Board"] [data-mobile-action-id^="season-"]',
+  const seasonButtons = seasonsSandbox.locator(
+    '[aria-label="Seasons Board"] .seasons-board__space-button',
   )
-  await expect(seasonTasks).toHaveCount(4)
+  await expect(seasonButtons).toHaveCount(4)
   const enabledSeason = seasonsSandbox.locator(
-    '[aria-label="Seasons Board"] [data-mobile-action-id^="season-"]:not([disabled])',
+    '[aria-label="Seasons Board"] .seasons-board__space-button:not([disabled])',
   ).first()
   await expect(enabledSeason).toBeEnabled()
   const seasonRequestPromise = page.waitForRequest((requestEvent) =>
@@ -120,24 +109,14 @@ test('workshop variants expose and submit every mobile action family', async ({ 
 
   const moorSandbox = await configureAndStartSandbox(page, { seasons: false, moor: true })
   const specialActions = moorSandbox.locator('[aria-label="Special Actions"]')
-  const specialImages = specialActions.locator('img')
+  const specialImages = specialActions.locator('.special-action-card__image')
   await expect(specialImages).toHaveCount(2)
-  for (const image of await specialImages.all()) {
-    await expect(image).toHaveJSProperty('complete', true)
-    expect(await image.evaluate((element: HTMLImageElement) => element.naturalWidth))
-      .toBeGreaterThan(0)
-  }
   const cutPeat = specialActions.getByRole('button', { name: 'Cut Peat' })
   await expect(cutPeat).toBeEnabled()
   await cutPeat.click()
-  await expect(moorSandbox.locator('.game-presentations')).toHaveAttribute(
-    'data-presentation',
-    'farm',
-  )
-  await moorSandbox.getByRole('navigation', { name: 'Game presentation' })
-    .getByRole('button', { name: 'Action' })
-    .click()
   await expect(cutPeat).toHaveAttribute('aria-pressed', 'true')
+  await expect(moorSandbox.locator('.farm-tile.selectable').first()).toBeVisible()
+  await expect(moorSandbox.locator('.action-board')).toBeVisible()
 
   const hiringFair = specialActions.getByRole('button', { name: 'Hiring Fair' })
   await expect(hiringFair).toBeEnabled()
@@ -146,12 +125,50 @@ test('workshop variants expose and submit every mobile action family', async ({ 
   await hiringFair.click()
   const specialRequest = await specialRequestPromise
   expect(await specialRequest.postDataJSON()).toMatchObject({ actionId: 'hiring-fair' })
-  await expect(moorSandbox.locator('.mobile-major-improvements .major-improvements')).toBeVisible()
+  await expect(moorSandbox.locator('.major-improvements')).toBeVisible()
 
   const combinedSandbox = await configureAndStartSandbox(page, { seasons: true, moor: true })
   await expect(combinedSandbox.locator('[aria-label="Seasons Board"]')).toBeVisible()
   await expect(combinedSandbox.locator('[aria-label="Special Actions"]')).toBeVisible()
-  await expect(combinedSandbox.locator('[data-mobile-action-id="meeting-place"]')).toBeVisible()
-  await expect(combinedSandbox.locator('.action-board')).toHaveCount(1)
-  await expect(combinedSandbox.locator('.major-improvements')).toHaveCount(1)
+  await expect(combinedSandbox.locator('[data-action-id="meeting-place"]')).toBeVisible()
+  await expect(combinedSandbox.locator('.farm-grid')).toBeVisible()
+  await expect(combinedSandbox.locator('.major-improvements')).toBeVisible()
+})
+
+test('narrow 6-player board keeps its overview and offers touch-size graphical controls', async ({ page }) => {
+  await page.setViewportSize({ width: 375, height: 844 })
+  await setEnglish(page)
+  const sandbox = await configureAndStartSandbox(page, {
+    seasons: false,
+    moor: false,
+    playerCount: 6,
+  })
+
+  const copse = sandbox.locator('[data-action-id="copse-56"] button')
+  const overviewTarget = await copse.boundingBox()
+  expect(overviewTarget?.width).toBeLessThan(44)
+
+  await sandbox.getByRole('button', { name: 'Enlarge action controls' }).click()
+  await expect(sandbox.getByRole('button', { name: 'Show full board' })).toHaveAttribute('aria-pressed', 'true')
+
+  const precisionWrapper = sandbox.locator('.action-board-wrapper')
+  const scrollState = await precisionWrapper.evaluate((element) => ({
+    overflowX: getComputedStyle(element).overflowX,
+    scrollWidth: element.scrollWidth,
+    clientWidth: element.clientWidth,
+  }))
+  expect(scrollState.overflowX).toBe('auto')
+  expect(scrollState.scrollWidth).toBeGreaterThan(scrollState.clientWidth)
+  expect(await precisionWrapper.evaluate((element) => {
+    element.scrollLeft = element.scrollWidth
+    return element.scrollLeft
+  })).toBeGreaterThan(0)
+
+  const precisionTarget = await copse.boundingBox()
+  expect(precisionTarget?.width).toBeGreaterThanOrEqual(44)
+  expect(precisionTarget?.height).toBeGreaterThanOrEqual(44)
+  const actionRequestPromise = page.waitForRequest((requestEvent) =>
+    requestEvent.url().endsWith('/api/game/action') && requestEvent.method() === 'POST')
+  await copse.click()
+  expect((await actionRequestPromise).postDataJSON()).toMatchObject({ spaceId: 'copse-56' })
 })

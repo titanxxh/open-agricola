@@ -10,6 +10,9 @@ const BOARD_W_WITH_SIDE = 1000
 const BOARD_W_5P = 1190
 const BOARD_W_6P = 1370
 const BOARD_H = 795
+const MIN_TOUCH_TARGET = 44
+const MIN_ACTION_SPACE_WIDTH = 60
+const PRECISION_SCALE = MIN_TOUCH_TARGET / MIN_ACTION_SPACE_WIDTH
 
 type Pos = { top: number; left: number; width: number; height: number; size: 's' | 'std' }
 
@@ -383,6 +386,7 @@ type Props = {
   actionSpaceReservations?: ReadonlyMap<string, ActionBoardPlayerDisplay>
   actionSpaceAttachments?: ReadonlyMap<string, ActionSpaceAttachmentDisplay[]>
   leftActionNames?: ReadonlyMap<string, string>
+  enablePrecisionMode?: boolean
 }
 
 type TooltipInfo = {
@@ -591,9 +595,11 @@ export const ActionBoard = ({
   actionSpaceReservations = new Map<string, ActionBoardPlayerDisplay>(),
   actionSpaceAttachments = new Map<string, ActionSpaceAttachmentDisplay[]>(),
   leftActionNames = new Map<string, string>(),
+  enablePrecisionMode = false,
 }: Props) => {
   const wrapperRef = useRef<HTMLDivElement>(null)
   const [scale, setScale] = useState(1)
+  const [precisionMode, setPrecisionMode] = useState(false)
   const [tooltip, setTooltip] = useState<TooltipInfo | null>(null)
   const playerCount = getBoardPlayerCount(players)
   const boardClassName = `action-board action-board--${playerCount}p`
@@ -604,6 +610,8 @@ export const ActionBoard = ({
       : playerCount === 6
         ? BOARD_W_6P
         : BOARD_W_WITH_SIDE
+  const canUsePrecisionMode = enablePrecisionMode && scale < PRECISION_SCALE
+  const renderedScale = canUsePrecisionMode && precisionMode ? PRECISION_SCALE : scale
   const basePositions = useMemo(() => getBasePositions(playerCount), [playerCount])
   const resourceOffsets = useMemo(() => getResourceOffsets(playerCount), [playerCount])
   const roundPositions = useMemo(() => getRoundPositions(playerCount), [playerCount])
@@ -937,10 +945,24 @@ export const ActionBoard = ({
   }
 
   return (
-    <section className="actions">
+    <section className="actions" aria-label={t(locale, 'ui.actionArea')}>
       <h2>{t(locale, 'ui.actionArea')}</h2>
-      <div className="action-board-wrapper" ref={wrapperRef} style={{ height: BOARD_H * scale }}>
-        <div className={boardClassName} style={{ transform: `scale(${scale})`, width: boardWidth, height: BOARD_H }}>
+      {canUsePrecisionMode ? (
+        <button
+          type="button"
+          className="action-board-precision-toggle"
+          aria-pressed={precisionMode}
+          onClick={() => setPrecisionMode((value) => !value)}
+        >
+          {t(locale, precisionMode ? 'ui.fitActionBoard' : 'ui.enlargeActionBoard')}
+        </button>
+      ) : null}
+      <div
+        className={`action-board-wrapper${canUsePrecisionMode && precisionMode ? ' action-board-wrapper--precision' : ''}`}
+        ref={wrapperRef}
+        style={{ height: BOARD_H * renderedScale }}
+      >
+        <div className={boardClassName} style={{ transform: `scale(${renderedScale})`, width: boardWidth, height: BOARD_H }}>
           {renderExtensionScenery()}
           {renderLinkedActionMarkers()}
 
