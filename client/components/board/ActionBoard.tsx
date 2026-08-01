@@ -937,7 +937,7 @@ export const ActionBoard = ({
   }
 
   return (
-    <section className="actions">
+    <section className="actions" aria-label={t(locale, 'ui.actionArea')}>
       <h2>{t(locale, 'ui.actionArea')}</h2>
       <div className="action-board-wrapper" ref={wrapperRef} style={{ height: BOARD_H * scale }}>
         <div className={boardClassName} style={{ transform: `scale(${scale})`, width: boardWidth, height: BOARD_H }}>

@@ -10,16 +10,7 @@ export const en = {
     actionArea: 'Action Spaces',
     expandSection: 'expand',
     collapseSection: 'collapse',
-    boardOverview: 'Board overview',
-    gamePresentationNavigation: 'Game presentation',
-    gamePresentationChanged: 'Current request: {presentation}',
     roomPersistencePaused: 'Saving is paused. The game will resume automatically after storage recovers.',
-    gamePresentation: {
-      action: 'Action',
-      farm: 'Farm',
-      cards: 'Cards',
-      information: 'Information',
-    },
     seasons: {
       board: 'Seasons Board',
       winter: 'Winter',

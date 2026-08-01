@@ -1,6 +1,5 @@
 // @vitest-environment jsdom
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
-import userEvent from '@testing-library/user-event'
+import { render, screen } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { EngineStack } from '../../../shared/engine'
 import type { GameSyncPayload } from '../../../shared/contract/protocol/game'
@@ -23,6 +22,32 @@ const payload: GameSyncPayload = {
   ok: true,
 }
 
+const setupViewport = (isMobile: boolean) => {
+  vi.spyOn(window, 'matchMedia').mockImplementation((query) => ({
+    matches: isMobile && query === '(max-width: 900px)',
+    media: query,
+    onchange: null,
+    addListener: vi.fn(),
+    removeListener: vi.fn(),
+    addEventListener: vi.fn(),
+    removeEventListener: vi.fn(),
+    dispatchEvent: vi.fn(),
+  }))
+  vi.stubGlobal('ResizeObserver', class {
+    observe() {}
+    disconnect() {}
+  })
+  vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify(payload))))
+}
+
+const renderGame = () => render(
+  <LocaleProvider>
+    <AuthProvider>
+      <GameContainerApi />
+    </AuthProvider>
+  </LocaleProvider>,
+)
+
 afterEach(() => {
   window.localStorage.clear()
   window.history.replaceState(null, '', '/')
@@ -30,351 +55,47 @@ afterEach(() => {
   vi.unstubAllGlobals()
 })
 
-describe('GameContainerApi mobile presentation navigation', () => {
-  it('manually selects a localized presentation without changing browser history', async () => {
-    const user = userEvent.setup()
-    const originalUrl = '/?page=game&player=p1&devMode=1'
-    window.localStorage.setItem('open-agricola-locale-v2', 'en')
-    window.history.replaceState(null, '', originalUrl)
-    vi.spyOn(window, 'matchMedia').mockImplementation((query) => ({
-      matches: query === '(max-width: 900px)',
-      media: query,
-      onchange: null,
-      addListener: vi.fn(),
-      removeListener: vi.fn(),
-      addEventListener: vi.fn(),
-      removeEventListener: vi.fn(),
-      dispatchEvent: vi.fn(),
-    }))
-    vi.stubGlobal('ResizeObserver', class {
-      observe() {}
-      disconnect() {}
-    })
-    vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify(payload))))
-
-    render(
-      <LocaleProvider>
-        <AuthProvider>
-          <GameContainerApi />
-        </AuthProvider>
-      </LocaleProvider>,
-    )
-
-    const navigation = await screen.findByRole('navigation', {
-      name: 'Game presentation',
-    })
-    const action = screen.getByRole('button', { name: 'Action' })
-    const cards = screen.getByRole('button', { name: 'Cards' })
-
-    expect(navigation).toBeInTheDocument()
-    expect(action).toHaveAttribute('aria-pressed', 'true')
-    expect(screen.getByRole('button', { name: 'Farm' })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Information' })).toBeInTheDocument()
-
-    cards.focus()
-    await user.keyboard('{Enter}')
-
-    expect(cards).toHaveAttribute('aria-pressed', 'true')
-    expect(action).toHaveAttribute('aria-pressed', 'false')
-    expect(`${window.location.pathname}${window.location.search}`).toBe(originalUrl)
-  })
-
-  it('keeps every existing gameplay surface reachable through one mobile presentation', async () => {
-    const user = userEvent.setup()
+describe('GameContainerApi responsive presentation', () => {
+  it('shows one continuous graphical game layout on mobile', async () => {
     window.localStorage.setItem('open-agricola-locale-v2', 'en')
     window.history.replaceState(null, '', '/?page=game&player=p1&devMode=1')
-    vi.spyOn(window, 'matchMedia').mockImplementation((query) => ({
-      matches: query === '(max-width: 900px)',
-      media: query,
-      onchange: null,
-      addListener: vi.fn(),
-      removeListener: vi.fn(),
-      addEventListener: vi.fn(),
-      removeEventListener: vi.fn(),
-      dispatchEvent: vi.fn(),
-    }))
-    vi.stubGlobal('ResizeObserver', class {
-      observe() {}
-      disconnect() {}
-    })
-    vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify(payload))))
+    setupViewport(true)
 
-    const { container } = render(
-      <LocaleProvider>
-        <AuthProvider>
-          <GameContainerApi />
-        </AuthProvider>
-      </LocaleProvider>,
-    )
+    const { container } = renderGame()
 
-    await screen.findByRole('navigation', { name: 'Game presentation' })
-    const presentations = container.querySelector('.game-presentations')
+    await screen.findByRole('region', { name: 'Action Spaces' })
 
-    expect(presentations).toHaveAttribute('data-presentation', 'action')
-    expect(container.querySelector('.mobile-actions-panel > h2')).toHaveTextContent('Action Spaces')
-    expect(screen.getByRole('heading', { name: /Major Improvements/ })).toBeInTheDocument()
-    expect(screen.queryByRole('heading', { name: 'Player Farm' })).not.toBeInTheDocument()
-
-    await user.click(screen.getByRole('button', { name: 'Farm' }))
-    expect(presentations).toHaveAttribute('data-presentation', 'farm')
-    expect(screen.getByRole('heading', { name: 'Player Farm' })).toBeInTheDocument()
-    expect(screen.queryByRole('heading', { name: 'Action Spaces' })).not.toBeInTheDocument()
-    expect(screen.queryByRole('heading', { name: 'Hand Cards' })).not.toBeInTheDocument()
-
-    await user.click(screen.getByRole('button', { name: 'Cards' }))
-    expect(presentations).toHaveAttribute('data-presentation', 'cards')
-    expect(screen.queryByRole('heading', { name: /Major Improvements/ })).not.toBeInTheDocument()
-    expect(screen.getByRole('heading', { name: 'Played Cards' })).toBeInTheDocument()
-    expect(screen.getByRole('heading', { name: 'Hand Cards' })).toBeInTheDocument()
-    expect(screen.queryByRole('heading', { name: 'Player Farm' })).not.toBeInTheDocument()
-
-    await user.click(screen.getByRole('button', { name: 'Information' }))
-    expect(presentations).toHaveAttribute('data-presentation', 'information')
-    expect(screen.getByRole('heading', { name: 'Action Log' })).toBeInTheDocument()
-    expect(screen.queryByRole('heading', { name: /Major Improvements/ })).not.toBeInTheDocument()
-    expect(container.querySelector('.interaction-bar')).not.toHaveAttribute('hidden')
-    expect(container.querySelectorAll('.interaction-bar')).toHaveLength(1)
-    expect(container.querySelector('[class*="hand-dock"]')).not.toBeInTheDocument()
-    expect(container.querySelector('.hand-cards')?.closest('.game-layout__center')).not.toBeNull()
-
-    const disclosureButtons = screen.getAllByRole('button', { name: 'expand' })
-    expect(disclosureButtons).toHaveLength(2)
-    await user.click(disclosureButtons[0]!)
-    await user.click(disclosureButtons[1]!)
-
-    expect(container.querySelector('.score-panel')).toBeVisible()
-    expect(screen.getByRole('button', { name: 'All' })).toBeVisible()
-    expect(screen.getByRole('button', { name: 'Previous' })).toBeVisible()
-    expect(screen.getByRole('button', { name: 'Play' })).toBeVisible()
-    expect(screen.getByRole('button', { name: 'Next' })).toBeVisible()
-    expect(screen.getByRole('button', { name: 'Latest' })).toBeVisible()
-  })
-
-  it('leaves the desktop three-column presentation intact', async () => {
-    window.localStorage.setItem('open-agricola-locale-v2', 'en')
-    window.history.replaceState(null, '', '/?page=game&player=p1&devMode=1')
-    vi.spyOn(window, 'matchMedia').mockImplementation((query) => ({
-      matches: false,
-      media: query,
-      onchange: null,
-      addListener: vi.fn(),
-      removeListener: vi.fn(),
-      addEventListener: vi.fn(),
-      removeEventListener: vi.fn(),
-      dispatchEvent: vi.fn(),
-    }))
-    vi.stubGlobal('ResizeObserver', class {
-      observe() {}
-      disconnect() {}
-    })
-    vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify(payload))))
-
-    const { container } = render(
-      <LocaleProvider>
-        <AuthProvider>
-          <GameContainerApi />
-        </AuthProvider>
-      </LocaleProvider>,
-    )
-
-    await screen.findByRole('heading', { name: 'Action Spaces' })
-
-    expect(screen.queryByRole('navigation', { name: 'Game presentation' })).not.toBeInTheDocument()
-    expect(container.querySelector('.game-presentations')).not.toHaveAttribute('data-presentation')
-    expect(container.querySelector('.game-presentation-cards')).not.toHaveAttribute('hidden')
+    expect(screen.queryByRole('navigation', { name: 'Game presentation' }))
+      .not.toBeInTheDocument()
+    expect(container.querySelector('.mobile-actions-panel')).not.toBeInTheDocument()
+    expect(container.querySelector('.action-board')).toBeVisible()
+    expect(container.querySelector('.major-improvements')).toBeVisible()
+    expect(container.querySelector('.farm-grid')).toBeVisible()
+    expect(container.querySelector('.played-cards')).toBeVisible()
+    expect(container.querySelector('.hand-cards')).toBeVisible()
     expect(container.querySelector('.game-layout__left')).not.toHaveAttribute('hidden')
     expect(container.querySelector('.game-layout__center')).not.toHaveAttribute('hidden')
     expect(container.querySelector('.game-layout__right')).not.toHaveAttribute('hidden')
-    expect(container.querySelector('.farm-grid')).not.toHaveAttribute('hidden')
-    expect(container.querySelector('.played-cards')).not.toHaveAttribute('hidden')
+    expect(container.querySelectorAll('.interaction-bar')).toHaveLength(1)
+    expect(screen.getAllByRole('button', { name: 'expand' })).toHaveLength(2)
   })
 
-  it('routes only new mobile interactions without stealing focus', async () => {
-    const user = userEvent.setup()
-    window.localStorage.setItem('open-agricola-locale-v2', 'en')
-    window.history.replaceState(null, '', '/?page=game&player=p1&devMode=1&embedded=1')
-    vi.spyOn(window, 'matchMedia').mockImplementation((query) => ({
-      matches: query === '(max-width: 900px)',
-      media: query,
-      onchange: null,
-      addListener: vi.fn(),
-      removeListener: vi.fn(),
-      addEventListener: vi.fn(),
-      removeEventListener: vi.fn(),
-      dispatchEvent: vi.fn(),
-    }))
-    vi.stubGlobal('ResizeObserver', class {
-      observe() {}
-      disconnect() {}
-    })
-
-    const farmInteraction = {
-      stateId: 'wait',
-      playerIndex: 0,
-      request: {
-        kind: 'farm-select',
-        farm: { farmType: 'plow', selectableTiles: [{ row: 0, col: 0 }] },
-      },
-      allowedCommands: ['commitSelection'],
-      anytimeActions: [],
-    } satisfies GameSyncPayload['interaction']
-    const synchronizedFarmInteraction = {
-      ...farmInteraction,
-      sourceCard: 'ignored-card-id',
-      request: {
-        ...farmInteraction.request,
-        farm: { farmType: 'plow', selectableTiles: [{ row: 0, col: 1 }] },
-      },
-    } satisfies GameSyncPayload['interaction']
-    const actionInteraction = {
-      stateId: 'wait',
-      playerIndex: 0,
-      request: { kind: 'choice', options: [] },
-      allowedCommands: ['resolveChoice'],
-      anytimeActions: [],
-    } satisfies GameSyncPayload['interaction']
-    const responses = [
-      { ...payload, interaction: farmInteraction, historyLength: 3 },
-      { ...payload, interaction: synchronizedFarmInteraction, historyLength: 3 },
-      { ...payload, interaction: actionInteraction, historyLength: 4 },
-    ]
-    vi.stubGlobal('fetch', vi.fn(async () =>
-      new Response(JSON.stringify(responses.shift() ?? responses.at(-1))),
-    ))
-
-    const { container } = render(
-      <LocaleProvider>
-        <AuthProvider>
-          <GameContainerApi />
-        </AuthProvider>
-      </LocaleProvider>,
-    )
-
-    const navigation = await screen.findByRole('navigation', { name: 'Game presentation' })
-    const action = screen.getByRole('button', { name: 'Action' })
-    const farm = screen.getByRole('button', { name: 'Farm' })
-    const cards = screen.getByRole('button', { name: 'Cards' })
-
-    await waitFor(() => expect(farm).toHaveAttribute('aria-pressed', 'true'))
-    expect(screen.getByRole('status')).toHaveTextContent('Current request: Farm')
-
-    await user.click(cards)
-    expect(cards).toHaveFocus()
-    expect(container.querySelector('.game-presentations')).toHaveAttribute('data-presentation', 'cards')
-
-    fireEvent.click(screen.getByRole('button', { name: 'Add Resource' }))
-    await waitFor(() => expect(fetch).toHaveBeenCalledTimes(2))
-    expect(cards).toHaveAttribute('aria-pressed', 'true')
-    expect(cards).toHaveFocus()
-
-    fireEvent.click(screen.getByRole('button', { name: 'Add Resource' }))
-    await waitFor(() => expect(action).toHaveAttribute('aria-pressed', 'true'))
-    expect(cards).toHaveFocus()
-    expect(navigation).toContainElement(screen.getByRole('status'))
-    expect(screen.getByRole('status')).toHaveTextContent('Current request: Action')
-  })
-
-  it('submits a mobile task action through the existing transport and keeps the board as optional orientation', async () => {
-    const taskPayload: GameSyncPayload = {
-      ...payload,
-      actionAvailability: { 'meeting-place': true },
-    }
-    const fetchMock = vi.fn(async () => new Response(JSON.stringify(taskPayload)))
+  it('keeps the desktop three-column layout intact', async () => {
     window.localStorage.setItem('open-agricola-locale-v2', 'en')
     window.history.replaceState(null, '', '/?page=game&player=p1&devMode=1')
-    vi.spyOn(window, 'matchMedia').mockImplementation((query) => ({
-      matches: query === '(max-width: 900px)',
-      media: query,
-      onchange: null,
-      addListener: vi.fn(),
-      removeListener: vi.fn(),
-      addEventListener: vi.fn(),
-      removeEventListener: vi.fn(),
-      dispatchEvent: vi.fn(),
-    }))
-    vi.stubGlobal('ResizeObserver', class {
-      observe() {}
-      disconnect() {}
-    })
-    vi.stubGlobal('fetch', fetchMock)
+    setupViewport(false)
 
-    const { container } = render(
-      <LocaleProvider>
-        <AuthProvider>
-          <GameContainerApi />
-        </AuthProvider>
-      </LocaleProvider>,
-    )
+    const { container } = renderGame()
 
-    const tasks = await waitFor(() => {
-      const node = container.querySelector<HTMLElement>('.mobile-actions-panel')
-      expect(node).not.toBeNull()
-      return node!
-    })
-    const primaryTasks = tasks.querySelector<HTMLElement>(':scope > .mobile-action-tasks')
-    expect(primaryTasks).not.toBeNull()
-    const meetingPlace = within(primaryTasks!).getByRole('button', { name: /Meeting Place/ })
-    expect(meetingPlace).toBeEnabled()
+    await screen.findByRole('region', { name: 'Action Spaces' })
 
-    await userEvent.click(meetingPlace)
-
-    await waitFor(() => {
-      const actionCall = fetchMock.mock.calls.find(([input]) =>
-        String(input).endsWith('/api/game/action'),
-      )
-      expect(actionCall?.[1]).toMatchObject({
-        method: 'POST',
-        body: JSON.stringify({ playerIndex: 0, spaceId: 'meeting-place' }),
-      })
-    })
-    const overview = container.querySelector('.mobile-board-overview')
-    expect(overview).not.toHaveAttribute('open')
-    expect(overview?.querySelector('.action-board')).not.toBeNull()
-    expect(container.querySelectorAll('.action-board')).toHaveLength(1)
-    expect(container.querySelectorAll('.major-improvements')).toHaveLength(1)
-  })
-
-  it('routes a selected Moor terrain special action to the mobile farm presentation', async () => {
-    const moorPayload: GameSyncPayload = {
-      ...payload,
-      state: serializeState(createInitialState(42, {
-        playerCount: 2,
-        enableFarmersOfTheMoor: true,
-        allowIncompleteFarmersOfTheMoorMinorDeal: true,
-      }), { engineStack: new EngineStack() }),
-    }
-    window.localStorage.setItem('open-agricola-locale-v2', 'en')
-    window.history.replaceState(null, '', '/?page=game&player=p1&devMode=1')
-    vi.spyOn(window, 'matchMedia').mockImplementation((query) => ({
-      matches: query === '(max-width: 900px)',
-      media: query,
-      onchange: null,
-      addListener: vi.fn(),
-      removeListener: vi.fn(),
-      addEventListener: vi.fn(),
-      removeEventListener: vi.fn(),
-      dispatchEvent: vi.fn(),
-    }))
-    vi.stubGlobal('ResizeObserver', class {
-      observe() {}
-      disconnect() {}
-    })
-    vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify(moorPayload))))
-
-    const { container } = render(
-      <LocaleProvider>
-        <AuthProvider>
-          <GameContainerApi />
-        </AuthProvider>
-      </LocaleProvider>,
-    )
-
-    await userEvent.click(await screen.findByRole('button', { name: 'Cut Peat' }))
-
-    expect(container.querySelector('.game-presentations')).toHaveAttribute(
-      'data-presentation',
-      'farm',
-    )
-    expect(screen.getByRole('heading', { name: 'Player Farm' })).toBeInTheDocument()
+    expect(screen.queryByRole('navigation', { name: 'Game presentation' }))
+      .not.toBeInTheDocument()
+    expect(container.querySelector('.major-improvements')).toBeVisible()
+    expect(container.querySelector('.game-layout__left')).not.toHaveAttribute('hidden')
+    expect(container.querySelector('.game-layout__center')).not.toHaveAttribute('hidden')
+    expect(container.querySelector('.game-layout__right')).not.toHaveAttribute('hidden')
+    expect(container.querySelector('.farm-grid')).toBeVisible()
+    expect(container.querySelector('.played-cards')).toBeVisible()
   })
 })

@@ -10,16 +10,7 @@ export const zh = {
     actionArea: '行动区',
     expandSection: '展开',
     collapseSection: '收起',
-    boardOverview: '棋盘总览',
-    gamePresentationNavigation: '游戏视图',
-    gamePresentationChanged: '当前操作：{presentation}',
     roomPersistencePaused: '保存已暂停，存储恢复后对局会自动继续。',
-    gamePresentation: {
-      action: '行动',
-      farm: '农场',
-      cards: '卡牌',
-      information: '信息',
-    },
     seasons: {
       board: '四季版图',
       winter: '冬季',
