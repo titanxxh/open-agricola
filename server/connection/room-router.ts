@@ -87,7 +87,7 @@ const loadCustomCards = (
   let hasNotLive = false
   for (const dbId of cardDbIds) {
     const row = db.prepare(
-      'SELECT card_type, card_json, code_manifest, art_url, review_status, live, author_id FROM workshop_cards WHERE id = ?',
+      'SELECT card_type, card_json, code_manifest, art_url, review_status, live, built_in, author_id FROM workshop_cards WHERE id = ?',
     ).get(dbId) as {
       card_type: string
       card_json: string
@@ -95,6 +95,7 @@ const loadCustomCards = (
       art_url: string | null
       review_status: string
       live: number
+      built_in: number
       author_id: string
     } | undefined
     if (!row) continue
