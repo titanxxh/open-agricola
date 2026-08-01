@@ -1,5 +1,7 @@
 #!/bin/bash
 # 一键更新并重新部署后端 Docker
+# 部署前自动做完整备份（app-data 全量 + .env 快照 + 最新 ledger 副本），
+# 备份失败则拉回旧版本并中止部署；pre-deploy 备份保留最近 5 份、最多 30 天（ADR-0010）。
 # 用法: ./deploy-backend.sh <ssh-host> [ref] [remote-dir]
 # ref 可以是分支名或 release tag
 # 示例: ./deploy-backend.sh 1.2.3.4
@@ -45,7 +47,56 @@ ssh "$HOST" "${REMOTE_ENV[@]}" bash -s "$REMOTE_DIR" "$REF" << 'REMOTE_SCRIPT'
   GAME_BUILD_ID="$(git rev-parse HEAD)"
 
   echo ">>> docker compose build..."
-  GAME_BUILD_ID="$GAME_BUILD_ID" docker compose -f docker-compose.prod.yml up -d --build --remove-orphans
+  GAME_BUILD_ID="$GAME_BUILD_ID" docker compose -f docker-compose.prod.yml build
+
+  echo ">>> pre-deploy 备份..."
+  mkdir -p backups
+  chmod 700 backups
+  SAFE_REF="${REF//\//-}"
+  BACKUP_STEM="pre-${SAFE_REF}-$(date -u +%Y%m%dT%H%M%SZ)"
+  # app 停止后到新版本 up 成功之间，任何退出（含 CI cancel 杀掉 SSH）都拉回旧容器
+  RESTART_ON_EXIT=0
+  on_exit() {
+    if [ "$RESTART_ON_EXIT" = "1" ]; then
+      echo ">>> 部署未完成，恢复旧版本 app"
+      docker compose -f docker-compose.prod.yml start app || true
+    fi
+  }
+  trap on_exit EXIT
+  trap 'exit 129' HUP INT TERM
+  backup_failed() {
+    echo ">>> ✗ 备份失败，部署中止"
+    rm -f "backups/$BACKUP_STEM.tgz" "backups/env-$BACKUP_STEM"
+    exit 1
+  }
+  RESTART_ON_EXIT=1
+  docker compose -f docker-compose.prod.yml stop app
+  docker compose -f docker-compose.prod.yml run --rm --no-deps \
+    -v "$PWD/backups:/backup" app sh -c \
+    "tar -C /app/data -czf /backup/$BACKUP_STEM.tgz . && \
+     if [ -f /app/data/replay-removals.jsonl ]; then \
+       cp /app/data/replay-removals.jsonl /backup/replay-removals.latest.jsonl; \
+     elif [ ! -f /backup/replay-removals.latest.jsonl ]; then \
+       : > /backup/replay-removals.latest.jsonl; \
+     fi" || backup_failed
+  tar -tzf "backups/$BACKUP_STEM.tgz" > /dev/null || backup_failed
+  chmod 600 "backups/$BACKUP_STEM.tgz" backups/replay-removals.latest.jsonl || backup_failed
+  { cp .env "backups/env-$BACKUP_STEM" && chmod 600 "backups/env-$BACKUP_STEM"; } || backup_failed
+  echo ">>> ✓ 备份完成: backups/$BACKUP_STEM.tgz"
+
+  echo ">>> 清理旧 pre-deploy 备份（保留最近 5 份、最多 30 天）..."
+  {
+    ls -1t backups/pre-*.tgz 2>/dev/null | tail -n +6
+    find backups -maxdepth 1 -name 'pre-*.tgz' -mtime +30 2>/dev/null
+  } | sort -u | while read -r OLD; do
+    STEM="$(basename "$OLD" .tgz)"
+    rm -f "$OLD" "backups/env-$STEM"
+    echo ">>> 已删除旧备份 $STEM"
+  done
+
+  echo ">>> docker compose up..."
+  GAME_BUILD_ID="$GAME_BUILD_ID" docker compose -f docker-compose.prod.yml up -d --remove-orphans
+  RESTART_ON_EXIT=0
 
   echo ">>> 等待健康检查..."
   for i in $(seq 1 15); do

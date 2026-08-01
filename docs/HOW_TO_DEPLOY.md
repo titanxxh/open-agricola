@@ -456,6 +456,8 @@ PUBLIC_ASSET_LOCAL_DIR=../open-agricola-assets pnpm dev
 
 发布 GitHub Release 后，`.github/workflows/deploy-backend.yml` 自动调用 `deploy-backend.sh` 部署 release tag 对应的 commit（Actions 页面手动触发时部署 `main` 最新）。需要配置 Actions variables `DEPLOY_HOST`、`DEPLOY_USER`、`DEPLOY_REMOTE_DIR`、`ACCOUNT_REGISTRATION_POLICY`，以及 secret `DEPLOY_SSH_PRIVATE_KEY`。
 
+`deploy-backend.sh` 在切换新版本前自动做完整备份：先 build 新镜像（旧版本继续服务），然后停止 app，把 `app-data` volume 全量打包为 `backups/pre-<ref>-<timestamp>.tgz`（含 SQLite、card art、Replay Viewer、Replay assets、删除 ledger），同时刷新 `backups/replay-removals.latest.jsonl` 并保存 `.env` 快照 `backups/env-pre-<ref>-<timestamp>`（600 权限）。备份或完整性校验失败会拉回旧版本 app 并中止部署（Actions run 失败）；app 停止后到新版本启动成功之间部署被中断（例如被新的部署 run 取消）时同样自动拉回旧容器。脚本自动清理旧的 pre-deploy 备份：保留最近 5 份，且按 ADR-0010 的备份副本上限删除超过 30 天的归档；手动备份（非 `pre-` 前缀）不受影响。备份归档与 ledger 快照为 600 权限、`backups/` 目录为 700。停机窗口只覆盖打包和启动新容器，不包含镜像构建。恢复流程见[数据备份](#数据备份)。
+
 手动更新：
 
 ```bash
@@ -626,7 +628,7 @@ https://<backend-origin>/api/auth/oauth/google/callback
 
 ### 数据备份
 
-备份必须同时包含 SQLite、Viewer、Replay assets、card art 和 deletion ledger。以下命令假定 ledger 保持默认的 `/app/data/replay-removals.jsonl`；先停后端，避免备份跨越一次 Room Commit：
+备份必须同时包含 SQLite、Viewer、Replay assets、card art 和 deletion ledger。release 自动部署已在每次切换新版本前生成同等内容的 `backups/pre-<ref>-<timestamp>.tgz`（见「三、更新部署」），下述手动命令用于部署之外的场景。以下命令假定 ledger 保持默认的 `/app/data/replay-removals.jsonl`；先停后端，避免备份跨越一次 Room Commit：
 
 ```bash
 mkdir -p backups
