@@ -683,7 +683,7 @@ chmod 600 "backups/$OA_BACKUP_STEM.manifest.json"
 3. 本地 `daily-*` 保留最近 7 份；本地所有归档（含 `pre-*` 与手动备份）一律最多 30 天（ADR-0010 上限，按分钟计算避免整天舍入），份数层面 `pre-*` 仍由 `deploy-backend.sh` 管理、手动备份留人工处理。
 4. 把 `backups/`（含 `pre-*`、`daily-*`、手动备份、manifest、env 快照）rsync 到 `OFFSITE_BACKUP_TARGET` 的 `OFFSITE_BACKUP_REMOTE_DIR`；超过 30 天的本地归档不再推送。rsync 不带 `--delete`：远端保留策略独立于本地，本地误删不会传播到异机。
 5. `replay-removals.latest.jsonl` 不走目录同步：只有本地副本是远端副本的超集（前缀关系成立）时才覆盖远端，防止回滚的 ledger 冲掉异机删除事实；前缀不成立时脚本以非零退出并保留远端副本。
-6. 远端清理：`daily-*` 保留最近 30 份、`pre-*` 保留最近 10 份，且所有归档（含手动备份）一律最多 30 天（ADR-0010 备份副本上限）；`replay-removals.latest.jsonl` 永不自动清理。
+6. 远端清理：`daily-*` 保留最近 30 份、`pre-*` 保留最近 10 份，且所有归档（含手动备份）一律最多 30 天（ADR-0010 备份副本上限）；`replay-removals.latest.jsonl` 永不自动清理。异机自身另装 `deploy/offsite-retention.sh` 的自治 cron 兜底 30 天上限——生产机丢失或失联时合规仍然成立。
 
 首次在生产机启用：
 
@@ -708,6 +708,12 @@ cd /root/open-agricola
 cp deploy/open-agricola-backup.cron /etc/cron.d/open-agricola-backup
 chmod 644 /etc/cron.d/open-agricola-backup
 cp deploy/open-agricola-backup.logrotate /etc/logrotate.d/open-agricola-backup
+
+# 6. 异机安装自治 30 天清理（生产机失联时 ADR-0010 上限仍成立）
+scp deploy/offsite-retention.sh root@<异机IP>:/root/offsite-retention.sh
+ssh root@<异机IP> 'chmod +x /root/offsite-retention.sh'
+scp deploy/open-agricola-offsite-retention.cron root@<异机IP>:/etc/cron.d/open-agricola-offsite-retention
+ssh root@<异机IP> 'chmod 644 /etc/cron.d/open-agricola-offsite-retention && systemctl is-active cron'
 ```
 
 脚本随 git 部署自动更新；cron 定义改动后需重新执行第 5 步。从异机恢复时，先把目标归档、配对 manifest、`env-<stem>` 快照和 `replay-removals.latest.jsonl` 拉回生产机 `backups/`：

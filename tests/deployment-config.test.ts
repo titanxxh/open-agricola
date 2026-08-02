@@ -188,6 +188,24 @@ describe('production deployment config', () => {
     expect(script).toContain('|| { echo ">>> ✗ ledger 推送失败"; return 1; }')
   })
 
+  it('honors the configured removal ledger path in both backup modes', () => {
+    const script = readFileSync('backup-offsite.sh', 'utf8')
+    expect(script).toContain('REPLAY_REMOVAL_LEDGER_PATH')
+    expect(script).toContain('cp app:"$CONTAINER_LEDGER" "$LEDGER"')
+    expect(script).toContain('cp $CONTAINER_LEDGER /backup/replay-removals.latest.jsonl')
+    expect(script).not.toContain('app:/app/data/replay-removals.jsonl')
+  })
+
+  it('enforces the offsite 30-day cap autonomously on the replica host', () => {
+    const retention = readFileSync('deploy/offsite-retention.sh', 'utf8')
+    const cron = readFileSync('deploy/open-agricola-offsite-retention.cron', 'utf8')
+    expect(retention).toContain('MAX_AGE_MINUTES=$((30 * 24 * 60))')
+    expect(retention).toContain('find . -maxdepth 1 -name \'*.tgz\' -mmin "+$MAX_AGE_MINUTES"')
+    expect(retention).toContain('rm -f "$OLD" "$STEM.manifest.json" "env-$STEM"')
+    expect(cron).toContain('CRON_TZ=UTC')
+    expect(cron).toContain('/root/offsite-retention.sh')
+  })
+
   it('protects the offsite removal ledger from rollback and syncs it on takedown', () => {
     const script = readFileSync('backup-offsite.sh', 'utf8')
     expect(script).toContain('cmp -s -n')
