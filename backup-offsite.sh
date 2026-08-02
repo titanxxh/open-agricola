@@ -31,6 +31,13 @@ if [ -z "$OFFSITE_BACKUP_TARGET" ]; then
 fi
 SSH_OPTS=(-o StrictHostKeyChecking=accept-new -o ConnectTimeout=15)
 LEDGER=backups/replay-removals.latest.jsonl
+# 生产 ledger 的实际路径跟随 REPLAY_REMOVAL_LEDGER_PATH 配置，映射为容器内路径
+LEDGER_SRC="${REPLAY_REMOVAL_LEDGER_PATH:-$(env_value REPLAY_REMOVAL_LEDGER_PATH)}"
+LEDGER_SRC="${LEDGER_SRC:-./data/replay-removals.jsonl}"
+case "$LEDGER_SRC" in
+  /*) CONTAINER_LEDGER="$LEDGER_SRC" ;;
+  *) CONTAINER_LEDGER="/app/${LEDGER_SRC#./}" ;;
+esac
 # ADR-0010 的 30 天备份副本上限，按分钟计算避免 -mtime 的整天舍入
 MAX_AGE_MINUTES=$((30 * 24 * 60))
 
@@ -80,7 +87,7 @@ sync_ledger() {
 }
 
 if [ "$MODE" = "ledger-only" ]; then
-  docker compose -f docker-compose.prod.yml cp app:/app/data/replay-removals.jsonl "$LEDGER"
+  docker compose -f docker-compose.prod.yml cp app:"$CONTAINER_LEDGER" "$LEDGER"
   chmod 600 "$LEDGER"
   ensure_remote_dir
   sync_ledger
@@ -146,8 +153,8 @@ do_backup() {
   docker compose -f docker-compose.prod.yml run --rm --no-deps \
     -v "$PWD/backups:/backup" app sh -c \
     "tar -C /app/data -czf /backup/$BACKUP_STEM.tgz . && \
-     if [ -f /app/data/replay-removals.jsonl ]; then \
-       cp /app/data/replay-removals.jsonl /backup/replay-removals.latest.jsonl; \
+     if [ -f $CONTAINER_LEDGER ]; then \
+       cp $CONTAINER_LEDGER /backup/replay-removals.latest.jsonl; \
      elif [ ! -f /backup/replay-removals.latest.jsonl ]; then \
        : > /backup/replay-removals.latest.jsonl; \
      fi" < /dev/null || {

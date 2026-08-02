@@ -1,0 +1,9 @@
+# 安装到异机（备份目标机）：
+#   scp deploy/offsite-retention.sh root@<异机IP>:/root/offsite-retention.sh
+#   ssh root@<异机IP> 'chmod +x /root/offsite-retention.sh'
+#   scp deploy/open-agricola-offsite-retention.cron root@<异机IP>:/etc/cron.d/open-agricola-offsite-retention
+#   ssh root@<异机IP> 'chmod 644 /etc/cron.d/open-agricola-offsite-retention'
+# 异机自治执行 ADR-0010 的 30 天上限清理，生产机丢失或失联时合规仍然成立
+CRON_TZ=UTC
+PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+30 21 * * * root /root/offsite-retention.sh >> /var/log/open-agricola-offsite-retention.log 2>&1
