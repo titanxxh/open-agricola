@@ -21,7 +21,8 @@ type BackupMetadata = {
 
 export type BackupValidationReport = BackupMetadata & {
   formatVersion: 1
-  databaseSchemaVersion: number
+  sourceDatabaseSchemaVersion: number
+  targetDatabaseSchemaVersion: number
   replaySchemaVersions: number[]
   roomCount: number
   replayCount: number
@@ -60,6 +61,17 @@ const validateSqlite = (db: Database.Database): void => {
   }
   const foreignKeyFailures = db.pragma('foreign_key_check') as unknown[]
   if (foreignKeyFailures.length > 0) throw new Error('sqlite foreign key check failed')
+}
+
+const databaseSchemaVersion = (db: Database.Database): number => {
+  const table = db.prepare(`
+    SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'schema_version'
+  `).get()
+  if (!table) return 0
+  const row = db.prepare('SELECT MAX(version) AS version FROM schema_version').get() as {
+    version: number | null
+  }
+  return row.version ?? 0
 }
 
 const validateRooms = (
@@ -188,12 +200,10 @@ export const validateBackupDatabase = (
   dataRoot: string,
 ): BackupValidationReport => {
   db.pragma('foreign_keys = ON')
+  const sourceDatabaseSchemaVersion = databaseSchemaVersion(db)
   runMigrations(db, () => {})
   validateSqlite(db)
-  const schemaRow = db.prepare('SELECT MAX(version) AS version FROM schema_version').get() as {
-    version: number | null
-  }
-  const databaseSchemaVersion = schemaRow.version ?? 0
+  const targetDatabaseSchemaVersion = databaseSchemaVersion(db)
   const roomIds = (db.prepare('SELECT id FROM rooms ORDER BY id').all() as Array<{ id: string }>)
     .map(({ id }) => id)
   const headers = db.prepare(`
@@ -238,7 +248,8 @@ export const validateBackupDatabase = (
   return {
     formatVersion: 1,
     ...metadata,
-    databaseSchemaVersion,
+    sourceDatabaseSchemaVersion,
+    targetDatabaseSchemaVersion,
     replaySchemaVersions: [...new Set(headers.map(({ schema_version }) => schema_version))].sort((a, b) => a - b),
     roomCount: roomIds.length,
     replayCount: headers.length,

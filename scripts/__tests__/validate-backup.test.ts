@@ -108,7 +108,8 @@ describe('backup validation', () => {
     expect(validateBackupDatabase(db, metadata, root)).toEqual({
       formatVersion: 1,
       ...metadata,
-      databaseSchemaVersion: 27,
+      sourceDatabaseSchemaVersion: 26,
+      targetDatabaseSchemaVersion: 27,
       replaySchemaVersions: [1],
       roomCount: 1,
       replayCount: 1,
