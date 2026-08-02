@@ -16,7 +16,7 @@ env:
   DEPLOY_HOST: ${{ vars.DEPLOY_HOST || 'open-agricola.duckdns.org' }}
   DEPLOY_USER: ${{ vars.DEPLOY_USER || 'root' }}
   DEPLOY_REMOTE_DIR: ${{ vars.DEPLOY_REMOTE_DIR || '/root/open-agricola' }}
-  DEPLOY_REF: ${{ github.event.release.tag_name || 'main' }}
+  DEPLOY_REF: ${{ github.event.release.tag_name || github.sha }}
   ACCOUNT_REGISTRATION_POLICY: ${{ vars.ACCOUNT_REGISTRATION_POLICY }}
 
 jobs:
