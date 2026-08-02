@@ -1310,6 +1310,7 @@ export const zh = {
     seatLabel: '席位 {index}',
     statusPlaying: '进行中',
     statusWaiting: '等待中',
+    yourTurn: '轮到你了',
     resume: '继续',
     activeRooms: '当前活跃房间',
     noActiveRooms: '暂无活跃房间',
