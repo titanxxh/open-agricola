@@ -2,13 +2,15 @@
 # 定时备份 + 异机同步（在生产机上运行，由 cron 每日调用，cron 定义见 deploy/open-agricola-backup.cron）
 # 停 app 把 app-data volume 打包为 backups/daily-<timestamp>.tgz 并刷新 replay-removals.latest.jsonl，
 # 随即重启 app（停机窗口只覆盖打包），再在一次性副本上做恢复验证并写入同名 manifest，
-# 最后把 backups/ rsync 到异机并做两端保留清理。备份创建/验证失败时，保留清理与异机同步照常执行。
+# 最后把 backups/ rsync 到异机并做两端保留清理。备份创建/验证或 rsync 失败时，
+# 两端保留清理照常执行，脚本最终以非零退出。
 # 配置（.env 或环境变量）：
 #   OFFSITE_BACKUP_TARGET      必填，异机 ssh 目标，如 root@1.2.3.4
 #   OFFSITE_BACKUP_REMOTE_DIR  异机存放目录，默认 /root/open-agricola-backups
-# 保留策略：本地 daily 保留最近 7 份且最多 30 天（pre-* 由 deploy-backend.sh 管理，手动备份留人工处理）；
-# rsync 跳过本地超过 30 天的归档；远端 daily 保留最近 30 份、pre 保留最近 10 份，
-# 所有归档（含手动备份）一律最多 30 天（ADR-0010 备份副本上限）。
+# 保留策略：本地 daily 保留最近 7 份，本地所有归档一律最多 30 天（pre-* 份数由 deploy-backend.sh
+# 管理，手动备份份数留人工处理）；rsync 跳过本地超过 30 天的归档；远端 daily 保留最近 30 份、
+# pre 保留最近 10 份，所有归档（含手动备份）一律最多 30 天（ADR-0010 备份副本上限，
+# 30 天界限按分钟计算避免 -mtime 的整天舍入）。
 # replay-removals.latest.jsonl 是最新删除事实的异机副本，永不清理，且只有在本地副本
 # 是远端副本的超集（前缀关系成立）时才覆盖远端，防止回滚的 ledger 冲掉异机删除事实。
 # 用法: ./backup-offsite.sh              # 完整定时备份 + 异机同步
@@ -29,6 +31,8 @@ if [ -z "$OFFSITE_BACKUP_TARGET" ]; then
 fi
 SSH_OPTS=(-o StrictHostKeyChecking=accept-new -o ConnectTimeout=15)
 LEDGER=backups/replay-removals.latest.jsonl
+# ADR-0010 的 30 天备份副本上限，按分钟计算避免 -mtime 的整天舍入
+MAX_AGE_MINUTES=$((30 * 24 * 60))
 
 mkdir -p backups
 chmod 700 backups
@@ -47,16 +51,19 @@ ensure_remote_dir() {
     "mkdir -p '$OFFSITE_BACKUP_REMOTE_DIR' && chmod 700 '$OFFSITE_BACKUP_REMOTE_DIR'" < /dev/null
 }
 
-# 只有本地 ledger 是远端副本的超集（远端内容 == 本地前缀）时才覆盖远端副本
+# 只有本地 ledger 是远端副本的超集（远端内容 == 本地前缀）时才覆盖远端副本。
+# 可能被 `sync_ledger || ...` 调用（errexit 被抑制），每个可失败命令都显式传播失败。
 sync_ledger() {
   if [ ! -f "$LEDGER" ]; then
-    echo ">>> 本地无 ledger 副本，跳过 ledger 同步"
+    echo ">>> ✗ 本地无 ledger 副本，跳过 ledger 同步"
     return 1
   fi
   local remote_size local_size
   remote_size="$(ssh "${SSH_OPTS[@]}" "$OFFSITE_BACKUP_TARGET" \
-    "stat -c '%s' '$OFFSITE_BACKUP_REMOTE_DIR/replay-removals.latest.jsonl' 2>/dev/null || echo 0" < /dev/null)"
-  local_size="$(stat -c '%s' "$LEDGER")"
+    "stat -c '%s' '$OFFSITE_BACKUP_REMOTE_DIR/replay-removals.latest.jsonl' 2>/dev/null || echo 0" < /dev/null)" \
+    || { echo ">>> ✗ 读取远端 ledger 大小失败"; return 1; }
+  [[ "$remote_size" =~ ^[0-9]+$ ]] || { echo ">>> ✗ 远端 ledger 大小异常: $remote_size"; return 1; }
+  local_size="$(stat -c '%s' "$LEDGER")" || return 1
   if [ "$remote_size" -gt 0 ]; then
     if [ "$local_size" -lt "$remote_size" ] || \
        ! ssh "${SSH_OPTS[@]}" "$OFFSITE_BACKUP_TARGET" \
@@ -67,7 +74,8 @@ sync_ledger() {
     fi
   fi
   rsync -a -e "ssh ${SSH_OPTS[*]}" "$LEDGER" \
-    "$OFFSITE_BACKUP_TARGET:$OFFSITE_BACKUP_REMOTE_DIR/replay-removals.latest.jsonl"
+    "$OFFSITE_BACKUP_TARGET:$OFFSITE_BACKUP_REMOTE_DIR/replay-removals.latest.jsonl" \
+    || { echo ">>> ✗ ledger 推送失败"; return 1; }
   echo ">>> ✓ ledger 异机副本已更新（${local_size}B）"
 }
 
@@ -109,12 +117,23 @@ discard_backup() {
     "backups/$BACKUP_STEM.manifest.json" \
     "backups/env-$BACKUP_STEM"
 }
+# start 成功才清除 RESTART_ON_EXIT；失败保持 1，脚本退出时 EXIT trap 再次尝试拉起
+restart_app() {
+  if docker compose -f docker-compose.prod.yml start app; then
+    RESTART_ON_EXIT=0
+  else
+    echo ">>> ✗ app 启动失败，脚本退出时将再次尝试拉起"
+    return 1
+  fi
+}
 
+# do_backup 经 `if ! do_backup` 调用（errexit 被抑制），每个可失败命令都显式传播失败；
+# 打包失败立即重启 app，不把停机拖到脚本结束。
 do_backup() {
   local build_id
   build_id="$(
     docker compose -f docker-compose.prod.yml exec -T app \
-      sh -c 'printf "%s" "$GAME_BUILD_ID"' 2>/dev/null \
+      sh -c 'printf "%s" "$GAME_BUILD_ID"' < /dev/null 2>/dev/null \
       || git rev-parse HEAD
   )"
   if [ -z "$build_id" ]; then
@@ -123,7 +142,7 @@ do_backup() {
 
   echo ">>> 停止 app 并打包 $BACKUP_STEM.tgz ..."
   RESTART_ON_EXIT=1
-  docker compose -f docker-compose.prod.yml stop app
+  docker compose -f docker-compose.prod.yml stop app || true
   docker compose -f docker-compose.prod.yml run --rm --no-deps \
     -v "$PWD/backups:/backup" app sh -c \
     "tar -C /app/data -czf /backup/$BACKUP_STEM.tgz . && \
@@ -131,9 +150,12 @@ do_backup() {
        cp /app/data/replay-removals.jsonl /backup/replay-removals.latest.jsonl; \
      elif [ ! -f /backup/replay-removals.latest.jsonl ]; then \
        : > /backup/replay-removals.latest.jsonl; \
-     fi" < /dev/null || { discard_backup "打包"; return 1; }
-  docker compose -f docker-compose.prod.yml start app
-  RESTART_ON_EXIT=0
+     fi" < /dev/null || {
+       discard_backup "打包"
+       restart_app || true
+       return 1
+     }
+  restart_app || return 1
   echo ">>> app 已恢复，开始验证归档..."
 
   local backup_sha256 backup_size_bytes
@@ -156,7 +178,8 @@ do_backup() {
     -e BACKUP_SHA256="$backup_sha256" \
     -e BACKUP_SIZE_BYTES="$backup_size_bytes" \
     app node --import tsx scripts/validate-backup.ts \
-    > "backups/$BACKUP_STEM.manifest.json" < /dev/null || { discard_backup "恢复验证"; return 1; }
+    < /dev/null \
+    > "backups/$BACKUP_STEM.manifest.json" || { discard_backup "恢复验证"; return 1; }
   rm -rf -- "$VALIDATION_DIR"
   VALIDATION_DIR=""
   chmod 600 \
@@ -176,46 +199,50 @@ if ! do_backup; then
   echo ">>> ✗ 本次备份创建/验证失败，仍继续执行保留清理与异机同步"
 fi
 
-echo ">>> 清理本地旧 daily 备份（保留最近 7 份、最多 30 天）..."
+echo ">>> 清理本地旧备份（daily 保留最近 7 份；所有归档最多 30 天）..."
 {
   ls -1t backups/daily-*.tgz 2>/dev/null | tail -n +8
-  find backups -maxdepth 1 -name 'daily-*.tgz' -mtime +30 2>/dev/null
+  find backups -maxdepth 1 -name '*.tgz' -mmin "+$MAX_AGE_MINUTES" 2>/dev/null
 } | sort -u | while read -r OLD; do
   STEM="$(basename "$OLD" .tgz)"
   rm -f "$OLD" "backups/$STEM.manifest.json" "backups/env-$STEM"
   echo ">>> 已删除本地旧备份 $STEM"
 done
 
-echo ">>> 同步 backups/ 到 $OFFSITE_BACKUP_TARGET:$OFFSITE_BACKUP_REMOTE_DIR ..."
-ensure_remote_dir
-# 超过 30 天的本地归档不再推送，避免与远端 30 天清理形成删除-重推循环
-RSYNC_EXCLUDE_FILE="$(mktemp)"
-find backups -maxdepth 1 -name '*.tgz' -mtime +30 -printf '%f\n' 2>/dev/null \
-  | while read -r F; do
-      STEM="${F%.tgz}"
-      printf '%s\n%s\n%s\n' "$F" "$STEM.manifest.json" "env-$STEM"
-    done > "$RSYNC_EXCLUDE_FILE"
-# 不带 --delete：远端保留策略独立于本地，本地误删不会传播到异机；
-# ledger 不走目录同步，由 sync_ledger 做前缀检查后单独推送
-rsync -az --exclude '.validate-*' --exclude '.maintenance.lock' \
-  --exclude 'replay-removals.latest.jsonl' \
-  --exclude-from "$RSYNC_EXCLUDE_FILE" \
-  -e "ssh ${SSH_OPTS[*]}" \
-  backups/ "$OFFSITE_BACKUP_TARGET:$OFFSITE_BACKUP_REMOTE_DIR/"
-rm -f -- "$RSYNC_EXCLUDE_FILE"
-RSYNC_EXCLUDE_FILE=""
-
+SYNC_OK=1
 LEDGER_OK=1
-sync_ledger || LEDGER_OK=0
+if ensure_remote_dir; then
+  echo ">>> 同步 backups/ 到 $OFFSITE_BACKUP_TARGET:$OFFSITE_BACKUP_REMOTE_DIR ..."
+  # 超过 30 天的本地归档不再推送，避免与远端 30 天清理形成删除-重推循环
+  RSYNC_EXCLUDE_FILE="$(mktemp)"
+  find backups -maxdepth 1 -name '*.tgz' -mmin "+$MAX_AGE_MINUTES" -printf '%f\n' 2>/dev/null \
+    | while read -r F; do
+        STEM="${F%.tgz}"
+        printf '%s\n%s\n%s\n' "$F" "$STEM.manifest.json" "env-$STEM"
+      done > "$RSYNC_EXCLUDE_FILE"
+  # 不带 --delete：远端保留策略独立于本地，本地误删不会传播到异机；
+  # ledger 不走目录同步，由 sync_ledger 做前缀检查后单独推送
+  rsync -az --exclude '.validate-*' --exclude '.maintenance.lock' \
+    --exclude 'replay-removals.latest.jsonl' \
+    --exclude-from "$RSYNC_EXCLUDE_FILE" \
+    -e "ssh ${SSH_OPTS[*]}" \
+    backups/ "$OFFSITE_BACKUP_TARGET:$OFFSITE_BACKUP_REMOTE_DIR/" \
+    || { echo ">>> ✗ 归档 rsync 失败，仍继续执行远端清理"; SYNC_OK=0; }
+  rm -f -- "$RSYNC_EXCLUDE_FILE"
+  RSYNC_EXCLUDE_FILE=""
 
-echo ">>> 清理远端旧备份（daily 保留 30 份、pre 保留 10 份、归档一律最多 30 天）..."
-ssh "${SSH_OPTS[@]}" "$OFFSITE_BACKUP_TARGET" bash -s "$OFFSITE_BACKUP_REMOTE_DIR" << 'REMOTE_CLEANUP'
+  sync_ledger || LEDGER_OK=0
+
+  echo ">>> 清理远端旧备份（daily 保留 30 份、pre 保留 10 份、归档一律最多 30 天）..."
+  ssh "${SSH_OPTS[@]}" "$OFFSITE_BACKUP_TARGET" bash -s "$OFFSITE_BACKUP_REMOTE_DIR" "$MAX_AGE_MINUTES" << 'REMOTE_CLEANUP' \
+    || { echo ">>> ✗ 远端清理失败"; SYNC_OK=0; }
   set -e
   cd "$1"
+  MAX_AGE_MINUTES="$2"
   {
     ls -1t daily-*.tgz 2>/dev/null | tail -n +31
     ls -1t pre-*.tgz 2>/dev/null | tail -n +11
-    find . -maxdepth 1 -name '*.tgz' -mtime +30 2>/dev/null | sed 's|^\./||'
+    find . -maxdepth 1 -name '*.tgz' -mmin "+$MAX_AGE_MINUTES" 2>/dev/null | sed 's|^\./||'
   } | sort -u | while read -r OLD; do
     STEM="${OLD%.tgz}"
     rm -f "$OLD" "$STEM.manifest.json" "env-$STEM"
@@ -223,9 +250,14 @@ ssh "${SSH_OPTS[@]}" "$OFFSITE_BACKUP_TARGET" bash -s "$OFFSITE_BACKUP_REMOTE_DI
   done
   echo ">>> 远端备份占用: $(du -sh . | cut -f 1)"
 REMOTE_CLEANUP
+else
+  echo ">>> ✗ 无法连接异机 $OFFSITE_BACKUP_TARGET，跳过异机同步与远端清理"
+  SYNC_OK=0
+  LEDGER_OK=0
+fi
 
-if [ "$BACKUP_OK" != 1 ] || [ "$LEDGER_OK" != 1 ]; then
-  echo ">>> [$(date -u +%Y-%m-%dT%H:%M:%SZ)] ✗ 定时备份存在失败步骤（backup=$BACKUP_OK ledger=$LEDGER_OK）"
+if [ "$BACKUP_OK" != 1 ] || [ "$SYNC_OK" != 1 ] || [ "$LEDGER_OK" != 1 ]; then
+  echo ">>> [$(date -u +%Y-%m-%dT%H:%M:%SZ)] ✗ 定时备份存在失败步骤（backup=$BACKUP_OK sync=$SYNC_OK ledger=$LEDGER_OK）"
   exit 1
 fi
 echo ">>> [$(date -u +%Y-%m-%dT%H:%M:%SZ)] ✓ 定时备份 + 异机同步完成"

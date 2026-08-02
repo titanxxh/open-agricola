@@ -144,13 +144,12 @@ describe('production deployment config', () => {
     const script = readFileSync('backup-offsite.sh', 'utf8')
     const stopAt = script.indexOf('stop app')
     const tarAt = script.indexOf('tar -C /app/data -czf')
-    const startAt = script.indexOf('start app\n  RESTART_ON_EXIT=0')
+    const startAt = script.indexOf('restart_app || return 1')
     const validateAt = script.indexOf('scripts/validate-backup.ts')
     expect(stopAt).toBeGreaterThan(-1)
     expect(tarAt).toBeGreaterThan(stopAt)
     expect(startAt).toBeGreaterThan(tarAt)
     expect(validateAt).toBeGreaterThan(startAt)
-    expect(script).toContain('< /dev/null || { discard_backup "打包"; return 1; }')
   })
 
   it('shares one maintenance lock between deployment and scheduled backup', () => {
@@ -166,10 +165,27 @@ describe('production deployment config', () => {
     const script = readFileSync('backup-offsite.sh', 'utf8')
     expect(script).toContain('if ! do_backup; then')
     const failureHandledAt = script.indexOf('if ! do_backup; then')
-    const localPruneAt = script.indexOf('清理本地旧 daily 备份')
+    const localPruneAt = script.indexOf('清理本地旧备份')
     const remotePruneAt = script.indexOf('清理远端旧备份')
     expect(localPruneAt).toBeGreaterThan(failureHandledAt)
     expect(remotePruneAt).toBeGreaterThan(localPruneAt)
+    const rsyncFailureAt = script.indexOf('归档 rsync 失败，仍继续执行远端清理')
+    expect(rsyncFailureAt).toBeGreaterThan(-1)
+    expect(remotePruneAt).toBeGreaterThan(rsyncFailureAt)
+  })
+
+  it('restarts the app immediately when archiving fails instead of waiting for the exit trap', () => {
+    const script = readFileSync('backup-offsite.sh', 'utf8')
+    expect(script).toContain('discard_backup "打包"\n       restart_app || true\n       return 1')
+    const restartFn = script.slice(script.indexOf('restart_app() {'), script.indexOf('do_backup() {'))
+    expect(restartFn).toContain('RESTART_ON_EXIT=0')
+    expect(restartFn).toContain('return 1')
+  })
+
+  it('propagates every ledger sync failure so cron reports it', () => {
+    const script = readFileSync('backup-offsite.sh', 'utf8')
+    expect(script).toContain('|| { echo ">>> ✗ 读取远端 ledger 大小失败"; return 1; }')
+    expect(script).toContain('|| { echo ">>> ✗ ledger 推送失败"; return 1; }')
   })
 
   it('protects the offsite removal ledger from rollback and syncs it on takedown', () => {
@@ -192,7 +208,7 @@ describe('production deployment config', () => {
   it('keeps the offsite retention independent from local pruning and within the 30-day cap', () => {
     const script = readFileSync('backup-offsite.sh', 'utf8')
     const lines = script.split('\n')
-    const rsyncStart = lines.findIndex((line) => line.startsWith('rsync '))
+    const rsyncStart = lines.findIndex((line) => line.trimStart().startsWith('rsync -az'))
     expect(rsyncStart).toBeGreaterThan(-1)
     let rsyncCommand = ''
     for (let i = rsyncStart; i < lines.length; i += 1) {
@@ -202,8 +218,11 @@ describe('production deployment config', () => {
     expect(rsyncCommand).not.toContain('--delete')
     expect(rsyncCommand).toContain("--exclude '.validate-*'")
     expect(rsyncCommand).toContain('--exclude-from')
-    expect(script).toContain("find backups -maxdepth 1 -name '*.tgz' -mtime +30 -printf")
-    expect(script).toContain("find . -maxdepth 1 -name '*.tgz' -mtime +30")
+    expect(script).toContain('MAX_AGE_MINUTES=$((30 * 24 * 60))')
+    const localAgePrunes =
+      script.match(/find backups -maxdepth 1 -name '\*\.tgz' -mmin "\+\$MAX_AGE_MINUTES"/g) ?? []
+    expect(localAgePrunes.length).toBeGreaterThanOrEqual(2)
+    expect(script).toContain('find . -maxdepth 1 -name \'*.tgz\' -mmin "+$MAX_AGE_MINUTES"')
     expect(script).toContain("ls -1t daily-*.tgz 2>/dev/null | tail -n +31")
     expect(script).toContain("ls -1t pre-*.tgz 2>/dev/null | tail -n +11")
   })
@@ -211,6 +230,7 @@ describe('production deployment config', () => {
   it('schedules the offsite backup via cron with log rotation', () => {
     const cron = readFileSync('deploy/open-agricola-backup.cron', 'utf8')
     const logrotate = readFileSync('deploy/open-agricola-backup.logrotate', 'utf8')
+    expect(cron).toContain('CRON_TZ=UTC')
     expect(cron).toContain('/root/open-agricola/backup-offsite.sh')
     expect(cron).toContain('/var/log/open-agricola-backup.log')
     expect(logrotate).toContain('/var/log/open-agricola-backup.log')
