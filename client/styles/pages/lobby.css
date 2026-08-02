@@ -234,6 +234,15 @@
   color: var(--color-text-muted);
   background: #f0e6d0;
 }
+.room-status[data-status="my-turn"] {
+  color: #fff;
+  background: var(--color-success);
+  border-color: var(--color-success);
+}
+.lobby-rooms .room-item--my-turn {
+  border-color: var(--color-success);
+  box-shadow: 0 0 0 1px var(--color-success), 0 1px 3px rgba(90, 58, 32, 0.05);
+}
 
 /* ── Tablet breakpoint ───────────────────────────────────────────────────── */
 @media (max-width: 900px) {

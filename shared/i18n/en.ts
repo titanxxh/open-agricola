@@ -1330,6 +1330,7 @@ export const en = {
     seatLabel: 'Seat {index}',
     statusPlaying: 'Playing',
     statusWaiting: 'Waiting',
+    yourTurn: 'Your turn',
     resume: 'Resume',
     activeRooms: 'Active Rooms',
     noActiveRooms: 'No active rooms',

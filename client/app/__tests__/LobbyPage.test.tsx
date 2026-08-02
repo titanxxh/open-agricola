@@ -1,14 +1,16 @@
 // @vitest-environment jsdom
-import { cleanup, fireEvent, render, screen } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, within } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { LobbyPage } from '../LobbyPage'
 import { setPage } from '../PageRouter'
+
+const myRoomsResponse = vi.hoisted(() => ({ rooms: [] as unknown[] }))
 
 vi.mock('../../contexts/AuthContext', () => ({
   useAuth: () => ({
     user: { id: 'u1', username: 'host', displayName: 'Host' },
     logout: vi.fn(),
-    apiFetch: vi.fn(async () => new Response(JSON.stringify({ ok: true, rooms: [] }))),
+    apiFetch: vi.fn(async () => new Response(JSON.stringify({ ok: true, rooms: myRoomsResponse.rooms }))),
   }),
 }))
 
@@ -40,6 +42,10 @@ vi.mock('../../contexts/LocaleContext', () => {
     'platform.activeRooms': 'Active Rooms',
     'platform.noActiveRoomsTitle': 'No game in progress yet',
     'platform.noActiveRoomsDesc': 'Create a room and invite friends.',
+    'platform.myActiveGames': 'My Active Games',
+    'platform.statusPlaying': 'Playing',
+    'platform.yourTurn': 'Your turn',
+    'platform.resume': 'Resume',
   }
   return {
     useLocale: () => ({
@@ -58,6 +64,26 @@ afterEach(() => {
   cleanup()
   vi.clearAllMocks()
   vi.unstubAllGlobals()
+  myRoomsResponse.rooms = []
+})
+
+describe('LobbyPage my active games', () => {
+  it('shows a your-turn badge on rooms waiting for the player', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({ ok: true, rooms: [] }))))
+    myRoomsResponse.rooms = [
+      { id: 'room-a', status: 'playing', max_players: 2, updated_at: 2, player_index: 1, my_turn: 1 },
+      { id: 'room-b', status: 'playing', max_players: 2, updated_at: 1, player_index: 0, my_turn: 0 },
+    ]
+
+    render(<LobbyPage />)
+
+    await screen.findByText('Your turn')
+    const items = screen.getAllByRole('listitem')
+    expect(items).toHaveLength(2)
+    expect(within(items[0]!).getByText('Your turn')).toBeInTheDocument()
+    expect(within(items[1]!).queryByText('Your turn')).toBeNull()
+    expect(within(items[1]!).getByText('Playing')).toBeInTheDocument()
+  })
 })
 
 describe('LobbyPage player count selection', () => {

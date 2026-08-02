@@ -1011,6 +1011,33 @@ describe('auth routes', () => {
     expect((res.json.user as { username: string }).username).toBe('meuser')
   })
 
+  it('my-rooms flags rooms waiting on the caller and sorts them first', async () => {
+    const user = await createLocalUserForTests('lobbyuser', 'password123', 'Lobby User')
+    const token = createSession(user.id)
+    const db = getDb()
+    const insertRoom = db.prepare(`
+      INSERT INTO rooms (id, created_by, state_json, max_players, status, created_at, updated_at)
+      VALUES (?, ?, ?, 2, ?, ?, ?)
+    `)
+    const insertPlayer = db.prepare(
+      'INSERT INTO room_players (room_id, user_id, player_index, joined_at) VALUES (?, ?, ?, ?)',
+    )
+    insertRoom.run('room-their-turn', user.id, JSON.stringify({ currentPlayerIndex: 0 }), 'playing', 1, 300)
+    insertPlayer.run('room-their-turn', user.id, 1, 1)
+    insertRoom.run('room-my-turn', user.id, JSON.stringify({ currentPlayerIndex: 1 }), 'playing', 1, 100)
+    insertPlayer.run('room-my-turn', user.id, 1, 1)
+    insertRoom.run('room-waiting', user.id, null, 'waiting', 1, 200)
+    insertPlayer.run('room-waiting', user.id, 0, 1)
+
+    const res = await requestJson('GET', '/api/lobby/my-rooms', undefined, { Cookie: `oa_session=${token}` })
+    expect(res.status).toBe(200)
+    const rooms = res.json.rooms as Array<{ id: string; my_turn: number }>
+    expect(rooms.map(r => r.id)).toEqual(['room-my-turn', 'room-their-turn', 'room-waiting'])
+    expect(rooms[0]?.my_turn).toBe(1)
+    expect(rooms[1]?.my_turn).toBe(0)
+    expect(rooms[2]?.my_turn).toBe(0)
+  })
+
   it('uses the same admin config for me and admin invite routes', async () => {
     process.env.ADMIN_USERS = 'admin'
     const admin = await createLocalUserForTests('admin', 'password123', 'Admin')
