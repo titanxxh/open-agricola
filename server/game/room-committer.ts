@@ -400,9 +400,8 @@ export class RoomCommitter {
     ) {
       return { kind: 'unchanged' }
     }
+    if (persisted) return this.restoreHead(room, persisted)
     const { serialized, frame } = replayFrame(room)
-    const hash = frameHash(frame)
-    if (persisted) return this.restoreHead(room, frame, hash, persisted)
     const legacyRoom = room.replayRecording === undefined
     const shouldRecord = legacyRoom
       ? this.enabled
@@ -535,8 +534,6 @@ export class RoomCommitter {
 
   private restoreHead(
     room: Room,
-    frame: JsonValue,
-    hash: string,
     persisted: ReplayHead,
   ): RoomCommitResult {
     this.knownReplayIds.add(room.id)
@@ -546,6 +543,15 @@ export class RoomCommitter {
         `unsupported replay schema ${persisted.schemaVersion} for ${room.id}`,
       )
     }
+    const serialized = this.persistence.load(room.id)?.serialized
+    if (!serialized) {
+      return this.blockPermanently(
+        room.id,
+        `room snapshot missing for ${room.id} step ${persisted.latestStepNo}`,
+      )
+    }
+    const frame = JSON.parse(JSON.stringify(serialized)) as JsonValue
+    const hash = frameHash(frame)
     if (hash !== persisted.frameHash) {
       return this.blockPermanently(
         room.id,
