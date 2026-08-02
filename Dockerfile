@@ -27,6 +27,7 @@ COPY --from=deps /app/node_modules ./node_modules
 COPY shared/ ./shared/
 COPY server/ ./server/
 COPY scripts/replay-removal.ts ./scripts/
+COPY scripts/validate-backup.ts ./scripts/
 COPY tsconfig*.json ./
 
 # Data directories
