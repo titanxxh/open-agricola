@@ -19,7 +19,10 @@ export function getDb(): Database.Database {
   return _db
 }
 
-export function runMigrations(db: Database.Database): void {
+export function runMigrations(
+  db: Database.Database,
+  log: (message: string) => void = (message) => console.log(message),
+): void {
   db.exec(`
     CREATE TABLE IF NOT EXISTS schema_version (
       version INTEGER PRIMARY KEY
@@ -885,7 +888,7 @@ export function runMigrations(db: Database.Database): void {
       m.run?.(db)
       insert.run(m.version)
     })()
-    console.log(`[db] migration v${m.version} applied`)
+    log(`[db] migration v${m.version} applied`)
   }
 }
 
