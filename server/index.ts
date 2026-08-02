@@ -943,9 +943,11 @@ const server = createServer(async (req, res) => {
     try {
       const rows = getDb().prepare(`
         SELECT r.id, r.status, r.max_players, r.updated_at, rp.player_index,
-               CASE WHEN r.status = 'playing'
-                      AND json_extract(r.state_json, '$.currentPlayerIndex') = rp.player_index
-                    THEN 1 ELSE 0 END AS my_turn
+               CASE WHEN r.status = 'playing' AND json_valid(r.state_json) THEN
+                 CASE WHEN json_extract(r.state_json, '$.phase') = 'playing'
+                        AND json_extract(r.state_json, '$.currentPlayerIndex') = rp.player_index
+                      THEN 1 ELSE 0 END
+               ELSE 0 END AS my_turn
         FROM room_players rp
         JOIN rooms r ON rp.room_id = r.id
         WHERE rp.user_id = ? AND r.status != 'finished'
