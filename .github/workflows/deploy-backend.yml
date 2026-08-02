@@ -45,3 +45,14 @@ jobs:
         run: |
           chmod +x ./deploy-backend.sh
           ./deploy-backend.sh "$DEPLOY_USER@$DEPLOY_HOST" "$DEPLOY_REF" "$DEPLOY_REMOTE_DIR"
+
+      - name: Verify deployed build
+        run: |
+          DEPLOYED_BUILD_ID="$(
+            ssh -n "$DEPLOY_USER@$DEPLOY_HOST" \
+              "cd '$DEPLOY_REMOTE_DIR' && docker compose -f docker-compose.prod.yml exec -T app sh -c 'printf \"%s\" \"\$GAME_BUILD_ID\"'"
+          )"
+          if [ "$DEPLOYED_BUILD_ID" != "$GITHUB_SHA" ]; then
+            echo "deployed build mismatch: expected $GITHUB_SHA, got ${DEPLOYED_BUILD_ID:-empty}" >&2
+            exit 1
+          fi

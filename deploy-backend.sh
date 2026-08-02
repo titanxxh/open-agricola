@@ -43,7 +43,7 @@ ssh "$HOST" "${REMOTE_ENV[@]}" bash -s "$REMOTE_DIR" "$REF" << 'REMOTE_SCRIPT'
 
   SOURCE_BUILD_ID="$(
     docker compose -f docker-compose.prod.yml exec -T app \
-      sh -c 'printf "%s" "$GAME_BUILD_ID"' 2>/dev/null \
+      sh -c 'printf "%s" "$GAME_BUILD_ID"' < /dev/null 2>/dev/null \
       || git rev-parse HEAD
   )"
   if [ -z "$SOURCE_BUILD_ID" ]; then
@@ -116,6 +116,7 @@ ssh "$HOST" "${REMOTE_ENV[@]}" bash -s "$REMOTE_DIR" "$REF" << 'REMOTE_SCRIPT'
     -e BACKUP_SHA256="$BACKUP_SHA256" \
     -e BACKUP_SIZE_BYTES="$BACKUP_SIZE_BYTES" \
     app node --import tsx scripts/validate-backup.ts \
+    < /dev/null \
     > "backups/$BACKUP_STEM.manifest.json" || backup_failed
   rm -rf -- "$VALIDATION_DIR"
   VALIDATION_DIR=""
