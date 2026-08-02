@@ -26,6 +26,14 @@ jobs:
     steps:
       - uses: actions/checkout@v6
 
+      - name: Validate manual deployment ref
+        if: github.event_name == 'workflow_dispatch'
+        run: |
+          if [ "$GITHUB_REF" != "refs/heads/main" ]; then
+            echo "manual backend deployment must run from main" >&2
+            exit 1
+          fi
+
       - name: Configure SSH
         env:
           DEPLOY_SSH_PRIVATE_KEY: ${{ secrets.DEPLOY_SSH_PRIVATE_KEY }}
@@ -50,7 +58,8 @@ jobs:
         run: |
           DEPLOYED_BUILD_ID="$(
             ssh -n "$DEPLOY_USER@$DEPLOY_HOST" \
-              "cd '$DEPLOY_REMOTE_DIR' && docker compose -f docker-compose.prod.yml exec -T app sh -c 'printf \"%s\" \"\$GAME_BUILD_ID\"'"
+              "docker inspect --format='{{range .Config.Env}}{{println .}}{{end}}' open-agricola-app-1" \
+              | sed -n 's/^GAME_BUILD_ID=//p'
           )"
           if [ "$DEPLOYED_BUILD_ID" != "$GITHUB_SHA" ]; then
             echo "deployed build mismatch: expected $GITHUB_SHA, got ${DEPLOYED_BUILD_ID:-empty}" >&2
