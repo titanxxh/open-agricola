@@ -144,13 +144,39 @@ describe('production deployment config', () => {
     const script = readFileSync('backup-offsite.sh', 'utf8')
     const stopAt = script.indexOf('stop app')
     const tarAt = script.indexOf('tar -C /app/data -czf')
-    const startAt = script.indexOf('start app\nRESTART_ON_EXIT=0')
+    const startAt = script.indexOf('start app\n  RESTART_ON_EXIT=0')
     const validateAt = script.indexOf('scripts/validate-backup.ts')
     expect(stopAt).toBeGreaterThan(-1)
     expect(tarAt).toBeGreaterThan(stopAt)
     expect(startAt).toBeGreaterThan(tarAt)
     expect(validateAt).toBeGreaterThan(startAt)
-    expect(script).toContain('< /dev/null || backup_failed "打包"')
+    expect(script).toContain('< /dev/null || { discard_backup "打包"; return 1; }')
+  })
+
+  it('shares one maintenance lock between deployment and scheduled backup', () => {
+    const backup = readFileSync('backup-offsite.sh', 'utf8')
+    const deploy = readFileSync('deploy-backend.sh', 'utf8')
+    expect(backup).toContain('backups/.maintenance.lock')
+    expect(deploy).toContain('backups/.maintenance.lock')
+    expect(backup).toContain('flock -n 9')
+    expect(deploy).toContain('flock -w 1800 9')
+  })
+
+  it('runs retention and offsite sync even when the daily backup fails', () => {
+    const script = readFileSync('backup-offsite.sh', 'utf8')
+    expect(script).toContain('if ! do_backup; then')
+    const failureHandledAt = script.indexOf('if ! do_backup; then')
+    const localPruneAt = script.indexOf('清理本地旧 daily 备份')
+    const remotePruneAt = script.indexOf('清理远端旧备份')
+    expect(localPruneAt).toBeGreaterThan(failureHandledAt)
+    expect(remotePruneAt).toBeGreaterThan(localPruneAt)
+  })
+
+  it('protects the offsite removal ledger from rollback and syncs it on takedown', () => {
+    const script = readFileSync('backup-offsite.sh', 'utf8')
+    expect(script).toContain('cmp -s -n')
+    expect(script).toContain("--exclude 'replay-removals.latest.jsonl'")
+    expect(script).toContain('ledger-only')
   })
 
   it('validates each scheduled backup with the running image and writes a manifest', () => {
@@ -175,8 +201,9 @@ describe('production deployment config', () => {
     }
     expect(rsyncCommand).not.toContain('--delete')
     expect(rsyncCommand).toContain("--exclude '.validate-*'")
-    const mtimeCaps = script.match(/-mtime \+30/g) ?? []
-    expect(mtimeCaps.length).toBeGreaterThanOrEqual(2)
+    expect(rsyncCommand).toContain('--exclude-from')
+    expect(script).toContain("find backups -maxdepth 1 -name '*.tgz' -mtime +30 -printf")
+    expect(script).toContain("find . -maxdepth 1 -name '*.tgz' -mtime +30")
     expect(script).toContain("ls -1t daily-*.tgz 2>/dev/null | tail -n +31")
     expect(script).toContain("ls -1t pre-*.tgz 2>/dev/null | tail -n +11")
   })
