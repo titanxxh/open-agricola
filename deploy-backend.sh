@@ -41,6 +41,12 @@ ssh "$HOST" "${REMOTE_ENV[@]}" bash -s "$REMOTE_DIR" "$REF" << 'REMOTE_SCRIPT'
   REF="$2"
   cd "$REMOTE_DIR"
 
+  # 与 backup-offsite.sh 共享维护锁：等待进行中的定时备份结束，部署期间备份不会启动
+  mkdir -p backups
+  chmod 700 backups
+  exec 9> backups/.maintenance.lock
+  flock -w 1800 9 || { echo ">>> ✗ 等待维护锁超时（定时备份未结束？）"; exit 1; }
+
   SOURCE_BUILD_ID="$(
     docker compose -f docker-compose.prod.yml exec -T app \
       sh -c 'printf "%s" "$GAME_BUILD_ID"' < /dev/null 2>/dev/null \
