@@ -1022,20 +1022,22 @@ describe('auth routes', () => {
     const insertPlayer = db.prepare(
       'INSERT INTO room_players (room_id, user_id, player_index, joined_at) VALUES (?, ?, ?, ?)',
     )
-    insertRoom.run('room-their-turn', user.id, JSON.stringify({ currentPlayerIndex: 0 }), 'playing', 1, 300)
+    insertRoom.run('room-their-turn', user.id, JSON.stringify({ phase: 'playing', currentPlayerIndex: 0 }), 'playing', 1, 600)
     insertPlayer.run('room-their-turn', user.id, 1, 1)
-    insertRoom.run('room-my-turn', user.id, JSON.stringify({ currentPlayerIndex: 1 }), 'playing', 1, 100)
+    insertRoom.run('room-my-turn', user.id, JSON.stringify({ phase: 'playing', currentPlayerIndex: 1 }), 'playing', 1, 100)
     insertPlayer.run('room-my-turn', user.id, 1, 1)
-    insertRoom.run('room-waiting', user.id, null, 'waiting', 1, 200)
+    insertRoom.run('room-waiting', user.id, null, 'waiting', 1, 500)
     insertPlayer.run('room-waiting', user.id, 0, 1)
+    insertRoom.run('room-draft', user.id, JSON.stringify({ phase: 'draft', currentPlayerIndex: 0 }), 'playing', 1, 400)
+    insertPlayer.run('room-draft', user.id, 0, 1)
+    insertRoom.run('room-broken', user.id, '{not-json', 'playing', 1, 300)
+    insertPlayer.run('room-broken', user.id, 0, 1)
 
     const res = await requestJson('GET', '/api/lobby/my-rooms', undefined, { Cookie: `oa_session=${token}` })
     expect(res.status).toBe(200)
     const rooms = res.json.rooms as Array<{ id: string; my_turn: number }>
-    expect(rooms.map(r => r.id)).toEqual(['room-my-turn', 'room-their-turn', 'room-waiting'])
-    expect(rooms[0]?.my_turn).toBe(1)
-    expect(rooms[1]?.my_turn).toBe(0)
-    expect(rooms[2]?.my_turn).toBe(0)
+    expect(rooms.map(r => r.id)).toEqual(['room-my-turn', 'room-their-turn', 'room-waiting', 'room-draft', 'room-broken'])
+    expect(rooms.map(r => r.my_turn)).toEqual([1, 0, 0, 0, 0])
   })
 
   it('uses the same admin config for me and admin invite routes', async () => {
