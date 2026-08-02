@@ -1,6 +1,6 @@
 #!/bin/bash
 # 一键更新并重新部署后端 Docker
-# 部署前自动做完整备份、目标镜像只读恢复验证和版本清单，
+# 部署前自动做完整备份、目标镜像恢复验证和版本清单，
 # 备份失败则拉回旧版本并中止部署；pre-deploy 备份保留最近 5 份、最多 30 天（ADR-0010）。
 # 用法: ./deploy-backend.sh <ssh-host> [ref] [remote-dir]
 # ref 可以是分支名或 release tag
@@ -98,17 +98,23 @@ ssh "$HOST" "${REMOTE_ENV[@]}" bash -s "$REMOTE_DIR" "$REF" << 'REMOTE_SCRIPT'
        : > /backup/replay-removals.latest.jsonl; \
      fi" < /dev/null || backup_failed
   tar -tzf "backups/$BACKUP_STEM.tgz" > /dev/null || backup_failed
+  BACKUP_SHA256="$(sha256sum "backups/$BACKUP_STEM.tgz" | cut -d ' ' -f 1)" \
+    || backup_failed
+  BACKUP_SIZE_BYTES="$(stat -c '%s' "backups/$BACKUP_STEM.tgz")" \
+    || backup_failed
   VALIDATION_DIR="$(mktemp -d "$PWD/backups/.validate-$BACKUP_STEM.XXXXXX")" \
     || backup_failed
   tar -C "$VALIDATION_DIR" -xzf "backups/$BACKUP_STEM.tgz" || backup_failed
   docker compose -f docker-compose.prod.yml run --rm --no-deps \
-    -v "$VALIDATION_DIR:/validation-data:ro" \
+    -v "$VALIDATION_DIR:/validation-data" \
     -e DB_PATH=/validation-data/open-agricola.db \
     -e BACKUP_STEM="$BACKUP_STEM" \
     -e BACKUP_CREATED_AT="$BACKUP_CREATED_AT" \
     -e SOURCE_BUILD_ID="$SOURCE_BUILD_ID" \
     -e TARGET_BUILD_ID="$GAME_BUILD_ID" \
     -e TARGET_REF="$REF" \
+    -e BACKUP_SHA256="$BACKUP_SHA256" \
+    -e BACKUP_SIZE_BYTES="$BACKUP_SIZE_BYTES" \
     app node --import tsx scripts/validate-backup.ts \
     > "backups/$BACKUP_STEM.manifest.json" || backup_failed
   rm -rf -- "$VALIDATION_DIR"

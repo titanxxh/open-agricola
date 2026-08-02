@@ -26,9 +26,12 @@ describe('production deployment config', () => {
     const script = readFileSync('deploy-backend.sh', 'utf8')
     expect(dockerfile).toContain('COPY scripts/validate-backup.ts ./scripts/')
     expect(script).toContain('SOURCE_BUILD_ID=')
+    expect(script).toContain('BACKUP_SHA256=')
+    expect(script).toContain('BACKUP_SIZE_BYTES=')
     expect(script).toContain('DB_PATH=/validation-data/open-agricola.db')
     expect(script).toContain('scripts/validate-backup.ts')
     expect(script).toContain('$BACKUP_STEM.manifest.json')
+    expect(script).not.toContain('$VALIDATION_DIR:/validation-data:ro')
   })
 
   it('forwards replay recording settings into production', () => {
