@@ -680,7 +680,7 @@ chmod 600 "backups/$OA_BACKUP_STEM.manifest.json"
 
 1. 停 app 把 `app-data` volume 打包为 `backups/daily-<timestamp>.tgz` 并刷新 `backups/replay-removals.latest.jsonl`，随即重启 app——停机窗口只覆盖打包。备份与部署共享 `backups/.maintenance.lock`：部署进行中 cron 备份直接跳过，部署会等待进行中的备份结束。
 2. app 恢复服务后，用当前运行镜像在一次性副本上执行与 pre-deploy 备份相同的恢复验证（`scripts/validate-backup.ts`），写入同名 `.manifest.json` 并保存 `.env` 快照（存在 `.env` 文件时）；验证失败删除本次产物并以非零退出（cron 日志可见），不影响线上服务，后续保留清理与异机同步照常执行。
-3. 本地 `daily-*` 保留最近 7 份且最多 30 天（`pre-*` 仍由 `deploy-backend.sh` 管理，手动备份留人工处理）。
+3. 本地 `daily-*` 保留最近 7 份；本地所有归档（含 `pre-*` 与手动备份）一律最多 30 天（ADR-0010 上限，按分钟计算避免整天舍入），份数层面 `pre-*` 仍由 `deploy-backend.sh` 管理、手动备份留人工处理。
 4. 把 `backups/`（含 `pre-*`、`daily-*`、手动备份、manifest、env 快照）rsync 到 `OFFSITE_BACKUP_TARGET` 的 `OFFSITE_BACKUP_REMOTE_DIR`；超过 30 天的本地归档不再推送。rsync 不带 `--delete`：远端保留策略独立于本地，本地误删不会传播到异机。
 5. `replay-removals.latest.jsonl` 不走目录同步：只有本地副本是远端副本的超集（前缀关系成立）时才覆盖远端，防止回滚的 ledger 冲掉异机删除事实；前缀不成立时脚本以非零退出并保留远端副本。
 6. 远端清理：`daily-*` 保留最近 30 份、`pre-*` 保留最近 10 份，且所有归档（含手动备份）一律最多 30 天（ADR-0010 备份副本上限）；`replay-removals.latest.jsonl` 永不自动清理。
@@ -710,7 +710,14 @@ chmod 644 /etc/cron.d/open-agricola-backup
 cp deploy/open-agricola-backup.logrotate /etc/logrotate.d/open-agricola-backup
 ```
 
-脚本随 git 部署自动更新；cron 定义改动后需重新执行第 4 步。从异机恢复时，先把目标归档、配对 manifest 和 `replay-removals.latest.jsonl` 拉回生产机 `backups/`（如 `rsync root@<异机IP>:/root/open-agricola-backups/<stem>.* backups/`），再按下述恢复流程执行。
+脚本随 git 部署自动更新；cron 定义改动后需重新执行第 5 步。从异机恢复时，先把目标归档、配对 manifest、`env-<stem>` 快照和 `replay-removals.latest.jsonl` 拉回生产机 `backups/`：
+
+```bash
+rsync "root@<异机IP>:/root/open-agricola-backups/{<stem>.tgz,<stem>.manifest.json,env-<stem>,replay-removals.latest.jsonl}" backups/
+cp "backups/env-<stem>" .env && chmod 600 .env   # 新机器缺 .env 时恢复运行配置
+```
+
+再按下述恢复流程执行。
 
 恢复前准备目标归档、配对 manifest 和最新 ledger，并确认 manifest 的 `targetBuildId` 与准备启动的构建相同；否则先在归档副本上用目标镜像重新运行验证器。然后在后端停止期间替换数据。恢复命令会显式重放 ledger；服务启动也会再次幂等重放：
 
