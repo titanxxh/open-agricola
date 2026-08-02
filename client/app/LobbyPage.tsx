@@ -23,6 +23,7 @@ type MyRoom = {
   max_players: number
   updated_at: number
   player_index: number
+  my_turn: number
 }
 
 export function LobbyPage() {
@@ -350,11 +351,11 @@ export function LobbyPage() {
         <Section icon="🎯" title={t('platform.myActiveGames')} variant="default" className="lobby-rooms">
           <ul className="room-list">
             {myRooms.map(r => (
-              <li key={r.id} className="room-item">
+              <li key={r.id} className={r.my_turn === 1 ? 'room-item room-item--my-turn' : 'room-item'}>
                 <span className="room-id">{t('platform.roomLabel', { id: r.id })}</span>
                 <span className="room-players">{t('platform.seatLabel', { index: String(r.player_index + 1) })}</span>
-                <span className="room-status" data-status={r.status}>
-                  {r.status === 'playing' ? t('platform.statusPlaying') : r.status === 'waiting' ? t('platform.statusWaiting') : r.status}
+                <span className="room-status" data-status={r.my_turn === 1 ? 'my-turn' : r.status}>
+                  {r.my_turn === 1 ? t('platform.yourTurn') : r.status === 'playing' ? t('platform.statusPlaying') : r.status === 'waiting' ? t('platform.statusWaiting') : r.status}
                 </span>
                 <button
                   type="button"

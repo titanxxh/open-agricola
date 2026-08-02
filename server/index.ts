@@ -942,13 +942,18 @@ const server = createServer(async (req, res) => {
     if (!user) { sendJson(res, 401, { ok: false, error: 'Not authenticated' }); return }
     try {
       const rows = getDb().prepare(`
-        SELECT r.id, r.status, r.max_players, r.updated_at, rp.player_index
+        SELECT r.id, r.status, r.max_players, r.updated_at, rp.player_index,
+               CASE WHEN r.status = 'playing' AND json_valid(r.state_json) THEN
+                 CASE WHEN json_extract(r.state_json, '$.phase') = 'playing'
+                        AND json_extract(r.state_json, '$.currentPlayerIndex') = rp.player_index
+                      THEN 1 ELSE 0 END
+               ELSE 0 END AS my_turn
         FROM room_players rp
         JOIN rooms r ON rp.room_id = r.id
         WHERE rp.user_id = ? AND r.status != 'finished'
-        ORDER BY r.updated_at DESC
+        ORDER BY my_turn DESC, r.updated_at DESC
         LIMIT 20
-      `).all(user.id) as Array<{ id: string; status: string; max_players: number; updated_at: number; player_index: number }>
+      `).all(user.id) as Array<{ id: string; status: string; max_players: number; updated_at: number; player_index: number; my_turn: number }>
       sendJson(res, 200, { ok: true, rooms: rows })
     } catch {
       sendJson(res, 200, { ok: true, rooms: [] })
