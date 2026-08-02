@@ -1032,12 +1032,27 @@ describe('auth routes', () => {
     insertPlayer.run('room-draft', user.id, 0, 1)
     insertRoom.run('room-broken', user.id, '{not-json', 'playing', 1, 300)
     insertPlayer.run('room-broken', user.id, 0, 1)
+    insertRoom.run('room-harvest', user.id, JSON.stringify({
+      phase: 'playing',
+      currentPlayerIndex: 0,
+      engineStack: { frames: [{ ownerPlayerIndex: 1 }] },
+    }), 'playing', 1, 200)
+    insertPlayer.run('room-harvest', user.id, 1, 1)
+    insertRoom.run('room-gameover', user.id, JSON.stringify({
+      phase: 'playing',
+      currentPlayerIndex: 0,
+      gameOver: true,
+    }), 'playing', 1, 150)
+    insertPlayer.run('room-gameover', user.id, 0, 1)
 
     const res = await requestJson('GET', '/api/lobby/my-rooms', undefined, { Cookie: `oa_session=${token}` })
     expect(res.status).toBe(200)
     const rooms = res.json.rooms as Array<{ id: string; my_turn: number }>
-    expect(rooms.map(r => r.id)).toEqual(['room-my-turn', 'room-their-turn', 'room-waiting', 'room-draft', 'room-broken'])
-    expect(rooms.map(r => r.my_turn)).toEqual([1, 0, 0, 0, 0])
+    expect(rooms.map(r => r.id)).toEqual([
+      'room-harvest', 'room-my-turn',
+      'room-their-turn', 'room-waiting', 'room-draft', 'room-broken', 'room-gameover',
+    ])
+    expect(rooms.map(r => r.my_turn)).toEqual([1, 1, 0, 0, 0, 0, 0])
   })
 
   it('uses the same admin config for me and admin invite routes', async () => {
