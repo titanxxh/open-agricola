@@ -575,6 +575,8 @@ https://<backend-origin>/api/auth/oauth/google/callback
 | `WORKSHOP_REVIEW_GITHUB_PRIVATE_KEY` | — | App private key，使用单行 `\n` 转义 |
 | `WORKSHOP_REVIEW_GITHUB_INSTALLATION_ID` | — | App 在主仓库的 installation ID |
 | `WORKSHOP_REVIEW_GITHUB_WEBHOOK_SECRET` | — | `/api/github/webhook` HMAC secret |
+| `OFFSITE_BACKUP_TARGET` | — | 定时异机备份的 ssh 目标（如 `root@1.2.3.4`）；仅 `backup-offsite.sh` 读取，不进应用容器 |
+| `OFFSITE_BACKUP_REMOTE_DIR` | `/root/open-agricola-backups` | 异机上的备份存放目录；仅 `backup-offsite.sh` 读取 |
 
 ### Resend 邮箱验证
 
@@ -671,6 +673,38 @@ chmod 600 "backups/$OA_BACKUP_STEM.manifest.json"
 ```
 
 `replay-removals.latest.jsonl` 是只追加的最新删除事实，必须与普通备份分开保留；每次 Replay 下架后立即更新其异机副本，不能随旧数据备份回滚。
+
+#### 定时备份与异机副本
+
+`backup-offsite.sh` 由生产机 cron 每日调用（UTC 20:00，北京时间 04:00），补齐两次 release 之间的数据保护并把备份同步到生产机之外：
+
+1. 停 app 把 `app-data` volume 打包为 `backups/daily-<timestamp>.tgz` 并刷新 `backups/replay-removals.latest.jsonl`，随即重启 app——停机窗口只覆盖打包。
+2. app 恢复服务后，用当前运行镜像在一次性副本上执行与 pre-deploy 备份相同的恢复验证（`scripts/validate-backup.ts`），写入同名 `.manifest.json` 并保存 `.env` 快照；验证失败删除本次产物并以非零退出（cron 日志可见），不影响线上服务。
+3. 本地 `daily-*` 保留最近 7 份且最多 30 天（`pre-*` 仍由 `deploy-backend.sh` 管理）。
+4. 把整个 `backups/`（含 `pre-*`、`daily-*`、手动备份、manifest、env 快照和 `replay-removals.latest.jsonl`）rsync 到 `OFFSITE_BACKUP_TARGET` 的 `OFFSITE_BACKUP_REMOTE_DIR`。rsync 不带 `--delete`：远端保留策略独立于本地，本地误删不会传播到异机。
+5. 远端清理：`daily-*` 保留最近 30 份、`pre-*` 保留最近 10 份，且归档一律最多 30 天（ADR-0010 备份副本上限）；手动备份和 `replay-removals.latest.jsonl` 不自动清理。
+
+首次在生产机启用：
+
+```bash
+# 1. 生产机 → 异机的 ssh 信任（生产机上执行；已有 key 时跳过 ssh-keygen）
+test -f ~/.ssh/id_ed25519 || ssh-keygen -t ed25519 -N '' -f ~/.ssh/id_ed25519
+ssh-copy-id root@<异机IP>
+
+# 2. .env 配置备份目标
+echo 'OFFSITE_BACKUP_TARGET=root@<异机IP>' >> /root/open-agricola/.env
+
+# 3. 手动跑一次验证全链路
+/root/open-agricola/backup-offsite.sh
+
+# 4. 安装 cron 与日志轮转
+cd /root/open-agricola
+cp deploy/open-agricola-backup.cron /etc/cron.d/open-agricola-backup
+chmod 644 /etc/cron.d/open-agricola-backup
+cp deploy/open-agricola-backup.logrotate /etc/logrotate.d/open-agricola-backup
+```
+
+脚本随 git 部署自动更新；cron 定义改动后需重新执行第 4 步。从异机恢复时，先把目标归档、配对 manifest 和 `replay-removals.latest.jsonl` 拉回生产机 `backups/`（如 `rsync root@<异机IP>:/root/open-agricola-backups/<stem>.* backups/`），再按下述恢复流程执行。
 
 恢复前准备目标归档、配对 manifest 和最新 ledger，并确认 manifest 的 `targetBuildId` 与准备启动的构建相同；否则先在归档副本上用目标镜像重新运行验证器。然后在后端停止期间替换数据。恢复命令会显式重放 ledger；服务启动也会再次幂等重放：
 

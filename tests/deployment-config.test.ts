@@ -139,4 +139,53 @@ describe('production deployment config', () => {
     const script = readFileSync('deploy-backend.sh', 'utf8')
     expect(script).toContain('up -d --remove-orphans')
   })
+
+  it('restarts the app right after archiving so scheduled backup downtime only covers the tar step', () => {
+    const script = readFileSync('backup-offsite.sh', 'utf8')
+    const stopAt = script.indexOf('stop app')
+    const tarAt = script.indexOf('tar -C /app/data -czf')
+    const startAt = script.indexOf('start app\nRESTART_ON_EXIT=0')
+    const validateAt = script.indexOf('scripts/validate-backup.ts')
+    expect(stopAt).toBeGreaterThan(-1)
+    expect(tarAt).toBeGreaterThan(stopAt)
+    expect(startAt).toBeGreaterThan(tarAt)
+    expect(validateAt).toBeGreaterThan(startAt)
+    expect(script).toContain('< /dev/null || backup_failed "打包"')
+  })
+
+  it('validates each scheduled backup with the running image and writes a manifest', () => {
+    const script = readFileSync('backup-offsite.sh', 'utf8')
+    expect(script).toContain('BACKUP_SHA256=')
+    expect(script).toContain('BACKUP_SIZE_BYTES=')
+    expect(script).toContain('DB_PATH=/validation-data/open-agricola.db')
+    expect(script).toContain('scripts/validate-backup.ts')
+    expect(script).toContain('$BACKUP_STEM.manifest.json')
+    expect(script).toContain('replay-removals.latest.jsonl')
+  })
+
+  it('keeps the offsite retention independent from local pruning and within the 30-day cap', () => {
+    const script = readFileSync('backup-offsite.sh', 'utf8')
+    const lines = script.split('\n')
+    const rsyncStart = lines.findIndex((line) => line.startsWith('rsync '))
+    expect(rsyncStart).toBeGreaterThan(-1)
+    let rsyncCommand = ''
+    for (let i = rsyncStart; i < lines.length; i += 1) {
+      rsyncCommand += lines[i]
+      if (!lines[i]?.endsWith('\\')) break
+    }
+    expect(rsyncCommand).not.toContain('--delete')
+    expect(rsyncCommand).toContain("--exclude '.validate-*'")
+    const mtimeCaps = script.match(/-mtime \+30/g) ?? []
+    expect(mtimeCaps.length).toBeGreaterThanOrEqual(2)
+    expect(script).toContain("ls -1t daily-*.tgz 2>/dev/null | tail -n +31")
+    expect(script).toContain("ls -1t pre-*.tgz 2>/dev/null | tail -n +11")
+  })
+
+  it('schedules the offsite backup via cron with log rotation', () => {
+    const cron = readFileSync('deploy/open-agricola-backup.cron', 'utf8')
+    const logrotate = readFileSync('deploy/open-agricola-backup.logrotate', 'utf8')
+    expect(cron).toContain('/root/open-agricola/backup-offsite.sh')
+    expect(cron).toContain('/var/log/open-agricola-backup.log')
+    expect(logrotate).toContain('/var/log/open-agricola-backup.log')
+  })
 })
