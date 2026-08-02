@@ -4,6 +4,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type Database from 'better-sqlite3'
+import '../../../shared/cards/C/C104_Collector.ts'
 import { GameSession } from '../authoritative-session.ts'
 import { ReplayStore } from '../replay-store.ts'
 import {
@@ -616,6 +617,54 @@ describe('RoomCommitter', () => {
       roomVersion: 2,
       stepNo: 2,
     })
+  })
+
+  it('continues a replay when rehydration normalizes the persisted frame', () => {
+    const room = makeRoom()
+    const firstCommitter = createCommitter()
+    firstCommitter.prepareRoom(room, { missingPrefix: false })
+    const played = room.session.devPlayCard(0, 'C104_Collector')
+    const collectorSpace = room.session.state.actionSpaces.find(
+      (space) => space.id === 'C104_Collector',
+    )!
+    delete collectorSpace.blockedBy
+    room.session.state.players[0]!.playedCards = []
+    const playIntent = replayIntentFromCommand({
+      type: 'devPlayCard',
+      playerIndex: 0,
+      cardId: 'C104_Collector',
+    })
+
+    expect(firstCommitter.commit(room, played, playIntent!, 0)).toMatchObject({
+      kind: 'committed',
+      roomVersion: 1,
+      stepNo: 1,
+    })
+
+    const restored = snapshotToRoom(persistence.load(room.id)!)
+    expect(restored.session.state.actionSpaces.find(
+      (space) => space.id === 'C104_Collector',
+    )?.blockedBy).toEqual([])
+    expect(restored.session.state.players[0]!.playedCards)
+      .toEqual(['occupation:C104_Collector'])
+
+    const recoveredCommitter = createCommitter({ enabled: false })
+    expect(recoveredCommitter.prepareRoom(restored, { missingPrefix: true })).toMatchObject({
+      kind: 'committed',
+      roomVersion: 1,
+      stepNo: 1,
+    })
+
+    restored.session.devSetResources(1, { food: 3 })
+    restored.session.state.gameOver = true
+    const next = restored.session.getState()
+    expect(recoveredCommitter.commit(restored, next, actionIntent!, 1)).toMatchObject({
+      kind: 'committed',
+      roomVersion: 2,
+      stepNo: 2,
+    })
+    const replay = new ReplayStore(db).segment(room.id, 0)
+    expect(replay.ok).toBe(true)
   })
 
   it('blocks recovery of an unsupported replay schema', () => {
