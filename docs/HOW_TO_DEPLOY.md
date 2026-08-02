@@ -672,32 +672,38 @@ rm -rf -- "$OA_VALIDATE_DIR"
 chmod 600 "backups/$OA_BACKUP_STEM.manifest.json"
 ```
 
-`replay-removals.latest.jsonl` 是只追加的最新删除事实，必须与普通备份分开保留；每次 Replay 下架后立即更新其异机副本，不能随旧数据备份回滚。
+`replay-removals.latest.jsonl` 是只追加的最新删除事实，必须与普通备份分开保留；每次 Replay 下架后立即执行 `./backup-offsite.sh ledger-only` 更新其异机副本（不停 app），不能随旧数据备份回滚。
 
 #### 定时备份与异机副本
 
 `backup-offsite.sh` 由生产机 cron 每日调用（UTC 20:00，北京时间 04:00），补齐两次 release 之间的数据保护并把备份同步到生产机之外：
 
-1. 停 app 把 `app-data` volume 打包为 `backups/daily-<timestamp>.tgz` 并刷新 `backups/replay-removals.latest.jsonl`，随即重启 app——停机窗口只覆盖打包。
-2. app 恢复服务后，用当前运行镜像在一次性副本上执行与 pre-deploy 备份相同的恢复验证（`scripts/validate-backup.ts`），写入同名 `.manifest.json` 并保存 `.env` 快照；验证失败删除本次产物并以非零退出（cron 日志可见），不影响线上服务。
-3. 本地 `daily-*` 保留最近 7 份且最多 30 天（`pre-*` 仍由 `deploy-backend.sh` 管理）。
-4. 把整个 `backups/`（含 `pre-*`、`daily-*`、手动备份、manifest、env 快照和 `replay-removals.latest.jsonl`）rsync 到 `OFFSITE_BACKUP_TARGET` 的 `OFFSITE_BACKUP_REMOTE_DIR`。rsync 不带 `--delete`：远端保留策略独立于本地，本地误删不会传播到异机。
-5. 远端清理：`daily-*` 保留最近 30 份、`pre-*` 保留最近 10 份，且归档一律最多 30 天（ADR-0010 备份副本上限）；手动备份和 `replay-removals.latest.jsonl` 不自动清理。
+1. 停 app 把 `app-data` volume 打包为 `backups/daily-<timestamp>.tgz` 并刷新 `backups/replay-removals.latest.jsonl`，随即重启 app——停机窗口只覆盖打包。备份与部署共享 `backups/.maintenance.lock`：部署进行中 cron 备份直接跳过，部署会等待进行中的备份结束。
+2. app 恢复服务后，用当前运行镜像在一次性副本上执行与 pre-deploy 备份相同的恢复验证（`scripts/validate-backup.ts`），写入同名 `.manifest.json` 并保存 `.env` 快照（存在 `.env` 文件时）；验证失败删除本次产物并以非零退出（cron 日志可见），不影响线上服务，后续保留清理与异机同步照常执行。
+3. 本地 `daily-*` 保留最近 7 份且最多 30 天（`pre-*` 仍由 `deploy-backend.sh` 管理，手动备份留人工处理）。
+4. 把 `backups/`（含 `pre-*`、`daily-*`、手动备份、manifest、env 快照）rsync 到 `OFFSITE_BACKUP_TARGET` 的 `OFFSITE_BACKUP_REMOTE_DIR`；超过 30 天的本地归档不再推送。rsync 不带 `--delete`：远端保留策略独立于本地，本地误删不会传播到异机。
+5. `replay-removals.latest.jsonl` 不走目录同步：只有本地副本是远端副本的超集（前缀关系成立）时才覆盖远端，防止回滚的 ledger 冲掉异机删除事实；前缀不成立时脚本以非零退出并保留远端副本。
+6. 远端清理：`daily-*` 保留最近 30 份、`pre-*` 保留最近 10 份，且所有归档（含手动备份）一律最多 30 天（ADR-0010 备份副本上限）；`replay-removals.latest.jsonl` 永不自动清理。
 
 首次在生产机启用：
 
 ```bash
-# 1. 生产机 → 异机的 ssh 信任（生产机上执行；已有 key 时跳过 ssh-keygen）
+# 1. host 依赖：生产机需要 rsync + cron + logrotate（Docker 不自带），异机需要 rsync
+apt-get update && apt-get install -y rsync cron logrotate
+systemctl is-active cron   # 必须输出 active
+ssh root@<异机IP> 'command -v rsync || (apt-get update && apt-get install -y rsync)'
+
+# 2. 生产机 → 异机的 ssh 信任（生产机上执行；已有 key 时跳过 ssh-keygen）
 test -f ~/.ssh/id_ed25519 || ssh-keygen -t ed25519 -N '' -f ~/.ssh/id_ed25519
 ssh-copy-id root@<异机IP>
 
-# 2. .env 配置备份目标
+# 3. .env 配置备份目标
 echo 'OFFSITE_BACKUP_TARGET=root@<异机IP>' >> /root/open-agricola/.env
 
-# 3. 手动跑一次验证全链路
+# 4. 手动跑一次验证全链路
 /root/open-agricola/backup-offsite.sh
 
-# 4. 安装 cron 与日志轮转
+# 5. 安装 cron 与日志轮转
 cd /root/open-agricola
 cp deploy/open-agricola-backup.cron /etc/cron.d/open-agricola-backup
 chmod 644 /etc/cron.d/open-agricola-backup
@@ -790,7 +796,7 @@ docker compose -f docker-compose.prod.yml cp \
 docker compose -f docker-compose.prod.yml up -d app
 ```
 
-资产下架可使用 ledger 已证明引用关系的既有 Tombstone Room 作为入口。违规 Hash 会作为永久规则写入 ledger：旧备份恢复时自动下架新增引用，后续 Room 也不能重新归档同一内容。操作幂等；普通整局下架只删除不再被其他 Replay 引用的资源。成功后立即异机备份最新 `replay-removals.jsonl`。
+资产下架可使用 ledger 已证明引用关系的既有 Tombstone Room 作为入口。违规 Hash 会作为永久规则写入 ledger：旧备份恢复时自动下架新增引用，后续 Room 也不能重新归档同一内容。操作幂等；普通整局下架只删除不再被其他 Replay 引用的资源。成功后立即执行 `./backup-offsite.sh ledger-only` 异机备份最新 `replay-removals.jsonl`。
 
 ### Bug Report token 密钥轮换
 
