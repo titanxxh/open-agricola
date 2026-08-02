@@ -380,10 +380,13 @@ export class RoomCommitter {
     try {
       return this.prepareLoadedRoom(room, options, persisted)
     } catch (error) {
-      const message = `unable to archive custom card art: ${errorMessage(error)}`
-      return error instanceof ReplayAssetValidationError
-        ? this.blockPermanently(room.id, message)
-        : this.deferReplayLoad(room, options, message)
+      if (error instanceof ReplayAssetValidationError) {
+        return this.blockPermanently(
+          room.id,
+          `unable to archive custom card art: ${errorMessage(error)}`,
+        )
+      }
+      return this.deferReplayLoad(room, options, errorMessage(error))
     }
   }
 
@@ -543,7 +546,13 @@ export class RoomCommitter {
         `unsupported replay schema ${persisted.schemaVersion} for ${room.id}`,
       )
     }
-    const serialized = this.persistence.load(room.id)?.serialized
+    if (room.snapshotRehydrationFailed) {
+      return this.blockPermanently(
+        room.id,
+        `room snapshot rehydration failed for ${room.id} step ${persisted.latestStepNo}`,
+      )
+    }
+    const serialized = this.persistence.loadReplayFrame(room.id)
     if (!serialized) {
       return this.blockPermanently(
         room.id,

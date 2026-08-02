@@ -40,6 +40,7 @@ export type Room = {
   enableThroughTheSeasons?: boolean
   enableFarmersOfTheMoor?: boolean
   allowIncompleteFarmersOfTheMoorMinorDeal?: boolean
+  snapshotRehydrationFailed?: boolean
 }
 
 export const FIXED_DEV_ROOMS: ReadonlyArray<{ id: string; playerCount: number }> = [
@@ -280,6 +281,7 @@ export function summarizeRoomsForLobby(
 const createSessionFromSnapshot = (
   snapshot: RoomSnapshot,
   customCards: CustomCardData[],
+  onRehydrationFailure: () => void,
 ): GameSession => {
   if (snapshot.serialized === null) {
     return new GameSession(undefined, customCards.length > 0 ? customCards : undefined, {
@@ -298,6 +300,7 @@ const createSessionFromSnapshot = (
     )
   } catch (err) {
     console.warn(`[room] rehydrate failed for ${snapshot.id}, starting fresh:`, err)
+    onRehydrationFailure()
     return new GameSession(undefined, customCards.length > 0 ? customCards : undefined, {
       playerCount: snapshot.meta.maxPlayers,
       enableParentCards: snapshot.meta.enableParentCards ?? false,
@@ -313,7 +316,10 @@ export const snapshotToRoom = (
   snapshot: RoomSnapshot,
   customCards: CustomCardData[] = snapshot.meta.customCards ?? [],
 ): Room => {
-  const session = createSessionFromSnapshot(snapshot, customCards)
+  let snapshotRehydrationFailed = false
+  const session = createSessionFromSnapshot(snapshot, customCards, () => {
+    snapshotRehydrationFailed = true
+  })
   return {
     id: snapshot.id,
     session,
@@ -336,5 +342,6 @@ export const snapshotToRoom = (
     enableThroughTheSeasons: snapshot.meta.enableThroughTheSeasons ?? snapshot.serialized?.enableThroughTheSeasons ?? false,
     enableFarmersOfTheMoor: snapshot.meta.enableFarmersOfTheMoor ?? (snapshot.serialized?.enableFarmersOfTheMoor === true),
     allowIncompleteFarmersOfTheMoorMinorDeal: snapshot.meta.allowIncompleteFarmersOfTheMoorMinorDeal ?? false,
+    ...(snapshotRehydrationFailed ? { snapshotRehydrationFailed: true } : {}),
   }
 }
