@@ -39,8 +39,17 @@ describe('production deployment config', () => {
   it('fails the workflow when the deployed build does not match its checkout', () => {
     const workflow = readFileSync('.github/workflows/deploy-backend.yml', 'utf8')
     expect(workflow).toContain("DEPLOY_REF: ${{ github.event.release.tag_name || github.sha }}")
+    expect(workflow).toContain('- name: Validate manual deployment ref')
+    expect(workflow).toContain("if: github.event_name == 'workflow_dispatch'")
+    expect(workflow).toContain('if [ "$GITHUB_REF" != "refs/heads/main" ]; then')
     expect(workflow).toContain('- name: Verify deployed build')
     expect(workflow).toContain('ssh -n "$DEPLOY_USER@$DEPLOY_HOST"')
+    expect(workflow.slice(workflow.indexOf('- name: Verify deployed build'))).toContain(
+      'docker inspect',
+    )
+    expect(workflow.slice(workflow.indexOf('- name: Verify deployed build'))).not.toContain(
+      'docker compose',
+    )
     expect(workflow).toContain('if [ "$DEPLOYED_BUILD_ID" != "$GITHUB_SHA" ]; then')
   })
 
