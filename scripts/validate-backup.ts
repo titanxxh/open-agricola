@@ -1,9 +1,12 @@
-import { dirname, join, resolve } from 'node:path'
+import { createHash } from 'node:crypto'
+import { readFileSync } from 'node:fs'
+import { dirname, isAbsolute, join, relative, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import Database from 'better-sqlite3'
 import { runMigrations } from '../server/db.ts'
 import { decodeReplayFrame, type JsonValue } from '../server/game/replay-codec.ts'
 import { SqliteRoomPersistence } from '../server/game/persistence/sqlite-adapter.ts'
+import { applyReplayRemovalLedger } from '../server/game/replay-removal.ts'
 import { parseCustomCards, ReplayStore } from '../server/game/replay-store.ts'
 import { viewerBuildExists } from '../server/game/replay-viewer-build.ts'
 import { RoomCommitter } from '../server/game/room-committer.ts'
@@ -28,6 +31,10 @@ export type BackupValidationReport = BackupMetadata & {
   replayCount: number
   replayHeadCount: number
   replayViewerBuildCount: number
+  replayAssetCount: number
+  replayRemovalLedgerEntryCount: number
+  replayRemovalRoomCount: number
+  replayRemovalAssetCount: number
   replaySegmentCount: number
   replayStepCount: number
 }
@@ -54,6 +61,12 @@ type ReplayStepRow = {
   intent_json: string
 }
 
+type BackupValidationPaths = {
+  viewerRoot: string
+  assetRoot: string
+  ledgerPath: string
+}
+
 const validateSqlite = (db: Database.Database): void => {
   const rows = db.pragma('integrity_check') as Array<{ integrity_check: string }>
   if (rows.length !== 1 || rows[0]?.integrity_check !== 'ok') {
@@ -77,10 +90,9 @@ const databaseSchemaVersion = (db: Database.Database): number => {
 const validateRooms = (
   db: Database.Database,
   roomIds: string[],
-  dataRoot: string,
+  viewerRoot: string,
 ): number => {
   const persistence = new SqliteRoomPersistence(db)
-  const viewerRoot = join(dataRoot, 'replay-viewers')
   const committer = new RoomCommitter({
     persistence,
     enabled: false,
@@ -166,10 +178,9 @@ const validateReplay = (
 const validateReplayMetadata = (
   db: Database.Database,
   headers: ReplayHeaderRow[],
-  dataRoot: string,
+  viewerRoot: string,
 ): number => {
   const store = new ReplayStore(db)
-  const viewerRoot = join(dataRoot, 'replay-viewers')
   const viewerBuildIds = new Set<string>()
   for (const header of headers) {
     try {
@@ -194,14 +205,36 @@ const validateReplayMetadata = (
   return viewerBuildIds.size
 }
 
+const validateReplayAssets = (
+  db: Database.Database,
+  assetRoot: string,
+): number => {
+  const hashes = new SqliteRoomPersistence(db).referencedReplayAssetHashes()
+  for (const hash of hashes) {
+    try {
+      const actual = createHash('sha256')
+        .update(readFileSync(join(assetRoot, hash)))
+        .digest('hex')
+      if (actual !== hash) throw new Error()
+    } catch {
+      throw new Error(`replay asset invalid: ${hash}`)
+    }
+  }
+  return hashes.size
+}
+
 export const validateBackupDatabase = (
   db: Database.Database,
   metadata: BackupMetadata,
-  dataRoot: string,
+  paths: BackupValidationPaths,
 ): BackupValidationReport => {
   db.pragma('foreign_keys = ON')
   const sourceDatabaseSchemaVersion = databaseSchemaVersion(db)
   runMigrations(db, () => {})
+  const removal = applyReplayRemovalLedger(db, {
+    assetRoot: paths.assetRoot,
+    ledgerPath: paths.ledgerPath,
+  })
   validateSqlite(db)
   const targetDatabaseSchemaVersion = databaseSchemaVersion(db)
   const roomIds = (db.prepare('SELECT id FROM rooms ORDER BY id').all() as Array<{ id: string }>)
@@ -253,8 +286,12 @@ export const validateBackupDatabase = (
     replaySchemaVersions: [...new Set(headers.map(({ schema_version }) => schema_version))].sort((a, b) => a - b),
     roomCount: roomIds.length,
     replayCount: headers.length,
-    replayHeadCount: validateRooms(db, roomIds, dataRoot),
-    replayViewerBuildCount: validateReplayMetadata(db, headers, dataRoot),
+    replayHeadCount: validateRooms(db, roomIds, paths.viewerRoot),
+    replayViewerBuildCount: validateReplayMetadata(db, headers, paths.viewerRoot),
+    replayAssetCount: validateReplayAssets(db, paths.assetRoot),
+    replayRemovalLedgerEntryCount: removal.entries,
+    replayRemovalRoomCount: new Set(removal.removedRoomIds).size,
+    replayRemovalAssetCount: removal.deletedAssetHashes.length,
     replaySegmentCount,
     replayStepCount,
   }
@@ -278,10 +315,24 @@ const requiredArchiveSize = (env: NodeJS.ProcessEnv): number => {
   return value
 }
 
+const archivedDataPath = (
+  configuredPath: string,
+  extractedDataRoot: string,
+  name: string,
+): string => {
+  const containerPath = resolve('/app', configuredPath)
+  const archivedRelativePath = relative('/app/data', containerPath)
+  if (archivedRelativePath.startsWith('..') || isAbsolute(archivedRelativePath)) {
+    throw new Error(`${name} must be inside /app/data to be backed up`)
+  }
+  return resolve(extractedDataRoot, archivedRelativePath)
+}
+
 export const runBackupValidation = (
   env: NodeJS.ProcessEnv = process.env,
 ): BackupValidationReport => {
   const dbPath = resolve(requiredEnv(env, 'DB_PATH'))
+  const dataRoot = dirname(dbPath)
   const db = new Database(dbPath, { fileMustExist: true })
   try {
     return validateBackupDatabase(db, {
@@ -292,7 +343,23 @@ export const runBackupValidation = (
       targetRef: requiredEnv(env, 'TARGET_REF'),
       archiveSha256: requiredArchiveSha256(env),
       archiveSizeBytes: requiredArchiveSize(env),
-    }, dirname(dbPath))
+    }, {
+      viewerRoot: archivedDataPath(
+        env.REPLAY_VIEWER_ROOT?.trim() || './data/replay-viewers',
+        dataRoot,
+        'REPLAY_VIEWER_ROOT',
+      ),
+      assetRoot: archivedDataPath(
+        env.REPLAY_ASSET_ROOT?.trim() || './data/replay-assets',
+        dataRoot,
+        'REPLAY_ASSET_ROOT',
+      ),
+      ledgerPath: archivedDataPath(
+        env.REPLAY_REMOVAL_LEDGER_PATH?.trim() || './data/replay-removals.jsonl',
+        dataRoot,
+        'REPLAY_REMOVAL_LEDGER_PATH',
+      ),
+    })
   } finally {
     db.close()
   }
