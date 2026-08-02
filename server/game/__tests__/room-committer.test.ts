@@ -4,7 +4,9 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type Database from 'better-sqlite3'
+import '../../../shared/cards/C/C104_Collector.ts'
 import { GameSession } from '../authoritative-session.ts'
+import { encodeReplayFrame, type JsonValue } from '../replay-codec.ts'
 import { ReplayStore } from '../replay-store.ts'
 import {
   RoomCommitter,
@@ -615,6 +617,121 @@ describe('RoomCommitter', () => {
       kind: 'committed',
       roomVersion: 2,
       stepNo: 2,
+    })
+  })
+
+  it('pauses and retries persisted replay-frame reads', () => {
+    const room = makeRoom()
+    const firstCommitter = createCommitter()
+    firstCommitter.prepareRoom(room, { missingPrefix: false })
+    const response = room.session.devSetResources(0, { food: 1 })
+    firstCommitter.commit(room, response, actionIntent!, 0)
+
+    const restored = snapshotToRoom(persistence.load(room.id)!)
+    const { scheduler, tasks } = fakeScheduler()
+    const recoveredCommitter = createCommitter({ enabled: false, scheduler })
+    const load = vi.spyOn(persistence, 'loadReplayFrame')
+    load.mockImplementationOnce(() => {
+      throw new Error('snapshot read unavailable')
+    })
+    const ready: number[] = []
+
+    expect(recoveredCommitter.prepareRoom(restored, {
+      missingPrefix: true,
+      onReady: (result) => {
+        if (result.kind === 'committed') ready.push(result.stepNo)
+      },
+    })).toEqual({ kind: 'blocked', error: 'snapshot read unavailable' })
+    expect(recoveredCommitter.isRetrying(room.id)).toBe(true)
+    expect(tasks.map(({ delay }) => delay)).toEqual([1_000])
+
+    tasks.shift()!.callback()
+
+    expect(ready).toEqual([1])
+    expect(recoveredCommitter.isBlocked(room.id)).toBe(false)
+  })
+
+  it('continues a replay when rehydration normalizes the persisted frame', () => {
+    const room = makeRoom()
+    const firstCommitter = createCommitter()
+    firstCommitter.prepareRoom(room, { missingPrefix: false })
+    const played = room.session.devPlayCard(0, 'C104_Collector')
+    const collectorSpace = room.session.state.actionSpaces.find(
+      (space) => space.id === 'C104_Collector',
+    )!
+    delete collectorSpace.blockedBy
+    room.session.state.players[0]!.playedCards = []
+    const playIntent = replayIntentFromCommand({
+      type: 'devPlayCard',
+      playerIndex: 0,
+      cardId: 'C104_Collector',
+    })
+
+    expect(firstCommitter.commit(room, played, playIntent!, 0)).toMatchObject({
+      kind: 'committed',
+      roomVersion: 1,
+      stepNo: 1,
+    })
+
+    const restored = snapshotToRoom(persistence.load(room.id)!)
+    expect(restored.session.state.actionSpaces.find(
+      (space) => space.id === 'C104_Collector',
+    )?.blockedBy).toEqual([])
+    expect(restored.session.state.players[0]!.playedCards)
+      .toEqual(['occupation:C104_Collector'])
+
+    const recoveredCommitter = createCommitter({ enabled: false })
+    expect(recoveredCommitter.prepareRoom(restored, { missingPrefix: true })).toMatchObject({
+      kind: 'committed',
+      roomVersion: 1,
+      stepNo: 1,
+    })
+
+    restored.session.devSetResources(1, { food: 3 })
+    restored.session.state.gameOver = true
+    const next = restored.session.getState()
+    expect(recoveredCommitter.commit(restored, next, actionIntent!, 1)).toMatchObject({
+      kind: 'committed',
+      roomVersion: 2,
+      stepNo: 2,
+    })
+    const replay = new ReplayStore(db).segment(room.id, 0)
+    expect(replay.ok).toBe(true)
+  })
+
+  it('blocks replay recovery when the persisted room cannot be rehydrated', () => {
+    const room = makeRoom()
+    createCommitter().prepareRoom(room, { missingPrefix: false })
+    const snapshot = persistence.load(room.id)!
+    const incompatibleFrame = {
+      ...snapshot.serialized,
+      players: null,
+    } as unknown as JsonValue
+    const encoded = encodeReplayFrame({
+      frame: incompatibleFrame,
+      previousFrame: null,
+      stepNo: 0,
+      previousCheckpointStepNo: 0,
+    })
+    db.prepare('UPDATE rooms SET state_json = ? WHERE id = ?')
+      .run(JSON.stringify(incompatibleFrame), room.id)
+    db.prepare(`
+      UPDATE game_replay_steps
+      SET payload_kind = ?, payload_gzip = ?, checkpoint_step_no = ?, frame_hash = ?
+      WHERE room_id = ? AND step_no = 0
+    `).run(
+      encoded.payloadKind,
+      encoded.payloadGzip,
+      encoded.checkpointStepNo,
+      encoded.frameHash,
+      room.id,
+    )
+
+    const restored = snapshotToRoom(persistence.load(room.id)!)
+
+    expect(createCommitter().prepareRoom(restored, { missingPrefix: true })).toEqual({
+      kind: 'blocked',
+      error: `room snapshot rehydration failed for ${room.id} step 0`,
     })
   })
 

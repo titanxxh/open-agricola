@@ -555,6 +555,13 @@ export class SqliteRoomPersistence implements RoomPersistence {
     }
   }
 
+  loadReplayFrame(id: string): SerializedGameState | null {
+    const row = this.loadRoom.get(id) as RoomRow | undefined
+    return row?.state_json
+      ? JSON.parse(row.state_json) as SerializedGameState
+      : null
+  }
+
   save(id: string, serialized: SerializedGameState | null, meta: RoomMeta): void {
     const now = Date.now()
     this.saveRoom(roomValues(id, serialized, meta, now, null), meta.players)
