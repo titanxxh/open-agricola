@@ -32,7 +32,13 @@ const fixture: CardFixture = {
     state.players = state.players.slice(0, 2)
     freezeOtherPlayers(state, 0)
     const player = state.players[0]!
-    player.resources = { ...ALL_ZERO_RESOURCES, stone: 2 }
+    player.resources = { ...ALL_ZERO_RESOURCES, wood: 3, reed: 2, stone: 2 }
+    player.stableTiles = [
+      { row: 0, col: 4 },
+      { row: 1, col: 4 },
+      { row: 2, col: 4 },
+      { row: 0, col: 3 },
+    ]
     setHand(state, 0, { minor: ['__test_placeholder__'], occupation: ['__test_placeholder__'] })
     setHand(state, 1, { minor: ['__test_placeholder__'], occupation: ['__test_placeholder__'] })
     setActiveWorkerCount(player, 2)
@@ -51,6 +57,7 @@ const fixture: CardFixture = {
 
   scenario(driver) {
     driver.takeAction(0, 'major-improvement')
+    driver.takeAction(0, 'farm-expansion')
   },
 
   assert(session, _ctx): FixtureResult {
@@ -58,8 +65,11 @@ const fixture: CardFixture = {
     if (!player.improvements.includes('Major_Joinery')) {
       return { ok: false, reason: `expected Major_Joinery to be bought, got ${JSON.stringify(player.improvements)}` }
     }
-    if (player.resources.stone !== 0 || player.resources.wood !== 0) {
-      return { ok: false, reason: `expected wood=0 and stone=0, got ${JSON.stringify(player.resources)}` }
+    if (player.rooms !== 3 || player.roomTiles.length !== 3) {
+      return { ok: false, reason: `expected one room to be built, got rooms=${player.rooms} roomTiles=${JSON.stringify(player.roomTiles)}` }
+    }
+    if (player.resources.wood !== 0 || player.resources.reed !== 0 || player.resources.stone !== 0) {
+      return { ok: false, reason: `expected wood=0, reed=0 and stone=0, got ${JSON.stringify(player.resources)}` }
     }
     return { ok: true }
   },
