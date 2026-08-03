@@ -282,6 +282,35 @@ describe('GitHubClient', () => {
       expect(fetchCalls[0]?.url).toContain('state=all')
     })
 
+    it('findReusablePr prefers an eligible closed PR over an ineligible open PR', async () => {
+      fetchHandler = () => okJson([
+        {
+          number: 42,
+          html_url: 'https://github.com/t/r/pull/42',
+          base: { ref: 'release' },
+          draft: true,
+          state: 'open',
+          merged_at: null,
+        },
+        {
+          number: 43,
+          html_url: 'https://github.com/t/r/pull/43',
+          base: { ref: 'main' },
+          draft: false,
+          state: 'closed',
+          merged_at: null,
+        },
+      ])
+      const c = new GitHubClient({
+        token: 't',
+        upstreamOwner: 'titanxxh',
+        upstreamRepo: 'open-agricola',
+      })
+
+      await expect(c.findReusablePr({ forkOwner: 'alice', branchName: 'workshop/CUSTOM_X' }))
+        .resolves.toMatchObject({ number: 43, state: 'closed' })
+    })
+
     it('findReusablePr returns null when every matching PR was merged', async () => {
       fetchHandler = () => okJson([{
         number: 42,
