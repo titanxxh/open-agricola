@@ -114,6 +114,22 @@ describe('ast-validator: CARD_IMPL hook/phase whitelisting', () => {
     expect(result.valid === false && result.errors.some(e => e.includes("unknown listener action 'improvement-any'"))).toBe(true)
   })
 
+  it('rejects indirect and non-string listener phases', () => {
+    const code = `
+      const phases = ['computeExchanges']
+      const CARD_IMPL = {
+        listeners: [
+          { phases: phases, handler: (ctx) => {} },
+          { phases: ['computeCosts', 1], handler: (ctx) => {} },
+        ],
+      }
+    `
+    const result = validateCardCode(code)
+    expect(result.valid).toBe(false)
+    expect(result.valid === false && result.errors.some(e => e.includes('listener phases must be a string literal array'))).toBe(true)
+    expect(result.valid === false && result.errors.some(e => e.includes('listener phases must contain only string literals'))).toBe(true)
+  })
+
   it('rejects indirect listener entries and spread properties', () => {
     const code = `
       const listener = {
@@ -166,6 +182,12 @@ describe('ast-validator: CARD_IMPL hook/phase whitelisting', () => {
     expect(indirectCollection.valid === false && indirectCollection.errors.some(e => e.includes('CARD_IMPL.listeners must use a property assignment'))).toBe(true)
     expect(indirectCollection.valid === false && indirectCollection.errors.some(e => e.includes('CARD_IMPL must not use spread properties'))).toBe(true)
     expect(indirectCollection.valid === false && indirectCollection.errors.some(e => e.includes('CARD_IMPL properties must not use computed names'))).toBe(true)
+
+    const inheritedCollection = validateCardCode(`
+      const CARD_IMPL = { __proto__: { listeners: ${listeners} } }
+    `)
+    expect(inheritedCollection.valid).toBe(false)
+    expect(inheritedCollection.valid === false && inheritedCollection.errors.some(e => e.includes('CARD_IMPL properties must not set __proto__'))).toBe(true)
 
     const indirectImpl = validateCardCode(`
       const impl = { listeners: ${listeners} }
