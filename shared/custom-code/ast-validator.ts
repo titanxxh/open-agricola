@@ -218,8 +218,12 @@ function validateCardImplObject(
       validateEffectKeys(prop.initializer, errors, getLine)
     }
 
-    if (propName === 'listeners' && ts.isArrayLiteralExpression(prop.initializer)) {
-      validateListenersArray(prop.initializer, errors, getLine)
+    if (propName === 'listeners') {
+      if (!ts.isArrayLiteralExpression(prop.initializer)) {
+        errors.push(`line ${getLine(prop.initializer)}: CARD_IMPL.listeners must be an array literal`)
+      } else {
+        validateListenersArray(prop.initializer, errors, getLine)
+      }
     }
   }
 }
@@ -248,8 +252,15 @@ function validateListenersArray(
   getLine: (node: ts.Node) => number,
 ): void {
   for (const element of arr.elements) {
-    if (!ts.isObjectLiteralExpression(element)) continue
+    if (!ts.isObjectLiteralExpression(element)) {
+      errors.push(`line ${getLine(element)}: CARD_IMPL listener entries must be object literals`)
+      continue
+    }
     for (const prop of element.properties) {
+      if (ts.isSpreadAssignment(prop)) {
+        errors.push(`line ${getLine(prop)}: CARD_IMPL listener entries must not use spread properties`)
+        continue
+      }
       if (!ts.isPropertyAssignment(prop)) continue
       const propName = ts.isIdentifier(prop.name)
         ? prop.name.text
