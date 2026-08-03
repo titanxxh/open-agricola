@@ -195,8 +195,12 @@ export class GitHubClient {
       state: 'open' | 'closed'
       merged_at: string | null
     }>
-    const pr = list.find((item) => item.merged_at === null && item.state === 'open')
-      ?? list.find((item) => item.merged_at === null)
+    const unmerged = list.filter((item) => item.merged_at === null)
+    const eligible = unmerged.filter((item) => item.base.ref === 'main' && !item.draft)
+    const pr = eligible.find((item) => item.state === 'open')
+      ?? eligible[0]
+      ?? unmerged.find((item) => item.state === 'open')
+      ?? unmerged[0]
     if (!pr) return null
     return {
       number: pr.number,

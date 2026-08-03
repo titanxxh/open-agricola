@@ -82,3 +82,16 @@ test('workshop sandbox keeps the action log near viewport height on a short desk
   expect(actionLogBodyHeight).toBeGreaterThanOrEqual(iframeHeight * 0.6)
   expect(rightColumnOverflow).toBeLessThanOrEqual(1)
 })
+
+test('real room does not force the action log to viewport height on a short desktop', async ({ page }) => {
+  await page.setViewportSize({ width: 1366, height: 768 })
+  await openEnglishPage(page, '/?player=p1&transport=ws&room=dev5&devMode=1')
+
+  const actionLog = page.locator('.action-log')
+  await expect(actionLog).toBeVisible({ timeout: 30_000 })
+  const actionLogHeight = await actionLog.evaluate(
+    (element) => element.getBoundingClientRect().height,
+  )
+
+  expect(actionLogHeight).toBeLessThan(768 * 0.8)
+})
