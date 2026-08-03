@@ -433,7 +433,7 @@ registry。
 
 ### D2. 游戏中加载自定义卡牌
 
-1. 创建房间时可选 "启用工坊卡牌"（WS `createRoom.customCardIds` / HTTP `/api/game/new-sandbox`）
+1. 大厅通过 `GET /api/workshop/cards?scope=room` 分页列出可进入真实房间的已审核上线卡，创建房间时把勾选结果传入 WS `createRoom.customCardIds`；HTTP `/api/game/new-sandbox` 仍用于作者沙盒
 2. `server/connection/room-router.ts` 或 `server/game-router.ts` 从数据库构造 `CustomCardData[]`
 3. `GameSession` 构造时把卡牌定义和运行时实现注册到本局 `SessionCardContext`
 4. `server/custom-code/runtime.ts` 的 `registerExecutorBackedCustomCard()` 从编译产物 + manifest 注入 effect hook 和 listener，通过 `invokeCustomCodeEffectSync` / `invokeCustomCodeListenerSync` 委托给 Worker Thread + isolated-vm 执行

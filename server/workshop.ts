@@ -389,6 +389,7 @@ export async function handleWorkshopRoute(
     const offset = (page - 1) * limit
     const statusFilter = q.get('status')
     const mineOnly = q.get('scope') === 'mine'
+    const roomOnly = q.get('scope') === 'room'
     const featured = q.get('featured') === '1'
 
     if (mineOnly) {
@@ -440,7 +441,9 @@ export async function handleWorkshopRoute(
       return true
     }
 
-    let where = "((w.review_status = 'approved' AND w.live = 1) OR w.review_status = 'merged') AND w.approved_version_id IS NOT NULL"
+    let where = roomOnly
+      ? "w.live = 1 AND (w.review_status = 'approved' OR (w.review_status = 'merged' AND w.built_in = 0)) AND w.approved_version_id IS NOT NULL"
+      : "((w.review_status = 'approved' AND w.live = 1) OR w.review_status = 'merged') AND w.approved_version_id IS NOT NULL"
     const params: unknown[] = []
     if (featured) where += ' AND w.featured = 1'
     if (search) {

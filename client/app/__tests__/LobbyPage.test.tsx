@@ -32,6 +32,11 @@ vi.mock('../../contexts/LocaleContext', () => {
     'platform.draftModeLabel': 'Card draft',
     'platform.draftModeNone': 'Random hand',
     'platform.draftModeSimultaneous': 'Simultaneous draft',
+    'platform.reviewedWorkshopCards': 'Reviewed workshop cards',
+    'platform.reviewedWorkshopCardsHint': 'Select reviewed cards for this room only.',
+    'platform.reviewedWorkshopCardsLoading': 'Loading reviewed cards…',
+    'platform.reviewedWorkshopCardsEmpty': 'No reviewed cards are currently available.',
+    'platform.reviewedWorkshopCardsError': 'Could not load reviewed cards.',
     'platform.createGame': 'Create Game',
     'platform.cancel': 'Cancel',
     'platform.joinGame': 'Join Game',
@@ -64,6 +69,7 @@ afterEach(() => {
   cleanup()
   vi.clearAllMocks()
   vi.unstubAllGlobals()
+  vi.unstubAllEnvs()
   myRoomsResponse.rooms = []
 })
 
@@ -149,6 +155,41 @@ describe('LobbyPage player count selection', () => {
       enableThroughTheSeasons: 'true',
       enableFarmersOfTheMoor: 'true',
       allowIncompleteFarmersOfTheMoorMinorDeal: 'true',
+    })
+  })
+
+  it('adds selected reviewed workshop cards to game setup', async () => {
+    vi.stubEnv('VITE_ENABLE_COMMUNITY_DECK', 'true')
+    vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input)
+      if (url.includes('/api/workshop/cards')) {
+        return new Response(JSON.stringify({
+          ok: true,
+          cards: url.includes('page=2') ? [{
+            id: 'reviewed-card-1',
+            name: 'Reviewed Card',
+            card_type: 'minor',
+            author_name: 'Alice',
+          }] : [],
+          page: url.includes('page=2') ? 2 : 1,
+          total: 1,
+          hasMore: !url.includes('page=2'),
+        }))
+      }
+      return new Response(JSON.stringify({ ok: true, rooms: [] }))
+    }))
+
+    render(<LobbyPage />)
+    fireEvent.click(screen.getByRole('button', { name: 'Create Multiplayer Game' }))
+    fireEvent.click(await screen.findByRole('checkbox', { name: /Reviewed Card/ }))
+    fireEvent.click(screen.getByRole('button', { name: 'Create Game' }))
+
+    expect(fetch).toHaveBeenCalledWith(expect.stringContaining('/api/workshop/cards?scope=room&page=1'))
+    expect(fetch).toHaveBeenCalledWith(expect.stringContaining('/api/workshop/cards?scope=room&page=2'))
+    expect(setPage).toHaveBeenCalledWith('game', {
+      transport: 'ws',
+      maxPlayers: '2',
+      customCards: 'reviewed-card-1',
     })
   })
 })

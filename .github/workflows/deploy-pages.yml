@@ -36,6 +36,7 @@ jobs:
           VITE_API_BASE: ${{ vars.VITE_API_BASE }}
           VITE_WS_BASE: ${{ vars.VITE_WS_BASE }}
           VITE_BASE_PATH: /open-agricola/
+          VITE_ENABLE_COMMUNITY_DECK: ${{ vars.VITE_ENABLE_COMMUNITY_DECK }}
           BGA_CDN_BASE_URL: ${{ vars.BGA_CDN_BASE_URL }}
           VITE_SANDBOX_EXECUTOR: ${{ vars.VITE_SANDBOX_EXECUTOR }}
         run: pnpm run build
