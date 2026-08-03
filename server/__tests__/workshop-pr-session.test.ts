@@ -201,12 +201,13 @@ export const catalogCardDefinitions = [
 
 type StubOpts = {
   githubLogin: string
-  /** If given, findOpenPr returns this PR; openPr call should NOT happen. */
+  /** If given, findReusablePr returns this PR; openPr call should NOT happen. */
   existingPr?: {
     number: number
     url: string
     baseRefName?: string
     isDraft?: boolean
+    state?: 'open' | 'closed'
   } | null
   /** Used when openPr is invoked. */
   openedPr?: { number: number; url: string }
@@ -215,6 +216,7 @@ type StubOpts = {
 type StubCounts = {
   openPrCalls: number
   closePrCalls: number
+  reopenPrCalls: number
   findPrCalls: number
   blobCalls: number
   commitCalls: number
@@ -230,6 +232,7 @@ function createGitHubApiStub(opts: StubOpts): {
   const counts: StubCounts = {
     openPrCalls: 0,
     closePrCalls: 0,
+    reopenPrCalls: 0,
     findPrCalls: 0,
     blobCalls: 0,
     commitCalls: 0,
@@ -353,10 +356,13 @@ function createGitHubApiStub(opts: StubOpts): {
       return Promise.resolve(new Response(JSON.stringify({}), { status: 200 }))
     }
 
-    // Find open PR
+    // Find matching PR
     if (url.includes('/pulls?head=') && method === 'GET') {
       counts.findPrCalls++
-      const list = existingPr ? [existingPr] : []
+      const requestedState = new URL(url).searchParams.get('state') ?? 'open'
+      const list = existingPr && (
+        requestedState === 'all' || requestedState === (existingPr.state ?? 'open')
+      ) ? [existingPr] : []
       return Promise.resolve(
         new Response(
           JSON.stringify(
@@ -365,6 +371,8 @@ function createGitHubApiStub(opts: StubOpts): {
               html_url: p.url,
               base: { ref: p.baseRefName ?? 'main' },
               draft: p.isDraft ?? false,
+              state: p.state ?? 'open',
+              merged_at: null,
             })),
           ),
           { status: 200 },
@@ -373,7 +381,9 @@ function createGitHubApiStub(opts: StubOpts): {
     }
 
     if (url.match(/\/pulls\/\d+$/) && method === 'PATCH') {
-      counts.closePrCalls++
+      const state = JSON.parse(String(init?.body ?? '{}')).state
+      if (state === 'open') counts.reopenPrCalls++
+      if (state === 'closed') counts.closePrCalls++
       return Promise.resolve(new Response(JSON.stringify({}), { status: 200 }))
     }
 
@@ -934,6 +944,41 @@ describe('workshop PR propose — session', () => {
       )
       .all(cardDbId) as Array<{ action: string }>
     expect(audits.map((a) => a.action)).toEqual(['start', 'success'])
+  })
+
+  it('reopens the existing unmerged PR instead of creating another one', async () => {
+    db.prepare(
+      `UPDATE workshop_cards
+       SET github_pr_url = ?, github_pr_status = 'closed'
+       WHERE id = ?`,
+    ).run('https://github.com/titanxxh/open-agricola/pull/99', cardDbId)
+    const hs = tokenCache.allocateHandshakeId(userId)
+    tokenCache.bind(hs, 'ghp_mock')
+    const { fn: gh, counts } = createGitHubApiStub({
+      githubLogin: 'workshopuser',
+      existingPr: {
+        number: 99,
+        url: 'https://github.com/titanxxh/open-agricola/pull/99',
+        state: 'closed',
+      },
+      openedPr: {
+        number: 100,
+        url: 'https://github.com/titanxxh/open-agricola/pull/100',
+      },
+    })
+    vi.stubGlobal('fetch', gh)
+    const res = fakeRes()
+
+    await handleSubmitReviewRequest(fakeReq({
+      method: 'POST',
+      url: `/api/workshop/cards/${cardDbId}/submit-review`,
+      authHeader: `Bearer ${userToken}`,
+      body: JSON.stringify({ handshakeId: hs }),
+    }), res, cardDbId, reviewRequiredProvider())
+
+    expect(JSON.parse(res.body)).toMatchObject({ ok: true, prNumber: 99 })
+    expect(counts.reopenPrCalls).toBe(1)
+    expect(counts.openPrCalls).toBe(0)
   })
 
   it.each([

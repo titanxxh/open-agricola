@@ -172,7 +172,7 @@ export class GitHubClient {
     }
   }
 
-  async findOpenPr(opts: {
+  async findReusablePr(opts: {
     forkOwner: string
     branchName: string
   }): Promise<{
@@ -180,10 +180,11 @@ export class GitHubClient {
     url: string
     baseRefName: string
     isDraft: boolean
+    state: 'open' | 'closed'
   } | null> {
     const head = `${opts.forkOwner}:${opts.branchName}`
     const r = await this.fetch(
-      `/repos/${this.opts.upstreamOwner}/${this.opts.upstreamRepo}/pulls?head=${encodeURIComponent(head)}&state=open`,
+      `/repos/${this.opts.upstreamOwner}/${this.opts.upstreamRepo}/pulls?head=${encodeURIComponent(head)}&state=all`,
     )
     if (!r.ok) throw new GitHubApiError('pr lookup failed', 'pr_lookup_failed', r.status)
     const list = (await r.json()) as Array<{
@@ -191,13 +192,18 @@ export class GitHubClient {
       html_url: string
       base: { ref: string }
       draft: boolean
+      state: 'open' | 'closed'
+      merged_at: string | null
     }>
-    if (list.length === 0) return null
+    const pr = list.find((item) => item.merged_at === null && item.state === 'open')
+      ?? list.find((item) => item.merged_at === null)
+    if (!pr) return null
     return {
-      number: list[0]!.number,
-      url: list[0]!.html_url,
-      baseRefName: list[0]!.base.ref,
-      isDraft: list[0]!.draft,
+      number: pr.number,
+      url: pr.html_url,
+      baseRefName: pr.base.ref,
+      isDraft: pr.draft,
+      state: pr.state,
     }
   }
 
@@ -211,6 +217,7 @@ export class GitHubClient {
     url: string
     baseRefName: string
     isDraft: boolean
+    state: 'open'
   }> {
     const r = await this.fetch(
       `/repos/${this.opts.upstreamOwner}/${this.opts.upstreamRepo}/pulls`,
@@ -233,19 +240,20 @@ export class GitHubClient {
       url: pr.html_url,
       baseRefName: 'main',
       isDraft: false,
+      state: 'open',
     }
   }
 
-  async closePr(prNumber: number): Promise<void> {
+  async setPrState(prNumber: number, state: 'open' | 'closed'): Promise<void> {
     const r = await this.fetch(
       `/repos/${this.opts.upstreamOwner}/${this.opts.upstreamRepo}/pulls/${prNumber}`,
       {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ state: 'closed' }),
+        body: JSON.stringify({ state }),
       },
     )
-    if (!r.ok) throw new GitHubApiError('pr close failed', 'pr_close_failed', r.status)
+    if (!r.ok) throw new GitHubApiError('pr state update failed', 'pr_state_update_failed', r.status)
   }
 
   async commentOnPr(opts: { prNumber: number; body: string }): Promise<void> {
