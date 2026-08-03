@@ -28,7 +28,7 @@ describe('sandboxListenerActions', () => {
   it('白名单恰好是支持的 listener action 集合', () => {
     expect([...sandboxListenerActions].sort()).toEqual(
       [
-        'bake-bread', 'collect', 'construct', 'family-growth', 'fence', 'gain',
+        'bake-bread', 'breed', 'collect', 'construct', 'family-growth', 'fence', 'gain',
         'improvement', 'occupation', 'place-farmer', 'plow', 'reap', 'receive',
         'renovate-house', 'sow', 'stables', 'wish-children',
       ].sort(),
