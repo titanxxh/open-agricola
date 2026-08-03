@@ -347,11 +347,12 @@ export async function handleSubmitReviewRequest(
     })
 
     // Find or open PR
-    let pr = await client.findOpenPr({ forkOwner: githubLogin, branchName })
+    let pr = await client.findReusablePr({ forkOwner: githubLogin, branchName })
     if (pr && (pr.baseRefName !== 'main' || pr.isDraft)) {
-      await client.closePr(pr.number)
+      if (pr.state === 'open') await client.setPrState(pr.number, 'closed')
       pr = null
     }
+    if (pr?.state === 'closed') await client.setPrState(pr.number, 'open')
     if (!pr) {
       pr = await client.openPr({
         forkOwner: githubLogin,
