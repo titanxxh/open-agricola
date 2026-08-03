@@ -165,6 +165,13 @@ describe('ast-validator: CARD_IMPL hook/phase whitelisting', () => {
     `)
     expect(indirectImpl.valid).toBe(false)
     expect(indirectImpl.valid === false && indirectImpl.errors.some(e => e.includes('CARD_IMPL must be an object literal'))).toBe(true)
+
+    const mutatedImpl = validateCardCode(`
+      const CARD_IMPL = {}
+      CARD_IMPL.listeners = ${listeners}
+    `)
+    expect(mutatedImpl.valid).toBe(false)
+    expect(mutatedImpl.valid === false && mutatedImpl.errors.some(e => e.includes('CARD_IMPL must not be referenced outside its declaration'))).toBe(true)
   })
 
   it('rejects computeExchanges for sandbox custom cards', () => {
