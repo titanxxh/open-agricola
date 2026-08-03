@@ -621,9 +621,26 @@ const CARD_IMPL = {}
     name: text(variant.locale, '运行静态验证', 'Run static validation'),
   }).click()
   await expect(adopt).toBeEnabled({ timeout: 30_000 })
+  const draftPattern = `**/api/workshop/cards/${workspace.id}/draft`
+  let checkpointAttempts = 0
+  await page.route(draftPattern, route => {
+    checkpointAttempts += 1
+    return route.fulfill({
+      status: 400,
+      contentType: 'application/json',
+      body: JSON.stringify({ ok: false, error: 'old source must not block adoption' }),
+    })
+  })
   await adopt.click()
   await expect(page.locator('.aicw-candidate-section')).toBeHidden()
   await expect(page.locator('.aicw-current-code')).toContainText('CARD_IMPL')
+  expect(checkpointAttempts).toBe(0)
+  await page.unroute(draftPattern)
+
+  await page.getByRole('button', {
+    name: text(variant.locale, '导入手动编辑器', 'Open in manual editor'),
+  }).click()
+  await expect(editor).toHaveValue(`${validSource}\n`)
 
   const saved = await loadWorkspace(request, account, workspace.id)
   expect(saved.draft.effectCode).toContain('CARD_IMPL')
