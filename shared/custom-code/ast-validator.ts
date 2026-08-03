@@ -96,6 +96,14 @@ export function validateCardCode(source: string): ValidationResult {
     // Check identifier references against deny list
     if (ts.isIdentifier(node)) {
       const parent = node.parent
+      const isDeclarationName = parent && ts.isVariableDeclaration(parent) && parent.name === node
+      const isPropertyName = parent && (
+        (ts.isPropertyAccessExpression(parent) && parent.name === node)
+        || ((ts.isPropertyAssignment(parent) || ts.isPropertySignature(parent)) && parent.name === node)
+      )
+      if (node.text === 'CARD_IMPL' && !isDeclarationName && !isPropertyName) {
+        errors.push(`line ${getLine(node)}: CARD_IMPL must not be referenced outside its declaration`)
+      }
       // Skip property access names (obj.process is fine, bare process is not)
       // BUT check DENIED_PROPERTY_ACCESS for dangerous property names
       if (parent && ts.isPropertyAccessExpression(parent) && parent.name === node) {
