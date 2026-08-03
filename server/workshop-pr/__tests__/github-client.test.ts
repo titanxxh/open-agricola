@@ -278,6 +278,7 @@ describe('GitHubClient', () => {
         baseRefName: 'main',
         isDraft: false,
         state: 'open',
+        conflictingOpenPrNumbers: [],
       })
       expect(fetchCalls[0]?.url).toContain('state=all')
     })
@@ -287,7 +288,7 @@ describe('GitHubClient', () => {
         {
           number: 42,
           html_url: 'https://github.com/t/r/pull/42',
-          base: { ref: 'release' },
+          base: { ref: 'main' },
           draft: true,
           state: 'open',
           merged_at: null,
@@ -308,7 +309,11 @@ describe('GitHubClient', () => {
       })
 
       await expect(c.findReusablePr({ forkOwner: 'alice', branchName: 'workshop/CUSTOM_X' }))
-        .resolves.toMatchObject({ number: 43, state: 'closed' })
+        .resolves.toMatchObject({
+          number: 43,
+          state: 'closed',
+          conflictingOpenPrNumbers: [42],
+        })
     })
 
     it('findReusablePr returns null when every matching PR was merged', async () => {

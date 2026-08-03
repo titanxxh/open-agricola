@@ -181,6 +181,7 @@ export class GitHubClient {
     baseRefName: string
     isDraft: boolean
     state: 'open' | 'closed'
+    conflictingOpenPrNumbers?: number[]
   } | null> {
     const head = `${opts.forkOwner}:${opts.branchName}`
     const r = await this.fetch(
@@ -202,12 +203,18 @@ export class GitHubClient {
       ?? unmerged.find((item) => item.state === 'open')
       ?? unmerged[0]
     if (!pr) return null
+    const conflictingOpenPrNumbers = pr.state === 'closed'
+      ? unmerged
+        .filter((item) => item.state === 'open' && item.base.ref === pr.base.ref)
+        .map((item) => item.number)
+      : []
     return {
       number: pr.number,
       url: pr.html_url,
       baseRefName: pr.base.ref,
       isDraft: pr.draft,
       state: pr.state,
+      conflictingOpenPrNumbers,
     }
   }
 
