@@ -366,11 +366,16 @@ export const useWorkshopDraft = ({
   ): Promise<boolean> => {
     let current = stateRef.current
     if (!current || current.save.status === 'conflict') return false
-    if (saveRequestRef.current) {
-      await saveRequestRef.current.promise
+    const pendingSave = saveRequestRef.current
+    if (pendingSave) {
+      await pendingSave.promise
       current = stateRef.current
       if (!current || current.save.status === 'conflict') return false
     }
+    const mergeBaseDraft = pendingSave && current.save.status === 'dirty'
+      ? pendingSave.draft
+      : current.draft
+    const mergeBaseSession = current.session
     dispatch({ type: 'saving' })
     try {
       const response = await apiFetch(
@@ -408,12 +413,13 @@ export const useWorkshopDraft = ({
         kind: candidate.kind,
         workspace: payload.workspace,
       })
-      const concurrentDraft = latest.draft !== current.draft
-      const next = concurrentDraft || latest.session !== current.session
+      const concurrentDraft = latest.draft !== mergeBaseDraft
+      const concurrentSession = latest.session !== mergeBaseSession
+      const next = concurrentDraft || concurrentSession
         ? {
             ...adopted,
-            draft: mergeConcurrentEdits(current.draft, latest.draft, adopted.draft),
-            session: mergeConcurrentEdits(current.session, latest.session, adopted.session),
+            draft: mergeConcurrentEdits(mergeBaseDraft, latest.draft, adopted.draft),
+            session: mergeConcurrentEdits(mergeBaseSession, latest.session, adopted.session),
             sandboxPassVersionId: concurrentDraft
               ? latest.sandboxPassVersionId
               : adopted.sandboxPassVersionId,
