@@ -4,6 +4,7 @@ import { compileCardCode } from '../../shared/custom-code/compiler.ts'
 import { cardEffectHooks, type CardEffectField } from '../../shared/cards/card-effects.ts'
 import type { ActionFlow } from '../../shared/contract/types.ts'
 import type { ActionHookResult } from '../../shared/actions/hooks.ts'
+import { isSandboxListenerAction } from '../../shared/custom-code/sandbox-listener-actions.ts'
 import { isSandboxListenerPhase } from '../../shared/custom-code/sandbox-listener-phases.ts'
 import { isSandboxListenerScope } from '../../shared/custom-code/sandbox-listener-scopes.ts'
 import type {
@@ -179,6 +180,7 @@ function runManifestExtraction(compiledCode: string, cardId: string): {
     )
     const listeners = parsed.listeners.map((l) => ({
       ...l,
+      actions: l.actions?.filter(isSandboxListenerAction),
       phases: l.phases?.filter(isSandboxListenerPhase),
       scope: isSandboxListenerScope(l.scope) ? l.scope : undefined,
     }))

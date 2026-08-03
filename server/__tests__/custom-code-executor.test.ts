@@ -77,7 +77,7 @@ const CARD_IMPL = {
   listeners: [{
     id: CARD_ID,
     cardIds: [CARD_ID],
-    actions: ['meeting-place'],
+    actions: ['collect'],
     phases: ['after'],
     handler: () => ({ flow: { type: 'leaf', actionId: 'gain', params: { wood: 1 }, sourceCard: CARD_ID } }),
   }],
@@ -100,7 +100,7 @@ const CARD_IMPL = {
     })
     expect(result.manifest.effectHooks).toContain('onReturnHome')
     expect(result.manifest.listeners).toHaveLength(1)
-    expect(result.manifest.listeners[0]?.actions).toEqual(['meeting-place'])
+    expect(result.manifest.listeners[0]?.actions).toEqual(['collect'])
   })
 
   it('extracts before-end metadata for executor-backed custom cards', () => {
@@ -175,7 +175,7 @@ const CARD_IMPL = {
   listeners: [{
     id: CARD_ID,
     cardIds: [CARD_ID],
-    actions: ['meeting-place'],
+    actions: ['collect'],
     phases: ['after'],
     handler: () => ({ flow: { type: 'leaf', actionId: 'gain', params: { wood: 1 }, sourceCard: CARD_ID } }),
   }],
@@ -202,8 +202,8 @@ const CARD_IMPL = {
     const listenerContext = {
       state,
       player: state.players[0]!,
-      space: state.actionSpaces.find((space) => space.id === 'meeting-place') ?? state.actionSpaces[0]!,
-      actionId: 'meeting-place',
+      space: state.actionSpaces.find((space) => space.id === 'forest') ?? state.actionSpaces[0]!,
+      actionId: 'collect',
       phase: 'after' as const,
     }
     const matched = getMatchingListeners(listenerContext)

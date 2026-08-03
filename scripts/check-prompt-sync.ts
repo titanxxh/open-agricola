@@ -8,6 +8,7 @@
  *
  * Sources of truth this script reads:
  *   - shared/cards/card-effects.ts        → cardEffectHooks array
+ *   - shared/custom-code/sandbox-listener-actions.ts → sandboxListenerActions array
  *   - shared/custom-code/sandbox-listener-phases.ts → sandboxListenerPhases array
  *   - shared/custom-code/sandbox-listener-scopes.ts → sandboxListenerScopes array
  *   - shared/custom-code/ast-validator.ts → DENIED_IDENTIFIERS + DENIED_PROPERTY_ACCESS
@@ -16,9 +17,9 @@
  *   - docs/CUSTOM_CARD_SANDBOX.md         → <!-- prompt-sync:begin id=... --> blocks
  *
  * NOTE: client/services/llmPrompts.ts is no longer cross-checked here — it
- * renders the hook / phase / scope / actionId tables at runtime from the source-of-truth
+ * renders the hook / listener action / phase / scope / actionId tables at runtime from the source-of-truth
  * arrays + description metadata (shared/custom-code/*-meta, sandbox-*.ts), so
- * those four tables cannot drift by construction. The runtime render is guarded
+ * those five tables cannot drift by construction. The runtime render is guarded
  * by client/services/__tests__/llmPrompts.test.ts (set-equality assertions).
  *
  * If a hook / phase / denylist entry exists in the source but is missing from
@@ -30,6 +31,7 @@ import * as fs from 'node:fs'
 import * as path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { SANDBOX_ALLOWED_ACTION_IDS } from '../shared/custom-code/sandbox-action-ids'
+import { sandboxListenerActions } from '../shared/custom-code/sandbox-listener-actions'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
@@ -37,6 +39,7 @@ const REPO_ROOT = path.resolve(__dirname, '..')
 
 const SOURCES = {
   cardEffects: 'shared/cards/card-effects.ts',
+  sandboxListenerActions: 'shared/custom-code/sandbox-listener-actions.ts',
   sandboxListenerPhases: 'shared/custom-code/sandbox-listener-phases.ts',
   sandboxListenerScopes: 'shared/custom-code/sandbox-listener-scopes.ts',
   astValidator: 'shared/custom-code/ast-validator.ts',
@@ -213,6 +216,7 @@ function main() {
   const reports: DriftReport[] = []
 
   reports.push(...checkBlock('card-effect-hooks', cardEffectHooks, `${SOURCES.cardEffects}:cardEffectHooks`))
+  reports.push(...checkBlock('listener-actions', [...sandboxListenerActions], `${SOURCES.sandboxListenerActions}:sandboxListenerActions`))
   reports.push(...checkBlock('action-hook-phases', actionHookPhases, `${SOURCES.sandboxListenerPhases}:sandboxListenerPhases`))
   reports.push(...checkBlock('listener-scopes', listenerScopes, `${SOURCES.sandboxListenerScopes}:sandboxListenerScopes`))
   reports.push(...checkBlock('denied-identifiers', deniedIdentifiers, `${SOURCES.astValidator}:DENIED_IDENTIFIERS`))
@@ -244,6 +248,7 @@ function main() {
 
   console.log(`Sources:`)
   console.log(`  ${SOURCES.cardEffects}     (cardEffectHooks: ${cardEffectHooks.length})`)
+  console.log(`  ${SOURCES.sandboxListenerActions} (actions: ${sandboxListenerActions.length})`)
   console.log(`  ${SOURCES.sandboxListenerPhases} (sandboxListenerPhases: ${actionHookPhases.length})`)
   console.log(`  ${SOURCES.sandboxListenerScopes} (scopes: ${listenerScopes.length})`)
   console.log(`  ${SOURCES.astValidator}    (denied: ${deniedIdentifiers.length} ids + ${deniedPropertyAccess.length} props)`)

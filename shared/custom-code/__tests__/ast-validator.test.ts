@@ -80,6 +80,40 @@ describe('ast-validator: CARD_IMPL hook/phase whitelisting', () => {
     expect(result.valid === false && result.errors.some(e => e.includes("unknown listener phase 'superPhase'"))).toBe(true)
   })
 
+  it('accepts supported listener actions', () => {
+    const code = `
+      const CARD_IMPL = {
+        listeners: [
+          {
+            id: 'test-listener',
+            actions: ['collect', 'improvement'],
+            phases: ['computeCosts'],
+            handler: (ctx) => {},
+          },
+        ],
+      }
+    `
+    expect(validateCardCode(code).valid).toBe(true)
+  })
+
+  it('rejects unknown listener actions', () => {
+    const code = `
+      const CARD_IMPL = {
+        listeners: [
+          {
+            id: 'test-listener',
+            actions: ['improvement-any'],
+            phases: ['computeCosts'],
+            handler: (ctx) => {},
+          },
+        ],
+      }
+    `
+    const result = validateCardCode(code)
+    expect(result.valid).toBe(false)
+    expect(result.valid === false && result.errors.some(e => e.includes("unknown listener action 'improvement-any'"))).toBe(true)
+  })
+
   it('rejects computeExchanges for sandbox custom cards', () => {
     const code = `
       const CARD_IMPL = {
