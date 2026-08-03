@@ -131,6 +131,23 @@ describe('ast-validator: CARD_IMPL hook/phase whitelisting', () => {
     expect(result.valid === false && result.errors.some(e => e.includes('listener entries must not use spread properties'))).toBe(true)
   })
 
+  it('rejects nonstandard listener action properties', () => {
+    const code = `
+      const actions = ['improvement-any']
+      const CARD_IMPL = {
+        listeners: [
+          { actions, phases: ['computeCosts'], handler: (ctx) => {} },
+          { ['actions']: ['improvement-any'], phases: ['computeCosts'], handler: (ctx) => {} },
+          { actions() { return ['improvement-any'] }, phases: ['computeCosts'], handler: (ctx) => {} },
+        ],
+      }
+    `
+    const result = validateCardCode(code)
+    expect(result.valid).toBe(false)
+    expect(result.valid === false && result.errors.some(e => e.includes('listener actions must use a property assignment'))).toBe(true)
+    expect(result.valid === false && result.errors.some(e => e.includes('listener properties must not use computed names'))).toBe(true)
+  })
+
   it('rejects computeExchanges for sandbox custom cards', () => {
     const code = `
       const CARD_IMPL = {

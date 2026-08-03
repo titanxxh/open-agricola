@@ -261,10 +261,18 @@ function validateListenersArray(
         errors.push(`line ${getLine(prop)}: CARD_IMPL listener entries must not use spread properties`)
         continue
       }
-      if (!ts.isPropertyAssignment(prop)) continue
+      if (ts.isComputedPropertyName(prop.name)) {
+        errors.push(`line ${getLine(prop)}: CARD_IMPL listener properties must not use computed names`)
+        continue
+      }
       const propName = ts.isIdentifier(prop.name)
         ? prop.name.text
         : ts.isStringLiteral(prop.name) ? prop.name.text : undefined
+      if ((propName === 'actions' || propName === 'phases') && !ts.isPropertyAssignment(prop)) {
+        errors.push(`line ${getLine(prop)}: listener ${propName} must use a property assignment`)
+        continue
+      }
+      if (!ts.isPropertyAssignment(prop)) continue
       if (propName === 'actions') {
         if (!ts.isArrayLiteralExpression(prop.initializer)) {
           errors.push(`line ${getLine(prop.initializer)}: listener actions must be a string literal array`)
