@@ -988,9 +988,8 @@
 .game-layout__right {
   min-width: 0;
   display: grid;
-  grid-template-rows: auto 1fr;
+  grid-template-rows: auto auto;
   gap: 12px;
-  max-height: calc(100vh - 80px);
 }
 
 @media (max-width: 1280px) {
@@ -1009,10 +1008,6 @@
   .game-layout__center,
   .game-layout__right {
     width: 100%;
-  }
-  .game-layout__right {
-    grid-template-rows: auto auto;
-    max-height: none;
   }
   .stage-bar__cells {
     grid-template-columns: repeat(7, 1fr);
@@ -5625,6 +5620,7 @@ details[open] .ai-prompt-summary::before { transform: rotate(90deg); }
   border: 1px solid var(--color-border);
   display: flex;
   flex-direction: column;
+  min-height: calc(100vh - 80px);
   max-height: 100%;
   overflow: hidden;
 }
