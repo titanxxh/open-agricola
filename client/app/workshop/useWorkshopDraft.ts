@@ -366,10 +366,10 @@ export const useWorkshopDraft = ({
   ): Promise<boolean> => {
     let current = stateRef.current
     if (!current || current.save.status === 'conflict') return false
-    if (current.save.status !== 'saved') {
-      if (!await saveDraft(current)) return false
+    if (saveRequestRef.current) {
+      await saveRequestRef.current.promise
       current = stateRef.current
-      if (!current || current.save.status !== 'saved') return false
+      if (!current || current.save.status === 'conflict') return false
     }
     dispatch({ type: 'saving' })
     try {
@@ -436,7 +436,7 @@ export const useWorkshopDraft = ({
       })
       return false
     }
-  }, [apiFetch, cardId, dispatch, persist, saveDraft])
+  }, [apiFetch, cardId, dispatch, persist])
 
   const publishDraft = useCallback(async (): Promise<string | null> => {
     let current = stateRef.current

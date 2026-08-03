@@ -927,14 +927,12 @@ function AbilityPanel({
   prerequisite,
   costHint,
   extracted,
-  artUrl,
   input,
   messages,
   candidates,
   selectedCandidateId,
   baseRevision,
   apiFetch,
-  onImport,
   onInputChange,
   onMessagesChange,
   onCandidateCompleted,
@@ -952,14 +950,12 @@ function AbilityPanel({
   prerequisite?: string
   costHint?: string
   extracted: ExtractedCard | null
-  artUrl: string | null
   input: string
   messages: DisplayMessage[]
   candidates: AbilityCandidate[]
   selectedCandidateId?: string
   baseRevision: number
   apiFetch: ApiFetch
-  onImport: (card: ExtractedCard, artUrl: string | null) => void
   onInputChange: (input: string) => void
   onMessagesChange: (messages: DisplayMessage[]) => void
   onCandidateCompleted: (candidate: AbilityCandidate) => Promise<void>
@@ -999,6 +995,21 @@ function AbilityPanel({
 
   const selectedCandidate = candidates.find(candidate => candidate.id === selectedCandidateId)
     ?? candidates.at(-1)
+
+  const importAdoptedSource = () => {
+    if (!extracted?.sourceCode) return
+    void onCandidateCompleted({
+      id: globalThis.crypto?.randomUUID?.() ?? `ability-${Date.now()}`,
+      kind: 'ability',
+      prompt: locale === 'zh' ? '手动编辑当前源码' : 'Manually edit current source',
+      sourceCode: extracted.sourceCode,
+      cardJson: extracted.card,
+      validation: { valid: false, errors: [] },
+      createdAt: Date.now(),
+      baseRevision,
+      stale: false,
+    })
+  }
 
   const commitMessages = useCallback((
     update: DisplayMessage[] | ((current: DisplayMessage[]) => DisplayMessage[]),
@@ -1223,7 +1234,7 @@ function AbilityPanel({
       <div className="ai-ability-panel-header">
         <h3>{locale === 'zh' ? '卡牌能力' : 'Card ability'}</h3>
         {extracted?.sourceCode && (
-          <button type="button" className="aicw-button" onClick={() => onImport(extracted, artUrl)}>
+          <button type="button" className="aicw-button" onClick={importAdoptedSource}>
             {locale === 'zh' ? '导入手动编辑器' : 'Open in manual editor'}
           </button>
         )}
@@ -1476,7 +1487,6 @@ const draftToExtracted = (draft: WorkshopClientDraft): ExtractedCard => {
 type AiCardDesignerProps = {
   initialCard?: ApiCard
   initialCardId?: string
-  onImport: (card: ExtractedCard, artUrl: string | null) => void
   onClose: () => void
   onAddToSandboxAndRestart?: (cardDbId: string, versionId: string) => Promise<boolean>
   sandboxErrors?: string[] | null
@@ -1487,7 +1497,6 @@ type AiCardDesignerProps = {
 export function AiCardDesigner({
   initialCard,
   initialCardId,
-  onImport,
   onClose,
   onAddToSandboxAndRestart,
   sandboxErrors,
@@ -2492,14 +2501,12 @@ export function AiCardDesigner({
                 prerequisite={prerequisite}
                 costHint={costInput}
                 extracted={extracted}
-                artUrl={artUrl}
                 input={workspaceState?.session.abilityInput ?? ''}
                 messages={(workspaceState?.session.abilityMessages ?? []) as DisplayMessage[]}
                 candidates={workspaceState?.session.abilityCandidates ?? []}
                 selectedCandidateId={workspaceState?.session.selectedAbilityCandidateId}
                 baseRevision={workspaceState?.baseRevision ?? 0}
                 apiFetch={workshopApiFetch}
-                onImport={onImport}
                 onInputChange={input => updateSession({ abilityInput: input })}
                 onMessagesChange={messages => updateSession({ abilityMessages: messages })}
                 onCandidateCompleted={completeAbilityCandidate}
