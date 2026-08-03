@@ -254,6 +254,7 @@ reaction-compatible hook（action listener 的 `before` / `during` / `immediatel
 - `wish-children`
 - `family-growth`
 - `bake-bread`
+- `reap`
 <!-- prompt-sync:end id=listener-actions -->
 
 `sandboxListenerPhases` 是 Workshop listener phase 白名单。挂载 listener 前会过滤不在白名单里的项；AST validator 会**硬拒**不在白名单中的 phase——保存直接失败并给出错误信息。

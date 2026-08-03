@@ -14,6 +14,7 @@ export const sandboxListenerActions = [
   'wish-children',
   'family-growth',
   'bake-bread',
+  'reap',
 ] as const
 
 export type SandboxListenerAction = typeof sandboxListenerActions[number]
