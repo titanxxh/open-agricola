@@ -992,6 +992,10 @@
   gap: 12px;
   max-height: calc(100vh - 80px);
 }
+.app--embedded .game-layout__right {
+  grid-template-rows: auto auto;
+  max-height: none;
+}
 
 @media (max-width: 1280px) {
   .game-layout {
@@ -5627,6 +5631,9 @@ details[open] .ai-prompt-summary::before { transform: rotate(90deg); }
   flex-direction: column;
   max-height: 100%;
   overflow: hidden;
+}
+.app--embedded .action-log {
+  height: calc(100vh - 80px);
 }
 .action-log__title {
   margin: 0 0 8px;

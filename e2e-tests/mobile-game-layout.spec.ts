@@ -56,3 +56,58 @@ test('workshop sandbox uses the same continuous mobile game layout', async ({ pa
 
   await expectContinuousGame(page.frameLocator('iframe[title="Sandbox"]'))
 })
+
+test('workshop sandbox keeps the action log near viewport height on a short desktop', async ({ page }) => {
+  await page.setViewportSize({ width: 1366, height: 768 })
+  await openEnglishPage(page, '/?page=workshop&player=p1&devMode=1')
+  await expect(page.getByTestId('workshop-root')).toBeVisible({ timeout: 30_000 })
+  await page.getByRole('button', { name: 'Enter Sandbox' }).click()
+  await page.locator('.ws-sandbox-btns').getByRole('button', { name: 'Start Sandbox' }).click()
+
+  const iframe = page.locator('iframe[title="Sandbox"]')
+  const sandbox = page.frameLocator('iframe[title="Sandbox"]')
+  await expect(sandbox.locator('.action-log')).toBeVisible({ timeout: 30_000 })
+  const iframeHeight = await iframe.evaluate((element) => element.clientHeight)
+  const actionLogHeight = await sandbox.locator('.action-log').evaluate(
+    (element) => element.getBoundingClientRect().height,
+  )
+  const actionLogBodyHeight = await sandbox.locator('.action-log__body').evaluate(
+    (element) => element.getBoundingClientRect().height,
+  )
+  const rightColumnOverflow = await sandbox.locator('.game-layout__right').evaluate(
+    (element) => element.scrollHeight - element.clientHeight,
+  )
+
+  expect(actionLogHeight).toBeGreaterThanOrEqual(iframeHeight * 0.8)
+  expect(actionLogBodyHeight).toBeGreaterThanOrEqual(iframeHeight * 0.6)
+  expect(rightColumnOverflow).toBeLessThanOrEqual(1)
+
+  await sandbox.locator('.action-log__body').evaluate((element) => {
+    for (let index = 0; index < 100; index += 1) {
+      const entry = document.createElement('div')
+      entry.textContent = `Log entry ${index}`
+      element.append(entry)
+    }
+  })
+  const crowdedLog = await sandbox.locator('.action-log').evaluate((element) => ({
+    height: element.getBoundingClientRect().height,
+    bodyClientHeight: element.querySelector('.action-log__body')?.clientHeight ?? 0,
+    bodyScrollHeight: element.querySelector('.action-log__body')?.scrollHeight ?? 0,
+  }))
+
+  expect(crowdedLog.height).toBeLessThanOrEqual(iframeHeight)
+  expect(crowdedLog.bodyScrollHeight).toBeGreaterThan(crowdedLog.bodyClientHeight)
+})
+
+test('real room does not force the action log to viewport height on a short desktop', async ({ page }) => {
+  await page.setViewportSize({ width: 1366, height: 768 })
+  await openEnglishPage(page, '/?player=p1&transport=ws&room=dev5&devMode=1')
+
+  const actionLog = page.locator('.action-log')
+  await expect(actionLog).toBeVisible({ timeout: 30_000 })
+  const actionLogHeight = await actionLog.evaluate(
+    (element) => element.getBoundingClientRect().height,
+  )
+
+  expect(actionLogHeight).toBeLessThan(768 * 0.8)
+})
