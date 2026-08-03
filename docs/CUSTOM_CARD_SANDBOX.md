@@ -254,6 +254,7 @@ reaction-compatible hook（action listener 的 `before` / `during` / `immediatel
 - `wish-children`
 - `family-growth`
 - `bake-bread`
+- `breed`
 - `reap`
 <!-- prompt-sync:end id=listener-actions -->
 
