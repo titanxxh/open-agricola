@@ -146,6 +146,14 @@ describe('ast-validator: CARD_IMPL hook/phase whitelisting', () => {
     expect(result.valid).toBe(false)
     expect(result.valid === false && result.errors.some(e => e.includes('listener actions must use a property assignment'))).toBe(true)
     expect(result.valid === false && result.errors.some(e => e.includes('listener properties must not use computed names'))).toBe(true)
+
+    const inheritedActions = validateCardCode(`
+      const CARD_IMPL = {
+        listeners: [{ __proto__: { actions: ['improvement-any'] }, phases: ['computeCosts'], handler: (ctx) => {} }],
+      }
+    `)
+    expect(inheritedActions.valid).toBe(false)
+    expect(inheritedActions.valid === false && inheritedActions.errors.some(e => e.includes('listener properties must not set __proto__'))).toBe(true)
   })
 
   it('rejects indirect CARD_IMPL listener definitions', () => {

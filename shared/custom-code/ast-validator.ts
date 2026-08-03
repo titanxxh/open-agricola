@@ -303,6 +303,10 @@ function validateListenersArray(
       const propName = ts.isIdentifier(prop.name)
         ? prop.name.text
         : ts.isStringLiteral(prop.name) ? prop.name.text : undefined
+      if (propName === '__proto__') {
+        errors.push(`line ${getLine(prop)}: CARD_IMPL listener properties must not set __proto__`)
+        continue
+      }
       if ((propName === 'actions' || propName === 'phases') && !ts.isPropertyAssignment(prop)) {
         errors.push(`line ${getLine(prop)}: listener ${propName} must use a property assignment`)
         continue
