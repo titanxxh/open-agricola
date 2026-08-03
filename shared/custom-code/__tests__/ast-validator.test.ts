@@ -148,6 +148,25 @@ describe('ast-validator: CARD_IMPL hook/phase whitelisting', () => {
     expect(result.valid === false && result.errors.some(e => e.includes('listener properties must not use computed names'))).toBe(true)
   })
 
+  it('rejects indirect CARD_IMPL listener definitions', () => {
+    const listeners = `[{ actions: ['improvement-any'], phases: ['computeCosts'], handler: (ctx) => {} }]`
+    const indirectCollection = validateCardCode(`
+      const listeners = ${listeners}
+      const CARD_IMPL = { listeners, ...{ listeners }, ['listeners']: listeners }
+    `)
+    expect(indirectCollection.valid).toBe(false)
+    expect(indirectCollection.valid === false && indirectCollection.errors.some(e => e.includes('CARD_IMPL.listeners must use a property assignment'))).toBe(true)
+    expect(indirectCollection.valid === false && indirectCollection.errors.some(e => e.includes('CARD_IMPL must not use spread properties'))).toBe(true)
+    expect(indirectCollection.valid === false && indirectCollection.errors.some(e => e.includes('CARD_IMPL properties must not use computed names'))).toBe(true)
+
+    const indirectImpl = validateCardCode(`
+      const impl = { listeners: ${listeners} }
+      const CARD_IMPL = impl
+    `)
+    expect(indirectImpl.valid).toBe(false)
+    expect(indirectImpl.valid === false && indirectImpl.errors.some(e => e.includes('CARD_IMPL must be an object literal'))).toBe(true)
+  })
+
   it('rejects computeExchanges for sandbox custom cards', () => {
     const code = `
       const CARD_IMPL = {
