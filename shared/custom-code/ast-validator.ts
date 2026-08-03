@@ -196,7 +196,10 @@ function validateCardImplHooksAndPhases(
     if (!ts.isVariableStatement(stmt)) continue
     for (const decl of stmt.declarationList.declarations) {
       if (!ts.isIdentifier(decl.name) || decl.name.text !== 'CARD_IMPL') continue
-      if (!decl.initializer || !ts.isObjectLiteralExpression(decl.initializer)) continue
+      if (!decl.initializer || !ts.isObjectLiteralExpression(decl.initializer)) {
+        errors.push(`line ${getLine(decl)}: CARD_IMPL must be an object literal`)
+        continue
+      }
       validateCardImplObject(decl.initializer, errors, getLine)
     }
   }
@@ -208,10 +211,22 @@ function validateCardImplObject(
   getLine: (node: ts.Node) => number,
 ): void {
   for (const prop of obj.properties) {
-    if (!ts.isPropertyAssignment(prop)) continue
+    if (ts.isSpreadAssignment(prop)) {
+      errors.push(`line ${getLine(prop)}: CARD_IMPL must not use spread properties`)
+      continue
+    }
+    if (ts.isComputedPropertyName(prop.name)) {
+      errors.push(`line ${getLine(prop)}: CARD_IMPL properties must not use computed names`)
+      continue
+    }
     const propName = ts.isIdentifier(prop.name)
       ? prop.name.text
       : ts.isStringLiteral(prop.name) ? prop.name.text : undefined
+    if (propName === 'listeners' && !ts.isPropertyAssignment(prop)) {
+      errors.push(`line ${getLine(prop)}: CARD_IMPL.listeners must use a property assignment`)
+      continue
+    }
+    if (!ts.isPropertyAssignment(prop)) continue
     if (!propName) continue
 
     if (propName === 'effect' && ts.isObjectLiteralExpression(prop.initializer)) {
