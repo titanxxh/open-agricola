@@ -242,6 +242,10 @@ function validateCardImplObject(
     const propName = ts.isIdentifier(prop.name)
       ? prop.name.text
       : ts.isStringLiteral(prop.name) ? prop.name.text : undefined
+    if (propName === '__proto__') {
+      errors.push(`line ${getLine(prop)}: CARD_IMPL properties must not set __proto__`)
+      continue
+    }
     if (propName === 'listeners' && !ts.isPropertyAssignment(prop)) {
       errors.push(`line ${getLine(prop)}: CARD_IMPL.listeners must use a property assignment`)
       continue
@@ -325,10 +329,15 @@ function validateListenersArray(
           }
         }
       }
-      if (propName === 'phases' && ts.isArrayLiteralExpression(prop.initializer)) {
+      if (propName === 'phases') {
+        if (!ts.isArrayLiteralExpression(prop.initializer)) {
+          errors.push(`line ${getLine(prop.initializer)}: listener phases must be a string literal array`)
+          continue
+        }
         for (const phaseElement of prop.initializer.elements) {
-          if (!ts.isStringLiteral(phaseElement)) continue
-          if (!ALLOWED_LISTENER_PHASES.has(phaseElement.text)) {
+          if (!ts.isStringLiteral(phaseElement)) {
+            errors.push(`line ${getLine(phaseElement)}: listener phases must contain only string literals`)
+          } else if (!ALLOWED_LISTENER_PHASES.has(phaseElement.text)) {
             errors.push(`line ${getLine(phaseElement)}: unknown listener phase '${phaseElement.text}' in CARD_IMPL.listeners`)
           }
         }
