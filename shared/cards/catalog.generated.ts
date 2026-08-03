@@ -8141,6 +8141,27 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "kind": "minor"
   },
   {
+    "id": "CUSTOM_MasterBuilder",
+    "name": "Master Builder",
+    "deck": "community",
+    "number": 0,
+    "desc": [
+      "When you build a room, the cost is reduced by 2 <WOOD>. When you play an Improvement, the cost is reduced by 2 <WOOD>."
+    ],
+    "cost": {},
+    "vp": 0,
+    "implemented": true,
+    "locales": {
+      "zh": {
+        "name": "建造大师",
+        "desc": [
+          "当你建造房间时，费用减少 2 <WOOD>。当你打出改良卡时，费用减少 2 <WOOD>。"
+        ]
+      }
+    },
+    "kind": "occupation"
+  },
+  {
     "id": "D001_ZigzagHarrow",
     "name": "Zigzag Harrow",
     "deck": "D",

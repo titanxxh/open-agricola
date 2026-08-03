@@ -12,6 +12,7 @@
 <!-- community-card-entries:begin -->
 | Card ID | Name | Type | Author | PR  |
 | ------- | ---- | ---- | ------ | --- |
+| CUSTOM_MasterBuilder | Master Builder | occupation | @titanxxh | #675 |
 <!-- community-card-entries:end -->
 
 
