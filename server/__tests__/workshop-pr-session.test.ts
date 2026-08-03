@@ -199,16 +199,19 @@ export const catalogCardDefinitions = [
 
 // ── GitHub API stub factory ────────────────────────────────────────────────
 
+type StubPr = {
+  number: number
+  url: string
+  baseRefName?: string
+  isDraft?: boolean
+  state?: 'open' | 'closed'
+}
+
 type StubOpts = {
   githubLogin: string
   /** If given, findReusablePr returns this PR; openPr call should NOT happen. */
-  existingPr?: {
-    number: number
-    url: string
-    baseRefName?: string
-    isDraft?: boolean
-    state?: 'open' | 'closed'
-  } | null
+  existingPr?: StubPr | null
+  conflictingPr?: StubPr | null
   /** Used when openPr is invoked. */
   openedPr?: { number: number; url: string }
 }
@@ -227,7 +230,7 @@ function createGitHubApiStub(opts: StubOpts): {
   fn: (url: string, init?: RequestInit) => Promise<Response>
   counts: StubCounts
 } {
-  const { githubLogin, existingPr = null, openedPr } = opts
+  const { githubLogin, existingPr = null, conflictingPr = null, openedPr } = opts
   const upstream = `${workshopPrConfig.upstreamOwner}/${workshopPrConfig.upstreamRepo}`
   const counts: StubCounts = {
     openPrCalls: 0,
@@ -360,9 +363,9 @@ function createGitHubApiStub(opts: StubOpts): {
     if (url.includes('/pulls?head=') && method === 'GET') {
       counts.findPrCalls++
       const requestedState = new URL(url).searchParams.get('state') ?? 'open'
-      const list = existingPr && (
-        requestedState === 'all' || requestedState === (existingPr.state ?? 'open')
-      ) ? [existingPr] : []
+      const list = [conflictingPr, existingPr].filter((pr): pr is StubPr => (
+        !!pr && (requestedState === 'all' || requestedState === (pr.state ?? 'open'))
+      ))
       return Promise.resolve(
         new Response(
           JSON.stringify(
@@ -961,6 +964,12 @@ describe('workshop PR propose — session', () => {
         url: 'https://github.com/titanxxh/open-agricola/pull/99',
         state: 'closed',
       },
+      conflictingPr: {
+        number: 98,
+        url: 'https://github.com/titanxxh/open-agricola/pull/98',
+        state: 'open',
+        isDraft: true,
+      },
       openedPr: {
         number: 100,
         url: 'https://github.com/titanxxh/open-agricola/pull/100',
@@ -977,6 +986,7 @@ describe('workshop PR propose — session', () => {
     }), res, cardDbId, reviewRequiredProvider())
 
     expect(JSON.parse(res.body)).toMatchObject({ ok: true, prNumber: 99 })
+    expect(counts.closePrCalls).toBe(1)
     expect(counts.reopenPrCalls).toBe(1)
     expect(counts.openPrCalls).toBe(0)
   })
