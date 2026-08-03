@@ -661,6 +661,110 @@ describe('useWorkshopDraft', () => {
     expect(result.current.state?.save.status).toBe('dirty')
   })
 
+  it('preserves edits made while waiting for a candidate checkpoint', async () => {
+    let finishSave: ((response: Response) => void) | undefined
+    let finishAdopt: ((response: Response) => void) | undefined
+    let savedDraft: WorkshopClientDraft | undefined
+    const apiFetch = vi.fn(async (path: string, init?: RequestInit) => {
+      if (!init) {
+        return new Response(JSON.stringify({ ok: true, workspace: workspace(1) }))
+      }
+      const body = JSON.parse(String(init.body)) as {
+        draft?: WorkshopClientDraft
+        candidate?: Record<string, unknown>
+      }
+      if (init.method === 'PUT') {
+        savedDraft = body.draft
+        return new Promise<Response>(resolve => {
+          finishSave = resolve
+        })
+      }
+      if (path.endsWith('/adopt')) {
+        return new Promise<Response>(resolve => {
+          finishAdopt = resolve
+        })
+      }
+      throw new Error(`Unexpected request: ${path}`)
+    })
+    const { result } = renderHook(() => useWorkshopDraft({
+      cardId: 'card-1',
+      apiFetch,
+    }))
+    await waitFor(() => expect(result.current.state?.baseRevision).toBe(1))
+    act(() => result.current.dispatch({
+      type: 'candidateCompleted',
+      candidate: {
+        id: 'art-1',
+        kind: 'art',
+        prompt: 'a field',
+        resultUrl: '/card-art/candidate.png',
+        createdAt: 10,
+        baseRevision: 1,
+        stale: false,
+      },
+    }))
+
+    let checkpoint: Promise<boolean> | undefined
+    act(() => {
+      checkpoint = result.current.checkpoint()
+    })
+    await waitFor(() => expect(finishSave).toBeTypeOf('function'))
+    act(() => {
+      const current = result.current.state!.draft
+      result.current.updateDraft({
+        ...current,
+        name: 'Typed during checkpoint',
+        cardJson: { ...current.cardJson, name: 'Typed during checkpoint' },
+      })
+    })
+
+    let adoption: Promise<boolean> | undefined
+    act(() => {
+      adoption = result.current.adoptCandidate(
+        result.current.state!.session.artCandidates[0]!,
+      )
+    })
+    const checkpointWorkspace = workspace(2)
+    checkpointWorkspace.draft = savedDraft!
+    finishSave!(new Response(JSON.stringify({
+      ok: true,
+      workspace: checkpointWorkspace,
+    })))
+    await waitFor(() => expect(finishAdopt).toBeTypeOf('function'))
+
+    const adopted = workspace(3)
+    adopted.draft = {
+      ...savedDraft!,
+      artUrl: '/card-art/candidate.png',
+      generation: {
+        art: {
+          adopted: {
+            id: 'art-1',
+            kind: 'art',
+            prompt: 'a field',
+            resultUrl: '/card-art/candidate.png',
+            createdAt: 10,
+            baseRevision: 2,
+            stale: false,
+          },
+        },
+      },
+    }
+    finishAdopt!(new Response(JSON.stringify({
+      ok: true,
+      workspace: adopted,
+      versionId: 'version-1',
+    })))
+
+    await act(async () => {
+      expect(await checkpoint).toBe(true)
+      expect(await adoption).toBe(true)
+    })
+    expect(result.current.state?.draft.name).toBe('Typed during checkpoint')
+    expect(result.current.state?.draft.artUrl).toBe('/card-art/candidate.png')
+    expect(result.current.state?.save.status).toBe('dirty')
+  })
+
   it('publishes and confirms the same immutable sandbox version', async () => {
     const requests: Array<{ path: string; body?: Record<string, unknown> }> = []
     const apiFetch = vi.fn(async (path: string, init?: RequestInit) => {
