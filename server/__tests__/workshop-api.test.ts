@@ -355,6 +355,38 @@ describe('workshop API', () => {
       expect(Array.isArray(d.cards)).toBe(true)
     })
 
+    it('returns only cards loadable into real rooms for scope=room', async () => {
+      const liveId = await createPublishedCard({
+        card_id: 'CUSTOM_RoomLiveCard',
+        card_type: 'minor',
+        name: 'Room Live Card',
+        card_json: { id: 'CUSTOM_RoomLiveCard', name: 'Room Live Card', deck: 'CUSTOM', number: 0, desc: [] },
+      }, 'tok-alice')
+      const builtInId = await createPublishedCard({
+        card_id: 'CUSTOM_RoomBuiltInCard',
+        card_type: 'minor',
+        name: 'Room Built-in Card',
+        card_json: { id: 'CUSTOM_RoomBuiltInCard', name: 'Room Built-in Card', deck: 'CUSTOM', number: 0, desc: [] },
+      }, 'tok-bob')
+      const mergedWindowId = await createPublishedCard({
+        card_id: 'CUSTOM_RoomMergedWindowCard',
+        card_type: 'occupation',
+        name: 'Room Merged Window Card',
+        card_json: { id: 'CUSTOM_RoomMergedWindowCard', name: 'Room Merged Window Card', deck: 'CUSTOM', number: 0, desc: [] },
+      }, 'tok-alice')
+      db.prepare("UPDATE workshop_cards SET review_status = 'merged', built_in = 1 WHERE id = ?").run(builtInId)
+      db.prepare("UPDATE workshop_cards SET review_status = 'merged' WHERE id = ?").run(mergedWindowId)
+
+      const res = mockRes()
+      await handleWorkshopRoute(mockReq('GET', '/api/workshop/cards?scope=room'), res)
+      const d = JSON.parse(res.body)
+      const ids = d.cards.map((card: { id: string }) => card.id)
+
+      expect(ids).toContain(liveId)
+      expect(ids).toContain(mergedWindowId)
+      expect(ids).not.toContain(builtInId)
+    })
+
     it('returns both draft and published cards for scope=mine', async () => {
       const createDraft = mockReq('POST', '/api/workshop/cards', {
         card_id: 'CUSTOM_MyDraftCard',

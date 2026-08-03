@@ -26,6 +26,13 @@ type MyRoom = {
   my_turn: number
 }
 
+type RoomWorkshopCard = {
+  id: string
+  name: string
+  card_type: 'minor' | 'occupation'
+  author_name: string
+}
+
 export function LobbyPage() {
   const { user, logout, apiFetch } = useAuth()
   const { t } = useLocale()
@@ -39,6 +46,9 @@ export function LobbyPage() {
   const [draftMode, setDraftMode] = useState<'none' | 'simultaneous'>('none')
   const [draftPoolSize, setDraftPoolSize] = useState<number>(8)
   const [enableCommunityDeck, setEnableCommunityDeck] = useState(false)
+  const [workshopCards, setWorkshopCards] = useState<RoomWorkshopCard[]>([])
+  const [selectedWorkshopCardIds, setSelectedWorkshopCardIds] = useState<string[]>([])
+  const [workshopCardsStatus, setWorkshopCardsStatus] = useState<'idle' | 'loading' | 'error'>('idle')
   const [enableParentCards, setEnableParentCards] = useState(false)
   const [enableThroughTheSeasons, setEnableThroughTheSeasons] = useState(false)
   const [enableFarmersOfTheMoor, setEnableFarmersOfTheMoor] = useState(false)
@@ -69,6 +79,35 @@ export function LobbyPage() {
     return () => clearInterval(interval)
   }, [fetchRooms, fetchMyRooms])
 
+  useEffect(() => {
+    if (!showPlayerSelect || !showCommunityDeckToggle) return
+    let cancelled = false
+    const load = async () => {
+      setWorkshopCardsStatus('loading')
+      try {
+        const cards: RoomWorkshopCard[] = []
+        let page = 1
+        let hasMore: boolean
+        do {
+          const resp = await fetch(`${API_BASE}/api/workshop/cards?scope=room&page=${page}`)
+          const data = await resp.json() as { ok: boolean; cards?: RoomWorkshopCard[]; hasMore?: boolean }
+          if (!resp.ok || !data.ok || !Array.isArray(data.cards)) throw new Error('Failed to load workshop cards')
+          cards.push(...data.cards)
+          hasMore = data.hasMore === true
+          page += 1
+        } while (hasMore)
+        if (!cancelled) {
+          setWorkshopCards(cards)
+          setWorkshopCardsStatus('idle')
+        }
+      } catch {
+        if (!cancelled) setWorkshopCardsStatus('error')
+      }
+    }
+    void load()
+    return () => { cancelled = true }
+  }, [showPlayerSelect, showCommunityDeckToggle])
+
   const handleCreateGame = () => {
     const params: Record<string, string> = { transport: 'ws', maxPlayers: String(selectedMaxPlayers) }
     if (draftMode !== 'none') {
@@ -77,6 +116,9 @@ export function LobbyPage() {
     }
     if (enableCommunityDeck) {
       params.enableCommunityDeck = 'true'
+    }
+    if (selectedWorkshopCardIds.length > 0) {
+      params.customCards = selectedWorkshopCardIds.join(',')
     }
     if (enableParentCards) {
       params.enableParentCards = 'true'
@@ -262,20 +304,54 @@ export function LobbyPage() {
                 </>
               )}
               {showCommunityDeckToggle && (
-                <label className="community-deck-toggle">
-                  <input
-                    type="checkbox"
-                    checked={enableCommunityDeck}
-                    onChange={(e) => setEnableCommunityDeck(e.target.checked)}
-                  />
-                  <span>
-                    启用社区扩展卡（community deck）
-                    <br />
-                    <span className="community-deck-toggle-hint">
-                      这些卡由玩家通过工坊提交、maintainer review 后合入主仓库。质量 / 平衡性可能与官方卡有差异。
+                <>
+                  <label className="community-deck-toggle">
+                    <input
+                      type="checkbox"
+                      checked={enableCommunityDeck}
+                      onChange={(e) => setEnableCommunityDeck(e.target.checked)}
+                    />
+                    <span>
+                      启用社区扩展卡（community deck）
+                      <br />
+                      <span className="community-deck-toggle-hint">
+                        这些卡由玩家通过工坊提交、maintainer review 后合入主仓库。质量 / 平衡性可能与官方卡有差异。
+                      </span>
                     </span>
-                  </span>
-                </label>
+                  </label>
+                  <div className="room-workshop-picker">
+                    <div className="player-select-label">{t('platform.reviewedWorkshopCards')}</div>
+                    <div className="community-deck-toggle-hint">{t('platform.reviewedWorkshopCardsHint')}</div>
+                    {workshopCardsStatus === 'loading' ? (
+                      <div className="room-workshop-picker__status">{t('platform.reviewedWorkshopCardsLoading')}</div>
+                    ) : workshopCardsStatus === 'error' ? (
+                      <div className="room-workshop-picker__status form-error">{t('platform.reviewedWorkshopCardsError')}</div>
+                    ) : workshopCards.length === 0 ? (
+                      <div className="room-workshop-picker__status">{t('platform.reviewedWorkshopCardsEmpty')}</div>
+                    ) : (
+                      <div className="room-workshop-picker__list">
+                        {workshopCards.map(card => (
+                          <label key={card.id} className="community-deck-toggle">
+                            <input
+                              type="checkbox"
+                              checked={selectedWorkshopCardIds.includes(card.id)}
+                              onChange={() => setSelectedWorkshopCardIds(ids => ids.includes(card.id)
+                                ? ids.filter(id => id !== card.id)
+                                : [...ids, card.id])}
+                            />
+                            <span>
+                              {card.name}
+                              <br />
+                              <span className="community-deck-toggle-hint">
+                                {t(`platform.${card.card_type}`)}{card.author_name ? ` · ${card.author_name}` : ''}
+                              </span>
+                            </span>
+                          </label>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </>
               )}
               <label className="community-deck-toggle">
                 <input
