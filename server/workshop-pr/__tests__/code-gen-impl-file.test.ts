@@ -59,7 +59,7 @@ const CARD_IMPL = {
   listeners: [
     {
       cardIds: [CARD_ID],
-      actions: ['improvement-any'],
+      actions: ['improvement'],
       phases: ['computeCosts'],
       handler: (context) => ({ costs: { stone: -1 }, sourceCard: CARD_ID }),
     },

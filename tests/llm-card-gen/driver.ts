@@ -18,6 +18,10 @@ type SessionResp = {
     request?: {
       kind?: string
       options?: Array<{ value: string }>
+      farm?: {
+        farmType?: string
+        selectableTiles?: Array<{ row: number; col: number }>
+      }
     }
     playerIndex?: number
     options?: Array<{ value: string }>
@@ -69,6 +73,15 @@ export class Driver {
       return this.record(
         `resolveChoice(${pi},'${pick.value}')`,
         this.session.resolveChoice(pi, pick.value) as unknown as SessionResp,
+      )
+    }
+    if (kind === 'farm-select' && it.request?.farm?.farmType === 'room') {
+      const room = it.request.farm.selectableTiles?.[0]
+      if (!room) throw new Error(`driver: room selection with no selectable tiles at ${label}`)
+      const pi = it.playerIndex ?? 0
+      return this.record(
+        `commitSelectionChoice(${pi},room)`,
+        this.session.commitSelectionChoice(pi, { rooms: [room] }) as unknown as SessionResp,
       )
     }
     throw new Error(`driver needs extension: unknown interaction kind ${kind} (at ${label})`)

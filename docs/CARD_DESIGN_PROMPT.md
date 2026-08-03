@@ -132,7 +132,7 @@ const CARD_IMPL = {
 
 **可用 scope**以 `shared/custom-code/sandbox-listener-scopes.ts` 的 `sandboxListenerScopes` 为准：`player` / `opponent` / `any`。
 
-**可用 actions**（常用项；完整集见 `shared/actions/index.ts`）: `collect`, `gain`, `receive`, `construct`, `renovate-house`, `fence`, `stables`, `plow`, `sow`, `occupation`, `improvement-any`, `minor-improvement`, `place-farmer`, `wish-children`, `bake-bread`, `reap`（可由 ActionFlow 执行；也作为 `dispatchReapListener` 派发给 B132 EstateMaster 等 listener 的 actionId）
+**可用 actions**以 `shared/custom-code/sandbox-listener-actions.ts` 的 `sandboxListenerActions` 为准；主要或次要改良购买统一监听 `improvement`。未知 action 会被 AST validator 拒绝。
 
 ### 5. 可用 actionId（最常用项）
 

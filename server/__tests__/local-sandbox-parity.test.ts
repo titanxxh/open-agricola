@@ -39,7 +39,7 @@ const CARD_IMPL = {
   listeners: [{
     id: CARD_ID,
     cardIds: [CARD_ID],
-    actions: ['meeting-place'],
+    actions: ['collect'],
     phases: ['after'],
     handler: () => ({ flow: { type: 'leaf', actionId: 'gain', params: { wood: 1 }, sourceCard: CARD_ID } }),
   }],
@@ -157,7 +157,7 @@ describe('browser executor parity with server executor', () => {
         state,
         player: state.players[0]!,
         space: state.actionSpaces[0]!,
-        actionId: 'meeting-place',
+        actionId: 'collect',
         phase: 'after' as const,
       },
     }

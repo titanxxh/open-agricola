@@ -1,5 +1,8 @@
 import { describe, it, expect } from 'vitest'
+import { actionDefinitions } from '../../actions'
+import { internalActionDefinitions } from '../../actions/internal-actions'
 import { SANDBOX_ALLOWED_ACTION_IDS } from '../sandbox-action-ids'
+import { sandboxListenerActions } from '../sandbox-listener-actions'
 
 describe('SANDBOX_ALLOWED_ACTION_IDS', () => {
   it('包含核心沙盒 actionId 且无 card_ 前缀 ad-hoc id', () => {
@@ -18,5 +21,24 @@ describe('SANDBOX_ALLOWED_ACTION_IDS', () => {
         'push-to-card-stack', 'special-effect', 'store-on-card', 'take-from-card',
       ].sort(),
     )
+  })
+})
+
+describe('sandboxListenerActions', () => {
+  it('白名单恰好是支持的 listener action 集合', () => {
+    expect([...sandboxListenerActions].sort()).toEqual(
+      [
+        'bake-bread', 'breed', 'collect', 'construct', 'family-growth', 'fence', 'gain',
+        'improvement', 'occupation', 'place-farmer', 'plow', 'reap', 'receive',
+        'renovate-house', 'sow', 'stables', 'wish-children',
+      ].sort(),
+    )
+  })
+
+  it('只包含当前 action registry 中存在的 id', () => {
+    const runtimeActionIds = new Set(
+      [...actionDefinitions, ...internalActionDefinitions].map((action) => action.id),
+    )
+    expect(sandboxListenerActions.filter((id) => !runtimeActionIds.has(id))).toEqual([])
   })
 })

@@ -1,0 +1,36 @@
+```typescript
+const CARD_ID = 'CUSTOM_MedievalMallet'
+
+const CARD_DEF = {
+  cardType: 'occupation',
+  meta: {
+    id: CARD_ID,
+    name: 'Medieval Mallet',
+    deck: 'CUSTOM',
+    number: 0,
+    desc: ['When you build a room, pay 2 less <WOOD>. When you buy an Improvement, pay 2 less <WOOD>.'],
+    cost: {},
+    vp: 0,
+    implemented: true,
+    locales: {
+      zh: {
+        name: '中世纪木槌',
+        desc: ['你建造房间时少支付 2 <WOOD>；购买改良时少支付 2 <WOOD>。'],
+      },
+    },
+  },
+}
+
+const CARD_IMPL = {
+  listeners: [
+    {
+      cardIds: [CARD_ID],
+      actions: ['construct', 'improvement'],
+      phases: ['computeCosts'],
+      handler: () => {
+        return { costs: { wood: -2 }, sourceCard: CARD_ID }
+      },
+    },
+  ],
+}
+```

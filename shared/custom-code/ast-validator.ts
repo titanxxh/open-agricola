@@ -10,6 +10,7 @@
  */
 import ts from 'typescript'
 import { cardEffectHooks } from '../cards/card-effects'
+import { isSandboxListenerAction } from './sandbox-listener-actions'
 import { sandboxListenerPhases } from './sandbox-listener-phases'
 
 export type ValidationResult = { valid: true } | { valid: false; errors: string[] }
@@ -95,6 +96,26 @@ export function validateCardCode(source: string): ValidationResult {
     // Check identifier references against deny list
     if (ts.isIdentifier(node)) {
       const parent = node.parent
+      const declaration = parent && ts.isVariableDeclaration(parent) && parent.name === node
+        ? parent
+        : undefined
+      const declarationList = declaration?.parent
+      const isTopLevelConstDeclaration = declarationList
+        && ts.isVariableDeclarationList(declarationList)
+        && (declarationList.flags & ts.NodeFlags.Const) !== 0
+        && ts.isVariableStatement(declarationList.parent)
+        && declarationList.parent.parent === sourceFile
+      const isPropertyName = parent && (
+        (ts.isPropertyAccessExpression(parent) && parent.name === node)
+        || ((ts.isPropertyAssignment(parent) || ts.isPropertySignature(parent)) && parent.name === node)
+      )
+      if (node.text === 'CARD_IMPL') {
+        if (declaration && !isTopLevelConstDeclaration) {
+          errors.push(`line ${getLine(node)}: CARD_IMPL must be declared as a top-level const`)
+        } else if (!isTopLevelConstDeclaration && !isPropertyName) {
+          errors.push(`line ${getLine(node)}: CARD_IMPL must not be referenced outside its declaration`)
+        }
+      }
       // Skip property access names (obj.process is fine, bare process is not)
       // BUT check DENIED_PROPERTY_ACCESS for dangerous property names
       if (parent && ts.isPropertyAccessExpression(parent) && parent.name === node) {
@@ -148,7 +169,7 @@ export function validateCardCode(source: string): ValidationResult {
 
   visit(sourceFile)
 
-  // Validate CARD_IMPL hook/phase whitelists
+  // Validate CARD_IMPL hook/listener whitelists
   validateCardImplHooksAndPhases(sourceFile, errors)
 
   // Also check for syntax errors
@@ -179,7 +200,7 @@ export function validateCardCode(source: string): ValidationResult {
 /**
  * Find the CARD_IMPL variable declaration in the source and validate:
  * 1. effect keys are in the cardEffectHooks whitelist (+ meta fields)
- * 2. listener phases are in the sandbox listener phase whitelist
+ * 2. listener actions and phases are in their sandbox whitelists
  */
 function validateCardImplHooksAndPhases(
   sourceFile: ts.SourceFile,
@@ -195,7 +216,10 @@ function validateCardImplHooksAndPhases(
     if (!ts.isVariableStatement(stmt)) continue
     for (const decl of stmt.declarationList.declarations) {
       if (!ts.isIdentifier(decl.name) || decl.name.text !== 'CARD_IMPL') continue
-      if (!decl.initializer || !ts.isObjectLiteralExpression(decl.initializer)) continue
+      if (!decl.initializer || !ts.isObjectLiteralExpression(decl.initializer)) {
+        errors.push(`line ${getLine(decl)}: CARD_IMPL must be an object literal`)
+        continue
+      }
       validateCardImplObject(decl.initializer, errors, getLine)
     }
   }
@@ -207,18 +231,38 @@ function validateCardImplObject(
   getLine: (node: ts.Node) => number,
 ): void {
   for (const prop of obj.properties) {
-    if (!ts.isPropertyAssignment(prop)) continue
+    if (ts.isSpreadAssignment(prop)) {
+      errors.push(`line ${getLine(prop)}: CARD_IMPL must not use spread properties`)
+      continue
+    }
+    if (ts.isComputedPropertyName(prop.name)) {
+      errors.push(`line ${getLine(prop)}: CARD_IMPL properties must not use computed names`)
+      continue
+    }
     const propName = ts.isIdentifier(prop.name)
       ? prop.name.text
       : ts.isStringLiteral(prop.name) ? prop.name.text : undefined
+    if (propName === '__proto__') {
+      errors.push(`line ${getLine(prop)}: CARD_IMPL properties must not set __proto__`)
+      continue
+    }
+    if (propName === 'listeners' && !ts.isPropertyAssignment(prop)) {
+      errors.push(`line ${getLine(prop)}: CARD_IMPL.listeners must use a property assignment`)
+      continue
+    }
+    if (!ts.isPropertyAssignment(prop)) continue
     if (!propName) continue
 
     if (propName === 'effect' && ts.isObjectLiteralExpression(prop.initializer)) {
       validateEffectKeys(prop.initializer, errors, getLine)
     }
 
-    if (propName === 'listeners' && ts.isArrayLiteralExpression(prop.initializer)) {
-      validateListenersArray(prop.initializer, errors, getLine)
+    if (propName === 'listeners') {
+      if (!ts.isArrayLiteralExpression(prop.initializer)) {
+        errors.push(`line ${getLine(prop.initializer)}: CARD_IMPL.listeners must be an array literal`)
+      } else {
+        validateListenersArray(prop.initializer, errors, getLine)
+      }
     }
   }
 }
@@ -247,18 +291,55 @@ function validateListenersArray(
   getLine: (node: ts.Node) => number,
 ): void {
   for (const element of arr.elements) {
-    if (!ts.isObjectLiteralExpression(element)) continue
+    if (!ts.isObjectLiteralExpression(element)) {
+      errors.push(`line ${getLine(element)}: CARD_IMPL listener entries must be object literals`)
+      continue
+    }
     for (const prop of element.properties) {
-      if (!ts.isPropertyAssignment(prop)) continue
+      if (ts.isSpreadAssignment(prop)) {
+        errors.push(`line ${getLine(prop)}: CARD_IMPL listener entries must not use spread properties`)
+        continue
+      }
+      if (ts.isComputedPropertyName(prop.name)) {
+        errors.push(`line ${getLine(prop)}: CARD_IMPL listener properties must not use computed names`)
+        continue
+      }
       const propName = ts.isIdentifier(prop.name)
         ? prop.name.text
         : ts.isStringLiteral(prop.name) ? prop.name.text : undefined
-      if (propName !== 'phases') continue
-      if (!ts.isArrayLiteralExpression(prop.initializer)) continue
-      for (const phaseElement of prop.initializer.elements) {
-        if (!ts.isStringLiteral(phaseElement)) continue
-        if (!ALLOWED_LISTENER_PHASES.has(phaseElement.text)) {
-          errors.push(`line ${getLine(phaseElement)}: unknown listener phase '${phaseElement.text}' in CARD_IMPL.listeners`)
+      if (propName === '__proto__') {
+        errors.push(`line ${getLine(prop)}: CARD_IMPL listener properties must not set __proto__`)
+        continue
+      }
+      if ((propName === 'actions' || propName === 'phases') && !ts.isPropertyAssignment(prop)) {
+        errors.push(`line ${getLine(prop)}: listener ${propName} must use a property assignment`)
+        continue
+      }
+      if (!ts.isPropertyAssignment(prop)) continue
+      if (propName === 'actions') {
+        if (!ts.isArrayLiteralExpression(prop.initializer)) {
+          errors.push(`line ${getLine(prop.initializer)}: listener actions must be a string literal array`)
+          continue
+        }
+        for (const actionElement of prop.initializer.elements) {
+          if (!ts.isStringLiteral(actionElement)) {
+            errors.push(`line ${getLine(actionElement)}: listener actions must contain only string literals`)
+          } else if (!isSandboxListenerAction(actionElement.text)) {
+            errors.push(`line ${getLine(actionElement)}: unknown listener action '${actionElement.text}' in CARD_IMPL.listeners`)
+          }
+        }
+      }
+      if (propName === 'phases') {
+        if (!ts.isArrayLiteralExpression(prop.initializer)) {
+          errors.push(`line ${getLine(prop.initializer)}: listener phases must be a string literal array`)
+          continue
+        }
+        for (const phaseElement of prop.initializer.elements) {
+          if (!ts.isStringLiteral(phaseElement)) {
+            errors.push(`line ${getLine(phaseElement)}: listener phases must contain only string literals`)
+          } else if (!ALLOWED_LISTENER_PHASES.has(phaseElement.text)) {
+            errors.push(`line ${getLine(phaseElement)}: unknown listener phase '${phaseElement.text}' in CARD_IMPL.listeners`)
+          }
         }
       }
     }

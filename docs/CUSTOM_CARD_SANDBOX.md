@@ -234,7 +234,29 @@ reaction-compatible hook（action listener 的 `before` / `during` / `immediatel
 > C1 Overhaul rebuild 只处理 own ordinary fences，走 `consume-fence` ownOnly + generic `fencePolicy`。
 
 
-### 3.2 `CARD_IMPL.listeners[].phases` 可用 phase
+### 3.2 `CARD_IMPL.listeners` 白名单
+
+`actions` 只能使用以下高层 action ID；AST validator 会硬拒绝未知 ID：
+
+<!-- prompt-sync:begin id=listener-actions -->
+- `collect`
+- `gain`
+- `receive`
+- `plow`
+- `sow`
+- `construct`
+- `renovate-house`
+- `fence`
+- `stables`
+- `improvement`
+- `occupation`
+- `place-farmer`
+- `wish-children`
+- `family-growth`
+- `bake-bread`
+- `breed`
+- `reap`
+<!-- prompt-sync:end id=listener-actions -->
 
 `sandboxListenerPhases` 是 Workshop listener phase 白名单。挂载 listener 前会过滤不在白名单里的项；AST validator 会**硬拒**不在白名单中的 phase——保存直接失败并给出错误信息。
 
@@ -258,6 +280,8 @@ reaction-compatible hook（action listener 的 `before` / `during` / `immediatel
 ### 3.3 费用机制边界
 
 Workshop 自定义卡只能通过 `computeCosts` listener 的 handler 返回值影响支付：
+
+购买主要或次要改良的费用统一监听 `actions: ['improvement']`。
 
 - `costs`：简单费用 delta；负数表示折扣，正数表示额外费用。适合普通 action cost。
 - `trades`：支付替换候选，例如把一种资源换成另一种资源。适合“可以用 X 代替 Y”。
