@@ -5633,7 +5633,7 @@ details[open] .ai-prompt-summary::before { transform: rotate(90deg); }
   overflow: hidden;
 }
 .app--embedded .action-log {
-  min-height: calc(100vh - 80px);
+  height: calc(100vh - 80px);
 }
 .action-log__title {
   margin: 0 0 8px;
