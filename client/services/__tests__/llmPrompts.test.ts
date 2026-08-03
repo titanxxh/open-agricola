@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
-import { CARD_DESIGNER_SYSTEM_PROMPT, renderActionIdList } from '../llmPrompts'
+import { CARD_DESIGNER_SYSTEM_PROMPT, renderActionIdList, renderListenerActionList } from '../llmPrompts'
 import { cardEffectHooks } from '../../../shared/cards/card-effects'
+import { sandboxListenerActions } from '../../../shared/custom-code/sandbox-listener-actions'
 import { sandboxListenerPhases } from '../../../shared/custom-code/sandbox-listener-phases'
 import { sandboxListenerScopes } from '../../../shared/custom-code/sandbox-listener-scopes'
 import { SANDBOX_ALLOWED_ACTION_IDS } from '../../../shared/custom-code/sandbox-action-ids'
@@ -11,7 +12,7 @@ describe('CARD_DESIGNER_SYSTEM_PROMPT', () => {
     expect(CARD_DESIGNER_SYSTEM_PROMPT).not.toContain("'serial' | 'select'")
   })
 
-  // 三张 schema 表运行时从真相源数组渲染，故名字不会与引擎漂移。以下断言取代了
+  // schema 表运行时从真相源数组渲染，故名字不会与引擎漂移。以下断言取代了
   // 旧 check-prompt-sync 对 llmPrompts.ts 的 hook/phase substring + action-ids block
   // 校验：断言每个名字确实渲染进 prompt（防 render 逻辑 bug 漏掉某类），
   // actionId 额外做双向集合相等（渲染只遍历白名单，故不可能多，但仍显式钉住）。
@@ -27,6 +28,11 @@ describe('CARD_DESIGNER_SYSTEM_PROMPT', () => {
     expect(sandboxListenerScopes.filter((scope) => !CARD_DESIGNER_SYSTEM_PROMPT.includes(`| \`${scope}\` |`))).toEqual([])
   })
 
+  it('renders exactly the sandbox listener action whitelist', () => {
+    expect(renderListenerActionList().split('、')).toEqual([...sandboxListenerActions])
+    expect(CARD_DESIGNER_SYSTEM_PROMPT).toContain(renderListenerActionList())
+  })
+
   it('steers feeding-start gains away from the recursive harvest hook', () => {
     expect(CARD_DESIGNER_SYSTEM_PROMPT).toContain('请用 `onHarvest` 返回 `gainLeaf`')
     expect(CARD_DESIGNER_SYSTEM_PROMPT).toContain('不要从 `onStartHarvestFeedingPhase` 返回 flow')
@@ -36,6 +42,12 @@ describe('CARD_DESIGNER_SYSTEM_PROMPT', () => {
     expect(CARD_DESIGNER_SYSTEM_PROMPT).toContain("资源累积格用 `actions: ['collect']`")
     expect(CARD_DESIGNER_SYSTEM_PROMPT).toContain('用 `context.space?.id` 精确判断')
     expect(CARD_DESIGNER_SYSTEM_PROMPT).toContain('不要假设 `context.result.spaceId` 存在')
+  })
+
+  it('uses the runtime improvement action for purchase discounts', () => {
+    expect(CARD_DESIGNER_SYSTEM_PROMPT).toContain("actions: ['improvement']")
+    expect(CARD_DESIGNER_SYSTEM_PROMPT).not.toContain('improvement-any')
+    expect(CARD_DESIGNER_SYSTEM_PROMPT).not.toContain('minor-improvement')
   })
 
   it('renders exactly the actionId whitelist (no missing, no extras)', () => {

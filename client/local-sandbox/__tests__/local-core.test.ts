@@ -22,7 +22,7 @@ const CARD_IMPL = {
   listeners: [{
     id: CARD_ID,
     cardIds: [CARD_ID],
-    actions: ['meeting-place'],
+    actions: ['collect'],
     phases: ['after'],
     handler: () => ({ flow: { type: 'leaf', actionId: 'gain', params: { wood: 1 }, sourceCard: CARD_ID } }),
   }],

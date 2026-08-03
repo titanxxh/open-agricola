@@ -10,6 +10,7 @@
  */
 import ts from 'typescript'
 import { cardEffectHooks } from '../cards/card-effects'
+import { isSandboxListenerAction } from './sandbox-listener-actions'
 import { sandboxListenerPhases } from './sandbox-listener-phases'
 
 export type ValidationResult = { valid: true } | { valid: false; errors: string[] }
@@ -148,7 +149,7 @@ export function validateCardCode(source: string): ValidationResult {
 
   visit(sourceFile)
 
-  // Validate CARD_IMPL hook/phase whitelists
+  // Validate CARD_IMPL hook/listener whitelists
   validateCardImplHooksAndPhases(sourceFile, errors)
 
   // Also check for syntax errors
@@ -179,7 +180,7 @@ export function validateCardCode(source: string): ValidationResult {
 /**
  * Find the CARD_IMPL variable declaration in the source and validate:
  * 1. effect keys are in the cardEffectHooks whitelist (+ meta fields)
- * 2. listener phases are in the sandbox listener phase whitelist
+ * 2. listener actions and phases are in their sandbox whitelists
  */
 function validateCardImplHooksAndPhases(
   sourceFile: ts.SourceFile,
@@ -253,12 +254,25 @@ function validateListenersArray(
       const propName = ts.isIdentifier(prop.name)
         ? prop.name.text
         : ts.isStringLiteral(prop.name) ? prop.name.text : undefined
-      if (propName !== 'phases') continue
-      if (!ts.isArrayLiteralExpression(prop.initializer)) continue
-      for (const phaseElement of prop.initializer.elements) {
-        if (!ts.isStringLiteral(phaseElement)) continue
-        if (!ALLOWED_LISTENER_PHASES.has(phaseElement.text)) {
-          errors.push(`line ${getLine(phaseElement)}: unknown listener phase '${phaseElement.text}' in CARD_IMPL.listeners`)
+      if (propName === 'actions') {
+        if (!ts.isArrayLiteralExpression(prop.initializer)) {
+          errors.push(`line ${getLine(prop.initializer)}: listener actions must be a string literal array`)
+          continue
+        }
+        for (const actionElement of prop.initializer.elements) {
+          if (!ts.isStringLiteral(actionElement)) {
+            errors.push(`line ${getLine(actionElement)}: listener actions must contain only string literals`)
+          } else if (!isSandboxListenerAction(actionElement.text)) {
+            errors.push(`line ${getLine(actionElement)}: unknown listener action '${actionElement.text}' in CARD_IMPL.listeners`)
+          }
+        }
+      }
+      if (propName === 'phases' && ts.isArrayLiteralExpression(prop.initializer)) {
+        for (const phaseElement of prop.initializer.elements) {
+          if (!ts.isStringLiteral(phaseElement)) continue
+          if (!ALLOWED_LISTENER_PHASES.has(phaseElement.text)) {
+            errors.push(`line ${getLine(phaseElement)}: unknown listener phase '${phaseElement.text}' in CARD_IMPL.listeners`)
+          }
         }
       }
     }

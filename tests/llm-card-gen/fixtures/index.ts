@@ -8,7 +8,8 @@ import M7 from './M7_anytime-ability'
 import M8 from './M8_cross-player-trigger'
 import M9 from './M9_future-meeple'
 import M10 from './M10_payment-resource-provider'
+import M11 from './M11_improvement-cost-reduction'
 import type { CardFixture } from './types'
 
-export const fixtures: CardFixture[] = [M1, M2, M3, M4, M5, M6, M7, M8, M9, M10]
+export const fixtures: CardFixture[] = [M1, M2, M3, M4, M5, M6, M7, M8, M9, M10, M11]
 export type { CardFixture }

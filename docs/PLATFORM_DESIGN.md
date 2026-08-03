@@ -347,7 +347,7 @@ const CARD_IMPL = {
 
 可用 `scope`：`player`、`opponent`、`any`；权威白名单见 `shared/custom-code/sandbox-listener-scopes.ts`。
 
-可监听的 `actions`：`collect`、`gain`、`receive`、`plow`、`sow`、`construct`、`renovate-house`、`fence`、`stables`、`improvement-any`、`minor-improvement`、`occupation`、`place-farmer`、`wish-children`、`family-growth`、`bake-bread`。
+可监听的 `actions` 权威白名单见 `shared/custom-code/sandbox-listener-actions.ts`；prompt、AST validator 与 server/browser manifest 共用该列表。主要或次要改良购买统一使用 `improvement`。
 
 #### 可用 actionId（ActionFlow leaf）
 

@@ -6,9 +6,10 @@
  * `server/workshop-pr/code-gen.ts` 把这两个常量转换成一个 Card Source
  * 文件，与 prompt 内容无关。详见 docs/CUSTOM_CARD_SANDBOX.md §1.1。
  *
- * Hook / phase / scope / actionId 表从共享白名单运行时渲染；
+ * Hook / listener action / phase / scope / actionId 表从共享白名单运行时渲染；
  * docs/CUSTOM_CARD_SANDBOX.md 的对应标记块由 check:prompt-sync 校验：
  *   - shared/cards/card-effects.ts        (cardEffectHooks)
+ *   - shared/custom-code/sandbox-listener-actions.ts (sandboxListenerActions)
  *   - shared/custom-code/sandbox-listener-phases.ts (sandboxListenerPhases)
  *   - shared/custom-code/sandbox-listener-scopes.ts (sandboxListenerScopes)
  *   - shared/custom-code/ast-validator.ts (DENIED_IDENTIFIERS, DENIED_PROPERTY_ACCESS)
@@ -19,6 +20,7 @@
 import communityExamples from '../../docs/community-card-examples.md?raw'
 import { cardEffectHooks } from '../../shared/cards/card-effects'
 import { cardEffectHookMeta } from '../../shared/custom-code/sandbox-hook-meta'
+import { sandboxListenerActions } from '../../shared/custom-code/sandbox-listener-actions'
 import { sandboxListenerPhases, sandboxListenerPhaseMeta } from '../../shared/custom-code/sandbox-listener-phases'
 import { sandboxListenerScopes, type SandboxListenerScope } from '../../shared/custom-code/sandbox-listener-scopes'
 import { SANDBOX_ALLOWED_ACTION_IDS, sandboxActionIdMeta } from '../../shared/custom-code/sandbox-action-ids'
@@ -75,6 +77,10 @@ function renderScopeTable(): string {
   const rows = sandboxListenerScopes.map((scope) =>
     `| \`${scope}\` | ${escapePipe(sandboxListenerScopeDescriptions[scope])} |`)
   return ['| scope | 说明 |', '|-------|------|', ...rows].join('\n')
+}
+
+export function renderListenerActionList(): string {
+  return sandboxListenerActions.join('、')
 }
 
 function renderActionIdTable(): string {
@@ -217,7 +223,7 @@ ${renderScopeTable()}
 
 ### 可监听的行动（actions）
 
-collect、gain、receive、plow、sow、construct、renovate-house、fence、stables、improvement-any、minor-improvement、occupation、place-farmer、wish-children、wish-children-growth、family-growth、bake-bread
+${renderListenerActionList()}
 
 如果用户提到具体行动格 ID（如 \`forest\`、\`clay-pit\`、\`reed-bank\`、\`traveling-players\`），通常监听对应行动类型（资源累积格用 \`actions: ['collect']\`），并用 \`context.space?.id\` 精确判断；不要假设 \`context.result.spaceId\` 存在。
 
@@ -268,6 +274,8 @@ return {
 ### 费用机制边界
 
 Workshop 自定义卡只能通过 \`computeCosts\` listener 的 handler 返回值影响支付：
+
+购买主要或次要改良的费用统一监听 \`actions: ['improvement']\`。
 
 - \`costs\`：简单费用 delta；负数表示折扣，正数表示额外费用。适合普通 action cost。
 - \`trades\`：支付替换候选，例如把一种资源换成另一种资源。适合“可以用 X 代替 Y”。
