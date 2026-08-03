@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import { useAuth } from '../contexts/AuthContext'
 import { useLocale } from '../contexts/LocaleContext'
-import { AiCardDesigner, type ExtractedCard } from './workshop/AiCardDesigner'
+import { AiCardDesigner } from './workshop/AiCardDesigner'
 import { ProposeModal } from './workshop/ProposeModal'
 import { BrandMark } from '../components/common/BrandMark'
 import { LocaleSwitcher } from '../components/common/LocaleSwitcher'
@@ -730,16 +730,11 @@ function CardEditor({ initial, initialCardId, apiFetch, onCancel, onAddToSandbox
   sandboxErrors?: string[] | null
   onCardLoaded?: (cardDbId: string) => void
 }) {
-  const handleAiImport = (_extracted: ExtractedCard, _importedArtUrl: string | null) => {
-    // AI designer handles everything now; this callback is kept for interface compatibility
-  }
-
   return (
     <div className="ws-editor ws-editor-ai">
       <AiCardDesigner
         initialCard={initial}
         initialCardId={initialCardId}
-        onImport={handleAiImport}
         onClose={onCancel}
         onAddToSandboxAndRestart={onAddToSandboxAndRestart}
         sandboxErrors={sandboxErrors}

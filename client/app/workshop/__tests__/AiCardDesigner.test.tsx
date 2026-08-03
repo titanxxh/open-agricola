@@ -64,7 +64,7 @@ const apiFetchForExistingCard = vi.fn(async (path: string) => {
 const renderDesigner = () =>
   renderToStaticMarkup(
     <LocaleProvider>
-      <AiCardDesigner onImport={() => {}} onClose={() => {}} />
+      <AiCardDesigner onClose={() => {}} />
     </LocaleProvider>,
   )
 
@@ -119,7 +119,6 @@ describe('AiCardDesigner AI config header', () => {
       <LocaleProvider>
         <AiCardDesigner
           initialCard={existingCard}
-          onImport={() => {}}
           onClose={() => {}}
           apiFetch={apiFetchForExistingCard}
         />
@@ -132,6 +131,38 @@ describe('AiCardDesigner AI config header', () => {
     })
   })
 
+  it('copies the adopted source into a manually editable candidate', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: false }))
+    const apiFetch = vi.fn(async (path: string, init?: RequestInit) => {
+      if (!init) return apiFetchForExistingCard(path)
+      const body = JSON.parse(String(init.body)) as { draft: Record<string, unknown> }
+      return new Response(JSON.stringify({
+        ok: true,
+        workspace: {
+          ...JSON.parse(await apiFetchForExistingCard(path).then(response => response.text())).workspace,
+          revision: 3,
+          draft: body.draft,
+        },
+      }))
+    })
+
+    render(
+      <LocaleProvider>
+        <AiCardDesigner
+          initialCard={existingCard}
+          onClose={() => {}}
+          apiFetch={apiFetch}
+        />
+      </LocaleProvider>,
+    )
+
+    await waitFor(() => expect(screen.queryByText('正在恢复草稿…')).not.toBeInTheDocument())
+    await userEvent.click(screen.getByRole('button', { name: /卡牌能力 对话、源码与验证/ }))
+    await userEvent.click(screen.getByRole('button', { name: '导入手动编辑器' }))
+
+    expect(await screen.findByLabelText('能力候选源码')).toHaveValue(existingCard.effect_code)
+  })
+
   it('uses the game card renderer for the live preview', async () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: false }))
 
@@ -139,7 +170,6 @@ describe('AiCardDesigner AI config header', () => {
       <LocaleProvider>
         <AiCardDesigner
           initialCard={existingCard}
-          onImport={() => {}}
           onClose={() => {}}
           apiFetch={apiFetchForExistingCard}
         />
@@ -174,7 +204,6 @@ describe('AiCardDesigner AI config header', () => {
       <LocaleProvider>
         <AiCardDesigner
           initialCardId={existingCard.id}
-          onImport={() => {}}
           onClose={() => {}}
           apiFetch={apiFetch}
         />
@@ -244,7 +273,6 @@ describe('AiCardDesigner AI config header', () => {
       <LocaleProvider>
         <AiCardDesigner
           initialCard={unsavedExtractedCard}
-          onImport={() => {}}
           onClose={() => {}}
           apiFetch={apiFetch}
         />
@@ -278,7 +306,6 @@ describe('AiCardDesigner AI config header', () => {
       <LocaleProvider>
         <AiCardDesigner
           initialCard={existingCard}
-          onImport={() => {}}
           onClose={() => {}}
           apiFetch={apiFetchForExistingCard}
         />
@@ -351,7 +378,6 @@ describe('AiCardDesigner AI config header', () => {
       <LocaleProvider>
         <AiCardDesigner
           initialCard={existingCard}
-          onImport={() => {}}
           onClose={() => {}}
           apiFetch={apiFetch}
         />
@@ -440,7 +466,6 @@ describe('AiCardDesigner AI config header', () => {
       <LocaleProvider>
         <AiCardDesigner
           initialCard={completeCard}
-          onImport={() => {}}
           onClose={() => {}}
           onAddToSandboxAndRestart={startSandbox}
           apiFetch={apiFetch}
@@ -541,7 +566,6 @@ describe('AiCardDesigner AI config header', () => {
       <LocaleProvider>
         <AiCardDesigner
           initialCard={existingCard}
-          onImport={() => {}}
           onClose={() => {}}
           apiFetch={apiFetch}
         />
@@ -593,7 +617,6 @@ describe('AiCardDesigner AI config header', () => {
       <LocaleProvider>
         <AiCardDesigner
           initialCardId={existingCard.id}
-          onImport={() => {}}
           onClose={() => {}}
           apiFetch={apiFetch}
         />

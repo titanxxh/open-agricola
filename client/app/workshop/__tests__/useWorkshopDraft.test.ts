@@ -494,29 +494,31 @@ describe('useWorkshopDraft', () => {
     expect(result.current.state?.save.status).toBe('conflict')
   })
 
-  it('checkpoints provenance before adopting a candidate', async () => {
+  it('adopts a replacement candidate without validating the old draft source', async () => {
     const calls: { path: string; body?: Record<string, unknown> }[] = []
+    const legacySource = "const CARD_IMPL = { listeners: [{ actions: ['improvement-any', 'minor-improvement'] }] }"
+    const replacementSource = "const CARD_IMPL = { listeners: [{ actions: ['improvement'] }] }"
+    const initial = workspace(1)
+    initial.draft.effectCode = legacySource
     const apiFetch = vi.fn(async (path: string, init?: RequestInit) => {
       const body = init?.body
         ? JSON.parse(String(init.body)) as Record<string, unknown>
         : undefined
       calls.push({ path, body })
       if (!init) {
-        return new Response(JSON.stringify({ ok: true, workspace: workspace(1) }))
+        return new Response(JSON.stringify({ ok: true, workspace: initial }))
       }
       if (init.method === 'PUT') {
         return new Response(JSON.stringify({
-          ok: true,
-          workspace: {
-            ...workspace(2),
-            draft: body?.draft,
-          },
-        }))
+          ok: false,
+          error: 'Code validation failed',
+          errors: ["unknown listener action 'improvement-any'"],
+        }), { status: 400 })
       }
-      const adopted = workspace(3)
-      adopted.draft.artUrl = '/card-art/candidate.png'
+      const adopted = workspace(2)
+      adopted.draft.effectCode = replacementSource
       adopted.draft.generation = {
-        art: {
+        ability: {
           lastCompleted: body?.candidate,
           adopted: body?.candidate,
         },
@@ -535,10 +537,16 @@ describe('useWorkshopDraft', () => {
     act(() => result.current.dispatch({
       type: 'candidateCompleted',
       candidate: {
-        id: 'art-1',
-        kind: 'art',
-        prompt: 'a field',
-        resultUrl: '/card-art/candidate.png',
+        id: 'ability-1',
+        kind: 'ability',
+        prompt: 'replace legacy actions',
+        sourceCode: replacementSource,
+        cardJson: {
+          id: 'CUSTOM_FieldKeeper',
+          name: 'Field Keeper',
+          card_type: 'occupation',
+        },
+        validation: { valid: true, errors: [] },
         createdAt: 10,
         baseRevision: 1,
         stale: false,
@@ -547,16 +555,16 @@ describe('useWorkshopDraft', () => {
 
     await act(async () => {
       expect(await result.current.adoptCandidate(
-        result.current.state!.session.artCandidates[0]!,
+        result.current.state!.session.abilityCandidates[0]!,
       )).toBe(true)
     })
 
-    expect(result.current.state?.draft.artUrl).toBe('/card-art/candidate.png')
-    expect(result.current.state?.session.artCandidates).toEqual([])
-    expect(calls.filter(call => call.path.endsWith('/draft'))).toHaveLength(1)
+    expect(result.current.state?.draft.effectCode).toBe(replacementSource)
+    expect(result.current.state?.session.abilityCandidates).toEqual([])
+    expect(calls.filter(call => call.path.endsWith('/draft'))).toHaveLength(0)
     expect(calls.find(call => call.path.endsWith('/adopt'))?.body).toMatchObject({
-      baseRevision: 2,
-      candidate: { id: 'art-1', prompt: 'a field' },
+      baseRevision: 1,
+      candidate: { id: 'ability-1', sourceCode: replacementSource },
     })
     expect(localStorage.getItem(workshopDraftStorageKey('card-1'))).toBeNull()
   })
@@ -650,6 +658,110 @@ describe('useWorkshopDraft', () => {
     expect(result.current.state?.session.artCandidates).toEqual([
       expect.objectContaining({ id: 'art-1', stale: true }),
     ])
+    expect(result.current.state?.save.status).toBe('dirty')
+  })
+
+  it('preserves edits made while waiting for a candidate checkpoint', async () => {
+    let finishSave: ((response: Response) => void) | undefined
+    let finishAdopt: ((response: Response) => void) | undefined
+    let savedDraft: WorkshopClientDraft | undefined
+    const apiFetch = vi.fn(async (path: string, init?: RequestInit) => {
+      if (!init) {
+        return new Response(JSON.stringify({ ok: true, workspace: workspace(1) }))
+      }
+      const body = JSON.parse(String(init.body)) as {
+        draft?: WorkshopClientDraft
+        candidate?: Record<string, unknown>
+      }
+      if (init.method === 'PUT') {
+        savedDraft = body.draft
+        return new Promise<Response>(resolve => {
+          finishSave = resolve
+        })
+      }
+      if (path.endsWith('/adopt')) {
+        return new Promise<Response>(resolve => {
+          finishAdopt = resolve
+        })
+      }
+      throw new Error(`Unexpected request: ${path}`)
+    })
+    const { result } = renderHook(() => useWorkshopDraft({
+      cardId: 'card-1',
+      apiFetch,
+    }))
+    await waitFor(() => expect(result.current.state?.baseRevision).toBe(1))
+    act(() => result.current.dispatch({
+      type: 'candidateCompleted',
+      candidate: {
+        id: 'art-1',
+        kind: 'art',
+        prompt: 'a field',
+        resultUrl: '/card-art/candidate.png',
+        createdAt: 10,
+        baseRevision: 1,
+        stale: false,
+      },
+    }))
+
+    let checkpoint: Promise<boolean> | undefined
+    act(() => {
+      checkpoint = result.current.checkpoint()
+    })
+    await waitFor(() => expect(finishSave).toBeTypeOf('function'))
+    act(() => {
+      const current = result.current.state!.draft
+      result.current.updateDraft({
+        ...current,
+        name: 'Typed during checkpoint',
+        cardJson: { ...current.cardJson, name: 'Typed during checkpoint' },
+      })
+    })
+
+    let adoption: Promise<boolean> | undefined
+    act(() => {
+      adoption = result.current.adoptCandidate(
+        result.current.state!.session.artCandidates[0]!,
+      )
+    })
+    const checkpointWorkspace = workspace(2)
+    checkpointWorkspace.draft = savedDraft!
+    finishSave!(new Response(JSON.stringify({
+      ok: true,
+      workspace: checkpointWorkspace,
+    })))
+    await waitFor(() => expect(finishAdopt).toBeTypeOf('function'))
+
+    const adopted = workspace(3)
+    adopted.draft = {
+      ...savedDraft!,
+      artUrl: '/card-art/candidate.png',
+      generation: {
+        art: {
+          adopted: {
+            id: 'art-1',
+            kind: 'art',
+            prompt: 'a field',
+            resultUrl: '/card-art/candidate.png',
+            createdAt: 10,
+            baseRevision: 2,
+            stale: false,
+          },
+        },
+      },
+    }
+    finishAdopt!(new Response(JSON.stringify({
+      ok: true,
+      workspace: adopted,
+      versionId: 'version-1',
+    })))
+
+    await act(async () => {
+      expect(await checkpoint).toBe(true)
+      expect(await adoption).toBe(true)
+    })
+    expect(result.current.state?.draft.name).toBe('Typed during checkpoint')
+    expect(result.current.state?.draft.artUrl).toBe('/card-art/candidate.png')
     expect(result.current.state?.save.status).toBe('dirty')
   })
 
