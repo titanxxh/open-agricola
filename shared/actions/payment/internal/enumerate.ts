@@ -939,7 +939,9 @@ export const computeAllBuyableCombinations = (
   for (let feeIdx = 0; feeIdx < baseFeesRaw.length; feeIdx++) {
     const baseFeeRaw = baseFeesRaw[feeIdx]
     for (const unitTotal of unitTotals) {
-      const baseFee = clampNonNegative(mergePaymentResources(baseFeeRaw, unitTotal.cost))
+      const mergedBaseFee = clampNonNegative(mergePaymentResources(baseFeeRaw, unitTotal.cost))
+      const removedBaseFee = removeCostResources(mergedBaseFee)
+      const baseFee = removedBaseFee.cost
       const tradeCombos = actionTrades.length > 0
         ? generateTradeCombinations(actionTrades, playerResources)
         : [{ tradesUsed: [], result: { ...playerResources } }]
@@ -947,7 +949,10 @@ export const computeAllBuyableCombinations = (
       for (const tradeCombo of tradeCombos) {
         const tradesUsed = mergeTradeUsage(unitTotal.tradesUsed, tradeCombo.tradesUsed)
         if (!isWithinTradeGroupLimits(tradesUsed)) continue
-        const removalReductions = initialRemovalReductions(feeIdx)
+        const removalReductions = mergeBonusReductionsBySource(
+          initialRemovalReductions(feeIdx),
+          removedBaseFee.reductions,
+        )
         type BonusPath = {
           cost: PaymentResourceMap
           sources: string[]
