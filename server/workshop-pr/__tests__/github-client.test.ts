@@ -251,6 +251,7 @@ describe('GitHubClient', () => {
       let treeBody: {
         tree?: Array<{ path: string; sha: string | null; mode: string }>
       } | null = null
+      let blobBody: { content?: string; encoding?: string } | null = null
       fetchHandler = (url, init) => {
         if (url.includes('/contents/scripts/old.sh')) {
           return okJson({
@@ -259,6 +260,10 @@ describe('GitHubClient', () => {
           })
         }
         if (url.includes('/contents/scripts/new.sh')) return new Response('', { status: 404 })
+        if (url.includes('/git/blobs') && init?.method === 'POST') {
+          blobBody = JSON.parse(init.body as string) as typeof blobBody
+          return okJson({ sha: 'current-base-blob' })
+        }
         if (url.includes('/git/trees') && init?.method === 'POST') {
           treeBody = JSON.parse(init.body as string) as typeof treeBody
           return okJson({ sha: 'treesha' })
@@ -287,9 +292,10 @@ describe('GitHubClient', () => {
         upstreamBaseSha: 'fixed-base',
       })
 
+      expect(blobBody).toEqual({ content: '#!/bin/sh\necho ok\n', encoding: 'utf-8' })
       expect(treeBody?.tree).toEqual([
         { path: 'scripts/old.sh', sha: null, mode: '100755', type: 'blob' },
-        { path: 'scripts/new.sh', sha: 'old-pr-blob', mode: '100755', type: 'blob' },
+        { path: 'scripts/new.sh', sha: 'current-base-blob', mode: '100755', type: 'blob' },
       ])
     })
   })

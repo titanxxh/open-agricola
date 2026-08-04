@@ -232,7 +232,10 @@ export class GitHubClient {
       }
       if (entry.status === 'renamed' && !entry.patch) {
         preservedTree.push({ path: entry.previousPath!, sha: null, mode: entry.mode })
-        blobs.push({ path: entry.path, sha: entry.sha, mode: entry.mode })
+        blobs.push({
+          ...await createBlob({ path: entry.path, content: baseContent, encoding: 'utf-8' }),
+          mode: entry.mode,
+        })
         continue
       }
       const content = entry.patch ? applyUnifiedPatch(baseContent, entry.patch) : baseContent

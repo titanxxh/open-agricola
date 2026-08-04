@@ -269,6 +269,27 @@ const CARD_IMPL = {
     })).toThrow('plain object')
   })
 
+  it('rejects cost attribution without costs from a custom listener', () => {
+    const state = createInitialState(42)
+    const registry = new CardRegistry()
+    registry.loadImpl('CUSTOM_ExecutorCard', {
+      listeners: [{
+        id: 'opaque-listener-id',
+        handler: () => ({
+          costAttribution: [{ sourceCard: 'CUSTOM_ExecutorCard', costs: { wood: -2 } }],
+        } as never),
+      }],
+    })
+
+    expect(() => executeCardListener(registry.getAllListeners()[0]!, {
+      state,
+      player: state.players[0]!,
+      space: state.actionSpaces[0]!,
+      actionId: 'construct',
+      phase: 'computeCosts',
+    })).toThrow('costAttribution')
+  })
+
   it('executes registered effect and listener through runtime proxies', () => {
     const compiled = validateAndCompileCustomCode(`
 const CARD_ID = 'CUSTOM_ExecutorCard'

@@ -149,24 +149,32 @@ function validateCostAttributionShapes(
     if (ts.isShorthandPropertyAssignment(property)) return property.name
     return undefined
   }
-  const expressionText = (expression: ts.Expression): string => (
-    expression.getText(sourceFile).replace(/\s+/g, '')
-  )
-  const isNumberLiteral = (expression: ts.Expression): boolean => {
-    if (ts.isNumericLiteral(expression)) return Number.isFinite(Number(expression.text))
-    return ts.isPrefixUnaryExpression(expression)
-      && (expression.operator === ts.SyntaxKind.PlusToken || expression.operator === ts.SyntaxKind.MinusToken)
-      && ts.isNumericLiteral(expression.operand)
-      && Number.isFinite(Number(expression.operand.text))
+  const numberLiteralValue = (expression: ts.Expression): number | undefined => {
+    if (ts.isNumericLiteral(expression)) return Number(expression.text)
+    if (!ts.isPrefixUnaryExpression(expression)
+      || (expression.operator !== ts.SyntaxKind.PlusToken && expression.operator !== ts.SyntaxKind.MinusToken)
+      || !ts.isNumericLiteral(expression.operand)
+    ) return undefined
+    const value = Number(expression.operand.text)
+    return expression.operator === ts.SyntaxKind.MinusToken ? -value : value
   }
-  const isResourceDelta = (expression: ts.Expression): boolean => (
-    ts.isObjectLiteralExpression(expression)
-    && expression.properties.every((property) => (
-      ts.isPropertyAssignment(property)
-      && RESOURCE_KEYS.has(getStaticPropertyName(property, constants) ?? '')
-      && isNumberLiteral(property.initializer)
-    ))
-  )
+  const resourceDelta = (expression: ts.Expression): Record<string, number> | undefined => {
+    if (!ts.isObjectLiteralExpression(expression)) return undefined
+    const result: Record<string, number> = {}
+    for (const property of expression.properties) {
+      if (!ts.isPropertyAssignment(property)) return undefined
+      const key = getStaticPropertyName(property, constants)
+      const value = numberLiteralValue(property.initializer)
+      if (!key || !RESOURCE_KEYS.has(key) || value === undefined || !Number.isFinite(value)) return undefined
+      result[key] = value
+    }
+    return result
+  }
+  const equalResourceDeltas = (left: Record<string, number>, right: Record<string, number>): boolean => {
+    const keys = Object.keys(left)
+    return keys.length === Object.keys(right).length
+      && keys.every(key => left[key] === right[key])
+  }
   const visit = (node: ts.Node, insideCostAttribution = false): void => {
     if (ts.isObjectLiteralExpression(node) && !insideCostAttribution) {
       const costsProperty = node.properties.find(
@@ -175,7 +183,10 @@ function validateCostAttributionShapes(
       const attributionProperty = node.properties.find(
         property => getStaticPropertyName(property, constants) === 'costAttribution',
       )
-      if (costsProperty && attributionProperty) {
+      if (attributionProperty && !costsProperty) {
+        const { line } = sourceFile.getLineAndCharacterOfPosition(node.getStart(sourceFile))
+        errors.push(`line ${line + 1}: listener results with costAttribution must include costs`)
+      } else if (costsProperty && attributionProperty) {
         const costs = propertyValue(costsProperty)
         const attribution = propertyValue(attributionProperty)
         const entry = attribution && ts.isArrayLiteralExpression(attribution)
@@ -191,6 +202,8 @@ function validateCostAttributionShapes(
         )
         const source = sourceProperty && propertyValue(sourceProperty)
         const entryCosts = entryCostsProperty && propertyValue(entryCostsProperty)
+        const costsDelta = costs && resourceDelta(costs)
+        const entryCostsDelta = entryCosts && resourceDelta(entryCosts)
         const validSource = source
           && ts.isIdentifier(source)
           && source.text === 'CARD_ID'
@@ -198,13 +211,11 @@ function validateCostAttributionShapes(
           && declaredCardId.length > 0
           && (expectedCardId === undefined || declaredCardId === expectedCardId)
         if (
-          !costs
-          || !isResourceDelta(costs)
+          !costsDelta
           || !entry
           || !validSource
-          || !entryCosts
-          || !isResourceDelta(entryCosts)
-          || expressionText(costs) !== expressionText(entryCosts)
+          || !entryCostsDelta
+          || !equalResourceDeltas(costsDelta, entryCostsDelta)
         ) {
           const { line } = sourceFile.getLineAndCharacterOfPosition(node.getStart(sourceFile))
           errors.push(`line ${line + 1}: costAttribution must contain one matching source entry`)

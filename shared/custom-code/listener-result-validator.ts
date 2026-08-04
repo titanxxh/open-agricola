@@ -37,6 +37,9 @@ export const validateCustomListenerResult = (
   if (!isPlainRecord(value)) throw new Error('custom listener result must be a plain object')
   if (!Object.hasOwn(value, 'costs')) {
     if ('costs' in value) throw new Error('custom listener costs must be an own property')
+    if ('costAttribution' in value) {
+      throw new Error('custom listener results with costAttribution require costs')
+    }
     return value as ActionHookResult
   }
 
