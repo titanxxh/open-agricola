@@ -1,4 +1,5 @@
 import type {
+  ActionCostAttribution,
   CardResourceStats,
   CardStatGained,
   CardState,
@@ -238,6 +239,50 @@ export const recordCardCostAttribution = (
     if (entry.saved) addCardResourceSaved(player, cardId, entry.saved)
     if (entry.paid) addCardResourcePaid(player, cardId, entry.paid)
   }
+}
+
+export const recordActionCostAttribution = (
+  player: PlayerState,
+  attribution: ActionCostAttribution[] | undefined,
+  baseCost: Partial<Resource>,
+  finalCost: Partial<Resource>,
+  multiplier = 1,
+) => {
+  if (!attribution?.length) return
+  const remainingSaved: Partial<Resource> = {}
+  const remainingPaid: Partial<Resource> = {}
+  attribution.forEach((entry) => {
+    Object.entries(entry.costs).forEach(([key, value]) => {
+      if (typeof value !== 'number' || value === 0) return
+      const resourceKey = key as keyof Resource
+      if (value < 0 && remainingSaved[resourceKey] === undefined) {
+        remainingSaved[resourceKey] = Math.max(0, (baseCost[resourceKey] ?? 0) - (finalCost[resourceKey] ?? 0))
+      }
+      if (value > 0 && remainingPaid[resourceKey] === undefined) {
+        remainingPaid[resourceKey] = Math.max(0, (finalCost[resourceKey] ?? 0) - (baseCost[resourceKey] ?? 0))
+      }
+    })
+  })
+  attribution.forEach((entry) => {
+    const saved: Partial<Resource> = {}
+    const paid: Partial<Resource> = {}
+    Object.entries(entry.costs).forEach(([key, value]) => {
+      if (typeof value !== 'number' || value === 0) return
+      const resourceKey = key as keyof Resource
+      const requested = Math.abs(value) * multiplier
+      if (value < 0) {
+        const amount = Math.min(requested, remainingSaved[resourceKey] ?? 0)
+        saved[resourceKey] = amount
+        remainingSaved[resourceKey] = Math.max(0, (remainingSaved[resourceKey] ?? 0) - amount)
+      } else {
+        const amount = Math.min(requested, remainingPaid[resourceKey] ?? 0)
+        paid[resourceKey] = amount
+        remainingPaid[resourceKey] = Math.max(0, (remainingPaid[resourceKey] ?? 0) - amount)
+      }
+    })
+    addCardResourceSaved(player, entry.sourceCard, saved)
+    addCardResourcePaid(player, entry.sourceCard, paid)
+  })
 }
 
 export const getCardStack = (player: PlayerState, cardId: string): string[] =>

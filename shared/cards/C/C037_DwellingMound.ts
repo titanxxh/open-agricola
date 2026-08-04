@@ -10,7 +10,8 @@ const computeCostsListener: CardListenerRegistration = {
   phases: ['computeCosts' as ActionHookPhase],
   actions: ['plow'],
   handler: (_context: CardListenerContext): ActionHookResult | void => {
-    return { costs: { food: 1 } }
+    const costs = { food: 1 }
+    return { costs, costAttribution: [{ sourceCard: CARD_ID, costs }] }
   },
 }
 

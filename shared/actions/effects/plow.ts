@@ -13,7 +13,7 @@ import type { PlowAdjacencyPolicy, PlowValidationOptions } from '../../domain/fa
 import { canExecuteWithCostPreview } from '../helpers/cost-preview'
 import { playerBoard } from '../../domain'
 import { collectLockedFarmTileKeys } from '../../cards/card-effects'
-import { addCardResourceGained } from '../../cards/helpers/card-state'
+import { addCardResourceGained, recordActionCostAttribution } from '../../cards/helpers/card-state'
 import { PaymentSolver } from '../payment'
 
 const getOccupiedKeys = (player: PlayerState) => {
@@ -210,6 +210,12 @@ const finalizePlow = (
   const nextPlayer = JSON.parse(JSON.stringify(validated.player)) as PlayerState
   PaymentSolver.executeResolvedTypedFlatPayment(nextPlayer, payment, 'plow', ctx.state)
   applyPlayerMutation(ctx.player, nextPlayer)
+  recordActionCostAttribution(
+    ctx.player,
+    ctx.costAttribution,
+    resolvePlowCost(ctx.actionContext, undefined) ?? {},
+    resolvedCost,
+  )
   if (ctx.sourceCard) {
     addCardResourceGained(ctx.player, ctx.sourceCard, { field: 1 })
   }

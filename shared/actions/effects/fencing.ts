@@ -1,4 +1,5 @@
 import type {
+  ActionCostAttribution,
   ActionDefinition,
   ActionExecutionResult,
   ActionMutationContext,
@@ -49,6 +50,7 @@ import { findPlayerById } from '../../domain/player'
 import { collectLockedFarmTileKeys } from '../../cards/card-effects'
 import { collectFarmChoiceCostAdjustments } from '../../cards/card-listeners'
 import { playerCanBuildPalisades } from '../../cards/helpers/card-type'
+import { recordActionCostAttribution } from '../../cards/helpers/card-state'
 import {
   consumePendingFenceBonus,
   readPendingFenceBonus,
@@ -670,8 +672,10 @@ const computeFenceCostAdjustment = (
   space: ActionSpace | undefined,
   policy: FenceActionPolicy,
 ): {
+  baseFreeFences: number
   freeFences: number
   extraWood: number
+  costAttribution: ActionCostAttribution[]
   trades: Trade[]
   bonuses: Bonus[]
   paymentResourceProviders: ComplexCost['paymentResourceProviders']
@@ -694,9 +698,19 @@ const computeFenceCostAdjustment = (
     pendingFreeFences + hookFreeFences,
     Math.max(0, hookWood),
   )
+  const baseSpringFreeFences = computeSpringFreeFences(
+    state,
+    player,
+    newFenceEdges,
+    policy,
+    pendingFreeFences,
+    0,
+  )
   return {
+    baseFreeFences: pendingFreeFences + baseSpringFreeFences,
     freeFences: pendingFreeFences + hookFreeFences + springFreeFences,
     extraWood: Math.max(0, hookWood),
+    costAttribution: fenceOverride.costAttribution,
     trades: fenceOverride.trades,
     bonuses: fenceOverride.bonuses,
     paymentResourceProviders: fenceOverride.paymentResourceProviders,
@@ -791,17 +805,26 @@ const finalizeFence = (
     currentPolicy,
   )
   const idx = ctx.state.players.indexOf(ctx.player)
+  const validationOptions = fenceValidationOptions(
+    normalized,
+    playerCanBuildPalisades(normalized),
+    currentPolicy,
+    fenceSources,
+  )
+  const baseValidated = playerBoard(ctx.state, idx).farmyard.canBuildFence({
+    edges,
+    palisadeEdges,
+    extraWood,
+    freeFences: costAdjustment.baseFreeFences,
+    options: validationOptions,
+    lockedKeys,
+  })
   const validated = playerBoard(ctx.state, idx).farmyard.canBuildFence({
     edges,
     palisadeEdges,
     extraWood: extraWood + costAdjustment.extraWood,
     freeFences: costAdjustment.freeFences,
-    options: fenceValidationOptions(
-      normalized,
-      playerCanBuildPalisades(normalized),
-      currentPolicy,
-      fenceSources,
-    ),
+    options: validationOptions,
     lockedKeys,
   })
   if (!validated.ok) {
@@ -832,6 +855,12 @@ const finalizeFence = (
     ? undefined
     : consumePendingFenceBonus(nextPlayer, validated.newFenceEdges.length)
   applyPlayerMutation(ctx.player, nextPlayer)
+  recordActionCostAttribution(
+    ctx.player,
+    costAdjustment.costAttribution,
+    { wood: baseValidated.ok ? baseValidated.payableWoodCost : validated.payableWoodCost },
+    { wood: validated.payableWoodCost },
+  )
   for (const [donorId, count] of countBorrowedFenceSources(
     currentPolicy,
     validated.newFenceEdges,

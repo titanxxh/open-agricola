@@ -3,6 +3,7 @@ import { GameSession } from '../game/authoritative-session'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 import { setWorkersAtHome } from '../../shared/domain/player'
 import { getFenceCount } from '../../shared/actions/effects/fencing'
+import { readCardResourceStats } from '../../shared/cards/helpers/card-state'
 import { confirmPlayerSwitch } from './_helpers/pending-confirms'
 
 import '../../shared/cards/C/C016_FieldFences'
@@ -97,6 +98,7 @@ describe('C16 FieldFences session', () => {
     expect(getFenceCount(player)).toBe(4)
     expect(player.resources.wood).toBe(0) // 3 - 3 paid = 0
     expect(player.pastures).toHaveLength(1)
+    expect(readCardResourceStats(player, CARD_ID)?.saved).toEqual({ wood: 1 })
   })
 
   it('without C16 the same selection costs full 4 wood (no discount)', () => {
@@ -119,6 +121,7 @@ describe('C16 FieldFences session', () => {
     const after = resp.state.players[0]!
     expect(after.resources.wood).toBe(0)
     expect(getFenceCount(after)).toBe(4)
+    expect(readCardResourceStats(after, CARD_ID)).toBeUndefined()
   })
 
   it('three field-adjacent + one non-adjacent: pays 1 wood for non-adjacent only', () => {

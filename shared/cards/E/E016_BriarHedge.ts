@@ -28,10 +28,12 @@ const E16FenceListener: CardListenerRegistration = {
     const newFenceEdges = params?.newFenceEdges
     if (newFenceEdges === undefined) {
       const available = countAvailableBorderEdges(ctx.player)
-      return { costs: { wood: available === 0 ? 0 : -available } }
+      const costs = { wood: available === 0 ? 0 : -available }
+      return { costs, costAttribution: [{ sourceCard: CARD_ID, costs }] }
     }
     const borderCount = newFenceEdges.filter(isBorderEdge).length
-    return { costs: { wood: borderCount === 0 ? 0 : -borderCount } }
+    const costs = { wood: borderCount === 0 ? 0 : -borderCount }
+    return { costs, costAttribution: [{ sourceCard: CARD_ID, costs }] }
   },
 }
 

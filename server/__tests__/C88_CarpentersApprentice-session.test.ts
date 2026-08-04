@@ -5,6 +5,7 @@ import { getRegisteredCardListeners, collectComputeCostsForFarmChoice } from '..
 import type { CardListenerContext } from '../../shared/cards/card-listeners'
 import type { PlayerState, GameState } from '../../shared/contract/types'
 import { getAllTilePositions, positionKey } from '../../shared/domain/farm'
+import { readCardResourceStats } from '../../shared/cards/helpers/card-state'
 
 import '../../shared/cards/C/C088_CarpentersApprentice'
 import '../../shared/cards/B/B030_WoodPalisades'
@@ -103,6 +104,7 @@ describe('C88 Carpenter\'s Apprentice — session w/ palisades', () => {
     const result = resp.state.players[0]!
     expect(result.resources.wood).toBe(0)
     expect(result.pastures).toHaveLength(1)
+    expect(readCardResourceStats(result, 'C088_CarpentersApprentice')).toBeUndefined()
   })
 
   it('palisade 不打折:5 wood 不足 6 wood 的 2 fence + 2 palisade build', () => {
@@ -359,5 +361,6 @@ describe('C88 — fence 折扣 Session 端到端(第 13-14 个免费)', () => {
     expect(resp.ok).toBe(true)
     expect(resp.state.players[0]!.resources.wood).toBe(0)
     expect(resp.state.players[0]!.fenceSegments.length).toBe(14)
+    expect(readCardResourceStats(resp.state.players[0]!, 'C088_CarpentersApprentice')?.saved).toEqual({ wood: 2 })
   })
 })
