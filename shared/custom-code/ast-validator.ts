@@ -120,6 +120,21 @@ function getStaticPropertyName(
   return undefined
 }
 
+function hasInspectablePropertyName(
+  property: ts.ObjectLiteralElementLike,
+  constants: Map<string, string>,
+): boolean {
+  if (ts.isSpreadAssignment(property)) return false
+  if (
+    property.name
+    && ts.isComputedPropertyName(property.name)
+    && !ts.isStringLiteral(property.name.expression)
+    && !ts.isNoSubstitutionTemplateLiteral(property.name.expression)
+  ) return false
+  const name = getStaticPropertyName(property, constants)
+  return name !== undefined && name !== '__proto__'
+}
+
 function forEachListenerResultObject(
   sourceFile: ts.SourceFile,
   constants: Map<string, string>,
@@ -243,12 +258,18 @@ function validateCostAttributionShapes(
         && ts.isObjectLiteralExpression(attribution.elements[0])
         ? attribution.elements[0]
         : undefined
-      const sourceProperty = entry?.properties.find(
+      const sourceProperties = entry?.properties.filter(
         property => getStaticPropertyName(property, constants) === 'sourceCard',
-      )
-      const entryCostsProperty = entry?.properties.find(
+      ) ?? []
+      const entryCostsProperties = entry?.properties.filter(
         property => getStaticPropertyName(property, constants) === 'costs',
-      )
+      ) ?? []
+      const validEntryShape = entry
+        && entry.properties.every(property => hasInspectablePropertyName(property, constants))
+        && sourceProperties.length === 1
+        && entryCostsProperties.length === 1
+      const sourceProperty = sourceProperties[0]
+      const entryCostsProperty = entryCostsProperties[0]
       const source = sourceProperty && propertyValue(sourceProperty)
       const entryCosts = entryCostsProperty && propertyValue(entryCostsProperty)
       const costsDelta = costs && resourceDelta(costs)
@@ -271,6 +292,7 @@ function validateCostAttributionShapes(
         && (expectedCardId === undefined || declaredCardId === expectedCardId)
       if (
         !entry
+        || !validEntryShape
         || !validSource
         || !matchingCosts
       ) {
@@ -598,11 +620,7 @@ function validateListenersArray(
         && isInspectableResult(expression.whenFalse)
     }
     return ts.isObjectLiteralExpression(expression)
-      && expression.properties.every(property => (
-        !ts.isSpreadAssignment(property)
-        && getStaticPropertyName(property, constants) !== undefined
-        && getStaticPropertyName(property, constants) !== '__proto__'
-      ))
+      && expression.properties.every(property => hasInspectablePropertyName(property, constants))
   }
 
   const validateHandler = (handler: ts.ArrowFunction | ts.FunctionExpression): void => {

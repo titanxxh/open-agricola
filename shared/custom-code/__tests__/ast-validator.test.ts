@@ -130,25 +130,29 @@ describe('ast-validator: CARD_IMPL hook/phase whitelisting', () => {
     )
   })
 
-  it('does not let a nested constant shadow a computed result key', () => {
+  it('rejects identifier-computed result keys that can be shadowed', () => {
     const result = validateCardCode(`
+      const CARD_ID = 'CUSTOM_Test'
       const KEY = 'costs'
       const CARD_IMPL = {
         listeners: [{
           actions: ['construct'],
           phases: ['computeCosts'],
-          handler: () => ({ [KEY]: { wood: -1 } }),
+          handler: () => {
+            const KEY = 'other'
+            const costs = { wood: -1 }
+            return {
+              [KEY]: costs,
+              costAttribution: [{ sourceCard: CARD_ID, costs }],
+            }
+          },
         }],
-      }
-      function shadow() {
-        const KEY = 'other'
-        return KEY
       }
     `)
 
     expect(result.valid).toBe(false)
     expect(result.valid === false && result.errors.some(
-      error => error.includes('listener results with costs must include costAttribution'),
+      error => error.includes('listener handlers must return statically inspectable objects'),
     )).toBe(true)
   })
 
@@ -340,6 +344,32 @@ describe('ast-validator: CARD_IMPL hook/phase whitelisting', () => {
 
     expect(validateCardCode(source).valid).toBe(false)
     expect(validateCardCode(source.replace('CUSTOM_Test', 'CUSTOM_Other'), 'CUSTOM_Test').valid).toBe(false)
+  })
+
+  it('rejects attribution entries whose effective values can be overridden by spread', () => {
+    const result = validateCardCode(`
+      const CARD_ID = 'CUSTOM_Test'
+      const override = { sourceCard: 'CUSTOM_Other' }
+      const CARD_IMPL = {
+        listeners: [{
+          actions: ['construct'],
+          phases: ['computeCosts'],
+          handler: () => ({
+            costs: { wood: -2 },
+            costAttribution: [{
+              sourceCard: CARD_ID,
+              costs: { wood: -2 },
+              ...override,
+            }],
+          }),
+        }],
+      }
+    `)
+
+    expect(result.valid).toBe(false)
+    expect(result.valid === false && result.errors.some(
+      error => error.includes('costAttribution must contain one matching source entry'),
+    )).toBe(true)
   })
 
   it('resolves attribution CARD_ID from the top-level declaration', () => {

@@ -389,6 +389,55 @@ describe('GitHubClient', () => {
       ])
     })
 
+    it('reuses the current source blob for a patchless copied entry', async () => {
+      let treeBody: {
+        tree?: Array<{ path: string; sha: string | null; mode: string }>
+      } | null = null
+      fetchHandler = (url, init) => {
+        if (url.includes('/contents/fixtures/source.bin')) {
+          return okJson({
+            content: Buffer.from([0xff, 0x00, 0x80]).toString('base64'),
+            encoding: 'base64',
+            sha: 'current-source-blob',
+          })
+        }
+        if (url.includes('/contents/fixtures/copy.bin')) return new Response('', { status: 404 })
+        if (url.includes('/git/blobs') && init?.method === 'POST') {
+          throw new Error('should reuse the current source blob')
+        }
+        if (url.includes('/git/trees') && init?.method === 'POST') {
+          treeBody = JSON.parse(init.body as string) as typeof treeBody
+          return okJson({ sha: 'treesha' })
+        }
+        if (url.includes('/git/commits') && init?.method === 'POST') return okJson({ sha: 'commitsha' })
+        return new Response('', { status: 404 })
+      }
+      const c = new GitHubClient({
+        token: 't',
+        upstreamOwner: 'titanxxh',
+        upstreamRepo: 'open-agricola',
+      })
+
+      await c.createCommit({
+        forkOwner: 'alice',
+        files: [],
+        preservedTreeEntries: [{
+          path: 'fixtures/copy.bin',
+          previousPath: 'fixtures/source.bin',
+          sha: 'old-pr-blob',
+          status: 'copied',
+          mode: '100644',
+        }],
+        message: 'test commit',
+        author: { name: 'alice', email: 'a@users.noreply.github.com' },
+        upstreamBaseSha: 'fixed-base',
+      })
+
+      expect(treeBody?.tree).toEqual([
+        { path: 'fixtures/copy.bin', sha: 'current-source-blob', mode: '100644', type: 'blob' },
+      ])
+    })
+
     it('rejects a copied entry when its destination now exists on main', async () => {
       fetchHandler = (url, init) => {
         if (url.includes('/contents/server/__tests__/source.test.ts')) {

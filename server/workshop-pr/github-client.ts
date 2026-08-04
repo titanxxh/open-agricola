@@ -204,7 +204,7 @@ export class GitHubClient {
       if (entry.status === 'renamed' && !entry.previousPath) {
         throw new GitHubApiError('renamed PR file is missing its previous path', 'pr_patch_invalid', 422)
       }
-      if (!entry.patch && entry.status !== 'renamed' && entry.status !== 'added') {
+      if (!entry.patch && entry.status !== 'renamed' && entry.status !== 'copied' && entry.status !== 'added') {
         throw new GitHubApiError('PR patch is unavailable for safe rebase', 'pr_patch_unavailable', 409)
       }
       const basePath = entry.previousPath ?? entry.path
@@ -236,8 +236,10 @@ export class GitHubClient {
           if (!(error instanceof GitHubApiError) || error.status !== 404) throw error
         }
       }
-      if (entry.status === 'renamed' && !entry.patch) {
-        preservedTree.push({ path: entry.previousPath!, sha: null, mode: entry.mode })
+      if ((entry.status === 'renamed' || entry.status === 'copied') && !entry.patch) {
+        if (entry.status === 'renamed') {
+          preservedTree.push({ path: entry.previousPath!, sha: null, mode: entry.mode })
+        }
         blobs.push({ path: entry.path, sha: baseFile!.sha, mode: entry.mode })
         continue
       }
