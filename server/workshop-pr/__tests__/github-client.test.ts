@@ -234,34 +234,22 @@ describe('GitHubClient', () => {
     })
   })
 
-  describe('findReusablePr / openPr / setPrState / commentOnPr', () => {
-    it('findReusablePr prefers an open unmerged PR matching head', async () => {
+  describe('findOpenPr / openPr / closePr / commentOnPr', () => {
+    it('findOpenPr prefers an eligible open PR matching head', async () => {
       fetchHandler = (url) => {
         if (url.includes('/pulls?head='))
           return okJson([
-            {
-              number: 41,
-              html_url: 'https://github.com/t/r/pull/41',
-              base: { ref: 'main' },
-              draft: false,
-              state: 'closed',
-              merged_at: '2026-08-01T00:00:00Z',
-            },
             {
               number: 42,
               html_url: 'https://github.com/t/r/pull/42',
               base: { ref: 'release' },
               draft: true,
-              state: 'closed',
-              merged_at: null,
             },
             {
               number: 43,
               html_url: 'https://github.com/t/r/pull/43',
               base: { ref: 'main' },
               draft: false,
-              state: 'open',
-              merged_at: null,
             },
           ])
         return new Response('', { status: 404 })
@@ -271,66 +259,24 @@ describe('GitHubClient', () => {
         upstreamOwner: 'titanxxh',
         upstreamRepo: 'open-agricola',
       })
-      const pr = await c.findReusablePr({ forkOwner: 'alice', branchName: 'workshop/CUSTOM_X' })
+      const pr = await c.findOpenPr({ forkOwner: 'alice', branchName: 'workshop/CUSTOM_X' })
       expect(pr).toEqual({
         number: 43,
         url: 'https://github.com/t/r/pull/43',
         baseRefName: 'main',
         isDraft: false,
-        state: 'open',
-        conflictingOpenPrNumbers: [],
       })
-      expect(fetchCalls[0]?.url).toContain('state=all')
+      expect(fetchCalls[0]?.url).toContain('state=open')
     })
 
-    it('findReusablePr prefers an eligible closed PR over an ineligible open PR', async () => {
-      fetchHandler = () => okJson([
-        {
-          number: 42,
-          html_url: 'https://github.com/t/r/pull/42',
-          base: { ref: 'main' },
-          draft: true,
-          state: 'open',
-          merged_at: null,
-        },
-        {
-          number: 43,
-          html_url: 'https://github.com/t/r/pull/43',
-          base: { ref: 'main' },
-          draft: false,
-          state: 'closed',
-          merged_at: null,
-        },
-      ])
+    it('findOpenPr returns null when GitHub finds no open PR', async () => {
+      fetchHandler = () => okJson([])
       const c = new GitHubClient({
         token: 't',
         upstreamOwner: 'titanxxh',
         upstreamRepo: 'open-agricola',
       })
-
-      await expect(c.findReusablePr({ forkOwner: 'alice', branchName: 'workshop/CUSTOM_X' }))
-        .resolves.toMatchObject({
-          number: 43,
-          state: 'closed',
-          conflictingOpenPrNumbers: [42],
-        })
-    })
-
-    it('findReusablePr returns null when every matching PR was merged', async () => {
-      fetchHandler = () => okJson([{
-        number: 42,
-        html_url: 'https://github.com/t/r/pull/42',
-        base: { ref: 'main' },
-        draft: false,
-        state: 'closed',
-        merged_at: '2026-08-01T00:00:00Z',
-      }])
-      const c = new GitHubClient({
-        token: 't',
-        upstreamOwner: 'titanxxh',
-        upstreamRepo: 'open-agricola',
-      })
-      const pr = await c.findReusablePr({ forkOwner: 'alice', branchName: 'workshop/CUSTOM_X' })
+      const pr = await c.findOpenPr({ forkOwner: 'alice', branchName: 'workshop/CUSTOM_X' })
       expect(pr).toBeNull()
     })
 
@@ -356,14 +302,13 @@ describe('GitHubClient', () => {
         url: 'https://github.com/t/r/pull/99',
         baseRefName: 'main',
         isDraft: false,
-        state: 'open',
       })
     })
 
-    it.each(['open', 'closed'] as const)('setPrState changes the existing PR to %s', async (state) => {
+    it('closePr closes the existing PR', async () => {
       fetchHandler = (_url, init) => {
         expect(init?.method).toBe('PATCH')
-        expect(JSON.parse(String(init?.body))).toEqual({ state })
+        expect(JSON.parse(String(init?.body))).toEqual({ state: 'closed' })
         return okJson({}, 200)
       }
       const c = new GitHubClient({
@@ -371,7 +316,7 @@ describe('GitHubClient', () => {
         upstreamOwner: 'titanxxh',
         upstreamRepo: 'open-agricola',
       })
-      await expect(c.setPrState(42, state)).resolves.toBeUndefined()
+      await expect(c.closePr(42)).resolves.toBeUndefined()
     })
 
     it('commentOnPr posts a comment (best effort, no throw on failure)', async () => {

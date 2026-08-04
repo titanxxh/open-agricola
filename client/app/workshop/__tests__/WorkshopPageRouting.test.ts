@@ -152,6 +152,21 @@ describe('WorkshopPage PR action state', () => {
     expect(state.buttonLabel).toBe('已合并 ✓')
   })
 
+  it('explains that resubmitting after closure creates a new PR', () => {
+    const state = getWorkshopPrActionState({
+      enabled: true,
+      isAuthor: true,
+      reviewStatus: 'in_review',
+      githubPrUrl: 'https://github.com/x/y/pull/7',
+      githubPrStatus: 'closed',
+      localesComplete: true,
+    })
+
+    expect(state.disabled).toBe(false)
+    expect(state.buttonLabel).toBe('重新提交审核')
+    expect(state.secondary).toBe('上次 PR #7 已关闭 · 将创建新的审核 PR')
+  })
+
   it('treats omitted localesComplete as legacy (allowed) for back-compat', () => {
     const state = getWorkshopPrActionState({
       enabled: true,

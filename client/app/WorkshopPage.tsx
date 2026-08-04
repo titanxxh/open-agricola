@@ -213,7 +213,7 @@ export function getWorkshopPrActionState(input: WorkshopPrActionInput): {
         visible: true,
         disabled: false,
         buttonLabel: '重新提交审核',
-        secondary: `上次 PR #${prNum} 已关闭 · 点击重开`,
+        secondary: `上次 PR #${prNum} 已关闭 · 将创建新的审核 PR`,
       }
     }
     return {
