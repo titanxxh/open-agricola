@@ -471,4 +471,4 @@ const CARD_IMPL = {
 }
 ```
 
-> `handHooks` 是 meta 字段，只声明会从手牌派发的 stage hook；不支持 `onBuy`、`onEndTurn`、`onBeforePlayerTurn`。一旦卡牌打出，只走正常 hook 路径。
+> `handHooks` 是 meta 字段，只声明会从手牌派发的 stage hook；不支持 `onBuy`、`onEndTurn`、`onBeforeEndGame`、`onBeforePlayerTurn`。一旦卡牌打出，只走正常 hook 路径。

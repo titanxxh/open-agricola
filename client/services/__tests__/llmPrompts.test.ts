@@ -5,6 +5,7 @@ import { sandboxListenerActions } from '../../../shared/custom-code/sandbox-list
 import { sandboxListenerPhases } from '../../../shared/custom-code/sandbox-listener-phases'
 import { sandboxListenerScopes } from '../../../shared/custom-code/sandbox-listener-scopes'
 import { SANDBOX_ALLOWED_ACTION_IDS } from '../../../shared/custom-code/sandbox-action-ids'
+import platformDesign from '../../../docs/PLATFORM_DESIGN.md?raw'
 
 describe('CARD_DESIGNER_SYSTEM_PROMPT', () => {
   it('does not advertise deprecated before-end dispatch metadata', () => {
@@ -75,13 +76,15 @@ describe('CARD_DESIGNER_SYSTEM_PROMPT', () => {
 
   it('limits handHooks to hooks dispatched from cards in hand', () => {
     expect(CARD_DESIGNER_SYSTEM_PROMPT).toContain('HandCardEffectHook[]')
-    expect(CARD_DESIGNER_SYSTEM_PROMPT).toContain('不支持 `onBuy`、`onEndTurn`、`onBeforePlayerTurn`')
+    expect(CARD_DESIGNER_SYSTEM_PROMPT).toContain('不支持 `onBuy`、`onEndTurn`、`onBeforeEndGame`、`onBeforePlayerTurn`')
   })
 
   it('documents the runtime farm-position shape', () => {
     expect(CARD_DESIGNER_SYSTEM_PROMPT).toContain('`positionKey({ row, col })`')
     expect(CARD_DESIGNER_SYSTEM_PROMPT).toContain('`"row-col"`')
     expect(CARD_DESIGNER_SYSTEM_PROMPT).not.toContain('`positionKey({ x, y })`')
+    expect(platformDesign).toContain('`positionKey({row,col})`')
+    expect(platformDesign).not.toContain('`positionKey({x,y})`')
   })
 
   it('renders exactly the actionId whitelist (no missing, no extras)', () => {

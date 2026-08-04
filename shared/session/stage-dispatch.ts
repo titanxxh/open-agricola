@@ -324,20 +324,6 @@ export class StageDispatch {
       }
     }
 
-    const handCards = this.getPlayerHandEffectCardIds(targetPlayer, 'onBeforeEndGame')
-    for (const cardId of handCards) {
-      const effect = getCardEffect(cardId)
-      if (!effect?.onBeforeEndGame) continue
-      const flow = this.buildBeforeEndGameActivationFlow(
-        cardId,
-        targetPlayer.id,
-        targetPlayer.id,
-        'owner',
-        effect.beforeEndGameMandatory !== false,
-      )
-      children.push(flow)
-    }
-
     return children
   }
 }

@@ -246,7 +246,7 @@ describe('ast-validator: CARD_IMPL hook/phase whitelisting', () => {
   })
 
   it('rejects handHooks that are not dispatched from cards in hand', () => {
-    for (const hook of ['onBuy', 'onEndTurn', 'onBeforePlayerTurn']) {
+    for (const hook of ['onBuy', 'onEndTurn', 'onBeforeEndGame', 'onBeforePlayerTurn']) {
       const result = validateCardCode(`
         const CARD_IMPL = {
           effect: {
@@ -258,6 +258,31 @@ describe('ast-validator: CARD_IMPL hook/phase whitelisting', () => {
       `)
       expect(result.valid).toBe(false)
       expect(result.valid === false && result.errors.some(e => e.includes(`unsupported hand hook '${hook}'`))).toBe(true)
+    }
+  })
+
+  it('rejects effect metadata hidden behind spread or computed properties', () => {
+    const sources = [
+      `
+        const CARD_IMPL = {
+          effect: {
+            ...{ handHooks: ['onEndTurn'] },
+            onEndTurn: () => {},
+          },
+        }
+      `,
+      `
+        const CARD_IMPL = {
+          effect: {
+            ['handHooks']: ['onEndTurn'],
+            onEndTurn: () => {},
+          },
+        }
+      `,
+    ]
+
+    for (const source of sources) {
+      expect(validateCardCode(source).valid).toBe(false)
     }
   })
 

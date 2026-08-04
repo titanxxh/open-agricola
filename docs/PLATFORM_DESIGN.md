@@ -355,7 +355,7 @@ const CARD_IMPL = {
 
 #### 沙盒注入 helper
 
-`gainLeaf(cardId, {food:2})`、`payLeaf({cardId, cost:{wood:1}})`、`spaceHasPlayer(space, playerId)`、`positionKey({x,y})`、`getCardStack(player, cardId)`、`readCardExtraData(player, cardId)`。
+`gainLeaf(cardId, {food:2})`、`payLeaf({cardId, cost:{wood:1}})`、`spaceHasPlayer(space, playerId)`、`positionKey({row,col})`、`getCardStack(player, cardId)`、`readCardExtraData(player, cardId)`。
 
 #### 设计平衡参考
 
