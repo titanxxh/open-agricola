@@ -1,5 +1,4 @@
 import { defineMinorCard } from '../card-source'
-import type { BonusModifier } from '../../contract/types'
 import type { CardImpl } from '../registry'
 
 const CARD_ID = 'C014_StrawThatchedRoof'
@@ -9,8 +8,6 @@ const CARD_ID = 'C014_StrawThatchedRoof'
  *
  * BGA reference: removes reed from construct and renovation costs.
  * Prerequisite: 3 Grain Fields.
- *
- * We model reed removal as a large discount capped at the current reed cost.
  */
 
 export const C014_StrawThatchedRoof = defineMinorCard({
@@ -26,25 +23,15 @@ export const C014_StrawThatchedRoof = defineMinorCard({
     prerequisite: '3 Grain Fields',
   },
   impl: {
-  modifiers: [
-    ...([
-        {
-          type: 'bonus',
-          cardId: CARD_ID,
-          appliesTo: ['construct'],
-          discount: { reed: 99 },
-          capDiscountAtCost: true,
-        },
-        {
-          type: 'bonus',
-          cardId: CARD_ID,
-          appliesTo: ['renovation'],
-          discount: { reed: 99 },
-          capDiscountAtCost: true,
-        },
-      ] as BonusModifier[]),
-  ],
-} satisfies CardImpl,
+    modifiers: [
+      {
+        type: 'remove-resource',
+        cardId: CARD_ID,
+        appliesTo: ['construct', 'renovation'],
+        resources: ['reed'],
+      },
+    ],
+  } satisfies CardImpl,
 })
 
 export const C014_StrawThatchedRoof_impl = C014_StrawThatchedRoof.impl

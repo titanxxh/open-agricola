@@ -197,7 +197,20 @@ export type BonusModifier = {
   maxCost?: Partial<Resource>
 }
 
-export type CostModifier = TradeModifier | BonusModifier
+export type CostResourceRemovalModifier = {
+  type: 'remove-resource'
+  cardId: string
+  appliesTo: CostModifierType[]
+  resources: ResourceKey[]
+}
+
+export type AppliedCostResourceRemoval = {
+  resource: ResourceKey
+  sourceCard: string
+  savedByFee: number[]
+}
+
+export type CostModifier = TradeModifier | BonusModifier | CostResourceRemovalModifier
 
 export type ComplexCost = {
   fee?: PaymentResourceMap
@@ -216,6 +229,7 @@ export type ComplexCost = {
   paymentBudget?: PaymentResourceMap
   cards?: { type: string; list: string[]; cost?: PaymentResourceMap; required?: boolean }
   bonuses?: Bonus[]
+  costResourceRemovals?: AppliedCostResourceRemoval[]
 }
 
 export type CostAttribution = {

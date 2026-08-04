@@ -108,6 +108,49 @@ describe('validateComplexCost', () => {
 })
 
 describe('applyCostModifiers — scope handling', () => {
+  it('removes named resources from fees while preserving unitFee for trade expansion', () => {
+    const baseCost = {
+      fee: { wood: 1, reed: 2 },
+      fees: [{ clay: 3, reed: 4 }, { stone: 5 }],
+      unitFee: { wood: 6, reed: 7 },
+      nb: 2,
+    }
+    const result = applyCostModifiers(baseCost, [{
+      type: 'remove-resource',
+      cardId: 'C014_StrawThatchedRoof',
+      appliesTo: ['construct', 'renovation'],
+      resources: ['reed'],
+    }])
+
+    expect(result).toMatchObject({
+      fee: { wood: 1 },
+      fees: [{ clay: 3 }, { stone: 5 }],
+      unitFee: { wood: 6, reed: 7 },
+      costResourceRemovals: [{
+        resource: 'reed',
+        sourceCard: 'C014_StrawThatchedRoof',
+        savedByFee: [4, 0],
+      }],
+    })
+    expect(baseCost.fee.reed).toBe(2)
+    expect(baseCost.fees[0]?.reed).toBe(4)
+    expect(baseCost.unitFee.reed).toBe(7)
+  })
+
+  it('attributes duplicate resource removals independently of modifier order', () => {
+    const modifiers = ['Z_card', 'A_card'].map((cardId) => ({
+      type: 'remove-resource' as const,
+      cardId,
+      appliesTo: ['renovation' as const],
+      resources: ['reed' as const],
+    }))
+
+    expect(applyCostModifiers({ fee: { reed: 1 } }, modifiers).costResourceRemovals)
+      .toEqual(applyCostModifiers({ fee: { reed: 1 } }, [...modifiers].reverse()).costResourceRemovals)
+    expect(applyCostModifiers({ fee: { reed: 1 } }, modifiers).costResourceRemovals?.[0]?.sourceCard)
+      .toBe('A_card')
+  })
+
   it('copies scope to synthesised Trade and validates', () => {
     const result = applyCostModifiers({}, [
       {

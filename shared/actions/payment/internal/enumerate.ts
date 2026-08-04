@@ -222,6 +222,15 @@ const mergeBonusReductions = (
   return next
 }
 
+const mergeBonusReductionsBySource = (
+  current: Record<string, PaymentResourceMap>,
+  additions: Record<string, PaymentResourceMap>,
+): Record<string, PaymentResourceMap> =>
+  Object.entries(additions).reduce(
+    (next, [source, reduction]) => mergeBonusReductions(next, [source], reduction),
+    current,
+  )
+
 /**
  * Dominance pruning over AFFORDABLE solutions (ADR 0004 amendment, restoring
  * the BGA keepOnlyOptimals semantics dropped in b2b00d96): a solution paying
@@ -881,6 +890,33 @@ export const computeAllBuyableCombinations = (
   const actionTrades = allTrades.filter((trade) => (trade.scope ?? 'action') === 'action')
   const unitTrades = allTrades.filter((trade) => trade.scope === 'unit')
   const unitTotals = buildUnitTotalOptions(effectiveCost.unitFee ?? {}, unitTrades, nb)
+  const costResourceRemovals = effectiveCost.costResourceRemovals ?? []
+
+  const removeCostResources = (costToFilter: PaymentResourceMap) => {
+    const cost = { ...costToFilter }
+    const reductions: Record<string, PaymentResourceMap> = {}
+    for (const removal of costResourceRemovals) {
+      const amount = cost[removal.resource] ?? 0
+      delete cost[removal.resource]
+      if (amount <= 0) continue
+      const source = reductions[removal.sourceCard] ?? {}
+      source[removal.resource] = (source[removal.resource] ?? 0) + amount
+      reductions[removal.sourceCard] = source
+    }
+    return { cost, reductions }
+  }
+
+  const initialRemovalReductions = (feeIdx: number) => {
+    const reductions: Record<string, PaymentResourceMap> = {}
+    for (const removal of costResourceRemovals) {
+      const amount = removal.savedByFee[feeIdx] ?? 0
+      if (amount <= 0) continue
+      const source = reductions[removal.sourceCard] ?? {}
+      source[removal.resource] = (source[removal.resource] ?? 0) + amount
+      reductions[removal.sourceCard] = source
+    }
+    return reductions
+  }
 
   for (const bonus of effectiveCost.bonuses ?? []) {
     validateBonus(bonus)
@@ -903,7 +939,9 @@ export const computeAllBuyableCombinations = (
   for (let feeIdx = 0; feeIdx < baseFeesRaw.length; feeIdx++) {
     const baseFeeRaw = baseFeesRaw[feeIdx]
     for (const unitTotal of unitTotals) {
-      const baseFee = clampNonNegative(mergePaymentResources(baseFeeRaw, unitTotal.cost))
+      const mergedBaseFee = clampNonNegative(mergePaymentResources(baseFeeRaw, unitTotal.cost))
+      const removedBaseFee = removeCostResources(mergedBaseFee)
+      const baseFee = removedBaseFee.cost
       const tradeCombos = actionTrades.length > 0
         ? generateTradeCombinations(actionTrades, playerResources)
         : [{ tradesUsed: [], result: { ...playerResources } }]
@@ -911,6 +949,10 @@ export const computeAllBuyableCombinations = (
       for (const tradeCombo of tradeCombos) {
         const tradesUsed = mergeTradeUsage(unitTotal.tradesUsed, tradeCombo.tradesUsed)
         if (!isWithinTradeGroupLimits(tradesUsed)) continue
+        const removalReductions = mergeBonusReductionsBySource(
+          initialRemovalReductions(feeIdx),
+          removedBaseFee.reductions,
+        )
         type BonusPath = {
           cost: PaymentResourceMap
           sources: string[]
@@ -919,7 +961,13 @@ export const computeAllBuyableCombinations = (
           bonusReductions: Record<string, PaymentResourceMap>
         }
         let bonusPaths: BonusPath[] = [
-          { cost: baseFee, sources: [], choiceIndices: {}, choiceAffectsState: {}, bonusReductions: {} },
+          {
+            cost: baseFee,
+            sources: Object.keys(removalReductions),
+            choiceIndices: {},
+            choiceAffectsState: {},
+            bonusReductions: removalReductions,
+          },
         ]
 
         for (const bonus of effectiveCost.bonuses ?? []) {
@@ -987,7 +1035,9 @@ export const computeAllBuyableCombinations = (
               if (!canApplyBonus(path.cost, candidate.discount, candidate.capDiscountAtCost)) {
                 continue
               }
-              const nextCost = applyBonus(path.cost, candidate.discount, candidate.capDiscountAtCost)
+              const candidateCost = applyBonus(path.cost, candidate.discount, candidate.capDiscountAtCost)
+              const removed = removeCostResources(candidateCost)
+              const nextCost = removed.cost
               const costChanged = resourceSignature(path.cost) !== resourceSignature(nextCost)
               const reduction = collectCostReduction(path.cost, nextCost)
               const appliedSources = [...new Set([
@@ -996,10 +1046,11 @@ export const computeAllBuyableCombinations = (
               ])]
               const combined = new Set([
                 ...path.sources,
-                ...(bonus.sources ?? []),
-                ...(candidate.sources ?? []),
+                ...(costChanged ? bonus.sources ?? [] : []),
+                ...(costChanged ? candidate.sources ?? [] : []),
+                ...Object.keys(removed.reductions),
               ])
-              const nextSources = costChanged ? [...combined] : [...path.sources]
+              const nextSources = [...combined]
               const nextChoiceIndices =
                 costChanged && isMultiChoice && bonusKey && candidate.trackChoiceIndex !== false
                   ? { ...path.choiceIndices, [bonusKey]: candidate._origIndex }
@@ -1013,10 +1064,13 @@ export const computeAllBuyableCombinations = (
                 sources: nextSources,
                 choiceIndices: nextChoiceIndices,
                 choiceAffectsState: nextChoiceAffectsState,
-                bonusReductions: mergeBonusReductions(
-                  path.bonusReductions,
-                  costChanged ? appliedSources : [],
-                  reduction,
+                bonusReductions: mergeBonusReductionsBySource(
+                  mergeBonusReductions(
+                    path.bonusReductions,
+                    costChanged ? appliedSources : [],
+                    reduction,
+                  ),
+                  removed.reductions,
                 ),
               })
             }

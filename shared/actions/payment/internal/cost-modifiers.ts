@@ -15,7 +15,9 @@ import type {
   ComplexCost,
   CostModifier,
   CostModifierType,
+  PaymentResourceMap,
   PlayerState,
+  ResourceKey,
   Trade,
   TradeModifier,
 } from '../../../contract/types'
@@ -51,14 +53,54 @@ export const getModifiersForCostType = (
   const all = player.activeModifiers?.filter((m) => m.appliesTo.includes(costType)) ?? []
   // Layer 1 only: static player-state checks (houseType*). minNumRooms is
   // deferred to evaluateConditions(_, _, nb) inside enumerate.
-  return all.filter((m) => evaluateStaticConditions(player, m.conditions))
+  return all.filter((m) =>
+    m.type === 'remove-resource' || evaluateStaticConditions(player, m.conditions),
+  )
 }
 
 export const applyCostModifiers = (
   baseCost: ComplexCost,
   modifiers: CostModifier[],
 ): ComplexCost => {
-  let result: ComplexCost = { ...baseCost }
+  let result: ComplexCost = {
+    ...baseCost,
+    ...(baseCost.fee ? { fee: { ...baseCost.fee } } : {}),
+    ...(baseCost.fees ? { fees: baseCost.fees.map((fee) => ({ ...fee })) } : {}),
+    ...(baseCost.unitFee ? { unitFee: { ...baseCost.unitFee } } : {}),
+  }
+
+  const removalModifiers = modifiers
+    .filter((mod) => mod.type === 'remove-resource')
+    .sort((left, right) => left.cardId.localeCompare(right.cardId))
+  const claimedResources = new Set<ResourceKey>()
+  const baseFees = result.fees && result.fees.length > 0
+    ? result.fees
+    : result.fee
+      ? [result.fee]
+      : [{}]
+  const costResourceRemovals = removalModifiers.flatMap((modifier) =>
+    modifier.resources.flatMap((resource) => {
+      if (claimedResources.has(resource)) return []
+      claimedResources.add(resource)
+      return [{
+        resource,
+        sourceCard: modifier.cardId,
+        savedByFee: baseFees.map((fee) => Math.max(0, fee[resource] ?? 0)),
+      }]
+    }),
+  )
+  if (costResourceRemovals.length > 0) {
+    const remove = (fee: PaymentResourceMap): PaymentResourceMap => {
+      const next = { ...fee }
+      for (const { resource } of costResourceRemovals) delete next[resource]
+      return next
+    }
+    if (result.fee) result.fee = remove(result.fee)
+    if (result.fees) result.fees = result.fees.map(remove)
+    result.costResourceRemovals = costResourceRemovals
+  } else {
+    delete result.costResourceRemovals
+  }
 
   const effectiveTrades: Trade[] = [...(result.trades ?? [])]
   const effectiveBonuses: Bonus[] = [...(result.bonuses ?? [])]
