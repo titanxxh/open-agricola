@@ -58,6 +58,24 @@ const ALLOWED_EFFECT_KEYS = new Set<string>([
 const ALLOWED_LISTENER_PHASES = new Set<string>(sandboxListenerPhases)
 const RESOURCE_KEYS = new Set<string>(REAL_RESOURCE_KEYS)
 
+function getStaticStringValue(
+  input: ts.Expression,
+  constants: Map<string, string>,
+): string | undefined {
+  let expression = input
+  while (
+    ts.isParenthesizedExpression(expression)
+    || ts.isAsExpression(expression)
+    || ts.isTypeAssertionExpression(expression)
+    || ts.isNonNullExpression(expression)
+    || ts.isSatisfiesExpression(expression)
+  ) expression = expression.expression
+  if (ts.isStringLiteral(expression) || ts.isNoSubstitutionTemplateLiteral(expression)) {
+    return expression.text
+  }
+  return ts.isIdentifier(expression) ? constants.get(expression.text) : undefined
+}
+
 function collectStringConstants(sourceFile: ts.SourceFile): Map<string, string> {
   const constants = new Map<string, string>()
   for (const statement of sourceFile.statements) {
@@ -69,12 +87,9 @@ function collectStringConstants(sourceFile: ts.SourceFile): Map<string, string> 
       if (
         ts.isIdentifier(declaration.name)
         && declaration.initializer
-        && (
-          ts.isStringLiteral(declaration.initializer)
-          || ts.isNoSubstitutionTemplateLiteral(declaration.initializer)
-        )
       ) {
-        constants.set(declaration.name.text, declaration.initializer.text)
+        const value = getStaticStringValue(declaration.initializer, constants)
+        if (value !== undefined) constants.set(declaration.name.text, value)
       }
     }
   }
@@ -165,7 +180,7 @@ function forEachListenerResultObject(
     if (!phases) return true
     if (!ts.isPropertyAssignment(phases) || !ts.isArrayLiteralExpression(phases.initializer)) return true
     return phases.initializer.elements.some(
-      phase => ts.isStringLiteral(phase) && phase.text === 'computeCosts',
+      phase => getStaticStringValue(phase, constants) === 'computeCosts',
     )
   }
   const visitResult = (expression: ts.Expression, rejectUninspectable: boolean): void => {
@@ -371,7 +386,6 @@ export function validateCardCode(source: string, expectedCardId?: string): Valid
   )
 
   const errors: string[] = []
-  const constants = collectStringConstants(sourceFile)
 
   function getLine(node: ts.Node): number {
     const { line } = sourceFile.getLineAndCharacterOfPosition(node.getStart())
@@ -401,26 +415,6 @@ export function validateCardCode(source: string, expectedCardId?: string): Valid
     if (ts.isCallExpression(node) && ts.isIdentifier(node.expression) && node.expression.text === 'require') {
       errors.push(`line ${getLine(node)}: require() is not allowed`)
       return
-    }
-
-    if (
-      ts.isBinaryExpression(node)
-      && node.operatorToken.kind >= ts.SyntaxKind.FirstAssignment
-      && node.operatorToken.kind <= ts.SyntaxKind.LastAssignment
-    ) {
-      const assignedName = ts.isPropertyAccessExpression(node.left)
-        ? node.left.name.text
-        : ts.isElementAccessExpression(node.left)
-          ? ts.isStringLiteral(node.left.argumentExpression)
-            || ts.isNoSubstitutionTemplateLiteral(node.left.argumentExpression)
-            ? node.left.argumentExpression.text
-            : ts.isIdentifier(node.left.argumentExpression)
-              ? constants.get(node.left.argumentExpression.text)
-              : undefined
-          : undefined
-      if (assignedName === 'costs' || assignedName === 'costAttribution') {
-        errors.push(`line ${getLine(node)}: assigning to '${assignedName}' is not allowed; return costs and costAttribution together`)
-      }
     }
 
     // Check identifier references against deny list

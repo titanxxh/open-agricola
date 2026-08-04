@@ -387,19 +387,19 @@ export async function handleSubmitReviewRequest(
       upstreamBaseSha,
       preservedTreeEntries,
     })
-    await client.upsertBranch({
+    const previousBranchSha = await client.upsertBranch({
       forkOwner: githubLogin,
       branchName,
       commitSha: commit1.commitSha,
     })
     if (replacementPr) {
-      await client.closePr(replacementPr.number)
       pr = null
     }
 
     // Find or open PR
     if (!pr) {
       try {
+        if (replacementPr) await client.closePr(replacementPr.number)
         pr = await client.openPr({
           forkOwner: githubLogin,
           branchName,
@@ -407,7 +407,14 @@ export async function handleSubmitReviewRequest(
           body: buildPrBody(wcard, githubLogin),
         })
       } catch (error) {
-        if (replacementPr) await client.reopenPr(replacementPr.number)
+        if (replacementPr && previousBranchSha) {
+          await client.upsertBranch({
+            forkOwner: githubLogin,
+            branchName,
+            commitSha: previousBranchSha,
+          })
+          await client.reopenPr(replacementPr.number)
+        }
         throw error
       }
     } else {

@@ -13,12 +13,16 @@ const isPlainRecord = (value: unknown): value is Record<string, unknown> => {
   return prototype === Object.prototype || prototype === null
 }
 
-const isResourceDelta = (value: unknown): value is Record<string, number> => (
-  isPlainRecord(value)
-  && Object.entries(value).every(([key, amount]) => (
-    RESOURCE_KEYS.has(key) && typeof amount === 'number' && Number.isFinite(amount)
-  ))
-)
+const normalizeResourceDelta = (value: unknown): Record<string, number> | null => {
+  if (!isPlainRecord(value)) return null
+  const result: Record<string, number> = {}
+  for (const [key, amount] of Object.entries(value)) {
+    if (amount === undefined) continue
+    if (!RESOURCE_KEYS.has(key) || typeof amount !== 'number' || !Number.isFinite(amount)) return null
+    result[key] = amount
+  }
+  return result
+}
 
 const equalResourceDeltas = (
   left: Record<string, number>,
@@ -48,14 +52,16 @@ export const validateCustomListenerResult = (
     && isPlainRecord(attribution[0])
     ? attribution[0]
     : null
+  const costs = normalizeResourceDelta(value.costs)
+  const attributedCosts = entry ? normalizeResourceDelta(entry.costs) : null
   if (
-    !isResourceDelta(value.costs)
+    !costs
     || !entry
     || !Object.hasOwn(entry, 'sourceCard')
     || entry.sourceCard !== cardId
     || !Object.hasOwn(entry, 'costs')
-    || !isResourceDelta(entry.costs)
-    || !equalResourceDeltas(value.costs, entry.costs)
+    || !attributedCosts
+    || !equalResourceDeltas(costs, attributedCosts)
   ) {
     throw new Error('custom listener results with costs require one matching costAttribution entry')
   }

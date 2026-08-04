@@ -323,11 +323,12 @@ export class GitHubClient {
     forkOwner: string
     branchName: string
     commitSha: string
-  }): Promise<void> {
+  }): Promise<string | null> {
     const { forkOwner, branchName, commitSha } = opts
     const repo = this.opts.upstreamRepo
     const check = await this.fetch(`/repos/${forkOwner}/${repo}/git/ref/heads/${branchName}`)
     if (check.ok) {
+      const previousCommitSha = ((await check.json()) as { object: { sha: string } }).object.sha
       const patch = await this.fetch(
         `/repos/${forkOwner}/${repo}/git/refs/heads/${branchName}`,
         {
@@ -339,6 +340,7 @@ export class GitHubClient {
       if (!patch.ok) {
         throw new GitHubApiError('ref update failed', 'ref_update_failed', patch.status)
       }
+      return previousCommitSha
     } else if (check.status === 404) {
       const post = await this.fetch(`/repos/${forkOwner}/${repo}/git/refs`, {
         method: 'POST',
@@ -348,6 +350,7 @@ export class GitHubClient {
       if (!post.ok) {
         throw new GitHubApiError('ref create failed', 'ref_create_failed', post.status)
       }
+      return null
     } else {
       throw new GitHubApiError('ref lookup failed', 'ref_lookup_failed', check.status)
     }

@@ -792,12 +792,13 @@ describe('GitHubClient', () => {
         upstreamOwner: 'titanxxh',
         upstreamRepo: 'open-agricola',
       })
-      await c.upsertBranch({
+      const previousCommitSha = await c.upsertBranch({
         forkOwner: 'alice',
         branchName: 'workshop/CUSTOM_X',
         commitSha: 'new',
       })
       expect(patched).toBe(true)
+      expect(previousCommitSha).toBe('old')
     })
   })
 

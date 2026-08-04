@@ -269,6 +269,7 @@ type StubCounts = {
   treeCalls: number
   treeEntries: Array<Array<{ path: string; sha: string | null; mode: string }>>
   blobContents: Map<string, string>
+  mutations: string[]
 }
 
 function createGitHubApiStub(opts: StubOpts): {
@@ -294,6 +295,7 @@ function createGitHubApiStub(opts: StubOpts): {
     treeCalls: 0,
     treeEntries: [],
     blobContents: new Map(),
+    mutations: [],
   }
 
   const fn = (url: string, init?: RequestInit): Promise<Response> => {
@@ -414,9 +416,12 @@ function createGitHubApiStub(opts: StubOpts): {
       )
     }
 
-    // Branch ref check (GET /git/ref/heads/workshop/*) — 404 first time so we
-    // go through create; if called again the update path (PATCH) will be hit.
     if (url.includes('/git/ref/heads/workshop/') && method === 'GET') {
+      if (existingPr) {
+        return Promise.resolve(new Response(JSON.stringify({
+          object: { sha: 'existing_pr_head' },
+        }), { status: 200 }))
+      }
       return Promise.resolve(new Response('', { status: 404 }))
     }
 
@@ -427,6 +432,7 @@ function createGitHubApiStub(opts: StubOpts): {
 
     // Update ref (PATCH /git/refs/heads/workshop/*)
     if (url.includes('/git/refs/heads/workshop/') && method === 'PATCH') {
+      counts.mutations.push(`branch:${JSON.parse(String(init?.body)).sha}`)
       return Promise.resolve(new Response(JSON.stringify({}), { status: 200 }))
     }
 
@@ -481,6 +487,7 @@ function createGitHubApiStub(opts: StubOpts): {
       const state = JSON.parse(String(init?.body ?? '{}')).state
       if (state === 'open') counts.reopenPrCalls++
       if (state === 'closed') counts.closePrCalls++
+      counts.mutations.push(state)
       return Promise.resolve(new Response(JSON.stringify({}), { status: 200 }))
     }
 
@@ -1189,7 +1196,7 @@ describe('workshop PR propose — session', () => {
     )))).toBe(true)
   })
 
-  it('reopens a replacement source PR when opening the new PR fails', async () => {
+  it('restores and reopens a non-main source PR when opening its replacement fails', async () => {
     const hs = tokenCache.allocateHandshakeId(userId)
     tokenCache.bind(hs, 'ghp_mock')
     const { fn: gh, counts } = createGitHubApiStub({
@@ -1197,7 +1204,7 @@ describe('workshop PR propose — session', () => {
       existingPr: {
         number: 99,
         url: 'https://github.com/titanxxh/open-agricola/pull/99',
-        isDraft: true,
+        baseRefName: 'release',
       },
       existingPrFiles: [{
         filename: 'server/__tests__/CUSTOM_TestCard-session.test.ts',
@@ -1220,6 +1227,12 @@ describe('workshop PR propose — session', () => {
     expect(JSON.parse(res.body)).toMatchObject({ ok: false, code: 'pr_create_failed' })
     expect(counts.closePrCalls).toBe(1)
     expect(counts.reopenPrCalls).toBe(1)
+    expect(counts.mutations).toEqual([
+      'branch:commit_1',
+      'closed',
+      'branch:existing_pr_head',
+      'open',
+    ])
   })
 
   it('replays preserved test edits onto the current main file', async () => {

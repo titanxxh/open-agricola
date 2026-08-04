@@ -195,18 +195,36 @@ describe('ast-validator: CARD_IMPL hook/phase whitelisting', () => {
 
     expect(result.valid).toBe(false)
     expect(result.valid === false && result.errors.some(
-      error => error.includes("assigning to 'costs' is not allowed"),
+      error => error.includes('listener handlers must return statically inspectable objects'),
     )).toBe(true)
+  })
+
+  it('accepts nested payload cost fields outside listener results', () => {
+    const result = validateCardCode(`
+      const CARD_IMPL = {
+        listeners: [{
+          phases: ['after'],
+          handler: () => {
+            const payload = {}
+            payload.costs = { wood: 1 }
+            return { extraData: payload }
+          },
+        }],
+      }
+    `)
+
+    expect(result.valid).toBe(true)
   })
 
   it('flags indirect compute-cost handler results in the production audit', () => {
     const lines = findInvalidCostAttributionLines(`
+      const COMPUTE_COSTS = 'computeCosts'
       const discountHandler = () => {
         const result = { costs: { wood: -1 } }
         return result
       }
       const listener = {
-        phases: ['computeCosts'],
+        phases: [COMPUTE_COSTS as ActionHookPhase],
         handler: discountHandler,
       }
     `)
