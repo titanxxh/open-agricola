@@ -919,7 +919,13 @@ export const computeAllBuyableCombinations = (
           bonusReductions: Record<string, PaymentResourceMap>
         }
         let bonusPaths: BonusPath[] = [
-          { cost: baseFee, sources: [], choiceIndices: {}, choiceAffectsState: {}, bonusReductions: {} },
+          {
+            cost: baseFee,
+            sources: [...(effectiveCost.costModifierSources ?? [])],
+            choiceIndices: {},
+            choiceAffectsState: {},
+            bonusReductions: {},
+          },
         ]
 
         for (const bonus of effectiveCost.bonuses ?? []) {

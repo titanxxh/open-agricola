@@ -108,6 +108,30 @@ describe('validateComplexCost', () => {
 })
 
 describe('applyCostModifiers — scope handling', () => {
+  it('removes named resources from fee, fees, and unitFee without mutating the base cost', () => {
+    const baseCost = {
+      fee: { wood: 1, reed: 2 },
+      fees: [{ clay: 3, reed: 4 }, { stone: 5 }],
+      unitFee: { wood: 6, reed: 7 },
+    }
+    const result = applyCostModifiers(baseCost, [{
+      type: 'remove-resource',
+      cardId: 'C014_StrawThatchedRoof',
+      appliesTo: ['construct', 'renovation'],
+      resources: ['reed'],
+    }])
+
+    expect(result).toMatchObject({
+      fee: { wood: 1 },
+      fees: [{ clay: 3 }, { stone: 5 }],
+      unitFee: { wood: 6 },
+      costModifierSources: ['C014_StrawThatchedRoof'],
+    })
+    expect(baseCost.fee.reed).toBe(2)
+    expect(baseCost.fees[0]?.reed).toBe(4)
+    expect(baseCost.unitFee.reed).toBe(7)
+  })
+
   it('copies scope to synthesised Trade and validates', () => {
     const result = applyCostModifiers({}, [
       {

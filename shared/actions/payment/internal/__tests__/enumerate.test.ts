@@ -377,15 +377,15 @@ describe('computeAllBuyableCombinations — nb + unitFee scaling', () => {
     expect(payments).not.toContainEqual({ reed: 1, wood: 1 })
   })
 
-  it('capDiscountAtCost removes the current cost for a resource without requiring an exact discount amount', () => {
+  it('capDiscountAtCost caps a positive discount at the current resource cost', () => {
     const player = baseTestPlayer({ wood: 5, reed: 2 })
     const cost: ComplexCost = {
       fee: { wood: 5, reed: 2 },
       bonuses: [{
-        discount: { reed: 99 },
+        discount: { reed: 3 },
         capDiscountAtCost: true,
         optional: true,
-        sources: ['C014_StrawThatchedRoof'],
+        sources: ['TestCappedDiscount'],
       }],
     }
 

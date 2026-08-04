@@ -120,7 +120,7 @@ BGA PHP 路径默认相对 `/data00/home/xuxinhao.titan/raw/bga-agricola/modules
 | Printed improvement base cost helper | `getPrintedImprovementResourceCost()`、D80/E156 | 读取 minor / major definitions 的 printed/base cost candidates；`cost`、minor `altCosts`、major complex `fee` / `fees` 是候选组，按目标资源取最大值，不按实际支付或候选求和。 |
 | Card-purchase ComputeCardCosts candidate pipeline | `resolveCardCostWithModifiersDetailed()`、`deriveCardCostCandidate` + `cardCostCandidateMandatory`、`CardImpl.getBaseCosts()`、`PaymentSolver.discountCardCostCandidate()`、ADR 0003、ADR 0004 | 购买 major / minor improvement 的新成本变形走 Cost Candidate List；A20/B36 这类动态基础费用在 pipeline 前产出 base candidates；卡牌只声明单候选转换，遍历 / 去重 / 饱和过滤由候选闭包负责（`CardListenerRegistration.order` 已删除，禁止重新引入顺序字段）；普通折扣天然保留原候选，后续 payment dominance 再隐藏严格劣势支付项；`cardCostCandidateMandatory` 只用于固定价 / replacement 这类必须隐藏原 candidate 的语义（如 A27），不可用于 A75 这类普通折扣；折到 0 的资源键省略；候选 metadata 不写入资源 map 或通用 `PaymentSolution`，由 PaymentSolver payment receipt 合并到现有 `sourceCards`，并在支付选定后把 Cost Attribution 写入 Card Resource Stats；生产卡牌通过 `PaymentSolver` 使用 candidate helper，不直接 import `payment/internal/*`。 |
 | FoM 跨玩家 marker / 传牌小改良 | `publicCardMarkers` helper、`pass-minor-card-to-left` internal action、`card.passed` provenance、FarmBoard player summary marker | 跨玩家公开 marker 写入目标玩家 `cardStates[sourceCard].extraData.publicCardMarkers`，计分进入 `cardBonusVp`，UI 只扩展原有玩家摘要显示；传牌必须走 internal action 移除原打出区和 cardState、给目标玩家私有 handChanged，并用 `card.passed` 事件触发后续 listener。 |
-| Payment bonus choices / unit cost alternatives | `Bonus.capDiscountAtCost`、`Bonus.trackChoiceIndex`、`Bonus.choiceAffectsState`、A16、C56、D88 | 普通 bonus choice 必须在折扣后不产生负 cost；typed cost payment 不保留 `resourcesPaid` 为负的 surplus 分支。BGA `addCost` per-unit alternative 先用 `scope:'unit'` trade 生成 cost row，再允许 D88 这类 bonus choice 继续替换。只有“移除当前 cost 中某资源”这类卡牌显式设置 cap 时，折扣才按当前 cost 封顶。`bonusChoiceIndex` 只表示玩家选了第几个 choice；只有 `choiceAffectsState` 标记的 choice identity 会被 after-pay 等 listener 消费并改变状态时，payment dominance 才禁止互剪。B145/D88 这类无状态 replacement choice 不设置该标记。 |
+| Payment resource removal / bonus choices / unit cost alternatives | `CostResourceRemovalModifier`、`Bonus.capDiscountAtCost`、`Bonus.trackChoiceIndex`、`Bonus.choiceAffectsState`、C14、A16、C56、D88 | “不再需要某费用资源”在枚举前从 `fee` / `fees` / `unitFee` 删除资源键，不能用任意大 capped discount 模拟；普通 bonus choice 必须在折扣后不产生负 cost，typed cost payment 不保留 `resourcesPaid` 为负的 surplus 分支。BGA `addCost` per-unit alternative 先用 `scope:'unit'` trade 生成 cost row，再允许 D88 这类 bonus choice 继续替换。`bonusChoiceIndex` 只表示玩家选了第几个 choice；只有 `choiceAffectsState` 标记的 choice identity 会被 after-pay 等 listener 消费并改变状态时，payment dominance 才禁止互剪。B145/D88 这类无状态 replacement choice 不设置该标记。 |
 | Card-provided payment resources | `ComplexCost.paymentResourceProviders`、`PaymentSolution.paymentResourceCovers`、`B155_ArtTeacher`、ADR 0004 | 卡牌可在 `computeCosts` 内声明 payment-only 虚拟资源；provider 在卡牌内部定义可用量、覆盖比例和消费来源。虚拟资源不进入成本候选行或 `PlayerState.resources`，但会出现在 payment option / `resourcesPaid`；使用 provider 的 payment option 必须把 provider `sourceCard` 合入 `sourceCards` 以区分卡牌效果路径，并由 executor 消耗来源状态。 |
 | Payment budgets | `ComplexCost.paymentBudget`、`fencePolicy.paymentBudget`、`B015_CarpentersBench` | 对最终 `PaymentSolution.resourcesPaid` 做资源上限过滤；不提供资源、不改变 cost row、不作为 `segmentBounds`。fencing 中用于 B15 这类“只能使用本次资源”的规则，必须在 free fence / computeCosts / payment solver 之后检查，禁止用 collected+1 段数上限替代。 |
 | Candidate Closure（候选闭包，ADR 0004） | `candidate-closure.ts` `closeCandidates()`、`buildUnitCostOptions()` 闭包接入、`cost-modifier-permutation-probe.test.ts` | unit trade（D15/B145/A123 等）不再声明 `order`，`Trade.order` / `TradeModifier.order` 已删除；可达 cost row 集合由闭包求不动点产出，与修改器注册顺序无关；mandatory 饱和过滤保证强制折扣链任意序收敛；新增 cost 转换只声明局部语义（替换什么、mandatory 与否、maxUses），禁止重新引入任何顺序字段。 |
@@ -848,7 +848,7 @@ Action reaction listener 的同一 owner / phase 默认进入 `trigger-select`�
 | `C011_WildlifeReserve` | 已对齐 | Farmers of the Moor 启用时仍只允许 sheep / boar / cattle 各 1，horse 会被 card-zone invalid-animal 校验拒绝。 |
 | `C012_CattleFarm` | 已对齐 |  |
 | `C013_WoodSlideHammer` | 已对齐 | wood house 且至少 5 rooms 的直接翻修到 stone 折扣走 mandatory sourced bonus modifier，不保留原始 stone 翻修成本分支。 |
-| `C014_StrawThatchedRoof` | 已对齐 | construct / renovation 移除 reed 通过 `capDiscountAtCost` 表达，不再依赖过量折扣被 payment 枚举器截断。 |
+| `C014_StrawThatchedRoof` | 已对齐 | construct / renovation 在 payment 枚举前通过 `CostResourceRemovalModifier` 从 `fee` / `fees` / `unitFee` 删除 reed；E123 顶部 reed 不再生成或消耗支付选项。 |
 | `C015_Trellis` | 已对齐 | BGA ordinary `FENCING` 子行动映射到内部 `fence` leaf。 |
 | `C016_FieldFences` | 已对齐 | field-adjacent fence 折扣显式声明 Cost Attribution，按真实提交的相邻 fence 数记录 saved wood。 |
 | `C017_NewlyPlowedField` | 已对齐 |  |
@@ -1172,7 +1172,7 @@ Action reaction listener 的同一 owner / phase 默认进入 `trigger-select`�
 | `D155_Ebonist` | 已对齐 | runtime/display exchange 都为 harvest window，`sourceId=D155_Ebonist`，不再暴露为 anytime exchange |
 | `D156_RetailDealer` | 已对齐 |  |
 | `D157_PartyOrganizer` | 已对齐 |  |
-| `D158_BeanCounter` | 已对齐 |  |
+| `D158_BeanCounter` | 已对齐 | 通过 `roundActionOrder` / `getRoundActionSlot()` 判断真实第 1–8 轮行动格，不再依赖 action definition 的 `roundAvailable`。 |
 | `D159_ReedSeller` | 排除 | BGA implemented=false；OA 保留 data-only 定义 |
 | `D160_Midwife` | 已对齐 |  |
 | `D161_CabbageBuyer` | 已对齐 | renovation tracker 覆盖 renovate-house 与后续 major/minor improvement；无 worker placement 的卡牌 renovation 直接给 3f offer |
