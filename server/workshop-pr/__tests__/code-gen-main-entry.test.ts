@@ -43,7 +43,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
 ]
 `
   const upstreamMd = `# CC\n<!-- community-card-entries:begin -->\n| ID |\n<!-- community-card-entries:end -->\n`
-  it('returns 5 files when no art', async () => {
+  it('returns 4 files when no art', async () => {
     const files = await generatePrFiles({
       wcard,
       github_login: 'alice-gh',
@@ -53,17 +53,16 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
       pr_number: 0,
       art_data: null,
     })
-    expect(files).toHaveLength(5)
+    expect(files).toHaveLength(4)
     expect(files.map((f) => f.path)).toEqual([
       'shared/cards/community/CUSTOM_Foo.ts',
-      'shared/cards/community/__tests__/CUSTOM_Foo.test.ts',
       'shared/cards/register-all.ts',
       'shared/cards/catalog.generated.ts',
       'docs/community_cards.md',
     ])
   })
 
-  it('returns 6 files when art_data provided', async () => {
+  it('returns 5 files when art_data provided', async () => {
     const files = await generatePrFiles({
       wcard,
       github_login: 'alice-gh',
@@ -73,9 +72,9 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
       pr_number: 0,
       art_data: { ext: 'webp', buffer: Buffer.from('fakepng') },
     })
-    expect(files).toHaveLength(6)
-    expect(files[5]!.path).toBe('public/card-art/community/CUSTOM_Foo.webp')
-    expect(files[5]!.encoding).toBe('base64')
+    expect(files).toHaveLength(5)
+    expect(files[4]!.path).toBe('public/card-art/community/CUSTOM_Foo.webp')
+    expect(files[4]!.encoding).toBe('base64')
     const cardFile = files.find((file) => file.path === 'shared/cards/community/CUSTOM_Foo.ts')!
     const catalogFile = files.find((file) => file.path === 'shared/cards/catalog.generated.ts')!
     expect(cardFile.content).toContain('artUrl: "/card-art/community/CUSTOM_Foo.webp"')

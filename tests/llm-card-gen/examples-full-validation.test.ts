@@ -48,7 +48,7 @@ describe('community-card-examples.md — full validation (S9-B3)', () => {
         expect(result.valid).toBe(true)
       })
 
-      it('PR generation produces 5 syntactically valid TS files', async () => {
+      it('PR generation produces 4 syntactically valid files', async () => {
         const ex = get()
         const wcard = {
           id: `example-${idx}`,
@@ -75,7 +75,7 @@ describe('community-card-examples.md — full validation (S9-B3)', () => {
           ),
           pr_number: 1000 + idx,
         })
-        expect(files.length).toBe(5)
+        expect(files.length).toBe(4)
         expect(files.some((f) => f.path.includes('cards-display'))).toBe(false)
         // Parse generated TS files — ensures no syntax errors
         for (const f of files) {

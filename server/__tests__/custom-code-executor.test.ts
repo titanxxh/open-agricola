@@ -4,10 +4,16 @@ import { executeCardListener, getMatchingListeners } from '../../shared/cards/ca
 import { getCardEffect, runCardEffectHook } from '../../shared/cards/card-effects.ts'
 import { computeAnimalZones } from '../../shared/domain/animal-zones.ts'
 import { createInitialState } from '../../shared/session/state-bootstrap.ts'
-import { validateAndCompileCustomCode, invokeCustomCodeEffect } from '../custom-code/engine.ts'
+import { CardRegistry } from '../../shared/cards/registry.ts'
+import {
+  validateAndCompileCustomCode,
+  invokeCustomCodeEffect,
+  invokeCustomCodeListener,
+} from '../custom-code/engine.ts'
 import { registerExecutorBackedCustomCard } from '../custom-code/runtime.ts'
 import { GameSession } from '../game/authoritative-session.ts'
 import { workshopCardJsonFromDefinition } from '../workshop-draft-validation.ts'
+import { compileCardCode } from '../../shared/custom-code/compiler.ts'
 
 const makeCardData = (compiledCode: string, codeManifest: CustomCardData['codeManifest']): CustomCardData => ({
   cardType: 'minor',
@@ -197,6 +203,91 @@ const CARD_IMPL = {
     expect(result.valid).toBe(false)
     if (result.valid) return
     expect(result.errors.join('\n')).toContain('process')
+  })
+
+  it('rejects dynamically constructed costs without attribution at runtime', () => {
+    const source = `
+const CARD_ID = 'CUSTOM_ExecutorCard'
+const CARD_DEF = MinorImprovement({ id: CARD_ID, name: 'Executor Card' })
+const CARD_IMPL = {
+  listeners: [{
+    cardIds: [CARD_ID],
+    actions: ['construct'],
+    phases: ['computeCosts'],
+    handler: () => Object.fromEntries([['costs', { wood: -2 }]]),
+  }],
+}
+    `
+
+    expect(invokeCustomCodeListener({
+      compiledCode: compileCardCode(source),
+      cardId: 'CUSTOM_ExecutorCard',
+      registrationId: 'CUSTOM_ExecutorCard:listener:0',
+      context: {} as never,
+    })).toEqual({ ok: false, error: expect.stringContaining('costAttribution') })
+  })
+
+  it('rejects invalid results from a normally registered custom listener', () => {
+    const state = createInitialState(42)
+    const player = state.players[0]!
+    const space = state.actionSpaces[0]!
+    const registry = new CardRegistry()
+    registry.loadImpl('CUSTOM_ExecutorCard', {
+      listeners: [{
+        id: 'opaque-listener-id',
+        handler: () => Object.fromEntries([['costs', { wood: -2 }]]),
+      }],
+    })
+
+    expect(() => executeCardListener(registry.getAllListeners()[0]!, {
+      state,
+      player,
+      space,
+      actionId: 'construct',
+      phase: 'computeCosts',
+    })).toThrow('costAttribution')
+  })
+
+  it('rejects inherited costs from a normally registered custom listener', () => {
+    const state = createInitialState(42)
+    const registry = new CardRegistry()
+    registry.loadImpl('CUSTOM_ExecutorCard', {
+      listeners: [{
+        id: 'opaque-listener-id',
+        handler: () => ({
+          __proto__: Object.fromEntries([['costs', { wood: -2 }]]),
+        }),
+      }],
+    })
+
+    expect(() => executeCardListener(registry.getAllListeners()[0]!, {
+      state,
+      player: state.players[0]!,
+      space: state.actionSpaces[0]!,
+      actionId: 'construct',
+      phase: 'computeCosts',
+    })).toThrow('plain object')
+  })
+
+  it('rejects cost attribution without costs from a custom listener', () => {
+    const state = createInitialState(42)
+    const registry = new CardRegistry()
+    registry.loadImpl('CUSTOM_ExecutorCard', {
+      listeners: [{
+        id: 'opaque-listener-id',
+        handler: () => ({
+          costAttribution: [{ sourceCard: 'CUSTOM_ExecutorCard', costs: { wood: -2 } }],
+        } as never),
+      }],
+    })
+
+    expect(() => executeCardListener(registry.getAllListeners()[0]!, {
+      state,
+      player: state.players[0]!,
+      space: state.actionSpaces[0]!,
+      actionId: 'construct',
+      phase: 'computeCosts',
+    })).toThrow('costAttribution')
   })
 
   it('executes registered effect and listener through runtime proxies', () => {

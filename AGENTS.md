@@ -55,7 +55,7 @@ pnpm run build              # tsc + vite build
 - **Session**（`server/__tests__/*.test.ts`）——直接实例化 `GameSession`，调 `takeAction()` 等，断言 `resp.state` / `pending` / `ok`。
 - **E2E**（`e2e-tests/*.spec.ts`）——Playwright 浏览器测试。
 
-规则正确性测试用 Session 测试，断言 `state` / `pending` / `log` / `scores`。**不要把 DOM、按钮文案、页面结构作为规则正确性的主要断言依据**。前端渲染单独做 E2E。测试默认 **2 人游戏**。详见 `docs/CARD_TEST_TEMPLATE.md`。
+规则正确性按风险选择最小测试层：机械约束用静态门禁；简单即时资源效果可直接调用公开 effect / listener 做行为测试；支付、选择 / pending、延迟效果、跨玩家和多步 flow 必须用 Session 测试，断言 `state` / `interaction` / `log` / `scores`。禁止只验证导出和对象形状的通用 smoke test。前端渲染单独做 E2E。Session 测试默认 **2 人游戏**。详见 `docs/CARD_TEST_TEMPLATE.md`。
 
 ## Card Implementation Rules
 
@@ -83,11 +83,11 @@ pnpm run build              # tsc + vite build
 - **BGA 对照**：阅读 `../bga-agricola/modules/php/Cards/<Deck>/<Card>.php` 对应实现，记录 BGA 的事件点、node 形态、是否 optional / mandatory、是否有自定义 args/act 交互。
 - **落地边界**：优先选择最小可验证切片；如果要改主路径，说明它服务哪些卡和哪些测试，而不是只服务单卡。
 
-新增 / 修改卡牌实现时，**必须先提供测试说明**，得到确认后再编码。测试说明基于 `docs/CARD_TEST_TEMPLATE.md` 编写，必须包含：
+新增 / 修改卡牌实现时，**必须先提供测试说明**，得到确认后再编码。测试说明基于 `docs/CARD_TEST_TEMPLATE.md` 编写，必须先说明选择直接行为测试还是 Session 测试及原因。直接行为测试写清输入、公开 effect / listener 调用、预期 flow / 资源 delta 和不触发情况；Session 测试必须包含：
 - 从一局新的 2 人游戏开始的初始状态准备
 - 前置条件（玩家资源、已打出卡牌、行动格占用、农场版图、`cardStates`）
 - 玩家交互序列、每步调用的后端接口或命令
-- 每步后必须断言的字段（`state` / `pending` / `log` / `scores`）
+- 每步后必须断言的字段（`state` / `interaction` / `log` / `scores`）
 - 哪些情况不应触发卡牌效果
 
 ## Doc Sync (硬性)

@@ -67,8 +67,8 @@
 生成器还会同步输出：
 
 - `shared/cards/community/{CUSTOM_ID}.ts` — Card Source（UI metadata + `CardImpl`）
-- `shared/cards/community/__tests__/{CUSTOM_ID}.test.ts`
 - `shared/cards/register-all.ts`
+- `shared/cards/catalog.generated.ts`
 - `docs/community_cards.md`
 - 可选 `public/card-art/community/{CUSTOM_ID}.{ext}`
 
@@ -93,9 +93,11 @@ pnpm run build
   + `export const {CARD_ID}_impl = {CARD_ID}.impl`
 
 外加 3 个补丁文件：
-- `shared/cards/community/__tests__/{CARD_ID}.test.ts` — smoke test
 - `shared/cards/register-all.ts` — patched 加 `{CARD_ID}.impl` 注册
+- `shared/cards/catalog.generated.ts` — patched 加卡牌定义
 - `docs/community_cards.md` — patched 加目录行
+
+生成器不创建通用 smoke test。简单即时效果补直接行为测试；支付、选择 / pending、延迟、跨玩家和多步 flow 由作者、reviewer 或 LLM 编写专属 `GameSession` 场景。
 
 **用户在沙盒里不需要关心正式模块形态**：继续按 `CARD_DEF + CARD_IMPL`
 两个常量写就行。后端 `code-gen.ts` 负责规范化到单 Card Source。
@@ -146,7 +148,7 @@ const jsonSafe = JSON.parse(JSON.stringify(value ?? null))
 
 - **翻修目标房屋类型**：BGA 升级链固定 `wood → clay → stone`，无分支。`renovate-house` 触发时不要尝试从 `space` 读目标，用 `context.player.houseType` 反推：当前 `'wood'` 表示翻修到泥屋，`'clay'` 表示翻修到石屋。例：石屋翻修折扣 → `if (context.player.houseType !== 'clay') return`（参见 `shared/cards/A/A110_Roughcaster.ts:15,26`）。
 - **建造房屋类型**：`construct` 行动看 `context.choice` 或 `context.actionId`（`'build-clay-room'` / `'build-stone-room'` 等），不是 `space.params`。
-- **未使用 handler 参数**：项目 `tsconfig.json` 开了 `noUnusedParameters`。如果 handler 不需要 context（例如返回固定折扣），把参数前缀 `_` 或省掉：`handler: (_context) => ({ costs: { stone: -1 }, sourceCard: CARD_ID })` 或 `handler: () => ({ ... })`。否则 PR CI 报 `TS6133: 'context' is declared but its value is never read`。
+- **未使用 handler 参数**：项目 `tsconfig.json` 开了 `noUnusedParameters`。如果 handler 不需要 context，把参数前缀 `_` 或省掉。否则 PR CI 报 `TS6133: 'context' is declared but its value is never read`。
 
 ---
 
@@ -286,6 +288,16 @@ Workshop 自定义卡只能通过 `computeCosts` listener 的 handler 返回值�
 - `trades`：支付替换候选，例如把一种资源换成另一种资源。适合“可以用 X 代替 Y”。
 - `bonuses`：折扣或折扣选项；用 `choices` 表达玩家选择，用 `optional` 表达是否可跳过。
 - `paymentResourceProviders`：payment-only 虚拟支付资源，适合“可以用行动格上的 food 支付 occupation cost”这类路径。它不写入 `costs` / `PlayerState.resources`，只在支付选项里作为特殊 payment resource 出现，并由 `consume` 消耗来源。
+
+返回 `costs` 时必须在同一对象中返回 `costAttribution`；Workshop AST 校验和正式卡源码审计都会阻断缺失归因的代码：
+
+```ts
+handler: () => ({
+  costs: { wood: -1 },
+  costAttribution: [{ sourceCard: CARD_ID, costs: { wood: -1 } }],
+  sourceCard: CARD_ID,
+})
+```
 
 跨所有主要/次要改良候选的资源折扣必须返回 mandatory capped bonus；`costs` 只用于简单行动费用：
 

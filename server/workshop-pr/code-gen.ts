@@ -1,14 +1,13 @@
 /**
  * Pure code-generation module for workshop → PR integration.
  *
- * Given a workshop card row + upstream file contents, produce the 5-6 files
+ * Given a workshop card row + upstream file contents, produce the 4-5 files
  * that should be committed to a fork branch:
  *   1. shared/cards/community/{card_id}.ts              — main card file
- *   2. shared/cards/community/__tests__/{card_id}.test.ts — smoke test
- *   3. shared/cards/register-all.ts                     — patched from upstream main
- *   4. shared/cards/catalog.generated.ts                — patched from upstream main
- *   5. docs/community_cards.md                          — patched (new row)
- *   6. public/card-art/community/{card_id}.{ext}        — (optional) binary art
+ *   2. shared/cards/register-all.ts                     — patched from upstream main
+ *   3. shared/cards/catalog.generated.ts                — patched from upstream main
+ *   4. docs/community_cards.md                          — patched (new row)
+ *   5. public/card-art/community/{card_id}.{ext}        — (optional) binary art
  */
 import ts from 'typescript'
 
@@ -654,36 +653,6 @@ export const generateDisplayFile = generateCardSourceFile
 export const generateImplFile = generateCardSourceFile
 
 // ---------------------------------------------------------------------------
-// C-14: Smoke test generator
-// ---------------------------------------------------------------------------
-
-export function generateSmokeTest(args: { card_id: string }): string {
-  const id = args.card_id
-  return `import { describe, it, expect } from 'vitest'
-import { ${id}, ${id}_impl } from '../${id}'
-
-describe('${id} — community card smoke test', () => {
-  it('exports a valid definition', () => {
-    expect(${id}).toBeDefined()
-    expect(${id}.id).toBe('${id}')
-    expect(${id}.name).toBeTruthy()
-    expect(${id}.deck).toBe('community')
-  })
-
-  it('exports a CardImpl', () => {
-    expect(${id}_impl).toBeDefined()
-    const hasBehavior =
-      !!${id}_impl.effect ||
-      (${id}_impl.listeners?.length ?? 0) > 0 ||
-      (${id}_impl.modifiers?.length ?? 0) > 0 ||
-      (${id}.vp ?? 0) > 0
-    expect(hasBehavior).toBe(true)
-  })
-})
-`
-}
-
-// ---------------------------------------------------------------------------
 // C-15: register-all.ts patcher
 // ---------------------------------------------------------------------------
 
@@ -1031,7 +1000,6 @@ export async function generatePrFiles(args: GenArgs): Promise<PrFile[]> {
     iso,
     artUrl,
   })
-  const testContent = generateSmokeTest({ card_id: wcard.card_id })
   const newRegisterAll = patchRegisterAll(upstream_register_all, {
     card_id: wcard.card_id,
   })
@@ -1063,11 +1031,6 @@ export async function generatePrFiles(args: GenArgs): Promise<PrFile[]> {
     {
       path: `shared/cards/community/${wcard.card_id}.ts`,
       content: cardContent,
-      encoding: 'utf-8',
-    },
-    {
-      path: `shared/cards/community/__tests__/${wcard.card_id}.test.ts`,
-      content: testContent,
       encoding: 'utf-8',
     },
     {

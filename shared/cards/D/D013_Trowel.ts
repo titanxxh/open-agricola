@@ -83,8 +83,10 @@ const computeCostsListener: CardListenerRegistration = {
     if (selected === 'clay') {
       // Trowel never resolves via wood→clay; publish a prohibitive delta so
       // the affordability probe drops this option and leaves `stone` alone.
+      const costs = { clay: 999, reed: 999 }
       return {
-        costs: { clay: 999, reed: 999 },
+        costs,
+        costAttribution: [{ sourceCard: CARD_ID, costs }],
         sourceCard: CARD_ID,
       }
     }
