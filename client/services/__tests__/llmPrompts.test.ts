@@ -59,6 +59,13 @@ describe('CARD_DESIGNER_SYSTEM_PROMPT', () => {
     expect(CARD_DESIGNER_SYSTEM_PROMPT).toContain('`costs` 只用于简单行动费用')
   })
 
+  it('requires explicit attribution for action cost deltas', () => {
+    expect(CARD_DESIGNER_SYSTEM_PROMPT).toContain('返回 `costs` 时必须同时返回 `costAttribution`')
+    expect(CARD_DESIGNER_SYSTEM_PROMPT).toContain(
+      'costAttribution: [{ sourceCard: CARD_ID, costs: { wood: -1 } }]',
+    )
+  })
+
   it('documents only sandbox hooks whose return values can cross the JSON boundary', () => {
     for (const hook of [
       'onComputeSowableFields',

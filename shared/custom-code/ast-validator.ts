@@ -56,6 +56,31 @@ const ALLOWED_EFFECT_KEYS = new Set<string>([
 /** Allowed values inside listener.phases arrays. */
 const ALLOWED_LISTENER_PHASES = new Set<string>(sandboxListenerPhases)
 
+export function findMissingCostAttributionLines(source: string): number[] {
+  const sourceFile = ts.createSourceFile(
+    'card.ts', source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS,
+  )
+  const lines: number[] = []
+  const visit = (node: ts.Node, insideCostAttribution = false): void => {
+    if (ts.isObjectLiteralExpression(node) && !insideCostAttribution) {
+      const names = new Set(node.properties.flatMap((prop) => {
+        if (!prop.name) return []
+        if (ts.isIdentifier(prop.name) || ts.isStringLiteral(prop.name)) return [prop.name.text]
+        return []
+      }))
+      if (names.has('costs') && !names.has('costAttribution')) {
+        lines.push(sourceFile.getLineAndCharacterOfPosition(node.getStart(sourceFile)).line + 1)
+      }
+    }
+    const entersCostAttribution = ts.isPropertyAssignment(node)
+      && (ts.isIdentifier(node.name) || ts.isStringLiteral(node.name))
+      && node.name.text === 'costAttribution'
+    ts.forEachChild(node, child => visit(child, insideCostAttribution || entersCostAttribution))
+  }
+  visit(sourceFile)
+  return lines
+}
+
 export function validateCardCode(source: string): ValidationResult {
   const sourceFile = ts.createSourceFile(
     'card.ts', source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS,
@@ -171,6 +196,9 @@ export function validateCardCode(source: string): ValidationResult {
 
   // Validate CARD_IMPL hook/listener whitelists
   validateCardImplHooksAndPhases(sourceFile, errors)
+  for (const line of findMissingCostAttributionLines(source)) {
+    errors.push(`line ${line}: listener results with costs must include costAttribution`)
+  }
 
   // Also check for syntax errors
   const diagnostics = ts.transpileModule(source, {

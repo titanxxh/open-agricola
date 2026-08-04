@@ -96,6 +96,42 @@ describe('ast-validator: CARD_IMPL hook/phase whitelisting', () => {
     expect(validateCardCode(code).valid).toBe(true)
   })
 
+  it('rejects costs without cost attribution', () => {
+    const result = validateCardCode(`
+      const CARD_IMPL = {
+        listeners: [{
+          actions: ['construct'],
+          phases: ['computeCosts'],
+          handler: () => ({ costs: { wood: -2 }, sourceCard: 'CUSTOM_Test' }),
+        }],
+      }
+    `)
+
+    expect(result.valid).toBe(false)
+    expect(result.valid === false && result.errors).toContain(
+      'line 6: listener results with costs must include costAttribution',
+    )
+  })
+
+  it('accepts costs with explicit cost attribution', () => {
+    const result = validateCardCode(`
+      const CARD_ID = 'CUSTOM_Test'
+      const CARD_IMPL = {
+        listeners: [{
+          actions: ['construct'],
+          phases: ['computeCosts'],
+          handler: () => ({
+            costs: { wood: -2 },
+            costAttribution: [{ sourceCard: CARD_ID, costs: { wood: -2 } }],
+            sourceCard: CARD_ID,
+          }),
+        }],
+      }
+    `)
+
+    expect(result.valid).toBe(true)
+  })
+
   it('rejects unknown listener actions', () => {
     const code = `
       const CARD_IMPL = {

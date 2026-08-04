@@ -6,9 +6,9 @@
 
 核心原则：
 
-- 游戏逻辑测试优先站在前后端交互边界上做
-- 测试代码优先通过调用后端接口或后端命令驱动流程
-- 断言以服务端返回的 `state`、`interaction`、`state.log`、`scores` 为主
+- 机械规则用静态门禁，简单即时效果用直接行为测试，高风险流程站在 `GameSession` 边界测试
+- 测试必须断言真实行为，不验证导出存在或对象形状
+- Session 断言以服务端返回的 `state`、`interaction`、`state.log`、`scores` 为主
 - 前端渲染、控件展示、界面截图，单独作为渲染测试或 E2E 测试处理
 
 换句话说：
@@ -36,31 +36,26 @@
 
 ## 3. 测试分层约定
 
-每张卡至少应考虑三层测试，但主次不同。
+选择能证明规则的最小测试层，禁止统一生成只验证导出、定义存在或对象形状的 smoke test。
 
-### 3.1 后端交互边界测试
+### 3.1 静态门禁
 
-这是卡牌实现的主测试层。
+可机械判断、无需运行游戏的约束放在 CI 静态门禁。例如 listener 返回 `costs` 时必须在同一对象中提供 `costAttribution`。门禁不替代卡牌行为测试。
 
-目标：
+### 3.2 直接行为测试
 
-- 验证后端规则是否正确执行
-- 验证服务端状态变更是否符合预期
-- 验证 `interaction`、`state.log`、卡牌局部状态是否正确
+简单即时效果可以直接调用卡牌公开的 effect / listener，断言返回的 `ActionFlow`、资源 delta、来源卡和不触发分支。仅当效果不经过支付求解、选择 / pending、阶段延迟、跨玩家或多步 flow 时使用。
 
-驱动方式：
+### 3.3 Session 测试
 
-- 直接调用 `GameSession`
-- 或通过 WebSocket 发送命令消息
-
-断言对象：
+支付、选择 / pending、延迟效果、跨玩家、多步 flow，以及依赖实际 action candidate / payment pipeline 的卡牌必须使用 `GameSession`。直接调用 `takeAction()`、`resolveChoice()`、`commitSelectionChoice()` 等公开命令，断言：
 
 - `state`
 - `interaction`
 - `state.log`
 - `scores`
 
-### 3.2 前端渲染测试
+### 3.4 前端渲染测试
 
 这是辅助测试层。
 
@@ -75,7 +70,7 @@
 - 固定 `GameApiResponse`
 - 固定 `SerializedGameState`
 
-### 3.3 E2E 测试
+### 3.5 E2E 测试
 
 这是链路验证层。
 
@@ -112,10 +107,11 @@
 - 这张卡在什么情况下不应触发
 - 这张卡是否会写日志
 - 这张卡是否会改变后续 action / flow / interaction
+- 选择静态门禁、直接行为测试或 Session 测试中的哪一层，以及原因
 
 ### 4.3 初始状态准备
 
-测试说明里必须明确：
+选择 Session 测试时，测试说明必须明确：
 
 - 从一局新的 2 人游戏开始
 - 当前测试玩家是谁
@@ -142,7 +138,7 @@ Session 测试必须在首次行动前显式固定所有玩家的 `minorHand` �
 
 ## 5. 推荐的后端入口清单
 
-卡牌测试优先使用后端边界驱动。房间规则主链路走 WebSocket；HTTP `game-router` 只用于 dev / sandbox / 测试辅助；Session 测试直接调用 `GameSession`。
+Session 卡牌测试优先使用后端边界驱动。房间规则主链路走 WebSocket；HTTP `game-router` 只用于 dev / sandbox / 测试辅助；Session 测试直接调用 `GameSession`。
 
 ### 5.1 三种推荐驱动方式
 
@@ -447,17 +443,17 @@ const resp = session.takeAction(X, 'ACTION_ID')
 建议每张卡至少考虑下面几类测试文件（命名以仓库现状为准）：
 
 - `shared/cards/__tests__/CARD_ID.test.ts`
-  - 卡牌本身的核心规则单测（直接调 effect / listener，或断言卡定义元数据）
+  - 简单即时效果的直接行为测试；直接调公开 effect / listener 并断言真实 flow / delta，不写定义存在性 smoke
 
 - `server/__tests__/CARD_ID-session.test.ts`
-  - 站在 `GameSession` 边界的集成测试（**主战场**——目前 `server/__tests__/` 下绝大多数卡牌测试都是这种命名）
+  - 支付、选择 / pending、延迟、跨玩家和多步 flow 的 `GameSession` 集成测试
 
 - `e2e-tests/CARD_ID.spec.ts`
   - Playwright，只在需要验证真实 UI / 多窗口同步时增加（如 `e2e-tests/C22_BasketChair.spec.ts`）
 
 并不是每张卡都必须三层都写满，但至少要满足：
 
-- 规则正确性有后端边界测试
+- 规则正确性由直接行为或 Session 测试覆盖，机械规则另有静态门禁
 - 复杂 UI 交互有渲染或 E2E 覆盖
 
 ## 10. 一个最小示例

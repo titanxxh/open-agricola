@@ -491,7 +491,7 @@ WorkshopPage
 | `server/workshop-pr/propose-handler.ts` | 提交流程编排：权限检查、读取 upstream 文件、生成 PR 文件、创建 commit/branch/PR                    |
 | `server/workshop-pr/oauth-handler.ts`   | GitHub OAuth start/callback；请求 `repo` scope 以支持 private upstream           |
 | `server/workshop-pr/github-client.ts`   | GitHub REST API 封装；授权用户等于 upstream owner 时跳过 fork，直接推 upstream 分支          |
-| `server/workshop-pr/code-gen.ts`        | 纯生成器：把 workshop card 转成 community card 文件、测试、注册表和文档                        |
+| `server/workshop-pr/code-gen.ts`        | 纯生成器：把 workshop card 转成 community card 文件、注册表和文档                        |
 | `server/workshop-review/github-review-provider.ts` | GitHub App installation token 与 GraphQL review 原子快照 |
 | `server/workshop-review/webhook-handler.ts` | `/api/github/webhook` 验签、delivery 幂等及 review 失效/批准 |
 | `client/services/workshop-pr.ts`        | 前端 submit-review/OAuth popup helper；relative auth URL 会按 `VITE_API_BASE` 解析到后端域名 |
@@ -503,10 +503,12 @@ WorkshopPage
 | 文件                                                     | 说明                                          |
 | ------------------------------------------------------ | ------------------------------------------- |
 | `shared/cards/community/{CUSTOM_ID}.ts`                | Card Source：UI metadata + `CardImpl`          |
-| `shared/cards/community/__tests__/{CUSTOM_ID}.test.ts` | smoke test：定义存在、`deck === 'community'`、有行为  |
 | `shared/cards/register-all.ts`                         | 注册 `{CUSTOM_ID}.impl`                       |
+| `shared/cards/catalog.generated.ts`                    | 卡牌定义 catalog                               |
 | `docs/community_cards.md`                              | community card 索引；PR 创建后会用真实 PR number 二次提交 |
 | `public/card-art/community/{CUSTOM_ID}.{ext}`          | 可选，美术二进制                                    |
+
+生成器不创建定义/导出形状 smoke test。简单即时资源效果使用直接行为测试；支付、选择 / pending、延迟、跨玩家和多步 flow 必须由作者、reviewer 或 LLM 编写专属 `GameSession` 场景。
 
 
 生成器会做必要规范化，避免用户在沙盒中能跑但 PR CI 不通过：

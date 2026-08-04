@@ -85,6 +85,7 @@ const computeCostsListener: CardListenerRegistration = {
       // the affordability probe drops this option and leaves `stone` alone.
       return {
         costs: { clay: 999, reed: 999 },
+        costAttribution: [],
         sourceCard: CARD_ID,
       }
     }

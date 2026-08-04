@@ -1,7 +1,6 @@
 ```typescript
 const CARD_ID = 'CUSTOM_MedievalMallet'
 
-// 卡牌定义
 const CARD_DEF = {
   cardType: 'occupation',
   meta: {
@@ -9,20 +8,19 @@ const CARD_DEF = {
     name: 'Medieval Mallet',
     deck: 'CUSTOM',
     number: 0,
-    desc: ['When you build a room or buy an Improvement, pay 2 fewer <WOOD>.'],
+    desc: ['When you build a room, pay 2 fewer <WOOD>. When you buy an Improvement, pay 2 fewer <WOOD>.'],
     cost: {},
     vp: 0,
     implemented: true,
     locales: {
       zh: {
         name: '中世纪木槌',
-        desc: ['建造房间和购买改良卡时，各少支付 2 <WOOD>。'],
+        desc: ['你建造房间时少支付 2 <WOOD>；购买改良时少支付 2 <WOOD>。'],
       },
     },
   },
 }
 
-// 卡牌实现
 const CARD_IMPL = {
   listeners: [
     {
@@ -31,6 +29,7 @@ const CARD_IMPL = {
       phases: ['computeCosts'],
       handler: () => ({
         costs: { wood: -2 },
+        costAttribution: [{ sourceCard: CARD_ID, costs: { wood: -2 } }],
         sourceCard: CARD_ID,
       }),
     },
@@ -39,14 +38,12 @@ const CARD_IMPL = {
       actions: ['improvement'],
       phases: ['computeCosts'],
       handler: () => ({
-        bonuses: [
-          {
-            discount: { wood: 2 },
-            capDiscountAtCost: true,
-            optional: false,
-            sources: [CARD_ID],
-          },
-        ],
+        bonuses: [{
+          discount: { wood: 2 },
+          capDiscountAtCost: true,
+          optional: false,
+          sources: [CARD_ID],
+        }],
         sourceCard: CARD_ID,
       }),
     },

@@ -229,9 +229,9 @@ function ProposePreview({
       </p>
       <ul style={{ fontFamily: 'monospace', fontSize: '0.9em' }}>
         <li>shared/cards/community/{card.card_id}.ts</li>
-        <li>shared/cards/community/__tests__/{card.card_id}.test.ts</li>
         {hasArt && <li>public/card-art/community/{card.card_id}.&lt;ext&gt;</li>}
         <li>shared/cards/register-all.ts (插入一行 import + 一行 entry)</li>
+        <li>shared/cards/catalog.generated.ts (插入卡牌定义)</li>
         <li>docs/community_cards.md (追加一行)</li>
       </ul>
 

@@ -580,8 +580,8 @@ ${wcard.description || '_(no description)_'}
 ### Files changed
 
 - \`shared/cards/community/${wcard.card_id}.ts\` — card definition + implementation
-- \`shared/cards/community/__tests__/${wcard.card_id}.test.ts\` — smoke test
 - \`shared/cards/register-all.ts\` — registry patch (alphabetical insert)
+- \`shared/cards/catalog.generated.ts\` — generated catalog patch
 - \`docs/community_cards.md\` — community card log
 ${wcard.art_url ? `- \`public/card-art/community/${wcard.card_id}.{ext}\` — art (LLM-generated)\n` : ''}
 
@@ -590,6 +590,9 @@ ${wcard.art_url ? `- \`public/card-art/community/${wcard.card_id}.{ext}\` — ar
 - [ ] Balance check vs official cards
 - [ ] Card text clarity
 - [ ] Effect code review (sandbox-validated, AST-checked)
+- [ ] Any \`costs\` result includes explicit \`costAttribution\`
+- [ ] Simple immediate effects have a direct behavior test; payment, choice/pending, delayed, cross-player, or multi-step effects have a dedicated GameSession test
+- [ ] No definition-only generated smoke test
 ${wcard.art_url ? '- [ ] Art license (LLM-generated, author confirmed)\n' : ''}- [ ] Tests pass
 
 ---

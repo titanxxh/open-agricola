@@ -17,7 +17,7 @@ import { generatePrFiles } from '../code-gen'
 const REPO_ROOT = resolve(__dirname, '../../..')
 
 // Slow test: copies repo into tmpdir, writes generated files, runs tsc + generate.
-// Validates that the 5-file PR output from `generatePrFiles` is self-consistent:
+// Validates that the 4-file PR output from `generatePrFiles` is self-consistent:
 //   1. The generated tree compiles under `tsc --noEmit -p tsconfig.app.json`
 //   2. Re-running `scripts/generate-register-all.ts` on the generated tree
 //      produces byte-identical generated card files.
@@ -29,7 +29,7 @@ const REPO_ROOT = resolve(__dirname, '../../..')
 // here — diff would be vacuous.
 describe('PR files self-consistency (S9-B2)', () => {
   it(
-    'generated 5 files compile under tsc + generated card files match generate-register-all rerun',
+    'generated 4 files compile under tsc + generated card files match generate-register-all rerun',
     { timeout: 120_000 },
     async () => {
       const wcard = {
@@ -65,7 +65,7 @@ const CARD_IMPL = { effect: { id: CARD_ID, onHarvest: () => gainLeaf(CARD_ID, { 
         upstream_community_md,
         pr_number: 999,
       })
-      expect(files.length).toBe(5)
+      expect(files.length).toBe(4)
 
       // 2. Mirror repo into tmpdir + apply files
       const tmp = mkdtempSync(join(tmpdir(), 's9-pr-snapshot-'))
