@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { validateCardCode } from '../ast-validator'
+import { findInvalidCostAttributionLines, validateCardCode } from '../ast-validator'
 
 describe('ast-validator: CARD_IMPL hook/phase whitelisting', () => {
   it('accepts valid effect hooks', () => {
@@ -94,6 +94,459 @@ describe('ast-validator: CARD_IMPL hook/phase whitelisting', () => {
       }
     `
     expect(validateCardCode(code).valid).toBe(true)
+  })
+
+  it('rejects costs without cost attribution', () => {
+    const result = validateCardCode(`
+      const CARD_IMPL = {
+        listeners: [{
+          actions: ['construct'],
+          phases: ['computeCosts'],
+          handler: () => ({ costs: { wood: -2 }, sourceCard: 'CUSTOM_Test' }),
+        }],
+      }
+    `)
+
+    expect(result.valid).toBe(false)
+    expect(result.valid === false && result.errors).toContain(
+      'line 6: listener results with costs must include costAttribution',
+    )
+  })
+
+  it('rejects a statically computed costs key without attribution', () => {
+    const result = validateCardCode(`
+      const CARD_IMPL = {
+        listeners: [{
+          actions: ['construct'],
+          phases: ['computeCosts'],
+          handler: () => ({ ['costs']: { wood: -1 } }),
+        }],
+      }
+    `)
+
+    expect(result.valid).toBe(false)
+    expect(result.valid === false && result.errors).toContain(
+      'line 6: listener results with costs must include costAttribution',
+    )
+  })
+
+  it('rejects identifier-computed result keys that can be shadowed', () => {
+    const result = validateCardCode(`
+      const CARD_ID = 'CUSTOM_Test'
+      const KEY = 'costs'
+      const CARD_IMPL = {
+        listeners: [{
+          actions: ['construct'],
+          phases: ['computeCosts'],
+          handler: () => {
+            const KEY = 'other'
+            const costs = { wood: -1 }
+            return {
+              [KEY]: costs,
+              costAttribution: [{ sourceCard: CARD_ID, costs }],
+            }
+          },
+        }],
+      }
+    `)
+
+    expect(result.valid).toBe(false)
+    expect(result.valid === false && result.errors.some(
+      error => error.includes('listener handlers must return statically inspectable objects'),
+    )).toBe(true)
+  })
+
+  it.each([
+    "Object.fromEntries([['costs', { wood: -1 }]])",
+    "({ ['cost' + 's']: { wood: -1 } })",
+    "({ __proto__: Object.fromEntries([['costs', { wood: -1 }]]) })",
+  ])('rejects listener results that cannot be checked statically: %s', (resultExpression) => {
+    const result = validateCardCode(`
+      const CARD_IMPL = {
+        listeners: [{
+          actions: ['construct'],
+          phases: ['computeCosts'],
+          handler: () => ${resultExpression},
+        }],
+      }
+    `)
+
+    expect(result.valid).toBe(false)
+    expect(result.valid === false && result.errors.some(
+      error => error.includes('listener handlers must return statically inspectable objects'),
+    )).toBe(true)
+  })
+
+  it('rejects costs assigned after object construction', () => {
+    const result = validateCardCode(`
+      const CARD_ID = 'CUSTOM_Test'
+      const CARD_IMPL = {
+        listeners: [{
+          actions: ['construct'],
+          phases: ['computeCosts'],
+          handler: () => {
+            const result = { sourceCard: CARD_ID }
+            result.costs = { wood: -2 }
+            return result
+          },
+        }],
+      }
+    `)
+
+    expect(result.valid).toBe(false)
+    expect(result.valid === false && result.errors.some(
+      error => error.includes('listener handlers must return statically inspectable objects'),
+    )).toBe(true)
+  })
+
+  it('accepts nested payload cost fields outside listener results', () => {
+    const result = validateCardCode(`
+      const CARD_IMPL = {
+        listeners: [{
+          phases: ['after'],
+          handler: () => {
+            const payload = {}
+            payload.costs = { wood: 1 }
+            return { extraData: payload }
+          },
+        }],
+      }
+    `)
+
+    expect(result.valid).toBe(true)
+  })
+
+  it('accepts local result variables from non-cost listeners', () => {
+    const result = validateCardCode(`
+      const CARD_IMPL = {
+        listeners: [{
+          phases: ['after'],
+          handler: () => {
+            const result = { extraData: { ok: true } }
+            return result
+          },
+        }],
+      }
+    `)
+
+    expect(result.valid).toBe(true)
+  })
+
+  it('flags indirect compute-cost handler results in the production audit', () => {
+    const lines = findInvalidCostAttributionLines(`
+      const COMPUTE_COSTS = 'computeCosts'
+      const discountHandler = () => {
+        const result = { costs: { wood: -1 } }
+        return result
+      }
+      const listener = {
+        phases: [COMPUTE_COSTS as ActionHookPhase],
+        handler: discountHandler,
+      }
+    `)
+
+    expect(lines).toHaveLength(1)
+  })
+
+  it('flags invalid cost attribution entries in the production audit', () => {
+    const lines = findInvalidCostAttributionLines(`
+      const CARD_ID = 'D000_Test'
+      const listener = {
+        phases: ['computeCosts'],
+        handler: () => ({
+          costs: { wood: -1 },
+          costAttribution: [],
+        }),
+      }
+    `)
+
+    expect(lines).toHaveLength(1)
+  })
+
+  it('accepts an inspectable method-form listener handler', () => {
+    const result = validateCardCode(`
+      const CARD_ID = 'CUSTOM_Test'
+      const CARD_IMPL = {
+        listeners: [{
+          actions: ['construct'],
+          phases: ['computeCosts'],
+          handler() {
+            const costs = { wood: -1 }
+            return {
+              costs,
+              costAttribution: [{ sourceCard: CARD_ID, costs }],
+            }
+          },
+        }],
+      }
+    `, 'CUSTOM_Test')
+
+    expect(result.valid).toBe(true)
+  })
+
+  it('accepts costs with explicit cost attribution', () => {
+    const result = validateCardCode(`
+      const CARD_ID = 'CUSTOM_Test' as const
+      const CARD_IMPL = {
+        listeners: [{
+          actions: ['construct'],
+          phases: ['computeCosts'],
+          handler: () => ({
+            costs: { wood: -2 },
+            costAttribution: [{ sourceCard: CARD_ID, costs: { wood: -2 } }],
+            sourceCard: CARD_ID,
+          }),
+        }],
+      }
+    `)
+
+    expect(result.valid).toBe(true)
+  })
+
+  it('accepts equivalent attributed costs with different property order', () => {
+    const result = validateCardCode(`
+      const CARD_ID = 'CUSTOM_Test'
+      const CARD_IMPL = {
+        listeners: [{
+          actions: ['construct'],
+          phases: ['computeCosts'],
+          handler: () => ({
+            costs: { wood: -2, clay: -1 },
+            costAttribution: [{ sourceCard: CARD_ID, costs: { clay: -1, wood: -2 } }],
+          }),
+        }],
+      }
+    `)
+
+    expect(result.valid).toBe(true)
+  })
+
+  it('accepts a shared dynamic cost delta', () => {
+    const result = validateCardCode(`
+      const CARD_ID = 'CUSTOM_Test'
+      const CARD_IMPL = {
+        listeners: [{
+          actions: ['construct'],
+          phases: ['computeCosts'],
+          handler: (context) => {
+            const costs = { wood: -context.player.rooms }
+            return {
+              costs,
+              costAttribution: [{ sourceCard: CARD_ID, costs }],
+            }
+          },
+        }],
+      }
+    `)
+
+    expect(result.valid).toBe(true)
+  })
+
+  it('rejects duplicate resolved cost properties', () => {
+    const result = validateCardCode(`
+      const CARD_ID = 'CUSTOM_Test'
+      const KEY = 'costs'
+      const CARD_IMPL = {
+        listeners: [{
+          actions: ['construct'],
+          phases: ['computeCosts'],
+          handler: () => ({
+            costs: { wood: -1 },
+            costAttribution: [{ sourceCard: CARD_ID, costs: { wood: -1 } }],
+            [KEY]: { wood: -2 },
+          }),
+        }],
+      }
+    `)
+
+    expect(result.valid).toBe(false)
+  })
+
+  it('rejects cost attribution without costs', () => {
+    const result = validateCardCode(`
+      const CARD_ID = 'CUSTOM_Test'
+      const CARD_IMPL = {
+        listeners: [{
+          actions: ['construct'],
+          phases: ['computeCosts'],
+          handler: () => ({
+            costAttribution: [{ sourceCard: CARD_ID, costs: { wood: -2 } }],
+          }),
+        }],
+      }
+    `)
+
+    expect(result.valid).toBe(false)
+    expect(result.valid === false && result.errors).toContain(
+      'line 7: listener results with costAttribution must include costs',
+    )
+  })
+
+  it.each([
+    'null',
+    '{}',
+    '[]',
+    "[{ sourceCard: CARD_ID, costs: { reed: -1 } }]",
+    "[{ sourceCard: '', costs: { wood: -2 } }]",
+  ])('rejects invalid or mismatched cost attribution: %s', (costAttribution) => {
+    const result = validateCardCode(`
+      const CARD_ID = 'CUSTOM_Test'
+      const CARD_IMPL = {
+        listeners: [{
+          actions: ['construct'],
+          phases: ['computeCosts'],
+          handler: () => ({
+            costs: { wood: -2 },
+            costAttribution: ${costAttribution},
+            sourceCard: CARD_ID,
+          }),
+        }],
+      }
+    `)
+
+    expect(result.valid).toBe(false)
+    expect(result.valid === false && result.errors.some(
+      error => error.includes('costAttribution must contain one matching source entry'),
+    )).toBe(true)
+  })
+
+  it('requires attribution sourceCard to resolve to the submitted CARD_ID', () => {
+    const source = `
+      const CARD_ID = 'CUSTOM_Test'
+      const EMPTY = ''
+      const CARD_IMPL = {
+        listeners: [{
+          actions: ['construct'],
+          phases: ['computeCosts'],
+          handler: () => ({
+            costs: { wood: -2 },
+            costAttribution: [{ sourceCard: EMPTY, costs: { wood: -2 } }],
+            sourceCard: CARD_ID,
+          }),
+        }],
+      }
+    `
+
+    expect(validateCardCode(source).valid).toBe(false)
+    expect(validateCardCode(source.replace('CUSTOM_Test', 'CUSTOM_Other'), 'CUSTOM_Test').valid).toBe(false)
+  })
+
+  it('rejects attribution entries whose effective values can be overridden by spread', () => {
+    const result = validateCardCode(`
+      const CARD_ID = 'CUSTOM_Test'
+      const override = { sourceCard: 'CUSTOM_Other' }
+      const CARD_IMPL = {
+        listeners: [{
+          actions: ['construct'],
+          phases: ['computeCosts'],
+          handler: () => ({
+            costs: { wood: -2 },
+            costAttribution: [{
+              sourceCard: CARD_ID,
+              costs: { wood: -2 },
+              ...override,
+            }],
+          }),
+        }],
+      }
+    `)
+
+    expect(result.valid).toBe(false)
+    expect(result.valid === false && result.errors.some(
+      error => error.includes('costAttribution must contain one matching source entry'),
+    )).toBe(true)
+  })
+
+  it('resolves attribution CARD_ID from the top-level declaration', () => {
+    const result = validateCardCode(`
+      const CARD_ID = 'CUSTOM_Wrong'
+      const CARD_IMPL = {
+        listeners: [{
+          actions: ['construct'],
+          phases: ['computeCosts'],
+          handler: () => {
+            if (true) {
+              const CARD_ID = 'CUSTOM_Test'
+            }
+            return {
+              costs: { wood: -2 },
+              costAttribution: [{ sourceCard: CARD_ID, costs: { wood: -2 } }],
+              sourceCard: CARD_ID,
+            }
+          },
+        }],
+      }
+    `, 'CUSTOM_Test')
+
+    expect(result.valid).toBe(false)
+  })
+
+  it('rejects a listener-local CARD_ID that shadows the submitted card ID', () => {
+    const result = validateCardCode(`
+      const CARD_ID = 'CUSTOM_Test'
+      const CARD_IMPL = {
+        listeners: [{
+          actions: ['construct'],
+          phases: ['computeCosts'],
+          handler: () => {
+            const CARD_ID = 'CUSTOM_Other'
+            const costs = { wood: -2 }
+            return {
+              costs,
+              costAttribution: [{ sourceCard: CARD_ID, costs }],
+            }
+          },
+        }],
+      }
+    `, 'CUSTOM_Test')
+
+    expect(result.valid).toBe(false)
+    expect(result.valid === false && result.errors.some(
+      error => error.includes('CARD_ID must not be shadowed'),
+    )).toBe(true)
+  })
+
+  it('ignores costs nested inside a listener result payload', () => {
+    const result = validateCardCode(`
+      const CARD_IMPL = {
+        listeners: [{
+          actions: ['collect'],
+          phases: ['after'],
+          handler: () => ({
+            specialEffects: [{
+              kind: 'set-extra-data',
+              key: 'quote',
+              value: { costs: { wood: 1 } },
+            }],
+          }),
+        }],
+      }
+    `)
+
+    expect(result.valid).toBe(true)
+  })
+
+  it.each([
+    ['null costs', 'null', 'null'],
+    ['non-resource costs', "{ unknown: -2 }", "{ unknown: -2 }"],
+    ['non-numeric costs', "{ wood: 'two' }", "{ wood: 'two' }"],
+  ])('rejects %s in attributed cost results', (_case, costs, attributedCosts) => {
+    const result = validateCardCode(`
+      const CARD_ID = 'CUSTOM_Test'
+      const CARD_IMPL = {
+        listeners: [{
+          actions: ['construct'],
+          phases: ['computeCosts'],
+          handler: () => ({
+            costs: ${costs},
+            costAttribution: [{ sourceCard: CARD_ID, costs: ${attributedCosts} }],
+            sourceCard: CARD_ID,
+          }),
+        }],
+      }
+    `, 'CUSTOM_Test')
+
+    expect(result.valid).toBe(false)
   })
 
   it('rejects unknown listener actions', () => {

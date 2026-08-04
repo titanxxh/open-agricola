@@ -1,4 +1,5 @@
 import type { IncomingMessage, ServerResponse } from 'node:http'
+import { createHash } from 'node:crypto'
 import { readFileSync, existsSync } from 'node:fs'
 import { join } from 'node:path'
 import { nanoid } from 'nanoid'
@@ -31,6 +32,34 @@ import {
 
 const RATE_LIMIT_MS = 10 * 60_000 // 10 minutes
 const REFRESH_COOLDOWN_MS = 60_000 // 1 minute
+
+const legacySmokeSource = (cardId: string): string => `import { describe, it, expect } from 'vitest'
+import { ${cardId}, ${cardId}_impl } from '../${cardId}'
+
+describe('${cardId} — community card smoke test', () => {
+  it('exports a valid definition', () => {
+    expect(${cardId}).toBeDefined()
+    expect(${cardId}.id).toBe('${cardId}')
+    expect(${cardId}.name).toBeTruthy()
+    expect(${cardId}.deck).toBe('community')
+  })
+
+  it('exports a CardImpl', () => {
+    expect(${cardId}_impl).toBeDefined()
+    const hasBehavior =
+      !!${cardId}_impl.effect ||
+      (${cardId}_impl.listeners?.length ?? 0) > 0 ||
+      (${cardId}_impl.modifiers?.length ?? 0) > 0 ||
+      (${cardId}.vp ?? 0) > 0
+    expect(hasBehavior).toBe(true)
+  })
+})
+`
+
+const gitBlobSha = (content: string): string => createHash('sha1')
+  .update(`blob ${Buffer.byteLength(content)}\0`)
+  .update(content)
+  .digest('hex')
 
 type WorkshopCardRow = {
   id: string
@@ -319,6 +348,23 @@ export async function handleSubmitReviewRequest(
     }
 
     const branchName = `workshop/${wcard.card_id}`
+    let pr = await client.findOpenPr({ forkOwner: githubLogin, branchName })
+    const existingPrTreeEntries = pr
+      ? await client.getPullRequestTreeEntries(pr.number)
+      : []
+    const replacementPr = pr && (pr.baseRefName !== 'main' || pr.isDraft) ? pr : null
+    const legacySmokePath = `shared/cards/community/__tests__/${wcard.card_id}.test.ts`
+    const legacySmokeSha = gitBlobSha(legacySmokeSource(wcard.card_id))
+    const generatedArtPaths = new Set(['png', 'jpg', 'jpeg', 'webp'].map(
+      ext => `public/card-art/community/${wcard.card_id}.${ext}`,
+    ))
+    const preservedTreeEntries = existingPrTreeEntries.filter((entry) => !(
+      generatedArtPaths.has(entry.path)
+      || (
+        entry.path === legacySmokePath
+        && entry.sha === legacySmokeSha
+      )
+    ))
 
     // V1 commit with placeholder PR number (0) — lets us open the PR first
     const filesV1 = await generatePrFiles({
@@ -339,26 +385,38 @@ export async function handleSubmitReviewRequest(
         email: `${githubLogin}@users.noreply.github.com`,
       },
       upstreamBaseSha,
+      preservedTreeEntries,
     })
-    await client.upsertBranch({
+    const previousBranchSha = await client.upsertBranch({
       forkOwner: githubLogin,
       branchName,
       commitSha: commit1.commitSha,
     })
-
-    // Find or open PR
-    let pr = await client.findOpenPr({ forkOwner: githubLogin, branchName })
-    if (pr && (pr.baseRefName !== 'main' || pr.isDraft)) {
-      await client.closePr(pr.number)
+    if (replacementPr) {
       pr = null
     }
+
+    // Find or open PR
     if (!pr) {
-      pr = await client.openPr({
-        forkOwner: githubLogin,
-        branchName,
-        title: buildPrTitle(wcard, githubLogin),
-        body: buildPrBody(wcard, githubLogin),
-      })
+      try {
+        if (replacementPr) await client.closePr(replacementPr.number)
+        pr = await client.openPr({
+          forkOwner: githubLogin,
+          branchName,
+          title: buildPrTitle(wcard, githubLogin),
+          body: buildPrBody(wcard, githubLogin),
+        })
+      } catch (error) {
+        if (replacementPr && previousBranchSha) {
+          await client.upsertBranch({
+            forkOwner: githubLogin,
+            branchName,
+            commitSha: previousBranchSha,
+          })
+          await client.reopenPr(replacementPr.number)
+        }
+        throw error
+      }
     } else {
       await client.commentOnPr({
         prNumber: pr.number,
@@ -385,6 +443,7 @@ export async function handleSubmitReviewRequest(
         email: `${githubLogin}@users.noreply.github.com`,
       },
       upstreamBaseSha,
+      preservedTreeEntries,
     })
     await client.upsertBranch({
       forkOwner: githubLogin,
@@ -580,8 +639,8 @@ ${wcard.description || '_(no description)_'}
 ### Files changed
 
 - \`shared/cards/community/${wcard.card_id}.ts\` — card definition + implementation
-- \`shared/cards/community/__tests__/${wcard.card_id}.test.ts\` — smoke test
 - \`shared/cards/register-all.ts\` — registry patch (alphabetical insert)
+- \`shared/cards/catalog.generated.ts\` — generated catalog patch
 - \`docs/community_cards.md\` — community card log
 ${wcard.art_url ? `- \`public/card-art/community/${wcard.card_id}.{ext}\` — art (LLM-generated)\n` : ''}
 
@@ -590,6 +649,9 @@ ${wcard.art_url ? `- \`public/card-art/community/${wcard.card_id}.{ext}\` — ar
 - [ ] Balance check vs official cards
 - [ ] Card text clarity
 - [ ] Effect code review (sandbox-validated, AST-checked)
+- [ ] Any \`costs\` result includes explicit \`costAttribution\`
+- [ ] Simple immediate effects have a direct behavior test; payment, choice/pending, delayed, cross-player, or multi-step effects have a dedicated GameSession test
+- [ ] No definition-only generated smoke test
 ${wcard.art_url ? '- [ ] Art license (LLM-generated, author confirmed)\n' : ''}- [ ] Tests pass
 
 ---

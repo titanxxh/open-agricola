@@ -256,7 +256,7 @@ ${renderListenerActionList()}
 
 - **翻修目标房屋类型**：BGA 升级链固定 \`wood → clay → stone\`，无分支。\`renovate-house\` 触发时用 \`context.player.houseType\` 反推目标——\`'wood'\` 表示翻修到泥屋，\`'clay'\` 表示翻修到石屋。例：石屋翻修折扣 → \`if (context.player.houseType !== 'clay') return\`。
 - **建造房屋类型**：\`construct\` 行动看 \`context.choice\` 或 \`context.actionId\`（\`'build-clay-room'\` / \`'build-stone-room'\` 等），不是 \`space.params\`。
-- **未使用 handler 参数**：项目 TS strict 开了 \`noUnusedParameters\`。如果 handler 不需要 context（例如纯返回固定折扣），把参数前缀 \`_\` 或省掉：\`handler: (_context) => ({ costs: { stone: -1 }, sourceCard: CARD_ID })\` 或 \`handler: () => ({ ... })\`。
+- **未使用 handler 参数**：项目 TS strict 开了 \`noUnusedParameters\`。如果 handler 不需要 context，把参数前缀 \`_\` 或省掉。
 
 ### handler 返回值
 
@@ -264,6 +264,7 @@ ${renderListenerActionList()}
 return {
   flow?: ActionFlow,              // 追加的行动流
   costs?: { wood: -1 },           // 简单行动费用修改（负数=折扣）
+  costAttribution?: [{ sourceCard: CARD_ID, costs: { wood: -1 } }],
   trades?: Trade[],               // 支付替换候选
   bonuses?: Bonus[],              // 折扣 / 折扣选项
   paymentResourceProviders?: CardProvidedPaymentResourceProvider[], // payment-only 虚拟支付资源
@@ -272,6 +273,16 @@ return {
   alternativeFlow?: ActionFlow,   // 替换行动
   sourceCard?: CARD_ID,
 }
+\`\`\`
+
+返回 \`costs\` 时必须同时返回 \`costAttribution\`，两处使用同一费用 delta：
+
+\`\`\`typescript
+handler: () => ({
+  costs: { wood: -1 },
+  costAttribution: [{ sourceCard: CARD_ID, costs: { wood: -1 } }],
+  sourceCard: CARD_ID,
+})
 \`\`\`
 
 ### 费用机制边界

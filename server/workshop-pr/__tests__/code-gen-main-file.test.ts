@@ -17,7 +17,7 @@ export const catalogCardDefinitions = [
 `
   const upstreamCommunityMd = `# Community Cards\n\n<!-- community-card-entries:begin -->\n<!-- community-card-entries:end -->\n`
 
-  it('emits 5 files (card source + smoke test + generated catalogs + community.md)', async () => {
+  it('emits 4 files without a generated test', async () => {
     const wcard = {
       id: 'wc1',
       card_id: 'CUSTOM_NewCard',
@@ -39,7 +39,6 @@ export const catalogCardDefinitions = [
       'docs/community_cards.md',
       'shared/cards/catalog.generated.ts',
       'shared/cards/community/CUSTOM_NewCard.ts',
-      'shared/cards/community/__tests__/CUSTOM_NewCard.test.ts',
       'shared/cards/register-all.ts',
     ])
   })

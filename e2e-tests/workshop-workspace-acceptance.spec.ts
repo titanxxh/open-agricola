@@ -954,7 +954,10 @@ const scenarioHandoff = async ({
     '/api/workshop/cards/validate-code',
     {
       method: 'POST',
-      data: { source: sourceFor(workspace.draft.cardId, workspace.draft.name, true) },
+      data: {
+        source: sourceFor(workspace.draft.cardId, workspace.draft.name, true),
+        card_id: workspace.draft.cardId,
+      },
     },
   ))
   expect(invalidValidation.valid).toBe(false)
@@ -964,7 +967,10 @@ const scenarioHandoff = async ({
     '/api/workshop/cards/validate-code',
     {
       method: 'POST',
-      data: { source: sourceFor(workspace.draft.cardId, workspace.draft.name) },
+      data: {
+        source: sourceFor(workspace.draft.cardId, workspace.draft.name),
+        card_id: workspace.draft.cardId,
+      },
     },
   ))
   expect(validValidation.valid).toBe(true)

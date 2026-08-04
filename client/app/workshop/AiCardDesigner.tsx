@@ -1051,7 +1051,7 @@ function AbilityPanel({
       const response = await apiFetch('/api/workshop/cards/validate-code', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ source: sourceCode }),
+        body: JSON.stringify({ source: sourceCode, card_id: cardId }),
       })
       const data = await response.json() as {
         ok: boolean
@@ -1075,7 +1075,7 @@ function AbilityPanel({
         errors: [reason instanceof Error ? reason.message : String(reason)],
       }
     }
-  }, [apiFetch])
+  }, [apiFetch, cardId])
 
   const sendMessages = useCallback(async (
     chatHistory: ChatMessage[],

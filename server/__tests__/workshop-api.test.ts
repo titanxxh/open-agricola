@@ -255,6 +255,34 @@ const createPublishedCard = async (
 }
 
 describe('workshop API', () => {
+  describe('POST /api/workshop/cards/validate-code', () => {
+    it('validates cost attribution against the submitted card ID', async () => {
+      const source = `
+const CARD_ID = 'CUSTOM_ValidatedCard'
+const CARD_DEF = MinorImprovement({ id: CARD_ID, name: 'Validated Card' })
+const CARD_IMPL = {
+  listeners: [{
+    cardIds: [CARD_ID],
+    actions: ['construct'],
+    phases: ['computeCosts'],
+    handler: () => ({
+      costs: { wood: -1 },
+      costAttribution: [{ sourceCard: CARD_ID, costs: { wood: -1 } }],
+    }),
+  }],
+}
+      `
+      const res = mockRes()
+
+      await handleWorkshopRoute(mockReq('POST', '/api/workshop/cards/validate-code', {
+        source,
+        card_id: 'CUSTOM_ValidatedCard',
+      }, 'tok-alice'), res)
+
+      expect(JSON.parse(res.body)).toMatchObject({ ok: true, valid: true })
+    })
+  })
+
   describe('POST /api/workshop/cards (create)', () => {
     it('creates a draft card', async () => {
       const req = mockReq('POST', '/api/workshop/cards', {

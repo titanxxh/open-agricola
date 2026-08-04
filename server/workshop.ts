@@ -857,11 +857,14 @@ export async function handleWorkshopRoute(
   // ── POST /api/workshop/cards/validate-code ──────────────────────────────
   if (req.method === 'POST' && url === '/api/workshop/cards/validate-code') {
     if (!user) { sendJson(res, 401, { ok: false, error: 'Not authenticated' }); return true }
-    const body = await parseBody<{ source?: string }>(req)
+    const body = await parseBody<{ source?: string; card_id?: string }>(req)
     if (!body?.source || typeof body.source !== 'string') {
       sendJson(res, 400, { ok: false, error: 'Missing source' }); return true
     }
-    const result = await prepareWorkshopAbilityCode(body.source, 'CUSTOM_ValidateOnly')
+    if (!body.card_id || typeof body.card_id !== 'string') {
+      sendJson(res, 400, { ok: false, error: 'Missing card_id' }); return true
+    }
+    const result = await prepareWorkshopAbilityCode(body.source, body.card_id)
     if (!result.ok) {
       if (result.status === 400) {
         sendJson(res, 200, { ok: true, valid: false, errors: result.errors })

@@ -10,6 +10,7 @@
  */
 import ts from 'typescript'
 import { cardEffectHooks, isHandCardEffectHook } from '../cards/card-effects'
+import { REAL_RESOURCE_KEYS } from '../contract/resource-keys'
 import { isSandboxListenerAction } from './sandbox-listener-actions'
 import { sandboxListenerPhases } from './sandbox-listener-phases'
 
@@ -55,8 +56,315 @@ const ALLOWED_EFFECT_KEYS = new Set<string>([
 
 /** Allowed values inside listener.phases arrays. */
 const ALLOWED_LISTENER_PHASES = new Set<string>(sandboxListenerPhases)
+const RESOURCE_KEYS = new Set<string>(REAL_RESOURCE_KEYS)
 
-export function validateCardCode(source: string): ValidationResult {
+function getStaticStringValue(
+  input: ts.Expression,
+  constants: Map<string, string>,
+): string | undefined {
+  let expression = input
+  while (
+    ts.isParenthesizedExpression(expression)
+    || ts.isAsExpression(expression)
+    || ts.isTypeAssertionExpression(expression)
+    || ts.isNonNullExpression(expression)
+    || ts.isSatisfiesExpression(expression)
+  ) expression = expression.expression
+  if (ts.isStringLiteral(expression) || ts.isNoSubstitutionTemplateLiteral(expression)) {
+    return expression.text
+  }
+  return ts.isIdentifier(expression) ? constants.get(expression.text) : undefined
+}
+
+function collectStringConstants(sourceFile: ts.SourceFile): Map<string, string> {
+  const constants = new Map<string, string>()
+  for (const statement of sourceFile.statements) {
+    if (
+      !ts.isVariableStatement(statement)
+      || (statement.declarationList.flags & ts.NodeFlags.Const) === 0
+    ) continue
+    for (const declaration of statement.declarationList.declarations) {
+      if (
+        ts.isIdentifier(declaration.name)
+        && declaration.initializer
+      ) {
+        const value = getStaticStringValue(declaration.initializer, constants)
+        if (value !== undefined) constants.set(declaration.name.text, value)
+      }
+    }
+  }
+  return constants
+}
+
+function getStaticPropertyName(
+  property: ts.ObjectLiteralElementLike,
+  constants: Map<string, string>,
+): string | undefined {
+  if (!property.name) return undefined
+  if (ts.isIdentifier(property.name) || ts.isStringLiteral(property.name)) {
+    return property.name.text
+  }
+  if (ts.isComputedPropertyName(property.name)) {
+    const expression = property.name.expression
+    if (ts.isStringLiteral(expression) || ts.isNoSubstitutionTemplateLiteral(expression)) {
+      return expression.text
+    }
+    if (ts.isIdentifier(expression)) return constants.get(expression.text)
+  }
+  return undefined
+}
+
+function hasInspectablePropertyName(
+  property: ts.ObjectLiteralElementLike,
+  constants: Map<string, string>,
+): boolean {
+  if (ts.isSpreadAssignment(property)) return false
+  if (
+    property.name
+    && ts.isComputedPropertyName(property.name)
+    && !ts.isStringLiteral(property.name.expression)
+    && !ts.isNoSubstitutionTemplateLiteral(property.name.expression)
+  ) return false
+  const name = getStaticPropertyName(property, constants)
+  return name !== undefined && name !== '__proto__'
+}
+
+function listenerMayComputeCosts(
+  listener: ts.ObjectLiteralExpression,
+  constants: Map<string, string>,
+): boolean {
+  const phases = listener.properties.find(
+    property => getStaticPropertyName(property, constants) === 'phases',
+  )
+  if (!phases) return true
+  if (!ts.isPropertyAssignment(phases) || !ts.isArrayLiteralExpression(phases.initializer)) return true
+  return phases.initializer.elements.some(
+    phase => getStaticStringValue(phase, constants) === 'computeCosts',
+  )
+}
+
+function forEachListenerResultObject(
+  sourceFile: ts.SourceFile,
+  constants: Map<string, string>,
+  callback: (result: ts.ObjectLiteralExpression) => void,
+  onUninspectable?: (expression: ts.Node) => void,
+): void {
+  type Handler = ts.ArrowFunction | ts.FunctionExpression | ts.FunctionDeclaration | ts.MethodDeclaration
+  const findTopLevelHandler = (name: string): Handler | undefined => {
+    for (const statement of sourceFile.statements) {
+      if (ts.isFunctionDeclaration(statement) && statement.name?.text === name) return statement
+      if (!ts.isVariableStatement(statement)) continue
+      for (const declaration of statement.declarationList.declarations) {
+        if (
+          ts.isIdentifier(declaration.name)
+          && declaration.name.text === name
+          && declaration.initializer
+          && (ts.isArrowFunction(declaration.initializer) || ts.isFunctionExpression(declaration.initializer))
+        ) return declaration.initializer
+      }
+    }
+    return undefined
+  }
+  const visitResult = (expression: ts.Expression, rejectUninspectable: boolean): void => {
+    if (
+      ts.isParenthesizedExpression(expression)
+      || ts.isAsExpression(expression)
+      || ts.isTypeAssertionExpression(expression)
+      || ts.isNonNullExpression(expression)
+      || ts.isSatisfiesExpression(expression)
+    ) {
+      visitResult(expression.expression, rejectUninspectable)
+    } else if (ts.isConditionalExpression(expression)) {
+      visitResult(expression.whenTrue, rejectUninspectable)
+      visitResult(expression.whenFalse, rejectUninspectable)
+    } else if (ts.isObjectLiteralExpression(expression)) {
+      callback(expression)
+    } else if (
+      rejectUninspectable
+      && expression.kind !== ts.SyntaxKind.NullKeyword
+      && !(ts.isIdentifier(expression) && expression.text === 'undefined')
+      && !ts.isVoidExpression(expression)
+    ) {
+      onUninspectable?.(expression)
+    }
+  }
+  const inspectHandler = (handler: Handler, rejectUninspectable: boolean): void => {
+    if (!handler.body) {
+      if (rejectUninspectable) onUninspectable?.(handler)
+      return
+    }
+    if (!ts.isBlock(handler.body)) {
+      visitResult(handler.body, rejectUninspectable)
+      return
+    }
+    const visitReturns = (node: ts.Node): void => {
+      if (ts.isReturnStatement(node)) {
+        if (node.expression) visitResult(node.expression, rejectUninspectable)
+        return
+      }
+      if (ts.isFunctionLike(node)) return
+      ts.forEachChild(node, visitReturns)
+    }
+    ts.forEachChild(handler.body, visitReturns)
+  }
+  const visit = (node: ts.Node): void => {
+    if (
+      (ts.isPropertyAssignment(node) || ts.isMethodDeclaration(node))
+      && getStaticPropertyName(node, constants) === 'handler'
+    ) {
+      const rejectUninspectable = ts.isObjectLiteralExpression(node.parent)
+        ? listenerMayComputeCosts(node.parent, constants)
+        : true
+      if (ts.isMethodDeclaration(node)) {
+        inspectHandler(node, rejectUninspectable)
+      } else if (ts.isArrowFunction(node.initializer) || ts.isFunctionExpression(node.initializer)) {
+        inspectHandler(node.initializer, rejectUninspectable)
+      } else if (ts.isIdentifier(node.initializer)) {
+        const handler = findTopLevelHandler(node.initializer.text)
+        if (handler) inspectHandler(handler, rejectUninspectable)
+        else if (rejectUninspectable) onUninspectable?.(node.initializer)
+      } else if (rejectUninspectable) {
+        onUninspectable?.(node.initializer)
+      }
+    }
+    ts.forEachChild(node, visit)
+  }
+  visit(sourceFile)
+}
+
+function findMissingCostAttributionLines(sourceFile: ts.SourceFile): number[] {
+  const constants = collectStringConstants(sourceFile)
+  const lines: number[] = []
+  forEachListenerResultObject(sourceFile, constants, (result) => {
+    const names = new Set(result.properties.map(property => getStaticPropertyName(property, constants)))
+    if (names.has('costs') && !names.has('costAttribution')) {
+      lines.push(sourceFile.getLineAndCharacterOfPosition(result.getStart(sourceFile)).line + 1)
+    }
+  }, (expression) => {
+    lines.push(sourceFile.getLineAndCharacterOfPosition(expression.getStart(sourceFile)).line + 1)
+  })
+  return lines
+}
+
+export function findInvalidCostAttributionLines(source: string): number[] {
+  const sourceFile = ts.createSourceFile(
+    'card.ts', source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS,
+  )
+  const lines = findMissingCostAttributionLines(sourceFile)
+  validateCostAttributionShapes(sourceFile, [], undefined, lines)
+  return [...new Set(lines)]
+}
+
+function validateCostAttributionShapes(
+  sourceFile: ts.SourceFile,
+  errors: string[],
+  expectedCardId?: string,
+  invalidLines?: number[],
+): void {
+  const constants = collectStringConstants(sourceFile)
+  const declaredCardId = constants.get('CARD_ID')
+  const propertyValue = (property: ts.ObjectLiteralElementLike): ts.Expression | undefined => {
+    if (ts.isPropertyAssignment(property)) return property.initializer
+    if (ts.isShorthandPropertyAssignment(property)) return property.name
+    return undefined
+  }
+  const numberLiteralValue = (expression: ts.Expression): number | undefined => {
+    if (ts.isNumericLiteral(expression)) return Number(expression.text)
+    if (!ts.isPrefixUnaryExpression(expression)
+      || (expression.operator !== ts.SyntaxKind.PlusToken && expression.operator !== ts.SyntaxKind.MinusToken)
+      || !ts.isNumericLiteral(expression.operand)
+    ) return undefined
+    const value = Number(expression.operand.text)
+    return expression.operator === ts.SyntaxKind.MinusToken ? -value : value
+  }
+  const resourceDelta = (expression: ts.Expression): Record<string, number> | undefined => {
+    if (!ts.isObjectLiteralExpression(expression)) return undefined
+    const result: Record<string, number> = {}
+    for (const property of expression.properties) {
+      if (!ts.isPropertyAssignment(property)) return undefined
+      const key = getStaticPropertyName(property, constants)
+      const value = numberLiteralValue(property.initializer)
+      if (!key || !RESOURCE_KEYS.has(key) || value === undefined || !Number.isFinite(value)) return undefined
+      result[key] = value
+    }
+    return result
+  }
+  const equalResourceDeltas = (left: Record<string, number>, right: Record<string, number>): boolean => {
+    const keys = Object.keys(left)
+    return keys.length === Object.keys(right).length
+      && keys.every(key => left[key] === right[key])
+  }
+  const report = (result: ts.ObjectLiteralExpression, message: string): void => {
+    const { line } = sourceFile.getLineAndCharacterOfPosition(result.getStart(sourceFile))
+    errors.push(`line ${line + 1}: ${message}`)
+    invalidLines?.push(line + 1)
+  }
+  forEachListenerResultObject(sourceFile, constants, (result) => {
+    const costsProperties = result.properties.filter(
+      property => getStaticPropertyName(property, constants) === 'costs',
+    )
+    const attributionProperties = result.properties.filter(
+      property => getStaticPropertyName(property, constants) === 'costAttribution',
+    )
+    const costsProperty = costsProperties[0]
+    const attributionProperty = attributionProperties[0]
+    if (costsProperties.length > 1 || attributionProperties.length > 1) {
+      report(result, 'listener results must not contain duplicate costs or costAttribution')
+    } else if (attributionProperty && !costsProperty) {
+      report(result, 'listener results with costAttribution must include costs')
+    } else if (costsProperty && attributionProperty) {
+      const costs = propertyValue(costsProperty)
+      const attribution = propertyValue(attributionProperty)
+      const entry = attribution && ts.isArrayLiteralExpression(attribution)
+        && attribution.elements.length === 1
+        && ts.isObjectLiteralExpression(attribution.elements[0])
+        ? attribution.elements[0]
+        : undefined
+      const sourceProperties = entry?.properties.filter(
+        property => getStaticPropertyName(property, constants) === 'sourceCard',
+      ) ?? []
+      const entryCostsProperties = entry?.properties.filter(
+        property => getStaticPropertyName(property, constants) === 'costs',
+      ) ?? []
+      const validEntryShape = entry
+        && entry.properties.every(property => hasInspectablePropertyName(property, constants))
+        && sourceProperties.length === 1
+        && entryCostsProperties.length === 1
+      const sourceProperty = sourceProperties[0]
+      const entryCostsProperty = entryCostsProperties[0]
+      const source = sourceProperty && propertyValue(sourceProperty)
+      const entryCosts = entryCostsProperty && propertyValue(entryCostsProperty)
+      const costsDelta = costs && resourceDelta(costs)
+      const entryCostsDelta = entryCosts && resourceDelta(entryCosts)
+      const sharedDynamicDelta = costs
+        && entryCosts
+        && ts.isIdentifier(costs)
+        && ts.isIdentifier(entryCosts)
+        && costs.text === entryCosts.text
+      const matchingCosts = sharedDynamicDelta || (
+        costsDelta !== undefined
+        && entryCostsDelta !== undefined
+        && equalResourceDeltas(costsDelta, entryCostsDelta)
+      )
+      const validSource = source
+        && ts.isIdentifier(source)
+        && source.text === 'CARD_ID'
+        && declaredCardId !== undefined
+        && declaredCardId.length > 0
+        && (expectedCardId === undefined || declaredCardId === expectedCardId)
+      if (
+        !entry
+        || !validEntryShape
+        || !validSource
+        || !matchingCosts
+      ) {
+        report(result, 'costAttribution must contain one matching source entry')
+      }
+    }
+  })
+}
+
+export function validateCardCode(source: string, expectedCardId?: string): ValidationResult {
   const sourceFile = ts.createSourceFile(
     'card.ts', source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS,
   )
@@ -116,6 +424,16 @@ export function validateCardCode(source: string): ValidationResult {
           errors.push(`line ${getLine(node)}: CARD_IMPL must not be referenced outside its declaration`)
         }
       }
+      const shadowsCardId = node.text === 'CARD_ID' && (
+        (declaration && !isTopLevelConstDeclaration)
+        || (parent && ts.isParameter(parent) && parent.name === node)
+        || (parent && ts.isBindingElement(parent) && parent.name === node)
+        || (parent && ts.isFunctionDeclaration(parent) && parent.name === node)
+        || (parent && ts.isFunctionExpression(parent) && parent.name === node)
+      )
+      if (shadowsCardId) {
+        errors.push(`line ${getLine(node)}: CARD_ID must not be shadowed`)
+      }
       // Skip property access names (obj.process is fine, bare process is not)
       // BUT check DENIED_PROPERTY_ACCESS for dangerous property names
       if (parent && ts.isPropertyAccessExpression(parent) && parent.name === node) {
@@ -171,6 +489,10 @@ export function validateCardCode(source: string): ValidationResult {
 
   // Validate CARD_IMPL hook/listener whitelists
   validateCardImplHooksAndPhases(sourceFile, errors)
+  validateCostAttributionShapes(sourceFile, errors, expectedCardId)
+  for (const line of findMissingCostAttributionLines(sourceFile)) {
+    errors.push(`line ${line}: listener results with costs must include costAttribution`)
+  }
 
   // Also check for syntax errors
   const diagnostics = ts.transpileModule(source, {
@@ -206,6 +528,7 @@ function validateCardImplHooksAndPhases(
   sourceFile: ts.SourceFile,
   errors: string[],
 ): void {
+  const constants = collectStringConstants(sourceFile)
   function getLine(node: ts.Node): number {
     const { line } = sourceFile.getLineAndCharacterOfPosition(node.getStart())
     return line + 1
@@ -220,7 +543,7 @@ function validateCardImplHooksAndPhases(
         errors.push(`line ${getLine(decl)}: CARD_IMPL must be an object literal`)
         continue
       }
-      validateCardImplObject(decl.initializer, errors, getLine)
+      validateCardImplObject(decl.initializer, errors, getLine, constants)
     }
   }
 }
@@ -229,6 +552,7 @@ function validateCardImplObject(
   obj: ts.ObjectLiteralExpression,
   errors: string[],
   getLine: (node: ts.Node) => number,
+  constants: Map<string, string>,
 ): void {
   for (const prop of obj.properties) {
     if (ts.isSpreadAssignment(prop)) {
@@ -265,7 +589,7 @@ function validateCardImplObject(
       if (!ts.isArrayLiteralExpression(prop.initializer)) {
         errors.push(`line ${getLine(prop.initializer)}: CARD_IMPL.listeners must be an array literal`)
       } else {
-        validateListenersArray(prop.initializer, errors, getLine)
+        validateListenersArray(prop.initializer, errors, getLine, constants)
       }
     }
   }
@@ -316,12 +640,64 @@ function validateListenersArray(
   arr: ts.ArrayLiteralExpression,
   errors: string[],
   getLine: (node: ts.Node) => number,
+  constants: Map<string, string>,
 ): void {
+  const isInspectableResult = (expression: ts.Expression): boolean => {
+    if (
+      ts.isParenthesizedExpression(expression)
+      || ts.isAsExpression(expression)
+      || ts.isTypeAssertionExpression(expression)
+      || ts.isNonNullExpression(expression)
+      || ts.isSatisfiesExpression(expression)
+    ) return isInspectableResult(expression.expression)
+    if (
+      expression.kind === ts.SyntaxKind.NullKeyword
+      || (ts.isIdentifier(expression) && expression.text === 'undefined')
+      || ts.isVoidExpression(expression)
+    ) return true
+    if (ts.isConditionalExpression(expression)) {
+      return isInspectableResult(expression.whenTrue)
+        && isInspectableResult(expression.whenFalse)
+    }
+    return ts.isObjectLiteralExpression(expression)
+      && expression.properties.every(property => hasInspectablePropertyName(property, constants))
+  }
+
+  const validateHandler = (
+    handler: ts.ArrowFunction | ts.FunctionExpression | ts.MethodDeclaration,
+    inspectResults: boolean,
+  ): void => {
+    const validateResult = (expression: ts.Expression): void => {
+      if (!isInspectableResult(expression)) {
+        errors.push(`line ${getLine(expression)}: listener handlers must return statically inspectable objects`)
+      }
+    }
+    if (!handler.body) {
+      errors.push(`line ${getLine(handler)}: listener handlers must have a body`)
+      return
+    }
+    if (!inspectResults) return
+    if (!ts.isBlock(handler.body)) {
+      validateResult(handler.body)
+      return
+    }
+    const visitReturns = (node: ts.Node): void => {
+      if (ts.isReturnStatement(node)) {
+        if (node.expression) validateResult(node.expression)
+        return
+      }
+      if (ts.isFunctionLike(node)) return
+      ts.forEachChild(node, visitReturns)
+    }
+    ts.forEachChild(handler.body, visitReturns)
+  }
+
   for (const element of arr.elements) {
     if (!ts.isObjectLiteralExpression(element)) {
       errors.push(`line ${getLine(element)}: CARD_IMPL listener entries must be object literals`)
       continue
     }
+    const inspectResults = listenerMayComputeCosts(element, constants)
     for (const prop of element.properties) {
       if (ts.isSpreadAssignment(prop)) {
         errors.push(`line ${getLine(prop)}: CARD_IMPL listener entries must not use spread properties`)
@@ -340,6 +716,19 @@ function validateListenersArray(
       }
       if ((propName === 'actions' || propName === 'phases') && !ts.isPropertyAssignment(prop)) {
         errors.push(`line ${getLine(prop)}: listener ${propName} must use a property assignment`)
+        continue
+      }
+      if (propName === 'handler') {
+        if (ts.isMethodDeclaration(prop)) {
+          validateHandler(prop, inspectResults)
+        } else if (
+          ts.isPropertyAssignment(prop)
+          && (ts.isArrowFunction(prop.initializer) || ts.isFunctionExpression(prop.initializer))
+        ) {
+          validateHandler(prop.initializer, inspectResults)
+        } else {
+          errors.push(`line ${getLine(prop)}: listener handlers must be inline functions`)
+        }
         continue
       }
       if (!ts.isPropertyAssignment(prop)) continue
