@@ -2271,6 +2271,41 @@
   margin: 14px auto 0;
 }
 
+.aicw-live-card-id {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  width: min(100%, 310px);
+  margin: 10px auto 0;
+  padding: 9px 10px 9px 12px;
+  border: 1px solid var(--aicw-border);
+  border-radius: 8px;
+  background: var(--aicw-paper);
+}
+
+.aicw-live-card-id > span {
+  display: grid;
+  min-width: 0;
+  gap: 2px;
+}
+
+.aicw-live-card-id small {
+  color: var(--aicw-muted);
+  font-size: 10px;
+}
+
+.aicw-live-card-id code {
+  overflow-wrap: anywhere;
+  font-size: 12px;
+}
+
+.aicw-live-card-id .aicw-button {
+  flex: none;
+  min-height: 32px;
+  padding: 6px 10px;
+}
+
 .aicw-readiness {
   width: min(100%, 310px);
   margin: 24px auto 0;
