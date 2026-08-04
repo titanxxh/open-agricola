@@ -1,4 +1,5 @@
 import type {
+  ActionCostAttribution,
   ActionAvailabilityContext,
   ActionCostPreview,
   ActionDefinition,
@@ -22,8 +23,8 @@ import {
   collectSpecialStablePositions,
   applySpecialStableAt,
 } from '../../cards/card-effects'
-import { collectComputeCostsForFarmChoice } from '../../cards/card-listeners'
-import { addCardResourceGained } from '../../cards/helpers/card-state'
+import { collectFarmChoiceCostAdjustments } from '../../cards/card-listeners'
+import { addCardResourceGained, recordActionCostAttribution } from '../../cards/helpers/card-state'
 import { getAvailableStableSupplyCount } from '../../domain/supply-tokens'
 
 // `actionContext.farmHand === true` is the generic gate set by the
@@ -167,24 +168,11 @@ const resolveStableTotalCost = (
  * `computeFreeFenceTotal`: the listener is fed the per-build `stableCount` and
  * returns a single aggregate delta, which is applied to the base total cost.
  */
-const applyStableBuildDiscount = (
-  state: GameState,
-  player: PlayerState,
-  baseCost: Partial<Resource> | null,
-  totalUnits: number,
-): Partial<Resource> | null => {
-  if (!baseCost) return baseCost
-  const override = collectComputeCostsForFarmChoice(state, player, 'stables', {
-    stableCount: totalUnits,
-  })
-  const result: Partial<Resource> = { ...baseCost }
-  for (const [key, delta] of Object.entries(override)) {
-    if (typeof delta !== 'number' || delta === 0) continue
-    const k = key as keyof Resource
-    result[k] = Math.max(0, (result[k] ?? 0) + delta)
-    if (result[k] === 0) delete result[k]
-  }
-  return result
+type StableCostResolution = {
+  baseCost: Partial<Resource>
+  actionCost: Partial<Resource>
+  finalCost: Partial<Resource>
+  farmCostAttribution: ActionCostAttribution[]
 }
 
 const resolveStableTotalCostWithDiscount = (
@@ -193,17 +181,27 @@ const resolveStableTotalCostWithDiscount = (
   actionContext: Record<string, unknown> | undefined,
   costs: Partial<Resource> | undefined,
   totalUnits: number,
-): Partial<Resource> | null =>
-  // `costs` carries the dispatcher's per-unit computeCosts delta (e.g. a flat
-  // per-stable modifier). C88 deliberately stays out of that pass — it needs
-  // the real build count — and is applied here against `totalUnits` via
-  // applyStableBuildDiscount, so the two never double-count the same card.
-  applyStableBuildDiscount(
-    state,
-    player,
-    resolveStableTotalCost(actionContext, costs, totalUnits),
-    totalUnits,
-  )
+): StableCostResolution | null => {
+  const baseCost = resolveStableTotalCost(actionContext, undefined, totalUnits)
+  const actionCost = resolveStableTotalCost(actionContext, costs, totalUnits)
+  if (!baseCost || !actionCost) return null
+  const adjustments = collectFarmChoiceCostAdjustments(state, player, 'stables', {
+    stableCount: totalUnits,
+  })
+  const finalCost: Partial<Resource> = { ...actionCost }
+  for (const [key, delta] of Object.entries(adjustments.costs)) {
+    if (typeof delta !== 'number' || delta === 0) continue
+    const k = key as keyof Resource
+    finalCost[k] = Math.max(0, (finalCost[k] ?? 0) + delta)
+    if (finalCost[k] === 0) delete finalCost[k]
+  }
+  return {
+    baseCost,
+    actionCost,
+    finalCost,
+    farmCostAttribution: adjustments.costAttribution,
+  }
+}
 
 const buildStableFarmSelection = (
   state: GameState,
@@ -225,9 +223,9 @@ const buildStableFarmSelection = (
   // first unaffordable count terminates the scan.
   let affordableMax = 0
   for (let count = 1; count <= selectionMax; count += 1) {
-    const total = resolveStableTotalCostWithDiscount(state, player, actionContext, costs, count)
-    if (!total) break
-    if (!PaymentSolver.canAffordTypedFlatCost(player, total, 'stables', state)) break
+    const resolution = resolveStableTotalCostWithDiscount(state, player, actionContext, costs, count)
+    if (!resolution) break
+    if (!PaymentSolver.canAffordTypedFlatCost(player, resolution.finalCost, 'stables', state)) break
     affordableMax = count
   }
   const farm = playerBoard(state, idx).farmInteraction.selectableTiles('stable', {
@@ -307,14 +305,15 @@ const finalizeStables = (
   }
   const placementError = stables.length > 0 ? validateStablePlacement(ctx, stables) : undefined
   if (placementError) return placementError
-  const totalCost = resolveStableTotalCostWithDiscount(
+  const costResolution = resolveStableTotalCostWithDiscount(
     ctx.state,
     ctx.player,
     ctx.actionContext,
     ctx.costs,
     totalUnits,
   )
-  if (!totalCost) return { type: 'fail', errorKey: 'log.buildStableFail' }
+  if (!costResolution) return { type: 'fail', errorKey: 'log.buildStableFail' }
+  const totalCost = costResolution.finalCost
   const payment = PaymentSolver.resolveTypedFlatPaymentSelection(
     ctx.player,
     totalCost,
@@ -334,6 +333,19 @@ const finalizeStables = (
     specialSourceCardId = applied.sourceCardId
   }
   applyPlayerMutation(ctx.player, nextPlayer)
+  recordActionCostAttribution(
+    ctx.player,
+    ctx.costAttribution,
+    costResolution.baseCost,
+    costResolution.actionCost,
+    totalUnits,
+  )
+  recordActionCostAttribution(
+    ctx.player,
+    costResolution.farmCostAttribution,
+    costResolution.actionCost,
+    costResolution.finalCost,
+  )
   if (ctx.sourceCard) {
     addCardResourceGained(ctx.player, ctx.sourceCard, { stable: stables.length })
   }
@@ -442,14 +454,15 @@ export const stablesAction: ActionDefinition = {
       }
       const placementError = stables.length > 0 ? validateStablePlacement(ctx, stables) : undefined
       if (placementError) return placementError
-      const totalCost = resolveStableTotalCostWithDiscount(
+      const costResolution = resolveStableTotalCostWithDiscount(
         ctx.state,
         ctx.player,
         ctx.actionContext,
         ctx.costs,
         totalUnits,
       )
-      if (!totalCost) return { type: 'fail', errorKey: 'log.buildStableFail' }
+      if (!costResolution) return { type: 'fail', errorKey: 'log.buildStableFail' }
+      const totalCost = costResolution.finalCost
       const payment = PaymentSolver.resolveTypedFlatPaymentSelection(
         ctx.player,
         totalCost,

@@ -60,9 +60,11 @@ const C16FenceListener: CardListenerRegistration = {
       const built = new Set((ctx.player.fenceSegments ?? []).map((s) => s.edge))
       let n = 0
       for (const edge of fieldEdges) if (!built.has(edge)) n += 1
-      return { costs: { wood: -n } }
+      const costs = { wood: -n }
+      return { costs, costAttribution: [{ sourceCard: CARD_ID, costs }] }
     }
-    return { costs: { wood: -newFenceEdges.filter((e) => fieldEdges.has(e)).length } }
+    const costs = { wood: -newFenceEdges.filter((e) => fieldEdges.has(e)).length }
+    return { costs, costAttribution: [{ sourceCard: CARD_ID, costs }] }
   },
 }
 
