@@ -921,6 +921,7 @@ function ArtPanel({
 // ── Ability Chat Panel ────────────────────────────────────────────────────────
 
 function AbilityPanel({
+  cardId,
   cardType,
   cardName,
   prerequisite,
@@ -944,6 +945,7 @@ function AbilityPanel({
   validationErrors,
   onValidationErrorsConsumed,
 }: {
+  cardId: string
   cardType: 'minor' | 'occupation'
   cardName: string
   prerequisite?: string
@@ -1017,6 +1019,30 @@ function AbilityPanel({
     messagesRef.current = next
     onMessagesChange(next)
   }, [onMessagesChange])
+
+  const buildChatHistory = useCallback((
+    visibleMessages: DisplayMessage[],
+    requestIndex: number,
+  ): ChatMessage[] => {
+    const typeLabel = cardType === 'occupation'
+      ? '职业卡 (Occupation)'
+      : '小发展卡 (Minor Improvement)'
+    const contextParts = ['CARD_ID、卡牌类型和卡牌名称必须与当前卡牌完全一致']
+    if (cardId.trim()) contextParts.push(`卡牌 ID: ${cardId.trim()}`)
+    contextParts.push(`卡牌类型: ${typeLabel}`)
+    if (cardName.trim()) contextParts.push(`卡牌名称: ${cardName.trim()}`)
+    if (prerequisite?.trim()) contextParts.push(`前置条件: ${prerequisite.trim()}`)
+    if (costHint?.trim()) contextParts.push(`消耗资源: ${costHint.trim()}`)
+    if (requestIndex === 0 && extracted?.sourceCode) {
+      contextParts.push(`\n当前已有代码:\n\`\`\`typescript\n${extracted.sourceCode}\n\`\`\``)
+    }
+    return visibleMessages.map((message, index) => ({
+      role: message.isError ? 'user' : message.role,
+      content: index === requestIndex
+        ? `[${contextParts.join(', ')}]\n${message.content}`
+        : message.content,
+    }))
+  }, [cardId, cardName, cardType, costHint, extracted, prerequisite])
 
   const validateSource = useCallback(async (
     sourceCode: string,
@@ -1125,16 +1151,6 @@ function AbilityPanel({
 
   const handleSend = useCallback(async () => {
     if (!input.trim() || !config || streaming) return
-    const typeLabel = cardType === 'occupation'
-      ? '职业卡 (Occupation)'
-      : '小发展卡 (Minor Improvement)'
-    const contextParts = [`卡牌类型: ${typeLabel}`]
-    if (cardName.trim()) contextParts.push(`卡牌名称: ${cardName.trim()}`)
-    if (prerequisite?.trim()) contextParts.push(`前置条件: ${prerequisite.trim()}`)
-    if (costHint?.trim()) contextParts.push(`消耗资源: ${costHint.trim()}`)
-    if (messages.length === 0 && extracted?.sourceCode) {
-      contextParts.push(`\n当前已有代码:\n\`\`\`typescript\n${extracted.sourceCode}\n\`\`\``)
-    }
     const request = input.trim()
     const visibleMessages: DisplayMessage[] = [
       ...messages,
@@ -1142,12 +1158,7 @@ function AbilityPanel({
     ]
     commitMessages(visibleMessages)
     onInputChange('')
-    const chatHistory: ChatMessage[] = visibleMessages.map((message, index) => ({
-      role: message.isError ? 'user' : message.role,
-      content: index === visibleMessages.length - 1
-        ? `[${contextParts.join(', ')}]\n${request}`
-        : message.content,
-    }))
+    const chatHistory = buildChatHistory(visibleMessages, visibleMessages.length - 1)
     const promptSnapshot = [
       `[SYSTEM]\n${CARD_DESIGNER_SYSTEM_PROMPT}`,
       ...chatHistory.map(message =>
@@ -1155,16 +1166,12 @@ function AbilityPanel({
     ].join('\n\n---\n\n')
     await sendMessages(chatHistory, promptSnapshot, request)
   }, [
-    cardName,
-    cardType,
+    buildChatHistory,
     commitMessages,
     config,
-    costHint,
-    extracted,
     input,
     messages,
     onInputChange,
-    prerequisite,
     sendMessages,
     streaming,
   ])
@@ -1173,10 +1180,7 @@ function AbilityPanel({
     if (streaming || !config) return
     const truncated = messages.slice(0, messageIndex + 1)
     commitMessages(truncated)
-    const chatHistory: ChatMessage[] = truncated.map(message => ({
-      role: message.isError ? 'user' : message.role,
-      content: message.content,
-    }))
+    const chatHistory = buildChatHistory(truncated, messageIndex)
     const promptSnapshot = [
       `[SYSTEM]\n${CARD_DESIGNER_SYSTEM_PROMPT}`,
       ...chatHistory.map(message =>
@@ -1187,7 +1191,7 @@ function AbilityPanel({
       promptSnapshot,
       truncated[messageIndex]?.content ?? '',
     )
-  }, [commitMessages, config, messages, sendMessages, streaming])
+  }, [buildChatHistory, commitMessages, config, messages, sendMessages, streaming])
 
   const handleValidate = async (candidate: AbilityCandidate) => {
     setValidatingCandidateId(candidate.id)
@@ -2495,6 +2499,7 @@ export function AiCardDesigner({
 
             {!controllerLoading && activeStage === 'ability' && (
               <AbilityPanel
+                cardId={cardIdInput}
                 cardType={cardType}
                 cardName={cardName}
                 prerequisite={prerequisite}

@@ -414,7 +414,6 @@ describe('workshop draft aggregate', () => {
       codeManifest: { listeners: [] },
       cardJson: {
         ...baseDraft().cardJson,
-        name: 'Generated Field Keeper',
         desc: ['Generated effect text.'],
         cost: { wood: 2 },
         vp: 2,
@@ -436,9 +435,9 @@ describe('workshop draft aggregate', () => {
     expect(adopted.workspace.draft.effectCode).toBe(validCandidate.sourceCode)
     expect(adopted.workspace.draft.compiledCode).toBe(validCandidate.compiledCode)
     expect(adopted.workspace.draft.codeManifest).toEqual(validCandidate.codeManifest)
-    expect(adopted.workspace.draft.name).toBe('Generated Field Keeper')
+    expect(adopted.workspace.draft.name).toBe('Field Keeper')
     expect(adopted.workspace.draft.cardJson).toMatchObject({
-      name: 'Generated Field Keeper',
+      name: 'Field Keeper',
       desc: ['Generated effect text.'],
       cost: { wood: 2 },
       vp: 2,
@@ -478,7 +477,6 @@ describe('workshop draft aggregate', () => {
         codeManifest: { listeners: [] },
         cardJson: {
           ...baseDraft().cardJson,
-          name: 'Generated Field Keeper',
         },
         validation: { valid: true },
         createdAt: 100,
@@ -486,7 +484,7 @@ describe('workshop draft aggregate', () => {
     })
 
     expect(adopted.workspace.draft.cardJson).toMatchObject({
-      name: 'Generated Field Keeper',
+      name: 'Field Keeper',
       locales: draft.cardJson.locales,
       _draft: draft.cardJson._draft,
     })
