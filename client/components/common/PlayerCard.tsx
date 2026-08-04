@@ -251,7 +251,9 @@ export const PlayerCard = ({
   const moorMajor = cardType === 'major' ? getMoorMajorDisplay(cardId) : undefined
   const deck = getDeckFromId(cardId)
   const runtimeArt = artUrl === undefined ? getCustomCardArtUrl(cardId) : artUrl
-  const staticArt = cardData?.artUrl
+  const staticArt = cardData?.artUrl?.startsWith('/card-art/community/')
+    ? cardData.artUrl
+    : undefined
   const hasPlayer56Portrait = cardType !== 'major' && !runtimeArt && !staticArt && PLAYER56_PORTRAITS.has(numbering)
 
   const iconStyle = useMemo(() => {
@@ -284,9 +286,7 @@ export const PlayerCard = ({
       const base = import.meta.env.BASE_URL.endsWith('/')
         ? import.meta.env.BASE_URL
         : `${import.meta.env.BASE_URL}/`
-      const fullUrl = staticArt.startsWith('http')
-        ? staticArt
-        : `${base}${staticArt.replace(/^\/+/, '')}`
+      const fullUrl = `${base}${staticArt.replace(/^\/+/, '')}`
       return {
         backgroundImage: `url(${fullUrl})`,
         backgroundSize: 'cover',
