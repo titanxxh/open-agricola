@@ -286,6 +286,14 @@ describe('ast-validator: CARD_IMPL hook/phase whitelisting', () => {
         }
         const CARD_IMPL = { effect: EFFECT }
       `,
+      `
+        const CARD_IMPL = {
+          effect: {
+            get handHooks() { return ['onEndTurn'] },
+            onEndTurn: () => {},
+          },
+        }
+      `,
     ]
 
     for (const source of sources) {

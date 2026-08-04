@@ -77,7 +77,7 @@ describe('CARD_DESIGNER_SYSTEM_PROMPT', () => {
   it('limits handHooks to hooks dispatched from cards in hand', () => {
     expect(CARD_DESIGNER_SYSTEM_PROMPT).toContain('HandCardEffectHook[]')
     expect(CARD_DESIGNER_SYSTEM_PROMPT).toContain('不支持 `onBuy`、`onEndTurn`、`onBeforeEndGame`、`onBeforePlayerTurn`')
-    expect(CARD_DESIGNER_SYSTEM_PROMPT).toContain('`CARD_IMPL.effect` 必须直接写对象字面量')
+    expect(CARD_DESIGNER_SYSTEM_PROMPT).toContain('禁止引用变量、spread、computed key 和 accessor')
   })
 
   it('documents the runtime farm-position shape', () => {

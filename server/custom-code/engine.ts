@@ -1,7 +1,7 @@
 import ivm from 'isolated-vm'
 import { validateCardCode } from '../../shared/custom-code/ast-validator.ts'
 import { compileCardCode } from '../../shared/custom-code/compiler.ts'
-import { cardEffectHooks, type CardEffectField } from '../../shared/cards/card-effects.ts'
+import { cardEffectHooks, isHandCardEffectHook, type CardEffectField } from '../../shared/cards/card-effects.ts'
 import type { ActionFlow } from '../../shared/contract/types.ts'
 import type { ActionHookResult } from '../../shared/actions/hooks.ts'
 import { isSandboxListenerAction } from '../../shared/custom-code/sandbox-listener-actions.ts'
@@ -189,7 +189,12 @@ function runManifestExtraction(compiledCode: string, cardId: string): {
     }))
 
     const effectMetadata = parsed.effectMetadata && Object.keys(parsed.effectMetadata).length > 0
-      ? parsed.effectMetadata
+      ? {
+          ...parsed.effectMetadata,
+          ...(parsed.effectMetadata.handHooks
+            ? { handHooks: parsed.effectMetadata.handHooks.filter(isHandCardEffectHook) }
+            : {}),
+        }
       : undefined
 
     return {

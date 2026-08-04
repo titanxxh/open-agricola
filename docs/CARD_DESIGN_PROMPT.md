@@ -108,7 +108,7 @@ harvest field 三个 stage hook、`onBeforeEndGame` 和 action reaction listener
 | `computeLockedFarmTiles` | 动态锁定农场格（B38 FutureBuildingSite） |
 | `handHooks` | 声明哪些 stage hook 在卡牌还在手牌时也触发（E96 Elder；不支持 `onBuy` / `onEndTurn` / `onBeforeEndGame` / `onBeforePlayerTurn`） |
 
-`CARD_IMPL.effect` 必须直接写对象字面量，禁止变量引用、spread 和 computed key。
+`CARD_IMPL.effect` 必须直接写对象字面量，禁止变量引用、spread、computed key 和 accessor。
 
 > 围栏支付折扣（E16 BriarHedge / C16 FieldFences）现走 listener `computeCosts` phase（actions: `['fence']`），不再是独立 hook。详见 ARCHITECTURE.md §15.7。
 >
