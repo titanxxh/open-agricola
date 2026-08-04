@@ -15,6 +15,7 @@ import type {
   ComplexCost,
   CostModifier,
   CostModifierType,
+  PaymentResourceMap,
   PlayerState,
   Trade,
   TradeModifier,
@@ -51,7 +52,9 @@ export const getModifiersForCostType = (
   const all = player.activeModifiers?.filter((m) => m.appliesTo.includes(costType)) ?? []
   // Layer 1 only: static player-state checks (houseType*). minNumRooms is
   // deferred to evaluateConditions(_, _, nb) inside enumerate.
-  return all.filter((m) => evaluateStaticConditions(player, m.conditions))
+  return all.filter((m) =>
+    m.type === 'remove-resource' || evaluateStaticConditions(player, m.conditions),
+  )
 }
 
 export const applyCostModifiers = (
@@ -59,6 +62,33 @@ export const applyCostModifiers = (
   modifiers: CostModifier[],
 ): ComplexCost => {
   let result: ComplexCost = { ...baseCost }
+
+  const removalModifiers = modifiers.filter((mod) => mod.type === 'remove-resource')
+  const costMaps = [result.fee, ...(result.fees ?? []), result.unitFee]
+    .filter((fee): fee is PaymentResourceMap => fee !== undefined)
+  const removalSources = removalModifiers
+    .filter((mod) => mod.resources.some((resource) =>
+      costMaps.some((fee) => Object.hasOwn(fee, resource) && (fee[resource] ?? 0) !== 0),
+    ))
+    .map((mod) => mod.cardId)
+  const removedResources = removalModifiers
+    .flatMap((mod) => mod.resources)
+  if (removedResources.length > 0) {
+    const remove = (fee: PaymentResourceMap): PaymentResourceMap => {
+      const next = { ...fee }
+      for (const resource of removedResources) delete next[resource]
+      return next
+    }
+    if (result.fee) result.fee = remove(result.fee)
+    if (result.fees) result.fees = result.fees.map(remove)
+    if (result.unitFee) result.unitFee = remove(result.unitFee)
+  }
+  if (removalSources.length > 0) {
+    result.costModifierSources = [...new Set([
+      ...(result.costModifierSources ?? []),
+      ...removalSources,
+    ])]
+  }
 
   const effectiveTrades: Trade[] = [...(result.trades ?? [])]
   const effectiveBonuses: Bonus[] = [...(result.bonuses ?? [])]

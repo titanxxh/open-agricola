@@ -764,15 +764,27 @@ describe('listener purity wave 2b/c', () => {
     })
   })
 
-  it('D158 BeanCounter increments counter by flow only before threshold', () => {
+  it.each([1, 8])('D158 BeanCounter increments on actual round-action slot %i', (slotNumber) => {
     const p = player('D158_BeanCounter', {
       cardStates: { D158_BeanCounter: { counters: { food: 1 } } },
     })
-    const game = state([p])
+    const actionId = `actual-round-${slotNumber}`
+    const game = state([p], {
+      round: slotNumber,
+      roundActionOrder: Array.from(
+        { length: 14 },
+        (_, index) => index === slotNumber - 1 ? actionId : null,
+      ),
+    })
     const before = stateSnapshot(game)
 
     const result = listenerById(D158_BeanCounter_impl.listeners, 'D158-bean-counter-place-farmer')
-      .handler(context(p, { state: game, actionId: 'place-farmer', phase: 'after', space: space('round-5', { roundAvailable: 5 }) }))
+      .handler(context(p, {
+        state: game,
+        actionId: 'place-farmer',
+        phase: 'after',
+        space: space(actionId, { roundAvailable: 99 }),
+      }))
 
     expectUnchanged(before, game)
     expect(result?.flow).toMatchObject({
@@ -781,6 +793,35 @@ describe('listener purity wave 2b/c', () => {
       sourceCard: 'D158_BeanCounter',
       params: { kind: 'set-counter', key: 'food', value: 2 },
     })
+  })
+
+  it.each([
+    ['fixed action space', 8, null, 'farm-expansion', true],
+    ['round-action slot 9', 9, 9, 'actual-round-9', true],
+    ['missing action space', 8, 1, 'actual-round-1', false],
+  ])('D158 BeanCounter ignores %s', (_label, round, slotNumber, actionId, hasSpace) => {
+    const p = player('D158_BeanCounter', {
+      cardStates: { D158_BeanCounter: { counters: { food: 1 } } },
+    })
+    const game = state([p], {
+      round,
+      roundActionOrder: Array.from(
+        { length: 14 },
+        (_, index) => index === (slotNumber ?? 0) - 1 ? actionId : null,
+      ),
+    })
+    const before = stateSnapshot(game)
+
+    const result = listenerById(D158_BeanCounter_impl.listeners, 'D158-bean-counter-place-farmer')
+      .handler(context(p, {
+        state: game,
+        actionId: 'place-farmer',
+        phase: 'after',
+        space: hasSpace ? space(actionId, { roundAvailable: 1 }) : undefined,
+      }))
+
+    expectUnchanged(before, game)
+    expect(result).toBeUndefined()
   })
 
   it('E53 BoarSpear marks used token by flow before optional exchange', () => {
