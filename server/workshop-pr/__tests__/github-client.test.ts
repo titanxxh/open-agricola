@@ -247,6 +247,47 @@ describe('GitHubClient', () => {
       })).rejects.toMatchObject({ code: 'pr_rebase_conflict' })
     })
 
+    it('preserves a final newline added by a patch', async () => {
+      let blobBody: { content?: string } | null = null
+      fetchHandler = (url, init) => {
+        if (url.includes('/contents/example.ts')) {
+          return okJson({
+            content: Buffer.from('const value = 1').toString('base64'),
+            encoding: 'base64',
+          })
+        }
+        if (url.includes('/git/blobs') && init?.method === 'POST') {
+          blobBody = JSON.parse(init.body as string) as typeof blobBody
+          return okJson({ sha: 'blobsha' })
+        }
+        if (url.includes('/git/trees') && init?.method === 'POST') return okJson({ sha: 'treesha' })
+        if (url.includes('/git/commits') && init?.method === 'POST') return okJson({ sha: 'commitsha' })
+        return new Response('', { status: 404 })
+      }
+      const c = new GitHubClient({
+        token: 't',
+        upstreamOwner: 'titanxxh',
+        upstreamRepo: 'open-agricola',
+      })
+
+      await c.createCommit({
+        forkOwner: 'alice',
+        files: [],
+        preservedTreeEntries: [{
+          path: 'example.ts',
+          sha: 'old-pr-blob',
+          status: 'modified',
+          mode: '100644',
+          patch: '@@ -1 +1 @@\n-const value = 1\n\\ No newline at end of file\n+const value = 1',
+        }],
+        message: 'test commit',
+        author: { name: 'alice', email: 'a@users.noreply.github.com' },
+        upstreamBaseSha: 'fixed-base',
+      })
+
+      expect(blobBody?.content).toBe('const value = 1\n')
+    })
+
     it('replays a patchless file rename with its executable mode', async () => {
       let treeBody: {
         tree?: Array<{ path: string; sha: string | null; mode: string }>
@@ -296,6 +337,47 @@ describe('GitHubClient', () => {
       expect(treeBody?.tree).toEqual([
         { path: 'scripts/old.sh', sha: null, mode: '100755', type: 'blob' },
         { path: 'scripts/new.sh', sha: 'current-base-blob', mode: '100755', type: 'blob' },
+      ])
+    })
+
+    it('preserves a patchless newly added binary file', async () => {
+      let treeBody: {
+        tree?: Array<{ path: string; sha: string | null; mode: string }>
+      } | null = null
+      fetchHandler = (url, init) => {
+        if (url.includes('/contents/fixtures/reviewer.bin')) return new Response('', { status: 404 })
+        if (url.includes('/git/blobs') && init?.method === 'POST') {
+          throw new Error('should reuse the PR head blob')
+        }
+        if (url.includes('/git/trees') && init?.method === 'POST') {
+          treeBody = JSON.parse(init.body as string) as typeof treeBody
+          return okJson({ sha: 'treesha' })
+        }
+        if (url.includes('/git/commits') && init?.method === 'POST') return okJson({ sha: 'commitsha' })
+        return new Response('', { status: 404 })
+      }
+      const c = new GitHubClient({
+        token: 't',
+        upstreamOwner: 'titanxxh',
+        upstreamRepo: 'open-agricola',
+      })
+
+      await c.createCommit({
+        forkOwner: 'alice',
+        files: [],
+        preservedTreeEntries: [{
+          path: 'fixtures/reviewer.bin',
+          sha: 'reviewer-binary-blob',
+          status: 'added',
+          mode: '100644',
+        }],
+        message: 'test commit',
+        author: { name: 'alice', email: 'a@users.noreply.github.com' },
+        upstreamBaseSha: 'fixed-base',
+      })
+
+      expect(treeBody?.tree).toEqual([
+        { path: 'fixtures/reviewer.bin', sha: 'reviewer-binary-blob', mode: '100644', type: 'blob' },
       ])
     })
   })
@@ -579,6 +661,26 @@ describe('GitHubClient', () => {
       })
       const text = await c.getUpstreamFile('shared/cards/register-all.ts', 'fixedsha')
       expect(text).toBe('pinned content')
+    })
+
+    it('encodes reserved characters in each path segment', async () => {
+      let requestedUrl = ''
+      fetchHandler = (url) => {
+        requestedUrl = url
+        return okJson({
+          content: Buffer.from('encoded path').toString('base64'),
+          encoding: 'base64',
+        })
+      }
+      const c = new GitHubClient({
+        token: 't',
+        upstreamOwner: 'titanxxh',
+        upstreamRepo: 'open-agricola',
+      })
+
+      await c.getUpstreamFile('fixtures/a#b?/file name.txt', 'fixed ref')
+
+      expect(requestedUrl).toContain('/contents/fixtures/a%23b%3F/file%20name.txt?ref=fixed%20ref')
     })
 
     it('throws GitHubApiError on 404', async () => {

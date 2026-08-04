@@ -60,20 +60,24 @@ const RESOURCE_KEYS = new Set<string>(REAL_RESOURCE_KEYS)
 
 function collectStringConstants(sourceFile: ts.SourceFile): Map<string, string> {
   const constants = new Map<string, string>()
-  const visit = (node: ts.Node): void => {
+  for (const statement of sourceFile.statements) {
     if (
-      ts.isVariableDeclaration(node)
-      && ts.isIdentifier(node.name)
-      && node.initializer
-      && (ts.isStringLiteral(node.initializer) || ts.isNoSubstitutionTemplateLiteral(node.initializer))
-      && ts.isVariableDeclarationList(node.parent)
-      && (node.parent.flags & ts.NodeFlags.Const) !== 0
-    ) {
-      constants.set(node.name.text, node.initializer.text)
+      !ts.isVariableStatement(statement)
+      || (statement.declarationList.flags & ts.NodeFlags.Const) === 0
+    ) continue
+    for (const declaration of statement.declarationList.declarations) {
+      if (
+        ts.isIdentifier(declaration.name)
+        && declaration.initializer
+        && (
+          ts.isStringLiteral(declaration.initializer)
+          || ts.isNoSubstitutionTemplateLiteral(declaration.initializer)
+        )
+      ) {
+        constants.set(declaration.name.text, declaration.initializer.text)
+      }
     }
-    ts.forEachChild(node, visit)
   }
-  visit(sourceFile)
   return constants
 }
 

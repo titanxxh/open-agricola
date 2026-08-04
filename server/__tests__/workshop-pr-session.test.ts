@@ -1264,7 +1264,7 @@ describe('workshop PR propose — session', () => {
       },
       existingPrFiles: [{
         filename: 'server/__tests__/CUSTOM_TestCard-session.test.ts',
-        status: 'added',
+        status: 'modified',
         sha: 'manual-test-sha',
       }],
     })

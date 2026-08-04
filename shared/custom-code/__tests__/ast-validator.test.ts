@@ -130,6 +130,28 @@ describe('ast-validator: CARD_IMPL hook/phase whitelisting', () => {
     )
   })
 
+  it('does not let a nested constant shadow a computed result key', () => {
+    const result = validateCardCode(`
+      const KEY = 'costs'
+      const CARD_IMPL = {
+        listeners: [{
+          actions: ['construct'],
+          phases: ['computeCosts'],
+          handler: () => ({ [KEY]: { wood: -1 } }),
+        }],
+      }
+      function shadow() {
+        const KEY = 'other'
+        return KEY
+      }
+    `)
+
+    expect(result.valid).toBe(false)
+    expect(result.valid === false && result.errors.some(
+      error => error.includes('listener results with costs must include costAttribution'),
+    )).toBe(true)
+  })
+
   it.each([
     "Object.fromEntries([['costs', { wood: -1 }]])",
     "({ ['cost' + 's']: { wood: -1 } })",

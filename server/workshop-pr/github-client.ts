@@ -81,7 +81,7 @@ const applyUnifiedPatch = (source: string, patch: string): string => {
     for (const line of hunk) {
       const prefix = line[0]
       if (prefix === '\\') {
-        if (previousPrefix !== '-') resultEndsWithNewline = false
+        resultEndsWithNewline = previousPrefix === '-'
         continue
       }
       if (prefix === '+') {
@@ -204,7 +204,7 @@ export class GitHubClient {
       if (entry.status === 'renamed' && !entry.previousPath) {
         throw new GitHubApiError('renamed PR file is missing its previous path', 'pr_patch_invalid', 422)
       }
-      if (!entry.patch && entry.status !== 'renamed') {
+      if (!entry.patch && entry.status !== 'renamed' && entry.status !== 'added') {
         throw new GitHubApiError('PR patch is unavailable for safe rebase', 'pr_patch_unavailable', 409)
       }
       const basePath = entry.previousPath ?? entry.path
@@ -217,6 +217,10 @@ export class GitHubClient {
       if (entry.status === 'added') {
         if (baseContent !== undefined) {
           throw new GitHubApiError('preserved PR edits conflict with current main', 'pr_rebase_conflict', 409)
+        }
+        if (!entry.patch) {
+          blobs.push({ path: entry.path, sha: entry.sha, mode: entry.mode })
+          continue
         }
         baseContent = ''
       } else if (baseContent === undefined) {
@@ -494,8 +498,9 @@ export class GitHubClient {
   }
 
   async getUpstreamFile(path: string, ref = 'main'): Promise<string> {
+    const encodedPath = path.split('/').map(segment => encodeURIComponent(segment)).join('/')
     const r = await this.fetch(
-      `/repos/${this.opts.upstreamOwner}/${this.opts.upstreamRepo}/contents/${path}?ref=${encodeURIComponent(ref)}`,
+      `/repos/${this.opts.upstreamOwner}/${this.opts.upstreamRepo}/contents/${encodedPath}?ref=${encodeURIComponent(ref)}`,
     )
     if (!r.ok) throw new GitHubApiError(`contents failed: ${path}`, 'contents_failed', r.status)
     const data = (await r.json()) as { content: string; encoding: string }
