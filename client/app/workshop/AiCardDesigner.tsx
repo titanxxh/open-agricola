@@ -1519,6 +1519,7 @@ export function AiCardDesigner({
   const [validationErrors, setValidationErrors] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
   const [saveSuccess, setSaveSuccess] = useState(false)
+  const [cardIdCopied, setCardIdCopied] = useState(false)
   const [refCache, setRefCache] = useState<Map<string, ReferenceImage>>(new Map())
   const [myCards, setMyCards] = useState<ApiCard[]>([])
   const [currentCardDbId, setCurrentCardDbId] = useState<string | null>(
@@ -2128,6 +2129,31 @@ export function AiCardDesigner({
             : (locale === 'zh' ? '已同步' : 'Synced')
   const descriptionLines = extracted?.card.desc ?? []
   const liveCardId = cardIdInput || 'CUSTOM_'
+  const handleCopyLiveCardId = async () => {
+    let copied = false
+    try {
+      if (!navigator.clipboard) throw new Error('clipboard unavailable')
+      await navigator.clipboard.writeText(liveCardId)
+      copied = true
+    } catch {
+      const textarea = document.createElement('textarea')
+      textarea.value = liveCardId
+      textarea.style.position = 'fixed'
+      textarea.style.left = '-9999px'
+      document.body.appendChild(textarea)
+      textarea.select()
+      try {
+        copied = document.execCommand('copy')
+      } catch {
+        copied = false
+      } finally {
+        textarea.remove()
+      }
+    }
+    if (!copied) return
+    setCardIdCopied(true)
+    setTimeout(() => setCardIdCopied(false), 1500)
+  }
   const liveCardMeta: CardMeta = {
     id: liveCardId,
     name: cardLocales[locale]?.name || cardName || (locale === 'zh' ? '未命名卡牌' : 'Untitled card'),
@@ -2344,6 +2370,21 @@ export function AiCardDesigner({
             artUrl={artUrl}
             className="aicw-live-card"
           />
+          <div className="aicw-live-card-id">
+            <span>
+              <small>{locale === 'zh' ? '卡牌 ID' : 'Card ID'}</small>
+              <code>{liveCardId}</code>
+            </span>
+            <button
+              type="button"
+              className="aicw-button"
+              onClick={() => { void handleCopyLiveCardId() }}
+              disabled={!isValidCardId(liveCardId, locale).valid}
+              aria-live="polite"
+            >
+              {cardIdCopied ? t('ui.cardCopied') : t('ui.cardCopy')}
+            </button>
+          </div>
           <div className="aicw-readiness" aria-label={locale === 'zh' ? '草稿完整度' : 'Draft completeness'}>
             {WORKSHOP_STAGES.slice(0, 4).map(stage => (
               <div key={stage}>
