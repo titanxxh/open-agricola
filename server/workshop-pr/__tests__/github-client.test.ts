@@ -240,6 +240,27 @@ describe('GitHubClient', () => {
         { path: 'new.txt', sha: 'new-sha' },
       ])
     })
+
+    it('reads every page of PR files', async () => {
+      fetchHandler = (url) => {
+        const page = new URL(url).searchParams.get('page')
+        return okJson(page === '2'
+          ? [{ filename: 'last.test.ts', status: 'added', sha: 'last-sha' }]
+          : Array.from({ length: 100 }, (_, index) => ({
+              filename: `test-${index}.ts`, status: 'added', sha: `sha-${index}`,
+            })))
+      }
+      const c = new GitHubClient({
+        token: 't',
+        upstreamOwner: 'titanxxh',
+        upstreamRepo: 'open-agricola',
+      })
+
+      const entries = await c.getPullRequestTreeEntries(42)
+      expect(entries).toHaveLength(101)
+      expect(entries.at(-1)).toEqual({ path: 'last.test.ts', sha: 'last-sha' })
+      expect(fetchCalls.map(call => new URL(call.url).searchParams.get('page'))).toEqual(['1', '2'])
+    })
   })
 
   describe('upsertBranch', () => {

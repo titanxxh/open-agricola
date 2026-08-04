@@ -56,7 +56,29 @@ const ALLOWED_EFFECT_KEYS = new Set<string>([
 /** Allowed values inside listener.phases arrays. */
 const ALLOWED_LISTENER_PHASES = new Set<string>(sandboxListenerPhases)
 
-function getStaticPropertyName(property: ts.ObjectLiteralElementLike): string | undefined {
+function collectStringConstants(sourceFile: ts.SourceFile): Map<string, string> {
+  const constants = new Map<string, string>()
+  const visit = (node: ts.Node): void => {
+    if (
+      ts.isVariableDeclaration(node)
+      && ts.isIdentifier(node.name)
+      && node.initializer
+      && (ts.isStringLiteral(node.initializer) || ts.isNoSubstitutionTemplateLiteral(node.initializer))
+      && ts.isVariableDeclarationList(node.parent)
+      && (node.parent.flags & ts.NodeFlags.Const) !== 0
+    ) {
+      constants.set(node.name.text, node.initializer.text)
+    }
+    ts.forEachChild(node, visit)
+  }
+  visit(sourceFile)
+  return constants
+}
+
+function getStaticPropertyName(
+  property: ts.ObjectLiteralElementLike,
+  constants: Map<string, string>,
+): string | undefined {
   if (!property.name) return undefined
   if (ts.isIdentifier(property.name) || ts.isStringLiteral(property.name)) {
     return property.name.text
@@ -66,6 +88,7 @@ function getStaticPropertyName(property: ts.ObjectLiteralElementLike): string | 
     if (ts.isStringLiteral(expression) || ts.isNoSubstitutionTemplateLiteral(expression)) {
       return expression.text
     }
+    if (ts.isIdentifier(expression)) return constants.get(expression.text)
   }
   return undefined
 }
@@ -74,16 +97,17 @@ export function findMissingCostAttributionLines(source: string): number[] {
   const sourceFile = ts.createSourceFile(
     'card.ts', source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS,
   )
+  const constants = collectStringConstants(sourceFile)
   const lines: number[] = []
   const visit = (node: ts.Node, insideCostAttribution = false): void => {
     if (ts.isObjectLiteralExpression(node) && !insideCostAttribution) {
-      const names = new Set(node.properties.map(getStaticPropertyName))
+      const names = new Set(node.properties.map(property => getStaticPropertyName(property, constants)))
       if (names.has('costs') && !names.has('costAttribution')) {
         lines.push(sourceFile.getLineAndCharacterOfPosition(node.getStart(sourceFile)).line + 1)
       }
     }
     const entersCostAttribution = ts.isPropertyAssignment(node)
-      && getStaticPropertyName(node) === 'costAttribution'
+      && getStaticPropertyName(node, constants) === 'costAttribution'
     ts.forEachChild(node, child => visit(child, insideCostAttribution || entersCostAttribution))
   }
   visit(sourceFile)
@@ -93,7 +117,10 @@ export function findMissingCostAttributionLines(source: string): number[] {
 function validateCostAttributionShapes(
   sourceFile: ts.SourceFile,
   errors: string[],
+  expectedCardId?: string,
 ): void {
+  const constants = collectStringConstants(sourceFile)
+  const declaredCardId = constants.get('CARD_ID')
   const propertyValue = (property: ts.ObjectLiteralElementLike): ts.Expression | undefined => {
     if (ts.isPropertyAssignment(property)) return property.initializer
     if (ts.isShorthandPropertyAssignment(property)) return property.name
@@ -104,9 +131,11 @@ function validateCostAttributionShapes(
   )
   const visit = (node: ts.Node, insideCostAttribution = false): void => {
     if (ts.isObjectLiteralExpression(node) && !insideCostAttribution) {
-      const costsProperty = node.properties.find(property => getStaticPropertyName(property) === 'costs')
+      const costsProperty = node.properties.find(
+        property => getStaticPropertyName(property, constants) === 'costs',
+      )
       const attributionProperty = node.properties.find(
-        property => getStaticPropertyName(property) === 'costAttribution',
+        property => getStaticPropertyName(property, constants) === 'costAttribution',
       )
       if (costsProperty && attributionProperty) {
         const costs = propertyValue(costsProperty)
@@ -117,17 +146,19 @@ function validateCostAttributionShapes(
           ? attribution.elements[0]
           : undefined
         const sourceProperty = entry?.properties.find(
-          property => getStaticPropertyName(property) === 'sourceCard',
+          property => getStaticPropertyName(property, constants) === 'sourceCard',
         )
         const entryCostsProperty = entry?.properties.find(
-          property => getStaticPropertyName(property) === 'costs',
+          property => getStaticPropertyName(property, constants) === 'costs',
         )
         const source = sourceProperty && propertyValue(sourceProperty)
         const entryCosts = entryCostsProperty && propertyValue(entryCostsProperty)
-        const validSource = source && (
-          ts.isIdentifier(source)
-          || (ts.isStringLiteral(source) && source.text.trim().length > 0)
-        )
+        const validSource = source
+          && ts.isIdentifier(source)
+          && source.text === 'CARD_ID'
+          && declaredCardId !== undefined
+          && declaredCardId.length > 0
+          && (expectedCardId === undefined || declaredCardId === expectedCardId)
         if (
           !costs
           || !entry
@@ -141,18 +172,19 @@ function validateCostAttributionShapes(
       }
     }
     const entersCostAttribution = ts.isPropertyAssignment(node)
-      && getStaticPropertyName(node) === 'costAttribution'
+      && getStaticPropertyName(node, constants) === 'costAttribution'
     ts.forEachChild(node, child => visit(child, insideCostAttribution || entersCostAttribution))
   }
   visit(sourceFile)
 }
 
-export function validateCardCode(source: string): ValidationResult {
+export function validateCardCode(source: string, expectedCardId?: string): ValidationResult {
   const sourceFile = ts.createSourceFile(
     'card.ts', source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS,
   )
 
   const errors: string[] = []
+  const constants = collectStringConstants(sourceFile)
 
   function getLine(node: ts.Node): number {
     const { line } = sourceFile.getLineAndCharacterOfPosition(node.getStart())
@@ -182,6 +214,26 @@ export function validateCardCode(source: string): ValidationResult {
     if (ts.isCallExpression(node) && ts.isIdentifier(node.expression) && node.expression.text === 'require') {
       errors.push(`line ${getLine(node)}: require() is not allowed`)
       return
+    }
+
+    if (
+      ts.isBinaryExpression(node)
+      && node.operatorToken.kind >= ts.SyntaxKind.FirstAssignment
+      && node.operatorToken.kind <= ts.SyntaxKind.LastAssignment
+    ) {
+      const assignedName = ts.isPropertyAccessExpression(node.left)
+        ? node.left.name.text
+        : ts.isElementAccessExpression(node.left)
+          ? ts.isStringLiteral(node.left.argumentExpression)
+            || ts.isNoSubstitutionTemplateLiteral(node.left.argumentExpression)
+            ? node.left.argumentExpression.text
+            : ts.isIdentifier(node.left.argumentExpression)
+              ? constants.get(node.left.argumentExpression.text)
+              : undefined
+          : undefined
+      if (assignedName === 'costs' || assignedName === 'costAttribution') {
+        errors.push(`line ${getLine(node)}: assigning to '${assignedName}' is not allowed; return costs and costAttribution together`)
+      }
     }
 
     // Check identifier references against deny list
@@ -262,7 +314,7 @@ export function validateCardCode(source: string): ValidationResult {
 
   // Validate CARD_IMPL hook/listener whitelists
   validateCardImplHooksAndPhases(sourceFile, errors)
-  validateCostAttributionShapes(sourceFile, errors)
+  validateCostAttributionShapes(sourceFile, errors, expectedCardId)
   for (const line of findMissingCostAttributionLines(source)) {
     errors.push(`line ${line}: listener results with costs must include costAttribution`)
   }

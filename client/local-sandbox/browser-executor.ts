@@ -216,7 +216,7 @@ export const validateAndCompileCustomCodeLocal = (
   source: string,
   cardId: string,
 ): CustomCodeValidateResult => {
-  const validation = validateCardCode(source)
+  const validation = validateCardCode(source, cardId)
   if (!validation.valid) {
     return validation
   }

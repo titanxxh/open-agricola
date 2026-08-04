@@ -210,17 +210,23 @@ export class GitHubClient {
   }
 
   async getPullRequestTreeEntries(prNumber: number): Promise<CommitTreeEntry[]> {
-    const r = await this.fetch(
-      `/repos/${this.opts.upstreamOwner}/${this.opts.upstreamRepo}/pulls/${prNumber}/files?per_page=100`,
-    )
-    if (!r.ok) throw new GitHubApiError('pr files lookup failed', 'pr_files_lookup_failed', r.status)
-    const files = (await r.json()) as Array<{
+    type PullRequestFile = {
       filename: string
       previous_filename?: string
       status: string
       sha: string
       patch?: string
-    }>
+    }
+    const files: PullRequestFile[] = []
+    for (let page = 1; ; page++) {
+      const r = await this.fetch(
+        `/repos/${this.opts.upstreamOwner}/${this.opts.upstreamRepo}/pulls/${prNumber}/files?per_page=100&page=${page}`,
+      )
+      if (!r.ok) throw new GitHubApiError('pr files lookup failed', 'pr_files_lookup_failed', r.status)
+      const currentPage = (await r.json()) as PullRequestFile[]
+      files.push(...currentPage)
+      if (currentPage.length < 100) break
+    }
     return files.flatMap((file) => [
       ...(file.status === 'renamed' && file.previous_filename
         ? [{ path: file.previous_filename, sha: null }]

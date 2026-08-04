@@ -325,13 +325,17 @@ export async function handleSubmitReviewRequest(
       pr = null
     }
     const legacySmokePath = `shared/cards/community/__tests__/${wcard.card_id}.test.ts`
+    const generatedArtPrefix = `public/card-art/community/${wcard.card_id}.`
     const preservedTreeEntries = pr
       ? (await client.getPullRequestTreeEntries(pr.number)).filter((entry) => !(
-          entry.path === legacySmokePath
-          && entry.patch?.includes('community card smoke test')
-          && entry.patch.includes("exports a valid definition")
-          && entry.patch.includes('exports a CardImpl')
-          && (entry.patch.match(/\bit\s*\(/g) ?? []).length === 2
+          entry.path.startsWith(generatedArtPrefix)
+          || (
+            entry.path === legacySmokePath
+            && entry.patch?.includes('community card smoke test')
+            && entry.patch.includes("exports a valid definition")
+            && entry.patch.includes('exports a CardImpl')
+            && (entry.patch.match(/\bit\s*\(/g) ?? []).length === 2
+          )
         ))
       : []
 

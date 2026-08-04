@@ -130,6 +130,28 @@ describe('ast-validator: CARD_IMPL hook/phase whitelisting', () => {
     )
   })
 
+  it('rejects costs assigned after object construction', () => {
+    const result = validateCardCode(`
+      const CARD_ID = 'CUSTOM_Test'
+      const CARD_IMPL = {
+        listeners: [{
+          actions: ['construct'],
+          phases: ['computeCosts'],
+          handler: () => {
+            const result = { sourceCard: CARD_ID }
+            result.costs = { wood: -2 }
+            return result
+          },
+        }],
+      }
+    `)
+
+    expect(result.valid).toBe(false)
+    expect(result.valid === false && result.errors.some(
+      error => error.includes("assigning to 'costs' is not allowed"),
+    )).toBe(true)
+  })
+
   it('accepts costs with explicit cost attribution', () => {
     const result = validateCardCode(`
       const CARD_ID = 'CUSTOM_Test'
@@ -175,6 +197,27 @@ describe('ast-validator: CARD_IMPL hook/phase whitelisting', () => {
     expect(result.valid === false && result.errors.some(
       error => error.includes('costAttribution must contain one matching source entry'),
     )).toBe(true)
+  })
+
+  it('requires attribution sourceCard to resolve to the submitted CARD_ID', () => {
+    const source = `
+      const CARD_ID = 'CUSTOM_Test'
+      const EMPTY = ''
+      const CARD_IMPL = {
+        listeners: [{
+          actions: ['construct'],
+          phases: ['computeCosts'],
+          handler: () => ({
+            costs: { wood: -2 },
+            costAttribution: [{ sourceCard: EMPTY, costs: { wood: -2 } }],
+            sourceCard: CARD_ID,
+          }),
+        }],
+      }
+    `
+
+    expect(validateCardCode(source).valid).toBe(false)
+    expect(validateCardCode(source.replace('CUSTOM_Test', 'CUSTOM_Other'), 'CUSTOM_Test').valid).toBe(false)
   })
 
   it('rejects unknown listener actions', () => {

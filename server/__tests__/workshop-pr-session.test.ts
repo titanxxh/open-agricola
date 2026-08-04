@@ -925,12 +925,19 @@ describe('workshop PR propose — session', () => {
         number: 99,
         url: 'https://github.com/titanxxh/open-agricola/pull/99',
       },
-      existingPrFiles: [{
-        filename: 'shared/cards/community/__tests__/CUSTOM_TestCard.test.ts',
-        status: 'added',
-        sha: 'existing-test-sha',
-        patch,
-      }],
+      existingPrFiles: [
+        {
+          filename: 'shared/cards/community/__tests__/CUSTOM_TestCard.test.ts',
+          status: 'added',
+          sha: 'existing-test-sha',
+          patch,
+        },
+        {
+          filename: 'public/card-art/community/CUSTOM_TestCard.webp',
+          status: 'added',
+          sha: 'obsolete-art-sha',
+        },
+      ],
     })
     vi.stubGlobal('fetch', gh)
 
@@ -962,6 +969,9 @@ describe('workshop PR propose — session', () => {
       entry.path === 'shared/cards/community/__tests__/CUSTOM_TestCard.test.ts'
       && entry.sha === 'existing-test-sha'
     )))).toBe(shouldPreserveTest)
+    expect(counts.treeEntries.every(entries => !entries.some(entry => (
+      entry.path === 'public/card-art/community/CUSTOM_TestCard.webp'
+    )))).toBe(true)
 
     // github_pr_url sticks to pull/99.
     const row = db
