@@ -211,7 +211,7 @@ type StubOpts = {
   githubLogin: string
   /** If given and open, findOpenPr returns this PR; openPr call should NOT happen. */
   existingPr?: StubPr | null
-  existingPrFiles?: Array<{ filename: string; status: string; sha: string }>
+  existingPrFiles?: Array<{ filename: string; status: string; sha: string; patch?: string }>
   /** Used when openPr is invoked. */
   openedPr?: { number: number; url: string }
 }
@@ -897,7 +897,16 @@ describe('workshop PR propose — session', () => {
 
   // ── C-25: upsert path ────────────────────────────────────────────────────
 
-  it('upsert: second propose of same card reuses existing open PR (no new openPr)', async () => {
+  it.each([
+    ['manual behavior test', "+it('reduces the room cost through GameSession')", true],
+    [
+      'legacy generated smoke test',
+      "+describe('CUSTOM_TestCard — community card smoke test', () => {\n"
+        + "+  it('exports a valid definition', () => {})\n"
+        + "+  it('exports a CardImpl', () => {})\n+})",
+      false,
+    ],
+  ])('upsert: reuses the existing PR and handles its %s', async (_case, patch, shouldPreserveTest) => {
     // Pretend this card already has an open PR from a previous propose.
     db.prepare(
       `UPDATE workshop_cards
@@ -917,9 +926,10 @@ describe('workshop PR propose — session', () => {
         url: 'https://github.com/titanxxh/open-agricola/pull/99',
       },
       existingPrFiles: [{
-        filename: 'server/__tests__/CUSTOM_TestCard-session.test.ts',
+        filename: 'shared/cards/community/__tests__/CUSTOM_TestCard.test.ts',
         status: 'added',
-        sha: 'behavior-test-sha',
+        sha: 'existing-test-sha',
+        patch,
       }],
     })
     vi.stubGlobal('fetch', gh)
@@ -949,9 +959,9 @@ describe('workshop PR propose — session', () => {
     expect(counts.commitCalls).toBe(2)
     expect(counts.treeEntries).toHaveLength(2)
     expect(counts.treeEntries.every(entries => entries.some(entry => (
-      entry.path === 'server/__tests__/CUSTOM_TestCard-session.test.ts'
-      && entry.sha === 'behavior-test-sha'
-    )))).toBe(true)
+      entry.path === 'shared/cards/community/__tests__/CUSTOM_TestCard.test.ts'
+      && entry.sha === 'existing-test-sha'
+    )))).toBe(shouldPreserveTest)
 
     // github_pr_url sticks to pull/99.
     const row = db

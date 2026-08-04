@@ -193,7 +193,11 @@ describe('GitHubClient', () => {
         files: [{ path: 'card.ts', content: 'new', encoding: 'utf-8' }],
         preservedTreeEntries: [
           { path: 'card.ts', sha: 'old-card' },
-          { path: 'server/__tests__/CUSTOM_Test-session.test.ts', sha: 'behavior-test' },
+          {
+            path: 'server/__tests__/CUSTOM_Test-session.test.ts',
+            sha: 'behavior-test',
+            patch: '+it(\'tests behavior\')',
+          },
         ],
         message: 'test commit',
         author: { name: 'alice', email: 'a@users.noreply.github.com' },
@@ -210,7 +214,12 @@ describe('GitHubClient', () => {
   describe('getPullRequestTreeEntries', () => {
     it('maps added, removed, and renamed files to reusable tree entries', async () => {
       fetchHandler = () => okJson([
-        { filename: 'server/__tests__/A.test.ts', status: 'added', sha: 'added-sha' },
+        {
+          filename: 'server/__tests__/A.test.ts',
+          status: 'added',
+          sha: 'added-sha',
+          patch: '+it(\'tests behavior\')',
+        },
         { filename: 'old.txt', status: 'removed', sha: 'old-sha' },
         { filename: 'new.txt', previous_filename: 'before.txt', status: 'renamed', sha: 'new-sha' },
       ])
@@ -221,7 +230,11 @@ describe('GitHubClient', () => {
       })
 
       await expect(c.getPullRequestTreeEntries(42)).resolves.toEqual([
-        { path: 'server/__tests__/A.test.ts', sha: 'added-sha' },
+        {
+          path: 'server/__tests__/A.test.ts',
+          sha: 'added-sha',
+          patch: '+it(\'tests behavior\')',
+        },
         { path: 'old.txt', sha: null },
         { path: 'before.txt', sha: null },
         { path: 'new.txt', sha: 'new-sha' },

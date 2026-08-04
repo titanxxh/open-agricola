@@ -18,7 +18,7 @@ export class GitHubApiError extends Error {
 }
 
 type CommitFile = { path: string; content: string; encoding: 'utf-8' | 'base64' }
-type CommitTreeEntry = { path: string; sha: string | null }
+type CommitTreeEntry = { path: string; sha: string | null; patch?: string }
 
 export class GitHubClient {
   private readonly opts: ClientOpts
@@ -108,7 +108,7 @@ export class GitHubClient {
         tree: [
           ...(opts.preservedTreeEntries ?? [])
             .filter(entry => !blobs.some(blob => blob.path === entry.path))
-            .map(entry => ({ ...entry, mode: '100644', type: 'blob' })),
+            .map(({ path, sha }) => ({ path, sha, mode: '100644', type: 'blob' })),
           ...blobs.map((b) => ({ path: b.path, mode: '100644', type: 'blob', sha: b.sha })),
         ],
       }),
@@ -219,12 +219,17 @@ export class GitHubClient {
       previous_filename?: string
       status: string
       sha: string
+      patch?: string
     }>
     return files.flatMap((file) => [
       ...(file.status === 'renamed' && file.previous_filename
         ? [{ path: file.previous_filename, sha: null }]
         : []),
-      { path: file.filename, sha: file.status === 'removed' ? null : file.sha },
+      {
+        path: file.filename,
+        sha: file.status === 'removed' ? null : file.sha,
+        ...(file.patch ? { patch: file.patch } : {}),
+      },
     ])
   }
 

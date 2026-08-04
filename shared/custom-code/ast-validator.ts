@@ -56,6 +56,20 @@ const ALLOWED_EFFECT_KEYS = new Set<string>([
 /** Allowed values inside listener.phases arrays. */
 const ALLOWED_LISTENER_PHASES = new Set<string>(sandboxListenerPhases)
 
+function getStaticPropertyName(property: ts.ObjectLiteralElementLike): string | undefined {
+  if (!property.name) return undefined
+  if (ts.isIdentifier(property.name) || ts.isStringLiteral(property.name)) {
+    return property.name.text
+  }
+  if (ts.isComputedPropertyName(property.name)) {
+    const expression = property.name.expression
+    if (ts.isStringLiteral(expression) || ts.isNoSubstitutionTemplateLiteral(expression)) {
+      return expression.text
+    }
+  }
+  return undefined
+}
+
 export function findMissingCostAttributionLines(source: string): number[] {
   const sourceFile = ts.createSourceFile(
     'card.ts', source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS,
@@ -63,18 +77,13 @@ export function findMissingCostAttributionLines(source: string): number[] {
   const lines: number[] = []
   const visit = (node: ts.Node, insideCostAttribution = false): void => {
     if (ts.isObjectLiteralExpression(node) && !insideCostAttribution) {
-      const names = new Set(node.properties.flatMap((prop) => {
-        if (!prop.name) return []
-        if (ts.isIdentifier(prop.name) || ts.isStringLiteral(prop.name)) return [prop.name.text]
-        return []
-      }))
+      const names = new Set(node.properties.map(getStaticPropertyName))
       if (names.has('costs') && !names.has('costAttribution')) {
         lines.push(sourceFile.getLineAndCharacterOfPosition(node.getStart(sourceFile)).line + 1)
       }
     }
     const entersCostAttribution = ts.isPropertyAssignment(node)
-      && (ts.isIdentifier(node.name) || ts.isStringLiteral(node.name))
-      && node.name.text === 'costAttribution'
+      && getStaticPropertyName(node) === 'costAttribution'
     ts.forEachChild(node, child => visit(child, insideCostAttribution || entersCostAttribution))
   }
   visit(sourceFile)
@@ -85,11 +94,6 @@ function validateCostAttributionShapes(
   sourceFile: ts.SourceFile,
   errors: string[],
 ): void {
-  const propertyName = (property: ts.ObjectLiteralElementLike): string | undefined => {
-    if (!property.name) return undefined
-    if (ts.isIdentifier(property.name) || ts.isStringLiteral(property.name)) return property.name.text
-    return undefined
-  }
   const propertyValue = (property: ts.ObjectLiteralElementLike): ts.Expression | undefined => {
     if (ts.isPropertyAssignment(property)) return property.initializer
     if (ts.isShorthandPropertyAssignment(property)) return property.name
@@ -100,9 +104,9 @@ function validateCostAttributionShapes(
   )
   const visit = (node: ts.Node, insideCostAttribution = false): void => {
     if (ts.isObjectLiteralExpression(node) && !insideCostAttribution) {
-      const costsProperty = node.properties.find(property => propertyName(property) === 'costs')
+      const costsProperty = node.properties.find(property => getStaticPropertyName(property) === 'costs')
       const attributionProperty = node.properties.find(
-        property => propertyName(property) === 'costAttribution',
+        property => getStaticPropertyName(property) === 'costAttribution',
       )
       if (costsProperty && attributionProperty) {
         const costs = propertyValue(costsProperty)
@@ -112,8 +116,12 @@ function validateCostAttributionShapes(
           && ts.isObjectLiteralExpression(attribution.elements[0])
           ? attribution.elements[0]
           : undefined
-        const sourceProperty = entry?.properties.find(property => propertyName(property) === 'sourceCard')
-        const entryCostsProperty = entry?.properties.find(property => propertyName(property) === 'costs')
+        const sourceProperty = entry?.properties.find(
+          property => getStaticPropertyName(property) === 'sourceCard',
+        )
+        const entryCostsProperty = entry?.properties.find(
+          property => getStaticPropertyName(property) === 'costs',
+        )
         const source = sourceProperty && propertyValue(sourceProperty)
         const entryCosts = entryCostsProperty && propertyValue(entryCostsProperty)
         const validSource = source && (
@@ -133,8 +141,7 @@ function validateCostAttributionShapes(
       }
     }
     const entersCostAttribution = ts.isPropertyAssignment(node)
-      && (ts.isIdentifier(node.name) || ts.isStringLiteral(node.name))
-      && node.name.text === 'costAttribution'
+      && getStaticPropertyName(node) === 'costAttribution'
     ts.forEachChild(node, child => visit(child, insideCostAttribution || entersCostAttribution))
   }
   visit(sourceFile)

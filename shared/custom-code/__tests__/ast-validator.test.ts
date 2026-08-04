@@ -113,6 +113,23 @@ describe('ast-validator: CARD_IMPL hook/phase whitelisting', () => {
     )
   })
 
+  it('rejects a statically computed costs key without attribution', () => {
+    const result = validateCardCode(`
+      const CARD_IMPL = {
+        listeners: [{
+          actions: ['construct'],
+          phases: ['computeCosts'],
+          handler: () => ({ ['costs']: { wood: -1 } }),
+        }],
+      }
+    `)
+
+    expect(result.valid).toBe(false)
+    expect(result.valid === false && result.errors).toContain(
+      'line 6: listener results with costs must include costAttribution',
+    )
+  })
+
   it('accepts costs with explicit cost attribution', () => {
     const result = validateCardCode(`
       const CARD_ID = 'CUSTOM_Test'
