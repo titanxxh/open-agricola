@@ -108,7 +108,7 @@ describe('validateComplexCost', () => {
 })
 
 describe('applyCostModifiers — scope handling', () => {
-  it('removes named resources from fee, fees, and unitFee without mutating the base cost', () => {
+  it('removes named resources from fees while preserving unitFee for trade expansion', () => {
     const baseCost = {
       fee: { wood: 1, reed: 2 },
       fees: [{ clay: 3, reed: 4 }, { stone: 5 }],
@@ -125,11 +125,11 @@ describe('applyCostModifiers — scope handling', () => {
     expect(result).toMatchObject({
       fee: { wood: 1 },
       fees: [{ clay: 3 }, { stone: 5 }],
-      unitFee: { wood: 6 },
+      unitFee: { wood: 6, reed: 7 },
       costResourceRemovals: [{
         resource: 'reed',
         sourceCard: 'C014_StrawThatchedRoof',
-        savedByFee: [18, 14],
+        savedByFee: [4, 0],
       }],
     })
     expect(baseCost.fee.reed).toBe(2)

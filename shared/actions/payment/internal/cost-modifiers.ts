@@ -78,7 +78,6 @@ export const applyCostModifiers = (
     : result.fee
       ? [result.fee]
       : [{}]
-  const unitCount = result.nb !== undefined && result.nb > 0 ? result.nb : 0
   const costResourceRemovals = removalModifiers.flatMap((modifier) =>
     modifier.resources.flatMap((resource) => {
       if (claimedResources.has(resource)) return []
@@ -86,10 +85,7 @@ export const applyCostModifiers = (
       return [{
         resource,
         sourceCard: modifier.cardId,
-        savedByFee: baseFees.map((fee) => Math.max(
-          0,
-          (fee[resource] ?? 0) + (result.unitFee?.[resource] ?? 0) * unitCount,
-        )),
+        savedByFee: baseFees.map((fee) => Math.max(0, fee[resource] ?? 0)),
       }]
     }),
   )
@@ -101,7 +97,6 @@ export const applyCostModifiers = (
     }
     if (result.fee) result.fee = remove(result.fee)
     if (result.fees) result.fees = result.fees.map(remove)
-    if (result.unitFee) result.unitFee = remove(result.unitFee)
     result.costResourceRemovals = costResourceRemovals
   } else {
     delete result.costResourceRemovals

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession, type SessionResponse } from '../game/authoritative-session'
 import { C014_StrawThatchedRoof } from '../../shared/cards/C/C014_StrawThatchedRoof'
+import { D015_ClaySupports } from '../../shared/cards/D/D015_ClaySupports'
 import { canRenovate } from '../../shared/actions/effects/renovation'
 import { PaymentSolver } from '../../shared/actions/payment'
 import { setWorkersAtHome } from '../../shared/domain/player'
@@ -81,6 +82,45 @@ describe('C014 Straw-Thatched Roof session', () => {
     expect(paid?.type === 'resource.paid' ? paid.resources.reed ?? 0 : undefined).toBe(0)
     expect(resp.state.players[0]!.cardStates[CARD_ID]?.extraData?.resourceStats).toMatchObject({
       saved: { reed: 2 },
+    })
+    expect(actionLog(resp, 'construct')).toBeDefined()
+    expect(resp.scores).toHaveLength(2)
+  })
+
+  it('waives reed after applying the D015 clay-room alternative', () => {
+    const session = setup(true)
+    const player = session.state.players[0]!
+    player.houseType = 'clay'
+    player.resources.clay = 2
+    player.resources.wood = 1
+    player.minorPlayed.push('D015_ClaySupports')
+    player.activeModifiers.push(...(D015_ClaySupports.impl.modifiers ?? []))
+    session.loadState(session.state)
+
+    let resp = chooseConstructIfNeeded(session, session.takeAction(0, 'farm-expansion'))
+    expect(resp.ok).toBe(true)
+    expect(resp.interaction.stateId).toBe('wait')
+    if (resp.interaction.stateId !== 'wait') return
+    expect(resp.interaction.request.kind).toBe('farm-select')
+    if (resp.interaction.request.kind !== 'farm-select') return
+    const room = resp.interaction.request.farm.selectableTiles[0]!
+
+    resp = session.commitSelectionChoice(0, { rooms: [room] })
+
+    expect(resp.ok).toBe(true)
+    expect(resp.interaction.promptKey).not.toBe('prompt.selectPayment')
+    expect(resp.state.players[0]).toMatchObject({
+      rooms: 3,
+      resources: { clay: 0, wood: 0, reed: 0 },
+    })
+    const paid = resp.state.events.find(
+      (event) => event.type === 'resource.paid' && event.paymentFor === 'construct',
+    )
+    expect(paid).toBeDefined()
+    expect(paid?.type === 'resource.paid' ? paid.resources : undefined).toMatchObject({ clay: 2, wood: 1 })
+    expect(paid?.type === 'resource.paid' ? paid.resources.reed ?? 0 : undefined).toBe(0)
+    expect(resp.state.players[0]!.cardStates[CARD_ID]?.extraData?.resourceStats).toMatchObject({
+      saved: { reed: 1 },
     })
     expect(actionLog(resp, 'construct')).toBeDefined()
     expect(resp.scores).toHaveLength(2)
