@@ -170,7 +170,7 @@ describe('GitHubClient', () => {
       expect(commitBody?.parents).toEqual(['fixed-base'])
     })
 
-    it('preserves non-generated tree entries while generated files replace matching paths', async () => {
+    it('rebases non-generated tree entries while generated files replace matching paths', async () => {
       let treeBody: {
         tree?: Array<{ path: string; sha: string | null }>
       } | null = null
@@ -192,11 +192,12 @@ describe('GitHubClient', () => {
         forkOwner: 'alice',
         files: [{ path: 'card.ts', content: 'new', encoding: 'utf-8' }],
         preservedTreeEntries: [
-          { path: 'card.ts', sha: 'old-card' },
+          { path: 'card.ts', sha: 'old-card', status: 'modified' },
           {
             path: 'server/__tests__/CUSTOM_Test-session.test.ts',
             sha: 'behavior-test',
-            patch: '+it(\'tests behavior\')',
+            status: 'added',
+            patch: "@@ -0,0 +1 @@\n+it('tests behavior')",
           },
         ],
         message: 'test commit',
@@ -205,8 +206,8 @@ describe('GitHubClient', () => {
       })
 
       expect(treeBody?.tree).toEqual([
-        { path: 'server/__tests__/CUSTOM_Test-session.test.ts', mode: '100644', type: 'blob', sha: 'behavior-test' },
         { path: 'card.ts', mode: '100644', type: 'blob', sha: 'new-card' },
+        { path: 'server/__tests__/CUSTOM_Test-session.test.ts', mode: '100644', type: 'blob', sha: 'new-card' },
       ])
     })
   })
@@ -233,11 +234,16 @@ describe('GitHubClient', () => {
         {
           path: 'server/__tests__/A.test.ts',
           sha: 'added-sha',
+          status: 'added',
           patch: '+it(\'tests behavior\')',
         },
-        { path: 'old.txt', sha: null },
-        { path: 'before.txt', sha: null },
-        { path: 'new.txt', sha: 'new-sha' },
+        { path: 'old.txt', sha: 'old-sha', status: 'removed' },
+        {
+          path: 'new.txt',
+          previousPath: 'before.txt',
+          sha: 'new-sha',
+          status: 'renamed',
+        },
       ])
     })
 
@@ -258,7 +264,7 @@ describe('GitHubClient', () => {
 
       const entries = await c.getPullRequestTreeEntries(42)
       expect(entries).toHaveLength(101)
-      expect(entries.at(-1)).toEqual({ path: 'last.test.ts', sha: 'last-sha' })
+      expect(entries.at(-1)).toEqual({ path: 'last.test.ts', sha: 'last-sha', status: 'added' })
       expect(fetchCalls.map(call => new URL(call.url).searchParams.get('page'))).toEqual(['1', '2'])
     })
   })

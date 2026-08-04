@@ -18,7 +18,110 @@ export class GitHubApiError extends Error {
 }
 
 type CommitFile = { path: string; content: string; encoding: 'utf-8' | 'base64' }
-type CommitTreeEntry = { path: string; sha: string | null; patch?: string }
+type CommitTreeEntry = {
+  path: string
+  sha: string
+  patch?: string
+  previousPath?: string
+  status: string
+}
+
+const applyUnifiedPatch = (source: string, patch: string): string => {
+  const sourceLines = source === ''
+    ? []
+    : (source.endsWith('\n') ? source.slice(0, -1) : source).split('\n')
+  const patchLines = patch.split('\n')
+  const output: string[] = []
+  let sourceCursor = 0
+  let resultEndsWithNewline = source === '' || source.endsWith('\n')
+  let foundHunk = false
+
+  for (let index = 0; index < patchLines.length;) {
+    const header = /^@@ -(\d+)(?:,\d+)? \+\d+(?:,\d+)? @@/.exec(patchLines[index]!)
+    if (!header) {
+      index++
+      continue
+    }
+    foundHunk = true
+    const expectedStart = Math.max(sourceCursor, Number(header[1]) - 1)
+    index++
+    const hunk: string[] = []
+    while (index < patchLines.length && !patchLines[index]!.startsWith('@@ ')) {
+      const line = patchLines[index++]!
+      if (line !== '' || index < patchLines.length) hunk.push(line)
+    }
+    const oldLines = hunk
+      .filter(line => line.startsWith(' ') || line.startsWith('-'))
+      .map(line => line.slice(1))
+
+    let hunkStart = expectedStart
+    if (oldLines.length > 0) {
+      const candidates: number[] = []
+      for (let start = sourceCursor; start < sourceLines.length; start++) {
+        if (sourceLines[start] !== oldLines[0]) continue
+        let cursor = start + 1
+        let matches = true
+        for (const line of oldLines.slice(1)) {
+          const next = sourceLines.indexOf(line, cursor)
+          if (next < 0) {
+            matches = false
+            break
+          }
+          cursor = next + 1
+        }
+        if (matches) candidates.push(start)
+      }
+      hunkStart = candidates.includes(expectedStart)
+        ? expectedStart
+        : candidates.length === 1 ? candidates[0]! : -1
+      if (hunkStart < 0) {
+        throw new GitHubApiError(
+          'preserved PR edits conflict with current main',
+          'pr_rebase_conflict',
+          409,
+        )
+      }
+    }
+
+    output.push(...sourceLines.slice(sourceCursor, hunkStart))
+    let hunkCursor = hunkStart
+    let previousPrefix = ''
+    for (const line of hunk) {
+      const prefix = line[0]
+      if (prefix === '\\') {
+        if (previousPrefix !== '-') resultEndsWithNewline = false
+        continue
+      }
+      if (prefix === '+') {
+        output.push(line.slice(1))
+        previousPrefix = prefix
+        continue
+      }
+      if (prefix !== ' ' && prefix !== '-') {
+        throw new GitHubApiError('invalid PR patch', 'pr_patch_invalid', 422)
+      }
+      const content = line.slice(1)
+      const matchedAt = sourceLines.indexOf(content, hunkCursor)
+      if (matchedAt < 0) {
+        throw new GitHubApiError(
+          'preserved PR edits conflict with current main',
+          'pr_rebase_conflict',
+          409,
+        )
+      }
+      output.push(...sourceLines.slice(hunkCursor, matchedAt))
+      if (prefix === ' ') output.push(content)
+      hunkCursor = matchedAt + 1
+      previousPrefix = prefix
+    }
+    sourceCursor = hunkCursor
+  }
+
+  if (!foundHunk) throw new GitHubApiError('invalid PR patch', 'pr_patch_invalid', 422)
+  output.push(...sourceLines.slice(sourceCursor))
+  if (output.length === 0) return ''
+  return `${output.join('\n')}${resultEndsWithNewline ? '\n' : ''}`
+}
 
 export class GitHubClient {
   private readonly opts: ClientOpts
@@ -88,16 +191,62 @@ export class GitHubClient {
 
     const upstreamBaseSha = opts.upstreamBaseSha ?? await this.getUpstreamMainSha()
 
-    const blobs: Array<{ path: string; sha: string }> = []
-    for (const f of files) {
+    const createBlob = async (file: CommitFile): Promise<{ path: string; sha: string }> => {
       const r = await this.fetch(`/repos/${forkOwner}/${repo}/git/blobs`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ content: f.content, encoding: f.encoding }),
+        body: JSON.stringify({ content: file.content, encoding: file.encoding }),
       })
-      if (!r.ok) throw new GitHubApiError(`blob failed: ${f.path}`, 'blob_failed', r.status)
+      if (!r.ok) throw new GitHubApiError(`blob failed: ${file.path}`, 'blob_failed', r.status)
       const { sha } = (await r.json()) as { sha: string }
-      blobs.push({ path: f.path, sha })
+      return { path: file.path, sha }
+    }
+
+    const blobs: Array<{ path: string; sha: string }> = []
+    for (const file of files) blobs.push(await createBlob(file))
+
+    const generatedPaths = new Set(files.map(file => file.path))
+    const preservedTree: Array<{ path: string; sha: string | null }> = []
+    for (const entry of opts.preservedTreeEntries ?? []) {
+      if (generatedPaths.has(entry.path) || (entry.previousPath && generatedPaths.has(entry.previousPath))) {
+        continue
+      }
+      if (!entry.patch) {
+        throw new GitHubApiError('PR patch is unavailable for safe rebase', 'pr_patch_unavailable', 409)
+      }
+      const basePath = entry.previousPath ?? entry.path
+      let baseContent: string | undefined
+      try {
+        baseContent = await this.getUpstreamFile(basePath, upstreamBaseSha)
+      } catch (error) {
+        if (!(error instanceof GitHubApiError) || error.status !== 404) throw error
+      }
+      if (entry.status === 'added') {
+        if (baseContent !== undefined) {
+          throw new GitHubApiError('preserved PR edits conflict with current main', 'pr_rebase_conflict', 409)
+        }
+        baseContent = ''
+      } else if (baseContent === undefined) {
+        throw new GitHubApiError('preserved PR edits conflict with current main', 'pr_rebase_conflict', 409)
+      }
+      if (entry.status === 'renamed') {
+        try {
+          await this.getUpstreamFile(entry.path, upstreamBaseSha)
+          throw new GitHubApiError('preserved PR edits conflict with current main', 'pr_rebase_conflict', 409)
+        } catch (error) {
+          if (!(error instanceof GitHubApiError) || error.status !== 404) throw error
+        }
+      }
+      const content = applyUnifiedPatch(baseContent, entry.patch)
+      if (entry.status === 'removed') {
+        if (content !== '') {
+          throw new GitHubApiError('preserved PR edits conflict with current main', 'pr_rebase_conflict', 409)
+        }
+        preservedTree.push({ path: entry.path, sha: null })
+        continue
+      }
+      if (entry.previousPath) preservedTree.push({ path: entry.previousPath, sha: null })
+      blobs.push(await createBlob({ path: entry.path, content, encoding: 'utf-8' }))
     }
 
     const treeResp = await this.fetch(`/repos/${forkOwner}/${repo}/git/trees`, {
@@ -106,9 +255,7 @@ export class GitHubClient {
       body: JSON.stringify({
         base_tree: upstreamBaseSha,
         tree: [
-          ...(opts.preservedTreeEntries ?? [])
-            .filter(entry => !blobs.some(blob => blob.path === entry.path))
-            .map(({ path, sha }) => ({ path, sha, mode: '100644', type: 'blob' })),
+          ...preservedTree.map(({ path, sha }) => ({ path, sha, mode: '100644', type: 'blob' })),
           ...blobs.map((b) => ({ path: b.path, mode: '100644', type: 'blob', sha: b.sha })),
         ],
       }),
@@ -227,16 +374,13 @@ export class GitHubClient {
       files.push(...currentPage)
       if (currentPage.length < 100) break
     }
-    return files.flatMap((file) => [
-      ...(file.status === 'renamed' && file.previous_filename
-        ? [{ path: file.previous_filename, sha: null }]
-        : []),
-      {
-        path: file.filename,
-        sha: file.status === 'removed' ? null : file.sha,
-        ...(file.patch ? { patch: file.patch } : {}),
-      },
-    ])
+    return files.map(file => ({
+      path: file.filename,
+      sha: file.sha,
+      status: file.status,
+      ...(file.previous_filename ? { previousPath: file.previous_filename } : {}),
+      ...(file.patch ? { patch: file.patch } : {}),
+    }))
   }
 
   async openPr(opts: {

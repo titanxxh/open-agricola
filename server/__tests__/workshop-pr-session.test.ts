@@ -212,6 +212,7 @@ type StubOpts = {
   /** If given and open, findOpenPr returns this PR; openPr call should NOT happen. */
   existingPr?: StubPr | null
   existingPrFiles?: Array<{ filename: string; status: string; sha: string; patch?: string }>
+  upstreamFiles?: Record<string, string>
   /** Used when openPr is invoked. */
   openedPr?: { number: number; url: string }
 }
@@ -225,13 +226,20 @@ type StubCounts = {
   commitCalls: number
   treeCalls: number
   treeEntries: Array<Array<{ path: string; sha: string | null }>>
+  blobContents: Map<string, string>
 }
 
 function createGitHubApiStub(opts: StubOpts): {
   fn: (url: string, init?: RequestInit) => Promise<Response>
   counts: StubCounts
 } {
-  const { githubLogin, existingPr = null, existingPrFiles = [], openedPr } = opts
+  const {
+    githubLogin,
+    existingPr = null,
+    existingPrFiles = [],
+    upstreamFiles = {},
+    openedPr,
+  } = opts
   const upstream = `${workshopPrConfig.upstreamOwner}/${workshopPrConfig.upstreamRepo}`
   const counts: StubCounts = {
     openPrCalls: 0,
@@ -242,6 +250,7 @@ function createGitHubApiStub(opts: StubOpts): {
     commitCalls: 0,
     treeCalls: 0,
     treeEntries: [],
+    blobContents: new Map(),
   }
 
   const fn = (url: string, init?: RequestInit): Promise<Response> => {
@@ -307,6 +316,15 @@ function createGitHubApiStub(opts: StubOpts): {
         ),
       )
     }
+    const upstreamFilePath = Object.keys(upstreamFiles).find((path) => (
+      url.includes(`/contents/${path}?`)
+    ))
+    if (upstreamFilePath) {
+      return Promise.resolve(new Response(JSON.stringify({
+        content: Buffer.from(upstreamFiles[upstreamFilePath]!).toString('base64'),
+        encoding: 'base64',
+      }), { status: 200 }))
+    }
 
     // Upstream main ref
     if (url.includes(`/repos/${upstream}/git/ref/heads/main`)) {
@@ -318,11 +336,16 @@ function createGitHubApiStub(opts: StubOpts): {
     // Blob create
     if (url.includes('/git/blobs') && method === 'POST') {
       counts.blobCalls++
+      const payload = JSON.parse(String(init?.body)) as { content: string; encoding: string }
+      const sha = `blob_${counts.blobCalls}`
+      counts.blobContents.set(
+        sha,
+        payload.encoding === 'base64'
+          ? Buffer.from(payload.content, 'base64').toString('utf-8')
+          : payload.content,
+      )
       return Promise.resolve(
-        new Response(
-          JSON.stringify({ sha: `blob_${Math.random().toString(36).slice(2, 8)}` }),
-          { status: 201 },
-        ),
+        new Response(JSON.stringify({ sha }), { status: 201 }),
       )
     }
 
@@ -898,10 +921,22 @@ describe('workshop PR propose — session', () => {
   // ── C-25: upsert path ────────────────────────────────────────────────────
 
   it.each([
-    ['manual behavior test', "+it('reduces the room cost through GameSession')", true],
+    [
+      'manual behavior test',
+      "@@ -0,0 +1 @@\n+it('reduces the room cost through GameSession')",
+      true,
+    ],
+    [
+      'legacy smoke extended with test()',
+      "@@ -0,0 +1,5 @@\n+describe('CUSTOM_TestCard — community card smoke test', () => {\n"
+        + "+  it('exports a valid definition', () => {})\n"
+        + "+  it('exports a CardImpl', () => {})\n"
+        + "+  test('reduces the room cost through GameSession', () => {})\n+})",
+      true,
+    ],
     [
       'legacy generated smoke test',
-      "+describe('CUSTOM_TestCard — community card smoke test', () => {\n"
+      "@@ -0,0 +1,4 @@\n+describe('CUSTOM_TestCard — community card smoke test', () => {\n"
         + "+  it('exports a valid definition', () => {})\n"
         + "+  it('exports a CardImpl', () => {})\n+})",
       false,
@@ -967,7 +1002,6 @@ describe('workshop PR propose — session', () => {
     expect(counts.treeEntries).toHaveLength(2)
     expect(counts.treeEntries.every(entries => entries.some(entry => (
       entry.path === 'shared/cards/community/__tests__/CUSTOM_TestCard.test.ts'
-      && entry.sha === 'existing-test-sha'
     )))).toBe(shouldPreserveTest)
     expect(counts.treeEntries.every(entries => !entries.some(entry => (
       entry.path === 'public/card-art/community/CUSTOM_TestCard.webp'
@@ -1037,6 +1071,12 @@ describe('workshop PR propose — session', () => {
         url: 'https://github.com/titanxxh/open-agricola/pull/99',
         ...existingPrState,
       },
+      existingPrFiles: [{
+        filename: 'server/__tests__/CUSTOM_TestCard-session.test.ts',
+        status: 'added',
+        sha: 'manual-test-sha',
+        patch: "@@ -0,0 +1 @@\n+test('real behavior', () => {})",
+      }],
       openedPr: {
         number: 100,
         url: 'https://github.com/titanxxh/open-agricola/pull/100',
@@ -1055,6 +1095,47 @@ describe('workshop PR propose — session', () => {
     expect(JSON.parse(res.body)).toMatchObject({ ok: true, prNumber: 100 })
     expect(counts.closePrCalls).toBe(1)
     expect(counts.openPrCalls).toBe(1)
+    expect(counts.treeEntries.every(entries => entries.some(entry => (
+      entry.path === 'server/__tests__/CUSTOM_TestCard-session.test.ts'
+    )))).toBe(true)
+  })
+
+  it('replays preserved test edits onto the current main file', async () => {
+    const hs = tokenCache.allocateHandshakeId(userId)
+    tokenCache.bind(hs, 'ghp_mock')
+    const testPath = 'server/__tests__/CUSTOM_TestCard-session.test.ts'
+    const { fn: gh, counts } = createGitHubApiStub({
+      githubLogin: 'workshopuser',
+      existingPr: {
+        number: 99,
+        url: 'https://github.com/titanxxh/open-agricola/pull/99',
+      },
+      existingPrFiles: [{
+        filename: testPath,
+        status: 'modified',
+        sha: 'old-pr-blob',
+        patch: "@@ -1,3 +1,4 @@\n import { it } from 'vitest'\n \n it('existing', () => {})\n+it('manual behavior', () => {})",
+      }],
+      upstreamFiles: {
+        [testPath]: "import { it } from 'vitest'\n\nconst upstreamAddition = true\n\nit('existing', () => {})\n",
+      },
+    })
+    vi.stubGlobal('fetch', gh)
+    const res = fakeRes()
+
+    await handleSubmitReviewRequest(fakeReq({
+      method: 'POST',
+      url: `/api/workshop/cards/${cardDbId}/submit-review`,
+      authHeader: `Bearer ${userToken}`,
+      body: JSON.stringify({ handshakeId: hs }),
+    }), res, cardDbId, reviewRequiredProvider())
+
+    expect(res.statusCode).toBe(200)
+    const preservedBlobs = [...counts.blobContents.values()].filter(content => (
+      content.includes("it('manual behavior'")
+    ))
+    expect(preservedBlobs).toHaveLength(2)
+    expect(preservedBlobs.every(content => content.includes('const upstreamAddition = true'))).toBe(true)
   })
 
   it('reconciles a missed approval through the existing refresh endpoint', async () => {

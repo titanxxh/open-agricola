@@ -10,6 +10,7 @@
  */
 import ts from 'typescript'
 import { cardEffectHooks, isHandCardEffectHook } from '../cards/card-effects'
+import { REAL_RESOURCE_KEYS } from '../contract/resource-keys'
 import { isSandboxListenerAction } from './sandbox-listener-actions'
 import { sandboxListenerPhases } from './sandbox-listener-phases'
 
@@ -55,6 +56,7 @@ const ALLOWED_EFFECT_KEYS = new Set<string>([
 
 /** Allowed values inside listener.phases arrays. */
 const ALLOWED_LISTENER_PHASES = new Set<string>(sandboxListenerPhases)
+const RESOURCE_KEYS = new Set<string>(REAL_RESOURCE_KEYS)
 
 function collectStringConstants(sourceFile: ts.SourceFile): Map<string, string> {
   const constants = new Map<string, string>()
@@ -73,6 +75,27 @@ function collectStringConstants(sourceFile: ts.SourceFile): Map<string, string> 
   }
   visit(sourceFile)
   return constants
+}
+
+function getTopLevelStringConstant(sourceFile: ts.SourceFile, name: string): string | undefined {
+  for (const statement of sourceFile.statements) {
+    if (
+      !ts.isVariableStatement(statement)
+      || (statement.declarationList.flags & ts.NodeFlags.Const) === 0
+    ) continue
+    for (const declaration of statement.declarationList.declarations) {
+      if (
+        ts.isIdentifier(declaration.name)
+        && declaration.name.text === name
+        && declaration.initializer
+        && (
+          ts.isStringLiteral(declaration.initializer)
+          || ts.isNoSubstitutionTemplateLiteral(declaration.initializer)
+        )
+      ) return declaration.initializer.text
+    }
+  }
+  return undefined
 }
 
 function getStaticPropertyName(
@@ -120,7 +143,7 @@ function validateCostAttributionShapes(
   expectedCardId?: string,
 ): void {
   const constants = collectStringConstants(sourceFile)
-  const declaredCardId = constants.get('CARD_ID')
+  const declaredCardId = getTopLevelStringConstant(sourceFile, 'CARD_ID')
   const propertyValue = (property: ts.ObjectLiteralElementLike): ts.Expression | undefined => {
     if (ts.isPropertyAssignment(property)) return property.initializer
     if (ts.isShorthandPropertyAssignment(property)) return property.name
@@ -128,6 +151,21 @@ function validateCostAttributionShapes(
   }
   const expressionText = (expression: ts.Expression): string => (
     expression.getText(sourceFile).replace(/\s+/g, '')
+  )
+  const isNumberLiteral = (expression: ts.Expression): boolean => {
+    if (ts.isNumericLiteral(expression)) return Number.isFinite(Number(expression.text))
+    return ts.isPrefixUnaryExpression(expression)
+      && (expression.operator === ts.SyntaxKind.PlusToken || expression.operator === ts.SyntaxKind.MinusToken)
+      && ts.isNumericLiteral(expression.operand)
+      && Number.isFinite(Number(expression.operand.text))
+  }
+  const isResourceDelta = (expression: ts.Expression): boolean => (
+    ts.isObjectLiteralExpression(expression)
+    && expression.properties.every((property) => (
+      ts.isPropertyAssignment(property)
+      && RESOURCE_KEYS.has(getStaticPropertyName(property, constants) ?? '')
+      && isNumberLiteral(property.initializer)
+    ))
   )
   const visit = (node: ts.Node, insideCostAttribution = false): void => {
     if (ts.isObjectLiteralExpression(node) && !insideCostAttribution) {
@@ -161,9 +199,11 @@ function validateCostAttributionShapes(
           && (expectedCardId === undefined || declaredCardId === expectedCardId)
         if (
           !costs
+          || !isResourceDelta(costs)
           || !entry
           || !validSource
           || !entryCosts
+          || !isResourceDelta(entryCosts)
           || expressionText(costs) !== expressionText(entryCosts)
         ) {
           const { line } = sourceFile.getLineAndCharacterOfPosition(node.getStart(sourceFile))
