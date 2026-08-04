@@ -96,27 +96,6 @@ function collectStringConstants(sourceFile: ts.SourceFile): Map<string, string> 
   return constants
 }
 
-function getTopLevelStringConstant(sourceFile: ts.SourceFile, name: string): string | undefined {
-  for (const statement of sourceFile.statements) {
-    if (
-      !ts.isVariableStatement(statement)
-      || (statement.declarationList.flags & ts.NodeFlags.Const) === 0
-    ) continue
-    for (const declaration of statement.declarationList.declarations) {
-      if (
-        ts.isIdentifier(declaration.name)
-        && declaration.name.text === name
-        && declaration.initializer
-        && (
-          ts.isStringLiteral(declaration.initializer)
-          || ts.isNoSubstitutionTemplateLiteral(declaration.initializer)
-        )
-      ) return declaration.initializer.text
-    }
-  }
-  return undefined
-}
-
 function getStaticPropertyName(
   property: ts.ObjectLiteralElementLike,
   constants: Map<string, string>,
@@ -150,6 +129,20 @@ function hasInspectablePropertyName(
   return name !== undefined && name !== '__proto__'
 }
 
+function listenerMayComputeCosts(
+  listener: ts.ObjectLiteralExpression,
+  constants: Map<string, string>,
+): boolean {
+  const phases = listener.properties.find(
+    property => getStaticPropertyName(property, constants) === 'phases',
+  )
+  if (!phases) return true
+  if (!ts.isPropertyAssignment(phases) || !ts.isArrayLiteralExpression(phases.initializer)) return true
+  return phases.initializer.elements.some(
+    phase => getStaticStringValue(phase, constants) === 'computeCosts',
+  )
+}
+
 function forEachListenerResultObject(
   sourceFile: ts.SourceFile,
   constants: Map<string, string>,
@@ -171,17 +164,6 @@ function forEachListenerResultObject(
       }
     }
     return undefined
-  }
-  const mayComputeCosts = (handler: ts.ObjectLiteralElementLike): boolean => {
-    if (!ts.isObjectLiteralExpression(handler.parent)) return true
-    const phases = handler.parent.properties.find(
-      property => getStaticPropertyName(property, constants) === 'phases',
-    )
-    if (!phases) return true
-    if (!ts.isPropertyAssignment(phases) || !ts.isArrayLiteralExpression(phases.initializer)) return true
-    return phases.initializer.elements.some(
-      phase => getStaticStringValue(phase, constants) === 'computeCosts',
-    )
   }
   const visitResult = (expression: ts.Expression, rejectUninspectable: boolean): void => {
     if (
@@ -230,7 +212,9 @@ function forEachListenerResultObject(
       (ts.isPropertyAssignment(node) || ts.isMethodDeclaration(node))
       && getStaticPropertyName(node, constants) === 'handler'
     ) {
-      const rejectUninspectable = mayComputeCosts(node)
+      const rejectUninspectable = ts.isObjectLiteralExpression(node.parent)
+        ? listenerMayComputeCosts(node.parent, constants)
+        : true
       if (ts.isMethodDeclaration(node)) {
         inspectHandler(node, rejectUninspectable)
       } else if (ts.isArrowFunction(node.initializer) || ts.isFunctionExpression(node.initializer)) {
@@ -278,7 +262,7 @@ function validateCostAttributionShapes(
   invalidLines?: number[],
 ): void {
   const constants = collectStringConstants(sourceFile)
-  const declaredCardId = getTopLevelStringConstant(sourceFile, 'CARD_ID')
+  const declaredCardId = constants.get('CARD_ID')
   const propertyValue = (property: ts.ObjectLiteralElementLike): ts.Expression | undefined => {
     if (ts.isPropertyAssignment(property)) return property.initializer
     if (ts.isShorthandPropertyAssignment(property)) return property.name
@@ -681,6 +665,7 @@ function validateListenersArray(
 
   const validateHandler = (
     handler: ts.ArrowFunction | ts.FunctionExpression | ts.MethodDeclaration,
+    inspectResults: boolean,
   ): void => {
     const validateResult = (expression: ts.Expression): void => {
       if (!isInspectableResult(expression)) {
@@ -691,6 +676,7 @@ function validateListenersArray(
       errors.push(`line ${getLine(handler)}: listener handlers must have a body`)
       return
     }
+    if (!inspectResults) return
     if (!ts.isBlock(handler.body)) {
       validateResult(handler.body)
       return
@@ -711,6 +697,7 @@ function validateListenersArray(
       errors.push(`line ${getLine(element)}: CARD_IMPL listener entries must be object literals`)
       continue
     }
+    const inspectResults = listenerMayComputeCosts(element, constants)
     for (const prop of element.properties) {
       if (ts.isSpreadAssignment(prop)) {
         errors.push(`line ${getLine(prop)}: CARD_IMPL listener entries must not use spread properties`)
@@ -733,12 +720,12 @@ function validateListenersArray(
       }
       if (propName === 'handler') {
         if (ts.isMethodDeclaration(prop)) {
-          validateHandler(prop)
+          validateHandler(prop, inspectResults)
         } else if (
           ts.isPropertyAssignment(prop)
           && (ts.isArrowFunction(prop.initializer) || ts.isFunctionExpression(prop.initializer))
         ) {
-          validateHandler(prop.initializer)
+          validateHandler(prop.initializer, inspectResults)
         } else {
           errors.push(`line ${getLine(prop)}: listener handlers must be inline functions`)
         }

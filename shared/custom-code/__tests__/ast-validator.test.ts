@@ -216,6 +216,22 @@ describe('ast-validator: CARD_IMPL hook/phase whitelisting', () => {
     expect(result.valid).toBe(true)
   })
 
+  it('accepts local result variables from non-cost listeners', () => {
+    const result = validateCardCode(`
+      const CARD_IMPL = {
+        listeners: [{
+          phases: ['after'],
+          handler: () => {
+            const result = { extraData: { ok: true } }
+            return result
+          },
+        }],
+      }
+    `)
+
+    expect(result.valid).toBe(true)
+  })
+
   it('flags indirect compute-cost handler results in the production audit', () => {
     const lines = findInvalidCostAttributionLines(`
       const COMPUTE_COSTS = 'computeCosts'
@@ -270,7 +286,7 @@ describe('ast-validator: CARD_IMPL hook/phase whitelisting', () => {
 
   it('accepts costs with explicit cost attribution', () => {
     const result = validateCardCode(`
-      const CARD_ID = 'CUSTOM_Test'
+      const CARD_ID = 'CUSTOM_Test' as const
       const CARD_IMPL = {
         listeners: [{
           actions: ['construct'],

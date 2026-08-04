@@ -340,6 +340,47 @@ describe('GitHubClient', () => {
       expect(blobBody?.content).toBe('const value = 1\n')
     })
 
+    it('preserves the current EOF when rebasing an old no-newline hunk', async () => {
+      let blobBody: { content?: string } | null = null
+      fetchHandler = (url, init) => {
+        if (url.includes('/contents/example.ts')) {
+          return okJson({
+            content: Buffer.from('const value = 1\nconst upstream = 2\n').toString('base64'),
+            encoding: 'base64',
+          })
+        }
+        if (url.includes('/git/blobs') && init?.method === 'POST') {
+          blobBody = JSON.parse(init.body as string) as typeof blobBody
+          return okJson({ sha: 'blobsha' })
+        }
+        if (url.includes('/git/trees') && init?.method === 'POST') return okJson({ sha: 'treesha' })
+        if (url.includes('/git/commits') && init?.method === 'POST') return okJson({ sha: 'commitsha' })
+        return new Response('', { status: 404 })
+      }
+      const c = new GitHubClient({
+        token: 't',
+        upstreamOwner: 'titanxxh',
+        upstreamRepo: 'open-agricola',
+      })
+
+      await c.createCommit({
+        forkOwner: 'alice',
+        files: [],
+        preservedTreeEntries: [{
+          path: 'example.ts',
+          sha: 'old-pr-blob',
+          status: 'modified',
+          mode: '100644',
+          patch: '@@ -1 +1 @@\n-const value = 1\n\\ No newline at end of file\n+const reviewed = 1\n\\ No newline at end of file',
+        }],
+        message: 'test commit',
+        author: { name: 'alice', email: 'a@users.noreply.github.com' },
+        upstreamBaseSha: 'fixed-base',
+      })
+
+      expect(blobBody?.content).toBe('const reviewed = 1\nconst upstream = 2\n')
+    })
+
     it('replays a patchless binary rename from the current base blob', async () => {
       let treeBody: {
         tree?: Array<{ path: string; sha: string | null; mode: string }>

@@ -84,7 +84,7 @@ const applyUnifiedPatch = (source: string, patch: string): string => {
     for (const line of hunk) {
       const prefix = line[0]
       if (prefix === '\\') {
-        resultEndsWithNewline = previousPrefix === '-'
+        if (hunkCursor === sourceLines.length) resultEndsWithNewline = previousPrefix === '-'
         continue
       }
       if (prefix === '+') {
