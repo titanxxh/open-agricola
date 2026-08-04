@@ -1,4 +1,5 @@
 import type { IncomingMessage, ServerResponse } from 'node:http'
+import { createHash } from 'node:crypto'
 import { readFileSync, existsSync } from 'node:fs'
 import { join } from 'node:path'
 import { nanoid } from 'nanoid'
@@ -31,6 +32,34 @@ import {
 
 const RATE_LIMIT_MS = 10 * 60_000 // 10 minutes
 const REFRESH_COOLDOWN_MS = 60_000 // 1 minute
+
+const legacySmokeSource = (cardId: string): string => `import { describe, it, expect } from 'vitest'
+import { ${cardId}, ${cardId}_impl } from '../${cardId}'
+
+describe('${cardId} — community card smoke test', () => {
+  it('exports a valid definition', () => {
+    expect(${cardId}).toBeDefined()
+    expect(${cardId}.id).toBe('${cardId}')
+    expect(${cardId}.name).toBeTruthy()
+    expect(${cardId}.deck).toBe('community')
+  })
+
+  it('exports a CardImpl', () => {
+    expect(${cardId}_impl).toBeDefined()
+    const hasBehavior =
+      !!${cardId}_impl.effect ||
+      (${cardId}_impl.listeners?.length ?? 0) > 0 ||
+      (${cardId}_impl.modifiers?.length ?? 0) > 0 ||
+      (${cardId}.vp ?? 0) > 0
+    expect(hasBehavior).toBe(true)
+  })
+})
+`
+
+const gitBlobSha = (content: string): string => createHash('sha1')
+  .update(`blob ${Buffer.byteLength(content)}\0`)
+  .update(content)
+  .digest('hex')
 
 type WorkshopCardRow = {
   id: string
@@ -323,20 +352,15 @@ export async function handleSubmitReviewRequest(
     const existingPrTreeEntries = pr
       ? await client.getPullRequestTreeEntries(pr.number)
       : []
-    if (pr && (pr.baseRefName !== 'main' || pr.isDraft)) {
-      await client.closePr(pr.number)
-      pr = null
-    }
+    const replacementPr = pr && (pr.baseRefName !== 'main' || pr.isDraft) ? pr : null
     const legacySmokePath = `shared/cards/community/__tests__/${wcard.card_id}.test.ts`
+    const legacySmokeSha = gitBlobSha(legacySmokeSource(wcard.card_id))
     const generatedArtPrefix = `public/card-art/community/${wcard.card_id}.`
     const preservedTreeEntries = existingPrTreeEntries.filter((entry) => !(
       entry.path.startsWith(generatedArtPrefix)
       || (
         entry.path === legacySmokePath
-        && entry.patch?.includes('community card smoke test')
-        && entry.patch.includes("exports a valid definition")
-        && entry.patch.includes('exports a CardImpl')
-        && (entry.patch.match(/\b(?:it|test)(?:\.\w+)*\s*\(/g) ?? []).length === 2
+        && entry.sha === legacySmokeSha
       )
     ))
 
@@ -366,6 +390,10 @@ export async function handleSubmitReviewRequest(
       branchName,
       commitSha: commit1.commitSha,
     })
+    if (replacementPr) {
+      await client.closePr(replacementPr.number)
+      pr = null
+    }
 
     // Find or open PR
     if (!pr) {

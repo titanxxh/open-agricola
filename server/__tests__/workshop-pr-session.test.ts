@@ -13,6 +13,7 @@
  */
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { IncomingMessage, ServerResponse } from 'node:http'
+import { createHash } from 'node:crypto'
 import { Socket } from 'node:net'
 import Database from 'better-sqlite3'
 import { nanoid } from 'nanoid'
@@ -196,6 +197,39 @@ export const catalogCardDefinitions = [
   },
 ]
 `
+
+const legacySmokeSource = (cardId: string): string => `import { describe, it, expect } from 'vitest'
+import { ${cardId}, ${cardId}_impl } from '../${cardId}'
+
+describe('${cardId} — community card smoke test', () => {
+  it('exports a valid definition', () => {
+    expect(${cardId}).toBeDefined()
+    expect(${cardId}.id).toBe('${cardId}')
+    expect(${cardId}.name).toBeTruthy()
+    expect(${cardId}.deck).toBe('community')
+  })
+
+  it('exports a CardImpl', () => {
+    expect(${cardId}_impl).toBeDefined()
+    const hasBehavior =
+      !!${cardId}_impl.effect ||
+      (${cardId}_impl.listeners?.length ?? 0) > 0 ||
+      (${cardId}_impl.modifiers?.length ?? 0) > 0 ||
+      (${cardId}.vp ?? 0) > 0
+    expect(hasBehavior).toBe(true)
+  })
+})
+`
+
+const addedFilePatch = (content: string): string => {
+  const lines = content.trimEnd().split('\n')
+  return `@@ -0,0 +1,${lines.length} @@\n${lines.map(line => `+${line}`).join('\n')}`
+}
+
+const gitBlobSha = (content: string): string => createHash('sha1')
+  .update(`blob ${Buffer.byteLength(content)}\0`)
+  .update(content)
+  .digest('hex')
 
 // ── GitHub API stub factory ────────────────────────────────────────────────
 
@@ -925,23 +959,41 @@ describe('workshop PR propose — session', () => {
       'manual behavior test',
       "@@ -0,0 +1 @@\n+it('reduces the room cost through GameSession')",
       true,
+      'existing-test-sha',
     ],
     [
       'legacy smoke extended with test()',
-      "@@ -0,0 +1,5 @@\n+describe('CUSTOM_TestCard — community card smoke test', () => {\n"
-        + "+  it('exports a valid definition', () => {})\n"
-        + "+  it('exports a CardImpl', () => {})\n"
-        + "+  test('reduces the room cost through GameSession', () => {})\n+})",
+      addedFilePatch(legacySmokeSource('CUSTOM_TestCard').replace(
+        '\n})\n',
+        "\n  test('reduces the room cost through GameSession', () => {})\n})\n",
+      )),
       true,
+      'extended-test-sha',
+    ],
+    [
+      'legacy smoke with behavior inside an original test',
+      addedFilePatch(legacySmokeSource('CUSTOM_TestCard').replace(
+        'expect(CUSTOM_TestCard_impl).toBeDefined()',
+        'expect(CUSTOM_TestCard_impl.listeners).toHaveLength(1)',
+      )),
+      true,
+      gitBlobSha(legacySmokeSource('CUSTOM_TestCard').replace(
+        'expect(CUSTOM_TestCard_impl).toBeDefined()',
+        'expect(CUSTOM_TestCard_impl.listeners).toHaveLength(1)',
+      )),
     ],
     [
       'legacy generated smoke test',
-      "@@ -0,0 +1,4 @@\n+describe('CUSTOM_TestCard — community card smoke test', () => {\n"
-        + "+  it('exports a valid definition', () => {})\n"
-        + "+  it('exports a CardImpl', () => {})\n+})",
+      addedFilePatch(legacySmokeSource('CUSTOM_TestCard')),
       false,
+      gitBlobSha(legacySmokeSource('CUSTOM_TestCard')),
     ],
-  ])('upsert: reuses the existing PR and handles its %s', async (_case, patch, shouldPreserveTest) => {
+  ])('upsert: reuses the existing PR and handles its %s', async (
+    _case,
+    patch,
+    shouldPreserveTest,
+    testSha,
+  ) => {
     // Pretend this card already has an open PR from a previous propose.
     db.prepare(
       `UPDATE workshop_cards
@@ -964,7 +1016,7 @@ describe('workshop PR propose — session', () => {
         {
           filename: 'shared/cards/community/__tests__/CUSTOM_TestCard.test.ts',
           status: 'added',
-          sha: 'existing-test-sha',
+          sha: testSha,
           patch,
         },
         {
@@ -1117,7 +1169,7 @@ describe('workshop PR propose — session', () => {
         patch: "@@ -1,3 +1,4 @@\n import { it } from 'vitest'\n \n it('existing', () => {})\n+it('manual behavior', () => {})",
       }],
       upstreamFiles: {
-        [testPath]: "import { it } from 'vitest'\n\nconst upstreamAddition = true\n\nit('existing', () => {})\n",
+        [testPath]: "import { it } from 'vitest'\n\nit('existing', () => {})\n\nconst upstreamAddition = true\n",
       },
     })
     vi.stubGlobal('fetch', gh)
@@ -1136,6 +1188,37 @@ describe('workshop PR propose — session', () => {
     ))
     expect(preservedBlobs).toHaveLength(2)
     expect(preservedBlobs.every(content => content.includes('const upstreamAddition = true'))).toBe(true)
+  })
+
+  it('keeps a replacement PR open when its preserved patch cannot be rebased', async () => {
+    const hs = tokenCache.allocateHandshakeId(userId)
+    tokenCache.bind(hs, 'ghp_mock')
+    const { fn: gh, counts } = createGitHubApiStub({
+      githubLogin: 'workshopuser',
+      existingPr: {
+        number: 99,
+        url: 'https://github.com/titanxxh/open-agricola/pull/99',
+        isDraft: true,
+      },
+      existingPrFiles: [{
+        filename: 'server/__tests__/CUSTOM_TestCard-session.test.ts',
+        status: 'added',
+        sha: 'manual-test-sha',
+      }],
+    })
+    vi.stubGlobal('fetch', gh)
+    const res = fakeRes()
+
+    await handleSubmitReviewRequest(fakeReq({
+      method: 'POST',
+      url: `/api/workshop/cards/${cardDbId}/submit-review`,
+      authHeader: `Bearer ${userToken}`,
+      body: JSON.stringify({ handshakeId: hs }),
+    }), res, cardDbId, reviewRequiredProvider())
+
+    expect(JSON.parse(res.body)).toMatchObject({ ok: false, code: 'pr_patch_unavailable' })
+    expect(counts.closePrCalls).toBe(0)
+    expect(counts.openPrCalls).toBe(0)
   })
 
   it('reconciles a missed approval through the existing refresh endpoint', async () => {

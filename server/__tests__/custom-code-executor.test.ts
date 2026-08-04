@@ -4,7 +4,11 @@ import { executeCardListener, getMatchingListeners } from '../../shared/cards/ca
 import { getCardEffect, runCardEffectHook } from '../../shared/cards/card-effects.ts'
 import { computeAnimalZones } from '../../shared/domain/animal-zones.ts'
 import { createInitialState } from '../../shared/session/state-bootstrap.ts'
-import { validateAndCompileCustomCode, invokeCustomCodeEffect } from '../custom-code/engine.ts'
+import {
+  validateAndCompileCustomCode,
+  invokeCustomCodeEffect,
+  invokeCustomCodeListener,
+} from '../custom-code/engine.ts'
 import { registerExecutorBackedCustomCard } from '../custom-code/runtime.ts'
 import { GameSession } from '../game/authoritative-session.ts'
 import { workshopCardJsonFromDefinition } from '../workshop-draft-validation.ts'
@@ -197,6 +201,30 @@ const CARD_IMPL = {
     expect(result.valid).toBe(false)
     if (result.valid) return
     expect(result.errors.join('\n')).toContain('process')
+  })
+
+  it('rejects dynamically constructed costs without attribution at runtime', () => {
+    const compiled = validateAndCompileCustomCode(`
+const CARD_ID = 'CUSTOM_ExecutorCard'
+const CARD_DEF = MinorImprovement({ id: CARD_ID, name: 'Executor Card' })
+const CARD_IMPL = {
+  listeners: [{
+    cardIds: [CARD_ID],
+    actions: ['construct'],
+    phases: ['computeCosts'],
+    handler: () => Object.fromEntries([['costs', { wood: -2 }]]),
+  }],
+}
+    `, 'CUSTOM_ExecutorCard')
+    expect(compiled.valid).toBe(true)
+    if (!compiled.valid) return
+
+    expect(invokeCustomCodeListener({
+      compiledCode: compiled.compiledCode,
+      cardId: 'CUSTOM_ExecutorCard',
+      registrationId: 'CUSTOM_ExecutorCard:listener:0',
+      context: {} as never,
+    })).toEqual({ ok: false, error: expect.stringContaining('costAttribution') })
   })
 
   it('executes registered effect and listener through runtime proxies', () => {

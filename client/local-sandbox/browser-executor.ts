@@ -19,7 +19,7 @@ import { compileCardCode } from '../../shared/custom-code/compiler.ts'
 import { HELPERS_INJECTION_SOURCE } from '../../shared/custom-code/injected-helpers.ts'
 import { cardEffectHooks, isHandCardEffectHook, type CardEffectField } from '../../shared/cards/card-effects.ts'
 import type { ActionFlow } from '../../shared/contract/types.ts'
-import type { ActionHookResult } from '../../shared/actions/hooks.ts'
+import { validateCustomListenerResult } from '../../shared/custom-code/listener-result-validator.ts'
 import { isSandboxListenerAction } from '../../shared/custom-code/sandbox-listener-actions.ts'
 import { isSandboxListenerPhase } from '../../shared/custom-code/sandbox-listener-phases.ts'
 import { isSandboxListenerScope } from '../../shared/custom-code/sandbox-listener-scopes.ts'
@@ -291,7 +291,7 @@ __result = __listener && typeof __listener.handler === 'function'
         __input_context: request.context,
       },
     )
-    return { ok: true, result: (result ?? null) as ActionHookResult | null }
+    return { ok: true, result: validateCustomListenerResult(result, request.cardId) }
   } catch (error) {
     return {
       ok: false,

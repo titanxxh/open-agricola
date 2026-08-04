@@ -58,18 +58,9 @@ const applyUnifiedPatch = (source: string, patch: string): string => {
     if (oldLines.length > 0) {
       const candidates: number[] = []
       for (let start = sourceCursor; start < sourceLines.length; start++) {
-        if (sourceLines[start] !== oldLines[0]) continue
-        let cursor = start + 1
-        let matches = true
-        for (const line of oldLines.slice(1)) {
-          const next = sourceLines.indexOf(line, cursor)
-          if (next < 0) {
-            matches = false
-            break
-          }
-          cursor = next + 1
+        if (oldLines.every((line, offset) => sourceLines[start + offset] === line)) {
+          candidates.push(start)
         }
-        if (matches) candidates.push(start)
       }
       hunkStart = candidates.includes(expectedStart)
         ? expectedStart
@@ -101,17 +92,15 @@ const applyUnifiedPatch = (source: string, patch: string): string => {
         throw new GitHubApiError('invalid PR patch', 'pr_patch_invalid', 422)
       }
       const content = line.slice(1)
-      const matchedAt = sourceLines.indexOf(content, hunkCursor)
-      if (matchedAt < 0) {
+      if (sourceLines[hunkCursor] !== content) {
         throw new GitHubApiError(
           'preserved PR edits conflict with current main',
           'pr_rebase_conflict',
           409,
         )
       }
-      output.push(...sourceLines.slice(hunkCursor, matchedAt))
       if (prefix === ' ') output.push(content)
-      hunkCursor = matchedAt + 1
+      hunkCursor++
       previousPrefix = prefix
     }
     sourceCursor = hunkCursor

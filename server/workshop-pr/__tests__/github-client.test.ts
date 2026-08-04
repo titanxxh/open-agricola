@@ -210,6 +210,40 @@ describe('GitHubClient', () => {
         { path: 'server/__tests__/CUSTOM_Test-session.test.ts', mode: '100644', type: 'blob', sha: 'new-card' },
       ])
     })
+
+    it('rejects a preserved patch whose old hunk is not contiguous on current main', async () => {
+      fetchHandler = (url, init) => {
+        if (url.includes('/contents/server/__tests__/existing.test.ts')) {
+          return okJson({
+            content: Buffer.from('changed\nfirst\nunrelated\nsecond\n').toString('base64'),
+            encoding: 'base64',
+          })
+        }
+        if (url.includes('/git/blobs') && init?.method === 'POST') return okJson({ sha: 'blobsha' })
+        if (url.includes('/git/trees') && init?.method === 'POST') return okJson({ sha: 'treesha' })
+        if (url.includes('/git/commits') && init?.method === 'POST') return okJson({ sha: 'commitsha' })
+        return new Response('', { status: 404 })
+      }
+      const c = new GitHubClient({
+        token: 't',
+        upstreamOwner: 'titanxxh',
+        upstreamRepo: 'open-agricola',
+      })
+
+      await expect(c.createCommit({
+        forkOwner: 'alice',
+        files: [],
+        preservedTreeEntries: [{
+          path: 'server/__tests__/existing.test.ts',
+          sha: 'old-pr-blob',
+          status: 'modified',
+          patch: '@@ -1,2 +1,3 @@\n first\n second\n+manual',
+        }],
+        message: 'test commit',
+        author: { name: 'alice', email: 'a@users.noreply.github.com' },
+        upstreamBaseSha: 'fixed-base',
+      })).rejects.toMatchObject({ code: 'pr_rebase_conflict' })
+    })
   })
 
   describe('getPullRequestTreeEntries', () => {

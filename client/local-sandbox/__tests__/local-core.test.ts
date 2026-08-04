@@ -3,6 +3,7 @@ import { LocalSandboxCore } from '../worker-core.ts'
 import { LOCAL_SANDBOX_SCHEMA_VERSION, type LocalCardInput, type ViewerSpec } from '../protocol.ts'
 import {
   invokeCustomCodeEffectLocal,
+  invokeCustomCodeListenerLocal,
   validateAndCompileCustomCodeLocal,
 } from '../browser-executor.ts'
 
@@ -155,6 +156,30 @@ const CARD_IMPL = {
       player: { minorPlayed: [] } as never,
     })
     expect(result).toEqual({ ok: false, error: expect.stringContaining('local boom') })
+  })
+
+  it('rejects dynamically constructed costs without attribution at runtime', () => {
+    const compiled = validateAndCompileCustomCodeLocal(`
+const CARD_ID = 'CUSTOM_DynamicCosts'
+const CARD_DEF = MinorImprovement({ id: CARD_ID, name: 'Dynamic Costs' })
+const CARD_IMPL = {
+  listeners: [{
+    cardIds: [CARD_ID],
+    actions: ['construct'],
+    phases: ['computeCosts'],
+    handler: () => Object.fromEntries([['costs', { wood: -2 }]]),
+  }],
+}
+    `, 'CUSTOM_DynamicCosts')
+    expect(compiled.valid).toBe(true)
+    if (!compiled.valid) return
+
+    expect(invokeCustomCodeListenerLocal({
+      compiledCode: compiled.compiledCode,
+      cardId: 'CUSTOM_DynamicCosts',
+      registrationId: 'CUSTOM_DynamicCosts:listener:0',
+      context: {} as never,
+    })).toEqual({ ok: false, error: expect.stringContaining('costAttribution') })
   })
 
   it('runs card code under strict mode so `this` cannot reach worker globals', () => {
