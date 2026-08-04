@@ -1,43 +1,55 @@
 # LLM Card-Gen 自动化测试套件
 
-验证**LLM 生成的自定义卡代码**能否在真实 `GameSession` 里跑通既定场景。不是普通单元测试——每跑一次都会真的调 LLM 生成代码，成本与网络都有。
+验证**LLM 生成的自定义卡代码**能否在真实 `GameSession` 里跑通既定场景。默认 `record` 模式回放已提交的 golden，不调用 LLM；只有 `live` 或设置 `LLM_TEST_RECORD=1` 的刷新流程会调用外部模型。
 
 ## 位置
 
 ```
 tests/llm-card-gen/
-├── runner.test.ts            # 逐个 fixture 调 LLM → 编译 → 跑 fixture.setup/trigger/assert
+├── runner.test.ts            # 读取 golden 或调用 LLM → 编译 → 跑 fixture.setup/scenario/assert
+├── driver.ts                 # 驱动 GameSession action / choice / pending
 ├── session-helpers.ts        # buildSessionWithLLMCard / autoAdvanceRoundEnd / getBonusBreakdown 等
 ├── session-helpers.test.ts   # helpers 自身的 smoke（不调 LLM）
 ├── llm-client.ts             # Gemini / OpenAI / OpenRouter / DeepSeek / AiHubMix 兼容包装
 ├── extract.ts / extract.test.ts   # 从 LLM 响应里抽 TS 代码块
 └── fixtures/
-    ├── types.ts              # CardFixture = { setup, trigger, assert }
+    ├── types.ts              # CardFixture = { setup, scenario, assert }
     ├── M1_immediate-gain-with-cost-prereq.ts  # minor + cost + prereq + onBuy gain
     ├── M2_per-action-bonus.ts                 # listener: forest after → wood+1
     ├── M3_harvest-feed-modifier.ts            # onHarvest: food+1
     ├── M4_endgame-vp.ts                       # computeBonusScore: 每 2 牛 1 分
-    ├── M5_cost-reduction.ts                   # computeCosts: wish-children-growth -1 food
-    ├── M6_cardstate-counter.ts                # cardStates counter（write-card-extra-data）
+    ├── M5_cost-reduction.ts                   # computeCosts: renovate-house -1 reed
+    ├── M6_cardstate-counter.ts                # cardStates counter（special-effect）
     ├── M7_anytime-ability.ts                  # anytime: 2 wood → 3 food 一次性
     ├── M8_cross-player-trigger.ts             # scope:'any' listener cross-player gain
-    └── M9_future-meeple.ts                    # onBuy: futureMeeplesNode
+    ├── M9_future-meeple.ts                    # onBuy: future-meeples leaf
+    ├── M10_payment-resource-provider.ts       # paymentResourceProviders 虚拟支付资源
+    └── M11_improvement-cost-reduction.ts      # 改良 mandatory capped bonus + ComplexCost
 ```
 
 ## 运行
 
-默认 CI / 本地跑**不**触发 LLM 套件——需要显式选 project。
+普通 `pnpm test:fast` 不包含该 project；CI 另行执行确定性的 golden 回放。
 
 ```bash
 # 1. 默认代码生成使用 DeepSeek；API key 可直接放在 .env 的 MY_TEST_DEEPSEEK_APIKEY
 export LLM_TEST_CODE_PROVIDER=deepseek
 export LLM_TEST_CODE_MODEL=deepseek-v4-flash
 
-# 2. 全量 9 fixture（~110s）
+# 2. 全量 11 fixture golden 回放（确定性，不调 API）
 pnpm test:llm
 
-# 单跑一张
+# 单跑一张 golden
 pnpm exec vitest run --project llm tests/llm-card-gen/runner.test.ts -t 'M2-per-action-bonus'
+
+# 全量实时健康检查
+pnpm test:llm:live
+
+# 单张实时检查；不要把 -t 放到 pnpm script 的 -- 后面
+LLM_TEST_MODE=live pnpm exec vitest run --project llm tests/llm-card-gen/runner.test.ts -t 'M11-improvement-cost-reduction'
+
+# 单张确认通过后刷新 golden
+LLM_TEST_MODE=live LLM_TEST_RECORD=1 pnpm exec vitest run --project llm tests/llm-card-gen/runner.test.ts -t 'M11-improvement-cost-reduction'
 
 # 只跑 helper smoke（不调 LLM，~5s）
 pnpm exec vitest run --project llm tests/llm-card-gen/session-helpers.test.ts
@@ -49,10 +61,10 @@ pnpm run smoke:gemini:image
 LLM_TEST_CODE_PROVIDER=aihubmix \
 LLM_TEST_CODE_MODEL=coding-glm-5.1-free \
 AIHUBMIX_API_KEY=... \
-pnpm test:llm
+pnpm test:llm:live
 ```
 
-代码生成测试默认 provider=`deepseek`、model=`deepseek-v4-flash`。每次跑会把原始 LLM 响应写到 `output/tmp/llm-card-gen/<fixture-id>.txt`，失败时优先看这个文件。
+实时代码生成默认 provider=`deepseek`、model=`deepseek-v4-flash`。三种模式都会把本次使用的响应写到 `output/tmp/llm-card-gen/<fixture-id>.txt`，失败时优先看这个文件。
 
 环境变量按用途拆分，避免代码模型和图片模型混用：
 
@@ -81,7 +93,7 @@ pnpm test:llm
 
 ## CI / Workflow
 
-本套件不会在 push / PR 自动触发，只能本地手动运行或通过 GitHub Actions 的 `workflow_dispatch` 手动触发。原因是每次运行都会真实调用外部 LLM，受 API key、余额、限流和模型输出波动影响。
+`.github/workflows/ci.yml` 在 push / PR 运行 `pnpm test:llm`，只回放 golden。真实调用外部 LLM 的健康检查仅由 `.github/workflows/ci-llm-cards.yml` 的 `workflow_dispatch` 手动触发，避免 API key、余额、限流和模型输出波动影响普通 CI。
 
 工作流：`.github/workflows/ci-llm-cards.yml`
 
@@ -107,11 +119,11 @@ interface CardFixture {
   // 编译 LLM 代码 → 构造 GameSession → mutate 初始状态
   setup: (llmCode) => { session, ctx }
 
-  // 驱动场景（takeAction / resolveChoice / performRoundEnd / …）
-  trigger: (session, ctx) => TriggerResult
+  // 通过 Driver 驱动场景（takeAction / resolveChoice / advanceToHarvest / …）
+  scenario: (driver, ctx) => void
 
-  // 断言 state / interaction / scores
-  assert: (session, ctx, result) => FixtureResult
+  // 断言 state / interaction / log / scores
+  assert: (session, ctx) => FixtureResult
 }
 ```
 
@@ -135,13 +147,7 @@ interface CardFixture {
 
 ### 多步骤行动
 
-连续 `takeAction` 之间可能进入 `interaction.request.kind === 'confirm-next-player'`（比如轮到对手但对手没工人）。fixture trigger 内循环处理：
-
-```ts
-if (resp.interaction.stateId === 'wait' && resp.interaction.request.kind === 'confirm-next-player') {
-  resp = confirmNextPlayer(session)
-}
-```
+连续 `takeAction` 之间可能进入 `interaction.request.kind === 'confirm-next-player'`（比如轮到对手但对手没工人）。优先使用 `Driver.takeAction()` 自动 drain；只有必须观察中间 pending 时才用 `takeActionRaw()` / `resolveChoiceRaw()`。
 
 单回合内同一玩家多次 action 还需要：
 
@@ -163,19 +169,21 @@ setActiveWorkerCount(p1, 0)          // 对手零工人，避免轮转
 
 - `listeners[].actions:` 是 leaf actionId（`place-farmer` / `gain` / `collect` 等），不是行动空间 id
 - `harvest-feed` 不是 listener 动作——用 `onHarvest` effect hook
-- Anytime = `phases: ['anytime']` listener，不用 `actions:` 字段，一次性用 `flag-card` + `cardStates.flagged` 闸门
+- Anytime = `phases: ['anytime']` listener，不用 `actions:` 字段；一次性能力用 `special-effect` 的 `set-flag` + `cardStates.flagged` 闸门
 - `futureMeeplesNode` 没注入沙盒，手写 `params.__futureMeepleRequest` leaf
+- `costs` 只用于简单行动费用；跨所有主要/次要改良候选的资源折扣用 `bonuses`，并设置 `capDiscountAtCost: true`、`optional: false`、`sources: [CARD_ID]`
 
 ## 加新 fixture
 
 1. 读 `docs/CUSTOM_CARD_SANDBOX.md` 搞清题面能不能用现有沙盒机制做
 2. 新建 `tests/llm-card-gen/fixtures/M<n>_<slug>.ts`，follow `M2_per-action-bonus.ts` 模板
 3. 在 `tests/llm-card-gen/fixtures/index.ts` 注册导出
-4. 先手写一份 known-good `CARD_DEF` + `CARD_IMPL` 字符串，本地跑 `fixture.setup/trigger/assert` 确认 fixture 机制本身对
-5. 用真 LLM 跑一次（`pnpm exec vitest run --project llm -t M<n>`），看 dump
-6. 必要时收紧 `userMessage`，重复 2 次为止；超过就在 fixture 顶放 `// FIXME:` 加注说明并提交，不要死磕
+4. 先让旧 golden 或 known-bad 实现跑出预期红灯，确认断言能捕获机制漂移
+5. 用 `LLM_TEST_MODE=live` 单跑一次并 review `output/tmp/llm-card-gen/`
+6. live 通过后用 `LLM_TEST_RECORD=1` 刷新 golden，再用默认 `pnpm test:llm` 回放
 
 ## 历史
 
 - 2026-04-23 套件初版（9 fixture，hook-level 断言：`invokeCustomCodeEffect` / `invokeCustomCodeListener` 验证 LLM 代码形状）
 - 2026-04-24 重写到 session-driven：每个 fixture 真的装进 `GameSession` 里跑起来断 `state` / `interaction` / `scores`，能验"游戏中跑起来是否符合预期"而不是"编出来的 ActionFlow 是不是预期形状"
+- 2026-08-04 扩展到 11 fixture；M11 固化改良费用的 mandatory capped bonus、替代费用和归还卡要求，并明确 replay → live → record → replay 流程

@@ -50,6 +50,28 @@ describe('CARD_DESIGNER_SYSTEM_PROMPT', () => {
     expect(CARD_DESIGNER_SYSTEM_PROMPT).not.toContain('minor-improvement')
   })
 
+  it('uses a mandatory capped bonus for discounts across all improvements', () => {
+    expect(CARD_DESIGNER_SYSTEM_PROMPT).toContain('跨所有主要/次要改良候选的资源折扣')
+    expect(CARD_DESIGNER_SYSTEM_PROMPT).toContain('capDiscountAtCost: true')
+    expect(CARD_DESIGNER_SYSTEM_PROMPT).toContain('optional: false')
+    expect(CARD_DESIGNER_SYSTEM_PROMPT).toContain('sources: [CARD_ID]')
+    expect(CARD_DESIGNER_SYSTEM_PROMPT).toContain('`costs` 只用于简单行动费用')
+  })
+
+  it('documents only sandbox hooks whose return values can cross the JSON boundary', () => {
+    expect(CARD_DESIGNER_SYSTEM_PROMPT).not.toContain('| `onSowExtraField` |')
+    expect(CARD_DESIGNER_SYSTEM_PROMPT).not.toContain('| `applySpecialStable` |')
+    expect(CARD_DESIGNER_SYSTEM_PROMPT).toContain('(player, zones, state) => AnimalZone[]')
+    expect(CARD_DESIGNER_SYSTEM_PROMPT).toContain('必须返回新数组；原地修改 zones 无效')
+    expect(CARD_DESIGNER_SYSTEM_PROMPT).toContain('(state, player, choice) => ActionFlow')
+  })
+
+  it('documents the runtime farm-position shape', () => {
+    expect(CARD_DESIGNER_SYSTEM_PROMPT).toContain('`positionKey({ row, col })`')
+    expect(CARD_DESIGNER_SYSTEM_PROMPT).toContain('`"row-col"`')
+    expect(CARD_DESIGNER_SYSTEM_PROMPT).not.toContain('`positionKey({ x, y })`')
+  })
+
   it('renders exactly the actionId whitelist (no missing, no extras)', () => {
     const listed = [...renderActionIdList().matchAll(/`([^`]+)`/g)].map((m) => m[1])
     expect(new Set(listed)).toEqual(new Set(SANDBOX_ALLOWED_ACTION_IDS))

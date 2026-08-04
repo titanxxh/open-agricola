@@ -62,7 +62,8 @@ const CARD_IMPL = {
 |------|----------|------|
 | 阶段触发 | `CARD_IMPL.effect` + `onReturnHome` 等 | 回家/收获/轮次触发 |
 | 行动触发 | `CARD_IMPL.listeners` + `actions` + `phases` | 每次犁地/建造/收集等触发 |
-| 费用折扣 | listener `computeCosts` 返回 `costs` | 动态计算折扣 |
+| 简单行动费用折扣 | listener `computeCosts` 返回 `costs` | 仅用于 `construct` 等简单行动费用 |
+| 跨所有改良候选的资源折扣 | listener `computeCosts` 返回 `bonuses: [{ discount, capDiscountAtCost: true, optional: false, sources: [CARD_ID] }]` | mandatory capped bonus 保留候选和归还卡要求 |
 | 替代支付 | listener `computeCosts` 返回 `paymentResourceProviders` | 只影响支付选项，不直接改玩家资源 |
 | 动态计算 | hook 内读 `player` / `state` 字段（如家庭成员数 = `player.workers.filter(w=>w.isActive).length`） | 根据游戏状态计算 |
 | 替换行动 | listener + `computeReplace` + `decline: true` | 把某行动替换为其他效果 |
@@ -102,7 +103,8 @@ harvest field 三个 stage hook、`onBeforeEndGame` 和 action reaction listener
 | `computeCostedBonus` / `computeSharedPostScore` | 终局花资源换 VP（costed）/ 跨玩家分调（shared） |
 | `computeExtraRoomCapacity` | 房间容量修改 |
 | `onComputeAnimalZones` | 动物分区计算 |
-| `onComputeSowableFields` / `onSowExtraField` | 额外可播种田 |
+| `onComputeSowableFields` | 额外可播种田候选 |
+| `onSowExtraField` | 结算额外播种（仅官方卡；Workshop 的 JSON 快照无法回传 mutation） |
 | `computeLockedFarmTiles` | 动态锁定农场格（B38 FutureBuildingSite） |
 | `handHooks` | 声明哪些 hook 在卡牌还在手牌时也触发（E96 Elder） |
 

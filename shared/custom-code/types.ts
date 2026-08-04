@@ -3,11 +3,13 @@ import type { ActionFlow, GameState, PlayerState } from '../contract/types'
 import type { CardListenerContext, CardListenerScope } from '../cards/card-listeners'
 import type {
   BeforeEndGameScope,
+  CardEffectHook,
   CardEffectField,
   PaymentInfo,
 } from '../cards/card-effects'
 
 export type CustomCodeEffectMetadata = {
+  handHooks?: CardEffectHook[]
   beforeEndGameScope?: BeforeEndGameScope
   beforeEndGameMandatory?: boolean
 }

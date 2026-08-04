@@ -260,7 +260,7 @@ ${renderListenerActionList()}
 \`\`\`typescript
 return {
   flow?: ActionFlow,              // 追加的行动流
-  costs?: { wood: -1 },           // 费用修改（负数=折扣）
+  costs?: { wood: -1 },           // 简单行动费用修改（负数=折扣）
   trades?: Trade[],               // 支付替换候选
   bonuses?: Bonus[],              // 折扣 / 折扣选项
   paymentResourceProviders?: CardProvidedPaymentResourceProvider[], // payment-only 虚拟支付资源
@@ -277,10 +277,26 @@ Workshop 自定义卡只能通过 \`computeCosts\` listener 的 handler 返回�
 
 购买主要或次要改良的费用统一监听 \`actions: ['improvement']\`。
 
-- \`costs\`：简单费用 delta；负数表示折扣，正数表示额外费用。适合普通 action cost。
+- \`costs\`：简单行动费用 delta；负数表示折扣，正数表示额外费用。适合 \`construct\` 等普通 action cost。
 - \`trades\`：支付替换候选，例如把一种资源换成另一种资源。适合“可以用 X 代替 Y”。
 - \`bonuses\`：折扣或折扣选项；用 \`choices\` 表达玩家选择，用 \`optional\` 表达是否可跳过。
 - \`paymentResourceProviders\`：payment-only 虚拟支付资源，适合“可以用行动格上的 food 支付 occupation cost”这类路径。它不写入 \`costs\` / \`PlayerState.resources\`，只在支付选项里作为特殊 payment resource 出现，并由 \`consume\` 消耗来源。
+
+跨所有主要/次要改良候选的资源折扣必须返回 mandatory capped bonus；\`costs\` 只用于简单行动费用：
+
+\`\`\`typescript
+handler: () => ({
+  bonuses: [{
+    discount: { wood: 2 },
+    capDiscountAtCost: true,
+    optional: false,
+    sources: [CARD_ID],
+  }],
+  sourceCard: CARD_ID,
+})
+\`\`\`
+
+\`capDiscountAtCost: true\` 把低于折扣额的费用截到 0；\`optional: false\` 不保留未折扣路径。它只折扣实际含该资源的候选，并保留 \`ComplexCost.cards\` 等非资源要求。若同一张卡还折扣建房等简单行动，为 \`improvement\` 与该行动分别注册 listener，不要共用一个 \`costs\` 返回值。
 
 \`paymentResourceProviders\` 形态示例：
 
@@ -385,7 +401,7 @@ onBuy: (state, player) => ({
 | \`gainLeaf(cardId, { food: 2 })\` | 创建 gain leaf 节点 |
 | \`payLeaf({ cardId, cost: { wood: 1 } })\` | 创建 pay leaf 节点 |
 | \`spaceHasPlayer(space, playerId)\` | 判断行动位是否被指定玩家占据 |
-| \`positionKey({ x, y })\` | 将位置转为字符串 \`"x,y"\` |
+| \`positionKey({ row, col })\` | 将位置转为字符串 \`"row-col"\` |
 | \`getCardStack(player, cardId)\` | 读取 \`cardStates[cardId].stack\` |
 | \`readCardExtraData(player, cardId)\` | 读取 \`cardStates[cardId].extraData\` |
 | \`getCardDefinition(cardId)\` | 沙盒内为存根（始终返回 \`null\`），不要依赖它 |

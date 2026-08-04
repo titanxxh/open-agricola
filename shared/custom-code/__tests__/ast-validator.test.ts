@@ -245,6 +245,21 @@ describe('ast-validator: CARD_IMPL hook/phase whitelisting', () => {
     expect(result.valid).toBe(true)
   })
 
+  it('rejects sandbox hooks whose effects require host-object mutation', () => {
+    for (const hook of ['onSowExtraField', 'applySpecialStable']) {
+      const result = validateCardCode(`
+        const CARD_IMPL = {
+          effect: {
+            id: 'test',
+            ${hook}: () => true,
+          },
+        }
+      `)
+      expect(result.valid).toBe(false)
+      expect(result.valid === false && result.errors.some(e => e.includes(`unknown effect hook '${hook}'`))).toBe(true)
+    }
+  })
+
   it('rejects deprecated before-end dispatch meta field', () => {
     const deprecatedKey = 'beforeEndGame' + 'Dispatch' + 'Mode'
     const code = `
