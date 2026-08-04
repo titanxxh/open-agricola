@@ -1,4 +1,4 @@
-import type { ActionExecutionContext, ActionExecutionResult, ActionFlow, ActionSpace, Bonus, CardCostCandidate, CardProvidedPaymentResourceProvider, GameState, PlayerState, Resource, Trade } from '../contract/types'
+import type { ActionCostAttribution, ActionExecutionContext, ActionExecutionResult, ActionFlow, ActionSpace, Bonus, CardCostCandidate, CardProvidedPaymentResourceProvider, GameState, PlayerState, Resource, Trade } from '../contract/types'
 import { runActionHooks, type ActionHookContext, type ActionHookPhase, type ActionHookResult } from '../actions/hooks'
 import { getCurrentSessionContext } from './session-card-context'
 import { getActiveCardRegistry } from './active-registry'
@@ -418,6 +418,7 @@ const makeDummySpace = (actionId: string): ActionSpace => ({
  */
 export type FarmChoiceCostAdjustments = {
   costs: Partial<Resource>
+  costAttribution: ActionCostAttribution[]
   trades: Trade[]
   bonuses: Bonus[]
   paymentResourceProviders: CardProvidedPaymentResourceProvider[]
@@ -442,6 +443,7 @@ export const collectFarmChoiceCostAdjustments = (
   }
   const aggregated: FarmChoiceCostAdjustments = {
     costs: {},
+    costAttribution: [],
     trades: [],
     bonuses: [],
     paymentResourceProviders: [],
@@ -456,6 +458,7 @@ export const collectFarmChoiceCostAdjustments = (
   }
   const mergeResult = (result: ActionHookResult) => {
     merge(result.costs)
+    if (result.costAttribution) aggregated.costAttribution.push(...result.costAttribution)
     if (result.trades) aggregated.trades.push(...result.trades)
     if (result.bonuses) aggregated.bonuses.push(...result.bonuses)
     if (result.paymentResourceProviders) {

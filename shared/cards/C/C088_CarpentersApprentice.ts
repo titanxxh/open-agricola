@@ -47,7 +47,8 @@ const stablesCostListener: CardListenerRegistration = {
     if (before < 3 && after >= 3) discounted += 1
     if (before < 4 && after >= 4) discounted += 1
     if (discounted <= 0) return
-    return { costs: { wood: -discounted } }
+    const costs = { wood: -discounted }
+    return { costs, costAttribution: [{ sourceCard: CARD_ID, costs }] }
   },
 }
 
@@ -109,7 +110,8 @@ const fenceCostListener: CardListenerRegistration = {
     const end = before + buildingNow
     const free = Math.max(0, Math.min(end, buildLimit) - Math.max(start, 13) + 1)
     if (free <= 0) return
-    return { costs: { wood: -free } }
+    const costs = { wood: -free }
+    return { costs, costAttribution: [{ sourceCard: CARD_ID, costs }] }
   },
 }
 

@@ -3,6 +3,7 @@ import { GameSession } from '../game/authoritative-session'
 import type { FarmTilePosition, PlayerState } from '../../shared/contract/types'
 import { getAvailableStableSupplyCount } from '../../shared/domain/supply-tokens'
 import type { GameEvent } from '../../shared/contract/events'
+import { readCardResourceStats } from '../../shared/cards/helpers/card-state'
 
 import '../../shared/cards/C/C088_CarpentersApprentice'
 import '../../shared/cards/B/B085_FarmHand'
@@ -89,6 +90,7 @@ describe('C88 + B85 — mixed ordinary + FarmHand stable build', () => {
     expect(after.cardStates?.B085_FarmHand?.extraData?.position).toEqual(FARM_HAND_TILE)
     // supply: 1 normal + 1 farmhand → -2.
     expect(getAvailableStableSupplyCount(commit.state, after)).toBe(supplyBefore - 2)
+    expect(readCardResourceStats(after, 'C088_CarpentersApprentice')?.saved).toEqual({ wood: 2 })
 
     const stables = findStableBuiltStables(commit.state.events)
     expect(stables).toEqual([
@@ -136,5 +138,6 @@ describe('C88 + B85 — mixed ordinary + FarmHand stable build', () => {
       { row: 1, col: 4 },
     ])
     expect(after.cardStates?.B085_FarmHand?.extraData?.position).toBeUndefined()
+    expect(readCardResourceStats(after, 'C088_CarpentersApprentice')).toBeUndefined()
   })
 })

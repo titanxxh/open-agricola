@@ -116,7 +116,7 @@ BGA PHP 路径默认相对 `/data00/home/xuxinhao.titan/raw/bga-agricola/modules
 | Metadata 审计覆盖需要随字段演进同步 | `scripts/audit-bga-metadata-diff.ts` 已覆盖 `STABLE` cost 和 `passing`；当前 literal mismatch 为 0 | 新增 BGA metadata 字段时同步加 parser / diff fixture，避免统计口径回退。 |
 | 后端权威的 action / pending 合同 | `allowedCommands`、typed request、`commitSelection`、`engine-resolve` protected cancel、`resolveEngineChoice`、bare improvement choice ids | 新增交互必须显式暴露 command / options 并由后端校验；major/minor improvement choice value 使用裸 `cardId`，旧 `major:` / `minor:` 只作为 parser 兼容输入，支付 option 保留 `pay:*` 命名空间；不要恢复 encoded choice shortcut、old pending cursor 或前端裁定规则。 |
 | 事件与支付 provenance | `resource.paid`、`paymentSources`、`sumActualPaidResource()`、`bonusChoiceIndex`、`event-mapping-policy.ts`、`publicEventArchive`、`shared/actions/helpers/trades.ts`、`shared/actions/helpers/trade-applied-listener.ts`、`shared/cards/__tests__/provenance-result-audit.test.ts` | 支付 / 资源 / farm metadata 先 emit 结构化事件，再让 listener 消费；生产卡牌不要从 `context.result` 读取资源事实。动物 exchange 必须通过 exchange/trade 路径扣减，默认同步 pasture / house / stable / animal-holder 中已安置动物，避免只改 `player.resources` 留下 phantom animal。需要 per-trade 前置资源门槛的卡牌优先监听 `immediatelyAfter.trade-applied`，读取 `extraData.preResources`。 |
-| Cost Attribution / hover stats | `CardResourceStats`、`trackSourceCardPaymentStats`、`recordCardCostAttribution()`、ADR 0003 | 成本变化卡牌的 saved / paid 展示必须走 Cost Attribution；card-purchase selected candidate 写入每个 source card 自己的 saved / paid delta；不要因为 pay leaf 携带 `sourceCard` 就把整笔 action / card-purchase 支付记成该卡 PAID。 |
+| Cost Attribution / hover stats | `CardResourceStats`、`trackSourceCardPaymentStats`、`recordCardCostAttribution()`、`recordActionCostAttribution()`、`collectFarmChoiceCostAdjustments()`、ADR 0003 | 成本变化卡牌的 saved / paid 展示必须走 Cost Attribution；card-purchase selected candidate 写入每个 source card 自己的 saved / paid delta；construct / fencing / stables / plow 的 action `computeCosts` 必须显式声明 attribution，并由 host action 按实际 before / after delta 与 clamp 写入统计；farm-choice commit 必须保留 payload-aware attribution。不要因为 pay leaf 携带 `sourceCard` 就把整笔 action / card-purchase 支付记成该卡 PAID。 |
 | Printed improvement base cost helper | `getPrintedImprovementResourceCost()`、D80/E156 | 读取 minor / major definitions 的 printed/base cost candidates；`cost`、minor `altCosts`、major complex `fee` / `fees` 是候选组，按目标资源取最大值，不按实际支付或候选求和。 |
 | Card-purchase ComputeCardCosts candidate pipeline | `resolveCardCostWithModifiersDetailed()`、`deriveCardCostCandidate` + `cardCostCandidateMandatory`、`CardImpl.getBaseCosts()`、`PaymentSolver.discountCardCostCandidate()`、ADR 0003、ADR 0004 | 购买 major / minor improvement 的新成本变形走 Cost Candidate List；A20/B36 这类动态基础费用在 pipeline 前产出 base candidates；卡牌只声明单候选转换，遍历 / 去重 / 饱和过滤由候选闭包负责（`CardListenerRegistration.order` 已删除，禁止重新引入顺序字段）；普通折扣天然保留原候选，后续 payment dominance 再隐藏严格劣势支付项；`cardCostCandidateMandatory` 只用于固定价 / replacement 这类必须隐藏原 candidate 的语义（如 A27），不可用于 A75 这类普通折扣；折到 0 的资源键省略；候选 metadata 不写入资源 map 或通用 `PaymentSolution`，由 PaymentSolver payment receipt 合并到现有 `sourceCards`，并在支付选定后把 Cost Attribution 写入 Card Resource Stats；生产卡牌通过 `PaymentSolver` 使用 candidate helper，不直接 import `payment/internal/*`。 |
 | FoM 跨玩家 marker / 传牌小改良 | `publicCardMarkers` helper、`pass-minor-card-to-left` internal action、`card.passed` provenance、FarmBoard player summary marker | 跨玩家公开 marker 写入目标玩家 `cardStates[sourceCard].extraData.publicCardMarkers`，计分进入 `cardBonusVp`，UI 只扩展原有玩家摘要显示；传牌必须走 internal action 移除原打出区和 cardState、给目标玩家私有 handChanged，并用 `card.passed` 事件触发后续 listener。 |
@@ -850,7 +850,7 @@ Action reaction listener 的同一 owner / phase 默认进入 `trigger-select`�
 | `C013_WoodSlideHammer` | 已对齐 | wood house 且至少 5 rooms 的直接翻修到 stone 折扣走 mandatory sourced bonus modifier，不保留原始 stone 翻修成本分支。 |
 | `C014_StrawThatchedRoof` | 已对齐 | construct / renovation 移除 reed 通过 `capDiscountAtCost` 表达，不再依赖过量折扣被 payment 枚举器截断。 |
 | `C015_Trellis` | 已对齐 | BGA ordinary `FENCING` 子行动映射到内部 `fence` leaf。 |
-| `C016_FieldFences` | 已对齐 |  |
+| `C016_FieldFences` | 已对齐 | field-adjacent fence 折扣显式声明 Cost Attribution，按真实提交的相邻 fence 数记录 saved wood。 |
 | `C017_NewlyPlowedField` | 已对齐 |  |
 | `C018_RollOverPlow` | 已对齐 | discard selection 默认至少选 1 个有作物田，空提交或选择空田不会绕过 discard 直接进入 plow。 |
 | `C019_SwingPlow` | 已对齐 |  |
@@ -871,7 +871,7 @@ Action reaction listener 的同一 owner / phase 默认进入 `trigger-select`�
 | `C034_ElephantgrassPlant` | 已对齐 |  |
 | `C035_LanternHouse` | 已对齐 |  |
 | `C036_ClayDeposit` | 已对齐 |  |
-| `C037_DwellingMound` | 已对齐 |  |
+| `C037_DwellingMound` | 已对齐 | plow 的额外 1 food 成本显式声明 Cost Attribution，成功支付后记录本卡 paid food。 |
 | `C038_Christianity` | 已对齐 |  |
 | `C039_StudioBoat` | 已对齐 |  |
 | `C040_CanvasSack` | 已对齐 |  |
@@ -922,7 +922,7 @@ Action reaction listener 的同一 owner / phase 默认进入 `trigger-select`�
 | `C085_DenBuilder` | 已对齐 |  |
 | `C086_LivestockFeeder` | 已对齐 |  |
 | `C087_Mason` | 已对齐 | BGA `CONSTRUCT + formatCost(['max'=>1])` 走真实 `construct` + `exactCost: { max: 1 }`，会放置 room tile，不再用 `build-farmhand-room` 虚拟房间。 |
-| `C088_CarpentersApprentice` | 已对齐 | 木房建房 -2 wood 走 sourced `scope:'unit'` trade，保留原始建房成本并追加 BGA `addCost` 折扣候选。第 13–15 根 fence 免费区间走 `computeCosts.fence`，doability 通过免费 `fencePolicy` 复用真实布局门禁。Build Stables 的 `maxSelections` 用 count-aware total cost 计算（#191）：`stables.ts` 的 `buildStableFarmSelection` 对 count=1..reserve 逐一算 `resolveStableTotalCostWithDiscount`（与结算同一总额，含 C88 第 3/4 座 -1 的 non-uniform 折扣）+ `canAffordTypedFlatCost`，取最大可负担数覆写 `farm.maxSelections`，不再 probe `stableCount:1` 折后注入 farmyard 的 per-unit `costOverride`（non-uniform 折扣下会少让一座，如 1 card-facing stable + 3 wood + C88 应能建 2 座）。total 对 count 单调（每多一座 ≥+1 wood），首个不可负担即终止扫描。`actionContext.max`（A1 Shelter）/`zoneFilter='pasture-1'`/`exactCost`（C94）路径不受影响。 |
+| `C088_CarpentersApprentice` | 已对齐 | 木房建房 -2 wood 走 sourced `scope:'unit'` trade，保留原始建房成本并追加 BGA `addCost` 折扣候选。第 13–15 根 fence 免费区间走 `computeCosts.fence`，doability 通过免费 `fencePolicy` 复用真实布局门禁。Build Stables 的 `maxSelections` 用 count-aware total cost 计算（#191）：`stables.ts` 的 `buildStableFarmSelection` 对 count=1..reserve 逐一算 `resolveStableTotalCostWithDiscount`（与结算同一总额，含 C88 第 3/4 座 -1 的 non-uniform 折扣）+ `canAffordTypedFlatCost`，取最大可负担数覆写 `farm.maxSelections`，不再 probe `stableCount:1` 折后注入 farmyard 的 per-unit `costOverride`（non-uniform 折扣下会少让一座，如 1 card-facing stable + 3 wood + C88 应能建 2 座）。第 3/4 座 stable 与第 13–15 根 fence 的实际折扣都显式声明 Cost Attribution 并记录 saved wood。total 对 count 单调（每多一座 ≥+1 wood），首个不可负担即终止扫描。`actionContext.max`（A1 Shelter）/`zoneFilter='pasture-1'`/`exactCost`（C94）路径不受影响。 |
 | `C089_StableMaster` | 已对齐 | onBuy 的 1 wood stable 走 `stables` exactCost，入口不做 raw wood gate，允许 C88 等 `computeCosts.stables` 折扣叠加。 |
 | `C090_FieldWatchman` | 已对齐 |  |
 | `C091_PlowHero` | 已对齐 |  |
@@ -1210,7 +1210,7 @@ Action reaction listener 的同一 owner / phase 默认进入 `trigger-select`�
 | `E013_StoneHouseReconstruction` | 已对齐 | anytime 翻修子行动使用当前 `renovate-house` action id。 |
 | `E014_WoodSaw` | 已对齐 |  |
 | `E015_NailBasket` | 已对齐 |  |
-| `E016_BriarHedge` | 已对齐 | prerequisite 改用 `getAssignedAnimalsByType()`，house/pasture/stable/animal-holder 口径统一；fence discount 保留本卡 listener。 |
+| `E016_BriarHedge` | 已对齐 | prerequisite 改用 `getAssignedAnimalsByType()`，house/pasture/stable/animal-holder 口径统一；fence discount 保留本卡 listener，并按真实提交的 border fence 数记录 saved wood。 |
 | `E017_SkimmerPlow` | 已对齐 |  |
 | `E018_SeedAlmanac` | 已对齐 |  |
 | `E019_OxGoad` | 已对齐 |  |

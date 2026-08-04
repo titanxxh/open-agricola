@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 import { meetsCardPrerequisites } from '../../shared/cards/helpers/prerequisites'
+import { readCardResourceStats } from '../../shared/cards/helpers/card-state'
 import { getFenceCount, getPalisadeCount } from '../../shared/actions/effects/fencing'
 
 import '../../shared/cards/E/E016_BriarHedge'
@@ -107,6 +108,7 @@ describe('E16 BriarHedge — border-fence discount', () => {
     expect(p.resources.wood).toBe(2) // paid 2 (2 internal), 2 border free
     expect(getFenceCount(p)).toBe(4)
     expect(p.pastures).toHaveLength(1)
+    expect(readCardResourceStats(p, 'E016_BriarHedge')?.saved).toEqual({ wood: 2 })
   })
 
   it('D.2 未打 E16 同布局无折扣：border 边全额付费', () => {
@@ -140,6 +142,7 @@ describe('E16 BriarHedge — border-fence discount', () => {
     const p = resp.state.players[0]!
     expect(p.resources.wood).toBe(0)
     expect(getFenceCount(p)).toBe(4)
+    expect(readCardResourceStats(p, 'E016_BriarHedge')).toBeUndefined()
   })
 
   it('D.4 E16 + B30 共存：border 给 palisade 不给 E16 额外免', () => {
