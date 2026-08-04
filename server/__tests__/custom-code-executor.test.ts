@@ -4,6 +4,7 @@ import { executeCardListener, getMatchingListeners } from '../../shared/cards/ca
 import { getCardEffect, runCardEffectHook } from '../../shared/cards/card-effects.ts'
 import { computeAnimalZones } from '../../shared/domain/animal-zones.ts'
 import { createInitialState } from '../../shared/session/state-bootstrap.ts'
+import { CardRegistry } from '../../shared/cards/registry.ts'
 import {
   validateAndCompileCustomCode,
   invokeCustomCodeEffect,
@@ -230,18 +231,42 @@ const CARD_IMPL = {
     const state = createInitialState(42)
     const player = state.players[0]!
     const space = state.actionSpaces[0]!
+    const registry = new CardRegistry()
+    registry.loadImpl('CUSTOM_ExecutorCard', {
+      listeners: [{
+        id: 'opaque-listener-id',
+        handler: () => Object.fromEntries([['costs', { wood: -2 }]]),
+      }],
+    })
 
-    expect(() => executeCardListener({
-      id: 'CUSTOM_ExecutorCard:listener:0',
-      cardIds: ['CUSTOM_ExecutorCard'],
-      handler: () => Object.fromEntries([['costs', { wood: -2 }]]),
-    }, {
+    expect(() => executeCardListener(registry.getAllListeners()[0]!, {
       state,
       player,
       space,
       actionId: 'construct',
       phase: 'computeCosts',
-    }, { ownerCardId: 'CUSTOM_ExecutorCard' })).toThrow('costAttribution')
+    })).toThrow('costAttribution')
+  })
+
+  it('rejects inherited costs from a normally registered custom listener', () => {
+    const state = createInitialState(42)
+    const registry = new CardRegistry()
+    registry.loadImpl('CUSTOM_ExecutorCard', {
+      listeners: [{
+        id: 'opaque-listener-id',
+        handler: () => ({
+          __proto__: Object.fromEntries([['costs', { wood: -2 }]]),
+        }),
+      }],
+    })
+
+    expect(() => executeCardListener(registry.getAllListeners()[0]!, {
+      state,
+      player: state.players[0]!,
+      space: state.actionSpaces[0]!,
+      actionId: 'construct',
+      phase: 'computeCosts',
+    })).toThrow('plain object')
   })
 
   it('executes registered effect and listener through runtime proxies', () => {

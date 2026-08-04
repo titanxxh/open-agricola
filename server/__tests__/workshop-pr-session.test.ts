@@ -256,6 +256,7 @@ type StubOpts = {
   upstreamFiles?: Record<string, string>
   /** Used when openPr is invoked. */
   openedPr?: { number: number; url: string }
+  openPrStatus?: number
 }
 
 type StubCounts = {
@@ -280,6 +281,7 @@ function createGitHubApiStub(opts: StubOpts): {
     existingPrFiles = [],
     upstreamFiles = {},
     openedPr,
+    openPrStatus,
   } = opts
   const upstream = `${workshopPrConfig.upstreamOwner}/${workshopPrConfig.upstreamRepo}`
   const counts: StubCounts = {
@@ -490,6 +492,7 @@ function createGitHubApiStub(opts: StubOpts): {
     // Create PR
     if (url.match(/\/repos\/[^/]+\/[^/]+\/pulls$/) && method === 'POST') {
       counts.openPrCalls++
+      if (openPrStatus) return Promise.resolve(new Response('', { status: openPrStatus }))
       const pr = openedPr ?? { number: 1, url: 'https://github.com/x/y/pull/1' }
       return Promise.resolve(
         new Response(
@@ -1176,6 +1179,39 @@ describe('workshop PR propose — session', () => {
     expect(counts.treeEntries.every(entries => entries.some(entry => (
       entry.path === 'server/__tests__/CUSTOM_TestCard-session.test.ts'
     )))).toBe(true)
+  })
+
+  it('reopens a replacement source PR when opening the new PR fails', async () => {
+    const hs = tokenCache.allocateHandshakeId(userId)
+    tokenCache.bind(hs, 'ghp_mock')
+    const { fn: gh, counts } = createGitHubApiStub({
+      githubLogin: 'workshopuser',
+      existingPr: {
+        number: 99,
+        url: 'https://github.com/titanxxh/open-agricola/pull/99',
+        isDraft: true,
+      },
+      existingPrFiles: [{
+        filename: 'server/__tests__/CUSTOM_TestCard-session.test.ts',
+        status: 'added',
+        sha: 'manual-test-sha',
+        patch: "@@ -0,0 +1 @@\n+test('real behavior', () => {})",
+      }],
+      openPrStatus: 503,
+    })
+    vi.stubGlobal('fetch', gh)
+    const res = fakeRes()
+
+    await handleSubmitReviewRequest(fakeReq({
+      method: 'POST',
+      url: `/api/workshop/cards/${cardDbId}/submit-review`,
+      authHeader: `Bearer ${userToken}`,
+      body: JSON.stringify({ handshakeId: hs }),
+    }), res, cardDbId, reviewRequiredProvider())
+
+    expect(JSON.parse(res.body)).toMatchObject({ ok: false, code: 'pr_create_failed' })
+    expect(counts.closePrCalls).toBe(1)
+    expect(counts.reopenPrCalls).toBe(1)
   })
 
   it('replays preserved test edits onto the current main file', async () => {

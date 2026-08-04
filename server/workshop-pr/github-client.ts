@@ -201,7 +201,10 @@ export class GitHubClient {
       if (generatedPaths.has(entry.path) || (entry.previousPath && generatedPaths.has(entry.previousPath))) {
         continue
       }
-      if (!entry.patch) {
+      if (entry.status === 'renamed' && !entry.previousPath) {
+        throw new GitHubApiError('renamed PR file is missing its previous path', 'pr_patch_invalid', 422)
+      }
+      if (!entry.patch && entry.status !== 'renamed') {
         throw new GitHubApiError('PR patch is unavailable for safe rebase', 'pr_patch_unavailable', 409)
       }
       const basePath = entry.previousPath ?? entry.path
@@ -227,7 +230,12 @@ export class GitHubClient {
           if (!(error instanceof GitHubApiError) || error.status !== 404) throw error
         }
       }
-      const content = applyUnifiedPatch(baseContent, entry.patch)
+      if (entry.status === 'renamed' && !entry.patch) {
+        preservedTree.push({ path: entry.previousPath!, sha: null, mode: entry.mode })
+        blobs.push({ path: entry.path, sha: entry.sha, mode: entry.mode })
+        continue
+      }
+      const content = entry.patch ? applyUnifiedPatch(baseContent, entry.patch) : baseContent
       if (entry.status === 'removed') {
         if (content !== '') {
           throw new GitHubApiError('preserved PR edits conflict with current main', 'pr_rebase_conflict', 409)
@@ -450,6 +458,18 @@ export class GitHubClient {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ state: 'closed' }),
+      },
+    )
+    if (!r.ok) throw new GitHubApiError('pr state update failed', 'pr_state_update_failed', r.status)
+  }
+
+  async reopenPr(prNumber: number): Promise<void> {
+    const r = await this.fetch(
+      `/repos/${this.opts.upstreamOwner}/${this.opts.upstreamRepo}/pulls/${prNumber}`,
+      {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ state: 'open' }),
       },
     )
     if (!r.ok) throw new GitHubApiError('pr state update failed', 'pr_state_update_failed', r.status)

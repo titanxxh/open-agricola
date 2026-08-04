@@ -397,12 +397,17 @@ export async function handleSubmitReviewRequest(
 
     // Find or open PR
     if (!pr) {
-      pr = await client.openPr({
-        forkOwner: githubLogin,
-        branchName,
-        title: buildPrTitle(wcard, githubLogin),
-        body: buildPrBody(wcard, githubLogin),
-      })
+      try {
+        pr = await client.openPr({
+          forkOwner: githubLogin,
+          branchName,
+          title: buildPrTitle(wcard, githubLogin),
+          body: buildPrBody(wcard, githubLogin),
+        })
+      } catch (error) {
+        if (replacementPr) await client.reopenPr(replacementPr.number)
+        throw error
+      }
     } else {
       await client.commentOnPr({
         prNumber: pr.number,

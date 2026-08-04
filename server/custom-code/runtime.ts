@@ -4,6 +4,7 @@ import type { CardListenerContext } from '../../shared/cards/card-listeners.ts'
 import type { GameState, PlayerState } from '../../shared/contract/types.ts'
 import { requireActiveCardRegistry } from '../../shared/cards/active-registry.ts'
 import { getCurrentSessionContext, type CustomCardData } from '../../shared/cards/session-card-context.ts'
+import { setCardListenerSource } from '../../shared/cards/card-listener-source.ts'
 import { invokeCustomCodeEffectSync, invokeCustomCodeListenerSync } from './client.ts'
 
 export const registerExecutorBackedCustomCard = (cardData: CustomCardData): void => {
@@ -74,6 +75,7 @@ export const registerExecutorBackedCustomCard = (cardData: CustomCardData): void
         return response.result ?? undefined
       },
     }
+    setCardListenerSource(reg, cardId)
     if (sessionCtx) {
       sessionCtx.registerListener(reg)
     } else {

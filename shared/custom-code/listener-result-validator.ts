@@ -7,8 +7,14 @@ const isRecord = (value: unknown): value is Record<string, unknown> => (
   !!value && typeof value === 'object' && !Array.isArray(value)
 )
 
+const isPlainRecord = (value: unknown): value is Record<string, unknown> => {
+  if (!isRecord(value)) return false
+  const prototype = Object.getPrototypeOf(value)
+  return prototype === Object.prototype || prototype === null
+}
+
 const isResourceDelta = (value: unknown): value is Record<string, number> => (
-  isRecord(value)
+  isPlainRecord(value)
   && Object.entries(value).every(([key, amount]) => (
     RESOURCE_KEYS.has(key) && typeof amount === 'number' && Number.isFinite(amount)
   ))
@@ -28,18 +34,23 @@ export const validateCustomListenerResult = (
   cardId: string,
 ): ActionHookResult | null => {
   if (value === null || value === undefined) return null
-  if (!isRecord(value)) throw new Error('custom listener result must be an object')
-  if (!Object.hasOwn(value, 'costs')) return value as ActionHookResult
+  if (!isPlainRecord(value)) throw new Error('custom listener result must be a plain object')
+  if (!Object.hasOwn(value, 'costs')) {
+    if ('costs' in value) throw new Error('custom listener costs must be an own property')
+    return value as ActionHookResult
+  }
 
-  const attribution = value.costAttribution
+  const attribution = Object.hasOwn(value, 'costAttribution') ? value.costAttribution : undefined
   const entry = Array.isArray(attribution) && attribution.length === 1
-    && isRecord(attribution[0])
+    && isPlainRecord(attribution[0])
     ? attribution[0]
     : null
   if (
     !isResourceDelta(value.costs)
     || !entry
+    || !Object.hasOwn(entry, 'sourceCard')
     || entry.sourceCard !== cardId
+    || !Object.hasOwn(entry, 'costs')
     || !isResourceDelta(entry.costs)
     || !equalResourceDeltas(value.costs, entry.costs)
   ) {

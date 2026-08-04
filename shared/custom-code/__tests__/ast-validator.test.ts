@@ -133,6 +133,7 @@ describe('ast-validator: CARD_IMPL hook/phase whitelisting', () => {
   it.each([
     "Object.fromEntries([['costs', { wood: -1 }]])",
     "({ ['cost' + 's']: { wood: -1 } })",
+    "({ __proto__: Object.fromEntries([['costs', { wood: -1 }]]) })",
   ])('rejects listener results that cannot be checked statically: %s', (resultExpression) => {
     const result = validateCardCode(`
       const CARD_IMPL = {

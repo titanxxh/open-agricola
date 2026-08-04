@@ -246,6 +246,52 @@ describe('GitHubClient', () => {
         upstreamBaseSha: 'fixed-base',
       })).rejects.toMatchObject({ code: 'pr_rebase_conflict' })
     })
+
+    it('replays a patchless file rename with its executable mode', async () => {
+      let treeBody: {
+        tree?: Array<{ path: string; sha: string | null; mode: string }>
+      } | null = null
+      fetchHandler = (url, init) => {
+        if (url.includes('/contents/scripts/old.sh')) {
+          return okJson({
+            content: Buffer.from('#!/bin/sh\necho ok\n').toString('base64'),
+            encoding: 'base64',
+          })
+        }
+        if (url.includes('/contents/scripts/new.sh')) return new Response('', { status: 404 })
+        if (url.includes('/git/trees') && init?.method === 'POST') {
+          treeBody = JSON.parse(init.body as string) as typeof treeBody
+          return okJson({ sha: 'treesha' })
+        }
+        if (url.includes('/git/commits') && init?.method === 'POST') return okJson({ sha: 'commitsha' })
+        return new Response('', { status: 404 })
+      }
+      const c = new GitHubClient({
+        token: 't',
+        upstreamOwner: 'titanxxh',
+        upstreamRepo: 'open-agricola',
+      })
+
+      await c.createCommit({
+        forkOwner: 'alice',
+        files: [],
+        preservedTreeEntries: [{
+          path: 'scripts/new.sh',
+          previousPath: 'scripts/old.sh',
+          sha: 'old-pr-blob',
+          status: 'renamed',
+          mode: '100755',
+        }],
+        message: 'test commit',
+        author: { name: 'alice', email: 'a@users.noreply.github.com' },
+        upstreamBaseSha: 'fixed-base',
+      })
+
+      expect(treeBody?.tree).toEqual([
+        { path: 'scripts/old.sh', sha: null, mode: '100755', type: 'blob' },
+        { path: 'scripts/new.sh', sha: 'old-pr-blob', mode: '100755', type: 'blob' },
+      ])
+    })
   })
 
   describe('getPullRequestTreeEntries', () => {

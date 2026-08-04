@@ -7,6 +7,7 @@ import type { DraftGameEvent, GameEvent } from '../contract/events'
 import { createEventQuery, type EventQuery } from '../events/query'
 import type { TriggerSnapshot } from './helpers/trigger-snapshot'
 import { validateCustomListenerResult } from '../custom-code/listener-result-validator'
+import { getCardListenerSource } from './card-listener-source'
 
 export type CardListenerContext = ActionExecutionContext & {
   actionId: string
@@ -313,7 +314,8 @@ export const executeCardListener = (
   if (!registration.handler) return undefined
   const listenerContext = buildCardListenerContext(registration, context, options)
   const result = registration.handler(listenerContext)
-  const cardId = listenerContext.ownerCardId
+  const cardId = getCardListenerSource(registration)
+    ?? listenerContext.ownerCardId
     ?? registration.cardIds?.find(candidate => candidate.startsWith('CUSTOM_'))
   if (cardId?.startsWith('CUSTOM_')) {
     return validateCustomListenerResult(result, cardId) ?? undefined

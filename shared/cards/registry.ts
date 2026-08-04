@@ -15,6 +15,7 @@ import type { CardListenerRegistration } from './card-listeners'
 import type { CardEffect } from './card-effects'
 import type { CardDefinition } from '../contract/cards'
 import type { ComplexCost, CostModifier, GameState, PaymentResourceMap, PlayerState } from '../contract/types'
+import { setCardListenerSource } from './card-listener-source'
 
 export type PrerequisiteHandler = (player: PlayerState, state?: GameState) => boolean
 export type CardPurchaseBaseCostContext = {
@@ -60,6 +61,7 @@ export class CardRegistry {
 
   loadImpl(cardId: string, impl: CardImpl, options: CardRegistryLoadOptions = {}): void {
     if (impl.listeners && impl.listeners.length > 0) {
+      for (const listener of impl.listeners) setCardListenerSource(listener, cardId)
       this.listenersByCard.set(cardId, impl.listeners)
       if (options.protected) {
         for (const listener of impl.listeners) this.protectedListenerIds.add(listener.id)

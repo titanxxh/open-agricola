@@ -528,6 +528,7 @@ function validateListenersArray(
       && expression.properties.every(property => (
         !ts.isSpreadAssignment(property)
         && getStaticPropertyName(property, constants) !== undefined
+        && getStaticPropertyName(property, constants) !== '__proto__'
       ))
   }
 
