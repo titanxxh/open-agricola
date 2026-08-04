@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { validateCardCode } from '../ast-validator'
+import { findMissingCostAttributionLines, validateCardCode } from '../ast-validator'
 
 describe('ast-validator: CARD_IMPL hook/phase whitelisting', () => {
   it('accepts valid effect hooks', () => {
@@ -197,6 +197,42 @@ describe('ast-validator: CARD_IMPL hook/phase whitelisting', () => {
     expect(result.valid === false && result.errors.some(
       error => error.includes("assigning to 'costs' is not allowed"),
     )).toBe(true)
+  })
+
+  it('flags indirect compute-cost handler results in the production audit', () => {
+    const lines = findMissingCostAttributionLines(`
+      const discountHandler = () => {
+        const result = { costs: { wood: -1 } }
+        return result
+      }
+      const listener = {
+        phases: ['computeCosts'],
+        handler: discountHandler,
+      }
+    `)
+
+    expect(lines).toHaveLength(1)
+  })
+
+  it('accepts an inspectable method-form listener handler', () => {
+    const result = validateCardCode(`
+      const CARD_ID = 'CUSTOM_Test'
+      const CARD_IMPL = {
+        listeners: [{
+          actions: ['construct'],
+          phases: ['computeCosts'],
+          handler() {
+            const costs = { wood: -1 }
+            return {
+              costs,
+              costAttribution: [{ sourceCard: CARD_ID, costs }],
+            }
+          },
+        }],
+      }
+    `, 'CUSTOM_Test')
+
+    expect(result.valid).toBe(true)
   })
 
   it('accepts costs with explicit cost attribution', () => {

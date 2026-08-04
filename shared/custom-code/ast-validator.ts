@@ -139,8 +139,36 @@ function forEachListenerResultObject(
   sourceFile: ts.SourceFile,
   constants: Map<string, string>,
   callback: (result: ts.ObjectLiteralExpression) => void,
+  onUninspectable?: (expression: ts.Node) => void,
 ): void {
-  const visitResult = (expression: ts.Expression): void => {
+  type Handler = ts.ArrowFunction | ts.FunctionExpression | ts.FunctionDeclaration | ts.MethodDeclaration
+  const findTopLevelHandler = (name: string): Handler | undefined => {
+    for (const statement of sourceFile.statements) {
+      if (ts.isFunctionDeclaration(statement) && statement.name?.text === name) return statement
+      if (!ts.isVariableStatement(statement)) continue
+      for (const declaration of statement.declarationList.declarations) {
+        if (
+          ts.isIdentifier(declaration.name)
+          && declaration.name.text === name
+          && declaration.initializer
+          && (ts.isArrowFunction(declaration.initializer) || ts.isFunctionExpression(declaration.initializer))
+        ) return declaration.initializer
+      }
+    }
+    return undefined
+  }
+  const mayComputeCosts = (handler: ts.ObjectLiteralElementLike): boolean => {
+    if (!ts.isObjectLiteralExpression(handler.parent)) return true
+    const phases = handler.parent.properties.find(
+      property => getStaticPropertyName(property, constants) === 'phases',
+    )
+    if (!phases) return true
+    if (!ts.isPropertyAssignment(phases) || !ts.isArrayLiteralExpression(phases.initializer)) return true
+    return phases.initializer.elements.some(
+      phase => ts.isStringLiteral(phase) && phase.text === 'computeCosts',
+    )
+  }
+  const visitResult = (expression: ts.Expression, rejectUninspectable: boolean): void => {
     if (
       ts.isParenthesizedExpression(expression)
       || ts.isAsExpression(expression)
@@ -148,33 +176,56 @@ function forEachListenerResultObject(
       || ts.isNonNullExpression(expression)
       || ts.isSatisfiesExpression(expression)
     ) {
-      visitResult(expression.expression)
+      visitResult(expression.expression, rejectUninspectable)
     } else if (ts.isConditionalExpression(expression)) {
-      visitResult(expression.whenTrue)
-      visitResult(expression.whenFalse)
+      visitResult(expression.whenTrue, rejectUninspectable)
+      visitResult(expression.whenFalse, rejectUninspectable)
     } else if (ts.isObjectLiteralExpression(expression)) {
       callback(expression)
+    } else if (
+      rejectUninspectable
+      && expression.kind !== ts.SyntaxKind.NullKeyword
+      && !(ts.isIdentifier(expression) && expression.text === 'undefined')
+      && !ts.isVoidExpression(expression)
+    ) {
+      onUninspectable?.(expression)
     }
   }
-  const visitReturns = (node: ts.Node): void => {
-    if (ts.isReturnStatement(node)) {
-      if (node.expression) visitResult(node.expression)
+  const inspectHandler = (handler: Handler, rejectUninspectable: boolean): void => {
+    if (!handler.body) {
+      if (rejectUninspectable) onUninspectable?.(handler)
       return
     }
-    if (ts.isFunctionLike(node)) return
-    ts.forEachChild(node, visitReturns)
+    if (!ts.isBlock(handler.body)) {
+      visitResult(handler.body, rejectUninspectable)
+      return
+    }
+    const visitReturns = (node: ts.Node): void => {
+      if (ts.isReturnStatement(node)) {
+        if (node.expression) visitResult(node.expression, rejectUninspectable)
+        return
+      }
+      if (ts.isFunctionLike(node)) return
+      ts.forEachChild(node, visitReturns)
+    }
+    ts.forEachChild(handler.body, visitReturns)
   }
   const visit = (node: ts.Node): void => {
     if (
-      ts.isPropertyAssignment(node)
+      (ts.isPropertyAssignment(node) || ts.isMethodDeclaration(node))
       && getStaticPropertyName(node, constants) === 'handler'
-      && (ts.isArrowFunction(node.initializer) || ts.isFunctionExpression(node.initializer))
     ) {
-      const handler = node.initializer
-      if (ts.isBlock(handler.body)) {
-        ts.forEachChild(handler.body, visitReturns)
-      } else {
-        visitResult(handler.body)
+      const rejectUninspectable = mayComputeCosts(node)
+      if (ts.isMethodDeclaration(node)) {
+        inspectHandler(node, rejectUninspectable)
+      } else if (ts.isArrowFunction(node.initializer) || ts.isFunctionExpression(node.initializer)) {
+        inspectHandler(node.initializer, rejectUninspectable)
+      } else if (ts.isIdentifier(node.initializer)) {
+        const handler = findTopLevelHandler(node.initializer.text)
+        if (handler) inspectHandler(handler, rejectUninspectable)
+        else if (rejectUninspectable) onUninspectable?.(node.initializer)
+      } else if (rejectUninspectable) {
+        onUninspectable?.(node.initializer)
       }
     }
     ts.forEachChild(node, visit)
@@ -193,6 +244,8 @@ export function findMissingCostAttributionLines(source: string): number[] {
     if (names.has('costs') && !names.has('costAttribution')) {
       lines.push(sourceFile.getLineAndCharacterOfPosition(result.getStart(sourceFile)).line + 1)
     }
+  }, (expression) => {
+    lines.push(sourceFile.getLineAndCharacterOfPosition(expression.getStart(sourceFile)).line + 1)
   })
   return lines
 }
@@ -623,11 +676,17 @@ function validateListenersArray(
       && expression.properties.every(property => hasInspectablePropertyName(property, constants))
   }
 
-  const validateHandler = (handler: ts.ArrowFunction | ts.FunctionExpression): void => {
+  const validateHandler = (
+    handler: ts.ArrowFunction | ts.FunctionExpression | ts.MethodDeclaration,
+  ): void => {
     const validateResult = (expression: ts.Expression): void => {
       if (!isInspectableResult(expression)) {
         errors.push(`line ${getLine(expression)}: listener handlers must return statically inspectable objects`)
       }
+    }
+    if (!handler.body) {
+      errors.push(`line ${getLine(handler)}: listener handlers must have a body`)
+      return
     }
     if (!ts.isBlock(handler.body)) {
       validateResult(handler.body)
@@ -670,13 +729,15 @@ function validateListenersArray(
         continue
       }
       if (propName === 'handler') {
-        if (
-          !ts.isPropertyAssignment(prop)
-          || (!ts.isArrowFunction(prop.initializer) && !ts.isFunctionExpression(prop.initializer))
+        if (ts.isMethodDeclaration(prop)) {
+          validateHandler(prop)
+        } else if (
+          ts.isPropertyAssignment(prop)
+          && (ts.isArrowFunction(prop.initializer) || ts.isFunctionExpression(prop.initializer))
         ) {
-          errors.push(`line ${getLine(prop)}: listener handlers must be inline functions`)
-        } else {
           validateHandler(prop.initializer)
+        } else {
+          errors.push(`line ${getLine(prop)}: listener handlers must be inline functions`)
         }
         continue
       }
