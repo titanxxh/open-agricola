@@ -7,6 +7,10 @@ import {
   type CardMeta,
   type CardsManifestPayload,
 } from '../card-meta'
+import {
+  clearCustomCardMetadata,
+  registerCustomCardMetadata,
+} from '../../../shared/cards/custom-card-metadata'
 
 const samplePayload: CardsManifestPayload = {
   A123_FrameBuilder: {
@@ -50,6 +54,7 @@ describe('card-meta service', () => {
 
   beforeEach(() => {
     __resetCardsManifestCache()
+    clearCustomCardMetadata()
     fetchSpy.mockReset()
     fetchSpy.mockResolvedValue(makeFetchResponse(samplePayload))
     vi.stubGlobal('fetch', fetchSpy)
@@ -88,5 +93,29 @@ describe('card-meta service', () => {
   it('fetches manifest from BASE_URL + cards-manifest.json', async () => {
     await loadCardsManifest()
     expect(fetchSpy).toHaveBeenCalledWith(expect.stringMatching(/cards-manifest\.json$/))
+  })
+
+  it('preserves locales from runtime custom-card metadata', () => {
+    registerCustomCardMetadata({
+      cardType: 'occupation',
+      cardJson: {
+        id: 'CUSTOM_LocalisedCard',
+        name: 'Localised Card',
+        deck: 'CUSTOM',
+        number: 0,
+        desc: ['English description.'],
+        cost: {},
+        artUrl: 'https://attacker.example/tracker.webp',
+        locales: {
+          zh: { name: '本地化卡', desc: ['中文描述。'] },
+        },
+      },
+    })
+
+    expect(getCardMeta('CUSTOM_LocalisedCard')?.locales?.zh).toEqual({
+      name: '本地化卡',
+      desc: ['中文描述。'],
+    })
+    expect(getCardMeta('CUSTOM_LocalisedCard')?.artUrl).toBeUndefined()
   })
 })

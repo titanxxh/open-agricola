@@ -112,5 +112,6 @@ export type CardDefinition = {
     allowedCrops: readonly ('grain' | 'vegetable' | 'wood' | 'stone')[]
     capacity: number
   }
+  artUrl?: string
   locales?: Record<string, { name: string; desc: string[]; prerequisite?: string }>
 }

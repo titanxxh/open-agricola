@@ -160,6 +160,62 @@ describe('PlayerCard dual-type rendering (alsoCountsAs)', () => {
     expect(html).toContain('data-id="CUSTOM_DebugMallet"')
   })
 
+  it('renders published community art and card-local Chinese metadata', () => {
+    const html = renderToStaticMarkup(
+      <PlayerCard
+        locale="zh"
+        cardId="CUSTOM_LocalisedCard"
+        cardType="occupation"
+        cardMeta={{
+          id: 'CUSTOM_LocalisedCard',
+          name: 'Localised Card',
+          deck: 'community',
+          number: 0,
+          desc: ['English description.'],
+          artUrl: '/card-art/community/CUSTOM_LocalisedCard.webp',
+          locales: {
+            zh: {
+              name: '本地化卡',
+              desc: ['中文描述。'],
+              prerequisite: '中文前置条件',
+            },
+          },
+        }}
+      />,
+    )
+    const base = import.meta.env.BASE_URL.endsWith('/')
+      ? import.meta.env.BASE_URL
+      : `${import.meta.env.BASE_URL}/`
+
+    expect(html).toContain('本地化卡')
+    expect(html).toContain('中文描述。')
+    expect(html).toContain('中文前置条件')
+    expect(html).not.toContain('English description.')
+    expect(html).toContain(`${base}card-art/community/CUSTOM_LocalisedCard.webp`)
+    expect(html).not.toContain('/bga-img/')
+  })
+
+  it('ignores remote art from card metadata', () => {
+    const html = renderToStaticMarkup(
+      <PlayerCard
+        locale="en"
+        cardId="CUSTOM_RemoteArt"
+        cardType="occupation"
+        cardMeta={{
+          id: 'CUSTOM_RemoteArt',
+          name: 'Remote Art',
+          deck: 'community',
+          number: 0,
+          desc: [],
+          artUrl: 'https://attacker.example/tracker.webp',
+        }}
+      />,
+    )
+
+    expect(html).not.toContain('attacker.example')
+    expect(html).toContain('/bga-img/')
+  })
+
   it('renders C54 stable printed cost from card metadata', async () => {
     const manifest = await loadCardsManifest()
     const originalCost = manifest.C054_MarketBooth?.cost
