@@ -288,22 +288,21 @@ describe('GitHubClient', () => {
       expect(blobBody?.content).toBe('const value = 1\n')
     })
 
-    it('replays a patchless file rename with its executable mode', async () => {
+    it('replays a patchless binary rename from the current base blob', async () => {
       let treeBody: {
         tree?: Array<{ path: string; sha: string | null; mode: string }>
       } | null = null
-      let blobBody: { content?: string; encoding?: string } | null = null
       fetchHandler = (url, init) => {
         if (url.includes('/contents/scripts/old.sh')) {
           return okJson({
-            content: Buffer.from('#!/bin/sh\necho ok\n').toString('base64'),
+            content: Buffer.from([0xff, 0x00, 0x80]).toString('base64'),
             encoding: 'base64',
+            sha: 'current-base-blob',
           })
         }
         if (url.includes('/contents/scripts/new.sh')) return new Response('', { status: 404 })
         if (url.includes('/git/blobs') && init?.method === 'POST') {
-          blobBody = JSON.parse(init.body as string) as typeof blobBody
-          return okJson({ sha: 'current-base-blob' })
+          throw new Error('should reuse the current base blob')
         }
         if (url.includes('/git/trees') && init?.method === 'POST') {
           treeBody = JSON.parse(init.body as string) as typeof treeBody
@@ -333,7 +332,6 @@ describe('GitHubClient', () => {
         upstreamBaseSha: 'fixed-base',
       })
 
-      expect(blobBody).toEqual({ content: '#!/bin/sh\necho ok\n', encoding: 'utf-8' })
       expect(treeBody?.tree).toEqual([
         { path: 'scripts/old.sh', sha: null, mode: '100755', type: 'blob' },
         { path: 'scripts/new.sh', sha: 'current-base-blob', mode: '100755', type: 'blob' },

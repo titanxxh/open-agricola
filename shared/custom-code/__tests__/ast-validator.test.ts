@@ -232,6 +232,47 @@ describe('ast-validator: CARD_IMPL hook/phase whitelisting', () => {
     expect(result.valid).toBe(true)
   })
 
+  it('accepts a shared dynamic cost delta', () => {
+    const result = validateCardCode(`
+      const CARD_ID = 'CUSTOM_Test'
+      const CARD_IMPL = {
+        listeners: [{
+          actions: ['construct'],
+          phases: ['computeCosts'],
+          handler: (context) => {
+            const costs = { wood: -context.player.rooms }
+            return {
+              costs,
+              costAttribution: [{ sourceCard: CARD_ID, costs }],
+            }
+          },
+        }],
+      }
+    `)
+
+    expect(result.valid).toBe(true)
+  })
+
+  it('rejects duplicate resolved cost properties', () => {
+    const result = validateCardCode(`
+      const CARD_ID = 'CUSTOM_Test'
+      const KEY = 'costs'
+      const CARD_IMPL = {
+        listeners: [{
+          actions: ['construct'],
+          phases: ['computeCosts'],
+          handler: () => ({
+            costs: { wood: -1 },
+            costAttribution: [{ sourceCard: CARD_ID, costs: { wood: -1 } }],
+            [KEY]: { wood: -2 },
+          }),
+        }],
+      }
+    `)
+
+    expect(result.valid).toBe(false)
+  })
+
   it('rejects cost attribution without costs', () => {
     const result = validateCardCode(`
       const CARD_ID = 'CUSTOM_Test'

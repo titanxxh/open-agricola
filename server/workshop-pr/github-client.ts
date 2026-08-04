@@ -208,9 +208,11 @@ export class GitHubClient {
         throw new GitHubApiError('PR patch is unavailable for safe rebase', 'pr_patch_unavailable', 409)
       }
       const basePath = entry.previousPath ?? entry.path
+      let baseFile: { content: string; sha: string } | undefined
       let baseContent: string | undefined
       try {
-        baseContent = await this.getUpstreamFile(basePath, upstreamBaseSha)
+        baseFile = await this.getUpstreamFileEntry(basePath, upstreamBaseSha)
+        baseContent = baseFile.content
       } catch (error) {
         if (!(error instanceof GitHubApiError) || error.status !== 404) throw error
       }
@@ -236,10 +238,7 @@ export class GitHubClient {
       }
       if (entry.status === 'renamed' && !entry.patch) {
         preservedTree.push({ path: entry.previousPath!, sha: null, mode: entry.mode })
-        blobs.push({
-          ...await createBlob({ path: entry.path, content: baseContent, encoding: 'utf-8' }),
-          mode: entry.mode,
-        })
+        blobs.push({ path: entry.path, sha: baseFile!.sha, mode: entry.mode })
         continue
       }
       const content = entry.patch ? applyUnifiedPatch(baseContent, entry.patch) : baseContent
@@ -497,16 +496,23 @@ export class GitHubClient {
     }
   }
 
-  async getUpstreamFile(path: string, ref = 'main'): Promise<string> {
+  private async getUpstreamFileEntry(
+    path: string,
+    ref = 'main',
+  ): Promise<{ content: string; sha: string }> {
     const encodedPath = path.split('/').map(segment => encodeURIComponent(segment)).join('/')
     const r = await this.fetch(
       `/repos/${this.opts.upstreamOwner}/${this.opts.upstreamRepo}/contents/${encodedPath}?ref=${encodeURIComponent(ref)}`,
     )
     if (!r.ok) throw new GitHubApiError(`contents failed: ${path}`, 'contents_failed', r.status)
-    const data = (await r.json()) as { content: string; encoding: string }
+    const data = (await r.json()) as { content: string; encoding: string; sha: string }
     if (data.encoding !== 'base64') {
       throw new GitHubApiError('unexpected encoding', 'contents_encoding', 500)
     }
-    return Buffer.from(data.content, 'base64').toString('utf-8')
+    return { content: Buffer.from(data.content, 'base64').toString('utf-8'), sha: data.sha }
+  }
+
+  async getUpstreamFile(path: string, ref = 'main'): Promise<string> {
+    return (await this.getUpstreamFileEntry(path, ref)).content
   }
 }

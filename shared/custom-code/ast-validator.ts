@@ -181,13 +181,18 @@ function validateCostAttributionShapes(
   }
   const visit = (node: ts.Node, insideCostAttribution = false): void => {
     if (ts.isObjectLiteralExpression(node) && !insideCostAttribution) {
-      const costsProperty = node.properties.find(
+      const costsProperties = node.properties.filter(
         property => getStaticPropertyName(property, constants) === 'costs',
       )
-      const attributionProperty = node.properties.find(
+      const attributionProperties = node.properties.filter(
         property => getStaticPropertyName(property, constants) === 'costAttribution',
       )
-      if (attributionProperty && !costsProperty) {
+      const costsProperty = costsProperties[0]
+      const attributionProperty = attributionProperties[0]
+      if (costsProperties.length > 1 || attributionProperties.length > 1) {
+        const { line } = sourceFile.getLineAndCharacterOfPosition(node.getStart(sourceFile))
+        errors.push(`line ${line + 1}: listener results must not contain duplicate costs or costAttribution`)
+      } else if (attributionProperty && !costsProperty) {
         const { line } = sourceFile.getLineAndCharacterOfPosition(node.getStart(sourceFile))
         errors.push(`line ${line + 1}: listener results with costAttribution must include costs`)
       } else if (costsProperty && attributionProperty) {
@@ -208,6 +213,16 @@ function validateCostAttributionShapes(
         const entryCosts = entryCostsProperty && propertyValue(entryCostsProperty)
         const costsDelta = costs && resourceDelta(costs)
         const entryCostsDelta = entryCosts && resourceDelta(entryCosts)
+        const sharedDynamicDelta = costs
+          && entryCosts
+          && ts.isIdentifier(costs)
+          && ts.isIdentifier(entryCosts)
+          && costs.text === entryCosts.text
+        const matchingCosts = sharedDynamicDelta || (
+          costsDelta !== undefined
+          && entryCostsDelta !== undefined
+          && equalResourceDeltas(costsDelta, entryCostsDelta)
+        )
         const validSource = source
           && ts.isIdentifier(source)
           && source.text === 'CARD_ID'
@@ -215,11 +230,9 @@ function validateCostAttributionShapes(
           && declaredCardId.length > 0
           && (expectedCardId === undefined || declaredCardId === expectedCardId)
         if (
-          !costsDelta
-          || !entry
+          !entry
           || !validSource
-          || !entryCostsDelta
-          || !equalResourceDeltas(costsDelta, entryCostsDelta)
+          || !matchingCosts
         ) {
           const { line } = sourceFile.getLineAndCharacterOfPosition(node.getStart(sourceFile))
           errors.push(`line ${line + 1}: costAttribution must contain one matching source entry`)

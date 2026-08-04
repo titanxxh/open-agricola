@@ -1075,7 +1075,7 @@ function AbilityPanel({
         errors: [reason instanceof Error ? reason.message : String(reason)],
       }
     }
-  }, [apiFetch])
+  }, [apiFetch, cardId])
 
   const sendMessages = useCallback(async (
     chatHistory: ChatMessage[],
