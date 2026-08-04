@@ -543,6 +543,8 @@ WorkshopPage
 | `POST /api/github/webhook` | GitHub App HMAC 验签；处理 review submitted/dismissed、PR synchronize/edited/converted-to-draft/closed，delivery 幂等 |
 | `POST /api/workshop/cards/:id/sandbox-pass` | 只记录当前精确发布版本且无运行错误的作者确认 |
 
+能力首次生成和重发都会附带当前卡牌上下文；`CARD_ID`、卡牌类型和名称必须保持一致，采用时由 Workshop Card 聚合再次校验，效果描述、费用、VP 与本地化等其余定义字段仍可随候选更新。
+
 每次能力源码验证都会把 isolated-vm 提取的 `CARD_DEF` 快照写入服务端 manifest；发布静态门禁会双向比较该快照与当前 `card_json` 的可交付字段，PR handoff 还必须存在已验证源码，避免沙盒运行、已发布定义与最终提交源码不一致。
 
 普通编辑只在切换阶段、站内离开或显式保存时创建检查点，不创建 Draft Version。刷新或崩溃恢复依赖同步写入的 localStorage 副本；同 revision 恢复为未同步状态，服务器 revision 已前进则要求用户选择整份服务器稿或整份本机稿。

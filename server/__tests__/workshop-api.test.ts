@@ -864,15 +864,78 @@ describe('workshop API', () => {
       expect(conflict.current.draft.name).toBe('Server wins')
     })
 
+    it('rejects an ability candidate that changes the current card identity', async () => {
+      const createRes = mockRes()
+      await handleWorkshopRoute(mockReq('POST', '/api/workshop/cards', {
+        card_id: 'CUSTOM_IdentityLocked',
+        card_type: 'minor',
+        name: 'Identity Locked',
+        card_json: {
+          id: 'CUSTOM_IdentityLocked',
+          name: 'Identity Locked',
+          card_type: 'minor',
+          deck: 'CUSTOM',
+          number: 0,
+          desc: ['Original effect.'],
+        },
+      }, 'tok-alice'), createRes)
+      const cardDbId = JSON.parse(createRes.body).id
+
+      const adoptRes = mockRes()
+      await handleWorkshopRoute(mockReq('POST', `/api/workshop/cards/${cardDbId}/adopt`, {
+        baseRevision: 1,
+        candidate: {
+          id: 'wrong-identity',
+          kind: 'ability',
+          prompt: 'regenerate the ability',
+          sourceCode: `
+const CARD_ID = 'CUSTOM_MasterCarpenter'
+const CARD_DEF = {
+  cardType: 'occupation',
+  meta: {
+    id: CARD_ID,
+    name: 'Master Carpenter',
+    deck: 'CUSTOM',
+    number: 0,
+    desc: ['Different effect.'],
+  },
+}
+const CARD_IMPL = {}
+          `.trim(),
+          createdAt: 100,
+        },
+      }, 'tok-alice'), adoptRes)
+
+      expect(adoptRes.statusCode).toBe(400)
+      expect(JSON.parse(adoptRes.body)).toMatchObject({
+        ok: false,
+        error: 'Ability candidate identity does not match current card',
+      })
+
+      const workspaceRes = mockRes()
+      await handleWorkshopRoute(
+        mockReq('GET', `/api/workshop/cards/${cardDbId}/workspace`, null, 'tok-alice'),
+        workspaceRes,
+      )
+      expect(JSON.parse(workspaceRes.body).workspace).toMatchObject({
+        revision: 1,
+        draft: {
+          cardId: 'CUSTOM_IdentityLocked',
+          cardType: 'minor',
+          name: 'Identity Locked',
+        },
+      })
+    })
+
     it('adopts factory-style ability card definitions', async () => {
       const createRes = mockRes()
       await handleWorkshopRoute(mockReq('POST', '/api/workshop/cards', {
         card_id: 'CUSTOM_FactoryWorkspace',
         card_type: 'minor',
-        name: 'Factory Workspace',
+        name: 'Factory Ability',
         card_json: {
           id: 'CUSTOM_FactoryWorkspace',
-          name: 'Factory Workspace',
+          name: 'Factory Ability',
           card_type: 'minor',
           deck: 'CUSTOM',
           number: 0,

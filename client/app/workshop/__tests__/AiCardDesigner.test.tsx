@@ -321,6 +321,77 @@ describe('AiCardDesigner AI config header', () => {
     expect(screen.queryByText('第一行能力')).not.toBeInTheDocument()
   })
 
+  it('keeps the current card context when resending an ability request', async () => {
+    localStorage.setItem(
+      'open-agricola-llm-config',
+      JSON.stringify({ provider: 'deepseek', apiKey: 'test', model: 'deepseek-v4-flash' }),
+    )
+    const card = {
+      ...existingCard,
+      card_json: {
+        ...existingCard.card_json,
+        _draft: { prerequisite: '2职业', costInput: '2木' },
+      },
+    }
+    const apiFetch = vi.fn(async (path: string) => {
+      if (path.includes('scope=mine')) {
+        return new Response(JSON.stringify({ ok: true, cards: [card] }))
+      }
+      return new Response(JSON.stringify({
+        ok: true,
+        workspace: {
+          ...JSON.parse(await apiFetchForExistingCard(path).then(response => response.text())).workspace,
+          draft: {
+            ...JSON.parse(await apiFetchForExistingCard(path).then(response => response.text())).workspace.draft,
+            cardJson: card.card_json,
+          },
+        },
+      }))
+    })
+    const providerBodies: Array<{ messages: Array<{ role: string; content: string }> }> = []
+    vi.stubGlobal('fetch', vi.fn(async (input: string | URL | Request, init?: RequestInit) => {
+      if (String(input) !== 'https://api.deepseek.com/v1/chat/completions') {
+        return new Response(null, { status: 404 })
+      }
+      providerBodies.push(JSON.parse(String(init?.body)))
+      const encoder = new TextEncoder()
+      return new Response(new ReadableStream({
+        start(controller) {
+          controller.enqueue(encoder.encode(
+            `data: ${JSON.stringify({ choices: [{ delta: { content: 'no code' } }] })}\n\ndata: [DONE]\n\n`,
+          ))
+          controller.close()
+        },
+      }))
+    }))
+
+    render(
+      <LocaleProvider>
+        <AiCardDesigner
+          initialCard={card}
+          onClose={() => {}}
+          apiFetch={apiFetch}
+        />
+      </LocaleProvider>,
+    )
+
+    await waitFor(() => expect(screen.queryByText('正在恢复草稿…')).not.toBeInTheDocument())
+    await userEvent.click(screen.getByRole('button', { name: /卡牌能力 对话、源码与验证/ }))
+    await userEvent.type(screen.getByPlaceholderText('描述你想要的卡牌效果…'), '重新生成能力')
+    await userEvent.click(screen.getByRole('button', { name: '生成能力候选' }))
+    await waitFor(() => expect(screen.getByRole('button', { name: '重发' })).toBeInTheDocument())
+    await userEvent.click(screen.getByRole('button', { name: '重发' }))
+    await waitFor(() => expect(providerBodies).toHaveLength(2))
+
+    const resent = providerBodies[1]!.messages.at(-1)!.content
+    expect(resent).toContain('卡牌 ID: CUSTOM_MedievalMallet')
+    expect(resent).toContain('卡牌类型: 小发展卡 (Minor Improvement)')
+    expect(resent).toContain('卡牌名称: 中世纪木槌')
+    expect(resent).toContain('前置条件: 2职业')
+    expect(resent).toContain('消耗资源: 2木')
+    expect(resent).toContain(existingCard.effect_code)
+  })
+
   it('restores the exact last art prompt and adopted ability source', async () => {
     localStorage.setItem(
       'open-agricola-llm-config-art',

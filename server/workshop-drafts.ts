@@ -516,6 +516,13 @@ export function adoptCandidate(
       ) {
         throw new WorkshopDraftError('not_ready', 'Ability candidate has not passed validation')
       }
+      if (
+        input.candidate.cardJson.id !== current.draft.cardId
+        || input.candidate.cardJson.card_type !== current.draft.cardType
+        || input.candidate.cardJson.name !== current.draft.name
+      ) {
+        throw new WorkshopDraftError('invalid', 'Ability candidate identity does not match current card')
+      }
       const cardJson = { ...input.candidate.cardJson }
       if (cardJson.locales === undefined && current.draft.cardJson.locales !== undefined) {
         cardJson.locales = current.draft.cardJson.locales
