@@ -132,6 +132,34 @@ describe('ast-validator: CARD_IMPL hook/phase whitelisting', () => {
     expect(result.valid).toBe(true)
   })
 
+  it.each([
+    'null',
+    '{}',
+    '[]',
+    "[{ sourceCard: CARD_ID, costs: { reed: -1 } }]",
+    "[{ sourceCard: '', costs: { wood: -2 } }]",
+  ])('rejects invalid or mismatched cost attribution: %s', (costAttribution) => {
+    const result = validateCardCode(`
+      const CARD_ID = 'CUSTOM_Test'
+      const CARD_IMPL = {
+        listeners: [{
+          actions: ['construct'],
+          phases: ['computeCosts'],
+          handler: () => ({
+            costs: { wood: -2 },
+            costAttribution: ${costAttribution},
+            sourceCard: CARD_ID,
+          }),
+        }],
+      }
+    `)
+
+    expect(result.valid).toBe(false)
+    expect(result.valid === false && result.errors.some(
+      error => error.includes('costAttribution must contain one matching source entry'),
+    )).toBe(true)
+  })
+
   it('rejects unknown listener actions', () => {
     const code = `
       const CARD_IMPL = {

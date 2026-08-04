@@ -211,6 +211,7 @@ type StubOpts = {
   githubLogin: string
   /** If given and open, findOpenPr returns this PR; openPr call should NOT happen. */
   existingPr?: StubPr | null
+  existingPrFiles?: Array<{ filename: string; status: string; sha: string }>
   /** Used when openPr is invoked. */
   openedPr?: { number: number; url: string }
 }
@@ -223,13 +224,14 @@ type StubCounts = {
   blobCalls: number
   commitCalls: number
   treeCalls: number
+  treeEntries: Array<Array<{ path: string; sha: string | null }>>
 }
 
 function createGitHubApiStub(opts: StubOpts): {
   fn: (url: string, init?: RequestInit) => Promise<Response>
   counts: StubCounts
 } {
-  const { githubLogin, existingPr = null, openedPr } = opts
+  const { githubLogin, existingPr = null, existingPrFiles = [], openedPr } = opts
   const upstream = `${workshopPrConfig.upstreamOwner}/${workshopPrConfig.upstreamRepo}`
   const counts: StubCounts = {
     openPrCalls: 0,
@@ -239,6 +241,7 @@ function createGitHubApiStub(opts: StubOpts): {
     blobCalls: 0,
     commitCalls: 0,
     treeCalls: 0,
+    treeEntries: [],
   }
 
   const fn = (url: string, init?: RequestInit): Promise<Response> => {
@@ -326,6 +329,9 @@ function createGitHubApiStub(opts: StubOpts): {
     // Tree create
     if (url.includes('/git/trees') && method === 'POST') {
       counts.treeCalls++
+      counts.treeEntries.push((JSON.parse(String(init?.body)) as {
+        tree: Array<{ path: string; sha: string | null }>
+      }).tree)
       return Promise.resolve(
         new Response(JSON.stringify({ sha: 'tree_sha' }), { status: 201 }),
       )
@@ -380,6 +386,10 @@ function createGitHubApiStub(opts: StubOpts): {
           { status: 200 },
         ),
       )
+    }
+
+    if (url.match(/\/pulls\/\d+\/files/) && method === 'GET') {
+      return Promise.resolve(new Response(JSON.stringify(existingPrFiles), { status: 200 }))
     }
 
     if (url.match(/\/pulls\/\d+$/) && method === 'PATCH') {
@@ -906,6 +916,11 @@ describe('workshop PR propose — session', () => {
         number: 99,
         url: 'https://github.com/titanxxh/open-agricola/pull/99',
       },
+      existingPrFiles: [{
+        filename: 'server/__tests__/CUSTOM_TestCard-session.test.ts',
+        status: 'added',
+        sha: 'behavior-test-sha',
+      }],
     })
     vi.stubGlobal('fetch', gh)
 
@@ -932,6 +947,11 @@ describe('workshop PR propose — session', () => {
     expect(counts.openPrCalls).toBe(0)
     // Commits still happen (V1 + V2).
     expect(counts.commitCalls).toBe(2)
+    expect(counts.treeEntries).toHaveLength(2)
+    expect(counts.treeEntries.every(entries => entries.some(entry => (
+      entry.path === 'server/__tests__/CUSTOM_TestCard-session.test.ts'
+      && entry.sha === 'behavior-test-sha'
+    )))).toBe(true)
 
     // github_pr_url sticks to pull/99.
     const row = db

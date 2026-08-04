@@ -169,6 +169,64 @@ describe('GitHubClient', () => {
       expect(treeBody?.base_tree).toBe('fixed-base')
       expect(commitBody?.parents).toEqual(['fixed-base'])
     })
+
+    it('preserves non-generated tree entries while generated files replace matching paths', async () => {
+      let treeBody: {
+        tree?: Array<{ path: string; sha: string | null }>
+      } | null = null
+      fetchHandler = (url, init) => {
+        if (url.includes('/git/blobs') && init?.method === 'POST') return okJson({ sha: 'new-card' })
+        if (url.includes('/git/trees') && init?.method === 'POST') {
+          treeBody = JSON.parse(init.body as string) as typeof treeBody
+          return okJson({ sha: 'treesha' })
+        }
+        if (url.includes('/git/commits') && init?.method === 'POST') return okJson({ sha: 'commitsha' })
+        return new Response('', { status: 404 })
+      }
+      const c = new GitHubClient({
+        token: 't',
+        upstreamOwner: 'titanxxh',
+        upstreamRepo: 'open-agricola',
+      })
+      await c.createCommit({
+        forkOwner: 'alice',
+        files: [{ path: 'card.ts', content: 'new', encoding: 'utf-8' }],
+        preservedTreeEntries: [
+          { path: 'card.ts', sha: 'old-card' },
+          { path: 'server/__tests__/CUSTOM_Test-session.test.ts', sha: 'behavior-test' },
+        ],
+        message: 'test commit',
+        author: { name: 'alice', email: 'a@users.noreply.github.com' },
+        upstreamBaseSha: 'fixed-base',
+      })
+
+      expect(treeBody?.tree).toEqual([
+        { path: 'server/__tests__/CUSTOM_Test-session.test.ts', mode: '100644', type: 'blob', sha: 'behavior-test' },
+        { path: 'card.ts', mode: '100644', type: 'blob', sha: 'new-card' },
+      ])
+    })
+  })
+
+  describe('getPullRequestTreeEntries', () => {
+    it('maps added, removed, and renamed files to reusable tree entries', async () => {
+      fetchHandler = () => okJson([
+        { filename: 'server/__tests__/A.test.ts', status: 'added', sha: 'added-sha' },
+        { filename: 'old.txt', status: 'removed', sha: 'old-sha' },
+        { filename: 'new.txt', previous_filename: 'before.txt', status: 'renamed', sha: 'new-sha' },
+      ])
+      const c = new GitHubClient({
+        token: 't',
+        upstreamOwner: 'titanxxh',
+        upstreamRepo: 'open-agricola',
+      })
+
+      await expect(c.getPullRequestTreeEntries(42)).resolves.toEqual([
+        { path: 'server/__tests__/A.test.ts', sha: 'added-sha' },
+        { path: 'old.txt', sha: null },
+        { path: 'before.txt', sha: null },
+        { path: 'new.txt', sha: 'new-sha' },
+      ])
+    })
   })
 
   describe('upsertBranch', () => {

@@ -18,6 +18,7 @@ export class GitHubApiError extends Error {
 }
 
 type CommitFile = { path: string; content: string; encoding: 'utf-8' | 'base64' }
+type CommitTreeEntry = { path: string; sha: string | null }
 
 export class GitHubClient {
   private readonly opts: ClientOpts
@@ -80,6 +81,7 @@ export class GitHubClient {
     message: string
     author: { name: string; email: string }
     upstreamBaseSha?: string
+    preservedTreeEntries?: CommitTreeEntry[]
   }): Promise<{ commitSha: string; upstreamBaseSha: string }> {
     const { forkOwner, files, message, author } = opts
     const repo = this.opts.upstreamRepo
@@ -103,7 +105,12 @@ export class GitHubClient {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         base_tree: upstreamBaseSha,
-        tree: blobs.map((b) => ({ path: b.path, mode: '100644', type: 'blob', sha: b.sha })),
+        tree: [
+          ...(opts.preservedTreeEntries ?? [])
+            .filter(entry => !blobs.some(blob => blob.path === entry.path))
+            .map(entry => ({ ...entry, mode: '100644', type: 'blob' })),
+          ...blobs.map((b) => ({ path: b.path, mode: '100644', type: 'blob', sha: b.sha })),
+        ],
       }),
     })
     if (!treeResp.ok) throw new GitHubApiError('tree failed', 'tree_failed', treeResp.status)
@@ -200,6 +207,25 @@ export class GitHubClient {
       baseRefName: pr.base.ref,
       isDraft: pr.draft,
     }
+  }
+
+  async getPullRequestTreeEntries(prNumber: number): Promise<CommitTreeEntry[]> {
+    const r = await this.fetch(
+      `/repos/${this.opts.upstreamOwner}/${this.opts.upstreamRepo}/pulls/${prNumber}/files?per_page=100`,
+    )
+    if (!r.ok) throw new GitHubApiError('pr files lookup failed', 'pr_files_lookup_failed', r.status)
+    const files = (await r.json()) as Array<{
+      filename: string
+      previous_filename?: string
+      status: string
+      sha: string
+    }>
+    return files.flatMap((file) => [
+      ...(file.status === 'renamed' && file.previous_filename
+        ? [{ path: file.previous_filename, sha: null }]
+        : []),
+      { path: file.filename, sha: file.status === 'removed' ? null : file.sha },
+    ])
   }
 
   async openPr(opts: {

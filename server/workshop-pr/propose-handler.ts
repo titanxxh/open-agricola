@@ -319,6 +319,14 @@ export async function handleSubmitReviewRequest(
     }
 
     const branchName = `workshop/${wcard.card_id}`
+    let pr = await client.findOpenPr({ forkOwner: githubLogin, branchName })
+    if (pr && (pr.baseRefName !== 'main' || pr.isDraft)) {
+      await client.closePr(pr.number)
+      pr = null
+    }
+    const preservedTreeEntries = pr
+      ? await client.getPullRequestTreeEntries(pr.number)
+      : []
 
     // V1 commit with placeholder PR number (0) — lets us open the PR first
     const filesV1 = await generatePrFiles({
@@ -339,6 +347,7 @@ export async function handleSubmitReviewRequest(
         email: `${githubLogin}@users.noreply.github.com`,
       },
       upstreamBaseSha,
+      preservedTreeEntries,
     })
     await client.upsertBranch({
       forkOwner: githubLogin,
@@ -347,11 +356,6 @@ export async function handleSubmitReviewRequest(
     })
 
     // Find or open PR
-    let pr = await client.findOpenPr({ forkOwner: githubLogin, branchName })
-    if (pr && (pr.baseRefName !== 'main' || pr.isDraft)) {
-      await client.closePr(pr.number)
-      pr = null
-    }
     if (!pr) {
       pr = await client.openPr({
         forkOwner: githubLogin,
@@ -385,6 +389,7 @@ export async function handleSubmitReviewRequest(
         email: `${githubLogin}@users.noreply.github.com`,
       },
       upstreamBaseSha,
+      preservedTreeEntries,
     })
     await client.upsertBranch({
       forkOwner: githubLogin,

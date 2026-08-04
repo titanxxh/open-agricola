@@ -81,6 +81,65 @@ export function findMissingCostAttributionLines(source: string): number[] {
   return lines
 }
 
+function validateCostAttributionShapes(
+  sourceFile: ts.SourceFile,
+  errors: string[],
+): void {
+  const propertyName = (property: ts.ObjectLiteralElementLike): string | undefined => {
+    if (!property.name) return undefined
+    if (ts.isIdentifier(property.name) || ts.isStringLiteral(property.name)) return property.name.text
+    return undefined
+  }
+  const propertyValue = (property: ts.ObjectLiteralElementLike): ts.Expression | undefined => {
+    if (ts.isPropertyAssignment(property)) return property.initializer
+    if (ts.isShorthandPropertyAssignment(property)) return property.name
+    return undefined
+  }
+  const expressionText = (expression: ts.Expression): string => (
+    expression.getText(sourceFile).replace(/\s+/g, '')
+  )
+  const visit = (node: ts.Node, insideCostAttribution = false): void => {
+    if (ts.isObjectLiteralExpression(node) && !insideCostAttribution) {
+      const costsProperty = node.properties.find(property => propertyName(property) === 'costs')
+      const attributionProperty = node.properties.find(
+        property => propertyName(property) === 'costAttribution',
+      )
+      if (costsProperty && attributionProperty) {
+        const costs = propertyValue(costsProperty)
+        const attribution = propertyValue(attributionProperty)
+        const entry = attribution && ts.isArrayLiteralExpression(attribution)
+          && attribution.elements.length === 1
+          && ts.isObjectLiteralExpression(attribution.elements[0])
+          ? attribution.elements[0]
+          : undefined
+        const sourceProperty = entry?.properties.find(property => propertyName(property) === 'sourceCard')
+        const entryCostsProperty = entry?.properties.find(property => propertyName(property) === 'costs')
+        const source = sourceProperty && propertyValue(sourceProperty)
+        const entryCosts = entryCostsProperty && propertyValue(entryCostsProperty)
+        const validSource = source && (
+          ts.isIdentifier(source)
+          || (ts.isStringLiteral(source) && source.text.trim().length > 0)
+        )
+        if (
+          !costs
+          || !entry
+          || !validSource
+          || !entryCosts
+          || expressionText(costs) !== expressionText(entryCosts)
+        ) {
+          const { line } = sourceFile.getLineAndCharacterOfPosition(node.getStart(sourceFile))
+          errors.push(`line ${line + 1}: costAttribution must contain one matching source entry`)
+        }
+      }
+    }
+    const entersCostAttribution = ts.isPropertyAssignment(node)
+      && (ts.isIdentifier(node.name) || ts.isStringLiteral(node.name))
+      && node.name.text === 'costAttribution'
+    ts.forEachChild(node, child => visit(child, insideCostAttribution || entersCostAttribution))
+  }
+  visit(sourceFile)
+}
+
 export function validateCardCode(source: string): ValidationResult {
   const sourceFile = ts.createSourceFile(
     'card.ts', source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS,
@@ -196,6 +255,7 @@ export function validateCardCode(source: string): ValidationResult {
 
   // Validate CARD_IMPL hook/listener whitelists
   validateCardImplHooksAndPhases(sourceFile, errors)
+  validateCostAttributionShapes(sourceFile, errors)
   for (const line of findMissingCostAttributionLines(source)) {
     errors.push(`line ${line}: listener results with costs must include costAttribution`)
   }
