@@ -37,6 +37,8 @@ export type CardMeta = {
   returnCards?: string[]
   alsoCountsAs?: string[]
   enablesPalisades?: boolean
+  artUrl?: string
+  locales?: Record<string, { name: string; desc: string[]; prerequisite?: string }>
 }
 
 export type CardManifestEntry = {
@@ -106,6 +108,8 @@ const customCardToMeta = ({ cardJson: card, cardType }: CustomCardMetadata): Car
   passing: card.passing,
   returnCards: card.returnCards,
   alsoCountsAs: card.alsoCountsAs,
+  artUrl: card.artUrl,
+  locales: card.locales,
 })
 
 const getCustomCardMeta = (id: string): CardMeta | undefined => {

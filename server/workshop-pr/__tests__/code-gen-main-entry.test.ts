@@ -76,6 +76,10 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     expect(files).toHaveLength(6)
     expect(files[5]!.path).toBe('public/card-art/community/CUSTOM_Foo.webp')
     expect(files[5]!.encoding).toBe('base64')
+    const cardFile = files.find((file) => file.path === 'shared/cards/community/CUSTOM_Foo.ts')!
+    const catalogFile = files.find((file) => file.path === 'shared/cards/catalog.generated.ts')!
+    expect(cardFile.content).toContain('artUrl: "/card-art/community/CUSTOM_Foo.webp"')
+    expect(catalogFile.content).toContain('"artUrl": "/card-art/community/CUSTOM_Foo.webp"')
   })
 
   it('uses card name from card_json in community_cards.md patch', async () => {
