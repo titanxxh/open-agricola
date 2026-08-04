@@ -273,7 +273,14 @@ function validateEffectKeys(
   getLine: (node: ts.Node) => number,
 ): void {
   for (const prop of effectObj.properties) {
-    if (ts.isSpreadAssignment(prop)) continue
+    if (ts.isSpreadAssignment(prop)) {
+      errors.push(`line ${getLine(prop)}: CARD_IMPL.effect must not use spread properties`)
+      continue
+    }
+    if (ts.isComputedPropertyName(prop.name)) {
+      errors.push(`line ${getLine(prop)}: CARD_IMPL.effect properties must not use computed names`)
+      continue
+    }
     if (!ts.isPropertyAssignment(prop) && !ts.isMethodDeclaration(prop) && !ts.isShorthandPropertyAssignment(prop)) continue
     const name = prop.name && ts.isIdentifier(prop.name)
       ? prop.name.text

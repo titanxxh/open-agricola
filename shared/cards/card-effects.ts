@@ -141,11 +141,12 @@ export const flowCardEffectHooks: FlowCardEffectHook[] = [
   'onAllWorkersPlaced',
 ]
 
-export type HandCardEffectHook = Exclude<FlowCardEffectHook, 'onBuy' | 'onEndTurn'>
+export type HandCardEffectHook = Exclude<FlowCardEffectHook, 'onBuy' | 'onEndTurn' | 'onBeforeEndGame'>
 
 export const isHandCardEffectHook = (hook: string): hook is HandCardEffectHook =>
   hook !== 'onBuy' &&
   hook !== 'onEndTurn' &&
+  hook !== 'onBeforeEndGame' &&
   flowCardEffectHooks.includes(hook as FlowCardEffectHook)
 
 /**

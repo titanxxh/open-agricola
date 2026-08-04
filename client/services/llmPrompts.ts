@@ -192,7 +192,7 @@ const CARD_IMPL = {
 }
 \`\`\`
 
-\`handHooks\` 只接受会从手牌派发的 stage hook；不支持 \`onBuy\`、\`onEndTurn\`、\`onBeforePlayerTurn\`。
+\`handHooks\` 只接受会从手牌派发的 stage hook；不支持 \`onBuy\`、\`onEndTurn\`、\`onBeforeEndGame\`、\`onBeforePlayerTurn\`。
 
 ## effect 阶段 hook
 
