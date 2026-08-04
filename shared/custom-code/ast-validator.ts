@@ -246,16 +246,20 @@ function validateCardImplObject(
       errors.push(`line ${getLine(prop)}: CARD_IMPL properties must not set __proto__`)
       continue
     }
+    if (propName === 'effect') {
+      if (!ts.isPropertyAssignment(prop) || !ts.isObjectLiteralExpression(prop.initializer)) {
+        errors.push(`line ${getLine(prop)}: CARD_IMPL.effect must be an object literal`)
+      } else {
+        validateEffectKeys(prop.initializer, errors, getLine)
+      }
+      continue
+    }
     if (propName === 'listeners' && !ts.isPropertyAssignment(prop)) {
       errors.push(`line ${getLine(prop)}: CARD_IMPL.listeners must use a property assignment`)
       continue
     }
     if (!ts.isPropertyAssignment(prop)) continue
     if (!propName) continue
-
-    if (propName === 'effect' && ts.isObjectLiteralExpression(prop.initializer)) {
-      validateEffectKeys(prop.initializer, errors, getLine)
-    }
 
     if (propName === 'listeners') {
       if (!ts.isArrayLiteralExpression(prop.initializer)) {

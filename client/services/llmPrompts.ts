@@ -193,6 +193,7 @@ const CARD_IMPL = {
 \`\`\`
 
 \`handHooks\` 只接受会从手牌派发的 stage hook；不支持 \`onBuy\`、\`onEndTurn\`、\`onBeforeEndGame\`、\`onBeforePlayerTurn\`。
+\`CARD_IMPL.effect\` 必须直接写对象字面量，禁止引用变量、spread 和 computed key，确保所有 hook 与 meta 字段都经过静态校验。
 
 ## effect 阶段 hook
 
