@@ -193,10 +193,8 @@ const jsonSafe = JSON.parse(JSON.stringify(value ?? null))
 - `computeExtraRoomCapacity`
 - `computeHarvestBreedOrderPriority`
 - `onComputeAnimalZones`
-- `onComputeSowableFields`
 - `computeLockedFarmTiles`
 - `getInvalidAnimals`
-- `getSpecialStablePositions`
 - `getBuiltSpecialStables`
 <!-- prompt-sync:end id=card-effect-hooks -->
 
@@ -222,15 +220,13 @@ reaction-compatible hook（action listener 的 `before` / `during` / `immediatel
 | `resolveChoice`                              | `(state, player, choice) => ActionFlow`                           | 处理玩家选择；沙盒不传 `ctx`                                  |
 | `computeExtraRoomCapacity`                   | `(player) => number`                                              | 额外容纳空间                                              |
 | `computeHarvestBreedOrderPriority`           | `(state, player) => number \| void`                               | Harvest breeding phase 顺序调整，数字越大越晚                         |
-| `onComputeAnimalZones`                       | `(player, zones, state) => AnimalZone[]`                          | 必须返回新数组；原地修改 JSON 快照 `zones` 无效                        |
-| `onComputeSowableFields`                     | `(player) => ExtraSowableField[]`                                 | 返回额外可播种田                                            |
+| `onComputeAnimalZones`                       | `(player, zones, state) => AnimalZone[]`                          | 只返回新增 zones；不要拼接传入的 `zones`；原地修改 JSON 快照无效             |
 | `computeLockedFarmTiles`                     | `(player) => FarmTilePosition[]`                                  | 田地锁定                                                |
 | `getInvalidAnimals`                          | `(player, zone, meeples) => Meeple[]`                             | 卡牌专属动物分区禁入校验；沙盒不传 `state`                           |
-| `getSpecialStablePositions`                  | `(state, player) => FarmTilePosition[]`                           | Build Stables 特殊 stable 候选                            |
 | `getBuiltSpecialStables`                     | `(player) => FarmTilePosition[]`                                | 当前矗立的特殊 stable（驱动 snapshot `specialStables` 展示派生）    |
-| `handHooks`（meta）                            | `CardEffectHook[]`                                               | 声明哪些 hook 在卡牌还在手牌时也触发                               |
+| `handHooks`（meta）                            | `HandCardEffectHook[]`                                           | 声明哪些 stage hook 在卡牌还在手牌时也触发                          |
 
-`onSowExtraField` 与 `applySpecialStable` 的官方卡契约依赖原地修改宿主 `player`；沙盒输入是 JSON 快照，修改无法回传，因此 Workshop 不暴露这两个 hook。
+额外播种与特殊 stable 都是“候选 + 结算”成对契约：`onComputeSowableFields` / `onSowExtraField`、`getSpecialStablePositions` / `applySpecialStable`。结算 hook 依赖原地修改宿主对象，沙盒的 JSON 快照无法回传，因此 Workshop 不暴露这两对 hook。`handHooks` 不支持 `onBuy`、`onEndTurn`、`onBeforePlayerTurn`。
 
 > 围栏折扣（E16 BriarHedge / C16 FieldFences）现走 listener `computeCosts` phase（actions: `['fence']`）；详见 ARCHITECTURE.md §15.7。
 >
@@ -716,7 +712,7 @@ CI 会拦下漏改的情况。
 
 | 日期         | 变更                                                                                                                                                                                                                                                                                                                               |
 | ---------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 2026-08-04 | 修正跨全部改良候选折扣为 mandatory capped bonus；补齐 `handHooks` manifest、`positionKey({row,col})`，移除依赖宿主 mutation 的 Workshop hook；新增语义 contract 与 M11 live/record/replay 守卫。 |
+| 2026-08-04 | 修正跨全部改良候选折扣为 mandatory capped bonus；补齐并收窄 `handHooks` manifest、`positionKey({row,col})`，移除无法完整结算的 Workshop candidate/settlement hook；新增语义 contract 与 M11 live/record/replay 守卫。 |
 | 2026-04-30 | 双轨 scoring hook 重构：删除 `computePostScore` / `scoringPriority` / `ctx.reserved`；新增 `computeCostedBonus` 走 Pareto 求解器。详见 `(spec/plan 已归档，见 git history)`。|
 | 2026-04-24 | 修正 `computeBonusScore` / `computePostScore` / `computeSharedPostScore` 签名（实为 `=> number` / `=> Array<{playerId,score}>`，非 `{score,label}`）；新增 §5.5 listener `actions:` 高频踩坑（不含空间 ID、`harvest-feed` 不可监听）、§5.6 anytime 写法、§5.7 `futureMeeplesNode` 不在沙箱；登记 `flag-card` / `future-meeples` actionId。来源：LLM card-gen session 测试套件实测 |
 | 2026-04-22 | 全面重写：`registerCardEffect`/`registerCardListener` → `CARD_DEF`/`CARD_IMPL` 双常量；注入 helper 函数；扩展 hook 白名单至全部 CardEffectField；扩展 phase 白名单增加 `anytime`/`computeChoiceCandidates`；AST validator hard-fail；4 个新 actionId                                                                                                               |

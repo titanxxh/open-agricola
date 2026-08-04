@@ -141,6 +141,13 @@ export const flowCardEffectHooks: FlowCardEffectHook[] = [
   'onAllWorkersPlaced',
 ]
 
+export type HandCardEffectHook = Exclude<FlowCardEffectHook, 'onBuy' | 'onEndTurn'>
+
+export const isHandCardEffectHook = (hook: string): hook is HandCardEffectHook =>
+  hook !== 'onBuy' &&
+  hook !== 'onEndTurn' &&
+  flowCardEffectHooks.includes(hook as FlowCardEffectHook)
+
 /**
  * Function-type fields on CardEffect addressable by the custom-code executor.
  * `cardEffectHooks` below is the actual sandbox allowlist; this wider union also
@@ -193,10 +200,8 @@ export const cardEffectHooks: CardEffectField[] = [
   'computeExtraRoomCapacity',
   'computeHarvestBreedOrderPriority',
   'onComputeAnimalZones',
-  'onComputeSowableFields',
   'computeLockedFarmTiles',
   'getInvalidAnimals',
-  'getSpecialStablePositions',
   'getBuiltSpecialStables',
 ]
 
@@ -380,7 +385,7 @@ export type CardEffect = {
    * so there is no overlap — once a card is played it moves out of the hand arrays
    * and into the played arrays, and only the normal hook path applies.
    */
-  handHooks?: CardEffectHook[]
+  handHooks?: HandCardEffectHook[]
   beforeEndGameScope?: BeforeEndGameScope
   beforeEndGameMandatory?: boolean
 }

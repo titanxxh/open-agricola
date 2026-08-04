@@ -245,8 +245,29 @@ describe('ast-validator: CARD_IMPL hook/phase whitelisting', () => {
     expect(result.valid).toBe(true)
   })
 
-  it('rejects sandbox hooks whose effects require host-object mutation', () => {
-    for (const hook of ['onSowExtraField', 'applySpecialStable']) {
+  it('rejects handHooks that are not dispatched from cards in hand', () => {
+    for (const hook of ['onBuy', 'onEndTurn', 'onBeforePlayerTurn']) {
+      const result = validateCardCode(`
+        const CARD_IMPL = {
+          effect: {
+            id: 'test',
+            handHooks: ['${hook}'],
+            ${hook}: () => {},
+          },
+        }
+      `)
+      expect(result.valid).toBe(false)
+      expect(result.valid === false && result.errors.some(e => e.includes(`unsupported hand hook '${hook}'`))).toBe(true)
+    }
+  })
+
+  it('rejects sandbox candidate and settlement hooks that cannot complete across the JSON boundary', () => {
+    for (const hook of [
+      'onComputeSowableFields',
+      'onSowExtraField',
+      'getSpecialStablePositions',
+      'applySpecialStable',
+    ]) {
       const result = validateCardCode(`
         const CARD_IMPL = {
           effect: {

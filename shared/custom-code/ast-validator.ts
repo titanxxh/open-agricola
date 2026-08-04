@@ -9,7 +9,7 @@
  * (separate V8 heap, no prototype chain escapes possible).
  */
 import ts from 'typescript'
-import { cardEffectHooks } from '../cards/card-effects'
+import { cardEffectHooks, isHandCardEffectHook } from '../cards/card-effects'
 import { isSandboxListenerAction } from './sandbox-listener-actions'
 import { sandboxListenerPhases } from './sandbox-listener-phases'
 
@@ -281,6 +281,18 @@ function validateEffectKeys(
     if (!name) continue
     if (!ALLOWED_EFFECT_KEYS.has(name)) {
       errors.push(`line ${getLine(prop)}: unknown effect hook '${name}' in CARD_IMPL.effect`)
+    }
+    if (name !== 'handHooks') continue
+    if (!ts.isPropertyAssignment(prop) || !ts.isArrayLiteralExpression(prop.initializer)) {
+      errors.push(`line ${getLine(prop)}: handHooks must be a string literal array`)
+      continue
+    }
+    for (const hook of prop.initializer.elements) {
+      if (!ts.isStringLiteral(hook)) {
+        errors.push(`line ${getLine(hook)}: handHooks must contain only string literals`)
+      } else if (!isHandCardEffectHook(hook.text)) {
+        errors.push(`line ${getLine(hook)}: unsupported hand hook '${hook.text}' in CARD_IMPL.effect`)
+      }
     }
   }
 }

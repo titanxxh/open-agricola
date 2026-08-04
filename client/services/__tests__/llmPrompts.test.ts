@@ -59,11 +59,23 @@ describe('CARD_DESIGNER_SYSTEM_PROMPT', () => {
   })
 
   it('documents only sandbox hooks whose return values can cross the JSON boundary', () => {
-    expect(CARD_DESIGNER_SYSTEM_PROMPT).not.toContain('| `onSowExtraField` |')
-    expect(CARD_DESIGNER_SYSTEM_PROMPT).not.toContain('| `applySpecialStable` |')
+    for (const hook of [
+      'onComputeSowableFields',
+      'onSowExtraField',
+      'getSpecialStablePositions',
+      'applySpecialStable',
+    ]) {
+      expect(CARD_DESIGNER_SYSTEM_PROMPT).not.toContain(`| \`${hook}\` |`)
+    }
     expect(CARD_DESIGNER_SYSTEM_PROMPT).toContain('(player, zones, state) => AnimalZone[]')
-    expect(CARD_DESIGNER_SYSTEM_PROMPT).toContain('必须返回新数组；原地修改 zones 无效')
+    expect(CARD_DESIGNER_SYSTEM_PROMPT).toContain('只返回新增 zones')
+    expect(CARD_DESIGNER_SYSTEM_PROMPT).toContain('不要拼接传入的 zones')
     expect(CARD_DESIGNER_SYSTEM_PROMPT).toContain('(state, player, choice) => ActionFlow')
+  })
+
+  it('limits handHooks to hooks dispatched from cards in hand', () => {
+    expect(CARD_DESIGNER_SYSTEM_PROMPT).toContain('HandCardEffectHook[]')
+    expect(CARD_DESIGNER_SYSTEM_PROMPT).toContain('不支持 `onBuy`、`onEndTurn`、`onBeforePlayerTurn`')
   })
 
   it('documents the runtime farm-position shape', () => {

@@ -55,7 +55,7 @@ function renderAdvancedHookTable(): string {
   }
   // meta 字段（非 hook，不在真相源数组），手写附录
   const metaRows = [
-    { name: 'handHooks (meta)', sig: 'CardEffectHook[]', use: '声明手牌时也触发的 hook' },
+    { name: 'handHooks (meta)', sig: 'HandCardEffectHook[]', use: '声明手牌时也触发的 stage hook' },
     { name: 'beforeEndGameScope (meta)', sig: "'owner' | 'allPlayers'", use: '终局前按 target player 分发 onBeforeEndGame' },
     { name: 'beforeEndGameMandatory (meta)', sig: 'boolean', use: 'select trigger 可用时是否禁用 pass' },
   ]
@@ -191,6 +191,8 @@ const CARD_IMPL = {
   ],
 }
 \`\`\`
+
+\`handHooks\` 只接受会从手牌派发的 stage hook；不支持 \`onBuy\`、\`onEndTurn\`、\`onBeforePlayerTurn\`。
 
 ## effect 阶段 hook
 
