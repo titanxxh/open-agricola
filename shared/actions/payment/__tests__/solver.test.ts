@@ -80,6 +80,40 @@ describe('PaymentSolver', () => {
       expect(options[0]?.resourcesPaid.reed ?? 0).toBe(0)
       expect(options[0]?.resourcesPaid.clay).toBe(1)
       expect(options[0]?.bonusUsed).toBe('C014_StrawThatchedRoof')
+      expect(options[0]?.bonusReductions).toEqual({
+        C014_StrawThatchedRoof: { reed: 1_000_000 },
+      })
+    })
+
+    it('does not let a later mandatory bonus reintroduce a removed resource', () => {
+      const player = makePlayerWithResources({ food: 2, reed: 0, stone: 2 })
+      player.activeModifiers = [{
+        type: 'remove-resource',
+        cardId: 'C014_StrawThatchedRoof',
+        appliesTo: ['renovation'],
+        resources: ['reed'],
+      }]
+
+      const options = PaymentSolver.computeOptions(
+        makeState(player),
+        0,
+        {
+          fee: { reed: 1, stone: 2 },
+          bonuses: [{
+            discount: { food: -2, reed: -1 },
+            optional: false,
+            sources: ['D013_Trowel'],
+          }],
+        },
+        { ...ctx, costType: 'renovation' },
+      )
+
+      expect(options).toHaveLength(1)
+      expect(options[0]?.resourcesPaid).toMatchObject({ food: 2, stone: 2 })
+      expect(options[0]?.resourcesPaid.reed ?? 0).toBe(0)
+      expect(options[0]?.bonusReductions).toMatchObject({
+        C014_StrawThatchedRoof: { reed: 2 },
+      })
     })
 
     it('merges required returned-card cost into resourcesPaid and executes supply token payment', () => {
