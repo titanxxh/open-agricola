@@ -142,10 +142,9 @@ export const flowCardEffectHooks: FlowCardEffectHook[] = [
 ]
 
 /**
- * All function-type fields on CardEffect that the custom-card sandbox is allowed
- * to define.  This is a superset of CardEffectHook: it also includes hooks with
- * non-standard signatures (scoring, animal zones, sowing, etc.) that cannot be
- * invoked via the generic `runCardEffectHook()` path.
+ * Function-type fields on CardEffect addressable by the custom-code executor.
+ * `cardEffectHooks` below is the actual sandbox allowlist; this wider union also
+ * retains official-only fields used by shared invocation types.
  *
  * `handHooks` (meta-field) and engine-internal adjuncts such as
  * `countExtraTurns` are deliberately excluded.
@@ -195,11 +194,9 @@ export const cardEffectHooks: CardEffectField[] = [
   'computeHarvestBreedOrderPriority',
   'onComputeAnimalZones',
   'onComputeSowableFields',
-  'onSowExtraField',
   'computeLockedFarmTiles',
   'getInvalidAnimals',
   'getSpecialStablePositions',
-  'applySpecialStable',
   'getBuiltSpecialStables',
 ]
 

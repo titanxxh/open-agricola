@@ -10,7 +10,7 @@
  * integration because (a) each example's hook semantics are documented in markdown,
  * not formal expected-output, (b) validateAndCompileCustomCode already exercises
  * sandbox + manifest extraction, (c) full session play would require crafting
- * per-example triggerHook fixtures (out of scope — that's the M1..M9 fixture
+ * per-example scenario fixtures (out of scope — that's the M1..M11 fixture
  * suite's job).
  */
 

@@ -136,6 +136,9 @@ function runManifestExtraction(compiledCode: string, cardId: string): {
       if (eff.beforeEndGameScope === 'owner' || eff.beforeEndGameScope === 'allPlayers') {
         __effectMetadata.beforeEndGameScope = eff.beforeEndGameScope;
       }
+      if (Array.isArray(eff.handHooks)) {
+        __effectMetadata.handHooks = eff.handHooks.filter(function(x) { return typeof x === 'string'; });
+      }
       if (typeof eff.beforeEndGameMandatory === 'boolean') {
         __effectMetadata.beforeEndGameMandatory = eff.beforeEndGameMandatory;
       }

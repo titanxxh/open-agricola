@@ -30,6 +30,7 @@ const CARD_DEF = MinorImprovement({ id: CARD_ID, name: 'Parity Card' })
 const CARD_IMPL = {
   effect: {
     id: CARD_ID,
+    handHooks: ['onReturnHome'],
     onReturnHome: (_state: any, player: any) => {
       if (!player.minorPlayed.includes(CARD_ID)) return
       player.minorPlayed.push('MUTATION_MUST_NOT_LEAK')
@@ -82,6 +83,8 @@ describe('browser executor parity with server executor', () => {
     const local = validateAndCompileCustomCodeLocal(CARD_SOURCE, 'CUSTOM_ParityCard')
     expect(local).toEqual(server)
     expect(server.valid).toBe(true)
+    if (!server.valid) return
+    expect(server.manifest.effectMetadata).toEqual({ handHooks: ['onReturnHome'] })
   })
 
   it('rejects forbidden globals identically', () => {

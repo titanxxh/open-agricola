@@ -70,10 +70,7 @@ export class Driver {
         opts[0]
       if (!pick) throw new Error(`driver: choice with no options at ${label}`)
       const pi = it.playerIndex ?? 0
-      return this.record(
-        `resolveChoice(${pi},'${pick.value}')`,
-        this.session.resolveChoice(pi, pick.value) as unknown as SessionResp,
-      )
+      return this.resolveChoiceRaw(pi, pick.value)
     }
     if (kind === 'farm-select' && it.request?.farm?.farmType === 'room') {
       const room = it.request.farm.selectableTiles?.[0]
@@ -105,6 +102,22 @@ export class Driver {
     )
   }
 
+  resolveChoiceRaw(pi: number, choice: string): SessionResp {
+    return this.record(
+      `resolveChoice(${pi},'${choice}')`,
+      this.session.resolveChoice(pi, choice) as unknown as SessionResp,
+    )
+  }
+
+  resolveChoice(pi: number, choice: string): SessionResp {
+    const label = `resolveChoice(${pi},'${choice}')`
+    return this.drain(label, this.resolveChoiceRaw(pi, choice))
+  }
+
+  getState(): ReturnType<GameSession['getState']> {
+    return this.session.getState()
+  }
+
   playMinorViaMeetingPlace(pi: number): SessionResp {
     return this.takeAction(pi, 'meeting-place')
   }
@@ -117,7 +130,7 @@ export class Driver {
     // 不 drain：anytime 行动的 flow 通常自包含（纯资源操作），执行后会停回
     // 触发它的宿主 interaction（如 farmland 的 farm-select）——宿主 interaction
     // 不该被 driver 消化。若将来某 anytime flow 产生需 resolve 的 sub-interaction，
-    // driver 需扩展（目前 9 个 fixture 无此需求）。
+    // driver 需扩展（目前 11 个 fixture 无此需求）。
     return this.record(
       `takeAnytimeAction(${pi},'${anytimeId}')`,
       this.session.takeAnytimeAction(pi, anytimeId) as unknown as SessionResp,
