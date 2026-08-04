@@ -190,7 +190,7 @@ function getNumericObjectProperty(object: ts.ObjectLiteralExpression, key: strin
 function normalizeWorkshopEffectCode(
   source: string,
   cardId: string,
-  opts: { locales?: CardLocales | null } = {},
+  opts: { locales?: CardLocales | null; artUrl?: string | null } = {},
 ): string {
   const sf = ts.createSourceFile(
     `${cardId}.ts`,
@@ -203,15 +203,16 @@ function normalizeWorkshopEffectCode(
   const localesToInject = opts.locales && Object.keys(opts.locales).length > 0
     ? opts.locales
     : null
+  const artUrlToInject = opts.artUrl ?? null
 
   const transformer: ts.TransformerFactory<ts.SourceFile> = (context) => {
     const { factory } = context
-    const syncLocalesObject = (object: ts.ObjectLiteralExpression) => {
+    const syncCardMetaObject = (object: ts.ObjectLiteralExpression) => {
       const filtered: ts.ObjectLiteralElementLike[] = []
       for (const prop of object.properties) {
         if (
           ts.isPropertyAssignment(prop)
-          && propertyNameMatches(prop.name, 'locales')
+          && (propertyNameMatches(prop.name, 'locales') || propertyNameMatches(prop.name, 'artUrl'))
         ) {
           continue
         }
@@ -225,13 +226,17 @@ function normalizeWorkshopEffectCode(
           ),
         )
       }
+      if (artUrlToInject) {
+        filtered.push(
+          factory.createPropertyAssignment(
+            'artUrl',
+            factory.createStringLiteral(artUrlToInject),
+          ),
+        )
+      }
       return factory.updateObjectLiteralExpression(object, filtered)
     }
     const visit: ts.Visitor = (node) => {
-      // Sync the CARD_DEF locales field with card_json.locales (db is the
-      // source of truth; LLM-generated locales in source may be stale once
-      // the user edits via the LocalizationModal). Drop any existing
-      // `locales:` property and re-emit from `localesToInject`.
       if (
         ts.isNewExpression(node)
         && ts.isIdentifier(node.expression)
@@ -240,7 +245,7 @@ function normalizeWorkshopEffectCode(
       ) {
         const arg = node.arguments[0]!
         if (ts.isObjectLiteralExpression(arg)) {
-          const updatedArg = syncLocalesObject(arg)
+          const updatedArg = syncCardMetaObject(arg)
           return ts.visitEachChild(
             factory.updateNewExpression(node, node.expression, node.typeArguments, [updatedArg]),
             visit,
@@ -257,7 +262,7 @@ function normalizeWorkshopEffectCode(
       ) {
         const arg = node.arguments[0]!
         if (ts.isObjectLiteralExpression(arg)) {
-          const updatedArg = syncLocalesObject(arg)
+          const updatedArg = syncCardMetaObject(arg)
           return ts.visitEachChild(
             factory.updateCallExpression(node, node.expression, node.typeArguments, [updatedArg]),
             visit,
@@ -275,7 +280,7 @@ function normalizeWorkshopEffectCode(
           factory.updatePropertyAssignment(
             node,
             node.name,
-            syncLocalesObject(node.initializer),
+            syncCardMetaObject(node.initializer),
           ),
           visit,
           context,
@@ -602,7 +607,7 @@ function cardSourceFactory(cardType: string): string {
 
 export function generateCardSourceFile(
   wcard: WorkshopCardForGen & { card_json?: string },
-  ctx: { githubLogin: string; iso: string },
+  ctx: { githubLogin: string; iso: string; artUrl?: string | null },
 ): string {
   const used = scanUsedHelpers(wcard.effect_code)
   const helperImports = Array.from(used)
@@ -612,7 +617,10 @@ export function generateCardSourceFile(
     .join('\n')
 
   const locales = readLocalesFromCardJson(wcard.card_json)
-  const normalised = normalizeWorkshopEffectCode(wcard.effect_code, wcard.card_id, { locales })
+  const normalised = normalizeWorkshopEffectCode(wcard.effect_code, wcard.card_id, {
+    locales,
+    artUrl: ctx.artUrl,
+  })
   const cardMetaSource = extractCardMetaSource(normalised)
   const cardImplSource = extractCardImplSource(normalised)
   const cardImplWithId = cardImplSource.includes('const CARD_ID')
@@ -1014,10 +1022,14 @@ export async function generatePrFiles(args: GenArgs): Promise<PrFile[]> {
     art_data,
   } = args
   const iso = new Date().toISOString()
+  const artUrl = art_data
+    ? `/card-art/community/${wcard.card_id}.${art_data.ext}`
+    : undefined
 
   const cardContent = generateCardSourceFile(wcard, {
     githubLogin: github_login,
     iso,
+    artUrl,
   })
   const testContent = generateSmokeTest({ card_id: wcard.card_id })
   const newRegisterAll = patchRegisterAll(upstream_register_all, {

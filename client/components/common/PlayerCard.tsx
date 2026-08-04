@@ -185,8 +185,9 @@ export const PlayerCard = ({
 }: PlayerCardProps) => {
   const cardData = useMemo(() => {
     const meta = cardMeta ?? getCardMeta(cardId)
+    if (!meta) return null
+    const localized = meta.locales?.[locale]
     if (cardType === 'major') {
-      if (!meta) return null
       const rawCost = (meta.cost ?? {}) as PaymentResourceMap | ComplexCost
       const { baseCost } = extractMajorDisplayCost(rawCost)
       return {
@@ -198,49 +199,50 @@ export const PlayerCard = ({
         vp: meta.vp,
         isCookery: meta.isCookery,
         isBaking: meta.isBaking,
+        artUrl: meta.artUrl,
       }
     } else if (cardType === 'minor') {
-      if (!meta) return null
       const i18nKey = `minorImprovements.${cardId}`
       const i18nName = t(locale, `${i18nKey}.name`)
       const i18nDesc = t(locale, `${i18nKey}.description`)
       const hasI18n = i18nName !== `${i18nKey}.name`
       return {
-        name: hasI18n ? i18nName : meta.name,
+        name: hasI18n ? i18nName : localized?.name ?? meta.name,
         description: hasI18n && i18nDesc !== `${i18nKey}.description`
           ? i18nDesc
-          : (meta.desc ?? []).join('\n'),
+          : (localized?.desc ?? meta.desc ?? []).join('\n'),
         cost: { ...emptyResources, ...(meta.cost ?? {}) },
         altCosts: meta.altCosts,
         deck: meta.deck,
         category: meta.category,
         vp: meta.vp,
-        prerequisite: meta.prerequisite,
+        prerequisite: localized?.prerequisite ?? meta.prerequisite,
         players: meta.players,
         isCookery: meta.isCookery,
         isBaking: meta.isBaking,
         passing: meta.passing,
         returnCards: meta.returnCards,
         alsoCountsAs: meta.alsoCountsAs,
+        artUrl: meta.artUrl,
       }
     } else {
-      if (!meta) return null
       const i18nKey = `occupations.${cardId}`
       const i18nName = t(locale, `${i18nKey}.name`)
       const i18nDesc = t(locale, `${i18nKey}.description`)
       const hasI18n = i18nName !== `${i18nKey}.name`
       return {
-        name: hasI18n ? i18nName : meta.name,
+        name: hasI18n ? i18nName : localized?.name ?? meta.name,
         description: hasI18n && i18nDesc !== `${i18nKey}.description`
           ? i18nDesc
-          : (meta.desc ?? []).join('\n'),
+          : (localized?.desc ?? meta.desc ?? []).join('\n'),
         cost: { ...emptyResources, ...(meta.cost ?? {}) },
         deck: meta.deck,
         category: meta.category,
-        prerequisite: meta.prerequisite,
+        prerequisite: localized?.prerequisite ?? meta.prerequisite,
         players: meta.players,
         isCookery: meta.isCookery,
         isBaking: meta.isBaking,
+        artUrl: meta.artUrl,
       }
     }
   }, [cardId, cardMeta, cardType, locale])
@@ -248,8 +250,9 @@ export const PlayerCard = ({
   const numbering = getCardNumbering(cardId)
   const moorMajor = cardType === 'major' ? getMoorMajorDisplay(cardId) : undefined
   const deck = getDeckFromId(cardId)
-  const customArt = artUrl === undefined ? getCustomCardArtUrl(cardId) : artUrl
-  const hasPlayer56Portrait = cardType !== 'major' && !customArt && PLAYER56_PORTRAITS.has(numbering)
+  const runtimeArt = artUrl === undefined ? getCustomCardArtUrl(cardId) : artUrl
+  const staticArt = cardData?.artUrl
+  const hasPlayer56Portrait = cardType !== 'major' && !runtimeArt && !staticArt && PLAYER56_PORTRAITS.has(numbering)
 
   const iconStyle = useMemo(() => {
     if (cardType === 'major') {
@@ -267,10 +270,23 @@ export const PlayerCard = ({
       }
     }
     // Custom card art: use the uploaded image URL
-    if (customArt) {
+    if (runtimeArt) {
       // artUrl is a relative path like /card-art/xxx.png — resolve against API_BASE (lazy import to avoid window access in tests)
       const apiBase = (typeof import.meta !== 'undefined' && import.meta.env?.VITE_API_BASE) || ''
-      const fullUrl = customArt.startsWith('http') ? customArt : `${apiBase}${customArt}`
+      const fullUrl = runtimeArt.startsWith('http') ? runtimeArt : `${apiBase}${runtimeArt}`
+      return {
+        backgroundImage: `url(${fullUrl})`,
+        backgroundSize: 'cover',
+        backgroundPosition: 'center',
+      }
+    }
+    if (staticArt) {
+      const base = import.meta.env.BASE_URL.endsWith('/')
+        ? import.meta.env.BASE_URL
+        : `${import.meta.env.BASE_URL}/`
+      const fullUrl = staticArt.startsWith('http')
+        ? staticArt
+        : `${base}${staticArt.replace(/^\/+/, '')}`
       return {
         backgroundImage: `url(${fullUrl})`,
         backgroundSize: 'cover',
@@ -298,7 +314,7 @@ export const PlayerCard = ({
     return {
       backgroundImage: `url(/bga-img/${deckName}/${numbering}.png)`,
     }
-  }, [cardType, cardId, customArt, deck, hasPlayer56Portrait, numbering])
+  }, [cardType, cardId, runtimeArt, staticArt, deck, hasPlayer56Portrait, numbering])
 
   if (!cardData) return null
 

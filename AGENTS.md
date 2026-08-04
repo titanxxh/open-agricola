@@ -96,12 +96,13 @@ pnpm run build              # tsc + vite build
 
 | Doc | When to update |
 |---|---|
-| `docs/card_implementation_status.md` | 每次改卡牌相关代码（新实现 / 修 bug / 改简化 / 改 desc / 调 hook / 调整计划） |
+| `docs/card_implementation_status.md` | 官方卡实现变化，或社区卡引入 / 修复通用机制、基础设施 gap、accepted divergence 时 |
+| `docs/community_cards.md` | 工坊社区卡新增 / 更新时，由 PR 生成器维护唯一社区卡清单；纯社区卡新增不重复修改 `card_implementation_status.md` |
 | `docs/ARCHITECTURE.md` | 改通用扩展点（hook phase、ActionFlow node、协议层） |
 | `docs/CARD_TEST_TEMPLATE.md` | 测试策略 / 卡牌测试写法变化 |
 | `docs/PLATFORM_DESIGN.md` / `DEPLOY_PLAN.md` / `HOW_TO_DEPLOY.md` | 仅在对应议题改动时更新 |
 
-**`card_implementation_status.md` 同步检查清单**（每次卡牌相关 commit）：
+**`card_implementation_status.md` 同步检查清单**（需要更新该文档时）：
 - §2 问题优先清单 — 修复后移除或降级，新增 gap 立即登记
 - §3 / §10 / §11 — 同步 accepted divergence、excluded、per-card appendix 状态
 - §1 总览数字 — 状态数量有变化时同步

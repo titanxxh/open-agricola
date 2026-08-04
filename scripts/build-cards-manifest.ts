@@ -67,6 +67,7 @@ export type CardMeta = {
   alsoCountsAs?: string[]
   cardField?: unknown
   enablesPalisades?: boolean
+  artUrl?: string
   locales?: Record<string, { name: string; desc: string[]; prerequisite?: string }>
 }
 
@@ -91,7 +92,7 @@ const META_FIELDS = new Set([
   'heatingWoodToFuelDiscount',
   'moorSpecialActionBonuses',
   'mustBePlayedViaMajorImprovementAction', 'alsoCountsAs', 'cardField',
-  'enablesPalisades', 'locales',
+  'enablesPalisades', 'artUrl', 'locales',
 ])
 
 const CARD_CLASSES = new Set([
