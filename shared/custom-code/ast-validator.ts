@@ -285,6 +285,10 @@ function validateEffectKeys(
       errors.push(`line ${getLine(prop)}: CARD_IMPL.effect properties must not use computed names`)
       continue
     }
+    if (ts.isGetAccessorDeclaration(prop) || ts.isSetAccessorDeclaration(prop)) {
+      errors.push(`line ${getLine(prop)}: CARD_IMPL.effect must not use accessors`)
+      continue
+    }
     if (!ts.isPropertyAssignment(prop) && !ts.isMethodDeclaration(prop) && !ts.isShorthandPropertyAssignment(prop)) continue
     const name = prop.name && ts.isIdentifier(prop.name)
       ? prop.name.text
