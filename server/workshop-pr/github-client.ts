@@ -250,7 +250,7 @@ export class GitHubClient {
         preservedTree.push({ path: entry.path, sha: null, mode: entry.mode })
         continue
       }
-      if (entry.previousPath) {
+      if (entry.status === 'renamed' && entry.previousPath) {
         preservedTree.push({ path: entry.previousPath, sha: null, mode: entry.mode })
       }
       blobs.push({

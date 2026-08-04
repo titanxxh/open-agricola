@@ -340,6 +340,57 @@ describe('GitHubClient', () => {
       ])
     })
 
+    it('keeps the source file when replaying a copied entry', async () => {
+      let treeBody: {
+        tree?: Array<{ path: string; sha: string | null; mode: string }>
+      } | null = null
+      let blobBody: { content?: string } | null = null
+      fetchHandler = (url, init) => {
+        if (url.includes('/contents/server/__tests__/source.test.ts')) {
+          return okJson({
+            content: Buffer.from("it('source', () => {})\n").toString('base64'),
+            encoding: 'base64',
+          })
+        }
+        if (url.includes('/git/blobs') && init?.method === 'POST') {
+          blobBody = JSON.parse(init.body as string) as typeof blobBody
+          return okJson({ sha: 'copied-blob' })
+        }
+        if (url.includes('/git/trees') && init?.method === 'POST') {
+          treeBody = JSON.parse(init.body as string) as typeof treeBody
+          return okJson({ sha: 'treesha' })
+        }
+        if (url.includes('/git/commits') && init?.method === 'POST') return okJson({ sha: 'commitsha' })
+        return new Response('', { status: 404 })
+      }
+      const c = new GitHubClient({
+        token: 't',
+        upstreamOwner: 'titanxxh',
+        upstreamRepo: 'open-agricola',
+      })
+
+      await c.createCommit({
+        forkOwner: 'alice',
+        files: [],
+        preservedTreeEntries: [{
+          path: 'server/__tests__/copy.test.ts',
+          previousPath: 'server/__tests__/source.test.ts',
+          sha: 'old-pr-blob',
+          status: 'copied',
+          mode: '100644',
+          patch: "@@ -1 +1,2 @@\n it('source', () => {})\n+it('copy', () => {})",
+        }],
+        message: 'test commit',
+        author: { name: 'alice', email: 'a@users.noreply.github.com' },
+        upstreamBaseSha: 'fixed-base',
+      })
+
+      expect(blobBody?.content).toBe("it('source', () => {})\nit('copy', () => {})\n")
+      expect(treeBody?.tree).toEqual([
+        { path: 'server/__tests__/copy.test.ts', sha: 'copied-blob', mode: '100644', type: 'blob' },
+      ])
+    })
+
     it('preserves a patchless newly added binary file', async () => {
       let treeBody: {
         tree?: Array<{ path: string; sha: string | null; mode: string }>
