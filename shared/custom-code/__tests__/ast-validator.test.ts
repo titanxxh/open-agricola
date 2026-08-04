@@ -366,6 +366,51 @@ describe('ast-validator: CARD_IMPL hook/phase whitelisting', () => {
     expect(result.valid).toBe(false)
   })
 
+  it('rejects a listener-local CARD_ID that shadows the submitted card ID', () => {
+    const result = validateCardCode(`
+      const CARD_ID = 'CUSTOM_Test'
+      const CARD_IMPL = {
+        listeners: [{
+          actions: ['construct'],
+          phases: ['computeCosts'],
+          handler: () => {
+            const CARD_ID = 'CUSTOM_Other'
+            const costs = { wood: -2 }
+            return {
+              costs,
+              costAttribution: [{ sourceCard: CARD_ID, costs }],
+            }
+          },
+        }],
+      }
+    `, 'CUSTOM_Test')
+
+    expect(result.valid).toBe(false)
+    expect(result.valid === false && result.errors.some(
+      error => error.includes('CARD_ID must not be shadowed'),
+    )).toBe(true)
+  })
+
+  it('ignores costs nested inside a listener result payload', () => {
+    const result = validateCardCode(`
+      const CARD_IMPL = {
+        listeners: [{
+          actions: ['collect'],
+          phases: ['after'],
+          handler: () => ({
+            specialEffects: [{
+              kind: 'set-extra-data',
+              key: 'quote',
+              value: { costs: { wood: 1 } },
+            }],
+          }),
+        }],
+      }
+    `)
+
+    expect(result.valid).toBe(true)
+  })
+
   it.each([
     ['null costs', 'null', 'null'],
     ['non-resource costs', "{ unknown: -2 }", "{ unknown: -2 }"],

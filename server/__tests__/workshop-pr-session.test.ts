@@ -1053,6 +1053,11 @@ describe('workshop PR propose — session', () => {
           status: 'added',
           sha: 'obsolete-art-sha',
         },
+        {
+          filename: 'public/card-art/community/CUSTOM_TestCard.license.txt',
+          status: 'added',
+          sha: 'art-license-sha',
+        },
       ],
     })
     vi.stubGlobal('fetch', gh)
@@ -1086,6 +1091,9 @@ describe('workshop PR propose — session', () => {
     )))).toBe(shouldPreserveTest)
     expect(counts.treeEntries.every(entries => !entries.some(entry => (
       entry.path === 'public/card-art/community/CUSTOM_TestCard.webp'
+    )))).toBe(true)
+    expect(counts.treeEntries.every(entries => entries.some(entry => (
+      entry.path === 'public/card-art/community/CUSTOM_TestCard.license.txt'
     )))).toBe(true)
 
     // github_pr_url sticks to pull/99.

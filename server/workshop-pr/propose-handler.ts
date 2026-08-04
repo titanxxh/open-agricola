@@ -355,9 +355,11 @@ export async function handleSubmitReviewRequest(
     const replacementPr = pr && (pr.baseRefName !== 'main' || pr.isDraft) ? pr : null
     const legacySmokePath = `shared/cards/community/__tests__/${wcard.card_id}.test.ts`
     const legacySmokeSha = gitBlobSha(legacySmokeSource(wcard.card_id))
-    const generatedArtPrefix = `public/card-art/community/${wcard.card_id}.`
+    const generatedArtPaths = new Set(['png', 'jpg', 'jpeg', 'webp'].map(
+      ext => `public/card-art/community/${wcard.card_id}.${ext}`,
+    ))
     const preservedTreeEntries = existingPrTreeEntries.filter((entry) => !(
-      entry.path.startsWith(generatedArtPrefix)
+      generatedArtPaths.has(entry.path)
       || (
         entry.path === legacySmokePath
         && entry.sha === legacySmokeSha

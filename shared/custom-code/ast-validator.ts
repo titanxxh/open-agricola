@@ -120,24 +120,65 @@ function getStaticPropertyName(
   return undefined
 }
 
+function forEachListenerResultObject(
+  sourceFile: ts.SourceFile,
+  constants: Map<string, string>,
+  callback: (result: ts.ObjectLiteralExpression) => void,
+): void {
+  const visitResult = (expression: ts.Expression): void => {
+    if (
+      ts.isParenthesizedExpression(expression)
+      || ts.isAsExpression(expression)
+      || ts.isTypeAssertionExpression(expression)
+      || ts.isNonNullExpression(expression)
+      || ts.isSatisfiesExpression(expression)
+    ) {
+      visitResult(expression.expression)
+    } else if (ts.isConditionalExpression(expression)) {
+      visitResult(expression.whenTrue)
+      visitResult(expression.whenFalse)
+    } else if (ts.isObjectLiteralExpression(expression)) {
+      callback(expression)
+    }
+  }
+  const visitReturns = (node: ts.Node): void => {
+    if (ts.isReturnStatement(node)) {
+      if (node.expression) visitResult(node.expression)
+      return
+    }
+    if (ts.isFunctionLike(node)) return
+    ts.forEachChild(node, visitReturns)
+  }
+  const visit = (node: ts.Node): void => {
+    if (
+      ts.isPropertyAssignment(node)
+      && getStaticPropertyName(node, constants) === 'handler'
+      && (ts.isArrowFunction(node.initializer) || ts.isFunctionExpression(node.initializer))
+    ) {
+      const handler = node.initializer
+      if (ts.isBlock(handler.body)) {
+        ts.forEachChild(handler.body, visitReturns)
+      } else {
+        visitResult(handler.body)
+      }
+    }
+    ts.forEachChild(node, visit)
+  }
+  visit(sourceFile)
+}
+
 export function findMissingCostAttributionLines(source: string): number[] {
   const sourceFile = ts.createSourceFile(
     'card.ts', source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS,
   )
   const constants = collectStringConstants(sourceFile)
   const lines: number[] = []
-  const visit = (node: ts.Node, insideCostAttribution = false): void => {
-    if (ts.isObjectLiteralExpression(node) && !insideCostAttribution) {
-      const names = new Set(node.properties.map(property => getStaticPropertyName(property, constants)))
-      if (names.has('costs') && !names.has('costAttribution')) {
-        lines.push(sourceFile.getLineAndCharacterOfPosition(node.getStart(sourceFile)).line + 1)
-      }
+  forEachListenerResultObject(sourceFile, constants, (result) => {
+    const names = new Set(result.properties.map(property => getStaticPropertyName(property, constants)))
+    if (names.has('costs') && !names.has('costAttribution')) {
+      lines.push(sourceFile.getLineAndCharacterOfPosition(result.getStart(sourceFile)).line + 1)
     }
-    const entersCostAttribution = ts.isPropertyAssignment(node)
-      && getStaticPropertyName(node, constants) === 'costAttribution'
-    ts.forEachChild(node, child => visit(child, insideCostAttribution || entersCostAttribution))
-  }
-  visit(sourceFile)
+  })
   return lines
 }
 
@@ -179,71 +220,65 @@ function validateCostAttributionShapes(
     return keys.length === Object.keys(right).length
       && keys.every(key => left[key] === right[key])
   }
-  const visit = (node: ts.Node, insideCostAttribution = false): void => {
-    if (ts.isObjectLiteralExpression(node) && !insideCostAttribution) {
-      const costsProperties = node.properties.filter(
+  forEachListenerResultObject(sourceFile, constants, (result) => {
+    const costsProperties = result.properties.filter(
+      property => getStaticPropertyName(property, constants) === 'costs',
+    )
+    const attributionProperties = result.properties.filter(
+      property => getStaticPropertyName(property, constants) === 'costAttribution',
+    )
+    const costsProperty = costsProperties[0]
+    const attributionProperty = attributionProperties[0]
+    if (costsProperties.length > 1 || attributionProperties.length > 1) {
+      const { line } = sourceFile.getLineAndCharacterOfPosition(result.getStart(sourceFile))
+      errors.push(`line ${line + 1}: listener results must not contain duplicate costs or costAttribution`)
+    } else if (attributionProperty && !costsProperty) {
+      const { line } = sourceFile.getLineAndCharacterOfPosition(result.getStart(sourceFile))
+      errors.push(`line ${line + 1}: listener results with costAttribution must include costs`)
+    } else if (costsProperty && attributionProperty) {
+      const costs = propertyValue(costsProperty)
+      const attribution = propertyValue(attributionProperty)
+      const entry = attribution && ts.isArrayLiteralExpression(attribution)
+        && attribution.elements.length === 1
+        && ts.isObjectLiteralExpression(attribution.elements[0])
+        ? attribution.elements[0]
+        : undefined
+      const sourceProperty = entry?.properties.find(
+        property => getStaticPropertyName(property, constants) === 'sourceCard',
+      )
+      const entryCostsProperty = entry?.properties.find(
         property => getStaticPropertyName(property, constants) === 'costs',
       )
-      const attributionProperties = node.properties.filter(
-        property => getStaticPropertyName(property, constants) === 'costAttribution',
+      const source = sourceProperty && propertyValue(sourceProperty)
+      const entryCosts = entryCostsProperty && propertyValue(entryCostsProperty)
+      const costsDelta = costs && resourceDelta(costs)
+      const entryCostsDelta = entryCosts && resourceDelta(entryCosts)
+      const sharedDynamicDelta = costs
+        && entryCosts
+        && ts.isIdentifier(costs)
+        && ts.isIdentifier(entryCosts)
+        && costs.text === entryCosts.text
+      const matchingCosts = sharedDynamicDelta || (
+        costsDelta !== undefined
+        && entryCostsDelta !== undefined
+        && equalResourceDeltas(costsDelta, entryCostsDelta)
       )
-      const costsProperty = costsProperties[0]
-      const attributionProperty = attributionProperties[0]
-      if (costsProperties.length > 1 || attributionProperties.length > 1) {
-        const { line } = sourceFile.getLineAndCharacterOfPosition(node.getStart(sourceFile))
-        errors.push(`line ${line + 1}: listener results must not contain duplicate costs or costAttribution`)
-      } else if (attributionProperty && !costsProperty) {
-        const { line } = sourceFile.getLineAndCharacterOfPosition(node.getStart(sourceFile))
-        errors.push(`line ${line + 1}: listener results with costAttribution must include costs`)
-      } else if (costsProperty && attributionProperty) {
-        const costs = propertyValue(costsProperty)
-        const attribution = propertyValue(attributionProperty)
-        const entry = attribution && ts.isArrayLiteralExpression(attribution)
-          && attribution.elements.length === 1
-          && ts.isObjectLiteralExpression(attribution.elements[0])
-          ? attribution.elements[0]
-          : undefined
-        const sourceProperty = entry?.properties.find(
-          property => getStaticPropertyName(property, constants) === 'sourceCard',
-        )
-        const entryCostsProperty = entry?.properties.find(
-          property => getStaticPropertyName(property, constants) === 'costs',
-        )
-        const source = sourceProperty && propertyValue(sourceProperty)
-        const entryCosts = entryCostsProperty && propertyValue(entryCostsProperty)
-        const costsDelta = costs && resourceDelta(costs)
-        const entryCostsDelta = entryCosts && resourceDelta(entryCosts)
-        const sharedDynamicDelta = costs
-          && entryCosts
-          && ts.isIdentifier(costs)
-          && ts.isIdentifier(entryCosts)
-          && costs.text === entryCosts.text
-        const matchingCosts = sharedDynamicDelta || (
-          costsDelta !== undefined
-          && entryCostsDelta !== undefined
-          && equalResourceDeltas(costsDelta, entryCostsDelta)
-        )
-        const validSource = source
-          && ts.isIdentifier(source)
-          && source.text === 'CARD_ID'
-          && declaredCardId !== undefined
-          && declaredCardId.length > 0
-          && (expectedCardId === undefined || declaredCardId === expectedCardId)
-        if (
-          !entry
-          || !validSource
-          || !matchingCosts
-        ) {
-          const { line } = sourceFile.getLineAndCharacterOfPosition(node.getStart(sourceFile))
-          errors.push(`line ${line + 1}: costAttribution must contain one matching source entry`)
-        }
+      const validSource = source
+        && ts.isIdentifier(source)
+        && source.text === 'CARD_ID'
+        && declaredCardId !== undefined
+        && declaredCardId.length > 0
+        && (expectedCardId === undefined || declaredCardId === expectedCardId)
+      if (
+        !entry
+        || !validSource
+        || !matchingCosts
+      ) {
+        const { line } = sourceFile.getLineAndCharacterOfPosition(result.getStart(sourceFile))
+        errors.push(`line ${line + 1}: costAttribution must contain one matching source entry`)
       }
     }
-    const entersCostAttribution = ts.isPropertyAssignment(node)
-      && getStaticPropertyName(node, constants) === 'costAttribution'
-    ts.forEachChild(node, child => visit(child, insideCostAttribution || entersCostAttribution))
-  }
-  visit(sourceFile)
+  })
 }
 
 export function validateCardCode(source: string, expectedCardId?: string): ValidationResult {
@@ -326,6 +361,16 @@ export function validateCardCode(source: string, expectedCardId?: string): Valid
         } else if (!isTopLevelConstDeclaration && !isPropertyName) {
           errors.push(`line ${getLine(node)}: CARD_IMPL must not be referenced outside its declaration`)
         }
+      }
+      const shadowsCardId = node.text === 'CARD_ID' && (
+        (declaration && !isTopLevelConstDeclaration)
+        || (parent && ts.isParameter(parent) && parent.name === node)
+        || (parent && ts.isBindingElement(parent) && parent.name === node)
+        || (parent && ts.isFunctionDeclaration(parent) && parent.name === node)
+        || (parent && ts.isFunctionExpression(parent) && parent.name === node)
+      )
+      if (shadowsCardId) {
+        errors.push(`line ${getLine(node)}: CARD_ID must not be shadowed`)
       }
       // Skip property access names (obj.process is fine, bare process is not)
       // BUT check DENIED_PROPERTY_ACCESS for dangerous property names

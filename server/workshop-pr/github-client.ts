@@ -228,7 +228,7 @@ export class GitHubClient {
       } else if (baseContent === undefined) {
         throw new GitHubApiError('preserved PR edits conflict with current main', 'pr_rebase_conflict', 409)
       }
-      if (entry.status === 'renamed') {
+      if (entry.status === 'renamed' || entry.status === 'copied') {
         try {
           await this.getUpstreamFile(entry.path, upstreamBaseSha)
           throw new GitHubApiError('preserved PR edits conflict with current main', 'pr_rebase_conflict', 409)

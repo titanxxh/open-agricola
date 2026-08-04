@@ -389,6 +389,50 @@ describe('GitHubClient', () => {
       ])
     })
 
+    it('rejects a copied entry when its destination now exists on main', async () => {
+      fetchHandler = (url, init) => {
+        if (url.includes('/contents/server/__tests__/source.test.ts')) {
+          return okJson({
+            content: Buffer.from("it('source', () => {})\n").toString('base64'),
+            encoding: 'base64',
+            sha: 'source-sha',
+          })
+        }
+        if (url.includes('/contents/server/__tests__/copy.test.ts')) {
+          return okJson({
+            content: Buffer.from("it('upstream', () => {})\n").toString('base64'),
+            encoding: 'base64',
+            sha: 'destination-sha',
+          })
+        }
+        if (url.includes('/git/blobs') && init?.method === 'POST') return okJson({ sha: 'copied-blob' })
+        if (url.includes('/git/trees') && init?.method === 'POST') return okJson({ sha: 'treesha' })
+        if (url.includes('/git/commits') && init?.method === 'POST') return okJson({ sha: 'commitsha' })
+        return new Response('', { status: 404 })
+      }
+      const c = new GitHubClient({
+        token: 't',
+        upstreamOwner: 'titanxxh',
+        upstreamRepo: 'open-agricola',
+      })
+
+      await expect(c.createCommit({
+        forkOwner: 'alice',
+        files: [],
+        preservedTreeEntries: [{
+          path: 'server/__tests__/copy.test.ts',
+          previousPath: 'server/__tests__/source.test.ts',
+          sha: 'old-pr-blob',
+          status: 'copied',
+          mode: '100644',
+          patch: "@@ -1 +1,2 @@\n it('source', () => {})\n+it('copy', () => {})",
+        }],
+        message: 'test commit',
+        author: { name: 'alice', email: 'a@users.noreply.github.com' },
+        upstreamBaseSha: 'fixed-base',
+      })).rejects.toMatchObject({ code: 'pr_rebase_conflict' })
+    })
+
     it('preserves a patchless newly added binary file', async () => {
       let treeBody: {
         tree?: Array<{ path: string; sha: string | null; mode: string }>
