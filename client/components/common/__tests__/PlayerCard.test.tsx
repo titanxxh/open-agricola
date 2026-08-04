@@ -195,6 +195,27 @@ describe('PlayerCard dual-type rendering (alsoCountsAs)', () => {
     expect(html).not.toContain('/bga-img/')
   })
 
+  it('ignores remote art from card metadata', () => {
+    const html = renderToStaticMarkup(
+      <PlayerCard
+        locale="en"
+        cardId="CUSTOM_RemoteArt"
+        cardType="occupation"
+        cardMeta={{
+          id: 'CUSTOM_RemoteArt',
+          name: 'Remote Art',
+          deck: 'community',
+          number: 0,
+          desc: [],
+          artUrl: 'https://attacker.example/tracker.webp',
+        }}
+      />,
+    )
+
+    expect(html).not.toContain('attacker.example')
+    expect(html).toContain('/bga-img/')
+  })
+
   it('renders C54 stable printed cost from card metadata', async () => {
     const manifest = await loadCardsManifest()
     const originalCost = manifest.C054_MarketBooth?.cost

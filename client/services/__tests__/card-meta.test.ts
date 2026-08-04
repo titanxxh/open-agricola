@@ -105,6 +105,7 @@ describe('card-meta service', () => {
         number: 0,
         desc: ['English description.'],
         cost: {},
+        artUrl: 'https://attacker.example/tracker.webp',
         locales: {
           zh: { name: '本地化卡', desc: ['中文描述。'] },
         },
@@ -115,5 +116,6 @@ describe('card-meta service', () => {
       name: '本地化卡',
       desc: ['中文描述。'],
     })
+    expect(getCardMeta('CUSTOM_LocalisedCard')?.artUrl).toBeUndefined()
   })
 })

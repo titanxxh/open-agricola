@@ -108,7 +108,6 @@ const customCardToMeta = ({ cardJson: card, cardType }: CustomCardMetadata): Car
   passing: card.passing,
   returnCards: card.returnCards,
   alsoCountsAs: card.alsoCountsAs,
-  artUrl: card.artUrl,
   locales: card.locales,
 })
 
