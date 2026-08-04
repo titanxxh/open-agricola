@@ -1,5 +1,5 @@
 import type { ReorganizeTrigger } from '../actions/effects/reorganize.ts'
-import { getCardEffect, runCardEffectHook } from '../cards/card-effects.ts'
+import { getCardEffect, isHandCardEffectHook, runCardEffectHook } from '../cards/card-effects.ts'
 import type { BeforeEndGameScope, FlowCardEffectHook } from '../cards/card-effects.ts'
 import type { ActionFlow, GameState, PlayerState } from '../contract/types.ts'
 import type { Engine, EngineFrame } from '../engine/index.ts'
@@ -207,6 +207,7 @@ export class StageDispatch {
   }
 
   private getPlayerHandEffectCardIds(player: PlayerState, hook: StageCardEffectHook): string[] {
+    if (!isHandCardEffectHook(hook)) return []
     const handCards = [...player.occupationHand, ...player.minorHand]
     return handCards.filter((id) => {
       const effect = getCardEffect(id)
@@ -321,20 +322,6 @@ export class StageDispatch {
         )
         children.push(flow)
       }
-    }
-
-    const handCards = this.getPlayerHandEffectCardIds(targetPlayer, 'onBeforeEndGame')
-    for (const cardId of handCards) {
-      const effect = getCardEffect(cardId)
-      if (!effect?.onBeforeEndGame) continue
-      const flow = this.buildBeforeEndGameActivationFlow(
-        cardId,
-        targetPlayer.id,
-        targetPlayer.id,
-        'owner',
-        effect.beforeEndGameMandatory !== false,
-      )
-      children.push(flow)
     }
 
     return children

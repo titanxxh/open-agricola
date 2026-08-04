@@ -8,9 +8,8 @@
  * `Record<CardEffectField, HookMeta>` 提供编译期穷尽性：往 `CardEffectField`
  * 联合新增一个 hook 而不在这里补描述，tsc 直接报错。
  *
- * 注意 `CardEffectField` 联合有 40 个成员，比 `cardEffectHooks` 数组（39）多一个
- * `onComputeSharedAnimalZones`（未进沙盒白名单数组）。渲染只遍历那 39 项数组，
- * 所以这条多出来的描述到不了 prompt——保留它仅为满足 Record 穷尽性。
+ * `CardEffectField` 还包含未进沙盒白名单的官方卡 hook；渲染只遍历
+ * `cardEffectHooks`，这些描述保留用于满足 Record 穷尽性。
  */
 import type { CardEffectField } from '../cards/card-effects'
 
@@ -55,7 +54,7 @@ export const cardEffectHookMeta: Record<CardEffectField, HookMeta> = {
   },
 
   // --- 进阶 hook：签名与普通 hook 不同 ---
-  resolveChoice: { table: 'advanced', signature: '(state, player, choice, ctx) => ActionFlow', usage: '处理玩家选择' },
+  resolveChoice: { table: 'advanced', signature: '(state, player, choice) => ActionFlow', usage: '处理玩家选择；沙盒不传 ctx' },
   computeBonusScore: {
     table: 'advanced',
     signature: '(state, player, ctx) => number',
@@ -71,24 +70,28 @@ export const cardEffectHookMeta: Record<CardEffectField, HookMeta> = {
     signature: '(state, player, ctx) => BonusScoreLevel[]',
     usage: '终局花资源换 VP（声明 levels；solver 枚举最优组合）',
   },
-  computeExtraRoomCapacity: { table: 'advanced', signature: 'number', usage: '额外容纳空间' },
+  computeExtraRoomCapacity: { table: 'advanced', signature: '(player) => number', usage: '额外容纳空间' },
   computeHarvestBreedOrderPriority: {
     table: 'advanced',
-    signature: 'number',
+    signature: '(state, player) => number | void',
     usage: 'Harvest breeding phase 顺序调整，数字越大越晚',
   },
-  onComputeAnimalZones: { table: 'advanced', signature: '修改 zones 数组', usage: '动物分区扩展' },
-  onComputeSowableFields: { table: 'advanced', signature: '返回额外可播种田', usage: '播种扩展' },
+  onComputeAnimalZones: {
+    table: 'advanced',
+    signature: '(player, zones, state) => AnimalZone[]',
+    usage: '动物分区扩展；只返回新增 zones，不要拼接传入的 zones；原地修改无效',
+  },
+  onComputeSowableFields: { table: 'advanced', signature: '(player) => ExtraSowableField[]', usage: '返回额外可播种田' },
   onSowExtraField: { table: 'advanced', signature: '返回额外可播种田', usage: '播种扩展' },
-  computeLockedFarmTiles: { table: 'advanced', signature: '返回锁定位置', usage: '田地锁定' },
+  computeLockedFarmTiles: { table: 'advanced', signature: '(player) => FarmTilePosition[]', usage: '返回锁定位置' },
   getInvalidAnimals: {
     table: 'advanced',
-    signature: '(zone, raise) => Meeple[]',
-    usage: '卡牌专属动物分区禁入校验',
+    signature: '(player, zone, meeples) => Meeple[]',
+    usage: '卡牌专属动物分区禁入校验；沙盒不传 state',
   },
   getSpecialStablePositions: {
     table: 'advanced',
-    signature: '(state, player[, position]) => FarmTilePosition[] / boolean',
+    signature: '(state, player) => FarmTilePosition[]',
     usage: 'Build Stables 特殊 stable（如 B85 的 2×2 中心）',
   },
   applySpecialStable: {

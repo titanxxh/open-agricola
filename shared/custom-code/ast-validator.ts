@@ -9,7 +9,7 @@
  * (separate V8 heap, no prototype chain escapes possible).
  */
 import ts from 'typescript'
-import { cardEffectHooks } from '../cards/card-effects'
+import { cardEffectHooks, isHandCardEffectHook } from '../cards/card-effects'
 import { isSandboxListenerAction } from './sandbox-listener-actions'
 import { sandboxListenerPhases } from './sandbox-listener-phases'
 
@@ -246,16 +246,20 @@ function validateCardImplObject(
       errors.push(`line ${getLine(prop)}: CARD_IMPL properties must not set __proto__`)
       continue
     }
+    if (propName === 'effect') {
+      if (!ts.isPropertyAssignment(prop) || !ts.isObjectLiteralExpression(prop.initializer)) {
+        errors.push(`line ${getLine(prop)}: CARD_IMPL.effect must be an object literal`)
+      } else {
+        validateEffectKeys(prop.initializer, errors, getLine)
+      }
+      continue
+    }
     if (propName === 'listeners' && !ts.isPropertyAssignment(prop)) {
       errors.push(`line ${getLine(prop)}: CARD_IMPL.listeners must use a property assignment`)
       continue
     }
     if (!ts.isPropertyAssignment(prop)) continue
     if (!propName) continue
-
-    if (propName === 'effect' && ts.isObjectLiteralExpression(prop.initializer)) {
-      validateEffectKeys(prop.initializer, errors, getLine)
-    }
 
     if (propName === 'listeners') {
       if (!ts.isArrayLiteralExpression(prop.initializer)) {
@@ -273,7 +277,18 @@ function validateEffectKeys(
   getLine: (node: ts.Node) => number,
 ): void {
   for (const prop of effectObj.properties) {
-    if (ts.isSpreadAssignment(prop)) continue
+    if (ts.isSpreadAssignment(prop)) {
+      errors.push(`line ${getLine(prop)}: CARD_IMPL.effect must not use spread properties`)
+      continue
+    }
+    if (ts.isComputedPropertyName(prop.name)) {
+      errors.push(`line ${getLine(prop)}: CARD_IMPL.effect properties must not use computed names`)
+      continue
+    }
+    if (ts.isGetAccessorDeclaration(prop) || ts.isSetAccessorDeclaration(prop)) {
+      errors.push(`line ${getLine(prop)}: CARD_IMPL.effect must not use accessors`)
+      continue
+    }
     if (!ts.isPropertyAssignment(prop) && !ts.isMethodDeclaration(prop) && !ts.isShorthandPropertyAssignment(prop)) continue
     const name = prop.name && ts.isIdentifier(prop.name)
       ? prop.name.text
@@ -281,6 +296,18 @@ function validateEffectKeys(
     if (!name) continue
     if (!ALLOWED_EFFECT_KEYS.has(name)) {
       errors.push(`line ${getLine(prop)}: unknown effect hook '${name}' in CARD_IMPL.effect`)
+    }
+    if (name !== 'handHooks') continue
+    if (!ts.isPropertyAssignment(prop) || !ts.isArrayLiteralExpression(prop.initializer)) {
+      errors.push(`line ${getLine(prop)}: handHooks must be a string literal array`)
+      continue
+    }
+    for (const hook of prop.initializer.elements) {
+      if (!ts.isStringLiteral(hook)) {
+        errors.push(`line ${getLine(hook)}: handHooks must contain only string literals`)
+      } else if (!isHandCardEffectHook(hook.text)) {
+        errors.push(`line ${getLine(hook)}: unsupported hand hook '${hook.text}' in CARD_IMPL.effect`)
+      }
     }
   }
 }

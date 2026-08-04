@@ -5,6 +5,7 @@ import { sandboxListenerActions } from '../../../shared/custom-code/sandbox-list
 import { sandboxListenerPhases } from '../../../shared/custom-code/sandbox-listener-phases'
 import { sandboxListenerScopes } from '../../../shared/custom-code/sandbox-listener-scopes'
 import { SANDBOX_ALLOWED_ACTION_IDS } from '../../../shared/custom-code/sandbox-action-ids'
+import platformDesign from '../../../docs/PLATFORM_DESIGN.md?raw'
 
 describe('CARD_DESIGNER_SYSTEM_PROMPT', () => {
   it('does not advertise deprecated before-end dispatch metadata', () => {
@@ -48,6 +49,43 @@ describe('CARD_DESIGNER_SYSTEM_PROMPT', () => {
     expect(CARD_DESIGNER_SYSTEM_PROMPT).toContain("actions: ['improvement']")
     expect(CARD_DESIGNER_SYSTEM_PROMPT).not.toContain('improvement-any')
     expect(CARD_DESIGNER_SYSTEM_PROMPT).not.toContain('minor-improvement')
+  })
+
+  it('uses a mandatory capped bonus for discounts across all improvements', () => {
+    expect(CARD_DESIGNER_SYSTEM_PROMPT).toContain('跨所有主要/次要改良候选的资源折扣')
+    expect(CARD_DESIGNER_SYSTEM_PROMPT).toContain('capDiscountAtCost: true')
+    expect(CARD_DESIGNER_SYSTEM_PROMPT).toContain('optional: false')
+    expect(CARD_DESIGNER_SYSTEM_PROMPT).toContain('sources: [CARD_ID]')
+    expect(CARD_DESIGNER_SYSTEM_PROMPT).toContain('`costs` 只用于简单行动费用')
+  })
+
+  it('documents only sandbox hooks whose return values can cross the JSON boundary', () => {
+    for (const hook of [
+      'onComputeSowableFields',
+      'onSowExtraField',
+      'getSpecialStablePositions',
+      'applySpecialStable',
+    ]) {
+      expect(CARD_DESIGNER_SYSTEM_PROMPT).not.toContain(`| \`${hook}\` |`)
+    }
+    expect(CARD_DESIGNER_SYSTEM_PROMPT).toContain('(player, zones, state) => AnimalZone[]')
+    expect(CARD_DESIGNER_SYSTEM_PROMPT).toContain('只返回新增 zones')
+    expect(CARD_DESIGNER_SYSTEM_PROMPT).toContain('不要拼接传入的 zones')
+    expect(CARD_DESIGNER_SYSTEM_PROMPT).toContain('(state, player, choice) => ActionFlow')
+  })
+
+  it('limits handHooks to hooks dispatched from cards in hand', () => {
+    expect(CARD_DESIGNER_SYSTEM_PROMPT).toContain('HandCardEffectHook[]')
+    expect(CARD_DESIGNER_SYSTEM_PROMPT).toContain('不支持 `onBuy`、`onEndTurn`、`onBeforeEndGame`、`onBeforePlayerTurn`')
+    expect(CARD_DESIGNER_SYSTEM_PROMPT).toContain('禁止引用变量、spread、computed key 和 accessor')
+  })
+
+  it('documents the runtime farm-position shape', () => {
+    expect(CARD_DESIGNER_SYSTEM_PROMPT).toContain('`positionKey({ row, col })`')
+    expect(CARD_DESIGNER_SYSTEM_PROMPT).toContain('`"row-col"`')
+    expect(CARD_DESIGNER_SYSTEM_PROMPT).not.toContain('`positionKey({ x, y })`')
+    expect(platformDesign).toContain('`positionKey({row,col})`')
+    expect(platformDesign).not.toContain('`positionKey({x,y})`')
   })
 
   it('renders exactly the actionId whitelist (no missing, no extras)', () => {

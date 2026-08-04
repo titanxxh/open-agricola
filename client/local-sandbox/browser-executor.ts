@@ -17,7 +17,7 @@
 import { validateCardCode } from '../../shared/custom-code/ast-validator.ts'
 import { compileCardCode } from '../../shared/custom-code/compiler.ts'
 import { HELPERS_INJECTION_SOURCE } from '../../shared/custom-code/injected-helpers.ts'
-import { cardEffectHooks, type CardEffectField } from '../../shared/cards/card-effects.ts'
+import { cardEffectHooks, isHandCardEffectHook, type CardEffectField } from '../../shared/cards/card-effects.ts'
 import type { ActionFlow } from '../../shared/contract/types.ts'
 import type { ActionHookResult } from '../../shared/actions/hooks.ts'
 import { isSandboxListenerAction } from '../../shared/custom-code/sandbox-listener-actions.ts'
@@ -136,6 +136,9 @@ function runManifestExtraction(compiledCode: string, cardId: string): {
       if (eff.beforeEndGameScope === 'owner' || eff.beforeEndGameScope === 'allPlayers') {
         __effectMetadata.beforeEndGameScope = eff.beforeEndGameScope;
       }
+      if (Array.isArray(eff.handHooks)) {
+        __effectMetadata.handHooks = eff.handHooks.filter(function(x) { return typeof x === 'string'; });
+      }
       if (typeof eff.beforeEndGameMandatory === 'boolean') {
         __effectMetadata.beforeEndGameMandatory = eff.beforeEndGameMandatory;
       }
@@ -190,7 +193,12 @@ function runManifestExtraction(compiledCode: string, cardId: string): {
   }))
 
   const effectMetadata = parsed.effectMetadata && Object.keys(parsed.effectMetadata).length > 0
-    ? parsed.effectMetadata
+    ? {
+        ...parsed.effectMetadata,
+        ...(parsed.effectMetadata.handHooks
+          ? { handHooks: parsed.effectMetadata.handHooks.filter(isHandCardEffectHook) }
+          : {}),
+      }
     : undefined
 
   return {

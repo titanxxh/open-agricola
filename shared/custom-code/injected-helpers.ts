@@ -26,8 +26,8 @@ function spaceHasPlayer(space, playerId) {
 
 // --- positionKey — deterministic farm tile position hash ---
 function positionKey(pos) {
-  if (!pos) return '?,?';
-  return String(pos.x) + ',' + String(pos.y);
+  if (!pos) return '?-?';
+  return String(pos.row) + '-' + String(pos.col);
 }
 
 // --- getCardDefinition — stub (sandbox has no access to card catalog) ---

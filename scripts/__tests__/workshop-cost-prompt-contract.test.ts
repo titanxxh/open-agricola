@@ -19,4 +19,31 @@ describe('workshop cost prompt contract', () => {
       expect(content).toMatch(/computeExchanges[\s\S]{0,240}(不可用|不支持|不要|官方卡)/)
     }
   })
+
+  it('requires mandatory capped bonuses for improvement-wide discounts', () => {
+    const guidance = [
+      read('client/services/llmPrompts.ts'),
+      read('docs/CARD_DESIGN_PROMPT.md'),
+      read('docs/CUSTOM_CARD_SANDBOX.md'),
+    ]
+
+    for (const content of guidance) {
+      expect(content).toMatch(/改良[\s\S]{0,500}capDiscountAtCost/)
+      expect(content).toMatch(/capDiscountAtCost[\s\S]{0,240}optional/)
+      expect(content).toMatch(/optional:\s*false/)
+      expect(content).toMatch(/sources:\s*\[CARD_ID\]/)
+      expect(content).toMatch(/costs[^\n]*(简单|普通 action)/)
+    }
+
+    const example = read('docs/community-card-examples.md').split('## 5.')[0]!.split('## 4.')[1]!
+    expect(example).toContain('bonuses:')
+    expect(example).toContain('capDiscountAtCost: true')
+    expect(example).toContain('optional: false')
+    expect(example).not.toContain('costs: { wood: -1 }')
+
+    const recording = read('tests/llm-card-gen/recordings/M11-improvement-cost-reduction.txt')
+    expect(recording).toContain('bonuses:')
+    expect(recording).toContain('capDiscountAtCost: true')
+    expect(recording).toContain('optional: false')
+  })
 })

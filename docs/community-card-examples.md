@@ -142,7 +142,7 @@ const CARD_IMPL = {
 
 ## 4. computeCosts phase listener：购买折扣
 
-监听改良卡购买，在 computeCosts 阶段返回费用修改。
+监听改良卡购买，在 computeCosts 阶段返回 mandatory capped bonus。
 
 ```typescript
 const CARD_ID = 'CUSTOM_Bargainer'
@@ -173,15 +173,21 @@ const CARD_IMPL = {
       cardIds: [CARD_ID],
       actions: ['improvement'],
       phases: ['computeCosts'],
-      handler: (context) => {
-        return { costs: { wood: -1 }, sourceCard: CARD_ID }
-      },
+      handler: () => ({
+        bonuses: [{
+          discount: { wood: 1 },
+          capDiscountAtCost: true,
+          optional: false,
+          sources: [CARD_ID],
+        }],
+        sourceCard: CARD_ID,
+      }),
     },
   ],
 }
 ```
 
-> `computeCosts` 阶段返回 `{ costs: { resource: amount } }`，负数表示折扣。
+> 跨所有主要/次要改良候选的资源折扣必须用 mandatory capped bonus。`capDiscountAtCost` 防止费用变成负数，`optional: false` 不保留原价路径；`costs` 只用于简单行动费用。
 
 ---
 
@@ -465,5 +471,4 @@ const CARD_IMPL = {
 }
 ```
 
-> `handHooks` 是 meta 字段，声明哪些 hook 在卡牌还在手牌时也触发。一旦卡牌打出，只走正常 hook 路径。
-
+> `handHooks` 是 meta 字段，只声明会从手牌派发的 stage hook；不支持 `onBuy`、`onEndTurn`、`onBeforeEndGame`、`onBeforePlayerTurn`。`CARD_IMPL.effect` 必须直接写对象字面量，禁止变量引用、spread、computed key 和 accessor。一旦卡牌打出，只走正常 hook 路径。

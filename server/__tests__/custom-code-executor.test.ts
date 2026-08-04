@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it } from 'vitest'
 import { clearCustomCards, registerCustomCard, type CustomCardData } from '../../shared/cards/custom-registry.ts'
 import { executeCardListener, getMatchingListeners } from '../../shared/cards/card-listeners.ts'
 import { getCardEffect, runCardEffectHook } from '../../shared/cards/card-effects.ts'
+import { computeAnimalZones } from '../../shared/domain/animal-zones.ts'
 import { createInitialState } from '../../shared/session/state-bootstrap.ts'
 import { validateAndCompileCustomCode, invokeCustomCodeEffect } from '../custom-code/engine.ts'
 import { registerExecutorBackedCustomCard } from '../custom-code/runtime.ts'
@@ -110,6 +111,7 @@ const CARD_DEF = MinorImprovement({ id: CARD_ID, name: 'Executor Card' })
 const CARD_IMPL = {
   effect: {
     id: CARD_ID,
+    handHooks: ['onBeforeStartOfTurn'],
     beforeEndGameScope: 'allPlayers',
     beforeEndGameMandatory: true,
     onBeforeEndGame: (_state: any, _player: any) => {
@@ -122,6 +124,7 @@ const CARD_IMPL = {
     expect(result.valid).toBe(true)
     if (!result.valid) return
     expect((result.manifest as any).effectMetadata).toEqual({
+      handHooks: ['onBeforeStartOfTurn'],
       beforeEndGameScope: 'allPlayers',
       beforeEndGameMandatory: true,
     })
@@ -131,9 +134,45 @@ const CARD_IMPL = {
     registerExecutorBackedCustomCard(cardData)
 
     expect(getCardEffect('CUSTOM_ExecutorCard')).toMatchObject({
+      handHooks: ['onBeforeStartOfTurn'],
       beforeEndGameScope: 'allPlayers',
       beforeEndGameMandatory: true,
     })
+  })
+
+  it('dispatches a supported custom hand hook through a real session stage', () => {
+    const result = validateAndCompileCustomCode(`
+const CARD_ID = 'CUSTOM_ExecutorCard'
+const CARD_DEF = MinorImprovement({ id: CARD_ID, name: 'Executor Card' })
+const CARD_IMPL = {
+  effect: {
+    id: CARD_ID,
+    handHooks: ['onBeforeStartOfTurn'],
+    onBeforeStartOfTurn: () => gainLeaf(CARD_ID, { food: 1 }),
+  },
+}
+    `, 'CUSTOM_ExecutorCard')
+    expect(result.valid).toBe(true)
+    if (!result.valid) return
+
+    const session = new GameSession(undefined, [makeCardData(result.compiledCode, result.manifest)], { playerCount: 2 })
+    const state = session.getState().state
+    state.players.forEach((player) => {
+      player.minorHand = ['__test_placeholder__']
+      player.occupationHand = ['__test_placeholder__']
+    })
+    state.players[0]!.minorHand = ['CUSTOM_ExecutorCard']
+    state.players[0]!.resources.food = 0
+    state.round = 1
+    state.roundPhase = 'preparation'
+    session.loadState(state)
+
+    const response = session.withCtx(() => (
+      session as unknown as { continueBeforeStartOfTurn: () => ReturnType<GameSession['takeAction']> }
+    ).continueBeforeStartOfTurn())
+
+    expect(response.ok).toBe(true)
+    expect(response.state.players[0]!.resources.food).toBe(1)
   })
 
   it('does not expose shared animal zone hooks without executor argument plumbing', () => {
@@ -316,5 +355,77 @@ const CARD_IMPL = {
       params: { food: 3 },
       sourceCard: 'CUSTOM_HelperCard',
     })
+  })
+
+  it('uses row and col in positionKey', () => {
+    const compiled = validateAndCompileCustomCode(`
+const CARD_ID = 'CUSTOM_HelperCard'
+const CARD_DEF = MinorImprovement({ id: CARD_ID, name: 'Helper Card' })
+const CARD_IMPL = {
+  effect: {
+    id: CARD_ID,
+    onReturnHome: () => ({
+      type: 'leaf',
+      actionId: 'special-effect',
+      params: { kind: 'set-infobox', text: positionKey({ row: 1, col: 2 }) },
+      sourceCard: CARD_ID,
+    }),
+  },
+}
+    `, 'CUSTOM_HelperCard')
+    expect(compiled.valid).toBe(true)
+    if (!compiled.valid) return
+
+    const state = createInitialState(42)
+    const result = invokeCustomCodeEffect({
+      compiledCode: compiled.compiledCode,
+      cardId: 'CUSTOM_HelperCard',
+      hook: 'onReturnHome',
+      state,
+      player: state.players[0]!,
+    })
+    expect(result).toEqual({
+      ok: true,
+      result: {
+        type: 'leaf',
+        actionId: 'special-effect',
+        params: { kind: 'set-infobox', text: '1-2' },
+        sourceCard: 'CUSTOM_HelperCard',
+      },
+    })
+  })
+
+  it('adds only incremental animal zones through the real zone collector', () => {
+    const compiled = validateAndCompileCustomCode(`
+const CARD_ID = 'CUSTOM_ExecutorCard'
+const CARD_DEF = MinorImprovement({ id: CARD_ID, name: 'Executor Card' })
+const CARD_IMPL = {
+  effect: {
+    id: CARD_ID,
+    onComputeAnimalZones: (player: any, _zones: any[], state: any) => [{
+      id: 'custom-zone',
+      zoneType: 'card',
+      ownerPlayerId: player.id,
+      capacity: state.round,
+    }],
+  },
+}
+    `, 'CUSTOM_ExecutorCard')
+    expect(compiled.valid).toBe(true)
+    if (!compiled.valid) return
+
+    const session = new GameSession(undefined, [makeCardData(compiled.compiledCode, compiled.manifest)], { playerCount: 2 })
+    const state = session.getState().state
+    const player = state.players[0]!
+    player.minorPlayed.push('CUSTOM_ExecutorCard')
+
+    const zones = session.withCtx(() => computeAnimalZones(player, state))
+
+    expect(zones.filter((zone) => zone.id === 'house')).toHaveLength(1)
+    expect(zones.filter((zone) => zone.id === 'custom-zone')).toEqual([expect.objectContaining({
+      ownerPlayerId: player.id,
+      capacity: state.round,
+      cardId: 'CUSTOM_ExecutorCard',
+    })])
   })
 })

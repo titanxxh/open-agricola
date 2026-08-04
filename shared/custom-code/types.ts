@@ -4,10 +4,12 @@ import type { CardListenerContext, CardListenerScope } from '../cards/card-liste
 import type {
   BeforeEndGameScope,
   CardEffectField,
+  HandCardEffectHook,
   PaymentInfo,
 } from '../cards/card-effects'
 
 export type CustomCodeEffectMetadata = {
+  handHooks?: HandCardEffectHook[]
   beforeEndGameScope?: BeforeEndGameScope
   beforeEndGameMandatory?: boolean
 }
