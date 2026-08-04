@@ -393,6 +393,7 @@ function validateCardImplHooksAndPhases(
   sourceFile: ts.SourceFile,
   errors: string[],
 ): void {
+  const constants = collectStringConstants(sourceFile)
   function getLine(node: ts.Node): number {
     const { line } = sourceFile.getLineAndCharacterOfPosition(node.getStart())
     return line + 1
@@ -407,7 +408,7 @@ function validateCardImplHooksAndPhases(
         errors.push(`line ${getLine(decl)}: CARD_IMPL must be an object literal`)
         continue
       }
-      validateCardImplObject(decl.initializer, errors, getLine)
+      validateCardImplObject(decl.initializer, errors, getLine, constants)
     }
   }
 }
@@ -416,6 +417,7 @@ function validateCardImplObject(
   obj: ts.ObjectLiteralExpression,
   errors: string[],
   getLine: (node: ts.Node) => number,
+  constants: Map<string, string>,
 ): void {
   for (const prop of obj.properties) {
     if (ts.isSpreadAssignment(prop)) {
@@ -452,7 +454,7 @@ function validateCardImplObject(
       if (!ts.isArrayLiteralExpression(prop.initializer)) {
         errors.push(`line ${getLine(prop.initializer)}: CARD_IMPL.listeners must be an array literal`)
       } else {
-        validateListenersArray(prop.initializer, errors, getLine)
+        validateListenersArray(prop.initializer, errors, getLine, constants)
       }
     }
   }
@@ -503,7 +505,53 @@ function validateListenersArray(
   arr: ts.ArrayLiteralExpression,
   errors: string[],
   getLine: (node: ts.Node) => number,
+  constants: Map<string, string>,
 ): void {
+  const isInspectableResult = (expression: ts.Expression): boolean => {
+    if (
+      ts.isParenthesizedExpression(expression)
+      || ts.isAsExpression(expression)
+      || ts.isTypeAssertionExpression(expression)
+      || ts.isNonNullExpression(expression)
+      || ts.isSatisfiesExpression(expression)
+    ) return isInspectableResult(expression.expression)
+    if (
+      expression.kind === ts.SyntaxKind.NullKeyword
+      || (ts.isIdentifier(expression) && expression.text === 'undefined')
+      || ts.isVoidExpression(expression)
+    ) return true
+    if (ts.isConditionalExpression(expression)) {
+      return isInspectableResult(expression.whenTrue)
+        && isInspectableResult(expression.whenFalse)
+    }
+    return ts.isObjectLiteralExpression(expression)
+      && expression.properties.every(property => (
+        !ts.isSpreadAssignment(property)
+        && getStaticPropertyName(property, constants) !== undefined
+      ))
+  }
+
+  const validateHandler = (handler: ts.ArrowFunction | ts.FunctionExpression): void => {
+    const validateResult = (expression: ts.Expression): void => {
+      if (!isInspectableResult(expression)) {
+        errors.push(`line ${getLine(expression)}: listener handlers must return statically inspectable objects`)
+      }
+    }
+    if (!ts.isBlock(handler.body)) {
+      validateResult(handler.body)
+      return
+    }
+    const visitReturns = (node: ts.Node): void => {
+      if (ts.isReturnStatement(node)) {
+        if (node.expression) validateResult(node.expression)
+        return
+      }
+      if (ts.isFunctionLike(node)) return
+      ts.forEachChild(node, visitReturns)
+    }
+    ts.forEachChild(handler.body, visitReturns)
+  }
+
   for (const element of arr.elements) {
     if (!ts.isObjectLiteralExpression(element)) {
       errors.push(`line ${getLine(element)}: CARD_IMPL listener entries must be object literals`)
@@ -527,6 +575,17 @@ function validateListenersArray(
       }
       if ((propName === 'actions' || propName === 'phases') && !ts.isPropertyAssignment(prop)) {
         errors.push(`line ${getLine(prop)}: listener ${propName} must use a property assignment`)
+        continue
+      }
+      if (propName === 'handler') {
+        if (
+          !ts.isPropertyAssignment(prop)
+          || (!ts.isArrowFunction(prop.initializer) && !ts.isFunctionExpression(prop.initializer))
+        ) {
+          errors.push(`line ${getLine(prop)}: listener handlers must be inline functions`)
+        } else {
+          validateHandler(prop.initializer)
+        }
         continue
       }
       if (!ts.isPropertyAssignment(prop)) continue

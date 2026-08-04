@@ -12,6 +12,7 @@ import {
 import { registerExecutorBackedCustomCard } from '../custom-code/runtime.ts'
 import { GameSession } from '../game/authoritative-session.ts'
 import { workshopCardJsonFromDefinition } from '../workshop-draft-validation.ts'
+import { compileCardCode } from '../../shared/custom-code/compiler.ts'
 
 const makeCardData = (compiledCode: string, codeManifest: CustomCardData['codeManifest']): CustomCardData => ({
   cardType: 'minor',
@@ -204,7 +205,7 @@ const CARD_IMPL = {
   })
 
   it('rejects dynamically constructed costs without attribution at runtime', () => {
-    const compiled = validateAndCompileCustomCode(`
+    const source = `
 const CARD_ID = 'CUSTOM_ExecutorCard'
 const CARD_DEF = MinorImprovement({ id: CARD_ID, name: 'Executor Card' })
 const CARD_IMPL = {
@@ -215,16 +216,32 @@ const CARD_IMPL = {
     handler: () => Object.fromEntries([['costs', { wood: -2 }]]),
   }],
 }
-    `, 'CUSTOM_ExecutorCard')
-    expect(compiled.valid).toBe(true)
-    if (!compiled.valid) return
+    `
 
     expect(invokeCustomCodeListener({
-      compiledCode: compiled.compiledCode,
+      compiledCode: compileCardCode(source),
       cardId: 'CUSTOM_ExecutorCard',
       registrationId: 'CUSTOM_ExecutorCard:listener:0',
       context: {} as never,
     })).toEqual({ ok: false, error: expect.stringContaining('costAttribution') })
+  })
+
+  it('rejects invalid results from a normally registered custom listener', () => {
+    const state = createInitialState(42)
+    const player = state.players[0]!
+    const space = state.actionSpaces[0]!
+
+    expect(() => executeCardListener({
+      id: 'CUSTOM_ExecutorCard:listener:0',
+      cardIds: ['CUSTOM_ExecutorCard'],
+      handler: () => Object.fromEntries([['costs', { wood: -2 }]]),
+    }, {
+      state,
+      player,
+      space,
+      actionId: 'construct',
+      phase: 'computeCosts',
+    }, { ownerCardId: 'CUSTOM_ExecutorCard' })).toThrow('costAttribution')
   })
 
   it('executes registered effect and listener through runtime proxies', () => {

@@ -245,7 +245,14 @@ type StubOpts = {
   githubLogin: string
   /** If given and open, findOpenPr returns this PR; openPr call should NOT happen. */
   existingPr?: StubPr | null
-  existingPrFiles?: Array<{ filename: string; status: string; sha: string; patch?: string }>
+  existingPrFiles?: Array<{
+    filename: string
+    previous_filename?: string
+    status: string
+    sha: string
+    mode?: '100644' | '100755'
+    patch?: string
+  }>
   upstreamFiles?: Record<string, string>
   /** Used when openPr is invoked. */
   openedPr?: { number: number; url: string }
@@ -259,7 +266,7 @@ type StubCounts = {
   blobCalls: number
   commitCalls: number
   treeCalls: number
-  treeEntries: Array<Array<{ path: string; sha: string | null }>>
+  treeEntries: Array<Array<{ path: string; sha: string | null; mode: string }>>
   blobContents: Map<string, string>
 }
 
@@ -387,7 +394,7 @@ function createGitHubApiStub(opts: StubOpts): {
     if (url.includes('/git/trees') && method === 'POST') {
       counts.treeCalls++
       counts.treeEntries.push((JSON.parse(String(init?.body)) as {
-        tree: Array<{ path: string; sha: string | null }>
+        tree: Array<{ path: string; sha: string | null; mode: string }>
       }).tree)
       return Promise.resolve(
         new Response(JSON.stringify({ sha: 'tree_sha' }), { status: 201 }),
@@ -447,6 +454,25 @@ function createGitHubApiStub(opts: StubOpts): {
 
     if (url.match(/\/pulls\/\d+\/files/) && method === 'GET') {
       return Promise.resolve(new Response(JSON.stringify(existingPrFiles), { status: 200 }))
+    }
+
+    if (url.match(/\/pulls\/\d+$/) && method === 'GET') {
+      return Promise.resolve(new Response(JSON.stringify({ head: { sha: 'existing_pr_head' } }), {
+        status: 200,
+      }))
+    }
+
+    if (url.includes('/git/trees/existing_pr_head') && method === 'GET') {
+      return Promise.resolve(new Response(JSON.stringify({
+        truncated: false,
+        tree: existingPrFiles
+          .filter(file => file.status !== 'removed')
+          .map(file => ({
+            path: file.filename,
+            mode: file.mode ?? '100644',
+            type: 'blob',
+          })),
+      }), { status: 200 }))
     }
 
     if (url.match(/\/pulls\/\d+$/) && method === 'PATCH') {

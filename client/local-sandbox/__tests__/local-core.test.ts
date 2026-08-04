@@ -6,6 +6,7 @@ import {
   invokeCustomCodeListenerLocal,
   validateAndCompileCustomCodeLocal,
 } from '../browser-executor.ts'
+import { compileCardCode } from '../../../shared/custom-code/compiler.ts'
 
 const DEBUG_VIEWER: ViewerSpec = { viewerPlayerId: null, mode: 'debug' }
 
@@ -159,7 +160,7 @@ const CARD_IMPL = {
   })
 
   it('rejects dynamically constructed costs without attribution at runtime', () => {
-    const compiled = validateAndCompileCustomCodeLocal(`
+    const source = `
 const CARD_ID = 'CUSTOM_DynamicCosts'
 const CARD_DEF = MinorImprovement({ id: CARD_ID, name: 'Dynamic Costs' })
 const CARD_IMPL = {
@@ -170,12 +171,10 @@ const CARD_IMPL = {
     handler: () => Object.fromEntries([['costs', { wood: -2 }]]),
   }],
 }
-    `, 'CUSTOM_DynamicCosts')
-    expect(compiled.valid).toBe(true)
-    if (!compiled.valid) return
+    `
 
     expect(invokeCustomCodeListenerLocal({
-      compiledCode: compiled.compiledCode,
+      compiledCode: compileCardCode(source),
       cardId: 'CUSTOM_DynamicCosts',
       registrationId: 'CUSTOM_DynamicCosts:listener:0',
       context: {} as never,

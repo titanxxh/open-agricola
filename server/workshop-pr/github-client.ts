@@ -21,6 +21,7 @@ type CommitFile = { path: string; content: string; encoding: 'utf-8' | 'base64' 
 type CommitTreeEntry = {
   path: string
   sha: string
+  mode: '100644' | '100755'
   patch?: string
   previousPath?: string
   status: string
@@ -191,11 +192,11 @@ export class GitHubClient {
       return { path: file.path, sha }
     }
 
-    const blobs: Array<{ path: string; sha: string }> = []
-    for (const file of files) blobs.push(await createBlob(file))
+    const blobs: Array<{ path: string; sha: string; mode: '100644' | '100755' }> = []
+    for (const file of files) blobs.push({ ...await createBlob(file), mode: '100644' })
 
     const generatedPaths = new Set(files.map(file => file.path))
-    const preservedTree: Array<{ path: string; sha: string | null }> = []
+    const preservedTree: Array<{ path: string; sha: string | null; mode: '100644' | '100755' }> = []
     for (const entry of opts.preservedTreeEntries ?? []) {
       if (generatedPaths.has(entry.path) || (entry.previousPath && generatedPaths.has(entry.previousPath))) {
         continue
@@ -231,11 +232,16 @@ export class GitHubClient {
         if (content !== '') {
           throw new GitHubApiError('preserved PR edits conflict with current main', 'pr_rebase_conflict', 409)
         }
-        preservedTree.push({ path: entry.path, sha: null })
+        preservedTree.push({ path: entry.path, sha: null, mode: entry.mode })
         continue
       }
-      if (entry.previousPath) preservedTree.push({ path: entry.previousPath, sha: null })
-      blobs.push(await createBlob({ path: entry.path, content, encoding: 'utf-8' }))
+      if (entry.previousPath) {
+        preservedTree.push({ path: entry.previousPath, sha: null, mode: entry.mode })
+      }
+      blobs.push({
+        ...await createBlob({ path: entry.path, content, encoding: 'utf-8' }),
+        mode: entry.mode,
+      })
     }
 
     const treeResp = await this.fetch(`/repos/${forkOwner}/${repo}/git/trees`, {
@@ -244,8 +250,8 @@ export class GitHubClient {
       body: JSON.stringify({
         base_tree: upstreamBaseSha,
         tree: [
-          ...preservedTree.map(({ path, sha }) => ({ path, sha, mode: '100644', type: 'blob' })),
-          ...blobs.map((b) => ({ path: b.path, mode: '100644', type: 'blob', sha: b.sha })),
+          ...preservedTree.map(({ path, sha, mode }) => ({ path, sha, mode, type: 'blob' })),
+          ...blobs.map((b) => ({ path: b.path, mode: b.mode, type: 'blob', sha: b.sha })),
         ],
       }),
     })
@@ -353,6 +359,29 @@ export class GitHubClient {
       sha: string
       patch?: string
     }
+    const prResponse = await this.fetch(
+      `/repos/${this.opts.upstreamOwner}/${this.opts.upstreamRepo}/pulls/${prNumber}`,
+    )
+    if (!prResponse.ok) {
+      throw new GitHubApiError('pr lookup failed', 'pr_lookup_failed', prResponse.status)
+    }
+    const { head } = (await prResponse.json()) as { head: { sha: string } }
+    const treeResponse = await this.fetch(
+      `/repos/${this.opts.upstreamOwner}/${this.opts.upstreamRepo}/git/trees/${head.sha}?recursive=1`,
+    )
+    if (!treeResponse.ok) {
+      throw new GitHubApiError('pr tree lookup failed', 'pr_tree_lookup_failed', treeResponse.status)
+    }
+    const tree = (await treeResponse.json()) as {
+      truncated: boolean
+      tree: Array<{ path: string; mode: string; type: string }>
+    }
+    if (tree.truncated) {
+      throw new GitHubApiError('PR tree is too large to preserve safely', 'pr_tree_truncated', 409)
+    }
+    const modes = new Map(tree.tree
+      .filter(entry => entry.type === 'blob')
+      .map(entry => [entry.path, entry.mode]))
     const files: PullRequestFile[] = []
     for (let page = 1; ; page++) {
       const r = await this.fetch(
@@ -363,13 +392,20 @@ export class GitHubClient {
       files.push(...currentPage)
       if (currentPage.length < 100) break
     }
-    return files.map(file => ({
-      path: file.filename,
-      sha: file.sha,
-      status: file.status,
-      ...(file.previous_filename ? { previousPath: file.previous_filename } : {}),
-      ...(file.patch ? { patch: file.patch } : {}),
-    }))
+    return files.map(file => {
+      const mode = file.status === 'removed' ? '100644' : modes.get(file.filename)
+      if (mode !== '100644' && mode !== '100755') {
+        throw new GitHubApiError('unsupported PR file mode', 'pr_file_mode_unsupported', 409)
+      }
+      return {
+        path: file.filename,
+        sha: file.sha,
+        status: file.status,
+        mode,
+        ...(file.previous_filename ? { previousPath: file.previous_filename } : {}),
+        ...(file.patch ? { patch: file.patch } : {}),
+      }
+    })
   }
 
   async openPr(opts: {

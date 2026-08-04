@@ -130,6 +130,26 @@ describe('ast-validator: CARD_IMPL hook/phase whitelisting', () => {
     )
   })
 
+  it.each([
+    "Object.fromEntries([['costs', { wood: -1 }]])",
+    "({ ['cost' + 's']: { wood: -1 } })",
+  ])('rejects listener results that cannot be checked statically: %s', (resultExpression) => {
+    const result = validateCardCode(`
+      const CARD_IMPL = {
+        listeners: [{
+          actions: ['construct'],
+          phases: ['computeCosts'],
+          handler: () => ${resultExpression},
+        }],
+      }
+    `)
+
+    expect(result.valid).toBe(false)
+    expect(result.valid === false && result.errors.some(
+      error => error.includes('listener handlers must return statically inspectable objects'),
+    )).toBe(true)
+  })
+
   it('rejects costs assigned after object construction', () => {
     const result = validateCardCode(`
       const CARD_ID = 'CUSTOM_Test'
