@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession, type SessionResponse } from '../game/authoritative-session'
 import { C014_StrawThatchedRoof } from '../../shared/cards/C/C014_StrawThatchedRoof'
+import { canRenovate } from '../../shared/actions/effects/renovation'
+import { PaymentSolver } from '../../shared/actions/payment'
 import { setWorkersAtHome } from '../../shared/domain/player'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 
@@ -61,7 +63,9 @@ describe('C014 Straw-Thatched Roof session', () => {
     let resp = chooseConstructIfNeeded(session, session.takeAction(0, 'farm-expansion'))
     expect(resp.ok).toBe(true)
     expect(resp.interaction.stateId).toBe('wait')
-    if (resp.interaction.stateId !== 'wait' || resp.interaction.request.kind !== 'farm') return
+    if (resp.interaction.stateId !== 'wait') return
+    expect(resp.interaction.request.kind).toBe('farm-select')
+    if (resp.interaction.request.kind !== 'farm-select') return
     expect(resp.interaction.request.farm.farmType).toBe('room')
     const room = resp.interaction.request.farm.selectableTiles[0]!
 
@@ -75,6 +79,9 @@ describe('C014 Straw-Thatched Roof session', () => {
     )
     expect(paid).toBeDefined()
     expect(paid?.type === 'resource.paid' ? paid.resources.reed ?? 0 : undefined).toBe(0)
+    expect(resp.state.players[0]!.cardStates[CARD_ID]?.extraData?.resourceStats).toMatchObject({
+      saved: { reed: 2 },
+    })
     expect(actionLog(resp, 'construct')).toBeDefined()
     expect(resp.scores).toHaveLength(2)
   })
@@ -98,6 +105,9 @@ describe('C014 Straw-Thatched Roof session', () => {
     )
     expect(paid).toBeDefined()
     expect(paid?.type === 'resource.paid' ? paid.resources.reed ?? 0 : undefined).toBe(0)
+    expect(resp.state.players[0]!.cardStates[CARD_ID]?.extraData?.resourceStats).toMatchObject({
+      saved: { reed: 1 },
+    })
     expect(actionLog(resp, 'renovate-house')).toBeDefined()
     expect(resp.scores).toHaveLength(2)
   })
@@ -108,35 +118,23 @@ describe('C014 Straw-Thatched Roof session', () => {
     constructSession.loadState(constructSession.state)
     const constructBefore = constructSession.getState()
 
-    const construct = constructSession.takeAction(0, 'farm-expansion')
-
-    expect(construct.ok).toBe(true)
-    expect(construct.interaction.stateId).toBe('wait')
-    if (construct.interaction.stateId !== 'wait') return
-    expect(construct.interaction.request.kind).toBe('confirm-next-player')
-    expect(construct.state.players[0]!.rooms).toBe(2)
-    expect(actionLog(construct, 'construct')).toBeUndefined()
-    expect(construct.state.events.some(
-      (event) => event.type === 'resource.paid' && event.paymentFor === 'construct',
-    )).toBe(false)
-    expect(construct.scores).toEqual(constructBefore.scores)
+    expect(PaymentSolver.getMaxBuildableRooms(constructSession.state.players[0]!)).toBe(0)
+    const constructAfter = constructSession.getState()
+    expect(constructAfter.interaction).toEqual(constructBefore.interaction)
+    expect(constructAfter.state.log).toEqual(constructBefore.state.log)
+    expect(constructAfter.scores).toEqual(constructBefore.scores)
+    expect(constructAfter.state).toEqual(constructBefore.state)
 
     const renovationSession = setup(false)
     renovationSession.state.players[0]!.resources.clay = 2
     renovationSession.loadState(renovationSession.state)
     const renovationBefore = renovationSession.getState()
 
-    const renovation = renovationSession.takeAction(0, 'house-redevelopment')
-
-    expect(renovation.ok).toBe(true)
-    expect(renovation.interaction.stateId).toBe('wait')
-    if (renovation.interaction.stateId !== 'wait') return
-    expect(renovation.interaction.request.kind).toBe('confirm-next-player')
-    expect(renovation.state.players[0]!.houseType).toBe('wood')
-    expect(actionLog(renovation, 'renovate-house')).toBeUndefined()
-    expect(renovation.state.events.some(
-      (event) => event.type === 'resource.paid' && event.paymentFor === 'renovation',
-    )).toBe(false)
-    expect(renovation.scores).toEqual(renovationBefore.scores)
+    expect(canRenovate(renovationSession.state.players[0]!)).toBe(false)
+    const renovationAfter = renovationSession.getState()
+    expect(renovationAfter.interaction).toEqual(renovationBefore.interaction)
+    expect(renovationAfter.state.log).toEqual(renovationBefore.state.log)
+    expect(renovationAfter.scores).toEqual(renovationBefore.scores)
+    expect(renovationAfter.state).toEqual(renovationBefore.state)
   })
 })

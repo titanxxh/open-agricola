@@ -204,6 +204,12 @@ export type CostResourceRemovalModifier = {
   resources: ResourceKey[]
 }
 
+export type AppliedCostResourceRemoval = {
+  resource: ResourceKey
+  sourceCard: string
+  savedByFee: number[]
+}
+
 export type CostModifier = TradeModifier | BonusModifier | CostResourceRemovalModifier
 
 export type ComplexCost = {
@@ -223,7 +229,7 @@ export type ComplexCost = {
   paymentBudget?: PaymentResourceMap
   cards?: { type: string; list: string[]; cost?: PaymentResourceMap; required?: boolean }
   bonuses?: Bonus[]
-  costModifierSources?: string[]
+  costResourceRemovals?: AppliedCostResourceRemoval[]
 }
 
 export type CostAttribution = {
