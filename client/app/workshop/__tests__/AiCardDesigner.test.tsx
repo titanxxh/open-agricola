@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { describe, expect, it, beforeEach, vi } from 'vitest'
 import { renderToStaticMarkup } from 'react-dom/server'
-import { render, screen, waitFor } from '@testing-library/react'
+import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 
 import { LocaleProvider } from '../../../contexts/LocaleContext'
@@ -189,6 +189,35 @@ describe('AiCardDesigner AI config header', () => {
     expect(preview?.querySelector('.card-frame')).not.toBeNull()
     expect(preview?.querySelector('.card-cost .card-res-icon.wood')).not.toBeNull()
     expect(container.querySelector('.aicw-preview-pane .aicw-card')).toBeNull()
+  })
+
+  it('shows and copies the card ID below the live preview', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: false }))
+    const user = userEvent.setup()
+    const writeText = vi.spyOn(navigator.clipboard, 'writeText')
+
+    const { container } = render(
+      <LocaleProvider>
+        <AiCardDesigner
+          initialCard={existingCard}
+          onClose={() => {}}
+          apiFetch={apiFetchForExistingCard}
+        />
+      </LocaleProvider>,
+    )
+
+    await waitFor(() => {
+      expect(screen.getByDisplayValue(existingCard.card_id)).toBeInTheDocument()
+    })
+    const cardIdRow = container.querySelector('.aicw-live-card-id')
+    expect(cardIdRow).not.toBeNull()
+    expect(within(cardIdRow as HTMLElement).getByText(existingCard.card_id)).toBeVisible()
+
+    await user.click(within(cardIdRow as HTMLElement).getByRole('button', { name: '复制ID' }))
+
+    expect(writeText).toHaveBeenCalledWith(existingCard.card_id)
+    expect(within(cardIdRow as HTMLElement).getByRole('button')).toHaveTextContent('已复制!')
+    expect(within(cardIdRow as HTMLElement).getByRole('button')).toHaveAttribute('aria-live', 'polite')
   })
 
   it('loads an author workspace directly from an editor card URL', async () => {
