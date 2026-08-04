@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { findMissingCostAttributionLines, validateCardCode } from '../ast-validator'
+import { findInvalidCostAttributionLines, validateCardCode } from '../ast-validator'
 
 describe('ast-validator: CARD_IMPL hook/phase whitelisting', () => {
   it('accepts valid effect hooks', () => {
@@ -200,7 +200,7 @@ describe('ast-validator: CARD_IMPL hook/phase whitelisting', () => {
   })
 
   it('flags indirect compute-cost handler results in the production audit', () => {
-    const lines = findMissingCostAttributionLines(`
+    const lines = findInvalidCostAttributionLines(`
       const discountHandler = () => {
         const result = { costs: { wood: -1 } }
         return result
@@ -208,6 +208,21 @@ describe('ast-validator: CARD_IMPL hook/phase whitelisting', () => {
       const listener = {
         phases: ['computeCosts'],
         handler: discountHandler,
+      }
+    `)
+
+    expect(lines).toHaveLength(1)
+  })
+
+  it('flags invalid cost attribution entries in the production audit', () => {
+    const lines = findInvalidCostAttributionLines(`
+      const CARD_ID = 'D000_Test'
+      const listener = {
+        phases: ['computeCosts'],
+        handler: () => ({
+          costs: { wood: -1 },
+          costAttribution: [],
+        }),
       }
     `)
 

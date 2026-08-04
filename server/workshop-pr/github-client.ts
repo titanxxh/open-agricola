@@ -34,6 +34,7 @@ const applyUnifiedPatch = (source: string, patch: string): string => {
   const patchLines = patch.split('\n')
   const output: string[] = []
   let sourceCursor = 0
+  let relocationOffset = 0
   let resultEndsWithNewline = source === '' || source.endsWith('\n')
   let foundHunk = false
 
@@ -44,7 +45,8 @@ const applyUnifiedPatch = (source: string, patch: string): string => {
       continue
     }
     foundHunk = true
-    const expectedStart = Math.max(sourceCursor, Number(header[1]) - 1)
+    const originalStart = Math.max(0, Number(header[1]) - 1)
+    const expectedStart = Math.max(sourceCursor, originalStart + relocationOffset)
     index++
     const hunk: string[] = []
     while (index < patchLines.length && !patchLines[index]!.startsWith('@@ ')) {
@@ -74,6 +76,7 @@ const applyUnifiedPatch = (source: string, patch: string): string => {
         )
       }
     }
+    relocationOffset = hunkStart - originalStart
 
     output.push(...sourceLines.slice(sourceCursor, hunkStart))
     let hunkCursor = hunkStart
@@ -204,7 +207,13 @@ export class GitHubClient {
       if (entry.status === 'renamed' && !entry.previousPath) {
         throw new GitHubApiError('renamed PR file is missing its previous path', 'pr_patch_invalid', 422)
       }
-      if (!entry.patch && entry.status !== 'renamed' && entry.status !== 'copied' && entry.status !== 'added') {
+      if (
+        !entry.patch
+        && entry.status !== 'renamed'
+        && entry.status !== 'copied'
+        && entry.status !== 'added'
+        && entry.status !== 'removed'
+      ) {
         throw new GitHubApiError('PR patch is unavailable for safe rebase', 'pr_patch_unavailable', 409)
       }
       const basePath = entry.previousPath ?? entry.path
@@ -227,6 +236,13 @@ export class GitHubClient {
         baseContent = ''
       } else if (baseContent === undefined) {
         throw new GitHubApiError('preserved PR edits conflict with current main', 'pr_rebase_conflict', 409)
+      }
+      if (entry.status === 'removed' && !entry.patch) {
+        if (baseFile?.sha !== entry.sha) {
+          throw new GitHubApiError('preserved PR edits conflict with current main', 'pr_rebase_conflict', 409)
+        }
+        preservedTree.push({ path: entry.path, sha: null, mode: entry.mode })
+        continue
       }
       if (entry.status === 'renamed' || entry.status === 'copied') {
         try {

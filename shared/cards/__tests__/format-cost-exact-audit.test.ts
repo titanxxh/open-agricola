@@ -1,7 +1,7 @@
 import { readdirSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
-import { findMissingCostAttributionLines } from '../../custom-code/ast-validator'
+import { findInvalidCostAttributionLines } from '../../custom-code/ast-validator'
 
 type FindingType =
   | 'costOverride'
@@ -109,7 +109,7 @@ const scanCardAuthoredCostHacks = () => {
   const findings: Finding[] = []
   for (const file of listCardSourceFiles()) {
     const text = readFileSync(file, 'utf8')
-    if (findMissingCostAttributionLines(text).length > 0) {
+    if (findInvalidCostAttributionLines(text).length > 0) {
       findings.push({ file, type: 'missingCostAttribution' })
     }
     if (/\bcostOverride\b/.test(text)) {

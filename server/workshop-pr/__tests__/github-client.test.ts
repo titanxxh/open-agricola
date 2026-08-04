@@ -247,6 +247,58 @@ describe('GitHubClient', () => {
       })).rejects.toMatchObject({ code: 'pr_rebase_conflict' })
     })
 
+    it('carries a relocated offset across later patch hunks', async () => {
+      let blobBody: { content?: string } | null = null
+      fetchHandler = (url, init) => {
+        if (url.includes('/contents/example.ts')) {
+          return okJson({
+            content: Buffer.from(
+              'inserted\nfirst-target\nfiller\nsecond-target\nsecond-target\n',
+            ).toString('base64'),
+            encoding: 'base64',
+          })
+        }
+        if (url.includes('/git/blobs') && init?.method === 'POST') {
+          blobBody = JSON.parse(init.body as string) as typeof blobBody
+          return okJson({ sha: 'blobsha' })
+        }
+        if (url.includes('/git/trees') && init?.method === 'POST') return okJson({ sha: 'treesha' })
+        if (url.includes('/git/commits') && init?.method === 'POST') return okJson({ sha: 'commitsha' })
+        return new Response('', { status: 404 })
+      }
+      const c = new GitHubClient({
+        token: 't',
+        upstreamOwner: 'titanxxh',
+        upstreamRepo: 'open-agricola',
+      })
+
+      await c.createCommit({
+        forkOwner: 'alice',
+        files: [],
+        preservedTreeEntries: [{
+          path: 'example.ts',
+          sha: 'old-pr-blob',
+          status: 'modified',
+          mode: '100644',
+          patch: [
+            '@@ -1 +1 @@',
+            '-first-target',
+            '+first-reviewed',
+            '@@ -4 +4 @@',
+            '-second-target',
+            '+second-reviewed',
+          ].join('\n'),
+        }],
+        message: 'test commit',
+        author: { name: 'alice', email: 'a@users.noreply.github.com' },
+        upstreamBaseSha: 'fixed-base',
+      })
+
+      expect(blobBody?.content).toBe(
+        'inserted\nfirst-reviewed\nfiller\nsecond-target\nsecond-reviewed\n',
+      )
+    })
+
     it('preserves a final newline added by a patch', async () => {
       let blobBody: { content?: string } | null = null
       fetchHandler = (url, init) => {
@@ -521,6 +573,85 @@ describe('GitHubClient', () => {
       expect(treeBody?.tree).toEqual([
         { path: 'fixtures/reviewer.bin', sha: 'reviewer-binary-blob', mode: '100644', type: 'blob' },
       ])
+    })
+
+    it('preserves a patchless removal when the current blob is unchanged', async () => {
+      let treeBody: {
+        tree?: Array<{ path: string; sha: string | null; mode: string }>
+      } | null = null
+      fetchHandler = (url, init) => {
+        if (url.includes('/contents/fixtures/removed.bin')) {
+          return okJson({
+            content: Buffer.from([0xff, 0x00, 0x80]).toString('base64'),
+            encoding: 'base64',
+            sha: 'removed-blob',
+          })
+        }
+        if (url.includes('/git/blobs') && init?.method === 'POST') {
+          throw new Error('a removal must not create a blob')
+        }
+        if (url.includes('/git/trees') && init?.method === 'POST') {
+          treeBody = JSON.parse(init.body as string) as typeof treeBody
+          return okJson({ sha: 'treesha' })
+        }
+        if (url.includes('/git/commits') && init?.method === 'POST') return okJson({ sha: 'commitsha' })
+        return new Response('', { status: 404 })
+      }
+      const c = new GitHubClient({
+        token: 't',
+        upstreamOwner: 'titanxxh',
+        upstreamRepo: 'open-agricola',
+      })
+
+      await c.createCommit({
+        forkOwner: 'alice',
+        files: [],
+        preservedTreeEntries: [{
+          path: 'fixtures/removed.bin',
+          sha: 'removed-blob',
+          status: 'removed',
+          mode: '100644',
+        }],
+        message: 'test commit',
+        author: { name: 'alice', email: 'a@users.noreply.github.com' },
+        upstreamBaseSha: 'fixed-base',
+      })
+
+      expect(treeBody?.tree).toEqual([
+        { path: 'fixtures/removed.bin', sha: null, mode: '100644', type: 'blob' },
+      ])
+    })
+
+    it('rejects a patchless removal when the current blob changed', async () => {
+      fetchHandler = (url) => {
+        if (url.includes('/contents/fixtures/removed.bin')) {
+          return okJson({
+            content: Buffer.from([0xff, 0x00, 0x80]).toString('base64'),
+            encoding: 'base64',
+            sha: 'changed-blob',
+          })
+        }
+        return new Response('', { status: 404 })
+      }
+      const c = new GitHubClient({
+        token: 't',
+        upstreamOwner: 'titanxxh',
+        upstreamRepo: 'open-agricola',
+      })
+
+      await expect(c.createCommit({
+        forkOwner: 'alice',
+        files: [],
+        preservedTreeEntries: [{
+          path: 'fixtures/removed.bin',
+          sha: 'removed-blob',
+          status: 'removed',
+          mode: '100644',
+        }],
+        message: 'test commit',
+        author: { name: 'alice', email: 'a@users.noreply.github.com' },
+        upstreamBaseSha: 'fixed-base',
+      })).rejects.toMatchObject({ code: 'pr_rebase_conflict' })
     })
   })
 

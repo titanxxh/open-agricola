@@ -1027,7 +1027,7 @@ Action reaction listener 的同一 owner / phase 默认进入 `trigger-select`�
 | `D010_StorksNest` | 已对齐 |  |
 | `D011_LawnFertilizer` | 已对齐 | size-one pasture replacement 走 `computePastureCapacityModifiers`；先替换为 `3 * (stables + 1)`，再叠加 A12/B72 等 additive。 |
 | `D012_MilkingPlace` | 已对齐 | 通过 `blocksHouseAnimalZones` metadata 触发 `computeAnimalZones()` 通用过滤，不再直接读取 D148。 |
-| `D013_Trowel` | 已对齐 | anytime 直接翻修到 stone 通过 `params.selectedOption='stone'` 进入真实 `renovate-house`；wood→stone / clay→stone 固定成本用 sourced mandatory bonus 表达，payment option 保留 Trowel 来源。 |
+| `D013_Trowel` | 已对齐 | anytime 直接翻修到 stone 通过 `params.selectedOption='stone'` 进入真实 `renovate-house`；wood→stone / clay→stone 固定成本用 sourced mandatory bonus 表达，payment option 保留 Trowel 来源；过滤 clay probe 的 prohibitive `costs` 同样携带匹配的 Cost Attribution。 |
 | `D014_HammerCrusher` | 已对齐 |  |
 | `D015_ClaySupports` | 已对齐 |  |
 | `D016_WoodenWheyBucket` | 已对齐 | BGA `formatCost(['max' => 1, WOOD => 1])` / `formatCost(['max' => 1])` 通过 `stables` `actionContext.exactCost` 表达羊市场 1 wood、牛市场免费，且最多 1 个 stable。 |

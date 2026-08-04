@@ -233,10 +233,7 @@ function forEachListenerResultObject(
   visit(sourceFile)
 }
 
-export function findMissingCostAttributionLines(source: string): number[] {
-  const sourceFile = ts.createSourceFile(
-    'card.ts', source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS,
-  )
+function findMissingCostAttributionLines(sourceFile: ts.SourceFile): number[] {
   const constants = collectStringConstants(sourceFile)
   const lines: number[] = []
   forEachListenerResultObject(sourceFile, constants, (result) => {
@@ -250,10 +247,20 @@ export function findMissingCostAttributionLines(source: string): number[] {
   return lines
 }
 
+export function findInvalidCostAttributionLines(source: string): number[] {
+  const sourceFile = ts.createSourceFile(
+    'card.ts', source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS,
+  )
+  const lines = findMissingCostAttributionLines(sourceFile)
+  validateCostAttributionShapes(sourceFile, [], undefined, lines)
+  return [...new Set(lines)]
+}
+
 function validateCostAttributionShapes(
   sourceFile: ts.SourceFile,
   errors: string[],
   expectedCardId?: string,
+  invalidLines?: number[],
 ): void {
   const constants = collectStringConstants(sourceFile)
   const declaredCardId = getTopLevelStringConstant(sourceFile, 'CARD_ID')
@@ -288,6 +295,11 @@ function validateCostAttributionShapes(
     return keys.length === Object.keys(right).length
       && keys.every(key => left[key] === right[key])
   }
+  const report = (result: ts.ObjectLiteralExpression, message: string): void => {
+    const { line } = sourceFile.getLineAndCharacterOfPosition(result.getStart(sourceFile))
+    errors.push(`line ${line + 1}: ${message}`)
+    invalidLines?.push(line + 1)
+  }
   forEachListenerResultObject(sourceFile, constants, (result) => {
     const costsProperties = result.properties.filter(
       property => getStaticPropertyName(property, constants) === 'costs',
@@ -298,11 +310,9 @@ function validateCostAttributionShapes(
     const costsProperty = costsProperties[0]
     const attributionProperty = attributionProperties[0]
     if (costsProperties.length > 1 || attributionProperties.length > 1) {
-      const { line } = sourceFile.getLineAndCharacterOfPosition(result.getStart(sourceFile))
-      errors.push(`line ${line + 1}: listener results must not contain duplicate costs or costAttribution`)
+      report(result, 'listener results must not contain duplicate costs or costAttribution')
     } else if (attributionProperty && !costsProperty) {
-      const { line } = sourceFile.getLineAndCharacterOfPosition(result.getStart(sourceFile))
-      errors.push(`line ${line + 1}: listener results with costAttribution must include costs`)
+      report(result, 'listener results with costAttribution must include costs')
     } else if (costsProperty && attributionProperty) {
       const costs = propertyValue(costsProperty)
       const attribution = propertyValue(attributionProperty)
@@ -349,8 +359,7 @@ function validateCostAttributionShapes(
         || !validSource
         || !matchingCosts
       ) {
-        const { line } = sourceFile.getLineAndCharacterOfPosition(result.getStart(sourceFile))
-        errors.push(`line ${line + 1}: costAttribution must contain one matching source entry`)
+        report(result, 'costAttribution must contain one matching source entry')
       }
     }
   })
@@ -503,7 +512,7 @@ export function validateCardCode(source: string, expectedCardId?: string): Valid
   // Validate CARD_IMPL hook/listener whitelists
   validateCardImplHooksAndPhases(sourceFile, errors)
   validateCostAttributionShapes(sourceFile, errors, expectedCardId)
-  for (const line of findMissingCostAttributionLines(source)) {
+  for (const line of findMissingCostAttributionLines(sourceFile)) {
     errors.push(`line ${line}: listener results with costs must include costAttribution`)
   }
 
