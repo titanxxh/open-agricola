@@ -79,7 +79,7 @@ export const cardEffectHookMeta: Record<CardEffectField, HookMeta> = {
   onComputeAnimalZones: {
     table: 'advanced',
     signature: '(player, zones, state) => AnimalZone[]',
-    usage: '动物分区扩展；必须返回新数组；原地修改 zones 无效',
+    usage: '动物分区扩展；只返回新增 zones，不要拼接传入的 zones；原地修改无效',
   },
   onComputeSowableFields: { table: 'advanced', signature: '(player) => ExtraSowableField[]', usage: '返回额外可播种田' },
   onSowExtraField: { table: 'advanced', signature: '返回额外可播种田', usage: '播种扩展' },

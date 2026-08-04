@@ -103,10 +103,10 @@ harvest field 三个 stage hook、`onBeforeEndGame` 和 action reaction listener
 | `computeCostedBonus` / `computeSharedPostScore` | 终局花资源换 VP（costed）/ 跨玩家分调（shared） |
 | `computeExtraRoomCapacity` | 房间容量修改 |
 | `onComputeAnimalZones` | 动物分区计算 |
-| `onComputeSowableFields` | 额外可播种田候选 |
+| `onComputeSowableFields` | 额外可播种田候选（仅官方卡；Workshop 无法执行配套结算） |
 | `onSowExtraField` | 结算额外播种（仅官方卡；Workshop 的 JSON 快照无法回传 mutation） |
 | `computeLockedFarmTiles` | 动态锁定农场格（B38 FutureBuildingSite） |
-| `handHooks` | 声明哪些 hook 在卡牌还在手牌时也触发（E96 Elder） |
+| `handHooks` | 声明哪些 stage hook 在卡牌还在手牌时也触发（E96 Elder；不支持 `onBuy` / `onEndTurn` / `onBeforePlayerTurn`） |
 
 > 围栏支付折扣（E16 BriarHedge / C16 FieldFences）现走 listener `computeCosts` phase（actions: `['fence']`），不再是独立 hook。详见 ARCHITECTURE.md §15.7。
 >
