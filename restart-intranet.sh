@@ -197,6 +197,54 @@ wait_for_port_state() {
   return 1
 }
 
+process_target_for_pid() {
+  local pid="$1"
+  local pgid=""
+  local sid=""
+  local script_pgid=""
+
+  read -r pgid sid < <(ps -o pgid=,sid= -p "$pid" 2>/dev/null || true) || true
+  read -r script_pgid < <(ps -o pgid= -p "$$" 2>/dev/null || true) || true
+  if [ -n "$pgid" ] && [ "$pgid" = "$sid" ] && [ "$pgid" != "$script_pgid" ]; then
+    echo "-$pgid"
+  else
+    echo "$pid"
+  fi
+}
+
+terminate_process_targets() {
+  local signal=""
+  local target=""
+  local alive=0
+  local attempt=0
+
+  if [ "$#" -eq 0 ]; then
+    return 0
+  fi
+  for signal in TERM KILL; do
+    if [ "$signal" = "KILL" ]; then
+      echo "  Escalating to SIGKILL..."
+    fi
+    for target in "$@"; do
+      kill "-$signal" -- "$target" 2>/dev/null || true
+    done
+    for ((attempt = 0; attempt < 20; attempt += 1)); do
+      alive=0
+      for target in "$@"; do
+        if kill -0 -- "$target" 2>/dev/null; then
+          alive=1
+          break
+        fi
+      done
+      if [ "$alive" -eq 0 ]; then
+        return 0
+      fi
+      sleep 0.25
+    done
+  done
+  return 1
+}
+
 show_log_tail() {
   local label="$1"
   local log_file="$2"
@@ -212,6 +260,7 @@ stop_port_listeners() {
   local label="$2"
   local pids=""
   local pid=""
+  local targets=()
 
   pids="$(list_listening_pids "$port")"
   if [ -z "$pids" ]; then
@@ -223,24 +272,15 @@ stop_port_listeners() {
   while IFS= read -r pid; do
     [ -n "$pid" ] || continue
     ps -p "$pid" -o pid=,command= || true
-    kill "$pid" 2>/dev/null || true
+    targets+=("$(process_target_for_pid "$pid")")
   done <<EOF
 $pids
 EOF
 
-  if wait_for_port_state "$port" "no" 20 0.5; then
-    return 0
+  if ! terminate_process_targets "${targets[@]}"; then
+    echo "Error: failed to stop $label process group(s) on port $port"
+    return 1
   fi
-
-  echo "  Escalating to SIGKILL for $label port $port..."
-  pids="$(list_listening_pids "$port")"
-  while IFS= read -r pid; do
-    [ -n "$pid" ] || continue
-    kill -9 "$pid" 2>/dev/null || true
-  done <<EOF
-$pids
-EOF
-
   if ! wait_for_port_state "$port" "no" 10 0.2; then
     echo "Error: failed to free $label port $port"
     return 1
@@ -412,19 +452,39 @@ EOF
   done
 }
 
+STARTED_PROCESS_TARGETS=()
+
+cleanup_failed_start() {
+  local status=$?
+  trap - EXIT
+  if [ "$status" -ne 0 ] && [ "${#STARTED_PROCESS_TARGETS[@]}" -gt 0 ]; then
+    set +e
+    echo "Cleaning up processes from failed startup..."
+    terminate_process_targets "${STARTED_PROCESS_TARGETS[@]}"
+  fi
+  exit "$status"
+}
+
 start_and_wait() {
   local label="$1"
   local port="$2"
   local log_file="$3"
+  local detached=0
   shift 3
 
   : > "$log_file"
   if command -v setsid >/dev/null 2>&1; then
     setsid "$@" > "$log_file" 2>&1 &
+    detached=1
   else
     nohup "$@" > "$log_file" 2>&1 &
   fi
   local pid=$!
+  if [ "$detached" -eq 1 ]; then
+    STARTED_PROCESS_TARGETS+=("-$pid")
+  else
+    STARTED_PROCESS_TARGETS+=("$pid")
+  fi
   echo "  PID: $pid"
 
   for ((i = 0; i < 30; i += 1)); do
@@ -443,6 +503,8 @@ start_and_wait() {
   show_log_tail "$label" "$log_file"
   return 1
 }
+
+trap cleanup_failed_start EXIT
 
 if [ "$KILL_ONLY" -eq 1 ]; then
   echo "Stopping existing processes (kill-only)..."
