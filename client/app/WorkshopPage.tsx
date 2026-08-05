@@ -441,7 +441,7 @@ export function CardDetailPrSection({
     return () => {
       cancelled = true
     }
-  }, [apiFetch, card.id, isAuthor])
+  }, [apiFetch, card.id, card.live, card.review_status, isAuthor])
 
   const action = getWorkshopPrActionState({
     enabled: true,

@@ -128,6 +128,40 @@ describe('Workshop card detail publish action', () => {
     expect(reloadCard).toHaveBeenCalledTimes(1)
   })
 
+  it('reloads workspace state when PR refresh changes the card to approved', async () => {
+    let reviewStatus: WorkshopCard['review_status'] = 'in_review'
+    const apiFetch = vi.fn(async () => new Response(JSON.stringify({
+      ok: true,
+      workspace: { ...workspace, reviewStatus },
+      readiness: { ready: true },
+    })))
+
+    const { rerender } = render(
+      <CardDetailPrSection
+        card={{ ...approvedCard, review_status: 'in_review' }}
+        currentUserId="author-1"
+        apiFetch={apiFetch}
+        reloadCard={() => {}}
+      />,
+    )
+
+    await waitFor(() => expect(apiFetch).toHaveBeenCalledTimes(1))
+    expect(screen.queryByRole('button', { name: '发布上线' })).toBeNull()
+
+    reviewStatus = 'approved'
+    rerender(
+      <CardDetailPrSection
+        card={approvedCard}
+        currentUserId="author-1"
+        apiFetch={apiFetch}
+        reloadCard={() => {}}
+      />,
+    )
+
+    expect(await screen.findByRole('button', { name: '发布上线' })).toBeInTheDocument()
+    expect(apiFetch).toHaveBeenCalledTimes(2)
+  })
+
   it('does not offer publish for a card that is already live', async () => {
     const apiFetch = vi.fn(async () => new Response(JSON.stringify({
       ok: true,
