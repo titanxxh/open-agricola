@@ -93,6 +93,7 @@ type ReviewQueryResponse = {
   data?: {
     repository?: {
       pullRequest?: {
+        authorAssociation?: string | null
         reviewDecision?: string | null
         headRefOid?: string
         baseRefName?: string
@@ -168,6 +169,7 @@ export class GitHubReviewProvider {
         query: `query WorkshopReviewSnapshot($owner: String!, $name: String!, $number: Int!) {
           repository(owner: $owner, name: $name) {
             pullRequest(number: $number) {
+              authorAssociation
               reviewDecision
               headRefOid
               baseRefName
@@ -217,15 +219,26 @@ export class GitHubReviewProvider {
           }]
         : [],
     )
+    const ownerApproval = pullRequest.authorAssociation === 'OWNER'
+      && pullRequest.reviewDecision !== 'CHANGES_REQUESTED'
+      ? {
+          id: `owner:${pullRequest.headRefOid}`,
+          state: 'APPROVED',
+          commitOid: pullRequest.headRefOid,
+          authorCanPushToRepository: true,
+        }
+      : null
     return {
-      reviewDecision: typeof pullRequest.reviewDecision === 'string'
+      reviewDecision: ownerApproval
+        ? 'APPROVED'
+        : typeof pullRequest.reviewDecision === 'string'
         ? pullRequest.reviewDecision
         : null,
       headRefOid: pullRequest.headRefOid,
       baseRefName: pullRequest.baseRefName,
       state: pullRequest.state,
       isDraft: pullRequest.isDraft,
-      reviews,
+      reviews: ownerApproval ? [...reviews, ownerApproval] : reviews,
     }
   }
 

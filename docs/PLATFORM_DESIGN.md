@@ -480,8 +480,8 @@ WorkshopPage
 3. 前端调用 `POST /api/workshop/cards/:id/submit-review`。
 4. 如果服务端没有当前会话对应的 GitHub token，会返回 OAuth start URL；前端用 popup 打开，并等待 callback 页面通过 `postMessage({ type: 'workshop-pr-oauth', ... }, '*')` 通知授权完成。
 5. 授权完成后前端重试请求，服务端创建/更新分支并打开或更新 PR，成功后卡牌转入 `in_review`（`enterReview`），同时固定 PR head SHA 与对应 Draft Version；一个 PR URL 只绑定一张卡，只复用同一分支上仍为 open、非 draft 且以 `main` 为 base 的 PR。已关闭或已合并的 PR 保留为历史，重新提交时创建新 PR；open 但 draft 或 base 非 `main` 的旧 PR 会先关闭，再创建合格 PR。绑定后补查一次当前 review 快照以覆盖先到的审批 webhook；补查暂时失败不回滚已建立的 PR/绑定，清空同步时间后由现有 `refresh-pr-status` 入口重试协调。
-6. Workshop Review GitHub App 接收 `pull_request_review` / `pull_request` webhook；验签和 delivery 幂等通过后，approved review 必须经 GraphQL 原子快照确认。GitHub 当前 head 不同、PR 关闭/转 draft/改离 `main`、有效审批被 `dismissed` 或 `CHANGES_REQUESTED` 都把卡转为 `stale·offline`；未绑定或绑定歧义的 PR 不查询 GitHub，可能乱序的事件重读当前快照且只在含 lifecycle/更新时间的 review binding 未变时提交，已 merge 进 `main` 的 PR 的迟到 review 事件保留同 head 绑定（合入非 `main` 分支不享有此豁免，视同未 merge 关闭），GraphQL 不可用则记录 delivery 并保守下线且不覆盖已记录的 PR 关闭状态；comment-only review 不改变状态。
-7. 作者发布时服务端再次即时查询 GraphQL，只有 state=`OPEN`、非 draft、base=`main`、reviewer 可 push、review commit、PR head、平台 approved commit、固定版本和查询前后的 live-state token 全部一致才置 live。
+6. Workshop Review GitHub App 接收 `pull_request_review` / `pull_request` webhook；验签和 delivery 幂等通过后，approved review 必须经 GraphQL 原子快照确认。`authorAssociation=OWNER` 且没有 `CHANGES_REQUESTED` 的 PR 由 provider 生成绑定当前 head 的 owner approval，以补足 GitHub 禁止作者 self-approve 的平台限制；普通作者仍必须取得有 push 权限的 reviewer approval。GitHub 当前 head 不同、PR 关闭/转 draft/改离 `main`、有效审批被 `dismissed` 或 `CHANGES_REQUESTED` 都把卡转为 `stale·offline`；未绑定或绑定歧义的 PR 不查询 GitHub，可能乱序的事件重读当前快照且只在含 lifecycle/更新时间的 review binding 未变时提交，已 merge 进 `main` 的 PR 的迟到 review 事件保留同 head 绑定（合入非 `main` 分支不享有此豁免，视同未 merge 关闭），GraphQL 不可用则记录 delivery 并保守下线且不覆盖已记录的 PR 关闭状态；comment-only review 不改变状态。
+7. 作者发布时服务端再次即时查询 GraphQL，只有 state=`OPEN`、非 draft、base=`main`、有效 reviewer/owner approval、review commit、PR head、平台 approved commit、固定版本和查询前后的 live-state token 全部一致才置 live。
 
 服务端核心模块：
 
