@@ -83,6 +83,7 @@ describe('durable publish', () => {
       type: 'createRoom',
       maxPlayers: 2,
       customCardIds: [unpublished.id],
+      enableCommunityDeck: true,
       requestId: 'draft-rejected',
     })
     expect(draftAuthor.currentRoom).toBeNull()
@@ -115,12 +116,30 @@ describe('durable publish', () => {
     })
     approveCurrentDraft(db, { cardId: publishedCard.id, authorId: 'u1' })
     publish(db, { cardId: publishedCard.id, authorId: 'u1', baseRevision: publishedCard.revision })
+    const communityDisabledWs = fakeWs()
+    const communityDisabledAuthor = createConnectionCtx(communityDisabledWs as never, deps, true, 'u1')
+    dispatch(communityDisabledAuthor, {
+      type: 'createRoom',
+      maxPlayers: 2,
+      customCardIds: [publishedCard.id],
+    })
+    expect(communityDisabledAuthor.currentRoom?.customCardDbIds).toEqual([])
+    expect(communityDisabledAuthor.currentRoom?.customCards).toEqual([])
+    expect(communityDisabledAuthor.currentRoom?.session.getCustomCardDefs()).toEqual([])
+    communityDisabledAuthor.currentRoom!.customCardDbIds = [publishedCard.id]
+    communityDisabledAuthor.currentRoom!.status = 'playing'
+    dispatch(communityDisabledAuthor, { type: 'newGame' })
+    expect(communityDisabledAuthor.currentRoom?.customCardDbIds).toEqual([])
+    expect(communityDisabledAuthor.currentRoom?.session.getCustomCardDefs()).toEqual([])
+    dispatch(communityDisabledAuthor, { type: 'dissolveRoom' })
+
     const publishedWs = fakeWs()
     const publishedAuthor = createConnectionCtx(publishedWs as never, deps, true, 'u1')
     dispatch(publishedAuthor, {
       type: 'createRoom',
       maxPlayers: 2,
       customCardIds: [publishedCard.id],
+      enableCommunityDeck: true,
     })
     expect(publishedAuthor.currentRoom?.customCards).toHaveLength(1)
     dispatch(publishedAuthor, { type: 'dissolveRoom' })
