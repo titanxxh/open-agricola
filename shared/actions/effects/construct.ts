@@ -144,7 +144,7 @@ const recordConstructCostAttribution = (
   baseCost: ComplexCost,
   finalCost: ComplexCost,
   rooms: number,
-) => {
+) =>
   recordActionCostAttribution(
     ctx.player,
     ctx.costAttribution,
@@ -152,7 +152,6 @@ const recordConstructCostAttribution = (
     totalComplexCostResources(finalCost),
     rooms,
   )
-}
 
 const buildConstructPayCost = (
   player: PlayerState,
@@ -221,7 +220,7 @@ const finalizeRoom = (
       : 'roomStone'
     addCardResourceGained(ctx.player, ctx.sourceCard, { [roomKey]: rooms.length })
   }
-  recordConstructCostAttribution(ctx, baseCost, payCost, rooms.length)
+  const costAttributionSources = recordConstructCostAttribution(ctx, baseCost, payCost, rooms.length)
   incRoomsBuilt(ctx.player, rooms.length)
   ctx.eventSink?.emit<'farm.roomBuilt'>({
     type: 'farm.roomBuilt',
@@ -247,6 +246,9 @@ const finalizeRoom = (
           paymentChoice,
           sourceCard: ctx.sourceCard,
           sourceActionId: ctx.space.id,
+          candidateMetadataByFeeIndex: costAttributionSources.length > 0
+            ? { 0: { originalFeeIndex: 0, sources: costAttributionSources } }
+            : undefined,
         }),
       ],
     },

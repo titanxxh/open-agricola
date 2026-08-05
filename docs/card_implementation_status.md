@@ -180,7 +180,7 @@ OA 没有照抄 notification-as-rule-source，而是建了一个比 `GameState.l
 
 ### 卡牌判定
 
-Card listener（`shared/cards/card-listeners.ts`）收到 `transactionEvents`（整个工作事务的事件）、`actionEvents`（当前行动/阶段切片）和类型化 `eventQuery`（`has` / `find` / `filter`）。资源类卡牌优先读 `actionEvents`、回退 `transactionEvents`。`resource.paid` 携带 `paymentFor` / `paymentSources` / `bonusSources` / `bonusChoiceIndex` / `returnedCardId`，支付折扣 / 退卡类卡牌据此判定，不依赖 action result 资源事实；需要判断实际被消耗的资源时用 `sumActualPaidResource()` 从 `paymentSources` 还原，避免把 card-provided payment resource 当成普通资源。Card-purchase candidate metadata 即使收敛为单候选行，也按 index 0 继续写入 `bonusSources` / Card Resource Stats。
+Card listener（`shared/cards/card-listeners.ts`）收到 `transactionEvents`（整个工作事务的事件）、`actionEvents`（当前行动/阶段切片）和类型化 `eventQuery`（`has` / `find` / `filter`）。资源类卡牌优先读 `actionEvents`、回退 `transactionEvents`。`resource.paid` 携带 `paymentFor` / `paymentSources` / `bonusSources` / `bonusChoiceIndex` / `returnedCardId`，支付折扣 / 退卡类卡牌据此判定，不依赖 action result 资源事实；需要判断实际被消耗的资源时用 `sumActualPaidResource()` 从 `paymentSources` 还原，避免把 card-provided payment resource 当成普通资源。Card-purchase candidate metadata 即使收敛为单候选行，也按 index 0 继续写入 `bonusSources` / Card Resource Stats；construct 的 raw `costs` + `costAttribution` 仅在实际产生非零成本变化时，把来源投影到 internal pay candidate metadata 与 `bonusSources`。
 
 ### 客户端消费
 
