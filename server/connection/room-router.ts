@@ -359,12 +359,13 @@ function handleCreateRoom(ctx: ConnectionCtx, msg: Extract<ClientCommand, { type
   const maxPlayers = Number.isFinite(rawMaxPlayers)
     ? Math.min(Math.max(2, Math.floor(rawMaxPlayers)), 6)
     : 2
-  const customCardDbIds = Array.isArray((msg as Record<string, unknown>).customCardIds)
+  const enableCommunityDeck = (msg as Record<string, unknown>).enableCommunityDeck === true
+  const requestedCustomCardDbIds = Array.isArray((msg as Record<string, unknown>).customCardIds)
     ? (msg as Record<string, unknown>).customCardIds as string[]
     : []
+  const customCardDbIds = enableCommunityDeck ? requestedCustomCardDbIds : []
   const draftOptions = parseDraftOptions(msg as Record<string, unknown>)
   if (!draftOptions.ok) { sendCommandError(ctx, draftOptions.error, msg.requestId); return }
-  const enableCommunityDeck = (msg as Record<string, unknown>).enableCommunityDeck === true
   const enableParentCards = (msg as Record<string, unknown>).enableParentCards === true
   const draftParents = (msg as Record<string, unknown>).draftParents === false ? false : undefined
   const enableThroughTheSeasons = (msg as Record<string, unknown>).enableThroughTheSeasons === true
@@ -729,11 +730,15 @@ function handleNewGame(ctx: ConnectionCtx, msg: Extract<ClientCommand, { type: '
   // to the fresh room while the finished game stays untouched. The id list
   // is refreshed alongside so a stale id cannot mark this room for a later
   // takedown it does not deserve.
-  const reloaded = loadCustomCards(room.customCardDbIds ?? [], room.createdBy, { liveOnly: true })
+  const enableCommunityDeck = room.session.state.enableCommunityDeck
+  const reloaded = loadCustomCards(
+    enableCommunityDeck ? room.customCardDbIds ?? [] : [],
+    room.createdBy,
+    { liveOnly: true },
+  )
   const customCards = reloaded.cards
   room.customCardDbIds = reloaded.loadedDbIds
   room.customCards = customCards
-  const enableCommunityDeck = room.session.state.enableCommunityDeck
   const enableParentCards = room.enableParentCards ?? room.session.state.enableParentCards
   const draftMode = room.draftMode ?? room.session.state.draftMode
   const draftPoolSize = room.draftPoolSize ?? room.session.state.draftPoolSize
