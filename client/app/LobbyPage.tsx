@@ -80,7 +80,7 @@ export function LobbyPage() {
   }, [fetchRooms, fetchMyRooms])
 
   useEffect(() => {
-    if (!showPlayerSelect || !showCommunityDeckToggle) return
+    if (!showPlayerSelect || !showCommunityDeckToggle || !enableCommunityDeck) return
     let cancelled = false
     const load = async () => {
       setWorkshopCardsStatus('loading')
@@ -106,7 +106,7 @@ export function LobbyPage() {
     }
     void load()
     return () => { cancelled = true }
-  }, [showPlayerSelect, showCommunityDeckToggle])
+  }, [enableCommunityDeck, showPlayerSelect, showCommunityDeckToggle])
 
   const handleCreateGame = () => {
     const params: Record<string, string> = { transport: 'ws', maxPlayers: String(selectedMaxPlayers) }
@@ -117,7 +117,7 @@ export function LobbyPage() {
     if (enableCommunityDeck) {
       params.enableCommunityDeck = 'true'
     }
-    if (selectedWorkshopCardIds.length > 0) {
+    if (enableCommunityDeck && selectedWorkshopCardIds.length > 0) {
       params.customCards = selectedWorkshopCardIds.join(',')
     }
     if (enableParentCards) {
@@ -319,38 +319,40 @@ export function LobbyPage() {
                       </span>
                     </span>
                   </label>
-                  <div className="room-workshop-picker">
-                    <div className="player-select-label">{t('platform.reviewedWorkshopCards')}</div>
-                    <div className="community-deck-toggle-hint">{t('platform.reviewedWorkshopCardsHint')}</div>
-                    {workshopCardsStatus === 'loading' ? (
-                      <div className="room-workshop-picker__status">{t('platform.reviewedWorkshopCardsLoading')}</div>
-                    ) : workshopCardsStatus === 'error' ? (
-                      <div className="room-workshop-picker__status form-error">{t('platform.reviewedWorkshopCardsError')}</div>
-                    ) : workshopCards.length === 0 ? (
-                      <div className="room-workshop-picker__status">{t('platform.reviewedWorkshopCardsEmpty')}</div>
-                    ) : (
-                      <div className="room-workshop-picker__list">
-                        {workshopCards.map(card => (
-                          <label key={card.id} className="community-deck-toggle">
-                            <input
-                              type="checkbox"
-                              checked={selectedWorkshopCardIds.includes(card.id)}
-                              onChange={() => setSelectedWorkshopCardIds(ids => ids.includes(card.id)
-                                ? ids.filter(id => id !== card.id)
-                                : [...ids, card.id])}
-                            />
-                            <span>
-                              {card.name}
-                              <br />
-                              <span className="community-deck-toggle-hint">
-                                {t(`platform.${card.card_type}`)}{card.author_name ? ` · ${card.author_name}` : ''}
+                  {enableCommunityDeck && (
+                    <div className="room-workshop-picker">
+                      <div className="player-select-label">{t('platform.reviewedWorkshopCards')}</div>
+                      <div className="community-deck-toggle-hint">{t('platform.reviewedWorkshopCardsHint')}</div>
+                      {workshopCardsStatus === 'loading' ? (
+                        <div className="room-workshop-picker__status">{t('platform.reviewedWorkshopCardsLoading')}</div>
+                      ) : workshopCardsStatus === 'error' ? (
+                        <div className="room-workshop-picker__status form-error">{t('platform.reviewedWorkshopCardsError')}</div>
+                      ) : workshopCards.length === 0 ? (
+                        <div className="room-workshop-picker__status">{t('platform.reviewedWorkshopCardsEmpty')}</div>
+                      ) : (
+                        <div className="room-workshop-picker__list">
+                          {workshopCards.map(card => (
+                            <label key={card.id} className="community-deck-toggle">
+                              <input
+                                type="checkbox"
+                                checked={selectedWorkshopCardIds.includes(card.id)}
+                                onChange={() => setSelectedWorkshopCardIds(ids => ids.includes(card.id)
+                                  ? ids.filter(id => id !== card.id)
+                                  : [...ids, card.id])}
+                              />
+                              <span>
+                                {card.name}
+                                <br />
+                                <span className="community-deck-toggle-hint">
+                                  {t(`platform.${card.card_type}`)}{card.author_name ? ` · ${card.author_name}` : ''}
+                                </span>
                               </span>
-                            </span>
-                          </label>
-                        ))}
-                      </div>
-                    )}
-                  </div>
+                            </label>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </>
               )}
               <label className="community-deck-toggle">

@@ -181,6 +181,7 @@ describe('LobbyPage player count selection', () => {
 
     render(<LobbyPage />)
     fireEvent.click(screen.getByRole('button', { name: 'Create Multiplayer Game' }))
+    fireEvent.click(screen.getByRole('checkbox', { name: /启用社区扩展卡/ }))
     fireEvent.click(await screen.findByRole('checkbox', { name: /Reviewed Card/ }))
     fireEvent.click(screen.getByRole('button', { name: 'Create Game' }))
 
@@ -189,6 +190,57 @@ describe('LobbyPage player count selection', () => {
     expect(setPage).toHaveBeenCalledWith('game', {
       transport: 'ws',
       maxPlayers: '2',
+      enableCommunityDeck: 'true',
+      customCards: 'reviewed-card-1',
+    })
+  })
+
+  it('keeps reviewed card selections hidden and inert while the community deck is disabled', async () => {
+    vi.stubEnv('VITE_ENABLE_COMMUNITY_DECK', 'true')
+    vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input)
+      if (url.includes('/api/workshop/cards')) {
+        return new Response(JSON.stringify({
+          ok: true,
+          cards: [{
+            id: 'reviewed-card-1',
+            name: 'Reviewed Card',
+            card_type: 'minor',
+            author_name: 'Alice',
+          }],
+          page: 1,
+          total: 1,
+          hasMore: false,
+        }))
+      }
+      return new Response(JSON.stringify({ ok: true, rooms: [] }))
+    }))
+
+    render(<LobbyPage />)
+    fireEvent.click(screen.getByRole('button', { name: 'Create Multiplayer Game' }))
+
+    const communityDeck = screen.getByRole('checkbox', { name: /启用社区扩展卡/ })
+    expect(screen.queryByText('Reviewed workshop cards')).toBeNull()
+    expect(fetch).not.toHaveBeenCalledWith(expect.stringContaining('/api/workshop/cards'))
+
+    fireEvent.click(communityDeck)
+    fireEvent.click(await screen.findByRole('checkbox', { name: /Reviewed Card/ }))
+    fireEvent.click(communityDeck)
+
+    expect(screen.queryByText('Reviewed workshop cards')).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: 'Create Game' }))
+    expect(setPage).toHaveBeenLastCalledWith('game', {
+      transport: 'ws',
+      maxPlayers: '2',
+    })
+
+    fireEvent.click(communityDeck)
+    expect(await screen.findByRole('checkbox', { name: /Reviewed Card/ })).toBeChecked()
+    fireEvent.click(screen.getByRole('button', { name: 'Create Game' }))
+    expect(setPage).toHaveBeenLastCalledWith('game', {
+      transport: 'ws',
+      maxPlayers: '2',
+      enableCommunityDeck: 'true',
       customCards: 'reviewed-card-1',
     })
   })

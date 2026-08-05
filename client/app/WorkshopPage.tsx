@@ -12,7 +12,7 @@ import { API_BASE } from '../config'
 import { refreshPrStatus, extractPrNumber } from '../services/workshop-pr'
 import { buildLocalGameConfig, isBrowserSandbox, stashLocalSandboxConfig } from '../local-sandbox/workshop-launch'
 
-type WorkshopCard = {
+export type WorkshopCard = {
   id: string
   card_id: string
   card_type: 'minor' | 'occupation'
@@ -381,7 +381,7 @@ function CardSourceViewer({ card, t }: { card: WorkshopCard; t: (key: string, pa
 
 // ── Card Detail PR Section (Propose to main repo) ───────────────────────────
 
-function CardDetailPrSection({
+export function CardDetailPrSection({
   card,
   currentUserId,
   apiFetch,
@@ -395,27 +395,48 @@ function CardDetailPrSection({
   const [modalOpen, setModalOpen] = useState(false)
   const [refreshing, setRefreshing] = useState(false)
   const [refreshError, setRefreshError] = useState<string | null>(null)
-  const [handoffState, setHandoffState] = useState<{
+  const [publishing, setPublishing] = useState(false)
+  const [publishError, setPublishError] = useState<string | null>(null)
+  const [workspaceState, setWorkspaceState] = useState<{
     cardId: string
     ready: boolean
+    revision: number | null
+    reviewStatus: WorkshopCard['review_status'] | null
+    live: boolean | null
   } | null>(null)
   const isAuthor = !!currentUserId && card.author_id === currentUserId
 
   useEffect(() => {
     let cancelled = false
+    setWorkspaceState(null)
+    setPublishError(null)
     if (!isAuthor) return
     void apiFetch(`/api/workshop/cards/${card.id}/workspace`)
       .then(response => response.json())
       .then(payload => {
         if (!cancelled) {
-          setHandoffState({
+          const workspace = payload.workspace as Record<string, unknown> | undefined
+          setWorkspaceState({
             cardId: card.id,
             ready: payload.ok === true && payload.readiness?.ready === true,
+            revision: Number.isInteger(workspace?.revision) ? workspace!.revision as number : null,
+            reviewStatus: typeof workspace?.reviewStatus === 'string'
+              ? workspace.reviewStatus as WorkshopCard['review_status']
+              : null,
+            live: typeof workspace?.live === 'boolean' ? workspace.live : null,
           })
         }
       })
       .catch(() => {
-        if (!cancelled) setHandoffState({ cardId: card.id, ready: false })
+        if (!cancelled) {
+          setWorkspaceState({
+            cardId: card.id,
+            ready: false,
+            revision: null,
+            reviewStatus: null,
+            live: null,
+          })
+        }
       })
     return () => {
       cancelled = true
@@ -428,10 +449,17 @@ function CardDetailPrSection({
     reviewStatus: card.review_status,
     githubPrUrl: card.github_pr_url,
     githubPrStatus: card.github_pr_status,
-    handoffReady: handoffState?.cardId === card.id && handoffState.ready,
+    handoffReady: workspaceState?.cardId === card.id && workspaceState.ready,
     localesComplete: hasZhLocale(card.card_json),
   })
   if (!action.visible) return null
+  const currentWorkspace = workspaceState?.cardId === card.id ? workspaceState : null
+  const canPublish = isAuthor
+    && card.review_status === 'approved'
+    && !card.live
+    && currentWorkspace?.reviewStatus === 'approved'
+    && currentWorkspace.live === false
+    && currentWorkspace.revision !== null
 
   async function onRefresh() {
     setRefreshing(true)
@@ -444,6 +472,57 @@ function CardDetailPrSection({
       reloadCard()
     } finally {
       setRefreshing(false)
+    }
+  }
+
+  async function onPublish() {
+    if (!canPublish || currentWorkspace.revision === null) return
+    setPublishing(true)
+    setPublishError(null)
+    try {
+      const response = await apiFetch(`/api/workshop/cards/${card.id}/publish`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ baseRevision: currentWorkspace.revision }),
+      })
+      const payload = await response.json() as {
+        ok?: boolean
+        error?: string
+        code?: string
+        workspace?: { revision?: number; reviewStatus?: WorkshopCard['review_status']; live?: boolean }
+        current?: { revision?: number; reviewStatus?: WorkshopCard['review_status']; live?: boolean }
+      }
+      if (!response.ok || payload.ok !== true) {
+        const latest = payload.current
+        if (latest) {
+          setWorkspaceState(previous => ({
+            cardId: card.id,
+            ready: previous?.ready ?? false,
+            revision: Number.isInteger(latest.revision) ? latest.revision! : null,
+            reviewStatus: latest.reviewStatus ?? null,
+            live: typeof latest.live === 'boolean' ? latest.live : null,
+          }))
+        }
+        setPublishError(payload.error ?? payload.code ?? `发布失败 (${response.status})`)
+        reloadCard()
+        return
+      }
+      setWorkspaceState(previous => previous
+        ? {
+            ...previous,
+            revision: Number.isInteger(payload.workspace?.revision)
+              ? payload.workspace!.revision!
+              : previous.revision,
+            reviewStatus: payload.workspace?.reviewStatus ?? previous.reviewStatus,
+            live: payload.workspace?.live ?? true,
+          }
+        : previous)
+      reloadCard()
+    } catch {
+      setPublishError('网络错误，发布失败')
+      reloadCard()
+    } finally {
+      setPublishing(false)
     }
   }
 
@@ -468,6 +547,16 @@ function CardDetailPrSection({
       >
         {action.buttonLabel}
       </button>
+      {canPublish && (
+        <button
+          type="button"
+          className="btn-primary ws-btn-sm"
+          disabled={publishing}
+          onClick={() => { void onPublish() }}
+        >
+          {publishing ? '发布中…' : '发布上线'}
+        </button>
+      )}
       {action.secondary && (
         <span style={{ fontSize: '0.9em', opacity: 0.75 }}>{action.secondary}</span>
       )}
@@ -497,6 +586,11 @@ function CardDetailPrSection({
             </span>
           )}
         </>
+      )}
+      {publishError && (
+        <span role="alert" style={{ color: 'crimson', fontSize: '0.85em' }}>
+          {publishError}
+        </span>
       )}
       {modalOpen && (
         <ProposeModal
