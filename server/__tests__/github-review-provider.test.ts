@@ -6,6 +6,8 @@ const json = (body: unknown, status = 200): Response => new Response(
   JSON.stringify(body),
   { status, headers: { 'Content-Type': 'application/json' } },
 )
+const pullRequestJson = (pullRequest: Record<string, unknown>): Response =>
+  json({ data: { repository: { pullRequest } } })
 
 describe('GitHubReviewProvider', () => {
   it('reads one atomic pull-request review snapshot with an installation token', async () => {
@@ -17,25 +19,20 @@ describe('GitHubReviewProvider', () => {
         token: 'installation-token',
         expires_at: '2026-07-31T17:00:00Z',
       }))
-      .mockResolvedValueOnce(json({
-        data: {
-          repository: {
-            pullRequest: {
-              reviewDecision: 'APPROVED',
-              headRefOid: 'head-42',
-              baseRefName: 'main',
-              state: 'OPEN',
-              isDraft: false,
-              latestOpinionatedReviews: {
-                nodes: [{
-                  id: 'review-42',
-                  state: 'APPROVED',
-                  commit: { oid: 'head-42' },
-                  authorCanPushToRepository: true,
-                }],
-              },
-            },
-          },
+      .mockResolvedValueOnce(pullRequestJson({
+        authorAssociation: 'CONTRIBUTOR',
+        reviewDecision: 'APPROVED',
+        headRefOid: 'head-42',
+        baseRefName: 'main',
+        state: 'OPEN',
+        isDraft: false,
+        latestOpinionatedReviews: {
+          nodes: [{
+            id: 'review-42',
+            state: 'APPROVED',
+            commit: { oid: 'head-42' },
+            authorCanPushToRepository: true,
+          }],
         },
       }))
     const provider = new GitHubReviewProvider({
@@ -69,10 +66,51 @@ describe('GitHubReviewProvider', () => {
     expect(graphQlBody.query).toContain('baseRefName')
     expect(graphQlBody.query).toContain('isDraft')
     expect(graphQlBody.query).toContain('state')
+    expect(graphQlBody.query).toContain('authorAssociation')
     expect(graphQlBody.variables).toEqual({
       owner: 'titanxxh',
       name: 'open-agricola',
       number: 42,
     })
+
+    fetchImpl.mockResolvedValueOnce(pullRequestJson({
+      authorAssociation: 'OWNER',
+      reviewDecision: null,
+      headRefOid: 'head-43',
+      baseRefName: 'main',
+      state: 'OPEN',
+      isDraft: false,
+      latestOpinionatedReviews: { nodes: [] },
+    }))
+
+    await expect(provider.getPullRequestSnapshot(43)).resolves.toEqual({
+      reviewDecision: 'APPROVED',
+      headRefOid: 'head-43',
+      baseRefName: 'main',
+      state: 'OPEN',
+      isDraft: false,
+      reviews: [{
+        id: 'owner:head-43',
+        state: 'APPROVED',
+        commitOid: 'head-43',
+        authorCanPushToRepository: true,
+      }],
+    })
+
+    fetchImpl.mockResolvedValueOnce(pullRequestJson({
+      authorAssociation: 'OWNER',
+      reviewDecision: 'CHANGES_REQUESTED',
+      headRefOid: 'head-44',
+      baseRefName: 'main',
+      state: 'OPEN',
+      isDraft: false,
+      latestOpinionatedReviews: { nodes: [] },
+    }))
+
+    await expect(provider.getPullRequestSnapshot(44)).resolves.toMatchObject({
+      reviewDecision: 'CHANGES_REQUESTED',
+      reviews: [],
+    })
+    expect(fetchImpl).toHaveBeenCalledTimes(4)
   })
 })
