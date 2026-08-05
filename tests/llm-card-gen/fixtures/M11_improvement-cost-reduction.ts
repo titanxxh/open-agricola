@@ -127,12 +127,27 @@ const fixture: CardFixture = {
     if (!m11.afterPurchase.logKeys.includes('log.playMinorImprovement')) {
       return { ok: false, reason: `missing B043 purchase log: ${JSON.stringify(m11.afterPurchase.logKeys)}` }
     }
-    const player = session.getState().state.players[0]!
+    const state = session.getState().state
+    const player = state.players[0]!
     if (player.rooms !== 3 || player.roomTiles.length !== 3) {
       return { ok: false, reason: `expected one room to be built, got rooms=${player.rooms} roomTiles=${JSON.stringify(player.roomTiles)}` }
     }
     if (player.resources.wood !== 0 || player.resources.reed !== 0 || player.resources.clay !== 2) {
       return { ok: false, reason: `expected room to cost 3 wood and 2 reed, got ${JSON.stringify(player.resources)}` }
+    }
+    const constructPayment = state.events.find(
+      event => event.type === 'resource.paid' && event.paymentFor === 'construct',
+    )
+    if (constructPayment?.type !== 'resource.paid' || !constructPayment.bonusSources?.includes(CARD_ID)) {
+      return { ok: false, reason: `construct payment missing ${CARD_ID} source: ${JSON.stringify(constructPayment)}` }
+    }
+    const constructLogHasSource = state.log.some((entry) => {
+      if (entry.key !== 'log.actionDetail') return false
+      const detailParts = entry.params?.detailParts as { bonusSources?: string[] } | undefined
+      return detailParts?.bonusSources?.includes(CARD_ID) === true
+    })
+    if (!constructLogHasSource) {
+      return { ok: false, reason: `construct log missing ${CARD_ID} source: ${JSON.stringify(state.log)}` }
     }
     return { ok: true }
   },
