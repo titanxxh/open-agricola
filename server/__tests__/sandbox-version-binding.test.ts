@@ -103,6 +103,7 @@ describe('sandbox version binding', () => {
         id: 'art-pinned',
         kind: 'art',
         prompt: 'pinned',
+        promptFormat: 'subject',
         resultUrl: '/card-art/pinned.png',
         createdAt: now,
       },

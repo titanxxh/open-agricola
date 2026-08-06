@@ -66,7 +66,7 @@ describe('replay migration', () => {
     const db = getDb()
 
     expect(db.prepare('SELECT MAX(version) AS version FROM schema_version').get()).toEqual({
-      version: 27,
+      version: 28,
     })
     expect([
       'bug_report_attempts',

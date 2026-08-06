@@ -877,6 +877,84 @@ export function runMigrations(
         `)
       },
     },
+    {
+      version: 28,
+      run: (database) => {
+        const cardColumns = database.pragma('table_info(workshop_cards)') as Array<{ name: string }>
+        if (cardColumns.length === 0) return
+        if (cardColumns.some(({ name }) => name === 'draft_generation_json')) {
+          const rows = database.prepare(`
+            SELECT id, draft_generation_json
+            FROM workshop_cards
+            WHERE json_valid(draft_generation_json)
+              AND json_type(draft_generation_json, '$.art') = 'object'
+          `).all() as Array<{ id: string; draft_generation_json: string }>
+          const update = database.prepare(`
+            UPDATE workshop_cards SET draft_generation_json = ? WHERE id = ?
+          `)
+          for (const row of rows) {
+            const generation = JSON.parse(row.draft_generation_json) as Record<string, unknown>
+            const art = generation.art as Record<string, unknown>
+            const subject = typeof art.subject === 'string' && art.subject.trim()
+              ? art.subject
+              : 'Manually uploaded image'
+            delete art.prompt
+            for (const key of ['lastCompleted', 'adopted']) {
+              const candidate = art[key]
+              if (
+                candidate
+                && typeof candidate === 'object'
+                && !Array.isArray(candidate)
+                && (candidate as Record<string, unknown>).provider === 'upload'
+              ) {
+                art[key] = {
+                  ...candidate as Record<string, unknown>,
+                  prompt: subject,
+                  promptFormat: 'subject',
+                }
+              } else {
+                delete art[key]
+              }
+            }
+            update.run(JSON.stringify(generation), row.id)
+          }
+        }
+        if (cardColumns.some(({ name }) => name === 'art_prompt')) {
+          database.exec('UPDATE workshop_cards SET art_prompt = NULL;')
+        }
+        const versionColumns = database.pragma('table_info(workshop_card_versions)') as Array<{ name: string }>
+        if (versionColumns.length === 0) return
+        if (versionColumns.some(({ name }) => name === 'provenance_json')) {
+          database.exec(`
+            UPDATE workshop_card_versions
+            SET provenance_json = json_remove(provenance_json, '$.art')
+            WHERE json_valid(provenance_json)
+              AND json_type(provenance_json, '$.art') IS NOT NULL;
+          `)
+        }
+        database.exec(`
+          DELETE FROM workshop_card_versions
+          WHERE id IN (
+            SELECT id FROM (
+              SELECT id, ROW_NUMBER() OVER (
+                PARTITION BY card_id ORDER BY version_number DESC
+              ) AS history_rank
+              FROM workshop_card_versions
+            )
+            WHERE history_rank > 5
+          )
+            AND NOT EXISTS (
+              SELECT 1 FROM workshop_cards
+              WHERE workshop_cards.id = workshop_card_versions.card_id
+                AND workshop_card_versions.id IN (
+                  review_version_id,
+                  approved_version_id,
+                  sandbox_pass_version_id
+                )
+            );
+        `)
+      },
+    },
   ]
 
   const insert = db.prepare('INSERT INTO schema_version (version) VALUES (?)')

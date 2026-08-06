@@ -803,6 +803,7 @@ const CARD_IMPL = {
                 id: 'private-art',
                 kind: 'art',
                 prompt: 'private prompt',
+                promptFormat: 'subject',
                 resultUrl: '/card-art/private.png',
                 model: 'private-model',
                 createdAt: 100,
@@ -1051,21 +1052,26 @@ const CARD_IMPL = {}
         candidate: {
           id: 'art-public',
           kind: 'art',
-          prompt: 'secret prompt',
+          prompt: 'legacy full generation template',
           resultUrl: '/card-art/published.png',
           model: 'secret-model',
           createdAt: 100,
         },
         artInputs: {
-          subject: 'private subject',
-          prompt: 'edited private prompt',
+          subject: 'current draft subject',
         },
       }, 'tok-alice'), adoptRes)
       expect(JSON.parse(adoptRes.body).workspace).toMatchObject({
         revision: 2,
         draft: {
           generation: {
-            art: { subject: 'private subject', prompt: 'edited private prompt' },
+            art: {
+              subject: 'current draft subject',
+              adopted: {
+                prompt: 'current draft subject',
+                promptFormat: 'subject',
+              },
+            },
           },
         },
       })
@@ -1083,7 +1089,7 @@ const CARD_IMPL = {}
       const publicBefore = JSON.parse(publicBeforeRes.body)
       expect(publicBefore.card.art_url).toBe('/card-art/published.png')
       expect(publicBefore.card.card_json._draft).toBeUndefined()
-      expect(publicBeforeRes.body).not.toContain('secret prompt')
+      expect(publicBeforeRes.body).not.toContain('legacy full generation template')
       expect(publicBeforeRes.body).not.toContain('secret-model')
 
       const workspaceRes = mockRes()
@@ -1113,7 +1119,7 @@ const CARD_IMPL = {}
 
       const publicListRes = mockRes()
       await handleWorkshopRoute(mockReq('GET', '/api/workshop/cards'), publicListRes)
-      expect(publicListRes.body).not.toContain('secret prompt')
+      expect(publicListRes.body).not.toContain('generation-time subject')
       expect(publicListRes.body).not.toContain('Unpublished change')
 
       await handleWorkshopRoute(mockReq('POST', '/api/workshop/sandbox', {

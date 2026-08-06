@@ -232,7 +232,7 @@ const adoptArt = async (
   request: APIRequestContext,
   account: Account,
   workspace: Workspace,
-  prompt: string,
+  subject: string,
   resultUrl = imageData,
 ) => responseJson<{ workspace: Workspace; versionId: string }>(await api(
   request,
@@ -245,13 +245,14 @@ const adoptArt = async (
       candidate: {
         id: unique('art'),
         kind: 'art',
-        prompt,
+        prompt: subject,
         resultUrl,
         provider: 'fake-image',
         model: 'deterministic-v1',
         referenceImages: ['reference://fixture'],
         createdAt: Date.now(),
       },
+      artInputs: { subject },
     },
   },
 ))
@@ -375,9 +376,11 @@ const withDatabase = <T>(read: (database: Database.Database) => T): T => {
   }
 }
 
-const fakeImageService = async (page: Page) => {
-  await page.route('https://generativelanguage.googleapis.com/**', route =>
-    route.fulfill({
+const fakeImageService = async (page: Page): Promise<unknown[]> => {
+  const requests: unknown[] = []
+  await page.route('https://generativelanguage.googleapis.com/**', route => {
+    requests.push(route.request().postDataJSON())
+    return route.fulfill({
       status: 200,
       contentType: 'application/json',
       body: JSON.stringify({
@@ -387,8 +390,9 @@ const fakeImageService = async (page: Page) => {
           },
         }],
       }),
-    }),
-  )
+    })
+  })
+  return requests
 }
 
 const fakeChatService = async (
@@ -466,16 +470,14 @@ const scenarioArtCandidates = async ({
   account,
   variant,
 }: ScenarioContext) => {
-  await fakeImageService(page)
+  const imageRequests = await fakeImageService(page)
   const workspace = await createDraft(request, account)
   await openEditor(page, workspace.id)
   await stage(page, variant.locale, '卡面图', 'Card art')
 
   const subject = text(variant.locale, '河谷木匠', 'A valley carpenter')
-  const prompt = unique('private art prompt')
-  await page.getByLabel(text(variant.locale, '画面主题', 'Image subject')).fill(subject)
-  const promptInput = page.getByLabel(text(variant.locale, '生成提示词', 'Generation prompt'))
-  await promptInput.fill(prompt)
+  const subjectInput = page.getByLabel(text(variant.locale, '画面主题', 'Image subject'))
+  await subjectInput.fill(subject)
   const referenceButton = page.locator('.ai-ref-thumb').first()
   const referenceId = await referenceButton.locator('img').getAttribute('src')
   expect(referenceId).toBeTruthy()
@@ -502,6 +504,11 @@ const scenarioArtCandidates = async ({
       )
     }
   }
+  const generatedRequest = JSON.stringify(imageRequests[0])
+  expect(generatedRequest).toContain(subject)
+  expect(generatedRequest).toContain('0.95:1')
+  expect(generatedRequest).not.toMatch(/512|534|537|像素|pixel/i)
+  expect(generatedRequest).not.toMatch(/金边|gold[- ]trimmed|gold border/i)
   const fourthLabels = await page.locator('.aicw-art-candidates button').evaluateAll(buttons =>
     buttons.map(button => button.getAttribute('aria-label') ?? ''),
   )
@@ -523,13 +530,11 @@ const scenarioArtCandidates = async ({
 
   await page.locator('.aicw-art-candidates button').last().click()
   await page.locator('.aicw-art-review details').click()
-  await expect(page.locator('.aicw-art-review details')).toContainText(prompt)
+  await expect(page.locator('.aicw-art-review details')).toContainText(subject)
   await expect(page.locator('.aicw-art-review details')).toContainText('gemini')
   await expect(page.locator('.aicw-art-review details')).toContainText(referenceId!)
   const latestSubject = text(variant.locale, '河谷家具匠', 'A valley cabinetmaker')
-  const latestPrompt = unique('edited private art prompt')
-  await page.getByLabel(text(variant.locale, '画面主题', 'Image subject')).fill(latestSubject)
-  await promptInput.fill(latestPrompt)
+  await subjectInput.fill(latestSubject)
   page.once('dialog', dialog => dialog.accept())
   const adopt = page.getByRole('button', {
     name: text(variant.locale, '采用为当前卡面', 'Adopt as current art'),
@@ -543,8 +548,9 @@ const scenarioArtCandidates = async ({
   const saved = await loadWorkspace(request, account, workspace.id)
   expect(saved.draft.artUrl).toBeTruthy()
   expect(saved.draft.generation).toMatchObject({
-    art: { subject: latestSubject, prompt: latestPrompt },
+    art: { subject: latestSubject },
   })
+  expect(saved.draft.generation.art).not.toHaveProperty('prompt')
   expect((await versions(request, account, workspace.id)).versions).toHaveLength(1)
 
   await page.evaluate(
@@ -559,16 +565,15 @@ const scenarioArtCandidates = async ({
   await expect(page.getByLabel(
     text(variant.locale, '画面主题', 'Image subject'),
   )).toHaveValue(latestSubject)
-  await expect(promptInput).toHaveValue(latestPrompt)
 
-  await promptInput.fill('')
+  await page.getByLabel(text(variant.locale, '画面主题', 'Image subject')).fill('')
   await page.locator('.ai-art-upload-section input[type="file"]').setInputFiles({
     name: 'manual.png',
     mimeType: 'image/png',
     buffer: Buffer.from(imagePng, 'base64'),
   })
   await expect(candidateSection).toContainText('1 / 3', { timeout: 30_000 })
-  await expect(promptInput).toHaveValue('')
+  await expect(page.getByLabel(text(variant.locale, '画面主题', 'Image subject'))).toHaveValue('')
   await expectSaved(page, variant.locale)
   await expectAccessibleWorkspace(page)
 }
@@ -703,10 +708,10 @@ const scenarioReopen = async ({
   account,
   variant,
 }: ScenarioContext) => {
-  const artPrompt = unique('exact private art prompt')
+  const artSubject = unique('exact private art subject')
   const abilityPrompt = unique('exact private ability prompt')
   let workspace = await createDraft(request, account)
-  workspace = (await adoptArt(request, account, workspace, artPrompt)).workspace
+  workspace = (await adoptArt(request, account, workspace, artSubject)).workspace
   const ability = await adoptAbility(request, account, workspace, abilityPrompt)
   workspace = ability.workspace
   const englishName = unique('Acceptance card')
@@ -727,8 +732,8 @@ const scenarioReopen = async ({
   await page.getByLabel(text(variant.locale, '前置条件', 'Prerequisite')).fill('3 occupations')
   await stage(page, variant.locale, '卡面图', 'Card art')
   await expect(page.getByLabel(
-    text(variant.locale, '生成提示词', 'Generation prompt'),
-  )).toHaveValue(artPrompt)
+    text(variant.locale, '画面主题', 'Image subject'),
+  )).toHaveValue(artSubject)
   await stage(page, variant.locale, '卡牌能力', 'Card ability')
   await expect(page.locator('.aicw-current-code')).toContainText(
     sourceFor(workspace.draft.cardId, workspace.draft.name),
@@ -786,8 +791,8 @@ const scenarioReopen = async ({
   await openEditor(page, workspace.id)
   await stage(page, variant.locale, '卡面图', 'Card art')
   await expect(page.getByLabel(
-    text(variant.locale, '生成提示词', 'Generation prompt'),
-  )).toHaveValue(artPrompt)
+    text(variant.locale, '画面主题', 'Image subject'),
+  )).toHaveValue(artSubject)
   await stage(page, variant.locale, '卡牌能力', 'Card ability')
   await expect(page.locator('.aicw-current-code')).toContainText('CARD_IMPL')
   await expect(page.locator('.ai-chat-hint')).toBeVisible()
@@ -891,15 +896,17 @@ const scenarioLocalRecovery = async ({
   await stage(page, variant.locale, '卡面图', 'Card art')
   await expect(page.getByLabel(text(variant.locale, '画面主题', 'Image subject')))
     .toHaveValue(legacySubject)
-  await expect(page.getByLabel(text(variant.locale, '生成提示词', 'Generation prompt')))
-    .toHaveValue(legacyPrompt)
+  await expect(page.getByText(text(variant.locale, '生成提示词', 'Generation prompt')))
+    .toHaveCount(0)
   await page.locator('.aicw-header-actions').getByRole('button', {
     name: text(variant.locale, '保存草稿', 'Save draft'),
   }).click()
   await expectSaved(page, variant.locale)
   expect((await loadWorkspace(request, account, workspace.id)).draft.generation).toMatchObject({
-    art: { subject: legacySubject, prompt: legacyPrompt },
+    art: { subject: legacySubject },
   })
+  expect(JSON.stringify((await loadWorkspace(request, account, workspace.id)).draft.generation))
+    .not.toContain(legacyPrompt)
   expect(await page.evaluate(key => localStorage.getItem(key), recoveryKey)).toBeNull()
   await expectAccessibleWorkspace(page)
 }
@@ -972,12 +979,11 @@ const scenarioVersionRestore = async ({
 }: ScenarioContext) => {
   let workspace = await createDraft(request, account)
   const originalName = workspace.draft.name
-  const versionPrompt = unique('version prompt')
-  const adopted = await adoptArt(request, account, workspace, versionPrompt)
+  const versionSubject = unique('version subject')
+  const adopted = await adoptArt(request, account, workspace, versionSubject)
   workspace = adopted.workspace
   const editedName = unique('Edited after version')
   const currentSubject = unique('current subject')
-  const currentPrompt = unique('current prompt')
   workspace = await checkpoint(request, account, workspace, {
     ...workspace.draft,
     name: editedName,
@@ -987,7 +993,6 @@ const scenarioVersionRestore = async ({
       art: {
         ...workspace.draft.generation.art as Record<string, unknown>,
         subject: currentSubject,
-        prompt: currentPrompt,
       },
     },
   })
@@ -1002,9 +1007,8 @@ const scenarioVersionRestore = async ({
   await expect(page.locator('.aicw-heading h2')).toHaveText(originalName)
   await expect(page.locator('.aicw-version-history ol > li')).toHaveCount(1)
   await stage(page, variant.locale, '卡面图', 'Card art')
-  await expect(page.getByLabel(text(variant.locale, '画面主题', 'Image subject'))).toHaveValue('')
-  await expect(page.getByLabel(text(variant.locale, '生成提示词', 'Generation prompt')))
-    .toHaveValue(versionPrompt)
+  await expect(page.getByLabel(text(variant.locale, '画面主题', 'Image subject')))
+    .toHaveValue(versionSubject)
   const restored = await loadWorkspace(request, account, workspace.id)
   expect(restored.revision).toBe(revisionBeforeRestore + 1)
 
@@ -1017,8 +1021,6 @@ const scenarioVersionRestore = async ({
   await stage(page, variant.locale, '卡面图', 'Card art')
   await expect(page.getByLabel(text(variant.locale, '画面主题', 'Image subject')))
     .toHaveValue(currentSubject)
-  await expect(page.getByLabel(text(variant.locale, '生成提示词', 'Generation prompt')))
-    .toHaveValue(currentPrompt)
   const undone = await loadWorkspace(request, account, workspace.id)
   expect(undone.revision).toBe(revisionBeforeRestore + 2)
   expect(withDatabase(database => (database.prepare(
@@ -1248,6 +1250,7 @@ const scenarioPrivacy = async ({
   account,
   variant,
 }: ScenarioContext) => {
+  const privateSubject = unique('secret subject')
   const privatePrompt = unique('secret prompt')
   const privateAbilityPrompt = unique('secret ability')
   const privateModel = unique('secret-model')
@@ -1273,6 +1276,7 @@ const scenarioPrivacy = async ({
           model: privateModel,
           createdAt: Date.now(),
         },
+        artInputs: { subject: privateSubject },
       },
     },
   ))
@@ -1293,7 +1297,8 @@ const scenarioPrivacy = async ({
   const ownerPayload = await responseJson<{ workspace: Workspace }>(
     await api(request, account, `/api/workshop/cards/${workspace.id}/workspace`),
   )
-  expect(JSON.stringify(ownerPayload)).toContain(privatePrompt)
+  expect(JSON.stringify(ownerPayload)).toContain(privateSubject)
+  expect(JSON.stringify(ownerPayload)).not.toContain(privatePrompt)
   expect(JSON.stringify(ownerPayload)).toContain(privateModel)
   const other = await createAccount(request)
   await responseJson(
@@ -1312,6 +1317,7 @@ const scenarioPrivacy = async ({
     await api(request, null, `/api/workshop/cards/${workspace.id}`),
   )
   const publicText = JSON.stringify(publicDetail)
+  expect(publicText).not.toContain(privateSubject)
   expect(publicText).not.toContain(privatePrompt)
   expect(publicText).not.toContain(privateAbilityPrompt)
   expect(publicText).not.toContain(privateModel)
@@ -1325,17 +1331,18 @@ const scenarioPrivacy = async ({
       'SELECT draft_generation_json FROM workshop_cards WHERE id = ?',
     ).get(workspace.id) as { draft_generation_json: string }).draft_generation_json
     return {
+      hasSubject: generation.includes(privateSubject),
       hasPrompt: generation.includes(privatePrompt),
       hasModel: generation.includes(privateModel),
       hasKey: generation.includes('e2e-fake-key'),
     }
-  })).toEqual({ hasPrompt: true, hasModel: true, hasKey: false })
+  })).toEqual({ hasSubject: true, hasPrompt: false, hasModel: true, hasKey: false })
 
   await openEditor(page, workspace.id)
   await stage(page, variant.locale, '卡面图', 'Card art')
   await expect(page.getByLabel(
-    text(variant.locale, '生成提示词', 'Generation prompt'),
-  )).toHaveValue(privatePrompt)
+    text(variant.locale, '画面主题', 'Image subject'),
+  )).toHaveValue(privateSubject)
   await expectAccessibleWorkspace(page)
 }
 

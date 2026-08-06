@@ -378,17 +378,11 @@ const CARD_IMPL = {
 
 ### C4. 卡牌美术生成
 
-图片生成使用单独的 prompt，调用 DALL-E / Stable Diffusion API：
+界面只收集 `Image subject` 文本；固定模板在发送图片请求时按卡牌类型拼接，不展示、不上传也不持久化完整 prompt。模板只要求约 `0.95:1` 的近方形竖向满幅构图，不声明像素尺寸，也不要求模型绘制边框、金边或文字。
 
-```
-Generate a card illustration for a medieval farming board game.
-Style: Watercolor, warm earth tones, medieval European pastoral setting.
-Card name: "{name}"
-Card description: "{desc}"
-Single centered illustration, no text, no borders, square format.
-```
+模型原图由浏览器统一 cover 裁切到卡牌图框比例，再套职业卡圆形或次要发展卡六角形遮罩并绘制金边；最终画布分别为职业卡 `512×537`、次要发展卡 `512×534`。因此模型是否遵循输出尺寸不影响卡面文件尺寸。
 
-生成结果先成为图片候选，不直接覆盖当前卡面。当前浏览器会话最多保留三个候选；采用后才原子更新 Design Draft、创建去重 Draft Version，并把图片上传到 `/data/card-art/`。
+生成结果先成为图片候选，不直接覆盖当前卡面。当前浏览器会话最多保留三个候选；采用后才原子更新 Design Draft、创建去重 Draft Version，并把图片上传到 `/data/card-art/`。服务端只保存用户输入的 subject 及已采用候选 provenance。
 
 ### C5. LLM 生成代码的安全验证
 
@@ -525,7 +519,7 @@ WorkshopPage
 
 编辑器直链使用 `?page=workshop&view=editor&card=<workshop-card-id>`。它直接加载作者私有的 `GET /api/workshop/cards/:id/workspace`，不能通过仅含已发布投影的公共详情接口回填草稿。
 
-版本历史读取 `GET /api/workshop/cards/:id/versions`。恢复必须调用带 `baseRevision` 的 `POST /api/workshop/cards/:id/restore`，把不可变版本复制到当前 Design Draft 并推进 revision；不改写历史、不额外创建版本。浏览器保留恢复前草稿，提供一次本地撤销。
+版本历史读取 `GET /api/workshop/cards/:id/versions`，玩家只看到最近 5 个版本；创建新版本时会清理超出上限且未被审核、发布或沙盒确认固定的旧版本。恢复必须调用带 `baseRevision` 的 `POST /api/workshop/cards/:id/restore`，把不可变版本复制到当前 Design Draft 并推进 revision；不改写历史、不额外创建版本。浏览器保留恢复前草稿，提供一次本地撤销。
 
 ### D7. Design Draft 持久化与命令
 
@@ -551,7 +545,7 @@ WorkshopPage
 
 普通编辑只在切换阶段、站内离开或显式保存时创建检查点，不创建 Draft Version。刷新或崩溃恢复依赖同步写入的 localStorage 副本；同 revision 恢复为未同步状态，服务器 revision 已前进则要求用户选择整份服务器稿或整份本机稿。
 
-Draft Version 只序列化最终卡牌内容和各分区已采用候选的 provenance；临时 `_draft` 表单字段、未采用候选、完整生成结果副本和工作对话不进入版本。
+Draft Version 只序列化最终卡牌内容和各分区已采用候选的 provenance；图片 provenance 同层保留用户输入的 subject，确保恢复版本后仍可重新生成。临时 `_draft` 表单字段、未采用候选、完整生成结果副本和工作对话不进入版本。
 
 ---
 

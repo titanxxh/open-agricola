@@ -117,6 +117,14 @@ describe('workshop draft migration', () => {
         'old-version', 'published', '{"id":"CUSTOM_Published","desc":["old"]}',
         '{}', '/old.png', 1, 'author', 2
       );
+      INSERT INTO workshop_card_versions (
+        id, card_id, card_json, code_manifest, art_url, version_number, created_by, created_at
+      ) VALUES
+        ('old-version-2', 'published', '{"id":"CUSTOM_Published"}', '{}', '/old-2.png', 2, 'author', 2),
+        ('old-version-3', 'published', '{"id":"CUSTOM_Published"}', '{}', '/old-3.png', 3, 'author', 2),
+        ('old-version-4', 'published', '{"id":"CUSTOM_Published"}', '{}', '/old-4.png', 4, 'author', 2),
+        ('old-version-5', 'published', '{"id":"CUSTOM_Published"}', '{}', '/old-5.png', 5, 'author', 2),
+        ('old-version-6', 'published', '{"id":"CUSTOM_Published"}', '{}', '/old-6.png', 6, 'author', 2);
       INSERT INTO card_likes VALUES ('author', 'published', 3);
       INSERT INTO card_comments VALUES ('comment', 'published', 'author', 'keep', 3);
       INSERT INTO sandbox_cards VALUES ('author', 'published', 3);
@@ -128,7 +136,7 @@ describe('workshop draft migration', () => {
     const { getDb } = await import('../db.ts')
     const db = getDb()
 
-    expect(db.prepare('SELECT MAX(version) AS version FROM schema_version').get()).toEqual({ version: 27 })
+    expect(db.prepare('SELECT MAX(version) AS version FROM schema_version').get()).toEqual({ version: 28 })
     expect(db.prepare(`
       SELECT review_commit_sha, review_version_id FROM workshop_cards WHERE id = 'draft'
     `).get()).toEqual({ review_commit_sha: null, review_version_id: null })
@@ -165,39 +173,27 @@ describe('workshop draft migration', () => {
       SELECT draft_generation_json FROM workshop_cards WHERE id = 'draft'
     `).get() as { draft_generation_json: string }).draft_generation_json)
     expect(generation).toEqual({
-      art: {
-        prompt: 'draw a field',
-        lastCompleted: {
-          id: 'legacy-art-draft',
-          kind: 'art',
-          prompt: 'draw a field',
-          resultUrl: '/draft.png',
-          createdAt: 1,
-        },
-        adopted: {
-          id: 'legacy-art-draft',
-          kind: 'art',
-          prompt: 'draw a field',
-          resultUrl: '/draft.png',
-          createdAt: 1,
-        },
-      },
+      art: {},
     })
 
     expect(db.prepare(`
       SELECT card_json, code_manifest, art_url, version_number, content_hash, provenance_json
       FROM workshop_card_versions
-      WHERE card_id = 'published' AND version_number = 2
+      WHERE card_id = 'published' AND version_number = 7
     `).get()).toEqual({
       card_json: '{"id":"CUSTOM_Published","desc":["final"]}',
       code_manifest: '{"effect":true}',
       art_url: '/published.png',
-      version_number: 2,
+      version_number: 7,
       content_hash: null,
       provenance_json: '{}',
     })
     expect(db.prepare('SELECT content_hash, provenance_json FROM workshop_card_versions WHERE id = ?')
-      .get('old-version')).toEqual({ content_hash: null, provenance_json: '{}' })
+      .get('old-version-3')).toEqual({ content_hash: null, provenance_json: '{}' })
+    expect(db.prepare(`
+      SELECT COUNT(*) AS count, MIN(version_number) AS oldest, MAX(version_number) AS newest
+      FROM workshop_card_versions WHERE card_id = 'published'
+    `).get()).toEqual({ count: 5, oldest: 3, newest: 7 })
     expect(db.prepare(`
       SELECT
         (SELECT COUNT(*) FROM card_likes) AS likes,
@@ -211,5 +207,81 @@ describe('workshop draft migration', () => {
       github_pr_url: 'https://example.test/pr/1',
     })
     db.close()
+  })
+
+  it('scrubs nested legacy art prompts from v27 drafts and version provenance', async () => {
+    tempDir = mkdtempSync(join(tmpdir(), 'open-agricola-workshop-prompts-'))
+    const path = join(tempDir, 'migration.db')
+    const seed = new Database(path)
+    seed.exec(`
+      CREATE TABLE schema_version (version INTEGER PRIMARY KEY);
+      INSERT INTO schema_version (version) VALUES (27);
+      CREATE TABLE workshop_cards (
+        id TEXT PRIMARY KEY,
+        draft_generation_json TEXT NOT NULL,
+        art_prompt TEXT,
+        review_version_id TEXT,
+        approved_version_id TEXT,
+        sandbox_pass_version_id TEXT
+      );
+      CREATE TABLE workshop_card_versions (
+        id TEXT PRIMARY KEY,
+        card_id TEXT NOT NULL,
+        version_number INTEGER NOT NULL,
+        provenance_json TEXT NOT NULL
+      );
+    `)
+    seed.prepare(`
+      INSERT INTO workshop_cards (
+        id, draft_generation_json, art_prompt,
+        review_version_id, approved_version_id, sandbox_pass_version_id
+      ) VALUES (?, ?, ?, NULL, NULL, NULL)
+    `).run('card', JSON.stringify({
+      art: {
+        subject: 'current subject',
+        prompt: 'full editable prompt',
+        lastCompleted: {
+          id: 'last',
+          kind: 'art',
+          prompt: 'Manually uploaded image',
+          resultUrl: '/card-art/upload.png',
+          provider: 'upload',
+          createdAt: 100,
+        },
+        adopted: { id: 'adopted', prompt: 'full adopted prompt', provider: 'gemini' },
+      },
+    }), 'legacy column prompt')
+    seed.prepare(`
+      INSERT INTO workshop_card_versions (id, card_id, version_number, provenance_json)
+      VALUES (?, ?, ?, ?)
+    `).run('version', 'card', 1, JSON.stringify({
+      art: { adopted: { id: 'adopted', prompt: 'full version prompt' } },
+    }))
+
+    const { runMigrations } = await import('../db.ts')
+    runMigrations(seed, () => {})
+
+    const card = seed.prepare(`
+      SELECT draft_generation_json, art_prompt FROM workshop_cards WHERE id = 'card'
+    `).get() as { draft_generation_json: string; art_prompt: string | null }
+    expect(card.art_prompt).toBeNull()
+    expect(JSON.parse(card.draft_generation_json)).toEqual({
+      art: {
+        subject: 'current subject',
+        lastCompleted: {
+          id: 'last',
+          kind: 'art',
+          prompt: 'current subject',
+          promptFormat: 'subject',
+          resultUrl: '/card-art/upload.png',
+          provider: 'upload',
+          createdAt: 100,
+        },
+      },
+    })
+    expect(JSON.parse((seed.prepare(`
+      SELECT provenance_json FROM workshop_card_versions WHERE id = 'version'
+    `).get() as { provenance_json: string }).provenance_json)).toEqual({})
+    seed.close()
   })
 })

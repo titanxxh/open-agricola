@@ -143,15 +143,40 @@ const serialiseDraft = (draft: WorkshopDraft): {
   cardJson: string
   codeManifest: string | null
   generation: string
-} => ({
-  cardJson: JSON.stringify({
-    ...draft.cardJson,
-    ...(draft.effectCode ? { _code: draft.effectCode } : {}),
-    ...(draft.compiledCode ? { _compiled: draft.compiledCode } : {}),
-  }),
-  codeManifest: draft.codeManifest ? JSON.stringify(draft.codeManifest) : null,
-  generation: JSON.stringify(draft.generation),
-})
+} => {
+  const generation = structuredClone(draft.generation)
+  const art = generation.art
+  if (art && typeof art === 'object' && !Array.isArray(art)) {
+    const record = art as Record<string, unknown>
+    delete record.prompt
+    const subject = typeof record.subject === 'string' && record.subject.trim()
+      ? record.subject
+      : 'Manually uploaded image'
+    for (const key of ['lastCompleted', 'adopted']) {
+      const candidate = record[key]
+      if (!candidate || typeof candidate !== 'object' || Array.isArray(candidate)) {
+        delete record[key]
+        continue
+      }
+      const candidateRecord = candidate as Record<string, unknown>
+      if (candidateRecord.promptFormat === 'subject' && typeof candidateRecord.prompt === 'string') {
+        continue
+      }
+      if (candidateRecord.provider === 'upload') {
+        record[key] = { ...candidateRecord, prompt: subject, promptFormat: 'subject' }
+      } else delete record[key]
+    }
+  }
+  return {
+    cardJson: JSON.stringify({
+      ...draft.cardJson,
+      ...(draft.effectCode ? { _code: draft.effectCode } : {}),
+      ...(draft.compiledCode ? { _compiled: draft.compiledCode } : {}),
+    }),
+    codeManifest: draft.codeManifest ? JSON.stringify(draft.codeManifest) : null,
+    generation: JSON.stringify(generation),
+  }
+}
 
 const versionCardJson = (draft: WorkshopDraft): Record<string, unknown> => {
   const cardJson = { ...draft.cardJson }
@@ -172,6 +197,7 @@ const provenanceCandidate = (value: unknown): Record<string, unknown> | null => 
     'id',
     'kind',
     'prompt',
+    'promptFormat',
     'provider',
     'model',
     'referenceImages',
@@ -193,8 +219,15 @@ const versionProvenance = (
   ['art', 'ability'].flatMap(kind => {
     const group = generation[kind]
     if (!group || typeof group !== 'object' || Array.isArray(group)) return []
-    const adopted = provenanceCandidate((group as Record<string, unknown>).adopted)
-    return adopted ? [[kind, { adopted }]] : []
+    const record = group as Record<string, unknown>
+    const adopted = provenanceCandidate(record.adopted)
+    if (!adopted) return []
+    return [[kind, {
+      ...(kind === 'art' && typeof record.subject === 'string'
+        ? { subject: record.subject }
+        : {}),
+      adopted,
+    }]]
   }),
 )
 
@@ -474,6 +507,25 @@ const ensureVersion = (
     hash,
     provenance,
   )
+  db.prepare(`
+    DELETE FROM workshop_card_versions
+    WHERE card_id = @cardId
+      AND id NOT IN (
+        SELECT id FROM workshop_card_versions
+        WHERE card_id = @cardId
+        ORDER BY version_number DESC
+        LIMIT 5
+      )
+      AND NOT EXISTS (
+        SELECT 1 FROM workshop_cards
+        WHERE id = @cardId
+          AND workshop_card_versions.id IN (
+            review_version_id,
+            approved_version_id,
+            sandbox_pass_version_id
+          )
+      )
+  `).run({ cardId: workspace.id })
   return id
 }
 
@@ -484,7 +536,7 @@ export function adoptCandidate(
     authorId: string
     baseRevision: number
     candidate: WorkshopCandidate
-    artInputs?: { subject: string; prompt: string }
+    artInputs?: { subject: string }
   },
 ): { workspace: WorkshopWorkspace; versionId: string } {
   return db.transaction(() => {

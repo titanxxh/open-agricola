@@ -145,6 +145,7 @@ describe('workshop draft aggregate', () => {
       draft: baseDraft({
         generation: {
           art: {
+            subject: 'sunlit medieval field',
             prompt: 'sunlit medieval field',
             resultUrl: '/card-art/field.png',
           },
@@ -158,7 +159,7 @@ describe('workshop draft aggregate', () => {
     expect(created.draft.effectCode).toBeNull()
     expect(created.draft.generation).toEqual({
       art: {
-        prompt: 'sunlit medieval field',
+        subject: 'sunlit medieval field',
         resultUrl: '/card-art/field.png',
       },
     })
@@ -166,6 +167,37 @@ describe('workshop draft aggregate', () => {
     expect(() => loadWorkspace(db, created.id, 'other')).toThrowError(
       expect.objectContaining<Partial<WorkshopDraftError>>({ code: 'forbidden' }),
     )
+  })
+
+  it('scrubs unmarked nested art prompts without losing uploads', () => {
+    const upload = {
+      id: 'uploaded-art',
+      kind: 'art' as const,
+      prompt: 'legacy generated template',
+      resultUrl: '/card-art/upload.png',
+      provider: 'upload',
+      model: 'image/png',
+      createdAt: 100,
+    }
+    const created = createCard(db, {
+      authorId: 'author',
+      draft: baseDraft({
+        generation: {
+          art: {
+            subject: 'A field keeper',
+            lastCompleted: upload,
+            adopted: { ...upload, id: 'generated-art', provider: 'gemini' },
+          },
+        },
+      }),
+    })
+
+    expect(created.draft.generation).toEqual({
+      art: {
+        subject: 'A field keeper',
+        lastCompleted: { ...upload, prompt: 'A field keeper', promptFormat: 'subject' },
+      },
+    })
   })
 
   it('normalizes row and card definition names together', () => {
@@ -300,10 +332,11 @@ describe('workshop draft aggregate', () => {
     const candidate = {
       id: 'art-1',
       kind: 'art' as const,
-      prompt: 'a field at sunrise',
+      prompt: 'An edited field keeper',
       resultUrl: '/card-art/sunrise.png',
       provider: 'fake',
       model: 'image-test',
+      promptFormat: 'subject' as const,
       createdAt: 100,
     }
 
@@ -313,8 +346,7 @@ describe('workshop draft aggregate', () => {
       baseRevision: 1,
       candidate,
       artInputs: {
-        subject: 'An edited field keeper',
-        prompt: 'an edited field at sunrise',
+        subject: 'Current field keeper',
       },
     })
 
@@ -322,8 +354,7 @@ describe('workshop draft aggregate', () => {
     expect(adopted.workspace.draft.artUrl).toBe('/card-art/sunrise.png')
     expect(adopted.workspace.draft.generation).toEqual({
       art: {
-        subject: 'An edited field keeper',
-        prompt: 'an edited field at sunrise',
+        subject: 'Current field keeper',
         lastCompleted: candidate,
         adopted: candidate,
       },
@@ -334,10 +365,12 @@ describe('workshop draft aggregate', () => {
       content_hash: expect.stringMatching(/^[a-f0-9]{64}$/),
       provenance_json: JSON.stringify({
         art: {
+          subject: 'Current field keeper',
           adopted: {
             id: candidate.id,
             kind: candidate.kind,
             prompt: candidate.prompt,
+            promptFormat: candidate.promptFormat,
             provider: candidate.provider,
             model: candidate.model,
             createdAt: candidate.createdAt,
@@ -354,6 +387,37 @@ describe('workshop draft aggregate', () => {
     })
     expect(repeated.versionId).toBe(adopted.versionId)
     expect(db.prepare('SELECT COUNT(*) AS count FROM workshop_card_versions').get()).toEqual({ count: 1 })
+  })
+
+  it('keeps only the five newest player versions', () => {
+    let workspace = createCard(db, { authorId: 'author', draft: baseDraft() })
+
+    for (let index = 1; index <= 6; index += 1) {
+      workspace = adoptCandidate(db, {
+        cardId: workspace.id,
+        authorId: 'author',
+        baseRevision: workspace.revision,
+        candidate: {
+          id: `art-${index}`,
+          kind: 'art',
+          prompt: `field ${index}`,
+          promptFormat: 'subject',
+          resultUrl: `/card-art/${index}.png`,
+          createdAt: index,
+        },
+      }).workspace
+    }
+
+    expect(db.prepare(`
+      SELECT version_number FROM workshop_card_versions
+      WHERE card_id = ? ORDER BY version_number
+    `).all(workspace.id)).toEqual([
+      { version_number: 2 },
+      { version_number: 3 },
+      { version_number: 4 },
+      { version_number: 5 },
+      { version_number: 6 },
+    ])
   })
 
   it('keeps transient form state and unadopted generations out of versions', () => {
@@ -383,6 +447,7 @@ describe('workshop draft aggregate', () => {
         id: 'art-final',
         kind: 'art',
         prompt: 'final art prompt',
+        promptFormat: 'subject',
         resultUrl: '/card-art/final.png',
         createdAt: 100,
       },
@@ -401,6 +466,7 @@ describe('workshop draft aggregate', () => {
           id: 'art-final',
           kind: 'art',
           prompt: 'final art prompt',
+          promptFormat: 'subject',
           createdAt: 100,
         },
       },
@@ -587,9 +653,11 @@ describe('workshop draft aggregate', () => {
         id: 'art-restore',
         kind: 'art',
         prompt: 'original field',
+        promptFormat: 'subject',
         resultUrl: '/card-art/original.png',
         createdAt: 100,
       },
+      artInputs: { subject: 'original field' },
     })
     const changed = checkpointDraft(db, {
       cardId: created.id,
@@ -613,6 +681,7 @@ describe('workshop draft aggregate', () => {
     expect(restored.revision).toBe(4)
     expect(restored.draft.name).toBe('Field Keeper')
     expect(restored.draft.artUrl).toBe('/card-art/original.png')
+    expect(restored.draft.generation).toMatchObject({ art: { subject: 'original field' } })
     expect(db.prepare('SELECT COUNT(*) AS count FROM workshop_card_versions').get()).toEqual({ count: 1 })
   })
 
@@ -626,6 +695,7 @@ describe('workshop draft aggregate', () => {
         id: 'art-original',
         kind: 'art',
         prompt: 'original field',
+        promptFormat: 'subject',
         resultUrl: '/card-art/original.png',
         createdAt: 100,
       },
