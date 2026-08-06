@@ -271,14 +271,19 @@ export const PlayerCard = ({
         backgroundPosition: `${pos.x} ${pos.y}`,
       }
     }
-    // Custom card art: use the uploaded image URL
+    // Custom card art: use the uploaded image URL.
+    // `contain`, not `cover`: official deck art is pre-cropped to the icon box,
+    // but workshop art is whatever the generator or upload produced (DALL·E is
+    // 1:1, uploads are arbitrary). `cover` scales it up until it fills the
+    // 180.9x189.6 box and crops both sides — a 3:2 image loses ~36% of its
+    // width. `contain` keeps the whole frame visible.
     if (runtimeArt) {
       // artUrl is a relative path like /card-art/xxx.png — resolve against API_BASE (lazy import to avoid window access in tests)
       const apiBase = (typeof import.meta !== 'undefined' && import.meta.env?.VITE_API_BASE) || ''
       const fullUrl = runtimeArt.startsWith('http') ? runtimeArt : `${apiBase}${runtimeArt}`
       return {
         backgroundImage: `url(${fullUrl})`,
-        backgroundSize: 'cover',
+        backgroundSize: 'contain',
         backgroundPosition: 'center',
       }
     }
@@ -289,7 +294,7 @@ export const PlayerCard = ({
       const fullUrl = `${base}${staticArt.replace(/^\/+/, '')}`
       return {
         backgroundImage: `url(${fullUrl})`,
-        backgroundSize: 'cover',
+        backgroundSize: 'contain',
         backgroundPosition: 'center',
       }
     }

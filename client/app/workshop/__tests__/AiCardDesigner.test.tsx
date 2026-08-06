@@ -5,7 +5,12 @@ import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 
 import { LocaleProvider } from '../../../contexts/LocaleContext'
-import { AiCardDesigner, type ApiCard } from '../AiCardDesigner'
+import {
+  AiCardDesigner,
+  CARD_ART_BADGE_RATIO,
+  cardArtCanvasSize,
+  type ApiCard,
+} from '../AiCardDesigner'
 
 const existingCard: ApiCard = {
   id: 'db-card-1',
@@ -766,3 +771,36 @@ describe('AiCardDesigner AI config header', () => {
     expect(html).toContain('DeepSeek')
   })
 })
+
+describe('card art geometry', () => {
+  it('emits a canvas matching the card face icon box, so no crop or letterbox is needed', () => {
+    const occupation = cardArtCanvasSize('occupation')
+    const minor = cardArtCanvasSize('minor')
+
+    expect(occupation).toEqual({ width: 512, height: 537 })
+    expect(minor).toEqual({ width: 512, height: 534 })
+
+    // .card-icon boxes in client/styles/card-sprite.css — a square canvas
+    // (the old 512x512) forced the card face to crop or letterbox the art.
+    expect(occupation.width / occupation.height).toBeCloseTo(180.95 / 189.645, 2)
+    expect(minor.width / minor.height).toBeCloseTo(182.125 / 189.9975, 2)
+  })
+
+  it('sizes each badge shape like the official deck art it sits next to', () => {
+    // Measured off the alpha bounding box of the official art, which uses the
+    // same badge-with-transparent-corners layout:
+    //   deckE/E089.png (occupation circle)  383/512 = 0.748
+    //   deckE/E001.png (minor hexagon)      441/512 = 0.861
+    // A flat-top hexagon needs the extra width to reach the same visual height.
+    expect(CARD_ART_BADGE_RATIO.occupation).toBeCloseTo(383 / 512, 2)
+    expect(CARD_ART_BADGE_RATIO.minor).toBeCloseTo(441 / 512, 2)
+    expect(CARD_ART_BADGE_RATIO.minor).toBeGreaterThan(CARD_ART_BADGE_RATIO.occupation)
+  })
+
+  it('gives the hexagon the same visual height as the official one', () => {
+    // Hexagon height is sqrt(3)/2 of its width; official is 384/512 = 0.75.
+    const hexHeight = CARD_ART_BADGE_RATIO.minor * (Math.sqrt(3) / 2)
+    expect(hexHeight).toBeCloseTo(384 / 512, 2)
+  })
+})
+
