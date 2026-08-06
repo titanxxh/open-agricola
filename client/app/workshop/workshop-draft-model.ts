@@ -423,6 +423,12 @@ const migrateRecoveredArtInputs = (
   const hadPrompt = Object.hasOwn(art, 'prompt') || Object.hasOwn(sessionState, 'artPrompt')
   delete art.prompt
   delete sessionState.artPrompt
+  if (hadPrompt) {
+    delete art.lastCompleted
+    delete art.adopted
+    sessionState.artCandidates = []
+    delete sessionState.selectedArtCandidateId
+  }
   if (!subjectChanged && !hadPrompt) return local
   if (subjectChanged) art.subject = local.sessionState.artSubject
   return {

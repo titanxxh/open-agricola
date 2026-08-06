@@ -885,25 +885,17 @@ export function runMigrations(
         if (cardColumns.some(({ name }) => name === 'draft_generation_json')) {
           database.exec(`
             UPDATE workshop_cards
-            SET draft_generation_json = CASE
-              WHEN json_type(draft_generation_json, '$.art.subject') = 'text'
-                THEN json_remove(json_replace(
-                  draft_generation_json,
-                  '$.art.lastCompleted.prompt', json_extract(draft_generation_json, '$.art.subject'),
-                  '$.art.adopted.prompt', json_extract(draft_generation_json, '$.art.subject')
-                ), '$.art.prompt')
-              ELSE json_remove(
-                draft_generation_json,
-                '$.art.prompt',
-                '$.art.lastCompleted.prompt',
-                '$.art.adopted.prompt'
-              )
-            END
+            SET draft_generation_json = json_remove(
+              draft_generation_json,
+              '$.art.prompt',
+              '$.art.lastCompleted',
+              '$.art.adopted'
+            )
             WHERE json_valid(draft_generation_json)
               AND (
                 json_type(draft_generation_json, '$.art.prompt') IS NOT NULL
-                OR json_type(draft_generation_json, '$.art.lastCompleted.prompt') IS NOT NULL
-                OR json_type(draft_generation_json, '$.art.adopted.prompt') IS NOT NULL
+                OR json_type(draft_generation_json, '$.art.lastCompleted') IS NOT NULL
+                OR json_type(draft_generation_json, '$.art.adopted') IS NOT NULL
               );
           `)
         }
@@ -915,18 +907,9 @@ export function runMigrations(
         if (versionColumns.some(({ name }) => name === 'provenance_json')) {
           database.exec(`
             UPDATE workshop_card_versions
-            SET provenance_json = json_remove(
-              provenance_json,
-              '$.art.prompt',
-              '$.art.lastCompleted.prompt',
-              '$.art.adopted.prompt'
-            )
+            SET provenance_json = json_remove(provenance_json, '$.art')
             WHERE json_valid(provenance_json)
-              AND (
-                json_type(provenance_json, '$.art.prompt') IS NOT NULL
-                OR json_type(provenance_json, '$.art.lastCompleted.prompt') IS NOT NULL
-                OR json_type(provenance_json, '$.art.adopted.prompt') IS NOT NULL
-              );
+              AND json_type(provenance_json, '$.art') IS NOT NULL;
           `)
         }
         database.exec(`

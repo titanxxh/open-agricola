@@ -173,20 +173,7 @@ describe('workshop draft migration', () => {
       SELECT draft_generation_json FROM workshop_cards WHERE id = 'draft'
     `).get() as { draft_generation_json: string }).draft_generation_json)
     expect(generation).toEqual({
-      art: {
-        lastCompleted: {
-          id: 'legacy-art-draft',
-          kind: 'art',
-          resultUrl: '/draft.png',
-          createdAt: 1,
-        },
-        adopted: {
-          id: 'legacy-art-draft',
-          kind: 'art',
-          resultUrl: '/draft.png',
-          createdAt: 1,
-        },
-      },
+      art: {},
     })
 
     expect(db.prepare(`
@@ -274,15 +261,11 @@ describe('workshop draft migration', () => {
     expect(JSON.parse(card.draft_generation_json)).toEqual({
       art: {
         subject: 'current subject',
-        lastCompleted: { id: 'last', prompt: 'current subject' },
-        adopted: { id: 'adopted', prompt: 'current subject' },
       },
     })
     expect(JSON.parse((seed.prepare(`
       SELECT provenance_json FROM workshop_card_versions WHERE id = 'version'
-    `).get() as { provenance_json: string }).provenance_json)).toEqual({
-      art: { adopted: { id: 'adopted' } },
-    })
+    `).get() as { provenance_json: string }).provenance_json)).toEqual({})
     seed.close()
   })
 })

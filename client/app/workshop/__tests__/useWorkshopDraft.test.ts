@@ -58,11 +58,40 @@ describe('useWorkshopDraft', () => {
   })
 
   it('migrates same-revision legacy art inputs into the checkpointed draft', async () => {
+    const legacyDraft = draft()
+    legacyDraft.generation = {
+      art: {
+        prompt: 'unsent art',
+        lastCompleted: {
+          id: 'legacy-art',
+          kind: 'art',
+          prompt: 'full generated prompt',
+          resultUrl: '/legacy.png',
+          createdAt: 1,
+        },
+        adopted: {
+          id: 'legacy-art',
+          kind: 'art',
+          prompt: 'full generated prompt',
+          resultUrl: '/legacy.png',
+          createdAt: 1,
+        },
+      },
+    }
     localStorage.setItem(workshopDraftStorageKey('card-1'), JSON.stringify({
       baseRevision: 3,
-      draft: draft(),
+      draft: legacyDraft,
       sessionState: {
-        artCandidates: [],
+        artCandidates: [{
+          id: 'legacy-art',
+          kind: 'art',
+          prompt: 'full generated prompt',
+          resultUrl: '/legacy.png',
+          createdAt: 1,
+          baseRevision: 3,
+          stale: false,
+        }],
+        selectedArtCandidateId: 'legacy-art',
         abilityCandidates: [],
         artSubject: 'unsent subject',
         artPrompt: 'unsent art',
@@ -94,6 +123,8 @@ describe('useWorkshopDraft', () => {
     await waitFor(() => expect(result.current.state?.baseRevision).toBe(3))
     expect(result.current.state?.save.status).toBe('dirty')
     expect(result.current.state?.session.artSubject).toBe('unsent subject')
+    expect(result.current.state?.session.artCandidates).toEqual([])
+    expect(result.current.state?.session.selectedArtCandidateId).toBeUndefined()
     expect(result.current.state?.session).not.toHaveProperty('artPrompt')
 
     await act(async () => {
@@ -397,7 +428,6 @@ describe('useWorkshopDraft', () => {
         }],
         abilityCandidates: [],
         artSubject: 'local subject',
-        artPrompt: 'local prompt',
         abilityInput: '',
         abilityMessages: [],
       },
