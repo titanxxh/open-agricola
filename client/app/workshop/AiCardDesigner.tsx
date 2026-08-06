@@ -635,12 +635,14 @@ function ArtPanel({
   cardType,
   cardName,
   artUrl,
+  artSubject,
   artPrompt,
   candidates,
   selectedCandidateId,
   baseRevision,
   refCache,
   apiFetch,
+  onSubjectChange,
   onPromptChange,
   onCandidateCompleted,
   onCandidateSelected,
@@ -650,12 +652,14 @@ function ArtPanel({
   cardType: 'minor' | 'occupation'
   cardName: string
   artUrl: string | null
+  artSubject: string
   artPrompt: string
   candidates: ArtCandidate[]
   selectedCandidateId?: string
   baseRevision: number
   refCache?: Map<string, ReferenceImage>
   apiFetch: ApiFetch
+  onSubjectChange: (subject: string) => void
   onPromptChange: (prompt: string) => void
   onCandidateCompleted: (candidate: ArtCandidate) => Promise<void>
   onCandidateSelected: (candidateId: string) => void
@@ -664,7 +668,6 @@ function ArtPanel({
 }) {
   const { locale, t } = useLocale()
   const config = getLlmConfig(KEY_LLM_CONFIG_ART)
-  const [artSubject, setArtSubject] = useState('')
   const [selectedRefs, setSelectedRefs] = useState<string[]>([])
   const [generating, setGenerating] = useState(false)
   const [uploading, setUploading] = useState(false)
@@ -705,7 +708,7 @@ function ArtPanel({
   }
 
   const handleSubjectChange = (subject: string) => {
-    setArtSubject(subject)
+    onSubjectChange(subject)
     if (subject.trim()) {
       onPromptChange(buildCardArtPrompt(
         subject.trim(),
@@ -2561,12 +2564,14 @@ export function AiCardDesigner({
                 cardType={cardType}
                 cardName={cardName}
                 artUrl={artUrl}
+                artSubject={workspaceState?.session.artSubject ?? ''}
                 artPrompt={workspaceState?.session.artPrompt ?? ''}
                 candidates={workspaceState?.session.artCandidates ?? []}
                 selectedCandidateId={workspaceState?.session.selectedArtCandidateId}
                 baseRevision={workspaceState?.baseRevision ?? 0}
                 refCache={refCache}
                 apiFetch={workshopApiFetch}
+                onSubjectChange={artSubject => updateSession({ artSubject })}
                 onPromptChange={prompt => updateSession({ artPrompt: prompt })}
                 onCandidateCompleted={completeArtCandidate}
                 onCandidateSelected={candidateId => updateSession({

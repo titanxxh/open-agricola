@@ -286,7 +286,17 @@ describe('workshop draft aggregate', () => {
   })
 
   it('adopts typed candidates and deduplicates immutable versions by content', () => {
-    const created = createCard(db, { authorId: 'author', draft: baseDraft() })
+    const created = createCard(db, {
+      authorId: 'author',
+      draft: baseDraft({
+        generation: {
+          art: {
+            subject: 'A field keeper',
+            prompt: 'a field at sunrise',
+          },
+        },
+      }),
+    })
     const candidate = {
       id: 'art-1',
       kind: 'art' as const,
@@ -302,12 +312,21 @@ describe('workshop draft aggregate', () => {
       authorId: 'author',
       baseRevision: 1,
       candidate,
+      artInputs: {
+        subject: 'An edited field keeper',
+        prompt: 'an edited field at sunrise',
+      },
     })
 
     expect(adopted.workspace.revision).toBe(2)
     expect(adopted.workspace.draft.artUrl).toBe('/card-art/sunrise.png')
     expect(adopted.workspace.draft.generation).toEqual({
-      art: { lastCompleted: candidate, adopted: candidate },
+      art: {
+        subject: 'An edited field keeper',
+        prompt: 'an edited field at sunrise',
+        lastCompleted: candidate,
+        adopted: candidate,
+      },
     })
     expect(db.prepare(`
       SELECT content_hash, provenance_json FROM workshop_card_versions WHERE id = ?

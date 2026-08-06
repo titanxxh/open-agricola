@@ -27,6 +27,7 @@ export type WorkshopSaveStatus = 'saved' | 'dirty' | 'saving' | 'offline' | 'err
 export type WorkshopSessionState = {
   artCandidates: ArtCandidate[]
   abilityCandidates: AbilityCandidate[]
+  artSubject?: string
   artPrompt: string
   abilityInput: string
   abilityMessages: unknown[]
@@ -64,6 +65,7 @@ export type WorkshopDraftState = {
 const emptySession = (): WorkshopSessionState => ({
   artCandidates: [],
   abilityCandidates: [],
+  artSubject: '',
   artPrompt: '',
   abilityInput: '',
   abilityMessages: [],
@@ -141,10 +143,13 @@ const sessionFromGeneration = (
   const pendingAbility = lastAbility?.id === adoptedAbility?.id ? null : lastAbility
   return {
     ...emptySession(),
-    artPrompt: lastArt?.prompt
-      ?? (typeof asRecord(art.adopted).prompt === 'string'
-        ? asRecord(art.adopted).prompt as string
-        : typeof art.prompt === 'string' ? art.prompt : ''),
+    artSubject: typeof art.subject === 'string' ? art.subject : '',
+    artPrompt: typeof art.prompt === 'string'
+      ? art.prompt
+      : lastArt?.prompt
+        ?? (typeof asRecord(art.adopted).prompt === 'string'
+          ? asRecord(art.adopted).prompt as string
+          : ''),
     artCandidates: pendingArt?.kind === 'art' ? [pendingArt] : [],
     abilityCandidates: pendingAbility?.kind === 'ability' ? [pendingAbility] : [],
     ...(pendingArt ? { selectedArtCandidateId: pendingArt.id } : {}),
@@ -271,7 +276,6 @@ export const workshopDraftReducer = (
             session: {
               ...state.session,
               artCandidates: [...state.session.artCandidates, action.candidate].slice(-3),
-              artPrompt: action.candidate.prompt,
               selectedArtCandidateId: action.candidate.id,
             },
             save: { status: 'dirty' },
@@ -374,8 +378,24 @@ export const workshopDraftReducer = (
             },
       }
     }
-    case 'sessionChanged':
-      return { ...state, session: { ...state.session, ...action.session } }
+    case 'sessionChanged': {
+      const session = { ...state.session, ...action.session }
+      if (action.session.artSubject === undefined && action.session.artPrompt === undefined) {
+        return { ...state, session }
+      }
+      const art = { ...asRecord(state.draft.generation.art) }
+      if (action.session.artSubject !== undefined) art.subject = action.session.artSubject
+      if (action.session.artPrompt !== undefined) art.prompt = action.session.artPrompt
+      return {
+        ...state,
+        draft: {
+          ...state.draft,
+          generation: { ...state.draft.generation, art },
+        },
+        session,
+        save: { status: 'dirty' },
+      }
+    }
     case 'stageChanged':
       return { ...state, stage: action.stage }
     case 'saving':
@@ -399,6 +419,28 @@ export const toLocalRecovery = (state: WorkshopDraftState): WorkshopLocalRecover
   sessionState: state.session,
 })
 
+const migrateRecoveredArtInputs = (
+  server: WorkshopWorkspaceDto,
+  local: WorkshopLocalRecovery,
+): WorkshopLocalRecovery => {
+  const stored = sessionFromGeneration({ ...server, draft: local.draft })
+  const subjectChanged = typeof local.sessionState.artSubject === 'string'
+    && local.sessionState.artSubject !== stored.artSubject
+  const promptChanged = typeof local.sessionState.artPrompt === 'string'
+    && local.sessionState.artPrompt !== stored.artPrompt
+  if (!subjectChanged && !promptChanged) return local
+  const art = { ...asRecord(local.draft.generation.art) }
+  if (subjectChanged) art.subject = local.sessionState.artSubject
+  if (promptChanged) art.prompt = local.sessionState.artPrompt
+  return {
+    ...local,
+    draft: {
+      ...local.draft,
+      generation: { ...local.draft.generation, art },
+    },
+  }
+}
+
 export const resolveWorkshopRecovery = (
   server: WorkshopWorkspaceDto,
   local?: WorkshopLocalRecovery | null,
@@ -406,28 +448,29 @@ export const resolveWorkshopRecovery = (
   | { kind: 'server'; state: WorkshopDraftState; clearLocal: boolean }
   | { kind: 'local'; state: WorkshopDraftState; clearLocal: false }
   | { kind: 'conflict'; state: WorkshopDraftState; clearLocal: false } => {
-  const serverState = createWorkshopDraftState(server, local?.sessionState)
-  if (!local) return { kind: 'server', state: serverState, clearLocal: false }
-  if (local.baseRevision !== server.revision) {
+  const recovered = local ? migrateRecoveredArtInputs(server, local) : null
+  const serverState = createWorkshopDraftState(server, recovered?.sessionState)
+  if (!recovered) return { kind: 'server', state: serverState, clearLocal: false }
+  if (recovered.baseRevision !== server.revision) {
     return {
       kind: 'conflict',
       state: {
         ...serverState,
         save: { status: 'conflict' },
-        conflict: { server, local },
+        conflict: { server, local: recovered },
       },
       clearLocal: false,
     }
   }
-  if (JSON.stringify(local.draft) === JSON.stringify(server.draft)) {
+  if (JSON.stringify(recovered.draft) === JSON.stringify(server.draft)) {
     return { kind: 'server', state: serverState, clearLocal: true }
   }
   return {
     kind: 'local',
     state: {
       ...serverState,
-      draft: local.draft,
-      session: local.sessionState,
+      draft: recovered.draft,
+      session: recovered.sessionState,
       save: { status: 'dirty' },
     },
     clearLocal: false,

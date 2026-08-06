@@ -37,6 +37,84 @@ const workspace = (revision = 1, name = 'Field Keeper'): WorkshopWorkspaceDto =>
 })
 
 describe('workshop draft model', () => {
+  it('stores and restores art inputs through the draft generation state', () => {
+    let state = createWorkshopDraftState(workspace())
+    state = workshopDraftReducer(state, {
+      type: 'sessionChanged',
+      session: {
+        artSubject: 'A valley carpenter',
+        artPrompt: 'A carpenter working beside a river',
+      },
+    })
+
+    expect(state.draft.generation).toEqual({
+      art: {
+        subject: 'A valley carpenter',
+        prompt: 'A carpenter working beside a river',
+      },
+    })
+    expect(state.save.status).toBe('dirty')
+
+    const restored = createWorkshopDraftState({
+      ...workspace(2),
+      draft: state.draft,
+    })
+    expect(restored.session).toMatchObject({
+      artSubject: 'A valley carpenter',
+      artPrompt: 'A carpenter working beside a river',
+    })
+  })
+
+  it('prefers the saved art prompt over candidate provenance', () => {
+    const restoredWorkspace = workspace(2)
+    restoredWorkspace.draft.generation = {
+      art: {
+        prompt: 'edited after generation',
+        lastCompleted: {
+          id: 'art-1',
+          kind: 'art',
+          prompt: 'original generation prompt',
+          resultUrl: '/card-art/1.png',
+          createdAt: 1,
+        },
+      },
+    }
+
+    expect(createWorkshopDraftState(restoredWorkspace).session.artPrompt).toBe(
+      'edited after generation',
+    )
+  })
+
+  it('keeps an explicitly cleared prompt after a manual upload completes', () => {
+    const currentWorkspace = workspace()
+    currentWorkspace.draft.generation = { art: { prompt: 'previous prompt' } }
+    let state = createWorkshopDraftState(currentWorkspace)
+    state = workshopDraftReducer(state, {
+      type: 'sessionChanged',
+      session: { artPrompt: '' },
+    })
+    state = workshopDraftReducer(state, {
+      type: 'candidateCompleted',
+      candidate: {
+        id: 'upload-1',
+        kind: 'art',
+        prompt: 'Manually uploaded image',
+        resultUrl: '/card-art/upload.png',
+        createdAt: 1,
+        baseRevision: 1,
+        stale: false,
+      },
+    })
+
+    expect(state.session.artPrompt).toBe('')
+    expect(state.draft.generation).toMatchObject({
+      art: {
+        prompt: '',
+        lastCompleted: { prompt: 'Manually uploaded image' },
+      },
+    })
+  })
+
   it('keeps only the three newest candidates and marks them stale after draft edits', () => {
     let state = createWorkshopDraftState(workspace())
     for (let index = 1; index <= 4; index += 1) {
@@ -191,6 +269,7 @@ describe('workshop draft model', () => {
       sessionState: {
         artCandidates: [],
         abilityCandidates: [],
+        artSubject: 'unsent subject',
         artPrompt: 'unsent art',
         abilityInput: 'unsent ability',
         abilityMessages: [],
@@ -217,7 +296,18 @@ describe('workshop draft model', () => {
     expect(resolveWorkshopRecovery(workspace(3), {
       ...local,
       draft: draft(),
-    })).toMatchObject({ kind: 'server', clearLocal: true })
+    })).toMatchObject({
+      kind: 'local',
+      clearLocal: false,
+      state: {
+        draft: {
+          generation: {
+            art: { subject: 'unsent subject', prompt: 'unsent art' },
+          },
+        },
+        save: { status: 'dirty' },
+      },
+    })
   })
 
   it('restores the last unadopted server candidates and image prompt', () => {
