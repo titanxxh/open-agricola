@@ -424,10 +424,20 @@ const migrateRecoveredArtInputs = (
   delete art.prompt
   delete sessionState.artPrompt
   if (hadPrompt) {
-    delete art.lastCompleted
-    delete art.adopted
-    sessionState.artCandidates = []
-    delete sessionState.selectedArtCandidateId
+    const subject = typeof sessionState.artSubject === 'string' && sessionState.artSubject.trim()
+      ? sessionState.artSubject
+      : 'Manually uploaded image'
+    for (const key of ['lastCompleted', 'adopted']) {
+      const candidate = asRecord(art[key])
+      if (candidate.provider === 'upload') art[key] = { ...candidate, prompt: subject }
+      else delete art[key]
+    }
+    sessionState.artCandidates = sessionState.artCandidates
+      .filter(candidate => candidate.provider === 'upload')
+      .map(candidate => ({ ...candidate, prompt: subject }))
+    if (!sessionState.artCandidates.some(
+      candidate => candidate.id === sessionState.selectedArtCandidateId,
+    )) delete sessionState.selectedArtCandidateId
   }
   if (!subjectChanged && !hadPrompt) return local
   if (subjectChanged) art.subject = local.sessionState.artSubject

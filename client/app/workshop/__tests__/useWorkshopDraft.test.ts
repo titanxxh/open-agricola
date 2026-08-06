@@ -57,7 +57,7 @@ describe('useWorkshopDraft', () => {
     expect(apiFetch).not.toHaveBeenCalled()
   })
 
-  it('migrates same-revision legacy art inputs into the checkpointed draft', async () => {
+  it('migrates legacy art inputs without losing a manually uploaded candidate', async () => {
     const legacyDraft = draft()
     legacyDraft.generation = {
       art: {
@@ -65,15 +65,17 @@ describe('useWorkshopDraft', () => {
         lastCompleted: {
           id: 'legacy-art',
           kind: 'art',
-          prompt: 'full generated prompt',
+          prompt: 'Manually uploaded image',
           resultUrl: '/legacy.png',
+          provider: 'upload',
           createdAt: 1,
         },
         adopted: {
-          id: 'legacy-art',
+          id: 'generated-art',
           kind: 'art',
           prompt: 'full generated prompt',
           resultUrl: '/legacy.png',
+          provider: 'gemini',
           createdAt: 1,
         },
       },
@@ -85,8 +87,9 @@ describe('useWorkshopDraft', () => {
         artCandidates: [{
           id: 'legacy-art',
           kind: 'art',
-          prompt: 'full generated prompt',
+          prompt: 'Manually uploaded image',
           resultUrl: '/legacy.png',
+          provider: 'upload',
           createdAt: 1,
           baseRevision: 3,
           stale: false,
@@ -107,6 +110,14 @@ describe('useWorkshopDraft', () => {
       expect(request.baseRevision).toBe(3)
       expect(request.draft.generation.art).toEqual({
         subject: 'unsent subject',
+        lastCompleted: {
+          id: 'legacy-art',
+          kind: 'art',
+          prompt: 'unsent subject',
+          resultUrl: '/legacy.png',
+          provider: 'upload',
+          createdAt: 1,
+        },
       })
       const saved = workspace(4)
       saved.draft = request.draft
@@ -123,8 +134,10 @@ describe('useWorkshopDraft', () => {
     await waitFor(() => expect(result.current.state?.baseRevision).toBe(3))
     expect(result.current.state?.save.status).toBe('dirty')
     expect(result.current.state?.session.artSubject).toBe('unsent subject')
-    expect(result.current.state?.session.artCandidates).toEqual([])
-    expect(result.current.state?.session.selectedArtCandidateId).toBeUndefined()
+    expect(result.current.state?.session.artCandidates).toEqual([
+      expect.objectContaining({ id: 'legacy-art', prompt: 'unsent subject' }),
+    ])
+    expect(result.current.state?.session.selectedArtCandidateId).toBe('legacy-art')
     expect(result.current.state?.session).not.toHaveProperty('artPrompt')
 
     await act(async () => {

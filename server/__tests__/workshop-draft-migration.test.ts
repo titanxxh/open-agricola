@@ -240,8 +240,15 @@ describe('workshop draft migration', () => {
       art: {
         subject: 'current subject',
         prompt: 'full editable prompt',
-        lastCompleted: { id: 'last', prompt: 'full generated prompt' },
-        adopted: { id: 'adopted', prompt: 'full adopted prompt' },
+        lastCompleted: {
+          id: 'last',
+          kind: 'art',
+          prompt: 'Manually uploaded image',
+          resultUrl: '/card-art/upload.png',
+          provider: 'upload',
+          createdAt: 100,
+        },
+        adopted: { id: 'adopted', prompt: 'full adopted prompt', provider: 'gemini' },
       },
     }), 'legacy column prompt')
     seed.prepare(`
@@ -261,6 +268,14 @@ describe('workshop draft migration', () => {
     expect(JSON.parse(card.draft_generation_json)).toEqual({
       art: {
         subject: 'current subject',
+        lastCompleted: {
+          id: 'last',
+          kind: 'art',
+          prompt: 'current subject',
+          resultUrl: '/card-art/upload.png',
+          provider: 'upload',
+          createdAt: 100,
+        },
       },
     })
     expect(JSON.parse((seed.prepare(`

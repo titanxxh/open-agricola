@@ -147,7 +147,27 @@ const serialiseDraft = (draft: WorkshopDraft): {
   const generation = structuredClone(draft.generation)
   const art = generation.art
   if (art && typeof art === 'object' && !Array.isArray(art)) {
-    delete (art as Record<string, unknown>).prompt
+    const record = art as Record<string, unknown>
+    const hadPrompt = Object.hasOwn(record, 'prompt')
+    delete record.prompt
+    if (hadPrompt) {
+      const subject = typeof record.subject === 'string' && record.subject.trim()
+        ? record.subject
+        : 'Manually uploaded image'
+      for (const key of ['lastCompleted', 'adopted']) {
+        const candidate = record[key]
+        if (
+          candidate
+          && typeof candidate === 'object'
+          && !Array.isArray(candidate)
+          && (candidate as Record<string, unknown>).provider === 'upload'
+        ) {
+          record[key] = { ...candidate as Record<string, unknown>, prompt: subject }
+        } else {
+          delete record[key]
+        }
+      }
+    }
   }
   return {
     cardJson: JSON.stringify({

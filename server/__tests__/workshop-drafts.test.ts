@@ -169,6 +169,38 @@ describe('workshop draft aggregate', () => {
     )
   })
 
+  it('scrubs legacy art prompts at the draft save boundary without losing uploads', () => {
+    const upload = {
+      id: 'uploaded-art',
+      kind: 'art' as const,
+      prompt: 'legacy generated template',
+      resultUrl: '/card-art/upload.png',
+      provider: 'upload',
+      model: 'image/png',
+      createdAt: 100,
+    }
+    const created = createCard(db, {
+      authorId: 'author',
+      draft: baseDraft({
+        generation: {
+          art: {
+            subject: 'A field keeper',
+            prompt: 'legacy generated template',
+            lastCompleted: upload,
+            adopted: { ...upload, id: 'generated-art', provider: 'gemini' },
+          },
+        },
+      }),
+    })
+
+    expect(created.draft.generation).toEqual({
+      art: {
+        subject: 'A field keeper',
+        lastCompleted: { ...upload, prompt: 'A field keeper' },
+      },
+    })
+  })
+
   it('normalizes row and card definition names together', () => {
     const created = createCard(db, {
       authorId: 'author',

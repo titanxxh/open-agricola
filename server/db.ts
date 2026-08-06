@@ -883,21 +883,37 @@ export function runMigrations(
         const cardColumns = database.pragma('table_info(workshop_cards)') as Array<{ name: string }>
         if (cardColumns.length === 0) return
         if (cardColumns.some(({ name }) => name === 'draft_generation_json')) {
-          database.exec(`
-            UPDATE workshop_cards
-            SET draft_generation_json = json_remove(
-              draft_generation_json,
-              '$.art.prompt',
-              '$.art.lastCompleted',
-              '$.art.adopted'
-            )
+          const rows = database.prepare(`
+            SELECT id, draft_generation_json
+            FROM workshop_cards
             WHERE json_valid(draft_generation_json)
-              AND (
-                json_type(draft_generation_json, '$.art.prompt') IS NOT NULL
-                OR json_type(draft_generation_json, '$.art.lastCompleted') IS NOT NULL
-                OR json_type(draft_generation_json, '$.art.adopted') IS NOT NULL
-              );
+              AND json_type(draft_generation_json, '$.art') = 'object'
+          `).all() as Array<{ id: string; draft_generation_json: string }>
+          const update = database.prepare(`
+            UPDATE workshop_cards SET draft_generation_json = ? WHERE id = ?
           `)
+          for (const row of rows) {
+            const generation = JSON.parse(row.draft_generation_json) as Record<string, unknown>
+            const art = generation.art as Record<string, unknown>
+            const subject = typeof art.subject === 'string' && art.subject.trim()
+              ? art.subject
+              : 'Manually uploaded image'
+            delete art.prompt
+            for (const key of ['lastCompleted', 'adopted']) {
+              const candidate = art[key]
+              if (
+                candidate
+                && typeof candidate === 'object'
+                && !Array.isArray(candidate)
+                && (candidate as Record<string, unknown>).provider === 'upload'
+              ) {
+                art[key] = { ...candidate as Record<string, unknown>, prompt: subject }
+              } else {
+                delete art[key]
+              }
+            }
+            update.run(JSON.stringify(generation), row.id)
+          }
         }
         if (cardColumns.some(({ name }) => name === 'art_prompt')) {
           database.exec('UPDATE workshop_cards SET art_prompt = NULL;')
