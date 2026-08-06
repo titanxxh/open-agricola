@@ -27,6 +27,7 @@ export type WorkshopSaveStatus = 'saved' | 'dirty' | 'saving' | 'offline' | 'err
 export type WorkshopSessionState = {
   artCandidates: ArtCandidate[]
   abilityCandidates: AbilityCandidate[]
+  artSubject?: string
   artPrompt: string
   abilityInput: string
   abilityMessages: unknown[]
@@ -64,6 +65,7 @@ export type WorkshopDraftState = {
 const emptySession = (): WorkshopSessionState => ({
   artCandidates: [],
   abilityCandidates: [],
+  artSubject: '',
   artPrompt: '',
   abilityInput: '',
   abilityMessages: [],
@@ -141,6 +143,7 @@ const sessionFromGeneration = (
   const pendingAbility = lastAbility?.id === adoptedAbility?.id ? null : lastAbility
   return {
     ...emptySession(),
+    artSubject: typeof art.subject === 'string' ? art.subject : '',
     artPrompt: lastArt?.prompt
       ?? (typeof asRecord(art.adopted).prompt === 'string'
         ? asRecord(art.adopted).prompt as string
@@ -374,8 +377,24 @@ export const workshopDraftReducer = (
             },
       }
     }
-    case 'sessionChanged':
-      return { ...state, session: { ...state.session, ...action.session } }
+    case 'sessionChanged': {
+      const session = { ...state.session, ...action.session }
+      if (action.session.artSubject === undefined && action.session.artPrompt === undefined) {
+        return { ...state, session }
+      }
+      const art = { ...asRecord(state.draft.generation.art) }
+      if (action.session.artSubject !== undefined) art.subject = action.session.artSubject
+      if (action.session.artPrompt !== undefined) art.prompt = action.session.artPrompt
+      return {
+        ...state,
+        draft: {
+          ...state.draft,
+          generation: { ...state.draft.generation, art },
+        },
+        session,
+        save: { status: 'dirty' },
+      }
+    }
     case 'stageChanged':
       return { ...state, stage: action.stage }
     case 'saving':
