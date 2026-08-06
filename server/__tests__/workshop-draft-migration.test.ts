@@ -177,14 +177,12 @@ describe('workshop draft migration', () => {
         lastCompleted: {
           id: 'legacy-art-draft',
           kind: 'art',
-          prompt: 'draw a field',
           resultUrl: '/draft.png',
           createdAt: 1,
         },
         adopted: {
           id: 'legacy-art-draft',
           kind: 'art',
-          prompt: 'draw a field',
           resultUrl: '/draft.png',
           createdAt: 1,
         },
@@ -222,5 +220,69 @@ describe('workshop draft migration', () => {
       github_pr_url: 'https://example.test/pr/1',
     })
     db.close()
+  })
+
+  it('scrubs nested legacy art prompts from v27 drafts and version provenance', async () => {
+    tempDir = mkdtempSync(join(tmpdir(), 'open-agricola-workshop-prompts-'))
+    const path = join(tempDir, 'migration.db')
+    const seed = new Database(path)
+    seed.exec(`
+      CREATE TABLE schema_version (version INTEGER PRIMARY KEY);
+      INSERT INTO schema_version (version) VALUES (27);
+      CREATE TABLE workshop_cards (
+        id TEXT PRIMARY KEY,
+        draft_generation_json TEXT NOT NULL,
+        art_prompt TEXT,
+        review_version_id TEXT,
+        approved_version_id TEXT,
+        sandbox_pass_version_id TEXT
+      );
+      CREATE TABLE workshop_card_versions (
+        id TEXT PRIMARY KEY,
+        card_id TEXT NOT NULL,
+        version_number INTEGER NOT NULL,
+        provenance_json TEXT NOT NULL
+      );
+    `)
+    seed.prepare(`
+      INSERT INTO workshop_cards (
+        id, draft_generation_json, art_prompt,
+        review_version_id, approved_version_id, sandbox_pass_version_id
+      ) VALUES (?, ?, ?, NULL, NULL, NULL)
+    `).run('card', JSON.stringify({
+      art: {
+        subject: 'current subject',
+        prompt: 'full editable prompt',
+        lastCompleted: { id: 'last', prompt: 'full generated prompt' },
+        adopted: { id: 'adopted', prompt: 'full adopted prompt' },
+      },
+    }), 'legacy column prompt')
+    seed.prepare(`
+      INSERT INTO workshop_card_versions (id, card_id, version_number, provenance_json)
+      VALUES (?, ?, ?, ?)
+    `).run('version', 'card', 1, JSON.stringify({
+      art: { adopted: { id: 'adopted', prompt: 'full version prompt' } },
+    }))
+
+    const { runMigrations } = await import('../db.ts')
+    runMigrations(seed, () => {})
+
+    const card = seed.prepare(`
+      SELECT draft_generation_json, art_prompt FROM workshop_cards WHERE id = 'card'
+    `).get() as { draft_generation_json: string; art_prompt: string | null }
+    expect(card.art_prompt).toBeNull()
+    expect(JSON.parse(card.draft_generation_json)).toEqual({
+      art: {
+        subject: 'current subject',
+        lastCompleted: { id: 'last', prompt: 'current subject' },
+        adopted: { id: 'adopted', prompt: 'current subject' },
+      },
+    })
+    expect(JSON.parse((seed.prepare(`
+      SELECT provenance_json FROM workshop_card_versions WHERE id = 'version'
+    `).get() as { provenance_json: string }).provenance_json)).toEqual({
+      art: { adopted: { id: 'adopted' } },
+    })
+    seed.close()
   })
 })

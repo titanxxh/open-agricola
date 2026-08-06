@@ -564,7 +564,7 @@ export async function handleWorkshopRoute(
       candidate = {
         id: raw.id,
         kind: 'art',
-        prompt: artInputs?.subject ?? raw.prompt,
+        prompt: raw.prompt,
         resultUrl: raw.resultUrl,
         ...(typeof raw.provider === 'string' ? { provider: raw.provider } : {}),
         ...(typeof raw.model === 'string' ? { model: raw.model } : {}),
