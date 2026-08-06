@@ -333,6 +333,7 @@ describe('workshop draft aggregate', () => {
       content_hash: expect.stringMatching(/^[a-f0-9]{64}$/),
       provenance_json: JSON.stringify({
         art: {
+          subject: 'An edited field keeper',
           adopted: {
             id: candidate.id,
             kind: candidate.kind,
@@ -619,6 +620,7 @@ describe('workshop draft aggregate', () => {
         resultUrl: '/card-art/original.png',
         createdAt: 100,
       },
+      artInputs: { subject: 'original field' },
     })
     const changed = checkpointDraft(db, {
       cardId: created.id,
@@ -642,6 +644,7 @@ describe('workshop draft aggregate', () => {
     expect(restored.revision).toBe(4)
     expect(restored.draft.name).toBe('Field Keeper')
     expect(restored.draft.artUrl).toBe('/card-art/original.png')
+    expect(restored.draft.generation).toMatchObject({ art: { subject: 'original field' } })
     expect(db.prepare('SELECT COUNT(*) AS count FROM workshop_card_versions').get()).toEqual({ count: 1 })
   })
 

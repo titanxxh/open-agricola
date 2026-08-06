@@ -200,8 +200,15 @@ const versionProvenance = (
   ['art', 'ability'].flatMap(kind => {
     const group = generation[kind]
     if (!group || typeof group !== 'object' || Array.isArray(group)) return []
-    const adopted = provenanceCandidate((group as Record<string, unknown>).adopted)
-    return adopted ? [[kind, { adopted }]] : []
+    const record = group as Record<string, unknown>
+    const adopted = provenanceCandidate(record.adopted)
+    if (!adopted) return []
+    return [[kind, {
+      ...(kind === 'art' && typeof record.subject === 'string'
+        ? { subject: record.subject }
+        : {}),
+      adopted,
+    }]]
   }),
 )
 
