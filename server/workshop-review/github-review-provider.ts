@@ -23,6 +23,13 @@ export const isReviewTargetEligible = (
   && !snapshot.isDraft
   && snapshot.baseRefName === 'main'
 
+const hasBlockingChangesRequest = (
+  snapshot: WorkshopReviewSnapshot,
+): boolean => snapshot.reviewDecision === 'CHANGES_REQUESTED'
+  || snapshot.reviews.some(review =>
+    review.state === 'CHANGES_REQUESTED' && review.authorCanPushToRepository,
+  )
+
 export const githubPrStatus = (
   snapshot: WorkshopReviewSnapshot,
 ): 'open' | 'merged' | 'closed' => snapshot.state === 'MERGED'
@@ -41,13 +48,15 @@ export const breaksReviewGateWithoutApproval = (
   // registry, so it cannot graduate — treat it like an unmerged close.
   ? snapshot.baseRefName !== 'main'
   : !isReviewTargetEligible(snapshot)
-    || snapshot.reviewDecision === 'CHANGES_REQUESTED'
+    || hasBlockingChangesRequest(snapshot)
     || snapshot.reviewDecision === 'APPROVED'
 
 export const findApprovedHeadReview = (
   snapshot: WorkshopReviewSnapshot,
 ): WorkshopReviewSnapshot['reviews'][number] | undefined =>
-  snapshot.reviewDecision === 'APPROVED' && isReviewTargetEligible(snapshot)
+  (snapshot.reviewDecision === null || snapshot.reviewDecision === 'APPROVED')
+  && !hasBlockingChangesRequest(snapshot)
+  && isReviewTargetEligible(snapshot)
     ? snapshot.reviews.find(review =>
         review.state === 'APPROVED'
         && review.authorCanPushToRepository
@@ -66,7 +75,8 @@ export const findApprovedMergedHeadReview = (
 ): WorkshopReviewSnapshot['reviews'][number] | undefined =>
   snapshot.state === 'MERGED'
   && snapshot.baseRefName === 'main'
-  && snapshot.reviewDecision === 'APPROVED'
+  && (snapshot.reviewDecision === null || snapshot.reviewDecision === 'APPROVED')
+  && !hasBlockingChangesRequest(snapshot)
     ? snapshot.reviews.find(review =>
         review.state === 'APPROVED'
         && review.authorCanPushToRepository
@@ -264,7 +274,9 @@ export class GitHubReviewProvider {
       {
         method: 'POST',
         headers: headers(jwt),
-        body: JSON.stringify({ permissions: { pull_requests: 'read' } }),
+        body: JSON.stringify({
+          permissions: { contents: 'read', pull_requests: 'read' },
+        }),
       },
     )
     const body = await parseJson<InstallationTokenResponse>(response)
