@@ -29,6 +29,8 @@ export type ProposeFailure = {
   needsAuth?: false
   code?: string
   message?: string
+  /** HTTP status GitHub returned for the failing API call, when the failure came from GitHub. */
+  status?: number
   retryAfter?: number
   error?: string
 }
