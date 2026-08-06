@@ -907,7 +907,11 @@ export function runMigrations(
                 && !Array.isArray(candidate)
                 && (candidate as Record<string, unknown>).provider === 'upload'
               ) {
-                art[key] = { ...candidate as Record<string, unknown>, prompt: subject }
+                art[key] = {
+                  ...candidate as Record<string, unknown>,
+                  prompt: subject,
+                  promptFormat: 'subject',
+                }
               } else {
                 delete art[key]
               }

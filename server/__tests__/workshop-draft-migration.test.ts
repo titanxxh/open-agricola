@@ -272,6 +272,7 @@ describe('workshop draft migration', () => {
           id: 'last',
           kind: 'art',
           prompt: 'current subject',
+          promptFormat: 'subject',
           resultUrl: '/card-art/upload.png',
           provider: 'upload',
           createdAt: 100,

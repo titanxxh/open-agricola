@@ -38,6 +38,7 @@ export type WorkshopGenerationCandidateBase = {
 export type WorkshopArtCandidateContract = WorkshopGenerationCandidateBase & {
   kind: 'art'
   resultUrl: string
+  promptFormat?: 'subject'
   referenceImages?: string[]
 }
 

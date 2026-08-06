@@ -114,6 +114,7 @@ describe('useWorkshopDraft', () => {
           id: 'legacy-art',
           kind: 'art',
           prompt: 'unsent subject',
+          promptFormat: 'subject',
           resultUrl: '/legacy.png',
           provider: 'upload',
           createdAt: 1,
@@ -135,7 +136,11 @@ describe('useWorkshopDraft', () => {
     expect(result.current.state?.save.status).toBe('dirty')
     expect(result.current.state?.session.artSubject).toBe('unsent subject')
     expect(result.current.state?.session.artCandidates).toEqual([
-      expect.objectContaining({ id: 'legacy-art', prompt: 'unsent subject' }),
+      expect.objectContaining({
+        id: 'legacy-art',
+        prompt: 'unsent subject',
+        promptFormat: 'subject',
+      }),
     ])
     expect(result.current.state?.session.selectedArtCandidateId).toBe('legacy-art')
     expect(result.current.state?.session).not.toHaveProperty('artPrompt')
@@ -434,6 +439,7 @@ describe('useWorkshopDraft', () => {
           id: 'art-1',
           kind: 'art',
           prompt: 'old prompt',
+          promptFormat: 'subject',
           resultUrl: '/old.png',
           createdAt: 10,
           baseRevision: 1,

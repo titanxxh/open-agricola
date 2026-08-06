@@ -101,6 +101,7 @@ const candidateFromGeneration = (
       ...common,
       kind,
       resultUrl: candidate.resultUrl,
+      ...(candidate.promptFormat === 'subject' ? { promptFormat: 'subject' as const } : {}),
       ...(Array.isArray(candidate.referenceImages)
         ? {
             referenceImages: candidate.referenceImages.filter(
@@ -421,25 +422,35 @@ const migrateRecoveredArtInputs = (
   const art = { ...asRecord(local.draft.generation.art) }
   const sessionState = { ...local.sessionState } as WorkshopSessionState & { artPrompt?: unknown }
   const hadPrompt = Object.hasOwn(art, 'prompt') || Object.hasOwn(sessionState, 'artPrompt')
+  const hasLegacyCandidate = ['lastCompleted', 'adopted'].some(
+    key => art[key] !== undefined && asRecord(art[key]).promptFormat !== 'subject',
+  )
+  const hasLegacySessionCandidate = sessionState.artCandidates.some(
+    candidate => candidate.promptFormat !== 'subject',
+  )
   delete art.prompt
   delete sessionState.artPrompt
-  if (hadPrompt) {
+  if (hadPrompt || hasLegacyCandidate || hasLegacySessionCandidate) {
     const subject = typeof sessionState.artSubject === 'string' && sessionState.artSubject.trim()
       ? sessionState.artSubject
       : 'Manually uploaded image'
     for (const key of ['lastCompleted', 'adopted']) {
       const candidate = asRecord(art[key])
-      if (candidate.provider === 'upload') art[key] = { ...candidate, prompt: subject }
-      else delete art[key]
+      if (candidate.promptFormat === 'subject') continue
+      if (candidate.provider === 'upload') {
+        art[key] = { ...candidate, prompt: subject, promptFormat: 'subject' }
+      } else delete art[key]
     }
     sessionState.artCandidates = sessionState.artCandidates
-      .filter(candidate => candidate.provider === 'upload')
-      .map(candidate => ({ ...candidate, prompt: subject }))
+      .filter(candidate => candidate.promptFormat === 'subject' || candidate.provider === 'upload')
+      .map(candidate => candidate.promptFormat === 'subject'
+        ? candidate
+        : { ...candidate, prompt: subject, promptFormat: 'subject' })
     if (!sessionState.artCandidates.some(
       candidate => candidate.id === sessionState.selectedArtCandidateId,
     )) delete sessionState.selectedArtCandidateId
   }
-  if (!subjectChanged && !hadPrompt) return local
+  if (!subjectChanged && !hadPrompt && !hasLegacyCandidate && !hasLegacySessionCandidate) return local
   if (subjectChanged) art.subject = local.sessionState.artSubject
   return {
     ...local,

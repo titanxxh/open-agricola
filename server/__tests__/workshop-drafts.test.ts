@@ -169,7 +169,7 @@ describe('workshop draft aggregate', () => {
     )
   })
 
-  it('scrubs legacy art prompts at the draft save boundary without losing uploads', () => {
+  it('scrubs unmarked nested art prompts without losing uploads', () => {
     const upload = {
       id: 'uploaded-art',
       kind: 'art' as const,
@@ -185,7 +185,6 @@ describe('workshop draft aggregate', () => {
         generation: {
           art: {
             subject: 'A field keeper',
-            prompt: 'legacy generated template',
             lastCompleted: upload,
             adopted: { ...upload, id: 'generated-art', provider: 'gemini' },
           },
@@ -196,7 +195,7 @@ describe('workshop draft aggregate', () => {
     expect(created.draft.generation).toEqual({
       art: {
         subject: 'A field keeper',
-        lastCompleted: { ...upload, prompt: 'A field keeper' },
+        lastCompleted: { ...upload, prompt: 'A field keeper', promptFormat: 'subject' },
       },
     })
   })
@@ -337,6 +336,7 @@ describe('workshop draft aggregate', () => {
       resultUrl: '/card-art/sunrise.png',
       provider: 'fake',
       model: 'image-test',
+      promptFormat: 'subject' as const,
       createdAt: 100,
     }
 
@@ -370,6 +370,7 @@ describe('workshop draft aggregate', () => {
             id: candidate.id,
             kind: candidate.kind,
             prompt: candidate.prompt,
+            promptFormat: candidate.promptFormat,
             provider: candidate.provider,
             model: candidate.model,
             createdAt: candidate.createdAt,
@@ -400,6 +401,7 @@ describe('workshop draft aggregate', () => {
           id: `art-${index}`,
           kind: 'art',
           prompt: `field ${index}`,
+          promptFormat: 'subject',
           resultUrl: `/card-art/${index}.png`,
           createdAt: index,
         },
@@ -445,6 +447,7 @@ describe('workshop draft aggregate', () => {
         id: 'art-final',
         kind: 'art',
         prompt: 'final art prompt',
+        promptFormat: 'subject',
         resultUrl: '/card-art/final.png',
         createdAt: 100,
       },
@@ -463,6 +466,7 @@ describe('workshop draft aggregate', () => {
           id: 'art-final',
           kind: 'art',
           prompt: 'final art prompt',
+          promptFormat: 'subject',
           createdAt: 100,
         },
       },
@@ -649,6 +653,7 @@ describe('workshop draft aggregate', () => {
         id: 'art-restore',
         kind: 'art',
         prompt: 'original field',
+        promptFormat: 'subject',
         resultUrl: '/card-art/original.png',
         createdAt: 100,
       },
@@ -690,6 +695,7 @@ describe('workshop draft aggregate', () => {
         id: 'art-original',
         kind: 'art',
         prompt: 'original field',
+        promptFormat: 'subject',
         resultUrl: '/card-art/original.png',
         createdAt: 100,
       },

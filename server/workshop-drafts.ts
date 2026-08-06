@@ -148,25 +148,23 @@ const serialiseDraft = (draft: WorkshopDraft): {
   const art = generation.art
   if (art && typeof art === 'object' && !Array.isArray(art)) {
     const record = art as Record<string, unknown>
-    const hadPrompt = Object.hasOwn(record, 'prompt')
     delete record.prompt
-    if (hadPrompt) {
-      const subject = typeof record.subject === 'string' && record.subject.trim()
-        ? record.subject
-        : 'Manually uploaded image'
-      for (const key of ['lastCompleted', 'adopted']) {
-        const candidate = record[key]
-        if (
-          candidate
-          && typeof candidate === 'object'
-          && !Array.isArray(candidate)
-          && (candidate as Record<string, unknown>).provider === 'upload'
-        ) {
-          record[key] = { ...candidate as Record<string, unknown>, prompt: subject }
-        } else {
-          delete record[key]
-        }
+    const subject = typeof record.subject === 'string' && record.subject.trim()
+      ? record.subject
+      : 'Manually uploaded image'
+    for (const key of ['lastCompleted', 'adopted']) {
+      const candidate = record[key]
+      if (!candidate || typeof candidate !== 'object' || Array.isArray(candidate)) {
+        delete record[key]
+        continue
       }
+      const candidateRecord = candidate as Record<string, unknown>
+      if (candidateRecord.promptFormat === 'subject' && typeof candidateRecord.prompt === 'string') {
+        continue
+      }
+      if (candidateRecord.provider === 'upload') {
+        record[key] = { ...candidateRecord, prompt: subject, promptFormat: 'subject' }
+      } else delete record[key]
     }
   }
   return {
@@ -199,6 +197,7 @@ const provenanceCandidate = (value: unknown): Record<string, unknown> | null => 
     'id',
     'kind',
     'prompt',
+    'promptFormat',
     'provider',
     'model',
     'referenceImages',

@@ -693,6 +693,7 @@ function ArtPanel({
       id: globalThis.crypto?.randomUUID?.() ?? `art-${Date.now()}`,
       kind: 'art',
       prompt,
+      promptFormat: 'subject',
       resultUrl,
       createdAt: Date.now(),
       baseRevision,
