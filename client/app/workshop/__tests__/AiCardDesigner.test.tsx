@@ -467,6 +467,8 @@ describe('AiCardDesigner AI config header', () => {
             artUrl: '/card-art/current.png',
             generation: {
               art: {
+                subject: 'exact private art subject',
+                prompt: 'exact private art prompt',
                 lastCompleted: artGeneration,
                 adopted: artGeneration,
               },
@@ -491,10 +493,48 @@ describe('AiCardDesigner AI config header', () => {
 
     await waitFor(() => expect(screen.queryByText('正在恢复草稿…')).not.toBeInTheDocument())
     await userEvent.click(screen.getByRole('button', { name: /卡面图 提示词、参考图与候选/ }))
+    expect(screen.getByLabelText('画面主题')).toHaveValue('exact private art subject')
     expect(screen.getByDisplayValue('exact private art prompt')).toBeInTheDocument()
 
     await userEvent.click(screen.getByRole('button', { name: /卡牌能力 对话、源码与验证/ }))
     expect(container.querySelector('.aicw-current-code code')?.textContent).toBe(sourceCode)
+  })
+
+  it('keeps the image subject when changing stages and reopening the editor', async () => {
+    localStorage.setItem(
+      'open-agricola-llm-config-art',
+      JSON.stringify({ provider: 'gemini', apiKey: 'test', model: 'gemini-3.1-pro-preview' }),
+    )
+    const firstRender = render(
+      <LocaleProvider>
+        <AiCardDesigner
+          initialCard={existingCard}
+          onClose={() => {}}
+          apiFetch={apiFetchForExistingCard}
+        />
+      </LocaleProvider>,
+    )
+
+    await waitFor(() => expect(screen.queryByText('正在恢复草稿…')).not.toBeInTheDocument())
+    await userEvent.click(screen.getByRole('button', { name: /卡面图 提示词、参考图与候选/ }))
+    await userEvent.type(screen.getByLabelText('画面主题'), '河谷木匠')
+    await userEvent.click(screen.getByRole('button', { name: /卡牌能力 对话、源码与验证/ }))
+    await userEvent.click(screen.getByRole('button', { name: /卡面图 提示词、参考图与候选/ }))
+    expect(screen.getByLabelText('画面主题')).toHaveValue('河谷木匠')
+
+    firstRender.unmount()
+    render(
+      <LocaleProvider>
+        <AiCardDesigner
+          initialCard={existingCard}
+          onClose={() => {}}
+          apiFetch={apiFetchForExistingCard}
+        />
+      </LocaleProvider>,
+    )
+    await waitFor(() => expect(screen.queryByText('正在恢复草稿…')).not.toBeInTheDocument())
+    await userEvent.click(screen.getByRole('button', { name: /卡面图 提示词、参考图与候选/ }))
+    expect(screen.getByLabelText('画面主题')).toHaveValue('河谷木匠')
   })
 
   it('pins, starts, and confirms one exact sandbox version', async () => {

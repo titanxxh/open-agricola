@@ -493,7 +493,11 @@ export function adoptCandidate(
     }
 
     const generation = structuredClone(current.draft.generation)
+    const previous = generation[input.candidate.kind]
     generation[input.candidate.kind] = {
+      ...(previous && typeof previous === 'object' && !Array.isArray(previous)
+        ? previous as Record<string, unknown>
+        : {}),
       lastCompleted: input.candidate,
       adopted: input.candidate,
     }

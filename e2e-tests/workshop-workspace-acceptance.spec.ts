@@ -471,10 +471,9 @@ const scenarioArtCandidates = async ({
   await openEditor(page, workspace.id)
   await stage(page, variant.locale, '卡面图', 'Card art')
 
+  const subject = text(variant.locale, '河谷木匠', 'A valley carpenter')
   const prompt = unique('private art prompt')
-  await page.getByLabel(text(variant.locale, '画面主题', 'Image subject')).fill(
-    text(variant.locale, '河谷木匠', 'A valley carpenter'),
-  )
+  await page.getByLabel(text(variant.locale, '画面主题', 'Image subject')).fill(subject)
   const promptInput = page.getByLabel(text(variant.locale, '生成提示词', 'Generation prompt'))
   await promptInput.fill(prompt)
   const referenceButton = page.locator('.ai-ref-thumb').first()
@@ -539,8 +538,22 @@ const scenarioArtCandidates = async ({
 
   const saved = await loadWorkspace(request, account, workspace.id)
   expect(saved.draft.artUrl).toBeTruthy()
-  expect(JSON.stringify(saved.draft.generation)).toContain(prompt)
+  expect(saved.draft.generation).toMatchObject({ art: { subject, prompt } })
   expect((await versions(request, account, workspace.id)).versions).toHaveLength(1)
+
+  await page.evaluate(
+    key => localStorage.removeItem(key),
+    `open-agricola-workshop-draft:${workspace.id}`,
+  )
+  await page.locator('.aicw-header-actions').getByRole('button', {
+    name: text(variant.locale, '关闭', 'Close'),
+  }).click()
+  await openEditor(page, workspace.id)
+  await stage(page, variant.locale, '卡面图', 'Card art')
+  await expect(page.getByLabel(
+    text(variant.locale, '画面主题', 'Image subject'),
+  )).toHaveValue(subject)
+  await expect(promptInput).toHaveValue(prompt)
   await expectAccessibleWorkspace(page)
 }
 

@@ -35,13 +35,20 @@ const nullableReducer = (
   return state ? workshopDraftReducer(state, action) : state
 }
 
-const generationCandidate = (
+const generationGroup = (
   draft: WorkshopClientDraft,
   kind: WorkshopCandidate['kind'],
 ): Record<string, unknown> => {
   const group = draft.generation[kind]
   if (!group || typeof group !== 'object' || Array.isArray(group)) return {}
-  const record = group as Record<string, unknown>
+  return group as Record<string, unknown>
+}
+
+const generationCandidate = (
+  draft: WorkshopClientDraft,
+  kind: WorkshopCandidate['kind'],
+): Record<string, unknown> => {
+  const record = generationGroup(draft, kind)
   for (const key of ['lastCompleted', 'adopted']) {
     const candidate = record[key]
     if (candidate && typeof candidate === 'object' && !Array.isArray(candidate)) {
@@ -52,15 +59,19 @@ const generationCandidate = (
 }
 
 const hasSessionData = (state: WorkshopDraftState): boolean => {
+  const artGroup = generationGroup(state.draft, 'art')
   const art = generationCandidate(state.draft, 'art')
   const ability = generationCandidate(state.draft, 'ability')
+  const storedArtSubject = typeof artGroup.subject === 'string' ? artGroup.subject : ''
+  const storedArtPrompt = typeof artGroup.prompt === 'string' ? artGroup.prompt : art.prompt
   const artCandidatesAreRecoverable = state.session.artCandidates.length <= 1
     && state.session.artCandidates.every(candidate => candidate.id === art.id)
   const abilityCandidatesAreRecoverable = state.session.abilityCandidates.length <= 1
     && state.session.abilityCandidates.every(candidate => candidate.id === ability.id)
   return !artCandidatesAreRecoverable
     || !abilityCandidatesAreRecoverable
-    || Boolean(state.session.artPrompt && state.session.artPrompt !== art.prompt)
+    || (state.session.artSubject ?? '') !== storedArtSubject
+    || Boolean(state.session.artPrompt && state.session.artPrompt !== storedArtPrompt)
     || state.session.abilityInput.length > 0
     || state.session.abilityMessages.length > 0
     || Boolean(state.session.sandboxTestVersionId)

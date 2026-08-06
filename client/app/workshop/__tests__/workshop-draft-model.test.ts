@@ -37,6 +37,34 @@ const workspace = (revision = 1, name = 'Field Keeper'): WorkshopWorkspaceDto =>
 })
 
 describe('workshop draft model', () => {
+  it('stores and restores art inputs through the draft generation state', () => {
+    let state = createWorkshopDraftState(workspace())
+    state = workshopDraftReducer(state, {
+      type: 'sessionChanged',
+      session: {
+        artSubject: 'A valley carpenter',
+        artPrompt: 'A carpenter working beside a river',
+      },
+    })
+
+    expect(state.draft.generation).toEqual({
+      art: {
+        subject: 'A valley carpenter',
+        prompt: 'A carpenter working beside a river',
+      },
+    })
+    expect(state.save.status).toBe('dirty')
+
+    const restored = createWorkshopDraftState({
+      ...workspace(2),
+      draft: state.draft,
+    })
+    expect(restored.session).toMatchObject({
+      artSubject: 'A valley carpenter',
+      artPrompt: 'A carpenter working beside a river',
+    })
+  })
+
   it('keeps only the three newest candidates and marks them stale after draft edits', () => {
     let state = createWorkshopDraftState(workspace())
     for (let index = 1; index <= 4; index += 1) {
