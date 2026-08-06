@@ -636,14 +636,12 @@ function ArtPanel({
   cardName,
   artUrl,
   artSubject,
-  artPrompt,
   candidates,
   selectedCandidateId,
   baseRevision,
   refCache,
   apiFetch,
   onSubjectChange,
-  onPromptChange,
   onCandidateCompleted,
   onCandidateSelected,
   onCandidateDiscarded,
@@ -653,14 +651,12 @@ function ArtPanel({
   cardName: string
   artUrl: string | null
   artSubject: string
-  artPrompt: string
   candidates: ArtCandidate[]
   selectedCandidateId?: string
   baseRevision: number
   refCache?: Map<string, ReferenceImage>
   apiFetch: ApiFetch
   onSubjectChange: (subject: string) => void
-  onPromptChange: (prompt: string) => void
   onCandidateCompleted: (candidate: ArtCandidate) => Promise<void>
   onCandidateSelected: (candidateId: string) => void
   onCandidateDiscarded: (candidateId: string) => Promise<void>
@@ -707,17 +703,6 @@ function ArtPanel({
     })
   }
 
-  const handleSubjectChange = (subject: string) => {
-    onSubjectChange(subject)
-    if (subject.trim()) {
-      onPromptChange(buildCardArtPrompt(
-        subject.trim(),
-        cardType,
-        locale as 'zh' | 'en',
-      ))
-    }
-  }
-
   const handleToggleRef = (url: string) => {
     setSelectedRefs(previous =>
       previous.includes(url)
@@ -727,10 +712,12 @@ function ArtPanel({
   }
 
   const handleGenerate = async () => {
-    if (!artPrompt.trim() || generating || !canGenerateArt || !config) return
+    const subject = artSubject.trim()
+    if (!subject || generating || !canGenerateArt || !config) return
     setGenerating(true)
     setArtError('')
     try {
+      const prompt = buildCardArtPrompt(subject, cardType, locale as 'zh' | 'en')
       const referenceImages = selectedRefs.length > 0
         ? (await Promise.all(
             selectedRefs.map(url =>
@@ -740,7 +727,7 @@ function ArtPanel({
             ),
           )).filter((entry): entry is ReferenceImage => entry !== null)
         : undefined
-      const rawDataUrl = await generateCardArt(artPrompt, config, referenceImages)
+      const rawDataUrl = await generateCardArt(prompt, config, referenceImages)
       if (!rawDataUrl) {
         setArtError(locale === 'zh'
           ? '图片服务没有返回结果，请检查模型与 API Key。'
@@ -756,7 +743,7 @@ function ArtPanel({
       }
       await completeCandidate(
         uploaded ?? processed,
-        artPrompt,
+        subject,
         config.provider,
         config.model,
         selectedRefs,
@@ -784,7 +771,7 @@ function ArtPanel({
       const uploaded = await uploadArt(processed, apiFetch)
       await completeCandidate(
         uploaded ?? processed,
-        artPrompt || (locale === 'zh' ? '手动上传图片' : 'Manually uploaded image'),
+        artSubject.trim() || (locale === 'zh' ? '手动上传图片' : 'Manually uploaded image'),
         'upload',
         file.type,
       )
@@ -828,22 +815,10 @@ function ArtPanel({
             <input
               type="text"
               value={artSubject}
-              onChange={event => handleSubjectChange(event.target.value)}
+              onChange={event => onSubjectChange(event.target.value)}
               placeholder={cardType === 'occupation'
                 ? (locale === 'zh' ? '一个正在采摘水果的农夫' : 'A farmer picking fruit')
                 : (locale === 'zh' ? '一把质朴的中世纪木锤' : 'A rustic medieval wooden mallet')}
-            />
-          </label>
-          <label>
-            <span>{locale === 'zh' ? '生成提示词' : 'Generation prompt'}</span>
-            <textarea
-              className="ai-art-prompt-text"
-              value={artPrompt}
-              onChange={event => onPromptChange(event.target.value)}
-              rows={5}
-              placeholder={locale === 'zh'
-                ? '输入或从画面主题生成提示词'
-                : 'Enter a prompt or generate one from the subject'}
             />
           </label>
           {canGenerateArt && (
@@ -857,7 +832,7 @@ function ArtPanel({
             type="button"
             className="aicw-button aicw-button-primary"
             onClick={() => { void handleGenerate() }}
-            disabled={generating || !artPrompt.trim() || !canGenerateArt}
+            disabled={generating || !artSubject.trim() || !canGenerateArt}
           >
             {generating
               ? (locale === 'zh' ? '正在生成候选…' : 'Generating candidate…')
@@ -2136,14 +2111,14 @@ export function AiCardDesigner({
   const stageCopy: Record<WorkshopStage, { label: string; helper: string }> = locale === 'zh'
     ? {
         metadata: { label: '基础信息', helper: '名称、类型与卡牌 ID' },
-        art: { label: '卡面图', helper: '提示词、参考图与候选' },
+        art: { label: '卡面图', helper: '主题、参考图与候选' },
         ability: { label: '卡牌能力', helper: '对话、源码与验证' },
         localization: { label: '本地化', helper: '补齐中英文案' },
         validation: { label: '验证与交付', helper: '沙盒测试和发布检查' },
       }
     : {
         metadata: { label: 'Card details', helper: 'Name, type, and card ID' },
-        art: { label: 'Card art', helper: 'Prompt, references, and candidates' },
+        art: { label: 'Card art', helper: 'Subject, references, and candidates' },
         ability: { label: 'Card ability', helper: 'Conversation, source, and validation' },
         localization: { label: 'Localization', helper: 'Complete Chinese and English copy' },
         validation: { label: 'Validate & hand off', helper: 'Sandbox test and publish checks' },
@@ -2565,14 +2540,12 @@ export function AiCardDesigner({
                 cardName={cardName}
                 artUrl={artUrl}
                 artSubject={workspaceState?.session.artSubject ?? ''}
-                artPrompt={workspaceState?.session.artPrompt ?? ''}
                 candidates={workspaceState?.session.artCandidates ?? []}
                 selectedCandidateId={workspaceState?.session.selectedArtCandidateId}
                 baseRevision={workspaceState?.baseRevision ?? 0}
                 refCache={refCache}
                 apiFetch={workshopApiFetch}
                 onSubjectChange={artSubject => updateSession({ artSubject })}
-                onPromptChange={prompt => updateSession({ artPrompt: prompt })}
                 onCandidateCompleted={completeArtCandidate}
                 onCandidateSelected={candidateId => updateSession({
                   selectedArtCandidateId: candidateId,

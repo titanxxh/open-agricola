@@ -537,7 +537,7 @@ export async function handleWorkshopRoute(
     }
     const raw = body.candidate
     let candidate: WorkshopArtCandidate | WorkshopAbilityCandidate
-    let artInputs: { subject: string; prompt: string } | undefined
+    let artInputs: { subject: string } | undefined
     if (raw.kind === 'art') {
       if (
         typeof raw.id !== 'string'
@@ -553,20 +553,18 @@ export async function handleWorkshopRoute(
           || typeof body.artInputs !== 'object'
           || Array.isArray(body.artInputs)
           || typeof (body.artInputs as Record<string, unknown>).subject !== 'string'
-          || typeof (body.artInputs as Record<string, unknown>).prompt !== 'string'
         ) {
           sendJson(res, 400, { ok: false, error: 'Invalid art inputs' })
           return true
         }
         artInputs = {
           subject: (body.artInputs as Record<string, string>).subject!,
-          prompt: (body.artInputs as Record<string, string>).prompt!,
         }
       }
       candidate = {
         id: raw.id,
         kind: 'art',
-        prompt: raw.prompt,
+        prompt: artInputs?.subject ?? raw.prompt,
         resultUrl: raw.resultUrl,
         ...(typeof raw.provider === 'string' ? { provider: raw.provider } : {}),
         ...(typeof raw.model === 'string' ? { model: raw.model } : {}),
@@ -1140,6 +1138,7 @@ export async function handleWorkshopRoute(
       FROM workshop_card_versions
       WHERE card_id = ?
       ORDER BY version_number DESC
+      LIMIT 5
     `).all(cardDbId) as { id: string; version_number: number; card_json: string; art_url: string | null; created_at: number }[]
 
     const versions = rows.map(r => ({

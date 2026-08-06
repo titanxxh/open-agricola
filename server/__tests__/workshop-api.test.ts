@@ -1058,17 +1058,17 @@ const CARD_IMPL = {}
         },
         artInputs: {
           subject: 'private subject',
-          prompt: 'edited private prompt',
         },
       }, 'tok-alice'), adoptRes)
       expect(JSON.parse(adoptRes.body).workspace).toMatchObject({
         revision: 2,
         draft: {
           generation: {
-            art: { subject: 'private subject', prompt: 'edited private prompt' },
+            art: { subject: 'private subject' },
           },
         },
       })
+      expect(adoptRes.body).not.toContain('secret prompt')
 
       approveForPublish(cardDbId, 'u1', 2)
       const publishRes = mockRes()

@@ -115,14 +115,14 @@ describe('backup validation', () => {
       DROP TABLE github_webhook_events;
       ALTER TABLE workshop_cards DROP COLUMN review_commit_sha;
       ALTER TABLE workshop_cards DROP COLUMN review_version_id;
-      DELETE FROM schema_version WHERE version = 27;
+      DELETE FROM schema_version WHERE version >= 27;
     `)
 
     expect(validateBackupDatabase(db, metadata, validationPaths())).toEqual({
       formatVersion: 1,
       ...metadata,
       sourceDatabaseSchemaVersion: 26,
-      targetDatabaseSchemaVersion: 27,
+      targetDatabaseSchemaVersion: 28,
       replaySchemaVersions: [1],
       roomCount: 1,
       replayCount: 1,

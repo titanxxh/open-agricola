@@ -143,15 +143,22 @@ const serialiseDraft = (draft: WorkshopDraft): {
   cardJson: string
   codeManifest: string | null
   generation: string
-} => ({
-  cardJson: JSON.stringify({
-    ...draft.cardJson,
-    ...(draft.effectCode ? { _code: draft.effectCode } : {}),
-    ...(draft.compiledCode ? { _compiled: draft.compiledCode } : {}),
-  }),
-  codeManifest: draft.codeManifest ? JSON.stringify(draft.codeManifest) : null,
-  generation: JSON.stringify(draft.generation),
-})
+} => {
+  const generation = structuredClone(draft.generation)
+  const art = generation.art
+  if (art && typeof art === 'object' && !Array.isArray(art)) {
+    delete (art as Record<string, unknown>).prompt
+  }
+  return {
+    cardJson: JSON.stringify({
+      ...draft.cardJson,
+      ...(draft.effectCode ? { _code: draft.effectCode } : {}),
+      ...(draft.compiledCode ? { _compiled: draft.compiledCode } : {}),
+    }),
+    codeManifest: draft.codeManifest ? JSON.stringify(draft.codeManifest) : null,
+    generation: JSON.stringify(generation),
+  }
+}
 
 const versionCardJson = (draft: WorkshopDraft): Record<string, unknown> => {
   const cardJson = { ...draft.cardJson }
@@ -474,6 +481,25 @@ const ensureVersion = (
     hash,
     provenance,
   )
+  db.prepare(`
+    DELETE FROM workshop_card_versions
+    WHERE card_id = @cardId
+      AND id NOT IN (
+        SELECT id FROM workshop_card_versions
+        WHERE card_id = @cardId
+        ORDER BY version_number DESC
+        LIMIT 5
+      )
+      AND NOT EXISTS (
+        SELECT 1 FROM workshop_cards
+        WHERE id = @cardId
+          AND workshop_card_versions.id IN (
+            review_version_id,
+            approved_version_id,
+            sandbox_pass_version_id
+          )
+      )
+  `).run({ cardId: workspace.id })
   return id
 }
 
@@ -484,7 +510,7 @@ export function adoptCandidate(
     authorId: string
     baseRevision: number
     candidate: WorkshopCandidate
-    artInputs?: { subject: string; prompt: string }
+    artInputs?: { subject: string }
   },
 ): { workspace: WorkshopWorkspace; versionId: string } {
   return db.transaction(() => {

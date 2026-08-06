@@ -28,7 +28,6 @@ export type WorkshopSessionState = {
   artCandidates: ArtCandidate[]
   abilityCandidates: AbilityCandidate[]
   artSubject?: string
-  artPrompt: string
   abilityInput: string
   abilityMessages: unknown[]
   selectedArtCandidateId?: string
@@ -66,7 +65,6 @@ const emptySession = (): WorkshopSessionState => ({
   artCandidates: [],
   abilityCandidates: [],
   artSubject: '',
-  artPrompt: '',
   abilityInput: '',
   abilityMessages: [],
 })
@@ -144,12 +142,6 @@ const sessionFromGeneration = (
   return {
     ...emptySession(),
     artSubject: typeof art.subject === 'string' ? art.subject : '',
-    artPrompt: typeof art.prompt === 'string'
-      ? art.prompt
-      : lastArt?.prompt
-        ?? (typeof asRecord(art.adopted).prompt === 'string'
-          ? asRecord(art.adopted).prompt as string
-          : ''),
     artCandidates: pendingArt?.kind === 'art' ? [pendingArt] : [],
     abilityCandidates: pendingAbility?.kind === 'ability' ? [pendingAbility] : [],
     ...(pendingArt ? { selectedArtCandidateId: pendingArt.id } : {}),
@@ -380,12 +372,12 @@ export const workshopDraftReducer = (
     }
     case 'sessionChanged': {
       const session = { ...state.session, ...action.session }
-      if (action.session.artSubject === undefined && action.session.artPrompt === undefined) {
+      if (action.session.artSubject === undefined) {
         return { ...state, session }
       }
       const art = { ...asRecord(state.draft.generation.art) }
-      if (action.session.artSubject !== undefined) art.subject = action.session.artSubject
-      if (action.session.artPrompt !== undefined) art.prompt = action.session.artPrompt
+      delete art.prompt
+      art.subject = action.session.artSubject
       return {
         ...state,
         draft: {
@@ -426,18 +418,20 @@ const migrateRecoveredArtInputs = (
   const stored = sessionFromGeneration({ ...server, draft: local.draft })
   const subjectChanged = typeof local.sessionState.artSubject === 'string'
     && local.sessionState.artSubject !== stored.artSubject
-  const promptChanged = typeof local.sessionState.artPrompt === 'string'
-    && local.sessionState.artPrompt !== stored.artPrompt
-  if (!subjectChanged && !promptChanged) return local
   const art = { ...asRecord(local.draft.generation.art) }
+  const sessionState = { ...local.sessionState } as WorkshopSessionState & { artPrompt?: unknown }
+  const hadPrompt = Object.hasOwn(art, 'prompt') || Object.hasOwn(sessionState, 'artPrompt')
+  delete art.prompt
+  delete sessionState.artPrompt
+  if (!subjectChanged && !hadPrompt) return local
   if (subjectChanged) art.subject = local.sessionState.artSubject
-  if (promptChanged) art.prompt = local.sessionState.artPrompt
   return {
     ...local,
     draft: {
       ...local.draft,
       generation: { ...local.draft.generation, art },
     },
+    sessionState,
   }
 }
 

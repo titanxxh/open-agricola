@@ -60,12 +60,8 @@ const generationCandidate = (
 
 const artInputsFromDraft = (draft: WorkshopClientDraft) => {
   const group = generationGroup(draft, 'art')
-  const candidate = generationCandidate(draft, 'art')
   return {
     artSubject: typeof group.subject === 'string' ? group.subject : '',
-    artPrompt: typeof group.prompt === 'string'
-      ? group.prompt
-      : typeof candidate.prompt === 'string' ? candidate.prompt : '',
   }
 }
 
@@ -80,7 +76,6 @@ const hasSessionData = (state: WorkshopDraftState): boolean => {
   return !artCandidatesAreRecoverable
     || !abilityCandidatesAreRecoverable
     || (state.session.artSubject ?? '') !== storedArtInputs.artSubject
-    || Boolean(state.session.artPrompt && state.session.artPrompt !== storedArtInputs.artPrompt)
     || state.session.abilityInput.length > 0
     || state.session.abilityMessages.length > 0
     || Boolean(state.session.sandboxTestVersionId)
@@ -352,7 +347,6 @@ export const useWorkshopDraft = ({
       serverState.session = {
         ...serverState.session,
         artSubject: serverSession.artSubject,
-        artPrompt: serverSession.artPrompt,
         artCandidates: serverState.session.artCandidates.map(candidate => ({
           ...candidate,
           stale: true,
@@ -402,7 +396,6 @@ export const useWorkshopDraft = ({
     const artInputs = candidate.kind === 'art'
       ? {
           subject: current.session.artSubject ?? '',
-          prompt: current.session.artPrompt,
         }
       : undefined
     dispatch({ type: 'saving' })

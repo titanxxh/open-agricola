@@ -117,6 +117,14 @@ describe('workshop draft migration', () => {
         'old-version', 'published', '{"id":"CUSTOM_Published","desc":["old"]}',
         '{}', '/old.png', 1, 'author', 2
       );
+      INSERT INTO workshop_card_versions (
+        id, card_id, card_json, code_manifest, art_url, version_number, created_by, created_at
+      ) VALUES
+        ('old-version-2', 'published', '{"id":"CUSTOM_Published"}', '{}', '/old-2.png', 2, 'author', 2),
+        ('old-version-3', 'published', '{"id":"CUSTOM_Published"}', '{}', '/old-3.png', 3, 'author', 2),
+        ('old-version-4', 'published', '{"id":"CUSTOM_Published"}', '{}', '/old-4.png', 4, 'author', 2),
+        ('old-version-5', 'published', '{"id":"CUSTOM_Published"}', '{}', '/old-5.png', 5, 'author', 2),
+        ('old-version-6', 'published', '{"id":"CUSTOM_Published"}', '{}', '/old-6.png', 6, 'author', 2);
       INSERT INTO card_likes VALUES ('author', 'published', 3);
       INSERT INTO card_comments VALUES ('comment', 'published', 'author', 'keep', 3);
       INSERT INTO sandbox_cards VALUES ('author', 'published', 3);
@@ -128,7 +136,7 @@ describe('workshop draft migration', () => {
     const { getDb } = await import('../db.ts')
     const db = getDb()
 
-    expect(db.prepare('SELECT MAX(version) AS version FROM schema_version').get()).toEqual({ version: 27 })
+    expect(db.prepare('SELECT MAX(version) AS version FROM schema_version').get()).toEqual({ version: 28 })
     expect(db.prepare(`
       SELECT review_commit_sha, review_version_id FROM workshop_cards WHERE id = 'draft'
     `).get()).toEqual({ review_commit_sha: null, review_version_id: null })
@@ -166,7 +174,6 @@ describe('workshop draft migration', () => {
     `).get() as { draft_generation_json: string }).draft_generation_json)
     expect(generation).toEqual({
       art: {
-        prompt: 'draw a field',
         lastCompleted: {
           id: 'legacy-art-draft',
           kind: 'art',
@@ -187,17 +194,21 @@ describe('workshop draft migration', () => {
     expect(db.prepare(`
       SELECT card_json, code_manifest, art_url, version_number, content_hash, provenance_json
       FROM workshop_card_versions
-      WHERE card_id = 'published' AND version_number = 2
+      WHERE card_id = 'published' AND version_number = 7
     `).get()).toEqual({
       card_json: '{"id":"CUSTOM_Published","desc":["final"]}',
       code_manifest: '{"effect":true}',
       art_url: '/published.png',
-      version_number: 2,
+      version_number: 7,
       content_hash: null,
       provenance_json: '{}',
     })
     expect(db.prepare('SELECT content_hash, provenance_json FROM workshop_card_versions WHERE id = ?')
-      .get('old-version')).toEqual({ content_hash: null, provenance_json: '{}' })
+      .get('old-version-3')).toEqual({ content_hash: null, provenance_json: '{}' })
+    expect(db.prepare(`
+      SELECT COUNT(*) AS count, MIN(version_number) AS oldest, MAX(version_number) AS newest
+      FROM workshop_card_versions WHERE card_id = 'published'
+    `).get()).toEqual({ count: 5, oldest: 3, newest: 7 })
     expect(db.prepare(`
       SELECT
         (SELECT COUNT(*) FROM card_likes) AS likes,

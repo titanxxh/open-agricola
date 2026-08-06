@@ -78,7 +78,6 @@ describe('useWorkshopDraft', () => {
       expect(request.baseRevision).toBe(3)
       expect(request.draft.generation.art).toEqual({
         subject: 'unsent subject',
-        prompt: 'unsent art',
       })
       const saved = workspace(4)
       saved.draft = request.draft
@@ -95,7 +94,7 @@ describe('useWorkshopDraft', () => {
     await waitFor(() => expect(result.current.state?.baseRevision).toBe(3))
     expect(result.current.state?.save.status).toBe('dirty')
     expect(result.current.state?.session.artSubject).toBe('unsent subject')
-    expect(result.current.state?.session.artPrompt).toBe('unsent art')
+    expect(result.current.state?.session).not.toHaveProperty('artPrompt')
 
     await act(async () => {
       expect(await result.current.checkpoint()).toBe(true)
@@ -365,7 +364,6 @@ describe('useWorkshopDraft', () => {
       sessionState: {
         artCandidates: [],
         abilityCandidates: [],
-        artPrompt: '',
         abilityInput: '',
         abilityMessages: [],
       },
@@ -428,8 +426,8 @@ describe('useWorkshopDraft', () => {
     ])
     expect(result.current.state?.session).toMatchObject({
       artSubject: 'server subject',
-      artPrompt: 'server prompt',
     })
+    expect(result.current.state?.session).not.toHaveProperty('artPrompt')
   })
 
   it('keeps the local draft when a checkpoint receives 409', async () => {
@@ -599,7 +597,6 @@ describe('useWorkshopDraft', () => {
     initial.draft.generation = {
       art: {
         subject: 'original subject',
-        prompt: candidate.prompt,
         lastCompleted: candidate,
       },
     }
@@ -632,7 +629,6 @@ describe('useWorkshopDraft', () => {
     await waitFor(() => expect(result.current.state?.baseRevision).toBe(1))
     act(() => result.current.updateSession({
       artSubject: 'latest subject',
-      artPrompt: 'latest prompt',
     }))
 
     await act(async () => {
@@ -646,13 +642,12 @@ describe('useWorkshopDraft', () => {
         path: '/api/workshop/cards/card-1/adopt',
         method: 'POST',
         body: expect.objectContaining({
-          artInputs: { subject: 'latest subject', prompt: 'latest prompt' },
+          artInputs: { subject: 'latest subject' },
         }),
       }),
     ])
     expect(result.current.state?.session).toMatchObject({
       artSubject: 'latest subject',
-      artPrompt: 'latest prompt',
     })
   })
 
@@ -960,11 +955,11 @@ describe('useWorkshopDraft', () => {
     const requests: Array<{ path: string; body?: Record<string, unknown> }> = []
     const currentWorkspace = workspace(4, 'Current work')
     currentWorkspace.draft.generation = {
-      art: { subject: 'current subject', prompt: 'current prompt' },
+      art: { subject: 'current subject' },
     }
     const restoredWorkspace = workspace(5, 'Version one')
     restoredWorkspace.draft.generation = {
-      art: { subject: 'version subject', prompt: 'version prompt' },
+      art: { subject: 'version subject' },
     }
     const apiFetch = vi.fn(async (path: string, init?: RequestInit) => {
       const body = init?.body
@@ -999,7 +994,6 @@ describe('useWorkshopDraft', () => {
     expect(result.current.state?.draft.name).toBe('Version one')
     expect(result.current.state?.session).toMatchObject({
       artSubject: 'version subject',
-      artPrompt: 'version prompt',
     })
     expect(result.current.state?.session.restoreUndoDraft?.name).toBe('Current work')
     expect(requests.find(request => request.path.endsWith('/restore'))?.body)
@@ -1011,7 +1005,6 @@ describe('useWorkshopDraft', () => {
     expect(result.current.state?.draft.name).toBe('Current work')
     expect(result.current.state?.session).toMatchObject({
       artSubject: 'current subject',
-      artPrompt: 'current prompt',
     })
     expect(result.current.state?.session.restoreUndoDraft).toBeUndefined()
     expect(requests.find(request => request.path.endsWith('/draft'))?.body)

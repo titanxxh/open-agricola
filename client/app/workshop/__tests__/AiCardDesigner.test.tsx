@@ -426,7 +426,7 @@ describe('AiCardDesigner AI config header', () => {
     expect(resent).toContain(existingCard.effect_code)
   })
 
-  it('restores the exact last art prompt and adopted ability source', async () => {
+  it('restores the saved art subject and adopted ability source without exposing the prompt', async () => {
     localStorage.setItem(
       'open-agricola-llm-config-art',
       JSON.stringify({ provider: 'gemini', apiKey: 'test', model: 'gemini-3.1-pro-preview' }),
@@ -492,12 +492,37 @@ describe('AiCardDesigner AI config header', () => {
     )
 
     await waitFor(() => expect(screen.queryByText('正在恢复草稿…')).not.toBeInTheDocument())
-    await userEvent.click(screen.getByRole('button', { name: /卡面图 提示词、参考图与候选/ }))
+    await userEvent.click(screen.getByRole('button', { name: /卡面图 主题、参考图与候选/ }))
     expect(screen.getByLabelText('画面主题')).toHaveValue('exact private art subject')
-    expect(screen.getByDisplayValue('exact private art prompt')).toBeInTheDocument()
+    expect(screen.queryByDisplayValue('exact private art prompt')).not.toBeInTheDocument()
 
     await userEvent.click(screen.getByRole('button', { name: /卡牌能力 对话、源码与验证/ }))
     expect(container.querySelector('.aicw-current-code code')?.textContent).toBe(sourceCode)
+  })
+
+  it('shows only a text input for the image subject', async () => {
+    localStorage.setItem(
+      'open-agricola-llm-config-art',
+      JSON.stringify({ provider: 'gemini', apiKey: 'test', model: 'gemini-3.1-pro-preview' }),
+    )
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: false }))
+
+    render(
+      <LocaleProvider>
+        <AiCardDesigner
+          initialCard={existingCard}
+          onClose={() => {}}
+          apiFetch={apiFetchForExistingCard}
+        />
+      </LocaleProvider>,
+    )
+
+    await waitFor(() => expect(screen.queryByText('正在恢复草稿…')).not.toBeInTheDocument())
+    await userEvent.click(screen.getByRole('button', { name: /卡面图 主题、参考图与候选/ }))
+
+    expect(screen.getByLabelText('画面主题')).toHaveAttribute('type', 'text')
+    expect(screen.queryByText('生成提示词')).not.toBeInTheDocument()
+    expect(screen.queryByText('Generation prompt')).not.toBeInTheDocument()
   })
 
   it('keeps the image subject when changing stages and reopening the editor', async () => {
@@ -516,10 +541,10 @@ describe('AiCardDesigner AI config header', () => {
     )
 
     await waitFor(() => expect(screen.queryByText('正在恢复草稿…')).not.toBeInTheDocument())
-    await userEvent.click(screen.getByRole('button', { name: /卡面图 提示词、参考图与候选/ }))
+    await userEvent.click(screen.getByRole('button', { name: /卡面图 主题、参考图与候选/ }))
     await userEvent.type(screen.getByLabelText('画面主题'), '河谷木匠')
     await userEvent.click(screen.getByRole('button', { name: /卡牌能力 对话、源码与验证/ }))
-    await userEvent.click(screen.getByRole('button', { name: /卡面图 提示词、参考图与候选/ }))
+    await userEvent.click(screen.getByRole('button', { name: /卡面图 主题、参考图与候选/ }))
     expect(screen.getByLabelText('画面主题')).toHaveValue('河谷木匠')
 
     firstRender.unmount()
@@ -533,7 +558,7 @@ describe('AiCardDesigner AI config header', () => {
       </LocaleProvider>,
     )
     await waitFor(() => expect(screen.queryByText('正在恢复草稿…')).not.toBeInTheDocument())
-    await userEvent.click(screen.getByRole('button', { name: /卡面图 提示词、参考图与候选/ }))
+    await userEvent.click(screen.getByRole('button', { name: /卡面图 主题、参考图与候选/ }))
     expect(screen.getByLabelText('画面主题')).toHaveValue('河谷木匠')
   })
 
@@ -776,7 +801,7 @@ describe('AiCardDesigner AI config header', () => {
     await userEvent.type(costInput, '3 黏土')
     expect(screen.getByText('有未保存修改')).toBeInTheDocument()
 
-    await userEvent.click(screen.getByRole('button', { name: /卡面图 提示词、参考图与候选/ }))
+    await userEvent.click(screen.getByRole('button', { name: /卡面图 主题、参考图与候选/ }))
     await waitFor(() => expect(screen.getByRole('heading', { name: '卡面图' })).toBeInTheDocument())
 
     const saveCall = apiFetch.mock.calls.find(([, init]) => init?.method === 'PUT')
@@ -843,4 +868,3 @@ describe('card art geometry', () => {
     expect(hexHeight).toBeCloseTo(384 / 512, 2)
   })
 })
-

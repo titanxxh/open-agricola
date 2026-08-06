@@ -145,6 +145,7 @@ describe('workshop draft aggregate', () => {
       draft: baseDraft({
         generation: {
           art: {
+            subject: 'sunlit medieval field',
             prompt: 'sunlit medieval field',
             resultUrl: '/card-art/field.png',
           },
@@ -158,7 +159,7 @@ describe('workshop draft aggregate', () => {
     expect(created.draft.effectCode).toBeNull()
     expect(created.draft.generation).toEqual({
       art: {
-        prompt: 'sunlit medieval field',
+        subject: 'sunlit medieval field',
         resultUrl: '/card-art/field.png',
       },
     })
@@ -300,7 +301,7 @@ describe('workshop draft aggregate', () => {
     const candidate = {
       id: 'art-1',
       kind: 'art' as const,
-      prompt: 'a field at sunrise',
+      prompt: 'An edited field keeper',
       resultUrl: '/card-art/sunrise.png',
       provider: 'fake',
       model: 'image-test',
@@ -314,7 +315,6 @@ describe('workshop draft aggregate', () => {
       candidate,
       artInputs: {
         subject: 'An edited field keeper',
-        prompt: 'an edited field at sunrise',
       },
     })
 
@@ -323,7 +323,6 @@ describe('workshop draft aggregate', () => {
     expect(adopted.workspace.draft.generation).toEqual({
       art: {
         subject: 'An edited field keeper',
-        prompt: 'an edited field at sunrise',
         lastCompleted: candidate,
         adopted: candidate,
       },
@@ -354,6 +353,36 @@ describe('workshop draft aggregate', () => {
     })
     expect(repeated.versionId).toBe(adopted.versionId)
     expect(db.prepare('SELECT COUNT(*) AS count FROM workshop_card_versions').get()).toEqual({ count: 1 })
+  })
+
+  it('keeps only the five newest player versions', () => {
+    let workspace = createCard(db, { authorId: 'author', draft: baseDraft() })
+
+    for (let index = 1; index <= 6; index += 1) {
+      workspace = adoptCandidate(db, {
+        cardId: workspace.id,
+        authorId: 'author',
+        baseRevision: workspace.revision,
+        candidate: {
+          id: `art-${index}`,
+          kind: 'art',
+          prompt: `field ${index}`,
+          resultUrl: `/card-art/${index}.png`,
+          createdAt: index,
+        },
+      }).workspace
+    }
+
+    expect(db.prepare(`
+      SELECT version_number FROM workshop_card_versions
+      WHERE card_id = ? ORDER BY version_number
+    `).all(workspace.id)).toEqual([
+      { version_number: 2 },
+      { version_number: 3 },
+      { version_number: 4 },
+      { version_number: 5 },
+      { version_number: 6 },
+    ])
   })
 
   it('keeps transient form state and unadopted generations out of versions', () => {

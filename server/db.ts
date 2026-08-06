@@ -877,6 +877,47 @@ export function runMigrations(
         `)
       },
     },
+    {
+      version: 28,
+      run: (database) => {
+        const cardColumns = database.pragma('table_info(workshop_cards)') as Array<{ name: string }>
+        if (cardColumns.length === 0) return
+        if (cardColumns.some(({ name }) => name === 'draft_generation_json')) {
+          database.exec(`
+            UPDATE workshop_cards
+            SET draft_generation_json = json_remove(draft_generation_json, '$.art.prompt')
+            WHERE json_valid(draft_generation_json)
+              AND json_type(draft_generation_json, '$.art.prompt') IS NOT NULL;
+          `)
+        }
+        if (cardColumns.some(({ name }) => name === 'art_prompt')) {
+          database.exec('UPDATE workshop_cards SET art_prompt = NULL;')
+        }
+        const versionColumns = database.pragma('table_info(workshop_card_versions)') as Array<{ name: string }>
+        if (versionColumns.length === 0) return
+        database.exec(`
+          DELETE FROM workshop_card_versions
+          WHERE id IN (
+            SELECT id FROM (
+              SELECT id, ROW_NUMBER() OVER (
+                PARTITION BY card_id ORDER BY version_number DESC
+              ) AS history_rank
+              FROM workshop_card_versions
+            )
+            WHERE history_rank > 5
+          )
+            AND NOT EXISTS (
+              SELECT 1 FROM workshop_cards
+              WHERE workshop_cards.id = workshop_card_versions.card_id
+                AND workshop_card_versions.id IN (
+                  review_version_id,
+                  approved_version_id,
+                  sandbox_pass_version_id
+                )
+            );
+        `)
+      },
+    },
   ]
 
   const insert = db.prepare('INSERT INTO schema_version (version) VALUES (?)')
