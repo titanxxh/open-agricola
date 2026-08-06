@@ -193,6 +193,30 @@ describe('PlayerCard dual-type rendering (alsoCountsAs)', () => {
     expect(html).not.toContain('English description.')
     expect(html).toContain(`${base}card-art/community/CUSTOM_LocalisedCard.webp`)
     expect(html).not.toContain('/bga-img/')
+    // `cover` would crop a non-square image against the ~0.95:1 icon box.
+    expect(html).toContain('background-size:contain')
+  })
+
+  it('fits workshop draft art inside the icon box instead of cropping it', () => {
+    const html = renderToStaticMarkup(
+      <PlayerCard
+        locale="en"
+        cardId="CUSTOM_DraftArt"
+        cardType="occupation"
+        artUrl="/card-art/e1a2b3.png"
+        cardMeta={{
+          id: 'CUSTOM_DraftArt',
+          name: 'Draft Art',
+          deck: 'community',
+          number: 0,
+          desc: [],
+        }}
+      />,
+    )
+
+    expect(html).toContain('/card-art/e1a2b3.png')
+    expect(html).toContain('background-size:contain')
+    expect(html).not.toContain('background-size:cover')
   })
 
   it('ignores remote art from card metadata', () => {
