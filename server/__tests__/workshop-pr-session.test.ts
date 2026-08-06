@@ -257,6 +257,8 @@ type StubOpts = {
   /** Used when openPr is invoked. */
   openedPr?: { number: number; url: string }
   openPrStatus?: number
+  /** When set, the fork lookup 404s and the fork creation POST fails with this status. */
+  forkCreateStatus?: number
 }
 
 type StubCounts = {
@@ -283,6 +285,7 @@ function createGitHubApiStub(opts: StubOpts): {
     upstreamFiles = {},
     openedPr,
     openPrStatus,
+    forkCreateStatus,
   } = opts
   const upstream = `${workshopPrConfig.upstreamOwner}/${workshopPrConfig.upstreamRepo}`
   const counts: StubCounts = {
@@ -319,12 +322,18 @@ function createGitHubApiStub(opts: StubOpts): {
       !url.includes('/contents/') &&
       !url.includes('/pulls')
     ) {
+      if (forkCreateStatus) return Promise.resolve(new Response('{}', { status: 404 }))
       return Promise.resolve(
         new Response(
           JSON.stringify({ full_name: `${githubLogin}/${workshopPrConfig.upstreamRepo}` }),
           { status: 200 },
         ),
       )
+    }
+
+    // Fork creation: POST /repos/{upstream}/forks
+    if (method === 'POST' && url.endsWith(`/repos/${upstream}/forks`)) {
+      return Promise.resolve(new Response('{}', { status: forkCreateStatus ?? 202 }))
     }
 
     // Upstream contents (generated catalogs, community_cards.md)
@@ -1194,6 +1203,38 @@ describe('workshop PR propose — session', () => {
     expect(counts.treeEntries.every(entries => entries.some(entry => (
       entry.path === 'server/__tests__/CUSTOM_TestCard-session.test.ts'
     )))).toBe(true)
+  })
+
+  it('reports the GitHub HTTP status when the fork cannot be created', async () => {
+    const hs = tokenCache.allocateHandshakeId(userId)
+    tokenCache.bind(hs, 'ghp_mock')
+    const { fn: gh } = createGitHubApiStub({
+      githubLogin: 'workshopuser',
+      forkCreateStatus: 404,
+    })
+    vi.stubGlobal('fetch', gh)
+    const res = fakeRes()
+
+    await handleSubmitReviewRequest(fakeReq({
+      method: 'POST',
+      url: `/api/workshop/cards/${cardDbId}/submit-review`,
+      authHeader: `Bearer ${userToken}`,
+      body: JSON.stringify({ handshakeId: hs }),
+    }), res, cardDbId, reviewRequiredProvider())
+
+    // Without the status the client cannot tell "repo is invisible to this
+    // account" (404) from "GitHub refused the fork" (403).
+    expect(JSON.parse(res.body)).toMatchObject({
+      ok: false,
+      code: 'fork_create_failed',
+      status: 404,
+    })
+    const audit = db.prepare(
+      `SELECT error_message FROM github_propose_audit
+       WHERE workshop_card_id = ? AND action = 'fail'
+       ORDER BY created_at DESC LIMIT 1`,
+    ).get(cardDbId) as { error_message: string }
+    expect(audit.error_message).toContain('HTTP 404')
   })
 
   it('restores and reopens a non-main source PR when opening its replacement fails', async () => {

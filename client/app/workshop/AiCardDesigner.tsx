@@ -534,21 +534,56 @@ function RefImagePicker({ cardType, selected, onToggle }: {
 
 // ── Canvas Art Processing ──────────────────────────────────────────────────────
 
+// Card face icon box geometry, mirrored from client/styles/card-sprite.css:
+//   .player-card.occupation .card-icon { width: 180.95px;  height: 189.645px }
+//   .player-card.minor      .card-icon { width: 182.125px; height: 189.9975px }
+// Both boxes are slightly taller than wide. Art must ship at that ratio —
+// a square canvas leaves the card face no good option, only cropping the
+// sides (cover) or letterboxing it (contain).
+const CARD_ART_ICON_BOX = {
+  occupation: { width: 180.95, height: 189.645 },
+  minor: { width: 182.125, height: 189.9975 },
+} as const
+
+// Badge width as a share of the canvas width, measured off official deck art
+// (which uses the very same badge-with-transparent-corners layout):
+//   deckE/E089.png (occupation): circle   383x383 of 512 -> 74.8% wide
+//   deckE/E001.png (minor):      hexagon  441x384 of 512 -> 86.1% wide
+// The two card types differ because a flat-top hexagon is 1.155x wider than
+// tall, so it needs more width to carry the same visual height. Filling the
+// canvas edge to edge instead swallows the frame's wheat-ear ornaments and
+// reads as "the art is too big" next to an official card.
+export const CARD_ART_BADGE_RATIO = {
+  occupation: 383 / 512,
+  minor: 441 / 512,
+} as const
+
+export function cardArtCanvasSize(cardType: 'minor' | 'occupation'): {
+  width: number
+  height: number
+} {
+  const width = 512
+  const box = CARD_ART_ICON_BOX[cardType]
+  return { width, height: Math.round((width * box.height) / box.width) }
+}
+
 async function processCardArt(dataUrl: string, cardType: 'minor' | 'occupation'): Promise<string> {
-  const SIZE = 512
+  const { width: WIDTH, height: HEIGHT } = cardArtCanvasSize(cardType)
   const BORDER = 8
   const GOLD = '#c9a227'
-  const R = SIZE / 2 - BORDER / 2 - 2
+  // R is the path radius; the stroke straddles it, so the badge's outer edge
+  // lands exactly on WIDTH * ratio.
+  const R = (WIDTH * CARD_ART_BADGE_RATIO[cardType]) / 2 - BORDER / 2
 
   return new Promise((resolve, reject) => {
     const img = new Image()
     img.onload = () => {
       const canvas = document.createElement('canvas')
-      canvas.width = SIZE
-      canvas.height = SIZE
+      canvas.width = WIDTH
+      canvas.height = HEIGHT
       const ctx = canvas.getContext('2d')!
-      const cx = SIZE / 2
-      const cy = SIZE / 2
+      const cx = WIDTH / 2
+      const cy = HEIGHT / 2
 
       const buildPath = () => {
         ctx.beginPath()
@@ -567,14 +602,18 @@ async function processCardArt(dataUrl: string, cardType: 'minor' | 'occupation')
         }
       }
 
-      // Clip and draw image cover-fit
+      // Cover-fit the badge's bounding box, not the whole canvas: scaling to
+      // the canvas would push most of the picture outside the clip. A flat-top
+      // hexagon is only sqrt(3)*R tall against its 2*R width.
       ctx.save()
       buildPath()
       ctx.clip()
-      const scale = Math.max(SIZE / img.width, SIZE / img.height)
+      const badgeWidth = R * 2
+      const badgeHeight = cardType === 'occupation' ? R * 2 : R * Math.sqrt(3)
+      const scale = Math.max(badgeWidth / img.width, badgeHeight / img.height)
       const iw = img.width * scale
       const ih = img.height * scale
-      ctx.drawImage(img, (SIZE - iw) / 2, (SIZE - ih) / 2, iw, ih)
+      ctx.drawImage(img, cx - iw / 2, cy - ih / 2, iw, ih)
       ctx.restore()
 
       // Gold border on top
