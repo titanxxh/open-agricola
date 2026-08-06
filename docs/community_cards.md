@@ -12,6 +12,7 @@
 <!-- community-card-entries:begin -->
 | Card ID | Name | Type | Author | PR  |
 | ------- | ---- | ---- | ------ | --- |
+| CUSTOM_Gleaner | Gleaner | occupation | @autowinag | #699 |
 <!-- community-card-entries:end -->
 
 
