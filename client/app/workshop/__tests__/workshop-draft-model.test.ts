@@ -85,6 +85,36 @@ describe('workshop draft model', () => {
     )
   })
 
+  it('keeps an explicitly cleared prompt after a manual upload completes', () => {
+    const currentWorkspace = workspace()
+    currentWorkspace.draft.generation = { art: { prompt: 'previous prompt' } }
+    let state = createWorkshopDraftState(currentWorkspace)
+    state = workshopDraftReducer(state, {
+      type: 'sessionChanged',
+      session: { artPrompt: '' },
+    })
+    state = workshopDraftReducer(state, {
+      type: 'candidateCompleted',
+      candidate: {
+        id: 'upload-1',
+        kind: 'art',
+        prompt: 'Manually uploaded image',
+        resultUrl: '/card-art/upload.png',
+        createdAt: 1,
+        baseRevision: 1,
+        stale: false,
+      },
+    })
+
+    expect(state.session.artPrompt).toBe('')
+    expect(state.draft.generation).toMatchObject({
+      art: {
+        prompt: '',
+        lastCompleted: { prompt: 'Manually uploaded image' },
+      },
+    })
+  })
+
   it('keeps only the three newest candidates and marks them stale after draft edits', () => {
     let state = createWorkshopDraftState(workspace())
     for (let index = 1; index <= 4; index += 1) {

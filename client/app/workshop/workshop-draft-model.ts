@@ -276,7 +276,6 @@ export const workshopDraftReducer = (
             session: {
               ...state.session,
               artCandidates: [...state.session.artCandidates, action.candidate].slice(-3),
-              artPrompt: action.candidate.prompt,
               selectedArtCandidateId: action.candidate.id,
             },
             save: { status: 'dirty' },

@@ -560,6 +560,16 @@ const scenarioArtCandidates = async ({
     text(variant.locale, '画面主题', 'Image subject'),
   )).toHaveValue(latestSubject)
   await expect(promptInput).toHaveValue(latestPrompt)
+
+  await promptInput.fill('')
+  await page.locator('.ai-art-upload-section input[type="file"]').setInputFiles({
+    name: 'manual.png',
+    mimeType: 'image/png',
+    buffer: Buffer.from(imagePng, 'base64'),
+  })
+  await expect(candidateSection).toContainText('1 / 3', { timeout: 30_000 })
+  await expect(promptInput).toHaveValue('')
+  await expectSaved(page, variant.locale)
   await expectAccessibleWorkspace(page)
 }
 
