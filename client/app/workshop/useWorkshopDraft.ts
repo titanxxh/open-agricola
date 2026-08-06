@@ -58,20 +58,29 @@ const generationCandidate = (
   return record
 }
 
+const artInputsFromDraft = (draft: WorkshopClientDraft) => {
+  const group = generationGroup(draft, 'art')
+  const candidate = generationCandidate(draft, 'art')
+  return {
+    artSubject: typeof group.subject === 'string' ? group.subject : '',
+    artPrompt: typeof group.prompt === 'string'
+      ? group.prompt
+      : typeof candidate.prompt === 'string' ? candidate.prompt : '',
+  }
+}
+
 const hasSessionData = (state: WorkshopDraftState): boolean => {
-  const artGroup = generationGroup(state.draft, 'art')
   const art = generationCandidate(state.draft, 'art')
   const ability = generationCandidate(state.draft, 'ability')
-  const storedArtSubject = typeof artGroup.subject === 'string' ? artGroup.subject : ''
-  const storedArtPrompt = typeof artGroup.prompt === 'string' ? artGroup.prompt : art.prompt
+  const storedArtInputs = artInputsFromDraft(state.draft)
   const artCandidatesAreRecoverable = state.session.artCandidates.length <= 1
     && state.session.artCandidates.every(candidate => candidate.id === art.id)
   const abilityCandidatesAreRecoverable = state.session.abilityCandidates.length <= 1
     && state.session.abilityCandidates.every(candidate => candidate.id === ability.id)
   return !artCandidatesAreRecoverable
     || !abilityCandidatesAreRecoverable
-    || (state.session.artSubject ?? '') !== storedArtSubject
-    || Boolean(state.session.artPrompt && state.session.artPrompt !== storedArtPrompt)
+    || (state.session.artSubject ?? '') !== storedArtInputs.artSubject
+    || Boolean(state.session.artPrompt && state.session.artPrompt !== storedArtInputs.artPrompt)
     || state.session.abilityInput.length > 0
     || state.session.abilityMessages.length > 0
     || Boolean(state.session.sandboxTestVersionId)
@@ -774,6 +783,7 @@ export const useWorkshopDraft = ({
       })
       restored.session = {
         ...restored.session,
+        ...artInputsFromDraft(payload.workspace.draft),
         restoreUndoDraft,
         sandboxTestVersionId: undefined,
       }
@@ -795,12 +805,20 @@ export const useWorkshopDraft = ({
     const restoreUndoDraft = current?.session.restoreUndoDraft
     if (!current || !restoreUndoDraft || current.save.status === 'conflict') return false
     if (!await saveDraft(current, current.baseRevision, restoreUndoDraft)) return false
-    dispatch({
-      type: 'sessionChanged',
-      session: { restoreUndoDraft: undefined },
-    })
+    const undone = stateRef.current
+    if (!undone) return false
+    const next = {
+      ...undone,
+      session: {
+        ...undone.session,
+        ...(undone.save.status === 'saved' ? artInputsFromDraft(restoreUndoDraft) : {}),
+        restoreUndoDraft: undefined,
+      },
+    }
+    dispatch({ type: 'serverLoaded', state: next })
+    persist(next)
     return true
-  }, [dispatch, saveDraft])
+  }, [dispatch, persist, saveDraft])
 
   return {
     state,

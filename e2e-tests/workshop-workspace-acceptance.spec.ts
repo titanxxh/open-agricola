@@ -922,13 +922,24 @@ const scenarioVersionRestore = async ({
 }: ScenarioContext) => {
   let workspace = await createDraft(request, account)
   const originalName = workspace.draft.name
-  const adopted = await adoptArt(request, account, workspace, unique('version prompt'))
+  const versionPrompt = unique('version prompt')
+  const adopted = await adoptArt(request, account, workspace, versionPrompt)
   workspace = adopted.workspace
   const editedName = unique('Edited after version')
+  const currentSubject = unique('current subject')
+  const currentPrompt = unique('current prompt')
   workspace = await checkpoint(request, account, workspace, {
     ...workspace.draft,
     name: editedName,
     cardJson: { ...workspace.draft.cardJson, name: editedName },
+    generation: {
+      ...workspace.draft.generation,
+      art: {
+        ...workspace.draft.generation.art as Record<string, unknown>,
+        subject: currentSubject,
+        prompt: currentPrompt,
+      },
+    },
   })
   const revisionBeforeRestore = workspace.revision
 
@@ -940,14 +951,24 @@ const scenarioVersionRestore = async ({
   }).click()
   await expect(page.locator('.aicw-heading h2')).toHaveText(originalName)
   await expect(page.locator('.aicw-version-history ol > li')).toHaveCount(1)
+  await stage(page, variant.locale, '卡面图', 'Card art')
+  await expect(page.getByLabel(text(variant.locale, '画面主题', 'Image subject'))).toHaveValue('')
+  await expect(page.getByLabel(text(variant.locale, '生成提示词', 'Generation prompt')))
+    .toHaveValue(versionPrompt)
   const restored = await loadWorkspace(request, account, workspace.id)
   expect(restored.revision).toBe(revisionBeforeRestore + 1)
 
+  await stage(page, variant.locale, '验证与交付', 'Validate & hand off')
   await page.getByRole('button', {
     name: text(variant.locale, '撤销恢复', 'Undo restore'),
   }).click()
   await expect(page.locator('.aicw-heading h2')).toHaveText(editedName)
   await expect(page.locator('.aicw-version-history ol > li')).toHaveCount(1)
+  await stage(page, variant.locale, '卡面图', 'Card art')
+  await expect(page.getByLabel(text(variant.locale, '画面主题', 'Image subject')))
+    .toHaveValue(currentSubject)
+  await expect(page.getByLabel(text(variant.locale, '生成提示词', 'Generation prompt')))
+    .toHaveValue(currentPrompt)
   const undone = await loadWorkspace(request, account, workspace.id)
   expect(undone.revision).toBe(revisionBeforeRestore + 2)
   expect(withDatabase(database => (database.prepare(
@@ -1397,7 +1418,7 @@ const scenarios: Array<{
   { title: '04 metadata localization save and reopen', run: scenarioReopen, llm: true },
   { title: '05 offline failure and local recovery', run: scenarioLocalRecovery },
   { title: '06 revision conflict choices', run: scenarioConflict },
-  { title: '07 immutable versions restore and undo', run: scenarioVersionRestore },
+  { title: '07 immutable versions restore and undo', run: scenarioVersionRestore, llm: true },
   { title: '08 validation sandbox and PR handoff', run: scenarioHandoff },
   { title: '09 author privacy and public projection', run: scenarioPrivacy, llm: true },
   { title: '10 loading errors and retry', run: scenarioErrors, llm: true },
