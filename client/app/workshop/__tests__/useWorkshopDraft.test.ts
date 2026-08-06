@@ -57,13 +57,14 @@ describe('useWorkshopDraft', () => {
     expect(apiFetch).not.toHaveBeenCalled()
   })
 
-  it('restores same-revision local work and checkpoints the whole draft', async () => {
+  it('migrates same-revision legacy art inputs into the checkpointed draft', async () => {
     localStorage.setItem(workshopDraftStorageKey('card-1'), JSON.stringify({
       baseRevision: 3,
-      draft: draft('Local work'),
+      draft: draft(),
       sessionState: {
         artCandidates: [],
         abilityCandidates: [],
+        artSubject: 'unsent subject',
         artPrompt: 'unsent art',
         abilityInput: '',
         abilityMessages: [],
@@ -75,10 +76,15 @@ describe('useWorkshopDraft', () => {
       }
       const request = JSON.parse(String(init.body))
       expect(request.baseRevision).toBe(3)
-      expect(request.draft.name).toBe('Local work')
+      expect(request.draft.generation.art).toEqual({
+        subject: 'unsent subject',
+        prompt: 'unsent art',
+      })
+      const saved = workspace(4)
+      saved.draft = request.draft
       return new Response(JSON.stringify({
         ok: true,
-        workspace: workspace(4, 'Local work'),
+        workspace: saved,
       }))
     })
 
@@ -86,8 +92,9 @@ describe('useWorkshopDraft', () => {
       cardId: 'card-1',
       apiFetch,
     }))
-    await waitFor(() => expect(result.current.state?.draft.name).toBe('Local work'))
+    await waitFor(() => expect(result.current.state?.baseRevision).toBe(3))
     expect(result.current.state?.save.status).toBe('dirty')
+    expect(result.current.state?.session.artSubject).toBe('unsent subject')
     expect(result.current.state?.session.artPrompt).toBe('unsent art')
 
     await act(async () => {
@@ -95,7 +102,7 @@ describe('useWorkshopDraft', () => {
     })
     expect(result.current.state?.baseRevision).toBe(4)
     expect(result.current.state?.save.status).toBe('saved')
-    expect(JSON.parse(localStorage.getItem(workshopDraftStorageKey('card-1'))!).baseRevision).toBe(4)
+    expect(localStorage.getItem(workshopDraftStorageKey('card-1'))).toBeNull()
   })
 
   it('preserves edits made while a checkpoint request is in flight', async () => {

@@ -269,6 +269,7 @@ describe('workshop draft model', () => {
       sessionState: {
         artCandidates: [],
         abilityCandidates: [],
+        artSubject: 'unsent subject',
         artPrompt: 'unsent art',
         abilityInput: 'unsent ability',
         abilityMessages: [],
@@ -295,7 +296,18 @@ describe('workshop draft model', () => {
     expect(resolveWorkshopRecovery(workspace(3), {
       ...local,
       draft: draft(),
-    })).toMatchObject({ kind: 'server', clearLocal: true })
+    })).toMatchObject({
+      kind: 'local',
+      clearLocal: false,
+      state: {
+        draft: {
+          generation: {
+            art: { subject: 'unsent subject', prompt: 'unsent art' },
+          },
+        },
+        save: { status: 'dirty' },
+      },
+    })
   })
 
   it('restores the last unadopted server candidates and image prompt', () => {
