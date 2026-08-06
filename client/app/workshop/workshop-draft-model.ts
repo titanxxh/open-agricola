@@ -419,6 +419,28 @@ export const toLocalRecovery = (state: WorkshopDraftState): WorkshopLocalRecover
   sessionState: state.session,
 })
 
+const migrateRecoveredArtInputs = (
+  server: WorkshopWorkspaceDto,
+  local: WorkshopLocalRecovery,
+): WorkshopLocalRecovery => {
+  const stored = sessionFromGeneration({ ...server, draft: local.draft })
+  const subjectChanged = typeof local.sessionState.artSubject === 'string'
+    && local.sessionState.artSubject !== stored.artSubject
+  const promptChanged = typeof local.sessionState.artPrompt === 'string'
+    && local.sessionState.artPrompt !== stored.artPrompt
+  if (!subjectChanged && !promptChanged) return local
+  const art = { ...asRecord(local.draft.generation.art) }
+  if (subjectChanged) art.subject = local.sessionState.artSubject
+  if (promptChanged) art.prompt = local.sessionState.artPrompt
+  return {
+    ...local,
+    draft: {
+      ...local.draft,
+      generation: { ...local.draft.generation, art },
+    },
+  }
+}
+
 export const resolveWorkshopRecovery = (
   server: WorkshopWorkspaceDto,
   local?: WorkshopLocalRecovery | null,
@@ -426,28 +448,29 @@ export const resolveWorkshopRecovery = (
   | { kind: 'server'; state: WorkshopDraftState; clearLocal: boolean }
   | { kind: 'local'; state: WorkshopDraftState; clearLocal: false }
   | { kind: 'conflict'; state: WorkshopDraftState; clearLocal: false } => {
-  const serverState = createWorkshopDraftState(server, local?.sessionState)
-  if (!local) return { kind: 'server', state: serverState, clearLocal: false }
-  if (local.baseRevision !== server.revision) {
+  const recovered = local ? migrateRecoveredArtInputs(server, local) : null
+  const serverState = createWorkshopDraftState(server, recovered?.sessionState)
+  if (!recovered) return { kind: 'server', state: serverState, clearLocal: false }
+  if (recovered.baseRevision !== server.revision) {
     return {
       kind: 'conflict',
       state: {
         ...serverState,
         save: { status: 'conflict' },
-        conflict: { server, local },
+        conflict: { server, local: recovered },
       },
       clearLocal: false,
     }
   }
-  if (JSON.stringify(local.draft) === JSON.stringify(server.draft)) {
+  if (JSON.stringify(recovered.draft) === JSON.stringify(server.draft)) {
     return { kind: 'server', state: serverState, clearLocal: true }
   }
   return {
     kind: 'local',
     state: {
       ...serverState,
-      draft: local.draft,
-      session: local.sessionState,
+      draft: recovered.draft,
+      session: recovered.sessionState,
       save: { status: 'dirty' },
     },
     clearLocal: false,

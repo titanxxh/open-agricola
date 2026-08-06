@@ -861,6 +861,46 @@ const scenarioLocalRecovery = async ({
   expect(saved.revision).toBe(workspace.revision + 1)
   expect(saved.draft.name).toBe(recoveredName)
   expect(await page.evaluate(key => localStorage.getItem(key), recoveryKey)).toBeNull()
+
+  const legacySubject = unique('legacy subject')
+  const legacyPrompt = unique('legacy prompt')
+  await page.addInitScript(({ key, revision, draft, subject, prompt }) => {
+    if (sessionStorage.getItem('legacy-art-recovery-injected')) return
+    sessionStorage.setItem('legacy-art-recovery-injected', '1')
+    localStorage.setItem(key, JSON.stringify({
+      baseRevision: revision,
+      draft,
+      sessionState: {
+        artCandidates: [],
+        abilityCandidates: [],
+        artSubject: subject,
+        artPrompt: prompt,
+        abilityInput: '',
+        abilityMessages: [],
+      },
+    }))
+  }, {
+    key: recoveryKey,
+    revision: saved.revision,
+    draft: saved.draft,
+    subject: legacySubject,
+    prompt: legacyPrompt,
+  })
+  await page.reload()
+  await expect(page.locator('.aicw-shell')).toBeVisible()
+  await stage(page, variant.locale, '卡面图', 'Card art')
+  await expect(page.getByLabel(text(variant.locale, '画面主题', 'Image subject')))
+    .toHaveValue(legacySubject)
+  await expect(page.getByLabel(text(variant.locale, '生成提示词', 'Generation prompt')))
+    .toHaveValue(legacyPrompt)
+  await page.locator('.aicw-header-actions').getByRole('button', {
+    name: text(variant.locale, '保存草稿', 'Save draft'),
+  }).click()
+  await expectSaved(page, variant.locale)
+  expect((await loadWorkspace(request, account, workspace.id)).draft.generation).toMatchObject({
+    art: { subject: legacySubject, prompt: legacyPrompt },
+  })
+  expect(await page.evaluate(key => localStorage.getItem(key), recoveryKey)).toBeNull()
   await expectAccessibleWorkspace(page)
 }
 
@@ -1426,7 +1466,7 @@ const scenarios: Array<{
   { title: '02 art candidate generation and adoption', run: scenarioArtCandidates, llm: true },
   { title: '03 ability candidates validation and adoption', run: scenarioAbilityCandidates, llm: true },
   { title: '04 metadata localization save and reopen', run: scenarioReopen, llm: true },
-  { title: '05 offline failure and local recovery', run: scenarioLocalRecovery },
+  { title: '05 offline failure and local recovery', run: scenarioLocalRecovery, llm: true },
   { title: '06 revision conflict choices', run: scenarioConflict },
   { title: '07 immutable versions restore and undo', run: scenarioVersionRestore, llm: true },
   { title: '08 validation sandbox and PR handoff', run: scenarioHandoff },
