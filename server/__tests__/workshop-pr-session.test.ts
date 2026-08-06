@@ -1385,6 +1385,52 @@ describe('workshop PR propose — session', () => {
     ).get(cardDbId)).toEqual({ review_status: 'approved' })
   })
 
+  it('invalidates an approved card when no authorized head approval remains', async () => {
+    const prUrl = 'https://github.com/titanxxh/open-agricola/pull/42'
+    enterReview(db, {
+      cardId: cardDbId,
+      authorId: userId,
+      prUrl,
+      expectedRevision: 1,
+      commitSha: 'review-head',
+    })
+    db.prepare(`
+      UPDATE workshop_cards
+      SET review_status = 'approved',
+          live = 1,
+          approved_commit_sha = 'review-head',
+          approved_version_id = review_version_id,
+          github_pr_last_synced_at = NULL
+      WHERE id = ?
+    `).run(cardDbId)
+    const res = fakeRes()
+
+    await handleRefreshPrStatus(fakeReq({
+      method: 'POST',
+      url: `/api/workshop/cards/${cardDbId}/refresh-pr-status`,
+      authHeader: `Bearer ${userToken}`,
+    }), res, cardDbId, {
+      getPullRequestSnapshot: vi.fn().mockResolvedValue({
+        reviewDecision: null,
+        headRefOid: 'review-head',
+        baseRefName: 'main',
+        state: 'OPEN',
+        isDraft: false,
+        reviews: [{
+          id: 'revoked-approval',
+          state: 'APPROVED',
+          commitOid: 'review-head',
+          authorCanPushToRepository: false,
+        }],
+      }),
+    })
+
+    expect(JSON.parse(res.body)).toEqual({ ok: true, status: 'open' })
+    expect(db.prepare(
+      'SELECT review_status, live FROM workshop_cards WHERE id = ?',
+    ).get(cardDbId)).toEqual({ review_status: 'stale', live: 0 })
+  })
+
   it('graduates a merged approved snapshot through the refresh endpoint', async () => {
     // Both the approval and merge webhooks were missed: refresh sees an
     // approved MERGED snapshot. The head is frozen after merge, so the #629

@@ -41,11 +41,13 @@ PR 审批读取和 webhook 使用独立的 GitHub App，不复用 Workshop OAuth
 ### 注册与安装
 
 1. 在 GitHub App 设置页创建 `open-agricola-workshop-review`，Homepage URL 指向主仓库。
-2. Repository permissions 仅设置 `Pull requests: Read-only`；其余权限保持 `No access`，GitHub 自动附带的 `Metadata: Read-only` 除外。
+2. Repository permissions 仅设置 `Contents: Read-only` 和 `Pull requests: Read-only`；其余权限保持 `No access`，GitHub 自动附带的 `Metadata: Read-only` 除外。
 3. Webhook URL 设置为 `<PUBLIC_API_BASE>/api/github/webhook`，用 `openssl rand -hex 32` 生成独立 secret。
 4. Subscribe to events 仅勾选 `Pull request` 和 `Pull request review`。
 5. 安装范围选择 `Only on this account`，并只安装到 `titanxxh/open-agricola`。
 6. 记录 App ID，生成并下载 private key，再从安装页面地址记录 Installation ID。
+
+旧安装新增 `Contents: Read-only` 后，必须在 App installation 页面批准权限变更；否则 installation token 会拒绝该权限。
 
 此 App 不参与用户 OAuth，不需要配置 callback URL、Client ID 或 Client Secret。`POST /api/github/webhook` 上线前关闭 Webhook Active；上线后重新开启并检查 Recent deliveries 返回 2xx。
 
