@@ -137,7 +137,8 @@ const reconcileReviewSnapshot = (
     }
     return approved
   }
-  return breaksReviewGateWithoutApproval(snapshot)
+  return expectedBinding.approvedVersionId !== null
+    || breaksReviewGateWithoutApproval(snapshot)
     ? invalidateReviewedCard(db, {
         prUrl,
         prStatus: githubPrStatus(snapshot),
