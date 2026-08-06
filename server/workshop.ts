@@ -529,6 +529,7 @@ export async function handleWorkshopRoute(
     const body = await parseBody<{
       baseRevision?: unknown
       candidate?: Record<string, unknown>
+      artInputs?: unknown
     }>(req)
     if (!Number.isInteger(body?.baseRevision) || !body?.candidate) {
       sendJson(res, 400, { ok: false, error: 'Missing baseRevision or candidate' })
@@ -536,6 +537,7 @@ export async function handleWorkshopRoute(
     }
     const raw = body.candidate
     let candidate: WorkshopArtCandidate | WorkshopAbilityCandidate
+    let artInputs: { subject: string; prompt: string } | undefined
     if (raw.kind === 'art') {
       if (
         typeof raw.id !== 'string'
@@ -544,6 +546,22 @@ export async function handleWorkshopRoute(
       ) {
         sendJson(res, 400, { ok: false, error: 'Invalid art candidate' })
         return true
+      }
+      if (body.artInputs !== undefined) {
+        if (
+          !body.artInputs
+          || typeof body.artInputs !== 'object'
+          || Array.isArray(body.artInputs)
+          || typeof (body.artInputs as Record<string, unknown>).subject !== 'string'
+          || typeof (body.artInputs as Record<string, unknown>).prompt !== 'string'
+        ) {
+          sendJson(res, 400, { ok: false, error: 'Invalid art inputs' })
+          return true
+        }
+        artInputs = {
+          subject: (body.artInputs as Record<string, string>).subject!,
+          prompt: (body.artInputs as Record<string, string>).prompt!,
+        }
       }
       candidate = {
         id: raw.id,
@@ -618,6 +636,7 @@ export async function handleWorkshopRoute(
         authorId: user.id,
         baseRevision: body.baseRevision as number,
         candidate,
+        ...(artInputs ? { artInputs } : {}),
       })
       sendJson(res, 200, { ok: true, ...result })
     } catch (error) {

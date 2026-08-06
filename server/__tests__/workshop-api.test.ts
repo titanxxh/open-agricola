@@ -1056,8 +1056,19 @@ const CARD_IMPL = {}
           model: 'secret-model',
           createdAt: 100,
         },
+        artInputs: {
+          subject: 'private subject',
+          prompt: 'edited private prompt',
+        },
       }, 'tok-alice'), adoptRes)
-      expect(JSON.parse(adoptRes.body).workspace.revision).toBe(2)
+      expect(JSON.parse(adoptRes.body).workspace).toMatchObject({
+        revision: 2,
+        draft: {
+          generation: {
+            art: { subject: 'private subject', prompt: 'edited private prompt' },
+          },
+        },
+      })
 
       approveForPublish(cardDbId, 'u1', 2)
       const publishRes = mockRes()

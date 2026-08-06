@@ -526,6 +526,10 @@ const scenarioArtCandidates = async ({
   await expect(page.locator('.aicw-art-review details')).toContainText(prompt)
   await expect(page.locator('.aicw-art-review details')).toContainText('gemini')
   await expect(page.locator('.aicw-art-review details')).toContainText(referenceId!)
+  const latestSubject = text(variant.locale, '河谷家具匠', 'A valley cabinetmaker')
+  const latestPrompt = unique('edited private art prompt')
+  await page.getByLabel(text(variant.locale, '画面主题', 'Image subject')).fill(latestSubject)
+  await promptInput.fill(latestPrompt)
   page.once('dialog', dialog => dialog.accept())
   const adopt = page.getByRole('button', {
     name: text(variant.locale, '采用为当前卡面', 'Adopt as current art'),
@@ -538,7 +542,9 @@ const scenarioArtCandidates = async ({
 
   const saved = await loadWorkspace(request, account, workspace.id)
   expect(saved.draft.artUrl).toBeTruthy()
-  expect(saved.draft.generation).toMatchObject({ art: { subject, prompt } })
+  expect(saved.draft.generation).toMatchObject({
+    art: { subject: latestSubject, prompt: latestPrompt },
+  })
   expect((await versions(request, account, workspace.id)).versions).toHaveLength(1)
 
   await page.evaluate(
@@ -552,8 +558,8 @@ const scenarioArtCandidates = async ({
   await stage(page, variant.locale, '卡面图', 'Card art')
   await expect(page.getByLabel(
     text(variant.locale, '画面主题', 'Image subject'),
-  )).toHaveValue(subject)
-  await expect(promptInput).toHaveValue(prompt)
+  )).toHaveValue(latestSubject)
+  await expect(promptInput).toHaveValue(latestPrompt)
   await expectAccessibleWorkspace(page)
 }
 
