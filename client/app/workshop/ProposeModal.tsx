@@ -152,14 +152,49 @@ export function ProposeModal({
   )
 }
 
+// Keyed by `${code}:${status}` first, then by bare `code`. The combined key
+// wins so a failure whose HTTP status pins down the cause can say exactly that
+// instead of falling back to the generic per-status wording.
+const FAILURE_HINTS: Record<string, string> = {
+  'fork_create_failed:404':
+    '无法 fork 主仓库：你的 GitHub 账号看不到它。主仓库是 private 时，非协作者同样会收到 404。'
+    + '请联系维护者把主仓库设为 public，或把你的 GitHub 账号加为协作者。',
+  fork_create_failed: '无法在你的账号下创建主仓库的 fork。',
+  fork_lookup_failed: '无法确认你的账号下是否已有主仓库的 fork。',
+  fork_pending: 'GitHub 仍在后台创建 fork。稍等片刻后重试即可。',
+  pr_rebase_conflict: 'PR 分支上的手工修改与当前 main 冲突，无法自动 rebase。请先在 GitHub 上解决冲突。',
+  pr_patch_unavailable: 'PR 中部分改动拿不到 diff，无法安全保留。请先在 GitHub 上处理该 PR。',
+  pr_tree_truncated: 'PR 涉及的文件过多，无法安全保留其中的手工改动。请先在 GitHub 上处理该 PR。',
+  handshake_expired: 'GitHub 授权握手已过期，请重新发起提交。',
+  rate_limited: '提交过于频繁。',
+  github_unavailable: 'GitHub 接口暂时不可用。',
+}
+
+const STATUS_HINTS: Record<number, string> = {
+  401: 'GitHub 授权已失效或被撤销，请重新连接 GitHub。',
+  403: 'GitHub 拒绝了这次操作：授权范围不足、仓库禁止该操作，或触发了接口速率限制。',
+  404: 'GitHub 返回「不存在」。注意 private 仓库对没有访问权限的账号同样返回 404。',
+  409: '与主仓库当前状态冲突。',
+  422: 'GitHub 拒绝了请求内容：分支可能没有新提交、已存在同源 PR，或文件内容不合法。',
+}
+
+function describeStatus(status: number | undefined): string | undefined {
+  if (!status) return undefined
+  return STATUS_HINTS[status] ?? (status >= 500 ? 'GitHub 服务暂时不可用，请稍后重试。' : undefined)
+}
+
 function describeProposeFailure(resp: ProposeFailure): FailureInfo {
   const code = resp.code ?? resp.error ?? 'failed'
   const message = resp.message?.trim()
+  const status = resp.status
+  const label = status ? `${code} (HTTP ${status})` : code
+  const reason = FAILURE_HINTS[`${code}:${status}`]
+    ?? [FAILURE_HINTS[code], describeStatus(status)].filter(Boolean).join(' ')
   const retryAfter = resp.retryAfter ? `可在 ${resp.retryAfter} 秒后重试。` : undefined
-  const detail = [message, retryAfter].filter(Boolean).join(' ')
+  const detail = [reason, retryAfter].filter(Boolean).join(' ')
   return {
-    summary: message ? `${code}: ${message}` : code,
-    detail: detail || undefined,
+    summary: message ? `${label}: ${message}` : label,
+    detail: detail || message,
   }
 }
 

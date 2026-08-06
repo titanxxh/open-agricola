@@ -490,13 +490,21 @@ export async function handleSubmitReviewRequest(
     })
   } catch (err) {
     const code = err instanceof GitHubApiError ? err.code : 'unknown'
+    const status = err instanceof GitHubApiError ? err.status : undefined
     const message = err instanceof Error ? err.message : String(err)
     db.prepare(
       `INSERT INTO github_propose_audit
         (id, user_id, workshop_card_id, action, error_code, error_message, created_at)
        VALUES (?, ?, ?, 'fail', ?, ?, ?)`,
-    ).run(nanoid(), user.id, cardDbId, code, message, Date.now())
-    sendJson(res, 200, { ok: false, code, message })
+    ).run(
+      nanoid(),
+      user.id,
+      cardDbId,
+      code,
+      status ? `${message} (HTTP ${status})` : message,
+      Date.now(),
+    )
+    sendJson(res, 200, { ok: false, code, message, ...(status ? { status } : {}) })
   }
 }
 
