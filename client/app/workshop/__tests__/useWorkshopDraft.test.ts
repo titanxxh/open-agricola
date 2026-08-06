@@ -951,23 +951,33 @@ describe('useWorkshopDraft', () => {
 
   it('restores an immutable version by copy-forward and offers one local undo', async () => {
     const requests: Array<{ path: string; body?: Record<string, unknown> }> = []
+    const currentWorkspace = workspace(4, 'Current work')
+    currentWorkspace.draft.generation = {
+      art: { subject: 'current subject', prompt: 'current prompt' },
+    }
+    const restoredWorkspace = workspace(5, 'Version one')
+    restoredWorkspace.draft.generation = {
+      art: { subject: 'version subject', prompt: 'version prompt' },
+    }
     const apiFetch = vi.fn(async (path: string, init?: RequestInit) => {
       const body = init?.body
         ? JSON.parse(String(init.body)) as Record<string, unknown>
         : undefined
       requests.push({ path, body })
       if (!init) {
-        return new Response(JSON.stringify({ ok: true, workspace: workspace(4, 'Current work') }))
+        return new Response(JSON.stringify({ ok: true, workspace: currentWorkspace }))
       }
       if (path.endsWith('/restore')) {
         return new Response(JSON.stringify({
           ok: true,
-          workspace: workspace(5, 'Version one'),
+          workspace: restoredWorkspace,
         }))
       }
+      const savedWorkspace = workspace(6, 'Current work')
+      savedWorkspace.draft = body?.draft as WorkshopClientDraft
       return new Response(JSON.stringify({
         ok: true,
-        workspace: workspace(6, 'Current work'),
+        workspace: savedWorkspace,
       }))
     })
     const { result } = renderHook(() => useWorkshopDraft({
@@ -980,6 +990,10 @@ describe('useWorkshopDraft', () => {
       expect(await result.current.restoreVersion('version-1')).toBe(true)
     })
     expect(result.current.state?.draft.name).toBe('Version one')
+    expect(result.current.state?.session).toMatchObject({
+      artSubject: 'version subject',
+      artPrompt: 'version prompt',
+    })
     expect(result.current.state?.session.restoreUndoDraft?.name).toBe('Current work')
     expect(requests.find(request => request.path.endsWith('/restore'))?.body)
       .toEqual({ baseRevision: 4, versionId: 'version-1' })
@@ -988,6 +1002,10 @@ describe('useWorkshopDraft', () => {
       expect(await result.current.undoRestore()).toBe(true)
     })
     expect(result.current.state?.draft.name).toBe('Current work')
+    expect(result.current.state?.session).toMatchObject({
+      artSubject: 'current subject',
+      artPrompt: 'current prompt',
+    })
     expect(result.current.state?.session.restoreUndoDraft).toBeUndefined()
     expect(requests.find(request => request.path.endsWith('/draft'))?.body)
       .toMatchObject({ baseRevision: 5, draft: { name: 'Current work' } })
