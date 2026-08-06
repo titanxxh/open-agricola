@@ -65,6 +65,26 @@ describe('workshop draft model', () => {
     })
   })
 
+  it('prefers the saved art prompt over candidate provenance', () => {
+    const restoredWorkspace = workspace(2)
+    restoredWorkspace.draft.generation = {
+      art: {
+        prompt: 'edited after generation',
+        lastCompleted: {
+          id: 'art-1',
+          kind: 'art',
+          prompt: 'original generation prompt',
+          resultUrl: '/card-art/1.png',
+          createdAt: 1,
+        },
+      },
+    }
+
+    expect(createWorkshopDraftState(restoredWorkspace).session.artPrompt).toBe(
+      'edited after generation',
+    )
+  })
+
   it('keeps only the three newest candidates and marks them stale after draft edits', () => {
     let state = createWorkshopDraftState(workspace())
     for (let index = 1; index <= 4; index += 1) {

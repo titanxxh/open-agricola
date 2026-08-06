@@ -339,8 +339,11 @@ export const useWorkshopDraft = ({
         current.conflict.server,
         current.conflict.local.sessionState,
       )
+      const serverSession = createWorkshopDraftState(current.conflict.server).session
       serverState.session = {
         ...serverState.session,
+        artSubject: serverSession.artSubject,
+        artPrompt: serverSession.artPrompt,
         artCandidates: serverState.session.artCandidates.map(candidate => ({
           ...candidate,
           stale: true,
@@ -387,6 +390,12 @@ export const useWorkshopDraft = ({
       ? pendingSave.draft
       : current.draft
     const mergeBaseSession = current.session
+    const artInputs = candidate.kind === 'art'
+      ? {
+          subject: current.session.artSubject ?? '',
+          prompt: current.session.artPrompt,
+        }
+      : undefined
     dispatch({ type: 'saving' })
     try {
       const response = await apiFetch(
@@ -397,6 +406,7 @@ export const useWorkshopDraft = ({
           body: JSON.stringify({
             baseRevision: current.baseRevision,
             candidate,
+            ...(artInputs ? { artInputs } : {}),
           }),
         },
       )

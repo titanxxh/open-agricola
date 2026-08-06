@@ -312,14 +312,18 @@ describe('workshop draft aggregate', () => {
       authorId: 'author',
       baseRevision: 1,
       candidate,
+      artInputs: {
+        subject: 'An edited field keeper',
+        prompt: 'an edited field at sunrise',
+      },
     })
 
     expect(adopted.workspace.revision).toBe(2)
     expect(adopted.workspace.draft.artUrl).toBe('/card-art/sunrise.png')
     expect(adopted.workspace.draft.generation).toEqual({
       art: {
-        subject: 'A field keeper',
-        prompt: 'a field at sunrise',
+        subject: 'An edited field keeper',
+        prompt: 'an edited field at sunrise',
         lastCompleted: candidate,
         adopted: candidate,
       },

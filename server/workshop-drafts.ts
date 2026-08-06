@@ -484,6 +484,7 @@ export function adoptCandidate(
     authorId: string
     baseRevision: number
     candidate: WorkshopCandidate
+    artInputs?: { subject: string; prompt: string }
   },
 ): { workspace: WorkshopWorkspace; versionId: string } {
   return db.transaction(() => {
@@ -498,6 +499,7 @@ export function adoptCandidate(
       ...(previous && typeof previous === 'object' && !Array.isArray(previous)
         ? previous as Record<string, unknown>
         : {}),
+      ...(input.candidate.kind === 'art' && input.artInputs ? input.artInputs : {}),
       lastCompleted: input.candidate,
       adopted: input.candidate,
     }

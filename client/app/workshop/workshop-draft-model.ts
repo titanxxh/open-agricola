@@ -144,10 +144,12 @@ const sessionFromGeneration = (
   return {
     ...emptySession(),
     artSubject: typeof art.subject === 'string' ? art.subject : '',
-    artPrompt: lastArt?.prompt
-      ?? (typeof asRecord(art.adopted).prompt === 'string'
-        ? asRecord(art.adopted).prompt as string
-        : typeof art.prompt === 'string' ? art.prompt : ''),
+    artPrompt: typeof art.prompt === 'string'
+      ? art.prompt
+      : lastArt?.prompt
+        ?? (typeof asRecord(art.adopted).prompt === 'string'
+          ? asRecord(art.adopted).prompt as string
+          : ''),
     artCandidates: pendingArt?.kind === 'art' ? [pendingArt] : [],
     abilityCandidates: pendingAbility?.kind === 'ability' ? [pendingAbility] : [],
     ...(pendingArt ? { selectedArtCandidateId: pendingArt.id } : {}),
