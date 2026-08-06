@@ -1052,8 +1052,7 @@ const CARD_IMPL = {}
         candidate: {
           id: 'art-public',
           kind: 'art',
-          prompt: 'generation-time subject',
-          promptFormat: 'subject',
+          prompt: 'legacy full generation template',
           resultUrl: '/card-art/published.png',
           model: 'secret-model',
           createdAt: 100,
@@ -1068,7 +1067,10 @@ const CARD_IMPL = {}
           generation: {
             art: {
               subject: 'current draft subject',
-              adopted: { prompt: 'generation-time subject' },
+              adopted: {
+                prompt: 'current draft subject',
+                promptFormat: 'subject',
+              },
             },
           },
         },
@@ -1087,7 +1089,7 @@ const CARD_IMPL = {}
       const publicBefore = JSON.parse(publicBeforeRes.body)
       expect(publicBefore.card.art_url).toBe('/card-art/published.png')
       expect(publicBefore.card.card_json._draft).toBeUndefined()
-      expect(publicBeforeRes.body).not.toContain('generation-time subject')
+      expect(publicBeforeRes.body).not.toContain('legacy full generation template')
       expect(publicBeforeRes.body).not.toContain('secret-model')
 
       const workspaceRes = mockRes()

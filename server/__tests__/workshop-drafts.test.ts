@@ -346,7 +346,7 @@ describe('workshop draft aggregate', () => {
       baseRevision: 1,
       candidate,
       artInputs: {
-        subject: 'An edited field keeper',
+        subject: 'Current field keeper',
       },
     })
 
@@ -354,7 +354,7 @@ describe('workshop draft aggregate', () => {
     expect(adopted.workspace.draft.artUrl).toBe('/card-art/sunrise.png')
     expect(adopted.workspace.draft.generation).toEqual({
       art: {
-        subject: 'An edited field keeper',
+        subject: 'Current field keeper',
         lastCompleted: candidate,
         adopted: candidate,
       },
@@ -365,7 +365,7 @@ describe('workshop draft aggregate', () => {
       content_hash: expect.stringMatching(/^[a-f0-9]{64}$/),
       provenance_json: JSON.stringify({
         art: {
-          subject: 'An edited field keeper',
+          subject: 'Current field keeper',
           adopted: {
             id: candidate.id,
             kind: candidate.kind,
