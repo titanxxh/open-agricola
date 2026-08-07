@@ -5,6 +5,10 @@ import { rehydrateState } from '../../shared/session/serialization.ts'
 import type { InitialStateOptions } from '../../shared/session/state-bootstrap.ts'
 import type { CustomCardData } from '../../shared/cards/session-card-context.ts'
 import type { RoomSummary } from '../../shared/contract/protocol/ws.ts'
+import {
+  createIsolatedGameSession,
+  type CustomSessionExecutor,
+} from './custom-session-executor.ts'
 
 export type RoomPlayer = {
   ws: WebSocket
@@ -21,6 +25,7 @@ export type RoomSeatOwner = {
 export type Room = {
   id: string
   session: GameSession
+  customSessionExecutor?: CustomSessionExecutor
   players: RoomPlayer[]
   seatOwners?: RoomSeatOwner[]
   maxPlayers: number
@@ -282,9 +287,9 @@ const createSessionFromSnapshot = (
   snapshot: RoomSnapshot,
   customCards: CustomCardData[],
   onRehydrationFailure: () => void,
-): GameSession => {
+): ReturnType<typeof createIsolatedGameSession> => {
   if (snapshot.serialized === null) {
-    return new GameSession(undefined, customCards.length > 0 ? customCards : undefined, {
+    return createIsolatedGameSession(undefined, customCards.length > 0 ? customCards : undefined, {
       playerCount: snapshot.meta.maxPlayers,
       enableParentCards: snapshot.meta.enableParentCards ?? false,
       ...(snapshot.meta.draftParents === false ? { draftParents: false } : {}),
@@ -294,14 +299,14 @@ const createSessionFromSnapshot = (
     })
   }
   try {
-    return new GameSession(
+    return createIsolatedGameSession(
       rehydrateState(snapshot.serialized),
       customCards.length > 0 ? customCards : undefined,
     )
   } catch (err) {
     console.warn(`[room] rehydrate failed for ${snapshot.id}, starting fresh:`, err)
     onRehydrationFailure()
-    return new GameSession(undefined, customCards.length > 0 ? customCards : undefined, {
+    return createIsolatedGameSession(undefined, customCards.length > 0 ? customCards : undefined, {
       playerCount: snapshot.meta.maxPlayers,
       enableParentCards: snapshot.meta.enableParentCards ?? false,
       ...(snapshot.meta.draftParents === false ? { draftParents: false } : {}),
@@ -317,12 +322,14 @@ export const snapshotToRoom = (
   customCards: CustomCardData[] = snapshot.meta.customCards ?? [],
 ): Room => {
   let snapshotRehydrationFailed = false
-  const session = createSessionFromSnapshot(snapshot, customCards, () => {
+  const created = createSessionFromSnapshot(snapshot, customCards, () => {
     snapshotRehydrationFailed = true
   })
+  const session = created.session
   return {
     id: snapshot.id,
     session,
+    ...(created.executor ? { customSessionExecutor: created.executor } : {}),
     players: [],
     seatOwners: snapshot.meta.players.map((owner) => ({ ...owner })),
     maxPlayers: snapshot.meta.maxPlayers,

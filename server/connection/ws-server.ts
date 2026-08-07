@@ -228,7 +228,16 @@ const handleConnection = (ws: WebSocket, req: IncomingMessage, deps: ConnectionD
       })
       return
     }
-    dispatch(ctx, msg)
+    const dispatched = dispatch(ctx, msg)
+    if (dispatched instanceof Promise) {
+      void dispatched.catch((error) => {
+        deps.broadcaster.sendTo(ws, {
+          type: 'error',
+          error: error instanceof Error ? error.message : String(error),
+          requestId: (msg as { requestId?: string }).requestId,
+        })
+      })
+    }
     if (ctx.currentUserId && ctx.currentUserId !== trackedUserId) {
       if (trackedUserId) untrack(trackedUserId)
       trackedUserId = ctx.currentUserId

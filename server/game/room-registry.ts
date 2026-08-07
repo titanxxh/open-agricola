@@ -6,7 +6,11 @@ export class RoomRegistry {
 
   get(id: string): Room | undefined { return this.rooms.get(id) }
   set(room: Room): void { this.rooms.set(room.id, room) }
-  delete(id: string): void { this.rooms.delete(id) }
+  delete(id: string): void {
+    const room = this.rooms.get(id)
+    room?.customSessionExecutor?.dispose()
+    this.rooms.delete(id)
+  }
   has(id: string): boolean { return this.rooms.has(id) }
   iter(): IterableIterator<Room> { return this.rooms.values() }
   size(): number { return this.rooms.size }
