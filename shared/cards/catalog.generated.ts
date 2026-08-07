@@ -8141,6 +8141,34 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "kind": "minor"
   },
   {
+    "id": "CUSTOM_Gleaner",
+    "name": "Gleaner",
+    "deck": "community",
+    "number": 0,
+    "desc": [
+      "Whenever you take 3 or more of one resource from an accumulating action space at once, also gain 1 of that resource; if you take 6 or more, gain 2 instead. Once per round, after an opponent takes 4 or more of one resource from an accumulating action space at once, gain 1 <FOOD>."
+    ],
+    "cost": {},
+    "vp": 0,
+    "implemented": true,
+    "locales": {
+      "zh": {
+        "name": "拾穗者",
+        "desc": [
+          "每当你从同一个累积行动格上一次取走 3 个或更多同种资源时，额外获得 1 个该种资源；若取走 6 个或更多，则改为额外获得 2 个该种资源。每轮一次：当对手从同一个累积行动格上一次取走 4 个或更多同种资源后，你获得 1 <FOOD>。"
+        ]
+      },
+      "en": {
+        "name": "Gleaner",
+        "desc": [
+          "Whenever you take 3 or more of one resource from an accumulating action space at once, also gain 1 of that resource; if you take 6 or more, gain 2 instead. Once per round, after an opponent takes 4 or more of one resource from an accumulating action space at once, gain 1 <FOOD>."
+        ]
+      }
+    },
+    "artUrl": "/card-art/community/CUSTOM_Gleaner.png",
+    "kind": "occupation"
+  },
+  {
     "id": "D001_ZigzagHarrow",
     "name": "Zigzag Harrow",
     "deck": "D",
