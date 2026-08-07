@@ -23,8 +23,8 @@ ADR-0010 至 ADR-0013 已固定公开回放、delta 链、GitHub 身份和 Game 
 
 ### Capacity and process shape
 
-8. 内置卡 Room 保持主进程内执行与同步 SQLite 提交，不增加房间分片、Redis 或通用异步命令队列。尚未内置的可执行 Workshop 卡使用 Room 专属会话 Worker；该 Room 的命令队列必须覆盖会话执行、广播准备和 Durable Commit 完成，一个 `ready | blocked` 写入状态门阻止重试与新命令交错。
-9. 2 CPU / 2 GiB 单实例最多保留 30 个普通内存 Room，`waiting` 与 `playing` 都计数，固定 dev Room 不计数。由于每个可执行 Workshop session 最多占两个 Worker，在没有同形态容量探针前，新建可执行 Room 另限 15 个，进程级会话 Worker 槽也硬限 15 个并覆盖 HTTP 与恢复 Room；净数量不变且没有新增可执行 Worker 的 `newGame` 允许。提高任一上限前必须用对应生产形态的真实命令探针复验。
+8. 内置卡 Room 保持主进程内执行与同步 SQLite 提交，不增加房间分片、Redis 或通用异步命令队列。尚未内置的可执行 Workshop 卡使用 Room 专属会话 Worker；该 Room 的命令队列必须覆盖会话执行、广播准备和 Durable Commit 完成，同一连接的换房 / 换座也不得越过在途命令，一个 `ready | blocked` 写入状态门阻止重试与新命令交错。
+9. 2 CPU / 2 GiB 单实例最多保留 30 个普通内存 Room，`waiting` 与 `playing` 都计数，固定 dev Room 不计数。由于每个可执行 Workshop session 最多占两个 Worker，在没有同形态容量探针前，可执行 Room 另限 15 个；进程级 15 个会话 Worker 槽统一计算 Room 预留与活跃 HTTP sandbox，恢复 Room 在恢复时也参与预留。提高任一上限前必须用对应生产形态的真实命令探针复验。
 
 ### Storage and delivery
 

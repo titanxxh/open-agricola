@@ -30,7 +30,6 @@ import {
 } from '../game/room-committer.ts'
 import {
   createIsolatedGameSession,
-  MAX_ACTIVE_CUSTOM_SESSION_WORKERS,
   type CustomSessionMethod,
 } from '../game/custom-session-executor.ts'
 
@@ -39,6 +38,19 @@ const DRAFT_POOL_SIZE_MIN = 7
 const DRAFT_POOL_SIZE_MAX = 10
 const MAX_ORDINARY_ROOMS = 30
 const customRoomQueues = new WeakMap<Room, Promise<void>>()
+const connectionQueues = new WeakMap<ConnectionCtx, Promise<void>>()
+
+const trackQueue = <K extends object>(
+  queues: WeakMap<K, Promise<void>>,
+  key: K,
+  result: Promise<void>,
+): void => {
+  const tail = result.then(() => undefined, () => undefined)
+  queues.set(key, tail)
+  void tail.then(() => {
+    if (queues.get(key) === tail) queues.delete(key)
+  })
+}
 
 type DraftRoomOptions = { draftMode: 'simultaneous'; draftPoolSize: number }
 
@@ -261,7 +273,7 @@ const publishInitialState = (
   requestId: string | undefined,
   beforePublish: () => void,
   onReady: () => void,
-): void => {
+): void | Promise<void> => {
   const publishReady = (result: Exclude<RoomCommitResult, { kind: 'blocked' }>): void => {
     if (ctx.committer?.hasReplay(room.id)) ctx.checkpoint.markInactive(room.id)
     beforePublish()
@@ -291,8 +303,11 @@ const publishInitialState = (
     notifyPersistencePaused(ctx, room)
     if (!ctx.committer.isRetrying(room.id)) {
       sendCommandError(ctx, result.error, requestId)
+      return
     }
-    return
+    return new Promise((resolve) => {
+      if (!ctx.committer?.waitUntilReady(room.id, () => resolve())) resolve()
+    })
   }
   beforePublish()
   if (ctx.committer.isRecording(room.id)) {
@@ -348,13 +363,6 @@ const useSessionResponse = (
   result: SessionResponse | Promise<SessionResponse>,
   use: (response: SessionResponse) => void | Promise<void>,
 ): void | Promise<void> => result instanceof Promise ? result.then(use) : use(result)
-
-export const hasExecutableRoomCapacity = (
-  rooms: Iterable<Pick<Room, 'customSessionExecutor'>>,
-  except?: Pick<Room, 'customSessionExecutor'>,
-): boolean => [...rooms]
-  .filter((room) => room !== except && room.customSessionExecutor)
-  .length < MAX_ACTIVE_CUSTOM_SESSION_WORKERS
 
 function handleAuth(ctx: ConnectionCtx, msg: Extract<ClientCommand, { type: 'auth' }>): void {
   if (!msg.token) {
@@ -436,7 +444,7 @@ function handleCreateRoom(ctx: ConnectionCtx, msg: Extract<ClientCommand, { type
     sendCommandError(ctx, err instanceof Error ? err.message : String(err), msg.requestId)
     return
   }
-  if (created.executor && !hasExecutableRoomCapacity(ctx.registry.iter())) {
+  if (created.executor && !created.executor.reserveWorkerSlot()) {
     created.executor.dispose()
     created.session.dispose()
     sendCommandError(ctx, 'executable room capacity reached', msg.requestId)
@@ -646,7 +654,7 @@ function handleJoinRoom(ctx: ConnectionCtx, msg: Extract<ClientCommand, { type: 
         () => room.session.getState(),
       )
       return useSessionResponse(response, (resp) => {
-        publishInitialState(ctx, room, resp, undefined, () => {
+        return publishInitialState(ctx, room, resp, undefined, () => {
           ctx.checkpoint.recordMeta(room)
           publishJoin()
         }, () => {
@@ -881,7 +889,7 @@ function handleNewGame(ctx: ConnectionCtx, msg: Extract<ClientCommand, { type: '
     sendCommandError(ctx, err instanceof Error ? err.message : String(err), msg.requestId)
     return
   }
-  if (created.executor && !hasExecutableRoomCapacity(ctx.registry.iter(), room)) {
+  if (created.executor && !created.executor.reserveWorkerSlot(room.customSessionExecutor)) {
     created.executor.dispose()
     created.session.dispose()
     sendCommandError(ctx, 'executable room capacity reached', msg.requestId)
@@ -933,7 +941,7 @@ function handleNewGame(ctx: ConnectionCtx, msg: Extract<ClientCommand, { type: '
     response,
     (resp) => {
       if (room.status === 'playing') {
-        publishInitialState(ctx, room, resp, msg.requestId, () => {}, () => {})
+        return publishInitialState(ctx, room, resp, msg.requestId, () => {}, () => {})
       } else {
         ctx.broadcaster.broadcastEvent(room, {
           type: 'roomWaiting',
@@ -1065,14 +1073,29 @@ const handlers: { [K in ClientCommand['type']]: Handler<Extract<ClientCommand, {
 export function dispatch(ctx: ConnectionCtx, msg: ClientCommand): void | Promise<void> {
   const fn = handlers[msg.type] as Handler | undefined
   if (!fn) { sendCommandError(ctx, `unknown command: ${msg.type}`, msg.requestId); return }
-  const room = msg.type === 'joinRoom' ? ctx.registry.get(msg.roomId) : ctx.currentRoom
-  if (!room?.customSessionExecutor) return fn(ctx, msg as never)
-  const result = (customRoomQueues.get(room) ?? Promise.resolve())
-    .then(() => fn(ctx, msg as never))
-  const tail = result.then(() => undefined, () => undefined)
-  customRoomQueues.set(room, tail)
-  void tail.then(() => {
-    if (customRoomQueues.get(room) === tail) customRoomQueues.delete(room)
-  })
+  const acceptedRoom = ctx.currentRoom
+  const acceptedPlayerIndex = ctx.currentPlayerIndex
+  const room = msg.type === 'joinRoom' ? ctx.registry.get(msg.roomId) : acceptedRoom
+  const queuedRoom = room && (
+    msg.type === 'newGame'
+    || !!room.customSessionExecutor
+    || customRoomQueues.has(room)
+  ) ? room : undefined
+  const pendingConnection = connectionQueues.get(ctx)
+  const pending = [
+    pendingConnection,
+    queuedRoom ? customRoomQueues.get(queuedRoom) : undefined,
+  ].filter((queue): queue is Promise<void> => !!queue)
+  const run = (): void | Promise<void> => {
+    if (ctx.currentRoom !== acceptedRoom || ctx.currentPlayerIndex !== acceptedPlayerIndex) {
+      sendCommandError(ctx, 'connection context changed before command ran', msg.requestId)
+      return
+    }
+    return fn(ctx, msg as never)
+  }
+  const result = pending.length > 0 ? Promise.all(pending).then(run) : run()
+  if (!(result instanceof Promise)) return
+  if (pendingConnection || queuedRoom) trackQueue(connectionQueues, ctx, result)
+  if (queuedRoom) trackQueue(customRoomQueues, queuedRoom, result)
   return result
 }

@@ -22,8 +22,12 @@ const WORKER_SCRIPT = path.resolve(
   'custom-session-worker-entry.mjs',
 )
 const COMMAND_TIMEOUT_MS = 10_000
-export const MAX_ACTIVE_CUSTOM_SESSION_WORKERS = 15
-const activeSessionWorkers = new Set<object>()
+const MAX_CUSTOM_SESSION_WORKER_SLOTS = 15
+const activeSessionWorkers = new Set<CustomSessionExecutor>()
+const reservedSessionWorkers = new Set<CustomSessionExecutor>()
+
+const claimedSessionWorkers = (): Set<CustomSessionExecutor> =>
+  new Set([...activeSessionWorkers, ...reservedSessionWorkers])
 
 export type CustomSessionMethod =
   | 'getState'
@@ -124,6 +128,16 @@ export class CustomSessionExecutor {
     this.customCards = customCards
   }
 
+  reserveWorkerSlot(replacing?: CustomSessionExecutor): boolean {
+    if (this.disposed) return false
+    if (reservedSessionWorkers.has(this)) return true
+    const claimed = claimedSessionWorkers()
+    if (replacing) claimed.delete(replacing)
+    if (claimed.size >= MAX_CUSTOM_SESSION_WORKER_SLOTS) return false
+    reservedSessionWorkers.add(this)
+    return true
+  }
+
   execute(method: CustomSessionMethod, args: unknown[]): Promise<SessionResponse> {
     const result = this.enqueue(async () => {
       try {
@@ -173,6 +187,7 @@ export class CustomSessionExecutor {
   dispose(): void {
     this.disposed = true
     activeSessionWorkers.delete(this)
+    reservedSessionWorkers.delete(this)
     void this.worker?.terminate()
     this.worker = null
     this.workerInitialized = false
@@ -203,7 +218,10 @@ export class CustomSessionExecutor {
   private ensureWorker(): Worker {
     if (this.disposed) throw new Error('custom session executor disposed')
     if (this.worker) return this.worker
-    if (activeSessionWorkers.size >= MAX_ACTIVE_CUSTOM_SESSION_WORKERS) {
+    if (
+      !reservedSessionWorkers.has(this)
+      && claimedSessionWorkers().size >= MAX_CUSTOM_SESSION_WORKER_SLOTS
+    ) {
       throw new Error('executable session worker capacity reached')
     }
     const worker = new Worker(WORKER_SCRIPT, {

@@ -61,6 +61,18 @@ afterEach(() => {
 })
 
 describe('custom session executor', () => {
+  it('shares the worker budget between room reservations and HTTP sessions', async () => {
+    const customCard = card('CUSTOM_Capacity')
+    const rooms = Array.from({ length: 14 }, () => setup(customCard))
+    rooms.forEach(({ executor }) => expect(executor.reserveWorkerSlot()).toBe(true))
+    const http = setup(customCard)
+    expect((await http.executor.execute('getState', [])).ok).toBe(true)
+
+    const nextRoom = setup(customCard)
+    expect(nextRoom.executor.reserveWorkerSlot()).toBe(false)
+    expect((await rooms[0]!.executor.execute('getState', [])).ok).toBe(true)
+  }, 15_000)
+
   it('keeps the event loop responsive and rolls back a timed-out command', async () => {
     const { session, executor } = setup(card('CUSTOM_Runaway', 'while (true) {}'))
     const woodBefore = session.state.players[0]!.resources.wood

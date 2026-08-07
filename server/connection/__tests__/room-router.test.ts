@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import { dispatch, hasExecutableRoomCapacity } from '../room-router.ts'
+import { dispatch } from '../room-router.ts'
 import { createConnectionCtx } from '../connection-ctx.ts'
 import { Broadcaster } from '../broadcaster.ts'
 import { RoomRegistry } from '../../game/room-registry.ts'
@@ -98,15 +98,6 @@ describe('handleCreateRoom', () => {
       error: 'room capacity reached',
       requestId: 'over-capacity',
     })
-  })
-
-  it('caps executable custom rooms at 15 worker pairs', () => {
-    const room = { customSessionExecutor: {} } as never
-    const rooms = Array.from({ length: 15 }, () => ({ customSessionExecutor: {} } as never))
-
-    expect(hasExecutableRoomCapacity(rooms.slice(0, 14))).toBe(true)
-    expect(hasExecutableRoomCapacity(rooms)).toBe(false)
-    expect(hasExecutableRoomCapacity([room, ...rooms.slice(0, 14)], room)).toBe(true)
   })
 
   it('checkpoints created rooms with state and host metadata', () => {
@@ -757,6 +748,91 @@ describe('custom room command queue', () => {
     await Promise.all([first, second])
     expect(execute).toHaveBeenCalledTimes(2)
     expect(commit).toHaveBeenCalledTimes(2)
+  })
+
+  it('keeps a rematch queued through initial durable persistence', async () => {
+    const deps = newDeps()
+    const host = newCtx(deps)
+    host.currentUserId = 'u1'
+    dispatch(host, { type: 'createRoom', maxPlayers: 2, name: 'host' })
+    const guest = newCtx(deps)
+    guest.currentUserId = 'u2'
+    dispatch(guest, { type: 'joinRoom', roomId: host.currentRoom!.id, name: 'guest' })
+
+    let pending = false
+    let publishReady: ((result: {
+      kind: 'committed'
+      roomVersion: number
+      stepNo: number
+      frameHash: string
+    }) => void) | undefined
+    let waiter: ((error?: string) => void) | undefined
+    const committer = {
+      canCreateRoom: () => ({ ok: true }),
+      hasReplay: () => false,
+      retireRoom: vi.fn(),
+      lockNewRoom: vi.fn(),
+      prepareRoom: (_room: unknown, options: { onReady?: typeof publishReady }) => {
+        pending = true
+        publishReady = options.onReady
+        return { kind: 'blocked' as const, error: 'disk busy' }
+      },
+      blockedError: () => pending ? 'disk busy' : undefined,
+      isRetrying: () => pending,
+      isRecording: () => false,
+      waitUntilReady: (_roomId: string, callback: (error?: string) => void) => {
+        waiter = callback
+        return true
+      },
+    } as never
+    host.committer = committer
+    guest.committer = committer
+
+    const rematch = Promise.resolve(dispatch(host, { type: 'newGame', seed: 309 }))
+    const takeAction = vi.spyOn(host.currentRoom!.session, 'takeAction')
+    const action = Promise.resolve(dispatch(guest, { type: 'action', spaceId: 'forest' }))
+
+    expect(takeAction).not.toHaveBeenCalled()
+    pending = false
+    publishReady?.({ kind: 'committed', roomVersion: 0, stepNo: 0, frameHash: 'initial' })
+    waiter?.()
+    await Promise.all([rematch, action])
+    expect(takeAction).toHaveBeenCalledTimes(1)
+  })
+
+  it('finishes queued room commands before the same connection changes rooms', async () => {
+    const deps = newDeps()
+    const ctx = newCtx(deps)
+    dispatch(ctx, { type: 'createRoom', maxPlayers: 2, name: 'host' })
+    markRoomStarted(ctx)
+    const source = ctx.currentRoom!
+    const destinationHost = newCtx(deps)
+    dispatch(destinationHost, { type: 'createRoom', maxPlayers: 2, name: 'other' })
+    const destination = destinationHost.currentRoom!
+    const response = source.session.getState()
+    let releaseFirst: (response: typeof response) => void = () => {}
+    const firstResponse = new Promise<typeof response>((resolve) => {
+      releaseFirst = resolve
+    })
+    const execute = vi.fn()
+      .mockImplementationOnce(() => firstResponse)
+      .mockImplementation(() => Promise.resolve(source.session.getState()))
+    source.customSessionExecutor = {
+      session: source.session,
+      execute,
+      dispose: vi.fn(),
+    } as never
+
+    const first = Promise.resolve(dispatch(ctx, { type: 'action', spaceId: 'forest' }))
+    const second = Promise.resolve(dispatch(ctx, { type: 'action', spaceId: 'clay-pit' }))
+    const join = Promise.resolve(dispatch(ctx, { type: 'joinRoom', roomId: destination.id }))
+
+    expect(execute).toHaveBeenCalledTimes(1)
+    expect(ctx.currentRoom).toBe(source)
+    releaseFirst(response)
+    await Promise.all([first, second, join])
+    expect(execute).toHaveBeenCalledTimes(2)
+    expect(ctx.currentRoom).toBe(destination)
   })
 })
 

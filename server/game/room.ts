@@ -325,6 +325,7 @@ export const snapshotToRoom = (
   const created = createSessionFromSnapshot(snapshot, customCards, () => {
     snapshotRehydrationFailed = true
   })
+  created.executor?.reserveWorkerSlot()
   const session = created.session
   return {
     id: snapshot.id,
