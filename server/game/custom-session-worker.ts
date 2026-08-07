@@ -37,12 +37,10 @@ type Success = {
 
 let session: GameSession | null = null
 let customCards: CustomCardData[] = []
-let committed: SerializedGameState | null = null
 
 const restore = (serialized: SerializedGameState): void => {
   session?.dispose()
   session = new GameSession(rehydrateState(serialized), customCards)
-  committed = serialized
 }
 
 const dispatch = (method: CustomSessionMethod, args: unknown[]): { response: SessionResponse; raw?: unknown } => {
@@ -74,37 +72,54 @@ const dispatch = (method: CustomSessionMethod, args: unknown[]): { response: Ses
   return { response: raw as SessionResponse }
 }
 
+const buildResult = (response: SessionResponse) => {
+  if (!session) throw new Error('custom session worker is not initialized')
+  const debug = session.buildSyncPayload(response, null, 'debug')
+  const spectator = session.buildSyncPayload(response, null)
+  const viewers = Object.fromEntries(response.state.players.map((player) => [
+    player.id,
+    session!.buildSyncPayload(response, player.id),
+  ]))
+  const { state: _state, ...responseWithoutState } = response
+  return {
+    response: responseWithoutState,
+    serialized: debug.state,
+    payloads: { debug, spectator, viewers },
+  }
+}
+
 parentPort?.on('message', (request: Request) => {
+  let checkpoint: ReturnType<GameSession['createCommandCheckpoint']> | null = null
   try {
     if (request.init) {
       customCards = request.init.customCards
       restore(request.init.serialized)
     }
-    if (!session || !committed) throw new Error('custom session worker is not initialized')
+    if (!session) throw new Error('custom session worker is not initialized')
     const warningCount = session.cardWarnings.length
+    checkpoint = session.createCommandCheckpoint()
     const { response, raw } = session.withCtx(() => dispatch(request.method, request.args))
-    const debug = session.buildSyncPayload(response, null, 'debug')
-    const spectator = session.buildSyncPayload(response, null)
-    const viewers = Object.fromEntries(response.state.players.map((player) => [
-      player.id,
-      session!.buildSyncPayload(response, player.id),
-    ]))
     const warnings = session.cardWarnings.slice(warningCount)
     if (warnings.length > 0) throw new Error(warnings.join('; '))
-    const { state: _state, ...responseWithoutState } = response
-    committed = debug.state
     const result: Success = {
       id: request.id,
       ok: true,
-      response: responseWithoutState,
-      serialized: committed,
-      payloads: { debug, spectator, viewers },
+      ...buildResult(response),
       ...(raw === undefined ? {} : { raw }),
     }
     parentPort?.postMessage(result)
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error)
-    if (committed) restore(committed)
-    parentPort?.postMessage({ id: request.id, ok: false, error: message })
+    if (!session || !checkpoint) {
+      parentPort?.postMessage({ id: request.id, ok: false, error: message })
+      return
+    }
+    try {
+      session.restoreCommandCheckpoint(checkpoint)
+      const response = { ...session.getState(), ok: false, error: message }
+      parentPort?.postMessage({ id: request.id, ok: false, error: message, ...buildResult(response) })
+    } catch {
+      parentPort?.postMessage({ id: request.id, ok: false, error: message })
+    }
   }
 })

@@ -14,4 +14,8 @@ export class LogStore {
   clear() {
     this.entries = []
   }
+
+  restore(entries: LogEntry[]) {
+    this.entries = [...entries]
+  }
 }

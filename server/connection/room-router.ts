@@ -37,6 +37,8 @@ const DRAFT_POOL_SIZE_DEFAULT = 7
 const DRAFT_POOL_SIZE_MIN = 7
 const DRAFT_POOL_SIZE_MAX = 10
 const MAX_ORDINARY_ROOMS = 30
+const MAX_EXECUTABLE_CUSTOM_ROOMS = 15
+const customRoomQueues = new WeakMap<Room, Promise<void>>()
 
 type DraftRoomOptions = { draftMode: 'simultaneous'; draftPoolSize: number }
 
@@ -209,7 +211,7 @@ const publishCommandResponse = (
   response: SessionResponse,
   command: ClientCommand,
   cause: StateUpdateCause,
-): void => {
+): void | Promise<void> => {
   if (!response.ok) {
     ctx.broadcaster.sendStateTo(ctx.ws, room, response, command.requestId, cause)
     return
@@ -244,7 +246,11 @@ const publishCommandResponse = (
     notifyPersistencePaused(ctx, room)
     if (!ctx.committer.isRetrying(room.id)) {
       sendCommandError(ctx, result.error, command.requestId)
+      return
     }
+    return new Promise((resolve) => {
+      if (!ctx.committer?.waitUntilReady(room.id, () => resolve())) resolve()
+    })
   }
 }
 
@@ -340,8 +346,15 @@ const executeRoomSession = (
 
 const useSessionResponse = (
   result: SessionResponse | Promise<SessionResponse>,
-  use: (response: SessionResponse) => void,
+  use: (response: SessionResponse) => void | Promise<void>,
 ): void | Promise<void> => result instanceof Promise ? result.then(use) : use(result)
+
+export const hasExecutableRoomCapacity = (
+  rooms: Iterable<Pick<Room, 'customSessionExecutor'>>,
+  except?: Pick<Room, 'customSessionExecutor'>,
+): boolean => [...rooms]
+  .filter((room) => room !== except && room.customSessionExecutor)
+  .length < MAX_EXECUTABLE_CUSTOM_ROOMS
 
 function handleAuth(ctx: ConnectionCtx, msg: Extract<ClientCommand, { type: 'auth' }>): void {
   if (!msg.token) {
@@ -421,6 +434,12 @@ function handleCreateRoom(ctx: ConnectionCtx, msg: Extract<ClientCommand, { type
     )
   } catch (err) {
     sendCommandError(ctx, err instanceof Error ? err.message : String(err), msg.requestId)
+    return
+  }
+  if (created.executor && !hasExecutableRoomCapacity(ctx.registry.iter())) {
+    created.executor.dispose()
+    created.session.dispose()
+    sendCommandError(ctx, 'executable room capacity reached', msg.requestId)
     return
   }
   const room: Room = {
@@ -862,8 +881,19 @@ function handleNewGame(ctx: ConnectionCtx, msg: Extract<ClientCommand, { type: '
     sendCommandError(ctx, err instanceof Error ? err.message : String(err), msg.requestId)
     return
   }
+  if (created.executor && !hasExecutableRoomCapacity(ctx.registry.iter(), room)) {
+    created.executor.dispose()
+    created.session.dispose()
+    sendCommandError(ctx, 'executable room capacity reached', msg.requestId)
+    return
+  }
   const nextRoomId = generateRoomId(ctx, fixedDevRoomRootId(previousRoomId))
-  if (!nextRoomId) { sendCommandError(ctx, 'unable to allocate room id', msg.requestId); return }
+  if (!nextRoomId) {
+    created.executor?.dispose()
+    created.session.dispose()
+    sendCommandError(ctx, 'unable to allocate room id', msg.requestId)
+    return
+  }
   if (!completedGame) ctx.checkpoint.discardRoom(previousRoomId)
   ctx.registry.delete(previousRoomId)
   ctx.registry.clearActivity(previousRoomId)
@@ -1035,5 +1065,14 @@ const handlers: { [K in ClientCommand['type']]: Handler<Extract<ClientCommand, {
 export function dispatch(ctx: ConnectionCtx, msg: ClientCommand): void | Promise<void> {
   const fn = handlers[msg.type] as Handler | undefined
   if (!fn) { sendCommandError(ctx, `unknown command: ${msg.type}`, msg.requestId); return }
-  return fn(ctx, msg as never)
+  const room = msg.type === 'joinRoom' ? ctx.registry.get(msg.roomId) : ctx.currentRoom
+  if (!room?.customSessionExecutor) return fn(ctx, msg as never)
+  const result = (customRoomQueues.get(room) ?? Promise.resolve())
+    .then(() => fn(ctx, msg as never))
+  const tail = result.then(() => undefined, () => undefined)
+  customRoomQueues.set(room, tail)
+  void tail.then(() => {
+    if (customRoomQueues.get(room) === tail) customRoomQueues.delete(room)
+  })
+  return result
 }

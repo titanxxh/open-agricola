@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import { dispatch } from '../room-router.ts'
+import { dispatch, hasExecutableRoomCapacity } from '../room-router.ts'
 import { createConnectionCtx } from '../connection-ctx.ts'
 import { Broadcaster } from '../broadcaster.ts'
 import { RoomRegistry } from '../../game/room-registry.ts'
@@ -98,6 +98,15 @@ describe('handleCreateRoom', () => {
       error: 'room capacity reached',
       requestId: 'over-capacity',
     })
+  })
+
+  it('caps executable custom rooms at 15 worker pairs', () => {
+    const room = { customSessionExecutor: {} } as never
+    const rooms = Array.from({ length: 15 }, () => ({ customSessionExecutor: {} } as never))
+
+    expect(hasExecutableRoomCapacity(rooms.slice(0, 14))).toBe(true)
+    expect(hasExecutableRoomCapacity(rooms)).toBe(false)
+    expect(hasExecutableRoomCapacity([room, ...rooms.slice(0, 14)], room)).toBe(true)
   })
 
   it('checkpoints created rooms with state and host metadata', () => {
@@ -692,6 +701,62 @@ describe('waiting-room write guard', () => {
       error: 'game has not started',
       requestId: 'waiting-action',
     })
+  })
+})
+
+describe('custom room command queue', () => {
+  it('waits for durable commit completion before dispatching the next command', async () => {
+    const ctx = newCtx()
+    ctx.currentUserId = 'u1'
+    dispatch(ctx, { type: 'createRoom', maxPlayers: 2, name: 'host' })
+    markRoomStarted(ctx)
+    const room = ctx.currentRoom!
+    const execute = vi.fn(async () => room.session.getState())
+    room.customSessionExecutor = { session: room.session, execute, dispose: vi.fn() } as never
+
+    let pending = false
+    let commitCount = 0
+    let finishCommit: (() => void) | undefined
+    let waiter: ((error?: string) => void) | undefined
+    const commit = vi.fn((
+      _room: unknown,
+      _response: unknown,
+      _intent: unknown,
+      _playerIndex: unknown,
+      onCommitted?: (result: { kind: 'committed'; roomVersion: number; stepNo: number; frameHash: string }) => void,
+    ) => {
+      commitCount += 1
+      if (commitCount > 1) {
+        return { kind: 'committed' as const, roomVersion: 2, stepNo: 2, frameHash: 'second' }
+      }
+      pending = true
+      finishCommit = () => {
+        pending = false
+        onCommitted?.({ kind: 'committed', roomVersion: 1, stepNo: 1, frameHash: 'first' })
+        waiter?.()
+      }
+      return { kind: 'blocked' as const, error: 'disk busy' }
+    })
+    ctx.committer = {
+      blockedError: () => pending ? 'disk busy' : undefined,
+      isRecording: () => true,
+      commit,
+      isRetrying: () => pending,
+      waitUntilReady: (_roomId: string, callback: (error?: string) => void) => {
+        waiter = callback
+        return true
+      },
+    } as never
+
+    const first = Promise.resolve(dispatch(ctx, { type: 'action', spaceId: 'forest' }))
+    const second = Promise.resolve(dispatch(ctx, { type: 'action', spaceId: 'clay-pit' }))
+    await vi.waitFor(() => expect(commit).toHaveBeenCalledTimes(1))
+
+    expect(execute).toHaveBeenCalledTimes(1)
+    finishCommit?.()
+    await Promise.all([first, second])
+    expect(execute).toHaveBeenCalledTimes(2)
+    expect(commit).toHaveBeenCalledTimes(2)
   })
 })
 

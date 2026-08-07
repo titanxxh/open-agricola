@@ -8,14 +8,18 @@ import {
 
 const executors: CustomSessionExecutor[] = []
 
-const card = (cardId: string, listenerBody = 'return undefined'): CustomCardData => {
+const card = (
+  cardId: string,
+  listenerBody = 'return undefined',
+  listenerAction = 'collect',
+): CustomCardData => {
   const compiled = validateAndCompileCustomCode(`
 const CARD_ID = '${cardId}'
 const CARD_DEF = MinorImprovement({ id: CARD_ID, name: 'Worker Card' })
 const CARD_IMPL = {
   listeners: [{
     cardIds: [CARD_ID],
-    actions: ['collect'],
+    actions: ['${listenerAction}'],
     phases: ['after'],
     handler: () => { ${listenerBody} },
   }],
@@ -37,8 +41,8 @@ const CARD_IMPL = {
   }
 }
 
-const setup = (customCard: CustomCardData) => {
-  const created = createIsolatedGameSession(42, [customCard], { playerCount: 2 })
+const setup = (customCard: CustomCardData, extraCards: CustomCardData[] = []) => {
+  const created = createIsolatedGameSession(42, [customCard, ...extraCards], { playerCount: 2 })
   expect(created.executor).toBeDefined()
   const executor = created.executor!
   executors.push(executor)
@@ -89,6 +93,37 @@ describe('custom session executor', () => {
     ])).toBe('healthy')
     expect((await healthy).ok).toBe(true)
     expect((await stalled).ok).toBe(false)
+  })
+
+  it('preserves undo history after a failed custom command', async () => {
+    const playable: CustomCardData = {
+      cardType: 'minor',
+      cardJson: {
+        id: 'CUSTOM_Playable',
+        name: 'Playable',
+        deck: 'CUSTOM',
+        number: 1,
+        desc: [],
+      },
+    }
+    const { session, executor } = setup(
+      card('CUSTOM_UndoAfterFailure', 'while (true) {}', 'improvement'),
+      [playable],
+    )
+    session.state.players[0]!.minorHand = [playable.cardJson.id]
+    session.loadState(session.state)
+    const played = await executor.execute('takeAction', [0, 'meeting-place'])
+    expect(played.ok).toBe(true)
+    expect(played.historyLength).toBeGreaterThan(0)
+    expect(played.interaction.stateId).toBe('wait')
+
+    const failed = await executor.execute('resolveChoice', [0, 'action-improvement-1'])
+    expect(failed.ok).toBe(false)
+    expect(failed.historyLength).toBeGreaterThan(0)
+    expect(failed.interaction).toEqual(played.interaction)
+    expect(failed.state.players[0]!.minorHand).toContain(playable.cardJson.id)
+
+    expect((await executor.execute('undoStep', [])).ok).toBe(true)
   })
 
   it('serializes commands within one session', async () => {

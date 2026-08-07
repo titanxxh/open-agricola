@@ -66,18 +66,21 @@ type WorkerPayloads = {
   viewers: Record<string, GameSyncPayload>
 }
 
-type WorkerResponse = {
-  id: number
-  ok: true
+type WorkerState = {
   response: Omit<SessionResponse, 'state'>
   serialized: SerializedGameState
   payloads: WorkerPayloads
+}
+
+type WorkerResponse = {
+  id: number
+  ok: true
   raw?: unknown
-} | {
+} & WorkerState | {
   id: number
   ok: false
   error: string
-}
+} & Partial<WorkerState>
 
 const payloadsByResponse = new WeakMap<SessionResponse, WorkerPayloads>()
 
@@ -123,12 +126,16 @@ export class CustomSessionExecutor {
     const result = this.enqueue(async () => {
       try {
         const message = await this.request(method, args)
-        if (!message.ok) return this.failed(message.error)
-        this.lastSerialized = message.serialized
-        this.session.withCtx(() => this.session.loadState(rehydrateState(message.serialized)))
-        const response: SessionResponse = { ...message.response, state: this.session.state }
-        payloadsByResponse.set(response, message.payloads)
-        return response
+        if (!message.ok) {
+          return message.response && message.serialized && message.payloads
+            ? this.applyWorkerState({
+                response: message.response,
+                serialized: message.serialized,
+                payloads: message.payloads,
+              })
+            : this.failed(message.error)
+        }
+        return this.applyWorkerState(message)
       } catch (error) {
         return this.failed(error instanceof Error ? error.message : String(error))
       }
@@ -146,9 +153,17 @@ export class CustomSessionExecutor {
   async query<T>(method: 'getAvailableActions' | 'validateFarmChoice', args: unknown[]): Promise<T> {
     return this.enqueue(async () => {
       const message = await this.request(method, args)
-      if (!message.ok) throw new Error(message.error)
-      this.lastSerialized = message.serialized
-      this.session.withCtx(() => this.session.loadState(rehydrateState(message.serialized)))
+      if (!message.ok) {
+        if (message.response && message.serialized && message.payloads) {
+          this.applyWorkerState({
+            response: message.response,
+            serialized: message.serialized,
+            payloads: message.payloads,
+          })
+        }
+        throw new Error(message.error)
+      }
+      this.applyWorkerState(message)
       return message.raw as T
     })
   }
@@ -169,6 +184,14 @@ export class CustomSessionExecutor {
   private failed(error: string): SessionResponse {
     const response = this.session.withCtx(() => this.session.getState())
     return { ...response, ok: false, error }
+  }
+
+  private applyWorkerState(message: WorkerState): SessionResponse {
+    this.lastSerialized = message.serialized
+    this.session.withCtx(() => this.session.loadState(rehydrateState(message.serialized)))
+    const response: SessionResponse = { ...message.response, state: this.session.state }
+    payloadsByResponse.set(response, message.payloads)
+    return response
   }
 
   private ensureWorker(): Worker {

@@ -309,6 +309,21 @@ type HistoryEntry = {
   undoBoundary?: boolean
 }
 
+type SessionCommandCheckpoint = {
+  state: GameState
+  engineStackCursor: EngineStackCursor
+  history: HistoryEntry[]
+  actionStartIndex: number | null
+  actionStartPlayerSnapshot: PlayerState | null
+  actionResultDetailsSinceFlush: { gains: Partial<Resource>; costs: Partial<Resource> }
+  responsePrivateEvents: PrivateGameEvent[]
+  deferPrivateEventDrainDepth: number
+  nextActionToken: number
+  turnOwnerPlayerIndex: number | null
+  engineLog: ReturnType<LogStore['all']>
+  cardWarningCount: number
+}
+
 export type SessionResponse = {
   ok: boolean
   state: GameState
@@ -818,6 +833,46 @@ export class GameCore {
    */
   getEngineStack(): EngineStack {
     return this.engineStack
+  }
+
+  createCommandCheckpoint(): SessionCommandCheckpoint {
+    return this.withCtx(() => ({
+      state: cloneState(this.state),
+      engineStackCursor: structuredClone(this.engineStack.toCursor()),
+      history: this.history.slice(),
+      actionStartIndex: this.actionStartIndex,
+      actionStartPlayerSnapshot: this.actionStartPlayerSnapshot
+        ? this.clonePlayer(this.actionStartPlayerSnapshot)
+        : null,
+      actionResultDetailsSinceFlush: structuredClone(this.actionResultDetailsSinceFlush),
+      responsePrivateEvents: structuredClone(this.responsePrivateEvents),
+      deferPrivateEventDrainDepth: this.deferPrivateEventDrainDepth,
+      nextActionToken: this.nextActionToken,
+      turnOwnerPlayerIndex: this.turnOwnerPlayerIndex,
+      engineLog: structuredClone(this.engineLog.all()),
+      cardWarningCount: this.cardWarnings.length,
+    }))
+  }
+
+  restoreCommandCheckpoint(checkpoint: SessionCommandCheckpoint): void {
+    this.withCtx(() => {
+      this.state = cloneState(checkpoint.state)
+      this.syncDynamicActionSpaces()
+      this.engineStack.clear()
+      if (checkpoint.engineStackCursor.frames.length > 0) {
+        this.restoreEngineStackFromCursor(checkpoint.engineStackCursor)
+      }
+      this.history = checkpoint.history
+      this.actionStartIndex = checkpoint.actionStartIndex
+      this.actionStartPlayerSnapshot = checkpoint.actionStartPlayerSnapshot
+      this.actionResultDetailsSinceFlush = checkpoint.actionResultDetailsSinceFlush
+      this.responsePrivateEvents = checkpoint.responsePrivateEvents
+      this.deferPrivateEventDrainDepth = checkpoint.deferPrivateEventDrainDepth
+      this.nextActionToken = checkpoint.nextActionToken
+      this.turnOwnerPlayerIndex = checkpoint.turnOwnerPlayerIndex
+      this.engineLog.restore(checkpoint.engineLog)
+      this.cardWarnings.length = checkpoint.cardWarningCount
+    })
   }
 
   private restoreEngineStackFromCursor(cursor: EngineStackCursor): void {

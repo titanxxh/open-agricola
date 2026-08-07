@@ -1137,7 +1137,7 @@ ClientCommand
 - 终局 Frame 额外归档权威 `PlayerScoreSummary[]`；历史 Viewer 在 `gameOver` Step 复用只读 `ScoringPad` 展示分类、卡牌加分与总分。
 - Replay Intent 由协议边界的穷尽 switch 白名单化；不保存 `requestId`、token、站点 `userId`、任意原始 WebSocket 消息或未校验 payload。
 - 写失败冻结同一 Frame/Intent，Room 进入 blocked 并拒绝新游戏命令；按 1/2/5/10/30 秒、随后每 30 秒重试。暂停期间重连者等待，不读取未提交内存状态。幂等键相同但 Hash 不同永久阻断并报警。
-- 单实例上限为 30 个普通内存 Room，`waiting` 与 `playing` 都计数，固定 dev Room 排除。达到上限只拒绝新建；已有 Room 恢复和净数量不变的 `newGame` 继续允许。内置卡房间不创建会话 Worker，也不增加房间分片、Redis 或外部队列。
+- 单实例上限为 30 个普通内存 Room，`waiting` 与 `playing` 都计数，固定 dev Room 排除。可执行 Workshop Room 因“会话 Worker + 代码 Worker”双 Worker 形态另限 15 个；命令 FIFO 覆盖会话执行直到 Durable Commit 完成。达到上限只拒绝需要新增对应资源的 Room / `newGame`。内置卡房间不创建会话 Worker，也不增加房间分片、Redis 或外部队列。
 
 完成 Replay 与 Bug Report 使用 ADR-0013 的公开/私有读取契约。GitHub 提交以 SQLite draft、稳定 `submissionId`、attempt 行和原子 claim 实现可恢复执行；生产 GitHub App client 与测试 fake 是 true-external seam 的两个 adapter。
 
@@ -1153,7 +1153,7 @@ server/custom-code/
 └── client.ts            主进程 → Worker Thread 同步调用客户端
 ```
 
-主后端只保存 `compiled_code + code_manifest`。尚未内置的可执行 Workshop 卡在 HTTP sandbox 和 WS community room 中各自拥有一个 `CustomSessionExecutor`：整个 `GameSession` 命令进入专用 Worker，房间内按 FIFO 串行，不同房间并行；主线程只保留最后成功快照的无执行代码镜像，用于广播、持久化和座位校验。Worker 内部继续由 `client.ts` 同步调用 isolated-vm，因此 `Atomics.wait()` 不会运行在 HTTP/WS event loop；hook 超时或 runtime warning 会丢弃当前命令，Worker 崩溃或总超时则终止并从最后成功快照重建。已随源码发布并标记 `built_in=1` 的卡直接走内置实现，不创建该 Worker。浏览器本地 Workshop sandbox 的 Worker 与恢复流程不变。沙盒约束唯一真源 → `docs/CUSTOM_CARD_SANDBOX.md`（含 `prompt-sync:begin/end` 标记块，`pnpm run check:prompt-sync` 校验）。
+主后端只保存 `compiled_code + code_manifest`。尚未内置的可执行 Workshop 卡在 HTTP sandbox 和 WS community room 中各自拥有一个 `CustomSessionExecutor`：整个 `GameSession` 命令进入专用 Worker，房间内按 FIFO 串行到 Durable Commit 完成，不同房间并行；主线程只保留最后成功快照的无执行代码镜像，用于广播、持久化和座位校验。Worker 内部继续由 `client.ts` 同步调用 isolated-vm，因此 `Atomics.wait()` 不会运行在 HTTP/WS event loop；每条命令前保留含 pending/undo history 的内存 checkpoint，hook 超时或 runtime warning 恢复该 checkpoint，Worker 崩溃或总超时则终止并从最后成功快照重建。已随源码发布并标记 `built_in=1` 的卡直接走内置实现，不创建该 Worker。浏览器本地 Workshop sandbox 的 Worker 与恢复流程不变。沙盒约束唯一真源 → `docs/CUSTOM_CARD_SANDBOX.md`（含 `prompt-sync:begin/end` 标记块，`pnpm run check:prompt-sync` 校验）。
 
 ### 11.5 HTTP 端点
 
