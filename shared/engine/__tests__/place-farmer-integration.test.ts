@@ -11,7 +11,6 @@ import type { Resource } from '../../contract/types'
 import { markAllWorkersUsed, setWorkersAtHome, workersAvailable } from '../../domain/player'
 import { CardRegistry } from '../../../shared/cards/registry'
 import { setActiveCardRegistry, requireActiveCardRegistry } from '../../../shared/cards/active-registry'
-import type { CardListenerContext } from '../../cards/card-listeners'
 const createState = (overrides: Partial<GameState> = {}): GameState => ({
   round: 1,
   currentPlayerIndex: 0,
