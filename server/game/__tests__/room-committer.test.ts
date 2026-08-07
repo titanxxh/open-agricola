@@ -5,6 +5,7 @@ import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type Database from 'better-sqlite3'
 import '../../../shared/cards/C/C104_Collector.ts'
+import { serializeState } from '../../../shared/session/serialization.ts'
 import { GameSession } from '../authoritative-session.ts'
 import { encodeReplayFrame, type JsonValue } from '../replay-codec.ts'
 import { ReplayStore } from '../replay-store.ts'
@@ -256,6 +257,37 @@ describe('RoomCommitter', () => {
         intent_json: '{"resources":{"food":3}}',
       },
     ])
+  })
+
+  it('persists the serialized frame produced by the custom session worker', () => {
+    const room = makeRoom()
+    let serialized = serializeState(room.session.state, {
+      engineStack: room.session.getEngineStack(),
+    })
+    serialized.players[0]!.pastureCapacities = { worker: 7 }
+    room.customSessionExecutor = {
+      serializedStateForPersistence: () => serialized,
+    } as NonNullable<Room['customSessionExecutor']>
+    const committer = createCommitter()
+
+    expect(committer.prepareRoom(room, { missingPrefix: false })).toMatchObject({
+      kind: 'committed',
+      stepNo: 0,
+    })
+    expect(persistence.loadReplayFrame(room.id)?.players[0]!.pastureCapacities)
+      .toEqual({ worker: 7 })
+
+    const response = room.session.devSetResources(0, { food: 1 })
+    serialized = serializeState(room.session.state, {
+      engineStack: room.session.getEngineStack(),
+    })
+    serialized.players[0]!.pastureCapacities = { worker: 8 }
+    expect(committer.commit(room, response, actionIntent!, 0)).toMatchObject({
+      kind: 'committed',
+      stepNo: 1,
+    })
+    expect(persistence.loadReplayFrame(room.id)?.players[0]!.pastureCapacities)
+      .toEqual({ worker: 8 })
   })
 
   it('archives the authoritative score breakdown in the game-over frame', () => {

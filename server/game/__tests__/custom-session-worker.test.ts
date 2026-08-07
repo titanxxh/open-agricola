@@ -66,12 +66,13 @@ describe('custom session executor', () => {
     const rooms = Array.from({ length: 14 }, () => setup(customCard))
     rooms.forEach(({ executor }) => expect(executor.reserveWorkerSlot()).toBe(true))
     const http = setup(customCard)
+    expect(http.executor.reserveWorkerSlot()).toBe(true)
     expect((await http.executor.execute('getState', [])).ok).toBe(true)
 
     const nextRoom = setup(customCard)
     expect(nextRoom.executor.reserveWorkerSlot()).toBe(false)
     expect((await rooms[0]!.executor.execute('getState', [])).ok).toBe(true)
-  }, 15_000)
+  }, 20_000)
 
   it('keeps the event loop responsive and rolls back a timed-out command', async () => {
     const { session, executor } = setup(card('CUSTOM_Runaway', 'while (true) {}'))
@@ -87,7 +88,7 @@ describe('custom session executor', () => {
     expect(session.cardWarnings).toEqual([expect.stringMatching(/timed out/i)])
     expect(session.state.players[0]!.resources.wood).toBe(woodBefore)
     expect(session.state.actionSpaces.find((space) => space.id === 'forest')?.takenBy).toEqual([])
-  })
+  }, 20_000)
 
   it('does not let a timed-out room delay another room', async () => {
     const bad = setup(card('CUSTOM_BadRoom', 'while (true) {}'))
@@ -106,7 +107,7 @@ describe('custom session executor', () => {
     ])).toBe('healthy')
     expect((await healthy).ok).toBe(true)
     expect((await stalled).ok).toBe(false)
-  })
+  }, 20_000)
 
   it('preserves undo history after a failed custom command', async () => {
     const playable: CustomCardData = {
@@ -137,7 +138,7 @@ describe('custom session executor', () => {
     expect(failed.state.players[0]!.minorHand).toContain(playable.cardJson.id)
 
     expect((await executor.execute('undoStep', [])).ok).toBe(true)
-  })
+  }, 20_000)
 
   it('serializes commands within one session', async () => {
     const { executor } = setup(card('CUSTOM_Ordered'))

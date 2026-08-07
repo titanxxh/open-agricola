@@ -112,12 +112,6 @@ export const disposeSandboxSessionsUsingCard = (cardDbId: string): number => {
   return disposed
 }
 
-/** Call a session method with its card context active. */
-const callSession = <T>(req: IncomingMessage, fn: (session: GameSession) => T): T => {
-  const session = getSessionForRequest(req)
-  return session.withCtx(() => fn(session))
-}
-
 /**
  * Resolve the caller's chosen viewer (seat) for privacy filtering + seat binding.
  *
@@ -503,11 +497,12 @@ export const handleGameRoute = async (
   if (req.method === 'GET' && req.url?.startsWith('/api/game/actions')) {
     const url = new URL(req.url, 'http://localhost')
     const playerIndex = Number(url.searchParams.get('playerIndex') ?? '0')
+    const session = getSessionForRequest(req)
     const executor = sessionExecutors.get(getSessionKey(req))
     try {
       const actions = executor
         ? await executor.query<{ spaceId: string; nameKey: string }[]>('getAvailableActions', [playerIndex])
-        : callSession(req, s => s.getAvailableActions(playerIndex))
+        : session.withCtx(() => session.getAvailableActions(playerIndex))
       sendJson(res, 200, { ok: true, actions })
     } catch (error) {
       sendJson(res, 400, { ok: false, error: error instanceof Error ? error.message : String(error) })
@@ -548,6 +543,7 @@ export const handleGameRoute = async (
       playerId: string
       payload: Record<string, unknown>
     }
+    const session = getSessionForRequest(req)
     const executor = sessionExecutors.get(getSessionKey(req))
     try {
       const validation = executor
@@ -556,7 +552,7 @@ export const handleGameRoute = async (
           [body.type, body.playerId, body.payload],
         )
         : validateFarmChoice(
-          callSession(req, s => s.getStateForRead()),
+          session.withCtx(() => session.getStateForRead()),
           body.type,
           body.playerId,
           body.payload,
@@ -726,6 +722,14 @@ export const handleGameRoute = async (
       },
     )
     const sandboxSession = created.session
+    if (created.executor && !created.executor.reserveWorkerSlot(
+      sessionExecutors.get(getSessionKey(req)),
+    )) {
+      created.executor.dispose()
+      sandboxSession.dispose()
+      sendJson(res, 503, { ok: false, error: 'executable session worker capacity reached' })
+      return true
+    }
     setSessionForRequest(req, sandboxSession, loadedCardDbIds, created.executor)
     const { result } = await callAndRespond(req, 'getState', [], s => s.getState())
     sendJson(res, 200, {

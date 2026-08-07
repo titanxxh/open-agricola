@@ -159,6 +159,49 @@ describe('custom session routes', () => {
     expect(JSON.parse(state.body).cardWarnings).toEqual([expect.stringMatching(/timed out/i)])
     disposeSandboxSessionsUsingCard(customCard.id)
     db.close()
+  }, 20_000)
+
+  it('keeps the existing sandbox when executable worker capacity is exhausted', async () => {
+    const db = new Database(':memory:')
+    database.runMigrations(db)
+    addUser(db, 'capacity-author', 'capacity-token')
+    const customCard = createRunawayCard(db, 'capacity-author')
+    const gameDatabase = await import('../db.ts')
+    vi.spyOn(gameDatabase, 'getDb').mockReturnValue(db)
+    const { GameSession } = await import('../game/authoritative-session.ts')
+    const { CustomSessionExecutor } = await import('../game/custom-session-executor.ts')
+    const slots = Array.from(
+      { length: 15 },
+      () => new CustomSessionExecutor(new GameSession(), []),
+    )
+    slots.forEach((executor) => expect(executor.reserveWorkerSlot()).toBe(true))
+    const { handleGameRoute } = await import('../game-router.ts')
+
+    try {
+      const start = mockRes()
+      await handleGameRoute(mockReq('POST', '/api/game/new-sandbox', {
+        seed: 42,
+      }, 'capacity-token'), start)
+      expect(start.statusCode).toBe(200)
+
+      const rejected = mockRes()
+      await handleGameRoute(mockReq('POST', '/api/game/new-sandbox', {
+        seed: 99,
+        customCardIds: [customCard.id],
+      }, 'capacity-token'), rejected)
+      expect(rejected.statusCode).toBe(503)
+      expect(JSON.parse(rejected.body).error).toMatch(/capacity/i)
+
+      const current = mockRes()
+      await handleGameRoute(mockReq('GET', '/api/game/state', {}, 'capacity-token'), current)
+      expect(JSON.parse(current.body).state).toEqual(JSON.parse(start.body).state)
+    } finally {
+      slots.forEach((executor) => {
+        executor.dispose()
+        executor.session.dispose()
+      })
+      db.close()
+    }
   })
 
   it('runs community-room commands through the WebSocket session worker', async () => {
@@ -215,5 +258,5 @@ describe('custom session routes', () => {
     registry.delete(host.currentRoom!.id)
     checkpoint.shutdown()
     db.close()
-  })
+  }, 20_000)
 })

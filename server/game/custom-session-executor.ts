@@ -166,6 +166,10 @@ export class CustomSessionExecutor {
     return this.session.withCtx(() => this.session.getState())
   }
 
+  serializedStateForPersistence(): SerializedGameState | null {
+    return this.lastSerialized
+  }
+
   async query<T>(method: 'getAvailableActions' | 'validateFarmChoice', args: unknown[]): Promise<T> {
     return this.enqueue(async () => {
       const message = await this.request(method, args)
