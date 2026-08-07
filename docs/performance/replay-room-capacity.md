@@ -45,4 +45,4 @@ At 30 Rooms and 170,267-byte states, 98 accepted commands passed with action p99
 
 ## Decision
 
-Keep the hard limit at 30 ordinary `waiting + playing` Rooms per 2 CPU / 2 GiB instance. Fixed development Rooms are excluded. Within that total, keep executable Workshop Rooms at 15 because each owns a session Worker whose code runtime owns another Worker. Raise either limit only after the same production-path probe passes with the corresponding Room shape.
+Keep the hard limit at 30 ordinary `waiting + playing` Rooms per 2 CPU / 2 GiB instance. Fixed development Rooms are excluded. Within that total, keep newly created executable Workshop Rooms at 15 because each owns a session Worker whose code runtime owns another Worker; a process-wide 15-session-Worker limit also covers restored Rooms and HTTP sandboxes. Raise either limit only after the same production-path probe passes with the corresponding Room shape.

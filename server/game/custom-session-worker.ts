@@ -90,6 +90,7 @@ const buildResult = (response: SessionResponse) => {
 
 parentPort?.on('message', (request: Request) => {
   let checkpoint: ReturnType<GameSession['createCommandCheckpoint']> | null = null
+  let commandWarnings: string[] = []
   try {
     if (request.init) {
       customCards = request.init.customCards
@@ -99,8 +100,8 @@ parentPort?.on('message', (request: Request) => {
     const warningCount = session.cardWarnings.length
     checkpoint = session.createCommandCheckpoint()
     const { response, raw } = session.withCtx(() => dispatch(request.method, request.args))
-    const warnings = session.cardWarnings.slice(warningCount)
-    if (warnings.length > 0) throw new Error(warnings.join('; '))
+    commandWarnings = session.cardWarnings.slice(warningCount)
+    if (commandWarnings.length > 0) throw new Error(commandWarnings.join('; '))
     const result: Success = {
       id: request.id,
       ok: true,
@@ -116,6 +117,7 @@ parentPort?.on('message', (request: Request) => {
     }
     try {
       session.restoreCommandCheckpoint(checkpoint)
+      session.cardWarnings.push(...commandWarnings)
       const response = { ...session.getState(), ok: false, error: message }
       parentPort?.postMessage({ id: request.id, ok: false, error: message, ...buildResult(response) })
     } catch {

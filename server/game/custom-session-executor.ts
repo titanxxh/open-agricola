@@ -22,6 +22,8 @@ const WORKER_SCRIPT = path.resolve(
   'custom-session-worker-entry.mjs',
 )
 const COMMAND_TIMEOUT_MS = 10_000
+export const MAX_ACTIVE_CUSTOM_SESSION_WORKERS = 15
+const activeSessionWorkers = new Set<object>()
 
 export type CustomSessionMethod =
   | 'getState'
@@ -170,6 +172,7 @@ export class CustomSessionExecutor {
 
   dispose(): void {
     this.disposed = true
+    activeSessionWorkers.delete(this)
     void this.worker?.terminate()
     this.worker = null
     this.workerInitialized = false
@@ -189,6 +192,9 @@ export class CustomSessionExecutor {
   private applyWorkerState(message: WorkerState): SessionResponse {
     this.lastSerialized = message.serialized
     this.session.withCtx(() => this.session.loadState(rehydrateState(message.serialized)))
+    for (const warning of message.payloads.debug.cardWarnings ?? []) {
+      if (!this.session.cardWarnings.includes(warning)) this.session.cardWarnings.push(warning)
+    }
     const response: SessionResponse = { ...message.response, state: this.session.state }
     payloadsByResponse.set(response, message.payloads)
     return response
@@ -197,6 +203,9 @@ export class CustomSessionExecutor {
   private ensureWorker(): Worker {
     if (this.disposed) throw new Error('custom session executor disposed')
     if (this.worker) return this.worker
+    if (activeSessionWorkers.size >= MAX_ACTIVE_CUSTOM_SESSION_WORKERS) {
+      throw new Error('executable session worker capacity reached')
+    }
     const worker = new Worker(WORKER_SCRIPT, {
       resourceLimits: {
         maxOldGenerationSizeMb: 256,
@@ -205,8 +214,15 @@ export class CustomSessionExecutor {
       },
     })
     worker.unref()
+    activeSessionWorkers.add(this)
     this.worker = worker
     this.workerInitialized = false
+    worker.once('exit', () => {
+      if (this.worker !== worker) return
+      this.worker = null
+      this.workerInitialized = false
+      activeSessionWorkers.delete(this)
+    })
     return worker
   }
 
@@ -244,6 +260,7 @@ export class CustomSessionExecutor {
         if (this.worker !== worker) return
         this.worker = null
         this.workerInitialized = false
+        activeSessionWorkers.delete(this)
         void worker.terminate()
       }
       const onMessage = (message: WorkerResponse): void => {

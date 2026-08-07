@@ -152,6 +152,11 @@ describe('custom session routes', () => {
     expect(action.statusCode).toBe(400)
     expect(payload.error).toMatch(/timed out/i)
     expect(payload.state.actionSpaces.find((space: { id: string }) => space.id === 'forest').takenBy).toEqual([])
+    expect(payload.cardWarnings).toEqual([expect.stringMatching(/timed out/i)])
+
+    const state = mockRes()
+    await handleGameRoute(mockReq('GET', '/api/game/state', {}, 'sandbox-token'), state)
+    expect(JSON.parse(state.body).cardWarnings).toEqual([expect.stringMatching(/timed out/i)])
     disposeSandboxSessionsUsingCard(customCard.id)
     db.close()
   })

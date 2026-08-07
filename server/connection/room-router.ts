@@ -30,6 +30,7 @@ import {
 } from '../game/room-committer.ts'
 import {
   createIsolatedGameSession,
+  MAX_ACTIVE_CUSTOM_SESSION_WORKERS,
   type CustomSessionMethod,
 } from '../game/custom-session-executor.ts'
 
@@ -37,7 +38,6 @@ const DRAFT_POOL_SIZE_DEFAULT = 7
 const DRAFT_POOL_SIZE_MIN = 7
 const DRAFT_POOL_SIZE_MAX = 10
 const MAX_ORDINARY_ROOMS = 30
-const MAX_EXECUTABLE_CUSTOM_ROOMS = 15
 const customRoomQueues = new WeakMap<Room, Promise<void>>()
 
 type DraftRoomOptions = { draftMode: 'simultaneous'; draftPoolSize: number }
@@ -354,7 +354,7 @@ export const hasExecutableRoomCapacity = (
   except?: Pick<Room, 'customSessionExecutor'>,
 ): boolean => [...rooms]
   .filter((room) => room !== except && room.customSessionExecutor)
-  .length < MAX_EXECUTABLE_CUSTOM_ROOMS
+  .length < MAX_ACTIVE_CUSTOM_SESSION_WORKERS
 
 function handleAuth(ctx: ConnectionCtx, msg: Extract<ClientCommand, { type: 'auth' }>): void {
   if (!msg.token) {

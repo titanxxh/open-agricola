@@ -72,6 +72,7 @@ describe('custom session executor', () => {
 
     expect(response.ok).toBe(false)
     expect(response.error).toMatch(/timed out/i)
+    expect(session.cardWarnings).toEqual([expect.stringMatching(/timed out/i)])
     expect(session.state.players[0]!.resources.wood).toBe(woodBefore)
     expect(session.state.actionSpaces.find((space) => space.id === 'forest')?.takenBy).toEqual([])
   })
