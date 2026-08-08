@@ -308,6 +308,34 @@ describe('RoomCommitter', () => {
       .toEqual(JSON.parse(JSON.stringify(response.scores)))
   })
 
+  it('uses worker-produced scores in the durable result archive', () => {
+    const room = makeRoom()
+    const serialized = serializeState(room.session.state, {
+      engineStack: room.session.getEngineStack(),
+    })
+    const workerScores = room.session.getState().scores!.map((score, index) => ({
+      ...score,
+      total: 100 + index,
+    }))
+    room.customSessionExecutor = {
+      serializedStateForPersistence: () => serialized,
+      scoresForPersistence: () => workerScores,
+    } as never
+    const committer = createCommitter()
+    committer.prepareRoom(room, { missingPrefix: false })
+    room.session.state.gameOver = true
+    const response = { ...room.session.getState(), scores: workerScores }
+
+    expect(committer.commit(room, response, actionIntent!, 0)).toMatchObject({
+      kind: 'committed',
+      stepNo: 1,
+    })
+    expect(db.prepare(`
+      SELECT score FROM game_result_players
+      WHERE room_id = ? ORDER BY player_index
+    `).all(room.id)).toEqual([{ score: 100 }, { score: 101 }])
+  })
+
   it('copies custom card art into content-addressed replay storage', () => {
     const cardArtRoot = join(tempDir, 'card-art')
     const assetRoot = join(tempDir, 'replay-assets')

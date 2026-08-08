@@ -196,6 +196,25 @@ describe('Room Persistence Checkpoint', () => {
     expect(clock.pending()).toBe(0)
   })
 
+  it('archives final scores produced by the custom session worker', () => {
+    const persistence = new InMemoryRoomPersistence()
+    const checkpoint = createRoomPersistenceCheckpoint({ persistence })
+    const finished = room('finished')
+    finished.startedAt = 10
+    finished.session.state.gameOver = true
+    const workerScores = finished.session.getState().scores!.map((score, index) => ({
+      ...score,
+      total: 100 + index,
+    }))
+    finished.customSessionExecutor = {
+      scoresForPersistence: () => workerScores,
+    } as never
+
+    expect(checkpoint.completeGame(finished, 20).ok).toBe(true)
+    expect(persistence.__getResultForTest('finished')?.players.map((player) => player.score))
+      .toEqual([100, 101])
+  })
+
   it('flushes all dirty rooms and disposes the timer on shutdown', () => {
     const persistence = new InMemoryRoomPersistence()
     const save = vi.spyOn(persistence, 'save')

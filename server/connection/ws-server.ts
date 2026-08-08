@@ -265,6 +265,9 @@ const handleConnection = (ws: WebSocket, req: IncomingMessage, deps: ConnectionD
           playerIndex: ctx.currentPlayerIndex,
         })
       } else if (removal === 'empty') {
+        if (ctx.currentRoom.session.state.gameOver && ctx.currentRoom.customSessionExecutor) {
+          ctx.currentRoom.customSessionExecutor.dispose()
+        }
         const now = Date.now()
         deps.registry.touchActivity(ctx.currentRoom.id, now)
         deps.gameContextStore?.setActiveExpiry(

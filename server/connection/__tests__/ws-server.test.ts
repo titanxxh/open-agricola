@@ -308,6 +308,30 @@ describe('room-manager ws sync', () => {
     expect(save).toHaveBeenCalledOnce()
   })
 
+  it('disposes a completed custom executor when the last socket disconnects', async () => {
+    const ws = new WebSocket(baseUrl) as TestSocket
+    ws.received = []
+    attachCollector(ws)
+    sockets.push(ws)
+    await waitForOpen(ws)
+    ws.send(JSON.stringify({ type: 'createRoom', name: 'P1', maxPlayers: 2 }))
+    const created = await waitForEvent(
+      ws,
+      (event): event is Extract<ServerEvent, { type: 'roomCreated' }> => event.type === 'roomCreated',
+    )
+    const room = wsServerResult.registry.get(created.roomId)!
+    const dispose = vi.fn()
+    room.session.state.gameOver = true
+    room.customSessionExecutor = { dispose } as never
+
+    const closed = new Promise<void>((resolve) => ws.once('close', () => resolve()))
+    ws.close()
+    await closed
+
+    expect(dispose).toHaveBeenCalledOnce()
+    expect(room.customSessionExecutor).toBeDefined()
+  })
+
   it('accepts createRoom over websocket when oa_session cookie is valid', async () => {
     process.env.ALLOW_ANONYMOUS_WS = 'false'
     vi.resetModules()

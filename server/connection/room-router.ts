@@ -923,45 +923,51 @@ function handleNewGame(ctx: ConnectionCtx, msg: Extract<ClientCommand, { type: '
     sendCommandError(ctx, 'unable to allocate room id', msg.requestId)
     return
   }
-  if (!completedGame) ctx.checkpoint.discardRoom(previousRoomId)
-  ctx.registry.delete(previousRoomId)
-  ctx.registry.clearActivity(previousRoomId)
-  ctx.committer?.retireRoom(previousRoomId)
-  room.id = nextRoomId
-  room.session = created.session
-  if (created.executor) room.customSessionExecutor = created.executor
-  else delete room.customSessionExecutor
-  room.version = 0
-  room.seatOwners = room.players.flatMap((player) =>
-    player.userId
-      ? [{ playerIndex: player.playerIndex, userId: player.userId }]
-      : []
-  )
-  room.status = isDevRoom(room.id) || roomOccupiedSeatCount(room) >= room.maxPlayers ? 'playing' : 'waiting'
-  room.startedAt = room.status === 'playing' ? Date.now() : undefined
-  room.enableParentCards = enableParentCards
-  room.draftMode = draftMode
-  room.draftPoolSize = draftPoolSize
-  room.enableThroughTheSeasons = enableThroughTheSeasons
-  room.enableFarmersOfTheMoor = enableFarmersOfTheMoor
-  room.allowIncompleteFarmersOfTheMoorMinorDeal = allowIncompleteFarmersOfTheMoorMinorDeal
-  room.customCardDbIds = reloaded.loadedDbIds
-  room.customCards = customCards
-  ctx.committer?.lockNewRoom(room)
   const names = room.players.map((player) => [player.playerIndex, player.name] as [number, string])
   let response: SessionResponse | Promise<SessionResponse>
-  if (room.customSessionExecutor) {
-    response = room.customSessionExecutor.execute('updatePlayerNames', [names])
+  if (created.executor) {
+    response = created.executor.execute('updatePlayerNames', [names])
   } else {
-    for (const [playerIndex, name] of names) room.session.updatePlayerName(playerIndex, name)
-    response = room.session.withCtx(() => room.session.getState())
+    for (const [playerIndex, name] of names) created.session.updatePlayerName(playerIndex, name)
+    response = created.session.withCtx(() => created.session.getState())
   }
-  ctx.registry.set(room)
-  ctx.registry.touchActivity(room.id, Date.now())
-  ctx.checkpoint.recordCreated(room)
   return useSessionResponse(
     response,
     (resp) => {
+      if (!resp.ok) {
+        created.executor?.dispose()
+        created.session.dispose()
+        sendCommandError(ctx, resp.error ?? 'unable to initialize game', msg.requestId)
+        return
+      }
+      if (!completedGame) ctx.checkpoint.discardRoom(previousRoomId)
+      ctx.registry.delete(previousRoomId)
+      ctx.registry.clearActivity(previousRoomId)
+      ctx.committer?.retireRoom(previousRoomId)
+      room.id = nextRoomId
+      room.session = created.session
+      if (created.executor) room.customSessionExecutor = created.executor
+      else delete room.customSessionExecutor
+      room.version = 0
+      room.seatOwners = room.players.flatMap((player) =>
+        player.userId
+          ? [{ playerIndex: player.playerIndex, userId: player.userId }]
+          : []
+      )
+      room.status = isDevRoom(room.id) || roomOccupiedSeatCount(room) >= room.maxPlayers ? 'playing' : 'waiting'
+      room.startedAt = room.status === 'playing' ? Date.now() : undefined
+      room.enableParentCards = enableParentCards
+      room.draftMode = draftMode
+      room.draftPoolSize = draftPoolSize
+      room.enableThroughTheSeasons = enableThroughTheSeasons
+      room.enableFarmersOfTheMoor = enableFarmersOfTheMoor
+      room.allowIncompleteFarmersOfTheMoorMinorDeal = allowIncompleteFarmersOfTheMoorMinorDeal
+      room.customCardDbIds = reloaded.loadedDbIds
+      room.customCards = customCards
+      ctx.committer?.lockNewRoom(room)
+      ctx.registry.set(room)
+      ctx.registry.touchActivity(room.id, Date.now())
+      ctx.checkpoint.recordCreated(room)
       if (room.status === 'playing') {
         return publishInitialState(ctx, room, resp, msg.requestId, () => {}, () => {})
       } else {

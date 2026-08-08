@@ -7,6 +7,7 @@ import { InMemoryRoomPersistence } from '../../game/persistence/memory-adapter.t
 import { createLobby } from '../../game/lobby.ts'
 import { createRoomPersistenceCheckpoint } from '../../game/room-persistence-checkpoint.ts'
 import { snapshotToRoom } from '../../game/room.ts'
+import { GameSession } from '../../game/authoritative-session.ts'
 import type { GameState } from '../../../shared/contract/types.ts'
 import type { CustomCardData } from '../../../shared/cards/session-card-context.ts'
 
@@ -213,6 +214,46 @@ describe('handleCreateRoom', () => {
     expect(sentMessagesOf(ctx)).toContainEqual({
       type: 'error',
       error: 'unable to allocate room id',
+      requestId: 'new-1',
+    })
+  })
+
+  it('keeps the prior room when rematch initialization fails', () => {
+    const deps = newDeps()
+    const ctx = newCtx(deps)
+    ctx.currentUserId = 'u1'
+    dispatch(ctx, { type: 'createRoom', maxPlayers: 2 })
+    const room = ctx.currentRoom!
+    const previousRoomId = room.id
+    const previousSession = room.session
+    const dispose = vi.fn()
+    room.customSessionExecutor = {
+      session: room.session,
+      execute: vi.fn(),
+      dispose,
+    } as never
+    markRoomStarted(ctx)
+    const failedResponse = {
+      ...previousSession.getState(),
+      ok: false,
+      error: 'worker initialization failed',
+    }
+    const getState = vi.spyOn(GameSession.prototype, 'getState')
+      .mockReturnValueOnce(failedResponse)
+    try {
+      dispatch(ctx, { type: 'newGame', seed: 309, requestId: 'new-1' })
+    } finally {
+      getState.mockRestore()
+    }
+
+    expect(ctx.currentRoom).toBe(room)
+    expect(room.id).toBe(previousRoomId)
+    expect(room.session).toBe(previousSession)
+    expect(deps.registry.get(previousRoomId)).toBe(room)
+    expect(dispose).not.toHaveBeenCalled()
+    expect(sentMessagesOf(ctx)).toContainEqual({
+      type: 'error',
+      error: 'worker initialization failed',
       requestId: 'new-1',
     })
   })

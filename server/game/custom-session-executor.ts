@@ -119,6 +119,7 @@ export class CustomSessionExecutor {
   private worker: Worker | null = null
   private workerInitialized = false
   private lastSerialized: SerializedGameState | null = null
+  private lastScores: SessionResponse['scores']
   private nextId = 0
   private queue: Promise<void> = Promise.resolve()
   private disposed = false
@@ -174,6 +175,10 @@ export class CustomSessionExecutor {
     return this.lastSerialized
   }
 
+  scoresForPersistence(): SessionResponse['scores'] {
+    return this.lastScores
+  }
+
   async query<T>(method: 'getAvailableActions' | 'validateFarmChoice', args: unknown[]): Promise<T> {
     return this.enqueue(async () => {
       const message = await this.request(method, args)
@@ -215,6 +220,7 @@ export class CustomSessionExecutor {
 
   private applyWorkerState(message: WorkerState): SessionResponse {
     this.lastSerialized = message.serialized
+    this.lastScores = message.response.scores
     this.session.withCtx(() => {
       this.session.loadState(rehydrateState(message.serialized))
       this.session.restoreCommandCheckpoint(message.checkpoint)

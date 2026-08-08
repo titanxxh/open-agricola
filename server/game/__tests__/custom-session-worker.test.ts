@@ -153,7 +153,9 @@ describe('custom session executor', () => {
     const read = executor.execute('getState', [])
 
     expect((await action).ok).toBe(true)
-    expect((await read).state.actionSpaces.find((space) => space.id === 'forest')?.takenBy)
+    const response = await read
+    expect(response.state.actionSpaces.find((space) => space.id === 'forest')?.takenBy)
       .toHaveLength(1)
+    expect(executor.scoresForPersistence()).toEqual(response.scores)
   })
 })
