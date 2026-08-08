@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { CustomCardData } from '../../../shared/cards/session-card-context.ts'
 import { validateAndCompileCustomCode } from '../../custom-code/engine.ts'
 import {
+  buildSessionSyncPayload,
   createIsolatedGameSession,
   type CustomSessionExecutor,
 } from '../custom-session-executor.ts'
@@ -12,11 +13,13 @@ const card = (
   cardId: string,
   listenerBody = 'return undefined',
   listenerAction = 'collect',
+  effectBody = '',
 ): CustomCardData => {
   const compiled = validateAndCompileCustomCode(`
 const CARD_ID = '${cardId}'
 const CARD_DEF = MinorImprovement({ id: CARD_ID, name: 'Worker Card' })
 const CARD_IMPL = {
+  ${effectBody ? `effect: { id: CARD_ID, ${effectBody} },` : ''}
   listeners: [{
     cardIds: [CARD_ID],
     actions: ['${listenerAction}'],
@@ -122,7 +125,12 @@ describe('custom session executor', () => {
       },
     }
     const { session, executor } = setup(
-      card('CUSTOM_UndoAfterFailure', 'while (true) {}', 'improvement'),
+      card(
+        'CUSTOM_UndoAfterFailure',
+        'while (true) {}',
+        'improvement',
+        'computeBonusScore: () => 50',
+      ),
       [playable],
     )
     session.state.players[0]!.minorHand = [playable.cardJson.id]
@@ -131,6 +139,7 @@ describe('custom session executor', () => {
     expect(played.ok).toBe(true)
     expect(played.historyLength).toBeGreaterThan(0)
     expect(played.interaction.stateId).toBe('wait')
+    const playedPayload = buildSessionSyncPayload(session, played, null, 'debug')
 
     vi.useFakeTimers()
     const failedPromise = executor.execute('resolveChoice', [0, 'action-improvement-1'])
@@ -143,6 +152,13 @@ describe('custom session executor', () => {
     expect(failed.interaction).toEqual(played.interaction)
     expect(failed.state.players[0]!.minorHand).toContain(playable.cardJson.id)
     expect(session.cardWarnings).toContain('custom session command timed out')
+    expect(buildSessionSyncPayload(session, failed, null, 'debug')).toMatchObject({
+      ok: false,
+      error: 'custom session command timed out',
+      scores: playedPayload.scores,
+      state: playedPayload.state,
+      cardWarnings: ['custom session command timed out'],
+    })
 
     expect((await executor.execute('undoStep', [])).ok).toBe(true)
   }, 20_000)

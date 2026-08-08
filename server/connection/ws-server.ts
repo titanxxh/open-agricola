@@ -387,6 +387,7 @@ export function createWsServer(
     committer?.shutdown()
     checkpoint.shutdown()
     clearInterval(cleanupTimer)
+    for (const room of registry.iter()) registry.delete(room.id)
     for (const client of wss.clients) client.close(1001, 'server shutdown')
     wss.close()
   }

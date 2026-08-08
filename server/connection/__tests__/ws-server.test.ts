@@ -187,6 +187,22 @@ describe('fixed dev room startup persistence', () => {
   })
 })
 
+describe('server shutdown', () => {
+  it('disposes room executors and clears the registry', () => {
+    const result = createWsServer(createServer(), {
+      persistence: new InMemoryRoomPersistence(),
+    })
+    const room = result.registry.get('dev2')!
+    const dispose = vi.fn()
+    room.customSessionExecutor = { dispose } as never
+
+    result.shutdown()
+
+    expect(dispose).toHaveBeenCalledOnce()
+    expect(result.registry.size()).toBe(0)
+  })
+})
+
 const waitForOpen = async (ws: WebSocket): Promise<void> => {
   await new Promise<void>((resolve) => ws.once('open', () => resolve()))
 }

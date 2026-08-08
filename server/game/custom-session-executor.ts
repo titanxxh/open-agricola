@@ -120,6 +120,7 @@ export class CustomSessionExecutor {
   private workerInitialized = false
   private lastSerialized: SerializedGameState | null = null
   private lastScores: SessionResponse['scores']
+  private lastPayloads: WorkerPayloads | null = null
   private nextId = 0
   private queue: Promise<void> = Promise.resolve()
   private disposed = false
@@ -214,13 +215,34 @@ export class CustomSessionExecutor {
   }
 
   private failed(error: string): SessionResponse {
-    const response = this.session.withCtx(() => this.session.getState())
-    return { ...response, ok: false, error }
+    const response: SessionResponse = {
+      ...this.session.withCtx(() => this.session.getState()),
+      ok: false,
+      error,
+    }
+    if (this.lastPayloads) {
+      const failed = (payload: GameSyncPayload): GameSyncPayload => ({
+        ...payload,
+        ok: false,
+        error,
+      })
+      payloadsByResponse.set(response, {
+        debug: {
+          ...failed(this.lastPayloads.debug),
+          cardWarnings: [...this.session.cardWarnings],
+        },
+        spectator: failed(this.lastPayloads.spectator),
+        viewers: Object.fromEntries(Object.entries(this.lastPayloads.viewers)
+          .map(([playerId, payload]) => [playerId, failed(payload)])),
+      })
+    }
+    return response
   }
 
   private applyWorkerState(message: WorkerState): SessionResponse {
     this.lastSerialized = message.serialized
     this.lastScores = message.response.scores
+    this.lastPayloads = message.payloads
     this.session.withCtx(() => {
       this.session.loadState(rehydrateState(message.serialized))
       this.session.restoreCommandCheckpoint(message.checkpoint)
