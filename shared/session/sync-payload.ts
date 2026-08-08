@@ -5,9 +5,10 @@
  */
 import type { GameSyncPayload } from '../contract/protocol/game.ts'
 import {
+  filterSerializedStateForPlayer,
   filterPublicEventCancellationsForPlayer,
   serializeState,
-  serializeStateForPlayer,
+  type SerializedGameState,
 } from './serialization.ts'
 import { privateEventsForViewer } from './interaction-privacy.ts'
 import { redactInteractionForViewer } from './interaction-state-adapter.ts'
@@ -20,13 +21,15 @@ export function buildSyncPayload(
   resp: SessionResponse,
   viewerPlayerId: string | null,
   mode: SyncPayloadMode = 'viewer',
+  serializedState?: SerializedGameState,
 ): GameSyncPayload {
   const ctx = { engineStack: core.getEngineStack() }
   const defs = core.getCustomCardDefs()
+  const canonicalState = serializedState ?? serializeState(resp.state, ctx)
   const base: GameSyncPayload = {
     state: mode === 'debug'
-      ? serializeState(resp.state, ctx)
-      : serializeStateForPlayer(resp.state, viewerPlayerId, ctx),
+      ? canonicalState
+      : filterSerializedStateForPlayer(canonicalState, viewerPlayerId),
     interaction: mode === 'debug'
       ? resp.interaction
       : redactInteractionForViewer(
@@ -53,7 +56,13 @@ export function buildSyncPayload(
     : privateEventsForViewer(resp.interaction, playerIds, viewerPlayerId, resp.privateEvents ?? [])
   const publicEventCancellations = mode === 'debug'
     ? resp.publicEventCancellations
-    : filterPublicEventCancellationsForPlayer(resp.state, viewerPlayerId, ctx, resp.publicEventCancellations)
+    : filterPublicEventCancellationsForPlayer(
+      resp.state,
+      viewerPlayerId,
+      ctx,
+      resp.publicEventCancellations,
+      canonicalState,
+    )
 
   if (privateEvents.length > 0) base.privateEvents = privateEvents
   if (publicEventCancellations?.length) base.publicEventCancellations = publicEventCancellations

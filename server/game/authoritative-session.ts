@@ -8,6 +8,7 @@
  */
 import type { GameState } from '../../shared/contract/types.ts'
 import type { GameSyncPayload } from '../../shared/contract/protocol/game.ts'
+import type { SerializedGameState } from '../../shared/session/serialization.ts'
 import type { InitialStateOptions } from '../../shared/session/state-bootstrap.ts'
 import type { CustomCardData } from '../../shared/cards/session-card-context.ts'
 import { GameCore, type SessionResponse as CoreSessionResponse, type StateWithCursor } from '../../shared/session/session-core.ts'
@@ -36,7 +37,8 @@ export class GameSession extends GameCore {
     resp: CoreSessionResponse,
     viewerPlayerId: string | null,
     mode: SyncPayloadMode = 'viewer',
+    serializedState?: SerializedGameState,
   ): GameSyncPayload {
-    return buildSyncPayload(this, resp, viewerPlayerId, mode)
+    return buildSyncPayload(this, resp, viewerPlayerId, mode, serializedState)
   }
 }

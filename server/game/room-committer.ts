@@ -164,9 +164,10 @@ const replayFrame = (
   serialized: SerializedGameState
   frame: JsonValue
 } => {
-  const serialized = serializeState(room.session.state, {
-    engineStack: room.session.getEngineStack(),
-  })
+  const serialized = room.customSessionExecutor?.serializedStateForPersistence()
+    ?? serializeState(room.session.state, {
+      engineStack: room.session.getEngineStack(),
+    })
   const frame = JSON.parse(JSON.stringify(
     scores === undefined ? serialized : { ...serialized, scores },
   )) as JsonValue

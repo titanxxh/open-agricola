@@ -7,7 +7,7 @@
 
 ADR-0010 至 ADR-0013 已固定公开回放、delta 链、GitHub 身份和 Game Context 访问契约，但当前连接层会先发送 `StateUpdateEnvelope`，再把 Room 标脏并延迟约一秒保存。这样无法保证玩家已经看到的步骤可在崩溃后恢复，也没有一个模块同时协调 Room 快照、Replay Step、结果归档和失败暂停。
 
-代表性真实命令与 Replay 写入的 2 CPU / 2 GiB 探针中，30 Room 的 action p99 为 88.5ms、CPU 为 83.6%，35 Room 的 action p99 升至 371.6ms、CPU 为 96.1%。首发上限因此固定为 30，不增加 Worker 或房间分片。
+代表性真实命令与 Replay 写入的 2 CPU / 2 GiB 探针中，30 Room 的 action p99 为 88.5ms、CPU 为 83.6%，35 Room 的 action p99 升至 371.6ms、CPU 为 96.1%。该探针没有加载可执行 Workshop 卡；这类卡后来采用每 Room 一个会话 Worker、Worker 内一个代码执行 Worker 的双 Worker 形态。
 
 ## Decision
 
@@ -23,8 +23,8 @@ ADR-0010 至 ADR-0013 已固定公开回放、delta 链、GitHub 身份和 Game 
 
 ### Capacity and process shape
 
-8. 首发保持单进程、同步 SQLite 提交，不增加 Worker、房间分片、Redis 或通用异步命令队列。一个 `ready | blocked` 的 Room 写入状态门阻止重试与新命令交错。
-9. 2 CPU / 2 GiB 单实例最多保留 30 个普通内存 Room，`waiting` 与 `playing` 都计数，固定 dev Room 不计数。达到上限只拒绝新建，恢复已有 Room 和净数量不变的 `newGame` 仍允许。实现完成后必须用同一 25/30/35 真实命令探针和 30 Room late-state 检查复验。
+8. 内置卡 Room 保持主进程内执行与同步 SQLite 提交，不增加房间分片、Redis 或通用异步命令队列。尚未内置的可执行 Workshop 卡使用 Room 专属会话 Worker；该 Room 的命令队列必须覆盖会话执行、广播准备和 Durable Commit 完成，同一连接的换房 / 换座也不得越过在途命令，一个 `ready | blocked` 写入状态门阻止重试与新命令交错。
+9. 2 CPU / 2 GiB 单实例最多保留 30 个普通内存 Room，`waiting` 与 `playing` 都计数，固定 dev Room 不计数。由于每个可执行 Workshop session 最多占两个 Worker，在没有同形态容量探针前，可执行 Room 另限 15 个；进程级 15 个会话 Worker 槽统一计算 Room 预留与活跃 HTTP sandbox，恢复 Room 在恢复时也参与预留。提高任一上限前必须用对应生产形态的真实命令探针复验。
 
 ### Storage and delivery
 
@@ -45,14 +45,14 @@ ADR-0010 至 ADR-0013 已固定公开回放、delta 链、GitHub 身份和 Game 
 ## Consequences
 
 - 已向玩家显示的成功状态一定有同事务的可恢复快照和 Replay Step；传输层不再决定持久化语义。
-- 首发容量为代表性 Replay 工作负载下留有 CPU 余量的 30 个普通内存 Room。
+- 首发容量为代表性 Replay 工作负载下留有 CPU 余量的 30 个普通内存 Room；其中双 Worker 的可执行 Workshop Room 保守限制为 15 个。
 - 当前一秒 debounce 仅可继续服务等待态元数据或旧 adapter；进行局成功步骤必须改走 Durable Room Commit。
 - 永久 Viewer Build、内容资源、删除 ledger 和兼容回滚成为生产部署的一部分，而不是普通前端构建的临时产物。
 
 ## Alternatives considered
 
 - **广播后异步保存**：拒绝。玩家看到的成功步骤可能在崩溃后消失。
-- **为更高容量增加 Worker 或分片**：拒绝。首发没有对应产品需求。
+- **用 Worker 或分片提高普通 Room 容量**：拒绝。可执行 Workshop 卡的 Worker 只承担不可信代码隔离，不用于提高容量。
 - **按玩家建立 Replay 链**：拒绝。权威 Frame 只有一份，视角应在读取时遮蔽。
 - **Redis 队列和独立提交 worker**：拒绝。当前单实例 SQLite 状态机已经能持久重试和对账。
 - **把历史 Viewer 放进每次覆盖的 GitHub Pages 构建**：拒绝。旧 Replay 引用的不可变 Viewer 会随部署消失。

@@ -27,7 +27,8 @@ const scheduler: RoomCheckpointScheduler = {
 
 export const buildGameResult = (room: Room, finishedAt: number): GameResult => {
   const state = room.session.state
-  const scores = Scoring.computeAll(state)
+  const scores = room.customSessionExecutor?.scoresForPersistence()
+    ?? Scoring.computeAll(state)
   const seatOwners = new Map(
     toRoomMeta(room).players.map((player) => [player.playerIndex, player.userId]),
   )

@@ -228,7 +228,16 @@ const handleConnection = (ws: WebSocket, req: IncomingMessage, deps: ConnectionD
       })
       return
     }
-    dispatch(ctx, msg)
+    const dispatched = dispatch(ctx, msg)
+    if (dispatched instanceof Promise) {
+      void dispatched.catch((error) => {
+        deps.broadcaster.sendTo(ws, {
+          type: 'error',
+          error: error instanceof Error ? error.message : String(error),
+          requestId: (msg as { requestId?: string }).requestId,
+        })
+      })
+    }
     if (ctx.currentUserId && ctx.currentUserId !== trackedUserId) {
       if (trackedUserId) untrack(trackedUserId)
       trackedUserId = ctx.currentUserId
@@ -256,6 +265,9 @@ const handleConnection = (ws: WebSocket, req: IncomingMessage, deps: ConnectionD
           playerIndex: ctx.currentPlayerIndex,
         })
       } else if (removal === 'empty') {
+        if (ctx.currentRoom.session.state.gameOver && ctx.currentRoom.customSessionExecutor) {
+          ctx.currentRoom.customSessionExecutor.dispose()
+        }
         const now = Date.now()
         deps.registry.touchActivity(ctx.currentRoom.id, now)
         deps.gameContextStore?.setActiveExpiry(
@@ -375,6 +387,7 @@ export function createWsServer(
     committer?.shutdown()
     checkpoint.shutdown()
     clearInterval(cleanupTimer)
+    for (const room of registry.iter()) registry.delete(room.id)
     for (const client of wss.clients) client.close(1001, 'server shutdown')
     wss.close()
   }

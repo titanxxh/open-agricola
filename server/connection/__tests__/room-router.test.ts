@@ -7,6 +7,7 @@ import { InMemoryRoomPersistence } from '../../game/persistence/memory-adapter.t
 import { createLobby } from '../../game/lobby.ts'
 import { createRoomPersistenceCheckpoint } from '../../game/room-persistence-checkpoint.ts'
 import { snapshotToRoom } from '../../game/room.ts'
+import { GameSession } from '../../game/authoritative-session.ts'
 import type { GameState } from '../../../shared/contract/types.ts'
 import type { CustomCardData } from '../../../shared/cards/session-card-context.ts'
 
@@ -184,6 +185,79 @@ describe('handleCreateRoom', () => {
     expect(ctx.currentRoom!.session.getCustomCardDefs()).toEqual([])
   })
 
+  it('keeps current custom card metadata when a rematch cannot allocate its room', () => {
+    const deps = newDeps()
+    const ctx = newCtx(deps)
+    ctx.currentUserId = 'u1'
+    dispatch(ctx, { type: 'createRoom', maxPlayers: 2 })
+    const room = ctx.currentRoom!
+    const customCard: CustomCardData = {
+      cardType: 'minor',
+      cardJson: {
+        id: 'CUSTOM_Pinned',
+        name: 'Pinned',
+        deck: 'CUSTOM',
+        number: 1,
+        desc: [],
+      },
+    }
+    room.customCardDbIds = ['deleted-card']
+    room.customCards = [customCard]
+    markRoomStarted(ctx)
+    vi.spyOn(deps.persistence, 'hasRoomId').mockReturnValue(true)
+
+    dispatch(ctx, { type: 'newGame', seed: 309, requestId: 'new-1' })
+
+    expect(ctx.currentRoom).toBe(room)
+    expect(room.customCardDbIds).toEqual(['deleted-card'])
+    expect(room.customCards).toEqual([customCard])
+    expect(sentMessagesOf(ctx)).toContainEqual({
+      type: 'error',
+      error: 'unable to allocate room id',
+      requestId: 'new-1',
+    })
+  })
+
+  it('keeps the prior room when rematch initialization fails', () => {
+    const deps = newDeps()
+    const ctx = newCtx(deps)
+    ctx.currentUserId = 'u1'
+    dispatch(ctx, { type: 'createRoom', maxPlayers: 2 })
+    const room = ctx.currentRoom!
+    const previousRoomId = room.id
+    const previousSession = room.session
+    const dispose = vi.fn()
+    room.customSessionExecutor = {
+      session: room.session,
+      execute: vi.fn(),
+      dispose,
+    } as never
+    markRoomStarted(ctx)
+    const failedResponse = {
+      ...previousSession.getState(),
+      ok: false,
+      error: 'worker initialization failed',
+    }
+    const getState = vi.spyOn(GameSession.prototype, 'getState')
+      .mockReturnValueOnce(failedResponse)
+    try {
+      dispatch(ctx, { type: 'newGame', seed: 309, requestId: 'new-1' })
+    } finally {
+      getState.mockRestore()
+    }
+
+    expect(ctx.currentRoom).toBe(room)
+    expect(room.id).toBe(previousRoomId)
+    expect(room.session).toBe(previousSession)
+    expect(deps.registry.get(previousRoomId)).toBe(room)
+    expect(dispose).not.toHaveBeenCalled()
+    expect(sentMessagesOf(ctx)).toContainEqual({
+      type: 'error',
+      error: 'worker initialization failed',
+      requestId: 'new-1',
+    })
+  })
+
   it('preserves direct Parent Card dealing when starting a new game', () => {
     const ctx = newCtx()
     ctx.currentUserId = 'u1'
@@ -260,6 +334,46 @@ describe('handleCreateRoom', () => {
       .map((entry) => entry.params?.player)
       .filter((player): player is string => typeof player === 'string')
     expect(new Set(loggedPlayerNames)).toEqual(new Set(['PlayerB', 'Bob']))
+  })
+
+  it('rolls back the final join when custom worker initialization fails', async () => {
+    const deps = newDeps()
+    const host = newCtx(deps)
+    host.currentUserId = 'u1'
+    dispatch(host, { type: 'createRoom', maxPlayers: 2, name: 'host' })
+    const room = host.currentRoom!
+    room.customSessionExecutor = {
+      session: room.session,
+      execute: vi.fn(async () => ({
+        ...room.session.getState(),
+        ok: false,
+        error: 'worker initialization failed',
+      })),
+      dispose: vi.fn(),
+    } as never
+    const playersBefore = [...room.players]
+    const seatOwnersBefore = [...(room.seatOwners ?? [])]
+    const guest = newCtx(deps)
+    guest.currentUserId = 'u2'
+
+    await dispatch(guest, {
+      type: 'joinRoom',
+      roomId: room.id,
+      name: 'guest',
+      requestId: 'join-1',
+    })
+
+    expect(room.status).toBe('waiting')
+    expect(room.startedAt).toBeUndefined()
+    expect(room.players).toEqual(playersBefore)
+    expect(room.seatOwners).toEqual(seatOwnersBefore)
+    expect(guest.currentRoom).toBeNull()
+    expect(sentMessagesOf(guest)).toContainEqual({
+      type: 'error',
+      error: 'worker initialization failed',
+      requestId: 'join-1',
+    })
+    expect(sentTypesOf(host)).not.toContain('gameStarted')
   })
 
   it('starts a full room when a disconnected owner still reserves a seat', () => {
@@ -692,6 +806,194 @@ describe('waiting-room write guard', () => {
       error: 'game has not started',
       requestId: 'waiting-action',
     })
+  })
+})
+
+describe('custom room command queue', () => {
+  it('waits for durable commit completion before dispatching the next command', async () => {
+    const ctx = newCtx()
+    ctx.currentUserId = 'u1'
+    dispatch(ctx, { type: 'createRoom', maxPlayers: 2, name: 'host' })
+    markRoomStarted(ctx)
+    const room = ctx.currentRoom!
+    const execute = vi.fn(async () => room.session.getState())
+    room.customSessionExecutor = { session: room.session, execute, dispose: vi.fn() } as never
+
+    let pending = false
+    let commitCount = 0
+    let finishCommit: (() => void) | undefined
+    let waiter: ((error?: string) => void) | undefined
+    const commit = vi.fn((
+      _room: unknown,
+      _response: unknown,
+      _intent: unknown,
+      _playerIndex: unknown,
+      onCommitted?: (result: { kind: 'committed'; roomVersion: number; stepNo: number; frameHash: string }) => void,
+    ) => {
+      commitCount += 1
+      if (commitCount > 1) {
+        return { kind: 'committed' as const, roomVersion: 2, stepNo: 2, frameHash: 'second' }
+      }
+      pending = true
+      finishCommit = () => {
+        pending = false
+        onCommitted?.({ kind: 'committed', roomVersion: 1, stepNo: 1, frameHash: 'first' })
+        waiter?.()
+      }
+      return { kind: 'blocked' as const, error: 'disk busy' }
+    })
+    ctx.committer = {
+      blockedError: () => pending ? 'disk busy' : undefined,
+      isRecording: () => true,
+      commit,
+      isRetrying: () => pending,
+      waitUntilReady: (_roomId: string, callback: (error?: string) => void) => {
+        waiter = callback
+        return true
+      },
+    } as never
+
+    const first = Promise.resolve(dispatch(ctx, { type: 'action', spaceId: 'forest' }))
+    const second = Promise.resolve(dispatch(ctx, { type: 'action', spaceId: 'clay-pit' }))
+    await vi.waitFor(() => expect(commit).toHaveBeenCalledTimes(1))
+
+    expect(execute).toHaveBeenCalledTimes(1)
+    finishCommit?.()
+    await Promise.all([first, second])
+    expect(execute).toHaveBeenCalledTimes(2)
+    expect(commit).toHaveBeenCalledTimes(2)
+  })
+
+  it('keeps a rematch queued through initial durable persistence', async () => {
+    const deps = newDeps()
+    const host = newCtx(deps)
+    host.currentUserId = 'u1'
+    dispatch(host, { type: 'createRoom', maxPlayers: 2, name: 'host' })
+    const guest = newCtx(deps)
+    guest.currentUserId = 'u2'
+    dispatch(guest, { type: 'joinRoom', roomId: host.currentRoom!.id, name: 'guest' })
+
+    let pending = false
+    let publishReady: ((result: {
+      kind: 'committed'
+      roomVersion: number
+      stepNo: number
+      frameHash: string
+    }) => void) | undefined
+    let waiter: ((error?: string) => void) | undefined
+    const committer = {
+      canCreateRoom: () => ({ ok: true }),
+      hasReplay: () => false,
+      retireRoom: vi.fn(),
+      lockNewRoom: vi.fn(),
+      prepareRoom: (_room: unknown, options: { onReady?: typeof publishReady }) => {
+        pending = true
+        publishReady = options.onReady
+        return { kind: 'blocked' as const, error: 'disk busy' }
+      },
+      blockedError: () => pending ? 'disk busy' : undefined,
+      isRetrying: () => pending,
+      isRecording: () => false,
+      waitUntilReady: (_roomId: string, callback: (error?: string) => void) => {
+        waiter = callback
+        return true
+      },
+    } as never
+    host.committer = committer
+    guest.committer = committer
+
+    const rematch = Promise.resolve(dispatch(host, { type: 'newGame', seed: 309 }))
+    const takeAction = vi.spyOn(host.currentRoom!.session, 'takeAction')
+    const action = Promise.resolve(dispatch(guest, { type: 'action', spaceId: 'forest' }))
+
+    expect(takeAction).not.toHaveBeenCalled()
+    pending = false
+    publishReady?.({ kind: 'committed', roomVersion: 0, stepNo: 0, frameHash: 'initial' })
+    waiter?.()
+    await Promise.all([rematch, action])
+    expect(takeAction).toHaveBeenCalledTimes(1)
+  })
+
+  it('rejects commands queued before a rematch changes the room generation', async () => {
+    const deps = newDeps()
+    const host = newCtx(deps)
+    host.currentUserId = 'u1'
+    dispatch(host, { type: 'createRoom', maxPlayers: 2, name: 'host' })
+    const guest = newCtx(deps)
+    guest.currentUserId = 'u2'
+    dispatch(guest, { type: 'joinRoom', roomId: host.currentRoom!.id, name: 'guest' })
+    const room = host.currentRoom!
+    const previousSession = room.session
+    const originalGetState = GameSession.prototype.getState
+    let releaseInitialization = () => {}
+    const initialization = new Promise<void>((resolve) => {
+      releaseInitialization = resolve
+    })
+    let delayed = false
+    const getState = vi.spyOn(GameSession.prototype, 'getState')
+      .mockImplementation(function (this: GameSession) {
+        const response = originalGetState.call(this)
+        if (this === previousSession || delayed) return response
+        delayed = true
+        return initialization.then(() => response) as never
+      })
+
+    try {
+      const rematch = Promise.resolve(dispatch(host, { type: 'newGame', seed: 309 }))
+      const action = Promise.resolve(dispatch(host, {
+        type: 'action',
+        spaceId: 'forest',
+        requestId: 'old-generation-action',
+      }))
+      releaseInitialization()
+      await Promise.all([rematch, action])
+
+      expect(room.session).not.toBe(previousSession)
+      expect(room.session.state.actionSpaces.find((space) => space.id === 'forest')?.takenBy)
+        .toEqual([])
+      expect(sentMessagesOf(host)).toContainEqual({
+        type: 'error',
+        error: 'connection context changed before command ran',
+        requestId: 'old-generation-action',
+      })
+    } finally {
+      getState.mockRestore()
+    }
+  })
+
+  it('finishes queued room commands before the same connection changes rooms', async () => {
+    const deps = newDeps()
+    const ctx = newCtx(deps)
+    dispatch(ctx, { type: 'createRoom', maxPlayers: 2, name: 'host' })
+    markRoomStarted(ctx)
+    const source = ctx.currentRoom!
+    const destinationHost = newCtx(deps)
+    dispatch(destinationHost, { type: 'createRoom', maxPlayers: 2, name: 'other' })
+    const destination = destinationHost.currentRoom!
+    const response = source.session.getState()
+    let releaseFirst: (response: typeof response) => void = () => {}
+    const firstResponse = new Promise<typeof response>((resolve) => {
+      releaseFirst = resolve
+    })
+    const execute = vi.fn()
+      .mockImplementationOnce(() => firstResponse)
+      .mockImplementation(() => Promise.resolve(source.session.getState()))
+    source.customSessionExecutor = {
+      session: source.session,
+      execute,
+      dispose: vi.fn(),
+    } as never
+
+    const first = Promise.resolve(dispatch(ctx, { type: 'action', spaceId: 'forest' }))
+    const second = Promise.resolve(dispatch(ctx, { type: 'action', spaceId: 'clay-pit' }))
+    const join = Promise.resolve(dispatch(ctx, { type: 'joinRoom', roomId: destination.id }))
+
+    expect(execute).toHaveBeenCalledTimes(1)
+    expect(ctx.currentRoom).toBe(source)
+    releaseFirst(response)
+    await Promise.all([first, second, join])
+    expect(execute).toHaveBeenCalledTimes(2)
+    expect(ctx.currentRoom).toBe(destination)
   })
 })
 

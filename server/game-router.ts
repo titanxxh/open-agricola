@@ -16,6 +16,12 @@ import {
   type WorkshopDraft,
 } from './workshop-drafts.ts'
 import { isLoadableLive } from './workshop-status.ts'
+import {
+  buildSessionSyncPayload,
+  createIsolatedGameSession,
+  type CustomSessionExecutor,
+  type CustomSessionMethod,
+} from './game/custom-session-executor.ts'
 
 const workshopDraftToCustomCard = (draft: WorkshopDraft): CustomCardData => ({
   cardType: draft.cardType,
@@ -32,7 +38,10 @@ const workshopDraftToCustomCard = (draft: WorkshopDraft): CustomCardData => ({
  * This prevents multiple logged-in users from sharing a single game state.
  */
 const userSessions = new Map<string, GameSession>()
+const sessionExecutors = new Map<string, CustomSessionExecutor>()
 const sessionLastAccess = new Map<string, number>()
+const sessionReplacementGenerations = new Map<string, number>()
+const cardTakedownGenerations = new Map<string, number>()
 // Workshop card db ids embedded in each sandbox session, so the admin kill
 // switch (#641) can dispose sessions still executing a taken-down card.
 const sessionCardDbIds = new Map<string, string[]>()
@@ -44,9 +53,12 @@ setInterval(() => {
   for (const [key, lastAccess] of sessionLastAccess) {
     if (now - lastAccess > SESSION_TTL_MS) {
       const session = userSessions.get(key)
+      sessionExecutors.get(key)?.dispose()
       session?.dispose()
       userSessions.delete(key)
+      sessionExecutors.delete(key)
       sessionLastAccess.delete(key)
+      sessionReplacementGenerations.delete(key)
       sessionCardDbIds.delete(key)
     }
   }
@@ -70,11 +82,16 @@ const setSessionForRequest = (
   req: IncomingMessage,
   s: GameSession,
   cardDbIds: string[] = [],
+  executor?: CustomSessionExecutor,
 ): void => {
   const key = getSessionKey(req)
   const old = userSessions.get(key)
   if (old && old !== s) old.dispose()
+  sessionExecutors.get(key)?.dispose()
   userSessions.set(key, s)
+  if (executor) sessionExecutors.set(key, executor)
+  else sessionExecutors.delete(key)
+  sessionLastAccess.set(key, Date.now())
   if (cardDbIds.length > 0) sessionCardDbIds.set(key, cardDbIds)
   else sessionCardDbIds.delete(key)
 }
@@ -85,22 +102,20 @@ const setSessionForRequest = (
  * otherwise keep it alive indefinitely).
  */
 export const disposeSandboxSessionsUsingCard = (cardDbId: string): number => {
+  cardTakedownGenerations.set(cardDbId, (cardTakedownGenerations.get(cardDbId) ?? 0) + 1)
   let disposed = 0
   for (const [key, ids] of [...sessionCardDbIds]) {
     if (!ids.includes(cardDbId)) continue
+    sessionExecutors.get(key)?.dispose()
     userSessions.get(key)?.dispose()
     userSessions.delete(key)
+    sessionExecutors.delete(key)
     sessionLastAccess.delete(key)
+    sessionReplacementGenerations.delete(key)
     sessionCardDbIds.delete(key)
     disposed += 1
   }
   return disposed
-}
-
-/** Call a session method with its card context active. */
-const callSession = <T>(req: IncomingMessage, fn: (session: GameSession) => T): T => {
-  const session = getSessionForRequest(req)
-  return session.withCtx(() => fn(session))
 }
 
 /**
@@ -131,9 +146,17 @@ const resolveViewerPlayerId = (req: IncomingMessage, session: GameSession): stri
 }
 
 /** Call a session method and build the respondWith payload (including custom card defs). */
-const callAndRespond = (req: IncomingMessage, fn: (session: GameSession) => import('./game/authoritative-session.ts').SessionResponse) => {
+const callAndRespond = async (
+  req: IncomingMessage,
+  method: CustomSessionMethod,
+  args: unknown[],
+  fn: (session: GameSession) => import('./game/authoritative-session.ts').SessionResponse,
+) => {
   const session = getSessionForRequest(req)
-  const resp = session.withCtx(() => fn(session))
+  const executor = sessionExecutors.get(getSessionKey(req))
+  const resp = executor
+    ? await executor.execute(method, args)
+    : session.withCtx(() => fn(session))
   const viewerId = resolveViewerPlayerId(req, session)
   return { resp, result: respondWith(resp, session, viewerId), viewerId }
 }
@@ -169,7 +192,11 @@ const enforceSeatBinding = (
  * sessions when missing, so this is the only way to seed for deterministic
  * tests. Production code paths use `getSessionForRequest` directly.
  */
-export const setSession = (s: GameSession) => { userSessions.set('anonymous', s) }
+export const setSession = (s: GameSession) => {
+  sessionExecutors.get('anonymous')?.dispose()
+  sessionExecutors.delete('anonymous')
+  userSessions.set('anonymous', s)
+}
 
 const readBody = (req: IncomingMessage): Promise<string> =>
   new Promise((resolve) => {
@@ -243,7 +270,12 @@ const respondWith = (
   session: GameSession,
   viewerPlayerId: string | null = null,
 ) => {
-  return session.buildSyncPayload(resp, viewerPlayerId, viewerPlayerId === null ? 'debug' : 'viewer')
+  return buildSessionSyncPayload(
+    session,
+    resp,
+    viewerPlayerId,
+    viewerPlayerId === null ? 'debug' : 'viewer',
+  )
 }
 
 export const handleGameRoute = async (
@@ -256,7 +288,7 @@ export const handleGameRoute = async (
   }
 
   if (req.method === 'GET' && req.url === '/api/game/state') {
-    const { result } = callAndRespond(req, s => s.getState())
+    const { result } = await callAndRespond(req, 'getState', [], s => s.getState())
     sendJson(res, 200, result)
     return true
   }
@@ -268,7 +300,12 @@ export const handleGameRoute = async (
       return true
     }
     if (!enforceSeatBinding(req, res, body.playerIndex)) return true
-    const { resp, result } = callAndRespond(req, s => s.takeAction(body.playerIndex!, body.spaceId!))
+    const { resp, result } = await callAndRespond(
+      req,
+      'takeAction',
+      [body.playerIndex, body.spaceId],
+      s => s.takeAction(body.playerIndex!, body.spaceId!),
+    )
     sendJson(res, resp.ok ? 200 : 400, result)
     return true
   }
@@ -289,8 +326,11 @@ export const handleGameRoute = async (
       return true
     }
     if (!enforceSeatBinding(req, res, body.playerIndex)) return true
-    const { resp, result } = callAndRespond(req, s =>
-      s.takeSpecialAction(body.playerIndex!, body.cardId!, body.actionId!, body.payload),
+    const { resp, result } = await callAndRespond(
+      req,
+      'takeSpecialAction',
+      [body.playerIndex, body.cardId, body.actionId, body.payload],
+      s => s.takeSpecialAction(body.playerIndex!, body.cardId!, body.actionId!, body.payload),
     )
     sendJson(res, resp.ok ? 200 : 400, result)
     return true
@@ -303,7 +343,12 @@ export const handleGameRoute = async (
       return true
     }
     if (!enforceSeatBinding(req, res, body.playerIndex)) return true
-    const { resp, result } = callAndRespond(req, s => s.resolveChoice(body.playerIndex!, body.value!, body.payload))
+    const { resp, result } = await callAndRespond(
+      req,
+      'resolveChoice',
+      [body.playerIndex, body.value, body.payload],
+      s => s.resolveChoice(body.playerIndex!, body.value!, body.payload),
+    )
     sendJson(res, resp.ok ? 200 : 400, result)
     return true
   }
@@ -315,7 +360,12 @@ export const handleGameRoute = async (
       return true
     }
     if (!enforceSeatBinding(req, res, body.playerIndex)) return true
-    const { resp, result } = callAndRespond(req, s => s.takeAnytimeAction(body.playerIndex!, body.actionId!))
+    const { resp, result } = await callAndRespond(
+      req,
+      'takeAnytimeAction',
+      [body.playerIndex, body.actionId],
+      s => s.takeAnytimeAction(body.playerIndex!, body.actionId!),
+    )
     sendJson(res, resp.ok ? 200 : 400, result)
     return true
   }
@@ -335,8 +385,12 @@ export const handleGameRoute = async (
       return true
     }
     if (!enforceSeatBinding(req, res, body.playerIndex)) return true
-    const { resp, result } = callAndRespond(req, s =>
-      s.resolveOrdinaryCardDrawChoice(body.playerIndex!, body.choiceId!, body.keepCardId!))
+    const { resp, result } = await callAndRespond(
+      req,
+      'resolveOrdinaryCardDrawChoice',
+      [body.playerIndex, body.choiceId, body.keepCardId],
+      s => s.resolveOrdinaryCardDrawChoice(body.playerIndex!, body.choiceId!, body.keepCardId!),
+    )
     sendJson(res, resp.ok ? 200 : 400, result)
     return true
   }
@@ -349,8 +403,11 @@ export const handleGameRoute = async (
     }
     if (!enforceSeatBinding(req, res, body.playerIndex)) return true
     // Task 9: forwarded through the unified resolveChoice dispatcher.
-    const { resp, result } = callAndRespond(req, (s) =>
-      s.resolveChoice(body.playerIndex!, 'confirm', { selections: body.selections }),
+    const { resp, result } = await callAndRespond(
+      req,
+      'resolveChoice',
+      [body.playerIndex, 'confirm', { selections: body.selections }],
+      s => s.resolveChoice(body.playerIndex!, 'confirm', { selections: body.selections }),
     )
     sendJson(res, resp.ok ? 200 : 400, result)
     return true
@@ -370,11 +427,15 @@ export const handleGameRoute = async (
       return true
     }
     if (!enforceSeatBinding(req, res, body.playerIndex)) return true
-    const { resp, result } = callAndRespond(req, (s) =>
-      s.commitSelectionChoice(
+    const { resp, result } = await callAndRespond(
+      req,
+      'commitSelectionChoice',
+      [body.playerIndex, payload],
+      s => s.commitSelectionChoice(
         body.playerIndex!,
         payload,
-      ))
+      ),
+    )
     sendJson(res, resp.ok ? 200 : 400, result)
     return true
   }
@@ -389,10 +450,13 @@ export const handleGameRoute = async (
       return true
     }
     if (!enforceSeatBinding(req, res, body.playerIndex)) return true
-    const { resp, result } = callAndRespond(req, s => s.submitParentSelection(
-      body.playerIndex!,
-      body.selection as Parameters<GameSession['submitParentSelection']>[1],
-    ))
+    const selection = body.selection as Parameters<GameSession['submitParentSelection']>[1]
+    const { resp, result } = await callAndRespond(
+      req,
+      'submitParentSelection',
+      [body.playerIndex, selection],
+      s => s.submitParentSelection(body.playerIndex!, selection),
+    )
     sendJson(res, resp.ok ? 200 : 400, result)
     return true
   }
@@ -400,7 +464,7 @@ export const handleGameRoute = async (
   if (req.method === 'POST' && req.url === '/api/game/next-player') {
     // Task 9: forwarded through resolveChoice; the synthetic
     // confirm-next-player pending envelope supplies `nextPlayerIndex`.
-    const { resp, result } = callAndRespond(req, (s) => {
+    const { resp, result } = await callAndRespond(req, 'confirmCurrentPlayer', [], (s) => {
       const idx = s.getState().state.currentPlayerIndex
       return s.resolveChoice(idx, 'confirm')
     })
@@ -410,7 +474,7 @@ export const handleGameRoute = async (
 
   if (req.method === 'POST' && req.url === '/api/game/confirm-player-switch') {
     // Task 9: forwarded through resolveChoice.
-    const { resp, result } = callAndRespond(req, (s) => {
+    const { resp, result } = await callAndRespond(req, 'confirmCurrentPlayer', [], (s) => {
       const idx = s.getState().state.currentPlayerIndex
       return s.resolveChoice(idx, 'confirm')
     })
@@ -419,19 +483,19 @@ export const handleGameRoute = async (
   }
 
   if (req.method === 'POST' && req.url === '/api/game/round-end') {
-    const { resp, result } = callAndRespond(req, s => s.performRoundEnd())
+    const { resp, result } = await callAndRespond(req, 'performRoundEnd', [], s => s.performRoundEnd())
     sendJson(res, resp.ok ? 200 : 400, result)
     return true
   }
 
   if (req.method === 'POST' && req.url === '/api/game/undo') {
-    const { resp, result } = callAndRespond(req, s => s.undoStep())
+    const { resp, result } = await callAndRespond(req, 'undoStep', [], s => s.undoStep())
     sendJson(res, resp.ok ? 200 : 400, result)
     return true
   }
 
   if (req.method === 'POST' && req.url === '/api/game/undo-action') {
-    const { resp, result } = callAndRespond(req, s => s.undoAction())
+    const { resp, result } = await callAndRespond(req, 'undoAction', [], s => s.undoAction())
     sendJson(res, resp.ok ? 200 : 400, result)
     return true
   }
@@ -439,8 +503,16 @@ export const handleGameRoute = async (
   if (req.method === 'GET' && req.url?.startsWith('/api/game/actions')) {
     const url = new URL(req.url, 'http://localhost')
     const playerIndex = Number(url.searchParams.get('playerIndex') ?? '0')
-    const actions = callSession(req, s => s.getAvailableActions(playerIndex))
-    sendJson(res, 200, { ok: true, actions })
+    const session = getSessionForRequest(req)
+    const executor = sessionExecutors.get(getSessionKey(req))
+    try {
+      const actions = executor
+        ? await executor.query<{ spaceId: string; nameKey: string }[]>('getAvailableActions', [playerIndex])
+        : session.withCtx(() => session.getAvailableActions(playerIndex))
+      sendJson(res, 200, { ok: true, actions })
+    } catch (error) {
+      sendJson(res, 400, { ok: false, error: error instanceof Error ? error.message : String(error) })
+    }
     return true
   }
 
@@ -450,7 +522,7 @@ export const handleGameRoute = async (
       sendJson(res, 400, { ok: false, error: 'missing state' })
       return true
     }
-    const { result } = callAndRespond(req, s => s.loadState(body.state))
+    const { result } = await callAndRespond(req, 'loadState', [body.state], s => s.loadState(body.state))
     sendJson(res, 200, result)
     return true
   }
@@ -461,7 +533,12 @@ export const handleGameRoute = async (
       sendJson(res, 400, { ok: false, error: 'invalid payload' })
       return true
     }
-    const { resp, result } = callAndRespond(req, s => s.startDevFenceSelect(body.playerIndex!))
+    const { resp, result } = await callAndRespond(
+      req,
+      'startDevFenceSelect',
+      [body.playerIndex],
+      s => s.startDevFenceSelect(body.playerIndex!),
+    )
     sendJson(res, resp.ok ? 200 : 400, result)
     return true
   }
@@ -472,28 +549,56 @@ export const handleGameRoute = async (
       playerId: string
       payload: Record<string, unknown>
     }
-    const state = callSession(req, s => s.getStateForRead())
-    const { requestError, ...result } = validateFarmChoice(state, body.type, body.playerId, body.payload)
-    // Preserve the pre-extraction contract: malformed requests (missing player /
-    // unknown type) are 400; ordinary invalid placements are 200 valid:false.
-    sendJson(res, requestError ? 400 : 200, result)
+    const session = getSessionForRequest(req)
+    const executor = sessionExecutors.get(getSessionKey(req))
+    try {
+      const validation = executor
+        ? await executor.query<ReturnType<typeof validateFarmChoice>>(
+          'validateFarmChoice',
+          [body.type, body.playerId, body.payload],
+        )
+        : validateFarmChoice(
+          session.withCtx(() => session.getStateForRead()),
+          body.type,
+          body.playerId,
+          body.payload,
+        )
+      const { requestError, ...result } = validation
+      // Preserve the pre-extraction contract: malformed requests (missing player /
+      // unknown type) are 400; ordinary invalid placements are 200 valid:false.
+      sendJson(res, requestError ? 400 : 200, result)
+    } catch (error) {
+      sendJson(res, 400, { ok: false, error: error instanceof Error ? error.message : String(error) })
+    }
     return true
   }
 
   if (req.method === 'POST' && req.url === '/api/game/new') {
+    const sessionKey = getSessionKey(req)
+    const replacementGeneration = (sessionReplacementGenerations.get(sessionKey) ?? 0) + 1
+    sessionReplacementGenerations.set(sessionKey, replacementGeneration)
+    sessionLastAccess.set(sessionKey, Date.now())
     let seed: number | undefined
     try {
       const body = JSON.parse(await readBody(req)) as { seed?: number }
       if (typeof body.seed === 'number') seed = body.seed
     } catch { /* no body or invalid JSON — use random seed */ }
+    if (sessionReplacementGenerations.get(sessionKey) !== replacementGeneration) {
+      sendJson(res, 409, { ok: false, error: 'session replaced by newer request' })
+      return true
+    }
     setSessionForRequest(req, new GameSession(seed))
-    const { result } = callAndRespond(req, s => s.getState())
+    const { result } = await callAndRespond(req, 'getState', [], s => s.getState())
     sendJson(res, 200, result)
     return true
   }
 
   // Sandbox game: start a new single-player game with custom workshop cards loaded
   if (req.method === 'POST' && req.url === '/api/game/new-sandbox') {
+    const sessionKey = getSessionKey(req)
+    const replacementGeneration = (sessionReplacementGenerations.get(sessionKey) ?? 0) + 1
+    sessionReplacementGenerations.set(sessionKey, replacementGeneration)
+    sessionLastAccess.set(sessionKey, Date.now())
     let seed: number | undefined
     let customCardDbIds: string[] = []
     let playerCount = 2
@@ -622,7 +727,12 @@ export const handleGameRoute = async (
       }
     }
 
-    const sandboxSession = new GameSession(
+    const takedownGenerations = loadedCardDbIds.map((cardDbId) => [
+      cardDbId,
+      cardTakedownGenerations.get(cardDbId) ?? 0,
+    ] as const)
+
+    const created = createIsolatedGameSession(
       seed,
       customCards.length > 0 ? customCards : undefined,
       {
@@ -634,14 +744,50 @@ export const handleGameRoute = async (
         allowIncompleteFarmersOfTheMoorMinorDeal,
       },
     )
-    setSessionForRequest(req, sandboxSession, loadedCardDbIds)
-    const { result } = callAndRespond(req, s => s.getState())
-    sendJson(res, 200, {
+    const sandboxSession = created.session
+    if (created.executor && !created.executor.reserveWorkerSlot()) {
+      created.executor.dispose()
+      sandboxSession.dispose()
+      sendJson(res, 503, { ok: false, error: 'executable session worker capacity reached' })
+      return true
+    }
+    const resp = created.executor
+      ? await created.executor.execute('getState', [])
+      : sandboxSession.withCtx(() => sandboxSession.getState())
+    if (takedownGenerations.some(([cardDbId, generation]) =>
+      (cardTakedownGenerations.get(cardDbId) ?? 0) !== generation
+    )) {
+      created.executor?.dispose()
+      sandboxSession.dispose()
+      sendJson(res, 409, { ok: false, error: 'sandbox card taken down during initialization' })
+      return true
+    }
+    if (sessionReplacementGenerations.get(sessionKey) !== replacementGeneration) {
+      created.executor?.dispose()
+      sandboxSession.dispose()
+      sendJson(res, 409, { ok: false, error: 'sandbox replaced by newer request' })
+      return true
+    }
+    const result = respondWith(
+      resp,
+      sandboxSession,
+      resolveViewerPlayerId(req, sandboxSession),
+    )
+    const payload = {
       ...result,
       customCardsLoaded: customCards.length,
       customCardVersionsLoaded,
       cardWarnings: sandboxSession.cardWarnings.length > 0 ? sandboxSession.cardWarnings : undefined,
-    })
+    }
+    if (!resp.ok) {
+      created.executor?.dispose()
+      sandboxSession.dispose()
+      sessionLastAccess.set(sessionKey, Date.now())
+      sendJson(res, 200, payload)
+      return true
+    }
+    setSessionForRequest(req, sandboxSession, loadedCardDbIds, created.executor)
+    sendJson(res, 200, payload)
     return true
   }
 
@@ -651,7 +797,12 @@ export const handleGameRoute = async (
       sendJson(res, 400, { ok: false, error: 'invalid payload' })
       return true
     }
-    const { resp, result } = callAndRespond(req, s => s.devPlayCard(body.playerIndex!, body.cardId!))
+    const { resp, result } = await callAndRespond(
+      req,
+      'devPlayCard',
+      [body.playerIndex, body.cardId],
+      s => s.devPlayCard(body.playerIndex!, body.cardId!),
+    )
     sendJson(res, resp.ok ? 200 : 400, result)
     return true
   }
@@ -663,7 +814,12 @@ export const handleGameRoute = async (
       return true
     }
     if (!enforceSeatBinding(req, res, body.playerIndex)) return true
-    const { resp, result } = callAndRespond(req, s => s.devDrawCard(body.playerIndex!, body.cardId!))
+    const { resp, result } = await callAndRespond(
+      req,
+      'devDrawCard',
+      [body.playerIndex, body.cardId],
+      s => s.devDrawCard(body.playerIndex!, body.cardId!),
+    )
     sendJson(res, resp.ok ? 200 : 400, result)
     return true
   }
@@ -674,7 +830,12 @@ export const handleGameRoute = async (
       sendJson(res, 400, { ok: false, error: 'invalid payload' })
       return true
     }
-    const { resp, result } = callAndRespond(req, s => s.devSetSpaceTaken(body.spaceId!, body.playerId ?? null))
+    const { resp, result } = await callAndRespond(
+      req,
+      'devSetSpaceTaken',
+      [body.spaceId, body.playerId ?? null],
+      s => s.devSetSpaceTaken(body.spaceId!, body.playerId ?? null),
+    )
     sendJson(res, resp.ok ? 200 : 400, result)
     return true
   }
@@ -685,7 +846,12 @@ export const handleGameRoute = async (
       sendJson(res, 400, { ok: false, error: 'invalid payload' })
       return true
     }
-    const { resp, result } = callAndRespond(req, s => s.devSetCurrentPlayer(body.playerIndex!))
+    const { resp, result } = await callAndRespond(
+      req,
+      'devSetCurrentPlayer',
+      [body.playerIndex],
+      s => s.devSetCurrentPlayer(body.playerIndex!),
+    )
     sendJson(res, resp.ok ? 200 : 400, result)
     return true
   }
@@ -696,7 +862,12 @@ export const handleGameRoute = async (
       sendJson(res, 400, { ok: false, error: 'invalid payload' })
       return true
     }
-    const { resp, result } = callAndRespond(req, s => s.devSetResources(body.playerIndex!, body.resources!))
+    const { resp, result } = await callAndRespond(
+      req,
+      'devSetResources',
+      [body.playerIndex, body.resources],
+      s => s.devSetResources(body.playerIndex!, body.resources!),
+    )
     sendJson(res, resp.ok ? 200 : 400, result)
     return true
   }
@@ -707,7 +878,12 @@ export const handleGameRoute = async (
       sendJson(res, 400, { ok: false, error: 'invalid payload' })
       return true
     }
-    const { resp, result } = callAndRespond(req, s => s.devAddRooms(body.playerIndex!, body.rooms!))
+    const { resp, result } = await callAndRespond(
+      req,
+      'devAddRooms',
+      [body.playerIndex, body.rooms],
+      s => s.devAddRooms(body.playerIndex!, body.rooms!),
+    )
     sendJson(res, resp.ok ? 200 : 400, result)
     return true
   }
@@ -718,7 +894,12 @@ export const handleGameRoute = async (
       sendJson(res, 400, { ok: false, error: 'invalid round' })
       return true
     }
-    const { resp, result } = callAndRespond(req, s => s.devSetRound(body.round!))
+    const { resp, result } = await callAndRespond(
+      req,
+      'devSetRound',
+      [body.round],
+      s => s.devSetRound(body.round!),
+    )
     sendJson(res, resp.ok ? 200 : 400, result)
     return true
   }
@@ -747,7 +928,12 @@ export const handleGameRoute = async (
       }
     }
     const pick = { occCardId, minorCardId }
-    const { resp, result } = callAndRespond(req, s => s.submitDraftPick(body.playerId!, pick))
+    const { resp, result } = await callAndRespond(
+      req,
+      'submitDraftPick',
+      [body.playerId, pick],
+      s => s.submitDraftPick(body.playerId!, pick),
+    )
     sendJson(res, resp.ok ? 200 : 400, result)
     return true
   }

@@ -2,7 +2,7 @@
 
 ## Result
 
-The 2 CPU / 2 GiB launch limit is 30 ordinary in-memory Rooms. The production Durable Room Commit path passes all thresholds at 30 Rooms and exceeds the action-latency threshold at 35 Rooms.
+The 2 CPU / 2 GiB launch limit is 30 ordinary in-memory Rooms. The production Durable Room Commit path passes all thresholds at 30 Rooms and exceeds the action-latency threshold at 35 Rooms. This probe used built-in cards and did not include the two-Worker topology of executable Workshop Rooms; those Rooms are separately capped at 15 until that topology is measured.
 
 ## Environment
 
@@ -14,6 +14,7 @@ The 2 CPU / 2 GiB launch limit is 30 ordinary in-memory Rooms. The production Du
 - Long-run state: 141,100 bytes from a 176-command seed-563 game, with 46 commands remaining
 - Late-state check: 170,267 bytes from the same game, with 16 commands remaining
 - Two WebSocket seats per Room; in-process socket sink
+- Built-in cards only; no executable Workshop session/code Workers
 - Thresholds: action-to-broadcast p99 <= 250ms, event-loop p99 <= 100ms, RSS <= 1.8 GiB
 
 Each 25/30/35 capacity level ran for 15 seconds of warmup and 60 seconds of measurement in a fresh process at 0.45125 accepted commands per Room per second. The late-state check used 1 second of warmup and 5 seconds of measurement.
@@ -44,4 +45,4 @@ At 30 Rooms and 170,267-byte states, 98 accepted commands passed with action p99
 
 ## Decision
 
-Keep the hard limit at 30 ordinary `waiting + playing` Rooms per 2 CPU / 2 GiB instance. Fixed development Rooms are excluded. Raise the limit only after the same production-path probe passes at the new level.
+Keep the hard limit at 30 ordinary `waiting + playing` Rooms per 2 CPU / 2 GiB instance. Fixed development Rooms are excluded. Within that total, keep executable Workshop Rooms at 15 because each owns a session Worker whose code runtime owns another Worker; the process-wide 15-slot budget counts every Room reservation together with active HTTP sandboxes, including restored Rooms before they resume. Raise either limit only after the same production-path probe passes with the corresponding Room shape.
