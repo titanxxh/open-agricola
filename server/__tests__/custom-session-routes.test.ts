@@ -264,6 +264,10 @@ describe('custom session routes', () => {
     const crossRouteReady = new Promise<void>((resolve) => {
       releaseCrossRoute = resolve
     })
+    let releaseTakedown = () => {}
+    const takedownReady = new Promise<void>((resolve) => {
+      releaseTakedown = resolve
+    })
     const execute = vi.spyOn(CustomSessionExecutor.prototype, 'execute')
       .mockImplementation(function (this: InstanceType<typeof CustomSessionExecutor>) {
         const response = this.session.withCtx(() => this.session.getState())
@@ -271,7 +275,9 @@ describe('custom session routes', () => {
           ? firstReady
           : this.session.state.gameSeed === 43
             ? crossRouteReady
-            : null
+            : this.session.state.gameSeed === 44
+              ? takedownReady
+              : null
         return wait ? wait.then(() => response) : Promise.resolve(response)
       })
     const { handleGameRoute, disposeSandboxSessionsUsingCard } = await import('../game-router.ts')
@@ -317,6 +323,21 @@ describe('custom session routes', () => {
       expect(normalResponse.statusCode).toBe(200)
       expect(crossRouteResponse.statusCode).toBe(409)
       expect(JSON.parse(finalState.body).state.gameSeed).toBe(77)
+
+      const takedownResponse = mockRes()
+      const pendingTakedown = handleGameRoute(mockReq('POST', '/api/game/new-sandbox', {
+        seed: 44,
+        customCardIds: [customCard.id],
+      }, 'concurrent-token'), takedownResponse)
+      await vi.waitFor(() => expect(execute).toHaveBeenCalledTimes(4))
+      expect(disposeSandboxSessionsUsingCard(customCard.id)).toBe(0)
+      releaseTakedown()
+      await pendingTakedown
+
+      const stateAfterTakedown = mockRes()
+      await handleGameRoute(mockReq('GET', '/api/game/state', {}, 'concurrent-token'), stateAfterTakedown)
+      expect(takedownResponse.statusCode).toBe(409)
+      expect(JSON.parse(stateAfterTakedown.body).state.gameSeed).toBe(77)
     } finally {
       disposeSandboxSessionsUsingCard(customCard.id)
       db.close()

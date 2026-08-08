@@ -41,6 +41,7 @@ const userSessions = new Map<string, GameSession>()
 const sessionExecutors = new Map<string, CustomSessionExecutor>()
 const sessionLastAccess = new Map<string, number>()
 const sessionReplacementGenerations = new Map<string, number>()
+const cardTakedownGenerations = new Map<string, number>()
 // Workshop card db ids embedded in each sandbox session, so the admin kill
 // switch (#641) can dispose sessions still executing a taken-down card.
 const sessionCardDbIds = new Map<string, string[]>()
@@ -101,6 +102,7 @@ const setSessionForRequest = (
  * otherwise keep it alive indefinitely).
  */
 export const disposeSandboxSessionsUsingCard = (cardDbId: string): number => {
+  cardTakedownGenerations.set(cardDbId, (cardTakedownGenerations.get(cardDbId) ?? 0) + 1)
   let disposed = 0
   for (const [key, ids] of [...sessionCardDbIds]) {
     if (!ids.includes(cardDbId)) continue
@@ -725,6 +727,11 @@ export const handleGameRoute = async (
       }
     }
 
+    const takedownGenerations = loadedCardDbIds.map((cardDbId) => [
+      cardDbId,
+      cardTakedownGenerations.get(cardDbId) ?? 0,
+    ] as const)
+
     const created = createIsolatedGameSession(
       seed,
       customCards.length > 0 ? customCards : undefined,
@@ -747,6 +754,14 @@ export const handleGameRoute = async (
     const resp = created.executor
       ? await created.executor.execute('getState', [])
       : sandboxSession.withCtx(() => sandboxSession.getState())
+    if (takedownGenerations.some(([cardDbId, generation]) =>
+      (cardTakedownGenerations.get(cardDbId) ?? 0) !== generation
+    )) {
+      created.executor?.dispose()
+      sandboxSession.dispose()
+      sendJson(res, 409, { ok: false, error: 'sandbox card taken down during initialization' })
+      return true
+    }
     if (sessionReplacementGenerations.get(sessionKey) !== replacementGeneration) {
       created.executor?.dispose()
       sandboxSession.dispose()
