@@ -295,6 +295,46 @@ describe('handleCreateRoom', () => {
     expect(new Set(loggedPlayerNames)).toEqual(new Set(['PlayerB', 'Bob']))
   })
 
+  it('rolls back the final join when custom worker initialization fails', async () => {
+    const deps = newDeps()
+    const host = newCtx(deps)
+    host.currentUserId = 'u1'
+    dispatch(host, { type: 'createRoom', maxPlayers: 2, name: 'host' })
+    const room = host.currentRoom!
+    room.customSessionExecutor = {
+      session: room.session,
+      execute: vi.fn(async () => ({
+        ...room.session.getState(),
+        ok: false,
+        error: 'worker initialization failed',
+      })),
+      dispose: vi.fn(),
+    } as never
+    const playersBefore = [...room.players]
+    const seatOwnersBefore = [...(room.seatOwners ?? [])]
+    const guest = newCtx(deps)
+    guest.currentUserId = 'u2'
+
+    await dispatch(guest, {
+      type: 'joinRoom',
+      roomId: room.id,
+      name: 'guest',
+      requestId: 'join-1',
+    })
+
+    expect(room.status).toBe('waiting')
+    expect(room.startedAt).toBeUndefined()
+    expect(room.players).toEqual(playersBefore)
+    expect(room.seatOwners).toEqual(seatOwnersBefore)
+    expect(guest.currentRoom).toBeNull()
+    expect(sentMessagesOf(guest)).toContainEqual({
+      type: 'error',
+      error: 'worker initialization failed',
+      requestId: 'join-1',
+    })
+    expect(sentTypesOf(host)).not.toContain('gameStarted')
+  })
+
   it('starts a full room when a disconnected owner still reserves a seat', () => {
     const deps = newDeps()
     const host = newCtx(deps)

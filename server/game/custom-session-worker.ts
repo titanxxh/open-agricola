@@ -3,6 +3,7 @@ import type { GameSyncPayload } from '../../shared/contract/protocol/game.ts'
 import type { CustomCardData } from '../../shared/cards/session-card-context.ts'
 import {
   rehydrateState,
+  serializeState,
   type SerializedGameState,
 } from '../../shared/session/serialization.ts'
 import { GameSession, type SessionResponse } from './authoritative-session.ts'
@@ -83,16 +84,17 @@ const dispatch = (method: CustomSessionMethod, args: unknown[]): { response: Ses
 
 const buildResult = (response: SessionResponse) => {
   if (!session) throw new Error('custom session worker is not initialized')
-  const debug = session.buildSyncPayload(response, null, 'debug')
-  const spectator = session.buildSyncPayload(response, null)
+  const serialized = serializeState(response.state, { engineStack: session.getEngineStack() })
+  const debug = session.buildSyncPayload(response, null, 'debug', serialized)
+  const spectator = session.buildSyncPayload(response, null, 'viewer', serialized)
   const viewers = Object.fromEntries(response.state.players.map((player) => [
     player.id,
-    session!.buildSyncPayload(response, player.id),
+    session!.buildSyncPayload(response, player.id, 'viewer', serialized),
   ]))
   const { state: _state, ...responseWithoutState } = response
   return {
     response: responseWithoutState,
-    serialized: debug.state,
+    serialized,
     checkpoint: JSON.parse(JSON.stringify(
       session.createCommandCheckpoint(),
     )) as ReturnType<GameSession['createCommandCheckpoint']>,

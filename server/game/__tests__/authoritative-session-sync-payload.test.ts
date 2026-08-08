@@ -1,4 +1,6 @@
 import { describe, expect, it } from 'vitest'
+import { requireActiveCardRegistry } from '../../../shared/cards/active-registry.ts'
+import { serializeState } from '../../../shared/session/serialization.ts'
 import { GameSession } from '../authoritative-session.ts'
 import type { SessionResponse } from '../authoritative-session.ts'
 
@@ -59,5 +61,35 @@ describe('GameSession.buildSyncPayload', () => {
       .toEqual(['runtime hook failed'])
     expect(session.buildSyncPayload(resp, null, 'viewer').cardWarnings)
       .toBeUndefined()
+  })
+
+  it('derives every viewer payload from one canonical custom projection', () => {
+    const session = new GameSession(42, undefined, { playerCount: 6 })
+    let hookCalls = 0
+    session.withCtx(() => {
+      requireActiveCardRegistry('sync payload projection test').setEffect({
+        id: '__TEST_projection__',
+        onComputeAnimalZones: () => {
+          hookCalls += 1
+          return []
+        },
+      })
+      session.state.players.forEach((player) => {
+        player.minorPlayed = ['__TEST_projection__']
+      })
+      const response = session.getState()
+      const serialized = serializeState(response.state, { engineStack: session.getEngineStack() })
+      const canonicalHookCalls = hookCalls
+
+      session.buildSyncPayload(response, null, 'debug', serialized)
+      session.buildSyncPayload(response, null, 'viewer', serialized)
+      response.state.players.forEach((player) => {
+        session.buildSyncPayload(response, player.id, 'viewer', serialized)
+      })
+
+      expect(canonicalHookCalls).toBeGreaterThan(0)
+      expect(hookCalls).toBe(canonicalHookCalls)
+    })
+    session.dispose()
   })
 })

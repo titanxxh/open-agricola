@@ -570,6 +570,12 @@ function handleJoinRoom(ctx: ConnectionCtx, msg: Extract<ClientCommand, { type: 
   }
   const seat = resolveJoinPlayerIndex(room, requested.requestedPlayerIndex, ctx.currentUserId)
   if (!seat.ok) { sendCommandError(ctx, seat.error, msg.requestId); return }
+  const previousCtxRoom = ctx.currentRoom
+  const previousPlayerIndex = ctx.currentPlayerIndex
+  const previousPlayers = room.players
+  const previousSeatOwners = room.seatOwners
+  const previousStatus = room.status
+  const previousStartedAt = room.startedAt
   ctx.currentRoom = room
   ctx.currentPlayerIndex = seat.playerIndex
   const requestedName = typeof (msg as Record<string, unknown>).name === 'string'
@@ -578,17 +584,29 @@ function handleJoinRoom(ctx: ConnectionCtx, msg: Extract<ClientCommand, { type: 
   const name = wasPlaying
     ? room.session.state.players[ctx.currentPlayerIndex]?.name ?? requestedName
     : requestedName
-  if (seat.replacedExistingPlayer) {
-    const existingPlayer = room.players.find(
+  const replacedPlayer = seat.replacedExistingPlayer
+    ? room.players.find(
       (player) => player.playerIndex === ctx.currentPlayerIndex,
     )
-    if (existingPlayer) {
-      ctx.broadcaster.sendTo(existingPlayer.ws, {
+    : undefined
+  const rollbackJoin = (error: string): void => {
+    room.players = previousPlayers
+    room.seatOwners = previousSeatOwners
+    room.status = previousStatus
+    if (previousStartedAt === undefined) delete room.startedAt
+    else room.startedAt = previousStartedAt
+    ctx.currentRoom = previousCtxRoom
+    ctx.currentPlayerIndex = previousPlayerIndex
+    sendCommandError(ctx, error, msg.requestId)
+  }
+  const publishSeatReplacement = (): void => {
+    if (replacedPlayer) {
+      ctx.broadcaster.sendTo(replacedPlayer.ws, {
         type: 'seat_replaced',
         roomId,
         playerIndex: ctx.currentPlayerIndex,
       })
-      try { existingPlayer.ws.close(4001, 'seat replaced') } catch { /* ignore */ }
+      try { replacedPlayer.ws.close(4001, 'seat replaced') } catch { /* ignore */ }
     }
   }
   room.players = room.players.filter(
@@ -629,6 +647,7 @@ function handleJoinRoom(ctx: ConnectionCtx, msg: Extract<ClientCommand, { type: 
         ?? `Player ${playerIndex + 1}`,
     }))
   const publishJoin = (): void => {
+    publishSeatReplacement()
     ctx.broadcaster.sendTo(ctx.ws, {
       type: 'roomJoined',
       roomId,
@@ -646,6 +665,10 @@ function handleJoinRoom(ctx: ConnectionCtx, msg: Extract<ClientCommand, { type: 
     })
   }
   const finishJoin = (updatedResponse?: SessionResponse): void | Promise<void> => {
+    if (starting && updatedResponse && !updatedResponse.ok) {
+      rollbackJoin(updatedResponse.error ?? 'unable to initialize game')
+      return
+    }
     if (starting) {
       const response = updatedResponse ?? executeRoomSession(
         room,

@@ -576,10 +576,11 @@ export const filterPublicEventCancellationsForPlayer = (
   viewerPlayerId: string | null,
   ctx: SerializeStateContext,
   cancellations: readonly PublicEventCancellation[] | undefined,
+  serializedState?: SerializedGameState,
 ): PublicEventCancellation[] | undefined => {
   if (!cancellations?.length) return undefined
   const { base, hiddenRefs, seqView } = createHiddenHandVisibility(
-    serializeState(state, ctx),
+    serializedState ?? serializeState(state, ctx),
     viewerPlayerId,
   )
   const filtered = cancellations
