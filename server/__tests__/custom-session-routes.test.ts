@@ -204,6 +204,47 @@ describe('custom session routes', () => {
     }
   })
 
+  it('keeps the existing sandbox when worker initialization fails', async () => {
+    const db = new Database(':memory:')
+    database.runMigrations(db)
+    addUser(db, 'failure-author', 'failure-token')
+    const customCard = createRunawayCard(db, 'failure-author')
+    const gameDatabase = await import('../db.ts')
+    vi.spyOn(gameDatabase, 'getDb').mockReturnValue(db)
+    const { CustomSessionExecutor } = await import('../game/custom-session-executor.ts')
+    const execute = vi.spyOn(CustomSessionExecutor.prototype, 'execute')
+      .mockImplementationOnce(async function (this: InstanceType<typeof CustomSessionExecutor>) {
+        return {
+          ...this.session.getState(),
+          ok: false,
+          error: 'worker initialization failed',
+        }
+      })
+    const dispose = vi.spyOn(CustomSessionExecutor.prototype, 'dispose')
+    const { handleGameRoute } = await import('../game-router.ts')
+
+    const start = mockRes()
+    await handleGameRoute(mockReq('POST', '/api/game/new-sandbox', {
+      seed: 42,
+    }, 'failure-token'), start)
+    const failed = mockRes()
+    await handleGameRoute(mockReq('POST', '/api/game/new-sandbox', {
+      seed: 99,
+      customCardIds: [customCard.id],
+    }, 'failure-token'), failed)
+    const current = mockRes()
+    await handleGameRoute(mockReq('GET', '/api/game/state', {}, 'failure-token'), current)
+
+    expect(execute).toHaveBeenCalled()
+    expect(JSON.parse(failed.body)).toMatchObject({
+      ok: false,
+      error: 'worker initialization failed',
+    })
+    expect(JSON.parse(current.body).state).toEqual(JSON.parse(start.body).state)
+    expect(dispose).toHaveBeenCalledOnce()
+    db.close()
+  })
+
   it('runs community-room commands through the WebSocket session worker', async () => {
     const db = new Database(':memory:')
     database.runMigrations(db)

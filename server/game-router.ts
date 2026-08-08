@@ -88,6 +88,7 @@ const setSessionForRequest = (
   userSessions.set(key, s)
   if (executor) sessionExecutors.set(key, executor)
   else sessionExecutors.delete(key)
+  sessionLastAccess.set(key, Date.now())
   if (cardDbIds.length > 0) sessionCardDbIds.set(key, cardDbIds)
   else sessionCardDbIds.delete(key)
 }
@@ -730,14 +731,29 @@ export const handleGameRoute = async (
       sendJson(res, 503, { ok: false, error: 'executable session worker capacity reached' })
       return true
     }
-    setSessionForRequest(req, sandboxSession, loadedCardDbIds, created.executor)
-    const { result } = await callAndRespond(req, 'getState', [], s => s.getState())
-    sendJson(res, 200, {
+    const resp = created.executor
+      ? await created.executor.execute('getState', [])
+      : sandboxSession.withCtx(() => sandboxSession.getState())
+    const result = respondWith(
+      resp,
+      sandboxSession,
+      resolveViewerPlayerId(req, sandboxSession),
+    )
+    const payload = {
       ...result,
       customCardsLoaded: customCards.length,
       customCardVersionsLoaded,
       cardWarnings: sandboxSession.cardWarnings.length > 0 ? sandboxSession.cardWarnings : undefined,
-    })
+    }
+    if (!resp.ok) {
+      created.executor?.dispose()
+      sandboxSession.dispose()
+      sessionLastAccess.set(getSessionKey(req), Date.now())
+      sendJson(res, 200, payload)
+      return true
+    }
+    setSessionForRequest(req, sandboxSession, loadedCardDbIds, created.executor)
+    sendJson(res, 200, payload)
     return true
   }
 
