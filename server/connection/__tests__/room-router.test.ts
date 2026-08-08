@@ -914,6 +914,53 @@ describe('custom room command queue', () => {
     expect(takeAction).toHaveBeenCalledTimes(1)
   })
 
+  it('rejects commands queued before a rematch changes the room generation', async () => {
+    const deps = newDeps()
+    const host = newCtx(deps)
+    host.currentUserId = 'u1'
+    dispatch(host, { type: 'createRoom', maxPlayers: 2, name: 'host' })
+    const guest = newCtx(deps)
+    guest.currentUserId = 'u2'
+    dispatch(guest, { type: 'joinRoom', roomId: host.currentRoom!.id, name: 'guest' })
+    const room = host.currentRoom!
+    const previousSession = room.session
+    const originalGetState = GameSession.prototype.getState
+    let releaseInitialization = () => {}
+    const initialization = new Promise<void>((resolve) => {
+      releaseInitialization = resolve
+    })
+    let delayed = false
+    const getState = vi.spyOn(GameSession.prototype, 'getState')
+      .mockImplementation(function (this: GameSession) {
+        const response = originalGetState.call(this)
+        if (this === previousSession || delayed) return response
+        delayed = true
+        return initialization.then(() => response) as never
+      })
+
+    try {
+      const rematch = Promise.resolve(dispatch(host, { type: 'newGame', seed: 309 }))
+      const action = Promise.resolve(dispatch(host, {
+        type: 'action',
+        spaceId: 'forest',
+        requestId: 'old-generation-action',
+      }))
+      releaseInitialization()
+      await Promise.all([rematch, action])
+
+      expect(room.session).not.toBe(previousSession)
+      expect(room.session.state.actionSpaces.find((space) => space.id === 'forest')?.takenBy)
+        .toEqual([])
+      expect(sentMessagesOf(host)).toContainEqual({
+        type: 'error',
+        error: 'connection context changed before command ran',
+        requestId: 'old-generation-action',
+      })
+    } finally {
+      getState.mockRestore()
+    }
+  })
+
   it('finishes queued room commands before the same connection changes rooms', async () => {
     const deps = newDeps()
     const ctx = newCtx(deps)

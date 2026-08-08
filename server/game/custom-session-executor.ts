@@ -133,11 +133,10 @@ export class CustomSessionExecutor {
     this.customCards = customCards
   }
 
-  reserveWorkerSlot(replacing?: CustomSessionExecutor): boolean {
+  reserveWorkerSlot(): boolean {
     if (this.disposed) return false
     if (reservedSessionWorkers.has(this)) return true
     const claimed = claimedSessionWorkers()
-    if (replacing) claimed.delete(replacing)
     if (claimed.size >= MAX_CUSTOM_SESSION_WORKER_SLOTS) return false
     reservedSessionWorkers.add(this)
     return true

@@ -40,6 +40,7 @@ const workshopDraftToCustomCard = (draft: WorkshopDraft): CustomCardData => ({
 const userSessions = new Map<string, GameSession>()
 const sessionExecutors = new Map<string, CustomSessionExecutor>()
 const sessionLastAccess = new Map<string, number>()
+const sandboxReplacementGenerations = new Map<string, number>()
 // Workshop card db ids embedded in each sandbox session, so the admin kill
 // switch (#641) can dispose sessions still executing a taken-down card.
 const sessionCardDbIds = new Map<string, string[]>()
@@ -56,6 +57,7 @@ setInterval(() => {
       userSessions.delete(key)
       sessionExecutors.delete(key)
       sessionLastAccess.delete(key)
+      sandboxReplacementGenerations.delete(key)
       sessionCardDbIds.delete(key)
     }
   }
@@ -107,6 +109,7 @@ export const disposeSandboxSessionsUsingCard = (cardDbId: string): number => {
     userSessions.delete(key)
     sessionExecutors.delete(key)
     sessionLastAccess.delete(key)
+    sandboxReplacementGenerations.delete(key)
     sessionCardDbIds.delete(key)
     disposed += 1
   }
@@ -582,6 +585,10 @@ export const handleGameRoute = async (
 
   // Sandbox game: start a new single-player game with custom workshop cards loaded
   if (req.method === 'POST' && req.url === '/api/game/new-sandbox') {
+    const sessionKey = getSessionKey(req)
+    const replacementGeneration = (sandboxReplacementGenerations.get(sessionKey) ?? 0) + 1
+    sandboxReplacementGenerations.set(sessionKey, replacementGeneration)
+    sessionLastAccess.set(sessionKey, Date.now())
     let seed: number | undefined
     let customCardDbIds: string[] = []
     let playerCount = 2
@@ -723,9 +730,7 @@ export const handleGameRoute = async (
       },
     )
     const sandboxSession = created.session
-    if (created.executor && !created.executor.reserveWorkerSlot(
-      sessionExecutors.get(getSessionKey(req)),
-    )) {
+    if (created.executor && !created.executor.reserveWorkerSlot()) {
       created.executor.dispose()
       sandboxSession.dispose()
       sendJson(res, 503, { ok: false, error: 'executable session worker capacity reached' })
@@ -734,6 +739,12 @@ export const handleGameRoute = async (
     const resp = created.executor
       ? await created.executor.execute('getState', [])
       : sandboxSession.withCtx(() => sandboxSession.getState())
+    if (sandboxReplacementGenerations.get(sessionKey) !== replacementGeneration) {
+      created.executor?.dispose()
+      sandboxSession.dispose()
+      sendJson(res, 409, { ok: false, error: 'sandbox replaced by newer request' })
+      return true
+    }
     const result = respondWith(
       resp,
       sandboxSession,
@@ -748,7 +759,7 @@ export const handleGameRoute = async (
     if (!resp.ok) {
       created.executor?.dispose()
       sandboxSession.dispose()
-      sessionLastAccess.set(getSessionKey(req), Date.now())
+      sessionLastAccess.set(sessionKey, Date.now())
       sendJson(res, 200, payload)
       return true
     }

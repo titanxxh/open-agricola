@@ -171,16 +171,17 @@ describe('custom session routes', () => {
     const { GameSession } = await import('../game/authoritative-session.ts')
     const { CustomSessionExecutor } = await import('../game/custom-session-executor.ts')
     const slots = Array.from(
-      { length: 15 },
+      { length: 14 },
       () => new CustomSessionExecutor(new GameSession(), []),
     )
     slots.forEach((executor) => expect(executor.reserveWorkerSlot()).toBe(true))
-    const { handleGameRoute } = await import('../game-router.ts')
+    const { handleGameRoute, disposeSandboxSessionsUsingCard } = await import('../game-router.ts')
 
     try {
       const start = mockRes()
       await handleGameRoute(mockReq('POST', '/api/game/new-sandbox', {
         seed: 42,
+        customCardIds: [customCard.id],
       }, 'capacity-token'), start)
       expect(start.statusCode).toBe(200)
 
@@ -194,8 +195,10 @@ describe('custom session routes', () => {
 
       const current = mockRes()
       await handleGameRoute(mockReq('GET', '/api/game/state', {}, 'capacity-token'), current)
+      expect(JSON.parse(current.body).state.gameSeed).toBe(42)
       expect(JSON.parse(current.body).state).toEqual(JSON.parse(start.body).state)
     } finally {
+      disposeSandboxSessionsUsingCard(customCard.id)
       slots.forEach((executor) => {
         executor.dispose()
         executor.session.dispose()
@@ -243,6 +246,54 @@ describe('custom session routes', () => {
     expect(JSON.parse(current.body).state).toEqual(JSON.parse(start.body).state)
     expect(dispose).toHaveBeenCalledOnce()
     db.close()
+  })
+
+  it('keeps the last submitted concurrent sandbox replacement', async () => {
+    const db = new Database(':memory:')
+    database.runMigrations(db)
+    addUser(db, 'concurrent-author', 'concurrent-token')
+    const customCard = createRunawayCard(db, 'concurrent-author')
+    const gameDatabase = await import('../db.ts')
+    vi.spyOn(gameDatabase, 'getDb').mockReturnValue(db)
+    const { CustomSessionExecutor } = await import('../game/custom-session-executor.ts')
+    let releaseFirst = () => {}
+    const firstReady = new Promise<void>((resolve) => {
+      releaseFirst = resolve
+    })
+    const execute = vi.spyOn(CustomSessionExecutor.prototype, 'execute')
+      .mockImplementation(function (this: InstanceType<typeof CustomSessionExecutor>) {
+        const response = this.session.withCtx(() => this.session.getState())
+        return this.session.state.gameSeed === 42
+          ? firstReady.then(() => response)
+          : Promise.resolve(response)
+      })
+    const { handleGameRoute, disposeSandboxSessionsUsingCard } = await import('../game-router.ts')
+
+    try {
+      const firstResponse = mockRes()
+      const first = handleGameRoute(mockReq('POST', '/api/game/new-sandbox', {
+        seed: 42,
+        customCardIds: [customCard.id],
+      }, 'concurrent-token'), firstResponse)
+      await vi.waitFor(() => expect(execute).toHaveBeenCalledOnce())
+
+      const secondResponse = mockRes()
+      await handleGameRoute(mockReq('POST', '/api/game/new-sandbox', {
+        seed: 99,
+        customCardIds: [customCard.id],
+      }, 'concurrent-token'), secondResponse)
+      releaseFirst()
+      await first
+
+      const current = mockRes()
+      await handleGameRoute(mockReq('GET', '/api/game/state', {}, 'concurrent-token'), current)
+      expect(secondResponse.statusCode).toBe(200)
+      expect(firstResponse.statusCode).toBe(409)
+      expect(JSON.parse(current.body).state.gameSeed).toBe(99)
+    } finally {
+      disposeSandboxSessionsUsingCard(customCard.id)
+      db.close()
+    }
   })
 
   it('runs community-room commands through the WebSocket session worker', async () => {

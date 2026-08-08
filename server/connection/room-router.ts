@@ -910,7 +910,7 @@ function handleNewGame(ctx: ConnectionCtx, msg: Extract<ClientCommand, { type: '
     sendCommandError(ctx, err instanceof Error ? err.message : String(err), msg.requestId)
     return
   }
-  if (created.executor && !created.executor.reserveWorkerSlot(room.customSessionExecutor)) {
+  if (created.executor && !created.executor.reserveWorkerSlot()) {
     created.executor.dispose()
     created.session.dispose()
     sendCommandError(ctx, 'executable room capacity reached', msg.requestId)
@@ -1102,6 +1102,8 @@ export function dispatch(ctx: ConnectionCtx, msg: ClientCommand): void | Promise
   const fn = handlers[msg.type] as Handler | undefined
   if (!fn) { sendCommandError(ctx, `unknown command: ${msg.type}`, msg.requestId); return }
   const acceptedRoom = ctx.currentRoom
+  const acceptedRoomId = acceptedRoom?.id
+  const acceptedSession = acceptedRoom?.session
   const acceptedPlayerIndex = ctx.currentPlayerIndex
   const room = msg.type === 'joinRoom' ? ctx.registry.get(msg.roomId) : acceptedRoom
   const queuedRoom = room && (
@@ -1115,7 +1117,12 @@ export function dispatch(ctx: ConnectionCtx, msg: ClientCommand): void | Promise
     queuedRoom ? customRoomQueues.get(queuedRoom) : undefined,
   ].filter((queue): queue is Promise<void> => !!queue)
   const run = (): void | Promise<void> => {
-    if (ctx.currentRoom !== acceptedRoom || ctx.currentPlayerIndex !== acceptedPlayerIndex) {
+    if (
+      ctx.currentRoom !== acceptedRoom
+      || acceptedRoom?.id !== acceptedRoomId
+      || acceptedRoom?.session !== acceptedSession
+      || ctx.currentPlayerIndex !== acceptedPlayerIndex
+    ) {
       sendCommandError(ctx, 'connection context changed before command ran', msg.requestId)
       return
     }
