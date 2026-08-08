@@ -348,6 +348,41 @@ describe('room-manager ws sync', () => {
     expect(room.customSessionExecutor).toBeDefined()
   })
 
+  it('disposes a custom executor when an in-flight command completes an empty room', async () => {
+    const ws = new WebSocket(baseUrl) as TestSocket
+    ws.received = []
+    attachCollector(ws)
+    sockets.push(ws)
+    await waitForOpen(ws)
+    ws.send(JSON.stringify({ type: 'createRoom', name: 'P1', maxPlayers: 2 }))
+    const created = await waitForEvent(
+      ws,
+      (event): event is Extract<ServerEvent, { type: 'roomCreated' }> => event.type === 'roomCreated',
+    )
+    const room = wsServerResult.registry.get(created.roomId)!
+    room.status = 'playing'
+    const response = room.session.withCtx(() => room.session.getState())
+    const dispose = vi.fn()
+    let finishCommand = () => {}
+    const execute = vi.fn(() => new Promise<typeof response>((resolve) => {
+      finishCommand = () => {
+        room.session.state.gameOver = true
+        resolve(response)
+      }
+    }))
+    room.customSessionExecutor = { session: room.session, execute, dispose } as never
+    ws.send(JSON.stringify({ type: 'action', spaceId: 'forest' }))
+    await vi.waitFor(() => expect(execute).toHaveBeenCalledOnce())
+
+    const closed = new Promise<void>((resolve) => ws.once('close', () => resolve()))
+    ws.close()
+    await closed
+    expect(dispose).not.toHaveBeenCalled()
+
+    finishCommand()
+    await vi.waitFor(() => expect(dispose).toHaveBeenCalledOnce())
+  })
+
   it('accepts createRoom over websocket when oa_session cookie is valid', async () => {
     process.env.ALLOW_ANONYMOUS_WS = 'false'
     vi.resetModules()

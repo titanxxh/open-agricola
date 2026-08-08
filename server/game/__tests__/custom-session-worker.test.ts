@@ -140,6 +140,8 @@ describe('custom session executor', () => {
     expect(played.historyLength).toBeGreaterThan(0)
     expect(played.interaction.stateId).toBe('wait')
     const playedPayload = buildSessionSyncPayload(session, played, null, 'debug')
+    playedPayload.privateEvents = [{} as never]
+    playedPayload.publicEventCancellations = [{} as never]
 
     vi.useFakeTimers()
     const failedPromise = executor.execute('resolveChoice', [0, 'action-improvement-1'])
@@ -152,13 +154,16 @@ describe('custom session executor', () => {
     expect(failed.interaction).toEqual(played.interaction)
     expect(failed.state.players[0]!.minorHand).toContain(playable.cardJson.id)
     expect(session.cardWarnings).toContain('custom session command timed out')
-    expect(buildSessionSyncPayload(session, failed, null, 'debug')).toMatchObject({
+    const failedPayload = buildSessionSyncPayload(session, failed, null, 'debug')
+    expect(failedPayload).toMatchObject({
       ok: false,
       error: 'custom session command timed out',
       scores: playedPayload.scores,
       state: playedPayload.state,
       cardWarnings: ['custom session command timed out'],
     })
+    expect(failedPayload.privateEvents).toBeUndefined()
+    expect(failedPayload.publicEventCancellations).toBeUndefined()
 
     expect((await executor.execute('undoStep', [])).ok).toBe(true)
   }, 20_000)

@@ -228,6 +228,9 @@ const publishCommandResponse = (
     ctx.broadcaster.sendStateTo(ctx.ws, room, response, command.requestId, cause)
     return
   }
+  if (response.state.gameOver && room.players.length === 0) {
+    room.customSessionExecutor?.dispose()
+  }
   const replayIntent = replayIntentFromCommand(command)
   if (!ctx.committer || !ctx.committer.isRecording(room.id) || !replayIntent) {
     ctx.broadcaster.broadcastState(room, response, cause, command.requestId)

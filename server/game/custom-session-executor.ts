@@ -220,11 +220,12 @@ export class CustomSessionExecutor {
       error,
     }
     if (this.lastPayloads) {
-      const failed = (payload: GameSyncPayload): GameSyncPayload => ({
-        ...payload,
-        ok: false,
-        error,
-      })
+      const failed = (payload: GameSyncPayload): GameSyncPayload => {
+        const result = { ...payload, ok: false, error }
+        delete result.privateEvents
+        delete result.publicEventCancellations
+        return result
+      }
       payloadsByResponse.set(response, {
         debug: {
           ...failed(this.lastPayloads.debug),

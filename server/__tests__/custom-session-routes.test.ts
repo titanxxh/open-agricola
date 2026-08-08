@@ -260,12 +260,19 @@ describe('custom session routes', () => {
     const firstReady = new Promise<void>((resolve) => {
       releaseFirst = resolve
     })
+    let releaseCrossRoute = () => {}
+    const crossRouteReady = new Promise<void>((resolve) => {
+      releaseCrossRoute = resolve
+    })
     const execute = vi.spyOn(CustomSessionExecutor.prototype, 'execute')
       .mockImplementation(function (this: InstanceType<typeof CustomSessionExecutor>) {
         const response = this.session.withCtx(() => this.session.getState())
-        return this.session.state.gameSeed === 42
-          ? firstReady.then(() => response)
-          : Promise.resolve(response)
+        const wait = this.session.state.gameSeed === 42
+          ? firstReady
+          : this.session.state.gameSeed === 43
+            ? crossRouteReady
+            : null
+        return wait ? wait.then(() => response) : Promise.resolve(response)
       })
     const { handleGameRoute, disposeSandboxSessionsUsingCard } = await import('../game-router.ts')
 
@@ -290,6 +297,26 @@ describe('custom session routes', () => {
       expect(secondResponse.statusCode).toBe(200)
       expect(firstResponse.statusCode).toBe(409)
       expect(JSON.parse(current.body).state.gameSeed).toBe(99)
+
+      const crossRouteResponse = mockRes()
+      const crossRoute = handleGameRoute(mockReq('POST', '/api/game/new-sandbox', {
+        seed: 43,
+        customCardIds: [customCard.id],
+      }, 'concurrent-token'), crossRouteResponse)
+      await vi.waitFor(() => expect(execute).toHaveBeenCalledTimes(3))
+
+      const normalResponse = mockRes()
+      await handleGameRoute(mockReq('POST', '/api/game/new', {
+        seed: 77,
+      }, 'concurrent-token'), normalResponse)
+      releaseCrossRoute()
+      await crossRoute
+
+      const finalState = mockRes()
+      await handleGameRoute(mockReq('GET', '/api/game/state', {}, 'concurrent-token'), finalState)
+      expect(normalResponse.statusCode).toBe(200)
+      expect(crossRouteResponse.statusCode).toBe(409)
+      expect(JSON.parse(finalState.body).state.gameSeed).toBe(77)
     } finally {
       disposeSandboxSessionsUsingCard(customCard.id)
       db.close()

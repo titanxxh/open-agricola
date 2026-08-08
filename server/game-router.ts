@@ -40,7 +40,7 @@ const workshopDraftToCustomCard = (draft: WorkshopDraft): CustomCardData => ({
 const userSessions = new Map<string, GameSession>()
 const sessionExecutors = new Map<string, CustomSessionExecutor>()
 const sessionLastAccess = new Map<string, number>()
-const sandboxReplacementGenerations = new Map<string, number>()
+const sessionReplacementGenerations = new Map<string, number>()
 // Workshop card db ids embedded in each sandbox session, so the admin kill
 // switch (#641) can dispose sessions still executing a taken-down card.
 const sessionCardDbIds = new Map<string, string[]>()
@@ -57,7 +57,7 @@ setInterval(() => {
       userSessions.delete(key)
       sessionExecutors.delete(key)
       sessionLastAccess.delete(key)
-      sandboxReplacementGenerations.delete(key)
+      sessionReplacementGenerations.delete(key)
       sessionCardDbIds.delete(key)
     }
   }
@@ -109,7 +109,7 @@ export const disposeSandboxSessionsUsingCard = (cardDbId: string): number => {
     userSessions.delete(key)
     sessionExecutors.delete(key)
     sessionLastAccess.delete(key)
-    sandboxReplacementGenerations.delete(key)
+    sessionReplacementGenerations.delete(key)
     sessionCardDbIds.delete(key)
     disposed += 1
   }
@@ -572,11 +572,19 @@ export const handleGameRoute = async (
   }
 
   if (req.method === 'POST' && req.url === '/api/game/new') {
+    const sessionKey = getSessionKey(req)
+    const replacementGeneration = (sessionReplacementGenerations.get(sessionKey) ?? 0) + 1
+    sessionReplacementGenerations.set(sessionKey, replacementGeneration)
+    sessionLastAccess.set(sessionKey, Date.now())
     let seed: number | undefined
     try {
       const body = JSON.parse(await readBody(req)) as { seed?: number }
       if (typeof body.seed === 'number') seed = body.seed
     } catch { /* no body or invalid JSON — use random seed */ }
+    if (sessionReplacementGenerations.get(sessionKey) !== replacementGeneration) {
+      sendJson(res, 409, { ok: false, error: 'session replaced by newer request' })
+      return true
+    }
     setSessionForRequest(req, new GameSession(seed))
     const { result } = await callAndRespond(req, 'getState', [], s => s.getState())
     sendJson(res, 200, result)
@@ -586,8 +594,8 @@ export const handleGameRoute = async (
   // Sandbox game: start a new single-player game with custom workshop cards loaded
   if (req.method === 'POST' && req.url === '/api/game/new-sandbox') {
     const sessionKey = getSessionKey(req)
-    const replacementGeneration = (sandboxReplacementGenerations.get(sessionKey) ?? 0) + 1
-    sandboxReplacementGenerations.set(sessionKey, replacementGeneration)
+    const replacementGeneration = (sessionReplacementGenerations.get(sessionKey) ?? 0) + 1
+    sessionReplacementGenerations.set(sessionKey, replacementGeneration)
     sessionLastAccess.set(sessionKey, Date.now())
     let seed: number | undefined
     let customCardDbIds: string[] = []
@@ -739,7 +747,7 @@ export const handleGameRoute = async (
     const resp = created.executor
       ? await created.executor.execute('getState', [])
       : sandboxSession.withCtx(() => sandboxSession.getState())
-    if (sandboxReplacementGenerations.get(sessionKey) !== replacementGeneration) {
+    if (sessionReplacementGenerations.get(sessionKey) !== replacementGeneration) {
       created.executor?.dispose()
       sandboxSession.dispose()
       sendJson(res, 409, { ok: false, error: 'sandbox replaced by newer request' })
