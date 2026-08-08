@@ -62,6 +62,8 @@ type WorkerRequest = {
   args: unknown[]
   init?: {
     serialized: SerializedGameState
+    checkpoint: ReturnType<GameSession['createCommandCheckpoint']>
+    cardWarnings: string[]
     customCards: CustomCardData[]
   }
 }
@@ -75,6 +77,7 @@ type WorkerPayloads = {
 type WorkerState = {
   response: Omit<SessionResponse, 'state'>
   serialized: SerializedGameState
+  checkpoint: ReturnType<GameSession['createCommandCheckpoint']>
   payloads: WorkerPayloads
 }
 
@@ -143,10 +146,11 @@ export class CustomSessionExecutor {
       try {
         const message = await this.request(method, args)
         if (!message.ok) {
-          return message.response && message.serialized && message.payloads
+          return message.response && message.serialized && message.checkpoint && message.payloads
             ? this.applyWorkerState({
                 response: message.response,
                 serialized: message.serialized,
+                checkpoint: message.checkpoint,
                 payloads: message.payloads,
               })
             : this.failed(message.error)
@@ -174,10 +178,11 @@ export class CustomSessionExecutor {
     return this.enqueue(async () => {
       const message = await this.request(method, args)
       if (!message.ok) {
-        if (message.response && message.serialized && message.payloads) {
+        if (message.response && message.serialized && message.checkpoint && message.payloads) {
           this.applyWorkerState({
             response: message.response,
             serialized: message.serialized,
+            checkpoint: message.checkpoint,
             payloads: message.payloads,
           })
         }
@@ -210,10 +215,15 @@ export class CustomSessionExecutor {
 
   private applyWorkerState(message: WorkerState): SessionResponse {
     this.lastSerialized = message.serialized
-    this.session.withCtx(() => this.session.loadState(rehydrateState(message.serialized)))
-    for (const warning of message.payloads.debug.cardWarnings ?? []) {
-      if (!this.session.cardWarnings.includes(warning)) this.session.cardWarnings.push(warning)
-    }
+    this.session.withCtx(() => {
+      this.session.loadState(rehydrateState(message.serialized))
+      this.session.restoreCommandCheckpoint(message.checkpoint)
+    })
+    this.session.cardWarnings.splice(
+      0,
+      this.session.cardWarnings.length,
+      ...(message.payloads.debug.cardWarnings ?? []),
+    )
     const response: SessionResponse = { ...message.response, state: this.session.state }
     payloadsByResponse.set(response, message.payloads)
     return response
@@ -265,6 +275,10 @@ export class CustomSessionExecutor {
         ? {
             init: {
               serialized: this.initialSerialized(),
+              checkpoint: JSON.parse(JSON.stringify(
+                this.session.createCommandCheckpoint(),
+              )) as ReturnType<GameSession['createCommandCheckpoint']>,
+              cardWarnings: [...this.session.cardWarnings],
               customCards: this.customCards,
             },
           }
@@ -303,7 +317,9 @@ export class CustomSessionExecutor {
       const timer = setTimeout(() => {
         cleanup()
         reset()
-        reject(new Error('custom session command timed out'))
+        const warning = 'custom session command timed out'
+        if (!this.session.cardWarnings.includes(warning)) this.session.cardWarnings.push(warning)
+        reject(new Error(warning))
       }, COMMAND_TIMEOUT_MS)
       worker.on('message', onMessage)
       worker.once('error', onError)

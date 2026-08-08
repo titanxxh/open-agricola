@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { CustomCardData } from '../../../shared/cards/session-card-context.ts'
 import { validateAndCompileCustomCode } from '../../custom-code/engine.ts'
 import {
@@ -57,6 +57,7 @@ const setup = (customCard: CustomCardData, extraCards: CustomCardData[] = []) =>
 }
 
 afterEach(() => {
+  vi.useRealTimers()
   executors.splice(0).forEach((executor) => executor.dispose())
 })
 
@@ -109,7 +110,7 @@ describe('custom session executor', () => {
     expect((await stalled).ok).toBe(false)
   }, 20_000)
 
-  it('preserves undo history after a failed custom command', async () => {
+  it('preserves undo history and warnings after a parent-level timeout', async () => {
     const playable: CustomCardData = {
       cardType: 'minor',
       cardJson: {
@@ -131,11 +132,17 @@ describe('custom session executor', () => {
     expect(played.historyLength).toBeGreaterThan(0)
     expect(played.interaction.stateId).toBe('wait')
 
-    const failed = await executor.execute('resolveChoice', [0, 'action-improvement-1'])
+    vi.useFakeTimers()
+    const failedPromise = executor.execute('resolveChoice', [0, 'action-improvement-1'])
+    await vi.advanceTimersByTimeAsync(10_000)
+    const failed = await failedPromise
+    vi.useRealTimers()
     expect(failed.ok).toBe(false)
+    expect(failed.error).toBe('custom session command timed out')
     expect(failed.historyLength).toBeGreaterThan(0)
     expect(failed.interaction).toEqual(played.interaction)
     expect(failed.state.players[0]!.minorHand).toContain(playable.cardJson.id)
+    expect(session.cardWarnings).toContain('custom session command timed out')
 
     expect((await executor.execute('undoStep', [])).ok).toBe(true)
   }, 20_000)

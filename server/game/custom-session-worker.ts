@@ -18,6 +18,8 @@ type Request = {
   args: unknown[]
   init?: {
     serialized: SerializedGameState
+    checkpoint: ReturnType<GameSession['createCommandCheckpoint']>
+    cardWarnings: string[]
     customCards: CustomCardData[]
   }
 }
@@ -27,6 +29,7 @@ type Success = {
   ok: true
   response: Omit<SessionResponse, 'state'>
   serialized: SerializedGameState
+  checkpoint: ReturnType<GameSession['createCommandCheckpoint']>
   payloads: {
     debug: GameSyncPayload
     spectator: GameSyncPayload
@@ -38,9 +41,15 @@ type Success = {
 let session: GameSession | null = null
 let customCards: CustomCardData[] = []
 
-const restore = (serialized: SerializedGameState): void => {
+const restore = (
+  serialized: SerializedGameState,
+  checkpoint: ReturnType<GameSession['createCommandCheckpoint']>,
+  cardWarnings: string[],
+): void => {
   session?.dispose()
   session = new GameSession(rehydrateState(serialized), customCards)
+  session.restoreCommandCheckpoint(checkpoint)
+  session.cardWarnings.splice(0, session.cardWarnings.length, ...cardWarnings)
 }
 
 const dispatch = (method: CustomSessionMethod, args: unknown[]): { response: SessionResponse; raw?: unknown } => {
@@ -84,6 +93,9 @@ const buildResult = (response: SessionResponse) => {
   return {
     response: responseWithoutState,
     serialized: debug.state,
+    checkpoint: JSON.parse(JSON.stringify(
+      session.createCommandCheckpoint(),
+    )) as ReturnType<GameSession['createCommandCheckpoint']>,
     payloads: { debug, spectator, viewers },
   }
 }
@@ -94,7 +106,7 @@ parentPort?.on('message', (request: Request) => {
   try {
     if (request.init) {
       customCards = request.init.customCards
-      restore(request.init.serialized)
+      restore(request.init.serialized, request.init.checkpoint, request.init.cardWarnings)
     }
     if (!session) throw new Error('custom session worker is not initialized')
     const warningCount = session.cardWarnings.length

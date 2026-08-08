@@ -184,6 +184,39 @@ describe('handleCreateRoom', () => {
     expect(ctx.currentRoom!.session.getCustomCardDefs()).toEqual([])
   })
 
+  it('keeps current custom card metadata when a rematch cannot allocate its room', () => {
+    const deps = newDeps()
+    const ctx = newCtx(deps)
+    ctx.currentUserId = 'u1'
+    dispatch(ctx, { type: 'createRoom', maxPlayers: 2 })
+    const room = ctx.currentRoom!
+    const customCard: CustomCardData = {
+      cardType: 'minor',
+      cardJson: {
+        id: 'CUSTOM_Pinned',
+        name: 'Pinned',
+        deck: 'CUSTOM',
+        number: 1,
+        desc: [],
+      },
+    }
+    room.customCardDbIds = ['deleted-card']
+    room.customCards = [customCard]
+    markRoomStarted(ctx)
+    vi.spyOn(deps.persistence, 'hasRoomId').mockReturnValue(true)
+
+    dispatch(ctx, { type: 'newGame', seed: 309, requestId: 'new-1' })
+
+    expect(ctx.currentRoom).toBe(room)
+    expect(room.customCardDbIds).toEqual(['deleted-card'])
+    expect(room.customCards).toEqual([customCard])
+    expect(sentMessagesOf(ctx)).toContainEqual({
+      type: 'error',
+      error: 'unable to allocate room id',
+      requestId: 'new-1',
+    })
+  })
+
   it('preserves direct Parent Card dealing when starting a new game', () => {
     const ctx = newCtx()
     ctx.currentUserId = 'u1'

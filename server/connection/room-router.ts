@@ -859,8 +859,6 @@ function handleNewGame(ctx: ConnectionCtx, msg: Extract<ClientCommand, { type: '
     { liveOnly: true },
   )
   const customCards = reloaded.cards
-  room.customCardDbIds = reloaded.loadedDbIds
-  room.customCards = customCards
   const enableParentCards = room.enableParentCards ?? room.session.state.enableParentCards
   const draftMode = room.draftMode ?? room.session.state.draftMode
   const draftPoolSize = room.draftPoolSize ?? room.session.state.draftPoolSize
@@ -924,6 +922,7 @@ function handleNewGame(ctx: ConnectionCtx, msg: Extract<ClientCommand, { type: '
   room.enableThroughTheSeasons = enableThroughTheSeasons
   room.enableFarmersOfTheMoor = enableFarmersOfTheMoor
   room.allowIncompleteFarmersOfTheMoorMinorDeal = allowIncompleteFarmersOfTheMoorMinorDeal
+  room.customCardDbIds = reloaded.loadedDbIds
   room.customCards = customCards
   ctx.committer?.lockNewRoom(room)
   const names = room.players.map((player) => [player.playerIndex, player.name] as [number, string])
