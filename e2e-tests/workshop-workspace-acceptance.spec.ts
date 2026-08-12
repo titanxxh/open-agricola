@@ -1497,8 +1497,15 @@ test.describe('AI card workspace acceptance matrix', () => {
         const account = await createAccount(request, page)
         const pageErrors: string[] = []
         page.on('pageerror', error => pageErrors.push(error.message))
-        await scenario.run({ page, request, account, variant })
-        expect(pageErrors).toEqual([])
+        try {
+          await scenario.run({ page, request, account, variant })
+          expect(pageErrors).toEqual([])
+        } finally {
+          await responseJson(await api(request, account, '/api/game/new', {
+            method: 'POST',
+            data: {},
+          }))
+        }
       })
     }
   }
