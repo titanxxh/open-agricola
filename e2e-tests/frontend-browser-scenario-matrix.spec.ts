@@ -233,8 +233,9 @@ const expectTouchTarget = async (locator: Locator, minSize = 44) => {
 }
 
 const completePlowInteraction = async (page: Page, locale: LocaleScenario) => {
+  await page.locator('.action-board-precision-toggle').click()
   const farmland = page.locator('[data-action-id="farmland"] button').first()
-  await expectTouchTarget(farmland, 24)
+  await expectTouchTarget(farmland)
   await farmland.click()
   await expect(page.locator('.action-board')).toBeVisible()
   await expect(page.locator('.farm-grid')).toBeVisible()

@@ -7,6 +7,7 @@ import {
   type APIResponse,
   type Page,
 } from '@playwright/test'
+import { approveCurrentDraft, publish } from '../server/workshop-drafts.ts'
 import { BACKEND_URL, FRONTEND_URL } from './fixtures'
 
 type Locale = 'zh' | 'en'
@@ -366,20 +367,26 @@ const versions = async (
   card_json: Record<string, unknown>
 }> }>(await api(request, account, `/api/workshop/cards/${cardId}/versions`))
 
-const withDatabase = <T>(read: (database: Database.Database) => T): T => {
+const withDatabase = <T>(
+  run: (database: Database.Database) => T,
+  readonly = true,
+): T => {
   const path = process.env.DB_PATH ?? 'data/open-agricola.db'
-  const database = new Database(path, { readonly: true })
+  const database = new Database(path, { readonly })
   try {
-    return read(database)
+    return run(database)
   } finally {
     database.close()
   }
 }
 
-const fakeImageService = async (page: Page): Promise<unknown[]> => {
-  const requests: unknown[] = []
+const fakeImageService = async (page: Page): Promise<string[]> => {
+  const prompts: string[] = []
   await page.route('https://generativelanguage.googleapis.com/**', route => {
-    requests.push(route.request().postDataJSON())
+    const request = route.request().postDataJSON() as {
+      contents?: Array<{ parts?: Array<{ text?: string }> }>
+    }
+    prompts.push(request.contents?.[0]?.parts?.[0]?.text ?? '')
     return route.fulfill({
       status: 200,
       contentType: 'application/json',
@@ -392,7 +399,7 @@ const fakeImageService = async (page: Page): Promise<unknown[]> => {
       }),
     })
   })
-  return requests
+  return prompts
 }
 
 const fakeChatService = async (
@@ -470,7 +477,7 @@ const scenarioArtCandidates = async ({
   account,
   variant,
 }: ScenarioContext) => {
-  const imageRequests = await fakeImageService(page)
+  const imagePrompts = await fakeImageService(page)
   const workspace = await createDraft(request, account)
   await openEditor(page, workspace.id)
   await stage(page, variant.locale, '卡面图', 'Card art')
@@ -504,11 +511,11 @@ const scenarioArtCandidates = async ({
       )
     }
   }
-  const generatedRequest = JSON.stringify(imageRequests[0])
-  expect(generatedRequest).toContain(subject)
-  expect(generatedRequest).toContain('0.95:1')
-  expect(generatedRequest).not.toMatch(/512|534|537|像素|pixel/i)
-  expect(generatedRequest).not.toMatch(/金边|gold[- ]trimmed|gold border/i)
+  const generatedPrompt = imagePrompts[0]!
+  expect(generatedPrompt).toContain(subject)
+  expect(generatedPrompt).toContain('0.95:1')
+  expect(generatedPrompt).not.toMatch(/512|534|537|像素|pixel/i)
+  expect(generatedPrompt).not.toMatch(/金边|gold[- ]trimmed|gold border/i)
   const fourthLabels = await page.locator('.aicw-art-candidates button').evaluateAll(buttons =>
     buttons.map(button => button.getAttribute('aria-label') ?? ''),
   )
@@ -585,15 +592,13 @@ const scenarioAbilityCandidates = async ({
   variant,
 }: ScenarioContext) => {
   const workspace = await createDraft(request, account)
-  const generatedId = `CUSTOM_${unique('GeneratedAbility')}`
-  const generatedName = unique('Generated ability card')
   const validSource = `
-const CARD_ID = '${generatedId}'
+const CARD_ID = '${workspace.draft.cardId}'
 const CARD_DEF = {
   cardType: 'minor',
   meta: {
     id: CARD_ID,
-    name: '${generatedName}',
+    name: '${workspace.draft.name}',
     desc: ['Generated ability description'],
     cost: { wood: 2 },
     vp: 2,
@@ -679,12 +684,12 @@ const CARD_IMPL = {}
   const saved = await loadWorkspace(request, account, workspace.id)
   expect(saved.draft.effectCode).toContain('CARD_IMPL')
   expect(saved.draft).toMatchObject({
-    cardId: generatedId,
+    cardId: workspace.draft.cardId,
     cardType: 'minor',
-    name: generatedName,
+    name: workspace.draft.name,
     cardJson: {
-      id: generatedId,
-      name: generatedName,
+      id: workspace.draft.cardId,
+      name: workspace.draft.name,
       card_type: 'minor',
       desc: ['Generated ability description'],
       cost: { wood: 2 },
@@ -1073,13 +1078,7 @@ const scenarioHandoff = async ({
     unique('handoff ability prompt'),
   )
   workspace = adopted.workspace
-  const published = await responseJson<{ workspace: Workspace; versionId: string }>(
-    await api(request, account, `/api/workshop/cards/${workspace.id}/publish`, {
-      method: 'POST',
-      data: { baseRevision: workspace.revision },
-    }),
-  )
-  workspace = published.workspace
+  const versionId = adopted.versionId
 
   await responseJson(await api(
     request,
@@ -1088,7 +1087,7 @@ const scenarioHandoff = async ({
     {
       method: 'POST',
       data: {
-        versionId: published.versionId,
+        versionId,
         authorConfirmed: true,
         runtimeErrors: ['deterministic runtime failure'],
       },
@@ -1115,7 +1114,7 @@ const scenarioHandoff = async ({
           cardWarnings: ['deterministic sandbox warning'],
           customCardVersionsLoaded: [{
             cardId: workspace.id,
-            versionId: published.versionId,
+            versionId,
           }],
         }),
       })
@@ -1125,8 +1124,8 @@ const scenarioHandoff = async ({
   const launch = page.getByRole('button', {
     name: text(
       variant.locale,
-      '发布当前版本并启动沙盒',
-      'Publish current version and start sandbox',
+      '固化当前版本并启动沙盒',
+      'Pin current version and start sandbox',
     ),
   })
   page.once('dialog', dialog => dialog.accept())
@@ -1163,7 +1162,7 @@ const scenarioHandoff = async ({
   }
   expect(sandbox.customCardVersionsLoaded).toEqual([{
     cardId: workspace.id,
-    versionId: published.versionId,
+    versionId,
   }])
   await expect(sandboxConfirmation).toBeEnabled()
   await sandboxConfirmation.check()
@@ -1281,18 +1280,24 @@ const scenarioPrivacy = async ({
     },
   ))
   workspace = art.workspace
-  workspace = (await adoptAbility(
+  const adopted = await adoptAbility(
     request,
     account,
     workspace,
     privateAbilityPrompt,
-  )).workspace
-  workspace = (await responseJson<{ workspace: Workspace }>(await api(
-    request,
-    account,
-    `/api/workshop/cards/${workspace.id}/publish`,
-    { method: 'POST', data: { baseRevision: workspace.revision } },
-  ))).workspace
+  )
+  workspace = adopted.workspace
+  withDatabase(database => {
+    approveCurrentDraft(database, {
+      cardId: workspace.id,
+      authorId: workspace.authorId,
+    })
+    publish(database, {
+      cardId: workspace.id,
+      authorId: workspace.authorId,
+      baseRevision: workspace.revision,
+    })
+  }, false)
 
   const ownerPayload = await responseJson<{ workspace: Workspace }>(
     await api(request, account, `/api/workshop/cards/${workspace.id}/workspace`),
