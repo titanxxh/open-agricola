@@ -624,7 +624,7 @@ https://<backend-origin>/api/auth/oauth/google/callback
 
 ### 数据备份
 
-备份必须同时包含 SQLite、Viewer、Replay assets、card art 和 deletion ledger。release 自动部署已在每次切换新版本前生成同等内容的 `backups/pre-<ref>-<timestamp>.tgz`，并配对 `pre-<ref>-<timestamp>.manifest.json` 证明目标镜像已在一次性副本上完成迁移和恢复验证（见「三、更新部署」）。manifest 中的 `targetBuildId` 只证明该构建兼容，`archiveSha256` 和 `archiveSizeBytes` 绑定实际归档；换用其他构建恢复时必须重新运行 `scripts/validate-backup.ts`。下述手动命令用于部署之外的场景。以下命令假定 ledger 保持默认的 `/app/data/replay-removals.jsonl`；先停后端，避免备份跨越一次 Room Commit：
+备份必须同时包含 SQLite、Viewer、Replay assets、card art 和 deletion ledger。`deploy-backend.sh` 会在每次切换新版本前生成同等内容的 `backups/pre-<ref>-<timestamp>.tgz`，并配对 `pre-<ref>-<timestamp>.manifest.json` 证明目标镜像已在一次性副本上完成迁移和恢复验证（见「三、更新部署」）。manifest 中的 `targetBuildId` 只证明该构建兼容，`archiveSha256` 和 `archiveSizeBytes` 绑定实际归档；换用其他构建恢复时必须重新运行 `scripts/validate-backup.ts`。下述手动命令用于部署之外的场景。以下命令假定 ledger 保持默认的 `/app/data/replay-removals.jsonl`；先停后端，避免备份跨越一次 Room Commit：
 
 ```bash
 mkdir -p backups

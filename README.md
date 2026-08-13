@@ -15,16 +15,16 @@
 
 - 后端权威 + WebSocket 实时多人同步
 - 2-6 人房间、simultaneous draft、Community Deck、自定义工坊卡
-- 888 张 BGA A-E canonical 卡牌定义已对齐；Parent Cards、Through the Seasons、Farmers of the Moor complexity III 已接入，细节见卡牌实现现状文档
-- **LLM-Assisted Card Design** — 浏览器内调用 LLM 设计自定义卡牌，自动生成卡牌艺术，PR 一键提交到工坊
-- 一键 Docker 自部署（自建 VPS + GitHub Pages 双部署）
+- 888 张 BGA A-E canonical 卡牌定义已覆盖并完成审计（含已接受差异）；Parent Cards、Through the Seasons、Farmers of the Moor complexity III 已接入，细节见卡牌实现现状文档
+- **LLM-Assisted Card Design** — 浏览器内调用 LLM 设计自定义卡牌，自动生成农场主画风的卡牌图片和**实现代码**；配置 GitHub 集成后可从工坊提交 PR
+- 发布 GitHub Release 后自动部署 GitHub Pages 前端；后端通过 Docker Compose 部署到自建 VPS，并由 owner 在可信本机触发更新
 - 自定义代码沙盒（TypeScript AST 校验 + VM 隔离执行）
 
 ## Live Demo
 
 https://titanxxh.github.io/open-agricola/
 
-<!-- TODO: 截图占位（后续 PR 补） -->
+![Open Agricola 游戏运行截图](docs/assets/gameplay-screenshot.webp)
 
 ## Quick Start
 
@@ -88,10 +88,10 @@ docs/      架构、部署、平台设计、卡牌进度
 ![Node](https://img.shields.io/badge/node-22-brightgreen)
 ![TypeScript](https://img.shields.io/badge/TypeScript-5-blue)
 ![React](https://img.shields.io/badge/React-19-61dafb)
-![Vite](https://img.shields.io/badge/Vite-7-646cff)
+![Vite](https://img.shields.io/badge/Vite-8-646cff)
 ![pnpm](https://img.shields.io/badge/pnpm-10-f69220)
 
-后端 Node.js + WebSocket + SQLite（better-sqlite3）；前端 React 19 + Vite 7 + TypeScript。
+后端 Node.js + WebSocket + SQLite（better-sqlite3）；前端 React 19 + Vite 8 + TypeScript。
 
 ## Documentation
 
