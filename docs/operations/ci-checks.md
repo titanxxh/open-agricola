@@ -42,17 +42,12 @@ curl -sL -H "Authorization: Bearer $GH_TOKEN" \
 gh run view <RUN_ID> --log-failed
 ```
 
-## 手动触发部署 workflow
+## 手动触发前端部署
 
 ```bash
 curl -X POST -H "Authorization: Bearer $GH_TOKEN" \
   -H "Accept: application/vnd.github+json" \
   https://api.github.com/repos/titanxxh/open-agricola/actions/workflows/deploy-pages.yml/dispatches \
-  -d '{"ref":"main"}'
-
-curl -X POST -H "Authorization: Bearer $GH_TOKEN" \
-  -H "Accept: application/vnd.github+json" \
-  https://api.github.com/repos/titanxxh/open-agricola/actions/workflows/deploy-backend.yml/dispatches \
   -d '{"ref":"main"}'
 ```
 
@@ -71,13 +66,21 @@ curl -s -H "Authorization: Bearer $GH_TOKEN" \
 
 前端关键 variable：`VITE_API_BASE`（HTTPS 后端 base，如 `https://open-agricola.duckdns.org`）、`VITE_WS_BASE`（`wss://.../ws`）、`BGA_CDN_BASE_URL`。
 
-后端部署关键 variable：`DEPLOY_HOST`、`DEPLOY_USER`、`DEPLOY_REMOTE_DIR`、`ACCOUNT_REGISTRATION_POLICY`；还需 Actions secret `DEPLOY_SSH_PRIVATE_KEY`。
+GitHub Actions 固定使用 `ubuntu-latest`；额度不足时 workflow 直接失败，不切换到 self-hosted runner。
 
-## 切换 GitHub Actions runner
+## 本地可信操作
+
+长期凭据只保存在已忽略的本地 `.env` 或本机 SSH 配置中：
 
 ```bash
-pnpm run set-runner-label -- github       # RUNNER_LABEL=ubuntu-latest
-pnpm run set-runner-label -- self-hosted  # RUNNER_LABEL=self-hosted
+pnpm test:llm:live
+pnpm run sync-bga-cdn
+
+set -a
+source .env
+set +a
+gh workflow run deploy-pages.yml --ref main  # 仅在 BGA_CDN_BASE_URL 更新后执行
+./deploy-backend.sh root@open-agricola.duckdns.org main /root/open-agricola
 ```
 
 ## 引用

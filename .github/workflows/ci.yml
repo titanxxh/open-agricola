@@ -13,7 +13,7 @@ concurrency:
 
 jobs:
   check-prompt-sync:
-    runs-on: ${{ vars.RUNNER_LABEL || 'ubuntu-latest' }}
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
 
@@ -31,7 +31,7 @@ jobs:
         run: pnpm run check:prompt-sync -- --strict
 
   llm-cards-record:
-    runs-on: ${{ vars.RUNNER_LABEL || 'ubuntu-latest' }}
+    runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v6
@@ -50,7 +50,7 @@ jobs:
         run: pnpm test:llm
 
   verify:
-    runs-on: ${{ vars.RUNNER_LABEL || 'ubuntu-latest' }}
+    runs-on: ubuntu-latest
     timeout-minutes: 30
     env:
       BGA_CDN_BASE_URL: ${{ vars.BGA_CDN_BASE_URL }}

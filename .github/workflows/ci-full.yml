@@ -11,7 +11,7 @@ concurrency:
 
 jobs:
   full:
-    runs-on: ${{ vars.RUNNER_LABEL || 'ubuntu-latest' }}
+    runs-on: ubuntu-latest
     timeout-minutes: 60
     env:
       BGA_CDN_BASE_URL: ${{ vars.BGA_CDN_BASE_URL }}

@@ -93,19 +93,7 @@ pnpm test:llm:live
 
 ## CI / Workflow
 
-`.github/workflows/ci.yml` 在 push / PR 运行 `pnpm test:llm`，只回放 golden。真实调用外部 LLM 的健康检查仅由 `.github/workflows/ci-llm-cards.yml` 的 `workflow_dispatch` 手动触发，避免 API key、余额、限流和模型输出波动影响普通 CI。
-
-工作流：`.github/workflows/ci-llm-cards.yml`
-
-触发方式：
-
-```bash
-GH_TOKEN="$(grep '^GH_TOKEN=' .env | cut -d= -f2-)"
-curl -X POST -H "Authorization: Bearer $GH_TOKEN" \
-  -H "Accept: application/vnd.github+json" \
-  https://api.github.com/repos/titanxxh/open-agricola/actions/workflows/ci-llm-cards.yml/dispatches \
-  -d '{"ref":"<branch-name>"}'
-```
+`.github/workflows/ci.yml` 只运行确定性的 `pnpm test:llm` golden 回放。真实调用外部 LLM 的健康检查仅在 owner 控制的本机运行 `pnpm test:llm:live`，API key 从已忽略的本地 `.env` 读取，不进入 GitHub Actions。
 
 ## Fixture 三段式
 
