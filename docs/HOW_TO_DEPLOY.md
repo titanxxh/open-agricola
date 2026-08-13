@@ -417,13 +417,13 @@ docker compose logs -f app
 
 ### 触发部署
 
-发布 GitHub Release 后自动部署（`.github/workflows/deploy-pages.yml`，`on: release: published`）：
+发布 GitHub Release 后自动部署前端（`.github/workflows/deploy-pages.yml`，`on: release: published`）：
 
 ```bash
 gh release create v0.3.0 --generate-notes
 ```
 
-也可以在 GitHub UI 操作：Releases → Draft a new release → 新建 tag（`vX.Y.Z`）→ Generate release notes → Publish。一次 release 会同时触发前端与后端部署。Actions 页面手动触发（workflow_dispatch）时部署 `main` 最新。
+也可以在 GitHub UI 操作：Releases → Draft a new release → 新建 tag（`vX.Y.Z`）→ Generate release notes → Publish。后端不会由 release 自动部署。Actions 页面手动触发（workflow_dispatch）时部署 `main` 最新前端。
 
 部署成功后访问：`https://YOUR_USER.github.io/open-agricola/`
 
@@ -454,19 +454,13 @@ PUBLIC_ASSET_LOCAL_DIR=../open-agricola-assets pnpm dev
 
 ### 后端
 
-发布 GitHub Release 后，`.github/workflows/deploy-backend.yml` 自动调用 `deploy-backend.sh` 部署 release tag 对应的 commit（Actions 页面手动触发时部署 `main` 最新）。需要配置 Actions variables `DEPLOY_HOST`、`DEPLOY_USER`、`DEPLOY_REMOTE_DIR`、`ACCOUNT_REGISTRATION_POLICY`，以及 secret `DEPLOY_SSH_PRIVATE_KEY`。
-
-`deploy-backend.sh` 在切换新版本前自动做完整备份：先 build 新镜像（旧版本继续服务），然后停止 app，把 `app-data` volume 全量打包为 `backups/pre-<ref>-<timestamp>.tgz`（含 SQLite、card art、Replay Viewer、Replay assets、删除 ledger），同时刷新 `backups/replay-removals.latest.jsonl` 并保存 `.env` 快照 `backups/env-pre-<ref>-<timestamp>`（600 权限）。归档生成后，目标镜像会在一次性可写副本上执行目标数据库迁移、删除 ledger 重放、SQLite `integrity_check`、所有活动 Room 反序列化、Replay metadata/Head/Segment、内容寻址 assets 和 Viewer 构建校验；配置在 `/app/data` 下的自定义 Replay 路径会映射到解包副本，原归档保持不变。通过后写入同名 `.manifest.json`，记录归档 SHA-256/大小、源/目标 Build、目标 ref、迁移前后数据库 schema、Replay schema 及校验计数。备份或语义校验失败会拉回旧版本 app 并中止部署（Actions run 失败）；app 停止后到新版本启动成功之间部署被中断（例如被新的部署 run 取消）时同样自动拉回旧容器。脚本自动清理旧的 pre-deploy 备份及配对 manifest：保留最近 5 份，且按 ADR-0010 的备份副本上限删除超过 30 天的归档；手动备份（非 `pre-` 前缀）不受影响。备份归档、manifest 与 ledger 快照为 600 权限、`backups/` 目录为 700。停机窗口只覆盖打包、语义校验和启动新容器，不包含镜像构建。恢复流程见[数据备份](#数据备份)。
-
-手动更新：
+后端只在 owner 控制的本机部署。SSH 私钥保留在本机，`ACCOUNT_REGISTRATION_POLICY` 由服务器 `.env` 提供；两者都不写入 GitHub Actions：
 
 ```bash
-cd open-agricola
-git pull
-docker compose up -d --build
-# 或 Caddy 方案：
-docker compose -f docker-compose.prod.yml up -d --build
+./deploy-backend.sh root@open-agricola.duckdns.org v0.3.0 /root/open-agricola
 ```
+
+`deploy-backend.sh` 在切换新版本前自动做完整备份：先 build 新镜像（旧版本继续服务），然后停止 app，把 `app-data` volume 全量打包为 `backups/pre-<ref>-<timestamp>.tgz`（含 SQLite、card art、Replay Viewer、Replay assets、删除 ledger），同时刷新 `backups/replay-removals.latest.jsonl` 并保存 `.env` 快照 `backups/env-pre-<ref>-<timestamp>`（600 权限）。归档生成后，目标镜像会在一次性可写副本上执行目标数据库迁移、删除 ledger 重放、SQLite `integrity_check`、所有活动 Room 反序列化、Replay metadata/Head/Segment、内容寻址 assets 和 Viewer 构建校验；配置在 `/app/data` 下的自定义 Replay 路径会映射到解包副本，原归档保持不变。通过后写入同名 `.manifest.json`，记录归档 SHA-256/大小、源/目标 Build、目标 ref、迁移前后数据库 schema、Replay schema 及校验计数。备份或语义校验失败会拉回旧版本 app 并使本地部署命令失败；app 停止后到新版本启动成功之间本地 SSH 被中断时同样自动拉回旧容器。脚本自动清理旧的 pre-deploy 备份及配对 manifest：保留最近 5 份，且按 ADR-0010 的备份副本上限删除超过 30 天的归档；手动备份（非 `pre-` 前缀）不受影响。备份归档、manifest 与 ledger 快照为 600 权限、`backups/` 目录为 700。停机窗口只覆盖打包、语义校验和启动新容器，不包含镜像构建。恢复流程见[数据备份](#数据备份)。
 
 数据（SQLite 数据库、card art）存储在 Docker volume 中，重建容器不会丢失。
 

@@ -683,7 +683,7 @@ Draft Version 只序列化最终卡牌内容和各分区已采用候选的 prove
 | TypeScript AST 验证 + isolated-vm 沙盒 | `shared/custom-code/ast-validator.ts`, `server/custom-code/{compiler, engine, client, executor-worker, isolate-runner, runtime, injected-helpers}.ts` |
 | 卡牌版本历史                         | `workshop_card_versions` 表, versions/restore API, WorkshopPage 版本面板                                                          |
 | 工坊精选页面                         | `workshop_cards.featured` 列, admin 精选切换, Featured 标签页                                                                        |
-| 生产部署 (Docker + GitHub Pages)   | `Dockerfile`, `docker-compose.prod.yml`, `deploy-backend.sh`, `.github/workflows/{deploy-pages,deploy-backend}.yml`, `client/config.ts` |
+| 生产部署 (Docker + GitHub Pages)   | `Dockerfile`, `docker-compose.prod.yml`, `deploy-backend.sh`, `.github/workflows/deploy-pages.yml`, `client/config.ts` |
 | 管理员角色                          | `server/auth.ts` isAdmin(), `ADMIN_USERS` 环境变量                                                                               |
 | 管理员 API                        | `GET/DELETE /api/admin/cards`, `GET /api/admin/cards/:id/export`, `GET /api/admin/users`（自证发布的 status 切换端点已随 PRD #634 移除） |
 | 卡牌发布/取消发布                      | PR-gated（PRD #634）：GitHub App GraphQL 定论 pin 被审版本 → 作者 publish 再校验后置 live；非作者只能看到 live 卡                                                             |

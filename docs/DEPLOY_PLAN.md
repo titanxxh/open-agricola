@@ -3,6 +3,5 @@
 本文件保留为旧链接入口。当前部署方案与操作步骤统一维护在
 [`HOW_TO_DEPLOY.md`](HOW_TO_DEPLOY.md)。
 
-自动部署行为以 `.github/workflows/deploy-pages.yml` 和
-`.github/workflows/deploy-backend.yml` 为准；手动后端部署入口为
-`deploy-backend.sh`。
+前端自动部署行为以 `.github/workflows/deploy-pages.yml` 为准；后端仅在
+owner 控制的本机通过 `deploy-backend.sh` 部署，SSH 身份只保留在本地。
