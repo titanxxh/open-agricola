@@ -1,8 +1,6 @@
 name: E2E
 
 on:
-  schedule:
-    - cron: '0 18 * * *'   # daily 18:00 UTC = 02:00 CST (Beijing) next day, same cadence as CI Full
   workflow_dispatch:
 
 concurrency:
