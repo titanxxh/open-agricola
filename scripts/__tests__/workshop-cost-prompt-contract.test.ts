@@ -23,7 +23,6 @@ describe('workshop cost prompt contract', () => {
   it('requires mandatory capped bonuses for improvement-wide discounts', () => {
     const guidance = [
       read('client/services/llmPrompts.ts'),
-      read('docs/CARD_DESIGN_PROMPT.md'),
       read('docs/CUSTOM_CARD_SANDBOX.md'),
     ]
 

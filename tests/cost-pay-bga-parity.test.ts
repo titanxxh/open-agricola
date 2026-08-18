@@ -113,7 +113,7 @@ const BGA_HARNESS = path.resolve(
 
 const BGA_FIXTURE = path.resolve(process.cwd(), 'tests/__fixtures__/cost-pay-bga-parity.json')
 
-const REPORT_PATH = path.resolve(process.cwd(), 'docs/cost-pay-bga-parity-report.md')
+const REPORT_PATH = path.resolve(process.cwd(), 'output/cost-pay-bga-parity-report.md')
 
 const baseResources = {
   wood: 0,
