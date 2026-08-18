@@ -1,14 +1,16 @@
 # Contributing to Open Agricola
 
-感谢你的关注！提交 issue / PR 前请先读完本文。
+[English](CONTRIBUTING.md) | [中文](CONTRIBUTING_zh.md)
 
-## 开发环境
+Thank you for your interest in Open Agricola. Please read this guide before opening an issue or pull request.
 
-前置依赖：
+## Development Environment
 
-- **Node.js 22**。`better-sqlite3` 等原生依赖按 Node ABI 编译，Node 20 启动会出现 `NODE_MODULE_VERSION` 不匹配。
-- **pnpm**。版本由 `package.json` 的 `packageManager` 字段锁定，推荐 `corepack enable` 自动匹配。
-- **canvas 原生编译所需的系统库与工具链**。缺少时 `pnpm install` 会在编译 canvas 时失败：
+Prerequisites:
+
+- **Node.js 22.** Native dependencies such as `better-sqlite3` are compiled against the Node ABI. Starting the project with Node 20 causes a `NODE_MODULE_VERSION` mismatch.
+- **pnpm.** The required version is pinned in the `packageManager` field of `package.json`; run `corepack enable` to select it automatically.
+- **System libraries and build tools required by canvas.** Without them, `pnpm install` fails while compiling canvas:
 
   ```bash
   # Debian / Ubuntu
@@ -19,46 +21,46 @@
   brew install pkg-config cairo pango libpng jpeg giflib librsvg pixman
   ```
 
-安装与启动：
+Install dependencies and start the project:
 
 ```bash
 pnpm install
-./restart-intranet.sh    # 本地开发/运行/测试统一入口，同时启动后端 (5175) + 前端 (5173)
+./restart-intranet.sh    # Unified local development, runtime, and test entry point; starts backend (5175) and frontend (5173)
 ```
 
-## 测试
+## Testing
 
-三层测试：
+The project has three test layers:
 
-- **Unit**（`shared/**/__tests__/*.test.ts`）——纯领域逻辑。
-- **Session**（`server/__tests__/*.test.ts`）——直接实例化 `GameSession`，断言 `state` / `pending` / `log` / `scores`。规则正确性测试写在这一层。
-- **E2E**（`e2e-tests/*.spec.ts`）——Playwright 浏览器测试，需要前后端在运行。
+- **Unit** (`shared/**/__tests__/*.test.ts`) — pure domain logic.
+- **Session** (`server/__tests__/*.test.ts`) — instantiate `GameSession` directly and assert `state`, `pending`, `log`, and `scores`. Rule correctness belongs at this layer.
+- **E2E** (`e2e-tests/*.spec.ts`) — Playwright browser tests that require the frontend and backend to be running.
 
 ```bash
-pnpm test:fast              # fast project（CI 默认）
-pnpm test                   # vitest 全量（fast + slow）
-pnpm exec vitest run <file> # 单文件
+pnpm test:fast              # Fast projects; the CI default
+pnpm test                   # Full Vitest suite: fast + slow
+pnpm exec vitest run <file> # One test file
 pnpm run test:e2e           # Playwright E2E
-pnpm run lint               # ESLint，error 必须清零
+pnpm run lint               # ESLint; errors must be zero
 ```
 
-改完代码的验证顺序：`./restart-intranet.sh` 重启 → 用浏览器验真实行为 → `pnpm test:fast` → `pnpm run lint`。
+After changing code, verify in this order: restart with `./restart-intranet.sh`, exercise the real behavior in a browser, run `pnpm test:fast`, then run `pnpm run lint`.
 
-## 架构边界（必读）
+## Architecture Boundaries
 
-- 三层 `shared/`（领域逻辑）+ `server/`（HTTP + WS 服务）+ `client/`（React UI）。前端只负责渲染与输入收集，**不做规则裁定**。
-- 后端 `GameSession`（`server/game/authoritative-session.ts`）是 `GameState` 的唯一写入者。
-- 卡牌能力尽量在卡牌文件内部闭环；**禁止**在核心文件加单卡 `if-else`、建集中式卡牌效果注册表、在前端硬编码卡牌规则。
+- The project has three layers: `shared/` for domain logic, `server/` for HTTP and WebSocket services, and `client/` for the React UI. The frontend renders and collects input; it **does not adjudicate rules**.
+- Backend `GameSession` in `server/game/authoritative-session.ts` is the sole writer of `GameState`.
+- Keep card behavior inside the card file whenever possible. Do not add per-card `if-else` branches to core files, create a centralized card-effect registry, or hard-code card rules in the frontend.
 
-完整规范（卡牌实现规则、Card Workflow、文档同步硬规则）见 [AGENTS.md](AGENTS.md)，架构细节见 [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)。卡牌相关改动前请先阅读 [docs/CARD_TEST_TEMPLATE.md](docs/CARD_TEST_TEMPLATE.md) 并提供测试说明。
+See [AGENTS.md](AGENTS.md) for the complete card workflow, implementation rules, and documentation synchronization requirements. See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for architecture details. Before changing a card, read [docs/CARD_TEST_TEMPLATE.md](docs/CARD_TEST_TEMPLATE.md) and provide the required test description.
 
-## Commit 与 PR
+## Commits and Pull Requests
 
-- Commit 标题规范：`feat: ...` / `fix: ...` / `refactor: ...` / `docs: ...`，message 用英文，简洁明了。
-- 永远 rebase main，**禁止 merge commit**。
-- push 前本地先过 `pnpm run lint` + `pnpm test:fast`。
-- 卡牌相关改动必须同步 [docs/card_implementation_status.md](docs/card_implementation_status.md)；改动通用扩展点（hook phase、ActionFlow node、协议层）必须同步 [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)。
+- Use concise English commit subjects with one of these prefixes: `feat:`, `fix:`, `refactor:`, or `docs:`.
+- Always rebase onto `main`; do not create merge commits.
+- Before pushing, run `pnpm run lint` and `pnpm test:fast` locally.
+- Card changes must update [docs/card_implementation_status.md](docs/card_implementation_status.md). Changes to shared extension points such as hook phases, ActionFlow nodes, or protocols must update [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 
-## Issue
+## Issues
 
-报 bug / 提功能请求请使用 issue 模板。对局中发现的规则 bug 优先用游戏内的 Bug Report 按钮提交——它会自动附带对局 replay，定位效率高得多。
+Use the issue templates for bug reports and feature requests. For rule bugs found during a game, prefer the in-game Bug Report button because it automatically attaches the replay needed for diagnosis.

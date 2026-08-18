@@ -14,9 +14,9 @@ describe('workshop cost prompt contract', () => {
       expect(content).toMatch(/computeCosts[\s\S]{0,1000}costs[\s\S]{0,1000}trades[\s\S]{0,1000}bonuses/)
       expect(content).toMatch(/paymentResourceProviders/)
       expect(content).toMatch(/payment-only|虚拟支付资源/)
-      expect(content).toMatch(/deriveCardCostCandidate[\s\S]{0,240}官方卡/)
-      expect(content).toMatch(/getBaseCosts[\s\S]{0,240}官方卡/)
-      expect(content).toMatch(/computeExchanges[\s\S]{0,240}(不可用|不支持|不要|官方卡)/)
+      expect(content).toMatch(/(?:deriveCardCostCandidate[\s\S]{0,240}(?:official-card|官方卡)|(?:official-card|官方卡)[\s\S]{0,240}deriveCardCostCandidate)/i)
+      expect(content).toMatch(/(?:getBaseCosts[\s\S]{0,240}(?:official-card|官方卡)|(?:official-card|官方卡)[\s\S]{0,240}getBaseCosts)/i)
+      expect(content).toMatch(/(?:computeExchanges[\s\S]{0,240}(?:unavailable|unsupported|do not|不可用|不支持|不要|官方卡)|(?:unavailable|unsupported|do not|不可用|不支持|不要|官方卡)[\s\S]{0,240}computeExchanges)/i)
     }
   })
 
@@ -27,11 +27,11 @@ describe('workshop cost prompt contract', () => {
     ]
 
     for (const content of guidance) {
-      expect(content).toMatch(/改良[\s\S]{0,500}capDiscountAtCost/)
+      expect(content).toMatch(/(?:改良|improvement)[\s\S]{0,500}capDiscountAtCost/i)
       expect(content).toMatch(/capDiscountAtCost[\s\S]{0,240}optional/)
       expect(content).toMatch(/optional:\s*false/)
       expect(content).toMatch(/sources:\s*\[CARD_ID\]/)
-      expect(content).toMatch(/costs[^\n]*(简单|普通 action)/)
+      expect(content).toMatch(/costs[^\n]*(简单|普通 action|simple action)/i)
     }
 
     const example = read('docs/community-card-examples.md').split('## 5.')[0]!.split('## 4.')[1]!

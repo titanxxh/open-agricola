@@ -1,52 +1,53 @@
 # How to Deploy Open Agricola
 
-本文档面向想要自行部署 Open Agricola 平台的开发者。
+[English](HOW_TO_DEPLOY.md) | [中文](HOW_TO_DEPLOY_zh.md)
 
-## 架构概览
+This guide is for developers who want to self-host the Open Agricola platform.
 
-```
+## Architecture Overview
+
+```text
 ┌──────────────────────────────┐      ┌───────────────────────────────┐
-│  GitHub Pages（主站）          │      │  VPS（你的服务器）              │
-│  index.html + JS/CSS         │─────▶│  Node.js 后端                  │
-└──────────────┬───────────────┘      │    ├── HTTP API  /api/*       │
-               │                      │    ├── WebSocket /ws          │
-               ▼                      │    ├── Card art  /card-art/*  │
-┌──────────────────────────────┐      │    └── SQLite    ./data/*.db  │
-│  GitHub Pages（图片资源站）    │      └───────────────────────────────┘
-│  open-agricola-assets        │
+│ GitHub Pages: main site      │      │ VPS                           │
+│ index.html + JS/CSS          │─────▶│ Node.js backend               │
+└──────────────┬───────────────┘      │   ├── HTTP API  /api/*        │
+               │                      │   ├── WebSocket /ws            │
+               ▼                      │   ├── Card art  /card-art/*    │
+┌──────────────────────────────┐      │   └── SQLite    ./data/*.db   │
+│ GitHub Pages: asset site     │      └───────────────────────────────┘
+│ open-agricola-assets         │
 └──────────────────────────────┘
 ```
 
-前端和后端完全分离——前端是纯静态文件（GitHub Pages），后端是一个 Docker 容器（VPS）。
+The frontend and backend are fully separated. The frontend is a static GitHub Pages site; the backend runs in a Docker container on a VPS.
 
 ---
 
-## 一、部署后端
+## 1. Deploy the Backend
 
-后端部署分两种情况：
-- **情况 A**：全新 VPS，只有公网 IP，没有域名
-- **情况 B**：有域名 + 已有 HTTPS（Nginx + Let's Encrypt / Certbot）
+There are two deployment cases:
 
-两种情况都需要先完成基础步骤。
+- **Case A:** a new VPS with only a public IP and no domain
+- **Case B:** an existing domain and HTTPS through Nginx plus Let's Encrypt or Certbot
 
-### 1. 基础步骤（两种情况通用）
+Both cases start with the common steps below.
 
-#### 容量基准规格
+### 1.1 Common Setup
 
-单实例容量统一以 **2 vCPU / 2 GiB 内存**为测量锚点，真实命令与 Replay 写入复测见
-[`docs/performance/replay-room-capacity.md`](performance/replay-room-capacity.md)。
-该规格最多保留 **30 个普通 `waiting + playing` Room**；只有相同探针的新报告可以上调。
+#### Capacity Baseline
 
-#### 安装 Docker
+Use **2 vCPU and 2 GiB RAM** as the single-instance capacity baseline. The exact probe and Replay-write rerun are recorded in [`docs/performance/replay-room-capacity.md`](performance/replay-room-capacity.md). This specification supports at most **30 ordinary `waiting + playing` rooms**. Increase that limit only after a new run of the same probe.
+
+#### Install Docker
 
 ```bash
-# 一键安装 Docker（Ubuntu/Debian/CentOS）
+# One-command Docker installation on Ubuntu, Debian, or CentOS
 curl -fsSL https://get.docker.com | sh
 sudo usermod -aG docker $USER
-# 重新登录 SSH 让 docker 组生效
+# Log in through SSH again for the docker group change to take effect
 ```
 
-#### 拉取代码
+#### Clone the Repository
 
 ```bash
 git clone https://github.com/YOUR_USER/open-agricola.git
@@ -54,13 +55,13 @@ cd open-agricola
 git checkout main
 ```
 
-#### 配置环境变量
+#### Configure Environment Variables
 
 ```bash
 cp .env.example .env
 ```
 
-编辑 `.env`（后续步骤会覆盖部分值，先填通用的）：
+Edit `.env`. Later steps override some values; start with the common settings:
 
 ```env
 BACKEND_PORT=5175
@@ -74,26 +75,23 @@ REPLAY_ASSET_ROOT=./data/replay-assets
 REPLAY_REMOVAL_LEDGER_PATH=./data/replay-removals.jsonl
 REPLAY_TRUST_PROXY=false
 GAME_BUILD_ID=
-# CORS_ORIGIN 等后续根据情况设置
+# Set CORS_ORIGIN and other environment-specific values later
 ```
 
-后端直接暴露端口时保持 `REPLAY_TRUST_PROXY=false`。只有后端仅能经可信 Caddy/Nginx 到达，且代理会覆盖 `X-Forwarded-For` 时才设为 `true`。
-仓库的 `docker-compose.prod.yml` 使用隔离的 Caddy 作为唯一入口，因此已固定为 `REPLAY_TRUST_PROXY=true`。
+Keep `REPLAY_TRUST_PROXY=false` when the backend port is exposed directly. Set it to `true` only when the backend is reachable exclusively through a trusted Caddy or Nginx proxy that overwrites `X-Forwarded-For`. The repository's `docker-compose.prod.yml` uses an isolated Caddy container as the only ingress and therefore pins `REPLAY_TRUST_PROXY=true`.
 
-首次启用 Replay 时必须使用 `PERSIST_ROOMS=sqlite`。先生成并追加发布 Viewer Build：
+The first Replay rollout requires `PERSIST_ROOMS=sqlite`. Build and append a Viewer Build before enabling recording:
 
 ```bash
 REPLAY_VIEWER_ROOT="$PWD/data/replay-viewers" \
 BGA_CDN_BASE_URL="https://x.boardgamearena.net/data/themereleases/current/games/agricola/<version>/img" \
 pnpm run build:replay-viewer
-# stdout 最后一行是 REPLAY_VIEWER_BUILD_ID
+# The final stdout line is REPLAY_VIEWER_BUILD_ID
 ```
 
-`BGA_CDN_BASE_URL` 与主站构建使用同一仓库变量。命令只把 Viewer 代码、样式和卡牌 manifest 写入独立只读 Build，BGA 棋盘图、卡图和字体直接读取 CDN，不进入持久卷。发布仍生成逐文件 SHA-256 清单，以清单本身的 SHA-256 作为目录名，并在发布后重新校验完整目录；已存在的同 ID 目录不会覆盖。
+Use the same repository variable for `BGA_CDN_BASE_URL` as the main-site build. The command writes Viewer code, styles, and the card manifest into a separate read-only Build. It reads BGA board art, card art, and fonts directly from the CDN instead of storing them in the persistent volume. Publishing creates a per-file SHA-256 manifest, uses the manifest's own SHA-256 as the directory name, and revalidates the complete directory. It never overwrites an existing directory with the same ID.
 
-`docker-compose.prod.yml` 使用 `app-data:/app/data` named volume。保持 `REPLAY_NEW_ROOMS_ENABLED=false` 启动一次后，把 Build 追加进去，再启用录制：
-
-运行下方命令前，把上一步 stdout 最后一行填入 `.env` 的 `REPLAY_VIEWER_BUILD_ID`，并把 `git rev-parse HEAD` 的输出填入 `GAME_BUILD_ID`。
+`docker-compose.prod.yml` stores data in the `app-data:/app/data` named volume. Start once with `REPLAY_NEW_ROOMS_ENABLED=false`, append the Build, and only then enable recording. Put the previous command's final output in `.env` as `REPLAY_VIEWER_BUILD_ID`, and put the output of `git rev-parse HEAD` in `GAME_BUILD_ID`:
 
 ```bash
 set -a
@@ -107,22 +105,22 @@ docker compose -f docker-compose.prod.yml exec app \
 docker compose -f docker-compose.prod.yml cp \
   "data/replay-viewers/$REPLAY_VIEWER_BUILD_ID/." \
   "app:/app/data/replay-viewers/$REPLAY_VIEWER_BUILD_ID"
-# 复制完成后，在 .env 改为 REPLAY_NEW_ROOMS_ENABLED=true
+# After the copy succeeds, set REPLAY_NEW_ROOMS_ENABLED=true in .env
 docker compose -f docker-compose.prod.yml up -d --force-recreate app
 ```
 
-清单、内容 Hash 或入口校验失败时拒绝创建新 Room。开关、Build ID 和自定义卡运行时版本在 Room 创建时锁定；自定义卡图复制到 `REPLAY_ASSET_ROOT` 的内容寻址文件。已有 Replay Room 会继续按锁定值记录，开关关闭期间不会迁移旧进行局。
+New room creation is rejected if the manifest, content hash, or entry-point validation fails. The feature flag, Build ID, and custom-card runtime version are locked when the room is created. Custom-card art is copied into `REPLAY_ASSET_ROOT` under a content-addressed filename. Existing Replay rooms continue using their locked settings, and disabling the feature does not migrate games already in progress.
 
-Bug Report 使用独立 GitHub App，只安装到 `titanxxh/open-agricola-issues`：
+Bug Reports use a separate GitHub App installed only on `titanxxh/open-agricola-issues`:
 
-1. Repository permissions 只开启 `Issues: Read and write`，安装范围只选 issues-only 仓库。
-2. Callback URL 设为 `<PUBLIC_API_BASE>/api/v1/issue-submission-connection/github/callback`。
-3. Webhook URL 设为 `<PUBLIC_API_BASE>/api/v1/github-app/webhook`，配置独立 webhook secret，并订阅 GitHub App authorization 和 Issues 事件。
-4. 在 `.env` 填写 App ID、Client ID/secret、单行 `\n` 转义的 private key、webhook secret、installation ID 和 issues-only repository ID。
-5. 生成 32 字节随机加密密钥，使用 JSON key ring 配置 `BUG_REPORT_TOKEN_ENCRYPTION_KEYS`，并让 `BUG_REPORT_TOKEN_ACTIVE_KEY_ID` 指向其中一个 key。
-6. 保持 `BUG_REPORTS_ENABLED=false` 启动并完成迁移；验证 Hosted 与本人 GitHub 两条链路后再改为 `true`。关闭开关只隐藏新入口，不会丢弃既有草稿或交付队列。
+1. Grant only `Issues: Read and write`, and install it only on the issues repository.
+2. Set the callback URL to `<PUBLIC_API_BASE>/api/v1/issue-submission-connection/github/callback`.
+3. Set the webhook URL to `<PUBLIC_API_BASE>/api/v1/github-app/webhook`, configure a dedicated webhook secret, and subscribe to GitHub App authorization and Issues events.
+4. Add the App ID, Client ID and secret, private key escaped as single-line `\n`, webhook secret, installation ID, and issues-only repository ID to `.env`.
+5. Generate a random 32-byte encryption key, configure `BUG_REPORT_TOKEN_ENCRYPTION_KEYS` as a JSON key ring, and point `BUG_REPORT_TOKEN_ACTIVE_KEY_ID` at one key.
+6. Start with `BUG_REPORTS_ENABLED=false` and complete migrations. Set it to `true` only after validating both Hosted and personal-GitHub delivery paths. Disabling the flag hides only the new entry point; it does not discard existing drafts or delivery queues.
 
-启用后，`PUBLIC_APP_ORIGIN` 缺失或不是有效的 HTTP(S) 前端地址会让健康检查返回 `503`，并暂停 OAuth、新草稿和交付，避免创建缺少对局链接的 Issue。
+After the feature is enabled, a missing or invalid HTTP(S) frontend URL in `PUBLIC_APP_ORIGIN` makes the health check return `503` and pauses OAuth, new drafts, and delivery. This prevents issues without game links.
 
 ```env
 BUG_REPORTS_ENABLED=false
@@ -137,20 +135,20 @@ BUG_REPORT_TOKEN_ENCRYPTION_KEYS={"v1":"<32-byte-base64-key>"}
 BUG_REPORT_TOKEN_ACTIVE_KEY_ID=v1
 ```
 
-#### 构建并启动
+#### Build and Start
 
 ```bash
 docker compose up -d --build
 ```
 
-#### 验证
+#### Verify
 
 ```bash
 curl http://localhost:5175/api/health
-# 应返回: {"ok":true}
+# Expected: {"ok":true}
 ```
 
-查看日志：
+View logs:
 
 ```bash
 docker compose logs -f app
@@ -158,66 +156,56 @@ docker compose logs -f app
 
 ---
 
-### 情况 A：全新 VPS，只有公网 IP，没有域名
+### 1.2 Case A: New VPS with a Public IP and No Domain
 
-> 适用于：刚买的 VPS，没有域名，想用最简单的方式让后端跑起来。
+#### Option A1: Plain HTTP for Testing Only
 
-#### 方案 A1：纯 HTTP（仅限测试，前端也需 HTTP）
+This is the simplest option. GitHub Pages uses HTTPS and cannot connect to an HTTP backend because browsers block mixed content. The frontend must also be served over HTTP from the VPS rather than GitHub Pages.
 
-最简单的方式。缺点：**GitHub Pages 是 HTTPS，无法直接连接 HTTP 后端**（浏览器会拦截混合内容）。所以前端也必须用 HTTP 方式部署（不用 GitHub Pages，用 VPS 自身提供静态文件）。
-
-**步骤：**
-
-1. 编辑 `.env`：
+1. Edit `.env`:
 
    ```env
    CORS_ORIGIN=*
    ```
 
-2. 修改 `docker-compose.yml`，在 app 容器中挂载前端构建产物：
+2. Build the frontend locally for the VPS public IP:
 
    ```bash
-   # 本地构建前端（指向 VPS 公网 IP）
    VITE_API_BASE=http://YOUR_VPS_IP:5175 pnpm run build
    ```
 
-3. 把 `dist/` 目录上传到 VPS，然后用简单 HTTP 服务器托管：
+3. Upload `dist/` to the VPS and serve it with a basic HTTP server:
 
    ```bash
-   # 在 VPS 上
    cd dist
    python3 -m http.server 8080 &
    ```
 
-4. 访问 `http://YOUR_VPS_IP:8080`
+4. Open `http://YOUR_VPS_IP:8080`.
+5. Use `ws://YOUR_VPS_IP:5175/ws` as the WebSocket address.
 
-5. WebSocket 地址：`ws://YOUR_VPS_IP:5175/ws`
+> This option sends passwords in clear text. Use it only for local testing or a private network.
 
-> ⚠️ 此方案不安全（明文传输密码），仅用于本地测试或内网。
+#### Option A2: Caddy with Automatic HTTPS
 
-#### 方案 A2：Caddy 自签 / IP 直连 + 自动 HTTPS（推荐，需要域名）
+With any domain, including a free subdomain, Caddy can obtain and renew a Let's Encrypt certificate automatically.
 
-如果你有域名（即使是免费的），Caddy 可以自动申请 Let's Encrypt 证书，零配置 HTTPS。
+Optional free-domain providers:
 
-**获取免费域名（可选）：**
+- [DuckDNS](https://www.duckdns.org/)
+- [No-IP](https://www.noip.com/)
+- [FreeDNS](https://freedns.afraid.org/)
 
-- [DuckDNS](https://www.duckdns.org/) — 免费子域名，如 `your-game.duckdns.org`
-- [No-IP](https://www.noip.com/) — 免费 DDNS
-- [FreeDNS](https://freedns.afraid.org/) — 免费子域名
+1. Point the domain's DNS A record to the VPS IP.
+2. Create `deploy/Caddyfile`:
 
-**步骤：**
-
-1. 把域名 DNS A 记录指向你的 VPS IP
-
-2. 创建 `deploy/Caddyfile`：
-
-   ```
+   ```caddy
    your-game.duckdns.org {
        reverse_proxy app:5175
    }
    ```
 
-3. 创建 `docker-compose.prod.yml`（不覆盖原文件）：
+3. Create `docker-compose.prod.yml` without replacing the repository's original Compose file:
 
    ```yaml
    services:
@@ -263,64 +251,58 @@ docker compose logs -f app
      caddy-data:
    ```
 
-4. 启动：
+4. Start the stack:
 
    ```bash
    docker compose -f docker-compose.prod.yml up -d --build
    ```
 
-5. 验证：
+5. Verify it:
 
    ```bash
    curl https://your-game.duckdns.org/api/health
    ```
 
-6. 前端 `VITE_API_BASE` 设为 `https://your-game.duckdns.org`
+6. Set frontend `VITE_API_BASE=https://your-game.duckdns.org`.
 
-> Caddy 会自动申请和续期 Let's Encrypt 证书，你无需手动管理。
+Caddy obtains and renews the certificate automatically.
 
 ---
 
-### 情况 B：已有域名 + HTTPS（Nginx + Let's Encrypt）
+### 1.3 Case B: Existing Domain and HTTPS with Nginx
 
-> 适用于：VPS 上已经跑了 Nginx，已通过 Certbot 配了 HTTPS 证书。
+Use this when the VPS already runs Nginx with a Certbot-managed certificate. Docker exposes only an HTTP port; Nginx provides the reverse proxy and TLS termination.
 
-这种情况最简单——Docker 只暴露 HTTP 端口，Nginx 做反向代理 + TLS 终止。
-
-**步骤：**
-
-1. 编辑 `.env`：
+1. Edit `.env`:
 
    ```env
    CORS_ORIGIN=https://YOUR_USER.github.io
    ```
 
-2. 确保 `docker-compose.yml` 端口映射绑定到 `127.0.0.1`（仅本地可访问）：
+2. Bind the `docker-compose.yml` port mapping to `127.0.0.1`:
 
    ```yaml
    ports:
      - "127.0.0.1:5175:5175"
    ```
 
-3. 启动 Docker：
+3. Start Docker:
 
    ```bash
    docker compose up -d --build
    ```
 
-4. 为后端 API 添加一个 Nginx server block 或 location。
+4. Add an Nginx server block or location for the backend API. Because these examples overwrite `X-Forwarded-For`, also set `REPLAY_TRUST_PROXY=true` in the backend `.env`.
 
-   因为下面配置会覆盖 `X-Forwarded-For`，同时在后端 `.env` 设置 `REPLAY_TRUST_PROXY=true`。
+   **Subdomain, recommended:** `api.your-domain.com`
 
-   **方式一：子域名（推荐）**，如 `api.your-domain.com`
-
-   先申请子域名证书：
+   Obtain its certificate first:
 
    ```bash
    sudo certbot --nginx -d api.your-domain.com
    ```
 
-   然后添加 Nginx 配置 `/etc/nginx/sites-available/open-agricola-api`：
+   Add `/etc/nginx/sites-available/open-agricola-api`:
 
    ```nginx
    server {
@@ -334,7 +316,7 @@ docker compose logs -f app
            proxy_pass http://127.0.0.1:5175;
            proxy_http_version 1.1;
 
-           # WebSocket 支持（必须，否则多人游戏不工作）
+           # Required WebSocket forwarding
            proxy_set_header Upgrade $http_upgrade;
            proxy_set_header Connection "upgrade";
 
@@ -343,7 +325,6 @@ docker compose logs -f app
            proxy_set_header X-Forwarded-For $remote_addr;
            proxy_set_header X-Forwarded-Proto $scheme;
 
-           # WebSocket 超时设长一些
            proxy_read_timeout 86400s;
            proxy_send_timeout 86400s;
        }
@@ -356,9 +337,9 @@ docker compose logs -f app
    }
    ```
 
-   **方式二：子路径**，如 `your-domain.com/agricola-api/`
+   **Subpath:** `your-domain.com/agricola-api/`
 
-   在现有 server block 里添加：
+   Add this to an existing server block:
 
    ```nginx
    location /agricola-api/ {
@@ -375,256 +356,264 @@ docker compose logs -f app
    }
    ```
 
-5. 启用配置并重载 Nginx：
+5. Enable and reload Nginx:
 
    ```bash
-   # 仅子域名方式需要
+   # Required only for the subdomain option
    sudo ln -s /etc/nginx/sites-available/open-agricola-api /etc/nginx/sites-enabled/
 
-   sudo nginx -t          # 测试配置
+   sudo nginx -t
    sudo systemctl reload nginx
    ```
 
-6. 验证：
+6. Verify it:
 
    ```bash
    curl https://api.your-domain.com/api/health
    ```
 
-7. 前端 `VITE_API_BASE` 设为 `https://api.your-domain.com`（或 `https://your-domain.com/agricola-api`）
+7. Set frontend `VITE_API_BASE` to `https://api.your-domain.com`, or `https://your-domain.com/agricola-api` for the subpath option.
 
-> **关键：Nginx 必须转发 WebSocket**。如果忘了 `Upgrade` / `Connection` 头，HTTP API 正常但多人游戏会断连。
+> Nginx must forward WebSocket traffic. Without the `Upgrade` and `Connection` headers, HTTP APIs work but multiplayer connections fail.
 
 ---
 
-## 二、部署前端（GitHub Pages）
+## 2. Deploy the Frontend to GitHub Pages
 
-### 前置条件
+### Prerequisites
 
-- GitHub 仓库 Settings → Pages → Source 选 **GitHub Actions**
-- 仓库 Settings → Environments → `github-pages` → Deployment branches and tags：允许 `main` 和 tag 模式 `v*`（release 部署以 tag 为 ref 运行，缺 tag 规则会被拒绝部署）
+- In repository **Settings → Pages**, set Source to **GitHub Actions**.
+- In **Settings → Environments → github-pages → Deployment branches and tags**, allow `main` and tags matching `v*`. Release deployments run from the tag ref and are rejected without the tag rule.
 
-### 配置
+### Configuration
 
-在 Settings → Secrets and variables → Actions → **Variables** 标签中添加：
+Under **Settings → Secrets and variables → Actions → Variables**, add:
 
-| Variable | 值 | 示例 |
-|----------|---|------|
-| `VITE_API_BASE` | 后端完整 URL | `https://api.your-domain.com` 或 `http://VPS_IP:5175`（仅 HTTP 方案） |
-| `VITE_WS_BASE` | WebSocket URL（可选，自动推导） | `wss://api.your-domain.com/ws` |
-| `BGA_CDN_BASE_URL` | BGA 图片 CDN 根地址 | 与 `.env.example` 保持一致 |
-| `VITE_SANDBOX_EXECUTOR` | 工坊试玩沙盒执行器（可选） | `browser` = 试玩全程在浏览器本地运行（引擎 Worker + 本地编译，零服务器参与）；缺省 / 其他值 = 走服务端 `/api/game/new-sandbox` |
+| Variable | Value | Example |
+|---|---|---|
+| `VITE_API_BASE` | Complete backend URL | `https://api.your-domain.com`, or `http://VPS_IP:5175` for HTTP-only testing |
+| `VITE_WS_BASE` | Optional WebSocket URL; derived automatically by default | `wss://api.your-domain.com/ws` |
+| `BGA_CDN_BASE_URL` | BGA image CDN root | Keep it aligned with `.env.example` |
+| `VITE_SANDBOX_EXECUTOR` | Optional Workshop playtest executor | `browser` runs the engine Worker and local compilation entirely in the browser; unset or another value uses `/api/game/new-sandbox` on the server |
 
-### 触发部署
+### Trigger a Deployment
 
-发布 GitHub Release 后自动部署前端（`.github/workflows/deploy-pages.yml`，`on: release: published`）：
+Publishing a GitHub Release triggers `.github/workflows/deploy-pages.yml` through `release: published`:
 
 ```bash
 gh release create v0.3.0 --generate-notes
 ```
 
-也可以在 GitHub UI 操作：Releases → Draft a new release → 新建 tag（`vX.Y.Z`）→ Generate release notes → Publish。后端不会由 release 自动部署。Actions 页面手动触发（workflow_dispatch）时部署 `main` 最新前端。
+Alternatively, use **Releases → Draft a new release**, create a `vX.Y.Z` tag, generate release notes, and publish. A release does not deploy the backend. A manual `workflow_dispatch` from the Actions page deploys the latest frontend from `main`.
 
-部署成功后访问：`https://YOUR_USER.github.io/open-agricola/`
+After deployment, the site is available at `https://YOUR_USER.github.io/open-agricola/`.
 
-### 手动构建（不用 GitHub Actions）
+### Manual Build without GitHub Actions
 
 ```bash
 VITE_API_BASE=https://api.your-domain.com pnpm run build
 pnpm dlx gh-pages -d dist
 ```
 
-### 主站图片资源
+### Main-Site Image Assets
 
-`public-assets.ref` 固定图片仓的 Git commit，`public-assets.required.json` 声明主站需要的全部路径。构建和默认本地启动读取该 commit 的 GitHub tree；响应无效、tree 不完整或缺少必需路径时立即失败。测试配置只读取本地契约，不依赖网络。运行时从 `raw.githubusercontent.com/titanxxh/open-agricola-assets/<commit>/` 读取对应 commit 的图片，主站和不可变 Replay Viewer 使用同一固定来源，图片本身不再打进主站 Pages artifact。
+`public-assets.ref` pins a Git commit in the asset repository. `public-assets.required.json` declares every path required by the main site. Production builds and the default local startup read that commit's GitHub tree and fail immediately if the response is invalid, the tree is incomplete, or a required path is missing. Test configuration reads only the local contract and does not use the network.
 
-本地修改图片时可全量切到一个资产仓 checkout：
+At runtime, the site loads images from `raw.githubusercontent.com/titanxxh/open-agricola-assets/<commit>/`. The main site and immutable Replay Viewer use the same pinned source; image binaries are no longer bundled into the main Pages artifact.
+
+For local asset work, override the complete asset repository with a checkout:
 
 ```bash
 PUBLIC_ASSET_LOCAL_DIR=../open-agricola-assets pnpm dev
 ```
 
-启动前会检查全部必需文件；缺少任一文件即失败，不会混用或回退到远端。该覆盖仅用于本地开发服务器，CI 和生产构建不接受它。
+Startup verifies every required file. A missing file fails startup; it never mixes local and remote assets or falls back to the remote source. This override is accepted only by the local development server, not CI or production builds.
 
-更新图片时先在 `open-agricola-assets` 发布并验证 commit-addressed raw URL，再把主仓 `public-assets.ref` 更新为该 commit，并同步 `public-assets.required.json`；随后再走主仓的正常 Release。旧版本通过 Git 历史中的 commit 继续读取原图片，不需要在当前目录保留旧文件。
+To update images, publish and verify a commit-addressed raw URL in `open-agricola-assets`, update `public-assets.ref` in this repository to that commit, synchronize `public-assets.required.json`, and follow the normal release flow. Historical versions continue loading their original images through the commit recorded in Git history; the current asset directory does not need to retain old files.
 
 ---
 
-## 三、更新部署
+## 3. Update a Deployment
 
-### 后端
+### Backend
 
-后端只在 owner 控制的本机部署。SSH 私钥保留在本机，`ACCOUNT_REGISTRATION_POLICY` 由服务器 `.env` 提供；两者都不写入 GitHub Actions：
+Deploy the backend only from an owner-controlled machine. Keep the SSH private key on that machine and provide `ACCOUNT_REGISTRATION_POLICY` through the server's `.env`; neither belongs in GitHub Actions.
 
 ```bash
 ./deploy-backend.sh root@open-agricola.duckdns.org v0.3.0 /root/open-agricola
 ```
 
-`deploy-backend.sh` 在切换新版本前自动做完整备份：先 build 新镜像（旧版本继续服务），然后停止 app，把 `app-data` volume 全量打包为 `backups/pre-<ref>-<timestamp>.tgz`（含 SQLite、card art、Replay Viewer、Replay assets、删除 ledger），同时刷新 `backups/replay-removals.latest.jsonl` 并保存 `.env` 快照 `backups/env-pre-<ref>-<timestamp>`（600 权限）。归档生成后，目标镜像会在一次性可写副本上执行目标数据库迁移、删除 ledger 重放、SQLite `integrity_check`、所有活动 Room 反序列化、Replay metadata/Head/Segment、内容寻址 assets 和 Viewer 构建校验；配置在 `/app/data` 下的自定义 Replay 路径会映射到解包副本，原归档保持不变。通过后写入同名 `.manifest.json`，记录归档 SHA-256/大小、源/目标 Build、目标 ref、迁移前后数据库 schema、Replay schema 及校验计数。备份或语义校验失败会拉回旧版本 app 并使本地部署命令失败；app 停止后到新版本启动成功之间本地 SSH 被中断时同样自动拉回旧容器。脚本自动清理旧的 pre-deploy 备份及配对 manifest：保留最近 5 份，且按 ADR-0010 的备份副本上限删除超过 30 天的归档；手动备份（非 `pre-` 前缀）不受影响。备份归档、manifest 与 ledger 快照为 600 权限、`backups/` 目录为 700。停机窗口只覆盖打包、语义校验和启动新容器，不包含镜像构建。恢复流程见[数据备份](#数据备份)。
+Before switching versions, `deploy-backend.sh` builds the new image while the old version remains online, stops the app, and archives the complete `app-data` volume as `backups/pre-<ref>-<timestamp>.tgz`. The archive includes SQLite, card art, Replay Viewer builds, Replay assets, and the removal ledger. It also refreshes `backups/replay-removals.latest.jsonl` and stores a mode-600 `.env` snapshot at `backups/env-pre-<ref>-<timestamp>`.
 
-数据（SQLite 数据库、card art）存储在 Docker volume 中，重建容器不会丢失。
+After creating the archive, the target image operates on a disposable writable copy. It runs target database migrations, replays the removal ledger, runs SQLite `integrity_check`, deserializes every active room, and validates Replay metadata, Head and Segment records, content-addressed assets, and Viewer builds. Custom Replay paths under `/app/data` are mapped to the extracted copy while the original archive remains unchanged.
 
-### 前端
+On success, the script writes a matching `.manifest.json` containing the archive SHA-256 and size, source and target Builds, target ref, database schemas before and after migration, Replay schema, and validation counts. A backup or semantic-validation failure restores the previous app and fails the local deployment command. Losing the local SSH session after the app stops but before the new version starts also restores the old container.
 
-发布 GitHub Release 后自动重新部署（见上文「触发部署」）。
+The script retains the five newest pre-deploy backups and matching manifests, and removes archives older than 30 days under ADR-0010's backup-copy ceiling. Manual archives without the `pre-` prefix are unaffected. Backup archives, manifests, and ledger snapshots use mode 600; `backups/` uses mode 700. Downtime covers only archive creation, semantic validation, and new-container startup, not image building. See [Data Backup](#data-backup) for recovery.
+
+SQLite and card art live in the Docker volume, so rebuilding the container does not delete them.
+
+### Frontend
+
+Publish a GitHub Release to redeploy the frontend as described in [Trigger a Deployment](#trigger-a-deployment).
 
 ---
 
-## Auth OAuth
+## Authentication OAuth
 
-生产环境可启用密码注册（需要 Resend 邮箱验证）和 GitHub / Google OAuth；`ACCOUNT_REGISTRATION_POLICY` 统一控制注册入口。
+Production can enable password registration with Resend email verification and GitHub or Google OAuth. `ACCOUNT_REGISTRATION_POLICY` controls every registration entry point.
 
-OAuth 所需后端环境变量：
+Required backend settings:
 
-- `PUBLIC_APP_ORIGIN`：用户在浏览器中打开的前端地址；GitHub Pages 子路径部署要包含 base path，例如 `https://your-user.github.io/open-agricola/`。
-- `PUBLIC_API_BASE`：用户浏览器可访问的后端 origin，例如 `https://api.your-domain.com`，用于 OAuth provider callback URL 和邮箱验证链接；生产环境必填。
-- `CORS_ORIGIN`：前后端不同源时必须等于前端 origin。
-- `ACCOUNT_GITHUB_OAUTH_CLIENT_ID` / `ACCOUNT_GITHUB_OAUTH_CLIENT_SECRET`：账号登录/注册用 GitHub OAuth App 凭据。
-- `ACCOUNT_GOOGLE_OAUTH_CLIENT_ID` / `ACCOUNT_GOOGLE_OAUTH_CLIENT_SECRET`：账号登录/注册用 Google OAuth Client 凭据。
+- `PUBLIC_APP_ORIGIN`: the frontend address opened by users. Include the base path for a GitHub Pages subpath deployment, such as `https://your-user.github.io/open-agricola/`.
+- `PUBLIC_API_BASE`: the browser-accessible backend origin, such as `https://api.your-domain.com`. It is used for OAuth provider callbacks and email verification links and is required in production.
+- `CORS_ORIGIN`: when frontend and backend have different origins, set this to the frontend origin.
+- `ACCOUNT_GITHUB_OAUTH_CLIENT_ID` / `ACCOUNT_GITHUB_OAUTH_CLIENT_SECRET`: credentials for the account login and registration GitHub OAuth App.
+- `ACCOUNT_GOOGLE_OAUTH_CLIENT_ID` / `ACCOUNT_GOOGLE_OAUTH_CLIENT_SECRET`: credentials for the account login and registration Google OAuth Client.
 
-OAuth callback URL 填后端 origin：
+Configure provider callback URLs on the backend origin:
 
 ```text
 https://<backend-origin>/api/auth/oauth/github/callback
 https://<backend-origin>/api/auth/oauth/google/callback
 ```
 
-生产环境不要设置：
+Never set these in production:
 
 - `ALLOW_ANONYMOUS_WS=true`
 - `ENABLE_AUTH_TEST_HELPERS=1`
 
 ---
 
-## 四、验证清单
+## 4. Verification Checklist
 
-部署完成后逐项验证：
-
-- [ ] `curl https://your-backend/api/health` 返回 `{"ok":true}`
-- [ ] 访问前端 URL，能看到登录页
-- [ ] 首次部署时先用 `ACCOUNT_REGISTRATION_POLICY=open` 注册 `ADMIN_USERS` 中的第一个管理员账号
-- [ ] 管理员能进入 Settings 生成邀请码后，将 `ACCOUNT_REGISTRATION_POLICY` 改为 `invite_only` 并重启后端
-- [ ] 通过 GitHub 或 Google + 邀请码注册新用户
-- [ ] 登录成功，进入大厅
-- [ ] 创建房间，开始游戏
-- [ ] WebSocket 连接正常（浏览器 Console 无 WS 错误）
-- [ ] 双人模式：两个浏览器窗口加入同一房间
-- [ ] 进行局与结束局原参与者都能打开三步 Bug Report，非参与者被拒绝
-- [ ] 本人 GitHub 与 Hosted Identity 各创建一个 Issue，正文只含现象、Reporter ID 和对局锚点
-- [ ] Settings 能断开 Issue Submission Connection，GitHub 撤销授权后连接状态失效
-- [ ] Workshop：创建/浏览自定义卡牌
-- [ ] Card art 上传和显示正常
-- [ ] `docker compose down && docker compose up -d` 后数据仍在（SQLite 持久化）
+- [ ] `curl https://your-backend/api/health` returns `{"ok":true}`.
+- [ ] The frontend URL displays the login page.
+- [ ] On the first deployment, use `ACCOUNT_REGISTRATION_POLICY=open` to register the first administrator named in `ADMIN_USERS`.
+- [ ] The administrator can generate an invitation in Settings; then change `ACCOUNT_REGISTRATION_POLICY` to `invite_only` and restart the backend.
+- [ ] A new user can register with GitHub or Google plus an invitation code.
+- [ ] Login succeeds and opens the lobby.
+- [ ] A room can be created and a game started.
+- [ ] WebSocket connects without errors in the browser console.
+- [ ] Two browser windows can join the same two-player room.
+- [ ] Original participants can open the three-step Bug Report flow in active and completed games; nonparticipants are rejected.
+- [ ] Personal GitHub and Hosted Identity can each create an issue whose body contains only the observation, Reporter ID, and game anchor.
+- [ ] Settings can disconnect an Issue Submission Connection, and revoking GitHub authorization invalidates the connection.
+- [ ] Workshop cards can be created and browsed.
+- [ ] Card art uploads and displays correctly.
+- [ ] Data remains after `docker compose down && docker compose up -d`.
 
 ---
 
-## 五、环境变量参考
+## 5. Environment Variable Reference
 
-### 后端（Docker / .env）
+### Backend: Docker and `.env`
 
-| 变量 | 默认值 | 说明 |
-|------|--------|------|
-| `BACKEND_PORT` | `5175` | HTTP/WS 监听端口 |
-| `BACKEND_HOST` | `0.0.0.0` | 绑定地址 |
-| `NODE_ENV` | — | 设为 `production` 启用生产模式 |
-| `PERSIST_ROOMS` | `sqlite` | 房间持久化方式 (`sqlite` / `json`) |
-| `ALLOW_ANONYMOUS_WS` | `true`(dev) / `false`(prod) | 是否允许匿名 WebSocket |
-| `CORS_ORIGIN` | `*` | 允许的前端域名，生产环境必须设置 |
-| `PUBLIC_APP_ORIGIN` | — | 前端公开地址；Pages 子路径部署要包含 `/open-agricola/` |
-| `PUBLIC_API_BASE` | — | 后端公开 origin，用于 OAuth provider callback URL 和邮箱验证链接；生产环境必填 |
-| `EMAIL_DELIVERY` | `log` | 邮件发送模式；生产用户名密码注册必须设为 `resend` |
-| `RESEND_API_KEY` | — | Resend API key，只给后端容器 |
-| `EMAIL_FROM` | — | 发信地址，例如 `Open Agricola <no-reply@mail.example.com>` |
-| `EMAIL_REPLY_TO` | — | 可选回复地址 |
-| `ACCOUNT_GITHUB_OAUTH_CLIENT_ID` | — | 账号 GitHub OAuth App client id |
-| `ACCOUNT_GITHUB_OAUTH_CLIENT_SECRET` | — | 账号 GitHub OAuth App client secret |
-| `ACCOUNT_GOOGLE_OAUTH_CLIENT_ID` | — | 账号 Google OAuth client id |
-| `ACCOUNT_GOOGLE_OAUTH_CLIENT_SECRET` | — | 账号 Google OAuth client secret |
-| `BUG_REPORTS_ENABLED` | `false` | 是否允许创建新的 Bug Report 草稿 |
-| `BUG_REPORT_GITHUB_APP_ID` | — | issues-only GitHub App ID |
+| Variable | Default | Description |
+|---|---|---|
+| `BACKEND_PORT` | `5175` | HTTP and WebSocket listen port |
+| `BACKEND_HOST` | `0.0.0.0` | Bind address |
+| `NODE_ENV` | — | Set to `production` for production mode |
+| `PERSIST_ROOMS` | `sqlite` | Room persistence: `sqlite` or `json` |
+| `ALLOW_ANONYMOUS_WS` | `true` in development, `false` in production | Whether anonymous WebSocket connections are allowed |
+| `CORS_ORIGIN` | `*` | Allowed frontend origin; required in production |
+| `PUBLIC_APP_ORIGIN` | — | Public frontend URL; include `/open-agricola/` for a Pages subpath |
+| `PUBLIC_API_BASE` | — | Public backend origin for OAuth callbacks and email verification; required in production |
+| `EMAIL_DELIVERY` | `log` | Email mode; password registration in production requires `resend` |
+| `RESEND_API_KEY` | — | Resend API key, available only to the backend container |
+| `EMAIL_FROM` | — | Sender address, such as `Open Agricola <no-reply@mail.example.com>` |
+| `EMAIL_REPLY_TO` | — | Optional reply-to address |
+| `ACCOUNT_GITHUB_OAUTH_CLIENT_ID` | — | Account GitHub OAuth App client ID |
+| `ACCOUNT_GITHUB_OAUTH_CLIENT_SECRET` | — | Account GitHub OAuth App client secret |
+| `ACCOUNT_GOOGLE_OAUTH_CLIENT_ID` | — | Account Google OAuth client ID |
+| `ACCOUNT_GOOGLE_OAUTH_CLIENT_SECRET` | — | Account Google OAuth client secret |
+| `BUG_REPORTS_ENABLED` | `false` | Whether new Bug Report drafts can be created |
+| `BUG_REPORT_GITHUB_APP_ID` | — | Issues-only GitHub App ID |
 | `BUG_REPORT_GITHUB_CLIENT_ID` | — | GitHub App Client ID |
 | `BUG_REPORT_GITHUB_CLIENT_SECRET` | — | GitHub App Client secret |
-| `BUG_REPORT_GITHUB_PRIVATE_KEY` | — | GitHub App private key，使用单行 `\n` 转义 |
+| `BUG_REPORT_GITHUB_PRIVATE_KEY` | — | GitHub App private key escaped with single-line `\n` |
 | `BUG_REPORT_GITHUB_WEBHOOK_SECRET` | — | GitHub App webhook secret |
-| `BUG_REPORT_GITHUB_INSTALLATION_ID` | — | issues-only 仓库的 App installation ID |
-| `BUG_REPORT_GITHUB_REPOSITORY_ID` | — | `titanxxh/open-agricola-issues` 数字 repository ID |
-| `BUG_REPORT_TOKEN_ENCRYPTION_KEYS` | — | AES-256-GCM key ring JSON；每个值为 32 字节 base64 |
-| `BUG_REPORT_TOKEN_ACTIVE_KEY_ID` | — | 新令牌使用的 key ring key ID |
-| `ENABLE_AUTH_TEST_HELPERS` | — | 仅本地/E2E 可设 `1`，生产禁止设置 |
-| `DB_PATH` | `./data/open-agricola.db` | SQLite 文件路径 |
-| `CARD_ART_DIR` | `./data/card-art` | 上传的卡牌图片存储路径 |
-| `REPLAY_VIEWER_ROOT` | `./data/replay-viewers` | 不可变 Replay Viewer Build 目录 |
-| `REPLAY_VIEWER_BUILD_ID` | — | 新 Room 锁定的不可变 Viewer Build ID |
-| `REPLAY_ASSET_ROOT` | `./data/replay-assets` | 内容寻址的 Replay 自定义卡资源目录 |
-| `REPLAY_REMOVAL_LEDGER_PATH` | `./data/replay-removals.jsonl` | SQLite 外、只追加的 Replay 删除 ledger；恢复旧备份时必须使用最新副本 |
-| `REPLAY_NEW_ROOMS_ENABLED` | `false` | 是否为新 Room 启用 Replay 录制；启用前必须准备 Viewer Build |
-| `REPLAY_TRUST_PROXY` | `false` | 仅当后端只能经会覆盖 `X-Forwarded-For` 的可信反向代理访问时设为 `true` |
-| `GAME_BUILD_ID` | — | 当前后端 Git commit；自动部署脚本会填入 |
-| `ADMIN_USERS` | — | 管理员用户名，逗号分隔 |
-| `ACCOUNT_REGISTRATION_POLICY` | 必填 | 账号注册策略：首次部署用 `open` 创建第一个管理员，之后改为 `invite_only`；`disabled` 禁止新账号注册 |
-| `GITHUB_OAUTH_CLIENT_ID` / `GITHUB_OAUTH_CLIENT_SECRET` | — | Workshop → PR 使用的 GitHub OAuth App 凭据 |
-| `GITHUB_UPSTREAM_OWNER` / `GITHUB_UPSTREAM_REPO` | `titanxxh` / `open-agricola` | Workshop PR 目标仓库 |
-| `WORKSHOP_PR_ENABLED` | `false` | 是否开放 Workshop → PR |
+| `BUG_REPORT_GITHUB_INSTALLATION_ID` | — | App installation ID for the issues-only repository |
+| `BUG_REPORT_GITHUB_REPOSITORY_ID` | — | Numeric repository ID of `titanxxh/open-agricola-issues` |
+| `BUG_REPORT_TOKEN_ENCRYPTION_KEYS` | — | AES-256-GCM key-ring JSON; every value is 32-byte base64 |
+| `BUG_REPORT_TOKEN_ACTIVE_KEY_ID` | — | Key-ring ID used for new tokens |
+| `ENABLE_AUTH_TEST_HELPERS` | — | May be `1` only locally or in E2E; forbidden in production |
+| `DB_PATH` | `./data/open-agricola.db` | SQLite file path |
+| `CARD_ART_DIR` | `./data/card-art` | Uploaded card-art directory |
+| `REPLAY_VIEWER_ROOT` | `./data/replay-viewers` | Immutable Replay Viewer Build directory |
+| `REPLAY_VIEWER_BUILD_ID` | — | Immutable Viewer Build ID locked by new rooms |
+| `REPLAY_ASSET_ROOT` | `./data/replay-assets` | Content-addressed custom-card assets for Replay |
+| `REPLAY_REMOVAL_LEDGER_PATH` | `./data/replay-removals.jsonl` | Append-only Replay removal ledger outside SQLite; restore with the latest copy |
+| `REPLAY_NEW_ROOMS_ENABLED` | `false` | Whether new rooms record Replay; requires a Viewer Build first |
+| `REPLAY_TRUST_PROXY` | `false` | Set only when the backend is reachable exclusively through a trusted proxy that overwrites `X-Forwarded-For` |
+| `GAME_BUILD_ID` | — | Current backend Git commit; deployment scripts set it automatically |
+| `ADMIN_USERS` | — | Comma-separated administrator usernames |
+| `ACCOUNT_REGISTRATION_POLICY` | required | Use `open` for the first administrator, then `invite_only`; `disabled` blocks new accounts |
+| `GITHUB_OAUTH_CLIENT_ID` / `GITHUB_OAUTH_CLIENT_SECRET` | — | GitHub OAuth App credentials for Workshop pull requests |
+| `GITHUB_UPSTREAM_OWNER` / `GITHUB_UPSTREAM_REPO` | `titanxxh` / `open-agricola` | Workshop pull-request target |
+| `WORKSHOP_PR_ENABLED` | `false` | Whether Workshop pull requests are enabled |
 | `WORKSHOP_REVIEW_GITHUB_APP_ID` | — | Workshop Review GitHub App ID |
-| `WORKSHOP_REVIEW_GITHUB_PRIVATE_KEY` | — | App private key，使用单行 `\n` 转义 |
-| `WORKSHOP_REVIEW_GITHUB_INSTALLATION_ID` | — | App 在主仓库的 installation ID |
-| `WORKSHOP_REVIEW_GITHUB_WEBHOOK_SECRET` | — | `/api/github/webhook` HMAC secret |
-| `OFFSITE_BACKUP_TARGET` | — | 定时异机备份的 ssh 目标（如 `root@1.2.3.4`）；仅 `backup-offsite.sh` 读取，不进应用容器 |
-| `OFFSITE_BACKUP_REMOTE_DIR` | `/root/open-agricola-backups` | 异机上的备份存放目录；仅 `backup-offsite.sh` 读取 |
+| `WORKSHOP_REVIEW_GITHUB_PRIVATE_KEY` | — | App private key escaped with single-line `\n` |
+| `WORKSHOP_REVIEW_GITHUB_INSTALLATION_ID` | — | App installation ID for the main repository |
+| `WORKSHOP_REVIEW_GITHUB_WEBHOOK_SECRET` | — | HMAC secret for `/api/github/webhook` |
+| `OFFSITE_BACKUP_TARGET` | — | SSH destination for scheduled offsite backups, such as `root@1.2.3.4`; read only by `backup-offsite.sh` |
+| `OFFSITE_BACKUP_REMOTE_DIR` | `/root/open-agricola-backups` | Remote backup directory; read only by `backup-offsite.sh` |
 
-### Resend 邮箱验证
+### Resend Email Verification
 
-1. 在 Resend 添加并验证发信域名。
-2. 创建 Sending access API key。
-3. 在后端 `.env` 中设置：
+1. Add and verify a sending domain in Resend.
+2. Create a Sending access API key.
+3. Add these values to the backend `.env`:
 
-   ```bash
+   ```env
    EMAIL_DELIVERY=resend
    RESEND_API_KEY=re_xxx
    EMAIL_FROM="Open Agricola <no-reply@mail.example.com>"
    ```
 
-4. 确认 `PUBLIC_API_BASE` 是用户可访问的后端 HTTPS 地址，`PUBLIC_APP_ORIGIN` 是前端地址。
+4. Confirm that `PUBLIC_API_BASE` is the public backend HTTPS URL and `PUBLIC_APP_ORIGIN` is the frontend URL.
 
-### 前端（构建时注入）
+### Frontend: Build-Time Variables
 
-| 变量 | 默认值 | 说明 |
-|------|--------|------|
-| `VITE_API_BASE` | `''`（空=同源） | 后端 API 地址 |
-| `VITE_WS_BASE` | 从 API_BASE 推导 | WebSocket 地址 |
-| `BGA_CDN_BASE_URL` | — | 主站与 Replay Viewer 构建共用的 BGA 图片 CDN 根地址 |
-| `PUBLIC_ASSET_LOCAL_DIR` | — | 仅本地开发：完整图片仓 checkout；设置后禁止远端混用或回退 |
+| Variable | Default | Description |
+|---|---|---|
+| `VITE_API_BASE` | `''`, meaning same-origin | Backend API URL |
+| `VITE_WS_BASE` | Derived from the API base | WebSocket URL |
+| `BGA_CDN_BASE_URL` | — | BGA image CDN root shared by the main site and Replay Viewer build |
+| `PUBLIC_ASSET_LOCAL_DIR` | — | Local development only: a complete asset-repository checkout; remote mixing and fallback are disabled |
 
 ---
 
-## 六、常见问题
+## 6. Troubleshooting
 
-### WebSocket 连接失败
+### WebSocket Connection Fails
 
-- 确认后端 HTTPS 配置正确（GitHub Pages 是 HTTPS，WS 必须用 `wss://`）
-- 确认反向代理转发 WebSocket upgrade 头（Nginx 需要 `proxy_set_header Upgrade`）
-- 检查 `VITE_WS_BASE` 是否正确设置
-- Nginx `proxy_read_timeout` 太短会导致 WS 连接被切断，建议 `86400s`
+- Confirm that backend HTTPS works. GitHub Pages uses HTTPS, so WebSocket must use `wss://`.
+- Confirm that the reverse proxy forwards WebSocket upgrade headers; Nginx needs `proxy_set_header Upgrade`.
+- Check `VITE_WS_BASE`.
+- Set a sufficiently long Nginx `proxy_read_timeout`, such as `86400s`.
 
-### CORS 错误
+### CORS Error
 
-- 检查 `.env` 中 `CORS_ORIGIN` 是否与前端域名完全匹配（含 `https://`，不含尾部 `/`）
-- 如果使用自定义域名，确保 `CORS_ORIGIN` 与实际访问域名一致
+- Ensure `.env` `CORS_ORIGIN` exactly matches the frontend origin, including `https://` and excluding a trailing slash.
+- When using a custom domain, ensure it matches the domain users actually open.
 
-### 混合内容被拦截（Mixed Content）
+### Mixed Content Is Blocked
 
-- 浏览器会阻止 HTTPS 页面加载 HTTP 资源
-- 解决：后端必须配置 HTTPS（方案 A2 或情况 B）
-- 临时方案：前端也用 HTTP 部署（方案 A1），但不安全
+- Browsers block an HTTPS page from loading HTTP resources.
+- Configure backend HTTPS through Option A2 or Case B.
+- For temporary testing only, serve both frontend and backend over HTTP as in Option A1.
 
-### 卡牌图片不显示
+### Card Images Do Not Display
 
-- 不影响游戏功能，仅影响显示
-- 确认 BGA 图片目录存在且路径正确
+- This affects display only, not gameplay.
+- Confirm that the BGA image directory exists at the configured path.
 
-### 数据备份
+### Data Backup
 
-备份必须同时包含 SQLite、Viewer、Replay assets、card art 和 deletion ledger。`deploy-backend.sh` 会在每次切换新版本前生成同等内容的 `backups/pre-<ref>-<timestamp>.tgz`，并配对 `pre-<ref>-<timestamp>.manifest.json` 证明目标镜像已在一次性副本上完成迁移和恢复验证（见「三、更新部署」）。manifest 中的 `targetBuildId` 只证明该构建兼容，`archiveSha256` 和 `archiveSizeBytes` 绑定实际归档；换用其他构建恢复时必须重新运行 `scripts/validate-backup.ts`。下述手动命令用于部署之外的场景。以下命令假定 ledger 保持默认的 `/app/data/replay-removals.jsonl`；先停后端，避免备份跨越一次 Room Commit：
+A backup must contain SQLite, Viewer builds, Replay assets, card art, and the deletion ledger. Before every version switch, `deploy-backend.sh` creates an equivalent `backups/pre-<ref>-<timestamp>.tgz` and pairs it with `pre-<ref>-<timestamp>.manifest.json`, proving that the target image migrated and restored a disposable copy successfully. The manifest's `targetBuildId` proves only build compatibility; `archiveSha256` and `archiveSizeBytes` bind the actual archive. Before restoring with another build, rerun `scripts/validate-backup.ts` against that build.
+
+The following manual procedure is for backups outside deployment. It assumes the default ledger path `/app/data/replay-removals.jsonl`. Stop the backend first so the archive does not cross a Room Commit:
 
 ```bash
 mkdir -p backups
@@ -641,7 +630,7 @@ docker compose -f docker-compose.prod.yml run --rm --no-deps \
 docker compose -f docker-compose.prod.yml up -d app
 ```
 
-手动归档只有通过当前目标镜像的只读恢复验证后才能作为已验证恢复点，并须保留配对 manifest：
+A manual archive is a verified restore point only after read-only validation with the target image. Keep the matching manifest:
 
 ```bash
 OA_BACKUP_STEM="${OA_BACKUP_NAME%.tgz}"
@@ -666,60 +655,58 @@ rm -rf -- "$OA_VALIDATE_DIR"
 chmod 600 "backups/$OA_BACKUP_STEM.manifest.json"
 ```
 
-`replay-removals.latest.jsonl` 是只追加的最新删除事实，必须与普通备份分开保留；每次 Replay 下架后立即执行 `./backup-offsite.sh ledger-only` 更新其异机副本（不停 app），不能随旧数据备份回滚。
+`replay-removals.latest.jsonl` is the newest append-only deletion fact. Store it separately from ordinary backups. Immediately after every Replay removal, run `./backup-offsite.sh ledger-only` to update its offsite copy without stopping the app. Never roll it back with an older data archive.
 
-#### 定时备份与异机副本
+#### Scheduled Backups and Offsite Copies
 
-`backup-offsite.sh` 由生产机 cron 每日调用（UTC 20:00，北京时间 04:00），补齐两次 release 之间的数据保护并把备份同步到生产机之外：
+Production cron runs `backup-offsite.sh` daily at 20:00 UTC, or 04:00 Beijing time. It protects data between releases and copies backups off the production host:
 
-1. 停 app 把 `app-data` volume 打包为 `backups/daily-<timestamp>.tgz` 并刷新 `backups/replay-removals.latest.jsonl`，随即重启 app——停机窗口只覆盖打包。备份与部署共享 `backups/.maintenance.lock`：部署进行中 cron 备份直接跳过，部署会等待进行中的备份结束。
-2. app 恢复服务后，用当前运行镜像在一次性副本上执行与 pre-deploy 备份相同的恢复验证（`scripts/validate-backup.ts`），写入同名 `.manifest.json` 并保存 `.env` 快照（存在 `.env` 文件时）；验证失败删除本次产物并以非零退出（cron 日志可见），不影响线上服务，后续保留清理与异机同步照常执行。
-3. 本地 `daily-*` 保留最近 7 份；本地所有归档（含 `pre-*` 与手动备份）一律最多 30 天（ADR-0010 上限，按分钟计算避免整天舍入），份数层面 `pre-*` 仍由 `deploy-backend.sh` 管理、手动备份留人工处理。
-4. 把 `backups/`（含 `pre-*`、`daily-*`、手动备份、manifest、env 快照）rsync 到 `OFFSITE_BACKUP_TARGET` 的 `OFFSITE_BACKUP_REMOTE_DIR`；超过 30 天的本地归档不再推送。rsync 不带 `--delete`：远端保留策略独立于本地，本地误删不会传播到异机。
-5. `replay-removals.latest.jsonl` 不走目录同步：只有本地副本是远端副本的超集（前缀关系成立）时才覆盖远端，防止回滚的 ledger 冲掉异机删除事实；前缀不成立时脚本以非零退出并保留远端副本。
-6. 远端清理：`daily-*` 保留最近 30 份、`pre-*` 保留最近 10 份，且所有归档（含手动备份）一律最多 30 天（ADR-0010 备份副本上限）；`replay-removals.latest.jsonl` 永不自动清理。异机自身另装 `deploy/offsite-retention.sh` 的自治 cron 兜底 30 天上限——生产机丢失或失联时合规仍然成立。
+1. Stop the app, archive `app-data` as `backups/daily-<timestamp>.tgz`, refresh `backups/replay-removals.latest.jsonl`, and restart the app. Downtime covers only archive creation. Backups and deployments share `backups/.maintenance.lock`: cron skips a backup during deployment, and deployment waits for a backup already in progress.
+2. After service returns, use the current image to run the same restore validation as a pre-deploy backup against a disposable copy. Write the matching `.manifest.json` and an `.env` snapshot when `.env` exists. On validation failure, delete this run's artifacts and exit nonzero without affecting production; retention cleanup and offsite synchronization still run.
+3. Retain the seven newest local `daily-*` archives. Every local archive, including `pre-*` and manual backups, has a 30-day maximum age under ADR-0010, calculated by minute to avoid day rounding. `deploy-backend.sh` still owns the count limit for `pre-*`; manual archives remain operator-managed.
+4. Use rsync to copy `backups/`, including pre-deploy, daily, manual, manifest, and environment snapshots, to `OFFSITE_BACKUP_REMOTE_DIR` on `OFFSITE_BACKUP_TARGET`. Do not upload local archives older than 30 days. Do not use `--delete`; remote retention is independent, so an accidental local deletion does not propagate.
+5. Synchronize `replay-removals.latest.jsonl` separately. Replace the remote ledger only when the local copy is a prefix-compatible superset of it. A divergent prefix fails the script and preserves the remote copy, preventing a rolled-back ledger from overwriting offsite deletion facts.
+6. Remotely retain the newest 30 `daily-*` archives and 10 `pre-*` archives, while enforcing the 30-day maximum on every archive, including manual ones. Never automatically delete `replay-removals.latest.jsonl`. Install the autonomous `deploy/offsite-retention.sh` cron on the offsite host so the 30-day ceiling still applies if production is lost or unreachable.
 
-首次在生产机启用：
+Initial production-host setup:
 
 ```bash
-# 1. host 依赖：生产机需要 rsync + cron + logrotate（Docker 不自带），异机需要 rsync
+# 1. Host dependencies: production needs rsync, cron, and logrotate; offsite needs rsync
 apt-get update && apt-get install -y rsync cron logrotate
-systemctl is-active cron   # 必须输出 active
-ssh root@<异机IP> 'command -v rsync || (apt-get update && apt-get install -y rsync)'
+systemctl is-active cron
+ssh root@<OFFSITE_IP> 'command -v rsync || (apt-get update && apt-get install -y rsync)'
 
-# 2. 生产机 → 异机的 ssh 信任（生产机上执行；已有 key 时跳过 ssh-keygen）
+# 2. SSH trust from production to offsite; skip ssh-keygen when the key exists
 test -f ~/.ssh/id_ed25519 || ssh-keygen -t ed25519 -N '' -f ~/.ssh/id_ed25519
-ssh-copy-id root@<异机IP>
+ssh-copy-id root@<OFFSITE_IP>
 
-# 3. .env 配置备份目标
-echo 'OFFSITE_BACKUP_TARGET=root@<异机IP>' >> /root/open-agricola/.env
+# 3. Configure the destination in .env
+echo 'OFFSITE_BACKUP_TARGET=root@<OFFSITE_IP>' >> /root/open-agricola/.env
 
-# 4. 手动跑一次验证全链路
+# 4. Verify the complete path manually
 /root/open-agricola/backup-offsite.sh
 
-# 5. 安装 cron 与日志轮转
+# 5. Install cron and log rotation
 cd /root/open-agricola
 cp deploy/open-agricola-backup.cron /etc/cron.d/open-agricola-backup
 chmod 644 /etc/cron.d/open-agricola-backup
 cp deploy/open-agricola-backup.logrotate /etc/logrotate.d/open-agricola-backup
 
-# 6. 异机安装自治 30 天清理（生产机失联时 ADR-0010 上限仍成立）
-scp deploy/offsite-retention.sh root@<异机IP>:/root/offsite-retention.sh
-ssh root@<异机IP> 'chmod +x /root/offsite-retention.sh'
-scp deploy/open-agricola-offsite-retention.cron root@<异机IP>:/etc/cron.d/open-agricola-offsite-retention
-ssh root@<异机IP> 'chmod 644 /etc/cron.d/open-agricola-offsite-retention && systemctl is-active cron'
+# 6. Install autonomous 30-day retention on the offsite host
+scp deploy/offsite-retention.sh root@<OFFSITE_IP>:/root/offsite-retention.sh
+ssh root@<OFFSITE_IP> 'chmod +x /root/offsite-retention.sh'
+scp deploy/open-agricola-offsite-retention.cron root@<OFFSITE_IP>:/etc/cron.d/open-agricola-offsite-retention
+ssh root@<OFFSITE_IP> 'chmod 644 /etc/cron.d/open-agricola-offsite-retention && systemctl is-active cron'
 ```
 
-脚本随 git 部署自动更新；cron 定义改动后需重新执行第 5 步。从异机恢复时，先把目标归档、配对 manifest、`env-<stem>` 快照和 `replay-removals.latest.jsonl` 拉回生产机 `backups/`：
+The scripts update with normal Git deployment. Reinstall the cron file after changing its definition. To restore from the offsite host, first pull the archive, matching manifest, `env-<stem>` snapshot, and latest ledger into production `backups/`:
 
 ```bash
-rsync "root@<异机IP>:/root/open-agricola-backups/{<stem>.tgz,<stem>.manifest.json,env-<stem>,replay-removals.latest.jsonl}" backups/
-cp "backups/env-<stem>" .env && chmod 600 .env   # 新机器缺 .env 时恢复运行配置
+rsync "root@<OFFSITE_IP>:/root/open-agricola-backups/{<stem>.tgz,<stem>.manifest.json,env-<stem>,replay-removals.latest.jsonl}" backups/
+cp "backups/env-<stem>" .env && chmod 600 .env
 ```
 
-再按下述恢复流程执行。
-
-恢复前准备目标归档、配对 manifest 和最新 ledger，并确认 manifest 的 `targetBuildId` 与准备启动的构建相同；否则先在归档副本上用目标镜像重新运行验证器。然后在后端停止期间替换数据。恢复命令会显式重放 ledger；服务启动也会再次幂等重放：
+Before restoring, prepare the archive, matching manifest, and latest ledger. Confirm that the manifest `targetBuildId` equals the build to be started; otherwise rerun the validator with the target image against a copy of the archive. Replace data while the backend is stopped. The command explicitly replays the ledger, and service startup replays it idempotently again:
 
 ```bash
 OA_RESTORE_ARCHIVE=open-agricola-YYYYMMDDTHHMMSSZ.tgz
@@ -746,11 +733,11 @@ docker compose -f docker-compose.prod.yml run --rm --no-deps \
 docker compose -f docker-compose.prod.yml up -d app
 ```
 
-恢复后逐个抽查 ledger 中的 Room ID：Game Context 只能返回 `removed` Tombstone，manifest/segment 不可读取；无其他 Replay 引用的资源 Hash 必须返回 404。
+After restoration, sample every Room ID in the ledger. Game Context may return only a `removed` Tombstone; manifests and segments must be unreadable, and asset hashes with no remaining Replay reference must return 404.
 
-### Replay 下架
+### Remove a Replay
 
-CLI 只接受精确 Room ID 和 `removed`、`moderation`、`legal` 三种原因。先停后端并 dry-run，确认输出的 Room 与资源 Hash 后再执行：
+The CLI accepts only an exact Room ID and one of three reasons: `removed`, `moderation`, or `legal`. Stop the backend and run a dry run first. Execute only after confirming the Room and asset hashes in its output:
 
 ```bash
 OA_ROOM_ID=replace-with-exact-room-id
@@ -767,7 +754,7 @@ docker compose -f docker-compose.prod.yml cp \
 docker compose -f docker-compose.prod.yml up -d app
 ```
 
-法律请求明确要求删除 Game Result Archive 时，仅可使用 `legal` 原因并追加 `--erase-result`；该模式不能和 `--asset-hash` 组合：
+When a legal request explicitly requires erasing the Game Result Archive, use reason `legal` with `--erase-result`. This mode cannot be combined with `--asset-hash`:
 
 ```bash
 OA_ROOM_ID=replace-with-exact-room-id
@@ -784,7 +771,7 @@ docker compose -f docker-compose.prod.yml cp \
 docker compose -f docker-compose.prod.yml up -d app
 ```
 
-若违规对象是自定义卡图片本身，再传精确的 64 位内容 Hash；dry-run 会列出所有引用该资源、将一并 Tombstone 的 Room：
+If the violating content is custom-card art, also pass its exact 64-character content hash. The dry run lists every Room referencing that asset that will also become a Tombstone:
 
 ```bash
 OA_ASSET_HASH=replace-with-64-character-sha256
@@ -803,20 +790,20 @@ docker compose -f docker-compose.prod.yml cp \
 docker compose -f docker-compose.prod.yml up -d app
 ```
 
-资产下架可使用 ledger 已证明引用关系的既有 Tombstone Room 作为入口。违规 Hash 会作为永久规则写入 ledger：旧备份恢复时自动下架新增引用，后续 Room 也不能重新归档同一内容。操作幂等；普通整局下架只删除不再被其他 Replay 引用的资源。成功后立即执行 `./backup-offsite.sh ledger-only` 异机备份最新 `replay-removals.jsonl`。
+An asset removal may use an existing Tombstone Room whose ledger proves the reference. The violating hash becomes a permanent ledger rule: restoring an old backup automatically removes new references, and later rooms cannot archive the same content. The operation is idempotent. Ordinary whole-Replay removal deletes only assets no longer referenced by another Replay. On success, immediately run `./backup-offsite.sh ledger-only` to back up the latest `replay-removals.jsonl` offsite.
 
-### Bug Report token 密钥轮换
+### Rotate Bug Report Token Keys
 
-1. 生成新的 32 字节随机 key，加入 `BUG_REPORT_TOKEN_ENCRYPTION_KEYS`，保留旧 key。
-2. 把 `BUG_REPORT_TOKEN_ACTIVE_KEY_ID` 改为新 key id，重启后端；新连接和后续 token refresh 会使用新 key。
-3. 旧 key 仍用于解密尚未刷新连接，不能提前删除。检查 `issue_submission_connections.key_id`，并等待旧 key 行数归零；仍有效的旧 `oauth_states.pkce_verifier_key_id` 也必须归零或过期。
-4. 确认 Hosted 与本人 GitHub 提交都成功后，才从 key ring 删除旧 key 并再次重启。轮换期间不要修改已有 key id 对应的 key 内容。
+1. Generate a new random 32-byte key, add it to `BUG_REPORT_TOKEN_ENCRYPTION_KEYS`, and retain the old key.
+2. Set `BUG_REPORT_TOKEN_ACTIVE_KEY_ID` to the new key ID and restart the backend. New connections and later token refreshes use the new key.
+3. Keep the old key while any connection still requires it. Wait until rows using the old key disappear from `issue_submission_connections.key_id`, and until old `oauth_states.pkce_verifier_key_id` rows disappear or expire.
+4. After confirming both Hosted and personal-GitHub submissions, remove the old key from the key ring and restart again. Never change the key material associated with an existing key ID during rotation.
 
-### 本地开发（不需要 Docker）
+### Local Development without Docker
 
 ```bash
 pnpm install
 ./restart-intranet.sh
 ```
 
-`VITE_API_BASE` 未设置时默认为空字符串（同源），开发模式下前端自动连接 `localhost:5175`。
+When `VITE_API_BASE` is unset, it defaults to the empty string for same-origin use. In development, the frontend automatically connects to `localhost:5175`.

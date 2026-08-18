@@ -1,59 +1,63 @@
-# GitHub OAuth App 注册（Workshop → PR 功能前置）
+# Registering the GitHub OAuth App for Workshop Pull Requests
 
-本文档面向仓库维护者 (titanxxh)。此步骤在代码部署前完成。
+[English](github-oauth-app-setup.md) | [中文](github-oauth-app-setup_zh.md)
 
-## 步骤
+This guide is for the repository maintainer (`titanxxh`). Complete this setup before deploying the application.
 
-1. 访问 [https://github.com/settings/applications/new](https://github.com/settings/applications/new)
-2. 填：
-  - Application name: **Open Agricola Workshop**
-  - Homepage URL: `https://titanxxh.github.io/open-agricola/`
-  - Authorization callback URL:
-    - Dev: `http://localhost:5175/api/workshop/github/oauth/callback`
-    - Prod: `https://<backend-host>/api/workshop/github/oauth/callback`
-    - 当前生产示例：`https://open-agricola.duckdns.org:8443/api/workshop/github/oauth/callback`
-  - 可配多个 callback URL（每个环境一个）
-3. 点 Register application
-4. 在 App 详情页点 "Generate a new client secret"，**立刻**复制保存 Client ID 和 Client Secret（secret 离开页面后无法再看）
-5. 把 secret 写入服务端 env：
-  ```
+## Setup
+
+1. Open [https://github.com/settings/applications/new](https://github.com/settings/applications/new).
+2. Enter:
+   - Application name: **Open Agricola Workshop**
+   - Homepage URL: `https://titanxxh.github.io/open-agricola/`
+   - Authorization callback URL:
+     - Development: `http://localhost:5175/api/workshop/github/oauth/callback`
+     - Production: `https://<backend-host>/api/workshop/github/oauth/callback`
+     - Current production example: `https://open-agricola.duckdns.org:8443/api/workshop/github/oauth/callback`
+   - You may configure multiple callback URLs, one for each environment.
+3. Click **Register application**.
+4. On the application page, click **Generate a new client secret**. Copy and store the Client ID and Client Secret immediately; the secret cannot be viewed again after leaving the page.
+5. Add the secret to the backend environment:
+
+   ```env
    GITHUB_OAUTH_CLIENT_ID=<Client ID>
    GITHUB_OAUTH_CLIENT_SECRET=<Client Secret>
    GITHUB_UPSTREAM_OWNER=titanxxh
    GITHUB_UPSTREAM_REPO=open-agricola
    WORKSHOP_PR_ENABLED=true
-   # 生产前端在 GitHub Pages 时，后端需要知道自己的公开 URL
-   # 用于拼 OAuth callback URL。
+   # When the production frontend is hosted on GitHub Pages, the backend
+   # needs its own public URL to construct the OAuth callback URL.
    PUBLIC_API_BASE=https://open-agricola.duckdns.org:8443
-  ```
-  - Dev: 写 `.env`（已在 `.gitignore`）
-  - Prod: 通过 Docker secret 或环境变量注入
-6. 验证：服务启动后访问 `GET /api/workshop/github/oauth/start?hs=test`，应 302 到 `github.com/login/oauth/authorize`
+   ```
+
+   - Development: store these values in `.env`, which is already ignored by Git.
+   - Production: inject them through Docker secrets or environment variables.
+6. Verify the configuration after starting the service. `GET /api/workshop/github/oauth/start?hs=test` must return a 302 redirect to `github.com/login/oauth/authorize`.
 
 ## Scope
 
-应用请求 `repo` scope，以便在主仓库是 private repository 时读取内容、创建分支并提交 PR。若主仓库改为 public repository，可再收紧为 `public_repo`。
+The application requests the `repo` scope so it can read repository contents, create branches, and submit pull requests when the upstream repository is private. If the upstream repository becomes public, reduce this to `public_repo`.
 
 ## Workshop Review GitHub App
 
-PR 审批读取和 webhook 使用独立的 GitHub App，不复用 Workshop OAuth App 或 issues-only Bug Report App。
+Pull-request approval reads and webhooks use a separate GitHub App. Do not reuse either the Workshop OAuth App or the issues-only Bug Report App.
 
-### 注册与安装
+### Registration and Installation
 
-1. 在 GitHub App 设置页创建 `open-agricola-workshop-review`，Homepage URL 指向主仓库。
-2. Repository permissions 仅设置 `Contents: Read-only` 和 `Pull requests: Read-only`；其余权限保持 `No access`，GitHub 自动附带的 `Metadata: Read-only` 除外。
-3. Webhook URL 设置为 `<PUBLIC_API_BASE>/api/github/webhook`，用 `openssl rand -hex 32` 生成独立 secret。
-4. Subscribe to events 仅勾选 `Pull request` 和 `Pull request review`。
-5. 安装范围选择 `Only on this account`，并只安装到 `titanxxh/open-agricola`。
-6. 记录 App ID，生成并下载 private key，再从安装页面地址记录 Installation ID。
+1. Create a GitHub App named `open-agricola-workshop-review` and set its homepage URL to the main repository.
+2. Set repository permissions to `Contents: Read-only` and `Pull requests: Read-only`. Leave all other permissions at `No access`, except GitHub's automatic `Metadata: Read-only` permission.
+3. Set the Webhook URL to `<PUBLIC_API_BASE>/api/github/webhook`. Generate a dedicated secret with `openssl rand -hex 32`.
+4. Under **Subscribe to events**, select only `Pull request` and `Pull request review`.
+5. Select **Only on this account** for the installation scope and install the app only on `titanxxh/open-agricola`.
+6. Record the App ID, generate and download a private key, and record the Installation ID from the installation page URL.
 
-旧安装新增 `Contents: Read-only` 后，必须在 App installation 页面批准权限变更；否则 installation token 会拒绝该权限。
+After adding `Contents: Read-only` to an existing installation, approve the permission change on the App installation page. Until approval, installation tokens will not receive that permission.
 
-此 App 不参与用户 OAuth，不需要配置 callback URL、Client ID 或 Client Secret。`POST /api/github/webhook` 上线前关闭 Webhook Active；上线后重新开启并检查 Recent deliveries 返回 2xx。
+This App does not participate in user OAuth and needs no callback URL, Client ID, or Client Secret. Disable **Webhook Active** before `POST /api/github/webhook` is deployed. Re-enable it after deployment and confirm that Recent deliveries return 2xx.
 
-### 后端配置
+### Backend Configuration
 
-把以下变量写入后端部署环境；当前生产配置位置是 `/root/open-agricola/.env`：
+Add these variables to the backend deployment environment. The current production configuration is stored in `/root/open-agricola/.env`:
 
 ```env
 WORKSHOP_REVIEW_GITHUB_APP_ID=<App ID>
@@ -62,33 +66,35 @@ WORKSHOP_REVIEW_GITHUB_INSTALLATION_ID=<Installation ID>
 WORKSHOP_REVIEW_GITHUB_WEBHOOK_SECRET=<Webhook secret>
 ```
 
-Private key 中的换行以 `\n` 保存。private key 和 webhook secret 只能进入后端部署密钥，不得提交到仓库、写入日志或粘贴到 issue；issue 只记录变量名、配置位置和安装仓库。`docker-compose.prod.yml` 会把这四项显式传入后端容器。
+Store private-key newlines as `\n`. The private key and webhook secret may exist only in backend deployment secrets: never commit them, log them, or paste them into an issue. Issues may record only variable names, configuration locations, and the installed repository. `docker-compose.prod.yml` explicitly passes these four variables into the backend container.
 
 ## Runtime Flow
 
-1. 前端卡牌详情页点击“提交审核”。
-2. 前端调用 `POST /api/workshop/cards/:id/submit-review`。
-3. 服务端若缺 GitHub token，返回 OAuth start URL。
-4. 前端 popup 打开 OAuth URL。生产环境下 popup URL 必须解析到后端域名，而不是 GitHub Pages 路径；前端通过 `VITE_API_BASE` 做 base URL。
-5. GitHub callback 页面由后端返回一段 HTML，执行：
-  ```js
+1. The author clicks **Submit for review** on a card detail page.
+2. The frontend calls `POST /api/workshop/cards/:id/submit-review`.
+3. If the server has no GitHub token, it returns an OAuth start URL.
+4. The frontend opens that OAuth URL in a popup. In production, the popup URL must resolve to the backend host, not a GitHub Pages path; the frontend uses `VITE_API_BASE` as its base URL.
+5. The backend returns an HTML page from the GitHub callback that runs:
+
+   ```js
    window.opener.postMessage({ type: 'workshop-pr-oauth', result }, '*')
-  ```
-   这里必须用 `'*'`，因为 callback 页面在后端域名，opener 在 GitHub Pages 域名。
-6. 前端收到消息后关闭 popup 并重试 submit-review。
-7. 服务端：
-  - 若授权用户与 upstream owner 相同，跳过 fork，直接使用 upstream repo。
-  - 否则确保 fork 存在。
-  - 读取 `shared/cards/register-all.ts`、`shared/cards/catalog.generated.ts`、`docs/community_cards.md`。
-  - 生成 community card 文件、注册表、community docs、可选 card art；行为测试由 PR 按风险补充。
-  - 先提交占位 PR number 的 V1 commit，打开或更新 PR。
-  - 再提交带真实 PR number 的 V2 commit。
-8. Review App 接收 webhook；approved review 经 GraphQL 快照确认 PR 为 open、非 draft 且 base=`main` 后固定被审版本；GitHub 当前 head 不同、`dismissed`、`CHANGES_REQUESTED` 或未合并关闭 PR 使旧资格变为 stale。
-9. 作者调用 `POST /api/workshop/cards/:id/publish` 时再次即时查询 GraphQL，一致才置 live。
+   ```
 
-## CI Requirements for Generated PRs
+   The target origin must be `'*'` because the callback page is served by the backend host while the opener is hosted on GitHub Pages.
+6. The frontend receives the message, closes the popup, and retries `submit-review`.
+7. The server:
+   - Uses the upstream repository directly when the authorized user is the upstream owner, skipping the fork.
+   - Otherwise ensures that the user's fork exists.
+   - Reads `shared/cards/register-all.ts`, `shared/cards/catalog.generated.ts`, and `docs/community_cards.md`.
+   - Generates the community card file, registries, community documentation, and optional card art. The pull request adds behavior tests according to risk.
+   - Creates a V1 commit with a placeholder pull-request number and opens or updates the pull request.
+   - Creates a V2 commit containing the real pull-request number.
+8. The Review App receives the webhook. An approved review pins the reviewed revision only after a GraphQL snapshot confirms that the pull request is open, not a draft, and targets `main`. A different current head, `dismissed`, `CHANGES_REQUESTED`, or a closed unmerged pull request makes the previous qualification stale.
+9. When the author calls `POST /api/workshop/cards/:id/publish`, the server queries GraphQL again and marks the card live only if the result still matches.
 
-生成出的社区卡 PR 必须满足完整 CI，尤其是：
+## CI Requirements for Generated Pull Requests
+
+Generated community-card pull requests must pass the full CI suite, especially:
 
 ```bash
 pnpm run check:community-deck
@@ -96,41 +102,39 @@ pnpm exec tsc -p tsconfig.server.json --noEmit
 pnpm run build
 ```
 
-常见生成问题与对应修复点：
+Common generator failures and their fixes:
 
-
-| 症状                                  | 原因                     | 修复位置                                                                      |
-| ----------------------------------- | ---------------------- | ------------------------------------------------------------------------- |
-| `deck` 检查失败                         | 工坊卡仍是 `deck: 'CUSTOM'` | `server/workshop-pr/code-gen.ts` 把 deck 规范成 `community`                   |
-| `localeCompare` / listener 排序报错     | listener 缺稳定 `id`      | 生成器给缺 id 的 listener 补 `{cardId}-listener-{n}`                             |
-| `catalog.generated.ts is out of sync` | 生成后未提交 generated catalog | 运行 `pnpm run generate:register-all` 并提交 `catalog.generated.ts` / `major/generated.ts` |
-| TypeScript 报 `phases: string[]` 不兼容 | `CARD_IMPL` 没有上下文类型    | 生成器把 `CARD_IMPL` 标注为 `CardImpl`                                           |
-| TypeScript 报 `prerequisite` 类型不兼容   | 工坊 JSON 用了结构化 prereq   | 生成器把 `{ occupation: N }` 转成 `prerequisite` 文本 + `occupationPrerequisites` |
-
+| Symptom | Cause | Fix location |
+|---|---|---|
+| `deck` check fails | Workshop card still has `deck: 'CUSTOM'` | `server/workshop-pr/code-gen.ts` normalizes the deck to `community` |
+| `localeCompare` or listener sorting fails | Listener has no stable `id` | Generator assigns `{cardId}-listener-{n}` to listeners without an ID |
+| `catalog.generated.ts is out of sync` | Generated catalog was not committed | Run `pnpm run generate:register-all` and commit `catalog.generated.ts` and `major/generated.ts` |
+| TypeScript rejects `phases: string[]` | `CARD_IMPL` has no contextual type | Generator annotates `CARD_IMPL` as `CardImpl` |
+| TypeScript rejects `prerequisite` | Workshop JSON used a structured prerequisite | Generator converts `{ occupation: N }` into prerequisite text plus `occupationPrerequisites` |
 
 ## Troubleshooting
 
-### OAuth 页面显示 `redirect_uri is not associated with this application`
+### OAuth reports `redirect_uri is not associated with this application`
 
-GitHub OAuth App 的 Authorization callback URL 与服务端实际拼出的 callback 不一致。检查：
+The GitHub OAuth App's Authorization callback URL does not match the callback constructed by the server. Check:
 
-- GitHub App 里是否配置了生产 callback：`https://open-agricola.duckdns.org:8443/api/workshop/github/oauth/callback`
-- 服务端 `PUBLIC_API_BASE` / 反代 HTTPS 地址是否正确
-- 浏览器实际打开的 GitHub 授权 URL 中 `redirect_uri=` 参数是否与 GitHub App 完全一致
+- The production callback is configured in the GitHub App: `https://open-agricola.duckdns.org:8443/api/workshop/github/oauth/callback`.
+- The backend `PUBLIC_API_BASE` and reverse-proxy HTTPS address are correct.
+- The `redirect_uri` parameter in the GitHub authorization URL opened by the browser exactly matches the GitHub App setting.
 
-### 授权完成后 popup 关闭了，但页面没有创建 PR
+### The popup closes after authorization, but no pull request is created
 
-优先检查 callback HTML 的 `postMessage` target origin。生产环境是跨域：后端 callback 页面向 GitHub Pages opener 发消息，必须使用 `'*'`。如果限定为 `window.location.origin`，前端收不到消息，propose 不会重试。
+Check the callback HTML's `postMessage` target origin first. Production is cross-origin: the backend callback page sends a message to the GitHub Pages opener, so it must use `'*'`. If it uses `window.location.origin`, the frontend never receives the message and does not retry the proposal.
 
-### 授权用户就是 upstream owner，fork 失败
+### Forking fails when the authorized user is the upstream owner
 
-GitHub 不允许用户 fork 自己的仓库。`GitHubClient.ensureFork()` 必须在 `login === upstreamOwner` 时直接返回 upstream owner/repo，跳过 fork API。
+GitHub does not allow users to fork their own repositories. `GitHubClient.ensureFork()` must return the upstream owner and repository directly when `login === upstreamOwner`, without calling the fork API.
 
 ## Revocation
 
-若 secret 泄露：
+If a secret is exposed:
 
-1. 在 App 详情页 "Revoke all user tokens"
-2. 点 "Generate a new client secret"
-3. 更新服务端 env 的 `GITHUB_OAUTH_CLIENT_SECRET`
-4. 重启服务
+1. Click **Revoke all user tokens** on the application page.
+2. Click **Generate a new client secret**.
+3. Update `GITHUB_OAUTH_CLIENT_SECRET` in the backend environment.
+4. Restart the service.

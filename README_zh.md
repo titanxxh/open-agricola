@@ -1,5 +1,7 @@
 # Open Agricola
 
+[English](README.md) | [中文](README_zh.md)
+
 Open Agricola 项目的目标是支持全部的 Agricola 扩展。目前支持的包括：
 - Revised version A-E 全部888张卡牌
 - Parent Cards
@@ -102,18 +104,18 @@ docs/      架构、部署、平台设计、卡牌进度
 
 | Topic | Doc |
 |---|---|
-| Architecture | [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) |
-| Deployment | [docs/HOW_TO_DEPLOY.md](docs/HOW_TO_DEPLOY.md) |
-| Platform & Workshop | [docs/PLATFORM_DESIGN.md](docs/PLATFORM_DESIGN.md) |
-| Card Test Template | [docs/CARD_TEST_TEMPLATE.md](docs/CARD_TEST_TEMPLATE.md) |
-| 卡牌实现现状 | [docs/card_implementation_status.md](docs/card_implementation_status.md) |
-| Custom Card Sandbox | [docs/CUSTOM_CARD_SANDBOX.md](docs/CUSTOM_CARD_SANDBOX.md) |
+| Architecture | [docs/ARCHITECTURE_zh.md](docs/ARCHITECTURE_zh.md) |
+| Deployment | [docs/HOW_TO_DEPLOY_zh.md](docs/HOW_TO_DEPLOY_zh.md) |
+| Platform & Workshop | [docs/PLATFORM_DESIGN_zh.md](docs/PLATFORM_DESIGN_zh.md) |
+| Card Test Template | [docs/CARD_TEST_TEMPLATE_zh.md](docs/CARD_TEST_TEMPLATE_zh.md) |
+| 卡牌实现现状 | [docs/card_implementation_status_zh.md](docs/card_implementation_status_zh.md) |
+| Custom Card Sandbox | [docs/CUSTOM_CARD_SANDBOX_zh.md](docs/CUSTOM_CARD_SANDBOX_zh.md) |
 | Community Cards | [docs/community_cards.md](docs/community_cards.md) |
 | CI Checks | [docs/operations/ci-checks.md](docs/operations/ci-checks.md) |
 
 ## Contributing
 
-PRs welcome. 开发环境、测试、commit 与 PR 规范见 [CONTRIBUTING.md](CONTRIBUTING.md)。AI 协作约束（卡牌实现规范、文档同步硬规则、测试边界）见 [AGENTS.md](AGENTS.md)。安全漏洞请按 [SECURITY.md](SECURITY.md) 私下报告。
+PRs welcome. 开发环境、测试、commit 与 PR 规范见 [CONTRIBUTING_zh.md](CONTRIBUTING_zh.md)。AI 协作约束（卡牌实现规范、文档同步硬规则、测试边界）见 [AGENTS.md](AGENTS.md)。安全漏洞请按 [SECURITY_zh.md](SECURITY_zh.md) 私下报告。
 
 ## 支持项目
 
