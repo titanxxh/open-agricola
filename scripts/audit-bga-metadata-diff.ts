@@ -127,7 +127,8 @@ function main() {
 
   const date = new Date().toISOString().slice(0, 10)
   const md = renderReport(result, date)
-  const outPath = path.join(REPO_ROOT, 'docs/operations/bga-metadata-diff-report.md')
+  const outPath = path.join(REPO_ROOT, 'output/bga-metadata-diff-report.md')
+  fs.mkdirSync(path.dirname(outPath), { recursive: true })
   fs.writeFileSync(outPath, md, 'utf8')
   console.log(`Wrote ${outPath}`)
   console.log(`⚠ literal: ${result.deviations.filter(d => d.verdict === 'warn').length}, ❌ complex: ${result.deviations.filter(d => d.verdict === 'error').length}, 🔍 single-sided: ${result.bgaOnly.length + result.tsOnly.length + result.bannedButPresent.length}`)

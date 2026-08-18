@@ -6,13 +6,13 @@
 >
 > - **AI 系统提示词作者** — `client/services/llmPrompts.ts` 运行时从源码真相源 + 描述元数据渲染 hook / phase / scope / actionId 表；hook / phase / actionId 描述分别维护在 `shared/custom-code/sandbox-hook-meta.ts` / `sandbox-listener-phases.ts` / `sandbox-action-ids.ts`，scope 描述维护在 prompt 文件的穷尽 map
 > - **Workshop UI 文案作者** — `client/app/workshop/AiCardDesigner.tsx` / `WorkshopPage.tsx` 文案
-> - **设计文档作者** — `docs/CARD_DESIGN_PROMPT.md` / `docs/ARCHITECTURE.md` 提到沙盒的章节
+> - **设计文档作者** — `docs/ARCHITECTURE.md` 提到沙盒的章节
 > - **LLM 自动化测试维护者** — `docs/test/llm-card-gen.md` 描述了用真 LLM 验证沙盒契约的 fixture 套件
 >
 > **修改本文件的同时**必须：
 >
 > 1. 本文件是 hook / phase / scope / actionId 的**人读镜像**：名字白名单由源码常量拥有（`cardEffectHooks` / `sandboxListenerPhases` / `sandboxListenerScopes` / `SANDBOX_ALLOWED_ACTION_IDS`），描述由穷尽 map 拥有；`CARD_DESIGNER_SYSTEM_PROMPT` 运行时渲染，**不再手工同步 prompt**。CI `pnpm run check:prompt-sync` 只校验本文件的 `prompt-sync` 块与源码名字一致。
-> 2. 让 `docs/CARD_DESIGN_PROMPT.md` / `docs/ARCHITECTURE.md` 引用本文件而不是各自维护一份
+> 2. 让 `docs/ARCHITECTURE.md` 引用本文件而不是另行维护一份
 > 3. 支付语义、hook 参数/返回值和 helper 数据形状不是名字同步能覆盖的；同步更新 executor / prompt contract 测试，并按 `docs/test/llm-card-gen.md` 跑 live → record → replay
 
 > **官方卡作者**（在 `shared/cards/<deck>/<id>.ts` 里写 TS 模块）**不受**本文件约束 —— 直接 import `shared/domain/player.ts` 等任意 helper。本文件只覆盖 Workshop 自定义卡。
@@ -702,7 +702,6 @@ const CARD_IMPL = {
 ### 9.1 修改本文件 → 谁会自动同步
 
 - `**client/services/llmPrompts.ts`**：**不再手工同步**——它运行时从源码真相源（`cardEffectHooks` / `sandboxListenerPhases` / `sandboxListenerScopes` / `SANDBOX_ALLOWED_ACTION_IDS`）和描述元数据渲染 hook / phase / scope / actionId 表，由 `client/services/__tests__/llmPrompts.test.ts` 集合断言守卫。CI `pnpm run check:prompt-sync` 校验本文件的全部 `prompt-sync` 块与源码一致。
-- `**docs/CARD_DESIGN_PROMPT.md**`：手工同步引用本文件即可（避免重复列表）。
 - `**docs/ARCHITECTURE.md**`：手工同步引用本文件即可。
 - `**client/app/workshop/AiCardDesigner.tsx**`：手工同步引用本文件即可。
 
@@ -728,4 +727,4 @@ CI 会拦下漏改的情况。
 | 2026-04-30 | 双轨 scoring hook 重构：删除 `computePostScore` / `scoringPriority` / `ctx.reserved`；新增 `computeCostedBonus` 走 Pareto 求解器。详见 `(spec/plan 已归档，见 git history)`。|
 | 2026-04-24 | 修正 `computeBonusScore` / `computePostScore` / `computeSharedPostScore` 签名（实为 `=> number` / `=> Array<{playerId,score}>`，非 `{score,label}`）；新增 §5.5 listener `actions:` 高频踩坑（不含空间 ID、`harvest-feed` 不可监听）、§5.6 anytime 写法、§5.7 `futureMeeplesNode` 不在沙箱；登记 `flag-card` / `future-meeples` actionId。来源：LLM card-gen session 测试套件实测 |
 | 2026-04-22 | 全面重写：`registerCardEffect`/`registerCardListener` → `CARD_DEF`/`CARD_IMPL` 双常量；注入 helper 函数；扩展 hook 白名单至全部 CardEffectField；扩展 phase 白名单增加 `anytime`/`computeChoiceCandidates`；AST validator hard-fail；4 个新 actionId                                                                                                               |
-| 2026-04-19 | 抽出本文件作为唯一真源；从 `docs/CARD_DESIGN_PROMPT.md` / `(spec/plan 已归档，见 git history)` §16 内联描述迁出                                                                                                                                                                                             |
+| 2026-04-19 | 抽出本文件作为唯一真源；从旧设计文档 §16 内联描述迁出                                                                                                                                                                                                                                                            |

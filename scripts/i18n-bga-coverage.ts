@@ -1,7 +1,7 @@
 #!/usr/bin/env tsx
 /**
  * Generate BGA clienttranslate coverage report. Read-only: produces
- * docs/i18n-bga-coverage-report.md.
+ * output/i18n-bga-coverage-report.md.
  *
  * Usage:
  *   pnpm exec tsx scripts/i18n-bga-coverage.ts
@@ -109,7 +109,8 @@ async function main() {
 
   const report = computeCoverageReport(bga.unique, enValues)
   const md = renderReport(report, bga.unextractedVariants.length)
-  const outPath = path.resolve(REPO_ROOT, 'docs/i18n-bga-coverage-report.md')
+  const outPath = path.resolve(REPO_ROOT, 'output/i18n-bga-coverage-report.md')
+  fs.mkdirSync(path.dirname(outPath), { recursive: true })
   fs.writeFileSync(outPath, md, 'utf8')
   console.log(`wrote ${outPath}`)
   console.log(`bgaTotal=${report.bgaTotal} ourCovered=${report.ourCovered} gap=${report.gap.length}`)

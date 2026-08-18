@@ -1,36 +1,41 @@
 # Open Agricola
 
-后端权威 + WebSocket 实时多人同步的 Agricola 桌游在线复刻。
+Open Agricola aims to support every Agricola expansion. Currently supported:
+- All 888 cards from Revised Edition decks A–E
+- Parent Cards
+- Through the Seasons
+- Farmers of the Moor
+
+The project also aims to provide solid infrastructure for players to create new expansions through the Card Workshop.
+
+> Fun fact: All code in this repository has been produced by AI agents so far.
 
 [![CI](https://github.com/titanxxh/open-agricola/actions/workflows/ci.yml/badge.svg)](https://github.com/titanxxh/open-agricola/actions)
 [![Pages Deploy](https://github.com/titanxxh/open-agricola/actions/workflows/deploy-pages.yml/badge.svg)](https://github.com/titanxxh/open-agricola/actions/workflows/deploy-pages.yml)
 [![License: Apache 2.0](https://img.shields.io/github/license/titanxxh/open-agricola)](LICENSE)
 [![Live Demo](https://img.shields.io/badge/demo-live-success)](https://titanxxh.github.io/open-agricola/)
 [![Ko-fi](https://img.shields.io/badge/Ko--fi-Support%20Me-FF5E5B?logo=ko-fi&logoColor=white)](https://ko-fi.com/titanxxh)
-[![爱发电](https://img.shields.io/badge/爱发电-支持titanxxh-946ce6)](https://afdian.com/a/titanxxh)
+[![Afdian](https://img.shields.io/badge/Afdian-Support%20titanxxh-946ce6)](https://afdian.com/a/titanxxh)
 
-> **Disclaimer**: Open Agricola is a fan-made implementation. Agricola is © Uwe Rosenberg / Lookout Spiele / Z-Man Games. This project is not affiliated with or endorsed by the rights holders.
+> **Disclaimer**: Open Agricola is a fan-made implementation. Agricola © Uwe Rosenberg / Lookout Spiele / Z-Man Games. This project is not affiliated with or endorsed by the rights holders.
 
 ## Features
 
-- 后端权威 + WebSocket 实时多人同步
-- 2-6 人房间、simultaneous draft、Community Deck、自定义工坊卡
-- 888 张 BGA A-E canonical 卡牌定义已覆盖并完成审计（含已接受差异）；Parent Cards、Through the Seasons、Farmers of the Moor complexity III 已接入，细节见卡牌实现现状文档
-- **LLM-Assisted Card Design** — 浏览器内调用 LLM 设计自定义卡牌，自动生成农场主画风的卡牌图片和**实现代码**；配置 GitHub 集成后可从工坊提交 PR
-- 发布 GitHub Release 后自动部署 GitHub Pages 前端；后端通过 Docker Compose 部署到自建 VPS，并由 owner 在可信本机触发更新
-- 自定义代码沙盒（TypeScript AST 校验 + VM 隔离执行）
+- Server-authoritative gameplay with real-time multiplayer synchronization over WebSocket
+- Rooms for 2–6 players, simultaneous drafting, the Community Deck, and custom Workshop cards
+- **LLM-Assisted Card Design** — Design custom cards with an LLM in the browser and automatically generate Agricola-style artwork and **implementation code**; configure the GitHub integration to submit PRs directly from the Workshop
 
 ## Live Demo
 
 https://titanxxh.github.io/open-agricola/
 
-![Open Agricola 游戏运行截图](docs/assets/gameplay-screenshot.webp)
+![Open Agricola gameplay screenshot](docs/assets/gameplay-screenshot.webp)
 
 ## Quick Start
 
-前置：Node.js 22 + pnpm（项目 `package.json` 的 `packageManager` 字段已锁定 pnpm 版本）。`better-sqlite3` 等原生依赖按 Node ABI 编译，Node 20 启动会出现 `NODE_MODULE_VERSION` 不匹配。
+Prerequisites: Node.js 22 and pnpm. The pnpm version is pinned by the `packageManager` field in `package.json`. Native dependencies such as `better-sqlite3` are compiled against the Node ABI; running with Node 20 causes a `NODE_MODULE_VERSION` mismatch.
 
-`canvas` 从源码编译，需要先装系统库与编译工具链，否则 `pnpm install` 会失败：
+The `canvas` package is built from source and requires the following system libraries and build tools before running `pnpm install`:
 
 ```bash
 # Debian / Ubuntu
@@ -43,10 +48,10 @@ brew install pkg-config cairo pango libpng jpeg giflib librsvg pixman
 
 ```bash
 pnpm install
-./restart-intranet.sh    # 同时启动后端 (5175) + 前端 (5173)
+./restart-intranet.sh    # Start the backend (5175) and frontend (5173)
 ```
 
-常用验证命令：
+Common verification commands:
 
 ```bash
 pnpm test:fast
@@ -56,31 +61,31 @@ pnpm run build
 
 ## URL Parameters
 
-| 参数 | 说明 |
+| Parameter | Description |
 |---|---|
-| `player=p1` / `player=p2` | 锁定玩家视角 |
-| `transport=ws` | 启用 WebSocket 实时同步 |
-| `room=<id>` | 加入指定房间 |
-| `maxPlayers=2..6` | 创建 WS 房间时设置人数 |
-| `draftMode=simultaneous` | 创建 WS 房间时启用 simultaneous draft |
-| `draftPoolSize=7..10` | 设置 draft 每类牌池大小 |
-| `enableCommunityDeck=true` | 创建 WS 房间时加入 Community Deck |
-| `enableParentCards=true` | 创建 WS 房间时启用 Parent Cards |
-| `enableThroughTheSeasons=true` | 创建 WS 房间时启用 Through the Seasons |
-| `enableFarmersOfTheMoor=true` | 创建 WS 房间时启用 Farmers of the Moor |
-| `allowIncompleteFarmersOfTheMoorMinorDeal=true` | Farmers of the Moor 小改良池不完整时仍允许开局 |
-| `customCards=id1,id2` | 创建 WS 房间时加载工坊卡 ID |
-| `devMode=1` | 在固定 dev 房间或 embedded sandbox 启用开发者面板 |
-| `page=workshop` | 打开工坊页面 |
-| `page=login` | 强制跳登录页（认证后默认跳大厅）|
+| `player=p1` / `player=p2` | Lock the view to a specific player |
+| `transport=ws` | Enable real-time synchronization over WebSocket |
+| `room=<id>` | Join a specific room |
+| `maxPlayers=2..6` | Set the player count when creating a WebSocket room |
+| `draftMode=simultaneous` | Enable simultaneous drafting when creating a WebSocket room |
+| `draftPoolSize=7..10` | Set the pool size for each card type in the draft |
+| `enableCommunityDeck=true` | Include the Community Deck when creating a WebSocket room |
+| `enableParentCards=true` | Enable Parent Cards when creating a WebSocket room |
+| `enableThroughTheSeasons=true` | Enable Through the Seasons when creating a WebSocket room |
+| `enableFarmersOfTheMoor=true` | Enable Farmers of the Moor when creating a WebSocket room |
+| `allowIncompleteFarmersOfTheMoorMinorDeal=true` | Allow the game to start with an incomplete Farmers of the Moor minor improvement pool |
+| `customCards=id1,id2` | Load Workshop card IDs when creating a WebSocket room |
+| `devMode=1` | Enable the developer panel in the fixed development room or embedded sandbox |
+| `page=workshop` | Open the Workshop page |
+| `page=login` | Force the login page; authenticated users are redirected to the lobby |
 
 ## Project Structure
 
 ```
-shared/    前后端共用：领域模型、引擎、卡牌、行动、协议
-server/    后端：HTTP + WebSocket，权威状态
-client/    前端：React UI、transport 抽象、hooks
-docs/      架构、部署、平台设计、卡牌进度
+shared/    Shared domain models, engine, cards, actions, and protocols
+server/    Authoritative backend over HTTP and WebSocket
+client/    React UI, transport abstractions, and hooks
+docs/      Architecture, deployment, platform design, and card progress
 ```
 
 ## Tech Stack
@@ -91,7 +96,7 @@ docs/      架构、部署、平台设计、卡牌进度
 ![Vite](https://img.shields.io/badge/Vite-8-646cff)
 ![pnpm](https://img.shields.io/badge/pnpm-10-f69220)
 
-后端 Node.js + WebSocket + SQLite（better-sqlite3）；前端 React 19 + Vite 8 + TypeScript。
+The backend uses Node.js, WebSocket, and SQLite (`better-sqlite3`); the frontend uses React 19, Vite 8, and TypeScript.
 
 ## Documentation
 
@@ -101,23 +106,23 @@ docs/      架构、部署、平台设计、卡牌进度
 | Deployment | [docs/HOW_TO_DEPLOY.md](docs/HOW_TO_DEPLOY.md) |
 | Platform & Workshop | [docs/PLATFORM_DESIGN.md](docs/PLATFORM_DESIGN.md) |
 | Card Test Template | [docs/CARD_TEST_TEMPLATE.md](docs/CARD_TEST_TEMPLATE.md) |
-| 卡牌实现现状 | [docs/card_implementation_status.md](docs/card_implementation_status.md) |
+| Card Implementation Status | [docs/card_implementation_status.md](docs/card_implementation_status.md) |
 | Custom Card Sandbox | [docs/CUSTOM_CARD_SANDBOX.md](docs/CUSTOM_CARD_SANDBOX.md) |
 | Community Cards | [docs/community_cards.md](docs/community_cards.md) |
 | CI Checks | [docs/operations/ci-checks.md](docs/operations/ci-checks.md) |
 
 ## Contributing
 
-PRs welcome. 开发环境、测试、commit 与 PR 规范见 [CONTRIBUTING.md](CONTRIBUTING.md)。AI 协作约束（卡牌实现规范、文档同步硬规则、测试边界）见 [AGENTS.md](AGENTS.md)。安全漏洞请按 [SECURITY.md](SECURITY.md) 私下报告。
+PRs are welcome. See [CONTRIBUTING.md](CONTRIBUTING.md) for development setup, testing, commit, and PR conventions. See [AGENTS.md](AGENTS.md) for AI collaboration constraints, including card implementation rules, documentation synchronization requirements, and testing boundaries. Report security vulnerabilities privately according to [SECURITY.md](SECURITY.md).
 
-## 支持项目
+## Support the Project
 
-如果这个项目对你有帮助，可以请开发者喝杯咖啡：
+If this project helps you, consider buying the developer a coffee:
 
 [![ko-fi](https://ko-fi.com/img/githubbutton_sm.svg)](https://ko-fi.com/titanxxh)
 
-<a href="https://afdian.com/a/titanxxh"><img width="180" src="https://pic1.afdiancdn.com/static/img/welcome/button-sponsorme.png" alt="爱发电"></a>
+<a href="https://afdian.com/a/titanxxh"><img width="180" src="https://pic1.afdiancdn.com/static/img/welcome/button-sponsorme.png" alt="Afdian"></a>
 
 ## License
 
-[Apache 2.0](LICENSE)。fan project disclaimer + BGA studio attribution 见 [NOTICE](NOTICE)。
+[Apache 2.0](LICENSE). See [NOTICE](NOTICE) for the fan project disclaimer and BGA Studio attribution.
