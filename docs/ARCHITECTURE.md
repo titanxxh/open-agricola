@@ -1,134 +1,138 @@
-# Open Agricola 架构
+# Open Agricola Architecture
 
-> 唯一真源。描述当前 `main` 已落地的架构。
-> 本文档替换历史的 `ENGINE_ARCHITECTURE.md` 与 `ENGINE_NEW_ARCHITECTURE.md`。
+[English](ARCHITECTURE.md) | [中文](ARCHITECTURE_zh.md)
 
----
-
-## 1. 设计目标与不变量
-
-主链路 = **WebSocket 房间对局 + 后端权威 + 前端被动渲染**；HTTP 退化为启动 / 调试 / 运维 / 测试通道。
-
-不变量（违反即架构 bug）：
-
-- **后端唯一写入者**：只有 `GameSession`（`server/game/authoritative-session.ts`）能修改 `GameState`。
-- **全量快照**：同房间所有客户端收到同一份 `stateUpdate`，前端不做局部 patch。
-- **弱客户端**：前端只渲染、收集输入、管理本地 UI 临时态，不裁定规则。
-- **命令驱动**：前端只发"我要做什么"，后端校验、执行、落状态、产生日志后广播。
-- **单一领域实现**：行动 / 引擎 / 卡牌 / 回合 / 收获 / 计分统一放 `shared/`，前后端共用同一套领域模型。
-- **三层物理边界**：`shared/` ⇄ `server/` ⇄ `client/` 由 ESLint `no-restricted-imports` 强制（CI error）。
-- **卡牌就地闭环**：卡牌特效写在卡牌文件内部，不向核心路径扩散。
-- **Supply token 也是支付资源**：fence / stable 这类玩家 supply 上限不能写死为 15 / 4；读取必须走 supply-token helper 或 payment resource pipeline。
+> Canonical description of the architecture currently implemented on `main`.
+> This document replaces the historical `ENGINE_ARCHITECTURE.md` and `ENGINE_NEW_ARCHITECTURE.md` files.
 
 ---
 
-## 2. 总体拓扑
+## 1. Design Goals and Invariants
+
+The primary path is **WebSocket room gameplay + backend authority + passive frontend rendering**. HTTP is limited to startup, debugging, operations, and test support.
+
+Violating any invariant below is an architecture bug:
+
+- **Sole backend writer:** only `GameSession` in `server/game/authoritative-session.ts` may modify `GameState`.
+- **Full snapshots:** every client in a room receives the same `stateUpdate`; the frontend does not apply partial patches.
+- **Weak client:** the frontend renders, collects input, and manages temporary local UI state. It never adjudicates rules.
+- **Command-driven:** the frontend sends intent. The backend validates, executes, commits state, produces logs, and broadcasts.
+- **One domain implementation:** actions, engine, cards, rounds, harvest, and scoring live in `shared/` and are reused by both frontend and backend.
+- **Physical three-layer boundary:** ESLint `no-restricted-imports` enforces `shared/` ⇄ `server/` ⇄ `client/` as CI errors.
+- **Card-local closure:** card effects stay in their card files instead of spreading into core paths.
+- **Supply tokens are payment resources:** player supply limits such as fences and stables must not be hard-coded as 15 or 4. Read them through supply-token helpers or the payment-resource pipeline.
+
+---
+
+## 2. System Topology
 
 ```text
-浏览器窗口 p1 / p2 / p3 / p4
+Browser windows p1 / p2 / p3 / p4
         │
-        │ WebSocket /ws            ← 主链路
+        │ WebSocket /ws            ← primary path
         ▼
 server/connection/ws-server.ts
-  ├─ 连接生命周期 / auth
-  ├─ 命令路由
-  └─ 广播 StateUpdateEnvelope
+  ├─ connection lifecycle / auth
+  ├─ command routing
+  └─ StateUpdateEnvelope broadcast
         │
         ▼
 server/game/{room.ts, room-registry.ts, lobby.ts}
         │
         ▼
 server/game/authoritative-session.ts (GameSession extends GameCore)
-  ├─ 命令执行中心（唯一写入 GameState）
-  ├─ 继承 GameCore（GameCore 持有 EngineStack）
-  ├─ undo 历史 / 行动起点快照
-  └─ 计算 InteractionState、scores
+  ├─ command execution center and sole GameState writer
+  ├─ inherits GameCore, which owns EngineStack
+  ├─ undo history / action-start snapshots
+  └─ computes InteractionState and scores
         │
         ├─→ shared/session/ (GameCore, phases/)
         ├─→ shared/engine/  (Engine, EngineStack, nodes/)
         ├─→ shared/actions/ (effects/, payment/, hooks)
-        ├─→ shared/cards/   (deck A..E + major + community)
+        ├─→ shared/cards/   (decks A..E + major + community)
         └─→ shared/domain/  (PlayerBoard, farmyard, scoring, ...)
         │
         ▼
 server/game/persistence/
-  ├─ sqlite-adapter.ts   (PERSIST_ROOMS=sqlite，默认，data/open-agricola.db)
-  ├─ json-adapter.ts     (PERSIST_ROOMS=json，output/<roomId>.json)
-  └─ memory-adapter.ts   (测试)
+  ├─ sqlite-adapter.ts   (PERSIST_ROOMS=sqlite, default, data/open-agricola.db)
+  ├─ json-adapter.ts     (PERSIST_ROOMS=json, output/<roomId>.json)
+  └─ memory-adapter.ts   (tests)
 ```
 
-HTTP 入口 `server/game-router.ts`（`/api/*`）保留：健康检查 / 房间列表 / 快照补拉 / 测试夹具 / dev 调试 / sandbox 创建。
+`server/game-router.ts` retains HTTP `/api/*` endpoints for health checks, room lists, snapshot recovery, test fixtures, development debugging, and sandbox creation.
 
 ---
 
-## 3. 三层结构与目录骨架
+## 3. Three-Layer Directory Structure
 
-```
-shared/        零 React，前后端 + sandbox 共用
-├── contract/      协议层（GameState、InteractionState、ClientCommand、StateUpdateEnvelope）
-├── engine/        节点树引擎 + EngineStack
-├── session/       GameCore + phases/（setup, round, harvest, draft）
-├── actions/       行动定义、effects/、payment/、Hook 系统
-├── cards/         Card Source（按 deck A/B/C/D/E + major + community 分目录，单卡 meta + impl）
-├── domain/        领域聚合层（PlayerBoard、farmyard、pasture、scoring、...）
-├── draft/         simultaneous 卡牌选择
-├── custom-code/   自定义卡牌 AST 校验
-├── i18n/          多语 key
-└── utils/         通用工具
+```text
+shared/        No React; shared by frontend, backend, and sandbox
+├── contract/      Protocol shapes: GameState, InteractionState, ClientCommand, StateUpdateEnvelope
+├── engine/        Node-tree engine + EngineStack
+├── session/       GameCore + phases/ for setup, round, harvest, and draft
+├── actions/       Action definitions, effects/, payment/, and hooks
+├── cards/         Card Source by decks A/B/C/D/E, major, and community; each card owns meta + impl
+├── domain/        Domain aggregates: PlayerBoard, farmyard, pasture, scoring, ...
+├── draft/         Simultaneous card selection
+├── custom-code/   Custom-card AST validation
+├── i18n/          Locale keys
+└── utils/         Shared utilities
 
-server/        Node 进程（HTTP + WS + persistence + custom-code 隔离）
-├── index.ts             装配 HTTP + WS + DB + 静态资源
-├── connection/          WS 连接层（ws-server, room-router, broadcaster）
-├── game/                Room、GameSession、Lobby、RoomRegistry
-│   └── persistence/     sqlite / json / memory adapter
-├── game-router.ts       HTTP /api/* 路由
+server/        Node process: HTTP + WebSocket + persistence + custom-code isolation
+├── index.ts             Composes HTTP, WebSocket, database, and static assets
+├── connection/          WebSocket layer: ws-server, room-router, broadcaster
+├── game/                Room, GameSession, Lobby, RoomRegistry
+│   └── persistence/     SQLite, JSON, and memory adapters
+├── game-router.ts       HTTP /api/* routes
 ├── auth.ts              GitHub OAuth
-├── workshop.ts          Workshop / Sandbox 后端
-├── workshop-pr/         Workshop PR 集成
-├── custom-code/         自定义代码隔离执行（compiler, runtime, executor-worker）
-├── payload-validation.ts  纯校验（不写状态）
-└── db.ts                SQLite 连接
+├── workshop.ts          Workshop and Sandbox backend
+├── workshop-pr/         Workshop pull-request integration
+├── custom-code/         Isolated execution: compiler, runtime, executor-worker
+├── payload-validation.ts  Pure validation; never writes state
+└── db.ts                SQLite connection
 
-client/        浏览器 React UI（双 bundle）
-├── app/                 顶层路由 + 页面（GameContainerApi、LobbyPage、...）
-├── components/          board/、interaction/、common/、header/
-├── contexts/            AuthContext、LocaleContext
-├── hooks/               useGameSync、useFarmSelection 等
-├── services/            gameTransport、card-meta、rehydrate、llmPrompts
-├── sandbox/             Hot-seat 离线 client（独立 bundle）
-└── types/、utils/、styles/、assets/、config.ts、main.tsx
+client/        Browser React UI with two bundles
+├── app/                 Top-level routing and pages: GameContainerApi, LobbyPage, ...
+├── components/          board/, interaction/, common/, header/
+├── contexts/            AuthContext, LocaleContext
+├── hooks/               useGameSync, useFarmSelection, ...
+├── services/            gameTransport, card-meta, rehydrate, llmPrompts
+├── sandbox/             Offline hot-seat client in a separate bundle
+└── types/, utils/, styles/, assets/, config.ts, main.tsx
 
-e2e-tests/     Playwright 浏览器测试
+e2e-tests/     Playwright browser tests
 ```
 
-ESLint 三层强制（`eslint.config.js`）：
-- `client/{app,components,services,hooks,contexts,utils}/**` 禁 import `shared/session`、`shared/engine`、card source、card generated catalog 和 per-card impl modules；UI metadata 必须走 `public/cards-manifest.json` + `client/services/card-meta`
-- `client/sandbox/**` 全开
-- 附加 `no-restricted-syntax` 禁动态 `import('shared/session/...')` / `import('shared/engine/...')` / card impl-bootstrap 字面量绕过
-- violation = CI error
+`eslint.config.js` enforces the three layers:
+
+- `client/{app,components,services,hooks,contexts,utils}/**` cannot import `shared/session`, `shared/engine`, Card Source, generated card catalogs, or per-card implementation modules. UI metadata must come from `public/cards-manifest.json` through `client/services/card-meta`.
+- `client/sandbox/**` has full access.
+- Additional `no-restricted-syntax` rules prevent literal dynamic imports of `shared/session/...`, `shared/engine/...`, and card implementation bootstrap modules.
+- Every violation is a CI error.
 
 ---
 
-## 4. shared/contract/ — 协议层
+## 4. `shared/contract/`: Protocol Layer
 
-**唯一作用**：把"前后端 + sandbox 都要看到的形状"集中到这里。前端主 bundle 只读 `shared/contract/` + `shared/i18n/` + `shared/domain/` 和 manifest-backed `client/services/card-meta`，其余不进 bundle。
+Its only purpose is to centralize shapes needed by the frontend, backend, and sandbox. The main frontend bundle may read only `shared/contract/`, `shared/i18n/`, `shared/domain/`, and manifest-backed `client/services/card-meta`; other shared modules do not enter that bundle.
 
-### 4.1 关键文件
+### 4.1 Key Files
 
-| 文件 | 内容 |
+| File | Contents |
 |---|---|
-| `contract/types.ts` | `GameState` / `PlayerState` / `ActionSpace` / `Resource` / `InteractionState` / `InteractionRequest` / `ActionDefinition` |
-| `contract/workshop.ts` | Workshop Design Draft、Workspace 与生成候选的前后端协议 |
-| `contract/protocol/ws.ts` | `ClientCommand` / `ServerEvent` / `RoomSummary` |
-| `contract/protocol/game.ts` | `GameSyncPayload` / `StateUpdateEnvelope` / `StateUpdateCause` / `ActionDetailEffects` |
-| `contract/cards.ts` | `CardDefinition`（卡牌外形） |
-| `contract/prompt-keys.ts` | `PromptKey` 枚举（i18n 锚） |
-| `contract/state-constants.ts` | 行动格 / 棋盘常量（前端常量层，无规则代码） |
-| `session/serialization.ts` | `SerializedGameState` + `serializeState` / `rehydrateState` |
+| `contract/types.ts` | `GameState`, `PlayerState`, `ActionSpace`, `Resource`, `InteractionState`, `InteractionRequest`, `ActionDefinition` |
+| `contract/workshop.ts` | Frontend/backend protocol for Workshop Design Drafts, Workspaces, and generated candidates |
+| `contract/protocol/ws.ts` | `ClientCommand`, `ServerEvent`, `RoomSummary` |
+| `contract/protocol/game.ts` | `GameSyncPayload`, `StateUpdateEnvelope`, `StateUpdateCause`, `ActionDetailEffects` |
+| `contract/cards.ts` | `CardDefinition`, the public card shape |
+| `contract/prompt-keys.ts` | `PromptKey` enum used as the i18n anchor |
+| `contract/state-constants.ts` | Action-space and board constants without rule code |
+| `session/serialization.ts` | `SerializedGameState`, `serializeState`, and `rehydrateState` |
 
-### 4.2 GameState（领域真相）
+### 4.2 GameState: Domain Truth
 
-字段（节选）：
+Selected fields:
+
 ```ts
 {
   round, currentPlayerIndex, gameOver,
@@ -144,48 +148,50 @@ ESLint 三层强制（`eslint.config.js`）：
   availableMajorImprovements: string[],
   futureMeeples, pendingFutureMeeples,
   workPhaseObtainedResources: Record<string, Partial<Resource>>,
-  completedFeedingPhases: number,    // 已完成的收获 feeding phase 数；A148/B86 等卡读取
+  completedFeedingPhases: number,
 }
 ```
 
-`actionSpaces[*].takenBy` 是 `WorkerRef[]`。普通 ref 只包含 `playerId` / `workerId`；卡牌创建的联动占格可额外写 `synthetic: { kind: 'linked-occupancy', sourceCard, linkedWorkerId }`，让后续清理按行动格 state 上的语义 metadata 判断，而不是跨读外卡 id。
+`actionSpaces[*].takenBy` is a `WorkerRef[]`. An ordinary reference contains only `playerId` and `workerId`. Linked occupancy created by a card may additionally contain `synthetic: { kind: 'linked-occupancy', sourceCard, linkedWorkerId }`. Cleanup can then use semantic metadata stored on the action-space state instead of reading another card's ID.
 
-`workPhaseObtainedResources` 服务于"前一工作阶段获得资源"类卡（A53 等），回家阶段结算后清空。
+`workPhaseObtainedResources` supports cards such as A53 that inspect resources gained during the previous work phase. It is cleared after the returning-home phase resolves.
 
-`completedFeedingPhases` 在 `shared/session/phases/harvest.ts` 的 feeding phase 结束时 `+= 1`，等价于 BGA Globals 同款全局计数；A148/B86 等"按已完成收获 +1 容量"卡牌从此字段读取，避免再走 per-card post-play counter。
+`completedFeedingPhases` increments in the feeding phase of `shared/session/phases/harvest.ts`. It matches BGA's global count. Cards such as A148 and B86 read it for completed-harvest-plus-one capacity instead of maintaining a per-card post-play counter.
 
-`events` 是公共结构化规则事件流，位于 `GameState.log` 下层。后端规则执行时先写 `GameEvent`，再由 mapper 派生 UI log、动画提示、审计报告和未来 replay；`log` 仍是当前可见文字日志，不作为规则来源。`GameState.log` 是由 public events 派生出来的 UI 缓存。规则代码不直接写 `state.log`；允许的写入点只有命名 cache writer：`appendImmediateEvents()` 的 mapper 结果，以及 `GameCore.flushEngineLog()` 从 engine `LogStore` 刷出的 mapper 结果。`pnpm run check:direct-session-log` 守住这个边界。客户端还会按 `seq` 增量消费部分 public events，转成本地 transient notification、action/farm/fence highlight 和 resource animation；首次 snapshot 只初始化 cursor，不回放历史事件。该 cue 层只服务 UI 反馈，不作为规则来源。旧 action-result detail 也通过 `action.detailLogged` 这类公开事件进入 mapper，而不是直接把规则事实写进 `state.log`。`nextEventSeq` 是持久化事件序号游标，`normalizeState` 会丢弃不符合公开事件 envelope/schema/json/size guard 的旧事件并从最大 `seq` 继续。
+`events` is the public structured rule-event stream beneath `GameState.log`. Backend rules first write `GameEvent`; mappers then derive UI logs, animation cues, audit reports, and future replay. `log` remains the visible text-log cache and is never a rule source. Rule code does not write `state.log` directly. The only writers are named cache boundaries: mapper output from `appendImmediateEvents()` and mapper output flushed from engine `LogStore` by `GameCore.flushEngineLog()`. `pnpm run check:direct-session-log` enforces this boundary.
 
-每个 public `GameEvent['type']` 都必须列入 `shared/events/event-mapping-policy.ts`。该 policy 记录 Action Log、public notification、board/farm highlight、resource animation 和 replay 是否 mapped、conditionally mapped 或 intentionally silent。`eventsToLogEntries()` 不向 `GameState.log` 写 generic fallback rows；replay-only summaries 保留在客户端 timeline layer。新增 event type 时，同一个 PR 必须同时补 policy、mapper fixtures 和文档。
+The client incrementally consumes selected public events by `seq` to produce transient notifications, action, farm, and fence highlights, and resource animations. An initial snapshot initializes the cursor without replaying historical events. This cue layer serves UI feedback only. Legacy action-result detail also reaches the mapper through public events such as `action.detailLogged` instead of writing rule facts directly into `state.log`. `nextEventSeq` is the persisted event cursor. `normalizeState` drops old events that violate the public envelope, schema, JSON, or size guards, then continues from the greatest valid `seq`.
 
-`buildLogPresentationPlan()` 是 Action Log 展示关系的单一来源：`rows` 表示可见日志，`consumedEvents` 表示已被更丰富日志吸收的事件，`suppressedEvents` 表示按事件自身语义明确不生成 Action Log 行的事件。客户端 timeline 只按这些结构化 event ref 过滤，不得通过玩家名、资源数量、卡牌 id 或跨 archive packet 猜测事件对应关系。纯普通资源的 `futureMeeple.resolved` 由后续 `resource.moved(reason='receive')` 展示实际入账，因此进入 `suppressedEvents`；带房间或 field/stable/forest/moor 独立效果的结算仍保留独立日志。
+Every public `GameEvent['type']` must appear in `shared/events/event-mapping-policy.ts`. The policy marks Action Log, public notification, board or farm highlight, resource animation, and replay handling as mapped, conditionally mapped, or intentionally silent. `eventsToLogEntries()` never writes generic fallback rows into `GameState.log`; replay-only summaries remain in the client timeline layer. A pull request adding an event type must also add its policy, mapper fixtures, and documentation.
 
-`publicEventArchive` 是 append-only 的公共事件 archive metadata。`publicEvents.committed` packet 记录每次提交的 public event ids/seqs；`publicEvents.canceled` packet 记录 undo 取消的 event ids/seqs 和完整 public event payload，供后续 replay/archive UI 使用。archive 写入会先校验 live archive 的 packetSeq/cursor 不变量，并拒绝 private / malformed / non-json / oversized payload；若异常腐败事件导致 canceled packet 写入失败，undo 的 runtime cancellation 仍返回，但不会持久化非法 archive payload；若 live archive 不变量已损坏，undo 不落地。规则层和卡牌监听仍只读当前 `GameState.events` / 当前 transaction events，不读 archive。
+`buildLogPresentationPlan()` is the sole source for Action Log presentation relationships. `rows` are visible entries, `consumedEvents` are events absorbed into richer entries, and `suppressedEvents` are semantically excluded from the Action Log. The client timeline filters only by these structured event references; it must not infer relationships from player names, resource counts, card IDs, or events in another archive packet. A plain-resource `futureMeeple.resolved` is suppressed because a later `resource.moved(reason='receive')` shows the actual receipt. Resolutions with independent room, field, stable, forest, or moor effects retain a separate entry.
 
-客户端 Action Log 以只读 replay timeline 消费 `publicEventArchive`。UI 用 `publicEventArchive` 加当前 `events` 重建 active、canceled、missing 行；canceled 行保留 canceled packet payload 并用删除线渲染。选择 replay 行只生成带 `replay:` 前缀 id 的本地 notification、highlight 和 resource animation cue，不修改 `GameState`、不发送游戏命令，也不推进 live public-event cursor。
+`publicEventArchive` is append-only public event metadata. A `publicEvents.committed` packet records committed public event IDs and sequences. A `publicEvents.canceled` packet records event IDs, sequences, and complete public payloads canceled by undo for later replay and archive UI. Archive writes first validate packet-sequence and cursor invariants and reject private, malformed, non-JSON, or oversized payloads. If a corrupt event prevents writing a canceled packet, runtime undo cancellation still returns without persisting the invalid payload. If live archive invariants are already corrupt, undo is not committed. Rules and card listeners read only current `GameState.events` or transaction events, never the archive.
 
-Undo 的 runtime `publicEventCancellations` 是同步响应 metadata，不写入 `GameState.events`，也只出现在当前 undo response。成功 undo 如果移除了已提交 public events，HTTP/WS payload 会带 `publicEventCancellations`，客户端用它清理当前 transient public feedback 并把 public event cursor 对齐到 undo 后 snapshot；普通 reconnect/getState 不重放旧 cancellation。持久化取消历史保存在 `publicEventArchive` 的 `publicEvents.canceled` packet。进入 per-viewer payload 前，runtime cancellation 必须与同一 viewer 的 `publicEventArchive` 使用同一套隐藏事件过滤和 seq remap。
+The client Action Log consumes `publicEventArchive` as a read-only replay timeline. It combines the archive with current `events` to rebuild active, canceled, and missing rows. Canceled rows retain their packet payload and render with strikethrough. Selecting a replay row produces local notification, highlight, and resource-animation cues with `replay:` IDs. It never modifies `GameState`, sends a command, or advances the live public-event cursor.
 
-首版只允许 `visibility: 'public'` 的规则事件进入 `GameState.events`。私有 prompt、手牌、draft、living-hand 等 per-recipient 信息不写入公共事件流，仍通过 snapshot/privacy/pending 通道处理。`privateEvents` 是独立的 per-viewer 同步附加层：只描述当前快照中目标玩家可见的私有提示和私有手牌/draft 更新（例如 `private.promptShown`、`private.handChanged`、`private.draftUpdated`），由客户端消费为短暂 UI 通知，不进入公共 replay 事件流，也不作为规则来源。卡牌效果导致的手牌变化通过 runtime-only response buffer 发出 `private.handChanged`，不写入 `ActionExecutionResult`、engine snapshot/history 或 `GameState.events`。
+Runtime undo `publicEventCancellations` is response metadata. It is not added to `GameState.events` and appears only in the current undo response. When successful undo removes committed public events, HTTP and WebSocket payloads include the cancellations. The client uses them to clear current transient feedback and align its public-event cursor with the post-undo snapshot. Reconnect and `getState` do not replay old cancellations. Persistent cancellation history remains in `publicEvents.canceled` packets. Before entering a per-viewer payload, runtime cancellation and that viewer's `publicEventArchive` use the same hidden-event filtering and sequence remapping.
 
-`SerializedGameState` 是 `GameState` 的 JSON 网络/持久化形态，权威持久化快照携带 `engineStack: EngineStackCursor` 便于跨进程恢复引擎光标。任何 `filterSerializedStateForPlayer` 玩家/旁观者视图都把 `engineStack` 清为空；客户端不消费该恢复游标，交互请求走独立的 viewer-safe pending 协议，避免 cursor 内的其他玩家 choice 数据泄漏。同步版本号 / 历史 / 房间连接 **不进** `GameState`。
+Initially, only rules events with `visibility: 'public'` may enter `GameState.events`. Private prompts, hands, draft state, and living-hand information remain in snapshot, privacy, and pending channels. `privateEvents` is a separate per-viewer synchronization layer describing private prompts and hand or draft changes visible in the current snapshot, such as `private.promptShown`, `private.handChanged`, and `private.draftUpdated`. The client consumes them as transient UI notifications. They never enter the public replay stream or become rule sources. Card-driven hand changes emit through a runtime-only response buffer, not `ActionExecutionResult`, engine snapshots, history, or `GameState.events`.
 
-### 4.3 PlayerState（按职责分组）
+`SerializedGameState` is the JSON network and persistence representation of `GameState`. Authoritative persistence snapshots carry `engineStack: EngineStackCursor` for cross-process engine-cursor restoration. Every player or spectator view produced by `filterSerializedStateForPlayer` clears `engineStack`. The client never consumes that recovery cursor; interaction requests use a separate viewer-safe pending protocol so another player's choice data cannot leak through the cursor. Synchronization versions, history, and room connections do not belong in `GameState`.
 
-- 身份：`id` / `name` / `color`
-- 经营：`resources` / `familySize` / `workersAvailable` / `rooms` / `houseType`
-- 农场：`fields`（多堆 `CropStack[]`）/ `roomTiles` / `stableTiles` / `fenceSegments` / `pastures` / FoM `farmTerrain`（top `kind` + optional `covered`）/ `farmyardExtensions` / `farmyardSpaceStates`
-- 动物：`houseAnimalType` / `houseAnimalCount` / `stableAnimals` / `newbornCount`
-- 出牌：`improvements` / `minorPlayed` / `occupationPlayed`
-- 手牌：`minorHand` / `occupationHand`
-- 持续效果：`majorEffects` / `activeModifiers`
-- Supply token：`supplyTokensConsumed` 记录被永久消耗的 fence / stable 组件；可用上限由 helper 动态计算
-- **卡牌局部状态**：`cardStates`（见 §8.3）
-- **工人身份**：`workers: Worker[]`，固定 5 槽 id `'1'..'5'`，`isActive` / `isNewborn` 标记
+### 4.3 PlayerState by Responsibility
 
-`Field.stacks: CropStack[]`：底堆在 `[0]`，顶堆在末尾。Sow 必须空田（`fieldIsEmpty`）；Reap 只收顶堆，`remaining===0` 时 pop；混合田同时计入 grain 田与 veg 田。所有访问走 `shared/domain/field.ts` helper。
+- Identity: `id`, `name`, `color`
+- Economy: `resources`, `familySize`, `workersAvailable`, `rooms`, `houseType`
+- Farm: `fields` with multiple `CropStack[]`, `roomTiles`, `stableTiles`, `fenceSegments`, `pastures`, Farmers of the Moor `farmTerrain` with top `kind` and optional `covered`, `farmyardExtensions`, `farmyardSpaceStates`
+- Animals: `houseAnimalType`, `houseAnimalCount`, `stableAnimals`, `newbornCount`
+- Played cards: `improvements`, `minorPlayed`, `occupationPlayed`
+- Hands: `minorHand`, `occupationHand`
+- Persistent effects: `majorEffects`, `activeModifiers`
+- Supply tokens: `supplyTokensConsumed` records permanently consumed fence or stable components; helpers calculate the remaining limit dynamically
+- **Card-local state:** `cardStates`, described in section 8.3
+- **Worker identity:** `workers: Worker[]`, with five fixed slots identified by `'1'..'5'` and marked by `isActive` and `isNewborn`
 
-### 4.4 ClientCommand（已收敛）
+`Field.stacks: CropStack[]` stores the bottom stack at index 0 and the top stack last. Sow requires an empty field through `fieldIsEmpty`. Reap takes only the top stack and pops it when `remaining === 0`. A mixed field counts as both a grain and vegetable field. All access goes through helpers in `shared/domain/field.ts`.
+
+### 4.4 ClientCommand
 
 ```ts
 type ClientCommand = (
@@ -197,8 +203,8 @@ type ClientCommand = (
   | { type: 'joinRoom'; roomId; intent?: 'join' | 'resume'; requestedPlayerIndex?; name? }
   | { type: 'dissolveRoom' }
   | { type: 'getState' }
-  | { type: 'action'; spaceId }              // 放置工人 / 启动 anytime
-  | { type: 'choice'; value; payload? }       // 统一的"选择"命令（含 farm/选格/分支）
+  | { type: 'action'; spaceId }
+  | { type: 'choice'; value; payload? }
   | { type: 'anytime'; actionId }
   | { type: 'commitSelection'; playerIndex; payload: {
       cancel?, positions?, cardIds?, resourceCounts?, resourceBatchExchange?,
@@ -212,21 +218,21 @@ type ClientCommand = (
 ) & { requestId? }
 ```
 
-注意：
+Important boundaries:
 
-- 没有独立的 `reorg` / `feed` / `nextPlayer` / `confirmPlayerSwitch` 命令。这些等待形态全部归并到 `choice` 命令，由 `payload` 携带具体形状（按 `InteractionRequest.kind` 决定）。
-- `commitSelection` 只为 farm-position / occupation-hand / resource-quantity / resource-batch-exchange 这类带结构化 payload 的定向选择保留单独入口。farm-position 可通过 `validPositionGroups` 表达服务端校验的合法坐标组合，例如 FoM Farmyard Extension 的相邻二格选择。
-- `enableParentCards: true` 启用父母牌；同时传 `draftParents: false` 时直接为每位玩家发一对父母牌，不进入 `parent-selection`。该选择保存在房间元数据中，`newGame` 与后端重启后继续沿用。
-- Workshop 卡采用**二维状态**（PRD #634，`server/workshop-status.ts`）：review 轴 `unsubmitted / in_review / approved / stale / merged` × 上线轴 `live`。提交审核时 `enterReview` 原子取得唯一 PR URL 绑定，把 PR head 固定为 `review_commit_sha`，并把同一份 Design Draft 固定为 `review_version_id`；同一卡分支只复用仍为 open、非 draft 且 base=`main` 的 PR。已关闭或已合并的 PR 永久保留为历史，重新提交时创建新 PR；open 但 draft 或 base 不再是 `main` 的 PR 会先关闭，再创建合格 PR。绑定完成后立即补查当前 GraphQL 快照，覆盖审批 webhook 先于本地绑定到达的竞态；补查暂时失败仍保留成功绑定并清空同步时间，作者可通过 `refresh-pr-status` 立即重试同一套协调。GraphQL 快照中的有效 approved review 必须匹配当前 head 且 reviewer 可 push；若 PR 的 `authorAssociation=OWNER` 且没有 `CHANGES_REQUESTED`，provider 生成绑定同一 head 的 owner approval，因为 GitHub 不允许 PR 作者 self-approve。两者都由 `approveReviewedVersion` 把固定版本置为 `approved_version_id`。作者 publish 时再次即时查询 GraphQL，并要求 head SHA、review SHA、`approved_commit_sha` 及固定版本映射全部一致后才置 live。GitHub 当前 head 不同、PR 关闭/转 draft/改离 `main`、有效审批被 dismissed 或 `CHANGES_REQUESTED` 都转为 `stale·offline`；可能乱序的 `synchronize`、dismissed 和资格变更事件先重读当前 GraphQL 快照，已 merge PR 的迟到 review 事件保留同 head 绑定，comment-only review 保持原状态。未绑定或绑定歧义的 Workshop PR 事件不请求 GitHub；异步快照只在查询前后的 review binding（含 lifecycle 与单调更新时间）未变时事务提交，publish 同样要求查询前后的 live-state token 未变；GraphQL 不可用时记录 delivery 并保守转为 `stale·offline`。delivery id 由 `github_webhook_events` 幂等去重；webhook 只负责失效与推进，publish 定论不依赖缓存。旧单列 `status`（draft/published）已由 migration v26 移除，存量卡一刀切回 `unsubmitted·offline`（#632）。
-- `customCardIds` 只有在真实房间同时传入 `enableCommunityDeck: true` 时才会生效；未启用时服务端忽略这些 id，且房间不保存对应自定义卡元数据。启用后仍只接受 **live（approved 且已上线）** 的 workshop 卡，运行的是被审的 `approved_version_id` 快照（`loadLiveDraft`）；未过审卡的自定义代码只能在 workshop sandbox（`POST /api/game/new-sandbox` + 浏览器本地 executor）里由作者本人试玩，绝不进实时同步主链路。真实房间创建（`createRoom`）与房间恢复（`loadCustomCardsFromDb`）都走 `loadCustomCards(..., { liveOnly: true })`，加载时按 id 逐个裁定：
-  - 请求者**自己**的非 live 卡 → 置 `hasNotLive`，`handleCreateRoom` 直接报错拒绝建房（引导作者走 review → publish）。
-  - 其余无法加载的 id（**他人**的非 live 卡、未认证请求、id 不存在）→ 静默从卡池过滤，房间仍照常创建，只是不含这些卡。之所以不对他人卡报错，是为了不泄露"某 id 是否为某人草稿卡"的存在性。
-  - 无论哪种情形，未过审代码都不会被加载进 `GameSession` 的 executor——安全边界一致，差异仅在给作者本人的错误反馈。
-- 旧的 replay-snapshot 同意往返（`confirmReplayCardSnapshotPublic` / `REPLAY_CARD_SNAPSHOT_CONSENT_REQUIRED`）已移除——非 live 卡不再进真实房间，该机制失去存在理由。
-- 毕业切轨（#642）：review PR 合入 `main`（webhook `closed+merged` 且 base=`main`）→ 卡转 `merged` 终态（工坊只读，`unpublish`/编辑均拒绝）；改离 `main` 后 merge 不毕业，视同未 merge 关闭转 `stale·offline`。merge 事件先于审批到达时持久化 merge 事实（`github_pr_status='merged'`），审批 webhook 或 `refresh-pr-status` 读到 approved MERGED 快照（head 在 merge 后冻结、SHA 绑定仍可验）时补毕业并即时对账 built_in。live 的 merged 卡在发版空窗期继续供给被审快照，服务启动时对照内置注册表（`markBuiltInMergedCards`）置 `built_in=1` 后由内置卡定义接管、工坊快照退役。
-- 下架双轨（#631/#641）：作者 `unpublish` 温和（存量对局用嵌入快照跑完，仅挡新房间）；管理员 `POST /api/admin/cards/:id/takedown` 为 kill switch——强制卡 `stale·offline` 并经 `lobby.endRoomsUsingCard` 终止所有嵌入该卡的进行中房间（广播 `roomDissolved reason:'card_takedown'`，对局不计分、不产 completed replay，半截录制行被清除）。GitHub review dismissed 不自动杀局，只走温和失效。
+- There are no separate `reorg`, `feed`, `nextPlayer`, or `confirmPlayerSwitch` commands. Every such wait shape is sent through `choice`, with `payload` determined by `InteractionRequest.kind`.
+- `commitSelection` remains separate only for structured targeted selections such as farm-position, occupation-hand, resource-quantity, and resource-batch-exchange. Farm-position may use `validPositionGroups` for server-validated coordinate sets, including the adjacent two-space Farmers of the Moor Farmyard Extension.
+- `enableParentCards: true` enables Parent Cards. With `draftParents: false`, each player receives a parent pair directly without entering `parent-selection`. Room metadata persists this choice across `newGame` and backend restarts.
+- Workshop cards use a two-dimensional state model from PRD #634 in `server/workshop-status.ts`: review state `unsubmitted / in_review / approved / stale / merged` and publication state `live`. `enterReview` atomically binds one eligible pull-request URL, pins its head as `review_commit_sha`, and pins the same Design Draft as `review_version_id`. A card branch reuses only a pull request that remains open, non-draft, and based on `main`. Closed or merged pull requests remain permanent history; a resubmission creates a new pull request. An open pull request that becomes a draft or changes base is closed before replacement.
+- After binding, the server immediately refreshes the GraphQL snapshot to cover approval webhooks arriving before the local binding. A temporary refresh failure retains the successful binding, clears synchronization time, and lets the author retry through `refresh-pr-status`. A valid approval must match the current head and come from a reviewer with push permission. If `authorAssociation=OWNER` and there is no `CHANGES_REQUESTED`, the provider generates owner approval for that head because GitHub forbids self-approval. Both paths call `approveReviewedVersion` to set `approved_version_id`.
+- Publish re-queries GraphQL and requires the head SHA, review SHA, `approved_commit_sha`, and pinned-version mapping to agree before setting the card live. A different head, a closed pull request, draft transition, base other than `main`, dismissed approval, or `CHANGES_REQUESTED` becomes `stale·offline`. Potentially out-of-order synchronize, dismissal, and qualification events reread GraphQL first. Late review events for an already merged pull request retain the same-head binding; comment-only reviews preserve state. Unbound or ambiguous Workshop events do not query GitHub. An asynchronous snapshot commits only if the review binding, lifecycle, and monotonic update time are unchanged before and after the query; publish likewise checks an unchanged live-state token. GraphQL failure records the delivery and conservatively moves the card to `stale·offline`. `github_webhook_events` deduplicates delivery IDs. Webhooks invalidate and advance state, but publish never treats cached state as final. Migration v26 removed the old draft/published `status` column and reset existing cards to `unsubmitted·offline` under #632.
+- `customCardIds` affects a real room only with `enableCommunityDeck: true`. Otherwise the server ignores the IDs and stores no corresponding custom-card metadata. When enabled, only live Workshop cards that are approved and published are accepted, using the reviewed `approved_version_id` snapshot through `loadLiveDraft`. An author's unreviewed code may run only in the Workshop sandbox through `POST /api/game/new-sandbox` and the browser-local executor; it never enters real-time multiplayer.
+- Both real room creation and room recovery use `loadCustomCards(..., { liveOnly: true })`. Loading evaluates each ID independently. The requesting author's own non-live card sets `hasNotLive` and makes `handleCreateRoom` reject room creation with guidance to review and publish. Every other unloadable ID, including another author's non-live card, an unauthenticated request, or a missing ID, is silently filtered so the room can start without it. This prevents disclosing whether an ID names another user's draft. In all cases, unreviewed code never reaches the `GameSession` executor; only author-facing error feedback differs.
+- The former replay-snapshot consent round trip, `confirmReplayCardSnapshotPublic` and `REPLAY_CARD_SNAPSHOT_CONSENT_REQUIRED`, was removed because non-live cards can no longer enter real rooms.
+- Graduation under #642 occurs when the review pull request is closed as merged into `main`. The card enters terminal `merged` state, becomes read-only in Workshop, and rejects edit or unpublish. A pull request merged into another base does not graduate and becomes `stale·offline`. If merge arrives before approval, `github_pr_status='merged'` persists the fact. A later approval webhook or `refresh-pr-status` can read an approved MERGED snapshot, validate the frozen head and SHA binding, graduate the card, and reconcile built-in status immediately. A live merged card continues serving its reviewed snapshot until release. On service startup, `markBuiltInMergedCards` compares the built-in registry, sets `built_in=1`, lets the built-in definition take over, and retires the Workshop snapshot.
+- Takedown has two tracks under #631 and #641. Author `unpublish` is gentle: existing games finish with embedded snapshots while new rooms are blocked. Administrator `POST /api/admin/cards/:id/takedown` is a kill switch: it forces `stale·offline` and calls `lobby.endRoomsUsingCard` to terminate every active room embedding the card, broadcasting `roomDissolved` with reason `card_takedown`. Those games do not score, produce completed Replay, or retain partial recording rows. A dismissed GitHub review uses gentle invalidation and never kills active rooms automatically.
 
-### 4.5 ServerEvent / StateUpdateEnvelope
+### 4.5 ServerEvent and StateUpdateEnvelope
 
 ```ts
 type ServerEvent =
@@ -241,9 +247,9 @@ type ServerEvent =
 type StateUpdateEnvelope = {
   type: 'stateUpdate'
   roomId: string
-  version: number             // 单调递增
-  sync: 'snapshot'            // 当前只走全量快照
-  cause: StateUpdateCause     // 'action'|'choice'|'anytime'|'reorg'|'feed'|'undo'|'dev'|'reconnect'|'draftSubmit'
+  version: number
+  sync: 'snapshot'
+  cause: StateUpdateCause
   requestId?: string
   payload: GameSyncPayload
   emittedAt: number
@@ -261,27 +267,27 @@ type GameSyncPayload = {
   actionAvailability?: Record<string, boolean>
   cardAvailability?: Record<string, boolean>
   error?: string
-  cardWarnings?: string[]          // 仅 HTTP debug/sandbox
+  cardWarnings?: string[]
   customCardDefs?: CustomCardDef[]
 }
 ```
 
-**广播 vs 单播**：`stateUpdate` / `roomWaiting` / `gameStarted` / `playerJoined` / `playerDisconnected` / `roomDissolved` 广播；`roomCreated` / `roomJoined` / `authOk` / 请求级 `error` 单播。WS 广播会按连接对应的 `viewerPlayerId` 构造 per-viewer payload：目标玩家收到真实私有 prompt 和 `privateEvents`，其他玩家收到 `private-prompt` redaction。HTTP sandbox 默认无 `X-Viewer-Player` 时保持未过滤多座位开发流；带 `X-Viewer-Player` 时使用同一套 viewer 过滤和 seat guard。`cardWarnings` 只进入 HTTP debug/sandbox payload，用于把该局运行期自定义卡异常送回工坊确认门禁，不向 WS viewer 广播。
+`stateUpdate`, `roomWaiting`, `gameStarted`, `playerJoined`, `playerDisconnected`, and `roomDissolved` are broadcasts. `roomCreated`, `roomJoined`, `authOk`, and request-level `error` are unicasts. WebSocket broadcasts build a per-viewer payload using the connection's `viewerPlayerId`: the target player receives real private prompts and `privateEvents`, while others receive `private-prompt` redaction. An HTTP sandbox without `X-Viewer-Player` keeps the unfiltered multi-seat development flow; with that header it uses the same viewer filtering and seat guard. `cardWarnings` appears only in HTTP debugging and sandbox payloads so Workshop confirmation gates can report runtime custom-card failures; it is never broadcast to WebSocket viewers.
 
-### 4.6 InteractionState — 前端唯一渲染真相
+### 4.6 InteractionState: Frontend Rendering Authority
 
 ```ts
 type InteractionState =
   | { stateId: 'idle';  allowedCommands; anytimeActions }
   | { stateId: 'wait';  allowedCommands; anytimeActions;
       playerIndex; spaceId?; promptKey?; promptParams?; sourceCard?;
-      request: InteractionRequest; ...accessor 兼容字段 }
+      request: InteractionRequest; ...accessor compatibility fields }
   | { stateId: 'gameover'; allowedCommands; anytimeActions; winners?; scores? }
 ```
 
-`InteractionRequest` sum type（`kind` 字段是 discriminator）：
+`InteractionRequest` is a sum type discriminated by `kind`:
 
-| kind | payload 形状 |
+| kind | Payload shape |
 |---|---|
 | `choice` | `{ options: ActionChoiceOption[] }` |
 | `farm-select` | `{ farm: { farmType: 'plow'\|'sow'\|'fence'\|'room'\|'stable', selectable*..., maxSelections? }, options? }` |
@@ -292,16 +298,17 @@ type InteractionState =
 | `confirm-player-switch` | `{ fromPlayerIndex; toPlayerIndex }` |
 | `card-draft` | `{ mode: 'simultaneous'; round; totalRounds; poolSize; seatOrder; pools; pendingPicks; kept }` |
 
-`InteractionCommand`（前端按 `allowedCommands` 决定 UI 启用的按钮）：
-```
+Frontend buttons use these `InteractionCommand` values from `allowedCommands`:
+
+```text
 takeAction | resolveChoice | commitSelection | takeAnytimeAction | undoStep | undoAction
 ```
 
-注意 WS 协议名（`ClientCommand.type`）与 `InteractionCommand` 不完全同名：前端"现在能做什么"以 `allowedCommands` 为准；线上 WS 命令名归一到 `choice` / `commitSelection` / `action` 等。
+WebSocket `ClientCommand.type` names do not exactly match `InteractionCommand`. The frontend determines what can be done from `allowedCommands`; online commands normalize to `choice`, `commitSelection`, `action`, and related protocol names.
 
-`shared/session/interaction-state-adapter.ts` 是 `InteractionState` 的服务端投影边界。`GameCore.buildInteraction()` 只传入当前 `GameState` / `EngineStack`、anytime/undo/score 快照和一个 `projectPendingRequest(PendingInteractionProjectionInput)`；具体 animal-reorg zone、farm-select、selection payload 的构造被收敛在该 projection request builder 后面，不作为多个闭包散落到 adapter 输入。viewer redaction (`redactInteractionForViewer`) 消费已经派生好的 `InteractionState`，不参与 pending/request 派生。
+`shared/session/interaction-state-adapter.ts` is the server projection boundary for `InteractionState`. `GameCore.buildInteraction()` passes only current `GameState` and `EngineStack`, anytime, undo, and score snapshots, and one `projectPendingRequest(PendingInteractionProjectionInput)`. Construction of animal-reorg zones, farm-select payloads, and selection payloads lives behind that projection request builder instead of being scattered among adapter closures. Viewer redaction through `redactInteractionForViewer` consumes an already-derived `InteractionState` and never participates in pending or request derivation.
 
-### 4.7 ActionChoiceOption + previews
+### 4.7 ActionChoiceOption and Previews
 
 ```ts
 type ActionChoiceOption = {
@@ -314,113 +321,115 @@ type ActionChoiceOption = {
 }
 ```
 
-`effectPreview` 三类（`resourceExchange` / `payment` / `text`）。引擎对 `seq(pay-resources, gain[, bonus-vp])` option 自动聚合 preview；卡牌手写 `payLeaf+gainLeaf` 也能拿到 preview。生产点：`shared/cards/helpers/pay-gain-node.ts`、`shared/actions/effects/pay-helpers.ts`、`shared/actions/effects/exchange.ts`。
+`effectPreview` has three variants: `resourceExchange`, `payment`, and `text`. The engine automatically aggregates previews for `seq(pay-resources, gain[, bonus-vp])` options. A card using handwritten `payLeaf` plus `gainLeaf` receives the same preview. Producers include `shared/cards/helpers/pay-gain-node.ts`, `shared/actions/effects/pay-helpers.ts`, and `shared/actions/effects/exchange.ts`.
 
-`descriptionPreview` 是 BGA-style 递归 ActionFlow 描述：leaf 使用 `ActionDefinition.nameKey` + leaf `effectPreview`，组合节点按类型拼接子描述（`SeqNode: ', '` / `XorNode: ' / '` / `OrNode: ' + '` / `ParallelNode: ' | '`）。前端优先渲染 `descriptionPreview`，这样普通 leaf、pay/gain 组合、嵌套 XOR/SEQ 都由引擎自动生成 option 文案。`pay-gain-node` 等通用 helper **不再**为机械 pay/gain 默认塞 `choiceLabelKey: 'ui.interactionResourceExchange'`；选项可见文案以 `descriptionPreview`（及 `effectPreview`）为准。`choiceLabelKey` / `choiceLabelParams` 仅用于**语义覆盖**（例如字段/数量选择、`ui.interactionUseCard`、`ui.interactionSeedResearcher` 等），不要为纯资源交换重复 i18n。`special-effect` 根据 `params.kind` 提供自己的语义描述，避免把内部状态同步暴露成泛化的 “Card Effect”；纯展示同步如 `set-infobox` 不进入描述。
+`descriptionPreview` is a BGA-style recursive description of `ActionFlow`. A leaf uses `ActionDefinition.nameKey` plus its `effectPreview`; composite nodes join child descriptions by type: `SeqNode` with `, `, `XorNode` with ` / `, `OrNode` with ` + `, and `ParallelNode` with ` | `. The frontend prefers `descriptionPreview`, allowing ordinary leaves, pay/gain compositions, and nested XOR or SEQ nodes to derive option text from the engine.
+
+Generic helpers such as `pay-gain-node` no longer inject `choiceLabelKey: 'ui.interactionResourceExchange'` for mechanical pay/gain choices. Visible option text comes from `descriptionPreview` and `effectPreview`. Reserve `choiceLabelKey` and `choiceLabelParams` for semantic overrides such as field or quantity selection, `ui.interactionUseCard`, or `ui.interactionSeedResearcher`; do not duplicate i18n for plain resource exchanges. `special-effect` supplies semantic descriptions from `params.kind` so internal state synchronization is not exposed as a generic “Card Effect.” Display-only synchronization such as `set-infobox` is omitted from descriptions.
 
 ### 4.8 LogEntry
 
-`LogEntry { key, params, playerId? }` —— 结构化 i18n key + 渲染参数。前端按 locale 渲染；新局 bootstrap 日志可携带稳定 `playerId`，WS 应用席位显示名时按身份刷新缓存，不按可能重复的显示文本匹配。
+`LogEntry { key, params, playerId? }` carries a structured i18n key plus rendering parameters. The frontend renders it for the active locale. New-game bootstrap entries may carry stable `playerId`; when WebSocket seat display names change, the client refreshes identity-based caches instead of matching potentially duplicate display text.
 
 ---
 
-## 5. shared/engine/ — 节点树引擎
+## 5. `shared/engine/`: Node-Tree Engine
 
-**节点树是唯一状态机**。`GameSession` 不再持有 `PendingAction` union，"等什么"从引擎光标派生。
+The node tree is the only state machine. `GameSession` no longer owns a `PendingAction` union; the engine cursor determines what input is awaited.
 
-### 5.1 文件清单
+### 5.1 Files
 
-```
+```text
 shared/engine/
-├── engine.ts              Engine 类
-├── engine-stack.ts        EngineStack：子流程帧栈
-├── engine-resolve.ts      resolveChoice 路径
-├── engine-proceed.ts      step / 推进路径
-├── dispatcher.ts          hook listener 调度
-├── tree.ts                节点树构建
-├── registry.ts            ActionDefinition 注册查找
-├── log-store.ts           日志缓冲
-├── types.ts               EngineContext / EngineFrame / EngineStackCursor
-└── nodes/                 节点类型实现
-    ├── base.ts            BaseNode 基类 + 共享 metadata/pending
-    ├── action-node.ts     原子 action leaf
+├── engine.ts              Engine class
+├── engine-stack.ts        EngineStack child-flow frame stack
+├── engine-resolve.ts      resolveChoice path
+├── engine-proceed.ts      step and progression path
+├── dispatcher.ts          Hook and listener dispatch
+├── tree.ts                Node-tree construction
+├── registry.ts            ActionDefinition registration and lookup
+├── log-store.ts           Buffered logs
+├── types.ts               EngineContext, EngineFrame, EngineStackCursor
+└── nodes/
+    ├── base.ts            BaseNode and shared metadata/pending state
+    ├── action-node.ts     Atomic action leaf
     ├── sequence-node.ts
     ├── parallel-node.ts
     ├── xor-node.ts
     └── or-node.ts
 ```
 
-### 5.2 节点类型
+### 5.2 Node Types
 
-**架构决策（2026-05-13）：领域层 `ActionFlow` 对齐 BGA node algebra，只保留 `leaf / seq / parallel / xor / or`。** `optional`、`promptKey`、`sourceCard`、`choiceLabel*`、`targetPlayerId` 是节点 metadata，不是新的领域节点类型。卡牌和 listener 只能构造这个小集合；新规则不应向 `ActionFlow` 暴露 runtime-only node。
+Architecture decision from 2026-05-13: domain `ActionFlow` follows BGA node algebra and exposes only `leaf`, `seq`, `parallel`, `xor`, and `or`. `optional`, `promptKey`, `sourceCard`, `choiceLabel*`, and `targetPlayerId` are metadata, not domain node types. Cards and listeners construct only this small set; new rules must not expose runtime-only nodes through `ActionFlow`.
 
-**架构决策（2026-05-14）：runtime engine tree 也收敛到五种具体 node：`ActionNode / SequenceNode / ParallelNode / XorNode / OrNode`。** 跨玩家 owner、optional、trigger selection、listener activation、pending 都不再由额外 wrapper node 表达，而是由 node metadata、internal action leaf、pending envelope 和 frame state 表达。
+Architecture decision from 2026-05-14: the runtime engine tree also has five concrete nodes: `ActionNode`, `SequenceNode`, `ParallelNode`, `XorNode`, and `OrNode`. Cross-player ownership, optional state, trigger selection, listener activation, and pending state are represented through node metadata, internal action leaves, pending envelopes, and frame state rather than wrapper nodes.
 
-`targetPlayerId` 表示"这个普通 flow node 在另一个玩家视角下执行"。编译到 runtime engine 时，它会转成目标 subtree 的 `ownerPlayerId` metadata；child 如果显式带自己的 owner，则保留 child owner。Session 顶层 flow builder 和动态插入路径（hook / listener / action `result.flow` / resolveChoice follow-up）都必须带上当前 effective owner，让后续 sibling 能回到 frame/ancestor owner。cursor restore 持久化 node owner metadata，不依赖全局 `currentPlayerIndex` 重新推断 owner。
+`targetPlayerId` executes an ordinary flow node from another player's perspective. Runtime compilation converts it into `ownerPlayerId` metadata on the target subtree; a child with an explicit owner keeps that owner. Top-level Session builders and dynamic insertion paths for hooks, listeners, action `result.flow`, and resolveChoice follow-ups must carry the current effective owner so later siblings can return to the frame or ancestor owner. Cursor restoration persists node-owner metadata instead of inferring it from global `currentPlayerIndex`.
 
-当前 runtime node 类型：
+Runtime nodes:
 
-- `ActionNode`：BGA `LeafNode(action)` 等价物；以 `actionId` + `params` 调 `ActionDefinition.execute`。
-- `SequenceNode` / `ParallelNode` / `OrNode` / `XorNode`：组合节点，对应 BGA `SEQ` / `PARALLEL` / `OR` / `XOR`。`XorNode` 在玩家选择复合分支后记录 `selectedChildId`，后续 traversal 只推进该分支直到完成，避免 `xor(seq(...))` 在第一个 leaf 成功后提前结束。`ParallelNode(mode='trigger-select')` 承接 BGA `NODE_PARALLEL` 风格的多 reaction select/pass/mandatory 语义，用于 action listener、阶段 card-effect activation 和 extra-turn provider selection。
+- `ActionNode` is equivalent to BGA `LeafNode(action)` and calls `ActionDefinition.execute` with `actionId` and `params`.
+- `SequenceNode`, `ParallelNode`, `OrNode`, and `XorNode` correspond to BGA `SEQ`, `PARALLEL`, `OR`, and `XOR`. After choosing a composite branch, `XorNode` stores `selectedChildId` and traverses only that branch until completion so `xor(seq(...))` does not finish after its first successful leaf. `ParallelNode(mode='trigger-select')` implements BGA-style reaction selection with pass and mandatory semantics for action listeners, phase card-effect activation, and extra-turn providers.
 
-共享 runtime metadata：
+Shared runtime metadata:
 
-- `ownerPlayerId`：跨玩家执行 owner；继承自 ancestor/frame，child explicit owner 优先。
-- `optional` / `optionalActive` / `optionalPromptKey`：optional accept/skip 状态；`xor` / `or` 保留直接 `__skip__` 选项。
-- `mandatory`：已选择 / 已接受的强制 continuation 会同时标记 host node 和 descendant `ActionNode`；后续 leaf 不可执行时返回 mandatory blocked，session 转成 `engine-blocked`（undo-only），避免只执行 composite 的前半段。
-- `selectedChildId`：`XorNode` 和 trigger-select `ParallelNode` 的运行态选择指针，会进入 cursor restore；用于让已选择的 composite branch / provider flow 在 pending、undo、WS restore 后继续从同一分支推进。
-- `resolveAfterSelection`：trigger-select 的 one-shot 变体，选中的 child 执行完后直接 resolve parent；用于 extra-turn provider selection，避免选择一个 provider 后继续展示同层其他 provider。
-- `pending: PendingEnvelope | null`：等待输入的数据 envelope。`InteractionRequest` 是 WS/session protocol，不是 tree node。leaf request、`xor` / `or`、optional、trigger-select parallel 和 synthetic confirm/feed/farm-select 都通过 pending envelope 暂停并 cursor-restore。
+- `ownerPlayerId`: cross-player execution owner, inherited from the ancestor or frame unless the child sets one explicitly.
+- `optional`, `optionalActive`, `optionalPromptKey`: optional accept or skip state. `xor` and `or` retain a direct `__skip__` option.
+- `mandatory`: an accepted mandatory continuation marks both its host node and descendant `ActionNode`s. If a later leaf cannot execute, it returns mandatory-blocked and Session enters undo-only `engine-blocked` instead of running only the first half of a composite.
+- `selectedChildId`: runtime selection cursor for `XorNode` and trigger-select `ParallelNode`. Cursor restoration persists it so a chosen composite branch or provider resumes after pending state, undo, or WebSocket restoration.
+- `resolveAfterSelection`: one-shot trigger-select mode. The parent resolves immediately after the selected child completes. Extra-turn provider selection uses this so sibling providers are not offered after one is chosen.
+- `pending: PendingEnvelope | null`: input envelope. `InteractionRequest` is a WebSocket and Session protocol shape, not a tree node. Leaf requests, `xor`, `or`, optional nodes, trigger-select parallel, and synthetic confirm, feed, and farm-select all pause and restore through pending envelopes.
 
-listener activation 是 internal action leaf：`ActionNode(actionId='activate-card')`，params 携 `{ listenerId, cardId, phase, actionId, event, ownerPlayerId, ownerCardZone, triggerPlayerId }`。`event` 保留触发 action 的 `actionContext`（包括 `targetSpaceId`），activation 执行时用该 context 解析 listener 的真实 `space`。它 bypass 普通 public action pipeline，只执行 listener body 并把返回 flow / follow-up actions 插入 engine。
+Listener activation is an internal leaf: `ActionNode(actionId='activate-card')`. Its parameters include `{ listenerId, cardId, phase, actionId, event, ownerPlayerId, ownerCardZone, triggerPlayerId }`. `event` retains the triggering action's `actionContext`, including `targetSpaceId`; activation resolves the listener's actual `space` from that context. It bypasses the ordinary public-action pipeline, executes only the listener body, and inserts returned flow or follow-up actions into the engine.
 
-`BaseNode` 提供共享 metadata / pending / cursor round-trip；具体 traversal 由 `EngineTree` 和五种 node 实现。
+`BaseNode` implements shared metadata, pending state, and cursor round trips. `EngineTree` and the five concrete nodes implement traversal.
 
-### 5.3 Engine 公共 API
+### 5.3 Engine Public API
 
-`Engine` class 暴露给 `GameCore` 的接口（小集合）：
+`Engine` exposes this small interface to `GameCore`:
 
-- `step(ctx)` —— 推进到下一个 unresolved 节点；遇到 node pending 暂停，返回 envelope。
-- `resolveChoice(value, ctx, payload?)` —— 提供玩家选择，继续推进。
-- `peekPendingEnvelope()` —— 返回当前等待的 `PendingEnvelope`（或 null）。
-- `peekPendingHost()` —— 返回托管该 pending envelope 的 node（用于 sourceCard / actionContext / owner 反查）。
-- `injectBeforeFlows(flows, ctx?)` —— hook 注入子流程。
-- `snapshot()` / `restore(snapshot)` —— 序列化与重建节点树（含 `nodeStates`、pending envelope、owner/optional/trigger metadata）。
-- `hasPendingChoiceCompositeAncestor()` —— 用于 anytime 判断是否处在分支祖先内。
+- `step(ctx)`: advance to the next unresolved node and stop at pending input.
+- `resolveChoice(value, ctx, payload?)`: supply player input and continue.
+- `peekPendingEnvelope()`: return the current `PendingEnvelope`, or null.
+- `peekPendingHost()`: return the node hosting that envelope for `sourceCard`, `actionContext`, and owner lookup.
+- `injectBeforeFlows(flows, ctx?)`: insert hook flows.
+- `snapshot()` / `restore(snapshot)`: serialize and rebuild the tree, including `nodeStates`, pending envelope, owner, optional, and trigger metadata.
+- `hasPendingChoiceCompositeAncestor()`: tell anytime handling whether execution is inside a branch ancestor.
 
-### 5.4 EngineStack（子流程栈）
+### 5.4 EngineStack
 
-`EngineStack`（`engine-stack.ts`）持有 `EngineFrame[]`：
+`EngineStack` in `engine-stack.ts` owns `EngineFrame[]`:
 
 ```ts
 type EngineFrame = {
   engine: Engine
-  source: SubFlowReason     // 'topAction' | 'hook' | 'anytime' | 'animal-reorg' | 'harvest-feed' | ...
+  source: SubFlowReason
   ownerPlayerIndex: number
   spaceId?: string
-  stageResume?: StageResume  // hook 完成后回调钩子
+  stageResume?: StageResume
   reason: SubFlowReason
 }
 ```
 
-API：`push / pop / current / depth / peekPendingEnvelope / peekPendingHost / toCursor`。
+Its API is `push`, `pop`, `current`, `depth`, `peekPendingEnvelope`, `peekPendingHost`, and `toCursor`.
 
-`EngineStackCursor` 序列化成 `SerializedGameState.engineStack`，恢复路径：`engine.snapshot()` → 各 concrete node cursor restore 重建节点树并定位 pending host / traversal state。
+`EngineStackCursor` is serialized into `SerializedGameState.engineStack`. Restoration uses `engine.snapshot()` and each concrete node's cursor restoration to rebuild the tree and locate pending hosts and traversal state.
 
-`SubFlowKind` ∈ { `choice` / `animal-reorg` / `confirm-next-player` / `confirm-player-switch` / `feed` / `farm-select` / `selection` / `card-draft` }。
+`SubFlowKind` is one of `choice`, `animal-reorg`, `confirm-next-player`, `confirm-player-switch`, `feed`, `farm-select`, `selection`, or `card-draft`.
 
 ---
 
-## 6. shared/session/ — 会话层
+## 6. `shared/session/`: Session Layer
 
-### 6.1 文件清单
+### 6.1 Files
 
-```
+```text
 shared/session/
-├── session-core.ts        GameCore（命令执行入口）
-├── serialization.ts       SerializedGameState 序列化
-├── state-bootstrap.ts     初始 state 构造
-├── stats.ts               统计/日志
+├── session-core.ts        GameCore command entry points
+├── serialization.ts       SerializedGameState serialization
+├── state-bootstrap.ts     Initial state construction
+├── stats.ts               Statistics and logging
 └── phases/
     ├── setup.ts
     ├── round.ts
@@ -428,20 +437,20 @@ shared/session/
     └── draft.ts
 ```
 
-`shared/session/phases/` 是按阶段拆分的纯函数集合（`startBreedPhase` / `continueAfterFeed` / `startNewRound` 等），不是 mixin / trait class。逻辑都在 `GameCore` 主 class 上汇合。
+`shared/session/phases/` contains phase-specific pure functions such as `startBreedPhase`, `continueAfterFeed`, and `startNewRound`. These are not mixin or trait classes; all coordination converges in the main `GameCore` class.
 
-### 6.2 GameCore 入口
+### 6.2 GameCore Entry Points
 
-`GameCore` 持有：
+`GameCore` owns:
 
 - `state: GameState`
 - `engineStack: EngineStack`
-- 历史栈（步级 history + 行动起点 `actionStartSnapshot`）
-- 终局计分缓存
+- Step history and the action-start `actionStartSnapshot`
+- End-game scoring cache
 
-命令方法（被 `GameSession` / `authoritative-session.ts` 包装后导出给 server）：
+Commands wrapped by `GameSession` in `authoritative-session.ts` and exposed to the server:
 
-```
+```text
 takeAction(playerIndex, spaceId)
 takeSpecialAction(playerIndex, cardId, actionId, payload?)
 takeAnytimeAction(playerIndex, actionId)
@@ -453,9 +462,9 @@ loadState(raw)
 undoStep() / undoAction()
 ```
 
-`GameCore` 是领域引擎；`GameSession`（`server/game/authoritative-session.ts`）是薄包装，只注入隔离的自定义卡执行器，并生成按 viewer 裁剪或 debug 模式的同步 payload。连接、广播与持久化由 `server/connection/` 和 `server/game/` 管理。
+`GameCore` is the domain engine. `GameSession` in `server/game/authoritative-session.ts` is a thin wrapper that injects the isolated custom-card executor and creates viewer-filtered or debug synchronization payloads. `server/connection/` and `server/game/` own connections, broadcasts, and persistence.
 
-### 6.3 统一返回 SessionResponse
+### 6.3 Unified SessionResponse
 
 ```ts
 type SessionResponse = {
@@ -471,43 +480,41 @@ type SessionResponse = {
 }
 ```
 
-单测直接断言该结构；WS 由 `GameSession.buildSyncPayload()` 序列化并按 viewer 裁剪后广播。`InteractionState` 是前端交互真相。
+Tests assert this structure directly. WebSocket paths serialize it through `GameSession.buildSyncPayload()`, filter it for the viewer, and broadcast it. `InteractionState` remains the frontend interaction authority.
 
----
+### 6.4 Extra-Turn Rotation Extension: `contributeExtraTurn` and `hasPendingExtraTurn`
 
-### round.ts 额外回合轮转扩展点（contributeExtraTurn / hasPendingExtraTurn）
+A092 Adoptive Parents introduced the extra-turn mechanism at the rotation layer under #203 and #204. It runs after a player's ordinary workers are exhausted, the positive counterpart to `onBeforePlayerTurn` `skipTurn`, which skips before a turn starts.
 
-A092_AdoptiveParents 引入轮转层的**额外回合**机制（#203+#204），发生在玩家普通工人耗尽**之后**，与 `onBeforePlayerTurn` 的 `skipTurn` 在回合开始前的负向跳过相反。
+- `contributeExtraTurn?: (state, player) => ActionFlow | void` is a `CardEffect` hook. It returns that card's provider flow when available and `void` otherwise. `runCardEffectHook` does not execute it automatically; rotation gating in `shared/session/phases/round.ts` consumes it explicitly.
+- `collectExtraTurnContributions(state, player)` is the sole source. `hasPendingExtraTurn` checks for providers; `collectExtraTurnFlow` compiles the real interaction. One provider expands directly. Multiple providers use one-shot `ParallelNode(mode='trigger-select')`, with each child an internal `activate-extra-turn` leaf. The player first selects a source card; only then does its flow expand. Provider flow may contain nested interactions such as `xor(seq(...))`, and the selected branch must drain completely before the provider finishes.
+- A repeatable provider may define internal adjunct `countExtraTurns`, allowing mandatory turn skipping or forced consumption to consume one opportunity. `_extraTurnSkipCountsByCard` and `_extraTurnConsumedCountsByCard` record per-card skipped and consumed counts. `countPendingExtraTurns` and `consumePendingExtraTurns` reuse provider aggregation instead of a global player counter. A noninteractive fallback consumes one source in stable card order only when automatic progression is required.
+- Three round gates treat a player with a pending extra turn as eligible: next-active-player selection via `nextSeatedPlayerIdx`, whose predicate is `workersAvailable(state, p) > 0 || hasPendingExtraTurn(state, p)`; `roundWorkComplete`, requiring every player to have no available workers and no pending extra turn; and the rotation skip loop, which stops on a zero-worker player with a pending extra turn so the flow can be injected.
+- `startPendingExtraTurnIfAny(core)` is the only injection path. Confirm-next-player rotation and history restoration after `undoStep` or `undoAction` reuse it. Undo rebuilds the pending flow only when the current player is already stopped at a zero-worker extra-turn seat and the engine stack is empty; it does not rerun the full seat walk.
+- A92 contributes XOR use or forfeit. Choosing Forfeit exits later opportunities that round. It triggers when ordinary workers are exhausted while an inactive newborn remains, matching BGA `stLabor` supply-placement choices such as adoptive, Telegram, and Work Permit. M057 enters the card or board selection flow for a Moor special action and still invokes normal special-action before and after listeners.
 
-- `contributeExtraTurn?: (state, player) => ActionFlow | void`：`CardEffect` 上的 hook，可用时返回本卡 provider 的 ActionFlow，否则 `void`。它**不**经 `runCardEffectHook` 自动执行，而是被 `shared/session/phases/round.ts` 的轮转 gating **主动消费**。
-- `collectExtraTurnContributions(state, player)` 是单一真相源：同一轮转点枚举所有 provider，`hasPendingExtraTurn(state, player)` 只判断是否存在 provider，`collectExtraTurnFlow(state, player)` 把 provider 编译成真实交互。单 provider 直接展开，多个 provider 进入 one-shot `ParallelNode(mode='trigger-select')`，每个 child 是 internal `activate-extra-turn` leaf；玩家先选来源卡，选中后才展开该卡自己的 flow。provider flow 可以继续包含 `xor(seq(...))` 这类嵌套交互，选中分支必须完整 drain 后才算 provider 完成。
-- 多次机会卡可配内部 adjunct `countExtraTurns`，让 mandatory skip-turn / forced consume 只消费一个 extra-turn opportunity。剩余机会按来源卡计算：`_extraTurnSkipCountsByCard` 和 `_extraTurnConsumedCountsByCard` 记录每张卡已跳过 / 已强制消费次数；`countPendingExtraTurns(state, player)` 与 `consumePendingExtraTurns(state, player)` 复用 provider 聚合，不再使用玩家级全局 counter。无交互 skip fallback 只在必须自动前进时按稳定卡牌顺序消费一个 source。
-- round.ts 三处 gating：选下一活跃玩家（`workersAvailable(state, p) > 0 || hasPendingExtraTurn(state, p)`，`nextSeatedPlayerIdx`）、round-work 完成谓词（全员 `workersAvailable <= 0 && !hasPendingExtraTurn`，`roundWorkComplete`）、轮转 skip 循环（0-worker 玩家若 `hasPendingExtraTurn` 则停轮以便注入 flow）。都把"有 pending extra turn"的玩家视为仍有资格、不提前跳过。
-- extra-turn pending 注入统一走 `startPendingExtraTurnIfAny(core)`；`confirm-next-player` 轮转和 `undoStep` / `undoAction` 的 history restore 后复用同一入口。Undo 只在当前玩家已经停在 0-worker extra-turn seat 且 engine stack 为空时重建 pending flow，不重新执行完整 seat-walk。
-- A92 provider 表现为 XOR[use, forfeit]；选 Forfeit（放弃）即退出本轮后续。A92 触发条件：普通工人耗尽但仍持未激活后代（newborn），对齐 BGA `stLabor` 里 adoptive / Telegram / Work Permit 等并列的 supply-placement 选项（pull model）。M057 provider 选中后进入 Moor special action 的卡牌 / 版图选择 flow，仍会触发普通 special action before / after listener。
+`skipTurn`, used by cards such as D134 Oyster Eater through `{ skipTurn: true }`, mirrors BGA `Globals::setSkipNext` and makes rotation continue past the player before their turn starts. `contributeExtraTurn` instead prevents early skipping after the player's workers are exhausted and appends another placement. See *Extra Turn / Forfeit* in `CONTEXT.md`.
 
-**与 `onBeforePlayerTurn` / `skipTurn` 的区别**：`skipTurn`（如 D134_OysterEater，返回 `{ skipTurn: true }`，镜像 BGA `Globals::setSkipNext`）在玩家回合**开始前**让轮转 `continue` 跳过该玩家整个回合（负向）；`contributeExtraTurn` 在玩家工人**耗尽后**让轮转**不提前跳过**、追加一次额外放工（正向）。术语见 `CONTEXT.md` 的 *Extra Turn / Forfeit*。
+## 7. `shared/actions/`: Actions and Hooks
 
-## 7. shared/actions/ — 行动定义与 Hook 系统
+### 7.1 Directory
 
-### 7.1 目录
-
-```
+```text
 shared/actions/
-├── index.ts               actionDefinitionLookup Map（27 base + internal 共发现）
-├── flow.ts                ActionFlow 节点表达式（leaf / seq / parallel / xor / or + optional metadata）
-├── hooks.ts               Hook 注册 + 调度
-├── hook-matrix.ts         buildHookMatrix() 优化矩阵
-├── internal-actions.ts    引擎内部辅助 action（mark-card-trigger 等）
-├── effects/               base action 实现（一文件一 action）
-│   └── internal/          内部 effect
-├── factories/             行动工厂
-├── helpers/               支付、动物、农场等共享 helper
-├── payment/               PaymentSolver 与执行器
+├── index.ts               actionDefinitionLookup Map; discovers 27 base plus internal actions
+├── flow.ts                ActionFlow: leaf, seq, parallel, xor, or, plus optional metadata
+├── hooks.ts               Hook registration and dispatch
+├── hook-matrix.ts         buildHookMatrix() optimization matrix
+├── internal-actions.ts    Internal engine actions such as mark-card-trigger
+├── effects/               Base actions, one action per file
+│   └── internal/          Internal effects
+├── factories/             Action factories
+├── helpers/               Shared payment, animal, and farm helpers
+├── payment/               PaymentSolver and executors
 └── __tests__/
 ```
 
-### 7.2 ActionDefinition
+### 7.2 `ActionDefinition`
 
 ```ts
 type ActionDefinition = {
@@ -530,321 +537,341 @@ type ActionDefinition = {
 }
 ```
 
-Hook 不进 `ActionDefinition`，由 `hooks.ts` 显式注册（卡牌文件内部）。
+Hooks are not part of `ActionDefinition`; card files register them explicitly through `hooks.ts`.
 
-`getBaseChoiceOptions` opt-in 选项流：base + `computeChoiceCandidates` 注入 → 按 `value` 去重 → `costPreview.canExecute` 过滤 → 0 候选 fail / 1 直跳 `resolveChoice` / ≥2 标准 prompt。当前消费者：`renovate-house` + `A087_Conservator`。与传统 `execute()→choice→computeArgs.extraOptions` 路径互斥。`renovate-house` 的 card-authored exact/free cost 通过 `actionContext.exactCost` 表达，和 construct / stables / plow 的 BGA `formatCost` 语义一致。
+The opt-in `getBaseChoiceOptions` path takes base options, injects `computeChoiceCandidates` results, deduplicates by `value`, and filters with `costPreview.canExecute`. Zero candidates fail, one candidate jumps directly to `resolveChoice`, and two or more candidates create the standard prompt. Current consumers are `renovate-house` and `A087_Conservator`. This path is mutually exclusive with the traditional `execute() -> choice -> computeArgs.extraOptions` path. Card-authored exact or free renovation costs use `actionContext.exactCost`, matching BGA `formatCost` semantics for construct, stables, and plow.
 
-### 7.3 effects/ 自动发现
+### 7.3 Automatic discovery under `effects/`
 
-`scripts/check-effects-file-list.ts` 是 top-level production effects allow-list 的单一来源；`shared/actions/effects/__tests__/architecture-guard.test.ts` 复用它，并继续守住 action id allow-list。`shared/actions/index.ts` 只导入 top-level base effects 和 `effects/internal/` 内部 effects，构建 `actionDefinitionLookup`。**禁止新增 top-level effect 文件来堆叠多卡逻辑**；需要 host action 子步骤时使用 `internalChildren` 或把内部 effect 放在 `shared/actions/effects/internal/`，纯 helper 放在 `shared/actions/helpers/`。
+`scripts/check-effects-file-list.ts` is the single source of truth for the top-level production-effects allowlist. `shared/actions/effects/__tests__/architecture-guard.test.ts` reuses it and also protects the action-ID allowlist. `shared/actions/index.ts` imports only top-level base effects and internal effects under `effects/internal/` to build `actionDefinitionLookup`. **Do not add top-level effect files that accumulate logic for multiple cards.** Use `internalChildren` for host-action substeps, place internal effects under `shared/actions/effects/internal/`, and put pure helpers under `shared/actions/helpers/`.
 
-`collect` 是 accumulation-space partial-take 的统一入口，接受可选 `actionContext: { spaceId?, resource?, amount? }`。`spaceId` 用于指向非当前 action space（卡牌效果触发的偷取场景）；`resource` + `amount` 用于 partial-take（不全取空一格）。旧的 `take-from-space` internal action 已删除并迁移到 `collect`，相关 i18n key 一并清理。
+`collect` is the unified entry point for partially taking an accumulation space. It accepts optional `actionContext: { spaceId?, resource?, amount? }`. `spaceId` can identify a space other than the current action space, such as a card-triggered theft. `resource` and `amount` support a partial take without emptying the space. The old `take-from-space` internal action and its i18n keys were removed after migration to `collect`.
 
-`place-farmer-on-space` 是指定目标额外放人的 internal action。它从当前 owner 家里取可用工人放到 `params.spaceId`，然后默认返回目标 action 的 `expandFlow` leaf；`params.allowOccupied` 只跳过 occupied 检查，不跳过 linked block / round availability / action executability / worker supply。需要 piggyback 或固定目标连锁放人的卡牌应使用该 internal action，不要在 listener handler 内直接改 `ActionSpace.takenBy`。
+`place-farmer-on-space` is the internal action for placing an additional worker on a specified target. It takes an available worker from the current owner's home, places it on `params.spaceId`, and normally returns that target action's `expandFlow` leaf. `params.allowOccupied` bypasses only the occupied-space check; it does not bypass linked blocks, round availability, action executability, or worker supply. Cards that piggyback on or chain placement to a fixed target must use this internal action instead of mutating `ActionSpace.takenBy` in a listener handler.
 
-`pass-minor-card-to-left` 是跨玩家传递已打出小改良的 internal action。它从当前玩家的 `minorPlayed` / `improvements` 移除目标卡，清理该卡在原玩家的 `cardStates`，把卡加入左手玩家 `minorHand`，发送 `card.passed` public event 和目标玩家私有 `cardEffectHandChanged`；后续触发条件应消费 `card.passed` provenance，不直接扫描手牌差异。
+`pass-minor-card-to-left` is the internal action for passing a played minor improvement between players. It removes the card from the current player's `minorPlayed` or `improvements`, clears that player's `cardStates` entry, adds the card to the player on the left's `minorHand`, emits a public `card.passed` event, and sends the target player a private `cardEffectHandChanged` event. Later triggers must consume the `card.passed` provenance rather than infer a pass by comparing hands.
 
-额外加作物的 follow-up selection 通过 `actionContext.extraCropPlacement` 表达 provenance；pending / anytime 构造必须从 `contextSnapshot.actionContext` 传递该 marker，后续卡牌只读语义 marker，不判断创建 pending 的 sourceCard id。
+Follow-up selection for an extra crop placement carries provenance in `actionContext.extraCropPlacement`. Pending and anytime construction must copy this marker from `contextSnapshot.actionContext`; subsequent cards read the semantic marker and must not branch on the source-card ID that created the pending interaction.
 
-### 7.4 payment/
+### 7.4 `payment/`
 
-`shared/actions/payment/`：
+`shared/actions/payment/` contains:
 
-- `solver.ts` —— 生产支付生命周期和支付相关 facade 入口：计算可支付方案、判断可支付性、构造支付选择、解析玩家选择、执行支付并返回结构化 receipt；preview-cost、typed-flat、room payment、simple resource/trade side effect、card cost candidate helper 也从这里进入。
-- `internal/enumerate.ts` —— `computeAllBuyableCombinations` / `keepOnlyOptimals`（资源可行性过滤后的严格支配剪枝；豁免 feeIdentity / 有状态副作用的 bonus choice / card 支付；卡牌提供的支付资源按自身 key 参与比较，ADR 0004 Amendment）/ `sortPaymentSolutions`
-- `internal/execute.ts` —— `payResources` / `executePaymentSolution`
-- `internal/cost-modifiers.ts` / `internal/preview-cost.ts` —— `computeCosts` hook 集成与 card-purchase cost preview glue
-- `internal/room-payment.ts` / `internal/typed-flat.ts` —— 房间 / typed flat cost 兼容 helper
-- `internal/cache.ts` —— solution cache
+- `solver.ts`: the production payment lifecycle and payment-facade entry point. It computes affordable solutions, checks affordability, builds payment choices, parses player choices, executes payment, and returns a structured receipt. Cost previews, typed-flat costs, room payment, simple resource or trade side effects, and card-cost candidate helpers also enter here.
+- `internal/enumerate.ts`: `computeAllBuyableCombinations`, `keepOnlyOptimals`, and `sortPaymentSolutions`. Dominance pruning runs after resource-feasibility filtering and exempts fee identity, stateful bonus choices, and card payment. Card-provided payment resources participate under their own keys, as required by the ADR 0004 amendment.
+- `internal/execute.ts`: `payResources` and `executePaymentSolution`.
+- `internal/cost-modifiers.ts` and `internal/preview-cost.ts`: `computeCosts` integration and card-purchase cost-preview glue.
+- `internal/room-payment.ts` and `internal/typed-flat.ts`: compatibility helpers for room and typed-flat costs.
+- `internal/cache.ts`: the solution cache.
 
-生产 effect / helper / card runtime 默认通过 `PaymentSolver` 进入支付生命周期或支付相关 facade；外部测试使用 `PaymentSolver` 或 `shared/actions/payment/__tests__/test-helpers.ts`，只有 `shared/actions/payment/internal/__tests__` 保留算法白盒测试；`payment/internal/*` 只供 payment package 内部和算法聚焦测试使用，边界测试禁止生产代码和非 payment 内部测试直接 import。卡牌购买费用走 `computeCosts` phase + `actions: ['improvement']` 区分行动空间费用 vs 卡牌购买费用。
+Production effects, helpers, and card runtime code enter the payment lifecycle or related facades through `PaymentSolver`. External tests use `PaymentSolver` or `shared/actions/payment/__tests__/test-helpers.ts`; only tests under `shared/actions/payment/internal/__tests__` retain white-box access to the algorithms. `payment/internal/*` is private to the payment package and algorithm-focused tests. Production code and other tests must not import it directly. Card-purchase costs use the `computeCosts` phase with `actions: ['improvement']` to distinguish action-space fees from card-purchase costs.
 
-**统一 cost 模型（`ComplexCost`）**：construct / renovation / fencing / plow / occupation / minor / major / pay leaf 全部走同一条 `computeAllBuyableCombinations` 管线。`ComplexCost` 字段语义：
+**Unified `ComplexCost` model.** Construct, renovation, fencing, plow, occupation, minor improvement, major improvement, and `pay` leaves all use the same `computeAllBuyableCombinations` pipeline. Its fields mean:
 
-- `fees: Partial<Resource>[]` —— per-action 总固定费用。`computeCosts` 返回的 raw `costs` 总成本 delta 写入 `fees[0]`；有来源的 BGA `addBonus` / `addBonusChoices` 优先表达为 `bonuses`，有来源且保留原始候选的 BGA `addCost` 优先表达为 `trades`。负值在 `enumerate` 内部 `mergeResources(fees[0], unitFee*nb)` 后 clamp 到 0，避免对 unrelated resource 退款。
-- `unitFee: Partial<Resource>` + `nb: number` —— per-unit × 数量。Construct 的每间房 `{wood: rooms_cost, reed: 1_per_pile_or_room}`、renovation 的 `{[material]: 1}`、fencing 的 `{wood: 1}` 都落在 `unitFee`，`nb` 是行动同时处理的单位数（建房间数 / fence 段数）。enumerate 先对每个 unit cost row 生成有序替换后的可选行，再组合成总成本。
-- typed flat fencing / stables 支付若传入单一 `{fee:{wood:N}}`，enumerate 会在套用 costType modifiers 前规范化为单位成本：fencing 为 `{unitFee:{wood:1}, nb:N}`，stables 为 `{fee:{wood:N%2}, unitFee:{wood:2}, nb:floor(N/2)}`。这样 A16/C56 这类 BGA `addCost` per-unit alternative 仍能先生成 cost row，再被 D88 这类 bonus choice 继续替换。
-- `trades: Trade[]` —— 资源替换选项（`from → to`），由 `TradeModifier` 或 `computeCosts` listener 注入。`Trade.scope: 'action' | 'unit'` 控制替换位置：scope:'action' 在玩家资源池上做 per-action 转换；scope:'unit' 经候选闭包作用在每个 unit cost row 上（无顺序字段，可达行集合与 trade 注册顺序无关）。`replaceUpTo` 支持 B145_BrushwoodCollector 这类“把当前行里 1 或 2 reed 都替换成 1 wood”的 BGA `addCost` 形态；`from:{}` + `to:{resource:n}` 表达保留原始行并追加 sourced 折扣候选。
-- `bonuses: Bonus[]` —— per-action 折扣 / 多选折扣（`{discount}` 单一折扣；`{choices: BonusChoice[]}` 多选）。`Bonus.optional` 决定 enumerate 是否生成"不应用 bonus"分支。
-- `CostResourceRemovalModifier` —— `type:'remove-resource'` 在枚举前从 `fee` / `fees` / `unitFee` 结构化删除指定资源键，并在 `costResourceRemovals` 保留约束来源和各费用路径的实际减免量；用于 C014 这类“不再需要某资源”的规则。该约束会在每次后置 bonus 后再次应用，因此 E123 不能使用已删除费用，D013 等成本 bonus 也不能把该资源重新加入；最终减免通过 `PaymentSolution.bonusReductions` 写入 Cost Attribution。
-- `paymentResourceProviders` —— 卡牌 / hook 提供的虚拟支付资源。provider 在卡牌内部声明稳定 key、可用量、可覆盖的真实成本资源以及执行时的消费来源；它不写入 `fee` / `fees` / `PlayerState.resources`，只在 `PaymentSolution.resourcesPaid` 中以自身 key 出现，并由 executor 消耗来源状态。
-- `paymentBudget` —— 对最终 `PaymentSolution.resourcesPaid` 的资源上限过滤。它不提供资源、不改变成本候选，也不提前限制几何/单位数量；必须在 trades / bonuses / paymentResourceProviders / cards 都生成最终支付方案后检查。
-- `Bonus.capDiscountAtCost` —— 把可变折扣封顶到当前正费用，但仍是后置 bonus；“不再需要某资源”必须使用 `CostResourceRemovalModifier`，不能用任意大 capped discount 模拟。普通 bonus choice 必须能完整应用折扣，不能靠 clamp 产生 no-op 或部分折扣。
-- `Bonus.trackChoiceIndex` —— 默认记录 multi-choice 的 `bonusChoiceIndex`，表示玩家选了第几个 choice；它本身不是 dominance pruning 的豁免理由。
-- `Bonus.choiceAffectsState` —— 标记该 choice identity 会被 after-pay 等 listener 消费并改变状态；只有这类方案禁止互相 dominance pruning。E123 需要该标记，B145/D88 这类无状态 replacement 不需要。
-- `bonuses[].conditions?: Record<string, number>` —— `applyCostModifiers` 把 BonusModifier.conditions 透传到生成的 Bonus，enumerate 用 `evaluateConditions(player, conditions, nb)` 重新评估 nb-aware 约束（如 C013_WoodSlideHammer `minNumRooms: 5`）。
+- `fees: Partial<Resource>[]`: total fixed fees per action. The raw total-cost delta in `computeCosts.costs` is written to `fees[0]`. Sourced BGA `addBonus` and `addBonusChoices` should normally become `bonuses`; sourced BGA `addCost` that retains the original candidate should normally become `trades`. After `mergeResources(fees[0], unitFee * nb)`, enumeration clamps negative values to zero so a discount cannot refund an unrelated resource.
+- `unitFee: Partial<Resource>` plus `nb: number`: per-unit cost times quantity. A constructed room uses `{wood: rooms_cost, reed: 1_per_pile_or_room}`, renovation uses `{[material]: 1}`, and fencing uses `{wood: 1}`. `nb` is the number of units handled by the action: rooms, fence segments, and so on. Enumeration first expands ordered replacements for every unit-cost row, then combines the rows into total costs.
+- Typed-flat fencing or stable payment passed as one `{fee:{wood:N}}` is normalized before cost-type modifiers: fencing becomes `{unitFee:{wood:1}, nb:N}`, while stables become `{fee:{wood:N%2}, unitFee:{wood:2}, nb:floor(N/2)}`. A BGA `addCost` per-unit alternative such as A16 or C56 can therefore generate a cost row before a bonus choice such as D88 replaces it.
+- `trades: Trade[]`: `from -> to` resource substitutions injected by a `TradeModifier` or `computeCosts` listener. `Trade.scope: 'action' | 'unit'` selects the substitution point. Action-scoped trades convert the player's resource pool once per action. Unit-scoped trades run candidate closure on each unit-cost row, with no ordering field, so reachable rows do not depend on registration order. `replaceUpTo` models B145 Brushwood Collector's BGA `addCost` form, which replaces either one or two reed in the current row with one wood. An empty `from` with `to:{resource:n}` preserves the original row and adds a sourced discount candidate.
+- `bonuses: Bonus[]`: per-action discounts or discount choices. `{discount}` is a single discount and `{choices: BonusChoice[]}` is a multi-choice discount. `Bonus.optional` controls whether enumeration includes a branch that does not apply the bonus.
+- `CostResourceRemovalModifier`: `type:'remove-resource'` structurally removes the named resource key from `fee`, `fees`, and `unitFee` before enumeration. `costResourceRemovals` retains the source and the actual reduction on every cost path. This models rules such as C014 that remove the need for a resource. The constraint is reapplied after each later bonus, so E123 cannot consume a removed cost and D013-style cost bonuses cannot reintroduce it. Final reductions are recorded in `PaymentSolution.bonusReductions` for Cost Attribution.
+- `paymentResourceProviders`: virtual payment resources supplied by a card or hook. A provider declares a stable key, available amount, covered real-cost resources, and the source consumed on execution. It is not written into `fee`, `fees`, or `PlayerState.resources`; it appears under its own key in `PaymentSolution.resourcesPaid`, and the executor consumes the source state.
+- `paymentBudget`: limits the resources in final `PaymentSolution.resourcesPaid`. It supplies no resources, changes no candidates, and must not restrict geometry or unit count early. It runs only after trades, bonuses, payment-resource providers, and cards have produced final payment solutions.
+- `Bonus.capDiscountAtCost`: caps a variable discount at the current positive fee, but remains a post-processing bonus. A rule that removes the need for a resource must use `CostResourceRemovalModifier`, not simulate removal with an arbitrarily large capped discount. An ordinary bonus choice must apply its full discount and cannot rely on clamping to create a no-op or partial discount.
+- `Bonus.trackChoiceIndex`: records `bonusChoiceIndex` for a multi-choice bonus by default. It indicates which choice the player selected but does not, by itself, exempt a solution from dominance pruning.
+- `Bonus.choiceAffectsState`: marks a choice identity that an `after-pay` or similar listener consumes to mutate state. Only these solutions are mutually exempt from dominance pruning. E123 needs this flag; stateless replacements such as B145 and D88 do not.
+- `bonuses[].conditions?: Record<string, number>`: `applyCostModifiers` carries `BonusModifier.conditions` into the generated bonus, and enumeration reevaluates quantity-aware constraints with `evaluateConditions(player, conditions, nb)`, such as C013 Wood Slide Hammer's `minNumRooms: 5`.
 
-**Card-purchase ComputeCardCosts candidate pipeline（候选闭包，ADR 0004）**：major / minor improvement 购买成本在进入 payment solver 前先规范化成 Cost Candidate List，再对全部 `deriveCardCostCandidate` 转换求候选闭包（`candidate-closure.ts` `closeCandidates()`）：不动点枚举 + Mandatory Saturation 过滤，结果与 listener 注册顺序 / 命名无关（`CardListenerRegistration.order` 已删除，禁止重新引入顺序字段）。卡牌只声明单候选转换（candidate → candidate(s) | null）和 `cardCostCandidateMandatory` 标志：optional（BGA "can pay instead"）天然保留原候选；mandatory（BGA "costs less" / 替换语义）经饱和过滤隐藏仍可被强制转换的行。fixed-price 卡是"不依赖输入的 optional / mandatory 转换"，闭包去重后只产出一行，无需任何先行声明。折扣 clamp 到 0 后资源键从 candidate 资源 map 中省略。Candidate metadata 只记录 `sources` / `originalFeeIndex` / Cost Attribution（dedupe key 中 sources 视为无序集合）；闭包输出后每个 resources + originalFeeIndex 组只保留一条代表行（sources 最少 → key 字典序，ADR 0004 Amendment），支付选定后由 improvement payment glue 写入 option `sourceCards`、`resource.paid.bonusSources` 和 Card Resource Stats（单候选行默认使用 index 0 metadata）。
+**Card-purchase `ComputeCardCosts` candidate pipeline: candidate closure, ADR 0004.** Before the payment solver sees a major or minor improvement purchase, the cost is normalized into a Cost Candidate List. Candidate closure then applies every `deriveCardCostCandidate` transform through `candidate-closure.ts` `closeCandidates()`: fixed-point enumeration followed by Mandatory Saturation filtering. Results do not depend on listener registration order or naming; `CardListenerRegistration.order` was removed and must not return. A card declares only a single-candidate transform, `candidate -> candidate(s) | null`, plus `cardCostCandidateMandatory`. Optional BGA "can pay instead" transforms naturally retain the original candidate. Mandatory BGA "costs less" or replacement transforms hide rows that can still undergo a mandatory transform after saturation. A fixed-price card is an input-independent optional or mandatory transform; closure deduplication produces one row without any precedence declaration. Discount clamping removes zero-valued resource keys from the candidate resource map. Candidate metadata stores only `sources`, `originalFeeIndex`, and Cost Attribution; sources are an unordered set in the deduplication key. After closure, each resources plus `originalFeeIndex` group keeps one representative row, choosing the fewest sources and then lexical key order, per the ADR 0004 amendment. Once payment is selected, improvement-payment glue writes the metadata to option `sourceCards`, `resource.paid.bonusSources`, and Card Resource Stats. A single-candidate row uses index-zero metadata by default.
 
-**统一管线阶段顺序（固定领域规则，非卡牌偏序）**：基础候选（fee/fees/unitFee + getBaseCosts 动态候选）→ cost-type modifier 的结构化资源删除 → 候选闭包（card-purchase deriveCardCostCandidate / unit-trade 转换）→ action-scope trades 组合枚举 → bonuses（含 capped / choices，必须最后求值，因折扣以最终成本为上界）→ card-provided payment resources 覆盖成本 → cards → 生成可支付方案 → paymentBudget 过滤最终实付资源 → Pareto + 排序。
+**Fixed pipeline order as a domain rule, not a card precedence rule:** base candidates from `fee`, `fees`, `unitFee`, and dynamic `getBaseCosts`; structured resource removal by cost-type modifiers; candidate closure for card-purchase `deriveCardCostCandidate` or unit-trade transforms; action-scoped trade enumeration; bonuses, including capped and choice bonuses, evaluated last because their upper bound is the final cost; card-provided payment resources; cards; affordable-solution generation; `paymentBudget` filtering of final resources paid; then Pareto pruning and sorting.
 
-**两层 condition 评估**（`cost-modifiers.ts`）：
+**Two levels of condition evaluation in `cost-modifiers.ts`:**
 
-- `evaluateStaticConditions(player, conditions)` —— 仅依赖 player 当前状态的静态判定（`houseTypeWood/Clay/Stone`）。
-- `evaluateConditions(player, conditions, nb)` —— 在 static 之上再判定 nb-aware 约束（`minNumRooms`）。enumerate 在生成 payment 分支和 bonus 应用时调用。
-- `getModifiersForCostType(player, costType)` —— 只用 static-only filter（`evaluateStaticConditions`），不再读 `player.rooms`。nb-aware 决策延后到 enumerate，确保 construct 的 `nb=rooms-to-build` 和 renovation 的 `nb=player.rooms` 都能正确驱动 `minNumRooms` gate。
+- `evaluateStaticConditions(player, conditions)` handles conditions that depend only on current player state: `houseTypeWood`, `houseTypeClay`, and `houseTypeStone`.
+- `evaluateConditions(player, conditions, nb)` adds quantity-aware constraints such as `minNumRooms`. Enumeration calls it while generating payment branches and applying bonuses.
+- `getModifiersForCostType(player, costType)` applies only the static filter and no longer reads `player.rooms`. Quantity-aware decisions stay in enumeration so construct's `nb=rooms-to-build` and renovation's `nb=player.rooms` both drive `minNumRooms` correctly.
 
-**`Trade.scope`**：
+**`Trade.scope`:**
 
-| scope | 应用位置 | max 默认 | 典型用例 |
+| Scope | Applied at | Default `max` | Typical use |
 |---|---|---|---|
-| `action` | 玩家资源池（每个 trade 独立到 `max`） | `?? 1` | A028_ForestSchool（lessons cost）、A088_HedgeKeeper（fencing 全部 3 段一次换）、E060_WorkingGloves（grouped exchange，未来加 groupMax）|
-| `unit` | 每个 unit cost row，经候选闭包展开（无顺序字段） | `?? 1`（每个 row）| A123_FrameBuilder（每间房一次 wood-for-clay/stone）、A016_RammedClay（每段 fence clay-for-wood）、C056_FeedFence（至多一座 stable clay-for-wood）|
+| `action` | The player's resource pool; each trade is independent up to `max` | `?? 1` | A028 Forest School for lesson costs; A088 Hedge Keeper replacing all three fence segments once; E060 Working Gloves grouped exchange, with a future `groupMax` if needed |
+| `unit` | Each unit-cost row through candidate closure, without an ordering field | `?? 1` per row | A123 Frame Builder once per room; A016 Rammed Clay once per fence segment; C056 Feed Fence for at most one stable |
 
-scope:'unit' MUST NOT 携带 `conditions.minNumRooms`（per-unit 没有 min-unit 阈值）；`validateTradeModifier` 在 `applyCostModifiers` 入口处强制此不变量。
+A unit-scoped trade **must not** carry `conditions.minNumRooms`; a per-unit trade has no minimum-unit threshold. `validateTradeModifier` enforces this invariant at the `applyCostModifiers` boundary.
 
-**Validation**：
+**Validation:**
 
-- `validateComplexCost(cost)` —— dev 抛错 + prod 降级为 "no affordable solutions"。检查 `nb` 与 `cards` 互斥、`scope:'unit'` trade 必须配合 `nb`。
-- `validateTradeModifier(modifier)` —— 拒绝 scope:'unit' + minNumRooms 组合。
-- `validateBonus(bonus)` —— 恰好一个 `discount` 或 `choices`、`choices` 非空。
-- typed cost payment solution 后处理会丢弃任何 `resourcesPaid` 出现负数的分支；BGA `addCost` alternative 不能表现为“多造资源再退款”的 surplus 组合。
+- `validateComplexCost(cost)` throws in development and degrades to no affordable solutions in production. It rejects costs that combine `nb` with `cards`, and requires a unit-scoped trade to have `nb`.
+- `validateTradeModifier(modifier)` rejects unit scope combined with `minNumRooms`.
+- `validateBonus(bonus)` requires exactly one of `discount` or nonempty `choices`.
+- Typed-cost payment post-processing drops any branch whose `resourcesPaid` contains a negative value. A BGA `addCost` alternative cannot mean producing surplus resources and refunding them.
 
-**Renovation 对齐**（`shared/actions/effects/renovation.ts`）：`buildRenovationPlan` 直接返回 `ComplexCost`（`fees:[{reed:1}], unitFee:{[material]:1}, nb:player.rooms`）。`computeCosts` hook 的 `costs` 通过 `mergeRenovationCost` 落到 `fees[0]`；`trades` / `bonuses` / `paymentResourceProviders` 经 `executionContext.costTrades` / `costBonuses` / `paymentResourceProviders` 追加到本次 payment child。`canAffordTypedFlatCost` / `payTypedFlatCost` / `payTypedFlatCostDetailed`（`typed-flat.ts`）接受 `Partial<Resource> | ComplexCost`，统一走 `computeAllBuyableCombinations` 单管线（之前的 `resolveSimpleTradeAdjustedCost` 已删除）。
+**Renovation alignment in `shared/actions/effects/renovation.ts`.** `buildRenovationPlan` returns `ComplexCost` directly as `{fees:[{reed:1}], unitFee:{[material]:1}, nb:player.rooms}`. A `computeCosts` hook's `costs` merge into `fees[0]` through `mergeRenovationCost`; `trades`, `bonuses`, and `paymentResourceProviders` are appended to this payment child through `executionContext.costTrades`, `costBonuses`, and `paymentResourceProviders`. `canAffordTypedFlatCost`, `payTypedFlatCost`, and `payTypedFlatCostDetailed` in `typed-flat.ts` accept `Partial<Resource> | ComplexCost` and all use the single `computeAllBuyableCombinations` pipeline. The old `resolveSimpleTradeAdjustedCost` path was removed.
 
-D015_ClaySupports clay→reed trade 仅当 `houseTypeClay > 0` 时生效；A123_FrameBuilder 的 construct 拆成两个 `scope:'unit'` TradeModifier（wood→clay / wood→stone），用 `houseTypeClay` / `houseTypeStone` 锁定方向；B145_BrushwoodCollector construct 用 `replaceUpTo` 覆盖 1/2 reed 行。Renovation 的 mandatory 折扣走 `Bonus.optional=false`；B128_Plumber 等 target-sensitive listener 从 `params.selectedOption` 读取本次目标材质后返回 sourced mandatory bonus choices。
+D015 Clay Supports' clay-to-reed trade applies only when `houseTypeClay > 0`. A123 Frame Builder represents construct with two unit-scoped `TradeModifier`s, wood to clay and wood to stone, gated by `houseTypeClay` and `houseTypeStone`. B145 Brushwood Collector uses `replaceUpTo` for one- or two-reed construct rows. Mandatory renovation discounts use `Bonus.optional=false`. Target-sensitive listeners such as B128 Plumber read the selected material from `params.selectedOption` and return sourced mandatory bonus choices.
 
-### 7.5 Hook 系统：行动生命周期 phase（11 个）
+### 7.5 Hook system: 11 action-lifecycle phases
 
-```
-isDoable                 改变行动可执行性
-computeReplace           整张行动替换
-computeCosts             调整成本（围栏折扣 / 卡牌购买折扣等）
-computeArgs              追加 execute() 已返 choice 的额外选项
-computeChoiceCandidates  针对 opt-in getBaseChoiceOptions 注入候选
-computeExchanges         注入运行时 CardExchange
+```text
+isDoable                 change whether an action is executable
+computeReplace           replace an entire action
+computeCosts             adjust costs, including fencing and card-purchase discounts
+computeArgs              add options to a choice returned by execute()
+computeChoiceCandidates  inject candidates into opt-in getBaseChoiceOptions
+computeExchanges         inject runtime CardExchange values
 before / during / immediatelyAfter / after
-anytime                  额外注册的 anytime 行动
+anytime                  register additional anytime actions
 ```
 
-`ActionHookContext { state, player, space, actionId, phase, result?, choice?, doable? }`。`ActionMutationContext` 在执行期额外携带 `eventSink`，action/effect 通过它记录当前事务的 `DraftGameEvent`；`result.extraData` 携执行元数据（如 fence 的 `newPastures` / `newEdges`）。
+`ActionHookContext` is `{ state, player, space, actionId, phase, result?, choice?, doable? }`. During execution, `ActionMutationContext` also carries `eventSink`, through which an action or effect records `DraftGameEvent`s in the current transaction. `result.extraData` carries execution metadata such as fencing's `newPastures` and `newEdges`.
 
-事件事务由 engine 的 `EventStore` 管理：public action / internal leaf 开始时建立 frame，action 成功推进后补齐 `schemaVersion/id/seq/round/phase/visibility` 并提交到 `state.events`，同时追加 `publicEvents.committed` archive packet；失败、取消、rollback 或 optional skip 不追加事件。提交时会按当前 `state.nextEventSeq` 重新定序，避免父 action pending 期间其他子流程先提交事件后产生重复 `seq`。提交前会校验公开性、JSON 安全、大小上限和已知 event type/字段；恢复 pending/engine snapshot 时也会校验事务内事件，避免把未完成 frame 的非法事件写回。
+The engine's `EventStore` owns event transactions. A public action or internal leaf opens a frame. After the action advances successfully, the engine fills in `schemaVersion`, `id`, `seq`, `round`, `phase`, and `visibility`, commits to `state.events`, and appends a `publicEvents.committed` archive packet. Failures, cancellations, rollbacks, and optional skips append no events. Commit resequences against the current `state.nextEventSeq`, preventing duplicate sequences when other subflows commit while a parent action is pending. Before commit, events are checked for public visibility, JSON safety, size limits, and known event types and fields. The same checks run when restoring pending or engine snapshots so an unfinished frame cannot later write an invalid event.
 
-卡牌 listener 通过 `CardListenerContext.transactionEvents` 和 `eventQuery` 读取当前 action frame 的事件。普通 listener 看到的是已经 emit 的当前 frame 事件；`trade-applied` 这类合成 listener 可以读取当前 exchange 的 `DraftGameEvent`，但不能依赖尚未提交的全局 `state.events`。listener handler 优先保持 state-pure flow builder，状态修改通过返回 flow/leaf 进入 engine；少数只写本卡 `cardStates[cardId]` 的 flag listener 可以返回 `void`，trigger-select preview 必须只在克隆 state/player 上执行并用 clone diff 判定该 activation 可选，真实写入只在玩家选择 activation 后发生。
+Card listeners read current-frame events through `CardListenerContext.transactionEvents` and `eventQuery`. Ordinary listeners see events already emitted in the frame. Synthetic listeners such as `trade-applied` can read the exchange's current `DraftGameEvent`, but cannot depend on uncommitted global `state.events`. Listener handlers should be state-pure flow builders: mutations return a flow or leaf to the engine. A small flag listener that writes only its own `cardStates[cardId]` may return `void`. Trigger-select preview must execute only against cloned state and players, using the clone diff to decide whether an activation is selectable; real mutation occurs only after the player selects it.
 
-`place-farmer` 这类 card-granted extra placement 在玩家选择目标 action space 后，会以目标 space id 运行该目标的 `before` listeners，再展开目标 action flow；随后按目标 placement 级联 `after` listeners。这样 A174 这类“放到 extension space 前”的卡牌在普通顶层 action 和 extra placement 路径上共享同一 target-space before 语义。
+After a player selects the target action space for a card-granted placement such as `place-farmer`, the engine runs that target's `before` listeners using the target space ID, expands its action flow, and then cascades target-placement `after` listeners. A card such as A174 that triggers before placement on an extension space therefore sees the same target-space-before semantics in both top-level and extra-placement paths.
 
-**架构决策（2026-05-29）：trailing trigger frame 必须固定在 host action 成功触发时。** `during` / `immediatelyAfter` / `after` 这类 trailing phases 的 listener 可能被编译成稍后执行的 `activate-card` leaf；执行前还可能先跑 `afterHostCommitListeners` / `onBuy` flow，并继续打出职业或改良。为避免 listener handler 在真正执行时读到 later live state，engine 在 host action commit 后、任何 `afterHostCommitListeners` 修改 state 前，捕获一个 trigger frame：当前 `transactionEvents` / `actionEvents`，以及本次 `during` / `immediatelyAfter` / `after` 的 matched card listener set 与顺序。若 host action 经过 deferred continuation，continuation 必须复用这个 trigger frame，不得按 later state 重新匹配 listener 或重排 listener。v1 trigger frame 只约束 card listener，不冻结 action hook results；当前生产路径没有 trailing action hook 注册，后续如有需求再为 action hook 单独扩展。
+**Architecture decision, 2026-05-29: freeze the trailing trigger frame when the host action succeeds.** A `during`, `immediatelyAfter`, or `after` listener may compile into an `activate-card` leaf that executes later. Before it runs, `afterHostCommitListeners` or an `onBuy` flow may play more occupations or improvements. To prevent the listener body from reading that later live state, the engine captures a trigger frame after host-action commit and before any `afterHostCommitListeners` mutation. The frame contains current `transactionEvents` and `actionEvents`, plus the matched card-listener set and order for the three trailing phases. A deferred host continuation must reuse that frame; it must not rematch or reorder listeners against later state. Trigger-frame v1 freezes only card listeners, not action-hook results. No production path currently registers trailing action hooks; extend them separately only when needed.
 
-`CardListenerContext.triggerSnapshot` 保存触发时只读事实，只在 successful action 后的 trailing phases 提供：`during` / `immediatelyAfter` / `after`。`before`、`isDoable`、`computeCosts`、`computeArgs`、`computeChoiceCandidates`、`computeReplace`、`anytime`、`computeExchanges` 不提供 snapshot，继续读取 live state。第一阶段保存每个玩家的 card type 列表快照和由列表长度派生的 count：`occupation`、`minor`、`major`、`improvement`、`played`。列表来源固定为 host action commit 后的现有 card type 语义：`occupation/minor/major` 都使用 `collectCardsAs(player, type)`，`major` 包含 `alsoCountsAs: ['major']` 的已打出 minor；`improvement` 是 `minor` 与 `major` 类型列表的 unique union，`played` 是 `occupation` / `minor` / `major` 类型列表的 unique union，dual-type card 不重复计数。列表顺序沿用 `collectCardsAs`：按 `player.improvements` → `player.minorPlayed` → `player.occupationPlayed` 扫描，unique union 保留第一次出现顺序，不额外排序。`card.played` 事件只用于判断当前 action 是否真的打出了 card 及其类型/id，不用于推导历史数量。snapshot helper 在没有 `triggerSnapshot` 时可 fallback 到 live player，但这只用于直接调用 listener 的单元测试、旧 helper 调用或非 trailing phase 兼容；engine 正常执行 `during` / `immediatelyAfter` / `after` 时必须提供 snapshot。`CardListenerContext.player` / `ownerPlayer` 仍是 live player，用于执行 flow 和写状态；按“第 N 张职业 / 第 N 张改良 / 职业数与改良数是否相等”判断的 listener 必须通过 trigger snapshot helper 读取数量，不能直接读 live `context.player.*Played.length`。`check:card-impl-boundaries` 会守住这个约束：trailing listener 中直接读取 live played-count 报错，非 trailing phase 不受该 snapshot guard 约束；membership 判断如 `context.player.*Played.includes(...)` 不因 snapshot guard 禁止，具体外卡 id 由跨卡 id guard 处理。后续若出现新的触发时事实需求，再扩展 `triggerSnapshot`，不引入完整 `PlayerState` 克隆。
+`CardListenerContext.triggerSnapshot` stores read-only trigger-time facts and exists only in successful-action trailing phases: `during`, `immediatelyAfter`, and `after`. It is absent from `before`, `isDoable`, `computeCosts`, `computeArgs`, `computeChoiceCandidates`, `computeReplace`, `anytime`, and `computeExchanges`, which continue to read live state. The first snapshot version stores each player's `occupation`, `minor`, `major`, `improvement`, and `played` card-type lists plus counts derived from their lengths. The lists use the card-type semantics immediately after host commit. Occupation, minor, and major each use `collectCardsAs(player, type)`; major includes played minors with `alsoCountsAs: ['major']`. Improvement is the unique union of minor and major; played is the unique union of occupation, minor, and major, without double-counting dual-type cards. Ordering follows `collectCardsAs`: `player.improvements`, then `player.minorPlayed`, then `player.occupationPlayed`, preserving first appearance in each union without additional sorting. A `card.played` event establishes whether this action played a card and its type or ID; it does not reconstruct historical counts.
 
-matched card listener set 冻结后，activation 前不重新检查 owner card 是否仍在原 zone。触发资格由 trigger-time 判定；listener body 执行时仍使用 live `ownerPlayer` / `effectPlayer` 承接收益、pending 和状态写入。
+Snapshot helpers may fall back to the live player only for direct-listener unit tests, legacy helper callers, or non-trailing compatibility. Normal engine execution of the three trailing phases must provide a snapshot. `CardListenerContext.player` and `ownerPlayer` remain live so flows and state writes affect the real player. A listener that asks whether this is the Nth occupation or improvement, or whether occupation and improvement counts are equal, must read trigger-snapshot helpers rather than live `context.player.*Played.length`. `check:card-impl-boundaries` enforces this: direct live count reads fail in trailing listeners, while non-trailing phases are not subject to the snapshot guard. Membership checks such as `context.player.*Played.includes(...)` remain allowed by this guard; the cross-card-ID guard handles references to other specific cards. Extend `triggerSnapshot` when a new trigger-time fact is needed instead of cloning all of `PlayerState`.
 
-trigger frame 必须随 trailing `activate-card` node 持久化：`ActivateCardActionParams` 携带 `triggerSnapshot`，`transactionEvents` / `actionEvents` / `triggerSnapshot` 随 node cursor 序列化与恢复。pending 恢复后继续使用 cursor 中的 trigger frame，禁止从恢复后的 live state 重算 snapshot、重新匹配 listener 或重排 listener。该约束必须有 cursor roundtrip 测试覆盖。
+Once the matched listener set is frozen, activation does not recheck whether the owner card remains in its original zone. Trigger-time state determines eligibility; the listener body still uses live `ownerPlayer` and `effectPlayer` for gains, pending interactions, and writes.
 
-卡牌不得用宿主 `onBuy` flow 补偿另一个 trailing listener 的数量判断。E97 这类“onBuy 继续打职业”的卡只表达自己的额外 action；E89 / D42 这类按第几张职业触发的效果必须留在自己的 listener 中，通过 trigger snapshot 读触发时数量。
+The trigger frame persists with its trailing `activate-card` node. `ActivateCardActionParams` carries `triggerSnapshot`; `transactionEvents`, `actionEvents`, and `triggerSnapshot` serialize and restore with the node cursor. After pending restoration, execution must keep the cursor's frame and must not recalculate the snapshot, rematch listeners, or reorder them. Cursor round-trip tests protect this invariant.
 
-`ActionHookResult { doable?, actionId?, extraOptions?, followUpActions?, flow?, costs?, trades?, bonuses?, paymentResourceProviders?, costAttribution?, reserveResources?, sourceCard? }`。`computeCosts` 返回的 `costs` / `trades` / `bonuses` / `paymentResourceProviders` 会通过 `applyComputeCostResults()` 进入本次 `executionContext.costs` / `costTrades` / `costBonuses` / `paymentResourceProviders`；construct / renovation / fencing payment 会把它们附加到 `ComplexCost` 后再枚举。farm-choice commit pass 使用 `collectFarmChoiceCostAdjustments()` 保留 farm-payload-aware `costs` / `trades` / `bonuses` / `paymentResourceProviders` / `costAttribution`，其中 fence settlement 会把 payment adjustment 一并传给 typed payment。`costAttribution` 服务 action-path `computeCosts` 的 Card Resource Stats 归因；listener 声明 source card 与成本 delta，construct / fencing / stables / plow host action 在真实执行后按 before/after 成本差和 clamp 写入 saved / paid。construct 实际产生非零 saved / paid 时，还会把对应 source id 投影到 internal pay 的 candidate metadata，进而写入 `resource.paid.bonusSources` / action detail；它只表示该卡参与了成本变化，不表示整笔 action payment 属于该卡。`reserveResources` 用于让选项级 `isDoable` 声明“本次 payment 结算后仍需保留的真实资源下限”，由 host action 传给 internal `pay` child 过滤 payment solutions；规则事实写入 `GameState.events`，不要再为单卡补日志字段。
+A card must not use its host `onBuy` flow to compensate for another trailing listener's count test. A card such as E97 expresses only its own extra action in `onBuy`. Effects such as E89 or D42 that trigger on the Nth occupation stay in their own listeners and read trigger-time counts from the snapshot.
 
-当前事件覆盖已包括资源主干（collect/gain/pay/exchange）、农场主干（sow/plow/construct/stables/fencing/reap/breed/reorganize）、worker 放置/返家/新生儿、round/work/return-home/harvest phase、action reveal/accumulate、future meeple、legacy action detail 以及 `special-effect` mutation 分支。`state.log` 作为 UI 缓存保留，由事件 mapper 和 session cache writer 派生；业务代码不再通过旧日志字段记录规则事实。
+`ActionHookResult` is `{ doable?, actionId?, extraOptions?, followUpActions?, flow?, costs?, trades?, bonuses?, paymentResourceProviders?, costAttribution?, reserveResources?, sourceCard? }`. `applyComputeCostResults()` carries `computeCosts` values into this execution's `executionContext.costs`, `costTrades`, `costBonuses`, and `paymentResourceProviders`; construct, renovation, and fencing append them to `ComplexCost` before enumeration. The farm-choice commit pass uses `collectFarmChoiceCostAdjustments()` to preserve farm-payload-aware costs, trades, bonuses, payment-resource providers, and cost attribution. Fence settlement passes those adjustments into typed payment as well.
 
-`sourceCard` 兜底：`ActionHookResult.flow` 顶层 `sourceCard` 递归补到缺失 child leaf；组合 pending / leaf request 写入 `PendingEnvelope.sourceCard`，`GameCore` 透传到 `interaction`。
+`costAttribution` attributes action-path `computeCosts` changes to Card Resource Stats. The listener declares the source card and cost delta; after real execution, construct, fencing, stables, and plow write saved and paid amounts from the clamped before-and-after cost difference. When construct records nonzero saved or paid amounts, it also projects the source ID into internal-payment candidate metadata and therefore into `resource.paid.bonusSources` and action detail. This means the card participated in the cost change, not that the card owns the action's entire payment. Option-level `isDoable` can use `reserveResources` to declare a minimum of real resources that must remain after this payment; the host passes it to the internal `pay` child to filter solutions. Rules facts belong in `GameState.events`, not new per-card log fields.
 
-### 7.5.1 Public ActionNode 执行顺序
+Current events cover the resource spine of collect, gain, pay, and exchange; the farm spine of sow, plow, construct, stables, fencing, reap, breed, and reorganize; worker placement, return home, and newborns; round, work, return-home, and harvest phases; action reveal and accumulation; future meeples; legacy action detail; and `special-effect` mutation branches. `state.log` remains a UI cache derived by the event mapper and session cache writer. Business code no longer records rules facts through legacy log fields.
 
-普通 public action leaf 进入 engine 后按以下顺序处理：`computeReplace -> before -> strict isDoable -> computeCosts -> execute -> during -> immediatelyAfter -> after`。
+As a `sourceCard` fallback, a top-level `ActionHookResult.flow.sourceCard` is recursively copied to child leaves that lack it. Compound pending requests and leaf requests write `PendingEnvelope.sourceCard`, and `GameCore` forwards it to `interaction`.
 
-Direct `cancel` 不是 protected atomic action 的成功路径。`plow` / `sow` / `construct` / `stables` / `fence` / `reorganize` / internal `selection` 的 direct `cancel` 会在 option validation、`resolveChoice` 和 hooks 之前被 recoverable reject，pending 保持 active，因此不会触发 `before` / `during` / `immediatelyAfter` / `after`。Optionality 由父级 ActionFlow optional metadata 和 `__skip__` 表达；undo / BGA `actRestart` 类回退走 history rollback。`construct` / `fence` 的 entry doability 必须先排除无 reachable room / 无 legal fence commit 的真实 state，避免 confirm-only pending 没有正常提交路径。`exchange` 与 `bake-bread` 暂按各自 legacy 窗口保留例外语义。
+#### 7.5.1 Public `ActionNode` execution order
 
-1. `computeReplace` 最先运行，早于 `before` / strict `isDoable` / `computeCosts`。`HookDispatcher.applyComputeReplace()` 先跑 action hook replacement，再跑匹配的 card listener `phase='computeReplace'`。
-2. 如果 `computeReplace` 只替换 `actionId`，后续所有阶段都使用替换后的 `actionId` 继续。
-3. 如果 `computeReplace` 返回 `decline + alternativeFlow`，当前 leaf 立即 resolve；engine 在其后插入一个 `xor(replacement branches..., original fallback)`，本轮返回。此时 original action 的 `before` listener 尚未运行。
-4. 玩家选择 replacement 分支后，分支中的每个 leaf 都作为普通 action 重新进入本流水线。replacement 分支 leaf 只携带 `skipComputeReplaceListenerIds` 跳过产生该 replacement 的 listener，不携带 `checkedReplaceAction`，因此真实替代行动仍会触发普通 `before` / `during` / `after` listener。original fallback leaf 携带 `checkedReplaceAction=true`，表示该 root action 已经检查过 replacement。
-5. 没有 decline replacement 后，engine 先执行 `before` card listener dispatch。匹配到的 reaction listener 被编译成 internal `activate-card` leaf，并插入在原 action leaf 前面；同一 card owner / phase 下的多个 reaction listener 默认包成 `ParallelNode(mode='trigger-select')`，由 owner 选择顺序。跨 owner 的同一时机 reaction 会拆成各 owner 自己的 activation/prompt。trigger-select 评估时，结构暂不适用的 child 本轮不显示且不永久 resolve，后续 sibling 执行后会重新评估；结构适用但当前不可支付的 listener 仍显示为 disabled。对没有 `cardIds`、靠 `context.sourceCard` 守卫的全局 listener，activation metadata 会继承本次 event 的 `sourceCard` 作为展示/选择卡牌 id，避免退到 listener id。
-6. 所有 `before` leaf 完成后，原 action leaf 恢复执行；`beforePhaseResolved` 防止同一个 action leaf 第二次插入同一批 before listener。
-7. 然后执行 strict `isDoable`：base `canBeExecutedByPlayer` → costPreview → action hook `isDoable` → card listener `isDoable`。这一步必须读取 `before` 已真实修改后的 state；如果仍不可达，不能继续原 action。
-   `occupation` 的手牌选项构建与 forged choice 校验也会用 `choice=<occupationId>` 跑选项级 `isDoable` card listener；这用于 B93 这类“打出后必须支付 onBuy 最低后续成本”的前置过滤。listener 返回的 `reserveResources` 会继续传入 occupation payment leaf，确保后续必付成本不能被职业付款选项提前花掉。
-8. 然后执行 `computeCosts`，把费用覆盖 / sourced trades / bonus choices / payment resource providers 写入本次 `executionContext.costs` / `costTrades` / `costBonuses` / `paymentResourceProviders`。因此 before unlocker / resource gain / exchange 可以先改变真实 state，再影响后续 strict doable 与费用枚举。
-9. 随后执行 action 本体：`getBaseChoiceOptions` opt-in path 先走 `computeChoiceCandidates`，否则走 `ActionDefinition.execute()`；`resolveChoice` continuation 也按同一条 public action 顺序恢复，先完成 pending 选择，再继续 host internal children / trailing phases。`execute()` 或 `resolveChoice()` 返回 request 时创建 pending；无 request 时继续 `during` / `immediatelyAfter` / `after`。
-10. `during` / `immediatelyAfter` / `after` 是 host action 成功后的 trailing phases；它们的 trigger frame 在 host commit 后立即固定。`beforeHostListeners` settlement 必须先完成，`afterHostCommitListeners` 在 host commit 后、trailing phases 的 activation 真正执行前运行，`afterHostListeners` settlement 则故意保留在 BGA slot 中，等 host `after` 之后再运行。
-11. `activate-card` 是 internal leaf，绕过上述 public action 流水线：只执行指定 listener body，并把 listener 返回的 `flow` / `followUpActions` 交回 engine 插入执行。
+An ordinary public-action leaf enters the engine in this order: `computeReplace -> before -> strict isDoable -> computeCosts -> execute -> during -> immediatelyAfter -> after`.
 
-作用域 scope：`player` / `opponent` / `any`。card listener 匹配层按 listener id 确定性枚举；phase trailing node 构建层再按 owner 分组（global → active player → 其他玩家），每个 owner 组内按卡牌 play order 与匹配序稳定排序，并由该 owner 执行 activation/prompt。reaction listener 默认进入 trigger-select；compute / query listener 仍按确定性顺序聚合，不产生玩家选择。
+Direct `cancel` is not a successful protected-atomic-action path. For `plow`, `sow`, `construct`, `stables`, `fence`, `reorganize`, and internal `selection`, direct cancellation is recoverably rejected before option validation, `resolveChoice`, and hooks. Pending remains active, so none of the four reaction phases runs. The parent `ActionFlow` optional metadata and `__skip__` express optionality; undo and BGA `actRestart`-style reversal use history rollback. Entry doability for construct and fence must reject a real state with no reachable room or no legal fence commit, avoiding a confirm-only pending interaction with no valid commit path. Exchange and bake-bread temporarily retain exceptions for their legacy windows.
 
-Card listener 区域默认只匹配已打出卡：`zones` 省略等价于 `['played']`，扫描 `improvements` / `minorPlayed` / `occupationPlayed`。只有显式声明 `zones: ['hand']` 或 `zones: ['hand', 'played']` 的 listener 才会扫描 `minorHand` / `occupationHand`。匹配结果携带 `ownerCardId` 与 `ownerCardZone`，并通过 `activate-card` params、trigger-select preview、`executeCardListener()` 透传给 handler；handler 不应自行重扫手牌/已打出数组来推断 owner 区域。
+1. `computeReplace` runs first, before `before`, strict `isDoable`, and `computeCosts`. `HookDispatcher.applyComputeReplace()` applies action-hook replacement, then matching card listeners with `phase='computeReplace'`.
+2. If `computeReplace` changes only `actionId`, every later phase continues with the replaced ID.
+3. If it returns `decline + alternativeFlow`, the current leaf resolves immediately. The engine inserts `xor(replacement branches..., original fallback)` after it and returns for this iteration. The original action's `before` listeners have not run.
+4. After the player selects a replacement branch, every branch leaf reenters this normal pipeline. A replacement leaf carries only `skipComputeReplaceListenerIds` to skip the listener that created it. It does not carry `checkedReplaceAction`, so the actual alternative still fires normal `before`, `during`, and `after` listeners. The original fallback carries `checkedReplaceAction=true`, recording that the root action already checked replacement.
+5. With no declined replacement, the engine dispatches `before` card listeners. Matching reaction listeners compile to internal `activate-card` leaves inserted before the original leaf. Multiple reaction listeners for the same card owner and phase normally become `ParallelNode(mode='trigger-select')`, letting that owner choose order. Same-timing reactions owned by different players produce separate activations and prompts for each owner. During trigger-select evaluation, a temporarily structurally inapplicable child is hidden for this iteration but not permanently resolved, so it is reevaluated after a sibling runs. A structurally applicable but currently unaffordable listener remains visible as disabled. For a global listener with no `cardIds` that guards on `context.sourceCard`, activation metadata inherits the event's `sourceCard` as its display and choice card ID instead of falling back to the listener ID.
+6. After all `before` leaves finish, the original action resumes. `beforePhaseResolved` prevents the same leaf from inserting that listener set twice.
+7. Strict `isDoable` then runs base `canBeExecutedByPlayer`, cost preview, action-hook `isDoable`, and card-listener `isDoable`. It must read the state after real `before` mutations. If the action is still unreachable, it cannot continue. Occupation hand-option construction and forged-choice validation also run option-level listeners with `choice=<occupationId>`. This prefilters cards such as B93 whose `onBuy` requires a minimum later payment. A listener's `reserveResources` continues into the occupation payment leaf so the occupation choice cannot spend resources required by that mandatory follow-up.
+8. `computeCosts` writes fee overrides, sourced trades, bonus choices, and payment-resource providers into `executionContext.costs`, `costTrades`, `costBonuses`, and `paymentResourceProviders`. A before-phase unlock, gain, or exchange may therefore change real state before strict doability and cost enumeration.
+9. The action body runs next. An opt-in `getBaseChoiceOptions` path first applies `computeChoiceCandidates`; otherwise it calls `ActionDefinition.execute()`. A `resolveChoice` continuation resumes under the same public-action ordering, completes the pending choice, then continues host internal children and trailing phases. A request from `execute()` or `resolveChoice()` creates pending state; otherwise execution advances to the trailing phases.
+10. `during`, `immediatelyAfter`, and `after` are successful-host-action trailing phases whose trigger frame freezes immediately after host commit. `beforeHostListeners` settlement must finish first. `afterHostCommitListeners` runs after commit but before trailing activations actually execute. `afterHostListeners` settlement intentionally stays in its BGA slot after host `after`.
+11. Internal `activate-card` bypasses this public-action pipeline. It runs only the designated listener body and gives any returned `flow` or `followUpActions` back to the engine for insertion.
 
-手牌 listener 只用于“卡牌存在于手牌时就必须监听历史”的卡牌局部规则。它仍必须遵守 state-pure flow builder 约束：只读当前 transaction events / state，状态更新通过返回 flow 落到本卡 `cardStates[cardId]`。当该卡仍在手牌中时，per-viewer serialization 必须对非 owner 隐藏对应 `cardStates[cardId]`、以该手牌卡为 source 的 public events、由这些事件派生的 log entry、过滤后的 event/archive seq cursor、runtime `publicEventCancellations` 和按手牌 id keyed 的 `cardAvailability`，避免从局部历史或可打出性元数据反推隐藏手牌。禁止为了单卡历史需求新增 `PlayerState.stats` / `GameState` 顶层全局 stat；没有该卡的对局不应为该卡维护额外历史。
+Listener scope is `player`, `opponent`, or `any`. Card-listener matching enumerates deterministically by listener ID. Trailing-node construction then groups by owner in global, active-player, other-player order. Within each owner group it sorts stably by card play order and match order; that owner executes the activation or prompt. Reaction listeners use trigger-select by default. Compute and query listeners still aggregate in deterministic order without a player choice.
 
-### 7.5.2 Pay child 架构不变量
+By default, a card listener matches only played cards. Omitting `zones` is equivalent to `['played']`, scanning `improvements`, `minorPlayed`, and `occupationPlayed`. Only an explicit `zones: ['hand']` or `zones: ['hand', 'played']` scans `minorHand` and `occupationHand`. Matches carry `ownerCardId` and `ownerCardZone` through `activate-card` params, trigger-select preview, and `executeCardListener()`. A handler must not rescan hand and played arrays to infer its owner zone.
 
-`pay` 是 internal settlement child；public host action 负责业务 mutation、事件事实和 completion。不要把业务 mutation 放回 `pay`，也不要用 `seq:[pay, apply-*]` 或顶层 `apply-*` effect 表达同一件事。
+A hand listener is only for a card-local rule that must observe history while the card remains in hand. It still obeys the state-pure flow-builder boundary: it reads current transaction events and state, then returns a flow that writes its own `cardStates[cardId]`. While the card remains hidden in hand, per-viewer serialization must hide its `cardStates[cardId]`, public events sourced from that hand card, derived log entries, filtered event and archive sequence cursors, runtime `publicEventCancellations`, and hand-ID-keyed `cardAvailability` from nonowners. This prevents hidden-hand inference from local history or playability metadata. Do not add a top-level `PlayerState.stats` or `GameState` statistic for one card's history. Games without that card should not maintain its history.
 
-`beforeHostListeners` / `afterHostCommitListeners` / `afterHostListeners` 是 host action 在 BGA pay slot 上的显式差异：
+#### 7.5.2 Pay-child architecture invariants
 
-- `renovation` / `improvement` / `occupation` / `construct` / `fencing` 在 `beforeHostListeners` 或主 action 内先完成 mandatory payment，再进入 trailing effects。
-- `improvement` / `occupation` 的 `onBuy` 使用 `afterHostCommitListeners`：先完成 mandatory payment，再由 host `completeInternalChildren` 提交卡牌，随后触发 onBuy，最后才进入 host `during` / `immediatelyAfter` / `after`。
-- `stables` 使用 `afterHostListeners`，保持 `farm.stableBuilt -> after-stables effects -> resource.paid(stables)`，让 after-stables 卡先看到已建 stable。
-- `fencing` 明确是 `beforeHostListeners`，避免 `A034_Loppers` 这类 after-fencing 效果先于 mandatory fence pay 结算而饿死支付。
+`pay` is an internal settlement child. The public host action owns business mutation, event facts, and completion. Do not move business mutation back into `pay`, and do not model one operation as `seq:[pay, apply-*]` or a top-level `apply-*` effect.
 
-禁止的形态：
+`beforeHostListeners`, `afterHostCommitListeners`, and `afterHostListeners` encode explicit differences in host actions' BGA payment slots:
 
-- `seq:[pay, apply-*]`。
-- 顶层 `apply-*` effect 文件。
-- `PlayerState` payment scratchpad 或跨 action 临时支付槽位。
+- Renovation, improvement, occupation, construct, and fencing complete mandatory payment in `beforeHostListeners` or the main action before trailing effects.
+- Improvement and occupation `onBuy` use `afterHostCommitListeners`: mandatory payment completes, host `completeInternalChildren` commits the card, `onBuy` runs, and only then do host `during`, `immediatelyAfter`, and `after` begin.
+- Stables use `afterHostListeners`, preserving `farm.stableBuilt -> after-stables effects -> resource.paid(stables)` so after-stables cards see the built stable first.
+- Fencing explicitly uses `beforeHostListeners`, preventing an after-fencing effect such as A034 Loppers from consuming resources before mandatory fence payment settles.
 
-`activate-card-effect` 是 internal child，用 `paymentInfoFrom` 从 internal result map 读取 `paymentInfo`，再执行 `onBuy` 等 card-effect hook；阶段 reaction dispatcher 也使用该 child 执行 harvest field / before-end card-effect activation。stage activation 可携带 `ownerPlayerId` / `targetPlayerId` / stage hook metadata，并在 `ParallelNode(mode='trigger-select')` preview 中用 cloned state/player 评估 applicable / doable / mandatory pass。flow-returning handler 返回 flow 即视为可执行；direct-mutation void handler 若在 clone 上产生变更，也视为可执行，但真实 mutation 只在玩家选择该 activation 后落地。choice flow 的真实 max / options 由后续 action leaf 再按 live state 生成或校验。trigger-select pass gate 以 preview 后的结果为准：显式 mandatory 或 enabled non-before non-optional result 会禁用 pass，root `flow.optional === true` 可允许 pass；before-end stage activation 继续以 `beforeEndGameMandatory` 为准，即使该 activation 是 no-flow direct mutation；`before` trigger 继续由原 action continuation 判定 pass 是否可用。`onBuy` 的 `paymentInfo` 路径不读取 stage target metadata。`occupation-gate` 是 no-op internal gate，只给需要先展示/执行其他节点、但 OR 分支可执行性仍必须按 occupation 判断的 flow 使用。卡牌购买的 onBuy / 多卡业务继续留在 card-effect 或 host action completion 中，不要塞回 top-level effect。
+Forbidden shapes are:
 
-`PaymentResourceMap` 覆盖真实资源、supply token 和卡牌提供的虚拟支付资源：`fence` / `stable` 与 `wood` / `food` 一样进入 `cost`、`payLeaf`、payment solver、`resourcesPaid`、`PaymentInfo` 和 `resource.paid`；虚拟支付资源不进入 `cost`，但会在 `PaymentSolution.resourcesPaid` / payment choice label 中以稳定 key 出现。支付 supply token 时只增加 `player.supplyTokensConsumed`，不修改已建 `fenceSegments` / `stableTiles`；所有“还能建多少 fence / stable”的读取必须走 `getOwnOrdinaryFenceBuildLimit()` / `getOwnOrdinaryFenceReserveCount()` / `getAvailableStableSupplyCount()`，不能再使用固定 15 / 4 上限。
+- `seq:[pay, apply-*]`;
+- top-level `apply-*` effect files;
+- a `PlayerState` payment scratchpad or cross-action temporary payment slot.
 
-### 7.6 阶段型 Hook（按触发顺序）
+`activate-card-effect` is an internal child. It reads `paymentInfo` from the internal result map through `paymentInfoFrom`, then runs a card-effect hook such as `onBuy`. Stage reaction dispatchers use the same child for harvest-field and before-end activations. A stage activation may carry `ownerPlayerId`, `targetPlayerId`, and stage-hook metadata. In `ParallelNode(mode='trigger-select')` preview, cloned state and players determine applicability, doability, and mandatory-pass behavior. A handler that returns a flow is executable. A void direct-mutation handler is also executable if it changes the clone, but the real mutation occurs only after the player selects it. Later action leaves generate or validate the real maximum and options for a choice flow against live state.
 
+The trigger-select pass gate uses the previewed result. An explicitly mandatory result, or an enabled non-before nonoptional result, disables pass; root `flow.optional === true` can allow it. A before-end activation continues to use `beforeEndGameMandatory`, including a no-flow direct mutation. A `before` trigger still lets the original action continuation decide whether pass is available. The `onBuy` `paymentInfo` path does not read stage-target metadata. `occupation-gate` is a no-op internal gate for a flow that must first display or execute other nodes while the OR branch remains gated by occupation doability. Card-purchase `onBuy` and multicard business logic stay in the card effect or host-action completion, never a top-level effect.
+
+`PaymentResourceMap` covers real resources, supply tokens, and card-provided virtual payment resources. `fence` and `stable`, like `wood` and `food`, flow through `cost`, `payLeaf`, the payment solver, `resourcesPaid`, `PaymentInfo`, and `resource.paid`. A virtual payment resource does not enter `cost`, but uses a stable key in `PaymentSolution.resourcesPaid` and payment-choice labels. Paying a supply token increments only `player.supplyTokensConsumed`; it does not change built `fenceSegments` or `stableTiles`. Every query for remaining fence or stable capacity must use `getOwnOrdinaryFenceBuildLimit()`, `getOwnOrdinaryFenceReserveCount()`, or `getAvailableStableSupplyCount()` rather than fixed limits of 15 or 4.
+
+### 7.6 Stage hooks in trigger order
+
+```text
+Round start: onBeforeStartOfTurn -> futureMeepleActions -> onRoundStart
+Work:        PlaceFarmer -> atomic actions -> onEndTurn -> allWorkersUsed -> onAllWorkersPlaced
+Return home: onBeforeReturnHome -> onStartReturnHome -> onReturnHome
+Round end:   onRoundEnd -> onAfterRoundEnd
+Harvest in rounds 4/7/9/11/13/14:
+  onBeforeHarvest -> onStartHarvest
+  -> onStartHarvestFieldPhase -> onHarvestFieldPhase -> reap [dispatch 'reap'] -> reap reaction parallel
+    -> onAfterReap -> onEndHarvestFieldPhase
+  -> onStartHarvestFeedingPhase -> onHarvestFeedingPhase
+    -> feed -> onEndHarvestFeedingPhase
+  -> breed -> onEndHarvest -> onAfterHarvest
+Before game end: after round 14 onAfterRoundEnd completes and advances to round 15,
+  onBeforeEndGame -> gameover
 ```
-回合开始: onBeforeStartOfTurn → futureMeepleActions → onRoundStart
-工作:    PlaceFarmer → 各原子行动 → onEndTurn → allWorkersUsed → onAllWorkersPlaced
-回家:    onBeforeReturnHome → onStartReturnHome → onReturnHome
-回合结束: onRoundEnd → onAfterRoundEnd
-收获 (4/7/9/11/13/14):
-  onBeforeHarvest → onStartHarvest
-  → onStartHarvestFieldPhase → onHarvestFieldPhase → reap [dispatch 'reap'] → reap reaction parallel
-    → onAfterReap → onEndHarvestFieldPhase
-  → onStartHarvestFeedingPhase → onHarvestFeedingPhase
-    → feed → onEndHarvestFeedingPhase
-  → breed → onEndHarvest → onAfterHarvest
-终局前:  round 14 的 onAfterRoundEnd 完成并递增到 round 15 后，onBeforeEndGame → gameover
-```
 
-普通 Harvest 收获用 `reap(..., { trigger: { phase: 'harvest' } })` 移除田里作物，事件层统一记录 `reason: 'reap'`。每块田先通过 `computeHarvestCount(state, player, field)` 得到本次普通 reap 要移动的 crop 数量、`sources`、`tags` 和 `scope`；单卡只能通过 `registerHarvestCountModifier(cardId, modifier)` 增减 `delta`、设置 `override`、追加语义 `tags` 或把 `scope` 升为 `field`，不要在 `reap` 主路径添加单卡分支。默认 `top-stack` scope 只收原始顶堆，只有 E73 这类 full-field 能用 `field` scope 跨堆。`HarvestReapSummary.harvestedCrops` 按 field/crop 记录实际收获数量与来源；`HarvestReapSummary.harvestCountApplications` 按 field/crop/scope 记录每次 harvest count 应用的 `count`、`sources`、`tags` 和 `scope`，包括 E112 这类 supply-instead-of-field 的零收获应用。后续卡牌若要判断“本次收获规则实际怎么作用”，必须读取 applications，不要反查外卡 `cardStates`。A112/D72 这类额外收获选择门槛通过 `registerHarvestSelectionThresholdModifier()` / `computeHarvestSelectionThreshold()` 扩展；helper 只接收当前 `state/player/field/sourceCard/baseThreshold`，由注册 modifier 返回更低阈值来源，调用方不读取具体外卡 id。`grainFields` / `vegetableFields` 仍按收获过的田数计数，不按 crop amount 计数。每种 crop 收获后走 `dispatchReapListener(state, player, crop, amount, ..., { trigger, sourceCard })` 派发 `'reap'` 合成事件；listener 返回的 flow 不在 dispatch 阶段执行，而是收集进普通 `parallel` stage flow，全部完成后再进入 `onAfterReap`。
+An ordinary Harvest removes crops with `reap(..., { trigger: { phase: 'harvest' } })`; the event layer records `reason: 'reap'`. For each field, `computeHarvestCount(state, player, field)` first returns the crop amount moved by ordinary reap plus `sources`, `tags`, and `scope`. An individual card may alter `delta`, set `override`, add semantic `tags`, or elevate `scope` to `field` only through `registerHarvestCountModifier(cardId, modifier)`. It must not add a card-specific branch to the main `reap` path. Default `top-stack` scope harvests only the original top stack; only a full-field effect such as E73 uses `field` scope across stacks.
 
-喂食需求通过 `computeHarvestFeedingRequirement(state, player)` 计算，默认公式是 `familySize * 2 - newbornCount`；E30/E159 这类只改变所需食物数量的卡通过 `registerHarvestFeedingRequirementModifier(cardId, modifier)` 扩展公式，不新增 `BeforeFeed` / `AfterFeed` 阶段 hook，也不在喂食主路径写单卡分支。
+`HarvestReapSummary.harvestedCrops` records actual harvested amounts and sources by field and crop. `HarvestReapSummary.harvestCountApplications` records the count, sources, tags, and scope of every harvest-count application by field, crop, and scope, including zero-harvest supply-instead-of-field applications such as E112. A later card that asks how a harvest rule actually applied must read these applications, not inspect another card's `cardStates`. Thresholds for extra-harvest choices such as A112 and D72 extend through `registerHarvestSelectionThresholdModifier()` and `computeHarvestSelectionThreshold()`. The helper receives only current `state`, `player`, `field`, `sourceCard`, and `baseThreshold`; registered modifiers return lower-threshold sources, so callers never read a specific external-card ID. `grainFields` and `vegetableFields` count harvested fields, not crop amount. After each crop, `dispatchReapListener(state, player, crop, amount, ..., { trigger, sourceCard })` emits a synthetic `reap` event. Returned listener flows do not execute during dispatch; they accumulate into an ordinary parallel stage flow, all complete, and then `onAfterReap` begins.
 
-Harvest outcome summary 是本次 Harvest 的事实，不是中间日志缓存。`harvestReapSummary` 在 field phase 累计本次实际 reaped crops；`harvestBreedSummary` 在 breed phase 累计本次实际 newborn animals。两份 summary 必须保留到 `onEndHarvest` / `onAfterHarvest` 全部完成后再清理，供 E134 这类“本次 harvest 后处理”读取实际收获/繁殖结果。不新增 `state.harvestOutcomeSummary` 顶层状态；卡牌通过 `getHarvestOutcome(state, playerId)` 从现有两份 summary 组合读取 outcome。Breed phase 通过 `getBreedThreshold(state, player, animalType, { sourceCard })` 计算每种动物的繁殖阈值，默认 2；helper 只枚举已打出卡的 `CardImpl.effect.computeBreedThreshold`，同一 animal type 多个 modifier 取最小 threshold。需要调整本次 harvest breed 处理顺序的卡牌使用 `CardImpl.effect.computeHarvestBreedOrderPriority(state, player)`，默认 0，数字越大越晚，priority 相同保持 harvest order；该 hook 只作用于 breeding phase。E84 只在 `sourceCard === 'harvest'` 时返回 sheep threshold=1，让 1 sheep + capacity 直接在 harvest breed 中产生 newborn sheep，并写入 `harvestBreedSummary.resources.sheep`。卡牌不得用具体卡牌 id、live animal count 或 virtual resource 推导 newborn 事实；breeding modifier 的影响必须先体现在 `harvestBreedSummary.resources` 中，再由后续卡牌消费。
+`computeHarvestFeedingRequirement(state, player)` calculates feeding need using the default `familySize * 2 - newbornCount`. Cards such as E30 and E159 that change only required food extend the formula through `registerHarvestFeedingRequirementModifier(cardId, modifier)`. They do not add `BeforeFeed` or `AfterFeed` stage hooks or card-specific branches to the feeding path.
 
-`reap` 是可由 ActionFlow/internal 执行的内部 action；私人田地收获通过 `trigger: { phase: 'private-field-phase', cardId: sourceCard }` 进入同一 action，不启动完整 Harvest：先收获普通田，再收获 Card Field，并跳过 Harvest summary 写入；普通田和 Card Field 的 `immediatelyAfter.reap` 反应同样合并成普通 `parallel` flow。
+A Harvest outcome summary is a fact about this Harvest, not an intermediate log cache. `harvestReapSummary` accumulates crops actually reaped in the field phase; `harvestBreedSummary` accumulates newborn animals actually produced in breeding. Both remain until all `onEndHarvest` and `onAfterHarvest` hooks finish, allowing post-Harvest cards such as E134 to read actual results. Do not add top-level `state.harvestOutcomeSummary`; cards compose the existing summaries through `getHarvestOutcome(state, playerId)`.
 
-`onAllWorkersPlaced` 在所有人本轮工人放完且 `performRoundEnd` 之前触发；`place-farmer` 的 `params.fromSupply` 模式可在该阶段把 supply worker 标 active 后立即放置。`place-farmer` 也支持 `actionContext.temporaryFromSupply + temporaryWorkerId` 放置由卡牌保留的 supply worker；该 worker 不标 active、不计 family/housing/feeding/scoring，生命周期由卡牌在 `onReturnHome` 清理。
+During breeding, `getBreedThreshold(state, player, animalType, { sourceCard })` calculates each animal's threshold, defaulting to two. It enumerates only played cards' `CardImpl.effect.computeBreedThreshold`, taking the smallest threshold among modifiers for one animal type. Cards that change this Harvest's player processing order use `CardImpl.effect.computeHarvestBreedOrderPriority(state, player)`, default zero; larger numbers run later and ties preserve Harvest order. This hook affects only breeding. E84 returns a sheep threshold of one only for `sourceCard === 'harvest'`, allowing one sheep plus capacity to produce a newborn directly in Harvest breeding and recording it in `harvestBreedSummary.resources.sheep`. Cards must not infer newborn facts from specific card IDs, live animal counts, or virtual resources. A breeding modifier's effect must first appear in `harvestBreedSummary.resources` before a later card consumes it.
 
-阶段 hook 已可返回 `ActionFlow`（`continueStageHook` / `continueAllWorkersPlacedHooks`），用于"hook 触发子流程"统一走 `EngineStack.push`。`futureMeepleActions` 是 round-start 内部 stage：普通资源到期时先按 player 合并成一个内部 `receive` action transaction，`resource.moved.reason='receive'` 且每个 entry 保留自己的 `sourceCardId`，因此 Receive listener 会触发一次，Gain listener 不会被隐式触发；`FutureMeepleResourceMap.field/stable` 到期后仍由 `applyFutureMeeples` 消费 token，再把 `field` 转成 optional `plow`、`stable` 转成 optional 免费 `stables`。entry 可携带 `actionContext`，用于 D91 这类付费 plow。该 stage 完成后继续普通 `onRoundStart`，不重复 round-start 初始化。Harvest field 三个阶段 hook（`onStartHarvestFieldPhase` / `onHarvestFieldPhase` / `onEndHarvestFieldPhase`）按玩家顺序进入；每个玩家进入该 hook 时先把该玩家全部可触发 card-effect 编译成 `activate-card-effect` activation，再以 `ParallelNode(mode='trigger-select')` 交给 engine；普通 `reap` 仍在 `onHarvestFieldPhase` reactions 完成后发生。`onBeforePlayerTurn` 是 non-flow skip-control exception：只在 labor turn 入口同步返回 `{ skipTurn?: true } | void`，不返回 `ActionFlow`、不走 `continueStageHook`、不产生 pending。`onBeforeEndGame?: FlowEffectHandler` 是终局计分前的阶段 hook：round 14 结束后启动 Before-End Player Dispatch，按 target player 座次构造 `activate-card-effect` activation。默认 `beforeEndGameScope='owner'`；`beforeEndGameScope='allPlayers'` 的已打出卡可在每个 target step 触发，`handHooks` 不支持 `onBeforeEndGame`；同一 target step 内多个 activation 默认进入 trigger-select，`beforeEndGameMandatory` 决定 pass gate。hook flow 可以产生 pending，并通过 `stageResume.hook='onBeforeEndGame'` 恢复到下一个 target player；全部完成后才写入 `gameOver` 并进入 `gameover` interaction。
+`reap` is an internal action executable by `ActionFlow`. A private-field harvest enters the same action through `trigger: { phase: 'private-field-phase', cardId: sourceCard }` without starting a complete Harvest: it reaps ordinary fields, then Card Fields, and omits Harvest-summary writes. `immediatelyAfter.reap` reactions from ordinary fields and Card Fields still combine into one ordinary parallel flow.
 
-阶段 hook 子流程产生 privateEvents 时，嵌套 `respond()` 不得提前 drain 外层 response buffer；`stageResume` 恢复阶段需要把私有事件保留到最外层响应统一发送。
+`onAllWorkersPlaced` runs after every player has placed all workers but before `performRoundEnd`. At this stage, `place-farmer` with `params.fromSupply` can activate a supply worker and place it immediately. It also accepts `actionContext.temporaryFromSupply + temporaryWorkerId` for a supply worker held by a card. That worker is not marked active and does not count toward family, housing, feeding, or scoring; the card clears its lifecycle in `onReturnHome`.
 
-阶段 hook 子流程可能移除正在结算的卡牌（例如传牌）。`stageResume` 除 numeric `cardIndex` 外还保存 `resumeAfterCardId`；恢复时若该卡仍在 played-card 列表中，从它之后继续，若已被移除，则从旧 index 前一位继续，避免跳过原本紧随其后的同阶段 hook。
+Stage hooks can return `ActionFlow`; `continueStageHook` and `continueAllWorkersPlacedHooks` route every hook-created subflow through `EngineStack.push`. `futureMeepleActions` is an internal round-start stage. When ordinary resources mature, it groups them per player into one internal `receive` transaction with `resource.moved.reason='receive'`, preserving each entry's `sourceCardId`. Receive listeners therefore fire once, and Gain listeners do not fire implicitly. When `FutureMeepleResourceMap.field` or `.stable` matures, `applyFutureMeeples` consumes its token, then turns `field` into optional `plow` and `stable` into optional free `stables`. An entry may carry `actionContext`, for paid-plow cases such as D91. Normal `onRoundStart` follows without repeating round-start initialization.
 
-未来回合的一次性 optional offer 不应塞进 `futureMeeples` 资源 token。`scheduled-offer` internal action 读取 `player.cardStates[cardId].extraData.scheduledOffers`，offer 记录 `dueRound`、`kind`、cost、目标 special action 或 animal、`consumed` / `consumedRound`；`onRoundStart` 通过 `scheduledOffersRoundStartFlow()` 把到期 offer 交给 engine。执行时先消费 token，再按当前状态决定是否弹 choice；拒绝、资源不足或目标不可执行都不会保留 token。M056 通过该 action 复用 Cut Peat special action card 的可用性、费用、market / opponent face-up 和翻面规则；M131 通过同一模型购买预约动物后显式进入 `reorganize`。
+The three Harvest-field stage hooks run in player order. On entry for each player, every triggerable card effect compiles into an `activate-card-effect` activation and enters `ParallelNode(mode='trigger-select')`. Ordinary `reap` still occurs after `onHarvestFieldPhase` reactions finish. `onBeforePlayerTurn` is the non-flow skip-control exception: it synchronously returns `{ skipTurn?: true } | void` at labor-turn entry, never returns `ActionFlow`, never enters `continueStageHook`, and cannot create pending state.
 
-### 7.7 Listener activation purity + BGA 对齐
+`onBeforeEndGame?: FlowEffectHandler` is the stage hook before final scoring. After round 14, Before-End Player Dispatch creates `activate-card-effect` activations in target-player seating order. Default `beforeEndGameScope` is `owner`; a played card with `allPlayers` can run in every target step. `handHooks` do not support `onBeforeEndGame`. Multiple activations for one target normally enter trigger-select, and `beforeEndGameMandatory` determines the pass gate. The hook flow may create pending state and resumes at the next target through `stageResume.hook='onBeforeEndGame'`. Only after all targets complete does the engine set `gameOver` and enter the `gameover` interaction.
 
-**架构决策（2026-05-13）：`CardListenerRegistration.handler` 在 listener dispatch / preview / doable 路径中必须是 state-pure flow builder。** 它可以读取 `GameState` / `PlayerState` / event，返回 `ActionHookResult`、`ActionFlow`、`costs`、`doable`、`extraOptions` 等结构化结果；不能直接修改 `GameState`、`PlayerState`、`ActionSpace`、`player.cardStates`、资源、农场格、日志或 pending。
+When a stage-hook subflow produces private events, nested `respond()` calls must not drain the outer response buffer early. A `stageResume` continuation preserves private events until the outermost response sends them together.
 
-当前 no-peek worktree 已把 `buildPhaseTrailingNodes` 改为不执行 handler；这只是 Phase 1 安全切口。后续设计不能再依赖 dispatch-time handler peek 或一次性 `preComputedResult`。
+A stage-hook subflow may remove the card currently being resolved, for example by passing it. In addition to numeric `cardIndex`, `stageResume` stores `resumeAfterCardId`. On restoration, it continues after that card if it remains in the played-card list; if the card was removed, it resumes from one position before the old index so it does not skip the next card's same-stage hook.
 
-BGA 参考语义：
+A one-time optional offer in a future round does not belong in a `futureMeeples` resource token. The internal `scheduled-offer` action reads `player.cardStates[cardId].extraData.scheduledOffers`. An offer records `dueRound`, `kind`, cost, its target special action or animal, and `consumed` or `consumedRound`. `onRoundStart` passes due offers to the engine through `scheduledOffersRoundStartFlow()`. Execution consumes the token first, then decides from current state whether to prompt. Declining, lacking resources, or having an unavailable target never preserves the token. M056 reuses the Cut Peat special-action card's availability, cost, market or opponent face-up state, and flip rules through this action. M131 uses the same model to buy a reserved animal, then explicitly enters `reorganize`.
 
-- `PlayerCards::getReaction($event)` 只收集 listening cards 并生成 `ACTIVATE_CARD` leaf，不执行卡牌 listener body。
-- `ActivateCard::getFlow()` 在 leaf 真正推进时调用卡牌方法得到 flow；`isDoable()` / `isIndependent()` / `getDescription()` 也可能重建 flow，因此 listener 方法必须可重复调用且无副作用。
-- 真正的状态修改放在 action / `SPECIAL_EFFECT` leaf 里执行，而不是放在 reaction 构建阶段。
+### 7.7 Listener activation purity and BGA alignment
 
-OA 对齐规则：
+**Architecture decision, 2026-05-13: `CardListenerRegistration.handler` must be a state-pure flow builder on listener-dispatch, preview, and doability paths.** It may read `GameState`, `PlayerState`, and events and return structured values such as `ActionHookResult`, `ActionFlow`, costs, doability, or extra options. It must not directly mutate `GameState`, `PlayerState`, `ActionSpace`, `player.cardStates`, resources, farmyard spaces, logs, or pending state.
 
-- 需要改资源、动物、农场、`cardStates` 或 log 的 listener，必须返回 leaf / seq flow，让 `gain`、`pay`、`special-effect`、`exchange` 等 action 执行状态修改。
-- 如果缺通用 mutation leaf，新增可复用 internal action；不要在单卡 handler 内直接 mutate，也不要在核心路径加单卡分支。
-- `effect.onBuy` 等非-listener 执行路径可保留现状；但一旦被 listener / preview / doable 复用，也必须遵守 state-pure flow builder 语义。
-- stage card-effect handler 在 trigger-select preview 中用 cloned state/player 运行；返回 flow 或 clone 上可检测的 direct mutation 都可用于 applicable / doable 判定，纯资源 preview 读取该 activation 的执行玩家资源与 supply token，真实 mutation 只能在 activation leaf 被选择后落地。
-- dispatch 阶段不得通过执行 handler 来制造一次性 `preComputedResult` 语义；可以收集 registration metadata、构造 activation leaf、或做纯 `isDoable` / preview 查询。
-- listener activation 是普通 internal leaf：`leaf actionId='activate-card'`，params 携 `{ listenerId, cardId, event, ownerPlayerId, triggerPlayerId }`。`event.actionContext` 必须保留触发 leaf 的 target context，尤其是 card-granted placement / jump / wrapper action 写入的 `targetSpaceId`，避免 listener 在执行时回落到外层 frame space。它 bypass public action pipeline，不跑普通 action hooks / cost / generic log；listener 返回的 `flow` / `followUpActions` 仍回到 engine 统一执行。
-- owner 与 trigger player 必须显式进入 event / params。opponent scope 触发时，activation 以 owner 为执行玩家；跨玩家 UI 确认和 undo boundary 由 runtime 处理，目标上不暴露为卡牌 flow primitive。
-- `confirm-player-switch` 确认后必须立刻写入 undo boundary。目标玩家刚进入跨玩家 prompt 时，`allowedCommands` 不暴露 `undoStep` / `undoAction`，`SessionResponse.historyLength` / `hasActionStartSnapshot` 表示当前可执行的 undo 能力，而不是内部 raw history。目标玩家后续作出选择后，undo 最多回到切换后的 prompt，不能跨回触发玩家的行动状态。
+The no-peek worktree changed `buildPhaseTrailingNodes` so it does not execute handlers. That was only the Phase 1 safety boundary. Later design must not depend on dispatch-time handler peeking or a one-shot `preComputedResult`.
 
-**2026-05-13 Wave 1 落地规则：listener handler 不再承担"先改状态再返回 flow"的桥接职责。** 对于本轮已迁移的 B48 / E103 / C148 / A144 / D82 / D27，handler 只读取当前状态并返回可重放 flow 或纯查询结果：
+BGA reference semantics are:
 
-- 卡上计数、flag、infobox、stack pop、major swap 等状态修改统一走 `special-effect` leaf；本轮补齐 `set-counter`、`pop-card-stack-top`、`swap-improvement-with-board`。
-- 跨玩家奖励用 `gain` leaf 的 `recipientPlayerId` / `payerId`，不要在 handler 内直接改 trigger player 资源。
-- optional accept/decline 语义必须由 flow 表达。典型例子：D27 Retraining 先执行 `set-flag false`，再把 `swap-improvement-with-board` 放入 optional child；decline 只清 flag，不预留 / 回滚公共 major 池。
-- 只影响可达性或费用的 listener 应返回纯 `doable` / `costs` / `bonuses`。典型例子：D82 Hunting Trophy 通过 `space.id` scoped `isDoable` + `computeCosts` 建模 farm/house redevelopment，不再用 before/after flag 或 `activeModifiers` 临时桥。
+- `PlayerCards::getReaction($event)` only collects listening cards and creates `ACTIVATE_CARD` leaves; it does not execute card-listener bodies.
+- `ActivateCard::getFlow()` invokes the card method when the leaf actually advances. `isDoable()`, `isIndependent()`, and `getDescription()` may also rebuild the flow, so a listener method must be repeatable and side-effect free.
+- Real state mutation occurs in an action or `SPECIAL_EFFECT` leaf, never while constructing a reaction.
 
-**2026-05-13 Wave2a 合成 dispatch 边界：`trade-applied` / `harvest-feed-conversion` / `future-meeple-resolved` 这类没有完整 engine 的 listener dispatch，只通过 immediate-special-effect helper 执行确定性的状态同步叶子。** 该 helper 只遍历非 optional 的 `special-effect` leaf，以及确定性的 `seq` / `parallel` flow；刻意跳过 `gain`、`pay`、interactive、optional、`or` / `xor`、跨 owner targeted flow。需要更丰富合成 listener 效果时，必须接入真实 engine flow 路径，而不是扩展这个 helper；这样 Wave2a 的 cardState-only 合成 listener 能保持 pure handler，同时不重新引入 dispatch-time handler mutation。`reap` 已接入真实 engine flow 路径，由 Harvest / `reap` private trigger 收集 listener flow 并推进普通 `parallel`；round-start future resource entries 也已接入真实 `receive` action 路径；`harvest-feed-conversion` 只把已提交的 `harvest.feedConverted` 事件放进 listener `transactionEvents`，不合成 `resource.exchanged`；`future-meeple-resolved` 只把已提交的 `futureMeeple.resolved` 事件按目标玩家分组放进 listener `transactionEvents`。这些 synthetic dispatch 都不包含任何单卡分支。
+OA alignment rules are:
 
-**2026-05-13 Wave2b/c 落地规则：listener 内的 cardState / structural mutation 也必须通过 action leaf 执行。** 本轮把 A68 / A73 / A92 / B18 / B34 / B76 / C48 / C53 / C88 / C93 / C130 / C150 / D36 / D56 / D74 / D158 / E53 / E74 / E85 / E148 的剩余 handler mutation 迁出：
+- A listener that changes resources, animals, the farm, `cardStates`, or logs must return a leaf or sequential flow so an action such as `gain`, `pay`, `special-effect`, or `exchange` performs the mutation.
+- If no generic mutation leaf exists, add a reusable internal action. Do not mutate inside a single-card handler or add a single-card branch to a core path.
+- Nonlistener execution such as `effect.onBuy` may keep its current form, but must become a state-pure flow builder if listener, preview, or doability code reuses it.
+- Stage card-effect handlers execute against cloned state and players during trigger-select preview. A returned flow or detectable clone mutation can establish applicability and doability. Pure resource preview reads the activation player's resources and supply tokens. Real mutation occurs only after the activation leaf is selected.
+- Dispatch must not execute a handler to manufacture one-shot `preComputedResult` semantics. It may collect registration metadata, build activation leaves, and issue pure doability or preview queries.
+- A listener activation is an ordinary internal leaf: `actionId='activate-card'`, with `{ listenerId, cardId, event, ownerPlayerId, triggerPlayerId }` in params. `event.actionContext` must preserve the triggering leaf's target context, especially `targetSpaceId` written by card-granted placement, jump, or wrapper actions. Otherwise execution could fall back to the outer frame's space. The activation bypasses the public-action pipeline and does not run ordinary action hooks, costs, or generic logging. Returned `flow` or `followUpActions` goes back to the engine.
+- Owner and trigger player must be explicit in events and params. An opponent-scoped activation executes as the owner. Runtime owns cross-player confirmation and undo boundaries; they are not exposed to cards as flow primitives.
+- Confirmation of `confirm-player-switch` must immediately create an undo boundary. When the target player first enters the cross-player prompt, `allowedCommands` does not expose `undoStep` or `undoAction`. `SessionResponse.historyLength` and `hasActionStartSnapshot` describe currently executable undo, not raw internal history. After the target chooses, undo can go back only to the post-switch prompt and never across the triggering player's action state.
 
-- `special-effect` 扩展为 listener-purity 的通用 mutation dispatcher：`clear-pending-fence-bonus`、`consume-pending-extra-turns`、`remove-future-meeples`、`promote-first-newborn`、`add-resource-to-space`、`build-stable-on-first-empty-tile`、`record-scoring-reserve-bonus`、`add-farmyard-space-state`、`claim-farmyard-goods-tokens`、`claim-field-goods-tokens`、`grow-field-and-non-field-crops`、`consume-supply-token`。`record-scoring-reserve-bonus` 只记录终局 Scoring Reserve 与 bonus VP，不扣真实资源；target 由 server-side `actionContext.targetPlayerId` 解析，reserved 只校验非负整数 real resource 与不超过 `target.resources - 已选 Scoring Reserve`。shared scoring 卡牌可随该记录写入 `cardType`，让非持卡 target player 的 score entry 仍保留来源卡牌归类。
-- B18 这类 future-meeple 写入走 lazy flow；after-pay listener 不再立即 queue。
-- C93 / C130 对 action space 的资源写入返回 `special-effect.add-resource-to-space`，额外放人仍保持 optional。
-- E148 opponent-scope listener 用 owner-targeted `special-effect` 更新 reserved action spaces / stable；"无空地但需要移除 marker" 这种无收益状态同步可返回 `countCardUse: false`，避免把纯清理计入卡牌 used stats。
-- `countCardUse: false` 只用于 listener 结果需要执行 housekeeping flow、但不应被视为卡牌效果触发的场景；不要用它隐藏真实收益或玩家选择。
+**Wave 1 rule, 2026-05-13: a listener handler no longer bridges "mutate first, then return a flow."** For the migrated B48, E103, C148, A144, D82, and D27 cards, a handler only reads current state and returns a replayable flow or pure query:
 
-**多 reaction 同 phase 触发**采用 BGA-style PARALLEL trigger selection：
+- Counters, flags, infobox state, stack pops, and major-improvement swaps use `special-effect` leaves. This wave added `set-counter`, `pop-card-stack-top`, and `swap-improvement-with-board`.
+- Cross-player rewards use `gain.recipientPlayerId` or `payerId`; handlers do not mutate the trigger player's resources.
+- Flow expresses optional accept or decline. D27 Retraining first performs `set-flag false`, then places `swap-improvement-with-board` in an optional child. Declining only clears the flag and neither reserves nor rolls back the public major-improvement pool.
+- A listener that affects only reachability or cost returns pure `doable`, `costs`, or `bonuses`. D82 Hunting Trophy models farm or house redevelopment through a space-ID-scoped `isDoable` and `computeCosts`, without before-or-after flags or a temporary `activeModifiers` bridge.
 
-- action reaction listener、harvest field stage card-effect、before-end card-effect 在同一 owner / phase 下默认进入 `ParallelNode(mode='trigger-select')`。不同 owner 的同一时机 reaction 拆成各自 owner 的 activation/prompt；单 child 可直接展开以减少 UI 噪音；compute / query hook 保持确定性聚合。
-- 不翻转 `mandatory` 默认值；`mandatory: true` 只影响 `ParallelNode(mode='trigger-select')`：当前结构适用且可执行的 mandatory child 会让 `__pass__` disabled，避免 guaranteed effect 被静默跳过。结构暂不适用的 child 本轮不显示且不永久 resolve，后续 sibling 改变资源/状态后会重新评估；当前结构适用但暂时不可支付的 child 仍展示为 disabled，让玩家知道 trigger 存在。
-- 多个 optional / interactive trigger 同时可用时，必须显式给卡主玩家选择触发顺序，并允许 pass 跳过剩余 optional trigger。自动 flow 不再在 dispatcher 里与交互 flow 分开排序；是否可继续由 trigger-select preview 与真实 action leaf 校验共同决定。select-trigger option 默认以卡牌 id 作为 `value`；当同一层出现重复 `sourceCard`（同一张卡多个 listener child）时，`value` 改用 activation node id，`sourceCard` 仍保留展示用卡牌 id。
-- generic `ParallelNode` 负责 select/pass/mandatory/independent 语义；不再引入 listener-trigger 专用 runtime node。
-- `trigger-select` preview 支持 card listener `activate-card`、stage card-effect `activate-card-effect` 和 extra-turn provider `activate-extra-turn` child。card listener child 与 stage card-effect child 都按 child owner / target player 建立 preview state/player，纯资源 flow preview 使用该执行玩家的资源与 fence/stable supply token；select-trigger pending 会保留原 host action 的 `targetSpaceId`，确保 activation 执行时 listener 仍看到触发行动格。stage card-effect child 在 cloned state/player 上运行 live hook，返回 flow 或产生 clone mutation 即 applicable/doable，并据此更新 pass disabled 状态。one-shot extra-turn provider 若到真实 activation 时已不再贡献 flow，会 fail 而不是静默消费 provider prompt。
-- 不为 `CardListenerRegistration` 引入 / 复活 `order` 排序字段；fallback 稳定顺序来自 `playOrderIndex`（occupation < minor < improvement，数组 index），只服务单 child 展开、显示和确定性序列化。需要玩家选择时用 parallel trigger selection 显式化。
+**Wave 2a synthetic-dispatch boundary, 2026-05-13:** listener dispatch without a full engine, such as `trade-applied`, `harvest-feed-conversion`, or `future-meeple-resolved`, executes only deterministic state-synchronization leaves through the immediate-special-effect helper. The helper traverses nonoptional `special-effect` leaves and deterministic sequential or parallel flows. It deliberately skips `gain`, `pay`, interactive and optional flows, `or`, `xor`, and cross-owner targeted flows. A richer synthetic-listener effect must enter a real engine-flow path, not expand this helper. This keeps Wave 2a card-state-only synthetic listeners pure without restoring dispatch-time mutation.
 
-**2026-05-14 bake / trigger-select rule:** `bake-bread` is non-empty by default. Optional bake opportunities must be expressed by outer `optional` flow metadata. `ParallelNode(mode='trigger-select')` displays structurally applicable trigger options, including currently unaffordable options as disabled; disabled choices are server-rejected and remain unresolved. For before-action trigger-select, `__pass__` is disabled only when skipping remaining triggers would leave the action continuation impossible and at least one currently enabled trigger can make the action layer prove the continuation directly complete or reachable through the remaining select before-chain. Pure resource flows pass previewed resources into the continuation guard; non-resource flows ask the same guard with the current resource context, so cards such as D17 / C60 can express reachability through scoped `isDoable` listeners instead of engine-side simulation. The engine asks generic continuation guards and does not import bake-bread / D66 / oven rules; bake-specific direct continuation and before-chain reachability live in the action/card layer. Compact structured choice values such as `bulk:` are allowed through `InteractionRequest.kind === 'choice'` metadata (`structuredChoicePrefixes`), not by engine action-id special cases.
+`reap` now uses a real engine-flow path: Harvest and private `reap` triggers collect listener flows and advance an ordinary parallel node. Round-start future-resource entries likewise use a real `receive` action. `harvest-feed-conversion` only places committed `harvest.feedConverted` events in listener `transactionEvents`; it does not synthesize `resource.exchanged`. `future-meeple-resolved` groups committed `futureMeeple.resolved` events by target player into listener `transactionEvents`. None of these synthetic dispatchers contains card-specific branches.
 
-**2026-05-15 replacement-aware trigger pass:** before-action trigger-select 的 pass gate 不能只看 base action `canBeExecutedByPlayer`，也不能套完整 `applyIsDoable`，否则会把同批 before unlocker 自己当成可跳过依据。当前规则是：先用 `skipBeforeTriggers=true` 检查原 action 是否能直接继续；失败时只允许通用 `computeReplace` fallback 参与 continuation 判断，并在可启动性预览里用 `checkedReplaceAction=true` 避免 replacement 递归。这覆盖 B26 Agrarian Fences 这类"跳过 D66 后仍可继续 fencing replacement"的路径，同时不在 engine 中硬编码卡牌 id。`computeReplace` decline 返回的 alternative flow 如果顶层是 `xor`，引擎会展开其 children 作为 replacement 分支，再追加 original action 分支；运行时 replacement 分支 leaf 不携带 `checkedReplaceAction`，只携带 `skipComputeReplaceListenerIds` 来跳过产生该 replacement 的 listener，因此真实替代分支里的 sow / bake 仍能触发普通 before / after listener。original fallback 分支继续携带 `checkedReplaceAction=true`，保持旧的"已检查 replacement"语义。
+**Wave 2b/c rule, 2026-05-13: card-state and structural mutation inside listeners must also execute through action leaves.** Remaining handler mutations for A68, A73, A92, B18, B34, B76, C48, C53, C88, C93, C130, C150, D36, D56, D74, D158, E53, E74, E85, and E148 were moved out:
 
-**2026-05-22 before-reachability 决策：** 多个同一时机的 `before` listener 不是 availability 阶段可静态排序或预览的链路；它们属于真实 trigger 流程，顺序由玩家通过 `ParallelNode(mode='trigger-select')` 执行。卡牌如果能让原本不可达的 action 先进入 before 流程，应通过 scoped `isDoable` listener 返回 `doable: true` 表达启动 opt-in，并在 `actionContext.skipBeforeTriggers === true` 的 continuation 中退出。所有 before listener 和它们触发的 after / exchange / optional 分支真实执行完以后，原 action leaf 必须用真实 state 重新做 strict doable 检查；如果仍不可达，不能继续原 action，只能走现有 blocked / undo-only 语义。不要为 before-grant reachability 添加单卡 payment preview，也不要在 dispatcher 中枚举 before listener 顺序或静态模拟资源 / 转换链。参考模型是 C60 Small Potter's Oven / D66 Potter Ceramics / `STUB_BeforeBakeGainClay`：先让 action 进入 trigger-select，玩家按真实顺序执行 unlocker，剩余 trigger 与 pass gate 基于新状态重算，最终 continuation 再严格检查。
+- `special-effect` became the generic listener-purity mutation dispatcher, adding `clear-pending-fence-bonus`, `consume-pending-extra-turns`, `remove-future-meeples`, `promote-first-newborn`, `add-resource-to-space`, `build-stable-on-first-empty-tile`, `record-scoring-reserve-bonus`, `add-farmyard-space-state`, `claim-farmyard-goods-tokens`, `claim-field-goods-tokens`, `grow-field-and-non-field-crops`, and `consume-supply-token`. `record-scoring-reserve-bonus` records only final Scoring Reserve and bonus VP; it does not deduct real resources. Server-side `actionContext.targetPlayerId` resolves the target, and `reserved` must contain nonnegative integers for real resources no greater than `target.resources - existing Scoring Reserve`. Shared-scoring cards may store `cardType` with the record so a target who does not own the source card still retains its category in the score entry.
+- Future-meeple writes such as B18 use lazy flows. An after-pay listener no longer queues them immediately.
+- C93 and C130 write action-space resources through `special-effect.add-resource-to-space`; extra placement remains optional.
+- E148's opponent-scoped listener updates reserved action spaces or stables with an owner-targeted `special-effect`. A no-benefit synchronization such as removing a marker when no empty space exists may return `countCardUse: false`, avoiding a false card-use statistic.
+- `countCardUse: false` is only for housekeeping flow that should not count as an effect firing. It must never conceal a real benefit or player choice.
 
-### 7.8 farm-type 提交
+**Multiple reactions in one phase use BGA-style parallel trigger selection:**
 
-5 种 farmType 全在各自 ActionDef.resolveChoice 内闭环（`shared/actions/effects/`）：
+- Action-reaction listeners, Harvest-field stage card effects, and before-end card effects for one owner and phase normally enter `ParallelNode(mode='trigger-select')`. Same-timing reactions for different owners become separate owner prompts. A single child may expand directly to reduce UI noise. Compute and query hooks continue to aggregate deterministically.
+- Do not invert the default for `mandatory`. `mandatory: true` affects only trigger-select: a structurally applicable and executable mandatory child disables `__pass__`, preventing a guaranteed effect from being silently skipped. A temporarily structurally inapplicable child is hidden for this iteration without being resolved and is reevaluated after siblings change state. A structurally applicable but temporarily unaffordable child remains visible as disabled.
+- If multiple optional or interactive triggers are available, the card owner explicitly chooses their order and may pass over the remaining optional triggers. The dispatcher no longer sorts automatic flows separately from interactive flows. Trigger-select preview and real action-leaf validation jointly decide whether execution can continue. A select-trigger option normally uses the card ID as `value`; if siblings repeat the same `sourceCard`, because one card has multiple listener children, `value` becomes the activation-node ID while `sourceCard` remains the display ID.
+- Generic `ParallelNode` owns select, pass, mandatory, and independent semantics. There is no listener-specific runtime node.
+- Trigger-select preview supports card-listener `activate-card`, stage-card-effect `activate-card-effect`, and extra-turn-provider `activate-extra-turn` children. Card-listener and stage-card-effect children create preview state and players for the child owner or target. Pure resource-flow preview uses that execution player's resources and fence or stable supply tokens. Select-trigger pending state preserves the host action's `targetSpaceId`, so the listener still sees the triggering space during activation. A stage-card-effect child executes the live hook against cloned state and players; a returned flow or clone mutation establishes applicability and doability and updates pass-disabled state. If a one-shot extra-turn provider no longer contributes a flow at real activation time, it fails instead of silently consuming the provider prompt.
+- Do not add or revive an `order` field on `CardListenerRegistration`. Stable fallback ordering comes from `playOrderIndex`, with occupation before minor before improvement and array index within each. It serves only single-child expansion, display, and deterministic serialization. Use parallel trigger selection when the player must choose.
 
-- **room** (`construct.ts`)：`room-payment.ts` 展开"每间房"费用变体，并把本次 `computeCosts` 的 `costTrades` / `costBonuses` / `paymentResourceProviders` 附加到 construct `ComplexCost`；farm selection 的 `maxSelections` 也使用同一 adjusted construct cost。多解时二轮 `pay:room:*` prompt finalize；doability 同时检查支付上限和 reachable room selection；direct cancel 由通用 protected-action guard 拒绝。
-- **stable / plow** (`stables.ts` / `plow.ts`)：typed flat payment 解析。
-- **fence** (`fencing.ts`)：校验选边/来源/连通/封闭区域，得 `newEdges` 后计算 wood（考虑 `freeFences` / `extraWood` / fence-cost-unification 的 farm-choice computeCosts Pass #2），并把该 pass 的 trades/bonuses/paymentResourceProviders/paymentBudget 传入 `pay:fence:*` payment；多解 `pay:fence:*` 二轮 prompt。
-- **sow** (`sow.ts`)：validate + finalize（无 payment combo），含 extra-field card effect（`getPermittedExtraSowableFields` + `handleSowExtraField`）。
+**Bake and trigger-select rule, 2026-05-14.** `bake-bread` is nonempty by default. An optional bake opportunity must use outer optional flow metadata. `ParallelNode(mode='trigger-select')` displays structurally applicable triggers, including currently unaffordable options as disabled; the server rejects a disabled choice and leaves it unresolved. For a before-action trigger-select, `__pass__` is disabled only when skipping the remaining triggers would make continuation impossible and at least one currently enabled trigger can make the action layer prove direct completion or reachability through the remaining before-select chain. Pure resource flows pass previewed resources into the continuation guard. Nonresource flows call the same guard with current resources, so cards such as D17 and C60 can express reachability through scoped `isDoable` listeners instead of engine simulation. The engine calls generic continuation guards and imports no bake-bread, D66, or oven rules; bake-specific direct continuation and before-chain reachability remain in the action and card layers. Compact structured choice values such as `bulk:` are allowed by `InteractionRequest.kind === 'choice'` metadata through `structuredChoicePrefixes`, never by engine action-ID special cases.
 
-farmType 第一轮 payload 形态：`fence: {edges, palisadeEdges, extraWood, fenceSources?}` / `room: {rooms}` / `stable: {stables}` / `plow: {tile}` / `sow: {crops}`。WS `{type:'choice', value:'confirm', payload}` 经 `resolveChoice` 透传；二轮时由 `extraData.actionContextWrite: {farmPayload}` 持久化到 `pending.actionContext.farmPayload`，二轮 prompt 解析时 ActionDef 从 `ctx.actionContext.farmPayload` 读回。
+**Replacement-aware trigger pass, 2026-05-15.** A before-action trigger-select pass gate cannot inspect only base `canBeExecutedByPlayer`, and cannot apply complete `applyIsDoable`, because that would count a same-batch before unlocker as a reason it may itself be skipped. The current rule first checks whether the original action can continue with `skipBeforeTriggers=true`. If not, only generic `computeReplace` fallback participates in the continuation check, with `checkedReplaceAction=true` during startability preview to prevent replacement recursion. This covers paths such as B26 Agrarian Fences, where fencing replacement remains reachable after D66 is skipped, without hard-coding card IDs in the engine.
 
-`plow.actionContext.allowedTiles` 限制本次可选坐标；`plow.actionContext.adjacencyPolicy` 只表达本次 plow 的邻接策略（`ignore` / `notAdjacentToFields`），不改变后续普通 plow 默认邻接。
+If the alternative flow returned by a declined `computeReplace` has a top-level `xor`, the engine expands its children as replacement branches and appends the original-action branch. Runtime replacement leaves do not carry `checkedReplaceAction`; they carry only `skipComputeReplaceListenerIds`, so normal before and after listeners still run for sow or bake in the actual replacement. The original fallback retains `checkedReplaceAction=true`.
 
-### 7.8.1 Fence segment / policy 不变量
+**Before-reachability decision, 2026-05-22.** Multiple same-time `before` listeners are not a chain that availability code may statically sort or preview. They are a real trigger flow whose order the player controls through `ParallelNode(mode='trigger-select')`. If a card can bring an initially unreachable action into the before flow, it opts in through a scoped `isDoable` listener returning `doable: true`, and exits for a continuation carrying `actionContext.skipBeforeTriggers === true`. After every before listener and its after, exchange, and optional branches really execute, the original action leaf reruns strict doability against real state. If still unreachable, the action cannot continue and uses existing blocked or undo-only semantics.
 
-`FenceSegment.type` 与 `FenceSegment.source` 是独立维度：`type` 表示边段形态（普通 fence / B30 palisade），`source` 表示这段边来自谁。缺省普通 fence 视为 own ordinary source；B30 Wood Palisades 是不同 segment type；borrowed fence 是 `type='fence'` 且 `source.kind='borrowed'` 的普通边界，不是新 segment type。
+Do not add single-card payment preview for before-granted reachability, and do not have the dispatcher enumerate listener order or statically simulate resource and conversion chains. The reference model is C60 Small Potter's Oven, D66 Potter Ceramics, and `STUB_BeforeBakeGainClay`: allow entry to trigger-select, let the player run unlockers in the real order, recalculate remaining triggers and the pass gate against new state, then strictly check final continuation.
 
-fencing 主路径不得按卡牌 id 或单卡开关分支：不要在 `fencing.ts` / farmyard validation 里写 `C1` / `B30` / `E149`、`noWoodPalisades`、`midnightFencer` 这类分支。卡牌特殊行为统一通过 generic `fencePolicy` 表达：`allowedSegmentTypes`、`sourcePolicy`、`segmentBounds`、`newPastureBounds`、`newRegionBounds`、`connectionPolicy`、`allowedNewRegionTiles`、`allowTerrainInNewRegions`、`suppressTerrainRegions`、`costPolicy`、`paymentBudget`、`cancelPolicy`、`preserveAnimalTotals`、`promptHintKey`。
+### 7.8 Farm-type commit
 
-`sourcePolicy: { kind: 'borrowed', donorCaps }` 表示本次 ordinary fence 的 token source、build limit 和 segment source 都由 donor caps 提供。提交 payload 必须用 `fenceSources: Record<edgeId, donorPlayerId>` 为每条新增普通 fence 指定 donor；后端按当前 donor reserve 重新截断 cap，再校验 source key 精确覆盖新增 ordinary edges、donor 不超 cap、不能指向行动玩家自己。成功后新 segment 写入 borrowed source，并通过 `supplyTokensConsumed.fence` 消耗 donor supply；donor 后续 `getOwnOrdinaryFenceReserveCount()` / own ordinary fencing max 会自然下降。`farm.fenceBuilt.fences` 必须带完整新 `FenceSegment[]`，包括 source owner。
+All five farm types close their logic inside their own `ActionDef.resolveChoice` under `shared/actions/effects/`:
 
-`segmentBounds.fence` / `segmentBounds.palisade` 限制各自类型的新建边段；`segmentBounds.total` 限制普通 fence + palisade 的总新建边段。B149 Open Air Farmer 这类 BGA `max => 6` 总段数约束必须用 `total.max` 表达，B30 palisade 也计入该上限。`canStartFencing` 先做通用 policy 资源 / supply 可行性估算；在真实 state 中还会用 `validateFenceSelection()` 预检至少一个 legal fence commit，避免 confirm-only pending 无法完成。最终合法性仍由 `validateFenceSelection()` 原子校验并在失败时不支付。
+- **Room** in `construct.ts`: `room-payment.ts` expands per-room cost variants and appends this action's `computeCosts` `costTrades`, `costBonuses`, and `paymentResourceProviders` to construct `ComplexCost`. Farm selection uses the same adjusted construct cost for `maxSelections`. Multiple payment solutions create a second `pay:room:*` prompt before finalization. Doability checks both the affordable maximum and reachable room selection. The generic protected-action guard rejects direct cancellation.
+- **Stable and plow** in `stables.ts` and `plow.ts`: typed-flat payment parsing.
+- **Fence** in `fencing.ts`: validate selected edges, sources, connectivity, and closed regions; derive `newEdges`; calculate wood with `freeFences`, `extraWood`, and fence-cost-unification farm-choice computeCosts Pass 2; then pass that pass's trades, bonuses, payment-resource providers, and payment budget into `pay:fence:*`. Multiple solutions create a second `pay:fence:*` prompt.
+- **Sow** in `sow.ts`: validation and finalization without a payment combination, including extra-field effects through `getPermittedExtraSowableFields` and `handleSowExtraField`.
 
-`fencePolicy.costPolicy` 只表达 BGA `formatCost` 的本次基础单位成本；entry guard 与最终校验仍要叠加 `computeCosts.fence` 折扣/加价，确保 B93 future fence 这类嵌套 action 可以继续吃 E16 / C16 等围栏折扣。
+The first-round farm-type payloads are `fence: {edges, palisadeEdges, extraWood, fenceSources?}`, `room: {rooms}`, `stable: {stables}`, `plow: {tile}`, and `sow: {crops}`. WebSocket `{type:'choice', value:'confirm', payload}` passes through `resolveChoice`. For a second round, `extraData.actionContextWrite: {farmPayload}` persists it to `pending.actionContext.farmPayload`, and the `ActionDef` reads it back from `ctx.actionContext.farmPayload` while parsing that prompt.
 
-`fencePolicy.paymentBudget` 只限制最终实付资源，例如 B15 Carpenter's Bench 的“只能使用本次收集的 wood”。它不等同于 `segmentBounds.total.max`，因此合法 fence shape 不能按预算资源数提前裁剪；折扣、免费 fence、虚拟支付资源和 solver 选路完成后，才按 `PaymentSolution.resourcesPaid` 过滤。
+`plow.actionContext.allowedTiles` limits coordinates for this plow. `plow.actionContext.adjacencyPolicy` controls adjacency only for this action, using `ignore` or `notAdjacentToFields`; it does not change the default adjacency rule of later ordinary plow actions.
 
-`fencePolicy.promptHintKey` 只透传交互提示文案 key，不参与规则裁定；具体 key 由卡牌文件提供，前端只按通用 `promptParams.hintKey` 渲染。
+#### 7.8.1 Fence-segment and policy invariants
 
-C1 Overhaul 只计数、回收、重建 own ordinary fences：onBuy 先用 `consume-fence` + `sourcePolicy: 'ownOnly'` 返还自己的普通 fence，再用 `fencePolicy` 限制本次 rebuild 只能建 ordinary fence、只消耗 own ordinary supply，并由通用 protected-action guard 拒绝 direct cancel、保留动物总量。
+`FenceSegment.type` and `FenceSegment.source` are independent dimensions. Type describes the segment form, ordinary fence or B30 palisade. Source describes whose token created it. A default ordinary fence is treated as own ordinary source. B30 Wood Palisades is a different segment type. A borrowed fence is an ordinary segment with `type='fence'` and `source.kind='borrowed'`, not a new type.
+
+The main fencing path must not branch on card IDs or card-specific flags. Do not add `C1`, `B30`, `E149`, `noWoodPalisades`, or `midnightFencer` branches to `fencing.ts` or farmyard validation. Card-specific behavior uses generic `fencePolicy`: `allowedSegmentTypes`, `sourcePolicy`, `segmentBounds`, `newPastureBounds`, `newRegionBounds`, `connectionPolicy`, `allowedNewRegionTiles`, `allowTerrainInNewRegions`, `suppressTerrainRegions`, `costPolicy`, `paymentBudget`, `cancelPolicy`, `preserveAnimalTotals`, and `promptHintKey`.
+
+`sourcePolicy: { kind: 'borrowed', donorCaps }` means token source, build limit, and segment source for ordinary fences come from donor caps. The commit payload must use `fenceSources: Record<edgeId, donorPlayerId>` to identify a donor for every new ordinary fence. The server reclamps each cap against current donor reserve, then checks that source keys exactly cover new ordinary edges, no donor exceeds the cap, and no donor is the active player. A successful segment records its borrowed source and consumes donor supply through `supplyTokensConsumed.fence`. That donor's later `getOwnOrdinaryFenceReserveCount()` and own ordinary-fencing maximum naturally decrease. `farm.fenceBuilt.fences` must include complete new `FenceSegment[]` values, including source owner.
+
+`segmentBounds.fence` and `.palisade` limit new segments of their respective types. `segmentBounds.total` limits the combined number of new ordinary fences and palisades. A BGA total-segment limit such as B149 Open Air Farmer's `max => 6` uses `total.max`, and B30 palisades count toward it. `canStartFencing` first estimates generic policy resource and supply feasibility. Against real state it also calls `validateFenceSelection()` to preflight at least one legal commit, avoiding confirm-only pending state that cannot finish. `validateFenceSelection()` remains the atomic final validator and payment does not occur when it fails.
+
+`fencePolicy.costPolicy` expresses only this action's base unit cost from BGA `formatCost`. Entry guards and final validation must still apply `computeCosts.fence` discounts and surcharges, so a nested action such as B93 future fencing continues to benefit from E16, C16, and similar modifiers.
+
+`fencePolicy.paymentBudget` restricts only final resources paid, for rules such as B15 Carpenter's Bench allowing only wood collected by this action. It is not the same as `segmentBounds.total.max`, so legal geometry must not be trimmed early by the number of budgeted resources. Filtering by `PaymentSolution.resourcesPaid` occurs only after discounts, free fences, virtual payment resources, and solver routing.
+
+`fencePolicy.promptHintKey` forwards only an interaction-copy key and never decides rules. The card file supplies the specific key; the frontend generically renders `promptParams.hintKey`.
+
+C1 Overhaul counts, returns, and rebuilds only the player's own ordinary fences. Its `onBuy` first returns them using `consume-fence` with `sourcePolicy: 'ownOnly'`, then a `fencePolicy` limits the rebuild to ordinary fences paid from own ordinary supply. The generic protected-action guard rejects direct cancellation and preserves animal totals.
 
 ---
 
 ## Anytime Window Policy
 
-The set of card-listener anytime actions available in a given pending is computed once per `buildInteraction()` via `computeAnytimePolicy()` (`shared/session/anytime-policy.ts`). The helper is **server-only** — `client/` never imports it.
+The set of card-listener anytime actions available in a given pending interaction is computed once per `buildInteraction()` by `computeAnytimePolicy()` in `shared/session/anytime-policy.ts`. The helper is **server-only**; `client/` never imports it.
 
-Inputs (derived by `GameCore.getAnytimePolicyInput()` using the same node + composite fallback as `buildInteraction`):
+Inputs come from `GameCore.getAnytimePolicyInput()` using the same node-plus-composite fallback as `buildInteraction`:
 
-- `hasActiveContext` — `getActiveInteractionContext()` non-null
-- `stageResume` — current frame's `stageResume`
-- `interactionKind` — `node?.request?.kind ?? composite?.request?.kind`
-- `promptKey` — `node?.promptKey ?? composite?.promptKey`
+- `hasActiveContext`: whether `getActiveInteractionContext()` is nonnull;
+- `stageResume`: the current frame's `stageResume`;
+- `interactionKind`: `node?.request?.kind ?? composite?.request?.kind`;
+- `promptKey`: `node?.promptKey ?? composite?.promptKey`.
 
-Output: `{ allowed: false, reason }` or `{ allowed: true, blockedIds }`. The rules are priority-ordered (first match wins): no-context → feed-locked → `confirm-next-player` allowed with `exchange` blocked → `confirm-player-switch` blocked → animal-reorg → exchange/bake-bread promptKey → stage-hook-chain default block → everything else allowed with no blocks.
+Output is `{ allowed: false, reason }` or `{ allowed: true, blockedIds }`. Rules are priority ordered and first match wins: no context; feeding locked; `confirm-next-player` allowed with `exchange` blocked; `confirm-player-switch` blocked; animal reorganization; exchange or bake-bread prompt key; default stage-hook-chain block; otherwise allowed without blocked IDs.
 
-Three consumers share this snapshot:
+Three consumers share the snapshot:
 
-1. `buildAnytimeEntries()` — filters the auto-discovered registry + card-listener entries; returns `[]` if `!allowed`, otherwise removes any entry whose id is in `blockedIds`.
-2. `buildInteraction()` — derives `'takeAnytimeAction'` inclusion in `allowedCommands` strictly from `allowed && entries.length > 0`, keeping the UI and server views synchronised.
-3. `phases/round.ts::takeAnytimeAction()` — server-entry enforcement before any anytime injection. Additional guards (gameOver, draft phase, active-owner mismatch) sit at the function entry; the policy itself only sees pending-shape inputs.
+1. `buildAnytimeEntries()` filters the auto-discovered registry and card-listener entries. It returns `[]` when not allowed and otherwise removes IDs in `blockedIds`.
+2. `buildInteraction()` includes `takeAnytimeAction` in `allowedCommands` strictly when `allowed && entries.length > 0`, keeping UI and server views synchronized.
+3. `phases/round.ts::takeAnytimeAction()` enforces the policy before anytime injection. Entry guards for game over, draft phase, and active-owner mismatch remain in the function; the policy sees only pending-shape inputs.
 
-Nested anytime flows are injected ahead of the current pending tree. Parent pending state remains on its original pending host as a `PendingEnvelope`; when the nested flow resolves, `EngineStack` resumes the parent frame and `buildInteraction()` surfaces the parent envelope again instead of going idle.
+Nested anytime flows are inserted ahead of the current pending tree. The parent remains on its original host as a `PendingEnvelope`. After the nested flow resolves, `EngineStack` resumes the parent frame and `buildInteraction()` exposes the parent envelope again rather than going idle.
 
-OA-vs-BGA design notes:
+OA versus BGA design notes:
 
-- Reorganize is a system-driven sub-flow in OA (not a player-triggerable anytime) — the policy never produces a `'reorganize'` entry to filter.
-- `feed` pending is locked in OA because `executeFeedingLogic()` freezes `remaining`/`foodUsed` into the InteractionRequest. BGA allows nested anytime in its `ST_HARVEST_FEED` flow because its predecessor is the `EXCHANGE` state, which has no fixed budget.
-- Idle work-phase turns and `confirm-next-player` are acting-player anytime windows: legal anytime actions remain available before a worker is placed and before control passes to the next player. In `confirm-next-player`, `exchange` stays blocked to avoid recursive generic exchange prompts. `confirm-player-switch` remains blocked because it is a system-controlled cross-player transition inside another flow.
-- `stageResume`-bearing stage hook chains default to blocked to preserve the "system-driven hook chains do not yield to player anytime" invariant; the explicit allow-list (`animal-reorg`, exchange/bake-bread promptKey, and D132's `ui.cards.D132_HideFarmer.optional` before-endgame choice prompt) overrides this. D132's nested `resource-quantity-select` prompt stays blocked, because its max is frozen from current food/empty-space state and must not be resumed after arbitrary anytime changes.
+- Reorganize is a system-driven subflow in OA, not a player-triggerable anytime action, so the policy never emits a `reorganize` entry.
+- A `feed` pending interaction is locked because `executeFeedingLogic()` freezes `remaining` and `foodUsed` into `InteractionRequest`. BGA permits nested anytime actions in `ST_HARVEST_FEED` because its predecessor is an `EXCHANGE` state with no fixed budget.
+- Idle work-phase turns and `confirm-next-player` are acting-player anytime windows. Legal anytime actions remain available before placement and before control passes. During `confirm-next-player`, `exchange` stays blocked to avoid recursive generic exchange prompts. `confirm-player-switch` stays blocked because it is a system-controlled cross-player transition inside another flow.
+- Stage-hook chains carrying `stageResume` are blocked by default, preserving the invariant that system-driven hook chains do not yield to player anytime actions. Explicit exceptions are animal reorganization, exchange or bake-bread prompt keys, and D132's `ui.cards.D132_HideFarmer.optional` before-endgame choice prompt. D132's nested `resource-quantity-select` remains blocked because its maximum is frozen from current food and empty-space state and cannot safely resume after arbitrary anytime changes.
 
 ---
 
-## 8. shared/cards/ — Card Source 闭环
+## 8. `shared/cards/`: Card Source closure
 
-### 8.1 Card Source + 投影
+### 8.1 Card Source and projections
 
-目标态见 ADR-0002。单卡作者只维护一个 Card Source：
+ADR 0002 defines the target state. A card author maintains one Card Source:
 
 ```ts
 export const A123_FrameBuilder = defineOccupationCard({
@@ -853,56 +880,56 @@ export const A123_FrameBuilder = defineOccupationCard({
 })
 ```
 
-| 概念 | 形态 | 谁能读取 |
+| Concept | Form | Readers |
 |---|---|---|
-| Card Source | `shared/cards/{A..E,major,community}/{Card}.ts`，包含 `meta` + 可选 `impl` | server / sandbox / tests；主 client bundle 禁止 |
-| Card Display | 从 Card Source 的 `meta` 构建出的 `public/cards-manifest.json` | 主 client bundle 通过 `client/services/card-meta` 读取 |
-| Card Impl | Card Source 的 `impl` 投影进 `shared/cards/catalog.generated.ts` / `CardRegistry` | server / sandbox；主 client bundle 禁止 |
+| Card Source | `shared/cards/{A..E,major,community}/{Card}.ts`, containing `meta` and optional `impl` | Server, sandbox, and tests; forbidden from the main client bundle |
+| Card Display | `public/cards-manifest.json`, built from Card Source `meta` | Main client bundle through `client/services/card-meta` |
+| Card Impl | Card Source `impl`, projected into `shared/cards/catalog.generated.ts` and `CardRegistry` | Server and sandbox; forbidden from the main client bundle |
 
-目标态删除 `shared/cards-display/`，不生成 shadow display 目录。`shared/cards/community/*` 与基础牌、major 一样使用单源；`shared/cards/community/auto-catalog.ts` 不再存在。
+The target state removes `shared/cards-display/` and generates no shadow display directory. `shared/cards/community/*` uses the same single source as base and major cards. `shared/cards/community/auto-catalog.ts` no longer exists.
 
-`meta` 是 Card Definition：只允许可序列化、前端可见、无运行时行为的字段。允许 `cost`、`prerequisite`、`occupationPrerequisites`、`improvementPrerequisites`、`cardField`、`isCookery` 等声明式规则字段；禁止 `modifier` / `modifiers` / `listeners` / `effect` / `prerequisiteCheck`。`prerequisite` 是印刷文本，结构化静态条件走 `*Prerequisites`，动态条件走 `impl.prerequisiteCheck`。
+`meta` is the Card Definition. It contains only serializable, frontend-visible fields without runtime behavior. Declarative rules fields such as `cost`, `prerequisite`, `occupationPrerequisites`, `improvementPrerequisites`, `cardField`, and `isCookery` are allowed. `modifier`, `modifiers`, `listeners`, `effect`, and `prerequisiteCheck` are forbidden. `prerequisite` is printed text, structured static conditions use the `*Prerequisites` fields, and dynamic conditions use `impl.prerequisiteCheck`.
 
-`impl` 是 Card Impl：包含 `modifiers`、`listeners`、`effect`、`prerequisiteCheck`、helper 调用和 `reaches`。modifier 属于 impl，不属于 Card Display。`reaches` 可由构建器静态提取并投影到 manifest 顶层，但不放进 `meta`。
+`impl` is the Card Impl and contains `modifiers`, `listeners`, `effect`, `prerequisiteCheck`, helper calls, and `reaches`. Modifiers belong to the implementation, not Card Display. Builders may statically extract `reaches` and project it at the top level of the manifest, but it does not belong in `meta`.
 
-`scripts/build-cards-manifest.ts` 必须用 TypeScript AST 静态提取 `meta`，禁止 runtime import Card Source 或 generated catalog。`meta` 只允许 JSON-like 字面量和同文件简单常量引用；`impl` 可自由写运行时代码。
+`scripts/build-cards-manifest.ts` must statically extract `meta` with the TypeScript AST. It must not import a Card Source or generated catalog at runtime. `meta` may contain only JSON-like literals and simple same-file constant references; `impl` may contain arbitrary runtime code.
 
-### 8.2 Generated catalog + registry
+### 8.2 Generated catalog and registry
 
-| 文件 | 作用 |
+| File | Role |
 |---|---|
-| `shared/cards/catalog.generated.ts` | 从 Card Source 生成 `allCardSources`、`minorImprovementCards`、`occupationCards`、`implemented*`、`ALL_CARD_IMPLS` |
-| `shared/cards/active-registry.ts` | `CardRegistry` 单例 |
-| `shared/cards/registry.ts` | `CardRegistry` 类（loadByIds / unload） |
-| `shared/cards/custom-registry.ts` | server / sandbox 的 `CUSTOM_*` runtime impl + session context / effects / listeners / modifiers |
-| `shared/cards/custom-card-metadata.ts` | 前端 `CUSTOM_*` Card Display、art URL、O 编号 |
+| `shared/cards/catalog.generated.ts` | Generates `allCardSources`, `minorImprovementCards`, `occupationCards`, `implemented*`, and `ALL_CARD_IMPLS` from Card Sources |
+| `shared/cards/active-registry.ts` | `CardRegistry` singleton |
+| `shared/cards/registry.ts` | `CardRegistry` class with `loadByIds` and `unload` |
+| `shared/cards/custom-registry.ts` | Server and sandbox runtime implementation, session context, effects, listeners, and modifiers for `CUSTOM_*` cards |
+| `shared/cards/custom-card-metadata.ts` | Frontend `CUSTOM_*` Card Display, artwork URL, and O number |
 
-生产路径只通过 `catalog.generated.ts` 和 `CardRegistry` 访问卡牌；测试允许直接 import 单卡 Card Source 做精确断言。`CardBase` / `MinorImprovement` / `Occupation` / `PlayerActionCard` class 语义目标态删除，使用带 `kind: 'minor' | 'occupation' | 'playerAction' | 'major'` 的 plain Card Definition，并用 `kind` 替代 `instanceof`。
+Production paths access cards only through `catalog.generated.ts` and `CardRegistry`. Tests may import an individual Card Source for exact assertions. The target state removes `CardBase`, `MinorImprovement`, `Occupation`, and `PlayerActionCard` class semantics. It uses a plain Card Definition with `kind: 'minor' | 'occupation' | 'playerAction' | 'major'`, and replaces `instanceof` with `kind`.
 
-`CardRegistry.loadByIds(ids, lookup)` / `unload(id)` 支持按房间动态装卡。
+`CardRegistry.loadByIds(ids, lookup)` and `unload(id)` support dynamic per-room card loading.
 
-### 8.3 cardStates 局部状态
+### 8.3 Local state in `cardStates`
 
-- 持续计数 / 单次标记 / 局部状态写入 `player.cardStates[cardId]`，不污染 `PlayerState` 顶层字段。跨多张 FoM 小改良共享的 farmyard space 状态例外落到 `player.farmyardSpaceStates`，只保存后端权威的 blocked space / farmyard goods token / field goods token / non-field crop space 元数据；placement lock 与 farmyard used/unused 由共享 helper 区分。FoM Farmyard Extension 例外落到 `player.farmyardExtensions`，因为它改变共享 farmyard geometry，而不是单卡局部状态。
-- 只服务单卡或少数卡牌的历史记录优先落到 `cardStates[cardId].extraData`；如需覆盖卡牌打出前历史，使用显式 hand-zone listener，而不是新增全局 stat。
-- 复杂"等待玩家下一步选择"的卡牌交互抽显式 continuation 走 `pending` / `EngineStack.push`，不偷塞共享槽位。
-- 推荐结构：`{ cardId, kind:'choice'|'delayedEffect', payload }`。
-- 卡牌可在 `cardStates[cardId].extraData.heldWorkerId` 持有 worker（既不在 takenBy 也不在家）；`shared/cards/helpers/card-held-workers.ts` 提供 `holdWorkerOnCard` / `getWorkerHeldOnCard` / `releaseWorkerFromCard` / `getCardHeldWorkerIds`；`returnHome` 阶段统一释放。`family-growth` 可通过 `actionContext.holdNewbornOnCard` 把 newborn 直接放到卡上，避免其在回家前占用行动格或被再次用作容量来源。
-- 卡牌可在 `cardStates[cardId].extraData.farmTerrainMarkers` 写入只读 UI marker；FarmBoard 只把 marker 渲染在对应 terrain tile 内，规则仍由后端卡牌状态裁定。
-- 卡牌可在目标玩家 `cardStates[sourceCard].extraData.publicCardMarkers` 写入跨玩家公开 marker；helper 汇总后由 scoring 写入 `cardBonusVp`，FarmBoard 只在原玩家摘要区域展示，不把 marker 贴到农场板外侧。
+- Persistent counters, one-time flags, and local state belong in `player.cardStates[cardId]`, not top-level `PlayerState`. Shared farmyard-space state across multiple FoM minor improvements is an exception stored in `player.farmyardSpaceStates`; it contains only authoritative blocked-space, farmyard-goods-token, field-goods-token, and non-field-crop-space metadata. Shared helpers distinguish placement lock from farmyard used or unused state. FoM Farmyard Extension geometry is another exception stored in `player.farmyardExtensions`, because it changes shared farmyard geometry rather than one card's local state.
+- History used by one card or a small set of cards should live in `cardStates[cardId].extraData`. If the history must begin before a card is played, use an explicit hand-zone listener rather than a global statistic.
+- A complex card interaction that waits for a later player choice uses an explicit continuation through `pending` and `EngineStack.push`, never a hidden shared slot.
+- The recommended shape is `{ cardId, kind:'choice'|'delayedEffect', payload }`.
+- A card may hold a worker in `cardStates[cardId].extraData.heldWorkerId`, where the worker is neither in `takenBy` nor at home. `shared/cards/helpers/card-held-workers.ts` supplies `holdWorkerOnCard`, `getWorkerHeldOnCard`, `releaseWorkerFromCard`, and `getCardHeldWorkerIds`; return-home releases all held workers. `family-growth` can use `actionContext.holdNewbornOnCard` to place a newborn directly on the card, avoiding action-space occupancy before return-home and preventing reuse as a capacity source.
+- A card may write read-only UI markers to `cardStates[cardId].extraData.farmTerrainMarkers`. FarmBoard renders a marker inside its terrain tile, while backend card state remains authoritative for rules.
+- A card may write cross-player public markers into the target's `cardStates[sourceCard].extraData.publicCardMarkers`. A helper aggregates them and scoring writes them to `cardBonusVp`. FarmBoard displays them in the source player's summary area, not outside the farm board.
 
-### 8.4 helpers 糖衣层（`shared/cards/helpers/`）
+### 8.4 Convenience helpers under `shared/cards/helpers/`
 
-- `pay-gain-node.ts` —— "支付后得收益 / 支付后追加行动 / 返还到当前格再得"模板
-- `stage-effects.ts` —— 阶段型 card-effects 标记 / 即时支付 / bonus VP / 单次收获兑换
-- `card-state.ts` / `round-placement.ts` —— 一次性卡牌 `flagged/extraData` + 本轮放人顺序
-- `action-snapshot.ts` —— 单次行动起点快照（A74 等复用）
-- `card-held-workers.ts` —— 见 §8.3
-- `card-field.ts` —— "卡牌即田"声明式工厂，详见 §8.5
+- `pay-gain-node.ts`: templates for gain after payment, an appended action after payment, or returning resources to the current space before gaining.
+- `stage-effects.ts`: stage card-effect flags, immediate payment, bonus VP, and one-time Harvest exchanges.
+- `card-state.ts` and `round-placement.ts`: one-time `flagged` or `extraData` state and placement order this round.
+- `action-snapshot.ts`: action-start snapshots reused by cards such as A74.
+- `card-held-workers.ts`: worker holding described in section 8.3.
+- `card-field.ts`: declarative card-as-field factory described below.
 
-### 8.5 cardField 通用扩展点
+### 8.5 The generic `cardField` extension
 
-声明式"卡牌作为田"配置，定义在 `CardDefinition.cardField`：
+`CardDefinition.cardField` declaratively configures a card as a field:
 
 ```ts
 cardField?: {
@@ -911,15 +938,11 @@ cardField?: {
 }
 ```
 
-`shared/cards/helpers/card-field.ts:makeCardFieldImpl(cardId, def, options?)` 是工厂，按
-`def` 派生 `onComputeSowableFields` / `onSowExtraField` / `onHarvestFieldPhase` / `sow-isDoable`
-listener。单卡只声明配置 + 可选 `onReap` 回调处理副作用，文件行数贴近甚至少于 BGA。
+`shared/cards/helpers/card-field.ts:makeCardFieldImpl(cardId, def, options?)` derives `onComputeSowableFields`, `onSowExtraField`, `onHarvestFieldPhase`, and a `sow-isDoable` listener from the definition. An individual card declares only the configuration and an optional `onReap` callback for side effects, keeping the file near or below its BGA counterpart's size.
 
-虚拟 tile col 由
-`deriveVirtualTileCol(cardId, slotIdx) = deckOrdinal*1000 + cardNumber + slotIdx`
-派生，跨 deck 不冲突；同 deck 邻号 capacity 占位需 audit（当前 11 张卡 capacity≤3，安全余量充足）。
+Virtual tile columns derive from `deriveVirtualTileCol(cardId, slotIdx) = deckOrdinal*1000 + cardNumber + slotIdx`, preventing cross-deck collisions. Capacity slots for adjacent numbers in one deck require auditing; the current 11 cards all have capacity at most three, leaving ample margin.
 
-副作用 `onReap` 回调签名：
+The side-effect callback is:
 
 ```ts
 onReap?: (ctx: {
@@ -934,185 +957,183 @@ onReap?: (ctx: {
 }) => ActionFlow | void
 ```
 
-多 crop 各调一次回调；返回多个 flow 时基建用普通 `parallel` 包装。对齐 BGA `$this->field = true`
-+ `getFieldDetails()` + `onPlayerAfterReap` 语义。
+The callback runs once per crop. Infrastructure wraps multiple returned flows in ordinary `parallel`. This matches BGA `$this->field = true`, `getFieldDetails()`, and `onPlayerAfterReap` semantics.
 
-**Harvest reap log 时序**：`harvestReapSummary` 初始化已从 `continueHarvestReap` 提前到
-`continueHarvestFieldStart`，基建在 `onHarvestFieldPhase` 内累加 `summary.resources[crop]`，
-让 `log.reapDetail` 同时包含普通 field 与 cardField 产出（之前 cardField 累加发生在
-summary 初始化前会被丢弃）。该 summary 的生命周期不是 field phase 局部变量，必须延续到
-`onAfterHarvest` 完成后再清理。
+**Harvest reap-log ordering.** `harvestReapSummary` initialization moved from `continueHarvestReap` to the earlier `continueHarvestFieldStart`. Infrastructure accumulates `summary.resources[crop]` during `onHarvestFieldPhase`, so `log.reapDetail` contains both ordinary-field and Card Field production. Previously the Card Field accumulation happened before summary initialization and was discarded. The summary is not a field-phase local; it remains until `onAfterHarvest` finishes.
 
-`reap` 的 private trigger 复用同一套 Card Field reaper registry，但传入 `updateHarvestSummary: false`，避免私人田地阶段污染普通 Harvest 日志 summary。
+A private `reap` trigger reuses the same Card Field reaper registry with `updateHarvestSummary: false`, preventing a private-field phase from contaminating ordinary Harvest log summary.
 
-当前迁移到该 helper 的 11 张卡：B68 / D75 / E80 / D25 / E72 / C70 / E68 / E69 / E70 /
-B113 / B141。
+The 11 cards currently migrated to this helper are B68, D75, E80, D25, E72, C70, E68, E69, E70, B113, and B141.
 
-### 8.6 命名 & 约束
+### 8.6 Naming and constraints
 
-- 卡牌文件 `{Deck}_{Number}_{Name}.ts`（例 `A123_FrameBuilder.ts`），导出常量名同卡牌名。
-- 卡牌能力**尽量在卡牌文件内部闭环**，不能扩散到 `shared/actions/effects/pay.ts` / `shared/actions/effects/improvement.ts` / `shared/session/session-core.ts` / `server/game/authoritative-session.ts` 等核心文件。
-- 优先用 Hook 系统、`CardDefinition` 通用字段（`cost` / `reward` / `prerequisite`）、`cardStates`。
-- 禁止：核心文件内针对单卡的 `if-else`；集中式卡牌效果注册表；前端硬编码卡牌特定规则。
+- Card files use `{Deck}_{Number}_{Name}.ts`, for example `A123_FrameBuilder.ts`, and export a constant with the same name.
+- Keep a card's ability closed inside its card file wherever possible. Do not spread it into core files such as `shared/actions/effects/pay.ts`, `shared/actions/effects/improvement.ts`, `shared/session/session-core.ts`, or `server/game/authoritative-session.ts`.
+- Prefer hooks, generic `CardDefinition` fields such as `cost`, `reward`, and `prerequisite`, and `cardStates`.
+- Forbidden patterns are card-specific conditionals in core files, centralized card-effect registries, and frontend card-specific rules.
 
-运行时跨卡身份/能力读取必须优先落到 `CardDefinition` typed metadata 和 played-card helper：`getPlayedCardDefinitions(player)`、`collectCardDefinitionsAs(player, type)`、`playerHasCardCapability(player, capability, { asType? })` 只检查 `player.improvements` / `player.minorPlayed` / `player.occupationPlayed`，手牌不参与；`asType` 复用 `cardCountsAs`，因此 dual-type card 仍按既有身份语义进入查询。当前已登记的通用 metadata 包括 `preventsHandDiscard`、`fireplaceIdentity`、`cookingHearthIdentity`、`ovenIdentity`、`firewoodBuildTrigger`、`potteryIdentity`、`animalHolder`、`blocksHouseAnimalZones`、`waresSalesmanGains`。这些字段属于 Card Source `meta`，可投影进 catalog / manifest，但不新增前端展示行为。`ovenIdentity` 在 OA 中表达 oven-family identity，包含 Oven Installation 这类 upgrade/minor，供 Oven Damper 等 oven-family 计分使用；这是项目内的有意抽象，不表示每张牌都必须提供 bake exchange 或触发 Firewood，升级牌可用 `firewoodBuildTrigger:false` 保留计分身份但退出 build-trigger 语义。已迁移路径包括 B146/C35 弃手牌禁止、B153 major identity scoring、C75/A27 fireplace/hearth/oven trigger、B31 pottery identity、E144 wares gain options、D86 animal-holder occupation filtering、D12 house animal zone blocking、M72 oven-family scoring。
+Runtime cross-card identity and capability queries must use typed `CardDefinition` metadata and played-card helpers: `getPlayedCardDefinitions(player)`, `collectCardDefinitionsAs(player, type)`, and `playerHasCardCapability(player, capability, { asType? })`. They inspect only `player.improvements`, `player.minorPlayed`, and `player.occupationPlayed`, never hands. `asType` reuses `cardCountsAs`, preserving existing identity semantics for dual-type cards.
 
-`check:card-impl-boundaries` 是常规验证路径的一部分，并在 CI verify job 中默认严格执行。生产 `shared/cards/A-E/M/*.ts` 中的运行时跨非 Major 卡 id 读取必须迁入通用 capability、action context provenance、harvest outcome、breeding threshold modifier、synthetic occupancy、trigger snapshot 等扩展点；`Major_*`、`reaches`、`allowedPurchases` 和 prerequisite candidate list 是明确例外。需要临时审计时可显式传 `--warn-only`，但不能作为合入验证路径。
+Registered generic metadata currently includes `preventsHandDiscard`, `fireplaceIdentity`, `cookingHearthIdentity`, `ovenIdentity`, `firewoodBuildTrigger`, `potteryIdentity`, `animalHolder`, `blocksHouseAnimalZones`, and `waresSalesmanGains`. These fields belong to Card Source `meta` and may project into catalog and manifest, but add no frontend behavior. In OA, `ovenIdentity` represents oven-family identity and includes upgrades or minors such as Oven Installation for Oven Damper-style scoring. This intentional project abstraction does not require every such card to provide a baking exchange or trigger Firewood. An upgrade may retain scoring identity while opting out of build-trigger semantics with `firewoodBuildTrigger:false`. Migrated paths include B146 and C35 hand-discard prevention, B153 major-identity scoring, C75 and A27 fireplace, hearth, and oven triggers, B31 pottery identity, E144 wares-gain options, D86 animal-holder occupation filtering, D12 house-animal-zone blocking, and M72 oven-family scoring.
 
-卡面文字明确点名另一张普通卡时，源卡可以把该目标作为 named printed target 使用；目标 id 必须出现在 `reaches` 或等价声明式 metadata 中，runtime 只允许做存在性 / 拥有者 / 是否已打出这类公开检查。源卡不得读取目标卡 `cardStates` / `counters` / `extraData` 等私有实现状态，也不得据此模拟目标卡能力分支；checker 例外必须绑定具体 source-target pair 和允许的读取形态，不能用粗粒度 allowlist 绕过边界。
+`check:card-impl-boundaries` is part of normal verification and runs strictly in the CI verify job. Runtime reads of another non-Major card ID in production `shared/cards/A-E/M/*.ts` must migrate to a generic capability, action-context provenance, Harvest outcome, breeding-threshold modifier, synthetic occupancy, trigger snapshot, or another extension point. `Major_*`, `reaches`, `allowedPurchases`, and prerequisite candidate lists are explicit exceptions. `--warn-only` is available for an intentional temporary audit but is not an integration-validation path.
 
-### 8.7 Minor improvement passing mechanism
+When printed card text names another ordinary card, the source card may declare it as a named printed target. Its ID must appear in `reaches` or equivalent declarative metadata, and runtime may inspect only public facts such as existence, owner, or played status. The source must not inspect the target's private implementation state in `cardStates`, `counters`, or `extraData`, or simulate branches of the target's ability. A checker exception must bind one exact source-target pair and allowed read shape; a broad allowlist cannot bypass this boundary.
 
-OA 通过 `CardDefinition.passing?: boolean` 标记 BGA minor improvement 的"过手"机制。
-`shared/actions/effects/improvement.ts` 的 host action 先用 internal `pay` child 完成购买支付，再在 `completeInternalChildren` 阶段读取 payment result map 并提交卡牌购买。passing 卡：
+### 8.7 Minor-improvement passing
 
-- 不进 buyer.minorPlayed；卡 push 进 `nextPlayer.minorHand`（按 `state.currentPlayerIndex` wrap）
-- 不累加 `totalMinorBuilt`、不注入 `activeModifiers`、不触发 `providesOccupation` / `isField` 路径
-- emit `card.passed`（`fromPlayerId` / `toPlayerId` / `cardId`）替代 `card.played`
-- onBuy 仍通过 internal `activate-card-effect` 的 `afterHostCommitListeners` 执行——买家拿到效果，卡进入下家手牌等待下家自己回合再 actBuy
+OA marks BGA passing minor improvements with `CardDefinition.passing?: boolean`. The host action in `shared/actions/effects/improvement.ts` first completes purchase payment through an internal `pay` child, then reads its result map and commits the purchase during `completeInternalChildren`. For a passing card:
 
-listener 隔离自然成立：passing 卡不进 `minorPlayed` → `getPlayerCardIds` 自然不含 → "卡进场"反应 skip。
-无需 `apply-improvement` effect 或 `extraData.passing` scratchpad；BGA passing 行为由 improvement host action / pay child / `activate-card-effect` 三段承担。
+- it does not enter `buyer.minorPlayed`; it is pushed into `nextPlayer.minorHand`, wrapping from `state.currentPlayerIndex`;
+- it does not increment `totalMinorBuilt`, add `activeModifiers`, or enter `providesOccupation` or `isField` paths;
+- it emits `card.passed` with `fromPlayerId`, `toPlayerId`, and `cardId` instead of `card.played`;
+- `onBuy` still runs through internal `activate-card-effect` in `afterHostCommitListeners`, so the buyer receives the effect while the next player receives the card in hand for a later `actBuy`.
 
-客户端：`PublicEventCardPassAnimation` 订阅 `card.passed` events 流，按 `data-card-anchor` / `data-hand-anchor` DOM 锚点播放卡片飞行动画；LogPanel 通过现有 `mapCardPassed` 派生 `log.cardPassed` i18n 条目。
+Listener isolation follows naturally: a passing card never enters `minorPlayed`, so `getPlayerCardIds` omits it and card-entered-play reactions skip it. No `apply-improvement` effect or `extraData.passing` scratchpad is needed. The improvement host action, pay child, and `activate-card-effect` jointly implement BGA passing behavior.
+
+On the client, `PublicEventCardPassAnimation` subscribes to the `card.passed` event stream and animates the card between `data-card-anchor` and `data-hand-anchor` DOM anchors. LogPanel derives a `log.cardPassed` i18n entry through the existing `mapCardPassed` mapper.
 
 ---
 
-## 9. shared/domain/ — 领域聚合层
+## 9. `shared/domain/`: Domain aggregation
 
-派生视图 + 不变量校验集中处。`PlayerState` 仍是 JSON 可序列化纯数据，所有"我能不能 X"集中到 `PlayerBoard`。
+Derived views and invariant checks live here. `PlayerState` remains plain JSON-serializable data; every "can I do X?" query belongs to `PlayerBoard`.
 
-```
+```text
 shared/domain/
-├── player-board.ts    PlayerBoard（playerBoard 工厂）
-├── farmyard.ts        农场规则校验 / normalizePlayerFarm
-├── farmyard-interaction.ts  farm-select / farm-position 交互 payload 投影
-├── pasture.ts         围栏验证 / computePasturesFromFences
-├── animal-zones.ts    动物分区容量与容纳判定（getTotalAnimalCapacity / getPastureCapacity / canAccommodateAnimalTotals）
-├── animals.ts         动物模型
-├── scoring.ts         计分 / PlayerScoreSummary
-├── scoring-reserve.ts 终局 Scoring Reserve 读取 / 汇总 / 扣 scoring clone
-├── farm.ts、field.ts、space.ts、farmyard-space-states.ts
+├── player-board.ts          PlayerBoard and the playerBoard factory
+├── farmyard.ts             farm-rule validation and normalizePlayerFarm
+├── farmyard-interaction.ts interaction payload projections for farm-select and farm-position
+├── pasture.ts              fence validation and computePasturesFromFences
+├── animal-zones.ts         animal-zone capacity and accommodation
+├── animals.ts              animal model
+├── scoring.ts              scoring and PlayerScoreSummary
+├── scoring-reserve.ts      final Scoring Reserve reads, aggregation, and scoring-clone deduction
+├── farm.ts, field.ts, space.ts, farmyard-space-states.ts
 └── index.ts
 ```
 
-`PlayerBoard(player, state)` 暴露 `farmyard`、`farmInteraction`、`animals` 三个子边界。`farmyard` 只做农场规则校验与查询（如 `canPlow` / `canSow` / `canBuildFence` / `canBuildRoom` / `canBuildStable`）；`farmInteraction` 只把当前玩家农场、行动上下文和支付可行性派生成 `farm-select` / `farm-position` `InteractionRequest` payload；`animals` 负责动物分区容量与容纳判定。前端本地 farm draft 只消费服务端给出的 interaction payload，不调用这些规则边界。
+`PlayerBoard(player, state)` exposes three sub-boundaries: `farmyard`, `farmInteraction`, and `animals`. `farmyard` only validates and queries farm rules, such as `canPlow`, `canSow`, `canBuildFence`, `canBuildRoom`, and `canBuildStable`. `farmInteraction` only derives `farm-select` or `farm-position` `InteractionRequest` payloads from the current farm, action context, and payment feasibility. `animals` owns zone capacity and accommodation. A frontend local farm draft consumes only the server-provided interaction payload; it does not call these rule boundaries.
 
-域聚合可被三方共用（主 client + sandbox + server），属于 `[A]` 主 bundle 安全层。
+Domain aggregation is shared by the main client, sandbox, and server and therefore belongs to bundle-safe layer `[A]`.
 
-`Scoring Reserve` 是终局计分选择占用，不是 Payment Pipeline。卡牌通过 `special-effect.record-scoring-reserve-bonus` 把 `{ reserved, score, cardType? }` 写入目标玩家的 `cardStates[sourceCard].extraData.scoringReserveBonus`；`computeScores()` 先汇总所有已选 Scoring Reserve 并从 scoring clone 扣除，再运行现有 automatic costed-bonus solver，之后 resource-based major scoring 也读取该 clone 的剩余资源。`ScoreEntry.type='bonus'` 必须携带 `cardId`，并可以携带 `cardType` / `reserved` attribution；当 target player 没有打出 source card 时，`cardType` 由 Scoring Reserve 记录显式提供。
+Scoring Reserve is a final-scoring choice reservation, not part of the Payment Pipeline. A card writes `{ reserved, score, cardType? }` to the target player's `cardStates[sourceCard].extraData.scoringReserveBonus` through `special-effect.record-scoring-reserve-bonus`. `computeScores()` aggregates every selected reserve and deducts it from a scoring clone before running the existing automatic costed-bonus solver. Resource-based major scoring also reads remaining resources from that clone. `ScoreEntry.type='bonus'` must carry `cardId` and may carry `cardType` and `reserved` attribution. If the target has not played the source card, the Scoring Reserve record supplies `cardType` explicitly.
 
-`Card Bonus VP` 的统一 score category 是 `cardBonusVp`：所有由卡牌产生的非印刷 bonus VP 都进入该 category，并尽量在 `ScoreEntry.type='bonus'` 上保留 `cardId` / `cardType` attribution。它不同于 printed Cards VP；卡牌本身印刷分仍进入 `cards` category，compact/live score 也必须保持 `cards` 与 `cardBonusVp` 分离。旧 `cardsBonus`、`cardStateBonusVp`、`cardBonus` score shapes 不保留，客户端和文档都不应读取、合并或兼容这些旧 key。
+`cardBonusVp` is the single score category for nonprinted bonus VP produced by cards. Preserve `cardId` and `cardType` attribution on `ScoreEntry.type='bonus'` wherever possible. Printed VP on the card itself remains in `cards`; compact and live scoring must keep `cards` separate from `cardBonusVp`. Legacy `cardsBonus`, `cardStateBonusVp`, and `cardBonus` shapes are removed and must not be read, merged, or supported by clients or documentation.
 
-公开卡牌 marker 也属于 `cardBonusVp`：`publicCardMarkers` 可提供正负分，`ScoreEntry.type='bonus'` 使用 marker 的 `sourceCardId` attribution，不新增独立 score category。
+Public card markers also score under `cardBonusVp`. A `publicCardMarkers` entry may contribute positive or negative points, and its bonus score entry uses `sourceCardId` attribution without introducing another category.
 
-`computePastureCapacityModifiers(player, state)` 返回 pasture capacity modifier 列表，由 `computeAnimalZones` 在创建 pasture zone 时统一应用。modifier 分 `replacement` / `additive` 两类：先按打出顺序应用全部 replacement，再按打出顺序应用全部 additive；因此 D011_LawnFertilizer 这类 size-one pasture replacement 总是在 A012_DrinkingTrough / B072_LoveforAgriculture 这类 additive 前生效，不需要卡牌之间互读 id 或 scratch marker。没有 modifier 时 pasture 容量仍是 `size * 2 * 2^stables`。
+`computePastureCapacityModifiers(player, state)` returns pasture-capacity modifiers for `computeAnimalZones` to apply while creating pasture zones. Modifiers are `replacement` or `additive`. All replacements run in play order, followed by all additives in play order. A size-one-pasture replacement such as D011 Lawn Fertilizer therefore always precedes additives such as A012 Drinking Trough or B072 Love for Agriculture, without cross-card ID reads or scratch markers. With no modifier, capacity remains `size * 2 * 2^stables`.
 
-`AnimalZone.houseAnimalZone?: boolean` 标记“视作 house 动物区”的非 house zone。`computeAnimalZones` 在所有 `onComputeAnimalZones` 完成后，如果玩家有 `blocksHouseAnimalZones` capability，会统一移除普通 `zoneType === 'house'` 和 `houseAnimalZone === true` 的 zone。House-zone 规则统计必须使用 `isHouseAnimalZone()` / `countHouseAnimals()`，不要再直接读取 `player.houseAnimalCount` 后漏掉 D148_DomesticianExpert 这类 tagged zone。
+`AnimalZone.houseAnimalZone?: boolean` marks a non-house zone that counts as a house animal zone. After all `onComputeAnimalZones` calls, `computeAnimalZones` removes both ordinary `zoneType === 'house'` zones and zones with `houseAnimalZone === true` when the player has the `blocksHouseAnimalZones` capability. House-zone rules use `isHouseAnimalZone()` and `countHouseAnimals()`, not direct `player.houseAnimalCount`, which would miss tagged zones such as D148 Domestician Expert.
 
-动物“可容纳”问题统一走 `canAccommodateAnimalTotals(state, player, targetCounts)` 或 add-only wrapper `canAccommodateAllAnimals(state, player, animals)`。它们按最终动物总量搜索合法 zone assignment，允许后续系统 `reorganize` 重新分配；卡牌不得用“当前任一 zone 是否还能塞下一只”的局部判断替代，否则会错误拒绝可通过重整达成的合法状态。搜索会 memoize 已失败的工作区分配状态，避免 M031 这类多候选交换在 impossible late-game farm 上重复枚举等价分支；`exclusiveCardZoneLimit` 也必须在搜索期生效，避免候选被误判为可通过多个同卡 zone 容纳；如果候选本身会永久降低 holder 容量（例如 C148 held 被支付），候选过滤必须用支付后的容量。
+Every "can accommodate" question uses `canAccommodateAnimalTotals(state, player, targetCounts)` or the add-only wrapper `canAccommodateAllAnimals(state, player, animals)`. These search for a legal assignment of final animal totals and allow later system `reorganize`. A card must not substitute a local test of whether any current zone can accept one more animal; that incorrectly rejects states made legal by reorganization. The search memoizes failed workspace assignments to avoid repeatedly enumerating equivalent branches for multicandidate exchanges such as M031 on an impossible late-game farm. `exclusiveCardZoneLimit` applies during search, preventing false accommodation across multiple zones of the same card. If a candidate permanently reduces holder capacity, such as paying C148's held animal, candidate filtering uses postpayment capacity.
 
-`onComputeAnimalZones` card-effect 签名：`(player: PlayerState, zones: AnimalZone[], state: GameState) => AnimalZone[] | void`。第三个 `state` 入参用于读取全局字段（典型场景：A148_Woolgrower / B086_TruffleSearcher 读 `state.completedFeedingPhases` 计入容量），避免每张卡再走 per-card post-play counter。新增 `onComputeAnimalZones` 卡牌可忽略 `state`（使用 `_state` 占位）。`onComputeSharedAnimalZones(owner, animalOwner, zones, state)` 用于 card owner 为其他 animal owner 贡献 borrowed played-card animal zone；shared zone 必须携带或由 `computeAnimalZones` 补齐 `cardId`、`ownerPlayerId`、`animalOwnerPlayerId`、`displayOwnerName` 和 `displaySource:'borrowed-played-card'`，若繁殖归属不同于 Animal Owner，则显式设置 `breedingOwnerPlayerId`。当前卡牌 effect 新增的 `zoneType:'card'` zone 若没有显式 `cardId`，`computeAnimalZones` 会自动补为当前 card id，保证 animal-reorg 写回和可容纳判断使用同一个可持久化 zone 身份。固定动物类型必须显式写 `allowedAnimalType`；`animalType` 是当前可见占用类型，不能被最终总量可容纳搜索当成印刷限制。pasture capacity replacement/additive 不再放在这里，改走 `computePastureCapacityModifiers`。
+The `onComputeAnimalZones` card-effect signature is `(player: PlayerState, zones: AnimalZone[], state: GameState) => AnimalZone[] | void`. The third argument allows global facts, such as A148 Woolgrower and B086 Truffle Searcher reading `state.completedFeedingPhases`, without per-card postplay counters. Cards that do not need it may name it `_state`.
 
-farm-position backed card zones 和 hosted card zones 可把动物写入 `cardStates[cardId].extraData.animalCountsByZone`。Hosted Card Animal Zone 写入 card owner 的 card state，但统计、支付、capacity search、pending animal 检测和 reorg 操作按 `animalOwnerPlayerId` 归属到 Animal Owner；breeding phase 会把带 `breedingOwnerPlayerId` 的 zone 计入 breeding owner、并从 Animal Owner 的临时繁殖计数中扣除。reorg / capacity rewrite 按 `ownerPlayerId` 路由写回 card owner，同一卡只替换当前 Animal Owner 的 entries，不能清掉其他玩家借用同一卡的动物。所有普通 holder writer 都必须在 `animalCountsByZone` entry 上持久化 `cardId` / `ownerPlayerId` / `animalOwnerPlayerId`，跨玩家扣减只能消费显式属于目标 Animal Owner 的 entry。`serializeState` 会把当前玩家可见的 owner played-card zones、farm-position card zones 和 borrowed played-card zones 分别派生成 `SerializedPlayerState.playedCardAnimalZones`、`farmCardAnimalZones`、`borrowedPlayedCardAnimalZones`，让前端在非 reorg 状态也能展示 owner Played Cards、FarmBoard、Played Cards “by others” 的 0/N 卡牌动物区；active reorg 的 `InteractionAnimalReorgZone` draft 必须透传 owner metadata，覆盖该只读 projection 并启用控件。动物统计和消费 helper（例如 `getAssignedAnimalsByType()` / `subtractAnimalsFromBoard()`）必须同时读写 legacy `animalCounts` / `held` 与 per-zone `animalCountsByZone`，否则后续 reorg 会从 stale per-zone state 重新 hydrate 已消费动物。`exclusiveCardZoneLimit` / `allowedAnimalTypes` 是后端算出的 zone metadata，必须随 `InteractionAnimalReorgZone` 传给前端；前者由统一 reorg helper 阻止超过 limit 的多 zone 分配，后者用于 UI 禁用后端一定会拒绝的动物类型。前端不写具体卡牌 id 规则。
+`onComputeSharedAnimalZones(owner, animalOwner, zones, state)` lets a card owner contribute a borrowed played-card zone for another animal owner. A shared zone carries, or receives from `computeAnimalZones`, `cardId`, `ownerPlayerId`, `animalOwnerPlayerId`, `displayOwnerName`, and `displaySource:'borrowed-played-card'`. If breeding belongs to someone else, it sets `breedingOwnerPlayerId`. When a card effect adds `zoneType:'card'` without `cardId`, `computeAnimalZones` fills in the current card ID so reorganization writes and accommodation queries use the same persistent identity. A fixed animal type must use `allowedAnimalType`; `animalType` is current visible occupancy, not a printed restriction for final-total search. Pasture replacement and additive modifiers no longer belong here and instead use `computePastureCapacityModifiers`.
 
-farm-position backed card animal zone 使用 `AnimalZone.farmPosition` / `countsFarmyardSpaceAsUnused` / `displaySource:'farm-position'` 进入 `InteractionAnimalReorgZone`，前端 FarmBoard 只把后端给出的 zone 渲染到对应农场格，不自行判断合法格。普通单 zone animal-holder 继续写 `cardStates[cardId].extraData.animalCounts`；同一卡多农场格 zone 写 `cardStates[cardId].extraData.animalCountsByZone[zoneId]`，并随非空 zone 持久化 `capacity` / `allowedAnimalType` / `allowedAnimalTypes` / `farmPosition` 供非 active reorg 状态继续显示。zone 消失时由 animal reorg 写回清理。需要“多个候选格但只能选一个”的卡牌使用 `exclusiveCardZoneLimit`，避免同一卡多个候选 zone 同时容纳动物。
+Farm-position-backed and hosted card zones may store animals in `cardStates[cardId].extraData.animalCountsByZone`. A Hosted Card Animal Zone writes into the card owner's state, while statistics, payment, capacity search, pending-animal detection, and reorganization assign it to `animalOwnerPlayerId`. Breeding includes a zone with `breedingOwnerPlayerId` for that breeding owner and subtracts it from the Animal Owner's temporary breeding count. Reorganization and capacity rewrites route by `ownerPlayerId` to the card owner and replace only entries for the current Animal Owner; they must not erase another player's use of the same shared card.
 
-动物支付统一走 `shared/domain/animal-payment.ts`。普通 exchange 扣动物时先让已打出卡牌通过 `consumeAnimalPayment` card effect 消费卡牌局部 marker / holder，再通过 `subtractAnimalsFromBoard()` 扣 farm board、普通 `extraData.animalCounts` animal-holder 和 `animalCountsByZone` farm-position-backed holder，最后才扣会永久损失容量的 counter-backed holder。`AnimalZone.capacityCounterKey` + `capacityLossOnPayment` 表达这类 holder 的容量来源和支付后容量损失；`animalPaymentPreference.prefer` 指向具体 card counter 时，只消费该来源，未命中时不回退扣其他 counter-backed holder；reorg / capacity enforcement 这类系统丢弃动物的路径通过 `onAnimalRemoved` card effect 通知卡牌同步局部 marker，不把具体卡牌状态写进主路径；C148 Mud Wallower 通过该 metadata 暴露 `held` counter，M031 Livestock Market 这类候选过滤只模拟共享支付 helper 后的 player，不读取 C148 私有 `cardStates`。繁殖数量和动物计分的单卡调整分别走 `computeBreedableAnimalCount` / `computeAnimalScoreAdjustment` card effect，核心 breed / scoring path 不读取具体卡牌状态。
+Every ordinary holder writer persists `cardId`, `ownerPlayerId`, and `animalOwnerPlayerId` on each `animalCountsByZone` entry. A cross-player deduction consumes only entries explicitly owned by that Animal Owner. `serializeState` derives `SerializedPlayerState.playedCardAnimalZones`, `farmCardAnimalZones`, and `borrowedPlayedCardAnimalZones`, letting the frontend display 0/N zones for owner Played Cards, FarmBoard positions, and Played Cards "by others" outside active reorganization. An active `InteractionAnimalReorgZone` draft forwards owner metadata, overrides that read-only projection, and enables controls.
 
-**Special-stable card-effect 扩展点**：`getSpecialStablePositions?(state, player) => FarmTilePosition[]` + `applySpecialStable?(state, player, position) => boolean` + `getBuiltSpecialStables?(player) => FarmTilePosition[]`。在 Farm-Expansion 的 Build Stables `farm-select` 里，核心 `shared/actions/effects/stables.ts` 通过 `card-effects.ts` 的 `collectSpecialStablePositions(state, player)`（聚合所有卡的候选，每项带 `sourceCardId`）和 `applySpecialStableAt(state, player, position)`（委派给接受该格的卡，返回 `sourceCardId`）发现并结算这些“非 `stableTiles` 普通格”的特殊 stable。候选注入协议字段 `farmHandPositions`（字段名为前端兼容保留），结算时填 `farm.stableBuilt` item 的 `kind:'special'` + `sourceCardId`。门控为通用的 `actionContext.farmHand === true`——仅 Farm-Expansion stables leaf wrapper 设置，E148 / A089 / C94 等其他“建 stable”入口不提供特殊 stable。当前唯一实现者是 B085_FarmHand（2×2 田地中心），核心 stables 文件不再 import 任何具体卡牌。
+Animal statistics and consumption helpers such as `getAssignedAnimalsByType()` and `subtractAnimalsFromBoard()` must read and write legacy `animalCounts` or `held` together with per-zone `animalCountsByZone`; otherwise a later reorganization can rehydrate consumed animals from stale per-zone state. Server-derived `exclusiveCardZoneLimit` and `allowedAnimalTypes` travel with `InteractionAnimalReorgZone`. The unified reorganization helper enforces the first, while the second lets the UI disable animal types the backend will reject. The frontend contains no card-ID-specific rules.
 
-第三个并列方法 `getBuiltSpecialStables?(player)`（#200）返回该卡**当前矗立**的特殊 stable 位置（建造前空，D102 / E76 回收后再次为空）。聚合 `collectBuiltSpecialStables(player) => { position, sourceCardId }[]` 遍历所有卡。`serializeState`（`shared/session/serialization.ts`）据此给每个序列化玩家派生**展示派生字段** `SerializedPlayerState.specialStables: { position, sourceCardId }[]`；同一序列化层也派生 `playedCardAnimalZones` / `farmCardAnimalZones` / `borrowedPlayedCardAnimalZones` 供 card animal zone 常驻展示。领域真相仍在 `cardStates` / card effect 计算结果，这些字段只进 snapshot，不进 `PlayerState`/`GameState` 领域顶层，`rehydrateState` 反序列化时显式剥离避免泄漏回权威态。前端 `GameContainerApi` 从 `displayPlayer.specialStables` 派生「已建特殊 stable top-left 集合」传给 FarmBoard，渲染 `.farmhand-center-built` 实心常驻 overlay，无需读任何单卡 `cardStates`。
+A farm-position-backed animal zone enters `InteractionAnimalReorgZone` through `AnimalZone.farmPosition`, `countsFarmyardSpaceAsUnused`, and `displaySource:'farm-position'`. FarmBoard renders only server-provided zones at those farm positions and never decides legal spaces. An ordinary single-zone holder continues to use `cardStates[cardId].extraData.animalCounts`. Multiple farm-position zones for one card use `animalCountsByZone[zoneId]` and persist `capacity`, `allowedAnimalType`, `allowedAnimalTypes`, and `farmPosition` with each nonempty zone for display outside active reorganization. Reorganization cleanup removes vanished zones. A card offering multiple candidate positions but allowing only one uses `exclusiveCardZoneLimit`.
 
----
+Animal payment is centralized in `shared/domain/animal-payment.ts`. During an ordinary exchange, played cards first consume local markers or holders through the `consumeAnimalPayment` card effect. `subtractAnimalsFromBoard()` then deducts from the farm board, ordinary `extraData.animalCounts` holders, and `animalCountsByZone` farm-position holders. Counter-backed holders whose consumption permanently reduces capacity come last. `AnimalZone.capacityCounterKey` plus `capacityLossOnPayment` describes that source and its postpayment loss. When `animalPaymentPreference.prefer` names a card counter, only that source is consumed; no match does not fall back to another counter-backed holder. System removals from reorganization or capacity enforcement notify cards through `onAnimalRemoved` so they can synchronize local markers without card-specific state in the main path. C148 Mud Wallower exposes its `held` counter through this metadata. Candidate filtering for M031 Livestock Market and similar cards simulates the shared payment helper and never reads C148's private `cardStates`. Card-specific breeding amounts and animal-score adjustments use `computeBreedableAnimalCount` and `computeAnimalScoreAdjustment`, so core breeding and scoring never inspect a particular card's state.
 
-## 10. 其他 shared/ 模块
+**Special-stable card-effect extension.** The parallel methods are `getSpecialStablePositions?(state, player) => FarmTilePosition[]`, `applySpecialStable?(state, player, position) => boolean`, and `getBuiltSpecialStables?(player) => FarmTilePosition[]`. In Farm Expansion's Build Stables `farm-select`, core `shared/actions/effects/stables.ts` uses `collectSpecialStablePositions(state, player)` from `card-effects.ts` to aggregate candidates with `sourceCardId`, and `applySpecialStableAt(state, player, position)` to delegate settlement to the accepting card and return its source. Candidates enter protocol field `farmHandPositions`, whose name is retained for frontend compatibility. Settlement writes `kind:'special'` and `sourceCardId` into the `farm.stableBuilt` item. The generic gate is `actionContext.farmHand === true`, set only by the Farm Expansion stables-leaf wrapper. Other stable-building entry points such as E148, A089, and C94 do not expose special stables. B085 Farm Hand, at a two-by-two field center, is currently the only implementation; core stables code imports no card.
 
-### 10.1 shared/draft/
-
-`draft-manager.ts` —— 纯函数 simultaneous 卡牌选择：`initDraftState` / `processSubmit` / `tryAdvanceRound` / `finalizeDraft`。`types.ts` 定义 `DraftState` / `DraftPool` / `DraftPickPayload`。`createRoom` 时 `draftMode: 'simultaneous'` + `draftPoolSize: 7..10` 启用。
-
-### 10.2 shared/i18n/
-
-UI 文案 key 与多语言资源；`PromptKey` 在 `shared/contract/prompt-keys.ts` 集中定义。
-
-### 10.3 shared/custom-code/
-
-`ast-validator.ts` —— 用户自定义卡牌 TypeScript 源码 AST 校验（白名单 import / 禁用 API / 网络与 IO 隔离）。listener action 由 `sandbox-listener-actions.ts` 单源定义，prompt、AST validator 与 server/browser manifest 共用。运行期隔离在 `server/custom-code/`。
-
-### 10.4 shared/utils/
-
-通用工具（深拷贝、ID、math 等），无业务规则。
+The third method, added under #200, returns currently standing special-stable positions: empty before construction and empty again after D102 or E76 returns it. `collectBuiltSpecialStables(player)` aggregates `{ position, sourceCardId }[]` across cards. `serializeState` derives the display-only `SerializedPlayerState.specialStables` array for every serialized player, alongside the three persistent card-animal-zone projections. Domain truth remains in `cardStates` and card-effect results. These fields exist only in snapshots, not top-level `PlayerState` or `GameState`; `rehydrateState` strips them explicitly to prevent leakage into authoritative state. `GameContainerApi` derives the set of built-special-stable top-left positions from `displayPlayer.specialStables` and passes it to FarmBoard, which renders a persistent filled `.farmhand-center-built` overlay without reading card-specific `cardStates`.
 
 ---
 
-## 11. server/ — 后端权威
+## 10. Other `shared/` modules
 
-### 11.1 server/connection/ — WS 入口
+### 10.1 `shared/draft/`
 
-```
+`draft-manager.ts` contains pure functions for simultaneous card selection: `initDraftState`, `processSubmit`, `tryAdvanceRound`, and `finalizeDraft`. `types.ts` defines `DraftState`, `DraftPool`, and `DraftPickPayload`. Set `draftMode: 'simultaneous'` and `draftPoolSize: 7..10` in `createRoom` to enable it.
+
+### 10.2 `shared/i18n/`
+
+UI copy keys and localized resources. `PromptKey` is centralized in `shared/contract/prompt-keys.ts`.
+
+### 10.3 `shared/custom-code/`
+
+`ast-validator.ts` validates custom-card TypeScript with an AST, allowing only approved imports and blocking forbidden APIs, network, and I/O. `sandbox-listener-actions.ts` is the single source for listener actions used by prompts, the validator, and server and browser manifests. Runtime isolation lives under `server/custom-code/`.
+
+### 10.4 `shared/utils/`
+
+Generic helpers such as deep cloning, IDs, and math. It contains no business rules.
+
+---
+
+## 11. `server/`: Backend authority
+
+### 11.1 `server/connection/`: WebSocket entry
+
+```text
 server/connection/
 ├── ws-server.ts      new WebSocketServer({ server, path: '/ws' })
-├── room-router.ts    根据 ClientCommand.type 路由到 GameSession / Lobby
-└── broadcaster.ts    StateUpdateEnvelope 扇出
+├── room-router.ts    routes ClientCommand.type to GameSession or Lobby
+└── broadcaster.ts    fans out StateUpdateEnvelope
 ```
 
-不变量：
+Invariants:
 
-- 一个 Room 只持有一个 `GameSession`；当前 WS `message` handler 同步调用 `dispatch()`，同一 Node 进程内的命令自然串行。
-- `room-router` 负责验证、座位授权和调用 `GameSession`，不直接写 `GameState`。
-- `payload-validation.ts` 纯校验（`validateResourcePayload` / `validateSingleTilePayload` / `validateMultiTilePayload`），返合法/规范化结果，不写 `GameSession`。
-- ADR-0014 实施后，Room 的 `ready | blocked` 写入状态门必须位于命令入口；不增加通用异步命令队列。Durable Room Commit 同步完成，保存重试只能在 Room blocked 时运行。
-- 规则命令 `resp.ok=false` 只回发起连接，不增加 `roomVersion` 或 Replay Step，也不向其他座位广播错误。
+- One Room owns exactly one `GameSession`. The current WebSocket message handler calls `dispatch()` synchronously, so commands within one Node process are naturally serialized.
+- `room-router` validates commands, authorizes seats, and calls `GameSession`; it never writes `GameState` directly.
+- `payload-validation.ts` is pure validation through `validateResourcePayload`, `validateSingleTilePayload`, and `validateMultiTilePayload`. It returns legal normalized values and never writes `GameSession`.
+- Under ADR 0014, the Room's `ready | blocked` write gate must be at command entry. Do not add a generic asynchronous command queue. Durable Room Commit completes synchronously, and save retries run only while the Room is blocked.
+- A rules command returning `resp.ok=false` responds only to its origin connection. It neither increments `roomVersion` nor creates a Replay Step and does not broadcast the error to other seats.
 
-### 11.2 server/game/ — Room + GameSession
+### 11.2 `server/game/`: Room and GameSession
 
-```
+```text
 server/game/
 ├── room.ts                    Room { id, session, players, maxPlayers, startedAt }
 ├── room-registry.ts           RoomRegistry
-├── lobby.ts                   大厅 / 房间列表 / 自动加入
-├── room-persistence-checkpoint.ts  一秒合并写、完成 / 丢弃生命周期
-├── authoritative-session.ts   GameSession extends GameCore — 命令执行中心
+├── lobby.ts                   lobby, room list, and automatic join
+├── room-persistence-checkpoint.ts  one-second coalesced writes and completion/discard lifecycle
+├── authoritative-session.ts   GameSession extends GameCore; command-execution center
 └── persistence/
-    ├── room-persistence.ts    抽象接口
-    ├── sqlite-adapter.ts      data/open-agricola.db / rooms.state_json
+    ├── room-persistence.ts    abstract persistence contract
+    ├── sqlite-adapter.ts      data/open-agricola.db and rooms.state_json
     ├── json-adapter.ts        output/<roomId>.json
-    └── memory-adapter.ts      测试注入
+    └── memory-adapter.ts      test injection
 ```
 
-`RoomPlayer { ws, playerIndex, name, userId? }` 是连接实例，非领域 `PlayerState`。`GameSession` 是 `GameCore` 的薄服务端包装，只注入服务端 custom-code executor；连接绑定、广播和持久化不属于它。
+`RoomPlayer { ws, playerIndex, name, userId? }` represents a connection, not domain `PlayerState`. `GameSession` is a thin server wrapper around `GameCore` that injects the server custom-code executor. Connection binding, broadcasting, and persistence are outside it.
 
-固定持久化 dev 房：`dev2` 至 `dev6`。`PERSIST_ROOMS=sqlite`（默认） / `json` 切换 adapter。普通 SQLite 房间在全部玩家离线后，`waiting` 保留 30 分钟、`playing` 保留 7 天；启动恢复覆盖未过期的两种状态，`custom_card_ids` 一并恢复。允许同座位重连替换旧连接。
+The fixed persistent development rooms are `dev2` through `dev6`. `PERSIST_ROOMS=sqlite`, the default, or `json` chooses the adapter. After every player disconnects, an ordinary SQLite Room is retained for 30 minutes when `waiting` and seven days when `playing`. Startup restores either unexpired state and its `custom_card_ids`. Reconnection may replace the previous connection for one seat.
 
-`roomId` 唯一标识一局游戏：`newGame` 先创建新 `GameSession` 和 UUID，再把在线座位、人数、custom cards、已持久化变体开关及所有连接引用切到新 Room 记录；旧 id 永不复用。首个 `waiting → playing` 转换写入不可变 `started_at`。只有权威 `gameOver` 会在单个 SQLite 事务内写入 `game_results` / `game_result_players` 标量摘要并删除 `rooms.state_json`；TTL、解散、删号和未完成重开只删除可恢复快照，把永久 Game Context 置为 `expired`，不产生结果。归档写失败会回滚，最终全量状态继续保留用于恢复或重试。
+`roomId` uniquely identifies one game. `newGame` first creates a new `GameSession` and UUID, then switches online seats, player count, custom cards, persisted variant flags, and all connection references to the new Room record. It never reuses the old ID. The first `waiting -> playing` transition writes immutable `started_at`. Only authoritative `gameOver` writes scalar summaries to `game_results` and `game_result_players` and deletes `rooms.state_json` in one SQLite transaction. TTL expiry, room dissolution, account deletion, and restart of an unfinished game delete only the recoverable snapshot and mark permanent Game Context as `expired`; they produce no result. An archive-write failure rolls back and retains the full final state for recovery or retry.
 
-`RoomPersistenceCheckpoint` 继续处理等待态、未启用 Replay 的 Room 和非 SQLite adapter。SQLite Replay Room 的成功游戏命令改走 Durable Room Commit：同一事务先写 Room snapshot 与 Replay Step，提交后才广播；WebSocket 关闭时不再为这种 Room 补写旧 checkpoint。
+`RoomPersistenceCheckpoint` continues to serve waiting rooms, rooms without Replay, and non-SQLite adapters. A successful command in a SQLite Replay Room uses Durable Room Commit, writing the Room snapshot and Replay Step in one transaction before broadcast. WebSocket close no longer performs an old checkpoint write for such a Room.
 
-### 11.3 Game Context、Replay 与 Bug Report
+### 11.3 Game Context, Replay, and Bug Report
 
-本节是跨任务实现契约。`room-committer.ts`、`replay-codec.ts`、七表迁移、SQLite 原子写、Game Context resolver、活动局原座位恢复、公开 Replay/Anchor 读取与不可变 Replay Viewer 已落地；Bug Report 模块由后续任务补齐。
+This section is a cross-task implementation contract. `room-committer.ts`, `replay-codec.ts`, the seven-table migration, atomic SQLite writes, the Game Context resolver, original-seat active-game recovery, public Replay and Anchor reads, and the immutable Replay Viewer are implemented. A later task supplies the Bug Report module.
 
-模块：
-
-```
+```text
 server/game/
-├── room-committer.ts          Durable Room Commit 的唯一外部 seam
-├── replay-codec.ts            canonical JSON、delta、gzip、Frame Hash
+├── room-committer.ts          only external seam for Durable Room Commit
+├── replay-codec.ts            canonical JSON, delta, gzip, and Frame Hash
 ├── game-context-store.ts      lifecycle resolver
-├── replay-store.ts            公开 manifest、Segment、Anchor read model
-├── replay-viewer-build.ts     Viewer Build 完整性校验
+├── replay-store.ts            public manifest, Segment, and Anchor read model
+├── replay-viewer-build.ts     Viewer Build integrity checks
 └── persistence/
-    └── sqlite-adapter.ts      Room + Replay + Result 的原子事务
+    └── sqlite-adapter.ts      atomic Room, Replay, and Result transaction
 server/game-context-routes.ts  lifecycle resolver
-server/replay-routes.ts        manifest、Segment、Anchor、Viewer/Asset 静态读取
-server/bug-report-routes.ts    draft、GitHub connection、submit/status、audit
+server/replay-routes.ts        manifest, Segment, Anchor, and Viewer/Asset static reads
+server/bug-report-routes.ts    draft, GitHub connection, submit/status, and audit
 server/bug-report/
-├── bug-report-store.ts        SQLite draft/attempt/claim 状态机
-└── github-issue-client.ts     GitHub App 唯一外部 adapter
+├── bug-report-store.ts        SQLite draft/attempt/claim state machine
+└── github-issue-client.ts     sole external GitHub App adapter
 ```
 
-`RoomCommitter` 是具体深模块，不增加单实现 interface 或 factory。它的外部 interface 只暴露一个提交操作，返回：
+`RoomCommitter` is a concrete deep module; do not add a one-implementation interface or factory. Its external surface exposes one commit operation returning:
 
 ```ts
 type RoomCommitResult =
@@ -1121,58 +1142,61 @@ type RoomCommitResult =
   | { kind: 'blocked'; error: string }
 ```
 
-主链路：
+The main path is:
 
 ```text
 ClientCommand
-  → room-router：验证座位与 payload
-  → GameSession：内置卡同步产生 SessionResponse；可执行 Workshop 卡由会话 Worker 异步返回
-  → RoomCommitter：序列化一次，原子写 Room snapshot + Replay Step
-  → Broadcaster：提交成功后生成各座位遮蔽 envelope 并发送
+  -> room-router: validate seat and payload
+  -> GameSession: built-in cards synchronously produce SessionResponse;
+     executable Workshop cards return asynchronously from the session Worker
+  -> RoomCommitter: serialize once and atomically write Room snapshot plus Replay Step
+  -> Broadcaster: after commit, build viewer-filtered envelopes and send them
 ```
 
-- `resp.ok=false` 绕过提交并只回发起者。成功但 Frame Hash 未变化返回 `unchanged`，只给发起者确认当前状态；重连和补拉也不创建 Step。
-- Replay Step 使用 Room 全局单调 `stepNo`，与 `roomVersion` 分离。多个玩家在同一交互阶段提交时仍串行占用连续 Step；最后一次提交触发的自动引擎结算包含在该 Step 内，规则结果不得依赖提交到达顺序。
-- Step 0 在第一个互动命令前建立。classic deal 已包含在 Frame 中；互动 draft、Parent Selection 和显式多人提交从 Step 1 起记录。
-- 终局 Frame 额外归档权威 `PlayerScoreSummary[]`；历史 Viewer 在 `gameOver` Step 复用只读 `ScoringPad` 展示分类、卡牌加分与总分。
-- Replay Intent 由协议边界的穷尽 switch 白名单化；不保存 `requestId`、token、站点 `userId`、任意原始 WebSocket 消息或未校验 payload。
-- 写失败冻结同一 Frame/Intent，Room 进入 blocked 并拒绝新游戏命令；按 1/2/5/10/30 秒、随后每 30 秒重试。暂停期间重连者等待，不读取未提交内存状态。幂等键相同但 Hash 不同永久阻断并报警。
-- 单实例上限为 30 个普通内存 Room，`waiting` 与 `playing` 都计数，固定 dev Room 排除。可执行 Workshop Room 因“会话 Worker + 代码 Worker”双 Worker 形态另限 15 个；进程级 15 槽统一计算 WS Room、恢复 Room 与 HTTP sandbox 的 Worker 预留。房间 FIFO 覆盖会话执行直到 Durable Commit 完成，同一连接的换房 / 换座等待在途命令。达到上限只拒绝需要新增对应资源的 Room / `newGame`。内置卡房间不创建会话 Worker，也不增加房间分片、Redis 或外部队列。
+- `resp.ok=false` bypasses commit and responds only to the caller. A successful command whose Frame Hash is unchanged returns `unchanged` and confirms current state only to its caller. Reconnect and snapshot refetch create no Step.
+- Replay Step has a Room-global monotonic `stepNo`, independent of `roomVersion`. Concurrent players submitting in one interaction still serialize into consecutive Steps. Automatic engine settlement caused by the last submission belongs to that Step. Rule results must not depend on arrival order.
+- Step 0 is established before the first interactive command. The classic deal is already in the Frame. Interactive draft, Parent Selection, and explicit multiplayer submissions start at Step 1.
+- A terminal Frame also archives authoritative `PlayerScoreSummary[]`. At a `gameOver` Step, historical Viewer reuses the read-only `ScoringPad` to show categories, card bonuses, and totals.
+- An exhaustive protocol-boundary switch allowlists Replay Intent. Never store `requestId`, tokens, site `userId`, arbitrary raw WebSocket messages, or unvalidated payloads.
+- A write failure freezes the same Frame and Intent, marks the Room blocked, and rejects new game commands. Retry after 1, 2, 5, 10, and 30 seconds, then every 30 seconds. Reconnecting clients wait during the pause and never read uncommitted memory state. The same idempotency key with a different hash permanently blocks and alerts.
+- One instance allows at most 30 ordinary in-memory Rooms, counting both waiting and playing but excluding fixed development Rooms. An executable Workshop Room uses a session Worker plus a code Worker and has a separate limit of 15. The process-wide 15-slot accounting includes Worker reservations for WebSocket Rooms, restored Rooms, and HTTP sandboxes. A per-Room FIFO spans session execution through Durable Commit. Room or seat changes on the same connection wait for the in-flight command. Reaching a limit rejects only operations that need another corresponding Room or `newGame`. Built-in-card Rooms create no session Worker. Do not add Room sharding, Redis, or an external queue.
 
-完成 Replay 与 Bug Report 使用 ADR-0013 的公开/私有读取契约。GitHub 提交以 SQLite draft、稳定 `submissionId`、attempt 行和原子 claim 实现可恢复执行；生产 GitHub App client 与测试 fake 是 true-external seam 的两个 adapter。
+Completed Replay and Bug Report behavior uses ADR 0013's public and private read contract. GitHub submission is recoverable through SQLite drafts, stable `submissionId`, attempt rows, and atomic claims. The production GitHub App client and test fake are the two adapters at the true external seam.
 
-### 11.4 server/custom-code/ — 隔离执行
+### 11.4 `server/custom-code/`: Isolated execution
 
-```
+```text
 server/custom-code/
-├── compiler.ts          TS → JS（ts-blank-space + esbuild）
-├── runtime.ts           沙盒运行时
-├── engine.ts            hook / phase / scope 校验 + 调度
-├── isolate-runner.ts    isolate-vm 隔离入口
-├── executor-worker.ts   Worker Thread 入口
-└── client.ts            主进程 → Worker Thread 同步调用客户端
+├── compiler.ts          TypeScript to JavaScript through ts-blank-space and esbuild
+├── runtime.ts           sandbox runtime
+├── engine.ts            hook, phase, and scope validation plus dispatch
+├── isolate-runner.ts    isolated-vm entry
+├── executor-worker.ts   Worker Thread entry
+└── client.ts            synchronous main-process to Worker Thread client
 ```
 
-主后端只保存 `compiled_code + code_manifest`。尚未内置的可执行 Workshop 卡在 HTTP sandbox 和 WS community room 中各自拥有一个 `CustomSessionExecutor`：整个 `GameSession` 命令进入专用 Worker，房间内按 FIFO 串行到 Durable Commit 完成，不同房间并行；同一连接的后续换房 / 换座命令也进入连接 FIFO，不能改变在途命令的 Room 或 replay actor。主线程只保留最后成功快照的无执行代码镜像，用于广播、持久化和座位校验。Worker 内部继续由 `client.ts` 同步调用 isolated-vm，因此 `Atomics.wait()` 不会运行在 HTTP/WS event loop；每条命令前保留含 pending/undo history 的内存 checkpoint，hook 超时或 runtime warning 恢复该 checkpoint但保留诊断 warning，Worker 崩溃或总超时则终止并从最后成功快照重建。已随源码发布并标记 `built_in=1` 的卡直接走内置实现，不创建该 Worker。浏览器本地 Workshop sandbox 的 Worker 与恢复流程不变。沙盒约束唯一真源 → `docs/CUSTOM_CARD_SANDBOX.md`（含 `prompt-sync:begin/end` 标记块，`pnpm run check:prompt-sync` 校验）。
+The main backend stores only `compiled_code + code_manifest`. An executable Workshop card that is not built in gets a `CustomSessionExecutor` in both an HTTP sandbox and a WebSocket community Room. The entire `GameSession` command enters a dedicated Worker; one Room runs FIFO through Durable Commit and different Rooms run in parallel. Later room or seat changes on the same connection also enter the connection FIFO and cannot alter an in-flight command's Room or Replay actor.
 
-### 11.5 HTTP 端点
+The main thread retains only a nonexecuting mirror of the latest successful snapshot for broadcast, persistence, and seat validation. Inside the Worker, `client.ts` synchronously calls isolated-vm, so `Atomics.wait()` never runs on the HTTP or WebSocket event loop. Before each command, an in-memory checkpoint preserves pending state and undo history. Hook timeout or runtime warning restores that checkpoint while retaining the diagnostic warning. Worker crash or overall timeout terminates it and rebuilds from the latest successful snapshot. A source-shipped card marked `built_in=1` follows built-in implementation and creates no such Worker. Browser-local Workshop Worker and recovery behavior remain unchanged. The single source of truth for sandbox constraints is [`docs/CUSTOM_CARD_SANDBOX.md`](CUSTOM_CARD_SANDBOX.md), including its `prompt-sync:begin/end` marker blocks, validated by `pnpm run check:prompt-sync`.
 
-`server/game-router.ts` + `server/index.ts`：
+### 11.5 HTTP endpoints
 
-- `GET /api/health` 健康检查
-- `GET /api/rooms` 房间列表
-- `GET /api/game/state` 补拉当前快照
-- `POST /api/game/new` 创建新对局或测试重置（支持 `seed?: number`）
-- `POST /api/game/load` 加载测试状态
-- `POST /api/game/dev/*` 单机调试 / E2E 场景布置
-- `POST /api/game/new-sandbox` 创建独立 `GameSession`，**不创建 WS 房间**
-- `GET /cards-manifest.json` 主 bundle 启动时拉卡牌元数据
+`server/game-router.ts` and `server/index.ts` provide:
 
-不变量：HTTP 仅运维 / 测试 / 调试，不是实时同步主路径；返回结构与 `SessionResponse` 一致；`validate` 接口纯校验，不写权威状态。WS 房间内 dev 命令优先走 `ClientCommand`。
+- `GET /api/health`: health check;
+- `GET /api/rooms`: room list;
+- `GET /api/game/state`: current snapshot refetch;
+- `POST /api/game/new`: new game or test reset, supporting `seed?: number`;
+- `POST /api/game/load`: load test state;
+- `POST /api/game/dev/*`: single-player debugging and E2E setup;
+- `POST /api/game/new-sandbox`: create an independent `GameSession` without a WebSocket Room;
+- `GET /cards-manifest.json`: card metadata fetched by the main bundle at startup.
 
-Game Context、Replay 和 Bug Report 是产品读取/集成接口，不替代 WS 实时游戏同步：
+HTTP serves operations, tests, and debugging; it is not the real-time synchronization path. Responses match `SessionResponse`. Validation endpoints are pure and never write authoritative state. Inside a WebSocket Room, development commands should use `ClientCommand`.
 
-```
+Game Context, Replay, and Bug Report are product read and integration APIs, not replacements for WebSocket game synchronization:
+
+```text
 GET    /api/v1/game-contexts/:roomId
 GET    /api/v1/replays/:roomId/manifest
 GET    /api/v1/replays/:roomId/segments/:checkpointStepNo
@@ -1194,66 +1218,67 @@ POST   /api/v1/issue-submission-connection/github/complete
 POST   /api/v1/github-app/webhook
 ```
 
-公开 Replay API 返回版本化 JSON，不暴露 SQLite gzip/BLOB 编码。Segment 每次最多展开一个 checkpoint 链并在服务端逐帧验 Hash；Anchor 必须精确匹配 `stepNo + frameHash`。completed、expired、removed resolver 与公开 Replay 在登录门外；active descriptor、恢复、Bug Report、临时证据和维护者取证分别执行 ADR-0013 的座位或管理员授权。外部错误继续使用 ADR-0013 的 `{ ok:false, code, lifecycle?, message }` 判别式结构。
+Public Replay APIs return versioned JSON and never expose SQLite gzip or BLOB encoding. A Segment expands at most one checkpoint chain and verifies every frame hash on the server. An Anchor must exactly match `stepNo + frameHash`. Completed, expired, and removed resolution and public Replay remain outside login. Active descriptors, recovery, Bug Report, temporary evidence, and maintainer forensics enforce ADR 0013's seat or administrator authorization independently. External errors retain ADR 0013's discriminated `{ ok:false, code, lifecycle?, message }` form.
 
-### 11.6 server/workshop.ts + server/workshop-pr/
+### 11.6 `server/workshop.ts` and `server/workshop-pr/`
 
-Workshop / Sandbox 后端（自定义卡上传、编译、PR 集成）。沙盒配置由 SQLite 表 `sandbox_settings` / `sandbox_cards` 持久化，覆盖 `playerCount`、`deckIds`、Through the Seasons、Farmers of the Moor 和 FoM 小改良不足时是否允许开局；`POST /api/game/new-sandbox` 读取这些配置并把 `playerCount` / `deckIds` / `customCardIds` / variant flags 交给 `createInitialState()` 统一处理。
+These modules provide the Workshop and Sandbox backend for custom-card upload, compilation, and pull-request integration. SQLite tables `sandbox_settings` and `sandbox_cards` persist sandbox configuration: `playerCount`, `deckIds`, Through the Seasons, Farmers of the Moor, and whether a game may start with too few FoM minor improvements. `POST /api/game/new-sandbox` reads these settings and passes `playerCount`, `deckIds`, `customCardIds`, and variant flags to `createInitialState()` for unified handling.
 
-### 11.7 数据库
+### 11.7 Database
 
-`server/db.ts` —— SQLite 连接（`better-sqlite3`，按 Node 22 ABI 编译）。表：`rooms` / `users` / `sandbox_settings` / `sandbox_cards` / `custom_cards` / `pr_proposals` 等。
+`server/db.ts` owns the SQLite connection through `better-sqlite3`, built for the Node 22 ABI. Existing tables include `rooms`, `users`, `sandbox_settings`, `sandbox_cards`, `custom_cards`, and `pr_proposals`.
 
-ADR-0014 使用下一可用迁移增加十张表；首个正式 Replay `schemaVersion=1`，不保留未上线实验格式：
+ADR 0014 uses the next available migration to add ten tables. The first production Replay is `schemaVersion=1`; no unreleased experimental format is retained:
 
-| 表 | 所有事实 |
+| Table | Facts owned |
 |---|---|
-| `game_contexts` | 永久 `roomId`、`active/completed/expired/removed`、phase、`available/legacy_no_replay`、过期时间、Tombstone 原因 |
-| `game_context_participants` | 活动房间删除前保存座位与站点用户关联；删号后外键置空，供保留证据投影匿名座位，证据清理后同步删除 |
-| `game_replays` | `schemaVersion`、`viewerBuildId`、`gameBuildId`、recording/completed 状态、最新 Step、`missingPrefix`、自定义卡快照 |
-| `game_replay_steps` | `roomId + stepNo`、`roomVersion`、`checkpointStepNo`、玩家座位、白名单 intent、payload kind/gzip、Frame Hash |
-| `issue_submission_connections` | GitHub 数字用户 id、AES-256-GCM token/refresh token、nonce/tag、`keyId`、过期与撤销状态 |
-| `account_deletion_requests` | 已提交删号请求、下一次外部清理时间和最后错误；账号先失效，GitHub 清理失败后由后台重试 |
-| `github_grant_revocations` | 删除竞态或临时失败后待重试的加密 GitHub grant |
-| `bug_reports` | 稳定 `submissionId`、Reporter 关联、Anchor、草稿、作者选择、交付状态、Issue 编号/URL、证据到期时间 |
-| `bug_report_attempts` | 30 天交付/对账/限流尝试元数据；不保存 token、现象副本或原始 GitHub 响应 |
-| `bug_report_evidence_audit` | 维护者、时间、Anchor、视角和非空理由，永久保留 |
+| `game_contexts` | Permanent `roomId`, `active/completed/expired/removed`, phase, `available/legacy_no_replay`, expiry, and Tombstone reason |
+| `game_context_participants` | Seat-to-site-user associations captured before an active Room is removed; account deletion nulls the foreign key for anonymous-seat evidence projection, and evidence cleanup removes the row |
+| `game_replays` | `schemaVersion`, `viewerBuildId`, `gameBuildId`, recording or completed state, latest Step, `missingPrefix`, and custom-card snapshot |
+| `game_replay_steps` | `roomId + stepNo`, `roomVersion`, `checkpointStepNo`, actor seat, allowlisted intent, payload kind or gzip, and Frame Hash |
+| `issue_submission_connections` | Numeric GitHub user ID, AES-256-GCM token and refresh token, nonce and tag, `keyId`, expiry, and revocation state |
+| `account_deletion_requests` | Submitted deletion request, next external cleanup time, and last error; the account is disabled first and a failed GitHub cleanup retries in background |
+| `github_grant_revocations` | Encrypted GitHub grants awaiting retry after a deletion race or temporary failure |
+| `bug_reports` | Stable `submissionId`, Reporter association, Anchor, draft, author choice, delivery state, Issue number and URL, and evidence expiry |
+| `bug_report_attempts` | Thirty-day delivery, reconciliation, and rate-limit attempt metadata; never token, symptom copy, or raw GitHub response |
+| `bug_report_evidence_audit` | Permanent maintainer identity, time, Anchor, perspective, and nonempty reason |
 
-继续复用：
+The following tables remain in use:
 
-- `rooms` / `room_players`：活动恢复 snapshot 与站点座位所有权。
-- `game_results` / `game_result_players`：完成局标量结果、Replay Participant 显示名和内部用户关联。
-- `oauth_states`：增加加密 PKCE verifier，复用短期 state/returnTo 生命周期。
+- `rooms` and `room_players` for active recovery snapshots and site-seat ownership;
+- `game_results` and `game_result_players` for completed scalar results, Replay Participant names, and internal user associations;
+- `oauth_states`, extended with an encrypted PKCE verifier under its existing short-lived state and `returnTo` lifecycle.
 
-不增加 Replay Segment、Reported Evidence payload、quota counter 或 webhook delivery 表。Segment 由 `checkpointStepNo` 表达；`bug_reports.evidence_expires_at` 只在 Context 尚未完成时保护共享 Segment，正常完赛后改用永久 Replay Archive；额度和全站 20 次/分钟 GitHub 发送窗口从 report/attempt 行查询；撤销 webhook 操作本身幂等。
+Do not add Replay Segment, Reported Evidence payload, quota-counter, or webhook-delivery tables. `checkpointStepNo` represents Segments. `bug_reports.evidence_expires_at` protects a shared Segment only while the Context is incomplete; normal completion switches to the permanent Replay Archive. Report and attempt rows answer quotas and the sitewide GitHub sending window of 20 requests per minute. Revocation webhook operations are intrinsically idempotent.
 
-迁移必须幂等回填现有数据：`rooms` 生成 active `game_contexts`，`game_results` 生成 completed `game_contexts`，同一 `roomId` 同时存在时 completed 优先。上线前完成局标记 `legacy_no_replay`，不创建 `game_replays` header、Replay Frame、`schemaVersion` 或 `viewerBuildId`；completed descriptor 仍返回 Game Result Archive 摘要，只有 `replayStatus=available` 才返回 manifest 与 Segment。因此只有两个既有来源都不存在的 id 才返回 `unknown_context`。
+Migration must idempotently backfill existing data. `rooms` become active `game_contexts`; `game_results` become completed contexts; if one `roomId` exists in both, completed wins. A game completed before launch is marked `legacy_no_replay` and gets no `game_replays` header, Replay Frame, `schemaVersion`, or `viewerBuildId`. Its completed descriptor still returns the Game Result Archive summary; manifest and Segment exist only when `replayStatus=available`. Therefore an ID is `unknown_context` only when absent from both existing sources.
 
-### 11.8 GitHub 交付、安全与删除
+### 11.8 GitHub delivery, security, and deletion
 
-- 创建 draft 时由服务端确认 Reporter 是 active `room_players` 或 completed `game_result_players` 中的原座位，并固定 `roomId + stepNo + frameHash`。现象 trim 后必须为 1–2000 个 Unicode 字符；不做语法或句号判断；每用户最多保留 5 个尚未丢弃且 Issue 编号未知的报告。
-- `github-issue-client` 的 production adapter 只接受服务端固定 Repository ID / Installation ID，不接受客户端 owner、repo、labels 或 URL；所有 GitHub 请求使用 15 秒超时。marker 对账只接受由配置 GitHub App 创建、不早于对应交付尝试且唯一以预期 marker 结尾的 Issue。测试使用 fake adapter，覆盖成功、401、权限 403、限流 403/429、410/422、网络错误、5xx 和不确定结果对账。
-- 本人提交使用加密的 GitHub App user token，并要求玩家确认 GitHub 公开作者身份无法由站点删号匿名化；报告持久化确认时的 GitHub 数字用户 id，排队和实际投递都拒绝静默切换账号，账号变化后必须重新确认。Hosted Issue Identity 使用不落盘的 installation token。连接失效绝不自动换作者。token/refresh token 使用 AES-256-GCM、每行独立 nonce/tag 和 `keyId`；PKCE verifier 同样加密且只活到 OAuth state 到期。每用户只保留一个 live Bug Report state；GitHub callback 只把 state/code 放进前端 URL fragment，前端回到原顶层上下文后用分区 session 调用 complete，服务端按当前站点用户消费 state 后才换取令牌。
-- SQLite executor 原子 claim 一个 `submissionId`。不确定响应先按正文稳定标记对账；重试和限流遵守 ADR-0012。客户端只轮询站内状态，不直接调用 GitHub。
-- Bug Report 底栏请求带当前 `roomId` 的 connection status；只有该用户是原参与者且 Room 已存在 Replay Step 时才启用新建入口。完成局未登录时保留当前 Replay anchor 进入登录，已保存草稿在关联活动局过期或下架后仍可恢复或丢弃。等待局、未录制局和 legacy no-replay 局返回明确的 anchor unavailable，不伪装成非参与者。
-- Issue 标题为清洗并截断的 `Game bug: <现象首行>`，正文不包含截图、日志、Frame payload、其他玩家身份或隐藏信息。issues-only 仓库自动化统一添加 `needs-triage`；通知使用 GitHub 原生 watching。
-- 主动断开立即删除令牌。只有本地未提交草稿的账号可直接删除草稿和账号；存在连接、公开 Issue 或已进入交付的报告时，删号先持久化 `deletion_pending`、注销全部会话并禁用本地连接，再由同一 installation adapter 修改已知 Issue 正文；失败时后台按持久化状态重试。已放弃但曾提交且 Issue 编号未知的报告先按 marker 对账；GitHub `issues.deleted` webhook 使已删除 Issue 直接完成该项清理。GitHub 回包确认正文不再含站点用户 id 后才清除最终内部关联。
-- 维护者全开 evidence 读取必须提供非空理由并写 `bug_report_evidence_audit`，审计行同时保存不受账号外键删除影响的维护者身份快照；每个维护者账号每小时最多读取 30 次。返回证据前复用当前 Participant tombstone 投影；上线前已过期且没有座位快照的证据按全部座位已匿名化处理。`server/game/replay-removal.ts` 在删除 Step payload、匿名化或明确删除 Result 并把 Context 改为 removed 前，先把整次操作作为一条版本化 batch record fsync 追加到数据库外 ledger；batch 分别记录每局的 `eraseResult` 和永久资产下架规则。无换行的末尾残片会回滚，已提交坏行仍 fail-closed。后端监听前和恢复 CLI 都会幂等重放该 ledger，并补录旧备份中新发现的违规资产引用；同 Hash 后续不得再次归档。损坏的无关 Replay 元数据不会阻断 Tombstone 重放，无法证明未引用时只保守保留普通资源。共享内容资源仅在没有其他未下架 Replay 引用时删除，资源本身违规时先下架所有可识别引用局并强制删除。首版不做管理 UI。
-- public resolver/manifest/Segment 使用独立 IP 读取额度和响应大小上限；active evidence、Bug Report 和维护者接口按账号限流。任何日志都不得输出 token、Frame payload、现象原文或原始 GitHub 响应。
+- On draft creation, the server confirms that Reporter owns an original seat in active `room_players` or completed `game_result_players`, and freezes `roomId + stepNo + frameHash`. The trimmed symptom must contain 1 to 2,000 Unicode characters; there is no grammar or sentence-ending test. One user may retain at most five reports that are not discarded and have no known Issue number.
+- The production `github-issue-client` accepts only server-configured Repository ID and Installation ID, never client owner, repository, labels, or URL. Every GitHub request has a 15-second timeout. Marker reconciliation accepts only an Issue created by the configured GitHub App, no earlier than its delivery attempt, and ending uniquely with the expected marker. The fake adapter covers success, 401, permission 403, rate-limit 403 or 429, 410 or 422, network errors, 5xx, and reconciliation after an uncertain response.
+- Self-authored submission uses an encrypted GitHub App user token and requires confirmation that the public GitHub author identity cannot be anonymized by deleting the site account. The report persists the confirmed numeric GitHub user ID. Queueing and delivery reject silent account switching; the user must reconfirm after a change. Hosted Issue Identity uses an in-memory installation token. An invalid connection never changes author automatically. Token and refresh token use AES-256-GCM with per-row nonce and tag plus `keyId`. The PKCE verifier is encrypted and lives only until OAuth-state expiry. Each user retains one live Bug Report state. GitHub callback puts only state and code in the frontend URL fragment. After returning to the original top-level context, the frontend calls complete with a partitioned session; only then does the server consume state for the current site user and exchange the token.
+- The SQLite executor atomically claims one `submissionId`. After an uncertain response, it reconciles by the stable body marker before retrying. Retry and rate limiting follow ADR 0012. The client polls only site status and never GitHub directly.
+- The Bug Report footer requests connection status for the current `roomId`. New-report entry is enabled only when the user is an original participant and the Room has at least one Replay Step. From an unauthenticated completed game, login preserves the current Replay Anchor. A saved draft remains recoverable or discardable after its associated active game expires or is removed. Waiting, unrecorded, and legacy-no-replay games return explicit anchor-unavailable states rather than pretending the user is not a participant.
+- Issue title is a sanitized and truncated `Game bug: <first symptom line>`. Body contains no screenshot, log, Frame payload, other-player identity, or hidden information. Issues-only repository automation adds `needs-triage`; notifications rely on native GitHub watching.
+- Explicit disconnect deletes tokens immediately. An account with only local unsubmitted drafts may delete those drafts and the account directly. If it has a connection, public Issue, or report already in delivery, account deletion first persists `deletion_pending`, signs out every session, and disables the local connection; the same installation adapter then edits known Issue bodies, retrying in background on failure. A discarded but previously submitted report with unknown Issue number reconciles by marker first. A GitHub `issues.deleted` webhook completes cleanup for a deleted Issue. Final internal association is cleared only after GitHub confirms that the body no longer contains the site user ID.
+- Full maintainer evidence reads require a nonempty reason and append `bug_report_evidence_audit`; the audit stores a maintainer identity snapshot unaffected by account-foreign-key deletion. Each maintainer may read at most 30 times per hour. Before returning evidence, the server reapplies the current Participant tombstone projection. Evidence that expired before launch without a seat snapshot treats every seat as anonymized.
+- Before `server/game/replay-removal.ts` deletes Step payloads, anonymizes or explicitly deletes Results, and marks the Context removed, it appends and fsyncs the entire operation as one versioned batch record in an out-of-database ledger. Each game entry independently records `eraseResult` and permanent-asset removal rules. A trailing fragment without a newline rolls back; a committed malformed line remains fail-closed. Before the backend listens, and from the recovery CLI, ledger replay is idempotent and records newly discovered forbidden asset references from old backups. A hash may never be archived again. Corrupt unrelated Replay metadata does not block Tombstone replay; if the system cannot prove an ordinary asset is unreferenced, it conservatively keeps it. Shared content is deleted only when no other available Replay references it. If the resource itself is forbidden, all identifiable referencing games are removed first and the asset is forcibly deleted. Version one has no administration UI.
+- Public resolver, manifest, and Segment endpoints have independent per-IP read quotas and response-size caps. Active evidence, Bug Report, and maintainer endpoints are rate-limited by account. Logs must never contain tokens, Frame payloads, symptom text, or raw GitHub responses.
 
-### 11.9 部署、回滚与观测
+### 11.9 Deployment, rollback, and observability
 
-生产除现有 SQLite 持久卷外，还必须有三个不会被镜像部署覆盖的位置：
+In addition to the existing SQLite persistent volume, production requires three locations that image deployment never overwrites:
 
+```text
+replay-viewers/<viewerBuildId>/  immutable historical Viewer code Build
+replay-assets/<sha256>           content-addressed Replay Card Snapshot assets
+replay-removals.jsonl            out-of-database deletion ledger
 ```
-replay-viewers/<viewerBuildId>/  不可变历史 Viewer 代码 Build
-replay-assets/<sha256>           Replay Card Snapshot 内容资源
-replay-removals.jsonl            数据库外删除 ledger
-```
 
-完整目标配置：
+The complete target configuration is:
 
-```
+```text
 REPLAY_NEW_ROOMS_ENABLED
 REPLAY_VIEWER_BUILD_ID
 REPLAY_VIEWER_ROOT
@@ -1273,128 +1298,130 @@ BUG_REPORT_TOKEN_ENCRYPTION_KEYS
 BUG_REPORT_TOKEN_ACTIVE_KEY_ID
 ```
 
-当前 Durable Room Commit 读取 `REPLAY_NEW_ROOMS_ENABLED`、`REPLAY_VIEWER_BUILD_ID`、`REPLAY_VIEWER_ROOT`、`REPLAY_ASSET_ROOT` 和 `GAME_BUILD_ID`，启用录制时只接受 SQLite 持久化。创建 Room 时持久化录制决定、两个 Build ID 和自定义卡运行时快照；未发布自定义卡要求玩家明确确认永久公开。Viewer Build ID 必须是完整 `manifest.json` 的 SHA-256，清单固定 `index.html` 入口及目录内每个文件的 SHA-256；Build 只保存 Viewer 代码、样式和卡牌 manifest，BGA 棋盘图、卡图和字体与主站使用同一 `BGA_CDN_BASE_URL`，不归档图片历史；校验失败时拒绝创建。自定义卡图在 Step 0 前复制到内容寻址资源目录并把 Replay header 改写为不可变 URL。录制开启的等待局在 Step 0 建立前拒绝游戏写入。未完成局过期时删除未被有效 Bug Report Anchor 保护的 Replay payload；小时级清理会在 evidence 到期后再次裁剪 Segment、空 header 和无引用内容资源。已有 Replay header 不受后续配置变化影响并继续记录，开关开启后恢复出的旧进行局会以 `missingPrefix=true` 建立 Step 0。
+Durable Room Commit currently reads `REPLAY_NEW_ROOMS_ENABLED`, `REPLAY_VIEWER_BUILD_ID`, `REPLAY_VIEWER_ROOT`, `REPLAY_ASSET_ROOT`, and `GAME_BUILD_ID`. Recording requires SQLite persistence. Room creation freezes the recording decision, both Build IDs, and custom-card runtime snapshot. An unpublished custom card requires explicit player consent to permanent publication. Viewer Build ID is the SHA-256 of the complete `manifest.json`, which fixes the `index.html` entry and every file's SHA-256. A Build stores only Viewer code, styles, and card manifest. BGA board art, card art, and fonts share the main site's `BGA_CDN_BASE_URL` and are not archived. Room creation fails when Build validation fails.
 
-部署顺序固定为：
+Before Step 0, custom-card artwork is copied into the content-addressed asset root and the Replay header is rewritten to an immutable URL. A recording-enabled waiting Room rejects game writes until Step 0 exists. When an unfinished game expires, unprotected Replay payload is deleted unless a valid Bug Report Anchor retains it. Hourly cleanup trims Segments, empty headers, and unreferenced assets after evidence expiry. Later configuration changes do not alter an existing Replay header, which continues recording. If recording is later enabled, a restored older active Room starts with a `missingPrefix=true` Step 0.
 
-1. 追加并校验内容寻址 Viewer Build，旧目录不删除。
-2. 备份 SQLite、Replay 资源和删除 ledger，运行数据库迁移并核对既有 `rooms` / `game_results` 的 Context 回填数量，部署 recorder-compatible 后端；两个功能开关保持关闭。
-3. 启动时为恢复出的旧活动 Room 建立 `missingPrefix=true` 的 Step 0，再开始接受命令。
-4. 设置已存在的 `REPLAY_VIEWER_BUILD_ID` 并启用新 Room 录制；任何已有 Replay header 的 Room 此后无条件继续记录。
-5. 部署顶层 Game Context Router 和公开 Replay UI。
-6. 配置并实测 GitHub App 后启用 Bug Report。
+Deployment order is fixed:
 
-启用录制后，应用只能回滚到支持所有活动 Room `schemaVersion` 的 recorder-compatible 构建；不能回滚到功能上线前后端。Viewer Build 必须先存在，后端才能把其 id 锁进新 Room。缺少 Viewer、持久化不可写或 Room 数达到 30 时，readiness 进入 degraded 并拒绝新建 Room，不牺牲已有 Room。
+1. Append and validate a content-addressed Viewer Build. Never remove old directories.
+2. Back up SQLite, Replay assets, and the deletion ledger. Run database migration and reconcile Context-backfill counts from existing `rooms` and `game_results`. Deploy the recorder-compatible backend with both feature switches disabled.
+3. At startup, create `missingPrefix=true` Step 0 for restored old active Rooms before accepting commands.
+4. Set an existing `REPLAY_VIEWER_BUILD_ID` and enable new-Room recording. Every Room with an existing Replay header continues recording unconditionally.
+5. Deploy the top-level Game Context Router and public Replay UI.
+6. Configure and exercise the GitHub App before enabling Bug Report.
 
-首版不引入新的 metrics 后端。结构化日志和健康状态至少暴露：普通 Room 数、容量拒绝、Durable Room Commit latency/error/retry、blocked Room 数、Hash 冲突、Replay payload 大小/损坏、GitHub queue/attempt/rate-limit、缺失 Viewer Build。日志字段只含稳定 id 和数值，不含受保护 payload。
+After recording is enabled, the application may roll back only to a recorder-compatible build supporting every active Room `schemaVersion`; it cannot roll back to a backend predating the feature. The Viewer Build must exist before the backend freezes its ID into a new Room. Missing Viewer, unwritable persistence, or the 30-Room capacity limit makes readiness degraded and rejects new Rooms without sacrificing existing ones.
+
+Version one adds no metrics backend. Structured logs and health state must expose at least ordinary Room count, capacity rejection, Durable Room Commit latency, errors, and retries, blocked Room count, hash collisions, Replay payload size and corruption, GitHub queue, attempts, and rate limits, and missing Viewer Build. Log fields contain only stable IDs and numbers, never protected payloads.
 
 ---
 
-## 12. client/ — 前端
+## 12. `client/`: Frontend
 
-### 12.1 客户端 bundle 边界
+### 12.1 Client bundle boundaries
 
-| Bundle | 入口 | 路径 | 约束 |
+| Bundle | Entry | Paths | Constraint |
 |---|---|---|---|
-| `client-app` | `client/main.tsx` | `client/{app,components,services,hooks,contexts,utils}/` | 走 WS；`shared/*` 只准用 `contract` / `domain` / `i18n`，卡牌展示走 manifest-backed `card-meta` + `custom-card-metadata` |
-| `client-sandbox` | `client/sandbox/index.tsx` | `client/sandbox/` | 懒加载 Workshop sandbox UI；规则仍由后端 sandbox 路径执行。该目录是前端唯一允许引入完整 `shared/*` 的边界 |
-| `local-sandbox-worker` | `client/local-sandbox/worker.ts`（`new Worker(new URL(...))` 懒加载） | `client/local-sandbox/` | 工坊试玩 browser 模式的引擎 Worker。worker 侧四文件（worker / worker-core / browser-runtime / browser-executor）允许完整 `shared/*`（eslint S6c 豁免）；`local-transport` / `persistence` / `workshop-launch` 被主 bundle 引用，对 shared 仅 type-only import，保证引擎不进主 bundle |
-| `replay-viewer` | `replay-viewer/src/main.tsx` | `replay-viewer/` | 无登录、Cookie、WS 或命令发送；只读取公开 Replay JSON，并复用归档时编译进去的显示过滤与棋盘投影 |
+| `client-app` | `client/main.tsx` | `client/{app,components,services,hooks,contexts,utils}/` | Uses WebSocket. From `shared/*`, imports only `contract`, `domain`, and `i18n`. Card display uses manifest-backed `card-meta` plus `custom-card-metadata`. |
+| `client-sandbox` | `client/sandbox/index.tsx` | `client/sandbox/` | Lazy-loads Workshop sandbox UI; rules still execute through the backend sandbox path. This is the only frontend directory allowed to import complete `shared/*`. |
+| `local-sandbox-worker` | lazily created `client/local-sandbox/worker.ts` | `client/local-sandbox/` | Browser-mode engine Worker for Workshop playtesting. Its four Worker-side files may import complete `shared/*` under ESLint S6c. Main-bundle `local-transport`, `persistence`, and `workshop-launch` use type-only shared imports, keeping the engine out of the main bundle. |
+| `replay-viewer` | `replay-viewer/src/main.tsx` | `replay-viewer/` | Has no login, cookies, WebSocket, or command sending. It reads only public Replay JSON and reuses display filtering and board projection compiled at archive time. |
 
-主 bundle 预算：`scripts/check-bundle-size.ts` strict（main ≤ 550KB raw / ≤ 170KB gzip）。
+Strict main-bundle budgets in `scripts/check-bundle-size.ts` are 550 KB raw and 170 KB gzip.
 
-### 12.2 服务层 client/services/
+### 12.2 Service layer under `client/services/`
 
-- `gameTransport.ts` —— `WsGameTransport` 类管理 WebSocket 连接（不在 React Context；在 service 层）；URL 切换 `?transport=ws` / `?player=p1|p2` / `?room=devN`。
-- `card-meta.ts` —— 启动时 `GET /cards-manifest.json` 运行时拉取卡牌元数据；`CUSTOM_*` overlay 只读 `shared/cards/custom-card-metadata.ts`。
-- `rehydrate.ts` —— 轻量 rehydrator，跳过 `ActionSpace.onTaken` 回调，切断对 `shared/actions` / `shared/cards/catalog` 的依赖链。
-- `llmPrompts.ts` —— Workshop 卡牌设计师 system prompt；hook / phase / scope / actionId 表运行时从 shared 真相源 + 描述元数据（`sandbox-hook-meta.ts` 等）渲染，不再手工镜像。
+- `gameTransport.ts`: `WsGameTransport` manages the WebSocket connection in the service layer, not React Context. URL switches include `?transport=ws`, `?player=p1|p2`, and `?room=devN`.
+- `card-meta.ts`: fetches card metadata from `GET /cards-manifest.json` at startup. The `CUSTOM_*` overlay reads only `shared/cards/custom-card-metadata.ts`.
+- `rehydrate.ts`: a lightweight rehydrator that skips `ActionSpace.onTaken` callbacks and breaks dependency chains into `shared/actions` and `shared/cards/catalog`.
+- `llmPrompts.ts`: Workshop card-designer system prompts. Hook, phase, scope, and action-ID tables render at runtime from shared truth sources and descriptive metadata such as `sandbox-hook-meta.ts`; no manual mirror remains.
 
-### 12.3 同步状态层
+### 12.3 Synchronized state layer
 
-- `client/hooks/useGameSync.ts` —— hydrate 服务端快照，持有 `state` / `pending` / `interaction` / `scores`，**整体替换**。
-- 收到 `stateUpdate` 处理顺序：`normalizeState()` → `createActionSpaces()` → 用服务端 `resources` / `takenBy` 覆盖模板字段 → 替换 store。
-- 前端**不做乐观提交**：点完发命令，等 `stateUpdate` 到达再改 UI。
-- 本地 UI 临时态（hover / 临时选择 / 输入框）独立管理；新快照到达后检查本地选择是否仍合法，不合法清空。
-- 断线重连：`socket reconnect → joinRoom → roomJoined(status, players, maxPlayers)`；`waiting` 恢复等待页，`playing` 才继续 `getState → stateUpdate → 整体替换`。已连接玩家在 `newGame` 因缺席座位回到等待态时，服务端广播 `roomWaiting(roomId, players, maxPlayers)`，前端立即隐藏旧棋盘并恢复等待页。
+- `client/hooks/useGameSync.ts` hydrates the server snapshot and holds `state`, `pending`, `interaction`, and `scores`, replacing them as a unit.
+- A `stateUpdate` is processed as `normalizeState()`, `createActionSpaces()`, overlay server `resources` and `takenBy` on template fields, then replace the store.
+- The frontend makes no optimistic commits. A click sends a command and UI state changes only after `stateUpdate` arrives.
+- Local ephemeral UI state such as hover, draft selection, and input fields is separate. On a new snapshot, invalid local selection is cleared.
+- Reconnect follows `socket reconnect -> joinRoom -> roomJoined(status, players, maxPlayers)`. `waiting` restores the waiting page; only `playing` continues to `getState -> stateUpdate -> full replacement`. When `newGame` returns connected players to waiting because seats are absent, the server broadcasts `roomWaiting(roomId, players, maxPlayers)` and the frontend immediately hides the old board and restores the waiting page.
 
-### 12.4 视图编排
+### 12.4 View orchestration
 
-`client/app/GameContainerApi.tsx`（含内联 `useTransportSetup` 管理连接）+ `LobbyPage.tsx` + `PageRouter.tsx`。根据 `viewPlayerId` / `playerIndex` 计算窗口可交互性，管理本地临时态。
+`client/app/GameContainerApi.tsx`, with inline `useTransportSetup` connection management, plus `LobbyPage.tsx` and `PageRouter.tsx`. It derives window interactivity from `viewPlayerId` and `playerIndex` and owns local ephemeral state.
 
-### 12.5 浏览器本地试玩沙盒（client/local-sandbox/）
+### 12.5 Browser-local playtest sandbox under `client/local-sandbox/`
 
-`VITE_SANDBOX_EXECUTOR=browser` 时工坊试玩全程在浏览器运行，零服务器参与；缺省走服务端 `/api/game/new-sandbox`（原样保留）。
+With `VITE_SANDBOX_EXECUTOR=browser`, Workshop playtesting runs entirely in the browser without server participation. The default remains backend `POST /api/game/new-sandbox`.
 
-- 启动链路：`WorkshopPage` 组装 `LocalGameConfig`（卡 JSON + 源码 + 沙盒设置）写 sessionStorage → 嵌入 iframe 带 `?localSandbox=1` → `useTransportSetup` 创建 `LocalGameTransport`（实现 `GameTransport` 全部接口，与 HTTP/WS transport 同构接入 `useGameSync`）。
-- 引擎 Worker：`LocalSandboxCore` 装配 shared `GameCore`（经 `registerCustomCardImpl` 注入 `registerBrowserBackedCustomCard`），卡代码走 shared AST 校验 + `ts.transpileModule` 本地编译（typescript 只进 worker chunk），`new Function` 直接同步调用；执行语义与服务端 isolated-vm executor 由 `server/__tests__/local-sandbox-parity.test.ts` 钉死等价。快照组装复用 `shared/session/sync-payload.ts`（与 `GameSession.buildSyncPayload` 同一函数），本地默认 `debug` 视角（与服务端 sandbox 匿名 HTTP 行为一致）。
-- 死循环恢复：请求级超时（10s）→ `terminate()` → 重建 Worker → 从最后一份 persist 快照 `restore`（含 `engineStackCursor`，pending 交互存活）→ UI 提示回退。
-- 持久化：IndexedDB 单槽 + debounce 落盘（`onPersist` 钩子），进入试玩时「继续上一局」恢复；schema 版本不符或损坏的存档静默清除（不维护旧存档兼容）。
-- 已知边界：编辑器指定精确草稿版本（`exactVersionId`）的试玩暂仍走服务端 sandbox（卡数据不在工坊前端 state 中）。
+- Startup: `WorkshopPage` assembles `LocalGameConfig`, including card JSON, source, and sandbox settings, and writes it to sessionStorage. An embedded iframe uses `?localSandbox=1`. `useTransportSetup` creates `LocalGameTransport`, which implements the complete `GameTransport` interface and enters `useGameSync` exactly like HTTP or WebSocket transport.
+- Engine Worker: `LocalSandboxCore` assembles shared `GameCore`, registering custom implementation through `registerCustomCardImpl` and `registerBrowserBackedCustomCard`. Card code passes shared AST validation and local `ts.transpileModule`; TypeScript exists only in the Worker chunk. `new Function` invokes it synchronously. `server/__tests__/local-sandbox-parity.test.ts` locks behavior to the server isolated-vm executor. Snapshot assembly reuses `shared/session/sync-payload.ts`, the same function as `GameSession.buildSyncPayload`. Local mode defaults to a `debug` view, matching anonymous backend sandbox HTTP behavior.
+- Infinite-loop recovery: after a ten-second request timeout, terminate and rebuild the Worker, restore the latest persisted snapshot including `engineStackCursor`, keep pending interaction alive, and tell the UI it rolled back.
+- Persistence: one IndexedDB slot with debounced writes through `onPersist`. Entering playtest offers to continue the previous game. A mismatched schema or corrupt save is silently deleted; old-save compatibility is not maintained.
+- Known boundary: a playtest pinned to the editor's exact draft version through `exactVersionId` still uses the backend sandbox because that card data is absent from Workshop frontend state.
 
-`ActionBoard` 用 `getBoardPlayerCount(players)` 切 className `action-board--{n}p`：2P=830px，3P/4P=1000px。
+`ActionBoard` calls `getBoardPlayerCount(players)` to set `action-board--{n}p`: 830 px for two players and 1,000 px for three or four.
 
-### 12.5 contexts
+### 12.6 Contexts
 
-- `AuthContext` —— 站点登录 session（密码 / GitHub / Google）；不保存 Bug Issue 写权限。
-- `LocaleContext` —— 多语言切换。
+- `AuthContext`: site-login session by password, GitHub, or Google. It does not store Bug Issue write authorization.
+- `LocaleContext`: locale switching.
 
-### 12.6 ESLint 三层强制
+### 12.7 Three-layer ESLint enforcement
 
-`eslint.config.js` 关键规则：
+Important rules in `eslint.config.js` are:
 
-- `client/{app,components,services,hooks,contexts,utils}/**` 禁 import `shared/session`、`shared/engine`、card source、card generated catalog 和 per-card impl modules；UI metadata 必须走 `public/cards-manifest.json` + `client/services/card-meta`。
-- `client/sandbox/**` 全开。
-- `no-restricted-syntax` 禁动态字符串 `import('shared/session/...')` / `import('shared/engine/...')` / card impl-bootstrap 字面量绕过。
-- `package.json` 已声明 `sideEffects` 给 bundler tree-shaking 基线。
-- violation = CI error。
+- `client/{app,components,services,hooks,contexts,utils}/**` cannot import `shared/session`, `shared/engine`, Card Sources, generated card catalog, or per-card implementations. UI metadata must use `public/cards-manifest.json` and `client/services/card-meta`.
+- `client/sandbox/**` has complete access.
+- `no-restricted-syntax` blocks dynamic string imports of `shared/session/...`, `shared/engine/...`, and card implementation-bootstrap literals.
+- `package.json` declares `sideEffects` as the bundler tree-shaking baseline.
+- A violation is a CI error.
 
-### 12.7 Game Context、Replay Viewer 与 Bug Report seam
+### 12.8 Game Context, Replay Viewer, and Bug Report seam
 
-启动顺序改为：
+Startup becomes:
 
 ```text
 GameContextRouter
-  ├─ active → AuthProvider → 现有 PageRouter / GameContainerApi + 可选只读 Anchor 抽屉
-  ├─ completed → ReplayShell → credentialless Replay Viewer iframe
-  ├─ expired + retained Anchor → credentialless 历史 Viewer 单帧证据
-  ├─ expired → Expired Game Context 页面
-  └─ removed → Replay Tombstone 页面
+  ├─ active -> AuthProvider -> existing PageRouter / GameContainerApi plus optional read-only Anchor drawer
+  ├─ completed -> ReplayShell -> credentialless Replay Viewer iframe
+  ├─ expired with retained Anchor -> credentialless historical Viewer for one-frame evidence
+  ├─ expired -> Expired Game Context page
+  └─ removed -> Replay Tombstone page
 ```
 
-- `?context=<roomId>` 必须在当前卡牌 manifest 与全局登录门前解析。active 未登录时保留完整 returnTo；completed、expired、removed 不加载登录依赖。
-- active 恢复继续使用现有 WebSocket，但 `joinRoom` 必须携带 `intent:'resume'`；服务端只按持久化站点 `userId → playerIndex` 恢复原座位。保存暂停时所有在线座位显示同一状态提示，新命令控件禁用。
-- `ReplayShell` 校验 Replay header 与内容寻址 Viewer manifest，选择 `viewerBuildId`，并只在选定视角后创建 `credentialless`、`sandbox="allow-scripts"` iframe。历史 Viewer 是无登录、无 Cookie、无 WS、无 ClientCommand 的独立只读 bundle，直接读取公开 JSON Segment，并用当时编译的遮蔽逻辑切换 `p1…pN | open`。
-- retained evidence 由父页面携带站点 Cookie 鉴权并按原座位投影，再把单帧及 Replay header 中的自定义卡快照通过 `postMessage` 交给校验过 `viewerBuildId` 的 credentialless 历史 Viewer；历史 Viewer 不自行读取鉴权接口。
-- 直接打开 completed 且 URL 没有 perspective 时，任何 Frame 展示前先选座位或全开。桌面 auto 默认时间线优先双栏，手机 auto 默认棋盘优先；900px 是自动断点，手动布局写入 URL 并覆盖响应式默认。“本步证据”固定展示 Step、轮次、操作者、白名单 intent 和 Frame Hash。
-- 播放默认停在 Step 0，提供播放/暂停、前后步、滑杆跳转和键盘控制；损坏 Segment 显示不可用区间并允许从下一 checkpoint 继续，不尝试静默修复。
-- Bug Report 使用已定稿的三步引导式底栏：必填现象 → 自动上下文 → 作者身份。创建 GitHub OAuth 跳转前必须先保存 server draft；取消授权返回同一 `submissionId`，提交后通过 status endpoint 轮询。提交响应丢失时立即回读权威状态并恢复轮询，成功态禁止重复创建。
-- active Reporter 从当前最新已提交 Step 建 Anchor；completed Reporter 必须是历史原参赛者，并从当前播放 Step 建 Anchor。公开 Issue 不嵌入 Frame、截图、日志或其他玩家隐藏信息。
-- Issue Submission Connection 与 `AuthContext` 分离：报告底栏负责首次连接，Settings 只显示连接状态和断开操作；连接失效不得自动切换到 Hosted Issue Identity。
+- `?context=<roomId>` is parsed before the current card manifest and global login gate. Active unauthenticated flow preserves complete `returnTo`; completed, expired, and removed contexts load no authentication dependency.
+- Active recovery keeps the existing WebSocket, but `joinRoom` carries `intent:'resume'`. The server restores only the original seat through persisted site `userId -> playerIndex`. During a save pause, every online seat sees the same status and new-command controls are disabled.
+- `ReplayShell` validates the Replay header and content-addressed Viewer manifest, selects `viewerBuildId`, and creates a `credentialless`, `sandbox="allow-scripts"` iframe only after perspective selection. The historical Viewer is an independent read-only bundle with no login, cookies, WebSocket, or ClientCommand. It reads public JSON Segments and switches among `p1...pN | open` using filtering code compiled at archive time.
+- For retained evidence, the parent authenticates with the site cookie and projects the original seat, then sends the single Frame and Replay-header custom-card snapshot through `postMessage` to a historical Viewer with a validated `viewerBuildId`. The Viewer does not call authenticated APIs.
+- Opening a completed game without a perspective requires seat or open selection before any Frame is shown. Desktop automatic layout defaults to a timeline-first split; mobile defaults to board-first. The automatic breakpoint is 900 px. A manual layout writes to the URL and overrides the responsive default. The "Evidence for this step" panel always shows Step, round, actor, allowlisted intent, and Frame Hash.
+- Playback starts at Step 0 and supports play or pause, previous and next, slider seeking, and keyboard control. A corrupt Segment marks an unavailable interval and can resume at the next checkpoint; it is never silently repaired.
+- Bug Report uses the finalized three-step footer: required symptom, automatic context, and author identity. A server draft must be saved before starting GitHub OAuth. Cancelling authorization returns to the same `submissionId`; after submission, status is polled. If the submission response is lost, immediately reread authoritative status and resume polling. A successful report cannot be created twice.
+- An active Reporter anchors the latest committed Step. A completed-game Reporter must be an original participant and anchors the currently displayed Step. The public Issue embeds no Frame, screenshot, log, or other player's hidden information.
+- Issue Submission Connection is separate from `AuthContext`. The report footer owns initial connection; Settings shows status and disconnect only. An invalid connection never switches to Hosted Issue Identity automatically.
 
 ---
 
-## 13. 测试策略
+## 13. Testing strategy
 
-### 13.1 三层
+### 13.1 Three layers
 
-| 层 | 目录 | 用途 | 是否在主 PR 必须通过 |
+| Layer | Directory | Purpose | Required on a main PR |
 |---|---|---|---|
-| Unit | `shared/**/__tests__/*.test.ts` + `client/**/__tests__/*.test.ts` | 纯领域逻辑，造 mock state 调函数 | ✅（fast 项目） |
-| Session | `server/__tests__/*.test.ts` | 直接实例化 `GameSession`，调 `takeAction` 等，断言 `resp.state` / `pending` / `interaction` / `ok` | ✅（slow 项目，按文件名 glob `[A-E][0-9]*-session.test.ts` 一卡一文件） |
-| E2E | `e2e-tests/*.spec.ts` | Playwright 双窗口浏览器，验证多人链路 | 手动 / Workflow |
+| Unit | `shared/**/__tests__/*.test.ts` and `client/**/__tests__/*.test.ts` | Pure domain logic using mock state and direct function calls | Yes, in fast projects |
+| Session | `server/__tests__/*.test.ts` | Instantiate `GameSession`, call `takeAction`, and assert `resp.state`, `pending`, `interaction`, and `ok` | Yes, in slow project; one card per `[A-E][0-9]*-session.test.ts` file |
+| E2E | `e2e-tests/*.spec.ts` | Playwright with two browser windows for multiplayer paths | Manual or workflow |
 
-`vitest.config` 分多个 fast 子 project（`fast-shared` / `fast-cards` / `fast-card-runtime` / `fast-client` / `fast-server` / `fast-scripts` / `fast-tests`）以及 `slow` / `llm`。`pnpm test:fast` 先运行 `check:test-project-coverage`，确保新 fast projects 覆盖旧 fast 文件集合且没有重复。`pnpm test:fast` CI 默认；`pnpm test:slow` 单卡 session 测试；`pnpm run test:e2e` 需后端 + 前端在跑；`pnpm exec vitest run <file>` 单文件。
+`vitest.config` has several fast subprojects, `fast-shared`, `fast-cards`, `fast-card-runtime`, `fast-client`, `fast-server`, `fast-scripts`, and `fast-tests`, plus `slow` and `llm`. `pnpm test:fast` first runs `check:test-project-coverage`, ensuring new fast projects cover the former fast-file set without duplication. CI defaults to `pnpm test:fast`; use `pnpm test:slow` for per-card session tests, `pnpm run test:e2e` with frontend and backend running, and `pnpm exec vitest run <file>` for one file.
 
-### 13.2 后端边界测试驱动入口
+### 13.2 Backend-boundary test entry points
 
-- 直接调 `GameSession` 方法（推荐）。
-- 调 `/api/game/*` 或 WS 消息（黑盒契约）。
-- 模板 → `docs/CARD_TEST_TEMPLATE.md`（默认 2 人游戏）。
+- Call `GameSession` methods directly; this is preferred.
+- Call `/api/game/*` or send WebSocket messages for a black-box contract.
+- Follow [`docs/CARD_TEST_TEMPLATE.md`](CARD_TEST_TEMPLATE.md), using a two-player game by default.
 
-推荐断言字段：
+Recommended assertion targets are:
 
-```
+```text
 state.players[n].resources
 state.players[n].minorPlayed / occupationPlayed / improvements
 state.players[n].cardStates
@@ -1404,87 +1431,87 @@ log
 scores
 ```
 
-**不要把 DOM、按钮文案、页面结构作为规则正确性的主要断言依据**。前端渲染单独做 E2E。
+Do not use DOM shape, button copy, or page structure as the primary proof of rules correctness. Test frontend rendering separately with E2E.
 
-### 13.3 工程命令
+### 13.3 Engineering commands
 
 ```bash
-pnpm install                # canvas 需要系统库 libcairo2-dev libpango1.0-dev libjpeg-dev libgif-dev librsvg2-dev libpixman-1-dev
-./restart-intranet.sh       # 本地开发 / 运行 / 测试统一入口（绝对路径启动 tsx + vite，避免跨 worktree pkill 误伤）
-pnpm test                   # vitest 全量（fast + slow）
-pnpm test:fast              # 只跑 fast project（CI 默认）
-pnpm test:slow              # 只跑 slow project（单卡 session 测试）
-pnpm run test:e2e           # Playwright E2E（需要后端 + 前端在跑）
-pnpm exec vitest run <file> # 单文件
-pnpm run lint               # ESLint（error 必须清零）
-pnpm run build              # tsc + vite build
+pnpm install                # canvas needs libcairo2-dev libpango1.0-dev libjpeg-dev libgif-dev librsvg2-dev libpixman-1-dev
+./restart-intranet.sh       # unified local development, runtime, and test entry; absolute tsx/vite paths avoid cross-worktree pkill
+pnpm test                   # all Vitest projects, fast and slow
+pnpm test:fast              # fast projects only; CI default
+pnpm test:slow              # slow per-card session tests
+pnpm run test:e2e           # Playwright E2E; frontend and backend must be running
+pnpm exec vitest run <file> # one file
+pnpm run lint               # ESLint; zero errors required
+pnpm run build              # TypeScript plus Vite build
 ```
 
-本地开发统一 Node.js 22；`better-sqlite3` 等原生依赖按 Node ABI 编译。
+Local development standardizes on Node.js 22. Native dependencies such as `better-sqlite3` are built for its ABI.
 
-### 13.4 Replay、恢复与 Bug Report 上线门槛
+### 13.4 Replay, recovery, and Bug Report launch gates
 
-实现按以下可独立验证的切片推进：
+Implementation advances through independently verifiable slices:
 
-1. 数据库迁移、canonical JSON / delta / gzip / Hash codec。
-2. Durable Room Commit、失败暂停/重试、30 Room 容量限制。
-3. Game Context resolver、active 原座位恢复、evidence 权限。
-4. Replay manifest/Segment、历史 Viewer Build、桌面/手机回放 UI。
-5. Bug Report draft、GitHub App connection/queue、三步报告 UI。
-6. 匿名化、Tombstone、删除 ledger、部署和生产验收。
+1. Database migration and canonical JSON, delta, gzip, and hash codec.
+2. Durable Room Commit, failure pause and retry, and the 30-Room limit.
+3. Game Context resolver, original-seat active recovery, and evidence authorization.
+4. Replay manifest and Segment, historical Viewer Build, and desktop and mobile playback UI.
+5. Bug Report draft, GitHub App connection and queue, and three-step reporting UI.
+6. Anonymization, Tombstone, deletion ledger, deployment, and production acceptance.
 
-自动化必须覆盖：
+Automation must cover:
 
-- codec round-trip、最多 15 delta、提前 checkpoint、Hash mismatch 和损坏 Segment 后续恢复；
-- snapshot + Step 原子事务、gameOver 原子完成、相同 Hash 幂等、不同 Hash 阻断、数据库故障暂停与重启恢复；
-- 两个同时提交玩家得到连续 `stepNo`，最后提交触发结算且交换到达顺序不改变结果；
-- `ok=false` 和 unchanged 只回发起者；提交成功前任何座位都收不到未落盘状态；
-- active Room 双座位恢复、座位替换、他人隐藏信息遮蔽、暂停期间重连等待；
-- completed/expired/removed/unknown resolver、无登录公开 Replay、Anchor mismatch、缓存与错误码；
-- 桌面 auto 时间线布局、手机 auto 棋盘布局、手动 URL 覆盖、视角选择、播放/暂停/前后步/跳转、键盘和 axe；
-- OAuth 取消保留草稿、本人/Hosted 作者、稳定标记对账、限流与三次失败、重复点击、断开/撤销；
-- 删号 Issue 脱敏、Replay Participant 匿名化、Tombstone、维护者全开理由与永久审计。
+- codec round trip, at most 15 deltas, early checkpoints, hash mismatch, and recovery after a corrupt Segment;
+- atomic snapshot-plus-Step transaction, atomic game-over completion, same-hash idempotency, different-hash blocking, database-failure pause, and restart recovery;
+- consecutive `stepNo` for two simultaneous submitters, settlement triggered by the last submission, and results independent of arrival order;
+- `ok=false` and unchanged responses only to the caller, and no seat receiving unpersisted state before commit;
+- two-seat active-Room recovery, connection replacement, hidden-information filtering, and reconnect waiting during persistence pause;
+- completed, expired, removed, and unknown resolution; public Replay without login; Anchor mismatch; caching; and error codes;
+- desktop timeline-first auto layout, mobile board-first auto layout, manual URL override, perspective selection, play or pause, stepping, seeking, keyboard, and axe;
+- retained draft after OAuth cancellation, self and Hosted authors, stable-marker reconciliation, rate limits and three failures, duplicate clicks, disconnect, and revocation;
+- account-deletion Issue redaction, Replay Participant anonymization, Tombstone, and permanent audited maintainer access with a reason.
 
-最终性能探针在 2 CPU / 2 GiB、真实命令与 Replay 写入负载下重跑 25/30/35，并补跑 30 Room late-state：30 Room 必须满足 action p99 ≤250ms、event-loop p99 ≤100ms、RSS ≤1.8GiB；35 Room 用于确认首个失败点。
+The final performance probe runs under 2 CPU and 2 GiB with real commands and Replay-write load at 25, 30, and 35 Rooms, plus a late-state run at 30 Rooms. Thirty Rooms must satisfy action p99 no more than 250 ms, event-loop p99 no more than 100 ms, and RSS no more than 1.8 GiB. Thirty-five Rooms identifies the first failure point.
 
-生产验收必须由两个真实站点账号完成一局：双方在进行中分别恢复且只能看见自己的隐藏信息；完赛后在未登录浏览器选择两个座位视角和全开视角；再分别用本人 GitHub 和 Hosted Issue Identity 创建 smoke Issue、核对 Anchor/Reporter 字段并关闭。地图在 CI、前后端部署、这些线上步骤和删除/回滚演练全部通过前不关闭。
-
----
-
-## 14. 关键不变量速查
-
-1. **后端权威**：规则在 `shared/` + `server/`；前端不裁定。
-2. **三层物理边界**：`shared/` ⇄ `server/` ⇄ `client/`；ESLint CI error 强制。
-3. **双 client bundle**：`client-app` 不引 `shared/{engine,session,actions,cards,custom-code,draft}`；`client/sandbox` 全开。
-4. **WS 游戏主链路**：`/ws` 收 `ClientCommand`，发 `StateUpdateEnvelope`；Game Context、Replay 和 Bug Report 使用版本化 HTTP 产品接口。
-5. **InteractionState 是前端唯一真相**：`stateId ∈ {idle, wait, gameover}`；`wait` 下用 `request.kind` 分流。
-6. **节点树是唯一状态机**：`PendingAction` union 已消除；"等什么"由 `engine.peekPendingEnvelope()` / pending host 派生。
-7. **EngineStack.push / pop**：hook / anytime / 嵌套子流程唯一注入路径，不直接改 `pending`。
-8. **卡牌就地闭环**：`shared/cards/{Deck}/{Card}.ts` 内部完成；不改 `shared/actions/effects/pay.ts` / `shared/actions/effects/improvement.ts` / `shared/session/session-core.ts` / `server/game/authoritative-session.ts` 等核心文件。新增 Hook 点必须同时补测试和文档。
-9. **cardStates 局部状态**：持续计数 / 标记写 `player.cardStates[cardId]`；后续选择走显式 `pending` / continuation。
-10. **不引入循环依赖**。
-11. **不为单卡改主路径**。
-12. **测试默认 2 人游戏**；规则正确性站后端边界，不通过 DOM 反推规则。
-13. **前端不做乐观提交**：等 `stateUpdate` 到达再改 UI。
-14. **ActionFlow 对齐 BGA 小代数**：卡牌 DSL 只暴露 `leaf / seq / parallel / xor / or` + metadata；runtime-only node 不进入卡牌 flow。
-15. **listener handler 不改 state**：listener / preview / doable 路径只 build flow 或返回结构化结果；状态修改必须落在 action leaf 执行阶段。
-16. **Durable Room Commit**：成功且改变 Frame 的命令先原子写 Room snapshot + Replay Step，随后才按座位视角发送。
-17. **Replay 全局 Step**：多人同时提交仍占用连续 `stepNo`；自动结算属于最后触发输入，结果不得依赖到达顺序。
-18. **失败不扩散**：`resp.ok=false` 只回发起者；持久化失败冻结同一 Frame 并阻断 Room，不覆盖或继续推进。
-19. **30 Room 上限**：单实例统计普通 `waiting + playing` Room；只拒绝新建，不影响恢复。
-20. **历史 Viewer 不可变**：Room 锁定 schema/build，完成回放由 credentialless 只读 Viewer 读取，不执行历史规则代码。
+Production acceptance requires two real site accounts to complete one game. During play, each restores independently and sees only its own hidden information. After completion, an unauthenticated browser selects both seat perspectives and open view. The two users then create smoke Issues using self GitHub identity and Hosted Issue Identity, verify Anchor and Reporter fields, and close them. Do not close the milestone until CI, frontend and backend deployment, these online steps, and deletion and rollback drills all pass.
 
 ---
 
-## 15. 文档导航
+## 14. Key invariants
 
-| Topic | Doc |
+1. **Backend authority:** rules live in `shared/` and `server/`; the frontend does not adjudicate.
+2. **Physical three-layer boundary:** `shared/` to `server/` to `client/`, enforced as an ESLint CI error.
+3. **Two client bundles:** `client-app` does not import `shared/{engine,session,actions,cards,custom-code,draft}`; `client/sandbox` has complete access.
+4. **WebSocket game path:** `/ws` receives `ClientCommand` and emits `StateUpdateEnvelope`; Game Context, Replay, and Bug Report use versioned HTTP product APIs.
+5. **`InteractionState` is the only frontend interaction truth:** `stateId` is `idle`, `wait`, or `gameover`; `wait` branches on `request.kind`.
+6. **The node tree is the only state machine:** the `PendingAction` union is gone. `engine.peekPendingEnvelope()` and the pending host derive what execution is waiting for.
+7. **`EngineStack.push` and `pop`:** the only injection path for hooks, anytime actions, and nested subflows. Never mutate `pending` directly.
+8. **Card-local closure:** finish a card inside `shared/cards/{Deck}/{Card}.ts`. Do not change core files such as `shared/actions/effects/pay.ts`, `shared/actions/effects/improvement.ts`, `shared/session/session-core.ts`, or `server/game/authoritative-session.ts`. A new hook point requires tests and documentation in the same change.
+9. **Local `cardStates`:** persistent counters and markers use `player.cardStates[cardId]`; later choices use explicit pending state and continuations.
+10. **No circular dependencies.**
+11. **Do not change a main path for one card.**
+12. **Tests default to two players.** Prove rules at the backend boundary, never infer them from the DOM.
+13. **No optimistic frontend commit:** wait for `stateUpdate` before changing game UI.
+14. **`ActionFlow` matches BGA's small algebra:** the card DSL exposes only `leaf`, `seq`, `parallel`, `xor`, and `or` plus metadata. Runtime-only nodes do not enter card flows.
+15. **Listener handlers do not mutate state:** listener, preview, and doability paths build flows or return structured values. Mutation occurs only while an action leaf executes.
+16. **Durable Room Commit:** a successful command that changes the Frame atomically writes Room snapshot and Replay Step before sending viewer-filtered state.
+17. **Global Replay Steps:** simultaneous submissions still receive consecutive `stepNo`; automatic settlement belongs to the last triggering input and results do not depend on arrival order.
+18. **Failures do not spread:** `resp.ok=false` responds only to the caller. Persistence failure freezes the same Frame and blocks the Room instead of overwriting or advancing.
+19. **Thirty-Room limit:** one instance counts ordinary waiting and playing Rooms. Only new creation is rejected; recovery is unaffected.
+20. **Immutable historical Viewer:** a Room freezes schema and Build. Completed playback uses a credentialless read-only Viewer and never executes historical rules code.
+
+---
+
+## 15. Documentation map
+
+| Topic | Document |
 |---|---|
-| 卡牌测试模板 | `docs/CARD_TEST_TEMPLATE.md` |
-| 卡牌实现现状 / 描述对齐 / 计划 | `docs/card_implementation_status.md` |
-| 平台 / Workshop | `docs/PLATFORM_DESIGN.md` |
-| 部署 | `docs/HOW_TO_DEPLOY.md` |
-| 自定义卡沙盒约束 | `docs/CUSTOM_CARD_SANDBOX.md` |
-| CI 检查 | `docs/operations/ci-checks.md` |
-| GitHub OAuth | `docs/operations/github-oauth-app-setup.md` |
-| 已知卡牌架构债务 | `docs/card_implementation_status.md` |
+| Card test template | [`docs/CARD_TEST_TEMPLATE.md`](CARD_TEST_TEMPLATE.md) |
+| Card implementation status, description alignment, and plan | [`docs/card_implementation_status.md`](card_implementation_status.md) |
+| Platform and Workshop | [`docs/PLATFORM_DESIGN.md`](PLATFORM_DESIGN.md) |
+| Deployment | [`docs/HOW_TO_DEPLOY.md`](HOW_TO_DEPLOY.md) |
+| Custom-card sandbox constraints | [`docs/CUSTOM_CARD_SANDBOX.md`](CUSTOM_CARD_SANDBOX.md) |
+| CI checks | [`docs/operations/ci-checks.md`](operations/ci-checks.md) |
+| GitHub OAuth | [`docs/operations/github-oauth-app-setup.md`](operations/github-oauth-app-setup.md) |
+| Known card-architecture debt | [`docs/card_implementation_status.md`](card_implementation_status.md) |

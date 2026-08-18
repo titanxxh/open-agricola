@@ -1,5 +1,7 @@
 # Security Policy
 
+[English](SECURITY.md) | [中文](SECURITY_zh.md)
+
 ## Supported Versions
 
 Only the latest `main` branch and the current live deployment are supported.

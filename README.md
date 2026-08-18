@@ -1,5 +1,7 @@
 # Open Agricola
 
+[English](README.md) | [中文](README_zh.md)
+
 Open Agricola aims to support every Agricola expansion. Currently supported:
 - All 888 cards from Revised Edition decks A–E
 - Parent Cards

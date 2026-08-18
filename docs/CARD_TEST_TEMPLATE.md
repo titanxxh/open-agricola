@@ -1,185 +1,183 @@
-# 卡牌测试模板
+# Card Testing Template
 
-## 1. 目的
+[English](CARD_TEST_TEMPLATE.md) | [中文](CARD_TEST_TEMPLATE_zh.md)
 
-本文档用于约定 Open Agricola 中“新增或修改一张卡牌实现”时的标准测试写法。
+## 1. Purpose
 
-核心原则：
+This document defines the standard testing approach for adding or changing a card implementation in Open Agricola.
 
-- 机械规则用静态门禁，简单即时效果用直接行为测试，高风险流程站在 `GameSession` 边界测试
-- 测试必须断言真实行为，不验证导出存在或对象形状
-- Session 断言以服务端返回的 `state`、`interaction`、`state.log`、`scores` 为主
-- 前端渲染、控件展示、界面截图，单独作为渲染测试或 E2E 测试处理
+Core principles:
 
-换句话说：
+- Use static gates for mechanical constraints, direct behavior tests for simple immediate effects, and the `GameSession` boundary for high-risk flows.
+- Assert real behavior, not the existence of exports or object shapes.
+- Session assertions should focus on the server response: `state`, `interaction`, `state.log`, and `scores`.
+- Test frontend rendering, controls, and screenshots separately in rendering tests or E2E tests.
 
-- 卡牌效果是否正确，主要看后端状态有没有正确变化
-- 页面有没有正确显示，主要看前端渲染测试和 E2E
+In short:
 
-## 2. 适用范围
+- Card correctness is primarily determined by backend state changes.
+- Display correctness is primarily determined by frontend rendering tests and E2E tests.
 
-该模板适用于：
+## 2. Scope
 
-- 职业卡
-- 小改良卡
-- 大改良附带的卡牌效果
-- 行动触发型被动卡
-- 回合阶段触发型卡
-- 会引入等待交互、follow-up action、额外选择、延迟效果的卡
+Use this template for:
 
-不适用于：
+- Occupations
+- Minor improvements
+- Card effects attached to major improvements
+- Action-triggered passive cards
+- Round-phase-triggered cards
+- Cards that introduce waiting interactions, follow-up actions, additional choices, or delayed effects
 
-- 纯样式改动
-- 纯文案翻译改动
-- 与卡牌无关的通用 UI 组件测试
-- **Workshop / AI Designer 自定义卡的"LLM 生成代码能否跑通"测试** —— 那套独立框架见 `docs/test/llm-card-gen.md`
+Do not use it for:
 
-## 3. 测试分层约定
+- Style-only changes
+- Text-only translation changes
+- General UI component tests unrelated to cards
+- Tests of whether Workshop or AI Designer generated code runs; that framework is documented in `docs/test/llm-card-gen.md`
 
-选择能证明规则的最小测试层，禁止统一生成只验证导出、定义存在或对象形状的 smoke test。
+## 3. Test Layers
 
-### 3.1 静态门禁
+Choose the smallest test layer that proves the rule. Do not generate generic smoke tests that only verify exports, definitions, or object shapes.
 
-可机械判断、无需运行游戏的约束放在 CI 静态门禁。例如 listener 返回 `costs` 时必须在同一对象中提供 `costAttribution`。门禁不替代卡牌行为测试。
+### 3.1 Static Gates
 
-### 3.2 直接行为测试
+Put mechanically verifiable constraints that do not require a running game in CI static gates. For example, a listener that returns `costs` must provide `costAttribution` in the same object. Static gates do not replace card behavior tests.
 
-简单即时效果可以直接调用卡牌公开的 effect / listener，断言返回的 `ActionFlow`、资源 delta、来源卡和不触发分支。仅当效果不经过支付求解、选择 / pending、阶段延迟、跨玩家或多步 flow 时使用。
+### 3.2 Direct Behavior Tests
 
-### 3.3 Session 测试
+For a simple immediate effect, call the card's public effect or listener directly and assert the returned `ActionFlow`, resource delta, source card, and non-triggering branches. Use this layer only when the effect does not pass through payment solving, choices or pending state, delayed phases, cross-player behavior, or a multi-step flow.
 
-支付、选择 / pending、延迟效果、跨玩家、多步 flow，以及依赖实际 action candidate / payment pipeline 的卡牌必须使用 `GameSession`。直接调用 `takeAction()`、`resolveChoice()`、`commitSelectionChoice()` 等公开命令，断言：
+### 3.3 Session Tests
+
+Cards involving payment, choices or pending state, delayed effects, cross-player behavior, multi-step flows, or the real action-candidate or payment pipeline must use `GameSession`. Call public commands such as `takeAction()`, `resolveChoice()`, and `commitSelectionChoice()` directly, then assert:
 
 - `state`
 - `interaction`
 - `state.log`
 - `scores`
 
-### 3.4 前端渲染测试
+### 3.4 Frontend Rendering Tests
 
-这是辅助测试层。
+This is a supporting layer.
 
-目标：
+Goals:
 
-- 验证某份服务端状态被正确渲染
-- 验证按钮是否可见、控件是否禁用、日志是否显示
+- Verify that a server state renders correctly.
+- Verify button visibility, disabled controls, and log output.
 
-输入：
+Inputs:
 
-- 固定 `stateUpdate`
-- 固定 `GameApiResponse`
-- 固定 `SerializedGameState`
+- A fixed `stateUpdate`
+- A fixed `GameApiResponse`
+- A fixed `SerializedGameState`
 
-### 3.5 E2E 测试
+### 3.5 E2E Tests
 
-这是链路验证层。
+This layer verifies the complete path.
 
-目标：
+Goals:
 
-- 验证浏览器界面与多人实时同步主路径真的打通
-- 验证关键交互在真实页面中可以完成
+- Confirm that the browser UI and real-time multiplayer synchronization path work end to end.
+- Confirm that critical interactions can be completed in the real page.
 
-说明：
+E2E tests should not carry the primary rule assertions. They should focus on whether the action can be performed and whether multiple windows stay synchronized.
 
-- E2E 不应承担主要规则断言职责
-- E2E 重点验证“能不能操作”和“多个窗口是否同步”
+## 4. Required Test Information for Every Card
 
-## 4. 每张卡必须提供的测试信息
+A card test description must explicitly provide the following information.
 
-当你为一张卡编写测试说明时，必须明确写出下面这些信息。
-
-### 4.1 基本信息
+### 4.1 Basic Information
 
 - `cardId`
-- 卡牌名称
-- 卡牌类型：职业 / 小改良 / 大改良附带效果
-- 触发时机
-- 生效对象：自己 / 对手 / 任意玩家
-- 是否会产生等待交互
-- 是否会修改 `cardStates`
+- Card name
+- Card type: occupation, minor improvement, or an effect attached to a major improvement
+- Trigger timing
+- Affected player: self, opponent, or any player
+- Whether the card creates a waiting interaction
+- Whether the card modifies `cardStates`
 
-### 4.2 测试目标
+### 4.2 Test Goals
 
-至少写清楚：
+At minimum, explain:
 
-- 这张卡的正向效果是什么
-- 这张卡在什么前置条件下会触发
-- 这张卡在什么情况下不应触发
-- 这张卡是否会写日志
-- 这张卡是否会改变后续 action / flow / interaction
-- 选择静态门禁、直接行为测试或 Session 测试中的哪一层，以及原因
+- The card's positive effect
+- The prerequisites under which it triggers
+- Cases in which it must not trigger
+- Whether it writes a log entry
+- Whether it changes a later action, flow, or interaction
+- Whether the test uses a static gate, direct behavior test, or Session test, and why
 
-### 4.3 初始状态准备
+### 4.3 Initial State Setup
 
-选择 Session 测试时，测试说明必须明确：
+For a Session test, state explicitly:
 
-- 从一局新的 2 人游戏开始
-- 当前测试玩家是谁
-- 当前回合是多少
-- 玩家拥有哪些资源
-- 玩家已经打出了哪些卡
-- 玩家手里还有哪些卡
-- 行动格占用情况
-- 农场版图状态
-- 是否需要预先设置 `cardStates`
+- That the test starts from a new two-player game
+- Which player is under test
+- The current round
+- The player's resources
+- Cards the player has already played
+- Cards remaining in the player's hand
+- Occupied action spaces
+- Farmyard state
+- Any required initial `cardStates`
 
-Session 测试必须在首次行动前显式固定所有玩家的 `minorHand` 和
-`occupationHand`。与手牌无关时使用 `['__test_placeholder__']`；不要使用空数组，
-因为 `normalizeState` 会重新发牌。测试需要的目标卡应在固定背景手牌后单独加入。
+Before the first action, every Session test must explicitly fix every player's `minorHand` and `occupationHand`. Use `['__test_placeholder__']` when the hand is irrelevant. Do not use an empty array because `normalizeState` will deal a new hand. Add the target card separately after fixing these background hands.
 
-### 4.4 同时机多卡反应
+### 4.4 Multiple Reactions at the Same Timing
 
-如果卡牌属于 action reaction listener、harvest field stage card-effect、before-end card-effect 或 extra-turn provider，且同一时机可能与另一张卡同时触发，测试必须覆盖 `trigger-select`：
+If the card is an action-reaction listener, harvest field-stage card effect, before-end card effect, or extra-turn provider, and another card may trigger at the same timing, cover `trigger-select`:
 
-- 构造至少两张同一时机可触发的卡
-- 断言 `interaction` 展示的是可选择的来源卡，而不是直接按打出区顺序执行
-- 分别选择不同来源卡，断言后续 flow、状态、日志和剩余 trigger 的重算符合预期
-- 覆盖 `undoStep` 或 `undoAction` 后重新派生同一 trigger-select 的场景
+- Set up at least two cards that can trigger at the same timing.
+- Assert that `interaction` offers selectable source cards instead of executing them in played-zone order.
+- Select each source card in separate paths and assert the resulting flow, state, log, and recalculated remaining triggers.
+- Cover deriving the same `trigger-select` again after `undoStep` or `undoAction`.
 
-## 5. 推荐的后端入口清单
+## 5. Recommended Backend Entry Points
 
-Session 卡牌测试优先使用后端边界驱动。房间规则主链路走 WebSocket；HTTP `game-router` 只用于 dev / sandbox / 测试辅助；Session 测试直接调用 `GameSession`。
+Drive Session card tests through a backend boundary. Room gameplay uses WebSocket as its primary rule path; HTTP `game-router` is only for development, sandbox, and test support. Session tests call `GameSession` directly.
 
-### 5.1 三种推荐驱动方式
+### 5.1 Three Recommended Drivers
 
-按从轻到重排序：
+From lightest to heaviest:
 
-1. **直接 `new GameSession(stateOrSeed?, customCards?, initialStateOptions?)` + 调方法**（绝大多数 `server/__tests__/*.test.ts` 的写法）
-   - 不经网络，跑得最快；最适合"卡牌效果是否触发、状态怎么变"这类断言
-   - 入口方法见 §5.3
-2. **通过 `server/connection/room-router.ts` 驱动内存房间**
-   - 当需要验证多窗口同步、`stateUpdate` 广播、断线重连时使用
-   - 复用 `server/connection/__tests__/room-router.test.ts` 的 `RoomRegistry`、`Broadcaster`、内存 persistence 与 `dispatch` 组合
-3. **Playwright E2E（`e2e-tests/*.spec.ts`）**
-   - 仅在需要验证浏览器 UI 主路径或多窗口同步时用；规则断言不放在这层
+1. **Instantiate `new GameSession(stateOrSeed?, customCards?, initialStateOptions?)` and call methods directly.** This is the common pattern in `server/__tests__/*.test.ts`.
+   - It avoids the network and runs fastest.
+   - It is the preferred way to assert whether a card triggers and how state changes.
+   - See section 5.3 for entry-point methods.
+2. **Drive an in-memory room through `server/connection/room-router.ts`.**
+   - Use this when testing multiple-window synchronization, `stateUpdate` broadcasts, or reconnects.
+   - Reuse the `RoomRegistry`, `Broadcaster`, in-memory persistence, and `dispatch` arrangement in `server/connection/__tests__/room-router.test.ts`.
+3. **Playwright E2E in `e2e-tests/*.spec.ts`.**
+   - Use this only for the browser UI path or multi-window synchronization. Keep rule assertions out of this layer.
 
-### 5.2 状态准备方式
+### 5.2 Preparing State
 
-不要假设存在 `POST /api/game/dev/*`。当前可用的状态预设方式有：
+Do not assume that `POST /api/game/dev/*` exists. Available setup mechanisms are:
 
-- **`GameSession.loadState(state)`** —— 加载一份 `SerializedGameState`（`shared/session/serialization.ts`）
-- **WS `devSetResources` / `devSetRound` / `devDrawCard` / `devPlayCard` / `devCreatePasture`** —— 在 dev 房间里按需调整
-- **直接在 GameSession 实例上 mutate**（仅限单测，不要在跨网络场景使用）：
-  - 改 `session.state.players[i].resources`
-  - `session.state.players[i].minorPlayed.push(CARD_ID)`
-  - `session.state.actionSpaces[k].takenBy.push({ playerId, workerId })`
+- **`GameSession.loadState(state)`** — load a `SerializedGameState` defined in `shared/session/serialization.ts`.
+- **WebSocket commands `devSetResources`, `devSetRound`, `devDrawCard`, `devPlayCard`, and `devCreatePasture`** — adjust a development room as needed.
+- **Direct mutation on a GameSession instance**, only in unit and Session tests, never across a network path:
+  - Change `session.state.players[i].resources`.
+  - Push `CARD_ID` into `session.state.players[i].minorPlayed`.
+  - Push `{ playerId, workerId }` into `session.state.actionSpaces[k].takenBy`.
 
-### 5.3 GameSession 主入口（最常用）
+### 5.3 Common GameSession Entry Points
 
-| 方法 | 对应的 `interaction.allowedCommands` 名 | 对应 WS `type` | 用途 |
+| Method | `interaction.allowedCommands` name | WebSocket `type` | Purpose |
 |---|---|---|---|
-| `takeAction(playerIndex, spaceId)` | `takeAction` | `action` | 放工人 / 触发主行动 |
-| `takeAnytimeAction(playerIndex, actionId)` | `takeAnytimeAction` | `anytime` | 触发 anytime 卡牌效果 |
-| `resolveChoice(playerIndex, value, payload?)` | `resolveChoice` | `choice` | 回应 `interaction.stateId === 'wait'` 下的 choice / confirm / feed / animal-reorg |
-| `commitSelectionChoice(playerIndex, payload)` | `commitSelection` | `commitSelection` | 围栏 / 房间 / 马厩 / 犁地 / 播种 / farm-position / occupation-hand / resource selection 提交 |
-| `performRoundEnd()` | — | `roundEnd` | 推进回合（一般由引擎自动触发） |
-| `undoStep()` / `undoAction()` | `undoStep` / `undoAction` | `undoStep` / `undoAction` | 单步 / 整动作回退 |
+| `takeAction(playerIndex, spaceId)` | `takeAction` | `action` | Place a worker and trigger the main action |
+| `takeAnytimeAction(playerIndex, actionId)` | `takeAnytimeAction` | `anytime` | Trigger an anytime card effect |
+| `resolveChoice(playerIndex, value, payload?)` | `resolveChoice` | `choice` | Answer choice, confirm, feed, or animal-reorg while `interaction.stateId === 'wait'` |
+| `commitSelectionChoice(playerIndex, payload)` | `commitSelection` | `commitSelection` | Submit fence, room, stable, plow, sow, farm-position, occupation-hand, or resource selections |
+| `performRoundEnd()` | — | `roundEnd` | Advance the round; normally triggered by the engine |
+| `undoStep()` / `undoAction()` | `undoStep` / `undoAction` | `undoStep` / `undoAction` | Undo one step or the whole action |
 
-> **协议名 vs 引擎名**：WS `ClientCommand.type` 与 `interaction.allowedCommands` 字符串并不完全相同（详见 `ARCHITECTURE.md §7.2`）。测试里如果直接调 `GameSession`，用左一列；如果走 WS，用右一列。
+> **Protocol names versus engine names:** WebSocket `ClientCommand.type` values do not exactly match `interaction.allowedCommands` strings. See `ARCHITECTURE.md` section 7.2. Use the first column when calling `GameSession` directly and the WebSocket column when driving a room.
 
-### 5.4 WebSocket 命令（若走房间路径）
+### 5.4 WebSocket Commands for Room Tests
 
-以 `shared/contract/protocol/ws.ts` 中 `ClientCommand` 定义为准。常用：
+Treat the `ClientCommand` definition in `shared/contract/protocol/ws.ts` as authoritative. Common commands:
 
 - `createRoom` / `joinRoom` / `dissolveRoom`
 - `getState`
@@ -190,99 +188,99 @@ Session 卡牌测试优先使用后端边界驱动。房间规则主链路走 We
 - `newGame` / `loadGame`
 - `devSetResources` / `devSetRound` / `devDrawCard` / `devPlayCard` / `devCreatePasture`
 
-服务端事件（`ServerEvent`）主要看 `stateUpdate.payload`（包含 `state` / `interaction` / `scores` 等；日志在 `state.log`），其它握手事件不在卡牌规则断言的关心范围内。
+For `ServerEvent`, card rule assertions primarily inspect `stateUpdate.payload`, which contains `state`, `interaction`, and `scores`; logs are in `state.log`. Other handshake events are outside the scope of card rule assertions.
 
-## 6. 每一步必须断言哪些字段
+## 6. Fields to Assert After Each Step
 
-对于卡牌测试，建议每次关键交互后都断言下面几类字段。
+Assert the following groups after every critical interaction.
 
-### 6.1 玩家状态
+### 6.1 Player State
 
 - `state.players[n].resources`
 - `state.players[n].minorPlayed` / `occupationPlayed` / `improvements`
-- `getPlayedCardKeys(state.players[n])`（聚合上述三类）
+- `getPlayedCardKeys(state.players[n])`, which aggregates those three zones
 - `state.players[n].cardStates[CARD_ID]?.{ flagged, counters, extraData, stack, ... }`
-- `state.players[n].workers`（Worker 身份模型，每个槽含 `id` / `isActive` / `isNewborn`）
-- `familySize(player)` / `workersAvailable(state, player)` / `workersAtHome(state, player)`（`shared/domain/player.ts` helper，**不是字段**——直接读 `player.workers` 数组得到的是含 supply slot 的全部槽位，必须走 helper 才能得到游戏意义上的"家庭人数 / 在家可用人数"）
+- `state.players[n].workers`, where each Worker identity slot has `id`, `isActive`, and `isNewborn`
+- `familySize(player)` / `workersAvailable(state, player)` / `workersAtHome(state, player)` from `shared/domain/player.ts`. These are helpers, not fields. Reading `player.workers` directly returns every slot, including supply slots; use the helpers for game-level family size and workers at home.
 - `state.players[n].fields` / `pastures` / `stableTiles` / `roomTiles`
-- `state.players[n].fenceSegments`（`FenceSegment[]` 数组）
-- `getFenceCount(player)` / `getPalisadeCount(player)`（fence 计数 helper）
-- `countFields(player)` / `countOccupations(player)`（聚合自有 + 卡牌虚拟身份；用于 prereq）
-- `countPeopleOnSpace(state, spaceId)`（`shared/cards/helpers/space-occupancy.ts`，A25 等卡用到）
+- `state.players[n].fenceSegments`, an array of `FenceSegment`
+- `getFenceCount(player)` / `getPalisadeCount(player)`
+- `countFields(player)` / `countOccupations(player)`, which aggregate owned and card-provided virtual identities for prerequisites
+- `countPeopleOnSpace(state, spaceId)` from `shared/cards/helpers/space-occupancy.ts`, used by cards such as A25
 
-### 6.2 全局状态
+### 6.2 Global State
 
 - `state.currentPlayerIndex`
 - `state.round`
 - `state.gameOver`
 - `state.availableMajorImprovements`
-- `state.actionSpaces[*].takenBy`（**`WorkerRef[]`**——元素是 `{ playerId, workerId }`，不是单个 playerId）
+- `state.actionSpaces[*].takenBy`, which is a `WorkerRef[]` containing `{ playerId, workerId }`, not player IDs alone
 - `state.actionSpaces[*].resources`
-- `state.actionSpaces[*].players`（行动格的人数过滤，`createActionSpaces(playerCount?)` 按此字段筛）
+- `state.actionSpaces[*].players`, the player-count filter used by `createActionSpaces(playerCount?)`
 
-### 6.3 交互状态
+### 6.3 Interaction State
 
-`InteractionState` 是前端交互真相：
+`InteractionState` is the frontend's interaction authority:
 
-- `interaction.stateId`：`idle` / `wait` / `gameover`
-- `interaction.playerIndex`（`wait`）：当前需要响应的玩家
-- `interaction.sourceCard`（`wait`）：触发本次交互的来源卡 id
-- `interaction.request.kind`（`wait`）：`choice` / `farm-select` / `selection` / `animal-reorg` / `feed` / `confirm-next-player` / `confirm-player-switch` 等具体请求
-- `interaction.allowedCommands`：当前 player 允许调用的引擎命令名白名单（不在白名单里的会被拒）
-- `interaction.request.options`（choice 模式）：候选项数组
-- `interaction.request.farm`（farm-select 模式）：farmType + payload schema
-- `interaction.request.selection`（selection 模式）：选择类型与候选项
-- `interaction.promptKey` / `promptParams`：i18n key 与参数
+- `interaction.stateId`: `idle`, `wait`, or `gameover`
+- `interaction.playerIndex` for `wait`: the player who must respond
+- `interaction.sourceCard` for `wait`: the source card ID
+- `interaction.request.kind` for `wait`: `choice`, `farm-select`, `selection`, `animal-reorg`, `feed`, `confirm-next-player`, `confirm-player-switch`, or another concrete request
+- `interaction.allowedCommands`: the allowlist of engine command names available to the current player
+- `interaction.request.options` in choice mode
+- `interaction.request.farm` in farm-select mode: `farmType` plus its payload schema
+- `interaction.request.selection` in selection mode: selection type and candidates
+- `interaction.promptKey` / `promptParams`: i18n key and parameters
 
-### 6.4 日志与分数
+### 6.4 Logs and Scores
 
 - `log[0].key`
 - `log[0].params`
-- 是否新增了目标日志（避免误触发别的 listener 也写了日志）
-- `resp.scores`（WS 路径为 `stateUpdate.payload.scores`）
+- Whether the expected log was added, without mistaking a different listener's entry for the target
+- `resp.scores`, or `stateUpdate.payload.scores` on the WebSocket path
 
-## 7. 卡牌测试模板
+## 7. Card Test Description Template
 
-下面这份模板是每张卡测试说明都应该遵循的结构。
+Every card test description should follow this structure.
 
 ---
 
-## 卡牌测试说明模板
+## Card Test Description
 
-### A. 卡牌信息
+### A. Card Information
 
 - `cardId`: `CARD_ID`
-- 名称：`CARD_NAME`
-- 类型：职业 / 小改良 / 大改良附带效果
-- 触发时机：`TRIGGER_TIMING`（hook phase 或 listener `actions` + `phases`）
-- 生效范围：自己 / 对手 / 任意玩家（对应 `registerCardListener` 的 `scope`）
-- 是否产生等待交互：是 / 否（若是，说明 `interaction.request.kind`）
-- 是否写 `cardStates`：是 / 否（若是，列出 `flagged` / `counters` / `extraData` / `stack` 的 key）
-- 是否声明 `handHooks`：是 / 否（在手牌时也触发的 hook 列表，目前仅 E96 Elder 用到）
-- 是否需要透传 `sourceCard`：是 / 否（卡牌触发的 choice / farm-select / selection 应在 `interaction` 里带 `sourceCard`）
+- Name: `CARD_NAME`
+- Type: occupation, minor improvement, or an effect attached to a major improvement
+- Trigger timing: `TRIGGER_TIMING`, as a hook phase or listener `actions` plus `phases`
+- Scope: self, opponent, or any player, matching the `registerCardListener` scope
+- Waiting interaction: yes or no; if yes, name `interaction.request.kind`
+- Writes `cardStates`: yes or no; if yes, list the `flagged`, `counters`, `extraData`, or `stack` keys
+- Declares `handHooks`: yes or no; list hooks that trigger from hand, currently used only by E96 Elder
+- Must propagate `sourceCard`: yes or no; card-triggered choice, farm-select, and selection interactions should carry it
 
-### B. 测试目标
+### B. Test Goals
 
-- 验证 `EXPECTED_PRIMARY_EFFECT`
-- 验证 `EXPECTED_NEGATIVE_CASE`
-- 验证 `EXPECTED_LOG_BEHAVIOR`
-- 验证 `EXPECTED_PENDING_BEHAVIOR`
+- Verify `EXPECTED_PRIMARY_EFFECT`.
+- Verify `EXPECTED_NEGATIVE_CASE`.
+- Verify `EXPECTED_LOG_BEHAVIOR`.
+- Verify `EXPECTED_PENDING_BEHAVIOR`.
 
-### C. 初始状态准备
+### C. Initial State Setup
 
-#### C.1 开局
+#### C.1 Start the Game
 
-1. `const session = new GameSession(seed)`（默认 2 人；如需 3/4 人使用 `new GameSession(seed, undefined, { playerCount })`）
-2. 确认 `session.state.players.length === expectedPlayerCount`
+1. Create `const session = new GameSession(seed)`. Two players are the default; use `new GameSession(seed, undefined, { playerCount })` for three or four players.
+2. Assert `session.state.players.length === expectedPlayerCount`.
 
-#### C.2 设置当前玩家 / 推进到目标阶段
+#### C.2 Select the Current Player or Advance to the Target Phase
 
-1. 推 `state.currentPlayerIndex = X`，或者用 `takeAction` 把无关玩家先消耗掉
-2. 如需直接跳到指定回合：`state.round = R`，再按需调一次 `performRoundEnd()` 让阶段一致
+1. Set `state.currentPlayerIndex = X`, or consume unrelated players with `takeAction`.
+2. To jump to a round, set `state.round = R` and call `performRoundEnd()` if needed to align the phase.
 
-#### C.3 设置资源
+#### C.3 Set Resources
 
-直接 mutate `state.players[X].resources`，例如：
+Mutate `state.players[X].resources` directly:
 
 ```ts
 state.players[0].resources = {
@@ -291,137 +289,133 @@ state.players[0].resources = {
 }
 ```
 
-如果走 WS，则发 `devSetResources` 命令。
+On the WebSocket path, send `devSetResources`.
 
-#### C.4 设置卡牌
+#### C.4 Set Cards
 
-- 单测：`state.players[X].minorPlayed.push(CARD_ID)` 或 `occupationPlayed.push(...)` / `improvements.push(...)`
-- 如果需要触发 `onBuy`，通过 `takeAction` 走真实购买路径
-- 走 WS：`devPlayCard` / `devDrawCard`
+- In a Session test, push `CARD_ID` into `state.players[X].minorPlayed`, `occupationPlayed`, or `improvements`.
+- To trigger `onBuy`, use `takeAction` and the real purchase path.
+- On the WebSocket path, use `devPlayCard` or `devDrawCard`.
 
-#### C.5 设置版图 / 行动格 / 特殊前置条件
+#### C.5 Set the Board, Action Spaces, and Special Preconditions
 
-按需要补充：
+Add only what the card needs:
 
-- 行动格占用：`state.actionSpaces[k].takenBy.push({ playerId: state.players[X].id, workerId: state.players[X].workers[i].id })`
-- 圈地 / 田地 / 马厩 / 房间：直接 mutate `pastures` / `fields` / `stableTiles` / `roomTiles`，或调 `commitSelectionChoice` 走真实路径
-- 预置 `cardStates`：`state.players[X].cardStates[CARD_ID] = { flagged: true, counters: {...}, extraData: {...} }`
-- 预设回合 / 阶段：`state.round = R` + `performRoundEnd()`
+- Occupy an action space with `state.actionSpaces[k].takenBy.push({ playerId: state.players[X].id, workerId: state.players[X].workers[i].id })`.
+- Set pastures, fields, stables, or rooms by mutating `pastures`, `fields`, `stableTiles`, or `roomTiles`, or use `commitSelectionChoice` to exercise the real path.
+- Preload `cardStates` with `state.players[X].cardStates[CARD_ID] = { flagged: true, counters: {...}, extraData: {...} }`.
+- Set the round or phase with `state.round = R` and `performRoundEnd()`.
 
-#### C.6 Reading global `completedFeedingPhases` in tests
+#### C.6 Reading Global `completedFeedingPhases` in Tests
 
-`state.completedFeedingPhases` 是全局收获计数（A148_Woolgrower / B086_TruffleSearcher 等"按已完成 feeding +1 容量"卡牌从此字段读取）。Session 测试无需跑完整收获 phase；直接在 setup 阶段覆盖即可：
+`state.completedFeedingPhases` is the global completed-harvest count. Cards such as A148 Woolgrower and B086 Truffle Searcher use it for effects based on completed feeding phases plus one. A Session test does not need to run a complete harvest; override the field during setup:
 
 ```ts
 const session = new GameSession(SEED)
 session.state.completedFeedingPhases = 3
 session.state.players[0].occupationPlayed.push('A148_Woolgrower')
-// 之后 onComputeAnimalZones(player, zones, state) 读到 cap = 3
+// onComputeAnimalZones(player, zones, state) now reads cap = 3
 ```
 
-如果测试要验证"feeding phase 真正 +1"，通过 `performRoundEnd()` 和后续 `resolveChoice()` 跑完整收获流程，再断言 `session.state.completedFeedingPhases` 单调递增。
+To test that a real feeding phase increments the count, run the complete harvest through `performRoundEnd()` and subsequent `resolveChoice()` calls, then assert that `session.state.completedFeedingPhases` increases monotonically.
 
-### D. 测试步骤
+### D. Test Steps
 
-#### D.1 步骤 1：触发主动作
+#### D.1 Step 1: Trigger the Main Action
 
 ```ts
 const resp = session.takeAction(X, 'ACTION_ID')
 ```
 
-断言：
+Assert:
 
-- `resp.ok === true` （或对负向用例断言 `false` + `resp.error`）
+- `resp.ok === true`, or `false` plus `resp.error` for a negative case
 - `resp.state.players[X].resources`
 - `resp.state.players[X].cardStates[CARD_ID]`
 - `resp.state.actionSpaces[*].takenBy`
 - `resp.interaction`
 - `resp.state.log`
 
-#### D.2 步骤 2：如果产生等待交互，则按 request kind 提交
+#### D.2 Step 2: Submit a Waiting Interaction by Request Kind
 
-先断言 `interaction.stateId === 'wait'`，再按 `interaction.request.kind` 调对应方法：
+First assert `interaction.stateId === 'wait'`, then call the corresponding method for `interaction.request.kind`:
 
-- `choice`：`session.resolveChoice(X, 'CHOICE_VALUE')`
-- `animal-reorg`：`session.resolveChoice(X, 'confirm', interaction.request.zones)`
-- `feed`：`session.resolveChoice(X, 'confirm', { selections: [...] })`
-- `confirm-next-player`：`session.resolveChoice(interaction.request.nextPlayerIndex, 'confirm')`
-- `confirm-player-switch`：`session.resolveChoice(interaction.request.toPlayerIndex, 'confirm')`
-- `farm-select` / `selection`：`session.commitSelectionChoice(X, payload)`
+- `choice`: `session.resolveChoice(X, 'CHOICE_VALUE')`
+- `animal-reorg`: `session.resolveChoice(X, 'confirm', interaction.request.zones)`
+- `feed`: `session.resolveChoice(X, 'confirm', { selections: [...] })`
+- `confirm-next-player`: `session.resolveChoice(interaction.request.nextPlayerIndex, 'confirm')`
+- `confirm-player-switch`: `session.resolveChoice(interaction.request.toPlayerIndex, 'confirm')`
+- `farm-select` / `selection`: `session.commitSelectionChoice(X, payload)`
 
-断言：
+Assert:
 
-- `interaction.stateId` 是否回到 `idle` 或进入下一个 `wait`
-- `state.players[X].resources` / `cardStates`
+- Whether `interaction.stateId` returns to `idle` or enters another `wait`
+- `state.players[X].resources` and `cardStates`
 - `state.log`
 
-#### D.3 步骤 3：回合结束
+#### D.3 Step 3: End the Round
 
-按需调用：
+Call `performRoundEnd()` when needed. The engine normally invokes it automatically; a test calls it directly mainly to assert an end-of-round hook.
 
-- `performRoundEnd()`（一般引擎自动触发，测试里手动调用主要用于断言"回合结束 hook 是否触发"）
+For every step, record:
 
-每一步都要记录：
+- Request parameters
+- The response `interaction`
+- Critical state changes in the response
+- New log entries
 
-- 请求参数
-- 响应中的 `interaction`
-- 响应中的关键状态变化
-- 新增日志
+### E. Required State-Change Assertions
 
-### E. 必须断言的状态变化
+State each expected change explicitly:
 
-请逐项写清：
+- Which resources change for which player
+- Which action-space state changes
+- Whether a card is added or removed
+- How `cardStates[cardId]` changes
+- How `interaction` changes
+- Which entries are added to `log`
 
-- 哪个玩家的哪些资源变化
-- 哪个行动格状态变化
-- 是否新增 / 移除某张卡
-- `cardStates[cardId]` 如何变化
-- `interaction` 如何变化
-- `log` 增加了哪些条目
+### F. Log Assertions
 
-### F. 日志断言
+At minimum, assert:
 
-至少断言：
+- Log `key`
+- Log `params`
+- Whether it contains `cardId`
+- Whether it contains the resource change
+- Whether any forbidden log entry appears
 
-- 日志 `key`
-- 日志 `params`
-- 是否包含 `cardId`
-- 是否包含资源变化
-- 是否出现不应该出现的日志
+### G. Negative Tests
 
-### G. 负向测试
+Add at least one negative case:
 
-至少补充一个负向测试：
+- The card must not trigger when prerequisites are not met.
+- State must not change when the wrong player acts.
+- An invalid choice must return an error or leave state unchanged.
+- An unrelated action must not trigger the card.
 
-- 前置条件不足时，不应触发卡牌效果
-- 错误玩家操作时，状态不应变化
-- 选择非法值时，应返回错误或保持原状态
-- 行动不匹配时，不应触发该卡
+### H. Rendering Tests
 
-### H. 渲染测试
+Keep rendering tests separate from rule tests. Verify:
 
-这一部分单独处理，不与规则测试混在一起。
+- Correct buttons, prompts, and logs are displayed.
+- The current player is interactive while other players are read-only.
+- The appropriate controls appear for a `wait` interaction.
 
-应验证：
+### I. E2E Tests
 
-- 前端是否展示正确的按钮 / 提示 / 日志
-- 当前玩家与非当前玩家是否正确区分为可交互 / 只读
-- 如果有 `wait` interaction，对应控件是否正确显示
+If the card affects the multiplayer synchronization path, add an E2E test:
 
-### I. E2E 测试
-
-如果该卡会影响多人同步主路径，还要补一条 E2E：
-
-1. 两个窗口加入同一房间
-2. 玩家 A 触发该卡效果
-3. 玩家 B 自动收到最新状态
-4. 两端界面一致显示变化结果
+1. Join the same room in two windows.
+2. Player A triggers the card effect.
+3. Player B automatically receives the latest state.
+4. Both windows display the same result.
 
 ---
 
-## 8. 推荐的断言顺序
+## 8. Recommended Assertion Order
 
-每一步推荐按下面顺序断言：
+Assert each step in this order:
 
 1. `resp.ok`
 2. `resp.interaction`
@@ -431,34 +425,27 @@ const resp = session.takeAction(X, 'ACTION_ID')
 6. `resp.state.log[0]`
 7. `resp.scores`
 
-这样做的好处是：
+This confirms command success first, then the interaction phase, state changes, and finally supporting outputs such as logs and scores.
 
-- 先确认命令成功与否
-- 再确认交互阶段是否正确
-- 再确认状态变化
-- 最后确认日志和分数等附加结果
+## 9. Recommended Test File Split
 
-## 9. 推荐的测试文件拆分
-
-建议每张卡至少考虑下面几类测试文件（命名以仓库现状为准）：
+For each card, consider these test files using current repository naming conventions:
 
 - `shared/cards/__tests__/CARD_ID.test.ts`
-  - 简单即时效果的直接行为测试；直接调公开 effect / listener 并断言真实 flow / delta，不写定义存在性 smoke
-
+  - Direct behavior tests for simple immediate effects. Call public effects or listeners and assert real flows and deltas; do not write definition-existence smoke tests.
 - `server/__tests__/CARD_ID-session.test.ts`
-  - 支付、选择 / pending、延迟、跨玩家和多步 flow 的 `GameSession` 集成测试
-
+  - `GameSession` integration tests for payment, choices or pending state, delayed effects, cross-player behavior, and multi-step flows.
 - `e2e-tests/CARD_ID.spec.ts`
-  - Playwright，只在需要验证真实 UI / 多窗口同步时增加（如 `e2e-tests/C22_BasketChair.spec.ts`）
+  - Playwright tests only when the real UI or multi-window synchronization must be verified, as in `e2e-tests/C22_BasketChair.spec.ts`.
 
-并不是每张卡都必须三层都写满，但至少要满足：
+Not every card needs all three layers, but every card must meet these minimums:
 
-- 规则正确性由直接行为或 Session 测试覆盖，机械规则另有静态门禁
-- 复杂 UI 交互有渲染或 E2E 覆盖
+- Direct behavior or Session tests cover rule correctness; static gates cover mechanical constraints.
+- Rendering or E2E tests cover complex UI interactions.
 
-## 10. 一个最小示例
+## 10. Minimal Example
 
-下面给一个最小化模板示例，实际写测试说明时请把占位符替换成真实内容。
+Replace all placeholders with real values in an actual test description.
 
 ```ts
 // server/__tests__/CXX_SomeCard-session.test.ts
@@ -466,7 +453,7 @@ import { describe, it, expect } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 
 describe('CXX_SomeCard', () => {
-  it('在 fishing 后给玩家额外 1 食物', () => {
+  it('gives the player 1 additional food after fishing', () => {
     const session = new GameSession(42)
     const state = session.state
     state.currentPlayerIndex = 0
@@ -483,7 +470,7 @@ describe('CXX_SomeCard', () => {
     expect(resp.state.log[0].key).toBe('EXPECTED_LOG_KEY')
   })
 
-  it('未打出该卡时 fishing 不触发额外效果（负向）', () => {
+  it('does not add the effect when the card has not been played', () => {
     const session = new GameSession(42)
     const state = session.state
     state.currentPlayerIndex = 0
@@ -497,13 +484,11 @@ describe('CXX_SomeCard', () => {
 })
 ```
 
-## 11. 与架构文档的关系
+## 11. Relationship to the Architecture Document
 
-本模板是 `docs/ARCHITECTURE.md` 中“测试分层策略”的具体落地版本。
+This template implements the test-layering strategy described in `docs/ARCHITECTURE.md`.
 
-对应关系如下：
+- The architecture document defines testing principles.
+- This document defines how to write card test descriptions and cases.
 
-- 架构文档负责说明测试原则
-- 本文档负责说明每张卡该如何写测试说明与测试用例
-
-如果两者冲突，以架构文档中的系统边界原则为准，再更新本文档模板。
+If the two conflict, follow the system-boundary principles in the architecture document and then update this template.
