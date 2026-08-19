@@ -1226,7 +1226,7 @@ These modules provide the Workshop and Sandbox backend for custom-card upload, c
 
 ### 11.7 Database
 
-`server/db.ts` owns the SQLite connection through `better-sqlite3`, built for the Node 22 ABI. Existing tables include `rooms`, `users`, `sandbox_settings`, `sandbox_cards`, `custom_cards`, and `pr_proposals`.
+`server/db.ts` owns the SQLite connection through `better-sqlite3`, built for the Node 24 ABI. Existing tables include `rooms`, `users`, `sandbox_settings`, `sandbox_cards`, `custom_cards`, and `pr_proposals`.
 
 ADR 0014 uses the next available migration to add ten tables. The first production Replay is `schemaVersion=1`; no unreleased experimental format is retained:
 
@@ -1447,7 +1447,7 @@ pnpm run lint               # ESLint; zero errors required
 pnpm run build              # TypeScript plus Vite build
 ```
 
-Local development standardizes on Node.js 22. Native dependencies such as `better-sqlite3` are built for its ABI.
+Local development standardizes on Node.js 24. Native dependencies such as `better-sqlite3` are built for its ABI.
 
 ### 13.4 Replay, recovery, and Bug Report launch gates
 

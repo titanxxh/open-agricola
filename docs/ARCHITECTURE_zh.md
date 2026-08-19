@@ -1206,7 +1206,7 @@ Workshop / Sandbox 后端（自定义卡上传、编译、PR 集成）。沙盒�
 
 ### 11.7 数据库
 
-`server/db.ts` —— SQLite 连接（`better-sqlite3`，按 Node 22 ABI 编译）。表：`rooms` / `users` / `sandbox_settings` / `sandbox_cards` / `custom_cards` / `pr_proposals` 等。
+`server/db.ts` —— SQLite 连接（`better-sqlite3`，按 Node 24 ABI 编译）。表：`rooms` / `users` / `sandbox_settings` / `sandbox_cards` / `custom_cards` / `pr_proposals` 等。
 
 ADR-0014 使用下一可用迁移增加十张表；首个正式 Replay `schemaVersion=1`，不保留未上线实验格式：
 
@@ -1424,7 +1424,7 @@ pnpm run lint               # ESLint（error 必须清零）
 pnpm run build              # tsc + vite build
 ```
 
-本地开发统一 Node.js 22；`better-sqlite3` 等原生依赖按 Node ABI 编译。
+本地开发统一 Node.js 24；`better-sqlite3` 等原生依赖按 Node ABI 编译。
 
 ### 13.4 Replay、恢复与 Bug Report 上线门槛
 
