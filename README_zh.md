@@ -119,7 +119,7 @@ PRs welcome. 开发环境、测试、commit 与 PR 规范见 [CONTRIBUTING_zh.md
 
 ## 支持项目
 
-如果这个项目对你有帮助，可以请开发者喝杯咖啡：
+Open Agricola 免费游玩，没有任何付费内容。**赞助收入全部用于维持公开服务器的运行**——后端 VPS 和异机备份机的托管费用。这不是给开发者的打赏，而是让线上对局能一直开着。
 
 [![ko-fi](https://ko-fi.com/img/githubbutton_sm.svg)](https://ko-fi.com/titanxxh)
 

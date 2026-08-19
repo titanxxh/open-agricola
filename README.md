@@ -119,7 +119,7 @@ PRs are welcome. See [CONTRIBUTING.md](CONTRIBUTING.md) for development setup, t
 
 ## Support the Project
 
-If this project helps you, consider buying the developer a coffee:
+Open Agricola is free to play and nothing in it is paywalled. **Sponsorship goes entirely to running the public server** — hosting for the backend VPS and for the off-site backup machine. It is not a donation to the developer; it is what keeps the live game online.
 
 [![ko-fi](https://ko-fi.com/img/githubbutton_sm.svg)](https://ko-fi.com/titanxxh)
 
