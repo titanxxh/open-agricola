@@ -7,12 +7,12 @@ const CARD_ID = 'C125_Nightworker'
 /**
  * C125 Nightworker (Occupation, C, 125)
  *
- * BGA: `onPlayerStartOfWork` returns an optional `PLACE_FARMER` flow with
+ * Rule: `onPlayerStartOfWork` returns an optional `PLACE_FARMER` flow with
  * `constraints` = list of accumulation-space ids carrying a building resource
  * the player has 0 of. The placed worker counts as a normal placement (a
  * family pool worker is consumed; the action space pays out). Players without
  * any candidate space — i.e. they already have wood/clay/reed/stone or every
- * accumulation space of the missing type is empty — get no choice. BGA also
+ * accumulation space of the missing type is empty — get no choice. The reference also
  * marks the card `banned` (cup-pool filter) and `isCorbariusOrDulcinaria` (we
  * don't model either today).
  *
@@ -36,7 +36,7 @@ const cardImpl = {
     if (missingTypes.length === 0) return
 
     // Accumulation spaces with at least 1 of a missing type, currently
-    // unoccupied (BGA's PLACE_FARMER respects standard occupied rules).
+    // unoccupied (the reference's PLACE_FARMER respects standard occupied rules).
     const constraints: string[] = []
     for (const space of state.actionSpaces) {
       if (space.takenBy.length > 0) continue

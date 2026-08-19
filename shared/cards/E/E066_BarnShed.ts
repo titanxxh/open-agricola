@@ -9,7 +9,6 @@ const CARD_ID = 'E066_BarnShed'
  * E66 Barn Shed — Each time another player uses the Forest accumulation space,
  * card owner gets 1 grain.
  *
- * BGA reference: E_66_BarnShed.php
  * scope 'opponent' — fires when an opponent uses Forest, owner gains 1 grain.
  */
 const listener: CardListenerRegistration = {

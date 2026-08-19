@@ -8,7 +8,6 @@ const CARD_ID = 'B145_BrushwoodCollector'
  * B145 Brushwood Collector — Each time you renovate or build a room,
  * you can replace the required 1 or 2 <REED> with a total of 1 <WOOD>.
  *
- * BGA reference:
  * - onPlayerComputeCostsConstruct: for each trade that contains REED, creates an
  *   alternative with WOOD +1 and REED removed (all reed replaced by 1 wood).
  * - onPlayerComputeCostsRenovation: for each fee with 1 or 2 REED, creates an
@@ -38,7 +37,7 @@ export const B145_BrushwoodCollector = defineOccupationCard({
           cardId: CARD_ID,
           appliesTo: ['construct'],
           // scope:'unit' applies this replacement to each room cost row, matching
-          // BGA's per-room `addCost` alternative.
+          // The reference's per-room `addCost` alternative.
           scope: 'unit',
           replaceUpTo: true,
           from: { wood: 1 },

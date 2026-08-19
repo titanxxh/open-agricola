@@ -11,11 +11,11 @@ const TARGET_MAJOR = 'Major_Basket'
 /**
  * C95 Basket Weaver (Occupation, 1+ players).
  *
- * BGA (C095_BasketWeaver.php): When you play this card, immediately build the
+ * Rule: When you play this card, immediately build the
  * Basketmaker's Workshop (Major_Basket) for 1 STONE and 1 REED instead of the
  * normal 2 REED + 2 STONE cost.
  *
- * BGA implementation:
+ * The reference implementation:
  *   - onBuy → flag card, perform improvement action limited to Major_Basket
  *     with trueAction=false, unflag.
  *   - onPlayerComputeCardCosts: if flagged AND target is Major_Basket, override

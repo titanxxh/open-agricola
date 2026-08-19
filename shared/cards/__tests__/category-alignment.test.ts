@@ -218,7 +218,7 @@ const expectedCategories: Record<string, string> = {
   'E022_GuestRoom': 'FARMYARD_-_PLACE_FOR_PERSON',
 }
 
-describe('Sprint 4 PR-4B — category BGA alignment', () => {
+describe('Sprint 4 PR-4B — category reference alignment', () => {
   // C039_StudioBoat is a PlayerActionCard registered via side-effect import in
   // catalog.ts; it does not appear in the minor/occupation arrays, so include
   // it explicitly to keep this test's coverage exhaustive.

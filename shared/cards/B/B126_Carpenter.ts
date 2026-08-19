@@ -9,7 +9,7 @@ const CARD_ID = 'B126_Carpenter'
  * B126 Carpenter — Every new room only costs 3 of the appropriate building resource
  * and 2 reed (instead of the standard 5+2).
  *
- * BGA reference: onPlayerComputeCostsConstruct calls Utils::addCost with [res => 3, REED => 2].
+ * Reference: onPlayerComputeCostsConstruct calls Utils::addCost with [res => 3, REED => 2].
  */
 
 const constructCostListener: CardListenerRegistration = {

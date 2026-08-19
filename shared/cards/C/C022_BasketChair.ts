@@ -41,7 +41,7 @@ const cardImpl = {
       (t) => t.playerId === player.id && t.workerId === first.workerId,
     )) return
     // targetCardHold keeps the recalled worker off "home", so the place-farmer
-    // step needs a separate at-home farmer. Guard up-front, matching BGA's
+    // step needs a separate at-home farmer. Guard up-front, matching the reference's
     // isDoable propagation.
     if (workersAvailable(state, player) < 1) return
 

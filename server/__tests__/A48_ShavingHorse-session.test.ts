@@ -200,7 +200,7 @@ describe('A048_ShavingHorse session', () => {
     expect(result).toBeUndefined()
   })
 
-  it('has cost { wood: 1 } aligned with BGA', async () => {
+  it('has cost { wood: 1 } aligned with the reference', async () => {
     const mod = await import('../../shared/cards/A/A048_ShavingHorse')
     expect(mod.A048_ShavingHorse.cost).toEqual({ wood: 1 })
   })

@@ -566,7 +566,7 @@ export const handleConfirmPlayerSwitchResolved = (
 /**
  * Resolve the synthetic `confirm-next-player` pending frame:
  * advance state.currentPlayerIndex, clear engine stack + history, then
- * run the BGA `stLabor()` skip-next loop. If every player's workers are
+ * run the reference `stLabor` skip-next loop. If every player's workers are
  * spent, trampoline into `onAllWorkersPlaced` -> performRoundEnd.
  * Migrated from GameCore.handleConfirmNextPlayerResolved (S2 Task 10 part 3).
  */
@@ -584,7 +584,7 @@ export const handleConfirmNextPlayerResolved = (
   core.clearHistory() // Clear undo history when switching players
   core.setTurnOwner(null)
   const state = core.state
-  // Mirrors BGA `stLabor()` SkipNext consumption: dispatch
+  // Mirrors the reference `stLabor` SkipNext consumption: dispatch
   // `onBeforePlayerTurn` for the freshly-active player; if any card asks to
   // skip, advance to the next eligible player. Cap at `players.length` to
   // guarantee termination if every player is asked to skip.

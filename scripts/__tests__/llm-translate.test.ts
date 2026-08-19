@@ -3,17 +3,17 @@ import { buildTranslatePrompt, parseTranslateResponse } from '../i18n/llm-transl
 import type { MissingKey } from '../i18n-audit'
 
 describe('buildTranslatePrompt', () => {
-  it('includes style samples and BGA candidates', () => {
+  it('includes style samples and reference candidates', () => {
     const missing: MissingKey[] = [
       { key: 'actions.bake.name', locales: ['zh', 'en'], referencedAt: ['a.ts:1'] },
     ]
     const styleSamples = new Map<string, Array<{ key: string; zh: string; en: string }>>([
       ['actions.*.name', [{ key: 'actions.foo.name', zh: '某行动', en: 'Foo' }]],
     ])
-    const bgaCandidates = new Map<string, string[]>([
+    const referenceCandidates = new Map<string, string[]>([
       ['actions.bake.name', ['Bake bread']],
     ])
-    const prompt = buildTranslatePrompt(missing, styleSamples, bgaCandidates)
+    const prompt = buildTranslatePrompt(missing, styleSamples, referenceCandidates)
     expect(prompt).toContain('actions.bake.name')
     expect(prompt).toContain('Bake bread')
     expect(prompt).toContain('某行动')

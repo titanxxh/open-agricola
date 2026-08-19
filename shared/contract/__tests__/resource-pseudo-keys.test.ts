@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest'
 import { REAL_RESOURCE_KEYS, PSEUDO_RESOURCE_KEYS, isPseudoResourceKey } from '../resource-keys'
 
 describe('Resource pseudo keys', () => {
-  it('exposes the BGA pseudo set', () => {
+  it('exposes the reference pseudo set', () => {
     expect(PSEUDO_RESOURCE_KEYS).toEqual(
       expect.arrayContaining(['occupation', 'field', 'roomWood', 'roomClay', 'roomStone', 'stable']),
     )

@@ -44,7 +44,7 @@ const listener: CardListenerRegistration = {
 }
 
 /**
- * Part 2: BGA's Fishing Net uses `PAY` (must succeed) — when an opponent
+ * Part 2: the reference's Fishing Net uses `PAY` (must succeed) — when an opponent
  * tries to use Fishing without food, the entire Fishing action fails.
  * Mirror this by gating the inner `collect` action of the Fishing space via
  * an `isDoable` listener: the engine's `ActionNode` for `collect` runs the

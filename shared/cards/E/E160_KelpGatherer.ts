@@ -10,7 +10,7 @@ const CARD_ID = 'E160_KelpGatherer'
  * Each time another player uses the Fishing accumulation space,
  * the opponent gets 1 extra food and the card owner gets 1 vegetable.
  *
- * BGA: onPlayerPlaceFarmer — if opponent uses Fishing, opponent gains 1 food
+ * Rule: onPlayerPlaceFarmer — if opponent uses Fishing, opponent gains 1 food
  * and owner gains 1 vegetable.
  *
  * scope 'opponent' — fires when an opponent uses the fishing space.

@@ -2,11 +2,11 @@ import { defineOccupationCard } from '../card-source'
 /**
  * C156 Hoof Caregiver — Occupation (4+ players)
  *
- * BGA `C156_HoofCaregiver::onBuy`:
+ * The reference `C156_HoofCaregiver::onBuy`:
  *   1. If 'ActionCattleMarket' is revealed (i.e. the cattle-market round
  *      space exists), SPECIAL_EFFECT placeCattle adds 1 cattle to the space.
  *   2. gainNode([GRAIN => N, FOOD => N]) where N = cattle on the space
- *      AFTER the +1 (BGA computes N as `count() + 1`).
+ *      AFTER the +1 (the reference computes N as `count + 1`).
  *
  * Our previous implementation truncated to a static gain {grain:1, food:1}
  * and skipped the space mutation entirely.

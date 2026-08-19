@@ -39,7 +39,7 @@ describe('E011_PettingZoo getInvalidAnimals', () => {
     expect(zone.cardId).toBe('E011_PettingZoo')
   })
 
-  it('hook returns empty (BGA mirror; adjacency gate handles activation)', () => {
+  it('hook returns empty (reference mirror; adjacency gate handles activation)', () => {
     const session = setup()
     const state = session.getState().state
     const player = state.players[0]!

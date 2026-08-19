@@ -632,7 +632,7 @@ const executeActivateCardAction = (
     ownerCardId: params.cardId,
     ownerCardZone: params.ownerCardZone,
   })
-  // Track BGA-style per-card `used` stat: count a use only when the listener
+  // Track per-card `used` stat: count a use only when the listener
   // actually returned an effect. Pure no-op fires and universal listeners
   // without a cardId are skipped.
   if (

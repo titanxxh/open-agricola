@@ -10,7 +10,7 @@ const CARD_ID = 'A048_ShavingHorse'
  * A48 Shaving Horse (MinorImprovement, A, 48)
  *
  * Each time after you obtain at least 1 wood, if you then have 5+ wood you
- * may exchange 1 wood for 3 food. With 7+ wood it becomes mandatory. BGA
+ * may exchange 1 wood for 3 food. With 7+ wood it becomes mandatory. The reference
  * does not filter by action space — any wood-producing action counts.
  */
 

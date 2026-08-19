@@ -7,7 +7,7 @@ import type { CardImpl } from '../registry'
 
 const CARD_ID = 'E087_MasterRenovator'
 /**
- * BGA: `Utils::addBonusChoices($args['costs'], [[WOOD=>-1],[CLAY=>-1],
+ * Rule: `Utils::addBonusChoices($args['costs'], [[WOOD=>-1],[CLAY=>-1],
  * [STONE=>-1],[REED=>-1]], $this->id)` gated on `isFlagged()`. The flag is
  * set/cleared via `flagCardNode()`/`unflagCardNode()` wrapping the
  * RENOVATION leaf inside the SEQ returned from `onPlayerEndWorkPhase`.

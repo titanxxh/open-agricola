@@ -14,7 +14,7 @@ const CARD_ID = 'A137_RiverineShepherd'
  * - Use Sheep Market → optionally take 1 reed (if Reed Bank has accumulated reed)
  * - Use Reed Bank → optionally take 1 sheep (if Sheep Market has accumulated sheep)
  *
- * BGA reference: A_137_RiverineShepherd.php — checks the OTHER space's accumulated
+ * Reference: checks the OTHER space's accumulated
  * resources. If the other space has resources of the matching type, the player may
  * optionally take 1.
  *

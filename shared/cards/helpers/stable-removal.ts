@@ -98,7 +98,7 @@ export type ReturnedStableKind = 'normal' | 'farmhand'
  * Returns the kind removed, or null when no stable is there.
  *
  * Callers should treat the two kinds identically for payout purposes —
- * BGA and rulings apply the same resource gain to both.
+ * The reference and rulings apply the same resource gain to both.
  */
 export const removeStableOrFarmHandAtTile = (
   player: PlayerState,

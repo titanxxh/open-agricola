@@ -19,14 +19,11 @@ describe('restart-intranet preview mode', () => {
     expect(script).toContain('"$FRONTEND_BIN" preview')
   })
 
-  it('uses CDN only when configured and otherwise serves local BGA images', () => {
+  it('does not reference any reference image source', () => {
     expect(script).not.toContain('x.boardgamearena.net')
-    expect(script).not.toMatch(/BGA_CDN_BASE_URL:-https?:/)
-    expect(script).toContain('if [ -n "${BGA_CDN_BASE_URL:-}" ]; then')
-    expect(script).toContain('BGA_CDN_BASE_URL="$BGA_CDN_BASE_URL"')
-    expect(script).toContain('"$SCRIPT_DIR/dist/bga-img"')
-    expect(script).toContain('cp -R "$BGA_IMAGE_DIR"/. "$SCRIPT_DIR/dist/bga-img"/')
-    expect(script).not.toContain('REPLAY_VIEWER_ALLOW_MISSING_BGA_ART')
+    expect(script).not.toContain('BGA_CDN_BASE_URL')
+    expect(script).not.toContain('BGA_IMAGE_DIR')
+    expect(script).not.toContain('bga-img')
   })
 
   it('documents and wires --moor for fixed dev rooms', () => {

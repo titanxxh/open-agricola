@@ -9,7 +9,7 @@ const BUILDING_RESOURCES = ['wood', 'clay', 'stone', 'reed'] as const
 /**
  * D95 Site Manager (Occupation, 1+ players).
  *
- * BGA (D095_SiteManager.php): When you play this card, immediately build a
+ * Rule: When you play this card, immediately build a
  * MAJOR improvement. When paying its cost, you can replace up to 1 building
  * resource of each type with 1 FOOD each.
  *

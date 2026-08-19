@@ -102,7 +102,7 @@ describe('A150_Stagehand session', () => {
     if (resp.interaction.stateId !== 'wait') return
     expect(resp.interaction.request.farm.farmType).toBe('room')
     if (resp.interaction.request.farm.farmType !== 'room') return
-    // BGA: Stagehand's construct does not cap room count (unlike A128/D128).
+    // Rule: Stagehand's construct does not cap room count (unlike A128/D128).
     expect(resp.interaction.request.farm.maxSelections).toBeGreaterThan(1)
 
     // Build a room

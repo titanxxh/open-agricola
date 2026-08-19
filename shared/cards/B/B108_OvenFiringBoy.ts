@@ -10,7 +10,7 @@ const CARD_ID = 'B108_OvenFiringBoy'
  * Each time you use a wood accumulation space, you get an additional
  * Bake Bread action.
  *
- * BGA: isBeforeCollectEvent for WOOD → bakeBreadNode()
+ * Rule: isBeforeCollectEvent for WOOD → bakeBreadNode
  * In open-agricola: listen for place-farmer on forest/copse/grove,
  * return optional bake-bread leaf.
  */

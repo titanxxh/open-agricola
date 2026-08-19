@@ -12,7 +12,7 @@ const CARD_ID = 'C160_Outrider'
  * action space card (after it has been placed on the round space), you get
  * 1 grain."
  *
- * BGA: isListeningTo uses Globals::getLastRevealed() to filter to events
+ * Rule: isListeningTo uses Globals::getLastRevealed to filter to events
  * targeting the most recently revealed action card.
  *
  * In open-agricola the last revealed round action is at

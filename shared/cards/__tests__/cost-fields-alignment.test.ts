@@ -40,7 +40,7 @@ const cases: Case[] = [
   { id: 'A025_Bassinet',           kind: 'minor', cost: { wood: 1, reed: 1 } },
   { id: 'A031_DebtSecurity',       kind: 'minor', cost: { food: 2 } },
   { id: 'E035_Misanthropy',        kind: 'minor', cost: { wood: 1 } },
-  // metadata-3b reverse 8 (deleted to match BGA missing)
+  // metadata-3b reverse 8 (deleted to match the reference missing)
   { id: 'A001_Shelter',             kind: 'minor', cost: {} },
   { id: 'A064_BarleyMill',         kind: 'minor', cost: {} },
   { id: 'B026_AgrarianFences',     kind: 'minor', cost: {} },
@@ -51,7 +51,7 @@ const cases: Case[] = [
   { id: 'E038_RodCollection',      kind: 'minor', cost: {} },
 ]
 
-describe('Sprint 1 PR-1B — cost/vp BGA alignment (16 cards)', () => {
+describe('Sprint 1 PR-1B — cost/vp reference alignment (16 cards)', () => {
   it.each(cases)(
     '$id cost & vp',
     ({ id, kind, cost, vp }) => {

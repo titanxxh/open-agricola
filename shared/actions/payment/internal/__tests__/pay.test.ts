@@ -309,7 +309,7 @@ describe('computeAllBuyableCombinations', () => {
     }
     const solutions = computeAllBuyableCombinations(player, cost)
     // Dominance pruning hides the skip path (strictly worse than using the
-    // discount) — matching BGA's keepOnlyOptimals.
+    // discount) — matching the reference's keepOnlyOptimals.
     expect(solutions.map((s) => s.resourcesPaid.wood).sort()).toEqual([3])
   })
 
@@ -437,7 +437,7 @@ describe('computeAllBuyableCombinations', () => {
     expect(hasStoneSave).toBe(true)
   })
 
-  it('A88 HedgeKeeper: BGA-style empty-from trade covers up to 3 wood of fencing fee', () => {
+  it('A88 HedgeKeeper: empty-from trade covers up to 3 wood of fencing fee', () => {
     const player = createMockPlayer({ wood: 1 })
     player.activeModifiers = [{ ...hedgeKeeperModifier }]
     const cost: ComplexCost = { fee: { wood: 4 } }

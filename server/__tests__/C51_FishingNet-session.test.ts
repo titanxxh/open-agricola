@@ -191,10 +191,10 @@ describe('C051_FishingNet session', () => {
     expect(detailParts?.costs?.food).toBe(1)
   })
 
-  it('opponent without food cannot use fishing while owner has C51 (BGA transferOrLose)', () => {
+  it('opponent without food cannot use fishing while owner has C51 (reference transferOrLose)', () => {
     const session = setup(1)
     const s = session.getState().state
-    // Opponent has 0 food — by BGA rule, they cannot use Fishing.
+    // Opponent has 0 food — by the reference rule, they cannot use Fishing.
     s.players[1]!.resources.food = 0
     session.loadState(s)
 

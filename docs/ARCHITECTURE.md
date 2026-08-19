@@ -156,7 +156,7 @@ Selected fields:
 
 `workPhaseObtainedResources` supports cards such as A53 that inspect resources gained during the previous work phase. It is cleared after the returning-home phase resolves.
 
-`completedFeedingPhases` increments in the feeding phase of `shared/session/phases/harvest.ts`. It matches BGA's global count. Cards such as A148 and B86 read it for completed-harvest-plus-one capacity instead of maintaining a per-card post-play counter.
+`completedFeedingPhases` increments in the feeding phase of `shared/session/phases/harvest.ts`. It matches the reference's global count. Cards such as A148 and B86 read it for completed-harvest-plus-one capacity instead of maintaining a per-card post-play counter.
 
 `events` is the public structured rule-event stream beneath `GameState.log`. Backend rules first write `GameEvent`; mappers then derive UI logs, animation cues, audit reports, and future replay. `log` remains the visible text-log cache and is never a rule source. Rule code does not write `state.log` directly. The only writers are named cache boundaries: mapper output from `appendImmediateEvents()` and mapper output flushed from engine `LogStore` by `GameCore.flushEngineLog()`. `pnpm run check:direct-session-log` enforces this boundary.
 
@@ -323,7 +323,7 @@ type ActionChoiceOption = {
 
 `effectPreview` has three variants: `resourceExchange`, `payment`, and `text`. The engine automatically aggregates previews for `seq(pay-resources, gain[, bonus-vp])` options. A card using handwritten `payLeaf` plus `gainLeaf` receives the same preview. Producers include `shared/cards/helpers/pay-gain-node.ts`, `shared/actions/effects/pay-helpers.ts`, and `shared/actions/effects/exchange.ts`.
 
-`descriptionPreview` is a BGA-style recursive description of `ActionFlow`. A leaf uses `ActionDefinition.nameKey` plus its `effectPreview`; composite nodes join child descriptions by type: `SeqNode` with `, `, `XorNode` with ` / `, `OrNode` with ` + `, and `ParallelNode` with ` | `. The frontend prefers `descriptionPreview`, allowing ordinary leaves, pay/gain compositions, and nested XOR or SEQ nodes to derive option text from the engine.
+`descriptionPreview` is a recursive description of `ActionFlow`. A leaf uses `ActionDefinition.nameKey` plus its `effectPreview`; composite nodes join child descriptions by type: `SeqNode` with `, `, `XorNode` with ` / `, `OrNode` with ` + `, and `ParallelNode` with ` | `. The frontend prefers `descriptionPreview`, allowing ordinary leaves, pay/gain compositions, and nested XOR or SEQ nodes to derive option text from the engine.
 
 Generic helpers such as `pay-gain-node` no longer inject `choiceLabelKey: 'ui.interactionResourceExchange'` for mechanical pay/gain choices. Visible option text comes from `descriptionPreview` and `effectPreview`. Reserve `choiceLabelKey` and `choiceLabelParams` for semantic overrides such as field or quantity selection, `ui.interactionUseCard`, or `ui.interactionSeedResearcher`; do not duplicate i18n for plain resource exchanges. `special-effect` supplies semantic descriptions from `params.kind` so internal state synchronization is not exposed as a generic “Card Effect.” Display-only synchronization such as `set-infobox` is omitted from descriptions.
 
@@ -361,7 +361,7 @@ shared/engine/
 
 ### 5.2 Node Types
 
-Architecture decision from 2026-05-13: domain `ActionFlow` follows BGA node algebra and exposes only `leaf`, `seq`, `parallel`, `xor`, and `or`. `optional`, `promptKey`, `sourceCard`, `choiceLabel*`, and `targetPlayerId` are metadata, not domain node types. Cards and listeners construct only this small set; new rules must not expose runtime-only nodes through `ActionFlow`.
+Architecture decision from 2026-05-13: domain `ActionFlow` follows the reference node algebra and exposes only `leaf`, `seq`, `parallel`, `xor`, and `or`. `optional`, `promptKey`, `sourceCard`, `choiceLabel*`, and `targetPlayerId` are metadata, not domain node types. Cards and listeners construct only this small set; new rules must not expose runtime-only nodes through `ActionFlow`.
 
 Architecture decision from 2026-05-14: the runtime engine tree also has five concrete nodes: `ActionNode`, `SequenceNode`, `ParallelNode`, `XorNode`, and `OrNode`. Cross-player ownership, optional state, trigger selection, listener activation, and pending state are represented through node metadata, internal action leaves, pending envelopes, and frame state rather than wrapper nodes.
 
@@ -369,8 +369,8 @@ Architecture decision from 2026-05-14: the runtime engine tree also has five con
 
 Runtime nodes:
 
-- `ActionNode` is equivalent to BGA `LeafNode(action)` and calls `ActionDefinition.execute` with `actionId` and `params`.
-- `SequenceNode`, `ParallelNode`, `OrNode`, and `XorNode` correspond to BGA `SEQ`, `PARALLEL`, `OR`, and `XOR`. After choosing a composite branch, `XorNode` stores `selectedChildId` and traverses only that branch until completion so `xor(seq(...))` does not finish after its first successful leaf. `ParallelNode(mode='trigger-select')` implements BGA-style reaction selection with pass and mandatory semantics for action listeners, phase card-effect activation, and extra-turn providers.
+- `ActionNode` is equivalent to the reference `LeafNode(action)` and calls `ActionDefinition.execute` with `actionId` and `params`.
+- `SequenceNode`, `ParallelNode`, `OrNode`, and `XorNode` correspond to the reference `SEQ`, `PARALLEL`, `OR`, and `XOR`. After choosing a composite branch, `XorNode` stores `selectedChildId` and traverses only that branch until completion so `xor(seq(...))` does not finish after its first successful leaf. `ParallelNode(mode='trigger-select')` implements reaction selection with pass and mandatory semantics for action listeners, phase card-effect activation, and extra-turn providers.
 
 Shared runtime metadata:
 
@@ -491,9 +491,9 @@ A092 Adoptive Parents introduced the extra-turn mechanism at the rotation layer 
 - A repeatable provider may define internal adjunct `countExtraTurns`, allowing mandatory turn skipping or forced consumption to consume one opportunity. `_extraTurnSkipCountsByCard` and `_extraTurnConsumedCountsByCard` record per-card skipped and consumed counts. `countPendingExtraTurns` and `consumePendingExtraTurns` reuse provider aggregation instead of a global player counter. A noninteractive fallback consumes one source in stable card order only when automatic progression is required.
 - Three round gates treat a player with a pending extra turn as eligible: next-active-player selection via `nextSeatedPlayerIdx`, whose predicate is `workersAvailable(state, p) > 0 || hasPendingExtraTurn(state, p)`; `roundWorkComplete`, requiring every player to have no available workers and no pending extra turn; and the rotation skip loop, which stops on a zero-worker player with a pending extra turn so the flow can be injected.
 - `startPendingExtraTurnIfAny(core)` is the only injection path. Confirm-next-player rotation and history restoration after `undoStep` or `undoAction` reuse it. Undo rebuilds the pending flow only when the current player is already stopped at a zero-worker extra-turn seat and the engine stack is empty; it does not rerun the full seat walk.
-- A92 contributes XOR use or forfeit. Choosing Forfeit exits later opportunities that round. It triggers when ordinary workers are exhausted while an inactive newborn remains, matching BGA `stLabor` supply-placement choices such as adoptive, Telegram, and Work Permit. M057 enters the card or board selection flow for a Moor special action and still invokes normal special-action before and after listeners.
+- A92 contributes XOR use or forfeit. Choosing Forfeit exits later opportunities that round. It triggers when ordinary workers are exhausted while an inactive newborn remains, matching the reference `stLabor` supply-placement choices such as adoptive, Telegram, and Work Permit. M057 enters the card or board selection flow for a Moor special action and still invokes normal special-action before and after listeners.
 
-`skipTurn`, used by cards such as D134 Oyster Eater through `{ skipTurn: true }`, mirrors BGA `Globals::setSkipNext` and makes rotation continue past the player before their turn starts. `contributeExtraTurn` instead prevents early skipping after the player's workers are exhausted and appends another placement. See *Extra Turn / Forfeit* in `CONTEXT.md`.
+`skipTurn`, used by cards such as D134 Oyster Eater through `{ skipTurn: true }`, mirrors the reference `Globals::setSkipNext` and makes rotation continue past the player before their turn starts. `contributeExtraTurn` instead prevents early skipping after the player's workers are exhausted and appends another placement. See *Extra Turn / Forfeit* in `CONTEXT.md`.
 
 ## 7. `shared/actions/`: Actions and Hooks
 
@@ -539,7 +539,7 @@ type ActionDefinition = {
 
 Hooks are not part of `ActionDefinition`; card files register them explicitly through `hooks.ts`.
 
-The opt-in `getBaseChoiceOptions` path takes base options, injects `computeChoiceCandidates` results, deduplicates by `value`, and filters with `costPreview.canExecute`. Zero candidates fail, one candidate jumps directly to `resolveChoice`, and two or more candidates create the standard prompt. Current consumers are `renovate-house` and `A087_Conservator`. This path is mutually exclusive with the traditional `execute() -> choice -> computeArgs.extraOptions` path. Card-authored exact or free renovation costs use `actionContext.exactCost`, matching BGA `formatCost` semantics for construct, stables, and plow.
+The opt-in `getBaseChoiceOptions` path takes base options, injects `computeChoiceCandidates` results, deduplicates by `value`, and filters with `costPreview.canExecute`. Zero candidates fail, one candidate jumps directly to `resolveChoice`, and two or more candidates create the standard prompt. Current consumers are `renovate-house` and `A087_Conservator`. This path is mutually exclusive with the traditional `execute() -> choice -> computeArgs.extraOptions` path. Card-authored exact or free renovation costs use `actionContext.exactCost`, matching the reference `formatCost` semantics for construct, stables, and plow.
 
 ### 7.3 Automatic discovery under `effects/`
 
@@ -568,10 +568,10 @@ Production effects, helpers, and card runtime code enter the payment lifecycle o
 
 **Unified `ComplexCost` model.** Construct, renovation, fencing, plow, occupation, minor improvement, major improvement, and `pay` leaves all use the same `computeAllBuyableCombinations` pipeline. Its fields mean:
 
-- `fees: Partial<Resource>[]`: total fixed fees per action. The raw total-cost delta in `computeCosts.costs` is written to `fees[0]`. Sourced BGA `addBonus` and `addBonusChoices` should normally become `bonuses`; sourced BGA `addCost` that retains the original candidate should normally become `trades`. After `mergeResources(fees[0], unitFee * nb)`, enumeration clamps negative values to zero so a discount cannot refund an unrelated resource.
+- `fees: Partial<Resource>[]`: total fixed fees per action. The raw total-cost delta in `computeCosts.costs` is written to `fees[0]`. Sourced the reference `addBonus` and `addBonusChoices` should normally become `bonuses`; sourced the reference `addCost` that retains the original candidate should normally become `trades`. After `mergeResources(fees[0], unitFee * nb)`, enumeration clamps negative values to zero so a discount cannot refund an unrelated resource.
 - `unitFee: Partial<Resource>` plus `nb: number`: per-unit cost times quantity. A constructed room uses `{wood: rooms_cost, reed: 1_per_pile_or_room}`, renovation uses `{[material]: 1}`, and fencing uses `{wood: 1}`. `nb` is the number of units handled by the action: rooms, fence segments, and so on. Enumeration first expands ordered replacements for every unit-cost row, then combines the rows into total costs.
-- Typed-flat fencing or stable payment passed as one `{fee:{wood:N}}` is normalized before cost-type modifiers: fencing becomes `{unitFee:{wood:1}, nb:N}`, while stables become `{fee:{wood:N%2}, unitFee:{wood:2}, nb:floor(N/2)}`. A BGA `addCost` per-unit alternative such as A16 or C56 can therefore generate a cost row before a bonus choice such as D88 replaces it.
-- `trades: Trade[]`: `from -> to` resource substitutions injected by a `TradeModifier` or `computeCosts` listener. `Trade.scope: 'action' | 'unit'` selects the substitution point. Action-scoped trades convert the player's resource pool once per action. Unit-scoped trades run candidate closure on each unit-cost row, with no ordering field, so reachable rows do not depend on registration order. `replaceUpTo` models B145 Brushwood Collector's BGA `addCost` form, which replaces either one or two reed in the current row with one wood. An empty `from` with `to:{resource:n}` preserves the original row and adds a sourced discount candidate.
+- Typed-flat fencing or stable payment passed as one `{fee:{wood:N}}` is normalized before cost-type modifiers: fencing becomes `{unitFee:{wood:1}, nb:N}`, while stables become `{fee:{wood:N%2}, unitFee:{wood:2}, nb:floor(N/2)}`. A the reference `addCost` per-unit alternative such as A16 or C56 can therefore generate a cost row before a bonus choice such as D88 replaces it.
+- `trades: Trade[]`: `from -> to` resource substitutions injected by a `TradeModifier` or `computeCosts` listener. `Trade.scope: 'action' | 'unit'` selects the substitution point. Action-scoped trades convert the player's resource pool once per action. Unit-scoped trades run candidate closure on each unit-cost row, with no ordering field, so reachable rows do not depend on registration order. `replaceUpTo` models B145 Brushwood Collector's the reference `addCost` form, which replaces either one or two reed in the current row with one wood. An empty `from` with `to:{resource:n}` preserves the original row and adds a sourced discount candidate.
 - `bonuses: Bonus[]`: per-action discounts or discount choices. `{discount}` is a single discount and `{choices: BonusChoice[]}` is a multi-choice discount. `Bonus.optional` controls whether enumeration includes a branch that does not apply the bonus.
 - `CostResourceRemovalModifier`: `type:'remove-resource'` structurally removes the named resource key from `fee`, `fees`, and `unitFee` before enumeration. `costResourceRemovals` retains the source and the actual reduction on every cost path. This models rules such as C014 that remove the need for a resource. The constraint is reapplied after each later bonus, so E123 cannot consume a removed cost and D013-style cost bonuses cannot reintroduce it. Final reductions are recorded in `PaymentSolution.bonusReductions` for Cost Attribution.
 - `paymentResourceProviders`: virtual payment resources supplied by a card or hook. A provider declares a stable key, available amount, covered real-cost resources, and the source consumed on execution. It is not written into `fee`, `fees`, or `PlayerState.resources`; it appears under its own key in `PaymentSolution.resourcesPaid`, and the executor consumes the source state.
@@ -581,7 +581,7 @@ Production effects, helpers, and card runtime code enter the payment lifecycle o
 - `Bonus.choiceAffectsState`: marks a choice identity that an `after-pay` or similar listener consumes to mutate state. Only these solutions are mutually exempt from dominance pruning. E123 needs this flag; stateless replacements such as B145 and D88 do not.
 - `bonuses[].conditions?: Record<string, number>`: `applyCostModifiers` carries `BonusModifier.conditions` into the generated bonus, and enumeration reevaluates quantity-aware constraints with `evaluateConditions(player, conditions, nb)`, such as C013 Wood Slide Hammer's `minNumRooms: 5`.
 
-**Card-purchase `ComputeCardCosts` candidate pipeline: candidate closure, ADR 0004.** Before the payment solver sees a major or minor improvement purchase, the cost is normalized into a Cost Candidate List. Candidate closure then applies every `deriveCardCostCandidate` transform through `candidate-closure.ts` `closeCandidates()`: fixed-point enumeration followed by Mandatory Saturation filtering. Results do not depend on listener registration order or naming; `CardListenerRegistration.order` was removed and must not return. A card declares only a single-candidate transform, `candidate -> candidate(s) | null`, plus `cardCostCandidateMandatory`. Optional BGA "can pay instead" transforms naturally retain the original candidate. Mandatory BGA "costs less" or replacement transforms hide rows that can still undergo a mandatory transform after saturation. A fixed-price card is an input-independent optional or mandatory transform; closure deduplication produces one row without any precedence declaration. Discount clamping removes zero-valued resource keys from the candidate resource map. Candidate metadata stores only `sources`, `originalFeeIndex`, and Cost Attribution; sources are an unordered set in the deduplication key. After closure, each resources plus `originalFeeIndex` group keeps one representative row, choosing the fewest sources and then lexical key order, per the ADR 0004 amendment. Once payment is selected, improvement-payment glue writes the metadata to option `sourceCards`, `resource.paid.bonusSources`, and Card Resource Stats. A single-candidate row uses index-zero metadata by default.
+**Card-purchase `ComputeCardCosts` candidate pipeline: candidate closure, ADR 0004.** Before the payment solver sees a major or minor improvement purchase, the cost is normalized into a Cost Candidate List. Candidate closure then applies every `deriveCardCostCandidate` transform through `candidate-closure.ts` `closeCandidates()`: fixed-point enumeration followed by Mandatory Saturation filtering. Results do not depend on listener registration order or naming; `CardListenerRegistration.order` was removed and must not return. A card declares only a single-candidate transform, `candidate -> candidate(s) | null`, plus `cardCostCandidateMandatory`. Optional the reference "can pay instead" transforms naturally retain the original candidate. Mandatory the reference "costs less" or replacement transforms hide rows that can still undergo a mandatory transform after saturation. A fixed-price card is an input-independent optional or mandatory transform; closure deduplication produces one row without any precedence declaration. Discount clamping removes zero-valued resource keys from the candidate resource map. Candidate metadata stores only `sources`, `originalFeeIndex`, and Cost Attribution; sources are an unordered set in the deduplication key. After closure, each resources plus `originalFeeIndex` group keeps one representative row, choosing the fewest sources and then lexical key order, per the ADR 0004 amendment. Once payment is selected, improvement-payment glue writes the metadata to option `sourceCards`, `resource.paid.bonusSources`, and Card Resource Stats. A single-candidate row uses index-zero metadata by default.
 
 **Fixed pipeline order as a domain rule, not a card precedence rule:** base candidates from `fee`, `fees`, `unitFee`, and dynamic `getBaseCosts`; structured resource removal by cost-type modifiers; candidate closure for card-purchase `deriveCardCostCandidate` or unit-trade transforms; action-scoped trade enumeration; bonuses, including capped and choice bonuses, evaluated last because their upper bound is the final cost; card-provided payment resources; cards; affordable-solution generation; `paymentBudget` filtering of final resources paid; then Pareto pruning and sorting.
 
@@ -605,7 +605,7 @@ A unit-scoped trade **must not** carry `conditions.minNumRooms`; a per-unit trad
 - `validateComplexCost(cost)` throws in development and degrades to no affordable solutions in production. It rejects costs that combine `nb` with `cards`, and requires a unit-scoped trade to have `nb`.
 - `validateTradeModifier(modifier)` rejects unit scope combined with `minNumRooms`.
 - `validateBonus(bonus)` requires exactly one of `discount` or nonempty `choices`.
-- Typed-cost payment post-processing drops any branch whose `resourcesPaid` contains a negative value. A BGA `addCost` alternative cannot mean producing surplus resources and refunding them.
+- Typed-cost payment post-processing drops any branch whose `resourcesPaid` contains a negative value. A the reference `addCost` alternative cannot mean producing surplus resources and refunding them.
 
 **Renovation alignment in `shared/actions/effects/renovation.ts`.** `buildRenovationPlan` returns `ComplexCost` directly as `{fees:[{reed:1}], unitFee:{[material]:1}, nb:player.rooms}`. A `computeCosts` hook's `costs` merge into `fees[0]` through `mergeRenovationCost`; `trades`, `bonuses`, and `paymentResourceProviders` are appended to this payment child through `executionContext.costTrades`, `costBonuses`, and `paymentResourceProviders`. `canAffordTypedFlatCost`, `payTypedFlatCost`, and `payTypedFlatCostDetailed` in `typed-flat.ts` accept `Partial<Resource> | ComplexCost` and all use the single `computeAllBuyableCombinations` pipeline. The old `resolveSimpleTradeAdjustedCost` path was removed.
 
@@ -656,7 +656,7 @@ As a `sourceCard` fallback, a top-level `ActionHookResult.flow.sourceCard` is re
 
 An ordinary public-action leaf enters the engine in this order: `computeReplace -> before -> strict isDoable -> computeCosts -> execute -> during -> immediatelyAfter -> after`.
 
-Direct `cancel` is not a successful protected-atomic-action path. For `plow`, `sow`, `construct`, `stables`, `fence`, `reorganize`, and internal `selection`, direct cancellation is recoverably rejected before option validation, `resolveChoice`, and hooks. Pending remains active, so none of the four reaction phases runs. The parent `ActionFlow` optional metadata and `__skip__` express optionality; undo and BGA `actRestart`-style reversal use history rollback. Entry doability for construct and fence must reject a real state with no reachable room or no legal fence commit, avoiding a confirm-only pending interaction with no valid commit path. Exchange and bake-bread temporarily retain exceptions for their legacy windows.
+Direct `cancel` is not a successful protected-atomic-action path. For `plow`, `sow`, `construct`, `stables`, `fence`, `reorganize`, and internal `selection`, direct cancellation is recoverably rejected before option validation, `resolveChoice`, and hooks. Pending remains active, so none of the four reaction phases runs. The parent `ActionFlow` optional metadata and `__skip__` express optionality; undo and the reference `actRestart`-style reversal use history rollback. Entry doability for construct and fence must reject a real state with no reachable room or no legal fence commit, avoiding a confirm-only pending interaction with no valid commit path. Exchange and bake-bread temporarily retain exceptions for their legacy windows.
 
 1. `computeReplace` runs first, before `before`, strict `isDoable`, and `computeCosts`. `HookDispatcher.applyComputeReplace()` applies action-hook replacement, then matching card listeners with `phase='computeReplace'`.
 2. If `computeReplace` changes only `actionId`, every later phase continues with the replaced ID.
@@ -667,7 +667,7 @@ Direct `cancel` is not a successful protected-atomic-action path. For `plow`, `s
 7. Strict `isDoable` then runs base `canBeExecutedByPlayer`, cost preview, action-hook `isDoable`, and card-listener `isDoable`. It must read the state after real `before` mutations. If the action is still unreachable, it cannot continue. Occupation hand-option construction and forged-choice validation also run option-level listeners with `choice=<occupationId>`. This prefilters cards such as B93 whose `onBuy` requires a minimum later payment. A listener's `reserveResources` continues into the occupation payment leaf so the occupation choice cannot spend resources required by that mandatory follow-up.
 8. `computeCosts` writes fee overrides, sourced trades, bonus choices, and payment-resource providers into `executionContext.costs`, `costTrades`, `costBonuses`, and `paymentResourceProviders`. A before-phase unlock, gain, or exchange may therefore change real state before strict doability and cost enumeration.
 9. The action body runs next. An opt-in `getBaseChoiceOptions` path first applies `computeChoiceCandidates`; otherwise it calls `ActionDefinition.execute()`. A `resolveChoice` continuation resumes under the same public-action ordering, completes the pending choice, then continues host internal children and trailing phases. A request from `execute()` or `resolveChoice()` creates pending state; otherwise execution advances to the trailing phases.
-10. `during`, `immediatelyAfter`, and `after` are successful-host-action trailing phases whose trigger frame freezes immediately after host commit. `beforeHostListeners` settlement must finish first. `afterHostCommitListeners` runs after commit but before trailing activations actually execute. `afterHostListeners` settlement intentionally stays in its BGA slot after host `after`.
+10. `during`, `immediatelyAfter`, and `after` are successful-host-action trailing phases whose trigger frame freezes immediately after host commit. `beforeHostListeners` settlement must finish first. `afterHostCommitListeners` runs after commit but before trailing activations actually execute. `afterHostListeners` settlement intentionally stays in its the reference slot after host `after`.
 11. Internal `activate-card` bypasses this public-action pipeline. It runs only the designated listener body and gives any returned `flow` or `followUpActions` back to the engine for insertion.
 
 Listener scope is `player`, `opponent`, or `any`. Card-listener matching enumerates deterministically by listener ID. Trailing-node construction then groups by owner in global, active-player, other-player order. Within each owner group it sorts stably by card play order and match order; that owner executes the activation or prompt. Reaction listeners use trigger-select by default. Compute and query listeners still aggregate in deterministic order without a player choice.
@@ -680,7 +680,7 @@ A hand listener is only for a card-local rule that must observe history while th
 
 `pay` is an internal settlement child. The public host action owns business mutation, event facts, and completion. Do not move business mutation back into `pay`, and do not model one operation as `seq:[pay, apply-*]` or a top-level `apply-*` effect.
 
-`beforeHostListeners`, `afterHostCommitListeners`, and `afterHostListeners` encode explicit differences in host actions' BGA payment slots:
+`beforeHostListeners`, `afterHostCommitListeners`, and `afterHostListeners` encode explicit differences in host actions' the reference payment slots:
 
 - Renovation, improvement, occupation, construct, and fencing complete mandatory payment in `beforeHostListeners` or the main action before trailing effects.
 - Improvement and occupation `onBuy` use `afterHostCommitListeners`: mandatory payment completes, host `completeInternalChildren` commits the card, `onBuy` runs, and only then do host `during`, `immediatelyAfter`, and `after` begin.
@@ -743,13 +743,13 @@ A stage-hook subflow may remove the card currently being resolved, for example b
 
 A one-time optional offer in a future round does not belong in a `futureMeeples` resource token. The internal `scheduled-offer` action reads `player.cardStates[cardId].extraData.scheduledOffers`. An offer records `dueRound`, `kind`, cost, its target special action or animal, and `consumed` or `consumedRound`. `onRoundStart` passes due offers to the engine through `scheduledOffersRoundStartFlow()`. Execution consumes the token first, then decides from current state whether to prompt. Declining, lacking resources, or having an unavailable target never preserves the token. M056 reuses the Cut Peat special-action card's availability, cost, market or opponent face-up state, and flip rules through this action. M131 uses the same model to buy a reserved animal, then explicitly enters `reorganize`.
 
-### 7.7 Listener activation purity and BGA alignment
+### 7.7 Listener activation purity and the reference alignment
 
 **Architecture decision, 2026-05-13: `CardListenerRegistration.handler` must be a state-pure flow builder on listener-dispatch, preview, and doability paths.** It may read `GameState`, `PlayerState`, and events and return structured values such as `ActionHookResult`, `ActionFlow`, costs, doability, or extra options. It must not directly mutate `GameState`, `PlayerState`, `ActionSpace`, `player.cardStates`, resources, farmyard spaces, logs, or pending state.
 
 The no-peek worktree changed `buildPhaseTrailingNodes` so it does not execute handlers. That was only the Phase 1 safety boundary. Later design must not depend on dispatch-time handler peeking or a one-shot `preComputedResult`.
 
-BGA reference semantics are:
+The reference reference semantics are:
 
 - `PlayerCards::getReaction($event)` only collects listening cards and creates `ACTIVATE_CARD` leaves; it does not execute card-listener bodies.
 - `ActivateCard::getFlow()` invokes the card method when the leaf actually advances. `isDoable()`, `isIndependent()`, and `getDescription()` may also rebuild the flow, so a listener method must be repeatable and side-effect free.
@@ -785,7 +785,7 @@ OA alignment rules are:
 - E148's opponent-scoped listener updates reserved action spaces or stables with an owner-targeted `special-effect`. A no-benefit synchronization such as removing a marker when no empty space exists may return `countCardUse: false`, avoiding a false card-use statistic.
 - `countCardUse: false` is only for housekeeping flow that should not count as an effect firing. It must never conceal a real benefit or player choice.
 
-**Multiple reactions in one phase use BGA-style parallel trigger selection:**
+**Multiple reactions in one phase use parallel trigger selection:**
 
 - Action-reaction listeners, Harvest-field stage card effects, and before-end card effects for one owner and phase normally enter `ParallelNode(mode='trigger-select')`. Same-timing reactions for different owners become separate owner prompts. A single child may expand directly to reduce UI noise. Compute and query hooks continue to aggregate deterministically.
 - Do not invert the default for `mandatory`. `mandatory: true` affects only trigger-select: a structurally applicable and executable mandatory child disables `__pass__`, preventing a guaranteed effect from being silently skipped. A temporarily structurally inapplicable child is hidden for this iteration without being resolved and is reevaluated after siblings change state. A structurally applicable but temporarily unaffordable child remains visible as disabled.
@@ -825,9 +825,9 @@ The main fencing path must not branch on card IDs or card-specific flags. Do not
 
 `sourcePolicy: { kind: 'borrowed', donorCaps }` means token source, build limit, and segment source for ordinary fences come from donor caps. The commit payload must use `fenceSources: Record<edgeId, donorPlayerId>` to identify a donor for every new ordinary fence. The server reclamps each cap against current donor reserve, then checks that source keys exactly cover new ordinary edges, no donor exceeds the cap, and no donor is the active player. A successful segment records its borrowed source and consumes donor supply through `supplyTokensConsumed.fence`. That donor's later `getOwnOrdinaryFenceReserveCount()` and own ordinary-fencing maximum naturally decrease. `farm.fenceBuilt.fences` must include complete new `FenceSegment[]` values, including source owner.
 
-`segmentBounds.fence` and `.palisade` limit new segments of their respective types. `segmentBounds.total` limits the combined number of new ordinary fences and palisades. A BGA total-segment limit such as B149 Open Air Farmer's `max => 6` uses `total.max`, and B30 palisades count toward it. `canStartFencing` first estimates generic policy resource and supply feasibility. Against real state it also calls `validateFenceSelection()` to preflight at least one legal commit, avoiding confirm-only pending state that cannot finish. `validateFenceSelection()` remains the atomic final validator and payment does not occur when it fails.
+`segmentBounds.fence` and `.palisade` limit new segments of their respective types. `segmentBounds.total` limits the combined number of new ordinary fences and palisades. A the reference total-segment limit such as B149 Open Air Farmer's `max => 6` uses `total.max`, and B30 palisades count toward it. `canStartFencing` first estimates generic policy resource and supply feasibility. Against real state it also calls `validateFenceSelection()` to preflight at least one legal commit, avoiding confirm-only pending state that cannot finish. `validateFenceSelection()` remains the atomic final validator and payment does not occur when it fails.
 
-`fencePolicy.costPolicy` expresses only this action's base unit cost from BGA `formatCost`. Entry guards and final validation must still apply `computeCosts.fence` discounts and surcharges, so a nested action such as B93 future fencing continues to benefit from E16, C16, and similar modifiers.
+`fencePolicy.costPolicy` expresses only this action's base unit cost from the reference `formatCost`. Entry guards and final validation must still apply `computeCosts.fence` discounts and surcharges, so a nested action such as B93 future fencing continues to benefit from E16, C16, and similar modifiers.
 
 `fencePolicy.paymentBudget` restricts only final resources paid, for rules such as B15 Carpenter's Bench allowing only wood collected by this action. It is not the same as `segmentBounds.total.max`, so legal geometry must not be trimmed early by the number of budgeted resources. Filtering by `PaymentSolution.resourcesPaid` occurs only after discounts, free fences, virtual payment resources, and solver routing.
 
@@ -858,10 +858,10 @@ Three consumers share the snapshot:
 
 Nested anytime flows are inserted ahead of the current pending tree. The parent remains on its original host as a `PendingEnvelope`. After the nested flow resolves, `EngineStack` resumes the parent frame and `buildInteraction()` exposes the parent envelope again rather than going idle.
 
-OA versus BGA design notes:
+OA versus the reference design notes:
 
 - Reorganize is a system-driven subflow in OA, not a player-triggerable anytime action, so the policy never emits a `reorganize` entry.
-- A `feed` pending interaction is locked because `executeFeedingLogic()` freezes `remaining` and `foodUsed` into `InteractionRequest`. BGA permits nested anytime actions in `ST_HARVEST_FEED` because its predecessor is an `EXCHANGE` state with no fixed budget.
+- A `feed` pending interaction is locked because `executeFeedingLogic()` freezes `remaining` and `foodUsed` into `InteractionRequest`. The reference permits nested anytime actions in `ST_HARVEST_FEED` because its predecessor is an `EXCHANGE` state with no fixed budget.
 - Idle work-phase turns and `confirm-next-player` are acting-player anytime windows. Legal anytime actions remain available before placement and before control passes. During `confirm-next-player`, `exchange` stays blocked to avoid recursive generic exchange prompts. `confirm-player-switch` stays blocked because it is a system-controlled cross-player transition inside another flow.
 - Stage-hook chains carrying `stageResume` are blocked by default, preserving the invariant that system-driven hook chains do not yield to player anytime actions. Explicit exceptions are animal reorganization, exchange or bake-bread prompt keys, and D132's `ui.cards.D132_HideFarmer.optional` before-endgame choice prompt. D132's nested `resource-quantity-select` remains blocked because its maximum is frozen from current food and empty-space state and cannot safely resume after arbitrary anytime changes.
 
@@ -938,7 +938,7 @@ cardField?: {
 }
 ```
 
-`shared/cards/helpers/card-field.ts:makeCardFieldImpl(cardId, def, options?)` derives `onComputeSowableFields`, `onSowExtraField`, `onHarvestFieldPhase`, and a `sow-isDoable` listener from the definition. An individual card declares only the configuration and an optional `onReap` callback for side effects, keeping the file near or below its BGA counterpart's size.
+`shared/cards/helpers/card-field.ts:makeCardFieldImpl(cardId, def, options?)` derives `onComputeSowableFields`, `onSowExtraField`, `onHarvestFieldPhase`, and a `sow-isDoable` listener from the definition. An individual card declares only the configuration and an optional `onReap` callback for side effects, keeping the file near or below its the reference counterpart's size.
 
 Virtual tile columns derive from `deriveVirtualTileCol(cardId, slotIdx) = deckOrdinal*1000 + cardNumber + slotIdx`, preventing cross-deck collisions. Capacity slots for adjacent numbers in one deck require auditing; the current 11 cards all have capacity at most three, leaving ample margin.
 
@@ -957,7 +957,7 @@ onReap?: (ctx: {
 }) => ActionFlow | void
 ```
 
-The callback runs once per crop. Infrastructure wraps multiple returned flows in ordinary `parallel`. This matches BGA `$this->field = true`, `getFieldDetails()`, and `onPlayerAfterReap` semantics.
+The callback runs once per crop. Infrastructure wraps multiple returned flows in ordinary `parallel`. This matches the reference `$this->field = true`, `getFieldDetails()`, and `onPlayerAfterReap` semantics.
 
 **Harvest reap-log ordering.** `harvestReapSummary` initialization moved from `continueHarvestReap` to the earlier `continueHarvestFieldStart`. Infrastructure accumulates `summary.resources[crop]` during `onHarvestFieldPhase`, so `log.reapDetail` contains both ordinary-field and Card Field production. Previously the Card Field accumulation happened before summary initialization and was discarded. The summary is not a field-phase local; it remains until `onAfterHarvest` finishes.
 
@@ -982,14 +982,14 @@ When printed card text names another ordinary card, the source card may declare 
 
 ### 8.7 Minor-improvement passing
 
-OA marks BGA passing minor improvements with `CardDefinition.passing?: boolean`. The host action in `shared/actions/effects/improvement.ts` first completes purchase payment through an internal `pay` child, then reads its result map and commits the purchase during `completeInternalChildren`. For a passing card:
+OA marks the reference passing minor improvements with `CardDefinition.passing?: boolean`. The host action in `shared/actions/effects/improvement.ts` first completes purchase payment through an internal `pay` child, then reads its result map and commits the purchase during `completeInternalChildren`. For a passing card:
 
 - it does not enter `buyer.minorPlayed`; it is pushed into `nextPlayer.minorHand`, wrapping from `state.currentPlayerIndex`;
 - it does not increment `totalMinorBuilt`, add `activeModifiers`, or enter `providesOccupation` or `isField` paths;
 - it emits `card.passed` with `fromPlayerId`, `toPlayerId`, and `cardId` instead of `card.played`;
 - `onBuy` still runs through internal `activate-card-effect` in `afterHostCommitListeners`, so the buyer receives the effect while the next player receives the card in hand for a later `actBuy`.
 
-Listener isolation follows naturally: a passing card never enters `minorPlayed`, so `getPlayerCardIds` omits it and card-entered-play reactions skip it. No `apply-improvement` effect or `extraData.passing` scratchpad is needed. The improvement host action, pay child, and `activate-card-effect` jointly implement BGA passing behavior.
+Listener isolation follows naturally: a passing card never enters `minorPlayed`, so `getPlayerCardIds` omits it and card-entered-play reactions skip it. No `apply-improvement` effect or `extraData.passing` scratchpad is needed. The improvement host action, pay child, and `activate-card-effect` jointly implement the reference passing behavior.
 
 On the client, `PublicEventCardPassAnimation` subscribes to the `card.passed` event stream and animates the card between `data-card-anchor` and `data-hand-anchor` DOM anchors. LogPanel derives a `log.cardPassed` i18n entry through the existing `mapCardPassed` mapper.
 
@@ -1298,7 +1298,7 @@ BUG_REPORT_TOKEN_ENCRYPTION_KEYS
 BUG_REPORT_TOKEN_ACTIVE_KEY_ID
 ```
 
-Durable Room Commit currently reads `REPLAY_NEW_ROOMS_ENABLED`, `REPLAY_VIEWER_BUILD_ID`, `REPLAY_VIEWER_ROOT`, `REPLAY_ASSET_ROOT`, and `GAME_BUILD_ID`. Recording requires SQLite persistence. Room creation freezes the recording decision, both Build IDs, and custom-card runtime snapshot. An unpublished custom card requires explicit player consent to permanent publication. Viewer Build ID is the SHA-256 of the complete `manifest.json`, which fixes the `index.html` entry and every file's SHA-256. A Build stores only Viewer code, styles, and card manifest. BGA board art, card art, and fonts share the main site's `BGA_CDN_BASE_URL` and are not archived. Room creation fails when Build validation fails.
+Durable Room Commit currently reads `REPLAY_NEW_ROOMS_ENABLED`, `REPLAY_VIEWER_BUILD_ID`, `REPLAY_VIEWER_ROOT`, `REPLAY_ASSET_ROOT`, and `GAME_BUILD_ID`. Recording requires SQLite persistence. Room creation freezes the recording decision, both Build IDs, and custom-card runtime snapshot. An unpublished custom card requires explicit player consent to permanent publication. Viewer Build ID is the SHA-256 of the complete `manifest.json`, which fixes the `index.html` entry and every file's SHA-256. A Build stores only Viewer code, styles, and card manifest. Board art, card art, and fonts share the main site's pinned asset-repository commit and are not archived. Room creation fails when Build validation fails.
 
 Before Step 0, custom-card artwork is copied into the content-addressed asset root and the Replay header is rewritten to an immutable URL. A recording-enabled waiting Room rejects game writes until Step 0 exists. When an unfinished game expires, unprotected Replay payload is deleted unless a valid Bug Report Anchor retains it. Hourly cleanup trims Segments, empty headers, and unreferenced assets after evidence expiry. Later configuration changes do not alter an existing Replay header, which continues recording. If recording is later enabled, a restored older active Room starts with a `missingPrefix=true` Step 0.
 
@@ -1493,7 +1493,7 @@ Production acceptance requires two real site accounts to complete one game. Duri
 11. **Do not change a main path for one card.**
 12. **Tests default to two players.** Prove rules at the backend boundary, never infer them from the DOM.
 13. **No optimistic frontend commit:** wait for `stateUpdate` before changing game UI.
-14. **`ActionFlow` matches BGA's small algebra:** the card DSL exposes only `leaf`, `seq`, `parallel`, `xor`, and `or` plus metadata. Runtime-only nodes do not enter card flows.
+14. **`ActionFlow` matches the reference's small algebra:** the card DSL exposes only `leaf`, `seq`, `parallel`, `xor`, and `or` plus metadata. Runtime-only nodes do not enter card flows.
 15. **Listener handlers do not mutate state:** listener, preview, and doability paths build flows or return structured values. Mutation occurs only while an action leaf executes.
 16. **Durable Room Commit:** a successful command that changes the Frame atomically writes Room snapshot and Replay Step before sending viewer-filtered state.
 17. **Global Replay Steps:** simultaneous submissions still receive consecutive `stepNo`; automatic settlement belongs to the last triggering input and results do not depend on arrival order.

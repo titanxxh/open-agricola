@@ -4,7 +4,7 @@
  */
 :root {
   /* ─── existing (preserved verbatim from App.css:20-49) ─── */
-  --agricola-font: 'Dominican', 'CalibriB', serif;
+  --agricola-font: 'Dominican', 'Carlito', 'Calibri', serif;
   --app-edge-padding: clamp(12px, 2vw, 24px);
   --game-header-gap: 8px;
   --color-primary: #3a5a2c;

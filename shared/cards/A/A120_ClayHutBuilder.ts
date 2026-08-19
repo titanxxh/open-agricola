@@ -12,7 +12,7 @@ const CARD_ID = 'A120_ClayHutBuilder'
  * Once you no longer live in a wooden house, place 2 clay on each of the
  * next 5 round spaces. At the start of these rounds, you get the clay.
  *
- * BGA: onBuy delegates to onPlayerAfterRenovation. The card is flagged
+ * Rule: onBuy delegates to onPlayerAfterRenovation. The card is flagged
  * after first trigger so it cannot fire twice.
  */
 

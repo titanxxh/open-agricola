@@ -9,7 +9,7 @@ const CARD_ID = 'D106_WhiskyDistiller'
 /**
  * D106 Whisky Distiller (Sprint 7a F5+F6).
  *
- * BGA `Cards/D/D106_WhiskyDistiller.php`:
+ * The reference `Cards/D/the reference`:
  *   isListeningTo: isAnytime && Globals::getTurn() <= 12
  *   onPlayerAtAnytime: SEQ(payNode([GRAIN=>1]), futureMeeplesNode([FOOD=>4], ['+2']))
  *

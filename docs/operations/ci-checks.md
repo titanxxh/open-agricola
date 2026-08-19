@@ -10,8 +10,6 @@ agent 在 `git push` 后必须等 GitHub Actions run 结束。本文件给出验
 export $(grep '^GH_TOKEN=' .env | xargs)
 ```
 
-或参考 `scripts/sync-bga-cdn-github-var.ts` 里的 `loadGhTokenFromDotenv()`：读 `.env` 把 `GH_TOKEN` / `GITHUB_TOKEN` 注入 `process.env`。
-
 **不要**把 `GH_TOKEN` 写到 commit 里或发到日志。`.env` 已在 `.gitignore`。
 
 ## 最近 run 状态
@@ -64,7 +62,7 @@ curl -s -H "Authorization: Bearer $GH_TOKEN" \
   https://api.github.com/repos/titanxxh/open-agricola/actions/variables/VITE_API_BASE
 ```
 
-前端关键 variable：`VITE_API_BASE`（HTTPS 后端 base，如 `https://open-agricola.duckdns.org`）、`VITE_WS_BASE`（`wss://.../ws`）、`BGA_CDN_BASE_URL`。
+前端关键 variable：`VITE_API_BASE`（HTTPS 后端 base，如 `https://open-agricola.duckdns.org`）、`VITE_WS_BASE`（`wss://.../ws`）。
 
 GitHub Actions 固定使用 `ubuntu-latest`；额度不足时 workflow 直接失败，不切换到 self-hosted runner。
 
@@ -74,12 +72,11 @@ GitHub Actions 固定使用 `ubuntu-latest`；额度不足时 workflow 直接失
 
 ```bash
 pnpm test:llm:live
-pnpm run sync-bga-cdn
 
 set -a
 source .env
 set +a
-gh workflow run deploy-pages.yml --ref main  # 仅在 BGA_CDN_BASE_URL 更新后执行
+gh workflow run deploy-pages.yml --ref main  # 仅在 public-assets.ref 更新后执行
 ./deploy-backend.sh root@open-agricola.duckdns.org main /root/open-agricola
 ```
 

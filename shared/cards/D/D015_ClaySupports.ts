@@ -5,7 +5,7 @@ import type { CardImpl } from '../registry'
 const CARD_ID = 'D015_ClaySupports'
 
 /**
- * BGA reference (D015_ClaySupports.php): `onPlayerComputeCostsConstruct` pushes
+ * Reference: `onPlayerComputeCostsConstruct` pushes
  * an alternative trade `{clay:2, wood:1, reed:1}` when `args.type === 'roomClay'`.
  * Our equivalent: a static TradeModifier on the `construct` cost type with a
  * `houseTypeClay` condition — the construct path builds `ComplexCost`
@@ -34,7 +34,7 @@ export const D015_ClaySupports = defineMinorCard({
         cardId: CARD_ID,
         appliesTo: ['construct'],
         // scope:'unit' applies this replacement to each clay-room cost row,
-        // matching BGA's per-room `addCost`.
+        // matching the reference's per-room `addCost`.
         scope: 'unit',
         from: { wood: 1 },
         to: { clay: 3, reed: 1 },

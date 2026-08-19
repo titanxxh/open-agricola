@@ -237,7 +237,7 @@ describe('C148_MudWallower', () => {
   })
 
   it('held is permanent - does not increase when pig count grows back', () => {
-    // BGA behavior: once cap is reduced, it stays reduced even if pig count
+    // The reference behavior: once cap is reduced, it stays reduced even if pig count
     // returns to the original level (e.g., via breeding).
     const exchangeListener = findListener('C148-mud-wallower-after-exchange')
     expect(exchangeListener).toBeDefined()

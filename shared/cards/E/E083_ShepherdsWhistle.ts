@@ -12,7 +12,7 @@ const POST_REORG_CHECK_ACTION_ID = 'card_E083_ShepherdsWhistle_post-reorg-check'
  * E83 Shepherd's Whistle — At the start of the breeding phase of each harvest,
  * if you have at least 1 unfenced stable without an animal, you get 1 sheep.
  *
- * BGA reference: onPlayerEndHarvestFeedingPhase
+ * Reference: onPlayerEndHarvestFeedingPhase
  *   - If an empty unfenced stable already exists → gain 1 sheep.
  *   - Else if at least 1 (occupied) unfenced stable exists → optional
  *     reorganize, then re-check; if a stable became empty, gain 1 sheep.
@@ -32,7 +32,7 @@ const hasAnyUnfencedStable = (state: GameState, player: PlayerState): boolean =>
 /**
  * Post-reorganize check leaf: after the optional reorganize, if a
  * previously-occupied unfenced stable was vacated, the owner gains 1 sheep.
- * Mirrors BGA `checkGainSheep()` (Engine::insertAsChild a gainNode).
+ * Mirrors the reference `checkGainSheep` (Engine::insertAsChild a gainNode).
  */
 const postReorgCheckAction: ActionDefinition = {
   id: POST_REORG_CHECK_ACTION_ID,

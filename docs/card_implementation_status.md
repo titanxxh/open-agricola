@@ -4,20 +4,20 @@
 
 > [`card_implementation_status.md`](card_implementation_status.md) is canonical. This file has a maintained Chinese mirror at [`card_implementation_status_zh.md`](card_implementation_status_zh.md).
 
-> Generated and last updated on 2026-07-13. This file replaces `docs/card_desc_audit.md`, `docs/card_progress.md`, `docs/master-plan.md`, and `docs/bad-smell.md`. The sole BGA reference is `/data00/home/xuxinhao.titan/raw/bga-agricola`.
+> Generated and last updated on 2026-07-13. This file replaces `docs/card_desc_audit.md`, `docs/card_progress.md`, `docs/master-plan.md`, and `docs/bad-smell.md`. The sole the reference reference is the reference implementation.
 
 ## 1. Current snapshot
 
 | Item | Status |
 |---|---:|
-| Canonical BGA A-E cards | 888 |
+| Canonical A-E cards | 888 |
 | Canonical OA A-E card definitions | 888 |
 | Literal mismatches from the automated metadata audit | 0 |
 | Complex mismatches from the automated metadata audit | 4 |
 | Accepted schema-up differences among those mismatches | 4 |
 | Cards requiring implementation review | 0 |
 | Accepted or product-policy differences | 70 |
-| Excluded BGA legacy sources or non-target behavior | 3 |
+| Excluded legacy sources or non-target behavior | 3 |
 | Cards treated as aligned by this audit | 815 |
 | Structured Parent Card definitions | 24 / 24 |
 | Parent Cards gameplay | Setup, simultaneous selection, optional direct deal, mother rewards through future meeples, fractional scoring, ordinary-card draw-and-keep UI, typed father requirements, and simple or complex side quests are implemented |
@@ -25,15 +25,15 @@
 | Through the Seasons gameplay | Random starting season, four public seasonal spaces, next-round season changes, seasonal setup changes, actions, and discounts are implemented |
 | Farmers of the Moor complexity III gameplay | Variant setup, terrain, special actions, heating, fuel, sick workers, Infirmary, horses, Horse Market, breeding, reorganization, scoring, major-supply stacks, staged hand setup, UI and protocol integration, compatibility coverage, ten FoM Major Improvements, and all 117 FoM minor improvements from M015 through M131 are implemented |
 
-`scripts/audit-bga-metadata-diff.ts` now parses printed BGA `STABLE` costs and `passing`. All literal metadata matches. The four complex mismatches are accepted schema-up prerequisite differences.
+Printed `STABLE` costs and `passing` are aligned. All literal metadata matches. The four complex mismatches are accepted schema-up prerequisite differences.
 
 Parent Cards include PR01-PR12 and PS01-PS12 data and assets, registry validation, optional setup, simultaneous mother and father selection, direct dealing through `draftParents=false`, restart-safe Room settings, mother scheduling through `state.futureMeeples` and `receive`, public `parent.motherScheduled` events, stable player-name synchronization, fractional `parentCards` scoring, ordinary occupation and minor draw decks, private draw-three-keep-one choices, and father side-quest completion and rewards. Selection and draw decks use a private seed rather than public `gameSeed`; ordinary and anytime actions are blocked while a keep-one choice is pending. Typed father requirements cover PS03, PS04, PS06, and PS08, while complex rewards retain explicit draw, choice, or sow flows. Parent Cards remain outside A-E Card Sources, the cards manifest, ordinary hands, and the regular card registry. Adoption is not implemented.
 
-The audit prioritizes printed and custom descriptions, cost, prerequisites, passing, occupation or minor metadata, and game behavior. BGA platform fields such as `banned`, `implemented`, `isCorbariusOrDulcinaria`, and `isArtifexOrBubulcus` are not alignment requirements; product-policy effects are recorded as accepted differences or exclusions rather than implementation bugs.
+The audit prioritizes printed and custom descriptions, cost, prerequisites, passing, occupation or minor metadata, and game behavior. Upstream platform fields such as `banned`, `implemented`, `isCorbariusOrDulcinaria`, and `isArtifexOrBubulcus` are not alignment requirements; product-policy effects are recorded as accepted differences or exclusions rather than implementation bugs.
 
 ## 2. Open issues by priority
 
-BGA PHP path is relative by default`/data00/home/xuxinhao.titan/raw/bga-agricola/modules/php/Cards`;The OA path is relative to this warehouse by default.
+The reference PHP path is relative by defaultthe reference implementation;The OA path is relative to this warehouse by default.
 
 There are currently no open issue priority entries.
 
@@ -45,55 +45,55 @@ Unless the product direction changes, the following is not considered a current 
 
 |category|cards|
 |---|---|
-|Use schema-up metadata instead of BGA custom`isBuyable` | `A003_PaperKnife`, `B056_Brook`, `B074_ThickForest`, `B154_SheepKeeper` |
+|Use schema-up metadata instead of the reference custom`isBuyable` | `A003_PaperKnife`, `B056_Brook`, `B074_ThickForest`, `B154_SheepKeeper` |
 |field/cardField crop constraint difference| `E070_CropRotationField` |
-|BGA is not implemented, but OA has product extensions/rewrites| `A113_HeresyTeacher`, `A169_OffSiter`, `A170_Hayward`, `A171_Sidekick`, `A173_ClayThief`, `A174_MasterHora`, `A177_Middleman`, `A180_AnimalBrander`, `B170_CorralBuilder`, `B171_GreenhouseBuilder`, `B173_Sweeper`, `B175_FieldOverseer`, `B176_VillageIdiot`, `B178_TagAlong`, `B179_WildBoarHunter`, `C169_FastMason`, `C170_AmateurFencer`, `C171_YoungArtist`, `C172_FieldCounter`, `C173_TopOuter`, `C175_VillageTeacher`, `C180_Trapper`, `D025_WitchesDanceFloor`, `D170_FoldBuilder`, `D171_SeniorTeacher`, `D173_TownClerk`, `D175_Countryman`, `D176_Woodshacker`, `D178_SubstituteTeacher`, `D179_Bullcatcher`, `D180_PartTimeWorker` |
-|BGA banned, but OA retained| `A131_CraftTeacher`, `A133_Braggart`, `A014_CarpentersHammer`, `A033_BigCountry`, `A039_Chapel`, `A048_ShavingHorse`, `A082_WorkCertificate`, `A097_Freshman`, `B010_Caravan`, `B117_Informant`, `B132_EstateMaster`, `B151_LittlePeasant`, `B015_CarpentersBench`, `B161_Weakling`, `B021_HayloftBarn`, `B022_WalkingBoots`, `C102_TreeGuard`, `C125_Nightworker`, `C028_TeachersDesk`, `C031_WritingChamber`, `C003_CarriageTrip`, `C060_SmallPottersOven`, `C063_CraftBrewery`, `C099_GardenDesigner`, `D137_TradeTeacher`, `D019_PulverizerPlow`, `D021_Recruitment`, `D033_SummerHouse`, `D004_CrossCutWood`, `D074_RoyalWood`, `D092_ChildOmbudsman`, `D097_BeggingStudent`, `E022_GuestRoom` |
-|BGA stable / FarmHand model differences| `B085_FarmHand` |
-|Candidate Closure: The optional branch candidate set is a legal superset of the BGA single topo sequence product; after the solver layer controls pruning (ADR 0004 Amendment), the player optional set is consistent with the BGA optimal set, and the single option auto-resolve; the virtual payment resources provided by the card are entered with its own key`resourcesPaid`, and the player's inventory resources do not dominate each other|All card-purchase / unit-trade cost Modify card; B155 this type of action grid payment resources|
+|the reference is not implemented, but OA has product extensions/rewrites| `A113_HeresyTeacher`, `A169_OffSiter`, `A170_Hayward`, `A171_Sidekick`, `A173_ClayThief`, `A174_MasterHora`, `A177_Middleman`, `A180_AnimalBrander`, `B170_CorralBuilder`, `B171_GreenhouseBuilder`, `B173_Sweeper`, `B175_FieldOverseer`, `B176_VillageIdiot`, `B178_TagAlong`, `B179_WildBoarHunter`, `C169_FastMason`, `C170_AmateurFencer`, `C171_YoungArtist`, `C172_FieldCounter`, `C173_TopOuter`, `C175_VillageTeacher`, `C180_Trapper`, `D025_WitchesDanceFloor`, `D170_FoldBuilder`, `D171_SeniorTeacher`, `D173_TownClerk`, `D175_Countryman`, `D176_Woodshacker`, `D178_SubstituteTeacher`, `D179_Bullcatcher`, `D180_PartTimeWorker` |
+|the reference banned, but OA retained| `A131_CraftTeacher`, `A133_Braggart`, `A014_CarpentersHammer`, `A033_BigCountry`, `A039_Chapel`, `A048_ShavingHorse`, `A082_WorkCertificate`, `A097_Freshman`, `B010_Caravan`, `B117_Informant`, `B132_EstateMaster`, `B151_LittlePeasant`, `B015_CarpentersBench`, `B161_Weakling`, `B021_HayloftBarn`, `B022_WalkingBoots`, `C102_TreeGuard`, `C125_Nightworker`, `C028_TeachersDesk`, `C031_WritingChamber`, `C003_CarriageTrip`, `C060_SmallPottersOven`, `C063_CraftBrewery`, `C099_GardenDesigner`, `D137_TradeTeacher`, `D019_PulverizerPlow`, `D021_Recruitment`, `D033_SummerHouse`, `D004_CrossCutWood`, `D074_RoyalWood`, `D092_ChildOmbudsman`, `D097_BeggingStudent`, `E022_GuestRoom` |
+|the reference stable / FarmHand model differences| `B085_FarmHand` |
+|Candidate Closure: The optional branch candidate set is a legal superset of the the reference single topo sequence product; after the solver layer controls pruning (ADR 0004 Amendment), the player optional set is consistent with the the reference optimal set, and the single option auto-resolve; the virtual payment resources provided by the card are entered with its own key`resourcesPaid`, and the player's inventory resources do not dominate each other|All card-purchase / unit-trade cost Modify card; B155 this type of action grid payment resources|
 |Candidate Closure: Equivalent candidate rows (same as resources + originalFeeIndex, only different in sources) only retain one representative row (sources least → key lexicographic order, ADR 0004 Amendment); players no longer see the repeated payment option with only different attribution, and cards with unselected chains do not enter this option hover attribution|All card-purchase cost modification cards (C95/E109 fixed-price twin, A75/D117 bypass chain, etc.)|
 
 ## 4. Simplicity review
 
-The number of lines is just a signal, not a conclusion. Review scope: Count non-empty and non-comment lines based on the current Card Source file and canonical BGA PHP file; method/function declaration lines are retained. Only exclude OA`import` / `export`OK, and BGA's`<?php` / `namespace` / `use`OK.
+The number of lines is just a signal, not a conclusion. Review scope: Count non-empty and non-comment lines based on the current Card Source file and canonical the reference PHP file; method/function declaration lines are retained. Only exclude OA`import` / `export`OK, and the reference's`<?php` / `namespace` / `use`OK.
 
-To compare simplicity, we must first eliminate the bad taste of BGA: if BGA passes`Actions/*`, `Core/*`, `Models/*`Wait for the main path, or an explicit cardId branch in other card files to compensate for the behavior of a certain card. This card does not enter the simplicity comparison. BGA`implemented=false`There is no comparable implementation for the card, so it is skipped and not listed in this section.
+To compare simplicity, we must first eliminate the bad taste of the reference: if the reference passes`Actions/*`, `Core/*`, `Models/*`Wait for the main path, or an explicit cardId branch in other card files to compensate for the behavior of a certain card. This card does not enter the simplicity comparison. The reference`implemented=false`There is no comparable implementation for the card, so it is skipped and not listed in this section.
 
-After excluding BGA bad taste and unrealized items, there are currently 7 cards with OA/BGA > 1.5 that can be compared fairly:
+After excluding the reference bad taste and unrealized items, there are currently 7 cards with OA/the reference > 1.5 that can be compared fairly:
 
-|cards| BGA | OA |Proportion|Reason/Follow-up Judgment|
+|cards| the reference | OA |Proportion|Reason/Follow-up Judgment|
 |---|---:|---:|---:|---|
-| `B093_Confidant` | 59 | 132 | 2.24 |For BGA`FOODPLUS` future meeple + `getPostReceiveBonus()`Implicitly string together the sow/fence after returning food; OA also explicitly handles the professional payment`reserveResources`, lessons doability, future meeple resolved provenance, anti-duplication`lastResolvedRound`, and 1 wood fence policy. It can be simplified after future meeple supports post-receive bonus.|
-| `C150_ParrotBreeder` | 67 | 147 | 2.19 |BGA directly reads the seat/actionCardId, and uses flag + extraData + dummy playerConstraint to inject the occupied action grid; OA needs to explicitly track the right neighbor, pay the grain flag at any time, clean up after releasing oneself/opponent, and then`place-farmer`Inject occupied option. A complete single-card state machine, no general helpers are available for the time being.|
-| `C094_StableCleaner` | 42 | 78 | 1.86 |BGA directly returns fixed-cost`STABLES`flow; OA requires probe before exposing anytime`stables`cost modifier / affordability, and explicitly package flag,`trueAction:false`, fixed cost context and post-execution cleanup. If the anytime action can be integrated with the built-in affordability probe, it can be further reduced.|
-| `B157_Salter` | 104 | 177 | 1.70 |BGA's`payNode` / `argsSalt` / `actSalt`Responsible for animal selection and payment; OA needs to be customized`resource-quantity-select`ad-hoc action, verify that the animal must come from the farm and reserve is empty, deduct animals from the board, single animal shortcut, future food schedule and log. The BGA itself is also long and has low priority.|
-| `A130_MummysBoy` | 53 | 90 | 1.70 |BGA dependency`Globals::getPlacedFarmers()` / `Farmers`The manager directly finds the second farmer position and injects the dummy action; OA needs to be implemented explicitly with placement order, occupied-space option, meeting-place filtering, once-per-round flag and start-turn cleanup. Similar to C150, unless the occupied action helper is drawn, the card remains in a closed loop.|
-| `B156_StorehouseKeeper` | 29 | 44 | 1.52 |For BGA`isActionCardEvent('ResourceMarket')` + `gainNode`XOR; OA needs to explicitly list the resource-market variant and include listener / typed flow. Low boundary item, only worth pumping the helper if more action-space alias cards appear.|
-| `B107_Manservant` | 33 | 50 | 1.52 |BGA's`onBuy`Reuse`onPlayerAfterRenovation()`and return directly`futureMeeplesNode`;OA needs to be reused`placeFood`, after-renovation listener, stone-house guard, `queueFutureMeeples`+ node bridge. Low boundary items, low priority.|
+| `B093_Confidant` | 59 | 132 | 2.24 |For the reference`FOODPLUS` future meeple + `getPostReceiveBonus()`Implicitly string together the sow/fence after returning food; OA also explicitly handles the professional payment`reserveResources`, lessons doability, future meeple resolved provenance, anti-duplication`lastResolvedRound`, and 1 wood fence policy. It can be simplified after future meeple supports post-receive bonus.|
+| `C150_ParrotBreeder` | 67 | 147 | 2.19 |the reference directly reads the seat/actionCardId, and uses flag + extraData + dummy playerConstraint to inject the occupied action grid; OA needs to explicitly track the right neighbor, pay the grain flag at any time, clean up after releasing oneself/opponent, and then`place-farmer`Inject occupied option. A complete single-card state machine, no general helpers are available for the time being.|
+| `C094_StableCleaner` | 42 | 78 | 1.86 |the reference directly returns fixed-cost`STABLES`flow; OA requires probe before exposing anytime`stables`cost modifier / affordability, and explicitly package flag,`trueAction:false`, fixed cost context and post-execution cleanup. If the anytime action can be integrated with the built-in affordability probe, it can be further reduced.|
+| `B157_Salter` | 104 | 177 | 1.70 |the reference's`payNode` / `argsSalt` / `actSalt`Responsible for animal selection and payment; OA needs to be customized`resource-quantity-select`ad-hoc action, verify that the animal must come from the farm and reserve is empty, deduct animals from the board, single animal shortcut, future food schedule and log. The the reference itself is also long and has low priority.|
+| `A130_MummysBoy` | 53 | 90 | 1.70 |the reference dependency`Globals::getPlacedFarmers()` / `Farmers`The manager directly finds the second farmer position and injects the dummy action; OA needs to be implemented explicitly with placement order, occupied-space option, meeting-place filtering, once-per-round flag and start-turn cleanup. Similar to C150, unless the occupied action helper is drawn, the card remains in a closed loop.|
+| `B156_StorehouseKeeper` | 29 | 44 | 1.52 |For the reference`isActionCardEvent('ResourceMarket')` + `gainNode`XOR; OA needs to explicitly list the resource-market variant and include listener / typed flow. Low boundary item, only worth pumping the helper if more action-space alias cards appear.|
+| `B107_Manservant` | 33 | 50 | 1.52 |the reference's`onBuy`Reuse`onPlayerAfterRenovation()`and return directly`futureMeeplesNode`;OA needs to be reused`placeFood`, after-renovation listener, stone-house guard, `queueFutureMeeples`+ node bridge. Low boundary items, low priority.|
 
-Cards excluded due to BGA bad taste:
+Cards excluded due to the reference bad taste:
 
 |cards|Troubleshooting causes|
 |---|---|
-| `D036_BreedRegistry` |BGA in`Core/Stats.php`Update infobox for this card.|
-| `E161_ElderBaker` |BGA in`ActionCards.js`and`Actions/Improvement.php`Make a special judgment on the main path of this card.|
-| `C088_CarpentersApprentice` |BGA in`Actions/Fencing.php`and`Actions/Stables.php`Make a special judgment on the main path of this card.|
-| `A041_VegetableSlicer` |BGA in`Actions/Pay.php`Make a special decision on the payment route for this card.|
-| `A087_Conservator` |BGA in`Actions/Renovation.php`Make a special judgment on the renovation path of this card.|
-| `D131_CraftsmanshipPromoter` |BGA in`Actions/Improvement.php`Make a special judgment on the main path of this card.|
-| `D001_ZigzagHarrow` |BGA in`Models/PlayerBoard.php`Provides a special geometry helper for this card.|
-| `E016_BriarHedge` |BGA in`Actions/Fencing.php`Make a special judgment on the fence path for this card.|
-| `B138_ForestGuardian` | BGA `B100_Clutterer.php`Other card paths explicitly enumerate this card.|
-| `C016_FieldFences` |BGA in`Actions/Fencing.php`Make a special judgment on the fence path for this card.|
-| `C027_Blueprint` |BGA in`Actions/Improvement.php`Make a special judgment on the main path of this card.|
-| `B146_Illusionist` | BGA `B100_Clutterer.php`Other card paths explicitly enumerate this card.|
-| `B042_ForestInn` | BGA `E144_WaresSalesman.php`Other card paths explicitly enumerate this card.|
-| `C162_ForestOwner` | BGA `E047_SyrupTap.php`Other card paths explicitly determine this card.|
-| `A106_SlurrySpreader` |BGA in`Actions/Reap.php`Make a special judgment on the harvest path of this card.|
-| `D132_HideFarmer` |BGA in`Managers/Scores.php`Make a special judgment on the scoring path for this card.|
-| `E096_Elder` |BGA in`States/TurnTrait.php`Make a special turn path judgment on this card.|
-| `E155_Visionary` |BGA in`Actions/WishChildren.php`and`E130_Overachiever.php`Make a special judgment on this card.|
-| `E153_StoneSculptor` | BGA `E144_WaresSalesman.php`Other card paths explicitly enumerate this card.|
+| `D036_BreedRegistry` |the reference in`Core/the reference`Update infobox for this card.|
+| `E161_ElderBaker` |the reference in`ActionCards.js`and`Actions/the reference`Make a special judgment on the main path of this card.|
+| `C088_CarpentersApprentice` |the reference in`Actions/the reference`and`Actions/the reference`Make a special judgment on the main path of this card.|
+| `A041_VegetableSlicer` |the reference in`Actions/the reference`Make a special decision on the payment route for this card.|
+| `A087_Conservator` |the reference in`Actions/the reference`Make a special judgment on the renovation path of this card.|
+| `D131_CraftsmanshipPromoter` |the reference in`Actions/the reference`Make a special judgment on the main path of this card.|
+| `D001_ZigzagHarrow` |the reference in`Models/the reference`Provides a special geometry helper for this card.|
+| `E016_BriarHedge` |the reference in`Actions/the reference`Make a special judgment on the fence path for this card.|
+| `B138_ForestGuardian` | the referenceOther card paths explicitly enumerate this card.|
+| `C016_FieldFences` |the reference in`Actions/the reference`Make a special judgment on the fence path for this card.|
+| `C027_Blueprint` |the reference in`Actions/the reference`Make a special judgment on the main path of this card.|
+| `B146_Illusionist` | the referenceOther card paths explicitly enumerate this card.|
+| `B042_ForestInn` | the referenceOther card paths explicitly enumerate this card.|
+| `C162_ForestOwner` | the referenceOther card paths explicitly determine this card.|
+| `A106_SlurrySpreader` |the reference in`Actions/the reference`Make a special judgment on the harvest path of this card.|
+| `D132_HideFarmer` |the reference in`Managers/the reference`Make a special judgment on the scoring path for this card.|
+| `E096_Elder` |the reference in`States/the reference`Make a special turn path judgment on this card.|
+| `E155_Visionary` |the reference in`Actions/the reference`andthe referenceMake a special judgment on this card.|
+| `E153_StoneSculptor` | the referenceOther card paths explicitly enumerate this card.|
 
 Recent PR / Old high-proportion items that have been reduced after this round of simplification:
 
@@ -102,7 +102,7 @@ Recent PR / Old high-proportion items that have been reduced after this round of
 | `A111_WallBuilder` |This round is changed to after construct and returns directly to inline.`futureMeeplesNode`, remove the built-room delta, action snapshot token and extraData in the card to prevent redundancy; according to the current review caliber, it is lower than 1.5.|
 | `B018_GrasslandHarrow` |This round allows future meeple to support`field`/`stable`The action is triggered upon expiration; B18 only retains the after-pay calculation target round.`field`future meeple, remove from the card`targetRound` / `onRoundStart`State machine.|
 | `E118_KindlingGatherer` |This round of mergers`place-farmer` / `collect` / `gain`Three listeners with the same handler, retaining action-space provenance filtering.|
-| `E148_Lazybones` |Draw this round`action-space-tokens`Helper, unifies bounded token choice, choice resolve, owner-targeted token consume flow; only trigger space, open space judgment and helper call are retained in the E148 card, which is reduced to BGA 65 / OA 66 = 1.02 according to the current review caliber.|
+| `E148_Lazybones` |Draw this round`action-space-tokens`Helper, unifies bounded token choice, choice resolve, owner-targeted token consume flow; only trigger space, open space judgment and helper call are retained in the E148 card, which is reduced to the reference 65 / OA 66 = 1.02 according to the current review caliber.|
 | `C041_FarmStore` |#244 Use the card later`REWARD_OPTIONS`Table generation optional pay/gain XOR.|
 | `D080_BrickHammer` |#244 Go behind`getPrintedImprovementResourceCost()`, no more hand-written cost / altCosts branches.|
 | `E142_Smuggler` |#244 After`TRADE_OPTIONS`Table generates homogeneous 2x options and retains mixed optional OR.|
@@ -117,18 +117,18 @@ This review found no new "front-end only adjudication rules" path, nor an open c
 
 |matter|Current code evidence|Subsequent constraints|
 |---|---|---|
-|Metadata audit coverage needs to be synchronized with field evolution| `scripts/audit-bga-metadata-diff.ts`Covered`STABLE`cost and`passing`;Current literal mismatch is 0|When adding BGA metadata fields, add parser/diff fixture simultaneously to avoid statistical caliber rollback.|
+|Metadata audit coverage needs to be synchronized with field evolution|`STABLE` cost and `passing` are covered; current literal mismatch is 0|When adding metadata fields, add the matching fixture at the same time to avoid statistical caliber rollback.|
 |Backend authoritative action/pending contract| `allowedCommands`, typed request, `commitSelection`, `engine-resolve` protected cancel, `resolveEngineChoice`, bare improvement choice ids |New interactions must explicitly expose command/options and be verified by the backend; major/minor improvement choice value uses bare`cardId`,old`major:` / `minor:`Only available as parser compatible input, paid option reserved`pay:*`namespace; do not restore encoded choice shortcut, old pending cursor, or front-end arbitration rules.|
 |Events & Payments provenance| `resource.paid`, `paymentSources`, `sumActualPaidResource()`, `bonusChoiceIndex`, `event-mapping-policy.ts`, `publicEventArchive`, `shared/actions/helpers/trades.ts`, `shared/actions/helpers/trade-applied-listener.ts`, `shared/cards/__tests__/provenance-result-audit.test.ts` |Payment / resources / farm metadata emit structured events first, and then let the listener consume them; do not produce cards from`context.result`Read resource facts. Animal exchange must be deducted through the exchange/trade path. By default, animals have been placed in pasture/house/stable/animal-holder to avoid changing only`player.resources`Leave the phantom animal behind. Cards that require per-trade pre-resource thresholds are monitored first`immediatelyAfter.trade-applied`, read`extraData.preResources`. |
 | Cost Attribution / hover stats | `CardResourceStats`, `trackSourceCardPaymentStats`, `recordCardCostAttribution()`, `recordActionCostAttribution()`, `collectFarmChoiceCostAdjustments()`, ADR 0003 |The saved / paid display of cost change cards must go through Cost Attribution; card-purchase selected candidate writes each source card's own saved / paid delta; construct / fencing / stables / plow action`computeCosts`The attribution must be explicitly declared, and the statistics will be written by the host action according to the actual before / after delta and clamp; the farm-choice commit must retain the payload-aware attribution. Don’t carry it because of pay leaf`sourceCard`The entire action/card-purchase payment will be recorded as the PAID of the card.|
 | Printed improvement base cost helper | `getPrintedImprovementResourceCost()`, D80/E156 |Read printed/base cost candidates of minor/major definitions;`cost`, minor `altCosts`, major complex `fee` / `fees`Is the candidate group, taking the maximum value according to the target resource, not based on the actual payment or candidate sum.|
 | Card-purchase ComputeCardCosts candidate pipeline | `resolveCardCostWithModifiersDetailed()`, `deriveCardCostCandidate` + `cardCostCandidateMandatory`, `CardImpl.getBaseCosts()`, `PaymentSolver.discountCardCostCandidate()`, ADR 0003, ADR 0004 |The new cost variant of purchasing major/minor improvement goes through the Cost Candidate List; dynamic basic costs such as A20/B36 produce base candidates before the pipeline; the card only declares a single candidate transformation, and the traversal/deduplication/saturation filtering is handled by the candidate closure (`CardListenerRegistration.order`Deleted, reintroduction of the order field is prohibited); ordinary discounts naturally retain the original candidates, and subsequent payment dominance will hide the strictly disadvantaged payment items;`cardCostCandidateMandatory`Only used for fixed price/replacement products where the semantics of the original candidate must be hidden (such as A27), and cannot be used for ordinary discounts such as A75; resource keys folded to 0 are omitted; candidate metadata is not written to the resource map or general`PaymentSolution`, merged into existing by PaymentSolver payment receipt`sourceCards`, and write the Cost Attribution to Card Resource Stats after the payment is selected; the production card passes`PaymentSolver`Use candidate helper instead of direct import`payment/internal/*`. |
 |FoM cross-player marker/card passing minor improvements| `publicCardMarkers` helper, `pass-minor-card-to-left` internal action, `card.passed` provenance, FarmBoard player summary marker |Cross-player public marker writes to target player`cardStates[sourceCard].extraData.publicCardMarkers`, score entry`cardBonusVp`, the UI only expands the summary display of the original player; when passing cards, you must use internal action to remove the original playing area and cardState, give the target player private handChanged, and use`card.passed`The event triggers subsequent listeners.|
-| Payment resource removal / bonus choices / unit cost alternatives | `CostResourceRemovalModifier`, `Bonus.capDiscountAtCost`, `Bonus.trackChoiceIndex`, `Bonus.choiceAffectsState`, C14, A16, C56, D88 |"A cost resource is no longer needed" is changed from`fee` / `fees` / `unitFee`Delete the resource key and maintain the deletion constraint after each post-bonus. It cannot be simulated with an arbitrarily large capped discount; the actual reduction is written`PaymentSolution.bonusReductions`For Cost Attribution. Ordinary bonus choice must not generate negative cost after discount, typed cost payment is not retained`resourcesPaid`Negative surplus branch. BGA`addCost`per-unit alternative Use first`scope:'unit'`The trade generates a cost row, and then allows bonus choices such as D88 to continue to be replaced.`bonusChoiceIndex`It only indicates which choice the player has chosen; only`choiceAffectsState`Payment dominance prohibits mutual cutting only when the marked choice identity will be consumed by listeners such as after-pay and changes state. This flag is not set for stateless replacement choices such as B145/D88.|
+| Payment resource removal / bonus choices / unit cost alternatives | `CostResourceRemovalModifier`, `Bonus.capDiscountAtCost`, `Bonus.trackChoiceIndex`, `Bonus.choiceAffectsState`, C14, A16, C56, D88 |"A cost resource is no longer needed" is changed from`fee` / `fees` / `unitFee`Delete the resource key and maintain the deletion constraint after each post-bonus. It cannot be simulated with an arbitrarily large capped discount; the actual reduction is written`PaymentSolution.bonusReductions`For Cost Attribution. Ordinary bonus choice must not generate negative cost after discount, typed cost payment is not retained`resourcesPaid`Negative surplus branch. The reference`addCost`per-unit alternative Use first`scope:'unit'`The trade generates a cost row, and then allows bonus choices such as D88 to continue to be replaced.`bonusChoiceIndex`It only indicates which choice the player has chosen; only`choiceAffectsState`Payment dominance prohibits mutual cutting only when the marked choice identity will be consumed by listeners such as after-pay and changes state. This flag is not set for stateless replacement choices such as B145/D88.|
 | Card-provided payment resources | `ComplexCost.paymentResourceProviders`, `PaymentSolution.paymentResourceCovers`, `B155_ArtTeacher`, ADR 0004 |Cards are available at`computeCosts`Declare payment-only virtual resources within the card; provider defines the available amount, coverage ratio and consumption source inside the card. The virtual resource does not enter the cost candidate line or`PlayerState.resources`, but will appear in payment option /`resourcesPaid`;To use the payment option of provider, you must put the provider`sourceCard`Merge`sourceCards`To distinguish the card effect path, and consume the source status by the executor.|
 | Payment budgets | `ComplexCost.paymentBudget`, `fencePolicy.paymentBudget`, `B015_CarpentersBench` |to the end`PaymentSolution.resourcesPaid`Perform resource upper limit filtering; do not provide resources, do not change cost row, and do nothing.`segmentBounds`. The "only use this resource" rules used in fencing such as B15 must be checked after free fence / computeCosts / payment solver, and are prohibited from being replaced by the upper limit of the number of collected+1 segments.|
 |Candidate Closure (candidate closure, ADR 0004)| `candidate-closure.ts` `closeCandidates()`, `buildUnitCostOptions()`closure access,`cost-modifier-permutation-probe.test.ts` |unit trade (D15/B145/A123, etc.) is no longer declared`order`, `Trade.order` / `TradeModifier.order`Deleted; the reachable cost row set is generated by closure seeking fixed points and has nothing to do with the modifier registration order; mandatory saturation filtering ensures that the forced discount chain converges in any order; the new cost transformation only declares local semantics (what to replace, mandatory or not, maxUses) and prohibits the reintroduction of any order fields.|
-| Action reaction listener dispatch | `CardListenerRegistration`, `buildPhaseTrailingNodes()`, `resolveTriggerSelectChild()`, `canPreviewPureResourceFlow()` | `before` / `during` / `immediatelyAfter` / `after`Reaction listener enters according to BGA reaction semantics by default under the same owner / phase`trigger-select`, the same timing reaction of different owners is split into the activation/prompt of their respective owners. Single-card opt-in is no longer required, and per-card serial escape hatch is not retained; a single child can be directly expanded to reduce UI noise. The compute/query listener continues serial aggregation without generating player selections. The pure resource preview of trigger-select checks the common resources and fence/stable supply token according to the child owner / target player. The option defaults to the card id.`value`,repeat`sourceCard`Use activation node id instead,`sourceCard`Keep the displayed card id, and keep the host action in pending`targetSpaceId`;No`cardIds`Let's rely on`context.sourceCard`The guard's global listener will inherit this event`sourceCard`Return as activation card id;`void`But write this card on preview clone`cardStates`The mutation-only listener is also considered applicable/doable, and the actual mutation will only be implemented after the player selects it. pass gate is determined based on the actual result after preview, explicit mandatory or enabled non-before non-optional result disabled pass, root`flow.optional === true`Allow pass,`before`The trigger continues to be determined based on the original action continuation; pure resource flows use preview and post-resource check continuation, and non-resource flows will also use the current resource context to ask for continuation reachability to avoid scoped situations such as D17 / C60.`isDoable`The unlocker is skipped by pass; the optional root payment can be disabled due to insufficient resources, and the nested optional can still be retained as a skippable sub-process; the child whose structure is not applicable is not permanently resolved, and will be re-evaluated after subsequent sibling changes state.|
+| Action reaction listener dispatch | `CardListenerRegistration`, `buildPhaseTrailingNodes()`, `resolveTriggerSelectChild()`, `canPreviewPureResourceFlow()` | `before` / `during` / `immediatelyAfter` / `after`Reaction listener enters according to the reference reaction semantics by default under the same owner / phase`trigger-select`, the same timing reaction of different owners is split into the activation/prompt of their respective owners. Single-card opt-in is no longer required, and per-card serial escape hatch is not retained; a single child can be directly expanded to reduce UI noise. The compute/query listener continues serial aggregation without generating player selections. The pure resource preview of trigger-select checks the common resources and fence/stable supply token according to the child owner / target player. The option defaults to the card id.`value`,repeat`sourceCard`Use activation node id instead,`sourceCard`Keep the displayed card id, and keep the host action in pending`targetSpaceId`;No`cardIds`Let's rely on`context.sourceCard`The guard's global listener will inherit this event`sourceCard`Return as activation card id;`void`But write this card on preview clone`cardStates`The mutation-only listener is also considered applicable/doable, and the actual mutation will only be implemented after the player selects it. pass gate is determined based on the actual result after preview, explicit mandatory or enabled non-before non-optional result disabled pass, root`flow.optional === true`Allow pass,`before`The trigger continues to be determined based on the original action continuation; pure resource flows use preview and post-resource check continuation, and non-resource flows will also use the current resource context to ask for continuation reachability to avoid scoped situations such as D17 / C60.`isDoable`The unlocker is skipped by pass; the optional root payment can be disabled due to insufficient resources, and the nested optional can still be retained as a skippable sub-process; the child whose structure is not applicable is not permanently resolved, and will be re-evaluated after subsequent sibling changes state.|
 |Stage CardEffect reaction dispatch| `stageResume`, `confirm-player-switch`, `activate-card-effect`, `previewActivateCardEffect()`, `continueStageReactionHook()`, `onBeforeEndGame`, `beforeEndGameScope` |Harvest field three stages hook and before-end target-player step pass`activate-card-effect`child enter`ParallelNode(mode='trigger-select')`, there is no need for before-end single-card opt-in, nor is it necessary to separate and sort harvest field automatic flow and interactive flow; trigger-select preview uses the cloned state/player of the activation target, flow-returning and direct-mutation void handler can be used as applicable activation. The real mutation will only be implemented after the player selects activation, and unapplied activation will be re-evaluated after the sibling of the same layer is executed. before-end no-flow direct-mutation activation still obeys`beforeEndGameMandatory:false`, pass will not be forcibly disabled due to the existence of clone mutation.`beforeEndGameScope`Still expresses owner/allPlayers target semantics; other direct stage hooks that have not been moved into the reaction dispatcher temporarily maintain the serial scanning gap.|
 | Extra-turn provider selection | `collectExtraTurnContributions()`, `collectExtraTurnFlow()`, `activate-extra-turn`, `ParallelNode.resolveAfterSelection`, `XorNode.selectedChildId`, `_extraTurnSkipCountsByCard` / `_extraTurnConsumedCountsByCard` |When multiple cards contribute turn-rotation extra action at the same time, use one-shot first`ParallelNode(mode='trigger-select')`Show provider activation; trigger-select child but`activate-extra-turn`This kind of non-`activate-card`internal action, select it to expand the card's own flow. Nested provider after expansion`xor(seq(...))`The selected branch will be recorded and completely drained to avoid completing the process ahead of schedule after only executing the first step of pay. Single providers are still expanded directly to reduce UI noise. skip-turn / forced consume no longer uses player-level global counter, but writes per-source skip/consume count according to cardId; only non-interaction skip fallback uses stable card order to consume a source. During actual activation, if the provider no longer contributes to the flow, it will fail instead of silently consuming the provider prompt.|
 |Stage hook recovery with mutable played-card list| `stageResume.extra.resumeAfterCardId`, `resolveStageStartCardIndex()` |If the stage hook sub-process will remove the current card, the resume cannot only rely on the old numeric index; it must be restored according to the previous card id. When the card has been removed, it will continue from the previous index of the old index to avoid skipping subsequent cards in the same stage.|
@@ -170,7 +170,7 @@ If you discover a new mechanism that needs to span multiple cards in the future,
 
 ## 7. Log-system comparison
 
-BGA's log has a two-layer structure:`Core/Notifications.php`Responsible for player-visible gamelog and client status/animation notifications,`Helpers/Log.php`Responsible for database changes, checkpoint/step/engine boundaries, and canceling old gamelog packet concurrency after undo`clearTurn` / `refreshUI` / `refreshHand`.
+the reference's log has a two-layer structure:`Core/the reference`Responsible for player-visible gamelog and client status/animation notifications,`Helpers/the reference`Responsible for database changes, checkpoint/step/engine boundaries, and canceling old gamelog packet concurrency after undo`clearTurn` / `refreshUI` / `refreshHand`.
 
 OA did not copy notification-as-rule-source, but built a`GameState.log`The lower level **structured event layer**: emit events when rules are executed, and then uniformly derive UI log, instant notification, highlighting, resource animation, auditing and replay from the events. The backend state remains the only authority.
 
@@ -202,21 +202,21 @@ Card listener(`shared/cards/card-listeners.ts`)receive`transactionEvents`(the in
 
 `scripts/check-direct-session-log.ts`(`pnpm run check:direct-session-log`) Using TS AST static analysis to prohibit direct writing of session log bypassing the event layer: interception`state.log`Directly modify, non-whitelisted files`new LogStore()`, non-whitelist function`logStore.append()` / `prependDerivedLogEntries()`. Whitelist only`session-core.ts` / `engine.ts` / `engine-proceed.ts` / `engine-resolve.ts` / `append.ts`specified function.
 
-### Difference from BGA
+### Difference from the reference
 
 - `log.enterRound` / `log.harvest*` / `log.placeFarmer`While a small amount of legacy direct write logs are still retained, they will be gradually migrated to event derivation.
 - The event layer infrastructure (policy/audit/archive/replay UI) has been closed; richer animation details are subsequent enhancements, not infrastructure gaps.
-- Don't copy BGA's approach of using notification as a rule source - the same event layer of OA can already serve card determination, UI, private notification and playback at the same time, and the back-end state remains the only authoritative one.
+- Don't copy the reference's approach of using notification as a rule source - the same event layer of OA can already serve card determination, UI, private notification and playback at the same time, and the back-end state remains the only authoritative one.
 
-## 8. BGA anti-patterns: do not copy
+## 8. The reference anti-patterns: do not copy
 
 - Centralization`SpecialEffect.js`cardId dispatch and single card JS method. OA should retain typed pending/action flow.
-- BGA appears in the action/main path with card names or one-off logic such as global Scythe-style flag or C88 stable/fence cost relocation. OA should give priority to using card local hooks/helpers.
+- the reference appears in the action/main path with card names or one-off logic such as global Scythe-style flag or C88 stable/fence cost relocation. OA should give priority to using card local hooks/helpers.
 - The fencing main path must not be C1 / B30 / E149 to add card id branches or`noWoodPalisades` / `midnightFencer`A type of single card switch; used`FenceSegment.type` / `source`with generic`fencePolicy`Expression differences.
-- BGA mutable PHP args and in-place cost rewrite. OA should retain structured modifiers and payment enumeration.
-- BGA platform status fields such as`banned`, `implemented`OA product behavior should not be automatically driven.
+- the reference mutable PHP args and in-place cost rewrite. OA should retain structured modifiers and payment enumeration.
+- the reference platform status fields such as`banned`, `implemented`OA product behavior should not be automatically driven.
 
-## 9. Cards using BGA Special Effect
+## 9. Cards using the reference Special Effect
 
 | Deck |cards|
 |---|---|
@@ -426,17 +426,17 @@ The same owner / phase of Action reaction listener enters by default`trigger-sel
 
 | Source | Reason |
 |---|---|
-| `C054_MarketStall` | `C054_MarketBooth`BGA legacy source files.|
-| `C071_SlurrySpreader` | `C071_Slurry`BGA legacy/misnamed source files.|
-| `D011_LawnFertilzer` | `D011_LawnFertilizer`BGA typo source files.|
-| `E132_Shearer` | `E132_VeggieLover`BGA legacy source files.|
-| BGA `implemented=false`Cards with no runtime behavior|Excludes behavioral alignment scope unless OA is explicitly implemented as a product extension.|
+| `C054_MarketStall` | `C054_MarketBooth`the reference legacy source files.|
+| `C071_SlurrySpreader` | `C071_Slurry`the reference legacy/misnamed source files.|
+| `D011_LawnFertilzer` | `D011_LawnFertilizer`the reference typo source files.|
+| `E132_Shearer` | `E132_VeggieLover`the reference legacy source files.|
+| the reference `implemented=false`Cards with no runtime behavior|Excludes behavioral alignment scope unless OA is explicitly implemented as a product extension.|
 
 ## 12. Per-card appendix
 
 Status values are `Aligned`, `Accepted difference`, `Needs review`, and `Excluded`.
 
-`Needs review` means the implementation is not yet aligned: a known BGA difference or high-confidence behavior risk must be fixed or covered by additional tests before the row becomes `Aligned`. It is not an accepted difference.
+`Needs review` means the implementation is not yet aligned: a known the reference difference or high-confidence behavior risk must be fixed or covered by additional tests before the row becomes `Aligned`. It is not an accepted difference.
 
 | Card | Status | Notes |
 |---|---|---|
@@ -492,16 +492,16 @@ Status values are `Aligned`, `Accepted difference`, `Needs review`, and `Exclude
 | `A010_WoodenShed` | Aligned |  |
 | `A011_MudPatch` | Aligned |  |
 | `A012_DrinkingTrough` | Aligned |pasture capacity additive go`computePastureCapacityModifiers`, applied after replacement.|
-| `A013_RenovationCompany` | Aligned | BGA `formatCost([])`pass`renovate-house` `actionContext.exactCost`Express free renovation.|
-| `A014_CarpentersHammer` | Accepted difference |BGA banned, but OA retained according to product policy|
+| `A013_RenovationCompany` | Aligned | the reference `formatCost([])`pass`renovate-house` `actionContext.exactCost`Express free renovation.|
+| `A014_CarpentersHammer` | Accepted difference |the reference banned, but OA retained according to product policy|
 | `A015_CarpentersAxe` | Aligned |  |
-| `A016_RammedClay` | Aligned |fence clay-for-wood walk`scope:'unit'`trade, first generate BGA`addCost`clay cost row, and then allow D88 and other bonus choices to continue to replace.|
+| `A016_RammedClay` | Aligned |fence clay-for-wood walk`scope:'unit'`trade, first generate the reference`addCost`clay cost row, and then allow D88 and other bonus choices to continue to replace.|
 | `A017_ReclamationPlow` | Aligned |  |
 | `A018_WheelPlow` | Aligned |  |
 | `A019_Handplow` | Aligned |  |
-| `A020_DoubleTurnPlow` | Aligned | BGA `getBaseCosts()`Align to`CardImpl.getBaseCosts()`, generated before entering the card-purchase pipeline when round > 3`{grain:1, food:1}`base candidate; no longer used`computeCosts.improvement`modifier expression.|
+| `A020_DoubleTurnPlow` | Aligned | the reference `getBaseCosts()`Align to`CardImpl.getBaseCosts()`, generated before entering the card-purchase pipeline when round > 3`{grain:1, food:1}`base candidate; no longer used`computeCosts.improvement`modifier expression.|
 | `A021_FamilyFriendHome` | Aligned |  |
-| `A022_Telegram` | Aligned |The skip/use session path of turn-start optional extraPlacement has been covered, and the behavior is equivalent to the BGA flag and then merged into the placement option.|
+| `A022_Telegram` | Aligned |The skip/use session path of turn-start optional extraPlacement has been covered, and the behavior is equivalent to the the reference flag and then merged into the placement option.|
 | `A023_StoneCompany` | Aligned |  |
 | `A024_ThreshingBoard` | Aligned |  |
 | `A025_Bassinet` | Aligned |  |
@@ -512,13 +512,13 @@ Status values are `Aligned`, `Accepted difference`, `Needs review`, and `Exclude
 | `A030_BakingSheet` | Aligned |  |
 | `A031_DebtSecurity` | Aligned |  |
 | `A032_Manger` | Aligned |  |
-| `A033_BigCountry` | Accepted difference |BGA banned, but OA retained according to product policy|
+| `A033_BigCountry` | Accepted difference |the reference banned, but OA retained according to product policy|
 | `A034_Loppers` | Aligned |  |
 | `A035_SwimmingClass` | Aligned |  |
 | `A036_FacadesCarving` | Aligned |  |
 | `A037_Bucksaw` | Aligned |  |
 | `A038_WoolBlankets` | Aligned |  |
-| `A039_Chapel` | Accepted difference |BGA banned, but OA retained according to product policy|
+| `A039_Chapel` | Accepted difference |the reference banned, but OA retained according to product policy|
 | `A040_PottersYard` | Aligned |  |
 | `A041_VegetableSlicer` | Aligned |  |
 | `A042_ForestLakeHut` | Aligned |  |
@@ -527,7 +527,7 @@ Status values are `Aligned`, `Accepted difference`, `Needs review`, and `Exclude
 | `A045_FireProtectionPond` | Aligned |  |
 | `A046_ClawKnife` | Aligned |  |
 | `A047_Trellises` | Aligned |  |
-| `A048_ShavingHorse` | Accepted difference |BGA banned, but OA retained according to product policy|
+| `A048_ShavingHorse` | Accepted difference |the reference banned, but OA retained according to product policy|
 | `A049_NestSite` | Aligned |  |
 | `A050_MilkJug` | Aligned |  |
 | `A051_DriftNetBoat` | Aligned |  |
@@ -561,7 +561,7 @@ Status values are `Aligned`, `Accepted difference`, `Needs review`, and `Exclude
 | `A079_GardenHoe` | Aligned |  |
 | `A080_StoneTongs` | Aligned |  |
 | `A081_InterimStorage` | Aligned |  |
-| `A082_WorkCertificate` | Accepted difference |BGA banned, but OA retained by product policy; runtime uses shared partial-take helper to remove resources from accumulation space|
+| `A082_WorkCertificate` | Accepted difference |the reference banned, but OA retained by product policy; runtime uses shared partial-take helper to remove resources from accumulation space|
 | `A083_ShepherdsCrook` | Aligned |  |
 | `A084_Silage` | Aligned |  |
 | `A085_Homekeeper` | Aligned |  |
@@ -571,12 +571,12 @@ Status values are `Aligned`, `Accepted difference`, `Needs review`, and `Exclude
 | `A089_StablePlanner` | Aligned |  |
 | `A090_PlowDriver` | Aligned |  |
 | `A091_ShiftingCultivator` | Aligned |  |
-| `A092_AdoptiveParents` | Aligned |BGA pull model: When the player runs out of ordinary workers but still has unactivated descendants`contributeExtraTurn`Contribute extra-turn provider, expand after selection use/forfeit or stuck extra-turn flow; stacked/beyond-player-count skip per-source opportunity consumption, failed/auto-resolved/pending-context target rollback by placedWorkerId, forfeit visible log, multiple newborn / adult-feeding coverage completed|
+| `A092_AdoptiveParents` | Aligned |the reference pull model: When the player runs out of ordinary workers but still has unactivated descendants`contributeExtraTurn`Contribute extra-turn provider, expand after selection use/forfeit or stuck extra-turn flow; stacked/beyond-player-count skip per-source opportunity consumption, failed/auto-resolved/pending-context target rollback by placedWorkerId, forfeit visible log, multiple newborn / adult-feeding coverage completed|
 | `A093_BedMaker` | Aligned |  |
 | `A094_LazySowman` | Aligned |  |
 | `A095_Angler` | Aligned |  |
 | `A096_TaskArtisan` | Aligned |  |
-| `A097_Freshman` | Accepted difference |BGA banned, but OA retained according to product policy|
+| `A097_Freshman` | Accepted difference |the reference banned, but OA retained according to product policy|
 | `A098_StableArchitect` | Aligned |  |
 | `A099_FellowGrazer` | Aligned |  |
 | `A100_Curator` | Aligned |  |
@@ -607,15 +607,15 @@ Status values are `Aligned`, `Accepted difference`, `Needs review`, and `Exclude
 | `A125_Priest` | Aligned |  |
 | `A126_MasterWorkman` | Aligned |  |
 | `A127_Lodger` | Aligned |  |
-| `A128_RiparianBuilder` | Aligned |The cross-player construct prompt triggered by Reed Bank overrides undo and then reselects construct to ensure that confirm-player-switch will not be entered repeatedly; the clay/stone discount granted to construct is sourced`scope:'unit'`trade, retain the original construction cost and add BGA`addCost`Candidates for discounts.|
+| `A128_RiparianBuilder` | Aligned |The cross-player construct prompt triggered by Reed Bank overrides undo and then reselects construct to ensure that confirm-player-switch will not be entered repeatedly; the clay/stone discount granted to construct is sourced`scope:'unit'`trade, retain the original construction cost and add the reference`addCost`Candidates for discounts.|
 | `A129_Swagman` | Aligned |  |
 | `A130_MummysBoy` | Aligned |  |
-| `A131_CraftTeacher` | Accepted difference |BGA banned, but OA retained according to product policy|
+| `A131_CraftTeacher` | Accepted difference |the reference banned, but OA retained according to product policy|
 | `A132_Publican` | Aligned |  |
-| `A133_Braggart` | Accepted difference |BGA banned, but OA retained according to product policy|
+| `A133_Braggart` | Accepted difference |the reference banned, but OA retained according to product policy|
 | `A134_FullFarmer` | Aligned |  |
 | `A135_AnimalReeve` | Aligned |  |
-| `A136_DrudgeryReeve` | Aligned |BGA sharedScoring provides 0..max sets selection for each target player through all-player before-end select dispatch. After selection, use Scoring Reserve to record wood/clay/stone/reed occupancy and 1/3/5 extra points; real resources are not deducted, and Joinery/Pottery/Basketmaker/C133 reads the remaining scoring resources.|
+| `A136_DrudgeryReeve` | Aligned |the reference sharedScoring provides 0..max sets selection for each target player through all-player before-end select dispatch. After selection, use Scoring Reserve to record wood/clay/stone/reed occupancy and 1/3/5 extra points; real resources are not deducted, and Joinery/Pottery/Basketmaker/C133 reads the remaining scoring resources.|
 | `A137_RiverineShepherd` | Aligned |optional extra good partial collect using another accumulation cell, which will deduct the source cell and retain action-space provenance|
 | `A138_Harpooner` | Aligned |  |
 | `A139_HollowWarden` | Aligned |  |
@@ -628,7 +628,7 @@ Status values are `Aligned`, `Accepted difference`, `Needs review`, and `Exclude
 | `A146_StorehouseSteward` | Aligned |  |
 | `A147_AnimalDealer` | Aligned |  |
 | `A148_Woolgrower` | Aligned |  |
-| `A149_HouseArtist` | Aligned |grant construct's reed discount go sourced`scope:'unit'`trade, retain the original construction cost and add BGA`addCost`Candidates for discounts.|
+| `A149_HouseArtist` | Aligned |grant construct's reed discount go sourced`scope:'unit'`trade, retain the original construction cost and add the reference`addCost`Candidates for discounts.|
 | `A150_Stagehand` | Aligned |  |
 | `A151_Minstrel` | Aligned |  |
 | `A152_NightSchoolStudent` | Aligned |  |
@@ -648,20 +648,20 @@ Status values are `Aligned`, `Accepted difference`, `Needs review`, and `Exclude
 | `A166_Haydryer` | Aligned |  |
 | `A167_BreederBuyer` | Aligned |  |
 | `A168_AnimalTeacher` | Aligned |  |
-| `A169_OffSiter` | Accepted difference |BGA implemented=false; OA is implemented as a 5+ extension. Statistics owner has built major improvement and alsoCountsAs major improvement printed wood/clay/reed/stone cost (including fee cost), after the total number reaches 9+ for the first time, it will be locked to provide 1 extra room capacity.|
-| `A170_Hayward` | Accepted difference |BGA implemented=false; OA is implemented as a 5+ extension. The owner can trigger normal fence flow via anytime action during fencing legal without placing workers; the implementation still retains normal fence listener semantics.|
-| `A171_Sidekick` | Accepted difference |BGA implemented=false; OA is implemented as a 5+ extension. After the owner releases someone in the board action space, he can optionally pay 1 food, and passes`place-farmer-on-space`Place another available worker in the physical left adjacent action slot and execute the target action; the left neighbor is parsed according to the current player number and the layout coordinates, including round action cards and fixed/expanded action slots, and does not skip undisclosed round slots; target doability is judged by the resources after reserving/paying the 1 food, and reuses flow child doability to cover the hook/listener veto of the target action to avoid having no execution options for the target action after payment; activate cascaded after-place-farmer after each target action is completed listener, continue checking to the left, and stop at no left neighbor, no food, no worker, target occupied / blocked / not open / not executable or`sidekickChain`Visited.|
+| `A169_OffSiter` | Accepted difference |the reference implemented=false; OA is implemented as a 5+ extension. Statistics owner has built major improvement and alsoCountsAs major improvement printed wood/clay/reed/stone cost (including fee cost), after the total number reaches 9+ for the first time, it will be locked to provide 1 extra room capacity.|
+| `A170_Hayward` | Accepted difference |the reference implemented=false; OA is implemented as a 5+ extension. The owner can trigger normal fence flow via anytime action during fencing legal without placing workers; the implementation still retains normal fence listener semantics.|
+| `A171_Sidekick` | Accepted difference |the reference implemented=false; OA is implemented as a 5+ extension. After the owner releases someone in the board action space, he can optionally pay 1 food, and passes`place-farmer-on-space`Place another available worker in the physical left adjacent action slot and execute the target action; the left neighbor is parsed according to the current player number and the layout coordinates, including round action cards and fixed/expanded action slots, and does not skip undisclosed round slots; target doability is judged by the resources after reserving/paying the 1 food, and reuses flow child doability to cover the hook/listener veto of the target action to avoid having no execution options for the target action after payment; activate cascaded after-place-farmer after each target action is completed listener, continue checking to the left, and stop at no left neighbor, no food, no worker, target occupied / blocked / not open / not executable or`sidekickChain`Visited.|
 | `A172_BoatPainter` | Aligned |5+ product expansion implementation: Before the work phase returns home, when Fishing and Traveling Players (including 5-6 expansion slots) are both occupied, choose 1 grain or 2 food.|
-| `A173_ClayThief` | Accepted difference |BGA implemented=false; OA is implemented as a 5+ extension. After round start resources are accumulated, if there is clay in hollow-56 and it is not used, optionally mark used / update the infobox, and collect all the current clay in hollow-56; if there is no clay or it is used, it will not be triggered.|
-| `A174_MasterHora` | Accepted difference |BGA implemented=false; OA is implemented as a 5+ extension. owner in six 5/6 gray farmer linked extension spaces before release (with card-granted extra`place-farmer`Target selection) optional 1 food -> 1 vegetable; no host executability pre-check after single card payment is performed. If the host action is abnormal and cannot be executed after before flow, it will enter the engine-blocked undo-only state.|
+| `A173_ClayThief` | Accepted difference |the reference implemented=false; OA is implemented as a 5+ extension. After round start resources are accumulated, if there is clay in hollow-56 and it is not used, optionally mark used / update the infobox, and collect all the current clay in hollow-56; if there is no clay or it is used, it will not be triggered.|
+| `A174_MasterHora` | Accepted difference |the reference implemented=false; OA is implemented as a 5+ extension. owner in six 5/6 gray farmer linked extension spaces before release (with card-granted extra`place-farmer`Target selection) optional 1 food -> 1 vegetable; no host executability pre-check after single card payment is performed. If the host action is abnormal and cannot be executed after before flow, it will enter the engine-blocked undo-only state.|
 | `A175_HollowGardener` | Aligned |5+ product extension implementation: after collect reads Hollow (including hollow-56) actual clay provenance, 3-5 clay for grain, 6+ clay for vegetable.|
 | `A176_Wheelmaker` | Aligned |5+ product expansion implementation: onBuy requires that there is another profession, and the own wood is strictly greater than the total wood of other players. If it is lower than 15, it will be supplemented to 15.|
-| `A177_Middleman` | Accepted difference |BGA implemented=false; OA is implemented as a 5+ extension. When typing, place the owner-only 1 stone + 1 food attachment in the current meeple-symbol extension spaces; when the owner subsequently uses the action space accurately, he will receive and clear the space attachment. The linked partner will not receive it implicitly, and the non-owner will not receive it or consume it; the front end only renders the attachment resources serialized by the back end and the owner hover text.|
+| `A177_Middleman` | Accepted difference |the reference implemented=false; OA is implemented as a 5+ extension. When typing, place the owner-only 1 stone + 1 food attachment in the current meeple-symbol extension spaces; when the owner subsequently uses the action space accurately, he will receive and clear the space attachment. The linked partner will not receive it implicitly, and the non-owner will not receive it or consume it; the front end only renders the attachment resources serialized by the back end and the owner hover text.|
 | `A178_CarpentersBoy` | Aligned |5+ product extension implementation: After the opportunity construct, the owner will be given the same amount of wood according to the number of houses built this time.|
 | `A179_MountainShepherd` | Aligned |5+ Product Expansion Implementation: Get 1 sheep after using any Quarry.|
-| `A180_AnimalBrander` | Accepted difference |BGA implemented=false; OA is implemented as a 5+ extension. animal-market-56 Each original animal branch is expressed in the local flow; after the owner selects a specific branch and completes the original result, he can pay an additional 1 food to replay the same option. The cattle branch local pay/gain, no independent action will be registered; after accepting, the total payment of 3 food will be 2 cattle, if skipped, only the original result will be retained.|
+| `A180_AnimalBrander` | Accepted difference |the reference implemented=false; OA is implemented as a 5+ extension. animal-market-56 Each original animal branch is expressed in the local flow; after the owner selects a specific branch and completes the original result, he can pay an additional 1 food to replay the same option. The cattle branch local pay/gain, no independent action will be registered; after accepting, the total payment of 3 food will be 2 cattle, if skipped, only the original result will be retained.|
 | `B001_UpscaleLifestyle` | Aligned |Instant renovation sub-action uses current`renovate-house` action id. |
-| `B002_MiniPasture` | Aligned | BGA `formatCost([WOOD => 0])` / `miniPasture`by nested`fencePolicy`Express free fence, up to 4 total fences, exactly 1 new 1-square pasture, no walking`fencing`wrapper throws params.|
+| `B002_MiniPasture` | Aligned | the reference `formatCost([WOOD => 0])` / `miniPasture`by nested`fencePolicy`Express free fence, up to 4 total fences, exactly 1 new 1-square pasture, no walking`fencing`wrapper throws params.|
 | `B003_Moonshine` | Aligned |  |
 | `B004_WoodPile` | Aligned |  |
 | `B005_StoreofExperience` | Aligned |  |
@@ -669,19 +669,19 @@ Status values are `Aligned`, `Accepted difference`, `Needs review`, and `Exclude
 | `B007_Wage` | Aligned |  |
 | `B008_MarketStall` | Aligned |  |
 | `B009_BeatingRod` | Aligned |  |
-| `B010_Caravan` | Accepted difference |BGA banned, but OA retained according to product policy|
+| `B010_Caravan` | Accepted difference |the reference banned, but OA retained according to product policy|
 | `B011_Feedyard` | Aligned |  |
 | `B012_Stockyard` | Aligned |  |
-| `B013_CarpentersParlor` | Aligned |Wooden house fixed 2 wood + 2 reed house building cost sourced`scope:'unit'`trade, retain the original construction cost and add BGA`addCost`candidate.|
+| `B013_CarpentersParlor` | Aligned |Wooden house fixed 2 wood + 2 reed house building cost sourced`scope:'unit'`trade, retain the original construction cost and add the reference`addCost`candidate.|
 | `B014_Hawktower` | Aligned |  |
-| `B015_CarpentersBench` | Accepted difference |BGA banned, but OA retained according to product policy; BGA`formatCost([WOOD => 1])` / `max` / `benchWood`pass`reserve-fence-bonus` + nested `fencePolicy`Expression: Just build a normal fence, exactly 1 new pasture, 1 free section, and use`paymentBudget: { wood: collectedWood }`Limit the final actual payment of ordinary wood; pass`fencePolicy.promptHintKey`Prompt "Only 1 new pasture available" to the front end; do not register the global`fencing`Discount, avoid and E16/C16 etc.`computeCosts.fence`Overlay again; no longer used`collectedWood + 1`The upper limit of the number of segments can be used to crop legal shapes.|
+| `B015_CarpentersBench` | Accepted difference |the reference banned, but OA retained according to product policy; The reference`formatCost([WOOD => 1])` / `max` / `benchWood`pass`reserve-fence-bonus` + nested `fencePolicy`Expression: Just build a normal fence, exactly 1 new pasture, 1 free section, and use`paymentBudget: { wood: collectedWood }`Limit the final actual payment of ordinary wood; pass`fencePolicy.promptHintKey`Prompt "Only 1 new pasture available" to the front end; do not register the global`fencing`Discount, avoid and E16/C16 etc.`computeCosts.fence`Overlay again; no longer used`collectedWood + 1`The upper limit of the number of segments can be used to crop legal shapes.|
 | `B016_MiningHammer` | Aligned |onBuy uses CardEffect; still listening after renovation`after.renovate-house`And build 1 stable for free|
 | `B017_ForestPlow` | Aligned |  |
 | `B018_GrasslandHarrow` | Aligned |  |
 | `B019_MoldboardPlow` | Aligned |optional extra plow is executed first`plow`, then try again after success`pop-card-stack`;optional skip and go`__skip__`, after accepting`plow`confirm-only and direct`cancel`Rejected by generic guard|
 | `B020_ChainFloat` | Aligned |  |
-| `B021_HayloftBarn` | Accepted difference |BGA banned, but OA is retained according to product policy; grains obtained through resource exchange have been triggered by provenance helper; empty cards are used by family-growth`hasInactiveWorkerInSupply`, will not expose the flow to strangers when only removed workers are left|
-| `B022_WalkingBoots` | Accepted difference |BGA banned, but OA retained by product policy; temporary from-supply worker marked on return`removedFromSupply`, subsequent family-growth supply and the upper limit of family members on the player panel will no longer be included in the token.|
+| `B021_HayloftBarn` | Accepted difference |the reference banned, but OA is retained according to product policy; grains obtained through resource exchange have been triggered by provenance helper; empty cards are used by family-growth`hasInactiveWorkerInSupply`, will not expose the flow to strangers when only removed workers are left|
+| `B022_WalkingBoots` | Accepted difference |the reference banned, but OA retained by product policy; temporary from-supply worker marked on return`removedFromSupply`, subsequent family-growth supply and the upper limit of family members on the player panel will no longer be included in the token.|
 | `B023_FinalScenario` | Aligned |Round 14 action reveal / exclusive gate / clear event has been modeled by the backend authority|
 | `B024_Lasso` | Aligned |After any first release, the legal second-placement target is calculated using placement availability; the non-animal market first release is only triggered when there is a legal animal market, and the animal market first release is only triggered when there is any legal target, and the target action is executed through the general target action flow|
 | `B025_BreadPaddle` | Aligned |  |
@@ -692,10 +692,10 @@ Status values are `Aligned`, `Accepted difference`, `Needs review`, and `Exclude
 | `B030_WoodPalisades` | Aligned |  |
 | `B031_PotteryYard` | Aligned |use prerequisite instead`potteryIdentity`played-card capability; D060_LargePottery is judged by dual-type major identity participation.|
 | `B032_Kettle` | Aligned |  |
-| `B033_Mantlepiece` | Aligned |desc/cost/vp/prereq/onBuy score alignment; neither BGA/OA nor runtime prohibits renovate logic|
+| `B033_Mantlepiece` | Aligned |desc/cost/vp/prereq/onBuy score alignment; neither the reference/OA nor runtime prohibits renovate logic|
 | `B034_SpecialFood` | Aligned |Action animal provenance has converged to`sumActionSpaceMovedToTriggerPlayer()`;Keep the animal check and use the assigned animal caliber instead. Bonus VP is only recorded once and the cumulative value is displayed on the card.|
 | `B035_HookKnife` | Aligned |  |
-| `B036_Bottles` | Aligned | BGA `getBaseCosts()`Align to`CardImpl.getBaseCosts()`, generated according to the current family size before entering the card-purchase pipeline`{clay:N, food:N}`base candidate; no longer used`computeCosts.improvement`modifier expression.|
+| `B036_Bottles` | Aligned | the reference `getBaseCosts()`Align to`CardImpl.getBaseCosts()`, generated according to the current family size before entering the card-purchase pipeline`{clay:N, food:N}`base candidate; no longer used`computeCosts.improvement`modifier expression.|
 | `B037_Grange` | Aligned |  |
 | `B038_FutureBuildingSite` | Aligned |  |
 | `B039_Loom` | Aligned |  |
@@ -713,7 +713,7 @@ Status values are `Aligned`, `Accepted difference`, `Needs review`, and `Exclude
 | `B051_DiggingSpade` | Aligned |  |
 | `B052_GrowingFarm` | Aligned |  |
 | `B053_SculptureCourse` | Aligned |  |
-| `B054_Tumbrel` | Aligned |#186 After sow, "1 food per stall" is used instead.`getStableCountForCards`(Includes B85, aligned to BGA`countStablesForCards`) |
+| `B054_Tumbrel` | Aligned |#186 After sow, "1 food per stall" is used instead.`getStableCountForCards`(Includes B85, aligned to the reference`countStablesForCards`) |
 | `B055_MaintenancePremium` | Aligned |  |
 | `B056_Brook` | Accepted difference |schema-up prerequisite / isBuyable metadata difference|
 | `B057_Scullery` | Aligned |  |
@@ -747,12 +747,12 @@ Status values are `Aligned`, `Accepted difference`, `Needs review`, and `Exclude
 | `B085_FarmHand` | Accepted difference |FarmHand stable by Farm Expansion`stables` leaf wrapper(`actionContext.farmHand`) into shared stables paid /`farm.stableBuilt`Event/after-stables listener link, cost = 2 wood and takes effect uniformly with discounts such as C88; OA allows the same stables leaf to be mixed to build ordinary stable and FarmHand special stable. Difference: FarmHand position does not advance`stableTiles`(Does not count towards animal zone/loose stable capacity), only after`computeExtraRoomCapacity`+1 housing, stable count caliber by`shared/domain/stables.ts`Derived separately.`farm.stableBuilt`item add`kind: 'normal' \| 'special'`, special belt`sourceCardId`. Return-stable (D102/E76`stable-removal`helper) lists FarmHand as a candidate and clears`extraData.position`, release 1 stable supply, housing capacity returns to 0, but retain`flagged`(once-per-game, no longer offered after recycling), no animal reorganization flow is generated. Front End Wiring (#189 P1-1):`useFarmSelection`add`pendingFarmHand`status (up to 1 special site); FarmBoard converts farm-select's`farmHandPositions`Rendered as clickable target; InteractionBar confirm in`pendingStableTilesLength === 0 && !pendingFarmHand`Disabled (only select FarmHand to confirm); submit after`buildStableCommitPayload`Walk`commitSelection({ stables, farmHand })`. UI candidate/selected state (#199): Candidates are no longer marked in the upper left corner of the 2×2, but are rendered in the center of the 2×2 geometry.`post`cell (pure function`client/components/board/farmHandCenter.ts`Do top-left↔center-post coordinate mapping), use a translucent purple center box overlay (`.farmhand-center-overlay`, hot zone ≈0.7×`--tile`Easy to click, do not grab the outer ring (ordinary stable candidate), click the center classic`toggleFarmHand(top-left)`, select the bold solid box. Established resident state (#200): backend universal card-effect hook`getBuiltSpecialStables(player)`+ aggregation`collectBuiltSpecialStables`Derive snapshot display fields`SerializedPlayerState.specialStables`(Do not enter the top level of the field,`rehydrateState`stripped); frontend`GameContainerApi`from`displayPlayer.specialStables`Derive the built top-left collection and pass it to FarmBoard to post render in the 2×2 center`.farmhand-center-built`Permanent stable icon (no pulsation, no reselection), naturally updated with snapshot - after D102/E76 recycling`specialStables`Empty, overlay disappears. 2026-05-30 UI bugfix: InteractionBar summary counts FarmHand as selected and displays it`Max +`Semantics; farm post parent is no longer used`opacity: 0`Hide itself; in the selected state, only the center box is displayed and the stable icon is not displayed; in the completed state, only the stable icon is displayed and the selection box is not retained;`farm.stableBuilt`Highlight skip`kind:'special'`, avoid highlighting the top-left stored coordinates into ordinary fields. Front-end zero single card coupling (not read`cardStates['B085_FarmHand']`, no import`shared/cards`). |
 | `B086_TruffleSearcher` | Aligned |  |
 | `B087_Cottager` | Aligned |  |
-| `B088_EstablishedPerson` | Aligned | BGA `formatCost([])`pass`renovate-house` `actionContext.exactCost`Express free renovation; follow up with ordinary fence and go directly`fence`. |
+| `B088_EstablishedPerson` | Aligned | the reference `formatCost([])`pass`renovate-house` `actionContext.exactCost`Express free renovation; follow up with ordinary fence and go directly`fence`. |
 | `B089_Groom` | Aligned |  |
 | `B090_CooperativePlower` | Aligned |  |
 | `B091_AssistantTiller` | Aligned |  |
 | `B092_LittleStickKnitter` | Aligned |  |
-| `B093_Confidant` | Aligned |onBuy must select one of 2/3/4 future rounds;`isDoable.occupation`Filter by optional occupation payment plans and by`reserveResources`Requires a minimum of 2 real food payout future schedules after career payout;`isDoable.lessons*`When B93 is the only and unpayable profession, veto lessons action space to avoid having no profession to play after occupying the grid; optional after future receive`sow`or`fence`, where BGA`formatCost([WOOD => 1])`by nested`fencePolicy.costPolicy`Explicit expression, and continue to overlay E16 / C16 etc.`computeCosts.fence`Discount.|
+| `B093_Confidant` | Aligned |onBuy must select one of 2/3/4 future rounds;`isDoable.occupation`Filter by optional occupation payment plans and by`reserveResources`Requires a minimum of 2 real food payout future schedules after career payout;`isDoable.lessons*`When B93 is the only and unpayable profession, veto lessons action space to avoid having no profession to play after occupying the grid; optional after future receive`sow`or`fence`, where the reference`formatCost([WOOD => 1])`by nested`fencePolicy.costPolicy`Explicit expression, and continue to overlay E16 / C16 etc.`computeCosts.fence`Discount.|
 | `B094_StockProtector` | Aligned |  |
 | `B095_MasterBricklayer` | Aligned |major-only stone discounts`computeCardCostCandidates`, append sourced candidates according to the current number of rooms; minor improvement does not produce candidate pipeline output.|
 | `B096_TreeFarmJoiner` | Aligned |future wood expires and goes to universal Future Receive; in the card`after.receive`listener checks the card source wood and adds optional`minor-improvement`, do not write single-card branches in the round-start core path.|
@@ -776,7 +776,7 @@ Status values are `Aligned`, `Accepted difference`, `Needs review`, and `Exclude
 | `B114_Childless` | Aligned |  |
 | `B115_TinsmithMaster` | Aligned |Seeding rewards have been changed to optional farm-position selection, using precise selectableTiles|
 | `B116_Shoreforester` | Aligned |  |
-| `B117_Informant` | Accepted difference |BGA banned, but OA retained according to product policy|
+| `B117_Informant` | Accepted difference |the reference banned, but OA retained according to product policy|
 | `B118_SmallscaleFarmer` | Aligned |  |
 | `B119_Lumberjack` | Aligned |  |
 | `B120_Sweep` | Aligned |  |
@@ -785,13 +785,13 @@ Status values are `Aligned`, `Accepted difference`, `Needs review`, and `Exclude
 | `B123_RoofBallaster` | Aligned |  |
 | `B124_Trimmer` | Aligned |after fence no longer writes this work phase reward flag; each time the pasture coverage area increases, you can get 2 stone, and the return-home flag still prevents accidental triggering during non-work phases.|
 | `B125_EstateWorker` | Aligned |  |
-| `B126_Carpenter` | Aligned |Fixed 3 building-resource + 2 reed building cost sourced`scope:'unit'`trade, retain the original construction cost and add BGA`addCost`candidate.|
+| `B126_Carpenter` | Aligned |Fixed 3 building-resource + 2 reed building cost sourced`scope:'unit'`trade, retain the original construction cost and add the reference`addCost`candidate.|
 | `B127_Seducer` | Aligned |  |
 | `B128_Plumber` | Aligned |Optional after Major Improvement`renovate-house`leaf with`sourceCard`Trigger; overhaul cost listener read`params.selectedOption`target materials, only mandatory sourced 2 target resource discounts are provided.|
 | `B129_Seatmate` | Aligned |4p use`(ownerIdx+⌊n/2⌋)%n`Calculate the opposite seat. Allow-occupied is injected only when the opposite seat does not occupy r13 and the owner himself is not at r13; 3p is injected when any neighboring seat is occupied and the owner himself is not injected at r13; round<13 / other people are not injected. The ordering convention of state.players is consistent with C150_ParrotBreeder.|
 | `B130_FullPeasant` | Aligned |  |
 | `B131_Equipper` | Aligned |  |
-| `B132_EstateMaster` | Accepted difference |BGA banned, but OA retained according to product policy|
+| `B132_EstateMaster` | Accepted difference |the reference banned, but OA retained according to product policy|
 | `B133_VillagePeasant` | Aligned |  |
 | `B134_HousebookMaster` | Aligned |  |
 | `B135_NutritionExpert` | Aligned |  |
@@ -810,7 +810,7 @@ Status values are `Aligned`, `Accepted difference`, `Needs review`, and `Exclude
 | `B148_PetBroker` | Aligned |  |
 | `B149_OpenAirFarmer` | Aligned |pay 3 stable supply token; fixed 2 wood build a 2 grid pasture;`segmentBounds.total.max=6`, B30 palisade is included in the total number of segments and can supplement ordinary fence supply|
 | `B150_LargeScaleFarmer` | Aligned |  |
-| `B151_LittlePeasant` | Accepted difference |BGA banned, but OA retained according to product policy|
+| `B151_LittlePeasant` | Accepted difference |the reference banned, but OA retained according to product policy|
 | `B152_JuniorArtist` | Aligned |  |
 | `B153_Housemaster` | Aligned |Final score summarizes true major vs.`alsoCountsAs: ['major']`of minor, the A60 single-car classification will no longer be retained.|
 | `B154_SheepKeeper` | Accepted difference |schema-up prerequisite / isBuyable metadata difference|
@@ -820,7 +820,7 @@ Status values are `Aligned`, `Accepted difference`, `Needs review`, and `Exclude
 | `B158_DistrictManager` | Aligned |  |
 | `B159_LieutenantGeneral` | Aligned |  |
 | `B160_PubOwner` | Aligned |  |
-| `B161_Weakling` | Accepted difference |BGA banned, but OA retained according to product policy|
+| `B161_Weakling` | Accepted difference |the reference banned, but OA retained according to product policy|
 | `B162_ForestClearer` | Aligned |  |
 | `B163_Pastor` | Aligned |  |
 | `B164_SheepWhisperer` | Aligned |  |
@@ -829,32 +829,32 @@ Status values are `Aligned`, `Accepted difference`, `Needs review`, and `Exclude
 | `B167_StableSergeant` | Aligned |onBuy uses the shared final total animal accommodation helper; the payment reward flow will not be played when sheep / boar / cattle cannot be accommodated at the same time.|
 | `B168_PastureMaster` | Aligned |  |
 | `B169_LivestockSustainer` | Aligned |5+ product expansion implementation: provide mixed animal-holder card zone according to the current number of major identities of other players, including`alsoCountsAs: ['major']`The minor, excluding the owner's own major, the capacity limit is 8, and the capacity is dynamically reduced after the major leaves the site; the animal zone calculation read-only echo`animalCounts`, after animal reorg from general card-zone`animalCounts`To restore each species, the failed storage after the capacity is reset to zero or reduced will be cleaned up when reorg is written back.|
-| `B170_CorralBuilder` | Accepted difference |BGA implemented=false; OA is implemented as a 5+ extension. The round start of Pig Market / Cattle Market reveal is triggered independently, and optionally executes B2-style to free exactly 1 pasture non-action fence flow; if one pasture is illegal, there will be no compensation.|
-| `B171_GreenhouseBuilder` | Accepted difference |BGA implemented=false; OA is implemented as a 5+ extension. Register owner-only dynamic action space, only those that have been revealed before the current round and are executable by owner`fencing` / `house-redevelopment` / `vegetable-seeds`printed spaces expose corresponding branches.|
+| `B170_CorralBuilder` | Accepted difference |the reference implemented=false; OA is implemented as a 5+ extension. The round start of Pig Market / Cattle Market reveal is triggered independently, and optionally executes B2-style to free exactly 1 pasture non-action fence flow; if one pasture is illegal, there will be no compensation.|
+| `B171_GreenhouseBuilder` | Accepted difference |the reference implemented=false; OA is implemented as a 5+ extension. Register owner-only dynamic action space, only those that have been revealed before the current round and are executable by owner`fencing` / `house-redevelopment` / `vegetable-seeds`printed spaces expose corresponding branches.|
 | `B172_CattleCaregiver` | Aligned |5+ product expansion implementation: round start counts players who own cattle according to the currently visible and normalized animal zone and animal-holder card zone, and 3/4/5+ people are given 1/2/3 food respectively.|
-| `B173_Sweeper` | Accepted difference |BGA implemented=false; OA is implemented as a 5+ extension. The owner uses the meeple-symbol extension space and then puts 1 food on the card through the shared stored-food cashout helper; the one-time anytime cashout removes the food on the card and marks it as used. The occupation is still counted as played and will not be accumulated in the future.|
+| `B173_Sweeper` | Accepted difference |the reference implemented=false; OA is implemented as a 5+ extension. The owner uses the meeple-symbol extension space and then puts 1 food on the card through the shared stored-food cashout helper; the one-time anytime cashout removes the food on the card and marks it as used. The occupation is still counted as played and will not be accumulated in the future.|
 | `B174_RiverbankGardener` | Aligned |5+ Product Expansion Implementation: Get an additional 1 vegetable after Riverbank Forest collect.|
-| `B175_FieldOverseer` | Accepted difference |BGA implemented=false; OA is implemented as a 5+ extension. At the end of the harvest field phase, only other players will be counted.`harvestReapSummary`The number of grain fields in , 3/4/6+ is given to food/grain/vegetable according to the highest threshold.|
-| `B176_VillageIdiot` | Accepted difference |BGA implemented=false; OA is implemented as a 5+ extension. by hand/played`occupation.isDoable`and`providesOccupation`minor interception is guaranteed to be and remain a lone occupation, and used in opponent`meeting-place`Then give the owner 1 wood + 1 food.|
+| `B175_FieldOverseer` | Accepted difference |the reference implemented=false; OA is implemented as a 5+ extension. At the end of the harvest field phase, only other players will be counted.`harvestReapSummary`The number of grain fields in , 3/4/6+ is given to food/grain/vegetable according to the highest threshold.|
+| `B176_VillageIdiot` | Accepted difference |the reference implemented=false; OA is implemented as a 5+ extension. by hand/played`occupation.isDoable`and`providesOccupation`minor interception is guaranteed to be and remain a lone occupation, and used in opponent`meeting-place`Then give the owner 1 wood + 1 food.|
 | `B177_StoneClawer` | Aligned |5+ product expansion implementation: 1 stone will be given after each successful blow leaf settlement.|
-| `B178_TagAlong` | Accepted difference |BGA implemented=false; OA is implemented as a 5+ extension. After the opponent uses the Resource Market variant, the owner can optionally pass`place-farmer-on-space`Put available workers into the same occupied action space and execute the action; it will not trigger when the owner uses it himself, is not Resource Market, has no available workers, or the target is blocked/unexecutable.|
-| `B179_WildBoarHunter` | Accepted difference |BGA implemented=false; OA is implemented as a 5+ extension. Press actual before return home`takenBy`Occupancy statistics of wood accumulation spaces, 3+ and the owner has wood, optional 1 wood -> 1 boar.|
+| `B178_TagAlong` | Accepted difference |the reference implemented=false; OA is implemented as a 5+ extension. After the opponent uses the Resource Market variant, the owner can optionally pass`place-farmer-on-space`Put available workers into the same occupied action space and execute the action; it will not trigger when the owner uses it himself, is not Resource Market, has no available workers, or the target is blocked/unexecutable.|
+| `B179_WildBoarHunter` | Accepted difference |the reference implemented=false; OA is implemented as a 5+ extension. Press actual before return home`takenBy`Occupancy statistics of wood accumulation spaces, 3+ and the owner has wood, optional 1 wood -> 1 boar.|
 | `B180_GameTeaser` | Aligned |5+ product extension implementation: only count the food moved from the food accumulation space itself, 1/2/3 food are given to cattle/boar/sheep respectively, 4+ is not triggered.|
-| `C001_Overhaul` | Aligned |BGA passing behavior is handled by improvement host action / pay child / activate-card-effect; rebuild only counts/recycles/rebuilds own ordinary fences, go`consume-fence` ownOnly + generic `fencePolicy` |
-| `C002_Stable` | Aligned | BGA `formatCost([WOOD => 0])`pass`stables` `actionContext.exactCost`Express free stable.|
-| `C003_CarriageTrip` | Accepted difference |BGA banned, but OA retained according to product policy|
+| `C001_Overhaul` | Aligned |the reference passing behavior is handled by improvement host action / pay child / activate-card-effect; rebuild only counts/recycles/rebuilds own ordinary fences, go`consume-fence` ownOnly + generic `fencePolicy` |
+| `C002_Stable` | Aligned | the reference `formatCost([WOOD => 0])`pass`stables` `actionContext.exactCost`Express free stable.|
+| `C003_CarriageTrip` | Accepted difference |the reference banned, but OA retained according to product policy|
 | `C004_WritingBoards` | Aligned |  |
 | `C005_Remodeling` | Aligned |  |
-| `C006_StoneClearing` | Aligned |BGA passing behavior is handled by improvement host action / pay child / activate-card-effect|
+| `C006_StoneClearing` | Aligned |the reference passing behavior is handled by improvement host action / pay child / activate-card-effect|
 | `C007_BladeShears` | Aligned |  |
 | `C008_PlantFertilizer` | Aligned |  |
-| `C009_AutomaticWaterTrough` | Aligned |BGA passing behavior is handled by the improvement host action / pay child / activate-card-effect; purchasable animal candidates use the shared final total animal holding helper.|
+| `C009_AutomaticWaterTrough` | Aligned |the reference passing behavior is handled by the improvement host action / pay child / activate-card-effect; purchasable animal candidates use the shared final total animal holding helper.|
 | `C010_BunkBeds` | Aligned |  |
 | `C011_WildlifeReserve` | Aligned |When Farmers of the Moor is enabled, only 1 each of sheep / boar / cattle is allowed, and horse will be rejected by the card-zone invalid-animal check.|
 | `C012_CattleFarm` | Aligned |  |
 | `C013_WoodSlideHammer` | Aligned |Wood houses with at least 5 rooms directly renovated to stone are discounted by the mandatory sourced bonus modifier, and the original stone renovation cost branch is not retained.|
 | `C014_StrawThatchedRoof` | Aligned |construct/renovation pass`CostResourceRemovalModifier`from`fee` / `fees` / `unitFee`Delete reed, and prevent post-cost bonuses such as D013 from being re-added; E123 top reed no longer generates or consumes payment options, and the actual deduction is included in the saved reed of this card.|
-| `C015_Trellis` | Aligned | BGA ordinary `FENCING`sub-action mapped to internal`fence` leaf. |
+| `C015_Trellis` | Aligned | the reference ordinary `FENCING`sub-action mapped to internal`fence` leaf. |
 | `C016_FieldFences` | Aligned |Field-adjacent fence discount explicitly declares Cost Attribution and records saved wood according to the number of adjacent fences submitted.|
 | `C017_NewlyPlowedField` | Aligned |  |
 | `C018_RollOverPlow` | Aligned |By default, discard selection selects at least one crop field. Empty submission or selection of empty fields will not bypass discard and enter plow directly.|
@@ -867,10 +867,10 @@ Status values are `Aligned`, `Accepted difference`, `Needs review`, and `Exclude
 | `C025_SteamMachine` | Aligned |The last normal worker returns after using accumulation space`SEQ[optional bake-bread, special-effect.consume-pending-extra-turns]`;The consumption step uses the general pending extra-turn aggregation and does not reference A92. Silent no-op when there is no pending/unpayable; write all when there are multiple pending opportunities`_extraTurnConsumedCount`, and will only be issued by C25 during actual consumption.`card.triggered`. Listener explicitly declared`cardIds`, ensure that trigger-select/source card metadata remains as C25; Card-sourced follow-up leaf passes`sourceCard`Guards avoid the immediateAfter self-triggering loop, and do not treat additional cards as "normal workers' last actions".|
 | `C026_Flail` | Aligned |  |
 | `C027_Blueprint` | Aligned |Three workshop majors retain the original payment candidates, and add Blueprint stone-discount candidates; the minor-improvement entrance remains`computeChoiceCandidates`In listener mode, the payment option displays the source through candidate metadata.|
-| `C028_TeachersDesk` | Accepted difference |BGA banned, but OA retained according to product policy|
+| `C028_TeachersDesk` | Accepted difference |the reference banned, but OA retained according to product policy|
 | `C029_BeerTable` | Aligned |  |
 | `C030_HalfTimberedHouse` | Aligned |  |
-| `C031_WritingChamber` | Accepted difference |BGA banned, but OA retained according to product policy|
+| `C031_WritingChamber` | Accepted difference |the reference banned, but OA retained according to product policy|
 | `C032_AbortOriel` | Aligned |  |
 | `C033_GreeningPlan` | Aligned |  |
 | `C034_ElephantgrassPlant` | Aligned |  |
@@ -888,21 +888,21 @@ Status values are `Aligned`, `Accepted difference`, `Needs review`, and `Exclude
 | `C046_Mandoline` | Aligned |  |
 | `C047_GardenClaw` | Aligned |  |
 | `C048_Farmstead` | Aligned |  |
-| `C049_BeerStall` | Aligned |#186 "Empty unfenced corral" is used instead`getEmptyUnfencedStableCountForCards`(B85 always counts 1 empty, aligned with BGA`getEmptyUnfencedStables`) |
+| `C049_BeerStall` | Aligned |#186 "Empty unfenced corral" is used instead`getEmptyUnfencedStableCountForCards`(B85 always counts 1 empty, aligned with the reference`getEmptyUnfencedStables`) |
 | `C050_StableYard` | Aligned |  |
 | `C051_FishingNet` | Aligned |  |
 | `C052_HuntsmansHat` | Aligned |cooking prerequisite is aligned with the food path of action-space boar/pig gain; no current OA action-space difference is seen|
 | `C053_GypsysCrock` | Aligned |  |
 | `C054_MarketBooth` | Aligned |printed cost is 1 stable; harvest exchange pays grain + reserve fence|
 | `C055_Studio` | Aligned |  |
-| `C056_FeedFence` | Aligned |stable clay-for-wood go`scope:'unit'` trade + `groupMax:1`, only replaces an original 2 wood stable, and can generate BGA first`addCost`Clay cost row was replaced by D88; #186 "4th corral +2 food" bonus caliber was changed to`getStableCountForCards === 4`(Includes B85, aligned to BGA`countStablesForCards()==4`); the number of this construction is still`getStableTilesBuiltThisAction`(Reported to #185)|
+| `C056_FeedFence` | Aligned |stable clay-for-wood go`scope:'unit'` trade + `groupMax:1`, only replaces an original 2 wood stable, and can generate the reference first`addCost`Clay cost row was replaced by D88; #186 "4th corral +2 food" bonus caliber was changed to`getStableCountForCards === 4`(Includes B85, aligned to the reference`countStablesForCards()==4`); the number of this construction is still`getStableTilesBuiltThisAction`(Reported to #185)|
 | `C057_Crudite` | Aligned |  |
 | `C058_Woodcraft` | Aligned |  |
 | `C059_SchnappsDistillery` | Aligned |  |
-| `C060_SmallPottersOven` | Accepted difference |BGA banned, but OA retained according to product policy|
+| `C060_SmallPottersOven` | Accepted difference |the reference banned, but OA retained according to product policy|
 | `C061_BeerStein` | Aligned |  |
 | `C062_CookeryExtension` | Aligned |  |
-| `C063_CraftBrewery` | Accepted difference |BGA banned, but OA retained according to product policy|
+| `C063_CraftBrewery` | Accepted difference |the reference banned, but OA retained according to product policy|
 | `C064_CornSchnappsDistillery` | Aligned |  |
 | `C065_Granary` | Aligned |  |
 | `C066_EternalRyeCultivation` | Aligned |  |
@@ -910,7 +910,7 @@ Status values are `Aligned`, `Accepted difference`, `Needs review`, and `Exclude
 | `C068_Bookcase` | Aligned |  |
 | `C069_LandConsolidation` | Aligned |Passed during extra-crop placement pending`actionContext.extraCropPlacement`Disable anytime to avoid nested swaps|
 | `C070_LettucePatch` | Aligned |  |
-| `C071_Slurry` | Excluded |BGA implemented=false, there is no runtime alignment target in this round|
+| `C071_Slurry` | Excluded |the reference implemented=false, there is no runtime alignment target in this round|
 | `C072_FestivalPlanning` | Aligned |onBuy is executed first`reap`Private trigger harvests ordinary fields and Card Fields, and then enters optional improvement|
 | `C073_SeaweedFertilizer` | Aligned |  |
 | `C074_PrivateForest` | Aligned |  |
@@ -926,8 +926,8 @@ Status values are `Aligned`, `Accepted difference`, `Needs review`, and `Exclude
 | `C084_PerennialRye` | Aligned |  |
 | `C085_DenBuilder` | Aligned |  |
 | `C086_LivestockFeeder` | Aligned |  |
-| `C087_Mason` | Aligned | BGA `CONSTRUCT + formatCost(['max'=>1])`Be true`construct` + `exactCost: { max: 1 }`, the room tile will be placed and will no longer be used.`build-farmhand-room`Virtual room.|
-| `C088_CarpentersApprentice` | Aligned |wooden house building -2 wood go sourced`scope:'unit'`trade, retain the original construction cost and add BGA`addCost`Candidates for discounts. 13th–15th fence free zone walk`computeCosts.fence`, doability through free`fencePolicy`Reuse real layout access control. Build Stables`maxSelections`Calculate with count-aware total cost (#191):`stables.ts`of`buildStableFarmSelection`Count count=1..reserve one by one`resolveStableTotalCostWithDiscount`(Same total as settlement, including non-uniform discount of -1 for C88 Block 3/4) +`canAffordTypedFlatCost`, take the maximum affordable number and overwrite`farm.maxSelections`, no longer probe`stableCount:1`Fold and then inject farmyard’s per-unit`costOverride`(The non-uniform discount will give one less building, for example, 1 card-facing stable + 3 wood + C88 should be able to build 2 buildings). The actual discounts for stables 3/4 and fences 13–15 explicitly declare Cost Attribution and record saved wood. total is monotonic to count (each additional wood is ≥+1 wood), and the scan is terminated when the first one is unaffordable.`actionContext.max`(A1 Shelter)/`zoneFilter='pasture-1'`/`exactCost`(C94) paths are not affected.|
+| `C087_Mason` | Aligned | the reference `CONSTRUCT + formatCost(['max'=>1])`Be true`construct` + `exactCost: { max: 1 }`, the room tile will be placed and will no longer be used.`build-farmhand-room`Virtual room.|
+| `C088_CarpentersApprentice` | Aligned |wooden house building -2 wood go sourced`scope:'unit'`trade, retain the original construction cost and add the reference`addCost`Candidates for discounts. 13th–15th fence free zone walk`computeCosts.fence`, doability through free`fencePolicy`Reuse real layout access control. Build Stables`maxSelections`Calculate with count-aware total cost (#191):`stables.ts`of`buildStableFarmSelection`Count count=1..reserve one by one`resolveStableTotalCostWithDiscount`(Same total as settlement, including non-uniform discount of -1 for C88 Block 3/4) +`canAffordTypedFlatCost`, take the maximum affordable number and overwrite`farm.maxSelections`, no longer probe`stableCount:1`Fold and then inject farmyard’s per-unit`costOverride`(The non-uniform discount will give one less building, for example, 1 card-facing stable + 3 wood + C88 should be able to build 2 buildings). The actual discounts for stables 3/4 and fences 13–15 explicitly declare Cost Attribution and record saved wood. total is monotonic to count (each additional wood is ≥+1 wood), and the scan is terminated when the first one is unaffordable.`actionContext.max`(A1 Shelter)/`zoneFilter='pasture-1'`/`exactCost`(C94) paths are not affected.|
 | `C089_StableMaster` | Aligned |onBuy of 1 wood stable away`stables`exactCost, raw wood gate is not allowed at the entrance, C88, etc. are allowed.`computeCosts.stables`Discounts stack.|
 | `C090_FieldWatchman` | Aligned |  |
 | `C091_PlowHero` | Aligned |  |
@@ -938,10 +938,10 @@ Status values are `Aligned`, `Accepted difference`, `Needs review`, and `Exclude
 | `C096_Merchant` | Aligned |  |
 | `C097_SeedResearcher` | Aligned |  |
 | `C098_CubeCutter` | Aligned |  |
-| `C099_GardenDesigner` | Accepted difference |BGA banned, but OA retained according to product policy|
+| `C099_GardenDesigner` | Accepted difference |the reference banned, but OA retained according to product policy|
 | `C100_Butler` | Aligned |  |
-| `C101_StallHolder` | Aligned |#186 "Number of unfenced corrals" is used instead`getUnfencedStableCountForCards`(Includes B85, aligned to BGA`countUnfencedStablesForCards`) |
-| `C102_TreeGuard` | Accepted difference |BGA banned, but OA retained according to product policy|
+| `C101_StallHolder` | Aligned |#186 "Number of unfenced corrals" is used instead`getUnfencedStableCountForCards`(Includes B85, aligned to the reference`countUnfencedStablesForCards`) |
+| `C102_TreeGuard` | Accepted difference |the reference banned, but OA retained according to product policy|
 | `C103_GreenGrocer` | Aligned |  |
 | `C104_Collector` | Aligned |choice request passed`structuredChoicePrefixes`Accept the multi-select value of front-end comma splicing, and then use the card resolver to verify the resource type, deduplication and 6/7/8/9 quantity; GameSession regression test coverage #659.|
 | `C105_BasketCarrier` | Aligned |  |
@@ -964,10 +964,10 @@ Status values are `Aligned`, `Accepted difference`, `Needs review`, and `Exclude
 | `C122_Bricklayer` | Aligned |improvement clay discount`computeCardCostCandidates`Add sourced candidate; construct still uses optional bonus modifier, renovation uses mandatory sourced bonus modifier, and does not retain the original clay renovation cost branch.|
 | `C123_Freemason` | Aligned |  |
 | `C124_StoneImporter` | Aligned |  |
-| `C125_Nightworker` | Accepted difference |BGA banned, but OA retained according to product policy|
+| `C125_Nightworker` | Accepted difference |the reference banned, but OA retained according to product policy|
 | `C126_Excavator` | Aligned |  |
 | `C127_Lover` | Aligned |  |
-| `C128_WoodenHutExtender` | Aligned |The fixed cost of wooden houses is divided into rounds sourced`scope:'unit'`trade, retain the original construction cost and add BGA`addCost`candidate.|
+| `C128_WoodenHutExtender` | Aligned |The fixed cost of wooden houses is divided into rounds sourced`scope:'unit'`trade, retain the original construction cost and add the reference`addCost`candidate.|
 | `C129_SecondSpouse` | Aligned |  |
 | `C130_OutskirtsDirector` | Aligned |  |
 | `C131_PrivateTeacher` | Aligned |  |
@@ -993,7 +993,7 @@ Status values are `Aligned`, `Accepted difference`, `Needs review`, and `Exclude
 | `C151_SowingDirector` | Aligned |  |
 | `C152_Puppeteer` | Aligned |  |
 | `C153_PatternMaker` | Aligned |  |
-| `C154_TwinResearcher` | Aligned |pair mapping completion hollow / copse-add, etc. BGA action grid coverage|
+| `C154_TwinResearcher` | Aligned |pair mapping completion hollow / copse-add, etc. The reference action grid coverage|
 | `C155_FoodDistributor` | Aligned |  |
 | `C156_HoofCaregiver` | Aligned |  |
 | `C157_ResourceAnalyzer` | Aligned |  |
@@ -1008,22 +1008,22 @@ Status values are `Aligned`, `Accepted difference`, `Needs review`, and `Exclude
 | `C166_CattleWhisperer` | Aligned |  |
 | `C167_CattleBuyer` | Aligned |  |
 | `C168_AnimalCatcher` | Aligned |  |
-| `C169_FastMason` | Accepted difference |BGA implemented=false; OA is implemented as a 5+ extension. After owner collects clay/stone accumulation, optionally perform matching material renovation: clay collection only to clay, stone collection only clay house to stone,`exactCost`Remove reed.|
-| `C170_AmateurFencer` | Accepted difference |BGA implemented=false; OA is implemented as a 5+ extension. When onBuy, if the owner has no pasture and one-space fence is legal, you can optionally execute B2-style free exactly 1-space non-action fence flow.|
-| `C171_YoungArtist` | Accepted difference |BGA implemented=false; OA is implemented as a 5+ extension. When the returning home phase owner has food and at least one branch is feasible, you can choose to pay 1 food and then perform the Minor Improvement action without workers, or directly draw up to 2 minor improvement cards from the ordinary minor deck; the Minor Improvement branch is judged according to the resources after reserving/paying the 1 food, and will not display branches that cannot buy cards after paying; unfeasible branches are hidden, and there is no keep-one option.|
-| `C172_FieldCounter` | Accepted difference |BGA implemented=false; OA is implemented as a 5+ extension. opponent puts 1 food on the card every plow 1 field, press`farm.fieldPlowed.fields`The quantity is accumulated; the owner's own plow is not triggered; cashout reuses the shared stored-food helper.|
-| `C173_TopOuter` | Accepted difference |BGA implemented=false; OA is implemented as a 5+ extension. After any player uses house-building-56, the owner collects all the current food of linked traveling-players-56; empty food or non-house-building-56 will not trigger.|
+| `C169_FastMason` | Accepted difference |the reference implemented=false; OA is implemented as a 5+ extension. After owner collects clay/stone accumulation, optionally perform matching material renovation: clay collection only to clay, stone collection only clay house to stone,`exactCost`Remove reed.|
+| `C170_AmateurFencer` | Accepted difference |the reference implemented=false; OA is implemented as a 5+ extension. When onBuy, if the owner has no pasture and one-space fence is legal, you can optionally execute B2-style free exactly 1-space non-action fence flow.|
+| `C171_YoungArtist` | Accepted difference |the reference implemented=false; OA is implemented as a 5+ extension. When the returning home phase owner has food and at least one branch is feasible, you can choose to pay 1 food and then perform the Minor Improvement action without workers, or directly draw up to 2 minor improvement cards from the ordinary minor deck; the Minor Improvement branch is judged according to the resources after reserving/paying the 1 food, and will not display branches that cannot buy cards after paying; unfeasible branches are hidden, and there is no keep-one option.|
+| `C172_FieldCounter` | Accepted difference |the reference implemented=false; OA is implemented as a 5+ extension. opponent puts 1 food on the card every plow 1 field, press`farm.fieldPlowed.fields`The quantity is accumulated; the owner's own plow is not triggered; cashout reuses the shared stored-food helper.|
+| `C173_TopOuter` | Accepted difference |the reference implemented=false; OA is implemented as a 5+ extension. After any player uses house-building-56, the owner collects all the current food of linked traveling-players-56; empty food or non-house-building-56 will not trigger.|
 | `C174_StoneCustodian` | Aligned |5+ product expansion implementation: before work phase return home, there are stone accumulation spaces in the statistics, 1 will give 1 grain, 2+ will give 1 vegetable.|
-| `C175_VillageTeacher` | Accepted difference |BGA implemented=false; OA is implemented as a 5+ extension. After the owner uses Lessons, 1/2/3 of the actual number of occupied Lessons in the current round is given to food/grain/vegetable; linked blocked cells are not counted.|
+| `C175_VillageTeacher` | Accepted difference |the reference implemented=false; OA is implemented as a 5+ extension. After the owner uses Lessons, 1/2/3 of the actual number of occupied Lessons in the current round is given to food/grain/vegetable; linked blocked cells are not counted.|
 | `C176_Cleanacre` | Aligned |5+ product expansion implementation: Farmland/Cultivation/Farming Supplies gives 2 clay after the top-level action is completed; Farming Supplies multi-branch action only triggers once.|
 | `C177_MountainHiker` | Aligned |5+ product extension implementation: 5-6 extension accumulation space collect, you can pay 1 food to buy 1 stone; instant-gain extension spaces are not included.|
 | `C178_OnSiteReverend` | Aligned |5+ product extension implementation: harvest start forces selection of 1 building resource.|
 | `C179_BovinePioneer` | Aligned |5+ product extension implementation: 1 cattle is given when the fence action generates at least 1 newPasture; a fence action is triggered at most once.|
-| `C180_Trapper` | Accepted difference |BGA implemented=false; OA is implemented as a 5+ extension. After owner uses wood accumulation, if the actual occupied wood accumulation quantity is 2/3/4, he can choose 1 food to buy sheep/boar/cattle.|
-| `D001_ZigzagHarrow` | Aligned |Use generic`plow.actionContext.allowedTiles`Alignment BGA zigzag target limit; accepted divergence: raw zigzag candidates are not pre-filtered out of bounds/occupied, and are ultimately determined by plow validation/`allowedTiles`Intersection processing; empty intersection optional leaf auto-skip|
+| `C180_Trapper` | Accepted difference |the reference implemented=false; OA is implemented as a 5+ extension. After owner uses wood accumulation, if the actual occupied wood accumulation quantity is 2/3/4, he can choose 1 food to buy sheep/boar/cattle.|
+| `D001_ZigzagHarrow` | Aligned |Use generic`plow.actionContext.allowedTiles`Alignment the reference zigzag target limit; accepted divergence: raw zigzag candidates are not pre-filtered out of bounds/occupied, and are ultimately determined by plow validation/`allowedTiles`Intersection processing; empty intersection optional leaf auto-skip|
 | `D002_DwellingPlan` | Aligned |Instant renovation sub-action uses current`renovate-house` action id. |
 | `D003_Furrows` | Aligned |  |
-| `D004_CrossCutWood` | Accepted difference |BGA banned, but OA retained according to product policy|
+| `D004_CrossCutWood` | Accepted difference |the reference banned, but OA retained according to product policy|
 | `D005_FieldClay` | Aligned |  |
 | `D006_PetrifiedWood` | Aligned |  |
 | `D007_Trident` | Aligned |  |
@@ -1035,12 +1035,12 @@ Status values are `Aligned`, `Accepted difference`, `Needs review`, and `Exclude
 | `D013_Trowel` | Aligned |anytime Renovation directly to stone via`params.selectedOption='stone'`into reality`renovate-house`; wood→stone / clay→stone fixed costs are expressed as sourced mandatory bonus, payment option retains the Trowel source; filter the prohibitive of clay probe`costs`Also carries matching Cost Attribution.|
 | `D014_HammerCrusher` | Aligned |  |
 | `D015_ClaySupports` | Aligned |  |
-| `D016_WoodenWheyBucket` | Aligned | BGA `formatCost(['max' => 1, WOOD => 1])` / `formatCost(['max' => 1])`pass`stables` `actionContext.exactCost`Express sheep market 1 wood, cattle market free, and up to 1 stable.|
+| `D016_WoodenWheyBucket` | Aligned | the reference `formatCost(['max' => 1, WOOD => 1])` / `formatCost(['max' => 1])`pass`stables` `actionContext.exactCost`Express sheep market 1 wood, cattle market free, and up to 1 stable.|
 | `D017_DrillHarrow` | Aligned |  |
 | `D018_SteamPlow` | Aligned |  |
-| `D019_PulverizerPlow` | Accepted difference |BGA banned, but OA retained according to product policy|
+| `D019_PulverizerPlow` | Accepted difference |the reference banned, but OA retained according to product policy|
 | `D020_TurnwrestPlow` | Aligned |The payment for purchasing this card will not be recorded as Turnwrest Plow's own PAID; Wood Expert and other card-purchase Cost Attribution will be attributed to the corresponding source card.|
-| `D021_Recruitment` | Accepted difference |BGA banned, but OA retained according to product policy|
+| `D021_Recruitment` | Accepted difference |the reference banned, but OA retained according to product policy|
 | `D022_WorkPermit` | Aligned |  |
 | `D023_PioneeringSpirit` | Aligned |  |
 | `D024_BrotherlyLove` | Aligned |  |
@@ -1052,7 +1052,7 @@ Status values are `Aligned`, `Accepted difference`, `Needs review`, and `Exclude
 | `D030_ArtisanDistrict` | Aligned |  |
 | `D031_Storeroom` | Aligned |  |
 | `D032_WoodRake` | Aligned |  |
-| `D033_SummerHouse` | Accepted difference |BGA banned, but OA retained according to product policy|
+| `D033_SummerHouse` | Accepted difference |the reference banned, but OA retained according to product policy|
 | `D034_LuxuriousHostel` | Aligned |  |
 | `D035_FodderChamber` | Aligned |  |
 | `D036_BreedRegistry` | Aligned |Use zone-aware hand listener to maintain this card when D36 is in hand/played`boardSheep` / `cardSheep` / `sheepConvertedToFood`; Initialize infobox when buying; No Sheep walks the current animal zones.|
@@ -1091,9 +1091,9 @@ Status values are `Aligned`, `Accepted difference`, `Needs review`, and `Exclude
 | `D069_SmallGreenhouse` | Aligned |  |
 | `D070_StrawManure` | Aligned |  |
 | `D071_Changeover` | Aligned |  |
-| `D072_StableManure` | Aligned |Additional gain selection threshold`computeHarvestSelectionThreshold()`;The selected field increases the count through the Harvest Count modifier, and continues to collect the next stack of the same field after the top stack is empty.`harvestCountApplications`Document the source. #186 "Number of unfenced corrals" is used instead`getUnfencedStableCountForCards`(Includes B85, aligned to BGA`countUnfencedStablesForCards`) |
+| `D072_StableManure` | Aligned |Additional gain selection threshold`computeHarvestSelectionThreshold()`;The selected field increases the count through the Harvest Count modifier, and continues to collect the next stack of the same field after the top stack is empty.`harvestCountApplications`Document the source. #186 "Number of unfenced corrals" is used instead`getUnfencedStableCountForCards`(Includes B85, aligned to the reference`countUnfencedStablesForCards`) |
 | `D073_SupplyBoat` | Aligned |  |
-| `D074_RoyalWood` | Accepted difference |BGA banned, but OA is retained according to product policy; stables payment due to afterHost slot through after-pay provenance statistics|
+| `D074_RoyalWood` | Accepted difference |the reference banned, but OA is retained according to product policy; stables payment due to afterHost slot through after-pay provenance statistics|
 | `D075_WoodField` | Aligned |  |
 | `D076_SocialBenefits` | Aligned |  |
 | `D077_RecycledBrick` | Aligned |  |
@@ -1101,22 +1101,22 @@ Status values are `Aligned`, `Accepted difference`, `Needs review`, and `Exclude
 | `D079_CarrotMuseum` | Aligned |  |
 | `D080_BrickHammer` | Aligned |Use after-improvement judgment instead`getPrintedImprovementResourceCost(..., 'clay')`; `cost`and`altCosts`It is a base cost candidate, take the largest clay, and no longer add minor`cost.clay`and`altCosts[].clay`Add up.|
 | `D081_RoofLadder` | Aligned |Renovation costs 1 reed less and goes sourced mandatory bonus; after.renovate-house still gives 1 stone.|
-| `D082_HuntingTrophy` | Aligned |House Redevelopment's improvement discount goes to the mandatory sourced resource choice; Farm Redevelopment's fence discount goes to the sourced action trade up to a total of 3 wood, retaining the original fence cost and adding BGA`addCost`Discount candidate; fence farm-choice settlement will retain the trade and pass it in`pay:fence`. |
+| `D082_HuntingTrophy` | Aligned |House Redevelopment's improvement discount goes to the mandatory sourced resource choice; Farm Redevelopment's fence discount goes to the sourced action trade up to a total of 3 wood, retaining the original fence cost and adding the reference`addCost`Discount candidate; fence farm-choice settlement will retain the trade and pass it in`pay:fence`. |
 | `D083_Pigswill` | Aligned |  |
 | `D084_FeedPellets` | Aligned |  |
 | `D085_Reader` | Aligned |  |
 | `D086_SheepAgent` | Aligned |Capacity deduction passed`animalHolder`metadata + occupation identity filter; D86 itself is still counted in the capacity, and minor animal-holder is not deducted.|
-| `D087_MasterBuilder` | Aligned | BGA `CONSTRUCT + formatCost(['max'=>1])`Be true`construct` + `exactCost: { max: 1 }`, the room tile will be placed and will no longer be used.`build-farmhand-room`Virtual room.|
-| `D088_Millwright` | Aligned |Use two sequential optional`BonusModifier.choices`Expressed up to 2 times building-resource→grain replacement; applied after unit cost alternative such as A16/C56, retaining BGA combination source; stateless replacement is not set`choiceAffectsState`, can be merged by payment dominance pruning.|
+| `D087_MasterBuilder` | Aligned | the reference `CONSTRUCT + formatCost(['max'=>1])`Be true`construct` + `exactCost: { max: 1 }`, the room tile will be placed and will no longer be used.`build-farmhand-room`Virtual room.|
+| `D088_Millwright` | Aligned |Use two sequential optional`BonusModifier.choices`Expressed up to 2 times building-resource→grain replacement; applied after unit cost alternative such as A16/C56, retaining the reference combination source; stateless replacement is not set`choiceAffectsState`, can be merged by payment dominance pruning.|
 | `D089_Stablehand` | Aligned |  |
 | `D090_PlowMaker` | Aligned |  |
 | `D091_Plowman` | Aligned |  |
-| `D092_ChildOmbudsman` | Accepted difference |BGA banned, but OA retained according to product policy|
+| `D092_ChildOmbudsman` | Accepted difference |the reference banned, but OA retained according to product policy|
 | `D093_SheepInspector` | Aligned |  |
 | `D094_HenpeckedHusband` | Aligned |  |
 | `D095_SiteManager` | Aligned |During the onBuy period, major improvement payment is changed to card-purchase candidate append; for each non-empty subset that already has wood/clay/stone/reed in the current candidate, a "maximum 1 building resource -> 1 food per category" replacement candidate is generated, and the original candidate is retained.|
 | `D096_Furnisher` | Aligned | `actionCardId === D096_Furnisher`The improvement appends the wood-discount candidate; the normal improvement does not produce candidate pipeline output; Furnisher saved wood is recorded after selecting the discount candidate; the wood discounted to 0 does not retain the zero value key.|
-| `D097_BeggingStudent` | Accepted difference |BGA banned, but OA retained according to product policy|
+| `D097_BeggingStudent` | Accepted difference |the reference banned, but OA retained according to product policy|
 | `D098_Transactor` | Aligned |  |
 | `D099_EarthenwarePotter` | Aligned |  |
 | `D100_LordoftheManor` | Aligned |  |
@@ -1140,7 +1140,7 @@ Status values are `Aligned`, `Accepted difference`, `Needs review`, and `Exclude
 | `D118_Bonehead` | Aligned |  |
 | `D119_WoodBarterer` | Aligned |  |
 | `D120_ClayDeliveryman` | Aligned |  |
-| `D121_ClayPlasterer` | Aligned |Clay house fixed 3 clay + 2 reed house building cost sourced`scope:'unit'`trade, retain the original construction cost and add BGA`addCost`Candidate; renovate to clay to take sourced mandatory bonus, fix clay cost to 1.|
+| `D121_ClayPlasterer` | Aligned |Clay house fixed 3 clay + 2 reed house building cost sourced`scope:'unit'`trade, retain the original construction cost and add the reference`addCost`Candidate; renovate to clay to take sourced mandatory bonus, fix clay cost to 1.|
 | `D122_ClayCarrier` | Aligned |  |
 | `D123_RenovationPreparer` | Aligned |  |
 | `D124_Emissary` | Aligned |  |
@@ -1156,7 +1156,7 @@ Status values are `Aligned`, `Accepted difference`, `Needs review`, and `Exclude
 | `D134_OysterEater` | Aligned |Write card-local skip flag after Fishing;`onBeforePlayerTurn`non-flow skip-control consumes synchronously at the entrance of owner's next labor turn|
 | `D135_GardeningHeadOfficial` | Aligned |  |
 | `D136_AnimalActivist` | Aligned |  |
-| `D137_TradeTeacher` | Accepted difference |BGA banned, but OA retained according to product policy|
+| `D137_TradeTeacher` | Accepted difference |the reference banned, but OA retained according to product policy|
 | `D138_PetLover` | Aligned |  |
 | `D139_Chairman` | Aligned |  |
 | `D140_Loudmouth` | Aligned |  |
@@ -1178,7 +1178,7 @@ Status values are `Aligned`, `Accepted difference`, `Needs review`, and `Exclude
 | `D156_RetailDealer` | Aligned |  |
 | `D157_PartyOrganizer` | Aligned |  |
 | `D158_BeanCounter` | Aligned |pass`roundActionOrder` / `getRoundActionSlot()`Determine the real action patterns of rounds 1–8, no longer relying on action definition`roundAvailable`. |
-| `D159_ReedSeller` | Excluded |BGA implemented=false; OA retains data-only definitions|
+| `D159_ReedSeller` | Excluded |the reference implemented=false; OA retains data-only definitions|
 | `D160_Midwife` | Aligned |  |
 | `D161_CabbageBuyer` | Aligned |renovation tracker covers renovate-house and subsequent major/minor improvement; card renovation without worker placement directly gives 3f offer|
 | `D162_ClayFirer` | Aligned |  |
@@ -1187,24 +1187,24 @@ Status values are `Aligned`, `Accepted difference`, `Needs review`, and `Exclude
 | `D165_PigStalker` | Aligned |  |
 | `D166_StableMilker` | Aligned |  |
 | `D167_PureBreeder` | Aligned |  |
-| `D168_Stockman` | Aligned |#186 No. 2/3/4 corral positioning (`nAfter`) use instead`getStableCountForCards`(Includes B85, aligned to BGA`countStablesForCards`); the number of this construction is still`getStableTilesBuiltThisAction`(Reported to #185)|
+| `D168_Stockman` | Aligned |#186 No. 2/3/4 corral positioning (`nAfter`) use instead`getStableCountForCards`(Includes B85, aligned to the reference`countStablesForCards`); the number of this construction is still`getStableTilesBuiltThisAction`(Reported to #185)|
 | `D169_Plowsmith` | Aligned |5+ Product Extension Implementation: After the opponent takes at least 4 wood from the wood accumulation space itself, you can optionally pay 1 food to plow 1 field immediately; including 5/6 Riverbank Forest, non-accumulation source, lower than the threshold or owner has no legal plow tile will not trigger.|
-| `D170_FoldBuilder` | Accepted difference |BGA implemented=false; OA is implemented as a 5+ extension. Register all-player dynamic action space; non-owner pays owner 1 food first, then executes forbid-cancel fence flow and gets 1 sheep; owner does not pay for use.|
-| `D171_SeniorTeacher` | Accepted difference |BGA implemented=false; OA is implemented as a 5+ extension. Monitor opponent Lessons occupation payment`pay.after`,pass`sumActualPaidResource()`according to`paymentSources`Restore the actual food payment; non-Lessons, owner-pay, and non-food replacement will not be triggered. When actually paying for food, the owner will get exactly 1 food.|
+| `D170_FoldBuilder` | Accepted difference |the reference implemented=false; OA is implemented as a 5+ extension. Register all-player dynamic action space; non-owner pays owner 1 food first, then executes forbid-cancel fence flow and gets 1 sheep; owner does not pay for use.|
+| `D171_SeniorTeacher` | Accepted difference |the reference implemented=false; OA is implemented as a 5+ extension. Monitor opponent Lessons occupation payment`pay.after`,pass`sumActualPaidResource()`according to`paymentSources`Restore the actual food payment; non-Lessons, owner-pay, and non-food replacement will not be triggered. When actually paying for food, the owner will get exactly 1 food.|
 | `D172_PutcherMaker` | Aligned |5+ product expansion implementation: metadata-driven anytime exchange, 1 reed -> 2 food, no upper limit each time.|
-| `D173_TownClerk` | Accepted difference |BGA implemented=false; OA is implemented as a 5+ extension. Any player built card`cardCountsAs(..., 'major')`Then put 1 food on the owner card, including`alsoCountsAs: ['major']`minor; ordinary minor does not trigger; cashout reuses shared stored-food helper.|
+| `D173_TownClerk` | Accepted difference |the reference implemented=false; OA is implemented as a 5+ extension. Any player built card`cardCountsAs(..., 'major')`Then put 1 food on the owner card, including`alsoCountsAs: ['major']`minor; ordinary minor does not trigger; cashout reuses shared stored-food helper.|
 | `D174_LoessGardener` | Aligned |5+ product expansion implementation: After Clay Pit collect, you can pay 1 food to buy 1 vegetable.|
-| `D175_Countryman` | Accepted difference |BGA implemented=false; OA is implemented as a 5+ extension. After any player's renovation-providing action space, the owner can choose to sow exactly one field; non-renovation action-space, card-granted non-renovation space disguise or no legal one field sowing will not be triggered.|
-| `D176_Woodshacker` | Accepted difference |BGA implemented=false; OA is implemented as a 5+ extension. In the work phase, if the owner uses wood accumulation for the 1/2 time in this round, he will be given an additional 1/2 clay, which will be counted according to the actual number of uses in this round (reuse of the same space will also count), and will be reset when he returns home.|
+| `D175_Countryman` | Accepted difference |the reference implemented=false; OA is implemented as a 5+ extension. After any player's renovation-providing action space, the owner can choose to sow exactly one field; non-renovation action-space, card-granted non-renovation space disguise or no legal one field sowing will not be triggered.|
+| `D176_Woodshacker` | Accepted difference |the reference implemented=false; OA is implemented as a 5+ extension. In the work phase, if the owner uses wood accumulation for the 1/2 time in this round, he will be given an additional 1/2 clay, which will be counted according to the actual number of uses in this round (reuse of the same space will also count), and will be reset when he returns home.|
 | `D177_Graduate` | Aligned |5+ product extension implementation: when onBuy has 1 food, you are forced to pay 1 food; after the payment is successful, you will get 2 stone + 2 reed. If you cannot pay, the reward will not be triggered.|
-| `D178_SubstituteTeacher` | Accepted difference |BGA implemented=false; OA is implemented as a 5+ extension. Register owner-only action space. The three visible Lessons will be available after they are actually occupied. The reward is 1 building resource or grain+vegetable.|
-| `D179_Bullcatcher` | Accepted difference |BGA implemented=false; OA is implemented as a 5+ extension. Register the owner-only action space. The action spaces corresponding to round slot 3 and round slot 6 are both occupied and the owner still has available workers. After use, you will get 1 cattle + 2 food.|
-| `D180_PartTimeWorker` | Accepted difference |BGA implemented=false; OA is implemented as a 5+ extension. after collect reads the data moved to the player from the accumulation space this time`resource.moved`goods map, exact 2/4/6 respectively can optionally return 1/2/3 goods to the grid and obtain sheep/boar/cattle;`return-to-space`leaf from`resource.moved.from.spaceId`Derive and explicitly carry the charged`targetSpaceId`, card-granted placement will also return to the correct grid when collecting non-outer action grids; mixed resources enumerate all legal return combinations, and are combined with other`return-to-space`Optional flow serial coexistence, subsequent resource return is not included in the trigger.|
-| `E001_PoleBarns` | Aligned | BGA `formatCost([WOOD => 0])`pass`stables` `actionContext.exactCost`Express up to 3 free stables.|
-| `E002_RenovationMaterials` | Aligned | BGA `formatCost([])`pass`renovate-house` `actionContext.exactCost`Expression free renovation to clay.|
+| `D178_SubstituteTeacher` | Accepted difference |the reference implemented=false; OA is implemented as a 5+ extension. Register owner-only action space. The three visible Lessons will be available after they are actually occupied. The reward is 1 building resource or grain+vegetable.|
+| `D179_Bullcatcher` | Accepted difference |the reference implemented=false; OA is implemented as a 5+ extension. Register the owner-only action space. The action spaces corresponding to round slot 3 and round slot 6 are both occupied and the owner still has available workers. After use, you will get 1 cattle + 2 food.|
+| `D180_PartTimeWorker` | Accepted difference |the reference implemented=false; OA is implemented as a 5+ extension. after collect reads the data moved to the player from the accumulation space this time`resource.moved`goods map, exact 2/4/6 respectively can optionally return 1/2/3 goods to the grid and obtain sheep/boar/cattle;`return-to-space`leaf from`resource.moved.from.spaceId`Derive and explicitly carry the charged`targetSpaceId`, card-granted placement will also return to the correct grid when collecting non-outer action grids; mixed resources enumerate all legal return combinations, and are combined with other`return-to-space`Optional flow serial coexistence, subsequent resource return is not included in the trigger.|
+| `E001_PoleBarns` | Aligned | the reference `formatCost([WOOD => 0])`pass`stables` `actionContext.exactCost`Express up to 3 free stables.|
+| `E002_RenovationMaterials` | Aligned | the reference `formatCost([])`pass`renovate-house` `actionContext.exactCost`Expression free renovation to clay.|
 | `E003_TeaTime` | Aligned |  |
 | `E004_Thunderbolt` | Aligned |  |
-| `E005_NightLoot` | Aligned |BGA passing behavior is handled by improvement host action / pay child / activate-card-effect|
+| `E005_NightLoot` | Aligned |the reference passing behavior is handled by improvement host action / pay child / activate-card-effect|
 | `E006_Recount` | Aligned |  |
 | `E007_Pumpernickel` | Aligned |  |
 | `E008_FarmersMarket` | Aligned |  |
@@ -1242,7 +1242,7 @@ Status values are `Aligned`, `Accepted difference`, `Needs review`, and `Exclude
 | `E040_BeeStatue` | Aligned |  |
 | `E041_MuddyWaters` | Aligned |  |
 | `E042_WaterGully` | Aligned |  |
-| `E043_BarnCats` | Aligned |#186 prerequisite (1 stable) and onBuy's "number of corrals you own" are used instead`getStableCountForCards`(Includes B85, aligned to BGA`countStablesForCards`) |
+| `E043_BarnCats` | Aligned |#186 prerequisite (1 stable) and onBuy's "number of corrals you own" are used instead`getStableCountForCards`(Includes B85, aligned to the reference`countStablesForCards`) |
 | `E044_FodderBeets` | Aligned |  |
 | `E045_FruitLadder` | Aligned |  |
 | `E046_WaterlilyPond` | Aligned |  |
@@ -1267,7 +1267,7 @@ Status values are `Aligned`, `Accepted difference`, `Needs review`, and `Exclude
 | `E065_Almsbag` | Aligned |  |
 | `E066_BarnShed` | Aligned |Card Source listener represents migration; session covers opponent forest trigger|
 | `E067_GrainBag` | Aligned |  |
-| `E068_CherryOrchard` | Aligned |Description restore BGA sow/harvest-as-grain semantics, session coverage wood field harvest|
+| `E068_CherryOrchard` | Aligned |Description restore the reference sow/harvest-as-grain semantics, session coverage wood field harvest|
 | `E069_MelonPatch` | Aligned |  |
 | `E070_CropRotationField` | Accepted difference |Accepted Behavior/Product Differences|
 | `E071_CowPatty` | Aligned |Single eligible also uses optional selection, Tada uses precise selectableTiles|
@@ -1287,8 +1287,8 @@ Status values are `Aligned`, `Accepted difference`, `Needs review`, and `Exclude
 | `E085_MasterTanner` | Aligned |  |
 | `E086_PenBuilder` | Aligned |  |
 | `E087_MasterRenovator` | Aligned |  |
-| `E088_MasterFencer` | Aligned | BGA `formatCost([WOOD => 0])`by nested`fencePolicy`The expression pays 2/3 wood for up to 3/4 of the total free fence.|
-| `E089_Stallwright` | Aligned | BGA `formatCost(['max' => 1])`pass`stables` `actionContext.exactCost`Expression; the 2/3/5/7 professional judgment is changed to read the trigger snapshot, and does not rely on the E97 embedded special judgment or the number of live during execution.|
+| `E088_MasterFencer` | Aligned | the reference `formatCost([WOOD => 0])`by nested`fencePolicy`The expression pays 2/3 wood for up to 3/4 of the total free fence.|
+| `E089_Stallwright` | Aligned | the reference `formatCost(['max' => 1])`pass`stables` `actionContext.exactCost`Expression; the 2/3/5/7 professional judgment is changed to read the trigger snapshot, and does not rely on the E97 embedded special judgment or the number of live during execution.|
 | `E090_DungCollector` | Aligned |  |
 | `E091_PlowBuilder` | Aligned |  |
 | `E092_FieldDoctor` | Aligned |  |
@@ -1313,7 +1313,7 @@ Status values are `Aligned`, `Accepted difference`, `Needs review`, and `Exclude
 | `E111_Recluse` | Aligned |  |
 | `E112_GrainThief` | Aligned |start selects grain fields; reap writes via Harvest Count modifier`supply-instead-of-field`tag, end field phase read only`harvestCountApplications`,bring`full-field-reap`The same field of tag does not replenish the grain; the extra count of D72 can continue to harvest the next crop after the E112 supply heap replaces the top grain; at the same time, register the selection threshold modifier to reduce the grain field threshold of A112/D72 to 1; end harvest clears selectedPositions|
 | `E113_Godmother` | Aligned |  |
-| `E114_ShedBuilder` | Aligned |#186 No. 1-4 corral positioning (`nAfter`) use instead`getStableCountForCards`(Includes B85, aligned to BGA`countStablesForCards`); the number of this construction is still`getStableTilesBuiltThisAction`(Reported to #185)|
+| `E114_ShedBuilder` | Aligned |#186 No. 1-4 corral positioning (`nAfter`) use instead`getStableCountForCards`(Includes B85, aligned to the reference`countStablesForCards`); the number of this construction is still`getStableTilesBuiltThisAction`(Reported to #185)|
 | `E115_SeedServant` | Aligned |  |
 | `E116_FirCutter` | Aligned |  |
 | `E117_PipeSmoker` | Aligned |  |
@@ -1326,16 +1326,16 @@ Status values are `Aligned`, `Accepted difference`, `Needs review`, and `Exclude
 | `E124_MayorCandidate` | Aligned |  |
 | `E125_DelayedWayfarer` | Aligned |delayed from-supply`isDoable` / `onAllWorkersPlaced`use`hasInactiveWorkerInSupply`, will not expose the release flow when only removed workers are left.|
 | `E126_TaxCollector` | Aligned |  |
-| `E127_DiligentFarmer` | Aligned | BGA `CONSTRUCT + formatCost(['max'=>1])`Be true`construct` + `exactCost: { max: 1 }`, the room tile will be placed and will no longer be used.`build-farmhand-room`Virtual room.|
+| `E127_DiligentFarmer` | Aligned | the reference `CONSTRUCT + formatCost(['max'=>1])`Be true`construct` + `exactCost: { max: 1 }`, the room tile will be placed and will no longer be used.`build-farmhand-room`Virtual room.|
 | `E128_Saddler` | Aligned |  |
 | `E129_Imitator` | Aligned |  |
 | `E130_Overachiever` | Aligned |The additional improvement triggered by Wish for Children uses a mandatory resource-choice bonus (10 resource choices), which only reduces 1 selected resource at a time; it is no longer treated as 10 stackable optional bonuses.|
 | `E131_MarketMaster` | Aligned |  |
-| `E132_VeggieLover` | Excluded |BGA implemented=false, there is no runtime alignment target in this round|
+| `E132_VeggieLover` | Excluded |the reference implemented=false, there is no runtime alignment target in this round|
 | `E133_ChampionBreeder` | Aligned |  |
 | `E134_Omnifarmer` | Aligned |exist`onAfterHarvest`pass`getHarvestOutcome()`Provide a choice of stored goods based on the actual harvested crops / newborn animals this time; recheck outcome, stored goods and current resources when submitting, and no longer read E84 or live thresholds|
 | `E135_Pickler` | Aligned |  |
-| `E136_AnimalHusbandryWorker` | Aligned | BGA ordinary `FENCING`sub-action mapped to internal`fence` leaf. |
+| `E136_AnimalHusbandryWorker` | Aligned | the reference ordinary `FENCING`sub-action mapped to internal`fence` leaf. |
 | `E137_FlaxFarmer` | Aligned |  |
 | `E138_LivestockExpert` | Aligned |  |
 | `E139_BunnyBreeder` | Aligned |  |
@@ -1349,7 +1349,7 @@ Status values are `Aligned`, `Accepted difference`, `Needs review`, and `Exclude
 | `E147_AnimalDriver` | Aligned |  |
 | `E148_Lazybones` | Aligned |Action space reserved marker go`action-space-tokens`Use|
 | `E149_MidnightFencer` | Aligned |Round 14 harvest start provides optional real borrowed`fence`leaf; donor cap is based on other players' own ordinary reserves, each with a maximum of 2, skipping or building will no longer generate owed-fence bonus VP; borrowing the fence can undo back to E149 optional, but cannot continue to undo through the round-end boundary|
-| `E150_RockBeater` | Aligned |stone house building -2 stone walk sourced`scope:'unit'`trade, retain the original construction cost and add BGA`addCost`Candidates for discounts.|
+| `E150_RockBeater` | Aligned |stone house building -2 stone walk sourced`scope:'unit'`trade, retain the original construction cost and add the reference`addCost`Candidates for discounts.|
 | `E151_DeliveryNurse` | Aligned |  |
 | `E152_BargainHunter` | Aligned |  |
 | `E153_StoneSculptor` | Aligned |  |

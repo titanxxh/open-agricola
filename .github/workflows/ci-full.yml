@@ -11,8 +11,6 @@ jobs:
   full:
     runs-on: ubuntu-latest
     timeout-minutes: 60
-    env:
-      BGA_CDN_BASE_URL: ${{ vars.BGA_CDN_BASE_URL }}
     steps:
       - uses: actions/checkout@v6
 

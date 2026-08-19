@@ -8,7 +8,7 @@ import '../../shared/cards/B/B106_MoralCrusader'
 /**
  * B106 Moral Crusader (verify-only, Sprint 7a F6).
  *
- * BGA `Cards/B/B106_MoralCrusader.php::onPlayerBeforeStartOfTurn`:
+ * The reference `Cards/B/the reference::onPlayerBeforeStartOfTurn`:
  *   foreach (range(getTurn(), 14) as $turn) {
  *     $meeples = Meeples::getResourcesOnCard('turn_' . $turn, $player->getId());
  *     foreach ($meeples as $m) if ($m['type'] in goods) { $futureGoods=true; break 2; }
@@ -18,7 +18,7 @@ import '../../shared/cards/B/B106_MoralCrusader'
  * Our hook (`onBeforeStartOfTurn`) inspects `state.futureMeeples` for entries owned by
  * the player whose `round >= state.round + 1` and whose resources contain at least one
  * positive good. The `state.round` is incremented just before this hook fires (mirror of
- * BGA's pre-round event), so `round + 1` is the first "remaining round space".
+ * The reference's pre-round event), so `round + 1` is the first "remaining round space".
  */
 describe('B106_MoralCrusader session (verify-only)', () => {
   const setup = () => {
@@ -60,7 +60,7 @@ describe('B106_MoralCrusader session (verify-only)', () => {
     const state = session.getState().state
     const player = state.players[0]!
     // Push entry for round 5 — equal to current round, so NOT in the
-    // "remaining" rounds that BGA scans.
+    // "remaining" rounds that the reference scans.
     state.futureMeeples.push({
       id: 'fut-past',
       cardId: 'X',

@@ -19,7 +19,7 @@ const LESSONS_TOKEN_KEY = 'lessonsActionToken'
  * Each time you use a Lessons action space and a cooking improvement on the
  * SAME TURN (one takeAction), you get 1 bonus VP.
  *
- * BGA: 'on the same turn' = within one takeAction (one farmer placement and
+ * Rule: 'on the same turn' = within one takeAction (one farmer placement and
  * its triggered effects), not 'within the same round'. Tracking is per-action
  * via the action snapshot token.
  *

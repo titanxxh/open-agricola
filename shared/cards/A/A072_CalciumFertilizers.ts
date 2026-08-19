@@ -15,7 +15,7 @@ const CARD_ID = 'A072_CalciumFertilizers'
  * planted field (crop !== null && remaining > 0) qualifies. The effect is fully automatic
  * — no player choice needed.
  *
- * BGA reference: A_72_CalciumFertilizers.php — groups adjacent fields and checks for
+ * Reference: groups adjacent fields and checks for
  * single-type groups. Our simpler per-field model means each planted field independently
  * qualifies.
  */
@@ -33,7 +33,7 @@ const listener: CardListenerRegistration = {
     if (plantedFields.length === 0) return
 
     // Fully automatic: add 1 crop to top stack of each planted field.
-    // Skip stone-kind stacks (C6 StoneClearing) — BGA "additional crop"
+    // Skip stone-kind stacks (C6 StoneClearing) — the reference "additional crop"
     // only applies to GRAIN/VEGETABLE.
     for (const field of plantedFields) {
       const top = fieldTopStack(field)

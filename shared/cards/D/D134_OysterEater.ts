@@ -10,7 +10,7 @@ const CARD_ID = 'D134_OysterEater'
  * Each time the Fishing accumulation space is used (by any player), the card owner
  * gets 1 bonus SCORE and must skip placing their next person that round.
  *
- * BGA: onPlayerAfterPlaceFarmer / onOpponentAfterPlaceFarmer on actionCardType Fishing.
+ * Rule: onPlayerAfterPlaceFarmer / onOpponentAfterPlaceFarmer on actionCardType Fishing.
  *  - gainNode(SCORE => 1) to owner
  *  - SPECIAL_EFFECT skipNextPlacement (Globals::setSkipNext)
  *
@@ -21,7 +21,7 @@ const CARD_ID = 'D134_OysterEater'
  *   `cardStates.D134.extraData.skipNextPlacement` (count remaining). The
  *   `onBeforePlayerTurn` hook reads this flag at the start of each labor
  *   turn for the owner, decrements it by 1, and returns `{ skipTurn: true }`
- *   so the engine advances to the next eligible player. Mirrors BGA
+ *   so the engine advances to the next eligible player. Mirrors the reference
  *   `Globals::setSkipNext` consumed in `stLabor()`.
  */
 const listener: CardListenerRegistration = {

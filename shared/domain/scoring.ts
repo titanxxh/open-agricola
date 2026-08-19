@@ -346,7 +346,7 @@ export const computeScores = (state: GameState): PlayerScoreSummary[] => {
   const summaries = state.players.map((player) => {
     const categories: ScoreCategoryResult[] = []
 
-    // BGA PlayerBoard::countLogicalFields(): each `isField: true` card a player
+    // The reference PlayerBoard::countLogicalFields: each `isField: true` card a player
     // has played also counts as 1 field (e.g. D75 Wood Field, E80 Rock Garden,
     // E68 Cherry Orchard, B68 Beanfield, C70 Lettuce Patch, E69 Melon Patch,
     // E70 Crop Rotation Field, E72 Artichoke Field, B113 Patch Caregiver,

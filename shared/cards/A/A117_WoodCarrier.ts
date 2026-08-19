@@ -7,7 +7,7 @@ const cardImpl = {
   effect: {
   id: CARD_ID,
   onBuy: (_state, player) => {
-    // countAllImprovements in BGA = major + minor improvements
+    // countAllImprovements in the reference = major + minor improvements
     const n = player.improvements.length + player.minorPlayed.length
     if (n <= 0) return
     return {

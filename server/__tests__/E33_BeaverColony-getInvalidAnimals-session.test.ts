@@ -5,10 +5,10 @@ import { getCardEffect } from '../../shared/cards/card-effects'
 
 import '../../shared/cards/E/E033_BeaverColony'
 
-// E33 BeaverColony: BGA moved this restriction to PlayerBoard.php main-path
+// E33 BeaverColony: The reference moved this restriction to the reference main-path
 // `getInvalidAnimals`. Our model uses `onComputeAnimalZones` to set cap=0 on
 // the smallest pasture-with-stable, which forces overflow on reorg.
-// We still expose a `getInvalidAnimals` hook (returns []) for parity with BGA
+// We still expose a `getInvalidAnimals` hook (returns []) for parity with the reference
 // per-card method registration; the actual constraint runs via cap-zero.
 describe('E033_BeaverColony getInvalidAnimals', () => {
   const setup = () => {

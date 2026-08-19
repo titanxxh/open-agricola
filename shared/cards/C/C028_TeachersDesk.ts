@@ -10,7 +10,7 @@ const CARD_ID = 'C028_TeachersDesk'
  * "Each time you use the Major Improvement or House Redevelopment action
  * space, you can also play 1 occupation at an occupation cost of 1 food."
  *
- * BGA: isActionCardEvent for MajorImprovement or HouseRedevelopment;
+ * Rule: isActionCardEvent for MajorImprovement or HouseRedevelopment;
  * onPlayerPlaceFarmer → OCCUPATION action with cost [FOOD => 1].
  *
  * In open-agricola: before place-farmer on major-improvement or

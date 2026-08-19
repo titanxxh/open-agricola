@@ -11,7 +11,7 @@ const CARD_ID = 'E049_Twibil'
  * Each time any player builds at least 1 wood room,
  * card owner gets 1 food.
  *
- * BGA: onPlayerAfterBuildRoom — checks if at least 1 wood room was built.
+ * Rule: onPlayerAfterBuildRoom — checks if at least 1 wood room was built.
  *
  * scope 'any' — fires when any player (including owner) builds wood rooms.
  * Cost: 1 stone.

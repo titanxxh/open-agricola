@@ -6,7 +6,7 @@ const CARD_ID = 'D063_Lynchet'
 /**
  * D63 Lynchet (Sprint 7a F7).
  *
- * BGA `Cards/D/D063_Lynchet.php::countFields($event)`:
+ * The reference `Cards/D/the reference::countFields($event)`:
  *   $fields = $player->board()->getHarvestedFieldTilePositions($event['crops']);
  *   foreach ($fields as $field) if (isAdjacentToType($field['x'], $field['y'], roomType)) $n++;
  *

@@ -10,7 +10,7 @@ const CARD_ID = 'C122_Bricklayer'
  * C122 Bricklayer — Each improvement and each renovation cost you 1 clay less.
  * Each room costs you 2 clay less.
  *
- * BGA reference: onPlayerComputeCardCosts (improvements -1 clay),
+ * Reference: onPlayerComputeCardCosts (improvements -1 clay),
  * onPlayerComputeCostsConstruct (rooms -2 clay),
  * onPlayerComputeCostsRenovation (-1 clay).
  */

@@ -14,7 +14,7 @@ const CARD_ID = 'C129_SecondSpouse'
  * You can use the Urgent Wish for Children action space even if it is
  * occupied by the first person another player placed.
  *
- * BGA: onPlayerComputeArgsPlaceFarmer → checkCondition:
+ * Rule: onPlayerComputeArgsPlaceFarmer → checkCondition:
  * - space occupant count ≤ 2
  * - at least one occupant is another player's FIRST placed farmer this round
  * Players: 3+ (deck configuration, no runtime check).

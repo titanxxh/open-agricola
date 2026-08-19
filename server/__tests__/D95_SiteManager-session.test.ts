@@ -136,7 +136,7 @@ describe('D095_SiteManager session', () => {
   })
 
   it('prompts a multi-option payment choice when both direct and bonus paths are affordable', () => {
-    // BGA-aligned behaviour: with four independent optional bonuses the
+    // Behaviour: with four independent optional bonuses the
     // player must pick whether to swap wood/stone/both with food. Joinery
     // costs { wood: 2, stone: 2 }; player stocks enough of everything so
     // the skip-all, swap-wood, swap-stone, and swap-both paths are all

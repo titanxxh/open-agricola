@@ -106,7 +106,7 @@ const payWithEngine = (
   return result
 }
 
-describe('E123_ResourceHoarder use-top-k (BGA full)', () => {
+describe('E123_ResourceHoarder use-top-k (reference full)', () => {
   it('N=2 stack [stone, clay]: emits 3 BonusChoice (k=0/1/2)', () => {
     const player = createPlayer({
       occupationPlayed: [CARD_ID],

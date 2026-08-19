@@ -147,7 +147,7 @@ const scanCardAuthoredCostHacks = () => {
   )
 }
 
-describe('BGA formatCost exact/free cost audit', () => {
+describe('reference formatCost exact/free cost audit', () => {
   it('keeps card-authored exact costs on exactCost/policy paths', () => {
     expect(scanCardAuthoredCostHacks()).toEqual([])
   })

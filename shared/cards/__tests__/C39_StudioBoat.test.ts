@@ -238,7 +238,7 @@ describe('C039_StudioBoat', () => {
   })
 })
 
-describe('C039_StudioBoat prerequisite (BGA: 1 Occupation min)', () => {
+describe('C039_StudioBoat prerequisite (reference: 1 Occupation min)', () => {
   it('declares occupationPrerequisites: { min: 1 }', async () => {
     const { C039_StudioBoat } = await import('../../cards/C/C039_StudioBoat')
     expect(C039_StudioBoat.occupationPrerequisites).toEqual({ min: 1 })

@@ -8,7 +8,7 @@ const CARD_ID = 'A123_FrameBuilder'
  * A123 Frame Builder — Each time you build a room/renovate, but only once per
  * room/action, you can replace exactly 2 CLAY or 2 STONE with 1 WOOD.
  *
- * BGA reference: onPlayerComputeCostsConstruct / Renovation use
+ * Reference: onPlayerComputeCostsConstruct / Renovation use
  *   addBonusChoices([[wood:+1, clay:-2], [wood:+1, stone:-2]], source, optional:true)
  * which expresses "pick at most one of these exchanges per action".
  *
@@ -18,7 +18,7 @@ const CARD_ID = 'A123_FrameBuilder'
  *
  * Renovation: stays a BonusModifier (renovation is single-action, choices
  * are inherently mutually-exclusive per action; the prior shape already
- * matched BGA semantics).
+ * matched reference semantics).
  */
 
 export const A123_FrameBuilder = defineOccupationCard({

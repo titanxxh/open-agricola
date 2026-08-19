@@ -13,7 +13,7 @@ const CARD_ID = 'E116_FirCutter'
  * pig-market, cattle-market) with your 1st/2nd/3rd/4th/5th person,
  * you get 1/1/2/2/3 wood.
  *
- * BGA: onBuy → gain 1 food.
+ * Rule: onBuy → gain 1 food.
  *      isListeningTo → PlaceFarmer on SheepMarket/PigMarket/CattleMarket.
  *      onPlayerAfterPlaceFarmer → map = [null, 1, 1, 2, 2, 3], gain wood[countPlacedFarmers].
  *

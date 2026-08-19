@@ -10,9 +10,9 @@ import '../../shared/cards/D/D063_Lynchet'
 import '../../shared/cards/A/A011_MudPatch'
 
 /**
- * C6 Stone Clearing — full BGA alignment.
+ * C6 Stone Clearing — full the reference alignment.
  *
- * BGA `C006_StoneClearing::onBuy` places 1 STONE meeple on each empty field;
+ * The reference `C006_StoneClearing::onBuy` places 1 STONE meeple on each empty field;
  * those fields are considered planted until the next field-phase reap, where
  * the standard reap path moves the stone to the player's reserve.
  *
@@ -20,7 +20,7 @@ import '../../shared/cards/A/A011_MudPatch'
  * empty `player.fields` entry. No leaf is returned — stone is granted by the
  * reap main path next harvest.
  */
-describe('C006_StoneClearing session (BGA-aligned)', () => {
+describe('C006_StoneClearing session (reference-aligned)', () => {
   const setupWithFields = (fields: Array<{ row: number; col: number; stacks: Array<{ kind: 'grain' | 'vegetable' | 'stone'; remaining: number }> }>) => {
     const session = new GameSession()
     const state = session.getState().state

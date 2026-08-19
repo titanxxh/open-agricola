@@ -11,7 +11,7 @@ const CARD_ID = 'D114_SeedTrader'
 /**
  * D114 Seed Trader (Sprint 7a F5+F6).
  *
- * BGA `Cards/D/D114_SeedTrader.php`:
+ * The reference `Cards/D/the reference`:
  *   onBuy: createResourceInLocation cardId for [GRAIN, GRAIN, VEG, VEG]
  *   isListeningTo: isAnytime && resources-on-card non-empty
  *   onPlayerAtAnytime: XOR (PAY food:2 → take 1 grain) | (PAY food:3 → take 1 veg)

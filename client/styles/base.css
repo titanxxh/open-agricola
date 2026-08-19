@@ -1,18 +1,25 @@
 /* Migrated from client/App.css during UI overhaul Batch 1 (mechanical split, no rewrites). */
 
 @font-face {
-  font-family: 'Dominican';
-  src: url('/bga-img/fonts/Dominican.woff2') format('woff2'),
-       url('/bga-img/fonts/Dominican.woff') format('woff'),
-       url('/bga-img/fonts/Dominican.ttf') format('truetype');
+  font-family: 'Carlito';
+  src: url('/assets/fonts/carlito-latin-400-normal.woff2') format('woff2');
   font-weight: normal;
   font-style: normal;
   font-display: swap;
 }
 @font-face {
-  font-family: 'CalibriB';
-  src: url('/bga-img/fonts/CalibriB.ttf') format('truetype');
+  font-family: 'Carlito';
+  src: url('/assets/fonts/carlito-latin-700-normal.woff2') format('woff2');
   font-weight: bold;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Dominican';
+  src: url('/assets/revised/fonts/Dominican.woff2') format('woff2'),
+       url('/assets/revised/fonts/Dominican.woff') format('woff'),
+       url('/assets/revised/fonts/Dominican.ttf') format('truetype');
+  font-weight: normal;
   font-style: normal;
   font-display: swap;
 }

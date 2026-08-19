@@ -14,7 +14,7 @@ const CARD_ID = 'E144_WaresSalesman'
  * turn building resources into food, the card owner gets 1 of the corresponding
  * building resource and 1 reed (from the general supply).
  *
- * BGA uses a hardcoded grouping of cards to building resources (the card itself
+ * The reference uses a hardcoded grouping of cards to building resources (the card itself
  * does not always have that resource in its cost). Some cards belong to
  * multiple groups; in that case the owner chooses via xor.
  */

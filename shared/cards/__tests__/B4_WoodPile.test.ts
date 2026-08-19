@@ -43,7 +43,7 @@ const makeState = (player: PlayerState): GameState =>
   }) as unknown as GameState
 
 describe('B004_WoodPile onBuy', () => {
-  it('grants wood equal to count of accumulation spaces with my farmer (BGA)', () => {
+  it('grants wood equal to count of accumulation spaces with my farmer (reference)', () => {
     const player = makePlayer('p1')
     const state = makeState(player)
     const flow = runCardEffectHook(state, player, CARD_ID, 'onBuy')

@@ -11,13 +11,13 @@ const CARD_ID = 'C112_Thresher'
  * Before using Grain Utilization, Farmland, or Cultivation, you can
  * optionally buy 1 grain for 1 food.
  *
- * BGA `C112_Thresher::onPlayerPlaceFarmer` (PlaceFarmer event on Farmland /
+ * The reference `C112_Thresher::onPlayerPlaceFarmer` (PlaceFarmer event on Farmland /
  * GrainUtilization / Cultivation) returns an optional SEQ(pay 1 food, gain 1
  * grain) — i.e. the player exchanges food → grain so they can sow even when
  * starting with 0 grain. We mirror it as a `before` listener on the three
  * trigger space IDs, returning an optional `payGainNode({ food → grain })`.
  *
- * BGA `C112_Thresher::onPlayerIsDoable` flips doability for SOW / EXCHANGE
+ * The reference `C112_Thresher::onPlayerIsDoable` flips doability for SOW / EXCHANGE
  * to true when the player can pay 1 food (so the action card itself does not
  * appear undoable on a board with sow as its only inner option). Mirror it
  * as an `isDoable` listener on `sow` (we do not currently model EXCHANGE as

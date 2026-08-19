@@ -5,7 +5,7 @@ import { getCardEffect } from '../../shared/cards/card-effects'
 
 import '../../shared/cards/E/E036_HerbalGarden'
 
-// E36 HerbalGarden: BGA moved this restriction to PlayerBoard.php main path.
+// E36 HerbalGarden: The reference moved this restriction to the reference main path.
 // We enforce via `onComputeAnimalZones` blocking one pasture (cap=0). Hook
 // returns [] for parity.
 describe('E036_HerbalGarden getInvalidAnimals', () => {

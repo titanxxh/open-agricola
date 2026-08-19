@@ -95,7 +95,7 @@ describe('A92 alternation probe (session)', () => {
     expect(hasPendingExtraTurn(loaded, lp0)).toBe(true)
 
     // From P1's seat the rotation now STOPS on P0 (owed an extra turn) instead
-    // of skipping it — the BGA pull behaviour. From P0's own seat the walk still
+    // of skipping it — the reference pull behaviour. From P0's own seat the walk still
     // advances to P1, who has an ordinary worker available.
     expect(nextSeatedPlayerIdx(loaded, loaded.players, 1)).toBe(0)
     expect(nextSeatedPlayerIdx(loaded, loaded.players, 0)).toBe(1)

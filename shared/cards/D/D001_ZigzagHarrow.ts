@@ -13,16 +13,16 @@ const DIR_DELTA: Record<Dir, { dr: number; dc: number }> = {
   S: { dr: 1, dc: 0 },
 }
 
-// BGA traverses neighbors in W → N → E → S → W (W repeated so the
+// The reference traverses neighbors in W → N → E → S → W (W repeated so the
 // S↔W pair also closes an L corner). See PlayerBoard.php::zigzag.
 const DIR_RING: Dir[] = ['W', 'N', 'E', 'S', 'W']
 
 /**
- * Port of BGA `PlayerBoard::zigzag()`. For every existing field, walk the
+ * Port of the reference `PlayerBoard::zigzag`. For every existing field, walk the
  * 4 neighbors in a ring (W→N→E→S→W). Whenever two consecutive ring steps
  * land on fields (i.e. the field sits at an L corner), the two opposite-diagonal
  * tiles relative to the current corner are added to the zigzag candidate set.
- * BGA does NOT restrict candidates to in-bounds / unoccupied tiles — neither
+ * The reference does NOT restrict candidates to in-bounds / unoccupied tiles — neither
  * do we (matches buyable behavior exactly; plow validation rejects unusable
  * targets later).
  */
@@ -57,7 +57,7 @@ export const computeZigzagCandidates = (player: PlayerState): FarmTilePosition[]
         continue
       }
       if (aroundFields === 1) {
-        // BGA grid step 2 == one OA tile. (x±2, y±2) → (row±1, col±1).
+        // The reference grid step 2 == one OA tile. (x±2, y±2) → (row±1, col±1).
         if (dir === 'N' || dir === 'S') {
           addCandidate(field.row + 1, field.col - 1)
           addCandidate(field.row - 1, field.col + 1)

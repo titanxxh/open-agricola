@@ -88,12 +88,11 @@ GAME_BUILD_ID=
 
 ```bash
 REPLAY_VIEWER_ROOT="$PWD/data/replay-viewers" \
-BGA_CDN_BASE_URL="https://x.boardgamearena.net/data/themereleases/current/games/agricola/<version>/img" \
 pnpm run build:replay-viewer
 # stdout 最后一行是 REPLAY_VIEWER_BUILD_ID
 ```
 
-`BGA_CDN_BASE_URL` 与主站构建使用同一仓库变量。命令只把 Viewer 代码、样式和卡牌 manifest 写入独立只读 Build，BGA 棋盘图、卡图和字体直接读取 CDN，不进入持久卷。发布仍生成逐文件 SHA-256 清单，以清单本身的 SHA-256 作为目录名，并在发布后重新校验完整目录；已存在的同 ID 目录不会覆盖。
+命令只把 Viewer 代码、样式和卡牌 manifest 写入独立只读 Build，棋盘图、卡图和字体从固定的素材仓 commit 读取，不进入持久卷。发布仍生成逐文件 SHA-256 清单，以清单本身的 SHA-256 作为目录名，并在发布后重新校验完整目录；已存在的同 ID 目录不会覆盖。
 
 `docker-compose.prod.yml` 使用 `app-data:/app/data` named volume。保持 `REPLAY_NEW_ROOMS_ENABLED=false` 启动一次后，把 Build 追加进去，再启用录制：
 
@@ -416,7 +415,6 @@ docker compose logs -f app
 |----------|---|------|
 | `VITE_API_BASE` | 后端完整 URL | `https://api.your-domain.com` 或 `http://VPS_IP:5175`（仅 HTTP 方案） |
 | `VITE_WS_BASE` | WebSocket URL（可选，自动推导） | `wss://api.your-domain.com/ws` |
-| `BGA_CDN_BASE_URL` | BGA 图片 CDN 根地址 | 与 `.env.example` 保持一致 |
 | `VITE_SANDBOX_EXECUTOR` | 工坊试玩沙盒执行器（可选） | `browser` = 试玩全程在浏览器本地运行（引擎 Worker + 本地编译，零服务器参与）；缺省 / 其他值 = 走服务端 `/api/game/new-sandbox` |
 
 ### 触发部署
@@ -596,7 +594,6 @@ https://<backend-origin>/api/auth/oauth/google/callback
 |------|--------|------|
 | `VITE_API_BASE` | `''`（空=同源） | 后端 API 地址 |
 | `VITE_WS_BASE` | 从 API_BASE 推导 | WebSocket 地址 |
-| `BGA_CDN_BASE_URL` | — | 主站与 Replay Viewer 构建共用的 BGA 图片 CDN 根地址 |
 | `PUBLIC_ASSET_LOCAL_DIR` | — | 仅本地开发：完整图片仓 checkout；设置后禁止远端混用或回退 |
 
 ---
@@ -624,7 +621,7 @@ https://<backend-origin>/api/auth/oauth/google/callback
 ### 卡牌图片不显示
 
 - 不影响游戏功能，仅影响显示
-- 确认 BGA 图片目录存在且路径正确
+- 确认 `public-assets.ref` 指向已发布的素材仓 commit，且 `public-assets.required.json` 列出了所有需要的路径
 
 ### 数据备份
 

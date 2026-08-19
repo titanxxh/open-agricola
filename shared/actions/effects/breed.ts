@@ -157,7 +157,7 @@ export const breedAction: ActionDefinition = {
     if (breedSummary.animalCount > 0) {
       return { type: 'ok' }
     }
-    // BGA: in round 14 (last harvest), some cards (B104 SheepWalker, B35
+    // Rule: in round 14 (last harvest), some cards (B104 SheepWalker, B35
     // HookKnife, A153 PigOwner, ...) force a reorg even with no newborn so the
     // engine has a chance to evict mis-placed animals. Edge-case path —
     // returning 'request' here skips the `after` hooks, but round 14 is the

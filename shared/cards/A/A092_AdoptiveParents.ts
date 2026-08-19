@@ -15,7 +15,7 @@ const FORFEITED_KEY = 'forfeitedThisRound'
  * For 1 food, an offspring (Newborn) may take an action in the round it is born;
  * once it does, it no longer counts as "newborn".
  *
- * BGA models this as a pull / strict-alternation effect with two entry points,
+ * Modelled as a pull / strict-alternation effect with two entry points,
  * both gated by the same `adoptiveAvailable` predicate:
  *
  *  - Capability A (anytime grow-only): while the player still has an ordinary
@@ -35,7 +35,7 @@ const FORFEITED_KEY = 'forfeitedThisRound'
  *      forfeit: mark the card forfeited for this round and rotate past — avoids
  *               an infinite loop. Cleared at round start so it is usable again.
  *
- * Availability (single source of truth, mirrors BGA `hasAdoptiveAvailable`):
+ * Availability (single source of truth, mirrors the reference `hasAdoptiveAvailable`):
  * holds offspring (`newbornCount > 0`), not forfeited this round, and can afford
  * the 1-food cost. There is no per-round limit: promoting decrements
  * `newbornCount`, so N offspring grant N activations (each paying 1 food). When

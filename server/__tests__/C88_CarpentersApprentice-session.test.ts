@@ -241,7 +241,7 @@ const fenceDoable = (player: PlayerState, state = {} as GameState): boolean => {
   return (result as { doable?: boolean } | void)?.doable === true
 }
 
-describe('C88 — fenceIsDoableListener 精确 BGA doability', () => {
+describe('C88 — fenceIsDoableListener 精确 reference doability', () => {
   it('before 12,wood 0 → doable(第 13-15 全免费)', () => {
     expect(fenceDoable(makeFencePlayer(12, 0))).toBe(true)
   })

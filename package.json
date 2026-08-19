@@ -46,8 +46,6 @@
     "smoke:aihubmix": "tsx scripts/aihubmix-smoke-test.ts",
     "smoke:aihubmix:image": "tsx scripts/aihubmix-smoke-test.ts --image-only",
     "smoke:gemini:image": "tsx scripts/aihubmix-smoke-test.ts --image-only --image-provider=gemini --image-model=gemini-2.5-flash-image",
-    "sync-bga-cdn": "tsx scripts/sync-bga-cdn-github-var.ts",
-    "probe-bga-cdn": "tsx scripts/sync-bga-cdn-github-var.ts --probe-only",
     "generate:register-all": "tsx scripts/generate-register-all.ts",
     "check:generated-cards-sync": "tsx scripts/check-generated-cards-sync.ts",
     "check:community-deck": "pnpm exec vitest run --project fast-cards --project fast-server shared/cards/community/__tests__ server/workshop-pr/__tests__",

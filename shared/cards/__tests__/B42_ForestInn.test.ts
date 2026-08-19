@@ -4,7 +4,7 @@ import { meetsCardPrerequisites } from '../helpers/prerequisites'
 import type { PlayerState } from '../../contract/types'
 
 describe('B042_ForestInn definition', () => {
-  it('declares maxRound: 6 (BGA isBuyable refuses turn > 6)', () => {
+  it('declares maxRound: 6 (reference isBuyable refuses turn > 6)', () => {
     expect(B042_ForestInn.maxRound).toBe(6)
   })
 

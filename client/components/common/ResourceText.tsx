@@ -1,14 +1,14 @@
 import { Fragment, type Key, type ReactNode } from 'react'
 
 /**
- * Renders card description text with inline resource icons and BGA-style
+ * Renders card description text with inline resource icons and
  * markup. Three token kinds are recognised:
  *
  *   `<TAG>`     — resource / arrow / action sprite (see `RESOURCE_TAGS`)
- *   `[text]`    — section label, rendered as an italic block (BGA's
+ *   `[text]` — section label, rendered as an italic block (the reference's
  *                 `formatStringMeeples` `<span class="text">…</span>`).
  *   `__text__`  — italic emphasis used for in-line action references
- *                 (BGA's `<span class="action-card-name-reference">…</span>`).
+ *                 (the reference's `<span class="action-card-name-reference">…</span>`).
  *
  * Tokens may nest — e.g. `[__Bake Bread__ action:]` becomes a labelled
  * block whose `Bake Bread` portion is additionally emphasised.
@@ -41,7 +41,7 @@ const RESOURCE_TAGS: Record<string, string> = {
   'ARROW-2X': 'arrow-2x',
 
   // ── Action / farm iconography ──
-  BAKE: 'bake', // BGA meeple-bake: bread-baking action icon
+  BAKE: 'bake', // The reference meeple-bake: bread-baking action icon
   FIELD: 'field',
   FOREST: 'forest',
   MOOR: 'moor',

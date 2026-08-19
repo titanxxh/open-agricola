@@ -8,7 +8,7 @@ const CARD_ID = 'A087_Conservator'
 /**
  * A87 Conservator — Occupation.
  *
- * BGA effect: when you take a Renovation action, you may renovate your wooden
+ * Effect: when you take a Renovation action, you may renovate your wooden
  * house directly into a stone house, paying the stone-tier cost (1 stone + 1
  * reed per room) and skipping the clay tier entirely. Otherwise the action
  * resolves as a normal renovation.

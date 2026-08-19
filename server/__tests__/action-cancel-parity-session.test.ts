@@ -38,7 +38,7 @@ const takeFarmlandAndPlowBaseField = (session: GameSession) => {
   return resp
 }
 
-describe('action cancel BGA parity session regressions', () => {
+describe('action cancel parity session regressions', () => {
   it('B19 optional plow can be skipped through parent __skip__ without popping stack', () => {
     const session = setupB19()
     const resp = takeFarmlandAndPlowBaseField(session)

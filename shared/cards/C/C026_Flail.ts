@@ -12,7 +12,7 @@ const CARD_ID = 'C026_Flail'
  * the Farmland or Cultivation action space, you can also take a Bake Bread
  * action."
  *
- * BGA: onBuy → gainNode(FOOD => 2); listens to Farmland and Cultivation
+ * Rule: onBuy → gainNode(FOOD => 2); listens to Farmland and Cultivation
  * action-card events; onPlayerPlaceFarmer offers optional EXCHANGE with
  * trigger=BREAD (a Bake Bread action).
  *

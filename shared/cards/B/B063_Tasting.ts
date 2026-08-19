@@ -10,7 +10,7 @@ const CARD_ID = 'B063_Tasting'
  * B63 Tasting — Each time you use a Lessons action space, before paying the
  * occupation cost, you can exchange 1 GRAIN for 4 FOOD.
  *
- * BGA (B063_Tasting.php): isActionCardEvent($event, 'Lessons') → onPlayerPlaceFarmer
+ * Rule: isActionCardEvent($event, 'Lessons') → onPlayerPlaceFarmer
  * returns payGainNode([GRAIN => 1], [FOOD => 4]).
  *
  * We trigger on the 'before' phase of place-farmer on a Lessons space so the

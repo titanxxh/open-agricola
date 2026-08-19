@@ -18,7 +18,7 @@ const FIELD_EFFECT = 'lumber-pile-return-stables'
  *   to their supply (normal stables OR the B85 FarmHand stable). Each
  *   returned stable grants 3 WOOD.
  *
- * BGA (E076_LumberPile.php): optional returnStables → max 3 stables
+ * Rule: optional returnStables → max 3 stables
  * (including the FarmHand stable), then gainNode(WOOD => 3 * count).
  * Candidate listing + removal dispatch go through the shared
  * `stable-removal` helper so this card stays agnostic of the FarmHand

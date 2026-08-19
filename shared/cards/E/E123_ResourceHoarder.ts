@@ -14,7 +14,7 @@ const CARD_ID = 'E123_ResourceHoarder'
  * Player can use the top item(s) when building a room, playing/building
  * an improvement, or renovating. Using top items reduces the cost.
  *
- * BGA: onBuy places the stack, then computeCosts listeners offer "use top k"
+ * Rule: onBuy places the stack, then computeCosts listeners offer "use top k"
  * as bonus choices, and afterPay removes the used items.
  *
  * Simplified: on buy, store the stack in card state. Provide a computeCosts
@@ -38,7 +38,7 @@ const updateInfobox = (player: Parameters<typeof writeCardInfobox>[0]) => {
  * computeCosts listener: for construct, improvement-any, minor-improvement, and renovate,
  * offer use-top-k discounts (k=0..N) as a single Bonus with N+1 BonusChoice entries.
  *
- * BGA full alignment (Sprint 7b1 Task 2.9): k=0 means "skip" (zero discount),
+ * The reference full alignment (Sprint 7b1 Task 2.9): k=0 means "skip" (zero discount),
  * k=N means "use the entire stack". The afterPay listener pops the chosen
  * count from the top of the stack via `bonusChoiceIndex[CARD_ID]`.
  */

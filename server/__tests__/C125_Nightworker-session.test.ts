@@ -8,7 +8,7 @@ import type { ActionFlow } from '../../shared/contract/types'
 
 const CARD_ID = 'C125_Nightworker'
 
-describe('C125_Nightworker session — BGA-aligned place-farmer flow', () => {
+describe('C125_Nightworker session — place-farmer flow', () => {
   const setupSession = () => {
     const session = new GameSession()
     const state = session.getState().state

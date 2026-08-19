@@ -51,7 +51,7 @@ const setup = (options?: {
 
 describe('B113 PatchCaregiver — cardField bug fix (4 crops)', () => {
   it.each(['grain', 'vegetable', 'wood', 'stone'] as const)(
-    'allows sowing %s on virtual tile (BGA constraints=null)',
+    'allows sowing %s on virtual tile (reference constraints=null)',
     (crop) => {
       const session = setup({ resources: { [crop]: 2 } })
       const resp = session.takeAction(0, 'grain-utilization')

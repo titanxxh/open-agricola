@@ -1,6 +1,6 @@
 import { defineMinorCard } from '../card-source'
 /**
- * BGA: 3-grain trade gives +1 bonus VP, 5-grain trade gives +2 bonus VP.
+ * Rule: 3-grain trade gives +1 bonus VP, 5-grain trade gives +2 bonus VP.
  * Implemented via per-trade `sideEffect: { type: 'bonusVp', amount: N }` —
  * the engine accumulates amount × times into
  * `cardStates[B032_Kettle].extraData.bonusVpEarned` and `computeBonusScore`

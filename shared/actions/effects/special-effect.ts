@@ -492,7 +492,7 @@ export const specialEffectAction: ActionDefinition = {
       case 'remove-field-crop': {
         // Used by C57 Crudite-style "discard 1 crop on top of another" effects.
         // Picks the FIRST player field that has the crop with at least
-        // `minRemaining` left (default 2 — the BGA "stacked on another"
+        // `minRemaining` left (default 2 — the reference "stacked on another"
         // semantics) and decrements its top stack by 1. No-op if no field
         // qualifies.
         const minRem = p.minRemaining ?? 2

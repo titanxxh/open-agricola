@@ -6,7 +6,7 @@ const CARD_ID = 'B104_SheepWalker'
 const cardImpl = {
   effect: {
     id: CARD_ID,
-    // Mirrors BGA `B104_SheepWalker::enforceReorganizeOnLastHarvest`. Forces
+    // Mirrors the reference `B104_SheepWalker::enforceReorganizeOnLastHarvest`. Forces
     // a reorg interaction (request.kind === 'animal-reorg') on the round-14
     // harvest when at least one sheep is anywhere on the farm so the player
     // has a final chance to evict / accommodate sheep before scoring (the

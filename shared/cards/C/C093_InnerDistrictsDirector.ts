@@ -11,7 +11,7 @@ const CARD_ID = 'C093_InnerDistrictsDirector'
  * Each time you use Forest or Clay Pit, place 1 STONE from the general supply
  * on the other space. If you do, you can immediately place another person.
  *
- * BGA: After PlaceFarmer on Forest → place 1 stone on Clay Pit (and vice versa),
+ * Rule: After PlaceFarmer on Forest → place 1 stone on Clay Pit (and vice versa),
  * then optionally place another farmer.
  */
 const PAIRED_SPACE: Record<string, string> = {

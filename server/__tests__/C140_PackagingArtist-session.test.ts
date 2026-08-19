@@ -76,7 +76,7 @@ describe('C140_PackagingArtist session', () => {
     expect((flow as Extract<ActionFlow, { type: 'leaf' }>).sourceCard).toBe(CARD_ID)
   })
 
-  // BGA: computeReplaceImprovement returns bakeBreadNode — minor-improvement
+  // Rule: computeReplaceImprovement returns bakeBreadNode — minor-improvement
   // action is REPLACED by bake-bread (not "alongside"). Implementation uses a
   // computeReplace listener with `decline + alternativeFlow: bake-bread leaf`.
   it('computeReplace replaces minor-improvement with bake-bread (decline + alternativeFlow)', () => {
@@ -123,7 +123,7 @@ describe('C140_PackagingArtist session', () => {
     expect(result).toBeUndefined()
   })
 
-  // BGA: onPlayerIsDoable forces minor-improvement to be doable when player
+  // Rule: onPlayerIsDoable forces minor-improvement to be doable when player
   // has any "real" minor action context (the card replaces it with bake-bread,
   // which is always doable as long as the player can bake — the listener
   // returns `doable: true` so the underlying minor-improvement action stays

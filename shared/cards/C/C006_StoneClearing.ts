@@ -2,7 +2,7 @@ import { defineMinorCard } from '../card-source'
 /**
  * C6 Stone Clearing — Minor Improvement
  *
- * BGA `C006_StoneClearing::onBuy` places 1 STONE meeple on each empty field
+ * The reference `C006_StoneClearing::onBuy` places 1 STONE meeple on each empty field
  * (Meeples::createResourceInLocation), making the field count as "planted"
  * with stone. The next field-phase harvest yields 1 stone per such field
  * by reaping the field's top stack.

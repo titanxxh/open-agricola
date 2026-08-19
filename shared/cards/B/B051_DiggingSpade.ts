@@ -10,7 +10,7 @@ const CARD_ID = 'B051_DiggingSpade'
  * B51 Digging Spade — Each time you use a clay accumulation space,
  * you also get a number of FOOD equal to the number of PIG (boar) in your farmyard.
  *
- * BGA (B051_DiggingSpade.php): isBeforeCollectEvent($event, CLAY) → onPlayerPlaceFarmer
+ * Rule: isBeforeCollectEvent($event, CLAY) → onPlayerPlaceFarmer
  * returns gainNode([FOOD => pigs]). Play-in-round-7-or-later is enforced via isBuyable
  * which we mirror via the inline `prerequisiteCheck` field below.
  */
@@ -43,7 +43,7 @@ const listener: CardListenerRegistration = {
 }
 
 const cardImpl = {
-  // BGA isBuyable: turn < 7 → false.
+  // The reference isBuyable: turn < 7 → false.
   prerequisiteCheck: (_player, state) => {
     if (!state) return true
     return state.round >= 7

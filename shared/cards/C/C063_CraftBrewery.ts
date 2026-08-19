@@ -3,7 +3,7 @@ import { defineMinorCard } from '../card-source'
  * C63 Craft Brewery — In the feeding phase of each harvest, exchange 1 grain
  * from supply + 1 grain from a field for 4 food + 2 bonus VP.
  *
- * BGA `onPlayerHarvestFeedingPhase`:
+ * The reference `onPlayerHarvestFeedingPhase`:
  *   - 1 grain field: SE eatSingleFieldGrain + payGain.
  *   - 2+ grain fields: SE eatFieldGrain prompts player to pick which field.
  *

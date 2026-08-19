@@ -15,7 +15,7 @@ const CARD_ID = 'A130_MummysBoy'
  * Once per round, when placing a person after your first two, you can place it on the
  * action space with your 2nd person and use that space again (unless Meeting Place).
  *
- * BGA:
+ * Rule:
  * - StartOfTurn → unflag
  * - After place-farmer: if countPlacedFarmers >= 3 and farmer lands on 2nd farmer's space → flag
  * - computeArgs: if countPlacedFarmers >= 2 and not flagged, add 2nd farmer's space as option

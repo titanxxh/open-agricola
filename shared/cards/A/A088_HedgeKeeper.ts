@@ -2,7 +2,7 @@ import { defineOccupationCard } from '../card-source'
 import type { TradeModifier } from '../../contract/types'
 import type { CardImpl } from '../registry'
 
-/** BGA-style: up to 3× "pay 0 to cover 1 wood" fence units (see `addCost` in bga-agricola A088_HedgeKeeper.php). */
+/** Up to 3× "pay 0 to cover 1 wood" fence units. */
 
 export const A088_HedgeKeeper = defineOccupationCard({
   meta: {

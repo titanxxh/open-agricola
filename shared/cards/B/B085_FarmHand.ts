@@ -20,7 +20,7 @@ const POSITION_KEY = 'position'
  *  stable in the center of the 2×2 during a __Build Stables__ action.
  *  This stable provides room for a person but not animals."
  *
- * BGA rulings:
+ * The reference rulings:
  *   - Only during the exact Build Stables action reached from Farm
  *     Expansion (NOT Lazybones E148 / Stable Planner A089 / Stable
  *     Cleaner C94 / any other "build a stable" effect). The entry is

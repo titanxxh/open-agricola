@@ -18,7 +18,7 @@ const USED_ACTION_TOKEN_KEY = 'usedActionToken'
  * Each time you build at least 1 room and at least 1 stable on the same turn,
  * you also get 1 sheep/pig/cattle depending on room type (wood/clay/stone).
  *
- * BGA:
+ * Rule:
  * - onBuy: check if room+stable built same turn → grant livestock
  * - afterConstruct: if stables also built this turn → grant livestock (by room type)
  * - afterStables: if rooms also built this turn → grant livestock (by room type)

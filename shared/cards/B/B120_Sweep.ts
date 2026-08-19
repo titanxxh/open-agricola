@@ -9,11 +9,11 @@ const CARD_ID = 'B120_Sweep'
  * B120 Sweep — Each time before you use the action space above the most recent
  * round 1-14 action space, you get 2 CLAY.
  *
- * BGA (B120_Sweep.php): Listens to all action-card PlaceFarmer events, then
+ * Rule: Listens to all action-card PlaceFarmer events, then
  * compares the played actionCardId to ActionCard::getAboveSpaceForRound($turn).
  * Triggers on the 'before' phase so the clay can make the space affordable.
  *
- * BGA mapping of round -> above-space:
+ * The reference mapping of round -> above-space:
  *   5 -> turn-2's round card
  *   6 -> turn-3
  *   7 -> turn-4

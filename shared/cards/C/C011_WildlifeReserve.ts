@@ -18,7 +18,7 @@ const cardImpl = {
       })
     },
     /**
-     * BGA `Cards/C/C011_WildlifeReserve.php::getInvalidAnimals`:
+     * The reference `Cards/C/the reference::getInvalidAnimals`:
      * counter per type; if same type appears more than once → invalid.
      * Mirrors the per-type cap of 1 sheep + 1 pig + 1 cattle.
      */

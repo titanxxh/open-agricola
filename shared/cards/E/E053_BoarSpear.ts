@@ -152,7 +152,7 @@ export const E053_BoarSpear = defineMinorCard({
     vp: 1,
     cost: { wood: 1, stone: 1 },
     exchanges: [
-        // Sprint 6b: Aligned to BGA — listener-only. The trade is invocable only
+        // Sprint 6b: Aligned to the reference — listener-only. The trade is invocable only
         // via the `obtainListener` SEQ above (which dispatches `exchange` with
         // `tradeIds: ['E053_BoarSpear']`); it is intentionally NOT surfaced in the
         // anytime cookery window (`triggers: []`).

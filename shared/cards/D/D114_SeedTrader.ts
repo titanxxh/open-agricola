@@ -9,14 +9,14 @@ const CARD_ID = 'D114_SeedTrader'
 /**
  * D114 Seed Trader (Sprint 7a F5+F6).
  *
- * BGA `Cards/D/D114_SeedTrader.php`:
+ * The reference `Cards/D/the reference`:
  *   onBuy: createResourceInLocation cardId for [GRAIN, GRAIN, VEG, VEG]
  *   isListeningTo: isAnytime && resources-on-card non-empty
  *   onPlayerAtAnytime: XOR (PAY food:2 → take 1 grain from card) | (PAY food:3 → take 1 veg from card)
  *
  * We mirror via card-stored counters (grain/vegetable on cardStates), with anytime
  * emitting an XOR over (pay 2 food → take-from-card grain:1) and (pay 3 food →
- * take-from-card vegetable:1). No once-per-round limit (BGA has none).
+ * take-from-card vegetable:1). No once-per-round limit (the reference has none).
  */
 const anytimeListener: CardListenerRegistration = {
   id: 'D114-seed-trader-anytime',

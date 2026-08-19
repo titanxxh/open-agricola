@@ -123,7 +123,7 @@ describe('PlayerCard dual-type rendering (alsoCountsAs)', () => {
     )
 
     expect(html).toContain(publicAssetUrl('/assets/player56/A169.png'))
-    expect(html).not.toContain('/bga-img/deckA/A169.png')
+    expect(html).not.toContain('/assets/revised/deckA/A169.png')
     expect(html).toContain('data-n="5+"')
   })
 
@@ -133,7 +133,7 @@ describe('PlayerCard dual-type rendering (alsoCountsAs)', () => {
     )
 
     expect(html).toContain(publicAssetUrl('/assets/player56/B180.png'))
-    expect(html).not.toContain('/bga-img/deckB/B180.png')
+    expect(html).not.toContain('/assets/revised/deckB/B180.png')
   })
 
   it('renders globally registered custom cards even though they are absent from the static manifest', () => {
@@ -192,7 +192,7 @@ describe('PlayerCard dual-type rendering (alsoCountsAs)', () => {
     expect(html).toContain('中文前置条件')
     expect(html).not.toContain('English description.')
     expect(html).toContain(`${base}card-art/community/CUSTOM_LocalisedCard.webp`)
-    expect(html).not.toContain('/bga-img/')
+    expect(html).not.toContain('/assets/revised/')
     // `cover` would crop a non-square image against the ~0.95:1 icon box.
     expect(html).toContain('background-size:contain')
   })
@@ -237,7 +237,7 @@ describe('PlayerCard dual-type rendering (alsoCountsAs)', () => {
     )
 
     expect(html).not.toContain('attacker.example')
-    expect(html).toContain('/bga-img/')
+    expect(html).toContain('/assets/revised/')
   })
 
   it('renders C54 stable printed cost from card metadata', async () => {
@@ -330,7 +330,7 @@ describe('PlayerCard dual-type rendering (alsoCountsAs)', () => {
     expect(html).toContain(`class="card-score">${vp}</div>`)
   })
 
-  it('renders Moor major printed marker icons from BGA category sprite metadata', () => {
+  it('renders Moor major printed marker icons from reference category sprite metadata', () => {
     const html = renderToStaticMarkup(
       <PlayerCard locale="en" cardId="Major_Moor_MuseumOfTheMoors" cardType="major" />,
     )

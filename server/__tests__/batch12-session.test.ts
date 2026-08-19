@@ -460,7 +460,7 @@ describe('A082_WorkCertificate session', () => {
     expect(totalGained).toBeGreaterThanOrEqual(0)
   })
 
-  it('decrements the source accumulation space when a resource is taken (BGA partial-take parity)', () => {
+  it('decrements the source accumulation space when a resource is taken (reference partial-take parity)', () => {
     const session = setup()
     const s = session.getState().state
 
@@ -532,7 +532,7 @@ describe('A082_WorkCertificate session', () => {
 
     const playerGained = playerBuildingAfter - playerBuildingBefore
     expect(playerGained).toBeGreaterThanOrEqual(1)
-    // BGA parity: source space must be decremented by at least the amount the player gained
+    // The reference parity: source space must be decremented by at least the amount the player gained
     // from the A82 take. Day-laborer itself doesn't gain building resources, so the only
     // way the action-space total can drop is via collect partial-take.
     expect(totalBuildingBefore - totalBuildingAfter).toBeGreaterThanOrEqual(playerGained)

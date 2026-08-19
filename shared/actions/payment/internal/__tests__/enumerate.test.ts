@@ -258,7 +258,7 @@ describe('computeAllBuyableCombinations — nb + unitFee scaling', () => {
   })
 
   // ADR 0004 amendment: the undiscounted branch is strictly dominated by the
-  // discounted one and is pruned — matching BGA, where keepOnlyOptimals hides
+  // discounted one and is pruned — matching the reference, where keepOnlyOptimals hides
   // it and the player only ever sees the discounted payment.
   it('optional bonus surfaces only the discounted path when it dominates', () => {
     const player = baseTestPlayer({ wood: 2, stone: 2 })

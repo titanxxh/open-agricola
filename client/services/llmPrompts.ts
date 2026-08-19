@@ -254,7 +254,7 @@ ${renderListenerActionList()}
 
 ### 常见判断与陷阱
 
-- **翻修目标房屋类型**：BGA 升级链固定 \`wood → clay → stone\`，无分支。\`renovate-house\` 触发时用 \`context.player.houseType\` 反推目标——\`'wood'\` 表示翻修到泥屋，\`'clay'\` 表示翻修到石屋。例：石屋翻修折扣 → \`if (context.player.houseType !== 'clay') return\`。
+- **翻修目标房屋类型**：reference 升级链固定 \`wood → clay → stone\`，无分支。\`renovate-house\` 触发时用 \`context.player.houseType\` 反推目标——\`'wood'\` 表示翻修到泥屋，\`'clay'\` 表示翻修到石屋。例：石屋翻修折扣 → \`if (context.player.houseType !== 'clay') return\`。
 - **建造房屋类型**：\`construct\` 行动看 \`context.choice\` 或 \`context.actionId\`（\`'build-clay-room'\` / \`'build-stone-room'\` 等），不是 \`space.params\`。
 - **未使用 handler 参数**：项目 TS strict 开了 \`noUnusedParameters\`。如果 handler 不需要 context，把参数前缀 \`_\` 或省掉。
 

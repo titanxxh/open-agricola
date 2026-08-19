@@ -11,7 +11,7 @@ const CARD_ID = 'A154_Paymaster'
  * Each time an opponent uses a food accumulation space (Fishing, Traveling Players),
  * the card owner can optionally give the opponent 1 grain to get 1 bonus VP.
  *
- * BGA: isListeningTo → PlaceFarmer on Fishing/TravelingPlayers.
+ * Rule: isListeningTo → PlaceFarmer on Fishing/TravelingPlayers.
  *      onOpponentAfterPlaceFarmer → optional: pay 1 grain → give to opponent → bonus VP.
  *
  * Uses gain with recipientPlayerId to give grain to the opponent, then bonus-vp for owner.

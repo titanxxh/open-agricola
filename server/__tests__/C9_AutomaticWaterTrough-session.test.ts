@@ -6,7 +6,7 @@ const CARD_ID = 'C009_AutomaticWaterTrough'
 
 describe('C009_AutomaticWaterTrough session', () => {
   it('onBuy returns undefined when player has no zone that can hold any animal', () => {
-    // BGA `getValidAnimals()` returns empty list when no zone can accommodate
+    // The reference `getValidAnimals` returns empty list when no zone can accommodate
     // sheep / boar / cattle. In that case `onBuy` returns void, so the player
     // does not enter a degenerate XOR with no real options.
     const session = new GameSession()

@@ -317,7 +317,7 @@ export const PlayerCard = ({
       }
     }
     return {
-      backgroundImage: `url(/bga-img/${deckName}/${numbering}.png)`,
+      backgroundImage: `url(${publicAssetUrl(`/assets/revised/${deckName}/${numbering}.png`)})`,
     }
   }, [cardType, cardId, runtimeArt, staticArt, deck, hasPlayer56Portrait, numbering])
 

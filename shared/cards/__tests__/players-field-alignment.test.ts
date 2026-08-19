@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { getOccupationCard } from '../catalog'
 
 // All 10 P0 occupations in this batch.
-// BGA reference: bga-agricola/modules/php/Cards/<deck>/<id>_*.php $this->players
+// Reference: the reference $this->players
 const cases: Array<{ id: string; expected: string }> = [
   { id: 'A154_Paymaster', expected: '4+' },
   { id: 'A158_CulinaryArtist', expected: '4+' },
@@ -22,7 +22,7 @@ const cases: Array<{ id: string; expected: string }> = [
   { id: 'D149_CasualWorker', expected: '4+' },
 ]
 
-describe('Sprint 1 PR-1A — players field BGA alignment (10 occupations)', () => {
+describe('Sprint 1 PR-1A — players field reference alignment (10 occupations)', () => {
   it.each(cases)(
     '$id players field equals $expected',
     ({ id, expected }) => {

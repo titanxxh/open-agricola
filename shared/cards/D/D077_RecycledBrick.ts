@@ -11,7 +11,7 @@ const CARD_ID = 'D077_RecycledBrick'
  * Each time any player renovates to stone, card owner gets 1 clay
  * per newly renovated room.
  *
- * BGA: onPlayerAfterRenovate — checks if the player renovated to stone,
+ * Rule: onPlayerAfterRenovate — checks if the player renovated to stone,
  * then gives 1 clay per room to the card owner.
  *
  * scope 'any' — fires when any player renovates.

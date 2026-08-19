@@ -16,7 +16,7 @@ const LESSONS_SPACE_IDS = ['lessons', 'lessons-4'] as const
  *   Laborer first, then Lessons). Afterward both spaces are considered
  *   occupied.
  *
- * BGA (C023_JobContract.php): listens to place-farmer on DayLaborer and,
+ * Rule: listens to place-farmer on DayLaborer and,
  * immediately after, inserts a "place fake farmer on Lessons → use lessons"
  * subtree. The fake farmer is removed at end of round.
  *
@@ -65,7 +65,7 @@ const listener: CardListenerRegistration = {
     const lessonsSpace = getLessonsSpace(context.state, context.player)
     if (!lessonsSpace) return
 
-    // BGA C23 does NOT gate on occupationHand: even with empty hand the fake
+    // The reference C23 does NOT gate on occupationHand: even with empty hand the fake
     // worker still occupies the lessons space (cascading lessons-listeners on
     // other cards e.g. A113 / B155 still fire). The optional occupation
     // leaf is still safe to offer — the player can simply skip the seq.

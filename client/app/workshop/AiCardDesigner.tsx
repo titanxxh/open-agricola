@@ -28,6 +28,7 @@ import { PlayerCard } from '../../components/common/PlayerCard'
 import { Section } from '../../components/common/Section'
 import type { CardMeta } from '../../services/card-meta'
 import { API_BASE } from '../../config'
+import { publicAssetUrl } from '../../utils/public-asset-url'
 import { useWorkshopDraft } from './useWorkshopDraft'
 import type {
   AbilityCandidate,
@@ -461,23 +462,24 @@ function ConfigStatusSummary({
   )
 }
 
-// ── BGA Reference Image Picker ────────────────────────────────────────────────
+// ── the reference Reference Image Picker ────────────────────────────────────────────────
 
-/** BGA card image URL given deck letter and card number */
-function bgaImgUrl(deck: string, num: number) {
-  return `/bga-img/deck${deck}/${deck}${String(num).padStart(3, '0')}.png`
+/** The reference card image URL given deck letter and card number */
+function refImgUrl(deck: string, num: number) {
+  return publicAssetUrl(`/assets/revised/deck${deck}/${deck}${String(num).padStart(3, '0')}.png`)
 }
 
-// All BGA card images: decks A-E, minors 1-84, occupations 85-168
+// All the reference card images: decks A-E, minors 1-84, occupations 85-168
 const DECKS = ['A', 'B', 'C', 'D', 'E'] as const
-const MINOR_REF_IMAGES = DECKS.flatMap(d => Array.from({ length: 84 }, (_, i) => bgaImgUrl(d, i + 1)))
-const OCC_REF_IMAGES = DECKS.flatMap(d => Array.from({ length: 84 }, (_, i) => bgaImgUrl(d, i + 85)))
+const MINOR_REF_IMAGES = DECKS.flatMap(d => Array.from({ length: 84 }, (_, i) => refImgUrl(d, i + 1)))
+const OCC_REF_IMAGES = DECKS.flatMap(d => Array.from({ length: 84 }, (_, i) => refImgUrl(d, i + 85)))
 
 async function fetchRefImage(url: string): Promise<ReferenceImage | null> {
   try {
     const resp = await fetch(url)
     if (!resp.ok) return null
     const blob = await resp.blob()
+    if (!(blob instanceof Blob)) return null
     return new Promise(resolve => {
       const reader = new FileReader()
       reader.onload = () => {
@@ -590,7 +592,7 @@ async function processCardArt(dataUrl: string, cardType: 'minor' | 'occupation')
         if (cardType === 'occupation') {
           ctx.arc(cx, cy, R, 0, Math.PI * 2)
         } else {
-          // Flat-top hexagon (matching BGA card sprites)
+          // Flat-top hexagon (matching the reference card sprites)
           for (let i = 0; i < 6; i++) {
             const angle = (Math.PI / 3) * i
             const x = cx + R * Math.cos(angle)

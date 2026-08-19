@@ -28,7 +28,7 @@ describe('E086_PenBuilder getInvalidAnimals', () => {
     expect(zone.cardId).toBe('E086_PenBuilder')
   })
 
-  it('hook returns empty (BGA mirror; capacity = discards * 2)', () => {
+  it('hook returns empty (reference mirror; capacity = discards * 2)', () => {
     const session = setup(2)
     const state = session.getState().state
     const player = state.players[0]!

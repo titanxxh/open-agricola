@@ -30,7 +30,7 @@ export const createSingleHarvestExchange = (
   const preResources = { ...player.resources }
   player.resources[resource] -= 1
   applyCardGain(player, gain)
-  // BGA semantics: harvest-time conversions emit Exchange events. We mirror
+  // Reference semantics: harvest-time conversions emit Exchange events. We mirror
   // this by dispatching the synthetic 'trade-applied' listener so cards like
   // E91 PlowBuilder can react to the source-card identity (e.g. Joinery).
   if (options?.sourceId) {

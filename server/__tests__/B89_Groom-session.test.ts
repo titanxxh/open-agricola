@@ -62,7 +62,7 @@ describe('B089_Groom session', () => {
     player.resources.wood = 0
 
     const flow = runCardEffectHook(state, player, 'B089_Groom', 'onBeforeStartOfTurn')
-    // BGA does not block at trigger time — payability is checked when player
+    // The reference does not block at trigger time — payability is checked when player
     // chooses to act. Effect must still emit the leaf.
     expect(flow).not.toBeNull()
     expect(flow!.type).toBe('leaf')

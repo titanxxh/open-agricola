@@ -27,9 +27,9 @@ const cardImpl = {
     })
   },
   /**
-   * BGA `Cards/E/E011_PettingZoo.php::getInvalidAnimals` returns []:
+   * The reference `Cards/E/the reference::getInvalidAnimals` returns []:
    * adjacency is enforced by gating zone registration in
-   * onPlayerComputeDropZones. Mirror BGA exactly.
+   * onPlayerComputeDropZones. Mirror the reference exactly.
    */
   getInvalidAnimals: () => [],
 },

@@ -14,7 +14,7 @@ const CARD_ID = 'E150_RockBeater'
  *    even if it is occupied by another player. (resource-market-4 gives reed+stone+food)
  * 2. Stone rooms cost you 2 stone less each.
  *
- * BGA:
+ * Rule:
  * onPlayerComputeArgsPlaceFarmer → adds ActionResourceMarket4 as an extra occupied option.
  * onPlayerComputeCostsConstruct → removes 2 stone when stone is in the trade cost.
  */

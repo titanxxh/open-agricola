@@ -814,8 +814,8 @@ export const enforceAnimalCapacity = (
   }
   if (sumAnimalCounts(removed) > 0) notifyAnimalsRemovedFromCardEffects(state, player, removed)
 
-  // Per-card zone validation hook: BGA `getInvalidAnimals($zone, ...)`. We
-  // run this for each card-typed zone so card authors can mirror BGA's
+  // Per-card zone validation hook: The reference `getInvalidAnimals($zone,...)`. We
+  // run this for each card-typed zone so card authors can mirror the reference's
   // per-meeple constraint logic (e.g. C11 WildlifeReserve at most 1 of each
   // animal type, C12 CattleFarm dynamic-cap = pasture count). Concrete
   // resource adjustment on hook violations is per-card; the helper only
@@ -870,7 +870,7 @@ export class AnimalZones {
 
   /**
    * Per-type remaining capacity (animals that still fit on the board).
-   * NOTE: total capacity is type-agnostic in BGA; we report the same
+   * NOTE: total capacity is type-agnostic in the reference; we report the same
    * `free` value for each animal type.
    */
   capacityRemaining(): Record<AnimalType, number> {

@@ -21,7 +21,7 @@ if [ -f "$SCRIPT_DIR/.env" ]; then
 fi
 
 # Anchor persistent dev state (sqlite DB, JSON room snapshots, custom cards,
-# card art, BGA local images) to the MAIN repo even when we're running from
+# card art) to the MAIN repo even when we're running from
 # a worktree. Without this, each worktree gets its own ./data and ./output,
 # so fixed dev room game state diverges across worktrees.
 #
@@ -40,10 +40,6 @@ CARD_ART_DIR="${CARD_ART_DIR:-$SHARED_DATA_DIR/card-art}"
 REPLAY_VIEWER_ROOT="${REPLAY_VIEWER_ROOT:-$SHARED_DATA_DIR/replay-viewers}"
 REPLAY_ASSET_ROOT="${REPLAY_ASSET_ROOT:-$SHARED_DATA_DIR/replay-assets}"
 REPLAY_REMOVAL_LEDGER_PATH="${REPLAY_REMOVAL_LEDGER_PATH:-$SHARED_DATA_DIR/replay-removals.jsonl}"
-# BGA images live as a sibling of the MAIN repo, not the worktree.
-if [ -z "${BGA_IMAGE_DIR:-}" ]; then
-  BGA_IMAGE_DIR="$(cd "$MAIN_REPO_DIR/.." 2>/dev/null && pwd)/bga-agricola/img"
-fi
 
 if [ ! -x "$BACKEND_BIN" ] || [ ! -x "$FRONTEND_BIN" ]; then
   echo "Error: dependencies are missing. Run: pnpm install"
@@ -580,27 +576,11 @@ fi
 
 if [ "$PREVIEW_ENABLED" -eq 1 ]; then
   echo "Building frontend preview bundle..."
-  if [ -n "${BGA_CDN_BASE_URL:-}" ]; then
-    env \
-      VITE_API_BASE="http://$LAN_IP:$BACKEND_PORT" \
-      VITE_WS_BASE="ws://$LAN_IP:$BACKEND_PORT/ws" \
-      VITE_ENABLE_DEV_AUTH_SHORTCUTS=1 \
-      BGA_CDN_BASE_URL="$BGA_CDN_BASE_URL" \
-      "$PNPM_BIN" run build
-  else
-    if [ ! -d "$BGA_IMAGE_DIR" ]; then
-      echo "Error: BGA_IMAGE_DIR does not exist: $BGA_IMAGE_DIR"
-      exit 1
-    fi
-    env \
-      VITE_API_BASE="http://$LAN_IP:$BACKEND_PORT" \
-      VITE_WS_BASE="ws://$LAN_IP:$BACKEND_PORT/ws" \
-      VITE_ENABLE_DEV_AUTH_SHORTCUTS=1 \
-      "$PNPM_BIN" run build
-    rm -rf "$SCRIPT_DIR/dist/bga-img"
-    mkdir -p "$SCRIPT_DIR/dist/bga-img"
-    cp -R "$BGA_IMAGE_DIR"/. "$SCRIPT_DIR/dist/bga-img"/
-  fi
+  env \
+    VITE_API_BASE="http://$LAN_IP:$BACKEND_PORT" \
+    VITE_WS_BASE="ws://$LAN_IP:$BACKEND_PORT/ws" \
+    VITE_ENABLE_DEV_AUTH_SHORTCUTS=1 \
+    "$PNPM_BIN" run build
 fi
 
 echo "Starting backend (port $BACKEND_PORT on $LAN_IP, dev2/dev3/dev4/dev5/dev6 persisted via SQLite)..."
@@ -620,7 +600,6 @@ start_and_wait "backend" "$BACKEND_PORT" "$BACKEND_LOG" env \
   DEV_ALLOW_INCOMPLETE_FARMERS_OF_THE_MOOR_MINOR_DEAL="$([ "$MOOR_ENABLED" -eq 1 ] && echo true || echo false)" \
   DEV_DRAFT_MODE="$([ "$DRAFT_ENABLED" -eq 1 ] && echo simultaneous || echo none)" \
   DEV_DRAFT_POOL_SIZE=7 \
-  BGA_IMAGE_DIR="$BGA_IMAGE_DIR" \
   DB_DIR="$DB_DIR" \
   DB_PATH="$DB_PATH" \
   PERSISTED_ROOMS_DIR="$PERSISTED_ROOMS_DIR" \
@@ -647,7 +626,6 @@ else
     NODE_ENV=development \
     BACKEND_HOST="$LAN_IP" \
     VITE_ENABLE_DEV_AUTH_SHORTCUTS=1 \
-    BGA_IMAGE_DIR="$BGA_IMAGE_DIR" \
     "$FRONTEND_BIN" --host "$LAN_IP" --port "$FRONTEND_PORT" --strictPort
 fi
 
@@ -661,7 +639,6 @@ echo "  REPLAY_VIEWER_ROOT = $REPLAY_VIEWER_ROOT"
 echo "  REPLAY_VIEWER_ID   = $REPLAY_VIEWER_BUILD_ID"
 echo "  REPLAY_ASSET_ROOT  = $REPLAY_ASSET_ROOT"
 echo "  REPLAY_REMOVAL_LEDGER_PATH = $REPLAY_REMOVAL_LEDGER_PATH"
-echo "  BGA_IMAGE_DIR      = $BGA_IMAGE_DIR"
 echo "  FRONTEND_MODE      = $([ "$PREVIEW_ENABLED" -eq 1 ] && echo preview || echo dev)"
 [ "$SCRIPT_DIR" != "$MAIN_REPO_DIR" ] && echo "  (running from worktree; anchored to main repo: $MAIN_REPO_DIR)"
 echo ""

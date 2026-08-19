@@ -7,11 +7,11 @@ import type { CardImpl } from '../registry'
 
 const CARD_ID = 'C080_RockyTerrain'
 /**
- * C80 Rocky Terrain (BGA `Cards/C/C080_RockyTerrain.php`):
+ * C80 Rocky Terrain (the reference `Cards/C/the reference`):
  *   "Each time you plow a field (tile or card), you can also buy 1 STONE for 1 FOOD."
  *
- * Mirrors the BGA isListeningTo: Plow / Improvement / Occupation, with the
- * latter two gated on the played card carrying `field=true` (BGA ruling
+ * Mirrors the reference isListeningTo: Plow / Improvement / Occupation, with the
+ * latter two gated on the played card carrying `field=true` (the reference ruling
  * "Playing field cards counts as plowing a field"). We mirror via the
  * generic `isField` metadata flag (Sprint 7d basis) plus three listeners:
  *   - after `plow`             — always fires (field tile plow)

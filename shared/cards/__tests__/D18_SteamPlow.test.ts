@@ -46,7 +46,7 @@ describe('D018_SteamPlow', () => {
     expect(D18Card.vp).toBe(1)
   })
 
-  it('onStartReturnHome returns optional pay+plow flow when player can afford (no sow per BGA)', () => {
+  it('onStartReturnHome returns optional pay+plow flow when player can afford (no sow per the reference)', () => {
     const effect = getCardEffect(CARD_ID)
     expect(effect).not.toBeNull()
     const player = createPlayer()
@@ -59,7 +59,7 @@ describe('D018_SteamPlow', () => {
     const seq = flow as Extract<ActionFlow, { type: 'seq' }>
     expect(seq.type).toBe('seq')
     expect(seq.optional).toBe(true)
-    // BGA: only plow (ActionFarmland) — no sow leaf
+    // Rule: only plow (ActionFarmland) — no sow leaf
     expect(seq.children).toHaveLength(2)
     // First child: pay 2 wood + 1 food
     expect(seq.children[0].actionId).toBe('pay')

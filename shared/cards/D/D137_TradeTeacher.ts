@@ -13,7 +13,7 @@ const CARD_ID = 'D137_TradeTeacher'
  *   goods: grain / stone / sheep / pig = 1 food each; cattle / vegetable = 2 food
  *   each.
  *
- * BGA (D137_TradeTeacher.php):
+ * Rule:
  * - isListeningTo: PlaceFarmer && actionCardType == 'Lessons'
  * - onPlayerAfterPlaceFarmer: return optional SPECIAL_EFFECT which, after
  *   multi-select UI, calls payGainNode(food cost, gained goods) and inserts it.

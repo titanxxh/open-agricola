@@ -240,7 +240,6 @@ const serveViewerFile = (
   root: string,
   buildId: string,
   rawPath: string,
-  bgaCdnOrigin: string,
 ): void => {
   const path = safeViewerPath(rawPath)
   if (!path) {
@@ -279,8 +278,8 @@ const serveViewerFile = (
       "default-src 'none'",
       "script-src 'self'",
       "style-src 'self' 'unsafe-inline'",
-      `img-src 'self' data: https://raw.githubusercontent.com ${bgaCdnOrigin}`,
-      `font-src 'self' ${bgaCdnOrigin}`,
+      "img-src 'self' data: https://raw.githubusercontent.com",
+      "font-src 'self' https://raw.githubusercontent.com",
       "connect-src 'self'",
       "frame-ancestors *",
       "base-uri 'none'",
@@ -367,7 +366,6 @@ export function handleReplayRoute(
     viewerRoot: string
     assetRoot: string
     limiter: ReplayReadLimiter
-    bgaCdnOrigin: string
   },
 ): boolean {
   if (req.method !== 'GET' || !req.url) return false
@@ -398,7 +396,6 @@ export function handleReplayRoute(
       options.viewerRoot,
       viewerMatch[1]!,
       viewerMatch[2]!,
-      options.bgaCdnOrigin,
     )
     return true
   }

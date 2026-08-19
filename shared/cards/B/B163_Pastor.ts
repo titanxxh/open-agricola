@@ -8,7 +8,7 @@ import type { CardImpl } from '../registry'
 
 const CARD_ID = 'B163_Pastor'
 /** Shared predicate + flow used by both `effect.onBuy` and the after-construct
- *  listener — mirrors BGA's `onBuy($p) { return $this->onAfterConstruct(...) }`. */
+ *  listener — mirrors the reference's `onBuy($p) { return $this->onAfterConstruct(...) }`. */
 const evaluatePastorTrigger = (
   state: GameState,
   ownerPlayer: PlayerState,
@@ -55,7 +55,7 @@ const cardImpl = {
   listeners: [listener],
   effect: {
     id: CARD_ID,
-    // BGA: `onBuy($p) { return $this->onAfterConstruct($p, []) }` — purchasing
+    // Rule: `onBuy($p) { return $this->onAfterConstruct($p, []) }` — purchasing
     // the card triggers the same evaluation as a construct event, so a player
     // who is already alone at 2 rooms when buying gets the bonus immediately.
     onBuy: (state, player) => evaluatePastorTrigger(state, player) ?? undefined,

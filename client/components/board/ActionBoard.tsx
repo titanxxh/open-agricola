@@ -246,7 +246,7 @@ const ACTION_ICON_DESC: Record<string, string[]> = {
   'eastern-quarry':     [],
 }
 
-// Detailed icon-description shown inside the hover tooltip card body (BGA `tooltipDesc`).
+// Detailed icon-description shown inside the hover tooltip card body (the reference `tooltipDesc`).
 // More verbose than ACTION_ICON_DESC (adds [text] labels); falls back to ACTION_ICON_DESC
 // / gain display when an id is absent here.
 const ACTION_TOOLTIP_DESC: Record<string, string[]> = {
@@ -260,7 +260,7 @@ const ACTION_TOOLTIP_DESC: Record<string, string[]> = {
   'farm-redevelopment':   ['[Renovation]', '<upgrade>', '[then]', '[Build fences]', '1<wood><arrow><fence-icon>'],
 }
 
-// Full rule text shown to the right of the tooltip card (BGA `tooltip`).
+// Full rule text shown to the right of the tooltip card (the reference `tooltip`).
 // Falls back to the i18n short description when an id is absent here.
 const ACTION_TOOLTIP_TEXT: Record<string, string[]> = {
   'fencing': [
@@ -1102,7 +1102,7 @@ export const ActionBoard = ({
         </div>
       </div>
 
-      {/* Dynamic PlayerActionCard action spaces — rendered as BGA-style cards */}
+      {/* Dynamic PlayerActionCard action spaces — rendered as cards */}
       {baseActions.filter((s) => !basePositions[s.id]).length > 0 && (
         <div className="player-action-cards-row">
           <h3>{t(locale, 'ui.playerActionCards')}</h3>

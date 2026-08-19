@@ -15,7 +15,7 @@ const CARD_ID = 'B022_WalkingBoots'
 
 describe('B022_WalkingBoots session', () => {
   it('onBuy returns SEQ(gain food:2, place-farmer fromSupply markForRemoval)', () => {
-    // BGA `B022_WalkingBoots::onBuy` returns NODE_SEQ with children
+    // The reference `B022_WalkingBoots::onBuy` returns NODE_SEQ with children
     //   gainNode([FOOD => 2])
     //   PLACE_FARMER args { fromSupply: true, source, markForRemoval: true }
     // Our previous implementation truncated to gainLeaf food:2 only.

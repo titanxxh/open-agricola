@@ -51,7 +51,7 @@ const canBuildCleanerStable = (context: CardListenerContext) => {
  * C94 Stable Cleaner — At any time, you can take the __Build Stables__ action
  * without placing a person. If you do, each stable costs you 1 <WOOD> and 1 <FOOD>.
  *
- * BGA: anytime + flagCardNode + STABLES action with costs={WOOD=>1, FOOD=>1}.
+ * Rule: anytime + flagCardNode + STABLES action with costs={WOOD=>1, FOOD=>1}.
  *
  */
 const anytimeListener: CardListenerRegistration = {

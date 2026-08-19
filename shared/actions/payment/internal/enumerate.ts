@@ -233,16 +233,16 @@ const mergeBonusReductionsBySource = (
 
 /**
  * Dominance pruning over AFFORDABLE solutions (ADR 0004 amendment, restoring
- * the BGA keepOnlyOptimals semantics dropped in b2b00d96): a solution paying
+ * the reference keepOnlyOptimals semantics dropped in b2b00d96): a solution paying
  * >= another on every resource (and more on at least one) is never shown.
- * BGA's optional-append cost model relies on this to make appended fixed
+ * The reference's optional-append cost model relies on this to make appended fixed
  * prices and discounts behave as the printed card text (e.g. C95 "build the
  * Basket for 1 stone and 1 reed").
  *
- * Exemptions (mirroring BGA isWorseThan):
+ * Exemptions (mirroring the reference isWorseThan):
  * - different fee identities (B65 payment-path identity drives later effects)
  * - choices whose identity is consumed later for state side effects (E123)
- * - card payments (never compared, like BGA's `card` combinations)
+ * - card payments (never compared, like the reference's `card` combinations)
  *
  * Must run AFTER affordability filtering: pruning resource-blind would drop
  * the only row a poorer player can actually pay.

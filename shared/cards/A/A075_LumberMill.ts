@@ -7,7 +7,7 @@ import { PaymentSolver } from '../../actions/payment'
 const CARD_ID = 'A075_LumberMill'
 /**
  * A75 Lumber Mill — Every improvement costs you 1 wood less.
- * BGA: onPlayerComputeCardCosts, applies to MAJOR and MINOR types.
+ * Rule: onPlayerComputeCardCosts, applies to MAJOR and MINOR types.
  */
 const computeCostsListener: CardListenerRegistration = {
   id: 'A75-lumber-mill-compute-costs',

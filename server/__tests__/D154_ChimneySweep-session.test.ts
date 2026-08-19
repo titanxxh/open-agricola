@@ -58,7 +58,7 @@ const setup = (options: SetupOptions = {}) => {
 }
 
 describe('D154_ChimneySweep card definition', () => {
-  it('has players: 4+ (BGA parity)', () => {
+  it('has players: 4+ (parity)', () => {
     expect(D154_ChimneySweep.players).toBe('4+')
   })
 })

@@ -24,7 +24,7 @@ const specialEffect = (params: Record<string, unknown>): ActionFlow => ({
 })
 
 /**
- * BGA pattern: lazily set a saturation flag once the farmyard fills via any
+ * The reference pattern: lazily set a saturation flag once the farmyard fills via any
  * Construct/Stables/Fencing/Plow event. Reap then awards bonus VP only when
  * the flag is set (or, defensively, when the live check passes if some
  * exotic SE filled the farm via another path).
@@ -58,7 +58,7 @@ const reapListener: CardListenerRegistration = {
     const crop = ctx.extraData?.crop as string | undefined
     const amount = ctx.extraData?.amount as number | undefined
     if (crop !== 'vegetable' || typeof amount !== 'number' || amount <= 0) return
-    // BGA: bonus VP gated on saturation flag; defensive fallback to live check
+    // Rule: bonus VP gated on saturation flag; defensive fallback to live check
     // for paths that bypass the four flag-setting hooks.
     if (!isSaturatedFlagged(player) && !isFarmSaturated(player)) return
     return {

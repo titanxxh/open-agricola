@@ -17,7 +17,7 @@ const CARD_ID = 'B129_Seatmate'
  * on r13.
  *
  * 4-player branch: opposite seat is `(ownerIdx + 2) % 4`. Inject only when
- * neighbour(s) occupy r13 AND opposite seat is free. Aligns with BGA
+ * neighbour(s) occupy r13 AND opposite seat is free. Aligns with the reference
  * `B129_Seatmate.php` (Stats::getPosition; opposite blocks injection).
  *
  * Seat order: `state.players` array index === opening seat order (same
@@ -51,7 +51,7 @@ const computeArgsListener: CardListenerRegistration = {
 
     const n = context.state.players.length
     if (n === 3) {
-      // 3p 中所有非 owner 都是邻座（卡牌文本 "left and right" 与 BGA 3p 分支自然吻合）。
+      // 3p 中所有非 owner 都是邻座（卡牌文本 "left and right" 与 the reference 3p 分支自然吻合）。
       return {
         extraOptions: buildExtraOptions(round13Space),
         sourceCard: CARD_ID,

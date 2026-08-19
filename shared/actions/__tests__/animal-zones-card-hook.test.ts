@@ -57,7 +57,7 @@ describe('getInvalidAnimals hook', () => {
           animalCount: 3,
         } as AnimalZone,
       ],
-      // BGA-shape per-card validation: keep at most 1 meeple regardless of cap.
+      // The reference-shape per-card validation: keep at most 1 meeple regardless of cap.
       getInvalidAnimals: (_player, _zone, meeples, _state) =>
         meeples.slice(1),
     })

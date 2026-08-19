@@ -18,13 +18,13 @@ Output STRICT JSON only — no prose, no markdown fence. Every key in the input 
 gets exactly one entry in the output object: { "<key>": { "zh": "...", "en": "..." } }.
 Keep placeholder names like {actplayer}, {round}, {count} verbatim. Use natural Chinese
 (Simplified) and concise English. Match the existing style samples — same tone, same
-register, same punctuation. If a BGA reference is provided, prefer wording closely aligned
-with BGA's English text but ensure the Chinese reads naturally.`
+register, same punctuation. If a reference translation is provided, prefer wording closely
+aligned with the reference English text but ensure the Chinese reads naturally.`
 
 export function buildTranslatePrompt(
   missing: MissingKey[],
   styleSamples: Map<string, Array<{ key: string; zh: string; en: string }>>,
-  bgaCandidates: Map<string, string[]>,
+  referenceCandidates: Map<string, string[]>,
 ): string {
   const parts: string[] = []
   parts.push('# Style samples (existing translations to match)')
@@ -38,9 +38,9 @@ export function buildTranslatePrompt(
   for (const m of missing) {
     parts.push(`\n## ${m.key}`)
     parts.push(`Used at: ${m.referencedAt[0] ?? '(unknown)'}`)
-    const cands = bgaCandidates.get(m.key) ?? []
+    const cands = referenceCandidates.get(m.key) ?? []
     if (cands.length > 0) {
-      parts.push('BGA candidates:')
+      parts.push('reference candidates:')
       for (const c of cands.slice(0, 3)) parts.push(`- ${c}`)
     }
   }
@@ -81,10 +81,10 @@ function loadGeminiKey(): string {
 export async function translateBatch(
   missing: MissingKey[],
   styleSamples: Map<string, Array<{ key: string; zh: string; en: string }>>,
-  bgaCandidates: Map<string, string[]>,
+  referenceCandidates: Map<string, string[]>,
 ): Promise<Map<string, Translation>> {
   const apiKey = loadGeminiKey()
-  const userMessage = buildTranslatePrompt(missing, styleSamples, bgaCandidates)
+  const userMessage = buildTranslatePrompt(missing, styleSamples, referenceCandidates)
   let lastErr: unknown = null
   for (let attempt = 1; attempt <= 2; attempt++) {
     try {

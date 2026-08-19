@@ -44,7 +44,7 @@ const createState = (...players: PlayerState[]): GameState =>
   }) as unknown as GameState
 
 describe('D060_LargePottery', () => {
-  it('card definition matches BGA (cost, vp, prerequisite, extraVp, alsoCountsAs, exchanges)', () => {
+  it('card definition matches the reference (cost, vp, prerequisite, extraVp, alsoCountsAs, exchanges)', () => {
     expect(D60Card.cost).toEqual({ clay: 1, stone: 1 })
     expect(D60Card.vp).toBe(3)
     expect(D60Card.extraVp).toBe(true)

@@ -105,9 +105,9 @@ describe('C052_HuntsmansHat server session', () => {
 })
 
 /**
- * BGA C52 listens to **any** Gain event with `fromActionSpace`, summing
+ * The reference C52 listens to **any** Gain event with `fromActionSpace`, summing
  * obtained PIG and emitting `gainNode([FOOD => N])`. Our previous
- * implementation only handled `pig-market` collect; we now match BGA by
+ * implementation only handled `pig-market` collect; we now match the reference by
    * listening to `phase: 'after', actions: ['gain','collect','receive']` and
    * inspecting action-space resource.moved boar events. AnimalMarket flow modification
  * (sheep+food / boar+food / pay-food→cattle xor) is NOT implemented since
@@ -154,7 +154,7 @@ describe('C052_HuntsmansHat listener — generic boar-gain trigger (any space)',
     expect(result!.sourceCard).toBe(CARD_ID)
   })
 
-  it('triggers on a non-pig-market space when a boar is gained (BGA generic behavior)', () => {
+  it('triggers on a non-pig-market space when a boar is gained (reference generic behavior)', () => {
     const listener = findListener(LISTENER_ID)!
     const ctx = setupListenerContext('gain', 'forest', 1) // arbitrary space
     const result = executeCardListener(listener, ctx)

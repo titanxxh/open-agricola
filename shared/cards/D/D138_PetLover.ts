@@ -16,7 +16,7 @@ const ANIMAL_MARKET_SPACES: Record<string, 'sheep' | 'boar' | 'cattle'> = {
  * you can leave it on the space and get one from the general supply instead,
  * as well as 3 <FOOD> and 1 <GRAIN>.
  *
- * BGA: onPlayerComputePlaceFarmerFlow wraps the entire collect flow in an XOR
+ * Rule: onPlayerComputePlaceFarmerFlow wraps the entire collect flow in an XOR
  * (normal collect vs PetLover bonus). We achieve the same shape with a
  * computeReplace listener on the 'collect' action: returning `decline: true`
  * with an alternativeFlow makes the engine build XOR(alternative, original-with-sentinel).

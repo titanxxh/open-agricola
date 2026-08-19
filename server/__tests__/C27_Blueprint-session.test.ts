@@ -24,11 +24,11 @@ const findListener = (id: string) =>
 /**
  * C27 Blueprint — verify-only.
  *
- * BGA `Cards/C/C027_Blueprint.php::onPlayerComputeCardCosts` clones every
+ * The reference `Cards/C/the reference::onPlayerComputeCardCosts` clones every
  * matching stone cost trade for `Major_Joinery`, `Major_Pottery`,
  * `Major_Basket` only. OA mirrors that with card-purchase cost candidates.
  */
-describe('C027_Blueprint session — verify chooseOne aligned to BGA majors', () => {
+describe('C027_Blueprint session — verify chooseOne aligned to the reference majors', () => {
   const setup = () => {
     const session = new GameSession()
     const state = session.getState().state
@@ -128,7 +128,7 @@ describe('C027_Blueprint session — verify chooseOne aligned to BGA majors', ()
 })
 
 /**
- * BGA `C027_Blueprint`'s second behavior — "you can build the major
+ * The reference `C027_Blueprint`'s second behavior — "you can build the major
  * improvements ... even when taking a Minor Improvement action" — is
  * implemented via a `computeChoiceCandidates` listener that injects the 3
  * allowed majors into the minor-improvement choice list (mirrors D131

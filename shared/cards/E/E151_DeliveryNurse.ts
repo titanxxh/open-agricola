@@ -11,7 +11,7 @@ const CARD_ID = 'E151_DeliveryNurse'
  * E151 Delivery Nurse — Once this game, if you have all types of animals,
  * you can use any __Wish for Children__ action space even without room.
  *
- * BGA: onPlayerComputePlaceFarmerFlow — if WishChildren action, player has all
+ * Rule: onPlayerComputePlaceFarmerFlow — if WishChildren action, player has all
  * 3 animal types, and card not flagged: change wish-children-growth to
  * grow-family-without-room (and flag the card after).
  *

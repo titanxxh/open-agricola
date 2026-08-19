@@ -60,7 +60,7 @@ export type CardDefinition = {
   providesField?: boolean
   providesOccupation?: boolean
   /**
-   * BGA `$this->field = true`: marks the card itself as a field. C80 Rocky
+   * The reference `$this->field = true`: marks the card itself as a field. C80 Rocky
    * Terrain triggers off `Improvement` / `Occupation` events whose played
    * card has `isField === true` (treated as plowing a field). Cards that
    * also act as a literal sowable field (B68/C70/E68/E69/E70/E72) carry
@@ -90,7 +90,7 @@ export type CardDefinition = {
     horseAmount?: number
   }[]
   /**
-   * BGA `isBuyable` actionType gate ('Major' / 'MajorOrMinor'): A10 Wooden
+   * The reference `isBuyable` actionType gate ('Major' / 'MajorOrMinor'): A10 Wooden
    * Shed enforces "this card can only be played via a Major Improvement
    * action". When set, the minor cannot be bought through the
    * `minor-improvement` action space (only via `improvement-any` / direct
@@ -100,10 +100,10 @@ export type CardDefinition = {
   enablesPalisades?: boolean
   alsoCountsAs?: CardType[]
   /**
-   * BGA `$this->field = true` + `getFieldDetails()`. Declarative card-field config.
+   * The reference `$this->field = true` + `getFieldDetails`. Declarative card-field config.
    * When set, `shared/cards/helpers/card-field.ts` derives sow / harvest / isDoable
    * behavior automatically (see docs/ARCHITECTURE.md → cardField).
-   * `allowedCrops` mirrors BGA constraints (`null` = all 4 crops);
+   * `allowedCrops` mirrors the reference constraints (`null` = all 4 crops);
    * `capacity` is the number of independent stacks the card can hold.
    * Side-effects (e.g. E68 last-wood bonus) are wired via `makeCardFieldImpl`'s
    * `onReap` callback, not via this metadata.

@@ -9,7 +9,7 @@ const CARD_ID = 'C013_WoodSlideHammer'
  * On your first renovation (i.e. while still wood-roofed), if you have at
  * least 5 rooms, you get a 2 stone discount on the renovation cost.
  *
- * BGA: onPlayerComputeCostsRenovation, gated by roomType==='wood' && rooms>=5,
+ * Rule: onPlayerComputeCostsRenovation, gated by roomType==='wood' && rooms>=5,
  * adds bonus -2 stone.
  *
  * Implementation: BonusModifier with conditions { houseTypeWood, minNumRooms:5 }.

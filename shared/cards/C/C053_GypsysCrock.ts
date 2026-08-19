@@ -13,7 +13,7 @@ const CARD_ID = 'C053_GypsysCrock'
 const COUNTER_KEY = 'cookedCount'
 
 /**
- * BGA `checkPairIsCooked`: only `Exchange.isCookingSource($source)` exchanges
+ * The reference `checkPairIsCooked`: only `Exchange.isCookingSource($source)` exchanges
  * (Fireplace1/2, Cooking Hearth 1/2, Oriental Fireplace, Earth Oven) where
  * the `to` side includes FOOD count toward "cooked goods this batch". Pairs
  * (≥2) trigger `floor(count / 2)` bonus food.

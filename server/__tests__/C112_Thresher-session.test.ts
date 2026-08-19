@@ -54,7 +54,7 @@ describe('C112_Thresher session', () => {
   })
 
   it('exchange works: pay 1 food, gain 1 grain', () => {
-    // BGA: `buy 1 grain for 1 food` — pay food, gain grain.
+    // Rule: `buy 1 grain for 1 food` — pay food, gain grain.
     const session = setup({ withCard: true, grain: 3 })
     const initialState = session.getState().state
     const initialGrain = initialState.players[0]!.resources.grain
@@ -125,12 +125,12 @@ describe('C112_Thresher session', () => {
     expect(hasSkip).toBe(true)
   })
 
-  // BGA C112_Thresher::onPlayerIsDoable mirrors: when sow/exchange would
+  // The reference C112_Thresher::onPlayerIsDoable mirrors: when sow/exchange would
   // normally be undoable but the player has 1+ food (so they could buy 1
   // grain via the before-hook), flip doable=true. Before this fix, a player
   // sitting on grain-utilization with 0 grain + N food + an empty field
   // could not start the action at all because canSow returned false.
-  // BGA C112_Thresher::onPlayerIsDoable raises sow / exchange doability when
+  // The reference C112_Thresher::onPlayerIsDoable raises sow / exchange doability when
   // the player has 1 food (so they could buy 1 grain via the before-hook,
   // then sow it). Without this listener, sow is undoable when the player has
   // no grain and no veg, even though Thresher would let them buy grain first.

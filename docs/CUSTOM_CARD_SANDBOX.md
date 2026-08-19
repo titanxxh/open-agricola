@@ -137,7 +137,7 @@ Common hallucinated fields that do not exist are `space.params`, `space.target`,
 
 ### 2.2 Common tests and traps
 
-- **Renovation target:** BGA has a fixed wood-to-clay-to-stone chain. During `renovate-house`, infer the target from `context.player.houseType`; current `wood` means clay and current `clay` means stone. A stone-house renovation discount checks `if (context.player.houseType !== 'clay') return`. See `shared/cards/A/A110_Roughcaster.ts`.
+- **Renovation target:** the upgrade chain is a fixed wood-to-clay-to-stone sequence. During `renovate-house`, infer the target from `context.player.houseType`; current `wood` means clay and current `clay` means stone. A stone-house renovation discount checks `if (context.player.houseType !== 'clay') return`. See `shared/cards/A/A110_Roughcaster.ts`.
 - **Constructed room type:** read `context.choice` or `context.actionId`, such as `build-clay-room` or `build-stone-room`, never `space.params`.
 - **Unused handler parameters:** `tsconfig.json` enables `noUnusedParameters`. Omit an unused parameter or prefix it with `_`; otherwise pull-request CI fails with `TS6133`.
 

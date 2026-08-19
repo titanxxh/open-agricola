@@ -28,7 +28,7 @@ export const isPaymentResourceKey = (key: string): key is PaymentResourceKey =>
   PAYMENT_RESOURCE_KEY_SET.has(key) || isCardProvidedPaymentResourceKey(key)
 
 // Pseudo keys are NEVER stored in player.resources. They live exclusively in
-// CardResourceStats.gained to record BGA-style "Plows: N / Built: N rooms"
+// CardResourceStats.gained to record "Plows: N / Built: N rooms"
 // progress lines via the same Partial<Resource> storage slot.
 export const PSEUDO_RESOURCE_KEYS = [
   'occupation', 'field',

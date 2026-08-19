@@ -11,7 +11,7 @@ const CARD_ID = 'E129_Imitator'
  * E129 Imitator — If you have a person on the __Day Laborer__ action space,
  * you can use non-accumulating round 1-9 action spaces even if they are occupied.
  *
- * BGA: adds occupied non-accumulating round 1–9 spaces to computeArgsPlaceFarmer.
+ * Rule: adds occupied non-accumulating round 1–9 spaces to computeArgsPlaceFarmer.
  * The non-accumulating spaces available from round 1-9 are:
  * grain-utilization, fencing, major-improvement, wish-children,
  * house-redevelopment, vegetable-seeds.

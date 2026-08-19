@@ -12,7 +12,7 @@ const CARD_ID = 'B162_ForestClearer'
  * Each time you obtain exactly 2/3/4 wood from a wood accumulation space,
  * you get 1 additional wood and 1/0/1 food.
  *
- * BGA: isCollectEvent + getGains checks wood collected.
+ * Rule: isCollectEvent + getGains checks wood collected.
  *   wood 2 → +1 wood +1 food
  *   wood 3 → +1 wood
  *   wood 4 → +1 wood +1 food

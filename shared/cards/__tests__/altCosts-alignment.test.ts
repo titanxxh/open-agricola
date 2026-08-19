@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { getMinorImprovementCard } from '../catalog'
 
-// BGA reference: bga-agricola/modules/php/Cards/<deck>/<id>.php $this->costs = [[X],[Y]]
+// Reference: the reference $this->costs = [[X],[Y]]
 // Locked in by 2026-05-12 metadata-3b real-deviation fix (P0 gameplay).
 const cases: Array<{ id: string; altCosts: Record<string, number>[] }> = [
   { id: 'B048_ForestStone', altCosts: [{ wood: 2 }, { stone: 1 }] },
@@ -12,9 +12,9 @@ const cases: Array<{ id: string; altCosts: Record<string, number>[] }> = [
   { id: 'E052_Cubbyhole', altCosts: [{ wood: 1 }, { clay: 1 }] },
 ]
 
-describe('altCosts BGA alignment (P0 gameplay)', () => {
+describe('altCosts reference alignment (P0 gameplay)', () => {
   it.each(cases)(
-    '$id has altCosts matching BGA',
+    '$id has altCosts matching the reference',
     ({ id, altCosts }) => {
       const card = getMinorImprovementCard(id)
       expect(card, `card not found in catalog: ${id}`).toBeDefined()

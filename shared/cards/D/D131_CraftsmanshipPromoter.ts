@@ -9,8 +9,8 @@ import { filterAvailableMajorImprovementIds } from '../major/supply'
 
 const CARD_ID = 'D131_CraftsmanshipPromoter'
 /**
- * BGA bottom-row major candidates injected by D131 into the
- * Minor Improvement action. Source: bga-agricola
+ * The reference bottom-row major candidates injected by D131 into the
+ * Minor Improvement action.
  * modules/php/Actions/Improvement.php (D131 case in getBuyableCards).
  */
 const D131_BOTTOM_ROW_MAJORS = [
