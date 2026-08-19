@@ -14,7 +14,7 @@ const cardImpl = {
   effect: {
   id: CARD_ID,
   onBuy: (state, player) => {
-    // BGA reads the actual occupancy on Grain Utilization (not round-placement
+    // The reference reads the actual occupancy on Grain Utilization (not round-placement
     // history). Grab whichever of this player's workers is sitting there and
     // recall it via the shared helper.
     const space = state.actionSpaces.find((s) => s.id === 'grain-utilization')

@@ -370,7 +370,7 @@ export const payAction: ActionDefinition = {
     // game-core's pendingInteractionActionId now points at `pay` (vs the
     // improvement-any it would point at in the legacy mutate-in-place path).
     // Re-emit the same selectPayment prompt by re-invoking execute so the
-    // player can pick again, matching BGA's "missed the prompt → ask again"
+    // player can pick again, matching the reference's "missed the prompt → ask again"
     // UX and keeping legacy D83-style upper-flow tests compatible.
     if (!choiceLooksLikePayment) {
       return payAction.execute({

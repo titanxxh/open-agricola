@@ -2,12 +2,12 @@ import { defineMinorCard } from '../card-source'
 /**
  * B22 Walking Boots — Minor Improvement
  *
- * BGA `B022_WalkingBoots::onBuy` returns NODE_SEQ children:
+ * The reference `B022_WalkingBoots::onBuy` returns NODE_SEQ children:
  *   1. gainNode([FOOD => 2])
  *   2. PLACE_FARMER args { fromSupply: true, source, markForRemoval: true }
  *
  * The placed farmer is "marked for removal": at the start of the next
- * returning-home phase, BGA removes it from play (deactivates) and returns
+ * returning-home phase, the reference removes it from play (deactivates) and returns
  * it to the supply.
  *
  * Implementation:

@@ -121,13 +121,13 @@ const takeMeetingPlaceToMinorOptions = (session: GameSession) => {
 }
 
 describe('C054_MarketBooth session', () => {
-  it('has no prerequisite (BGA C054_MarketBooth has no isBuyable / prerequisite)', () => {
+  it('has no prerequisite (reference C054_MarketBooth has no isBuyable / prerequisite)', () => {
     const card = getRegisteredMinorImprovement(CARD_ID)!
     const session = new GameSession()
     stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     const player = state.players[0]!
-    // Even with all 4 stables built, BGA does not gate the purchase.
+    // Even with all 4 stables built, the reference does not gate the purchase.
     player.stableTiles = [
       { row: 0, col: 0 }, { row: 0, col: 1 }, { row: 0, col: 2 }, { row: 1, col: 0 },
     ]

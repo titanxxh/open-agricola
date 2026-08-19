@@ -302,13 +302,13 @@ describe('D074_RoyalWood session', () => {
     expect(resp.state.players[0]!.resources.wood).toBe(10)
   })
 
-  // BGA reference: `round((payWood-1)/2)` rounding rule.
+  // Reference: `round((payWood-1)/2)` rounding rule.
   // Our `Math.floor(totalSpent/2)` is equivalent for all spent ≥ 1
   //   spent=1 → 0, spent=2 → 1, spent=3 → 1, spent=4 → 2, spent=5 → 2,
   //   spent=6 → 3, spent=7 → 3, spent=8 → 4, ...
-  // Plan §F1 D74 outline asks to "match BGA's floor((spent-1)/2) rule";
+  // Plan §F1 D74 outline asks to "match the reference's floor((spent-1)/2) rule";
   // this test pins the equivalence for the boundary cases.
-  it('refund formula matches BGA round((spent-1)/2) for representative spends', () => {
+  it('refund formula matches the reference round((spent-1)/2) for representative spends', () => {
     const cases: { spent: number; refund: number }[] = [
       { spent: 1, refund: 0 },
       { spent: 2, refund: 1 },

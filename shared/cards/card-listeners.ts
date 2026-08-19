@@ -57,7 +57,7 @@ export type CardListenerRegistration = {
     candidate: CardCostCandidate,
   ) => CardCostCandidate | readonly CardCostCandidate[] | null
   /**
-   * Mandatory Saturation flag for `deriveCardCostCandidate` (BGA "costs
+   * Mandatory Saturation flag for `deriveCardCostCandidate` (the reference "costs
    * less" semantics): candidates this transform still applies to are not
    * shown to the player; only saturated candidates surface.
    */

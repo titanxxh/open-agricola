@@ -84,7 +84,7 @@ describe('A135_AnimalReeve sharedScoring', () => {
     expect(bonusVp(scores, state.players[1]!.id)).toBe(5)
   })
 
-  it('caps at 5 VP for min >= 5 (cap to 4 in BGA map)', () => {
+  it('caps at 5 VP for min >= 5 (cap to 4 in the reference map)', () => {
     const state = setupThreePlayers()
     state.players[0]!.occupationPlayed.push(A135)
     state.players[1]!.resources.sheep = 8

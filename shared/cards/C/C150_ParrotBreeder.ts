@@ -18,7 +18,7 @@ const RIGHT_KEY = 'right'
 /**
  * C150 Parrot Breeder (Occupation, 4+ players).
  *
- * BGA: on your turn, pay 1 <GRAIN> to use the same action space the player
+ * Rule: on your turn, pay 1 <GRAIN> to use the same action space the player
  * to your right just used (not retroactive; not Meeting Place).
  *
  * State (`cardStates.C150_ParrotBreeder`):

@@ -9,10 +9,10 @@ const CARD_ID = 'C140_PackagingArtist'
  * C140 Packaging Artist — Each time you get a Minor Improvement action, you
  * can take a Bake Bread action instead.
  *
- * BGA: `onPlayerComputeReplaceImprovement` returns `bakeBreadNode()`. BGA's
+ * Rule: `onPlayerComputeReplaceImprovement` returns `bakeBreadNode`. the reference's
  * `onPlayerComputeArgsPlaceFarmer` adds the Major Improvement space to the
  * placeFarmer pool, so a major-improvement space can also be retargeted to
- * bake-bread. BGA `onPlayerIsDoable` forces the underlying action doable so
+ * bake-bread. The reference `onPlayerIsDoable` forces the underlying action doable so
  * the player can pick the space even with no minor cards in hand.
  *
  * Implementation:
@@ -22,7 +22,7 @@ const CARD_ID = 'C140_PackagingArtist'
  *      `decline + alternativeFlow: bake-bread leaf`.
  *   2. `isDoable` listener on both actions, force `doable: true` so the
  *      player can place a farmer there even when no real improvement is
- *      affordable / available. Maps BGA `ignoreResources: true`.
+ *      affordable / available. Maps the reference `ignoreResources: true`.
  *   3. Both handlers bail out on `actionContext.checkedReplaceAction === true`
  *      so picking the original branch from the inserted XOR does not re-fire
  *      this listener and cause infinite XOR insertion. The engine

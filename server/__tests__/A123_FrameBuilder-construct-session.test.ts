@@ -11,7 +11,7 @@ void A123_FrameBuilder
 const CARD_ID = 'A123_FrameBuilder'
 
 /**
- * T5.3 — BGA equivalence trace for A123 construct (spec §7.1.1):
+ * T5.3 — the reference equivalence trace for A123 construct (spec §7.1.1):
  *   3 rooms, clay house. Baseline {reed:6, clay:15}. A123 unit trade
  *   wood→clay max=3 produces k∈{0..3} swaps:
  *     k=0: {reed:6, clay:15, wood:0}

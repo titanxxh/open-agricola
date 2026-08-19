@@ -118,7 +118,7 @@ describe('C052_HuntsmansHat', () => {
     }
   })
 
-  // BGA C52 listens to **any** Gain event with `fromActionSpace`. We mirror
+  // The reference C52 listens to **any** Gain event with `fromActionSpace`. We mirror
   // that with a `phase: 'after'` listener on { gain | collect | receive } and
   // gate on action-space resource.moved boar events.
 
@@ -148,7 +148,7 @@ describe('C052_HuntsmansHat', () => {
     expect(result?.sourceCard).toBe(CARD_ID)
   })
 
-  it('also fires for non-pig-market spaces when a boar is gained (BGA generic behavior)', () => {
+  it('also fires for non-pig-market spaces when a boar is gained (reference generic behavior)', () => {
     const listener = cardApi.getRegisteredCardListeners().find(
       (entry) => entry.id === 'C52-huntsmans-hat-after-boar-gain',
     )

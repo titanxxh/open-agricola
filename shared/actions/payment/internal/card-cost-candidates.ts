@@ -192,7 +192,7 @@ const resourcesAndFeeKey = (candidate: CardCostCandidate) =>
  * consumed a mandatory transform's resource first). Those rows are identical
  * payment choices for the player; surfacing them all is presentation noise
  * with multiplied attribution. Pick a deterministic representative: fewest
- * sources first (closest to BGA's reference attribution), then normalized
+ * sources first (closest to the reference's reference attribution), then normalized
  * candidate key order.
  */
 export const dedupeEquivalentRowCandidates = (

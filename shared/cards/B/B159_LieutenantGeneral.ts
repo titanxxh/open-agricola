@@ -10,7 +10,7 @@ const CARD_ID = 'B159_LieutenantGeneral'
  * Each time another player plows a field adjacent to an existing field,
  * card owner gets 1 food.
  *
- * BGA: onPlayerAfterPlow — checks if the newly plowed field is adjacent
+ * Rule: onPlayerAfterPlow — checks if the newly plowed field is adjacent
  * to an existing field. In open-agricola, when a player already has at
  * least 1 field, any newly plowed field must be adjacent (adjacency is
  * enforced by getPlowableTiles). So: after plow, if the acting player

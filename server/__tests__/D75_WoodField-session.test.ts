@@ -61,7 +61,7 @@ describe('D075_WoodField metadata', () => {
     expect(dealtIds).toContain(CARD_ID)
   })
 
-  it('carries BGA cost / vp / prerequisite metadata', () => {
+  it('carries reference cost / vp / prerequisite metadata', () => {
     expect(D075_WoodField.cost).toEqual({ food: 1 })
     expect(D075_WoodField.vp).toBe(1)
     expect(D075_WoodField.prerequisite).toBe('1 Occupation')
@@ -123,7 +123,7 @@ describe('D075_WoodField session', () => {
     expect(slot0).toBeDefined()
     expect(slot1).toBeDefined()
     // Both slots share groupKey so they merge into a single logical field
-    // for maxSelections counting (BGA "considered 1 field" semantics).
+    // for maxSelections counting (the reference "considered 1 field" semantics).
     expect(slot0!.groupKey).toBe(CARD_ID)
     expect(slot1!.groupKey).toBe(CARD_ID)
 

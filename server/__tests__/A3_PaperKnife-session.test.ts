@@ -1,5 +1,5 @@
 /**
- * A3 PaperKnife session tests — BGA alignment (Task 4.1).
+ * A3 PaperKnife session tests — the reference alignment (Task 4.1).
  *
  * This file contains two sets of tests:
  *
@@ -248,7 +248,7 @@ const playA3 = (session: GameSession) => {
 // ---------------------------------------------------------------------------
 // Case 1: onBuy emits a selection pending with kind='occupation-hand', min=max=3
 // ---------------------------------------------------------------------------
-describe('A003_PaperKnife session-tier: BGA-aligned flow', () => {
+describe('A003_PaperKnife session-tier: flow', () => {
   it('case 1: onBuy emits occupation-hand selection pending with min=max=3', () => {
     const session = makeSession({ wood: 1 })
 
@@ -481,7 +481,7 @@ describe('A003_PaperKnife session-tier: BGA-aligned flow', () => {
     // occupation's cost — there is no "additionalCost" field that survives the override.
     // Therefore, every A3-played occupation is free, regardless of its base cost.
     //
-    // BGA spec §6 item 3: "BGA likely fails the play silently, leaving the occupation in
+    // The reference spec §6 item 3: "the reference likely fails the play silently, leaving the occupation in
     // hand, when the occupation cost is unpayable." With exactCost: {} this
     // scenario cannot arise in our engine — the occupation is always affordable.
     //

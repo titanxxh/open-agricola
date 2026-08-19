@@ -150,7 +150,7 @@ const jsonSafe = JSON.parse(JSON.stringify(value ?? null))
 
 ### 2.2 常见判断与陷阱
 
-- **翻修目标房屋类型**：BGA 升级链固定 `wood → clay → stone`，无分支。`renovate-house` 触发时不要尝试从 `space` 读目标，用 `context.player.houseType` 反推：当前 `'wood'` 表示翻修到泥屋，`'clay'` 表示翻修到石屋。例：石屋翻修折扣 → `if (context.player.houseType !== 'clay') return`（参见 `shared/cards/A/A110_Roughcaster.ts:15,26`）。
+- **翻修目标房屋类型**：参考实现升级链固定 `wood → clay → stone`，无分支。`renovate-house` 触发时不要尝试从 `space` 读目标，用 `context.player.houseType` 反推：当前 `'wood'` 表示翻修到泥屋，`'clay'` 表示翻修到石屋。例：石屋翻修折扣 → `if (context.player.houseType !== 'clay') return`（参见 `shared/cards/A/A110_Roughcaster.ts:15,26`）。
 - **建造房屋类型**：`construct` 行动看 `context.choice` 或 `context.actionId`（`'build-clay-room'` / `'build-stone-room'` 等），不是 `space.params`。
 - **未使用 handler 参数**：项目 `tsconfig.json` 开了 `noUnusedParameters`。如果 handler 不需要 context，把参数前缀 `_` 或省掉。否则 PR CI 报 `TS6133: 'context' is declared but its value is never read`。
 

@@ -36,7 +36,7 @@ const familyGrowthLeaf = (): ActionFlow => ({
 
 const buildFlow = (newCount: number, player: PlayerState): ActionFlow => {
   const food = gainLeaf(CARD_ID, { food: 1 })
-  // BGA: when card just emptied AND player has farmer in reserve and family <= 4,
+  // Rule: when card just emptied AND player has farmer in reserve and family <= 4,
   // grant family-growth-without-room.
   if (newCount === 0 && hasInactiveWorkerInSupply(player) && familySize(player) <= 4) {
     return {

@@ -18,7 +18,7 @@ const makePlayer = (fieldPositions: Array<[number, number]>): PlayerState =>
 const sortKey = (positions: { row: number; col: number }[]) =>
   positions.map((p) => `${p.row}-${p.col}`).sort()
 
-describe('D001_ZigzagHarrow.computeZigzagCandidates (BGA geometry port)', () => {
+describe('D001_ZigzagHarrow.computeZigzagCandidates (reference geometry port)', () => {
   it('returns empty when player has no fields', () => {
     expect(computeZigzagCandidates(makePlayer([]))).toEqual([])
   })
@@ -56,7 +56,7 @@ describe('D001_ZigzagHarrow.computeZigzagCandidates (BGA geometry port)', () => 
 
   it('produces 4 deduped candidates for a 2x2 square of fields', () => {
     // Every corner of (0,0)(0,1)(1,0)(1,1) forms an L; union of candidates
-    // includes 4 in-bounds outer-diagonal tiles + 4 OOB ones; BGA does not
+    // includes 4 in-bounds outer-diagonal tiles + 4 OOB ones; The reference does not
     // filter to in-bounds, so we keep all 8 deduplicated coordinates.
     const candidates = computeZigzagCandidates(
       makePlayer([[0, 0], [0, 1], [1, 0], [1, 1]]),
@@ -88,7 +88,7 @@ describe('D001_ZigzagHarrow.prerequisiteCheck (registered handler)', () => {
     const check = requireActiveCardRegistry('D1 test').getPrerequisiteCheck(CARD_ID)!
     expect(check).toBeDefined()
     // Two adjacent fields (≥2) used to satisfy the old `fields.length >= 2`
-    // fallback; BGA's `zigzag()` returns empty here — handler must reject.
+    // fallback; the reference's `zigzag` returns empty here — handler must reject.
     expect(check(makePlayer([[0, 0], [0, 1]]))).toBe(false)
     // L-shaped 3 fields produce candidates; handler must accept.
     expect(check(makePlayer([[0, 0], [0, 1], [1, 1]]))).toBe(true)

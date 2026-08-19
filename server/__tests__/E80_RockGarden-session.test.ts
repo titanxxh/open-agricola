@@ -60,7 +60,7 @@ describe('E080_RockGarden metadata', () => {
     expect(dealtIds).toContain(CARD_ID)
   })
 
-  it('carries BGA cost-free metadata (no printed cost)', () => {
+  it('carries reference cost-free metadata (no printed cost)', () => {
     expect(E080_RockGarden.cost).toBeUndefined()
     expect(E080_RockGarden.vp).toBeUndefined()
   })
@@ -120,7 +120,7 @@ describe('E080_RockGarden session', () => {
     expect(slots[1]).toBeDefined()
     expect(slots[2]).toBeDefined()
     // All 3 slots share groupKey so they merge into 1 logical field
-    // (BGA "considered 1 field" semantics).
+    // (the reference "considered 1 field" semantics).
     for (const slot of slots) expect(slot!.groupKey).toBe(CARD_ID)
 
     resp = session.commitSelectionChoice(0, {

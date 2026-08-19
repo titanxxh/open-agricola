@@ -2,7 +2,7 @@ import { defineOccupationCard } from '../card-source'
 
 const CARD_ID = 'D155_Ebonist'
 
-// BGA: $this->exchanges = [Utils::formatExchange([WOOD => [FOOD => 1, GRAIN => 1], 'max' => 1], …, [HARVEST], …)]
+// Rule: $this->exchanges = [Utils::formatExchange([WOOD => [FOOD => 1, GRAIN => 1], 'max' => 1], …, [HARVEST], …)]
 
 export const D155_Ebonist = defineOccupationCard({
   meta: {

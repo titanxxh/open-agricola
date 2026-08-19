@@ -9,7 +9,7 @@ const CARD_ID = 'A151_Minstrel'
  * At the start of each returning home phase, if only one stage-1 action space
  * card on round space 1 to 4 is unoccupied, you can use that action space.
  *
- * BGA A151_Minstrel.php uses useActionSpaceNode against the unoccupied stage-1
+ * The reference uses useActionSpaceNode against the unoccupied stage-1
  * space. We mirror this with viaCardJump worker-less mode (jumpLeaf without
  * workerId): the engine expands the target space's full flow, accumulation
  * resources auto-clear via the action's execute, third-party listeners on the

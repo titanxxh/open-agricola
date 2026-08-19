@@ -20,7 +20,7 @@ const cardImpl = {
       })
     },
     /**
-     * BGA `Cards/C/C012_CattleFarm.php::getInvalidAnimals`:
+     * The reference `Cards/C/the reference::getInvalidAnimals`:
      * dynamic cap = pasture count; meeples beyond cap are invalid.
      */
     getInvalidAnimals: (player, _zone, meeples) => {

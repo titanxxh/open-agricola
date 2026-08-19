@@ -11,7 +11,7 @@ const CARD_ID = 'E156_ClaypitOwner'
  * Each time another player plays an improvement with a printed clay cost,
  * card owner gets 1 food + 1 clay.
  *
- * BGA: onPlayerAfterBuildImprovement — checks if the built improvement
+ * Rule: onPlayerAfterBuildImprovement — checks if the built improvement
  * has clay in its printed cost.
  *
  * scope 'opponent' — fires when an opponent plays an improvement with clay cost.

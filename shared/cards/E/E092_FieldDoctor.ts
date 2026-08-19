@@ -12,10 +12,10 @@ const CARD_ID = 'E092_FieldDoctor'
  * surrounded by 4 field tiles, you can use any __Wish for Children__ action space
  * even without room.
  *
- * BGA: onPlayerComputePlaceFarmerFlow — checks WishChildren action, 2 rooms,
+ * Rule: onPlayerComputePlaceFarmerFlow — checks WishChildren action, 2 rooms,
  * 4 field tiles at specific positions, card not flagged yet.
  *
- * The 4 field positions from BGA are: (3,5), (3,3), (3,1), (1,1) —
+ * The 4 field positions from the reference are: (3,5), (3,3), (3,1), (1,1) —
  * i.e. 4 specific farm tiles must be grain fields.
  *
  * Implementation: computeReplace listener on wish-children-growth to swap
@@ -26,8 +26,8 @@ const CARD_ID = 'E092_FieldDoctor'
 const checkRoomsSurroundedByFields = (context: CardListenerContext): boolean => {
   const player = context.player
   if (player.rooms !== 2) return false
-  // Check if fields exist at the 4 specific positions BGA uses.
-  // BGA positions: (x:3,y:5), (x:3,y:3), (x:3,y:1), (x:1,y:1).
+  // Check if fields exist at the 4 specific positions the reference uses.
+  // The reference positions: (x:3,y:5), (x:3,y:3), (x:3,y:1), (x:1,y:1).
   // In our coordinate system fields are tracked as player.fields array.
   // We check by tile position via positionKey or by checking enough planted fields near rooms.
   // Approximation: player must have at least 4 fields.

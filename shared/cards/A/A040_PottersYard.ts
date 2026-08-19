@@ -14,7 +14,7 @@ const CARD_ID = 'A040_PottersYard'
  * - After Plow/Construct/Fencing/Stables: collect clay from newly used spaces,
  *   offer optional exchange of N clay for 2N food.
  *
- * BGA: Tracks clay on individual farmyard tiles. When a tile becomes "used"
+ * Rule: Tracks clay on individual farmyard tiles. When a tile becomes "used"
  * (by plowing, building, fencing, or placing stables), collect the clay and
  * optionally exchange for food.
  *
@@ -65,7 +65,7 @@ const buildClayCollectFlow = (clayCollected: number): ActionHookResult | void =>
     gainLeaf(CARD_ID, { clay: clayCollected }),
   ]
   // Offer exchange: clay → 2 food per clay
-  // BGA offers XOR of (exchange i clay for 2i food) for i from clayCollected down to 1
+  // The reference offers XOR of (exchange i clay for 2i food) for i from clayCollected down to 1
   const exchangeChoices: ActionFlow[] = []
   for (let i = clayCollected; i > 0; i--) {
     exchangeChoices.push({

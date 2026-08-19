@@ -7,7 +7,7 @@ const CARD_ID = 'D059_EarthOven'
  * Bake Bread action: GRAIN→2 FOOD.
  * Cookery + Baking improvement. Replaces Fireplace only.
  *
- * BGA: isCookery=true, isBakingImprovement=true, returnCards = Fireplace variants.
+ * Rule: isCookery=true, isBakingImprovement=true, returnCards = Fireplace variants.
  * VP: 3.
  */
 

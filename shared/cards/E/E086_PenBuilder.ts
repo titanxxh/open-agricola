@@ -48,9 +48,9 @@ const cardImpl = {
     })
   },
   /**
-   * BGA `Cards/E/E086_PenBuilder.php::getInvalidAnimals` returns []:
+   * The reference `Cards/E/the reference::getInvalidAnimals` returns []:
    * capacity dynamically reflects discards * 2 via onPlayerComputeDropZones.
-   * Mirror BGA exactly.
+   * Mirror the reference exactly.
    */
   getInvalidAnimals: () => [],
 },

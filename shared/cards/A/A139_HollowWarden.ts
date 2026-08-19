@@ -11,7 +11,7 @@ const CARD_ID = 'A139_HollowWarden'
  * When you play this card, you immediately get a Major Improvement action to build a Fireplace.
  * Each time you use the Hollow accumulation space, you also get 1 Food.
  *
- * BGA: onBuy → optional improvement action for fireplaces (Major_Fireplace1, Major_Fireplace2,
+ * Rule: onBuy → optional improvement action for fireplaces (Major_Fireplace1, Major_Fireplace2,
  *      A060_OrientalFireplace). isListeningTo → isActionCardEvent(Hollow).
  *      onPlayerPlaceFarmer → gain 1 food.
  *

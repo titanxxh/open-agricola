@@ -196,7 +196,7 @@ const resolveBatchExchange = (
 }
 
 // ============================================
-// Trade System (BGA-aligned)
+// Trade System (the reference-aligned)
 // ============================================
 
 /**

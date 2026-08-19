@@ -21,7 +21,7 @@ const cardImpl = {
     const triggerRound = readCardExtraData<number>(player, CARD_ID, 'triggerRound')
     if (triggerRound === undefined || state.round !== triggerRound) return
     if (isCardFlagged(player, CARD_ID)) return
-    // BGA `Telegram::activate` checks `hasFarmerInReserve` before inserting the
+    // The reference `Telegram::activate` checks `hasFarmerInReserve` before inserting the
     // extra-placement node — without an unplaced worker, the trigger is wasted
     // (and the player loses the once-per-game flag). We mirror that guard via
     // `workersAvailable(state, player)`.

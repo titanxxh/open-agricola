@@ -16,7 +16,7 @@ const MEETING_PLACE_PREFIX = 'meeting-place'
  *   you just placed cannot be recalled, and persons on Meeting Place action
  *   spaces cannot be recalled either.
  *
- * BGA (D093_SheepInspector.php):
+ * Rule:
  * - isListeningTo: (PlaceFarmer + unflagged) OR (player startOfWork)
  * - onPlayerStartOfWork: unflag
  * - onPlayerAfterPlaceFarmer: build optional SEQ [flagCard, pay(1 sheep+2 food),

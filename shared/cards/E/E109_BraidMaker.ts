@@ -8,7 +8,7 @@ const CARD_ID = 'E109_BraidMaker'
 /**
  * E109 Braid Maker (Occupation, 1+ players).
  *
- * BGA (E109_BraidMaker.php):
+ * Rule:
  *   - exchanges: each harvest, 1 REED → 2 FOOD (max 1).
  *   - onPlayerComputeCardCosts: whenever buying Major_Basket (regardless of
  *     trigger), override trades to cost { stone: 1, reed: 1 }.
@@ -17,7 +17,7 @@ const CARD_ID = 'E109_BraidMaker'
  *   - exchanges field on the card definition handles the harvest reed → food.
  *   - computeCosts listener on improvement-any keyed off context.cardId ===
  *     Major_Basket → appends a sourced fixed-price candidate
- *     { reed: 1, stone: 1 }. No flag / actionCardId gate — BGA applies it any
+ *     { reed: 1, stone: 1 }. No flag / actionCardId gate — the reference applies it any
  *     time this card is owned.
  */
 

@@ -14,7 +14,7 @@ const RESOURCE_MARKET_SPACES = new Set([
  * B156 Storehouse Keeper — Each time you use the Resource Market action space,
  * you also get your choice of 1 CLAY or 1 GRAIN.
  *
- * BGA (B156_StorehouseKeeper.php): isActionCardEvent('ResourceMarket') →
+ * Rule: isActionCardEvent('ResourceMarket') →
  * returns a NODE_XOR of gainNode([CLAY => 1]) / gainNode([GRAIN => 1]).
  */
 const listener: CardListenerRegistration = {

@@ -19,7 +19,7 @@ const FIELD_EFFECT = 'sample-stable-maker-return'
  *   exchange: gain 1 WOOD + 1 GRAIN + 1 FOOD and then optionally play a
  *   minor improvement.
  *
- * BGA (D102_SampleStableMaker.php lines 42-111): player can always choose
+ * Rule: player can always choose
  * whether to use the effect (NODE_SEQ optional). A single-stable shortcut
  * skips the selection step.
  *

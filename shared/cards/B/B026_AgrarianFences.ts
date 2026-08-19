@@ -12,7 +12,7 @@ const CARD_ID = 'B026_AgrarianFences'
  * When you use the Grain Utilization action space, you can also/instead
  * build fences.
  *
- * BGA: onPlayerComputePlaceFarmerFlow — replaces grain-utilization flow
+ * Rule: onPlayerComputePlaceFarmerFlow — replaces grain-utilization flow
  * to offer XOR: (1) normal sow+bake, (2) build fences, (3) sow+fences.
  *
  * Implementation: computeReplace on 'sow' within grain-utilization context.

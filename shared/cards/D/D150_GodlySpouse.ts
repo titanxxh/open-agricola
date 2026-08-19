@@ -18,7 +18,7 @@ const afterWishChildrenListener: CardListenerRegistration = {
     const placements = getRoundPlacementDetails(context.player)
     if (placements.length !== 2) return
 
-    // BGA: "unless the first is on Meeting Place" — drop the workerId in that
+    // Rule: "unless the first is on Meeting Place" — drop the workerId in that
     // case so the recall is a no-op while flag/log decorations still fire.
     const first = placements[0]!
     const targetWorkerId =

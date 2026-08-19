@@ -5,7 +5,7 @@ import { runCardEffectHook, getCardEffect } from '../../shared/cards/card-effect
 import '../../shared/cards/C/C135_Constable'
 import type { ActionFlow } from '../../shared/contract/types'
 
-// BGA C135_Constable.php map (key = 14 - turn = remaining complete rounds left after this one):
+// The reference map (key = 14 - turn = remaining complete rounds left after this one):
 //   0→0, 1→1, 2→1, 3→2, 4→2, 5→2, 6→3, 7→3, 8→3,
 //   9→4, 10→4, 11→4, 12→4, 13→4, 14→4
 // onBuy fires when turn (= state.round) < 14.

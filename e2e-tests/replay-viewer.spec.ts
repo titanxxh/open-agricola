@@ -43,7 +43,7 @@ test('anonymous completed replay supports perspectives, playback, layout, and an
   const cardFrameImage = await replay.locator('.card-frame').first().evaluate(
     (element) => getComputedStyle(element).backgroundImage,
   )
-  expect(cardFrameImage).toContain('boardgamearena')
+  expect(cardFrameImage).toContain('raw.githubusercontent.com')
   expect(cardFrameImage).not.toContain('/replay-viewers/')
 
   await replay.locator('button[data-player="p2"]').click()

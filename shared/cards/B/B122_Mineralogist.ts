@@ -9,7 +9,7 @@ const CARD_ID = 'B122_Mineralogist'
  * B122 Mineralogist — Each time you use a clay/stone accumulation space,
  * you also get 1 of the other good.
  *
- * BGA (B122_Mineralogist.php): isBeforeCollectEvent CLAY/STONE →
+ * Rule: isBeforeCollectEvent CLAY/STONE →
  * onPlayerPlaceFarmer returns gainNode of the opposite resource.
  */
 const listener: CardListenerRegistration = {

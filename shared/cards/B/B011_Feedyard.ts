@@ -22,7 +22,7 @@ const cardImpl = {
       })
     },
     /**
-     * BGA `Cards/B/B011_Feedyard.php::getInvalidAnimals`:
+     * The reference `Cards/B/the reference::getInvalidAnimals`:
      * dynamic cap = pasture count; extras invalid.
      */
     getInvalidAnimals: (player, _zone, meeples) => {
@@ -30,7 +30,7 @@ const cardImpl = {
       return meeples.filter((_m, idx) => idx >= cap)
     },
     /**
-     * BGA `onPlayerEndHarvest`: 1 food per unused spot on the card zone
+     * The reference `onPlayerEndHarvest`: 1 food per unused spot on the card zone
      * (capacity - animalCount). Single-card hook — runs after the breed
      * phase via the existing onEndHarvest dispatch.
      */

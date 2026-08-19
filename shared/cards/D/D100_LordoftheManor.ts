@@ -8,7 +8,7 @@ const cardImpl = {
   id: CARD_ID,
   computeBonusScore: (_state, _player, ctx) => {
     // 1 VP per standard category where score = 4 (max in standard range)
-    // BGA whitelist (`computeSpecialScore`): fields, pastures, grains,
+    // The reference whitelist (`computeSpecialScore`): fields, pastures, grains,
     // vegetables, sheeps, pigs, cattles, stables. Card desc explicitly: "The
     // bonus point is also awarded for 4 fenced stables."
     const standardCategories = ['fields', 'pastures', 'grains', 'vegetables', 'sheeps', 'boars', 'cattles', 'stables']

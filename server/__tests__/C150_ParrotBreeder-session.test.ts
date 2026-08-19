@@ -177,7 +177,7 @@ describe('C150_ParrotBreeder session', () => {
     expect(readCardExtraData<string | null>(updated, CARD_ID, RIGHT_KEY)).toBeNull()
   })
 
-  it('blocks re-use of a Meeting-Place tracker (BGA exclusion)', () => {
+  it('blocks re-use of a Meeting-Place tracker (reference exclusion)', () => {
     const session = setup()
     const state = session.getState().state
     const owner = state.players[0]!

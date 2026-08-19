@@ -11,7 +11,7 @@ const CARD_ID = 'A026_SleepingCorner'
  * A26 Sleeping Corner — You can use any __Wish for Children__ action space
  * even if it is occupied by one other player's person.
  *
- * BGA: onPlayerComputeArgsPlaceFarmer adds WishChildren spaces that have
+ * Rule: onPlayerComputeArgsPlaceFarmer adds WishChildren spaces that have
  * exactly 1 farmer on them (not a child).
  *
  * Prerequisite: 2 Grain Fields.

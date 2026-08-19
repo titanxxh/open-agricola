@@ -9,7 +9,7 @@ const CARD_ID = 'C151_SowingDirector'
  * Each time another player uses the Grain Utilization action space,
  * the card owner gets a free sow action.
  *
- * BGA: isListeningTo → PlaceFarmer on GrainUtilization.
+ * Rule: isListeningTo → PlaceFarmer on GrainUtilization.
  *      onOpponentAfterPlaceFarmer → optional sow action.
  */
 const listener: CardListenerRegistration = {

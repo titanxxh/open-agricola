@@ -9,7 +9,6 @@ const CARD_ID = 'A050_MilkJug'
  * A50 Milk Jug — Each time any player (including you) uses the Cattle Market
  * accumulation space, you get 3 food and each other player gets 1 food.
  *
- * BGA reference: A_50_MilkJug.php
  * scope 'any' — fires once for the card owner regardless of who triggered.
  */
 const listener: CardListenerRegistration = {

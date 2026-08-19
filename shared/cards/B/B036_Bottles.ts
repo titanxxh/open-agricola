@@ -7,7 +7,6 @@ const CARD_ID = 'B036_Bottles'
  * B36 Bottles (Minor Improvement):
  * Worth 4 VP. Dynamic cost: for each person you have, pay 1 clay + 1 food.
  *
- * BGA reference:
  * - getBaseCosts: clay = farmers, food = farmers
  * - vp: 4
  */

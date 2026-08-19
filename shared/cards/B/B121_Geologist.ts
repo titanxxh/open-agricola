@@ -10,7 +10,7 @@ const CARD_ID = 'B121_Geologist'
  * you also get 1 CLAY. In games with 3 or more players, this also applies to
  * the Clay Pit.
  *
- * BGA (B121_Geologist.php): isActionCardEvent for 'Forest', 'ReedBank', or
+ * Rule: isActionCardEvent for 'Forest', 'ReedBank', or
  * (3+ players) 'ClayPit' → onPlayerPlaceFarmer returns gainNode([CLAY => 1]).
  */
 const listener: CardListenerRegistration = {

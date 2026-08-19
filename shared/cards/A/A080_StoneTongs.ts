@@ -9,7 +9,6 @@ const CARD_ID = 'A080_StoneTongs'
  * A80 Stone Tongs — Each time you use a stone accumulation space
  * (eastern-quarry or western-quarry), you get 1 additional stone.
  *
- * BGA reference: A_80_StoneTongs.php
  */
 const STONE_SPACES = ['eastern-quarry', 'western-quarry']
 

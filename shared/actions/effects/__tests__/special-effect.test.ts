@@ -934,9 +934,9 @@ describe('specialEffectAction — mutation dispatcher', () => {
   })
 
   // E166 Roastmaster relies on this SE kind. The plan (Task 9, F9) calls out
-  // BGA's "actually move the food meeple" semantic — verify the source space
+  // The reference's "actually move the food meeple" semantic — verify the source space
   // truly decrements and the destination truly increments.
-  describe('move-resource-between-spaces (E166 BGA parity)', () => {
+  describe('move-resource-between-spaces (E166 parity)', () => {
     const makeSpace = (id: string, food: number): ActionSpace => ({
       id,
       nameKey: `actions.${id}.name`,

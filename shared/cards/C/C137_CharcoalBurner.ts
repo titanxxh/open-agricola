@@ -13,7 +13,7 @@ const CARD_ID = 'C137_CharcoalBurner'
  * Each time any player plays/builds an improvement that has bake capability,
  * card owner gets 1 wood + 1 food.
  *
- * BGA: onPlayerAfterBuildImprovement — checks if the built improvement
+ * Rule: onPlayerAfterBuildImprovement — checks if the built improvement
  * has baking exchanges (isBaking flag).
  *
  * scope 'any' — fires when any player (including owner) builds a baking improvement.

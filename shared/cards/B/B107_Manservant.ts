@@ -11,7 +11,7 @@ const CARD_ID = 'B107_Manservant'
  * Once you live in a stone house, place 3 food on each remaining round space.
  * At the start of these rounds, you get the food.
  *
- * BGA: onBuy delegates to onPlayerAfterRenovation.
+ * Rule: onBuy delegates to onPlayerAfterRenovation.
  * Only triggers when player is in a stone house.
  * Uses futureMeeplesNode with count = 14 (all remaining rounds).
  */

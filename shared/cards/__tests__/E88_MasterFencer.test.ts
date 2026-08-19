@@ -33,7 +33,7 @@ const createState = (...players: PlayerState[]): GameState =>
   }) as unknown as GameState
 
 describe('E088_MasterFencer', () => {
-  it('passes BGA max and free-fence cost through fencePolicy', () => {
+  it('passes reference max and free-fence cost through fencePolicy', () => {
     const player = createPlayer()
     const flow = getCardEffect(CARD_ID)!.onRoundStart!(createState(player), player)
 

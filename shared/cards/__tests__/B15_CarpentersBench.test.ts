@@ -78,7 +78,7 @@ describe('B015_CarpentersBench', () => {
       space: woodSpace,
       actionId: 'collect',
       phase: 'after',
-      // Actually-collected wood (BGA L42-46 counts wood meeples on space) is
+      // Actually-collected wood (the reference L42-46 counts wood meeples on space) is
       // the source of truth for bench cap, not space.gainPerRound.
       result: { type: 'ok', resourcesGained: { wood: 3 } },
       transactionEvents: [woodMoved(3, player.id)],

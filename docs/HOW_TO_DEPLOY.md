@@ -84,12 +84,11 @@ The first Replay rollout requires `PERSIST_ROOMS=sqlite`. Build and append a Vie
 
 ```bash
 REPLAY_VIEWER_ROOT="$PWD/data/replay-viewers" \
-BGA_CDN_BASE_URL="https://x.boardgamearena.net/data/themereleases/current/games/agricola/<version>/img" \
 pnpm run build:replay-viewer
 # The final stdout line is REPLAY_VIEWER_BUILD_ID
 ```
 
-Use the same repository variable for `BGA_CDN_BASE_URL` as the main-site build. The command writes Viewer code, styles, and the card manifest into a separate read-only Build. It reads BGA board art, card art, and fonts directly from the CDN instead of storing them in the persistent volume. Publishing creates a per-file SHA-256 manifest, uses the manifest's own SHA-256 as the directory name, and revalidates the complete directory. It never overwrites an existing directory with the same ID.
+The command writes Viewer code, styles, and the card manifest into a separate read-only Build. It reads board art, card art, and fonts from the pinned asset repository instead of storing them in the persistent volume. Publishing creates a per-file SHA-256 manifest, uses the manifest's own SHA-256 as the directory name, and revalidates the complete directory. It never overwrites an existing directory with the same ID.
 
 `docker-compose.prod.yml` stores data in the `app-data:/app/data` named volume. Start once with `REPLAY_NEW_ROOMS_ENABLED=false`, append the Build, and only then enable recording. Put the previous command's final output in `.env` as `REPLAY_VIEWER_BUILD_ID`, and put the output of `git rev-parse HEAD` in `GAME_BUILD_ID`:
 
@@ -393,7 +392,6 @@ Under **Settings → Secrets and variables → Actions → Variables**, add:
 |---|---|---|
 | `VITE_API_BASE` | Complete backend URL | `https://api.your-domain.com`, or `http://VPS_IP:5175` for HTTP-only testing |
 | `VITE_WS_BASE` | Optional WebSocket URL; derived automatically by default | `wss://api.your-domain.com/ws` |
-| `BGA_CDN_BASE_URL` | BGA image CDN root | Keep it aligned with `.env.example` |
 | `VITE_SANDBOX_EXECUTOR` | Optional Workshop playtest executor | `browser` runs the engine Worker and local compilation entirely in the browser; unset or another value uses `/api/game/new-sandbox` on the server |
 
 ### Trigger a Deployment
@@ -579,7 +577,6 @@ Never set these in production:
 |---|---|---|
 | `VITE_API_BASE` | `''`, meaning same-origin | Backend API URL |
 | `VITE_WS_BASE` | Derived from the API base | WebSocket URL |
-| `BGA_CDN_BASE_URL` | — | BGA image CDN root shared by the main site and Replay Viewer build |
 | `PUBLIC_ASSET_LOCAL_DIR` | — | Local development only: a complete asset-repository checkout; remote mixing and fallback are disabled |
 
 ---
@@ -607,7 +604,7 @@ Never set these in production:
 ### Card Images Do Not Display
 
 - This affects display only, not gameplay.
-- Confirm that the BGA image directory exists at the configured path.
+- Confirm that `public-assets.ref` points at a published asset-repository commit and that `public-assets.required.json` lists every needed path.
 
 ### Data Backup
 

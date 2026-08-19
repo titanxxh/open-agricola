@@ -80,7 +80,7 @@ describe('C148_MudWallower reorg-after sync (zone-based)', () => {
     // Start: held=3 (cap), boar=2 (all conceptually in C148 zone, none in pasture).
     // Player collects 1 boar from pig-market → boar=3, engine triggers animal-reorg.
     // Player submits zones with 2 boars in pasture-1 → pigsInC148 = 3-2 = 1.
-    // After-reorg listener should sync held down to 1 (BGA decreaseRoom semantic).
+    // After-reorg listener should sync held down to 1 (the reference decreaseRoom semantic).
     const session = setupWorkPhase({ boar: 2, held: 3 })
     let resp = session.takeAction(0, 'pig-market')
     expect(resp.ok).toBe(true)

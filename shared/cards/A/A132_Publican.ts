@@ -6,7 +6,7 @@ import type { CardImpl } from '../registry'
 
 const CARD_ID = 'A132_Publican'
 /**
- * BGA `wrapSowWithDeferredCheck` defers the offer so that the offer is not
+ * The reference `wrapSowWithDeferredCheck` defers the offer so that the offer is not
  * shown when the only legal way for the sowing player to sow is to receive
  * grain from the Publican. This avoids the case where the Publican declines
  * and the sowing player is stuck. We currently skip the deferred-check and

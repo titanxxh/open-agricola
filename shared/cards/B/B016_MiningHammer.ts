@@ -10,7 +10,7 @@ const CARD_ID = 'B016_MiningHammer'
  * - onBuy: immediately get 1 food.
  * - After renovation: can build 1 stable without paying wood.
  *
- * BGA: onBuy → gain 1 food.
+ * Rule: onBuy → gain 1 food.
  *       afterRenovation → optional stables action (max 1, free cost).
  */
 

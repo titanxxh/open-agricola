@@ -63,7 +63,7 @@ describe('formatCardStatsLines', () => {
     ])
   })
 
-  it('emits all 6 fields in BGA-aligned order', () => {
+  it('emits all 6 fields in order', () => {
     const stats: CardResourceStats = {
       used: 1,
       gained: { wood: 1 },

@@ -12,7 +12,7 @@ const CARD_ID = 'D117_WoodExpert'
  * When you play this card, you immediately get 2 wood.
  * Each improvement costs you up to 2 wood less, if you pay 1 food instead.
  *
- * BGA: onBuy → gain 2 wood.
+ * Rule: onBuy → gain 2 wood.
  * onPlayerComputeCardCosts → for each major/minor cost candidate containing wood,
  *   appends an alternative candidate: -2 wood (clamped to 0) +1 food.
  */

@@ -370,7 +370,7 @@ describe('ActionBoard', () => {
     expect(html6p).toContain('class="action-board action-board--6p"')
   })
 
-  it('uses BGA-matching 3p and 4p side-space positions', () => {
+  it('uses 3p and 4p side-space positions', () => {
     const playerA = createPlayer('p1', 'PlayerA', 'red')
     const playerB = createPlayer('p2', 'PlayerB', 'blue')
     const playerC = createPlayer('p3', 'PlayerC', 'yellow')

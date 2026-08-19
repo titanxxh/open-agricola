@@ -9,7 +9,7 @@ const CARD_ID = 'B095_MasterBricklayer'
 /**
  * B95 Master Bricklayer — Each time you build a major improvement, reduce the stone cost
  * by the number of rooms you have built onto your initial house.
- * BGA: onPlayerComputeCardCosts, applies to MAJOR type only.
+ * Rule: onPlayerComputeCardCosts, applies to MAJOR type only.
  * Discount = (current rooms - 2) stone.
  */
 const computeCostsListener: CardListenerRegistration = {

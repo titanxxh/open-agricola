@@ -6,7 +6,7 @@ import type { CardImpl } from '../registry'
 const CARD_ID = 'E095_Miller'
 /**
  * List of baking-related improvements that the Miller can purchase onBuy.
- * Matches BGA reference (E095_Miller.php allowedPurchases).
+ * Matches the reference allowedPurchases.
  */
 const BAKING_IMPROVEMENT_IDS = [
   'Major_Fireplace1',

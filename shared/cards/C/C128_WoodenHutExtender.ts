@@ -11,7 +11,7 @@ const CARD_ID = 'C128_WoodenHutExtender'
  *   - Rounds 6–7:  4 wood + 1 reed  (base 5+2, so -1 wood -1 reed)
  *   - Round 8+:    3 wood + 1 reed  (base 5+2, so -2 wood -1 reed)
  *
- * BGA reference: onPlayerComputeCostsConstruct calls Utils::addCost to set the full cost
+ * Reference: onPlayerComputeCostsConstruct calls Utils::addCost to set the full cost
  * based on the current round, only for roomWood type.
  */
 

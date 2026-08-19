@@ -25,8 +25,8 @@ const hasPositiveResources = (resources: Partial<Resource>): boolean =>
 
 /**
  * Distribute `paid` and `saved` over each card that contributed to a
- * PaymentSolution. Mirrors BGA `Pay::updateSourceCardStatsFromCost`
- * (`bga-agricola/modules/php/Actions/Pay.php:271-292`) but uses our pre-built
+ * PaymentSolution. Mirrors the reference `Pay::updateSourceCardStatsFromCost`
+ * (`the reference`) but uses our pre-built
  * solution so we don't have to re-derive a "reference combination".
  *
  * Trade attribution rules:

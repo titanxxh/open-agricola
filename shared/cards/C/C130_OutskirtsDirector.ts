@@ -12,7 +12,7 @@ const CARD_ID = 'C130_OutskirtsDirector'
  * Each time you use Grove or Hollow, place 2 REED from the general supply
  * on the other space. If you do, you can immediately place another person.
  *
- * BGA: After PlaceFarmer on Grove → place 2 reed on Hollow (and vice versa).
+ * Rule: After PlaceFarmer on Grove → place 2 reed on Hollow (and vice versa).
  * In 4-player games, the Hollow accumulation space is 'hollow-4' (different
  * gain rate). We use `pairedSpaceIdFor` to resolve the variant.
  *

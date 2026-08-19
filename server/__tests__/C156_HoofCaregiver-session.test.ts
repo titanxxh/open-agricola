@@ -9,7 +9,7 @@ const CARD_ID = 'C156_HoofCaregiver'
 
 describe('C156_HoofCaregiver session', () => {
   it('onBuy adds 1 cattle to cattle-market space and gains N grain + N food', () => {
-    // BGA `C156_HoofCaregiver::onBuy`:
+    // The reference `C156_HoofCaregiver::onBuy`:
     //   1. SPECIAL_EFFECT placeCattle('ActionCattleMarket') — +1 cattle to space
     //   2. gainNode([GRAIN => N, FOOD => N]) where N = cattle on space (after +1)
     // Our previous impl hard-coded gain {grain: 1, food: 1} and skipped the
@@ -51,7 +51,7 @@ describe('C156_HoofCaregiver session', () => {
 
   it('onBuy returns undefined when cattle-market action space is absent', () => {
     // C156 requires the cattle-market reveal. Strip it from the state to
-    // simulate the BGA "card not yet revealed" guard (`if (!$revealed) return`).
+    // simulate the reference "card not yet revealed" guard (`if (!$revealed) return`).
     const session = new GameSession()
     const state = session.getState().state
     state.players = state.players.slice(0, 2)

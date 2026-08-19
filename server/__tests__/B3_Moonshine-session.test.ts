@@ -1,7 +1,7 @@
 /**
- * Failing TDD tests for B3 Moonshine BGA alignment (Task 3.1).
+ * Failing TDD tests for B3 Moonshine the reference alignment (Task 3.1).
  *
- * Target behavior (from spec docs/superpowers/specs/2026-04-19-align-bga-A3-B3-design.md §2.2):
+ * Target behavior:
  *   onBuy → rollAndCacheCardPick → pendingUndoBoundary = true
  *         → emit pending 'choice' with {play, pass} options
  *   resolveChoice('play') → insert occupation leaf (exactCost: { food: 2 })

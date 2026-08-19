@@ -132,7 +132,7 @@ export const recordDraftPlayed = (
  * Reserved for future pre-game discard mechanic. The current repo's draft
  * flow does not have a "discard before final pool" step, so this helper has
  * no production call site. Kept here so future work can wire it in once the
- * discard flow lands. See spec: docs/superpowers/specs/2026-04-28-stats-bga-alignment-track3-player-draft-design.md "待实施时确认 #5".
+ * discard flow lands.
  */
 export const recordDraftDiscarded = (player: PlayerState, cardId: string) => {
   const stats = ensureStats(player)

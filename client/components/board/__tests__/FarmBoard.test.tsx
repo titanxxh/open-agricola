@@ -1088,7 +1088,7 @@ describe('FarmBoard', () => {
     expect(html).toMatch(/farm-tile[^"]*\bevent-highlight\b/)
   })
 
-  it('renders BGA-style image layers for empty, room, and field farm tiles', () => {
+  it('renders image layers for empty, room, and field farm tiles', () => {
     const player = createPlayer('p1', 'Player A', 'red')
 
     const html = renderToStaticMarkup(
@@ -1274,7 +1274,7 @@ describe('FarmBoard', () => {
     expect(html).toMatch(/farm-fence-v[^>]*data-player-color="blue"/)
   })
 
-  it('renders farm fences with BGA fence orientation classes and color tokens', () => {
+  it('renders farm fences with reference fence orientation classes and color tokens', () => {
     const player = {
       ...createPlayer('p1', 'Player A', 'red'),
       fenceSegments: [

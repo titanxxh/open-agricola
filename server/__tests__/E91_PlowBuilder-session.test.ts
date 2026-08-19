@@ -16,7 +16,7 @@ const CARD_ID = 'E091_PlowBuilder'
 
 describe('E091_PlowBuilder session', () => {
   /**
-   * BGA gates the anytime action on a per-harvest `usedJoinery` flag set by
+   * The reference gates the anytime action on a per-harvest `usedJoinery` flag set by
    * an Exchange-event listener (Joinery used during the harvest), not just
    * on owning the card. Sprint 5e mirrored this with a `trade-applied`
    * listener; tests below set the flag directly via the same helper to
@@ -155,7 +155,7 @@ describe('E091_PlowBuilder session', () => {
   })
 
   it('trade-applied listener accepts Major_Joinery upgrade prefix matches', () => {
-    // Future-proofing: BGA prefix-matches Major_Joinery to catch potential
+    // Future-proofing: The reference prefix-matches Major_Joinery to catch potential
     // upgrade ids; we mirror with startsWith.
     const session = new GameSession()
     stabilizeRandomHands(session.state.players)

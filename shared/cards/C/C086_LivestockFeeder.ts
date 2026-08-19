@@ -22,9 +22,9 @@ const cardImpl = {
     })
   },
   /**
-   * BGA `Cards/C/C086_LivestockFeeder.php::getInvalidAnimals` returns []:
+   * The reference `Cards/C/the reference::getInvalidAnimals` returns []:
    * capacity dynamically reflects grain count via onPlayerComputeDropZones.
-   * Mirror BGA exactly.
+   * Mirror the reference exactly.
    */
   getInvalidAnimals: () => [],
 },

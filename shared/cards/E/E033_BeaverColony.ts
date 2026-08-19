@@ -72,7 +72,7 @@ const cardImpl = {
     blocked.capacity = 0
   },
   /**
-   * BGA `Models/PlayerBoard.php::getInvalidAnimals` (E33 branch):
+   * The reference `Models/the reference::getInvalidAnimals` (E33 branch):
    * pasture-with-stable restriction. We enforce via `onComputeAnimalZones`
    * setting cap=0 on the smallest stabled pasture, which forces overflow
    * on reorg. Hook returns [] because the constraint is not card-zone-local.

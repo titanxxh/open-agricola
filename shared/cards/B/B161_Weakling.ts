@@ -11,7 +11,7 @@ const CARD_ID = 'B161_Weakling'
  * one or more accumulation spaces with 5+ goods on them and you do not use
  * any of them, you get 1 VEGETABLE.
  *
- * BGA (B161_Weakling.php): isActionCardTurnEvent (any round/placement event) →
+ * Rule: isActionCardTurnEvent (any round/placement event) →
  * onPlayerPlaceFarmer scans ActionCards::getAccumulationSpaces() and:
  *   - returns nothing if the played space is one with 5+ goods,
  *   - returns gainNode([VEGETABLE => 1]) if any other accumulation space has 5+ goods.
@@ -19,7 +19,7 @@ const CARD_ID = 'B161_Weakling'
  * We approximate by scanning state.actionSpaces for spaces with non-empty
  * gainPerRound (i.e. accumulating spaces) and totalling their resources.
  *
- * BGA also has `onPlayerComputeArgsPlaceFarmer` which adds
+ * The reference also has `onPlayerComputeArgsPlaceFarmer` which adds
  * `ignoreResources: true` to all visible action cards so the player can
  * place onto resource-restricted spaces. We don't currently honor this
  * flag in placement-availability (sprint-7a fallback per spec §220 — flagged

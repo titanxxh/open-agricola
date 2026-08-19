@@ -30,7 +30,7 @@ const stablesCostListener: CardListenerRegistration = {
   phases: ['computeCosts' as ActionHookPhase],
   actions: ['stables'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
-    // BGA `countCarpenterDiscounts`: stable #3 and #4 each cost 1 wood less,
+    // The reference `countCarpenterDiscounts`: stable #3 and #4 each cost 1 wood less,
     // counted by card-facing stable count (ordinary + B85 FarmHand). The total
     // discount depends on how many of the 3rd/4th seats this build crosses, so
     // it is a single aggregate amount rather than a per-unit delta. Callers
@@ -66,7 +66,7 @@ const fenceIsDoableListener: CardListenerRegistration = {
     if (buildLimit < 13) return
     if (getTotalPastureCells(player) >= maxPastureCells) return
     const wood = player.resources.wood ?? 0
-    // BGA Fencing.php:195-201: the free band unlocks only once the player
+    // The reference:195-201: the free band unlocks only once the player
     // can self-pay up to the 12th fence.
     const neededToReach12 = Math.max(0, 12 - before)
     if (wood < neededToReach12) return
@@ -103,7 +103,7 @@ const fenceCostListener: CardListenerRegistration = {
     const newFenceEdges = context.params?.newFenceEdges as string[] | undefined
     const buildingNow = newFenceEdges?.length ?? 0
     if (buildingNow <= 0) return
-    // BGA Fencing.php:595-601: the 13th-15th fence each cost 1 wood less.
+    // The reference:595-601: the 13th-15th fence each cost 1 wood less.
     const before = getOwnOrdinaryFenceCount(context.player)
     const buildLimit = getOwnOrdinaryFenceBuildLimit(context.player)
     const start = before + 1

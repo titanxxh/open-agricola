@@ -28,7 +28,6 @@ services:
       - REPLAY_ASSET_ROOT=${REPLAY_ASSET_ROOT:-./data/replay-assets}
       - REPLAY_REMOVAL_LEDGER_PATH=${REPLAY_REMOVAL_LEDGER_PATH:-./data/replay-removals.jsonl}
       - REPLAY_TRUST_PROXY=true
-      - BGA_CDN_BASE_URL=${BGA_CDN_BASE_URL:-}
       - GAME_BUILD_ID=${GAME_BUILD_ID:-}
       - BUG_REPORTS_ENABLED=${BUG_REPORTS_ENABLED:-false}
       - BUG_REPORT_GITHUB_APP_ID=${BUG_REPORT_GITHUB_APP_ID:-}

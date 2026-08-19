@@ -36,7 +36,7 @@ export type FutureMeepleResourceMap = Partial<Resource> & {
 }
 
 // Pseudo-resource map — used ONLY by CardResourceStats.gained to record
-// BGA-style "Plows: N / Built: N rooms / Occupations played: N" lines via
+// "Plows: N / Built: N rooms / Occupations played: N" lines via
 // the same Partial<Resource>-shaped storage slot. These keys are NEVER
 // stored in player.resources or space.resources. See
 // shared/contract/resource-keys.ts for the runtime list / discriminator.
@@ -543,7 +543,7 @@ export type HarvestReapSummary = {
   harvestCountApplications?: HarvestCountApplication[]
   /**
    * Positions of every field tile that produced a crop in this reap pass.
-   * Mirror of BGA `getHarvestedFieldTilePositions($crops)`. Cards like
+   * Mirror of the reference `getHarvestedFieldTilePositions($crops)`. Cards like
    * D63 Lynchet need exact tile positions, not just totals — using only
    * grain/vegetable counts loses information when the player has multiple
    * fields of the same crop type.
@@ -615,7 +615,7 @@ export type GameState = {
    * Number of feeding phases that have completed (incremented once at the
    * start of each breeding phase, after all players have fed).
    * Consumed by A148_Woolgrower / B086_TruffleSearcher animal capacity.
-   * Mirrors BGA `Globals::getCompletedFeedingPhases()`.
+   * Mirrors the reference `Globals::getCompletedFeedingPhases`.
    */
   completedFeedingPhases: number
 }

@@ -7,7 +7,7 @@ const CARD_ID = 'A060_OrientalFireplace'
  * Bake Bread action: GRAIN→2 FOOD.
  * Cookery + Baking improvement. Replaces Fireplace or Cooking Hearth.
  *
- * BGA: isCookery=true, isBakingImprovement=true, returnCards = Fireplace/CookingHearth variants.
+ * Rule: isCookery=true, isBakingImprovement=true, returnCards = Fireplace/CookingHearth variants.
  */
 
 export const A060_OrientalFireplace = defineMinorCard({

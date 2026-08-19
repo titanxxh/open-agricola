@@ -80,7 +80,7 @@ registerAdHocAction(discardFromHandAction)
  *  discard exactly 1 card from your hand to get 1 additional building
  *  resource of the accumulating type."
  *
- * BGA (B146_Illusionist.php lines 32-62):
+ * Rule:
  *   - isListeningTo: isBeforeCollectEvent for WOOD / CLAY / REED / STONE.
  *   - onPlayerPlaceFarmer: if hand is empty or Lantern House is in play,
  *     skip. Otherwise return an optional SEQ [selectCard, gainNode(resource=1)].

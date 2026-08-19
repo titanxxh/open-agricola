@@ -4,8 +4,8 @@ import type { CardDefinition, CardType } from '../../contract/cards'
 import { getMajorCard } from '../major'
 
 /**
- * Card-type helpers — mirror of BGA's PlayerCard::hasType($type) and
- * getOtherCardTypes() (see bga-agricola/modules/php/Models/PlayerCard.php).
+ * Card-type helpers — mirror of the reference's PlayerCard::hasType($type) and
+ * getOtherCardTypes (see the reference).
  *
  * Primary type is derived from which catalog the card lives in (majors /
  * minors / occupations). A card additionally "counts as" extra types when its

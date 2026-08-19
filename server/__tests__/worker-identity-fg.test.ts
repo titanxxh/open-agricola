@@ -184,7 +184,7 @@ describe('worker-identity: A92 AdoptiveParents removes newborn from FG space tak
 
   // Drain the FG flow's own optional minor-improvement tail (stop before the
   // rotation confirm) so the engine is back to an interactive window where the
-  // A92 anytime grow-only entry is offered. Under the BGA pull model A92 no
+  // A92 anytime grow-only entry is offered. Under the reference pull model A92 no
   // longer auto-pushes a grow after FG — it is a `phases:['anytime']` listener
   // the player must invoke explicitly.
   const drainFgPrompts = (

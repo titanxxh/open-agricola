@@ -333,13 +333,13 @@ const humanizeSourceCard = (sourceCard: string) => {
 const getExtraSowTargetLabel = (sourceCard: string | undefined, tileKey: string) =>
   sourceCard ? humanizeSourceCard(sourceCard) || sourceCard : tileKey
 
-const BGA_EMPTY_SLOT_VARIANTS = [
+const EMPTY_SLOT_VARIANTS = [
   [4, 0, 1, 2, 6],
   [5, 1, 6, 5, 4],
   [3, 3, 2, 1, 0],
 ] as const
 
-const BGA_ROOM_LAYOUT_VARIANTS: Record<PlayerState['color'], readonly (readonly number[])[]> = {
+const ROOM_LAYOUT_VARIANTS: Record<PlayerState['color'], readonly (readonly number[])[]> = {
   red: [
     [0, 12, 4, 9, 10],
     [5, 1, 7, 3, 4],
@@ -379,10 +379,10 @@ const tileVariant = (matrix: readonly (readonly number[])[], row: number, col: n
 }
 
 const emptySlotClass = (row: number, col: number) =>
-  `empty-node-${tileVariant(BGA_EMPTY_SLOT_VARIANTS, row, col)}`
+  `empty-node-${tileVariant(EMPTY_SLOT_VARIANTS, row, col)}`
 
 const roomLayoutClass = (color: PlayerState['color'], row: number, col: number) =>
-  `room-layout-${tileVariant(BGA_ROOM_LAYOUT_VARIANTS[color], row, col)}`
+  `room-layout-${tileVariant(ROOM_LAYOUT_VARIANTS[color], row, col)}`
 
 const roomSpriteClass = (houseType: PlayerState['houseType']) =>
   houseType === 'clay'
@@ -391,7 +391,7 @@ const roomSpriteClass = (houseType: PlayerState['houseType']) =>
       ? 'meeple-roomStone'
       : 'meeple-roomWood'
 
-const BGA_FENCE_COLORS: Record<PlayerState['color'], string> = {
+const FENCE_COLORS: Record<PlayerState['color'], string> = {
   red: 'ff0000',
   yellow: 'ffa500',
   blue: '72c3b1',
@@ -400,8 +400,8 @@ const BGA_FENCE_COLORS: Record<PlayerState['color'], string> = {
   purple: '982fff',
 }
 
-const bgaFenceColor = (color: PlayerState['color'] | undefined) =>
-  color ? BGA_FENCE_COLORS[color] : undefined
+const fenceColor = (color: PlayerState['color'] | undefined) =>
+  color ? FENCE_COLORS[color] : undefined
 
 const canCardZoneAcceptAnimal = (display: CardAnimalDisplay, animalType: AnimalType) => {
   if (display.allowedAnimalTypes && !display.allowedAnimalTypes.includes(animalType)) return false
@@ -1542,7 +1542,7 @@ export const FarmBoard = ({ view, actions, inlineCardStats = false }: FarmBoardP
                 isPending ? ' selected' : ''
               }${segmentType ? ' ' + segmentType : ''}${isSelectable ? ' selectable' : ''}${blockedForPalisade ? ' palisade-disabled' : ''}${edgeId && highlightedFenceEdgeIds.has(edgeId) ? ' event-highlight' : ''}`}
               data-player-color={sourcePlayerColor}
-              data-color={bgaFenceColor(sourcePlayerColor)}
+              data-color={fenceColor(sourcePlayerColor)}
               onClick={() => {
                 if (isSelectable && edgeId) {
                   toggleFenceEdge(edgeId)

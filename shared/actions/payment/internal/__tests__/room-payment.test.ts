@@ -22,7 +22,7 @@ const makePlayer = (modifiers: CostModifier[], houseType: 'wood' | 'clay' | 'sto
 })
 
 describe('construct cost via unified enumerate (was buildRoomCostPerUnit)', () => {
-  // Migrated case 1: D15 multi-key trade — replicate the BGA cost shape and
+  // Migrated case 1: D15 multi-key trade — replicate the reference cost shape and
   // verify the alternative is enumerated.
   it('D15 ClaySupports multi-key unit trade produces 1-room cost variants', () => {
     const player = makePlayer([{

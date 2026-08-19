@@ -13,7 +13,7 @@ const CARD_ID = 'C148_MudWallower'
  * C148 Mud Wallower:
  * Every fourth time you use an accumulation space, you get 1 PIG, held by this card.
  *
- * BGA: Tracks a counter and held pig count. On every farmer placement on an
+ * Rule: Tracks a counter and held pig count. On every farmer placement on an
  * accumulation space, increments counter. At 4, gains 1 pig and resets.
  * The card acts as an animal holder zone for pigs.
  *
@@ -79,7 +79,7 @@ const afterPlaceFarmerListener: CardListenerRegistration = {
 
 /**
  * Sync C148.held downward when fewer pigs remain on the card than the
- * permanent capacity. BGA semantic: `decreaseRoom` — each pig that moves
+ * permanent capacity. The reference semantic: `decreaseRoom` — each pig that moves
  * off the card permanently reduces capacity; pigs returning later (e.g.
  * via breeding) do NOT restore it.
  *
@@ -177,9 +177,9 @@ const cardImpl = {
     })
   },
   /**
-   * BGA `Cards/C/C148_MudWallower.php::getInvalidAnimals` returns []:
+   * The reference `Cards/C/the reference::getInvalidAnimals` returns []:
    * the held counter manages capacity; zone constraint is PIG-only via
-   * onPlayerComputeDropZones. Mirror BGA exactly.
+   * onPlayerComputeDropZones. Mirror the reference exactly.
    */
   getInvalidAnimals: () => [],
 },

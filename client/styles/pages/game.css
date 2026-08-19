@@ -1055,7 +1055,7 @@
 .players h2 {
   margin-top: 0;
 }
-/* ==================== BGA-style Action Board ==================== */
+/* ==================== Action Board ==================== */
 .action-board-wrapper {
   width: 100%;
   overflow: hidden;
@@ -1522,7 +1522,7 @@
   overflow: hidden;
   border-radius: 8px;
   padding: 2.9% 4.5% 3.7%;
-  background-image: url('/bga-img/action_frame.png');
+  background-image: url('/assets/revised/action_frame.png');
   background-size: 100% 100%;
   background-repeat: no-repeat;
   box-shadow: 0 5px 9px rgba(43, 26, 9, 0.28);
@@ -1825,7 +1825,7 @@
 .action-board {
   position: relative;
   background:
-    url('/bga-img/background.jpg');
+    url('/assets/revised/background.jpg');
   border-radius: 12px;
   transform-origin: top left;
   transform: scale(var(--action-board-scale, 1));
@@ -1834,30 +1834,30 @@
 }
 .action-board.action-board--2p {
   background:
-    url('/bga-img/central.png') 0px 0 / 830px auto no-repeat,
-    url('/bga-img/background.jpg');
+    url('/assets/revised/central.png') 0px 0 / 830px auto no-repeat,
+    url('/assets/revised/background.jpg');
 }
 .action-board.action-board--3p {
   background:
-    url('/bga-img/central.png') 170px 0 / 830px auto no-repeat,
-    url('/bga-img/left_3p.png') 0px 0 / 156px auto no-repeat,
-    url('/bga-img/background.jpg');
+    url('/assets/revised/central.png') 170px 0 / 830px auto no-repeat,
+    url('/assets/revised/left_3p.png') 0px 0 / 156px auto no-repeat,
+    url('/assets/revised/background.jpg');
 }
 .action-board.action-board--4p {
   background:
-    url('/bga-img/central.png') 170px 0 / 830px auto no-repeat,
-    url('/bga-img/left_4p.png') 0px 0 / 156px auto no-repeat,
-    url('/bga-img/background.jpg');
+    url('/assets/revised/central.png') 170px 0 / 830px auto no-repeat,
+    url('/assets/revised/left_4p.png') 0px 0 / 156px auto no-repeat,
+    url('/assets/revised/background.jpg');
 }
 .action-board.action-board--5p {
   background:
-    url('/bga-img/central.png') 360px 0 / 830px auto no-repeat,
-    url('/bga-img/background.jpg');
+    url('/assets/revised/central.png') 360px 0 / 830px auto no-repeat,
+    url('/assets/revised/background.jpg');
 }
 .action-board.action-board--6p {
   background:
-    url('/bga-img/central.png') 540px 0 / 830px auto no-repeat,
-    url('/bga-img/background.jpg');
+    url('/assets/revised/central.png') 540px 0 / 830px auto no-repeat,
+    url('/assets/revised/background.jpg');
 }
 .action-board::before {
   content: none;
@@ -1869,7 +1869,7 @@
   z-index: 1;
   overflow: hidden;
   pointer-events: none;
-  background: url('/bga-img/background.jpg');
+  background: url('/assets/revised/background.jpg');
 }
 .action-board-extension--shared {
   width: 360px;
@@ -1896,7 +1896,7 @@
 .action-board-patch--patch-resource,
 .action-board-patch--patch-hollow,
 .action-board-patch--patch-travelers {
-  background-image: url('/bga-img/left_4p.png');
+  background-image: url('/assets/revised/left_4p.png');
   background-size: 156px auto;
   opacity: 0.92;
   filter: saturate(0.98) brightness(1.02);
@@ -1912,7 +1912,7 @@
 .action-board-patch--six-corral,
 .action-board-patch--six-side-job,
 .action-board-patch--six-improvement {
-  background-image: url('/bga-img/central.png');
+  background-image: url('/assets/revised/central.png');
   background-size: 830px auto;
 }
 .action-board-patch--patch-copse {
@@ -1958,7 +1958,7 @@
   border-radius: 18px;
   opacity: 0.92;
   filter: saturate(0.98) brightness(1.02);
-  background: url('/bga-img/left_4p.png') 20px -88px / 156px auto no-repeat;
+  background: url('/assets/revised/left_4p.png') 20px -88px / 156px auto no-repeat;
 }
 .action-board-patch--patch-lessons-a {
   top: 0;
@@ -2157,7 +2157,7 @@
   font-size: 11px;
   font-weight: 700;
   padding: 2px 4px 0;
-  background-image: url('/bga-img/action_frame.png');
+  background-image: url('/assets/revised/action_frame.png');
   background-size: 100% 160px;
   background-repeat: no-repeat;
   height: 32px;
@@ -2176,7 +2176,7 @@
   font-weight: bold;
   font-size: 22px;
   position: relative;
-  background-image: url('/bga-img/action_frame.png');
+  background-image: url('/assets/revised/action_frame.png');
   background-size: 100% 160px;
   background-position: 0 -40px;
   background-repeat: no-repeat;
@@ -2189,24 +2189,24 @@
   flex-shrink: 0;
   position: relative;
   height: 10px;
-  background-image: url('/bga-img/action_frame.png');
+  background-image: url('/assets/revised/action_frame.png');
   background-size: 100% 160px;
   background-position: 0px 10px;
 }
 /* Small card frame sections (action-s) */
 .action-card.action-s .action-header {
-  background-image: url('/bga-img/action_frame_s.png');
+  background-image: url('/assets/revised/action_frame_s.png');
   background-size: 100% 143px;
   height: 40px;
   font-size: 10px;
 }
 .action-card.action-s .action-desc {
-  background-image: url('/bga-img/action_frame_s.png');
+  background-image: url('/assets/revised/action_frame_s.png');
   background-size: 100% 109px;
   background-position: 0 -32px;
 }
 .action-card.action-s .action-footer {
-  background-image: url('/bga-img/action_frame_s.png');
+  background-image: url('/assets/revised/action_frame_s.png');
   background-size: 100% 109px;
   background-position: 0px 10px;
 }
@@ -2265,7 +2265,7 @@
   position: absolute;
   width: 26px;
   height: 30px;
-  background-image: url('/bga-img/action_frame_arrow.png');
+  background-image: url('/assets/revised/action_frame_arrow.png');
   background-size: 100%;
   background-repeat: no-repeat;
   top: 7px;
@@ -2277,7 +2277,7 @@
   position: absolute;
   width: 26px;
   height: 30px;
-  background-image: url('/bga-img/action_frame_arrow.png');
+  background-image: url('/assets/revised/action_frame_arrow.png');
   background-size: 100%;
   background-repeat: no-repeat;
   left: -23px;
@@ -2290,7 +2290,7 @@
   position: absolute;
   width: 26px;
   height: 30px;
-  background-image: url('/bga-img/action_frame_arrow.png');
+  background-image: url('/assets/revised/action_frame_arrow.png');
   background-size: 100%;
   background-repeat: no-repeat;
   right: -23px;
@@ -2384,10 +2384,10 @@
   width: 30px;
   height: 38px;
   background: var(--color-danger);
-  -webkit-mask-image: url('/bga-img/farmers.png');
+  -webkit-mask-image: url('/assets/revised/farmers.png');
   -webkit-mask-size: 500% 100%;
   -webkit-mask-repeat: no-repeat;
-  mask-image: url('/bga-img/farmers.png');
+  mask-image: url('/assets/revised/farmers.png');
   mask-size: 500% 100%;
   mask-repeat: no-repeat;
   transform: translateY(-2px);
@@ -2443,7 +2443,7 @@
   position: relative;
   border-radius: 8px;
   overflow: visible;
-  background-image: url('/bga-img/actions_background.png');
+  background-image: url('/assets/revised/actions_background.png');
   background-size: 500% 300%;
   background-repeat: no-repeat;
 }
@@ -2517,7 +2517,7 @@
   font-size: 14px;
   opacity: 0.5;
 }
-/* --- Round action hover tooltip (actions.jpg card + icon overlay, BGA-style) --- */
+/* --- Round action hover tooltip (actions.jpg card + icon overlay) --- */
 .round-action-tooltip {
   position: fixed;
   z-index: 200;
@@ -2536,7 +2536,7 @@
 .tooltip-action-card {
   width: 232px;
   height: 276px;
-  background-image: url('/bga-img/action_frame.png');
+  background-image: url('/assets/revised/action_frame.png');
   background-size: 100% 100%;
   background-repeat: no-repeat;
   flex-shrink: 0;
@@ -2599,7 +2599,7 @@
 .tooltip-action-card .action-desc .gain-res-icon {
   font-size: 34px;
 }
-/* Right: full rule text (BGA `tooltip`). */
+/* Right: full rule text (the reference `tooltip`). */
 .tooltip-text {
   padding: 12px 14px;
   width: 210px;
@@ -2631,7 +2631,7 @@
 .harvest-marker {
   width: 35px;
   height: 28px;
-  background-image: url('/bga-img/meeples.png');
+  background-image: url('/assets/revised/meeples.png');
   background-position: 8.62866% 21.8543%;
   background-size: 2027.72%;
   background-repeat: no-repeat;
@@ -2835,7 +2835,7 @@
   color: #4f4f4f;
   margin-top: 4px;
 }
-/* ── Compact icon-based resource bar (BGA style) ── */
+/* ── Compact icon-based resource bar (the reference style) ── */
 .player-resources-compact {
   display: flex;
   align-items: center;
@@ -3094,7 +3094,7 @@
   height: 100%;
 }
 .farm-node-background .empty-node {
-  background-image: url('/bga-img/empty_slots.png');
+  background-image: url('/assets/revised/empty_slots.png');
   background-repeat: no-repeat;
   background-size: 700% 100%;
 }
@@ -3117,7 +3117,7 @@
 .empty-node-5 { background-position-x: 83.3333%; }
 .empty-node-6 { background-position-x: 100%; }
 .farm-node-background .meeple-field {
-  background-image: url('/bga-img/field.png');
+  background-image: url('/assets/revised/field.png');
   background-repeat: no-repeat;
   background-size: 100% 100%;
 }
@@ -3125,7 +3125,7 @@
 .farm-node-background .meeple-roomClay,
 .farm-node-background .meeple-roomStone {
   position: relative;
-  background-image: url('/bga-img/rooms.png');
+  background-image: url('/assets/revised/rooms.png');
   background-repeat: no-repeat;
   background-size: 300% 100%;
 }
@@ -3144,7 +3144,7 @@
   right: 0;
   top: 0;
   bottom: 0;
-  background-image: url('/bga-img/room_layouts.png');
+  background-image: url('/assets/revised/room_layouts.png');
   background-repeat: no-repeat;
   background-size: 400% 400%;
 }
@@ -3999,7 +3999,7 @@
   font-size: 12px;
   color: #2e4b1e;
 }
-/* resource-inline-item colors removed for compact BGA-style icon display */
+/* resource-inline-item colors removed for compact icon display */
 .resource-inline-item.resource-wood,
 .resource-inline-item.resource-clay,
 .resource-inline-item.resource-reed,
@@ -4028,7 +4028,7 @@
 .res-icon {
   display: inline-block;
   font-size: 24px; /* Base size, acts as scale factor */
-  background-image: url('/bga-img/meeples.png');
+  background-image: url('/assets/revised/meeples.png');
   background-repeat: no-repeat;
   vertical-align: middle;
   flex-shrink: 0;
@@ -4078,7 +4078,7 @@
 .res-icon-score { width: 0.8em; height: 0.8em; background-position: 45.5793% 21.7988%; background-size: 2560%; }
 /* Action-specific icons from meeples.png */
 .res-icon-arrow     { width:0.4em; height:0.3em;  background-position:98.3359% 21.45%;    background-size:3150.77%; }
-/* Exchange-rate arrows that carry the "1×" / "2×" badge (BGA
+/* Exchange-rate arrows that carry the "1×" / "2×" badge (the reference
  * meeple-arrow-1x / meeple-arrow-2x on meeples.png). */
 .res-icon-arrow-1x  { width:1.3em; height:0.6em;  background-position:7.09477% 26.3736%; background-size:1750.43%; }
 .res-icon-arrow-2x  { width:1.2em; height:0.6em;  background-position:0.517866% 26.4397%; background-size:1750.43%; }
@@ -4115,26 +4115,26 @@
 .res-icon-pasture { width:1.1em; height:1.1em;  background-position:93.3536% 8.61632%;  background-size:2659.74%; }
 /* Icons from separate sprite files */
 .res-icon-barn {
-  background-image: url('/bga-img/stables.png');
+  background-image: url('/assets/revised/stables.png');
   background-size: 500% 100%;
   background-position-x: 100%;
   width: 0.8em; height: 1.1em;
 }
 .res-icon-fence-icon {
-  background-image: url('/bga-img/fences.png');
+  background-image: url('/assets/revised/fences.png');
   background-size: 500% 100%;
   background-position-x: 100%;
   width: 0.9em; height: 0.9em;
 }
 .res-icon-grain-veg-stack {
-  background-image: url('/bga-img/grain_veg_stack.png');
+  background-image: url('/assets/revised/grain_veg_stack.png');
   background-size: 100% 100%;
   background-position: 0 0;
   width: 1em; height: 1em;
   position: relative;
   top: -2px;
 }
-/* Icon description styling (matches BGA's action-desc rendering) */
+/* Icon description styling (matches the reference's action-desc rendering) */
 .action-desc .icon-line {
   display: flex;
   align-items: center;

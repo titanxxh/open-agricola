@@ -10,7 +10,6 @@ const CARD_ID = 'A116_WoodCutter'
  * A116 Wood Cutter — Each time you use a wood accumulation space
  * (forest, copse, grove), you get 1 additional wood.
  *
- * BGA reference: A_116_WoodCutter.php
  */
 const listener: CardListenerRegistration = {
   id: 'A116-wood-cutter-after-wood',

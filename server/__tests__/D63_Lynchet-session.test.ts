@@ -62,7 +62,7 @@ describe('D063_Lynchet session', () => {
   })
 
   it('end-to-end: reap with mixed fields populates harvestedPositions and listener counts adjacents', () => {
-    // BGA fix scenario: 3 grain fields, only 2 of them adjacent to rooms.
+    // The reference fix scenario: 3 grain fields, only 2 of them adjacent to rooms.
     // Old summary-only counting could not distinguish which fields were
     // harvested when there are multiple grain fields with different
     // adjacencies. The new harvestedPositions field makes it precise.

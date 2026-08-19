@@ -104,7 +104,7 @@ describe('C080_RockyTerrain', () => {
     })
   })
 
-  describe('improvement field-card trigger (BGA onPlayerAfterImprovement)', () => {
+  describe('improvement field-card trigger (reference onPlayerAfterImprovement)', () => {
     it('triggers when a minor field card (B68 Beanfield) is built', () => {
       const listener = findListener('C80-rocky-terrain-after-improvement-field')
       expect(listener).toBeDefined()
@@ -183,7 +183,7 @@ describe('C080_RockyTerrain', () => {
     })
   })
 
-  describe('occupation field-card trigger (BGA onPlayerAfterOccupation)', () => {
+  describe('occupation field-card trigger (reference onPlayerAfterOccupation)', () => {
     it('triggers when a field occupation (B113 PatchCaregiver) is played', () => {
       const listener = findListener('C80-rocky-terrain-after-occupation-field')
       expect(listener).toBeDefined()

@@ -26,7 +26,7 @@ describe('D100_LordoftheManor scoring bonus', () => {
     expect(compute(dummyState, dummyPlayer, { categories })).toBe(3)
   })
 
-  it('counts 4 fenced stables as a maxed category (BGA: stables in whitelist)', () => {
+  it('counts 4 fenced stables as a maxed category (reference: stables in whitelist)', () => {
     const categories: ScoreCategoryResult[] = [
       makeCategory('stables', 4),
       makeCategory('fields', 1),
@@ -56,7 +56,7 @@ describe('D100_LordoftheManor scoring bonus', () => {
     expect(compute(dummyState, dummyPlayer, { categories })).toBe(0)
   })
 
-  it('has extraVp:true metadata for UI display (BGA $this->extraVp = true)', () => {
+  it('has extraVp:true metadata for UI display (reference $this->extraVp = true)', () => {
     expect(D100_LordoftheManor.extraVp).toBe(true)
   })
 })

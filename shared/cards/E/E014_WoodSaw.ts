@@ -9,7 +9,7 @@ const CARD_ID = 'E014_WoodSaw'
  * E14 Wood Saw — Each time all other players have more people than you,
  * you can take a __Build Rooms__ action without placing a person.
  *
- * BGA: isListeningTo → all other players have more farmers than this player.
+ * Rule: isListeningTo → all other players have more farmers than this player.
  * onPlayerAtAnytime → construct action (optional).
  *
  * Implementation: anytime listener checks if ALL other players have more

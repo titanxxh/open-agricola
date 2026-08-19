@@ -11,8 +11,8 @@ const FLAG_KEY = 'c16Active'
 /**
  * C16 Field Fences — Minor Improvement
  *
- * BGA: `C016_FieldFences::onBuy` returns SEQ optional with a single
- * `FENCING` action carrying `fieldFences: true` (BGA `Fencing.php`
+ * Rule: `C016_FieldFences::onBuy` returns SEQ optional with a single
+ * `FENCING` action carrying `fieldFences: true` (the reference
  * looks at `getCtxArgs()['fieldFences']`, then for each new fence whose
  * (x,y) coordinate is in `getAvailableFieldFences()` the wood cost is
  * reduced by 1 — so any fence built next to a field tile is free).

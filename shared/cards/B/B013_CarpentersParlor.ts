@@ -9,7 +9,7 @@ const CARD_ID = 'B013_CarpentersParlor'
  * B13 Carpenter's Parlor — Wooden rooms only cost you 2 wood and 2 reed each
  * (instead of the standard 5 wood + 2 reed).
  *
- * BGA reference: onPlayerComputeCostsConstruct sets cost to [WOOD => 2, REED => 2]
+ * Reference: onPlayerComputeCostsConstruct sets cost to [WOOD => 2, REED => 2]
  * for roomWood type.
  */
 

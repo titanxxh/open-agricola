@@ -10,7 +10,7 @@ const CARD_ID = 'E165_MasterHuntsman'
  * E165 Master Huntsman:
  * When you play this card and each time you build a major improvement, you get 1 pig.
  *
- * BGA: onBuy → gain 1 pig.
+ * Rule: onBuy → gain 1 pig.
  *      isListeningTo → isActionEvent(Improvement) && cardId has type MAJOR.
  *      onPlayerAfterImprovement → gain 1 pig.
  *

@@ -6,7 +6,7 @@ const CARD_ID = 'C014_StrawThatchedRoof'
 /**
  * C14 Straw-Thatched Roof — You no longer need reed to renovate or build a room.
  *
- * BGA reference: removes reed from construct and renovation costs.
+ * Reference: removes reed from construct and renovation costs.
  * Prerequisite: 3 Grain Fields.
  */
 

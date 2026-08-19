@@ -15,7 +15,7 @@ const CARD_ID = 'D024_BrotherlyLove'
  * If you have exactly 4 family members and 3 are already placed, the 4th
  * can go on the same action space as one of your other family members.
  *
- * BGA: onPlayerComputeArgsPlaceFarmer — if familySize == 4 and
+ * Rule: onPlayerComputeArgsPlaceFarmer — if familySize == 4 and
  * workersAvailable == 1 (i.e., 3 placed, 1 remaining), add all spaces
  * where the player's own farmers are placed as extra options.
  *

@@ -10,9 +10,9 @@ const CARD_ID = 'C052_HuntsmansHat'
  * C52 Huntsman's Hat — For each new pig you get from the effect of an action
  * space, you also get 1 food.
  *
- * BGA: `isListeningTo` matches any Gain event with `fromActionSpace` true,
+ * Rule: `isListeningTo` matches any Gain event with `fromActionSpace` true,
  * and `onPlayerAfterGain` sums obtained PIG meeples → emits gainNode([FOOD => N]).
- * BGA also modifies the AnimalMarket placeFarmerFlow (sheep+food xor
+ * The reference also modifies the AnimalMarket placeFarmerFlow (sheep+food xor
  * boar+food xor pay-food→cattle) — NOT implemented since we have no
  * AnimalMarket action space (registered as §2.5 simplification).
  *

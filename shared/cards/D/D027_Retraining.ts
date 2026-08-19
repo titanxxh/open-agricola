@@ -13,7 +13,7 @@ const CARD_ID = 'D027_Retraining'
  *   their Joinery for the Pottery, OR their Pottery for the Basketmaker's
  *   Workshop (one swap, at most once per renovation).
  *
- * BGA (D027_Retraining.php):
+ * Rule:
  * - Listens to Renovation (unflagged) → flags the card.
  * - Listens to PlaceFarmer (after) → if flagged, builds an optional node
  *   offering the currently-available swap, then unflags.

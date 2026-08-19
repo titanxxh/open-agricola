@@ -13,7 +13,7 @@ const harvestRounds = [4, 7, 9, 11, 13, 14]
  * C67 Mineral Feeder — At the start of each round that does not end with a harvest,
  * if you have at least 1 sheep in a pasture, you get 1 grain.
  *
- * BGA reference: onPlayerStartOfTurn — checks pastures for sheep.
+ * Reference: onPlayerStartOfTurn — checks pastures for sheep.
  */
 
 const hasSheepInPasture = (player: PlayerState): boolean =>

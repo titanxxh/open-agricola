@@ -62,7 +62,7 @@ const createState = (player: PlayerState): GameState => ({
 } as GameState)
 
 describe('computeHarvestFeedingRequirement', () => {
-  it('uses the base BGA feeding formula without modifiers', () => {
+  it('uses the base reference feeding formula without modifiers', () => {
     const player = createPlayer({}, 3, 1)
     expect(computeHarvestFeedingRequirement(createState(player), player)).toBe(5)
   })

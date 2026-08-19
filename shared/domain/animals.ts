@@ -92,7 +92,7 @@ const subtractFromCountsByZone = (
  * Does NOT include reserve / unassigned animals — for total persisted count use
  * `player.resources.{sheep,boar,cattle}` directly.
  *
- * Equivalent to BGA `countAnimalsOnBoard()` semantically.
+ * Equivalent to the reference `countAnimalsOnBoard` semantically.
  *
  * Animal-holder cards report held animals via
  *   `cardStates[cardId].extraData.animalCounts`, or legacy single-type
@@ -142,7 +142,7 @@ export const getAssignedAnimalCount = (player: PlayerState, state?: GameState): 
  * Priority: pasture -> house -> stable -> animal-holder cards.
  * Caller must guarantee counts <= getAssignedAnimalsByType(player).
  *
- * Note: BGA `removeAnimals` PHP source not located; this simplified order matches
+ * Note: The reference `removeAnimals` PHP source not located; this simplified order matches
  * the B157 reserve=0 scenario semantics. If a future card requires closest-empty
  * pasture order, revisit.
  *

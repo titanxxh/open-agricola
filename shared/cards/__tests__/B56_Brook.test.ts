@@ -41,7 +41,7 @@ const makeState = (_player: PlayerState, fishingTakenBy: string[]): GameState =>
     ],
   }) as unknown as GameState
 
-describe('B056_Brook prerequisite (BGA isBuyable: farmer on Fishing space)', () => {
+describe('B056_Brook prerequisite (reference isBuyable: farmer on Fishing space)', () => {
   it('passes when the player has a farmer on the Fishing action space', () => {
     const card = getRegisteredMinorImprovement(CARD_ID)!
     const player = makePlayer('p1')

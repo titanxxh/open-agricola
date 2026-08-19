@@ -13,7 +13,7 @@ const HOUSE_REDEV = 'house-redevelopment'
 /**
  * D82 Hunting Trophy (MinorImprovement)
  *
- * BGA behavior:
+ * The reference behavior:
  *   1. Improvements built on HouseRedevelopment cost 1 building resource of
  *      player's choice less. Gated by `actionCardId == 'ActionHouseRedevelopment'`.
  *   2. Fences built on FarmRedevelopment cost a total of 3 wood less.

@@ -13,7 +13,6 @@ const CARD_ID = 'D121_ClayPlasterer'
  * D121 Clay Plasterer — Renovating to clay only costs you exactly 1 <CLAY> and 1 <REED>.
  * Each clay room only costs you 3 <CLAY> and 2 <REED> to build.
  *
- * BGA reference:
  * - onPlayerComputeCostsConstruct: for roomClay type, calls Utils::addCost with
  *   [CLAY => 3, REED => 2] as an alternative (discount of 2 clay from base 5 clay + 2 reed).
  * - onPlayerComputeCostsRenovation: for newRoomType=roomClay, removes clay from all trade

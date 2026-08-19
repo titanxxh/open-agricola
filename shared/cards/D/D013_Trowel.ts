@@ -11,7 +11,7 @@ const CARD_ID = 'D013_Trowel'
  *  - From a wooden house: 1 stone + 1 reed + 1 food per room.
  *  - From a clay house:   1 stone per room (reed waived).
  *
- * BGA (D013_Trowel.php):
+ * Rule:
  *  - isListeningTo → anytime, onPlayerAtAnytime returns RENOVATION with
  *    `toStone: true` and `actionCardId: D013_Trowel`.
  *  - onPlayerComputeCostsRenovation injects the wood→stone trade pattern
@@ -26,7 +26,7 @@ const CARD_ID = 'D013_Trowel'
  *  - `computeChoiceCandidates` listener (sourceCard scoped) injects the
  *    `stone` candidate when the owner is on a wooden house — base options
  *    for wood-house only include `clay`.
- *  - `computeCosts` listener (sourceCard scoped) adds the BGA wood→stone
+ *  - `computeCosts` listener (sourceCard scoped) adds the reference wood→stone
  *    food/reed delta on the stone path. The wood→clay sibling option still
  *    surfaces during the affordability probe; we publish a prohibitive
  *    cost on the `clay` probe so the engine filters it out and `stone`

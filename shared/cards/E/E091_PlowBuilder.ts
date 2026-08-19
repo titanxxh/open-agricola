@@ -19,7 +19,7 @@ const specialEffect = (params: Record<string, unknown>): ActionFlow => ({
 })
 
 /**
- * BGA isListeningTo: catches Exchange events; if `trade.sourceId` belongs to
+ * The reference isListeningTo: catches Exchange events; if `trade.sourceId` belongs to
  * the Joinery family, sets a per-harvest flag `usedJoinery=true`. Cleared at
  * EndHarvestFeedingPhase. We mirror this with a `trade-applied` listener
  * scoped to the card owner.
@@ -48,7 +48,7 @@ const anytimeListener: CardListenerRegistration = {
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (isCardFlagged(context.player, CARD_ID)) return
     if (!HARVEST_ROUNDS.includes(context.state.round)) return
-    // BGA: anytime gate is `isFlagged('usedJoinery') && !isFlagged()`. The
+    // Rule: anytime gate is `isFlagged('usedJoinery') && !isFlagged`. The
     // `usedJoinery` flag is set by the trade-applied listener above.
     const usedJoinery = readCardExtraData<boolean>(context.player, CARD_ID, 'usedJoinery') === true
     if (!usedJoinery) return
@@ -73,7 +73,7 @@ const cardImpl = {
   effect: {
     id: CARD_ID,
     /** Clear both the per-use flag (anytime gate) and the per-harvest
-     *  `usedJoinery` flag at the end of the harvest. Mirrors BGA's
+     *  `usedJoinery` flag at the end of the harvest. Mirrors the reference's
      *  EndHarvestFeedingPhase reset. */
     onAfterHarvest: (_state, player) => {
       setCardFlag(player, CARD_ID, false)

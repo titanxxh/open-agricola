@@ -11,7 +11,7 @@ const TRAVELING_PLAYERS_FOOD = `${CARD_ID}:traveling-players-food` as const
 /**
  * B155 Art Teacher (Occupation, 4+ players).
  *
- * BGA (B155_ArtTeacher.php):
+ * Rule:
  *   - onBuy → gain 1 wood + 1 reed.
  *   - onPlayerComputeCostsOccupation → occupation cost can use food from
  *     the Traveling Players accumulation space.

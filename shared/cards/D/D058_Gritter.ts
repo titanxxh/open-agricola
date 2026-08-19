@@ -20,7 +20,7 @@ const listener: CardListenerRegistration = {
     if (n <= 0) return
     // Only trigger if a vegetable was actually sown this action
     // We detect by checking if any field was just seeded (remaining > 0 indicates sowing happened)
-    // BGA: only triggers if at least one vegetable was sown this action
+    // Rule: only triggers if at least one vegetable was sown this action
     // We approximate: trigger only when we can confirm vegetable was sown
     // Use the last-sown detection: check if any vegetable field has remaining crops
     const justSowed = vegetableFields.some((f) => (fieldFindStackOfKind(f, 'vegetable')?.remaining ?? 0) > 0)

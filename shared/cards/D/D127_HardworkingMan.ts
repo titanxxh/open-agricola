@@ -16,7 +16,7 @@ registerPlayerActionSpace({
       return otherPlayers.length > 0 && otherPlayers.every((p) => p.rooms > player.rooms)
     },
     execute: () => {
-      // BGA NODE_OR: all three children may be executed (in any subset).
+      // The reference NODE_OR: all three children may be executed (in any subset).
       return {
         type: 'flow',
         flow: {

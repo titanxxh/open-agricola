@@ -10,7 +10,7 @@ const CARD_ID = 'A096_TaskArtisan'
  * - onBuy: gain 1 wood + optional minor improvement action.
  * - onRoundStart: when a stone quarry is revealed, gain 1 wood + optional minor improvement action.
  *
- * BGA: onBuy → parallel(gain 1 wood, optional improvement(minor)).
+ * Rule: onBuy → parallel(gain 1 wood, optional improvement(minor)).
  *       isListeningTo → AfterRevealAction on western/eastern quarry.
  *       onPlayerAfterRevealAction → parallel(gain 1 wood, optional improvement(minor)).
  *

@@ -12,10 +12,10 @@ const EFFECT_ID = 'paper-knife-random-play'
 /**
  * A3 Paper Knife (Minor Improvement, A, 3):
  *
- * BGA rule (A003_PaperKnife.php lines 33-115): "Select 3 occupations in your
+ * Rule: "Select 3 occupations in your
  * hand. Select one of them randomly, which you can play immediately without
  * paying an occupation cost." Requires ≥3 occupations in hand (isBuyable).
- * BGA implements it as: actSelectOccs(3-card subset) → rand(0,2) → playOcc
+ * Implemented as: actSelectOccs(3-card subset) → rand(0,2) → playOcc
  * with cost=[]; the other two stay in hand.
  *
  * Flow:
@@ -26,7 +26,7 @@ const EFFECT_ID = 'paper-knife-random-play'
  *     returns occupation leaf { exactCost: {}, allowedCards: [pick] }
  *   occupation auto-resolves (single option) → occupation played for free + onBuy fires
  *
- * Prerequisite: named "3 Occupations In Hand" — matches BGA's isBuyable
+ * Prerequisite: named "3 Occupations In Hand" — matches the reference's isBuyable
  * check `getHand(OCCUPATION) >= 3`.
  */
 

@@ -219,7 +219,7 @@ describe('construct cost alternatives', () => {
 
     // ADR 0004 amendment: the printed base row only survives when the
     // alternative does not strictly dominate it (replacement-style trades
-    // stay Pareto-incomparable; pure discounts hide the base row, like BGA).
+    // stay Pareto-incomparable; pure discounts hide the base row, like the reference).
     const keys = new Set([
       ...Object.keys(scenario.expectedBase),
       ...Object.keys(scenario.expectedAlternative),

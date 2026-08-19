@@ -47,7 +47,7 @@ registerAdHocAction(swapFieldGrainToVegAction)
 
 /**
  * C69 Land Consolidation (MinorImprovement, C, 69)
- * BGA: At any time, if you have a grain field with exactly 3 sown grain,
+ * Rule: At any time, if you have a grain field with exactly 3 sown grain,
  * swap the grain on that field for 1 vegetable (remaining=1) on the same field.
  * No supply cost, no per-round limit — trigger is field-local.
  */

@@ -144,7 +144,7 @@ describe('E005_NightLoot session', () => {
   })
 
   it('onBuy uses collect leaves with actionContext that decrement accumulation spaces', () => {
-    // BGA `E005_NightLoot::actSelectResources` decrements the chosen
+    // The reference `E005_NightLoot::actSelectResources` decrements the chosen
     // accumulation space's resources. Our previous impl used gain leaves
     // pulling from the general supply, so the accumulation space was left
     // untouched (the player effectively double-banked the resource). After

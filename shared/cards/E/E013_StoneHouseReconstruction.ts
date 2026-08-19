@@ -9,7 +9,7 @@ const CARD_ID = 'E013_StoneHouseReconstruction'
  * E13 Stone House Reconstruction — At any time, you can renovate your clay house
  * to a stone house without placing a person. (You must pay the normal renovation cost.)
  *
- * BGA: isListeningTo → player has clay house and card not flagged.
+ * Rule: isListeningTo → player has clay house and card not flagged.
  * Once flagged (used), stays flagged (once per game implicitly via room type).
  *
  * Implementation: anytime listener checks for clay house type, not flagged.

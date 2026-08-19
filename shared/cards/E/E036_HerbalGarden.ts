@@ -23,7 +23,7 @@ const cardImpl = {
       sorted[0]!.capacity = 0
     },
     /**
-     * BGA `Models/PlayerBoard.php::getInvalidAnimals` (E36 branch):
+     * The reference `Models/the reference::getInvalidAnimals` (E36 branch):
      * "at least one pasture must contain no animals". We enforce via
      * `onComputeAnimalZones` setting cap=0 on a chosen pasture, forcing
      * overflow on reorg. Hook returns [] because the constraint is not

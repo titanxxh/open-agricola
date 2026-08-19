@@ -13,7 +13,7 @@ const CARD_ID = 'B049_Scales'
  * if you then have the same number of improvements and occupations in play,
  * you get 2 food.
  *
- * BGA: countOccupations() == countAllImprovements()
+ * Rule: countOccupations == countAllImprovements
  * Passing cards do not trigger this (they are never "in front of you").
  * We count occupationPlayed.length vs (minorPlayed.length + improvements.length).
  */

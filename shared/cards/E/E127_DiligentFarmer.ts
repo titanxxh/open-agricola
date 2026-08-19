@@ -9,7 +9,7 @@ const CARD_ID = 'E127_DiligentFarmer'
  * categories (including fenced stables), you can extend your house by 1 room
  * at no cost.
  *
- * BGA: onBuy computes scores, counts categories where score == 4
+ * Rule: onBuy computes scores, counts categories where score == 4
  * (fields, pastures, grains, vegetables, sheeps, pigs, cattles, stables).
  * If 3+ categories have max score, offer optional free room.
  *

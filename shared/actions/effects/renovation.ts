@@ -79,7 +79,7 @@ const mergeRenovationCost = (
   // costOverride is a per-action delta against the TOTAL cost, matching the
   // legacy semantic where pre-spec baseCost was the pre-multiplied
   // {[material]: rooms, reed: 1} and override modified that total. It lands
-  // in fees[0]; unitFee × nb stays the BGA-aligned per-room cost. Negative
+  // in fees[0]; unitFee × nb stays the per-room cost. Negative
   // entries (e.g. D154 ChimneySweep `stone: -2`) remain in fees[0]; enumerate
   // clamps the merged baseFee at the affordability stage so wood→clay (no
   // stone in unitFee) doesn't credit a refund on the unrelated resource.
@@ -132,7 +132,7 @@ const resolveRenovationActionCost = (
  * Build a renovation plan for an explicit target. Returns `null` when the
  * target is not a legal next step from the player's current house type.
  *
- * Cost model (BGA): N building resources of the target type + 1 reed, where
+ * Cost model (the reference): N building resources of the target type + 1 reed, where
  * N is the player's current room count. The wood→stone direct path costs
  * `{ stone: rooms, reed: 1 }` and is only legal when explicitly requested
  * (e.g. via A87 Conservator).

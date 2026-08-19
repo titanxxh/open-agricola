@@ -10,7 +10,7 @@ import { isMajorImprovementAvailable } from '../major/supply'
 const CARD_ID = 'E161_ElderBaker'
 
 /**
- * BGA Desc: "You can build the Stone Oven major improvement even when taking a
+ * The reference Desc: "You can build the Stone Oven major improvement even when taking a
  * Minor Improvement action." Pattern mirrors D131 CraftsmanshipPromoter.
  */
 const STONE_OVEN_ID = 'Major_StoneOven'

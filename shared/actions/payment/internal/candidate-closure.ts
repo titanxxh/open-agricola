@@ -15,7 +15,7 @@
 export type CandidateTransform<C> = {
   /** Card id owning this transform — used for use-tracking and tie-break. */
   source: string
-  /** BGA "costs less" (true) vs "can pay instead" (false/omitted). */
+  /** The reference "costs less" (true) vs "can pay instead" (false/omitted). */
   mandatory?: boolean
   /** Applications allowed per derivation chain. Default 1. */
   maxUses?: number

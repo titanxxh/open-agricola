@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { getMinorImprovementCard, getOccupationCard } from '../catalog'
 
-// BGA reference: bga-agricola/modules/php/Cards/<deck>/<id>.php $this->extraVp = true
+// Reference: the reference $this->extraVp = true
 // Locked in by 2026-05-12 auto-fix run.
 const cases: Array<{ id: string; kind: 'minor' | 'occupation' }> = [
   { id: 'B100_Clutterer', kind: 'occupation' },
@@ -83,9 +83,9 @@ const cases: Array<{ id: string; kind: 'minor' | 'occupation' }> = [
   { id: 'D092_ChildOmbudsman', kind: 'occupation' },
 ]
 
-describe('extraVp BGA alignment (auto-fix lock-in)', () => {
+describe('extraVp reference alignment (auto-fix lock-in)', () => {
   it.each(cases)(
-    '$id has extraVp:true matching BGA',
+    '$id has extraVp:true matching the reference',
     ({ id, kind }) => {
       const card = kind === 'occupation' ? getOccupationCard(id) : getMinorImprovementCard(id)
       expect(card, `card not found in catalog: ${id}`).toBeDefined()

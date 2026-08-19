@@ -127,4 +127,4 @@ If this project helps you, consider buying the developer a coffee:
 
 ## License
 
-[Apache 2.0](LICENSE). See [NOTICE](NOTICE) for the fan project disclaimer and BGA Studio attribution.
+[Apache 2.0](LICENSE). See [NOTICE](NOTICE) for the fan project disclaimer and artwork attribution.

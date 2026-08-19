@@ -103,7 +103,7 @@ describe('C023_JobContract listener', () => {
     const listener = findListener()!
     const player = createPlayer('p1')
     player.minorPlayed.push(CARD_ID)
-    // empty occupationHand: BGA still places the fake worker on lessons
+    // empty occupationHand: The reference still places the fake worker on lessons
     const daySpace = createSpace('day-laborer', player.id)
     const lessonsSpace = createSpace('lessons')
     const state = createState([player], [daySpace, lessonsSpace])

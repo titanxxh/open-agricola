@@ -55,7 +55,7 @@ describe('PARALLEL trigger — multi-listener select-trigger loop', () => {
     const values = resp.interaction.request.options.map((o) => o.value).sort()
     expect(values).toContain('C082_HardwareStore')
     expect(values).toContain('C126_Excavator')
-    // C126 is mandatory (BGA: wood+clay must fire) → PASS remains visible but
+    // C126 is mandatory (Rule: wood+clay must fire) → PASS remains visible but
     // disabled so the player can see why the trigger cannot be skipped.
     expect(values).toContain('__pass__')
     expect(resp.interaction.request.options.find((option) => option.value === '__pass__')?.disabled).toBe(true)

@@ -8,7 +8,7 @@ import '../../shared/cards/C/C063_CraftBrewery'
 /**
  * C63 Craft Brewery — Sprint 7b2 F2 update.
  *
- * BGA `C063_CraftBrewery::onPlayerHarvestFeedingPhase`:
+ * The reference `C063_CraftBrewery::onPlayerHarvestFeedingPhase`:
  *   - 1 grain field on the board: auto SE eatSingleFieldGrain($field) +
  *     payGain GRAIN -> FOOD 4 + SCORE 2.
  *   - 2+ grain fields: SE eatFieldGrain prompts the player to pick which

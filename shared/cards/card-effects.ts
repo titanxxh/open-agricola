@@ -24,7 +24,7 @@ export type ExtraSowableCrop = ExtraSowableField['allowedCrops'][number]
  * Lightweight meeple shape consumed by `getInvalidAnimals`. Our model
  * aggregates animals as `(animalType, animalCount)` per zone; per-meeple
  * validation expands the aggregate into a list of these stubs so card
- * authors can mirror BGA's `foreach($zone['meeples'] as $meeple)` loop.
+ * authors can mirror the reference's `foreach($zone['meeples'] as $meeple)` loop.
  */
 export type Meeple = {
   type: AnimalKey
@@ -299,7 +299,7 @@ export type CardEffect = {
    * Fires immediately before control switches to a new active player at the
    * start of their labor turn. If any handler returns `{ skipTurn: true }`,
    * `GameCore` skips that player's turn and advances to the next eligible
-   * player. Mirrors BGA `Globals::setSkipNext` consumed in `stLabor()`.
+   * player. Mirrors the reference `Globals::setSkipNext` consumed in `stLabor`.
    *
    * Note: this is per-labor-turn (every `confirmNextPlayer`), distinct from
    * `onBeforeStartOfTurn` which fires once per round at round start.
@@ -327,7 +327,7 @@ export type CardEffect = {
   ) => void | AnimalZone[]
   onComputeSharedAnimalZones?: SharedAnimalZoneHandler
   /**
-   * Per-card zone validation. Mirrors BGA `getInvalidAnimals($zone, $raise)`.
+   * Per-card zone validation. Mirrors the reference `getInvalidAnimals($zone, $raise)`.
    * Given the meeples currently in a card-owned zone, return the subset that
    * violates this card's per-type / per-cap constraints. The reorg / capacity
    * enforcement path consumes the result to evict invalid animals.
@@ -371,7 +371,7 @@ export type CardEffect = {
    */
   getBuiltSpecialStables?: (player: PlayerState) => FarmTilePosition[]
   /**
-   * BGA `enforceReorganizeOnLastHarvest`: cards like B104 SheepWalker, B35
+   * The reference `enforceReorganizeOnLastHarvest`: cards like B104 SheepWalker, B35
    * HookKnife, A153 PigOwner force an animal reorg on the round-14 harvest
    * even when no breeding produced a newborn — to give the rules system a
    * chance to evict animals (e.g. SheepWalker's "must accommodate before
@@ -488,7 +488,7 @@ export const runBeforeEndGameHooks = (state: GameState, player: PlayerState): vo
 /**
  * Returns true when any of the player's played cards demand a reorg even on
  * the round-14 harvest with no newborn (e.g. B104 SheepWalker, B35 HookKnife,
- * A153 PigOwner). Mirrors BGA's `enforceReorganizeOnLastHarvest` aggregation
+ * A153 PigOwner). Mirrors the reference's `enforceReorganizeOnLastHarvest` aggregation
  * in `HarvestTrait::stHarvestBreed`.
  */
 export const shouldEnforceReorganizeOnLastHarvest = (

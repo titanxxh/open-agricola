@@ -24,7 +24,7 @@ registerPlayerActionSpace({
       }
       collectAccumulatedResources(player, space)
 
-      // BGA: bonus VP only when the owner is the actor.
+      // Rule: bonus VP only when the owner is the actor.
       if (player.id === ownerId) {
         incCounter(player, CARD_ID, 'bonusVp')
       }

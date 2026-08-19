@@ -313,7 +313,7 @@ describe('listener purity wave 2b/c', () => {
     })
   })
 
-  // A92 was migrated to the BGA pull model: a single anytime grow-only listener
+  // A92 was migrated to the reference pull model: a single anytime grow-only listener
   // (capability A) plus a `contributeExtraTurn` effect hook (capability B). The
   // old before/after/immediatelyAfter push listeners are gone.
   it('A92 AdoptiveParents anytime grow-only returns a pay+promote seq without mutating state', () => {

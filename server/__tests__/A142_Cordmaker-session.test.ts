@@ -106,7 +106,7 @@ describe('A142_Cordmaker', () => {
     expect(children).toHaveLength(2)
     expect(children[0].actionId).toBe('gain')
     expect(children[0].params).toEqual({ grain: 1 })
-    // Second branch: pay 2 food, then gain 1 vegetable (BGA: buy 1 vegetable for 2 food)
+    // Second branch: pay 2 food, then gain 1 vegetable (Rule: buy 1 vegetable for 2 food)
     expect(children[1].type).toBe('seq')
     const payGainChildren = children[1].children
     const payLeaf = payGainChildren.find((c: ActionFlow) => c.actionId === 'pay')

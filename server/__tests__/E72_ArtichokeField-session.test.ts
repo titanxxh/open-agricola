@@ -184,9 +184,9 @@ describe('E072_ArtichokeField session', () => {
     })
 
     /**
-     * BGA-equivalence verification (Sprint 5e):
+     * The reference-equivalence verification (Sprint 5e):
      *
-     * BGA implements ArtichokeField as a Reap-event listener that fires
+     * The reference implements ArtichokeField as a Reap-event listener that fires
      * "+1 food if harvested>=1 from this card" once per harvest field
      * phase. Our implementation routes the +1 food through the
      * onHarvestFieldPhase callback alongside the +1 crop.
@@ -198,10 +198,10 @@ describe('E072_ArtichokeField session', () => {
      * This test verifies the totals across the full life of a 3-grain
      * field and a 2-vegetable field by repeatedly invoking the
      * onHarvestFieldPhase hook (the engine drives one call per harvest
-     * round). If totals match BGA expectations the structural deviation
+     * round). If totals match the reference expectations the structural deviation
      * is non-observable and can be demoted to deliberate divergence.
      */
-    it('multi-harvest food totals equal BGA expectation (3 grain → 3 food bonus)', () => {
+    it('multi-harvest food totals equal reference expectation (3 grain → 3 food bonus)', () => {
       const session = setup()
       const state = session.getState().state
       const player = state.players[0]!
@@ -223,7 +223,7 @@ describe('E072_ArtichokeField session', () => {
       expect(player.cardStates[CARD_ID]?.extraData?.cardFieldStacks ?? []).toEqual([])
     })
 
-    it('multi-harvest food totals equal BGA expectation (2 vegetable → 2 food bonus)', () => {
+    it('multi-harvest food totals equal reference expectation (2 vegetable → 2 food bonus)', () => {
       const session = setup()
       const state = session.getState().state
       const player = state.players[0]!
@@ -244,7 +244,7 @@ describe('E072_ArtichokeField session', () => {
       expect(player.cardStates[CARD_ID]?.extraData?.cardFieldStacks ?? []).toEqual([])
     })
 
-    it('no harvest crop → no bonus food (parity with BGA "harvested>=1" guard)', () => {
+    it('no harvest crop → no bonus food (parity with the reference "harvested>=1" guard)', () => {
       const session = setup()
       const state = session.getState().state
       const player = state.players[0]!

@@ -21,7 +21,7 @@ const findListener = (id: string) =>
  * C94 Stable Cleaner — At any time, you can take the Build Stables action
  * without placing a person. If you do, each stable costs you 1 wood + 1 food.
  *
- * BGA: anytime + flagCardNode + STABLES action with costs={WOOD=>1, FOOD=>1}.
+ * Rule: anytime + flagCardNode + STABLES action with costs={WOOD=>1, FOOD=>1}.
  *
  */
 describe('C094_StableCleaner — exact cost 1 wood + 1 food', () => {

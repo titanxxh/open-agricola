@@ -10,13 +10,13 @@ const CARD_ID = 'E024_Ambition'
  * E24 Ambition — Each time you get a __Minor Improvement__ action on an action
  * space, you can build a major improvement instead of playing a minor one.
  *
- * BGA: onPlayerComputePlaceFarmerFlow — modifies the flow on MeetingPlace and
+ * Rule: onPlayerComputePlaceFarmerFlow — modifies the flow on MeetingPlace and
  * WishChildren action spaces to allow MAJOR in addition to MINOR improvements.
  *
  * Implementation: Use a computeReplace listener on the unified 'improvement'
  * action (gated to minor-only sub-flows via readImprovementTypes) and re-emit
  * with params.types: ['major','minor'] so the player can now also build major.
- * The BGA description says this only applies to literal Minor Improvement
+ * The reference description says this only applies to literal Minor Improvement
  * action spaces (meeting-place, wish-children, urgent-wish-children).
  *
  * Prerequisite: 2 Occupations.

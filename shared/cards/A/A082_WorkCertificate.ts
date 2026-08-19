@@ -13,12 +13,12 @@ const BUILDING_RESOURCES: (keyof Resource)[] = ['wood', 'clay', 'reed', 'stone']
  * Each time after you use an action space, you can take 1 building resource from
  * a building resource accumulation space with at least 4 building resources on it.
  *
- * BGA `A082_WorkCertificate::onPlayerAfterPlaceFarmer` collects all building
+ * The reference `A082_WorkCertificate::onPlayerAfterPlaceFarmer` collects all building
  * resource accumulation spaces with >= 4 resources and presents an XOR. The
- * BGA SE pulls one off the chosen space (decrementing the space's
+ * The reference pulls one off the chosen space (decrementing the space's
  * resource count) and gives it to the player. We use `collect` with
  * `actionContext: { spaceId, resource, amount: 1 }` (partial-take mode) so the
- * source space is properly decremented (BGA parity) instead of just gaining a
+ * source space is properly decremented instead of just gaining a
  * resource from the supply.
  */
 const findChoices = (context: CardListenerContext): ActionFlow[] => {

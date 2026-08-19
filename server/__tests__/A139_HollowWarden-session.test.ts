@@ -57,7 +57,7 @@ describe('A139_HollowWarden session', () => {
   })
 
   it('gains 1 food when using 3p hollow space', () => {
-    // 3p game uses 'hollow' space (non-4p variant). BGA listens via
+    // 3p game uses 'hollow' space (non-4p variant). The reference listens via
     // isActionCardEvent($event, 'Hollow') which matches both spaces.
     const session = new GameSession(undefined, undefined, { playerCount: 3 })
     stabilizeRandomHands(session.state.players)

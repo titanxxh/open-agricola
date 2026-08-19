@@ -26,7 +26,6 @@ Single-context layout: read root `CONTEXT.md` and any ADRs under `docs/adr/`. Se
 - 后端 `GameSession`（`server/game/authoritative-session.ts`）是 `GameState` 的**唯一写入者**。
 - WebSocket 房间对局是实时同步主链路；HTTP 用于调试、补拉快照、测试辅助，以及版本化的 Game Context、Replay 和 Bug Report 产品接口，不通过 HTTP 另建规则写入主链路。
 - 与游戏规则相关的实现优先放在 `shared/` + `server/`，不要在前端 UI 补规则逻辑。
-- 遇到不确定的实现，优先参考 `../bga-agricola`，除非架构文档已明确给出不同设计。
 - 详细架构（节点树引擎、Hook 系统、协议层、Pending 模型、房间系统）→ `docs/ARCHITECTURE.md`。
 
 ## Commands
@@ -59,7 +58,7 @@ pnpm run build              # tsc + vite build
 
 ## Card Implementation Rules
 
-**总规范：卡牌能力尽量在卡牌文件内部闭环，不能扩散。卡牌文件行数尽量贴近 BGA，甚至更少。**
+**总规范：卡牌能力尽量在卡牌文件内部闭环，不能扩散。卡牌文件保持精简。**
 
 扩展原则：无特殊原因不要改动主路径（`shared/actions/effects/pay.ts`、`shared/actions/effects/improvement.ts`、`shared/session/session-core.ts`、`server/game/authoritative-session.ts` 等核心文件）。
 
@@ -80,7 +79,6 @@ pnpm run build              # tsc + vite build
 新增 / 修改卡牌实现前，先做一轮简短设计判断，并把结论写进测试说明或实现计划：
 - **难易程度**：判断是单卡局部修复、复用现有 hook/helper、还是需要通用机制。
 - **基础设施缺口**：明确是否缺 ActionFlow / pending / payment / field / animal / action-pool 等通用能力；缺基础设施时先设计通用扩展，禁止在主路径塞单卡 `if-else`。
-- **BGA 对照**：阅读 `../bga-agricola/modules/php/Cards/<Deck>/<Card>.php` 对应实现，记录 BGA 的事件点、node 形态、是否 optional / mandatory、是否有自定义 args/act 交互。
 - **落地边界**：优先选择最小可验证切片；如果要改主路径，说明它服务哪些卡和哪些测试，而不是只服务单卡。
 
 新增 / 修改卡牌实现时，**必须先提供测试说明**，得到确认后再编码。测试说明基于 `docs/CARD_TEST_TEMPLATE.md` 编写，必须先说明选择直接行为测试还是 Session 测试及原因。直接行为测试写清输入、公开 effect / listener 调用、预期 flow / 资源 delta 和不触发情况；Session 测试必须包含：

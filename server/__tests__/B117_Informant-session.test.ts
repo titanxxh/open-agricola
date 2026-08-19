@@ -92,7 +92,7 @@ describe('B117_Informant session', () => {
   })
 
   it('multi-player: only owner gains wood (not opponent)', () => {
-    // BGA L29-33 isListeningTo isPlayerEvent → handler scoped to card owner only.
+    // The reference L29-33 isListeningTo isPlayerEvent → handler scoped to card owner only.
     // Our onBeforeReturnHome runs runCardEffectHook(state, player, ...) per
     // owner of the played card, so opponent without the card is unaffected.
     const session = new GameSession()

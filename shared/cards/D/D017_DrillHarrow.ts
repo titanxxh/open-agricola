@@ -9,7 +9,6 @@ const CARD_ID = 'D017_DrillHarrow'
  * D17 Drill Harrow (Minor Improvement):
  * Each time before you take an unconditional Sow action, you can pay 3 food to plow 1 field.
  *
- * BGA reference:
  * - isListeningTo: before Sow event, only if Sow.isUnconditional
  * - onPlayerBeforeSow: optional seq(pay 3 food, plow)
  * - onPlayerIsDoable: if action == SOW, set isDoable = true

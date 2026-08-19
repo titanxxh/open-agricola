@@ -247,7 +247,7 @@ export const placeFarmerAction: ActionDefinition = {
       actionContext,
       ignoreWorkerAvailability: temporarySupplyWorker !== null,
     })
-    // BGA `constraints` (e.g. C125 Nightworker restricts to building-resource
+    // The reference `constraints` (e.g. C125 Nightworker restricts to building-resource
     // accumulation spaces of types the player has 0 of). Caller passes a
     // string[] of space ids via `actionContext.constraints`; we intersect it
     // with the engine-computed allowed set.

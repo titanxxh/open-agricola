@@ -348,7 +348,7 @@ _Avoid_: 单个 flat cost、PaymentSolution 列表、已枚举支付方案
 _Avoid_: topo 排序、数字 order 优先级、卡牌间偏序
 
 **Mandatory Saturation（强制饱和）**:
-候选闭包结果集的过滤规则：只保留不存在仍可应用的 mandatory 成本转换的候选；未饱和候选仅作为中间节点继续派生，不暴露给玩家。mandatory / optional 是每个成本转换的局部自描述语义（对照 BGA 卡面"costs less" vs "can pay instead"逐卡确定），不是卡牌间关系。
+候选闭包结果集的过滤规则：只保留不存在仍可应用的 mandatory 成本转换的候选；未饱和候选仅作为中间节点继续派生，不暴露给玩家。mandatory / optional 是每个成本转换的局部自描述语义（对照卡面"costs less" vs "can pay instead"逐卡确定），不是卡牌间关系。
 _Avoid_: 卡牌执行顺序、Pareto 剪枝、domination
 
 **Payment Path（支付路径）**:
@@ -457,7 +457,7 @@ _Avoid_: 卡牌自己扫所有玩家、为单卡新增 custom turn-order
 _Avoid_: dispatch 阶段直接 mutate state
 
 **Reaction Hook**:
-同一时机可能有多张卡可触发、且玩家应能决定触发顺序的卡牌反应。OA 用 `ParallelNode(mode='trigger-select')` 对齐 BGA `NODE_PARALLEL`：先显示可触发卡牌，玩家选择一张后执行该卡 activation，剩余同组 reaction 继续由引擎重算。
+同一时机可能有多张卡可触发、且玩家应能决定触发顺序的卡牌反应。OA 用 `ParallelNode(mode='trigger-select')`：先显示可触发卡牌，玩家选择一张后执行该卡 activation，剩余同组 reaction 继续由引擎重算。
 _Avoid_: 固定卡牌扫描顺序、per-card 触发顺序开关
 
 **Compute / Query Hook**:
@@ -625,7 +625,7 @@ _Avoid_: 每轮一次的标记
 _Avoid_: 单纯增加工人计数
 
 **Extra Turn（额外行动）**:
-玩家普通工人耗尽后由卡牌贡献的一次额外放工机会；轮转不再提前跳过这类玩家。多张卡同时贡献时先进入 provider 级 `trigger-select`，选中某张卡后才展开该卡自己的额外行动 flow。skip / forced consume 按来源卡记录机会消耗，不用玩家级全局计数。对应 BGA `stLabor` 里 adoptive / Telegram / Work Permit 等并列的 supply-placement 选项。
+玩家普通工人耗尽后由卡牌贡献的一次额外放工机会；轮转不再提前跳过这类玩家。多张卡同时贡献时先进入 provider 级 `trigger-select`，选中某张卡后才展开该卡自己的额外行动 flow。skip / forced consume 按来源卡记录机会消耗，不用玩家级全局计数。对应 adoptive / Telegram / Work Permit 等并列的 supply-placement 选项。
 _Avoid_: 连续放工（破坏交替）
 
 **Forfeit（放弃额外行动）**:

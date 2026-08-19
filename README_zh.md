@@ -127,4 +127,4 @@ PRs welcome. 开发环境、测试、commit 与 PR 规范见 [CONTRIBUTING_zh.md
 
 ## License
 
-[Apache 2.0](LICENSE)。fan project disclaimer + BGA studio attribution 见 [NOTICE](NOTICE)。
+[Apache 2.0](LICENSE)。fan project disclaimer + 美术素材归属声明见 [NOTICE](NOTICE)。

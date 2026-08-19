@@ -2,7 +2,7 @@ import type { PlayerState } from '../../contract/types'
 import { familySize } from '../../domain/player'
 
 /**
- * BGA's bonusStoneRoom exclusivity: when a player plays multiple cards that
+ * The reference's bonusStoneRoom exclusivity: when a player plays multiple cards that
  * grant bonus VP based on their stone house, only the card with the highest
  * score contributes. Each contributing card calls this helper to decide
  * whether it is the winner (and thus scores) or not (and scores 0).

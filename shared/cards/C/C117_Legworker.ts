@@ -13,11 +13,11 @@ const CARD_ID = 'C117_Legworker'
  * "Each time you use an action space that is orthogonally adjacent to another
  * action space occupied by one of your people, you get 1 wood."
  *
- * BGA: isActionCardEvent(null) — fires for any action-card placement.
+ * Rule: isActionCardEvent(null) — fires for any action-card placement.
  * onPlayerPlaceFarmer checks hasAdjacentWorker via a static adjacency map.
  *
  * In open-agricola we use the space-id adjacency map below. Round-numbered
- * spaces (BGA indices 1..14) are resolved through state.roundActionOrder.
+ * spaces (the reference indices 1..14) are resolved through state.roundActionOrder.
  * We intentionally cover the spaces we ship; any id not present in the map
  * simply yields no neighbours.
  */

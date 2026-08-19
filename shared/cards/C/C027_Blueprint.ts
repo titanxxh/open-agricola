@@ -14,10 +14,10 @@ const ALLOWED_MAJORS = ['Major_Joinery', 'Major_Pottery', 'Major_Basket'] as con
  * C27 Blueprint — You can build Joinery, Pottery, and Basketmaker's Workshop
  * even when taking a Minor Improvement action. They each cost 1 stone less.
  *
- * BGA: `onPlayerComputeCardCosts` clones any cost-trade containing stone and
+ * Rule: `onPlayerComputeCardCosts` clones any cost-trade containing stone and
  * subtracts 1 (giving the player two payment paths: original cost OR
  * stone-discounted cost). The "buildable via minor-improvement action" part
- * is naturally part of BGA's improvement-action wiring.
+ * is naturally part of the reference's improvement-action wiring.
  */
 const computeCostsListener: CardListenerRegistration = {
   id: 'C27-blueprint-compute-costs',

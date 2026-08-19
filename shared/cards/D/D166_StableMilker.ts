@@ -16,7 +16,7 @@ const USED_ACTION_TOKEN_KEY = 'usedActionToken'
  * D166 Stable Milker
  * Each time you build at least 2 stables on the same turn, you also get 1 cattle.
  *
- * BGA: tracks stables built per turn via numStablesBuiltThisTurn.
+ * Rule: tracks stables built per turn via numStablesBuiltThisTurn.
  * Uses setUsedOnTurnId / usableThisTurn to fire only once per turn.
  *
  * In open-agricola we use getStableTilesBuiltThisAction from action-snapshot

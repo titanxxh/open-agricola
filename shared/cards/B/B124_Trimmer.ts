@@ -13,7 +13,7 @@ const CARD_ID = 'B124_Trimmer'
  * In each work phase, after you enclose at least one farmyard space, you get 2 stone.
  * (Subdividing an existing pasture does not count.)
  *
- * BGA:
+ * Rule:
  * - onBuy: record current fencing area (pasture-covered zones).
  *          If during work phase, also unflag.
  * - startOfWork: unflag

@@ -11,7 +11,7 @@ const CARD_ID = 'D160_Midwife'
  * Each time another player uses the FIRST person they place in a round to
  * take a Family Growth action, card owner gets 1 grain.
  *
- * BGA: onOpponentAfterWishChildren — guarded by
+ * Rule: onOpponentAfterWishChildren — guarded by
  *   `if ($player->countPlacedFarmers() == 1)` — i.e. only when the placement
  *   that triggered Family Growth is the opponent's first farmer this round.
  *
@@ -28,7 +28,7 @@ const listener: CardListenerRegistration = {
   scope: 'opponent',
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (!FAMILY_GROWTH_SPACES.has(context.space?.id ?? '')) return
-    // BGA: opponent's first farmer this round only.
+    // Rule: opponent's first farmer this round only.
     // recordRoundPlacement runs before the 'after' hook fires, so the just-placed
     // farmer is already counted — first farmer means exactly 1 placement so far.
     const placements = getRoundPlacementOrder(context.player)

@@ -35,7 +35,7 @@ const opponentGrowsToFiveListener: CardListenerRegistration = {
     if (isCardFlagged(owner, CARD_ID)) return
     const opponent = context.triggerPlayer ?? context.player
     if (!opponent) return
-    // BGA: trigger only at the moment the opponent reaches family of 5.
+    // Rule: trigger only at the moment the opponent reaches family of 5.
     if (familySize(opponent) !== 5) return
 
     return {

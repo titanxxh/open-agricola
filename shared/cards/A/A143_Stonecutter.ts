@@ -9,7 +9,7 @@ const CARD_ID = 'A143_Stonecutter'
 /**
  * A143 Stonecutter — Every improvement, room, and renovation costs you 1 stone less.
  *
- * BGA reference: onPlayerComputeCardCosts (improvements), onPlayerComputeCostsConstruct,
+ * Reference: onPlayerComputeCardCosts (improvements), onPlayerComputeCostsConstruct,
  * onPlayerComputeCostsRenovation.
  *
  * For construct and renovation we use BonusModifier (the modifier system).

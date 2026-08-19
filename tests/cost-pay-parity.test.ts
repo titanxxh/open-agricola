@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
+import { mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
-import { spawnSync } from 'node:child_process'
 import type {
   ActionSpace,
   Bonus,
@@ -21,7 +20,7 @@ import { getCardModifiers } from '../shared/cards/card-modifiers'
 import { runCardListeners } from '../shared/cards/card-listeners'
 import '../shared/cards/__tests__/setup-register-all'
 
-type BgaCost = {
+type ReferenceCost = {
   fees?: Array<Record<string, unknown>>
   trades?: Array<Record<string, unknown>>
   bonuses?: Array<Record<string, unknown>>
@@ -41,7 +40,7 @@ type ScenarioDiff = {
   kind: Scenario['kind']
   scenario: Scenario
   diffKind: DiffKind
-  bga: PaymentOption[]
+  reference: PaymentOption[]
   oa: PaymentOption[]
 }
 
@@ -106,14 +105,9 @@ const RESOURCE_KEYS = [
   'stable',
 ] as const
 
-const BGA_HARNESS = path.resolve(
-  process.cwd(),
-  '../../../bga-agricola/.worktree/bga-cost-pay-ut/tests/bga-cost-pay-parity.php',
-)
+const REFERENCE_FIXTURE = path.resolve(process.cwd(), 'tests/__fixtures__/cost-pay-parity.json')
 
-const BGA_FIXTURE = path.resolve(process.cwd(), 'tests/__fixtures__/cost-pay-bga-parity.json')
-
-const REPORT_PATH = path.resolve(process.cwd(), 'output/cost-pay-bga-parity-report.md')
+const REPORT_PATH = path.resolve(process.cwd(), 'output/cost-pay-parity-report.md')
 
 const baseResources = {
   wood: 0,
@@ -295,25 +289,18 @@ const ACCEPTED_DIFF_REASONS: Record<string, string> = {
   'E123 card-purchase top resource choices': 'Accepted: E123 top-k payment choices are stateful because after-pay consumes the selected count from the card stack; OA keeps the full stateful choice set instead of pruning by resources only.',
   'combo card-purchase basket fixed price plus stone and wood modifiers': 'Accepted: the payable resources are equivalent; OA collapses equivalent fixed-price source-attribution rows that have no distinct payment consequence.',
   'E123 construct top resource choices': 'Accepted: E123 use-top-k is stateful, so the no-use and use-resource paths may lead to different future card stack state even when one pays more resources.',
-  'E123 renovation top resource choices': 'Accepted: BGA records a k=0 Resource Hoarder choice source for the no-use branch; OA treats k=0 as no card effect and omits the source.',
+  'E123 renovation top resource choices': 'Accepted: the reference implementation records a k=0 Resource Hoarder choice source for the no-use branch; OA treats k=0 as no card effect and omits the source.',
 }
 
-type BgaPayload = {
+type ReferencePayload = {
   singleCardCaseCount: number
   comboCaseCount: number
-  results: Record<string, BgaCost>
+  results: Record<string, ReferenceCost>
   coveredCardIds: string[]
 }
 
-const getBgaPayload = () => {
-  if (existsSync(BGA_HARNESS)) {
-    const result = spawnSync('php', [BGA_HARNESS, '--json'], { encoding: 'utf8' })
-    expect(result.status, result.stderr || result.stdout).toBe(0)
-    return JSON.parse(result.stdout) as BgaPayload
-  }
-  expect(existsSync(BGA_FIXTURE), `missing BGA harness: ${BGA_HARNESS}; missing fixture: ${BGA_FIXTURE}`).toBe(true)
-  return JSON.parse(readFileSync(BGA_FIXTURE, 'utf8')) as BgaPayload
-}
+const getReferencePayload = () =>
+  JSON.parse(readFileSync(REFERENCE_FIXTURE, 'utf8')) as ReferencePayload
 
 const stripResources = (raw: Record<string, unknown>, multiplier = 1): Record<string, number> => {
   const out: Record<string, number> = {}
@@ -370,10 +357,10 @@ const paymentShapeKey = (options: PaymentOption[]): string =>
 
 const compareOptions = (
   scenario: Scenario,
-  bga: PaymentOption[],
+  reference: PaymentOption[],
   oa: PaymentOption[],
 ): ScenarioDiff[] => {
-  const expected = uniqueSortedOptions(bga)
+  const expected = uniqueSortedOptions(reference)
   const actual = uniqueSortedOptions(oa)
   if (optionListKey(expected) === optionListKey(actual)) return []
   return [{
@@ -381,7 +368,7 @@ const compareOptions = (
     kind: scenario.kind,
     scenario,
     diffKind: paymentShapeKey(expected) === paymentShapeKey(actual) ? 'source-diff' : 'payment-diff',
-    bga: expected,
+    reference: expected,
     oa: actual,
   }]
 }
@@ -399,7 +386,7 @@ const addCost = (base: PaymentOption, raw: Record<string, unknown>, multiplier =
   return { resources, sources: [...new Set([...base.sources, ...normalizeSources(raw.sources)])].sort() }
 }
 
-const bgaConditionsPass = (conditions: unknown, scenario: Scenario): boolean => {
+const referenceConditionsPass = (conditions: unknown, scenario: Scenario): boolean => {
   if (!conditions || typeof conditions !== 'object') return true
   const raw = conditions as Record<string, unknown>
   if (typeof raw.minNumRooms === 'number' && (scenario.units ?? scenario.rooms ?? 1) < raw.minNumRooms) return false
@@ -409,7 +396,7 @@ const bgaConditionsPass = (conditions: unknown, scenario: Scenario): boolean => 
   return true
 }
 
-const bgaOptions = (cost: BgaCost, scenario: Scenario): PaymentOption[] => {
+const referenceOptions = (cost: ReferenceCost, scenario: Scenario): PaymentOption[] => {
   const feeOptions = (cost.fees && cost.fees.length > 0 ? cost.fees : [{}]).map((fee) => ({
     resources: stripResources(fee),
     sources: normalizeSources(fee.sources),
@@ -426,14 +413,14 @@ const bgaOptions = (cost: BgaCost, scenario: Scenario): PaymentOption[] => {
     : feeOptions
 
   for (const bonus of cost.bonuses ?? []) {
-    if (!bgaConditionsPass(bonus.conditions, scenario)) continue
+    if (!referenceConditionsPass(bonus.conditions, scenario)) continue
     const isMultiChoice = Array.isArray(bonus.choices) && (bonus.choices as unknown[]).length > 1
     const choices = Array.isArray(bonus.choices) ? bonus.choices as Array<Record<string, unknown>> : [bonus]
     const old = options
     options = bonus.optional === true ? [...options] : []
     for (const option of old) {
       for (const choice of choices) {
-        if (!bgaConditionsPass(choice.conditions, scenario)) continue
+        if (!referenceConditionsPass(choice.conditions, scenario)) continue
         const applied = addCost(option, choice)
         if (applied) options.push(isMultiChoice ? { ...applied, fromChoices: true } : applied)
       }
@@ -444,7 +431,7 @@ const bgaOptions = (cost: BgaCost, scenario: Scenario): PaymentOption[] => {
   return pruneDominatedOptions(uniqueSortedOptions(options))
 }
 
-// Mirror of the production keepOnlyOptimals (ADR 0004 amendment): BGA's Pay
+// Mirror of the production keepOnlyOptimals (ADR 0004 amendment): the reference Pay
 // layer prunes strictly dominated combinations before showing them, so the
 // structurally-expanded fixture options must be pruned the same way to stay
 // on the same comparison plane as OA's solver output. Choice expansions are
@@ -731,9 +718,9 @@ const renderReport = (
     return acc
   }, { 'payment-diff': 0, 'source-diff': 0 })
   const lines = [
-    '# BGA/OA Cost-Pay Parity Report',
+    '# Cost-Pay Parity Report',
     '',
-    `BGA covered compute-cost cards: ${covered.length}`,
+    `Covered compute-cost cards: ${covered.length}`,
     `Compared scenarios: ${scenarios.length}`,
     `Compared card-purchase scenarios: ${counts['card-purchase'] ?? 0}`,
     `Compared construct scenarios: ${counts.construct ?? 0}`,
@@ -752,7 +739,7 @@ const renderReport = (
     lines.push(`${headingLevel} ${diff.name}`, '', `Kind: ${diff.kind}`, `Paying for: ${describePaymentSubject(diff.scenario)}`, `Difference type: ${diff.diffKind}`)
     const reason = ACCEPTED_DIFF_REASONS[diff.name]
     if (reason) lines.push(`Accepted reason: ${reason}`)
-    lines.push('', 'BGA:', '```json', JSON.stringify(diff.bga, null, 2), '```', '', 'OA:', '```json', JSON.stringify(diff.oa, null, 2), '```', '')
+    lines.push('', 'Reference:', '```json', JSON.stringify(diff.reference, null, 2), '```', '', 'OA:', '```json', JSON.stringify(diff.oa, null, 2), '```', '')
   }
   lines.push('## Accepted Differences', '')
   if (acceptedDiffs.length === 0) {
@@ -770,23 +757,23 @@ const renderReport = (
   writeFileSync(REPORT_PATH, `${lines.join('\n')}\n`)
 }
 
-describe('BGA/OA cost-pay parity', () => {
-  it('compares all BGA cost-pay scenarios against OA and writes a report', () => {
-    const bga = getBgaPayload()
-    expect(bga.singleCardCaseCount).toBe(53)
-    expect(bga.comboCaseCount).toBe(5)
-    expect(scenarios).toHaveLength(Object.keys(bga.results).length)
-    for (const name of Object.keys(bga.results)) {
+describe('cost-pay parity', () => {
+  it('compares all reference cost-pay scenarios against OA and writes a report', () => {
+    const reference = getReferencePayload()
+    expect(reference.singleCardCaseCount).toBe(53)
+    expect(reference.comboCaseCount).toBe(5)
+    expect(scenarios).toHaveLength(Object.keys(reference.results).length)
+    for (const name of Object.keys(reference.results)) {
       expect(scenarios.some((scenario) => scenario.name === name), name).toBe(true)
     }
 
     const diffs = scenarios.flatMap((scenario) => {
-      const bgaScenario = bga.results[scenario.name]
-      expect(bgaScenario, scenario.name).toBeDefined()
-      return compareOptions(scenario, bgaOptions(bgaScenario, scenario), oaOptions(scenario))
+      const referenceScenario = reference.results[scenario.name]
+      expect(referenceScenario, scenario.name).toBeDefined()
+      return compareOptions(scenario, referenceOptions(referenceScenario, scenario), oaOptions(scenario))
     })
 
-    renderReport(diffs, bga.coveredCardIds)
+    renderReport(diffs, reference.coveredCardIds)
     expect(readFileSync(REPORT_PATH, 'utf8')).toContain(`Differences: ${diffs.length}`)
     expect(readFileSync(REPORT_PATH, 'utf8')).toContain('Payment differences:')
     expect(readFileSync(REPORT_PATH, 'utf8')).toContain('Source-only differences:')

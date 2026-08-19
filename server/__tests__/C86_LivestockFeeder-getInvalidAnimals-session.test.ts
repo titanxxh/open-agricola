@@ -27,7 +27,7 @@ describe('C086_LivestockFeeder getInvalidAnimals', () => {
     expect(zone.cardId).toBe('C086_LivestockFeeder')
   })
 
-  it('hook returns empty (BGA mirror; capacity = grain)', () => {
+  it('hook returns empty (reference mirror; capacity = grain)', () => {
     const session = setup(2)
     const state = session.getState().state
     const player = state.players[0]!

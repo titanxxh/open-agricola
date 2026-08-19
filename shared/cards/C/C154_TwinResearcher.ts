@@ -13,7 +13,7 @@ const CARD_ID = 'C154_TwinResearcher'
  * good containing exactly the same number of goods, you can also buy 1 bonus
  * score for 1 food."
  *
- * BGA pairs (by resource type):
+ * The reference pairs (by resource type):
  *   - wood: forest/grove/copse/copse-add (triggered on each, compared to the
  *     others)
  *   - clay: clay-pit vs hollow / hollow-4

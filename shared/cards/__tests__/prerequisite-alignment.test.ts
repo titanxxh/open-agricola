@@ -1,19 +1,19 @@
 import { describe, expect, it } from 'vitest'
 import { getMinorImprovementCard, getOccupationCard } from '../catalog'
 
-// BGA reference: bga-agricola/modules/php/Cards/<deck>/<id>.php $this->prerequisite
+// Reference: the reference $this->prerequisite
 // Locked in by 2026-05-12 metadata-3b real-deviation fix.
 
 type Case = { id: string; prerequisite: string; kind: 'minor' | 'occupation' }
 
-// Forward 3: BGA has, TS now added
+// Forward 3: The reference has, TS now added
 const forwardAdded: Case[] = [
   { id: 'D030_ArtisanDistrict', prerequisite: '3 Occupations', kind: 'minor' },
   { id: 'D050_ForeignAid', prerequisite: 'Play in Round 11 or Before', kind: 'minor' },
   { id: 'E038_RodCollection', prerequisite: '3 Occupations', kind: 'minor' },
 ]
 
-// Wording 6: TS rewritten to match BGA exact text
+// Wording 6: TS rewritten to match the reference exact text
 const wordingFixed: Case[] = [
   { id: 'A020_DoubleTurnPlow', prerequisite: 'Play in Round 3 (5) or Before', kind: 'minor' },
   { id: 'B018_GrasslandHarrow', prerequisite: '2 Occ., 1 Resource After Payment', kind: 'minor' },
@@ -23,11 +23,11 @@ const wordingFixed: Case[] = [
   { id: 'E039_Paintbrush', prerequisite: '1 pig', kind: 'minor' },
 ]
 
-// Reverse 4 — BGA enforces these via `isBuyable()` method (no `$this->prerequisite`
+// Reverse 4 — the reference enforces these via `isBuyable` method (no `$this->prerequisite`
 // field); OA promotes the check to the `prerequisite` schema string + a matching
 // `prerequisiteCheck` handler so the gate is visible to players in the UI.
 // (2026-05-13: C30 / C54 removed — they were OA-extra hard gates with no
-// equivalent BGA isBuyable check; B56 re-labelled to match BGA's real Fishing
+// equivalent the reference isBuyable check; B56 re-labelled to match the reference's real Fishing
 // farmer requirement.)
 const oaExtraKept: Case[] = [
   { id: 'A003_PaperKnife', prerequisite: '3 Occupations In Hand', kind: 'minor' },
@@ -38,7 +38,7 @@ const oaExtraKept: Case[] = [
 
 const allCases: Case[] = [...forwardAdded, ...wordingFixed, ...oaExtraKept]
 
-describe('prerequisite BGA alignment', () => {
+describe('prerequisite reference alignment', () => {
   it.each(allCases)(
     '$id has prerequisite: $prerequisite',
     ({ id, prerequisite, kind }) => {

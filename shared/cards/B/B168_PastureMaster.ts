@@ -11,7 +11,7 @@ const CARD_ID = 'B168_PastureMaster'
  * Each time you renovate, you get 2 food and 1 additional animal of the
  * respective type in each of your pastures with stable.
  *
- * BGA: isActionEvent(Renovation). onPlayerAfterRenovation → gain food + animals.
+ * Rule: isActionEvent(Renovation). onPlayerAfterRenovation → gain food + animals.
  * getAnimals iterates zones: pasture type with stables > 0 → add 1 of each animal type present.
  */
 const listener: CardListenerRegistration = {

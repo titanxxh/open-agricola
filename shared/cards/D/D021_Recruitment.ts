@@ -12,7 +12,7 @@ const CARD_ID = 'D021_Recruitment'
  * From round 5 on, provided you have room in your house, each time you get a
  * Minor Improvement action, you can take a Family Growth action instead.
  *
- * BGA:
+ * Rule:
  *  - onPlayerComputeReplaceImprovement: returns WISHCHILDREN with optional flag,
  *    when event types contains MINOR and trueAction and round >= 5.
  *  - checkArgs: MINOR in args['types'] && trueAction && Globals::getTurn() >= 5
@@ -87,7 +87,7 @@ const isDoableListener: CardListenerRegistration = {
 
 const cardImpl = {
   /**
-   * BGA `onBuy` throws when `getNextFarmerAvailable()` is not null — i.e. the
+   * The reference `onBuy` throws when `getNextFarmerAvailable` is not null — i.e. the
    * player still has a farmer waiting at home. We model this as the
    * `prerequisite` handler so the card is filtered from the buy list while any
    * active farmer is still at home (= not placed on an action space).
