@@ -1,4 +1,6 @@
 #!/bin/bash
+# MAINTAINER-ONLY — 仅项目维护者在自己控制的机器上运行，贡献者无需使用本脚本。
+# Maintainer-only: deploys the owner's production backend. Contributors never need this.
 # 一键更新并重新部署后端 Docker
 # 部署前自动做完整备份、目标镜像恢复验证和版本清单，
 # 备份失败则拉回旧版本并中止部署；pre-deploy 备份保留最近 5 份、最多 30 天（ADR-0010）。

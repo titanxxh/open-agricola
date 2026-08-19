@@ -46,6 +46,8 @@ pnpm run lint               # ESLint; errors must be zero
 
 After changing code, verify in this order: restart with `./restart-intranet.sh`, exercise the real behavior in a browser, run `pnpm test:fast`, then run `pnpm run lint`.
 
+`./restart-intranet.sh` is the only shell script contributors need. `deploy-backend.sh` and `backup-offsite.sh` are maintainer-only: they operate the owner's production host and are not part of any contribution workflow.
+
 ## Architecture Boundaries
 
 - The project has three layers: `shared/` for domain logic, `server/` for HTTP and WebSocket services, and `client/` for the React UI. The frontend renders and collects input; it **does not adjudicate rules**.

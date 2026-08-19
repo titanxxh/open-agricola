@@ -48,6 +48,8 @@ pnpm run lint               # ESLint，error 必须清零
 
 改完代码的验证顺序：`./restart-intranet.sh` 重启 → 用浏览器验真实行为 → `pnpm test:fast` → `pnpm run lint`。
 
+贡献者只需要 `./restart-intranet.sh` 这一个 shell 脚本。`deploy-backend.sh` 和 `backup-offsite.sh` 是维护者专用的，用于运维 owner 的生产机，不属于任何贡献流程。
+
 ## 架构边界（必读）
 
 - 三层 `shared/`（领域逻辑）+ `server/`（HTTP + WS 服务）+ `client/`（React UI）。前端只负责渲染与输入收集，**不做规则裁定**。
