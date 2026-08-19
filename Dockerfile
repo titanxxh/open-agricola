@@ -1,7 +1,7 @@
 # syntax=docker/dockerfile:1
 
 # ── Stage 1: production dependencies (native deps for better-sqlite3/canvas) ──
-FROM node:22-alpine AS deps
+FROM node:24-alpine AS deps
 
 RUN apk add --no-cache \
     python3 make g++ \
@@ -13,7 +13,7 @@ RUN corepack enable && corepack prepare pnpm@10.33.0 --activate
 RUN pnpm install --prod --frozen-lockfile
 
 # ── Stage 2: production ──────────────────────────────────────────────────
-FROM node:22-alpine AS production
+FROM node:24-alpine AS production
 
 RUN apk add --no-cache \
     cairo pango jpeg giflib librsvg pixman

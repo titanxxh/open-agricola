@@ -8,7 +8,7 @@ Thank you for your interest in Open Agricola. Please read this guide before open
 
 Prerequisites:
 
-- **Node.js 22.** Native dependencies such as `better-sqlite3` are compiled against the Node ABI. Starting the project with Node 20 causes a `NODE_MODULE_VERSION` mismatch.
+- **Node.js 24.** Required by `isolated-vm` 7 (`node >= 24`). Native dependencies such as `better-sqlite3` are compiled against the Node ABI, so an older runtime causes a `NODE_MODULE_VERSION` mismatch.
 - **pnpm.** The required version is pinned in the `packageManager` field of `package.json`; run `corepack enable` to select it automatically.
 - **System libraries and build tools required by canvas.** Without them, `pnpm install` fails while compiling canvas:
 

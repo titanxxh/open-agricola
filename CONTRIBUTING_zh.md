@@ -10,7 +10,7 @@
 
 前置依赖：
 
-- **Node.js 22**。`better-sqlite3` 等原生依赖按 Node ABI 编译，Node 20 启动会出现 `NODE_MODULE_VERSION` 不匹配。
+- **Node.js 24**（`isolated-vm` 7 要求 `node >= 24`）。`better-sqlite3` 等原生依赖按 Node ABI 编译，用更低版本启动会出现 `NODE_MODULE_VERSION` 不匹配。
 - **pnpm**。版本由 `package.json` 的 `packageManager` 字段锁定，推荐 `corepack enable` 自动匹配。
 - **canvas 原生编译所需的系统库与工具链**。缺少时 `pnpm install` 会在编译 canvas 时失败：
 
