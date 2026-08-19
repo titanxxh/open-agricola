@@ -54,7 +54,7 @@ describe.skipIf(suiteSkip)(`LLM card-gen [${MODE}${MODE === 'live' ? ` ${PROVIDE
         code = extractCardCode(llmResponse)
       } catch (err) {
         const reason = err instanceof ExtractError ? err.message : (err as Error).message
-        throw new Error(`[${fixture.id}] extract failed: ${reason} (see ${DUMP_DIR}/${fixture.id}.txt)`)
+        throw new Error(`[${fixture.id}] extract failed: ${reason} (see ${DUMP_DIR}/${fixture.id}.txt)`, { cause: err })
       }
 
       const { session, ctx } = fixture.setup(code)
@@ -62,7 +62,7 @@ describe.skipIf(suiteSkip)(`LLM card-gen [${MODE}${MODE === 'live' ? ` ${PROVIDE
       try {
         fixture.scenario(driver, ctx)
       } catch (err) {
-        throw new Error(`[${fixture.id}] scenario threw: ${(err as Error).message} | steps: ${driver.steps.map((s) => s.label).join(' → ')} | dump: ${DUMP_DIR}/${fixture.id}.txt`)
+        throw new Error(`[${fixture.id}] scenario threw: ${(err as Error).message} | steps: ${driver.steps.map((s) => s.label).join(' → ')} | dump: ${DUMP_DIR}/${fixture.id}.txt`, { cause: err })
       }
 
       const result = fixture.assert(session, ctx)

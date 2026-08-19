@@ -66,6 +66,10 @@ export default defineConfig([
       'no-useless-escape': 'warn',
       'no-constant-binary-expression': 'warn',
       'no-useless-catch': 'warn',
+      // ESLint 10 promotes this to error. The hits are defensive initialisers
+      // (`let x = fallback` overwritten in every branch) and test helpers that
+      // assign a response they do not read; neither is a defect.
+      'no-useless-assignment': 'warn',
       'no-empty': 'warn',
     },
   },

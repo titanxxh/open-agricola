@@ -162,7 +162,7 @@ describe('AiCardDesigner AI config header', () => {
     )
 
     await waitFor(() => expect(screen.queryByText('正在恢复草稿…')).not.toBeInTheDocument())
-    await userEvent.click(screen.getByRole('button', { name: /卡牌能力 对话、源码与验证/ }))
+    await userEvent.click(screen.getByRole('button', { name: /卡牌能力\s*对话、源码与验证/ }))
     await userEvent.click(screen.getByRole('button', { name: '导入手动编辑器' }))
 
     expect(await screen.findByLabelText('能力候选源码')).toHaveValue(existingCard.effect_code)
@@ -347,7 +347,7 @@ describe('AiCardDesigner AI config header', () => {
     )
 
     await waitFor(() => expect(screen.queryByText('正在恢复草稿…')).not.toBeInTheDocument())
-    await userEvent.click(screen.getByRole('button', { name: /卡牌能力 对话、源码与验证/ }))
+    await userEvent.click(screen.getByRole('button', { name: /卡牌能力\s*对话、源码与验证/ }))
     const input = screen.getByPlaceholderText('描述你想要的卡牌效果…')
     await userEvent.type(input, '第一行能力{enter}第二行能力')
 
@@ -410,7 +410,7 @@ describe('AiCardDesigner AI config header', () => {
     )
 
     await waitFor(() => expect(screen.queryByText('正在恢复草稿…')).not.toBeInTheDocument())
-    await userEvent.click(screen.getByRole('button', { name: /卡牌能力 对话、源码与验证/ }))
+    await userEvent.click(screen.getByRole('button', { name: /卡牌能力\s*对话、源码与验证/ }))
     await userEvent.type(screen.getByPlaceholderText('描述你想要的卡牌效果…'), '重新生成能力')
     await userEvent.click(screen.getByRole('button', { name: '生成能力候选' }))
     await waitFor(() => expect(screen.getByRole('button', { name: '重发' })).toBeInTheDocument())
@@ -492,11 +492,11 @@ describe('AiCardDesigner AI config header', () => {
     )
 
     await waitFor(() => expect(screen.queryByText('正在恢复草稿…')).not.toBeInTheDocument())
-    await userEvent.click(screen.getByRole('button', { name: /卡面图 主题、参考图与候选/ }))
+    await userEvent.click(screen.getByRole('button', { name: /卡面图\s*主题、参考图与候选/ }))
     expect(screen.getByLabelText('画面主题')).toHaveValue('exact private art subject')
     expect(screen.queryByDisplayValue('exact private art prompt')).not.toBeInTheDocument()
 
-    await userEvent.click(screen.getByRole('button', { name: /卡牌能力 对话、源码与验证/ }))
+    await userEvent.click(screen.getByRole('button', { name: /卡牌能力\s*对话、源码与验证/ }))
     expect(container.querySelector('.aicw-current-code code')?.textContent).toBe(sourceCode)
   })
 
@@ -518,7 +518,7 @@ describe('AiCardDesigner AI config header', () => {
     )
 
     await waitFor(() => expect(screen.queryByText('正在恢复草稿…')).not.toBeInTheDocument())
-    await userEvent.click(screen.getByRole('button', { name: /卡面图 主题、参考图与候选/ }))
+    await userEvent.click(screen.getByRole('button', { name: /卡面图\s*主题、参考图与候选/ }))
 
     expect(screen.getByLabelText('画面主题')).toHaveAttribute('type', 'text')
     expect(screen.queryByText('生成提示词')).not.toBeInTheDocument()
@@ -541,10 +541,10 @@ describe('AiCardDesigner AI config header', () => {
     )
 
     await waitFor(() => expect(screen.queryByText('正在恢复草稿…')).not.toBeInTheDocument())
-    await userEvent.click(screen.getByRole('button', { name: /卡面图 主题、参考图与候选/ }))
+    await userEvent.click(screen.getByRole('button', { name: /卡面图\s*主题、参考图与候选/ }))
     await userEvent.type(screen.getByLabelText('画面主题'), '河谷木匠')
-    await userEvent.click(screen.getByRole('button', { name: /卡牌能力 对话、源码与验证/ }))
-    await userEvent.click(screen.getByRole('button', { name: /卡面图 主题、参考图与候选/ }))
+    await userEvent.click(screen.getByRole('button', { name: /卡牌能力\s*对话、源码与验证/ }))
+    await userEvent.click(screen.getByRole('button', { name: /卡面图\s*主题、参考图与候选/ }))
     expect(screen.getByLabelText('画面主题')).toHaveValue('河谷木匠')
 
     firstRender.unmount()
@@ -558,7 +558,7 @@ describe('AiCardDesigner AI config header', () => {
       </LocaleProvider>,
     )
     await waitFor(() => expect(screen.queryByText('正在恢复草稿…')).not.toBeInTheDocument())
-    await userEvent.click(screen.getByRole('button', { name: /卡面图 主题、参考图与候选/ }))
+    await userEvent.click(screen.getByRole('button', { name: /卡面图\s*主题、参考图与候选/ }))
     expect(screen.getByLabelText('画面主题')).toHaveValue('河谷木匠')
   })
 
@@ -644,7 +644,7 @@ describe('AiCardDesigner AI config header', () => {
     )
 
     await waitFor(() => expect(screen.queryByText('正在恢复草稿…')).not.toBeInTheDocument())
-    await userEvent.click(screen.getByRole('button', { name: /验证与交付 沙盒测试和发布检查/ }))
+    await userEvent.click(screen.getByRole('button', { name: /验证与交付\s*沙盒测试和发布检查/ }))
     await userEvent.click(screen.getByRole('button', { name: '固化当前版本并启动沙盒' }))
     await waitFor(() => expect(startSandbox).toHaveBeenCalledWith(
       completeCard.id,
@@ -743,7 +743,7 @@ describe('AiCardDesigner AI config header', () => {
     )
 
     await waitFor(() => expect(screen.queryByText('正在恢复草稿…')).not.toBeInTheDocument())
-    await userEvent.click(screen.getByRole('button', { name: /验证与交付 沙盒测试和发布检查/ }))
+    await userEvent.click(screen.getByRole('button', { name: /验证与交付\s*沙盒测试和发布检查/ }))
     await waitFor(() => expect(screen.getByText('版本 1')).toBeInTheDocument())
     await userEvent.click(screen.getByRole('button', { name: '恢复版本 1' }))
     await waitFor(() => expect(screen.getByRole('heading', {
@@ -801,7 +801,7 @@ describe('AiCardDesigner AI config header', () => {
     await userEvent.type(costInput, '3 黏土')
     expect(screen.getByText('有未保存修改')).toBeInTheDocument()
 
-    await userEvent.click(screen.getByRole('button', { name: /卡面图 主题、参考图与候选/ }))
+    await userEvent.click(screen.getByRole('button', { name: /卡面图\s*主题、参考图与候选/ }))
     await waitFor(() => expect(screen.getByRole('heading', { name: '卡面图' })).toBeInTheDocument())
 
     const saveCall = apiFetch.mock.calls.find(([, init]) => init?.method === 'PUT')
