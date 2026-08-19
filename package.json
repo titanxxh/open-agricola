@@ -60,7 +60,7 @@
     "better-sqlite3": "^13.0.3",
     "canvas": "^3.2.1",
     "isolated-vm": "^7.0.1",
-    "nanoid": "^5.1.7",
+    "nanoid": "^6.0.1",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
     "tsx": "^4.23.10",
