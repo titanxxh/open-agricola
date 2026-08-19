@@ -1424,7 +1424,7 @@ pnpm run lint               # ESLint（error 必须清零）
 pnpm run build              # tsc + vite build
 ```
 
-本地开发统一 Node.js 24.15+；`better-sqlite3` 等原生依赖按 Node ABI 编译。
+本地开发统一 Node.js 24.15+ 且不含 Node 25 线（`engines`：`^24.15.0 || >=26.0.0`）；`better-sqlite3` 等原生依赖按 Node ABI 编译。
 
 ### 13.4 Replay、恢复与 Bug Report 上线门槛
 
