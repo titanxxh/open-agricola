@@ -32,7 +32,8 @@ Single-context layout: read root `CONTEXT.md` and any ADRs under `docs/adr/`. Se
 
 ```bash
 pnpm install                # canvas 需要系统库：libcairo2-dev libpango1.0-dev libjpeg-dev libgif-dev librsvg2-dev libpixman-1-dev
-./restart-intranet.sh       # 本地开发/运行/测试统一入口（先重启再用浏览器/Playwright/命令行验真实行为）
+./restart-local.sh       # 本地开发/运行/测试统一入口，默认绑 127.0.0.1（先重启再用浏览器/Playwright/命令行验真实行为）
+./restart-local.sh --intranet   # 改绑局域网 IP（eth0/en0），供同网段其他机器访问
 pnpm test                   # vitest 全量（fast + slow）
 pnpm test:fast              # 只跑 fast project（CI 默认）
 pnpm test:slow              # 只跑 slow project（单卡 session 测试）
@@ -122,7 +123,7 @@ pnpm run build              # tsc + vite build
 
 每次代码改完，按以下顺序验证：
 
-1. `./restart-intranet.sh`——重启前后端，**这是本地开发 / 运行 / 测试的统一入口**
+1. `./restart-local.sh`——重启前后端，**这是本地开发 / 运行 / 测试的统一入口**
 2. 用浏览器 / Playwright / 命令行验真实行为
 3. `pnpm test:fast`（关键单卡涉及收获 / 多步 flow 时跑相关 session 测试）
 4. `pnpm run lint`（error 必须清零）
@@ -146,7 +147,7 @@ Commit 标题规范：`feat: ...` / `fix: ...` / `refactor: ...` / `docs: ...`�
 ## Common Pitfalls
 
 - **不要 commit `docs/superpowers/*`**：superpowers skill 产出的 spec / plan / working notes 不进 git。这是会话/PR 中间产物，污染 git history。即使 brainstorming / executing-plans skill 默认要求 commit spec，**违反默认行为，等用户明确要求才 commit**。每次 `git add` 必须显式排除 `docs/superpowers/`。
-- **`./restart-intranet.sh` 不仅是"启动方式"**：它是本地开发 / 运行 / 测试的统一入口。每次代码改完，先重启，再用浏览器 / Playwright / 命令行验真实行为，再考虑 `pnpm test:fast` 等单元测试。
+- **`./restart-local.sh` 不仅是"启动方式"**：它是本地开发 / 运行 / 测试的统一入口。每次代码改完，先重启，再用浏览器 / Playwright / 命令行验真实行为，再考虑 `pnpm test:fast` 等单元测试。
 - **Session 测试里卡牌不要随机，必须显式设置 hand**：`new GameSession()` 不传 seed 时 `createSeed()` 用 `Math.random()`（`shared/utils/rng.ts:1`），每次跑都给玩家发不同 7 张 minor / 7 张 occupation。Hand 内容会影响 `improvement-any` / `minor-improvement` / `wrapOptional(...)` 等节点的"是否 doable / 是 single auto-resolve 还是 multi-option wait"判定 → 测试断言对应的等待节点 / option 数随机生效，整体跑时偶发 fail。修法：setup 里显式覆盖所有玩家的 `minorHand` + `occupationHand`，最简洁用占位 id `['__test_placeholder__']`（在 `getMinorImprovement` 返回 undefined，被 buyable 列表过滤），既能避免 `normalizeState()` 因为空 hand 触发 re-deal，又让"任意可买 minor"的路径稳定为空。注意：放任 `player.minorHand = []` **不**等于 placeholder——它会触发 re-deal 重新发随机 7 张。
 
 ## Docs Map

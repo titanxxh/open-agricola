@@ -113,7 +113,7 @@ export const parseArgs = (argv: string[]): Args => {
   const maxStepsRaw = get('max-steps', '')
   const url = get('url', process.env.FRONTEND_URL ?? '')
   if (!url) {
-    throw new Error('--url is required; use the URL printed by ./restart-intranet.sh or set FRONTEND_URL')
+    throw new Error('--url is required; use the URL printed by ./restart-local.sh or set FRONTEND_URL')
   }
   return {
     players: Number(get('players', '4')),

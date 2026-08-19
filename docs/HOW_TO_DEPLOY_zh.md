@@ -817,7 +817,7 @@ docker compose -f docker-compose.prod.yml up -d app
 
 ```bash
 pnpm install
-./restart-intranet.sh
+./restart-local.sh
 ```
 
 `VITE_API_BASE` 未设置时默认为空字符串（同源），开发模式下前端自动连接 `localhost:5175`。

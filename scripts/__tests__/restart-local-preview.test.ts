@@ -1,9 +1,9 @@
 import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 
-const script = readFileSync('restart-intranet.sh', 'utf8')
+const script = readFileSync('restart-local.sh', 'utf8')
 
-describe('restart-intranet preview mode', () => {
+describe('restart-local preview mode', () => {
   it('documents and parses --preview', () => {
     expect(script).toContain('[--preview]')
     expect(script).toContain('--preview')
@@ -12,11 +12,20 @@ describe('restart-intranet preview mode', () => {
   })
 
   it('builds the frontend and serves dist through vite preview', () => {
-    expect(script).toContain('VITE_API_BASE="http://$LAN_IP:$BACKEND_PORT"')
-    expect(script).toContain('VITE_WS_BASE="ws://$LAN_IP:$BACKEND_PORT/ws"')
+    expect(script).toContain('VITE_API_BASE="http://$BIND_IP:$BACKEND_PORT"')
+    expect(script).toContain('VITE_WS_BASE="ws://$BIND_IP:$BACKEND_PORT/ws"')
     expect(script).toMatch(/VITE_ENABLE_DEV_AUTH_SHORTCUTS=1[\s\\]+"?\$PNPM_BIN"? run build/)
     expect(script).toContain('"$PNPM_BIN" run build')
     expect(script).toContain('"$FRONTEND_BIN" preview')
+  })
+
+  it('binds to loopback by default and only reads the LAN IP with --intranet', () => {
+    expect(script).toContain('[--intranet]')
+    expect(script).toMatch(/INTRANET_ENABLED=0/)
+    expect(script).toMatch(/--intranet\)\s*INTRANET_ENABLED=1/s)
+    expect(script).toContain('BIND_IP="127.0.0.1"')
+    expect(script).toMatch(/if \[ "\$INTRANET_ENABLED" -eq 1 \]; then\s*\n\s*BIND_IP=\$\(get_lan_ip\)/)
+    expect(script).not.toContain('LAN_IP=$(get_lan_ip)\nif')
   })
 
   it('does not reference any reference image source', () => {

@@ -800,7 +800,7 @@ An asset removal may use an existing Tombstone Room whose ledger proves the refe
 
 ```bash
 pnpm install
-./restart-intranet.sh
+./restart-local.sh
 ```
 
 When `VITE_API_BASE` is unset, it defaults to the empty string for same-origin use. In development, the frontend automatically connects to `localhost:5175`.

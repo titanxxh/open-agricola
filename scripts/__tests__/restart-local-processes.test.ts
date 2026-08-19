@@ -12,7 +12,7 @@ import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
 
-const scriptPath = resolve(import.meta.dirname, '../../restart-intranet.sh')
+const scriptPath = resolve(import.meta.dirname, '../../restart-local.sh')
 const tempDirs: string[] = []
 const processGroups: number[] = []
 
@@ -52,7 +52,7 @@ afterEach(async () => {
   tempDirs.length = 0
 })
 
-describe.skipIf(process.platform !== 'linux')('restart-intranet process cleanup', () => {
+describe.skipIf(process.platform !== 'linux')('restart-local process cleanup', () => {
   it('leaves no detached process groups when frontend startup fails', async () => {
     const root = mkdtempSync(join(tmpdir(), 'oa-restart-processes-'))
     tempDirs.push(root)
@@ -61,8 +61,8 @@ describe.skipIf(process.platform !== 'linux')('restart-intranet process cleanup'
     mkdirSync(bin, { recursive: true })
     mkdirSync(nodeBin, { recursive: true })
     execFileSync('git', ['init', '-q'], { cwd: root })
-    writeFileSync(join(root, 'restart-intranet.sh'), readFileSync(scriptPath))
-    chmodSync(join(root, 'restart-intranet.sh'), 0o755)
+    writeFileSync(join(root, 'restart-local.sh'), readFileSync(scriptPath))
+    chmodSync(join(root, 'restart-local.sh'), 0o755)
 
     const marker = join(root, 'backend-listening')
     const listenerPidFile = join(root, 'backend-listener.pid')
@@ -127,7 +127,7 @@ esac
     const oldGroup = Number(readFileSync(oldGroupFile, 'utf8'))
     processGroups.push(oldGroup)
 
-    const command = spawn('bash', [join(root, 'restart-intranet.sh')], {
+    const command = spawn('bash', [join(root, 'restart-local.sh'), '--intranet'], {
       cwd: root,
       env,
       timeout: 15_000,

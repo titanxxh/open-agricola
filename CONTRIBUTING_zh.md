@@ -27,7 +27,8 @@
 
 ```bash
 pnpm install
-./restart-intranet.sh    # 本地开发/运行/测试统一入口，同时启动后端 (5175) + 前端 (5173)
+./restart-local.sh    # 本地开发/运行/测试统一入口，在 127.0.0.1 上启动后端 (5175) + 前端 (5173)
+./restart-local.sh --intranet   # 改绑局域网 IP，便于从另一台机器测试
 ```
 
 ## 测试
@@ -46,9 +47,9 @@ pnpm run test:e2e           # Playwright E2E
 pnpm run lint               # ESLint，error 必须清零
 ```
 
-改完代码的验证顺序：`./restart-intranet.sh` 重启 → 用浏览器验真实行为 → `pnpm test:fast` → `pnpm run lint`。
+改完代码的验证顺序：`./restart-local.sh` 重启 → 用浏览器验真实行为 → `pnpm test:fast` → `pnpm run lint`。
 
-贡献者只需要 `./restart-intranet.sh` 这一个 shell 脚本。`deploy-backend.sh` 和 `backup-offsite.sh` 是维护者专用的，用于运维 owner 的生产机，不属于任何贡献流程。
+贡献者只需要 `./restart-local.sh` 这一个 shell 脚本。`deploy-backend.sh` 和 `backup-offsite.sh` 是维护者专用的，用于运维 owner 的生产机，不属于任何贡献流程。
 
 ## 架构边界（必读）
 

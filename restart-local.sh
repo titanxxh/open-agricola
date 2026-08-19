@@ -26,7 +26,7 @@ fi
 # so fixed dev room game state diverges across worktrees.
 #
 # Override: pass the env var explicitly to escape this anchor (e.g.
-#   DB_DIR=/tmp/foo PERSISTED_ROOMS_DIR=/tmp/bar ./restart-intranet.sh
+#   DB_DIR=/tmp/foo PERSISTED_ROOMS_DIR=/tmp/bar ./restart-local.sh
 # ).
 MAIN_REPO_DIR="$(cd "$(dirname "$(git -C "$SCRIPT_DIR" rev-parse --path-format=absolute --git-common-dir)")" && pwd -P)"
 SHARED_DATA_DIR="${SHARED_DATA_DIR:-$MAIN_REPO_DIR/data}"
@@ -53,18 +53,18 @@ fi
 
 usage() {
   cat <<'EOF'
-Usage: ./restart-intranet.sh [--kill-only|--kill_only|-k]
-                             [--players N | -p N | --players=N | -p=N]
-                             [--parents] [--seasons] [--moor] [--draft] [--preview]
-                             [-h|--help]
+Usage: ./restart-local.sh [--kill-only|--kill_only|-k]
+                          [--players N | -p N | --players=N | -p=N]
+                          [--parents] [--seasons] [--moor] [--draft] [--preview]
+                          [--intranet] [-h|--help]
 
 Without flags: stop any process on the frontend/backend ports, then start
-fresh backend (tsx) and frontend (vite) bound to the LAN IP. Five persistent
-dev rooms (dev2 / dev3 / dev4 / dev5 / dev6) are created automatically; each survives
-backend restarts independently.
+fresh backend (tsx) and frontend (vite) bound to 127.0.0.1, reachable only
+from this machine. Five persistent dev rooms (dev2 / dev3 / dev4 / dev5 / dev6)
+are created automatically; each survives backend restarts independently.
 
   --kill-only, --kill_only, -k   Only stop existing listeners; do not start
-                                 backend or frontend. Skips the LAN-IP check.
+                                 backend or frontend.
   --players N, -p N              Pick the dev room for N players (2/3/4/5/6).
                                  Defaults to 4. Links for all fixed rooms are
                                  always printed; the selected one is marked.
@@ -76,6 +76,10 @@ backend restarts independently.
                                  mode with draft pool size 7. Requires a reset.
   --preview                      Build the frontend and serve dist with
                                  vite preview for production-like loading.
+  --intranet                     Bind to this host's LAN IPv4 (macOS en0 /
+                                 Linux eth0) so other machines on the network
+                                 can reach the dev server. Fails if that
+                                 address cannot be determined.
   -h, --help                     Show this help.
 EOF
 }
@@ -87,6 +91,7 @@ SEASONS_ENABLED=0
 MOOR_ENABLED=0
 DRAFT_ENABLED=0
 PREVIEW_ENABLED=0
+INTRANET_ENABLED=0
 while [ $# -gt 0 ]; do
   case "$1" in
     --kill-only|--kill_only|-k)
@@ -125,6 +130,10 @@ while [ $# -gt 0 ]; do
       PREVIEW_ENABLED=1
       shift
       ;;
+    --intranet)
+      INTRANET_ENABLED=1
+      shift
+      ;;
     -h|--help)
       usage
       exit 0
@@ -147,7 +156,8 @@ esac
 
 cd "$SCRIPT_DIR"
 
-# LAN IPv4 for binding Vite / backend (macOS: en0; Linux: eth0)
+# Bind address for Vite / backend. Loopback by default; --intranet asks for
+# this host's LAN IPv4 (macOS: en0; Linux: eth0) so other machines can connect.
 get_lan_ip() {
   case "$(uname -s)" in
     Darwin)
@@ -519,10 +529,14 @@ REPLAY_VIEWER_BUILD_ID="${REPLAY_VIEWER_BUILD_ID:-$(
 )}"
 GAME_BUILD_ID="${GAME_BUILD_ID:-$(git -C "$SCRIPT_DIR" rev-parse HEAD)}"
 
-LAN_IP=$(get_lan_ip)
-if [ -z "$LAN_IP" ]; then
-  echo "Error: could not get LAN IP. On macOS use en0 (ipconfig getifaddr en0); on Linux ensure eth0 exists."
-  exit 1
+if [ "$INTRANET_ENABLED" -eq 1 ]; then
+  BIND_IP=$(get_lan_ip)
+  if [ -z "$BIND_IP" ]; then
+    echo "Error: --intranet could not determine the LAN IP. On macOS use en0 (ipconfig getifaddr en0); on Linux ensure eth0 exists."
+    exit 1
+  fi
+else
+  BIND_IP="127.0.0.1"
 fi
 
 RESET_CONFIRMED=0
@@ -563,8 +577,8 @@ if [ -n "$RESET_REASON" ]; then
   RESET_CONFIRMED=1
 fi
 
-echo "Using LAN IP: $LAN_IP"
-PUBLIC_API_BASE="${PUBLIC_API_BASE:-http://$LAN_IP:$BACKEND_PORT}"
+echo "Binding to: $BIND_IP$([ "$INTRANET_ENABLED" -eq 1 ] && echo " (intranet)" || echo " (local only; pass --intranet for LAN access)")"
+PUBLIC_API_BASE="${PUBLIC_API_BASE:-http://$BIND_IP:$BACKEND_PORT}"
 echo "Stopping existing processes..."
 stop_port_listeners "$FRONTEND_PORT" "frontend"
 stop_port_listeners "$BACKEND_PORT" "backend"
@@ -577,22 +591,22 @@ fi
 if [ "$PREVIEW_ENABLED" -eq 1 ]; then
   echo "Building frontend preview bundle..."
   env \
-    VITE_API_BASE="http://$LAN_IP:$BACKEND_PORT" \
-    VITE_WS_BASE="ws://$LAN_IP:$BACKEND_PORT/ws" \
+    VITE_API_BASE="http://$BIND_IP:$BACKEND_PORT" \
+    VITE_WS_BASE="ws://$BIND_IP:$BACKEND_PORT/ws" \
     VITE_ENABLE_DEV_AUTH_SHORTCUTS=1 \
     "$PNPM_BIN" run build
 fi
 
-echo "Starting backend (port $BACKEND_PORT on $LAN_IP, dev2/dev3/dev4/dev5/dev6 persisted via SQLite)..."
+echo "Starting backend (port $BACKEND_PORT on $BIND_IP, dev2/dev3/dev4/dev5/dev6 persisted via SQLite)..."
 start_and_wait "backend" "$BACKEND_PORT" "$BACKEND_LOG" env \
   NODE_ENV=development \
   PERSIST_ROOMS=sqlite \
   ALLOW_ANONYMOUS_WS=true \
   ENABLE_AUTH_TEST_HELPERS=1 \
-  BACKEND_HOST="$LAN_IP" \
-  CORS_ORIGIN="http://$LAN_IP:$FRONTEND_PORT" \
+  BACKEND_HOST="$BIND_IP" \
+  CORS_ORIGIN="http://$BIND_IP:$FRONTEND_PORT" \
   PUBLIC_API_BASE="$PUBLIC_API_BASE" \
-  PUBLIC_APP_ORIGIN="http://$LAN_IP:$FRONTEND_PORT" \
+  PUBLIC_APP_ORIGIN="http://$BIND_IP:$FRONTEND_PORT" \
   DEV_ENABLE_PARENT_CARDS="$([ "$PARENTS_ENABLED" -eq 1 ] && echo true || echo false)" \
   DEV_DRAFT_PARENTS="$([ "$PARENTS_ENABLED" -eq 1 ] && [ "$DRAFT_ENABLED" -eq 0 ] && echo false || echo true)" \
   DEV_ENABLE_THROUGH_THE_SEASONS="$([ "$SEASONS_ENABLED" -eq 1 ] && echo true || echo false)" \
@@ -614,19 +628,19 @@ start_and_wait "backend" "$BACKEND_PORT" "$BACKEND_LOG" env \
   "$BACKEND_BIN" "$SCRIPT_DIR/server/index.ts"
 
 if [ "$PREVIEW_ENABLED" -eq 1 ]; then
-  echo "Starting frontend preview (port $FRONTEND_PORT on $LAN_IP)..."
+  echo "Starting frontend preview (port $FRONTEND_PORT on $BIND_IP)..."
   start_and_wait "frontend" "$FRONTEND_PORT" "$FRONTEND_LOG" env \
-    VITE_API_BASE="http://$LAN_IP:$BACKEND_PORT" \
-    VITE_WS_BASE="ws://$LAN_IP:$BACKEND_PORT/ws" \
+    VITE_API_BASE="http://$BIND_IP:$BACKEND_PORT" \
+    VITE_WS_BASE="ws://$BIND_IP:$BACKEND_PORT/ws" \
     VITE_ENABLE_DEV_AUTH_SHORTCUTS=1 \
-    "$FRONTEND_BIN" preview --host "$LAN_IP" --port "$FRONTEND_PORT" --strictPort
+    "$FRONTEND_BIN" preview --host "$BIND_IP" --port "$FRONTEND_PORT" --strictPort
 else
-  echo "Starting frontend (port $FRONTEND_PORT on $LAN_IP)..."
+  echo "Starting frontend (port $FRONTEND_PORT on $BIND_IP)..."
   start_and_wait "frontend" "$FRONTEND_PORT" "$FRONTEND_LOG" env \
     NODE_ENV=development \
-    BACKEND_HOST="$LAN_IP" \
+    BACKEND_HOST="$BIND_IP" \
     VITE_ENABLE_DEV_AUTH_SHORTCUTS=1 \
-    "$FRONTEND_BIN" --host "$LAN_IP" --port "$FRONTEND_PORT" --strictPort
+    "$FRONTEND_BIN" --host "$BIND_IP" --port "$FRONTEND_PORT" --strictPort
 fi
 
 echo ""
@@ -668,20 +682,20 @@ for n in 2 3 4 5 6; do
   fi
   echo "  ${n}-player room (room=dev${n})${marker}"
   for ((i = 1; i <= n; i += 1)); do
-    echo "    P${i}: http://${LAN_IP}:5173/?player=p${i}&transport=ws&room=dev${n}&devMode=1${DEV_ROOM_QUERY_SUFFIX}"
+    echo "    P${i}: http://${BIND_IP}:5173/?player=p${i}&transport=ws&room=dev${n}&devMode=1${DEV_ROOM_QUERY_SUFFIX}"
   done
 done
 echo ""
 echo "HTTP single-player (debug, non-persistent):"
-echo "  http://${LAN_IP}:5173/?player=p1"
+echo "  http://${BIND_IP}:5173/?player=p1"
 echo ""
 echo "Platform / workshop testing:"
 echo "  Logged-in dev workshop (auth shortcut as p1):"
-echo "    http://${LAN_IP}:5173/?page=workshop&player=p1&devMode=1"
+echo "    http://${BIND_IP}:5173/?page=workshop&player=p1&devMode=1"
 echo "  Login page (real account/session flow):"
-echo "    http://${LAN_IP}:5173/?page=login"
+echo "    http://${BIND_IP}:5173/?page=login"
 echo "  Logged-in dev lobby (auth shortcut as p1):"
-echo "    http://${LAN_IP}:5173/?player=p1&devMode=1"
+echo "    http://${BIND_IP}:5173/?player=p1&devMode=1"
 echo ""
 echo "Logs:"
 echo "  tail -f \"$BACKEND_LOG\""
