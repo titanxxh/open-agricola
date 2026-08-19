@@ -104,10 +104,10 @@ pnpm run build              # tsc + vite build
 
 **`card_implementation_status.md` 同步检查清单**（需要更新该文档时）：
 - §2 问题优先清单 — 修复后移除或降级，新增 gap 立即登记
-- §3 / §10 / §11 — 同步 accepted divergence、excluded、per-card appendix 状态
-- §1 总览数字 — 状态数量有变化时同步
+- §3 已接受差异 / §11 源码排除 / §12 单卡附录 — 只登记有意的偏离和排除；已对齐的卡不逐条记录，行为以卡牌文件和相邻测试为准
 - §6 基础设施 — 新加的通用机制要登记
-- §9 Hook 清单 — 新增 / 删除 hook 点时同步
+- §8 反模式 — 新增设计禁令时补充
+- Hook 归属由 `ALL_CARD_IMPLS` 派生，不在文档里维护副本
 
 ## Change Boundaries
 
