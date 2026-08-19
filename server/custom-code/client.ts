@@ -52,8 +52,8 @@ function ensureWorker(): Worker {
     },
   })
 
-  w.on('error', (err) => {
-    console.error('[executor-worker] Worker error:', err.message)
+  w.on('error', (err: unknown) => {
+    console.error('[executor-worker] Worker error:', err instanceof Error ? err.message : String(err))
   })
 
   w.on('exit', (code) => {
