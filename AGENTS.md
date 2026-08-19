@@ -46,7 +46,7 @@ pnpm run lint               # ESLint（error 必须清零）
 pnpm run build              # tsc + vite build
 ```
 
-本地开发**统一使用 Node.js 24**（`isolated-vm` 7 要求 `node >= 24`）；`better-sqlite3` 等原生依赖按 Node ABI 编译，用更低版本启动会出现 `NODE_MODULE_VERSION` 不匹配。
+本地开发**统一使用 Node.js 24.15+**（`isolated-vm` 7 要求 `node >= 24`，`jsdom` 30 的 Node 24 分支要求 `^24.15`）；`better-sqlite3` 等原生依赖按 Node ABI 编译，用更低版本启动会出现 `NODE_MODULE_VERSION` 不匹配。
 
 ## Testing
 
