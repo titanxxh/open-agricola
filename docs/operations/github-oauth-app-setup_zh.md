@@ -15,7 +15,7 @@
   - Authorization callback URL:
     - Dev: `http://localhost:5175/api/workshop/github/oauth/callback`
     - Prod: `https://<backend-host>/api/workshop/github/oauth/callback`
-    - 当前生产示例：`https://open-agricola.duckdns.org:8443/api/workshop/github/oauth/callback`
+    - 当前生产示例：`https://your-game.duckdns.org:8443/api/workshop/github/oauth/callback`
   - 可配多个 callback URL（每个环境一个）
 3. 点 Register application
 4. 在 App 详情页点 "Generate a new client secret"，**立刻**复制保存 Client ID 和 Client Secret（secret 离开页面后无法再看）
@@ -28,7 +28,7 @@
    WORKSHOP_PR_ENABLED=true
    # 生产前端在 GitHub Pages 时，后端需要知道自己的公开 URL
    # 用于拼 OAuth callback URL。
-   PUBLIC_API_BASE=https://open-agricola.duckdns.org:8443
+   PUBLIC_API_BASE=https://your-game.duckdns.org:8443
   ```
   - Dev: 写 `.env`（已在 `.gitignore`）
   - Prod: 通过 Docker secret 或环境变量注入
@@ -118,7 +118,7 @@ pnpm run build
 
 GitHub OAuth App 的 Authorization callback URL 与服务端实际拼出的 callback 不一致。检查：
 
-- GitHub App 里是否配置了生产 callback：`https://open-agricola.duckdns.org:8443/api/workshop/github/oauth/callback`
+- GitHub App 里是否配置了生产 callback：`https://your-game.duckdns.org:8443/api/workshop/github/oauth/callback`
 - 服务端 `PUBLIC_API_BASE` / 反代 HTTPS 地址是否正确
 - 浏览器实际打开的 GitHub 授权 URL 中 `redirect_uri=` 参数是否与 GitHub App 完全一致
 

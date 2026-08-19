@@ -62,7 +62,7 @@ curl -s -H "Authorization: Bearer $GH_TOKEN" \
   https://api.github.com/repos/titanxxh/open-agricola/actions/variables/VITE_API_BASE
 ```
 
-前端关键 variable：`VITE_API_BASE`（HTTPS 后端 base，如 `https://open-agricola.duckdns.org`）、`VITE_WS_BASE`（`wss://.../ws`）。
+前端关键 variable：`VITE_API_BASE`（HTTPS 后端 base，如 `https://your-game.duckdns.org`）、`VITE_WS_BASE`（`wss://.../ws`）。
 
 GitHub Actions 固定使用 `ubuntu-latest`；额度不足时 workflow 直接失败，不切换到 self-hosted runner。
 
@@ -77,7 +77,7 @@ set -a
 source .env
 set +a
 gh workflow run deploy-pages.yml --ref main  # 仅在 public-assets.ref 更新后执行
-./deploy-backend.sh root@open-agricola.duckdns.org main /root/open-agricola
+./deploy-backend.sh root@your-game.duckdns.org main /root/open-agricola
 ```
 
 ## 引用

@@ -438,7 +438,7 @@ To update images, publish and verify a commit-addressed raw URL in `open-agricol
 Deploy the backend only from an owner-controlled machine. Keep the SSH private key on that machine and provide `ACCOUNT_REGISTRATION_POLICY` through the server's `.env`; neither belongs in GitHub Actions.
 
 ```bash
-./deploy-backend.sh root@open-agricola.duckdns.org v0.3.0 /root/open-agricola
+./deploy-backend.sh root@your-game.duckdns.org v0.3.0 /root/open-agricola
 ```
 
 Before switching versions, `deploy-backend.sh` builds the new image while the old version remains online, stops the app, and archives the complete `app-data` volume as `backups/pre-<ref>-<timestamp>.tgz`. The archive includes SQLite, card art, Replay Viewer builds, Replay assets, and the removal ledger. It also refreshes `backups/replay-removals.latest.jsonl` and stores a mode-600 `.env` snapshot at `backups/env-pre-<ref>-<timestamp>`.
