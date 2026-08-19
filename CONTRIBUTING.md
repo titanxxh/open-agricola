@@ -25,7 +25,8 @@ Install dependencies and start the project:
 
 ```bash
 pnpm install
-./restart-intranet.sh    # Unified local development, runtime, and test entry point; starts backend (5175) and frontend (5173)
+./restart-local.sh    # Unified local development, runtime, and test entry point; starts backend (5175) and frontend (5173) on 127.0.0.1
+./restart-local.sh --intranet   # Bind to the LAN IP instead, for testing from another machine
 ```
 
 ## Testing
@@ -44,9 +45,9 @@ pnpm run test:e2e           # Playwright E2E
 pnpm run lint               # ESLint; errors must be zero
 ```
 
-After changing code, verify in this order: restart with `./restart-intranet.sh`, exercise the real behavior in a browser, run `pnpm test:fast`, then run `pnpm run lint`.
+After changing code, verify in this order: restart with `./restart-local.sh`, exercise the real behavior in a browser, run `pnpm test:fast`, then run `pnpm run lint`.
 
-`./restart-intranet.sh` is the only shell script contributors need. `deploy-backend.sh` and `backup-offsite.sh` are maintainer-only: they operate the owner's production host and are not part of any contribution workflow.
+`./restart-local.sh` is the only shell script contributors need. `deploy-backend.sh` and `backup-offsite.sh` are maintainer-only: they operate the owner's production host and are not part of any contribution workflow.
 
 ## Architecture Boundaries
 

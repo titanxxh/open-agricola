@@ -215,7 +215,7 @@ App.tsx
 
 ### B2. 开发环境
 
-- `restart-intranet.sh` 无需修改 — 数据库初始化在服务器启动时自动完成（`CREATE TABLE IF NOT EXISTS`）
+- `restart-local.sh` 无需修改 — 数据库初始化在服务器启动时自动完成（`CREATE TABLE IF NOT EXISTS`）
 - SQLite 文件位于 `./data/open-agricola.db`，加入 `.gitignore`
 - 迁移策略：服务器启动时检查 schema 版本，自动执行 pending migrations
 

@@ -50,7 +50,8 @@ brew install pkg-config cairo pango libpng jpeg giflib librsvg pixman
 
 ```bash
 pnpm install
-./restart-intranet.sh    # Start the backend (5175) and frontend (5173)
+./restart-local.sh    # Start the backend (5175) and frontend (5173) on 127.0.0.1
+./restart-local.sh --intranet   # Same, but bind to the LAN IP so other machines can connect
 ```
 
 Common verification commands:

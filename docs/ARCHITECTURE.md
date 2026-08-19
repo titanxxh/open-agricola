@@ -1437,7 +1437,7 @@ Do not use DOM shape, button copy, or page structure as the primary proof of rul
 
 ```bash
 pnpm install                # canvas needs libcairo2-dev libpango1.0-dev libjpeg-dev libgif-dev librsvg2-dev libpixman-1-dev
-./restart-intranet.sh       # unified local development, runtime, and test entry; absolute tsx/vite paths avoid cross-worktree pkill
+./restart-local.sh       # unified local development, runtime, and test entry; absolute tsx/vite paths avoid cross-worktree pkill
 pnpm test                   # all Vitest projects, fast and slow
 pnpm test:fast              # fast projects only; CI default
 pnpm test:slow              # slow per-card session tests

@@ -211,7 +211,7 @@ Keep the raw Node.js HTTP server in `server/index.ts` and extend its routes:
 
 ### B2. Development
 
-- `restart-intranet.sh` needs no change; server startup initializes the database with `CREATE TABLE IF NOT EXISTS`.
+- `restart-local.sh` needs no change; server startup initializes the database with `CREATE TABLE IF NOT EXISTS`.
 - `./data/open-agricola.db` is ignored by Git.
 - At startup, check the schema version and run pending migrations.
 

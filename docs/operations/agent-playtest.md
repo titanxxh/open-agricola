@@ -111,7 +111,7 @@
 建议命令：
 
 ```bash
-./restart-intranet.sh --preview --moor --players 4
+./restart-local.sh --preview --moor --players 4
 FRONTEND_URL=<restart 输出的 preview URL>
 pnpm exec tsx scripts/agent-playtest.ts --moor --players 4 --url "$FRONTEND_URL" --out artifacts/agent-playtest/manual
 ```
@@ -124,9 +124,9 @@ pnpm exec tsx scripts/agent-playtest.ts --moor --players 4 --url "$FRONTEND_URL"
 
 第一版定稿如下：
 
-- **房间来源**：用 `restart-intranet.sh --moor --players 4`（`restart-intranet.sh:69`）的**持久化固定 dev4 Farmers 房间**（SQLite，跨重启存活；`ensureFixedDevRooms` 在后端启动时建好，发牌持久固定）。4 个 page 各用 dev4 房间的 `p1`–`p4` 视角进入。
+- **房间来源**：用 `restart-local.sh --moor --players 4` 的**持久化固定 dev4 Farmers 房间**（SQLite，跨重启存活；`ensureFixedDevRooms` 在后端启动时建好，发牌持久固定）。4 个 page 各用 dev4 房间的 `p1`–`p4` 视角进入。
 - **复现锚点 = state 快照，不依赖 seed**：WS 主链路建房 seed 恒为 `undefined`（`ws-server.ts:53`、`room.ts:208`），无法指定 seed，第一版**不**改这条主路径。复现改用 step-0 与关键步的完整 state 快照。dev4 发牌本身持久固定，快照 + 命令序列即可稳定定位。
-- **base URL**：`--preview` 用 vite preview + LAN_IP + 独立端口（`restart-intranet.sh:524`），不是 `fixtures.ts` 默认的 `localhost:5173`。harness 必须传 `--url`，也可用 `FRONTEND_URL` 作为默认值。
+- **base URL**：`--preview` 用 vite preview + 脚本解析出的绑定地址 + 独立端口，不是 `fixtures.ts` 默认的 `localhost:5173`。harness 必须传 `--url`，也可用 `FRONTEND_URL` 作为默认值。
 
 ## 输出目录
 
@@ -424,7 +424,7 @@ M1/M2 再补 plans、coverage、bugs、截图、log/sync 比较和逐项 scoring
 实现后至少跑：
 
 ```bash
-./restart-intranet.sh --preview --moor --players 4
+./restart-local.sh --preview --moor --players 4
 FRONTEND_URL=<restart 输出的 preview URL>
 pnpm exec tsx scripts/agent-playtest.ts --moor --players 4 --url "$FRONTEND_URL" --out artifacts/agent-playtest/smoke
 pnpm run lint

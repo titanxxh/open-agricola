@@ -50,7 +50,8 @@ brew install pkg-config cairo pango libpng jpeg giflib librsvg pixman
 
 ```bash
 pnpm install
-./restart-intranet.sh    # 同时启动后端 (5175) + 前端 (5173)
+./restart-local.sh    # 在 127.0.0.1 上启动后端 (5175) + 前端 (5173)
+./restart-local.sh --intranet   # 改绑局域网 IP，同网段其他机器可访问
 ```
 
 常用验证命令：

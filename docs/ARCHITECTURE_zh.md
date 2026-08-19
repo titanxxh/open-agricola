@@ -1414,7 +1414,7 @@ scores
 
 ```bash
 pnpm install                # canvas 需要系统库 libcairo2-dev libpango1.0-dev libjpeg-dev libgif-dev librsvg2-dev libpixman-1-dev
-./restart-intranet.sh       # 本地开发 / 运行 / 测试统一入口（绝对路径启动 tsx + vite，避免跨 worktree pkill 误伤）
+./restart-local.sh       # 本地开发 / 运行 / 测试统一入口（绝对路径启动 tsx + vite，避免跨 worktree pkill 误伤）
 pnpm test                   # vitest 全量（fast + slow）
 pnpm test:fast              # 只跑 fast project（CI 默认）
 pnpm test:slow              # 只跑 slow project（单卡 session 测试）
