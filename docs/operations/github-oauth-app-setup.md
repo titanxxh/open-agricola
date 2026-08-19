@@ -13,7 +13,6 @@ This guide is for the repository maintainer (`titanxxh`). Complete this setup be
    - Authorization callback URL:
      - Development: `http://localhost:5175/api/workshop/github/oauth/callback`
      - Production: `https://<backend-host>/api/workshop/github/oauth/callback`
-     - Current production example: `https://your-game.duckdns.org:8443/api/workshop/github/oauth/callback`
    - You may configure multiple callback URLs, one for each environment.
 3. Click **Register application**.
 4. On the application page, click **Generate a new client secret**. Copy and store the Client ID and Client Secret immediately; the secret cannot be viewed again after leaving the page.
@@ -118,7 +117,7 @@ Common generator failures and their fixes:
 
 The GitHub OAuth App's Authorization callback URL does not match the callback constructed by the server. Check:
 
-- The production callback is configured in the GitHub App: `https://your-game.duckdns.org:8443/api/workshop/github/oauth/callback`.
+- The production callback is configured in the GitHub App: `https://<backend-host>/api/workshop/github/oauth/callback`, using your own backend host.
 - The backend `PUBLIC_API_BASE` and reverse-proxy HTTPS address are correct.
 - The `redirect_uri` parameter in the GitHub authorization URL opened by the browser exactly matches the GitHub App setting.
 
