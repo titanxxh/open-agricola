@@ -1447,7 +1447,7 @@ pnpm run lint               # ESLint; zero errors required
 pnpm run build              # TypeScript plus Vite build
 ```
 
-Local development standardizes on Node.js 24. Native dependencies such as `better-sqlite3` are built for its ABI.
+Local development standardizes on Node.js 24.15 or newer. Native dependencies such as `better-sqlite3` are built for its ABI.
 
 ### 13.4 Replay, recovery, and Bug Report launch gates
 

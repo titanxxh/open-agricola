@@ -35,7 +35,7 @@ https://titanxxh.github.io/open-agricola/
 
 ## Quick Start
 
-Prerequisites: Node.js 24 and pnpm. The pnpm version is pinned by the `packageManager` field in `package.json`. `isolated-vm` 7 requires `node >= 24`, and native dependencies such as `better-sqlite3` are compiled against the Node ABI, so an older runtime causes a `NODE_MODULE_VERSION` mismatch.
+Prerequisites: Node.js 24.15 or newer, and pnpm. The pnpm version is pinned by the `packageManager` field in `package.json`. `isolated-vm` 7 requires `node >= 24`, and native dependencies such as `better-sqlite3` are compiled against the Node ABI, so an older runtime causes a `NODE_MODULE_VERSION` mismatch.
 
 The `canvas` package is built from source and requires the following system libraries and build tools before running `pnpm install`:
 
