@@ -9,6 +9,7 @@ import { MobileTabBar } from '../components/common/MobileTabBar'
 import { GameLoadScreen } from '../components/common/GameLoadScreen'
 import { AppShellLoadScreen } from './AppShellLoadScreen'
 import { getGameLoadProgress } from './game-load-progress'
+import { isHotseatModeQuery } from './game-setup-query'
 import { SandboxAppLazy } from '../sandbox'
 import { buildPlatformPageUrl, type PlatformPage } from '../utils/platform-page-url'
 import '../App.css'
@@ -23,7 +24,7 @@ function getPage(): PlatformPage {
   if (page === 'game' || page === 'workshop' || page === 'lobby' || page === 'settings' || page === 'login' || page === 'onboarding') return page
   if (params.get('context')) return 'game'
   if (params.get('room') || params.get('transport') === 'ws') return 'game'
-  if (params.get('hotseat') === '1') return 'game'
+  if (isHotseatModeQuery(window.location.search)) return 'game'
   return 'lobby'
 }
 

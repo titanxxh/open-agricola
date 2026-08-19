@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
+  isHotseatModeQuery,
   isHotseatSetupQuery,
   parseDraftParamsFromQuery,
   parseHotseatSetupFromQuery,
@@ -41,11 +42,27 @@ describe('parseDraftParamsFromQuery', () => {
 })
 
 describe('isHotseatSetupQuery', () => {
-  it('only recognises an explicit hotseat flag', () => {
+  it('only asks for a deal on the initial hotseat flag', () => {
     expect(isHotseatSetupQuery('?hotseat=1&maxPlayers=3')).toBe(true)
+    // Already dealt — a reload must resume, not deal again.
+    expect(isHotseatSetupQuery('?hotseat=live')).toBe(false)
     expect(isHotseatSetupQuery('?hotseat=0')).toBe(false)
     expect(isHotseatSetupQuery('?transport=ws&maxPlayers=3')).toBe(false)
     expect(isHotseatSetupQuery('')).toBe(false)
+  })
+})
+
+describe('isHotseatModeQuery', () => {
+  it('covers both the pending deal and the running game', () => {
+    expect(isHotseatModeQuery('?hotseat=1&maxPlayers=3')).toBe(true)
+    expect(isHotseatModeQuery('?hotseat=live')).toBe(true)
+  })
+
+  it('leaves plain HTTP sessions alone', () => {
+    // Workshop sandbox / E2E / debugging: one viewer, no handoff covers.
+    expect(isHotseatModeQuery('?localSandbox=1')).toBe(false)
+    expect(isHotseatModeQuery('?player=p1&devMode=1')).toBe(false)
+    expect(isHotseatModeQuery('')).toBe(false)
   })
 })
 
@@ -97,13 +114,17 @@ describe('parseHotseatSetupFromQuery', () => {
 })
 
 describe('stripHotseatSetupParams', () => {
-  it('removes the setup keys so a reload resumes instead of re-dealing', () => {
-    expect(stripHotseatSetupParams(
+  it('drops the setup keys but keeps the mode flag', () => {
+    const stripped = stripHotseatSetupParams(
       '?hotseat=1&maxPlayers=4&enableFarmersOfTheMoor=true&draftMode=simultaneous',
-    )).toBe('')
+    )
+    expect(stripped).toBe('hotseat=live')
+    // A reload of the stripped URL resumes the running game and stays hotseat.
+    expect(isHotseatSetupQuery(`?${stripped}`)).toBe(false)
+    expect(isHotseatModeQuery(`?${stripped}`)).toBe(true)
   })
 
   it('leaves unrelated keys alone', () => {
-    expect(stripHotseatSetupParams('?hotseat=1&maxPlayers=4&dev=1')).toBe('dev=1')
+    expect(stripHotseatSetupParams('?hotseat=1&maxPlayers=4&dev=1')).toBe('dev=1&hotseat=live')
   })
 })

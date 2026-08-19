@@ -3,6 +3,7 @@ import { GameSession } from '../game/authoritative-session'
 import {
   buildInitialStateOptions,
   parseGameSetupRequest,
+  resolveCustomCardDbIds,
 } from '../game/game-setup-options'
 import { parseDraftOptions } from '../connection/room-router'
 import { nextHotseatDraftSeatId, nextHotseatParentSeatId } from '../../client/app/hotseat-seat'
@@ -113,6 +114,21 @@ describe('hotseat draft phase', () => {
     }
 
     expect(session.getState().state.phase).not.toBe('draft')
+  })
+})
+
+describe('hotseat community cards', () => {
+  it('never deals community-deck cards when the deck switch is off', () => {
+    const setup = setupFromPayload({ maxPlayers: 2, customCardIds: ['card-a'] })
+    expect(setup.enableCommunityDeck).toBe(false)
+    expect(resolveCustomCardDbIds({ customCardIds: ['card-a'] }, false)).toEqual([])
+  })
+
+  it('keeps the selected card ids once the deck switch is on', () => {
+    expect(resolveCustomCardDbIds(
+      { customCardIds: ['card-a', 'card-b', 7] },
+      true,
+    )).toEqual(['card-a', 'card-b'])
   })
 })
 

@@ -59,8 +59,21 @@ export const HOTSEAT_SETUP_PARAM_KEYS = [
   'allowIncompleteFarmersOfTheMoorMinorDeal',
 ] as const
 
+/**
+ * `hotseat=1` asks for a fresh deal; once dealt the flag is rewritten to
+ * `hotseat=live`, which marks the running game without re-dealing on reload.
+ * Both mean "this is a hotseat game" — plain HTTP sessions (workshop sandbox,
+ * E2E, debugging) carry no flag and keep their single-viewer behaviour.
+ */
+export const HOTSEAT_LIVE_VALUE = 'live'
+
 export const isHotseatSetupQuery = (search: string): boolean =>
   new URLSearchParams(search).get('hotseat') === '1'
+
+export const isHotseatModeQuery = (search: string): boolean => {
+  const flag = new URLSearchParams(search).get('hotseat')
+  return flag === '1' || flag === HOTSEAT_LIVE_VALUE
+}
 
 /**
  * Map the lobby's query string onto the setup payload for `/api/game/new`.
@@ -93,11 +106,12 @@ export const parseHotseatSetupFromQuery = (search: string): HotseatGameOptions =
 }
 
 /**
- * Strip the setup keys once the game exists, so reloading the page resumes the
- * running hotseat session instead of dealing a fresh one.
+ * Drop the setup keys once the game exists, so reloading resumes the running
+ * hotseat game instead of dealing a fresh one, while keeping the mode flag.
  */
 export const stripHotseatSetupParams = (search: string): string => {
   const params = new URLSearchParams(search)
   for (const key of HOTSEAT_SETUP_PARAM_KEYS) params.delete(key)
+  params.set('hotseat', HOTSEAT_LIVE_VALUE)
   return params.toString()
 }

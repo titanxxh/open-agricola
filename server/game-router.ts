@@ -611,15 +611,41 @@ export const handleGameRoute = async (
       return true
     }
     const customCards = loadedCustomCards?.cards ?? []
-    if (sessionReplacementGenerations.get(sessionKey) !== replacementGeneration) {
-      sendJson(res, 409, { ok: false, error: 'session replaced by newer request' })
-      return true
-    }
-    setSessionForRequest(req, new GameSession(
+    const loadedCardDbIds = loadedCustomCards?.loadedDbIds ?? []
+    const takedownGenerations = loadedCardDbIds.map((cardDbId) => [
+      cardDbId,
+      cardTakedownGenerations.get(cardDbId) ?? 0,
+    ] as const)
+    // Community cards are executable, so they must run in an isolated session
+    // like the sandbox and Room paths do — never on the main event loop.
+    const created = createIsolatedGameSession(
       seed,
       customCards.length > 0 ? customCards : undefined,
       buildInitialStateOptions(setup),
-    ))
+    )
+    const session = created.session
+    if (created.executor && !created.executor.reserveWorkerSlot()) {
+      created.executor.dispose()
+      session.dispose()
+      sendJson(res, 503, { ok: false, error: 'executable session worker capacity reached' })
+      return true
+    }
+    if (takedownGenerations.some(([cardDbId, generation]) =>
+      (cardTakedownGenerations.get(cardDbId) ?? 0) !== generation
+    )) {
+      created.executor?.dispose()
+      session.dispose()
+      sendJson(res, 409, { ok: false, error: 'card taken down during initialization' })
+      return true
+    }
+    if (sessionReplacementGenerations.get(sessionKey) !== replacementGeneration) {
+      created.executor?.dispose()
+      session.dispose()
+      sendJson(res, 409, { ok: false, error: 'session replaced by newer request' })
+      return true
+    }
+    // Registering the card ids lets an administrator takedown dispose this game.
+    setSessionForRequest(req, session, loadedCardDbIds, created.executor)
     const { result } = await callAndRespond(req, 'getState', [], s => s.getState())
     sendJson(res, 200, result)
     return true

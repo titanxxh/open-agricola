@@ -10,6 +10,7 @@ import {
 import { useGameSync } from '../hooks/useGameSync'
 import { HttpGameTransport, WsGameTransport, type GameTransport } from '../services/gameTransport'
 import {
+  isHotseatModeQuery,
   isHotseatSetupQuery,
   parseDraftParamsFromQuery,
   parseHotseatSetupFromQuery,
@@ -460,7 +461,14 @@ export const GameContainerApi = () => {
       ? null
       : parseHotseatSetupFromQuery(window.location.search),
   )
+  // One device, every seat. Only games opened from the lobby's hotseat entry
+  // qualify — a plain HTTP session (workshop sandbox, E2E, debugging) has a
+  // single viewer and must not get handoff covers.
+  const [isHotseat] = useState(() =>
+    !isLocalMode && !isWsMode && isHotseatModeQuery(window.location.search),
+  )
   const hotseatDealtRef = useRef(false)
+  const [hotseatError, setHotseatError] = useState<string | null>(null)
   // Seat whose cards the person at the device has agreed to look at, during
   // the draft / parent-selection phases (see `hotseat-seat.ts`).
   const [hotseatSeatConfirmed, setHotseatSeatConfirmed] = useState<string | null>(null)
@@ -558,8 +566,6 @@ export const GameContainerApi = () => {
     setDevPlayerIdOverride(value)
   }, [])
   const wsAssignedPlayerId = isWs ? playerIdFromWsStatus(wsStatus) : null
-  // One device, every seat: the HTTP transport has no per-seat identity.
-  const isHotseat = !isWs && !isLocalMode
   const localPlayerId = lockedViewPlayerId ?? wsAssignedPlayerId
   // In WS mode, selfPlayer is locked to the URL ?player= param.
   // If the URL omits ?player=, use the seat assigned by the join/create handshake.
@@ -1129,8 +1135,19 @@ export const GameContainerApi = () => {
     // then drop the setup keys so a reload resumes the game just dealt.
     if (hotseatSetup && !hotseatDealtRef.current) {
       hotseatDealtRef.current = true
+      const failed = (message: string) => {
+        // Allow another attempt: keep the setup params in the URL so a reload
+        // re-deals rather than resuming a game that was never created.
+        hotseatDealtRef.current = false
+        setHotseatError(message)
+      }
       httpTransportSingleton.newHotseatGame(hotseatSetup)
-        .then(() => {
+        .then((payload) => {
+          const rejection = payload as { ok?: boolean; error?: string }
+          if (rejection?.ok === false) {
+            failed(rejection.error ?? 'unknown error')
+            return
+          }
           const search = stripHotseatSetupParams(window.location.search)
           window.history.replaceState(
             null,
@@ -1138,7 +1155,10 @@ export const GameContainerApi = () => {
             `${window.location.pathname}${search ? '?' + search : ''}${window.location.hash || ''}`,
           )
         })
-        .catch((e) => { console.error('hotseat newGame failed:', e) })
+        .catch((e) => {
+          console.error('hotseat newGame failed:', e)
+          failed(e instanceof Error ? e.message : String(e))
+        })
       return
     }
     transport.getState().catch((e) => { console.error("fetchState failed:", e) })
@@ -1510,6 +1530,22 @@ export const GameContainerApi = () => {
     )
   }
 
+  if (hotseatError) {
+    return (
+      <div className={`app${isEmbedded ? ' app--embedded' : ''}`}>
+        <div className="hotseat-handoff">
+          <div className="hotseat-handoff-panel">
+            <h2 className="hotseat-handoff-title">{t(locale, 'ui.hotseatSetupFailed')}</h2>
+            <p className="hotseat-handoff-hint">{hotseatError}</p>
+            <a className="btn-primary" href={import.meta.env.BASE_URL}>
+              {t(locale, 'ui.hotseatSetupBackToLobby')}
+            </a>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
   if (!hasGameView) {
     const fetchPhase =
       resolveGameLoadPhase({ wsStatus: isWs ? wsStatus : undefined, hasGameView: false }) ?? 'fetchingState'
@@ -1610,6 +1646,21 @@ export const GameContainerApi = () => {
               console.error('parentSubmit error', e)
             }
           }}
+        />
+      </div>
+    )
+  }
+
+  // Ordinary turns hand the device over too: once the board would start showing
+  // a different seat's cards, cover it until that player says they are holding
+  // the device. Draft / parent selection are covered by their own branches above.
+  if (isHotseat && displayPlayer && hotseatSeatConfirmed !== displayPlayer.id) {
+    return (
+      <div className={`app${isEmbedded ? ' app--embedded' : ''}`}>
+        <HotseatHandoff
+          playerName={playerNames[displayPlayer.id] ?? displayPlayer.id}
+          locale={locale}
+          onConfirm={() => setHotseatSeatConfirmed(displayPlayer.id)}
         />
       </div>
     )

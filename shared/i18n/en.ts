@@ -226,6 +226,8 @@ export const en = {
     hotseatHandoffPrompt: 'Pass the device to {player}.',
     hotseatHandoffHint: "{player}'s cards stay hidden until you confirm.",
     hotseatHandoffConfirm: "I'm {player} — continue",
+    hotseatSetupFailed: 'Could not start a hotseat game with the selected setup.',
+    hotseatSetupBackToLobby: 'Back to lobby',
     interactionSowChoice: 'Choose a crop to sow',
     interactionSowGrain: 'Sow grain',
     interactionSowVegetable: 'Sow vegetable',
