@@ -23,6 +23,7 @@ function getPage(): PlatformPage {
   if (page === 'game' || page === 'workshop' || page === 'lobby' || page === 'settings' || page === 'login' || page === 'onboarding') return page
   if (params.get('context')) return 'game'
   if (params.get('room') || params.get('transport') === 'ws') return 'game'
+  if (params.get('hotseat') === '1') return 'game'
   return 'lobby'
 }
 

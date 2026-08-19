@@ -32,6 +32,11 @@ import {
   createIsolatedGameSession,
   type CustomSessionMethod,
 } from '../game/custom-session-executor.ts'
+import {
+  buildInitialStateOptions,
+  parseGameSetupRequest,
+  resolveCustomCardDbIds,
+} from '../game/game-setup-options.ts'
 
 const DRAFT_POOL_SIZE_DEFAULT = 7
 const DRAFT_POOL_SIZE_MIN = 7
@@ -159,6 +164,13 @@ export const loadCustomCardsFromDb = (
   cardDbIds: string[],
   requestUserId?: string,
 ): CustomCardData[] => loadCustomCards(cardDbIds, requestUserId, { liveOnly: true }).cards
+
+/** Same lookup, but keeps `hasNotLive` so callers can reject unreviewed cards. */
+export const loadLiveCustomCards = (
+  cardDbIds: string[],
+  requestUserId?: string,
+): { cards: CustomCardData[]; hasNotLive: boolean; loadedDbIds: string[] } =>
+  loadCustomCards(cardDbIds, requestUserId, { liveOnly: true })
 
 const generateRoomId = (ctx: ConnectionCtx, devRoomRootId?: string | null): string | null => {
   for (let attempt = 0; attempt < 8; attempt += 1) {
@@ -397,25 +409,12 @@ function handleCreateRoom(ctx: ConnectionCtx, msg: Extract<ClientCommand, { type
   }
   const roomId = generateRoomId(ctx)
   if (!roomId) { sendCommandError(ctx, 'unable to allocate room id', msg.requestId); return }
-  const rawMaxPlayers = typeof (msg as Record<string, unknown>).maxPlayers === 'number'
-    ? (msg as Record<string, unknown>).maxPlayers as number
-    : 2
-  const maxPlayers = Number.isFinite(rawMaxPlayers)
-    ? Math.min(Math.max(2, Math.floor(rawMaxPlayers)), 6)
-    : 2
-  const enableCommunityDeck = (msg as Record<string, unknown>).enableCommunityDeck === true
-  const requestedCustomCardDbIds = Array.isArray((msg as Record<string, unknown>).customCardIds)
-    ? (msg as Record<string, unknown>).customCardIds as string[]
-    : []
-  const customCardDbIds = enableCommunityDeck ? requestedCustomCardDbIds : []
   const draftOptions = parseDraftOptions(msg as Record<string, unknown>)
   if (!draftOptions.ok) { sendCommandError(ctx, draftOptions.error, msg.requestId); return }
-  const enableParentCards = (msg as Record<string, unknown>).enableParentCards === true
-  const draftParents = (msg as Record<string, unknown>).draftParents === false ? false : undefined
-  const enableThroughTheSeasons = (msg as Record<string, unknown>).enableThroughTheSeasons === true
-  const enableFarmersOfTheMoor = (msg as Record<string, unknown>).enableFarmersOfTheMoor === true
-  const allowIncompleteFarmersOfTheMoorMinorDeal =
-    (msg as Record<string, unknown>).allowIncompleteFarmersOfTheMoorMinorDeal === true
+  const setup = parseGameSetupRequest(msg as Record<string, unknown>, draftOptions.value)
+  const maxPlayers = setup.playerCount
+  const enableCommunityDeck = setup.enableCommunityDeck
+  const customCardDbIds = resolveCustomCardDbIds(msg as Record<string, unknown>, enableCommunityDeck)
   const loadedCustomCards = loadCustomCards(customCardDbIds, ctx.currentUserId, { liveOnly: true })
   if (loadedCustomCards.hasNotLive) {
     sendCommandError(ctx, 'cards must pass review approval and be published live before they can be used in a room; unreviewed cards are only playable in the workshop sandbox', msg.requestId)
@@ -427,21 +426,7 @@ function handleCreateRoom(ctx: ConnectionCtx, msg: Extract<ClientCommand, { type
     created = createIsolatedGameSession(
       undefined,
       customCards.length > 0 ? customCards : undefined,
-      {
-        playerCount: maxPlayers,
-        enableCommunityDeck,
-        enableParentCards,
-        ...(draftParents === false ? { draftParents } : {}),
-        enableThroughTheSeasons,
-        enableFarmersOfTheMoor,
-        allowIncompleteFarmersOfTheMoorMinorDeal,
-        ...(draftOptions.value
-          ? {
-              draftMode: draftOptions.value.draftMode,
-              draftPoolSize: draftOptions.value.draftPoolSize,
-            }
-          : {}),
-      },
+      buildInitialStateOptions(setup),
     )
   } catch (err) {
     sendCommandError(ctx, err instanceof Error ? err.message : String(err), msg.requestId)
@@ -467,13 +452,13 @@ function handleCreateRoom(ctx: ConnectionCtx, msg: Extract<ClientCommand, { type
     createdBy: ctx.currentUserId,
     customCardDbIds: loadedCustomCards.loadedDbIds,
     customCards,
-    enableParentCards,
-    draftParents,
+    enableParentCards: setup.enableParentCards,
+    draftParents: setup.draftParents,
     draftMode: draftOptions.value?.draftMode,
     draftPoolSize: draftOptions.value?.draftPoolSize,
-    enableThroughTheSeasons,
-    enableFarmersOfTheMoor,
-    allowIncompleteFarmersOfTheMoorMinorDeal,
+    enableThroughTheSeasons: setup.enableThroughTheSeasons,
+    enableFarmersOfTheMoor: setup.enableFarmersOfTheMoor,
+    allowIncompleteFarmersOfTheMoorMinorDeal: setup.allowIncompleteFarmersOfTheMoorMinorDeal,
   }
   ctx.committer?.lockNewRoom(room)
   ctx.registry.set(room)

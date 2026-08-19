@@ -16,6 +16,12 @@ import {
   type WorkshopDraft,
 } from './workshop-drafts.ts'
 import { isLoadableLive } from './workshop-status.ts'
+import { parseDraftOptions, loadLiveCustomCards } from './connection/room-router.ts'
+import {
+  buildInitialStateOptions,
+  parseGameSetupRequest,
+  resolveCustomCardDbIds,
+} from './game/game-setup-options.ts'
 import {
   buildSessionSyncPayload,
   createIsolatedGameSession,
@@ -579,15 +585,41 @@ export const handleGameRoute = async (
     sessionReplacementGenerations.set(sessionKey, replacementGeneration)
     sessionLastAccess.set(sessionKey, Date.now())
     let seed: number | undefined
+    let raw: Record<string, unknown> = {}
     try {
-      const body = JSON.parse(await readBody(req)) as { seed?: number }
-      if (typeof body.seed === 'number') seed = body.seed
-    } catch { /* no body or invalid JSON — use random seed */ }
+      raw = JSON.parse(await readBody(req)) as Record<string, unknown>
+      if (typeof raw.seed === 'number') seed = raw.seed
+    } catch { /* no body or invalid JSON — use random seed and default setup */ }
+    // Hotseat games are set up from the same lobby panel as multiplayer rooms,
+    // so they go through the same option mapping (`game-setup-options.ts`).
+    const draftOptions = parseDraftOptions(raw)
+    if (!draftOptions.ok) {
+      sendJson(res, 400, { ok: false, error: draftOptions.error })
+      return true
+    }
+    const setup = parseGameSetupRequest(raw, draftOptions.value)
+    const customCardDbIds = resolveCustomCardDbIds(raw, setup.enableCommunityDeck)
+    const requestUserId = validateSession(extractToken(req.headers.authorization))?.id
+    const loadedCustomCards = customCardDbIds.length > 0
+      ? loadLiveCustomCards(customCardDbIds, requestUserId)
+      : null
+    if (loadedCustomCards?.hasNotLive) {
+      sendJson(res, 400, {
+        ok: false,
+        error: 'cards must pass review approval and be published live before they can be used in a game; unreviewed cards are only playable in the workshop sandbox',
+      })
+      return true
+    }
+    const customCards = loadedCustomCards?.cards ?? []
     if (sessionReplacementGenerations.get(sessionKey) !== replacementGeneration) {
       sendJson(res, 409, { ok: false, error: 'session replaced by newer request' })
       return true
     }
-    setSessionForRequest(req, new GameSession(seed))
+    setSessionForRequest(req, new GameSession(
+      seed,
+      customCards.length > 0 ? customCards : undefined,
+      buildInitialStateOptions(setup),
+    ))
     const { result } = await callAndRespond(req, 'getState', [], s => s.getState())
     sendJson(res, 200, result)
     return true

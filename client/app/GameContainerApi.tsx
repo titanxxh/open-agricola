@@ -8,8 +8,16 @@ import {
   positionKey,
 } from '../../shared/domain/farm'
 import { useGameSync } from '../hooks/useGameSync'
-import { HttpGameTransport, WsGameTransport, parseDraftParamsFromQuery, type GameTransport } from '../services/gameTransport'
+import { HttpGameTransport, WsGameTransport, type GameTransport } from '../services/gameTransport'
+import {
+  isHotseatSetupQuery,
+  parseDraftParamsFromQuery,
+  parseHotseatSetupFromQuery,
+  stripHotseatSetupParams,
+} from './game-setup-query'
 import { LocalGameTransport } from '../local-sandbox/local-transport'
+import { HotseatHandoff } from './HotseatHandoff'
+import { nextHotseatDraftSeatId, nextHotseatParentSeatId } from './hotseat-seat'
 import { isBrowserSandbox, readLocalSandboxConfig } from '../local-sandbox/workshop-launch'
 import { createDebouncedSaver, loadResumable, openLocalGameStore } from '../local-sandbox/persistence'
 import type { GameSyncPayload } from '../../shared/contract/protocol/game'
@@ -446,6 +454,16 @@ export const GameContainerApi = () => {
   const isLocalMode = currentUrlParams.get('localSandbox') === '1' && isBrowserSandbox()
   const isWsMode = !isLocalMode && (contextRoomId !== null || currentUrlParams.get('transport') === 'ws')
   const isEmbedded = currentUrlParams.get('embedded') === '1'
+  // Evaluated once: the setup keys are stripped from the URL after the deal.
+  const [hotseatSetup] = useState(() =>
+    isLocalMode || isWsMode || !isHotseatSetupQuery(window.location.search)
+      ? null
+      : parseHotseatSetupFromQuery(window.location.search),
+  )
+  const hotseatDealtRef = useRef(false)
+  // Seat whose cards the person at the device has agreed to look at, during
+  // the draft / parent-selection phases (see `hotseat-seat.ts`).
+  const [hotseatSeatConfirmed, setHotseatSeatConfirmed] = useState<string | null>(null)
 
   const lockedViewPlayerId = useMemo(() => {
     const p = new URLSearchParams(window.location.search)
@@ -540,6 +558,8 @@ export const GameContainerApi = () => {
     setDevPlayerIdOverride(value)
   }, [])
   const wsAssignedPlayerId = isWs ? playerIdFromWsStatus(wsStatus) : null
+  // One device, every seat: the HTTP transport has no per-seat identity.
+  const isHotseat = !isWs && !isLocalMode
   const localPlayerId = lockedViewPlayerId ?? wsAssignedPlayerId
   // In WS mode, selfPlayer is locked to the URL ?player= param.
   // If the URL omits ?player=, use the seat assigned by the join/create handshake.
@@ -1104,8 +1124,25 @@ export const GameContainerApi = () => {
   }, [handleSnapshot, snapshotTransport])
   useEffect(() => {
     if (!isReady) return
+    // Hotseat: the lobby passes the chosen player count and expansions in the
+    // query string, so deal a fresh game instead of resuming the cookie session,
+    // then drop the setup keys so a reload resumes the game just dealt.
+    if (hotseatSetup && !hotseatDealtRef.current) {
+      hotseatDealtRef.current = true
+      httpTransportSingleton.newHotseatGame(hotseatSetup)
+        .then(() => {
+          const search = stripHotseatSetupParams(window.location.search)
+          window.history.replaceState(
+            null,
+            '',
+            `${window.location.pathname}${search ? '?' + search : ''}${window.location.hash || ''}`,
+          )
+        })
+        .catch((e) => { console.error('hotseat newGame failed:', e) })
+      return
+    }
     transport.getState().catch((e) => { console.error("fetchState failed:", e) })
-  }, [transport, isReady])
+  }, [transport, isReady, hotseatSetup])
   useEffect(() => {
     if (!wsTransport) return
     return wsTransport.onPersistenceStatus(setPersistencePaused)
@@ -1503,7 +1540,23 @@ export const GameContainerApi = () => {
   // The locked URL-pinned player wins in WS mode; otherwise fall back to the
   // sandbox "self" (current player) so HTTP debugging still works.
   if (state.phase === 'draft' && state.draft) {
-    const meId = (isWs && localPlayerId) ? localPlayerId : (selfPlayer?.id ?? state.players[0]?.id ?? '')
+    // Draft does not advance currentPlayerIndex, so hotseat walks the seats in
+    // order and covers the screen before handing over to the next one.
+    const hotseatSeatId = isHotseat ? nextHotseatDraftSeatId(state.draft) : null
+    const meId = (isWs && localPlayerId)
+      ? localPlayerId
+      : (hotseatSeatId ?? selfPlayer?.id ?? state.players[0]?.id ?? '')
+    if (hotseatSeatId && hotseatSeatConfirmed !== hotseatSeatId) {
+      return (
+        <div className={`app${isEmbedded ? ' app--embedded' : ''}`}>
+          <HotseatHandoff
+            playerName={playerNames[hotseatSeatId] ?? hotseatSeatId}
+            locale={locale}
+            onConfirm={() => setHotseatSeatConfirmed(hotseatSeatId)}
+          />
+        </div>
+      )
+    }
     return (
       <div className={`app${isEmbedded ? ' app--embedded' : ''}`}>
         {notificationStack}
@@ -1526,8 +1579,22 @@ export const GameContainerApi = () => {
   }
 
   if (state.phase === 'parent-selection' && state.parentSelection) {
-    const meId = (isWs && localPlayerId) ? localPlayerId : (selfPlayer?.id ?? state.players[0]?.id ?? '')
+    const hotseatSeatId = isHotseat ? nextHotseatParentSeatId(state) : null
+    const meId = (isWs && localPlayerId)
+      ? localPlayerId
+      : (hotseatSeatId ?? selfPlayer?.id ?? state.players[0]?.id ?? '')
     const playerIndex = Math.max(0, state.players.findIndex((player) => player.id === meId))
+    if (hotseatSeatId && hotseatSeatConfirmed !== hotseatSeatId) {
+      return (
+        <div className={`app${isEmbedded ? ' app--embedded' : ''}`}>
+          <HotseatHandoff
+            playerName={playerNames[hotseatSeatId] ?? hotseatSeatId}
+            locale={locale}
+            onConfirm={() => setHotseatSeatConfirmed(hotseatSeatId)}
+          />
+        </div>
+      )
+    }
     return (
       <div className={`app${isEmbedded ? ' app--embedded' : ''}`}>
         {notificationStack}

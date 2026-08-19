@@ -77,29 +77,8 @@ export interface GameTransport {
 }
 
 import { API_BASE, WS_BASE } from '../config'
+import type { HotseatGameOptions } from '../app/game-setup-query'
 
-/**
- * Parse `draftMode` / `draftPoolSize` URL query params into the shape accepted by
- * `sendRoomCommand('createRoom', …)`. Returns `undefined` when draft is disabled
- * (so the payload stays backward compatible with servers that don't know the field).
- *
- * - Unknown/missing `draftMode` → returns `undefined` (classic hand-deal).
- * - `draftMode=simultaneous` without a valid `draftPoolSize` → returns
- *   `{ draftMode: 'simultaneous' }` (server will clamp/apply default).
- * - `draftPoolSize` must be integer in [7, 10]; out-of-range values are dropped.
- */
-export function parseDraftParamsFromQuery(
-  search: string,
-): { draftMode: 'simultaneous'; draftPoolSize?: number } | undefined {
-  const params = new URLSearchParams(search)
-  if (params.get('draftMode') !== 'simultaneous') return undefined
-  const raw = params.get('draftPoolSize')
-  const parsed = raw != null ? Number(raw) : NaN
-  if (Number.isInteger(parsed) && parsed >= 7 && parsed <= 10) {
-    return { draftMode: 'simultaneous', draftPoolSize: parsed }
-  }
-  return { draftMode: 'simultaneous' }
-}
 
 const post = async (path: string, body?: unknown): Promise<GameSyncPayload> => {
   const resp = await fetch(`${API_BASE}${path}`, {
@@ -200,6 +179,11 @@ export class HttpGameTransport implements GameTransport {
 
   newGame(seed?: number) {
     return this.send(() => post('/api/game/new', seed !== undefined ? { seed } : undefined))
+  }
+
+  /** Start a fresh hotseat game with the lobby-selected player count and expansions. */
+  newHotseatGame(options: HotseatGameOptions, seed?: number) {
+    return this.send(() => post('/api/game/new', seed !== undefined ? { ...options, seed } : options))
   }
 
   loadGame(state: unknown) {
