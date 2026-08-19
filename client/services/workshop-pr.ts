@@ -67,7 +67,7 @@ export async function refreshPrStatus(cardDbId: string): Promise<RefreshResponse
  * Compute which origins are acceptable for the postMessage sender.
  * The callback page is served from the backend; in dev the frontend proxies
  * /api, so window.location.origin matches. In production API_BASE may be a
- * different host (e.g., open-agricola.duckdns.org), so we accept it too.
+ * different host (e.g., your-game.duckdns.org), so we accept it too.
  */
 function allowedMessageOrigins(): Set<string> {
   const origins = new Set<string>()
