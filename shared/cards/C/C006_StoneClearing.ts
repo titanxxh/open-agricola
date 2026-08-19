@@ -15,8 +15,7 @@ import { defineMinorCard } from '../card-source'
  *      shared/actions/effects/reap.ts and HarvestReapSummary).
  *   3. Updating sow / plow / field-display to ignore stone fields where
  *      appropriate (touches shared/domain/farmyard.ts and UI).
- * All main-path changes outside the F1 onBuy SEQ-truncation scope. Tracked in
- * docs/card_implementation_status.md.
+ * All main-path changes outside the F1 onBuy SEQ-truncation scope.
  *
  * **Deliberate divergence:** we directly grant the stone to the
  * player's supply at buy time rather than placing it on the field for the
