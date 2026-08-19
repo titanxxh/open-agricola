@@ -1,4 +1,6 @@
 #!/bin/bash
+# MAINTAINER-ONLY — 在生产机上由 cron 调用，贡献者无需使用本脚本。
+# Maintainer-only: runs on the production host via cron. Contributors never need this.
 # 定时备份 + 异机同步（在生产机上运行，由 cron 每日调用，cron 定义见 deploy/open-agricola-backup.cron）
 # 停 app 把 app-data volume 打包为 backups/daily-<timestamp>.tgz 并刷新 replay-removals.latest.jsonl，
 # 随即重启 app（停机窗口只覆盖打包），再在一次性副本上做恢复验证并写入同名 manifest，
