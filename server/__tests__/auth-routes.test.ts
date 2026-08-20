@@ -148,6 +148,7 @@ vi.mock('../db.ts', () => {
       enable_through_the_seasons INTEGER NOT NULL DEFAULT 0,
       enable_farmers_of_the_moor INTEGER NOT NULL DEFAULT 0,
       allow_incomplete_farmers_of_the_moor_minor_deal INTEGER NOT NULL DEFAULT 0,
+      hotseat INTEGER NOT NULL DEFAULT 0,
       started_at INTEGER,
       replay_recording INTEGER,
       replay_viewer_build_id TEXT,

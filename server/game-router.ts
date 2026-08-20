@@ -16,6 +16,13 @@ import {
   type WorkshopDraft,
 } from './workshop-drafts.ts'
 import { isLoadableLive } from './workshop-status.ts'
+import { parseDraftOptions, loadLiveCustomCards } from './connection/room-router.ts'
+import {
+  asSetupPayload,
+  buildInitialStateOptions,
+  parseGameSetupRequest,
+  resolveCustomCardDbIds,
+} from './game/game-setup-options.ts'
 import {
   buildSessionSyncPayload,
   createIsolatedGameSession,
@@ -579,15 +586,67 @@ export const handleGameRoute = async (
     sessionReplacementGenerations.set(sessionKey, replacementGeneration)
     sessionLastAccess.set(sessionKey, Date.now())
     let seed: number | undefined
+    let raw: Record<string, unknown> = {}
     try {
-      const body = JSON.parse(await readBody(req)) as { seed?: number }
-      if (typeof body.seed === 'number') seed = body.seed
-    } catch { /* no body or invalid JSON — use random seed */ }
+      raw = asSetupPayload(JSON.parse(await readBody(req)))
+      if (typeof raw.seed === 'number') seed = raw.seed
+    } catch { /* no body or invalid JSON — use random seed and default setup */ }
+    // Hotseat games are set up from the same lobby panel as multiplayer rooms,
+    // so they go through the same option mapping (`game-setup-options.ts`).
+    const draftOptions = parseDraftOptions(raw)
+    if (!draftOptions.ok) {
+      sendJson(res, 400, { ok: false, error: draftOptions.error })
+      return true
+    }
+    const setup = parseGameSetupRequest(raw, draftOptions.value)
+    const customCardDbIds = resolveCustomCardDbIds(raw, setup.enableCommunityDeck)
+    const requestUserId = validateSession(extractToken(req.headers.authorization))?.id
+    const loadedCustomCards = customCardDbIds.length > 0
+      ? loadLiveCustomCards(customCardDbIds, requestUserId)
+      : null
+    if (loadedCustomCards?.hasNotLive) {
+      sendJson(res, 400, {
+        ok: false,
+        error: 'cards must pass review approval and be published live before they can be used in a game; unreviewed cards are only playable in the workshop sandbox',
+      })
+      return true
+    }
+    const customCards = loadedCustomCards?.cards ?? []
+    const loadedCardDbIds = loadedCustomCards?.loadedDbIds ?? []
+    const takedownGenerations = loadedCardDbIds.map((cardDbId) => [
+      cardDbId,
+      cardTakedownGenerations.get(cardDbId) ?? 0,
+    ] as const)
+    // Community cards are executable, so they must run in an isolated session
+    // like the sandbox and Room paths do — never on the main event loop.
+    const created = createIsolatedGameSession(
+      seed,
+      customCards.length > 0 ? customCards : undefined,
+      buildInitialStateOptions(setup),
+    )
+    const session = created.session
+    if (created.executor && !created.executor.reserveWorkerSlot()) {
+      created.executor.dispose()
+      session.dispose()
+      sendJson(res, 503, { ok: false, error: 'executable session worker capacity reached' })
+      return true
+    }
+    if (takedownGenerations.some(([cardDbId, generation]) =>
+      (cardTakedownGenerations.get(cardDbId) ?? 0) !== generation
+    )) {
+      created.executor?.dispose()
+      session.dispose()
+      sendJson(res, 409, { ok: false, error: 'card taken down during initialization' })
+      return true
+    }
     if (sessionReplacementGenerations.get(sessionKey) !== replacementGeneration) {
+      created.executor?.dispose()
+      session.dispose()
       sendJson(res, 409, { ok: false, error: 'session replaced by newer request' })
       return true
     }
-    setSessionForRequest(req, new GameSession(seed))
+    // Registering the card ids lets an administrator takedown dispose this game.
+    setSessionForRequest(req, session, loadedCardDbIds, created.executor)
     const { result } = await callAndRespond(req, 'getState', [], s => s.getState())
     sendJson(res, 200, result)
     return true

@@ -40,7 +40,7 @@ export function LobbyPage() {
   const [myRooms, setMyRooms] = useState<MyRoom[]>([])
   const [joinRoomId, setJoinRoomId] = useState('')
   const [error, setError] = useState('')
-  const [showPlayerSelect, setShowPlayerSelect] = useState(false)
+  const [selectMode, setSelectMode] = useState<'multiplayer' | 'hotseat' | null>(null)
   const [menuOpen, setMenuOpen] = useState(false)
   const [selectedMaxPlayers, setSelectedMaxPlayers] = useState(2)
   const [draftMode, setDraftMode] = useState<'none' | 'simultaneous'>('none')
@@ -80,7 +80,7 @@ export function LobbyPage() {
   }, [fetchRooms, fetchMyRooms])
 
   useEffect(() => {
-    if (!showPlayerSelect || !showCommunityDeckToggle || !enableCommunityDeck) return
+    if (!selectMode || !showCommunityDeckToggle || !enableCommunityDeck) return
     let cancelled = false
     const load = async () => {
       setWorkshopCardsStatus('loading')
@@ -106,10 +106,16 @@ export function LobbyPage() {
     }
     void load()
     return () => { cancelled = true }
-  }, [enableCommunityDeck, showPlayerSelect, showCommunityDeckToggle])
+  }, [enableCommunityDeck, selectMode, showCommunityDeckToggle])
 
   const handleCreateGame = () => {
-    const params: Record<string, string> = { transport: 'ws', maxPlayers: String(selectedMaxPlayers) }
+    // Hotseat is an ordinary authoritative room — it just belongs to one device,
+    // so it takes the same transport and only adds the hotseat flag.
+    const params: Record<string, string> = {
+      transport: 'ws',
+      maxPlayers: String(selectedMaxPlayers),
+      ...(selectMode === 'hotseat' ? { hotseat: '1' } : {}),
+    }
     if (draftMode !== 'none') {
       params.draftMode = draftMode
       params.draftPoolSize = String(draftPoolSize)
@@ -241,21 +247,24 @@ export function LobbyPage() {
 
       <div className="lobby-grid">
         <Section variant="parchment" icon="🎮" title={t('platform.startGame')} className="lobby-hero">
-          {!showPlayerSelect ? (
+          {!selectMode ? (
             <>
               <button
                 type="button"
                 className="btn-primary lobby-cta-primary"
-                onClick={() => setShowPlayerSelect(true)}
+                onClick={() => setSelectMode('multiplayer')}
               >
                 {t('platform.createMultiplayer')}
               </button>
-              <button type="button" className="btn-secondary" onClick={() => setPage('game')}>
-                {t('platform.singlePlayer')}
+              <button type="button" className="btn-secondary" onClick={() => setSelectMode('hotseat')}>
+                {t('platform.localHotseat')}
               </button>
             </>
           ) : (
             <div className="player-select-panel">
+              {selectMode === 'hotseat' && (
+                <div className="community-deck-toggle-hint">{t('platform.hotseatHint')}</div>
+              )}
               <div className="player-select-label">{t('platform.selectPlayerCount')}</div>
               <div className="player-select-options">
                 {([2, 3, 4, 5, 6] as const).map(n => (
@@ -394,9 +403,9 @@ export function LobbyPage() {
               )}
               <div className="player-select-actions">
                 <button type="button" className="btn-primary" onClick={handleCreateGame}>
-                  {t('platform.createGame')}
+                  {t(selectMode === 'hotseat' ? 'platform.startHotseat' : 'platform.createGame')}
                 </button>
-                <button type="button" className="btn-link" onClick={() => setShowPlayerSelect(false)}>
+                <button type="button" className="btn-link" onClick={() => setSelectMode(null)}>
                   {t('platform.cancel')}
                 </button>
               </div>

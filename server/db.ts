@@ -955,6 +955,20 @@ export function runMigrations(
         `)
       },
     },
+    {
+      version: 29,
+      run: (database) => {
+        const columns = database.pragma('table_info(rooms)') as Array<{ name: string }>
+        if (columns.length === 0) return
+        if (columns.some(({ name }) => name === 'hotseat')) return
+        database.exec(`
+          -- Local hotseat rooms: one person holds every seat on one device, so
+          -- they are excluded from the public room list and only the creator
+          -- may resume them.
+          ALTER TABLE rooms ADD COLUMN hotseat INTEGER NOT NULL DEFAULT 0;
+        `)
+      },
+    },
   ]
 
   const insert = db.prepare('INSERT INTO schema_version (version) VALUES (?)')

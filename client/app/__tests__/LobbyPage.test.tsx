@@ -22,7 +22,7 @@ vi.mock('../../contexts/LocaleContext', () => {
     'platform.logout': 'Logout',
     'platform.startGame': 'Start Game',
     'platform.createMultiplayer': 'Create Multiplayer Game',
-    'platform.singlePlayer': 'Single Player',
+    'platform.localHotseat': 'Local Hotseat',
     'platform.selectPlayerCount': 'Select number of players',
     'platform.players2': '2 Players',
     'platform.players3': '3 Players',
@@ -38,6 +38,8 @@ vi.mock('../../contexts/LocaleContext', () => {
     'platform.reviewedWorkshopCardsEmpty': 'No reviewed cards are currently available.',
     'platform.reviewedWorkshopCardsError': 'Could not load reviewed cards.',
     'platform.createGame': 'Create Game',
+    'platform.startHotseat': 'Start Hotseat Game',
+    'platform.hotseatHint': 'Play every seat on one device.',
     'platform.cancel': 'Cancel',
     'platform.joinGame': 'Join Game',
     'platform.joinRoomPlaceholder': 'Enter room ID',
@@ -119,6 +121,39 @@ describe('LobbyPage player count selection', () => {
     expect(setPage).toHaveBeenCalledWith('game', {
       transport: 'ws',
       maxPlayers: '6',
+    })
+  })
+
+  it('offers the same player counts and expansions for a local hotseat game', () => {
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({ ok: true, rooms: [] }))))
+
+    render(<LobbyPage />)
+    fireEvent.click(screen.getByRole('button', { name: 'Local Hotseat' }))
+
+    expect(screen.getByText('Play every seat on one device.')).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: '4 Players' }))
+    fireEvent.click(screen.getByLabelText('启用 Farmers of the Moor 扩展'))
+    fireEvent.click(screen.getByRole('button', { name: 'Start Hotseat Game' }))
+
+    // Hotseat is an ordinary room, flagged so one device can hold every seat.
+    expect(setPage).toHaveBeenCalledWith('game', {
+      transport: 'ws',
+      hotseat: '1',
+      maxPlayers: '4',
+      enableFarmersOfTheMoor: 'true',
+    })
+  })
+
+  it('keeps the multiplayer entry on the room transport', () => {
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({ ok: true, rooms: [] }))))
+
+    render(<LobbyPage />)
+    fireEvent.click(screen.getByRole('button', { name: 'Create Multiplayer Game' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Create Game' }))
+
+    expect(setPage).toHaveBeenCalledWith('game', {
+      transport: 'ws',
+      maxPlayers: '2',
     })
   })
 

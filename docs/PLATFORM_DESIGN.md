@@ -163,6 +163,7 @@ Do not add `react-router`; retain the current URL-parameter style through `?page
 - `?page=lobby`: lobby, the authenticated default;
 - `?page=workshop`: Workshop;
 - `?page=game&room=xxx`: existing `GameContainerApi`;
+- `?transport=ws&hotseat=1&...`: local hotseat — an ordinary authoritative room whose seats all belong to one device, so it persists and restores like any other room, is hidden from the lobby list, and only its creator can rejoin;
 - no `?page=` while unauthenticated: redirect to login.
 
 ```text

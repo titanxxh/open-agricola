@@ -167,6 +167,7 @@ CREATE TABLE sandbox_settings (
 - `?page=lobby` → 大厅（登录后默认）
 - `?page=workshop` → 工坊模式
 - `?page=game&room=xxx` → 游戏（现有 GameContainerApi）
+- `?transport=ws&hotseat=1&...` → 本地热座：一个座位全归同一台设备的权威房间，因此和普通房间一样持久化与恢复，但不出现在大厅列表，且只有创建者能重新进入
 - 无 `?page=` 且未登录 → 重定向到 login
 
 ```

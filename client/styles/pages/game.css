@@ -5021,6 +5021,37 @@ details[open] .ai-prompt-summary::before { transform: rotate(90deg); }
   padding: 24px 16px;
   animation: fadeIn 0.2s ease-out;
 }
+.hotseat-handoff {
+  position: fixed;
+  inset: 0;
+  background: rgba(18, 32, 18, 0.94);
+  z-index: 60;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px 16px;
+  animation: fadeIn 0.2s ease-out;
+}
+.hotseat-handoff-panel {
+  background: #fffaf0;
+  border-radius: 16px;
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.25);
+  max-width: 420px;
+  padding: 28px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  text-align: center;
+}
+.hotseat-handoff-title {
+  margin: 0;
+  font-size: 20px;
+}
+.hotseat-handoff-hint {
+  margin: 0;
+  font-size: 14px;
+  opacity: 0.75;
+}
 .draft-overlay-panel {
   background: #fffaf0;
   border-radius: 16px;
