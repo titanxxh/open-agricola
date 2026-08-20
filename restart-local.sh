@@ -10,13 +10,28 @@ FRONTEND_PORT=5173
 BACKEND_LOG="$SCRIPT_DIR/backend.log"
 FRONTEND_LOG="$SCRIPT_DIR/frontend.log"
 
+# The main repo backing this checkout: the same directory when run normally,
+# and the original clone when run from a worktree.
+MAIN_REPO_DIR="$(cd "$(dirname "$(git -C "$SCRIPT_DIR" rev-parse --path-format=absolute --git-common-dir)")" && pwd -P)"
+
 # Local platform features (GitHub OAuth, community deck toggle, API bases, etc.)
 # live in .env during development. Export them so both tsx and Vite see the
 # same config when this script is used as the one-stop local launcher.
-if [ -f "$SCRIPT_DIR/.env" ]; then
+#
+# .env is untracked, so a worktree is created without one. Fall back to the main
+# repo's, the same way persistent dev state is anchored there — otherwise every
+# new worktree silently starts with no GH_TOKEN, no OAuth config and no API
+# bases, and the first symptom is an opaque 403 while fetching the public asset
+# inventory.
+ENV_FILE="$SCRIPT_DIR/.env"
+if [ ! -f "$ENV_FILE" ]; then
+  ENV_FILE="$MAIN_REPO_DIR/.env"
+fi
+if [ -f "$ENV_FILE" ]; then
+  echo "Using env file: $ENV_FILE"
   set -a
   # shellcheck disable=SC1091
-  . "$SCRIPT_DIR/.env"
+  . "$ENV_FILE"
   set +a
 fi
 
@@ -28,7 +43,6 @@ fi
 # Override: pass the env var explicitly to escape this anchor (e.g.
 #   DB_DIR=/tmp/foo PERSISTED_ROOMS_DIR=/tmp/bar ./restart-local.sh
 # ).
-MAIN_REPO_DIR="$(cd "$(dirname "$(git -C "$SCRIPT_DIR" rev-parse --path-format=absolute --git-common-dir)")" && pwd -P)"
 SHARED_DATA_DIR="${SHARED_DATA_DIR:-$MAIN_REPO_DIR/data}"
 SHARED_OUTPUT_DIR="${SHARED_OUTPUT_DIR:-$MAIN_REPO_DIR/output}"
 
