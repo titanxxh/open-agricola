@@ -1,3 +1,4 @@
+// @vitest-environment jsdom
 import { describe, expect, it } from 'vitest'
 import {
   isHotseatModeQuery,
@@ -110,6 +111,21 @@ describe('parseHotseatSetupFromQuery', () => {
   it('opts out of parent drafting only when asked', () => {
     expect(parseHotseatSetupFromQuery('?hotseat=1&draftParents=false').draftParents).toBe(false)
     expect(parseHotseatSetupFromQuery('?hotseat=1').draftParents).toBeUndefined()
+  })
+})
+
+describe('leaving a hotseat game', () => {
+  it('drops the hotseat flag so lobby navigation is not routed back to the game', async () => {
+    const { buildPlatformPageUrl } = await import('../../utils/platform-page-url')
+    const original = window.location.search
+    window.history.replaceState(null, '', '/?hotseat=live&player=p1')
+    try {
+      const lobbyUrl = buildPlatformPageUrl('lobby')
+      expect(lobbyUrl).not.toContain('hotseat')
+      expect(isHotseatModeQuery(new URL(lobbyUrl, 'http://x').search)).toBe(false)
+    } finally {
+      window.history.replaceState(null, '', original || '/')
+    }
   })
 })
 

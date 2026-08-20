@@ -576,15 +576,21 @@ export const GameContainerApi = () => {
   const viewedPlayer = state?.players.find((p) => p.id === viewPlayerId) ?? selfPlayer ?? currentPlayer
   // In WS mode, viewPlayerId lets you peek at another player's board.
   // In HTTP (sandbox) mode, display follows the current player so the panel switches on turn change.
-  const displayPlayer = isWs
-    ? ((viewPlayerId ? viewedPlayer : selfPlayer ?? currentPlayer) ?? state?.players[0] ?? null)
-    : (selfPlayer ?? currentPlayer ?? state?.players[0] ?? null)
   const activePlayer =
     interaction.stateId === 'wait' && interaction.request.kind === 'confirm-player-switch'
       ? state?.players[interaction.request.fromPlayerIndex] ?? currentPlayer
       : interaction.stateId === 'wait' && typeof interaction.playerIndex === 'number'
         ? state?.players[interaction.playerIndex] ?? currentPlayer
         : currentPlayer
+  // Hotseat follows the seat that actually has to act: a pending interaction can
+  // belong to someone other than the current player (harvest feeding walks the
+  // harvest order without advancing currentPlayerIndex), and that seat is the
+  // one whose cards may be shown — and who the device has to be handed to.
+  const displayPlayer = isWs
+    ? ((viewPlayerId ? viewedPlayer : selfPlayer ?? currentPlayer) ?? state?.players[0] ?? null)
+    : isHotseat
+      ? (activePlayer ?? currentPlayer ?? state?.players[0] ?? null)
+      : (selfPlayer ?? currentPlayer ?? state?.players[0] ?? null)
   const isMyTurn = !!(activePlayer && selfPlayer && activePlayer.id === selfPlayer.id)
   // In HTTP (non-WS) mode, one human controls all players — always interactive
   const isInteractive = isWs

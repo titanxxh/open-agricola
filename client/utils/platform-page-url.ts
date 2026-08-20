@@ -7,6 +7,7 @@ const PAGE_SCOPED_QUERY_KEYS = [
   'player',
   'playerId',
   'transport',
+  'hotseat',
   'maxPlayers',
   'draftMode',
   'draftPoolSize',
