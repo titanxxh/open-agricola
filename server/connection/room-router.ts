@@ -532,16 +532,24 @@ function handleCreateRoom(ctx: ConnectionCtx, msg: Extract<ClientCommand, { type
   if (room.customSessionExecutor) void room.customSessionExecutor.updatePlayerNames([[0, name]])
   else room.session.updatePlayerName(0, name)
   ctx.checkpoint.recordCreated(room)
-  ctx.broadcaster.sendTo(ctx.ws, {
-    type: 'roomCreated',
-    roomId,
-    playerIndex: 0,
-    maxPlayers,
-    ...(setup.hotseat ? { hotseat: true } : {}),
-  })
+  const confirmCreated = (): void => {
+    ctx.broadcaster.sendTo(ctx.ws, {
+      type: 'roomCreated',
+      roomId,
+      playerIndex: 0,
+      maxPlayers,
+      ...(setup.hotseat ? { hotseat: true } : {}),
+    })
+  }
   // A hotseat room has nobody left to wait for — its creator holds every seat,
   // so it starts as soon as it exists instead of sitting in the waiting room.
-  if (!room.hotseat) return
+  // Its confirmation waits for that first deal: once the client sees
+  // `roomCreated` it stops listening for creation errors, so confirming a room
+  // that then fails to initialize would strand it in the waiting state.
+  if (!room.hotseat) {
+    confirmCreated()
+    return
+  }
   room.status = 'playing'
   room.startedAt ??= Date.now()
   return useSessionResponse(
@@ -560,6 +568,7 @@ function handleCreateRoom(ctx: ConnectionCtx, msg: Extract<ClientCommand, { type
         sendCommandError(ctx, resp.error ?? 'unable to initialize game', msg.requestId)
         return
       }
+      confirmCreated()
       return publishInitialState(ctx, room, resp, msg.requestId, () => {
         ctx.checkpoint.recordMeta(room)
       }, () => {

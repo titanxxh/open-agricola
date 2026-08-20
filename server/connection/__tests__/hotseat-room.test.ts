@@ -7,6 +7,7 @@ import { InMemoryRoomPersistence } from '../../game/persistence/memory-adapter.t
 import { createLobby } from '../../game/lobby.ts'
 import { createRoomPersistenceCheckpoint } from '../../game/room-persistence-checkpoint.ts'
 import { snapshotToRoom, summarizeRoomsForLobby, toRoomMeta } from '../../game/room.ts'
+import { GameSession } from '../../game/authoritative-session.ts'
 import type { StateUpdateEnvelope } from '../../../shared/contract/protocol/game.ts'
 
 /**
@@ -16,6 +17,9 @@ import type { StateUpdateEnvelope } from '../../../shared/contract/protocol/game
  * nobody else can join it, and it never shows up in the lobby list.
  */
 const fakeWs = () => ({ OPEN: 1, readyState: 1, send: vi.fn(), close: vi.fn() })
+
+const GameSessionPrototype = GameSession.prototype as unknown as { getState: () => unknown }
+const GameSessionGetState = GameSessionPrototype.getState
 
 const newDeps = (persistence = new InMemoryRoomPersistence()) => {
   const registry = new RoomRegistry()
@@ -65,6 +69,25 @@ describe('hotseat room creation', () => {
 
     const created = sentMessagesOf(ctx).find((msg) => msg.type === 'roomCreated')
     expect(created?.hotseat).toBe(true)
+  })
+
+  it('reports a failed deal instead of confirming the room', async () => {
+    const deps = newDeps()
+    const ctx = newCtx(deps)
+    ctx.currentUserId = 'owner'
+    // Stands in for an executable community card whose first getState times out.
+    GameSessionPrototype.getState = () => ({ ok: false, error: 'worker timed out' }) as never
+    try {
+      await dispatch(ctx, { type: 'createRoom', maxPlayers: 2, name: 'Owner', hotseat: true })
+    } finally {
+      GameSessionPrototype.getState = GameSessionGetState
+    }
+
+    // The client stops listening for creation errors once roomCreated arrives,
+    // so a room that fails to initialize must never be confirmed.
+    expect(sentMessagesOf(ctx).map((msg) => msg.type)).not.toContain('roomCreated')
+    expect(errorsOf(ctx)).toContain('worker timed out')
+    expect([...deps.registry.iter()]).toEqual([])
   })
 
   it('leaves an ordinary room waiting and unflagged', async () => {
