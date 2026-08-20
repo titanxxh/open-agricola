@@ -18,6 +18,7 @@ import {
 import { isLoadableLive } from './workshop-status.ts'
 import { parseDraftOptions, loadLiveCustomCards } from './connection/room-router.ts'
 import {
+  asSetupPayload,
   buildInitialStateOptions,
   parseGameSetupRequest,
   resolveCustomCardDbIds,
@@ -587,7 +588,7 @@ export const handleGameRoute = async (
     let seed: number | undefined
     let raw: Record<string, unknown> = {}
     try {
-      raw = JSON.parse(await readBody(req)) as Record<string, unknown>
+      raw = asSetupPayload(JSON.parse(await readBody(req)))
       if (typeof raw.seed === 'number') seed = raw.seed
     } catch { /* no body or invalid JSON — use random seed and default setup */ }
     // Hotseat games are set up from the same lobby panel as multiplayer rooms,

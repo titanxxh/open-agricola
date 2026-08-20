@@ -30,6 +30,16 @@ export const clampPlayerCount = (value: unknown): number => {
 }
 
 /**
+ * A request body is only a setup payload when it is a plain object: `null`,
+ * arrays and primitives all parse as valid JSON but carry no setup fields, and
+ * reading through them would throw instead of dealing the documented default.
+ */
+export const asSetupPayload = (parsed: unknown): Record<string, unknown> =>
+  parsed !== null && typeof parsed === 'object' && !Array.isArray(parsed)
+    ? parsed as Record<string, unknown>
+    : {}
+
+/**
  * `maxPlayers` is the room wording, `playerCount` the hotseat one; accept both
  * so the lobby can post either without a second mapping table.
  */

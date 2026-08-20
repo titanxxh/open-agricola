@@ -235,6 +235,12 @@ const publishCommandResponse = (
   response: SessionResponse,
   command: ClientCommand,
   cause: StateUpdateCause,
+  /**
+   * Seat the command actually ran as. It differs from the connection's own seat
+   * in a hotseat room, where every seat is played from seat 0's connection —
+   * without it the replay timeline would credit player 1 with everyone's moves.
+   */
+  seat: number = ctx.currentPlayerIndex,
 ): void | Promise<void> => {
   if (!response.ok) {
     ctx.broadcaster.sendStateTo(ctx.ws, room, response, command.requestId, cause)
@@ -256,7 +262,7 @@ const publishCommandResponse = (
     room,
     response,
     replayIntent,
-    ctx.currentPlayerIndex,
+    seat,
     () => {
       publishCommitted()
       ctx.broadcaster.broadcastEvent(room, {
@@ -838,7 +844,7 @@ function handleAction(ctx: ConnectionCtx, msg: Extract<ClientCommand, { type: 'a
       [seat, msg.spaceId],
       () => room.session.takeAction(seat, msg.spaceId),
     ),
-    (resp) => publishCommandResponse(ctx, room, resp, msg, 'action'),
+    (resp) => publishCommandResponse(ctx, room, resp, msg, 'action', seat),
   )
 }
 
@@ -852,7 +858,7 @@ function handleSpecialAction(ctx: ConnectionCtx, msg: Extract<ClientCommand, { t
       [seat, msg.cardId, msg.actionId, msg.payload],
       () => room.session.takeSpecialAction(seat, msg.cardId, msg.actionId, msg.payload),
     ),
-    (resp) => publishCommandResponse(ctx, room, resp, msg, 'action'),
+    (resp) => publishCommandResponse(ctx, room, resp, msg, 'action', seat),
   )
 }
 
@@ -866,7 +872,7 @@ function handleChoice(ctx: ConnectionCtx, msg: Extract<ClientCommand, { type: 'c
       [seat, msg.value, msg.payload],
       () => room.session.resolveChoice(seat, msg.value, msg.payload),
     ),
-    (resp) => publishCommandResponse(ctx, room, resp, msg, 'choice'),
+    (resp) => publishCommandResponse(ctx, room, resp, msg, 'choice', seat),
   )
 }
 
@@ -880,7 +886,7 @@ function handleAnytime(ctx: ConnectionCtx, msg: Extract<ClientCommand, { type: '
       [seat, msg.actionId],
       () => room.session.takeAnytimeAction(seat, msg.actionId),
     ),
-    (resp) => publishCommandResponse(ctx, room, resp, msg, 'anytime'),
+    (resp) => publishCommandResponse(ctx, room, resp, msg, 'anytime', seat),
   )
 }
 
@@ -895,7 +901,7 @@ function handleOrdinaryDrawKeep(ctx: ConnectionCtx, msg: Extract<ClientCommand, 
       [seat, msg.choiceId, msg.keepCardId],
       () => room.session.resolveOrdinaryCardDrawChoice(seat, msg.choiceId, msg.keepCardId),
     ),
-    (resp) => publishCommandResponse(ctx, room, resp, msg, 'choice'),
+    (resp) => publishCommandResponse(ctx, room, resp, msg, 'choice', seat),
   )
 }
 
@@ -918,7 +924,7 @@ function handleCommitSelection(ctx: ConnectionCtx, msg: Extract<ClientCommand, {
       [seat, msg.payload],
       () => room.session.commitSelectionChoice(seat, msg.payload),
     ),
-    (resp) => publishCommandResponse(ctx, room, resp, msg, 'choice'),
+    (resp) => publishCommandResponse(ctx, room, resp, msg, 'choice', seat),
   )
 }
 
@@ -933,23 +939,25 @@ function handleParentSubmit(ctx: ConnectionCtx, msg: Extract<ClientCommand, { ty
       [seat, msg.selection],
       () => room.session.submitParentSelection(seat, msg.selection),
     ),
-    (resp) => publishCommandResponse(ctx, room, resp, msg, 'choice'),
+    (resp) => publishCommandResponse(ctx, room, resp, msg, 'choice', seat),
   )
 }
 
 function handleUndoStep(ctx: ConnectionCtx, msg: Extract<ClientCommand, { type: 'undoStep' }>): void | Promise<void> {
   const room = requireWritableRoom(ctx, msg.requestId); if (!room) return
+  const seat = actingSeat(ctx)
   return useSessionResponse(
     executeRoomSession(room, 'undoStep', [], () => room.session.undoStep()),
-    (resp) => publishCommandResponse(ctx, room, resp, msg, 'undo'),
+    (resp) => publishCommandResponse(ctx, room, resp, msg, 'undo', seat),
   )
 }
 
 function handleUndoAction(ctx: ConnectionCtx, msg: Extract<ClientCommand, { type: 'undoAction' }>): void | Promise<void> {
   const room = requireWritableRoom(ctx, msg.requestId); if (!room) return
+  const seat = actingSeat(ctx)
   return useSessionResponse(
     executeRoomSession(room, 'undoAction', [], () => room.session.undoAction()),
-    (resp) => publishCommandResponse(ctx, room, resp, msg, 'undo'),
+    (resp) => publishCommandResponse(ctx, room, resp, msg, 'undo', seat),
   )
 }
 
@@ -1161,6 +1169,9 @@ function handleDevCreatePasture(ctx: ConnectionCtx, msg: Extract<ClientCommand, 
 function handleDraftSubmit(ctx: ConnectionCtx, msg: Extract<ClientCommand, { type: 'draftSubmit' }>): void | Promise<void> {
   const room = requireWritableRoom(ctx, msg.requestId); if (!room) return
   if (!assertOwnPlayerId(ctx, msg.playerId, msg.requestId)) return
+  const draftSeat = room.hotseat === true
+    ? room.session.getState().state.players.findIndex((player) => player.id === msg.playerId)
+    : ctx.currentPlayerIndex
   return useSessionResponse(
     executeRoomSession(
       room,
@@ -1168,7 +1179,14 @@ function handleDraftSubmit(ctx: ConnectionCtx, msg: Extract<ClientCommand, { typ
       [msg.playerId, msg.pick],
       () => room.session.submitDraftPick(msg.playerId, msg.pick),
     ),
-    (resp) => publishCommandResponse(ctx, room, resp, msg, 'draftSubmit'),
+    (resp) => publishCommandResponse(
+      ctx,
+      room,
+      resp,
+      msg,
+      'draftSubmit',
+      draftSeat >= 0 ? draftSeat : ctx.currentPlayerIndex,
+    ),
   )
 }
 

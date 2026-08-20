@@ -188,6 +188,35 @@ describe('hotseat snapshot projection', () => {
   })
 })
 
+describe('hotseat replay attribution', () => {
+  it('credits the acting seat, not the connection seat', async () => {
+    const deps = newDeps()
+    const ctx = newCtx(deps)
+    const room = await createHotseatRoom(ctx, 3)
+    const commits: number[] = []
+    ctx.committer = {
+      isRecording: () => true,
+      commit: (_room, _resp, _intent, playerIndex) => {
+        commits.push(playerIndex)
+        return { kind: 'committed' as const }
+      },
+      isRetrying: () => false,
+      blockedError: () => undefined,
+      canCreateRoom: () => undefined,
+      lockNewRoom: () => {},
+      hasReplay: () => false,
+      waitUntilReady: () => false,
+    } as unknown as typeof ctx.committer
+
+    // Seat 1 acts while the connection is still seated at 0.
+    room.session.getState().state.currentPlayerIndex = 1
+    ctx.currentPlayerIndex = 0
+    await dispatch(ctx, { type: 'action', spaceId: 'forest' })
+
+    expect(commits).toEqual([1])
+  })
+})
+
 describe('hotseat room access', () => {
   it('refuses anyone but the owner', async () => {
     const deps = newDeps()

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import {
+  asSetupPayload,
   buildInitialStateOptions,
   parseGameSetupRequest,
   resolveCustomCardDbIds,
@@ -60,6 +61,19 @@ describe('hotseat game setup', () => {
 
   it('rejects an invalid draft mode instead of silently dealing a classic hand', () => {
     expect(() => setupFromPayload({ draftMode: 'auction' })).toThrow(/invalid draftMode/)
+  })
+
+  it('falls back to the default setup for a body that is not an object', () => {
+    // `JSON.parse('null')` and `JSON.parse('[]')` both succeed; neither carries
+    // setup fields, so the request must deal a default game rather than throw.
+    for (const body of [null, [], 'nope', 7] as unknown[]) {
+      expect(() => setupFromPayload(asSetupPayload(body))).not.toThrow()
+      expect(setupFromPayload(asSetupPayload(body)).playerCount).toBe(2)
+    }
+  })
+
+  it('keeps a real object payload intact', () => {
+    expect(asSetupPayload({ maxPlayers: 5 })).toEqual({ maxPlayers: 5 })
   })
 })
 
