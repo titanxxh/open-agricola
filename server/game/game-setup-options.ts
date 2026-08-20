@@ -17,6 +17,8 @@ export type GameSetupRequest = {
   enableFarmersOfTheMoor: boolean
   allowIncompleteFarmersOfTheMoorMinorDeal: boolean
   draft: DraftSetupOptions | null
+  /** One device plays every seat (see `Room.hotseat`). */
+  hotseat: boolean
 }
 
 export const PLAYER_COUNT_MIN = 2
@@ -43,6 +45,7 @@ export const parseGameSetupRequest = (
   enableFarmersOfTheMoor: raw.enableFarmersOfTheMoor === true,
   allowIncompleteFarmersOfTheMoorMinorDeal: raw.allowIncompleteFarmersOfTheMoorMinorDeal === true,
   draft,
+  hotseat: raw.hotseat === true,
 })
 
 export const buildInitialStateOptions = (request: GameSetupRequest): InitialStateOptions => ({

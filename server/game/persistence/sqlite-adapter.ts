@@ -28,6 +28,7 @@ type RoomRow = {
   enable_through_the_seasons: number
   enable_farmers_of_the_moor: number
   allow_incomplete_farmers_of_the_moor_minor_deal: number
+  hotseat: number
   started_at: number | null
   updated_at: number
 }
@@ -149,6 +150,7 @@ const roomValues = (
   enableFarmersOfTheMoor: meta.enableFarmersOfTheMoor === true ? 1 : 0,
   allowIncompleteFarmersOfTheMoorMinorDeal:
     meta.allowIncompleteFarmersOfTheMoorMinorDeal === true ? 1 : 0,
+  hotseat: meta.hotseat === true ? 1 : 0,
   startedAt: meta.startedAt ?? null,
   now,
 })
@@ -181,6 +183,7 @@ const toSnapshot = (
     enableThroughTheSeasons: row.enable_through_the_seasons === 1,
     enableFarmersOfTheMoor: row.enable_farmers_of_the_moor === 1,
     allowIncompleteFarmersOfTheMoorMinorDeal: row.allow_incomplete_farmers_of_the_moor_minor_deal === 1,
+    hotseat: row.hotseat === 1,
     status: toStatus(row.status),
     players,
   },
@@ -221,7 +224,7 @@ export class SqliteRoomPersistence implements RoomPersistence {
               custom_cards_runtime_json,
               replay_recording, replay_viewer_build_id, replay_game_build_id,
               enable_parent_cards, draft_parents, enable_through_the_seasons, enable_farmers_of_the_moor,
-              allow_incomplete_farmers_of_the_moor_minor_deal, started_at, updated_at
+              allow_incomplete_farmers_of_the_moor_minor_deal, hotseat, started_at, updated_at
        FROM rooms WHERE id = ?`,
     )
     this.loadPlayers = db.prepare(
@@ -233,13 +236,13 @@ export class SqliteRoomPersistence implements RoomPersistence {
         custom_cards_runtime_json,
         replay_recording, replay_viewer_build_id, replay_game_build_id,
         enable_parent_cards, draft_parents, enable_through_the_seasons, enable_farmers_of_the_moor,
-        allow_incomplete_farmers_of_the_moor_minor_deal, started_at, created_at, updated_at
+        allow_incomplete_farmers_of_the_moor_minor_deal, hotseat, started_at, created_at, updated_at
       ) VALUES (
         @id, @createdBy, @stateJson, @maxPlayers, @status, COALESCE(@version, 1), @customCardIds,
         @customCards,
         @replayRecording, @replayViewerBuildId, @replayGameBuildId,
         @enableParentCards, @draftParents, @enableThroughTheSeasons, @enableFarmersOfTheMoor,
-        @allowIncompleteFarmersOfTheMoorMinorDeal, @startedAt, @now, @now
+        @allowIncompleteFarmersOfTheMoorMinorDeal, @hotseat, @startedAt, @now, @now
       )
       ON CONFLICT(id) DO UPDATE SET
         state_json = COALESCE(excluded.state_json, rooms.state_json),
@@ -254,6 +257,7 @@ export class SqliteRoomPersistence implements RoomPersistence {
         enable_through_the_seasons = excluded.enable_through_the_seasons,
         enable_farmers_of_the_moor = excluded.enable_farmers_of_the_moor,
         allow_incomplete_farmers_of_the_moor_minor_deal = excluded.allow_incomplete_farmers_of_the_moor_minor_deal,
+        hotseat = excluded.hotseat,
         started_at = COALESCE(rooms.started_at, excluded.started_at),
         version = COALESCE(@version, rooms.version + 1),
         updated_at = excluded.updated_at
@@ -313,7 +317,8 @@ export class SqliteRoomPersistence implements RoomPersistence {
              rooms.replay_recording, rooms.replay_viewer_build_id, rooms.replay_game_build_id,
              rooms.enable_parent_cards, rooms.draft_parents,
              rooms.enable_through_the_seasons, rooms.enable_farmers_of_the_moor,
-             rooms.allow_incomplete_farmers_of_the_moor_minor_deal, rooms.started_at, rooms.updated_at,
+             rooms.allow_incomplete_farmers_of_the_moor_minor_deal, rooms.hotseat,
+             rooms.started_at, rooms.updated_at,
              room_players.user_id AS player_user_id, room_players.player_index
       FROM rooms
       JOIN game_contexts

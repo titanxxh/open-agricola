@@ -135,8 +135,9 @@ describe('LobbyPage player count selection', () => {
     fireEvent.click(screen.getByLabelText('启用 Farmers of the Moor 扩展'))
     fireEvent.click(screen.getByRole('button', { name: 'Start Hotseat Game' }))
 
-    // No transport=ws: hotseat stays on the HTTP session instead of opening a room.
+    // Hotseat is an ordinary room, flagged so one device can hold every seat.
     expect(setPage).toHaveBeenCalledWith('game', {
+      transport: 'ws',
       hotseat: '1',
       maxPlayers: '4',
       enableFarmersOfTheMoor: 'true',

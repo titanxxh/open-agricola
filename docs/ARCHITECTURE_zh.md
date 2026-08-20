@@ -1166,7 +1166,7 @@ server/custom-code/
 - `GET /api/health` 健康检查
 - `GET /api/rooms` 房间列表
 - `GET /api/game/state` 补拉当前快照
-- `POST /api/game/new` 创建新对局、测试重置或本地热座开局。除 `seed?: number` 外，接受与 WebSocket `createRoom` 相同的开局参数（玩家数、轮抽模式与池大小、社区扩展卡 `customCardIds`、各扩展开关）；两条路径统一经 `server/game/game-setup-options.ts` 映射，保证大厅面板在两种模式下含义一致
+- `POST /api/game/new` 创建新对局或测试重置。除 `seed?: number` 外，接受与 WebSocket `createRoom` 相同的开局参数（玩家数、轮抽模式与池大小、社区扩展卡 `customCardIds`、各扩展开关），统一经 `server/game/game-setup-options.ts` 映射。这条是调试 / 测试路径——包括本地热座在内的产品对局都是权威房间
 - `POST /api/game/load` 加载测试状态
 - `POST /api/game/dev/*` 单机调试 / E2E 场景布置
 - `POST /api/game/new-sandbox` 创建独立 `GameSession`，**不创建 WS 房间**

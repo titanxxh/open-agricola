@@ -128,16 +128,6 @@ describe('PageRouter auth routes', () => {
     })
   })
 
-  it('routes a running hotseat game to the game page rather than the lobby', async () => {
-    stubMe({ ok: true, user: { id: 'u1', username: 'host', displayName: 'Host' } })
-    // The setup keys are stripped after the deal; hotseat=live is what a reload sees.
-    window.history.replaceState(null, '', '/?hotseat=live')
-
-    renderWithAuth()
-
-    await waitFor(() => expect(screen.queryByText('Lobby Page')).toBeNull())
-  })
-
   it('routes a pending hotseat deal to the game page', async () => {
     stubMe({ ok: true, user: { id: 'u1', username: 'host', displayName: 'Host' } })
     window.history.replaceState(null, '', '/?hotseat=1&maxPlayers=4')

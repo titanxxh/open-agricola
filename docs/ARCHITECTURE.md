@@ -1186,7 +1186,7 @@ The main thread retains only a nonexecuting mirror of the latest successful snap
 - `GET /api/health`: health check;
 - `GET /api/rooms`: room list;
 - `GET /api/game/state`: current snapshot refetch;
-- `POST /api/game/new`: new game, test reset, or a local-hotseat deal. Accepts `seed?: number` plus the same setup payload as WebSocket `createRoom` (player count, draft mode and pool size, community deck with `customCardIds`, and the expansion switches); both surfaces map it through `server/game/game-setup-options.ts` so the lobby panel means the same thing in either mode;
+- `POST /api/game/new`: new game or test reset. Accepts `seed?: number` plus the same setup payload as WebSocket `createRoom` (player count, draft mode and pool size, community deck with `customCardIds`, and the expansion switches), mapped through `server/game/game-setup-options.ts` so both surfaces agree. This is a debugging and test path — product games, including local hotseat, are authoritative rooms;
 - `POST /api/game/load`: load test state;
 - `POST /api/game/dev/*`: single-player debugging and E2E setup;
 - `POST /api/game/new-sandbox`: create an independent `GameSession` without a WebSocket Room;

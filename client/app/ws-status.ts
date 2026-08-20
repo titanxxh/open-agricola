@@ -8,5 +8,5 @@ export type WsStatus =
   | { phase: 'creating' }
   | { phase: 'joining'; roomId: string }
   | { phase: 'waiting'; roomId: string; players: Array<{ playerIndex: number; name: string }>; maxPlayers: number }
-  | { phase: 'ready'; roomId: string; playerIndex: number }
+  | { phase: 'ready'; roomId: string; playerIndex: number; hotseat?: boolean }
   | { phase: 'error'; message: string; code?: WsErrorCode }

@@ -55,7 +55,7 @@ describe('bug report migration', () => {
     runMigrations(db)
 
     expect(db.prepare('SELECT MAX(version) AS version FROM schema_version').get())
-      .toEqual({ version: 28 })
+      .toEqual({ version: 29 })
     expect((db.pragma('table_info(oauth_states)') as Array<{ name: string }>)
       .map(({ name }) => name)).toEqual(expect.arrayContaining([
       'pkce_verifier_ciphertext',

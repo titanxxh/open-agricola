@@ -9,13 +9,7 @@ import {
 } from '../../shared/domain/farm'
 import { useGameSync } from '../hooks/useGameSync'
 import { HttpGameTransport, WsGameTransport, type GameTransport } from '../services/gameTransport'
-import {
-  isHotseatModeQuery,
-  isHotseatSetupQuery,
-  parseDraftParamsFromQuery,
-  parseHotseatSetupFromQuery,
-  stripHotseatSetupParams,
-} from './game-setup-query'
+import { isHotseatSetupQuery, parseDraftParamsFromQuery } from './game-setup-query'
 import { LocalGameTransport } from '../local-sandbox/local-transport'
 import { HotseatHandoff } from './HotseatHandoff'
 import { nextHotseatDraftSeatId, nextHotseatParentSeatId } from './hotseat-seat'
@@ -238,6 +232,7 @@ const useTransportSetup = (
         playerIndex: number,
         players: Array<{ playerIndex: number; name: string }>,
         maxPlayers: number,
+        hotseat = false,
       ) => {
         setWsStatus({ phase: 'waiting', roomId, players, maxPlayers })
         const handler = (event: MessageEvent) => {
@@ -246,7 +241,7 @@ const useTransportSetup = (
             if (msg.type === 'gameStarted') {
               rawWs.removeEventListener('message', handler)
               setWsReady(true)
-              setWsStatus({ phase: 'ready', roomId, playerIndex })
+              setWsStatus({ phase: 'ready', roomId, playerIndex, ...(hotseat ? { hotseat: true } : {}) })
             } else if (msg.type === 'playerJoined') {
               setWsStatus(prev => {
                 if (prev.phase !== 'waiting') return prev
@@ -300,7 +295,7 @@ const useTransportSetup = (
 
       if (isCreator) {
         setWsStatus({ phase: 'creating' })
-        const resp = await new Promise<{ roomId: string; playerIndex: number; maxPlayers: number } | { error: string }>((resolve) => {
+        const resp = await new Promise<{ roomId: string; playerIndex: number; maxPlayers: number; hotseat: boolean } | { error: string }>((resolve) => {
           const searchParams = new URLSearchParams(window.location.search)
           const customCardsParam = searchParams.get('customCards')
           const customCardIds = customCardsParam ? customCardsParam.split(',').filter(Boolean) : undefined
@@ -313,9 +308,11 @@ const useTransportSetup = (
           const enableFarmersOfTheMoor = enableFarmersOfTheMoorFromQuery(window.location.search) || undefined
           const allowIncompleteFarmersOfTheMoorMinorDeal =
             allowIncompleteFarmersOfTheMoorMinorDealFromQuery(window.location.search) || undefined
+          const hotseat = isHotseatSetupQuery(window.location.search) || undefined
           const sendCreateRoom = () => {
             ws.sendRoomCommand('createRoom', {
               maxPlayers,
+              hotseat,
               name: displayName ?? playerParam ?? 'Player 1',
               customCardIds,
               enableCommunityDeck,
@@ -332,7 +329,12 @@ const useTransportSetup = (
               const msg = JSON.parse(event.data as string)
               if (msg.type === 'roomCreated') {
                 rawWs.removeEventListener('message', handler)
-                resolve({ roomId: msg.roomId, playerIndex: msg.playerIndex, maxPlayers: msg.maxPlayers ?? 2 })
+                resolve({
+                  roomId: msg.roomId,
+                  playerIndex: msg.playerIndex,
+                  maxPlayers: msg.maxPlayers ?? 2,
+                  hotseat: msg.hotseat === true,
+                })
               } else if (msg.type === 'error') {
                 rawWs.removeEventListener('message', handler)
                 resolve({ error: msg.error })
@@ -355,6 +357,7 @@ const useTransportSetup = (
           resp.playerIndex,
           [{ playerIndex: resp.playerIndex, name: creatorName }],
           resp.maxPlayers,
+          resp.hotseat,
         )
       } else {
         const roomId = roomParam
@@ -376,6 +379,7 @@ const useTransportSetup = (
           status: 'waiting' | 'playing'
           players: Array<{ playerIndex: number; name: string }>
           maxPlayers: number
+          hotseat: boolean
         } | { error: string; code?: WsErrorCode }>((resolve) => {
           const handler = (event: MessageEvent) => {
             try {
@@ -388,6 +392,7 @@ const useTransportSetup = (
                   status: msg.status,
                   players: msg.players,
                   maxPlayers: msg.maxPlayers,
+                  hotseat: msg.hotseat === true,
                 })
               } else if (msg.type === 'error') {
                 rawWs.removeEventListener('message', handler)
@@ -422,11 +427,17 @@ const useTransportSetup = (
             resp.playerIndex,
             resp.players,
             resp.maxPlayers,
+            resp.hotseat,
           )
           return
         }
         setWsReady(true)
-        setWsStatus({ phase: 'ready', roomId: resp.roomId, playerIndex: resp.playerIndex })
+        setWsStatus({
+          phase: 'ready',
+          roomId: resp.roomId,
+          playerIndex: resp.playerIndex,
+          ...(resp.hotseat ? { hotseat: true } : {}),
+        })
       }
     }
 
@@ -455,20 +466,6 @@ export const GameContainerApi = () => {
   const isLocalMode = currentUrlParams.get('localSandbox') === '1' && isBrowserSandbox()
   const isWsMode = !isLocalMode && (contextRoomId !== null || currentUrlParams.get('transport') === 'ws')
   const isEmbedded = currentUrlParams.get('embedded') === '1'
-  // Evaluated once: the setup keys are stripped from the URL after the deal.
-  const [hotseatSetup] = useState(() =>
-    isLocalMode || isWsMode || !isHotseatSetupQuery(window.location.search)
-      ? null
-      : parseHotseatSetupFromQuery(window.location.search),
-  )
-  // One device, every seat. Only games opened from the lobby's hotseat entry
-  // qualify — a plain HTTP session (workshop sandbox, E2E, debugging) has a
-  // single viewer and must not get handoff covers.
-  const [isHotseat] = useState(() =>
-    !isLocalMode && !isWsMode && isHotseatModeQuery(window.location.search),
-  )
-  const hotseatDealtRef = useRef(false)
-  const [hotseatError, setHotseatError] = useState<string | null>(null)
   // Seat whose cards the person at the device has agreed to look at, during
   // the draft / parent-selection phases (see `hotseat-seat.ts`).
   const [hotseatSeatConfirmed, setHotseatSeatConfirmed] = useState<string | null>(null)
@@ -566,11 +563,13 @@ export const GameContainerApi = () => {
     setDevPlayerIdOverride(value)
   }, [])
   const wsAssignedPlayerId = isWs ? playerIdFromWsStatus(wsStatus) : null
+  // One connection holds every seat, as confirmed by the server's room answer.
+  const isHotseat = wsStatus.phase === 'ready' && wsStatus.hotseat === true
   const localPlayerId = lockedViewPlayerId ?? wsAssignedPlayerId
   // In WS mode, selfPlayer is locked to the URL ?player= param.
   // If the URL omits ?player=, use the seat assigned by the join/create handshake.
   // In HTTP mode (sandbox/single-player), selfPlayer follows the current player.
-  const selfPlayer = isWs && localPlayerId
+  const selfPlayer = isWs && localPlayerId && !isHotseat
     ? state?.players.find((p) => p.id === localPlayerId) ?? currentPlayer
     : currentPlayer
   const viewedPlayer = state?.players.find((p) => p.id === viewPlayerId) ?? selfPlayer ?? currentPlayer
@@ -586,17 +585,19 @@ export const GameContainerApi = () => {
   // belong to someone other than the current player (harvest feeding walks the
   // harvest order without advancing currentPlayerIndex), and that seat is the
   // one whose cards may be shown — and who the device has to be handed to.
-  const displayPlayer = isWs
-    ? ((viewPlayerId ? viewedPlayer : selfPlayer ?? currentPlayer) ?? state?.players[0] ?? null)
-    : isHotseat
-      ? (activePlayer ?? currentPlayer ?? state?.players[0] ?? null)
+  const displayPlayer = isHotseat
+    ? (activePlayer ?? currentPlayer ?? state?.players[0] ?? null)
+    : isWs
+      ? ((viewPlayerId ? viewedPlayer : selfPlayer ?? currentPlayer) ?? state?.players[0] ?? null)
       : (selfPlayer ?? currentPlayer ?? state?.players[0] ?? null)
   const isMyTurn = !!(activePlayer && selfPlayer && activePlayer.id === selfPlayer.id)
   // In HTTP (non-WS) mode, one human controls all players — always interactive
-  const isInteractive = isWs
-    ? !persistencePaused && !!(activePlayer && selfPlayer && displayPlayer &&
-         activePlayer.id === selfPlayer.id && displayPlayer.id === selfPlayer.id)
-    : !!(activePlayer && displayPlayer)
+  const isInteractive = isHotseat
+    ? !persistencePaused && !!(activePlayer && displayPlayer)
+    : isWs
+      ? !persistencePaused && !!(activePlayer && selfPlayer && displayPlayer &&
+           activePlayer.id === selfPlayer.id && displayPlayer.id === selfPlayer.id)
+      : !!(activePlayer && displayPlayer)
   const hasGameView = !!(state && currentPlayer && displayPlayer)
   const bugReportRoomId = isWs && wsStatus.phase === 'ready'
     ? wsStatus.roomId
@@ -1136,39 +1137,8 @@ export const GameContainerApi = () => {
   }, [handleSnapshot, snapshotTransport])
   useEffect(() => {
     if (!isReady) return
-    // Hotseat: the lobby passes the chosen player count and expansions in the
-    // query string, so deal a fresh game instead of resuming the cookie session,
-    // then drop the setup keys so a reload resumes the game just dealt.
-    if (hotseatSetup && !hotseatDealtRef.current) {
-      hotseatDealtRef.current = true
-      const failed = (message: string) => {
-        // Allow another attempt: keep the setup params in the URL so a reload
-        // re-deals rather than resuming a game that was never created.
-        hotseatDealtRef.current = false
-        setHotseatError(message)
-      }
-      httpTransportSingleton.newHotseatGame(hotseatSetup)
-        .then((payload) => {
-          const rejection = payload as { ok?: boolean; error?: string }
-          if (rejection?.ok === false) {
-            failed(rejection.error ?? 'unknown error')
-            return
-          }
-          const search = stripHotseatSetupParams(window.location.search)
-          window.history.replaceState(
-            null,
-            '',
-            `${window.location.pathname}${search ? '?' + search : ''}${window.location.hash || ''}`,
-          )
-        })
-        .catch((e) => {
-          console.error('hotseat newGame failed:', e)
-          failed(e instanceof Error ? e.message : String(e))
-        })
-      return
-    }
     transport.getState().catch((e) => { console.error("fetchState failed:", e) })
-  }, [transport, isReady, hotseatSetup])
+  }, [transport, isReady])
   useEffect(() => {
     if (!wsTransport) return
     return wsTransport.onPersistenceStatus(setPersistencePaused)
@@ -1536,22 +1506,6 @@ export const GameContainerApi = () => {
     )
   }
 
-  if (hotseatError) {
-    return (
-      <div className={`app${isEmbedded ? ' app--embedded' : ''}`}>
-        <div className="hotseat-handoff">
-          <div className="hotseat-handoff-panel">
-            <h2 className="hotseat-handoff-title">{t(locale, 'ui.hotseatSetupFailed')}</h2>
-            <p className="hotseat-handoff-hint">{hotseatError}</p>
-            <a className="btn-primary" href={import.meta.env.BASE_URL}>
-              {t(locale, 'ui.hotseatSetupBackToLobby')}
-            </a>
-          </div>
-        </div>
-      </div>
-    )
-  }
-
   if (!hasGameView) {
     const fetchPhase =
       resolveGameLoadPhase({ wsStatus: isWs ? wsStatus : undefined, hasGameView: false }) ?? 'fetchingState'
@@ -1585,7 +1539,7 @@ export const GameContainerApi = () => {
     // Draft does not advance currentPlayerIndex, so hotseat walks the seats in
     // order and covers the screen before handing over to the next one.
     const hotseatSeatId = isHotseat ? nextHotseatDraftSeatId(state.draft) : null
-    const meId = (isWs && localPlayerId)
+    const meId = (isWs && localPlayerId && !isHotseat)
       ? localPlayerId
       : (hotseatSeatId ?? selfPlayer?.id ?? state.players[0]?.id ?? '')
     if (hotseatSeatId && hotseatSeatConfirmed !== hotseatSeatId) {
@@ -1622,7 +1576,7 @@ export const GameContainerApi = () => {
 
   if (state.phase === 'parent-selection' && state.parentSelection) {
     const hotseatSeatId = isHotseat ? nextHotseatParentSeatId(state) : null
-    const meId = (isWs && localPlayerId)
+    const meId = (isWs && localPlayerId && !isHotseat)
       ? localPlayerId
       : (hotseatSeatId ?? selfPlayer?.id ?? state.players[0]?.id ?? '')
     const playerIndex = Math.max(0, state.players.findIndex((player) => player.id === meId))

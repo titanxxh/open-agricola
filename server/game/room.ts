@@ -45,6 +45,13 @@ export type Room = {
   enableThroughTheSeasons?: boolean
   enableFarmersOfTheMoor?: boolean
   allowIncompleteFarmersOfTheMoorMinorDeal?: boolean
+  /**
+   * Local hotseat: one person plays every seat from a single connection.
+   * Such a room is hidden from the lobby list and only its creator can rejoin,
+   * but it is otherwise an ordinary authoritative room — it persists, restores,
+   * and records replays like any other.
+   */
+  hotseat?: boolean
   snapshotRehydrationFailed?: boolean
 }
 
@@ -184,6 +191,7 @@ export const toRoomMeta = (room: Room): RoomMeta => ({
   enableThroughTheSeasons: room.enableThroughTheSeasons ?? room.session.state.enableThroughTheSeasons,
   enableFarmersOfTheMoor: room.enableFarmersOfTheMoor ?? (room.session.state.enableFarmersOfTheMoor === true),
   allowIncompleteFarmersOfTheMoorMinorDeal: room.allowIncompleteFarmersOfTheMoorMinorDeal ?? false,
+  hotseat: room.hotseat === true,
   status: getRoomStatus(room),
   players: roomSeatOwners(room),
 })
@@ -259,7 +267,7 @@ export const removePlayerFromRoom = (
 
 type RoomLikeForSummary = Pick<
   Room,
-  'id' | 'players' | 'seatOwners' | 'maxPlayers' | 'createdBy'
+  'id' | 'players' | 'seatOwners' | 'maxPlayers' | 'createdBy' | 'hotseat'
 >
 
 export function summarizeRoomsForLobby(
@@ -269,6 +277,8 @@ export function summarizeRoomsForLobby(
 ): RoomSummary[] {
   const list: RoomSummary[] = []
   for (const r of source) {
+    // Nobody else can take a seat in a hotseat game, so it never shows up here.
+    if (r.hotseat) continue
     if (r.players.length === 0 && !isFixedDev(r.id)) continue
     const playerCount = roomOccupiedSeatCount(r)
     list.push({
@@ -343,6 +353,7 @@ export const snapshotToRoom = (
     replayRecording: snapshot.meta.replayRecording,
     replayViewerBuildId: snapshot.meta.replayViewerBuildId,
     replayGameBuildId: snapshot.meta.replayGameBuildId,
+    hotseat: snapshot.meta.hotseat === true,
     enableParentCards: snapshot.meta.enableParentCards ?? snapshot.serialized?.enableParentCards ?? false,
     draftParents: snapshot.meta.draftParents,
     draftMode: session.state.draftMode,

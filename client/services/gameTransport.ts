@@ -77,8 +77,6 @@ export interface GameTransport {
 }
 
 import { API_BASE, WS_BASE } from '../config'
-import type { HotseatGameOptions } from '../app/game-setup-query'
-
 
 const post = async (path: string, body?: unknown): Promise<GameSyncPayload> => {
   const resp = await fetch(`${API_BASE}${path}`, {
@@ -179,11 +177,6 @@ export class HttpGameTransport implements GameTransport {
 
   newGame(seed?: number) {
     return this.send(() => post('/api/game/new', seed !== undefined ? { seed } : undefined))
-  }
-
-  /** Start a fresh hotseat game with the lobby-selected player count and expansions. */
-  newHotseatGame(options: HotseatGameOptions, seed?: number) {
-    return this.send(() => post('/api/game/new', seed !== undefined ? { ...options, seed } : options))
   }
 
   loadGame(state: unknown) {
@@ -469,7 +462,7 @@ export class WsGameTransport implements GameTransport {
     return () => { this.persistenceStatusListeners.delete(cb) }
   }
 
-  sendRoomCommand(type: 'createRoom', opts: { maxPlayers?: number; name?: string; customCardIds?: string[]; enableCommunityDeck?: boolean; enableParentCards?: boolean; draftParents?: boolean; enableThroughTheSeasons?: boolean; enableFarmersOfTheMoor?: boolean; allowIncompleteFarmersOfTheMoorMinorDeal?: boolean; draftMode?: 'none' | 'simultaneous'; draftPoolSize?: number }): void
+  sendRoomCommand(type: 'createRoom', opts: { maxPlayers?: number; name?: string; customCardIds?: string[]; enableCommunityDeck?: boolean; enableParentCards?: boolean; draftParents?: boolean; enableThroughTheSeasons?: boolean; enableFarmersOfTheMoor?: boolean; allowIncompleteFarmersOfTheMoorMinorDeal?: boolean; draftMode?: 'none' | 'simultaneous'; draftPoolSize?: number; hotseat?: boolean }): void
   sendRoomCommand(type: 'joinRoom', opts: {
     roomId: string
     intent?: 'join' | 'resume'

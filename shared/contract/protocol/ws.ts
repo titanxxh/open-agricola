@@ -69,6 +69,11 @@ type ClientCommandBody =
       draftMode?: DraftMode
       /** Pool size per card type (7..10). Only applied when draftMode === 'simultaneous'. */
       draftPoolSize?: number
+      /**
+       * Local hotseat: one person plays every seat from this connection. The
+       * room is hidden from the lobby list and only its creator can rejoin.
+       */
+      hotseat?: boolean
     }
   | {
       type: 'joinRoom'
@@ -92,7 +97,7 @@ export type ServerEvent =
       requestId?: string
     }
   | { type: 'authOk'; userId: string; username: string }
-  | { type: 'roomCreated'; roomId: string; playerIndex: number; maxPlayers: number }
+  | { type: 'roomCreated'; roomId: string; playerIndex: number; maxPlayers: number; hotseat?: boolean }
   | {
       type: 'roomJoined'
       roomId: string
@@ -100,6 +105,8 @@ export type ServerEvent =
       status: 'waiting' | 'playing'
       players: Array<{ playerIndex: number; name: string }>
       maxPlayers: number
+      /** One device plays every seat; the client may act for any of them. */
+      hotseat?: boolean
     }
   | {
       type: 'roomWaiting'

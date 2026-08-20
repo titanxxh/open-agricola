@@ -109,9 +109,13 @@ export function LobbyPage() {
   }, [enableCommunityDeck, selectMode, showCommunityDeckToggle])
 
   const handleCreateGame = () => {
-    const params: Record<string, string> = selectMode === 'hotseat'
-      ? { hotseat: '1', maxPlayers: String(selectedMaxPlayers) }
-      : { transport: 'ws', maxPlayers: String(selectedMaxPlayers) }
+    // Hotseat is an ordinary authoritative room — it just belongs to one device,
+    // so it takes the same transport and only adds the hotseat flag.
+    const params: Record<string, string> = {
+      transport: 'ws',
+      maxPlayers: String(selectedMaxPlayers),
+      ...(selectMode === 'hotseat' ? { hotseat: '1' } : {}),
+    }
     if (draftMode !== 'none') {
       params.draftMode = draftMode
       params.draftPoolSize = String(draftPoolSize)

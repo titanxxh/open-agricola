@@ -333,8 +333,55 @@ const publishInitialState = (
   onReady()
 }
 
+/**
+ * In a hotseat room one person holds every seat from a single connection, so a
+ * command may name any seat in the room. Every other room keeps the strict
+ * one-connection-one-seat rule.
+ */
+const isHotseatRoom = (ctx: ConnectionCtx): boolean => ctx.currentRoom?.hotseat === true
+
+/**
+ * Which seat a game command applies to.
+ *
+ * Normally that is the seat this connection joined as. A hotseat connection is
+ * the whole table, so the command applies to whichever seat the engine is
+ * waiting on — the pending interaction's seat when there is one, otherwise the
+ * player whose turn it is. The engine still validates the seat, so a stale
+ * client cannot act out of turn.
+ */
+/**
+ * Seat for a command that names one. `assertOwnSeat` has already checked it, so
+ * a hotseat connection may act as the named seat; every other room ignores the
+ * claim and stays on the seat it joined as. Draft and parent selection have no
+ * pending interaction to derive a seat from, which is why they name it.
+ */
+const namedSeat = (ctx: ConnectionCtx, playerIndex: number): number =>
+  ctx.currentRoom?.hotseat === true ? playerIndex : ctx.currentPlayerIndex
+
+const actingSeat = (ctx: ConnectionCtx): number => {
+  const room = ctx.currentRoom
+  if (room?.hotseat !== true) return ctx.currentPlayerIndex
+  const { state, interaction } = room.session.getState()
+  if (interaction.stateId === 'wait' && typeof interaction.playerIndex === 'number') {
+    return interaction.playerIndex
+  }
+  return state.currentPlayerIndex
+}
+
 const assertOwnSeat = (ctx: ConnectionCtx, expectedPlayerIndex: unknown, requestId?: string): boolean => {
-  if (typeof expectedPlayerIndex !== 'number' || expectedPlayerIndex !== ctx.currentPlayerIndex) {
+  if (typeof expectedPlayerIndex !== 'number') {
+    sendCommandError(ctx, 'seat mismatch: you cannot act on another player', requestId)
+    return false
+  }
+  if (isHotseatRoom(ctx)) {
+    const seatCount = ctx.currentRoom?.session.state.players.length ?? 0
+    if (!Number.isInteger(expectedPlayerIndex) || expectedPlayerIndex < 0 || expectedPlayerIndex >= seatCount) {
+      sendCommandError(ctx, 'seat out of range for this game', requestId)
+      return false
+    }
+    return true
+  }
+  if (expectedPlayerIndex !== ctx.currentPlayerIndex) {
     sendCommandError(ctx, 'seat mismatch: you cannot act on another player', requestId)
     return false
   }
@@ -347,6 +394,13 @@ const assertOwnPlayerId = (ctx: ConnectionCtx, expectedPlayerId: unknown, reques
     return false
   }
   const state = ctx.currentRoom.session.state
+  if (isHotseatRoom(ctx)) {
+    if (typeof expectedPlayerId !== 'string' || !state.players.some((player) => player.id === expectedPlayerId)) {
+      sendCommandError(ctx, 'seat out of range for this game', requestId)
+      return false
+    }
+    return true
+  }
   const ownId = state.players[ctx.currentPlayerIndex]?.id
   if (typeof expectedPlayerId !== 'string' || !ownId || expectedPlayerId !== ownId) {
     sendCommandError(ctx, 'seat mismatch: you cannot act on another player', requestId)
@@ -394,7 +448,7 @@ function handleAuth(ctx: ConnectionCtx, msg: Extract<ClientCommand, { type: 'aut
   ctx.broadcaster.sendTo(ctx.ws, { type: 'authOk', userId: user.id, username: user.username })
 }
 
-function handleCreateRoom(ctx: ConnectionCtx, msg: Extract<ClientCommand, { type: 'createRoom' }>): void {
+function handleCreateRoom(ctx: ConnectionCtx, msg: Extract<ClientCommand, { type: 'createRoom' }>): void | Promise<void> {
   const ordinaryRoomCount = [...ctx.registry.iter()]
     .filter((room) => !isDevRoom(room.id))
     .length
@@ -449,6 +503,7 @@ function handleCreateRoom(ctx: ConnectionCtx, msg: Extract<ClientCommand, { type
     maxPlayers,
     version: 0,
     status: 'waiting',
+    ...(setup.hotseat ? { hotseat: true } : {}),
     createdBy: ctx.currentUserId,
     customCardDbIds: loadedCustomCards.loadedDbIds,
     customCards,
@@ -471,7 +526,26 @@ function handleCreateRoom(ctx: ConnectionCtx, msg: Extract<ClientCommand, { type
   if (room.customSessionExecutor) void room.customSessionExecutor.updatePlayerNames([[0, name]])
   else room.session.updatePlayerName(0, name)
   ctx.checkpoint.recordCreated(room)
-  ctx.broadcaster.sendTo(ctx.ws, { type: 'roomCreated', roomId, playerIndex: 0, maxPlayers })
+  ctx.broadcaster.sendTo(ctx.ws, {
+    type: 'roomCreated',
+    roomId,
+    playerIndex: 0,
+    maxPlayers,
+    ...(setup.hotseat ? { hotseat: true } : {}),
+  })
+  // A hotseat room has nobody left to wait for — its creator holds every seat,
+  // so it starts as soon as it exists instead of sitting in the waiting room.
+  if (!room.hotseat) return
+  room.status = 'playing'
+  room.startedAt ??= Date.now()
+  return useSessionResponse(
+    executeRoomSession(room, 'getState', [], () => room.session.getState()),
+    (resp) => publishInitialState(ctx, room, resp, msg.requestId, () => {
+      ctx.checkpoint.recordMeta(room)
+    }, () => {
+      ctx.broadcaster.broadcastEvent(room, { type: 'gameStarted' })
+    }),
+  )
 }
 
 function handleJoinRoom(ctx: ConnectionCtx, msg: Extract<ClientCommand, { type: 'joinRoom' }>): void | Promise<void> {
@@ -494,6 +568,19 @@ function handleJoinRoom(ctx: ConnectionCtx, msg: Extract<ClientCommand, { type: 
   const room = ctx.registry.get(roomId)
   if (!room) {
     sendCommandError(ctx, 'room not found', msg.requestId)
+    return
+  }
+  // A hotseat game belongs to one device: nobody else may take a seat in it.
+  // An anonymous room has no owner to check against — it stays as open as any
+  // other anonymous room rather than becoming unreachable for everyone.
+  if (room.hotseat && room.createdBy && ctx.currentUserId !== room.createdBy) {
+    sendCommandError(
+      ctx,
+      'this is a local hotseat game; only its owner can rejoin',
+      msg.requestId,
+      'not_participant',
+      'active',
+    )
     return
   }
   const blocked = ctx.committer?.blockedError(room.id)
@@ -617,7 +704,8 @@ function handleJoinRoom(ctx: ConnectionCtx, msg: Extract<ClientCommand, { type: 
   ctx.gameContextStore?.clearActiveExpiry(room.id)
   ctx.registry.touchActivity(room.id, Date.now())
   const playerCount = roomOccupiedSeatCount(room)
-  const roomFull = playerCount >= room.maxPlayers
+  // The hotseat owner is the whole table, so rejoining is always a full room.
+  const roomFull = room.hotseat === true || playerCount >= room.maxPlayers
   const starting = !wasPlaying && roomFull
   if (roomFull) {
     room.status = 'playing'
@@ -643,6 +731,7 @@ function handleJoinRoom(ctx: ConnectionCtx, msg: Extract<ClientCommand, { type: 
       status: room.status === 'waiting' ? 'waiting' : 'playing',
       players,
       maxPlayers: room.maxPlayers,
+      ...(room.hotseat ? { hotseat: true } : {}),
     })
     ctx.broadcaster.broadcastEvent(room, {
       type: 'playerJoined',
@@ -726,12 +815,13 @@ function handleGetState(ctx: ConnectionCtx, msg: Extract<ClientCommand, { type: 
 
 function handleAction(ctx: ConnectionCtx, msg: Extract<ClientCommand, { type: 'action' }>): void | Promise<void> {
   const room = requireWritableRoom(ctx, msg.requestId); if (!room) return
+  const seat = actingSeat(ctx)
   return useSessionResponse(
     executeRoomSession(
       room,
       'takeAction',
-      [ctx.currentPlayerIndex, msg.spaceId],
-      () => room.session.takeAction(ctx.currentPlayerIndex, msg.spaceId),
+      [seat, msg.spaceId],
+      () => room.session.takeAction(seat, msg.spaceId),
     ),
     (resp) => publishCommandResponse(ctx, room, resp, msg, 'action'),
   )
@@ -739,12 +829,13 @@ function handleAction(ctx: ConnectionCtx, msg: Extract<ClientCommand, { type: 'a
 
 function handleSpecialAction(ctx: ConnectionCtx, msg: Extract<ClientCommand, { type: 'specialAction' }>): void | Promise<void> {
   const room = requireWritableRoom(ctx, msg.requestId); if (!room) return
+  const seat = actingSeat(ctx)
   return useSessionResponse(
     executeRoomSession(
       room,
       'takeSpecialAction',
-      [ctx.currentPlayerIndex, msg.cardId, msg.actionId, msg.payload],
-      () => room.session.takeSpecialAction(ctx.currentPlayerIndex, msg.cardId, msg.actionId, msg.payload),
+      [seat, msg.cardId, msg.actionId, msg.payload],
+      () => room.session.takeSpecialAction(seat, msg.cardId, msg.actionId, msg.payload),
     ),
     (resp) => publishCommandResponse(ctx, room, resp, msg, 'action'),
   )
@@ -752,12 +843,13 @@ function handleSpecialAction(ctx: ConnectionCtx, msg: Extract<ClientCommand, { t
 
 function handleChoice(ctx: ConnectionCtx, msg: Extract<ClientCommand, { type: 'choice' }>): void | Promise<void> {
   const room = requireWritableRoom(ctx, msg.requestId); if (!room) return
+  const seat = actingSeat(ctx)
   return useSessionResponse(
     executeRoomSession(
       room,
       'resolveChoice',
-      [ctx.currentPlayerIndex, msg.value, msg.payload],
-      () => room.session.resolveChoice(ctx.currentPlayerIndex, msg.value, msg.payload),
+      [seat, msg.value, msg.payload],
+      () => room.session.resolveChoice(seat, msg.value, msg.payload),
     ),
     (resp) => publishCommandResponse(ctx, room, resp, msg, 'choice'),
   )
@@ -765,12 +857,13 @@ function handleChoice(ctx: ConnectionCtx, msg: Extract<ClientCommand, { type: 'c
 
 function handleAnytime(ctx: ConnectionCtx, msg: Extract<ClientCommand, { type: 'anytime' }>): void | Promise<void> {
   const room = requireWritableRoom(ctx, msg.requestId); if (!room) return
+  const seat = actingSeat(ctx)
   return useSessionResponse(
     executeRoomSession(
       room,
       'takeAnytimeAction',
-      [ctx.currentPlayerIndex, msg.actionId],
-      () => room.session.takeAnytimeAction(ctx.currentPlayerIndex, msg.actionId),
+      [seat, msg.actionId],
+      () => room.session.takeAnytimeAction(seat, msg.actionId),
     ),
     (resp) => publishCommandResponse(ctx, room, resp, msg, 'anytime'),
   )
@@ -779,12 +872,13 @@ function handleAnytime(ctx: ConnectionCtx, msg: Extract<ClientCommand, { type: '
 function handleOrdinaryDrawKeep(ctx: ConnectionCtx, msg: Extract<ClientCommand, { type: 'ordinaryDrawKeep' }>): void | Promise<void> {
   const room = requireWritableRoom(ctx, msg.requestId); if (!room) return
   if (!assertOwnSeat(ctx, msg.playerIndex, msg.requestId)) return
+  const seat = namedSeat(ctx, msg.playerIndex)
   return useSessionResponse(
     executeRoomSession(
       room,
       'resolveOrdinaryCardDrawChoice',
-      [ctx.currentPlayerIndex, msg.choiceId, msg.keepCardId],
-      () => room.session.resolveOrdinaryCardDrawChoice(ctx.currentPlayerIndex, msg.choiceId, msg.keepCardId),
+      [seat, msg.choiceId, msg.keepCardId],
+      () => room.session.resolveOrdinaryCardDrawChoice(seat, msg.choiceId, msg.keepCardId),
     ),
     (resp) => publishCommandResponse(ctx, room, resp, msg, 'choice'),
   )
@@ -801,12 +895,13 @@ function handleRoundEnd(ctx: ConnectionCtx, msg: Extract<ClientCommand, { type: 
 function handleCommitSelection(ctx: ConnectionCtx, msg: Extract<ClientCommand, { type: 'commitSelection' }>): void | Promise<void> {
   const room = requireWritableRoom(ctx, msg.requestId); if (!room) return
   if (!assertOwnSeat(ctx, msg.playerIndex, msg.requestId)) return
+  const seat = namedSeat(ctx, msg.playerIndex)
   return useSessionResponse(
     executeRoomSession(
       room,
       'commitSelectionChoice',
-      [ctx.currentPlayerIndex, msg.payload],
-      () => room.session.commitSelectionChoice(ctx.currentPlayerIndex, msg.payload),
+      [seat, msg.payload],
+      () => room.session.commitSelectionChoice(seat, msg.payload),
     ),
     (resp) => publishCommandResponse(ctx, room, resp, msg, 'choice'),
   )
@@ -815,12 +910,13 @@ function handleCommitSelection(ctx: ConnectionCtx, msg: Extract<ClientCommand, {
 function handleParentSubmit(ctx: ConnectionCtx, msg: Extract<ClientCommand, { type: 'parentSubmit' }>): void | Promise<void> {
   const room = requireWritableRoom(ctx, msg.requestId); if (!room) return
   if (!assertOwnSeat(ctx, msg.playerIndex, msg.requestId)) return
+  const seat = namedSeat(ctx, msg.playerIndex)
   return useSessionResponse(
     executeRoomSession(
       room,
       'submitParentSelection',
-      [ctx.currentPlayerIndex, msg.selection],
-      () => room.session.submitParentSelection(ctx.currentPlayerIndex, msg.selection),
+      [seat, msg.selection],
+      () => room.session.submitParentSelection(seat, msg.selection),
     ),
     (resp) => publishCommandResponse(ctx, room, resp, msg, 'choice'),
   )
@@ -942,7 +1038,8 @@ function handleNewGame(ctx: ConnectionCtx, msg: Extract<ClientCommand, { type: '
           ? [{ playerIndex: player.playerIndex, userId: player.userId }]
           : []
       )
-      room.status = isDevRoom(room.id) || roomOccupiedSeatCount(room) >= room.maxPlayers ? 'playing' : 'waiting'
+      room.status = isDevRoom(room.id) || room.hotseat === true
+        || roomOccupiedSeatCount(room) >= room.maxPlayers ? 'playing' : 'waiting'
       room.startedAt = room.status === 'playing' ? Date.now() : undefined
       room.enableParentCards = enableParentCards
       room.draftMode = draftMode

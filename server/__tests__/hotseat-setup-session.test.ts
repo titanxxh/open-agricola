@@ -9,10 +9,13 @@ import { parseDraftOptions } from '../connection/room-router'
 import { nextHotseatDraftSeatId, nextHotseatParentSeatId } from '../../client/app/hotseat-seat'
 
 /**
- * Local hotseat reuses the multiplayer lobby panel, so `/api/game/new` maps its
- * payload through the same helpers as `createRoom`. These tests pin that the
- * mapped options really reach the dealt game, and that the two setup phases
- * which never advance `currentPlayerIndex` can still be completed on one device.
+ * The lobby's setup panel drives both room creation and the `/api/game/new`
+ * debug endpoint through the same mapping helpers, so these tests pin that the
+ * mapped options really reach the dealt game.
+ *
+ * They also cover the two setup phases that never advance `currentPlayerIndex`
+ * — card draft and parent selection — which is why a hotseat client walks the
+ * seats itself instead of following the current player.
  */
 const setupFromPayload = (payload: Record<string, unknown>) => {
   const draft = parseDraftOptions(payload)
