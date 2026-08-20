@@ -7,6 +7,7 @@ import { InMemoryRoomPersistence } from '../../game/persistence/memory-adapter.t
 import { createLobby } from '../../game/lobby.ts'
 import { createRoomPersistenceCheckpoint } from '../../game/room-persistence-checkpoint.ts'
 import { snapshotToRoom, summarizeRoomsForLobby, toRoomMeta } from '../../game/room.ts'
+import type { StateUpdateEnvelope } from '../../../shared/contract/protocol/game.ts'
 
 /**
  * A local hotseat game is an ordinary authoritative room whose seats all belong
@@ -151,6 +152,39 @@ describe('hotseat seat ownership', () => {
     await dispatch(ctx, { type: 'action', spaceId: 'forest' })
 
     expect(takeAction).toHaveBeenCalledWith(0, 'forest')
+  })
+})
+
+describe('hotseat snapshot projection', () => {
+  const stateUpdateOf = (ctx: ReturnType<typeof newCtx>) =>
+    sentMessagesOf(ctx).filter((msg) => msg.type === 'stateUpdate') as unknown as StateUpdateEnvelope[]
+
+  it('shows every seat unredacted to the connection that plays them all', async () => {
+    const ctx = newCtx()
+    await createHotseatRoom(ctx, 3)
+
+    const payload = stateUpdateOf(ctx).at(-1)!.payload
+    // Per-seat redaction masks other players' cards as '?', which would make
+    // every seat but the first unplayable for a hotseat client.
+    for (const player of payload.state.players) {
+      expect(player.occupationHand ?? []).not.toContain('?')
+      expect(player.minorHand ?? []).not.toContain('?')
+    }
+    expect(payload.cardAvailability).toBeDefined()
+  })
+
+  it('keeps redacting other seats in an ordinary room', async () => {
+    const ctx = newCtx()
+    ctx.currentUserId = 'u1'
+    await dispatch(ctx, { type: 'createRoom', maxPlayers: 2, name: 'host' })
+    const room = ctx.currentRoom!
+    room.status = 'playing'
+    room.startedAt ??= 1
+    ctx.broadcaster.broadcastState(room, room.session.getState(), 'reconnect')
+
+    const payload = stateUpdateOf(ctx).at(-1)!.payload
+    const others = payload.state.players.filter((_, index) => index !== 0)
+    expect(others.some((player) => (player.occupationHand ?? []).includes('?'))).toBe(true)
   })
 })
 

@@ -540,11 +540,26 @@ function handleCreateRoom(ctx: ConnectionCtx, msg: Extract<ClientCommand, { type
   room.startedAt ??= Date.now()
   return useSessionResponse(
     executeRoomSession(room, 'getState', [], () => room.session.getState()),
-    (resp) => publishInitialState(ctx, room, resp, msg.requestId, () => {
-      ctx.checkpoint.recordMeta(room)
-    }, () => {
-      ctx.broadcaster.broadcastEvent(room, { type: 'gameStarted' })
-    }),
+    (resp) => {
+      // An executable community card can fail or time out on this first call;
+      // starting the game anyway would leave the client in a ready game backed
+      // by a failed session, with the error never shown.
+      if (!resp.ok) {
+        room.customSessionExecutor?.dispose()
+        room.session.dispose()
+        ctx.registry.delete(room.id)
+        ctx.registry.clearActivity(room.id)
+        ctx.checkpoint.discardRoom(room.id)
+        ctx.currentRoom = null
+        sendCommandError(ctx, resp.error ?? 'unable to initialize game', msg.requestId)
+        return
+      }
+      return publishInitialState(ctx, room, resp, msg.requestId, () => {
+        ctx.checkpoint.recordMeta(room)
+      }, () => {
+        ctx.broadcaster.broadcastEvent(room, { type: 'gameStarted' })
+      })
+    },
   )
 }
 

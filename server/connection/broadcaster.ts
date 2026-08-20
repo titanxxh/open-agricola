@@ -5,11 +5,22 @@ import type { RoomPersistenceCheckpoint } from '../game/room-persistence-checkpo
 import type { ServerEvent } from '../../shared/contract/protocol/ws.ts'
 import type { StateUpdateCause } from '../../shared/contract/protocol/game.ts'
 import { buildEnvelope } from './envelope-builder.ts'
+import type { SyncPayloadMode } from '../../shared/session/sync-payload.ts'
 
 const viewerIdForSeat = (resp: SessionResponse, seatIndex: number | undefined): string | null => {
   if (typeof seatIndex !== 'number') return null
   return resp.state.players[seatIndex]?.id ?? null
 }
+
+/**
+ * A hotseat connection holds every seat, so per-seat redaction would hide the
+ * very hands and prompts it has to play: masked cards, `private-prompt`
+ * placeholders and a missing `cardAvailability` make seats other than the first
+ * unplayable. Give it the unredacted projection instead — there is nobody on
+ * the other end to hide anything from.
+ */
+const projectionModeFor = (room: Room): SyncPayloadMode | undefined =>
+  room.hotseat === true ? 'debug' : undefined
 
 export class Broadcaster {
   private readonly checkpoint: RoomPersistenceCheckpoint
@@ -47,6 +58,7 @@ export class Broadcaster {
         cause,
         requestId,
         emittedAt,
+        mode: projectionModeFor(room),
       })
       seat.ws.send(JSON.stringify(env))
     }
@@ -68,6 +80,7 @@ export class Broadcaster {
       cause,
       requestId,
       emittedAt: Date.now(),
+      mode: projectionModeFor(room),
     })
     if (ws.readyState === ws.OPEN) ws.send(JSON.stringify(env))
   }

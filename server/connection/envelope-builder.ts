@@ -4,6 +4,7 @@ import type {
   StateUpdateEnvelope,
 } from '../../shared/contract/protocol/game.ts'
 import { buildSessionSyncPayload } from '../game/custom-session-executor.ts'
+import type { SyncPayloadMode } from '../../shared/session/sync-payload.ts'
 
 type Args = {
   room: { id: string; session: GameSession }
@@ -14,6 +15,7 @@ type Args = {
   requestId?: string
   emittedAt: number
   sync?: 'snapshot'
+  mode?: SyncPayloadMode
 }
 
 export function buildEnvelope(args: Args): StateUpdateEnvelope {
@@ -24,7 +26,7 @@ export function buildEnvelope(args: Args): StateUpdateEnvelope {
     sync: args.sync ?? 'snapshot',
     cause: args.cause,
     requestId: args.requestId,
-    payload: buildSessionSyncPayload(args.room.session, args.resp, args.viewerPlayerId),
+    payload: buildSessionSyncPayload(args.room.session, args.resp, args.viewerPlayerId, args.mode),
     emittedAt: args.emittedAt,
   }
 }
