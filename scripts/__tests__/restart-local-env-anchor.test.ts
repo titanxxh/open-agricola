@@ -20,6 +20,12 @@ const RESOLVER = script.slice(
   script.indexOf('# Anchor persistent dev state'),
 )
 
+/**
+ * A name only this test writes, so the assertions never depend on — or print —
+ * a real credential such as GH_TOKEN.
+ */
+const PROBE = 'RESTART_LOCAL_ENV_PROBE'
+
 const dirs: string[] = []
 
 const makeRepo = (): string => {
@@ -34,15 +40,22 @@ const makeRepo = (): string => {
   return dir
 }
 
-/** Run the launcher's env-resolution prologue with SCRIPT_DIR pointed at `dir`. */
-const resolveEnvFile = (dir: string): { envFile: string; token: string } => {
+/**
+ * Run the launcher's env-resolution prologue with SCRIPT_DIR pointed at `dir`.
+ * The probe variable is stripped from the child environment so the result
+ * reflects what the resolved .env supplied, not what the caller happened to
+ * export.
+ */
+const resolveEnvFile = (dir: string): { envFile: string; probe: string } => {
+  const env = { ...process.env }
+  delete env[PROBE]
   const out = execFileSync('bash', [
     '-c',
-    `set -euo pipefail\nSCRIPT_DIR=${JSON.stringify(dir)}\n${RESOLVER}\necho "ENV_FILE=$ENV_FILE"\necho "TOKEN=\${GH_TOKEN:-}"`,
-  ], { encoding: 'utf8' })
+    `set -euo pipefail\nSCRIPT_DIR=${JSON.stringify(dir)}\n${RESOLVER}\necho "ENV_FILE=$ENV_FILE"\necho "PROBE=\${${PROBE}:-}"`,
+  ], { encoding: 'utf8', env })
   return {
     envFile: /ENV_FILE=(.*)/.exec(out)?.[1] ?? '',
-    token: /TOKEN=(.*)/.exec(out)?.[1] ?? '',
+    probe: /PROBE=(.*)/.exec(out)?.[1] ?? '',
   }
 }
 
@@ -53,37 +66,37 @@ afterEach(() => {
 describe('restart-local env anchoring', () => {
   it('loads the main repo .env when a worktree has none of its own', () => {
     const main = makeRepo()
-    writeFileSync(join(main, '.env'), 'GH_TOKEN=from-main\n')
+    writeFileSync(join(main, '.env'), `${PROBE}=from-main\n`)
     const worktree = join(main, '.worktree', 'feature')
     execFileSync('git', ['worktree', 'add', '-q', '-b', 'feature', worktree], { cwd: main })
 
     const resolved = resolveEnvFile(worktree)
 
     expect(resolved.envFile).toBe(join(main, '.env'))
-    expect(resolved.token).toBe('from-main')
+    expect(resolved.probe).toBe('from-main')
   })
 
   it('prefers a worktree .env when one exists', () => {
     const main = makeRepo()
-    writeFileSync(join(main, '.env'), 'GH_TOKEN=from-main\n')
+    writeFileSync(join(main, '.env'), `${PROBE}=from-main\n`)
     const worktree = join(main, '.worktree', 'feature')
     execFileSync('git', ['worktree', 'add', '-q', '-b', 'feature', worktree], { cwd: main })
-    writeFileSync(join(worktree, '.env'), 'GH_TOKEN=from-worktree\n')
+    writeFileSync(join(worktree, '.env'), `${PROBE}=from-worktree\n`)
 
     const resolved = resolveEnvFile(worktree)
 
     expect(resolved.envFile).toBe(join(worktree, '.env'))
-    expect(resolved.token).toBe('from-worktree')
+    expect(resolved.probe).toBe('from-worktree')
   })
 
   it('uses its own .env when run from the main repo', () => {
     const main = makeRepo()
-    writeFileSync(join(main, '.env'), 'GH_TOKEN=from-main\n')
+    writeFileSync(join(main, '.env'), `${PROBE}=from-main\n`)
 
     const resolved = resolveEnvFile(main)
 
     expect(resolved.envFile).toBe(join(main, '.env'))
-    expect(resolved.token).toBe('from-main')
+    expect(resolved.probe).toBe('from-main')
   })
 
   it('starts without an env file when neither repo has one', () => {
@@ -94,6 +107,6 @@ describe('restart-local env anchoring', () => {
     const resolved = resolveEnvFile(worktree)
 
     expect(resolved.envFile).toBe(join(main, '.env'))
-    expect(resolved.token).toBe('')
+    expect(resolved.probe).toBe('')
   })
 })
