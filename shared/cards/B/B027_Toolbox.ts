@@ -17,7 +17,15 @@ const ALLOWED_MAJORS = ['Major_Joinery', 'Major_Pottery', 'Major_Basket']
 const setFlagHandler = (context: CardListenerContext): ActionHookResult | void => {
   if (context.state.roundPhase !== 'work') return
   if (context.actionId === 'fence' && !hasFenceBuiltEvent(context)) return
-  setCardFlag(context.player, CARD_ID, true)
+  return {
+    flow: {
+      type: 'leaf',
+      actionId: 'special-effect',
+      sourceCard: CARD_ID,
+      params: { kind: 'set-flag', flag: true },
+    },
+    sourceCard: CARD_ID,
+  }
 }
 
 const setFlagListeners: CardListenerRegistration[] = [

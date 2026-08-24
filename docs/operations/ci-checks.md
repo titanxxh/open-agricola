@@ -1,6 +1,36 @@
 # CI Checks Operations
 
-agent 在 `git push` 后必须等 GitHub Actions run 结束。本文件给出验证 run 状态、查失败日志、手动触发 workflow、查 repo variables 的完整命令。
+当前 GitHub Actions 月度额度已耗尽，`ci.yml` 和 `ci-full.yml` 仅保留 `workflow_dispatch`，不作为合入证据。提交和 rebase merge 前必须在 owner 控制的本机跑完下列 CI 并把结果写入 PR；push 后不触发或等待 Actions。仓库 ruleset 暂不配置 required `verify` check，避免形成无法满足的门禁。
+
+## 本机全量 CI
+
+本机执行普通 CI 与 CI Full 的并集；`pnpm test` 已覆盖 fast + slow，无需再重复 `pnpm test:fast`：
+
+```bash
+pnpm install --frozen-lockfile
+pnpm run check:architecture
+pnpm run lint:i18n
+pnpm test
+pnpm test:llm
+pnpm run check:prompt-sync -- --strict
+pnpm run build
+REPLAY_VIEWER_ROOT="$(mktemp -d)" pnpm run build:replay-viewer
+pnpm run check:bundle-size
+pnpm run check:community-deck
+```
+
+`check:architecture` 是唯一架构门禁清单，包含 lint、测试 project scope、直接 session log、effect 文件清单、生成卡牌同步、strict no-DSL、catalog types 和卡牌实现边界。两份 workflow 各调用它一次，meta-test 防止接线漂移。
+
+## 恢复 GitHub 门禁
+
+额度恢复后再按顺序启用：
+
+1. 为 `ci.yml` 恢复 `pull_request` 和 `push: main` 触发。
+2. 让一次 PR run 和一次 main run 的 `verify` job 成功完成。
+3. 确认 check 名稳定为 `CI / verify` 后，再把它加入 main ruleset required status checks。
+4. 更新本节并恢复 push 后等待 Actions 的要求。
+
+在上述四步完成前，不把手动 workflow 的 check 配成 required。
 
 ## 加载 GH_TOKEN
 

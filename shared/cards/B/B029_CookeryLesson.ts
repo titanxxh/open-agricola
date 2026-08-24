@@ -4,7 +4,7 @@ import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { readCardExtraData, writeCardExtraData } from '../helpers/card-state'
 import { readActionSnapshotToken } from '../helpers/action-snapshot'
 import { isLessonsSpaceId } from '../helpers/lessons-spaces'
-import type { PlayerState } from '../../contract/types'
+import type { ActionFlow, PlayerState } from '../../contract/types'
 import type { CardImpl } from '../registry'
 
 const CARD_ID = 'B029_CookeryLesson'
@@ -47,24 +47,36 @@ const tokenMatchesCurrent = (
   return stored === cur
 }
 
-const writeCurrentToken = (player: PlayerState, storedKey: string): void => {
+const currentTokenLeaf = (player: PlayerState, storedKey: string): ActionFlow | undefined => {
   const cur = currentActionToken(player)
   if (cur === undefined) return
-  writeCardExtraData(player, CARD_ID, storedKey, cur)
+  return {
+    type: 'leaf',
+    actionId: 'special-effect',
+    sourceCard: CARD_ID,
+    params: { kind: 'set-extra-data', key: storedKey, value: cur },
+  }
 }
 
-const awardBonusVp = (context: CardListenerContext): ActionHookResult | void => {
-  const actionToken = currentActionToken(context.player)
+const awardBonusVp = (player: PlayerState): ActionFlow | undefined => {
+  const actionToken = currentActionToken(player)
   if (actionToken === undefined) return
-  if (readCardExtraData<number>(context.player, CARD_ID, USED_ACTION_TOKEN_KEY) === actionToken) return
-  writeCardExtraData(context.player, CARD_ID, USED_ACTION_TOKEN_KEY, actionToken)
+  if (readCardExtraData<number>(player, CARD_ID, USED_ACTION_TOKEN_KEY) === actionToken) return
   return {
-    flow: {
-      type: 'leaf',
-      actionId: 'bonus-vp',
-      sourceCard: CARD_ID,
-    },
-    sourceCard: CARD_ID,
+    type: 'seq',
+    children: [
+      {
+        type: 'leaf',
+        actionId: 'special-effect',
+        sourceCard: CARD_ID,
+        params: { kind: 'set-extra-data', key: USED_ACTION_TOKEN_KEY, value: actionToken },
+      },
+      {
+        type: 'leaf',
+        actionId: 'bonus-vp',
+        sourceCard: CARD_ID,
+      },
+    ],
   }
 }
 
@@ -74,9 +86,14 @@ const afterExchangeListener: CardListenerRegistration = {
   phases: ['after' as ActionHookPhase],
   actions: ['exchange'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
-    writeCurrentToken(context.player, COOKED_TOKEN_KEY)
-    if (tokenMatchesCurrent(context.player, LESSONS_TOKEN_KEY)) {
-      return awardBonusVp(context)
+    const stamp = currentTokenLeaf(context.player, COOKED_TOKEN_KEY)
+    if (!stamp) return
+    const award = tokenMatchesCurrent(context.player, LESSONS_TOKEN_KEY)
+      ? awardBonusVp(context.player)
+      : undefined
+    return {
+      flow: award ? { type: 'seq', children: [stamp, award] } : stamp,
+      sourceCard: CARD_ID,
     }
   },
 }
@@ -88,9 +105,14 @@ const afterPlaceFarmerListener: CardListenerRegistration = {
   actions: ['place-farmer'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (!isLessonsSpaceId(context.space?.id)) return
-    writeCurrentToken(context.player, LESSONS_TOKEN_KEY)
-    if (tokenMatchesCurrent(context.player, COOKED_TOKEN_KEY)) {
-      return awardBonusVp(context)
+    const stamp = currentTokenLeaf(context.player, LESSONS_TOKEN_KEY)
+    if (!stamp) return
+    const award = tokenMatchesCurrent(context.player, COOKED_TOKEN_KEY)
+      ? awardBonusVp(context.player)
+      : undefined
+    return {
+      flow: award ? { type: 'seq', children: [stamp, award] } : stamp,
+      sourceCard: CARD_ID,
     }
   },
 }

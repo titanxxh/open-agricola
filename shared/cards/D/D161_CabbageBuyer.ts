@@ -2,7 +2,7 @@ import { defineOccupationCard } from '../card-source'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { payLeaf, gainLeaf } from '../helpers/pay-gain-node'
-import { readCardExtraData, writeCardExtraData } from '../helpers/card-state'
+import { readCardExtraData } from '../helpers/card-state'
 import { cardCountsAs } from '../helpers/card-type'
 import type { ActionFlow, PlayerState } from '../../contract/types'
 import type { CardImpl } from '../registry'
@@ -31,8 +31,13 @@ type InFlight = {
 const getInFlight = (owner: PlayerState): InFlight | undefined =>
   readCardExtraData<InFlight>(owner, CARD_ID, 'inFlight') ?? undefined
 
-const setInFlight = (owner: PlayerState, value: InFlight | null) =>
-  writeCardExtraData(owner, CARD_ID, 'inFlight', value)
+const setInFlightLeaf = (owner: PlayerState, value: InFlight | null): ActionFlow => ({
+  type: 'leaf',
+  actionId: 'special-effect',
+  sourceCard: CARD_ID,
+  params: { kind: 'set-extra-data', key: 'inFlight', value },
+  actionContext: { targetPlayerId: owner.id },
+})
 
 const buildOfferFlow = (owner: PlayerState, cost: number): ActionFlow | undefined => {
   if ((owner.resources.food ?? 0) < cost) return undefined
@@ -73,11 +78,14 @@ const openTrackerListener: CardListenerRegistration = {
       }
     }
 
-    setInFlight(owner, {
-      renovatorPId: context.player.id,
-      hasMajor: false,
-      hasMinor: false,
-    })
+    return {
+      flow: setInFlightLeaf(owner, {
+        renovatorPId: context.player.id,
+        hasMajor: false,
+        hasMinor: false,
+      }),
+      sourceCard: CARD_ID,
+    }
   },
 }
 
@@ -98,12 +106,16 @@ const tagImprovementListener: CardListenerRegistration = {
     const builtCardId = getBuiltCardId(context.choice)
     if (!builtCardId) return
 
-    if (cardCountsAs(builtCardId, 'major')) {
-      inFlight.hasMajor = true
-    } else {
-      inFlight.hasMinor = true
+    const next = {
+      ...inFlight,
+      ...(cardCountsAs(builtCardId, 'major')
+        ? { hasMajor: true }
+        : { hasMinor: true }),
     }
-    setInFlight(owner, inFlight)
+    return {
+      flow: setInFlightLeaf(owner, next),
+      sourceCard: CARD_ID,
+    }
   },
 }
 
@@ -120,15 +132,12 @@ const drainTrackerListener: CardListenerRegistration = {
     const inFlight = getInFlight(owner)
     if (!inFlight) return
 
-    // Clear tracker regardless of outcome
-    setInFlight(owner, null)
-
     const cost = inFlight.hasMajor ? 1 : inFlight.hasMinor ? 2 : 3
     const flow = buildOfferFlow(owner, cost)
-    if (!flow) return
-
     return {
-      flow,
+      flow: flow
+        ? { type: 'seq', children: [setInFlightLeaf(owner, null), flow] }
+        : setInFlightLeaf(owner, null),
       sourceCard: CARD_ID,
     }
   },

@@ -2,6 +2,7 @@ import { defineOccupationCard } from '../card-source'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { gainLeaf } from '../helpers/pay-gain-node'
+import { countTriggerCardsAs } from '../helpers/trigger-snapshot'
 import type { CardImpl } from '../registry'
 
 const CARD_ID = 'E157_Usufructuary'
@@ -11,11 +12,10 @@ const listener: CardListenerRegistration = {
   phases: ['after' as ActionHookPhase],
   actions: ['occupation'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
-    if (context.player.occupationPlayed.length !== 1) return
-    // Count occupations played by all other players
+    if (countTriggerCardsAs(context, context.player, 'occupation') !== 1) return
     const otherOccupations = context.state.players
       .filter((p) => p.id !== context.player.id)
-      .reduce((sum, p) => sum + p.occupationPlayed.length, 0)
+      .reduce((sum, p) => sum + countTriggerCardsAs(context, p, 'occupation'), 0)
     if (otherOccupations <= 0) return
     const food = Math.min(7, otherOccupations)
     return { flow: gainLeaf(CARD_ID, { food }), sourceCard: CARD_ID }

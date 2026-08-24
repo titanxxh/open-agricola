@@ -5,6 +5,7 @@ import { getWorkerHeldOnCard } from '../../shared/cards/helpers/card-held-worker
 import { familySize, setWorkersAtHome, workersAvailable } from '../../shared/domain/player'
 import { runCardListeners } from '../../shared/cards/card-listeners'
 import type { ActionFlow, Resource, SessionResponse } from '../../shared/contract/types'
+import { specialEffectAction } from '../../shared/actions/effects/special-effect'
 
 const M052 = 'M052_WeddingCoach'
 const M053 = 'M053_ForestHut'
@@ -152,6 +153,27 @@ const actionIds = (flow: ActionFlow | undefined): string[] => {
   return flow.children.flatMap(actionIds)
 }
 
+const applySpecialEffects = (
+  flow: ActionFlow | undefined,
+  state: SessionResponse['state'],
+  player: SessionResponse['state']['players'][number],
+) => {
+  if (!flow) return
+  if (flow.type !== 'leaf') {
+    flow.children.forEach((child) => applySpecialEffects(child, state, player))
+    return
+  }
+  if (flow.actionId === 'special-effect') {
+    specialEffectAction.execute({
+      state,
+      player,
+      params: flow.params,
+      sourceCard: flow.sourceCard,
+      actionContext: flow.actionContext,
+    } as never)
+  }
+}
+
 describe('M052/M053 temporary people', () => {
   it('M052 grows without room, holds the newborn on the card, and releases it at returning home', () => {
     const session = setup(M052)
@@ -269,7 +291,13 @@ describe('M052/M053 temporary people', () => {
       },
     })
 
-    expect(result.flatMap((entry) => actionIds(entry.flow))).toEqual(['place-farmer'])
+    expect(result.flatMap((entry) => actionIds(entry.flow))).toEqual([
+      'special-effect',
+      'special-effect',
+      'place-farmer',
+    ])
+    expect(player.cardStates[M053]?.extraData?.boundForest).toEqual({ row: 0, col: 0 })
+    result.forEach((entry) => applySpecialEffects(entry.flow, state, player))
     expect(player.cardStates[M053]?.extraData?.boundForest).toBeUndefined()
     expect(player.cardStates[M053]?.extraData?.farmTerrainMarkers).toEqual([])
     expect(workerId).toBeDefined()
@@ -300,7 +328,13 @@ describe('M052/M053 temporary people', () => {
       },
     })
 
-    expect(result.flatMap((entry) => actionIds(entry.flow))).toEqual(['place-farmer'])
+    expect(result.flatMap((entry) => actionIds(entry.flow))).toEqual([
+      'special-effect',
+      'special-effect',
+      'place-farmer',
+    ])
+    expect(player.cardStates[M053]?.extraData?.boundForest).toEqual({ row: 0, col: 0 })
+    result.forEach((entry) => applySpecialEffects(entry.flow, state, player))
     expect(player.cardStates[M053]?.extraData?.boundForest).toBeUndefined()
     expect(player.cardStates[M053]?.extraData?.farmTerrainMarkers).toEqual([])
   })

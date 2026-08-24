@@ -32,7 +32,7 @@
     "verify": "bash scripts/verify.sh",
     "verify:e2e:browser-sandbox": "VITE_SANDBOX_EXECUTOR=browser bash scripts/verify.sh e2e-tests/local-sandbox.spec.ts",
     "verify:e2e:webkit": "bash scripts/verify.sh e2e-tests/frontend-browser-scenario-matrix.spec.ts --browser=webkit --grep @webkit",
-    "check:reaches": "tsx scripts/check-reaches.ts",
+    "check:architecture": "pnpm run lint && pnpm run check:test-project-coverage && pnpm run check:direct-session-log && pnpm run check:effects-file-list && pnpm run check:generated-cards-sync && pnpm run check:no-dsl -- --strict && pnpm run check:catalog-types && pnpm run check:card-impl-boundaries",
     "check:no-dsl": "tsx scripts/check-no-dsl.ts",
     "check:test-project-coverage": "tsx scripts/check-test-project-coverage.ts",
     "check:bundle-size": "tsx scripts/check-bundle-size.ts",

@@ -1,7 +1,7 @@
 import { defineMinorCard } from '../card-source'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
-import { queueFutureMeeples, futureMeeplesNode } from '../../actions/effects/internal/future-meeples'
+import { futureMeeplesNode } from '../../actions/effects/internal/future-meeples'
 import type { CardImpl } from '../registry'
 import { isMajorCardId } from '../helpers/card-type'
 
@@ -15,15 +15,15 @@ const listener: CardListenerRegistration = {
     const choice = context.choice ?? ''
     const cardId = choice.replace(/^major:/, '').replace(/^minor:/, '')
     if (!isMajorCardId(cardId)) return
-    queueFutureMeeples(context.state, {
+    const request = {
       cardId: CARD_ID,
       playerId: context.player.id,
       startRound: context.state.round + 1,
       count: 3,
       resources: { food: 1 },
-    })
+    }
     return {
-      flow: futureMeeplesNode(),
+      flow: futureMeeplesNode(request),
       sourceCard: CARD_ID,
     }
   },

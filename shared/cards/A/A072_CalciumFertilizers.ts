@@ -2,6 +2,7 @@ import { defineMinorCard } from '../card-source'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { fieldTopStack, fieldIsEmpty } from '../../domain/field'
+import type { PlantAdditionalGoodLocation } from '../../actions/effects/special-effect'
 import type { CardImpl } from '../registry'
 
 const CARD_ID = 'A072_CalciumFertilizers'
@@ -32,17 +33,21 @@ const listener: CardListenerRegistration = {
     const plantedFields = context.player.fields.filter((f) => !fieldIsEmpty(f))
     if (plantedFields.length === 0) return
 
-    // Fully automatic: add 1 crop to top stack of each planted field.
-    // Skip stone-kind stacks (C6 StoneClearing) — the reference "additional crop"
-    // only applies to GRAIN/VEGETABLE.
+    const locations: PlantAdditionalGoodLocation[] = []
     for (const field of plantedFields) {
       const top = fieldTopStack(field)
       if (top && (top.kind === 'grain' || top.kind === 'vegetable')) {
-        top.remaining += 1
+        locations.push({ kind: 'field', row: field.row, col: field.col })
       }
     }
-
+    if (locations.length === 0) return
     return {
+      flow: {
+        type: 'leaf',
+        actionId: 'special-effect',
+        sourceCard: CARD_ID,
+        params: { kind: 'plant-additional-good', locations },
+      },
       sourceCard: CARD_ID,
     }
   },

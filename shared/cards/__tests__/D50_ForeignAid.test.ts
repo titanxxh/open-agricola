@@ -102,67 +102,39 @@ describe('D050_ForeignAid', () => {
     })
   })
 
-  describe('computeArgs place-farmer', () => {
-    it('filters out rounds 12-14 spaces from options', () => {
-      const listener = findListener('D50-foreign-aid-compute-args-place-farmer')!
+  describe('isDoable', () => {
+    it('vetoes round 12-14 action spaces without mutating context', () => {
+      const listener = findListener('D50-foreign-aid-isDoable')!
       expect(listener).toBeDefined()
       const player = createPlayer()
       const state = createState(player)
-      const result = {
-        type: 'request' as const,
-        request: {
-          kind: 'choice' as const,
-          options: [
-            { value: 'forest', labelKey: 'actions.forest.name' },
-            { value: 'farmland', labelKey: 'actions.farmland.name' },
-            { value: 'cultivation', labelKey: 'actions.cultivation.name' },
-            { value: 'urgent-wish-children', labelKey: 'actions.urgent-wish-children.name' },
-            { value: 'farm-redevelopment', labelKey: 'actions.farm-redevelopment.name' },
-          ],
-        },
-      }
-      executeCardListener(listener, {
-        state, player,
-        actionId: 'place-farmer', phase: 'computeArgs',
-        result,
-      } as unknown as CardListenerContext)
-      // Only non-blocked spaces remain
-      expect(result.request.options).toHaveLength(2)
-      expect(result.request.options.map(o => o.value)).toEqual(['forest', 'farmland'])
+      const context = {
+        state,
+        player,
+        actionId: 'cultivation',
+        phase: 'isDoable',
+        doable: true,
+      } as unknown as CardListenerContext
+      const before = JSON.stringify({
+        roundActionOrder: context.state.roundActionOrder,
+        players: context.state.players,
+      })
+
+      expect(executeCardListener(listener, context)).toEqual({ doable: false })
+      expect(JSON.stringify({
+        roundActionOrder: context.state.roundActionOrder,
+        players: context.state.players,
+      })).toBe(before)
     })
 
-
-    it('does nothing when result is not a choice', () => {
-      const listener = findListener('D50-foreign-aid-compute-args-place-farmer')!
+    it('does not veto other actions', () => {
+      const listener = findListener('D50-foreign-aid-isDoable')!
       const player = createPlayer()
       const state = createState(player)
-      const result = { type: 'ok' as const }
-      // Should not throw
-      executeCardListener(listener, {
+      expect(executeCardListener(listener, {
         state, player,
-        actionId: 'place-farmer', phase: 'computeArgs',
-        result,
-      } as unknown as CardListenerContext)
-    })
-
-    it('does not filter early-round spaces', () => {
-      const listener = findListener('D50-foreign-aid-compute-args-place-farmer')!
-      const player = createPlayer()
-      const state = createState(player)
-      const result = {
-        type: 'choice' as const,
-        options: [
-          { value: 'forest', labelKey: 'actions.forest.name' },
-          { value: 'sheep-market', labelKey: 'actions.sheep-market.name' },
-        ],
-      }
-      executeCardListener(listener, {
-        state, player,
-        actionId: 'place-farmer', phase: 'computeArgs',
-        result,
-      } as unknown as CardListenerContext)
-      // Both options remain (neither is in rounds 12-14)
-      expect(result.options).toHaveLength(2)
+        actionId: 'forest', phase: 'isDoable', doable: true,
+      } as unknown as CardListenerContext)).toBeUndefined()
     })
   })
 })

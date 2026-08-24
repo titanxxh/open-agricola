@@ -16,6 +16,242 @@ const writeFixture = (root: string, rel: string, content: string): string => {
 }
 
 describe('check-card-impl-boundaries', () => {
+  it('fails when no production card sources are scanned', () => {
+    const result = checkCardImplBoundaries([])
+
+    expect(result.scopeErrors).toContain('no production card files scanned')
+    expect(cardImplBoundaryExitCode(result)).toBe(1)
+  })
+
+  it('counts the current Card Source and listener handler shape', () => {
+    const root = mkdtempSync(path.join(tmpdir(), 'card-impl-boundaries-'))
+    const file = writeFixture(root, 'shared/cards/A/A001_Shelter.ts', [
+      "import { defineMinorCard } from '../card-source'",
+      "const listener = { id: 'test', phases: ['after'], handler: () => undefined }",
+      'const cardImpl = { listeners: [listener] }',
+      'export const A001_Shelter = defineMinorCard({',
+      "  meta: { id: 'A001_Shelter' },",
+      '  impl: cardImpl,',
+      '})',
+      'export const A001_Shelter_impl = A001_Shelter.impl',
+    ].join('\n'))
+
+    expect(checkCardImplBoundaries([file])).toMatchObject({
+      filesChecked: 1,
+      cardSourcesChecked: 1,
+      listenerHandlersChecked: 1,
+      scopeErrors: [],
+    })
+  })
+
+  it('reports live played-card counts in trailing listeners', () => {
+    const root = mkdtempSync(path.join(tmpdir(), 'card-impl-boundaries-'))
+    const file = writeFixture(root, 'shared/cards/A/A001_Shelter.ts', [
+      "import { defineMinorCard } from '../card-source'",
+      "const listener = { id: 'test', phases: ['after'], handler: (context: any) => {",
+      '  return context.player.occupationPlayed.length > 0 ? undefined : undefined',
+      '} }',
+      'export const A001_Shelter = defineMinorCard({',
+      "  meta: { id: 'A001_Shelter' },",
+      '  impl: { listeners: [listener] },',
+      '})',
+    ].join('\n'))
+
+    expect(checkCardImplBoundaries([file]).violations).toEqual([
+      expect.objectContaining({ kind: 'trailing-live-played-count' }),
+    ])
+  })
+
+  it('reports live played-card counts in named trailing handlers with phase casts', () => {
+    const root = mkdtempSync(path.join(tmpdir(), 'card-impl-boundaries-'))
+    const file = writeFixture(root, 'shared/cards/A/A001_Shelter.ts', [
+      "import { defineMinorCard } from '../card-source'",
+      'const handler = (context: any) => context.player.minorPlayed.length',
+      "const listener = { id: 'test', phases: ['immediatelyAfter' as any], handler }",
+      'export const A001_Shelter = defineMinorCard({',
+      "  meta: { id: 'A001_Shelter' },",
+      '  impl: { listeners: [listener] },',
+      '})',
+    ].join('\n'))
+
+    expect(checkCardImplBoundaries([file]).violations).toEqual([
+      expect.objectContaining({ kind: 'trailing-live-played-count' }),
+    ])
+  })
+
+  it('reports direct authority mutation in card listener handlers', () => {
+    const root = mkdtempSync(path.join(tmpdir(), 'card-impl-boundaries-'))
+    const file = writeFixture(root, 'shared/cards/A/A001_Shelter.ts', [
+      "import { defineMinorCard } from '../card-source'",
+      "const listener = { id: 'test', phases: ['after'], handler: (context: any) => {",
+      '  context.player.resources.food += 1',
+      '} }',
+      'export const A001_Shelter = defineMinorCard({',
+      "  meta: { id: 'A001_Shelter' },",
+      '  impl: { listeners: [listener] },',
+      '})',
+    ].join('\n'))
+
+    expect(checkCardImplBoundaries([file]).violations).toEqual([
+      expect.objectContaining({ kind: 'listener-mutation' }),
+    ])
+  })
+
+  it('reports mutation through listener-state aliases', () => {
+    const root = mkdtempSync(path.join(tmpdir(), 'card-impl-boundaries-'))
+    const file = writeFixture(root, 'shared/cards/A/A001_Shelter.ts', [
+      "import { defineMinorCard } from '../card-source'",
+      "const listener = { id: 'test', phases: ['after'], handler: (context: any) => {",
+      '  const player = context.player',
+      '  const field = player.fields[0]',
+      "  field.stacks.unshift({ kind: 'vegetable' })",
+      '  player.resources.food++',
+      '  delete player.cardStates.test',
+      '} }',
+      'export const A001_Shelter = defineMinorCard({',
+      "  meta: { id: 'A001_Shelter' },",
+      '  impl: { listeners: [listener] },',
+      '})',
+    ].join('\n'))
+
+    expect(checkCardImplBoundaries([file]).violations).toEqual([
+      expect.objectContaining({ kind: 'listener-mutation' }),
+      expect.objectContaining({ kind: 'listener-mutation' }),
+      expect.objectContaining({ kind: 'listener-mutation' }),
+    ])
+  })
+
+  it('reports mutations through nullish authority aliases', () => {
+    const root = mkdtempSync(path.join(tmpdir(), 'card-impl-boundaries-'))
+    const file = writeFixture(root, 'shared/cards/A/A001_Shelter.ts', [
+      "import { defineMinorCard } from '../card-source'",
+      "const listener = { id: 'test', phases: ['after'], handler: (context: any) => {",
+      '  const owner = context.ownerPlayer ?? context.player',
+      '  owner.resources.food += 1',
+      '} }',
+      'export const A001_Shelter = defineMinorCard({',
+      "  meta: { id: 'A001_Shelter' },",
+      '  impl: { listeners: [listener] },',
+      '})',
+    ].join('\n'))
+
+    expect(checkCardImplBoundaries([file]).violations).toEqual([
+      expect.objectContaining({ kind: 'listener-mutation' }),
+    ])
+  })
+
+  it('allows listener-local object spreads', () => {
+    const root = mkdtempSync(path.join(tmpdir(), 'card-impl-boundaries-'))
+    const file = writeFixture(root, 'shared/cards/A/A001_Shelter.ts', [
+      "import { defineMinorCard } from '../card-source'",
+      "const listener = { id: 'test', phases: ['after'], handler: (context: any) => {",
+      '  const result = { ...context.result }',
+      '  return { result }',
+      '} }',
+      'export const A001_Shelter = defineMinorCard({',
+      "  meta: { id: 'A001_Shelter' },",
+      '  impl: { listeners: [listener] },',
+      '})',
+    ].join('\n'))
+
+    expect(checkCardImplBoundaries([file]).violations).toEqual([])
+  })
+
+  it('allows mutations of arrays built with map inside a flow builder', () => {
+    const root = mkdtempSync(path.join(tmpdir(), 'card-impl-boundaries-'))
+    const file = writeFixture(root, 'shared/cards/A/A001_Shelter.ts', [
+      "import { defineMinorCard } from '../card-source'",
+      'const buildFlow = (context: any, updates: any[]) => {',
+      '  const children = updates.map((value) => ({ value }))',
+      '  children.push({ ownerId: context.player.id })',
+      '  return children',
+      '}',
+      "const listener = { id: 'test', phases: ['after'], handler: (context: any) => ({ flow: buildFlow(context, []) }) }",
+      'export const A001_Shelter = defineMinorCard({',
+      "  meta: { id: 'A001_Shelter' },",
+      '  impl: { listeners: [listener] },',
+      '})',
+    ].join('\n'))
+
+    expect(checkCardImplBoundaries([file]).violations).toEqual([])
+  })
+
+  it('reports imported mutator helpers through one same-file wrapper', () => {
+    const root = mkdtempSync(path.join(tmpdir(), 'card-impl-boundaries-'))
+    const file = writeFixture(root, 'shared/cards/A/A001_Shelter.ts', [
+      "import { defineMinorCard } from '../card-source'",
+      "import { writeCardExtraData as write } from '../helpers/card-state'",
+      "const setValue = (player: any) => write(player, 'A001_Shelter', 'value', 1)",
+      "const listener = { id: 'test', phases: ['after'], handler: (context: any) => {",
+      '  setValue(context.player)',
+      '} }',
+      'export const A001_Shelter = defineMinorCard({',
+      "  meta: { id: 'A001_Shelter' },",
+      '  impl: { listeners: [listener] },',
+      '})',
+    ].join('\n'))
+
+    expect(checkCardImplBoundaries([file]).violations).toEqual([
+      expect.objectContaining({ kind: 'listener-mutation' }),
+    ])
+  })
+
+  it('reports mutations through authority-returning field helpers', () => {
+    const root = mkdtempSync(path.join(tmpdir(), 'card-impl-boundaries-'))
+    const file = writeFixture(root, 'shared/cards/A/A001_Shelter.ts', [
+      "import { defineMinorCard } from '../card-source'",
+      "import { fieldTopStack } from '../../domain/field'",
+      "const listener = { id: 'test', phases: ['after'], handler: (context: any) => {",
+      '  const field = context.player.fields[0]',
+      '  const top = fieldTopStack(field)',
+      '  if (top) top.remaining += 1',
+      '} }',
+      'export const A001_Shelter = defineMinorCard({',
+      "  meta: { id: 'A001_Shelter' },",
+      '  impl: { listeners: [listener] },',
+      '})',
+    ].join('\n'))
+
+    expect(checkCardImplBoundaries([file]).violations).toEqual([
+      expect.objectContaining({ kind: 'listener-mutation' }),
+    ])
+  })
+
+  it('reports direct mutations through one same-file wrapper', () => {
+    const root = mkdtempSync(path.join(tmpdir(), 'card-impl-boundaries-'))
+    const file = writeFixture(root, 'shared/cards/A/A001_Shelter.ts', [
+      "import { defineMinorCard } from '../card-source'",
+      'const clear = (player: any) => { player.activeModifiers = [] }',
+      "const listener = { id: 'test', phases: ['after'], handler: (context: any) => {",
+      '  clear(context.player)',
+      '} }',
+      'export const A001_Shelter = defineMinorCard({',
+      "  meta: { id: 'A001_Shelter' },",
+      '  impl: { listeners: [listener] },',
+      '})',
+    ].join('\n'))
+
+    expect(checkCardImplBoundaries([file]).violations).toEqual([
+      expect.objectContaining({ kind: 'listener-mutation' }),
+    ])
+  })
+
+  it('allows live counts before an action and snapshot counts after it', () => {
+    const root = mkdtempSync(path.join(tmpdir(), 'card-impl-boundaries-'))
+    const file = writeFixture(root, 'shared/cards/A/A001_Shelter.ts', [
+      "import { defineMinorCard } from '../card-source'",
+      "import { countTriggerCardsAs } from '../helpers/trigger-snapshot'",
+      "const before = { id: 'before', phases: ['before'], handler: (context: any) => context.player.occupationPlayed.length }",
+      "const after = { id: 'after', phases: ['after'], handler: (context: any) => countTriggerCardsAs(context, 'occupation') }",
+      'export const A001_Shelter = defineMinorCard({',
+      "  meta: { id: 'A001_Shelter' },",
+      '  impl: { listeners: [before, after] },',
+      '})',
+    ].join('\n'))
+
+    expect(checkCardImplBoundaries([file]).violations).toEqual([])
+  })
+
   it('reports runtime reads of foreign non-Major card ids', () => {
     const root = mkdtempSync(path.join(tmpdir(), 'card-impl-boundaries-'))
     const file = writeFixture(root, 'shared/cards/A/A001_Shelter.ts', [
@@ -174,6 +410,10 @@ describe('check-card-impl-boundaries', () => {
     expect(
       cardImplBoundaryExitCode({
         filesChecked: 1,
+        cardSourcesChecked: 1,
+        listenerHandlersChecked: 1,
+        trailingListenerHandlersChecked: 1,
+        scopeErrors: [],
         violations: [
           {
             file: 'shared/cards/A/A001_Shelter.ts',
@@ -191,6 +431,10 @@ describe('check-card-impl-boundaries', () => {
       cardImplBoundaryExitCode(
         {
           filesChecked: 1,
+          cardSourcesChecked: 1,
+          listenerHandlersChecked: 1,
+          trailingListenerHandlersChecked: 1,
+          scopeErrors: [],
           violations: [
             {
               file: 'shared/cards/A/A001_Shelter.ts',

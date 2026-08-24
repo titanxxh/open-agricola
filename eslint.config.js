@@ -73,13 +73,13 @@ export default defineConfig([
       'no-empty': 'warn',
     },
   },
-  // Three-layer boundary enforcement (warn-level). Tests are exempt — session
+  // Three-layer boundary enforcement. Tests are exempt — session
   // tests under shared/**/__tests__ legitimately drive the server layer.
   {
     files: ['shared/**/*.{ts,tsx}'],
     ignores: ['shared/**/__tests__/**'],
     rules: {
-      'no-restricted-imports': ['warn', {
+      'no-restricted-imports': ['error', {
         patterns: [
           { group: ['**/client/**'], message: 'shared/ must not import from client/ (three-layer boundary)' },
           { group: ['**/server/**'], message: 'shared/ must not import from server/ (three-layer boundary)' },
@@ -152,7 +152,7 @@ export default defineConfig([
     files: ['server/**/*.{ts,tsx}'],
     ignores: ['server/**/__tests__/**'],
     rules: {
-      'no-restricted-imports': ['warn', {
+      'no-restricted-imports': ['error', {
         patterns: [
           { group: ['**/client/**'], message: 'server/ must not import from client/ (three-layer boundary)' },
         ],
@@ -163,7 +163,7 @@ export default defineConfig([
     files: ['client/**/*.{ts,tsx}'],
     ignores: ['client/**/__tests__/**'],
     rules: {
-      'no-restricted-imports': ['warn', {
+      'no-restricted-imports': ['error', {
         patterns: [
           { group: ['**/server/**'], message: 'client/ must not import from server/ (three-layer boundary)' },
         ],

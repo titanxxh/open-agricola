@@ -1,8 +1,8 @@
 import { defineOccupationCard } from '../card-source'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
-import type { GameState, PlayerState } from '../../contract/types'
-import { queueFutureMeeples, futureMeeplesNode } from '../../actions/effects/internal/future-meeples'
+import type { ActionFlow, GameState, PlayerState } from '../../contract/types'
+import { futureMeeplesNode, queueFutureMeeples } from '../../actions/effects/internal/future-meeples'
 import { isCardFlagged, setCardFlag } from '../helpers/card-state'
 import type { CardImpl } from '../registry'
 
@@ -19,10 +19,32 @@ const CARD_ID = 'A120_ClayHutBuilder'
 const placeClay = (
   state: GameState,
   player: PlayerState,
-) => {
+): ActionFlow | undefined => {
   if (player.houseType === 'wood') return
   if (isCardFlagged(player, CARD_ID)) return
 
+  return {
+    type: 'seq',
+    children: [
+      {
+        type: 'leaf',
+        actionId: 'special-effect',
+        sourceCard: CARD_ID,
+        params: { kind: 'set-flag', flag: true },
+      },
+      futureMeeplesNode({
+        cardId: CARD_ID,
+        playerId: player.id,
+        startRound: state.round + 1,
+        count: 5,
+        resources: { clay: 2 },
+      }),
+    ],
+  }
+}
+
+const placeClayOnBuy = (state: GameState, player: PlayerState) => {
+  if (player.houseType === 'wood' || isCardFlagged(player, CARD_ID)) return
   setCardFlag(player, CARD_ID, true)
   queueFutureMeeples(state, {
     cardId: CARD_ID,
@@ -50,7 +72,7 @@ const cardImpl = {
   listeners: [listener],
   effect: {
   id: CARD_ID,
-  onBuy: (state, player) => placeClay(state, player),
+  onBuy: (state, player) => placeClayOnBuy(state, player),
 },
   reaches: [] as readonly string[],
 } satisfies CardImpl

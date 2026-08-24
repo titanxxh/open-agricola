@@ -6,7 +6,6 @@ import { parsePositionKey, positionKey } from '../../domain/farm'
 import type { FarmTilePosition } from '../../contract/types'
 import type { CardImpl } from '../registry'
 import { majorImprovementCount } from './moor-batch1-helpers'
-import { writeCardExtraData } from '../helpers/card-state'
 
 const CARD_ID = 'M059_NaturesFertilizer'
 
@@ -36,21 +35,43 @@ const terrainSelectionFields = (context: CardListenerContext): FarmTilePosition[
 
 const sowFlow = (context: CardListenerContext, fields: FarmTilePosition[]) => {
   if (fields.length === 0) return
-  writeCardExtraData(context.player, CARD_ID, 'selectedPositions', fields.map(positionKey))
+  const selectedPositions = fields.map(positionKey)
   const actionContext = {
     minSelections: 1,
     maxSelections: fields.length,
     allowedFields: 'fromSelectedFields',
     sourceCard: CARD_ID,
   }
-  const farm = buildSowFarmInteraction(context.player, actionContext)
+  const cardState = context.player.cardStates[CARD_ID] ?? {}
+  const previewPlayer = {
+    ...context.player,
+    cardStates: {
+      ...context.player.cardStates,
+      [CARD_ID]: {
+        ...cardState,
+        extraData: { ...(cardState.extraData ?? {}), selectedPositions },
+      },
+    },
+  }
+  const farm = buildSowFarmInteraction(previewPlayer, actionContext)
   if (farm.farmType !== 'sow' || farm.selectableFields.length === 0) return
   return {
-    type: 'leaf' as const,
-    actionId: 'sow',
-    sourceCard: CARD_ID,
-    optional: true,
-    actionContext,
+    type: 'seq' as const,
+    children: [
+      {
+        type: 'leaf' as const,
+        actionId: 'special-effect',
+        sourceCard: CARD_ID,
+        params: { kind: 'set-extra-data', key: 'selectedPositions', value: selectedPositions },
+      },
+      {
+        type: 'leaf' as const,
+        actionId: 'sow',
+        sourceCard: CARD_ID,
+        optional: true,
+        actionContext,
+      },
+    ],
   }
 }
 

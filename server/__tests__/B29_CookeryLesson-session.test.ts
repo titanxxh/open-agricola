@@ -11,7 +11,9 @@ import {
   writeCardExtraData,
 } from '../../shared/cards/helpers/card-state'
 import { recordActionSnapshot } from '../../shared/cards/helpers/action-snapshot'
-import type { PlayerState } from '../../shared/contract/types'
+import type { ActionFlow, GameState, PlayerState } from '../../shared/contract/types'
+import { specialEffectAction } from '../../shared/actions/effects/special-effect'
+import { bonusVpAction } from '../../shared/actions/effects/bonus-vp'
 
 import '../../shared/cards/B/B029_CookeryLesson'
 
@@ -22,6 +24,40 @@ const findListener = (id: string) =>
 
 const setActionToken = (player: PlayerState, token: number) => {
   recordActionSnapshot(player, token)
+}
+
+const runFlow = (flow: ActionFlow, state: GameState, player: PlayerState) => {
+  if (flow.type !== 'leaf') {
+    if ('children' in flow) flow.children.forEach((child) => runFlow(child, state, player))
+    return
+  }
+  const action = flow.actionId === 'special-effect'
+    ? specialEffectAction
+    : flow.actionId === 'bonus-vp'
+      ? bonusVpAction
+      : undefined
+  action?.execute({
+    state,
+    player,
+    params: flow.params,
+    sourceCard: flow.sourceCard,
+    actionContext: flow.actionContext,
+  } as never)
+}
+
+const invokeListener = (
+  listener: NonNullable<ReturnType<typeof findListener>>,
+  context: CardListenerContext,
+) => {
+  const result = executeCardListener(listener, context)
+  if (result?.flow) runFlow(result.flow, context.state, context.player)
+  return result
+}
+
+const hasAction = (flow: ActionFlow | undefined, actionId: string): boolean => {
+  if (!flow) return false
+  if (flow.type === 'leaf') return flow.actionId === actionId
+  return 'children' in flow && flow.children.some((child) => hasAction(child, actionId))
 }
 
 describe('B029_CookeryLesson — per-action token tracking, not per-round', () => {
@@ -44,7 +80,7 @@ describe('B029_CookeryLesson — per-action token tracking, not per-round', () =
     setActionToken(player, 100)
 
     // 1) Place farmer on lessons → no VP yet (no cook stamp)
-    let result = executeCardListener(placeListener!, {
+    let result = invokeListener(placeListener!, {
       state,
       player,
       space: mkActionSpace({ id: 'lessons' }),
@@ -52,11 +88,11 @@ describe('B029_CookeryLesson — per-action token tracking, not per-round', () =
       phase: 'after',
       result: { type: 'ok' },
     } as CardListenerContext)
-    expect(result).toBeUndefined()
+    expect(hasAction(result?.flow, 'bonus-vp')).toBe(false)
     expect(readCardExtraData<number>(player, CARD_ID, 'lessonsActionToken')).toBe(100)
 
     // 2) anytime-exchange (cook) in same action → VP
-    result = executeCardListener(exchangeListener!, {
+    result = invokeListener(exchangeListener!, {
       state,
       player,
       space: mkActionSpace({ id: 'anytime-exchange' }),
@@ -64,11 +100,8 @@ describe('B029_CookeryLesson — per-action token tracking, not per-round', () =
       phase: 'after',
       result: { type: 'ok' },
     } as CardListenerContext)
-    expect(result).toBeDefined()
-    expect(result!.flow?.type).toBe('leaf')
-    if (result!.flow?.type === 'leaf') {
-      expect(result!.flow.actionId).toBe('bonus-vp')
-    }
+    expect(hasAction(result?.flow, 'bonus-vp')).toBe(true)
+    expect(player.cardStates[CARD_ID]?.counters?.bonusVp).toBe(1)
   })
 
   it('cook first, then lessons in same action → 1 VP awarded on lessons', () => {
@@ -77,7 +110,7 @@ describe('B029_CookeryLesson — per-action token tracking, not per-round', () =
     const { state, player } = setup()
     setActionToken(player, 200)
 
-    let result = executeCardListener(exchangeListener!, {
+    let result = invokeListener(exchangeListener!, {
       state,
       player,
       space: mkActionSpace({ id: 'anytime-exchange' }),
@@ -85,9 +118,9 @@ describe('B029_CookeryLesson — per-action token tracking, not per-round', () =
       phase: 'after',
       result: { type: 'ok' },
     } as CardListenerContext)
-    expect(result).toBeUndefined()
+    expect(hasAction(result?.flow, 'bonus-vp')).toBe(false)
 
-    result = executeCardListener(placeListener!, {
+    result = invokeListener(placeListener!, {
       state,
       player,
       space: mkActionSpace({ id: 'lessons-4' }),
@@ -95,8 +128,7 @@ describe('B029_CookeryLesson — per-action token tracking, not per-round', () =
       phase: 'after',
       result: { type: 'ok' },
     } as CardListenerContext)
-    expect(result).toBeDefined()
-    expect(result!.flow?.type).toBe('leaf')
+    expect(hasAction(result?.flow, 'bonus-vp')).toBe(true)
   })
 
   it('cook first, then lessons-3 in same action → 1 VP awarded on lessons', () => {
@@ -105,7 +137,7 @@ describe('B029_CookeryLesson — per-action token tracking, not per-round', () =
     const { state, player } = setup()
     setActionToken(player, 201)
 
-    let result = executeCardListener(exchangeListener!, {
+    let result = invokeListener(exchangeListener!, {
       state,
       player,
       space: mkActionSpace({ id: 'anytime-exchange' }),
@@ -113,9 +145,9 @@ describe('B029_CookeryLesson — per-action token tracking, not per-round', () =
       phase: 'after',
       result: { type: 'ok' },
     } as CardListenerContext)
-    expect(result).toBeUndefined()
+    expect(hasAction(result?.flow, 'bonus-vp')).toBe(false)
 
-    result = executeCardListener(placeListener!, {
+    result = invokeListener(placeListener!, {
       state,
       player,
       space: mkActionSpace({ id: 'lessons-3' }),
@@ -123,8 +155,7 @@ describe('B029_CookeryLesson — per-action token tracking, not per-round', () =
       phase: 'after',
       result: { type: 'ok' },
     } as CardListenerContext)
-    expect(result).toBeDefined()
-    expect(result!.flow?.type).toBe('leaf')
+    expect(hasAction(result?.flow, 'bonus-vp')).toBe(true)
   })
 
   it('cook in action 100, lessons in action 101 → NO VP (per-action gating)', () => {
@@ -133,7 +164,7 @@ describe('B029_CookeryLesson — per-action token tracking, not per-round', () =
     const { state, player } = setup()
 
     setActionToken(player, 100)
-    executeCardListener(exchangeListener!, {
+    invokeListener(exchangeListener!, {
       state,
       player,
       space: mkActionSpace({ id: 'anytime-exchange' }),
@@ -144,7 +175,7 @@ describe('B029_CookeryLesson — per-action token tracking, not per-round', () =
 
     // Action token advances → next farmer placement
     setActionToken(player, 101)
-    const result = executeCardListener(placeListener!, {
+    const result = invokeListener(placeListener!, {
       state,
       player,
       space: mkActionSpace({ id: 'lessons' }),
@@ -153,7 +184,7 @@ describe('B029_CookeryLesson — per-action token tracking, not per-round', () =
       result: { type: 'ok' },
     } as CardListenerContext)
     // lessons stamp is now 101, cooked stamp is 100 — no match
-    expect(result).toBeUndefined()
+    expect(hasAction(result?.flow, 'bonus-vp')).toBe(false)
   })
 
   it('lessons alone (no cook) → no VP', () => {
@@ -161,7 +192,7 @@ describe('B029_CookeryLesson — per-action token tracking, not per-round', () =
     const { state, player } = setup()
     setActionToken(player, 300)
 
-    const result = executeCardListener(placeListener!, {
+    const result = invokeListener(placeListener!, {
       state,
       player,
       space: mkActionSpace({ id: 'lessons' }),
@@ -169,7 +200,7 @@ describe('B029_CookeryLesson — per-action token tracking, not per-round', () =
       phase: 'after',
       result: { type: 'ok' },
     } as CardListenerContext)
-    expect(result).toBeUndefined()
+    expect(hasAction(result?.flow, 'bonus-vp')).toBe(false)
   })
 
   it('cook alone (no lessons) → no VP', () => {
@@ -177,7 +208,7 @@ describe('B029_CookeryLesson — per-action token tracking, not per-round', () =
     const { state, player } = setup()
     setActionToken(player, 400)
 
-    const result = executeCardListener(exchangeListener!, {
+    const result = invokeListener(exchangeListener!, {
       state,
       player,
       space: mkActionSpace({ id: 'anytime-exchange' }),
@@ -185,7 +216,7 @@ describe('B029_CookeryLesson — per-action token tracking, not per-round', () =
       phase: 'after',
       result: { type: 'ok' },
     } as CardListenerContext)
-    expect(result).toBeUndefined()
+    expect(hasAction(result?.flow, 'bonus-vp')).toBe(false)
   })
 
   it('multiple cook calls in same action with lessons stamped → only 1 VP (USED_ACTION_TOKEN dedup)', () => {
@@ -195,7 +226,7 @@ describe('B029_CookeryLesson — per-action token tracking, not per-round', () =
     setActionToken(player, 500)
 
     // First lessons placement (no VP yet)
-    executeCardListener(placeListener!, {
+    invokeListener(placeListener!, {
       state,
       player,
       space: mkActionSpace({ id: 'lessons' }),
@@ -205,7 +236,7 @@ describe('B029_CookeryLesson — per-action token tracking, not per-round', () =
     } as CardListenerContext)
 
     // First cook → VP awarded, USED_ACTION_TOKEN_KEY = 500
-    let result = executeCardListener(exchangeListener!, {
+    let result = invokeListener(exchangeListener!, {
       state,
       player,
       space: mkActionSpace({ id: 'anytime-exchange' }),
@@ -213,10 +244,10 @@ describe('B029_CookeryLesson — per-action token tracking, not per-round', () =
       phase: 'after',
       result: { type: 'ok' },
     } as CardListenerContext)
-    expect(result).toBeDefined()
+    expect(hasAction(result?.flow, 'bonus-vp')).toBe(true)
 
     // Second cook in same action → no VP (already used this action)
-    result = executeCardListener(exchangeListener!, {
+    result = invokeListener(exchangeListener!, {
       state,
       player,
       space: mkActionSpace({ id: 'anytime-exchange' }),
@@ -224,7 +255,7 @@ describe('B029_CookeryLesson — per-action token tracking, not per-round', () =
       phase: 'after',
       result: { type: 'ok' },
     } as CardListenerContext)
-    expect(result).toBeUndefined()
+    expect(hasAction(result?.flow, 'bonus-vp')).toBe(false)
   })
 
   it('non-lessons place-farmer does not stamp lessonsActionToken', () => {
@@ -233,7 +264,7 @@ describe('B029_CookeryLesson — per-action token tracking, not per-round', () =
     setActionToken(player, 600)
     writeCardExtraData(player, CARD_ID, 'lessonsActionToken', -1)
 
-    const result = executeCardListener(placeListener!, {
+    const result = invokeListener(placeListener!, {
       state,
       player,
       space: mkActionSpace({ id: 'forest' }),

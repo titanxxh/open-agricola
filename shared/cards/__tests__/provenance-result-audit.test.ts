@@ -51,11 +51,6 @@ const allowedContextResultUses = {
     expectedContextResultReferences: 1,
     expectedResultPaths: ['type'],
   },
-  'shared/cards/D/D050_ForeignAid.ts': {
-    reason: 'computeArgs request options filtering',
-    expectedContextResultReferences: 1,
-    expectedResultPaths: ['request', 'request.kind', 'request.options', 'request.options.filter', 'type'],
-  },
 } satisfies Record<string, AllowedContextResultUse>
 
 type AllowedContextResultPath = keyof typeof allowedContextResultUses
@@ -495,19 +490,6 @@ function hasResultStringComparison(
   return found
 }
 
-function hasResultPathAssignment(sourceFile: ts.SourceFile, path: string): boolean {
-  const aliases = collectAliases(sourceFile)
-  let found = false
-
-  forEachNode(sourceFile, (node) => {
-    if (!ts.isBinaryExpression(node) || node.operatorToken.kind !== ts.SyntaxKind.EqualsToken) return
-    const leftPath = resultPathFor(node.left, aliases)?.join('.')
-    if (leftPath === path) found = true
-  })
-
-  return found
-}
-
 function hasContextSourceCardGuard(sourceFile: ts.SourceFile): boolean {
   const aliases = collectAliases(sourceFile)
   let found = false
@@ -576,23 +558,6 @@ const requiredShapeChecks = {
     {
       label: 'uses boar payment provenance',
       check: (sourceFile) => hasCallWithStringArg(sourceFile, 'sumResourcePaid', 'boar'),
-    },
-  ],
-  'shared/cards/D/D050_ForeignAid.ts': [
-    {
-      label: 'guards request type',
-      check: (sourceFile) =>
-        hasResultStringComparison(sourceFile, 'type', ts.SyntaxKind.EqualsEqualsEqualsToken, 'request'),
-    },
-    {
-      label: 'guards choice request kind',
-      check: (sourceFile) =>
-        hasResultStringComparison(sourceFile, 'request.kind', ts.SyntaxKind.EqualsEqualsEqualsToken, 'choice'),
-    },
-    {
-      label: 'filters request options',
-      check: (sourceFile) => hasResultPathAssignment(sourceFile, 'request.options') &&
-        collectResultPaths(sourceFile).includes('request.options.filter'),
     },
   ],
 } satisfies Record<AllowedContextResultPath, readonly ShapeCheck[]>

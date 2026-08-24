@@ -1,7 +1,7 @@
 import { defineMinorCard } from '../card-source'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
-import { queueFutureMeeplesFlow } from '../../actions/effects/internal/future-meeples'
+import { futureMeeplesNode, queueFutureMeeplesFlow } from '../../actions/effects/internal/future-meeples'
 import {
   getStableTilesBuiltThisAction,
   readActionSnapshotToken,
@@ -21,6 +21,34 @@ const queueStableTreeWood = (
   if (getStableTilesBuiltThisAction(player) < 1) return
   if (readCardExtraData<number>(player, CARD_ID, USED_ACTION_TOKEN_KEY) === actionToken) return
 
+  return {
+    type: 'seq' as const,
+    children: [
+      {
+        type: 'leaf' as const,
+        actionId: 'special-effect',
+        sourceCard: CARD_ID,
+        params: { kind: 'set-extra-data', key: USED_ACTION_TOKEN_KEY, value: actionToken },
+      },
+      futureMeeplesNode({
+        cardId: CARD_ID,
+        playerId: player.id,
+        startRound: state.round + 1,
+        count: 3,
+        resources: { wood: 1 },
+      }),
+    ],
+  }
+}
+
+const queueStableTreeWoodOnBuy = (
+  state: CardListenerContext['state'],
+  player: CardListenerContext['player'],
+) => {
+  const actionToken = readActionSnapshotToken(player)
+  if (actionToken === undefined) return
+  if (getStableTilesBuiltThisAction(player) < 1) return
+  if (readCardExtraData<number>(player, CARD_ID, USED_ACTION_TOKEN_KEY) === actionToken) return
   writeCardExtraData(player, CARD_ID, USED_ACTION_TOKEN_KEY, actionToken)
   return queueFutureMeeplesFlow(state, {
     cardId: CARD_ID,
@@ -47,7 +75,7 @@ const cardImpl = {
   listeners: [listener],
   effect: {
   id: CARD_ID,
-  onBuy: (state, player) => queueStableTreeWood(state, player),
+  onBuy: (state, player) => queueStableTreeWoodOnBuy(state, player),
 },
   reaches: [] as readonly string[],
 } satisfies CardImpl

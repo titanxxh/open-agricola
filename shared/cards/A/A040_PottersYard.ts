@@ -56,10 +56,14 @@ const setClayRemaining = (player: CardListenerContext['player'], count: number) 
 const getUsedCountBefore = (player: CardListenerContext['player']): number =>
   readCardExtraData<number>(player, CARD_ID, 'usedCountBefore') ?? 0
 
-const setUsedCountBefore = (player: CardListenerContext['player'], count: number) =>
-  writeCardExtraData(player, CARD_ID, 'usedCountBefore', count)
+const setExtraDataLeaf = (key: string, value: unknown): ActionFlow => ({
+  type: 'leaf',
+  actionId: 'special-effect',
+  sourceCard: CARD_ID,
+  params: { kind: 'set-extra-data', key, value },
+})
 
-const buildClayCollectFlow = (clayCollected: number): ActionHookResult | void => {
+const buildClayCollectFlow = (clayCollected: number): ActionFlow | undefined => {
   if (clayCollected <= 0) return
   const children: ActionFlow[] = [
     gainLeaf(CARD_ID, { clay: clayCollected }),
@@ -81,13 +85,7 @@ const buildClayCollectFlow = (clayCollected: number): ActionHookResult | void =>
     optional: true,
     children: exchangeChoices,
   })
-  return {
-    flow: {
-      type: 'seq',
-      children,
-    },
-    sourceCard: CARD_ID,
-  }
+  return { type: 'seq', children }
 }
 
 const beforePlowListener: CardListenerRegistration = {
@@ -97,7 +95,10 @@ const beforePlowListener: CardListenerRegistration = {
   actions: ['plow'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (getClayRemaining(context.player) <= 0) return
-    setUsedCountBefore(context.player, getUsedTiles(context.player).size)
+    return {
+      flow: setExtraDataLeaf('usedCountBefore', getUsedTiles(context.player).size),
+      sourceCard: CARD_ID,
+    }
   },
 }
 
@@ -108,7 +109,10 @@ const beforeConstructListener: CardListenerRegistration = {
   actions: ['construct'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (getClayRemaining(context.player) <= 0) return
-    setUsedCountBefore(context.player, getUsedTiles(context.player).size)
+    return {
+      flow: setExtraDataLeaf('usedCountBefore', getUsedTiles(context.player).size),
+      sourceCard: CARD_ID,
+    }
   },
 }
 
@@ -119,7 +123,10 @@ const beforeFencingListener: CardListenerRegistration = {
   actions: ['fence'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (getClayRemaining(context.player) <= 0) return
-    setUsedCountBefore(context.player, getUsedTiles(context.player).size)
+    return {
+      flow: setExtraDataLeaf('usedCountBefore', getUsedTiles(context.player).size),
+      sourceCard: CARD_ID,
+    }
   },
 }
 
@@ -130,7 +137,10 @@ const beforeStablesListener: CardListenerRegistration = {
   actions: ['stables'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (getClayRemaining(context.player) <= 0) return
-    setUsedCountBefore(context.player, getUsedTiles(context.player).size)
+    return {
+      flow: setExtraDataLeaf('usedCountBefore', getUsedTiles(context.player).size),
+      sourceCard: CARD_ID,
+    }
   },
 }
 
@@ -147,8 +157,18 @@ const createAfterHandler = (actionName: string): CardListenerRegistration => ({
     const newlyUsed = Math.max(0, usedNow - usedBefore)
     if (newlyUsed <= 0) return
     const clayCollected = Math.min(newlyUsed, clayRemaining)
-    setClayRemaining(context.player, clayRemaining - clayCollected)
-    return buildClayCollectFlow(clayCollected)
+    const collect = buildClayCollectFlow(clayCollected)
+    if (!collect) return
+    return {
+      flow: {
+        type: 'seq',
+        children: [
+          setExtraDataLeaf('clayRemaining', clayRemaining - clayCollected),
+          collect,
+        ],
+      },
+      sourceCard: CARD_ID,
+    }
   },
 })
 

@@ -13,7 +13,7 @@ ADR-0010 至 ADR-0013 已固定公开回放、delta 链、GitHub 身份和 Game 
 
 ### Durable publish
 
-1. `room-router` 继续同步调用唯一写入 `GameState` 的 `GameSession`。成功且改变权威 Frame 的响应随后只经过一个具体的 `RoomCommitter` 模块；它在同一 SQLite 事务内更新 Room 快照并追加 Replay Step，成功后才允许 `Broadcaster` 为 Room 内在线座位生成各自遮蔽后的 envelope。
+1. `room-router` 继续同步调用服务端唯一游戏命令入口和 `GameState` owner `GameSession`；具体状态修改发生在它驱动的 `GameCore` 和 action leaf 中，而不是只允许 `authoritative-session.ts` 赋值。这个 ownership 是 review invariant；机械门禁只覆盖可精确定义的邻接命令入口和依赖边界，不宣称证明全部 mutation path。成功且改变权威 Frame 的响应随后只经过一个具体的 `RoomCommitter` 模块；它在同一 SQLite 事务内更新 Room 快照并追加 Replay Step，成功后才允许 `Broadcaster` 为 Room 内在线座位生成各自遮蔽后的 envelope。
 2. `RoomCommitter` 的小接口返回 committed、unchanged 或 blocked 结果，内部隐藏序列化、delta、gzip、Hash、事务、完成归档、幂等和重试。它不增加单实现 interface 或 factory；现有生产、JSON 和内存持久化 adapter seam 继续用于真实的多 adapter 差异。
 3. `resp.ok=false` 只回发起连接，不增加 `roomVersion` 或 `stepNo`。成功但 Frame Hash 未变化时也不产生 Replay Step，只向发起者确认当前状态。重连、补拉和心跳不经过 Durable Room Commit。
 4. `roomVersion` 和 `stepNo` 独立递增。`roomVersion` 标识成功提交后对玩家可见的状态版本；`stepNo` 只标识改变权威 Frame 的全局 Room 顺序。多个玩家同时提交时仍按 Room 串行占用连续 Step；最后一份输入触发的自动结算属于该输入的 Step，而且结算结果不得依赖到达顺序。

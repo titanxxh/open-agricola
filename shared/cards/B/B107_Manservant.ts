@@ -2,7 +2,7 @@ import { defineOccupationCard } from '../card-source'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import type { GameState, PlayerState } from '../../contract/types'
-import { queueFutureMeeples, futureMeeplesNode } from '../../actions/effects/internal/future-meeples'
+import { futureMeeplesNode, queueFutureMeeples } from '../../actions/effects/internal/future-meeples'
 import type { CardImpl } from '../registry'
 
 const CARD_ID = 'B107_Manservant'
@@ -22,6 +22,17 @@ const placeFood = (
 ) => {
   if (player.houseType !== 'stone') return
 
+  return futureMeeplesNode({
+    cardId: CARD_ID,
+    playerId: player.id,
+    startRound: state.round + 1,
+    count: 14,
+    resources: { food: 3 },
+  })
+}
+
+const placeFoodOnBuy = (state: GameState, player: PlayerState) => {
+  if (player.houseType !== 'stone') return
   queueFutureMeeples(state, {
     cardId: CARD_ID,
     playerId: player.id,
@@ -50,7 +61,7 @@ const cardImpl = {
   listeners: [listener],
   effect: {
   id: CARD_ID,
-  onBuy: (state, player) => placeFood(state, player),
+  onBuy: (state, player) => placeFoodOnBuy(state, player),
 },
   reaches: [] as readonly string[],
 } satisfies CardImpl

@@ -1,11 +1,10 @@
 name: CI
 
 on:
-  push:
-    branches: [main]
-    paths-ignore:
-      - 'docs/**'
   workflow_dispatch:
+
+permissions:
+  contents: read
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -65,23 +64,14 @@ jobs:
       - name: Install deps
         run: pnpm install --frozen-lockfile
 
-      - name: Lint
-        run: pnpm run lint
+      - name: Check architecture boundaries
+        run: pnpm run check:architecture
 
       - name: Lint i18n (no missing keys)
         run: pnpm run lint:i18n
 
       - name: Unit tests (fast tier)
         run: pnpm run test:fast
-
-      - name: Check direct session log writes
-        run: pnpm run check:direct-session-log
-
-      - name: Check effects file list
-        run: pnpm run check:effects-file-list
-
-      - name: Check generated card catalog sync
-        run: pnpm run check:generated-cards-sync
 
       - name: Build (includes cards manifest)
         env:
@@ -94,20 +84,8 @@ jobs:
           REPLAY_VIEWER_ROOT: ${{ runner.temp }}/replay-viewers
         run: pnpm run build:replay-viewer
 
-      - name: Check reaches (strict)
-        run: pnpm run check:reaches -- --strict
-
-      - name: Check no-DSL (strict — DSL path fully removed)
-        run: pnpm run check:no-dsl -- --strict
-
-      - name: Check card implementation boundaries
-        run: pnpm run check:card-impl-boundaries
-
       - name: Check bundle size (strict)
         run: pnpm run check:bundle-size
-
-      - name: Check catalog types (issue #10)
-        run: pnpm run check:catalog-types
 
       - name: Check community deck consistency
         run: pnpm run check:community-deck

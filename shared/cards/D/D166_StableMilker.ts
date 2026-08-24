@@ -7,6 +7,7 @@ import {
   readActionSnapshotToken,
 } from '../helpers/action-snapshot'
 import { readCardExtraData, writeCardExtraData } from '../helpers/card-state'
+import type { ActionFlow } from '../../contract/types'
 import type { CardImpl } from '../registry'
 
 const CARD_ID = 'D166_StableMilker'
@@ -25,14 +26,24 @@ const USED_ACTION_TOKEN_KEY = 'usedActionToken'
 
 const tryGainCattle = (
   player: CardListenerContext['player'],
-): ActionHookResult | void => {
+): ActionFlow | undefined => {
   const actionToken = readActionSnapshotToken(player)
   if (actionToken === undefined) return
   if (getStableTilesBuiltThisAction(player) < 2) return
   if (readCardExtraData<number>(player, CARD_ID, USED_ACTION_TOKEN_KEY) === actionToken) return
 
-  writeCardExtraData(player, CARD_ID, USED_ACTION_TOKEN_KEY, actionToken)
-  return { flow: gainLeaf(CARD_ID, { cattle: 1 }), sourceCard: CARD_ID }
+  return {
+    type: 'seq',
+    children: [
+      {
+        type: 'leaf',
+        actionId: 'special-effect',
+        sourceCard: CARD_ID,
+        params: { kind: 'set-extra-data', key: USED_ACTION_TOKEN_KEY, value: actionToken },
+      },
+      gainLeaf(CARD_ID, { cattle: 1 }),
+    ],
+  }
 }
 
 const listener: CardListenerRegistration = {
@@ -41,7 +52,8 @@ const listener: CardListenerRegistration = {
   phases: ['after' as ActionHookPhase],
   actions: ['stables'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
-    return tryGainCattle(context.player)
+    const flow = tryGainCattle(context.player)
+    if (flow) return { flow, sourceCard: CARD_ID }
   },
 }
 
@@ -50,8 +62,12 @@ const cardImpl = {
   effect: {
   id: CARD_ID,
   onBuy: (_state, player) => {
-    const result = tryGainCattle(player)
-    return result?.flow
+    const actionToken = readActionSnapshotToken(player)
+    if (actionToken === undefined) return
+    if (getStableTilesBuiltThisAction(player) < 2) return
+    if (readCardExtraData<number>(player, CARD_ID, USED_ACTION_TOKEN_KEY) === actionToken) return
+    writeCardExtraData(player, CARD_ID, USED_ACTION_TOKEN_KEY, actionToken)
+    return gainLeaf(CARD_ID, { cattle: 1 })
   },
 },
   reaches: [] as readonly string[],
