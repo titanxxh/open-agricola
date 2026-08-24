@@ -8,6 +8,7 @@ import {
   readActionSnapshotToken,
 } from '../helpers/action-snapshot'
 import { readCardExtraData, writeCardExtraData } from '../helpers/card-state'
+import type { ActionFlow, PlayerState } from '../../contract/types'
 import type { CardImpl } from '../registry'
 
 const CARD_ID = 'A167_BreederBuyer'
@@ -31,27 +32,37 @@ const GAINS = {
   stone: { cattle: 1 },
 }
 
-const tryGainLivestock = (
-  context: CardListenerContext,
+const buildLivestockFlow = (
+  player: PlayerState,
   needStables: boolean,
   needRooms: boolean,
-): ActionHookResult | void => {
-  const actionToken = readActionSnapshotToken(context.player)
+): ActionFlow | undefined => {
+  const actionToken = readActionSnapshotToken(player)
   if (actionToken === undefined) return
-  if (readCardExtraData<number>(context.player, CARD_ID, USED_ACTION_TOKEN_KEY) === actionToken) return
+  if (readCardExtraData<number>(player, CARD_ID, USED_ACTION_TOKEN_KEY) === actionToken) return
 
-  const stablesBuilt = getStableTilesBuiltThisAction(context.player)
-  const roomsBuilt = getRoomsBuiltThisAction(context.player)
+  const stablesBuilt = getStableTilesBuiltThisAction(player)
+  const roomsBuilt = getRoomsBuiltThisAction(player)
 
   if (needStables && stablesBuilt < 1) return
   if (needRooms && roomsBuilt < 1) return
 
-  const houseType = context.player.houseType
+  const houseType = player.houseType
   const gain = GAINS[houseType]
   if (!gain) return
 
-  writeCardExtraData(context.player, CARD_ID, USED_ACTION_TOKEN_KEY, actionToken)
-  return { flow: gainLeaf(CARD_ID, gain), sourceCard: CARD_ID }
+  return {
+    type: 'seq',
+    children: [
+      {
+        type: 'leaf',
+        actionId: 'special-effect',
+        sourceCard: CARD_ID,
+        params: { kind: 'set-extra-data', key: USED_ACTION_TOKEN_KEY, value: actionToken },
+      },
+      gainLeaf(CARD_ID, gain),
+    ],
+  }
 }
 
 const afterConstructListener: CardListenerRegistration = {
@@ -60,7 +71,8 @@ const afterConstructListener: CardListenerRegistration = {
   phases: ['after' as ActionHookPhase],
   actions: ['construct'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
-    return tryGainLivestock(context, true, false)
+    const flow = buildLivestockFlow(context.player, true, false)
+    if (flow) return { flow, sourceCard: CARD_ID }
   },
 }
 
@@ -70,7 +82,8 @@ const afterStablesListener: CardListenerRegistration = {
   phases: ['after' as ActionHookPhase],
   actions: ['stables'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
-    return tryGainLivestock(context, false, true)
+    const flow = buildLivestockFlow(context.player, false, true)
+    if (flow) return { flow, sourceCard: CARD_ID }
   },
 }
 
@@ -79,16 +92,13 @@ const cardImpl = {
   effect: {
   id: CARD_ID,
   onBuy: (_state, player) => {
-    const stablesBuilt = getStableTilesBuiltThisAction(player)
-    const roomsBuilt = getRoomsBuiltThisAction(player)
-    if (stablesBuilt < 1 || roomsBuilt < 1) return
+    if (getStableTilesBuiltThisAction(player) < 1 || getRoomsBuiltThisAction(player) < 1) return
     const actionToken = readActionSnapshotToken(player)
-    if (actionToken !== undefined) {
-      writeCardExtraData(player, CARD_ID, USED_ACTION_TOKEN_KEY, actionToken)
-    }
-    const houseType = player.houseType
-    const gain = GAINS[houseType]
+    if (actionToken === undefined) return
+    if (readCardExtraData<number>(player, CARD_ID, USED_ACTION_TOKEN_KEY) === actionToken) return
+    const gain = GAINS[player.houseType]
     if (!gain) return
+    writeCardExtraData(player, CARD_ID, USED_ACTION_TOKEN_KEY, actionToken)
     return gainLeaf(CARD_ID, gain)
   },
 },

@@ -4,7 +4,8 @@ import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 import { runCardEffectHook } from '../../shared/cards/card-effects'
 import { computePaymentOptionsForTest } from '../../shared/actions/payment/__tests__/test-helpers'
 import { setWorkersAtHome } from '../../shared/domain/player'
-import '../../shared/cards/E/E087_MasterRenovator'
+import { E087_MasterRenovator_impl } from '../../shared/cards/E/E087_MasterRenovator'
+import { getAdHocAction } from '../../shared/actions/helpers/ad-hoc-action-registry'
 
 const CARD_ID = 'E087_MasterRenovator'
 
@@ -97,16 +98,28 @@ describe('E087_MasterRenovator session — chooseOne renovation discount', () =>
   })
 
   it('listener pops the BonusModifier after renovate-house with sourceCard CARD_ID', () => {
-    // Drive: setup with E87 owner, push modifier via onStartReturnHome,
-    // then directly verify after listener removes it after a renovate-house leaf
-    // resolves with sourceCard match. We simulate by manually calling the
-    // `after` phase listener via the dispatcher; instead, use a simpler check:
-    // a second call to onStartReturnHome should not duplicate the modifier.
     const { state, player } = setup(7)
     runCardEffectHook(state, player, CARD_ID, 'onStartReturnHome')
-    runCardEffectHook(state, player, CARD_ID, 'onStartReturnHome')
-    const e87Mods = player.activeModifiers.filter((m) => m.cardId === CARD_ID)
-    expect(e87Mods.length).toBe(1)
+    const listener = E087_MasterRenovator_impl.listeners!.find((entry) =>
+      entry.id === 'E87-master-renovator-after-renovate')!
+    const before = JSON.stringify(player.activeModifiers)
+    const result = listener.handler({
+      state,
+      player,
+      sourceCard: CARD_ID,
+      actionId: 'renovate-house',
+      phase: 'after',
+    } as never)
+    expect(JSON.stringify(player.activeModifiers)).toBe(before)
+    expect(result?.flow).toMatchObject({
+      type: 'leaf',
+      actionId: 'card_E087_MasterRenovator_popModifier',
+      sourceCard: CARD_ID,
+    })
+    if (result?.flow?.type === 'leaf') {
+      getAdHocAction(result.flow.actionId)!.execute({ state, player } as never)
+    }
+    expect(player.activeModifiers.some((modifier) => modifier.cardId === CARD_ID)).toBe(false)
   })
 
   it('renovation target choice waits for payment before mutating', () => {

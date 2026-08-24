@@ -17,8 +17,8 @@ _Avoid_: client 直接 import `shared/session`、`shared/engine`、卡牌实现
 _Avoid_: WebSocket 连接层
 
 **GameSession**:
-服务端权威会话类，位于 `server/game/authoritative-session.ts`，继承 `GameCore` 并注入自定义卡沙盒运行时。HTTP、WebSocket 和 session 测试都通过它驱动规则。
-_Avoid_: React session、本地 UI store
+服务端唯一游戏命令入口和 `GameState` owner。状态修改可由它驱动的 `GameCore` 和 action leaf 执行；HTTP、WebSocket 和 session 测试都必须通过该权威边界驱动规则。
+_Avoid_: React session、本地 UI store、把唯一写入者理解为只有一个源文件可以赋值
 
 **GameState**:
 一局游戏的领域真相，包含玩家、行动格、回合、阶段、draft、公开事件、日志缓存、future meeple、收获摘要等可序列化状态。
@@ -454,7 +454,7 @@ _Avoid_: 卡牌自己扫所有玩家、为单卡新增 custom turn-order
 
 **Card Listener**:
 监听 action / event phase 的卡牌反应。listener handler 必须是 state-pure flow builder：只能读 state / events 并返回 flow 或结构化结果。
-_Avoid_: dispatch 阶段直接 mutate state
+_Avoid_: dispatch 阶段直接修改 `GameState`、`PlayerState` 或 `cardStates`
 
 **Reaction Hook**:
 同一时机可能有多张卡可触发、且玩家应能决定触发顺序的卡牌反应。OA 用 `ParallelNode(mode='trigger-select')`：先显示可触发卡牌，玩家选择一张后执行该卡 activation，剩余同组 reaction 继续由引擎重算。

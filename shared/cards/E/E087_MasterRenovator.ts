@@ -1,11 +1,13 @@
 import { defineOccupationCard } from '../card-source'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
-import type { BonusModifier } from '../../contract/types'
+import type { ActionDefinition, BonusModifier } from '../../contract/types'
 import { getRenovation } from '../../actions/effects/renovation'
+import { registerAdHocAction } from '../../actions/helpers/ad-hoc-action-registry'
 import type { CardImpl } from '../registry'
 
 const CARD_ID = 'E087_MasterRenovator'
+const POP_MODIFIER_ACTION_ID = 'card_E087_MasterRenovator_popModifier'
 /**
  * Rule: `Utils::addBonusChoices($args['costs'], [[WOOD=>-1],[CLAY=>-1],
  * [STONE=>-1],[REED=>-1]], $this->id)` gated on `isFlagged()`. The flag is
@@ -14,7 +16,7 @@ const CARD_ID = 'E087_MasterRenovator'
  *
  * Our equivalent: push a BonusModifier with 4 choices into player.activeModifiers
  * before returning the SEQ flow, and pop via:
- *   1. `after:renovate-house` listener gated on `sourceCard === CARD_ID`
+ *   1. a card-local action returned by the `after:renovate-house` listener
  *   2. `onAfterRoundEnd` safety net (covers SEQ skip path).
  */
 const E087_BONUS_MODIFIER: BonusModifier = {
@@ -43,6 +45,21 @@ const pushModifier = (player: {
   player.activeModifiers.push(E087_BONUS_MODIFIER as never)
 }
 
+const popModifierAction: ActionDefinition = {
+  id: POP_MODIFIER_ACTION_ID,
+  nameKey: 'actions.special-effect.name',
+  descriptionKey: 'actions.special-effect.description',
+  roundAvailable: 1,
+  gainPerRound: {},
+  canBeExecutedByPlayer: (_state, player) => player.occupationPlayed.includes(CARD_ID),
+  execute: ({ player }) => {
+    popModifier(player as never)
+    return { type: 'ok' }
+  },
+}
+
+registerAdHocAction(popModifierAction)
+
 const afterRenovateListener: CardListenerRegistration = {
   id: 'E87-master-renovator-after-renovate',
   cardIds: [CARD_ID],
@@ -50,7 +67,14 @@ const afterRenovateListener: CardListenerRegistration = {
   actions: ['renovate-house'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (context.sourceCard !== CARD_ID) return
-    popModifier(context.player as never)
+    return {
+      flow: {
+        type: 'leaf',
+        actionId: POP_MODIFIER_ACTION_ID,
+        sourceCard: CARD_ID,
+      },
+      sourceCard: CARD_ID,
+    }
   },
 }
 

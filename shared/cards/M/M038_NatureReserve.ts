@@ -2,13 +2,16 @@ import { defineMinorCard } from '../card-source'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import type { CardListenerContext, CardListenerRegistration } from '../card-listeners'
 import type { CardImpl } from '../registry'
-import type { FarmTilePosition, PlayerState } from '../../contract/types'
+import type { ActionDefinition, FarmTilePosition, PlayerState } from '../../contract/types'
 import { computeFencedRegions } from '../../domain/farmyard'
 import { positionKey } from '../../domain/farm'
 import { readCardExtraData, writeCardExtraData } from '../helpers/card-state'
+import { registerAdHocAction } from '../../actions/helpers/ad-hoc-action-registry'
 
 const CARD_ID = 'M038_NatureReserve'
 const RESERVE_TILES_KEY = 'natureReserveTiles'
+const RECORD_ACTION_ID = 'card_M038_NatureReserve_recordTiles'
+const ACTIVATE_ACTION_ID = 'card_M038_NatureReserve_activateTiles'
 
 type ReserveTile = { row: number; col: number }
 
@@ -106,6 +109,25 @@ const activateReserveTiles = (player: PlayerState) => {
   writeReserveTiles(player, remaining)
 }
 
+const reserveAction = (
+  id: string,
+  execute: (player: PlayerState) => void,
+): ActionDefinition => ({
+  id,
+  nameKey: 'actions.special-effect.name',
+  descriptionKey: 'actions.special-effect.description',
+  roundAvailable: 1,
+  gainPerRound: {},
+  canBeExecutedByPlayer: (_state, player) => player.minorPlayed.includes(CARD_ID),
+  execute: ({ player }) => {
+    execute(player)
+    return { type: 'ok' }
+  },
+})
+
+registerAdHocAction(reserveAction(RECORD_ACTION_ID, recordReserveTiles))
+registerAdHocAction(reserveAction(ACTIVATE_ACTION_ID, activateReserveTiles))
+
 const recordListener: CardListenerRegistration = {
   id: 'M038-nature-reserve-record-fenced-terrain',
   cardIds: [CARD_ID],
@@ -113,7 +135,10 @@ const recordListener: CardListenerRegistration = {
   actions: ['fence'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (context.sourceCard !== CARD_ID) return
-    recordReserveTiles(context.ownerPlayer ?? context.player)
+    return {
+      flow: { type: 'leaf', actionId: RECORD_ACTION_ID, sourceCard: CARD_ID },
+      sourceCard: CARD_ID,
+    }
   },
 }
 
@@ -122,9 +147,10 @@ const activateListener: CardListenerRegistration = {
   cardIds: [CARD_ID],
   phases: ['after' as ActionHookPhase],
   actions: ['fell-trees', 'cut-peat'],
-  handler: (context: CardListenerContext): ActionHookResult | void => {
-    activateReserveTiles(context.ownerPlayer ?? context.player)
-  },
+  handler: (): ActionHookResult => ({
+    flow: { type: 'leaf', actionId: ACTIVATE_ACTION_ID, sourceCard: CARD_ID },
+    sourceCard: CARD_ID,
+  }),
 }
 
 const cardImpl = {

@@ -1,7 +1,7 @@
 import { defineMinorCard } from '../card-source'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
-import { queueFutureMeeples, futureMeeplesNode } from '../../actions/effects/internal/future-meeples'
+import { futureMeeplesNode } from '../../actions/effects/internal/future-meeples'
 import type { CardImpl } from '../registry'
 
 const CARD_ID = 'A046_ClawKnife'
@@ -12,14 +12,14 @@ const listener: CardListenerRegistration = {
   actions: ['place-farmer'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (!context.space || context.space.id !== 'sheep-market') return
-    queueFutureMeeples(context.state, {
+    const request = {
       cardId: CARD_ID,
       playerId: context.player.id,
       startRound: context.state.round + 1,
       count: 2,
       resources: { food: 1 },
-    })
-    return { flow: futureMeeplesNode(), sourceCard: CARD_ID }
+    }
+    return { flow: futureMeeplesNode(request), sourceCard: CARD_ID }
   },
 }
 

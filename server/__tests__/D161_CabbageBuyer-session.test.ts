@@ -7,6 +7,7 @@ import { D161_CabbageBuyer_impl } from '../../shared/cards/D/D161_CabbageBuyer'
 import '../../shared/cards/A/A055_JunkRoom'
 import '../../shared/cards/D/D013_Trowel'
 import type { ActionFlow } from '../../shared/contract/types'
+import { specialEffectAction } from '../../shared/actions/effects/special-effect'
 
 const CARD_ID = 'D161_CabbageBuyer'
 
@@ -83,10 +84,35 @@ const setupD161DirectListeners = () => {
 }
 
 const getD161OfferCost = (flow: ActionFlow | undefined) => {
-  if (!flow || flow.type !== 'seq') return undefined
-  const pay = flow.children[0]
-  if (!pay || pay.type !== 'leaf' || pay.actionId !== 'pay') return undefined
-  return (pay.params as { food?: number } | undefined)?.food
+  if (!flow) return undefined
+  if (flow.type === 'leaf') {
+    return flow.actionId === 'pay'
+      ? (flow.params as { food?: number } | undefined)?.food
+      : undefined
+  }
+  if (!('children' in flow)) return undefined
+  return flow.children.map(getD161OfferCost).find((cost) => cost !== undefined)
+}
+
+const applyStateFlow = (
+  flow: ActionFlow | undefined,
+  state: ReturnType<GameSession['getState']>['state'],
+  player: typeof state.players[number],
+) => {
+  if (!flow) return
+  if (flow.type !== 'leaf') {
+    if ('children' in flow) flow.children.forEach((child) => applyStateFlow(child, state, player))
+    return
+  }
+  if (flow.actionId === 'special-effect') {
+    specialEffectAction.execute({
+      state,
+      player,
+      params: flow.params,
+      sourceCard: flow.sourceCard,
+      actionContext: flow.actionContext,
+    } as never)
+  }
 }
 
 const openDirectD161Tracker = (
@@ -95,7 +121,7 @@ const openDirectD161Tracker = (
 ) => {
   const { state, owner, actor, open, tagImprovement, offer } = setupResult
   if (options?.food !== undefined) owner.resources.food = options.food
-  open.handler({
+  const openResult = open.handler({
     state,
     player: actor,
     ownerPlayer: owner,
@@ -103,8 +129,9 @@ const openDirectD161Tracker = (
     actionId: 'renovate-house',
     phase: 'after',
   } as never)
+  applyStateFlow(openResult?.flow, state, actor)
   if (options?.choice) {
-    tagImprovement.handler({
+    const tagResult = tagImprovement.handler({
       state,
       player: actor,
       ownerPlayer: owner,
@@ -112,14 +139,17 @@ const openDirectD161Tracker = (
       phase: 'after',
       choice: options.choice,
     } as never)
+    applyStateFlow(tagResult?.flow, state, actor)
   }
-  return offer.handler({
+  const result = offer.handler({
     state,
     player: actor,
     ownerPlayer: owner,
     actionId: 'place-farmer',
     phase: 'after',
   } as never)
+  applyStateFlow(result?.flow, state, actor)
+  return result
 }
 
 /**
@@ -272,7 +302,7 @@ describe('D161_CabbageBuyer session', () => {
   it('direct price branch: no food emits no offer', () => {
     const result = openDirectD161Tracker(setupD161DirectListeners(), { food: 0 })
 
-    expect(result).toBeUndefined()
+    expect(getD161OfferCost(result?.flow)).toBeUndefined()
   })
 
   // ── Case 1: no improvement → cost = 3 food ──────────────────────────────

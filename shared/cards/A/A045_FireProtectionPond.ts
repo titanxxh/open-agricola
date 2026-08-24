@@ -2,7 +2,7 @@ import { defineMinorCard } from '../card-source'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { isCardFlagged } from '../helpers/card-state'
-import { queueFutureMeeples, futureMeeplesNode } from '../../actions/effects/internal/future-meeples'
+import { futureMeeplesNode } from '../../actions/effects/internal/future-meeples'
 import type { CardImpl } from '../registry'
 
 const CARD_ID = 'A045_FireProtectionPond'
@@ -13,19 +13,19 @@ const listener: CardListenerRegistration = {
   actions: ['renovate-house'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (isCardFlagged(context.player, CARD_ID)) return
-    queueFutureMeeples(context.state, {
+    const request = {
       cardId: CARD_ID,
       playerId: context.player.id,
       startRound: context.state.round + 1,
       count: 6,
       resources: { food: 1 },
-    })
+    }
     return {
       flow: {
         type: 'seq',
         children: [
           { type: 'leaf', actionId: 'special-effect', sourceCard: CARD_ID, params: { kind: 'set-flag', flag: true } },
-          futureMeeplesNode(),
+          futureMeeplesNode(request),
         ],
       },
       sourceCard: CARD_ID,

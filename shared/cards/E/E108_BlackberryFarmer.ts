@@ -2,7 +2,7 @@ import { defineOccupationCard } from '../card-source'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import type { DraftGameEvent, FarmFenceBuiltEvent } from '../../contract/events'
-import { queueFutureMeeples, futureMeeplesNode } from '../../actions/effects/internal/future-meeples'
+import { futureMeeplesNode } from '../../actions/effects/internal/future-meeples'
 import type { CardImpl } from '../registry'
 
 const CARD_ID = 'E108_BlackberryFarmer'
@@ -28,15 +28,15 @@ const listener: CardListenerRegistration = {
   handler: (context: CardListenerContext): ActionHookResult | void => {
     const fencesBuilt = countNewFenceEdges(context)
     if (fencesBuilt <= 0) return
-    queueFutureMeeples(context.state, {
+    const request = {
       cardId: CARD_ID,
       playerId: context.player.id,
       startRound: context.state.round + 1,
       count: fencesBuilt,
       resources: { food: 1 },
-    })
+    }
     return {
-      flow: futureMeeplesNode(),
+      flow: futureMeeplesNode(request),
       sourceCard: CARD_ID,
     }
   },

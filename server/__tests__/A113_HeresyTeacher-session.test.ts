@@ -4,6 +4,7 @@ import { getRegisteredCardListeners, executeCardListener, type CardListenerConte
 import { reap } from '../../shared/actions/effects/reap'
 import { computeScores } from '../../shared/domain/scoring'
 import type { Field } from '../../shared/contract/types'
+import { getAdHocAction } from '../../shared/actions/helpers/ad-hoc-action-registry'
 
 import '../../shared/cards/A/A113_HeresyTeacher'
 
@@ -59,13 +60,23 @@ const fireListener = (
   if (!listener) throw new Error('A113 listener not registered')
   const space = s.actionSpaces.find((x) => x.id === spaceId)
   if (!space) throw new Error(`space ${spaceId} not found`)
-  return executeCardListener(listener, {
+  const result = executeCardListener(listener, {
     state: s,
     player: s.players[0]!,
     space,
     actionId: 'place-farmer',
     phase: 'after',
   } as unknown as CardListenerContext)
+  if (result?.flow?.type === 'leaf') {
+    getAdHocAction(result.flow.actionId)?.execute({
+      state: s,
+      player: s.players[0]!,
+      space,
+      params: result.flow.params,
+      sourceCard: result.flow.sourceCard,
+    } as never)
+  }
+  return result
 }
 
 describe('A113 Heresy Teacher session', () => {

@@ -1,7 +1,7 @@
 import { defineOccupationCard } from '../card-source'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
-import { queueFutureMeeples, futureMeeplesNode } from '../../actions/effects/internal/future-meeples'
+import { futureMeeplesNode } from '../../actions/effects/internal/future-meeples'
 import type { CardImpl } from '../registry'
 
 const CARD_ID = 'D111_InteriorDecorator'
@@ -11,15 +11,15 @@ const listener: CardListenerRegistration = {
   phases: ['after' as ActionHookPhase],
   actions: ['renovate-house'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
-    queueFutureMeeples(context.state, {
+    const request = {
       cardId: CARD_ID,
       playerId: context.player.id,
       startRound: context.state.round + 1,
       count: 6,
       resources: { food: 1 },
-    })
+    }
     return {
-      flow: futureMeeplesNode(),
+      flow: futureMeeplesNode(request),
       sourceCard: CARD_ID,
     }
   },

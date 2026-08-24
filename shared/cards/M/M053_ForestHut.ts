@@ -50,11 +50,6 @@ const selectedForestRemovalTiles = (context: CardListenerContext): FarmTilePosit
   return removesForest ? terrainSelectionTiles(context) : []
 }
 
-const clearForestMarker = (player: Parameters<typeof writeCardExtraData>[0]) => {
-  writeCardExtraData(player, CARD_ID, BOUND_FOREST_KEY, undefined)
-  writeCardExtraData(player, CARD_ID, FARM_TERRAIN_MARKERS_KEY, [])
-}
-
 registerSelectionEffect(SELECTION_EFFECT, ({ player, positions }) => {
   const tile = parsePositionKey(positions[0] ?? '')
   if (!tile) return
@@ -104,8 +99,27 @@ const unlockListener: CardListenerRegistration = {
     if (!workerId) return
     const worker = (context.player.workers ?? []).find((entry) => entry.id === workerId)
     if (!worker || worker.isActive || worker.removedFromSupply !== true) return
-    clearForestMarker(context.player)
-    return { flow: unlockFlow(workerId), sourceCard: CARD_ID }
+    return {
+      flow: {
+        type: 'seq',
+        children: [
+          {
+            type: 'leaf',
+            actionId: 'special-effect',
+            sourceCard: CARD_ID,
+            params: { kind: 'set-extra-data', key: BOUND_FOREST_KEY, value: undefined },
+          },
+          {
+            type: 'leaf',
+            actionId: 'special-effect',
+            sourceCard: CARD_ID,
+            params: { kind: 'set-extra-data', key: FARM_TERRAIN_MARKERS_KEY, value: [] },
+          },
+          unlockFlow(workerId),
+        ],
+      },
+      sourceCard: CARD_ID,
+    }
   },
 }
 

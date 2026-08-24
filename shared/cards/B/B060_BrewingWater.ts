@@ -1,7 +1,7 @@
 import { defineMinorCard } from '../card-source'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
-import { queueFutureMeeples, futureMeeplesNode } from '../../actions/effects/internal/future-meeples'
+import { futureMeeplesNode } from '../../actions/effects/internal/future-meeples'
 import { payLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
 
@@ -13,22 +13,20 @@ const listener: CardListenerRegistration = {
   actions: ['place-farmer'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (context.space?.id !== 'fishing') return
-    // Queue eagerly; futureMeeplesNode only resolves if the player accepts the optional payment.
-    // If declined, pending entry stays until next futureMeeplesNode execution (known limitation).
-    queueFutureMeeples(context.state, {
+    const request = {
       cardId: CARD_ID,
       playerId: context.player.id,
       startRound: context.state.round + 1,
       count: 6,
       resources: { food: 1 },
-    })
+    }
     return {
       flow: {
         type: 'seq',
         optional: true,
         children: [
           payLeaf({ cardId: CARD_ID, cost: { grain: 1 } }),
-          futureMeeplesNode(),
+          futureMeeplesNode(request),
         ],
       },
       sourceCard: CARD_ID,

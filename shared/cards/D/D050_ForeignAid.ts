@@ -12,8 +12,8 @@ const CARD_ID = 'D050_ForeignAid'
  * Drawback: The card owner cannot use action spaces that are revealed in
  * rounds 12, 13, or 14 (the last 3 round-action spaces).
  *
- * Implementation: computeArgs listener on place-farmer that filters out
- * blocked action spaces from the choice options for the card owner.
+ * Implementation: isDoable listener vetoes blocked action spaces for the
+ * card owner at every entry path.
  */
 
 /** Returns the set of action space IDs that are revealed in rounds 12-14 */
@@ -27,31 +27,18 @@ export const getBlockedSpaceIds = (state: { roundActionOrder: (string | null)[] 
   return blocked
 }
 
-const computeArgsListener: CardListenerRegistration = {
-  id: 'D50-foreign-aid-compute-args-place-farmer',
+const isDoableListener: CardListenerRegistration = {
+  id: 'D50-foreign-aid-isDoable',
   cardIds: [CARD_ID],
-  phases: ['computeArgs' as ActionHookPhase],
-  actions: ['place-farmer'],
+  phases: ['isDoable' as ActionHookPhase],
   handler: (context: CardListenerContext): ActionHookResult | void => {
-    const blocked = getBlockedSpaceIds(context.state)
-    if (blocked.size === 0) return
-    // Mutate the result options to filter out blocked spaces
-    const result = context.result
-    if (
-      result
-      && result.type === 'request'
-      && result.request.kind === 'choice'
-      && Array.isArray(result.request.options)
-    ) {
-      result.request.options = result.request.options.filter(
-        (opt) => !blocked.has(opt.value),
-      )
-    }
+    if (!getBlockedSpaceIds(context.state).has(context.actionId)) return
+    return { doable: false }
   },
 }
 
 const cardImpl = {
-  listeners: [computeArgsListener],
+  listeners: [isDoableListener],
   effect: {
   id: CARD_ID,
   onBuy: () => {
