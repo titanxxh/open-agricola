@@ -209,6 +209,38 @@ export const validateMoorSpecialActionEffect = (
   actionId: MoorSpecialActionId,
   payload: MoorSpecialActionPayload = {},
 ): { ok: true } | { ok: false; error: string } => {
+  if (isMoorTerrainAction(actionId)) {
+    return validateMoorTerrainActionEffect(state, playerIndex, actionId, payload)
+  }
+  const player = state.players[playerIndex]
+  if (!player || !state.farmersOfTheMoor) return { ok: false, error: 'farmers of the moor unavailable' }
+  switch (actionId) {
+    case 'hiring-fair':
+      break
+    case 'horse-market':
+      break
+    case 'black-market':
+      if (!canExecuteImprovementFlow(state, player, ['minor'])) {
+        return { ok: false, error: 'special action unavailable' }
+      }
+      break
+    case 'illicit-work':
+      if (!canExecuteImprovementFlow(state, player, ['major'])) {
+        return { ok: false, error: 'special action unavailable' }
+      }
+      break
+    default:
+      return { ok: false, error: 'special action unavailable' }
+  }
+  return { ok: true }
+}
+
+export const validateMoorTerrainActionEffect = (
+  state: GameState,
+  playerIndex: number,
+  actionId: MoorSpecialActionId,
+  payload: MoorSpecialActionPayload = {},
+): { ok: true } | { ok: false; error: string } => {
   const player = state.players[playerIndex]
   if (!player || !state.farmersOfTheMoor) return { ok: false, error: 'farmers of the moor unavailable' }
   switch (actionId) {
@@ -224,20 +256,6 @@ export const validateMoorSpecialActionEffect = (
       }
       if ((player.fields ?? []).length > 0 && !hasAdjacentField(player.fields, payload.tile)) {
         return { ok: false, error: 'terrain unavailable' }
-      }
-      break
-    case 'hiring-fair':
-      break
-    case 'horse-market':
-      break
-    case 'black-market':
-      if (!canExecuteImprovementFlow(state, player, ['minor'])) {
-        return { ok: false, error: 'special action unavailable' }
-      }
-      break
-    case 'illicit-work':
-      if (!canExecuteImprovementFlow(state, player, ['major'])) {
-        return { ok: false, error: 'special action unavailable' }
       }
       break
     default:

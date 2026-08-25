@@ -1393,7 +1393,9 @@ GameContextRouter
 | 约束 | 可执行覆盖 | 边界 |
 |---|---|---|
 | `shared` / `server` / `client` 物理分层 | ESLint `no-restricted-imports` error | 测试目录有显式豁免；只检查 import，不证明 runtime ownership。 |
-| Card Source scope、跨卡引用、trailing snapshot、listener purity | `pnpm run check:card-impl-boundaries` | 生产扫描为空或 scope 不匹配时失败。purity 覆盖直接写入、权威别名、已知 mutator helper 和一层同文件 wrapper；更深 helper 链仍由 review 负责。 |
+| Card Source scope 与跨卡引用 | `pnpm run check:card-impl-boundaries` | TypeScript AST 检查生产 Card Source 文件及同文件卡牌 ID 字面量或顶层 const 别名。`Major_*`、`reaches`、购买候选和前置候选是显式例外；不追踪跨文件数据流。source scope 为空或不匹配时失败。 |
+| trailing listener snapshot | `pnpm run check:card-impl-boundaries` | 从解析后的 `ALL_CARD_IMPLS` 枚举 handler，其 ID 必须覆盖所有声明了 `impl` 的生产 Card Source。`during`、`immediatelyAfter`、`after` 中直接读取 `improvements` / `minorPlayed` / `occupationPlayed` 长度会失败；非 trailing 读取和 membership 检查仍允许。门禁只解析实际 handler 函数体，不跟踪 helper 调用或派生值。runtime scope 为空、不完整或无法解析时失败；runtime 诊断只标识卡牌与 listener，不伪造原始源码行号。 |
+| listener 状态纯净 | 行为测试与代码评审 | handler 必须保持 state-pure flow builder，但不声称存在全程序 TypeScript mutation proof；`check:card-impl-boundaries` 不执行该约束。 |
 | 生成目录与 Card Source 一致 | `pnpm run check:generated-cards-sync` | 结构化校验 source/catalog 相等，不硬编码卡牌数量。 |
 | `GameSession` 持有服务端命令边界 | `CONTEXT.md`、ADR-0014、review、三层 import error | 这是 ownership，不表示只有一个源文件包含赋值；不声称完成 whole-program mutation proof。 |
 | canonical 架构接线 | `pnpm run check:architecture` + `scripts/__tests__/ci-card-impl-boundaries.test.ts` | 两份 CI workflow 仅手动触发且各调用一次 aggregator；当前合入证据来自可信本机全量 CI。 |

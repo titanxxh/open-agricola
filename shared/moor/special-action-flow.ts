@@ -21,6 +21,7 @@ import {
   createMoorSpecialActionSpace,
   isMoorSpecialActionId,
   isMoorSpecialActionCardUsableByPlayer,
+  validateMoorTerrainActionEffect,
   validateMoorSpecialAction,
   validateMoorSpecialActionEffect,
   type MoorSpecialActionPayload,
@@ -104,6 +105,11 @@ const takeCardOptions = (
       labelKey: optionLabel(card.actions[0]!),
     }))
 
+export const hasMoorSpecialActionCardChoice = (
+  state: GameState,
+  player: PlayerState,
+): boolean => takeCardOptions(state, player).length > 0
+
 type ActionChoice = {
   value: string
   actionId: MoorSpecialActionId
@@ -137,6 +143,17 @@ const actionChoices = (
       if (!validation.ok) return []
       return [{ value: actionChoiceValue(actionId, payload), actionId, payload }]
     }),
+  )
+}
+
+export const hasMoorTerrainActionChoice = (
+  state: GameState,
+  player: PlayerState,
+  actionId: MoorSpecialActionId,
+): boolean => {
+  const playerIndex = state.players.indexOf(player)
+  return playerIndex >= 0 && tilePayloads(player, actionId).some((payload) =>
+    validateMoorTerrainActionEffect(state, playerIndex, actionId, payload).ok,
   )
 }
 
