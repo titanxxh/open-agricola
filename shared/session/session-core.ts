@@ -1269,14 +1269,15 @@ export class GameCore {
       ...player.minorPlayed,
       ...player.occupationPlayed,
     ]
-    for (const cardId of cardIds) {
-      const effect = getCardEffect(cardId)
+    const effects = cardIds.map((cardId) => getCardEffect(cardId))
+    const maySkipFieldPhase = effects.some((effect) => effect?.maySkipHarvestFieldPhase)
+    for (const effect of effects) {
       for (const resource of effect?.preHarvestGoodsWantedBeforeReap ?? []) {
         if ((player.resources[resource] ?? 0) <= 0) wanted.add(resource)
       }
       for (const resource of effect?.preHarvestGoodsWanted ?? []) {
         if ((player.resources[resource] ?? 0) > 0) continue
-        if (this.willReapHarvestGood(player, resource)) continue
+        if (!maySkipFieldPhase && this.willReapHarvestGood(player, resource)) continue
         wanted.add(resource)
       }
     }
@@ -2832,12 +2833,22 @@ export class GameCore {
     const startIdx = frozenStartIdx === -1
       ? this.state.players.findIndex((player) => player.startPlayer)
       : frozenStartIdx
-    this.state.currentPlayerIndex = startIdx === -1 ? 0 : startIdx
+    const frozenOrderStartIdx = startIdx === -1 ? 0 : startIdx
+    this.state.currentPlayerIndex = frozenOrderStartIdx
     if (this.state.round >= 2 && startIdx >= 0) {
       incFirstPlayer(this.state.players[startIdx]!)
     }
     this.state.roundPhase = 'work'
     appendImmediateEvents(this.state, [{ type: 'work.started' }])
+    const workComplete = roundPhase.roundWorkComplete(this.state)
+    if (!workComplete) {
+      const previousIdx = (frozenOrderStartIdx + this.state.players.length - 1) % this.state.players.length
+      this.state.currentPlayerIndex = roundPhase.nextSeatedPlayerIdx(
+        this.state,
+        this.state.players,
+        previousIdx,
+      )
+    }
     this.state.roundStartSnapshot = this.buildRoundSnapshot(this.state)
     this.engineStack.clear()
     this.history = []

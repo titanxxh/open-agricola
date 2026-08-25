@@ -552,10 +552,15 @@ export const computeScores = (state: GameState): PlayerScoreSummary[] => {
         cardId,
         handler: effect.computeCostedBonus!,
       }))
+    const selectedReserveEntries = getSelectedScoringReserveBonuses(player)
     const selectedReserve = sumSelectedScoringReserve(player)
+    const selectedReserveIsAffordable = Object.entries(selectedReserve).every(([resource, amount]) =>
+      (player.resources[resource as keyof Resource] ?? 0) >= (amount ?? 0),
+    )
+    const appliedSelectedReserve = selectedReserveIsAffordable ? selectedReserve : {}
     const playerForBonus = {
       ...player,
-      resources: subtractScoringReserve(player.resources, selectedReserve),
+      resources: subtractScoringReserve(player.resources, appliedSelectedReserve),
     }
     const bonusScoreResult = solveBonusScoring({
       state,
@@ -620,8 +625,7 @@ export const computeScores = (state: GameState): PlayerScoreSummary[] => {
 
     let cardBonusVp = 0
     const cardBonusEntries: Extract<ScoreEntry, { type: 'bonus' }>[] = []
-    const selectedReserveEntries = getSelectedScoringReserveBonuses(player)
-    for (const { cardId, bonus } of selectedReserveEntries) {
+    for (const { cardId, bonus } of selectedReserveIsAffordable ? selectedReserveEntries : []) {
       const entry: Extract<ScoreEntry, { type: 'bonus' }> = {
         type: 'bonus',
         score: bonus.score,
