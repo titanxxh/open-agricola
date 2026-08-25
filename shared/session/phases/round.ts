@@ -26,7 +26,7 @@ import { canEnterActionSpace } from '../action-entry-query.ts'
 import { incPlacedFarmers } from '../../session/stats.ts'
 import { recordActionSnapshot } from '../../cards/helpers/action-snapshot.ts'
 import { recordRoundPlacement } from '../../cards/helpers/round-placement.ts'
-import { executeCardListener, getMatchingListeners, listenerOwnerOptions, runCardListeners } from '../../cards/card-listeners.ts'
+import { collectBeforePlacementFlows, runCardListeners } from '../../cards/card-listeners.ts'
 import { shouldSkipPlayerTurn, hasPendingExtraTurn, collectExtraTurnFlow, skipPendingExtraTurn } from '../../cards/card-effects.ts'
 import { tagInjectedAnytimeFlow } from '../../engine/action-context-flags.ts'
 import { appendImmediateEvents } from '../../events/append.ts'
@@ -170,19 +170,7 @@ export const takeAction = (
     reason: 'top-level',
   })
 
-  const beforeListenerContext = {
-    state,
-    player,
-    space,
-    actionId: spaceId,
-    phase: 'before' as const,
-  }
-  const matched = getMatchingListeners(beforeListenerContext)
-  const beforeFlows: ActionFlow[] = []
-  for (const entry of matched) {
-    const result = executeCardListener(entry.registration, beforeListenerContext, listenerOwnerOptions(entry))
-    if (result?.flow) beforeFlows.push(result.flow)
-  }
+  const beforeFlows = collectBeforePlacementFlows(state, player, space)
   if (beforeFlows.length > 0) {
     core.peekEngineFrame()?.engine.injectBeforeFlows(beforeFlows, { state, player, space })
     core.flushEngineLogPublic()
