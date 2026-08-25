@@ -19,7 +19,7 @@ registerSelectionEffect('add-vegetable', ({ player, positions }) => {
 const cardImpl = {
   effect: {
   id: CARD_ID,
-  preHarvestGoodsWanted: ['grain'],
+  preHarvestGoodsWantedBeforeReap: ['grain'],
   onStartHarvestFieldPhase: (_state, player) => {
     // Need grain to pay and at least one vegetable field with crops
     if ((player.resources.grain ?? 0) < 1) return

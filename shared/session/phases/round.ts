@@ -61,7 +61,7 @@ export const nextSeatedPlayerIdx = (
  * turn keeps the round open instead of ending it prematurely. Mirrors the
  * extra-turn gating applied to `nextSeatedPlayerIdx` and the rotation skip loop.
  */
-const roundWorkComplete = (state: GameState): boolean =>
+export const roundWorkComplete = (state: GameState): boolean =>
   state.players.every((p) => workersAvailable(state, p) <= 0 && !hasPendingExtraTurn(state, p))
 
 const combineFlows = (flows: ActionFlow[]): ActionFlow | undefined => {

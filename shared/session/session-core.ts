@@ -1270,7 +1270,11 @@ export class GameCore {
       ...player.occupationPlayed,
     ]
     for (const cardId of cardIds) {
-      for (const resource of getCardEffect(cardId)?.preHarvestGoodsWanted ?? []) {
+      const effect = getCardEffect(cardId)
+      for (const resource of effect?.preHarvestGoodsWantedBeforeReap ?? []) {
+        if ((player.resources[resource] ?? 0) <= 0) wanted.add(resource)
+      }
+      for (const resource of effect?.preHarvestGoodsWanted ?? []) {
         if ((player.resources[resource] ?? 0) > 0) continue
         if (this.willReapHarvestGood(player, resource)) continue
         wanted.add(resource)
@@ -3902,11 +3906,17 @@ export class GameCore {
     if (this.stageDispatch.continueStageHook('onAllWorkersPlaced', playerIndex, cardIndex)) {
       return this.respond()
     }
-    return this.performRoundEnd()
+    return roundPhase.performRoundEnd(this)
   }
 
   /** S2 Task 10 part 7: thin delegator — body lives in `phases/round.ts`. */
-  performRoundEnd(): SessionResponse { return roundPhase.performRoundEnd(this) }
+  performRoundEnd(): SessionResponse {
+    return this.withCtx(() => {
+      if (!roundPhase.roundWorkComplete(this.state)) return this.respond(false, 'not all workers used')
+      if (this.peekEnginePendingEnvelope()) return this.respond(false, 'pending action exists')
+      return this.continueAllWorkersPlacedHooks()
+    })
+  }
 
   private continueBeforeReturnHomeHooks(playerIndex = 0, cardIndex = 0): SessionResponse {
     if (this.stageDispatch.continueStageHook('onBeforeReturnHome', playerIndex, cardIndex)) {

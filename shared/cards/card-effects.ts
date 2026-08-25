@@ -262,6 +262,7 @@ export type SharedPostScoreHandler = (
 export type CardEffect = {
   id: string
   preHarvestGoodsWanted?: ResourceKey[]
+  preHarvestGoodsWantedBeforeReap?: ResourceKey[]
   onBuy?: FlowEffectHandlerWithPayment
   /** Fires when a pending `choice` whose sourceCard is this card is resolved.
    *  If the handler returns an ActionFlow, it is inserted as the next engine node. */
