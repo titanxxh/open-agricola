@@ -821,6 +821,9 @@ export type ActionDefinition = {
   anytime?: boolean
   idleOnly?: boolean
   canBeExecutedByPlayer: CanBeExecutedByPlayer
+  isAlreadySatisfied?: (
+    context: ActionExecutionContext & { transactionEvents: readonly GameEvent[] },
+  ) => boolean
   costPreview?: ActionCostPreview
   execute: (context: ActionMutationContext) => ActionExecutionResult
   resolveChoice?: (
