@@ -37,7 +37,7 @@ const computeReplaceListener: CardListenerRegistration = {
 const afterPlaceFarmerListener: CardListenerRegistration = {
   id: 'A97-freshman-after-place-farmer',
   cardIds: [CARD_ID],
-  phases: ['after' as ActionHookPhase],
+  phases: ['before' as ActionHookPhase, 'after' as ActionHookPhase],
   actions: ['place-farmer'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (!isCardFlagged(context.player, CARD_ID)) return
