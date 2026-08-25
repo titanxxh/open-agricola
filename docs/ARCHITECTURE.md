@@ -714,7 +714,7 @@ Harvest in rounds 4/7/9/11/13/14:
     -> feed -> onEndHarvestFeedingPhase
   -> breed -> onEndHarvest -> onAfterHarvest
 Before game end: after round 14 onAfterRoundEnd completes and advances to round 15,
-  onBeforeEndGame -> gameover
+  onBeforeEndGame -> preScoringWindow -> gameover
 ```
 
 An ordinary Harvest removes crops with `reap(..., { trigger: { phase: 'harvest' } })`; the event layer records `reason: 'reap'`. For each field, `computeHarvestCount(state, player, field)` first returns the crop amount moved by ordinary reap plus `sources`, `tags`, and `scope`. An individual card may alter `delta`, set `override`, add semantic `tags`, or elevate `scope` to `field` only through `registerHarvestCountModifier(cardId, modifier)`. It must not add a card-specific branch to the main `reap` path. Default `top-stack` scope harvests only the original top stack; only a full-field effect such as E73 uses `field` scope across stacks.
@@ -735,7 +735,9 @@ Stage hooks can return `ActionFlow`; `continueStageHook` and `continueAllWorkers
 
 The three Harvest-field stage hooks run in player order. On entry for each player, every triggerable card effect compiles into an `activate-card-effect` activation and enters `ParallelNode(mode='trigger-select')`. Ordinary `reap` still occurs after `onHarvestFieldPhase` reactions finish. `onBeforePlayerTurn` is the non-flow skip-control exception: it synchronously returns `{ skipTurn?: true } | void` at labor-turn entry, never returns `ActionFlow`, never enters `continueStageHook`, and cannot create pending state.
 
-`onBeforeEndGame?: FlowEffectHandler` is the stage hook before final scoring. After round 14, Before-End Player Dispatch creates `activate-card-effect` activations in target-player seating order. Default `beforeEndGameScope` is `owner`; a played card with `allPlayers` can run in every target step. `handHooks` do not support `onBeforeEndGame`. Multiple activations for one target normally enter trigger-select, and `beforeEndGameMandatory` determines the pass gate. The hook flow may create pending state and resumes at the next target through `stageResume.hook='onBeforeEndGame'`. Only after all targets complete does the engine set `gameOver` and enter the `gameover` interaction.
+`onBeforeEndGame?: FlowEffectHandler` is the stage hook before final scoring. After round 14, Before-End Player Dispatch creates `activate-card-effect` activations in target-player seating order. Default `beforeEndGameScope` is `owner`; a played card with `allPlayers` can run in every target step. `handHooks` do not support `onBeforeEndGame`. Multiple activations for one target normally enter trigger-select, and `beforeEndGameMandatory` determines the pass gate. The hook flow may create pending state and resumes at the next target through `stageResume.hook='onBeforeEndGame'`.
+
+After every before-end target completes, `preScoringWindow` walks players in seating order and queries only `anytime` listeners marked `preScoring: true`. A player with no currently available marked flow is skipped without an empty interaction. Otherwise an optional XOR offers the available card flows; completing one flow rebuilds the same player's window against live state, while Pass advances to the next player. This ordering lets resources granted by `onBeforeEndGame` be spent. Only after every player passes or has no available marked flow does the engine set `gameOver` and enter the `gameover` interaction.
 
 When a stage-hook subflow produces private events, nested `respond()` calls must not drain the outer response buffer early. A `stageResume` continuation preserves private events until the outermost response sends them together.
 

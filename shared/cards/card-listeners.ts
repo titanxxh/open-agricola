@@ -46,6 +46,7 @@ export type CardListenerRegistration = {
   scope?: CardListenerScope
   zones?: CardListenerZone[]
   mandatory?: boolean
+  preScoring?: boolean
   /**
    * Card-purchase cost candidate transform (Candidate Closure, ADR 0004).
    * Receives one Cost Candidate and returns the derived candidate(s), or

@@ -22,6 +22,7 @@ export type StageResumeState = {
     | 'onAfterRoundEnd'
     | 'onRoundEnd'
     | 'onBeforeEndGame'
+    | 'preScoringWindow'
     | 'onStartHarvest'
     | 'onStartHarvestFieldPhase'
     | 'onHarvestFieldPhase'
@@ -40,6 +41,7 @@ export type StageResumeState = {
     originPlayerIndex?: number | null
     triggerActionId?: string | null
     resumeAfterCardId?: string | null
+    preScoringActionTaken?: boolean
   }
 }
 
@@ -79,10 +81,22 @@ export class StageDispatch {
   completeFrameIfStage(frame: EngineFrame): boolean {
     const stageResume = (frame.stageResume ?? null) as StageResumeState | null
     if (!stageResume) return false
+    const completedStageResume = stageResume.hook === 'preScoringWindow'
+      ? {
+          ...stageResume,
+          extra: {
+            ...stageResume.extra,
+            preScoringActionTaken:
+              frame.engine.snapshot().treeCursor.some((cursor) =>
+                cursor.data.optional === true && cursor.data.optionalActive === true,
+              ),
+          },
+        }
+      : stageResume
     this.host.popEngineFrame()
     this.pendingStageSwitchFromPlayerIndex = frame.ownerPlayerIndex
     try {
-      this.host.withDeferredPrivateEventDrain(() => this.resume(stageResume))
+      this.host.withDeferredPrivateEventDrain(() => this.resume(completedStageResume))
     } finally {
       this.pendingStageSwitchFromPlayerIndex = null
     }

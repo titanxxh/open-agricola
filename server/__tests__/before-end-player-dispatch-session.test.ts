@@ -2,12 +2,17 @@ import { describe, expect, it } from 'vitest'
 import { GameSession, type SessionResponse } from '../game/authoritative-session'
 import { requireActiveCardRegistry } from '../../shared/cards/active-registry'
 import type { CardEffect } from '../../shared/cards/card-effects'
+import { getCardStack, pushToCardStack } from '../../shared/cards/helpers/card-state'
 import { markAllWorkersUsed, setActiveWorkerCount } from '../../shared/domain/player'
 import type { PlayerState } from '../../shared/contract/types'
+import { confirmPlayerSwitch } from './_helpers/pending-confirms'
 
 const SHARED_CARD = 'TEST_BeforeEndShared'
 const OWNER_CARD = 'TEST_BeforeEndOwner'
 const PREVIEW_CARD = 'TEST_BeforeEndPreviewMutation'
+const GRANT_CARD = 'TEST_BeforeEndFoodGrant'
+const GROCER = 'A102_Grocer'
+const CLEARING_SPADE = 'A071_ClearingSpade'
 
 const setPlaceholderHands = (player: PlayerState) => {
   player.minorHand = ['__test_placeholder__']
@@ -80,6 +85,17 @@ const expectSharedTrigger = (resp: SessionResponse, playerIndex: number) => {
   })
 }
 
+const expectPreScoringGrocer = (resp: SessionResponse, playerIndex: number) => {
+  expect(resp.interaction.stateId).toBe('wait')
+  if (resp.interaction.stateId !== 'wait') throw new Error('expected pre-scoring window')
+  expect(resp.interaction.playerIndex).toBe(playerIndex)
+  expect(resp.interaction.request.kind).toBe('choice')
+  const option = resp.interaction.request.options?.find((entry) => entry.sourceCard === GROCER)
+  expect(option).toBeDefined()
+  expect(resp.interaction.request.options?.some((entry) => entry.value === '__skip__')).toBe(true)
+  return option!
+}
+
 describe('Before-End Player Dispatch session', () => {
   it('dispatches default before-end activations through trigger-select for each target player', () => {
     const session = setupEndGameSession()
@@ -136,5 +152,105 @@ describe('Before-End Player Dispatch session', () => {
 
     resp = session.resolveChoice(0, PREVIEW_CARD)
     expect(resp.state.players[0]!.fields).toEqual([{ row: 0, col: 0, stacks: [] }])
+  })
+
+  it('opens repeatable player-order anytime windows after the final harvest and before scoring', () => {
+    const session = new GameSession()
+    const state = session.getState().state
+    state.players = state.players.slice(0, 2)
+    state.currentPlayerIndex = 0
+    state.round = 14
+    state.roundPhase = 'work'
+    state.gameOver = false
+    state.players.forEach((player) => {
+      markAllWorkersUsed(state, player)
+      setActiveWorkerCount(player, 0)
+      setPlaceholderHands(player)
+      player.resources.food = 0
+      player.occupationPlayed = [GROCER]
+      player.minorPlayed = []
+      player.improvements = []
+      player.cardStates = {}
+    })
+    state.players[0]!.occupationPlayed.unshift(GRANT_CARD)
+    state.players[1]!.resources.food = 1
+    pushToCardStack(state.players[0]!, GROCER, ['wood', 'vegetable'])
+    pushToCardStack(state.players[1]!, GROCER, ['reed'])
+    session.loadState(state)
+    requireActiveCardRegistry('pre-scoring window test').setEffect({
+      id: GRANT_CARD,
+      onBeforeEndGame: () => ({
+        type: 'leaf',
+        actionId: 'gain',
+        sourceCard: GRANT_CARD,
+        params: { food: 2 },
+      }),
+    })
+
+    let resp = session.performRoundEnd()
+    const firstGrocer = expectPreScoringGrocer(resp, 0)
+    expect(resp.state.round).toBe(15)
+    expect(resp.state.gameOver).toBe(false)
+    expect(resp.state.players[0]!.resources.food).toBe(2)
+    expect(resp.state.events.filter((event) => event.type === 'harvest.started')).toHaveLength(1)
+    expect(resp.state.events.filter((event) => event.type === 'game.ended')).toHaveLength(0)
+    const logCount = resp.state.log.length
+
+    resp = session.resolveChoice(0, firstGrocer.value)
+    expectPreScoringGrocer(resp, 0)
+    expect(resp.state.players[0]!.resources.food).toBe(1)
+    expect(resp.state.players[0]!.resources.vegetable).toBe(1)
+    expect(getCardStack(resp.state.players[0]!, GROCER)).toEqual(['wood'])
+    expect(resp.state.log.length).toBeGreaterThan(logCount)
+
+    resp = session.resolveChoice(0, '__skip__')
+    if (resp.interaction.stateId === 'wait' && resp.interaction.request.kind === 'confirm-player-switch') {
+      resp = confirmPlayerSwitch(session)
+    }
+    expectPreScoringGrocer(resp, 1)
+
+    resp = session.resolveChoice(1, '__skip__')
+    expect(resp.state.gameOver).toBe(true)
+    expect(resp.interaction.stateId).toBe('gameover')
+    expect(resp.state.events.filter((event) => event.type === 'harvest.started')).toHaveLength(1)
+    expect(resp.state.events.filter((event) => event.type === 'game.ended')).toHaveLength(1)
+    expect(resp.scores).toHaveLength(2)
+  })
+
+  it('skips the pre-scoring window when only unlisted or unavailable anytime cards remain', () => {
+    const session = new GameSession()
+    const state = session.getState().state
+    state.players = state.players.slice(0, 2)
+    state.currentPlayerIndex = 0
+    state.round = 14
+    state.roundPhase = 'work'
+    state.gameOver = false
+    state.players.forEach((player) => {
+      markAllWorkersUsed(state, player)
+      setActiveWorkerCount(player, 0)
+      setPlaceholderHands(player)
+      player.resources.food = 0
+      player.occupationPlayed = []
+      player.minorPlayed = []
+      player.improvements = []
+      player.cardStates = {}
+    })
+    const player = state.players[0]!
+    player.occupationPlayed = [GROCER]
+    player.minorPlayed = [CLEARING_SPADE]
+    player.fields = [
+      { row: 0, col: 0, stacks: [{ kind: 'grain', remaining: 3 }] },
+      { row: 0, col: 1, stacks: [] },
+    ]
+    pushToCardStack(player, GROCER, ['wood'])
+    session.loadState(state)
+
+    const resp = session.performRoundEnd()
+
+    expect(resp.state.gameOver).toBe(true)
+    expect(resp.interaction.stateId).toBe('gameover')
+    expect(resp.state.players[0]!.fields[0]!.stacks[0]!.remaining).toBe(2)
+    expect(resp.state.events.filter((event) => event.type === 'harvest.started')).toHaveLength(1)
+    expect(resp.state.events.filter((event) => event.type === 'game.ended')).toHaveLength(1)
   })
 })

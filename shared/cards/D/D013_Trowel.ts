@@ -37,6 +37,7 @@ const anytimeListener: CardListenerRegistration = {
   id: 'D13-trowel-anytime',
   cardIds: [CARD_ID],
   phases: ['anytime' as ActionHookPhase],
+  preScoring: true,
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (context.player.houseType === 'stone') return
     return {

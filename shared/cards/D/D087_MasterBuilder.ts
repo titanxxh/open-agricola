@@ -16,6 +16,7 @@ const anytimeListener: CardListenerRegistration = {
   id: 'D87-master-builder-anytime',
   cardIds: [CARD_ID],
   phases: ['anytime' as ActionHookPhase],
+  preScoring: true,
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (isCardFlagged(context.player, CARD_ID)) return
     if (context.player.rooms < 5) return

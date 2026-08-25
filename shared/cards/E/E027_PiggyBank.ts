@@ -19,6 +19,7 @@ const anytimeListener: CardListenerRegistration = {
   id: 'E27-piggy-bank-anytime',
   cardIds: [CARD_ID],
   phases: ['anytime' as ActionHookPhase],
+  preScoring: true,
   handler: (context: CardListenerContext): ActionHookResult | void => {
     const foodOnCard = context.player.cardStates?.[CARD_ID]?.counters?.[FOOD_KEY] ?? 0
     if (foodOnCard < FOOD_THRESHOLD) return

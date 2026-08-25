@@ -52,7 +52,7 @@ import {
   LogStore,
   isSyntheticInteractionFrame,
 } from '../engine/index.ts'
-import { isInjectedAnytimeResult } from '../engine/action-context-flags.ts'
+import { isInjectedAnytimeResult, tagInjectedAnytimeFlow } from '../engine/action-context-flags.ts'
 import type { EngineFrame, EngineSource, EngineStackCursor, SubFlowReason } from '../engine/index.ts'
 import { isProtectedActionCancel } from '../engine/protected-action-cancel.ts'
 import type { PendingCursor, PendingEnvelope } from '../engine/types.ts'
@@ -743,6 +743,11 @@ export class GameCore {
       onStartReturnHome: (stageResume) => { this.continueStartReturnHomeHooks(stageResume.playerIndex, stageResume.cardIndex) },
       onAfterRoundEnd: (stageResume) => { this.continueAfterRoundEnd(stageResume.playerIndex, stageResume.cardIndex) },
       onBeforeEndGame: (stageResume) => { this.continueBeforeEndGameHooks(stageResume.playerIndex, stageResume.cardIndex) },
+      preScoringWindow: (stageResume) => {
+        this.continuePreScoringWindow(
+          stageResume.playerIndex + (stageResume.extra?.preScoringActionTaken ? 0 : 1),
+        )
+      },
       onStartHarvest: (stageResume) => { this.continueFromStartHarvest(stageResume.playerIndex, stageResume.cardIndex, stageResume.extra) },
       onStartHarvestFieldPhase: (stageResume) => { this.continueHarvestFieldStart(stageResume.playerIndex, stageResume.cardIndex) },
       onHarvestFieldPhase: (stageResume) => { this.continueHarvestFieldPhase(stageResume.playerIndex, stageResume.cardIndex) },
@@ -1487,7 +1492,7 @@ export class GameCore {
     return view?.sourceCard ?? choicesSourceCard(view?.choices ?? [])
   }
 
-  private buildAnytimeEntries(): { descriptor: AnytimeAction; flow: ActionFlow }[] {
+  private buildAnytimeEntries(options: { preScoringOnly?: boolean } = {}): { descriptor: AnytimeAction; flow: ActionFlow }[] {
     if (hasPendingOrdinaryCardDrawChoice(this.state)) return []
     const policy = this.computeAnytimePolicySnapshot()
     if (!policy.allowed) return []
@@ -1499,7 +1504,7 @@ export class GameCore {
     const pendingSnapshot = this.peekHostContextSnapshot()
     const pendingSourceCard = this.peekPendingSourceCard()
     const pendingActionContext = pendingSnapshot?.actionContext
-    for (const action of this.registry.values()) {
+    for (const action of options.preScoringOnly ? [] : this.registry.values()) {
       if (!action.anytime) continue
       if (blockedIds.has(action.id)) continue
       if (action.idleOnly && this.engineStack.depth() > 0) continue
@@ -1532,6 +1537,7 @@ export class GameCore {
     for (const entry of matchedAnytime) {
       if (!entry.cardId) continue
       if (entry.ownerPlayerId !== player.id) continue
+      if (options.preScoringOnly && entry.registration.preScoring !== true) continue
       if (blockedIds.has(entry.registration.id)) continue
       const result = executeCardListener(entry.registration, anytimeContext, listenerOwnerOptions(entry))
       if (!result?.flow) continue
@@ -3917,6 +3923,35 @@ export class GameCore {
 
   private continueBeforeEndGameHooks(playerIndex = 0, cardIndex = 0): SessionResponse {
     if (cardIndex === 0 && this.stageDispatch.continueBeforeEndGamePlayerDispatch(playerIndex)) {
+      return this.respond()
+    }
+    return this.continuePreScoringWindow()
+  }
+
+  private continuePreScoringWindow(playerIndex = 0): SessionResponse {
+    for (let currentPlayerIndex = playerIndex; currentPlayerIndex < this.state.players.length; currentPlayerIndex += 1) {
+      this.state.currentPlayerIndex = currentPlayerIndex
+      const entries = this.buildAnytimeEntries({ preScoringOnly: true })
+      if (entries.length === 0) continue
+      const flow: ActionFlow = {
+        type: 'xor',
+        optional: true,
+        promptKey: 'ui.interactionOptionalAction',
+        children: entries.map(({ descriptor, flow: entryFlow }) => ({
+          ...tagInjectedAnytimeFlow(entryFlow),
+          optionId: descriptor.id,
+          choiceLabelKey: descriptor.labelKey,
+          choiceLabelParams: descriptor.labelParams,
+          sourceCard: descriptor.sourceCard ?? entryFlow.sourceCard,
+        })),
+      }
+      this.stageDispatch.startFlow(
+        flow,
+        'preScoringWindow',
+        currentPlayerIndex,
+        0,
+        currentPlayerIndex,
+      )
       return this.respond()
     }
     if (!this.state.gameOver) {

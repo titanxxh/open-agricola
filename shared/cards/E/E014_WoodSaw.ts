@@ -19,6 +19,7 @@ const anytimeListener: CardListenerRegistration = {
   id: 'E14-wood-saw-anytime',
   cardIds: [CARD_ID],
   phases: ['anytime' as ActionHookPhase],
+  preScoring: true,
   handler: (context: CardListenerContext): ActionHookResult | void => {
     const myFamilySize = familySize(context.player)
     // Check if ALL other players have more farmers than current player

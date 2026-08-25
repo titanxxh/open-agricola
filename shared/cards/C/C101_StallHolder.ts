@@ -11,6 +11,7 @@ const anytimeListener: CardListenerRegistration = {
   id: 'C101-stall-holder-anytime',
   cardIds: [CARD_ID],
   phases: ['anytime' as ActionHookPhase],
+  preScoring: true,
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (isCardFlagged(context.player, CARD_ID)) return
     if (context.player.resources.grain < 2) return
