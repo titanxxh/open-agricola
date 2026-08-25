@@ -324,6 +324,34 @@ export const executeCardListener = (
   return result ?? undefined
 }
 
+export const collectBeforePlacementFlows = (
+  state: GameState,
+  player: PlayerState,
+  space: ActionSpace,
+  actionContext?: Record<string, unknown>,
+): ActionFlow[] => {
+  const seen = new Set<string>()
+  const flows: ActionFlow[] = []
+  for (const actionId of [space.id, 'place-farmer']) {
+    const context = {
+      state,
+      player,
+      space,
+      actionId,
+      phase: 'before' as const,
+      actionContext,
+    }
+    for (const entry of getMatchingListeners(context)) {
+      const key = `${entry.registration.id}\0${entry.cardId}\0${entry.ownerPlayerId}`
+      if (seen.has(key)) continue
+      seen.add(key)
+      const result = executeCardListener(entry.registration, context, listenerOwnerOptions(entry))
+      if (result?.flow) flows.push(result.flow)
+    }
+  }
+  return flows
+}
+
 export const getListenerById = (listenerId: string): CardListenerRegistration | undefined => {
   const sessionCtx = getCurrentSessionContext()
   if (sessionCtx) {

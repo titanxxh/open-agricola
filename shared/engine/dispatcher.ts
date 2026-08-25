@@ -198,7 +198,9 @@ export class HookDispatcher {
   before(context: ActionExecutionContext & { actionId: string }): EffectPhaseResult {
     return {
       actionHookResults: runActionHooks({ ...context, phase: 'before' }),
-      matchedListeners: getMatchingListeners({ ...context, phase: 'before' }),
+      matchedListeners: context.actionId === 'place-farmer'
+        ? []
+        : getMatchingListeners({ ...context, phase: 'before' }),
     }
   }
 

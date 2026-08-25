@@ -1,32 +1,10 @@
 import type { ActionDefinition, ActionFlow, ActionSpace, GameState, PlayerState } from '../../../contract/types'
 import { recordRoundPlacement } from '../../../cards/helpers/round-placement'
-import { executeCardListener, getMatchingListeners, listenerOwnerOptions, type MatchedCardListener } from '../../../cards/card-listeners'
+import { collectBeforePlacementFlows, getMatchingListeners, type MatchedCardListener } from '../../../cards/card-listeners'
 import { addLinkedSpaceBlocks, addWorkerRef, findActionSpaceById, isSpaceBlocked, isSpaceOccupied } from '../../../domain/space'
 import { smallestAvailableWorker, workersAvailable } from '../../../domain/player'
 import { incPlacedFarmers } from '../../../session/stats'
 import { canEnterSpace } from '../../helpers/placement-availability'
-
-const collectBeforePlacementFlows = (
-  state: GameState,
-  player: PlayerState,
-  targetSpace: ActionSpace,
-  actionContext: Record<string, unknown> | undefined,
-): ActionFlow[] => {
-  const context = {
-    state,
-    player,
-    space: targetSpace,
-    actionId: targetSpace.id,
-    phase: 'before' as const,
-    actionContext,
-  }
-  const flows: ActionFlow[] = []
-  for (const entry of getMatchingListeners(context)) {
-    const result = executeCardListener(entry.registration, context, listenerOwnerOptions(entry))
-    if (result?.flow) flows.push(result.flow)
-  }
-  return flows
-}
 
 const collectAfterPlacementFlows = (
   state: GameState,

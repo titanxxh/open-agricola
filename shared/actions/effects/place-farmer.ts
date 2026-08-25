@@ -19,7 +19,7 @@ import { inactiveWorkersInSupply, smallestAvailableWorker } from '../../domain/p
 import { incPlacedFarmers } from '../../session/stats'
 import { computeAllowedPlacementSpaces } from '../helpers/placement-availability'
 import { OCCUPIED_SPACE_CHOICE_PREFIX } from '../helpers/placement-constants'
-import { executeCardListener, getMatchingListeners, listenerOwnerOptions } from '../../cards/card-listeners'
+import { collectBeforePlacementFlows, executeCardListener, getMatchingListeners, listenerOwnerOptions } from '../../cards/card-listeners'
 import { writeCardExtraData } from '../../cards/helpers/card-state'
 
 export { OCCUPIED_SPACE_CHOICE_PREFIX } from '../helpers/placement-constants'
@@ -73,33 +73,6 @@ const placeTemporarySupplyWorker = (
   addLinkedSpaceBlocks(state, space, player.id, workerId)
   recordRoundPlacement(player, space.id, workerId)
   return { type: 'ok', workerId }
-}
-
-const collectBeforePlacementFlows = (
-  state: GameState,
-  player: PlayerState,
-  targetSpace: ActionSpace,
-  actionContext: Record<string, unknown> | undefined,
-): ActionFlow[] => {
-  const beforeListenerContext = {
-    state,
-    player,
-    space: targetSpace,
-    actionId: targetSpace.id,
-    phase: 'before' as const,
-    actionContext,
-  }
-  const matched = getMatchingListeners(beforeListenerContext)
-  const flows: ActionFlow[] = []
-  for (const entry of matched) {
-    const result = executeCardListener(
-      entry.registration,
-      beforeListenerContext,
-      listenerOwnerOptions(entry),
-    )
-    if (result?.flow) flows.push(result.flow)
-  }
-  return flows
 }
 
 export const placeFarmerAction: ActionDefinition = {
