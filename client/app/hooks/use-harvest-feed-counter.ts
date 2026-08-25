@@ -35,5 +35,6 @@ export const computeHarvestFeedCounterMax = (
     const cap = Math.floor(remaining / need)
     if (cap < maxTimes) maxTimes = cap
   }
-  return Math.max(0, Number.isFinite(maxTimes) ? maxTimes : 0)
+  const resourceMax = Math.max(0, Number.isFinite(maxTimes) ? maxTimes : 0)
+  return Math.min(resourceMax, target.max ?? resourceMax)
 }

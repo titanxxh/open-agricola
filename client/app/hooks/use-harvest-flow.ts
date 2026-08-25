@@ -52,6 +52,7 @@ export const buildHarvestFeedOptions = (
   player: PlayerState,
   locale: Locale,
   cardLabel: (id: string) => string,
+  maxTradeTimesBySourceId?: Record<string, number>,
 ): HarvestFeedOption[] => {
   const options: HarvestFeedOption[] = []
   const basicSourceName = locale === 'zh' ? '基础转化' : 'Basic conversion'
@@ -65,6 +66,8 @@ export const buildHarvestFeedOptions = (
     exchanges.forEach((ex, idx) => {
       if (!isHarvestFeedTrigger(ex)) return
       if (!playerCanAfford(player, ex)) return
+      const sourceMax = maxTradeTimesBySourceId?.[sourceId]
+      if (sourceMax !== undefined && sourceMax <= 0) return
       options.push({
         id: `${sourceId}-ex${idx}`,
         sourceName,
@@ -72,7 +75,7 @@ export const buildHarvestFeedOptions = (
         exchangeIndex: idx,
         from: { ...ex.from },
         to: { ...ex.to },
-        max: ex.max,
+        max: sourceMax === undefined ? ex.max : Math.min(ex.max ?? sourceMax, sourceMax),
       })
     })
   }

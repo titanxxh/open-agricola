@@ -7,6 +7,7 @@ const CARD_ID = 'C029_BeerTable'
 const cardImpl = {
   effect: {
   id: CARD_ID,
+  preHarvestGoodsWanted: ['grain'],
   onEndHarvestFieldPhase: (_state, player) => {
     if ((player.resources.grain ?? 0) < 1) return
     return {

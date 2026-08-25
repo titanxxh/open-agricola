@@ -7,6 +7,7 @@ const CARD_ID = 'C098_CubeCutter'
 const cardImpl = {
   effect: {
   id: CARD_ID,
+  preHarvestGoodsWanted: ['wood'],
   onBuy: () => gainLeaf(CARD_ID, { wood: 1 }),
   onHarvestFieldPhase: (_state, player) => {
     if (player.resources.wood < 1 || player.resources.food < 1) return

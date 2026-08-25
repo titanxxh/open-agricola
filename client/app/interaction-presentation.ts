@@ -85,6 +85,7 @@ export type InteractionPresentationPlan =
       playerIndex: number
       remaining: number
       foodUsed: number
+      maxTradeTimesBySourceId?: Record<string, number>
     }
   | {
       kind: 'heating'
@@ -270,6 +271,7 @@ export const buildInteractionPresentationPlan = (
       playerIndex: interaction.playerIndex,
       remaining: interaction.request.remaining,
       foodUsed: interaction.request.foodUsed,
+      maxTradeTimesBySourceId: interaction.request.maxTradeTimesBySourceId,
     }
   }
   if (interaction.request.kind === 'heating') {
