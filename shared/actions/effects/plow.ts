@@ -241,6 +241,12 @@ export const plowAction: ActionDefinition = {
       plowCostPreview,
       { state, player, actionContext: context?.actionContext } as PlowAvailabilityContext,
     ),
+  isAlreadySatisfied: ({ player, transactionEvents }) =>
+    transactionEvents.some((event) =>
+      event.type === 'farm.fieldPlowed'
+      && event.sourceActionId === 'plow'
+      && event.fields.some((field) => field.playerId === player.id),
+    ),
   costPreview: plowCostPreview,
   execute: ({ player, actionContext, costs }): ActionExecutionResult => {
     const selectableTiles = canPayPlowCost(player, actionContext, costs)

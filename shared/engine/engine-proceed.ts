@@ -1129,8 +1129,9 @@ export function engineProceed(
         return { type: 'ok', nodeId: node.id, result: { type: 'ok' } }
       }
     }
+    const doabilityEventReadContext = currentEventReadContext(int)
     const doable = int.hooks.applyIsDoable(
-      { ...executionContext, ...currentEventReadContext(int), actionId: replacedActionId },
+      { ...executionContext, ...doabilityEventReadContext, actionId: replacedActionId },
       action,
       action.canBeExecutedByPlayer(
         executionContext.state,
@@ -1142,6 +1143,22 @@ export function engineProceed(
       ),
     )
     if (!doable) {
+      if (node.mandatory === true && action.isAlreadySatisfied?.({
+        ...executionContext,
+        transactionEvents: doabilityEventReadContext.transactionEvents,
+      })) {
+        const result = { type: 'ok' as const }
+        recordInternalChildResult(int, node, result)
+        node.resolve(result)
+        commitIfEngineComplete(int, context, result)
+        return {
+          type: 'ok',
+          nodeId: node.id,
+          actionId: replacedActionId,
+          sourceCard: executionContext.sourceCard,
+          result,
+        }
+      }
       return node.mandatory === true
         ? {
             type: 'blocked',
