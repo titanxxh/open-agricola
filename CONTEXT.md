@@ -24,6 +24,26 @@ _Avoid_: React session、本地 UI store、把唯一写入者理解为只有一�
 一局游戏的领域真相，包含玩家、行动格、回合、阶段、draft、公开事件、日志缓存、future meeple、收获摘要等可序列化状态。
 _Avoid_: 房间连接、WebSocket version、React state
 
+**Start Player Marker（起始玩家标记）**:
+由一名玩家实时持有的起始玩家标记；取得 Meeting Place 会立即转移该标记，并用于冻结下一轮的 Round Work Order。
+_Avoid_: 当前行动玩家、本轮已冻结顺序
+
+**Round Work Order（本轮工作顺序）**:
+Preparation 开始时按 Start Player Marker 冻结的本轮普通放人顺序。随后在 work phase 前发生的标记转移不改变该顺序；Roman Pot 等本轮顺序消费者必须读取同一冻结结果。
+_Avoid_: Start Player Marker、`currentPlayerIndex`、`roundActionOrder`
+
+**Rule Audit Lead（规则审计线索）**:
+来自上游提交、issue 描述或静态代码阅读的待验证规则风险；必须先在当前 `main` 复现可观察错误，才能升级为 Rule Alignment Gap 或 Rule Flow Defect。
+_Avoid_: 已确认缺陷、直接修复依据
+
+**Rule Alignment Gap（规则对齐缺口）**:
+适用的官方规则、牌面或裁定已确认 Open Agricola 的可达行动、合法选择或权威结果与之不一致。BGA 提交只能作为发现和复现证据；证据冲突由 maintainer 裁定。
+_Avoid_: 规则修改、仅凭 BGA 提交确认
+
+**Rule Flow Defect（规则流程缺陷）**:
+规则语义与最终合法结果不变，但候选过滤或强制流程可能暴露必定失败的选项或无法完成。纯交互简化不属于该类。
+_Avoid_: Rule Alignment Gap、纯视觉问题
+
 **Game Variant（游戏变体）**:
 创建一局游戏时启用的可选规则模块，会改变该局的设置、公开状态、行动格、阶段流程或计分口径。它不是普通卡牌来源，也不是前端显示偏好。
 _Avoid_: Card Source、UI toggle、player count layout

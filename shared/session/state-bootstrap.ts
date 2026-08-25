@@ -912,6 +912,7 @@ export const createInitialState = (
     draftPoolSize: draft?.poolSize,
     parentSelection: null,
     currentPlayerIndex: 0,
+    roundFirstPlayerId: players.find((player) => player.startPlayer)?.id,
     players,
     actionSpaces: [
       ...createActionSpaces(players.length),

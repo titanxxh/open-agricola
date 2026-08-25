@@ -47,15 +47,14 @@ describe('E056_RomanPot session', () => {
     expect(readCardExtraData<number>(player, CARD_ID, 'foodCount')).toBe(4)
   })
 
-  it('last player in turn order gets 1 food at start of work phase', () => {
-    // 2-player game, player at index 1 is last
-    const session = new GameSession()
+  it('last player in frozen turn order gets 1 food at start of work phase', () => {
+    const session = new GameSession(undefined, undefined, { playerCount: 3 })
     const state = session.getState().state
-    state.players = state.players.slice(0, 2)
+    state.players = state.players.slice(0, 3)
     state.round = 1
+    state.roundFirstPlayerId = state.players[1]!.id
 
-    // Put card on last player (index 1)
-    const lastPlayer = state.players[1]!
+    const lastPlayer = state.players[0]!
     lastPlayer.minorPlayed.push(CARD_ID)
     if (!lastPlayer.cardStates) lastPlayer.cardStates = {}
     lastPlayer.cardStates[CARD_ID] = {
@@ -66,33 +65,31 @@ describe('E056_RomanPot session', () => {
 
     session.loadState(state)
 
-    // Simulate onBeforeStartOfTurn by calling it directly
-    const hook = runCardEffectHook(state, lastPlayer, CARD_ID, 'onBeforeStartOfTurn')
+    const hook = runCardEffectHook(state, lastPlayer, CARD_ID, 'onRoundStart')
     // The hook should return a gain flow for last player
     expect(hook).toBeDefined()
     expect(hook?.type).toBe('leaf')
   })
 
-  it('non-last player does NOT get food at start of work phase', () => {
-    const session = new GameSession()
+  it('physical last player does NOT get food when not last in frozen turn order', () => {
+    const session = new GameSession(undefined, undefined, { playerCount: 3 })
     const state = session.getState().state
-    state.players = state.players.slice(0, 2)
+    state.players = state.players.slice(0, 3)
     state.round = 1
+    state.roundFirstPlayerId = state.players[1]!.id
 
-    // Put card on first player (index 0) - NOT the last
-    const firstPlayer = state.players[0]!
-    firstPlayer.minorPlayed.push(CARD_ID)
-    if (!firstPlayer.cardStates) firstPlayer.cardStates = {}
-    firstPlayer.cardStates[CARD_ID] = {
+    const physicalLastPlayer = state.players[2]!
+    physicalLastPlayer.minorPlayed.push(CARD_ID)
+    if (!physicalLastPlayer.cardStates) physicalLastPlayer.cardStates = {}
+    physicalLastPlayer.cardStates[CARD_ID] = {
       extraData: { foodCount: 4 },
       infobox: '4 Food',
     }
-    firstPlayer.resources.food = 5
+    physicalLastPlayer.resources.food = 5
 
     session.loadState(state)
 
-    const hook = runCardEffectHook(state, firstPlayer, CARD_ID, 'onBeforeStartOfTurn')
-    // The hook should NOT return a flow for the first player
+    const hook = runCardEffectHook(state, physicalLastPlayer, CARD_ID, 'onRoundStart')
     expect(hook).toBeNull()
   })
 
@@ -112,7 +109,7 @@ describe('E056_RomanPot session', () => {
 
     session.loadState(state)
 
-    const hook = runCardEffectHook(state, lastPlayer, CARD_ID, 'onBeforeStartOfTurn')
+    const hook = runCardEffectHook(state, lastPlayer, CARD_ID, 'onRoundStart')
     expect(hook).toBeNull()
   })
 
@@ -133,22 +130,22 @@ describe('E056_RomanPot session', () => {
     session.loadState(state)
 
     // First trigger
-    let hook = runCardEffectHook(state, lastPlayer, CARD_ID, 'onBeforeStartOfTurn')
+    let hook = runCardEffectHook(state, lastPlayer, CARD_ID, 'onRoundStart')
     expect(hook).toBeDefined()
     expect(readCardExtraData<number>(lastPlayer, CARD_ID, 'foodCount')).toBe(2)
 
     // Second trigger
-    hook = runCardEffectHook(state, lastPlayer, CARD_ID, 'onBeforeStartOfTurn')
+    hook = runCardEffectHook(state, lastPlayer, CARD_ID, 'onRoundStart')
     expect(hook).toBeDefined()
     expect(readCardExtraData<number>(lastPlayer, CARD_ID, 'foodCount')).toBe(1)
 
     // Third trigger
-    hook = runCardEffectHook(state, lastPlayer, CARD_ID, 'onBeforeStartOfTurn')
+    hook = runCardEffectHook(state, lastPlayer, CARD_ID, 'onRoundStart')
     expect(hook).toBeDefined()
     expect(readCardExtraData<number>(lastPlayer, CARD_ID, 'foodCount')).toBe(0)
 
     // Fourth trigger - empty
-    hook = runCardEffectHook(state, lastPlayer, CARD_ID, 'onBeforeStartOfTurn')
+    hook = runCardEffectHook(state, lastPlayer, CARD_ID, 'onRoundStart')
     expect(hook).toBeNull()
   })
 })

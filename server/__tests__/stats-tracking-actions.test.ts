@@ -49,6 +49,7 @@ describe('PlayerStats action tracking', () => {
     // We move start-player marker over so when round 2 begins, p2 receives +1.
     setStartPlayer(state, state.players[1]!)
     state.round = 2
+    state.roundFirstPlayerId = state.players[1]!.id
     session.loadState(state)
 
     // invoke the round-start path directly (private method on GameCore).

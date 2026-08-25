@@ -578,6 +578,7 @@ export type GameState = {
   draftPoolSize?: number
   parentSelection: ParentSelectionState | null
   currentPlayerIndex: number
+  roundFirstPlayerId?: string
   players: PlayerState[]
   actionSpaces: ActionSpace[]
   log: LogEntry[]

@@ -15,11 +15,15 @@ const cardImpl = {
     writeCardExtraData(player, CARD_ID, 'foodCount', 4)
     updateInfobox(player, 4)
   },
-  onBeforeStartOfTurn: (state, player) => {
-    // Check if this player is the last in turn order
+  onRoundStart: (state, player) => {
     const playerIndex = state.players.indexOf(player)
     if (playerIndex < 0) return
-    if (playerIndex !== state.players.length - 1) return
+    const roundFirstPlayerId = state.roundFirstPlayerId
+      ?? state.players.find((candidate) => candidate.startPlayer)?.id
+    const firstPlayerIndex = state.players.findIndex((candidate) => candidate.id === roundFirstPlayerId)
+    if (firstPlayerIndex < 0) return
+    const lastPlayerIndex = (firstPlayerIndex + state.players.length - 1) % state.players.length
+    if (playerIndex !== lastPlayerIndex) return
     const foodCount = readCardExtraData<number>(player, CARD_ID, 'foodCount') ?? 0
     if (foodCount <= 0) return
     const newCount = foodCount - 1

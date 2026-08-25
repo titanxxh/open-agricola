@@ -7,7 +7,7 @@ const CARD_ID = 'C125_Nightworker'
 /**
  * C125 Nightworker (Occupation, C, 125)
  *
- * Rule: `onPlayerStartOfWork` returns an optional `PLACE_FARMER` flow with
+ * Rule: `onBeforeWork` returns an optional `PLACE_FARMER` flow with
  * `constraints` = list of accumulation-space ids carrying a building resource
  * the player has 0 of. The placed worker counts as a normal placement (a
  * family pool worker is consumed; the action space pays out). Players without
@@ -16,8 +16,8 @@ const CARD_ID = 'C125_Nightworker'
  * marks the card `banned` (cup-pool filter) and `isCorbariusOrDulcinaria` (we
  * don't model either today).
  *
- * Mirror it via `onRoundStart` (our analogue of startOfWork — fires after
- * round growth, before currentPlayerIndex is set to start player). The flow
+ * Mirror it via `onBeforeWork`, after round growth and before start-of-work
+ * card effects. The flow
  * is `optional` so the player can skip; place-farmer's standard worker-count
  * + occupied-space machinery handles the rest.
  */
@@ -27,7 +27,7 @@ const BUILDING_RESOURCES: (keyof Resource)[] = ['wood', 'clay', 'reed', 'stone']
 const cardImpl = {
   effect: {
   id: CARD_ID,
-  onRoundStart: (state, player): ActionFlow | undefined => {
+  onBeforeWork: (state, player): ActionFlow | undefined => {
     if (workersAvailable(state, player) <= 0) return
     // Building resource types the player has 0 of
     const missingTypes = BUILDING_RESOURCES.filter(

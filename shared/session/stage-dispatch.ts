@@ -13,6 +13,7 @@ export type StageResumeState = {
     | 'onEndHarvest'
     | 'onAfterHarvest'
     | 'onBeforeStartOfTurn'
+    | 'onBeforeWork'
     | 'onRoundStart'
     | 'onStartHarvestFeedingPhase'
     | 'onEndTurn'
