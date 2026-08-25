@@ -1,7 +1,7 @@
 import { defineMinorCard } from '../card-source'
 import type { CardListenerContext, CardListenerRegistration } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
-import { hasMoorSpecialActionChoice, MOOR_SPECIAL_ACTION_CHOICE_ACTION_ID } from '../../moor/special-action-flow'
+import { hasMoorTerrainActionChoice, MOOR_SPECIAL_ACTION_CHOICE_ACTION_ID } from '../../moor/special-action-flow'
 import type { MoorSpecialActionId } from '../../moor/types'
 import type { CardImpl } from '../registry'
 import { allImprovementCount, setUsageCounterLeaf } from './moor-batch1-helpers'
@@ -19,8 +19,8 @@ const usedThisRound = (context: CardListenerContext) =>
   context.player.cardStates?.[CARD_ID]?.counters?.usage === context.state.round
 
 const toolShedFlow = (context: CardListenerContext, actionId: MoorSpecialActionId) => {
+  if (!hasMoorTerrainActionChoice(context.state, context.player, actionId)) return
   const actionContext = { mode: 'take-action', actionIds: [actionId] }
-  if (!hasMoorSpecialActionChoice(context.state, context.player, actionContext)) return
   return {
     type: 'seq' as const,
     optional: true,

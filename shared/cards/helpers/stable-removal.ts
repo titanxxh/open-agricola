@@ -1,5 +1,9 @@
 import type { FarmTilePosition, PlayerState } from '../../contract/types'
 import { positionKey } from '../../domain/farm'
+import {
+  clearFarmHandStablePosition,
+  getFarmHandStablePosition,
+} from '../../domain/stables'
 
 /**
  * Stable-tile return helpers — the single abstraction layer for "put a
@@ -12,31 +16,8 @@ import { positionKey } from '../../domain/farm'
  * `docs/superpowers/specs/2026-04-24-c150-and-farmhand-model-design.md`
  * §3.5.1 for the encapsulation rule.
  *
- * The B85 FarmHand stable is persisted on
- * `player.cardStates.B085_FarmHand.extraData.position`. These helpers are
- * the ONLY place outside B85's own file that reads / mutates that field.
+ * The B85 FarmHand storage detail is encapsulated by `shared/domain/stables.ts`.
  */
-const FARMHAND_CARD_ID = 'B085_FarmHand'
-const FARMHAND_POSITION_KEY = 'position'
-
-const readFarmHandPosition = (
-  player: PlayerState,
-): FarmTilePosition | undefined => {
-  const state = player.cardStates?.[FARMHAND_CARD_ID]
-  const raw = state?.extraData?.[FARMHAND_POSITION_KEY]
-  if (!raw || typeof raw !== 'object') return undefined
-  const candidate = raw as { row?: unknown; col?: unknown }
-  if (typeof candidate.row !== 'number' || typeof candidate.col !== 'number') {
-    return undefined
-  }
-  return { row: candidate.row, col: candidate.col }
-}
-
-const clearFarmHandPosition = (player: PlayerState) => {
-  const state = player.cardStates?.[FARMHAND_CARD_ID]
-  if (!state?.extraData) return
-  delete state.extraData[FARMHAND_POSITION_KEY]
-}
 
 /**
  * Remove a normal stable at the given tile. Returns false when no normal
@@ -78,7 +59,7 @@ export const listReturnableStableTiles = (
     row: t.row,
     col: t.col,
   }))
-  const farmHand = readFarmHandPosition(player)
+  const farmHand = getFarmHandStablePosition(player)
   if (farmHand) {
     // Avoid listing the same coordinate twice when the FarmHand tile
     // coincides with a normal stable (shouldn't happen by construction
@@ -104,11 +85,10 @@ export const removeStableOrFarmHandAtTile = (
   player: PlayerState,
   tile: FarmTilePosition,
 ): ReturnedStableKind | null => {
-  const farmHand = readFarmHandPosition(player)
+  const farmHand = getFarmHandStablePosition(player)
   if (farmHand && farmHand.row === tile.row && farmHand.col === tile.col) {
-    clearFarmHandPosition(player)
+    clearFarmHandStablePosition(player)
     return 'farmhand'
   }
   return removeStableAtTile(player, tile) ? 'normal' : null
 }
-

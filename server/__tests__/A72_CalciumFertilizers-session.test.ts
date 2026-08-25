@@ -53,6 +53,97 @@ describe('A072_CalciumFertilizers session', () => {
     expect(p.fields[1]!.stacks[0]?.remaining ?? 0).toBe(2)
   })
 
+  it('adds the crop to the top of a same-crop multi-stack field', () => {
+    const session = setup()
+    const state = session.getState().state
+    state.players[0]!.fields = [
+      {
+        row: 0,
+        col: 3,
+        stacks: [
+          { kind: 'grain', remaining: 1 },
+          { kind: 'grain', remaining: 3 },
+        ],
+      },
+    ]
+    session.loadState(state)
+    const beforeLogLength = session.state.log.length
+    const beforeScores = session.getState().scores
+
+    const resp = session.takeAction(0, 'eastern-quarry')
+
+    expect(resp.ok).toBe(true)
+    expect(resp.interaction.stateId).toBe('wait')
+    if (resp.interaction.stateId !== 'wait') return
+    expect(resp.interaction.request.kind).toBe('confirm-next-player')
+    expect(resp.state.players[0]!.fields[0]!.stacks).toEqual([
+      { kind: 'grain', remaining: 1 },
+      { kind: 'grain', remaining: 4 },
+    ])
+    expect(resp.state.events).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        type: 'farm.cropAdded',
+        sourceCardId: CARD_ID,
+        reason: 'cardEffect',
+        crops: [{
+          location: { kind: 'field', playerId: resp.state.players[0]!.id, row: 0, col: 3 },
+          crop: 'grain',
+          amount: 1,
+        }],
+      }),
+    ]))
+    expect(resp.state.actionSpaces.find((space) => space.id === 'eastern-quarry')?.takenBy).toHaveLength(1)
+    expect(resp.state.log.length).toBeGreaterThan(beforeLogLength)
+    expect(resp.state.log).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        key: 'log.placeFarmer',
+        params: expect.objectContaining({ action: 'actions.eastern-quarry.name' }),
+      }),
+      expect.objectContaining({
+        key: 'log.farmCropAdded',
+        params: expect.objectContaining({ crops: { grain: 1 } }),
+      }),
+    ]))
+    expect(resp.scores).toEqual(beforeScores)
+  })
+
+  it('does not add a crop to a field growing multiple crop types', () => {
+    const session = setup()
+    const state = session.getState().state
+    state.players[0]!.fields = [
+      {
+        row: 0,
+        col: 3,
+        stacks: [
+          { kind: 'vegetable', remaining: 1 },
+          { kind: 'grain', remaining: 3 },
+        ],
+      },
+    ]
+    session.loadState(state)
+    const beforeLogLength = session.state.log.length
+    const beforeScores = session.getState().scores
+
+    const resp = session.takeAction(0, 'eastern-quarry')
+
+    expect(resp.ok).toBe(true)
+    expect(resp.interaction.stateId).toBe('wait')
+    if (resp.interaction.stateId !== 'wait') return
+    expect(resp.interaction.request.kind).toBe('confirm-next-player')
+    expect(resp.state.players[0]!.fields[0]!.stacks).toEqual([
+      { kind: 'vegetable', remaining: 1 },
+      { kind: 'grain', remaining: 3 },
+    ])
+    expect(resp.state.log.length).toBeGreaterThan(beforeLogLength)
+    expect(resp.state.log).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        key: 'log.placeFarmer',
+        params: expect.objectContaining({ action: 'actions.eastern-quarry.name' }),
+      }),
+    ]))
+    expect(resp.scores).toEqual(beforeScores)
+  })
+
   it('adds 1 crop to each planted vegetable field when using western quarry', () => {
     const session = setup()
     const state = session.getState().state
@@ -71,7 +162,7 @@ describe('A072_CalciumFertilizers session', () => {
     expect(p.fields[1]!.stacks[0]?.remaining ?? 0).toBe(3)
   })
 
-  it('adds 1 crop to mixed fields (some grain, some vegetable)', () => {
+  it('adds 1 crop across separate grain and vegetable fields', () => {
     const session = setup()
     const state = session.getState().state
     const player = state.players[0]!

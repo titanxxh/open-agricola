@@ -1,25 +1,67 @@
 import { defineMinorCard } from '../card-source'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
-import { fieldTopStack, fieldIsEmpty } from '../../domain/field'
-import type { PlantAdditionalGoodLocation } from '../../actions/effects/special-effect'
+import { fieldTopStack } from '../../domain/field'
+import { parsePositionKey, positionKey } from '../../domain/farm'
+import type { ActionDefinition, Field } from '../../contract/types'
+import type { FarmCropAddedEvent } from '../../contract/events'
+import { registerAdHocAction } from '../../actions/helpers/ad-hoc-action-registry'
 import type { CardImpl } from '../registry'
 
 const CARD_ID = 'A072_CalciumFertilizers'
-/**
- * A72 Calcium Fertilizers:
- * Prerequisite: No Field Tiles (player must have 0 fields to buy this card).
- * Each time you use a Quarry accumulation space (Eastern Quarry or Western Quarry),
- * add 1 additional crop to each of your planted fields growing a single type of crop.
- *
- * In our model each field has exactly one crop type (grain or vegetable), so every
- * planted field (crop !== null && remaining > 0) qualifies. The effect is fully automatic
- * — no player choice needed.
- *
- * Reference: groups adjacent fields and checks for
- * single-type groups. Our simpler per-field model means each planted field independently
- * qualifies.
- */
+const GROW_ACTION_ID = 'card_A072_CalciumFertilizers_growTopCrop'
+
+const growableTop = (field: Field) => {
+  const top = fieldTopStack(field)
+  return top
+    && top.remaining >= 1
+    && (top.kind === 'grain' || top.kind === 'vegetable')
+    && field.stacks.every((stack) => stack.kind === top.kind)
+    ? top
+    : undefined
+}
+
+const growTopCropAction: ActionDefinition = {
+  id: GROW_ACTION_ID,
+  nameKey: 'actions.special-effect.name',
+  descriptionKey: 'actions.special-effect.description',
+  roundAvailable: 1,
+  gainPerRound: {},
+  canBeExecutedByPlayer: (_state, player) => player.minorPlayed.includes(CARD_ID),
+  execute: ({ player, params, eventSink }) => {
+    const positions = (params as { positions?: unknown } | undefined)?.positions
+    if (!Array.isArray(positions) || positions.some((value) => typeof value !== 'string')) {
+      return { type: 'fail', errorKey: 'log.actionFail' }
+    }
+    const crops: FarmCropAddedEvent['crops'] = []
+    for (const key of positions) {
+      const position = parsePositionKey(key)
+      const field = position && player.fields.find(
+        (candidate) => candidate.row === position.row && candidate.col === position.col,
+      )
+      const top = field && growableTop(field)
+      if (!field || !top) continue
+      top.remaining += 1
+      crops.push({
+        location: { kind: 'field', playerId: player.id, row: field.row, col: field.col },
+        crop: top.kind,
+        amount: 1,
+      })
+    }
+    if (crops.length > 0) {
+      eventSink?.emit<'farm.cropAdded'>({
+        type: 'farm.cropAdded',
+        sourceCardId: CARD_ID,
+        crops,
+        reason: 'cardEffect',
+      })
+    }
+    return { type: 'ok' }
+  },
+}
+
+registerAdHocAction(growTopCropAction)
+
 const listener: CardListenerRegistration = {
   id: 'A72-calcium-fertilizers-after-place-farmer',
   cardIds: [CARD_ID],
@@ -30,23 +72,16 @@ const listener: CardListenerRegistration = {
     if (context.space.id !== 'eastern-quarry' && context.space.id !== 'western-quarry') return
 
     // Find planted fields with crops remaining
-    const plantedFields = context.player.fields.filter((f) => !fieldIsEmpty(f))
-    if (plantedFields.length === 0) return
-
-    const locations: PlantAdditionalGoodLocation[] = []
-    for (const field of plantedFields) {
-      const top = fieldTopStack(field)
-      if (top && (top.kind === 'grain' || top.kind === 'vegetable')) {
-        locations.push({ kind: 'field', row: field.row, col: field.col })
-      }
-    }
-    if (locations.length === 0) return
+    const positions = context.player.fields.flatMap((field) => (
+      growableTop(field) ? [positionKey(field)] : []
+    ))
+    if (positions.length === 0) return
     return {
       flow: {
         type: 'leaf',
-        actionId: 'special-effect',
+        actionId: GROW_ACTION_ID,
         sourceCard: CARD_ID,
-        params: { kind: 'plant-additional-good', locations },
+        params: { positions },
       },
       sourceCard: CARD_ID,
     }
