@@ -19,6 +19,7 @@ const anytimeListener: CardListenerRegistration = {
   id: 'E13-stone-house-reconstruction-anytime',
   cardIds: [CARD_ID],
   phases: ['anytime' as ActionHookPhase],
+  preScoring: true,
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (isCardFlagged(context.player, CARD_ID)) return
     if (context.player.houseType !== 'clay') return

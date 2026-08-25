@@ -22,6 +22,7 @@ const anytimeListener: CardListenerRegistration = {
   id: 'D114-seed-trader-anytime',
   cardIds: [CARD_ID],
   phases: ['anytime' as ActionHookPhase],
+  preScoring: true,
   handler: (context: CardListenerContext): ActionHookResult | void => {
     const counters = context.player.cardStates?.[CARD_ID]?.counters ?? {}
     const grainOnCard = counters.grain ?? 0

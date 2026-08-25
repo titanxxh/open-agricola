@@ -11,6 +11,7 @@ const anytimeListener: CardListenerRegistration = {
   id: 'C46-mandoline-anytime',
   cardIds: [CARD_ID],
   phases: ['anytime' as ActionHookPhase],
+  preScoring: true,
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (isCardFlagged(context.player, CARD_ID)) return
     if (context.player.resources.vegetable < 1) return

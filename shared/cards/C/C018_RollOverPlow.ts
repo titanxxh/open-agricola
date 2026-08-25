@@ -20,6 +20,7 @@ const anytimeListener: CardListenerRegistration = {
   id: 'C18-roll-over-plow-anytime',
   cardIds: [CARD_ID],
   phases: ['anytime' as ActionHookPhase],
+  preScoring: true,
   handler: (context: CardListenerContext): ActionHookResult | void => {
     const plantedFields = context.player.fields.filter(f => !fieldIsEmpty(f))
     if (plantedFields.length < 3) return

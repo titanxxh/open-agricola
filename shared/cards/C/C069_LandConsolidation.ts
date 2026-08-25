@@ -55,6 +55,7 @@ const anytimeListener: CardListenerRegistration = {
   id: 'C69-land-consolidation-anytime',
   cardIds: [CARD_ID],
   phases: ['anytime' as ActionHookPhase],
+  preScoring: true,
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (hasExtraCropPending(context)) return
     const qualifying = context.player.fields.filter((f) => {

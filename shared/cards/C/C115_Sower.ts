@@ -59,6 +59,7 @@ const anytimeListener: CardListenerRegistration = {
   id: 'C115-sower-anytime',
   cardIds: [CARD_ID],
   phases: ['anytime' as ActionHookPhase],
+  preScoring: true,
   handler: (context: CardListenerContext): ActionHookResult | void => {
     const stack = getCardStack(context.player, CARD_ID)
     if (stack.length === 0) return
