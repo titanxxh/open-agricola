@@ -168,6 +168,7 @@ const jsonSafe = JSON.parse(JSON.stringify(value ?? null))
 
 <!-- prompt-sync:begin id=card-effect-hooks -->
 - `onBuy`
+- `onBeforeWork`
 - `onRoundStart`
 - `onHarvest`
 - `onRoundEnd`
@@ -204,6 +205,8 @@ const jsonSafe = JSON.parse(JSON.stringify(value ?? null))
 - `getBuiltSpecialStables`
 <!-- prompt-sync:end id=card-effect-hooks -->
 
+
+`onBeforeWork` 在回合资源增长和 future-meeple 行动之后、`onRoundStart` 之前触发；仅用于卡面明确写明“工作阶段开始前”的效果。
 
 `onBeforePlayerTurn` 是 non-flow skip-control exception：签名是 `(state, player) => { skipTurn?: boolean } | void`，只用于 labor turn 入口同步跳过该玩家本次放工人机会；不能返回 `ActionFlow`，不能创建 pending。
 

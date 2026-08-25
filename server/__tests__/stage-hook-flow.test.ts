@@ -4,6 +4,11 @@ import { readCardResourceStats } from '../../shared/cards/helpers/card-state'
 
 import { markAllWorkersUsed } from '../../shared/domain/player'
 import '../../shared/cards/B/B070_NewPurchase'
+import '../../shared/cards/B/B081_Handcart'
+import '../../shared/cards/C/C093_InnerDistrictsDirector'
+import '../../shared/cards/C/C125_Nightworker'
+import '../../shared/cards/E/E056_RomanPot'
+import '../../shared/cards/E/E100_MuseumCaretaker'
 import '../../shared/cards/A/A166_Haydryer'
 import '../../shared/cards/A/A064_BarleyMill'
 import '../../shared/cards/C/C071_Slurry'
@@ -23,7 +28,223 @@ const chooseFirstOption = (session: GameSession, playerIndex: number) => {
   return session.resolveChoice(playerIndex, options[0]!.value)
 }
 
+const setupBeforeWorkOrderingSession = () => {
+  const session = new GameSession(42)
+  stabilizeRandomHands(session.state.players)
+  const state = session.getState().state
+  state.players = state.players.slice(0, 2)
+  state.round = 1
+  state.players.forEach((player) => {
+    markAllWorkersUsed(state, player)
+  })
+
+  const player = state.players[0]!
+  player.occupationPlayed.push('E100_MuseumCaretaker', 'C125_Nightworker')
+  Object.assign(player.resources, {
+    wood: 0,
+    clay: 1,
+    reed: 1,
+    stone: 1,
+    grain: 1,
+    vegetable: 1,
+  })
+  const forest = state.actionSpaces.find((space) => space.id === 'forest')!
+  forest.resources.wood = 3
+  forest.takenBy = []
+  session.loadState(state)
+  return session
+}
+
 describe('stage hook flows', () => {
+  it('resumes onBeforeWork without replaying preparation', () => {
+    const session = new GameSession(42)
+    stabilizeRandomHands(session.state.players)
+    const state = session.getState().state
+    state.players = state.players.slice(0, 2)
+    state.round = 1
+    state.players.forEach((player) => {
+      markAllWorkersUsed(state, player)
+    })
+
+    const player = state.players[0]!
+    player.minorPlayed.push('B081_Handcart')
+    const forest = state.actionSpaces.find((space) => space.id === 'forest')!
+    forest.resources.wood = 6
+
+    session.loadState(state)
+    let resp = session.performRoundEnd()
+
+    expect(resp.interaction.stateId).toBe('wait')
+    expect(resp.interaction.stateId === 'wait' ? resp.interaction.sourceCard : undefined)
+      .toBe('B081_Handcart')
+    expect(resp.state.actionSpaces.find((space) => space.id === 'forest')!.resources.wood).toBe(9)
+
+    resp = session.resolveChoice(0, '__skip__')
+
+    expect(resp.ok).toBe(true)
+    expect(resp.interaction.stateId).toBe('idle')
+    expect(resp.state.round).toBe(2)
+    expect(resp.state.roundPhase).toBe('work')
+    expect(resp.state.actionSpaces.find((space) => space.id === 'forest')!.resources.wood).toBe(9)
+    expect(resp.state.events.filter((event) => event.type === 'round.started')).toHaveLength(1)
+    expect(resp.state.events.filter((event) => event.type === 'work.started')).toHaveLength(1)
+    expect(resp.state.log.filter((entry) => entry.key === 'log.enterRound')).toHaveLength(1)
+    expect(resp.state.log.filter((entry) => entry.key === 'log.workStarted')).toHaveLength(1)
+  })
+
+  it('resolves before-work cards before start-of-work cards', () => {
+    const session = setupBeforeWorkOrderingSession()
+
+    let resp = session.performRoundEnd()
+
+    expect(resp.interaction.stateId).toBe('wait')
+    expect(resp.interaction.stateId === 'wait' ? resp.interaction.sourceCard : undefined)
+      .toBe('C125_Nightworker')
+    expect(resp.state.roundPhase).toBe('preparation')
+    expect(resp.state.players[0]!.cardStates.E100_MuseumCaretaker?.counters?.bonusVp ?? 0).toBe(0)
+
+    resp = chooseFirstOption(session, 0)
+
+    const player = resp.state.players[0]!
+    const forest = resp.state.actionSpaces.find((space) => space.id === 'forest')!
+    expect(resp.ok).toBe(true)
+    expect(resp.interaction.stateId).toBe('idle')
+    expect(resp.state.round).toBe(2)
+    expect(resp.state.roundPhase).toBe('work')
+    expect(player.resources.wood).toBe(6)
+    expect(forest.resources.wood).toBe(0)
+    expect(forest.takenBy).toEqual([expect.objectContaining({ playerId: player.id })])
+    expect(player.cardStates.E100_MuseumCaretaker?.counters?.bonusVp).toBe(1)
+    expect(resp.state.events).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        type: 'resource.moved',
+        sourceCardId: 'C125_Nightworker',
+        from: { kind: 'actionSpace', spaceId: 'forest' },
+        to: { kind: 'player', playerId: player.id },
+      }),
+      expect.objectContaining({
+        type: 'card.stateChanged',
+        cardId: 'E100_MuseumCaretaker',
+        key: 'bonusVp',
+        value: 1,
+      }),
+    ]))
+    expect(resp.state.events.filter((event) => event.type === 'round.started')).toHaveLength(1)
+    expect(resp.state.events.filter((event) => event.type === 'work.started')).toHaveLength(1)
+    expect(resp.state.log.filter((entry) => entry.key === 'log.enterRound')).toHaveLength(1)
+    expect(resp.state.log.filter((entry) => entry.key === 'log.workStarted')).toHaveLength(1)
+    expect(resp.scores[0]!.categories.find((category) => category.key === 'cardBonusVp')?.total).toBe(1)
+  })
+
+  it('does not trigger start-of-work prerequisites when before-work is skipped', () => {
+    const session = setupBeforeWorkOrderingSession()
+
+    session.performRoundEnd()
+    const resp = session.resolveChoice(0, '__skip__')
+
+    const player = resp.state.players[0]!
+    const forest = resp.state.actionSpaces.find((space) => space.id === 'forest')!
+    expect(resp.ok).toBe(true)
+    expect(resp.interaction.stateId).toBe('idle')
+    expect(resp.state.roundPhase).toBe('work')
+    expect(player.resources.wood).toBe(0)
+    expect(forest.resources.wood).toBe(6)
+    expect(forest.takenBy).toEqual([])
+    expect(player.cardStates.E100_MuseumCaretaker?.counters?.bonusVp ?? 0).toBe(0)
+    expect(resp.scores[0]!.categories.find((category) => category.key === 'cardBonusVp')?.total ?? 0).toBe(0)
+  })
+
+  it('freezes round work order before before-work marker changes', () => {
+    const session = new GameSession(42, undefined, { playerCount: 3 })
+    stabilizeRandomHands(session.state.players)
+    const state = session.getState().state
+    state.players = state.players.slice(0, 3)
+    state.round = 1
+    state.players.forEach((player, index) => {
+      markAllWorkersUsed(state, player)
+      player.startPlayer = index === 1
+    })
+
+    const originalFirstPlayer = state.players[1]!
+    const beforeWorkPlayer = state.players[2]!
+    beforeWorkPlayer.occupationPlayed.push('C125_Nightworker', 'C093_InnerDistrictsDirector')
+    Object.assign(beforeWorkPlayer.resources, { wood: 0, clay: 1, reed: 1, stone: 1 })
+    const forest = state.actionSpaces.find((space) => space.id === 'forest')!
+    forest.resources.wood = 3
+    forest.takenBy = []
+
+    const frozenLastPlayer = state.players[0]!
+    const physicalLastPlayer = state.players[2]!
+    for (const player of [frozenLastPlayer, physicalLastPlayer]) {
+      player.minorPlayed.push('E056_RomanPot')
+      player.cardStates.E056_RomanPot = {
+        extraData: { foodCount: 4 },
+        infobox: '4 Food',
+      }
+    }
+    const frozenLastFood = frozenLastPlayer.resources.food
+    const physicalLastFood = physicalLastPlayer.resources.food
+
+    session.loadState(state)
+    let resp = session.performRoundEnd()
+    expect(resp.interaction.stateId === 'wait' ? resp.interaction.sourceCard : undefined)
+      .toBe('C125_Nightworker')
+
+    resp = chooseFirstOption(session, 2)
+    expect(resp.interaction.stateId === 'wait' ? resp.interaction.request.options?.map((option) => option.value) : [])
+      .toContain('forest')
+    resp = session.resolveChoice(2, 'forest')
+    expect(resp.interaction.stateId === 'wait' ? resp.interaction.sourceCard : undefined)
+      .toBe('C093_InnerDistrictsDirector')
+
+    resp = chooseFirstOption(session, 2)
+    expect(resp.interaction.stateId === 'wait' ? resp.interaction.sourceCard : undefined)
+      .toBe('C093_InnerDistrictsDirector')
+    resp = chooseFirstOption(session, 2)
+    expect(resp.interaction.stateId === 'wait' ? resp.interaction.request.options?.map((option) => option.value) : [])
+      .toContain('meeting-place')
+    resp = session.resolveChoice(2, 'meeting-place')
+
+    expect(resp.ok).toBe(true)
+    expect(resp.interaction.stateId).toBe('idle')
+    expect(resp.state.round).toBe(2)
+    expect(resp.state.roundPhase).toBe('work')
+    expect(resp.state.roundFirstPlayerId).toBe(originalFirstPlayer.id)
+    expect(resp.state.currentPlayerIndex).toBe(1)
+    expect(resp.state.players.find((player) => player.startPlayer)?.id).toBe(beforeWorkPlayer.id)
+    expect(resp.state.players[0]!.resources.food).toBe(frozenLastFood + 1)
+    expect(resp.state.players[2]!.resources.food).toBe(physicalLastFood)
+    expect(resp.state.players[0]!.cardStates.E056_RomanPot?.extraData?.foodCount).toBe(3)
+    expect(resp.state.players[2]!.cardStates.E056_RomanPot?.extraData?.foodCount).toBe(4)
+
+    const markerEvent = resp.state.events.find((event) => event.type === 'startPlayer.changed')
+    const romanPotEvent = resp.state.events.find((event) =>
+      event.type === 'resource.moved' && event.sourceCardId === 'E056_RomanPot')
+    expect(markerEvent).toMatchObject({ type: 'startPlayer.changed', playerId: beforeWorkPlayer.id })
+    expect(romanPotEvent).toMatchObject({
+      type: 'resource.moved',
+      sourceCardId: 'E056_RomanPot',
+      to: { kind: 'player', playerId: frozenLastPlayer.id },
+    })
+    expect(markerEvent!.seq).toBeLessThan(romanPotEvent!.seq)
+    expect(resp.state.events.filter((event) => event.type === 'round.started')).toHaveLength(1)
+    expect(resp.state.events.filter((event) => event.type === 'work.started')).toHaveLength(1)
+    expect(resp.state.log.filter((entry) => entry.key === 'log.enterRound')).toHaveLength(1)
+    expect(resp.state.log.filter((entry) => entry.key === 'log.workStarted')).toHaveLength(1)
+
+    const roundTwoScores = resp.scores
+    session.state.players.forEach((player) => {
+      markAllWorkersUsed(session.state, player)
+    })
+    resp = session.performRoundEnd()
+
+    expect(resp.interaction.stateId).toBe('idle')
+    expect(resp.state.round).toBe(3)
+    expect(resp.state.roundFirstPlayerId).toBe(beforeWorkPlayer.id)
+    expect(resp.state.currentPlayerIndex).toBe(2)
+    expect(resp.scores).toEqual(roundTwoScores)
+  })
+
   it('runs B070_NewPurchase through before-start-of-turn flow', () => {
     const session = new GameSession()
     stabilizeRandomHands(session.state.players)

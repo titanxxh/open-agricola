@@ -16,7 +16,7 @@ const BUILDING_RESOURCES: (keyof Resource)[] = ['wood', 'clay', 'reed', 'stone']
 const cardImpl = {
   effect: {
   id: CARD_ID,
-  onRoundStart: (state, _player) => {
+  onBeforeWork: (state, _player) => {
 
     const choices: ActionFlow[] = []
     for (const space of state.actionSpaces) {

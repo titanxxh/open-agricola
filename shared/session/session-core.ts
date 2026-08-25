@@ -727,7 +727,8 @@ export class GameCore {
       onEndHarvest: (stageResume) => { this.continueEndHarvestEffects(stageResume.playerIndex, stageResume.cardIndex) },
       onAfterHarvest: (stageResume) => { this.continueAfterHarvestEffects(stageResume.playerIndex, stageResume.cardIndex) },
       onBeforeStartOfTurn: (stageResume) => { this.continueBeforeStartOfTurn(stageResume.playerIndex, stageResume.cardIndex) },
-      onRoundStart: (stageResume) => { this.continueBeforeStartOfTurn(stageResume.playerIndex, stageResume.cardIndex) },
+      onBeforeWork: (stageResume) => { this.continueAfterFutureMeepleActions(stageResume.playerIndex, stageResume.cardIndex) },
+      onRoundStart: (stageResume) => { this.continueAfterBeforeWork(stageResume.playerIndex, stageResume.cardIndex) },
       futureMeepleActions: () => { this.continueAfterFutureMeepleActions() },
       onStartHarvestFeedingPhase: (stageResume) => { this.continueHarvestEffects(stageResume.playerIndex, stageResume.cardIndex) },
       onEndTurn: (stageResume) => {
@@ -2703,11 +2704,21 @@ export class GameCore {
     return this.continueAfterFutureMeepleActions()
   }
 
-  private continueAfterFutureMeepleActions(): SessionResponse {
-    if (this.stageDispatch.continueStageHook('onRoundStart')) {
+  private continueAfterFutureMeepleActions(playerIndex = 0, cardIndex = 0): SessionResponse {
+    if (this.stageDispatch.continueStageHook('onBeforeWork', playerIndex, cardIndex)) {
       return this.respond()
     }
-    const startIdx = this.state.players.findIndex((player) => player.startPlayer)
+    return this.continueAfterBeforeWork()
+  }
+
+  private continueAfterBeforeWork(playerIndex = 0, cardIndex = 0): SessionResponse {
+    if (this.stageDispatch.continueStageHook('onRoundStart', playerIndex, cardIndex)) {
+      return this.respond()
+    }
+    const frozenStartIdx = this.state.players.findIndex((player) => player.id === this.state.roundFirstPlayerId)
+    const startIdx = frozenStartIdx === -1
+      ? this.state.players.findIndex((player) => player.startPlayer)
+      : frozenStartIdx
     this.state.currentPlayerIndex = startIdx === -1 ? 0 : startIdx
     if (this.state.round >= 2 && startIdx >= 0) {
       incFirstPlayer(this.state.players[startIdx]!)
@@ -3899,6 +3910,7 @@ export class GameCore {
     if (this.state.round > 14) {
       return this.continueBeforeEndGameHooks(0, 0)
     }
+    this.state.roundFirstPlayerId = this.state.players.find((player) => player.startPlayer)?.id
     advanceThroughTheSeasons(this.state)
     return this.continueBeforeStartOfTurn()
   }

@@ -100,7 +100,7 @@ export type PaymentInfo = {
   returnedCardId?: string
 }
 
-export type CardEffectHook = 'onBuy' | 'onRoundStart' | 'onHarvest' | 'onRoundEnd' | 'onEndTurn' | 'onReturnHome'
+export type CardEffectHook = 'onBuy' | 'onBeforeWork' | 'onRoundStart' | 'onHarvest' | 'onRoundEnd' | 'onEndTurn' | 'onReturnHome'
   | 'onBeforeReturnHome' | 'onStartReturnHome'
   | 'onAfterRoundEnd'
   | 'onBeforeHarvest' | 'onStartHarvest'
@@ -117,6 +117,7 @@ export type FlowCardEffectHook = Exclude<CardEffectHook, 'onBeforePlayerTurn'>
 
 export const flowCardEffectHooks: FlowCardEffectHook[] = [
   'onBuy',
+  'onBeforeWork',
   'onRoundStart',
   'onHarvest',
   'onRoundEnd',
@@ -170,6 +171,7 @@ export type CardEffectField = CardEffectHook
 
 export const cardEffectHooks: CardEffectField[] = [
   'onBuy',
+  'onBeforeWork',
   'onRoundStart',
   'onHarvest',
   'onRoundEnd',
@@ -272,6 +274,7 @@ export type CardEffect = {
    */
   contributeExtraTurn?: (state: GameState, player: PlayerState) => ActionFlow | void
   countExtraTurns?: (state: GameState, player: PlayerState) => number
+  onBeforeWork?: FlowEffectHandler
   onRoundStart?: FlowEffectHandler
   onHarvest?: FlowEffectHandler
   onRoundEnd?: FlowEffectHandler

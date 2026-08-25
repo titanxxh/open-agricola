@@ -98,7 +98,7 @@ describe('B081_Handcart', () => {
   it('offers xor with wood option when wood space has >= 6 wood', () => {
     const player = createPlayer()
     const state = createState(player)
-    const flow = runCardEffectHook(state, player, CARD_ID, 'onRoundStart')
+    const flow = runCardEffectHook(state, player, CARD_ID, 'onBeforeWork')
     expect(flow).not.toBeNull()
     const xor = flow as Extract<ActionFlow, { type: 'seq' }>
     expect(xor.type).toBe('xor')
@@ -142,7 +142,7 @@ describe('B081_Handcart', () => {
     const claySpace = state.actionSpaces.find((s) => s.id === 'clay-pit')!
     claySpace.resources.clay = 5
 
-    const flow = runCardEffectHook(state, player, CARD_ID, 'onRoundStart')
+    const flow = runCardEffectHook(state, player, CARD_ID, 'onBeforeWork')
     expect(flow).not.toBeNull()
     const xor = flow as Extract<ActionFlow, { type: 'seq' }>
     expect(xor.children).toHaveLength(2)
@@ -155,7 +155,7 @@ describe('B081_Handcart', () => {
     const woodSpace = state.actionSpaces.find((s) => s.id === 'wood-accumulation')!
     woodSpace.resources.wood = 5
 
-    const flow = runCardEffectHook(state, player, CARD_ID, 'onRoundStart')
+    const flow = runCardEffectHook(state, player, CARD_ID, 'onBeforeWork')
     expect(flow).toBeNull()
     expect(state.events).toEqual([])
   })

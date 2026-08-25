@@ -153,6 +153,7 @@ The marked blocks below are machine checked against `cardEffectHooks` in `shared
 
 <!-- prompt-sync:begin id=card-effect-hooks -->
 - `onBuy`
+- `onBeforeWork`
 - `onRoundStart`
 - `onHarvest`
 - `onRoundEnd`
@@ -188,6 +189,8 @@ The marked blocks below are machine checked against `cardEffectHooks` in `shared
 - `getInvalidAnimals`
 - `getBuiltSpecialStables`
 <!-- prompt-sync:end id=card-effect-hooks -->
+
+`onBeforeWork` runs after round growth and future-meeple actions but before `onRoundStart`. Use it only when the card explicitly acts before the work phase.
 
 `onBeforePlayerTurn` is the non-flow skip-control exception. Its signature is `(state, player) => { skipTurn?: boolean } | void`, and it synchronously skips this labor-turn placement opportunity. It cannot return ActionFlow or create pending state.
 
