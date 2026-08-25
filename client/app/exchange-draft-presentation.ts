@@ -270,9 +270,16 @@ export const useExchangeDraftPresentation = ({
   const harvestFeedOptions = useMemo(
     () =>
       harvestFeedPlayer
-        ? buildHarvestFeedOptions(harvestFeedPlayer, locale, cardLabel)
+        ? buildHarvestFeedOptions(
+            harvestFeedPlayer,
+            locale,
+            cardLabel,
+            interactionPresentationPlan.kind === 'harvest-feed'
+              ? interactionPresentationPlan.maxTradeTimesBySourceId
+              : undefined,
+          )
         : [],
-    [harvestFeedPlayer, locale, cardLabel],
+    [harvestFeedPlayer, locale, cardLabel, interactionPresentationPlan],
   )
   const harvestFeedOptionIds = useMemo(
     () => harvestFeedOptions.map((option) => option.id),

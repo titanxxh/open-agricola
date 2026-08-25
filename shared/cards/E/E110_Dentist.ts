@@ -8,6 +8,7 @@ const CARD_ID = 'E110_Dentist'
 const cardImpl = {
   effect: {
   id: CARD_ID,
+  preHarvestGoodsWanted: ['wood'],
   // At start of each harvest: optionally pay 1 wood to place on card
   onStartHarvest: (_state, player) => {
     if (player.resources.wood < 1) return

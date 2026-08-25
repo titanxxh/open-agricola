@@ -8,6 +8,7 @@ import type { PlayerState, Resource } from '../../shared/contract/types'
 import { confirmNextPlayer } from './_helpers/pending-confirms'
 
 const CARD_ID = 'C105_BasketCarrier'
+const HOME_BREWER = 'C110_HomeBrewer'
 
 const makePlayer = (overrides: Partial<PlayerState> = {}): PlayerState => ({
   id: 'p1', name: 'P1', color: 'red',
@@ -43,6 +44,96 @@ describe('C105_BasketCarrier — reverse trade metadata', () => {
     const trades = getExchangesInWindow(player, 'harvest')
     expect(trades).toHaveLength(1)
     expect(trades[0]!.from.food).toBe(2)
+  })
+
+  it('can prepare grain before Home Brewer resolves at the end of the field phase', () => {
+    const session = new GameSession()
+    stabilizeRandomHands(session.state.players)
+    const state = session.getState().state
+    state.players = state.players.slice(0, 2)
+    state.round = 4
+    state.roundPhase = 'work'
+
+    state.players.forEach((player) => {
+      markAllWorkersUsed(state, player)
+      setActiveWorkerCount(player, 2)
+      setNewbornCount(player, 0)
+      player.resources.food = 10
+      player.resources.grain = 0
+      player.fields = []
+      player.improvements = []
+      player.minorPlayed = []
+      player.occupationPlayed = []
+      player.cardStates = {}
+    })
+
+    const player = state.players[0]!
+    player.resources.food = 6
+    player.occupationPlayed = [CARD_ID, HOME_BREWER]
+    session.loadState(state)
+
+    let resp = session.performRoundEnd()
+    expect(resp.interaction.stateId).toBe('wait')
+    if (resp.interaction.stateId !== 'wait') throw new Error('expected harvest preparation exchange')
+    expect(resp.interaction.promptKey).toBe('ui.interactionExchangeChoice')
+    expect(resp.state.events.some((event) => event.type === 'harvest.phaseStarted')).toBe(false)
+    const basketCarrier = resp.interaction.request.options?.find((option) => option.sourceCard === CARD_ID)
+    expect(basketCarrier).toBeDefined()
+
+    resp = session.resolveChoice(0, basketCarrier!.value)
+    expect(resp.state.players[0]!.resources).toMatchObject({ food: 4, wood: 1, reed: 1, grain: 1 })
+    expect(resp.interaction.stateId).toBe('wait')
+    if (resp.interaction.stateId !== 'wait') throw new Error('expected Home Brewer choice')
+    const homeBrewer = resp.interaction.request.options?.find((option) =>
+      option.value !== '__skip__' && option.sourceCard === HOME_BREWER,
+    )
+    expect(homeBrewer).toBeDefined()
+
+    resp = session.resolveChoice(0, homeBrewer!.value)
+    expect(resp.state.players[0]!.resources).toMatchObject({ food: 3, wood: 1, reed: 1, grain: 0 })
+    expect(resp.state.events.filter((event) =>
+      event.type === 'resource.exchanged' && event.exchangeSource === CARD_ID,
+    )).toHaveLength(1)
+    expect(resp.interaction.stateId === 'wait' && resp.interaction.request.kind === 'feed'
+      && resp.interaction.playerIndex === 0).toBe(false)
+  })
+
+  it.each([
+    ['already has the wanted good', { food: 6, grain: 1, fields: [], homeBrewer: true }],
+    ['will reap the wanted good', { food: 6, grain: 0, fields: [{ row: 0, col: 0, stacks: [{ kind: 'grain' as const, remaining: 2 }] }], homeBrewer: true }],
+    ['cannot afford the harvest exchange', { food: 1, grain: 0, fields: [], homeBrewer: true }],
+    ['has no pre-field consumer', { food: 6, grain: 0, fields: [], homeBrewer: false }],
+  ])('does not open harvest preparation when the player %s', (_name, setup) => {
+    const session = new GameSession()
+    stabilizeRandomHands(session.state.players)
+    const state = session.getState().state
+    state.players = state.players.slice(0, 2)
+    state.round = 4
+    state.roundPhase = 'work'
+    state.players.forEach((player) => {
+      markAllWorkersUsed(state, player)
+      setActiveWorkerCount(player, 2)
+      setNewbornCount(player, 0)
+      player.resources.food = 10
+      player.resources.grain = 0
+      player.fields = []
+      player.improvements = []
+      player.minorPlayed = []
+      player.occupationPlayed = []
+      player.cardStates = {}
+    })
+    const player = state.players[0]!
+    player.resources.food = setup.food
+    player.resources.grain = setup.grain
+    player.fields = setup.fields
+    player.occupationPlayed = setup.homeBrewer ? [CARD_ID, HOME_BREWER] : [CARD_ID]
+    session.loadState(state)
+
+    const resp = session.performRoundEnd()
+
+    if (resp.interaction.stateId === 'wait') {
+      expect(resp.interaction.promptKey).not.toBe('ui.interactionExchangeChoice')
+    }
   })
 
   it('reverse trade applies bidirectionally via confirmHarvestFeed (food -2, wood/reed/grain +1)', () => {

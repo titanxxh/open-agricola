@@ -21,6 +21,7 @@ import type {
   ParentSelectionSubmission,
   PlayerState,
   Resource,
+  ResourceKey,
   InteractionAnimalReorgZone,
   ExactCost,
 } from '../contract/types.ts'
@@ -119,7 +120,12 @@ import { familySize, findPlayerById, findPlayerIndexById, hasPlayer, smallestAva
 import { animalKeysForState, type AnimalKey } from '../contract/animals.ts'
 import { getAllowedAnimalTypesForZone, readAnimalCountsForZoneAssignment } from '../domain/animal-zones.ts'
 import { getRegisteredMinorImprovement, getRegisteredOccupation } from '../cards/registry-display'
-import { getExchangesInWindow } from '../actions/effects/exchange.ts'
+import {
+  canAffordTrade,
+  getExchangesInWindow,
+  getRemainingHarvestExchangeUses,
+  recordHarvestExchangeUses,
+} from '../actions/effects/exchange.ts'
 import { getMajorCard } from '../cards/major/index.ts'
 import {
   getAvailableMajorImprovementIds,
@@ -721,6 +727,7 @@ export class GameCore {
       },
     }, {
       onBeforeHarvest: (stageResume) => { this.continueHarvestFromBeforeHarvest(stageResume.playerIndex, stageResume.cardIndex) },
+      harvestPrepWindow: (stageResume) => { this.continueHarvestPrepWindow(stageResume.playerIndex) },
       onAfterReap: (stageResume) => { this.continueAfterReapEffects(stageResume.playerIndex, stageResume.cardIndex) },
       afterHarvestReapReaction: (stageResume) => { this.continueAfterReapEffects(stageResume.playerIndex, stageResume.cardIndex) },
       onHarvest: (stageResume) => { this.continueHarvestEffects(stageResume.playerIndex, stageResume.cardIndex) },
@@ -1124,7 +1131,15 @@ export class GameCore {
     foodUsed: number,
     feedQueue?: FeedQueueEntry[],
   ): void {
-    roundPhase.startFeedSubFlow(this, playerIndex, remaining, foodUsed, feedQueue)
+    const player = this.state.players[playerIndex]
+    roundPhase.startFeedSubFlow(
+      this,
+      playerIndex,
+      remaining,
+      foodUsed,
+      feedQueue,
+      player ? this.getHarvestExchangeLimits(player) : undefined,
+    )
   }
   private startHeatingSubFlow(
     playerIndex: number,
@@ -1218,10 +1233,80 @@ export class GameCore {
   }
 
   private hasAnyHarvestExchange(player: PlayerState) {
-    return (
-      getExchangesInWindow(player, 'harvest', this.state).length > 0 ||
-      getExchangesInWindow(player, 'anytime', this.state).length > 0
+    const harvestExchange = getExchangesInWindow(player, 'harvest', this.state).some((trade) => {
+      const sourceId = trade.sourceId ?? trade.source
+      return !!sourceId
+        && canAffordTrade(player, trade)
+        && getRemainingHarvestExchangeUses(player, sourceId, trade.max, this.state.round) > 0
+    })
+    return harvestExchange || getExchangesInWindow(player, 'anytime', this.state).some((trade) =>
+      canAffordTrade(player, trade),
     )
+  }
+
+  private getHarvestExchangeLimits(player: PlayerState): Record<string, number> {
+    const limits: Record<string, number> = {}
+    for (const trade of getExchangesInWindow(player, 'harvest', this.state)) {
+      const sourceId = trade.sourceId ?? trade.source
+      if (!sourceId || trade.max === undefined) continue
+      const remaining = getRemainingHarvestExchangeUses(player, sourceId, trade.max, this.state.round)
+      limits[sourceId] = Math.max(limits[sourceId] ?? 0, remaining)
+    }
+    return limits
+  }
+
+  private willReapHarvestGood(player: PlayerState, resource: ResourceKey): boolean {
+    if (resource !== 'grain' && resource !== 'vegetable') return false
+    return player.fields.some((field) =>
+      field.stacks.some((stack) => stack.kind === resource && stack.remaining > 0),
+    )
+  }
+
+  private buildHarvestPrepFlow(player: PlayerState): ActionFlow | undefined {
+    const wanted = new Set<ResourceKey>()
+    const cardIds = [
+      ...player.improvements,
+      ...player.minorPlayed,
+      ...player.occupationPlayed,
+    ]
+    for (const cardId of cardIds) {
+      for (const resource of getCardEffect(cardId)?.preHarvestGoodsWanted ?? []) {
+        if ((player.resources[resource] ?? 0) > 0) continue
+        if (this.willReapHarvestGood(player, resource)) continue
+        wanted.add(resource)
+      }
+    }
+    if (wanted.size === 0) return
+
+    const sourceIds: string[] = []
+    const maxTradeTimesBySourceId: Record<string, number> = {}
+    for (const trade of getExchangesInWindow(player, 'harvest', this.state)) {
+      const sourceId = trade.sourceId ?? trade.source
+      if (!sourceId || !canAffordTrade(player, trade)) continue
+      if (!Object.entries(trade.to).some(([resource, amount]) =>
+        (amount ?? 0) > 0 && wanted.has(resource as ResourceKey),
+      )) continue
+      const remaining = getRemainingHarvestExchangeUses(player, sourceId, trade.max, this.state.round)
+      if (remaining <= 0) continue
+      if (!sourceIds.includes(sourceId)) sourceIds.push(sourceId)
+      if (Number.isFinite(remaining)) {
+        maxTradeTimesBySourceId[sourceId] = Math.max(
+          maxTradeTimesBySourceId[sourceId] ?? 0,
+          remaining,
+        )
+      }
+    }
+    if (sourceIds.length === 0) return
+
+    return {
+      type: 'leaf',
+      actionId: 'exchange',
+      actionContext: {
+        tradeIds: sourceIds,
+        maxTradeTimesBySourceId,
+        harvestExchangeRound: this.state.round,
+      },
+    }
   }
 
   private findNextHarvestReorgPlayer(afterPlayerIndex: number) {
@@ -2346,6 +2431,24 @@ export class GameCore {
 
   private continueHarvestFromBeforeHarvest(playerIndex = 0, cardIndex = 0): SessionResponse {
     if (this.stageDispatch.continueStageHook('onBeforeHarvest', playerIndex, cardIndex)) {
+      return this.respond()
+    }
+    return this.continueHarvestPrepWindow()
+  }
+
+  private continueHarvestPrepWindow(playerIndex = 0): SessionResponse {
+    for (let currentPlayerIndex = playerIndex; currentPlayerIndex < this.state.players.length; currentPlayerIndex += 1) {
+      const player = this.state.players[currentPlayerIndex]
+      if (!player) continue
+      const flow = this.buildHarvestPrepFlow(player)
+      if (!flow) continue
+      this.stageDispatch.startFlow(
+        flow,
+        'harvestPrepWindow',
+        currentPlayerIndex,
+        0,
+        currentPlayerIndex + 1,
+      )
       return this.respond()
     }
     return this.continueFromStartHarvest()
@@ -3645,7 +3748,15 @@ export class GameCore {
       let capped = sel.count
       if (exchange.max !== undefined) {
         const usedSoFar = perSourceUsed.get(sel.sourceId) ?? 0
-        const remaining = Math.max(0, exchange.max - usedSoFar)
+        const sourceLimit = (exchange.triggers ?? []).includes('harvest')
+          ? getRemainingHarvestExchangeUses(
+              player,
+              exchange.sourceId ?? sel.sourceId,
+              exchange.max,
+              this.state.round,
+            )
+          : exchange.max
+        const remaining = Math.max(0, sourceLimit - usedSoFar)
         capped = Math.min(sel.count, remaining)
         perSourceUsed.set(sel.sourceId, usedSoFar + capped)
       }
@@ -3704,6 +3815,14 @@ export class GameCore {
           food: gainMap,
         }], { actorPlayerId: player.id })
         this.dispatchHarvestFeedConversionListeners(player, feedConvertedEvents)
+        if ((exchange.triggers ?? []).includes('harvest') && exchange.max !== undefined) {
+          recordHarvestExchangeUses(
+            player,
+            exchange.sourceId ?? sel.sourceId,
+            this.state.round,
+            times,
+          )
+        }
         // Dispatch CardExchange.sideEffect (e.g. E153 StoneSculptor bonusVp).
         if (exchange.sideEffect && times > 0) {
           PaymentSolver.applyTradeSideEffect(

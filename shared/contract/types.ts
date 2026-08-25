@@ -929,6 +929,7 @@ export type InteractionRequest =
       remaining: number
       foodUsed: number
       feedQueue?: FeedQueueEntry[]
+      maxTradeTimesBySourceId?: Record<string, number>
     }
   | {
       kind: 'heating'

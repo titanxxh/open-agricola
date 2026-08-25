@@ -8,6 +8,7 @@ const CARD_ID = 'A061_WinnowingFan'
 const cardImpl = {
   effect: {
   id: CARD_ID,
+  preHarvestGoodsWanted: ['grain'],
   onEndHarvestFieldPhase: (_state, player) => {
     if (player.resources.grain < 1) return
 

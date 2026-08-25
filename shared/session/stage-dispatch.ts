@@ -7,6 +7,7 @@ import type { Engine, EngineFrame } from '../engine/index.ts'
 export type StageResumeState = {
   hook:
     | 'onBeforeHarvest'
+    | 'harvestPrepWindow'
     | 'onAfterReap'
     | 'afterHarvestReapReaction'
     | 'onHarvest'

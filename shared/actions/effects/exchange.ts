@@ -24,6 +24,7 @@ import { collectComputeExchanges } from '../../cards/card-listeners'
 import { isMajorCardId } from '../../cards/helpers/card-type'
 import { dispatchTradeAppliedListener } from '../helpers/trade-applied-listener'
 import { exchangeToTrade } from '../helpers/trades'
+import { readCardExtraData, writeCardExtraData } from '../../cards/helpers/card-state'
 import {
   applyAnimalPayment,
   isAnimalResourceKey,
@@ -218,6 +219,44 @@ export const canAffordTrade = (
     const requiredAmount = (fromResources[key] ?? 0) * times
     return (player.resources[key] ?? 0) >= requiredAmount
   })
+}
+
+type HarvestExchangeUsage = { round: number; count: number }
+
+const HARVEST_EXCHANGE_USAGE_KEY = 'harvestExchangeUsage'
+
+export const getRemainingHarvestExchangeUses = (
+  player: PlayerState,
+  sourceId: string,
+  max: number | undefined,
+  round: number,
+): number => {
+  if (max === undefined) return Number.POSITIVE_INFINITY
+  const usage = readCardExtraData<HarvestExchangeUsage>(
+    player,
+    sourceId,
+    HARVEST_EXCHANGE_USAGE_KEY,
+  )
+  const used = usage?.round === round ? usage.count : 0
+  return Math.max(0, max - used)
+}
+
+export const recordHarvestExchangeUses = (
+  player: PlayerState,
+  sourceId: string,
+  round: number,
+  count: number,
+): void => {
+  if (count <= 0) return
+  const usage = readCardExtraData<HarvestExchangeUsage>(
+    player,
+    sourceId,
+    HARVEST_EXCHANGE_USAGE_KEY,
+  )
+  writeCardExtraData(player, sourceId, HARVEST_EXCHANGE_USAGE_KEY, {
+    round,
+    count: (usage?.round === round ? usage.count : 0) + count,
+  } satisfies HarvestExchangeUsage)
 }
 
 /**
@@ -500,6 +539,9 @@ const resolveExchangeChoice = (
   }
   const tradeIds = actionContext?.tradeIds as string[] | undefined
   const maxTradeTimesBySourceId = readMaxTradeTimesBySourceId(actionContext)
+  const harvestExchangeRound = typeof actionContext?.harvestExchangeRound === 'number'
+    ? actionContext.harvestExchangeRound
+    : undefined
   const animalPaymentPreference = readAnimalPaymentPreference(actionContext)
   const { trades } = buildExchangeOptions(player, tradeIds, state, maxTradeTimesBySourceId)
   if (choice.startsWith('bulk:')) {
@@ -541,6 +583,9 @@ const resolveExchangeChoice = (
           exchangeEvent ? [exchangeEvent] : [],
           preResources,
         )
+        if (harvestExchangeRound !== undefined && trade.max !== undefined && trade.sourceId) {
+          recordHarvestExchangeUses(player, trade.sourceId, harvestExchangeRound, times)
+        }
         paid = mergePositiveResources(paid, scaleResources(trade.from, times))
         gained = mergePositiveResources(gained, scaleResources(trade.to, times))
       }
@@ -582,6 +627,9 @@ const resolveExchangeChoice = (
         exchangeEvent ? [exchangeEvent] : [],
         preResources,
       )
+      if (harvestExchangeRound !== undefined && trade.max !== undefined && trade.sourceId) {
+        recordHarvestExchangeUses(player, trade.sourceId, harvestExchangeRound, times)
+      }
     }
     const gained = times > 0 ? scaleResources(trade.to, times) : {}
     const paid = times > 0 ? scaleResources(trade.from, times) : {}

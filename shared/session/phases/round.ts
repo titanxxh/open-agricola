@@ -320,11 +320,12 @@ export const startFeedSubFlow = (
   remaining: number,
   foodUsed: number,
   feedQueue?: FeedQueueEntry[],
+  maxTradeTimesBySourceId?: Record<string, number>,
 ): void => {
   const options = [{ value: 'confirm', labelKey: 'ui.interactionConfirm' }]
   core.pushSyntheticPendingFrame({
     hostNodeId: core.mintSyntheticNodeId('interaction:feed'),
-    request: { kind: 'feed', remaining, foodUsed, feedQueue },
+    request: { kind: 'feed', remaining, foodUsed, feedQueue, maxTradeTimesBySourceId },
     choices: options,
     promptKey: 'ui.harvestFeed',
     ownerNodeId: null,

@@ -7,6 +7,7 @@ const CARD_ID = 'C054_MarketBooth'
 const cardImpl = {
   effect: {
     id: CARD_ID,
+    preHarvestGoodsWanted: ['grain'],
     onEndHarvestFieldPhase: () => payGainNode({
       cardId: CARD_ID,
       cost: { grain: 1, fence: 1 },

@@ -1,4 +1,4 @@
-import type { ActionFlow, FarmTilePosition, GameState, Pasture, PaymentResourceMap, PlayerState, Resource } from '../contract/types'
+import type { ActionFlow, FarmTilePosition, GameState, Pasture, PaymentResourceMap, PlayerState, Resource, ResourceKey } from '../contract/types'
 import type { PrivateGameEvent } from '../contract/private-events'
 import type { AnimalZone, PlayerScoreSummary, ScoreCategoryResult } from '../domain'
 import { getCurrentSessionContext } from './session-card-context'
@@ -261,6 +261,7 @@ export type SharedPostScoreHandler = (
 
 export type CardEffect = {
   id: string
+  preHarvestGoodsWanted?: ResourceKey[]
   onBuy?: FlowEffectHandlerWithPayment
   /** Fires when a pending `choice` whose sourceCard is this card is resolved.
    *  If the handler returns an ActionFlow, it is inserted as the next engine node. */
