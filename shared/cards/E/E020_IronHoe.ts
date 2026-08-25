@@ -7,7 +7,7 @@ const CARD_ID = 'E020_IronHoe'
 const cardImpl = {
   effect: {
   id: CARD_ID,
-  onStartReturnHome: (state, player) => {
+  onAllWorkersPlaced: (state, player) => {
     const grainSeeds = state.actionSpaces.find((s) => s.id === 'grain-seeds')
     const vegSeeds = state.actionSpaces.find((s) => s.id === 'vegetable-seeds')
     if (!grainSeeds || !vegSeeds) return
