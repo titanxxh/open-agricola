@@ -7,6 +7,7 @@ const CARD_ID = 'E058_LunchtimeBeer'
 const cardImpl = {
   effect: {
     id: CARD_ID,
+    maySkipHarvestFieldPhase: true,
     onStartHarvest: (state, _player) => ({
       type: 'seq',
       optional: true,
