@@ -1,6 +1,7 @@
 import { defineOccupationCard } from '../card-source'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
+import { getPlowableTiles } from '../../actions/effects/plow'
 import { payLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
 
@@ -13,6 +14,7 @@ const listener: CardListenerRegistration = {
   handler: (context: CardListenerContext): ActionHookResult | void => {
     const spaceId = context.space?.id
     if (spaceId !== 'farmland' && spaceId !== 'cultivation') return
+    if (getPlowableTiles(context.player).length < 2) return
     return {
       flow: {
         type: 'seq',
