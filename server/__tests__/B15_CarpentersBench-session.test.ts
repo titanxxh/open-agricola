@@ -40,7 +40,7 @@ const directContext = (
     player,
     space: { id: 'forest', gainPerRound: { wood: 1 } },
     actionId: 'collect',
-    phase: 'after',
+    phase: 'immediatelyAfter',
     transactionEvents,
     actionEvents,
     result: { type: 'ok', resourcesGained: { wood: 3 } },

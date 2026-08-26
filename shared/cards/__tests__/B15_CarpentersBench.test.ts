@@ -77,7 +77,7 @@ describe('B015_CarpentersBench', () => {
       player,
       space: woodSpace,
       actionId: 'collect',
-      phase: 'after',
+      phase: 'immediatelyAfter',
       // Actually-collected wood (the reference L42-46 counts wood meeples on space) is
       // the source of truth for bench cap, not space.gainPerRound.
       result: { type: 'ok', resourcesGained: { wood: 3 } },
@@ -128,7 +128,7 @@ describe('B015_CarpentersBench', () => {
       player,
       space: woodSpace,
       actionId: 'collect',
-      phase: 'after',
+      phase: 'immediatelyAfter',
       result: { type: 'ok', resourcesGained: { wood: 1 } },
       transactionEvents: [woodMoved(1, player.id)],
       actionEvents: [woodMoved(1, player.id)],
@@ -154,7 +154,7 @@ describe('B015_CarpentersBench', () => {
       player,
       space: woodSpace,
       actionId: 'collect',
-      phase: 'after',
+      phase: 'immediatelyAfter',
       result: { type: 'ok', resourcesGained: {} },
     })
     expect(result).toBeUndefined()
@@ -171,7 +171,7 @@ describe('B015_CarpentersBench', () => {
       player,
       space: claySpace,
       actionId: 'collect',
-      phase: 'after',
+      phase: 'immediatelyAfter',
       result: { type: 'ok', resourcesGained: { clay: 1 } },
     })
     expect(result).toBeUndefined()
