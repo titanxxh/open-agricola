@@ -19,7 +19,14 @@ const cardImpl = makeCardFieldImpl(
         actionId: 'sow',
         sourceCard: CARD_ID,
         optional: true,
-        actionContext: { allowedFields: 'fromSelectedFields', sourceCard: CARD_ID },
+        actionContext: {
+          allowedFields: 'fromSelectedFields',
+          sourceCard: CARD_ID,
+          cropType: oppositeCrop,
+          minSelections: 1,
+          maxSelections: 1,
+          autoResolveSingleSelection: true,
+        },
       }
     },
   },

@@ -178,16 +178,7 @@ describe('E070_CropRotationField session', () => {
       ])
     })
 
-    it('fromSelectedFields rejects committing a different extra sow field', () => {
-      // Drive the harvest-emitted optional sow leaf rather than mutating
-      // private session fields: round-4 harvest with cardCrop={grain,1} +
-      // vegetable=1 triggers E70's onHarvestFieldPhase to reap the last
-      // grain (cardCrop -> null, selectedPositions = ['-1-5070']) and emit
-      // an optional sow leaf with actionContext
-      // { allowedFields: 'fromSelectedFields', sourceCard: E70 }. The
-      // commit-time selectableFields filter then narrows allowed extras
-      // to just -1/70, so submitting the cross-card -1/69 (E69 MelonPatch)
-      // must be rejected.
+    it('automatically sows the opposite crop on the selected field', () => {
       const session = setup({
         round: 4,
         grain: 0,
@@ -210,15 +201,14 @@ describe('E070_CropRotationField session', () => {
       expect(sowOption).toBeDefined()
       resp = session.resolveChoice(0, sowOption!.value)
       expect(resp.ok).toBe(true)
-      expect(resp.interaction.stateId === 'wait' ? resp.interaction.promptKey : undefined)
-        .toBe('ui.interactionSowSelect')
-
-      resp = session.commitSelectionChoice(0, {
-        crops: [{ row: -1, col: 5069, crop: 'vegetable' }],
-      })
-
-      expect(resp.ok).toBe(false)
-      expect(session.getState().state.players[0]!.resources.vegetable).toBe(1)
+      expect(session.getState().state.players[0]!.resources.vegetable).toBe(0)
+      expect(
+        readCardExtraData<{ crop: string; remaining: number }[]>(
+          session.getState().state.players[0]!,
+          CARD_ID,
+          'cardFieldStacks',
+        ),
+      ).toEqual([{ crop: 'vegetable', remaining: 2 }])
       expect(
         readCardExtraData<{ crop: string; remaining: number }[]>(
           session.getState().state.players[0]!,
@@ -292,6 +282,10 @@ describe('E070_CropRotationField session', () => {
       expect(sow.actionContext).toEqual({
         allowedFields: 'fromSelectedFields',
         sourceCard: CARD_ID,
+        cropType: 'vegetable',
+        minSelections: 1,
+        maxSelections: 1,
+        autoResolveSingleSelection: true,
       })
 
       // Verify state changes

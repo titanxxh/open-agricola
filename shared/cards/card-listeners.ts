@@ -1,4 +1,4 @@
-import type { ActionCostAttribution, ActionExecutionContext, ActionExecutionResult, ActionFlow, ActionSpace, Bonus, CardCostCandidate, CardProvidedPaymentResourceProvider, GameState, PlayerState, Resource, Trade } from '../contract/types'
+import type { ActionCostAttribution, ActionExecutionContext, ActionExecutionResult, ActionFlow, ActionSpace, Bonus, CardCostCandidate, CardProvidedPaymentResourceProvider, GameState, InteractionRequest, PlayerState, Resource, Trade } from '../contract/types'
 import { runActionHooks, type ActionHookContext, type ActionHookPhase, type ActionHookResult } from '../actions/hooks'
 import { getCurrentSessionContext } from './session-card-context'
 import { getActiveCardRegistry } from './active-registry'
@@ -47,6 +47,7 @@ export type CardListenerRegistration = {
   zones?: CardListenerZone[]
   mandatory?: boolean
   preScoring?: boolean
+  blockedAnytimeInteractionKinds?: readonly InteractionRequest['kind'][]
   /**
    * Card-purchase cost candidate transform (Candidate Closure, ADR 0004).
    * Receives one Cost Candidate and returns the derived candidate(s), or

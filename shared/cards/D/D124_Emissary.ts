@@ -12,6 +12,8 @@ const listeners: CardListenerRegistration[] = GOOD_TYPES.map((good) => ({
   id: `D124-emissary-${good}`,
   cardIds: [CARD_ID],
   phases: ['anytime' as ActionHookPhase],
+  preScoring: true,
+  blockedAnytimeInteractionKinds: ['animal-reorg'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
     const placed = getCardStack(context.player, CARD_ID)
     if (placed.includes(good)) return

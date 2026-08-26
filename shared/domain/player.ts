@@ -66,16 +66,19 @@ export const workersAtHome = (state: GameState, p: PlayerState): Worker[] => {
   )
 }
 
+export const availableWorkers = (state: GameState, p: PlayerState): Worker[] =>
+  workersAtHome(state, p).filter((w) => !w.isNewborn)
+
 export const workersAvailable = (state: GameState, p: PlayerState): number =>
-  workersAtHome(state, p).length
+  availableWorkers(state, p).length
 
 export const smallestAvailableWorker = (
   state: GameState,
   p: PlayerState,
 ): Worker | null => {
-  const home = workersAtHome(state, p)
-  if (home.length === 0) return null
-  return [...home].sort((a, b) => Number(a.id) - Number(b.id))[0]
+  const available = availableWorkers(state, p)
+  if (available.length === 0) return null
+  return [...available].sort((a, b) => Number(a.id) - Number(b.id))[0]
 }
 
 export const findFirstNewborn = (p: PlayerState): Worker | null =>

@@ -4,175 +4,91 @@ import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 import { markAllWorkersUsed, setActiveWorkerCount } from '../../shared/domain/player'
 
 import '../../shared/cards/B/B104_SheepWalker'
+import '../../shared/cards/D/D124_Emissary'
 
-const CARD_ID = 'B104_SheepWalker'
+const B104 = 'B104_SheepWalker'
+const D124 = 'D124_Emissary'
 
-describe('B104_SheepWalker session — last harvest enforcement', () => {
-  const setupRound14Harvest = () => {
-    const session = new GameSession()
-    stabilizeRandomHands(session.state.players)
-    const state = session.getState().state
-    state.players = state.players.slice(0, 2)
-    state.round = 14
-    state.players.forEach((player) => {
-      markAllWorkersUsed(state, player)
-      setActiveWorkerCount(player, 1)
-      player.resources.food = 10
-    })
-    const playerA = state.players[0]!
-    const playerB = state.players[1]!
-    playerA.startPlayer = true
-    playerB.startPlayer = false
-    playerA.name = 'PlayerA'
-    playerB.name = 'PlayerB'
-    setActiveWorkerCount(playerB, 0)
-    return { session, state, playerA, playerB }
+const setupRound14 = (sheep: number) => {
+  const session = new GameSession()
+  stabilizeRandomHands(session.state.players)
+  const state = session.getState().state
+  state.players = state.players.slice(0, 2)
+  state.round = 14
+  state.players.forEach((player) => {
+    markAllWorkersUsed(state, player)
+    setActiveWorkerCount(player, 1)
+    player.resources.food = 10
+  })
+  const player = state.players[0]!
+  player.startPlayer = true
+  player.occupationPlayed.push(B104, D124)
+  player.resources.sheep = sheep
+  player.resources.wood = 1
+  player.pastures = [{
+    id: 'sheep-pasture',
+    size: 2,
+    tiles: [{ row: 0, col: 0 }, { row: 0, col: 1 }],
+    stables: 0,
+    animalType: 'sheep',
+    animalCount: sheep,
+  }]
+  state.players[1]!.startPlayer = false
+  setActiveWorkerCount(state.players[1]!, 0)
+  session.loadState(state)
+  return session
+}
+
+const passFeed = (session: GameSession) => {
+  let response = session.performRoundEnd()
+  if (response.interaction.stateId === 'wait' && response.interaction.request.kind === 'feed') {
+    response = session.resolveChoice(0, 'confirm', { selections: [] })
   }
+  return response
+}
 
-  it('forces animalReorg in last harvest even when no breeding occurs (single sheep)', () => {
-    const { session, state, playerA } = setupRound14Harvest()
-    playerA.occupationPlayed.push(CARD_ID)
-    // 1 sheep on a pasture — not enough to breed (<2), but B104 must force reorg.
-    playerA.resources.sheep = 1
-    playerA.pastures = [
-      {
-        id: 'a-pasture',
-        size: 2,
-        tiles: [{ row: 0, col: 0 }, { row: 0, col: 1 }],
-        stables: 0,
-        animalType: 'sheep',
-        animalCount: 1,
-      },
-    ]
-    session.loadState(state)
+describe('B104 Sheep Walker anytime timing', () => {
+  it('uses the shared pre-scoring window instead of forcing a final reorganization', () => {
+    const session = setupRound14(1)
+    let response = passFeed(session)
 
-    let resp = session.performRoundEnd()
-    // Feed phase — playerA has 10 food, no begging.
-    if (resp.interaction.stateId === 'wait' && resp.interaction.request.kind === 'feed') {
-      resp = session.resolveChoice(0, 'confirm', { selections: [] })
-    }
+    expect(response.interaction.stateId).toBe('wait')
+    if (response.interaction.stateId !== 'wait') throw new Error('expected pre-scoring window')
+    expect(response.interaction.request.kind).toBe('choice')
+    if (response.interaction.request.kind !== 'choice') throw new Error('expected choice')
+    expect(response.interaction.request.options.filter((option) => option.sourceCard === B104)).toHaveLength(3)
+    expect(response.interaction.request.options.some((option) => option.sourceCard === D124)).toBe(true)
 
-    // Without B104, breed phase ends here with no animals (1 sheep < 2). With
-    // the fix, B104.enforceReorganizeOnLastHarvest must force animalReorg.
-    expect(resp.interaction.stateId).toBe('wait')
-    if (resp.interaction.stateId !== 'wait') throw new Error('expected wait')
-    expect(resp.interaction.request.kind).toBe('animal-reorg')
-    expect(resp.interaction.playerIndex).toBe(0)
-    expect(resp.interaction.promptParams).toEqual({ trigger: 'harvest-breed' })
+    const stone = response.interaction.request.options.find((option) => option.labelKey === `cards.${B104}.stone`)
+    expect(stone).toBeDefined()
+    response = session.resolveChoice(0, stone!.value)
+    expect(response.state.players[0]!.resources.sheep).toBe(0)
+    expect(response.state.players[0]!.resources.stone).toBe(1)
 
-    // Confirm reorg leaving the sheep on its pasture.
-    resp = session.resolveChoice(0, 'confirm', [
-      { id: 'a-pasture', zoneType: 'pasture', animalType: 'sheep', animalCount: 1 },
-    ])
-
-    expect(resp.state.gameOver).toBe(true)
+    response = session.resolveChoice(0, '__skip__')
+    expect(response.state.gameOver).toBe(true)
   })
 
-  it('continues harvest breeding after a forced last-harvest reorg', () => {
-    const { session, state, playerA, playerB } = setupRound14Harvest()
-    playerA.occupationPlayed.push(CARD_ID)
-    playerA.resources.sheep = 1
-    playerA.pastures = [
-      {
-        id: 'a-pasture',
-        size: 2,
-        tiles: [{ row: 0, col: 0 }, { row: 0, col: 1 }],
-        stables: 0,
-        animalType: 'sheep',
-        animalCount: 1,
-      },
-    ]
-    playerB.resources.boar = 2
-    playerB.pastures = [
-      {
-        id: 'b-pasture',
-        size: 2,
-        tiles: [{ row: 1, col: 0 }, { row: 1, col: 1 }],
-        stables: 0,
-        animalType: 'boar',
-        animalCount: 2,
-      },
-    ]
-    session.loadState(state)
+  it('hides Sheep Walker and Emissary while animal reorganization is pending', () => {
+    const session = setupRound14(2)
+    let response = passFeed(session)
 
-    let resp = session.performRoundEnd()
-    if (resp.interaction.stateId === 'wait' && resp.interaction.request.kind === 'feed') {
-      resp = session.resolveChoice(0, 'confirm', { selections: [] })
-    }
+    expect(response.interaction.stateId).toBe('wait')
+    if (response.interaction.stateId !== 'wait') throw new Error('expected reorganization')
+    expect(response.interaction.request.kind).toBe('animal-reorg')
+    expect(response.interaction.anytimeActions.map((action) => action.id).some((id) =>
+      id.startsWith('B104-sheep-walker-') || id.startsWith('D124-emissary-'),
+    )).toBe(false)
 
-    expect(resp.interaction.stateId).toBe('wait')
-    if (resp.interaction.stateId !== 'wait') throw new Error('expected playerA reorg')
-    expect(resp.interaction.request.kind).toBe('animal-reorg')
-    expect(resp.interaction.playerIndex).toBe(0)
-
-    resp = session.resolveChoice(0, 'confirm', [
-      { id: 'a-pasture', zoneType: 'pasture', animalType: 'sheep', animalCount: 1 },
+    response = session.resolveChoice(0, 'confirm', [
+      { id: 'sheep-pasture', zoneType: 'pasture', animalType: 'sheep', animalCount: 2 },
     ])
 
-    expect(resp.interaction.stateId).toBe('wait')
-    if (resp.interaction.stateId !== 'wait') throw new Error('expected playerB reorg')
-    expect(resp.interaction.request.kind).toBe('animal-reorg')
-    expect(resp.interaction.playerIndex).toBe(1)
-    expect(resp.state.players[1]!.resources.boar).toBe(3)
-
-    resp = session.resolveChoice(1, 'confirm', [
-      { id: 'b-pasture', zoneType: 'pasture', animalType: 'boar', animalCount: 3 },
-    ])
-
-    expect(resp.state.gameOver).toBe(true)
-  })
-
-  it('does not enforce reorg when player has no sheep on board', () => {
-    const { session, state, playerA } = setupRound14Harvest()
-    playerA.occupationPlayed.push(CARD_ID)
-    playerA.resources.sheep = 0
-    session.loadState(state)
-
-    let resp = session.performRoundEnd()
-    if (resp.interaction.stateId === 'wait' && resp.interaction.request.kind === 'feed') {
-      resp = session.resolveChoice(0, 'confirm', { selections: [] })
-    }
-
-    // No sheep -> no reorg forcing -> game ends normally.
-    expect(resp.interaction.stateId).toBe('gameover')
-    expect(resp.state.gameOver).toBe(true)
-  })
-
-  it('does not enforce reorg in non-last harvest (round 4)', () => {
-    const session = new GameSession()
-    stabilizeRandomHands(session.state.players)
-    const state = session.getState().state
-    state.players = state.players.slice(0, 2)
-    state.round = 4
-    state.players.forEach((player) => {
-      markAllWorkersUsed(state, player)
-      setActiveWorkerCount(player, 1)
-      player.resources.food = 10
-    })
-    const playerA = state.players[0]!
-    playerA.startPlayer = true
-    playerA.name = 'PlayerA'
-    playerA.occupationPlayed.push(CARD_ID)
-    playerA.resources.sheep = 1
-    playerA.pastures = [
-      {
-        id: 'a-pasture',
-        size: 2,
-        tiles: [{ row: 0, col: 0 }, { row: 0, col: 1 }],
-        stables: 0,
-        animalType: 'sheep',
-        animalCount: 1,
-      },
-    ]
-    setActiveWorkerCount(state.players[1]!, 0)
-    session.loadState(state)
-
-    let resp = session.performRoundEnd()
-    if (resp.interaction.stateId === 'wait' && resp.interaction.request.kind === 'feed') {
-      resp = session.resolveChoice(0, 'confirm', { selections: [] })
-    }
-    // In a normal round, 1 sheep does not trigger reorg.
-    expect(resp.interaction.stateId).toBe('idle')
-    expect(resp.state.round).toBe(5)
+    expect(response.interaction.stateId).toBe('wait')
+    if (response.interaction.stateId !== 'wait') throw new Error('expected pre-scoring window')
+    expect(response.interaction.request.kind).toBe('choice')
+    if (response.interaction.request.kind !== 'choice') throw new Error('expected choice')
+    expect(response.interaction.request.options.some((option) => option.sourceCard === B104)).toBe(true)
+    expect(response.interaction.request.options.some((option) => option.sourceCard === D124)).toBe(true)
   })
 })

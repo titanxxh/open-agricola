@@ -4360,7 +4360,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
           "boar": 1
         },
         "triggers": [
-          "anytime"
+          "harvest"
         ]
       },
       {
@@ -4371,7 +4371,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
           "vegetable": 1
         },
         "triggers": [
-          "anytime"
+          "harvest"
         ]
       },
       {
@@ -4382,7 +4382,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
           "stone": 1
         },
         "triggers": [
-          "anytime"
+          "harvest"
         ]
       }
     ],
