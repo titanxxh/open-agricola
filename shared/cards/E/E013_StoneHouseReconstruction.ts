@@ -1,6 +1,8 @@
 import { defineMinorCard } from '../card-source'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
+import { isActionDoableInFlowContext } from '../../actions/flow'
+import { getActionDefinition } from '../../actions/index'
 import { isCardFlagged } from '../helpers/card-state'
 import type { CardImpl } from '../registry'
 
@@ -23,6 +25,16 @@ const anytimeListener: CardListenerRegistration = {
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (isCardFlagged(context.player, CARD_ID)) return
     if (context.player.houseType !== 'clay') return
+    const renovation = getActionDefinition('renovate-house')
+    if (!renovation || !isActionDoableInFlowContext({
+      actionId: renovation.id,
+      action: renovation,
+      state: context.state,
+      player: context.player,
+      space: context.space,
+      sourceCard: CARD_ID,
+      resolveAction: getActionDefinition,
+    })) return
     return {
       flow: {
         type: 'seq',

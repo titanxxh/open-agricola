@@ -1255,15 +1255,16 @@ export class GameCore {
     return limits
   }
 
-  private willReapHarvestGood(player: PlayerState, resource: ResourceKey): boolean {
-    if (resource !== 'grain' && resource !== 'vegetable') return false
-    return player.fields.some((field) =>
+  private countReapedHarvestGood(player: PlayerState, resource: ResourceKey): number {
+    if (resource !== 'grain' && resource !== 'vegetable') return 0
+    return player.fields.filter((field) =>
       field.stacks.some((stack) => stack.kind === resource && stack.remaining > 0),
-    )
+    ).length
   }
 
   private buildHarvestPrepFlow(player: PlayerState): ActionFlow | undefined {
-    const wanted = new Set<ResourceKey>()
+    const beforeReapDemand = new Map<ResourceKey, number>()
+    const afterReapDemand = new Map<ResourceKey, number>()
     const cardIds = [
       ...player.improvements,
       ...player.minorPlayed,
@@ -1273,14 +1274,19 @@ export class GameCore {
     const maySkipFieldPhase = effects.some((effect) => effect?.maySkipHarvestFieldPhase)
     for (const effect of effects) {
       for (const resource of effect?.preHarvestGoodsWantedBeforeReap ?? []) {
-        if ((player.resources[resource] ?? 0) <= 0) wanted.add(resource)
+        beforeReapDemand.set(resource, (beforeReapDemand.get(resource) ?? 0) + 1)
       }
       for (const resource of effect?.preHarvestGoodsWanted ?? []) {
-        if ((player.resources[resource] ?? 0) > 0) continue
-        if (!maySkipFieldPhase && this.willReapHarvestGood(player, resource)) continue
-        wanted.add(resource)
+        afterReapDemand.set(resource, (afterReapDemand.get(resource) ?? 0) + 1)
       }
     }
+    const wanted = new Set([...beforeReapDemand.keys(), ...afterReapDemand.keys()].filter((resource) => {
+      const current = player.resources[resource] ?? 0
+      const beforeReap = beforeReapDemand.get(resource) ?? 0
+      const afterReap = afterReapDemand.get(resource) ?? 0
+      const reaped = maySkipFieldPhase ? 0 : this.countReapedHarvestGood(player, resource)
+      return current < beforeReap || current + reaped < beforeReap + afterReap
+    }))
     if (wanted.size === 0) return
 
     const sourceIds: string[] = []
@@ -2841,6 +2847,13 @@ export class GameCore {
     this.state.roundPhase = 'work'
     appendImmediateEvents(this.state, [{ type: 'work.started' }])
     const workComplete = roundPhase.roundWorkComplete(this.state)
+    let roundStartedSeq = -1
+    for (const event of this.state.events) {
+      if (event.type === 'round.started') roundStartedSeq = event.seq
+    }
+    const placedBeforeWork = this.state.events.some((event) =>
+      event.type === 'worker.placed' && event.seq > roundStartedSeq,
+    )
     if (!workComplete) {
       const previousIdx = (frozenOrderStartIdx + this.state.players.length - 1) % this.state.players.length
       this.state.currentPlayerIndex = roundPhase.nextSeatedPlayerIdx(
@@ -2853,6 +2866,7 @@ export class GameCore {
     this.engineStack.clear()
     this.history = []
     this.actionStartIndex = null
+    if (workComplete && placedBeforeWork) return this.continueAllWorkersPlacedHooks()
     return this.respond()
   }
 
