@@ -11,6 +11,17 @@ export const getRoundPlacementDetails = (player: PlayerState): RoundPlacementEnt
 export const getRoundPlacementOrder = (player: PlayerState): string[] =>
   getRoundPlacementDetails(player).map(e => e.spaceId)
 
+export const getDistinctRoundPlacementOrder = (player: PlayerState): string[] => {
+  const workerIds = new Set<string>()
+  return getRoundPlacementDetails(player)
+    .filter(({ workerId }) => {
+      if (workerIds.has(workerId)) return false
+      workerIds.add(workerId)
+      return true
+    })
+    .map(({ spaceId }) => spaceId)
+}
+
 export const recordRoundPlacement = (
   player: PlayerState,
   spaceId: string,
