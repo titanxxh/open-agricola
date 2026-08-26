@@ -4031,7 +4031,7 @@ export class GameCore {
         return leftPriority - rightPriority || left.order - right.order
       })
       .map((entry) => entry.index)
-    const flow = this.buildHarvestBreedFlow(breedOrder)
+    const flow = this.buildHarvestBreedFlow(harvestOrder, breedOrder)
     if (flow) {
       this.stageDispatch.startFlow(flow, 'onBreedPhase', 0, 0)
       return this.respond()
@@ -4039,13 +4039,11 @@ export class GameCore {
     return this.continueEndHarvestEffects()
   }
 
-  private buildHarvestBreedFlow(harvestOrder: number[]): ActionFlow | null {
-    const players = harvestOrder
-      .map((idx) => this.state.players[idx])
-      .filter((p): p is PlayerState => !!p)
-    if (players.length === 0) return null
+  private buildHarvestBreedFlow(harvestOrder: number[], breedOrder: number[]): ActionFlow | null {
     const children: ActionFlow[] = []
-    for (const p of players) {
+    for (const index of harvestOrder) {
+      const p = this.state.players[index]
+      if (!p) continue
       const gainedAnimalDuringFeeding = this.state.events.some((event) =>
         event.type === 'harvest.feedConverted'
         && event.round === this.state.round
@@ -4060,8 +4058,13 @@ export class GameCore {
           targetPlayerId: p.id,
         })
       }
+    }
+    for (const index of breedOrder) {
+      const p = this.state.players[index]
+      if (!p) continue
       children.push({ ...breedLeaf('harvest'), targetPlayerId: p.id })
     }
+    if (children.length === 0) return null
     if (children.length === 1) {
       return children[0]
     }
