@@ -10,7 +10,7 @@ const isWoodAccumulationSpace = (space: CardListenerContext['space']): boolean =
 const listener: CardListenerRegistration = {
   id: 'B131-equipper-after-collect',
   cardIds: [CARD_ID],
-  phases: ['after' as ActionHookPhase],
+  phases: ['immediatelyAfter' as ActionHookPhase],
   actions: ['collect'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (!isWoodAccumulationSpace(context.space)) return

@@ -18,7 +18,7 @@ const collectedWood = (context: CardListenerContext): number => {
 const afterCollectListener: CardListenerRegistration = {
   id: 'B15-carpenters-bench-after-collect',
   cardIds: [CARD_ID],
-  phases: ['after' as ActionHookPhase],
+  phases: ['immediatelyAfter' as ActionHookPhase],
   actions: ['collect'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (!isWoodAccumulationSpace(context.space)) return
