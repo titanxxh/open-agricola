@@ -1,9 +1,14 @@
 import { describe, it, expect } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
-import { setWorkersAtHome } from '../../shared/domain/player'
+import { setActiveWorkerCount, setWorkersAtHome } from '../../shared/domain/player'
 import { readActionSnapshotToken } from '../../shared/cards/helpers/action-snapshot'
+import { getRoundPlacementDetails } from '../../shared/cards/helpers/round-placement'
 import '../../shared/cards/A/A129_Swagman'
+import '../../shared/cards/A/A130_MummysBoy'
+import '../../shared/cards/B/B130_FullPeasant'
 import '../../shared/cards/B/B150_LargeScaleFarmer'
+import '../../shared/cards/D/D075_WoodField'
+import '../../shared/cards/E/E116_FirCutter'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 
 const setup2P = (cardId: string) => {
@@ -52,6 +57,43 @@ const commitFirstFarmSelect = (
     })
   }
   throw new Error('unexpected mandatory fence farm-select in test helper')
+}
+
+const acceptSourceCardFlow = (
+  session: GameSession,
+  initialResp: ReturnType<GameSession['takeAction']>,
+  sourceCard: string,
+) => {
+  let resp = initialResp
+  let safety = 30
+  while (resp.interaction.stateId === 'wait' && safety-- > 0) {
+    const farmResp = commitFirstFarmSelect(session, resp)
+    if (farmResp) {
+      resp = farmResp
+      continue
+    }
+    const options = resp.interaction.request.options ?? []
+    const sourceOption = options.find((option) =>
+      option.sourceCard === sourceCard && option.value !== '__skip__')
+      ?? (resp.interaction.sourceCard === sourceCard
+        ? options.find((option) => option.value !== '__skip__')
+        : undefined)
+    if (sourceOption) {
+      resp = session.resolveChoice(0, sourceOption.value)
+      continue
+    }
+    const skip = options.find((option) => option.value === '__skip__')
+    if (skip) {
+      resp = session.resolveChoice(0, skip.value)
+      continue
+    }
+    if (options.length > 0) {
+      resp = session.resolveChoice(0, options[0]!.value)
+      continue
+    }
+    break
+  }
+  return resp
 }
 
 describe('A→A self-jump recursion guard', () => {
@@ -131,6 +173,65 @@ describe('A→A self-jump recursion guard', () => {
     const farmExpansion = resp.state.actionSpaces.find(s => s.id === 'farm-expansion')!
     expect(grainSeeds.takenBy).toEqual([])
     expect(farmExpansion.takenBy.length).toBe(1)
+  })
+})
+
+describe('distinct workers in round placement history', () => {
+  it("does not enable A130 Mummy's Boy after one worker uses B130", () => {
+    const { session } = setup2P('B130_FullPeasant')
+    const state = session.getState().state
+    const player = state.players[0]!
+    setActiveWorkerCount(player, 3)
+    setWorkersAtHome(state, player, 3)
+    player.occupationPlayed.push('A130_MummysBoy')
+    player.minorPlayed.push('D075_WoodField')
+    session.loadState(state)
+
+    let resp = session.takeAction(0, 'fencing')
+    expect(resp.ok).toBe(true)
+    resp = session.commitSelectionChoice(0, {
+      edges: ['H-0-1', 'H-1-1', 'V-0-1', 'V-0-2'],
+      extraWood: 0,
+    })
+    resp = acceptSourceCardFlow(session, resp, 'B130_FullPeasant')
+    const placements = getRoundPlacementDetails(resp.state.players[0]!)
+    expect(placements).toHaveLength(2)
+    expect(new Set(placements.map((entry) => entry.workerId)).size).toBe(1)
+
+    const nextTurn = resp.state
+    nextTurn.currentPlayerIndex = 0
+    session.loadState(nextTurn)
+    const secondPlacement = session.takeAction(0, 'grain-utilization')
+
+    expect(secondPlacement.ok).toBe(false)
+    expect(secondPlacement.error).toBe('space unavailable')
+  })
+
+  it('gives E116 Fir Cutter the second-person reward after an A129 jump', () => {
+    const { session } = setup2P('A129_Swagman')
+    const state = session.getState().state
+    const player = state.players[0]!
+    setActiveWorkerCount(player, 3)
+    setWorkersAtHome(state, player, 3)
+    player.occupationPlayed.push('E116_FirCutter')
+    state.actionSpaces.find((space) => space.id === 'sheep-market')!.resources.sheep = 0
+    session.loadState(state)
+
+    let resp = session.takeAction(0, 'farm-expansion')
+    resp = acceptSourceCardFlow(session, resp, 'A129_Swagman')
+    const placements = getRoundPlacementDetails(resp.state.players[0]!)
+    expect(placements).toHaveLength(2)
+    expect(new Set(placements.map((entry) => entry.workerId)).size).toBe(1)
+    const woodBefore = resp.state.players[0]!.resources.wood
+
+    const nextTurn = resp.state
+    nextTurn.currentPlayerIndex = 0
+    session.loadState(nextTurn)
+    resp = session.takeAction(0, 'sheep-market')
+    resp = acceptSourceCardFlow(session, resp, 'E116_FirCutter')
+
+    expect(resp.ok).toBe(true)
+    expect(resp.state.players[0]!.resources.wood).toBe(woodBefore + 1)
   })
 })
 
