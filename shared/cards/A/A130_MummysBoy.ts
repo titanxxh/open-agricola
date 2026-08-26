@@ -4,7 +4,7 @@ import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import type { ActionChoiceOption, ActionFlow } from '../../contract/types'
 import { OCCUPIED_SPACE_CHOICE_PREFIX } from '../../actions/effects/place-farmer'
 import { isCardFlagged, setCardFlag } from '../helpers/card-state'
-import { getDistinctRoundPlacementOrder } from '../helpers/round-placement'
+import { getRoundPersonPlacementOrder } from '../helpers/round-placement'
 import { isSpaceOccupied } from '../../domain/space'
 import type { CardImpl } from '../registry'
 
@@ -21,7 +21,7 @@ const CARD_ID = 'A130_MummysBoy'
  */
 
 const getSecondFarmerSpaceId = (context: CardListenerContext): string | null => {
-  const placements = getDistinctRoundPlacementOrder(context.player)
+  const placements = getRoundPersonPlacementOrder(context.player)
   if (placements.length < 2) return null
   return placements[1] ?? null
 }
@@ -43,7 +43,7 @@ const computeArgsListener: CardListenerRegistration = {
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (!context.player.occupationPlayed.includes(CARD_ID)) return
     if (isCardFlagged(context.player, CARD_ID)) return
-    const placedFarmers = getDistinctRoundPlacementOrder(context.player).length
+    const placedFarmers = getRoundPersonPlacementOrder(context.player).length
     if (placedFarmers < 2) return
     const secondSpaceId = getSecondFarmerSpaceId(context)
     if (!secondSpaceId) return
@@ -70,7 +70,7 @@ const afterPlaceFarmerListener: CardListenerRegistration = {
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (!context.player.occupationPlayed.includes(CARD_ID)) return
     if (isCardFlagged(context.player, CARD_ID)) return
-    const placedFarmers = getDistinctRoundPlacementOrder(context.player).length
+    const placedFarmers = getRoundPersonPlacementOrder(context.player).length
     if (placedFarmers < 3) return
     const secondSpaceId = getSecondFarmerSpaceId(context)
     if (!secondSpaceId) return

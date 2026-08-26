@@ -4046,6 +4046,20 @@ export class GameCore {
     if (players.length === 0) return null
     const children: ActionFlow[] = []
     for (const p of players) {
+      const gainedAnimalDuringFeeding = this.state.events.some((event) =>
+        event.type === 'harvest.feedConverted'
+        && event.round === this.state.round
+        && event.playerId === p.id
+        && animalKeysForState(this.state).some((animal) => (event.food[animal] ?? 0) > 0),
+      )
+      if (gainedAnimalDuringFeeding && this.hasPendingAnimals(p)) {
+        children.push({
+          type: 'leaf',
+          actionId: 'reorganize',
+          actionContext: { trigger: 'harvest-breed' },
+          targetPlayerId: p.id,
+        })
+      }
       children.push({ ...breedLeaf('harvest'), targetPlayerId: p.id })
     }
     if (children.length === 1) {

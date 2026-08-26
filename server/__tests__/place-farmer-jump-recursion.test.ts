@@ -8,6 +8,7 @@ import '../../shared/cards/A/A130_MummysBoy'
 import '../../shared/cards/B/B130_FullPeasant'
 import '../../shared/cards/B/B150_LargeScaleFarmer'
 import '../../shared/cards/D/D075_WoodField'
+import '../../shared/cards/E/E003_TeaTime'
 import '../../shared/cards/E/E116_FirCutter'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 
@@ -232,6 +233,57 @@ describe('distinct workers in round placement history', () => {
 
     expect(resp.ok).toBe(true)
     expect(resp.state.players[0]!.resources.wood).toBe(woodBefore + 1)
+  })
+
+  it('counts a recalled worker placed again as the third person for E116', () => {
+    const { session } = setup2P('E116_FirCutter')
+    const state = session.getState().state
+    const player = state.players[0]!
+    setActiveWorkerCount(player, 3)
+    setWorkersAtHome(state, player, 3)
+    player.minorPlayed.push('D075_WoodField')
+    player.minorHand = ['E003_TeaTime']
+    state.actionSpaces.find((space) => space.id === 'sheep-market')!.resources.sheep = 0
+    session.loadState(state)
+
+    let resp = session.takeAction(0, 'grain-utilization')
+    resp = acceptSourceCardFlow(session, resp, '__none__')
+
+    const teaTurn = resp.state
+    expect(teaTurn.players[0]!.minorHand).toContain('E003_TeaTime')
+    expect(teaTurn.actionSpaces.find((space) => space.id === 'grain-utilization')!.takenBy
+      .some((ref) => ref.playerId === teaTurn.players[0]!.id)).toBe(true)
+    teaTurn.currentPlayerIndex = 0
+    session.loadState(teaTurn)
+    resp = session.takeAction(0, 'meeting-place')
+    expect(resp.interaction.stateId).toBe('wait')
+    if (resp.interaction.stateId !== 'wait') throw new Error('expected improvement choice')
+    const improvement = resp.interaction.request.options?.find((option) =>
+      option.value.startsWith('action-improvement-'))
+    if (improvement) resp = session.resolveChoice(0, improvement.value)
+    if (resp.interaction.stateId === 'wait') {
+      const teaTime = resp.interaction.request.options?.find((option) => option.value === 'E003_TeaTime')
+      if (teaTime) resp = session.resolveChoice(0, teaTime.value)
+    }
+
+    expect(resp.state.actionSpaces.find((space) => space.id === 'grain-utilization')!.takenBy).toEqual([])
+    expect(resp.state.players[1]!.minorHand).toContain('E003_TeaTime')
+
+    const placements = getRoundPlacementDetails(resp.state.players[0]!)
+    expect(placements).toHaveLength(2)
+    expect(placements[1]!.workerId).not.toBe(placements[0]!.workerId)
+    const woodBefore = resp.state.players[0]!.resources.wood
+
+    const thirdTurn = resp.state
+    thirdTurn.currentPlayerIndex = 0
+    session.loadState(thirdTurn)
+    resp = session.takeAction(0, 'sheep-market')
+    resp = acceptSourceCardFlow(session, resp, 'E116_FirCutter')
+
+    const finalPlacements = getRoundPlacementDetails(resp.state.players[0]!)
+    expect(finalPlacements).toHaveLength(3)
+    expect(finalPlacements[2]!.workerId).toBe(finalPlacements[0]!.workerId)
+    expect(resp.state.players[0]!.resources.wood).toBe(woodBefore + 2)
   })
 })
 

@@ -130,7 +130,7 @@ export const placeFarmerAction: ActionDefinition = {
         clearLinkedSpaceBlocksForWorker(state, player.id, workerId!)
         addWorkerRef(targetSpace, player.id, workerId!)
         addLinkedSpaceBlocks(state, targetSpace, player.id, workerId!)
-        recordRoundPlacement(player, targetSpace.id, workerId!)
+        recordRoundPlacement(player, targetSpace.id, workerId!, true)
         incPlacedFarmers(player)
         eventSink?.emit<'worker.placed'>({
           type: 'worker.placed',

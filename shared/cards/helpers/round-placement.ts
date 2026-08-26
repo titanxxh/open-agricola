@@ -3,7 +3,7 @@ import { ensureCardState } from './card-state'
 
 const ROUND_PLACEMENT_CARD_ID = '__roundPlacement__'
 
-export type RoundPlacementEntry = { spaceId: string; workerId: string }
+export type RoundPlacementEntry = { spaceId: string; workerId: string; relocation?: true }
 
 export const getRoundPlacementDetails = (player: PlayerState): RoundPlacementEntry[] =>
   (player.cardStates?.[ROUND_PLACEMENT_CARD_ID]?.extraData?.placements as RoundPlacementEntry[] | undefined) ?? []
@@ -11,25 +11,21 @@ export const getRoundPlacementDetails = (player: PlayerState): RoundPlacementEnt
 export const getRoundPlacementOrder = (player: PlayerState): string[] =>
   getRoundPlacementDetails(player).map(e => e.spaceId)
 
-export const getDistinctRoundPlacementOrder = (player: PlayerState): string[] => {
-  const workerIds = new Set<string>()
-  return getRoundPlacementDetails(player)
-    .filter(({ workerId }) => {
-      if (workerIds.has(workerId)) return false
-      workerIds.add(workerId)
-      return true
-    })
+export const getRoundPersonPlacementOrder = (player: PlayerState): string[] =>
+  getRoundPlacementDetails(player)
+    .filter((entry) => entry.relocation !== true)
     .map(({ spaceId }) => spaceId)
-}
 
 export const recordRoundPlacement = (
   player: PlayerState,
   spaceId: string,
   workerId: string,
+  relocation = false,
 ): void => {
   const cs = ensureCardState(player, ROUND_PLACEMENT_CARD_ID)
   const current = getRoundPlacementDetails(player)
-  cs.extraData = { ...(cs.extraData ?? {}), placements: [...current, { spaceId, workerId }] }
+  const placement: RoundPlacementEntry = { spaceId, workerId, ...(relocation ? { relocation: true } : {}) }
+  cs.extraData = { ...(cs.extraData ?? {}), placements: [...current, placement] }
 }
 
 export const resetRoundPlacements = (player: PlayerState): void => {
