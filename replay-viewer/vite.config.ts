@@ -2,7 +2,7 @@ import { fileURLToPath } from 'node:url'
 import { dirname, resolve } from 'node:path'
 import react from '@vitejs/plugin-react'
 import { defineConfig } from 'vite'
-import { loadPublicAssetConfig, publicAssetUrls } from '../scripts/public-assets'
+import { loadPublicAssetConfig, publicAssetUrls } from '../scripts/public-assets.ts'
 
 const root = dirname(fileURLToPath(import.meta.url))
 const repoRoot = resolve(root, '..')
