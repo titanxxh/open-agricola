@@ -5,10 +5,10 @@ import { gainLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
 
 const CARD_ID = 'A122_PanBaker'
-const listener: CardListenerRegistration = {
-  id: 'A122-pan-baker-after-place-farmer',
+const gainListener: CardListenerRegistration = {
+  id: 'A122-pan-baker-before-place-farmer',
   cardIds: [CARD_ID],
-  phases: ['after' as ActionHookPhase],
+  phases: ['before' as ActionHookPhase],
   actions: ['place-farmer'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (!context.space || context.space.id !== 'grain-utilization') return
@@ -16,8 +16,37 @@ const listener: CardListenerRegistration = {
   },
 }
 
+const isDoableListener: CardListenerRegistration = {
+  id: 'A122-pan-baker-isdoable-grain-utilization',
+  cardIds: [CARD_ID],
+  phases: ['isDoable' as ActionHookPhase],
+  actions: ['grain-utilization'],
+  handler: (context: CardListenerContext): ActionHookResult | void => {
+    if (context.doable) return
+    if (context.actionContext?.skipBeforeTriggers === true) return
+    const player = {
+      ...context.player,
+      resources: {
+        ...context.player.resources,
+        clay: (context.player.resources.clay ?? 0) + 2,
+        wood: (context.player.resources.wood ?? 0) + 1,
+      },
+    }
+    const state = {
+      ...context.state,
+      players: context.state.players.map((entry) => entry.id === player.id ? player : entry),
+    }
+    if (context.space.canBeExecutedByPlayer.call(context.space, state, player, {
+      sourceCard: context.sourceCard,
+      actionContext: context.actionContext,
+    })) {
+      return { doable: true }
+    }
+  },
+}
+
 const cardImpl = {
-  listeners: [listener],
+  listeners: [gainListener, isDoableListener],
   reaches: [] as readonly string[],
 } satisfies CardImpl
 

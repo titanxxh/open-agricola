@@ -1,0 +1,93 @@
+import { describe, expect, it } from 'vitest'
+import { GameSession } from '../game/authoritative-session'
+import { setWorkersAtHome } from '../../shared/domain/player'
+import { readCardExtraData } from '../../shared/cards/helpers/card-state'
+import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
+import '../../shared/cards/A/A122_PanBaker'
+import '../../shared/cards/D/D066_PotterCeramics'
+import '../../shared/cards/D/D075_WoodField'
+
+const CARD_ID = 'A122_PanBaker'
+
+const setup = (options: {
+  minorPlayed?: string[]
+  improvements?: string[]
+} = {}) => {
+  const session = new GameSession()
+  const state = session.getState().state
+  state.players = state.players.slice(0, 2)
+  stabilizeRandomHands(state.players)
+  state.currentPlayerIndex = 0
+  state.round = 1
+  state.roundPhase = 'work'
+  state.roundActionOrder = state.roundActionOrder.map(() => null)
+  state.roundActionOrder[0] = 'grain-utilization'
+
+  const player = state.players[0]!
+  setWorkersAtHome(state, player, 2)
+  player.resources = {
+    ...player.resources,
+    wood: 0,
+    clay: 0,
+    grain: 0,
+    food: 0,
+  }
+  player.occupationPlayed.push(CARD_ID)
+  player.minorPlayed.push(...(options.minorPlayed ?? ['D066_PotterCeramics']))
+  player.improvements = options.improvements ?? ['Major_Fireplace1']
+  player.fields = []
+
+  session.loadState(state)
+  return session
+}
+
+describe('A122 Pan Baker session', () => {
+  it('makes Grain Utilization available and supplies D66 before Bake Bread', () => {
+    const session = setup()
+
+    expect(session.getActionAvailability(0)['grain-utilization']).toBe(true)
+
+    let resp = session.takeAction(0, 'grain-utilization')
+    expect(resp.ok).toBe(true)
+    expect(resp.state.players[0]!.resources).toMatchObject({ wood: 1, clay: 2, grain: 0 })
+    expect(resp.interaction.stateId).toBe('wait')
+    if (resp.interaction.stateId !== 'wait') return
+    expect(resp.interaction.sourceCard).toBe('D066_PotterCeramics')
+
+    const accept = resp.interaction.request.options?.find((option) => option.value !== '__skip__')
+    expect(accept).toBeDefined()
+    resp = session.resolveChoice(0, accept!.value)
+    expect(resp.ok).toBe(true)
+    if (resp.interaction.stateId === 'wait' && resp.interaction.promptKey === 'ui.interactionBakeBreadChoice') {
+      resp = session.resolveChoice(0, 'Major_Fireplace1')
+    }
+
+    expect(resp.ok).toBe(true)
+    expect(resp.state.players[0]!.resources).toMatchObject({ wood: 1, clay: 1, grain: 0, food: 2 })
+    expect(resp.state.actionSpaces.find((space) => space.id === 'grain-utilization')!.takenBy).toHaveLength(1)
+  })
+
+  it('makes Grain Utilization available and supplies wood before sowing D75', () => {
+    const session = setup({ minorPlayed: ['D075_WoodField'], improvements: [] })
+
+    expect(session.getActionAvailability(0)['grain-utilization']).toBe(true)
+
+    let resp = session.takeAction(0, 'grain-utilization')
+    expect(resp.ok).toBe(true)
+    expect(resp.state.players[0]!.resources).toMatchObject({ wood: 1, clay: 2, grain: 0 })
+    expect(resp.interaction.stateId).toBe('wait')
+    if (resp.interaction.stateId !== 'wait' || resp.interaction.request.farm.farmType !== 'sow') {
+      throw new Error('expected sow interaction')
+    }
+
+    resp = session.commitSelectionChoice(0, {
+      crops: [{ row: -1, col: 4075, crop: 'wood' }],
+    })
+
+    expect(resp.ok).toBe(true)
+    expect(resp.state.players[0]!.resources).toMatchObject({ wood: 0, clay: 2, grain: 0 })
+    expect(readCardExtraData(resp.state.players[0]!, 'D075_WoodField', 'cardFieldStacks')).toEqual([
+      { crop: 'wood', remaining: 3 },
+    ])
+  })
+})
