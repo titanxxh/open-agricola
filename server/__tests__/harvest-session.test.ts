@@ -312,6 +312,7 @@ describe('harvest session flow', () => {
     const p = resp.state.players[0]!
     expect(p.resources.sheep).toBe(0)
     expect(p.resources.stone).toBe(1)
+    expect(p.pastures[0]).toMatchObject({ animalType: null, animalCount: 0 })
     // No food produced -> full 2-food deficit goes to begging.
     expect(p.resources.begging).toBe(2)
   })

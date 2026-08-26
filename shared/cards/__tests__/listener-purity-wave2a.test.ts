@@ -328,6 +328,7 @@ describe('listener purity wave 2a', () => {
             placements: [
               { spaceId: 'forest', workerId: '1' },
               { spaceId: 'clay-pit', workerId: '2' },
+              { spaceId: 'clay-pit', workerId: '3' },
             ],
           },
         },

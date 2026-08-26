@@ -4,6 +4,7 @@ import { setWorkersAtHome } from '../../shared/domain/player'
 import { readCardExtraData } from '../../shared/cards/helpers/card-state'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 import '../../shared/cards/A/A122_PanBaker'
+import '../../shared/cards/B/B130_FullPeasant'
 import '../../shared/cards/D/D066_PotterCeramics'
 import '../../shared/cards/D/D075_WoodField'
 
@@ -89,5 +90,35 @@ describe('A122 Pan Baker session', () => {
     expect(readCardExtraData(resp.state.players[0]!, 'D075_WoodField', 'cardFieldStacks')).toEqual([
       { crop: 'wood', remaining: 3 },
     ])
+  })
+
+  it('gains resources once when B130 jumps to Grain Utilization', () => {
+    const session = setup({ minorPlayed: ['D075_WoodField'], improvements: [] })
+    const state = session.getState().state
+    const player = state.players[0]!
+    state.round = 5
+    state.roundActionOrder[1] = 'fencing'
+    player.occupationPlayed.push('B130_FullPeasant')
+    player.resources.wood = 4
+    player.resources.food = 1
+    session.loadState(state)
+
+    let resp = session.takeAction(0, 'fencing')
+    expect(resp.ok).toBe(true)
+    resp = session.commitSelectionChoice(0, {
+      edges: ['H-0-1', 'H-1-1', 'V-0-1', 'V-0-2'],
+      extraWood: 0,
+    })
+    expect(resp.ok).toBe(true)
+    expect(resp.interaction.stateId).toBe('wait')
+    if (resp.interaction.stateId !== 'wait') return
+    expect(resp.interaction.sourceCard).toBe('B130_FullPeasant')
+
+    const accept = resp.interaction.request.options?.find((option) => option.value !== '__skip__')
+    expect(accept).toBeDefined()
+    resp = session.resolveChoice(0, accept!.value)
+
+    expect(resp.ok).toBe(true)
+    expect(resp.state.players[0]!.resources).toMatchObject({ wood: 1, clay: 2, food: 0 })
   })
 })
