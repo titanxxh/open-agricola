@@ -6,7 +6,7 @@ import type { IncomingMessage, ServerResponse } from 'node:http'
 import {
   loadPublicAssetConfig,
   publicAssetUrls,
-} from './scripts/public-assets'
+} from './scripts/public-assets.ts'
 
 const publicAssets = await loadPublicAssetConfig({
   allowLocal: !process.argv.includes('build') && !process.env.CI,
