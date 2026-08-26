@@ -199,7 +199,7 @@ const resolvePayment = (
       paymentResourceProviders,
     })
   } else {
-    payResources(player, selection.solution.resourcesPaid)
+    payResources(player, selection.solution.resourcesPaid, state)
     paySupplyTokens(player, selection.solution.resourcesPaid)
   }
   return { type: 'paid', receipt: receiptForSolution(selection.solution, effectiveCost, ctx) }

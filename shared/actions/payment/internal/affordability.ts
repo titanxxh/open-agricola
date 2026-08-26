@@ -22,6 +22,7 @@ import {
   getOwnOrdinaryFenceReserveCount,
 } from '../../../domain/supply-tokens'
 import { REAL_RESOURCE_KEYS } from '../../../contract/resource-keys'
+import { applyAnimalPayment, isAnimalResourceKey } from '../../../domain/animal-payment'
 
 const SUPPLY_TOKEN_KEYS = new Set<SupplyTokenKey>(['fence', 'stable'])
 const REAL_RESOURCE_KEY_SET: ReadonlySet<string> = new Set(REAL_RESOURCE_KEYS)
@@ -68,13 +69,18 @@ export const paySupplyTokens = (
 export const payResources = (
   player: PlayerState,
   cost: PaymentResourceMap,
+  state?: GameState,
 ) => {
   const { resources } = splitSupplyTokenCost(cost)
   Object.keys(resources).forEach((key) => {
     const resourceKey = key as keyof Resource
     const amount = resources[resourceKey] ?? 0
     if (amount > 0) {
-      player.resources[resourceKey] -= amount
+      if (isAnimalResourceKey(key)) {
+        applyAnimalPayment(player, state, key, amount)
+      } else {
+        player.resources[resourceKey] -= amount
+      }
     }
   })
 }
