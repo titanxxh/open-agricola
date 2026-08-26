@@ -2,7 +2,7 @@ import { defineOccupationCard } from '../card-source'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { gainLeaf } from '../helpers/pay-gain-node'
-import { familySize, workersAvailable } from '../../domain/player'
+import { getRoundPlacementOrder } from '../helpers/round-placement'
 import type { CardImpl } from '../registry'
 
 const CARD_ID = 'E116_FirCutter'
@@ -17,7 +17,7 @@ const CARD_ID = 'E116_FirCutter'
  *      isListeningTo → PlaceFarmer on SheepMarket/PigMarket/CattleMarket.
  *      onPlayerAfterPlaceFarmer → map = [null, 1, 1, 2, 2, 3], gain wood[countPlacedFarmers].
  *
- * countPlacedFarmers = familySize - workersAvailable (after placing the current farmer).
+ * countPlacedFarmers comes from the recorded round placement order.
  *
  * Occupation onBuy flows must use a occupation listener.
  */
@@ -44,9 +44,7 @@ const animalMarketListener: CardListenerRegistration = {
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (!context.space || !ANIMAL_MARKET_SPACES.has(context.space.id)) return
 
-    // Number of placed farmers = familySize - workersAvailable
-    // At this point the current farmer has already been placed, so workersAvailable is decremented
-    const placedFarmers = familySize(context.player) - workersAvailable(context.state, context.player)
+    const placedFarmers = getRoundPlacementOrder(context.player).length
     const woodAmount = WOOD_BY_PLACEMENT[placedFarmers] ?? WOOD_BY_PLACEMENT[WOOD_BY_PLACEMENT.length - 1]!
     if (!woodAmount || woodAmount <= 0) return
 

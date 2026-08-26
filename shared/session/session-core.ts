@@ -118,6 +118,7 @@ import { releaseWorkerFromCard } from '../cards/helpers/card-held-workers.ts'
 import { resetRoundPlacements } from '../cards/helpers/round-placement.ts'
 import { familySize, findPlayerById, findPlayerIndexById, hasPlayer, smallestAvailableWorker } from '../domain/player.ts'
 import { animalKeysForState, type AnimalKey } from '../contract/animals.ts'
+import { applyAnimalPayment, isAnimalResourceKey } from '../domain/animal-payment.ts'
 import { getAllowedAnimalTypesForZone, readAnimalCountsForZoneAssignment } from '../domain/animal-zones.ts'
 import { getRegisteredMinorImprovement, getRegisteredOccupation } from '../cards/registry-display'
 import {
@@ -3816,7 +3817,11 @@ export class GameCore {
         const costMap: Record<string, number> = {}
         for (const [k, v] of Object.entries(exchange.from)) {
           const total = (v as number) * times
-          ;(player.resources as Record<string, number>)[k] -= total
+          if (isAnimalResourceKey(k)) {
+            applyAnimalPayment(player, this.state, k, total)
+          } else {
+            ;(player.resources as Record<string, number>)[k] -= total
+          }
           costMap[k] = total
           usedResources[k as keyof Resource] = (usedResources[k as keyof Resource] ?? 0) + total
           incResourceConverted(player, k as keyof Resource, total)
