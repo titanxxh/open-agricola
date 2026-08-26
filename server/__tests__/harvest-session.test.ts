@@ -316,4 +316,41 @@ describe('harvest session flow', () => {
     // No food produced -> full 2-food deficit goes to begging.
     expect(p.resources.begging).toBe(2)
   })
+
+  it('reorganizes a boar gained from B104 during the final harvest feed', () => {
+    const { session, state, playerA } = setupSinglePlayerHarvest()
+    state.round = 14
+    playerA.occupationPlayed.push('B104_SheepWalker')
+    playerA.resources.sheep = 1
+    playerA.pastures = [{
+      id: 'a-pasture',
+      size: 2,
+      tiles: [{ row: 0, col: 0 }, { row: 0, col: 1 }],
+      stables: 0,
+      animalType: 'sheep',
+      animalCount: 1,
+    }]
+    session.loadState(state)
+
+    let resp = session.performRoundEnd()
+    if (!(resp.interaction.stateId === 'wait' && resp.interaction.request.kind === 'feed')) {
+      throw new Error('expected harvestFeed pending')
+    }
+    resp = session.resolveChoice(0, 'confirm', { selections: [
+      { sourceId: 'B104_SheepWalker', exchangeIndex: 0, count: 1, sourceName: 'Sheep Walker' },
+    ] })
+
+    expect(resp.interaction.stateId).toBe('wait')
+    if (resp.interaction.stateId !== 'wait') throw new Error('expected animal reorganization')
+    expect(resp.interaction.request.kind).toBe('animal-reorg')
+    expect(resp.state.players[0]!.resources).toMatchObject({ sheep: 0, boar: 1 })
+    expect(resp.state.players[0]!.pastures[0]).toMatchObject({ animalType: null, animalCount: 0 })
+
+    resp = session.resolveChoice(0, 'confirm', [
+      { id: 'a-pasture', zoneType: 'pasture', animalType: 'boar', animalCount: 1 },
+    ])
+
+    expect(resp.state.gameOver).toBe(true)
+    expect(resp.state.players[0]!.pastures[0]).toMatchObject({ animalType: 'boar', animalCount: 1 })
+  })
 })
