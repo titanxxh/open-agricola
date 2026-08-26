@@ -1600,6 +1600,7 @@ export class GameCore {
     const pendingSnapshot = this.peekHostContextSnapshot()
     const pendingSourceCard = this.peekPendingSourceCard()
     const pendingActionContext = pendingSnapshot?.actionContext
+    const interactionKind = this.engineStack.peekPendingView()?.request.kind
     for (const action of options.preScoringOnly ? [] : this.registry.values()) {
       if (!action.anytime) continue
       if (blockedIds.has(action.id)) continue
@@ -1635,6 +1636,7 @@ export class GameCore {
       if (entry.ownerPlayerId !== player.id) continue
       if (options.preScoringOnly && entry.registration.preScoring !== true) continue
       if (blockedIds.has(entry.registration.id)) continue
+      if (interactionKind && entry.registration.blockedAnytimeInteractionKinds?.includes(interactionKind)) continue
       const result = executeCardListener(entry.registration, anytimeContext, listenerOwnerOptions(entry))
       if (!result?.flow) continue
       // anytime listeners are queried during build (idempotent peek), not

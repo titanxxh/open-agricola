@@ -1,7 +1,7 @@
 import type { GameState, PlayerState, Worker } from '../contract/types'
 import type { CardDefinition } from '../contract/cards'
 import { getPlayedCardDefinitions } from '../cards/helpers/card-type'
-import { workersAtHome, smallestAvailableWorker } from '../domain/player'
+import { availableWorkers, workersAtHome, smallestAvailableWorker } from '../domain/player'
 import { findActionSpaceById } from '../domain/space'
 import { isThroughTheSeasonsSeason } from '../seasons/rules'
 
@@ -80,7 +80,7 @@ export const healthyWorkersAtHome = (
   player: PlayerState,
 ): Worker[] => {
   const sick = sickSet(player)
-  return workersAtHome(state, player).filter((worker) => !sick.has(worker.id))
+  return availableWorkers(state, player).filter((worker) => !sick.has(worker.id))
 }
 
 export const sickWorkersAtHome = (
@@ -88,7 +88,7 @@ export const sickWorkersAtHome = (
   player: PlayerState,
 ): Worker[] => {
   const sick = sickSet(player)
-  return workersAtHome(state, player).filter((worker) => sick.has(worker.id))
+  return availableWorkers(state, player).filter((worker) => sick.has(worker.id))
 }
 
 export const hasHealthyWorkerAtHome = (

@@ -133,9 +133,26 @@ export const sowAction: ActionDefinition = {
     const farm = buildSowFarmInteraction(player, context?.actionContext)
     return farm.farmType === 'sow' && farm.selectableFields.length > 0
   },
-  execute: ({ state, player, actionContext }): ActionExecutionResult => {
-    const idx = state.players.indexOf(player)
-    const farm = playerBoard(state, idx).farmInteraction.selectableTiles('sow', { actionContext })
+  execute: (ctx): ActionExecutionResult => {
+    const idx = ctx.state.players.indexOf(ctx.player)
+    const farm = playerBoard(ctx.state, idx).farmInteraction.selectableTiles('sow', {
+      actionContext: ctx.actionContext,
+    })
+    if (
+      ctx.actionContext?.autoResolveSingleSelection === true &&
+      farm.farmType === 'sow' &&
+      farm.minSelections === 1 &&
+      farm.maxSelections === 1 &&
+      farm.selectableFields.length === 1 &&
+      farm.selectableFields[0]!.allowedCrops.length === 1
+    ) {
+      const onlyField = farm.selectableFields[0]!
+      return finalizeSow(ctx, [{
+        row: onlyField.tile.row,
+        col: onlyField.tile.col,
+        crop: onlyField.allowedCrops[0]!,
+      }])
+    }
     return {
       type: 'request',
       request: {
