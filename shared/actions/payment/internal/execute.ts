@@ -157,7 +157,7 @@ export const executePaymentSolution = (
   if (!consumePaymentResourceProviders(options.state, solution, options.paymentResourceProviders)) {
     throw new Error('Cannot consume card-provided payment resource')
   }
-  payResources(player, solution.resourcesPaid)
+  payResources(player, solution.resourcesPaid, options.state)
   paySupplyTokens(player, solution.resourcesPaid)
   if (solution.bonusUsed && player._activeActionBonusSources) {
     const seen = new Set(player._activeActionBonusSources)

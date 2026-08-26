@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 import { getCardStack } from '../../shared/cards/helpers/card-state'
+import { markAllWorkersUsed, setActiveWorkerCount } from '../../shared/domain/player'
 
 import '../../shared/cards/D/D124_Emissary'
 
@@ -97,5 +98,52 @@ describe('D124_Emissary session', () => {
     expect(anytimeIds).not.toContain('D124-emissary-sheep')
     expect(anytimeIds).not.toContain('D124-emissary-boar')
     expect(anytimeIds).not.toContain('D124-emissary-cattle')
+  })
+
+  it('removes a pre-scoring animal payment from its pasture', () => {
+    const session = setup()
+    const state = session.getState().state
+    state.round = 14
+    state.players.forEach((player) => {
+      markAllWorkersUsed(state, player)
+      setActiveWorkerCount(player, 1)
+      player.resources.food = 10
+    })
+    const player = state.players[0]!
+    player.startPlayer = true
+    player.resources.sheep = 1
+    player.pastures = [{
+      id: 'sheep-pasture',
+      size: 1,
+      tiles: [{ row: 0, col: 0 }],
+      stables: 0,
+      animalType: 'sheep',
+      animalCount: 1,
+    }]
+    state.players[1]!.startPlayer = false
+    setActiveWorkerCount(state.players[1]!, 0)
+    session.loadState(state)
+
+    let resp = session.performRoundEnd()
+    if (resp.interaction.stateId === 'wait' && resp.interaction.request.kind === 'feed') {
+      resp = session.resolveChoice(0, 'confirm', { selections: [] })
+    }
+    expect(resp.interaction.stateId).toBe('wait')
+    if (resp.interaction.stateId !== 'wait') throw new Error('expected pre-scoring window')
+    expect(resp.interaction.request.kind).toBe('choice')
+    if (resp.interaction.request.kind !== 'choice') throw new Error('expected choice')
+    const sheep = resp.interaction.request.options.find((option) =>
+      option.sourceCard === 'D124_Emissary' && option.labelParams?.good === 'sheep')
+    expect(sheep).toBeDefined()
+
+    resp = session.resolveChoice(0, sheep!.value)
+
+    expect(resp.ok).toBe(true)
+    expect(resp.state.players[0]!.resources).toMatchObject({ sheep: 0, stone: 1 })
+    expect(resp.state.players[0]!.pastures[0]).toMatchObject({ animalType: null, animalCount: 0 })
+    expect(getCardStack(resp.state.players[0]!, 'D124_Emissary')).toContain('sheep')
+
+    resp = session.resolveChoice(0, '__skip__')
+    expect(resp.state.gameOver).toBe(true)
   })
 })
