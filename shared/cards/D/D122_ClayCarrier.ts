@@ -17,9 +17,9 @@ const anytimeListener: CardListenerRegistration = {
       flow: {
         type: 'seq',
         children: [
+          { type: 'leaf', actionId: 'special-effect', sourceCard: CARD_ID, params: { kind: 'set-flag', flag: true } },
           payLeaf({ cardId: CARD_ID, cost: { food: 2 } }),
           gainLeaf(CARD_ID, { clay: 2 }),
-          { type: 'leaf', actionId: 'special-effect', sourceCard: CARD_ID, params: { kind: 'set-flag', flag: true } },
         ],
       },
       sourceCard: CARD_ID,
