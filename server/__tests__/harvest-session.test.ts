@@ -4,6 +4,7 @@ import { GameSession } from '../game/authoritative-session'
 import { markAllWorkersUsed, setActiveWorkerCount } from '../../shared/domain/player'
 import '../../shared/cards/D/D060_LargePottery'
 import '../../shared/cards/B/B104_SheepWalker'
+import '../../shared/cards/E/E058_LunchtimeBeer'
 import { autoAdvanceRoundEnd } from '../../tests/llm-card-gen/session-helpers'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 describe('harvest session flow', () => {
@@ -345,6 +346,48 @@ describe('harvest session flow', () => {
     expect(resp.interaction.request.kind).toBe('animal-reorg')
     expect(resp.state.players[0]!.resources).toMatchObject({ sheep: 0, boar: 1 })
     expect(resp.state.players[0]!.pastures[0]).toMatchObject({ animalType: null, animalCount: 0 })
+
+    resp = session.resolveChoice(0, 'confirm', [
+      { id: 'a-pasture', zoneType: 'pasture', animalType: 'boar', animalCount: 1 },
+    ])
+
+    expect(resp.state.gameOver).toBe(true)
+    expect(resp.state.players[0]!.pastures[0]).toMatchObject({ animalType: 'boar', animalCount: 1 })
+  })
+
+  it('reorganizes a B104 boar before scoring when E058 skips breeding', () => {
+    const { session, state, playerA } = setupSinglePlayerHarvest()
+    state.round = 14
+    playerA.minorPlayed.push('E058_LunchtimeBeer')
+    playerA.occupationPlayed.push('B104_SheepWalker')
+    playerA.resources.sheep = 1
+    playerA.pastures = [{
+      id: 'a-pasture',
+      size: 2,
+      tiles: [{ row: 0, col: 0 }, { row: 0, col: 1 }],
+      stables: 0,
+      animalType: 'sheep',
+      animalCount: 1,
+    }]
+    session.loadState(state)
+
+    let resp = session.performRoundEnd()
+    expect(resp.interaction.stateId).toBe('wait')
+    if (resp.interaction.stateId !== 'wait') throw new Error('expected E058 choice')
+    const accept = resp.interaction.request.options?.find((option) => option.value !== '__skip__')
+    if (!accept) throw new Error('expected E058 accept option')
+    resp = session.resolveChoice(0, accept.value)
+
+    if (!(resp.interaction.stateId === 'wait' && resp.interaction.request.kind === 'feed')) {
+      throw new Error('expected harvestFeed pending')
+    }
+    resp = session.resolveChoice(0, 'confirm', { selections: [
+      { sourceId: 'B104_SheepWalker', exchangeIndex: 0, count: 1, sourceName: 'Sheep Walker' },
+    ] })
+
+    expect(resp.interaction.stateId).toBe('wait')
+    if (resp.interaction.stateId !== 'wait') throw new Error('expected animal reorganization')
+    expect(resp.interaction.request.kind).toBe('animal-reorg')
 
     resp = session.resolveChoice(0, 'confirm', [
       { id: 'a-pasture', zoneType: 'pasture', animalType: 'boar', animalCount: 1 },
