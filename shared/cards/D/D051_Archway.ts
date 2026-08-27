@@ -1,6 +1,5 @@
 import { definePlayerActionCard } from '../card-source'
 import { registerPlayerActionSpace, createPlayerActionSpaces } from '../player-action-space'
-import { isSpaceOccupied, spaceHasPlayer } from '../../domain/space'
 import type { CardImpl } from '../registry'
 
 const CARD_ID = 'D051_Archway'
@@ -34,19 +33,19 @@ const cardImpl = {
     }
   },
   onBeforeReturnHome: (state, player) => {
-    // Only the player whose worker is on D51 gets the move effect
     const d51Space = state.actionSpaces.find((s) => s.id === CARD_ID)
-    if (!d51Space || !spaceHasPlayer(d51Space, player.id)) return
-    // Check if there are unoccupied action spaces the player can use
-    const hasAvailable = state.actionSpaces.some(
-      (s) => !isSpaceOccupied(s) && s.id !== CARD_ID && s.canBeExecutedByPlayer(state, player),
-    )
-    if (!hasAvailable) return
+    const worker = d51Space?.takenBy.find((entry) => entry.playerId === player.id)
+    if (!worker) return
+    const actionContext = {
+      moveFarmerSourceSpaceId: CARD_ID,
+      moveFarmerWorkerId: worker.workerId,
+    }
     return {
       type: 'leaf',
       actionId: 'move-farmer-to-space',
-      params: { excludeSpaceId: CARD_ID },
+      params: { excludeSpaceId: CARD_ID, workerId: worker.workerId },
       sourceCard: CARD_ID,
+      actionContext,
       optional: true,
     }
   },
