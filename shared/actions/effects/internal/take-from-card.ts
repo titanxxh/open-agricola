@@ -1,9 +1,5 @@
 import type { ActionDefinition, Resource } from '../../../contract/types'
 import { initCardState } from '../../../cards/__stubs__/helpers'
-import { addCardResourceGained } from '../../../cards/helpers/card-state'
-import { gainResources } from '../gain'
-import { trackWorkPhaseBuildingResources } from '../../../session/work-phase-resources'
-import { addResourcesFromCards } from '../../../session/stats'
 
 const canTakeFromCard = (
   counters: Record<string, number> | undefined,
@@ -21,7 +17,7 @@ export const takeFromCardAction: ActionDefinition = {
   roundAvailable: 1,
   gainPerRound: {},
   canBeExecutedByPlayer: () => true,
-  execute: ({ state, player, params, sourceCard, eventSink }) => {
+  execute: ({ player, params, sourceCard, eventSink }) => {
     if (!sourceCard) {
       return { type: 'fail', errorKey: 'log.exchangeFail' }
     }
@@ -36,10 +32,6 @@ export const takeFromCardAction: ActionDefinition = {
       if (typeof value !== 'number' || value <= 0) return
       cardCounters[key] = Math.max(0, (cardCounters[key] ?? 0) - value)
     })
-    gainResources(player, gain)
-    trackWorkPhaseBuildingResources(state, player.id, gain)
-    addCardResourceGained(player, sourceCard, gain)
-    addResourcesFromCards(player, gain as Partial<Resource>)
     eventSink?.emit<'card.stackChanged'>({
       type: 'card.stackChanged',
       cardId: sourceCard,
@@ -51,15 +43,14 @@ export const takeFromCardAction: ActionDefinition = {
       ),
       reason: 'take',
     })
-    eventSink?.emit<'resource.moved'>({
-      type: 'resource.moved',
-      resources: gain as Partial<Resource>,
-      from: { kind: 'card', playerId: player.id, cardId: sourceCard },
-      to: { kind: 'player', playerId: player.id },
-      reason: 'cardEffect',
-      sourceCardId: sourceCard,
-    })
-
-    return { type: 'ok', resourcesGained: gain }
+    return {
+      type: 'flow',
+      flow: {
+        type: 'leaf',
+        actionId: 'gain',
+        sourceCard,
+        params: gain,
+      },
+    }
   },
 }

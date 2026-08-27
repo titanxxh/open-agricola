@@ -171,7 +171,7 @@ describe('D036_BreedRegistry infobox', () => {
     expect(readCardInfobox(player, 'D036_BreedRegistry')).toBe('3 / 2')
   })
 
-  it('tracks sheep taken from card stacks through the listener action filter', () => {
+  it('tracks sheep gained from card stacks through the listener action filter', () => {
     const player = createPlayer()
     const state = createState(player)
     const actionEvents = [sheepMovedFromCard(1)]
@@ -179,8 +179,8 @@ describe('D036_BreedRegistry infobox', () => {
     const [result] = runCardListeners({
       state,
       player,
-      space: createSpace('take-from-card'),
-      actionId: 'take-from-card',
+      space: createSpace('gain'),
+      actionId: 'gain',
       phase: 'after',
       transactionEvents: actionEvents,
       actionEvents,

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 
-import { setWorkersAtHome } from '../../shared/domain/player'
+import { markAllWorkersUsed, setActiveWorkerCount, setWorkersAtHome } from '../../shared/domain/player'
 import { executeCardListener } from '../../shared/cards/card-listeners'
 import { E103_Wolf_impl } from '../../shared/cards/E/E103_Wolf'
 import type { DraftGameEvent } from '../../shared/contract/events'
@@ -140,6 +140,49 @@ describe('E103_Wolf session', () => {
     const updatedPlayer = resp.state.players[0]!
     expect(updatedPlayer.resources.boar).toBe(1)
     expect(updatedPlayer.cardStates?.[CARD_ID]?.stack).toEqual(['clay'])
+  })
+
+  it('reacts to Interim Storage payout at the start of round 7', () => {
+    const session = setup()
+    const state = session.getState().state
+    state.round = 6
+    state.roundPhase = 'work'
+    state.players.forEach((entry) => {
+      setActiveWorkerCount(entry, 2)
+      markAllWorkersUsed(state, entry)
+      entry.resources.food = 10
+    })
+
+    const player = state.players[0]!
+    player.minorPlayed.push('A081_InterimStorage')
+    player.cardStates!.A081_InterimStorage = { counters: { wood: 1 } }
+    player.cardStates![CARD_ID]!.stack = ['clay', 'wood']
+    player.resources.wood = 0
+    player.resources.boar = 0
+    session.loadState(state)
+
+    let resp = session.performRoundEnd()
+
+    expect(resp.ok).toBe(true)
+    expect(resp.interaction.stateId).toBe('wait')
+    expect(resp.state.round).toBe(7)
+    expect(resp.state.players[0]!.resources).toMatchObject({ wood: 1, boar: 1 })
+    expect(resp.state.players[0]!.cardStates?.A081_InterimStorage?.counters?.wood).toBe(0)
+    expect(resp.state.players[0]!.cardStates?.[CARD_ID]?.stack).toEqual(['clay'])
+    if (resp.interaction.stateId !== 'wait') throw new Error('expected animal reorganization')
+    expect(resp.interaction.request.kind).toBe('animal-reorg')
+    if (resp.interaction.request.kind !== 'animal-reorg') throw new Error('expected animal reorganization')
+
+    const zones = resp.interaction.request.zones.map((zone) =>
+      zone.zoneType === 'house'
+        ? { ...zone, animalType: 'boar' as const, animalCount: 1 }
+        : zone,
+    )
+    resp = session.resolveChoice(resp.interaction.playerIndex, 'confirm', zones)
+
+    expect(resp.ok).toBe(true)
+    expect(resp.interaction.stateId).toBe('idle')
+    expect(resp.state.players[0]!.resources).toMatchObject({ wood: 1, boar: 1 })
   })
 
   it('uses resource.moved events for matching stack top even when result has no resourcesGained', () => {
