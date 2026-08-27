@@ -19,7 +19,7 @@ import { inactiveWorkersInSupply, smallestAvailableWorker } from '../../domain/p
 import { incPlacedFarmers } from '../../session/stats'
 import { computeAllowedPlacementSpaces } from '../helpers/placement-availability'
 import { OCCUPIED_SPACE_CHOICE_PREFIX } from '../helpers/placement-constants'
-import { collectBeforePlacementFlows, executeCardListener, getMatchingListeners, listenerOwnerOptions } from '../../cards/card-listeners'
+import { collectBeforePlacementFlows } from '../../cards/card-listeners'
 import { writeCardExtraData } from '../../cards/helpers/card-state'
 
 export { OCCUPIED_SPACE_CHOICE_PREFIX } from '../helpers/placement-constants'
@@ -140,38 +140,6 @@ export const placeFarmerAction: ActionDefinition = {
         })
       }
 
-      // Cascade place-farmer after hooks for the second placement.
-      // game-core's runPlaceFarmerAfterHooks (game-core.ts:1629) is one-shot
-      // per top-level takeAction (only when isActionEngine). Once we hand the
-      // second placement off via expandFlow, engineSource flips to 'flow' and
-      // game-core won't dispatch place-farmer 'after' again. So we replicate
-      // the same dispatch here, keyed on the jump destination, so that
-      // third-party cards' place-farmer 'after' listeners (Y option) can fire
-      // and even chain another jump (A->B->C). jumpChain on actionContext is
-      // already accumulated above, so a card's self-check
-      // chain.includes(thisCardId) terminates A->B->A loops.
-      const cascadeListenerContext = {
-        state,
-        player,
-        space: targetSpace,
-        actionId: 'place-farmer',
-        phase: 'after' as const,
-        result: { type: 'ok' as const },
-        actionContext,
-      }
-      const matchedCascade = getMatchingListeners(cascadeListenerContext)
-      const cascadeFlows: ActionFlow[] = []
-      for (const entry of matchedCascade) {
-        const lresult = executeCardListener(
-          entry.registration,
-          cascadeListenerContext,
-          listenerOwnerOptions(entry),
-        )
-        if (lresult?.flow) {
-          cascadeFlows.push(lresult.flow)
-        }
-      }
-
       // Hand the second placement to the engine via a leaf with `expandFlow`.
       // When the target action defines an inner flow, the engine's
       // buildFlowNode expands it into the action's flow subtree (with
@@ -193,20 +161,11 @@ export const placeFarmerAction: ActionDefinition = {
           type: 'flow',
           flow: {
             type: 'seq',
-            children: [...beforeFlows, targetLeaf, ...cascadeFlows],
+            children: [...beforeFlows, targetLeaf],
           },
         }
       }
-      if (cascadeFlows.length === 0) {
-        return { type: 'flow', flow: targetLeaf }
-      }
-      return {
-        type: 'flow',
-        flow: {
-          type: 'seq',
-          children: [targetLeaf, ...cascadeFlows],
-        },
-      }
+      return { type: 'flow', flow: targetLeaf }
     }
 
     const temporarySupplyWorker = readTemporarySupplyWorker(player, actionContext)
