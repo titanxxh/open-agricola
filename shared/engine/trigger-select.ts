@@ -153,7 +153,9 @@ const previewContextForChild = (
       triggerPlayer,
       ownerPlayer: effectPlayer,
       effectPlayer,
-      space: context.space,
+      space: typeof event.targetSpaceId === 'string'
+        ? previewState.actionSpaces.find((space) => space.id === event.targetSpaceId) ?? context.space
+        : context.space,
       actionId: params.actionId,
       phase: params.phase,
       transactionEvents,

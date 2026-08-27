@@ -42,6 +42,11 @@ const listener: CardListenerRegistration = {
   phases: ['after' as ActionHookPhase],
   actions: ['place-farmer'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
+    if (context.state.roundPhase !== 'work') return
+    if (
+      context.actionContext?.viaCardJump === true &&
+      typeof context.actionContext.workerId !== 'string'
+    ) return
     const usedSpaceId = context.space?.id
     const accumulationSpaces = (context.state.actionSpaces ?? []).filter(
       isAccumulationSpace,

@@ -4,10 +4,7 @@ import { setWorkersAtHome } from '../../shared/domain/player'
 import { requireActiveCardRegistry } from '../../shared/cards/active-registry'
 import { registerActionHook, unregisterActionHook } from '../../shared/actions/hooks'
 import { jumpLeaf } from '../../shared/cards/helpers/jump-leaf'
-import {
-  readCardExtraData,
-  writeCardExtraData,
-} from '../../shared/cards/helpers/card-state'
+import { gainLeaf } from '../../shared/cards/helpers/pay-gain-node'
 import '../../shared/cards/A/A129_Swagman'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 
@@ -86,14 +83,13 @@ const setup2P = (...occupations: string[]) => {
 //   1. Player takes farm-expansion (entry placement).
 //   2. game-core's runPlaceFarmerAfterHooks dispatches A129's listener;
 //      A129 jumps farmer to grain-seeds (jumpChain=['A129']).
-//   3. The jump effect (place-farmer.ts viaCardJump branch) re-dispatches
-//      place-farmer 'after' listeners keyed on the new space (grain-seeds).
+//   3. The place-farmer ActionNode dispatches its standard `after` listeners
+//      against the new space (grain-seeds).
 //      The stub's listener matches and emits a jumpLeaf back to
-//      farm-expansion. The cascade flow is appended to the SEQ alongside
-//      grain-seeds' own ActionNode expansion.
+//      farm-expansion after grain-seeds' own ActionNode expansion.
 //   4. The stub's jumpLeaf executes: farmer moves back to farm-expansion;
 //      jumpChain=['A129', STUB_ID].
-//   5. The jump effect dispatches once more on farm-expansion. A129's
+//   5. The nested place-farmer dispatches once more on farm-expansion. A129's
 //      listener self-check (chain.includes('A129')) returns true, so it
 //      skips. No further jumps; chain terminates.
 //
@@ -155,17 +151,14 @@ describe('A->B->A indirect cycle - jumpChain self-check terminates on second hop
 // Scenario 2: cascade dispatch - third-party listener visibility on the
 // jump destination (the "Y option" in mech-A spec §6.5).
 //
-// Stub observer listens on `place-farmer` after for grain-seeds and
-// increments a trace counter via card extra-data.
-//   (a) direct placement on grain-seeds: counter increments (sanity).
-//   (b) reach grain-seeds via A129 jump from farm-expansion: jump effect's
-//       cascade dispatch (place-farmer.ts viaCardJump branch) keyed on the
-//       new space (grain-seeds) re-fires the place-farmer 'after' listener
-//       set, so the observer matches and the counter increments.
+// Stub observer listens on `place-farmer` after for grain-seeds and gains food.
+//   (a) direct placement on grain-seeds: gains 1 food (sanity).
+//   (b) reach grain-seeds via A129 jump from farm-expansion: the standard
+//       ActionNode `after` dispatch is keyed on grain-seeds, so the observer
+//       matches and gains food.
 describe('cascade dispatch - third-party place-farmer after listener fires on jump destination', () => {
   const STUB_OBS_ID = '__test_grain_seeds_observer__'
   const LISTENER_ID = 'stub-grain-seeds-observer-listener'
-  const TRACE_KEY = 'observed'
 
   const registerObserverListener = () => {
     const registry = requireActiveCardRegistry('stub-cascade-test')
@@ -176,8 +169,10 @@ describe('cascade dispatch - third-party place-farmer after listener fires on ju
       actions: ['place-farmer'],
       handler: (ctx) => {
         if (ctx.space?.id !== 'grain-seeds') return
-        const prev = readCardExtraData<number>(ctx.player, STUB_OBS_ID, TRACE_KEY) ?? 0
-        writeCardExtraData(ctx.player, STUB_OBS_ID, TRACE_KEY, prev + 1)
+        return {
+          flow: gainLeaf(STUB_OBS_ID, { food: 1 }),
+          sourceCard: STUB_OBS_ID,
+        }
       },
     })
   }
@@ -193,33 +188,23 @@ describe('cascade dispatch - third-party place-farmer after listener fires on ju
     registerObserverListener()
     state.players[0]!.occupationPlayed.push(STUB_OBS_ID)
     session.loadState(state)
+    const foodBefore = state.players[0]!.resources.food
 
     const resp = driveAccepts(session, session.takeAction(0, 'grain-seeds'))
 
-    const observed = readCardExtraData<number>(
-      resp.state.players[0]!,
-      STUB_OBS_ID,
-      TRACE_KEY,
-    )
-    expect(observed).toBeGreaterThanOrEqual(1)
+    expect(resp.state.players[0]!.resources.food).toBe(foodBefore + 1)
   })
 
-  it('observer fires on jump-second-placement via cascade dispatch keyed on jump destination', () => {
+  it('observer fires exactly once on the jump destination', () => {
     const { session, state } = setup2P('A129_Swagman')
     registerObserverListener()
     state.players[0]!.occupationPlayed.push(STUB_OBS_ID)
     session.loadState(state)
+    const foodBefore = state.players[0]!.resources.food
 
     const resp = driveAccepts(session, session.takeAction(0, 'farm-expansion'))
 
-    const observed = readCardExtraData<number>(
-      resp.state.players[0]!,
-      STUB_OBS_ID,
-      TRACE_KEY,
-    )
-    // Cascade dispatch in the jump effect (place-farmer.ts) re-fires
-    // place-farmer 'after' listeners on the jump destination (grain-seeds).
-    expect(observed ?? 0).toBeGreaterThanOrEqual(1)
+    expect(resp.state.players[0]!.resources.food).toBe(foodBefore + 1)
     const grain = resp.state.actionSpaces.find((s) => s.id === 'grain-seeds')!
     expect(grain.takenBy.length).toBe(1)
   })
