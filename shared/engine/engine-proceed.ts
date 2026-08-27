@@ -1064,12 +1064,14 @@ export function engineProceed(
     if (node.deferredHostResult) {
       return executeDeferredHostAction(int, context, node)
     }
+    const actionContext = actionContextForNode(node, int)
     const replaceResult = int.hooks.applyComputeReplace({
       ...context,
       ...currentEventReadContext(int),
+      space: resolveExecutionSpace(context.state, context.space, actionContext),
       params: node.params,
       sourceCard: node.sourceCard,
-      actionContext: actionContextForNode(node, int),
+      actionContext,
       actionId: node.actionId,
     })
     const replacedActionId = replaceResult.actionId
@@ -1096,7 +1098,6 @@ export function engineProceed(
     if (!action) {
       return { type: 'blocked', nodeId: node.id }
     }
-    const actionContext = actionContextForNode(node, int)
     const executionContext: ActionExecutionContext = {
       state: context.state,
       player: context.player,

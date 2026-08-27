@@ -124,4 +124,48 @@ describe('actionContext targetSpaceId execution', () => {
     expect(forest.resources.wood).toBe(0)
     expect(afterSpaceId).toBe('forest')
   })
+
+  it('uses targetSpaceId as context.space for computeReplace hooks', () => {
+    const player = makeEventTestPlayer()
+    player.stats = createInitialPlayerStats({ isFirstPlayer: false })
+    const state = makeEventTestState()
+    const forest = {
+      ...asActionSpace(collectAction),
+      id: 'forest',
+      gainPerRound: { wood: 3 },
+      resources: resources({ wood: 3 }),
+      takenBy: [{ playerId: player.id, workerId: '1' }],
+    }
+    const host = hostSpace()
+    state.players = [player]
+    state.actionSpaces = [host, forest]
+    let replaceSpaceId: string | undefined
+
+    registerActionHook({
+      id: 'target-space-compute-replace-collect',
+      actions: ['collect'],
+      phases: ['computeReplace'],
+      handler: (context) => {
+        replaceSpaceId = context.space.id
+      },
+    })
+
+    const { engine } = makeEventTestEngine(
+      [collectAction],
+      new ActionNode(
+        'collect-from-target',
+        'collect',
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        { targetSpaceId: 'forest' },
+      ),
+    )
+
+    const result = engine.proceed({ state, player, space: host })
+
+    expect(result.type).toBe('ok')
+    expect(replaceSpaceId).toBe('forest')
+  })
 })
