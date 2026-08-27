@@ -15,47 +15,38 @@ export const TRADE_OPTIONS = [
   { from: { grain: 1 }, to: { stone: 1 } },
 ] as const satisfies readonly TradeOption[]
 
-const hasResources = (resources: Resource, cost: ResourceMap, multiplier = 1): boolean =>
-  Object.entries(cost).every(([resource, amount]) => (resources[resource as keyof Resource] ?? 0) >= (amount ?? 0) * multiplier)
+const exchangeLeaf = ({ from, to }: TradeOption): ActionFlow => ({
+  type: 'leaf',
+  actionId: 'exchange',
+  sourceCard: CARD_ID,
+  actionContext: {
+    directTrade: { from, to, sourceId: CARD_ID },
+  },
+  choiceLabelKey: 'ui.interactionResourceExchange',
+  choiceLabelParams: {
+    resourcesPaid: from,
+    resourcesGained: to,
+  },
+  effectPreview: {
+    kind: 'resourceExchange',
+    resourcesPaid: from,
+    resourcesGained: to,
+  },
+})
 
-const scaleResources = (resources: ResourceMap, multiplier: number): ResourceMap =>
-  Object.fromEntries(Object.entries(resources).map(([resource, amount]) => [resource, amount * multiplier])) as ResourceMap
-
-const payGainFlow = ({ from, to }: TradeOption, multiplier = 1): ActionFlow => ({
-  type: 'seq',
-  children: [
-    { type: 'leaf', actionId: 'pay', params: scaleResources(from, multiplier), sourceCard: CARD_ID },
-    { type: 'leaf', actionId: 'gain', params: scaleResources(to, multiplier), sourceCard: CARD_ID },
-  ],
+const exchangeStage = (): ActionFlow => ({
+  type: 'xor',
+  optional: true,
+  children: TRADE_OPTIONS.map(exchangeLeaf),
 })
 
 const cardImpl = {
   effect: {
     id: CARD_ID,
-    onHarvestFeedingPhase: (_state, player) => {
-      const singleOptions = TRADE_OPTIONS
-        .filter((trade) => hasResources(player.resources, trade.from))
-        .map((trade) => payGainFlow(trade))
-      const children: ActionFlow[] = TRADE_OPTIONS
-        .filter((trade) => hasResources(player.resources, trade.from, 2))
-        .map((trade) => payGainFlow(trade, 2))
-
-      if (singleOptions.length > 0) {
-        children.push({
-          type: 'or',
-          optional: true,
-          children: singleOptions,
-        })
-      }
-
-      if (children.length === 0) return
-
-      return {
-        type: 'xor',
-        optional: true,
-        children,
-      }
-    },
+    onHarvestFeedingPhase: () => ({
+      type: 'seq',
+      children: [exchangeStage(), exchangeStage()],
+    }),
   },
   reaches: [] as readonly string[],
 } satisfies CardImpl

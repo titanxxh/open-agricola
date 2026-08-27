@@ -79,7 +79,7 @@
 | `E148_Lazybones` | 本轮抽出 `action-space-tokens` helper，统一 bounded token choice、choice resolve、owner-targeted token consume flow；E148 卡内只保留触发空间、空地判断和 helper 调用，按当前复核口径降至 参考实现 65 / OA 66 = 1.02。 |
 | `C041_FarmStore` | #244 后用卡内 `REWARD_OPTIONS` 表生成 optional pay/gain XOR。 |
 | `D080_BrickHammer` | #244 后走 `getPrintedImprovementResourceCost()`，不再手写 cost / altCosts 分支。 |
-| `E142_Smuggler` | #244 后 `TRADE_OPTIONS` 表生成同类 2x 选项，并保留 mixed optional OR。 |
+| `E142_Smuggler` | 改为连续两个可选的标准交换阶段，使第二次交换可使用第一次获得的货物，且每一步都能触发 exchange 监听。 |
 | `E156_ClaypitOwner` | #244 后 printed/base cost helper 覆盖 minor altCosts 与 major fee candidates。 |
 | `D117_WoodExpert` | #259/#272 后从当前 Cost Candidate List 派生候选，已低于 1.5 阈值。 |
 

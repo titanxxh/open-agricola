@@ -79,7 +79,7 @@ Recent PR / Old high-proportion items that have been reduced after this round of
 | `E148_Lazybones` |Draw this round`action-space-tokens`Helper, unifies bounded token choice, choice resolve, owner-targeted token consume flow; only trigger space, open space judgment and helper call are retained in the E148 card, which is reduced to the reference 65 / OA 66 = 1.02 according to the current review caliber.|
 | `C041_FarmStore` |#244 Use the card later`REWARD_OPTIONS`Table generation optional pay/gain XOR.|
 | `D080_BrickHammer` |#244 Go behind`getPrintedImprovementResourceCost()`, no more hand-written cost / altCosts branches.|
-| `E142_Smuggler` |#244 After`TRADE_OPTIONS`Table generates homogeneous 2x options and retains mixed optional OR.|
+| `E142_Smuggler` | Uses two consecutive optional standard exchange stages so the second exchange can consume goods gained by the first and exchange listeners observe each step. |
 | `E156_ClaypitOwner` |#244 Post printed/base cost helper covers minor altCosts and major fee candidates.|
 | `D117_WoodExpert` |#259/#272 After deriving candidates from the current Cost Candidate List, it has fallen below the 1.5 threshold.|
 
