@@ -6,7 +6,12 @@ import { CardRegistry } from '../../../cards/registry'
 import { withActiveRegistry } from '../../../cards/active-registry'
 import { D036_BreedRegistry_impl } from '../../../cards/D/D036_BreedRegistry'
 import { readCardExtraData } from '../../../cards/helpers/card-state'
-import { asActionSpace, makeEventTestEngine, makeEventTestState } from '../../../engine/__tests__/event-test-helpers'
+import {
+  asActionSpace,
+  makeEventTestEngine,
+  makeEventTestPlayer,
+  makeEventTestState,
+} from '../../../engine/__tests__/event-test-helpers'
 import { createInitialPlayerStats } from '../../../session/stats'
 import { specialEffectAction } from '../special-effect'
 import { bonusFoodAction, bonusWoodAction, gainAction } from '../gain'
@@ -24,6 +29,9 @@ describe('take-from-card', () => {
   it('takes stored goods through gain while preserving take-from-card reactions', () => {
     const state = makeEventTestState()
     const player = state.players[0]!
+    const opponent = makeEventTestPlayer()
+    opponent.id = 'p2'
+    state.players.push(opponent)
     player.stats = createInitialPlayerStats({ isFirstPlayer: false })
     player.minorPlayed = ['Test_Gain_Observer', 'Test_Take_Observer']
     player.cardStates = { Test_Source: { counters: { grain: 1 } } }
@@ -48,7 +56,7 @@ describe('take-from-card', () => {
       'take-from-card-root',
       'take-from-card',
       'Test_Source',
-      { grain: 1 },
+      { grain: 1, recipientMode: 'others' },
     )
     const { engine } = makeEventTestEngine(
       [takeFromCardAction, gainAction, bonusWoodAction, bonusFoodAction],
@@ -60,9 +68,49 @@ describe('take-from-card', () => {
     expect(finalStep.type).toBe('done')
     expect(player.cardStates.Test_Source?.counters?.grain).toBe(0)
     expect(player.resources).toMatchObject({ grain: 1, wood: 1, food: 1 })
+    expect(opponent.resources.grain).toBe(0)
     expect(state.events?.filter((event) =>
       event.type === 'resource.moved' && event.sourceCardId === 'Test_Source'
     )).toHaveLength(1)
+  })
+
+  it('does not offer action-space replacements for the delegated gain', () => {
+    const state = makeEventTestState()
+    const player = state.players[0]!
+    player.stats = createInitialPlayerStats({ isFirstPlayer: false })
+    player.cardStates = { Test_Source: { counters: { grain: 1 } } }
+    player.minorPlayed = ['Test_Replace_Observer']
+
+    const cardRegistry = new CardRegistry()
+    cardRegistry.registerListener({
+      id: 'test-replace-gain',
+      cardIds: ['Test_Replace_Observer'],
+      actions: ['gain'],
+      phases: ['computeReplace'],
+      handler: (context) => {
+        if (context.actionContext?.checkedReplaceAction) return
+        return {
+          decline: true,
+          alternativeFlow: { type: 'leaf', actionId: 'bonus-wood' },
+        }
+      },
+    })
+
+    const root = new ActionNode(
+      'take-from-card-root',
+      'take-from-card',
+      'Test_Source',
+      { grain: 1 },
+    )
+    const { engine } = makeEventTestEngine(
+      [takeFromCardAction, gainAction, bonusWoodAction],
+      root,
+    )
+
+    const finalStep = withActiveRegistry(cardRegistry, () => drain(engine, state))
+
+    expect(finalStep.type).toBe('done')
+    expect(player.resources).toMatchObject({ grain: 1, wood: 0 })
   })
 
   it('counts sheep taken from a card once for Breed Registry', () => {

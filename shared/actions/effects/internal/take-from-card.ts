@@ -1,5 +1,17 @@
 import type { ActionDefinition, Resource } from '../../../contract/types'
+import { REAL_RESOURCE_KEYS } from '../../../contract/resource-keys'
 import { initCardState } from '../../../cards/__stubs__/helpers'
+
+const positiveResources = (
+  params: Record<string, unknown> | undefined,
+): Partial<Resource> => {
+  const resources: Partial<Resource> = {}
+  REAL_RESOURCE_KEYS.forEach((key) => {
+    const amount = params?.[key]
+    if (typeof amount === 'number' && amount > 0) resources[key] = amount
+  })
+  return resources
+}
 
 const canTakeFromCard = (
   counters: Record<string, number> | undefined,
@@ -21,9 +33,12 @@ export const takeFromCardAction: ActionDefinition = {
     if (!sourceCard) {
       return { type: 'fail', errorKey: 'log.exchangeFail' }
     }
-    const gain = params ?? {}
+    const gain = positiveResources(params)
+    if (Object.keys(gain).length === 0) {
+      return { type: 'ok', resourcesGained: {} }
+    }
     const counters = player.cardStates?.[sourceCard]?.counters
-    if (!canTakeFromCard(counters, gain as Partial<Resource>)) {
+    if (!canTakeFromCard(counters, gain)) {
       return { type: 'fail', errorKey: 'log.exchangeFail' }
     }
 
@@ -36,8 +51,8 @@ export const takeFromCardAction: ActionDefinition = {
       type: 'card.stackChanged',
       cardId: sourceCard,
       targetPlayerId: player.id,
-      resources: gain as Partial<Resource>,
-      delta: -Object.values(gain as Partial<Resource>).reduce<number>(
+      resources: gain,
+      delta: -Object.values(gain).reduce<number>(
         (sum, value) => sum + (typeof value === 'number' && value > 0 ? value : 0),
         0,
       ),
@@ -50,6 +65,7 @@ export const takeFromCardAction: ActionDefinition = {
         actionId: 'gain',
         sourceCard,
         params: gain,
+        actionContext: { checkedReplaceAction: true },
       },
     }
   },
