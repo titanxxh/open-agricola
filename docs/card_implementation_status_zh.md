@@ -24,6 +24,7 @@
 | 参考实现未实现，但 OA 有产品扩展/重写 | `A113_HeresyTeacher`, `A169_OffSiter`, `A170_Hayward`, `A171_Sidekick`, `A173_ClayThief`, `A174_MasterHora`, `A177_Middleman`, `A180_AnimalBrander`, `B170_CorralBuilder`, `B171_GreenhouseBuilder`, `B173_Sweeper`, `B175_FieldOverseer`, `B176_VillageIdiot`, `B178_TagAlong`, `B179_WildBoarHunter`, `C169_FastMason`, `C170_AmateurFencer`, `C171_YoungArtist`, `C172_FieldCounter`, `C173_TopOuter`, `C175_VillageTeacher`, `C180_Trapper`, `D025_WitchesDanceFloor`, `D170_FoldBuilder`, `D171_SeniorTeacher`, `D173_TownClerk`, `D175_Countryman`, `D176_Woodshacker`, `D178_SubstituteTeacher`, `D179_Bullcatcher`, `D180_PartTimeWorker` |
 | 参考实现 banned，但 OA 保留 | `A131_CraftTeacher`, `A133_Braggart`, `A014_CarpentersHammer`, `A033_BigCountry`, `A039_Chapel`, `A048_ShavingHorse`, `A082_WorkCertificate`, `A097_Freshman`, `B010_Caravan`, `B117_Informant`, `B132_EstateMaster`, `B151_LittlePeasant`, `B015_CarpentersBench`, `B161_Weakling`, `B021_HayloftBarn`, `B022_WalkingBoots`, `C102_TreeGuard`, `C125_Nightworker`, `C028_TeachersDesk`, `C031_WritingChamber`, `C003_CarriageTrip`, `C060_SmallPottersOven`, `C063_CraftBrewery`, `C099_GardenDesigner`, `D137_TradeTeacher`, `D019_PulverizerPlow`, `D021_Recruitment`, `D033_SummerHouse`, `D004_CrossCutWood`, `D074_RoyalWood`, `D092_ChildOmbudsman`, `D097_BeggingStudent`, `E022_GuestRoom` |
 | 参考实现 stable / FarmHand 模型差异 | `B085_FarmHand` |
+| 卡牌驱动的工人移动复用普通放人合法性，包括容量或 modifier 允许的已占用目标；E010 对 Farmland 上每个 worker 分别结算食物或移动 | `D051_Archway`, `E010_StrawHat` |
 | Candidate Closure：optional 分支候选集是 参考实现单一 topo 序产物的合法超集；solver 层支配剪枝（ADR 0004 Amendment）后玩家可选集合与 参考实现 optimal 集一致，单选项 auto-resolve；卡牌提供的虚拟支付资源以自身 key 进入 `resourcesPaid`，与玩家库存资源不互相支配 | 全部 card-purchase / unit-trade cost 修改卡；B155 这类行动格支付资源 |
 | Candidate Closure：等价候选行（同 resources + originalFeeIndex、仅 sources 不同）只保留一条代表行（sources 最少 → key 字典序，ADR 0004 Amendment）；玩家不再看到仅归因不同的重复支付选项，未选中链的卡不进该选项 hover 归因 | 全部 card-purchase cost 修改卡（C95/E109 fixed-price 双子、A75/D117 bypass 链等） |
 
@@ -247,6 +248,7 @@ Hook 归属由 `ALL_CARD_IMPLS` 派生，不在此镜像一份会漂移的副本
 | `D021_Recruitment` | 已接受差异 | 参考实现 banned，但 OA 按产品策略保留 |
 | `D025_WitchesDanceFloor` | 已接受差异 | 已接受的行为 / 产品差异 |
 | `D033_SummerHouse` | 已接受差异 | 参考实现 banned，但 OA 按产品策略保留 |
+| `D051_Archway` | 已接受差异 | 移动工人复用共享普通放人合法性；即使牌面写着“未占用”，容量或 modifier 允许的已占用目标仍可选择；目标行动的普通 `isDoable` 否决仍然生效。 |
 | `D074_RoyalWood` | 已接受差异 | 参考实现 banned，但 OA 按产品策略保留；stables 支付因 afterHost slot 通过 after-pay provenance 统计 |
 | `D092_ChildOmbudsman` | 已接受差异 | 参考实现 banned，但 OA 按产品策略保留 |
 | `D097_BeggingStudent` | 已接受差异 | 参考实现 banned，但 OA 按产品策略保留 |
@@ -260,6 +262,7 @@ Hook 归属由 `ALL_CARD_IMPLS` 派生，不在此镜像一份会漂移的副本
 | `D178_SubstituteTeacher` | 已接受差异 | 参考实现 implemented=false；OA 作为 5+ 扩展产品实现。注册 owner-only action space，三个可见 Lessons 格都实际 occupied 后可用，奖励为 1 building resource 或 grain+vegetable。 |
 | `D179_Bullcatcher` | 已接受差异 | 参考实现 implemented=false；OA 作为 5+ 扩展产品实现。注册 owner-only action space，round slot 3 与 round slot 6 对应行动格都 occupied 且 owner 仍有可用工人时可用，使用后获得 1 cattle + 2 food。 |
 | `D180_PartTimeWorker` | 已接受差异 | 参考实现 implemented=false；OA 作为 5+ 扩展产品实现。after collect 读取本次从该 accumulation space 移到玩家的 `resource.moved` goods map，exact 2/4/6 分别可选返还 1/2/3 goods 到该格并获得 sheep/boar/cattle；`return-to-space` leaf 从 `resource.moved.from.spaceId` 派生并显式携带被收取格的 `targetSpaceId`，card-granted placement 收取非外层行动格时也返还到正确格；混合资源枚举所有合法返还组合，且与其他 `return-to-space` optional flow 串行共存，不把后续返还资源计入触发。 |
+| `E010_StrawHat` | 已接受差异 | Farmland 上每个 worker 分别选择获得 1 food 或精确移动该 worker。移动复用共享普通放人合法性；即使牌面写着“未占用”，容量或 modifier 允许的已占用目标仍可选择；目标行动的普通 `isDoable` 否决仍然生效。 |
 | `E022_GuestRoom` | 已接受差异 | 已接受的行为 / 产品差异 |
 | `E070_CropRotationField` | 已对齐 | 收获最后一份作物后可选择播种相反作物；唯一合法田格和作物自动完成 |
 | `E132_VeggieLover` | 排除 | 参考实现 implemented=false，本轮无运行时对齐目标 |

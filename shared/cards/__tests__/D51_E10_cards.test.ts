@@ -163,20 +163,10 @@ describe('D051_Archway', () => {
     expect(flow).toBeUndefined()
   })
 
-  it('onBeforeReturnHome does not trigger when no available spaces', () => {
-    const effect = getCardEffect('D051_Archway')!
-    const player = createPlayer()
-    player.minorPlayed = ['D051_Archway']
-    const d51Space = createSpace('D051_Archway', { takenBy: [{ playerId: 'p1', workerId: '1' }] })
-    const occupiedSpace = createSpace('day-laborer', { takenBy: [{ playerId: 'p2', workerId: '1' }] })
-    const state = createState([player], [d51Space, occupiedSpace])
-    const flow = effect.onBeforeReturnHome!(state, player)
-    expect(flow).toBeUndefined()
-  })
 })
 
 describe('E010_StrawHat', () => {
-  it('round 3 with no farmland worker returns mandatory food-only xor', () => {
+  it('does not trigger without an own worker on Farmland', () => {
     const effect = getCardEffect('E010_StrawHat')!
     const player = createPlayer()
     player.minorPlayed = ['E010_StrawHat']
@@ -184,33 +174,42 @@ describe('E010_StrawHat', () => {
     const target = createSpace('day-laborer')
     const state = createState([player], [farmland, target])
     state.round = 3
-    const flow = effect.onBeforeReturnHome!(state, player)
-    expect(flow).toBeDefined()
-    expect(flow!.type).toBe('xor')
-    if (flow!.type === 'xor') {
-      expect(flow!.optional).not.toBe(true)
-      expect(flow!.children.length).toBe(1)
-      expect((flow!.children[0] as Extract<ActionFlow, { type: 'leaf' }>).actionId).toBe('gain')
-    }
+    expect(effect.onBeforeReturnHome!(state, player)).toBeUndefined()
   })
 
-  it('round 3 with farmland worker returns mandatory food then move xor', () => {
+  it('creates one food-or-exact-move choice per Farmland worker', () => {
     const effect = getCardEffect('E010_StrawHat')!
     const player = createPlayer()
     player.minorPlayed = ['E010_StrawHat']
-    const farmland = createSpace('farmland', { takenBy: [{ playerId: 'p1', workerId: '1' }] })
+    const farmland = createSpace('farmland', {
+      takenBy: [
+        { playerId: 'p1', workerId: '1' },
+        { playerId: 'p1', workerId: '2' },
+      ],
+    })
     const target = createSpace('day-laborer')
     const state = createState([player], [farmland, target])
     state.round = 3
     const flow = effect.onBeforeReturnHome!(state, player)
-    expect(flow).toBeDefined()
-    expect(flow!.type).toBe('xor')
-    if (flow!.type === 'xor') {
-      expect(flow!.optional).not.toBe(true)
-      expect(flow!.children.length).toBe(2)
-      expect((flow!.children[0] as Extract<ActionFlow, { type: 'leaf' }>).actionId).toBe('gain')
-      expect((flow!.children[1] as Extract<ActionFlow, { type: 'leaf' }>).actionId).toBe('move-farmer-to-space')
-      expect((flow!.children[1] as Extract<ActionFlow, { type: 'leaf' }>).params.excludeSpaceId).toBe('farmland')
+    expect(flow?.type).toBe('seq')
+    if (flow?.type === 'seq') {
+      expect(flow.children).toHaveLength(2)
+      flow.children.forEach((choice, index) => {
+        expect(choice.type).toBe('xor')
+        if (choice.type !== 'xor') return
+        expect(choice.children.map((child) =>
+          (child as Extract<ActionFlow, { type: 'leaf' }>).actionId
+        )).toEqual(['gain', 'move-farmer-to-space'])
+        const move = choice.children[1] as Extract<ActionFlow, { type: 'leaf' }>
+        expect(move.params).toMatchObject({
+          excludeSpaceId: 'farmland',
+          workerId: String(index + 1),
+        })
+        expect(move.actionContext).toMatchObject({
+          moveFarmerSourceSpaceId: 'farmland',
+          moveFarmerWorkerId: String(index + 1),
+        })
+      })
     }
   })
 
@@ -223,11 +222,7 @@ describe('E010_StrawHat', () => {
     const state = createState([player], [farmland, target])
     state.round = 6
     const flow = effect.onBeforeReturnHome!(state, player)
-    expect(flow).toBeDefined()
-    expect(flow!.type).toBe('xor')
-    if (flow!.type === 'xor') {
-      expect(flow!.optional).not.toBe(true)
-    }
+    expect(flow?.type).toBe('seq')
   })
 
   it('does not trigger on round 4', () => {
@@ -241,7 +236,7 @@ describe('E010_StrawHat', () => {
     expect(flow).toBeUndefined()
   })
 
-  it('only offers food when player worker is not on farmland', () => {
+  it('does not trigger for another player worker on Farmland', () => {
     const effect = getCardEffect('E010_StrawHat')!
     const player = createPlayer()
     player.minorPlayed = ['E010_StrawHat']
@@ -249,64 +244,7 @@ describe('E010_StrawHat', () => {
     const target = createSpace('day-laborer')
     const state = createState([player], [farmland, target])
     state.round = 3
-    const flow = effect.onBeforeReturnHome!(state, player)
-    expect(flow).toBeDefined()
-    expect(flow!.type).toBe('xor')
-    if (flow!.type === 'xor') {
-      expect(flow!.optional).not.toBe(true)
-      expect(flow!.children.length).toBe(1)
-      expect((flow!.children[0] as Extract<ActionFlow, { type: 'leaf' }>).actionId).toBe('gain')
-    }
-  })
-
-  it('only offers food when no available spaces', () => {
-    const effect = getCardEffect('E010_StrawHat')!
-    const player = createPlayer()
-    player.minorPlayed = ['E010_StrawHat']
-    const farmland = createSpace('farmland', { takenBy: [{ playerId: 'p1', workerId: '1' }] })
-    const occupied = createSpace('day-laborer', { takenBy: [{ playerId: 'p2', workerId: '1' }] })
-    const state = createState([player], [farmland, occupied])
-    state.round = 3
-    const flow = effect.onBeforeReturnHome!(state, player)
-    expect(flow).toBeDefined()
-    expect(flow!.type).toBe('xor')
-    if (flow!.type === 'xor') {
-      expect(flow!.optional).not.toBe(true)
-      expect(flow!.children.length).toBe(1)
-      expect((flow!.children[0] as Extract<ActionFlow, { type: 'leaf' }>).actionId).toBe('gain')
-    }
-  })
-
-  it('does not offer move when target is unopened', () => {
-    const effect = getCardEffect('E010_StrawHat')!
-    const player = createPlayer()
-    player.minorPlayed = ['E010_StrawHat']
-    const farmland = createSpace('farmland', { takenBy: [{ playerId: 'p1', workerId: '1' }] })
-    const unopened = createSpace('vegetable-seeds', { roundAvailable: 8 })
-    const state = createState([player], [farmland, unopened])
-    state.round = 3
-    const flow = effect.onBeforeReturnHome!(state, player)
-    expect(flow).toBeDefined()
-    expect(flow!.type).toBe('xor')
-    if (flow!.type === 'xor') {
-      expect(flow!.children.map(child => (child as Extract<ActionFlow, { type: 'leaf' }>).actionId)).toEqual(['gain'])
-    }
-  })
-
-  it('does not offer move when target is unreachable', () => {
-    const effect = getCardEffect('E010_StrawHat')!
-    const player = createPlayer()
-    player.minorPlayed = ['E010_StrawHat']
-    const farmland = createSpace('farmland', { takenBy: [{ playerId: 'p1', workerId: '1' }] })
-    const unreachable = createSpace('day-laborer', { canBeExecutedByPlayer: () => false })
-    const state = createState([player], [farmland, unreachable])
-    state.round = 3
-    const flow = effect.onBeforeReturnHome!(state, player)
-    expect(flow).toBeDefined()
-    expect(flow!.type).toBe('xor')
-    if (flow!.type === 'xor') {
-      expect(flow!.children.map(child => (child as Extract<ActionFlow, { type: 'leaf' }>).actionId)).toEqual(['gain'])
-    }
+    expect(effect.onBeforeReturnHome!(state, player)).toBeUndefined()
   })
 
 })

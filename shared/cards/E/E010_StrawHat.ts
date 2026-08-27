@@ -1,9 +1,8 @@
 import { defineMinorCard } from '../card-source'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import type { ActionFlow } from '../../contract/types'
-import { spaceHasPlayer } from '../../domain/space'
+import { isSyntheticLinkedOccupancy } from '../../domain/space'
 import type { CardImpl } from '../registry'
-import { computeAllowedPlacementSpaces } from '../../actions/helpers/placement-availability'
 
 const CARD_ID = 'E010_StrawHat'
 
@@ -11,25 +10,34 @@ const TRIGGER_ROUNDS = [3, 6]
 
 const FARMLAND_SPACE_ID = 'farmland'
 
+const workerChoiceFlow = (workerId: string): ActionFlow => ({
+  type: 'xor',
+  children: [
+    gainLeaf(CARD_ID, { food: 1 }),
+    {
+      type: 'leaf',
+      actionId: 'move-farmer-to-space',
+      params: { excludeSpaceId: FARMLAND_SPACE_ID, workerId },
+      sourceCard: CARD_ID,
+      actionContext: {
+        moveFarmerSourceSpaceId: FARMLAND_SPACE_ID,
+        moveFarmerWorkerId: workerId,
+      },
+    },
+  ],
+})
+
 const cardImpl = {
   effect: {
   id: CARD_ID,
   onBeforeReturnHome: (state, player) => {
     if (!TRIGGER_ROUNDS.includes(state.round)) return
     const farmland = state.actionSpaces.find((s) => s.id === FARMLAND_SPACE_ID)
-    const hasFarmlandWorker = farmland ? spaceHasPlayer(farmland, player.id) : false
-    const hasMoveTarget = hasFarmlandWorker && computeAllowedPlacementSpaces(state, player, { ignoreWorkerAvailability: true })
-      .some((placement) => placement.spaceId !== FARMLAND_SPACE_ID)
-    const children: ActionFlow[] = [gainLeaf(CARD_ID, { food: 1 })]
-    if (hasMoveTarget) {
-      children.push({
-        type: 'leaf',
-        actionId: 'move-farmer-to-space',
-        params: { excludeSpaceId: FARMLAND_SPACE_ID },
-        sourceCard: CARD_ID,
-      })
-    }
-    return { type: 'xor', children }
+    const workers = farmland?.takenBy.filter((worker) =>
+      worker.playerId === player.id && !isSyntheticLinkedOccupancy(worker)
+    ) ?? []
+    if (workers.length === 0) return
+    return { type: 'seq', children: workers.map((worker) => workerChoiceFlow(worker.workerId)) }
   },
 },
   reaches: [] as readonly string[],
