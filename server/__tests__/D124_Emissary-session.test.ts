@@ -125,6 +125,9 @@ describe('D124_Emissary session', () => {
     session.loadState(state)
 
     let resp = session.performRoundEnd()
+    if (session.peekEnginePendingEnvelope()?.syntheticKind === 'post-reap-anytime') {
+      resp = session.resolveChoice(0, '__skip__')
+    }
     if (resp.interaction.stateId === 'wait' && resp.interaction.request.kind === 'feed') {
       resp = session.resolveChoice(0, 'confirm', { selections: [] })
     }

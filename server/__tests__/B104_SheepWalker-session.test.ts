@@ -41,6 +41,9 @@ const setupRound14 = (sheep: number) => {
 
 const passFeed = (session: GameSession) => {
   let response = session.performRoundEnd()
+  if (session.peekEnginePendingEnvelope()?.syntheticKind === 'post-reap-anytime') {
+    response = session.resolveChoice(0, '__skip__')
+  }
   if (response.interaction.stateId === 'wait' && response.interaction.request.kind === 'feed') {
     response = session.resolveChoice(0, 'confirm', { selections: [] })
   }

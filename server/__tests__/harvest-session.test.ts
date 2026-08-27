@@ -232,6 +232,17 @@ describe('harvest session flow', () => {
     return { session, state, playerA, playerB }
   }
 
+  const skipPostReapAnytime = (
+    session: GameSession,
+    resp: ReturnType<GameSession['performRoundEnd']>,
+  ) => {
+    expect(resp.state.roundPhase).toBe('harvest')
+    expect(resp.interaction.stateId === 'wait' ? resp.interaction.promptKey : undefined)
+      .toBe('ui.interactionOptionalAction')
+    if (resp.interaction.stateId !== 'wait') throw new Error('expected post-reap anytime window')
+    return session.resolveChoice(resp.interaction.playerIndex, '__skip__')
+  }
+
   it('basic conversion via sourceId="__basic__" idx=0 converts grain to food', () => {
     const { session, state, playerA } = setupSinglePlayerHarvest()
     playerA.resources.grain = 2
@@ -256,13 +267,44 @@ describe('harvest session flow', () => {
     expect((convertLog as any).params.food).toEqual({ food: 2 })
   })
 
-  it('anytime exchange (D60 LargePottery clay->food) usable in harvest feed', () => {
+  it('calculates automatic feeding from resources changed in the post-reap anytime window', () => {
     const { session, state, playerA } = setupSinglePlayerHarvest()
     playerA.minorPlayed.push('D060_LargePottery')
     playerA.resources.clay = 2
     session.loadState(state)
 
     let resp = session.performRoundEnd()
+    expect(resp.interaction.anytimeActions.map((action) => action.id)).toContain('exchange')
+
+    resp = session.takeAnytimeAction(0, 'exchange')
+    expect(resp.ok).toBe(true)
+    resp = session.resolveChoice(0, 'bulk:0=1')
+
+    expect(resp.state.players[0]!.resources).toMatchObject({ clay: 1, food: 2, begging: 0 })
+    expect(resp.interaction.anytimeActions.map((action) => action.id)).toContain('exchange')
+
+    resp = skipPostReapAnytime(session, resp)
+    expect(resp.interaction.stateId).toBe('wait')
+    if (!(resp.interaction.stateId === 'wait' && resp.interaction.request.kind === 'feed')) {
+      throw new Error('expected harvestFeed pending')
+    }
+    expect(resp.interaction.request).toMatchObject({ remaining: 0, foodUsed: 2 })
+    expect(resp.interaction.anytimeActions).toEqual([])
+
+    resp = session.resolveChoice(0, 'confirm', { selections: [] })
+    expect(resp.state.players[0]!.resources).toMatchObject({ clay: 1, food: 0, begging: 0 })
+    expect(resp.state.log.some((entry) => entry.key === 'log.harvestFeedDetail')).toBe(true)
+    expect(resp.scores).toHaveLength(2)
+    expect(resp.state.round).toBe(5)
+  })
+
+  it('anytime exchange (D60 LargePottery clay->food) usable in harvest feed', () => {
+    const { session, state, playerA } = setupSinglePlayerHarvest()
+    playerA.minorPlayed.push('D060_LargePottery')
+    playerA.resources.clay = 2
+    session.loadState(state)
+
+    let resp = skipPostReapAnytime(session, session.performRoundEnd())
     if (!(resp.interaction.stateId === 'wait' && resp.interaction.request.kind === 'feed')) throw new Error('expected harvestFeed pending')
 
     resp = session.resolveChoice(0, 'confirm', { selections: [
@@ -301,7 +343,7 @@ describe('harvest session flow', () => {
     ]
     session.loadState(state)
 
-    let resp = session.performRoundEnd()
+    let resp = skipPostReapAnytime(session, session.performRoundEnd())
     if (!(resp.interaction.stateId === 'wait' && resp.interaction.request.kind === 'feed')) throw new Error('expected harvestFeed pending')
 
     // SheepWalker exchanges: idx 0 sheep->boar, idx 1 sheep->vegetable, idx 2 sheep->stone
@@ -333,7 +375,7 @@ describe('harvest session flow', () => {
     }]
     session.loadState(state)
 
-    let resp = session.performRoundEnd()
+    let resp = skipPostReapAnytime(session, session.performRoundEnd())
     if (!(resp.interaction.stateId === 'wait' && resp.interaction.request.kind === 'feed')) {
       throw new Error('expected harvestFeed pending')
     }
@@ -378,6 +420,7 @@ describe('harvest session flow', () => {
     if (!accept) throw new Error('expected E058 accept option')
     resp = session.resolveChoice(0, accept.value)
 
+    resp = skipPostReapAnytime(session, resp)
     if (!(resp.interaction.stateId === 'wait' && resp.interaction.request.kind === 'feed')) {
       throw new Error('expected harvestFeed pending')
     }

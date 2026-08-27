@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
-import { setWorkersAtHome } from '../../shared/domain/player'
+import { markAllWorkersUsed, setActiveWorkerCount, setWorkersAtHome } from '../../shared/domain/player'
 
 import '../../shared/cards/D/D071_Changeover'
 import type { ActionChoiceOption, AnytimeAction } from '../../shared/contract/types'
@@ -46,6 +46,81 @@ describe('D071_Changeover session', () => {
     const resp = enterActiveInteraction(session)
     const ids = resp.interaction.anytimeActions.map((a: AnytimeAction) => a.id)
     expect(ids).toContain('D71-changeover-anytime')
+  })
+
+  it.each([
+    { round: 4, finalHarvest: false, sow: true },
+    { round: 4, finalHarvest: false, sow: false },
+    { round: 14, finalHarvest: true, sow: true },
+  ])('can act after reap and resume after sow=$sow in round $round', ({ round, finalHarvest, sow }) => {
+    const session = new GameSession()
+    const state = session.getState().state
+    state.players = state.players.slice(0, 2)
+    state.currentPlayerIndex = 0
+    state.round = round
+    state.roundPhase = 'work'
+    state.players.forEach((player, index) => {
+      player.minorHand = ['__test_placeholder__']
+      player.occupationHand = ['__test_placeholder__']
+      player.startPlayer = index === 0
+      player.resources.food = 10
+      setActiveWorkerCount(player, 1)
+      markAllWorkersUsed(state, player)
+    })
+
+    const player = state.players[0]!
+    player.minorPlayed.push('D071_Changeover')
+    player.fields = [
+      { row: 0, col: 2, stacks: [{ kind: 'grain', remaining: 2 }] },
+      { row: 0, col: 3, stacks: [] },
+    ]
+    player.resources.grain = 0
+
+    session.loadState(state)
+    let resp = session.performRoundEnd()
+
+    expect(resp.interaction.stateId).toBe('wait')
+    expect(resp.state.roundPhase).toBe('harvest')
+    expect(resp.state.players[0]!.fields[0]!.stacks[0]!.remaining).toBe(1)
+    expect(resp.interaction.anytimeActions.map((action) => action.id))
+      .toContain('D71-changeover-anytime')
+
+    resp = session.takeAnytimeAction(0, 'D71-changeover-anytime')
+    resp = session.commitSelectionChoice(0, { positions: [{ row: 0, col: 2 }] })
+    expect(resp.interaction.stateId === 'wait' ? resp.interaction.promptKey : undefined)
+      .toBe('ui.interactionOptionalAction')
+
+    const sowOption = resp.interaction.stateId === 'wait'
+      ? resp.interaction.request.options?.find((option) => option.value !== '__skip__')
+      : undefined
+    expect(sowOption).toBeDefined()
+    if (sow) {
+      resp = session.resolveChoice(0, sowOption!.value)
+      const selectableFields = resp.interaction.stateId === 'wait' &&
+        resp.interaction.request.kind === 'farm-select' &&
+        resp.interaction.request.farm.farmType === 'sow'
+        ? resp.interaction.request.farm.selectableFields.map((field) => field.tile)
+        : []
+      expect(selectableFields).toEqual([{ row: 0, col: 2 }])
+      resp = session.commitSelectionChoice(0, {
+        crops: [{ row: 0, col: 2, crop: 'grain' }],
+      })
+      expect(resp.state.players[0]!.fields[0]!.stacks[0]).toMatchObject({
+        kind: 'grain',
+        remaining: 3,
+      })
+    } else {
+      resp = session.resolveChoice(0, '__skip__')
+      expect(resp.state.players[0]!.fields[0]!.stacks).toEqual([])
+    }
+    expect(resp.state.players[0]!.resources.begging).toBe(0)
+    expect(resp.state.log.some((entry) => entry.key === 'log.reapDetail')).toBe(true)
+    expect(resp.state.gameOver).toBe(finalHarvest)
+    if (finalHarvest) expect(resp.scores).toHaveLength(2)
+    if (!finalHarvest) {
+      expect(resp.state.round).toBe(5)
+      expect(resp.state.roundPhase).toBe('work')
+    }
   })
 
   it('select field 0-2 discards crop, then sow interaction follows', () => {

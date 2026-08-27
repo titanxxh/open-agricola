@@ -36,7 +36,18 @@ const heatingRequest = (session: GameSession, playerIndex: number, required: num
   expect(request.kind).toBe('heating')
   expect(interaction.playerIndex).toBe(playerIndex)
   expect(request.required).toBe(required)
+  expect(interaction.anytimeActions).toEqual([])
   return request
+}
+
+const skipPostReapAnytime = (session: GameSession, playerIndex: number) => {
+  const interaction = session.getState().interaction
+  expect(session.peekEnginePendingEnvelope()?.syntheticKind).toBe('post-reap-anytime')
+  expect(interaction.stateId).toBe('wait')
+  if (interaction.stateId !== 'wait') throw new Error('expected post-reap anytime window')
+  expect(interaction.playerIndex).toBe(playerIndex)
+  expect(interaction.anytimeActions.length).toBeGreaterThan(0)
+  return session.resolveChoice(playerIndex, '__skip__')
 }
 
 const confirmHeating = (
@@ -281,6 +292,8 @@ describe('Farmers of the Moor heating, sick workers, and Infirmary', () => {
     p2!.resources.wood = 2
 
     expect(session.performRoundEnd().ok).toBe(true)
+    skipPostReapAnytime(session, 0)
+    skipPostReapAnytime(session, 1)
     const p1Heat = heatingRequest(session, 0, 2)
     expect(p1Heat.maxFuelPayable).toBe(1)
     expect(p1Heat.maxWoodConvertibleToFuel).toBe(1)

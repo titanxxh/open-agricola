@@ -384,6 +384,13 @@ export function autoAdvanceRoundEnd(
       resp = confirmPlayerSwitch(session)
       continue
     }
+    if (
+      resp.interaction.stateId === 'wait' &&
+      session.peekEnginePendingEnvelope()?.syntheticKind === 'post-reap-anytime'
+    ) {
+      resp = session.resolveChoice(resp.interaction.playerIndex, '__skip__')
+      continue
+    }
     if (resp.interaction.stateId === 'wait') {
       if (opts.onChoice) {
         const next = opts.onChoice(resp.interaction, session)

@@ -26,6 +26,7 @@ export type SubFlowReason =
   | 'reorganize'
   | 'feed'
   | 'heating'
+  | 'post-reap-anytime'
   | 'card-draft'
   | 'confirm-next-player'
   | 'confirm-player-switch'

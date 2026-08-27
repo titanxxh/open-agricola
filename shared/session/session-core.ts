@@ -1142,6 +1142,17 @@ export class GameCore {
       player ? this.getHarvestExchangeLimits(player) : undefined,
     )
   }
+  private startPostReapAnytimeSubFlow(playerIndex: number): void {
+    const options = [{ value: '__skip__', labelKey: 'ui.interactionOptionalSkip' }]
+    this.pushPendingFrame({
+      hostNodeId: this.nextSyntheticNodeId('interaction:post-reap-anytime'),
+      request: { kind: 'choice', options },
+      choices: options,
+      promptKey: 'ui.interactionOptionalAction',
+      ownerNodeId: null,
+      syntheticKind: 'post-reap-anytime',
+    }, playerIndex, 'post-reap-anytime')
+  }
   private startHeatingSubFlow(
     playerIndex: number,
     required: number,
@@ -2600,6 +2611,24 @@ export class GameCore {
       return this.respond()
     }
 
+    return this.continuePostReapAnytimeWindow()
+  }
+
+  private continuePostReapAnytimeWindow(afterPlayerIndex?: number): SessionResponse {
+    const harvestOrder = this.getHarvestPlayerIndices()
+    const start = afterPlayerIndex === undefined
+      ? 0
+      : harvestOrder.indexOf(afterPlayerIndex) + 1
+    for (let offset = Math.max(0, start); offset < harvestOrder.length; offset += 1) {
+      const playerIndex = harvestOrder[offset]!
+      this.startPostReapAnytimeSubFlow(playerIndex)
+      if (this.buildAnytimeEntries().length > 0) return this.respond()
+      this.engineStack.pop()
+    }
+    return this.startHarvestFeedingPhase()
+  }
+
+  private startHarvestFeedingPhase(): SessionResponse {
     this.state.roundPhase = 'feeding'
     appendImmediateEvents(this.state, [{
       type: 'harvest.phaseStarted',
@@ -3137,6 +3166,18 @@ export class GameCore {
         // the previous hard-coded kind list so future synthetic frames
         // (Task 11+) inherit the right behaviour automatically.
         if (isSyntheticInteractionFrame(frame)) {
+          if (
+            frame.reason === 'post-reap-anytime' &&
+            this.engineStack.peekPendingView()?.syntheticKind === 'post-reap-anytime'
+          ) {
+            frame.engine.flushEventTransaction({ state: this.state, player, space })
+            this.flushEngineLog()
+            if (this.buildAnytimeEntries().length === 0) {
+              const ownerPlayerIndex = frame.ownerPlayerIndex
+              this.engineStack.pop()
+              this.continuePostReapAnytimeWindow(ownerPlayerIndex)
+            }
+          }
           return
         }
         // Reorganize confirmations carry the zone assignment in the resolve
@@ -3649,6 +3690,8 @@ export class GameCore {
           return this.handleFeedResolved(playerIndex, plan.selections)
         case 'heating':
           return this.handleHeatingResolved(playerIndex, plan.payload as HeatingPaymentPayload | undefined)
+        case 'post-reap-anytime':
+          return this.handlePostReapAnytimeResolved(playerIndex)
         case 'engine-choice':
           return this.resolveEngineChoice(playerIndex, value, true, payload)
       }
@@ -3919,6 +3962,19 @@ export class GameCore {
     const top = this.engineStack.current()
     if (top?.reason === 'heating') this.engineStack.pop()
     return this.continueHarvestFeedingQueue(request.feedQueue ?? [])
+  }
+
+  private handlePostReapAnytimeResolved(playerIndex: number): SessionResponse {
+    const frame = this.engineStack.current()
+    if (
+      frame?.reason !== 'post-reap-anytime' ||
+      frame.ownerPlayerIndex !== playerIndex
+    ) {
+      return this.respond(false, 'no pending post-reap anytime window')
+    }
+    this.pushHistory()
+    this.engineStack.pop()
+    return this.continuePostReapAnytimeWindow(playerIndex)
   }
 
   /** S2 Task 10 part 3: thin delegator — body lives in `phases/round.ts`. */
