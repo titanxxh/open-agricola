@@ -3,7 +3,6 @@ import type { CardListenerRegistration, CardListenerContext } from '../card-list
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { computeAllowedPlacementSpaces } from '../../actions/helpers/placement-availability'
 import { gainLeaf } from '../helpers/pay-gain-node'
-import { isCardFlagged } from '../helpers/card-state'
 import type { ActionFlow, ActionSpace, Resource } from '../../contract/types'
 import { workersAvailable } from '../../domain/player'
 import type { CardImpl } from '../registry'
@@ -17,23 +16,21 @@ const accumulationSpaceIds = (context: CardListenerContext) =>
     )
     .map((space) => space.id)
 
-const collectedSpaceId = (context: CardListenerContext) => {
-  const events = [...(context.actionEvents ?? []), ...(context.transactionEvents ?? [])]
-  for (const event of events) {
-    const entry = event as { type?: string; reason?: string; from?: { kind?: string; spaceId?: string } }
-    if (entry.type === 'resource.moved' && entry.reason === 'collect' && entry.from?.kind === 'actionSpace') {
-      return entry.from.spaceId
-    }
-  }
-  return undefined
-}
-
 const afterPlaceFarmerListener: CardListenerRegistration = {
   id: 'C42-ravenous-hunger-after-place-farmer',
   cardIds: [CARD_ID],
+  mandatory: true,
   phases: ['after' as ActionHookPhase],
   actions: ['place-farmer'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
+    if (context.sourceCard === CARD_ID) {
+      const gain: Partial<Resource> = {}
+      for (const [key, value] of Object.entries(context.space.gainPerRound)) {
+        if ((value ?? 0) > 0) gain[key as keyof Resource] = 1
+      }
+      if (Object.keys(gain).length === 0) return
+      return { flow: gainLeaf(CARD_ID, gain), sourceCard: CARD_ID }
+    }
     if (context.space?.id !== 'vegetable-seeds') return
     if (workersAvailable(context.state, context.player) <= 0) return
     const constraints = accumulationSpaceIds(context)
@@ -44,7 +41,6 @@ const afterPlaceFarmerListener: CardListenerRegistration = {
         type: 'seq',
         optional: true,
         children: [
-          { type: 'leaf', actionId: 'special-effect', sourceCard: CARD_ID, params: { kind: 'set-flag', flag: true } },
           {
             type: 'leaf',
             actionId: 'place-farmer',
@@ -58,47 +54,8 @@ const afterPlaceFarmerListener: CardListenerRegistration = {
   },
 }
 
-const afterCollectListener: CardListenerRegistration = {
-  id: 'C42-ravenous-hunger-after-collect',
-  cardIds: [CARD_ID],
-  phases: ['after' as ActionHookPhase],
-  actions: ['collect'],
-  handler: (context: CardListenerContext): ActionHookResult | void => {
-    if (!isCardFlagged(context.player, CARD_ID)) return
-
-    const targetSpaceId = context.actionContext?.targetSpaceId as string | undefined
-    const spaceId = targetSpaceId ?? collectedSpaceId(context)
-    const targetSpace = spaceId
-      ? context.state.actionSpaces.find((space) => space.id === spaceId)
-      : undefined
-    const gainPerRound = (targetSpace ?? context.space)?.gainPerRound
-    if (!gainPerRound) return
-
-    const gain: Partial<Resource> = {}
-    for (const [key, value] of Object.entries(gainPerRound)) {
-      if ((value ?? 0) > 0) {
-        gain[key as keyof Resource] = 1
-      }
-    }
-    const unflag: Extract<ActionFlow, { type: 'leaf' }> = {
-      type: 'leaf',
-      actionId: 'special-effect',
-      sourceCard: CARD_ID,
-      params: { kind: 'set-flag', flag: false },
-    }
-    if (Object.keys(gain).length === 0) return { flow: unflag, sourceCard: CARD_ID }
-    return {
-      flow: {
-        type: 'seq',
-        children: [gainLeaf(CARD_ID, gain), unflag],
-      },
-      sourceCard: CARD_ID,
-    }
-  },
-}
-
 const cardImpl = {
-  listeners: [afterPlaceFarmerListener, afterCollectListener],
+  listeners: [afterPlaceFarmerListener],
   reaches: [] as readonly string[],
 } satisfies CardImpl
 

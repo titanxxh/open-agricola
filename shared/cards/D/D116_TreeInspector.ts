@@ -1,6 +1,7 @@
 import { definePlayerActionCard } from '../card-source'
 import { registerPlayerActionSpace, createPlayerActionSpaces } from '../player-action-space'
-import { getStoredResource, setStoredResource } from '../helpers/card-storage'
+import { collectAccumulatedResources } from '../../actions/effects/collect'
+import { findActionSpaceById } from '../../domain/space'
 import type { CardImpl } from '../registry'
 
 const CARD_ID = 'D116_TreeInspector'
@@ -8,27 +9,19 @@ const CARD_ID = 'D116_TreeInspector'
 registerPlayerActionSpace({
   cardId: CARD_ID,
   access: 'owner',
+  gainPerRound: { wood: 1 },
   createDefinition: (ownerId) => ({
     id: CARD_ID,
     nameKey: 'cards.D116_TreeInspector.name',
     descriptionKey: 'cards.D116_TreeInspector.desc',
-    canBeExecutedByPlayer: (_state, player) => {
-      if (player.id !== ownerId) return false
-      return getStoredResource(player, CARD_ID, 'wood') > 0
+    canBeExecutedByPlayer: (_state, player) => player.id === ownerId,
+    execute: ({ player, space }) => {
+      collectAccumulatedResources(player, space)
+      return { type: 'ok' }
     },
-    execute: ({ player }) => {
-      const stored = getStoredResource(player, CARD_ID, 'wood')
-      if (stored <= 0) return { type: 'ok' }
-      // Collect all stored wood via take-from-card
-      return {
-        type: 'flow',
-        flow: {
-          type: 'leaf',
-          actionId: 'take-from-card',
-          params: { wood: stored },
-          sourceCard: CARD_ID,
-        },
-      }
+    flow: {
+      type: 'seq',
+      children: [{ type: 'leaf', actionId: 'collect' }],
     },
   }),
 })
@@ -44,17 +37,11 @@ const cardImpl = {
       }
     }
   },
-  onRoundStart: (state, player) => {
-    // Check if the newly revealed action this round is a Quarry
+  onRoundStart: (state) => {
     const revealedAction = state.roundActionOrder[state.round - 1]
-    if (revealedAction === 'western-quarry' || revealedAction === 'eastern-quarry') {
-      // Discard all stored wood
-      setStoredResource(player, CARD_ID, 'wood', 0)
-      return
-    }
-    // Otherwise accumulate 1 wood
-    const current = getStoredResource(player, CARD_ID, 'wood')
-    setStoredResource(player, CARD_ID, 'wood', current + 1)
+    if (revealedAction !== 'western-quarry' && revealedAction !== 'eastern-quarry') return
+    const space = findActionSpaceById(state, CARD_ID)
+    if (space) space.resources.wood = 0
   },
 },
   reaches: [] as readonly string[],

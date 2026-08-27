@@ -1,14 +1,20 @@
 import { describe, expect, it } from 'vitest'
 import { getRegisteredCardListeners, executeCardListener, type CardListenerContext } from '../../shared/cards/card-listeners'
-import { setCardFlag, isCardFlagged } from '../../shared/cards/helpers/card-state'
 import type { ActionChoiceOption, GameState, PlayerState, ActionSpace, Resource } from '../../shared/contract/types'
 
 import { GameSession } from '../game/authoritative-session'
 import { markAllWorkersUsed, setWorkersAtHome } from '../../shared/domain/player'
 import '../../shared/cards/C/C042_RavenousHunger'
+import '../../shared/cards/C/C076_WoodCart'
+import { D116_TreeInspector_impl } from '../../shared/cards/D/D116_TreeInspector'
+import '../../shared/cards/D/D138_PetLover'
+import { applyRoundGrowth } from '../../shared/session/state-constants'
 import type { ActionFlow } from '../../shared/contract/types'
 
 const CARD_ID = 'C042_RavenousHunger'
+const WOOD_CART_ID = 'C076_WoodCart'
+const TREE_INSPECTOR_ID = 'D116_TreeInspector'
+const PET_LOVER_ID = 'D138_PetLover'
 
 const createPlayer = (id = 'p1'): PlayerState =>
   ({
@@ -114,8 +120,56 @@ const acceptOptional = (session: GameSession, resp: ReturnType<GameSession['getS
   return session.resolveChoice(0, accept!.value)
 }
 
+const setupTreeInspectorSession = () => {
+  const session = setupSession()
+  const state = session.getState().state
+  state.players[0]!.occupationPlayed.push(TREE_INSPECTOR_ID)
+  session.loadState(state)
+  const stateWithTreeInspector = session.getState().state
+  stateWithTreeInspector.actionSpaces.find((space) => space.id === TREE_INSPECTOR_ID)!.resources.wood = 2
+  session.loadState(stateWithTreeInspector)
+  return session
+}
+
+const setupPetLoverSession = () => {
+  const session = new GameSession(undefined, undefined, { playerCount: 3 })
+  const state = session.getState().state
+  state.currentPlayerIndex = 0
+  state.round = 14
+  state.roundPhase = 'work'
+
+  for (const player of state.players) {
+    setWorkersAtHome(state, player, 2)
+    player.minorHand = ['__test_placeholder__']
+    player.occupationHand = ['__test_placeholder__']
+  }
+
+  const player = state.players[0]!
+  player.minorPlayed.push(CARD_ID)
+  player.occupationPlayed.push(PET_LOVER_ID)
+  player.resources = resources()
+  player.pastures = [{
+    id: 'sheep-pasture',
+    size: 1,
+    tiles: [{ row: 2, col: 0 }],
+    stables: 0,
+    animalType: null,
+    animalCount: 0,
+  }]
+
+  for (const space of state.actionSpaces) {
+    space.takenBy = []
+    space.roundAvailable = Math.min(space.roundAvailable, 14)
+  }
+  const sheepMarket = state.actionSpaces.find((space) => space.id === 'sheep-market')!
+  sheepMarket.resources.sheep = 1
+
+  session.loadState(state)
+  return session
+}
+
 describe('C042_RavenousHunger', () => {
-  it('after vegetable-seeds: offers place-farmer with flag/unflag sequence and accumulation constraints', () => {
+  it('after vegetable-seeds: offers one extra placement constrained to accumulation spaces', () => {
     const listener = findListener('C42-ravenous-hunger-after-place-farmer')
     expect(listener).toBeDefined()
 
@@ -131,10 +185,9 @@ describe('C042_RavenousHunger', () => {
     expect(result).toBeDefined()
     expect(result!.flow!.type).toBe('seq')
     const children = (result!.flow as Extract<ActionFlow, { type: 'seq' }>).children
-    expect(children).toHaveLength(2)
-    expect(children[0]).toMatchObject({ actionId: 'special-effect', params: { kind: 'set-flag', flag: true } })
-    expect(children[1].actionId).toBe('place-farmer')
-    expect(children[1].actionContext).toMatchObject({ constraints: expect.arrayContaining(['forest']) })
+    expect(children).toHaveLength(1)
+    expect(children[0].actionId).toBe('place-farmer')
+    expect(children[0].actionContext).toMatchObject({ constraints: expect.arrayContaining(['forest']) })
   })
 
   it('after vegetable-seeds: constraints include only legal accumulation spaces', () => {
@@ -155,7 +208,7 @@ describe('C042_RavenousHunger', () => {
     expect(result).toBeDefined()
     expect(result!.flow!.type).toBe('seq')
     const children = (result!.flow as Extract<ActionFlow, { type: 'seq' }>).children
-    expect(children[1].actionContext).toEqual({ constraints: ['fishing'] })
+    expect(children[0].actionContext).toEqual({ constraints: ['fishing'] })
   })
 
   it('does not trigger on non-vegetable-seeds spaces', () => {
@@ -189,38 +242,35 @@ describe('C042_RavenousHunger', () => {
     expect(result).toBeUndefined()
   })
 
-  it('after collect while flagged: gains 1 extra of accumulating resource', () => {
-    const listener = findListener('C42-ravenous-hunger-after-collect')
+  it('after its extra placement: gains the printed accumulation type', () => {
+    const listener = findListener('C42-ravenous-hunger-after-place-farmer')
     expect(listener).toBeDefined()
 
     const player = createPlayer()
-    setCardFlag(player, CARD_ID, true)
     const state = createState(player)
+    const forest = createSpace('forest', { wood: 3 })
+    forest.resources.clay = 4
 
     const result = executeCardListener(listener!, {
-      state, player, space: createSpace('forest', { wood: 3 }),
-      actionId: 'collect', phase: 'after',
+      state, player, space: forest,
+      actionId: 'place-farmer', phase: 'after', sourceCard: CARD_ID,
       result: { type: 'ok' },
     } as unknown as CardListenerContext)
 
     expect(result).toBeDefined()
-    expect(result!.flow!.type).toBe('seq')
-    const children = (result!.flow as Extract<ActionFlow, { type: 'seq' }>).children
-    expect(children[0]).toMatchObject({ actionId: 'gain', params: { wood: 1 } })
-    expect(children[1]).toMatchObject({ actionId: 'special-effect', params: { kind: 'set-flag', flag: false } })
+    expect(result!.flow).toMatchObject({ actionId: 'gain', params: { wood: 1 } })
   })
 
-  it('after collect when not flagged: no bonus', () => {
-    const listener = findListener('C42-ravenous-hunger-after-collect')
+  it('does not grant the bonus after a normal placement', () => {
+    const listener = findListener('C42-ravenous-hunger-after-place-farmer')
     expect(listener).toBeDefined()
 
     const player = createPlayer()
-    // Not flagged
     const state = createState(player)
 
     const result = executeCardListener(listener!, {
       state, player, space: createSpace('forest', { wood: 3 }),
-      actionId: 'collect', phase: 'after',
+      actionId: 'place-farmer', phase: 'after',
       result: { type: 'ok' },
     } as unknown as CardListenerContext)
 
@@ -262,7 +312,6 @@ describe('C042_RavenousHunger', () => {
 
     expect(resp.ok).toBe(true)
     expect(resp.interaction.request.kind).not.toBe('choice')
-    expect(isCardFlagged(resp.state.players[0]!, CARD_ID)).toBe(false)
   })
 
   it('second placement on an accumulation space collects and gains one extra accumulating resource', () => {
@@ -277,10 +326,100 @@ describe('C042_RavenousHunger', () => {
     expect(resp.state.players[0]!.resources.vegetable).toBe(1)
     expect(resp.state.players[0]!.resources.wood).toBe(4)
     expect(resp.state.actionSpaces.find((space) => space.id === 'forest')!.resources.wood).toBe(0)
-    expect(isCardFlagged(resp.state.players[0]!, CARD_ID)).toBe(false)
   })
 
-  it('skip leaves no flag and grants no accumulation bonus', () => {
+  it('offers Tree Inspector and gains one wood beyond the wood on its action space', () => {
+    const session = setupTreeInspectorSession()
+
+    let resp = session.takeAction(0, 'vegetable-seeds')
+    expect(resp.ok).toBe(true)
+    resp = acceptOptional(session, resp)
+    expect(waitOptions(resp).map((option) => option.value)).toContain(TREE_INSPECTOR_ID)
+
+    resp = session.resolveChoice(0, TREE_INSPECTOR_ID)
+
+    expect(resp.ok).toBe(true)
+    expect(resp.state.players[0]!.resources.vegetable).toBe(1)
+    expect(resp.state.players[0]!.resources.wood).toBe(3)
+    expect(resp.state.actionSpaces.find((space) => space.id === TREE_INSPECTOR_ID)?.resources.wood).toBe(0)
+    expect(resp.state.actionSpaces.find((space) => space.id === TREE_INSPECTOR_ID)?.takenBy)
+      .toHaveLength(1)
+    expect(resp.state.log).toContainEqual(expect.objectContaining({
+      key: 'log.cardEffectGain',
+      params: expect.objectContaining({ cardId: CARD_ID, gain: { wood: 1 } }),
+    }))
+  })
+
+  it('runs normal collect listeners when Tree Inspector is used', () => {
+    const session = setupTreeInspectorSession()
+    const state = session.getState().state
+    state.players[0]!.minorPlayed.push(WOOD_CART_ID)
+    session.loadState(state)
+
+    const resp = session.takeAction(0, TREE_INSPECTOR_ID)
+
+    expect(resp.ok).toBe(true)
+    expect(resp.state.players[0]!.resources.wood).toBe(4)
+    expect(resp.state.actionSpaces.find((space) => space.id === TREE_INSPECTOR_ID)?.resources.wood).toBe(0)
+    expect(resp.state.log).toContainEqual(expect.objectContaining({
+      key: 'log.cardEffectGain',
+      params: expect.objectContaining({ cardId: WOOD_CART_ID, gain: { wood: 2 } }),
+    }))
+  })
+
+  it('accumulates Tree Inspector through round growth and clears it when a Quarry is revealed', () => {
+    const session = setupTreeInspectorSession()
+    const state = session.getState().state
+    const treeInspector = state.actionSpaces.find((space) => space.id === TREE_INSPECTOR_ID)!
+
+    applyRoundGrowth(state)
+    expect(treeInspector.resources.wood).toBe(3)
+
+    state.roundActionOrder[state.round - 1] = 'eastern-quarry'
+    D116_TreeInspector_impl.effect!.onRoundStart!(state, state.players[0]!)
+    expect(treeInspector.resources.wood).toBe(0)
+  })
+
+  it('gains the printed sheep type after Pet Lover replaces collect', () => {
+    const session = setupPetLoverSession()
+
+    let resp = session.takeAction(0, 'vegetable-seeds')
+    expect(resp.ok).toBe(true)
+    resp = acceptOptional(session, resp)
+    resp = session.resolveChoice(0, 'sheep-market')
+    const petLoverOption = waitOptions(resp).find((option) => option.sourceCard === PET_LOVER_ID)
+    expect(petLoverOption).toBeDefined()
+
+    resp = session.resolveChoice(0, petLoverOption!.value)
+    while (resp.interaction.stateId === 'wait' && resp.interaction.request.kind === 'animal-reorg') {
+      const sheep = resp.state.players[0]!.resources.sheep
+      resp = session.resolveChoice(0, 'confirm', [{
+        id: 'sheep-pasture',
+        zoneType: 'pasture',
+        animalType: 'sheep',
+        animalCount: sheep,
+      }])
+    }
+
+    expect(resp.ok).toBe(true)
+    expect(resp.state.players[0]!.resources).toMatchObject({
+      vegetable: 1,
+      sheep: 2,
+      food: 3,
+      grain: 1,
+    })
+    expect(resp.state.players[0]!.pastures[0]).toMatchObject({
+      animalType: 'sheep',
+      animalCount: 2,
+    })
+    expect(resp.state.actionSpaces.find((space) => space.id === 'sheep-market')!.resources.sheep).toBe(1)
+    expect(resp.state.log).toContainEqual(expect.objectContaining({
+      key: 'log.cardEffectGain',
+      params: expect.objectContaining({ cardId: CARD_ID, gain: { sheep: 1 } }),
+    }))
+  })
+
+  it('skip grants no accumulation bonus', () => {
     const session = setupSession()
 
     const resp = session.takeAction(0, 'vegetable-seeds')
@@ -290,6 +429,5 @@ describe('C042_RavenousHunger', () => {
     expect(skipped.ok).toBe(true)
     expect(skipped.state.players[0]!.resources.vegetable).toBe(1)
     expect(skipped.state.players[0]!.resources.wood).toBe(0)
-    expect(isCardFlagged(skipped.state.players[0]!, CARD_ID)).toBe(false)
   })
 })

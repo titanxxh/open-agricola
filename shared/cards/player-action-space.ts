@@ -5,6 +5,7 @@ export type PlayerActionSpaceConfig = {
   cardId: string
   /** Who can use this action space: 'all' = any player, 'owner' = only the player who played it */
   access: 'all' | 'owner'
+  gainPerRound?: Partial<Resource>
   /**
    * Optional gate. If provided, the space is only created when this returns
    * true for the current game state. Use for cards whose action-space behavior
@@ -55,7 +56,7 @@ export const createPlayerActionSpaces = (state: GameState): ActionSpace[] => {
         ...def,
         id: cardId,
         roundAvailable: 1,
-        gainPerRound: {},
+        gainPerRound: { ...config.gainPerRound },
         resources: { ...emptyResources },
         takenBy: [],
       } as ActionSpace)
