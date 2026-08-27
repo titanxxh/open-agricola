@@ -108,9 +108,6 @@ const expectPayGain = (flow: ActionFlow, pay: ResourceMap, gain: ResourceMap, so
   ])
 }
 
-const doubled = (resources: ResourceMap): ResourceMap =>
-  Object.fromEntries(Object.entries(resources).map(([key, value]) => [key, value * 2])) as ResourceMap
-
 describe('card-local table-driven flows', () => {
   it('B137 Wholesaler exports the action-space reward table used by generated listeners', () => {
     const table = (B137Module as unknown as { SPACE_REWARDS?: readonly SpaceReward[] }).SPACE_REWARDS
@@ -197,30 +194,38 @@ describe('card-local table-driven flows', () => {
     })
   })
 
-  it('E142 Smuggler exports trade options while preserving the mixed OR flow shape', () => {
+  it('E142 Smuggler uses its trade options in two optional exchange stages', () => {
     const table = (E142Module as unknown as { TRADE_OPTIONS?: readonly TradeOption[] }).TRADE_OPTIONS
     expect(table).toEqual([
       { from: { wood: 1 }, to: { grain: 1 } },
       { from: { grain: 1 }, to: { stone: 1 } },
     ])
 
-    const owner = player({ wood: 2, grain: 2 })
+    const owner = player({ wood: 1 })
     const flow = E142_Smuggler_impl.effect?.onHarvestFeedingPhase?.(state(owner), owner)
-    expect(flow?.type).toBe('xor')
-    if (flow?.type !== 'xor') return
-    expect(flow.optional).toBe(true)
-    expect(flow.children).toHaveLength(3)
-    table!.forEach((trade, index) => {
-      expectPayGain(flow.children[index]!, doubled(trade.from), doubled(trade.to), 'E142_Smuggler')
-    })
-
-    const mixed = flow.children[2]
-    expect(mixed?.type).toBe('or')
-    if (mixed?.type !== 'or') return
-    expect(mixed.optional).toBe(true)
-    expect(mixed.children).toHaveLength(table!.length)
-    table!.forEach((trade, index) => {
-      expectPayGain(mixed.children[index]!, trade.from, trade.to, 'E142_Smuggler')
+    expect(flow?.type).toBe('seq')
+    if (flow?.type !== 'seq') return
+    expect(flow.children).toHaveLength(2)
+    flow.children.forEach((stage) => {
+      expect(stage.type).toBe('xor')
+      if (stage.type !== 'xor') return
+      expect(stage.optional).toBe(true)
+      expect(stage.children).toHaveLength(table!.length)
+      table!.forEach((trade, index) => {
+        expect(stage.children[index]).toMatchObject({
+          type: 'leaf',
+          actionId: 'exchange',
+          sourceCard: 'E142_Smuggler',
+          actionContext: {
+            directTrade: { ...trade, sourceId: 'E142_Smuggler' },
+          },
+          effectPreview: {
+            kind: 'resourceExchange',
+            resourcesPaid: trade.from,
+            resourcesGained: trade.to,
+          },
+        })
+      })
     })
   })
 })
