@@ -59,6 +59,7 @@ export type ResolveChoiceSubmissionPlan =
   | { ok: true; kind: 'confirm-player-switch'; fromPlayerIndex: number; toPlayerIndex: number }
   | { ok: true; kind: 'feed'; selections: FeedSelections }
   | { ok: true; kind: 'heating'; payload: Record<string, unknown> | undefined }
+  | { ok: true; kind: 'post-reap-anytime' }
   | { ok: true; kind: 'engine-choice' }
 
 export type ResolveChoiceSubmissionInput = {
@@ -113,6 +114,10 @@ export const planResolveChoiceSubmission = (
     if (request.kind === 'engine-blocked') {
       return { ok: false, error: 'engine-blocked cannot resolve' }
     }
+  }
+
+  if (envelope.syntheticKind === 'post-reap-anytime') {
+    return { ok: true, kind: 'post-reap-anytime' }
   }
 
   switch (request.kind) {

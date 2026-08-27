@@ -411,6 +411,8 @@ API：`push / pop / current / depth / peekPendingEnvelope / peekPendingHost / to
 
 `EngineStackCursor` 序列化成 `SerializedGameState.engineStack`，恢复路径：`engine.snapshot()` → 各 concrete node cursor restore 重建节点树并定位 pending host / traversal state。
 
+收获后窗口在 `SubFlowReason` 和 `PendingSyntheticKind` 中都使用 `post-reap-anytime`，因此 Session 能区分它的根 choice 与嵌套卡牌 choice，而不需要单卡分支。
+
 `SubFlowKind` ∈ { `choice` / `animal-reorg` / `confirm-next-player` / `confirm-player-switch` / `feed` / `farm-select` / `selection` / `card-draft` }。
 
 ---
@@ -701,8 +703,8 @@ Card listener 区域默认只匹配已打出卡：`zones` 省略等价于 `['pla
 收获 (4/7/9/11/13/14):
   onBeforeHarvest → harvestPrepWindow → onStartHarvest
   → onStartHarvestFieldPhase → onHarvestFieldPhase → reap [dispatch 'reap'] → reap reaction parallel
-    → onAfterReap → onEndHarvestFieldPhase
-  → onStartHarvestFeedingPhase → onHarvestFeedingPhase
+    → onAfterReap → onEndHarvestFieldPhase → onHarvest
+  → postReapAnytimeWindow → onStartHarvestFeedingPhase → onHarvestFeedingPhase
     → feed → onEndHarvestFeedingPhase
   → breed → onEndHarvest → onAfterHarvest
 终局前:  round 14 的 onAfterRoundEnd 完成并递增到 round 15 后，onBeforeEndGame → preScoringWindow → gameover
@@ -711,6 +713,8 @@ Card listener 区域默认只匹配已打出卡：`zones` 省略等价于 `['pla
 `onBeforeHarvest` 完成后，`harvestPrepWindow` 在任何 `onStartHarvest` / field-phase 卡牌结算前按座次遍历玩家。已打出的卡可声明 `preHarvestGoodsWanted`；准备窗口会把所有已打出消费者的需求汇总，再和当前存量及必然收割量比较。若卡牌在普通收割前就消费该资源，则改为声明 `preHarvestGoodsWantedBeforeReap`；当前存量必须独立覆盖汇总后的收割前需求，田里的作物不计入。E58 这类可以选择跳过田地阶段的卡牌声明 `maySkipHarvestFieldPhase`；其可能发生的收割不会被任何消费者视为必然。没有有用且可支付的限次 `harvest` exchange 的玩家直接跳过。harvest exchange 的使用次数按来源和轮次记录，因此这里使用后，后续喂食窗口只能使用剩余额度。当前由 A61/C29/C54/C98/C110/D70/E110 声明粮食或木材需求，提供者从 exchange metadata 发现，不维护卡牌 ID 清单。
 
 普通 Harvest 收获用 `reap(..., { trigger: { phase: 'harvest' } })` 移除田里作物，事件层统一记录 `reason: 'reap'`。每块田先通过 `computeHarvestCount(state, player, field)` 得到本次普通 reap 要移动的 crop 数量、`sources`、`tags` 和 `scope`；单卡只能通过 `registerHarvestCountModifier(cardId, modifier)` 增减 `delta`、设置 `override`、追加语义 `tags` 或把 `scope` 升为 `field`，不要在 `reap` 主路径添加单卡分支。默认 `top-stack` scope 只收原始顶堆，只有 E73 这类 full-field 能用 `field` scope 跨堆。`HarvestReapSummary.harvestedCrops` 按 field/crop 记录实际收获数量与来源；`HarvestReapSummary.harvestCountApplications` 按 field/crop/scope 记录每次 harvest count 应用的 `count`、`sources`、`tags` 和 `scope`，包括 E112 这类 supply-instead-of-field 的零收获应用。后续卡牌若要判断“本次收获规则实际怎么作用”，必须读取 applications，不要反查外卡 `cardStates`。A112/D72 这类额外收获选择门槛通过 `registerHarvestSelectionThresholdModifier()` / `computeHarvestSelectionThreshold()` 扩展；helper 只接收当前 `state/player/field/sourceCard/baseThreshold`，由注册 modifier 返回更低阈值来源，调用方不读取具体外卡 id。`grainFields` / `vegetableFields` 仍按收获过的田数计数，不按 crop amount 计数。每种 crop 收获后走 `dispatchReapListener(state, player, crop, amount, ..., { trigger, sourceCard })` 派发 `'reap'` 合成事件；listener 返回的 flow 不在 dispatch 阶段执行，而是收集进普通 `parallel` stage flow，全部完成后再进入 `onAfterReap`。
+
+`onHarvest` 完成后、喂食阶段开始前，`postReapAnytimeWindow` 按 Harvest 顺序遍历玩家。只有 `buildAnytimeEntries()` 找到当前可执行的 registry action 或卡牌 listener flow 时，才建立可跳过的 synthetic choice；完成一次 anytime flow 后按实时状态重建同一玩家的能力，没有剩余能力时自动推进，Pass 则显式推进。所有玩家完成后，`executeFeedingLogic()` 才冻结 `remaining` / `foodUsed`，因此窗口内资源变化会进入喂食计算，同时真实 `feed` / `heating` pending 仍保持锁定。
 
 喂食需求通过 `computeHarvestFeedingRequirement(state, player)` 计算，默认公式是 `familySize * 2 - newbornCount`；E30/E159 这类只改变所需食物数量的卡通过 `registerHarvestFeedingRequirementModifier(cardId, modifier)` 扩展公式，不新增 `BeforeFeed` / `AfterFeed` 阶段 hook，也不在喂食主路径写单卡分支。
 
@@ -842,6 +846,7 @@ Nested anytime flows are injected ahead of the current pending tree. Parent pend
 OA-vs-the reference design notes:
 
 - Reorganize is a system-driven sub-flow in OA (not a player-triggerable anytime) — the policy never produces a `'reorganize'` entry to filter.
+- `postReapAnytimeWindow` 是 `onHarvest` 完成后、喂食状态计算前的通用开放窗口。它只查询普通 anytime registry / listener，不含卡牌 ID 分支；每次嵌套 flow 完成后重新计算能力，并跳过没有可执行能力的玩家。
 - `feed` pending is locked in OA because `executeFeedingLogic()` freezes `remaining`/`foodUsed` into the InteractionRequest. The reference allows nested anytime in its `ST_HARVEST_FEED` flow because its predecessor is the `EXCHANGE` state, which has no fixed budget.
 - Idle work-phase turns and `confirm-next-player` are acting-player anytime windows: legal anytime actions remain available before a worker is placed and before control passes to the next player. In `confirm-next-player`, `exchange` stays blocked to avoid recursive generic exchange prompts. `confirm-player-switch` remains blocked because it is a system-controlled cross-player transition inside another flow.
 - `stageResume`-bearing stage hook chains default to blocked to preserve the "system-driven hook chains do not yield to player anytime" invariant; the explicit allow-list (`animal-reorg`, exchange/bake-bread promptKey, and D132's `ui.cards.D132_HideFarmer.optional` before-endgame choice prompt) overrides this. D132's nested `resource-quantity-select` prompt stays blocked, because its max is frozen from current food/empty-space state and must not be resumed after arbitrary anytime changes.

@@ -108,6 +108,16 @@ const skipOptional = (session: GameSession, resp: ReturnType<GameSession['perfor
   return resolveSkipChoice(session, resp)
 }
 
+const skipPostReapAnytime = (
+  session: GameSession,
+  resp: ReturnType<GameSession['performRoundEnd']>,
+) => {
+  expect(session.peekEnginePendingEnvelope()?.syntheticKind).toBe('post-reap-anytime')
+  expect(resp.interaction.anytimeActions.map((action) => action.id)).toContain(ANYTIME_ID)
+  if (resp.interaction.stateId !== 'wait') throw new Error('expected post-reap anytime window')
+  return session.resolveChoice(resp.interaction.playerIndex, '__skip__')
+}
+
 const expectC57Selection = (resp: ReturnType<GameSession['performRoundEnd']>) => {
   expect(resp.interaction.stateId).toBe('wait')
   if (resp.interaction.stateId !== 'wait') throw new Error('expected C57 selection')
@@ -183,6 +193,7 @@ describe('C057_Crudite', () => {
     const session = setupSession()
     let resp = session.performRoundEnd()
     resp = skipOptional(session, resp)
+    resp = skipPostReapAnytime(session, resp)
 
     const player = resp.state.players[0]!
     expect(fieldCountsOf(player)).toEqual([2, 1, 0])
@@ -209,6 +220,7 @@ describe('C057_Crudite', () => {
     resp = acceptOptional(session, resp)
     expectC57Selection(resp)
     resp = selectPositions(session, [{ row: 0, col: 1 }])
+    resp = skipPostReapAnytime(session, resp)
 
     const player = resp.state.players[0]!
     expect(fieldCountsOf(player)).toEqual([2, 0, 0])

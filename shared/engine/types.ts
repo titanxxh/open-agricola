@@ -49,6 +49,7 @@ export type PendingSyntheticKind =
   | 'interaction-only'
   | 'feed'
   | 'heating'
+  | 'post-reap-anytime'
   | 'confirm-next-player'
   | 'confirm-player-switch'
   | 'farm-select'

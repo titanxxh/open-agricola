@@ -96,6 +96,19 @@ const expectPreScoringGrocer = (resp: SessionResponse, playerIndex: number) => {
   return option!
 }
 
+const skipPostReapAnytime = (
+  session: GameSession,
+  resp: SessionResponse,
+  playerIndex: number,
+) => {
+  expect(resp.state.roundPhase).toBe('harvest')
+  expect(resp.interaction.stateId).toBe('wait')
+  if (resp.interaction.stateId !== 'wait') throw new Error('expected post-reap anytime window')
+  expect(resp.interaction.playerIndex).toBe(playerIndex)
+  expect(resp.interaction.request.options?.map((option) => option.value)).toEqual(['__skip__'])
+  return session.resolveChoice(playerIndex, '__skip__')
+}
+
 describe('Before-End Player Dispatch session', () => {
   it('dispatches default before-end activations through trigger-select for each target player', () => {
     const session = setupEndGameSession()
@@ -187,7 +200,7 @@ describe('Before-End Player Dispatch session', () => {
       }),
     })
 
-    let resp = session.performRoundEnd()
+    let resp = skipPostReapAnytime(session, session.performRoundEnd(), 1)
     const firstGrocer = expectPreScoringGrocer(resp, 0)
     expect(resp.state.round).toBe(15)
     expect(resp.state.gameOver).toBe(false)
@@ -245,7 +258,7 @@ describe('Before-End Player Dispatch session', () => {
     pushToCardStack(player, GROCER, ['wood'])
     session.loadState(state)
 
-    const resp = session.performRoundEnd()
+    const resp = skipPostReapAnytime(session, session.performRoundEnd(), 0)
 
     expect(resp.state.gameOver).toBe(true)
     expect(resp.interaction.stateId).toBe('gameover')

@@ -416,6 +416,8 @@ Its API is `push`, `pop`, `current`, `depth`, `peekPendingEnvelope`, `peekPendin
 
 `EngineStackCursor` is serialized into `SerializedGameState.engineStack`. Restoration uses `engine.snapshot()` and each concrete node's cursor restoration to rebuild the tree and locate pending hosts and traversal state.
 
+The post-Reap window uses `post-reap-anytime` in both `SubFlowReason` and `PendingSyntheticKind`, so Session can distinguish its root choice from nested card choices without a card-specific branch.
+
 `SubFlowKind` is one of `choice`, `animal-reorg`, `confirm-next-player`, `confirm-player-switch`, `feed`, `farm-select`, `selection`, or `card-draft`.
 
 ---
@@ -709,8 +711,8 @@ Round end:   onRoundEnd -> onAfterRoundEnd
 Harvest in rounds 4/7/9/11/13/14:
   onBeforeHarvest -> harvestPrepWindow -> onStartHarvest
   -> onStartHarvestFieldPhase -> onHarvestFieldPhase -> reap [dispatch 'reap'] -> reap reaction parallel
-    -> onAfterReap -> onEndHarvestFieldPhase
-  -> onStartHarvestFeedingPhase -> onHarvestFeedingPhase
+    -> onAfterReap -> onEndHarvestFieldPhase -> onHarvest
+  -> postReapAnytimeWindow -> onStartHarvestFeedingPhase -> onHarvestFeedingPhase
     -> feed -> onEndHarvestFeedingPhase
   -> breed -> onEndHarvest -> onAfterHarvest
 Before game end: after round 14 onAfterRoundEnd completes and advances to round 15,
@@ -722,6 +724,8 @@ After `onBeforeHarvest`, `harvestPrepWindow` walks players in seating order befo
 An ordinary Harvest removes crops with `reap(..., { trigger: { phase: 'harvest' } })`; the event layer records `reason: 'reap'`. For each field, `computeHarvestCount(state, player, field)` first returns the crop amount moved by ordinary reap plus `sources`, `tags`, and `scope`. An individual card may alter `delta`, set `override`, add semantic `tags`, or elevate `scope` to `field` only through `registerHarvestCountModifier(cardId, modifier)`. It must not add a card-specific branch to the main `reap` path. Default `top-stack` scope harvests only the original top stack; only a full-field effect such as E73 uses `field` scope across stacks.
 
 `HarvestReapSummary.harvestedCrops` records actual harvested amounts and sources by field and crop. `HarvestReapSummary.harvestCountApplications` records the count, sources, tags, and scope of every harvest-count application by field, crop, and scope, including zero-harvest supply-instead-of-field applications such as E112. A later card that asks how a harvest rule actually applied must read these applications, not inspect another card's `cardStates`. Thresholds for extra-harvest choices such as A112 and D72 extend through `registerHarvestSelectionThresholdModifier()` and `computeHarvestSelectionThreshold()`. The helper receives only current `state`, `player`, `field`, `sourceCard`, and `baseThreshold`; registered modifiers return lower-threshold sources, so callers never read a specific external-card ID. `grainFields` and `vegetableFields` count harvested fields, not crop amount. After each crop, `dispatchReapListener(state, player, crop, amount, ..., { trigger, sourceCard })` emits a synthetic `reap` event. Returned listener flows do not execute during dispatch; they accumulate into an ordinary parallel stage flow, all complete, and then `onAfterReap` begins.
+
+After `onHarvest`, `postReapAnytimeWindow` walks players in Harvest order before the feeding phase starts. It creates a skippable synthetic choice only when `buildAnytimeEntries()` finds an executable registry action or card-listener flow. A completed anytime flow returns to the same player and rebuilds availability from live state; no remaining entry advances automatically, while Pass advances explicitly. Only after every player finishes does `executeFeedingLogic()` snapshot `remaining` and `foodUsed`, so resource changes in this window are included without unlocking the real `feed` or `heating` pending interactions.
 
 `computeHarvestFeedingRequirement(state, player)` calculates feeding need using the default `familySize * 2 - newbornCount`. Cards such as E30 and E159 that change only required food extend the formula through `registerHarvestFeedingRequirementModifier(cardId, modifier)`. They do not add `BeforeFeed` or `AfterFeed` stage hooks or card-specific branches to the feeding path.
 
@@ -865,6 +869,7 @@ Nested anytime flows are inserted ahead of the current pending tree. The parent 
 OA versus the reference design notes:
 
 - Reorganize is a system-driven subflow in OA, not a player-triggerable anytime action, so the policy never emits a `reorganize` entry.
+- `postReapAnytimeWindow` is the generic unlocked opportunity after `onHarvest` and before feeding state is calculated. It uses the ordinary anytime registry/listener query, contains no card-ID branches, re-evaluates after every nested flow, and skips players with no executable entry.
 - A `feed` pending interaction is locked because `executeFeedingLogic()` freezes `remaining` and `foodUsed` into `InteractionRequest`. The reference permits nested anytime actions in `ST_HARVEST_FEED` because its predecessor is an `EXCHANGE` state with no fixed budget.
 - Idle work-phase turns and `confirm-next-player` are acting-player anytime windows. Legal anytime actions remain available before placement and before control passes. During `confirm-next-player`, `exchange` stays blocked to avoid recursive generic exchange prompts. `confirm-player-switch` stays blocked because it is a system-controlled cross-player transition inside another flow.
 - Stage-hook chains carrying `stageResume` are blocked by default, preserving the invariant that system-driven hook chains do not yield to player anytime actions. Explicit exceptions are animal reorganization, exchange or bake-bread prompt keys, and D132's `ui.cards.D132_HideFarmer.optional` before-endgame choice prompt. D132's nested `resource-quantity-select` remains blocked because its maximum is frozen from current food and empty-space state and cannot safely resume after arbitrary anytime changes.
