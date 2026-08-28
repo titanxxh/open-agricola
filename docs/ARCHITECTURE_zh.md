@@ -481,7 +481,7 @@ type SessionResponse = {
 
 ---
 
-### round.ts 额外回合轮转扩展点（contributeExtraTurn / hasPendingExtraTurn）
+### 6.4 round.ts 额外回合轮转扩展点（contributeExtraTurn / hasPendingExtraTurn）
 
 A092_AdoptiveParents 引入轮转层的**额外回合**机制（#203+#204），发生在玩家普通工人耗尽**之后**，与 `onBeforePlayerTurn` 的 `skipTurn` 在回合开始前的负向跳过相反。
 
@@ -493,6 +493,25 @@ A092_AdoptiveParents 引入轮转层的**额外回合**机制（#203+#204），�
 - A92 provider 表现为 XOR[use, forfeit]；选 Forfeit（放弃）即退出本轮后续。A92 触发条件：普通工人耗尽但仍持未激活后代（newborn），对齐 参考实现 `stLabor` 里 adoptive / Telegram / Work Permit 等并列的 supply-placement 选项（pull model）。M057 provider 选中后进入 Moor special action 的卡牌 / 版图选择 flow，仍会触发普通 special action before / after listener。
 
 **与 `onBeforePlayerTurn` / `skipTurn` 的区别**：`skipTurn`（如 D134_OysterEater，返回 `{ skipTurn: true }`，镜像 参考实现 `Globals::setSkipNext`）在玩家回合**开始前**让轮转 `continue` 跳过该玩家整个回合（负向）；`contributeExtraTurn` 在玩家工人**耗尽后**让轮转**不提前跳过**、追加一次额外放工（正向）。术语见 `CONTEXT.md` 的 *Extra Turn / Forfeit*。
+
+### 6.5 回合作用域与行动执行作用域
+
+轮转机会、Turn Scope 和行动执行作用域是三种独立的生命周期。卡面写“在你的回合”或“同一回合”的卡牌读取 Turn Scope；判断实际建造、耕地、播种或其他变化的卡牌读取当前行动作用域或 transaction 结果。
+
+| 规则情形 | 轮转机会 | Turn Scope | 行动执行作用域 |
+|---|---|---|---|
+| 轮转选中的普通放工或沼泽特殊行动 | 消耗当前机会 | 新建作用域 | 每个完整 Rule Action 新建一个作用域 |
+| 卡牌贡献的 Extra Turn | 新增一次机会 | 新建作用域 | 每个完整 Rule Action 新建一个作用域 |
+| D051 Archway，或 E010 Straw Hat 移动的每个 worker | 不新增机会 | 每个移动的 worker 新建作用域 | 每个完整 Rule Action 新建一个作用域 |
+| 仍属于当前 Turn 的立即 Rule Action | 不新增机会 | 沿用当前作用域 | 新建作用域 |
+| 不算 Turn 的阶段或 anytime Rule Action，例如 Iron Hoe | 不新增机会 | 无 | 新建作用域 |
+| 单独的 gain、payment、choice 或 listener activation | 不新增机会 | 若存在则沿用作用域 | 不新建作用域，留在外围作用域内 |
+
+Turn Scope 在人员放置、沼泽特殊行动或等价的卡牌行动格使用开始前建立，并持续覆盖该 Turn 的全部 Rule Action 和后置效果，随后清除。D051 Archway 在目标行动格完整结算后关闭 Turn Scope；E010 Straw Hat 在开始下一个 worker 的选择前关闭上一个 Turn Scope。idle 或后续阶段流程绝不能读到已完成 Turn 遗留的身份或起点快照。
+
+行动执行作用域在单个 Rule Action 的生命周期开始前建立，并持续覆盖它的 pending 选择、continuation、listener 和后置效果。同一 Turn 内的多个 Rule Action 使用不同的行动作用域，但共用 Turn Scope。按行动计算 delta 的消费者读取 action transaction，而不是 Turn 起点快照。
+
+`actionContext.trueAction` 与这三种生命周期相互独立。它只表示某个效果是否算作执行其命名行动，供 action listener 判断；它既不创建 Turn，也不能替代行动执行作用域。一次免费建造可以使用 `trueAction: false`，同时仍把实际建造 delta 暴露给通用的“当你建造时”规则。
 
 ## 7. shared/actions/ — 行动定义与 Hook 系统
 
@@ -909,7 +928,7 @@ export const A123_FrameBuilder = defineOccupationCard({
 - `pay-gain-node.ts` —— "支付后得收益 / 支付后追加行动 / 返还到当前格再得"模板
 - `stage-effects.ts` —— 阶段型 card-effects 标记 / 即时支付 / bonus VP / 单次收获兑换
 - `card-state.ts` / `round-placement.ts` —— 一次性卡牌 `flagged/extraData` + 本轮放人顺序
-- `action-snapshot.ts` —— 单次行动起点快照（A74 等复用）
+- `action-snapshot.ts` —— §6.5 定义的当前 Turn Scope 身份和起点快照；按行动计算的 delta 属于 action transaction，不读取这里
 - `card-held-workers.ts` —— 见 §8.3
 - `card-field.ts` —— "卡牌即田"声明式工厂，详见 §8.5
 

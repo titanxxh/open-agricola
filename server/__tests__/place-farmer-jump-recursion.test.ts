@@ -136,9 +136,7 @@ describe('A→A self-jump recursion guard', () => {
     expect(farmExpansion.takenBy).toEqual([])
     expect(grainSeeds.takenBy.length).toBe(1)
 
-    // actionToken: takeAction entry sets it once; jump does not bump it (per-action
-    // bookkeeping intentionally not reset across the jump).
-    expect(readActionSnapshotToken(resp.state.players[0]!)).toBe(1)
+    expect(readActionSnapshotToken(resp.state.players[0]!)).toBeUndefined()
 
     // placedFarmers +2: one for the entry placement, one for the jump.
     expect(resp.state.players[0]!.stats!.placedFarmers).toBe(placedBefore + 2)

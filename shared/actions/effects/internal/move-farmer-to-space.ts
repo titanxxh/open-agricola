@@ -125,7 +125,7 @@ export const moveFarmerToSpaceAction: ActionDefinition = {
 
     const targetActionContext = { ...(actionContext ?? {}), targetSpaceId: targetSpace.id }
     if (actionContext) actionContext.targetSpaceId = targetSpace.id
-    const flow: ActionFlow = {
+    const targetFlow: ActionFlow = {
       type: 'leaf',
       actionId: targetSpace.id,
       expandFlow: true,
@@ -134,7 +134,14 @@ export const moveFarmerToSpaceAction: ActionDefinition = {
     }
     return {
       type: 'flow',
-      flow,
+      flow: {
+        type: 'seq',
+        children: [
+          { type: 'leaf', actionId: 'turn-scope', params: { operation: 'begin' } },
+          targetFlow,
+          { type: 'leaf', actionId: 'turn-scope', params: { operation: 'end' } },
+        ],
+      },
       extraData: { actionContextWrite: { targetSpaceId: targetSpace.id } },
     }
   },

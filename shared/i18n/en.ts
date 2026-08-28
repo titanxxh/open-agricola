@@ -827,6 +827,10 @@ export const en = {
       description: 'Move farmer to action space',
           name: 'Move Farmer',
 },
+    'turn-scope': {
+      description: 'Track one rules turn',
+          name: 'Turn Scope',
+},
     'pay-grain-any': {
       description: 'Pay any grain',
           name: 'Pay Grain',

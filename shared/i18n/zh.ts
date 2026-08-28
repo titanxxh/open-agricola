@@ -808,6 +808,10 @@ export const zh = {
       description: '将农夫移动到行动格',
           name: '移动农夫',
 },
+    'turn-scope': {
+      description: '记录一个规则回合',
+          name: '回合作用域',
+},
     'pay-grain-any': {
       description: '支付任意谷物',
           name: '支付谷物',

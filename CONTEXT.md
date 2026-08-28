@@ -246,6 +246,22 @@ _Avoid_: 旧 `PendingAction` union、前端 pending 状态机
 一次 pending 被玩家选择后继续执行的后续 flow 或阶段恢复。复杂卡牌的“下一步选择”应走显式 pending / continuation。
 _Avoid_: 共享临时槽位、前端偷补流程
 
+**Turn（规则回合）**:
+用于解释“在你的回合”和“同一回合”的规则结算单位；一个 Turn 可以包含多个 Rule Action。工作阶段轮转中的普通放工或沼泽特殊行动会开启 Turn；卡牌在轮转之外移动或放置人员并使用行动格时也可以开启 Turn，例如 D051 Archway 的移动和 E010 Straw Hat 移动的每个 worker 分别是独立 Turn。
+_Avoid_: 轮转机会、单个 Rule Action、把所有阶段 / anytime 效果都算作 Turn
+
+**Turn Scope（回合作用域）**:
+一个 Turn 的身份和起点状态。该 Turn 内的所有 Rule Action 共用同一 Turn Scope；新的 Turn 使用新的作用域，并在该 Turn 的所有后置效果结算完后结束。
+_Avoid_: Action Execution Scope、跨 Turn 复用身份或起点状态
+
+**Rule Action（规则行动）**:
+一次完整使用行动格，或规则明确授予的一次命名行动。Rule Action 可以发生在 Turn 内，也可以在阶段或 anytime 窗口中脱离 Turn 执行；选择和 continuation 只是该行动的结算过程。
+_Avoid_: Turn、ActionNode、单独的资源增减 / 支付 / 选择
+
+**Action Execution Scope（行动执行作用域）**:
+一项 Rule Action 的完整结算边界，覆盖该行动的选择、continuation、响应和后置效果。同一 Turn 内的多个 Rule Action 各自使用独立作用域，但共用 Turn Scope。
+_Avoid_: 用 Turn Scope 代替、为单独的资源增减 / 支付 / 选择新建作用域
+
 **Engine**:
 节点树执行层，核心包括 `Engine`、`EngineStack`、`engineProceed`、`engineResolve`、`BaseNode`、`ActionNode`、`OrNode`、`XorNode`、`ParallelNode`。
 _Avoid_: 新建并行状态机
@@ -644,9 +660,9 @@ _Avoid_: 每轮一次的标记
 把一个 newborn 转成普通可用工人；提升后该工人不再算 newborn（喂食按成人计、相关计分不再计入）。A92 让后代当轮行动的领域动作。
 _Avoid_: 单纯增加工人计数
 
-**Extra Turn（额外行动）**:
-玩家普通工人耗尽后由卡牌贡献的一次额外放工机会；轮转不再提前跳过这类玩家。多张卡同时贡献时先进入 provider 级 `trigger-select`，选中某张卡后才展开该卡自己的额外行动 flow。skip / forced consume 按来源卡记录机会消耗，不用玩家级全局计数。对应 adoptive / Telegram / Work Permit 等并列的 supply-placement 选项。
-_Avoid_: 连续放工（破坏交替）
+**Extra Turn（额外工作回合）**:
+玩家普通工人耗尽后由卡牌贡献的一次额外轮转机会；轮转不再提前跳过这类玩家，且该机会会开启新的 Turn。新的 Turn 不一定是 Extra Turn：Archway、Straw Hat 这类轮转外行动不新增轮转机会。
+_Avoid_: 把轮转外 Turn 算作 Extra Turn、连续放工（破坏交替）
 
 **Forfeit（放弃额外行动）**:
 玩家在额外行动选择窗口里选“不用”，退出本轮后续行动，避免轮转死循环；标记在每轮开始清空。
@@ -663,6 +679,7 @@ _Avoid_: 永久放弃、全局出局名单
 - **InteractionState** 是前端启用按钮和渲染交互的依据；前端不从规则代码推断可操作性。
 - **ActionFlow** 编译成 runtime engine tree；`leaf` 变成 **ActionNode**，组合节点变成 sequence / parallel / or / xor runtime node。
 - **EngineStack** 是 hook、anytime、喂食、动物整理、confirm、farm-select 等子流程的唯一嵌套机制。
+- **Extra Turn** 是轮转机会；**Turn Scope** 承载“你的回合 / 同一回合”身份；**Rule Action** 是规则行动单位。一个 Turn 可包含多个 Rule Action，Turn 外也可执行 Rule Action；每个 Rule Action 对应独立的 **Action Execution Scope**。
 - **Action Space** 是棋盘空间；**ActionDefinition** 是行动规则；**ActionNode** 是 runtime 执行叶子。
 - **Effects** 定义公开和内部行动；**Internal Action** 支撑支付、selection、future meeple、worker recall 等非玩家直选叶子。
 - **Action Hook** 修改行动生命周期的可达性、成本、替代、候选或后续 flow；**Card Effect Hook** 处理阶段/计分；**Card Listener** 响应 action/event phase。
