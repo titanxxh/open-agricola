@@ -6326,7 +6326,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "number": 56,
     "category": "FOOD_PROVIDER",
     "desc": [
-      "For each new <STABLE> you build, you get 1 <FOOD> —for your last one, get 3 <FOOD>. Each time you build <STABLE>, you can build exactly 1 <STABLE> for 1 <CLAY> instead of 2 <WOOD>."
+      "For each new <STABLE> you build, you get 1 <FOOD> —for your last one, get 3 <FOOD>. Each time you build <STABLE>, you can build exactly 1 <STABLE> for 1 <CLAY> instead of <WOOD>."
     ],
     "cost": {
       "wood": 1

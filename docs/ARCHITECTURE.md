@@ -617,7 +617,7 @@ Production effects, helpers, and card runtime code enter the payment lifecycle o
 | Scope | Applied at | Default `max` | Typical use |
 |---|---|---|---|
 | `action` | The player's resource pool; each trade is independent up to `max` | `?? 1` | A028 Forest School for lesson costs; A088 Hedge Keeper replacing all three fence segments once; E060 Working Gloves grouped exchange, with a future `groupMax` if needed |
-| `unit` | Each unit-cost row through candidate closure, without an ordering field | `?? 1` per row | A123 Frame Builder once per room; A016 Rammed Clay once per fence segment; C056 Feed Fence for at most one stable |
+| `unit` | Each unit-cost row through candidate closure, without an ordering field | `?? 1` per row | A123 Frame Builder once per room; A016 Rammed Clay once per fence segment |
 
 A unit-scoped trade **must not** carry `conditions.minNumRooms`; a per-unit trade has no minimum-unit threshold. `validateTradeModifier` enforces this invariant at the `applyCostModifiers` boundary.
 
