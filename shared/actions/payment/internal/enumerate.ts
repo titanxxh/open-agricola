@@ -14,6 +14,7 @@
 
 import type {
   ComplexCost,
+  CostAttribution,
   CostModifierType,
   CardProvidedPaymentResourceProvider,
   GameState,
@@ -25,6 +26,7 @@ import type {
   Resource,
   ResourceKey,
   Trade,
+  TradeUsage,
 } from '../../../contract/types'
 import {
   convertResources,
@@ -113,8 +115,14 @@ const hashSolution = (solution: PaymentSolution): number => {
     const resId = stablePaymentResourceId(res)
     h = ((h + resId * 17 + ((amount ?? 0) * 31)) * 31) >>> 0
   }
-  for (const { trade, times } of solution.tradesUsed) {
+  for (const { trade, times, costAttribution } of solution.tradesUsed) {
     h = ((h + (trade.from?.wood ?? 0) * 13 + times * 7) * 31) >>> 0
+    for (const [res, amount] of sortedPaymentResourceEntries(costAttribution?.saved ?? {})) {
+      h = ((h + stablePaymentResourceId(res) * 37 + amount * 41) * 31) >>> 0
+    }
+    for (const [res, amount] of sortedPaymentResourceEntries(costAttribution?.paid ?? {})) {
+      h = ((h + stablePaymentResourceId(res) * 43 + amount * 47) * 31) >>> 0
+    }
   }
   if (solution.bonusUsed) {
     h = ((h + solution.bonusUsed.charCodeAt(0) * 17) * 31) >>> 0
@@ -420,13 +428,13 @@ const getMaxTradeTimesFromPartial = (
 }
 
 type TradeCombo = {
-  tradesUsed: { trade: Trade; times: number }[]
+  tradesUsed: TradeUsage[]
   result: PaymentResourceMap
 }
 
 type UnitCostOption = {
   cost: PaymentResourceMap
-  tradesUsed: { trade: Trade; times: number }[]
+  tradesUsed: TradeUsage[]
 }
 
 const normalizePositiveResources = (resources: PaymentResourceMap): PaymentResourceMap => {
@@ -568,10 +576,15 @@ const tradeSignature = (trade: Trade) =>
     trade.replaceUpTo ? 'upTo' : 'exact',
   ].join('#')
 
-const tradeUsageSignature = (tradesUsed: { trade: Trade; times: number }[]) =>
+const tradeUsageSignature = (tradesUsed: TradeUsage[]) =>
   tradesUsed
     .filter((entry) => entry.times > 0)
-    .map((entry) => `${tradeSignature(entry.trade)}:${entry.times}`)
+    .map((entry) => [
+      tradeSignature(entry.trade),
+      entry.times,
+      resourceSignature(entry.costAttribution?.saved ?? {}),
+      resourceSignature(entry.costAttribution?.paid ?? {}),
+    ].join(':'))
     .sort()
     .join('|')
 
@@ -579,8 +592,8 @@ const unitCostOptionSignature = (option: UnitCostOption) =>
   `${resourceSignature(option.cost)}::${tradeUsageSignature(option.tradesUsed)}`
 
 const mergeTradeUsage = (
-  left: { trade: Trade; times: number }[],
-  right: { trade: Trade; times: number }[],
+  left: TradeUsage[],
+  right: TradeUsage[],
 ) => {
   const merged = left.map((entry) => ({ ...entry }))
   for (const entry of right) {
@@ -588,6 +601,18 @@ const mergeTradeUsage = (
     const existing = merged.find((candidate) => candidate.trade === entry.trade)
     if (existing) {
       existing.times += entry.times
+      if (entry.costAttribution) {
+        existing.costAttribution = {
+          saved: normalizePositiveResources(mergePaymentResources(
+            existing.costAttribution?.saved ?? {},
+            entry.costAttribution.saved ?? {},
+          )),
+          paid: normalizePositiveResources(mergePaymentResources(
+            existing.costAttribution?.paid ?? {},
+            entry.costAttribution.paid ?? {},
+          )),
+        }
+      }
     } else {
       merged.push({ ...entry })
     }
@@ -596,17 +621,18 @@ const mergeTradeUsage = (
 }
 
 const incrementTradeUsage = (
-  tradesUsed: { trade: Trade; times: number }[],
+  tradesUsed: TradeUsage[],
   trade: Trade,
-) => mergeTradeUsage(tradesUsed, [{ trade, times: 1 }])
+  costAttribution?: CostAttribution,
+) => mergeTradeUsage(tradesUsed, [{ trade, times: 1, costAttribution }])
 
 const getTradeUsage = (
-  tradesUsed: { trade: Trade; times: number }[],
+  tradesUsed: TradeUsage[],
   trade: Trade,
 ) => tradesUsed.find((entry) => entry.trade === trade)?.times ?? 0
 
 const getTradeGroupUsage = (
-  tradesUsed: { trade: Trade; times: number }[],
+  tradesUsed: TradeUsage[],
   trade: Trade,
 ) => {
   if (!trade.groupId || trade.groupMax === undefined) return 0
@@ -617,7 +643,7 @@ const getTradeGroupUsage = (
 }
 
 const getRemainingTradeGroupUses = (
-  tradesUsed: { trade: Trade; times: number }[],
+  tradesUsed: TradeUsage[],
   trade: Trade,
 ) => {
   if (!trade.groupId || trade.groupMax === undefined) return Infinity
@@ -625,7 +651,7 @@ const getRemainingTradeGroupUses = (
 }
 
 const isWithinTradeGroupLimits = (
-  tradesUsed: { trade: Trade; times: number }[],
+  tradesUsed: TradeUsage[],
 ) => {
   const groups = new Map<string, { max: number; used: number }>()
   for (const entry of tradesUsed) {
@@ -645,7 +671,7 @@ const isWithinTradeGroupLimits = (
 }
 
 const satisfiesTradeGroupMinimums = (
-  tradesUsed: { trade: Trade; times: number }[],
+  tradesUsed: TradeUsage[],
   trades: Trade[],
 ) => {
   const minimums = new Map<string, number>()
@@ -666,13 +692,14 @@ const satisfiesTradeGroupMinimums = (
 const applyUnitTradeToCost = (
   cost: PaymentResourceMap,
   trade: Trade,
-): PaymentResourceMap | null => {
+): { cost: PaymentResourceMap; costAttribution: CostAttribution } | null => {
   if (!costBoundsSatisfied(cost, trade.minCost, trade.maxCost)) return null
   const toEntries = (Object.entries(trade.to) as [ResourceKey, number][])
     .filter(([, amount]) => amount > 0)
   if (toEntries.length === 0) return null
 
   const next: PaymentResourceMap = { ...cost }
+  const saved: PaymentResourceMap = {}
   for (const [key, amount] of toEntries) {
     const current = next[key] ?? 0
     const removed = trade.replaceUpTo ? Math.min(current, amount) : amount
@@ -680,6 +707,7 @@ const applyUnitTradeToCost = (
       return null
     }
     next[key] = current - removed
+    saved[key] = removed
   }
 
   for (const [key, amount] of Object.entries(trade.from) as [ResourceKey, number][]) {
@@ -687,7 +715,14 @@ const applyUnitTradeToCost = (
     next[key] = (next[key] ?? 0) + amount
   }
 
-  return normalizePositiveResources(next)
+  const paid = normalizePositiveResources(trade.from)
+  return {
+    cost: normalizePositiveResources(next),
+    costAttribution: {
+      saved,
+      ...(Object.keys(paid).length > 0 ? { paid } : {}),
+    },
+  }
 }
 
 const dedupeUnitCostOptions = (options: UnitCostOption[]) => {
@@ -723,9 +758,12 @@ const buildUnitCostOptions = (
         return null
       }
       if (getRemainingTradeGroupUses(option.tradesUsed, trade) <= 0) return null
-      const nextCost = applyUnitTradeToCost(option.cost, trade)
-      if (!nextCost) return null
-      return { cost: nextCost, tradesUsed: incrementTradeUsage(option.tradesUsed, trade) }
+      const applied = applyUnitTradeToCost(option.cost, trade)
+      if (!applied) return null
+      return {
+        cost: applied.cost,
+        tradesUsed: incrementTradeUsage(option.tradesUsed, trade, applied.costAttribution),
+      }
     },
   }))
   return closeCandidates([base], transforms, { key: unitCostOptionSignature })
