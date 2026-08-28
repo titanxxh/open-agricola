@@ -103,6 +103,23 @@ describe('B026_AgrarianFences session', () => {
       'ui.interactionUseCard',
       'actions.sow.name',
     ])
+
+    const originalSow = resp.interaction.request.options.find(
+      (option) => option.labelKey === 'actions.sow.name',
+    )
+    expect(originalSow).toBeDefined()
+    resp = session.resolveChoice(0, originalSow!.value)
+    expect(resp.ok).toBe(true)
+    expect(resp.interaction.request.farm?.farmType).toBe('sow')
+    const field = resp.interaction.request.farm?.farmType === 'sow'
+      ? resp.interaction.request.farm.selectableFields[0]!.tile
+      : { row: 0, col: 2 }
+
+    resp = session.commitSelectionChoice(0, {
+      crops: [{ ...field, crop: 'grain' }],
+    })
+    expect(resp.ok).toBe(true)
+    expect(resp.interaction.request.farm?.farmType).toBe('fence')
   })
 
   it('without enough wood for fencing and no seeds, grain-utilization with card still works with bake', () => {

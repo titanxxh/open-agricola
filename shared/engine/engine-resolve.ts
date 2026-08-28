@@ -526,13 +526,12 @@ export function engineResolveChoice(
           context.player.id,
         )
         enforceCompositeContinuationMandatory(flowNode)
-        int.tree.insertAfter(node.id, [flowNode])
-        targetNode!.resolve(choice)
-        if (node instanceof XorNode) {
-          resolveXorIfSelectedBranchComplete(node)
-        } else {
-          node.resolve(choice)
-        }
+        const targetIndex = node.children.indexOf(targetNode!)
+        int.tree.insertAfter(child.id, [flowNode])
+        child.resolve({ type: 'ok' })
+        const selectedTarget = node.children[targetIndex] ?? targetNode!
+        enforceSelectedTargetMandatory(selectedTarget)
+        rememberXorSelection(node, selectedTarget)
         int.pendingNodeIdRef.value = null
         return { type: 'ok' }
       }
