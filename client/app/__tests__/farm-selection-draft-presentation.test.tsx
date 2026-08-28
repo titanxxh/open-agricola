@@ -134,6 +134,27 @@ describe('useFarmSelectionDraftPresentation', () => {
     expect(result.current.submitDraft.positionSelectionKeys).toEqual(['1-0'])
     expect(result.current.interactionBarDraft.pendingPositionSelectionsLength).toBe(1)
 
+    act(() => {
+      result.current.reset()
+      rerender({
+        plan: {
+          kind: 'position-selection',
+          pendingChoice,
+          selection: {
+            kind: 'farm-position',
+            selectablePositions: [
+              { row: -1, col: 4075, groupKey: 'D075_WoodField' },
+              { row: -1, col: 4076, groupKey: 'D075_WoodField' },
+            ],
+            maxSelections: 1,
+          },
+        },
+      })
+    })
+    act(() => result.current.controls.togglePositionSelection({ row: -1, col: 4075 }))
+    act(() => result.current.controls.togglePositionSelection({ row: -1, col: 4076 }))
+    expect(result.current.submitDraft.positionSelectionKeys).toEqual(['-1-4076'])
+
     act(() => result.current.reset())
     expect(result.current.submitDraft).toEqual({
       positionSelectionKeys: [],

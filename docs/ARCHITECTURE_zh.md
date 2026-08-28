@@ -219,7 +219,7 @@ type ClientCommand = (
 注意：
 
 - 没有独立的 `reorg` / `feed` / `nextPlayer` / `confirmPlayerSwitch` 命令。这些等待形态全部归并到 `choice` 命令，由 `payload` 携带具体形状（按 `InteractionRequest.kind` 决定）。
-- `commitSelection` 只为 farm-position / occupation-hand / resource-quantity / resource-batch-exchange 这类带结构化 payload 的定向选择保留单独入口。farm-position 可通过 `validPositionGroups` 表达服务端校验的合法坐标组合，例如 FoM Farmyard Extension 的相邻二格选择。
+- `commitSelection` 只为 farm-position / occupation-hand / resource-quantity / resource-batch-exchange 这类带结构化 payload 的定向选择保留单独入口。farm-position 可通过 `validPositionGroups` 表达服务端校验的合法坐标组合，例如 FoM Farmyard Extension 的相邻二格选择。可选位置还可携带 `sourceCard`、`cardFieldSlot` 与 `groupKey`：选择上限按不同 group 计数，服务端在执行效果前把同组提交规范化为一个位置；前端把卡牌来源的虚拟位置渲染到已打出卡牌的对应槽上，而不扩张农场网格。
 - `enableParentCards: true` 启用父母牌；同时传 `draftParents: false` 时直接为每位玩家发一对父母牌，不进入 `parent-selection`。该选择保存在房间元数据中，`newGame` 与后端重启后继续沿用。
 - Workshop 卡采用**二维状态**（PRD #634，`server/workshop-status.ts`）：review 轴 `unsubmitted / in_review / approved / stale / merged` × 上线轴 `live`。提交审核时 `enterReview` 原子取得唯一 PR URL 绑定，把 PR head 固定为 `review_commit_sha`，并把同一份 Design Draft 固定为 `review_version_id`；同一卡分支只复用仍为 open、非 draft 且 base=`main` 的 PR。已关闭或已合并的 PR 永久保留为历史，重新提交时创建新 PR；open 但 draft 或 base 不再是 `main` 的 PR 会先关闭，再创建合格 PR。绑定完成后立即补查当前 GraphQL 快照，覆盖审批 webhook 先于本地绑定到达的竞态；补查暂时失败仍保留成功绑定并清空同步时间，作者可通过 `refresh-pr-status` 立即重试同一套协调。GraphQL 快照中的有效 approved review 必须匹配当前 head 且 reviewer 可 push；若 PR 的 `authorAssociation=OWNER` 且没有 `CHANGES_REQUESTED`，provider 生成绑定同一 head 的 owner approval，因为 GitHub 不允许 PR 作者 self-approve。两者都由 `approveReviewedVersion` 把固定版本置为 `approved_version_id`。作者 publish 时再次即时查询 GraphQL，并要求 head SHA、review SHA、`approved_commit_sha` 及固定版本映射全部一致后才置 live。GitHub 当前 head 不同、PR 关闭/转 draft/改离 `main`、有效审批被 dismissed 或 `CHANGES_REQUESTED` 都转为 `stale·offline`；可能乱序的 `synchronize`、dismissed 和资格变更事件先重读当前 GraphQL 快照，已 merge PR 的迟到 review 事件保留同 head 绑定，comment-only review 保持原状态。未绑定或绑定歧义的 Workshop PR 事件不请求 GitHub；异步快照只在查询前后的 review binding（含 lifecycle 与单调更新时间）未变时事务提交，publish 同样要求查询前后的 live-state token 未变；GraphQL 不可用时记录 delivery 并保守转为 `stale·offline`。delivery id 由 `github_webhook_events` 幂等去重；webhook 只负责失效与推进，publish 定论不依赖缓存。旧单列 `status`（draft/published）已由 migration v26 移除，存量卡一刀切回 `unsubmitted·offline`（#632）。
 - `customCardIds` 只有在真实房间同时传入 `enableCommunityDeck: true` 时才会生效；未启用时服务端忽略这些 id，且房间不保存对应自定义卡元数据。启用后仍只接受 **live（approved 且已上线）** 的 workshop 卡，运行的是被审的 `approved_version_id` 快照（`loadLiveDraft`）；未过审卡的自定义代码只能在 workshop sandbox（`POST /api/game/new-sandbox` + 浏览器本地 executor）里由作者本人试玩，绝不进实时同步主链路。真实房间创建（`createRoom`）与房间恢复（`loadCustomCardsFromDb`）都走 `loadCustomCards(..., { liveOnly: true })`，加载时按 id 逐个裁定：
@@ -950,6 +950,8 @@ listener。单卡只声明配置 + 可选 `onReap` 回调处理副作用，文�
 虚拟 tile col 由
 `deriveVirtualTileCol(cardId, slotIdx) = deckOrdinal*1000 + cardNumber + slotIdx`
 派生，跨 deck 不冲突；同 deck 邻号 capacity 占位需 audit（当前 11 张卡 capacity≤3，安全余量充足）。
+
+每个已有作物的槽都会投影为虚拟 `Field`，并与普通田共用 `computeHarvestCount()`。同一 Card Field 的多个槽以 card id 共享 `groupKey`，选择数量上只算一块 Logical Field；田地数量 modifier 只作用于规范化后选中的一个槽，普通 Reap 仍会收割所有已有作物的槽。
 
 副作用 `onReap` 回调签名：
 

@@ -230,6 +230,52 @@ describe('buildFarmBoardProjection', () => {
     })
   })
 
+  it('projects card-field selection onto the played card without expanding the farm', () => {
+    const player = createPlayer({
+      minorPlayed: ['D075_WoodField'],
+      cardStates: {
+        D075_WoodField: {
+          extraData: {
+            cardFieldStacks: [
+              { crop: 'wood', remaining: 2 },
+              { crop: 'wood', remaining: 2 },
+            ],
+          },
+        },
+      },
+    })
+    const interaction: ClientInteractionState = {
+      stateId: 'wait',
+      playerIndex: 0,
+      request: {
+        kind: 'selection',
+        selection: {
+          kind: 'farm-position',
+          selectablePositions: [
+            { row: -1, col: 4075, sourceCard: 'D075_WoodField', groupKey: 'D075_WoodField', cardFieldSlot: 0 },
+            { row: -1, col: 4076, sourceCard: 'D075_WoodField', groupKey: 'D075_WoodField', cardFieldSlot: 1 },
+          ],
+          maxSelections: 1,
+        },
+      },
+      allowedCommands: ['commitSelection'],
+      anytimeActions: [],
+    }
+
+    const projection = buildFarmBoardProjection({
+      displayPlayer: player,
+      interaction,
+      selectionInteraction: interaction.request.selection,
+      players: [player],
+    })
+
+    expect(projection.farmGridColumns).toBe(11)
+    expect(projection.playedCardDisplays[0]?.cardStackSelectionTiles).toEqual([
+      expect.objectContaining({ row: -1, col: 4075 }),
+      expect.objectContaining({ row: -1, col: 4076 }),
+    ])
+  })
+
   it('projects farm board selection display props', () => {
     const player: PlayerStateWithSpecialStables = {
       ...createPlayer({

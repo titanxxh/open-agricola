@@ -220,14 +220,21 @@ export const useFarmSelection = () => {
     tile: FarmTilePosition,
     maxPositionSelections: number,
     positionKey: (tile: FarmTilePosition) => string,
+    groupKeyByTile: Map<string, string | undefined>,
   ) => {
     const key = positionKey(tile)
     setPendingPositionSelections((prev) => {
       const next = new Set(prev)
       if (next.has(key)) {
         next.delete(key)
-      } else if (next.size < maxPositionSelections) {
-        next.add(key)
+      } else {
+        const groupKey = groupKeyByTile.get(key)
+        if (groupKey) {
+          for (const selectedKey of next) {
+            if (groupKeyByTile.get(selectedKey) === groupKey) next.delete(selectedKey)
+          }
+        }
+        if (next.size < maxPositionSelections) next.add(key)
       }
       return next
     })

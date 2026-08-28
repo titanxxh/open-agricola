@@ -67,6 +67,16 @@ const groupKeysForSow = (farmInteraction: InteractionFarmSelection | null) => {
   return map
 }
 
+const groupKeysForPositionSelection = (selectionInteraction: InteractionSelection | null) => {
+  const map = new Map<string, string | undefined>()
+  if (selectionInteraction?.kind === 'farm-position') {
+    selectionInteraction.selectablePositions.forEach((entry) => {
+      map.set(positionKey(entry), entry.groupKey)
+    })
+  }
+  return map
+}
+
 const cropCount = (
   selections: Record<string, PendingSowCrop>,
   crop: PendingSowCrop,
@@ -123,6 +133,10 @@ export const useFarmSelectionDraftPresentation = ({
   const groupKeyByTile = useMemo(
     () => groupKeysForSow(farmInteraction),
     [farmInteraction],
+  )
+  const positionGroupKeyByTile = useMemo(
+    () => groupKeysForPositionSelection(selectionInteraction),
+    [selectionInteraction],
   )
 
   const pendingFenceSet = useMemo(
@@ -371,7 +385,12 @@ export const useFarmSelectionDraftPresentation = ({
     updateSowSelection: (tile: FarmTilePosition, value: string) =>
       farmDraft.updateSowSelection(tile, value, maxSowSelections, positionKey, groupKeyByTile),
     togglePositionSelection: (tile: FarmTilePosition) =>
-      farmDraft.togglePositionSelection(tile, maxPositionSelections, positionKey),
+      farmDraft.togglePositionSelection(
+        tile,
+        maxPositionSelections,
+        positionKey,
+        positionGroupKeyByTile,
+      ),
   }), [
     borrowedFenceSource,
     displayPlayer,
@@ -382,6 +401,7 @@ export const useFarmSelectionDraftPresentation = ({
     maxRoomSelections,
     maxSowSelections,
     maxStableSelections,
+    positionGroupKeyByTile,
   ])
 
   return {

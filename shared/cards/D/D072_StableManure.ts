@@ -9,6 +9,7 @@ import {
 import { fieldIsEmpty, fieldTopStack, fieldTotalRemaining } from '../../domain/field'
 import { getUnfencedStableCountForCards } from '../../domain/stables'
 import type { CardImpl } from '../registry'
+import { getCroppedCardFields } from '../helpers/card-field'
 
 const CARD_ID = 'D072_StableManure'
 registerHarvestCountModifier(CARD_ID, ({ player, field }) => {
@@ -18,8 +19,18 @@ registerHarvestCountModifier(CARD_ID, ({ player, field }) => {
   return { delta: 1, sources: [CARD_ID] }
 })
 
-const eligibleFields = (state: GameState, player: PlayerState) =>
-  player.fields.filter((field) => {
+const eligibleFields = (state: GameState, player: PlayerState) => {
+  const fields = [
+    ...player.fields.map((field) => ({
+      field,
+      tile: { row: field.row, col: field.col },
+      groupKey: positionKey(field),
+      sourceCard: undefined,
+      cardFieldSlot: undefined,
+    })),
+    ...getCroppedCardFields(player),
+  ]
+  return fields.filter(({ field }) => {
     const top = fieldTopStack(field)
     if (!top) return false
     const min = computeHarvestSelectionThreshold(state, player, field, {
@@ -28,6 +39,7 @@ const eligibleFields = (state: GameState, player: PlayerState) =>
     }).threshold
     return fieldTotalRemaining(field) >= min
   })
+}
 
 const cardImpl = {
   effect: {
@@ -37,7 +49,8 @@ const cardImpl = {
     if (unfencedCount === 0) return
 
     const croppedFields = eligibleFields(state, player)
-    if (croppedFields.length === 0) return
+    const logicalFieldCount = new Set(croppedFields.map(({ groupKey }) => groupKey)).size
+    if (logicalFieldCount === 0) return
 
     return {
       type: 'leaf',
@@ -46,8 +59,13 @@ const cardImpl = {
       optional: true,
       actionContext: {
         selectionKind: 'farm-position',
-        maxSelections: Math.min(unfencedCount, croppedFields.length),
-        selectableTiles: croppedFields.map(({ row, col }) => ({ row, col })),
+        maxSelections: Math.min(unfencedCount, logicalFieldCount),
+        selectableTiles: croppedFields.map(({ tile, groupKey, sourceCard, cardFieldSlot }) => ({
+          ...tile,
+          groupKey,
+          ...(sourceCard ? { sourceCard } : {}),
+          ...(cardFieldSlot !== undefined ? { cardFieldSlot } : {}),
+        })),
       },
     }
   },

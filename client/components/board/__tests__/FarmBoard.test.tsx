@@ -1476,6 +1476,61 @@ describe('FarmBoard', () => {
     expect(segments.length).toBeGreaterThanOrEqual(2)
   })
 
+  it('selects a D75 stack from the played card', () => {
+    const player: PlayerState = {
+      ...createPlayer('p1', 'Player A', 'red'),
+      minorPlayed: ['D075_WoodField'],
+      cardStates: {
+        D075_WoodField: {
+          extraData: {
+            cardFieldStacks: [
+              { crop: 'wood', remaining: 2 },
+              { crop: 'wood', remaining: 2 },
+            ],
+          },
+        },
+      },
+    }
+    const interaction = {
+      stateId: 'wait' as const,
+      playerIndex: 0,
+      request: {
+        kind: 'selection' as const,
+        selection: {
+          kind: 'farm-position' as const,
+          selectablePositions: [
+            { row: -1, col: 4075, sourceCard: 'D075_WoodField', groupKey: 'D075_WoodField', cardFieldSlot: 0 },
+            { row: -1, col: 4076, sourceCard: 'D075_WoodField', groupKey: 'D075_WoodField', cardFieldSlot: 1 },
+          ],
+          maxSelections: 1,
+        },
+      },
+      allowedCommands: ['commitSelection' as const],
+      anytimeActions: [],
+    }
+    const projection = buildFarmBoardProjection({
+      displayPlayer: player,
+      interaction,
+      selectionInteraction: interaction.request.selection,
+      players: [player],
+    })
+    const togglePositionSelection = vi.fn()
+
+    const { container } = render(
+      <FarmBoard
+        {...createFarmBoardProps(player, {
+          playedCardDisplays: projection.playedCardDisplays,
+          pendingPositionSelections: new Set(['-1-4075']),
+        }, { togglePositionSelection })}
+      />,
+    )
+
+    const stack = container.querySelector('[data-card-field-position="-1-4075"]')
+    expect(stack).toHaveClass('selected')
+    fireEvent.click(stack!)
+    expect(togglePositionSelection).toHaveBeenCalledWith(expect.objectContaining({ row: -1, col: 4075 }))
+  })
+
   it('renders C146 stored pairs from extraData as resource-pair stack on the played card', () => {
     const player = createPlayer('p1', 'Player A', 'red')
     player.occupationPlayed = ['C146_WorkshopAssistant']

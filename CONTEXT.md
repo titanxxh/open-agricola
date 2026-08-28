@@ -545,8 +545,12 @@ _Avoid_: 规则执行逻辑
 _Avoid_: 为单卡新增 PlayerState / GameState 顶层字段
 
 **Card Field**:
-一张已打出卡提供的虚拟田，可播种、收获并参与“田”的计数；通过 `CardDefinition.cardField` 和 card-field helper 声明。
+一张已打出卡提供的虚拟田，可包含多个播种 / 收获槽并参与“田”的计数；通过 `CardDefinition.cardField` 和 card-field helper 声明。
 _Avoid_: Harvest hook
+
+**Logical Field**:
+规则计数中的一块田。普通田各自是一块 Logical Field；同一 Card Field 的多个槽可以共享 `groupKey`，整体只算一块 Logical Field。
+_Avoid_: Sow Slot、Harvest Slot
 
 **Domain**:
 领域聚合和派生视图层，覆盖农场、动物区、牧场容量、计分、`PlayerBoard` 等不变量校验。
@@ -690,7 +694,7 @@ _Avoid_: 永久放弃、全局出局名单
 - **Domain** 提供农场、动物、牧场、计分等派生视图和不变量；规则路径可以复用，前端只能把它当安全派生 helper。
 - **Harvest** 包含最多一个 **Harvest Field Phase**；**Private Field Phase** 可以执行 **Reap**，但不是 Harvest。
 - **Harvest Field Phase** 可能触发 harvest-scoped card effects；**Private Field Phase** 和 **Private Breeding Phase** 不能触发这些效果，除非卡牌明确说明。
-- **Card Field** 在 Reap 时参与田地收获，但其副作用是否属于 Harvest 取决于触发上下文。
+- **Card Field** 在 Reap 时参与田地收获；多个槽可以属于同一 **Logical Field**，其副作用是否属于 Harvest 取决于触发上下文。
 - 规则事实先写 **Public Event**，再派生 **Action Log**、notification、highlight、animation 和 replay。
 - 进行局的私有手牌、私有 prompt 和 draft 选择通过 **Private Event** 或 viewer 过滤传输；结束局的 **Game Replay Archive** 可按座位视角或全开视角展示归档规则状态，但不保存 Private Event envelope。
 - **Game Replay Archive** 由 **Replay Step** 组织，用 **Replay Participant** 表达座位身份，并由 **Replay Perspective** 决定展示遮蔽；内容删除后原 `roomId` 只解析为 **Replay Tombstone**。

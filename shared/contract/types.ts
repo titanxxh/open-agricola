@@ -1089,10 +1089,16 @@ export type InteractionFarmSelection =
       maxSelections?: number
     }
 
+export type FarmPositionSelectionTarget = FarmTilePosition & {
+  sourceCard?: string
+  groupKey?: string
+  cardFieldSlot?: number
+}
+
 export type InteractionSelection =
   | {
       kind: 'farm-position'
-      selectablePositions: FarmTilePosition[]
+      selectablePositions: FarmPositionSelectionTarget[]
       maxSelections: number
       minSelections?: number
       allowedSelectionCounts?: number[]

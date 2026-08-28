@@ -2,13 +2,14 @@ import type { CardImpl } from '../registry'
 import type { CardListenerRegistration } from '../card-listeners'
 import type { ExtraSowableField, ExtraSowableCrop } from '../card-effects'
 import type {
-  ActionFlow, FarmTilePosition, GameState, PlayerState,
+  ActionFlow, FarmTilePosition, Field, GameState, PlayerState,
 } from '../../contract/types'
 import type { EventSink } from '../../contract/events'
 import { readCardExtraData, writeCardExtraData } from './card-state'
 import { canSow } from '../../actions/effects/sow'
 import { defaultReapTrigger, dispatchReapListener, type ReapTrigger } from '../../actions/helpers/reap-listener'
 import { appendImmediateEvents } from '../../events/append'
+import { computeHarvestCount } from '../../actions/helpers/harvest-count-registry'
 
 type Crop = ExtraSowableCrop
 
@@ -102,6 +103,33 @@ export const hasCardFieldCrop = (player: PlayerState, crop: Crop): boolean =>
     readStacks(player, cardId).some((stack) => stack.crop === crop && stack.remaining > 0),
   )
 
+export type CroppedCardField = {
+  field: Field
+  tile: FarmTilePosition
+  sourceCard: string
+  groupKey: string
+  cardFieldSlot: number
+}
+
+export const getCroppedCardFields = (player: PlayerState): CroppedCardField[] =>
+  playedCardIds(player).flatMap((cardId) => {
+    if (!cardFieldReapers.has(cardId)) return []
+    return readStacks(player, cardId).flatMap((stack, slotIdx) => {
+      if (stack.remaining <= 0) return []
+      const tile = { row: -1, col: deriveVirtualTileCol(cardId, slotIdx) }
+      return [{
+        field: {
+          ...tile,
+          stacks: [{ kind: stack.crop, remaining: stack.remaining }],
+        },
+        tile,
+        sourceCard: cardId,
+        groupKey: cardId,
+        cardFieldSlot: slotIdx,
+      }]
+    })
+  })
+
 export const reapAllCardFields = (
   state: GameState,
   player: PlayerState,
@@ -131,10 +159,16 @@ export const makeCardFieldImpl = (
     const trigger = runOptions.trigger ?? defaultReapTrigger()
     const perCropAmount = new Map<Crop, number>()
     const nextStacks: CardFieldStack[] = []
-    for (const stack of stacks) {
-      stack.remaining -= 1
-      player.resources[stack.crop] += 1
-      perCropAmount.set(stack.crop, (perCropAmount.get(stack.crop) ?? 0) + 1)
+    for (const [slotIdx, stack] of stacks.entries()) {
+      const field: Field = {
+        row: -1,
+        col: baseCol + slotIdx,
+        stacks: [{ kind: stack.crop, remaining: stack.remaining }],
+      }
+      const amount = computeHarvestCount(state, player, field).count
+      stack.remaining -= amount
+      player.resources[stack.crop] += amount
+      if (amount > 0) perCropAmount.set(stack.crop, (perCropAmount.get(stack.crop) ?? 0) + amount)
       if (stack.remaining > 0) nextStacks.push(stack)
     }
     if (runOptions.updateHarvestSummary !== false) {

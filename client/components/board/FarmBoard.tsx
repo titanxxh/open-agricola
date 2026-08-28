@@ -16,7 +16,7 @@ import {
   getPlayerPanelSupplySummary,
   type PlayerPanelSupplySummary,
 } from '../../../shared/domain/player-panel-summary'
-import { isFarmyardBorderEdge } from '../../../shared/domain/farm'
+import { isFarmyardBorderEdge, positionKey } from '../../../shared/domain/farm'
 import type { AnimalReorgState, ExtraSowTarget, PendingSowCrop } from '../../types/ui'
 import { ResourceLine } from '../common/ResourceLine'
 import { formatCardStatsLines, type CardStatLine } from '../common/cardStatsFormat'
@@ -74,6 +74,7 @@ type PlayedCardDisplay = {
   resourceStats?: CardResourceStats
   stack: string[]
   cardStacks: CropStack[] | null
+  cardStackSelectionTiles: (FarmTilePosition | null)[]
   heldWorkerId?: string
   m084LyingHorses: number
 }
@@ -138,9 +139,15 @@ const AnimalCount = ({
 const FieldCropStack = ({
   locale,
   stacks,
+  selectionTiles = [],
+  selectedPositionKeys,
+  onToggle,
 }: {
   locale: Locale
   stacks: CropStack[]
+  selectionTiles?: (FarmTilePosition | null)[]
+  selectedPositionKeys?: ReadonlySet<string>
+  onToggle?: (tile: FarmTilePosition) => void
 }) => {
   if (stacks.length === 0) return null
   const tooltip = stacks
@@ -151,24 +158,44 @@ const FieldCropStack = ({
   const topKind = stacks[stacks.length - 1].kind
   return (
     <div
-      className={`field-crop field-crop-${topKind}`}
+      className={`field-crop field-crop-${topKind}${selectionTiles.some(Boolean) ? ' field-crop-selectable' : ''}`}
       title={tooltip}
       aria-label={tooltip}
     >
-      {stacks.map((stack, stackIdx) => (
-        <span
-          key={`stack-${stackIdx}-${stack.kind}`}
-          className={`field-crop-segment field-crop-${stack.kind}`}
-        >
-          {Array.from({ length: stack.remaining }, (_, index) => (
-            <span
-              key={`${stack.kind}-${stackIdx}-${index}`}
-              className={`res-icon res-icon-${stack.kind} field-crop-icon`}
-              aria-hidden="true"
-            />
-          ))}
-        </span>
-      ))}
+      {stacks.map((stack, stackIdx) => {
+        const selectionTile = selectionTiles[stackIdx]
+        const key = selectionTile ? positionKey(selectionTile) : null
+        const icons = Array.from({ length: stack.remaining }, (_, index) => (
+          <span
+            key={`${stack.kind}-${stackIdx}-${index}`}
+            className={`res-icon res-icon-${stack.kind} field-crop-icon`}
+            aria-hidden="true"
+          />
+        ))
+        return selectionTile && key && onToggle ? (
+          <button
+            type="button"
+            key={`stack-${stackIdx}-${stack.kind}`}
+            className={`field-crop-segment field-crop-${stack.kind} card-field-selection${selectedPositionKeys?.has(key) ? ' selected' : ''}`}
+            data-card-field-position={key}
+            aria-pressed={selectedPositionKeys?.has(key) ?? false}
+            aria-label={`${t(locale, `resources.${stack.kind}`)} ${stack.remaining}`}
+            onClick={(event) => {
+              event.stopPropagation()
+              onToggle(selectionTile)
+            }}
+          >
+            {icons}
+          </button>
+        ) : (
+          <span
+            key={`stack-${stackIdx}-${stack.kind}`}
+            className={`field-crop-segment field-crop-${stack.kind}`}
+          >
+            {icons}
+          </span>
+        )
+      })}
     </div>
   )
 }
@@ -565,6 +592,9 @@ const PlayedCardStats = ({
   resourceStats,
   stack,
   cardStacks,
+  cardStackSelectionTiles,
+  selectedPositionKeys,
+  togglePositionSelection,
   heldWorkerId,
   playerColor,
   inlineStats,
@@ -584,6 +614,9 @@ const PlayedCardStats = ({
   resourceStats?: CardResourceStats
   stack: string[]
   cardStacks?: CropStack[] | null
+  cardStackSelectionTiles?: (FarmTilePosition | null)[]
+  selectedPositionKeys?: ReadonlySet<string>
+  togglePositionSelection?: (tile: FarmTilePosition) => void
   heldWorkerId?: string
   playerColor?: PlayerState['color']
   inlineStats: boolean
@@ -720,7 +753,13 @@ const PlayedCardStats = ({
             </div>
           )}
           {hasCardStacks && cardStacks && (
-            <FieldCropStack locale={locale} stacks={cardStacks} />
+            <FieldCropStack
+              locale={locale}
+              stacks={cardStacks}
+              selectionTiles={cardStackSelectionTiles}
+              selectedPositionKeys={selectedPositionKeys}
+              onToggle={togglePositionSelection}
+            />
           )}
           {futureEntries.map((entry, entryIndex) => {
             const label = formatResources(
@@ -1679,6 +1718,9 @@ export const FarmBoard = ({ view, actions, inlineCardStats = false }: FarmBoardP
                 resourceStats={card.resourceStats}
                 stack={card.stack}
                 cardStacks={card.cardStacks}
+                cardStackSelectionTiles={card.cardStackSelectionTiles}
+                selectedPositionKeys={pendingPositionSelections}
+                togglePositionSelection={isInteractive ? togglePositionSelection : undefined}
                 heldWorkerId={card.heldWorkerId}
                 playerColor={displayPlayer.color}
                 inlineStats={inlineCardStats}

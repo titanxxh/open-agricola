@@ -12,9 +12,8 @@ const validateFarmPositions = (
   player: PlayerState,
 ) => {
   const request = buildFarmPositionSelectionRequest(player, actionContext)
-  if (!request.hasConstraints) return null
-  const validation = validateFarmPositionSelection({ request, positions })
-  return validation.ok ? null : validation.error
+  if (!request.hasConstraints) return { ok: true as const, positionStrings: positions }
+  return validateFarmPositionSelection({ request, positions })
 }
 
 const validateOccupationCards = (
@@ -66,14 +65,15 @@ export const selectionAction: ActionDefinition = {
 
     const payloadPositions = (payload as { positions?: string[] } | undefined)?.positions
     const payloadCards = (payload as { cards?: string[] } | undefined)?.cards
-    const positions = Array.isArray(payloadPositions)
+    let positions = Array.isArray(payloadPositions)
       ? payloadPositions
       : []
     const cards = Array.isArray(payloadCards) ? payloadCards : []
     const kind = (actionContext?.selectionKind as string | undefined) ?? 'farm-position'
     if (kind === 'farm-position') {
-      const validationError = validateFarmPositions(positions, actionContext, player)
-      if (validationError) return { type: 'fail', errorKey: validationError, recoverable: true }
+      const validation = validateFarmPositions(positions, actionContext, player)
+      if (!validation.ok) return { type: 'fail', errorKey: validation.error, recoverable: true }
+      positions = validation.positionStrings
     }
     if (kind === 'occupation-hand') {
       const validationError = validateOccupationCards(cards, player.occupationHand, actionContext)

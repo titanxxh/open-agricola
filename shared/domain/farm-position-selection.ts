@@ -1,9 +1,9 @@
-import type { FarmTilePosition, PlayerState } from '../contract/types'
+import type { FarmPositionSelectionTarget, FarmTilePosition, PlayerState } from '../contract/types'
 import { positionKey } from './farm'
 import { getUsedFarmyardTileKeys } from './farmyard-usage-core'
 
 export type FarmPositionSelectionRequest = {
-  selectablePositions: FarmTilePosition[]
+  selectablePositions: FarmPositionSelectionTarget[]
   minSelections: number
   maxSelections?: number
   allowedSelectionCounts?: number[]
@@ -23,14 +23,28 @@ export const parseFarmPositionKey = (key: string): FarmTilePosition | null => {
   return { row, col }
 }
 
-const normalizePosition = (input: unknown): FarmTilePosition | null => {
-  const row = Number((input as { row?: unknown } | null)?.row)
-  const col = Number((input as { col?: unknown } | null)?.col)
+const normalizePosition = (input: unknown): FarmPositionSelectionTarget | null => {
+  const target = input as {
+    row?: unknown
+    col?: unknown
+    sourceCard?: unknown
+    groupKey?: unknown
+    cardFieldSlot?: unknown
+  } | null
+  const row = Number(target?.row)
+  const col = Number(target?.col)
+  const cardFieldSlot = target?.cardFieldSlot
   if (!Number.isFinite(row) || !Number.isFinite(col)) return null
-  return { row, col }
+  return {
+    row,
+    col,
+    ...(typeof target?.sourceCard === 'string' ? { sourceCard: target.sourceCard } : {}),
+    ...(typeof target?.groupKey === 'string' ? { groupKey: target.groupKey } : {}),
+    ...(typeof cardFieldSlot === 'number' && Number.isInteger(cardFieldSlot) ? { cardFieldSlot } : {}),
+  }
 }
 
-const normalizePositions = (input: unknown): FarmTilePosition[] => {
+const normalizePositions = (input: unknown): FarmPositionSelectionTarget[] => {
   if (!Array.isArray(input)) return []
   return input.flatMap((position) => {
     const normalized = normalizePosition(position)
@@ -118,11 +132,6 @@ export const validateFarmPositionSelection = (input: {
     if (!normalized) return { ok: false, error: 'invalid selection position' }
     positions.push(normalized)
   }
-  if (positions.length < request.minSelections) return { ok: false, error: 'not enough selection positions' }
-  if (request.maxSelections !== undefined && positions.length > request.maxSelections) {
-    return { ok: false, error: 'too many selection positions' }
-  }
-
   const selectedKeys = new Set<string>()
   for (const position of positions) {
     if (!Number.isInteger(position.row) || !Number.isInteger(position.col)) {
@@ -134,14 +143,31 @@ export const validateFarmPositionSelection = (input: {
     if (request.blockedPositionKeys?.has(key)) return { ok: false, error: 'invalid selection position' }
   }
 
-  const selectableKeys = new Set(request.selectablePositions.map(positionKey))
+  const selectableByKey = new Map(request.selectablePositions.map((position) => [positionKey(position), position]))
   for (const position of positions) {
-    if (!selectableKeys.has(positionKey(position))) return { ok: false, error: 'invalid selection position' }
+    if (!selectableByKey.has(positionKey(position))) return { ok: false, error: 'invalid selection position' }
+  }
+
+  const selectedGroups = new Set<string>()
+  const canonicalPositions: FarmTilePosition[] = []
+  for (const position of positions) {
+    const key = positionKey(position)
+    const groupKey = selectableByKey.get(key)?.groupKey ?? key
+    if (selectedGroups.has(groupKey)) continue
+    selectedGroups.add(groupKey)
+    canonicalPositions.push(position)
+  }
+
+  if (canonicalPositions.length < request.minSelections) {
+    return { ok: false, error: 'not enough selection positions' }
+  }
+  if (request.maxSelections !== undefined && canonicalPositions.length > request.maxSelections) {
+    return { ok: false, error: 'too many selection positions' }
   }
 
   if (
     request.allowedSelectionCounts &&
-    !request.allowedSelectionCounts.includes(positions.length)
+    !request.allowedSelectionCounts.includes(canonicalPositions.length)
   ) {
     return { ok: false, error: 'invalid selection count' }
   }
@@ -150,11 +176,11 @@ export const validateFarmPositionSelection = (input: {
     const validGroups = request.validPositionGroups.map((group) =>
       group.map(positionKey).sort().join('|'),
     )
-    const selectedGroup = positions.map(positionKey).sort().join('|')
+    const selectedGroup = canonicalPositions.map(positionKey).sort().join('|')
     if (!validGroups.includes(selectedGroup)) return { ok: false, error: 'invalid selection position' }
   }
 
-  const positionStrings = positions.map(positionKey)
+  const positionStrings = canonicalPositions.map(positionKey)
   const effectError = input.validateEffect?.(positionStrings)
   if (effectError) return { ok: false, error: effectError }
   return { ok: true, positionStrings }
