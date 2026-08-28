@@ -251,7 +251,7 @@ _Avoid_: 共享临时槽位、前端偷补流程
 _Avoid_: 轮转机会、单个 Rule Action、把所有阶段 / anytime 效果都算作 Turn
 
 **Turn Scope（回合作用域）**:
-一个 Turn 的身份和起点状态。该 Turn 内的所有 Rule Action 共用同一 Turn Scope；新的 Turn 使用新的作用域，并在该 Turn 的所有后置效果结算完后结束。
+一个 Turn 的身份和起点状态。该 Turn 内的所有 Rule Action 共用同一 Turn Scope；新的 Turn 使用新的作用域，并在该 Turn 的所有后置效果与回合结束 hook 结算完后结束。
 _Avoid_: Action Execution Scope、跨 Turn 复用身份或起点状态
 
 **Rule Action（规则行动）**:

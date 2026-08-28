@@ -3,6 +3,7 @@ import { GameSession, type SessionResponse } from '../game/authoritative-session
 import { hasPendingExtraTurn } from '../../shared/cards/card-effects'
 import { getCardEffect } from '../../shared/cards/card-effects'
 import { readActionSnapshotToken } from '../../shared/cards/helpers/action-snapshot'
+import { resolveTriggerIfPresent } from './_helpers/trigger-select'
 import {
   markAllWorkersUsed,
   newbornCount,
@@ -11,18 +12,22 @@ import {
 } from '../../shared/domain/player'
 
 import '../../shared/cards/E/E010_StrawHat'
+import '../../shared/cards/E/E024_Ambition'
 import '../../shared/cards/A/A074_StableTree'
 import '../../shared/cards/A/A092_AdoptiveParents'
 import '../../shared/cards/B/B151_LittlePeasant'
 import '../../shared/cards/C/C002_Stable'
 import '../../shared/cards/D/D050_ForeignAid'
 import '../../shared/cards/D/D051_Archway'
+import '../../shared/cards/D/D074_RoyalWood'
 
 const CARD_ID = 'E010_StrawHat'
 const A092_ID = 'A092_AdoptiveParents'
 const D050_ID = 'D050_ForeignAid'
 const D051_ID = 'D051_Archway'
 const A074_ID = 'A074_StableTree'
+const D074_ID = 'D074_RoyalWood'
+const E024_ID = 'E024_Ambition'
 
 const requestKind = (resp: ReturnType<GameSession['takeAction']>): string =>
   resp.interaction.stateId === 'wait' ? resp.interaction.request.kind : 'idle'
@@ -126,6 +131,35 @@ describe('E010_StrawHat session', () => {
     expect(farmland.takenBy).toEqual([])
     expect(resp.state.players[0]!.occupationPlayed).toContain('A116_WoodCutter')
     expect(resp.interaction.stateId).toBe('idle')
+  })
+
+  it('keeps Ambition available after moving to a Minor Improvement action space', () => {
+    const session = setupRoundEnd({ occupationHand: ['__test_placeholder__'] })
+    const state = session.getState().state
+    const player = state.players[0]!
+    player.minorPlayed.push(E024_ID)
+    Object.assign(player.resources, { wood: 10, clay: 10, reed: 10, stone: 10 })
+    session.loadState(state)
+
+    let resp = session.performRoundEnd()
+    if (resp.interaction.stateId !== 'wait') throw new Error('expected Straw Hat choice')
+    const move = resp.interaction.request.options?.find(
+      (option) => option.labelKey === 'actions.move-farmer-to-space.name',
+    )
+    resp = session.resolveChoice(0, move!.value)
+    if (resp.interaction.stateId !== 'wait') throw new Error('expected move target')
+    resp = session.resolveChoice(0, 'meeting-place')
+
+    if (resp.interaction.stateId !== 'wait') throw new Error('expected Minor Improvement action')
+    const takeImprovement = resp.interaction.request.options?.find(
+      (option) => option.value !== '__skip__',
+    )
+    resp = session.resolveChoice(0, takeImprovement!.value)
+
+    expect(resp.interaction.stateId).toBe('wait')
+    if (resp.interaction.stateId !== 'wait') throw new Error('expected improvement choice')
+    expect(resp.interaction.request.options?.map((option) => option.value))
+      .toContain('Major_Pottery')
   })
 
   it('offers food or movement separately for each worker on Farmland', () => {
@@ -362,7 +396,7 @@ const acceptArchwayMove = (session: GameSession, resp: SessionResponse) => {
   return session.resolveChoice(0, move!.value)
 }
 
-const setupArchwayStableTurn = () => {
+const setupArchwayStableTurn = (options?: { royalWood?: boolean; stableTree?: boolean }) => {
   const session = new GameSession(42, undefined, { playerCount: 2 })
   const state = session.getState().state
   state.currentPlayerIndex = 0
@@ -370,7 +404,9 @@ const setupArchwayStableTurn = () => {
   state.roundPhase = 'work'
   const player = state.players[0]!
   const opponent = state.players[1]!
-  player.minorPlayed.push(D051_ID, A074_ID)
+  player.minorPlayed.push(D051_ID)
+  if (options?.stableTree !== false) player.minorPlayed.push(A074_ID)
+  if (options?.royalWood) player.minorPlayed.push(D074_ID)
   player.minorHand = ['__test_placeholder__']
   player.occupationHand = ['__test_placeholder__']
   opponent.minorHand = ['__test_placeholder__']
@@ -417,6 +453,24 @@ describe('D051_Archway session', () => {
       const detailParts = entry.params?.detailParts as { effects?: { buildStables?: number } } | undefined
       return detailParts?.effects?.buildStables === 1
     })).toBe(true)
+    expect(readActionSnapshotToken(resp.state.players[0]!)).toBeUndefined()
+  })
+
+  it('runs Royal Wood at the end of the moved-worker turn', () => {
+    const session = setupArchwayStableTurn({ royalWood: true, stableTree: false })
+    let resp = acceptArchwayMove(session, session.performRoundEnd())
+    if (resp.interaction.stateId !== 'wait') throw new Error('expected Archway move target')
+    resp = session.resolveChoice(0, 'farm-expansion')
+    if (resp.interaction.stateId !== 'wait') throw new Error('expected stable selection')
+    if (resp.interaction.request.farm.farmType !== 'stable') throw new Error('expected stable selection')
+
+    const stable = resp.interaction.request.farm.selectableTiles[0]!
+    resp = session.commitSelectionChoice(0, { stables: [stable] })
+    resp = resolveTriggerIfPresent(session, resp, D074_ID)
+
+    expect(resp.ok).toBe(true)
+    expect(resp.state.players[0]!.resources.wood).toBe(4)
+    expect(resp.state.players[0]!.cardStates?.[D074_ID]?.extraData?.woodSpent).toBe(0)
     expect(readActionSnapshotToken(resp.state.players[0]!)).toBeUndefined()
   })
 

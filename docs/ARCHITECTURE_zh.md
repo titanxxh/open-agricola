@@ -507,7 +507,7 @@ A092_AdoptiveParents 引入轮转层的**额外回合**机制（#203+#204），�
 | 不算 Turn 的阶段或 anytime Rule Action，例如 Iron Hoe | 不新增机会 | 无 | 新建作用域 |
 | 单独的 gain、payment、choice 或 listener activation | 不新增机会 | 若存在则沿用作用域 | 不新建作用域，留在外围作用域内 |
 
-Turn Scope 在人员放置、沼泽特殊行动或等价的卡牌行动格使用开始前建立，并持续覆盖该 Turn 的全部 Rule Action 和后置效果，随后清除。D051 Archway 在目标行动格完整结算后关闭 Turn Scope；E010 Straw Hat 在开始下一个 worker 的选择前关闭上一个 Turn Scope。idle 或后续阶段流程绝不能读到已完成 Turn 遗留的身份或起点快照。
+Turn Scope 在人员放置、沼泽特殊行动或等价的卡牌行动格使用开始前建立，并持续覆盖该 Turn 的全部 Rule Action、后置效果、必要的动物重整与回合结束 hook，随后清除。D051 Archway 在目标行动格及其回合结束 hook 完整结算后关闭 Turn Scope；E010 Straw Hat 在开始下一个 worker 的选择前关闭上一个 Turn Scope。idle 或后续阶段流程绝不能读到已完成 Turn 遗留的身份或起点快照。
 
 行动执行作用域在单个 Rule Action 的生命周期开始前建立，并持续覆盖它的 pending 选择、continuation、listener 和后置效果。同一 Turn 内的多个 Rule Action 使用不同的行动作用域，但共用 Turn Scope。按行动计算 delta 的消费者读取 action transaction，而不是 Turn 起点快照。
 

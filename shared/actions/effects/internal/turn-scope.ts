@@ -1,5 +1,24 @@
-import type { ActionDefinition } from '../../../contract/types'
+import type { ActionDefinition, ActionFlow, PlayerState } from '../../../contract/types'
 import { beginTurnScope, endTurnScope } from '../../../cards/helpers/action-snapshot'
+import { getCardEffect } from '../../../cards/card-effects'
+
+const endTurnHooks = (player: PlayerState): ActionFlow => ({
+  type: 'seq',
+  children: [
+    ...[
+      ...player.improvements,
+      ...player.minorPlayed,
+      ...player.occupationPlayed,
+    ].filter((cardId) => getCardEffect(cardId)?.onEndTurn)
+      .map((cardId) => ({
+        type: 'leaf' as const,
+        actionId: 'activate-card-effect',
+        params: { cardId, hook: 'onEndTurn' },
+        sourceCard: cardId,
+      })),
+    { type: 'leaf', actionId: 'turn-scope', params: { operation: 'close' } },
+  ],
+})
 
 export const turnScopeAction: ActionDefinition = {
   id: 'turn-scope',
@@ -10,7 +29,8 @@ export const turnScopeAction: ActionDefinition = {
   canBeExecutedByPlayer: () => true,
   execute: ({ player, params }) => {
     if (params?.operation === 'begin') beginTurnScope(player)
-    else if (params?.operation === 'end') endTurnScope(player)
+    else if (params?.operation === 'end') return { type: 'flow', flow: endTurnHooks(player) }
+    else if (params?.operation === 'close') endTurnScope(player)
     else return { type: 'fail', errorKey: 'log.actionFail' }
     return { type: 'ok' }
   },
