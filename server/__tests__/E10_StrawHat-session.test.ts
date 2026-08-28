@@ -3,6 +3,8 @@ import { GameSession, type SessionResponse } from '../game/authoritative-session
 import { hasPendingExtraTurn } from '../../shared/cards/card-effects'
 import { getCardEffect } from '../../shared/cards/card-effects'
 import { readActionSnapshotToken } from '../../shared/cards/helpers/action-snapshot'
+import { writeCardExtraData } from '../../shared/cards/helpers/card-state'
+import { moveMajorImprovementToSupplyTop } from '../../shared/cards/major/supply'
 import { resolveTriggerIfPresent } from './_helpers/trigger-select'
 import {
   markAllWorkersUsed,
@@ -20,6 +22,7 @@ import '../../shared/cards/C/C002_Stable'
 import '../../shared/cards/D/D050_ForeignAid'
 import '../../shared/cards/D/D051_Archway'
 import '../../shared/cards/D/D074_RoyalWood'
+import '../../shared/cards/M/M062_HearthBrush'
 
 const CARD_ID = 'E010_StrawHat'
 const A092_ID = 'A092_AdoptiveParents'
@@ -28,6 +31,8 @@ const D051_ID = 'D051_Archway'
 const A074_ID = 'A074_StableTree'
 const D074_ID = 'D074_RoyalWood'
 const E024_ID = 'E024_Ambition'
+const M062_ID = 'M062_HearthBrush'
+const TILED_OVEN_ID = 'Major_Moor_TiledOven'
 
 const requestKind = (resp: ReturnType<GameSession['takeAction']>): string =>
   resp.interaction.stateId === 'wait' ? resp.interaction.request.kind : 'idle'
@@ -396,8 +401,17 @@ const acceptArchwayMove = (session: GameSession, resp: SessionResponse) => {
   return session.resolveChoice(0, move!.value)
 }
 
-const setupArchwayStableTurn = (options?: { royalWood?: boolean; stableTree?: boolean }) => {
-  const session = new GameSession(42, undefined, { playerCount: 2 })
+const setupArchwayStableTurn = (options?: {
+  hearthBrush?: boolean
+  royalWood?: boolean
+  stableTree?: boolean
+}) => {
+  const session = new GameSession(42, undefined, {
+    playerCount: 2,
+    ...(options?.hearthBrush
+      ? { enableFarmersOfTheMoor: true, allowIncompleteFarmersOfTheMoorMinorDeal: true }
+      : {}),
+  })
   const state = session.getState().state
   state.currentPlayerIndex = 0
   state.round = 3
@@ -407,6 +421,12 @@ const setupArchwayStableTurn = (options?: { royalWood?: boolean; stableTree?: bo
   player.minorPlayed.push(D051_ID)
   if (options?.stableTree !== false) player.minorPlayed.push(A074_ID)
   if (options?.royalWood) player.minorPlayed.push(D074_ID)
+  if (options?.hearthBrush) {
+    player.minorPlayed.push(M062_ID)
+    writeCardExtraData(player, M062_ID, 'playedRound', state.round - 1)
+    moveMajorImprovementToSupplyTop(state, TILED_OVEN_ID)
+    Object.assign(player.resources, { clay: 2, stone: 1 })
+  }
   player.minorHand = ['__test_placeholder__']
   player.occupationHand = ['__test_placeholder__']
   opponent.minorHand = ['__test_placeholder__']
@@ -471,6 +491,22 @@ describe('D051_Archway session', () => {
     expect(resp.ok).toBe(true)
     expect(resp.state.players[0]!.resources.wood).toBe(4)
     expect(resp.state.players[0]!.cardStates?.[D074_ID]?.extraData?.woodSpent).toBe(0)
+    expect(readActionSnapshotToken(resp.state.players[0]!)).toBeUndefined()
+  })
+
+  it('runs person-action end hooks after the moved-worker turn', () => {
+    const session = setupArchwayStableTurn({ hearthBrush: true, stableTree: false })
+    let resp = acceptArchwayMove(session, session.performRoundEnd())
+    if (resp.interaction.stateId !== 'wait') throw new Error('expected Archway move target')
+
+    resp = session.resolveChoice(0, 'forest')
+
+    expect(resp.interaction.stateId).toBe('wait')
+    if (resp.interaction.stateId !== 'wait') throw new Error('expected Hearth Brush purchase')
+    expect(resp.interaction.sourceCard).toBe(M062_ID)
+    const skip = resp.interaction.request.options?.find((option) => option.value === '__skip__')
+    expect(skip).toBeDefined()
+    resp = session.resolveChoice(0, skip!.value)
     expect(readActionSnapshotToken(resp.state.players[0]!)).toBeUndefined()
   })
 

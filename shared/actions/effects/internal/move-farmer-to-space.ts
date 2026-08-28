@@ -139,7 +139,11 @@ export const moveFarmerToSpaceAction: ActionDefinition = {
         children: [
           { type: 'leaf', actionId: 'turn-scope', params: { operation: 'begin' } },
           targetFlow,
-          { type: 'leaf', actionId: 'turn-scope', params: { operation: 'end' } },
+          {
+            type: 'leaf',
+            actionId: 'turn-scope',
+            params: { operation: 'end', triggerActionId: 'place-farmer' },
+          },
         ],
       },
       extraData: { actionContextWrite: { targetSpaceId: targetSpace.id } },
