@@ -64,12 +64,12 @@ const stablesDiscount = (player: PlayerState, stableCount = 1): number => {
     space: {} as never,
     actionId: 'stables',
     phase: 'computeCosts',
-    params: { stableCount },
+    params: { stableCount, stableUnitCost: { wood: 2 } },
   } as unknown as CardListenerContext
   const result = stableListener.handler(ctx)
   if (!result || typeof result !== 'object') return 0
-  const costs = (result as { costs?: { wood?: number } }).costs
-  return costs?.wood ?? 0
+  const minimumUses = (result as { trades?: { groupMin?: number }[] }).trades?.[0]?.groupMin
+  return -(minimumUses ?? 0)
 }
 
 describe('C88 Carpenter\'s Apprentice — session w/ palisades', () => {

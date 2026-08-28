@@ -1,5 +1,6 @@
 import { defineOccupationCard } from '../card-source'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
+import type { Trade } from '../../contract/types'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import {
   canStartFencing,
@@ -30,25 +31,30 @@ const stablesCostListener: CardListenerRegistration = {
   phases: ['computeCosts' as ActionHookPhase],
   actions: ['stables'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
-    // The reference `countCarpenterDiscounts`: stable #3 and #4 each cost 1 wood less,
-    // counted by card-facing stable count (ordinary + B85 FarmHand). The total
-    // discount depends on how many of the 3rd/4th seats this build crosses, so
-    // it is a single aggregate amount rather than a per-unit delta. Callers
-    // therefore must pass `params.stableCount` = the stables this build/probe
-    // covers (ordinary + FarmHand); the dispatcher's per-unit computeCosts pass
-    // omits it (it cannot scale a partial discount) and yields no discount.
     const totalBuilt = typeof context.params?.stableCount === 'number'
       ? context.params.stableCount
       : 0
     if (totalBuilt <= 0) return
+    const unitCost = context.params?.stableUnitCost as Partial<Record<'wood', number>> | undefined
+    if ((unitCost?.wood ?? 0) <= 0) return
     const before = getStableCountForCards(context.player)
     const after = before + totalBuilt
     let discounted = 0
     if (before < 3 && after >= 3) discounted += 1
     if (before < 4 && after >= 4) discounted += 1
     if (discounted <= 0) return
-    const costs = { wood: -discounted }
-    return { costs, costAttribution: [{ sourceCard: CARD_ID, costs }] }
+    const trade: Trade = {
+      from: {},
+      to: { wood: 1 },
+      scope: 'unit',
+      max: 1,
+      groupId: `${CARD_ID}:stables`,
+      groupMin: discounted,
+      groupMax: discounted,
+      source: CARD_ID,
+      sourceId: CARD_ID,
+    }
+    return { trades: [trade] }
   },
 }
 

@@ -80,6 +80,16 @@ describe('validateTradeModifier', () => {
       groupMax: 0,
     })).toThrow(/positive integer/)
   })
+  it('requires groupMin to be positive and no greater than groupMax', () => {
+    const modifier = {
+      type: 'trade', cardId: 'X', appliesTo: ['occupation'],
+      from: { wood: 1 }, to: { food: 2 },
+      groupId: 'g', groupMin: 2, groupMax: 1,
+    } as TradeModifier
+    expect(() => validateTradeModifier(modifier)).toThrow(/cannot exceed/)
+    modifier.groupMin = 0
+    expect(() => validateTradeModifier(modifier)).toThrow(/positive integer/)
+  })
 })
 
 describe('validateComplexCost', () => {
@@ -181,16 +191,18 @@ describe('applyCostModifiers — scope handling', () => {
     ])
     expect(result.trades?.[0]?.max).toBe(3)
   })
-  it('copies groupId and groupMax to synthesised Trade', () => {
+  it('copies grouped-use bounds to synthesised Trade', () => {
     const result = applyCostModifiers({}, [
       {
         type: 'trade', cardId: 'E060_WorkingGloves', appliesTo: ['occupation'],
         from: { wood: 1 }, to: { food: 2 }, max: 1,
         groupId: 'E060_WorkingGloves:occupation-food-replacement',
+        groupMin: 1,
         groupMax: 1,
       },
     ])
     expect(result.trades?.[0]?.groupId).toBe('E060_WorkingGloves:occupation-food-replacement')
+    expect(result.trades?.[0]?.groupMin).toBe(1)
     expect(result.trades?.[0]?.groupMax).toBe(1)
   })
   it('throws via validateTradeModifier on scope:unit + minNumRooms', () => {

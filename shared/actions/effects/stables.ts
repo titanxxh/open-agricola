@@ -5,6 +5,7 @@ import type {
   ActionDefinition,
   ActionMutationContext,
   ActionExecutionResult,
+  ComplexCost,
   FarmTilePosition,
   GameState,
   PlayerState,
@@ -162,16 +163,13 @@ const resolveStableTotalCost = (
 }
 
 /**
- * Aggregate computeCosts/stables card discounts that depend on how many
- * stables this build crosses (e.g. C88 Carpenter's Apprentice gives the 3rd
- * and 4th card-facing stable -1 wood each). Mirrors fencing's
- * `computeFreeFenceTotal`: the listener is fed the per-build `stableCount` and
- * returns a single aggregate delta, which is applied to the base total cost.
+ * Resolve payload-aware stable costs while retaining their per-unit structure.
  */
 type StableCostResolution = {
   baseCost: Partial<Resource>
   actionCost: Partial<Resource>
   finalCost: Partial<Resource>
+  paymentCost: ComplexCost
   farmCostAttribution: ActionCostAttribution[]
 }
 
@@ -184,9 +182,11 @@ const resolveStableTotalCostWithDiscount = (
 ): StableCostResolution | null => {
   const baseCost = resolveStableTotalCost(actionContext, undefined, totalUnits)
   const actionCost = resolveStableTotalCost(actionContext, costs, totalUnits)
-  if (!baseCost || !actionCost) return null
+  const unitCost = resolveStableTotalCost(actionContext, costs, 1)
+  if (!baseCost || !actionCost || !unitCost) return null
   const adjustments = collectFarmChoiceCostAdjustments(state, player, 'stables', {
     stableCount: totalUnits,
+    stableUnitCost: unitCost,
   })
   const finalCost: Partial<Resource> = { ...actionCost }
   for (const [key, delta] of Object.entries(adjustments.costs)) {
@@ -195,10 +195,18 @@ const resolveStableTotalCostWithDiscount = (
     finalCost[k] = Math.max(0, (finalCost[k] ?? 0) + delta)
     if (finalCost[k] === 0) delete finalCost[k]
   }
+  const paymentCost: ComplexCost = { unitFee: unitCost, nb: totalUnits }
+  if (Object.keys(adjustments.costs).length > 0) paymentCost.fee = adjustments.costs
+  if (adjustments.trades.length > 0) paymentCost.trades = adjustments.trades
+  if (adjustments.bonuses.length > 0) paymentCost.bonuses = adjustments.bonuses
+  if (adjustments.paymentResourceProviders.length > 0) {
+    paymentCost.paymentResourceProviders = adjustments.paymentResourceProviders
+  }
   return {
     baseCost,
     actionCost,
     finalCost,
+    paymentCost,
     farmCostAttribution: adjustments.costAttribution,
   }
 }
@@ -225,7 +233,7 @@ const buildStableFarmSelection = (
   for (let count = 1; count <= selectionMax; count += 1) {
     const resolution = resolveStableTotalCostWithDiscount(state, player, actionContext, costs, count)
     if (!resolution) break
-    if (!PaymentSolver.canAffordTypedFlatCost(player, resolution.finalCost, 'stables', state)) break
+    if (!PaymentSolver.canAffordTypedFlatCost(player, resolution.paymentCost, 'stables', state)) break
     affordableMax = count
   }
   const farm = playerBoard(state, idx).farmInteraction.selectableTiles('stable', {
@@ -313,10 +321,9 @@ const finalizeStables = (
     totalUnits,
   )
   if (!costResolution) return { type: 'fail', errorKey: 'log.buildStableFail' }
-  const totalCost = costResolution.finalCost
   const payment = PaymentSolver.resolveTypedFlatPaymentSelection(
     ctx.player,
-    totalCost,
+    costResolution.paymentCost,
     'pay:stable',
     paymentChoice,
     { type: 'fail', errorKey: 'log.buildStableFail' },
@@ -377,7 +384,7 @@ const finalizeStables = (
     internalChildren: {
       afterHostListeners: [
         buildInternalPayChild({
-          cost: { fee: totalCost },
+          cost: costResolution.paymentCost,
           costType: 'stables',
           optionPrefix: 'pay:stable',
           paymentChoice,
@@ -462,10 +469,9 @@ export const stablesAction: ActionDefinition = {
         totalUnits,
       )
       if (!costResolution) return { type: 'fail', errorKey: 'log.buildStableFail' }
-      const totalCost = costResolution.finalCost
       const payment = PaymentSolver.resolveTypedFlatPaymentSelection(
         ctx.player,
-        totalCost,
+        costResolution.paymentCost,
         'pay:stable',
         undefined,
         { type: 'fail', errorKey: 'log.buildStableFail' },

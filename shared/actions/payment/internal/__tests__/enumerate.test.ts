@@ -216,6 +216,30 @@ describe('computeAllBuyableCombinations — nb + unitFee scaling', () => {
     })).toBe(false)
   })
 
+  it('groupMin requires the declared number of unit-scope alternatives', () => {
+    const sols = computeAllBuyableCombinations(
+      baseTestPlayer({ wood: 4 }),
+      {
+        unitFee: { wood: 2 },
+        nb: 2,
+        trades: [{
+          from: {},
+          to: { wood: 1 },
+          scope: 'unit',
+          max: 1,
+          groupId: 'g',
+          groupMin: 2,
+          groupMax: 2,
+        }],
+      },
+    )
+
+    expect(sols.length).toBeGreaterThan(0)
+    expect(sols.every((solution) =>
+      solution.tradesUsed.reduce((sum, entry) => sum + entry.times, 0) === 2,
+    )).toBe(true)
+  })
+
   it('mixed action + unit trades — independent budgets', () => {
     const sols = computeAllBuyableCombinations(
       baseTestPlayer({ wood: 10 }),

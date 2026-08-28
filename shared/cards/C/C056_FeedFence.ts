@@ -1,5 +1,5 @@
 import { defineMinorCard } from '../card-source'
-import type { BonusModifier, Resource } from '../../contract/types'
+import type { Resource, TradeModifier } from '../../contract/types'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { gainLeaf } from '../helpers/pay-gain-node'
@@ -40,24 +40,19 @@ const afterListener: CardListenerRegistration = {
 const cardImpl = {
   listeners: [afterListener],
   modifiers: [{
-    type: 'bonus',
+    type: 'trade',
     cardId: CARD_ID,
     appliesTo: ['stables'],
-    optional: true,
-    trackChoiceIndex: false,
-    choices: [
-      {
-        discount: { wood: 1, clay: -1 },
-        minCost: { wood: 1 },
-        maxCost: { ...NON_WOOD_COST_MAX, wood: 1 },
-      },
-      {
-        discount: { wood: 2, clay: -1 },
-        minCost: { wood: 2 },
-        maxCost: NON_WOOD_COST_MAX,
-      },
-    ],
-  } as BonusModifier],
+    from: { clay: 1 },
+    to: { wood: 2 },
+    scope: 'unit',
+    max: 1,
+    groupId: CARD_ID,
+    groupMax: 1,
+    replaceUpTo: true,
+    minCost: { wood: 1 },
+    maxCost: NON_WOOD_COST_MAX,
+  } as TradeModifier],
   reaches: [] as readonly string[],
 } satisfies CardImpl
 
