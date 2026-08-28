@@ -588,8 +588,8 @@ Hook 不进 `ActionDefinition`，由 `hooks.ts` 显式注册（卡牌文件内�
 
 - `fees: Partial<Resource>[]` —— per-action 总固定费用。`computeCosts` 返回的 raw `costs` 总成本 delta 写入 `fees[0]`；有来源的 参考实现 `addBonus` / `addBonusChoices` 优先表达为 `bonuses`，有来源且保留原始候选的 参考实现 `addCost` 优先表达为 `trades`。负值在 `enumerate` 内部 `mergeResources(fees[0], unitFee*nb)` 后 clamp 到 0，避免对 unrelated resource 退款。
 - `unitFee: Partial<Resource>` + `nb: number` —— per-unit × 数量。Construct 的每间房 `{wood: rooms_cost, reed: 1_per_pile_or_room}`、renovation 的 `{[material]: 1}`、fencing 的 `{wood: 1}` 都落在 `unitFee`，`nb` 是行动同时处理的单位数（建房间数 / fence 段数）。enumerate 先对每个 unit cost row 生成有序替换后的可选行，再组合成总成本。
-- typed flat fencing / stables 支付若传入单一 `{fee:{wood:N}}`，enumerate 会在套用 costType modifiers 前规范化为单位成本：fencing 为 `{unitFee:{wood:1}, nb:N}`，stables 为 `{fee:{wood:N%2}, unitFee:{wood:2}, nb:floor(N/2)}`。这样 A16/C56 这类 参考实现 `addCost` per-unit alternative 仍能先生成 cost row，再被 D88 这类 bonus choice 继续替换。
-- `trades: Trade[]` —— 资源替换选项（`from → to`），由 `TradeModifier` 或 `computeCosts` listener 注入。`Trade.scope: 'action' | 'unit'` 控制替换位置：scope:'action' 在玩家资源池上做 per-action 转换；scope:'unit' 经候选闭包作用在每个 unit cost row 上（无顺序字段，可达行集合与 trade 注册顺序无关）。`replaceUpTo` 支持 B145_BrushwoodCollector 这类“把当前行里 1 或 2 reed 都替换成 1 wood”的 参考实现 `addCost` 形态；`from:{}` + `to:{resource:n}` 表达保留原始行并追加 sourced 折扣候选。
+- typed flat fencing / stables 支付若传入单一 `{fee:{wood:N}}`，enumerate 会在套用 costType modifiers 前规范化为单位成本：fencing 为 `{unitFee:{wood:1}, nb:N}`，stables 为 `{fee:{wood:N%2}, unitFee:{wood:2}, nb:floor(N/2)}`。stable farm-choice 的可支付性和结算会保留 `{unitFee, nb}`，再追加 payload-aware `computeCosts` trades、bonuses 和 providers。这样 A16/C56 这类参考实现 `addCost` per-unit alternative 仍能先生成 cost row，再被 D88 这类 bonus choice 继续替换。
+- `trades: Trade[]` —— 资源替换选项（`from → to`），由 `TradeModifier` 或 `computeCosts` listener 注入。`Trade.scope: 'action' | 'unit'` 控制替换位置：scope:'action' 在玩家资源池上做 per-action 转换；scope:'unit' 经候选闭包作用在每个 unit cost row 上（无顺序字段，可达行集合与 trade 注册顺序无关）。`minCost` / `maxCost` 限定可替换的 cost row，`replaceUpTo` 替换不超过声明目标的当前可用量，`groupMin` / `groupMax` 限定所有 row 合计使用次数。`from:{}` + `to:{resource:n}` 表达保留原始行并追加 sourced 折扣候选；C88 用相等的 group bounds 强制恰好折扣对应数量的 stable row。
 - `bonuses: Bonus[]` —— per-action 折扣 / 多选折扣（`{discount}` 单一折扣；`{choices: BonusChoice[]}` 多选）。`Bonus.optional` 决定 enumerate 是否生成"不应用 bonus"分支。
 - `CostResourceRemovalModifier` —— `type:'remove-resource'` 在枚举前从 `fee` / `fees` / `unitFee` 结构化删除指定资源键，并在 `costResourceRemovals` 保留约束来源和各费用路径的实际减免量；用于 C014 这类“不再需要某资源”的规则。该约束会在每次后置 bonus 后再次应用，因此 E123 不能使用已删除费用，D013 等成本 bonus 也不能把该资源重新加入；最终减免通过 `PaymentSolution.bonusReductions` 写入 Cost Attribution。
 - `paymentResourceProviders` —— 卡牌 / hook 提供的虚拟支付资源。provider 在卡牌内部声明稳定 key、可用量、可覆盖的真实成本资源以及执行时的消费来源；它不写入 `fee` / `fees` / `PlayerState.resources`，只在 `PaymentSolution.resourcesPaid` 中以自身 key 出现，并由 executor 消耗来源状态。
@@ -614,14 +614,14 @@ Hook 不进 `ActionDefinition`，由 `hooks.ts` 显式注册（卡牌文件内�
 | scope | 应用位置 | max 默认 | 典型用例 |
 |---|---|---|---|
 | `action` | 玩家资源池（每个 trade 独立到 `max`） | `?? 1` | A028_ForestSchool（lessons cost）、A088_HedgeKeeper（fencing 全部 3 段一次换）、E060_WorkingGloves（grouped exchange，未来加 groupMax）|
-| `unit` | 每个 unit cost row，经候选闭包展开（无顺序字段） | `?? 1`（每个 row）| A123_FrameBuilder（每间房一次 wood-for-clay/stone）、A016_RammedClay（每段 fence clay-for-wood）|
+| `unit` | 每个 unit cost row，经候选闭包展开（无顺序字段） | `?? 1`（每个 row）| A123_FrameBuilder（每间房一次 wood-for-clay/stone）、A016_RammedClay（每段 fence clay-for-wood）、C056_FeedFence（至多一座纯木 stable）、C088_CarpentersApprentice（恰好折扣指定数量的 stable）|
 
 scope:'unit' MUST NOT 携带 `conditions.minNumRooms`（per-unit 没有 min-unit 阈值）；`validateTradeModifier` 在 `applyCostModifiers` 入口处强制此不变量。
 
 **Validation**：
 
 - `validateComplexCost(cost)` —— dev 抛错 + prod 降级为 "no affordable solutions"。检查 `nb` 与 `cards` 互斥、`scope:'unit'` trade 必须配合 `nb`。
-- `validateTradeModifier(modifier)` —— 拒绝 scope:'unit' + minNumRooms 组合。
+- `validateTradeModifier(modifier)` —— 拒绝 scope:'unit' + minNumRooms 组合及非法 grouped-use bounds。
 - `validateBonus(bonus)` —— 恰好一个 `discount` 或 `choices`、`choices` 非空。
 - typed cost payment solution 后处理会丢弃任何 `resourcesPaid` 出现负数的分支；参考实现 `addCost` alternative 不能表现为“多造资源再退款”的 surplus 组合。
 

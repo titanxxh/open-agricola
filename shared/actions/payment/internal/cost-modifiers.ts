@@ -119,8 +119,11 @@ export const applyCostModifiers = (
         ...(synthMax !== undefined ? { max: synthMax } : {}),
         scope,
         ...(tradeMod.groupId !== undefined ? { groupId: tradeMod.groupId } : {}),
+        ...(tradeMod.groupMin !== undefined ? { groupMin: tradeMod.groupMin } : {}),
         ...(tradeMod.groupMax !== undefined ? { groupMax: tradeMod.groupMax } : {}),
         ...(tradeMod.replaceUpTo ? { replaceUpTo: true } : {}),
+        ...(tradeMod.minCost ? { minCost: tradeMod.minCost } : {}),
+        ...(tradeMod.maxCost ? { maxCost: tradeMod.maxCost } : {}),
         source: tradeMod.cardId,
         sourceId: tradeMod.cardId,
       })
@@ -192,18 +195,32 @@ export const validateTradeModifier = (modifier: TradeModifier): void => {
     )
   }
   const hasGroupId = modifier.groupId !== undefined
+  const hasGroupMin = modifier.groupMin !== undefined
   const hasGroupMax = modifier.groupMax !== undefined
-  if (hasGroupId !== hasGroupMax) {
+  if (hasGroupId !== hasGroupMax || (hasGroupMin && !hasGroupId)) {
     throw new Error(`TradeModifier ${modifier.cardId}: groupId and groupMax must be set together.`)
   }
   if (modifier.groupId !== undefined && modifier.groupId.trim().length === 0) {
     throw new Error(`TradeModifier ${modifier.cardId}: groupId must be non-empty.`)
   }
   if (
+    modifier.groupMin !== undefined &&
+    (!Number.isInteger(modifier.groupMin) || modifier.groupMin <= 0)
+  ) {
+    throw new Error(`TradeModifier ${modifier.cardId}: groupMin must be a positive integer.`)
+  }
+  if (
     modifier.groupMax !== undefined &&
     (!Number.isInteger(modifier.groupMax) || modifier.groupMax <= 0)
   ) {
     throw new Error(`TradeModifier ${modifier.cardId}: groupMax must be a positive integer.`)
+  }
+  if (
+    modifier.groupMin !== undefined &&
+    modifier.groupMax !== undefined &&
+    modifier.groupMin > modifier.groupMax
+  ) {
+    throw new Error(`TradeModifier ${modifier.cardId}: groupMin cannot exceed groupMax.`)
   }
 }
 

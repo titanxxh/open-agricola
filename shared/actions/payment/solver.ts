@@ -81,6 +81,13 @@ const receiptForSolution = (
     ctx.candidateMetadataByFeeIndex,
     solution,
   )
+  const paymentSources = [...new Set([
+    ...(metadata?.sources ?? []),
+    ...solution.tradesUsed
+      .filter((entry) => entry.times > 0)
+      .map((entry) => entry.trade.sourceId)
+      .filter((source): source is string => Boolean(source)),
+  ])]
   return {
     solution,
     resourcesPaid: solution.resourcesPaid,
@@ -89,7 +96,7 @@ const receiptForSolution = (
     ...(ctx.includeReturnedCard && solution.cardUsed ? { returnedCardId: solution.cardUsed } : {}),
     ...(solution.feeIndex !== undefined ? { feeIndex: solution.feeIndex } : {}),
     ...(metadata?.originalFeeIndex !== undefined ? { originalFeeIndex: metadata.originalFeeIndex } : {}),
-    ...(metadata?.sources ? { candidateSources: metadata.sources } : {}),
+    ...(paymentSources.length > 0 ? { candidateSources: paymentSources } : {}),
     ...(metadata?.costAttribution ? { costAttribution: metadata.costAttribution } : {}),
     ...(solutionPaymentResourceProviders(cost, ctx)
       ? { paymentResourceProviders: solutionPaymentResourceProviders(cost, ctx) }

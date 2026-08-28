@@ -4,8 +4,10 @@ import { getRegisteredCardListeners, executeCardListener } from '../../shared/ca
 import type { CardListenerContext } from '../../shared/cards/card-listeners'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 
-import '../../shared/cards/C/C056_FeedFence'
+import { C056_FeedFence } from '../../shared/cards/C/C056_FeedFence'
+import '../../shared/cards/C/C088_CarpentersApprentice'
 import '../../shared/cards/C/C094_StableCleaner'
+import { D088_Millwright } from '../../shared/cards/D/D088_Millwright'
 import type { ActionFlow } from '../../shared/contract/types'
 
 const CARD_ID = 'C056_FeedFence'
@@ -144,6 +146,97 @@ describe('C056_FeedFence session', () => {
     ]))
     expect(resp.state.log.some((entry) => entry.key === 'log.actionDetail')).toBe(true)
     expect(resp.scores).toHaveLength(2)
+  })
+
+  it('replaces only one stable after Carpenter Apprentice discounts the 3rd and 4th', () => {
+    const blocked = setupPaymentSession()
+    blocked.player.occupationPlayed.push('C088_CarpentersApprentice')
+    blocked.player.stableTiles = [{ row: 2, col: 0 }, { row: 2, col: 1 }]
+    blocked.player.resources.clay = 1
+    blocked.session.loadState(blocked.state)
+
+    const blockedResp = blocked.session.takeAction(0, 'farm-expansion')
+    expect(blockedResp.interaction.stateId).toBe('wait')
+    if (blockedResp.interaction.stateId !== 'wait' || blockedResp.interaction.request.kind !== 'farm-select') {
+      throw new Error('expected stable selection')
+    }
+    expect(blockedResp.interaction.request.farm.farmType).toBe('stable')
+    if (blockedResp.interaction.request.farm.farmType !== 'stable') throw new Error('expected stables')
+    expect(blockedResp.interaction.request.farm.maxSelections).toBe(1)
+    const blockedStables = blockedResp.interaction.request.farm.selectableTiles.slice(0, 2)
+    expect(blockedStables).toHaveLength(2)
+    const blockedCommit = blocked.session.commitSelectionChoice(0, { stables: blockedStables })
+    expect(blockedCommit.ok).toBe(false)
+
+    const { session, state, player } = setupPaymentSession()
+    player.occupationPlayed.push('C088_CarpentersApprentice')
+    player.stableTiles = [{ row: 2, col: 0 }, { row: 2, col: 1 }]
+    Object.assign(player.resources, { wood: 1, clay: 1 })
+    session.loadState(state)
+
+    let resp = session.takeAction(0, 'farm-expansion')
+    expect(resp.interaction.stateId).toBe('wait')
+    if (resp.interaction.stateId !== 'wait' || resp.interaction.request.kind !== 'farm-select') {
+      throw new Error('expected stable selection')
+    }
+    expect(resp.interaction.request.farm.farmType).toBe('stable')
+    if (resp.interaction.request.farm.farmType !== 'stable') throw new Error('expected stables')
+    const stables = resp.interaction.request.farm.selectableTiles.slice(0, 2)
+
+    resp = session.commitSelectionChoice(0, { stables })
+
+    expect(resp.ok).toBe(true)
+    expect(resp.state.players[0]!.resources).toMatchObject({ wood: 0, clay: 0 })
+    expect(resp.state.events).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        type: 'resource.paid',
+        paymentFor: 'stables',
+        resources: { wood: 1, clay: 1 },
+      }),
+    ]))
+    expect(resp.state.log.some((entry) => entry.key === 'log.actionDetail')).toBe(true)
+    expect(resp.scores).toHaveLength(2)
+  })
+
+  it('composes with Millwright independently of active modifier order', () => {
+    const feedFenceModifier = C056_FeedFence.impl.modifiers![0]!
+    const millwrightModifiers = D088_Millwright.impl.modifiers!
+      .filter((modifier) => modifier.appliesTo.includes('stables'))
+
+    for (const activeModifiers of [
+      [feedFenceModifier, ...millwrightModifiers],
+      [...millwrightModifiers, feedFenceModifier],
+    ]) {
+      const { session, state, player } = setupPaymentSession()
+      player.occupationPlayed.push('D088_Millwright')
+      player.activeModifiers = activeModifiers
+      player.resources.grain = 1
+      session.loadState(state)
+
+      let resp = session.takeAction(0, 'farm-expansion')
+      expect(resp.interaction.stateId).toBe('wait')
+      if (resp.interaction.stateId !== 'wait' || resp.interaction.request.kind !== 'farm-select') {
+        throw new Error('expected stable selection')
+      }
+      expect(resp.interaction.request.farm.farmType).toBe('stable')
+      if (resp.interaction.request.farm.farmType !== 'stable') throw new Error('expected stables')
+      const stable = resp.interaction.request.farm.selectableTiles[0]!
+
+      resp = session.commitSelectionChoice(0, { stables: [stable] })
+
+      expect(resp.ok).toBe(true)
+      expect(resp.state.players[0]!.resources).toMatchObject({ wood: 0, clay: 0, grain: 0 })
+      expect(resp.state.events).toEqual(expect.arrayContaining([
+        expect.objectContaining({
+          type: 'resource.paid',
+          paymentFor: 'stables',
+          resources: { grain: 1 },
+          bonusSources: expect.arrayContaining([CARD_ID, 'D088_Millwright']),
+        }),
+      ]))
+      expect(resp.state.log.some((entry) => entry.key === 'log.actionDetail')).toBe(true)
+      expect(resp.scores).toHaveLength(2)
+    }
   })
 
   it('does not apply to Stable Cleaner mixed wood and food cost', () => {

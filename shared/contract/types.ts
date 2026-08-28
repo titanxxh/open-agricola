@@ -111,8 +111,11 @@ export type Trade = {
   max?: number
   scope?: 'action' | 'unit'   // default 'action' (back-compat)
   groupId?: string
+  groupMin?: number
   groupMax?: number
   replaceUpTo?: boolean
+  minCost?: Partial<Resource>
+  maxCost?: Partial<Resource>
   source?: string
   sourceId?: string
   sideEffect?: TradeSideEffect
@@ -169,8 +172,11 @@ export type TradeModifier = {
   max?: number
   scope?: 'action' | 'unit'   // default 'action'
   groupId?: string
+  groupMin?: number
   groupMax?: number
   replaceUpTo?: boolean
+  minCost?: Partial<Resource>
+  maxCost?: Partial<Resource>
   /**
    * Player-state conditions evaluated when the modifier is applied. Same
    * supported keys as `Bonus.conditions` (`minNumRooms`, `houseTypeWood` /

@@ -541,13 +541,30 @@ const resourceSignature = (resources: PaymentResourceMap) =>
     .map(([key, value]) => `${key}:${value}`)
     .join('|')
 
+const costBoundsSatisfied = (
+  currentCost: PaymentResourceMap,
+  minCost?: Partial<Resource>,
+  maxCost?: Partial<Resource>,
+) => {
+  for (const [key, value] of Object.entries(minCost ?? {})) {
+    if ((currentCost[key as ResourceKey] ?? 0) < (value ?? 0)) return false
+  }
+  for (const [key, value] of Object.entries(maxCost ?? {})) {
+    if ((currentCost[key as ResourceKey] ?? 0) > (value ?? 0)) return false
+  }
+  return true
+}
+
 const tradeSignature = (trade: Trade) =>
   [
     trade.sourceId ?? trade.source ?? '',
     trade.groupId ?? '',
+    trade.groupMin ?? '',
     trade.groupMax ?? '',
     resourceSignature(trade.from),
     resourceSignature(trade.to),
+    resourceSignature(trade.minCost ?? {}),
+    resourceSignature(trade.maxCost ?? {}),
     trade.replaceUpTo ? 'upTo' : 'exact',
   ].join('#')
 
@@ -627,10 +644,30 @@ const isWithinTradeGroupLimits = (
   return true
 }
 
+const satisfiesTradeGroupMinimums = (
+  tradesUsed: { trade: Trade; times: number }[],
+  trades: Trade[],
+) => {
+  const minimums = new Map<string, number>()
+  for (const trade of trades) {
+    if (!trade.groupId || trade.groupMin === undefined) continue
+    minimums.set(trade.groupId, Math.max(minimums.get(trade.groupId) ?? 0, trade.groupMin))
+  }
+  for (const [groupId, minimum] of minimums) {
+    const used = tradesUsed.reduce(
+      (sum, entry) => sum + (entry.trade.groupId === groupId ? entry.times : 0),
+      0,
+    )
+    if (used < minimum) return false
+  }
+  return true
+}
+
 const applyUnitTradeToCost = (
   cost: PaymentResourceMap,
   trade: Trade,
 ): PaymentResourceMap | null => {
+  if (!costBoundsSatisfied(cost, trade.minCost, trade.maxCost)) return null
   const toEntries = (Object.entries(trade.to) as [ResourceKey, number][])
     .filter(([, amount]) => amount > 0)
   if (toEntries.length === 0) return null
@@ -922,20 +959,6 @@ export const computeAllBuyableCombinations = (
     validateBonus(bonus)
   }
 
-  const costBoundsSatisfied = (
-    currentCost: PaymentResourceMap,
-    minCost?: Partial<Resource>,
-    maxCost?: Partial<Resource>,
-  ) => {
-    for (const [key, value] of Object.entries(minCost ?? {})) {
-      if ((currentCost[key as ResourceKey] ?? 0) < (value ?? 0)) return false
-    }
-    for (const [key, value] of Object.entries(maxCost ?? {})) {
-      if ((currentCost[key as ResourceKey] ?? 0) > (value ?? 0)) return false
-    }
-    return true
-  }
-
   for (let feeIdx = 0; feeIdx < baseFeesRaw.length; feeIdx++) {
     const baseFeeRaw = baseFeesRaw[feeIdx]
     for (const unitTotal of unitTotals) {
@@ -949,6 +972,7 @@ export const computeAllBuyableCombinations = (
       for (const tradeCombo of tradeCombos) {
         const tradesUsed = mergeTradeUsage(unitTotal.tradesUsed, tradeCombo.tradesUsed)
         if (!isWithinTradeGroupLimits(tradesUsed)) continue
+        if (!satisfiesTradeGroupMinimums(tradesUsed, allTrades)) continue
         const removalReductions = mergeBonusReductionsBySource(
           initialRemovalReductions(feeIdx),
           removedBaseFee.reductions,

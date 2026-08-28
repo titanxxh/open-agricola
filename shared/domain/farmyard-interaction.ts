@@ -133,6 +133,12 @@ export const buildStableFarmInteraction = (
     Math.max(0, 4 - getOrdinaryStableCount(player)),
     options?.max ?? Number.POSITIVE_INFINITY,
   )
+  const unitCost = PaymentSolver.resolveUnitCostWithDelta(
+    { wood: STABLE_WOOD_COST },
+    options?.exactCost,
+    costOverride,
+    1,
+  )
   let resourceMax = 0
   for (let count = 1; count <= structuralMax; count += 1) {
     const totalCost = PaymentSolver.resolveUnitCostWithDelta(
@@ -141,7 +147,11 @@ export const buildStableFarmInteraction = (
       costOverride,
       count,
     )
-    if (!totalCost || !PaymentSolver.canAffordTypedFlatCost(player, totalCost, 'stables')) break
+    if (
+      !unitCost ||
+      !totalCost ||
+      !PaymentSolver.canAffordTypedFlatCost(player, { unitFee: unitCost, nb: count }, 'stables')
+    ) break
     resourceMax = count
   }
   return {
