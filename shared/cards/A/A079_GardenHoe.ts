@@ -3,6 +3,7 @@ import type { CardListenerRegistration, CardListenerContext } from '../card-list
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import { fieldHasCrop, fieldTotalRemaining } from '../../domain/field'
+import { isUnconditionalSow } from '../../actions/effects/sow'
 import type { CardImpl } from '../registry'
 
 const CARD_ID = 'A079_GardenHoe'
@@ -12,9 +13,7 @@ const listener: CardListenerRegistration = {
   phases: ['after' as ActionHookPhase],
   actions: ['sow'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
-    const actionContext = context.actionContext ?? {}
-    if (actionContext.checkedReplaceAction === true) return
-    if (actionContext.maxSelections !== undefined || actionContext.cropType !== undefined) return
+    if (!isUnconditionalSow(context.actionContext)) return
     const hasVegetable = context.player.fields.some(
       (field) => fieldHasCrop(field, 'vegetable') && fieldTotalRemaining(field) > 0,
     )

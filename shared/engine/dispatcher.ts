@@ -29,10 +29,12 @@ export type EffectPhaseResult = {
 
 export type ComputeReplaceResult = {
   actionId: string
-  declined: boolean
-  alternativeFlow?: ActionFlow
+  alternatives: Array<{
+    flow: ActionFlow
+    sourceCard?: string
+    replacementListenerIds: string[]
+  }>
   sourceCard?: string
-  replacementListenerIds: string[]
 }
 
 const cloneValue = <T>(value: T): T => {
@@ -92,33 +94,43 @@ export class HookDispatcher {
   }
 
   applyComputeReplace(context: ActionExecutionContext & { actionId: string }): ComputeReplaceResult {
+    if (context.actionContext?.checkedReplaceAction === true) {
+      return { actionId: context.actionId, alternatives: [], sourceCard: context.sourceCard }
+    }
     let actionId = applyComputeReplaceHooks(context)
-    let declined = false
-    let alternativeFlow: ActionFlow | undefined
+    const alternatives: ComputeReplaceResult['alternatives'] = []
     let sourceCard = context.sourceCard
-    let replacementListenerIds = getSkipComputeReplaceListenerIds(context.actionContext)
-    const skippedListenerIds = new Set(replacementListenerIds)
+    const inheritedListenerIds = getSkipComputeReplaceListenerIds(context.actionContext)
+    const skippedListenerIds = new Set(inheritedListenerIds)
     const listenerContext = { ...context, phase: 'computeReplace' as const }
     const matched = getMatchingListeners(listenerContext)
     for (const entry of matched) {
       if (skippedListenerIds.has(entry.registration.id)) continue
       const result = executeCardListener(entry.registration, listenerContext, listenerOwnerOptions(entry))
       if (result) {
+        const resultSourceCard = typeof result.sourceCard === 'string' && result.sourceCard.length > 0
+          ? result.sourceCard
+          : undefined
         if (typeof result.actionId === 'string') {
           actionId = result.actionId
         }
-        if (typeof result.sourceCard === 'string' && result.sourceCard.length > 0) {
-          sourceCard = result.sourceCard
+        if (resultSourceCard) {
+          sourceCard = resultSourceCard
         }
-        if (result.decline) {
-          declined = true
-          alternativeFlow = result.alternativeFlow
+        if (result.decline && result.alternativeFlow) {
+          alternatives.push({
+            flow: result.alternativeFlow,
+            sourceCard: resultSourceCard ?? (entry.cardId || context.sourceCard),
+            replacementListenerIds: [...new Set([
+              ...inheritedListenerIds,
+              entry.registration.id,
+            ])],
+          })
           skippedListenerIds.add(entry.registration.id)
-          replacementListenerIds = [...new Set([...replacementListenerIds, entry.registration.id])]
         }
       }
     }
-    return { actionId, declined, alternativeFlow, sourceCard, replacementListenerIds }
+    return { actionId, alternatives, sourceCard }
   }
 
   applyIsDoable(

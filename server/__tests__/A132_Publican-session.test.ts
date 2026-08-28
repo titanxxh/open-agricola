@@ -3,6 +3,8 @@ import { GameSession } from '../game/authoritative-session'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 
 import '../../shared/cards/A/A132_Publican'
+import '../../shared/cards/A/A065_SeedPellets'
+import '../../shared/cards/A/A094_LazySowman'
 import type { ActionChoiceOption } from '../../shared/contract/types'
 import type { SessionResponse } from '../../shared/session/session-core'
 import { confirmPlayerSwitch } from './_helpers/pending-confirms'
@@ -146,6 +148,49 @@ describe('A132_Publican session', () => {
     expect(after.players[0]!.resources.grain).toBe(ownerGrainBefore)
     // No bonus VP
     expect(after.players[0]!.cardStates?.A132_Publican?.counters?.bonusVp).toBeUndefined()
+  })
+
+  it('offers Publican after the opponent selects original sow from Lazy Sowman', () => {
+    const session = setup(1)
+    const state = session.getState().state
+    state.players[1]!.occupationPlayed.push('A094_LazySowman')
+    session.loadState(state)
+
+    let resp = session.takeAction(1, 'grain-utilization')
+    expect(resp.ok).toBe(true)
+    expect(resp.interaction.stateId).toBe('wait')
+    if (resp.interaction.stateId !== 'wait') return
+    const sowOption = resp.interaction.request.options.find(
+      (option) => option.labelKey === 'actions.sow.name',
+    )
+    expect(sowOption).toBeDefined()
+
+    resp = session.resolveChoice(1, sowOption!.value)
+    resp = advancePastPlayerSwitches(session, resp)
+
+    expect(resp.interaction.stateId).toBe('wait')
+    if (resp.interaction.stateId !== 'wait') return
+    expect(resp.interaction.playerIndex).toBe(0)
+    expect(resp.interaction.sourceCard).toBe('A132_Publican')
+    expect(resp.interaction.request.options.map((option) => option.value)).toContain('__skip__')
+  })
+
+  it('rechecks sow after Seed Pellets gives the opponent grain', () => {
+    const session = setup(1)
+    const state = session.getState().state
+    state.players[1]!.resources.grain = 0
+    state.players[1]!.minorPlayed.push('A065_SeedPellets')
+    session.loadState(state)
+
+    let resp = session.takeAction(1, 'grain-utilization')
+    expect(resp.ok).toBe(true)
+    resp = advancePastPlayerSwitches(session, resp)
+
+    expect(resp.state.players[1]!.resources.grain).toBe(1)
+    expect(resp.interaction.stateId).toBe('wait')
+    if (resp.interaction.stateId !== 'wait') return
+    expect(resp.interaction.playerIndex).toBe(0)
+    expect(resp.interaction.sourceCard).toBe('A132_Publican')
   })
 
   it('does not trigger when owner takes sow themselves', () => {

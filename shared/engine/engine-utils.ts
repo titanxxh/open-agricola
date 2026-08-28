@@ -980,12 +980,12 @@ export const canActionContinueWithoutBeforeTriggers = (
     actionId,
     actionContext,
   })
-  if (!replaceResult.declined || !replaceResult.alternativeFlow) return false
-  return canStartFlowWithoutBeforeTriggers(
-    int,
-    scopedContext,
-    applyDefaultSourceCardToFlow(replaceResult.alternativeFlow, replaceResult.sourceCard),
-  )
+  return replaceResult.alternatives.some((alternative) =>
+    canStartFlowWithoutBeforeTriggers(
+      int,
+      scopedContext,
+      applyDefaultSourceCardToFlow(alternative.flow, alternative.sourceCard),
+    ))
 }
 
 /**

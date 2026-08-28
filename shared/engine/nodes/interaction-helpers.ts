@@ -16,7 +16,7 @@ import type {
   ActionChoiceOption,
 } from '../../contract/types'
 import type { ActionRegistry } from '../registry'
-import type { HookDispatcher } from '../dispatcher'
+import type { ComputeReplaceResult, HookDispatcher } from '../dispatcher'
 import type { EngineNode } from '../types'
 import { ActionNode } from './action-node'
 import { SequenceNode } from './sequence-node'
@@ -179,29 +179,27 @@ function markFlowSkippedComputeReplaceListeners(
 }
 
 /**
- * Wrap an alternative flow + the original (now declined) action into a `xor`
- * flow node so the engine can present "do alternative / take original" as
- * two choices. Pure transformation — no dependencies.
+ * Wrap replacement alternatives + the original action into a `xor` flow.
  */
 export function buildReplaceChoiceFlow(
   actionNode: Pick<
     ActionNode,
     'actionId' | 'params' | 'sourceCard' | 'actionContext' | 'choiceLabelKey' | 'choiceLabelParams'
   >,
-  alternativeFlow: ActionFlow,
+  alternatives: ComputeReplaceResult['alternatives'],
   replacedActionId: string,
-  replacementListenerIds: readonly string[] = [],
 ): ActionFlow {
-  const guardedAlternativeFlow = markFlowSkippedComputeReplaceListeners(
-    alternativeFlow,
-    replacementListenerIds,
-  )
+  const guardedAlternatives = alternatives.flatMap((alternative) => {
+    const guarded = markFlowSkippedComputeReplaceListeners(
+      alternative.flow,
+      alternative.replacementListenerIds,
+    )
+    return guarded.type === 'xor' ? guarded.children : [guarded]
+  })
   return {
     type: 'xor',
     children: [
-      ...(guardedAlternativeFlow.type === 'xor'
-        ? guardedAlternativeFlow.children
-        : [guardedAlternativeFlow]),
+      ...guardedAlternatives,
       {
         type: 'leaf',
         actionId: replacedActionId,
@@ -231,6 +229,7 @@ export function getReplaceAwareChoiceLabel(
   actionNode: ActionNode,
   executionContext: ActionExecutionContext,
   defaultLabel: { labelKey: string; labelParams?: Record<string, unknown> },
+  actionNameKey: string,
   hooks: HookDispatcher,
   applyDefaultSourceCardToFlow: (flow: ActionFlow, sourceCard?: string) => ActionFlow,
 ): { labelKey: string; labelParams?: Record<string, unknown>; sourceCard?: string } {
@@ -239,18 +238,18 @@ export function getReplaceAwareChoiceLabel(
     actionId: actionNode.actionId,
   })
   const replaceSourceCard = replaceResult.sourceCard ?? actionNode.sourceCard
-  if (actionNode.choiceLabelKey) return { ...defaultLabel, sourceCard: replaceSourceCard }
-  if (!replaceResult.declined || !replaceResult.alternativeFlow) {
+  if (actionNode.choiceLabelKey || defaultLabel.labelKey !== actionNameKey) {
     return { ...defaultLabel, sourceCard: replaceSourceCard }
   }
-  const alternativeFlow = applyDefaultSourceCardToFlow(
-    replaceResult.alternativeFlow,
-    replaceResult.sourceCard,
-  )
+  if (replaceResult.alternatives.length === 0) {
+    return { ...defaultLabel, sourceCard: replaceSourceCard }
+  }
+  const alternativeFlows = replaceResult.alternatives.map((alternative) =>
+    applyDefaultSourceCardToFlow(alternative.flow, alternative.sourceCard))
   return {
     labelKey: 'ui.interactionActionOrReplace',
     labelParams: { actionNameKey: defaultLabel.labelKey },
-    sourceCard: getFlowSourceCard(alternativeFlow),
+    sourceCard: getFlowSourceCard({ type: 'xor', children: alternativeFlows }),
   }
 }
 

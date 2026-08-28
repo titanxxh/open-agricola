@@ -3,23 +3,10 @@ import type { CardListenerContext, CardListenerRegistration } from '../card-list
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { payLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
+import { isUnconditionalSow } from '../../actions/effects/sow'
+import { buildSowFarmInteraction } from '../../domain/farmyard-interaction'
 
 const CARD_ID = 'A132_Publican'
-/**
- * The reference `wrapSowWithDeferredCheck` defers the offer so that the offer is not
- * shown when the only legal way for the sowing player to sow is to receive
- * grain from the Publican. This avoids the case where the Publican declines
- * and the sowing player is stuck. We currently skip the deferred-check and
- * always offer when the sow is unconditional; the corner case where a
- * decline traps the sowing player is acknowledged in
- * docs/card_implementation_status.md as a known minor deviation. (Tests cover
- * the common offer/accept/decline path.)
- */
-const isUnconditionalSow = (context: CardListenerContext) => {
-  const actionContext = context.actionContext ?? {}
-  if (actionContext.checkedReplaceAction === true) return false
-  return actionContext.maxSelections === undefined && actionContext.cropType === undefined
-}
 
 const listener: CardListenerRegistration = {
   id: 'A132-publican-before-opponent-sow',
@@ -28,7 +15,9 @@ const listener: CardListenerRegistration = {
   phases: ['before' as ActionHookPhase],
   scope: 'opponent',
   handler: (context: CardListenerContext): ActionHookResult | void => {
-    if (!isUnconditionalSow(context)) return
+    if (!isUnconditionalSow(context.actionContext)) return
+    const farm = buildSowFarmInteraction(context.player, context.actionContext)
+    if (farm.farmType !== 'sow' || farm.selectableFields.length === 0) return
     const triggerPlayerId = context.triggerPlayer?.id ?? context.player.id
     return {
       flow: {

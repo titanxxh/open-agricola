@@ -106,7 +106,7 @@ describe('D017_DrillHarrow', () => {
       expect(result).toBeUndefined()
     })
 
-    it('does not trigger for checkedReplaceAction sow', () => {
+    it('still triggers for an original sow selected after computeReplace', () => {
       const listener = findListener('D17-drill-harrow-before-sow')!
       const player = createPlayer()
       const result = executeCardListener(listener, {
@@ -115,7 +115,7 @@ describe('D017_DrillHarrow', () => {
         actionContext: { checkedReplaceAction: true },
       } as unknown as CardListenerContext)
 
-      expect(result).toBeUndefined()
+      expect(result).toBeDefined()
     })
 
   })

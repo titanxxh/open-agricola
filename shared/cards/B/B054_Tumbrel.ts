@@ -4,6 +4,7 @@ import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import { getStableCountForCards } from '../../domain/stables'
 import type { CardImpl } from '../registry'
+import { isUnconditionalSow } from '../../actions/effects/sow'
 
 const CARD_ID = 'B054_Tumbrel'
 /**
@@ -13,19 +14,13 @@ const CARD_ID = 'B054_Tumbrel'
  * you get 1 Food for each stable you have.
  */
 
-const isUnconditionalSow = (context: CardListenerContext): boolean => {
-  const actionContext = context.actionContext ?? {}
-  if (actionContext.checkedReplaceAction === true) return false
-  return actionContext.maxSelections === undefined && actionContext.cropType === undefined
-}
-
 const listener: CardListenerRegistration = {
   id: 'B54-tumbrel-after-sow',
   cardIds: [CARD_ID],
   phases: ['after' as ActionHookPhase],
   actions: ['sow'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
-    if (!isUnconditionalSow(context)) return
+    if (!isUnconditionalSow(context.actionContext)) return
     const stableCount = getStableCountForCards(context.player)
     if (stableCount <= 0) return
     return { flow: gainLeaf(CARD_ID, { food: stableCount }), sourceCard: CARD_ID }

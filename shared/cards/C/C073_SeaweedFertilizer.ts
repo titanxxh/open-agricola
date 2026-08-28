@@ -3,13 +3,9 @@ import type { CardListenerRegistration, CardListenerContext } from '../card-list
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
+import { isUnconditionalSow } from '../../actions/effects/sow'
 
 const CARD_ID = 'C073_SeaweedFertilizer'
-const isUnconditionalSow = (context: CardListenerContext): boolean => {
-  const actionContext = context.actionContext ?? {}
-  if (actionContext.checkedReplaceAction === true) return false
-  return actionContext.maxSelections === undefined && actionContext.cropType === undefined
-}
 
 const listener: CardListenerRegistration = {
   id: 'C73-seaweed-fertilizer-after-sow',
@@ -17,7 +13,7 @@ const listener: CardListenerRegistration = {
   phases: ['after' as ActionHookPhase],
   actions: ['sow'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
-    if (!isUnconditionalSow(context)) return
+    if (!isUnconditionalSow(context.actionContext)) return
     if (context.state.round < 11) {
       return { flow: gainLeaf(CARD_ID, { grain: 1 }), sourceCard: CARD_ID }
     } else {

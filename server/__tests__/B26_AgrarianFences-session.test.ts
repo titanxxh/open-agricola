@@ -3,6 +3,7 @@ import { GameSession } from '../game/authoritative-session'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 
 import { setWorkersAtHome } from '../../shared/domain/player'
+import '../../shared/cards/A/A094_LazySowman'
 import '../../shared/cards/B/B026_AgrarianFences'
 
 const playedKey = (cardId: string, type: 'minor' | 'occupation') => `${type}:${cardId}`
@@ -62,6 +63,46 @@ describe('B026_AgrarianFences session', () => {
     if (resp.interaction.stateId !== 'wait') return
     // Should have more options than just normal sow/bake
     expect(resp.interaction.request.options?.length).toBeGreaterThanOrEqual(2)
+  })
+
+  it('keeps Lazy Sowman and Agrarian Fences alternatives independently selectable', () => {
+    const session = setup({ withCard: true })
+    const state = session.getState().state
+    state.players[0]!.occupationPlayed.push('A094_LazySowman')
+    session.loadState(state)
+
+    let resp = session.takeAction(0, 'grain-utilization')
+    expect(resp.ok).toBe(true)
+    expect(resp.interaction.stateId).toBe('wait')
+    if (resp.interaction.stateId !== 'wait') return
+    const sowBranch = resp.interaction.request.options.find(
+      (option) => option.labelParams?.actionNameKey === 'actions.sow.name',
+    )
+    expect(sowBranch).toBeDefined()
+
+    resp = session.resolveChoice(0, sowBranch!.value)
+    expect(resp.ok).toBe(true)
+    expect(resp.interaction.stateId).toBe('wait')
+    if (resp.interaction.stateId !== 'wait') return
+    expect(resp.interaction.request.options.map((option) => option.labelKey)).toEqual([
+      'ui.interactionUseCard',
+      'actions.fencing.name',
+      'ui.interactionAgrarianFencesSowAndFence',
+      'actions.sow.name',
+    ])
+    const sowAndFence = resp.interaction.request.options.find(
+      (option) => option.labelKey === 'ui.interactionAgrarianFencesSowAndFence',
+    )
+    expect(sowAndFence).toBeDefined()
+
+    resp = session.resolveChoice(0, sowAndFence!.value)
+    expect(resp.ok).toBe(true)
+    expect(resp.interaction.stateId).toBe('wait')
+    if (resp.interaction.stateId !== 'wait') return
+    expect(resp.interaction.request.options.map((option) => option.labelKey)).toEqual([
+      'ui.interactionUseCard',
+      'actions.sow.name',
+    ])
   })
 
   it('without enough wood for fencing and no seeds, grain-utilization with card still works with bake', () => {

@@ -3,6 +3,7 @@ import type { CardListenerRegistration, CardListenerContext } from '../card-list
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { payLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
+import { isUnconditionalSow } from '../../actions/effects/sow'
 
 const CARD_ID = 'D017_DrillHarrow'
 /**
@@ -15,19 +16,13 @@ const CARD_ID = 'D017_DrillHarrow'
  *   (because even without seeds, you can plow a field which may enable sowing)
  */
 
-const isUnconditionalSow = (context: CardListenerContext): boolean => {
-  const actionContext = context.actionContext ?? {}
-  if (actionContext.checkedReplaceAction === true) return false
-  return actionContext.maxSelections === undefined && actionContext.cropType === undefined
-}
-
 const beforeSowListener: CardListenerRegistration = {
   id: 'D17-drill-harrow-before-sow',
   cardIds: [CARD_ID],
   phases: ['before' as ActionHookPhase],
   actions: ['sow'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
-    if (!isUnconditionalSow(context)) return
+    if (!isUnconditionalSow(context.actionContext)) return
     return {
       flow: {
         type: 'seq',
@@ -50,7 +45,7 @@ const isDoableListener: CardListenerRegistration = {
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (context.doable) return
     if (context.actionContext?.skipBeforeTriggers === true) return
-    if (!isUnconditionalSow(context)) return
+    if (!isUnconditionalSow(context.actionContext)) return
     // Player can plow to create an empty field, making sow possible
     if (context.player.resources.food < 3) return
     return { doable: true }

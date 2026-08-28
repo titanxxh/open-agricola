@@ -925,6 +925,7 @@ export function engineProceed(
           entry.actionNode,
           { ...executionContext, ...currentEventReadContext(int) },
           baseLabel,
+          action.nameKey,
           int.hooks,
           (flow, sc) => applyDefaultSourceCardToFlow(flow, sc),
         )
@@ -1076,16 +1077,15 @@ export function engineProceed(
     })
     const replacedActionId = replaceResult.actionId
     const replaceSourceCard = replaceResult.sourceCard ?? node.sourceCard
-    if (replaceResult.declined && replaceResult.alternativeFlow) {
+    if (replaceResult.alternatives.length > 0) {
       const flowNode = buildOwnedFlowNode(int,
         buildReplaceChoiceFlow(
           node,
-          applyDefaultSourceCardToFlow(
-            replaceResult.alternativeFlow,
-            replaceResult.sourceCard,
-          ),
+          replaceResult.alternatives.map((alternative) => ({
+            ...alternative,
+            flow: applyDefaultSourceCardToFlow(alternative.flow, alternative.sourceCard),
+          })),
           replacedActionId,
-          replaceResult.replacementListenerIds,
         ),
         context.player.id,
       )
