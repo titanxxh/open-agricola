@@ -4,6 +4,9 @@ import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { readCardExtraData, writeCardExtraData } from '../helpers/card-state'
 import { readActionSnapshotToken } from '../helpers/action-snapshot'
 import { isLessonsSpaceId } from '../helpers/lessons-spaces'
+import { getPlayerCookeryCards } from '../helpers/cookery'
+import { hasExchangeGained } from '../helpers/event-provenance'
+import { isAnimalKey } from '../../domain/animal-holder-state'
 import type { ActionFlow, PlayerState } from '../../contract/types'
 import type { CardImpl } from '../registry'
 
@@ -80,12 +83,22 @@ const awardBonusVp = (player: PlayerState): ActionFlow | undefined => {
   }
 }
 
+const usedCookery = (context: CardListenerContext): boolean => {
+  const cookeryIds = new Set(getPlayerCookeryCards(context.player).map((card) => card.id))
+  return hasExchangeGained(context.actionEvents, 'food', (event) =>
+    Object.entries(event.paid).some(([resource, amount]) =>
+      (amount ?? 0) > 0 && (resource === 'vegetable' || isAnimalKey(resource))) &&
+    !!event.exchangeSource &&
+    cookeryIds.has(event.exchangeSource))
+}
+
 const afterExchangeListener: CardListenerRegistration = {
   id: 'B29-cookery-lesson-after-exchange',
   cardIds: [CARD_ID],
   phases: ['after' as ActionHookPhase],
   actions: ['exchange'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
+    if (!usedCookery(context)) return
     const stamp = currentTokenLeaf(context.player, COOKED_TOKEN_KEY)
     if (!stamp) return
     const award = tokenMatchesCurrent(context.player, LESSONS_TOKEN_KEY)
