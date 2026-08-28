@@ -313,7 +313,11 @@ describe('move-farmer-to-space action', () => {
         children: [
           { type: 'leaf', actionId: 'turn-scope', params: { operation: 'begin' } },
           { type: 'leaf', actionId: 'day-laborer', expandFlow: true },
-          { type: 'leaf', actionId: 'turn-scope', params: { operation: 'end' } },
+          {
+            type: 'leaf',
+            actionId: 'turn-scope',
+            params: { operation: 'end', triggerActionId: 'place-farmer' },
+          },
         ],
       })
     }

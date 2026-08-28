@@ -247,7 +247,7 @@ _Avoid_: 旧 `PendingAction` union、前端 pending 状态机
 _Avoid_: 共享临时槽位、前端偷补流程
 
 **Turn（规则回合）**:
-用于解释“在你的回合”和“同一回合”的规则结算单位；一个 Turn 可以包含多个 Rule Action。工作阶段轮转中的普通放工或沼泽特殊行动会开启 Turn；卡牌在轮转之外移动或放置人员并使用行动格时也可以开启 Turn，例如 D051 Archway 的移动和 E010 Straw Hat 移动的每个 worker 分别是独立 Turn。
+用于解释“在你的回合”和“同一回合”的规则结算单位；一个 Turn 可以包含多个 Rule Action。工作阶段轮转中的普通放工或沼泽特殊行动会开启 Turn；卡牌在轮转之外移动或放置人员并使用行动格时也可以开启 Turn，例如 D051 Archway 的移动和 E010 Straw Hat 移动的每个 worker 分别是独立 Turn，并按人员行动触发其回合结束时点。
 _Avoid_: 轮转机会、单个 Rule Action、把所有阶段 / anytime 效果都算作 Turn
 
 **Turn Scope（回合作用域）**:
