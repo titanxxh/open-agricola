@@ -14,10 +14,15 @@ import { recordActionSnapshot } from '../../shared/cards/helpers/action-snapshot
 import type { ActionFlow, GameState, PlayerState } from '../../shared/contract/types'
 import { specialEffectAction } from '../../shared/actions/effects/special-effect'
 import { bonusVpAction } from '../../shared/actions/effects/bonus-vp'
+import { setWorkersAtHome } from '../../shared/domain/player'
+import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
+import type { DraftGameEvent } from '../../shared/contract/events'
 
 import '../../shared/cards/B/B029_CookeryLesson'
+import '../../shared/cards/B/B032_Kettle'
 
 const CARD_ID = 'B029_CookeryLesson'
+const OCCUPATION_ID = 'A123_FrameBuilder'
 
 const findListener = (id: string) =>
   getRegisteredCardListeners().find((l) => l.id === id)
@@ -60,6 +65,98 @@ const hasAction = (flow: ActionFlow | undefined, actionId: string): boolean => {
   return 'children' in flow && flow.children.some((child) => hasAction(child, actionId))
 }
 
+const exchangedForFood = (
+  player: PlayerState,
+  exchangeSource = 'Major_Fireplace1',
+  paid: DraftGameEvent<'resource.exchanged'>['paid'] = { sheep: 1 },
+): DraftGameEvent<'resource.exchanged'> => ({
+  type: 'resource.exchanged',
+  paid,
+  gained: { food: 2 },
+  paidFrom: { kind: 'player', playerId: player.id },
+  paidTo: { kind: 'supply' },
+  gainedFrom: { kind: 'supply' },
+  gainedTo: { kind: 'player', playerId: player.id },
+  exchangeSource,
+})
+
+const setupLessonsExchangeSession = (exchangeSource: 'kettle' | 'fireplace') => {
+  const session = new GameSession()
+  stabilizeRandomHands(session.state.players)
+  const state = session.getState().state
+  state.players = state.players.slice(0, 2)
+  state.currentPlayerIndex = 0
+  state.round = 1
+
+  const player = state.players[0]!
+  setWorkersAtHome(state, player, 2)
+  player.minorPlayed = [CARD_ID]
+  player.occupationHand = [OCCUPATION_ID, 'A124_Knapper']
+  player.resources = {
+    ...player.resources,
+    food: 10,
+    grain: exchangeSource === 'kettle' ? 1 : 0,
+    sheep: exchangeSource === 'fireplace' ? 1 : 0,
+  }
+  if (exchangeSource === 'kettle') player.minorPlayed.push('B032_Kettle')
+  if (exchangeSource === 'fireplace') player.improvements = ['Major_Fireplace1']
+  session.loadState(state)
+  return session
+}
+
+const useLessonsAndExchange = (
+  session: GameSession,
+  exchangeSource: 'B032_Kettle' | 'Major_Fireplace1',
+) => {
+  let resp = session.takeAction(0, 'lessons')
+  expect(resp.ok).toBe(true)
+  expect(resp.interaction.stateId).toBe('wait')
+  expect(resp.interaction.request.options?.map((option) => option.value)).toContain(OCCUPATION_ID)
+
+  resp = session.takeAnytimeAction(0, 'exchange')
+  expect(resp.ok).toBe(true)
+  expect(resp.interaction.stateId).toBe('wait')
+  resp = session.resolveChoice(0, 'bulk:0=1')
+  expect(resp.ok).toBe(true)
+  expect(resp.state.events).toContainEqual(expect.objectContaining({
+    type: 'resource.exchanged',
+    exchangeSource,
+  }))
+  expect(resp.interaction.stateId).toBe('wait')
+  expect(resp.interaction.request.options?.map((option) => option.value)).toContain(OCCUPATION_ID)
+
+  resp = session.resolveChoice(0, OCCUPATION_ID)
+  expect(resp.ok).toBe(true)
+  expect(resp.state.players[0]!.occupationPlayed).toContain(OCCUPATION_ID)
+  expect(resp.state.log).toContainEqual(expect.objectContaining({
+    key: 'log.placeFarmer',
+    params: expect.objectContaining({ action: 'actions.lessons.name' }),
+  }))
+  return resp
+}
+
+describe('B029_CookeryLesson — real Lessons exchange flow', () => {
+  it('does not count Kettle grain-to-food as cooking', () => {
+    const resp = useLessonsAndExchange(
+      setupLessonsExchangeSession('kettle'),
+      'B032_Kettle',
+    )
+
+    expect(resp.state.players[0]!.cardStates[CARD_ID]?.counters?.bonusVp).toBeUndefined()
+    expect(resp.scores?.[0]!.categories.find((category) => category.key === 'cardBonusVp')?.total ?? 0).toBe(0)
+  })
+
+  it('counts Fireplace sheep-to-food as cooking', () => {
+    const resp = useLessonsAndExchange(
+      setupLessonsExchangeSession('fireplace'),
+      'Major_Fireplace1',
+    )
+
+    expect(resp.state.players[0]!.cardStates[CARD_ID]?.counters?.bonusVp).toBe(1)
+    expect(resp.scores?.[0]!.categories.find((category) => category.key === 'cardBonusVp')?.total).toBe(1)
+  })
+})
+
 describe('B029_CookeryLesson — per-action token tracking, not per-round', () => {
   const setup = () => {
     const session = new GameSession()
@@ -67,6 +164,7 @@ describe('B029_CookeryLesson — per-action token tracking, not per-round', () =
     state.players = state.players.slice(0, 2)
     const player = state.players[0]!
     player.minorPlayed.push(CARD_ID)
+    player.improvements.push('Major_Fireplace1')
     return { session, state, player }
   }
 
@@ -99,6 +197,7 @@ describe('B029_CookeryLesson — per-action token tracking, not per-round', () =
       actionId: 'anytime-exchange',
       phase: 'after',
       result: { type: 'ok' },
+      actionEvents: [exchangedForFood(player)],
     } as CardListenerContext)
     expect(hasAction(result?.flow, 'bonus-vp')).toBe(true)
     expect(player.cardStates[CARD_ID]?.counters?.bonusVp).toBe(1)
@@ -117,6 +216,7 @@ describe('B029_CookeryLesson — per-action token tracking, not per-round', () =
       actionId: 'anytime-exchange',
       phase: 'after',
       result: { type: 'ok' },
+      actionEvents: [exchangedForFood(player)],
     } as CardListenerContext)
     expect(hasAction(result?.flow, 'bonus-vp')).toBe(false)
 
@@ -144,6 +244,7 @@ describe('B029_CookeryLesson — per-action token tracking, not per-round', () =
       actionId: 'anytime-exchange',
       phase: 'after',
       result: { type: 'ok' },
+      actionEvents: [exchangedForFood(player)],
     } as CardListenerContext)
     expect(hasAction(result?.flow, 'bonus-vp')).toBe(false)
 
@@ -171,6 +272,7 @@ describe('B029_CookeryLesson — per-action token tracking, not per-round', () =
       actionId: 'anytime-exchange',
       phase: 'after',
       result: { type: 'ok' },
+      actionEvents: [exchangedForFood(player)],
     } as CardListenerContext)
 
     // Action token advances → next farmer placement
@@ -215,6 +317,7 @@ describe('B029_CookeryLesson — per-action token tracking, not per-round', () =
       actionId: 'anytime-exchange',
       phase: 'after',
       result: { type: 'ok' },
+      actionEvents: [exchangedForFood(player)],
     } as CardListenerContext)
     expect(hasAction(result?.flow, 'bonus-vp')).toBe(false)
   })
@@ -243,6 +346,7 @@ describe('B029_CookeryLesson — per-action token tracking, not per-round', () =
       actionId: 'anytime-exchange',
       phase: 'after',
       result: { type: 'ok' },
+      actionEvents: [exchangedForFood(player)],
     } as CardListenerContext)
     expect(hasAction(result?.flow, 'bonus-vp')).toBe(true)
 
@@ -254,8 +358,46 @@ describe('B029_CookeryLesson — per-action token tracking, not per-round', () =
       actionId: 'anytime-exchange',
       phase: 'after',
       result: { type: 'ok' },
+      actionEvents: [exchangedForFood(player)],
     } as CardListenerContext)
     expect(hasAction(result?.flow, 'bonus-vp')).toBe(false)
+  })
+
+  it('does not stamp cooking for grain-to-food from a cookery source', () => {
+    const exchangeListener = findListener('B29-cookery-lesson-after-exchange')
+    const { state, player } = setup()
+    setActionToken(player, 550)
+
+    const result = invokeListener(exchangeListener!, {
+      state,
+      player,
+      actionId: 'anytime-exchange',
+      phase: 'after',
+      result: { type: 'ok' },
+      actionEvents: [exchangedForFood(player, 'Major_Fireplace1', { grain: 1 })],
+    } as CardListenerContext)
+
+    expect(result).toBeUndefined()
+    expect(readCardExtraData<number>(player, CARD_ID, 'cookedActionToken')).toBeUndefined()
+  })
+
+  it('does not stamp cooking for animal-to-food from a non-cookery source', () => {
+    const exchangeListener = findListener('B29-cookery-lesson-after-exchange')
+    const { state, player } = setup()
+    player.minorPlayed.push('B032_Kettle')
+    setActionToken(player, 551)
+
+    const result = invokeListener(exchangeListener!, {
+      state,
+      player,
+      actionId: 'anytime-exchange',
+      phase: 'after',
+      result: { type: 'ok' },
+      actionEvents: [exchangedForFood(player, 'B032_Kettle')],
+    } as CardListenerContext)
+
+    expect(result).toBeUndefined()
+    expect(readCardExtraData<number>(player, CARD_ID, 'cookedActionToken')).toBeUndefined()
   })
 
   it('non-lessons place-farmer does not stamp lessonsActionToken', () => {
