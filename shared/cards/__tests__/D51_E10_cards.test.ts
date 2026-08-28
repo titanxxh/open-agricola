@@ -309,9 +309,12 @@ describe('move-farmer-to-space action', () => {
     expect(target.takenBy).toEqual([{ playerId: 'p1', workerId: '1' }])
     if (result.type === 'flow') {
       expect(result.flow).toMatchObject({
-        type: 'leaf',
-        actionId: 'day-laborer',
-        expandFlow: true,
+        type: 'seq',
+        children: [
+          { type: 'leaf', actionId: 'turn-scope', params: { operation: 'begin' } },
+          { type: 'leaf', actionId: 'day-laborer', expandFlow: true },
+          { type: 'leaf', actionId: 'turn-scope', params: { operation: 'end' } },
+        ],
       })
     }
   })

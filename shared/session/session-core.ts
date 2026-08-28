@@ -80,6 +80,7 @@ import {
   incResourceConverted,
 } from '../session/stats.ts'
 import { getMinorImprovement } from '../cards/registry-display.ts'
+import { endTurnScope } from '../cards/helpers/action-snapshot.ts'
 import {
   registerCustomCard,
   getCustomMinorImprovementIds,
@@ -466,31 +467,9 @@ export class GameCore {
   private responsePrivateEvents: PrivateGameEvent[] = []
   private deferPrivateEventDrainDepth = 0
   /**
-   * Monotonic counter for two purposes:
-   *   1. `recordActionSnapshot(player, n)` — per-player action token used by
-   *      undo/replay to label whose turn produced each player snapshot.
-   *   2. `nextSyntheticNodeId(prefix)` — generates `${prefix}-${n}` ids for
-   *      synthetic pending frames (`startConfirmNextPlayer` etc.).
-   *
-   * Cursor restore: the pending envelope carries the original
-   * synthetic id (e.g. `interaction:feed-7`); after `loadState` the freshly-
-   * constructed `GameCore` resets `nextActionToken` to 1, so the next
-   * `startConfirm*` call mints `interaction:confirm-next-player-1`.
-   * Collisions on synthetic *node ids* are impossible because each id lives
-   * on a separate `Engine` instance (one per stack frame) and
-   * synthetic frames are isolated engine instances.
-   *
-   * Caveat (Task 10 S-2 / Task 11 carry-over): the same counter also stamps
-   * per-player action snapshots (`recordActionSnapshot(player, token)`).
-   * Those tokens persist into `player.actionSnapshots` and survive
-   * serialize/rehydrate; a cold-restart `GameCore` will start emitting fresh
-   * tokens from `1` again, so post-restart snapshot tokens are not globally
-   * monotonic across the session boundary. Today the only consumers compare
-   * tokens within a single session run (undo/replay within one process), so
-   * the restart is benign — but if any future feature wants a stable
-   * "this happened before that" ordering across restarts, the counter will
-   * need to ride the cursor (or be derived from `max(actionSnapshots) + 1`
-   * during rehydrate). Logged here so the next change-author sees the gap.
+   * Supplies synthetic node ids and preferred Turn Scope tokens. Snapshot
+   * state persists its own last token and raises stale values after reload;
+   * synthetic ids may restart because each one is local to its Engine.
    */
   private nextActionToken = 1
   private turnOwnerPlayerIndex: number | null = null
@@ -3263,6 +3242,7 @@ export class GameCore {
               if (!frame.stageResume) {
                 this.cleanupFailedWorkerPlacement(space, player, activeActionContext)
               }
+              endTurnScope(frameOwnerPlayer)
               this.engineStack.pop()
               this.actionStartIndex = null
               this.actionStartPlayerSnapshot = null
@@ -3296,6 +3276,7 @@ export class GameCore {
         if (!frame.stageResume) {
           this.cleanupFailedWorkerPlacement(space, player, activeActionContext)
         }
+        endTurnScope(frameOwnerPlayer)
         this.engineStack.pop()
         this.actionStartIndex = null
         this.actionStartPlayerSnapshot = null
@@ -3629,6 +3610,7 @@ export class GameCore {
       if (result.recoverable === true) {
         return this.respond(false, result.errorKey ?? 'action failed')
       }
+      endTurnScope(this.state.players[frame?.ownerPlayerIndex ?? playerIndex] ?? player)
       this.engineStack.pop()
       this.actionStartIndex = null
       this.actionStartPlayerSnapshot = null
@@ -4285,6 +4267,7 @@ export class GameCore {
       return this.respond()
     }
     if (result.type === 'fail') {
+      endTurnScope(updatedPlayer)
       this.engineStack.pop()
       this.actionStartIndex = null
       return this.respond()
@@ -4359,6 +4342,7 @@ export class GameCore {
       if (result.recoverable === true) {
         return this.respond(false, result.errorKey ?? 'action failed')
       }
+      endTurnScope(this.state.players[frame?.ownerPlayerIndex ?? playerIndex] ?? player)
       this.engineStack.pop()
       this.actionStartIndex = null
       this.actionStartPlayerSnapshot = null

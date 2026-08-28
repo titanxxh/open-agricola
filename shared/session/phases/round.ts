@@ -24,7 +24,7 @@ import type { MoorSpecialActionId } from '../../moor/types.ts'
 import { hasHealthyWorkerAtHome, selectWorkerForMoorAction } from '../../moor/heating.ts'
 import { canEnterActionSpace } from '../action-entry-query.ts'
 import { incPlacedFarmers } from '../../session/stats.ts'
-import { recordActionSnapshot } from '../../cards/helpers/action-snapshot.ts'
+import { endTurnScope, recordActionSnapshot } from '../../cards/helpers/action-snapshot.ts'
 import { recordRoundPlacement } from '../../cards/helpers/round-placement.ts'
 import { collectBeforePlacementFlows, runCardListeners } from '../../cards/card-listeners.ts'
 import { shouldSkipPlayerTurn, hasPendingExtraTurn, collectExtraTurnFlow, skipPendingExtraTurn } from '../../cards/card-effects.ts'
@@ -462,6 +462,7 @@ export const finishCompletedActionTurn = (
   const player = core.state.players[playerIndex]
   if (!player) return core.emitResponse(false, 'invalid player')
   finalizeActionLog(core, player)
+  endTurnScope(player)
   core.setTurnOwner(null)
   core.clearEngineStack()
   if (!roundWorkComplete(core.state)) {

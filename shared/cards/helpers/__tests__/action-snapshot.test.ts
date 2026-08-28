@@ -1,5 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import {
+  beginTurnScope,
+  endTurnScope,
   recordActionSnapshot,
   readActionSnapshotToken,
   getRoomsBuiltThisAction,
@@ -105,5 +107,15 @@ describe('action-snapshot', () => {
     recordActionSnapshot(player, 1)
     player.fenceSegments = []
     expect(getFencesBuiltThisAction(player)).toBe(0)
+  })
+
+  it('keeps turn tokens monotonic after a scope ends', () => {
+    const player = makePlayer()
+    expect(recordActionSnapshot(player, 7)).toBe(7)
+    endTurnScope(player)
+    expect(readActionSnapshotToken(player)).toBeUndefined()
+    expect(beginTurnScope(player)).toBe(8)
+    endTurnScope(player)
+    expect(recordActionSnapshot(player, 1)).toBe(9)
   })
 })

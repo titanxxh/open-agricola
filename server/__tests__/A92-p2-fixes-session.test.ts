@@ -385,6 +385,7 @@ describe('A92 P2 fixes', () => {
       const p0 = session.getState().state.players[0]!
       const failingSpace = session.getState().state.actionSpaces.find((space) => space.id === failingSpaceId)!
       expect(failingSpace.takenBy.filter((ref) => ref.playerId === p0.id)).toHaveLength(0)
+      expect(readActionSnapshotToken(p0)).toBeUndefined()
     })
 
     it('failed allow-occupied target action removes the newly placed worker, not an older worker', () => {

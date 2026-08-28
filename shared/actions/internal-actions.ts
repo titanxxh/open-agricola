@@ -37,6 +37,7 @@ import { activateCardEffectAction } from './effects/internal/activate-card-effec
 import { activateExtraTurnAction } from './effects/internal/activate-extra-turn'
 import { drawOrdinaryCardsAction } from './effects/internal/draw-ordinary-cards'
 import { placeFarmerOnSpaceAction } from './effects/internal/place-farmer-on-space'
+import { turnScopeAction } from './effects/internal/turn-scope'
 import { scheduledOfferAction } from './effects/internal/scheduled-offers'
 import { passMinorCardToLeftAction } from './effects/internal/pass-minor-card-to-left'
 import { specialEffectAction } from './effects/special-effect'
@@ -88,6 +89,7 @@ export const internalActionDefinitions: ActionDefinition[] = [
   activateExtraTurnAction,
   drawOrdinaryCardsAction,
   placeFarmerOnSpaceAction,
+  turnScopeAction,
   scheduledOfferAction,
   passMinorCardToLeftAction,
   specialEffectAction,

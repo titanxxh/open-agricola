@@ -4,17 +4,36 @@ import { ensureCardState } from './card-state'
 
 const ACTION_SNAPSHOT_CARD_ID = '__actionSnapshot__'
 
+const lastActionToken = (player: PlayerState): number => {
+  const extraData = player.cardStates?.[ACTION_SNAPSHOT_CARD_ID]?.extraData
+  const value = extraData?.lastToken ?? extraData?.token
+  return typeof value === 'number' ? value : 0
+}
+
 export const recordActionSnapshot = (
   player: PlayerState,
   token: number,
 ) => {
   const cardState = ensureCardState(player, ACTION_SNAPSHOT_CARD_ID)
+  const nextToken = Math.max(token, lastActionToken(player) + 1)
   cardState.extraData = {
-    token,
+    lastToken: nextToken,
+    token: nextToken,
     stableTiles: getStableCountForCards(player),
     roomTiles: player.roomTiles.length,
     fenceSegments: player.fenceSegments.length,
   }
+  return nextToken
+}
+
+export const beginTurnScope = (player: PlayerState): number =>
+  recordActionSnapshot(player, 1)
+
+export const endTurnScope = (player: PlayerState): void => {
+  const cardState = player.cardStates?.[ACTION_SNAPSHOT_CARD_ID]
+  if (!cardState) return
+  const lastToken = lastActionToken(player)
+  cardState.extraData = lastToken > 0 ? { lastToken } : {}
 }
 
 export const readActionSnapshotToken = (player: PlayerState): number | undefined =>

@@ -497,6 +497,25 @@ A092 Adoptive Parents introduced the extra-turn mechanism at the rotation layer 
 
 `skipTurn`, used by cards such as D134 Oyster Eater through `{ skipTurn: true }`, mirrors the reference `Globals::setSkipNext` and makes rotation continue past the player before their turn starts. `contributeExtraTurn` instead prevents early skipping after the player's workers are exhausted and appends another placement. See *Extra Turn / Forfeit* in `CONTEXT.md`.
 
+### 6.5 Turn Scope and Action-Execution Scope
+
+Rotation opportunity, Turn Scope, and action-execution scope are separate lifetimes. Cards whose text says “on your turn” or “in the same turn” consume Turn Scope. Cards that inspect what was actually built, plowed, sown, or otherwise changed consume the current action's scope or transaction result.
+
+| Rule situation | Rotation opportunity | Turn Scope | Action-execution scope |
+|---|---|---|---|
+| Ordinary worker placement or a Moor special action selected by rotation | Consume the current opportunity | Open a new scope | Open one scope for each complete Rule Action |
+| A contributed Extra Turn | Open an additional opportunity | Open a new scope | Open one scope for each complete Rule Action |
+| D051 Archway, or each worker moved by E010 Straw Hat | No new opportunity | Open a new scope for each moved worker | Open one scope for each complete Rule Action |
+| An immediate Rule Action that remains part of the current Turn | No new opportunity | Inherit the current scope | Open a new scope |
+| A phase or anytime Rule Action that does not count as a Turn, such as Iron Hoe | No new opportunity | None | Open a new scope |
+| A raw gain, payment, choice, or listener activation | No new opportunity | Inherit a scope if one exists | Do not open a new scope; remain in the surrounding scope |
+
+A Turn Scope begins before its worker placement, Moor special action, or equivalent card-driven action-space use. It remains active through every Rule Action and trailing effect belonging to that Turn, then clears. D051 Archway closes its Turn Scope after the target action space is fully resolved. E010 Straw Hat closes one Turn Scope before starting the next moved worker's choice. Idle or later stage processing must never observe a completed Turn's stale identity or start snapshot.
+
+An action-execution scope begins before one Rule Action's lifecycle and remains active through its pending choices, continuations, listeners, and trailing effects. Multiple Rule Actions in one Turn use separate action scopes while sharing the Turn Scope. Per-action delta consumers use the action transaction, not the Turn's start snapshot.
+
+`actionContext.trueAction` is independent of all three lifetimes. It says only whether an effect counts as taking its named action for action listeners. It neither creates a Turn nor replaces an action-execution scope: a free build may use `trueAction: false` while still exposing its actual build delta to generic “when you build” rules.
+
 ## 7. `shared/actions/`: Actions and Hooks
 
 ### 7.1 Directory
@@ -932,7 +951,7 @@ Production paths access cards only through `catalog.generated.ts` and `CardRegis
 - `pay-gain-node.ts`: templates for gain after payment, an appended action after payment, or returning resources to the current space before gaining.
 - `stage-effects.ts`: stage card-effect flags, immediate payment, bonus VP, and one-time Harvest exchanges.
 - `card-state.ts` and `round-placement.ts`: one-time `flagged` or `extraData` state and placement order this round.
-- `action-snapshot.ts`: action-start snapshots reused by cards such as A74.
+- `action-snapshot.ts`: the active Turn Scope identity and start snapshot described in section 6.5. Per-action deltas belong to action transactions, not this snapshot.
 - `card-held-workers.ts`: worker holding described in section 8.3.
 - `card-field.ts`: declarative card-as-field factory described below.
 

@@ -72,6 +72,7 @@ describe('effects architecture guard', () => {
       'stables',
       'store-on-card',
       'take-from-card',
+      'turn-scope',
     ])
   })
 
