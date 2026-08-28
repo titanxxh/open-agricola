@@ -6,6 +6,11 @@ import { readImprovementTypes } from '../../actions/effects/improvement'
 import { getAvailableMajorImprovementIds } from '../major/supply'
 
 const CARD_ID = 'E024_Ambition'
+const MINOR_IMPROVEMENT_SPACES = new Set([
+  'meeting-place',
+  'wish-children',
+  'urgent-wish-children',
+])
 
 /**
  * E24 Ambition — Each time you get a __Minor Improvement__ action on an action
@@ -25,7 +30,12 @@ const choiceCandidateListener: CardListenerRegistration = {
   phases: ['computeChoiceCandidates' as ActionHookPhase],
   actions: ['improvement'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
-    if (context.sourceCard || context.trueAction === false) return
+    if (context.trueAction === false) return
+    const targetSpaceId = context.actionContext?.targetSpaceId
+    if (
+      context.sourceCard &&
+      (typeof targetSpaceId !== 'string' || !MINOR_IMPROVEMENT_SPACES.has(targetSpaceId))
+    ) return
     const types = readImprovementTypes(context)
     if (types.length !== 1 || types[0] !== 'minor') return
     const extraOptions = getAvailableMajorImprovementIds(context.state).map((id) => ({
