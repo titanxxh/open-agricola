@@ -3,6 +3,7 @@ import { GameSession } from '../game/authoritative-session'
 import { getRegisteredCardListeners, executeCardListener } from '../../shared/cards/card-listeners'
 import type { CardListenerContext } from '../../shared/cards/card-listeners'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
+import { readCardResourceStats } from '../../shared/cards/helpers/card-state'
 
 import { C056_FeedFence } from '../../shared/cards/C/C056_FeedFence'
 import '../../shared/cards/C/C088_CarpentersApprentice'
@@ -111,6 +112,8 @@ describe('C056_FeedFence session', () => {
         bonusSources: [CARD_ID],
       }),
     ]))
+    expect(readCardResourceStats(resp.state.players[0]!, CARD_ID)?.saved).toEqual({ wood: 1 })
+    expect(readCardResourceStats(resp.state.players[0]!, CARD_ID)?.paid).toEqual({ clay: 1 })
     expect(resp.state.log.some((entry) => entry.key === 'log.actionDetail')).toBe(true)
     expect(resp.scores).toHaveLength(6)
   })

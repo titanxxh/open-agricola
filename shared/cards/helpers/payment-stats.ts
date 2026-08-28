@@ -30,7 +30,8 @@ const hasPositiveResources = (resources: Partial<Resource>): boolean =>
  * solution so we don't have to re-derive a "reference combination".
  *
  * Trade attribution rules:
- *  - For each tradesUsed[i] with sourceId set:
+ *  - Unit-cost trades use their recorded actual cost attribution.
+ *  - Other trades with sourceId derive attribution from their declaration:
  *    saved[res] += times * trade.from[res]
  *    paid[res]  += times * trade.to[res]
  *  - tradesUsed without sourceId are engine-internal and skipped.
@@ -49,13 +50,17 @@ export const recordPaymentStats = (
     const sourceId = used.trade.sourceId
     if (!sourceId) continue
     const isPureDiscount = !hasPositiveResources(used.trade.from as Partial<Resource>)
-    const saved = scaleResources(
-      (isPureDiscount ? used.trade.to : used.trade.from) as Partial<Resource>,
-      used.times,
-    )
-    const paid = isPureDiscount
-      ? {}
-      : scaleResources(used.trade.to as Partial<Resource>, used.times)
+    const saved = used.costAttribution
+      ? used.costAttribution.saved ?? {}
+      : scaleResources(
+          (isPureDiscount ? used.trade.to : used.trade.from) as Partial<Resource>,
+          used.times,
+        )
+    const paid = used.costAttribution
+      ? used.costAttribution.paid ?? {}
+      : isPureDiscount
+        ? {}
+        : scaleResources(used.trade.to as Partial<Resource>, used.times)
     if (Object.keys(saved).length > 0) {
       addCardResourceSaved(player, sourceId, saved)
     }

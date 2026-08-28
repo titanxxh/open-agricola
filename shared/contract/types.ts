@@ -243,6 +243,12 @@ export type CostAttribution = {
   paid?: PaymentResourceMap
 }
 
+export type TradeUsage = {
+  trade: Trade
+  times: number
+  costAttribution?: CostAttribution
+}
+
 export type CostAttributionBySource = Record<string, CostAttribution>
 
 export type CardCostCandidateMetadata = {
@@ -262,7 +268,7 @@ export type ActionCostAttribution = {
 
 export type PaymentSolution = {
   resourcesPaid: PaymentResourceMap
-  tradesUsed: { trade: Trade; times: number }[]
+  tradesUsed: TradeUsage[]
   cardUsed?: string
   bonusUsed?: string
   bonusChoiceIndex?: Record<string, number>
