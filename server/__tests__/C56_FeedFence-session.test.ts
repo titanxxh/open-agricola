@@ -2,13 +2,33 @@ import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { getRegisteredCardListeners, executeCardListener } from '../../shared/cards/card-listeners'
 import type { CardListenerContext } from '../../shared/cards/card-listeners'
+import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 
 import '../../shared/cards/C/C056_FeedFence'
+import '../../shared/cards/C/C094_StableCleaner'
 import type { ActionFlow } from '../../shared/contract/types'
 
 const CARD_ID = 'C056_FeedFence'
 
 describe('C056_FeedFence session', () => {
+  const setupPaymentSession = (playerCount: 2 | 6 = 2) => {
+    const session = new GameSession(56, undefined, { playerCount })
+    stabilizeRandomHands(session.state.players)
+    const state = session.getState().state
+    state.currentPlayerIndex = 0
+    const player = state.players[0]!
+    player.minorPlayed.push(CARD_ID)
+    Object.assign(player.resources, {
+      wood: 0,
+      clay: 0,
+      reed: 0,
+      food: 0,
+      grain: 0,
+    })
+    session.loadState(state)
+    return { session, state, player }
+  }
+
   const runAfterStables = (configure: (player: import('../../shared/contract/types').PlayerState) => void) => {
     const session = new GameSession()
     const state = session.getState().state
@@ -59,5 +79,116 @@ describe('C056_FeedFence session', () => {
     })
     expect(result).toBeDefined()
     expect((result!.flow as Extract<ActionFlow, { type: 'leaf' }>).params?.food).toBe(1)
+  })
+
+  it('pays 1 clay for the Side Job stable whose pure wood cost is 1', () => {
+    const { session, state, player } = setupPaymentSession(6)
+    player.resources.clay = 1
+    session.loadState(state)
+
+    let resp = session.takeAction(0, 'side-job-6')
+    expect(resp.ok).toBe(true)
+    expect(resp.interaction.stateId).toBe('wait')
+    if (resp.interaction.stateId !== 'wait' || resp.interaction.request.kind !== 'farm-select') {
+      throw new Error('expected stable selection')
+    }
+    expect(resp.interaction.request.farm.farmType).toBe('stable')
+    if (resp.interaction.request.farm.farmType !== 'stable') throw new Error('expected stables')
+    const stable = resp.interaction.request.farm.selectableTiles[0]!
+
+    resp = session.commitSelectionChoice(0, { stables: [stable] })
+
+    expect(resp.ok).toBe(true)
+    expect(resp.state.players[0]!.stableTiles).toEqual([stable])
+    expect(resp.state.players[0]!.resources).toMatchObject({ wood: 0, clay: 0, food: 1 })
+    expect(resp.state.events).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        type: 'resource.paid',
+        paymentFor: 'stables',
+        resources: { clay: 1 },
+        bonusSources: [CARD_ID],
+      }),
+    ]))
+    expect(resp.state.log.some((entry) => entry.key === 'log.actionDetail')).toBe(true)
+    expect(resp.scores).toHaveLength(6)
+  })
+
+  it('replaces only one standard stable when building two', () => {
+    const { session, state, player } = setupPaymentSession()
+    Object.assign(player.resources, { wood: 2, clay: 1 })
+    session.loadState(state)
+
+    let resp = session.takeAction(0, 'farm-expansion')
+    expect(resp.ok).toBe(true)
+    expect(resp.interaction.stateId).toBe('wait')
+    if (resp.interaction.stateId !== 'wait' || resp.interaction.request.kind !== 'farm-select') {
+      throw new Error('expected stable selection')
+    }
+    expect(resp.interaction.request.farm.farmType).toBe('stable')
+    if (resp.interaction.request.farm.farmType !== 'stable') throw new Error('expected stables')
+    const stables = resp.interaction.request.farm.selectableTiles.slice(0, 2)
+    expect(stables).toHaveLength(2)
+
+    resp = session.commitSelectionChoice(0, { stables })
+
+    expect(resp.ok).toBe(true)
+    expect(resp.state.players[0]!.stableTiles).toEqual(stables)
+    expect(resp.state.players[0]!.resources).toMatchObject({ wood: 0, clay: 0, food: 2 })
+    expect(resp.state.events).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        type: 'resource.paid',
+        paymentFor: 'stables',
+        resources: { wood: 2, clay: 1 },
+        bonusSources: [CARD_ID],
+      }),
+    ]))
+    expect(resp.state.log.some((entry) => entry.key === 'log.actionDetail')).toBe(true)
+    expect(resp.scores).toHaveLength(2)
+  })
+
+  it('does not apply to Stable Cleaner mixed wood and food cost', () => {
+    const blocked = setupPaymentSession()
+    blocked.player.occupationPlayed.push('C094_StableCleaner')
+    Object.assign(blocked.player.resources, { clay: 1, food: 1 })
+    blocked.session.loadState(blocked.state)
+
+    const unavailable = blocked.session.takeAction(0, 'farmland')
+    expect(unavailable.ok).toBe(true)
+    expect(unavailable.interaction.anytimeActions.map((action) => action.id))
+      .not.toContain('C94-stable-cleaner-anytime')
+
+    const payable = setupPaymentSession()
+    payable.player.occupationPlayed.push('C094_StableCleaner')
+    Object.assign(payable.player.resources, { wood: 1, clay: 1, food: 1 })
+    payable.session.loadState(payable.state)
+
+    let resp = payable.session.takeAction(0, 'farmland')
+    expect(resp.interaction.anytimeActions.map((action) => action.id))
+      .toContain('C94-stable-cleaner-anytime')
+    resp = payable.session.takeAnytimeAction(0, 'C94-stable-cleaner-anytime')
+    expect(resp.interaction.stateId).toBe('wait')
+    if (resp.interaction.stateId !== 'wait' || resp.interaction.request.kind !== 'farm-select') {
+      throw new Error('expected stable selection')
+    }
+    expect(resp.interaction.request.farm.farmType).toBe('stable')
+    if (resp.interaction.request.farm.farmType !== 'stable') throw new Error('expected stables')
+    const stable = resp.interaction.request.farm.selectableTiles[0]!
+    resp = payable.session.commitSelectionChoice(0, { stables: [stable] })
+
+    expect(resp.ok).toBe(true)
+    expect(resp.state.players[0]!.resources).toMatchObject({ wood: 0, clay: 1, food: 1 })
+    expect(resp.state.events).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        type: 'resource.paid',
+        paymentFor: 'stables',
+        resources: { wood: 1, food: 1 },
+      }),
+    ]))
+    const paid = resp.state.events.find(
+      (event) => event.type === 'resource.paid' && event.paymentFor === 'stables',
+    )
+    expect(paid?.type === 'resource.paid' ? paid.bonusSources ?? [] : []).not.toContain(CARD_ID)
+    expect(resp.state.log.some((entry) => entry.key === 'log.actionDetail')).toBe(true)
+    expect(resp.scores).toHaveLength(2)
   })
 })

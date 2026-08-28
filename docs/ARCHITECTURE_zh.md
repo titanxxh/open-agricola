@@ -614,7 +614,7 @@ Hook 不进 `ActionDefinition`，由 `hooks.ts` 显式注册（卡牌文件内�
 | scope | 应用位置 | max 默认 | 典型用例 |
 |---|---|---|---|
 | `action` | 玩家资源池（每个 trade 独立到 `max`） | `?? 1` | A028_ForestSchool（lessons cost）、A088_HedgeKeeper（fencing 全部 3 段一次换）、E060_WorkingGloves（grouped exchange，未来加 groupMax）|
-| `unit` | 每个 unit cost row，经候选闭包展开（无顺序字段） | `?? 1`（每个 row）| A123_FrameBuilder（每间房一次 wood-for-clay/stone）、A016_RammedClay（每段 fence clay-for-wood）、C056_FeedFence（至多一座 stable clay-for-wood）|
+| `unit` | 每个 unit cost row，经候选闭包展开（无顺序字段） | `?? 1`（每个 row）| A123_FrameBuilder（每间房一次 wood-for-clay/stone）、A016_RammedClay（每段 fence clay-for-wood）|
 
 scope:'unit' MUST NOT 携带 `conditions.minNumRooms`（per-unit 没有 min-unit 阈值）；`validateTradeModifier` 在 `applyCostModifiers` 入口处强制此不变量。
 
