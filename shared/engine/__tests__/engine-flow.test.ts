@@ -1481,6 +1481,117 @@ describe('Engine flow nodes', () => {
     expect(events).toEqual(['original'])
   })
 
+  it('keeps every computeReplace alternative with branch-local recursion guards', () => {
+    const events: string[] = []
+    const original: ActionDefinition = {
+      id: 'multi-replace-original',
+      nameKey: 'actions.construct.name',
+      descriptionKey: 'actions.construct.description',
+      roundAvailable: 1,
+      gainPerRound: {},
+      canBeExecutedByPlayer: () => true,
+      execute: () => {
+        events.push('original')
+        return { type: 'ok' }
+      },
+    }
+    const replacementA: ActionDefinition = {
+      id: 'multi-replace-a',
+      nameKey: 'actions.plow.name',
+      descriptionKey: 'actions.plow.description',
+      roundAvailable: 1,
+      gainPerRound: {},
+      canBeExecutedByPlayer: () => true,
+      execute: () => ({ type: 'ok' }),
+    }
+    const replacementB: ActionDefinition = {
+      id: 'multi-replace-b',
+      nameKey: 'actions.fencing.name',
+      descriptionKey: 'actions.fencing.description',
+      roundAvailable: 1,
+      gainPerRound: {},
+      canBeExecutedByPlayer: () => true,
+      execute: () => ({ type: 'ok' }),
+    }
+    requireActiveCardRegistry('engine-flow').registerListener({
+      id: 'a-multi-replace',
+      actions: [original.id],
+      phases: ['computeReplace'],
+      handler: () => ({
+        decline: true,
+        alternativeFlow: {
+          type: 'leaf',
+          actionId: replacementA.id,
+          choiceLabelKey: 'test.replacementA',
+        },
+      }),
+    })
+    requireActiveCardRegistry('engine-flow').registerListener({
+      id: 'b-multi-replace',
+      actions: [original.id],
+      phases: ['computeReplace'],
+      handler: () => ({
+        decline: true,
+        alternativeFlow: {
+          type: 'seq',
+          choiceLabelKey: 'test.replacementB',
+          children: [
+            { type: 'leaf', actionId: original.id },
+            { type: 'leaf', actionId: replacementB.id },
+          ],
+        },
+      }),
+    })
+    const registry = new ActionRegistry()
+    registry.register(original)
+    registry.register(replacementA)
+    registry.register(replacementB)
+    const state = createState()
+    const player = createPlayer()
+    const space = createSpace(original)
+    const makeEngine = () => new Engine({
+      tree: new EngineTree(new ActionNode('action-multi-replace-original', original.id)),
+      registry,
+      hooks: new HookDispatcher(),
+      log: new LogStore(),
+    })
+
+    const nestedEngine = makeEngine()
+    expect(nestedEngine.proceed({ state, player, space }).type).toBe('ok')
+    const topChoice = nestedEngine.proceed({ state, player, space })
+    expect(topChoice.type).toBe('choice')
+    if (topChoice.type !== 'choice') return
+    expect(topChoice.choice.options.map((option) => option.labelKey)).toEqual([
+      'test.replacementA',
+      'test.replacementB',
+      'actions.construct.name',
+    ])
+    const replacementBOption = topChoice.choice.options.find(
+      (option) => option.labelKey === 'test.replacementB',
+    )
+    expect(replacementBOption).toBeDefined()
+    expect(nestedEngine.resolveChoice(replacementBOption!.value, { state, player, space }).type).toBe('ok')
+    const nestedChoice = nestedEngine.proceed({ state, player, space })
+    expect(nestedChoice.type).toBe('choice')
+    if (nestedChoice.type !== 'choice') return
+    expect(nestedChoice.choice.options.map((option) => option.labelKey)).toEqual([
+      'test.replacementA',
+      'actions.construct.name',
+    ])
+
+    const originalEngine = makeEngine()
+    expect(originalEngine.proceed({ state, player, space }).type).toBe('ok')
+    const originalChoice = originalEngine.proceed({ state, player, space })
+    expect(originalChoice.type).toBe('choice')
+    if (originalChoice.type !== 'choice') return
+    const originalOption = originalChoice.choice.options.find(
+      (option) => option.labelKey === 'actions.construct.name',
+    )
+    expect(originalOption).toBeDefined()
+    expect(originalEngine.resolveChoice(originalOption!.value, { state, player, space }).type).toBe('ok')
+    expect(events).toEqual(['original'])
+  })
+
   it('replacement alternatives keep normal hook context while suppressing source replace recursion', () => {
     const events: string[] = []
     const sow: ActionDefinition = {

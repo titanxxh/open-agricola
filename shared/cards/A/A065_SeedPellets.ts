@@ -1,25 +1,19 @@
 import { defineMinorCard } from '../card-source'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
-import { canSow } from '../../actions/effects/sow'
+import { canSow, isUnconditionalSow } from '../../actions/effects/sow'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import { fieldIsEmpty } from '../../domain/field'
 import type { CardImpl } from '../registry'
 
 const CARD_ID = 'A065_SeedPellets'
-const isUnconditionalSow = (context: CardListenerContext) => {
-  const actionContext = context.actionContext ?? {}
-  if (actionContext.checkedReplaceAction === true) return false
-  return actionContext.maxSelections === undefined && actionContext.cropType === undefined
-}
-
 const beforeSowListener: CardListenerRegistration = {
   id: 'A65-seed-pellets-before-sow',
   cardIds: [CARD_ID],
   phases: ['before' as ActionHookPhase],
   actions: ['sow'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
-    if (!isUnconditionalSow(context)) return
+    if (!isUnconditionalSow(context.actionContext)) return
     return { flow: gainLeaf(CARD_ID, { grain: 1 }), sourceCard: CARD_ID }
   },
 }
@@ -32,7 +26,7 @@ const isDoableListener: CardListenerRegistration = {
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (context.doable) return
     if (context.actionContext?.skipBeforeTriggers === true) return
-    if (!isUnconditionalSow(context)) return
+    if (!isUnconditionalSow(context.actionContext)) return
     if (canSow(context.player)) return
     if (!context.player.fields.some((field) => fieldIsEmpty(field))) return
     return { doable: true }

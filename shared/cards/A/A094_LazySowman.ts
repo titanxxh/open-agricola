@@ -3,7 +3,7 @@ import type { CardListenerRegistration, CardListenerContext } from '../card-list
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import type { ActionChoiceOption, ActionSpace, GameState } from '../../contract/types'
 import { OCCUPIED_SPACE_CHOICE_PREFIX } from '../../actions/helpers/placement-constants'
-import { canSow } from '../../actions/effects/sow'
+import { canSow, isUnconditionalSow } from '../../actions/effects/sow'
 import { isSpaceOccupied } from '../../domain/space'
 import { workersAvailable } from '../../domain/player'
 import type { CardImpl } from '../registry'
@@ -20,12 +20,6 @@ const isOpenSpace = (state: GameState, space: ActionSpace) => {
   return state.round >= getOpenRound(state, space)
 }
 
-const isUnconditionalSow = (context: CardListenerContext) => {
-  const actionContext = context.actionContext ?? {}
-  if (actionContext.checkedReplaceAction === true) return false
-  return actionContext.maxSelections === undefined && actionContext.cropType === undefined
-}
-
 const computeReplaceListener: CardListenerRegistration = {
   id: 'A94-lazy-sowman-replace-sow',
   cardIds: [CARD_ID],
@@ -33,7 +27,8 @@ const computeReplaceListener: CardListenerRegistration = {
   actions: ['sow'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (context.state.roundPhase !== 'work') return
-    if (!isUnconditionalSow(context)) return
+    if (context.actionContext?.checkedReplaceAction === true) return
+    if (!isUnconditionalSow(context.actionContext)) return
     if (workersAvailable(context.state, context.player) <= 0) return
     return {
       decline: true,
@@ -61,7 +56,8 @@ const isDoableListener: CardListenerRegistration = {
   actions: ['sow'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (context.state.roundPhase !== 'work') return
-    if (!isUnconditionalSow(context)) return
+    if (context.actionContext?.checkedReplaceAction === true) return
+    if (!isUnconditionalSow(context.actionContext)) return
     if (canSow(context.player)) return
     if (workersAvailable(context.state, context.player) <= 0) return
     return { doable: true }

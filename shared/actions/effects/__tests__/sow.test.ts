@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { sowCrop, getEmptyFields, canSow, sowAction } from '../sow'
+import { sowCrop, getEmptyFields, canSow, isUnconditionalSow, sowAction } from '../sow'
 import { makeBlankPlayer } from '../../../domain/__tests__/helpers'
 import type { Field, GameState, PlayerState } from '../../../contract/types'
 
@@ -48,6 +48,15 @@ describe('sowCrop with stacks', () => {
       0,
     )
     expect(canSow(player)).toBe(false)
+  })
+})
+
+describe('isUnconditionalSow', () => {
+  it('ignores replacement bookkeeping but rejects selection restrictions', () => {
+    expect(isUnconditionalSow()).toBe(true)
+    expect(isUnconditionalSow({ checkedReplaceAction: true })).toBe(true)
+    expect(isUnconditionalSow({ maxSelections: 1 })).toBe(false)
+    expect(isUnconditionalSow({ cropType: 'grain' })).toBe(false)
   })
 })
 

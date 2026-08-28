@@ -513,16 +513,15 @@ export function engineResolveChoice(
       })
       const actionId = replaceResult.actionId
       executionContext.sourceCard = replaceResult.sourceCard ?? child.sourceCard
-      if (replaceResult.declined && replaceResult.alternativeFlow) {
+      if (replaceResult.alternatives.length > 0) {
         const flowNode = buildOwnedFlowNode(int,
           buildReplaceChoiceFlow(
             child,
-            applyDefaultSourceCardToFlow(
-              replaceResult.alternativeFlow,
-              replaceResult.sourceCard,
-            ),
+            replaceResult.alternatives.map((alternative) => ({
+              ...alternative,
+              flow: applyDefaultSourceCardToFlow(alternative.flow, alternative.sourceCard),
+            })),
             actionId,
-            replaceResult.replacementListenerIds,
           ),
           context.player.id,
         )

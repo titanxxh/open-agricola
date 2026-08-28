@@ -17,6 +17,9 @@ export const canSow = (player: PlayerState) =>
   getEmptyFields(player).length > 0 &&
   (player.resources.grain > 0 || player.resources.vegetable > 0)
 
+export const isUnconditionalSow = (actionContext?: Record<string, unknown>) =>
+  actionContext?.maxSelections === undefined && actionContext?.cropType === undefined
+
 export const sowCrop = (
   player: PlayerState,
   crop: 'grain' | 'vegetable',
