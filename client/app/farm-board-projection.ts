@@ -93,6 +93,7 @@ export type FarmBoardProjectionPlayedCardDisplay = {
   resourceStats?: CardResourceStats
   stack: string[]
   cardStacks: CropStack[] | null
+  cardStackSelectionTiles: (FarmTilePosition | null)[]
   heldWorkerId?: string
   m084LyingHorses: number
 }
@@ -276,6 +277,7 @@ const buildParentCardDisplays = (
 
 const buildPlayedCardDisplays = (
   displayPlayer: PlayerState | null | undefined,
+  selectionInteraction: InteractionSelection | null | undefined,
 ): FarmBoardProjectionPlayedCardDisplay[] => {
   if (!displayPlayer) return []
   return getPlayedCardKeys(displayPlayer).map((cardId) => {
@@ -290,6 +292,10 @@ const buildPlayedCardDisplays = (
       Object.entries(cardState?.counters ?? {})
         .filter(([key, count]) => !PLAYED_CARD_INTERNAL_COUNTERS.has(key) && count > 0),
     )
+    const cardStacks = readCardStacksFromExtraData(rawExtraData)
+    const cardSelectionTargets = selectionInteraction?.kind === 'farm-position'
+      ? selectionInteraction.selectablePositions.filter((position) => position.sourceCard === rawId)
+      : []
     return {
       cardId,
       rawId,
@@ -298,7 +304,10 @@ const buildPlayedCardDisplays = (
       displayCounters,
       resourceStats: readCardResourceStats(displayPlayer, rawId),
       stack: c146Pairs ?? cardState?.stack ?? [],
-      cardStacks: readCardStacksFromExtraData(rawExtraData),
+      cardStacks,
+      cardStackSelectionTiles: cardStacks?.map((_, slotIdx) =>
+        cardSelectionTargets.find((position) => position.cardFieldSlot === slotIdx) ?? null,
+      ) ?? [],
       heldWorkerId: getWorkerHeldOnCard(displayPlayer, rawId),
       m084LyingHorses: rawId === M084_BOG_PONY_ID
         ? readBogPonyLyingHorseCountFromExtraData(rawExtraData)
@@ -338,7 +347,7 @@ const buildFarmCells = (
     interaction.stateId === 'wait' &&
     selectionInteraction?.kind === 'farm-position' &&
     players[interaction.playerIndex]?.id === displayPlayer.id
-      ? selectionInteraction.selectablePositions
+      ? selectionInteraction.selectablePositions.filter((position) => !position.sourceCard)
       : []
   pendingSelectionTiles.forEach((tile) => {
     tileKeys.add(positionKey(tile))
@@ -718,7 +727,12 @@ export const buildFarmBoardProjection = ({
   const farmTerrainMarkerMap = buildFarmTerrainMarkerMap(displayPlayer)
   const terrainMap = buildFarmTerrainMap(displayPlayer)
   const parentCardDisplays = buildParentCardDisplays(displayPlayer)
-  const playedCardDisplays = buildPlayedCardDisplays(displayPlayer)
+  const activeSelection =
+    interaction.stateId === 'wait' &&
+    players[interaction.playerIndex]?.id === displayPlayer?.id
+      ? selectionInteraction
+      : null
+  const playedCardDisplays = buildPlayedCardDisplays(displayPlayer, activeSelection)
   if (!displayPlayer) {
     return {
       farmCells: [],

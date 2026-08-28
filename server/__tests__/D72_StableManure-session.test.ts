@@ -5,6 +5,8 @@ import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 import { markAllWorkersUsed, setActiveWorkerCount } from '../../shared/domain/player'
 import { getCardEffect } from '../../shared/cards/card-effects'
 import '../../shared/cards/D/D072_StableManure'
+import '../../shared/cards/D/D075_WoodField'
+import '../../shared/cards/E/E080_RockGarden'
 import type { ActionChoiceOption } from '../../shared/contract/types'
 import { autoAdvanceRoundEnd } from '../../tests/llm-card-gen/session-helpers'
 
@@ -116,6 +118,112 @@ describe('D072_StableManure session', () => {
     const p = session.getState().state.players[0]!
     // Extra: 1 grain from card + 2 grain from normal harvest (0-0 and 0-2)
     expect(p.resources.grain).toBeGreaterThanOrEqual(3)
+  })
+
+  it('treats Wood Field slots as one field and harvests only one extra wood', () => {
+    const { session } = setupHarvest(1)
+    const state = session.getState().state
+    const player = state.players[0]!
+    player.fields = []
+    player.resources.wood = 0
+    player.minorPlayed.push('D075_WoodField')
+    player.cardStates.D075_WoodField = {
+      extraData: {
+        cardFieldStacks: [
+          { crop: 'wood', remaining: 2 },
+          { crop: 'wood', remaining: 2 },
+        ],
+      },
+    }
+    session.loadState(state)
+
+    const selection = chooseStableManureSelection(session)
+    expect(selection.interaction.stateId).toBe('wait')
+    if (selection.interaction.stateId !== 'wait') throw new Error('expected selection')
+    expect(selection.interaction.request.selection?.selectablePositions).toEqual([
+      { row: -1, col: 4075, sourceCard: 'D075_WoodField', groupKey: 'D075_WoodField', cardFieldSlot: 0 },
+      { row: -1, col: 4076, sourceCard: 'D075_WoodField', groupKey: 'D075_WoodField', cardFieldSlot: 1 },
+    ])
+
+    const committed = session.commitSelectionChoice(0, {
+      positions: [{ row: -1, col: 4075 }, { row: -1, col: 4076 }],
+    })
+    expect(committed.ok).toBe(true)
+    autoAdvanceRoundEnd(session)
+
+    const harvested = session.getState().state.players[0]!
+    expect(harvested.resources.wood).toBe(3)
+    expect(harvested.cardStates.D075_WoodField?.extraData?.cardFieldStacks).toEqual([
+      { crop: 'wood', remaining: 1 },
+    ])
+    expect(harvested.cardStates.D072_StableManure?.extraData?.selectedPositions).toBeUndefined()
+  })
+
+  it('treats all Rock Garden slots as one field and harvests only one extra stone', () => {
+    const { session } = setupHarvest(1)
+    const state = session.getState().state
+    const player = state.players[0]!
+    player.fields = []
+    player.resources.stone = 0
+    player.minorPlayed.push('E080_RockGarden')
+    player.cardStates.E080_RockGarden = {
+      extraData: {
+        cardFieldStacks: [
+          { crop: 'stone', remaining: 2 },
+          { crop: 'stone', remaining: 2 },
+          { crop: 'stone', remaining: 2 },
+        ],
+      },
+    }
+    session.loadState(state)
+
+    chooseStableManureSelection(session)
+    const committed = session.commitSelectionChoice(0, {
+      positions: [
+        { row: -1, col: 5080 },
+        { row: -1, col: 5081 },
+        { row: -1, col: 5082 },
+      ],
+    })
+    expect(committed.ok).toBe(true)
+    autoAdvanceRoundEnd(session)
+
+    const harvested = session.getState().state.players[0]!
+    expect(harvested.resources.stone).toBe(4)
+    expect(harvested.cardStates.E080_RockGarden?.extraData?.cardFieldStacks).toEqual([
+      { crop: 'stone', remaining: 1 },
+      { crop: 'stone', remaining: 1 },
+    ])
+  })
+
+  it('rejects selecting a normal field and a card field with only one unfenced stable', () => {
+    const { session } = setupHarvest(1)
+    const state = session.getState().state
+    const player = state.players[0]!
+    player.fields = [{ row: 0, col: 0, stacks: [{ kind: 'grain', remaining: 2 }] }]
+    player.resources.grain = 0
+    player.resources.wood = 0
+    player.minorPlayed.push('D075_WoodField')
+    player.cardStates.D075_WoodField = {
+      extraData: {
+        cardFieldStacks: [{ crop: 'wood', remaining: 2 }],
+      },
+    }
+    session.loadState(state)
+
+    chooseStableManureSelection(session)
+    const rejected = session.commitSelectionChoice(0, {
+      positions: [{ row: 0, col: 0 }, { row: -1, col: 4075 }],
+    })
+
+    expect(rejected.ok).toBe(false)
+    const unchanged = session.getState().state.players[0]!
+    expect(unchanged.resources.grain).toBe(0)
+    expect(unchanged.resources.wood).toBe(0)
+    expect(unchanged.cardStates.D075_WoodField?.extraData?.cardFieldStacks).toEqual([
+      { crop: 'wood', remaining: 2 },
+    ])
+    expect(unchanged.cardStates.D072_StableManure?.extraData?.selectedPositions).toBeUndefined()
   })
 
   it('does not trigger when no unfenced stables', () => {
