@@ -3,6 +3,8 @@ import type { CardListenerRegistration, CardListenerContext } from '../card-list
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
+import type { ActionFlow } from '../../contract/types'
+import { readImprovementTypes } from '../../actions/effects/improvement'
 
 const CARD_ID = 'B103_FieldMerchant'
 const computeReplaceListener: CardListenerRegistration = {
@@ -13,21 +15,17 @@ const computeReplaceListener: CardListenerRegistration = {
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (context.trueAction === false) return
     if (context.actionContext?.checkedReplaceAction) return
+    const types = readImprovementTypes(context)
+    const alternatives: ActionFlow[] = []
+    if (types.includes('minor')) alternatives.push(gainLeaf(CARD_ID, { food: 1 }))
+    if (types.includes('major')) alternatives.push(gainLeaf(CARD_ID, { vegetable: 1 }))
+    if (alternatives.length === 0) return
     return {
       decline: true,
       alternativeFlow: {
-        type: 'seq',
-        choiceLabelKey: 'ui.interactionFieldMerchantChoose',
-        children: [
-          {
-            type: 'xor',
-            promptKey: 'ui.interactionFieldMerchantChoose',
-            children: [
-              { type: 'leaf', actionId: 'gain', params: { food: 1 }, sourceCard: CARD_ID },
-              { type: 'leaf', actionId: 'gain', params: { vegetable: 1 }, sourceCard: CARD_ID },
-            ],
-          },
-        ],
+        type: 'xor',
+        promptKey: 'ui.interactionFieldMerchantChoose',
+        children: alternatives,
       },
     }
   },
