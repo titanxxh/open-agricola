@@ -291,6 +291,12 @@ describe('D014 Hammer Crusher provisional continuation', () => {
       throw new Error('expected restored room selection')
     }
     expect(response.interaction.request.farm.selectableTiles).not.toContainEqual(room)
+    session.updatePlayerName(0, 'Renamed player')
+    response = session.getState()
+    if (response.interaction.stateId !== 'wait' || response.interaction.request.kind !== 'farm-select') {
+      throw new Error('expected restored room selection after rename')
+    }
+    expect(response.interaction.request.farm.selectableTiles).not.toContainEqual(room)
     expect(response.state.log.filter(
       (entry) => entry.key === 'log.provisionalContinuationRollback',
     )).toHaveLength(0)
@@ -298,6 +304,47 @@ describe('D014 Hammer Crusher provisional continuation', () => {
       .toEqual([expect.objectContaining({ guarded: true })])
     expect(session.commitSelectionChoice(0, { rooms: [room] }).ok).toBe(false)
     expect(response.scores).toHaveLength(2)
+  })
+
+  it('declines the optional Construct after every guarded room plan fails', () => {
+    const session = setup({ buildingTycoon: false, clay: 0, reed: 0, stone: 3 })
+    const helperPlayerIndex = registerNestedConstructHelper(session, { clay: 3, reed: 1 })
+
+    let response = session.takeAction(0, 'house-redevelopment')
+    if (response.interaction.stateId !== 'wait') throw new Error('expected Construct choice')
+    const construct = response.interaction.request.options.find(
+      (option) => option.value !== '__skip__',
+    )
+    response = advanceSwitches(session, session.resolveChoice(0, construct!.value))
+    if (response.interaction.stateId !== 'wait') throw new Error('expected helper choice')
+    const accept = response.interaction.request.options.find(
+      (option) => option.value !== '__skip__',
+    )
+    response = advanceSwitches(session, session.resolveChoice(helperPlayerIndex, accept!.value))
+
+    const rejectedRooms = []
+    while (
+      response.interaction.stateId === 'wait' &&
+      response.interaction.request.kind === 'farm-select'
+    ) {
+      const room = response.interaction.request.farm.selectableTiles[0]
+      if (!room) break
+      rejectedRooms.push(room)
+      response = session.commitSelectionChoice(0, { rooms: [room] })
+    }
+
+    expect(rejectedRooms).toHaveLength(3)
+    expect(response.ok).toBe(true)
+    expect(response.state.players[0]).toMatchObject({
+      houseType: 'stone',
+      rooms: 2,
+      resources: { clay: 2, reed: 0, stone: 1 },
+    })
+    expect(response.state.log.filter(
+      (entry) => entry.key === 'log.provisionalContinuationRollback',
+    )).toHaveLength(1)
+    expect(response.publicEventCancellations?.[0]?.canceledEventIds.length).toBeGreaterThan(0)
+    expect(session.createSessionPrivateCursor().provisionalContinuationScopes).toEqual([])
   })
 
   it('merges a successful child into a successful guarded parent', () => {

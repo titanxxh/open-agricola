@@ -433,7 +433,10 @@ const ruleStateKey = (state: GameState): string => {
     nextPublicEventArchivePacketSeq: _nextPublicEventArchivePacketSeq,
     ...rules
   } = state
-  return canonicalJson(rules)
+  return canonicalJson({
+    ...rules,
+    players: rules.players.map(({ name: _name, ...player }) => player),
+  })
 }
 
 export type SessionResponse = {
@@ -1277,11 +1280,75 @@ export class GameCore {
     return true
   }
 
-  private rejectCurrentCommand(settlement: ActiveCommandSettlement): SessionResponse {
+  private checkpointRestoresOptionalChoice(scope: ProvisionalContinuationScope): boolean {
+    const frame = scope.checkpoint.engineStackCursor.frames.find(
+      (candidate) => candidate.frameId === scope.frameId,
+    )
+    return frame?.engineSnapshot.pendingData.some(({ nodeId, pending }) => {
+      const node = frame.engineSnapshot.treeCursor.find((candidate) => candidate.id === nodeId)
+      return node?.data.optional === true &&
+        node.data.optionalActive === false &&
+        pending.request.kind === 'choice' &&
+        pending.request.options.some((option) => option.value === '__skip__')
+    }) === true
+  }
+
+  private declineExhaustedOptionalFlow(
+    scope: ProvisionalContinuationScope,
+  ): SessionResponse | null {
+    const interaction = this.buildInteraction()
+    if (
+      interaction.stateId !== 'wait' ||
+      interaction.request.kind !== 'farm-select' ||
+      interaction.request.farm.farmType !== 'room' ||
+      interaction.request.farm.selectableTiles.length > 0 ||
+      !this.checkpointRestoresOptionalChoice(scope)
+    ) return null
+
+    const rollback = this.abortProvisionalScope(scope)
+    if (
+      rollback.interaction.stateId !== 'wait' ||
+      rollback.interaction.request.kind !== 'choice' ||
+      !rollback.interaction.request.options.some((option) => option.value === '__skip__')
+    ) return rollback
+
+    const declined = this.resolveEngineChoice(
+      rollback.interaction.playerIndex,
+      '__skip__',
+      false,
+    )
+    const probes = new Map(this.mandatoryContinuationProbes().map((probe) => [
+      `${probe.frameId}:${probe.nodeId}`,
+      probe,
+    ]))
+    this.provisionalContinuationScopes = this.provisionalContinuationScopes.flatMap((candidate) => {
+      const probe = probes.get(`${candidate.frameId}:${candidate.hostNodeId}`)
+      return probe ? [{ ...candidate, guarded: candidate.guarded || probe.strictDoable }] : []
+    })
+    this.refreshFailedAuthoritativeCommands()
+    const publicEventCancellations = [
+      ...(rollback.publicEventCancellations ?? []),
+      ...(declined.publicEventCancellations ?? []),
+    ]
+    return {
+      ...declined,
+      durableTransition: true,
+      ...(publicEventCancellations.length > 0 ? { publicEventCancellations } : {}),
+    }
+  }
+
+  private rejectCurrentCommand(
+    settlement: ActiveCommandSettlement,
+    failedScope?: ProvisionalContinuationScope,
+  ): SessionResponse {
     this.restoreCommandCheckpoint(settlement.checkpoint)
     this.provisionalContinuationScopes = settlement.scopeSnapshot
     this.failedAuthoritativeCommands = settlement.failedCommandSnapshot
     this.rememberFailedAuthoritativeCommand(settlement.command, settlement.interactionKey)
+    if (failedScope) {
+      const declined = this.declineExhaustedOptionalFlow(failedScope)
+      if (declined) return declined
+    }
     return {
       ...this.respond(false, 'command would break a mandatory continuation'),
       durableTransition: true,
@@ -1332,7 +1399,7 @@ export class GameCore {
       const scope = this.provisionalContinuationScopes.find((entry) => entry.id === settlement.abortScopeId)
       if (scope) {
         return scope.guarded
-          ? this.rejectCurrentCommand(settlement)
+          ? this.rejectCurrentCommand(settlement, scope)
           : this.abortProvisionalScope(scope)
       }
     }
@@ -1350,7 +1417,7 @@ export class GameCore {
       if (probe.strictDoable) {
         scope.guarded = true
       } else if (scope.guarded) {
-        return this.rejectCurrentCommand(settlement)
+        return this.rejectCurrentCommand(settlement, scope)
       }
     }
     if (
