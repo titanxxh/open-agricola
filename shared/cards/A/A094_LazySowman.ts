@@ -7,9 +7,17 @@ import { canSow, isUnconditionalSow } from '../../actions/effects/sow'
 import { isSpaceOccupied } from '../../domain/space'
 import { workersAvailable } from '../../domain/player'
 import type { CardImpl } from '../registry'
+import { readActionSnapshotToken } from '../helpers/action-snapshot'
 
 const CARD_ID = 'A094_LazySowman'
 const isMeetingPlace = (space: ActionSpace) => space.id === 'meeting-place'
+const isOwnersActiveWorkTurn = (context: CardListenerContext) =>
+  context.state.roundPhase === 'work' && readActionSnapshotToken(context.player) !== undefined
+const isOwnersWorkTurnPreview = (context: CardListenerContext) =>
+  isOwnersActiveWorkTurn(context) || (
+    context.state.roundPhase === 'work' &&
+    context.state.players[context.state.currentPlayerIndex]?.id === context.player.id
+  )
 
 const getOpenRound = (state: GameState, space: ActionSpace) => {
   const roundIndex = state.roundActionOrder.findIndex((spaceId) => spaceId === space.id)
@@ -26,7 +34,7 @@ const computeReplaceListener: CardListenerRegistration = {
   phases: ['computeReplace' as ActionHookPhase],
   actions: ['sow'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
-    if (context.state.roundPhase !== 'work') return
+    if (!isOwnersActiveWorkTurn(context)) return
     if (context.actionContext?.checkedReplaceAction === true) return
     if (!isUnconditionalSow(context.actionContext)) return
     if (workersAvailable(context.state, context.player) <= 0) return
@@ -55,7 +63,7 @@ const isDoableListener: CardListenerRegistration = {
   phases: ['isDoable' as ActionHookPhase],
   actions: ['sow'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
-    if (context.state.roundPhase !== 'work') return
+    if (!isOwnersWorkTurnPreview(context)) return
     if (context.actionContext?.checkedReplaceAction === true) return
     if (!isUnconditionalSow(context.actionContext)) return
     if (canSow(context.player)) return
