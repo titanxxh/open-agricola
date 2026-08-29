@@ -10,7 +10,7 @@
  *   • `GameSession.submitDraftPick` advances the draft round-by-round, finally
  *     flipping `state.phase='playing'` with player hands populated from `kept`.
  *   • `resp.pending` is `{ type: 'cardDraft', ... }` throughout the draft.
- *   • Invalid pick / double submit / wrong phase error paths surface via `resp.ok`.
+ *   • Exact retries are idempotent; invalid picks, conflicting retries, and wrong phases surface via `resp.ok`.
  *   • `serializeState` -> `rehydrateState` preserves draft fields cleanly.
  */
 
@@ -321,7 +321,7 @@ describe('GameSession.submitDraftPick — happy paths', () => {
   })
 })
 
-describe('GameSession.submitDraftPick — error paths', () => {
+describe('GameSession.submitDraftPick — validation and retry paths', () => {
   it('rejects a pick that is not in the player’s current pool', () => {
     const session = makeDraftSession(2, 7)
     const resp = session.submitDraftPick('p1', {
@@ -335,15 +335,28 @@ describe('GameSession.submitDraftPick — error paths', () => {
     expect(resp.state.draft!.pendingPicks.p1.occ).toBeNull()
   })
 
-  it('rejects a double submit in the same round', () => {
+  it('returns the existing result for an exact retry in the same round', () => {
     const session = makeDraftSession(2, 7)
     const p1Pick = firstPick(session, 'p1')
     const first = session.submitDraftPick('p1', p1Pick)
     expect(first.ok).toBe(true)
-    const second = session.submitDraftPick('p1', p1Pick)
-    expect(second.ok).toBe(false)
-    expect(second.error).toMatch(/already submitted/i)
-    expect(second.state.draft!.round).toBe(1)
+    const submittedDraft = structuredClone(first.state.draft)
+
+    const retry = session.submitDraftPick('p1', p1Pick)
+
+    expect(retry.ok).toBe(true)
+    expect(retry.error).toBeUndefined()
+    expect(retry.state.draft).toEqual(submittedDraft)
+    expect(retry.state.players[0]!.stats.draftHistory).toHaveLength(2)
+    expect(retry.privateEvents).toEqual([
+      expect.objectContaining({
+        type: 'private.draftUpdated',
+        recipientPlayerId: 'p1',
+        picked: p1Pick,
+        advanced: false,
+        finished: false,
+      }),
+    ])
   })
 
   it('rejects a pick from an unknown player', () => {
