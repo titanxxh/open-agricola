@@ -397,6 +397,44 @@ describe('A132_Publican session', () => {
     expect(retry.interaction.stateId).toBe('idle')
   })
 
+  it('preserves the Publican guard when undo would make Sow unreachable again', () => {
+    const session = setup(1)
+    const state = session.getState().state
+    const opponent = state.players[1]!
+    opponent.resources.grain = 0
+    opponent.resources.food = 2
+    opponent.occupationPlayed.push('D114_SeedTrader')
+    opponent.cardStates.D114_SeedTrader = {
+      counters: { grain: 1, vegetable: 0 },
+      extraData: {},
+    }
+    session.loadState(state)
+
+    let resp = advancePastPlayerSwitches(session, session.takeAction(1, 'grain-utilization'))
+    expect(resp.interaction.stateId === 'wait' ? resp.interaction.sourceCard : undefined)
+      .toBe('A132_Publican')
+    expect(session.createSessionPrivateCursor().provisionalContinuationScopes)
+      .toMatchObject([{ guarded: false }])
+
+    resp = session.takeAnytimeAction(1, 'D114-seed-trader-anytime')
+    expect(resp.ok).toBe(true)
+    expect(resp.state.players[1]!.resources).toMatchObject({ food: 0, grain: 1 })
+    expect(session.createSessionPrivateCursor().provisionalContinuationScopes)
+      .toMatchObject([{ guarded: true }])
+
+    resp = session.undoStep()
+    expect(resp.ok).toBe(false)
+    expect(resp.error).toBe('command would break a mandatory continuation')
+    expect(resp.state.players[1]!.resources).toMatchObject({ food: 0, grain: 1 })
+    expect(session.createSessionPrivateCursor().provisionalContinuationScopes)
+      .toMatchObject([{ guarded: true }])
+
+    resp = advancePastPlayerSwitches(session, session.resolveChoice(0, '__skip__'))
+    expect(resp.interaction.stateId === 'wait' ? resp.interaction.promptKey : undefined)
+      .toBe('ui.interactionSowSelect')
+    expect(session.createSessionPrivateCursor().provisionalContinuationScopes).toEqual([])
+  })
+
   it('rederives a failed Sow only after a material anytime action', () => {
     const session = setup(1)
     const state = session.getState().state
