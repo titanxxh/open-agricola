@@ -697,9 +697,9 @@ Card listener 区域默认只匹配已打出卡：`zones` 省略等价于 `['pla
 
 `beforeHostListeners` / `afterHostCommitListeners` / `afterHostListeners` 是 host action 在 参考实现 pay slot 上的显式差异：
 
-- `renovation` / `improvement` / `occupation` / `construct` / `fencing` 在 `beforeHostListeners` 或主 action 内先完成 mandatory payment，再进入 trailing effects。
+- `renovation` / `improvement` / `occupation` / `construct` / `fencing` / `stables` 在 `beforeHostListeners` 或主 action 内先完成 mandatory payment，再进入 trailing effects。
 - `improvement` / `occupation` 的 `onBuy` 使用 `afterHostCommitListeners`：先完成 mandatory payment，再由 host `completeInternalChildren` 提交卡牌，随后触发 onBuy，最后才进入 host `during` / `immediatelyAfter` / `after`。
-- `stables` 使用 `afterHostListeners`，保持 `farm.stableBuilt -> after-stables effects -> resource.paid(stables)`，让 after-stables 卡先看到已建 stable。
+- `stables` 保持 `farm.stableBuilt -> resource.paid(stables) -> after-stables effects`：农场 mutation 仍是 host action 的事实，但 mandatory payment 会在 reaction 花费这些资源前结算。
 - `fencing` 明确是 `beforeHostListeners`，避免 `A034_Loppers` 这类 after-fencing 效果先于 mandatory fence pay 结算而饿死支付。
 
 禁止的形态：

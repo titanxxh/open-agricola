@@ -6,11 +6,13 @@ import { isCardFlagged, setCardFlag } from '../../shared/cards/helpers/card-stat
 import { recordActionSnapshot } from '../../shared/cards/helpers/action-snapshot'
 import '../../shared/cards/B/B027_Toolbox'
 import '../../shared/cards/B/B150_LargeScaleFarmer'
+import '../../shared/cards/C/C094_StableCleaner'
 import '../../shared/cards/E/E052_Cubbyhole'
 import { B027_Toolbox_impl } from '../../shared/cards/B/B027_Toolbox'
 
 const CARD_ID = 'B027_Toolbox'
 const CUBBYHOLE_ID = 'E052_Cubbyhole'
+const STABLE_CLEANER_ID = 'C94-stable-cleaner-anytime'
 
 const setupPlayed = (food = 5) => {
   const session = new GameSession()
@@ -40,6 +42,9 @@ const setupPlayed = (food = 5) => {
 describe('B27 Toolbox session', () => {
   it('已 played + 修房 → onEndTurn 弹一次买 major（不每次 construct 都弹）', () => {
     const session = setupPlayed()
+    const initialState = session.getState().state
+    initialState.players[0]!.occupationPlayed.push('C094_StableCleaner')
+    session.loadState(initialState)
     let resp = session.takeAction(0, 'farm-expansion')
     expect(resp.ok).toBe(true)
     expect(resp.interaction.stateId).toBe('wait')
@@ -79,6 +84,16 @@ describe('B27 Toolbox session', () => {
     }
     expect(reachedBuyMajor).toBe(true)
     expect(resp.interaction.stateId === 'wait' ? resp.interaction.request.kind : resp.interaction.stateId).toBe('confirm-next-player')
+
+    resp = session.takeAnytimeAction(0, STABLE_CLEANER_ID)
+    expect(resp.ok).toBe(true)
+    expect(resp.interaction.stateId).toBe('wait')
+    if (resp.interaction.stateId !== 'wait') return
+    const stable = resp.interaction.request.farm.selectableTiles[0]!
+    resp = session.commitSelectionChoice(0, { stables: [stable] })
+    expect(resp.ok).toBe(true)
+    expect(resp.interaction.stateId === 'wait' ? resp.interaction.request.kind : resp.interaction.stateId)
+      .toBe('confirm-next-player')
   })
 
   it('什么都没造 → onEndTurn 不弹', () => {
@@ -88,6 +103,50 @@ describe('B27 Toolbox session', () => {
     // grain-seeds 直接 gain 1 grain，不修房 / 围栏 / stable
     expect(resp.interaction.stateId === 'wait' ? resp.interaction.request.kind : resp.interaction.stateId).toBe('confirm-next-player')
     expect(isCardFlagged(resp.state.players[0]!, CARD_ID)).toBe(false)
+  })
+
+  it('confirm-next-player 使用 Stable Cleaner 后立即且仅一次提供 Toolbox', () => {
+    const session = setupPlayed()
+    const state = session.getState().state
+    state.players[0]!.occupationPlayed.push('C094_StableCleaner')
+    session.loadState(state)
+
+    let resp = session.takeAction(0, 'grain-seeds')
+    expect(resp.ok).toBe(true)
+    expect(resp.interaction.stateId === 'wait' ? resp.interaction.request.kind : resp.interaction.stateId)
+      .toBe('confirm-next-player')
+
+    resp = session.takeAnytimeAction(0, STABLE_CLEANER_ID)
+    expect(resp.ok).toBe(true)
+    expect(resp.interaction.stateId).toBe('wait')
+    if (resp.interaction.stateId !== 'wait') return
+    expect(resp.interaction.request.kind).toBe('farm-select')
+
+    const firstStable = resp.interaction.request.farm.selectableTiles[0]!
+    resp = session.commitSelectionChoice(0, { stables: [firstStable] })
+    expect(resp.ok).toBe(true)
+    expect(resp.state.players[0]!.resources.wood).toBe(19)
+    expect(resp.state.players[0]!.resources.food).toBe(4)
+    expect(resp.interaction.stateId).toBe('wait')
+    if (resp.interaction.stateId !== 'wait') return
+    expect(resp.interaction.promptKey).toBe('ui.interactionToolboxImprovement')
+
+    const skip = resp.interaction.request.options?.find((option) => option.value === '__skip__')
+    expect(skip).toBeDefined()
+    resp = session.resolveChoice(0, skip!.value)
+    expect(resp.interaction.stateId === 'wait' ? resp.interaction.request.kind : resp.interaction.stateId)
+      .toBe('confirm-next-player')
+
+    resp = session.takeAnytimeAction(0, STABLE_CLEANER_ID)
+    expect(resp.ok).toBe(true)
+    expect(resp.interaction.stateId).toBe('wait')
+    if (resp.interaction.stateId !== 'wait') return
+    const secondStable = resp.interaction.request.farm.selectableTiles[0]!
+    resp = session.commitSelectionChoice(0, { stables: [secondStable] })
+    expect(resp.ok).toBe(true)
+    expect(resp.state.players[0]!.stableTiles).toHaveLength(2)
+    expect(resp.interaction.stateId === 'wait' ? resp.interaction.request.kind : resp.interaction.stateId)
+      .toBe('confirm-next-player')
   })
 
   it('与 E52 同时 after construct 时仍显示并执行 Toolbox flag listener', () => {

@@ -139,7 +139,7 @@ describe('stablesAction.resolveChoice', () => {
     expect(result.resourcesPaid).toEqual({ wood: 2 })
     expect(ctx.player.stableTiles.some((t) => t.row === 0 && t.col === 0)).toBe(true)
     expect(ctx.player.resources.wood).toBe(4)
-    expect(result.internalChildren?.afterHostListeners).toMatchObject([
+    expect(result.internalChildren?.beforeHostListeners).toMatchObject([
       {
         actionId: 'pay',
         params: {
