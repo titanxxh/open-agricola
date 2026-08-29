@@ -199,7 +199,7 @@ export const PlayerCard = ({
       return {
         name: t(locale, `improvements.${cardId}.name`),
         description: (meta.desc ?? []).join('\n'),
-        rules: fallbackRules,
+        rules: localizeRules(`improvements.${cardId}`),
         cost: { ...emptyResources, ...baseCost },
         category: meta.category,
         returnCards: meta.returnCards,

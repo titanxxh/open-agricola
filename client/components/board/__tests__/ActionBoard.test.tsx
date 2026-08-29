@@ -462,8 +462,13 @@ describe('ActionBoard', () => {
       />,
     )
 
-    fireEvent.mouseEnter(container.querySelector(`[data-action-id="${id}"]`)!)
+    const holder = container.querySelector(`[data-action-id="${id}"]`)!
+    fireEvent.mouseEnter(holder)
     expect(screen.getByText(label)).toBeInTheDocument()
+    expect(screen.getByText(new RegExp(rules)).closest('.action-rules')).not.toBeNull()
+
+    fireEvent.mouseLeave(holder)
+    fireEvent.focus(holder.querySelector('button')!)
     expect(screen.getByText(new RegExp(rules)).closest('.action-rules')).not.toBeNull()
   })
 

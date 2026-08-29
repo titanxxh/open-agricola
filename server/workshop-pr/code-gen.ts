@@ -75,6 +75,7 @@ export type WorkshopCardForGen = {
 export type CardLocaleEntry = {
   name: string
   desc: string[]
+  rules?: string[]
   prerequisite?: string
 }
 
@@ -96,10 +97,14 @@ function readLocalesFromCardJson(cardJson: string | undefined): CardLocales | nu
     const entry = entryRaw as Partial<CardLocaleEntry>
     if (typeof entry.name !== 'string' || !Array.isArray(entry.desc)) continue
     const desc = entry.desc.filter((line): line is string => typeof line === 'string')
+    const rules = Array.isArray(entry.rules)
+      ? entry.rules.filter((line): line is string => typeof line === 'string')
+      : []
     if (entry.name.length === 0 && desc.length === 0) continue
     result[lang] = {
       name: entry.name,
       desc,
+      ...(rules.length > 0 ? { rules } : {}),
       ...(typeof entry.prerequisite === 'string' && entry.prerequisite.length > 0
         ? { prerequisite: entry.prerequisite }
         : {}),
@@ -130,6 +135,17 @@ function buildLocalesLiteral(
         factory.createPropertyAssignment(
           'prerequisite',
           factory.createStringLiteral(entry.prerequisite),
+        ),
+      )
+    }
+    if (Array.isArray(entry.rules) && entry.rules.length > 0) {
+      fields.push(
+        factory.createPropertyAssignment(
+          'rules',
+          factory.createArrayLiteralExpression(
+            entry.rules.map((line) => factory.createStringLiteral(line)),
+            false,
+          ),
         ),
       )
     }

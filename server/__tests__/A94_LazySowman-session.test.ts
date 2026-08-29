@@ -15,6 +15,7 @@ const setup = (options?: {
   vegetable?: number
   workersAvailable?: number
   actionId?: string
+  meetingPlaceOccupied?: boolean
 }) => {
   const session = new GameSession()
   stabilizeRandomHands(session.state.players)
@@ -40,7 +41,7 @@ const setup = (options?: {
   const meetingPlace = state.actionSpaces.find((space) => space.id === 'meeting-place')
   if (!dayLaborer || !meetingPlace) throw new Error('required action space missing')
   dayLaborer.takenBy = opponentId
-  meetingPlace.takenBy = opponentId
+  meetingPlace.takenBy = options?.meetingPlaceOccupied === false ? [] : opponentId
 
   session.loadState(state)
   return session
@@ -48,7 +49,7 @@ const setup = (options?: {
 
 describe('A094_LazySowman session', () => {
   it('turns unavailable sow into an immediate extra place-farmer flow', () => {
-    const session = setup({ withCard: true })
+    const session = setup({ withCard: true, meetingPlaceOccupied: false })
 
     let resp = session.takeAction(0, 'grain-utilization')
     expect(resp.ok).toBe(true)
@@ -56,6 +57,7 @@ describe('A094_LazySowman session', () => {
     if (resp.interaction.stateId !== 'wait') return
     expect(resp.interaction.promptKey).toBe('ui.interactionPlaceFarmerExtra')
     expect(resp.interaction.request.options?.map((option) => option.value)).toContain('allow-occupied:day-laborer')
+    expect(resp.interaction.request.options?.map((option) => option.value)).not.toContain('meeting-place')
     expect(resp.interaction.request.options?.map((option) => option.value)).not.toContain('allow-occupied:meeting-place')
     expect(resp.interaction.request.options?.find((option) => option.value === 'allow-occupied:day-laborer')?.sourceCard).toBe(CARD_ID)
 

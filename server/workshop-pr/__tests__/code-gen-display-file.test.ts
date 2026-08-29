@@ -52,7 +52,13 @@ const CARD_IMPL = {}
       card_id: 'CUSTOM_LocalisedCard',
       card_type: 'minor',
       card_json: JSON.stringify({
-        locales: { zh: { name: '本地化卡', desc: ['中文描述。'] } },
+        locales: {
+          zh: {
+            name: '本地化卡',
+            desc: ['中文描述。'],
+            rules: ['中文规则补充。'],
+          },
+        },
       }),
       effect_code: `
 const CARD_ID = 'CUSTOM_LocalisedCard'
@@ -66,6 +72,7 @@ const CARD_IMPL = {}
     })
     expect(out).toContain('本地化卡')
     expect(out).toContain('中文描述。')
+    expect(out).toContain('中文规则补充。')
     expect(out).toContain(`deck: "community"`)
     expect(out).toContain(`impl: cardImpl`)
   })
