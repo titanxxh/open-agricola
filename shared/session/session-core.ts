@@ -1576,7 +1576,10 @@ export class GameCore {
     const visiblePlayerIndex = visibleFrame
       ? this.visiblePlayerIndexForFrame(visibleFrame)
       : this.state.currentPlayerIndex
-    if (visiblePlayerIndex !== playerIndex) this.openProvisionalScopesForRisk()
+    if (visiblePlayerIndex !== playerIndex) {
+      this.openProvisionalScopesForRisk()
+      this.appendHistoryWithUndoBoundary()
+    }
     const player = this.state.players[playerIndex]
     if (!player) return
     const flow: ActionFlow = {
@@ -4953,6 +4956,15 @@ export class GameCore {
   }
 
   private loadStateInContext(raw: unknown): SessionResponse {
+    this.restoreStateSnapshotInContext(raw)
+    return this.respond()
+  }
+
+  restoreStateSnapshot(raw: unknown): void {
+    this.withCtx(() => this.restoreStateSnapshotInContext(raw))
+  }
+
+  private restoreStateSnapshotInContext(raw: unknown): void {
     let nextState: GameState
     let cursor: SessionPrivateCursor | null = null
     if (isStateWithCursor(raw)) {
@@ -4975,7 +4987,6 @@ export class GameCore {
     this.failedAuthoritativeCommands = []
     this.nextProvisionalScopeId = 1
     if (cursor) this.restoreSessionPrivateCursor(cursor)
-    return this.respond()
   }
 
   getStateForRead(): Readonly<GameState> {

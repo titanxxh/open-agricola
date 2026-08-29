@@ -248,6 +248,10 @@ describe('D014 Hammer Crusher provisional continuation', () => {
     } : response.interaction).toEqual({ kind: 'animal-reorg', playerIndex: helperPlayerIndex })
     expect(session.createSessionPrivateCursor().provisionalContinuationScopes.length)
       .toBeGreaterThan(0)
+    expect(session.undoStep()).toMatchObject({
+      ok: false,
+      error: 'cannot undo past boundary',
+    })
     if (response.interaction.stateId !== 'wait' || response.interaction.request.kind !== 'animal-reorg') {
       throw new Error('expected helper animal reorganization')
     }

@@ -108,6 +108,8 @@ parentPort?.on('message', (request: Request) => {
     checkpoint = serializeSessionSnapshot(session.state, session)
     checkpointWarnings = [...session.cardWarnings]
     const { response, raw } = session.withCtx(() => dispatch(request.method, request.args))
+    const commandWarnings = session.cardWarnings.slice(checkpointWarnings.length)
+    if (commandWarnings.length > 0) throw new Error(commandWarnings.join('; '))
     const result: Success = {
       id: request.id,
       ok: true,
@@ -122,7 +124,8 @@ parentPort?.on('message', (request: Request) => {
       return
     }
     try {
-      restore(checkpoint, checkpointWarnings)
+      const commandWarnings = session.cardWarnings.slice(checkpointWarnings.length)
+      restore(checkpoint, [...checkpointWarnings, ...commandWarnings])
       const response = { ...session.getState(), ok: false, error: message }
       parentPort?.postMessage({ id: request.id, ok: false, error: message, ...buildResult(response) })
     } catch {
