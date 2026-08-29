@@ -105,6 +105,37 @@ describe('card listener zones', () => {
     ])
   })
 
+  it('excludes listeners owned by a player skipping the current harvest', () => {
+    const player = makePlayer({ id: 'p1' })
+    const opponent = makePlayer({
+      id: 'p2',
+      minorPlayed: ['X_TestCard'],
+      cardStates: { X_TestCard: { extraData: { skipHarvestRound: 4 } } },
+    })
+    const state = makeState([player, opponent])
+    state.round = 4
+    state.roundPhase = 'harvest'
+    const context = {
+      state,
+      player,
+      space: makeSpace(),
+      actionId: 'test-action',
+      phase: 'after' as const,
+    }
+    const listener: CardListenerRegistration = {
+      id: 'test-skipped-harvest-owner',
+      cardIds: ['X_TestCard'],
+      scope: 'opponent',
+    }
+
+    expect(getMatchingListeners(context, [listener])).toEqual([])
+
+    state.roundPhase = 'preparation'
+    expect(getMatchingListeners(context, [listener])).toMatchObject([
+      { cardId: 'X_TestCard', ownerPlayerId: 'p2', ownerCardZone: 'played' },
+    ])
+  })
+
   it('matches hand listeners only when zones includes hand', () => {
     const player = makePlayer({ minorHand: ['X_TestCard'] })
     const context = {

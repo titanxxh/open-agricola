@@ -1,6 +1,7 @@
 import type { ReorganizeTrigger } from '../actions/effects/reorganize.ts'
 import { getCardEffect, isHandCardEffectHook, runCardEffectHook } from '../cards/card-effects.ts'
 import type { BeforeEndGameScope, FlowCardEffectHook } from '../cards/card-effects.ts'
+import { isPlayerSkippingCurrentHarvest } from '../cards/helpers/harvest-skip.ts'
 import type { ActionFlow, GameState, PlayerState } from '../contract/types.ts'
 import type { Engine, EngineFrame } from '../engine/index.ts'
 
@@ -147,6 +148,7 @@ export class StageDispatch {
     for (let currentPlayerIndex = playerIndex; currentPlayerIndex < this.state.players.length; currentPlayerIndex += 1) {
       const player = this.state.players[currentPlayerIndex]
       if (!player) continue
+      if (isPlayerSkippingCurrentHarvest(this.state, player)) continue
       const cards = [
         ...this.getPlayerEffectCardIds(player),
         ...this.getPlayerHandEffectCardIds(player, hook),
@@ -287,6 +289,7 @@ export class StageDispatch {
     for (let currentPlayerIndex = playerIndex; currentPlayerIndex < this.state.players.length; currentPlayerIndex += 1) {
       const player = this.state.players[currentPlayerIndex]
       if (!player) continue
+      if (isPlayerSkippingCurrentHarvest(this.state, player)) continue
       const children = this.collectOwnStageReactionActivationFlows(hook, player)
       if (children.length === 0) continue
       const flow = children.length === 1

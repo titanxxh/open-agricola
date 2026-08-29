@@ -1,5 +1,5 @@
 import { defineOccupationCard } from '../card-source'
-import { writeCardExtraData } from '../helpers/card-state'
+import { scheduleNextHarvestSkip } from '../helpers/harvest-skip'
 import type { CardImpl } from '../registry'
 
 const CARD_ID = 'C108_Layabout'
@@ -8,7 +8,7 @@ const cardImpl = {
   effect: {
   id: CARD_ID,
   onBuy: (_state, player) => {
-    writeCardExtraData(player, CARD_ID, 'skipNextHarvest', true)
+    scheduleNextHarvestSkip(player, CARD_ID)
   },
 },
   reaches: [] as readonly string[],
