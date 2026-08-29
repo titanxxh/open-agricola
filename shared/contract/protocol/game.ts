@@ -46,7 +46,7 @@ export type ActionDetailParts = {
 }
 
 export type PublicEventCancellation = {
-  reason: 'undoStep' | 'undoAction'
+  reason: 'undoStep' | 'undoAction' | 'provisionalContinuationRollback'
   previousMaxSeq: number
   nextMaxSeq: number
   canceledEventIds: string[]

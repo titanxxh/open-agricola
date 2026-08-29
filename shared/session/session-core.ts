@@ -1289,6 +1289,8 @@ export class GameCore {
   }
 
   private abortProvisionalScope(scope: ProvisionalContinuationScope): SessionResponse {
+    const beforeEvents = [...this.state.events]
+    const beforeArchive = this.capturePublicEventArchive()
     const removed = new Set([scope.id])
     let changed = true
     while (changed) {
@@ -1313,7 +1315,13 @@ export class GameCore {
     this.failedAuthoritativeCommands = scope.failedCommandsAtCheckpoint.map((entry) => ({ ...entry }))
     this.rememberFailedAuthoritativeCommand(scope.rollbackCommand, scope.rollbackInteractionKey)
     this.state.log.unshift({ key: 'log.provisionalContinuationRollback' })
-    return this.respond()
+    const cancellationPlan = this.preparePublicEventCancellation(
+      'provisionalContinuationRollback',
+      beforeEvents,
+      this.state.events,
+      beforeArchive,
+    )
+    return this.applyPreparedPublicEventCancellation(beforeArchive, cancellationPlan)
   }
 
   private settleAuthoritativeCommand(
@@ -2142,6 +2150,26 @@ export class GameCore {
     return farm ? { kind: 'farm-select', farm } : request
   }
 
+  private projectFailedAuthoritativeCommands(
+    request: InteractionRequest,
+    playerIndex: number,
+  ): InteractionRequest {
+    if (request.kind !== 'farm-select' || request.farm.farmType !== 'room') return request
+    return {
+      ...request,
+      farm: {
+        ...request.farm,
+        selectableTiles: request.farm.selectableTiles.filter((tile) =>
+          !this.isFailedAuthoritativeCommand(normalizedCommand(
+            'commitSelection',
+            playerIndex,
+            { rooms: [tile] },
+          )),
+        ),
+      },
+    }
+  }
+
   private buildInteraction(): InteractionState {
     return deriveInteractionState({
       state: this.state,
@@ -2153,7 +2181,10 @@ export class GameCore {
       scoreSummary: () => this.computeScoreSummary(),
       effectiveOwnerIndexForFrame: (frame, nodeId, pending) =>
         this.effectiveOwnerIndexForFrame(frame, nodeId, pending),
-      projectPendingRequest: (input) => this.projectPendingInteractionRequest(input),
+      projectPendingRequest: (input) => this.projectFailedAuthoritativeCommands(
+        this.projectPendingInteractionRequest(input),
+        input.playerIndex,
+      ),
     })
   }
 

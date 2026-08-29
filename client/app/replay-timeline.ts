@@ -17,7 +17,7 @@ export type ReplayTimelineEntry = {
   replayable: boolean
   canceledByPacketSeq?: number
   canceledEventRefs?: Array<{ eventId: string; eventSeq: number }>
-  cancelReason?: 'undoStep' | 'undoAction'
+  cancelReason?: 'undoStep' | 'undoAction' | 'provisionalContinuationRollback'
 }
 
 export type ReplayTimelineSummary = {

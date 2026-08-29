@@ -413,7 +413,16 @@ describe('RoomCommitter', () => {
     expect(response.state.log.filter(
       (entry) => entry.key === 'log.provisionalContinuationRollback',
     )).toHaveLength(1)
+    expect(response.publicEventCancellations).toEqual([
+      expect.objectContaining({ reason: 'provisionalContinuationRollback' }),
+    ])
     expect(finalSnapshot.serialized?.sessionCursor.provisionalContinuationScopes).toEqual([])
+    expect(finalSnapshot.serialized?.state.publicEventArchive.at(-1)).toEqual(
+      expect.objectContaining({
+        type: 'publicEvents.canceled',
+        reason: 'provisionalContinuationRollback',
+      }),
+    )
     expect(JSON.stringify(persistence.loadReplayFrame(room.id)))
       .not.toMatch(/provisionalContinuationScopes|checkpoint|failedAuthoritativeCommands/)
   })

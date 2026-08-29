@@ -287,6 +287,10 @@ describe('D014 Hammer Crusher provisional continuation', () => {
     })
     expect(response.interaction.stateId === 'wait' ? response.interaction.request.kind : undefined)
       .toBe('farm-select')
+    if (response.interaction.stateId !== 'wait' || response.interaction.request.kind !== 'farm-select') {
+      throw new Error('expected restored room selection')
+    }
+    expect(response.interaction.request.farm.selectableTiles).not.toContainEqual(room)
     expect(response.state.log.filter(
       (entry) => entry.key === 'log.provisionalContinuationRollback',
     )).toHaveLength(0)
