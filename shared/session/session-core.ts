@@ -27,6 +27,7 @@ import type {
   ExactCost,
 } from '../contract/types.ts'
 import type { ActionDetailParts, PublicEventCancellation } from '../contract/protocol/game.ts'
+import { authoritativeCommandKey, canonicalJson } from '../contract/authoritative-command.ts'
 import type { PrivateGameEvent } from '../contract/private-events.ts'
 import { actionDefinitions, getActionDefinition } from '../actions/index.ts'
 import { internalActionDefinitions } from '../actions/internal-actions.ts'
@@ -379,19 +380,6 @@ export type SessionPrivateCursor = Omit<SessionCommandCheckpoint, 'state'> & {
   nextProvisionalScopeId: number
 }
 
-const canonicalValue = (value: unknown): unknown => {
-  if (Array.isArray(value)) return value.map(canonicalValue)
-  if (!value || typeof value !== 'object') return value
-  return Object.fromEntries(
-    Object.entries(value as Record<string, unknown>)
-      .filter(([, entry]) => entry !== undefined && typeof entry !== 'function')
-      .sort(([left], [right]) => left.localeCompare(right))
-      .map(([key, entry]) => [key, canonicalValue(entry)]),
-  )
-}
-
-const canonicalJson = (value: unknown): string => JSON.stringify(canonicalValue(value))
-
 const cloneCommandValue = <T>(value: T): T => {
   if (Array.isArray(value)) return value.map((entry) => cloneCommandValue(entry)) as T
   if (!value || typeof value !== 'object') return value
@@ -434,7 +422,7 @@ const normalizedCommand = (
   payload?: unknown,
 ): NormalizedAuthoritativeCommand => ({
   type,
-  key: canonicalJson({ type, playerIndex, payload }),
+  key: authoritativeCommandKey(type, playerIndex, payload),
 })
 
 const ruleStateKey = (state: GameState): string => {
@@ -1129,15 +1117,18 @@ export class GameCore {
     return currentRuleStateKey
   }
 
-  private isFailedAuthoritativeCommand(command: NormalizedAuthoritativeCommand): boolean {
-    if (this.failedAuthoritativeCommands.length === 0) return false
+  private currentFailedAuthoritativeCommandKeys(): string[] {
+    if (this.failedAuthoritativeCommands.length === 0) return []
     const currentRuleStateKey = this.refreshFailedAuthoritativeCommands()
     const interactionKey = this.currentInteractionKey()
-    return this.failedAuthoritativeCommands.some((entry) =>
-      entry.commandKey === command.key &&
+    return this.failedAuthoritativeCommands.filter((entry) =>
       entry.interactionKey === interactionKey &&
       entry.ruleStateKey === currentRuleStateKey,
-    )
+    ).map((entry) => entry.commandKey)
+  }
+
+  private isFailedAuthoritativeCommand(command: NormalizedAuthoritativeCommand): boolean {
+    return this.currentFailedAuthoritativeCommandKeys().includes(command.key)
   }
 
   private rememberFailedAuthoritativeCommand(
@@ -2253,7 +2244,7 @@ export class GameCore {
   }
 
   private buildInteraction(): InteractionState {
-    return deriveInteractionState({
+    const interaction = deriveInteractionState({
       state: this.state,
       engineStack: this.engineStack,
       getAnytimeEntries: () => this.buildAnytimeEntries(),
@@ -2268,6 +2259,11 @@ export class GameCore {
         input.playerIndex,
       ),
     })
+    if (interaction.stateId !== 'wait') return interaction
+    const rejectedCommandKeys = this.currentFailedAuthoritativeCommandKeys()
+    return rejectedCommandKeys.length > 0
+      ? { ...interaction, rejectedCommandKeys }
+      : interaction
   }
 
   private computeWinnerIds(): string[] {

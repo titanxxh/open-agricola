@@ -1,4 +1,5 @@
 import type { ClientInteractionState } from '../../shared/contract/protocol/game'
+import { authoritativeCommandKey } from '../../shared/contract/authoritative-command'
 import type {
   FarmTilePosition,
   InteractionAnimalReorgZone,
@@ -159,6 +160,7 @@ export type HeatingPayment = {
 
 export type InteractionSubmitCommand =
   | { kind: 'none' }
+  | { kind: 'rejected' }
   | { kind: 'undoStep' }
   | { kind: 'confirmNextPlayer' }
   | { kind: 'confirmPlayerSwitch' }
@@ -184,12 +186,54 @@ export type InteractionSubmitCommand =
       payload: Record<string, unknown>
     }
 
+const interactionSubmitCommandKey = (
+  interaction: Extract<ClientInteractionState, { stateId: 'wait' }>,
+  command: InteractionSubmitCommand,
+): string | null => {
+  if (command.kind === 'resolveChoice') {
+    return authoritativeCommandKey('choice', command.playerIndex, {
+      value: command.value,
+      payload: command.payload,
+    })
+  }
+  if (command.kind === 'commitSelection') {
+    return authoritativeCommandKey('commitSelection', command.playerIndex, command.payload)
+  }
+  if (command.kind === 'confirmFeed') {
+    return authoritativeCommandKey('choice', command.playerIndex, {
+      value: 'confirm',
+      payload: { selections: command.selections },
+    })
+  }
+  if (command.kind === 'confirmNextPlayer' || command.kind === 'confirmPlayerSwitch') {
+    return authoritativeCommandKey('choice', interaction.playerIndex, { value: 'confirm' })
+  }
+  return null
+}
+
+export const isInteractionSubmitCommandRejected = (
+  interaction: ClientInteractionState,
+  command: InteractionSubmitCommand,
+): boolean => {
+  if (interaction.stateId !== 'wait' || !interaction.rejectedCommandKeys?.length) return false
+  const key = interactionSubmitCommandKey(interaction, command)
+  return key !== null && interaction.rejectedCommandKeys.includes(key)
+}
+
 export const interactionChoiceOptions = (interaction: WaitInteraction): ActionChoiceOption[] => {
-  if (interaction.request.kind === 'choice') return interaction.request.options
-  if (interaction.request.kind === 'select-trigger') return interaction.request.options
-  if (interaction.request.kind === 'farm-select') return interaction.request.options ?? []
-  if (interaction.request.kind === 'selection') return interaction.request.options ?? []
-  return []
+  const options = interaction.request.kind === 'choice' || interaction.request.kind === 'select-trigger'
+    ? interaction.request.options
+    : interaction.request.kind === 'farm-select' || interaction.request.kind === 'selection'
+      ? interaction.request.options ?? []
+      : []
+  return options.map((option) =>
+    isInteractionSubmitCommandRejected(interaction, {
+      kind: 'resolveChoice',
+      playerIndex: interaction.playerIndex,
+      value: option.value,
+    })
+      ? { ...option, disabled: true }
+      : option)
 }
 
 const farmFromInteraction = (interaction: WaitInteraction): InteractionFarmSelection | null =>
@@ -348,7 +392,7 @@ const cropsFromSowSelections = (
     })
     .filter((entry): entry is { row: number; col: number; crop: 'grain' | 'vegetable' | 'wood' | 'stone' } => !!entry)
 
-export const buildInteractionSubmitCommand = (
+const buildInteractionSubmitCommandUnchecked = (
   interaction: ClientInteractionState,
   draft: InteractionSubmitDraft,
 ): InteractionSubmitCommand => {
@@ -499,5 +543,22 @@ export const buildInteractionSubmitCommand = (
       }
     }
   }
+  if (interaction.request.kind === 'choice' || interaction.request.kind === 'select-trigger') {
+    return {
+      kind: 'resolveChoice',
+      playerIndex: interaction.playerIndex,
+      value: draft.value,
+    }
+  }
   return { kind: 'none' }
+}
+
+export const buildInteractionSubmitCommand = (
+  interaction: ClientInteractionState,
+  draft: InteractionSubmitDraft,
+): InteractionSubmitCommand => {
+  const command = buildInteractionSubmitCommandUnchecked(interaction, draft)
+  return isInteractionSubmitCommandRejected(interaction, command)
+    ? { kind: 'rejected' }
+    : command
 }

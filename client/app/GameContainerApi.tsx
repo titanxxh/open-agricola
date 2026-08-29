@@ -799,6 +799,7 @@ export const GameContainerApi = () => {
     farmType?: FarmCommitType,
   ) => {
     if (submitCommand.kind === 'none') return false
+    if (submitCommand.kind === 'rejected') return true
     if (submitCommand.kind === 'undoStep') {
       void transport.undoStep().catch((e) => console.error('undoStep error', e))
       return true
@@ -899,11 +900,21 @@ export const GameContainerApi = () => {
       ? interactionPresentationPlan.pendingChoice
       : null
   const pendingChoice = planPendingChoice
+  const currentSelectionRejected = buildInteractionSubmitCommand(interaction, {
+    value: 'confirm',
+    ...farmSelectionDraft.submitDraft,
+  }).kind === 'rejected'
   const interactionBarPendingChoice =
     interactionPresentationPlan.kind === 'exchange-center' ||
     interactionPresentationPlan.kind === 'moor-special-action'
       ? null
-      : planPendingChoice
+      : currentSelectionRejected && planPendingChoice
+        ? {
+            ...planPendingChoice,
+            options: planPendingChoice.options.map((option) =>
+              option.value === 'confirm' ? { ...option, disabled: true } : option),
+          }
+        : planPendingChoice
   const suppressPendingChoiceOptions = interactionPresentationPlan.kind === 'moor-special-action'
   const pendingNextPlayerIndex =
     interactionPresentationPlan.kind === 'confirm-next-player'
