@@ -2,36 +2,34 @@ import { defineOccupationCard } from '../card-source'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { isCardFlagged } from '../helpers/card-state'
-import { familySize } from '../../domain/player'
-import { fieldIsEmpty } from '../../domain/field'
+import { familySize, hasInactiveWorkerInSupply } from '../../domain/player'
+import { positionKey } from '../../domain/farm'
+import { getExtraRoomCapacity } from '../card-effects'
 import type { CardImpl } from '../registry'
 
 const CARD_ID = 'E092_FieldDoctor'
-/**
- * E92 Field Doctor — Once this game, if you live in a house with exactly 2 rooms
- * surrounded by 4 field tiles, you can use any __Wish for Children__ action space
- * even without room.
- *
- * Rule: onPlayerComputePlaceFarmerFlow — checks WishChildren action, 2 rooms,
- * 4 field tiles at specific positions, card not flagged yet.
- *
- * The 4 field positions from the reference are: (3,5), (3,3), (3,1), (1,1) —
- * i.e. 4 specific farm tiles must be grain fields.
- *
- * Implementation: computeReplace listener on wish-children-growth to swap
- * with grow-family-without-room if conditions met, then flag card.
- * Players: 1+.
- */
+const REQUIRED_FIELD_KEYS = ['0-0', '0-1', '1-1', '2-1'] as const
+const WISH_CHILDREN_SPACE_IDS = new Set([
+  'wish-children',
+  'urgent-wish-children',
+  'modest-wish-children-56',
+])
 
 const checkRoomsSurroundedByFields = (context: CardListenerContext): boolean => {
   const player = context.player
   if (player.rooms !== 2) return false
-  // Check if fields exist at the 4 specific positions the reference uses.
-  // The reference positions: (x:3,y:5), (x:3,y:3), (x:3,y:1), (x:1,y:1).
-  // In our coordinate system fields are tracked as player.fields array.
-  // We check by tile position via positionKey or by checking enough planted fields near rooms.
-  // Approximation: player must have at least 4 fields.
-  return (player.fields ?? []).filter((f) => !fieldIsEmpty(f) || f !== undefined).length >= 4
+  const fieldKeys = new Set(player.fields.map(positionKey))
+  return REQUIRED_FIELD_KEYS.every((key) => fieldKeys.has(key))
+}
+
+const canUseFieldDoctor = (context: CardListenerContext): boolean => {
+  if (!WISH_CHILDREN_SPACE_IDS.has(context.space.id)) return false
+  if (context.actionContext?.skipRoomCheck === true) return false
+  if (context.actionContext?.checkedReplaceAction === true) return false
+  if (isCardFlagged(context.player, CARD_ID)) return false
+  if (!checkRoomsSurroundedByFields(context)) return false
+  if (!hasInactiveWorkerInSupply(context.player)) return false
+  return context.player.rooms + getExtraRoomCapacity(context.player) <= familySize(context.player)
 }
 
 const computeReplaceListener: CardListenerRegistration = {
@@ -40,13 +38,10 @@ const computeReplaceListener: CardListenerRegistration = {
   phases: ['computeReplace' as ActionHookPhase],
   actions: ['family-growth'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
-    if (isCardFlagged(context.player, CARD_ID)) return
-    if (!checkRoomsSurroundedByFields(context)) return
-    // Only activate if player actually needs the "without room" bypass
-    if (context.player.rooms > familySize(context.player)) return
+    if (!canUseFieldDoctor(context)) return
     return {
-      actionId: 'family-growth',
-      flow: {
+      decline: true,
+      alternativeFlow: {
         type: 'seq',
         children: [
           {
@@ -63,8 +58,19 @@ const computeReplaceListener: CardListenerRegistration = {
   },
 }
 
+const isDoableListener: CardListenerRegistration = {
+  id: 'E92-field-doctor-isdoable-wish-children',
+  cardIds: [CARD_ID],
+  phases: ['isDoable' as ActionHookPhase],
+  actions: ['family-growth'],
+  handler: (context: CardListenerContext): ActionHookResult | void => {
+    if (!canUseFieldDoctor(context)) return
+    return { doable: true }
+  },
+}
+
 const cardImpl = {
-  listeners: [computeReplaceListener],
+  listeners: [computeReplaceListener, isDoableListener],
   reaches: [] as readonly string[],
 } satisfies CardImpl
 
