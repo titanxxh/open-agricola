@@ -1,11 +1,17 @@
 import type { ActionExecutionResult, ActionFlow } from '../contract/types'
 
 export const INJECTED_ANYTIME_ACTION_CONTEXT_KEY = '__injectedAnytimeAction' as const
+export const INJECTED_ANYTIME_COMPLETION_CONTEXT_KEY = '__injectedAnytimeCompletion' as const
 export const INJECTED_ANYTIME_RESULT_KEY = '__injectedAnytimeResult' as const
 
 export const isInjectedAnytimeActionContext = (
   actionContext: Record<string, unknown> | undefined,
 ) => actionContext?.[INJECTED_ANYTIME_ACTION_CONTEXT_KEY] === true
+
+export const isInjectedAnytimeCompletionContext = (
+  actionContext: Record<string, unknown> | undefined,
+) => isInjectedAnytimeActionContext(actionContext) &&
+  actionContext?.[INJECTED_ANYTIME_COMPLETION_CONTEXT_KEY] === true
 
 export const tagInjectedAnytimeFlow = (flow: ActionFlow): ActionFlow => {
   if (flow.type === 'leaf') {

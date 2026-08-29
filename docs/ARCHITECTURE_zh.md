@@ -862,6 +862,8 @@ Three consumers share this snapshot:
 
 Nested anytime flows are injected ahead of the current pending tree. Parent pending state remains on its original pending host as a `PendingEnvelope`; when the nested flow resolves, `EngineStack` resumes the parent frame and `buildInteraction()` surfaces the parent envelope again instead of going idle.
 
+若 anytime flow 的终止 reaction 必须等整个 injected sequence 完成后才运行，可在最后一个 leaf 上写入 `INJECTED_ANYTIME_COMPLETION_CONTEXT_KEY`。completion listener 必须同时看到该 marker 与引擎添加的 injected-anytime marker，因此空栈顶层 anytime action 不会被误判为 suspended-flow completion。
+
 OA-vs-the reference design notes:
 
 - Reorganize is a system-driven sub-flow in OA (not a player-triggerable anytime) — the policy never produces a `'reorganize'` entry to filter.
