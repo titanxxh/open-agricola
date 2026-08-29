@@ -1,7 +1,7 @@
 import { defineMinorCard } from '../card-source'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
-import { getMinorImprovementCard } from '../catalog'
+import { getPrintedImprovementCostCandidates } from '../../actions/helpers/improvement-helpers'
 import { payGainNode } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
 
@@ -19,16 +19,10 @@ const listener: CardListenerRegistration = {
     if (costType !== 'major-improvement' && costType !== 'minor-improvement') return
     const builtId = context.sourceCard
     if (!builtId || builtId === CARD_ID) return
-    // Get card cost to find valid resource types
-    const card = getMinorImprovementCard(builtId)
-    if (!card) return
     const costResources = new Set<string>()
-    // Minor improvements only ever carry Partial<Resource> costs.
-    const cardCost = card.cost as Partial<Record<string, number>> | undefined
-    const allCosts = [cardCost, ...(card.altCosts ?? [])].filter(Boolean)
-    for (const cost of allCosts) {
+    for (const cost of getPrintedImprovementCostCandidates(context.state, context.player, builtId)) {
       for (const res of BUILDING_RESOURCES) {
-        if ((cost![res] ?? 0) > 0) costResources.add(res)
+        if ((cost[res] ?? 0) > 0) costResources.add(res)
       }
     }
     if (costResources.size === 0) return

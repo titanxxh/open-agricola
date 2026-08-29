@@ -91,9 +91,10 @@ export const getMinorImprovementBaseCost = (
 }
 
 const readBaseCostCandidates = (
-  cost: PaymentResourceMap | ComplexCost | null | undefined,
+  cost: PaymentResourceMap | PaymentResourceMap[] | ComplexCost | null | undefined,
 ): PaymentResourceMap[] => {
   if (!cost) return []
+  if (Array.isArray(cost)) return cost
   if (PaymentSolver.isComplexCost(cost)) {
     if (cost.fees && cost.fees.length > 0) return cost.fees
     return cost.fee ? [cost.fee] : []
@@ -113,6 +114,28 @@ export const getPrintedImprovementResourceCost = (
       ]
     : readBaseCostCandidates(getMajorCard(improvementId)?.cost)
   return Math.max(0, ...candidates.map((cost) => cost[resource] ?? 0))
+}
+
+export const getPrintedImprovementCostCandidates = (
+  state: GameState,
+  player: PlayerState,
+  improvementId: string,
+): PaymentResourceMap[] => {
+  const dynamicCost = getActiveCardRegistry()?.getBaseCosts(improvementId)?.({
+    state,
+    player,
+    cardId: improvementId,
+    actionId: 'improvement',
+  })
+  if (dynamicCost != null) return readBaseCostCandidates(dynamicCost)
+
+  const minor = getMinorImprovement(improvementId)
+  return minor
+    ? [
+        ...readBaseCostCandidates(minor.cost),
+        ...(minor.altCosts ?? []),
+      ]
+    : readBaseCostCandidates(getMajorCard(improvementId)?.cost)
 }
 
 export const getMinorImprovementEffectiveCost = (
