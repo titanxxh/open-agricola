@@ -307,6 +307,65 @@ describe('RoomCommitter', () => {
     ])
   })
 
+  it('persists a choice that advances only the authoritative session cursor', () => {
+    const room = makeRoom()
+    const state = room.session.getState().state
+    stabilizeRandomHands(state.players)
+    state.currentPlayerIndex = 0
+    state.players[0]!.resources = {
+      ...state.players[0]!.resources,
+      wood: 5,
+      reed: 2,
+    }
+    room.session.loadState(state)
+    const committer = createCommitter()
+    expect(committer.prepareRoom(room, { missingPrefix: false })).toMatchObject({
+      kind: 'committed',
+      stepNo: 0,
+    })
+
+    let response = room.session.takeAction(0, 'farm-expansion')
+    expect(committer.commit(
+      room,
+      response,
+      replayIntentFromCommand({ type: 'action', spaceId: 'farm-expansion' })!,
+      0,
+    )).toMatchObject({ kind: 'committed', stepNo: 1 })
+    if (response.interaction.stateId !== 'wait') throw new Error('expected action choice')
+    const construct = response.interaction.request.options?.find(
+      (option) => option.labelKey === 'actions.construct.name',
+    )
+    expect(construct).toBeDefined()
+    const beforeSnapshot = serializeSessionSnapshot(room.session.state, room.session)
+
+    response = room.session.resolveChoice(0, construct!.value)
+    expect(response.ok).toBe(true)
+    const afterSnapshot = serializeSessionSnapshot(room.session.state, room.session)
+    expect(afterSnapshot.frame).toEqual(beforeSnapshot.frame)
+    expect(afterSnapshot.sessionCursor).not.toEqual(beforeSnapshot.sessionCursor)
+    expect(response.interaction.stateId === 'wait' ? response.interaction.request.kind : undefined)
+      .toBe('farm-select')
+    expect(committer.commit(
+      room,
+      response,
+      replayIntentFromCommand({ type: 'choice', value: construct!.value })!,
+      0,
+    )).toMatchObject({ kind: 'committed', stepNo: 2 })
+
+    const restored = snapshotToRoom(persistence.load(room.id)!)
+    const restoredCommitter = createCommitter()
+    expect(restoredCommitter.prepareRoom(restored, { missingPrefix: true })).toMatchObject({
+      kind: 'committed',
+      stepNo: 2,
+    })
+    const restoredResponse = restored.session.getState()
+    expect(restoredResponse.interaction.stateId === 'wait'
+      ? restoredResponse.interaction.request.kind
+      : undefined).toBe('farm-select')
+    expect(restoredCommitter.commit(restored, restoredResponse, actionIntent!, 0))
+      .toEqual({ kind: 'unchanged' })
+  })
+
   it('persists provisional recovery privately and records abort as a new replay Step', () => {
     const room = makeRoom()
     const state = room.session.getState().state
