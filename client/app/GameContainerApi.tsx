@@ -91,6 +91,7 @@ import {
   interactionChoiceOptions,
   isDomainWaitInteraction,
   type InteractionSubmitCommand,
+  type InteractionSubmitDraft,
 } from './interaction-presentation'
 import {
   buildInteractionBarActions,
@@ -691,6 +692,8 @@ export const GameContainerApi = () => {
       cancelDiscardPrompt: cancelAnimalDiscardPrompt,
     },
   } = animalReorgDraft
+  const isInteractionSubmitDraftRejected = useCallback((draft: InteractionSubmitDraft) =>
+    buildInteractionSubmitCommand(interaction, draft).kind === 'rejected', [interaction])
 
   const takeAction = useCallback((space: ActionSpace) => {
     if (!state || !isInteractive) return
@@ -900,10 +903,15 @@ export const GameContainerApi = () => {
       ? interactionPresentationPlan.pendingChoice
       : null
   const pendingChoice = planPendingChoice
-  const currentSelectionRejected = buildInteractionSubmitCommand(interaction, {
+  const currentSelectionRejected = isInteractionSubmitDraftRejected({
     value: 'confirm',
     ...farmSelectionDraft.submitDraft,
-  }).kind === 'rejected'
+  })
+  const currentConfirmRejected = isInteractionSubmitDraftRejected({ value: 'confirm' })
+  const animalReorgConfirmDisabled = isInteractionSubmitDraftRejected({
+    value: 'confirm',
+    ...animalReorgSubmitDraft,
+  })
   const interactionBarPendingChoice =
     interactionPresentationPlan.kind === 'exchange-center' ||
     interactionPresentationPlan.kind === 'moor-special-action'
@@ -947,9 +955,14 @@ export const GameContainerApi = () => {
             required: interactionPresentationPlan.required,
             maxFuelPayable: interactionPresentationPlan.maxFuelPayable,
             maxWoodConvertibleToFuel: interactionPresentationPlan.maxWoodConvertibleToFuel,
+            isConfirmDisabled: (payload: { fuelUsed: number; woodToFuel: number }) =>
+              isInteractionSubmitDraftRejected({
+                value: 'confirm',
+                heatingPayment: payload,
+              }),
           }
         : null,
-    [interactionPresentationPlan, state],
+    [interactionPresentationPlan, isInteractionSubmitDraftRejected, state],
   )
   const canTakeActionForBoard = useCallback((space: ActionSpace, _player: PlayerState) => {
     if (!state || !currentPlayer || !isInteractive) return false
@@ -1119,6 +1132,10 @@ export const GameContainerApi = () => {
   const isBakeExchange = exchangeDraft.bake.isActive
   const isAnytimeExchange = exchangeDraft.anytime.isActive
   const harvestFeedSelections = exchangeDraft.harvestFeed.selections
+  const harvestFeedConfirmDisabled = isInteractionSubmitDraftRejected({
+    value: 'confirm',
+    feedSelections: harvestFeedSelections,
+  })
   const bakeExchangeChoice = exchangeDraft.bake.choice
   const anytimeExchangeChoice = exchangeDraft.anytime.choice
   const confirmBakeExchange = useCallback(() => {
@@ -1687,6 +1704,10 @@ export const GameContainerApi = () => {
       })
       runInteractionSubmitCommand(submitCommand)
     },
+    isOccupationHandSelectionRejected: (ids: string[]) => isInteractionSubmitDraftRejected({
+      value: 'confirm',
+      occupationCardIds: ids,
+    }),
   }
   const interactionBarResourceQuantitySelect =
     interactionPresentationPlan.kind === 'resource-quantity-select'
@@ -1694,6 +1715,11 @@ export const GameContainerApi = () => {
           availableByResource: interactionPresentationPlan.availableByResource,
           promptKey: interactionPresentationPlan.promptKey,
           requireAtLeastOne: interactionPresentationPlan.requireAtLeastOne,
+          isConfirmDisabled: (counts: Partial<Record<keyof Resource, number>>) =>
+            isInteractionSubmitDraftRejected({
+              value: 'confirm',
+              resourceCounts: counts,
+            }),
           onConfirm: (counts: Partial<Record<keyof Resource, number>>) => {
             if (!isInteractive) return
             const submitCommand = buildInteractionSubmitCommand(interaction, {
@@ -1716,6 +1742,13 @@ export const GameContainerApi = () => {
           receiveResources: interactionPresentationPlan.receiveResources,
           maxTotal: interactionPresentationPlan.maxTotal,
           promptKey: interactionPresentationPlan.promptKey,
+          isConfirmDisabled: (payload: {
+            discard: Partial<Record<keyof Resource, number>>
+            receive: Partial<Record<keyof Resource, number>>
+          }) => isInteractionSubmitDraftRejected({
+            value: 'confirm',
+            resourceBatchExchange: payload,
+          }),
           onConfirm: (payload: {
             discard: Partial<Record<keyof Resource, number>>
             receive: Partial<Record<keyof Resource, number>>
@@ -1745,6 +1778,9 @@ export const GameContainerApi = () => {
       nextPlayerIndex: pendingNextPlayerIndex,
       playerSwitch: pendingPlayerSwitch,
       harvestFeedPlayerName: harvestPending?.playerName ?? null,
+      harvestFeedConfirmDisabled,
+      nextPlayerConfirmDisabled: currentConfirmRejected,
+      playerSwitchConfirmDisabled: currentConfirmRejected,
       heating: heatingPending,
       resourceQuantitySelect: interactionBarResourceQuantitySelect,
       resourceBatchExchangeSelect: interactionBarResourceBatchExchangeSelect,
@@ -1786,6 +1822,7 @@ export const GameContainerApi = () => {
       state: animalReorg,
       remaining: reorgRemaining,
       hasOverflow: hasReorgOverflow,
+      confirmDisabled: animalReorgConfirmDisabled,
     },
     controls: {
       canUndoStep,
@@ -1888,6 +1925,7 @@ export const GameContainerApi = () => {
         isInteractive={isInteractive}
         pendingChoice={pendingChoice}
         harvestPending={harvestPending}
+        harvestFeedConfirmDisabled={harvestFeedConfirmDisabled}
         draft={exchangeDraft}
         cardLabel={cardLabel}
         actions={{

@@ -28,12 +28,14 @@ export type HeatingPending = {
   required: number
   maxFuelPayable: number
   maxWoodConvertibleToFuel: number
+  isConfirmDisabled?: (payload: { fuelUsed: number; woodToFuel: number }) => boolean
 }
 
 export type InteractionBarResourceQuantitySelect = {
   availableByResource: Partial<Record<keyof Resource, number>>
   promptKey?: string
   requireAtLeastOne?: boolean
+  isConfirmDisabled?: (counts: Partial<Record<keyof Resource, number>>) => boolean
   onConfirm: (counts: Partial<Record<keyof Resource, number>>) => void
   onCancel: () => void
 }
@@ -43,6 +45,10 @@ export type InteractionBarResourceBatchExchangeSelect = {
   receiveResources: readonly (keyof Resource)[]
   maxTotal: number
   promptKey?: string
+  isConfirmDisabled?: (payload: {
+    discard: Partial<Record<keyof Resource, number>>
+    receive: Partial<Record<keyof Resource, number>>
+  }) => boolean
   onConfirm: (payload: {
     discard: Partial<Record<keyof Resource, number>>
     receive: Partial<Record<keyof Resource, number>>
@@ -64,6 +70,9 @@ export type InteractionBarPresentationInput = {
     nextPlayerIndex: number | null
     playerSwitch: { fromPlayerIndex: number; toPlayerIndex: number } | null
     harvestFeedPlayerName: string | null
+    harvestFeedConfirmDisabled?: boolean
+    nextPlayerConfirmDisabled?: boolean
+    playerSwitchConfirmDisabled?: boolean
     heating: HeatingPending | null
     resourceQuantitySelect: InteractionBarResourceQuantitySelect | null
     resourceBatchExchangeSelect: InteractionBarResourceBatchExchangeSelect | null
@@ -105,6 +114,7 @@ export type InteractionBarPresentationInput = {
     state: AnimalReorgState | null
     remaining: Record<AnimalKey, number> | null
     hasOverflow: boolean
+    confirmDisabled?: boolean
   }
   controls: {
     canUndoStep: boolean

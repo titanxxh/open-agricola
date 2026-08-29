@@ -83,12 +83,11 @@ const HeatingPanel = ({
   const [fuelUsed, setFuelUsed] = useState(Math.min(pending.required, pending.maxFuelPayable))
   const maxWood = pending.maxWoodConvertibleToFuel
   const maxFuel = Math.min(pending.required, pending.maxFuelPayable + woodToFuel)
-  const commit = () => {
-    onConfirm({
-      woodToFuel: clampWhole(woodToFuel, 0, maxWood),
-      fuelUsed: clampWhole(fuelUsed, 0, maxFuel),
-    })
+  const payload = {
+    woodToFuel: clampWhole(woodToFuel, 0, maxWood),
+    fuelUsed: clampWhole(fuelUsed, 0, maxFuel),
   }
+  const commit = () => onConfirm(payload)
   return (
     <>
       <div className="interaction-title">
@@ -130,7 +129,7 @@ const HeatingPanel = ({
           </label>
         </div>
         <div className="interaction-actions resource-quantity-actions">
-          <button onClick={commit} disabled={!isInteractive}>
+          <button onClick={commit} disabled={!isInteractive || pending.isConfirmDisabled?.(payload)}>
             {t(locale, 'ui.harvestHeatingConfirm')}
           </button>
         </div>
@@ -588,14 +587,14 @@ export const InteractionBar = ({
                       <button onClick={cancelAnimalDiscardPrompt} disabled={!isInteractive}>
                         {t(locale, 'ui.reorgAdjustMore')}
                       </button>
-                      <button onClick={confirmAnimalReorg} disabled={!isInteractive}>
+                      <button onClick={confirmAnimalReorg} disabled={!isInteractive || model.animalReorg.confirmDisabled}>
                         {t(locale, 'ui.reorgDiscardConfirm')}
                       </button>
                     </div>
                   </div>
                 ) : (
                   <div className="interaction-actions">
-                    <button onClick={confirmAnimalReorg} disabled={!isInteractive || hasReorgOverflow}>
+                    <button onClick={confirmAnimalReorg} disabled={!isInteractive || hasReorgOverflow || model.animalReorg.confirmDisabled}>
                       {t(locale, 'ui.reorgConfirm')}
                     </button>
                   </div>
@@ -609,6 +608,7 @@ export const InteractionBar = ({
               receiveResources={resourceBatchExchangeSelect.receiveResources}
               maxTotal={resourceBatchExchangeSelect.maxTotal}
               promptKey={resourceBatchExchangeSelect.promptKey}
+              isConfirmDisabled={resourceBatchExchangeSelect.isConfirmDisabled}
               onConfirm={resourceBatchExchangeSelect.onConfirm}
               onCancel={resourceBatchExchangeSelect.onCancel}
             />
@@ -618,6 +618,7 @@ export const InteractionBar = ({
               availableByResource={resourceQuantitySelect.availableByResource}
               promptKey={resourceQuantitySelect.promptKey}
               requireAtLeastOne={resourceQuantitySelect.requireAtLeastOne}
+              isConfirmDisabled={resourceQuantitySelect.isConfirmDisabled}
               onConfirm={resourceQuantitySelect.onConfirm}
               onCancel={resourceQuantitySelect.onCancel}
             />
@@ -640,7 +641,7 @@ export const InteractionBar = ({
                 {body.subtitle ? renderInteractionText(locale, body.subtitle) : null}
               </div>
               <div className="interaction-actions">
-                <button onClick={confirmHarvestFeed} disabled={!isInteractive}>
+                <button onClick={confirmHarvestFeed} disabled={!isInteractive || model.pending.harvestFeedConfirmDisabled}>
                   {t(locale, 'ui.interactionConfirmButton')}
                 </button>
               </div>
@@ -778,7 +779,7 @@ export const InteractionBar = ({
                 {body.title ? renderInteractionText(locale, body.title) : null}
               </div>
               <div className="interaction-actions">
-                <button onClick={confirmPlayerSwitch} disabled={!isInteractive}>
+                <button onClick={confirmPlayerSwitch} disabled={!isInteractive || model.pending.playerSwitchConfirmDisabled}>
                   {t(locale, 'ui.interactionPlayerSwitchConfirm')}
                 </button>
               </div>
@@ -789,7 +790,7 @@ export const InteractionBar = ({
                 {body.title ? renderInteractionText(locale, body.title) : null}
               </div>
               <div className="interaction-actions">
-                <button onClick={confirmNextPlayer} disabled={!isInteractive}>
+                <button onClick={confirmNextPlayer} disabled={!isInteractive || model.pending.nextPlayerConfirmDisabled}>
                   {t(locale, 'ui.interactionConfirmSwitch')}
                 </button>
               </div>

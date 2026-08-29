@@ -10,6 +10,10 @@ type Props = {
   receiveResources: readonly ResourceKey[]
   maxTotal: number
   promptKey?: string
+  isConfirmDisabled?: (payload: {
+    discard: Partial<Record<ResourceKey, number>>
+    receive: Partial<Record<ResourceKey, number>>
+  }) => boolean
   onConfirm: (payload: {
     discard: Partial<Record<ResourceKey, number>>
     receive: Partial<Record<ResourceKey, number>>
@@ -36,6 +40,7 @@ export const ResourceBatchExchangePanel = ({
   receiveResources,
   maxTotal,
   promptKey,
+  isConfirmDisabled,
   onConfirm,
   onCancel,
 }: Props) => {
@@ -45,6 +50,7 @@ export const ResourceBatchExchangePanel = ({
   const discardTotal = discardEntries.reduce((sum, [key]) => sum + (discard[key] ?? 0), 0)
   const receiveTotal = receiveResources.reduce((sum, key) => sum + (receive[key] ?? 0), 0)
   const totalsValid = discardTotal === receiveTotal && discardTotal <= maxTotal
+  const payload = { discard: stripZeroes(discard), receive: stripZeroes(receive) }
 
   const setCount = (
     setter: (value: Partial<Record<ResourceKey, number>>) => void,
@@ -96,8 +102,8 @@ export const ResourceBatchExchangePanel = ({
         <button
           type="button"
           className="is-primary"
-          disabled={!totalsValid}
-          onClick={() => onConfirm({ discard: stripZeroes(discard), receive: stripZeroes(receive) })}
+          disabled={!totalsValid || isConfirmDisabled?.(payload)}
+          onClick={() => onConfirm(payload)}
         >
           {t(locale, 'ui.interactionBatchExchangeConfirm')}
         </button>

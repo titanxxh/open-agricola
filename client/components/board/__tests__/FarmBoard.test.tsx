@@ -1592,7 +1592,7 @@ const renderWithOccSelection = (
     minSelections: number
     maxSelections: number
   },
-  overrides: Partial<{ onConfirmOccupationHandSelection: (ids: string[]) => void }> = {},
+  overrides: Partial<FarmBoardProps['actions']> = {},
 ) => {
   const player = createPlayer('p1', 'Player A', 'red')
   const displayPlayer = { ...player, occupationHand: BASE_OCC_HAND }
@@ -1603,6 +1603,7 @@ const renderWithOccSelection = (
         occupationHandSelection,
       }, {
         onConfirmOccupationHandSelection: overrides.onConfirmOccupationHandSelection,
+        isOccupationHandSelectionRejected: overrides.isOccupationHandSelectionRejected,
       })}
     />,
   )
@@ -1621,6 +1622,20 @@ describe('FarmBoard occupation-hand multi-select mode', () => {
     expect(html).toContain('data-testid="occupation-hand-confirm"')
 
     // Starts at 0 selected < min=3, so button must be disabled
+    expect(html).toContain('disabled=""')
+  })
+
+  it('disables an exact rejected occupation-hand selection', () => {
+    const html = renderWithOccSelection({
+      kind: 'occupation-hand',
+      selectableCards: BASE_OCC_HAND.slice(0, 3),
+      minSelections: 0,
+      maxSelections: 3,
+    }, {
+      isOccupationHandSelectionRejected: () => true,
+    })
+
+    expect(html).toContain('data-testid="occupation-hand-confirm"')
     expect(html).toContain('disabled=""')
   })
 

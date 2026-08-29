@@ -38,6 +38,21 @@ describe('ResourceQuantitySelectPanel', () => {
     expect(onConfirm).toHaveBeenCalledWith({ food: 0 })
   })
 
+  it('disables an exact rejected resource selection', () => {
+    render(
+      <ResourceQuantitySelectPanel
+        locale="en"
+        availableByResource={{ food: 2 }}
+        requireAtLeastOne={false}
+        isConfirmDisabled={(counts) => counts.food === 0}
+        onConfirm={() => {}}
+        onCancel={() => {}}
+      />,
+    )
+
+    expect(screen.getByRole('button', { name: 'Confirm' })).toBeDisabled()
+  })
+
   it('drops stale resource counts when available resources change', async () => {
     const user = userEvent.setup()
     const onConfirm = vi.fn()

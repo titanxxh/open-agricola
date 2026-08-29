@@ -46,6 +46,7 @@ const baseDraft = (): ExchangeOverlayDraft => ({
 const renderOverlay = (
   draft: ExchangeOverlayDraft,
   actions: Partial<ComponentProps<typeof ExchangeOverlayPresentation>['actions']> = {},
+  props: Partial<ComponentProps<typeof ExchangeOverlayPresentation>> = {},
 ) => render(
   <ExchangeOverlayPresentation
     locale="en"
@@ -54,6 +55,7 @@ const renderOverlay = (
     harvestPending={{ playerName: 'P1', remaining: 2, foodUsed: 1 }}
     draft={draft}
     cardLabel={(id) => id}
+    {...props}
     actions={{
       confirmBakeExchange: vi.fn(),
       confirmAnytimeExchange: vi.fn(),
@@ -136,5 +138,23 @@ describe('ExchangeOverlayPresentation', () => {
     expect(screen.getByTestId('harvest-feed-option-__basic__-ex0')).toBeTruthy()
     fireEvent.click(screen.getByRole('button', { name: 'Confirm' }))
     expect(confirmHarvestFeed).toHaveBeenCalledTimes(1)
+  })
+
+  it('disables a rejected harvest-feed submission', () => {
+    const draft = baseDraft()
+    draft.harvestFeed.isActive = true
+    draft.harvestFeed.options = [{
+      id: '__basic__-ex0',
+      sourceId: '__basic__',
+      sourceName: 'Basic conversion',
+      exchangeIndex: 0,
+      from: { grain: 1 },
+      to: { food: 1 },
+      maxTimes: 1,
+    }]
+
+    renderOverlay(draft, {}, { harvestFeedConfirmDisabled: true })
+
+    expect(screen.getByRole('button', { name: 'Confirm' })).toBeDisabled()
   })
 })

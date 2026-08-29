@@ -6,6 +6,22 @@ import userEvent from '@testing-library/user-event'
 import { ResourceBatchExchangePanel } from '../ResourceBatchExchangePanel'
 
 describe('ResourceBatchExchangePanel', () => {
+  it('disables an exact rejected batch exchange', () => {
+    render(
+      <ResourceBatchExchangePanel
+        locale="en"
+        discardAvailableByResource={{ wood: 2 }}
+        receiveResources={['stone']}
+        maxTotal={2}
+        isConfirmDisabled={() => true}
+        onConfirm={() => {}}
+        onCancel={() => {}}
+      />,
+    )
+
+    expect(screen.getByRole('button', { name: 'Confirm' })).toBeDisabled()
+  })
+
   it('submits discard and receive maps with equal totals', async () => {
     const user = userEvent.setup()
     const onConfirm = vi.fn()
