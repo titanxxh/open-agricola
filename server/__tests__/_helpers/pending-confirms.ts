@@ -18,5 +18,5 @@ export function confirmPlayerSwitch(session: GameSession): SessionResponse {
   if (interaction.stateId !== 'wait' || interaction.request?.kind !== 'confirm-player-switch') {
     return session.resolveChoice(0, 'confirm')
   }
-  return session.resolveChoice(interaction.request.toPlayerIndex, 'confirm')
+  return session.resolveChoice(interaction.request.fromPlayerIndex, 'confirm')
 }

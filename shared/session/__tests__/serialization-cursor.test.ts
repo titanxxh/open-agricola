@@ -615,6 +615,11 @@ describe('serialization cursor round-trip', () => {
     const restoredEnvelope = restored.getEngineStack().peekPendingEnvelope()
     expect(restoredEnvelope?.request.kind).toBe('confirm-player-switch')
     expect(restoredEnvelope?.hostNodeId).toBeTruthy()
+    expect(restored.getState().interaction).toMatchObject({
+      stateId: 'wait',
+      playerIndex: 1,
+      request: { kind: 'confirm-player-switch', fromPlayerIndex: 1, toPlayerIndex: 0 },
+    })
 
     // Resolving the synthetic frame pops it and resumes the parent action
     // engine. The parent's exact follow-up (a 'choice' for reed-bank's OR
@@ -622,7 +627,7 @@ describe('serialization cursor round-trip', () => {
     // already-resolved) is not the contract we're asserting here — what we
     // care about is that the round-trip preserved the synthetic frame and
     // resolveChoice no longer reports an error.
-    const after = restored.resolveChoice(0, 'confirm')
+    const after = restored.resolveChoice(1, 'confirm')
     expect(after.ok).toBe(true)
   })
 

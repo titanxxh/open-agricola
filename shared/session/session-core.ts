@@ -4395,6 +4395,9 @@ export class GameCore {
         case 'confirm-next-player':
           return this.handleConfirmNextPlayerResolved(plan.nextPlayerIndex)
         case 'confirm-player-switch':
+          if (playerIndex !== plan.fromPlayerIndex) {
+            return this.respond(false, 'no pending choice for this player')
+          }
           return this.handleConfirmPlayerSwitchResolved(plan.fromPlayerIndex, plan.toPlayerIndex)
         case 'feed':
           return this.handleFeedResolved(playerIndex, plan.selections)

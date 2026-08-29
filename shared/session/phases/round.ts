@@ -278,7 +278,7 @@ export const startConfirmNextPlayer = (
 /**
  * Mirror of `startConfirmNextPlayer` for deferred owner-metadata transitions.
  * The owner switch itself is represented on runtime nodes; this synthetic
- * pending frame only asks the target player to confirm before the parent
+ * pending frame only asks the outgoing player to confirm before the parent
  * action frame resumes.
  */
 export const startConfirmPlayerSwitch = (
@@ -294,7 +294,7 @@ export const startConfirmPlayerSwitch = (
     promptKey: 'ui.confirmPlayerSwitch',
     ownerNodeId: null,
     syntheticKind: 'confirm-player-switch',
-  } satisfies PendingEnvelope, toPlayerIndex, 'confirm-player-switch')
+  } satisfies PendingEnvelope, fromPlayerIndex, 'confirm-player-switch')
 }
 
 /**
