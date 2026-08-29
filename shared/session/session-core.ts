@@ -1447,7 +1447,9 @@ export class GameCore {
     }
     if (
       settlement.protectedObservations.length > 0 &&
-      this.provisionalContinuationScopes.some((scope) => !scope.guarded)
+      this.provisionalContinuationScopes.some(
+        (scope) => !completedScopeIds.has(scope.id) && !scope.guarded,
+      )
     ) {
       return this.rejectCurrentCommand(settlement)
     }
@@ -5443,6 +5445,15 @@ export class GameCore {
     const cardId = resolveDevCardIdInput(cardIdInput)
     const isMajor = !!getMajorCard(cardId)
     const isOccupation = this.isOccupationCard(cardId)
+    const revealsHiddenCard = this.state.players.some((entry) =>
+      entry.minorHand.includes(cardId) || entry.occupationHand.includes(cardId),
+    )
+    if (revealsHiddenCard) {
+      this.reportProtectedObservation({
+        kind: 'hidden-information',
+        recipientPlayerIds: this.state.players.map((entry) => entry.id),
+      })
+    }
     for (const p of this.state.players) {
       this.clearDevCardState(p, cardId)
     }

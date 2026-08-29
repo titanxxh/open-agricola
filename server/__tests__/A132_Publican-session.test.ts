@@ -277,6 +277,26 @@ describe('A132_Publican session', () => {
     expect(resp.scores).toHaveLength(2)
   })
 
+  it('rejects revealing a hidden hand card before Sow is guarded', () => {
+    const session = setup(1)
+    const state = session.getState().state
+    state.players[1]!.resources.grain = 0
+    state.players[1]!.minorHand = ['A001_Shelter']
+    session.loadState(state)
+
+    let resp = advancePastPlayerSwitches(session, session.takeAction(1, 'grain-utilization'))
+    expect(resp.interaction.stateId === 'wait' ? resp.interaction.sourceCard : undefined)
+      .toBe('A132_Publican')
+
+    resp = session.devPlayCard(1, 'A001_Shelter')
+
+    expect(resp.ok).toBe(false)
+    expect(resp.state.players[1]!.minorHand).toContain('A001_Shelter')
+    expect(resp.state.players[1]!.minorPlayed).not.toContain('A001_Shelter')
+    expect(session.createSessionPrivateCursor().provisionalContinuationScopes)
+      .toEqual([expect.objectContaining({ guarded: false })])
+  })
+
   it('commits protected observations after the Sow continuation is guarded', () => {
     const session = setup(1)
     const state = session.getState().state
