@@ -6,6 +6,7 @@ import { stablesAction } from '../../actions/effects/stables'
 import type { ActionAvailabilityContext, Resource } from '../../contract/types'
 import type { CardImpl } from '../registry'
 import { getAvailableStableSupplyCount } from '../../domain/supply-tokens'
+import { INJECTED_ANYTIME_COMPLETION_CONTEXT_KEY } from '../../engine/action-context-flags'
 
 const CARD_ID = 'C094_StableCleaner'
 
@@ -74,7 +75,13 @@ const anytimeListener: CardListenerRegistration = {
             sourceCard: CARD_ID,
             actionContext: STABLES_CONTEXT,
           },
-          { type: 'leaf', actionId: 'special-effect', sourceCard: CARD_ID, params: { kind: 'set-flag', flag: false } },
+          {
+            type: 'leaf',
+            actionId: 'special-effect',
+            sourceCard: CARD_ID,
+            params: { kind: 'set-flag', flag: false },
+            actionContext: { [INJECTED_ANYTIME_COMPLETION_CONTEXT_KEY]: true },
+          },
         ],
       },
       sourceCard: CARD_ID,

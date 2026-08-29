@@ -11,7 +11,7 @@ import {
   readActionSnapshotToken,
 } from '../helpers/action-snapshot'
 import { hasFenceBuiltEvent } from '../helpers/fence-events'
-import { isInjectedAnytimeActionContext } from '../../engine/action-context-flags'
+import { isInjectedAnytimeCompletionContext } from '../../engine/action-context-flags'
 import type { CardImpl } from '../registry'
 
 const CARD_ID = 'B027_Toolbox'
@@ -29,17 +29,6 @@ const setFlagHandler = (context: CardListenerContext): ActionHookResult | void =
     turnToken !== undefined &&
     readCardExtraData<number>(context.player, CARD_ID, WINDOW_OFFERED_TURN_TOKEN_KEY) === turnToken
   ) return
-  if (
-    activeTurnToken === undefined &&
-    completedTurnToken !== undefined &&
-    isInjectedAnytimeActionContext(context.actionContext)
-  ) {
-    return {
-      flow: makeWindowedToolboxFlow(completedTurnToken),
-      sourceCard: CARD_ID,
-    }
-  }
-
   return {
     flow: {
       type: 'leaf',
@@ -51,10 +40,28 @@ const setFlagHandler = (context: CardListenerContext): ActionHookResult | void =
   }
 }
 
+const finishInjectedAnytimeHandler = (
+  context: CardListenerContext,
+): ActionHookResult | void => {
+  if (context.state.roundPhase !== 'work') return
+  if (!isInjectedAnytimeCompletionContext(context.actionContext)) return
+  if (readActionSnapshotToken(context.player) !== undefined) return
+  if (!isCardFlagged(context.player, CARD_ID)) return
+
+  const turnToken = readActionSnapshotExtraData<number>(context.player, 'lastToken')
+  if (turnToken === undefined) return
+  if (readCardExtraData<number>(context.player, CARD_ID, WINDOW_OFFERED_TURN_TOKEN_KEY) === turnToken) return
+  return {
+    flow: makeWindowedToolboxFlow(turnToken, true),
+    sourceCard: CARD_ID,
+  }
+}
+
 const setFlagListeners: CardListenerRegistration[] = [
   { id: 'B27-flag-construct', cardIds: [CARD_ID], phases: ['after' as ActionHookPhase], actions: ['construct'],     handler: setFlagHandler },
   { id: 'B27-flag-stables',   cardIds: [CARD_ID], phases: ['after' as ActionHookPhase], actions: ['stables'],       handler: setFlagHandler },
   { id: 'B27-flag-fencing',   cardIds: [CARD_ID], phases: ['after' as ActionHookPhase], actions: ['fence'],         handler: setFlagHandler },
+  { id: 'B27-window-after-injected-anytime', cardIds: [CARD_ID], phases: ['after' as ActionHookPhase], actions: ['special-effect'], handler: finishInjectedAnytimeHandler },
 ]
 
 const builtSomethingThisAction = (player: PlayerState): boolean =>
@@ -72,9 +79,15 @@ const makeToolboxFlow = (): ActionFlow => ({
   actionContext: { trueAction: false },
 })
 
-const makeWindowedToolboxFlow = (turnToken: number): ActionFlow => ({
+const makeWindowedToolboxFlow = (turnToken: number, clearFlag = false): ActionFlow => ({
   type: 'seq',
   children: [
+    ...(clearFlag ? [{
+      type: 'leaf' as const,
+      actionId: 'special-effect',
+      sourceCard: CARD_ID,
+      params: { kind: 'set-flag', flag: false },
+    }] : []),
     {
       type: 'leaf',
       actionId: 'special-effect',
