@@ -270,6 +270,21 @@ describe('B27 Toolbox session', () => {
     expect(isCardFlagged(player, CARD_ID)).toBe(true)
   })
 
+  it('B27 在手里 + 本回合只造 Wood Palisade + 调 onBuy → flag unset', () => {
+    const session = setupPlayed()
+    const state = session.getState().state
+    const player = state.players[0]!
+    player.minorPlayed = player.minorPlayed.filter(id => id !== CARD_ID)
+    player.minorHand.push(CARD_ID)
+    recordActionSnapshot(player, 1)
+    player.fenceSegments = [{ edge: 'H-0-0', type: 'palisade' }]
+    session.loadState(state)
+
+    B027_Toolbox_impl.effect!.onBuy!(state, player)
+
+    expect(isCardFlagged(player, CARD_ID)).toBe(false)
+  })
+
   it('跨 turn flag 残留 + onBuy 时本 turn 没造 → flag 被清', () => {
     const session = setupPlayed()
     const state = session.getState().state

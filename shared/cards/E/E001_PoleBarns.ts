@@ -1,10 +1,11 @@
 import { defineMinorCard } from '../card-source'
 import type { CardImpl } from '../registry'
+import { getFenceCount } from '../../domain/fence-segments'
 
 const CARD_ID = 'E001_PoleBarns'
 
 const cardImpl = {
-  prerequisiteCheck: (player) => player.fenceSegments.length >= 15,
+  prerequisiteCheck: (player) => getFenceCount(player) >= 15,
   effect: {
   id: CARD_ID,
   onBuy: () => ({

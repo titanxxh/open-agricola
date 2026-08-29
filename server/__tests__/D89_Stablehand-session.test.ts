@@ -9,10 +9,11 @@ const CARD_ID = 'D089_Stablehand'
 
 const fenceBuilt = (
   newPastures: Array<{ tiles?: unknown[] }>,
+  type: 'fence' | 'palisade' = 'fence',
 ): DraftGameEvent<'farm.fenceBuilt'> => ({
   type: 'farm.fenceBuilt',
-  fences: [{ edge: 'H-0-0', type: 'fence' }],
-  newFenceEdges: ['H-0-0'],
+  fences: [{ edge: 'H-0-0', type }],
+  newFenceEdges: type === 'fence' ? ['H-0-0'] : [],
   newPastures,
 })
 
@@ -52,7 +53,7 @@ describe('D089_Stablehand fence provenance', () => {
     })
   })
 
-  it('ignores legacy newPastures extraData when fence event has no new pasture', () => {
+  it('offers one optional stable after building an ordinary fence without a new pasture', () => {
     const { state, player, listener } = setup()
     const actionEvents = [fenceBuilt([])]
 
@@ -62,7 +63,30 @@ describe('D089_Stablehand fence provenance', () => {
       space: state.actionSpaces.find((entry) => entry.id === 'fencing')!,
       actionId: 'fence',
       phase: 'after',
-      result: { type: 'ok', extraData: { newPastures: [{ tiles: [{ row: 0, col: 0 }] }] } },
+      result: { type: 'ok' },
+      transactionEvents: actionEvents,
+      actionEvents,
+    } as unknown as CardListenerContext)
+
+    expect(result?.flow).toMatchObject({
+      type: 'leaf',
+      actionId: 'stables',
+      optional: true,
+      sourceCard: CARD_ID,
+    })
+  })
+
+  it('ignores Wood Palisades even when they enclose a new pasture', () => {
+    const { state, player, listener } = setup()
+    const actionEvents = [fenceBuilt([{ tiles: [{ row: 0, col: 0 }] }], 'palisade')]
+
+    const result = executeCardListener(listener, {
+      state,
+      player,
+      space: state.actionSpaces.find((entry) => entry.id === 'fencing')!,
+      actionId: 'fence',
+      phase: 'after',
+      result: { type: 'ok' },
       transactionEvents: actionEvents,
       actionEvents,
     } as unknown as CardListenerContext)

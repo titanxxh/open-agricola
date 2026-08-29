@@ -92,6 +92,7 @@
 
 | 事项 | 当前代码证据 | 后续约束 |
 |---|---|---|
+| 普通围栏计数与事件语义 | `FenceSegment.type`、`getFenceCount()`、`farm.fenceBuilt.newFenceEdges`、`hasOrdinaryFenceBuiltEvent()`、E001/B027/D089 | 印刷 `<FENCE>` 的数量和触发只计算普通 `type='fence'` segment，包括农场上的借用普通围栏，但排除 Wood Palisades。确实关心任意围地 segment 或农场物件的消费者可继续读取广义 `farm.fenceBuilt.fences` 事件字段。 |
 | Metadata 审计覆盖需要随字段演进同步 | `STABLE` cost 和 `passing` 已覆盖；当前 literal mismatch 为 0 | 新增 metadata 字段时同步加 fixture，避免统计口径回退。 |
 | 后端权威的 action / pending 合同 | `allowedCommands`、typed request、`commitSelection`、`engine-resolve` protected cancel、`resolveEngineChoice`、bare improvement choice ids | 新增交互必须显式暴露 command / options 并由后端校验；major/minor improvement choice value 使用裸 `cardId`，旧 `major:` / `minor:` 只作为 parser 兼容输入，支付 option 保留 `pay:*` 命名空间；不要恢复 encoded choice shortcut、old pending cursor 或前端裁定规则。 |
 | 事件与支付 provenance | `resource.paid`、`paymentSources`、`sumActualPaidResource()`、`bonusChoiceIndex`、`event-mapping-policy.ts`、`publicEventArchive`、`shared/actions/helpers/trades.ts`、`shared/actions/helpers/trade-applied-listener.ts`、`shared/cards/__tests__/provenance-result-audit.test.ts` | 支付 / 资源 / farm metadata 先 emit 结构化事件，再让 listener 消费；生产卡牌不要从 `context.result` 读取资源事实。动物 exchange 必须通过 exchange/trade 路径扣减，默认同步 pasture / house / stable / animal-holder 中已安置动物，避免只改 `player.resources` 留下 phantom animal。需要 per-trade 前置资源门槛的卡牌优先监听 `immediatelyAfter.trade-applied`，读取 `extraData.preResources`。 |
