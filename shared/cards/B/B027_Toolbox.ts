@@ -2,21 +2,44 @@ import { defineMinorCard } from '../card-source'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import type { ActionFlow, PlayerState } from '../../contract/types'
-import { isCardFlagged, setCardFlag } from '../helpers/card-state'
+import { isCardFlagged, readCardExtraData, setCardFlag } from '../helpers/card-state'
 import {
   getRoomsBuiltThisAction,
   getStableTilesBuiltThisAction,
   getFencesBuiltThisAction,
+  readActionSnapshotExtraData,
+  readActionSnapshotToken,
 } from '../helpers/action-snapshot'
 import { hasFenceBuiltEvent } from '../helpers/fence-events'
+import { isInjectedAnytimeActionContext } from '../../engine/action-context-flags'
 import type { CardImpl } from '../registry'
 
 const CARD_ID = 'B027_Toolbox'
 const ALLOWED_MAJORS = ['Major_Joinery', 'Major_Pottery', 'Major_Basket']
+const WINDOW_OFFERED_TURN_TOKEN_KEY = 'windowOfferedTurnToken'
 
 const setFlagHandler = (context: CardListenerContext): ActionHookResult | void => {
   if (context.state.roundPhase !== 'work') return
   if (context.actionId === 'fence' && !hasFenceBuiltEvent(context)) return
+
+  const activeTurnToken = readActionSnapshotToken(context.player)
+  const completedTurnToken = readActionSnapshotExtraData<number>(context.player, 'lastToken')
+  const turnToken = activeTurnToken ?? completedTurnToken
+  if (
+    turnToken !== undefined &&
+    readCardExtraData<number>(context.player, CARD_ID, WINDOW_OFFERED_TURN_TOKEN_KEY) === turnToken
+  ) return
+  if (
+    activeTurnToken === undefined &&
+    completedTurnToken !== undefined &&
+    isInjectedAnytimeActionContext(context.actionContext)
+  ) {
+    return {
+      flow: makeWindowedToolboxFlow(completedTurnToken),
+      sourceCard: CARD_ID,
+    }
+  }
+
   return {
     flow: {
       type: 'leaf',
@@ -49,6 +72,19 @@ const makeToolboxFlow = (): ActionFlow => ({
   actionContext: { trueAction: false },
 })
 
+const makeWindowedToolboxFlow = (turnToken: number): ActionFlow => ({
+  type: 'seq',
+  children: [
+    {
+      type: 'leaf',
+      actionId: 'special-effect',
+      sourceCard: CARD_ID,
+      params: { kind: 'set-extra-data', key: WINDOW_OFFERED_TURN_TOKEN_KEY, value: turnToken },
+    },
+    makeToolboxFlow(),
+  ],
+})
+
 const cardImpl = {
   listeners: setFlagListeners,
   effect: {
@@ -60,7 +96,8 @@ const cardImpl = {
     onEndTurn: (_state, player) => {
       if (!isCardFlagged(player, CARD_ID)) return
       setCardFlag(player, CARD_ID, false)
-      return makeToolboxFlow()
+      const turnToken = readActionSnapshotToken(player)
+      return turnToken === undefined ? makeToolboxFlow() : makeWindowedToolboxFlow(turnToken)
     },
   },
   reaches: [] as readonly string[],

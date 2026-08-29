@@ -92,8 +92,8 @@ describe('stable payment session', () => {
     expect(stableBuiltIndex).toBeGreaterThanOrEqual(0)
     expect(afterStablesIndex).toBeGreaterThanOrEqual(0)
     expect(paidIndex).toBeGreaterThanOrEqual(0)
-    expect(stableBuiltIndex).toBeLessThan(afterStablesIndex)
-    expect(afterStablesIndex).toBeLessThan(paidIndex)
+    expect(stableBuiltIndex).toBeLessThan(paidIndex)
+    expect(paidIndex).toBeLessThan(afterStablesIndex)
   })
 
   it('does not offer build stables when consumed stable tokens exhaust reserve', () => {

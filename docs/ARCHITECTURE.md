@@ -703,9 +703,9 @@ A hand listener is only for a card-local rule that must observe history while th
 
 `beforeHostListeners`, `afterHostCommitListeners`, and `afterHostListeners` encode explicit differences in host actions' the reference payment slots:
 
-- Renovation, improvement, occupation, construct, and fencing complete mandatory payment in `beforeHostListeners` or the main action before trailing effects.
+- Renovation, improvement, occupation, construct, fencing, and stables complete mandatory payment in `beforeHostListeners` or the main action before trailing effects.
 - Improvement and occupation `onBuy` use `afterHostCommitListeners`: mandatory payment completes, host `completeInternalChildren` commits the card, `onBuy` runs, and only then do host `during`, `immediatelyAfter`, and `after` begin.
-- Stables use `afterHostListeners`, preserving `farm.stableBuilt -> after-stables effects -> resource.paid(stables)` so after-stables cards see the built stable first.
+- Stables preserve `farm.stableBuilt -> resource.paid(stables) -> after-stables effects`: the farm mutation remains the host action's fact, but mandatory payment settles before a reaction can spend those resources.
 - Fencing explicitly uses `beforeHostListeners`, preventing an after-fencing effect such as A034 Loppers from consuming resources before mandatory fence payment settles.
 
 Forbidden shapes are:

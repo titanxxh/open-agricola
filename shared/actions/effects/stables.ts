@@ -382,7 +382,7 @@ const finalizeStables = (
     resourcesPaid,
     extraData: { builtStables: stables },
     internalChildren: {
-      afterHostListeners: [
+      beforeHostListeners: [
         buildInternalPayChild({
           cost: costResolution.paymentCost,
           costType: 'stables',
