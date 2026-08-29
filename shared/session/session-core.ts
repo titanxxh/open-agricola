@@ -4286,8 +4286,8 @@ export class GameCore {
    * the final round is complete, `finalizeDraft` copies each player's `kept`
    * cards back to `occupationHand` / `minorHand` and flips `phase='playing'`.
    *
-   * No-op for non-draft phases, unknown players, out-of-pool picks, or double
-   * submits in the same round — each returns `ok:false` with an error message.
+   * Exact same-round retries return the existing result. Non-draft phases,
+   * unknown players, out-of-pool picks, or conflicting retries return `ok:false`.
    */
   /** S2 Task 12 part 2: thin delegator — body lives in `phases/draft.ts`. */
   submitDraftPick(playerId: string, pick: DraftPickPayload): SessionResponse {

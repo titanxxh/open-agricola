@@ -121,8 +121,14 @@ export function processSubmit(
     return { draft, error: `unknown player ${pid}` }
   }
   const stage = activeStageKind(draft)
-  if (isSubmittedForStage(draft.pendingPicks[pid], stage)) {
-    return { draft, error: `already submitted this round` }
+  const submittedPick = draft.pendingPicks[pid]
+  if (isSubmittedForStage(submittedPick, stage)) {
+    const isRetry = stage === 'standard'
+      ? submittedPick.occ === pick.occCardId && submittedPick.minor === pick.minorCardId
+      : stage === 'occupation'
+        ? submittedPick.occ === pick.occCardId
+        : submittedPick.minor === pick.minorCardId
+    return isRetry ? { draft } : { draft, error: `already submitted this round` }
   }
   if (stage === 'standard' || stage === 'occupation') {
     if (!pick.occCardId || !draft.pools[pid].occ.includes(pick.occCardId)) {

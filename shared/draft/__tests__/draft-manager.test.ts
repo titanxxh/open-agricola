@@ -191,7 +191,7 @@ describe('processSubmit', () => {
     expect(res.draft).toBe(d)
   })
 
-  it('second submit in same round by same player returns error', () => {
+  it('a different second submit in the same round returns an error', () => {
     const d = makeInitial()
     const first = processSubmit(d, 'p1', { occCardId: 'p1_OCC_0', minorCardId: 'p1_MIN_0' })
     expect(first.error).toBeUndefined()
