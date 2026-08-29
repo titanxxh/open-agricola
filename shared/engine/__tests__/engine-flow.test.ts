@@ -289,6 +289,60 @@ describe('Engine flow nodes', () => {
     }])
   })
 
+  it('strict mandatory probes include replacement alternative isDoable vetoes', () => {
+    const player = createPlayer()
+    player.minorPlayed = ['strict-alternative-veto-card']
+    const state = createState()
+    state.players = [player]
+    const original: ActionDefinition = {
+      id: 'strict-alternative-original',
+      nameKey: 'test',
+      descriptionKey: 'test',
+      roundAvailable: 1,
+      gainPerRound: {},
+      canBeExecutedByPlayer: () => false,
+      execute: () => ({ type: 'ok' }),
+    }
+    const replacement: ActionDefinition = {
+      ...original,
+      id: 'strict-alternative-replacement',
+      canBeExecutedByPlayer: () => true,
+    }
+    requireActiveCardRegistry('strict replacement alternative probe test').registerListener({
+      id: 'strict-alternative-replace',
+      actions: [original.id],
+      phases: ['computeReplace'],
+      handler: () => ({
+        decline: true,
+        alternativeFlow: { type: 'leaf', actionId: replacement.id },
+      }),
+    })
+    requireActiveCardRegistry('strict replacement alternative probe test').registerListener({
+      id: 'strict-alternative-veto',
+      cardIds: ['strict-alternative-veto-card'],
+      actions: [replacement.id],
+      phases: ['isDoable'],
+      handler: (context) => context.actionContext?.skipBeforeTriggers === true
+        ? { doable: false }
+        : undefined,
+    })
+    const node = new ActionNode('strict-alternative-host', original.id)
+    node.mandatory = true
+    node.beforePhaseResolved = true
+    const registry = new ActionRegistry()
+    registry.register(original)
+    registry.register(replacement)
+    const engine = new Engine({
+      tree: new EngineTree(node),
+      registry,
+      hooks: new HookDispatcher(),
+      log: new LogStore(),
+    })
+
+    expect(engine.probeMandatoryContinuations(state, createSpace(original), player.id))
+      .toEqual([expect.objectContaining({ strictDoable: false })])
+  })
+
   it('single reaction listener stays a direct activation leaf', () => {
     const p1 = createPlayer()
     const state = createState()

@@ -948,19 +948,25 @@ const canStartFlowWithoutBeforeTriggers = (
   if (flow.type === 'leaf') {
     const action = int.registry.get(flow.actionId)
     if (!action) return false
+    const sourceCard = flow.sourceCard ?? context.sourceCard
     const actionContext = {
       ...(context.actionContext ?? {}),
       ...(flow.actionContext ?? {}),
       skipBeforeTriggers: true,
       checkedReplaceAction: true,
     }
-    return action.canBeExecutedByPlayer(
+    const doable = action.canBeExecutedByPlayer(
       context.state,
       context.player,
       {
-        sourceCard: flow.sourceCard ?? context.sourceCard,
+        sourceCard,
         actionContext,
       },
+    )
+    return int.hooks.applyIsDoable(
+      { ...context, actionId: flow.actionId, sourceCard, actionContext },
+      action,
+      doable,
     )
   }
 
