@@ -171,6 +171,7 @@ describe('D014 Hammer Crusher provisional continuation', () => {
     expect(response.interaction.stateId === 'wait' ? response.interaction.sourceCard : undefined)
       .toBe('D128_BuildingTycoon')
 
+    session.updatePlayerName(0, 'Renamed player')
     response = advanceSwitches(session, session.resolveChoice(1, '__skip__'))
 
     expect(response.ok).toBe(true)
@@ -178,6 +179,7 @@ describe('D014 Hammer Crusher provisional continuation', () => {
     if (response.interaction.stateId !== 'wait') throw new Error('expected restored room selection')
     expect(response.interaction.request.kind).toBe('farm-select')
     expect(response.state.players[0]).toMatchObject({
+      name: 'Renamed player',
       houseType: 'clay',
       rooms: 2,
       resources: { clay: 5, reed: 2, stone: 2 },
