@@ -30,18 +30,30 @@ export const submitDraftPick = (
   playerId: string,
   pick: DraftPickPayload,
 ): SessionResponse => {
+  const player = findPlayerById(core.state, playerId)
+  const lastPick = player?.lastDraftSubmission
+  const isRetry = lastPick !== undefined
+    && lastPick.occCardId === pick.occCardId
+    && lastPick.minorCardId === pick.minorCardId
   if (core.state.phase !== 'draft' || !core.state.draft) {
-    return core.emitResponse(false, 'not in draft phase')
+    return isRetry
+      ? core.emitResponse(true)
+      : core.emitResponse(false, 'not in draft phase')
   }
   const sub = processSubmit(core.state.draft, playerId, pick)
   if (sub.error) {
-    return core.emitResponse(false, sub.error)
+    return isRetry
+      ? core.emitResponse(true)
+      : core.emitResponse(false, sub.error)
   }
   const submittedRound = sub.draft.round
   const totalRounds = sub.draft.totalRounds
   core.setDraftState(sub.draft)
-  const player = findPlayerById(core.state, playerId)
   if (player && core.state.draft) {
+    player.lastDraftSubmission = {
+      occCardId: pick.occCardId,
+      minorCardId: pick.minorCardId,
+    }
     const draftTurn = core.state.draft.round
     if (pick.occCardId) recordDraftPick(player, pick.occCardId, draftTurn)
     if (pick.minorCardId) recordDraftPick(player, pick.minorCardId, draftTurn)
