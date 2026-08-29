@@ -1150,6 +1150,7 @@ export type InteractionState =
       promptParams?: Record<string, unknown>
       sourceCard?: string
       request: InteractionRequest
+      rejectedCommandKeys?: string[]
     })
   | (InteractionBase & {
       stateId: 'gameover'

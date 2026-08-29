@@ -293,6 +293,9 @@ describe('D014 Hammer Crusher provisional continuation', () => {
       throw new Error('expected restored room selection')
     }
     expect(response.interaction.request.farm.selectableTiles).not.toContainEqual(room)
+    expect(response.interaction.rejectedCommandKeys).toEqual(
+      session.createSessionPrivateCursor().failedAuthoritativeCommands.map((entry) => entry.commandKey),
+    )
     session.updatePlayerName(0, 'Renamed player')
     response = session.getState()
     if (response.interaction.stateId !== 'wait' || response.interaction.request.kind !== 'farm-select') {

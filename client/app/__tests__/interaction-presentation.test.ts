@@ -7,10 +7,12 @@ import type {
   ResourceBatchExchangePayload,
 } from '../../../shared/contract/types'
 import type { ClientInteractionState } from '../../../shared/contract/protocol/game'
+import { authoritativeCommandKey } from '../../../shared/contract/authoritative-command'
 
 import {
   buildInteractionPresentationPlan,
   buildInteractionSubmitCommand,
+  interactionChoiceOptions,
 } from '../interaction-presentation'
 
 const option = (value: string, labelKey = value): ActionChoiceOption => ({
@@ -509,5 +511,61 @@ describe('Interaction Presentation', () => {
       playerIndex: 1,
       payload: { resourceBatchExchange: batchPayload },
     })
+  })
+
+  it('rejects exact failed choice and selection submissions across interaction kinds', () => {
+    const choice = waitChoice([option('blocked'), option('available')])
+    if (choice.stateId !== 'wait') throw new Error('expected wait interaction')
+    choice.rejectedCommandKeys = [authoritativeCommandKey('choice', 0, { value: 'blocked' })]
+    expect(interactionChoiceOptions(choice)).toEqual([
+      { ...option('blocked'), disabled: true },
+      option('available'),
+    ])
+    expect(buildInteractionSubmitCommand(choice, { value: 'blocked' })).toEqual({ kind: 'rejected' })
+
+    const submissions = [
+      {
+        interaction: waitSelection(),
+        draft: { value: 'confirm', positionSelectionKeys: ['0-0'] },
+        playerIndex: 1,
+        payload: { positions: [{ row: 0, col: 0 }] },
+      },
+      {
+        interaction: waitFarm({ farmType: 'fence', selectableEdges: ['H-0-0'] }),
+        draft: { value: 'confirm', fenceEdges: ['H-0-0'] },
+        playerIndex: 0,
+        payload: { edges: ['H-0-0'], palisadeEdges: [], extraWood: 0 },
+      },
+      {
+        interaction: waitFarm({
+          farmType: 'stable',
+          selectableTiles: [{ row: 1, col: 0 }],
+          maxSelections: 1,
+        }),
+        draft: { value: 'confirm', stableTiles: [{ row: 1, col: 0 }] },
+        playerIndex: 0,
+        payload: { stables: [{ row: 1, col: 0 }] },
+      },
+      {
+        interaction: waitFarm({
+          farmType: 'sow',
+          selectableFields: [{ tile: { row: 0, col: 0 }, allowedCrops: ['grain'] }],
+        }),
+        draft: { value: 'confirm', sowSelections: { '0-0': 'grain' as const } },
+        playerIndex: 0,
+        payload: { crops: [{ row: 0, col: 0, crop: 'grain' }] },
+      },
+    ]
+
+    for (const submission of submissions) {
+      if (submission.interaction.stateId !== 'wait') throw new Error('expected wait interaction')
+      submission.interaction.rejectedCommandKeys = [authoritativeCommandKey(
+        'commitSelection',
+        submission.playerIndex,
+        submission.payload,
+      )]
+      expect(buildInteractionSubmitCommand(submission.interaction, submission.draft))
+        .toEqual({ kind: 'rejected' })
+    }
   })
 })
