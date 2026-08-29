@@ -12,6 +12,7 @@
 import type { GameState } from '../../contract/types.ts'
 import { computeStartPlayerIdx } from './round.ts'
 import { appendImmediateEvents } from '../../events/append.ts'
+import { isPlayerSkippingCurrentHarvest } from '../../cards/helpers/harvest-skip.ts'
 import type { GameCore, SessionResponse } from '../session-core.ts'
 
 /**
@@ -22,7 +23,9 @@ import type { GameCore, SessionResponse } from '../session-core.ts'
 export const getHarvestPlayerIndices = (state: GameState): number[] => {
   const players = state.players
   const startIdx = computeStartPlayerIdx(state)
-  return players.map((_, offset) => (startIdx + offset) % players.length)
+  return players
+    .map((_, offset) => (startIdx + offset) % players.length)
+    .filter((index) => !isPlayerSkippingCurrentHarvest(state, players[index]!))
 }
 
 /**

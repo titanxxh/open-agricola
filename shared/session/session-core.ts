@@ -116,6 +116,10 @@ import { breedLeaf } from '../actions/effects/breed'
 import { computeHarvestFeedingRequirement } from '../actions/helpers/harvest-feeding-requirement.ts'
 import { executeImmediateSpecialEffectFlows } from '../actions/effects/internal/immediate-special-effect-flow.ts'
 import { releaseWorkerFromCard } from '../cards/helpers/card-held-workers.ts'
+import {
+  activatePendingHarvestSkips,
+  isPlayerSkippingCurrentHarvest,
+} from '../cards/helpers/harvest-skip.ts'
 import { resetRoundPlacements } from '../cards/helpers/round-placement.ts'
 import { familySize, findPlayerById, findPlayerIndexById, hasPlayer, smallestAvailableWorker } from '../domain/player.ts'
 import { animalKeysForState, type AnimalKey } from '../contract/animals.ts'
@@ -2464,6 +2468,7 @@ export class GameCore {
     if (this.stageDispatch.continueStageHook('onBeforeHarvest', playerIndex, cardIndex)) {
       return this.respond()
     }
+    activatePendingHarvestSkips(this.state)
     return this.continueHarvestPrepWindow()
   }
 
@@ -2471,6 +2476,7 @@ export class GameCore {
     for (let currentPlayerIndex = playerIndex; currentPlayerIndex < this.state.players.length; currentPlayerIndex += 1) {
       const player = this.state.players[currentPlayerIndex]
       if (!player) continue
+      if (isPlayerSkippingCurrentHarvest(this.state, player)) continue
       const flow = this.buildHarvestPrepFlow(player)
       if (!flow) continue
       this.stageDispatch.startFlow(

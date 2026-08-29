@@ -8,6 +8,7 @@ import { createEventQuery, type EventQuery } from '../events/query'
 import type { TriggerSnapshot } from './helpers/trigger-snapshot'
 import { validateCustomListenerResult } from '../custom-code/listener-result-validator'
 import { getCardListenerSource } from './card-listener-source'
+import { isPlayerSkippingCurrentHarvest } from './helpers/harvest-skip'
 
 export type CardListenerContext = ActionExecutionContext & {
   actionId: string
@@ -279,7 +280,7 @@ export const getMatchingListeners = (
     for (const cardId of registration.cardIds) {
       if (scope === 'player') {
         const ref = findPlayerCardRef(listenerContext.player, cardId, zones)
-        if (ref) {
+        if (ref && !isPlayerSkippingCurrentHarvest(listenerContext.state, listenerContext.player)) {
           matched.push({
             registration,
             cardId,
@@ -290,14 +291,18 @@ export const getMatchingListeners = (
       } else if (scope === 'opponent') {
         for (const p of listenerContext.state.players ?? []) {
           const ref = findPlayerCardRef(p, cardId, zones)
-          if (p.id !== listenerContext.player.id && ref) {
+          if (
+            p.id !== listenerContext.player.id &&
+            ref &&
+            !isPlayerSkippingCurrentHarvest(listenerContext.state, p)
+          ) {
             matched.push({ registration, cardId, ownerPlayerId: p.id, ownerCardZone: ref.zone })
           }
         }
       } else {
         for (const p of listenerContext.state.players ?? []) {
           const ref = findPlayerCardRef(p, cardId, zones)
-          if (ref) {
+          if (ref && !isPlayerSkippingCurrentHarvest(listenerContext.state, p)) {
             matched.push({ registration, cardId, ownerPlayerId: p.id, ownerCardZone: ref.zone })
             break
           }
