@@ -567,5 +567,10 @@ describe('Interaction Presentation', () => {
       expect(buildInteractionSubmitCommand(submission.interaction, submission.draft))
         .toEqual({ kind: 'rejected' })
     }
+
+    const undo = waitResourceQuantity()
+    if (undo.stateId !== 'wait') throw new Error('expected wait interaction')
+    undo.rejectedCommandKeys = [authoritativeCommandKey('undoStep', null, {})]
+    expect(buildInteractionSubmitCommand(undo, { value: 'cancel' })).toEqual({ kind: 'rejected' })
   })
 })

@@ -208,6 +208,7 @@ const interactionSubmitCommandKey = (
   if (command.kind === 'confirmNextPlayer' || command.kind === 'confirmPlayerSwitch') {
     return authoritativeCommandKey('choice', interaction.playerIndex, { value: 'confirm' })
   }
+  if (command.kind === 'undoStep') return authoritativeCommandKey('undoStep', null, {})
   return null
 }
 

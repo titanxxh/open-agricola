@@ -2579,12 +2579,14 @@ export class GameCore {
 
   private canUndoStepNow(): boolean {
     if (this.state.pendingUndoBoundary === true) return false
+    if (this.isFailedAuthoritativeCommand(normalizedCommand('undoStep', null, {}))) return false
     const entry = this.history[this.history.length - 1]
     return !!entry && entry.undoBoundary !== true
   }
 
   private canUndoActionNow(): boolean {
     if (this.state.pendingUndoBoundary === true) return false
+    if (this.isFailedAuthoritativeCommand(normalizedCommand('undoAction', null, {}))) return false
     if (this.actionStartIndex === null) return false
     return this.actionStartIndex > this.latestUndoBoundaryIndex()
   }

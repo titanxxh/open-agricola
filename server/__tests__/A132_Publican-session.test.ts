@@ -445,6 +445,7 @@ describe('A132_Publican session', () => {
     resp = session.undoStep()
     expect(resp.ok).toBe(false)
     expect(resp.error).toBe('command would break a mandatory continuation')
+    expect(resp.interaction.allowedCommands).not.toContain('undoStep')
     expect(resp.state.players[1]!.resources).toMatchObject({ food: 0, grain: 1 })
     expect(session.createSessionPrivateCursor().provisionalContinuationScopes)
       .toMatchObject([{ guarded: true }])
