@@ -1,23 +1,10 @@
 import { defineOccupationCard } from '../card-source'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
-import type { DraftGameEvent, FarmFenceBuiltEvent } from '../../contract/events'
+import { hasOrdinaryFenceBuiltEvent } from '../helpers/fence-events'
 import type { CardImpl } from '../registry'
 
 const CARD_ID = 'D089_Stablehand'
-type QueryableFarmFenceBuiltEvent = FarmFenceBuiltEvent | DraftGameEvent<'farm.fenceBuilt'>
-
-const isFarmFenceBuiltEvent = (
-  event: CardListenerContext['transactionEvents'][number],
-): event is QueryableFarmFenceBuiltEvent =>
-  event.type === 'farm.fenceBuilt'
-
-const hasNewPasture = (context: CardListenerContext): boolean => {
-  const events = context.actionEvents ?? context.transactionEvents
-  return (events ?? []).some((event) =>
-    isFarmFenceBuiltEvent(event) && (event.newPastures?.length ?? 0) > 0,
-  )
-}
 
 const listener: CardListenerRegistration = {
   id: 'D89-stablehand-after-fencing',
@@ -25,7 +12,7 @@ const listener: CardListenerRegistration = {
   phases: ['after' as ActionHookPhase],
   actions: ['fence'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
-    if (!hasNewPasture(context)) return
+    if (!hasOrdinaryFenceBuiltEvent(context)) return
     return {
       flow: {
         type: 'leaf',

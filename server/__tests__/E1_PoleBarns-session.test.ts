@@ -13,6 +13,20 @@ describe('E001_PoleBarns prerequisite', () => {
     expect(meetsCardPrerequisites(player, E001_PoleBarns, state.round, state)).toBe(false)
   })
 
+  it('does not count Wood Palisades toward the 15-fence prerequisite', () => {
+    const session = new GameSession()
+    const state = session.getState().state
+    const player = state.players[0]!
+    player.fenceSegments = [
+      ...Array.from({ length: 14 }, (_, i): FenceSegment => ({
+        edge: `H-0-${i}`,
+        type: 'fence',
+      })),
+      { edge: 'V-0-0', type: 'palisade' },
+    ]
+    expect(meetsCardPrerequisites(player, E001_PoleBarns, state.round, state)).toBe(false)
+  })
+
   it('allows when player has 15 fence segments on board', () => {
     const session = new GameSession()
     const state = session.getState().state

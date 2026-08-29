@@ -1,5 +1,6 @@
 import type { PlayerState } from '../../contract/types'
 import { getStableCountForCards } from '../../domain/stables'
+import { getFenceCount } from '../../domain/fence-segments'
 import { ensureCardState } from './card-state'
 
 const ACTION_SNAPSHOT_CARD_ID = '__actionSnapshot__'
@@ -21,7 +22,7 @@ export const recordActionSnapshot = (
     token: nextToken,
     stableTiles: getStableCountForCards(player),
     roomTiles: player.roomTiles.length,
-    fenceSegments: player.fenceSegments.length,
+    fenceSegments: getFenceCount(player),
   }
   return nextToken
 }
@@ -75,5 +76,5 @@ export const getFencesBuiltThisAction = (player: PlayerState) => {
   const before =
     player.cardStates?.[ACTION_SNAPSHOT_CARD_ID]?.extraData?.fenceSegments as number | undefined
   if (typeof before !== 'number') return 0
-  return Math.max(0, player.fenceSegments.length - before)
+  return Math.max(0, getFenceCount(player) - before)
 }

@@ -10,7 +10,7 @@ import {
   readActionSnapshotExtraData,
   readActionSnapshotToken,
 } from '../helpers/action-snapshot'
-import { hasFenceBuiltEvent } from '../helpers/fence-events'
+import { hasOrdinaryFenceBuiltEvent } from '../helpers/fence-events'
 import {
   isInjectedAnytimeActionContext,
   isInjectedAnytimeCompletionContext,
@@ -23,7 +23,7 @@ const WINDOW_OFFERED_TURN_TOKEN_KEY = 'windowOfferedTurnToken'
 
 const setFlagHandler = (context: CardListenerContext): ActionHookResult | void => {
   if (context.state.roundPhase !== 'work') return
-  if (context.actionId === 'fence' && !hasFenceBuiltEvent(context)) return
+  if (context.actionId === 'fence' && !hasOrdinaryFenceBuiltEvent(context)) return
 
   const activeTurnToken = readActionSnapshotToken(context.player)
   const completedTurnToken = readActionSnapshotExtraData<number>(context.player, 'lastToken')

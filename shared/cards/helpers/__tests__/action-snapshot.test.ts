@@ -92,6 +92,13 @@ describe('action-snapshot', () => {
     expect(getFencesBuiltThisAction(player)).toBe(4)
   })
 
+  it('getFencesBuiltThisAction ignores Wood Palisades', () => {
+    const player = makePlayer()
+    recordActionSnapshot(player, 1)
+    player.fenceSegments = [{ edge: '0,0/N', type: 'palisade' }]
+    expect(getFencesBuiltThisAction(player)).toBe(0)
+  })
+
   it('getFencesBuiltThisAction returns 0 when no snapshot recorded', () => {
     const player = makePlayer()
     player.fenceSegments = [{ edge: '0,0/N', type: 'fence' }]

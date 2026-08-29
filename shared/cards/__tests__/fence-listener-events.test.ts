@@ -87,6 +87,40 @@ describe('fence listener event guards', () => {
     expect(isCardFlagged(actor, 'B027_Toolbox')).toBe(false)
   })
 
+  it('B27 Toolbox ignores a Wood Palisade-only fence event', () => {
+    const actor = player('B027_Toolbox')
+    const listener = listenerById(B027_Toolbox_impl.listeners, 'B27-flag-fencing')
+    const event: DraftGameEvent<'farm.fenceBuilt'> = {
+      type: 'farm.fenceBuilt',
+      fences: [{ edge: 'H-0-0', type: 'palisade' }],
+      newFenceEdges: [],
+      newPastures: [{ tiles: [{ row: 0, col: 0 }] }],
+    }
+
+    const result = listener.handler(context(actor, [event]))
+
+    expect(result).toBeUndefined()
+  })
+
+  it('B27 Toolbox recognizes an ordinary fence event', () => {
+    const actor = player('B027_Toolbox')
+    const listener = listenerById(B027_Toolbox_impl.listeners, 'B27-flag-fencing')
+    const event: DraftGameEvent<'farm.fenceBuilt'> = {
+      type: 'farm.fenceBuilt',
+      fences: [{ edge: 'H-0-0', type: 'fence' }],
+      newFenceEdges: ['H-0-0'],
+      newPastures: [],
+    }
+
+    const result = listener.handler(context(actor, [event]))
+
+    expect(result?.flow).toMatchObject({
+      type: 'leaf',
+      actionId: 'special-effect',
+      params: { kind: 'set-flag', flag: true },
+    })
+  })
+
   it('B140 FarmyardWorker ignores fence cancel/no-op after-hook', () => {
     const actor = player('B140_FarmyardWorker')
     const listener = listenerById(B140_FarmyardWorker_impl.listeners, 'B140-farmyard-worker-after-farmyard')
