@@ -2,11 +2,17 @@ import { describe, expect, it } from 'vitest'
 import { executeCardListener, getRegisteredCardListeners, type CardListenerContext } from '../../shared/cards/card-listeners'
 import type { ActionSpace, ComplexCost, GameState, PlayerState } from '../../shared/contract/types'
 import { registerCustomCard } from '../../shared/cards/custom-registry'
-import { getMinorImprovementPreviewCostDetailed } from '../../shared/actions/helpers/improvement-helpers'
+import {
+  getMinorImprovementPreviewCostDetailed,
+  getPrintedImprovementCostCandidates,
+} from '../../shared/actions/helpers/improvement-helpers'
 import { PaymentSolver } from '../../shared/actions/payment'
 
+import '../../shared/cards/B/B036_Bottles'
 import '../../shared/cards/D/D080_BrickHammer'
 import '../../shared/cards/D/D117_WoodExpert'
+import '../../shared/cards/E/E054_Contraband'
+import '../../shared/cards/E/E146_Reseller'
 import '../../shared/cards/E/E156_ClaypitOwner'
 
 registerCustomCard({
@@ -78,6 +84,16 @@ const makeState = (players: PlayerState[]): GameState => ({
   workPhaseObtainedResources: {},
 } as GameState)
 
+const makePlayerWithWorkers = (id: string, count: number): PlayerState => {
+  const player = makePlayer(id)
+  player.workers = Array.from({ length: count }, (_, index) => ({
+    id: String(index + 1),
+    isActive: true,
+    isNewborn: false,
+  }))
+  return player
+}
+
 const space = { id: 'improvement' } as ActionSpace
 
 const findListener = (id: string) => {
@@ -101,7 +117,115 @@ const runAfterImprovement = (
   result: { type: 'ok' },
 } as CardListenerContext)
 
+const runAfterPay = (
+  builtCardId: string,
+  costType: 'major-improvement' | 'minor-improvement',
+  player: PlayerState,
+  state: GameState,
+) => executeCardListener(findListener('E54-contraband-after-pay'), {
+  state,
+  player,
+  space,
+  actionId: 'pay',
+  phase: 'after',
+  sourceCard: builtCardId,
+  costType,
+} as CardListenerContext)
+
+const runImmediatelyAfterImprovement = (
+  builtCardId: string,
+  kind: 'major' | 'minor',
+  player: PlayerState,
+  state: GameState,
+) => executeCardListener(findListener('E146-reseller-immediately-after-improvement'), {
+  state,
+  player,
+  space,
+  actionId: 'improvement',
+  phase: 'immediatelyAfter',
+  choice: `${kind}:${builtCardId}`,
+} as CardListenerContext)
+
 describe('printed improvement cost listeners', () => {
+  it('reads dynamic and alternative printed cost candidates without combining them', () => {
+    const player = makePlayerWithWorkers('p1', 3)
+    const state = makeState([player])
+
+    expect(getPrintedImprovementCostCandidates(state, player, 'B036_Bottles')).toEqual([
+      { clay: 3, food: 3 },
+    ])
+    expect(getPrintedImprovementCostCandidates(state, player, 'E030_ChildsToy')).toEqual([
+      { wood: 1 },
+      { clay: 1 },
+    ])
+  })
+
+  it('E54 and E146 use Bottles dynamic printed cost', () => {
+    const player = makePlayerWithWorkers('p1', 3)
+    const state = makeState([player])
+
+    expect(runAfterPay('B036_Bottles', 'minor-improvement', player, state)?.flow).toMatchObject({
+      type: 'xor',
+      optional: true,
+      children: [{
+        type: 'seq',
+        children: [
+          { type: 'leaf', actionId: 'pay', params: { clay: 1 } },
+          { type: 'leaf', actionId: 'gain', params: { food: 3 } },
+        ],
+      }],
+    })
+    expect(runImmediatelyAfterImprovement('B036_Bottles', 'minor', player, state)?.flow).toMatchObject({
+      type: 'seq',
+      optional: true,
+      children: [
+        { type: 'leaf', actionId: 'special-effect', params: { kind: 'set-flag', flag: true } },
+        { type: 'leaf', actionId: 'gain', params: { clay: 3, food: 3 } },
+      ],
+    })
+  })
+
+  it('E156 detects Bottles dynamic clay cost for the triggering player', () => {
+    const trigger = makePlayerWithWorkers('p1', 3)
+    const owner = makePlayer('p2')
+    owner.occupationPlayed = ['E156_ClaypitOwner']
+
+    expect(runAfterImprovement(
+      'E156-claypit-owner-opponent-improvement-clay',
+      'B036_Bottles',
+      trigger,
+      makeState([trigger, owner]),
+    )?.flow).toMatchObject({
+      type: 'leaf',
+      actionId: 'gain',
+      sourceCard: 'E156_ClaypitOwner',
+      params: { food: 1, clay: 1 },
+    })
+  })
+
+  it('E54 and E146 read major improvement printed costs', () => {
+    const player = makePlayer('p1')
+    const state = makeState([player])
+
+    expect(runAfterPay('Major_Fireplace1', 'major-improvement', player, state)?.flow).toMatchObject({
+      type: 'xor',
+      children: [{
+        type: 'seq',
+        children: [
+          { type: 'leaf', actionId: 'pay', params: { clay: 1 } },
+          { type: 'leaf', actionId: 'gain', params: { food: 3 } },
+        ],
+      }],
+    })
+    expect(runImmediatelyAfterImprovement('Major_Fireplace1', 'major', player, state)?.flow).toMatchObject({
+      type: 'seq',
+      children: [
+        { type: 'leaf', actionId: 'special-effect', params: { kind: 'set-flag', flag: true } },
+        { type: 'leaf', actionId: 'gain', params: { clay: 2 } },
+      ],
+    })
+  })
+
   it('D80 ignores its own non-clay altCosts when checking printed clay cost', () => {
     const player = makePlayer('p1')
     player.minorPlayed = ['D080_BrickHammer']

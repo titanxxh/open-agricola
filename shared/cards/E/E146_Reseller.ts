@@ -2,7 +2,7 @@ import { defineOccupationCard } from '../card-source'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { isCardFlagged } from '../helpers/card-state'
-import { getMinorImprovementCard } from '../catalog'
+import { getPrintedImprovementCostCandidates } from '../../actions/helpers/improvement-helpers'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
 
@@ -17,12 +17,8 @@ const listener: CardListenerRegistration = {
     const choice = context.choice ?? ''
     const builtId = choice.replace(/^major:/, '').replace(/^minor:/, '')
     if (!builtId) return
-    const card = getMinorImprovementCard(builtId)
-    if (!card) return
-    // Minor improvements only ever carry Partial<Resource> costs.
-    const cardCost = card.cost as Partial<Record<string, number>> | undefined
-    const allCosts = [cardCost, ...(card.altCosts ?? [])].filter(
-      (c): c is NonNullable<typeof c> => !!c && Object.keys(c).length > 0,
+    const allCosts = getPrintedImprovementCostCandidates(context.state, context.player, builtId).filter(
+      (cost) => Object.keys(cost).length > 0,
     )
     if (allCosts.length === 0) return
     const gainChildren = allCosts.map((cost) => gainLeaf(CARD_ID, cost))

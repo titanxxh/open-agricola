@@ -2,7 +2,8 @@ import { defineOccupationCard } from '../card-source'
 import type { CardListenerContext, CardListenerRegistration } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { gainLeaf } from '../helpers/pay-gain-node'
-import { getPrintedImprovementResourceCost } from '../../actions/helpers/improvement-helpers'
+import { getPrintedImprovementCostCandidates } from '../../actions/helpers/improvement-helpers'
+import type { GameState, PlayerState } from '../../contract/types'
 import type { CardImpl } from '../registry'
 
 const CARD_ID = 'E156_ClaypitOwner'
@@ -18,8 +19,8 @@ const CARD_ID = 'E156_ClaypitOwner'
  * Players 4+.
  */
 
-const hasPrintedClayCost = (cardId: string): boolean =>
-  getPrintedImprovementResourceCost(cardId, 'clay') > 0
+const hasPrintedClayCost = (state: GameState, player: PlayerState, cardId: string): boolean =>
+  getPrintedImprovementCostCandidates(state, player, cardId).some((cost) => (cost.clay ?? 0) > 0)
 
 const getBuiltCardId = (choice: string | undefined): string | undefined => {
   if (!choice) return undefined
@@ -35,7 +36,7 @@ const listener: CardListenerRegistration = {
   handler: (context: CardListenerContext): ActionHookResult | void => {
     const builtCardId = getBuiltCardId(context.choice)
     if (!builtCardId) return
-    if (!hasPrintedClayCost(builtCardId)) return
+    if (!hasPrintedClayCost(context.state, context.player, builtCardId)) return
     return { flow: gainLeaf(CARD_ID, { food: 1, clay: 1 }), sourceCard: CARD_ID }
   },
 }
