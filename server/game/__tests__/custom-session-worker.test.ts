@@ -128,6 +128,24 @@ describe('custom session executor', () => {
     expect(session.cardWarnings).toEqual([expect.stringContaining('finite boom')])
   })
 
+  it('restores worker state when dispatch fails after a partial mutation', async () => {
+    const { session, executor } = setup(card('CUSTOM_SerializationFailure'))
+    const namesBefore = session.state.players.map((player) => player.name)
+    expect((await executor.execute('getState', [])).ok).toBe(true)
+
+    const failed = await executor.execute('updatePlayerNames', [[
+      [0, 'Mutated'],
+      [1, 1n],
+    ]])
+
+    expect(failed.ok).toBe(false)
+    expect(failed.error).toBe('name.trim is not a function')
+    expect(session.state.players.map((player) => player.name)).toEqual(namesBefore)
+    const next = await executor.execute('getState', [])
+    expect(next.ok).toBe(true)
+    expect(next.state.players.map((player) => player.name)).toEqual(namesBefore)
+  })
+
   it('preserves undo history and warnings after a parent-level timeout', async () => {
     const playable: CustomCardData = {
       cardType: 'minor',
