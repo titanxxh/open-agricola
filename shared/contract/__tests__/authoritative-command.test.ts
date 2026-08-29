@@ -25,4 +25,19 @@ describe('authoritativeCommandKey', () => {
     expect(authoritativeCommandKey('choice', 0, { selections: ['b', 'a'] }))
       .not.toBe(authoritativeCommandKey('choice', 0, { selections: ['a', 'b'] }))
   })
+
+  it('normalizes animal-reorganization zones without reordering other choices', () => {
+    const zones = [
+      { id: 'house', animalType: 'sheep', animalCount: 1 },
+      { id: 'pasture-0', animalType: null, animalCount: 0 },
+    ]
+
+    expect(authoritativeCommandKey('choice', 0, { value: 'confirm', payload: { zones } }))
+      .toBe(authoritativeCommandKey('choice', 0, {
+        value: 'confirm',
+        payload: { zones: [...zones].reverse() },
+      }))
+    expect(authoritativeCommandKey('choice', 0, { selections: ['b', 'a'] }))
+      .not.toBe(authoritativeCommandKey('choice', 0, { selections: ['a', 'b'] }))
+  })
 })

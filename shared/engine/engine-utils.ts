@@ -32,6 +32,7 @@ import type { TriggerSnapshot } from '../cards/helpers/trigger-snapshot'
 import type { GameState } from '../contract/types'
 import {
   ACTIVATE_CARD_ACTION_ID,
+  isActivateCardActionNode,
   type ActivateCardActionNode,
   type ActivateCardActionParams,
 } from './activation-action'
@@ -364,6 +365,11 @@ export function buildPhaseTrailingNodes(
 export function stampContinuationParentHost(node: EngineNode, hostNodeId: string): void {
   if (node instanceof ActionNode) node.continuationParentHostNodeId = hostNodeId
   for (const child of getNodeChildren(node)) stampContinuationParentHost(child, hostNodeId)
+}
+
+export function stampBeforeHostNode(node: EngineNode, hostNodeId: string): void {
+  if (isActivateCardActionNode(node)) node.params.beforeHostNodeId = hostNodeId
+  for (const child of getNodeChildren(node)) stampBeforeHostNode(child, hostNodeId)
 }
 
 export function stampSuppressedBeforeListeners(

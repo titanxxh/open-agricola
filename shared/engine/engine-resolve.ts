@@ -40,6 +40,7 @@ import {
   pendingCursorFromEnvelope,
   pendingEnvelopeFromHostNode,
   resolveSubtree,
+  stampBeforeHostNode,
   stampContinuationParentHost,
 } from './engine-utils'
 import { withInjectedAnytimeResultFlag } from './action-context-flags'
@@ -50,7 +51,6 @@ import { createBufferedEventSink, emitCardTriggered } from './card-trigger-event
 import { createTriggerSnapshot } from '../cards/helpers/trigger-snapshot'
 import { applyComputeCostResults } from './compute-cost-results'
 import { findActionSpaceById } from '../domain/space'
-import { isActivateCardActionNode } from './activation-action'
 
 type EngineContext = {
   state: ActionExecutionContext['state']
@@ -564,11 +564,8 @@ export function engineResolveChoice(
         const deferredAction = findActionNode(deferredTarget)
         if (deferredAction) {
           deferredAction.beforePhaseResolved = true
-          beforeActivateNodes.forEach((beforeNode) => {
-            if (isActivateCardActionNode(beforeNode)) {
-              beforeNode.params.beforeHostNodeId = deferredAction.id
-            }
-          })
+          beforeActivateNodes.forEach((beforeNode) =>
+            stampBeforeHostNode(beforeNode, deferredAction.id))
         }
         resolveSubtree(targetNode!)
         if (node instanceof XorNode) {
@@ -911,11 +908,8 @@ export function engineResolveChoice(
     )
     if (beforeActivateNodes.length > 0 && pendingActionNode && !pendingActionNode.beforePhaseResolved) {
       pendingActionNode.beforePhaseResolved = true
-      beforeActivateNodes.forEach((beforeNode) => {
-        if (isActivateCardActionNode(beforeNode)) {
-          beforeNode.params.beforeHostNodeId = pendingActionNode.id
-        }
-      })
+      beforeActivateNodes.forEach((beforeNode) =>
+        stampBeforeHostNode(beforeNode, pendingActionNode.id))
       int.tree.insertBefore(pendingActionNode.id, beforeActivateNodes)
       return { type: 'ok' }
     }

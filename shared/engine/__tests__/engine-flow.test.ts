@@ -26,7 +26,11 @@ import {
   XorNode,
 } from '../nodes'
 import { clearActionHooks, registerActionHook } from '../../actions/hooks'
-import { buildPhaseTrailingNodes, getNodeDescriptionPreview } from '../engine-utils'
+import {
+  buildPhaseTrailingNodes,
+  getNodeDescriptionPreview,
+  stampBeforeHostNode,
+} from '../engine-utils'
 import type { CardListenerContext, MatchedCardListener } from '../../cards/card-listeners'
 
 const createState = () =>
@@ -382,6 +386,39 @@ describe('Engine flow nodes', () => {
     expect(parallel.triggerChildren.map((child) => child.cardId)).toEqual(['C1', 'C2'])
     expect(parallel.children).toHaveLength(2)
     expect(parallel.children.every((child) => child instanceof ActionNode)).toBe(true)
+  })
+
+  it('stamps every grouped before listener with its host node', () => {
+    const p1 = createPlayer()
+    p1.minorPlayed = ['C1', 'C2']
+    const state = createState()
+    state.players = [p1]
+    const engine = new Engine({
+      tree: new EngineTree(new ActionNode('trigger', 'gain')),
+      registry: new ActionRegistry(),
+      hooks: new HookDispatcher(),
+      log: new LogStore(),
+    })
+    const nodes = buildPhaseTrailingNodes(
+      engine._internals(),
+      ['C1', 'C2'].map((cardId, index) => ({
+        registration: { id: `listener-${index}`, cardIds: [cardId], handler: () => undefined },
+        cardId,
+        ownerPlayerId: p1.id,
+        ownerCardZone: 'played' as const,
+      })),
+      'before',
+      'gain',
+      state,
+      {},
+      p1.id,
+    )
+
+    stampBeforeHostNode(nodes[0]!, 'host')
+
+    expect((nodes[0] as ParallelNode).children.map(
+      (child) => (child as ActionNode).params.beforeHostNodeId,
+    )).toEqual(['host', 'host'])
   })
 
   it('uses the event source card for grouped global reaction listeners', () => {

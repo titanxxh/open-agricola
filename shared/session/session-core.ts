@@ -1155,6 +1155,23 @@ export class GameCore {
     return this.provisionalContinuationScopes.every((scope) => !scope.guarded)
   }
 
+  private createActiveCommandSettlement(
+    command: NormalizedAuthoritativeCommand,
+  ): ActiveCommandSettlement {
+    return {
+      command,
+      checkpoint: this.createCommandCheckpoint(),
+      interactionKey: this.currentInteractionKey(),
+      scopeSnapshot: this.provisionalContinuationScopes.map((scope) => ({
+        ...scope,
+        failedCommandsAtCheckpoint: scope.failedCommandsAtCheckpoint.map((entry) => ({ ...entry })),
+      })),
+      failedCommandSnapshot: this.failedAuthoritativeCommands.map((entry) => ({ ...entry })),
+      protectedObservations: [],
+      provisional: this.provisionalContinuationScopes.length > 0,
+    }
+  }
+
   private runAuthoritativeCommand(
     type: string,
     playerIndex: number | null,
@@ -1170,18 +1187,7 @@ export class GameCore {
       if (this.isFailedAuthoritativeCommand(command)) {
         return this.respond(false, 'command unavailable until game state changes')
       }
-      const settlement: ActiveCommandSettlement = {
-        command,
-        checkpoint: this.createCommandCheckpoint(),
-        interactionKey: this.currentInteractionKey(),
-        scopeSnapshot: this.provisionalContinuationScopes.map((scope) => ({
-          ...scope,
-          failedCommandsAtCheckpoint: scope.failedCommandsAtCheckpoint.map((entry) => ({ ...entry })),
-        })),
-        failedCommandSnapshot: this.failedAuthoritativeCommands.map((entry) => ({ ...entry })),
-        protectedObservations: [],
-        provisional: this.provisionalContinuationScopes.length > 0,
-      }
+      const settlement = this.createActiveCommandSettlement(command)
       this.activeCommandSettlement = settlement
       this.commandSettlementDepth = 1
       try {
@@ -1318,28 +1324,40 @@ export class GameCore {
       !rollback.interaction.request.options.some((option) => option.value === '__skip__')
     ) return rollback
 
-    const declined = this.resolveEngineChoice(
+    const settlement = this.createActiveCommandSettlement(normalizedCommand(
+      'choice',
       rollback.interaction.playerIndex,
-      '__skip__',
-      false,
-    )
-    const probes = new Map(this.mandatoryContinuationProbes().map((probe) => [
-      `${probe.frameId}:${probe.nodeId}`,
-      probe,
-    ]))
-    this.provisionalContinuationScopes = this.provisionalContinuationScopes.flatMap((candidate) => {
-      const probe = probes.get(`${candidate.frameId}:${candidate.hostNodeId}`)
-      return probe ? [{ ...candidate, guarded: candidate.guarded || probe.strictDoable }] : []
-    })
-    this.refreshFailedAuthoritativeCommands()
-    const publicEventCancellations = [
-      ...(rollback.publicEventCancellations ?? []),
-      ...(declined.publicEventCancellations ?? []),
-    ]
-    return {
-      ...declined,
-      durableTransition: true,
-      ...(publicEventCancellations.length > 0 ? { publicEventCancellations } : {}),
+      { value: '__skip__', payload: undefined },
+    ))
+    const activeSettlement = this.activeCommandSettlement
+    this.activeCommandSettlement = settlement
+    try {
+      const declined = this.resolveEngineChoice(
+        rollback.interaction.playerIndex,
+        '__skip__',
+        false,
+      )
+      const publicEventCancellations = [
+        ...(rollback.publicEventCancellations ?? []),
+        ...(declined.publicEventCancellations ?? []),
+      ]
+      const settled = this.settleAuthoritativeCommand({
+        ...declined,
+        durableTransition: true,
+        ...(publicEventCancellations.length > 0 ? { publicEventCancellations } : {}),
+      }, settlement)
+      const cancellations = [
+        ...publicEventCancellations,
+        ...(settled.publicEventCancellations ?? []),
+      ].filter((entry, index, entries) =>
+        entries.findIndex((candidate) => canonicalJson(candidate) === canonicalJson(entry)) === index)
+      return {
+        ...settled,
+        durableTransition: true,
+        ...(cancellations.length > 0 ? { publicEventCancellations: cancellations } : {}),
+      }
+    } finally {
+      this.activeCommandSettlement = activeSettlement
     }
   }
 

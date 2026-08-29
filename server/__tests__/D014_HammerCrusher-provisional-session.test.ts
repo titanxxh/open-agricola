@@ -7,6 +7,7 @@ import { requireActiveCardRegistry } from '../../shared/cards/active-registry'
 import type { CardListenerRegistration } from '../../shared/cards/card-listeners'
 import type { ActionDefinition, ActionFlow } from '../../shared/contract/types'
 import { rehydrateState, serializeSessionSnapshot } from '../../shared/session/serialization'
+import { rollAndCacheCardPick } from '../../shared/cards/helpers/card-random'
 
 const advanceSwitches = (session: GameSession, response: SessionResponse): SessionResponse => {
   let current = response
@@ -427,6 +428,60 @@ describe('D014 Hammer Crusher provisional continuation', () => {
     )).toHaveLength(1)
     expect(response.publicEventCancellations?.[0]?.canceledEventIds.length).toBeGreaterThan(0)
     expect(session.createSessionPrivateCursor().provisionalContinuationScopes).toEqual([])
+  })
+
+  it('settles effects triggered by automatically declining Construct', () => {
+    const session = setup({ buildingTycoon: false, clay: 0, reed: 0, stone: 3 })
+    const helperPlayerIndex = registerNestedConstructHelper(session, { clay: 3, reed: 1 })
+    session.withCtx(() => requireActiveCardRegistry('automatic decline settlement test').setEffect({
+      id: 'D014_HammerCrusher',
+      resolveChoice: (state, player, choice, context) => {
+        if (choice !== '__skip__') return
+        player.resources.stone = 0
+        rollAndCacheCardPick(
+          state,
+          player,
+          '__TEST_automatic_decline__',
+          'pick',
+          ['left', 'right'],
+          context.reportProtectedObservation,
+        )
+      },
+    }))
+
+    let response = session.takeAction(0, 'house-redevelopment')
+    if (response.interaction.stateId !== 'wait') throw new Error('expected Construct choice')
+    const construct = response.interaction.request.options.find(
+      (option) => option.value !== '__skip__',
+    )
+    response = advanceSwitches(session, session.resolveChoice(0, construct!.value))
+    if (response.interaction.stateId !== 'wait') throw new Error('expected helper choice')
+    const accept = response.interaction.request.options.find(
+      (option) => option.value !== '__skip__',
+    )
+    response = advanceSwitches(session, session.resolveChoice(helperPlayerIndex, accept!.value))
+
+    while (
+      response.interaction.stateId === 'wait' &&
+      response.interaction.request.kind === 'farm-select'
+    ) {
+      const room = response.interaction.request.farm.selectableTiles[0]
+      if (!room) break
+      response = session.commitSelectionChoice(0, { rooms: [room] })
+    }
+
+    expect(response.state.players[0]).toMatchObject({
+      houseType: 'clay',
+      rooms: 2,
+      resources: { clay: 2, reed: 1, stone: 3 },
+    })
+    expect(response.state.players[0]!.cardStates.__TEST_automatic_decline__).toBeUndefined()
+    expect(response.interaction.stateId === 'wait' ? response.interaction.sourceCard : undefined)
+      .toBe('D014_HammerCrusher')
+    expect(response.publicEventCancellations?.some(
+      (entry) => entry.canceledEventIds.length > 0,
+    )).toBe(true)
+    expect(session.resolveChoice(0, '__skip__').ok).toBe(false)
   })
 
   it('merges a successful child into a successful guarded parent', () => {
