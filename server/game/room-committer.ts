@@ -47,6 +47,7 @@ export type RoomCommitScheduler = {
 type RoomHead = {
   frame: JsonValue
   frameHash: string
+  cursorHash: string
   stepNo: number
   roomVersion: number
   checkpointStepNo: number
@@ -486,6 +487,7 @@ export class RoomCommitter {
       room,
       response.state.gameOver ? response.scores ?? [] : undefined,
     )
+    const cursorHash = frameHash(serialized.sessionCursor)
     const stepNo = head.stepNo + 1
     const roomVersion = head.roomVersion + 1
     const encoded = encodeReplayFrame({
@@ -494,7 +496,11 @@ export class RoomCommitter {
       stepNo,
       previousCheckpointStepNo: head.checkpointStepNo,
     })
-    if (encoded.frameHash === head.frameHash && response.durableTransition !== true) {
+    if (
+      encoded.frameHash === head.frameHash &&
+      cursorHash === head.cursorHash &&
+      response.durableTransition !== true
+    ) {
       return { kind: 'unchanged' }
     }
     if (response.state.gameOver && room.startedAt === undefined) {
@@ -575,9 +581,11 @@ export class RoomCommitter {
     if (persisted.status === 'completed') {
       this.heads.delete(room.id)
     } else {
+      const { serialized: current } = replayFrame(room)
       this.heads.set(room.id, {
         frame,
         frameHash: hash,
+        cursorHash: frameHash(current.sessionCursor),
         stepNo: persisted.latestStepNo,
         roomVersion: persisted.roomVersion,
         checkpointStepNo: persisted.checkpointStepNo,
@@ -646,6 +654,7 @@ export class RoomCommitter {
       this.heads.set(room.id, {
         frame,
         frameHash: encoded.frameHash,
+        cursorHash: frameHash(commit.serialized.sessionCursor),
         stepNo: commit.step.stepNo,
         roomVersion: commit.step.roomVersion,
         checkpointStepNo: encoded.checkpointStepNo,

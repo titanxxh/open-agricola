@@ -812,7 +812,7 @@ OA 对齐规则：
 
 **2026-08-29 Provisional Continuation 结算：** 每个公开的 `GameCore` 写命令只经过一次原子 settlement，使用规范化命令身份和完整的命令入口 checkpoint。未完成的 mandatory host 在 `before` 链中首次切换响应玩家或产生 Protected Observation 时，Session 在该命令 checkpoint 开启 Provisional Continuation Scope。Scope 按 Engine 提供的 mandatory-host ancestry 嵌套：同一 host 复用 scope，嵌套 host 建立 child；child abort 只恢复自身 checkpoint，未 guarded parent abort 会恢复整个子树。每个命令边界都以 `skipBeforeTriggers=true` strict-probe 所有 active host；成功后建立 guard，后续破坏 guard 的命令在发布前恢复。Undo history 会保留被恢复 host frame 的身份，因此 settlement 会继续关联原 scope，并原子拒绝破坏既有 guard 的撤销。activation descendants 只抑制产生它的那个 `before` listener，其他 listener 仍可形成真正的 nested host。
 
-随机与隐藏信息通用原语把 observation 报告给当前 settlement；dev 命令把任意隐藏手牌移到公开区域前，也必须先报告这次公开。只有所有仍 active 的 ancestor 都 guarded 时命令才可发布；同一命令已经完成的 host 不再参与 gate，仍 active 的未 guarded ancestor 则会把 GameState、Engine/Session cursor、事件、隐藏区域和 RNG 一并恢复到命令入口。Strict replacement probe 对每个 alternative leaf 使用与 direct action 相同的 `isDoable` hook 与 listener pipeline。规范化失败命令会保留到规则相关状态真正变化。集合语义的命令字段，包括 `commitSelection` 农场元素和动物重整的 `choice.payload.zones`，按与数组顺序无关的方式规范化。耗尽 optional flow 后自动执行的拒绝使用嵌套命令 settlement，因为解析 `__skip__` 仍可能执行后续效果。成功的 provisional 命令，以及需要持久化失败记忆的拒绝命令，携带内部 durable-transition 标记；即使公开 Frame hash 未变化，`RoomCommitter` 仍记录 Replay Step；durable rejection 的错误只发送给提交 socket，其他玩家收到同一已提交版本的无错快照。持久化明确分离 authoritative `state`、公开/回放 `frame` 和私有 `sessionCursor`：scope ancestry、rollback checkpoint、guard 与失败记忆可在恢复后继续，但不会进入 Replay Frame；只有同时匹配当前规则状态与 pending interaction 的命令键会作为 `rejectedCommandKeys` 投影给该交互的接收者，由共享客户端提交路径对所有 request kind 禁用精确重试。Scope abort 只追加一条 rollback log 和一个新的恢复 Frame，不重写旧 Step。详见 ADR 0015。
+随机与隐藏信息通用原语把 observation 报告给当前 settlement；dev 命令把任意隐藏手牌移到公开区域前，也必须先报告这次公开。只有所有仍 active 的 ancestor 都 guarded 时命令才可发布；同一命令已经完成的 host 不再参与 gate，仍 active 的未 guarded ancestor 则会把 GameState、Engine/Session cursor、事件、隐藏区域和 RNG 一并恢复到命令入口。Strict replacement probe 对每个 alternative leaf 使用与 direct action 相同的 `isDoable` hook 与 listener pipeline。规范化失败命令会保留到规则相关状态真正变化。集合语义的命令字段，包括 `commitSelection` 农场元素和动物重整的 `choice.payload.zones`，按与数组顺序无关的方式规范化。耗尽 optional flow 后自动执行的拒绝使用嵌套命令 settlement，因为解析 `__skip__` 仍可能执行后续效果。成功的 provisional 命令，以及需要持久化失败记忆的拒绝命令，携带内部 durable-transition 标记；即使公开 Frame hash 未变化，`RoomCommitter` 仍记录 Replay Step；同时它独立哈希私有 `sessionCursor`，因此普通 cursor-only 转换也会持久化，且不会把 cursor 暴露到 Replay Frame。durable rejection 的错误只发送给提交 socket，其他玩家收到同一已提交版本的无错快照。持久化明确分离 authoritative `state`、公开/回放 `frame` 和私有 `sessionCursor`：scope ancestry、rollback checkpoint、guard 与失败记忆可在恢复后继续，但不会进入 Replay Frame；只有同时匹配当前规则状态与 pending interaction 的命令键会作为 `rejectedCommandKeys` 投影给该交互的接收者，由共享客户端提交路径对所有 request kind 禁用精确重试。Scope abort 只追加一条 rollback log 和一个新的恢复 Frame，不重写旧 Step。详见 ADR 0015。
 
 ### 7.8 farm-type 提交
 
@@ -1174,7 +1174,7 @@ ClientCommand
   → Broadcaster：提交成功后生成各座位遮蔽 envelope 并发送
 ```
 
-- `resp.ok=false` 绕过提交并只回发起者。成功但 Frame Hash 未变化返回 `unchanged`，只给发起者确认当前状态；重连和补拉也不创建 Step。
+- `resp.ok=false` 绕过提交并只回发起者。成功命令只有在公开 Frame Hash 与私有权威 session-cursor hash 都未变化时才返回 `unchanged`；cursor-only 转换仍持久化 Room snapshot，并记录公开 Frame 可重复的 Step。重连和补拉不创建 Step。
 - Replay Step 使用 Room 全局单调 `stepNo`，与 `roomVersion` 分离。多个玩家在同一交互阶段提交时仍串行占用连续 Step；最后一次提交触发的自动引擎结算包含在该 Step 内，规则结果不得依赖提交到达顺序。
 - Step 0 在第一个互动命令前建立。classic deal 已包含在 Frame 中；互动 draft、Parent Selection 和显式多人提交从 Step 1 起记录。
 - 终局 Frame 额外归档权威 `PlayerScoreSummary[]`；历史 Viewer 在 `gameOver` Step 复用只读 `ScoringPad` 展示分类、卡牌加分与总分。
@@ -1523,7 +1523,7 @@ pnpm run build              # tsc + vite build
 13. **前端不做乐观提交**：等 `stateUpdate` 到达再改 UI。
 14. **ActionFlow 对齐 参考实现小代数**：卡牌 DSL 只暴露 `leaf / seq / parallel / xor / or` + metadata；runtime-only node 不进入卡牌 flow。
 15. **listener handler 不改 state**：listener / preview / doable 路径只 build flow 或返回结构化结果；状态修改必须落在 action leaf 执行阶段。
-16. **Durable Room Commit**：成功且改变 Frame 的命令先原子写 Room snapshot + Replay Step，随后才按座位视角发送。
+16. **Durable Room Commit**：成功且改变公开 Frame 或私有权威 session cursor 的命令先原子写 Room snapshot + Replay Step，随后才按座位视角发送。
 17. **Replay 全局 Step**：多人同时提交仍占用连续 `stepNo`；自动结算属于最后触发输入，结果不得依赖到达顺序。
 18. **失败不扩散**：`resp.ok=false` 只回发起者；持久化失败冻结同一 Frame 并阻断 Room，不覆盖或继续推进。
 19. **30 Room 上限**：单实例统计普通 `waiting + playing` Room；只拒绝新建，不影响恢复。
