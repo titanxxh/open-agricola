@@ -33,6 +33,8 @@ export type StageResumeState = {
     | 'onBeforeReturnHome'
     | 'onAllWorkersPlaced'
     | 'onBreedPhase'
+    | 'futureMeepleReceives'
+    | 'futureActionAnytimeWindow'
     | 'futureMeepleActions'
     | 'onReorganizeComplete'
   playerIndex: number
@@ -42,7 +44,7 @@ export type StageResumeState = {
     originPlayerIndex?: number | null
     triggerActionId?: string | null
     resumeAfterCardId?: string | null
-    preScoringActionTaken?: boolean
+    anytimeActionTaken?: boolean
   }
 }
 
@@ -82,12 +84,12 @@ export class StageDispatch {
   completeFrameIfStage(frame: EngineFrame): boolean {
     const stageResume = (frame.stageResume ?? null) as StageResumeState | null
     if (!stageResume) return false
-    const completedStageResume = stageResume.hook === 'preScoringWindow'
+    const completedStageResume = stageResume.hook === 'preScoringWindow' || stageResume.hook === 'futureActionAnytimeWindow'
       ? {
           ...stageResume,
           extra: {
             ...stageResume.extra,
-            preScoringActionTaken:
+            anytimeActionTaken:
               frame.engine.snapshot().treeCursor.some((cursor) =>
                 cursor.data.optional === true && cursor.data.optionalActive === true,
               ),

@@ -716,8 +716,17 @@ export class GameCore {
       onBeforeStartOfTurn: (stageResume) => { this.continueBeforeStartOfTurn(stageResume.playerIndex, stageResume.cardIndex) },
       onBeforeWork: (stageResume) => { this.continueAfterFutureMeepleActions(stageResume.playerIndex, stageResume.cardIndex) },
       onRoundStart: (stageResume) => { this.continueAfterBeforeWork(stageResume.playerIndex, stageResume.cardIndex) },
+      futureMeepleReceives: () => { this.continueFutureMeepleAnytimeWindow() },
+      futureActionAnytimeWindow: (stageResume) => {
+        this.continueFutureMeepleAnytimeWindow(
+          stageResume.playerIndex,
+          stageResume.extra?.anytimeActionTaken === true,
+        )
+      },
       futureMeepleActions: () => { this.continueAfterFutureMeepleActions() },
-      onStartHarvestFeedingPhase: (stageResume) => { this.continueHarvestEffects(stageResume.playerIndex, stageResume.cardIndex) },
+      onStartHarvestFeedingPhase: (stageResume) => {
+        this.continueStartHarvestFeedingPhase(stageResume.playerIndex, stageResume.cardIndex)
+      },
       onEndTurn: (stageResume) => {
         this.continueEndTurnHooks(
           stageResume.playerIndex,
@@ -732,7 +741,7 @@ export class GameCore {
       onBeforeEndGame: (stageResume) => { this.continueBeforeEndGameHooks(stageResume.playerIndex, stageResume.cardIndex) },
       preScoringWindow: (stageResume) => {
         this.continuePreScoringWindow(
-          stageResume.playerIndex + (stageResume.extra?.preScoringActionTaken ? 0 : 1),
+          stageResume.playerIndex + (stageResume.extra?.anytimeActionTaken ? 0 : 1),
         )
       },
       onStartHarvest: (stageResume) => { this.continueFromStartHarvest(stageResume.playerIndex, stageResume.cardIndex, stageResume.extra) },
@@ -1579,7 +1588,7 @@ export class GameCore {
     return view?.sourceCard ?? choicesSourceCard(view?.choices ?? [])
   }
 
-  private buildAnytimeEntries(options: { preScoringOnly?: boolean } = {}): { descriptor: AnytimeAction; flow: ActionFlow }[] {
+  private buildAnytimeEntries(options: { preScoringOnly?: boolean; nestedWindow?: boolean } = {}): { descriptor: AnytimeAction; flow: ActionFlow }[] {
     if (hasPendingOrdinaryCardDrawChoice(this.state)) return []
     const policy = this.computeAnytimePolicySnapshot()
     if (!policy.allowed) return []
@@ -1591,11 +1600,11 @@ export class GameCore {
     const pendingSnapshot = this.peekHostContextSnapshot()
     const pendingSourceCard = this.peekPendingSourceCard()
     const pendingActionContext = pendingSnapshot?.actionContext
-    const interactionKind = this.engineStack.peekPendingView()?.request.kind
+    const interactionKind = options.nestedWindow ? 'choice' : this.engineStack.peekPendingView()?.request.kind
     for (const action of options.preScoringOnly ? [] : this.registry.values()) {
       if (!action.anytime) continue
       if (blockedIds.has(action.id)) continue
-      if (action.idleOnly && this.engineStack.depth() > 0) continue
+      if (action.idleOnly && (this.engineStack.depth() > 0 || options.nestedWindow)) continue
       const doable = this.hookDispatcher.applyIsDoable(
         { state: this.state, player, space, actionId: action.id },
         action,
@@ -2291,9 +2300,7 @@ export class GameCore {
   /** S2 Task 10 part 6: thin delegator — body lives in `phases/round.ts`. */
   private finalizeActionLog(player: PlayerState) { return roundPhase.finalizeActionLog(this, player) }
 
-  private buildFutureMeepleActionFlow() {
-    const children: ActionFlow[] = []
-    let firstPlayerIndex = -1
+  private buildFutureMeepleReceiveFlow() {
     const receiveEntriesByPlayer = new Map<string, Array<{
       cardId: string
       round: number
@@ -2303,8 +2310,6 @@ export class GameCore {
       if (entry.round !== this.state.round) continue
       const playerIndex = findPlayerIndexById(this.state, entry.playerId)
       if (playerIndex === -1) continue
-      const player = this.state.players[playerIndex]!
-      if (firstPlayerIndex === -1) firstPlayerIndex = playerIndex
       const receiveResources: Partial<Resource> = {}
       if (this.futureMeepleResourceConditionMet(entry)) {
         for (const key of extendedResourceKeyList) {
@@ -2321,8 +2326,38 @@ export class GameCore {
         })
         receiveEntriesByPlayer.set(entry.playerId, receiveEntries)
       }
+    }
+    const children: ActionFlow[] = []
+    let firstPlayerIndex = -1
+    for (const [playerId, entries] of receiveEntriesByPlayer) {
+      const playerIndex = findPlayerIndexById(this.state, playerId)
+      if (playerIndex === -1) continue
+      if (firstPlayerIndex === -1) firstPlayerIndex = playerIndex
+      children.push({
+        type: 'leaf',
+        actionId: 'receive',
+        targetPlayerId: playerId,
+        params: { entries },
+      })
+    }
+    if (children.length === 0 || firstPlayerIndex === -1) return null
+    return {
+      flow: children.length === 1 ? children[0]! : { type: 'seq', children } as ActionFlow,
+      playerIndex: firstPlayerIndex,
+    }
+  }
+
+  private buildFutureMeepleActionFlow() {
+    const children: ActionFlow[] = []
+    let firstPlayerIndex = -1
+    for (const entry of this.state.futureMeeples) {
+      if (entry.round !== this.state.round) continue
+      const playerIndex = findPlayerIndexById(this.state, entry.playerId)
+      if (playerIndex === -1) continue
+      const player = this.state.players[playerIndex]!
       const actionContext = entry.actionContext ?? {}
       for (let i = 0; i < futureMeepleActionCount(entry, 'field'); i += 1) {
+        if (firstPlayerIndex === -1) firstPlayerIndex = playerIndex
         children.push({
           type: 'seq',
           optional: true,
@@ -2336,6 +2371,7 @@ export class GameCore {
         })
       }
       for (let i = 0; i < futureMeepleActionCount(entry, 'stable'); i += 1) {
+        if (firstPlayerIndex === -1) firstPlayerIndex = playerIndex
         children.push({
           type: 'seq',
           optional: true,
@@ -2352,6 +2388,7 @@ export class GameCore {
         for (let i = 0; i < futureMeepleActionCount(entry, kind); i += 1) {
           const flow = buildPlaceTerrainFlow(entry.cardId, player, kind)
           if (!flow) continue
+          if (firstPlayerIndex === -1) firstPlayerIndex = playerIndex
           children.push({
             type: 'seq',
             optional: true,
@@ -2360,16 +2397,6 @@ export class GameCore {
           })
         }
       }
-    }
-    for (const [playerId, entries] of [...receiveEntriesByPlayer.entries()].reverse()) {
-      const playerIndex = findPlayerIndexById(this.state, playerId)
-      if (playerIndex === -1) continue
-      children.unshift({
-        type: 'leaf',
-        actionId: 'receive',
-        targetPlayerId: playerId,
-        params: { entries },
-      })
     }
     if (children.length === 0 || firstPlayerIndex === -1) return null
     return {
@@ -2613,7 +2640,11 @@ export class GameCore {
       type: 'harvest.phaseStarted',
       harvestPhase: 'feeding',
     }])
-    if (this.stageDispatch.continueStageHook('onStartHarvestFeedingPhase')) {
+    return this.continueStartHarvestFeedingPhase()
+  }
+
+  private continueStartHarvestFeedingPhase(playerIndex = 0, cardIndex = 0): SessionResponse {
+    if (this.stageDispatch.continueStageHook('onStartHarvestFeedingPhase', playerIndex, cardIndex)) {
       return this.respond()
     }
     return this.continueHarvestFeeding()
@@ -2764,6 +2795,7 @@ export class GameCore {
     })
     const roundOpen = createRoundOpenById(this.state.roundActionOrder)
     const futureResolvedEvents = this.buildFutureMeepleResolvedEvents()
+    const futureMeepleReceiveFlow = this.buildFutureMeepleReceiveFlow()
     const openActionSpaceIds = new Set<string>()
     const actionSpaceResourcesBefore = new Map<string, Resource>()
     const actionEvents = this.state.actionSpaces.flatMap((space): ImmediateEventDraft[] => {
@@ -2796,7 +2828,6 @@ export class GameCore {
       }
       return events
     })
-    const futureMeepleActionFlow = this.buildFutureMeepleActionFlow()
     applyRoundGrowth(this.state)
     applySeasonPreparationAdjustments(this.state)
     const accumulatedActionEvents = this.state.actionSpaces.flatMap((space): ImmediateEventDraft[] => {
@@ -2814,7 +2845,7 @@ export class GameCore {
         resources,
       }]
     })
-    applyFutureMeeples(this.state, { skipResourceReceive: true })
+    applyFutureMeeples(this.state, { skipResourceReceive: true, keepActionTokens: true })
     const committedStartEvents = appendImmediateEvents(this.state, [
       { type: 'round.started' },
       ...futureResolvedEvents,
@@ -2822,6 +2853,81 @@ export class GameCore {
       ...accumulatedActionEvents,
     ])
     this.dispatchFutureMeepleResolvedListeners(committedStartEvents)
+    return this.startFutureMeepleResolution(futureMeepleReceiveFlow)
+  }
+
+  private startFutureMeepleResolution(
+    receiveFlow = this.buildFutureMeepleReceiveFlow(),
+  ): SessionResponse {
+    if (receiveFlow) {
+      this.stageDispatch.startFlow(
+        receiveFlow.flow,
+        'futureMeepleReceives',
+        receiveFlow.playerIndex,
+        0,
+        0,
+      )
+      return this.respond()
+    }
+    return this.continueFutureMeepleAnytimeWindow()
+  }
+
+  private continueFutureMeepleAnytimeWindow(
+    resumePlayerIndex?: number,
+    repeatCurrentPlayer = false,
+  ): SessionResponse {
+    const playerIndices: number[] = []
+    for (const entry of this.state.futureMeeples) {
+      if (entry.round !== this.state.round) continue
+      const hasAction = (['field', 'stable', 'forest', 'moor'] as const)
+        .some((key) => futureMeepleActionCount(entry, key) > 0)
+      if (!hasAction) continue
+      const playerIndex = findPlayerIndexById(this.state, entry.playerId)
+      if (playerIndex >= 0 && !playerIndices.includes(playerIndex)) playerIndices.push(playerIndex)
+    }
+    playerIndices.sort((left, right) => left - right)
+    let start = 0
+    if (resumePlayerIndex !== undefined) {
+      const resumeOffset = playerIndices.indexOf(resumePlayerIndex)
+      if (resumeOffset >= 0) {
+        start = resumeOffset + (repeatCurrentPlayer ? 0 : 1)
+      } else {
+        const nextOffset = playerIndices.findIndex((playerIndex) => playerIndex > resumePlayerIndex)
+        start = nextOffset === -1 ? playerIndices.length : nextOffset
+      }
+    }
+    for (let offset = Math.max(0, start); offset < playerIndices.length; offset += 1) {
+      const playerIndex = playerIndices[offset]!
+      this.state.currentPlayerIndex = playerIndex
+      const entries = this.buildAnytimeEntries({ nestedWindow: true })
+      if (entries.length === 0) continue
+      const flow: ActionFlow = {
+        type: 'xor',
+        optional: true,
+        promptKey: 'ui.interactionOptionalAction',
+        children: entries.map(({ descriptor, flow: entryFlow }) => ({
+          ...tagInjectedAnytimeFlow(entryFlow),
+          optionId: descriptor.id,
+          choiceLabelKey: descriptor.labelKey,
+          choiceLabelParams: descriptor.labelParams,
+          sourceCard: descriptor.sourceCard ?? entryFlow.sourceCard,
+        })),
+      }
+      this.stageDispatch.startFlow(
+        flow,
+        'futureActionAnytimeWindow',
+        playerIndex,
+        0,
+        playerIndex,
+      )
+      return this.respond()
+    }
+    return this.startCurrentFutureMeepleActions()
+  }
+
+  private startCurrentFutureMeepleActions(): SessionResponse {
+    const futureMeepleActionFlow = this.buildFutureMeepleActionFlow()
+    applyFutureMeeples(this.state, { skipResourceReceive: true })
     if (futureMeepleActionFlow) {
       this.stageDispatch.startFlow(
         futureMeepleActionFlow.flow,
@@ -2882,24 +2988,14 @@ export class GameCore {
   }
 
   private continueCurrentFutureMeepleActions(): SessionResponse {
-    const futureMeepleActionFlow = this.buildFutureMeepleActionFlow()
+    const futureMeepleReceiveFlow = this.buildFutureMeepleReceiveFlow()
     const futureResolvedEvents = this.buildFutureMeepleResolvedEvents()
-    applyFutureMeeples(this.state, { skipResourceReceive: true })
+    applyFutureMeeples(this.state, { skipResourceReceive: true, keepActionTokens: true })
     if (futureResolvedEvents.length > 0) {
       const committedEvents = appendImmediateEvents(this.state, futureResolvedEvents)
       this.dispatchFutureMeepleResolvedListeners(committedEvents)
     }
-    if (futureMeepleActionFlow) {
-      this.stageDispatch.startFlow(
-        futureMeepleActionFlow.flow,
-        'futureMeepleActions',
-        futureMeepleActionFlow.playerIndex,
-        0,
-        0,
-      )
-      return this.respond()
-    }
-    return this.continueAfterFutureMeepleActions()
+    return this.startFutureMeepleResolution(futureMeepleReceiveFlow)
   }
 
   /** S2 Task 10 part 5: thin delegator — body lives in `phases/round.ts`. */

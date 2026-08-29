@@ -13,10 +13,13 @@ import '../../shared/cards/A/A166_Haydryer'
 import '../../shared/cards/A/A064_BarleyMill'
 import '../../shared/cards/C/C071_Slurry'
 import '../../shared/cards/C/C120_AgriculturalLabourer'
+import '../../shared/cards/C/C107_Baker'
 import '../../shared/cards/D/D099_EarthenwarePotter'
 import '../../shared/cards/D/D115_FodderPlanter'
 import '../../shared/cards/D/D167_PureBreeder'
+import '../../shared/cards/E/E052_Cubbyhole'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
+import { getStoredResource, setStoredResource } from '../../shared/cards/helpers/card-storage'
 
 const chooseFirstOption = (session: GameSession, playerIndex: number) => {
   const interaction = session.getState().interaction
@@ -56,6 +59,38 @@ const setupBeforeWorkOrderingSession = () => {
 }
 
 describe('stage hook flows', () => {
+  it('resumes start-of-feeding hooks without replaying harvest hooks', () => {
+    const session = new GameSession()
+    stabilizeRandomHands(session.state.players)
+    const state = session.getState().state
+    state.players = state.players.slice(0, 2)
+    state.round = 4
+    state.players.forEach((player) => {
+      markAllWorkersUsed(state, player)
+      player.resources.food = 4
+    })
+
+    const baker = state.players[0]!
+    baker.occupationPlayed.push('C107_Baker')
+    baker.resources.grain = 1
+    const cubbyhole = state.players[1]!
+    cubbyhole.minorPlayed.push('E052_Cubbyhole')
+    setStoredResource(cubbyhole, 'E052_Cubbyhole', 'food', 3)
+
+    session.loadState(state)
+    const resp = session.performRoundEnd()
+
+    expect(resp.ok).toBe(true)
+    expect(resp.interaction.stateId).toBe('idle')
+    expect(resp.state.round).toBe(5)
+    expect(resp.state.roundPhase).toBe('work')
+    expect(resp.state.players[1]!.resources.food).toBe(3)
+    expect(getStoredResource(resp.state.players[1]!, 'E052_Cubbyhole', 'food')).toBe(0)
+    expect(resp.state.events.filter((event) =>
+      event.type === 'harvest.phaseStarted' && event.harvestPhase === 'feeding',
+    )).toHaveLength(1)
+  })
+
   it('resumes onBeforeWork without replaying preparation', () => {
     const session = new GameSession(42)
     stabilizeRandomHands(session.state.players)
