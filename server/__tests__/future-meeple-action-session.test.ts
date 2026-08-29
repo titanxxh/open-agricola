@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { markAllWorkersUsed } from '../../shared/domain/player'
+import '../../shared/cards/B/B069_PottersMarket'
 
 describe('future meeple round-start actions', () => {
   it('offers plow when a field future meeple resolves', () => {
@@ -196,5 +197,46 @@ describe('future meeple round-start actions', () => {
     expect(resp.ok).toBe(true)
     expect(resp.state.players[0]!.fields).toHaveLength(1)
     expect(resp.state.players[0]!.resources).toMatchObject({ food: 1, vegetable: 0 })
+  })
+
+  it('does not expose round-start schedulers in the future action preparation window', () => {
+    const session = new GameSession()
+    const state = session.getState().state
+    state.players = state.players.slice(0, 2)
+    state.round = 1
+    state.players.forEach((player) => {
+      markAllWorkersUsed(state, player)
+      player.minorHand = ['__test_placeholder__']
+      player.occupationHand = ['__test_placeholder__']
+    })
+
+    const player = state.players[0]!
+    player.startPlayer = true
+    player.improvements = ['Major_Fireplace1']
+    player.minorPlayed.push('B069_PottersMarket')
+    player.resources = { ...player.resources, clay: 3, food: 2, vegetable: 1 }
+    state.futureMeeples = [{
+      id: 'future-paid-field-with-potters-market',
+      cardId: 'D091_Plowman',
+      playerId: player.id,
+      round: 2,
+      actionId: null,
+      resources: { field: 1 } as never,
+      actionContext: { exactCost: { food: 1 }, trueAction: false },
+    } as never]
+
+    session.loadState(state)
+    let resp = session.performRoundEnd()
+
+    expect(resp.interaction.stateId).toBe('wait')
+    if (resp.interaction.stateId !== 'wait') throw new Error('expected future action preparation')
+    expect(resp.interaction.request.options?.some((option) => option.sourceCard === 'B069_PottersMarket')).toBe(false)
+    expect(resp.interaction.request.options?.some((option) => option.labelKey === 'actions.exchange.name')).toBe(true)
+
+    resp = session.resolveChoice(0, '__skip__')
+    if (resp.interaction.stateId !== 'wait') throw new Error('expected future field choice')
+    resp = session.resolveChoice(0, '__skip__')
+
+    expect(resp.state.players[0]!.cardStates.B069_PottersMarket?.counters?.pending ?? 0).toBe(0)
   })
 })

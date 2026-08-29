@@ -2900,6 +2900,7 @@ export class GameCore {
       const playerIndex = playerIndices[offset]!
       this.state.currentPlayerIndex = playerIndex
       const entries = this.buildAnytimeEntries({ nestedWindow: true })
+        .filter((entry) => entry.descriptor.actionId === 'exchange')
       if (entries.length === 0) continue
       const flow: ActionFlow = {
         type: 'xor',
