@@ -230,6 +230,61 @@ describe('Engine flow nodes', () => {
     })
   })
 
+  it('strict mandatory probes include replacement isDoable vetoes', () => {
+    const player = createPlayer()
+    player.minorPlayed = ['strict-veto-card']
+    const state = createState()
+    state.players = [player]
+    const action: ActionDefinition = {
+      id: 'strict-probe-action',
+      nameKey: 'test',
+      descriptionKey: 'test',
+      roundAvailable: 1,
+      gainPerRound: {},
+      canBeExecutedByPlayer: () => true,
+      execute: () => ({ type: 'ok' }),
+    }
+    const replacement: ActionDefinition = {
+      ...action,
+      id: 'strict-probe-replacement',
+    }
+    registerActionHook({
+      id: 'strict-probe-replace',
+      actions: [action.id],
+      phases: ['computeReplace'],
+      handler: () => ({ actionId: replacement.id }),
+    })
+    requireActiveCardRegistry('strict mandatory probe test').registerListener({
+      id: 'strict-probe-veto',
+      cardIds: ['strict-veto-card'],
+      actions: [replacement.id],
+      phases: ['isDoable'],
+      handler: (context) => context.actionContext?.skipBeforeTriggers === true
+        ? { doable: false }
+        : undefined,
+    })
+    const node = new ActionNode('strict-host', action.id)
+    node.mandatory = true
+    node.beforePhaseResolved = true
+    const registry = new ActionRegistry()
+    registry.register(action)
+    registry.register(replacement)
+    const space = createSpace(action)
+    const engine = new Engine({
+      tree: new EngineTree(node),
+      registry,
+      hooks: new HookDispatcher(),
+      log: new LogStore(),
+    })
+
+    expect(engine.probeMandatoryContinuations(state, space, player.id)).toEqual([{
+      nodeId: node.id,
+      actionId: action.id,
+      ownerPlayerId: player.id,
+      strictDoable: false,
+    }])
+  })
+
   it('single reaction listener stays a direct activation leaf', () => {
     const p1 = createPlayer()
     const state = createState()
@@ -746,7 +801,7 @@ describe('Engine flow nodes', () => {
     ])
   })
 
-  it('before listener optional flow does not re-trigger before hooks on its child', () => {
+  it('before listener optional flow does not re-trigger the same listener on its child', () => {
     const p1 = createPlayer()
     p1.minorPlayed = ['OPTIONAL_BEFORE_CARD']
     const state = createState()
@@ -820,7 +875,7 @@ describe('Engine flow nodes', () => {
     expect(activationNodes).toHaveLength(1)
   })
 
-  it('restores before-flow skip ids for pending optional listener flow', () => {
+  it('restores suppressed before-listener ids for a pending optional flow', () => {
     const p1 = createPlayer()
     p1.minorPlayed = ['RESTORED_OPTIONAL_BEFORE_CARD']
     const state = createState()

@@ -19,6 +19,8 @@ export class ActionNode extends BaseNode {
   public choiceLabelKey?: string
   public choiceLabelParams?: Record<string, unknown>
   public beforePhaseResolved = false
+  public bodyStarted = false
+  public continuationParentHostNodeId?: string
   public internalHostNodeId?: string
   public internalResultKey?: string
   public internalPaymentInfoFrom?: string
@@ -110,6 +112,8 @@ export class ActionNode extends BaseNode {
       choiceLabelKey: this.choiceLabelKey,
       choiceLabelParams: this.choiceLabelParams,
       beforePhaseResolved: this.beforePhaseResolved,
+      bodyStarted: this.bodyStarted,
+      continuationParentHostNodeId: this.continuationParentHostNodeId,
       emittedRequest: this.emittedRequest,
       internalHostNodeId: this.internalHostNodeId,
       internalResultKey: this.internalResultKey,

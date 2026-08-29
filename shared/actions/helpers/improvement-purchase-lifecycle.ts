@@ -1,4 +1,4 @@
-import type { ActionExecutionResult, GameState, PlayerState } from '../../contract/types'
+import type { ActionExecutionResult, GameState, PlayerState, ProtectedObservation } from '../../contract/types'
 import type { EventSink } from '../../contract/events'
 import type { PaymentInfo } from '../../cards/card-effects'
 import { getMinorImprovement } from '../../cards/registry-display'
@@ -31,6 +31,7 @@ type CommitImprovementPurchaseLifecycleArgs = {
   actionContext?: Record<string, unknown>
   emitPrivateEvent?: (event: ReturnType<typeof cardEffectHandChangedEvent>) => void
   eventSink?: EventSink
+  reportProtectedObservation?: (observation: ProtectedObservation) => void
 }
 
 type FinalizeDirectImprovementPurchaseLifecycleArgs = Omit<
@@ -124,9 +125,16 @@ export const commitImprovementPurchaseLifecycle = ({
   actionContext,
   emitPrivateEvent,
   eventSink,
+  reportProtectedObservation,
 }: CommitImprovementPurchaseLifecycleArgs): SuccessfulImprovementResult => {
   const costResources = paymentInfo.resourcesPaid ?? {}
   const wasMinorInHand = kind === 'minor' && player.minorHand.includes(improvementId)
+  if (wasMinorInHand) {
+    reportProtectedObservation?.({
+      kind: 'hidden-information',
+      recipientPlayerIds: state.players.map((entry) => entry.id),
+    })
+  }
   let passResult: ApplyMinorResult | null = null
   if (kind === 'major') {
     applyMajorImprovementPurchase(state, player, improvementId, paymentInfo.returnedCardId)

@@ -16,13 +16,13 @@ import type {
   RoomSnapshot,
   RestoreOptions,
 } from './room-persistence.ts'
-import type { SerializedGameState } from '../../../shared/session/serialization.ts'
+import type { PersistedSessionSnapshot } from '../../../shared/session/serialization.ts'
 
 const sanitise = (id: string) => id.replace(/[^a-zA-Z0-9._-]/g, '_')
 
-const fallbackMeta = (serialized: SerializedGameState): RoomMeta => ({
+const fallbackMeta = (serialized: PersistedSessionSnapshot): RoomMeta => ({
   createdBy: null,
-  maxPlayers: Array.isArray(serialized.players) ? serialized.players.length : 2,
+  maxPlayers: Array.isArray(serialized.state.players) ? serialized.state.players.length : 2,
   customCardDbIds: [],
   status: 'playing',
   players: [],
@@ -44,7 +44,7 @@ export class JsonRoomPersistence implements RoomPersistence {
       const file = this.fileFor(id)
       if (!existsSync(file)) return null
       const raw = readFileSync(file, 'utf-8')
-      const serialized = JSON.parse(raw) as SerializedGameState
+      const serialized = JSON.parse(raw) as PersistedSessionSnapshot
       const updatedAt = statSync(file).mtimeMs
       return {
         id,
@@ -67,7 +67,7 @@ export class JsonRoomPersistence implements RoomPersistence {
    * When `serialized` is null (placeholder row), this is a no-op — the JSON
    * adapter does not track placeholder rows.
    */
-  save(id: string, serialized: SerializedGameState | null, _meta: RoomMeta): void {
+  save(id: string, serialized: PersistedSessionSnapshot | null, _meta: RoomMeta): void {
     if (serialized === null) return
     try {
       mkdirSync(this.dir, { recursive: true })

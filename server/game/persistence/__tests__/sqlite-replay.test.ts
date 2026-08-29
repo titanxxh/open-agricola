@@ -5,7 +5,7 @@ import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { SqliteRoomPersistence, type ReplayCommit } from '../sqlite-adapter.ts'
 import type { GameResult, RoomMeta } from '../room-persistence.ts'
-import type { SerializedGameState } from '../../../../shared/session/serialization.ts'
+import type { PersistedSessionSnapshot } from '../../../../shared/session/serialization.ts'
 
 const META: RoomMeta = {
   createdBy: null,
@@ -16,8 +16,14 @@ const META: RoomMeta = {
   players: [],
 }
 
-const STATE0 = { marker: 0 } as unknown as SerializedGameState
-const STATE1 = { marker: 1 } as unknown as SerializedGameState
+const snapshot = (marker: number) => ({
+  state: { players: [] },
+  frame: { marker },
+  sessionCursor: {},
+}) as unknown as PersistedSessionSnapshot
+
+const STATE0 = snapshot(0)
+const STATE1 = snapshot(1)
 
 const RESULT: GameResult = {
   roomId: 'room-1',

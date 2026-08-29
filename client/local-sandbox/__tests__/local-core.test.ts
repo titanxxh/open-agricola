@@ -75,7 +75,7 @@ describe('LocalSandboxCore', () => {
     const { payload, persist } = core.call('devSetResources', [0, { food: 9 }], DEBUG_VIEWER)
     expect(payload.ok).toBe(true)
     expect(payload.state.players[0]?.resources.food).toBe(9)
-    expect(persist.serializedState.players[0]?.resources.food).toBe(9)
+    expect(persist.serializedState.state.players[0]?.resources.food).toBe(9)
   })
 
   it('dispatches commands inside the session card context', () => {
@@ -109,6 +109,16 @@ describe('LocalSandboxCore', () => {
     expect(payload.state.players[0]?.resources.food).toBe(7)
     expect(payload.state.players[0]?.resources.wood).toBe(4)
     expect(payload.customCardDefs?.some((def) => def.cardJson.id === 'CUSTOM_LocalCard')).toBe(true)
+  })
+
+  it('restores an in-flight interaction from the private cursor', () => {
+    const first = new LocalSandboxCore()
+    first.init({ cards: [], playerCount: 2, seed: 42 }, DEBUG_VIEWER)
+    const action = first.call('takeAction', [0, 'forest'], DEBUG_VIEWER)
+    expect(action.payload.interaction.stateId).toBe('wait')
+
+    const restored = new LocalSandboxCore().restore(action.persist, DEBUG_VIEWER)
+    expect(restored.payload.interaction).toEqual(action.payload.interaction)
   })
 
   it('rejects persisted games from another schema version', () => {

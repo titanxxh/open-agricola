@@ -1102,6 +1102,7 @@ export const en = {
     startGame: 'Game start: Round 1',
     enterRound: 'Enter Round {round}',
     gameOver: 'Game over: Round 14 completed',
+    provisionalContinuationRollback: 'The pending action was restored because its mandatory continuation could not be completed',
     harvest: 'Round {round} harvest',
     harvestPhaseReap: 'Reap',
     harvestPhaseFeed: 'Feed',

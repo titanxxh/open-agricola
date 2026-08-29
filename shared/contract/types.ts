@@ -664,6 +664,11 @@ export type ActionAvailabilityContext = {
   sourceCard?: string
 }
 
+export type ProtectedObservation = {
+  kind: 'random' | 'hidden-information'
+  recipientPlayerIds: string[]
+}
+
 export type ActionExecutionContext = {
   state: GameState
   player: PlayerState
@@ -677,6 +682,7 @@ export type ActionExecutionContext = {
   sourceCard?: string
   actionContext?: Record<string, unknown>
   emitPrivateEvent?: (event: PrivateGameEvent) => void
+  reportProtectedObservation?: (observation: ProtectedObservation) => void
 }
 
 export type ActionMutationContext = ActionExecutionContext & {

@@ -3,6 +3,26 @@ import type { ActionExecutionResult, ActionFlow } from '../contract/types'
 export const INJECTED_ANYTIME_ACTION_CONTEXT_KEY = '__injectedAnytimeAction' as const
 export const INJECTED_ANYTIME_COMPLETION_CONTEXT_KEY = '__injectedAnytimeCompletion' as const
 export const INJECTED_ANYTIME_RESULT_KEY = '__injectedAnytimeResult' as const
+export const SUPPRESSED_BEFORE_LISTENER_IDS_KEY = '__suppressedBeforeListenerIds' as const
+
+export const getSuppressedBeforeListenerIds = (
+  actionContext: Record<string, unknown> | undefined,
+): string[] => {
+  const value = actionContext?.[SUPPRESSED_BEFORE_LISTENER_IDS_KEY]
+  return Array.isArray(value)
+    ? value.filter((entry): entry is string => typeof entry === 'string')
+    : []
+}
+
+export const suppressBeforeListeners = (
+  actionContext: Record<string, unknown> | undefined,
+  listenerIds: readonly string[],
+): Record<string, unknown> => ({
+  ...(actionContext ?? {}),
+  [SUPPRESSED_BEFORE_LISTENER_IDS_KEY]: [
+    ...new Set([...getSuppressedBeforeListenerIds(actionContext), ...listenerIds]),
+  ],
+})
 
 export const isInjectedAnytimeActionContext = (
   actionContext: Record<string, unknown> | undefined,

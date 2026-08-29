@@ -113,6 +113,21 @@ describe('custom session executor', () => {
     expect((await stalled).ok).toBe(false)
   }, 20_000)
 
+  it('uses authoritative command settlement for custom-card failures', async () => {
+    const { session, executor } = setup(card(
+      'CUSTOM_FiniteFailure',
+      "throw new Error('finite boom')",
+    ))
+    const before = JSON.parse(JSON.stringify(session.state))
+
+    const response = await executor.execute('takeAction', [0, 'forest'])
+
+    expect(response.ok).toBe(false)
+    expect(response.error).toContain('finite boom')
+    expect(JSON.parse(JSON.stringify(session.state))).toEqual(before)
+    expect(session.cardWarnings).toEqual([expect.stringContaining('finite boom')])
+  })
+
   it('preserves undo history and warnings after a parent-level timeout', async () => {
     const playable: CustomCardData = {
       cardType: 'minor',

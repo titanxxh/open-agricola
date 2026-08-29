@@ -242,7 +242,7 @@ const publishCommandResponse = (
    */
   seat: number = ctx.currentPlayerIndex,
 ): void | Promise<void> => {
-  if (!response.ok) {
+  if (!response.ok && response.durableTransition !== true) {
     ctx.broadcaster.sendStateTo(ctx.ws, room, response, command.requestId, cause)
     return
   }

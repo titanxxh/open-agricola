@@ -1,4 +1,4 @@
-import { serializeState } from '../../shared/session/serialization.ts'
+import { serializeSessionSnapshot } from '../../shared/session/serialization.ts'
 import { Scoring } from '../../shared/domain/scoring.ts'
 import { toRoomMeta, type Room } from './room.ts'
 import type {
@@ -183,7 +183,7 @@ export class RoomPersistenceCheckpoint {
   private saveState(room: Room): void {
     this.persistence.save(
       room.id,
-      serializeState(room.session.state, { engineStack: room.session.getEngineStack() }),
+      serializeSessionSnapshot(room.session.state, room.session),
       toRoomMeta(room),
     )
   }

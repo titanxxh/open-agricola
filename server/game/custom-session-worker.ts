@@ -3,8 +3,8 @@ import type { GameSyncPayload } from '../../shared/contract/protocol/game.ts'
 import type { CustomCardData } from '../../shared/cards/session-card-context.ts'
 import {
   rehydrateState,
-  serializeState,
-  type SerializedGameState,
+  serializeSessionSnapshot,
+  type PersistedSessionSnapshot,
 } from '../../shared/session/serialization.ts'
 import { GameSession, type SessionResponse } from './authoritative-session.ts'
 import type { CustomSessionMethod } from './custom-session-executor.ts'
@@ -18,8 +18,7 @@ type Request = {
   method: CustomSessionMethod
   args: unknown[]
   init?: {
-    serialized: SerializedGameState
-    checkpoint: ReturnType<GameSession['createCommandCheckpoint']>
+    snapshot: PersistedSessionSnapshot
     cardWarnings: string[]
     customCards: CustomCardData[]
   }
@@ -29,8 +28,7 @@ type Success = {
   id: number
   ok: true
   response: Omit<SessionResponse, 'state'>
-  serialized: SerializedGameState
-  checkpoint: ReturnType<GameSession['createCommandCheckpoint']>
+  snapshot: PersistedSessionSnapshot
   payloads: {
     debug: GameSyncPayload
     spectator: GameSyncPayload
@@ -43,13 +41,11 @@ let session: GameSession | null = null
 let customCards: CustomCardData[] = []
 
 const restore = (
-  serialized: SerializedGameState,
-  checkpoint: ReturnType<GameSession['createCommandCheckpoint']>,
+  snapshot: PersistedSessionSnapshot,
   cardWarnings: string[],
 ): void => {
   session?.dispose()
-  session = new GameSession(rehydrateState(serialized), customCards)
-  session.restoreCommandCheckpoint(checkpoint)
+  session = new GameSession(rehydrateState(snapshot), customCards)
   session.cardWarnings.splice(0, session.cardWarnings.length, ...cardWarnings)
 }
 
@@ -84,7 +80,8 @@ const dispatch = (method: CustomSessionMethod, args: unknown[]): { response: Ses
 
 const buildResult = (response: SessionResponse) => {
   if (!session) throw new Error('custom session worker is not initialized')
-  const serialized = serializeState(response.state, { engineStack: session.getEngineStack() })
+  const snapshot = serializeSessionSnapshot(response.state, session)
+  const serialized = snapshot.frame
   const debug = session.buildSyncPayload(response, null, 'debug', serialized)
   const spectator = session.buildSyncPayload(response, null, 'viewer', serialized)
   const viewers = Object.fromEntries(response.state.players.map((player) => [
@@ -94,28 +91,19 @@ const buildResult = (response: SessionResponse) => {
   const { state: _state, ...responseWithoutState } = response
   return {
     response: responseWithoutState,
-    serialized,
-    checkpoint: JSON.parse(JSON.stringify(
-      session.createCommandCheckpoint(),
-    )) as ReturnType<GameSession['createCommandCheckpoint']>,
+    snapshot,
     payloads: { debug, spectator, viewers },
   }
 }
 
 parentPort?.on('message', (request: Request) => {
-  let checkpoint: ReturnType<GameSession['createCommandCheckpoint']> | null = null
-  let commandWarnings: string[] = []
   try {
     if (request.init) {
       customCards = request.init.customCards
-      restore(request.init.serialized, request.init.checkpoint, request.init.cardWarnings)
+      restore(request.init.snapshot, request.init.cardWarnings)
     }
     if (!session) throw new Error('custom session worker is not initialized')
-    const warningCount = session.cardWarnings.length
-    checkpoint = session.createCommandCheckpoint()
     const { response, raw } = session.withCtx(() => dispatch(request.method, request.args))
-    commandWarnings = session.cardWarnings.slice(warningCount)
-    if (commandWarnings.length > 0) throw new Error(commandWarnings.join('; '))
     const result: Success = {
       id: request.id,
       ok: true,
@@ -125,13 +113,11 @@ parentPort?.on('message', (request: Request) => {
     parentPort?.postMessage(result)
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error)
-    if (!session || !checkpoint) {
+    if (!session) {
       parentPort?.postMessage({ id: request.id, ok: false, error: message })
       return
     }
     try {
-      session.restoreCommandCheckpoint(checkpoint)
-      session.cardWarnings.push(...commandWarnings)
       const response = { ...session.getState(), ok: false, error: message }
       parentPort?.postMessage({ id: request.id, ok: false, error: message, ...buildResult(response) })
     } catch {

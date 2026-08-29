@@ -940,11 +940,11 @@ const server = createServer(async (req, res) => {
       const rows = getDb().prepare(`
         SELECT r.id, r.status, r.max_players, r.updated_at, rp.player_index,
                CASE WHEN r.status = 'playing' AND json_valid(r.state_json) THEN
-                 CASE WHEN json_extract(r.state_json, '$.phase') = 'playing'
-                        AND json_extract(r.state_json, '$.gameOver') IS NOT 1
+                 CASE WHEN json_extract(r.state_json, '$.state.phase') = 'playing'
+                        AND json_extract(r.state_json, '$.state.gameOver') IS NOT 1
                         AND COALESCE(
-                              json_extract(r.state_json, '$.engineStack.frames[#-1].ownerPlayerIndex'),
-                              json_extract(r.state_json, '$.currentPlayerIndex')
+                              json_extract(r.state_json, '$.sessionCursor.engineStackCursor.frames[#-1].ownerPlayerIndex'),
+                              json_extract(r.state_json, '$.state.currentPlayerIndex')
                             ) = rp.player_index
                       THEN 1 ELSE 0 END
                ELSE 0 END AS my_turn

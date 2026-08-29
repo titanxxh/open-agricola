@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../../../server/game/authoritative-session'
-import { rehydrateState, serializeState } from '../serialization'
+import { rehydrateState, serializeSessionSnapshot } from '../serialization'
 import { INTERACTION_ONLY_ACTION_ID } from '../../engine'
 import type { InteractionRequest } from '../../contract/types'
 
@@ -169,7 +169,7 @@ describe('serialization cursor — new InteractionRequest kinds', () => {
     expect(envelope?.request.kind).toBe('farm-select')
     expect(envelope?.hostNodeId).toBeTruthy()
 
-    const serialized = serializeState(before.state, { engineStack: stack })
+    const serialized = serializeSessionSnapshot(before.state, session)
     const wireSafe = JSON.parse(JSON.stringify(serialized))
     const rehydrated = rehydrateState(wireSafe)
     const restored = new GameSession(rehydrated)
@@ -199,9 +199,7 @@ describe('serialization cursor — new InteractionRequest kinds', () => {
     }
     pushSyntheticInteraction(session, request, 'ui.interactionSelection')
 
-    const serialized = serializeState(session.getState().state, {
-      engineStack: session.getEngineStack(),
-    })
+    const serialized = serializeSessionSnapshot(session.getState().state, session)
     const wireSafe = JSON.parse(JSON.stringify(serialized))
     const rehydrated = rehydrateState(wireSafe)
     const restored = new GameSession(rehydrated)
@@ -231,9 +229,7 @@ describe('serialization cursor — new InteractionRequest kinds', () => {
     }
     pushSyntheticInteraction(session, request, 'ui.interactionOccupationHand')
 
-    const serialized = serializeState(session.getState().state, {
-      engineStack: session.getEngineStack(),
-    })
+    const serialized = serializeSessionSnapshot(session.getState().state, session)
     const wireSafe = JSON.parse(JSON.stringify(serialized))
     const rehydrated = rehydrateState(wireSafe)
     const restored = new GameSession(rehydrated)
@@ -271,9 +267,7 @@ describe('serialization cursor — new InteractionRequest kinds', () => {
     }
     pushSyntheticInteraction(session, request, 'ui.interactionCardDraft' as never)
 
-    const serialized = serializeState(session.getState().state, {
-      engineStack: session.getEngineStack(),
-    })
+    const serialized = serializeSessionSnapshot(session.getState().state, session)
     const wireSafe = JSON.parse(JSON.stringify(serialized))
     const rehydrated = rehydrateState(wireSafe)
     const restored = new GameSession(rehydrated)
@@ -304,9 +298,7 @@ describe('serialization cursor — new InteractionRequest kinds', () => {
     }
     pushSyntheticInteraction(session, request, 'ui.interactionEngineBlocked', [])
 
-    const serialized = serializeState(session.getState().state, {
-      engineStack: session.getEngineStack(),
-    })
+    const serialized = serializeSessionSnapshot(session.getState().state, session)
     const wireSafe = JSON.parse(JSON.stringify(serialized))
     const rehydrated = rehydrateState(wireSafe)
     const restored = new GameSession(rehydrated)

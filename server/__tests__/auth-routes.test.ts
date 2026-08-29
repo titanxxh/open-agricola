@@ -1023,23 +1023,30 @@ describe('auth routes', () => {
     const insertPlayer = db.prepare(
       'INSERT INTO room_players (room_id, user_id, player_index, joined_at) VALUES (?, ?, ?, ?)',
     )
-    insertRoom.run('room-their-turn', user.id, JSON.stringify({ phase: 'playing', currentPlayerIndex: 0 }), 'playing', 1, 600)
+    const persisted = (
+      state: Record<string, unknown>,
+      frames: Array<{ ownerPlayerIndex: number }> = [],
+    ) => JSON.stringify({
+      state,
+      frame: state,
+      sessionCursor: { engineStackCursor: { frames } },
+    })
+    insertRoom.run('room-their-turn', user.id, persisted({ phase: 'playing', currentPlayerIndex: 0 }), 'playing', 1, 600)
     insertPlayer.run('room-their-turn', user.id, 1, 1)
-    insertRoom.run('room-my-turn', user.id, JSON.stringify({ phase: 'playing', currentPlayerIndex: 1 }), 'playing', 1, 100)
+    insertRoom.run('room-my-turn', user.id, persisted({ phase: 'playing', currentPlayerIndex: 1 }), 'playing', 1, 100)
     insertPlayer.run('room-my-turn', user.id, 1, 1)
     insertRoom.run('room-waiting', user.id, null, 'waiting', 1, 500)
     insertPlayer.run('room-waiting', user.id, 0, 1)
-    insertRoom.run('room-draft', user.id, JSON.stringify({ phase: 'draft', currentPlayerIndex: 0 }), 'playing', 1, 400)
+    insertRoom.run('room-draft', user.id, persisted({ phase: 'draft', currentPlayerIndex: 0 }), 'playing', 1, 400)
     insertPlayer.run('room-draft', user.id, 0, 1)
     insertRoom.run('room-broken', user.id, '{not-json', 'playing', 1, 300)
     insertPlayer.run('room-broken', user.id, 0, 1)
-    insertRoom.run('room-harvest', user.id, JSON.stringify({
+    insertRoom.run('room-harvest', user.id, persisted({
       phase: 'playing',
       currentPlayerIndex: 0,
-      engineStack: { frames: [{ ownerPlayerIndex: 1 }] },
-    }), 'playing', 1, 200)
+    }, [{ ownerPlayerIndex: 1 }]), 'playing', 1, 200)
     insertPlayer.run('room-harvest', user.id, 1, 1)
-    insertRoom.run('room-gameover', user.id, JSON.stringify({
+    insertRoom.run('room-gameover', user.id, persisted({
       phase: 'playing',
       currentPlayerIndex: 0,
       gameOver: true,

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { serializeState } from '../../../shared/session/serialization.ts'
+import { serializeSessionSnapshot } from '../../../shared/session/serialization.ts'
 import { GameSession } from '../authoritative-session.ts'
 import {
   FIXED_DEV_ROOMS,
@@ -189,7 +189,7 @@ describe('room-manager seat assignment', () => {
     session.state.draftPoolSize = undefined
     session.state.draft!.stage = 'farmersOfTheMoorMinor'
     session.state.draft!.poolSize = 4
-    const serialized = serializeState(session.state, { engineStack: session.getEngineStack() })
+    const serialized = serializeSessionSnapshot(session.state, session)
 
     const room = snapshotToRoom({
       id: 'legacy-fom-draft',

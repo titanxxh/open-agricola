@@ -31,6 +31,7 @@ describe('Engine surface guard', () => {
     'peekPendingEnvelope',
     'peekPendingChoiceFromComposite',
     'peekPendingHost',
+    'probeMandatoryContinuations',
     'setEngineBlockedPending',
     'acknowledgePendingActionRequest',
     'hasPendingHostRequiringExternalResolution',

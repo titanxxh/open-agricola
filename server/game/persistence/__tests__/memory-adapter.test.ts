@@ -1,7 +1,7 @@
 import { describe, expect, it, beforeEach } from 'vitest'
 import { InMemoryRoomPersistence } from '../memory-adapter.ts'
 import type { GameResult, RoomMeta } from '../room-persistence.ts'
-import type { SerializedGameState } from '../../../../shared/session/serialization.ts'
+import type { PersistedSessionSnapshot } from '../../../../shared/session/serialization.ts'
 
 const META: RoomMeta = {
   createdBy: 'u',
@@ -10,7 +10,11 @@ const META: RoomMeta = {
   status: 'playing',
   players: [{ userId: 'u', playerIndex: 0 }],
 }
-const STATE = { _stub: true } as unknown as SerializedGameState
+const STATE = {
+  state: { players: [] },
+  frame: { _stub: true },
+  sessionCursor: {},
+} as unknown as PersistedSessionSnapshot
 const RESULT: GameResult = {
   roomId: 'r1',
   startedAt: 1,

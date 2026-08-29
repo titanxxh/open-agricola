@@ -23,6 +23,7 @@ import { EngineTree } from './tree'
 import { LogStore } from './log-store'
 import { INTERACTION_ONLY_ACTION_ID } from './engine-stack'
 import { EventStore } from '../events/store'
+import { createEventQuery } from '../events/query'
 import { eventsToLogEntries } from '../events/log-mapper'
 import type { EngineInternals } from './engine-internals'
 import {
@@ -30,6 +31,7 @@ import {
   buildFlowNode,
   effectiveOwnerPlayerId,
   enforceCompositeContinuationMandatory,
+  isActionStrictlyDoableWithoutBeforeTriggers,
   pendingEnvelopeFromHostNode,
   snapshotCompositeEmit,
 } from './engine-utils'
@@ -46,6 +48,14 @@ type EngineContext = {
   state: GameState
   player: PlayerState
   space: ActionSpace
+}
+
+export type MandatoryContinuationProbe = {
+  nodeId: string
+  actionId: string
+  ownerPlayerId: string
+  parentHostNodeId?: string
+  strictDoable: boolean
 }
 
 type MutableNodeState = EngineNode & {
@@ -174,6 +184,10 @@ const restoreTreeFromCursor = (cursors: NodeCursor[]): EngineNode | null => {
           data.internalPaymentInfoFrom as string | undefined,
         )
         action.beforePhaseResolved = data.beforePhaseResolved === true
+        action.bodyStarted = data.bodyStarted === true
+        action.continuationParentHostNodeId = typeof data.continuationParentHostNodeId === 'string'
+          ? data.continuationParentHostNodeId
+          : undefined
         action.emittedRequest = data.emittedRequest as InteractionRequest | undefined
         action.deferredHostResult = data.deferredHostResult as ActionExecutionResult | undefined
         action.deferredAfterHostCommitChildren = data.deferredAfterHostCommitChildren as ActionNode['deferredAfterHostCommitChildren']
@@ -259,7 +273,6 @@ export class Engine {
   private internalChildResults: EngineInternals['internalChildResults'] = new Map()
   private _pendingNodeIdRef: { value: string | null } = { value: null }
   private _counterRef: { value: number } = { value: 0 }
-  private beforePhaseFlowNodeIds = new Set<string>()
 
   static fromRoot(root: EngineNode, deps: EngineDeps): Engine {
     return new Engine({ tree: new EngineTree(root), ...deps })
@@ -336,7 +349,6 @@ export class Engine {
       eventLogDerivations: this.eventLogDerivations,
       internalChildResults: this.internalChildResults,
       counterRef: this._counterRef,
-      beforePhaseFlowNodeIds: this.beforePhaseFlowNodeIds,
       pendingNodeIdRef: this._pendingNodeIdRef,
     }
   }
@@ -496,6 +508,61 @@ export class Engine {
     return effectiveOwnerPlayerId(this._internals(), nodeId, frameOwnerPlayerId)
   }
 
+  probeMandatoryContinuations(
+    state: GameState,
+    space: ActionSpace,
+    frameOwnerPlayerId: string,
+  ): MandatoryContinuationProbe[] {
+    return this.tree.allNodes()
+      .filter((node): node is ActionNode =>
+        node instanceof ActionNode &&
+        node.mandatory === true &&
+        node.beforePhaseResolved &&
+        !node.bodyStarted &&
+        node.getState() === 'ready',
+      )
+      .map((node) => {
+        const ownerPlayerId = effectiveOwnerPlayerId(
+          this._internals(),
+          node.id,
+          frameOwnerPlayerId,
+        ) ?? frameOwnerPlayerId
+        const clonedState = cloneSnapshotValue(state)
+        const player = clonedState.players.find((entry) => entry.id === ownerPlayerId)
+        const targetSpaceId = typeof node.actionContext?.targetSpaceId === 'string'
+          ? node.actionContext.targetSpaceId
+          : space.id
+        const clonedSpace = clonedState.actionSpaces.find((entry) => entry.id === targetSpaceId)
+          ?? cloneSnapshotValue(space)
+        const transactionEvents = cloneSnapshotValue(this.events.currentTransactionEvents())
+        const strictDoable = !!player && isActionStrictlyDoableWithoutBeforeTriggers(
+          this._internals(), {
+            state: clonedState,
+            player,
+            space: clonedSpace,
+            params: node.params ? cloneSnapshotValue(node.params) : undefined,
+            sourceCard: node.sourceCard,
+            actionContext: {
+              ...(node.actionContext ? cloneSnapshotValue(node.actionContext) : {}),
+              skipBeforeTriggers: true,
+            },
+            transactionEvents,
+            eventQuery: createEventQuery(transactionEvents),
+          },
+          node.actionId,
+        )
+        return {
+          nodeId: node.id,
+          actionId: node.actionId,
+          ownerPlayerId,
+          ...(node.continuationParentHostNodeId
+            ? { parentHostNodeId: node.continuationParentHostNodeId }
+            : {}),
+          strictDoable,
+        }
+      })
+  }
+
   /**
    * Build flow nodes from the given ActionFlow list, inject them before the
    * next unresolved node (or prepend before root when nothing is pending), then
@@ -564,7 +631,6 @@ export class Engine {
       // to persist it so cursor round-trip / undo restoreHistory can rebuild
       // the pending-choice host on rehydrate.
       compositeEmit: snapshotCompositeEmit(this._internals()),
-      beforePhaseFlowNodeIds: [...this.beforePhaseFlowNodeIds],
       internalChildResults: cloneInternalChildResults(this.internalChildResults),
       eventTransaction: this.events.snapshot(),
       eventLogDerivations: cloneEventLogDerivations(this.eventLogDerivations),
@@ -626,12 +692,10 @@ export class Engine {
       options: ActionChoiceOption[]
       request?: InteractionRequest
     } | null
-    beforePhaseFlowNodeIds?: string[]
     internalChildResults?: InternalChildResultsSnapshot
     eventTransaction?: ReturnType<Engine['events']['snapshot']>
     eventLogDerivations?: EngineInternals['eventLogDerivations']
   }) {
-    this.beforePhaseFlowNodeIds = new Set(snapshot.beforePhaseFlowNodeIds ?? [])
     this.internalChildResults = restoreInternalChildResults(snapshot.internalChildResults)
     this.events.restore(snapshot.eventTransaction)
     this.eventLogDerivations = cloneEventLogDerivations(snapshot.eventLogDerivations ?? [])

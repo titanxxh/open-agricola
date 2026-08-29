@@ -1,8 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../../../server/game/authoritative-session'
 import { setWorkersAtHome } from '../../domain/player'
-import { rehydrateState, serializeState } from '../serialization'
-import { EngineStack } from '../../engine'
+import { rehydrateState, serializeSessionSnapshot } from '../serialization'
 import { stabilizeRandomHands } from '../../../server/__tests__/_helpers/stabilize-random-hands'
 
 describe('serialization cursor round-trip', () => {
@@ -17,8 +16,8 @@ describe('serialization cursor round-trip', () => {
 
     const flow = { type: 'leaf' as const, actionId: 'gain', params: { wood: 1 } }
     const nodeId = 'action-gain-0'
-    const serialized = serializeState(state, { engineStack: new EngineStack() })
-    serialized.engineStack = {
+    const serialized = serializeSessionSnapshot(state, session)
+    serialized.sessionCursor.engineStackCursor = {
       frames: [{
         source: { kind: 'flow', flow },
         engineSnapshot: {
@@ -59,8 +58,8 @@ describe('serialization cursor round-trip', () => {
 
     const flow = { type: 'leaf' as const, actionId: 'gain', params: { wood: 1 } }
     const nodeId = 'action-gain-0'
-    const serialized = serializeState(state, { engineStack: new EngineStack() })
-    serialized.engineStack = {
+    const serialized = serializeSessionSnapshot(state, session)
+    serialized.sessionCursor.engineStackCursor = {
       frames: [{
         source: { kind: 'flow', flow },
         engineSnapshot: {
@@ -114,8 +113,8 @@ describe('serialization cursor round-trip', () => {
 
     const flow = { type: 'leaf' as const, actionId: 'gain', params: { wood: 1 } }
     const nodeId = 'action-gain-0'
-    const serialized = serializeState(state, { engineStack: new EngineStack() })
-    serialized.engineStack = {
+    const serialized = serializeSessionSnapshot(state, session)
+    serialized.sessionCursor.engineStackCursor = {
       frames: [{
         source: { kind: 'flow', flow },
         engineSnapshot: {
@@ -224,8 +223,8 @@ describe('serialization cursor round-trip', () => {
       { value: 'C1', labelKey: 'cards.C1.name', sourceCard: 'C1' },
       { value: 'C2', labelKey: 'cards.C2.name', sourceCard: 'C2' },
     ]
-    const serialized = serializeState(state, { engineStack: new EngineStack() })
-    serialized.engineStack = {
+    const serialized = serializeSessionSnapshot(state, session)
+    serialized.sessionCursor.engineStackCursor = {
       frames: [{
         source: { kind: 'flow', flow },
         engineSnapshot: {
@@ -276,8 +275,8 @@ describe('serialization cursor round-trip', () => {
       { value: 'C1', labelKey: 'cards.C1.name', sourceCard: 'C1', disabled: true },
       { value: '__pass__', labelKey: 'ui.interactionSelectTriggerPass' },
     ]
-    const serialized = serializeState(state, { engineStack: new EngineStack() })
-    serialized.engineStack = {
+    const serialized = serializeSessionSnapshot(state, session)
+    serialized.sessionCursor.engineStackCursor = {
       frames: [{
         source: { kind: 'flow', flow },
         engineSnapshot: {
@@ -329,8 +328,8 @@ describe('serialization cursor round-trip', () => {
     const options = [
       { value: 'C1', labelKey: 'cards.C1.name', sourceCard: 'C1', disabled: true },
     ]
-    const serialized = serializeState(state, { engineStack: new EngineStack() })
-    serialized.engineStack = {
+    const serialized = serializeSessionSnapshot(state, session)
+    serialized.sessionCursor.engineStackCursor = {
       frames: [{
         source: { kind: 'flow', flow },
         engineSnapshot: {
@@ -420,16 +419,14 @@ describe('serialization cursor round-trip', () => {
     expect(session.getEngineStack().current()?.reason).toBe('reorganize')
 
     // Serialize with the cursor.
-    const serialized = serializeState(before.state, {
-      engineStack: session.getEngineStack(),
-    })
-    expect(serialized.engineStack.frames).toHaveLength(initialDepth)
-    expect(serialized.engineStack.frames[initialDepth - 1]!.reason).toBe('reorganize')
+    const serialized = serializeSessionSnapshot(before.state, session)
+    expect(serialized.sessionCursor.engineStackCursor.frames).toHaveLength(initialDepth)
+    expect(serialized.sessionCursor.engineStackCursor.frames[initialDepth - 1]!.reason).toBe('reorganize')
 
     // Round-trip via JSON to mirror the WS / SQLite persistence path.
     const wireSafe = JSON.parse(JSON.stringify(serialized))
     const rehydrated = rehydrateState(wireSafe)
-    expect(rehydrated.engineStackCursor.frames).toHaveLength(initialDepth)
+    expect(rehydrated.sessionCursor?.engineStackCursor.frames).toHaveLength(initialDepth)
 
     // Construct a fresh session from the cursor and verify it can resolve the
     // pending interaction normally.
@@ -471,15 +468,13 @@ describe('serialization cursor round-trip', () => {
     expect(resp.interaction.stateId).toBe('wait')
     expect(session.getEngineStack().depth()).toBeGreaterThanOrEqual(1)
 
-    const serialized = serializeState(session.getState().state, {
-      engineStack: session.getEngineStack(),
-    })
-    expect(serialized.engineStack.frames.length).toBeGreaterThanOrEqual(1)
+    const serialized = serializeSessionSnapshot(session.getState().state, session)
+    expect(serialized.sessionCursor.engineStackCursor.frames.length).toBeGreaterThanOrEqual(1)
 
     // Round-trip via JSON.
     const wireSafe = JSON.parse(JSON.stringify(serialized))
     const rehydrated = rehydrateState(wireSafe)
-    expect(rehydrated.engineStackCursor.frames.length).toBeGreaterThanOrEqual(1)
+    expect(rehydrated.sessionCursor?.engineStackCursor.frames.length).toBeGreaterThanOrEqual(1)
 
     const restored = new GameSession(rehydrated)
     expect(restored.getEngineStack().depth()).toBeGreaterThanOrEqual(1)
@@ -549,9 +544,9 @@ describe('serialization cursor round-trip', () => {
     expect(stack.peekPendingEnvelope()?.request.kind).toBe('confirm-next-player')
 
     // Round-trip via JSON.
-    const serialized = serializeState(session.getState().state, { engineStack: stack })
-    expect(serialized.engineStack.frames).toHaveLength(1)
-    expect(serialized.engineStack.frames[0]!.reason).toBe('confirm-next-player')
+    const serialized = serializeSessionSnapshot(session.getState().state, session)
+    expect(serialized.sessionCursor.engineStackCursor.frames).toHaveLength(1)
+    expect(serialized.sessionCursor.engineStackCursor.frames[0]!.reason).toBe('confirm-next-player')
     const wireSafe = JSON.parse(JSON.stringify(serialized))
     const rehydrated = rehydrateState(wireSafe)
 
@@ -608,9 +603,9 @@ describe('serialization cursor round-trip', () => {
 
     // Round-trip via JSON.
     const initialDepth = stack.depth()
-    const serialized = serializeState(session.getState().state, { engineStack: stack })
-    expect(serialized.engineStack.frames).toHaveLength(initialDepth)
-    expect(serialized.engineStack.frames[initialDepth - 1]!.reason).toBe('confirm-player-switch')
+    const serialized = serializeSessionSnapshot(session.getState().state, session)
+    expect(serialized.sessionCursor.engineStackCursor.frames).toHaveLength(initialDepth)
+    expect(serialized.sessionCursor.engineStackCursor.frames[initialDepth - 1]!.reason).toBe('confirm-player-switch')
     const wireSafe = JSON.parse(JSON.stringify(serialized))
     const rehydrated = rehydrateState(wireSafe)
 
@@ -669,9 +664,9 @@ describe('serialization cursor round-trip', () => {
 
     // Round-trip via JSON.
     const initialDepth = stack.depth()
-    const serialized = serializeState(session.getState().state, { engineStack: stack })
-    expect(serialized.engineStack.frames).toHaveLength(initialDepth)
-    expect(serialized.engineStack.frames[initialDepth - 1]!.reason).toBe('feed')
+    const serialized = serializeSessionSnapshot(session.getState().state, session)
+    expect(serialized.sessionCursor.engineStackCursor.frames).toHaveLength(initialDepth)
+    expect(serialized.sessionCursor.engineStackCursor.frames[initialDepth - 1]!.reason).toBe('feed')
     const wireSafe = JSON.parse(JSON.stringify(serialized))
     const rehydrated = rehydrateState(wireSafe)
 

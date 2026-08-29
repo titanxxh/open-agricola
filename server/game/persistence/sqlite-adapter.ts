@@ -8,7 +8,10 @@ import type {
   RoomStatus,
   RestoreOptions,
 } from './room-persistence.ts'
-import type { SerializedGameState } from '../../../shared/session/serialization.ts'
+import type {
+  PersistedSessionSnapshot,
+  SerializedGameState,
+} from '../../../shared/session/serialization.ts'
 import type { CustomCardData } from '../../../shared/cards/session-card-context.ts'
 
 type RoomRow = {
@@ -42,7 +45,7 @@ type SqliteDb = Pick<Database.Database, 'prepare' | 'transaction'>
 
 export type ReplayCommit = {
   roomId: string
-  serialized: SerializedGameState
+  serialized: PersistedSessionSnapshot
   meta: RoomMeta
   header?: {
     schemaVersion: number
@@ -128,7 +131,7 @@ const toStatus = (raw: string): RoomStatus =>
 
 const roomValues = (
   id: string,
-  serialized: SerializedGameState | null,
+  serialized: PersistedSessionSnapshot | null,
   meta: RoomMeta,
   now: number,
   version: number | null,
@@ -160,7 +163,7 @@ const toSnapshot = (
   players: RoomMeta['players'],
 ): RoomSnapshot => ({
   id: row.id,
-  serialized: row.state_json ? (JSON.parse(row.state_json) as SerializedGameState) : null,
+  serialized: row.state_json ? (JSON.parse(row.state_json) as PersistedSessionSnapshot) : null,
   meta: {
     createdBy: row.created_by,
     startedAt: row.started_at,
@@ -563,11 +566,11 @@ export class SqliteRoomPersistence implements RoomPersistence {
   loadReplayFrame(id: string): SerializedGameState | null {
     const row = this.loadRoom.get(id) as RoomRow | undefined
     return row?.state_json
-      ? JSON.parse(row.state_json) as SerializedGameState
+      ? (JSON.parse(row.state_json) as PersistedSessionSnapshot).frame
       : null
   }
 
-  save(id: string, serialized: SerializedGameState | null, meta: RoomMeta): void {
+  save(id: string, serialized: PersistedSessionSnapshot | null, meta: RoomMeta): void {
     const now = Date.now()
     this.saveRoom(roomValues(id, serialized, meta, now, null), meta.players)
   }

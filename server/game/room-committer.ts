@@ -3,7 +3,10 @@ import { mkdirSync, readFileSync, readdirSync, unlinkSync, writeFileSync } from 
 import { basename, join } from 'node:path'
 import type { CustomCardDef } from '../../shared/contract/protocol/game.ts'
 import type { ClientCommand } from '../../shared/contract/protocol/ws.ts'
-import { serializeState, type SerializedGameState } from '../../shared/session/serialization.ts'
+import {
+  serializeSessionSnapshot,
+  type PersistedSessionSnapshot,
+} from '../../shared/session/serialization.ts'
 import type { SessionResponse } from './authoritative-session.ts'
 import {
   canonicalJson,
@@ -161,15 +164,13 @@ const replayFrame = (
   room: Room,
   scores?: SessionResponse['scores'],
 ): {
-  serialized: SerializedGameState
+  serialized: PersistedSessionSnapshot
   frame: JsonValue
 } => {
   const serialized = room.customSessionExecutor?.serializedStateForPersistence()
-    ?? serializeState(room.session.state, {
-      engineStack: room.session.getEngineStack(),
-    })
+    ?? serializeSessionSnapshot(room.session.state, room.session)
   const frame = JSON.parse(JSON.stringify(
-    scores === undefined ? serialized : { ...serialized, scores },
+    scores === undefined ? serialized.frame : { ...serialized.frame, scores },
   )) as JsonValue
   return { serialized, frame }
 }
@@ -476,7 +477,7 @@ export class RoomCommitter {
   ): RoomCommitResult {
     const blocked = this.blockedError(room.id)
     if (blocked) return { kind: 'blocked', error: blocked }
-    if (!response.ok) return { kind: 'unchanged' }
+    if (!response.ok && response.durableTransition !== true) return { kind: 'unchanged' }
     const head = this.heads.get(room.id)
     if (!head) {
       return { kind: 'blocked', error: `replay is not recording for ${room.id}` }
@@ -493,7 +494,9 @@ export class RoomCommitter {
       stepNo,
       previousCheckpointStepNo: head.checkpointStepNo,
     })
-    if (encoded.frameHash === head.frameHash) return { kind: 'unchanged' }
+    if (encoded.frameHash === head.frameHash && response.durableTransition !== true) {
+      return { kind: 'unchanged' }
+    }
     if (response.state.gameOver && room.startedAt === undefined) {
       return this.blockPermanently(room.id, 'game start time is missing')
     }

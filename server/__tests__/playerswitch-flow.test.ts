@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import type { ActionDefinition, ActionFlow } from '../../shared/contract/types'
 import { confirmPlayerSwitch } from './_helpers/pending-confirms'
-import { rehydrateState, serializeState } from '../../shared/session/serialization'
+import { rehydrateState, serializeSessionSnapshot } from '../../shared/session/serialization'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 
 /**
@@ -553,9 +553,7 @@ describe('ActionFlow targetPlayerId', () => {
     expect(sheepOption).toBeDefined()
     expect(session.getEngineStack().peekPendingEnvelope()?.effectiveOwnerPlayerId).toBe(p2.id)
 
-    const serialized = serializeState(session.getState().state, {
-      engineStack: session.getEngineStack(),
-    })
+    const serialized = serializeSessionSnapshot(session.getState().state, session)
     const restored = new GameSession(rehydrateState(JSON.parse(JSON.stringify(serialized))))
     expect(restored.getEngineStack().peekPendingEnvelope()?.effectiveOwnerPlayerId).toBe(p2.id)
 

@@ -16,6 +16,7 @@ import '../../shared/cards/register-all.ts'
 import { familySize, workersAvailable } from '../../shared/domain/player.ts'
 import {
   rehydrateState,
+  serializeSessionSnapshot,
   serializeState,
   type SerializedGameState,
 } from '../../shared/session/serialization.ts'
@@ -711,12 +712,12 @@ const profileCosts = (
       playerIndex: player.playerIndex,
     })),
   }
-  const serialized = serializeState(state, { engineStack: room.session.getEngineStack() })
+  const serialized = serializeSessionSnapshot(state, room.session)
   const json = JSON.stringify(serialized)
   const update = db.prepare('UPDATE rooms SET state_json = ?, version = version + 1, updated_at = ? WHERE id = ?')
   for (let index = 0; index < iterations; index += 1) {
     let start = performance.now()
-    serializeState(state, { engineStack: room.session.getEngineStack() })
+    serializeSessionSnapshot(state, room.session)
     persistenceStateMs += performance.now() - start
     const resp = room.session.getState()
     start = performance.now()

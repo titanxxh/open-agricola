@@ -246,6 +246,18 @@ _Avoid_: 旧 `PendingAction` union、前端 pending 状态机
 一次 pending 被玩家选择后继续执行的后续 flow 或阶段恢复。复杂卡牌的“下一步选择”应走显式 pending / continuation。
 _Avoid_: 共享临时槽位、前端偷补流程
 
+**Provisional Continuation Scope（暂定 continuation 作用域）**:
+Action Execution Scope 内，围绕已承诺但尚未执行本体的 mandatory host action 前置结算而建立的暂定结果边界；它在前置链首次切换玩家或产生受保护观察时开启。真正嵌套的 mandatory host 形成子作用域；未受保证的作用域可以整体撤销，受保证后则约束后续结算不得再次破坏 host continuation。
+_Avoid_: 数据库 Transaction、普通 Undo Scope、已完成 action 的 after response、Interaction Presentation Draft
+
+**Continuation Guard（continuation 保证）**:
+对尚未执行本体但已经严格可执行的 mandatory host action 建立的持续规则义务；后续结算必须保持其严格可执行，直到 host action 进入本体执行。
+_Avoid_: 单次 doability 检查、资源预留、玩家 Undo boundary
+
+**Protected Observation（受保护观察）**:
+玩家一旦看见便无法通过状态恢复消除的随机结果或新隐藏信息。它只有在所有祖先 continuation 均受保证后才能离开权威会话边界。
+_Avoid_: 普通公开暂定状态、跨玩家询问本身、前端动画
+
 **Turn（规则回合）**:
 用于解释“在你的回合”和“同一回合”的规则结算单位；一个 Turn 可以包含多个 Rule Action。工作阶段轮转中的普通放工或沼泽特殊行动会开启 Turn；卡牌在轮转之外移动或放置人员并使用行动格时也可以开启 Turn，例如 D051 Archway 的移动和 E010 Straw Hat 移动的每个 worker 分别是独立 Turn，并按人员行动触发其回合结束时点。
 _Avoid_: 轮转机会、单个 Rule Action、把所有阶段 / anytime 效果都算作 Turn

@@ -469,7 +469,13 @@ export const improvementAction: ActionDefinition = {
       internalChildren,
     }
   },
-  completeInternalChildren: ({ state, player, emitPrivateEvent, eventSink }, result, internalResults) => {
+  completeInternalChildren: ({
+    state,
+    player,
+    emitPrivateEvent,
+    eventSink,
+    reportProtectedObservation,
+  }, result, internalResults) => {
     const data = readImprovementCommitData(result)
     if (!data) return result
     const paymentInfo = paymentInfoFromPayResult(internalResults.payment)
@@ -483,6 +489,7 @@ export const improvementAction: ActionDefinition = {
       actionContext: data.actionContext,
       emitPrivateEvent,
       eventSink,
+      reportProtectedObservation,
     }) as Extract<ActionExecutionResult, { type: 'ok' }>
   },
 }

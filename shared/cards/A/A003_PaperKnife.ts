@@ -30,11 +30,25 @@ const EFFECT_ID = 'paper-knife-random-play'
  * check `getHand(OCCUPATION) >= 3`.
  */
 
-registerSelectionEffect(EFFECT_ID, ({ state, player, positions, cards, sourceCard }): ActionFlow | void => {
+registerSelectionEffect(EFFECT_ID, ({
+  state,
+  player,
+  positions,
+  cards,
+  sourceCard,
+  reportProtectedObservation,
+}): ActionFlow | void => {
   if (!sourceCard || sourceCard !== CARD_ID) return
   const selected = cards.length > 0 ? cards : positions
   if (selected.length !== 3) return
-  const pick = rollAndCacheCardPick(state, player, CARD_ID, KEY_PICK, selected)
+  const pick = rollAndCacheCardPick(
+    state,
+    player,
+    CARD_ID,
+    KEY_PICK,
+    selected,
+    reportProtectedObservation,
+  )
   state.pendingUndoBoundary = true
   return {
     type: 'leaf',

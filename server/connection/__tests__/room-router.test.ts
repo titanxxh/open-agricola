@@ -409,7 +409,7 @@ describe('handleCreateRoom', () => {
     dispatch(ctx, { type: 'newGame', seed: 309 })
 
     ctx.checkpoint.flushAll()
-    expect(ctx.persistence.load(ctx.currentRoom!.id)?.serialized?.gameSeed).toBe(309)
+    expect(ctx.persistence.load(ctx.currentRoom!.id)?.serialized?.state.gameSeed).toBe(309)
   })
 
   it('moves newGame to a fresh room id and discards the unfinished game', () => {
@@ -428,7 +428,7 @@ describe('handleCreateRoom', () => {
     expect(ctx.registry.has(nextRoomId)).toBe(true)
     expect(ctx.persistence.load(previousRoomId)).toBeNull()
     expect(ctx.persistence.__getResultForTest(previousRoomId)).toBeUndefined()
-    expect(ctx.persistence.load(nextRoomId)?.serialized?.gameSeed).toBe(309)
+    expect(ctx.persistence.load(nextRoomId)?.serialized?.state.gameSeed).toBe(309)
     expect(sentMessagesOf(ctx)).toContainEqual(expect.objectContaining({
       type: 'stateUpdate',
       roomId: nextRoomId,
@@ -519,7 +519,7 @@ describe('handleCreateRoom', () => {
 
     expect(ctx.currentRoom!.id).toBe(previousRoomId)
     expect(ctx.registry.has(previousRoomId)).toBe(true)
-    expect(ctx.persistence.load(previousRoomId)?.serialized?.gameOver).toBe(true)
+    expect(ctx.persistence.load(previousRoomId)?.serialized?.state.gameOver).toBe(true)
     expect(sentMessagesOf(ctx)).toContainEqual(expect.objectContaining({
       type: 'error',
       error: 'unable to archive completed game: write failed',
@@ -558,7 +558,7 @@ describe('handleCreateRoom', () => {
     dispatch(ctx, { type: 'loadGame', state: loaded })
 
     ctx.checkpoint.flushAll()
-    expect(ctx.persistence.load(ctx.currentRoom!.id)?.serialized?.gameSeed).toBe(777)
+    expect(ctx.persistence.load(ctx.currentRoom!.id)?.serialized?.state.gameSeed).toBe(777)
   })
 
   it('forwards enableThroughTheSeasons into the created room session', () => {

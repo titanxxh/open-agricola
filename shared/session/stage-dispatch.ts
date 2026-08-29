@@ -2,7 +2,7 @@ import type { ReorganizeTrigger } from '../actions/effects/reorganize.ts'
 import { getCardEffect, isHandCardEffectHook, runCardEffectHook } from '../cards/card-effects.ts'
 import type { BeforeEndGameScope, FlowCardEffectHook } from '../cards/card-effects.ts'
 import { isPlayerSkippingCurrentHarvest } from '../cards/helpers/harvest-skip.ts'
-import type { ActionFlow, GameState, PlayerState } from '../contract/types.ts'
+import type { ActionFlow, GameState, PlayerState, ProtectedObservation } from '../contract/types.ts'
 import type { Engine, EngineFrame } from '../engine/index.ts'
 
 export type StageResumeState = {
@@ -58,6 +58,7 @@ export type StageDispatchHost = {
   popEngineFrame(): EngineFrame | undefined
   driveEngineSteps(): void
   withDeferredPrivateEventDrain(fn: () => void): void
+  reportProtectedObservation(observation: ProtectedObservation): void
 }
 
 export type StageContinuationTable = Record<StageResumeState['hook'], (stageResume: StageResumeState) => void>
@@ -159,7 +160,9 @@ export class StageDispatch {
       for (let currentCardIndex = startCardIndex; currentCardIndex < cards.length; currentCardIndex += 1) {
         const cardId = cards[currentCardIndex]
         if (!cardId) continue
-        const flow = runCardEffectHook(this.state, player, cardId, hook)
+        const flow = runCardEffectHook(this.state, player, cardId, hook, undefined, {
+          reportProtectedObservation: (observation) => this.host.reportProtectedObservation(observation),
+        })
         if (!flow) continue
         this.startFlow(flow, hook, currentPlayerIndex, currentCardIndex + 1, currentPlayerIndex, {
           resumeAfterCardId: cardId,
@@ -184,6 +187,7 @@ export class StageDispatch {
       if (!cardId) continue
       const flow = runCardEffectHook(this.state, player, cardId, hook, undefined, {
         triggerActionId: extra?.triggerActionId ?? undefined,
+        reportProtectedObservation: (observation) => this.host.reportProtectedObservation(observation),
       })
       if (!flow) continue
       this.startFlow(flow, hook, playerIndex, currentCardIndex + 1, playerIndex, extra)

@@ -60,7 +60,13 @@ export const selectionAction: ActionDefinition = {
       promptParams: { maxSelections, minSelections },
     }
   },
-  resolveChoice: ({ player, sourceCard, actionContext, state }, choice, payload) => {
+  resolveChoice: ({
+    player,
+    sourceCard,
+    actionContext,
+    state,
+    reportProtectedObservation,
+  }, choice, payload) => {
     if (choice === 'cancel') return { type: 'fail', errorKey: 'log.action', recoverable: true }
 
     const payloadPositions = (payload as { positions?: string[] } | undefined)?.positions
@@ -81,7 +87,15 @@ export const selectionAction: ActionDefinition = {
     }
     const effect = actionContext?.selectionEffect as string | undefined
     if (effect) {
-      const validationError = validateSelectionEffect(effect, { player, positions, cards, sourceCard, state, actionContext })
+      const validationError = validateSelectionEffect(effect, {
+        player,
+        positions,
+        cards,
+        sourceCard,
+        state,
+        actionContext,
+        reportProtectedObservation,
+      })
       if (validationError) return { type: 'fail', errorKey: validationError, recoverable: true }
     }
 
@@ -95,7 +109,15 @@ export const selectionAction: ActionDefinition = {
     const extraData: Record<string, unknown> = { selectedPositions: positions }
     if (kind === 'occupation-hand' || cards.length > 0) extraData.selectedCards = cards
     if (effect) {
-      const followup = runSelectionEffect(effect, { player, positions, cards, sourceCard, state, actionContext })
+      const followup = runSelectionEffect(effect, {
+        player,
+        positions,
+        cards,
+        sourceCard,
+        state,
+        actionContext,
+        reportProtectedObservation,
+      })
       if (followup) {
         return { type: 'flow', flow: followup, extraData }
       }

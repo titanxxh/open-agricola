@@ -4,7 +4,7 @@ import { join } from 'node:path'
 import { describe, expect, it, beforeEach, afterEach } from 'vitest'
 import { JsonRoomPersistence } from '../json-adapter.ts'
 import type { GameResult, RoomMeta } from '../room-persistence.ts'
-import type { SerializedGameState } from '../../../../shared/session/serialization.ts'
+import type { PersistedSessionSnapshot } from '../../../../shared/session/serialization.ts'
 
 const META: RoomMeta = {
   createdBy: null,
@@ -13,7 +13,11 @@ const META: RoomMeta = {
   status: 'playing',
   players: [],
 }
-const STATE = { _stub: true } as unknown as SerializedGameState
+const STATE = {
+  state: { players: [] },
+  frame: { _stub: true },
+  sessionCursor: {},
+} as unknown as PersistedSessionSnapshot
 const RESULT: GameResult = {
   roomId: 'r1',
   startedAt: 1,

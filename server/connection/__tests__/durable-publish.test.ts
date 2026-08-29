@@ -167,7 +167,7 @@ describe('durable publish', () => {
       const snapshot = persistence.load(host.currentRoom!.id)
       joinPublications.push({
         stepNo: persistence.loadReplayHead(host.currentRoom!.id)?.latestStepNo,
-        names: snapshot?.serialized?.players.map((player) => player.name),
+        names: snapshot?.serialized?.state.players.map((player) => player.name),
       })
     }
     const sendTo = broadcaster.sendTo.bind(broadcaster)

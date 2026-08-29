@@ -22,6 +22,7 @@ export type ActivateCardActionParams = {
   actionEvents?: GameEvent[]
   actionEventStartIndex?: number
   triggerSnapshot?: TriggerSnapshot
+  beforeHostNodeId?: string
 }
 
 export type ActivateCardActionNode = ActionNode & {

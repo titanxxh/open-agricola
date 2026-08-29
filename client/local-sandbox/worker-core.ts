@@ -17,7 +17,7 @@
  */
 import { GameCore, type SessionResponse } from '../../shared/session/session-core.ts'
 import { buildSyncPayload } from '../../shared/session/sync-payload.ts'
-import { rehydrateState, serializeState } from '../../shared/session/serialization.ts'
+import { rehydrateState, serializeSessionSnapshot } from '../../shared/session/serialization.ts'
 import {
   defaultSandboxDeckIds,
   defaultSandboxPlayerNames,
@@ -198,7 +198,7 @@ export class LocalSandboxCore {
       persist: {
         schemaVersion: LOCAL_SANDBOX_SCHEMA_VERSION,
         config: this.config!,
-        serializedState: serializeState(resp.state, { engineStack: core.getEngineStack() }),
+        serializedState: serializeSessionSnapshot(resp.state, core),
       },
     }
   }

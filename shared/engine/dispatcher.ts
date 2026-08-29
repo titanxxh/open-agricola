@@ -21,6 +21,7 @@ import { resolveActionPreviewCost } from '../actions/helpers/cost-preview'
 import { PaymentSolver } from '../actions/payment'
 import { getSkipComputeReplaceListenerIds } from './replace-guard'
 import { applyComputeCostResults } from './compute-cost-results'
+import { getSuppressedBeforeListenerIds } from './action-context-flags'
 
 export type EffectPhaseResult = {
   actionHookResults: ActionHookResult[]
@@ -208,11 +209,13 @@ export class HookDispatcher {
   }
 
   before(context: ActionExecutionContext & { actionId: string }): EffectPhaseResult {
+    const suppressed = new Set(getSuppressedBeforeListenerIds(context.actionContext))
     return {
       actionHookResults: runActionHooks({ ...context, phase: 'before' }),
       matchedListeners: context.actionId === 'place-farmer'
         ? []
-        : getMatchingListeners({ ...context, phase: 'before' }),
+        : getMatchingListeners({ ...context, phase: 'before' })
+          .filter((entry) => !suppressed.has(entry.registration.id)),
     }
   }
 
