@@ -315,6 +315,7 @@ export type HistoryEntry = {
   hadChoicePending: boolean
   activeSpaceId: string | null
   activePlayerIndex: number | null
+  frameId: string | null
   engineSnapshot: ReturnType<Engine['snapshot']> | null
   engineSource: EngineSource | null
   stageResume: StageResumeState | null
@@ -2489,6 +2490,7 @@ export class GameCore {
       hadChoicePending: this.currentIsChoicePending(),
       activeSpaceId: this.activeSpaceId,
       activePlayerIndex: this.activePlayerIndex,
+      frameId: frame?.frameId ?? null,
       engineSnapshot: this.engine?.snapshot() ?? null,
       engineSource: this.engineSource
         ? JSON.parse(JSON.stringify(this.engineSource)) as EngineSource
@@ -2531,6 +2533,7 @@ export class GameCore {
         engine.restore(entry.engineSnapshot)
       }
       this.engineStack.push({
+        frameId: entry.frameId ?? undefined,
         engine,
         source,
         ownerPlayerIndex: entry.activePlayerIndex!,
