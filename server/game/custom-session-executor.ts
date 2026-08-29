@@ -239,7 +239,7 @@ export class CustomSessionExecutor {
     this.lastSnapshot = message.snapshot
     this.lastScores = message.response.scores
     this.lastPayloads = message.payloads
-    this.session.loadState(rehydrateState(message.snapshot))
+    this.session.restoreStateSnapshot(rehydrateState(message.snapshot))
     this.session.cardWarnings.splice(
       0,
       this.session.cardWarnings.length,

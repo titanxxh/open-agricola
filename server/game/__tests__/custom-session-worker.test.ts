@@ -12,8 +12,9 @@ const executors: CustomSessionExecutor[] = []
 const card = (
   cardId: string,
   listenerBody = 'return undefined',
-  listenerAction = 'collect',
+  listenerAction: string | null = 'collect',
   effectBody = '',
+  listenerPhase = 'after',
 ): CustomCardData => {
   const compiled = validateAndCompileCustomCode(`
 const CARD_ID = '${cardId}'
@@ -22,9 +23,9 @@ const CARD_IMPL = {
   ${effectBody ? `effect: { id: CARD_ID, ${effectBody} },` : ''}
   listeners: [{
     cardIds: [CARD_ID],
-    actions: ['${listenerAction}'],
-    phases: ['after'],
-    handler: () => { ${listenerBody} },
+    ${listenerAction ? `actions: ['${listenerAction}'],` : ''}
+    phases: ['${listenerPhase}'],
+    handler: (context) => { ${listenerBody} },
   }],
 }
   `, cardId)
@@ -126,6 +127,33 @@ describe('custom session executor', () => {
     expect(response.error).toContain('finite boom')
     expect(JSON.parse(JSON.stringify(session.state))).toEqual(before)
     expect(session.cardWarnings).toEqual([expect.stringContaining('finite boom')])
+  })
+
+  it('rejects a query when a custom-card listener emits a warning', async () => {
+    const { session, executor } = setup(card(
+      'CUSTOM_QueryFailure',
+      "if (context.actionId === 'forest') throw new Error('query boom')",
+      null,
+      '',
+      'isDoable',
+    ))
+    const before = JSON.parse(JSON.stringify(session.state))
+
+    await expect(executor.query('getAvailableActions', [0])).rejects.toThrow('query boom')
+
+    expect(JSON.parse(JSON.stringify(session.state))).toEqual(before)
+    expect(session.cardWarnings).toEqual([expect.stringContaining('query boom')])
+    expect((await executor.execute('getState', [])).ok).toBe(true)
+  })
+
+  it('applies worker snapshots without invoking authoritative loadState', async () => {
+    const { session, executor } = setup(card('CUSTOM_NonSettlingMirror'))
+    const loadState = vi.spyOn(session, 'loadState').mockImplementation(() => {
+      throw new Error('authoritative loadState called')
+    })
+
+    expect((await executor.execute('getState', [])).ok).toBe(true)
+    expect(loadState).not.toHaveBeenCalled()
   })
 
   it('restores worker state when dispatch fails after a partial mutation', async () => {
