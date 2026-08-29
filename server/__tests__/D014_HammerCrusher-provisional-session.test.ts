@@ -320,10 +320,18 @@ describe('D014 Hammer Crusher provisional continuation', () => {
     expect(response.interaction.stateId === 'wait' ? {
       kind: response.interaction.request.kind,
       playerIndex: response.interaction.playerIndex,
+      fromPlayerIndex: response.interaction.request.kind === 'confirm-player-switch'
+        ? response.interaction.request.fromPlayerIndex
+        : undefined,
+      toPlayerIndex: response.interaction.request.kind === 'confirm-player-switch'
+        ? response.interaction.request.toPlayerIndex
+        : undefined,
       sourceCard: response.interaction.sourceCard,
     } : response.interaction).toEqual({
       kind: 'confirm-player-switch',
-      playerIndex: helperPlayerIndex,
+      playerIndex: 0,
+      fromPlayerIndex: 0,
+      toPlayerIndex: helperPlayerIndex,
       sourceCard: undefined,
     })
     const scopes = session.createSessionPrivateCursor().provisionalContinuationScopes

@@ -186,7 +186,22 @@ describe('A132_Publican session', () => {
 
     let resp = session.takeAction(1, 'grain-utilization')
     expect(resp.ok).toBe(true)
-    resp = advancePastPlayerSwitches(session, resp)
+    expect(resp.interaction.stateId).toBe('wait')
+    if (resp.interaction.stateId !== 'wait') throw new Error('expected player switch confirmation')
+    expect(resp.interaction.request.kind).toBe('confirm-player-switch')
+    expect(resp.interaction.playerIndex).toBe(1)
+    expect(resp.interaction.request.kind === 'confirm-player-switch'
+      ? resp.interaction.request.fromPlayerIndex
+      : undefined).toBe(1)
+    expect(resp.interaction.request.kind === 'confirm-player-switch'
+      ? resp.interaction.request.toPlayerIndex
+      : undefined).toBe(0)
+
+    const wrongPlayer = session.resolveChoice(0, 'confirm')
+    expect(wrongPlayer.ok).toBe(false)
+    expect(wrongPlayer.ok ? undefined : wrongPlayer.error).toBe('no pending choice for this player')
+
+    resp = session.resolveChoice(1, 'confirm')
 
     expect(resp.interaction.stateId).toBe('wait')
     if (resp.interaction.stateId !== 'wait') throw new Error('expected Publican choice')

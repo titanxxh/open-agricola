@@ -102,6 +102,31 @@ describe('Interaction State Adapter', () => {
     expect(interaction).not.toHaveProperty('nextPlayerIndex')
   })
 
+  it('assigns player-switch confirmation to the outgoing player', () => {
+    const state = createInitialState(1)
+    const interaction = deriveInteractionState({
+      state,
+      engineStack: pendingStack({
+        kind: 'confirm-player-switch',
+        fromPlayerIndex: 1,
+        toPlayerIndex: 0,
+      }, 'ui.confirmPlayerSwitch'),
+      getAnytimeEntries: () => [],
+      getAnytimePolicy: () => ({ allowed: false, reason: 'confirm-window' }),
+      filterUndoCommands: (commands: readonly InteractionCommand[]) => [...commands],
+      winnerIds: () => [],
+      scoreSummary: () => [],
+      effectiveOwnerIndexForFrame: (frame: EngineFrame) => frame.ownerPlayerIndex,
+      projectPendingRequest: ({ request }) => request,
+    })
+
+    expect(interaction).toMatchObject({
+      stateId: 'wait',
+      playerIndex: 1,
+      request: { kind: 'confirm-player-switch', fromPlayerIndex: 1, toPlayerIndex: 0 },
+    })
+  })
+
   it('redacts another player wait interaction for viewer payloads', () => {
     const interaction = {
       stateId: 'wait',

@@ -134,11 +134,13 @@ export const deriveInteractionState = ({
     }
   }
 
-  const playerIndex = effectiveOwnerIndexForFrame(frame, cursor.hostNodeId, view)
+  const request = view.request
+  const playerIndex = request.kind === 'confirm-player-switch'
+    ? request.fromPlayerIndex
+    : effectiveOwnerIndexForFrame(frame, cursor.hostNodeId, view)
   const spaceId = frame.spaceId
   const promptKey = view.promptKey
   const promptParams = view.promptParams
-  const request = view.request
   const choiceOptions = view.choices ?? []
   const sourceCard = view.sourceCard ?? choicesSourceCard(choiceOptions)
   const player = state.players[playerIndex]

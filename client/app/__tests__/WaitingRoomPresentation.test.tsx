@@ -32,6 +32,7 @@ class WaitingRoomWebSocket {
   static sent: Array<Record<string, unknown>> = []
   static joinStatus: 'waiting' | 'playing' = 'waiting'
   static respondToGetState = true
+  static statePayload = playingPayload(1)
   static latest: WaitingRoomWebSocket | null = null
   readonly readyState = WaitingRoomWebSocket.OPEN
   onopen: ((event: Event) => void) | null = null
@@ -92,7 +93,7 @@ class WaitingRoomWebSocket {
           sync: 'snapshot',
           cause: 'reconnect',
           requestId: message.requestId,
-          payload: playingPayload(1),
+          payload: WaitingRoomWebSocket.statePayload,
           emittedAt: Date.now(),
         })
       })
@@ -182,6 +183,7 @@ afterEach(() => {
   WaitingRoomWebSocket.sent = []
   WaitingRoomWebSocket.joinStatus = 'waiting'
   WaitingRoomWebSocket.respondToGetState = true
+  WaitingRoomWebSocket.statePayload = playingPayload(1)
   WaitingRoomWebSocket.latest = null
   JoinErrorWebSocket.errorMessage = {}
   Object.defineProperty(navigator, 'clipboard', { configurable: true, value: undefined })
@@ -305,6 +307,51 @@ describe('waiting room presentation', () => {
     await waitFor(() => {
       expect(document.querySelector('.header-round')).toHaveTextContent('R2/14')
     })
+  })
+
+  it('lets the outgoing websocket seat confirm a player switch', async () => {
+    const user = userEvent.setup()
+    const payload = playingPayload(7)
+    payload.state.currentPlayerIndex = 1
+    payload.interaction = {
+      stateId: 'wait',
+      playerIndex: 1,
+      promptKey: 'ui.confirmPlayerSwitch',
+      request: { kind: 'confirm-player-switch', fromPlayerIndex: 1, toPlayerIndex: 0 },
+      allowedCommands: ['resolveChoice'],
+      anytimeActions: [],
+    }
+    WaitingRoomWebSocket.joinStatus = 'playing'
+    WaitingRoomWebSocket.statePayload = payload
+    window.localStorage.setItem('open-agricola-locale-v2', 'en')
+    window.history.replaceState(null, '', '/?page=game&transport=ws&room=room-1&player=p2')
+    vi.stubGlobal('ResizeObserver', class {
+      observe() {}
+      disconnect() {}
+    })
+    vi.stubGlobal('WebSocket', WaitingRoomWebSocket)
+    vi.stubGlobal('fetch', vi.fn(async () =>
+      new Response(JSON.stringify({
+        ok: true,
+        user: { id: 'u1', username: 'host', displayName: 'Host' },
+      })),
+    ))
+
+    render(
+      <LocaleProvider>
+        <AuthProvider>
+          <AuthenticatedGame />
+        </AuthProvider>
+      </LocaleProvider>,
+    )
+
+    const confirm = await screen.findByRole('button', { name: 'Confirm switch' })
+    expect(confirm).toBeEnabled()
+    await user.click(confirm)
+    expect(WaitingRoomWebSocket.sent).toContainEqual(expect.objectContaining({
+      type: 'choice',
+      value: 'confirm',
+    }))
   })
 
   it('announces successful invitation-link copying', async () => {

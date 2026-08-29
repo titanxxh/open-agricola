@@ -446,7 +446,7 @@ describe('RoomCommitter', () => {
       response.interaction.stateId === 'wait' &&
       response.interaction.request.kind === 'confirm-player-switch'
     ) {
-      response = commitChoice(response.interaction.request.toPlayerIndex, 'confirm')
+      response = commitChoice(response.interaction.request.fromPlayerIndex, 'confirm')
     }
     expect(response.interaction.stateId === 'wait' ? response.interaction.sourceCard : undefined)
       .toBe('A132_Publican')
@@ -457,7 +457,7 @@ describe('RoomCommitter', () => {
       response.interaction.stateId === 'wait' &&
       response.interaction.request.kind === 'confirm-player-switch'
     ) {
-      response = commitChoice(response.interaction.request.toPlayerIndex, 'confirm')
+      response = commitChoice(response.interaction.request.fromPlayerIndex, 'confirm')
     }
 
     const finalSnapshot = persistence.load(room.id)!
@@ -563,10 +563,11 @@ describe('RoomCommitter', () => {
     if (response.interaction.stateId !== 'wait' || response.interaction.request.kind !== 'confirm-player-switch') {
       throw new Error('expected player switch')
     }
+    const switchOwner = response.interaction.request.fromPlayerIndex
     response = commit(
-      room.session.resolveChoice(response.interaction.request.toPlayerIndex, 'confirm'),
+      room.session.resolveChoice(switchOwner, 'confirm'),
       { type: 'choice', value: 'confirm' },
-      response.interaction.request.toPlayerIndex,
+      switchOwner,
     )
     expect(response.interaction.stateId === 'wait' ? response.interaction.playerIndex : undefined)
       .toBe(1)
