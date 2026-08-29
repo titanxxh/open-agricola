@@ -372,7 +372,7 @@ export type PublicEventArchiveCanceledPacket = {
   id: string
   packetSeq: number
   type: 'publicEvents.canceled'
-  reason: 'undoStep' | 'undoAction'
+  reason: 'undoStep' | 'undoAction' | 'provisionalContinuationRollback'
   previousMaxSeq: number
   nextMaxSeq: number
   canceledEventIds: string[]

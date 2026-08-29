@@ -3,9 +3,23 @@ import type { CardListenerContext, CardListenerRegistration } from '../card-list
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { payLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
-import { getEmptyFields, isUnconditionalSow } from '../../actions/effects/sow'
+import { isUnconditionalSow } from '../../actions/effects/sow'
+import { buildSowFarmInteraction } from '../../domain/farmyard-interaction'
 
 const CARD_ID = 'A132_Publican'
+
+const canSowReceivedGrain = (context: CardListenerContext): boolean => {
+  const player = {
+    ...context.player,
+    resources: {
+      ...context.player.resources,
+      grain: context.player.resources.grain + 1,
+    },
+  }
+  const farm = buildSowFarmInteraction(player, context.actionContext)
+  return farm.farmType === 'sow' && farm.selectableFields
+    .some((field) => field.allowedCrops.includes('grain'))
+}
 
 const beforeSowListener: CardListenerRegistration = {
   id: 'A132-publican-before-opponent-sow',
@@ -15,7 +29,7 @@ const beforeSowListener: CardListenerRegistration = {
   scope: 'opponent',
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (!isUnconditionalSow(context.actionContext)) return
-    if (getEmptyFields(context.player).length === 0) return
+    if (!canSowReceivedGrain(context)) return
     if ((context.ownerPlayer?.resources.grain ?? 0) < 1) return
     const triggerPlayerId = context.triggerPlayer?.id ?? context.player.id
     return {
@@ -52,7 +66,7 @@ const isDoableListener: CardListenerRegistration = {
     if (context.doable) return
     if (context.actionContext?.skipBeforeTriggers === true) return
     if (!isUnconditionalSow(context.actionContext)) return
-    if (getEmptyFields(context.player).length === 0) return
+    if (!canSowReceivedGrain(context)) return
     if ((context.ownerPlayer?.resources.grain ?? 0) < 1) return
     return { doable: true }
   },

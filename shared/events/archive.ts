@@ -109,7 +109,11 @@ const isPersistedPublicEventArchivePacket = (
     }
     if (value.type === 'publicEvents.canceled') {
       if (!hasOnlyKeys(value, canceledPacketKeys)) return false
-      if (value.reason !== 'undoStep' && value.reason !== 'undoAction') return false
+      if (
+        value.reason !== 'undoStep' &&
+        value.reason !== 'undoAction' &&
+        value.reason !== 'provisionalContinuationRollback'
+      ) return false
       const { previousMaxSeq, nextMaxSeq } = value
       if (!isNonNegativeSafeInteger(previousMaxSeq)) return false
       if (!isNonNegativeSafeInteger(nextMaxSeq)) return false

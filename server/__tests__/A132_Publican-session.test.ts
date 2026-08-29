@@ -6,6 +6,7 @@ import '../../shared/cards/A/A132_Publican'
 import '../../shared/cards/A/A065_SeedPellets'
 import '../../shared/cards/A/A094_LazySowman'
 import '../../shared/cards/D/D114_SeedTrader'
+import '../../shared/cards/D/D025_WitchesDanceFloor'
 import type { ActionChoiceOption, ActionDefinition } from '../../shared/contract/types'
 import { rollAndCacheCardPick } from '../../shared/cards/helpers/card-random'
 import type { SessionResponse } from '../../shared/session/session-core'
@@ -214,6 +215,36 @@ describe('A132_Publican session', () => {
       (entry) => entry.key === 'log.provisionalContinuationRollback',
     )).toHaveLength(0)
     expect(resp.scores).toHaveLength(2)
+  })
+
+  it('makes a grain-capable card field reachable with Publican grain', () => {
+    const session = setup(1)
+    const state = session.getState().state
+    const opponent = state.players[1]!
+    opponent.resources.grain = 0
+    opponent.fields = []
+    opponent.minorPlayed.push('D025_WitchesDanceFloor')
+    session.loadState(state)
+
+    let resp = advancePastPlayerSwitches(session, session.takeAction(1, 'grain-utilization'))
+    expect(resp.interaction.stateId === 'wait' ? resp.interaction.sourceCard : undefined)
+      .toBe('A132_Publican')
+    if (resp.interaction.stateId !== 'wait') throw new Error('expected Publican choice')
+    const accept = resp.interaction.request.options.find((option) => option.value !== '__skip__')
+
+    resp = advancePastPlayerSwitches(session, session.resolveChoice(0, accept!.value))
+
+    expect(resp.interaction.stateId).toBe('wait')
+    if (resp.interaction.stateId !== 'wait' || resp.interaction.request.kind !== 'farm-select') {
+      throw new Error('expected Sow selection')
+    }
+    expect(resp.interaction.request.farm).toEqual(expect.objectContaining({
+      farmType: 'sow',
+      selectableFields: [expect.objectContaining({
+        sourceCard: 'D025_WitchesDanceFloor',
+        allowedCrops: expect.arrayContaining(['grain']),
+      })],
+    }))
   })
 
   it('rejects random and hidden observations before Sow is guarded', () => {
