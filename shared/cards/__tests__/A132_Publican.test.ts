@@ -5,7 +5,7 @@ import { makeBlankPlayer } from '../../domain/__tests__/helpers'
 import { A132_Publican_impl } from '../A/A132_Publican'
 
 describe('A132_Publican', () => {
-  it('does not offer grain when the opponent cannot sow independently', () => {
+  it('offers grain when it makes an opponent with an empty field able to sow', () => {
     const sower = makeBlankPlayer({
       id: 'sower',
       resources: { grain: 0, vegetable: 0 },
@@ -29,6 +29,6 @@ describe('A132_Publican', () => {
       actionContext: { checkedReplaceAction: true },
     } as CardListenerContext)
 
-    expect(result).toBeUndefined()
+    expect(result).toMatchObject({ sourceCard: 'A132_Publican' })
   })
 })

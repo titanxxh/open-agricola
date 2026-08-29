@@ -3,12 +3,11 @@ import type { CardListenerContext, CardListenerRegistration } from '../card-list
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { payLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
-import { isUnconditionalSow } from '../../actions/effects/sow'
-import { buildSowFarmInteraction } from '../../domain/farmyard-interaction'
+import { getEmptyFields, isUnconditionalSow } from '../../actions/effects/sow'
 
 const CARD_ID = 'A132_Publican'
 
-const listener: CardListenerRegistration = {
+const beforeSowListener: CardListenerRegistration = {
   id: 'A132-publican-before-opponent-sow',
   cardIds: [CARD_ID],
   actions: ['sow'],
@@ -16,8 +15,8 @@ const listener: CardListenerRegistration = {
   scope: 'opponent',
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (!isUnconditionalSow(context.actionContext)) return
-    const farm = buildSowFarmInteraction(context.player, context.actionContext)
-    if (farm.farmType !== 'sow' || farm.selectableFields.length === 0) return
+    if (getEmptyFields(context.player).length === 0) return
+    if ((context.ownerPlayer?.resources.grain ?? 0) < 1) return
     const triggerPlayerId = context.triggerPlayer?.id ?? context.player.id
     return {
       flow: {
@@ -43,8 +42,24 @@ const listener: CardListenerRegistration = {
   },
 }
 
+const isDoableListener: CardListenerRegistration = {
+  id: 'A132-publican-isdoable-opponent-sow',
+  cardIds: [CARD_ID],
+  actions: ['sow'],
+  phases: ['isDoable' as ActionHookPhase],
+  scope: 'opponent',
+  handler: (context: CardListenerContext): ActionHookResult | void => {
+    if (context.doable) return
+    if (context.actionContext?.skipBeforeTriggers === true) return
+    if (!isUnconditionalSow(context.actionContext)) return
+    if (getEmptyFields(context.player).length === 0) return
+    if ((context.ownerPlayer?.resources.grain ?? 0) < 1) return
+    return { doable: true }
+  },
+}
+
 const cardImpl = {
-  listeners: [listener],
+  listeners: [beforeSowListener, isDoableListener],
   reaches: [] as readonly string[],
 } satisfies CardImpl
 

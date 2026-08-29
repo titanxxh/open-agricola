@@ -69,7 +69,7 @@ describe('replay room restoration', () => {
     approveCurrentDraft(db, { cardId: card.id, authorId: 'author' })
     publish(db, { cardId: card.id, authorId: 'author', baseRevision: card.revision })
     const { GameSession } = await import('../../game/authoritative-session.ts')
-    const { serializeState } = await import('../../../shared/session/serialization.ts')
+    const { serializeSessionSnapshot } = await import('../../../shared/session/serialization.ts')
     const { SqliteRoomPersistence } = await import('../../game/persistence/sqlite-adapter.ts')
     const persistence = new SqliteRoomPersistence(db)
     const session = new GameSession(587, undefined, { playerCount: 2 })
@@ -77,7 +77,7 @@ describe('replay room restoration', () => {
     const viewerBuildId = createViewerBuild(viewerRoot)
     persistence.save(
       'custom-room',
-      serializeState(session.state, { engineStack: session.getEngineStack() }),
+      serializeSessionSnapshot(session.state, session),
       {
         createdBy: 'author',
         startedAt: 100,

@@ -51,7 +51,6 @@ describe('Engine.restore regressions', () => {
       nodeStates: [{ id: restoredHost.id, state: 'ready' }],
       pendingData: [],
       compositeEmit: null,
-      beforePhaseFlowNodeIds: [],
     }
 
     const engine = buildEngine()

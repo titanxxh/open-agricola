@@ -2,7 +2,7 @@ import Database from 'better-sqlite3'
 import { describe, expect, it, beforeEach } from 'vitest'
 import { SqliteRoomPersistence } from '../sqlite-adapter.ts'
 import type { GameResult, RoomMeta, RoomSnapshot } from '../room-persistence.ts'
-import type { SerializedGameState } from '../../../../shared/session/serialization.ts'
+import type { PersistedSessionSnapshot } from '../../../../shared/session/serialization.ts'
 
 const WAITING_TTL = 30 * 60 * 1000
 const PLAYING_TTL = 7 * 24 * 60 * 60 * 1000
@@ -17,7 +17,11 @@ const META: RoomMeta = {
   players: [{ userId: 'u1', playerIndex: 0 }],
 }
 
-const STATE = { _stub: true } as unknown as SerializedGameState
+const STATE = {
+  state: { players: [] },
+  frame: { _stub: true },
+  sessionCursor: {},
+} as unknown as PersistedSessionSnapshot
 const RESULT: GameResult = {
   roomId: 'r1',
   startedAt: NOW - 1000,

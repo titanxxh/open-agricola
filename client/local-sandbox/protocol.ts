@@ -3,7 +3,7 @@
  * local-sandbox engine worker. See wayfinder T1 (#606) for the design notes.
  */
 import type { GameSyncPayload } from '../../shared/contract/protocol/game.ts'
-import type { SerializedGameState } from '../../shared/session/serialization.ts'
+import type { PersistedSessionSnapshot } from '../../shared/session/serialization.ts'
 import type { SyncPayloadMode } from '../../shared/session/sync-payload.ts'
 import type { CustomCardData } from '../../shared/cards/session-card-context.ts'
 
@@ -37,7 +37,7 @@ export type ViewerSpec = {
 export type PersistedLocalGame = {
   schemaVersion: number
   config: LocalGameConfig
-  serializedState: SerializedGameState
+  serializedState: PersistedSessionSnapshot
 }
 
 export type LocalSandboxRequest =

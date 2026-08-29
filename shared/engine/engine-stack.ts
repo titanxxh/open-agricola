@@ -39,6 +39,7 @@ export type StageResumeState = {
 }
 
 export type EngineFrame = {
+  frameId?: string
   engine: Engine
   source: EngineSource
   ownerPlayerIndex: number
@@ -54,6 +55,7 @@ export type EngineFrame = {
 }
 
 export type EngineFrameCursor = {
+  frameId?: string
   source: EngineSource
   engineSnapshot: ReturnType<Engine['snapshot']>
   ownerPlayerIndex: number
@@ -97,8 +99,12 @@ export function isSyntheticInteractionFrame(frame: EngineFrame): boolean {
  */
 export class EngineStack {
   private frames: EngineFrame[] = []
+  private nextFrameId = 1
 
   push(frame: EngineFrame): void {
+    frame.frameId ??= `engine-frame-${this.nextFrameId++}`
+    const match = /^engine-frame-(\d+)$/.exec(frame.frameId)
+    if (match) this.nextFrameId = Math.max(this.nextFrameId, Number(match[1]) + 1)
     this.frames.push(frame)
   }
 
@@ -147,6 +153,10 @@ export class EngineStack {
 
   depth(): number {
     return this.frames.length
+  }
+
+  allFrames(): readonly EngineFrame[] {
+    return this.frames
   }
 
   clear(): void {
@@ -201,6 +211,7 @@ export class EngineStack {
   toCursor(): EngineStackCursor {
     return {
       frames: this.frames.map((f) => ({
+        frameId: f.frameId,
         source: f.source,
         engineSnapshot: f.engine.snapshot(),
         ownerPlayerIndex: f.ownerPlayerIndex,
@@ -224,6 +235,7 @@ export class EngineStack {
     for (const fc of cursor.frames) {
       const engine = rebuild(fc.source, fc.engineSnapshot, fc)
       stack.push({
+        frameId: fc.frameId,
         engine,
         source: fc.source,
         ownerPlayerIndex: fc.ownerPlayerIndex,

@@ -111,7 +111,7 @@ describe('Room Persistence Checkpoint', () => {
     expect(clock.scheduler.setTimeout).toHaveBeenCalledWith(expect.any(Function), 1000)
     clock.tick()
     expect(save).toHaveBeenCalledOnce()
-    expect(save.mock.calls[0]?.[1]).toMatchObject({ rngTick: 2 })
+    expect(save.mock.calls[0]?.[1]?.state).toMatchObject({ rngTick: 2 })
   })
 
   it('flushes multiple dirty rooms from one scheduler tick', () => {
@@ -158,7 +158,7 @@ describe('Room Persistence Checkpoint', () => {
 
     clock.tick()
     expect(saves).toBe(2)
-    expect(persistence.load(r.id)?.serialized).toMatchObject({ rngTick: 2 })
+    expect(persistence.load(r.id)?.serialized?.state).toMatchObject({ rngTick: 2 })
   })
 
   it('cancels stale writes for deleted and terminal rooms', () => {
@@ -268,7 +268,7 @@ describe('Room Persistence Checkpoint', () => {
     finished.session.state.gameOver = true
 
     expect(checkpoint.completeGame(finished, 20)).toEqual({ ok: false, error: 'write failed' })
-    expect(persistence.load('finished')?.serialized?.gameOver).toBe(true)
+    expect(persistence.load('finished')?.serialized?.state.gameOver).toBe(true)
     expect(clock.pending()).toBe(1)
     clock.tick()
 

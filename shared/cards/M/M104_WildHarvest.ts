@@ -14,8 +14,15 @@ const cardImpl = {
   effect: {
     id: CARD_ID,
     onBuy: () => gainLeaf(CARD_ID, { food: 1 }),
-    onStartHarvest: (state, player) => {
-      const pick = rollAndCacheCardPick(state, player, CARD_ID, `harvest-${state.round}`, moorStartCardIds)
+    onStartHarvest: (state, player, ctx) => {
+      const pick = rollAndCacheCardPick(
+        state,
+        player,
+        CARD_ID,
+        `harvest-${state.round}`,
+        moorStartCardIds,
+        ctx?.reportProtectedObservation,
+      )
       state.pendingUndoBoundary = true
       return countTerrain(player, 'forest') >= startCardNumber(pick) ? gainLeaf(CARD_ID, { food: 1 }) : undefined
     },

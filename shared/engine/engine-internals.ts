@@ -29,6 +29,5 @@ export interface EngineInternals {
   }>
   internalChildResults: Map<string, Record<string, ActionExecutionResult>>
   counterRef: { value: number }
-  beforePhaseFlowNodeIds: Set<string>
   pendingNodeIdRef: { value: string | null }
 }

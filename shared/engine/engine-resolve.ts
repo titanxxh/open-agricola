@@ -40,6 +40,7 @@ import {
   pendingCursorFromEnvelope,
   pendingEnvelopeFromHostNode,
   resolveSubtree,
+  stampContinuationParentHost,
 } from './engine-utils'
 import { withInjectedAnytimeResultFlag } from './action-context-flags'
 import { eventsToLogEntries } from '../events/log-mapper'
@@ -49,12 +50,14 @@ import { createBufferedEventSink, emitCardTriggered } from './card-trigger-event
 import { createTriggerSnapshot } from '../cards/helpers/trigger-snapshot'
 import { applyComputeCostResults } from './compute-cost-results'
 import { findActionSpaceById } from '../domain/space'
+import { isActivateCardActionNode } from './activation-action'
 
 type EngineContext = {
   state: ActionExecutionContext['state']
   player: ActionExecutionContext['player']
   space: ActionExecutionContext['space']
   emitPrivateEvent?: ActionExecutionContext['emitPrivateEvent']
+  reportProtectedObservation?: ActionExecutionContext['reportProtectedObservation']
 }
 
 const resolveExecutionSpace = (
@@ -505,6 +508,7 @@ export function engineResolveChoice(
         sourceCard: child.sourceCard,
         actionContext,
         emitPrivateEvent: context.emitPrivateEvent,
+        reportProtectedObservation: context.reportProtectedObservation,
       }
       const replaceResult = int.hooks.applyComputeReplace({
         ...executionContext,
@@ -541,11 +545,8 @@ export function engineResolveChoice(
         int.pendingNodeIdRef.value = null
         return rollbackAndReturn(int, { type: 'fail', errorKey: 'log.buildRoomFail' })
       }
-      const skipBefore = int.beforePhaseFlowNodeIds.has(child.id)
       const beforeEventReadContext = currentEventReadContext(int)
-      const beforePhase = skipBefore
-        ? { matchedListeners: [] }
-        : int.hooks.before({ ...executionContext, ...beforeEventReadContext, actionId })
+      const beforePhase = int.hooks.before({ ...executionContext, ...beforeEventReadContext, actionId })
       const beforeBaseEvent = buildListenerEvent(executionContext, {})
       const beforeActivateNodes = buildPhaseTrailingNodes(
         int,
@@ -563,6 +564,11 @@ export function engineResolveChoice(
         const deferredAction = findActionNode(deferredTarget)
         if (deferredAction) {
           deferredAction.beforePhaseResolved = true
+          beforeActivateNodes.forEach((beforeNode) => {
+            if (isActivateCardActionNode(beforeNode)) {
+              beforeNode.params.beforeHostNodeId = deferredAction.id
+            }
+          })
         }
         resolveSubtree(targetNode!)
         if (node instanceof XorNode) {
@@ -601,6 +607,7 @@ export function engineResolveChoice(
       })
       const eventBuffer = createBufferedEventSink()
       let completedEvents: GameEvent[] = []
+      child.bodyStarted = true
       const result = action.execute({
         ...executionContext,
         eventSink: eventBuffer.sink,
@@ -794,8 +801,15 @@ export function engineResolveChoice(
         ...afterActivateNodes,
         ...afterHostNodes,
       ]
+      if (child.continuationParentHostNodeId) {
+        [...hookFlows, ...trailingHookNodes].forEach((insertedNode) =>
+          stampContinuationParentHost(insertedNode, child.continuationParentHostNodeId!))
+      }
       if (result.type === 'flow') {
         const flowNode = buildOwnedFlowNode(int, result.flow, context.player.id)
+        if (child.continuationParentHostNodeId) {
+          stampContinuationParentHost(flowNode, child.continuationParentHostNodeId)
+        }
         if (trailingHookNodes.length > 0) {
           int.tree.insertAfter(insertAnchor, trailingHookNodes)
         }
@@ -897,6 +911,11 @@ export function engineResolveChoice(
     )
     if (beforeActivateNodes.length > 0 && pendingActionNode && !pendingActionNode.beforePhaseResolved) {
       pendingActionNode.beforePhaseResolved = true
+      beforeActivateNodes.forEach((beforeNode) => {
+        if (isActivateCardActionNode(beforeNode)) {
+          beforeNode.params.beforeHostNodeId = pendingActionNode.id
+        }
+      })
       int.tree.insertBefore(pendingActionNode.id, beforeActivateNodes)
       return { type: 'ok' }
     }
@@ -1162,8 +1181,15 @@ export function engineResolveChoice(
       ...afterActivateNodes,
       ...afterHostNodes,
     ]
+    if (pendingActionNode?.continuationParentHostNodeId) {
+      [...hookFlows, ...trailingHookNodes].forEach((insertedNode) =>
+        stampContinuationParentHost(insertedNode, pendingActionNode.continuationParentHostNodeId!))
+    }
     if (result.type === 'flow') {
       const flowNode = buildOwnedFlowNode(int, result.flow, context.player.id)
+      if (pendingActionNode?.continuationParentHostNodeId) {
+        stampContinuationParentHost(flowNode, pendingActionNode.continuationParentHostNodeId)
+      }
       if (trailingHookNodes.length > 0) {
         int.tree.insertAfter(insertionTargetId, trailingHookNodes)
       }

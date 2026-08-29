@@ -7,8 +7,8 @@ import type { CustomCardData } from '../../shared/cards/session-card-context.ts'
 import type { InitialStateOptions } from '../../shared/session/state-bootstrap.ts'
 import {
   rehydrateState,
-  serializeState,
-  type SerializedGameState,
+  serializeSessionSnapshot,
+  type PersistedSessionSnapshot,
 } from '../../shared/session/serialization.ts'
 import {
   GameSession,
@@ -61,8 +61,7 @@ type WorkerRequest = {
   method: CustomSessionMethod
   args: unknown[]
   init?: {
-    serialized: SerializedGameState
-    checkpoint: ReturnType<GameSession['createCommandCheckpoint']>
+    snapshot: PersistedSessionSnapshot
     cardWarnings: string[]
     customCards: CustomCardData[]
   }
@@ -76,8 +75,7 @@ type WorkerPayloads = {
 
 type WorkerState = {
   response: Omit<SessionResponse, 'state'>
-  serialized: SerializedGameState
-  checkpoint: ReturnType<GameSession['createCommandCheckpoint']>
+  snapshot: PersistedSessionSnapshot
   payloads: WorkerPayloads
 }
 
@@ -118,7 +116,7 @@ export class CustomSessionExecutor {
   private readonly customCards: CustomCardData[]
   private worker: Worker | null = null
   private workerInitialized = false
-  private lastSerialized: SerializedGameState | null = null
+  private lastSnapshot: PersistedSessionSnapshot | null = null
   private lastScores: SessionResponse['scores']
   private lastPayloads: WorkerPayloads | null = null
   private nextId = 0
@@ -147,11 +145,10 @@ export class CustomSessionExecutor {
       try {
         const message = await this.request(method, args)
         if (!message.ok) {
-          return message.response && message.serialized && message.checkpoint && message.payloads
+          return message.response && message.snapshot && message.payloads
             ? this.applyWorkerState({
                 response: message.response,
-                serialized: message.serialized,
-                checkpoint: message.checkpoint,
+                snapshot: message.snapshot,
                 payloads: message.payloads,
               })
             : this.failed(message.error)
@@ -167,12 +164,12 @@ export class CustomSessionExecutor {
   updatePlayerNames(names: Array<[number, string]>): SessionResponse | Promise<SessionResponse> {
     if (this.workerInitialized) return this.execute('updatePlayerNames', [names])
     for (const [playerIndex, name] of names) this.session.updatePlayerName(playerIndex, name)
-    this.lastSerialized = null
+    this.lastSnapshot = null
     return this.session.withCtx(() => this.session.getState())
   }
 
-  serializedStateForPersistence(): SerializedGameState | null {
-    return this.lastSerialized
+  serializedStateForPersistence(): PersistedSessionSnapshot | null {
+    return this.lastSnapshot
   }
 
   scoresForPersistence(): SessionResponse['scores'] {
@@ -183,11 +180,10 @@ export class CustomSessionExecutor {
     return this.enqueue(async () => {
       const message = await this.request(method, args)
       if (!message.ok) {
-        if (message.response && message.serialized && message.checkpoint && message.payloads) {
+        if (message.response && message.snapshot && message.payloads) {
           this.applyWorkerState({
             response: message.response,
-            serialized: message.serialized,
-            checkpoint: message.checkpoint,
+            snapshot: message.snapshot,
             payloads: message.payloads,
           })
         }
@@ -240,13 +236,10 @@ export class CustomSessionExecutor {
   }
 
   private applyWorkerState(message: WorkerState): SessionResponse {
-    this.lastSerialized = message.serialized
+    this.lastSnapshot = message.snapshot
     this.lastScores = message.response.scores
     this.lastPayloads = message.payloads
-    this.session.withCtx(() => {
-      this.session.loadState(rehydrateState(message.serialized))
-      this.session.restoreCommandCheckpoint(message.checkpoint)
-    })
+    this.session.loadState(rehydrateState(message.snapshot))
     this.session.cardWarnings.splice(
       0,
       this.session.cardWarnings.length,
@@ -286,10 +279,8 @@ export class CustomSessionExecutor {
     return worker
   }
 
-  private initialSerialized(): SerializedGameState {
-    return this.lastSerialized ?? serializeState(this.session.state, {
-      engineStack: this.session.getEngineStack(),
-    })
+  private initialSerialized(): PersistedSessionSnapshot {
+    return this.lastSnapshot ?? serializeSessionSnapshot(this.session.state, this.session)
   }
 
   private request(method: CustomSessionMethod, args: unknown[]): Promise<WorkerResponse> {
@@ -301,11 +292,8 @@ export class CustomSessionExecutor {
       args,
       ...(!this.workerInitialized
         ? {
-            init: {
-              serialized: this.initialSerialized(),
-              checkpoint: JSON.parse(JSON.stringify(
-                this.session.createCommandCheckpoint(),
-              )) as ReturnType<GameSession['createCommandCheckpoint']>,
+          init: {
+              snapshot: this.initialSerialized(),
               cardWarnings: [...this.session.cardWarnings],
               customCards: this.customCards,
             },

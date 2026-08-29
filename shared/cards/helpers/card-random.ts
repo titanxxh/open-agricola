@@ -1,5 +1,5 @@
 import { createRng } from '../../utils/rng'
-import type { GameState, PlayerState } from '../../contract/types'
+import type { GameState, PlayerState, ProtectedObservation } from '../../contract/types'
 import { readCardExtraData, writeCardExtraData } from './card-state'
 
 /**
@@ -20,6 +20,7 @@ export const rollAndCacheCardPick = <T>(
   cardId: string,
   key: string,
   candidates: T[],
+  reportProtectedObservation?: (observation: ProtectedObservation) => void,
 ): T => {
   const cached = readCardExtraData<T>(player, cardId, key)
   if (cached !== undefined) return cached
@@ -32,5 +33,9 @@ export const rollAndCacheCardPick = <T>(
   const idx = Math.floor(rng() * candidates.length)
   const pick = candidates[idx]!
   writeCardExtraData(player, cardId, key, pick)
+  reportProtectedObservation?.({
+    kind: 'random',
+    recipientPlayerIds: [player.id],
+  })
   return pick
 }

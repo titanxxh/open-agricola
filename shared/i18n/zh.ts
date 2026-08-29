@@ -1083,6 +1083,7 @@ export const zh = {
     startGame: '游戏开始：第 1 回合',
     enterRound: '进入第 {round} 回合',
     gameOver: '游戏结束：完成第 14 回合',
+    provisionalContinuationRollback: '因必做后续无法完成，系统已恢复待处理行动',
     harvest: '第 {round} 回合收获',
     harvestPhaseReap: '收割',
     harvestPhaseFeed: '喂养',

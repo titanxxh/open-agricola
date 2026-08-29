@@ -13,7 +13,7 @@ import type {
 import type { EventSink } from '../contract/events'
 import type { GameEvent } from '../contract/events'
 import type { PromptKey } from '../contract/prompt-keys'
-import type { FollowUpAction, ActionHookPhase } from '../actions/hooks'
+import type { FollowUpAction, ActionHookContext, ActionHookPhase } from '../actions/hooks'
 import {
   ActionNode,
   OrNode,
@@ -38,6 +38,7 @@ import {
 import { applyComputeCostResults } from './compute-cost-results'
 import { pendingEnvelopeChoices } from './pending-validation'
 import { findPlayerById, findPlayerIndexById } from '../domain/player'
+import { suppressBeforeListeners } from './action-context-flags'
 
 /**
  * S4c PR5 — module-private utilities extracted from `Engine`. Each function
@@ -360,9 +361,19 @@ export function buildPhaseTrailingNodes(
   })
 }
 
-export function collectNodeIds(node: EngineNode, ids: Set<string>): void {
-  ids.add(node.id)
-  for (const child of getNodeChildren(node)) collectNodeIds(child, ids)
+export function stampContinuationParentHost(node: EngineNode, hostNodeId: string): void {
+  if (node instanceof ActionNode) node.continuationParentHostNodeId = hostNodeId
+  for (const child of getNodeChildren(node)) stampContinuationParentHost(child, hostNodeId)
+}
+
+export function stampSuppressedBeforeListeners(
+  node: EngineNode,
+  listenerIds: readonly string[],
+): void {
+  if (node instanceof ActionNode) {
+    node.actionContext = suppressBeforeListeners(node.actionContext, listenerIds)
+  }
+  for (const child of getNodeChildren(node)) stampSuppressedBeforeListeners(child, listenerIds)
 }
 
 export function cloneNode(int: EngineInternals, node: EngineNode): EngineNode {
@@ -378,6 +389,8 @@ export function cloneNode(int: EngineInternals, node: EngineNode): EngineNode {
       node.effectPreview,
     )
     clone.beforePhaseResolved = node.beforePhaseResolved
+    clone.bodyStarted = node.bodyStarted
+    clone.continuationParentHostNodeId = node.continuationParentHostNodeId
     return copySharedNodeMetadata(node, clone)
   }
   if (node instanceof SequenceNode) {
@@ -878,6 +891,7 @@ export function buildChoiceExecutionContext(
     player: ActionExecutionContext['player']
     space: ActionExecutionContext['space']
     emitPrivateEvent?: ActionExecutionContext['emitPrivateEvent']
+    reportProtectedObservation?: ActionExecutionContext['reportProtectedObservation']
   },
   base?: Pick<ActionExecutionContext, 'params' | 'costs' | 'costTrades' | 'costBonuses' | 'paymentResourceProviders' | 'costAttribution' | 'sourceCard' | 'actionContext'> | null,
 ): ActionExecutionContext {
@@ -894,6 +908,7 @@ export function buildChoiceExecutionContext(
     sourceCard: base?.sourceCard,
     actionContext: base?.actionContext,
     emitPrivateEvent: context.emitPrivateEvent,
+    reportProtectedObservation: context.reportProtectedObservation,
   }
 }
 
@@ -984,6 +999,41 @@ export const canActionContinueWithoutBeforeTriggers = (
     canStartFlowWithoutBeforeTriggers(
       int,
       scopedContext,
+      applyDefaultSourceCardToFlow(alternative.flow, alternative.sourceCard),
+    ))
+}
+
+export const isActionStrictlyDoableWithoutBeforeTriggers = (
+  int: EngineInternals,
+  context: ActionExecutionContext & Partial<Pick<ActionHookContext, 'transactionEvents' | 'eventQuery'>>,
+  actionId: string,
+): boolean => {
+  const actionContext = {
+    ...(context.actionContext ?? {}),
+    skipBeforeTriggers: true,
+  }
+  const strictContext = { ...context, actionContext, actionId }
+  const replaceResult = int.hooks.applyComputeReplace(strictContext)
+  const action = int.registry.get(replaceResult.actionId)
+  if (!action) return false
+  const replacedContext = {
+    ...strictContext,
+    actionId: replaceResult.actionId,
+    sourceCard: replaceResult.sourceCard ?? context.sourceCard,
+  }
+  const direct = int.hooks.applyIsDoable(
+    replacedContext,
+    action,
+    action.canBeExecutedByPlayer(context.state, context.player, {
+      sourceCard: replacedContext.sourceCard,
+      actionContext,
+    }),
+  )
+  if (direct) return true
+  return replaceResult.alternatives.some((alternative) =>
+    canStartFlowWithoutBeforeTriggers(
+      int,
+      context,
       applyDefaultSourceCardToFlow(alternative.flow, alternative.sourceCard),
     ))
 }

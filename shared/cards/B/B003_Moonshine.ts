@@ -14,11 +14,18 @@ const cardImpl = {
   effect: {
   id: CARD_ID,
 
-  onBuy: (state, player) => {
+  onBuy: (state, player, _paymentInfo, ctx) => {
     if (player.occupationHand.length === 0) return
 
     // Roll and cache via Task-1.1 helper (writes to extraData.occ).
-    rollAndCacheCardPick(state, player, CARD_ID, KEY_OCC, player.occupationHand)
+    rollAndCacheCardPick(
+      state,
+      player,
+      CARD_ID,
+      KEY_OCC,
+      player.occupationHand,
+      ctx?.reportProtectedObservation,
+    )
 
     state.pendingUndoBoundary = true
 
@@ -66,6 +73,12 @@ const cardImpl = {
     if (choice === 'pass') {
       const result = passOccupationToNextPlayer(state, player, pick)
       if (result.cardId) {
+        if (result.target === 'next') {
+          ctx.reportProtectedObservation?.({
+            kind: 'hidden-information',
+            recipientPlayerIds: [result.targetPlayerId],
+          })
+        }
         ctx.emitPrivateEvent?.(cardEffectHandChangedEvent(
           result.fromPlayerId,
           [result.cardId],

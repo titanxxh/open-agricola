@@ -1,4 +1,4 @@
-import type { ActionChoiceOption, ActionDefinition, ActionExecutionResult, ActionFlow, ChoiceEffectPreview, GameState, OrdinaryCardType, PlayerState, Resource } from '../contract/types'
+import type { ActionChoiceOption, ActionDefinition, ActionExecutionContext, ActionExecutionResult, ActionFlow, ChoiceEffectPreview, GameState, OrdinaryCardType, PlayerState, Resource } from '../contract/types'
 import { animalKeysForState, type AnimalKey } from '../contract/animals'
 import { countUnusedFarmyardSpaces } from '../domain/farm'
 import { computeAnimalZones } from '../domain/animal-zones'
@@ -406,6 +406,7 @@ const applyComplexFatherReward = (
   fatherId: FatherParentCardId,
   reward: FatherReward,
   choice: string,
+  reportProtectedObservation?: ActionExecutionContext['reportProtectedObservation'],
 ): ActionExecutionResult | null => {
   const houseMaterial = houseMaterialReward(reward)
   if (houseMaterial !== null) {
@@ -426,6 +427,7 @@ const applyComplexFatherReward = (
         count: 3,
         sourceCard: fatherId,
         sourceActionId: COMPLETE_PARENT_FATHER_ACTION_ID,
+        reportProtectedObservation,
       })
       if (!started.ok) return { type: 'fail', errorKey: 'log.actionUnavailable' }
     }
@@ -496,7 +498,7 @@ export const completeParentFatherAction: ActionDefinition = {
       sourceCard: fatherId,
     }
   },
-  resolveChoice: ({ state, player }, choice) => {
+  resolveChoice: ({ state, player, reportProtectedObservation }, choice) => {
     const fatherId = player.parentCards.father
     if (!fatherId) return { type: 'fail', errorKey: 'log.actionUnavailable' }
     const [choiceFatherId, tierText] = choice.split(':')
@@ -509,7 +511,14 @@ export const completeParentFatherAction: ActionDefinition = {
     if (!selected || selected.reward.tier !== tier) return { type: 'fail', errorKey: 'log.actionUnavailable' }
     const simple = simpleFatherRewardFlow(fatherId, selected.reward)
     if (simple) return { type: 'flow', flow: simple }
-    const complex = applyComplexFatherReward(state, player, fatherId, selected.reward, choice)
+    const complex = applyComplexFatherReward(
+      state,
+      player,
+      fatherId,
+      selected.reward,
+      choice,
+      reportProtectedObservation,
+    )
     if (complex === null) {
       return { type: 'fail', errorKey: 'log.actionUnavailable' }
     }

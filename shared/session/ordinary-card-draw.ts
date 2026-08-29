@@ -1,5 +1,6 @@
 import type { PrivateGameEvent } from '../contract/private-events'
 import type {
+  ActionExecutionContext,
   GameState,
   OrdinaryCardDrawChoice,
   OrdinaryCardType,
@@ -13,6 +14,7 @@ type StartOrdinaryCardDrawChoiceInput = {
   count: number
   sourceCard?: string
   sourceActionId?: string
+  reportProtectedObservation?: ActionExecutionContext['reportProtectedObservation']
 }
 
 type ResolveOrdinaryCardDrawChoiceInput = {
@@ -55,6 +57,10 @@ export const startOrdinaryCardDrawChoice = (
     ...(input.sourceActionId ? { sourceActionId: input.sourceActionId } : {}),
   }
   state.ordinaryCardDrawChoices[choice.id] = choice
+  input.reportProtectedObservation?.({
+    kind: 'hidden-information',
+    recipientPlayerIds: [player.id],
+  })
   return { ok: true, choice }
 }
 

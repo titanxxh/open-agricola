@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 import { setWorkersAtHome } from '../../shared/domain/player'
-import { rehydrateState, serializeState } from '../../shared/session/serialization'
+import { rehydrateState, serializeSessionSnapshot } from '../../shared/session/serialization'
 import { EXTRA_CROP_PLACEMENT_CONTEXT_KEY, isExtraCropPlacementActionContext } from '../../shared/actions/helpers/extra-crop-placement-context'
 
 import '../../shared/cards/C/C069_LandConsolidation'
@@ -103,7 +103,7 @@ describe('C069_LandConsolidation session', () => {
     const session = setupC69ExtraCropSession('B115_TinsmithMaster')
     driveSowUntilExtraCropPrompt(session)
 
-    const serialized = serializeState(session.getState().state, { engineStack: session.getEngineStack() })
+    const serialized = serializeSessionSnapshot(session.getState().state, session)
     const restored = new GameSession(rehydrateState(JSON.parse(JSON.stringify(serialized))))
     const envelope = restored.getEngineStack().peekPendingEnvelope() as
       | ({ contextSnapshot?: { actionContext?: Record<string, unknown> } } & Record<string, unknown>)

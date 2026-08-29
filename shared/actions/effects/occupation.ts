@@ -1,4 +1,4 @@
-import type { ActionChoiceOption, ActionDefinition, ActionExecutionResult, ActionSpace, ComplexCost, GameState, InternalActionChild, InternalActionChildren, PaymentSolution, PlayerState, Resource } from '../../contract/types'
+import type { ActionChoiceOption, ActionDefinition, ActionExecutionResult, ActionSpace, ComplexCost, GameState, InternalActionChild, InternalActionChildren, PaymentSolution, PlayerState, ProtectedObservation, Resource } from '../../contract/types'
 import type { EventSink } from '../../contract/events'
 import { getOccupation } from '../../cards/registry-display'
 import { runCardListeners } from '../../cards/card-listeners'
@@ -165,8 +165,15 @@ const commitOccupationPlay = (
   actionContext?: Record<string, unknown>,
   emitPrivateEvent?: (event: ReturnType<typeof cardEffectHandChangedEvent>) => void,
   eventSink?: EventSink,
+  reportProtectedObservation?: (observation: ProtectedObservation) => void,
 ): Extract<ActionExecutionResult, { type: 'ok' }> => {
   const wasInHand = player.occupationHand.includes(occupationId)
+  if (wasInHand) {
+    reportProtectedObservation?.({
+      kind: 'hidden-information',
+      recipientPlayerIds: state.players.map((entry) => entry.id),
+    })
+  }
   applyOccupationPlay(state, player, occupationId)
   const handChangeSourceCard = readPrivateHandChangeSourceCard(actionContext, occupationId)
   if (wasInHand && handChangeSourceCard) {
@@ -558,7 +565,13 @@ export const playOccupationAction: ActionDefinition = {
       ),
     }
   },
-  completeInternalChildren: ({ state, player, emitPrivateEvent, eventSink }, result, internalResults) => {
+  completeInternalChildren: ({
+    state,
+    player,
+    emitPrivateEvent,
+    eventSink,
+    reportProtectedObservation,
+  }, result, internalResults) => {
     const data = readOccupationCommitData(result)
     if (!data) return result
     const paymentInfo = paymentInfoFromPayResult(internalResults.payment)
@@ -571,6 +584,7 @@ export const playOccupationAction: ActionDefinition = {
       data.actionContext,
       emitPrivateEvent,
       eventSink,
+      reportProtectedObservation,
     )
   },
 }

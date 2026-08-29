@@ -25,7 +25,15 @@ export const drawOrdinaryCardsAction: ActionDefinition = {
     const count = readCount(context?.actionContext)
     return cardType !== null && count !== null && state.ordinaryCardDecks[cardType].length > 0
   },
-  execute: ({ state, player, params, sourceCard, actionContext, emitPrivateEvent }) => {
+  execute: ({
+    state,
+    player,
+    params,
+    sourceCard,
+    actionContext,
+    emitPrivateEvent,
+    reportProtectedObservation,
+  }) => {
     const mergedParams = { ...(actionContext ?? {}), ...(params ?? {}) }
     const cardType = readCardType(mergedParams)
     const count = readCount(mergedParams)
@@ -34,6 +42,10 @@ export const drawOrdinaryCardsAction: ActionDefinition = {
     const deck = state.ordinaryCardDecks[cardType]
     const drawn = deck.splice(0, Math.min(count, deck.length))
     if (drawn.length === 0) return { type: 'ok' }
+    reportProtectedObservation?.({
+      kind: 'hidden-information',
+      recipientPlayerIds: [player.id],
+    })
 
     const hand = handFor(player, cardType)
     hand.push(...drawn)

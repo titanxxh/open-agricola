@@ -21,9 +21,15 @@ const jsonSnapshot = (state: GameState, player: PlayerState): string =>
 
 const readFlowEffectContext = (
   params?: Record<string, unknown>,
+  reportProtectedObservation?: FlowEffectContext['reportProtectedObservation'],
 ): FlowEffectContext | undefined =>
-  typeof params?.triggerActionId === 'string'
-    ? { triggerActionId: params.triggerActionId }
+  typeof params?.triggerActionId === 'string' || reportProtectedObservation
+    ? {
+        ...(typeof params?.triggerActionId === 'string'
+          ? { triggerActionId: params.triggerActionId }
+          : {}),
+        ...(reportProtectedObservation ? { reportProtectedObservation } : {}),
+      }
     : undefined
 
 export const activateCardEffect = (
@@ -82,7 +88,7 @@ export const activateCardEffectAction: ActionDefinition = {
   roundAvailable: 1,
   gainPerRound: {},
   canBeExecutedByPlayer: () => true,
-  execute: ({ state, player, params, actionContext }) => {
+  execute: ({ state, player, params, actionContext, reportProtectedObservation }) => {
     const cardId = params?.cardId
     const hook = params?.hook
     if (typeof cardId !== 'string' || typeof hook !== 'string') {
@@ -99,7 +105,7 @@ export const activateCardEffectAction: ActionDefinition = {
       cardId,
       hook as FlowCardEffectHook,
       paymentInfo,
-      readFlowEffectContext(params),
+      readFlowEffectContext(params, reportProtectedObservation),
     )
   },
 }

@@ -1,4 +1,4 @@
-import type { ActionFlow, FarmTilePosition, GameState, Pasture, PaymentResourceMap, PlayerState, Resource, ResourceKey } from '../contract/types'
+import type { ActionFlow, FarmTilePosition, GameState, Pasture, PaymentResourceMap, PlayerState, ProtectedObservation, Resource, ResourceKey } from '../contract/types'
 import type { PrivateGameEvent } from '../contract/private-events'
 import type { AnimalZone, PlayerScoreSummary, ScoreCategoryResult } from '../domain'
 import { getCurrentSessionContext } from './session-card-context'
@@ -208,16 +208,26 @@ export const cardEffectHooks: CardEffectField[] = [
   'getBuiltSpecialStables',
 ]
 
-type FlowEffectHandler = (state: GameState, player: PlayerState) => ActionFlow | void
+type FlowEffectHandler = (
+  state: GameState,
+  player: PlayerState,
+  ctx?: FlowEffectContext,
+) => ActionFlow | void
 export type FlowEffectContext = {
   triggerActionId?: string
+  reportProtectedObservation?: (observation: ProtectedObservation) => void
 }
 type FlowEffectHandlerWithContext = (
   state: GameState,
   player: PlayerState,
   ctx?: FlowEffectContext,
 ) => ActionFlow | void
-type FlowEffectHandlerWithPayment = (state: GameState, player: PlayerState, paymentInfo?: PaymentInfo) => ActionFlow | void
+type FlowEffectHandlerWithPayment = (
+  state: GameState,
+  player: PlayerState,
+  paymentInfo?: PaymentInfo,
+  ctx?: FlowEffectContext,
+) => ActionFlow | void
 export type BeforeEndGameScope = 'owner' | 'allPlayers'
 
 export type ResolveChoiceHandler = (
@@ -228,6 +238,7 @@ export type ResolveChoiceHandler = (
     sourceCard: string
     actionContext?: Record<string, unknown>
     emitPrivateEvent?: (event: PrivateGameEvent) => void
+    reportProtectedObservation?: (observation: ProtectedObservation) => void
   },
 ) => ActionFlow | void
 
@@ -420,12 +431,12 @@ export const runCardEffectHook = (
   if (!handler) return null
   try {
     if (hook === 'onBuy') {
-      return (handler as FlowEffectHandlerWithPayment)(state, player, paymentInfo) ?? null
+      return (handler as FlowEffectHandlerWithPayment)(state, player, paymentInfo, ctx) ?? null
     }
     if (hook === 'onEndTurn') {
       return (handler as FlowEffectHandlerWithContext)(state, player, ctx) ?? null
     }
-    return (handler as FlowEffectHandler)(state, player) ?? null
+    return (handler as FlowEffectHandler)(state, player, ctx) ?? null
   } catch (err) {
     if (isCustomCard(cardId)) {
       console.warn(`[card-effects] custom card ${cardId} hook "${hook}" threw, skipping:`, err)

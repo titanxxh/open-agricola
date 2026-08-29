@@ -20,8 +20,15 @@ const passLeftLeaf = (): ActionFlow => ({
 const cardImpl = {
   effect: {
     id: CARD_ID,
-    onStartHarvest: (state, player) => {
-      const pick = rollAndCacheCardPick(state, player, CARD_ID, `harvest-${state.round}`, moorStartCardIds)
+    onStartHarvest: (state, player, ctx) => {
+      const pick = rollAndCacheCardPick(
+        state,
+        player,
+        CARD_ID,
+        `harvest-${state.round}`,
+        moorStartCardIds,
+        ctx?.reportProtectedObservation,
+      )
       state.pendingUndoBoundary = true
       const children: ActionFlow[] = []
       if (startCardNumber(pick) <= (player.resources.clay ?? 0)) {

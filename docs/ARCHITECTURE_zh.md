@@ -172,7 +172,7 @@ Undo 的 runtime `publicEventCancellations` 是同步响应 metadata，不写入
 
 首版只允许 `visibility: 'public'` 的规则事件进入 `GameState.events`。私有 prompt、手牌、draft、living-hand 等 per-recipient 信息不写入公共事件流，仍通过 snapshot/privacy/pending 通道处理。`privateEvents` 是独立的 per-viewer 同步附加层：只描述当前快照中目标玩家可见的私有提示和私有手牌/draft 更新（例如 `private.promptShown`、`private.handChanged`、`private.draftUpdated`），由客户端消费为短暂 UI 通知，不进入公共 replay 事件流，也不作为规则来源。卡牌效果导致的手牌变化通过 runtime-only response buffer 发出 `private.handChanged`，不写入 `ActionExecutionResult`、engine snapshot/history 或 `GameState.events`。
 
-`SerializedGameState` 是 `GameState` 的 JSON 网络/持久化形态，权威持久化快照携带 `engineStack: EngineStackCursor` 便于跨进程恢复引擎光标。任何 `filterSerializedStateForPlayer` 玩家/旁观者视图都把 `engineStack` 清为空；客户端不消费该恢复游标，交互请求走独立的 viewer-safe pending 协议，避免 cursor 内的其他玩家 choice 数据泄漏。同步版本号 / 历史 / 房间连接 **不进** `GameState`。
+`SerializedGameState` 是 `GameState` 的公共网络与 Replay 形态，其中 `engineStack` 始终为空。`PersistedSessionSnapshot` 分开保存权威 `state`、公共 `frame` 和服务端私有 `sessionCursor`；私有 cursor 包含跨进程恢复所需的 Engine 数据、history 和 provisional continuation 元数据，绝不进入玩家或旁观者 payload。交互请求走独立的 viewer-safe pending 协议，避免其他玩家的 choice 数据泄漏。同步版本号和房间连接 **不进** `GameState`。
 
 ### 4.3 PlayerState（按职责分组）
 
@@ -409,7 +409,7 @@ type EngineFrame = {
 
 API：`push / pop / current / depth / peekPendingEnvelope / peekPendingHost / toCursor`。
 
-`EngineStackCursor` 序列化成 `SerializedGameState.engineStack`，恢复路径：`engine.snapshot()` → 各 concrete node cursor restore 重建节点树并定位 pending host / traversal state。
+`EngineStackCursor` 序列化到 `PersistedSessionSnapshot.sessionCursor.engineStackCursor`。恢复路径为 `engine.snapshot()` → 各 concrete node cursor restore 重建节点树并定位 pending host / traversal state；公共和 Replay 使用的 `SerializedGameState.engineStack` 始终为空。
 
 收获后窗口在 `SubFlowReason` 和 `PendingSyntheticKind` 中都使用 `post-reap-anytime`，因此 Session 能区分它的根 choice 与嵌套卡牌 choice，而不需要单卡分支。
 
@@ -809,6 +809,10 @@ OA 对齐规则：
 **2026-05-15 replacement-aware trigger pass:** before-action trigger-select 的 pass gate 不能只看 base action `canBeExecutedByPlayer`，也不能套完整 `applyIsDoable`，否则会把同批 before unlocker 自己当成可跳过依据。当前规则是：先用 `skipBeforeTriggers=true` 检查原 action 是否能直接继续；失败时只允许通用 `computeReplace` fallback 参与 continuation 判断，并在可启动性预览里用 `checkedReplaceAction=true` 避免 replacement 递归。这覆盖 B26 Agrarian Fences 这类"跳过 D66 后仍可继续 fencing replacement"的路径，同时不在 engine 中硬编码卡牌 id。所有 declined `computeReplace` alternative 都按 listener ID 确定顺序保留；每个顶层 `xor` 按原顺序展开后再追加 original action 分支。运行时 replacement 分支只跳过自身 producer 与继承 guard，nested action 仍可使用 sibling replacement；它不携带 `checkedReplaceAction`，普通 before / after listener 继续运行。original fallback 的 `checkedReplaceAction=true` 只禁止再次计算 replacement。
 
 **2026-05-22 before-reachability 决策：** 多个同一时机的 `before` listener 不是 availability 阶段可静态排序或预览的链路；它们属于真实 trigger 流程，顺序由玩家通过 `ParallelNode(mode='trigger-select')` 执行。卡牌如果能让原本不可达的 action 先进入 before 流程，应通过 scoped `isDoable` listener 返回 `doable: true` 表达启动 opt-in，并在 `actionContext.skipBeforeTriggers === true` 的 continuation 中退出。所有 before listener 和它们触发的 after / exchange / optional 分支真实执行完以后，原 action leaf 必须用真实 state 重新做 strict doable 检查；如果仍不可达，不能继续原 action，只能走现有 blocked / undo-only 语义。不要为 before-grant reachability 添加单卡 payment preview，也不要在 dispatcher 中枚举 before listener 顺序或静态模拟资源 / 转换链。参考模型是 C60 Small Potter's Oven / D66 Potter Ceramics / `STUB_BeforeBakeGainClay`：先让 action 进入 trigger-select，玩家按真实顺序执行 unlocker，剩余 trigger 与 pass gate 基于新状态重算，最终 continuation 再严格检查。
+
+**2026-08-29 Provisional Continuation 结算：** 每个公开的 `GameCore` 写命令只经过一次原子 settlement，使用规范化命令身份和完整的命令入口 checkpoint。未完成的 mandatory host 在 `before` 链中首次切换响应玩家或产生 Protected Observation 时，Session 在该命令 checkpoint 开启 Provisional Continuation Scope。Scope 按 Engine 提供的 mandatory-host ancestry 嵌套：同一 host 复用 scope，嵌套 host 建立 child；child abort 只恢复自身 checkpoint，未 guarded parent abort 会恢复整个子树。每个命令边界都以 `skipBeforeTriggers=true` strict-probe 所有 active host；成功后建立 guard，后续破坏 guard 的命令在发布前恢复。activation descendants 只抑制产生它的那个 `before` listener，其他 listener 仍可形成真正的 nested host。
+
+随机与隐藏信息通用原语把 observation 报告给当前 settlement。只有所有 active ancestor 都 guarded 时命令才可发布；否则 GameState、Engine/Session cursor、事件、隐藏区域和 RNG 一并恢复到命令入口，并记住规范化失败命令，直到规则相关状态真正变化。成功的 provisional 命令，以及需要持久化失败记忆的拒绝命令，携带内部 durable-transition 标记；即使公开 Frame hash 未变化，`RoomCommitter` 仍记录 Replay Step。持久化明确分离 authoritative `state`、公开/回放 `frame` 和私有 `sessionCursor`：scope ancestry、rollback checkpoint、guard 与失败记忆可在恢复后继续，但不会进入 viewer payload 或 Replay Frame。Scope abort 只追加一条 rollback log 和一个新的恢复 Frame，不重写旧 Step。详见 ADR 0015。
 
 ### 7.8 farm-type 提交
 

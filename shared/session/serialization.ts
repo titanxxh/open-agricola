@@ -9,7 +9,8 @@ import type {
 } from '../contract/types'
 import type { FatherParentCardId, MotherParentCardId } from '../parents/types'
 import type { PublicEventCancellation } from '../contract/protocol/game'
-import type { EngineStack, EngineStackCursor } from '../engine'
+import type { EngineStackCursor } from '../engine'
+import type { SessionPrivateCursor, StateWithCursor } from './session-core'
 import { createActionSpaces } from '../actions'
 import { normalizeState } from '../session/state-bootstrap'
 import { getCardModifiers } from '../cards/card-modifiers'
@@ -64,7 +65,25 @@ export type SerializedGameState = Omit<
 }
 
 export type SerializeStateContext = {
-  engineStack: EngineStack
+  engineStack?: unknown
+}
+
+export type SerializedAuthoritativeGameState = Omit<
+  GameState,
+  'actionSpaces' | 'roundStartSnapshot'
+> & {
+  actionSpaces: SerializedActionSpace[]
+  roundStartSnapshot: SerializedAuthoritativeGameState | null
+}
+
+export type PersistedSessionSnapshot = {
+  state: SerializedAuthoritativeGameState
+  frame: SerializedGameState
+  sessionCursor: SessionPrivateCursor
+}
+
+export type SessionCursorSource = {
+  createSessionPrivateCursor(): SessionPrivateCursor
 }
 
 const serializeAnimalZone = (zone: AnimalZone): InteractionAnimalReorgZone => {
@@ -135,7 +154,7 @@ const collectFarmCardAnimalZones = (
 
 export const serializeState = (
   state: GameState,
-  ctx: SerializeStateContext,
+  _ctx: SerializeStateContext,
 ): SerializedGameState => {
   const { actionSpaces, players, ...rest } = state
   return {
@@ -153,9 +172,18 @@ export const serializeState = (
       // eslint-disable-next-line @typescript-eslint/no-unused-vars
       ({ canBeExecutedByPlayer, execute, resolveChoice, flow, ...s }) => s,
     ),
-    engineStack: ctx.engineStack.toCursor(),
+    engineStack: { frames: [] },
   }
 }
+
+export const serializeSessionSnapshot = (
+  state: GameState,
+  session: SessionCursorSource,
+): PersistedSessionSnapshot => ({
+  state: JSON.parse(JSON.stringify(state)) as SerializedAuthoritativeGameState,
+  frame: serializeState(state, {}),
+  sessionCursor: session.createSessionPrivateCursor(),
+})
 
 const hiddenHandCardIdsByPlayer = (
   players: readonly PlayerState[],
@@ -783,17 +811,18 @@ export const rebuildActiveModifiers = (state: GameState): GameState => {
   return state
 }
 
-export type RehydratedState = {
-  state: GameState
-  engineStackCursor: EngineStackCursor
-}
+export type RehydratedState = StateWithCursor
 
-export const rehydrateState = (raw: SerializedGameState): RehydratedState => {
+export const rehydrateState = (
+  input: SerializedGameState | PersistedSessionSnapshot,
+): RehydratedState => {
+  const persisted = 'state' in input && 'frame' in input && 'sessionCursor' in input ? input : null
+  const raw = (persisted?.state ?? input) as SerializedGameState
   const templates = [
     ...createActionSpaces(raw.players?.length),
     ...(raw.enableThroughTheSeasons ? createSeasonActionSpaces(raw.players?.length) : []),
   ]
-  const { engineStack, players, ...rest } = raw
+  const { engineStack: _engineStack, players, ...rest } = raw
   // Strip snapshot-only display projections so they never
   // leaks into the authoritative `PlayerState` domain shape.
   const rawWithoutCursor = {
@@ -832,6 +861,6 @@ export const rehydrateState = (raw: SerializedGameState): RehydratedState => {
   }
   return {
     state: restored,
-    engineStackCursor: engineStack ?? { frames: [] },
+    ...(persisted ? { sessionCursor: persisted.sessionCursor } : {}),
   }
 }

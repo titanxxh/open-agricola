@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { rollAndCacheCardPick } from '../card-random'
-import type { GameState, PlayerState } from '../../../contract/types'
+import type { GameState, PlayerState, ProtectedObservation } from '../../../contract/types'
 
 const mkPlayer = (): PlayerState => ({
   id: 'p1', name: 'P1',
@@ -33,6 +33,21 @@ describe('rollAndCacheCardPick', () => {
     const pick2 = rollAndCacheCardPick(state, player, 'CARD', 'k', candidates)
     expect(pick2).toBe(pick1)
     expect(state.rngTick).toBe(1)
+  })
+
+  it('reports only the first random result', () => {
+    const state = mkState(42)
+    const player = mkPlayer()
+    const observations: ProtectedObservation[] = []
+    const report = (observation: ProtectedObservation) => observations.push(observation)
+
+    rollAndCacheCardPick(state, player, 'CARD', 'k', ['a', 'b'], report)
+    rollAndCacheCardPick(state, player, 'CARD', 'k', ['a', 'b'], report)
+
+    expect(observations).toEqual([{
+      kind: 'random',
+      recipientPlayerIds: ['p1'],
+    }])
   })
 
   it('advances rngTick when a different key is rolled', () => {

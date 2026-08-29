@@ -1,4 +1,4 @@
-import type { ActionFlow, GameState, PlayerState } from '../../contract/types'
+import type { ActionFlow, GameState, PlayerState, ProtectedObservation } from '../../contract/types'
 
 export type SelectionEffectContext = {
   player: PlayerState
@@ -9,6 +9,7 @@ export type SelectionEffectContext = {
   sourceCard: string | undefined
   state: GameState
   actionContext?: Record<string, unknown>
+  reportProtectedObservation?: (observation: ProtectedObservation) => void
 }
 
 export type SelectionEffectHandler = (

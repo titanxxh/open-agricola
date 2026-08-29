@@ -6,9 +6,9 @@ import type {
   RoomSnapshot,
   RestoreOptions,
 } from './room-persistence.ts'
-import type { SerializedGameState } from '../../../shared/session/serialization.ts'
+import type { PersistedSessionSnapshot } from '../../../shared/session/serialization.ts'
 
-type Row = { serialized: SerializedGameState | null; meta: RoomMeta; updatedAt: number }
+type Row = { serialized: PersistedSessionSnapshot | null; meta: RoomMeta; updatedAt: number }
 
 const copyMeta = (meta: RoomMeta): RoomMeta => ({
   ...meta,
@@ -32,7 +32,7 @@ export class InMemoryRoomPersistence implements RoomPersistence {
     }
   }
 
-  save(id: string, serialized: SerializedGameState | null, meta: RoomMeta): void {
+  save(id: string, serialized: PersistedSessionSnapshot | null, meta: RoomMeta): void {
     const existing = this.rooms.get(id)
     this.rooms.set(id, {
       serialized: serialized === null ? (existing?.serialized ?? null) : serialized,

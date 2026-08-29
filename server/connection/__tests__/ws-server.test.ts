@@ -132,7 +132,7 @@ describe('fixed dev room startup persistence', () => {
     try {
       wsServerResult.checkpoint.flushAll()
       const snap = persistence.load('dev2')
-      expect(snap?.serialized).toMatchObject({
+      expect(snap?.serialized?.state).toMatchObject({
         enableFarmersOfTheMoor: true,
       })
       expect(snap?.meta).toMatchObject({

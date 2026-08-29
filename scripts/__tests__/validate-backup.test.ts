@@ -160,9 +160,14 @@ describe('backup validation', () => {
     const { db } = createFixture()
     const snapshot = new SqliteRoomPersistence(db).load('room-1')!
     const incompatibleFrame = {
-      ...snapshot.serialized,
+      ...snapshot.serialized!.frame,
       players: null,
     } as unknown as JsonValue
+    const incompatibleSnapshot = {
+      ...snapshot.serialized!,
+      state: { ...snapshot.serialized!.state, players: null },
+      frame: incompatibleFrame,
+    }
     const encoded = encodeReplayFrame({
       frame: incompatibleFrame,
       previousFrame: null,
@@ -170,7 +175,7 @@ describe('backup validation', () => {
       previousCheckpointStepNo: 0,
     })
     db.prepare("UPDATE rooms SET state_json = ? WHERE id = 'room-1'")
-      .run(JSON.stringify(incompatibleFrame))
+      .run(JSON.stringify(incompatibleSnapshot))
     db.prepare(`
       UPDATE game_replay_steps
       SET checkpoint_step_no = 1,

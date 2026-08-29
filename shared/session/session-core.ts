@@ -20,6 +20,7 @@ import type {
   InteractionState,
   ParentSelectionSubmission,
   PlayerState,
+  ProtectedObservation,
   Resource,
   ResourceKey,
   InteractionAnimalReorgZone,
@@ -52,6 +53,7 @@ import {
   HookDispatcher,
   LogStore,
   isSyntheticInteractionFrame,
+  type MandatoryContinuationProbe,
 } from '../engine/index.ts'
 import { isInjectedAnytimeResult, tagInjectedAnytimeFlow } from '../engine/action-context-flags.ts'
 import type { EngineFrame, EngineSource, EngineStackCursor, SubFlowReason } from '../engine/index.ts'
@@ -301,7 +303,7 @@ const futureMeepleActionCount = (
   key: FutureMeepleActionKey,
 ): number => Math.max(0, Math.floor(entry.resources?.[key] ?? 0))
 
-type HistoryEntry = {
+export type HistoryEntry = {
   state: GameState
   /**
    * Pending-shape discriminator at the moment of the snapshot. Only the
@@ -321,7 +323,7 @@ type HistoryEntry = {
   undoBoundary?: boolean
 }
 
-type SessionCommandCheckpoint = {
+export type SessionCommandCheckpoint = {
   state: GameState
   engineStackCursor: EngineStackCursor
   history: HistoryEntry[]
@@ -336,8 +338,107 @@ type SessionCommandCheckpoint = {
   cardWarningCount: number
 }
 
+export type NormalizedAuthoritativeCommand = {
+  type: string
+  key: string
+}
+
+export type FailedAuthoritativeCommand = {
+  commandKey: string
+  interactionKey: string
+  ruleStateKey: string
+  bindingFrameId?: string
+}
+
+export type ProvisionalContinuationScope = {
+  id: string
+  frameId: string
+  hostNodeId: string
+  parentScopeId?: string
+  checkpoint: SessionCommandCheckpoint
+  rollbackCommand: NormalizedAuthoritativeCommand
+  rollbackInteractionKey: string
+  failedCommandsAtCheckpoint: FailedAuthoritativeCommand[]
+  guarded: boolean
+}
+
+type ActiveCommandSettlement = {
+  command: NormalizedAuthoritativeCommand
+  checkpoint: SessionCommandCheckpoint
+  interactionKey: string
+  scopeSnapshot: ProvisionalContinuationScope[]
+  failedCommandSnapshot: FailedAuthoritativeCommand[]
+  protectedObservations: ProtectedObservation[]
+  provisional: boolean
+  abortScopeId?: string
+}
+
+export type SessionPrivateCursor = Omit<SessionCommandCheckpoint, 'state'> & {
+  provisionalContinuationScopes: ProvisionalContinuationScope[]
+  failedAuthoritativeCommands: FailedAuthoritativeCommand[]
+  nextProvisionalScopeId: number
+}
+
+const canonicalValue = (value: unknown): unknown => {
+  if (Array.isArray(value)) return value.map(canonicalValue)
+  if (!value || typeof value !== 'object') return value
+  return Object.fromEntries(
+    Object.entries(value as Record<string, unknown>)
+      .filter(([, entry]) => entry !== undefined && typeof entry !== 'function')
+      .sort(([left], [right]) => left.localeCompare(right))
+      .map(([key, entry]) => [key, canonicalValue(entry)]),
+  )
+}
+
+const canonicalJson = (value: unknown): string => JSON.stringify(canonicalValue(value))
+
+const cloneCommandValue = <T>(value: T): T => {
+  if (Array.isArray(value)) return value.map((entry) => cloneCommandValue(entry)) as T
+  if (!value || typeof value !== 'object') return value
+  return Object.fromEntries(
+    Object.entries(value as Record<string, unknown>)
+      .map(([key, entry]) => [key, cloneCommandValue(entry)]),
+  ) as T
+}
+
+const commandValuesEqual = (left: unknown, right: unknown): boolean => {
+  if (Object.is(left, right)) return true
+  if (Array.isArray(left) || Array.isArray(right)) {
+    return Array.isArray(left) && Array.isArray(right) &&
+      left.length === right.length &&
+      left.every((entry, index) => commandValuesEqual(entry, right[index]))
+  }
+  if (!left || !right || typeof left !== 'object' || typeof right !== 'object') return false
+  const leftEntries = Object.entries(left)
+  const rightRecord = right as Record<string, unknown>
+  return leftEntries.length === Object.keys(rightRecord).length &&
+    leftEntries.every(([key, entry]) =>
+      Object.hasOwn(rightRecord, key) && commandValuesEqual(entry, rightRecord[key]))
+}
+
+const normalizedCommand = (
+  type: string,
+  playerIndex: number | null,
+  payload?: unknown,
+): NormalizedAuthoritativeCommand => ({
+  type,
+  key: canonicalJson({ type, playerIndex, payload }),
+})
+
+const ruleStateKey = (state: GameState): string => {
+  const {
+    log: _log,
+    publicEventArchive: _publicEventArchive,
+    nextEventSeq: _nextEventSeq,
+    nextPublicEventArchivePacketSeq: _nextPublicEventArchivePacketSeq,
+    ...rules
+  } = state
+  return canonicalJson(rules)
+}
+
 export type SessionResponse = {
   ok: boolean
+  durableTransition?: boolean
   state: GameState
   interaction: InteractionState
   historyLength: number
@@ -378,7 +479,7 @@ type PublicEventCancellationPlan = {
  */
 export type StateWithCursor = {
   state: GameState
-  engineStackCursor: EngineStackCursor
+  sessionCursor?: SessionPrivateCursor
 }
 
 const isStateWithCursor = (value: unknown): value is StateWithCursor => {
@@ -386,12 +487,13 @@ const isStateWithCursor = (value: unknown): value is StateWithCursor => {
   const v = value as Record<string, unknown>
   return (
     'state' in v &&
-    'engineStackCursor' in v &&
     typeof v.state === 'object' &&
     v.state !== null &&
-    typeof v.engineStackCursor === 'object' &&
-    v.engineStackCursor !== null &&
-    Array.isArray((v.engineStackCursor as { frames?: unknown }).frames)
+    (!('sessionCursor' in v) || (
+      typeof v.sessionCursor === 'object' &&
+      v.sessionCursor !== null &&
+      Array.isArray((v.sessionCursor as { engineStackCursor?: { frames?: unknown } }).engineStackCursor?.frames)
+    ))
   )
 }
 
@@ -477,6 +579,11 @@ export class GameCore {
    */
   private nextActionToken = 1
   private turnOwnerPlayerIndex: number | null = null
+  private provisionalContinuationScopes: ProvisionalContinuationScope[] = []
+  private failedAuthoritativeCommands: FailedAuthoritativeCommand[] = []
+  private activeCommandSettlement: ActiveCommandSettlement | null = null
+  private commandSettlementDepth = 0
+  private nextProvisionalScopeId = 1
 
   // ─────────────────────────────────────────────────────────────────────
   // S2 Tasks 9-12: internal accessor / mutator API for phase mixins.
@@ -709,6 +816,7 @@ export class GameCore {
           this.deferPrivateEventDrainDepth -= 1
         }
       },
+      reportProtectedObservation: (observation) => this.reportProtectedObservation(observation),
     }, {
       onBeforeHarvest: (stageResume) => { this.continueHarvestFromBeforeHarvest(stageResume.playerIndex, stageResume.cardIndex) },
       harvestPrepWindow: (stageResume) => { this.continueHarvestPrepWindow(stageResume.playerIndex) },
@@ -807,7 +915,7 @@ export class GameCore {
       if (isStateWithCursor(stateOrSeed)) {
         this.state = normalizeState(stateOrSeed.state)
         this.syncDynamicActionSpaces()
-        this.restoreEngineStackFromCursor(stateOrSeed.engineStackCursor)
+        if (stateOrSeed.sessionCursor) this.restoreSessionPrivateCursor(stateOrSeed.sessionCursor)
         return
       }
       this.state = normalizeState(stateOrSeed)
@@ -841,9 +949,32 @@ export class GameCore {
     return this.engineStack
   }
 
+  createSessionPrivateCursor(): SessionPrivateCursor {
+    const { state: _state, ...runtime } = this.createCommandCheckpoint()
+    return JSON.parse(JSON.stringify({
+      ...runtime,
+      provisionalContinuationScopes: this.provisionalContinuationScopes,
+      failedAuthoritativeCommands: this.failedAuthoritativeCommands,
+      nextProvisionalScopeId: this.nextProvisionalScopeId,
+    })) as SessionPrivateCursor
+  }
+
+  restoreSessionPrivateCursor(cursor: SessionPrivateCursor): void {
+    const {
+      provisionalContinuationScopes,
+      failedAuthoritativeCommands,
+      nextProvisionalScopeId,
+      ...runtime
+    } = structuredClone(cursor)
+    this.restoreCommandCheckpoint({ state: this.state, ...runtime })
+    this.provisionalContinuationScopes = provisionalContinuationScopes
+    this.failedAuthoritativeCommands = failedAuthoritativeCommands
+    this.nextProvisionalScopeId = nextProvisionalScopeId
+  }
+
   createCommandCheckpoint(): SessionCommandCheckpoint {
     return this.withCtx(() => ({
-      state: cloneState(this.state),
+      state: cloneCommandValue(this.state),
       engineStackCursor: structuredClone(this.engineStack.toCursor()),
       history: this.history.slice(),
       actionStartIndex: this.actionStartIndex,
@@ -862,8 +993,18 @@ export class GameCore {
 
   restoreCommandCheckpoint(checkpoint: SessionCommandCheckpoint): void {
     this.withCtx(() => {
-      this.state = cloneState(checkpoint.state)
-      this.syncDynamicActionSpaces()
+      if (!commandValuesEqual(this.state, checkpoint.state)) {
+        this.state = cloneCommandValue(checkpoint.state)
+        for (const space of this.state.actionSpaces) {
+          const definition = this.registry.get(space.id)
+          if (!definition) continue
+          space.canBeExecutedByPlayer ??= definition.canBeExecutedByPlayer
+          space.execute ??= definition.execute
+          space.resolveChoice ??= definition.resolveChoice
+          space.flow ??= definition.flow
+        }
+        this.syncDynamicActionSpaces()
+      }
       this.engineStack.clear()
       if (checkpoint.engineStackCursor.frames.length > 0) {
         this.restoreEngineStackFromCursor(checkpoint.engineStackCursor)
@@ -938,6 +1079,298 @@ export class GameCore {
   /** Run a function with this session's card context active. */
   withCtx<T>(fn: () => T): T {
     return withActiveRegistry(this.cardRegistry, () => withSessionContext(this.sessionCardContext, fn))
+  }
+
+  private currentInteractionKey(): string {
+    const frame = this.engineStack.current()
+    const view = this.engineStack.peekPendingView()
+    const cursor = this.engineStack.peekPendingCursor()
+    return canonicalJson({
+      phase: this.state.phase,
+      currentPlayerIndex: this.state.currentPlayerIndex,
+      frameId: frame?.frameId,
+      frameReason: frame?.reason,
+      hostNodeId: cursor?.hostNodeId,
+      pendingActionId: cursor?.pendingActionId,
+      requestKind: view?.request.kind,
+      promptKey: view?.promptKey,
+      effectiveOwnerPlayerId: view?.effectiveOwnerPlayerId,
+    })
+  }
+
+  private refreshFailedAuthoritativeCommands(): string | null {
+    if (this.failedAuthoritativeCommands.length === 0) return null
+    const currentRuleStateKey = ruleStateKey(this.state)
+    const activeFrameIds = new Set(
+      this.engineStack.allFrames().flatMap((frame) => frame.frameId ? [frame.frameId] : []),
+    )
+    this.failedAuthoritativeCommands = this.failedAuthoritativeCommands.filter(
+      (entry) => entry.ruleStateKey === currentRuleStateKey &&
+        (!entry.bindingFrameId || activeFrameIds.has(entry.bindingFrameId)),
+    )
+    return currentRuleStateKey
+  }
+
+  private isFailedAuthoritativeCommand(command: NormalizedAuthoritativeCommand): boolean {
+    if (this.failedAuthoritativeCommands.length === 0) return false
+    const currentRuleStateKey = this.refreshFailedAuthoritativeCommands()
+    const interactionKey = this.currentInteractionKey()
+    return this.failedAuthoritativeCommands.some((entry) =>
+      entry.commandKey === command.key &&
+      entry.interactionKey === interactionKey &&
+      entry.ruleStateKey === currentRuleStateKey,
+    )
+  }
+
+  private rememberFailedAuthoritativeCommand(
+    command: NormalizedAuthoritativeCommand,
+    interactionKey = this.currentInteractionKey(),
+  ): void {
+    const bindingFrameId = this.engineStack.current()?.frameId
+    const entry = {
+      commandKey: command.key,
+      interactionKey,
+      ruleStateKey: ruleStateKey(this.state),
+      ...(bindingFrameId ? { bindingFrameId } : {}),
+    }
+    if (!this.failedAuthoritativeCommands.some((candidate) =>
+      candidate.commandKey === entry.commandKey &&
+      candidate.interactionKey === entry.interactionKey &&
+      candidate.ruleStateKey === entry.ruleStateKey,
+    )) {
+      this.failedAuthoritativeCommands.push(entry)
+    }
+  }
+
+  private canInterleaveAnytimeAction(): boolean {
+    return this.provisionalContinuationScopes.every((scope) => !scope.guarded)
+  }
+
+  private runAuthoritativeCommand(
+    type: string,
+    playerIndex: number | null,
+    payload: unknown,
+    run: () => SessionResponse,
+  ): SessionResponse {
+    return this.withCtx(() => {
+      if (this.commandSettlementDepth > 0) return run()
+      const command = normalizedCommand(type, playerIndex, payload)
+      if (type === 'anytime' && !this.canInterleaveAnytimeAction()) {
+        return this.respond(false, 'anytime action unavailable during mandatory continuation')
+      }
+      if (this.isFailedAuthoritativeCommand(command)) {
+        return this.respond(false, 'command unavailable until game state changes')
+      }
+      const settlement: ActiveCommandSettlement = {
+        command,
+        checkpoint: this.createCommandCheckpoint(),
+        interactionKey: this.currentInteractionKey(),
+        scopeSnapshot: this.provisionalContinuationScopes.map((scope) => ({
+          ...scope,
+          failedCommandsAtCheckpoint: scope.failedCommandsAtCheckpoint.map((entry) => ({ ...entry })),
+        })),
+        failedCommandSnapshot: this.failedAuthoritativeCommands.map((entry) => ({ ...entry })),
+        protectedObservations: [],
+        provisional: this.provisionalContinuationScopes.length > 0,
+      }
+      this.activeCommandSettlement = settlement
+      this.commandSettlementDepth = 1
+      try {
+        const response = run()
+        const warnings = this.cardWarnings.slice(settlement.checkpoint.cardWarningCount)
+        if (warnings.length > 0) {
+          this.restoreCommandCheckpoint(settlement.checkpoint)
+          this.provisionalContinuationScopes = settlement.scopeSnapshot
+          this.failedAuthoritativeCommands = settlement.failedCommandSnapshot
+          this.cardWarnings.push(...warnings)
+          return this.respond(false, warnings.join('; '))
+        }
+        return this.settleAuthoritativeCommand(response, settlement)
+      } catch (error) {
+        const warnings = this.cardWarnings.slice(settlement.checkpoint.cardWarningCount)
+        this.restoreCommandCheckpoint(settlement.checkpoint)
+        this.provisionalContinuationScopes = settlement.scopeSnapshot
+        this.failedAuthoritativeCommands = settlement.failedCommandSnapshot
+        this.cardWarnings.push(...warnings)
+        throw error
+      } finally {
+        this.activeCommandSettlement = null
+        this.commandSettlementDepth = 0
+      }
+    })
+  }
+
+  private mandatoryContinuationProbes(): Array<MandatoryContinuationProbe & { frameId: string }> {
+    const probes: Array<MandatoryContinuationProbe & { frameId: string }> = []
+    for (const frame of this.engineStack.allFrames()) {
+      if (!frame.frameId) continue
+      const space = this.getSpaceById(frame.spaceId) ?? this.createSyntheticSpace(frame.spaceId)
+      const ownerPlayerId = this.state.players[frame.ownerPlayerIndex]?.id
+      if (!ownerPlayerId) continue
+      probes.push(...frame.engine.probeMandatoryContinuations(
+        this.state,
+        space,
+        ownerPlayerId,
+      ).map((probe) => ({ ...probe, frameId: frame.frameId! })))
+    }
+    return probes
+  }
+
+  private openProvisionalScopesForRisk(): void {
+    const settlement = this.activeCommandSettlement
+    if (!settlement) return
+    const probes = this.mandatoryContinuationProbes()
+    const byHost = new Map(probes.map((probe) => [`${probe.frameId}:${probe.nodeId}`, probe]))
+    const depth = (probe: MandatoryContinuationProbe & { frameId: string }): number => {
+      let current = probe
+      let result = 0
+      const seen = new Set<string>()
+      while (current.parentHostNodeId) {
+        const key = `${current.frameId}:${current.parentHostNodeId}`
+        if (seen.has(key)) break
+        seen.add(key)
+        const parent = byHost.get(key)
+        if (!parent) break
+        result += 1
+        current = parent
+      }
+      return result
+    }
+    probes.sort((left, right) => depth(left) - depth(right))
+    for (const probe of probes) {
+      if (this.provisionalContinuationScopes.some((scope) =>
+        scope.frameId === probe.frameId && scope.hostNodeId === probe.nodeId,
+      )) continue
+      const directParent = probe.parentHostNodeId
+        ? this.provisionalContinuationScopes.find((scope) =>
+            scope.frameId === probe.frameId && scope.hostNodeId === probe.parentHostNodeId,
+          )
+        : undefined
+      const parentScope = directParent
+      this.provisionalContinuationScopes.push({
+        id: `provisional-scope-${this.nextProvisionalScopeId++}`,
+        frameId: probe.frameId,
+        hostNodeId: probe.nodeId,
+        ...(parentScope ? { parentScopeId: parentScope.id } : {}),
+        checkpoint: settlement.checkpoint,
+        rollbackCommand: settlement.command,
+        rollbackInteractionKey: settlement.interactionKey,
+        failedCommandsAtCheckpoint: settlement.failedCommandSnapshot.map((entry) => ({ ...entry })),
+        guarded: probe.strictDoable,
+      })
+      settlement.provisional = true
+    }
+  }
+
+  private reportProtectedObservation(observation: ProtectedObservation): void {
+    if (!this.activeCommandSettlement) return
+    this.openProvisionalScopesForRisk()
+    this.activeCommandSettlement.protectedObservations.push(structuredClone(observation))
+  }
+
+  private markProvisionalHostBlocked(frame: EngineFrame, nodeId: string): boolean {
+    const scope = this.provisionalContinuationScopes.find((entry) =>
+      entry.frameId === frame.frameId && entry.hostNodeId === nodeId,
+    )
+    if (!scope || !this.activeCommandSettlement) return false
+    this.activeCommandSettlement.abortScopeId = scope.id
+    return true
+  }
+
+  private rejectCurrentCommand(settlement: ActiveCommandSettlement): SessionResponse {
+    this.restoreCommandCheckpoint(settlement.checkpoint)
+    this.provisionalContinuationScopes = settlement.scopeSnapshot
+    this.failedAuthoritativeCommands = settlement.failedCommandSnapshot
+    this.rememberFailedAuthoritativeCommand(settlement.command, settlement.interactionKey)
+    return {
+      ...this.respond(false, 'command would break a mandatory continuation'),
+      durableTransition: true,
+    }
+  }
+
+  private abortProvisionalScope(scope: ProvisionalContinuationScope): SessionResponse {
+    const removed = new Set([scope.id])
+    let changed = true
+    while (changed) {
+      changed = false
+      for (const candidate of this.provisionalContinuationScopes) {
+        if (candidate.parentScopeId && removed.has(candidate.parentScopeId) && !removed.has(candidate.id)) {
+          removed.add(candidate.id)
+          changed = true
+        }
+      }
+    }
+    const retained = this.provisionalContinuationScopes.filter((candidate) => !removed.has(candidate.id))
+    this.restoreCommandCheckpoint(scope.checkpoint)
+    const restoredProbes = new Map(this.mandatoryContinuationProbes().map((probe) => [
+      `${probe.frameId}:${probe.nodeId}`,
+      probe,
+    ]))
+    this.provisionalContinuationScopes = retained.flatMap((candidate) => {
+      const probe = restoredProbes.get(`${candidate.frameId}:${candidate.hostNodeId}`)
+      return probe ? [{ ...candidate, guarded: probe.strictDoable }] : []
+    })
+    this.failedAuthoritativeCommands = scope.failedCommandsAtCheckpoint.map((entry) => ({ ...entry }))
+    this.rememberFailedAuthoritativeCommand(scope.rollbackCommand, scope.rollbackInteractionKey)
+    this.state.log.unshift({ key: 'log.provisionalContinuationRollback' })
+    return this.respond()
+  }
+
+  private settleAuthoritativeCommand(
+    response: SessionResponse,
+    settlement: ActiveCommandSettlement,
+  ): SessionResponse {
+    if (settlement.abortScopeId) {
+      const scope = this.provisionalContinuationScopes.find((entry) => entry.id === settlement.abortScopeId)
+      if (scope) {
+        return scope.guarded
+          ? this.rejectCurrentCommand(settlement)
+          : this.abortProvisionalScope(scope)
+      }
+    }
+    const probes = new Map(this.mandatoryContinuationProbes().map((probe) => [
+      `${probe.frameId}:${probe.nodeId}`,
+      probe,
+    ]))
+    const completedScopeIds = new Set<string>()
+    for (const scope of this.provisionalContinuationScopes) {
+      const probe = probes.get(`${scope.frameId}:${scope.hostNodeId}`)
+      if (!probe) {
+        completedScopeIds.add(scope.id)
+        continue
+      }
+      if (probe.strictDoable) {
+        scope.guarded = true
+      } else if (scope.guarded) {
+        return this.rejectCurrentCommand(settlement)
+      }
+    }
+    if (
+      settlement.protectedObservations.length > 0 &&
+      this.provisionalContinuationScopes.some((scope) => !scope.guarded)
+    ) {
+      return this.rejectCurrentCommand(settlement)
+    }
+    if (completedScopeIds.size > 0) {
+      this.provisionalContinuationScopes = this.provisionalContinuationScopes
+        .filter((scope) => !completedScopeIds.has(scope.id))
+        .map((scope) => scope.parentScopeId && completedScopeIds.has(scope.parentScopeId)
+          ? { ...scope, parentScopeId: undefined }
+          : scope)
+    }
+    this.refreshFailedAuthoritativeCommands()
+    if (!settlement.provisional) return response
+    return {
+      ...this.respond(
+        response.ok,
+        response.error,
+        response.privateEvents,
+        response.publicEventCancellations
+          ? { publicEventCancellations: response.publicEventCancellations }
+          : {},
+      ),
+      durableTransition: response.ok || response.durableTransition === true,
+    }
   }
 
   /** Dispose of session resources. Call when replacing or removing a session. */
@@ -1116,6 +1549,7 @@ export class GameCore {
 
   /** S2 Task 10: thin delegator retained because internal handlers still call it. */
   private startConfirmPlayerSwitch(fromPlayerIndex: number, toPlayerIndex: number): void {
+    this.openProvisionalScopesForRisk()
     roundPhase.startConfirmPlayerSwitch(this, fromPlayerIndex, toPlayerIndex)
   }
   private startFeedSubFlow(
@@ -1593,6 +2027,7 @@ export class GameCore {
   }
 
   private buildAnytimeEntries(options: { preScoringOnly?: boolean; nestedWindow?: boolean } = {}): { descriptor: AnytimeAction; flow: ActionFlow }[] {
+    if (!this.canInterleaveAnytimeAction()) return []
     if (hasPendingOrdinaryCardDrawChoice(this.state)) return []
     const policy = this.computeAnytimePolicySnapshot()
     if (!policy.allowed) return []
@@ -1876,6 +2311,8 @@ export class GameCore {
       player,
       space,
       emitPrivateEvent: (event: PrivateGameEvent) => this.emitResponsePrivateEvent(event),
+      reportProtectedObservation: (observation: ProtectedObservation) =>
+        this.reportProtectedObservation(observation),
     }
   }
 
@@ -3150,6 +3587,7 @@ export class GameCore {
       this.flushEngineLog()
 
       if (step.type === 'blocked' && step.mandatory === true && step.actionId) {
+        if (this.markProvisionalHostBlocked(frame, step.nodeId)) return
         this.engineStack.clearDeferredPlayerSwitch()
         const pendingSet = frame.engine.setEngineBlockedPending(step.nodeId, step.actionId)
         if (!pendingSet) throw new Error(`missing mandatory blocked engine node: ${step.nodeId}`)
@@ -3478,7 +3916,14 @@ export class GameCore {
     const player = this.state.players[playerIndex]
     if (!player) return []
     return this.state.actionSpaces
-      .filter((space) => this.isActionSpaceAvailableToPlayer(player, space))
+      .filter((space) =>
+        this.isActionSpaceAvailableToPlayer(player, space) &&
+        !this.isFailedAuthoritativeCommand(normalizedCommand(
+          'action',
+          playerIndex,
+          { spaceId: space.id },
+        )),
+      )
       .map((space) => ({ spaceId: space.id, nameKey: space.nameKey }))
   }
 
@@ -3493,13 +3938,21 @@ export class GameCore {
   private getActionAvailabilityInContext(playerIndex: number): Record<string, boolean> {
     const player = this.state.players[playerIndex]
     if (!player) return {}
-    return computeActionEntryAvailability(this.state, player, {
+    const availability = computeActionEntryAvailability(this.state, player, {
       isActionDoable: (space, baseDoable) => this.hookDispatcher.applyIsDoable(
         { state: this.state, player, space, actionId: space.id },
         space,
         baseDoable,
       ),
     })
+    for (const spaceId of Object.keys(availability)) {
+      if (this.isFailedAuthoritativeCommand(normalizedCommand(
+        'action',
+        playerIndex,
+        { spaceId },
+      ))) availability[spaceId] = false
+    }
+    return availability
   }
 
   getCardAvailability(
@@ -3583,7 +4036,12 @@ export class GameCore {
   }
 
   takeAction(playerIndex: number, spaceId: string): SessionResponse {
-    return this.withCtx(() => roundPhase.takeAction(this, playerIndex, spaceId))
+    return this.runAuthoritativeCommand(
+      'action',
+      playerIndex,
+      { spaceId },
+      () => roundPhase.takeAction(this, playerIndex, spaceId),
+    )
   }
 
   takeSpecialAction(
@@ -3592,12 +4050,22 @@ export class GameCore {
     actionId: MoorSpecialActionId,
     payload?: MoorSpecialActionPayload,
   ): SessionResponse {
-    return this.withCtx(() => roundPhase.takeSpecialAction(this, playerIndex, cardId, actionId, payload))
+    return this.runAuthoritativeCommand(
+      'specialAction',
+      playerIndex,
+      { cardId, actionId, payload },
+      () => roundPhase.takeSpecialAction(this, playerIndex, cardId, actionId, payload),
+    )
   }
 
   /** S2 Task 10 part 4: thin delegator — body lives in `phases/round.ts`. */
   takeAnytimeAction(playerIndex: number, actionId: string): SessionResponse {
-    return this.withCtx(() => roundPhase.takeAnytimeAction(this, playerIndex, actionId))
+    return this.runAuthoritativeCommand(
+      'anytime',
+      playerIndex,
+      { actionId },
+      () => roundPhase.takeAnytimeAction(this, playerIndex, actionId),
+    )
   }
 
   resolveOrdinaryCardDrawChoice(
@@ -3605,15 +4073,22 @@ export class GameCore {
     choiceId: string,
     keepCardId: string,
   ): SessionResponse {
-    const player = this.state.players[playerIndex]
-    if (!player) return this.respond(false, 'invalid player')
-    const result = resolveOrdinaryCardDrawChoice(this.state, {
-      playerId: player.id,
-      choiceId,
-      keepCardId,
-    })
-    if (!result.ok) return this.respond(false, result.error)
-    return this.respond(true, undefined, result.privateEvents)
+    return this.runAuthoritativeCommand(
+      'ordinaryDrawKeep',
+      playerIndex,
+      { choiceId, keepCardId },
+      () => {
+        const player = this.state.players[playerIndex]
+        if (!player) return this.respond(false, 'invalid player')
+        const result = resolveOrdinaryCardDrawChoice(this.state, {
+          playerId: player.id,
+          choiceId,
+          keepCardId,
+        })
+        if (!result.ok) return this.respond(false, result.error)
+        return this.respond(true, undefined, result.privateEvents)
+      },
+    )
   }
 
   private resolveEngineChoice(
@@ -3676,6 +4151,7 @@ export class GameCore {
           sourceCard: pendingSourceCard,
           actionContext: pendingActionContext,
           emitPrivateEvent: (event) => this.emitResponsePrivateEvent(event),
+          reportProtectedObservation: (observation) => this.reportProtectedObservation(observation),
         })
         if (cardFlow && this.engine) {
           // Insert the follow-up so it runs after the engine finishes resolving the choice.
@@ -3743,7 +4219,12 @@ export class GameCore {
     value: string,
     payload?: Record<string, unknown>,
   ): SessionResponse {
-    return this.withCtx(() => this.resolveChoiceInContext(playerIndex, value, payload))
+    return this.runAuthoritativeCommand(
+      'choice',
+      playerIndex,
+      { value, payload },
+      () => this.resolveChoiceInContext(playerIndex, value, payload),
+    )
   }
 
   private resolveChoiceInContext(
@@ -3785,6 +4266,15 @@ export class GameCore {
   }
 
   startDevFenceSelect(playerIndex: number): SessionResponse {
+    return this.runAuthoritativeCommand(
+      'devFenceSelect',
+      playerIndex,
+      {},
+      () => this.startDevFenceSelectInContext(playerIndex),
+    )
+  }
+
+  private startDevFenceSelectInContext(playerIndex: number): SessionResponse {
     if (this.state.gameOver) return this.respond(false, 'game is over')
     if (playerIndex !== this.state.currentPlayerIndex) return this.respond(false, 'not your turn')
     const player = this.state.players[playerIndex]
@@ -4084,7 +4574,7 @@ export class GameCore {
 
   /** S2 Task 10 part 7: thin delegator — body lives in `phases/round.ts`. */
   performRoundEnd(): SessionResponse {
-    return this.withCtx(() => {
+    return this.runAuthoritativeCommand('performRoundEnd', null, {}, () => {
       if (!roundPhase.roundWorkComplete(this.state)) return this.respond(false, 'not all workers used')
       if (this.peekEnginePendingEnvelope()) return this.respond(false, 'pending action exists')
       return this.continueAllWorkersPlacedHooks()
@@ -4292,10 +4782,27 @@ export class GameCore {
    */
   /** S2 Task 12 part 2: thin delegator — body lives in `phases/draft.ts`. */
   submitDraftPick(playerId: string, pick: DraftPickPayload): SessionResponse {
-    return draftPhase.submitDraftPick(this, playerId, pick)
+    return this.runAuthoritativeCommand(
+      'draftPick',
+      this.state.players.findIndex((player) => player.id === playerId),
+      { playerId, pick },
+      () => draftPhase.submitDraftPick(this, playerId, pick),
+    )
   }
 
   submitParentSelection(
+    playerIndex: number,
+    submission: ParentSelectionSubmission,
+  ): SessionResponse {
+    return this.runAuthoritativeCommand(
+      'parentSelection',
+      playerIndex,
+      submission,
+      () => this.submitParentSelectionInContext(playerIndex, submission),
+    )
+  }
+
+  private submitParentSelectionInContext(
     playerIndex: number,
     submission: ParentSelectionSubmission,
   ): SessionResponse {
@@ -4310,15 +4817,15 @@ export class GameCore {
   }
 
   loadState(raw: unknown): SessionResponse {
-    return this.withCtx(() => this.loadStateInContext(raw))
+    return this.runAuthoritativeCommand('loadState', null, {}, () => this.loadStateInContext(raw))
   }
 
   private loadStateInContext(raw: unknown): SessionResponse {
     let nextState: GameState
-    let cursor: EngineStackCursor | null = null
+    let cursor: SessionPrivateCursor | null = null
     if (isStateWithCursor(raw)) {
       nextState = raw.state
-      cursor = raw.engineStackCursor
+      cursor = raw.sessionCursor ?? null
     } else {
       nextState = raw as GameState
     }
@@ -4330,10 +4837,12 @@ export class GameCore {
     this.engineStack.clear()
     this.history = []
     this.actionStartIndex = null
+    this.actionStartPlayerSnapshot = null
     this.turnOwnerPlayerIndex = null
-    if (cursor && cursor.frames.length > 0) {
-      this.restoreEngineStackFromCursor(cursor)
-    }
+    this.provisionalContinuationScopes = []
+    this.failedAuthoritativeCommands = []
+    this.nextProvisionalScopeId = 1
+    if (cursor) this.restoreSessionPrivateCursor(cursor)
     return this.respond()
   }
 
@@ -4477,7 +4986,12 @@ export class GameCore {
     playerIndex: number,
     payload: SelectionCommitPayload,
   ): SessionResponse {
-    return this.withCtx(() => this.commitSelectionChoiceInContext(playerIndex, payload))
+    return this.runAuthoritativeCommand(
+      'commitSelection',
+      playerIndex,
+      payload,
+      () => this.commitSelectionChoiceInContext(playerIndex, payload),
+    )
   }
 
   private commitSelectionChoiceInContext(
@@ -4645,6 +5159,15 @@ export class GameCore {
   }
 
   devSetResources(playerIndex: number, resources: Record<string, number>): SessionResponse {
+    return this.runAuthoritativeCommand(
+      'devSetResources',
+      playerIndex,
+      resources,
+      () => this.devSetResourcesInContext(playerIndex, resources),
+    )
+  }
+
+  private devSetResourcesInContext(playerIndex: number, resources: Record<string, number>): SessionResponse {
     const player = this.state.players[playerIndex]
     if (!player) return this.respond(false, 'player not found')
     const animalKeys = new Set(animalKeysForState(this.state))
@@ -4664,16 +5187,20 @@ export class GameCore {
   }
 
   devSetRound(round: number): SessionResponse {
-    this.state.round = round
-    return this.respond()
+    return this.runAuthoritativeCommand('devSetRound', null, { round }, () => {
+      this.state.round = round
+      return this.respond()
+    })
   }
 
   devSetCurrentPlayer(playerIndex: number): SessionResponse {
-    if (playerIndex < 0 || playerIndex >= this.state.players.length) {
-      return this.respond(false, 'invalid player index')
-    }
-    this.state.currentPlayerIndex = playerIndex
-    return this.respond()
+    return this.runAuthoritativeCommand('devSetCurrentPlayer', playerIndex, {}, () => {
+      if (playerIndex < 0 || playerIndex >= this.state.players.length) {
+        return this.respond(false, 'invalid player index')
+      }
+      this.state.currentPlayerIndex = playerIndex
+      return this.respond()
+    })
   }
 
   private isOccupationCard(cardId: string): boolean {
@@ -4709,6 +5236,15 @@ export class GameCore {
   }
 
   devDrawCard(playerIndex: number, cardIdInput: string): SessionResponse {
+    return this.runAuthoritativeCommand(
+      'devDrawCard',
+      playerIndex,
+      { cardId: cardIdInput },
+      () => this.devDrawCardInContext(playerIndex, cardIdInput),
+    )
+  }
+
+  private devDrawCardInContext(playerIndex: number, cardIdInput: string): SessionResponse {
     const player = this.state.players[playerIndex]
     if (!player) return this.respond(false, 'player not found')
     const cardId = resolveDevCardIdInput(cardIdInput)
@@ -4725,6 +5261,12 @@ export class GameCore {
     } else {
       player.minorHand.push(cardId)
     }
+    if (!isMajor) {
+      this.reportProtectedObservation({
+        kind: 'hidden-information',
+        recipientPlayerIds: [player.id],
+      })
+    }
     const events = isMajor ? [] : [
       {
         schemaVersion: 1 as const,
@@ -4739,7 +5281,12 @@ export class GameCore {
   }
 
   devPlayCard(playerIndex: number, cardIdInput: string): SessionResponse {
-    return this.withCtx(() => this.devPlayCardInContext(playerIndex, cardIdInput))
+    return this.runAuthoritativeCommand(
+      'devPlayCard',
+      playerIndex,
+      { cardId: cardIdInput },
+      () => this.devPlayCardInContext(playerIndex, cardIdInput),
+    )
   }
 
   private devPlayCardInContext(playerIndex: number, cardIdInput: string): SessionResponse {
@@ -4770,7 +5317,9 @@ export class GameCore {
       }
     })
     // Trigger onBuy hook (creates PlayerActionCard action spaces, etc.)
-    runCardEffectHook(this.state, player, cardId, 'onBuy')
+    runCardEffectHook(this.state, player, cardId, 'onBuy', undefined, {
+      reportProtectedObservation: (observation) => this.reportProtectedObservation(observation),
+    })
     this.syncDynamicActionSpaces()
     const dynamicSpace = findActionSpaceById(this.state, cardId)
     if (dynamicSpace && getPlayerActionSpaceConfig(cardId)) {
@@ -4780,6 +5329,15 @@ export class GameCore {
   }
 
   devSetSpaceTaken(spaceId: string, playerId: string | null): SessionResponse {
+    return this.runAuthoritativeCommand(
+      'devSetSpaceTaken',
+      playerId ? this.state.players.findIndex((player) => player.id === playerId) : null,
+      { spaceId, playerId },
+      () => this.devSetSpaceTakenInContext(spaceId, playerId),
+    )
+  }
+
+  private devSetSpaceTakenInContext(spaceId: string, playerId: string | null): SessionResponse {
     const space = findActionSpaceById(this.state, spaceId)
     if (!space) return this.respond(false, 'space not found')
     if (!playerId) {
@@ -4794,6 +5352,15 @@ export class GameCore {
   }
 
   devAddRooms(playerIndex: number, rooms: FarmTilePosition[]): SessionResponse {
+    return this.runAuthoritativeCommand(
+      'devAddRooms',
+      playerIndex,
+      { rooms },
+      () => this.devAddRoomsInContext(playerIndex, rooms),
+    )
+  }
+
+  private devAddRoomsInContext(playerIndex: number, rooms: FarmTilePosition[]): SessionResponse {
     const player = this.state.players[playerIndex]
     if (!player) return this.respond(false, 'player not found')
     player.roomTiles = [...player.roomTiles, ...rooms]
@@ -4802,7 +5369,7 @@ export class GameCore {
   }
 
   undoStep(): SessionResponse {
-    return this.withCtx(() => this.undoStepInContext())
+    return this.runAuthoritativeCommand('undoStep', null, {}, () => this.undoStepInContext())
   }
 
   private undoStepInContext(): SessionResponse {
@@ -4884,7 +5451,7 @@ export class GameCore {
   }
 
   undoAction(): SessionResponse {
-    return this.withCtx(() => this.undoActionInContext())
+    return this.runAuthoritativeCommand('undoAction', null, {}, () => this.undoActionInContext())
   }
 
   private undoActionInContext(): SessionResponse {

@@ -4,8 +4,13 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type Database from 'better-sqlite3'
+import '../../../shared/cards/A/A132_Publican.ts'
 import '../../../shared/cards/C/C104_Collector.ts'
-import { serializeState } from '../../../shared/session/serialization.ts'
+import { requireActiveCardRegistry } from '../../../shared/cards/active-registry.ts'
+import type { CardListenerRegistration } from '../../../shared/cards/card-listeners.ts'
+import { setWorkersAtHome } from '../../../shared/domain/player.ts'
+import { serializeSessionSnapshot } from '../../../shared/session/serialization.ts'
+import { stabilizeRandomHands } from '../../__tests__/_helpers/stabilize-random-hands.ts'
 import { GameSession } from '../authoritative-session.ts'
 import { encodeReplayFrame, type JsonValue } from '../replay-codec.ts'
 import { ReplayStore } from '../replay-store.ts'
@@ -27,6 +32,49 @@ const makeRoom = (id = 'room-1'): Room => ({
   status: 'playing',
   startedAt: 100,
 })
+
+const registerNestedConstructHelper = (session: GameSession): void => {
+  const cardId = '__TEST_room_nested_construct_helper__'
+  const state = session.getState().state
+  state.players[1]!.occupationPlayed.push(cardId)
+  session.loadState(state)
+  const isDoable: CardListenerRegistration = {
+    id: '__TEST_room_nested_construct_is_doable__',
+    cardIds: [cardId],
+    actions: ['construct'],
+    phases: ['isDoable'],
+    scope: 'opponent',
+    handler: (context) => context.actionContext?.skipBeforeTriggers === true
+      ? undefined
+      : { doable: true },
+  }
+  const before: CardListenerRegistration = {
+    id: '__TEST_room_nested_construct_before__',
+    cardIds: [cardId],
+    actions: ['construct'],
+    phases: ['before'],
+    scope: 'opponent',
+    handler: (context) => ({
+      sourceCard: cardId,
+      flow: {
+        type: 'leaf',
+        actionId: 'gain',
+        optional: true,
+        sourceCard: cardId,
+        params: {
+          clay: 3,
+          reed: 1,
+          recipientPlayerId: context.triggerPlayer?.id ?? context.player.id,
+        },
+      },
+    }),
+  }
+  session.withCtx(() => {
+    const registry = requireActiveCardRegistry('nested Room recovery test')
+    registry.registerListener(isDoable)
+    registry.registerListener(before)
+  })
+}
 
 const actionIntent = replayIntentFromCommand({
   type: 'action',
@@ -259,12 +307,233 @@ describe('RoomCommitter', () => {
     ])
   })
 
+  it('persists provisional recovery privately and records abort as a new replay Step', () => {
+    const room = makeRoom()
+    const state = room.session.getState().state
+    stabilizeRandomHands(state.players)
+    state.currentPlayerIndex = 1
+    state.round = 1
+    state.roundActionOrder = state.roundActionOrder.map(() => null)
+    state.roundActionOrder[0] = 'grain-utilization'
+    state.players[0]!.occupationPlayed.push('A132_Publican')
+    state.players[0]!.resources.grain = 1
+    state.players[1]!.resources.grain = 0
+    state.players[1]!.fields = [{ row: 0, col: 0, stacks: [] }]
+    room.session.loadState(state)
+    const committer = createCommitter()
+    committer.prepareRoom(room, { missingPrefix: false })
+
+    const actionResponse = room.session.takeAction(1, 'grain-utilization')
+    expect(committer.commit(
+      room,
+      actionResponse,
+      replayIntentFromCommand({ type: 'action', spaceId: 'grain-utilization' })!,
+      1,
+    )).toMatchObject({ kind: 'committed', stepNo: 1 })
+
+    const rejectedDraw = room.session.devDrawCard(1, 'A001_Shelter')
+    expect(rejectedDraw).toMatchObject({ ok: false, durableTransition: true })
+    expect(committer.commit(
+      room,
+      rejectedDraw,
+      replayIntentFromCommand({
+        type: 'devDrawCard',
+        playerIndex: 1,
+        cardId: 'A001_Shelter',
+      })!,
+      1,
+    )).toMatchObject({ kind: 'committed', stepNo: 2 })
+
+    const activeSnapshot = persistence.load(room.id)!
+    expect(activeSnapshot.serialized?.sessionCursor.provisionalContinuationScopes)
+      .toHaveLength(1)
+    expect(activeSnapshot.serialized?.sessionCursor.failedAuthoritativeCommands)
+      .toHaveLength(1)
+    expect(activeSnapshot.serialized?.state.players[1]!.minorHand)
+      .not.toContain('A001_Shelter')
+    expect(JSON.stringify(activeSnapshot.serialized?.frame))
+      .not.toMatch(/provisionalContinuationScopes|checkpoint|failedAuthoritativeCommands/)
+    expect(activeSnapshot.serialized?.frame.players[1]!.minorHand)
+      .not.toContain('A001_Shelter')
+    expect(room.session.buildSyncPayload(rejectedDraw, null, 'viewer').privateEvents)
+      .toBeUndefined()
+    expect(JSON.stringify(room.session.buildSyncPayload(actionResponse, null, 'viewer')))
+      .not.toMatch(/provisionalContinuationScopes|checkpoint|failedAuthoritativeCommands/)
+
+    const restored = snapshotToRoom(activeSnapshot)
+    expect(committer.prepareRoom(restored, { missingPrefix: true })).toMatchObject({
+      kind: 'committed',
+      stepNo: 2,
+    })
+    expect(restored.session.createSessionPrivateCursor().provisionalContinuationScopes)
+      .toHaveLength(1)
+    const repeatedDraw = restored.session.devDrawCard(1, 'A001_Shelter')
+    expect(repeatedDraw).toMatchObject({ ok: false })
+    expect(repeatedDraw.durableTransition).toBeUndefined()
+
+    const commitChoice = (playerIndex: number, value: string) => {
+      const response = restored.session.resolveChoice(playerIndex, value)
+      expect(response.ok).toBe(true)
+      expect(committer.commit(
+        restored,
+        response,
+        replayIntentFromCommand({ type: 'choice', value })!,
+        playerIndex,
+      ).kind).toBe('committed')
+      return response
+    }
+    let response = restored.session.getState()
+    while (
+      response.interaction.stateId === 'wait' &&
+      response.interaction.request.kind === 'confirm-player-switch'
+    ) {
+      response = commitChoice(response.interaction.request.toPlayerIndex, 'confirm')
+    }
+    expect(response.interaction.stateId === 'wait' ? response.interaction.sourceCard : undefined)
+      .toBe('A132_Publican')
+    const provisionalStepNo = persistence.loadReplayHead(room.id)!.latestStepNo
+
+    response = commitChoice(0, '__skip__')
+    while (
+      response.interaction.stateId === 'wait' &&
+      response.interaction.request.kind === 'confirm-player-switch'
+    ) {
+      response = commitChoice(response.interaction.request.toPlayerIndex, 'confirm')
+    }
+
+    const finalSnapshot = persistence.load(room.id)!
+    const finalStepNo = persistence.loadReplayHead(room.id)!.latestStepNo
+    const steps = db.prepare(`
+      SELECT step_no FROM game_replay_steps WHERE room_id = ? ORDER BY step_no
+    `).all(room.id) as Array<{ step_no: number }>
+    expect(finalStepNo).toBeGreaterThan(provisionalStepNo)
+    expect(steps.map(({ step_no }) => step_no)).toEqual(
+      Array.from({ length: finalStepNo + 1 }, (_, index) => index),
+    )
+    expect(response.state.log.filter(
+      (entry) => entry.key === 'log.provisionalContinuationRollback',
+    )).toHaveLength(1)
+    expect(finalSnapshot.serialized?.sessionCursor.provisionalContinuationScopes).toEqual([])
+    expect(JSON.stringify(persistence.loadReplayFrame(room.id)))
+      .not.toMatch(/provisionalContinuationScopes|checkpoint|failedAuthoritativeCommands/)
+  })
+
+  it('restores nested scopes and records child abort without rewriting Replay', () => {
+    let room: Room = {
+      ...makeRoom('nested-room'),
+      session: new GameSession(7, undefined, { playerCount: 2 }),
+    }
+    const state = room.session.getState().state
+    stabilizeRandomHands(state.players)
+    state.currentPlayerIndex = 0
+    state.round = 6
+    for (const player of state.players) {
+      player.minorHand = ['__test_placeholder__']
+      player.occupationHand = ['__test_placeholder__']
+    }
+    const actor = state.players[0]!
+    actor.houseType = 'clay'
+    actor.rooms = 2
+    actor.roomTiles = [{ row: 1, col: 0 }, { row: 2, col: 0 }]
+    actor.resources = { ...actor.resources, clay: 0, reed: 0, stone: 2 }
+    actor.minorPlayed.push('D014_HammerCrusher')
+    setWorkersAtHome(state, actor, 2)
+    room.session.loadState(state)
+    registerNestedConstructHelper(room.session)
+
+    const committer = createCommitter()
+    expect(committer.prepareRoom(room, { missingPrefix: false })).toMatchObject({
+      kind: 'committed',
+      stepNo: 0,
+    })
+    const commit = (
+      response: ReturnType<GameSession['getState']>,
+      command: Parameters<typeof replayIntentFromCommand>[0],
+      playerIndex: number,
+    ) => {
+      expect(response.ok).toBe(true)
+      expect(committer.commit(
+        room,
+        response,
+        replayIntentFromCommand(command)!,
+        playerIndex,
+      ).kind).toBe('committed')
+      return response
+    }
+
+    let response = commit(
+      room.session.takeAction(0, 'house-redevelopment'),
+      { type: 'action', spaceId: 'house-redevelopment' },
+      0,
+    )
+    expect(response.interaction.stateId).toBe('wait')
+    if (response.interaction.stateId !== 'wait') throw new Error('expected Construct choice')
+    const construct = response.interaction.request.options.find(
+      (option) => option.value !== '__skip__',
+    )
+    commit(
+      room.session.resolveChoice(0, construct!.value),
+      { type: 'choice', value: construct!.value },
+      0,
+    )
+
+    const activeSnapshot = persistence.load(room.id)!
+    const activeScopes = activeSnapshot.serialized?.sessionCursor.provisionalContinuationScopes ?? []
+    expect(activeScopes).toHaveLength(2)
+    expect(activeScopes[1]!.parentScopeId).toBe(activeScopes[0]!.id)
+    expect(JSON.stringify(activeSnapshot.serialized?.frame))
+      .not.toMatch(/provisionalContinuationScopes|checkpoint|failedAuthoritativeCommands/)
+    const restored = snapshotToRoom(activeSnapshot)
+    expect(committer.prepareRoom(restored, { missingPrefix: true })).toMatchObject({
+      kind: 'committed',
+    })
+    room = restored
+    response = room.session.getState()
+    expect(response.interaction.stateId === 'wait' ? response.interaction.request.kind : undefined)
+      .toBe('confirm-player-switch')
+
+    if (response.interaction.stateId !== 'wait' || response.interaction.request.kind !== 'confirm-player-switch') {
+      throw new Error('expected player switch')
+    }
+    response = commit(
+      room.session.resolveChoice(response.interaction.request.toPlayerIndex, 'confirm'),
+      { type: 'choice', value: 'confirm' },
+      response.interaction.request.toPlayerIndex,
+    )
+    expect(response.interaction.stateId === 'wait' ? response.interaction.playerIndex : undefined)
+      .toBe(1)
+    response = commit(
+      room.session.resolveChoice(1, '__skip__'),
+      { type: 'choice', value: '__skip__' },
+      1,
+    )
+
+    expect(response.state.players[0]!.resources).toMatchObject({ clay: 2, reed: 1, stone: 2 })
+    expect(response.state.log.filter(
+      (entry) => entry.key === 'log.provisionalContinuationRollback',
+    )).toHaveLength(1)
+    expect(response.scores).toHaveLength(2)
+    const finalSnapshot = persistence.load(room.id)!
+    expect(finalSnapshot.serialized?.sessionCursor.provisionalContinuationScopes)
+      .toEqual([expect.objectContaining({ guarded: true })])
+    expect(finalSnapshot.serialized?.sessionCursor.failedAuthoritativeCommands).toHaveLength(1)
+    expect(JSON.stringify(persistence.loadReplayFrame(room.id)))
+      .not.toMatch(/provisionalContinuationScopes|checkpoint|failedAuthoritativeCommands/)
+    expect(snapshotToRoom(finalSnapshot).session.resolveChoice(0, construct!.value).ok).toBe(false)
+
+    const finalStepNo = persistence.loadReplayHead(room.id)!.latestStepNo
+    const steps = db.prepare(`
+      SELECT step_no FROM game_replay_steps WHERE room_id = ? ORDER BY step_no
+    `).all(room.id) as Array<{ step_no: number }>
+    expect(steps.map(({ step_no }) => step_no)).toEqual(
+      Array.from({ length: finalStepNo + 1 }, (_, index) => index),
+    )
+  })
+
   it('persists the serialized frame produced by the custom session worker', () => {
     const room = makeRoom()
-    let serialized = serializeState(room.session.state, {
-      engineStack: room.session.getEngineStack(),
-    })
-    serialized.players[0]!.pastureCapacities = { worker: 7 }
+    let serialized = serializeSessionSnapshot(room.session.state, room.session)
+    serialized.frame.players[0]!.pastureCapacities = { worker: 7 }
     room.customSessionExecutor = {
       serializedStateForPersistence: () => serialized,
     } as NonNullable<Room['customSessionExecutor']>
@@ -278,10 +547,8 @@ describe('RoomCommitter', () => {
       .toEqual({ worker: 7 })
 
     const response = room.session.devSetResources(0, { food: 1 })
-    serialized = serializeState(room.session.state, {
-      engineStack: room.session.getEngineStack(),
-    })
-    serialized.players[0]!.pastureCapacities = { worker: 8 }
+    serialized = serializeSessionSnapshot(room.session.state, room.session)
+    serialized.frame.players[0]!.pastureCapacities = { worker: 8 }
     expect(committer.commit(room, response, actionIntent!, 0)).toMatchObject({
       kind: 'committed',
       stepNo: 1,
@@ -310,9 +577,7 @@ describe('RoomCommitter', () => {
 
   it('uses worker-produced scores in the durable result archive', () => {
     const room = makeRoom()
-    const serialized = serializeState(room.session.state, {
-      engineStack: room.session.getEngineStack(),
-    })
+    const serialized = serializeSessionSnapshot(room.session.state, room.session)
     const workerScores = room.session.getState().scores!.map((score, index) => ({
       ...score,
       total: 100 + index,
@@ -763,8 +1028,12 @@ describe('RoomCommitter', () => {
     const room = makeRoom()
     createCommitter().prepareRoom(room, { missingPrefix: false })
     const snapshot = persistence.load(room.id)!
+    const incompatibleSnapshot = {
+      ...snapshot.serialized!,
+      state: { ...snapshot.serialized!.state, players: null },
+    }
     const incompatibleFrame = {
-      ...snapshot.serialized,
+      ...snapshot.serialized!.frame,
       players: null,
     } as unknown as JsonValue
     const encoded = encodeReplayFrame({
@@ -774,7 +1043,7 @@ describe('RoomCommitter', () => {
       previousCheckpointStepNo: 0,
     })
     db.prepare('UPDATE rooms SET state_json = ? WHERE id = ?')
-      .run(JSON.stringify(incompatibleFrame), room.id)
+      .run(JSON.stringify(incompatibleSnapshot), room.id)
     db.prepare(`
       UPDATE game_replay_steps
       SET payload_kind = ?, payload_gzip = ?, checkpoint_step_no = ?, frame_hash = ?

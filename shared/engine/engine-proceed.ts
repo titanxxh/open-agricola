@@ -39,7 +39,6 @@ import {
   buildListenerEvent,
   buildOwnedFlowNode,
   canActionContinueWithoutBeforeTriggers,
-  collectNodeIds,
   enforceCompositeContinuationMandatory,
   findActionNode,
   getNodeDescriptionPreview,
@@ -48,11 +47,16 @@ import {
   normalizeFollowUpAction,
   pendingEnvelopeFromHostNode,
   resolveSubtree,
+  stampContinuationParentHost,
+  stampSuppressedBeforeListeners,
 } from './engine-utils'
 import type { InteractionContextSnapshot, PendingEnvelope } from './types'
 import { isActivateCardActionNode, type ActivateCardActionNode } from './activation-action'
 import { evaluateTriggerSelect, type TriggerSelectEvaluationOptions } from './trigger-select'
-import { withInjectedAnytimeResultFlag } from './action-context-flags'
+import {
+  getSuppressedBeforeListenerIds,
+  withInjectedAnytimeResultFlag,
+} from './action-context-flags'
 import { eventsToLogEntries } from '../events/log-mapper'
 import type { GameEvent } from '../contract/events'
 import { createEventQuery } from '../events/query'
@@ -67,6 +71,7 @@ type EngineContext = {
   player: ActionExecutionContext['player']
   space: ActionExecutionContext['space']
   emitPrivateEvent?: ActionExecutionContext['emitPrivateEvent']
+  reportProtectedObservation?: ActionExecutionContext['reportProtectedObservation']
 }
 
 const resolveExecutionSpace = (
@@ -516,6 +521,7 @@ const buildOptionalPrompt = (
     sourceCard: actionNode.sourceCard,
     actionContext,
     emitPrivateEvent: context.emitPrivateEvent,
+    reportProtectedObservation: context.reportProtectedObservation,
   }
   const doable = int.hooks.applyIsDoable(
     { ...executionContext, ...currentEventReadContext(int), actionId: actionNode.actionId },
@@ -654,10 +660,22 @@ const executeActivateCardAction = (
       insertedNodes.push(buildOwnedFlowNode(int, flow, effectPlayer.id))
     }
     insertedNodes.push(...buildFollowUpNodes(int, normalizedFollowUps, node.id, effectPlayer, context.state))
+    const continuationParentHostNodeId = params.phase === 'before'
+      ? params.beforeHostNodeId
+      : node.continuationParentHostNodeId
     if (params.phase === 'before') {
+      const host = params.beforeHostNodeId
+        ? int.tree.findNodeById(params.beforeHostNodeId)
+        : undefined
+      const inherited = host instanceof ActionNode
+        ? getSuppressedBeforeListenerIds(host.actionContext)
+        : []
       insertedNodes.forEach((insertedNode) =>
-        collectNodeIds(insertedNode, int.beforePhaseFlowNodeIds),
-      )
+        stampSuppressedBeforeListeners(insertedNode, [...inherited, params.listenerId]))
+    }
+    if (continuationParentHostNodeId) {
+      insertedNodes.forEach((insertedNode) =>
+        stampContinuationParentHost(insertedNode, continuationParentHostNodeId))
     }
     if (insertedNodes.length > 0) {
       int.tree.insertAfter(node.id, insertedNodes)
@@ -690,6 +708,7 @@ const executeDeferredHostAction = (
     sourceCard: node.sourceCard,
     actionContext,
     emitPrivateEvent: context.emitPrivateEvent,
+    reportProtectedObservation: context.reportProtectedObservation,
   }
   const action = int.registry.get(node.actionId)
   let completedEvents: GameEvent[] | undefined
@@ -824,8 +843,15 @@ const executeDeferredHostAction = (
     ...duringActivateNodes,
     ...hookFlows,
   ]
+  if (node.continuationParentHostNodeId) {
+    [...leadingNodes, ...trailingHookNodes].forEach((insertedNode) =>
+      stampContinuationParentHost(insertedNode, node.continuationParentHostNodeId!))
+  }
   if (result.type === 'flow') {
     const flowNode = buildOwnedFlowNode(int, result.flow, context.player.id)
+    if (node.continuationParentHostNodeId) {
+      stampContinuationParentHost(flowNode, node.continuationParentHostNodeId)
+    }
     if (trailingHookNodes.length > 0) {
       int.tree.insertAfter(node.id, trailingHookNodes)
     }
@@ -847,7 +873,7 @@ const executeDeferredHostAction = (
 
 /**
  * S4c PR5 — extracted from `Engine.proceed`. Drives one step of the engine
- * tree. Mutates `int.tree` / `int.pendingNodeIdRef` / `int.beforePhaseFlowNodeIds`
+ * tree. Mutates `int.tree` / `int.pendingNodeIdRef`
  * via the boxed refs in `EngineInternals`.
  */
 export function engineProceed(
@@ -903,6 +929,7 @@ export function engineProceed(
           sourceCard: entry.actionNode.sourceCard,
           actionContext,
           emitPrivateEvent: context.emitPrivateEvent,
+          reportProtectedObservation: context.reportProtectedObservation,
         }
         const action = int.registry.get(entry.actionNode.actionId)
         if (!action) return null
@@ -1106,29 +1133,31 @@ export function engineProceed(
       sourceCard: replaceSourceCard,
       actionContext,
       emitPrivateEvent: context.emitPrivateEvent,
+      reportProtectedObservation: context.reportProtectedObservation,
     }
-    if (!int.beforePhaseFlowNodeIds.has(node.id)) {
-      const beforePhase = int.hooks.before({
-        ...executionContext,
-        ...currentEventReadContext(int),
-        actionId: replacedActionId,
+    const beforePhase = int.hooks.before({
+      ...executionContext,
+      ...currentEventReadContext(int),
+      actionId: replacedActionId,
+    })
+    const beforeBaseEvent = buildListenerEvent(executionContext, {})
+    const beforeActivateNodes = buildPhaseTrailingNodes(
+      int,
+      beforePhase.matchedListeners,
+      'before',
+      replacedActionId,
+      context.state,
+      beforeBaseEvent,
+      executionContext.player.id,
+    )
+    if (beforeActivateNodes.length > 0 && !node.beforePhaseResolved) {
+      node.beforePhaseResolved = true
+      beforeActivateNodes.forEach((beforeNode) => {
+        if (isActivateCardActionNode(beforeNode)) beforeNode.params.beforeHostNodeId = node.id
       })
-      const beforeBaseEvent = buildListenerEvent(executionContext, {})
-      const beforeActivateNodes = buildPhaseTrailingNodes(
-        int,
-        beforePhase.matchedListeners,
-        'before',
-        replacedActionId,
-        context.state,
-        beforeBaseEvent,
-        executionContext.player.id,
-      )
-      if (beforeActivateNodes.length > 0 && !node.beforePhaseResolved) {
-        node.beforePhaseResolved = true
-        enforceCompositeContinuationMandatory(node)
-        int.tree.insertBefore(node.id, beforeActivateNodes)
-        return { type: 'ok', nodeId: node.id, result: { type: 'ok' } }
-      }
+      enforceCompositeContinuationMandatory(node)
+      int.tree.insertBefore(node.id, beforeActivateNodes)
+      return { type: 'ok', nodeId: node.id, result: { type: 'ok' } }
     }
     const doabilityEventReadContext = currentEventReadContext(int)
     const doable = int.hooks.applyIsDoable(
@@ -1187,6 +1216,7 @@ export function engineProceed(
       replacedActionId,
       eventBuffer.sink,
     )
+    node.bodyStarted = true
     const rawResult = optInChoice ?? action.execute({
       ...executionContext,
       eventSink: eventBuffer.sink,
@@ -1460,8 +1490,15 @@ export function engineProceed(
       ...duringActivateNodes,
       ...hookFlows,
     ]
+    if (node.continuationParentHostNodeId) {
+      [...leadingNodes, ...trailingHookNodes].forEach((insertedNode) =>
+        stampContinuationParentHost(insertedNode, node.continuationParentHostNodeId!))
+    }
     if (result.type === 'flow') {
       const flowNode = buildOwnedFlowNode(int, result.flow, context.player.id)
+      if (node.continuationParentHostNodeId) {
+        stampContinuationParentHost(flowNode, node.continuationParentHostNodeId)
+      }
       // Insertion order: trailing hooks first (deepest behind), then flow
       // body, then leading nodes. insertAfter prepends each batch to
       // node.id+1, so the resulting child layout is:

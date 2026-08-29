@@ -1,4 +1,4 @@
-export { Engine } from './engine'
+export { Engine, type MandatoryContinuationProbe } from './engine'
 export { EngineTree } from './tree'
 export { ActionRegistry } from './registry'
 export { HookDispatcher } from './dispatcher'

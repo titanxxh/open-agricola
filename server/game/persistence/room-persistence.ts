@@ -1,4 +1,4 @@
-import type { SerializedGameState } from '../../../shared/session/serialization.ts'
+import type { PersistedSessionSnapshot } from '../../../shared/session/serialization.ts'
 import type { CustomCardData } from '../../../shared/cards/session-card-context.ts'
 
 export type RoomStatus = 'waiting' | 'playing' | 'finished'
@@ -27,7 +27,7 @@ export type RoomMeta = {
 export type RoomSnapshot = {
   id: string
   /** null = row exists but no state has been saved yet (e.g., room just created). */
-  serialized: SerializedGameState | null
+  serialized: PersistedSessionSnapshot | null
   meta: RoomMeta
   /** ms-since-epoch of the last save. */
   updatedAt: number
@@ -97,7 +97,7 @@ export interface RoomPersistence {
    * is fire-and-forget. Tests that need deterministic timestamps should use the
    * adapter-specific test helper (e.g., `InMemoryRoomPersistence.__setUpdatedAtForTest`).
    */
-  save(id: string, serialized: SerializedGameState | null, meta: RoomMeta): void
+  save(id: string, serialized: PersistedSessionSnapshot | null, meta: RoomMeta): void
   discard(id: string): void
   complete(result: GameResult): RoomCompletionResult
   hasRoomId(id: string): boolean
