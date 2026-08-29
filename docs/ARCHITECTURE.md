@@ -542,6 +542,7 @@ type ActionDefinition = {
   id: string
   nameKey: string
   descriptionKey?: string
+  rulesKey?: string
   roundAvailable?: number
   gainPerRound?: Partial<Resource>
   canBeExecutedByPlayer?(state, player): boolean
@@ -557,6 +558,8 @@ type ActionDefinition = {
   noChoiceLogKey?: string
 }
 ```
+
+`descriptionKey` preserves the printed action-space text. Optional `rulesKey` points to separate localized supplemental rulings or implementation limits and has no effect on action legality or execution.
 
 Hooks are not part of `ActionDefinition`; card files register them explicitly through `hooks.ts`.
 
@@ -921,7 +924,7 @@ export const A123_FrameBuilder = defineOccupationCard({
 
 The target state removes `shared/cards-display/` and generates no shadow display directory. `shared/cards/community/*` uses the same single source as base and major cards. `shared/cards/community/auto-catalog.ts` no longer exists.
 
-`meta` is the Card Definition. It contains only serializable, frontend-visible fields without runtime behavior. Declarative rules fields such as `cost`, `prerequisite`, `occupationPrerequisites`, `improvementPrerequisites`, `cardField`, and `isCookery` are allowed. `modifier`, `modifiers`, `listeners`, `effect`, and `prerequisiteCheck` are forbidden. `prerequisite` is printed text, structured static conditions use the `*Prerequisites` fields, and dynamic conditions use `impl.prerequisiteCheck`.
+`meta` is the Card Definition. It contains only serializable, frontend-visible fields without runtime behavior. Declarative rules fields such as `cost`, `prerequisite`, `occupationPrerequisites`, `improvementPrerequisites`, `cardField`, and `isCookery` are allowed. `modifier`, `modifiers`, `listeners`, `effect`, and `prerequisiteCheck` are forbidden. `desc` preserves printed card text; optional localizable `rules` contains separate supplemental rulings or implementation limits and never changes runtime behavior. `prerequisite` is printed text, structured static conditions use the `*Prerequisites` fields, and dynamic conditions use `impl.prerequisiteCheck`.
 
 `impl` is the Card Impl and contains `modifiers`, `listeners`, `effect`, `prerequisiteCheck`, helper calls, and `reaches`. Modifiers belong to the implementation, not Card Display. Builders may statically extract `reaches` and project it at the top level of the manifest, but it does not belong in `meta`.
 
