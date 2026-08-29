@@ -157,7 +157,7 @@ export const applyRoundGrowth = (state: GameState) => {
 
 export const applyFutureMeeples = (
   state: GameState,
-  options: { skipResourceReceive?: boolean } = {},
+  options: { skipResourceReceive?: boolean; keepActionTokens?: boolean } = {},
 ) => {
   if (state.futureMeeples.length === 0) return
   const remaining: GameState['futureMeeples'] = []
@@ -176,6 +176,24 @@ export const applyFutureMeeples = (
     })
     if (entry.roomType && player.houseType === entry.roomType) {
       tryAddRoomTile(player, entry.roomType)
+    }
+    if (options.keepActionTokens) {
+      const resources: GameState['futureMeeples'][number]['resources'] = {}
+      for (const key of ['field', 'stable', 'forest', 'moor'] as const) {
+        const amount = entry.resources[key] ?? 0
+        if (amount > 0) resources[key] = amount
+      }
+      if (Object.keys(resources).length > 0) {
+        remaining.push({
+          id: entry.id,
+          cardId: entry.cardId,
+          playerId: entry.playerId,
+          round: entry.round,
+          actionId: entry.actionId,
+          resources,
+          ...(entry.actionContext ? { actionContext: entry.actionContext } : {}),
+        })
+      }
     }
   })
   state.futureMeeples = remaining
