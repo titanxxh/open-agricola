@@ -653,11 +653,12 @@ export const filterSerializedStateForPlayer = (
         ].filter((cardId) => cardId !== '?')),
       ]),
   )
-  const filteredPlayers = base.players.map((p) =>
-    p.id === viewerPlayerId
-      ? p
+  const filteredPlayers = base.players.map((p) => {
+    const { lastDraftSubmission: _lastDraftSubmission, ...visiblePlayer } = p
+    return p.id === viewerPlayerId
+      ? visiblePlayer
       : {
-          ...p,
+          ...visiblePlayer,
           occupationHand: Array(p.occupationHand.length).fill('?'),
           minorHand: Array(p.minorHand.length).fill('?'),
           cardStates: filterHiddenHandCardStates(p.cardStates, hiddenCardIds.get(p.id)),
@@ -668,8 +669,8 @@ export const filterSerializedStateForPlayer = (
                 ? { ...entry, cardId: '?' }
                 : entry),
           },
-        },
-  )
+        }
+  })
   const filteredDraft = !base.draft
     ? base.draft
     : {

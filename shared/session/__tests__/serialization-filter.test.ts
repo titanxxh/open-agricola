@@ -270,6 +270,14 @@ describe('serializeStateForPlayer', () => {
     state.players[1]!.stats.draftHistory = [
       { cardId: state.draft!.kept.p2.occ[0]!, draftTurn: 1 },
     ]
+    state.players[0]!.lastDraftSubmission = {
+      occCardId: state.draft!.pendingPicks.p1.occ!,
+      minorCardId: state.draft!.pendingPicks.p1.minor!,
+    }
+    state.players[1]!.lastDraftSubmission = {
+      occCardId: state.draft!.pendingPicks.p2.occ!,
+      minorCardId: state.draft!.pendingPicks.p2.minor!,
+    }
     const raw = serializeState(state, emptyCtx())
     const filtered = serializeStateForPlayer(state, 'p1', emptyCtx())
     const spectator = serializeStateForPlayer(state, null, emptyCtx())
@@ -293,6 +301,11 @@ describe('serializeStateForPlayer', () => {
     expect(filtered.players[1]!.stats.draftHistory[0]!.cardId).toBe('?')
     expect(spectator.players[0]!.stats.draftHistory[0]!.cardId).toBe('?')
     expect(spectator.players[1]!.stats.draftHistory[0]!.cardId).toBe('?')
+    expect(raw.players[0]!.lastDraftSubmission).toEqual(state.players[0]!.lastDraftSubmission)
+    expect(filtered.players[0]!.lastDraftSubmission).toBeUndefined()
+    expect(filtered.players[1]!.lastDraftSubmission).toBeUndefined()
+    expect(spectator.players[0]!.lastDraftSubmission).toBeUndefined()
+    expect(spectator.players[1]!.lastDraftSubmission).toBeUndefined()
     expect(f.round).toBe(r.round)
     expect(f.totalRounds).toBe(r.totalRounds)
     expect(f.poolSize).toBe(r.poolSize)

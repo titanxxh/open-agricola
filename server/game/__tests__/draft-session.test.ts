@@ -359,6 +359,36 @@ describe('GameSession.submitDraftPick — validation and retry paths', () => {
     ])
   })
 
+  it('returns the existing result when the final submitter retries after advancement', () => {
+    const session = makeDraftSession(2, 7)
+    session.submitDraftPick('p1', firstPick(session, 'p1'))
+    const roundOnePick = firstPick(session, 'p2')
+    const advanced = session.submitDraftPick('p2', roundOnePick)
+    expect(advanced.state.draft!.round).toBe(2)
+    const advancedState = serializeState(advanced.state, { engineStack: session.getEngineStack() })
+
+    const roundOneRetry = session.submitDraftPick('p2', roundOnePick)
+
+    expect(roundOneRetry.ok).toBe(true)
+    expect(serializeState(roundOneRetry.state, { engineStack: session.getEngineStack() })).toEqual(advancedState)
+    expect(roundOneRetry.state.players[1]!.stats.draftHistory).toHaveLength(2)
+
+    let finalPick = roundOnePick
+    for (let round = 2; round <= 6; round += 1) {
+      session.submitDraftPick('p1', firstPick(session, 'p1'))
+      finalPick = firstPick(session, 'p2')
+      session.submitDraftPick('p2', finalPick)
+    }
+    const finishedState = serializeState(session.getState().state, { engineStack: session.getEngineStack() })
+    const historyLength = finishedState.players[1]!.stats.draftHistory.length
+
+    const finalRetry = session.submitDraftPick('p2', finalPick)
+
+    expect(finalRetry.ok).toBe(true)
+    expect(serializeState(finalRetry.state, { engineStack: session.getEngineStack() })).toEqual(finishedState)
+    expect(finalRetry.state.players[1]!.stats.draftHistory).toHaveLength(historyLength)
+  })
+
   it('rejects a pick from an unknown player', () => {
     const session = makeDraftSession(2, 7)
     const resp = session.submitDraftPick('p99', {
@@ -419,6 +449,10 @@ describe('GameSession — draft persistence (serialize → rehydrate)', () => {
     const revived = new GameSession(rehydrated)
     expect(revived.getState().state.phase).toBe('draft')
     expect(revived.getState().state.draft).not.toBeNull()
+    const retry = revived.submitDraftPick('p2', p2)
+    expect(retry.ok).toBe(true)
+    expect(retry.state.draft!.round).toBe(2)
+    expect(retry.state.players[1]!.stats.draftHistory).toHaveLength(2)
 
     for (let round = 2; round <= 6; round += 1) {
       const pa = firstPick(revived, 'p1')

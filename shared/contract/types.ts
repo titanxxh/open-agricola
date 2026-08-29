@@ -359,6 +359,7 @@ export type PlayerState = {
   activeModifiers: CostModifier[]
   cardStates: CardStates
   stats: PlayerStats
+  lastDraftSubmission?: import('../draft/types').DraftPickPayload
   parentCards: PlayerParentCards
   supplyTokensConsumed?: SupplyTokenCounts
   /**
