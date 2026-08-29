@@ -1,9 +1,11 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
+import { confirmPlayerSwitch } from './_helpers/pending-confirms'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 import { setWorkersAtHome, workersAvailable } from '../../shared/domain/player'
 
 import '../../shared/cards/A/A094_LazySowman'
+import '../../shared/cards/C/C151_SowingDirector'
 
 const CARD_ID = 'A094_LazySowman'
 
@@ -139,5 +141,37 @@ describe('A094_LazySowman session', () => {
     if (resp.interaction.stateId !== 'wait') return
     expect(resp.interaction.request.options?.map((option) => option.labelKey)).toContain('actions.sow.name')
     expect(resp.interaction.request.options?.map((option) => option.labelKey)).toContain('ui.interactionUseCard')
+  })
+
+  it('does not replace a sow granted outside the owners turn', () => {
+    const session = setup({ withCard: true })
+    const state = session.getState().state
+    const owner = state.players[0]!
+    const opponent = state.players[1]!
+    state.currentPlayerIndex = 1
+    owner.occupationPlayed.push('C151_SowingDirector')
+    state.actionSpaces.find((space) => space.id === 'day-laborer')!.takenBy = []
+    state.actionSpaces.find((space) => space.id === 'meeting-place')!.takenBy = []
+    setWorkersAtHome(state, opponent, 1)
+    opponent.resources.grain = 1
+    opponent.fields = [{ row: 0, col: 0, crop: null, remaining: 0 }]
+    session.loadState(state)
+
+    let resp = session.takeAction(1, 'grain-utilization')
+    expect(resp.ok, resp.error).toBe(true)
+    expect(resp.interaction.stateId).toBe('wait')
+    if (resp.interaction.stateId !== 'wait') return
+    expect(resp.interaction.request.kind).toBe('farm-select')
+
+    resp = session.commitSelectionChoice(1, {
+      crops: [{ row: 0, col: 0, crop: 'grain' }],
+    })
+    if (resp.interaction.stateId === 'wait' && resp.interaction.request.kind === 'confirm-player-switch') {
+      resp = confirmPlayerSwitch(session)
+    }
+
+    expect(resp.interaction.stateId === 'wait' ? resp.interaction.request.kind : resp.interaction.stateId).toBe('confirm-next-player')
+    expect(resp.interaction.stateId === 'wait' ? resp.interaction.promptKey : undefined).not.toBe('ui.interactionPlaceFarmerExtra')
+    expect(workersAvailable(resp.state, resp.state.players[0]!)).toBe(2)
   })
 })
