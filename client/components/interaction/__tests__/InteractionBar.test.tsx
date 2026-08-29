@@ -147,6 +147,47 @@ describe('InteractionBar', () => {
     expect(confirmHeating).toHaveBeenCalledWith({ woodToFuel: 1, fuelUsed: 2 })
   })
 
+  it('disables rejected specialized confirmations', () => {
+    const heating = renderBar((input) => {
+      input.pending.heating = {
+        playerName: 'P1',
+        required: 1,
+        maxFuelPayable: 1,
+        maxWoodConvertibleToFuel: 0,
+        isConfirmDisabled: () => true,
+      }
+    })
+    expect(screen.getByRole('button', { name: 'Confirm heating' })).toBeDisabled()
+    heating.unmount()
+
+    const reorg = renderBar((input) => {
+      input.pending.animalReorg = { playerIndex: 0, spaceId: 'space' }
+      input.animalReorg.confirmDisabled = true
+    })
+    expect(screen.getByRole('button', { name: 'Confirm' })).toBeDisabled()
+    reorg.unmount()
+
+    const feed = renderBar((input) => {
+      input.pending.harvestFeedPlayerName = 'P1'
+      input.pending.harvestFeedConfirmDisabled = true
+    })
+    expect(screen.getByRole('button', { name: 'Confirm' })).toBeDisabled()
+    feed.unmount()
+
+    const playerSwitch = renderBar((input) => {
+      input.pending.playerSwitch = { fromPlayerIndex: 0, toPlayerIndex: 1 }
+      input.pending.playerSwitchConfirmDisabled = true
+    })
+    expect(screen.getByRole('button', { name: 'Confirm switch' })).toBeDisabled()
+    playerSwitch.unmount()
+
+    renderBar((input) => {
+      input.pending.nextPlayerIndex = 1
+      input.pending.nextPlayerConfirmDisabled = true
+    })
+    expect(screen.getByRole('button', { name: 'Confirm switch' })).toBeDisabled()
+  })
+
   it('renders animal reorg model data and invokes confirm', () => {
     const confirmAnimalReorg = vi.fn()
     renderBar((input) => {

@@ -65,6 +65,7 @@ type ExchangeOverlayPresentationProps = {
   isInteractive: boolean
   pendingChoice: PendingChoice | null
   harvestPending: HarvestPending
+  harvestFeedConfirmDisabled?: boolean
   draft: ExchangeOverlayDraft
   cardLabel: (id: string) => string
   actions: ExchangeOverlayActions
@@ -181,6 +182,7 @@ export const ExchangeOverlayPresentation = ({
   isInteractive,
   pendingChoice,
   harvestPending,
+  harvestFeedConfirmDisabled,
   draft,
   cardLabel,
   actions,
@@ -238,6 +240,7 @@ export const ExchangeOverlayPresentation = ({
               type="button"
               className="exchange-confirm"
               onClick={actions.confirmHarvestFeed}
+              disabled={harvestFeedConfirmDisabled}
             >
               {t(locale, 'ui.interactionConfirmButton')}
             </button>

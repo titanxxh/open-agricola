@@ -543,6 +543,7 @@ export type FarmBoardActions = {
   setViewPlayerId: (value: string) => void
   resolveChoice: (value: string) => void
   onConfirmOccupationHandSelection?: (cardIds: string[]) => void
+  isOccupationHandSelectionRejected?: (cardIds: string[]) => boolean
 }
 
 export type FarmBoardProps = {
@@ -920,6 +921,7 @@ export const FarmBoard = ({ view, actions, inlineCardStats = false }: FarmBoardP
     setViewPlayerId,
     resolveChoice,
     onConfirmOccupationHandSelection,
+    isOccupationHandSelectionRejected,
   } = actions
   const activeFarmPlayerId = activePlayerId ?? currentPlayer.id
   const canInteractHand = displayPlayer.id === activeFarmPlayerId && isInteractive
@@ -1855,7 +1857,8 @@ export const FarmBoard = ({ view, actions, inlineCardStats = false }: FarmBoardP
                   type="button"
                   disabled={
                     selectedOccIds.size < occupationHandSelection.minSelections ||
-                    selectedOccIds.size > occupationHandSelection.maxSelections
+                    selectedOccIds.size > occupationHandSelection.maxSelections ||
+                    isOccupationHandSelectionRejected?.([...selectedOccIds])
                   }
                   onClick={() => onConfirmOccupationHandSelection?.([...selectedOccIds])}
                   data-testid="occupation-hand-confirm"
