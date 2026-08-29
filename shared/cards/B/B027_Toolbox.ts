@@ -11,7 +11,10 @@ import {
   readActionSnapshotToken,
 } from '../helpers/action-snapshot'
 import { hasFenceBuiltEvent } from '../helpers/fence-events'
-import { isInjectedAnytimeCompletionContext } from '../../engine/action-context-flags'
+import {
+  isInjectedAnytimeActionContext,
+  isInjectedAnytimeCompletionContext,
+} from '../../engine/action-context-flags'
 import type { CardImpl } from '../registry'
 
 const CARD_ID = 'B027_Toolbox'
@@ -24,7 +27,9 @@ const setFlagHandler = (context: CardListenerContext): ActionHookResult | void =
 
   const activeTurnToken = readActionSnapshotToken(context.player)
   const completedTurnToken = readActionSnapshotExtraData<number>(context.player, 'lastToken')
-  const turnToken = activeTurnToken ?? completedTurnToken
+  const turnToken = activeTurnToken ?? (
+    isInjectedAnytimeActionContext(context.actionContext) ? completedTurnToken : undefined
+  )
   if (
     turnToken !== undefined &&
     readCardExtraData<number>(context.player, CARD_ID, WINDOW_OFFERED_TURN_TOKEN_KEY) === turnToken

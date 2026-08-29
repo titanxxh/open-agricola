@@ -3,7 +3,7 @@ import { GameSession } from '../game/authoritative-session'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 import { setWorkersAtHome } from '../../shared/domain/player'
 import { isCardFlagged, setCardFlag, writeCardExtraData } from '../../shared/cards/helpers/card-state'
-import { recordActionSnapshot } from '../../shared/cards/helpers/action-snapshot'
+import { endTurnScope, recordActionSnapshot } from '../../shared/cards/helpers/action-snapshot'
 import '../../shared/cards/A/A040_PottersYard'
 import '../../shared/cards/B/B027_Toolbox'
 import '../../shared/cards/B/B150_LargeScaleFarmer'
@@ -185,6 +185,9 @@ describe('B27 Toolbox session', () => {
     second.minorPlayed.push(CARD_ID)
     second.occupationPlayed.push('C094_StableCleaner')
     second.resources = { ...second.resources, food: 5, wood: 20, clay: 20, reed: 20, stone: 20 }
+    const previousTurnToken = recordActionSnapshot(second, 77)
+    endTurnScope(second)
+    writeCardExtraData(second, CARD_ID, 'windowOfferedTurnToken', previousTurnToken)
     session.loadState(state)
 
     let resp = session.takeAction(0, 'grain-seeds')
