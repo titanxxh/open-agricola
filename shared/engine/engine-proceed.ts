@@ -47,6 +47,7 @@ import {
   normalizeFollowUpAction,
   pendingEnvelopeFromHostNode,
   resolveSubtree,
+  stampBeforeHostNode,
   stampContinuationParentHost,
   stampSuppressedBeforeListeners,
 } from './engine-utils'
@@ -1152,9 +1153,7 @@ export function engineProceed(
     )
     if (beforeActivateNodes.length > 0 && !node.beforePhaseResolved) {
       node.beforePhaseResolved = true
-      beforeActivateNodes.forEach((beforeNode) => {
-        if (isActivateCardActionNode(beforeNode)) beforeNode.params.beforeHostNodeId = node.id
-      })
+      beforeActivateNodes.forEach((beforeNode) => stampBeforeHostNode(beforeNode, node.id))
       enforceCompositeContinuationMandatory(node)
       int.tree.insertBefore(node.id, beforeActivateNodes)
       return { type: 'ok', nodeId: node.id, result: { type: 'ok' } }

@@ -18,18 +18,31 @@ const unorderedSelectionFields = new Set([
   'rooms',
   'stables',
 ])
+const unorderedChoicePayloadFields = new Set(['zones'])
+
+const sortCanonical = (value: unknown[]): unknown[] => [...value].sort((left, right) =>
+  JSON.stringify(canonicalValue(left)).localeCompare(JSON.stringify(canonicalValue(right))))
+
+const normalizeFields = (
+  payload: Record<string, unknown>,
+  fields: ReadonlySet<string>,
+): Record<string, unknown> => Object.fromEntries(Object.entries(payload).map(([key, value]) => [
+  key,
+  Array.isArray(value) && fields.has(key) ? sortCanonical(value) : value,
+]))
 
 const normalizeCommandPayload = (type: string, payload: unknown): unknown => {
-  if (type !== 'commitSelection' || !payload || typeof payload !== 'object' || Array.isArray(payload)) {
+  if (!payload || typeof payload !== 'object' || Array.isArray(payload)) {
     return payload
   }
-  return Object.fromEntries(Object.entries(payload as Record<string, unknown>).map(([key, value]) => [
-    key,
-    Array.isArray(value) && unorderedSelectionFields.has(key)
-      ? [...value].sort((left, right) =>
-          JSON.stringify(canonicalValue(left)).localeCompare(JSON.stringify(canonicalValue(right))))
-      : value,
-  ]))
+  const record = payload as Record<string, unknown>
+  if (type === 'commitSelection') return normalizeFields(record, unorderedSelectionFields)
+  if (type !== 'choice' || !record.payload || typeof record.payload !== 'object' ||
+      Array.isArray(record.payload)) return payload
+  return {
+    ...record,
+    payload: normalizeFields(record.payload as Record<string, unknown>, unorderedChoicePayloadFields),
+  }
 }
 
 export const canonicalJson = (value: unknown): string => JSON.stringify(canonicalValue(value))
