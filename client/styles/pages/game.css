@@ -2624,6 +2624,17 @@
   color: #2f5d35;
   font-weight: 700;
 }
+.tooltip-text .action-rules {
+  margin-top: 8px;
+  padding: 7px 8px;
+  border-top: 1px solid rgba(113, 82, 39, 0.24);
+  border-radius: 4px;
+  background: rgba(255, 247, 214, 0.7);
+}
+.tooltip-text .action-rules strong {
+  font-size: 12px;
+  margin-bottom: 2px;
+}
 .tooltip-text p:last-child {
   margin-bottom: 0;
 }

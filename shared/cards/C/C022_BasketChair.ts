@@ -88,6 +88,9 @@ export const C022_BasketChair = defineMinorCard({
     desc: [
         'When you play this card, you can immediately move the first person you placed this work phase to this card (unless it is on __Meeting Place__). If you do, immediately afterward, you can place another person.',
       ],
+    rules: [
+      'Only an adult person can be moved to this card; a newborn remains on its action space.',
+    ],
     cost: { reed: 1 },
     vp: 1,
     evenMoreSet: true,

@@ -431,6 +431,42 @@ describe('ActionBoard', () => {
     expect(html2p).toContain('left:31px')
   })
 
+  it.each([
+    ['grain-utilization', 'en', 'Rules', 'Taking this space moves the Start Player Marker immediately'],
+    ['test-supplemental-rules', 'zh', '规则补充', '使用此格会立即转移起始玩家标记'],
+  ] as const)('renders supplemental rules in the %s tooltip', (id, locale, label, rules) => {
+    vi.stubGlobal('ResizeObserver', class {
+      observe() {}
+      disconnect() {}
+    })
+    const playerA = createPlayer('p1', 'PlayerA', 'red')
+    const action = {
+      ...createAction(id, 'actions.meeting-place.name'),
+      descriptionKey: 'actions.meeting-place.description',
+      rulesKey: 'actions.meeting-place.rules',
+    }
+    const sprite = id === 'grain-utilization'
+
+    const { container } = render(
+      <ActionBoard
+        locale={locale}
+        baseActions={sprite ? [] : [action]}
+        roundSlots={sprite ? [{ round: 1, action }] : []}
+        currentPlayer={playerA}
+        players={[playerA]}
+        futureMeeples={[]}
+        canTakeAction={() => true}
+        takeAction={() => {}}
+        currentRound={1}
+        devMode={false}
+      />,
+    )
+
+    fireEvent.mouseEnter(container.querySelector(`[data-action-id="${id}"]`)!)
+    expect(screen.getByText(label)).toBeInTheDocument()
+    expect(screen.getByText(new RegExp(rules)).closest('.action-rules')).not.toBeNull()
+  })
+
   it('renders 3p resource market and lessons-3 with icon descs', () => {
     const playerA = createPlayer('p1', 'PlayerA', 'red')
     const playerB = createPlayer('p2', 'PlayerB', 'blue')

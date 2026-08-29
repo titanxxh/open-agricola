@@ -944,6 +944,13 @@ export const ActionBoard = ({
     return info.descKey ? t(locale, info.descKey) : null
   }
 
+  const renderSupplementalRules = (action?: ActionSpace) => action?.rulesKey ? (
+    <div className="action-rules">
+      <strong>{t(locale, 'ui.supplementalRules')}</strong>
+      <p>{t(locale, action.rulesKey)}</p>
+    </div>
+  ) : null
+
   return (
     <section className="actions" aria-label={t(locale, 'ui.actionArea')}>
       <h2>{t(locale, 'ui.actionArea')}</h2>
@@ -1208,6 +1215,7 @@ export const ActionBoard = ({
                 {(ACTION_TOOLTIP_TEXT[tooltip.actionId!] ?? [t(locale, tooltip.descKey!)]).map((line, i) => (
                   <p key={i}>{line}</p>
                 ))}
+                {renderSupplementalRules(tooltip.action)}
               </div>
             </>
           ) : (
@@ -1221,6 +1229,7 @@ export const ActionBoard = ({
               {(tooltip.kind === 'action' || tooltip.description) && (
                 <p>{tooltip.kind === 'action' ? t(locale, tooltip.descKey!) : tooltip.description}</p>
               )}
+              {tooltip.kind === 'action' && renderSupplementalRules(tooltip.action)}
             </div>
           )}
         </div>

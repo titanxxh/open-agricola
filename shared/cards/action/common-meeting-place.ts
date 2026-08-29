@@ -5,6 +5,7 @@ export const meetingPlace: ActionDefinition = {
   id: 'meeting-place',
   nameKey: 'actions.meeting-place.name',
   descriptionKey: 'actions.meeting-place.description',
+  rulesKey: 'actions.meeting-place.rules',
   roundAvailable: 1,
   gainPerRound: {},
   players: [2, 3, 4, 5, 6],

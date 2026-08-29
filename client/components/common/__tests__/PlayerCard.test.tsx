@@ -84,6 +84,65 @@ describe('PlayerCard dual-type rendering (alsoCountsAs)', () => {
     expect(html).not.toContain('<WOOD>')
   })
 
+  it('renders localized supplemental rules separately from printed text', () => {
+    const english = renderToStaticMarkup(
+      <PlayerCard locale="en" cardId="A094_LazySowman" cardType="occupation" />,
+    )
+    const chinese = renderToStaticMarkup(
+      <PlayerCard locale="zh" cardId="A094_LazySowman" cardType="occupation" />,
+    )
+
+    expect(english).toContain('Each time you decline an unconditional')
+    expect(english).toContain('even if it is occupied')
+    expect(english).toContain('class="card-rules"')
+    expect(english).toContain('Rules')
+    expect(english).toContain('cannot be placed on')
+
+    expect(chinese).toContain('每当你在回合中拒绝一次无条件')
+    expect(chinese).toContain('即使被占用')
+    expect(chinese).toContain('class="card-rules"')
+    expect(chinese).toContain('规则补充')
+    expect(chinese).toContain('此次额外放人不能选择')
+    expect(chinese).not.toContain('The additional person cannot be placed on')
+  })
+
+  it.each([
+    [
+      'C022_BasketChair',
+      'minor' as const,
+      'When you play this card',
+      'Only an adult person can be moved to this card',
+      '只能将成人工人移到本牌',
+    ],
+    [
+      'D151_SpinDoctor',
+      'occupation' as const,
+      'Immediately after each time you use',
+      'The additional person cannot be placed on',
+      '此次额外放人不能选择',
+    ],
+  ])('renders audited supplemental rules for %s', (
+    cardId,
+    cardType,
+    printedText,
+    englishRule,
+    chineseRule,
+  ) => {
+    const english = renderToStaticMarkup(
+      <PlayerCard locale="en" cardId={cardId} cardType={cardType} />,
+    )
+    const chinese = renderToStaticMarkup(
+      <PlayerCard locale="zh" cardId={cardId} cardType={cardType} />,
+    )
+
+    expect(english).toContain(printedText)
+    expect(english).toContain('class="card-rules"')
+    expect(english).toContain(englishRule)
+    expect(chinese).toContain('class="card-rules"')
+    expect(chinese).toContain(chineseRule)
+    expect(chinese).not.toContain(englishRule)
+  })
+
   it('renders Moor minor resource descriptions as inline icons', () => {
     const html = renderToStaticMarkup(
       <PlayerCard locale="en" cardId="M080_AdvancePayment" cardType="minor" />,

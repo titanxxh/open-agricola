@@ -187,12 +187,19 @@ export const PlayerCard = ({
     const meta = cardMeta ?? getCardMeta(cardId)
     if (!meta) return null
     const localized = meta.locales?.[locale]
+    const fallbackRules = (localized?.rules ?? meta.rules ?? []).join('\n')
+    const localizeRules = (i18nKey: string): string => {
+      const key = `${i18nKey}.rules`
+      const translated = t(locale, key)
+      return translated === key ? fallbackRules : translated
+    }
     if (cardType === 'major') {
       const rawCost = (meta.cost ?? {}) as PaymentResourceMap | ComplexCost
       const { baseCost } = extractMajorDisplayCost(rawCost)
       return {
         name: t(locale, `improvements.${cardId}.name`),
         description: (meta.desc ?? []).join('\n'),
+        rules: fallbackRules,
         cost: { ...emptyResources, ...baseCost },
         category: meta.category,
         returnCards: meta.returnCards,
@@ -211,6 +218,7 @@ export const PlayerCard = ({
         description: hasI18n && i18nDesc !== `${i18nKey}.description`
           ? i18nDesc
           : (localized?.desc ?? meta.desc ?? []).join('\n'),
+        rules: localizeRules(i18nKey),
         cost: { ...emptyResources, ...(meta.cost ?? {}) },
         altCosts: meta.altCosts,
         deck: meta.deck,
@@ -235,6 +243,7 @@ export const PlayerCard = ({
         description: hasI18n && i18nDesc !== `${i18nKey}.description`
           ? i18nDesc
           : (localized?.desc ?? meta.desc ?? []).join('\n'),
+        rules: localizeRules(i18nKey),
         cost: { ...emptyResources, ...(meta.cost ?? {}) },
         deck: meta.deck,
         category: meta.category,
@@ -448,6 +457,14 @@ export const PlayerCard = ({
         <div className="card-desc">
           <div className="card-desc-scroller">
             <ResourceText text={cardData.description} />
+            {cardData.rules && (
+              <div className="card-rules">
+                <strong className="card-rules-label">
+                  {t(locale, 'ui.supplementalRules')}
+                </strong>
+                <ResourceText text={cardData.rules} />
+              </div>
+            )}
           </div>
         </div>
 

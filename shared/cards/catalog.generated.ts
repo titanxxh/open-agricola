@@ -1513,6 +1513,9 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "desc": [
       "Each time you decline an unconditional __Sow__ action on your turn, you can immediately place another person on an action space of your choice (even if it is occupied)."
     ],
+    "rules": [
+      "The additional person cannot be placed on __Meeting Place__."
+    ],
     "cost": {},
     "players": "1+",
     "kind": "occupation"
@@ -5751,6 +5754,9 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "category": "ACTIONS_BOOSTER",
     "desc": [
       "When you play this card, you can immediately move the first person you placed this work phase to this card (unless it is on __Meeting Place__). If you do, immediately afterward, you can place another person."
+    ],
+    "rules": [
+      "Only an adult person can be moved to this card; a newborn remains on its action space."
     ],
     "cost": {
       "reed": 1
@@ -10636,6 +10642,9 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "category": "ACTIONS_BOOSTER",
     "desc": [
       "Immediately after each time you use the __Traveling Players__ accumulation space, you can place another person on an action space of your choice, regardless whether or not the action space is occupied."
+    ],
+    "rules": [
+      "The additional person cannot be placed on __Meeting Place__."
     ],
     "cost": {},
     "players": "4+",
