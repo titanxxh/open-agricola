@@ -830,6 +830,7 @@ export type ActionDefinition = {
   id: string
   nameKey: string
   descriptionKey: string
+  rulesKey?: string
   roundAvailable: number
   gainPerRound: Partial<Resource>
   players?: number[]

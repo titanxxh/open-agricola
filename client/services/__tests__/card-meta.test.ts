@@ -95,7 +95,7 @@ describe('card-meta service', () => {
     expect(fetchSpy).toHaveBeenCalledWith(expect.stringMatching(/cards-manifest\.json$/))
   })
 
-  it('preserves locales from runtime custom-card metadata', () => {
+  it('preserves supplemental rules and locales from runtime custom-card metadata', () => {
     registerCustomCardMetadata({
       cardType: 'occupation',
       cardJson: {
@@ -104,17 +104,26 @@ describe('card-meta service', () => {
         deck: 'CUSTOM',
         number: 0,
         desc: ['English description.'],
+        rules: ['Supplemental ruling.'],
         cost: {},
         artUrl: 'https://attacker.example/tracker.webp',
         locales: {
-          zh: { name: '本地化卡', desc: ['中文描述。'] },
+          zh: {
+            name: '本地化卡',
+            desc: ['中文描述。'],
+            rules: ['补充裁定。'],
+          },
         },
       },
     })
 
+    expect(getCardMeta('CUSTOM_LocalisedCard')?.rules).toEqual([
+      'Supplemental ruling.',
+    ])
     expect(getCardMeta('CUSTOM_LocalisedCard')?.locales?.zh).toEqual({
       name: '本地化卡',
       desc: ['中文描述。'],
+      rules: ['补充裁定。'],
     })
     expect(getCardMeta('CUSTOM_LocalisedCard')?.artUrl).toBeUndefined()
   })

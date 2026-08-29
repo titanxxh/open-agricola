@@ -40,6 +40,7 @@ export type CardDefinition = {
   number: number
   category?: string
   desc: string[]
+  rules?: string[]
   playerActionCardType?: PlayerActionCardType
   cost?: PaymentResourceMap | ComplexCost
   altCosts?: PaymentResourceMap[]
@@ -113,5 +114,10 @@ export type CardDefinition = {
     capacity: number
   }
   artUrl?: string
-  locales?: Record<string, { name: string; desc: string[]; prerequisite?: string }>
+  locales?: Record<string, {
+    name: string
+    desc: string[]
+    rules?: string[]
+    prerequisite?: string
+  }>
 }

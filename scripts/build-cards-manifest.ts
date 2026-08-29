@@ -24,6 +24,7 @@ export type CardMeta = {
   playerActionCardType?: 'minor' | 'occupation'
   category?: string
   desc?: string[]
+  rules?: string[]
   cost?: Record<string, number>
   altCosts?: Record<string, number>[]
   exchanges?: Array<{
@@ -68,7 +69,12 @@ export type CardMeta = {
   cardField?: unknown
   enablesPalisades?: boolean
   artUrl?: string
-  locales?: Record<string, { name: string; desc: string[]; prerequisite?: string }>
+  locales?: Record<string, {
+    name: string
+    desc: string[]
+    rules?: string[]
+    prerequisite?: string
+  }>
 }
 
 export type CardManifestEntry = {
@@ -80,7 +86,7 @@ export type CardManifestEntry = {
 export type CardsManifest = Record<string, CardManifestEntry>
 
 const META_FIELDS = new Set([
-  'id', 'name', 'deck', 'number', 'playerActionCardType', 'category', 'desc',
+  'id', 'name', 'deck', 'number', 'playerActionCardType', 'category', 'desc', 'rules',
   'cost', 'altCosts', 'exchanges', 'players', 'prerequisite', 'vp',
   'maxRound', 'isCookery', 'isBaking', 'passing', 'returnCards',
   'occupationPrerequisites', 'improvementPrerequisites', 'implemented',

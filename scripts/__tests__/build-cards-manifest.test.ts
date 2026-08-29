@@ -128,6 +128,7 @@ describe('buildCardsManifest — Card Source projection', () => {
       `import { defineMinorCard } from '../card-source'\n` +
       `const CARD_ID = 'A001_SourceMinor'\n` +
       `const CARD_DESC = ['A source minor.']\n` +
+      `const CARD_RULES = ['Supplemental ruling.']\n` +
       `const CARD_COST = { wood: 1, clay: 2 }\n` +
       `function explode() { throw new Error('runtime impl executed') }\n` +
       `export const A001_SourceMinor = defineMinorCard({\n` +
@@ -137,9 +138,10 @@ describe('buildCardsManifest — Card Source projection', () => {
       `    deck: 'A',\n` +
       `    number: 1,\n` +
       `    desc: CARD_DESC,\n` +
+      `    rules: CARD_RULES,\n` +
       `    cost: CARD_COST,\n` +
       `    artUrl: '/card-art/community/A001_SourceMinor.webp',\n` +
-      `    locales: { zh: { name: '来源小改良', desc: ['中文描述。'] } },\n` +
+      `    locales: { zh: { name: '来源小改良', desc: ['中文描述。'], rules: ['补充裁定。'] } },\n` +
       `  },\n` +
       `  impl: { modifiers: [explode()], listeners: [explode()], effect: explode(), prerequisiteCheck: explode() },\n` +
       `})\n`,
@@ -156,9 +158,16 @@ describe('buildCardsManifest — Card Source projection', () => {
       number: 1,
       type: 'minor',
       desc: ['A source minor.'],
+      rules: ['Supplemental ruling.'],
       cost: { wood: 1, clay: 2 },
       artUrl: '/card-art/community/A001_SourceMinor.webp',
-      locales: { zh: { name: '来源小改良', desc: ['中文描述。'] } },
+      locales: {
+        zh: {
+          name: '来源小改良',
+          desc: ['中文描述。'],
+          rules: ['补充裁定。'],
+        },
+      },
     })
     expect(manifest['A001_SourceMinor'].module).toMatch(/shared\/cards\/A\/A001_SourceMinor$/)
     expect(manifest['A001_SourceMinor'].meta).not.toHaveProperty('modifiers')

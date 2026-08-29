@@ -25,6 +25,7 @@ export type CardMeta = {
   playerActionCardType?: 'minor' | 'occupation'
   category?: string
   desc?: string[]
+  rules?: string[]
   cost?: Record<string, number>
   altCosts?: Record<string, number>[]
   exchanges?: CardExchange[]
@@ -38,7 +39,12 @@ export type CardMeta = {
   alsoCountsAs?: string[]
   enablesPalisades?: boolean
   artUrl?: string
-  locales?: Record<string, { name: string; desc: string[]; prerequisite?: string }>
+  locales?: Record<string, {
+    name: string
+    desc: string[]
+    rules?: string[]
+    prerequisite?: string
+  }>
 }
 
 export type CardManifestEntry = {
@@ -97,6 +103,7 @@ const customCardToMeta = ({ cardJson: card, cardType }: CustomCardMetadata): Car
   type: cardType,
   category: card.category,
   desc: card.desc,
+  rules: card.rules,
   cost: card.cost as Record<string, number> | undefined,
   altCosts: card.altCosts as Record<string, number>[] | undefined,
   exchanges: card.exchanges,

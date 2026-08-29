@@ -539,6 +539,7 @@ type ActionDefinition = {
   id: string
   nameKey: string
   descriptionKey?: string
+  rulesKey?: string
   roundAvailable?: number
   gainPerRound?: Partial<Resource>
   canBeExecutedByPlayer?(state, player): boolean
@@ -554,6 +555,8 @@ type ActionDefinition = {
   noChoiceLogKey?: string
 }
 ```
+
+`descriptionKey` 保留行动格印刷文本。可选的 `rulesKey` 指向独立本地化的补充裁定或实现限制，不影响行动合法性或执行。
 
 Hook 不进 `ActionDefinition`，由 `hooks.ts` 显式注册（卡牌文件内部）。
 
@@ -902,7 +905,7 @@ export const A123_FrameBuilder = defineOccupationCard({
 
 目标态删除 `shared/cards-display/`，不生成 shadow display 目录。`shared/cards/community/*` 与基础牌、major 一样使用单源；`shared/cards/community/auto-catalog.ts` 不再存在。
 
-`meta` 是 Card Definition：只允许可序列化、前端可见、无运行时行为的字段。允许 `cost`、`prerequisite`、`occupationPrerequisites`、`improvementPrerequisites`、`cardField`、`isCookery` 等声明式规则字段；禁止 `modifier` / `modifiers` / `listeners` / `effect` / `prerequisiteCheck`。`prerequisite` 是印刷文本，结构化静态条件走 `*Prerequisites`，动态条件走 `impl.prerequisiteCheck`。
+`meta` 是 Card Definition：只允许可序列化、前端可见、无运行时行为的字段。允许 `cost`、`prerequisite`、`occupationPrerequisites`、`improvementPrerequisites`、`cardField`、`isCookery` 等声明式规则字段；禁止 `modifier` / `modifiers` / `listeners` / `effect` / `prerequisiteCheck`。`desc` 保留卡牌印刷文本；可选且可本地化的 `rules` 独立记录补充裁定或实现限制，不改变运行时行为。`prerequisite` 是印刷文本，结构化静态条件走 `*Prerequisites`，动态条件走 `impl.prerequisiteCheck`。
 
 `impl` 是 Card Impl：包含 `modifiers`、`listeners`、`effect`、`prerequisiteCheck`、helper 调用和 `reaches`。modifier 属于 impl，不属于 Card Display。`reaches` 可由构建器静态提取并投影到 manifest 顶层，但不放进 `meta`。
 
