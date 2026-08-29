@@ -139,7 +139,7 @@ const registerNoopAnytime = (session: GameSession): string => {
   return id
 }
 
-const registerDirectReorgHelper = (session: GameSession): number => {
+const registerDirectReorgHelper = (session: GameSession, invalidateHost = true): number => {
   const helperCardId = '__TEST_direct_reorg_helper__'
   const actionId = '__TEST_direct_reorg_gain__'
   const helperPlayerIndex = 1
@@ -155,7 +155,7 @@ const registerDirectReorgHelper = (session: GameSession): number => {
     canBeExecutedByPlayer: () => true,
     execute: ({ state: current, player }) => {
       player.resources.sheep += 1
-      current.players[0]!.resources.clay = 0
+      if (invalidateHost) current.players[0]!.resources.clay = 0
       return { type: 'ok' }
     },
   }
@@ -274,6 +274,35 @@ describe('D014 Hammer Crusher provisional continuation', () => {
       (entry) => entry.key === 'log.provisionalContinuationRollback',
     )).toHaveLength(1)
     expect(session.resolveChoice(0, construct!.value).ok).toBe(false)
+  })
+
+  it('keeps a successful direct cross-player reorganization behind the undo boundary', () => {
+    const session = setup({ buildingTycoon: false })
+    const helperPlayerIndex = registerDirectReorgHelper(session, false)
+    let response = session.takeAction(0, 'house-redevelopment')
+    if (response.interaction.stateId !== 'wait') throw new Error('expected Construct choice')
+    const construct = response.interaction.request.options.find(
+      (option) => option.value !== '__skip__',
+    )
+
+    response = session.resolveChoice(0, construct!.value)
+    if (response.interaction.stateId !== 'wait' || response.interaction.request.kind !== 'animal-reorg') {
+      throw new Error('expected helper animal reorganization')
+    }
+    const zones = structuredClone(response.interaction.request.zones)
+    const house = zones.find((zone) => zone.zoneType === 'house')!
+    house.animalType = 'sheep'
+    house.animalCount = 1
+
+    response = session.resolveChoice(helperPlayerIndex, 'confirm', { zones })
+
+    expect(response.ok).toBe(true)
+    expect(response.interaction.stateId === 'wait' ? response.interaction.request.kind : undefined)
+      .toBe('farm-select')
+    expect(session.undoStep()).toMatchObject({
+      ok: false,
+      error: 'cannot undo past boundary',
+    })
   })
 
   it('records explicit ancestry and aborts only the nested Construct scope', () => {

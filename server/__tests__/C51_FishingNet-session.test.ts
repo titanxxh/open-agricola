@@ -159,7 +159,7 @@ describe('C051_FishingNet session', () => {
   it('opponent food is deducted by 1 when they use fishing (payerId fix)', () => {
     const session = setup(1)
     const s = session.getState().state
-    s.players[1]!.resources.food = 5
+    s.players[1]!.resources.food = 1
     session.loadState(s)
     const opponentFoodBefore = session.getState().state.players[1]!.resources.food
 

@@ -1576,7 +1576,8 @@ export class GameCore {
     const visiblePlayerIndex = visibleFrame
       ? this.visiblePlayerIndexForFrame(visibleFrame)
       : this.state.currentPlayerIndex
-    if (visiblePlayerIndex !== playerIndex) {
+    const foreignResponse = visiblePlayerIndex !== playerIndex
+    if (foreignResponse) {
       this.openProvisionalScopesForRisk()
       this.appendHistoryWithUndoBoundary()
     }
@@ -1603,6 +1604,7 @@ export class GameCore {
         },
       },
       deferredPlayerSwitch: null,
+      undoBoundaryOnResolve: foreignResponse,
       reason: 'reorganize',
     })
     this.runEngineSteps()
@@ -4273,7 +4275,7 @@ export class GameCore {
     const protectedDirectCancel = isProtectedActionCancel(resolvedActionId, value)
 
     if (pushHistoryEntry && !protectedDirectCancel) {
-      this.pushHistory()
+      this.pushHistory(false, frame?.undoBoundaryOnResolve === true)
     }
     // Card-effect resolveChoice hook: if the pending choice has a sourceCard with a
     // registered CardEffect.resolveChoice, give the card a chance to produce a follow-up
