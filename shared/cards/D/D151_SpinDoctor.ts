@@ -1,6 +1,9 @@
 import { defineOccupationCard } from '../card-source'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
+import type { ActionChoiceOption } from '../../contract/types'
+import { OCCUPIED_SPACE_CHOICE_PREFIX } from '../../actions/helpers/placement-constants'
+import { isSpaceOccupied } from '../../domain/space'
 import { workersAvailable } from '../../domain/player'
 import type { CardImpl } from '../registry'
 import { isTravelingPlayersSpaceId } from '../helpers/action-space-categories'
@@ -14,10 +17,9 @@ const listener: CardListenerRegistration = {
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (!isTravelingPlayersSpaceId(context.space?.id)) return
     if (workersAvailable(context.state, context.player) <= 0) return
-    // Collect all visible action spaces except Meeting Place
-    const addedSpaces = context.state.actionSpaces
-      .filter((s) => s.id !== 'meeting-place' && context.state.round >= (s.roundAvailable ?? 1))
-      .map((s) => s.id)
+    const constraints = context.state.actionSpaces
+      .filter((space) => space.id !== 'meeting-place')
+      .map((space) => space.id)
     return {
       flow: {
         type: 'seq',
@@ -28,7 +30,7 @@ const listener: CardListenerRegistration = {
             actionId: 'place-farmer',
             optional: true,
             sourceCard: CARD_ID,
-            params: { allowOccupied: true, added: addedSpaces },
+            actionContext: { constraints },
           },
         ],
       },
@@ -37,8 +39,27 @@ const listener: CardListenerRegistration = {
   },
 }
 
+const computeArgsListener: CardListenerRegistration = {
+  id: 'D151-spin-doctor-compute-args-place-farmer',
+  cardIds: [CARD_ID],
+  phases: ['computeArgs' as ActionHookPhase],
+  actions: ['place-farmer'],
+  handler: (context: CardListenerContext): ActionHookResult | void => {
+    if (context.sourceCard !== CARD_ID) return
+    const extraOptions: ActionChoiceOption[] = context.state.actionSpaces
+      .filter((space) => space.id !== 'meeting-place' && isSpaceOccupied(space))
+      .map((space) => ({
+        value: `${OCCUPIED_SPACE_CHOICE_PREFIX}${space.id}`,
+        labelKey: space.nameKey,
+        sourceCard: CARD_ID,
+      }))
+    if (extraOptions.length === 0) return
+    return { extraOptions, sourceCard: CARD_ID }
+  },
+}
+
 const cardImpl = {
-  listeners: [listener],
+  listeners: [listener, computeArgsListener],
   reaches: [] as readonly string[],
 } satisfies CardImpl
 

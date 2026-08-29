@@ -38,6 +38,9 @@ const computeReplaceListener: CardListenerRegistration = {
     if (context.actionContext?.checkedReplaceAction === true) return
     if (!isUnconditionalSow(context.actionContext)) return
     if (workersAvailable(context.state, context.player) <= 0) return
+    const constraints = context.state.actionSpaces
+      .filter((space) => !isMeetingPlace(space))
+      .map((space) => space.id)
     return {
       decline: true,
       alternativeFlow: {
@@ -49,7 +52,12 @@ const computeReplaceListener: CardListenerRegistration = {
           cardNameKey: 'occupations.A094_LazySowman.name',
         },
         children: [
-          { type: 'leaf', actionId: 'place-farmer', sourceCard: CARD_ID },
+          {
+            type: 'leaf',
+            actionId: 'place-farmer',
+            sourceCard: CARD_ID,
+            actionContext: { constraints },
+          },
         ],
       },
       sourceCard: CARD_ID,

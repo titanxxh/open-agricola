@@ -8,6 +8,7 @@ import {
 } from '../../../../shared/cards/custom-card-metadata'
 import { loadCardsManifest } from '../../../services/card-meta'
 import { publicAssetUrl } from '../../../utils/public-asset-url'
+import { zh } from '../../../../shared/i18n/zh'
 // Cards-manifest is preloaded by `client/__tests__/setup-card-manifest.ts`.
 
 describe('PlayerCard dual-type rendering (alsoCountsAs)', () => {
@@ -439,5 +440,20 @@ describe('PlayerCard dual-type rendering (alsoCountsAs)', () => {
     expect(heatingOven).not.toContain('Furnace')
     expect(tiledOven).toContain('Tiled Oven')
     expect(tiledOven).not.toContain('Heating Stove')
+  })
+})
+
+describe('PlayerCard supplemental rules', () => {
+  it('uses the global translation for major-improvement rules', () => {
+    const localeEntry = zh.improvements.Major_Fireplace1 as typeof zh.improvements.Major_Fireplace1 & { rules?: string }
+    localeEntry.rules = '主改良规则翻译'
+    try {
+      const html = renderToStaticMarkup(
+        <PlayerCard locale="zh" cardId="Major_Fireplace1" cardType="major" />,
+      )
+      expect(html).toContain('主改良规则翻译')
+    } finally {
+      delete localeEntry.rules
+    }
   })
 })

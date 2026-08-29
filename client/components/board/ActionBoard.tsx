@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type MouseEvent } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type FocusEvent, type MouseEvent } from 'react'
 import type { Locale } from '../../../shared/i18n'
 import { t } from '../../../shared/i18n'
 import type { ActionSpace, FutureMeeple, FutureMeepleResourceMap, PlayerState } from '../../../shared/contract/types'
@@ -839,7 +839,7 @@ export const ActionBoard = ({
     )
   }
 
-  const showTooltip = (e: MouseEvent, action: ActionSpace) => {
+  const showTooltip = (e: MouseEvent | FocusEvent, action: ActionSpace) => {
     const spritePos = ACTION_SPRITE[action.id]
     const rect = (e.currentTarget as HTMLElement).getBoundingClientRect()
     const tooltipW = spritePos ? 470 : 240
@@ -998,6 +998,8 @@ export const ActionBoard = ({
                 style={{ position: 'absolute', top: pos.top, left: pos.left, width: pos.width, height: pos.height }}
                 onMouseEnter={(e) => showTooltip(e, space)}
                 onMouseLeave={hideTooltip}
+                onFocus={(e) => showTooltip(e, space)}
+                onBlur={hideTooltip}
               >
                 <button
                   className={`action-card action-${pos.size}`}
@@ -1059,6 +1061,8 @@ export const ActionBoard = ({
                     data-action-id={action.id}
                     onMouseEnter={(e) => showTooltip(e, action)}
                     onMouseLeave={hideTooltip}
+                    onFocus={(e) => showTooltip(e, action)}
+                    onBlur={hideTooltip}
                   >
                     <button
                       className="action-card"
@@ -1130,6 +1134,8 @@ export const ActionBoard = ({
                     style={{ height: 150 }}
                     onMouseEnter={(e) => showTooltip(e, space)}
                     onMouseLeave={hideTooltip}
+                    onFocus={(e) => showTooltip(e, space)}
+                    onBlur={hideTooltip}
                   >
                     <button
                       className="action-card player-action-space-card"
