@@ -401,6 +401,18 @@ const cloneCommandValue = <T>(value: T): T => {
   ) as T
 }
 
+const preservePlayerDisplayNames = (current: GameState, restored: GameState): GameState => {
+  const names = new Map(current.players.map((player) => [player.id, player.name]))
+  for (const player of restored.players) {
+    player.name = names.get(player.id) ?? player.name
+  }
+  for (const entry of restored.log) {
+    const name = entry.playerId ? names.get(entry.playerId) : undefined
+    if (name !== undefined && entry.params) entry.params.player = name
+  }
+  return restored
+}
+
 const commandValuesEqual = (left: unknown, right: unknown): boolean => {
   if (Object.is(left, right)) return true
   if (Array.isArray(left) || Array.isArray(right)) {
@@ -997,7 +1009,10 @@ export class GameCore {
   restoreCommandCheckpoint(checkpoint: SessionCommandCheckpoint): void {
     this.withCtx(() => {
       if (!commandValuesEqual(this.state, checkpoint.state)) {
-        this.state = cloneCommandValue(checkpoint.state)
+        this.state = preservePlayerDisplayNames(
+          this.state,
+          cloneCommandValue(checkpoint.state),
+        )
         for (const space of this.state.actionSpaces) {
           const definition = this.registry.get(space.id)
           if (!definition) continue
@@ -2469,7 +2484,7 @@ export class GameCore {
   }
 
   private restoreHistory(entry: HistoryEntry) {
-    this.state = cloneState(entry.state)
+    this.state = preservePlayerDisplayNames(this.state, cloneState(entry.state))
     // Task 10/11: the previous GameCore pending field was deleted from
     // `GameState`. S2 Task 13.6 collapsed the HistoryEntry pending snapshot to a single boolean
     // (`hadChoicePending`) consumed by `undoStep()`'s `canRestorePriorChoice`
