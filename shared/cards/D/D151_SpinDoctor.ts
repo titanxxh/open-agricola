@@ -50,6 +50,7 @@ export const D151_SpinDoctor = defineOccupationCard({
     number: 151,
     category: 'ACTIONS_BOOSTER',
     desc: ['Immediately after each time you use the __Traveling Players__ accumulation space, you can place another person on an action space of your choice, regardless whether or not the action space is occupied.'],
+    rules: ['The additional person cannot be placed on __Meeting Place__.'],
     cost: {},
     players: '4+',
   },

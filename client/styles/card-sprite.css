@@ -607,6 +607,25 @@
   border-radius: 4px;
 }
 
+.card-rules {
+  margin: 4px 6px 0;
+  padding: 4px 5px;
+  border-top: 1px solid rgba(111, 79, 35, 0.35);
+  border-radius: 3px;
+  background: rgba(255, 247, 214, 0.55);
+  color: #5b4528;
+  font-size: 10px;
+  line-height: 12px;
+  text-align: left;
+}
+
+.card-rules-label {
+  display: block;
+  margin-bottom: 1px;
+  color: #49351d;
+  font-size: 10px;
+}
+
 /* Card cost text area */
 .card-cost-text {
   height: 80%;

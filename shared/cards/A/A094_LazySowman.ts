@@ -110,6 +110,7 @@ export const A094_LazySowman = defineOccupationCard({
     number: 94,
     category: "ACTIONS_BOOSTER",
     desc: ["Each time you decline an unconditional __Sow__ action on your turn, you can immediately place another person on an action space of your choice (even if it is occupied)."],
+    rules: ["The additional person cannot be placed on __Meeting Place__."],
     cost: {},
     players: "1+",
   },
