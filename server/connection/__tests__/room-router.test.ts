@@ -7,7 +7,7 @@ import { InMemoryRoomPersistence } from '../../game/persistence/memory-adapter.t
 import { createLobby } from '../../game/lobby.ts'
 import { createRoomPersistenceCheckpoint } from '../../game/room-persistence-checkpoint.ts'
 import { snapshotToRoom } from '../../game/room.ts'
-import { GameSession } from '../../game/authoritative-session.ts'
+import { GameSession, type SessionResponse } from '../../game/authoritative-session.ts'
 import type { GameState } from '../../../shared/contract/types.ts'
 import type { CustomCardData } from '../../../shared/cards/session-card-context.ts'
 
@@ -788,6 +788,60 @@ describe('handleAction guard: no-room', () => {
     const ctx = newCtx()
     dispatch(ctx, { type: 'action', spaceId: 'whatever' })
     expect(sentTypesOf(ctx)).toContain('error')
+  })
+})
+
+describe('durable rejection publication', () => {
+  it('sends the rejection only to its submitter and a successful snapshot to peers', () => {
+    const deps = newDeps()
+    const host = newCtx(deps)
+    host.currentUserId = 'u1'
+    dispatch(host, { type: 'createRoom', maxPlayers: 2, name: 'host' })
+    const guest = newCtx(deps)
+    guest.currentUserId = 'u2'
+    dispatch(guest, { type: 'joinRoom', roomId: host.currentRoom!.id, name: 'guest' })
+    const room = host.currentRoom!
+    const versionBefore = room.version
+    ;(host.ws.send as unknown as ReturnType<typeof vi.fn>).mockClear()
+    ;(guest.ws.send as unknown as ReturnType<typeof vi.fn>).mockClear()
+    vi.spyOn(room.session, 'takeAction').mockReturnValue({
+      ...room.session.getState(),
+      ok: false,
+      durableTransition: true,
+      error: 'command would break a mandatory continuation',
+    })
+    const commit = vi.fn((target: typeof room, response: SessionResponse) => {
+      target.version += 1
+      expect(response).toMatchObject({ ok: true, durableTransition: true })
+      expect(response.error).toBeUndefined()
+      return { kind: 'committed' as const, roomVersion: target.version, stepNo: 1, frameHash: 'frame' }
+    })
+    host.committer = {
+      blockedError: () => undefined,
+      isRecording: () => true,
+      commit,
+      isRetrying: () => false,
+      waitUntilReady: () => false,
+    } as never
+
+    dispatch(host, { type: 'action', spaceId: 'forest', requestId: 'durable-rejection' })
+
+    expect(sentMessagesOf(host)).toContainEqual(expect.objectContaining({
+      type: 'stateUpdate',
+      version: versionBefore + 1,
+      requestId: 'durable-rejection',
+      payload: expect.objectContaining({
+        ok: false,
+        error: 'command would break a mandatory continuation',
+      }),
+    }))
+    const peerUpdate = sentMessagesOf(guest).find(({ type }) => type === 'stateUpdate')
+    expect(peerUpdate).toMatchObject({
+      version: versionBefore + 1,
+      payload: { ok: true },
+    })
+    expect((peerUpdate?.payload as Record<string, unknown>).error).toBeUndefined()
+    expect(commit).toHaveBeenCalledTimes(1)
   })
 })
 

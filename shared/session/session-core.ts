@@ -1554,6 +1554,11 @@ export class GameCore {
     trigger: import('../actions/effects/reorganize').ReorganizeTrigger,
     resumeExtra: { originPlayerIndex?: number | null; triggerActionId?: string | null } = {},
   ): void {
+    const visibleFrame = this.engineStack.current()
+    const visiblePlayerIndex = visibleFrame
+      ? this.visiblePlayerIndexForFrame(visibleFrame)
+      : this.state.currentPlayerIndex
+    if (visiblePlayerIndex !== playerIndex) this.openProvisionalScopesForRisk()
     const player = this.state.players[playerIndex]
     if (!player) return
     const flow: ActionFlow = {

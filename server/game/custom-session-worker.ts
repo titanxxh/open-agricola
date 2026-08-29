@@ -97,12 +97,16 @@ const buildResult = (response: SessionResponse) => {
 }
 
 parentPort?.on('message', (request: Request) => {
+  let checkpoint: PersistedSessionSnapshot | null = null
+  let checkpointWarnings: string[] = []
   try {
     if (request.init) {
       customCards = request.init.customCards
       restore(request.init.snapshot, request.init.cardWarnings)
     }
     if (!session) throw new Error('custom session worker is not initialized')
+    checkpoint = serializeSessionSnapshot(session.state, session)
+    checkpointWarnings = [...session.cardWarnings]
     const { response, raw } = session.withCtx(() => dispatch(request.method, request.args))
     const result: Success = {
       id: request.id,
@@ -113,11 +117,12 @@ parentPort?.on('message', (request: Request) => {
     parentPort?.postMessage(result)
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error)
-    if (!session) {
+    if (!session || !checkpoint) {
       parentPort?.postMessage({ id: request.id, ok: false, error: message })
       return
     }
     try {
+      restore(checkpoint, checkpointWarnings)
       const response = { ...session.getState(), ok: false, error: message }
       parentPort?.postMessage({ id: request.id, ok: false, error: message, ...buildResult(response) })
     } catch {

@@ -138,6 +138,42 @@ const registerNoopAnytime = (session: GameSession): string => {
   return id
 }
 
+const registerDirectReorgHelper = (session: GameSession): number => {
+  const helperCardId = '__TEST_direct_reorg_helper__'
+  const actionId = '__TEST_direct_reorg_gain__'
+  const helperPlayerIndex = 1
+  const state = session.getState().state
+  state.players[helperPlayerIndex]!.occupationPlayed.push(helperCardId)
+  session.loadState(state)
+  const action: ActionDefinition = {
+    id: actionId,
+    nameKey: 'actions.test.name',
+    descriptionKey: 'actions.test.description',
+    roundAvailable: 1,
+    gainPerRound: {},
+    canBeExecutedByPlayer: () => true,
+    execute: ({ state: current, player }) => {
+      player.resources.sheep += 1
+      current.players[0]!.resources.clay = 0
+      return { type: 'ok' }
+    },
+  }
+  ;(session as unknown as { registry: { register: (definition: ActionDefinition) => void } })
+    .registry.register(action)
+  session.withCtx(() => requireActiveCardRegistry('direct reorg provisional scope test').registerListener({
+    id: '__TEST_direct_reorg_before__',
+    cardIds: [helperCardId],
+    actions: ['construct'],
+    phases: ['before'],
+    scope: 'opponent',
+    handler: () => ({
+      sourceCard: helperCardId,
+      flow: { type: 'leaf', actionId, sourceCard: helperCardId },
+    }),
+  }))
+  return helperPlayerIndex
+}
+
 describe('D014 Hammer Crusher provisional continuation', () => {
   it('restores the room plan while retaining Hammer Crusher resources', () => {
     let session = setup()
@@ -192,6 +228,47 @@ describe('D014 Hammer Crusher provisional continuation', () => {
     const retry = session.commitSelectionChoice(0, { rooms: [room] })
     expect(retry.ok).toBe(false)
     expect(retry.interaction.stateId).toBe('wait')
+  })
+
+  it('opens a scope before a direct cross-player animal reorganization', () => {
+    const session = setup({ buildingTycoon: false })
+    const helperPlayerIndex = registerDirectReorgHelper(session)
+    let response = session.takeAction(0, 'house-redevelopment')
+    if (response.interaction.stateId !== 'wait') throw new Error('expected Construct choice')
+    const construct = response.interaction.request.options.find(
+      (option) => option.value !== '__skip__',
+    )
+
+    response = session.resolveChoice(0, construct!.value)
+
+    expect(response.interaction.stateId === 'wait' ? {
+      kind: response.interaction.request.kind,
+      playerIndex: response.interaction.playerIndex,
+    } : response.interaction).toEqual({ kind: 'animal-reorg', playerIndex: helperPlayerIndex })
+    expect(session.createSessionPrivateCursor().provisionalContinuationScopes.length)
+      .toBeGreaterThan(0)
+    if (response.interaction.stateId !== 'wait' || response.interaction.request.kind !== 'animal-reorg') {
+      throw new Error('expected helper animal reorganization')
+    }
+    const zones = structuredClone(response.interaction.request.zones)
+    const house = zones.find((zone) => zone.zoneType === 'house')!
+    house.animalType = 'sheep'
+    house.animalCount = 1
+
+    response = session.resolveChoice(helperPlayerIndex, 'confirm', { zones })
+
+    expect(response.ok).toBe(true)
+    expect(response.interaction.stateId === 'wait' ? response.interaction.request.kind : undefined)
+      .toBe('choice')
+    expect(response.state.players[0]).toMatchObject({
+      rooms: 2,
+      resources: { clay: 5, reed: 2 },
+    })
+    expect(response.state.players[helperPlayerIndex]!.resources.sheep).toBe(0)
+    expect(response.state.log.filter(
+      (entry) => entry.key === 'log.provisionalContinuationRollback',
+    )).toHaveLength(1)
+    expect(session.resolveChoice(0, construct!.value).ok).toBe(false)
   })
 
   it('records explicit ancestry and aborts only the nested Construct scope', () => {

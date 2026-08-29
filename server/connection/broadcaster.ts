@@ -22,6 +22,11 @@ const viewerIdForSeat = (resp: SessionResponse, seatIndex: number | undefined): 
 const projectionModeFor = (room: Room): SyncPayloadMode | undefined =>
   room.hotseat === true ? 'debug' : undefined
 
+type RequesterResponse = {
+  ws: WebSocket
+  response: SessionResponse
+}
+
 export class Broadcaster {
   private readonly checkpoint: RoomPersistenceCheckpoint
 
@@ -31,9 +36,15 @@ export class Broadcaster {
     this.checkpoint = deps.checkpoint
   }
 
-  broadcastState(room: Room, resp: SessionResponse, cause: StateUpdateCause, requestId?: string): void {
+  broadcastState(
+    room: Room,
+    resp: SessionResponse,
+    cause: StateUpdateCause,
+    requestId?: string,
+    requesterResponse?: RequesterResponse,
+  ): void {
     room.version += 1
-    this.broadcastCommitted(room, resp, cause, requestId)
+    this.broadcastCommitted(room, resp, cause, requestId, requesterResponse)
     if (resp.state.gameOver) {
       this.checkpoint.completeGame(room)
     } else {
@@ -46,13 +57,14 @@ export class Broadcaster {
     resp: SessionResponse,
     cause: StateUpdateCause,
     requestId?: string,
+    requesterResponse?: RequesterResponse,
   ): void {
     const emittedAt = Date.now()
     for (const seat of room.players) {
       if (seat.ws.readyState !== seat.ws.OPEN) continue
       const env = buildEnvelope({
         room,
-        resp,
+        resp: requesterResponse?.ws === seat.ws ? requesterResponse.response : resp,
         viewerPlayerId: viewerIdForSeat(resp, seat.playerIndex),
         version: room.version,
         cause,

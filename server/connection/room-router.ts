@@ -246,21 +246,40 @@ const publishCommandResponse = (
     ctx.broadcaster.sendStateTo(ctx.ws, room, response, command.requestId, cause)
     return
   }
+  const { error: _error, ...responseWithoutError } = response
+  const publishedResponse: SessionResponse = response.ok
+    ? response
+    : { ...responseWithoutError, ok: true }
+  const requesterResponse = response.ok
+    ? undefined
+    : { ws: ctx.ws, response }
   if (response.state.gameOver && room.players.length === 0) {
     room.customSessionExecutor?.dispose()
   }
   const replayIntent = replayIntentFromCommand(command)
   if (!ctx.committer || !ctx.committer.isRecording(room.id) || !replayIntent) {
-    ctx.broadcaster.broadcastState(room, response, cause, command.requestId)
+    ctx.broadcaster.broadcastState(
+      room,
+      publishedResponse,
+      cause,
+      command.requestId,
+      requesterResponse,
+    )
     return
   }
   const publishCommitted = (): void => {
     if (response.state.gameOver) ctx.checkpoint.markInactive(room.id)
-    ctx.broadcaster.broadcastCommitted(room, response, cause, command.requestId)
+    ctx.broadcaster.broadcastCommitted(
+      room,
+      publishedResponse,
+      cause,
+      command.requestId,
+      requesterResponse,
+    )
   }
   const result = ctx.committer.commit(
     room,
-    response,
+    publishedResponse,
     replayIntent,
     seat,
     () => {
