@@ -63,6 +63,7 @@ const isDoableListener: CardListenerRegistration = {
   actions: ['collect', 'fishing'],
   scope: 'opponent',
   handler: (context: CardListenerContext): ActionHookResult | void => {
+    if (context.actionContext?.skipBeforeTriggers === true) return
     if (context.space?.id !== 'fishing') return
     if (context.player.resources.food >= 1) return
     return { doable: false }

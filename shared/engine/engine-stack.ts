@@ -51,6 +51,7 @@ export type EngineFrame = {
     confirmed?: boolean
     returnPlayerStack?: number[]
   } | null
+  undoBoundaryOnResolve?: boolean
   reason: SubFlowReason
 }
 
@@ -67,6 +68,7 @@ export type EngineFrameCursor = {
     confirmed?: boolean
     returnPlayerStack?: number[]
   } | null
+  undoBoundaryOnResolve?: boolean
   reason: SubFlowReason
 }
 
@@ -218,6 +220,7 @@ export class EngineStack {
         spaceId: f.spaceId,
         stageResume: f.stageResume,
         deferredPlayerSwitch: f.deferredPlayerSwitch,
+        undoBoundaryOnResolve: f.undoBoundaryOnResolve,
         reason: f.reason,
       })),
     }
@@ -242,6 +245,7 @@ export class EngineStack {
         spaceId: fc.spaceId,
         stageResume: fc.stageResume,
         deferredPlayerSwitch: fc.deferredPlayerSwitch,
+        undoBoundaryOnResolve: fc.undoBoundaryOnResolve,
         reason: fc.reason,
       })
     }

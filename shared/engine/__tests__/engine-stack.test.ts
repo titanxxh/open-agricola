@@ -59,6 +59,7 @@ describe('EngineStack', () => {
       ownerPlayerIndex: 1,
       spaceId: '__subflow:reorganize',
       reason: 'reorganize',
+      undoBoundaryOnResolve: true,
       stageResume: { hook: 'onReorganizeComplete', playerIndex: 1, cardIndex: 0, extra: { trigger: 'anytime' } },
     })
     stack.push(frame)
@@ -68,6 +69,7 @@ describe('EngineStack', () => {
     expect(cursor.frames[0]!.ownerPlayerIndex).toBe(1)
     expect(cursor.frames[0]!.spaceId).toBe('__subflow:reorganize')
     expect(cursor.frames[0]!.reason).toBe('reorganize')
+    expect(cursor.frames[0]!.undoBoundaryOnResolve).toBe(true)
     expect(cursor.frames[0]!.stageResume).toEqual({
       hook: 'onReorganizeComplete', playerIndex: 1, cardIndex: 0, extra: { trigger: 'anytime' },
     })
@@ -79,6 +81,7 @@ describe('EngineStack', () => {
     expect(rebuilt.depth()).toBe(1)
     expect(rebuilt.current()!.ownerPlayerIndex).toBe(1)
     expect(rebuilt.current()!.reason).toBe('reorganize')
+    expect(rebuilt.current()!.undoBoundaryOnResolve).toBe(true)
   })
 
   it('replaces the current frame engine and source together', () => {
