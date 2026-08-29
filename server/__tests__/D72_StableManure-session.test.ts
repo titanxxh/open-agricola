@@ -6,7 +6,9 @@ import { markAllWorkersUsed, setActiveWorkerCount } from '../../shared/domain/pl
 import { getCardEffect } from '../../shared/cards/card-effects'
 import '../../shared/cards/D/D072_StableManure'
 import '../../shared/cards/D/D075_WoodField'
+import '../../shared/cards/E/E070_CropRotationField'
 import '../../shared/cards/E/E080_RockGarden'
+import '../../shared/cards/E/E112_GrainThief'
 import type { ActionChoiceOption } from '../../shared/contract/types'
 import { autoAdvanceRoundEnd } from '../../tests/llm-card-gen/session-helpers'
 
@@ -157,6 +159,27 @@ describe('D072_StableManure session', () => {
       { crop: 'wood', remaining: 1 },
     ])
     expect(harvested.cardStates.D072_StableManure?.extraData?.selectedPositions).toBeUndefined()
+  })
+
+  it('does not apply Grain Thief selection thresholds to card fields', () => {
+    const { session } = setupHarvest(1)
+    const state = session.getState().state
+    const player = state.players[0]!
+    player.fields = [{ row: 0, col: 0, stacks: [{ kind: 'grain', remaining: 1 }] }]
+    player.occupationPlayed.push('E112_GrainThief')
+    player.minorPlayed.push('E070_CropRotationField')
+    player.cardStates.E070_CropRotationField = {
+      extraData: { cardFieldStacks: [{ crop: 'grain', remaining: 1 }] },
+    }
+    session.loadState(state)
+
+    const selection = chooseStableManureSelection(session)
+
+    expect(selection.interaction.stateId).toBe('wait')
+    if (selection.interaction.stateId !== 'wait') throw new Error('expected selection')
+    expect(selection.interaction.request.selection?.selectablePositions).toEqual([
+      { row: 0, col: 0, groupKey: '0-0' },
+    ])
   })
 
   it('treats all Rock Garden slots as one field and harvests only one extra stone', () => {
