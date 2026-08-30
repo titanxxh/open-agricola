@@ -5,6 +5,7 @@ import type { ActionChoiceOption, PlayerState } from '../../shared/contract/type
 
 import '../../shared/cards/B/B132_EstateMaster'
 import '../../shared/cards/B/B050_ButterChurn'
+import '../../shared/cards/B/B101_FurnitureCarpenter'
 import '../../shared/cards/C/C098_CubeCutter'
 import '../../shared/cards/D/D038_MilkingStool'
 import '../../shared/cards/D/D072_StableManure'
@@ -112,6 +113,23 @@ describe('harvest reaction flow', () => {
     expect(resp.interaction.stateId).toBe('idle')
     expect(resp.state.round).toBe(5)
     expect(resp.state.players[0]!.resources.food).toBe(19)
+  })
+
+  it('offers Furniture Carpenter exactly once in a harvest', () => {
+    const { session, state } = setupHarvestSession()
+    state.players[0]!.occupationPlayed.push('B101_FurnitureCarpenter')
+    state.players[1]!.improvements.push('Major_Joinery')
+
+    session.loadState(state)
+    let resp = session.performRoundEnd()
+    resp = resolveCardTrigger(session, resp, 'B101_FurnitureCarpenter')
+    resp = acceptOptional(session, resp)
+
+    expect(resp.ok).toBe(true)
+    expect(resp.interaction.stateId).toBe('idle')
+    expect(resp.state.round).toBe(5)
+    expect(resp.state.players[0]!.resources.food).toBe(16)
+    expect(resp.state.players[0]!.cardStates.B101_FurnitureCarpenter?.counters?.bonusVp).toBe(1)
   })
 
   it('keeps deterministic and interactive harvest field hooks in the same trigger selection', () => {
