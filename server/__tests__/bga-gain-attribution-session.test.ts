@@ -3,7 +3,7 @@ import { GameSession, type SessionResponse } from '../game/authoritative-session
 import { readCardResourceStats } from '../../shared/cards/helpers/card-state'
 import { setWorkersAtHome } from '../../shared/domain/player'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
-import { confirmPlayerSwitch } from './_helpers/pending-confirms'
+import { confirmNextPlayer, confirmPlayerSwitch } from './_helpers/pending-confirms'
 import { resolveTriggerIfPresent } from './_helpers/trigger-select'
 
 import '../../shared/cards/A/A147_AnimalDealer'
@@ -34,6 +34,7 @@ const driveCardFlow = (
   let resp = initial
   let guard = 20
   while (guard-- > 0 && resp.interaction.stateId === 'wait') {
+    expect(resp.ok).toBe(true)
     const { request, playerIndex } = resp.interaction
     if (request.kind === 'animal-reorg') {
       resp = session.resolveChoice(playerIndex, 'confirm', [])
@@ -41,6 +42,10 @@ const driveCardFlow = (
     }
     if (request.kind === 'confirm-player-switch') {
       resp = confirmPlayerSwitch(session)
+      continue
+    }
+    if (request.kind === 'confirm-next-player') {
+      resp = confirmNextPlayer(session)
       continue
     }
     if (request.kind === 'select-trigger') {
@@ -55,6 +60,8 @@ const driveCardFlow = (
     if (!option) break
     resp = session.resolveChoice(playerIndex, option.value)
   }
+  expect(resp.ok).toBe(true)
+  expect(resp.interaction.stateId).not.toBe('wait')
   return resp
 }
 
@@ -104,8 +111,13 @@ describe('BGA gain attribution regressions', () => {
     let resp = session.takeAction(1, 'house-redevelopment')
     let guard = 12
     while (guard-- > 0 && resp.interaction.stateId === 'wait') {
+      expect(resp.ok).toBe(true)
       if (resp.interaction.request.kind === 'confirm-player-switch') {
         resp = confirmPlayerSwitch(session)
+        continue
+      }
+      if (resp.interaction.request.kind === 'confirm-next-player') {
+        resp = confirmNextPlayer(session)
         continue
       }
       if (resp.interaction.request.kind === 'select-trigger') {
@@ -120,6 +132,7 @@ describe('BGA gain attribution regressions', () => {
     }
 
     expect(resp.ok).toBe(true)
+    expect(resp.interaction.stateId).not.toBe('wait')
     expect(resp.state.players[1]!.houseType).toBe('clay')
     expect(resp.state.players[0]!.resources.reed).toBe(initialReed + 1)
     expect(readCardResourceStats(resp.state.players[0]!, 'C144_ReedRoofRenovator')?.gained.reed).toBe(1)
