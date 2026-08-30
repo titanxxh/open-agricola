@@ -329,6 +329,33 @@ describe('buildActionLogTimelineRows', () => {
     ])
   })
 
+  it('keeps the round cursor across a replay-derived state-log split', () => {
+    const buckets = buildActionLogTimelineRows({
+      entries: [replayEntry()],
+      stateLog: [
+        { key: 'log.enterRound', params: { round: 3 } },
+        { key: 'log.startGame' },
+        {
+          key: 'log.actionDetail',
+          params: {
+            player: 'Alice',
+            action: 'Forest',
+            detailParts: { gains: { wood: 3 } },
+          },
+        },
+        { key: 'log.provisionalContinuationRollback' },
+      ],
+      currentRound: 3,
+      locale: 'en',
+      playerNames: { p1: 'Alice' },
+      actionNames: { forest: 'Forest' },
+    })
+
+    const rollback = buckets.flatMap((bucket) => bucket.rows)
+      .find((row) => row.logEntry?.key === 'log.provisionalContinuationRollback')
+    expect(rollback?.round).toBe(2)
+  })
+
   it('suppresses pure resource future resolution across archive packets', () => {
     const resolved = {
       schemaVersion: 1,

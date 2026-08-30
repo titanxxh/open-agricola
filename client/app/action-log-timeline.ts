@@ -51,7 +51,7 @@ type BuildActionLogTimelineRowsInput = {
 const groupStateLog = (
   log: readonly LogEntry[],
   currentRound: number,
-): ActionLogTimelineBucket[] => {
+): { buckets: ActionLogTimelineBucket[]; nextRound: number } => {
   const buckets: ActionLogTimelineBucket[] = []
   let rows: ActionLogTimelineRow[] = []
   let round = currentRound
@@ -79,7 +79,7 @@ const groupStateLog = (
   })
 
   if (rows.length > 0) buckets.push({ round, rows })
-  return buckets
+  return { buckets, nextRound: round }
 }
 
 type ReplayEventTimelineEntry = ReplayTimelineEntry & { event: GameEvent }
@@ -268,9 +268,10 @@ export const buildActionLogTimelineRows = ({
       }]
     })
   const visibleStateLog = splitReplayIndependentStateLogRows(stateLog, contextualLogEntries)
-  const leadingStateLogRows = groupStateLog(visibleStateLog.leading, currentRound)
+  const leadingStateLog = groupStateLog(visibleStateLog.leading, currentRound)
+  const leadingStateLogRows = leadingStateLog.buckets
     .flatMap((bucket) => bucket.rows)
-  const trailingStateLogRows = groupStateLog(visibleStateLog.trailing, currentRound)
+  const trailingStateLogRows = groupStateLog(visibleStateLog.trailing, leadingStateLog.nextRound).buckets
     .flatMap((bucket) => bucket.rows)
 
   return mergeBuckets([...leadingStateLogRows, ...eventRows, ...trailingStateLogRows])

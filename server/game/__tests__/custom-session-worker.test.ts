@@ -156,6 +156,42 @@ describe('custom session executor', () => {
     expect(loadState).not.toHaveBeenCalled()
   })
 
+  it('confirms a returning player switch from the outgoing responder', async () => {
+    const customCard = card('CUSTOM_PlayerSwitch')
+    const created = createIsolatedGameSession(42, [customCard], { playerCount: 5 })
+    expect(created.executor).toBeDefined()
+    const executor = created.executor!
+    executors.push(executor)
+    const state = created.session.state
+    state.currentPlayerIndex = 1
+    state.round = 1
+    state.players[0]!.occupationPlayed.push('B178_TagAlong')
+    state.players.forEach((player) => {
+      player.minorHand = ['__test_placeholder__']
+      player.occupationHand = ['__test_placeholder__']
+    })
+    created.session.loadState(state)
+
+    await executor.execute('takeAction', [1, 'resource-market-56'])
+    const prompted = await executor.execute('confirmCurrentPlayer', [])
+    if (prompted.interaction.stateId !== 'wait') throw new Error('expected Tag-Along choice')
+    const accept = prompted.interaction.request.options.find((option) => option.value !== '__skip__')
+    const returning = await executor.execute('resolveChoice', [0, accept!.value])
+    expect(returning.state.currentPlayerIndex).toBe(1)
+    expect(returning.interaction.stateId === 'wait' ? returning.interaction.request : undefined)
+      .toMatchObject({
+        kind: 'confirm-player-switch',
+        fromPlayerIndex: 0,
+        toPlayerIndex: 1,
+      })
+
+    const confirmed = await executor.execute('confirmCurrentPlayer', [])
+    expect(confirmed.ok).toBe(true)
+    expect(confirmed.interaction.stateId === 'wait'
+      ? confirmed.interaction.request.kind
+      : confirmed.interaction.stateId).not.toBe('confirm-player-switch')
+  })
+
   it('restores worker state when dispatch fails after a partial mutation', async () => {
     const { session, executor } = setup(card('CUSTOM_SerializationFailure'))
     const namesBefore = session.state.players.map((player) => player.name)

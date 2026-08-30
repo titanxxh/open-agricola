@@ -18,6 +18,7 @@ import type { GameEvent } from '../../shared/contract/events.ts'
 
 import '../../shared/cards/E/E078_SleightofHand'
 import '../../shared/cards/D/D036_BreedRegistry'
+import '../../shared/cards/B/B178_TagAlong'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 
 const E078_CARD_ID = 'E078_SleightofHand'
@@ -128,6 +129,42 @@ describe('HTTP privacy + seat binding', () => {
       const data = JSON.parse(res.body)
       expect(data.state.players).toHaveLength(6)
       expect(data.state.players.map((player: { id: string }) => player.id)).toEqual(['p1', 'p2', 'p3', 'p4', 'p5', 'p6'])
+    })
+
+    it('confirms a returning player switch from the outgoing responder', async () => {
+      const session = new GameSession(42, undefined, { playerCount: 5 })
+      stabilizeRandomHands(session.state.players)
+      const state = session.getState().state
+      state.currentPlayerIndex = 1
+      state.round = 1
+      state.players[0]!.occupationPlayed.push('B178_TagAlong')
+      state.players.forEach((player) => {
+        player.minorHand = ['__test_placeholder__']
+        player.occupationHand = ['__test_placeholder__']
+      })
+      session.loadState(state)
+
+      let response = session.takeAction(1, 'resource-market-56')
+      if (response.interaction.stateId !== 'wait') throw new Error('expected initial switch')
+      response = session.resolveChoice(response.interaction.playerIndex, 'confirm')
+      if (response.interaction.stateId !== 'wait') throw new Error('expected Tag-Along choice')
+      const accept = response.interaction.request.options.find((option) => option.value !== '__skip__')
+      response = session.resolveChoice(0, accept!.value)
+      expect(response.state.currentPlayerIndex).toBe(1)
+      expect(response.interaction.stateId === 'wait' ? response.interaction.request : undefined).toMatchObject({
+        kind: 'confirm-player-switch',
+        fromPlayerIndex: 0,
+        toPlayerIndex: 1,
+      })
+      setSession(session)
+
+      const res = mockRes()
+      await handleGameRoute(mockReq('POST', '/api/game/confirm-player-switch'), res)
+
+      expect(res.statusCode).toBe(200)
+      const data = JSON.parse(res.body)
+      expect(data.ok).toBe(true)
+      expect(data.interaction.request?.kind).not.toBe('confirm-player-switch')
     })
 
     it('POST /api/game/new-sandbox accepts variant options', async () => {

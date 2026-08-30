@@ -153,9 +153,16 @@ export class LocalSandboxCore {
       case 'commitSelection': return core.commitSelectionChoice(a[0], a[1])
       case 'confirmFeed':
         return core.resolveChoice(a[0], 'confirm' as never, { selections: a[1] } as never)
-      case 'confirmNextPlayer':
-      case 'confirmPlayerSwitch': {
+      case 'confirmNextPlayer': {
         const idx = core.getState().state.currentPlayerIndex
+        return core.resolveChoice(idx as never, 'confirm' as never)
+      }
+      case 'confirmPlayerSwitch': {
+        const snapshot = core.getState()
+        const idx = snapshot.interaction.stateId === 'wait' &&
+          snapshot.interaction.request.kind === 'confirm-player-switch'
+          ? snapshot.interaction.playerIndex
+          : snapshot.state.currentPlayerIndex
         return core.resolveChoice(idx as never, 'confirm' as never)
       }
       case 'performRoundEnd': return core.performRoundEnd()
