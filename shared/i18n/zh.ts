@@ -375,6 +375,8 @@ export const zh = {
     interactionFirewoodExchange: '选择要从柴火卡上拿取的木材数量',
     interactionFirewoodExchangeCount: '拿走 {count} 木材',
     interactionFirewoodExchangeSkip: '不拿木材',
+    interactionFurnisherCount: '选择要使用家具商打出或建造几次改良',
+    interactionFurnisherCountChoice: '打出或建造 {count} 张改良',
     interactionReclamationPlow: '你已安置本次拿到的全部动物。要使用开垦犁吗？',
     interactionReclamationPlowAmbiguous: '这次拿到的动物是否都安置到了你的农场上？',
     interactionReclamationPlowUse: '开垦 1 块田并使用开垦犁',
