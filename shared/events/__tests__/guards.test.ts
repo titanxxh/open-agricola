@@ -68,6 +68,19 @@ describe('event guards', () => {
     })).not.toThrow()
   })
 
+  it('accepts known continuation restore reasons', () => {
+    expect(() => assertKnownGameEventShape({
+      ...baseEvent,
+      type: 'continuation.restored',
+      reason: 'scopeRollback',
+    })).not.toThrow()
+    expect(() => assertKnownGameEventShape({
+      ...baseEvent,
+      type: 'continuation.restored',
+      reason: 'unknown',
+    })).toThrow(/known continuation restore reason/)
+  })
+
   it('rejects private payloads in action detail log events', () => {
     expect(() => assertKnownGameEventShape({
       ...baseEvent,

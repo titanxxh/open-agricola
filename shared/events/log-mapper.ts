@@ -922,6 +922,15 @@ export const buildLogPresentationPlan = (
         return presentationRows(event, [{ key: 'log.gameOver' }])
       }
 
+      if (event.type === 'continuation.restored') {
+        const key = event.reason === 'scopeRollback'
+          ? 'log.provisionalContinuationRollback'
+          : event.reason === 'protectedObservationRejected'
+            ? 'log.provisionalProtectedObservationRejected'
+            : 'log.provisionalContinuationCommandRejected'
+        return presentationRows(event, [{ key }])
+      }
+
       if (event.type === 'farm.sown') {
         return presentationRows(event, [{
           key: 'log.sow',

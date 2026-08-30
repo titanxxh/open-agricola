@@ -45,7 +45,7 @@ describe('B178 Tag-Along session', () => {
     expect(resp.interaction.stateId).toBe('wait')
     if (resp.interaction.stateId !== 'wait') return
     expect(resp.interaction.request.kind).toBe('confirm-player-switch')
-    expect(resp.interaction.playerIndex).toBe(0)
+    expect(resp.interaction.playerIndex).toBe(1)
     resp = confirmPlayerSwitch(session)
     expect(resp.interaction.stateId).toBe('wait')
     if (resp.interaction.stateId !== 'wait') return

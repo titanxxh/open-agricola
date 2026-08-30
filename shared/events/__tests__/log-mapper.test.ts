@@ -1138,6 +1138,26 @@ describe('eventsToLogEntries', () => {
     ])
   })
 
+  it('maps continuation restore reasons to explicit log entries', () => {
+    const base = {
+      schemaVersion: 1,
+      round: 3,
+      phase: 'work',
+      visibility: 'public',
+    } as const
+    const events = [
+      { ...base, id: '1', seq: 1, type: 'continuation.restored', reason: 'commandRejected' },
+      { ...base, id: '2', seq: 2, type: 'continuation.restored', reason: 'protectedObservationRejected' },
+      { ...base, id: '3', seq: 3, type: 'continuation.restored', reason: 'scopeRollback' },
+    ] satisfies GameEvent[]
+
+    expect(eventsToLogEntries(events, { playerNames: {} }).map((entry) => entry.key)).toEqual([
+      'log.provisionalContinuationRollback',
+      'log.provisionalProtectedObservationRejected',
+      'log.provisionalContinuationCommandRejected',
+    ])
+  })
+
   it('maps start and card-granted events to legacy log entries', () => {
     const events = [
       {
