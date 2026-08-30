@@ -54,6 +54,7 @@ export type PromptKey =
   | 'ui.interactionFodderPlanterSow'
   | 'ui.interactionForestInn'
   | 'ui.interactionFreshmanOccupation'
+  | 'ui.interactionFurnisherCount'
   | 'ui.interactionGodlySpouse'
   | 'ui.interactionHammerCrusherBuild'
   | 'ui.interactionHaydryer'

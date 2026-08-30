@@ -381,6 +381,8 @@ export const en = {
     interactionFirewoodExchange: 'Select how much wood to take from Firewood',
     interactionFirewoodExchangeCount: 'Take {count} wood',
     interactionFirewoodExchangeSkip: 'Do not take wood',
+    interactionFurnisherCount: 'Choose how many improvements to build or play with Furnisher',
+    interactionFurnisherCountChoice: 'Build or play {count} improvement(s)',
     interactionReclamationPlow: 'You accommodated all collected animals. Use Reclamation Plow?',
     interactionReclamationPlowAmbiguous: 'Did you accommodate all collected animals on your farm?',
     interactionReclamationPlowUse: 'Plow 1 field and use Reclamation Plow',

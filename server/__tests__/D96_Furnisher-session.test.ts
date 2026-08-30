@@ -31,7 +31,7 @@ const setupTwoRoomBuild = () => {
 
   const player = state.players[0]!
   player.occupationPlayed.push(CARD_ID)
-  player.minorHand = ['A037_Bucksaw', 'D014_HammerCrusher']
+  player.minorHand = ['A037_Bucksaw', 'D014_HammerCrusher', 'B067_HandTruck']
   player.resources = {
     ...player.resources,
     wood: 10,
@@ -62,7 +62,7 @@ const setup = () => {
 }
 
 describe('D096_Furnisher session', () => {
-  it('offers one optional improvement for each of two rooms built at once', () => {
+  it('chooses two mandatory improvements after building two rooms at once', () => {
     const session = setupTwoRoomBuild()
 
     let resp = session.takeAction(0, 'farm-expansion')
@@ -88,38 +88,75 @@ describe('D096_Furnisher session', () => {
     if (resp.interaction.stateId !== 'wait') return
     expect(resp.interaction.playerIndex).toBe(0)
     expect(resp.interaction.sourceCard).toBe(CARD_ID)
-    expect(resp.interaction.request.options?.some((option) => option.value === '__skip__')).toBe(true)
-    const useFurnisher = resp.interaction.request.options?.find((option) => option.value !== '__skip__')
-    expect(useFurnisher).toBeDefined()
+    const countOptions = resp.interaction.request.options ?? []
+    expect(countOptions.map((option) => option.labelParams?.count)).toEqual([0, 1, 2])
+    const useFurnisherTwice = countOptions.find((option) => option.labelParams?.count === 2)
+    expect(useFurnisherTwice).toBeDefined()
 
-    resp = session.resolveChoice(0, useFurnisher!.value)
-    expect(resp.interaction.stateId).toBe('wait')
-    if (resp.interaction.stateId !== 'wait') return
-    const firstImprovement = resp.interaction.request.options?.find(
-      (option) => option.value !== '__skip__',
-    )
-    expect(firstImprovement).toBeDefined()
-
-    resp = session.resolveChoice(0, firstImprovement!.value)
+    resp = session.resolveChoice(0, useFurnisherTwice!.value)
     expect(resp.interaction.stateId).toBe('wait')
     if (resp.interaction.stateId !== 'wait') return
     expect(resp.interaction.request.options?.map((option) => option.value)).toEqual([
       'A037_Bucksaw',
       'D014_HammerCrusher',
+      'B067_HandTruck',
     ])
+    expect(resp.interaction.request.options?.some((option) => option.value === '__skip__')).toBe(false)
 
     resp = session.resolveChoice(0, 'A037_Bucksaw')
     expect(resp.state.players[0]!.minorPlayed).toContain('A037_Bucksaw')
     expect(resp.state.players[0]!.resources.wood).toBe(0)
     expect(resp.interaction.stateId).toBe('wait')
     if (resp.interaction.stateId !== 'wait') return
-    expect(resp.interaction.sourceCard).toBe(CARD_ID)
-    expect(resp.interaction.request.options?.some((option) => option.value === '__skip__')).toBe(true)
+    expect(resp.interaction.request.options?.map((option) => option.value)).toEqual([
+      'D014_HammerCrusher',
+      'B067_HandTruck',
+    ])
+    expect(resp.interaction.request.options?.some((option) => option.value === '__skip__')).toBe(false)
 
-    resp = session.resolveChoice(0, '__skip__')
+    resp = session.resolveChoice(0, 'D014_HammerCrusher')
     expect(resp.ok).toBe(true)
-    expect(resp.state.players[0]!.minorPlayed).not.toContain('D014_HammerCrusher')
-    expect(resp.state.players[0]!.minorHand).toContain('D014_HammerCrusher')
+    expect(resp.state.players[0]!.minorPlayed).toEqual(
+      expect.arrayContaining(['A037_Bucksaw', 'D014_HammerCrusher']),
+    )
+    expect(resp.state.players[0]!.minorHand).toEqual(['B067_HandTruck'])
+  })
+
+  it('chooses zero improvements without undoing the built room', () => {
+    const session = setupTwoRoomBuild()
+
+    let resp = session.takeAction(0, 'farm-expansion')
+    if (resp.interaction.stateId !== 'wait') throw new Error('expected construct choice')
+    const construct = resp.interaction.request.options?.find(
+      (option) => option.labelKey === 'actions.construct.name',
+    )
+    expect(construct).toBeDefined()
+
+    resp = session.resolveChoice(0, construct!.value)
+    if (resp.interaction.stateId !== 'wait' || resp.interaction.request.kind !== 'farm-select') {
+      throw new Error('expected room selection')
+    }
+    const room = resp.interaction.request.farm.selectableTiles[0]!
+
+    resp = session.commitSelectionChoice(0, { rooms: [room] })
+    if (resp.interaction.stateId !== 'wait') throw new Error('expected Furnisher count choice')
+    expect(resp.state.players[0]!.rooms).toBe(3)
+    const skipFurnisher = resp.interaction.request.options?.find(
+      (option) => option.labelParams?.count === 0,
+    )
+    expect(skipFurnisher).toBeDefined()
+    const resources = resp.state.players[0]!.resources
+
+    resp = session.resolveChoice(0, skipFurnisher!.value)
+    expect(resp.ok).toBe(true)
+    expect(resp.state.players[0]!.rooms).toBe(3)
+    expect(resp.state.players[0]!.resources).toEqual(resources)
+    expect(resp.state.players[0]!.minorPlayed).toEqual([])
+    expect(resp.state.players[0]!.minorHand).toEqual([
+      'A037_Bucksaw',
+      'D014_HammerCrusher',
+      'B067_HandTruck',
+    ])
   })
 
   it('offers an improvement after the owner builds a room through Building Tycoon', () => {
@@ -178,12 +215,15 @@ describe('D096_Furnisher session', () => {
     if (resp.interaction.stateId !== 'wait') return
     expect(resp.interaction.playerIndex).toBe(1)
     expect(resp.interaction.sourceCard).toBe(CARD_ID)
-    expect(resp.interaction.request.options?.some((option) => option.value === '__skip__')).toBe(true)
+    const skipFurnisher = resp.interaction.request.options?.find(
+      (option) => option.labelParams?.count === 0,
+    )
+    expect(skipFurnisher).toBeDefined()
     expect(resp.state.log.filter(
       (entry) => entry.key === 'log.provisionalContinuationRollback',
     )).toHaveLength(0)
 
-    resp = advancePlayerSwitches(session, session.resolveChoice(1, '__skip__'))
+    resp = advancePlayerSwitches(session, session.resolveChoice(1, skipFurnisher!.value))
     expect(resp.ok).toBe(true)
     expect(resp.state.players[1]!.rooms).toBe(2)
     expect(resp.state.log.filter(
@@ -253,22 +293,16 @@ describe('D096_Furnisher session', () => {
     if (resp.interaction.stateId !== 'wait') throw new Error('expected Furnisher choice')
     expect(resp.interaction.sourceCard).toBe(CARD_ID)
     const useFurnisher = resp.interaction.request.options.find(
-      (option) => option.value !== '__skip__',
+      (option) => option.labelParams?.count === 1,
     )
     expect(useFurnisher).toBeDefined()
 
     resp = session.resolveChoice(1, useFurnisher!.value)
     if (resp.interaction.stateId !== 'wait') throw new Error('expected Furnisher improvement choice')
-    const useImprovement = resp.interaction.request.options.find(
-      (option) => option.value !== '__skip__',
-    )
-    expect(useImprovement).toBeDefined()
-
-    resp = session.resolveChoice(1, useImprovement!.value)
-    if (resp.interaction.stateId !== 'wait') throw new Error('expected improvement choice')
     expect(resp.interaction.request.options.map((option) => option.value)).toEqual(
       expect.arrayContaining(['B003_Moonshine', 'B070_NewPurchase']),
     )
+    expect(resp.interaction.request.options.some((option) => option.value === '__skip__')).toBe(false)
 
     resp = session.resolveChoice(1, 'B003_Moonshine')
     if (resp.interaction.stateId !== 'wait') throw new Error('expected Moonshine choice')

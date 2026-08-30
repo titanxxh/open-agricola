@@ -65,7 +65,7 @@ describe('D096_Furnisher', () => {
     expect((flow as Extract<ActionFlow, { type: 'leaf' }>).params).toEqual({ wood: 2 })
   })
 
-  it('after construct with 1 room built, offers 1 optional improvement', () => {
+  it('after construct with 1 room built, asks for a use count from 0 to 1', () => {
     const listener = findListener('D96-furnisher-after-construct')!
     expect(listener).toBeDefined()
     const player = createPlayer()
@@ -80,15 +80,21 @@ describe('D096_Furnisher', () => {
     } as unknown as CardListenerContext)
 
     expect(result).toBeDefined()
-    const flow = result!.flow as Extract<ActionFlow, { type: 'seq' }>
-    expect(flow.type).toBe('seq')
-    expect(flow.optional).toBe(true)
-    expect(flow.children).toHaveLength(1)
-    expect(flow.children[0].children[0].actionId).toBe('improvement')
-    expect(flow.children[0].children[0].sourceCard).toBe(CARD_ID)
+    const flow = result!.flow as Extract<ActionFlow, { type: 'leaf' }>
+    expect(flow.type).toBe('leaf')
+    expect(flow.actionId).toBe('emit-choice')
+    expect(flow.sourceCard).toBe(CARD_ID)
+    expect(flow.actionContext).toEqual({ furnisherImprovementCount: 1 })
+    expect(flow.params).toMatchObject({
+      promptKey: 'ui.interactionFurnisherCount',
+      options: [
+        { value: '0', labelParams: { count: 0 } },
+        { value: '1', labelParams: { count: 1 } },
+      ],
+    })
   })
 
-  it('after construct with 2 rooms built, offers 2 optional improvements', () => {
+  it('chains two mandatory improvements after choosing a count of 2', () => {
     const listener = findListener('D96-furnisher-after-construct')!
     const player = createPlayer()
 
@@ -105,8 +111,36 @@ describe('D096_Furnisher', () => {
     } as unknown as CardListenerContext)
 
     expect(result).toBeDefined()
-    const flow = result!.flow as Extract<ActionFlow, { type: 'seq' }>
-    expect(flow.children).toHaveLength(2)
+    const countFlow = result!.flow as Extract<ActionFlow, { type: 'leaf' }>
+    expect((countFlow.params?.options as Array<{ value: string }>).map((option) => option.value))
+      .toEqual(['0', '1', '2'])
+
+    const first = getCardEffect(CARD_ID)!.resolveChoice!(createState(player), player, '2', {
+      sourceCard: CARD_ID,
+      actionContext: { furnisherImprovementCount: 2 },
+    }) as Extract<ActionFlow, { type: 'leaf' }>
+    expect(first).toMatchObject({
+      type: 'leaf',
+      actionId: 'improvement',
+      actionContext: { trueAction: false, furnisherRemainingImprovements: 2 },
+    })
+    expect(first.optional).not.toBe(true)
+
+    const continueListener = findListener('D96-furnisher-after-improvement')!
+    const second = executeCardListener(continueListener, {
+      state: createState(player), player, space: createSpace('improvement'),
+      actionId: 'improvement', phase: 'after', choice: 'A037_Bucksaw',
+      actionContext: { trueAction: false, furnisherRemainingImprovements: 2 },
+    } as unknown as CardListenerContext)!.flow as Extract<ActionFlow, { type: 'leaf' }>
+    expect(second.actionContext).toEqual({
+      trueAction: false,
+      furnisherRemainingImprovements: 1,
+    })
+    expect(executeCardListener(continueListener, {
+      state: createState(player), player, space: createSpace('improvement'),
+      actionId: 'improvement', phase: 'after', choice: 'D014_HammerCrusher',
+      actionContext: { trueAction: false, furnisherRemainingImprovements: 1 },
+    } as unknown as CardListenerContext)).toBeUndefined()
   })
 
   it('does not trigger after construct with no new rooms', () => {

@@ -13,6 +13,16 @@ const isFarmRoomBuiltEvent = (
   event: CardListenerContext['transactionEvents'][number],
 ): event is QueryableFarmRoomBuiltEvent => event.type === 'farm.roomBuilt'
 
+const improvementLeaf = (remaining: number) => ({
+  type: 'leaf' as const,
+  actionId: 'improvement',
+  sourceCard: CARD_ID,
+  actionContext: {
+    trueAction: false,
+    furnisherRemainingImprovements: remaining,
+  },
+})
+
 const afterConstructListener: CardListenerRegistration = {
   id: 'D96-furnisher-after-construct',
   cardIds: [CARD_ID],
@@ -26,24 +36,20 @@ const afterConstructListener: CardListenerRegistration = {
       .length
     if (roomsBuilt <= 0) return
 
-    const children = Array.from({ length: roomsBuilt }, () => ({
-      type: 'seq' as const,
-      optional: true,
-      children: [
-        {
-          type: 'leaf' as const,
-          actionId: 'improvement',
-          sourceCard: CARD_ID,
-          actionContext: { trueAction: false },
-        },
-      ],
-    }))
-
     return {
       flow: {
-        type: 'seq',
-        optional: true,
-        children,
+        type: 'leaf',
+        actionId: 'emit-choice',
+        sourceCard: CARD_ID,
+        params: {
+          promptKey: 'ui.interactionFurnisherCount',
+          options: Array.from({ length: roomsBuilt + 1 }, (_, count) => ({
+            value: String(count),
+            labelKey: 'ui.interactionFurnisherCountChoice',
+            labelParams: { count },
+          })),
+        },
+        actionContext: { furnisherImprovementCount: roomsBuilt },
       },
       sourceCard: CARD_ID,
     }
@@ -61,12 +67,36 @@ const computeCostsListener: CardListenerRegistration = {
   },
 }
 
+const afterImprovementListener: CardListenerRegistration = {
+  id: 'D96-furnisher-after-improvement',
+  cardIds: [CARD_ID],
+  phases: ['after' as ActionHookPhase],
+  actions: ['improvement'],
+  handler: (context: CardListenerContext): ActionHookResult | void => {
+    const remaining = context.actionContext?.furnisherRemainingImprovements
+    if (typeof remaining !== 'number' || !Number.isInteger(remaining) || remaining <= 1) return
+    return { flow: improvementLeaf(remaining - 1), sourceCard: CARD_ID }
+  },
+}
+
 const cardImpl = {
-  listeners: [afterConstructListener, computeCostsListener],
+  listeners: [afterConstructListener, computeCostsListener, afterImprovementListener],
   effect: {
-  id: CARD_ID,
-  onBuy: () => gainLeaf(CARD_ID, { wood: 2 }),
-},
+    id: CARD_ID,
+    onBuy: () => gainLeaf(CARD_ID, { wood: 2 }),
+    resolveChoice: (_state, _player, choice, context) => {
+      const maxCount = context.actionContext?.furnisherImprovementCount
+      const count = Number(choice)
+      if (
+        typeof maxCount !== 'number' ||
+        !Number.isInteger(maxCount) ||
+        !Number.isInteger(count) ||
+        count <= 0 ||
+        count > maxCount
+      ) return
+      return improvementLeaf(count)
+    },
+  },
   reaches: [] as readonly string[],
 } satisfies CardImpl
 
