@@ -103,6 +103,20 @@ describe('WsGameTransport request correlation', () => {
     transport.destroy()
   })
 
+  it('requests an unredacted snapshot for developer state saves', async () => {
+    const { WsGameTransport } = await import('../gameTransport')
+    const transport = new WsGameTransport('ws://test')
+    await transport.connect()
+
+    const socket = FakeWebSocket.instances[0]!
+    const pending = transport.getState({ unredacted: true })
+
+    expect(socket.sent[0]).toMatchObject({ type: 'getState', unredacted: true })
+    socket.emit(buildEnvelope(String(socket.sent[0]?.requestId), 1))
+    await pending
+    transport.destroy()
+  })
+
   it('switches its room reference from each authoritative state envelope', async () => {
     const { WsGameTransport } = await import('../gameTransport')
     const transport = new WsGameTransport('ws://test', 'old-room')

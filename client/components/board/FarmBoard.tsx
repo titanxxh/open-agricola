@@ -520,6 +520,7 @@ export type FarmBoardView = {
     minSelections: number
     maxSelections: number
   }
+  highlightedHandCardId?: string
   infirmaryWorkerCount?: number
   highlightedFarmTileKeys?: ReadonlySet<string>
   highlightedFenceEdgeIds?: ReadonlySet<string>
@@ -905,6 +906,7 @@ export const FarmBoard = ({ view, actions, inlineCardStats = false }: FarmBoardP
     devMode,
     isInteractive,
     occupationHandSelection,
+    highlightedHandCardId,
     infirmaryWorkerCount,
     highlightedFarmTileKeys = new Set<string>(),
     highlightedFenceEdgeIds = new Set<string>(),
@@ -1817,7 +1819,7 @@ export const FarmBoard = ({ view, actions, inlineCardStats = false }: FarmBoardP
                         }}
                         disabled={!isSelectable}
                         selectable={isSelectable}
-                        selected={selectedOccIds.has(cardId)}
+                        selected={selectedOccIds.has(cardId) || highlightedHandCardId === cardId}
                       />
                     )
                   }
@@ -1846,6 +1848,7 @@ export const FarmBoard = ({ view, actions, inlineCardStats = false }: FarmBoardP
                           : !canInteractHand || !canPlay || !isOptionSelectable
                       }
                       selectable={isSelectingOccupation && canInteract}
+                      selected={highlightedHandCardId === cardId}
                     />
                   )
                 })
@@ -1907,6 +1910,7 @@ export const FarmBoard = ({ view, actions, inlineCardStats = false }: FarmBoardP
                           : !canInteractHand || !canPlay || !isOptionSelectable
                       }
                       selectable={canSelect}
+                      selected={highlightedHandCardId === cardId}
                     />
                   )
                 })

@@ -1374,6 +1374,11 @@ export class GameCore {
       const declined = this.declineExhaustedOptionalFlow(failedScope)
       if (declined) return declined
     }
+    this.state.log.unshift({
+      key: settlement.protectedObservations.length > 0
+        ? 'log.provisionalProtectedObservationRejected'
+        : 'log.provisionalContinuationCommandRejected',
+    })
     return {
       ...this.respond(false, 'command would break a mandatory continuation'),
       durableTransition: true,

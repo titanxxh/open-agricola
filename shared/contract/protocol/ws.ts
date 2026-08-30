@@ -48,7 +48,7 @@ type ClientCommandBody =
   | { type: 'devDrawCard'; playerIndex: number; cardId: string }
   | { type: 'devPlayCard'; playerIndex: number; cardId: string }
   | { type: 'devCreatePasture'; playerIndex: number }
-  | { type: 'getState' }
+  | { type: 'getState'; unredacted?: boolean }
   | {
       type: 'createRoom'
       maxPlayers?: number

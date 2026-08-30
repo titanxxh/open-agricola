@@ -408,6 +408,9 @@ describe('RoomCommitter', () => {
       .toHaveLength(1)
     expect(activeSnapshot.serialized?.sessionCursor.failedAuthoritativeCommands)
       .toHaveLength(1)
+    expect(activeSnapshot.serialized?.state.log.filter(
+      (entry) => entry.key === 'log.provisionalProtectedObservationRejected',
+    )).toHaveLength(1)
     expect(activeSnapshot.serialized?.state.players[1]!.minorHand)
       .not.toContain('A001_Shelter')
     expect(JSON.stringify(activeSnapshot.serialized?.frame))
@@ -426,6 +429,9 @@ describe('RoomCommitter', () => {
     })
     expect(restored.session.createSessionPrivateCursor().provisionalContinuationScopes)
       .toHaveLength(1)
+    expect(restored.session.getState().state.log.filter(
+      (entry) => entry.key === 'log.provisionalProtectedObservationRejected',
+    )).toHaveLength(1)
     const repeatedDraw = restored.session.devDrawCard(1, 'A001_Shelter')
     expect(repeatedDraw).toMatchObject({ ok: false })
     expect(repeatedDraw.durableTransition).toBeUndefined()

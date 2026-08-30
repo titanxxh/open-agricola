@@ -424,6 +424,9 @@ describe('D014 Hammer Crusher provisional continuation', () => {
     expect(response.state.log.filter(
       (entry) => entry.key === 'log.provisionalContinuationRollback',
     )).toHaveLength(0)
+    expect(response.state.log.filter(
+      (entry) => entry.key === 'log.provisionalContinuationCommandRejected',
+    )).toHaveLength(1)
     expect(session.createSessionPrivateCursor().provisionalContinuationScopes)
       .toEqual([expect.objectContaining({ guarded: true })])
     expect(session.commitSelectionChoice(0, { rooms: [room] }).ok).toBe(false)

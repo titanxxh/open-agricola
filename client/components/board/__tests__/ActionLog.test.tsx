@@ -113,6 +113,30 @@ describe('ActionLog', () => {
     expect(screen.getAllByRole('listitem').length).toBeGreaterThan(0)
   })
 
+  it('explains provisional rollback outcomes', () => {
+    render(
+      <ActionLog
+        locale="zh"
+        currentRound={1}
+        log={[
+          { key: 'log.provisionalProtectedObservationRejected' },
+          { key: 'log.provisionalContinuationCommandRejected' },
+          { key: 'log.provisionalContinuationRollback' },
+        ]}
+      />,
+    )
+
+    expect(screen.getByText(
+      '随机或隐藏信息效果未执行：当前行动的必做后续尚未确定可以完成，因此结果不能公开。系统已恢复到操作前；游戏状态变化前不能重试该操作。',
+    )).toBeInTheDocument()
+    expect(screen.getByText(
+      '该选择未执行：执行后会导致当前行动的必做后续无法完成。系统已恢复到选择前；游戏状态变化前不能重试该选项。',
+    )).toBeInTheDocument()
+    expect(screen.getByText(
+      '必做后续无法完成：系统已撤销暂定效果并恢复到之前的选择；游戏状态变化前不能重复该选择。',
+    )).toBeInTheDocument()
+  })
+
   it('groups entries by round using log.enterRound markers', () => {
     const { container } = render(
       <ActionLog

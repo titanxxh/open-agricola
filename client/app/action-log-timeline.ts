@@ -158,20 +158,30 @@ const visibleReplayDerivedLogCounts = (
   return counts
 }
 
-const removeReplayDerivedStateLogRows = (
+const splitReplayIndependentStateLogRows = (
   stateLog: readonly LogEntry[],
   contextualLogEntries: ReadonlyMap<string, LogPresentationRow>,
-): LogEntry[] => {
+): { leading: LogEntry[]; trailing: LogEntry[] } => {
   const counts = visibleReplayDerivedLogCounts(contextualLogEntries)
-  if (counts.size === 0) return [...stateLog]
-  return stateLog.filter((entry) => {
-    if (entry.key === 'log.enterRound') return true
-    const key = logPresentationRowIdentityKey(logPresentationRowIdentity(entry))
-    const remaining = counts.get(key) ?? 0
-    if (remaining <= 0) return true
-    counts.set(key, remaining - 1)
-    return false
+  if (counts.size === 0) return { leading: [], trailing: [...stateLog] }
+  const leading: LogEntry[] = []
+  const trailing: LogEntry[] = []
+  let foundReplayDerived = false
+
+  stateLog.forEach((entry) => {
+    if (entry.key !== 'log.enterRound') {
+      const key = logPresentationRowIdentityKey(logPresentationRowIdentity(entry))
+      const remaining = counts.get(key) ?? 0
+      if (remaining > 0) {
+        counts.set(key, remaining - 1)
+        foundReplayDerived = true
+        return
+      }
+    }
+    ;(foundReplayDerived ? trailing : leading).push(entry)
   })
+
+  return foundReplayDerived ? { leading, trailing } : { leading: [], trailing: leading }
 }
 
 const structuredEventSummary = (
@@ -257,8 +267,11 @@ export const buildActionLogTimelineRows = ({
         strikethrough: entry.status === 'canceled',
       }]
     })
-  const visibleStateLog = removeReplayDerivedStateLogRows(stateLog, contextualLogEntries)
-  const stateLogRows = groupStateLog(visibleStateLog, currentRound).flatMap((bucket) => bucket.rows)
+  const visibleStateLog = splitReplayIndependentStateLogRows(stateLog, contextualLogEntries)
+  const leadingStateLogRows = groupStateLog(visibleStateLog.leading, currentRound)
+    .flatMap((bucket) => bucket.rows)
+  const trailingStateLogRows = groupStateLog(visibleStateLog.trailing, currentRound)
+    .flatMap((bucket) => bucket.rows)
 
-  return mergeBuckets([...eventRows, ...stateLogRows])
+  return mergeBuckets([...leadingStateLogRows, ...eventRows, ...trailingStateLogRows])
 }

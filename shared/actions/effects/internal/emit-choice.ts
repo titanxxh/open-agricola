@@ -6,8 +6,8 @@ import type { PromptKey } from '../../../contract/prompt-keys'
  * pending choice whose resolution is handled entirely by the card's own
  * `CardEffect.resolveChoice` hook (see GameSession.resolvePendingChoice).
  *
- * Pass the choice options and an optional promptKey via params:
- *   { promptKey: 'i18n.key', options: ActionChoiceOption[] }
+ * Pass the choice options and optional promptKey / promptParams via params:
+ *   { promptKey: 'i18n.key', promptParams: {}, options: ActionChoiceOption[] }
  *
  * The action emits the choice; the card's resolveChoice hook handles all
  * side-effects and may return a follow-up ActionFlow. The engine's stub
@@ -22,13 +22,18 @@ export const emitChoiceAction: ActionDefinition = {
   gainPerRound: {},
   canBeExecutedByPlayer: () => true,
   execute: ({ params }) => {
-    const options = (params as { options?: ActionChoiceOption[]; promptKey?: PromptKey } | undefined)?.options
+    const choice = params as {
+      options?: ActionChoiceOption[]
+      promptKey?: PromptKey
+      promptParams?: Record<string, unknown>
+    } | undefined
+    const options = choice?.options
     if (Array.isArray(options) && options.length > 0) {
-      const promptKey = (params as { promptKey?: PromptKey } | undefined)?.promptKey
       return {
         type: 'request',
         request: { kind: 'choice', options },
-        promptKey,
+        promptKey: choice?.promptKey,
+        promptParams: choice?.promptParams,
       }
     }
     return { type: 'ok' }
