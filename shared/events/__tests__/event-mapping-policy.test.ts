@@ -23,6 +23,7 @@ const expectedPublicEventTypes = [
   'card.stateChanged',
   'card.swappedWithBoard',
   'card.triggered',
+  'continuation.restored',
   'farm.animalBred',
   'farm.animalDiscarded',
   'farm.animalMoved',

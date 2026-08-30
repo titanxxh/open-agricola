@@ -273,6 +273,7 @@ export const publicEventMappingPolicy = {
   'harvest.heated': silentPublicCues(mapped()),
   'game.started': silentPublicCues(mapped()),
   'game.ended': silentPublicCues(mapped()),
+  'continuation.restored': silentPublicCues(mapped()),
 } satisfies Record<GameEvent['type'], PublicEventMappingPolicy>
 
 export const privateEventMappingPolicy = {

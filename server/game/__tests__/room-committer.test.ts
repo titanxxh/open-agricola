@@ -482,7 +482,7 @@ describe('RoomCommitter', () => {
       expect.objectContaining({ reason: 'provisionalContinuationRollback' }),
     ])
     expect(finalSnapshot.serialized?.sessionCursor.provisionalContinuationScopes).toEqual([])
-    expect(finalSnapshot.serialized?.state.publicEventArchive.at(-1)).toEqual(
+    expect(finalSnapshot.serialized?.state.publicEventArchive).toContainEqual(
       expect.objectContaining({
         type: 'publicEvents.canceled',
         reason: 'provisionalContinuationRollback',

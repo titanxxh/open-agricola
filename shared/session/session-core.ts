@@ -436,6 +436,7 @@ const ruleStateKey = (state: GameState): string => {
   } = state
   return canonicalJson({
     ...rules,
+    events: rules.events.filter((event) => event.type !== 'continuation.restored'),
     players: rules.players.map(({ name: _name, ...player }) => player),
   })
 }
@@ -1369,16 +1370,18 @@ export class GameCore {
     this.restoreCommandCheckpoint(settlement.checkpoint)
     this.provisionalContinuationScopes = settlement.scopeSnapshot
     this.failedAuthoritativeCommands = settlement.failedCommandSnapshot
-    this.rememberFailedAuthoritativeCommand(settlement.command, settlement.interactionKey)
     if (failedScope) {
+      this.rememberFailedAuthoritativeCommand(settlement.command, settlement.interactionKey)
       const declined = this.declineExhaustedOptionalFlow(failedScope)
       if (declined) return declined
     }
-    this.state.log.unshift({
-      key: settlement.protectedObservations.length > 0
-        ? 'log.provisionalProtectedObservationRejected'
-        : 'log.provisionalContinuationCommandRejected',
-    })
+    appendImmediateEvents(this.state, [{
+      type: 'continuation.restored',
+      reason: settlement.protectedObservations.length > 0
+        ? 'protectedObservationRejected'
+        : 'commandRejected',
+    }])
+    this.rememberFailedAuthoritativeCommand(settlement.command, settlement.interactionKey)
     return {
       ...this.respond(false, 'command would break a mandatory continuation'),
       durableTransition: true,
@@ -1410,15 +1413,18 @@ export class GameCore {
       return probe ? [{ ...candidate, guarded: probe.strictDoable }] : []
     })
     this.failedAuthoritativeCommands = scope.failedCommandsAtCheckpoint.map((entry) => ({ ...entry }))
-    this.rememberFailedAuthoritativeCommand(scope.rollbackCommand, scope.rollbackInteractionKey)
-    this.state.log.unshift({ key: 'log.provisionalContinuationRollback' })
     const cancellationPlan = this.preparePublicEventCancellation(
       'provisionalContinuationRollback',
       beforeEvents,
       this.state.events,
       beforeArchive,
     )
-    return this.applyPreparedPublicEventCancellation(beforeArchive, cancellationPlan)
+    this.restorePublicEventArchive(cancellationPlan.archiveAfterAppend ?? beforeArchive)
+    appendImmediateEvents(this.state, [{ type: 'continuation.restored', reason: 'scopeRollback' }])
+    this.rememberFailedAuthoritativeCommand(scope.rollbackCommand, scope.rollbackInteractionKey)
+    return this.respond(true, undefined, undefined, cancellationPlan.publicEventCancellations
+      ? { publicEventCancellations: cancellationPlan.publicEventCancellations }
+      : {})
   }
 
   private settleAuthoritativeCommand(
@@ -3750,7 +3756,9 @@ export class GameCore {
         // whether to pop. runPlaceFarmerAfterHooks mutates the same frame's
         // engine, so we keep the frame on the stack for that branch.
         const visiblePlayerIndex = this.visiblePlayerIndexForFrame(frame)
-        const returnTarget = this.returnTargetIndexForFrame(frame)
+        const returnTarget = step.type === 'done'
+          ? { playerIndex: frame.ownerPlayerIndex }
+          : this.returnTargetIndexForFrame(frame)
         if (visiblePlayerIndex !== returnTarget.playerIndex) {
           this.engineStack.setDeferredPlayerSwitch({
             fromPlayerIndex: visiblePlayerIndex,
@@ -3762,6 +3770,7 @@ export class GameCore {
           this.startConfirmPlayerSwitch(visiblePlayerIndex, returnTarget.playerIndex)
           return
         }
+        if (step.type === 'done') this.engineStack.clearDeferredPlayerSwitch()
         const isActionEngine = frame.source.kind === 'action'
         const ownerIdx = frame.ownerPlayerIndex
         if (this.stageDispatch.completeFrameIfStage(frame)) return

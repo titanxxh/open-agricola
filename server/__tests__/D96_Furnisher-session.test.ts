@@ -5,6 +5,7 @@ import { confirmPlayerSwitch } from './_helpers/pending-confirms'
 import { runCardEffectHook } from '../../shared/cards/card-effects'
 
 import '../../shared/cards/D/D096_Furnisher'
+import '../../shared/cards/B/B003_Moonshine'
 import type { ActionFlow } from '../../shared/contract/types'
 
 const CARD_ID = 'D096_Furnisher'
@@ -188,6 +189,108 @@ describe('D096_Furnisher session', () => {
     expect(resp.state.log.filter(
       (entry) => entry.key === 'log.provisionalContinuationRollback',
     )).toHaveLength(1)
+  })
+
+  it('skips exhausted nested return points after the outer player resumes', () => {
+    const session = new GameSession(42)
+    stabilizeRandomHands(session.state.players)
+    const state = session.getState().state
+    state.players = state.players.slice(0, 2)
+    state.currentPlayerIndex = 0
+    state.round = 6
+    state.availableMajorImprovements = []
+
+    const actor = state.players[0]!
+    actor.houseType = 'clay'
+    actor.rooms = 2
+    actor.roomTiles = [{ row: 1, col: 0 }, { row: 2, col: 0 }]
+    actor.resources = { ...actor.resources, wood: 1, clay: 3, reed: 2, stone: 3 }
+    actor.minorPlayed.push('D014_HammerCrusher')
+    actor.minorHand = ['A037_Bucksaw']
+    actor.occupationHand = ['__test_placeholder__']
+
+    const furnisher = state.players[1]!
+    furnisher.occupationPlayed.push('D128_BuildingTycoon', CARD_ID)
+    furnisher.minorHand = ['B003_Moonshine', 'B070_NewPurchase']
+    furnisher.occupationHand = ['A116_WoodCutter']
+    furnisher.resources = { ...furnisher.resources, wood: 5, reed: 2, food: 3 }
+    session.loadState(state)
+
+    let resp = session.takeAction(0, 'house-redevelopment')
+    if (resp.interaction.stateId !== 'wait') throw new Error('expected Hammer Crusher choice')
+    const hammerConstruct = resp.interaction.request.options.find(
+      (option) => option.value !== '__skip__',
+    )
+    expect(hammerConstruct).toBeDefined()
+
+    resp = session.resolveChoice(0, hammerConstruct!.value)
+    if (resp.interaction.stateId !== 'wait' || resp.interaction.request.kind !== 'farm-select') {
+      throw new Error('expected Hammer Crusher room selection')
+    }
+    const actorRoom = resp.interaction.request.farm.selectableTiles[0]!
+
+    resp = session.commitSelectionChoice(0, { rooms: [actorRoom] })
+    expect(resp.interaction.stateId === 'wait' ? resp.interaction.request : undefined).toMatchObject({
+      kind: 'confirm-player-switch',
+      fromPlayerIndex: 0,
+      toPlayerIndex: 1,
+    })
+    resp = confirmPlayerSwitch(session)
+    if (resp.interaction.stateId !== 'wait') throw new Error('expected Building Tycoon choice')
+    expect(resp.interaction.sourceCard).toBe('D128_BuildingTycoon')
+    const tycoonConstruct = resp.interaction.request.options.find(
+      (option) => option.value !== '__skip__',
+    )
+    expect(tycoonConstruct).toBeDefined()
+
+    resp = session.resolveChoice(1, tycoonConstruct!.value)
+    if (resp.interaction.stateId !== 'wait' || resp.interaction.request.kind !== 'farm-select') {
+      throw new Error('expected Building Tycoon room selection')
+    }
+    const furnisherRoom = resp.interaction.request.farm.selectableTiles[0]!
+
+    resp = session.commitSelectionChoice(1, { rooms: [furnisherRoom] })
+    if (resp.interaction.stateId !== 'wait') throw new Error('expected Furnisher choice')
+    expect(resp.interaction.sourceCard).toBe(CARD_ID)
+    const useFurnisher = resp.interaction.request.options.find(
+      (option) => option.value !== '__skip__',
+    )
+    expect(useFurnisher).toBeDefined()
+
+    resp = session.resolveChoice(1, useFurnisher!.value)
+    if (resp.interaction.stateId !== 'wait') throw new Error('expected Furnisher improvement choice')
+    const useImprovement = resp.interaction.request.options.find(
+      (option) => option.value !== '__skip__',
+    )
+    expect(useImprovement).toBeDefined()
+
+    resp = session.resolveChoice(1, useImprovement!.value)
+    if (resp.interaction.stateId !== 'wait') throw new Error('expected improvement choice')
+    expect(resp.interaction.request.options.map((option) => option.value)).toEqual(
+      expect.arrayContaining(['B003_Moonshine', 'B070_NewPurchase']),
+    )
+
+    resp = session.resolveChoice(1, 'B003_Moonshine')
+    if (resp.interaction.stateId !== 'wait') throw new Error('expected Moonshine choice')
+    expect(resp.interaction.sourceCard).toBe('B003_Moonshine')
+
+    resp = session.resolveChoice(1, 'play')
+    expect(resp.interaction.stateId === 'wait' ? resp.interaction.request : undefined).toMatchObject({
+      kind: 'confirm-player-switch',
+      fromPlayerIndex: 1,
+      toPlayerIndex: 0,
+    })
+    resp = confirmPlayerSwitch(session)
+    if (resp.interaction.stateId !== 'wait') throw new Error('expected outer improvement choice')
+    expect(resp.interaction.playerIndex).toBe(0)
+    expect(resp.interaction.request.options.some((option) => option.value === '__skip__')).toBe(true)
+
+    resp = session.resolveChoice(0, '__skip__')
+
+    expect(resp.ok).toBe(true)
+    expect(resp.state.players[0]!.houseType).toBe('stone')
+    expect(resp.interaction.stateId === 'wait' ? resp.interaction.request.kind : undefined)
+      .toBe('confirm-next-player')
   })
 
   it('card is registered after devPlayCard', () => {

@@ -401,7 +401,7 @@ describe('ActionFlow targetPlayerId', () => {
     expect(resp.interaction.request.toPlayerIndex).toBe(0)
   })
 
-  it('dynamic target flow triggered by the switched player can switch to a third player and back', () => {
+  it('skips exhausted intermediate responders when a nested target flow completes', () => {
     const session = new GameSession(undefined, undefined, { playerCount: 3 })
     stabilizeRandomHands(session.state.players)
     const state = session.getState().state
@@ -471,14 +471,11 @@ describe('ActionFlow targetPlayerId', () => {
     if (resp.interaction.stateId !== 'wait') return
     expect(resp.interaction.request.kind).toBe('confirm-player-switch')
     expect(resp.interaction.request.fromPlayerIndex).toBe(2)
-    expect(resp.interaction.request.toPlayerIndex).toBe(1)
+    expect(resp.interaction.request.toPlayerIndex).toBe(0)
 
     resp = confirmPlayerSwitch(session)
-    expect(resp.interaction.stateId).toBe('wait')
-    if (resp.interaction.stateId !== 'wait') return
-    expect(resp.interaction.request.kind).toBe('confirm-player-switch')
-    expect(resp.interaction.request.fromPlayerIndex).toBe(1)
-    expect(resp.interaction.request.toPlayerIndex).toBe(0)
+    expect(resp.interaction.stateId === 'wait' ? resp.interaction.request.kind : resp.interaction.stateId)
+      .not.toBe('confirm-player-switch')
   })
 
   it('confirmed target player switch exposes no undo before the target acts', () => {

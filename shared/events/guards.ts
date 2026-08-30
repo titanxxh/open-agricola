@@ -75,6 +75,7 @@ const eventKeysByType: Record<string, readonly string[]> = {
   'harvest.heated': ['playerId', 'required', 'fuelUsed', 'woodToFuel', 'sickWorkerIds'],
   'game.started': [],
   'game.ended': [],
+  'continuation.restored': ['reason'],
 }
 
 const resourceKeys = new Set<string>(REAL_RESOURCE_KEYS)
@@ -633,6 +634,15 @@ const assertKnownEventDetails = (type: string, event: Record<string, unknown>): 
       assertFiniteNumberField(event.fuelUsed, 'fuelUsed')
       assertFiniteNumberField(event.woodToFuel, 'woodToFuel')
       assertStringArray(event.sickWorkerIds, 'sickWorkerIds')
+      return
+    case 'continuation.restored':
+      if (
+        event.reason !== 'commandRejected' &&
+        event.reason !== 'protectedObservationRejected' &&
+        event.reason !== 'scopeRollback'
+      ) {
+        throw new Error('GameEvent reason must be a known continuation restore reason')
+      }
       return
     default:
       assertNoPrivatePayload(event, '$')

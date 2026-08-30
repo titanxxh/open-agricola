@@ -356,6 +356,10 @@ export type GameStartedEvent = GameEventBase<'game.started'>
 
 export type GameEndedEvent = GameEventBase<'game.ended'>
 
+export type ContinuationRestoredEvent = GameEventBase<'continuation.restored'> & {
+  reason: 'commandRejected' | 'protectedObservationRejected' | 'scopeRollback'
+}
+
 export type PublicEventArchiveCommittedPacket = {
   schemaVersion: 1
   id: string
@@ -437,6 +441,7 @@ export type GameEvent =
   | HarvestHeatedEvent
   | GameStartedEvent
   | GameEndedEvent
+  | ContinuationRestoredEvent
 
 export type DraftGameEvent<T extends GameEvent['type'] = GameEvent['type']> =
   Omit<Extract<GameEvent, { type: T }>, 'id' | 'seq' | 'round' | 'phase' | 'visibility' | 'schemaVersion'> & {
