@@ -482,7 +482,11 @@ export const handleGameRoute = async (
   if (req.method === 'POST' && req.url === '/api/game/confirm-player-switch') {
     // Task 9: forwarded through resolveChoice.
     const { resp, result } = await callAndRespond(req, 'confirmCurrentPlayer', [], (s) => {
-      const idx = s.getState().state.currentPlayerIndex
+      const snapshot = s.getState()
+      const idx = snapshot.interaction.stateId === 'wait' &&
+        snapshot.interaction.request.kind === 'confirm-player-switch'
+        ? snapshot.interaction.playerIndex
+        : snapshot.state.currentPlayerIndex
       return s.resolveChoice(idx, 'confirm')
     })
     sendJson(res, resp.ok ? 200 : 400, result)

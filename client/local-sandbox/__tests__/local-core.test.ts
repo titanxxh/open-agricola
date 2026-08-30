@@ -7,6 +7,7 @@ import {
   validateAndCompileCustomCodeLocal,
 } from '../browser-executor.ts'
 import { compileCardCode } from '../../../shared/custom-code/compiler.ts'
+import '../../../shared/cards/B/B178_TagAlong'
 
 const DEBUG_VIEWER: ViewerSpec = { viewerPlayerId: null, mode: 'debug' }
 
@@ -76,6 +77,42 @@ describe('LocalSandboxCore', () => {
     expect(payload.ok).toBe(true)
     expect(payload.state.players[0]?.resources.food).toBe(9)
     expect(persist.serializedState.state.players[0]?.resources.food).toBe(9)
+  })
+
+  it('confirms a returning player switch from the outgoing responder', () => {
+    const core = new LocalSandboxCore()
+    const initialized = core.init({ cards: [], playerCount: 5, seed: 42 }, DEBUG_VIEWER)
+    const state = initialized.payload.state
+    state.currentPlayerIndex = 1
+    state.round = 1
+    state.players[0]!.occupationPlayed.push('B178_TagAlong')
+    state.players.forEach((player) => {
+      player.minorHand = ['__test_placeholder__']
+      player.occupationHand = ['__test_placeholder__']
+    })
+    core.call('loadGame', [state], DEBUG_VIEWER)
+
+    core.call('takeAction', [1, 'resource-market-56'], DEBUG_VIEWER)
+    const prompted = core.call('confirmPlayerSwitch', [], DEBUG_VIEWER)
+    if (prompted.payload.interaction.stateId !== 'wait') throw new Error('expected Tag-Along choice')
+    const accept = prompted.payload.interaction.request.options.find(
+      (option) => option.value !== '__skip__',
+    )
+    const returning = core.call('resolveChoice', [0, accept!.value], DEBUG_VIEWER)
+    expect(returning.payload.state.currentPlayerIndex).toBe(1)
+    expect(returning.payload.interaction.stateId === 'wait'
+      ? returning.payload.interaction.request
+      : undefined).toMatchObject({
+      kind: 'confirm-player-switch',
+      fromPlayerIndex: 0,
+      toPlayerIndex: 1,
+    })
+
+    const confirmed = core.call('confirmPlayerSwitch', [], DEBUG_VIEWER)
+    expect(confirmed.payload.ok).toBe(true)
+    expect(confirmed.payload.interaction.stateId === 'wait'
+      ? confirmed.payload.interaction.request.kind
+      : confirmed.payload.interaction.stateId).not.toBe('confirm-player-switch')
   })
 
   it('dispatches commands inside the session card context', () => {

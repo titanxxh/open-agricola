@@ -58,8 +58,14 @@ const dispatch = (method: CustomSessionMethod, args: unknown[]): { response: Ses
     return { response: session.getState() }
   }
   if (method === 'confirmCurrentPlayer') {
+    const snapshot = session.getState()
+    const idx = snapshot.interaction.stateId === 'wait' &&
+      (snapshot.interaction.request.kind === 'confirm-next-player' ||
+        snapshot.interaction.request.kind === 'confirm-player-switch')
+      ? snapshot.interaction.playerIndex
+      : snapshot.state.currentPlayerIndex
     return {
-      response: session.resolveChoice(session.state.currentPlayerIndex, 'confirm'),
+      response: session.resolveChoice(idx, 'confirm'),
     }
   }
   if (method === 'validateFarmChoice') {
