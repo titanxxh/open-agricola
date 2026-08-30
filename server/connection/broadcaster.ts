@@ -82,6 +82,7 @@ export class Broadcaster {
     resp: SessionResponse,
     requestId?: string,
     cause: StateUpdateCause = 'reconnect',
+    mode?: SyncPayloadMode,
   ): void {
     const seat = room.players.find((p) => p.ws === ws)
     const env = buildEnvelope({
@@ -92,7 +93,7 @@ export class Broadcaster {
       cause,
       requestId,
       emittedAt: Date.now(),
-      mode: projectionModeFor(room),
+      mode: mode ?? projectionModeFor(room),
     })
     if (ws.readyState === ws.OPEN) ws.send(JSON.stringify(env))
   }

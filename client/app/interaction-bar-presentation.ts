@@ -397,6 +397,11 @@ const buildChoiceModel = (
     typeof choice.promptParams?.hintKey === 'string'
       ? choice.promptParams.hintKey
       : null
+  const promptCardId =
+    typeof choice.promptParams?.cardId === 'string'
+      ? choice.promptParams.cardId
+      : null
+  const titleParams = choice.promptParams as Record<string, string | number> | undefined
   const needed = (choice.promptParams?.needed as number | undefined) ?? 0
   const showOptions =
     !input.pending.suppressChoiceOptions &&
@@ -441,7 +446,9 @@ const buildChoiceModel = (
         ? textKey('ui.interactionOptionalActionWithChoice', { action: optionalActionName })
         : textKey(
             choice.promptKey ?? 'ui.interactionChooseOne',
-            choice.promptParams as Record<string, string | number> | undefined,
+            promptCardId
+              ? { ...titleParams, card: getAnyCardDisplayName(locale, promptCardId) }
+              : titleParams,
           ),
     triggerSubtitle: triggerCardName
       ? textKey('ui.interactionTriggeredByCard', { card: triggerCardName })

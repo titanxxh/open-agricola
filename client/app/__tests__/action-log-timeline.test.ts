@@ -301,6 +301,34 @@ describe('buildActionLogTimelineRows', () => {
     })
   })
 
+  it('keeps newer state-only logs ahead of replay-derived rows', () => {
+    const buckets = buildActionLogTimelineRows({
+      entries: [replayEntry()],
+      stateLog: [
+        { key: 'log.provisionalContinuationRollback' },
+        {
+          key: 'log.actionDetail',
+          params: {
+            player: 'Alice',
+            action: 'Forest',
+            detailParts: { gains: { wood: 3 } },
+          },
+        },
+        { key: 'log.startGame' },
+      ],
+      currentRound: 2,
+      locale: 'en',
+      playerNames: { p1: 'Alice' },
+      actionNames: { forest: 'Forest' },
+    })
+
+    expect(buckets[0]?.rows.map((row) => row.logEntry?.key)).toEqual([
+      'log.provisionalContinuationRollback',
+      'log.actionDetail',
+      'log.startGame',
+    ])
+  })
+
   it('suppresses pure resource future resolution across archive packets', () => {
     const resolved = {
       schemaVersion: 1,

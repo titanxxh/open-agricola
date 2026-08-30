@@ -640,6 +640,10 @@ export const GameContainerApi = () => {
     () => buildInteractionPresentationPlan(interaction),
     [interaction],
   )
+  const highlightedHandCardId =
+    isInteractive && interaction.stateId === 'wait' && typeof interaction.promptParams?.cardId === 'string'
+      ? interaction.promptParams.cardId
+      : undefined
   const pendingMoorSpecialActionChoices = useMemo(
     () =>
       interactionPresentationPlan.kind === 'moor-special-action'
@@ -1377,17 +1381,21 @@ export const GameContainerApi = () => {
     await transport.devCreatePasture(playerIndex)
   }, [state, isInteractive, devPlayerId, transport])
 
-  const saveDevState = useCallback(() => {
+  const saveDevState = useCallback(async () => {
     if (!state) return
-    const payload = JSON.stringify(state, null, 2)
-    const blob = new Blob([payload], { type: 'application/json' })
-    const url = URL.createObjectURL(blob)
-    const link = document.createElement('a')
-    link.href = url
-    link.download = `open-agricola-round-${state.round}.json`
-    link.click()
-    URL.revokeObjectURL(url)
-  }, [state])
+    try {
+      const snapshot = (await transport.getState({ unredacted: true })).state
+      const blob = new Blob([JSON.stringify(snapshot, null, 2)], { type: 'application/json' })
+      const url = URL.createObjectURL(blob)
+      const link = document.createElement('a')
+      link.href = url
+      link.download = `open-agricola-round-${snapshot.round}.json`
+      link.click()
+      URL.revokeObjectURL(url)
+    } catch (e) {
+      console.error('saveDevState error', e)
+    }
+  }, [state, transport])
 
   const loadDevState = useCallback((file: File) => {
     const reader = new FileReader()
@@ -1673,6 +1681,7 @@ export const GameContainerApi = () => {
     devMode,
     isInteractive,
     occupationHandSelection: occupationHandInteraction ?? undefined,
+    highlightedHandCardId,
     highlightedFarmTileKeys,
     highlightedFenceEdgeIds,
   }

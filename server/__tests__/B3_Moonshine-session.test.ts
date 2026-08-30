@@ -108,6 +108,13 @@ describe('B003_Moonshine session', () => {
     const p0 = resp.state.players[0]!
     const cachedOcc = p0.cardStates?.[CARD_ID]?.extraData?.occ
     expect(cachedOcc === OCC_A || cachedOcc === OCC_B).toBe(true)
+    expect(resp.interaction.promptParams).toEqual({ cardId: cachedOcc })
+
+    const ownerInteraction = session.buildSyncPayload(resp, p0.id).interaction
+    expect(ownerInteraction.stateId === 'wait' && ownerInteraction.promptParams).toEqual({ cardId: cachedOcc })
+    const otherInteraction = session.buildSyncPayload(resp, resp.state.players[1]!.id).interaction
+    expect(otherInteraction.stateId === 'wait' && otherInteraction.request.kind).toBe('private-prompt')
+    expect(JSON.stringify(otherInteraction)).not.toContain(String(cachedOcc))
 
     expect(p0.minorHand).not.toContain(CARD_ID)
     expect(p0.minorPlayed).not.toContain(CARD_ID)

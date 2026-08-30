@@ -11,6 +11,7 @@ export type ValidateResult = {
 
 export type SnapshotListener = (payload: GameSyncPayload, roomId?: string) => void
 export type PersistenceStatusListener = (paused: boolean) => void
+export type GetStateOptions = { unredacted?: boolean }
 
 type CommitSelectionPayload = {
   cancel?: boolean
@@ -34,7 +35,7 @@ type MoorSpecialActionPayload = {
 }
 
 export interface GameTransport {
-  getState(): Promise<GameSyncPayload>
+  getState(options?: GetStateOptions): Promise<GameSyncPayload>
   takeAction(playerIndex: number, spaceId: string): Promise<GameSyncPayload>
   takeSpecialAction(
     playerIndex: number,
@@ -113,7 +114,7 @@ export class HttpGameTransport implements GameTransport {
     return payload
   }
 
-  async getState(): Promise<GameSyncPayload> {
+  async getState(_options?: GetStateOptions): Promise<GameSyncPayload> {
     const payload = await get('/api/game/state')
     this.emit(payload)
     return payload
@@ -340,8 +341,11 @@ export class WsGameTransport implements GameTransport {
     })
   }
 
-  async getState(): Promise<GameSyncPayload> {
-    return this.sendCommand({ type: 'getState' })
+  async getState(options?: GetStateOptions): Promise<GameSyncPayload> {
+    return this.sendCommand({
+      type: 'getState',
+      ...(options?.unredacted ? { unredacted: true } : {}),
+    })
   }
 
   async takeAction(_playerIndex: number, spaceId: string): Promise<GameSyncPayload> {

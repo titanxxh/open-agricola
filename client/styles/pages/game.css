@@ -5782,6 +5782,14 @@ details[open] .ai-prompt-summary::before { transform: rotate(90deg); }
   font-weight: 700;
   font-size: 11px;
 }
+.action-log__text {
+  grid-column: 3 / -1;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.action-log__player + .action-log__text {
+  grid-column: 4 / -1;
+}
 .action-log__controls {
   display: flex;
   flex-wrap: wrap;

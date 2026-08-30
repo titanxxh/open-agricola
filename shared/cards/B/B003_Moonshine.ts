@@ -18,7 +18,7 @@ const cardImpl = {
     if (player.occupationHand.length === 0) return
 
     // Roll and cache via Task-1.1 helper (writes to extraData.occ).
-    rollAndCacheCardPick(
+    const pick = rollAndCacheCardPick(
       state,
       player,
       CARD_ID,
@@ -37,6 +37,7 @@ const cardImpl = {
       sourceCard: CARD_ID,
       params: {
         promptKey: 'cards.B003_Moonshine.choice',
+        promptParams: { cardId: pick },
         options: [
           {
             value: 'play',

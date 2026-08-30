@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest'
+import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
 
 import {
   buildInteractionBarModel,
@@ -6,8 +6,29 @@ import {
   type InteractionBarPresentationInput,
 } from '../interaction-bar-presentation'
 import type { ActionChoiceOption } from '../../../shared/contract/types'
+import { __resetCardsManifestCache, loadCardsManifest } from '../../services/card-meta'
 
 const noop = () => {}
+
+beforeAll(async () => {
+  __resetCardsManifestCache()
+  vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
+    ok: true,
+    json: async () => ({
+      B126_Carpenter: {
+        meta: { id: 'B126_Carpenter', name: 'Carpenter', deck: 'B', number: 126, type: 'occupation' },
+        module: '',
+        reaches: [],
+      },
+    }),
+  }))
+  await loadCardsManifest()
+})
+
+afterAll(() => {
+  __resetCardsManifestCache()
+  vi.unstubAllGlobals()
+})
 
 const baseInput = (): InteractionBarPresentationInput => ({
   locale: 'en',
@@ -70,6 +91,22 @@ const baseInput = (): InteractionBarPresentationInput => ({
 })
 
 describe('Interaction Bar Presentation', () => {
+  it('shows the named card carried by choice prompt params', () => {
+    const input = baseInput()
+    input.pending.choice = {
+      promptKey: 'cards.B003_Moonshine.choice',
+      promptParams: { cardId: 'B126_Carpenter' },
+      options: [{ value: 'play', labelKey: 'cards.B003_Moonshine.choicePlay' }],
+      playerIndex: 0,
+      spaceId: 'meeting-place',
+    }
+
+    expect(buildInteractionBarModel(input).choice?.title).toEqual({
+      key: 'cards.B003_Moonshine.choice',
+      params: { cardId: 'B126_Carpenter', card: 'Carpenter' },
+    })
+  })
+
   it('builds a compact model and action set for rendering', () => {
     const confirmHeating = vi.fn()
     const input = baseInput()

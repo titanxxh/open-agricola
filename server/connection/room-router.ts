@@ -851,6 +851,7 @@ function handleDissolveRoom(ctx: ConnectionCtx, msg: Extract<ClientCommand, { ty
 
 function handleGetState(ctx: ConnectionCtx, msg: Extract<ClientCommand, { type: 'getState' }>): void | Promise<void> {
   const room = requireRoom(ctx, msg.requestId); if (!room) return
+  if (msg.unredacted && !assertDevCommandAllowed(ctx, room, msg.requestId)) return
   const blocked = ctx.committer?.blockedError(room.id)
   if (blocked) {
     sendCommandError(ctx, `room saving is paused: ${blocked}`, msg.requestId)
@@ -858,7 +859,14 @@ function handleGetState(ctx: ConnectionCtx, msg: Extract<ClientCommand, { type: 
   }
   return useSessionResponse(
     executeRoomSession(room, 'getState', [], () => room.session.getState()),
-    (resp) => ctx.broadcaster.sendStateTo(ctx.ws, room, resp, msg.requestId),
+    (resp) => ctx.broadcaster.sendStateTo(
+      ctx.ws,
+      room,
+      resp,
+      msg.requestId,
+      'reconnect',
+      msg.unredacted ? 'debug' : undefined,
+    ),
   )
 }
 

@@ -561,6 +561,40 @@ describe('handleCreateRoom', () => {
     expect(ctx.persistence.load(ctx.currentRoom!.id)?.serialized?.state.gameSeed).toBe(777)
   })
 
+  it('exports unredacted state only from development rooms', () => {
+    const ctx = newCtx()
+    dispatch(ctx, { type: 'createRoom', maxPlayers: 2 })
+    const room = ctx.currentRoom!
+    ctx.registry.delete(room.id)
+    room.id = 'dev2'
+    ctx.registry.set(room)
+    room.session.state.players[0]!.minorHand = ['minor-a']
+    room.session.state.players[1]!.minorHand = ['minor-b']
+    ;(ctx.ws.send as unknown as ReturnType<typeof vi.fn>).mockClear()
+
+    dispatch(ctx, { type: 'getState', unredacted: true, requestId: 'export-1' })
+
+    const message = sentMessagesOf(ctx).findLast((entry) => entry.type === 'stateUpdate') as {
+      payload: { state: GameState }
+    }
+    expect(message.payload.state.players[0]!.minorHand).toEqual(['minor-a'])
+    expect(message.payload.state.players[1]!.minorHand).toEqual(['minor-b'])
+  })
+
+  it('rejects unredacted state export outside development rooms', () => {
+    const ctx = newCtx()
+    dispatch(ctx, { type: 'createRoom', maxPlayers: 2 })
+    ;(ctx.ws.send as unknown as ReturnType<typeof vi.fn>).mockClear()
+
+    dispatch(ctx, { type: 'getState', unredacted: true, requestId: 'export-1' })
+
+    expect(sentMessagesOf(ctx)).toContainEqual({
+      type: 'error',
+      error: 'dev commands disabled for this room',
+      requestId: 'export-1',
+    })
+  })
+
   it('forwards enableThroughTheSeasons into the created room session', () => {
     const ctx = newCtx()
     ctx.currentUserId = 'u1'

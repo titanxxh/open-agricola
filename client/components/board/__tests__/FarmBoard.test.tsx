@@ -192,6 +192,23 @@ const createFarmBoardProps = (
 }
 
 describe('FarmBoard', () => {
+  it('highlights only the hand card named by the interaction', () => {
+    const player = createPlayer('p1', 'Player 1', 'red')
+    player.occupationHand = ['A102_Grocer', 'A105_BarrowPusher']
+
+    const { container, rerender } = render(
+      <FarmBoard
+        {...createFarmBoardProps(player, { highlightedHandCardId: 'A105_BarrowPusher' })}
+      />,
+    )
+
+    expect(container.querySelector('[data-card-anchor="A105_BarrowPusher"]')).toHaveClass('selected')
+    expect(container.querySelector('[data-card-anchor="A102_Grocer"]')).not.toHaveClass('selected')
+
+    rerender(<FarmBoard {...createFarmBoardProps(player)} />)
+    expect(container.querySelectorAll('.player-card.selected')).toHaveLength(0)
+  })
+
   it('keeps zero-valued resource slots readable while emphasizing non-zero values', () => {
     const player = createPlayer('p1', 'Player 1', 'red')
 

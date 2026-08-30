@@ -2,7 +2,6 @@ import { describe, expect, it } from 'vitest'
 import { getRegisteredCardListeners, executeCardListener } from '../card-listeners'
 import { getCardEffect, runCardEffectHook } from '../card-effects'
 import type { GameState, PlayerState, ActionSpace } from '../../contract/types'
-import { recordActionSnapshot } from '../helpers/action-snapshot'
 
 import '../D/D096_Furnisher'
 import type { ActionFlow } from '../../contract/types'
@@ -70,14 +69,14 @@ describe('D096_Furnisher', () => {
     const listener = findListener('D96-furnisher-after-construct')!
     expect(listener).toBeDefined()
     const player = createPlayer()
-    player.roomTiles = [{ row: 0, col: 0 }] as any
-    // Record snapshot with 0 rooms, then add 1 room
-    recordActionSnapshot(player, 1)
-    player.roomTiles.push({ row: 0, col: 1 } as any)
 
     const result = executeCardListener(listener, {
       state: createState(player), player, space: createSpace('construct'),
       actionId: 'construct', phase: 'after',
+      actionEvents: [{
+        type: 'farm.roomBuilt',
+        rooms: [{ playerId: player.id, row: 0, col: 1, type: 'wood' }],
+      }],
     } as unknown as CardListenerContext)
 
     expect(result).toBeDefined()
@@ -92,13 +91,17 @@ describe('D096_Furnisher', () => {
   it('after construct with 2 rooms built, offers 2 optional improvements', () => {
     const listener = findListener('D96-furnisher-after-construct')!
     const player = createPlayer()
-    player.roomTiles = [{ row: 0, col: 0 }] as any
-    recordActionSnapshot(player, 1)
-    player.roomTiles.push({ row: 0, col: 1 } as any, { row: 0, col: 2 } as any)
 
     const result = executeCardListener(listener, {
       state: createState(player), player, space: createSpace('construct'),
       actionId: 'construct', phase: 'after',
+      actionEvents: [{
+        type: 'farm.roomBuilt',
+        rooms: [
+          { playerId: player.id, row: 0, col: 1, type: 'wood' },
+          { playerId: player.id, row: 0, col: 2, type: 'wood' },
+        ],
+      }],
     } as unknown as CardListenerContext)
 
     expect(result).toBeDefined()
@@ -109,9 +112,6 @@ describe('D096_Furnisher', () => {
   it('does not trigger after construct with no new rooms', () => {
     const listener = findListener('D96-furnisher-after-construct')!
     const player = createPlayer()
-    player.roomTiles = [{ row: 0, col: 0 }] as any
-    recordActionSnapshot(player, 1)
-    // No new rooms added
 
     const result = executeCardListener(listener, {
       state: createState(player), player, space: createSpace('construct'),

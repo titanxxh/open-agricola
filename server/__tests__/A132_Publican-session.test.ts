@@ -279,6 +279,9 @@ describe('A132_Publican session', () => {
     expect(resp.state.rngTick).toBe(rngTick)
     expect(resp.state.players[1]!.cardStates.__TEST_protected_observation__).toBeUndefined()
     expect(resp.privateEvents).toBeUndefined()
+    expect(resp.state.log.filter(
+      (entry) => entry.key === 'log.provisionalProtectedObservationRejected',
+    )).toHaveLength(1)
     expect(session.takeAnytimeAction(1, 'card___TEST_random_failure').ok).toBe(false)
 
     resp = session.devDrawCard(1, 'A001_Shelter')
@@ -286,6 +289,9 @@ describe('A132_Publican session', () => {
     expect(resp.state.players[1]!.minorHand).not.toContain('A001_Shelter')
     expect(resp.privateEvents).toBeUndefined()
     expect(session.devDrawCard(1, 'A001_Shelter').ok).toBe(false)
+    expect(resp.state.log.filter(
+      (entry) => entry.key === 'log.provisionalProtectedObservationRejected',
+    )).toHaveLength(2)
     expect(resp.state.log.filter(
       (entry) => entry.key === 'log.provisionalContinuationRollback',
     )).toHaveLength(0)

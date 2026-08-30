@@ -2,18 +2,28 @@ import { defineOccupationCard } from '../card-source'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { gainLeaf } from '../helpers/pay-gain-node'
-import { getRoomsBuiltThisAction } from '../helpers/action-snapshot'
 import type { CardImpl } from '../registry'
 import { PaymentSolver } from '../../actions/payment'
+import type { DraftGameEvent, FarmRoomBuiltEvent } from '../../contract/events'
 
 const CARD_ID = 'D096_Furnisher'
+type QueryableFarmRoomBuiltEvent = FarmRoomBuiltEvent | DraftGameEvent<'farm.roomBuilt'>
+
+const isFarmRoomBuiltEvent = (
+  event: CardListenerContext['transactionEvents'][number],
+): event is QueryableFarmRoomBuiltEvent => event.type === 'farm.roomBuilt'
+
 const afterConstructListener: CardListenerRegistration = {
   id: 'D96-furnisher-after-construct',
   cardIds: [CARD_ID],
   phases: ['after' as ActionHookPhase],
   actions: ['construct'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
-    const roomsBuilt = getRoomsBuiltThisAction(context.player)
+    const roomsBuilt = (context.actionEvents ?? context.transactionEvents)
+      .filter(isFarmRoomBuiltEvent)
+      .flatMap((event) => event.rooms)
+      .filter((room) => room.playerId === context.player.id)
+      .length
     if (roomsBuilt <= 0) return
 
     const children = Array.from({ length: roomsBuilt }, () => ({
