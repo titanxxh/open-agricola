@@ -10,6 +10,7 @@ import { D116_TreeInspector_impl } from '../../shared/cards/D/D116_TreeInspector
 import '../../shared/cards/D/D138_PetLover'
 import { applyRoundGrowth } from '../../shared/session/state-constants'
 import type { ActionFlow } from '../../shared/contract/types'
+import { readCardResourceStats } from '../../shared/cards/helpers/card-state'
 
 const CARD_ID = 'C042_RavenousHunger'
 const WOOD_CART_ID = 'C076_WoodCart'
@@ -326,6 +327,7 @@ describe('C042_RavenousHunger', () => {
     expect(resp.state.players[0]!.resources.vegetable).toBe(1)
     expect(resp.state.players[0]!.resources.wood).toBe(4)
     expect(resp.state.actionSpaces.find((space) => space.id === 'forest')!.resources.wood).toBe(0)
+    expect(readCardResourceStats(resp.state.players[0]!, CARD_ID)?.gained.wood).toBe(1)
   })
 
   it('offers Tree Inspector and gains one wood beyond the wood on its action space', () => {

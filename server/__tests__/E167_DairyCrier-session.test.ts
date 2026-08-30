@@ -4,6 +4,7 @@ import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 import { setFencesForTest } from '../../shared/cards/__tests__/__fixtures__/fence'
 
 import { setWorkersAtHome } from '../../shared/domain/player'
+import { readCardResourceStats } from '../../shared/cards/helpers/card-state'
 import '../../shared/cards/E/E167_DairyCrier'
 
 const CARD_ID = 'E167_DairyCrier'
@@ -42,6 +43,7 @@ const setup = () => {
 const drainPending = (session: GameSession, resp: ReturnType<GameSession['getState']>) => {
   let safety = 30
   while (safety-- > 0) {
+    expect(resp.ok).toBe(true)
     if (resp.interaction.stateId !== 'wait') {
       break
     }
@@ -65,7 +67,7 @@ const drainPending = (session: GameSession, resp: ReturnType<GameSession['getSta
       continue
     }
     if (resp.interaction.request.kind === 'confirm-player-switch') {
-      resp = session.resolveChoice(resp.interaction.request.toPlayerIndex, 'confirm')
+      resp = session.resolveChoice(resp.interaction.request.fromPlayerIndex, 'confirm')
       continue
     }
     const options = resp.interaction.request.kind === 'choice' || resp.interaction.request.kind === 'select-trigger'
@@ -77,6 +79,7 @@ const drainPending = (session: GameSession, resp: ReturnType<GameSession['getSta
     if (!option) break
     resp = session.resolveChoice(playerIdx, option.value)
   }
+  expect(resp.interaction.stateId).not.toBe('wait')
   return resp
 }
 
@@ -108,5 +111,7 @@ describe('E167_DairyCrier session', () => {
     // Owner should have gained cattle
     expect(finalP0.resources.cattle).toBeGreaterThanOrEqual(initialCattle0 + 1)
     expect(finalP0.occupationPlayed).toContain(CARD_ID)
+    expect(readCardResourceStats(finalP0, CARD_ID)?.gained).toMatchObject({ cattle: 1, food: 2 })
+    expect(resp.state.players[1]!.stats.resourcesFromCards.food).toBe(2)
   })
 })
