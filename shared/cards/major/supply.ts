@@ -110,6 +110,11 @@ const canonicalMajorStackByStackId = new Map<string, CanonicalMajorStack>(
   ]),
 )
 
+export const isMajorImprovementInFamily = (
+  cardId: string,
+  familyId: string,
+): boolean => canonicalMajorStackByCard.get(cardId)?.familyId === familyId
+
 const recomputeVisible = (stack: MajorSupplyStack): MajorSupplyStack => ({
   ...stack,
   visibleId: stack.cardIds[0] ?? null,

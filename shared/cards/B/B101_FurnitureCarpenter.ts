@@ -1,4 +1,5 @@
 import { defineOccupationCard } from '../card-source'
+import { isMajorImprovementInFamily } from '../major/supply'
 import type { CardImpl } from '../registry'
 
 const CARD_ID = 'B101_FurnitureCarpenter'
@@ -7,9 +8,8 @@ const cardImpl = {
   effect: {
   id: CARD_ID,
   onHarvestFieldPhase: (state, player) => {
-    // Check if any player has built Major_Joinery
     const anyPlayerHasJoinery = state.players.some(
-      (p) => p.improvements?.includes('Major_Joinery'),
+      (p) => p.improvements.some((cardId) => isMajorImprovementInFamily(cardId, 'joinery')),
     )
     if (!anyPlayerHasJoinery) return
     if ((player.resources.food ?? 0) < 2) return
