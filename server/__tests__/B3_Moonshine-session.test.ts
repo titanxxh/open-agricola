@@ -20,25 +20,40 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { setWorkersAtHome, setActiveWorkerCount } from '../../shared/domain/player'
+import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 
 // Force card modules to register their effects.
 import '../../shared/cards/B/B003_Moonshine'
 import '../../shared/cards/A/A116_WoodCutter'
 import '../../shared/cards/A/A117_WoodCarrier'
+import '../../shared/cards/B/B149_OpenAirFarmer'
 
 const CARD_ID = 'B003_Moonshine'
 const OCC_A = 'A116_WoodCutter'
 const OCC_B = 'A117_WoodCarrier'
+const OCC_EXTRA_COST = 'B149_OpenAirFarmer'
 
 /** Build a standard 2-player session in round 1, p0 current player.
  *  p0 has B003_Moonshine in minorHand and [OCC_A, OCC_B] in occupationHand.
  *  food is configurable (default 3).
  */
-const makeSession = (opts: { food?: number; gameSeed?: number } = {}) => {
-  const { food = 3, gameSeed = 42 } = opts
-  const session = new GameSession(gameSeed, undefined, { playerCount: 4 })
+const makeSession = (opts: {
+  food?: number
+  gameSeed?: number
+  occupationHand?: string[]
+  playerCount?: number
+  consumedStables?: number
+} = {}) => {
+  const {
+    food = 3,
+    gameSeed = 42,
+    occupationHand = [OCC_A, OCC_B],
+    playerCount = 2,
+    consumedStables = 0,
+  } = opts
+  const session = new GameSession(gameSeed, undefined, { playerCount })
+  stabilizeRandomHands(session.state.players)
   const state = session.getState().state
-  state.players = state.players.slice(0, 2)
   state.currentPlayerIndex = 0
   state.round = 1
   state.roundPhase = 'work'
@@ -47,13 +62,15 @@ const makeSession = (opts: { food?: number; gameSeed?: number } = {}) => {
   setActiveWorkerCount(p0, 2)
   setWorkersAtHome(state, p0, 2)
   p0.minorHand = [CARD_ID]
-  p0.occupationHand = [OCC_A, OCC_B]
+  p0.occupationHand = occupationHand
   p0.resources.food = food
+  p0.supplyTokensConsumed = consumedStables > 0 ? { stable: consumedStables } : {}
 
-  const p1 = state.players[1]!
-  setActiveWorkerCount(p1, 2)
-  setWorkersAtHome(state, p1, 2)
-  p1.resources.food = 5
+  state.players.slice(1).forEach((player) => {
+    setActiveWorkerCount(player, 2)
+    setWorkersAtHome(state, player, 2)
+    player.resources.food = 5
+  })
 
   session.loadState(state)
   return session
@@ -75,11 +92,28 @@ const playB3 = (session: GameSession) => {
     expect(resp.ok).toBe(true)
   }
   if (resp.interaction.sourceCard === CARD_ID) return resp
+  if (!resp.state.players[0]!.minorHand.includes(CARD_ID)) return resp
   expect(resp.interaction.stateId).toBe('wait')
   if (resp.interaction.stateId !== 'wait') return resp
   const cardOption = resp.interaction.request.options?.find((option) => option.value === CARD_ID)
   expect(cardOption).toBeDefined()
   // Choose to play B003_Moonshine
+  return session.resolveChoice(0, cardOption!.value)
+}
+
+const playB3AfterFamilyGrowth = (session: GameSession) => {
+  let resp = session.takeAction(0, 'wish-children')
+  expect(resp.ok).toBe(true)
+  if (resp.interaction.stateId !== 'wait') return resp
+  const improvementOption = resp.interaction.request.options?.find((option) =>
+    option.value.startsWith('action-improvement-'))
+  expect(improvementOption).toBeDefined()
+  resp = session.resolveChoice(0, improvementOption!.value)
+  if (resp.interaction.sourceCard === CARD_ID) return resp
+  if (!resp.state.players[0]!.minorHand.includes(CARD_ID)) return resp
+  if (resp.interaction.stateId !== 'wait') return resp
+  const cardOption = resp.interaction.request.options?.find((option) => option.value === CARD_ID)
+  expect(cardOption).toBeDefined()
   return session.resolveChoice(0, cardOption!.value)
 }
 
@@ -122,6 +156,16 @@ describe('B003_Moonshine session', () => {
 
     // Food should NOT be deducted yet (deduction happens on resolveChoice('play'))
     expect(p0.resources.food).toBe(3)
+  })
+
+  it('empty occupation hand produces no play-or-pass choice', () => {
+    const session = makeSession()
+    session.state.players[0]!.occupationHand = []
+    const resp = playB3(session)
+    expect(resp.ok).toBe(true)
+    expect(resp.interaction.stateId === 'wait' ? resp.interaction.request.kind : resp.interaction.stateId).toBe('confirm-next-player')
+    expect(resp.state.players[0]!.occupationHand).toEqual([])
+    expect(resp.state.players[1]!.minorHand).toContain(CARD_ID)
   })
 
   // ---------------------------------------------------------------------------
@@ -211,28 +255,41 @@ describe('B003_Moonshine session', () => {
     expect(p1After.occupationHand.length).toBeGreaterThan(0)
   })
 
-  // ---------------------------------------------------------------------------
-  // Case 5: Solo (1 player) — pass discards rather than passing to another player
-  // Skipped after main's 2026-04-19 player-count-aware action-space filtering:
-  // meeting-place is configured with `players: [2,3,4]`, so a 1-player session
-  // cannot reach B3 through the normal path. Solo discard semantics are covered
-  // by the unit test in shared/cards/helpers/__tests__/pass-occupation.test.ts.
-  // ---------------------------------------------------------------------------
-  it.skip('case 5: solo game — pass discards the picked occupation', () => {
-    const session = makeSession({ food: 3 })
-    // Trim to 1 player directly in state
+  it('plays the occupation while skipping its unaffordable mandatory cost', () => {
+    const session = makeSession({
+      food: 2,
+      occupationHand: [OCC_EXTRA_COST],
+      playerCount: 4,
+      consumedStables: 3,
+    })
+    const b3Resp = playB3(session)
+    expect(b3Resp.interaction.stateId).toBe('wait')
+    if (b3Resp.interaction.stateId !== 'wait') return
+    expect(b3Resp.interaction.request.options?.find((option) => option.value === 'play')?.disabled).not.toBe(true)
+
+    const playResp = session.resolveChoice(0, 'play')
+    expect(playResp.ok).toBe(true)
+    expect(playResp.state.players[0]!.occupationPlayed).toContain(OCC_EXTRA_COST)
+    expect(playResp.state.players[0]!.resources.food).toBe(0)
+    expect(playResp.state.players[0]!.supplyTokensConsumed?.stable).toBe(3)
+    expect(playResp.state.players[0]!.fenceSegments).toHaveLength(0)
+  })
+
+  it('case 5: solo game — pass discards the picked occupation', () => {
+    const session = makeSession({ food: 3, occupationHand: [OCC_A], playerCount: 1 })
     const state = session.getState().state
-    state.players = state.players.slice(0, 1)
+    state.round = 14
     state.currentPlayerIndex = 0
     const p0 = state.players[0]!
     setActiveWorkerCount(p0, 2)
     setWorkersAtHome(state, p0, 2)
+    p0.rooms = 3
     p0.minorHand = [CARD_ID]
-    p0.occupationHand = [OCC_A, OCC_B]
+    p0.occupationHand = [OCC_A]
     p0.resources.food = 3
     session.loadState(state)
 
-    const b3Resp = playB3(session)
+    const b3Resp = playB3AfterFamilyGrowth(session)
     expect(b3Resp.interaction.stateId).toBe('wait')
     if (b3Resp.interaction.stateId !== 'wait') return
 

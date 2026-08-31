@@ -3,12 +3,14 @@ import { GameSession } from '../game/authoritative-session'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 import { recordRoundPlacement } from '../../shared/cards/helpers/round-placement'
 import {
+  markAllWorkersUsed,
   setActiveWorkerCount,
   setWorkersAtHome,
   newbornCount,
 } from '../../shared/domain/player'
 import { addWorkerRef } from '../../shared/domain/space'
 import type { GameState, PlayerState } from '../../shared/contract/types'
+import { confirmNextPlayer } from './_helpers/pending-confirms'
 
 import '../../shared/cards/A/A025_Bassinet'
 import '../../shared/cards/A/A092_AdoptiveParents'
@@ -66,6 +68,23 @@ const baseSetup = () => {
   return session
 }
 
+const completeFarmland = (session: GameSession, playerIndex: number) => {
+  let resp = session.takeAction(playerIndex, 'farmland')
+  if (resp.ok && resp.interaction.stateId === 'wait' && resp.interaction.request.kind === 'farm-select') {
+    const tile = resp.interaction.request.farm.selectableTiles[0]
+    expect(tile).toBeDefined()
+    resp = session.commitSelectionChoice(playerIndex, { tile: tile! })
+  }
+  return resp
+}
+
+const advanceTurn = (session: GameSession) => {
+  const interaction = session.getState().interaction
+  expect(interaction.stateId).toBe('wait')
+  if (interaction.stateId === 'wait') expect(interaction.request.kind).toBe('confirm-next-player')
+  return confirmNextPlayer(session)
+}
+
 describe('A025_Bassinet session', () => {
   it('case 1: happy path — P2 follows P1 into first non-accum space', () => {
     const session = baseSetup()
@@ -103,28 +122,29 @@ describe('A025_Bassinet session', () => {
 
   it('case 3: second non-accum space — rejected', () => {
     const session = baseSetup()
-    const state = session.getState().state
-    const p1 = state.players[0]!
-    // P1 places on farmland (first non-accum), then on grain-seeds (second non-accum)
-    simulatePlacement(state, p1, 'farmland', '1')
-    simulatePlacement(state, p1, 'grain-seeds', '2')
-    state.currentPlayerIndex = 1
-    session.loadState(state)
 
-    // P2 (A25) tries grain-seeds — NOT the first non-accum used
+    expect(completeFarmland(session, 0).ok).toBe(true)
+    advanceTurn(session)
+    expect(session.takeAction(1, 'clay-pit').ok).toBe(true)
+    advanceTurn(session)
+    expect(session.takeAction(0, 'grain-seeds').ok).toBe(true)
+    advanceTurn(session)
+
     const resp = session.takeAction(1, 'grain-seeds')
     expect(resp.ok).toBe(false)
   })
 
   it('case 4: Meeting Place is first non-accum — always rejected', () => {
     const session = baseSetup()
-    const state = session.getState().state
-    const p1 = state.players[0]!
-    simulatePlacement(state, p1, 'meeting-place', '1')
-    state.currentPlayerIndex = 1
-    session.loadState(state)
 
-    const resp = session.takeAction(1, 'meeting-place')
+    let resp = session.takeAction(0, 'meeting-place')
+    expect(resp.ok).toBe(true)
+    if (resp.interaction.stateId === 'wait' && resp.interaction.request.options?.some((option) => option.value === '__skip__')) {
+      expect(session.resolveChoice(0, '__skip__').ok).toBe(true)
+    }
+    advanceTurn(session)
+
+    resp = session.takeAction(1, 'meeting-place')
     expect(resp.ok).toBe(false)
   })
 
@@ -249,10 +269,6 @@ describe('A025_Bassinet session', () => {
     expect(new Set(workerIds).size).toBe(2) // two distinct worker ids
   })
 
-  it.skip('case 9: D150 godly-spouse sends worker home — normal placement on empty space', () => {
-    // D150 requires specific round state and stable occupation setup; skipped for brevity.
-  })
-
   it('case 10: 2 occupants on first non-accum — rejected', () => {
     const session = baseSetup()
     const state = session.getState().state
@@ -289,5 +305,182 @@ describe('A025_Bassinet session', () => {
     farmland = undoResp.state.actionSpaces.find((s) => s.id === 'farmland')!
     expect(farmland.takenBy).toHaveLength(1)
     expect(farmland.takenBy[0]!.playerId).toBe('p1')
+  })
+
+  it('only the Bassinet owner can follow another player onto the occupied space', () => {
+    const session = baseSetup()
+    const state = session.getState().state
+    state.players[0]!.minorPlayed.push(CARD_ID)
+    state.players[1]!.minorPlayed = state.players[1]!.minorPlayed.filter((id) => id !== CARD_ID)
+    session.loadState(state)
+
+    expect(completeFarmland(session, 0).ok).toBe(true)
+    advanceTurn(session)
+
+    expect(session.takeAction(1, 'farmland').ok).toBe(false)
+  })
+
+  it('ignores accumulating actions used before the first non-accumulating action', () => {
+    const session = baseSetup()
+
+    expect(session.takeAction(0, 'forest').ok).toBe(true)
+    advanceTurn(session)
+    expect(session.takeAction(1, 'clay-pit').ok).toBe(true)
+    advanceTurn(session)
+    expect(completeFarmland(session, 0).ok).toBe(true)
+    advanceTurn(session)
+
+    expect(session.takeAction(1, 'farmland').ok).toBe(true)
+  })
+
+  it('does not bypass the target action requirements', () => {
+    const session = baseSetup()
+    const state = session.getState().state
+    const firstPlayer = state.players[0]!
+    const owner = state.players[1]!
+    firstPlayer.occupationPlayed.push('A092_AdoptiveParents')
+    firstPlayer.resources.food = 5
+    firstPlayer.rooms = 3
+    owner.rooms = 2
+    session.loadState(state)
+
+    let resp = session.takeAction(0, 'wish-children')
+    expect(resp.ok).toBe(true)
+    resp = session.takeAnytimeAction(0, 'A92-adoptive-parents-anytime-grow')
+    expect(resp.ok).toBe(true)
+    if (resp.interaction.stateId === 'wait' && resp.interaction.request.options?.some((option) => option.value === '__skip__')) {
+      resp = session.resolveChoice(0, '__skip__')
+    }
+    if (resp.interaction.stateId === 'wait' && resp.interaction.request.kind === 'confirm-next-player') {
+      resp = confirmNextPlayer(session)
+    }
+
+    expect(resp.state.actionSpaces.find((space) => space.id === 'wish-children')!.takenBy).toHaveLength(1)
+    expect(session.takeAction(1, 'wish-children').ok).toBe(false)
+  })
+
+  it('recognizes an earlier first non-accumulating space when played mid-round', () => {
+    const session = baseSetup()
+    const state = session.getState().state
+    const owner = state.players[1]!
+    owner.minorPlayed = owner.minorPlayed.filter((id) => id !== CARD_ID)
+    owner.minorHand = [CARD_ID]
+    owner.resources.wood = 5
+    owner.resources.reed = 5
+    owner.resources.clay = 5
+    owner.resources.stone = 5
+    session.loadState(state)
+
+    expect(completeFarmland(session, 0).ok).toBe(true)
+    advanceTurn(session)
+    let resp = session.takeAction(1, 'major-improvement')
+    expect(resp.ok).toBe(true)
+    if (resp.interaction.stateId === 'wait') {
+      const improvement = resp.interaction.request.options?.find((option) =>
+        option.value.startsWith('action-improvement-'))
+      const card = resp.interaction.request.options?.find((option) => option.value === CARD_ID)
+      expect(improvement ?? card).toBeDefined()
+      resp = session.resolveChoice(1, (improvement ?? card)!.value)
+    }
+    if (resp.interaction.stateId === 'wait') {
+      const card = resp.interaction.request.options?.find((option) => option.value === CARD_ID)
+      if (card) resp = session.resolveChoice(1, card.value)
+    }
+    expect(resp.state.players[1]!.minorPlayed).toContain(CARD_ID)
+    advanceTurn(session)
+    expect(session.takeAction(0, 'forest').ok).toBe(true)
+    advanceTurn(session)
+
+    resp = session.takeAction(1, 'farmland')
+    expect(resp.ok).toBe(true)
+    expect(resp.state.actionSpaces.find((space) => space.id === 'farmland')!.takenBy).toHaveLength(2)
+  })
+
+  it('reorders the first space after Meeting Place changes the start player', () => {
+    const session = baseSetup()
+    const state = session.getState().state
+    const owner = state.players[1]!
+    owner.minorPlayed = owner.minorPlayed.filter((id) => id !== CARD_ID)
+    owner.minorHand = [CARD_ID]
+    owner.resources.wood = 1
+    owner.resources.reed = 1
+    session.loadState(state)
+
+    expect(completeFarmland(session, 0).ok).toBe(true)
+    advanceTurn(session)
+    let resp = session.takeAction(1, 'meeting-place')
+    expect(resp.ok).toBe(true)
+    if (resp.interaction.stateId === 'wait') {
+      const improvement = resp.interaction.request.options?.find((option) =>
+        option.value.startsWith('action-improvement-'))
+      expect(improvement).toBeDefined()
+      resp = session.resolveChoice(1, improvement!.value)
+    }
+    expect(resp.state.players[1]!.minorPlayed).toContain(CARD_ID)
+    expect(resp.state.players[1]!.resources.wood).toBe(0)
+    expect(resp.state.players[1]!.resources.reed).toBe(0)
+    advanceTurn(session)
+    expect(session.takeAction(0, 'forest').ok).toBe(true)
+    advanceTurn(session)
+
+    resp = session.takeAction(1, 'farmland')
+    expect(resp.ok).toBe(false)
+    expect(resp.error).toBe('space unavailable')
+    expect(resp.state.actionSpaces.find((space) => space.id === 'farmland')!.takenBy).toHaveLength(1)
+  })
+
+  it('selects a new first non-accumulating action in the next work phase', () => {
+    const session = baseSetup()
+
+    expect(completeFarmland(session, 0).ok).toBe(true)
+    advanceTurn(session)
+    expect(completeFarmland(session, 1).ok).toBe(true)
+    advanceTurn(session)
+
+    const endState = session.getState().state
+    endState.players.forEach((player) => markAllWorkersUsed(endState, player))
+    session.loadState(endState)
+    let resp = session.performRoundEnd()
+    expect(resp.ok).toBe(true)
+    expect(resp.state.round).toBe(3)
+
+    resp = session.takeAction(0, 'grain-seeds')
+    expect(resp.ok).toBe(true)
+    advanceTurn(session)
+
+    resp = session.takeAction(1, 'grain-seeds')
+    expect(resp.ok).toBe(true)
+    expect(resp.state.actionSpaces.find((space) => space.id === 'grain-seeds')!.takenBy).toHaveLength(2)
+  })
+
+  it('reconstructs slot order when one player acts twice before another', () => {
+    const session = new GameSession(25, undefined, { playerCount: 4 })
+    stabilizeRandomHands(session.state.players)
+    const state = session.getState().state
+    state.currentPlayerIndex = 0
+    state.round = 2
+    state.roundPhase = 'work'
+    state.players.forEach((player) => {
+      setActiveWorkerCount(player, 2)
+      setWorkersAtHome(state, player, 2)
+    })
+    state.players[3]!.minorPlayed = [CARD_ID]
+    session.loadState(state)
+
+    expect(session.takeAction(0, 'forest').ok).toBe(true)
+    let next = session.getState().state
+    next.currentPlayerIndex = 0
+    session.loadState(next)
+    expect(session.takeAction(0, 'day-laborer').ok).toBe(true)
+    next = session.getState().state
+    next.currentPlayerIndex = 1
+    session.loadState(next)
+    expect(session.takeAction(1, 'grain-seeds').ok).toBe(true)
+    next = session.getState().state
+    next.currentPlayerIndex = 3
+    session.loadState(next)
+
+    expect(session.takeAction(3, 'day-laborer').ok).toBe(false)
+    expect(session.takeAction(3, 'grain-seeds').ok).toBe(true)
   })
 })

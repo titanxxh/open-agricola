@@ -1,12 +1,14 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { setWorkersAtHome } from '../../shared/domain/player'
+import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 import '../../shared/cards/A/A004_Baseboards'
 
 const CARD_ID = 'A004_Baseboards'
 
-const setup = (opts?: { food?: number; grain?: number }) => {
+const setup = (opts?: { food?: number; grain?: number; rooms?: number }) => {
   const session = new GameSession(/* seed */ 1)
+  stabilizeRandomHands(session.state.players)
   const state = session.getState().state
   state.players = state.players.slice(0, 2)
   state.currentPlayerIndex = 0
@@ -15,6 +17,7 @@ const setup = (opts?: { food?: number; grain?: number }) => {
 
   const player = state.players[0]!
   setWorkersAtHome(state, player, 2)
+  player.rooms = opts?.rooms ?? 2
   // Stock building resources so multiple majors are affordable, ensuring the
   // major-improvement choice prompt is shown (game-core auto-resolves when
   // options.length === 1 and fails when it is 0).
@@ -27,9 +30,7 @@ const setup = (opts?: { food?: number; grain?: number }) => {
     food: opts?.food ?? 2,
     grain: opts?.grain ?? 0,
   }
-  if (!player.minorHand.includes(CARD_ID)) {
-    player.minorHand.push(CARD_ID)
-  }
+  player.minorHand = [CARD_ID]
   state.players[1]!.workersAvailable = 2
 
   const majorImprovement = state.actionSpaces.find((space) => space.id === 'major-improvement')
@@ -61,21 +62,25 @@ const playA4 = (session: GameSession) => {
 }
 
 describe('A004_Baseboards session — altCosts', () => {
-  it('food=2, grain=0 → auto-pay food (single solution, no choice prompt)', () => {
-    const session = setup({ food: 2, grain: 0 })
+  it('food cost: gains 1 wood per room and passes Baseboards', () => {
+    const session = setup({ food: 2, grain: 0, rooms: 2 })
     const resp = playA4(session)
     expect(resp.ok).toBe(true)
     expect(resp.interaction.stateId === 'wait' ? resp.interaction.request.kind : resp.interaction.stateId).toBe('confirm-next-player')
     expect(resp.state.players[0]!.resources.food).toBe(0)
     expect(resp.state.players[0]!.resources.grain).toBe(0)
+    expect(resp.state.players[0]!.resources.wood).toBe(7)
+    expect(resp.state.players[0]!.minorPlayed).not.toContain(CARD_ID)
+    expect(resp.state.players[1]!.minorHand).toContain(CARD_ID)
   })
 
-  it('food=0, grain=1 → auto-pay grain (single solution)', () => {
-    const session = setup({ food: 0, grain: 1 })
+  it('grain cost: gains an additional wood when rooms exceed people', () => {
+    const session = setup({ food: 0, grain: 1, rooms: 3 })
     const resp = playA4(session)
     expect(resp.interaction.stateId === 'wait' ? resp.interaction.request.kind : resp.interaction.stateId).toBe('confirm-next-player')
     expect(resp.state.players[0]!.resources.food).toBe(0)
     expect(resp.state.players[0]!.resources.grain).toBe(0)
+    expect(resp.state.players[0]!.resources.wood).toBe(9)
   })
 
   it('food=2, grain=1 → multi-solution → selectPayment choice', () => {
