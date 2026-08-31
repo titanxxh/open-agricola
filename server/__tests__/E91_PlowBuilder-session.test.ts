@@ -8,6 +8,9 @@ import {
 } from '../../shared/cards/helpers/card-state'
 import { runCardEffectHook } from '../../shared/cards/card-effects'
 import { dispatchTradeAppliedListener } from '../../shared/actions/helpers/trade-applied-listener'
+import { takeMajorImprovementFromSupply } from '../../shared/cards/major/supply'
+import { markAllWorkersUsed, setActiveWorkerCount } from '../../shared/domain/player'
+import type { InitialStateOptions } from '../../shared/session/state-constants'
 
 import '../../shared/cards/E/E091_PlowBuilder'
 import type { AnytimeAction } from '../../shared/contract/types'
@@ -15,13 +18,6 @@ import type { AnytimeAction } from '../../shared/contract/types'
 const CARD_ID = 'E091_PlowBuilder'
 
 describe('E091_PlowBuilder session', () => {
-  /**
-   * The reference gates the anytime action on a per-harvest `usedJoinery` flag set by
-   * an Exchange-event listener (Joinery used during the harvest), not just
-   * on owning the card. Sprint 5e mirrored this with a `trade-applied`
-   * listener; tests below set the flag directly via the same helper to
-   * decouple from Joinery's exchange listing.
-   */
   const setup = (round = 4, options?: { joineryUsed?: boolean }) => {
     const session = new GameSession()
     stabilizeRandomHands(session.state.players)
@@ -29,6 +25,7 @@ describe('E091_PlowBuilder session', () => {
     state.players = state.players.slice(0, 2)
     state.currentPlayerIndex = 0
     state.round = round
+    state.roundPhase = 'work'
 
     const player = state.players[0]!
     player.occupationHand.push(CARD_ID)
@@ -56,51 +53,80 @@ describe('E091_PlowBuilder session', () => {
     return resp
   }
 
-  it('available during harvest round with Joinery used + food', () => {
-    const session = setup(4) // round 4 is a harvest round
-    const resp = enterActiveInteraction(session)
-    const ids = resp.interaction.anytimeActions.map((a: AnytimeAction) => a.id)
-    expect(ids).toContain('E91-plow-builder-anytime')
-  })
-
-  it('pay 1 food and plow 1 field', () => {
-    const session = setup(4)
-    enterActiveInteraction(session)
-
-    // Take the anytime action
-    let resp = session.takeAnytimeAction(0, 'E91-plow-builder-anytime')
-    expect(resp.ok).toBe(true)
-
-    // After paying food, plow action starts — should show farmSelect for tile selection
-    expect(resp.interaction.stateId).toBe('wait')
-    expect(resp.interaction.stateId).toBe('wait')
-
-    // Commit the plow choice
-    const tile = resp.interaction.request.farm.selectableTiles[0]
-    expect(tile).toBeDefined()
-    resp = session.commitSelectionChoice(0, { tile })
-    expect(resp.ok).toBe(true)
-
-    const p = resp.state.players[0]!
-    // Should have paid 1 food (started with 5)
-    expect(p.resources.food).toBe(4)
-    // Should have gained a new field
-    expect(p.fields.length).toBeGreaterThanOrEqual(1)
-    // Card should be flagged (one-time per harvest)
-    expect(p.cardStates?.[CARD_ID]?.flagged).toBe(true)
-  })
-
-  it('NOT available in non-harvest round', () => {
-    const session = setup(3) // round 3 is not a harvest round
-    const resp = enterActiveInteraction(session)
-    const ids = resp.interaction.anytimeActions.map((a: AnytimeAction) => a.id)
-    expect(ids).not.toContain('E91-plow-builder-anytime')
-  })
-
-  it('NOT available without food', () => {
-    const session = setup(4)
+  const setupMinorImprovement = (
+    options: InitialStateOptions = { playerCount: 2 },
+    revealJoinerySuccessor = false,
+  ) => {
+    const session = new GameSession(91, undefined, options)
+    stabilizeRandomHands(session.state.players)
     const state = session.getState().state
-    state.players[0]!.resources.food = 0
+    state.round = 3
+    state.roundPhase = 'work'
+    state.currentPlayerIndex = 0
+    state.players.forEach((player, index) => {
+      player.workersAvailable = index === 0 ? 1 : 0
+      player.familySize = 1
+    })
+    const owner = state.players[0]!
+    owner.occupationPlayed.push(CARD_ID)
+    owner.minorHand = ['B007_Wage']
+    owner.resources = {
+      ...owner.resources,
+      food: 10,
+      wood: 5,
+      clay: 5,
+      stone: 5,
+      reed: 5,
+    }
+    if (revealJoinerySuccessor) takeMajorImprovementFromSupply(state, 'Major_Joinery')
+    session.loadState(state)
+    return session
+  }
+
+  const enterMinorChoice = (session: GameSession) => {
+    let resp = session.takeAction(0, 'meeting-place')
+    expect(resp.ok).toBe(true)
+    expect(resp.interaction.stateId).toBe('wait')
+    resp = session.resolveChoice(0, 'action-improvement-1')
+    expect(resp.interaction.stateId).toBe('wait')
+    return resp
+  }
+
+  const setupHarvest = () => {
+    const session = new GameSession(91)
+    stabilizeRandomHands(session.state.players)
+    const state = session.getState().state
+    state.players = state.players.slice(0, 2)
+    state.currentPlayerIndex = 0
+    state.round = 4
+    state.roundPhase = 'work'
+    state.players.forEach((player, index) => {
+      setActiveWorkerCount(player, index === 0 ? 1 : 0)
+      markAllWorkersUsed(state, player)
+      player.resources.food = 0
+    })
+    const owner = state.players[0]!
+    owner.occupationPlayed.push(CARD_ID)
+    owner.minorPlayed.push('D060_LargePottery')
+    owner.improvements.push('Major_Joinery')
+    owner.resources.wood = 1
+    owner.resources.clay = 1
+    owner.resources.food = 5
+    session.loadState(state)
+    return session
+  }
+
+  it('does not arm or become available during the work phase of a harvest round', () => {
+    const session = setup(4, { joineryUsed: false })
+    const state = session.getState().state
+    const player = state.players[0]!
+    dispatchTradeAppliedListener(
+      state,
+      player,
+      { from: { wood: 1 }, to: { food: 2 }, sourceId: 'Major_Joinery' },
+      1,
+    )
+    expect(readCardExtraData<boolean>(player, CARD_ID, 'usedJoinery')).toBeFalsy()
     session.loadState(state)
 
     const resp = enterActiveInteraction(session)
@@ -108,13 +134,73 @@ describe('E091_PlowBuilder session', () => {
     expect(ids).not.toContain('E91-plow-builder-anytime')
   })
 
-  it('NOT available when Joinery owned but not used this harvest', () => {
-    // Sprint 5e change: anytime now gates on usedJoinery flag, not just
-    // ownership. Without the flag, action does not appear.
-    const session = setup(4, { joineryUsed: false })
-    const resp = enterActiveInteraction(session)
-    const ids = resp.interaction.anytimeActions.map((a: AnytimeAction) => a.id)
-    expect(ids).not.toContain('E91-plow-builder-anytime')
+  it('uses Joinery during the real harvest, pays 1 food, and plows 1 field', () => {
+    const session = setupHarvest()
+    let resp = session.performRoundEnd()
+
+    expect(resp.state.roundPhase).toBe('harvest')
+    expect(readCardExtraData<boolean>(resp.state.players[0]!, CARD_ID, 'usedJoinery')).toBe(true)
+    expect(resp.interaction.anytimeActions.map((action) => action.id))
+      .toContain('E91-plow-builder-anytime')
+
+    resp = session.takeAnytimeAction(0, 'E91-plow-builder-anytime')
+    expect(resp.ok).toBe(true)
+    expect(resp.interaction.stateId).toBe('wait')
+    expect(resp.state.players[0]!.resources.food).toBe(6)
+    const tile = resp.interaction.request.farm.selectableTiles[0]
+    expect(tile).toBeDefined()
+    resp = session.commitSelectionChoice(0, { tile })
+    expect(resp.ok).toBe(true)
+
+    const p = resp.state.players[0]!
+    expect(p.fields).toContainEqual(expect.objectContaining(tile))
+    expect(p.cardStates?.[CARD_ID]?.flagged).toBe(true)
+    expect(resp.interaction.anytimeActions.map((action) => action.id))
+      .not.toContain('E91-plow-builder-anytime')
+    expect(resp.state.events).toContainEqual(expect.objectContaining({ type: 'farm.fieldPlowed' }))
+  })
+
+  it('builds Joinery through a Minor Improvement action and normal payment', () => {
+    const session = setupMinorImprovement()
+    const before = { ...session.state.players[0]!.resources }
+    let resp = enterMinorChoice(session)
+    const values = resp.interaction.request.options?.map((option) => option.value) ?? []
+    expect(values).toContain('Major_Joinery')
+    expect(values).not.toContain('Major_Pottery')
+
+    resp = session.resolveChoice(0, 'Major_Joinery')
+    if (resp.interaction.stateId === 'wait' && resp.interaction.promptKey === 'prompt.selectPayment') {
+      const payment = resp.interaction.request.options?.find((option) => option.value !== 'cancel')
+      expect(payment).toBeDefined()
+      resp = session.resolveChoice(0, payment!.value)
+    }
+
+    expect(resp.state.players[0]!.resources.wood).toBe(before.wood - 2)
+    expect(resp.state.players[0]!.resources.stone).toBe(before.stone - 2)
+    expect(resp.state.players[0]!.improvements).toContain('Major_Joinery')
+    expect(resp.state.availableMajorImprovements).not.toContain('Major_Joinery')
+    expect(resp.state.log.find((entry) => entry.key === 'log.playImprovement')?.params)
+      .toMatchObject({ improvements: 'Major_Joinery' })
+  })
+
+  it('offers the visible six-player Joinery copy through a Minor Improvement action', () => {
+    const session = setupMinorImprovement({ playerCount: 6 }, true)
+    const resp = enterMinorChoice(session)
+
+    expect(resp.interaction.request.options?.map((option) => option.value) ?? [])
+      .toContain('Major_Joinery2')
+  })
+
+  it('does not offer Furniture Stall as Joinery through a Minor Improvement action', () => {
+    const session = setupMinorImprovement({
+      playerCount: 2,
+      enableFarmersOfTheMoor: true,
+      allowIncompleteFarmersOfTheMoorMinorDeal: true,
+    }, true)
+    const resp = enterMinorChoice(session)
+
+    expect(resp.interaction.request.options?.map((option) => option.value) ?? [])
+      .not.toContain('Major_Moor_FurnitureStall')
   })
 
   it('trade-applied listener sets usedJoinery on Major_Joinery sourceId', () => {
@@ -122,6 +208,7 @@ describe('E091_PlowBuilder session', () => {
     stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
+    state.roundPhase = 'harvest'
     const player = state.players[0]!
     player.occupationPlayed.push(CARD_ID)
     session.loadState(state)
@@ -145,6 +232,7 @@ describe('E091_PlowBuilder session', () => {
     stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
+    state.roundPhase = 'harvest'
     const player = state.players[0]!
     player.occupationPlayed.push(CARD_ID)
     session.loadState(state)
@@ -163,6 +251,7 @@ describe('E091_PlowBuilder session', () => {
     stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
+    state.roundPhase = 'harvest'
     const player = state.players[0]!
     player.occupationPlayed.push(CARD_ID)
     session.loadState(state)
@@ -181,6 +270,7 @@ describe('E091_PlowBuilder session', () => {
     stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
+    state.roundPhase = 'harvest'
     const player = state.players[0]!
     player.occupationPlayed.push(CARD_ID)
     setCardFlag(player, CARD_ID, true)
@@ -200,6 +290,7 @@ describe('E091_PlowBuilder session', () => {
     stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
+    state.roundPhase = 'harvest'
     const player = state.players[0]!
     player.occupationPlayed.push(CARD_ID)
     player.improvements.push('Major_Joinery')
@@ -214,25 +305,4 @@ describe('E091_PlowBuilder session', () => {
     expect(readCardExtraData<boolean>(player, CARD_ID, 'usedJoinery')).toBe(true)
   })
 
-  it('one-time per harvest (flagged after use, reset at onAfterHarvest)', () => {
-    const session = setup(4)
-    enterActiveInteraction(session)
-
-    // Use the anytime action
-    let resp = session.takeAnytimeAction(0, 'E91-plow-builder-anytime')
-    expect(resp.ok).toBe(true)
-
-    // Complete the plow
-    const tile = resp.interaction.request.farm.selectableTiles[0]
-    expect(tile).toBeDefined()
-    resp = session.commitSelectionChoice(0, { tile })
-    expect(resp.ok).toBe(true)
-
-    // Card should now be flagged
-    expect(resp.state.players[0]!.cardStates?.[CARD_ID]?.flagged).toBe(true)
-
-    // The anytime action should no longer appear
-    const ids = resp.interaction.anytimeActions.map((a: AnytimeAction) => a.id)
-    expect(ids).not.toContain('E91-plow-builder-anytime')
-  })
 })

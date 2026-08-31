@@ -6,6 +6,8 @@ import {
   getRegisteredCardListeners,
   type CardListenerContext,
 } from '../../shared/cards/card-listeners'
+import { takeMajorImprovementFromSupply } from '../../shared/cards/major/supply'
+import type { InitialStateOptions } from '../../shared/session/state-constants'
 
 import '../../shared/cards/D/D131_CraftsmanshipPromoter'
 
@@ -78,6 +80,48 @@ const enterMinorChoice = (session: GameSession) => {
   return resp
 }
 
+const setupVariant = (options: InitialStateOptions) => {
+  const session = new GameSession(42, undefined, options)
+  stabilizeRandomHands(session.state.players)
+  const state = session.getState().state
+  state.round = 3
+  state.roundPhase = 'work'
+  state.currentPlayerIndex = 0
+  state.players.forEach((player, index) => {
+    player.workersAvailable = index === 0 ? 1 : 0
+    player.familySize = 1
+  })
+  const owner = state.players[0]!
+  owner.occupationPlayed.push(CARD_ID)
+  owner.resources = {
+    ...owner.resources,
+    food: 10,
+    wood: 5,
+    clay: 5,
+    stone: 5,
+    reed: 5,
+  }
+  takeMajorImprovementFromSupply(state, 'Major_Joinery')
+  takeMajorImprovementFromSupply(state, 'Major_Well')
+  session.loadState(state)
+  return session
+}
+
+const buyCandidate = (session: GameSession, cardId: string) => {
+  let resp = enterMinorChoice(session)
+  expect(resp.interaction.stateId).toBe('wait')
+  if (resp.interaction.stateId !== 'wait') throw new Error('expected improvement choice')
+  const values = resp.interaction.request.options?.map((option) => option.value) ?? []
+  expect(values).toContain(cardId)
+  resp = session.resolveChoice(0, cardId)
+  if (resp.interaction.stateId === 'wait' && resp.interaction.promptKey === 'prompt.selectPayment') {
+    const payment = resp.interaction.request.options?.find((option) => option.value !== 'cancel')
+    expect(payment).toBeDefined()
+    resp = session.resolveChoice(0, payment!.value)
+  }
+  return { resp, values }
+}
+
 describe('D131_CraftsmanshipPromoter listener (unit)', () => {
   it('injects bottom-row major candidates when owner played D131', () => {
     const session = setup()
@@ -145,7 +189,7 @@ describe('D131_CraftsmanshipPromoter listener (unit)', () => {
 
 describe('D131_CraftsmanshipPromoter session integration', () => {
   it('minor-improvement choice list contains all bottom-row major candidates', () => {
-    const session = setup({ minorHand: [] })
+    const session = setup({ minorHand: ['__test_placeholder__'] })
     const resp = enterMinorChoice(session)
     expect(resp.ok).toBe(true)
     expect(resp.interaction.stateId).toBe('wait')
@@ -158,7 +202,7 @@ describe('D131_CraftsmanshipPromoter session integration', () => {
   })
 
   it('selecting Major_Pottery on minor-improvement plays it as a major', () => {
-    const session = setup({ minorHand: [] })
+    const session = setup({ minorHand: ['__test_placeholder__'] })
     let resp = enterMinorChoice(session)
     expect(resp.ok).toBe(true)
     expect(resp.interaction.stateId).toBe('wait')
@@ -183,6 +227,41 @@ describe('D131_CraftsmanshipPromoter session integration', () => {
     expect(resp.state.availableMajorImprovements).not.toContain('Major_Pottery')
   })
 
+  it.each([
+    [
+      'six-player duplicate',
+      { playerCount: 6 },
+      'Major_Joinery2',
+      'Major_Well2',
+    ],
+    [
+      'Farmers of the Moor successor',
+      {
+        playerCount: 2,
+        enableFarmersOfTheMoor: true,
+        allowIncompleteFarmersOfTheMoorMinorDeal: true,
+      },
+      'Major_Moor_FurnitureStall',
+      'Major_Moor_VillageChurch',
+    ],
+  ] as const)('builds a visible bottom-row %s through a Minor Improvement action', (
+    _name,
+    options,
+    cardId,
+    excludedId,
+  ) => {
+    const session = setupVariant(options)
+    const { resp, values } = buyCandidate(session, cardId)
+
+    expect(resp.ok).toBe(true)
+    expect(values).not.toContain(excludedId)
+    expect(resp.state.players[0]!.improvements).toContain(cardId)
+    expect(resp.state.availableMajorImprovements).not.toContain(cardId)
+    expect(resp.state.log.find((entry) => entry.key === 'log.playImprovement')?.params)
+      .toMatchObject({ improvements: cardId })
+    expect(resp.state.players[0]!.improvements).not.toContain(excludedId)
+  })
+
   it('non-D131 owner: minor-improvement has no major candidates', () => {
     const session = setup({ playD131: false })
     const resp = enterMinorChoice(session)
@@ -195,7 +274,7 @@ describe('D131_CraftsmanshipPromoter session integration', () => {
 
   it('cost-unaffordable: bottom-row majors filtered out', () => {
     const session = setup({
-      minorHand: [],
+      minorHand: ['__test_placeholder__'],
       resources: { food: 0, wood: 0, clay: 0, stone: 0, reed: 0 },
     })
     const resp = enterMinorChoice(session)

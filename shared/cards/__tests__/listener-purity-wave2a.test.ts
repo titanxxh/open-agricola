@@ -888,6 +888,7 @@ describe('listener purity wave 2a', () => {
       phase: 'immediatelyAfter',
       extraData: { sourceId: 'Major_Joinery' },
     })
+    ctx.state.roundPhase = 'harvest'
     const before = snapshot(p)
 
     const result = listenerById(

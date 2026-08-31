@@ -428,6 +428,14 @@ _Avoid_: dual-type minor purchase、按计数身份套用购买规则
 主要设施供应区中同一类主要设施的实体卡叠放口径；只有当前可见的顶层实体卡可被购买，被覆盖的实体卡仍属于供应但不可直接选择。
 _Avoid_: flat available major list、把 covered card 当作可购买卡、duplicate major alias
 
+**Major Improvement Supply Family（主要改良供应堆家族）**:
+主要改良在实体供应版图上的堆位归属；共享同一供应堆家族只表示这些卡属于同一堆位或行，不表示它们在卡牌规则中互为升级或等价。
+_Avoid_: Improvement Identity、规则等价关系、按卡牌名称前缀归类
+
+**Improvement Identity（改良身份）**:
+卡面或规则赋予一个改良“视为某个命名改良或其升级”的等价口径；它独立于该卡在实体供应版图上的堆位归属。
+_Avoid_: Major Improvement Supply Family、供应堆位置、按卡牌名称前缀推断
+
 **Supply Token**:
 玩家 supply 中的 fence / stable 组件也视为支付资源；支付 supply token 记录到 `player.supplyTokensConsumed`。
 _Avoid_: 固定 15 fence / 4 stable 上限

@@ -103,6 +103,17 @@ for (const stack of canonicalMajorSupplyTemplates) {
   }
 }
 
+const bottomRowMajorFamilyIds = new Set([
+  'clay-oven',
+  'stone-oven',
+  'joinery',
+  'pottery',
+  'basketmaker',
+])
+
+export const isBottomRowMajorImprovement = (cardId: string): boolean =>
+  bottomRowMajorFamilyIds.has(canonicalMajorStackByCard.get(cardId)?.familyId ?? '')
+
 const canonicalMajorStackByStackId = new Map<string, CanonicalMajorStack>(
   canonicalMajorSupplyTemplates.map((stack) => [
     stack.stackId!,
@@ -177,6 +188,10 @@ export const getAvailableMajorImprovementIds = (
 ): string[] =>
   getVisibleMajorImprovementIds(state.majorImprovementSupply) ??
   [...state.availableMajorImprovements]
+
+export const getAvailableBottomRowMajorImprovementIds = (
+  state: MajorSupplyState,
+): string[] => getAvailableMajorImprovementIds(state).filter(isBottomRowMajorImprovement)
 
 export const isMajorImprovementAvailable = (
   state: MajorSupplyState,

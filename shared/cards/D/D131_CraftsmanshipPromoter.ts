@@ -5,21 +5,9 @@ import { readImprovementTypes } from '../../actions/effects/improvement'
 import type { ActionHookPhase } from '../../actions/hooks'
 import type { ActionChoiceOption } from '../../contract/types'
 import type { CardImpl } from '../registry'
-import { filterAvailableMajorImprovementIds } from '../major/supply'
+import { getAvailableBottomRowMajorImprovementIds } from '../major/supply'
 
 const CARD_ID = 'D131_CraftsmanshipPromoter'
-/**
- * The reference bottom-row major candidates injected by D131 into the
- * Minor Improvement action.
- * modules/php/Actions/Improvement.php (D131 case in getBuyableCards).
- */
-const D131_BOTTOM_ROW_MAJORS = [
-  'Major_ClayOven',
-  'Major_StoneOven',
-  'Major_Joinery',
-  'Major_Pottery',
-  'Major_Basket',
-] as const
 
 const choiceCandidateListener: CardListenerRegistration = {
   id: 'D131-craftsmanship-promoter-compute-choice-candidates',
@@ -30,7 +18,7 @@ const choiceCandidateListener: CardListenerRegistration = {
     const types = readImprovementTypes(ctx)
     if (types.length !== 1 || types[0] !== 'minor') return
     if (!ctx.player.occupationPlayed.includes(CARD_ID)) return
-    const extraOptions: ActionChoiceOption[] = filterAvailableMajorImprovementIds(ctx.state, D131_BOTTOM_ROW_MAJORS)
+    const extraOptions: ActionChoiceOption[] = getAvailableBottomRowMajorImprovementIds(ctx.state)
       .map((id) => ({
         value: id,
         labelKey: `improvements.${id}.name`,
@@ -47,7 +35,7 @@ const cardImpl = {
     onBuy: () => gainLeaf(CARD_ID, { stone: 1 }),
   },
   listeners: [choiceCandidateListener],
-  reaches: [...D131_BOTTOM_ROW_MAJORS] as readonly string[],
+  reaches: [] as readonly string[],
 } satisfies CardImpl
 
 export const D131_CraftsmanshipPromoter = defineOccupationCard({
