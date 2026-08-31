@@ -50,6 +50,8 @@ const choiceCandidateListener: CardListenerRegistration = {
   handler: (context) => {
     const types = readImprovementTypes(context)
     if (types.length !== 1 || types[0] !== 'minor') return
+    if (context.actionContext?.trueAction === false) return
+    if (context.sourceCard) return
     if (!context.player.occupationPlayed.includes(CARD_ID)) return
     const extraOptions: ActionChoiceOption[] = getAvailableMajorImprovementIds(context.state)
       .filter((id) => getCardDefinitionById(id)?.joineryIdentity === true)
