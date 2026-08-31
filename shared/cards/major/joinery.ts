@@ -26,6 +26,7 @@ export const Major_Joinery = defineMajorCard({
   cost: { wood: 2, stone: 2 },
   vp: 2,
   extraVp: true,
+  joineryIdentity: true,
   waresSalesmanGains: [{ wood: 1, reed: 1 }],
   desc: [
     '[Harvest]',
@@ -46,6 +47,7 @@ export const Major_Joinery2 = defineMajorCard({
   cost: { wood: 2, stone: 2 },
   vp: 2,
   extraVp: true,
+  joineryIdentity: true,
   waresSalesmanGains: [{ wood: 1, reed: 1 }],
   desc: [
     '[Harvest]',

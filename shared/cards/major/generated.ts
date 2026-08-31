@@ -282,6 +282,7 @@ export const majorCardDefinitionsList: readonly (MajorCardDisplay & { kind: 'maj
     },
     "vp": 2,
     "extraVp": true,
+    "joineryIdentity": true,
     "waresSalesmanGains": [
       {
         "wood": 1,
@@ -626,6 +627,7 @@ export const majorCardDefinitionsList: readonly (MajorCardDisplay & { kind: 'maj
     },
     "vp": 2,
     "extraVp": true,
+    "joineryIdentity": true,
     "waresSalesmanGains": [
       {
         "wood": 1,

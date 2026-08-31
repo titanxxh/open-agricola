@@ -136,7 +136,11 @@ describe('E091_PlowBuilder session', () => {
     expect(readCardExtraData<boolean>(player, CARD_ID, 'usedJoinery')).toBe(true)
   })
 
-  it('trade-applied listener ignores non-Joinery sourceIds (e.g. Fireplace)', () => {
+  it.each([
+    ['Major_Fireplace1'],
+    ['Major_Moor_FurnitureStall'],
+    ['Major_JoineryDeluxe'],
+  ])('trade-applied listener ignores sources without Joinery identity: %s', (sourceId) => {
     const session = new GameSession()
     stabilizeRandomHands(session.state.players)
     const state = session.getState().state
@@ -148,15 +152,13 @@ describe('E091_PlowBuilder session', () => {
     dispatchTradeAppliedListener(
       state,
       player,
-      { from: { wood: 1 }, to: { food: 2 }, sourceId: 'Major_Fireplace1' },
+      { from: { wood: 1 }, to: { food: 2 }, sourceId },
       1,
     )
     expect(readCardExtraData<boolean>(player, CARD_ID, 'usedJoinery')).toBeFalsy()
   })
 
-  it('trade-applied listener accepts Major_Joinery upgrade prefix matches', () => {
-    // Future-proofing: The reference prefix-matches Major_Joinery to catch potential
-    // upgrade ids; we mirror with startsWith.
+  it('trade-applied listener accepts the six-player Joinery copy', () => {
     const session = new GameSession()
     stabilizeRandomHands(session.state.players)
     const state = session.getState().state
@@ -168,7 +170,7 @@ describe('E091_PlowBuilder session', () => {
     dispatchTradeAppliedListener(
       state,
       player,
-      { from: { wood: 1 }, to: { food: 2 }, sourceId: 'Major_JoineryDeluxe' },
+      { from: { wood: 1 }, to: { food: 2 }, sourceId: 'Major_Joinery2' },
       1,
     )
     expect(readCardExtraData<boolean>(player, CARD_ID, 'usedJoinery')).toBe(true)
