@@ -12,6 +12,47 @@ import { A011_MudPatch_impl } from '../../shared/cards/A/A011_MudPatch'
 
 const CARD_ID = 'C008_PlantFertilizer'
 
+const buyMinor = (
+  session: GameSession,
+  response: ReturnType<GameSession['takeAction']>,
+) => {
+  expect(response.interaction.stateId).toBe('wait')
+  if (response.interaction.stateId !== 'wait') return response
+  let cardPrompt = response
+  const directOption = cardPrompt.interaction.request.options?.find((option) => option.value === CARD_ID)
+  if (!directOption) {
+    const improvementOption = cardPrompt.interaction.request.options?.find((option) =>
+      option.value.startsWith('action-improvement-'),
+    )
+    expect(improvementOption).toBeDefined()
+    cardPrompt = session.resolveChoice(0, improvementOption!.value)
+    expect(cardPrompt.ok).toBe(true)
+    if (cardPrompt.interaction.stateId !== 'wait') return cardPrompt
+  }
+  if (
+    cardPrompt.interaction.sourceCard === CARD_ID ||
+    cardPrompt.state.players[1]!.minorHand.includes(CARD_ID)
+  ) return cardPrompt
+  const cardOption = cardPrompt.interaction.request.options?.find((option) => option.value === CARD_ID)
+  expect(cardOption).toBeDefined()
+  return session.resolveChoice(0, cardOption!.value)
+}
+
+const setupPublicSession = () => {
+  const session = new GameSession(42)
+  const state = session.getState().state
+  state.players = state.players.slice(0, 2)
+  state.currentPlayerIndex = 0
+  state.round = 1
+  for (const player of state.players) {
+    player.minorHand = ['__test_placeholder__']
+    player.occupationHand = ['__test_placeholder__']
+  }
+  state.players[0]!.minorHand = [CARD_ID]
+  session.loadState(state)
+  return session
+}
+
 const setupSession = () => {
   const session = new GameSession()
   const state = session.getState().state
@@ -30,6 +71,79 @@ const setupSession = () => {
 }
 
 describe('C8 PlantFertilizer session', () => {
+  it('public buy accepts once and grows every eligible ordinary and card field without spending goods', () => {
+    const session = setupPublicSession()
+    const state = session.getState().state
+    const buyer = state.players[0]!
+    buyer.fields = [{ row: 0, col: 1, stacks: [{ kind: 'grain', remaining: 1 }] }]
+    buyer.minorPlayed.push('D075_WoodField')
+    buyer.cardStates.D075_WoodField = {
+      extraData: { cardFieldStacks: [{ crop: 'wood', remaining: 1 }] },
+    }
+    buyer.resources.grain = 0
+    buyer.resources.wood = 0
+    session.loadState(state)
+
+    let response = buyMinor(session, session.takeAction(0, 'meeting-place'))
+    expect(response.interaction.stateId).toBe('wait')
+    if (response.interaction.stateId !== 'wait') throw new Error('expected optional fertilizer choice')
+    expect(response.interaction.promptKey).toBe('ui.interactionOptionalAction')
+    const accept = response.interaction.request.options?.find((option) => option.value !== '__skip__')
+    expect(accept).toBeDefined()
+
+    response = session.resolveChoice(0, accept!.value)
+
+    const result = response.state.players[0]!
+    expect(result.fields[0]!.stacks[0]).toMatchObject({ kind: 'grain', remaining: 2 })
+    expect(result.cardStates.D075_WoodField?.extraData?.cardFieldStacks).toEqual([
+      { crop: 'wood', remaining: 2 },
+    ])
+    expect(result.resources).toMatchObject({ grain: 0, wood: 0 })
+    expect(result.minorPlayed).not.toContain(CARD_ID)
+    expect(response.state.players[1]!.minorHand).toContain(CARD_ID)
+  })
+
+  it('public buy can decline without changing any eligible field and still passes', () => {
+    const session = setupPublicSession()
+    const state = session.getState().state
+    const buyer = state.players[0]!
+    buyer.fields = [{ row: 0, col: 1, stacks: [{ kind: 'vegetable', remaining: 1 }] }]
+    session.loadState(state)
+
+    let response = buyMinor(session, session.takeAction(0, 'meeting-place'))
+    expect(response.interaction.stateId).toBe('wait')
+    response = session.resolveChoice(0, '__skip__')
+
+    expect(response.state.players[0]!.fields[0]!.stacks[0]).toMatchObject({
+      kind: 'vegetable',
+      remaining: 1,
+    })
+    expect(response.state.players[1]!.minorHand).toContain(CARD_ID)
+  })
+
+  it('public buy skips empty, total-2, and Mud Patch animal zones', () => {
+    const session = setupPublicSession()
+    const state = session.getState().state
+    const buyer = state.players[0]!
+    buyer.fields = [
+      { row: 0, col: 0, stacks: [] },
+      { row: 0, col: 1, stacks: [{ kind: 'grain', remaining: 2 }] },
+    ]
+    buyer.minorPlayed.push('A011_MudPatch')
+    session.loadState(state)
+
+    const response = buyMinor(session, session.takeAction(0, 'meeting-place'))
+
+    expect(response.state.players[0]!.fields).toEqual([
+      { row: 0, col: 0, stacks: [] },
+      { row: 0, col: 1, stacks: [{ kind: 'grain', remaining: 2 }] },
+    ])
+    if (response.interaction.stateId === 'wait') {
+      expect(response.interaction.promptKey).not.toBe('ui.interactionOptionalAction')
+    }
+    expect(response.state.players[1]!.minorHand).toContain(CARD_ID)
+  })
+
   it('onBuy returns no flow when no field is eligible', () => {
     const { session, state, player } = setupSession()
     player.fields = [{ row: 0, col: 1, stacks: [] }]

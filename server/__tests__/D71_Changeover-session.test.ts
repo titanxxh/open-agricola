@@ -3,6 +3,7 @@ import { GameSession } from '../game/authoritative-session'
 import { markAllWorkersUsed, setActiveWorkerCount, setWorkersAtHome } from '../../shared/domain/player'
 
 import '../../shared/cards/D/D071_Changeover'
+import '../../shared/cards/D/D075_WoodField'
 import type { ActionChoiceOption, AnytimeAction } from '../../shared/contract/types'
 
 describe('D071_Changeover session', () => {
@@ -41,11 +42,46 @@ describe('D071_Changeover session', () => {
     return resp
   }
 
-  it('available when field has exactly 1 remaining', () => {
+  it('characterizes OA: offers the action for exactly 1 remaining without a harvest origin', () => {
     const session = setup()
     const resp = enterActiveInteraction(session)
     const ids = resp.interaction.anytimeActions.map((a: AnytimeAction) => a.id)
     expect(ids).toContain('D71-changeover-anytime')
+    expect(resp.state.harvestReapSummary).toBeUndefined()
+  })
+
+  it('characterizes OA: a card field reduced to exactly 1 by harvest is not offered', () => {
+    const session = new GameSession(42)
+    const state = session.getState().state
+    state.players = state.players.slice(0, 2)
+    state.currentPlayerIndex = 0
+    state.round = 4
+    state.roundPhase = 'work'
+    for (const player of state.players) {
+      player.minorHand = ['__test_placeholder__']
+      player.occupationHand = ['__test_placeholder__']
+      player.resources.food = 10
+      setActiveWorkerCount(player, 1)
+      markAllWorkersUsed(state, player)
+    }
+    const player = state.players[0]!
+    player.minorPlayed.push('D071_Changeover', 'D075_WoodField')
+    player.fields = []
+    player.resources.wood = 0
+    player.cardStates.D075_WoodField = {
+      extraData: { cardFieldStacks: [{ crop: 'wood', remaining: 2 }] },
+    }
+    session.loadState(state)
+
+    const response = session.performRoundEnd()
+
+    expect(response.ok).toBe(true)
+    expect(response.state.players[0]!.resources.wood).toBe(1)
+    expect(response.state.players[0]!.cardStates.D075_WoodField?.extraData?.cardFieldStacks).toEqual([
+      { crop: 'wood', remaining: 1 },
+    ])
+    expect(response.interaction.anytimeActions.map((action) => action.id))
+      .not.toContain('D71-changeover-anytime')
   })
 
   it.each([
@@ -86,6 +122,7 @@ describe('D071_Changeover session', () => {
       .toContain('D71-changeover-anytime')
 
     resp = session.takeAnytimeAction(0, 'D71-changeover-anytime')
+    expect(resp.ok).toBe(true)
     resp = session.commitSelectionChoice(0, { positions: [{ row: 0, col: 2 }] })
     expect(resp.interaction.stateId === 'wait' ? resp.interaction.promptKey : undefined)
       .toBe('ui.interactionOptionalAction')

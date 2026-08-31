@@ -68,13 +68,16 @@ const buildSpaceForPlayer = (state: GameState, ownerId: string): ActionSpace => 
   return space
 }
 
-const createSession = () => {
+const createSession = (options: { used?: number; currentPlayerIndex?: number } = {}) => {
   const session = new GameSession(42)
   stabilizeRandomHands(session.state.players)
   const state = session.getState().state
-  state.currentPlayerIndex = 0
+  state.currentPlayerIndex = options.currentPlayerIndex ?? 0
   state.round = 1
   state.players[0]!.occupationPlayed.push(CARD_ID)
+  if (options.used !== undefined) {
+    writeCardExtraData(state.players[0]!, CARD_ID, 'used', options.used)
+  }
   for (const space of createPlayerActionSpaces(state)) {
     if (!state.actionSpaces.some((entry) => entry.id === space.id)) {
       state.actionSpaces.push(space)
@@ -194,7 +197,7 @@ describe('C104 — multi-select session (player action space)', () => {
     const before = { ...session.state.players[0]!.resources }
     expect(session.takeAction(0, CARD_ID).ok).toBe(true)
 
-    const resolved = session.resolveChoice(0, 'wood,clay,reed,stone,food')
+    const resolved = session.resolveChoice(0, 'wood,clay,reed,stone,food,wood')
     expect(resolved.ok).toBe(true)
     expect(resolved.interaction).toMatchObject({
       stateId: 'wait',
@@ -204,5 +207,82 @@ describe('C104 — multi-select session (player action space)', () => {
     })
     expect(resolved.state.players[0]!.resources).toEqual(before)
     expect(resolved.state.players[0]!.cardStates[CARD_ID]?.extraData?.used).toBeUndefined()
+  })
+
+  it.each([
+    {
+      used: 1,
+      needed: 7,
+      selection: 'wood,clay,reed,stone,food,grain,vegetable',
+      goods: ['wood', 'clay', 'reed', 'stone', 'food', 'grain', 'vegetable'],
+    },
+    {
+      used: 2,
+      needed: 8,
+      selection: 'wood,clay,reed,stone,food,grain,vegetable,sheep',
+      goods: ['wood', 'clay', 'reed', 'stone', 'food', 'grain', 'vegetable', 'sheep'],
+    },
+    {
+      used: 3,
+      needed: 9,
+      selection: 'wood,clay,reed,stone,food,grain,vegetable,sheep,boar',
+      goods: ['wood', 'clay', 'reed', 'stone', 'food', 'grain', 'vegetable', 'sheep', 'boar'],
+    },
+  ])(
+    'use $needed asks for and grants $needed distinct goods plus 1 begging through GameSession',
+    ({ used, needed, selection, goods }) => {
+      const session = createSession({ used })
+      const before = { ...session.state.players[0]!.resources }
+
+      const started = session.takeAction(0, CARD_ID)
+      expect(started.ok).toBe(true)
+      expect(started.interaction).toMatchObject({
+        stateId: 'wait',
+        playerIndex: 0,
+        promptParams: { needed },
+      })
+
+      const resolved = session.resolveChoice(0, selection)
+
+      expect(resolved.ok).toBe(true)
+      for (const good of goods) {
+        const key = good as keyof PlayerState['resources']
+        expect(resolved.state.players[0]!.resources[key]).toBe((before[key] ?? 0) + 1)
+      }
+      expect(resolved.state.players[0]!.resources.begging).toBe(before.begging + 1)
+      expect(resolved.state.players[0]!.cardStates[CARD_ID]?.extraData?.used).toBe(used + 1)
+    },
+  )
+
+  it('does not execute a fifth use through GameSession', () => {
+    const session = createSession({ used: 4 })
+    const before = { ...session.state.players[0]!.resources }
+
+    const response = session.takeAction(0, CARD_ID)
+
+    expect(response.ok).toBe(true)
+    expect(response.interaction).toMatchObject({
+      stateId: 'wait',
+      playerIndex: 0,
+      request: { kind: 'confirm-next-player' },
+    })
+    expect(response.state.players[0]!.resources).toEqual(before)
+    expect(response.state.players[0]!.cardStates[CARD_ID]?.extraData?.used).toBe(4)
+  })
+
+  it('does not execute the owner-only space for a non-owner through GameSession', () => {
+    const session = createSession({ currentPlayerIndex: 1 })
+    const before = { ...session.state.players[1]!.resources }
+
+    const response = session.takeAction(1, CARD_ID)
+
+    expect(response.ok).toBe(true)
+    expect(response.interaction).toMatchObject({
+      stateId: 'wait',
+      playerIndex: 1,
+      request: { kind: 'confirm-next-player' },
+    })
+    expect(response.state.players[1]!.resources).toEqual(before)
+    expect(response.state.players[1]!.cardStates[CARD_ID]?.extraData?.used).toBeUndefined()
   })
 })

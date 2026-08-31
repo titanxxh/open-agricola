@@ -1,49 +1,76 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
-import { getExtraRoomCapacity } from '../../shared/cards/card-effects'
+import { familySize, setWorkersAtHome } from '../../shared/domain/player'
+import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 
 import '../../shared/cards/D/D085_Reader'
 
 const CARD_ID = 'D085_Reader'
 
-describe('D085_Reader session', () => {
-  const setup = () => {
-    const session = new GameSession()
-    const state = session.getState().state
-    state.players = state.players.slice(0, 2)
-    state.currentPlayerIndex = 0
-    return session
-  }
+const setup = (occupationCount: number, draftMode = false, includeReader = true) => {
+  const session = new GameSession(374)
+  stabilizeRandomHands(session.state.players)
+  const state = session.getState().state
+  state.players = state.players.slice(0, 2)
+  state.currentPlayerIndex = 0
+  state.round = 2
+  state.roundPhase = 'work'
+  state.phase = 'playing'
+  state.draft = null
+  state.draftMode = draftMode ? 'simultaneous' : undefined
+  state.draftPoolSize = draftMode ? 7 : undefined
+  state.players.forEach((entry, index) => setWorkersAtHome(state, entry, index === 0 ? 2 : 0))
 
-  it('grants no extra room below 6 occupations', () => {
-    const session = setup()
-    const state = session.getState().state
-    const player = state.players[0]!
-    player.occupationPlayed = ['a', 'b', 'c', 'd', CARD_ID] // 5 total
-    expect(getExtraRoomCapacity(player)).toBe(0)
+  const player = state.players[0]!
+  player.rooms = 2
+  player.occupationPlayed = Array.from(
+    { length: occupationCount - (includeReader ? 1 : 0) },
+    (_, index) => `__reader_occupation_${index}__`,
+  )
+  if (includeReader) player.occupationPlayed.push(CARD_ID)
+  session.loadState(state)
+  return session
+}
+
+const takeFamilyGrowth = (session: GameSession) => {
+  const before = familySize(session.state.players[0]!)
+  const response = session.takeAction(0, 'wish-children')
+  return { before, response }
+}
+
+describe('D085 Reader native session', () => {
+  it('does not provide room with 5 occupations in a normal game', () => {
+    const { before, response } = takeFamilyGrowth(setup(5))
+
+    expect(response.ok, response.error).toBe(true)
+    expect(familySize(response.state.players[0]!)).toBe(before)
   })
 
-  it('grants +1 at 6 occupations (including self)', () => {
-    const session = setup()
-    const state = session.getState().state
-    const player = state.players[0]!
-    player.occupationPlayed = ['a', 'b', 'c', 'd', 'e', CARD_ID]
-    expect(getExtraRoomCapacity(player)).toBe(1)
+  it('provides room with 6 occupations in a normal game', () => {
+    const { before, response } = takeFamilyGrowth(setup(6))
+
+    expect(response.ok, response.error).toBe(true)
+    expect(familySize(response.state.players[0]!)).toBe(before + 1)
   })
 
-  it('grants +1 at more than 6 occupations', () => {
-    const session = setup()
-    const state = session.getState().state
-    const player = state.players[0]!
-    player.occupationPlayed = ['a', 'b', 'c', 'd', 'e', 'f', 'g', CARD_ID]
-    expect(getExtraRoomCapacity(player)).toBe(1)
+  it('currently provides room with 6 occupations after a 7-card draft', () => {
+    const { before, response } = takeFamilyGrowth(setup(6, true))
+
+    expect(response.ok, response.error).toBe(true)
+    expect(familySize(response.state.players[0]!)).toBe(before + 1)
   })
 
-  it('grants nothing if card not in play', () => {
-    const session = setup()
-    const state = session.getState().state
-    const player = state.players[0]!
-    player.occupationPlayed = ['a', 'b', 'c', 'd', 'e', 'f']
-    expect(getExtraRoomCapacity(player)).toBe(0)
+  it('provides room with 7 occupations after a 7-card draft', () => {
+    const { before, response } = takeFamilyGrowth(setup(7, true))
+
+    expect(response.ok, response.error).toBe(true)
+    expect(familySize(response.state.players[0]!)).toBe(before + 1)
+  })
+
+  it('does not provide room when Reader is absent', () => {
+    const { before, response } = takeFamilyGrowth(setup(6, false, false))
+
+    expect(response.ok, response.error).toBe(true)
+    expect(familySize(response.state.players[0]!)).toBe(before)
   })
 })

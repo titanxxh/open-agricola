@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { GameSession } from '../game/authoritative-session'
+import { GameSession, type SessionResponse } from '../game/authoritative-session'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 import { getRegisteredCardListeners, executeCardListener } from '../../shared/cards/card-listeners'
 import type { CardListenerContext } from '../../shared/cards/card-listeners'
@@ -13,6 +13,7 @@ import { ActionNode } from '../../shared/engine/nodes'
 import { ActionRegistry } from '../../shared/engine/registry'
 import { EngineTree } from '../../shared/engine/tree'
 import { readCardResourceStats } from '../../shared/cards/helpers/card-state'
+import { resolveTriggerIfPresent } from './_helpers/trigger-select'
 
 import '../../shared/cards/E/E123_ResourceHoarder'
 import { C014_StrawThatchedRoof } from '../../shared/cards/C/C014_StrawThatchedRoof'
@@ -408,5 +409,285 @@ describe('E123_ResourceHoarder use-top-k (reference full)', () => {
       entry.params.action.includes('renovate-house'),
     )).toBe(true)
     expect(resp.scores).toHaveLength(2)
+  })
+})
+
+const setupNativeSession = (round = 1) => {
+  const session = new GameSession(123)
+  stabilizeRandomHands(session.state.players)
+  const state = session.getState().state
+  state.players = state.players.slice(0, 2)
+  state.currentPlayerIndex = 0
+  state.round = round
+  state.roundPhase = 'work'
+  state.players.forEach((entry, index) => setWorkersAtHome(state, entry, index === 0 ? 2 : 0))
+  session.loadState(state)
+  return session
+}
+
+const chooseE123Payment = (
+  session: GameSession,
+  response: SessionResponse,
+  bonusChoiceIndex: number,
+  expectedPaid: Partial<Resource>,
+) => {
+  if (response.interaction.stateId !== 'wait' || response.interaction.promptKey !== 'prompt.selectPayment') {
+    return response
+  }
+  const option = response.interaction.request.options?.find((entry) => {
+    const label = entry.labelParams as {
+      resourcesPaid?: Partial<Resource>
+      sourceCards?: string[]
+    } | undefined
+    const preview = entry.effectPreview as { sourceCards?: string[] } | undefined
+    const sourceCards = label?.sourceCards ?? preview?.sourceCards ?? []
+    const matchesSource = bonusChoiceIndex === 0
+      ? !sourceCards.includes(CARD_ID)
+      : sourceCards.includes(CARD_ID)
+    return matchesSource && Object.entries(expectedPaid).every(
+      ([resource, amount]) => (label?.resourcesPaid?.[resource as keyof Resource] ?? 0) === amount,
+    )
+  })
+  expect(
+    option,
+    JSON.stringify(response.interaction.request.options?.map((entry) => ({
+      value: entry.value,
+      labelParams: entry.labelParams,
+      effectPreview: entry.effectPreview,
+    }))),
+  ).toBeDefined()
+  return session.resolveChoice(0, option!.value)
+}
+
+const settleE123Triggers = (session: GameSession, response: SessionResponse) => {
+  let current = response
+  for (let step = 0; step < 4; step += 1) {
+    if (current.interaction.stateId !== 'wait' || current.interaction.request.kind !== 'select-trigger') {
+      return current
+    }
+    current = resolveTriggerIfPresent(session, current, CARD_ID)
+  }
+  return current
+}
+
+const buyFireplace = (
+  session: GameSession,
+  bonusChoiceIndex?: number,
+  expectedPaid: Partial<Resource> = {},
+) => {
+  let response = session.takeAction(0, 'major-improvement')
+  expect(response.ok, response.error).toBe(true)
+  if (
+    response.interaction.stateId === 'wait'
+    && response.interaction.request.options?.some((option) => option.value === 'Major_Fireplace1')
+  ) {
+    response = session.resolveChoice(0, 'Major_Fireplace1')
+  }
+  if (bonusChoiceIndex !== undefined) {
+    response = chooseE123Payment(session, response, bonusChoiceIndex, expectedPaid)
+  }
+  return settleE123Triggers(session, response)
+}
+
+const e123Payment = (response: SessionResponse, paymentFor: string) =>
+  response.state.events.find(
+    (event) => event.type === 'resource.paid' && event.paymentFor === paymentFor,
+  )
+
+describe('E123 Resource Hoarder native session', () => {
+  it('initializes the ordered six-resource stack through a Lessons action', () => {
+    const session = setupNativeSession()
+    const player = session.state.players[0]!
+    player.occupationHand = [CARD_ID]
+    session.loadState(session.state)
+
+    let response = session.takeAction(0, 'lessons')
+    for (let step = 0; step < 4 && response.state.players[0]!.occupationHand.includes(CARD_ID); step += 1) {
+      expect(response.interaction.stateId).toBe('wait')
+      if (response.interaction.stateId !== 'wait') break
+      const option = response.interaction.request.options?.find(
+        (entry) => entry.value === CARD_ID || entry.value.startsWith('flow-'),
+      )
+      expect(option).toBeDefined()
+      response = session.resolveChoice(0, option!.value)
+    }
+
+    expect(response.ok, response.error).toBe(true)
+    expect(response.state.players[0]!.occupationPlayed).toContain(CARD_ID)
+    expect(response.state.players[0]!.cardStates[CARD_ID]?.stack).toEqual([
+      'stone', 'clay', 'stone', 'reed', 'wood', 'clay',
+    ])
+  })
+
+  it('uses only the top resource for a room and exposes the next item', () => {
+    const session = setupNativeSession()
+    const player = session.state.players[0]!
+    player.occupationPlayed = [CARD_ID]
+    player.cardStates = { [CARD_ID]: { stack: ['reed', 'wood'] } }
+    player.resources = { ...emptyResources(), wood: 5, reed: 2 }
+    session.loadState(session.state)
+
+    let response = session.takeAction(0, 'farm-expansion')
+    expect(response.ok, response.error).toBe(true)
+    if (response.interaction.stateId === 'wait') {
+      const construct = response.interaction.request.options?.find(
+        (option) => option.labelKey === 'actions.construct.name',
+      )
+      if (construct) response = session.resolveChoice(0, construct.value)
+    }
+    expect(response.interaction.stateId).toBe('wait')
+    if (response.interaction.stateId !== 'wait') return
+    expect(response.interaction.request.kind).toBe('farm-select')
+    if (response.interaction.request.kind !== 'farm-select') return
+    const room = response.interaction.request.farm.selectableTiles[0]!
+
+    response = settleE123Triggers(
+      session,
+      chooseE123Payment(
+        session,
+        session.commitSelectionChoice(0, { rooms: [room] }),
+        1,
+        { wood: 4, reed: 2 },
+      ),
+    )
+
+    expect(response.ok, response.error).toBe(true)
+    expect(response.state.players[0]).toMatchObject({
+      rooms: 3,
+      resources: { wood: 1, reed: 0 },
+      cardStates: { [CARD_ID]: { stack: ['reed'] } },
+    })
+    expect(e123Payment(response, 'construct')).toMatchObject({
+      bonusSources: [CARD_ID],
+      bonusChoiceIndex: { [CARD_ID]: 1 },
+    })
+  })
+
+  it('aggregates two equal top resources when building a room', () => {
+    const session = setupNativeSession()
+    const player = session.state.players[0]!
+    player.occupationPlayed = [CARD_ID]
+    player.cardStates = { [CARD_ID]: { stack: ['wood', 'wood'] } }
+    player.resources = { ...emptyResources(), wood: 5, reed: 2 }
+    session.loadState(session.state)
+
+    let response = session.takeAction(0, 'farm-expansion')
+    if (response.interaction.stateId === 'wait') {
+      const construct = response.interaction.request.options?.find(
+        (option) => option.labelKey === 'actions.construct.name',
+      )
+      if (construct) response = session.resolveChoice(0, construct.value)
+    }
+    expect(response.interaction.stateId).toBe('wait')
+    if (response.interaction.stateId !== 'wait' || response.interaction.request.kind !== 'farm-select') return
+    const room = response.interaction.request.farm.selectableTiles[0]!
+    response = settleE123Triggers(
+      session,
+      chooseE123Payment(
+        session,
+        session.commitSelectionChoice(0, { rooms: [room] }),
+        2,
+        { wood: 3, reed: 2 },
+      ),
+    )
+
+    expect(response.ok, response.error).toBe(true)
+    expect(response.state.players[0]!.resources).toMatchObject({ wood: 2, reed: 0 })
+    expect(response.state.players[0]!.cardStates[CARD_ID]?.stack).toEqual([])
+    expect(e123Payment(response, 'construct')).toMatchObject({
+      resources: { wood: 3, reed: 2 },
+      bonusSources: [CARD_ID],
+      bonusChoiceIndex: { [CARD_ID]: 2 },
+    })
+  })
+
+  it('uses the entire stack to build a major improvement', () => {
+    const session = setupNativeSession()
+    const player = session.state.players[0]!
+    player.occupationPlayed = [CARD_ID]
+    player.cardStates = { [CARD_ID]: { stack: ['clay'] } }
+    player.resources = { ...emptyResources(), clay: 2 }
+    session.loadState(session.state)
+
+    const response = buyFireplace(session, 1, { clay: 1 })
+
+    expect(response.state.players[0]!.improvements).toContain('Major_Fireplace1')
+    expect(response.state.players[0]!.resources.clay).toBe(1)
+    expect(response.state.players[0]!.cardStates[CARD_ID]?.stack).toEqual([])
+    expect(e123Payment(response, 'major-improvement')).toMatchObject({
+      resources: { clay: 1 },
+      bonusSources: [CARD_ID],
+      bonusChoiceIndex: { [CARD_ID]: 1 },
+    })
+  })
+
+  it('uses the top resource to renovate', () => {
+    const session = setupNativeSession(6)
+    const player = session.state.players[0]!
+    player.occupationPlayed = [CARD_ID]
+    player.cardStates = { [CARD_ID]: { stack: ['clay'] } }
+    player.houseType = 'wood'
+    player.rooms = 2
+    player.roomTiles = [{ row: 0, col: 0 }, { row: 0, col: 1 }]
+    player.resources = { ...emptyResources(), clay: 2, reed: 1 }
+    session.loadState(session.state)
+
+    let response = session.takeAction(0, 'house-redevelopment')
+    expect(response.ok, response.error).toBe(true)
+    if (response.interaction.stateId === 'wait' && response.interaction.promptKey === 'ui.interactionChooseRenovationTarget') {
+      response = session.resolveChoice(0, 'clay')
+    }
+    response = settleE123Triggers(
+      session,
+      chooseE123Payment(session, response, 1, { clay: 1, reed: 1 }),
+    )
+
+    expect(response.state.players[0]).toMatchObject({
+      houseType: 'clay',
+      resources: { clay: 1, reed: 0 },
+      cardStates: { [CARD_ID]: { stack: [] } },
+    })
+    expect(e123Payment(response, 'renovation')).toMatchObject({
+      resources: { clay: 1, reed: 1 },
+      bonusSources: [CARD_ID],
+      bonusChoiceIndex: { [CARD_ID]: 1 },
+    })
+  })
+
+  it('keeps the stack when k=0 is selected', () => {
+    const session = setupNativeSession()
+    const player = session.state.players[0]!
+    player.occupationPlayed = [CARD_ID]
+    player.cardStates = { [CARD_ID]: { stack: ['clay'] } }
+    player.resources = { ...emptyResources(), clay: 2 }
+    session.loadState(session.state)
+
+    const response = buyFireplace(session, 0, { clay: 2 })
+
+    expect(response.state.players[0]!.improvements).toContain('Major_Fireplace1')
+    expect(response.state.players[0]!.resources.clay).toBe(0)
+    expect(response.state.players[0]!.cardStates[CARD_ID]?.stack).toEqual(['clay'])
+    expect(e123Payment(response, 'major-improvement')).toMatchObject({
+      resources: { clay: 2 },
+    })
+    expect(e123Payment(response, 'major-improvement')).not.toHaveProperty('bonusChoiceIndex')
+  })
+
+  it('offers no Resource Hoarder payment when the stack is empty', () => {
+    const session = setupNativeSession()
+    const player = session.state.players[0]!
+    player.occupationPlayed = [CARD_ID]
+    player.cardStates = { [CARD_ID]: { stack: [] } }
+    player.resources = { ...emptyResources(), clay: 2 }
+    session.loadState(session.state)
+
+    const response = buyFireplace(session)
+    const payment = e123Payment(response, 'major-improvement')
+
+    expect(response.state.players[0]!.improvements).toContain('Major_Fireplace1')
+    expect(response.state.players[0]!.cardStates[CARD_ID]?.stack).toEqual([])
+    expect(payment).toBeDefined()
+    expect(payment?.type === 'resource.paid' ? payment.bonusSources ?? [] : []).not.toContain(CARD_ID)
+    expect(payment?.type === 'resource.paid' ? payment.bonusChoiceIndex : undefined).toBeUndefined()
   })
 })

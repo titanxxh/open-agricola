@@ -1,23 +1,13 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
-import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
+import { markAllWorkersUsed, setWorkersAtHome } from '../../shared/domain/player'
 import type { PlayerState } from '../../shared/contract/types'
-import { reap, dispatchReapListener } from '../../shared/actions/effects/reap'
-import { getCardEffect } from '../../shared/cards/card-effects'
-import { markAllWorkersUsed } from '../../shared/domain/player'
+import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 
 import '../../shared/cards/B/B132_EstateMaster'
-import '../../shared/cards/catalog'
 
 const CARD_ID = 'B132_EstateMaster'
 
-/**
- * Fill the player's 3×5 farm completely with rooms, fields, pastures, and stables.
- * Layout:
- *   Row 0: rooms at (0,0) (0,1); fields at (0,2) (0,3) (0,4)
- *   Row 1: rooms at (1,0) (1,1); fields at (1,2) (1,3) (1,4)
- *   Row 2: pasture tiles at (2,0)..(2,4)
- */
 const fillFarm = (player: PlayerState): void => {
   player.rooms = 4
   player.roomTiles = [
@@ -32,197 +22,194 @@ const fillFarm = (player: PlayerState): void => {
     { row: 1, col: 3, stacks: [] },
     { row: 1, col: 4, stacks: [] },
   ]
-  player.pastures = [
-    { tiles: [{ row: 2, col: 0 }, { row: 2, col: 1 }, { row: 2, col: 2 }, { row: 2, col: 3 }, { row: 2, col: 4 }], capacity: 8 },
-  ]
+  player.pastures = [{
+    id: `${player.id}-pasture`,
+    size: 5,
+    tiles: [
+      { row: 2, col: 0 }, { row: 2, col: 1 }, { row: 2, col: 2 },
+      { row: 2, col: 3 }, { row: 2, col: 4 },
+    ],
+    stables: 0,
+    animalType: null,
+    animalCount: 0,
+  }]
   player.stableTiles = []
 }
 
-/**
- * Leave one empty farmyard space (only 14 of 15 used).
- */
-const fillFarmMinus1 = (player: PlayerState): void => {
+const fillFarmMinusOne = (player: PlayerState): void => {
   fillFarm(player)
-  player.pastures = [
-    { tiles: [{ row: 2, col: 0 }, { row: 2, col: 1 }, { row: 2, col: 2 }, { row: 2, col: 3 }], capacity: 6 },
-  ]
+  player.pastures = [{
+    id: `${player.id}-pasture`,
+    size: 4,
+    tiles: [
+      { row: 2, col: 0 }, { row: 2, col: 1 },
+      { row: 2, col: 2 }, { row: 2, col: 3 },
+    ],
+    stables: 0,
+    animalType: null,
+    animalCount: 0,
+  }]
 }
 
-const setupSession = () => {
-  const session = new GameSession()
+const setup = () => {
+  const session = new GameSession(132, undefined, { playerCount: 3 })
   stabilizeRandomHands(session.state.players)
   const state = session.getState().state
-  state.players = state.players.slice(0, 2)
-  return { session, state }
-}
-
-const addCardToPlayer = (player: PlayerState) => {
-  player.occupationPlayed.push(CARD_ID)
-  player.playedCards = player.playedCards ?? []
-  player.playedCards.push(`occupation:${CARD_ID}`)
-}
-
-const expectBonusVpReaction = (flow: unknown, amount: number, targetPlayerId = 'p1') => {
-  expect(flow).toEqual({
-    type: 'parallel',
-    children: [{
-      type: 'leaf',
-      actionId: 'special-effect',
-      sourceCard: CARD_ID,
-      targetPlayerId,
-      params: { kind: 'increment-counter', key: 'bonusVp', amount },
-    }],
+  state.currentPlayerIndex = 0
+  state.round = 4
+  state.roundPhase = 'work'
+  state.players.forEach((player) => {
+    player.resources.food = 20
+    markAllWorkersUsed(state, player)
   })
+  const owner = state.players[0]!
+  owner.occupationPlayed = [CARD_ID]
+  owner.playedCards = [`occupation:${CARD_ID}`]
+  return { session, state, owner }
 }
+
+const bonusVp = (resp: ReturnType<GameSession['getState']>) =>
+  resp.scores[0]!.categories.find((category) => category.key === 'cardBonusVp')?.total ?? 0
 
 describe('B132_EstateMaster session', () => {
-  it('does not score when farm is not saturated', () => {
-    const { session, state } = setupSession()
-    const player = state.players[0]!
-    addCardToPlayer(player)
-    fillFarmMinus1(player)
-    player.fields[0]!.stacks = [{ kind: 'vegetable', remaining: 1 }]
-    session.loadState(state)
-
-    reap(state, player)
-
-    expect(player.cardStates[CARD_ID]?.counters?.bonusVp).toBeUndefined()
-  })
-
-  it('returns 1 VP reaction flow when farm is saturated and 1 vegetable field is reaped', () => {
-    const { session, state } = setupSession()
-    const player = state.players[0]!
-    addCardToPlayer(player)
-    fillFarm(player)
-    player.fields[0]!.stacks = [{ kind: 'vegetable', remaining: 1 }]
-    session.loadState(state)
-
-    const result = reap(state, player)
-
-    expectBonusVpReaction(result.reactionFlow, 1)
-    expect(player.cardStates[CARD_ID]?.counters?.bonusVp).toBeUndefined()
-  })
-
-  it('returns 2 VP reaction flow when farm is saturated and 2 vegetable fields are reaped', () => {
-    const { session, state } = setupSession()
-    const player = state.players[0]!
-    addCardToPlayer(player)
-    fillFarm(player)
-    player.fields[0]!.stacks = [{ kind: 'vegetable', remaining: 1 }]
-    player.fields[1]!.stacks = [{ kind: 'vegetable', remaining: 2 }]
-    session.loadState(state)
-
-    const result = reap(state, player)
-
-    expectBonusVpReaction(result.reactionFlow, 2)
-    expect(player.cardStates[CARD_ID]?.counters?.bonusVp).toBeUndefined()
-  })
-
-  it('returns VP reaction flow across multiple harvests', () => {
-    const { session, state } = setupSession()
-    const player = state.players[0]!
-    addCardToPlayer(player)
-    fillFarm(player)
-    player.fields[0]!.stacks = [{ kind: 'vegetable', remaining: 2 }]
-    session.loadState(state)
-
-    let result = reap(state, player)
-    expectBonusVpReaction(result.reactionFlow, 1)
-
-    result = reap(state, player)
-    expectBonusVpReaction(result.reactionFlow, 1)
-    expect(player.cardStates[CARD_ID]?.counters?.bonusVp).toBeUndefined()
-  })
-
-  it('does not score for grain fields', () => {
-    const { session, state } = setupSession()
-    const player = state.players[0]!
-    addCardToPlayer(player)
-    fillFarm(player)
-    player.fields[0]!.stacks = [{ kind: 'grain', remaining: 3 }]
-    session.loadState(state)
-
-    reap(state, player)
-
-    expect(player.cardStates[CARD_ID]?.counters?.bonusVp).toBeUndefined()
-  })
-
-  it('does not score when card is not played', () => {
-    const { session, state } = setupSession()
-    const player = state.players[0]!
-    fillFarm(player)
-    player.fields[0]!.stacks = [{ kind: 'vegetable', remaining: 1 }]
-    session.loadState(state)
-
-    reap(state, player)
-
-    expect(player.cardStates[CARD_ID]?.counters?.bonusVp).toBeUndefined()
-  })
-
-  it('does not score when vegetable fields have amount=0', () => {
-    const { session, state } = setupSession()
-    const player = state.players[0]!
-    addCardToPlayer(player)
-    fillFarm(player)
-    session.loadState(state)
-
-    reap(state, player)
-
-    expect(player.cardStates[CARD_ID]?.counters?.bonusVp).toBeUndefined()
-  })
-
-  it('returns VP reaction flow for extra reap via dispatchReapListener', () => {
-    const { session, state } = setupSession()
-    const player = state.players[0]!
-    addCardToPlayer(player)
-    fillFarm(player)
-    session.loadState(state)
-
-    const flow = dispatchReapListener(state, player, 'vegetable', 1)
-
-    expectBonusVpReaction(flow, 1)
-    expect(player.cardStates[CARD_ID]?.counters?.bonusVp).toBeUndefined()
-  })
-
-  it('runs ordinary Harvest Reap reaction flow before the harvest pipeline completes', () => {
-    const { session, state } = setupSession()
-    state.round = 4
-    state.players.forEach((current) => {
-      current.resources.food = 10
-      markAllWorkersUsed(state, current)
-    })
-    const player = state.players[0]!
-    addCardToPlayer(player)
-    fillFarm(player)
-    player.fields[0]!.stacks = [{ kind: 'vegetable', remaining: 1 }]
+  it('scores no bonus while at least one farmyard space is unused', () => {
+    const { session, state, owner } = setup()
+    fillFarmMinusOne(owner)
+    owner.fields[0]!.stacks = [{ kind: 'vegetable', remaining: 1 }]
     session.loadState(state)
 
     const resp = session.performRoundEnd()
+    expect(resp.ok).toBe(true)
+    expect(resp.state.players[0]!.resources.vegetable).toBe(1)
+    expect(bonusVp(resp)).toBe(0)
+  })
 
-    expect(resp.interaction.stateId).toBe('idle')
-    expect(resp.state.round).toBe(5)
-    expect(resp.state.roundPhase).toBe('work')
+  it('records 1 bonus VP but reports it twice in the final score', () => {
+    const { session, state, owner } = setup()
+    fillFarm(owner)
+    owner.fields[0]!.stacks = [{ kind: 'vegetable', remaining: 1 }]
+    session.loadState(state)
+
+    const resp = session.performRoundEnd()
+    expect(resp.ok).toBe(true)
+    expect(resp.state.players[0]!.resources.vegetable).toBe(1)
     expect(resp.state.players[0]!.cardStates[CARD_ID]?.counters?.bonusVp).toBe(1)
+    expect(bonusVp(resp)).toBe(2)
   })
 
-  it('computeBonusScore returns accumulated bonusVp', () => {
-    const { session, state } = setupSession()
-    const player = state.players[0]!
-    addCardToPlayer(player)
-    fillFarm(player)
-    player.cardStates[CARD_ID] = { counters: { bonusVp: 3 } }
+  it('records each vegetable harvested but doubles the total in the final score', () => {
+    const { session, state, owner } = setup()
+    fillFarm(owner)
+    owner.fields[0]!.stacks = [{ kind: 'vegetable', remaining: 1 }]
+    owner.fields[1]!.stacks = [{ kind: 'vegetable', remaining: 2 }]
     session.loadState(state)
 
-    const effect = getCardEffect(CARD_ID)
-    expect(effect!.computeBonusScore!(state, player, { reserved: {} })).toBe(3)
+    const resp = session.performRoundEnd()
+    expect(resp.ok).toBe(true)
+    expect(resp.state.players[0]!.resources.vegetable).toBe(2)
+    expect(resp.state.players[0]!.cardStates[CARD_ID]?.counters?.bonusVp).toBe(2)
+    expect(bonusVp(resp)).toBe(4)
   })
 
-  it('computeBonusScore returns 0 when card is not played', () => {
-    const { session, state } = setupSession()
-    const player = state.players[0]!
+  it('does not score for harvested grain', () => {
+    const { session, state, owner } = setup()
+    fillFarm(owner)
+    owner.fields[0]!.stacks = [{ kind: 'grain', remaining: 3 }]
     session.loadState(state)
 
-    const effect = getCardEffect(CARD_ID)
-    expect(effect!.computeBonusScore!(state, player, { reserved: {} })).toBe(0)
+    const resp = session.performRoundEnd()
+    expect(resp.ok).toBe(true)
+    expect(resp.state.players[0]!.resources.grain).toBe(1)
+    expect(bonusVp(resp)).toBe(0)
+  })
+
+  it('keeps bonus VP cumulative across harvests', () => {
+    const { session, state, owner } = setup()
+    fillFarm(owner)
+    owner.fields[0]!.stacks = [{ kind: 'vegetable', remaining: 2 }]
+    session.loadState(state)
+
+    let resp = session.performRoundEnd()
+    expect(resp.state.players[0]!.cardStates[CARD_ID]?.counters?.bonusVp).toBe(1)
+    expect(bonusVp(resp)).toBe(2)
+
+    const nextHarvest = resp.state
+    nextHarvest.round = 7
+    nextHarvest.roundPhase = 'work'
+    nextHarvest.players.forEach((player) => {
+      player.resources.food = 20
+      markAllWorkersUsed(nextHarvest, player)
+    })
+    session.loadState(nextHarvest)
+    resp = session.performRoundEnd()
+
+    expect(resp.state.players[0]!.resources.vegetable).toBe(2)
+    expect(resp.state.players[0]!.cardStates[CARD_ID]?.counters?.bonusVp).toBe(2)
+    expect(bonusVp(resp)).toBe(4)
+  })
+
+  it('stays active after a real plow fills the farm and a space later becomes unused', () => {
+    const session = new GameSession(132, undefined, { playerCount: 3 })
+    stabilizeRandomHands(session.state.players)
+    const state = session.getState().state
+    state.currentPlayerIndex = 0
+    state.round = 1
+    state.roundPhase = 'work'
+    state.players.forEach((player) => {
+      setWorkersAtHome(state, player, 2)
+      player.resources.food = 20
+    })
+    const owner = state.players[0]!
+    owner.occupationPlayed = [CARD_ID]
+    owner.playedCards = [`occupation:${CARD_ID}`]
+    fillFarmMinusOne(owner)
+    session.loadState(state)
+
+    let resp = session.takeAction(0, 'farmland')
+    expect(resp.ok).toBe(true)
+    expect(resp.interaction.stateId).toBe('wait')
+    if (resp.interaction.stateId !== 'wait' || resp.interaction.request.kind !== 'farm-select') {
+      throw new Error('expected plow selection')
+    }
+    const lastSpace = resp.interaction.request.farm.selectableTiles.find((tile) =>
+      tile.row === 2 && tile.col === 4)
+    expect(lastSpace).toBeDefined()
+    resp = session.commitSelectionChoice(0, { tile: lastSpace! })
+    expect(resp.ok).toBe(true)
+    expect(resp.state.players[0]!.cardStates[CARD_ID]?.extraData?.saturated).toBe(true)
+
+    const harvestState = resp.state
+    harvestState.round = 4
+    harvestState.roundPhase = 'work'
+    harvestState.players.forEach((player) => {
+      player.resources.food = 20
+      markAllWorkersUsed(harvestState, player)
+    })
+    harvestState.players[0]!.fields.find((field) =>
+      field.row === 2 && field.col === 4)!.stacks = [{ kind: 'vegetable', remaining: 1 }]
+    session.loadState(harvestState)
+    resp = session.performRoundEnd()
+
+    expect(resp.state.players[0]!.resources.vegetable).toBe(1)
+    expect(resp.state.players[0]!.cardStates[CARD_ID]?.counters?.bonusVp).toBe(1)
+    expect(bonusVp(resp)).toBe(2)
+
+    const reopenedFarm = resp.state
+    const reopenedOwner = reopenedFarm.players[0]!
+    reopenedOwner.fields = reopenedOwner.fields.filter((field) =>
+      field.row !== 1 || field.col !== 4)
+    reopenedOwner.fields[0]!.stacks = [{ kind: 'vegetable', remaining: 1 }]
+    reopenedFarm.round = 7
+    reopenedFarm.roundPhase = 'work'
+    reopenedFarm.players.forEach((player) => {
+      player.resources.food = 20
+      markAllWorkersUsed(reopenedFarm, player)
+    })
+    session.loadState(reopenedFarm)
+    resp = session.performRoundEnd()
+
+    expect(resp.state.players[0]!.resources.vegetable).toBe(2)
+    expect(resp.state.players[0]!.cardStates[CARD_ID]?.counters?.bonusVp).toBe(2)
+    expect(bonusVp(resp)).toBe(4)
   })
 })
