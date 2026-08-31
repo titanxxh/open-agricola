@@ -417,9 +417,13 @@ export const improvementAction: ActionDefinition = {
           sourceCard,
         )
       : []
-    const seen = new Set(baseMinor.map((o) => o.value))
+    const seen = new Set([...majorOpts, ...baseMinor].map((o) => o.value))
     const extraMinor = extras
-      .filter((o) => !seen.has(o.value))
+      .filter((o) => {
+        if (seen.has(o.value)) return false
+        seen.add(o.value)
+        return true
+      })
       .filter((o) => canAffordInjectedImprovement(state, player, o.value))
     const options = [...majorOpts, ...baseMinor, ...extraMinor]
     if (options.length === 0) {

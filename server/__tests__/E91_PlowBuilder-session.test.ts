@@ -8,11 +8,13 @@ import {
 } from '../../shared/cards/helpers/card-state'
 import { runCardEffectHook } from '../../shared/cards/card-effects'
 import { dispatchTradeAppliedListener } from '../../shared/actions/helpers/trade-applied-listener'
+import { collectComputeChoiceCandidates } from '../../shared/cards/card-listeners'
 import { takeMajorImprovementFromSupply } from '../../shared/cards/major/supply'
 import { markAllWorkersUsed, setActiveWorkerCount } from '../../shared/domain/player'
 import type { InitialStateOptions } from '../../shared/session/state-constants'
 
 import '../../shared/cards/E/E091_PlowBuilder'
+import '../../shared/cards/D/D131_CraftsmanshipPromoter'
 import type { AnytimeAction } from '../../shared/contract/types'
 
 const CARD_ID = 'E091_PlowBuilder'
@@ -201,6 +203,36 @@ describe('E091_PlowBuilder session', () => {
 
     expect(resp.interaction.request.options?.map((option) => option.value) ?? [])
       .not.toContain('Major_Moor_FurnitureStall')
+  })
+
+  it('offers Joinery once when D131 also injects the same candidate', () => {
+    const session = setupMinorImprovement()
+    const state = session.getState().state
+    state.players[0]!.occupationPlayed.push('D131_CraftsmanshipPromoter')
+    session.loadState(state)
+
+    const resp = enterMinorChoice(session)
+    const joineryOptions = resp.interaction.request.options
+      ?.filter((option) => option.value === 'Major_Joinery') ?? []
+
+    expect(joineryOptions).toHaveLength(1)
+  })
+
+  it.each([
+    [{ types: ['minor'], trueAction: false }, undefined],
+    [{ types: ['minor'] }, 'E152_BargainHunter'],
+  ])('does not inject Joinery into a card-derived improvement flow', (actionContext, sourceCard) => {
+    const session = setupMinorImprovement()
+    const state = session.getState().state
+    const extras = collectComputeChoiceCandidates(
+      state,
+      state.players[0]!,
+      'improvement',
+      actionContext,
+      sourceCard,
+    )
+
+    expect(extras.map((option) => option.value)).not.toContain('Major_Joinery')
   })
 
   it('trade-applied listener sets usedJoinery on Major_Joinery sourceId', () => {
