@@ -74,6 +74,7 @@ export type CardDefinition = {
   cookingHearthIdentity?: boolean
   ovenIdentity?: boolean
   firewoodBuildTrigger?: boolean
+  joineryIdentity?: boolean
   potteryIdentity?: boolean
   preventsHandDiscard?: boolean
   animalHolder?: boolean

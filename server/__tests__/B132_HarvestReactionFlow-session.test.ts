@@ -118,7 +118,6 @@ describe('harvest reaction flow', () => {
   it.each([
     ['Major_Joinery'],
     ['Major_Joinery2'],
-    ['Major_Moor_FurnitureStall'],
   ])('offers Furniture Carpenter exactly once when any player owns %s', (joineryId) => {
     const { session, state } = setupHarvestSession()
     state.players[0]!.occupationPlayed.push('B101_FurnitureCarpenter')
@@ -136,7 +135,22 @@ describe('harvest reaction flow', () => {
     expect(resp.state.players[0]!.cardStates.B101_FurnitureCarpenter?.counters?.bonusVp).toBe(1)
   })
 
-  it('does not offer Furniture Carpenter without a Joinery family improvement', () => {
+  it('does not offer Furniture Carpenter when another player owns Furniture Stall', () => {
+    const { session, state } = setupHarvestSession()
+    state.players[0]!.occupationPlayed.push('B101_FurnitureCarpenter')
+    state.players[1]!.improvements.push('Major_Moor_FurnitureStall')
+
+    session.loadState(state)
+    const resp = session.performRoundEnd()
+
+    expect(resp.ok).toBe(true)
+    expect(resp.interaction.stateId).toBe('idle')
+    expect(resp.state.round).toBe(5)
+    expect(resp.state.players[0]!.resources.food).toBe(18)
+    expect(resp.state.players[0]!.cardStates.B101_FurnitureCarpenter?.counters?.bonusVp).toBeUndefined()
+  })
+
+  it('does not offer Furniture Carpenter without a Joinery identity', () => {
     const { session, state } = setupHarvestSession()
     state.players[0]!.occupationPlayed.push('B101_FurnitureCarpenter')
 
