@@ -1,15 +1,15 @@
 import { defineMinorCard } from '../card-source'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
+import { isBottomRowMajorImprovement } from '../major/supply'
 
 const CARD_ID = 'B007_Wage'
-const BOTTOM_ROW_MAJORS = ['Major_ClayOven', 'Major_StoneOven', 'Major_Joinery', 'Major_Pottery', 'Major_Basket']
 
 const cardImpl = {
   effect: {
   id: CARD_ID,
   onBuy: (_state, player) => {
-    const bonus = player.improvements.filter((id) => BOTTOM_ROW_MAJORS.includes(id)).length
+    const bonus = player.improvements.filter(isBottomRowMajorImprovement).length
     return gainLeaf(CARD_ID, { food: 2 + bonus })
   },
 },

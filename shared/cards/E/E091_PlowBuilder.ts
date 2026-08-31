@@ -1,15 +1,15 @@
 import { defineOccupationCard } from '../card-source'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
-import type { ActionFlow } from '../../contract/types'
+import { readImprovementTypes } from '../../actions/effects/improvement'
+import type { ActionChoiceOption, ActionFlow } from '../../contract/types'
 import { isCardFlagged, setCardFlag, readCardExtraData, writeCardExtraData } from '../helpers/card-state'
 import { getCardDefinitionById } from '../helpers/card-type'
 import { payLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
+import { getAvailableMajorImprovementIds } from '../major/supply'
 
 const CARD_ID = 'E091_PlowBuilder'
-
-const HARVEST_ROUNDS = [4, 7, 9, 11, 13, 14]
 
 const specialEffect = (params: Record<string, unknown>): ActionFlow => ({
   type: 'leaf',
@@ -31,6 +31,7 @@ const tradeAppliedListener: CardListenerRegistration = {
   phases: ['immediatelyAfter' as ActionHookPhase],
   scope: 'player',
   handler: (context: CardListenerContext): ActionHookResult | void => {
+    if (context.state.roundPhase !== 'harvest') return
     const sourceId = context.extraData?.sourceId
     if (typeof sourceId !== 'string') return
     if (getCardDefinitionById(sourceId)?.joineryIdentity !== true) return
@@ -41,13 +42,34 @@ const tradeAppliedListener: CardListenerRegistration = {
   },
 }
 
+const choiceCandidateListener: CardListenerRegistration = {
+  id: 'E91-plow-builder-compute-choice-candidates',
+  cardIds: [CARD_ID],
+  actions: ['improvement'],
+  phases: ['computeChoiceCandidates' as ActionHookPhase],
+  handler: (context) => {
+    const types = readImprovementTypes(context)
+    if (types.length !== 1 || types[0] !== 'minor') return
+    if (!context.player.occupationPlayed.includes(CARD_ID)) return
+    const extraOptions: ActionChoiceOption[] = getAvailableMajorImprovementIds(context.state)
+      .filter((id) => getCardDefinitionById(id)?.joineryIdentity === true)
+      .map((id) => ({
+        value: id,
+        labelKey: `improvements.${id}.name`,
+        sourceCard: CARD_ID,
+      }))
+    if (extraOptions.length === 0) return
+    return { extraOptions, sourceCard: CARD_ID }
+  },
+}
+
 const anytimeListener: CardListenerRegistration = {
   id: 'E91-plow-builder-anytime',
   cardIds: [CARD_ID],
   phases: ['anytime' as ActionHookPhase],
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (isCardFlagged(context.player, CARD_ID)) return
-    if (!HARVEST_ROUNDS.includes(context.state.round)) return
+    if (context.state.roundPhase !== 'harvest') return
     // Rule: anytime gate is `isFlagged('usedJoinery') && !isFlagged`. The
     // `usedJoinery` flag is set by the trade-applied listener above.
     const usedJoinery = readCardExtraData<boolean>(context.player, CARD_ID, 'usedJoinery') === true
@@ -69,7 +91,7 @@ const anytimeListener: CardListenerRegistration = {
 }
 
 const cardImpl = {
-  listeners: [tradeAppliedListener, anytimeListener],
+  listeners: [choiceCandidateListener, tradeAppliedListener, anytimeListener],
   effect: {
     id: CARD_ID,
     /** Clear both the per-use flag (anytime gate) and the per-harvest
