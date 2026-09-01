@@ -17,7 +17,10 @@ import {
   buildHarvestFeedOptions,
   type HarvestFeedOption,
 } from './hooks/use-harvest-flow'
-import { computeHarvestFeedCounterMax } from './hooks/use-harvest-feed-counter'
+import {
+  canApplyHarvestFeedCounts,
+  computeHarvestFeedCounterMax,
+} from './hooks/use-harvest-feed-counter'
 import type { InteractionFeedSelection, InteractionPresentationPlan } from './interaction-presentation'
 import type { PendingChoice } from '../types/ui'
 
@@ -323,7 +326,13 @@ export const useExchangeDraftPresentation = ({
     )
     const nextValue = Math.max(0, Math.min(current + delta, max))
     if (nextValue === current) return
-    setHarvestFeedCounts({ ...activeHarvestFeedCounts, [id]: nextValue })
+    const nextCounts = { ...activeHarvestFeedCounts, [id]: nextValue }
+    if (!canApplyHarvestFeedCounts(
+      orderedHarvestFeedOptions,
+      nextCounts,
+      harvestFeedPlayer.resources,
+    )) return
+    setHarvestFeedCounts(nextCounts)
     setHarvestFeedSelectionOrder((prev) => current === 0
       ? [...prev, id]
       : nextValue === 0
