@@ -32,6 +32,10 @@ _Avoid_: 当前行动玩家、本轮已冻结顺序
 Preparation 开始时按 Start Player Marker 冻结的本轮普通放人顺序。随后在 work phase 前发生的标记转移不改变该顺序；Roman Pot 等本轮顺序消费者必须读取同一冻结结果。
 _Avoid_: Start Player Marker、`currentPlayerIndex`、`roundActionOrder`
 
+**Work Placement Chronology（工作阶段放人时序）**:
+当前 Work Phase 内实际发生的人员放置先后。起始玩家标记转移不会重排已发生的放置，额外或连续放置保留其真实位置；新 Work Phase 重新开始。
+_Avoid_: Round Work Order、Start Player Marker
+
 **Rule Audit Lead（规则审计线索）**:
 来自上游提交、issue 描述或静态代码阅读的待验证规则风险；必须先在当前 `main` 复现可观察错误，才能升级为 Rule Alignment Gap 或 Rule Flow Defect。
 _Avoid_: 已确认缺陷、直接修复依据
