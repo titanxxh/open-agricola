@@ -9737,6 +9737,9 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "desc": [
       "As soon as you have 6 (7 in draft mode) occupations in front of you (including this one), this card provides room for one person."
     ],
+    "rules": [
+      "In simultaneous draft mode, the occupation threshold is fixed at 7, regardless of draft pool size."
+    ],
     "cost": {},
     "players": "1+",
     "evenMoreSet": true,
