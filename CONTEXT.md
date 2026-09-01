@@ -251,8 +251,8 @@ _Avoid_: 共享临时槽位、前端偷补流程
 _Avoid_: optional flow、Mandatory Saturation、Continuation Guard
 
 **Provisional Continuation Scope（暂定 continuation 作用域）**:
-Action Execution Scope 内，围绕已承诺但尚未执行本体的 mandatory host action 前置结算而建立的暂定结果边界；它在前置链首次切换玩家或产生受保护观察时开启。真正嵌套的 mandatory host 形成子作用域；未受保证的作用域可以整体撤销，受保证后则约束后续结算不得再次破坏 host continuation。
-_Avoid_: 数据库 Transaction、普通 Undo Scope、已完成 action 的 after response、Interaction Presentation Draft
+Action Execution Scope 内，围绕尚未完成的 Mandatory Continuation 建立的暂定结果边界。它可以在 mandatory host 的前置链首次切换玩家或产生受保护观察时开启，也可以覆盖受保护观察已经发布后、由同一选择提交 host 但其 mandatory `afterHostCommit` 续行尚未完成的结算；后者只能回到观察之后的同一选择，不能重掷或假装忘记结果。真正嵌套的 mandatory host 形成子作用域；未受保证的作用域可以整体撤销，受保证后则约束后续结算不得再次破坏 host continuation。
+_Avoid_: 数据库 Transaction、普通 Undo Scope、普通 optional after response、Interaction Presentation Draft
 
 **Continuation Guard（continuation 保证）**:
 对尚未执行本体但已经严格可执行的 mandatory host action 建立的持续规则义务；后续结算必须保持其严格可执行，直到 host action 进入本体执行。
