@@ -260,6 +260,7 @@ describe('harvest session flow', () => {
 
     const p = resp.state.players[0]!
     expect(p.resources.grain).toBe(0)
+    expect(p.resources.food).toBe(0)
     expect(p.resources.begging).toBe(0)
     const convertLog = resp.state.log.find((e) => e.key === 'log.harvestFeedConvert')
     expect(convertLog).toBeDefined()
@@ -314,6 +315,7 @@ describe('harvest session flow', () => {
     const p = resp.state.players[0]!
     // 1 clay -> 2 food; need 2 food, all consumed; no begging
     expect(p.resources.clay).toBe(1)
+    expect(p.resources.food).toBe(0)
     expect(p.resources.begging).toBe(0)
     const convertLog = resp.state.log.find((e) => e.key === 'log.harvestFeedConvert')
     expect(convertLog).toBeDefined()

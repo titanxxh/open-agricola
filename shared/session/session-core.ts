@@ -4631,7 +4631,6 @@ export class GameCore {
       return { ...sel, count: capped, _exchange: exchange }
     })
 
-    let totalFood = 0
     const usedResources: Partial<Resource> = { food: pendingFoodUsed }
     for (const sel of cappedSelections) {
       if (sel.count <= 0) continue
@@ -4669,7 +4668,6 @@ export class GameCore {
           ;(player.resources as Record<string, number>)[k] += total
           gainMap[k] = total
           if (k === 'food') {
-            totalFood += total
             // Per-key conversion stat: only meaningful for forward (* -> food)
             // trades; reverse trades log under usedResources but skip food
             // conversion stats.
@@ -4707,8 +4705,10 @@ export class GameCore {
         }
       }
     }
-    const required = pendingRemaining
-    const deficit = Math.max(0, required - totalFood)
+    const foodUsed = Math.min(player.resources.food, pendingRemaining)
+    player.resources.food -= foodUsed
+    usedResources.food = (usedResources.food ?? 0) + foodUsed
+    const deficit = pendingRemaining - foodUsed
     if (deficit > 0) {
       player.resources.begging += deficit
       usedResources.begging = (usedResources.begging ?? 0) + deficit
