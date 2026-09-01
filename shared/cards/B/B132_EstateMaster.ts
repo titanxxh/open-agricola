@@ -79,9 +79,6 @@ const cardImpl = {
   ],
   effect: {
     id: CARD_ID,
-    computeBonusScore: (_state, player) => {
-      return player.cardStates[CARD_ID]?.counters?.bonusVp ?? 0
-    },
   },
   reaches: [] as readonly string[],
 } satisfies CardImpl
