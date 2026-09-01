@@ -1058,7 +1058,7 @@ export const zh = {
     D157_PartyOrganizer: { name: '宴会筹办者', description: '当下一位非你玩家获得第 5 名工人时，你立即获得 8 <FOOD>（不追溯）。计分时若只有你拥有 5 名工人，获得 3 额外 <SCORE>。' },
     D158_BeanCounter: { name: '算盘先生', description: '每当你在第 1 至 8 回合的行动位上行动时，在本牌上放 1 <FOOD>。每当本牌上有 3 <FOOD> 时，将其移至供给区。' },
     D167_PureBreeder: { name: '纯种饲育者', description: '立即获得 1 <WOOD>。每个未以收获结束的回合后，你可以繁殖恰好一种动物。（不视为繁殖阶段。）' },
-    D085_Reader: { name: '读者', description: '当你面前有 6 张（选秀模式为 7）职业牌（含本牌）时，本牌提供 1 人房间。' },
+    D085_Reader: { name: '读者', description: '当你面前有 6 张（轮抽模式为 7）职业牌（含本牌）时，本牌提供 1 人房间。', rules: '轮抽模式下，职业牌门槛固定为 7 张，与轮抽池大小无关。' },
     D093_SheepInspector: { name: '羊只检查员', description: '每个工作阶段一次，在你完成一次工人行动后，你可以支付 1 <SHEEP> 和 2 <FOOD> 将另一名已放置的工人送回家，除非其在 __Meeting Place__ 行动位上。' },
     D094_HenpeckedHusband: { name: '怕老婆的丈夫', description: '每当你用同一回合放置的第二名工人执行 __Build Rooms__ 行动时，除非该工人在 __Meeting Place__ 上，否则将你放置的第一名工人送回家。' },
     D095_SiteManager: { name: '工地管理员', description: '当你打出此牌时，立刻建造 1 个重大改进。支付其费用时，每种建材各至多可以用 1 <FOOD> 代替。' },
