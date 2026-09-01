@@ -98,6 +98,7 @@ export const useExchangeDraftPresentation = ({
 }: ExchangeDraftInput) => {
   const [bakeExchangeCounts, setBakeExchangeCounts] = useState<Record<string, number>>({})
   const [harvestFeedCounts, setHarvestFeedCounts] = useState<Record<string, number>>({})
+  const [harvestFeedSelectionOrder, setHarvestFeedSelectionOrder] = useState<string[]>([])
   const [anytimeExchangeCounts, setAnytimeExchangeCounts] = useState<Record<string, number>>({})
 
   const isBakeExchange = pendingChoice?.promptKey === 'ui.interactionBakeBreadChoice'
@@ -289,47 +290,57 @@ export const useExchangeDraftPresentation = ({
     () => activeCountsFor(harvestFeedOptionIds, harvestFeedCounts),
     [harvestFeedCounts, harvestFeedOptionIds],
   )
+  const orderedHarvestFeedOptions = useMemo(() => {
+    const order = new Map(harvestFeedSelectionOrder.map((id, index) => [id, index]))
+    return [...harvestFeedOptions].sort(
+      (a, b) => (order.get(a.id) ?? Number.POSITIVE_INFINITY)
+        - (order.get(b.id) ?? Number.POSITIVE_INFINITY),
+    )
+  }, [harvestFeedOptions, harvestFeedSelectionOrder])
   const harvestFeedLimitById = useMemo(() => {
     const limits: Record<string, number> = {}
-    harvestFeedOptions.forEach((option) => {
+    orderedHarvestFeedOptions.forEach((option) => {
       limits[option.id] = harvestFeedPlayer
         ? computeHarvestFeedCounterMax(
             option,
-            harvestFeedOptions,
+            orderedHarvestFeedOptions,
             activeHarvestFeedCounts,
             harvestFeedPlayer.resources,
           )
         : 0
     })
     return limits
-  }, [activeHarvestFeedCounts, harvestFeedOptions, harvestFeedPlayer])
+  }, [activeHarvestFeedCounts, harvestFeedPlayer, orderedHarvestFeedOptions])
   const updateHarvestFeedCount = useCallback((id: string, delta: number) => {
-    setHarvestFeedCounts((prev) => {
-      const currentCounts = activeCountsFor(harvestFeedOptionIds, prev)
-      const current = currentCounts[id] ?? 0
-      const option = harvestFeedOptions.find((entry) => entry.id === id)
-      if (!option || !harvestFeedPlayer) return prev
-      const max = computeHarvestFeedCounterMax(
-        option,
-        harvestFeedOptions,
-        currentCounts,
-        harvestFeedPlayer.resources,
-      )
-      const nextValue = Math.max(0, Math.min(current + delta, max))
-      if (nextValue === current) return prev
-      return { ...prev, [id]: nextValue }
-    })
-  }, [harvestFeedOptionIds, harvestFeedOptions, harvestFeedPlayer])
+    const current = activeHarvestFeedCounts[id] ?? 0
+    const option = harvestFeedOptions.find((entry) => entry.id === id)
+    if (!option || !harvestFeedPlayer) return
+    const max = computeHarvestFeedCounterMax(
+      option,
+      orderedHarvestFeedOptions,
+      activeHarvestFeedCounts,
+      harvestFeedPlayer.resources,
+    )
+    const nextValue = Math.max(0, Math.min(current + delta, max))
+    if (nextValue === current) return
+    setHarvestFeedCounts({ ...activeHarvestFeedCounts, [id]: nextValue })
+    setHarvestFeedSelectionOrder((prev) => current === 0
+      ? [...prev, id]
+      : nextValue === 0
+        ? prev.filter((entry) => entry !== id)
+        : prev)
+  }, [activeHarvestFeedCounts, harvestFeedOptions, harvestFeedPlayer, orderedHarvestFeedOptions])
   const resetHarvestFeedCounts = useCallback(() => {
     const nextCounts: Record<string, number> = {}
     harvestFeedOptionIds.forEach((id) => {
       nextCounts[id] = 0
     })
     setHarvestFeedCounts(nextCounts)
+    setHarvestFeedSelectionOrder([])
   }, [harvestFeedOptionIds])
   const harvestFeedSelections = useMemo(
     () =>
-      harvestFeedOptions
+      orderedHarvestFeedOptions
         .map((option) => ({
           count: activeHarvestFeedCounts[option.id] ?? 0,
           sourceName: option.sourceName,
@@ -339,9 +350,9 @@ export const useExchangeDraftPresentation = ({
           to: option.to,
         }))
         .filter((entry) => entry.count > 0),
-    [activeHarvestFeedCounts, harvestFeedOptions],
+    [activeHarvestFeedCounts, orderedHarvestFeedOptions],
   )
-  const harvestFeedConvertedFood = useMemo(
+  const harvestFeedNetFood = useMemo(
     () =>
       harvestFeedSelections.reduce(
         (sum, entry) =>
@@ -353,24 +364,29 @@ export const useExchangeDraftPresentation = ({
   const harvestPending = interactionPresentationPlan.kind === 'harvest-feed'
     ? interactionPresentationPlan
     : null
+  const harvestFeedConvertedFood = Math.min(
+    harvestPending?.remaining ?? 0,
+    Math.max(0, harvestFeedNetFood),
+  )
   const harvestFeedBegging = Math.max(
     0,
-    (harvestPending?.remaining ?? 0) - Math.max(0, harvestFeedConvertedFood),
+    (harvestPending?.remaining ?? 0) - Math.max(0, harvestFeedNetFood),
   )
   const harvestFeedSummary = useMemo(
     () => buildHarvestFeedSummary({
       selections: harvestFeedSelections,
       foodUsed: harvestPending?.foodUsed ?? 0,
-      convertedFood: harvestFeedConvertedFood,
+      convertedFood: harvestFeedNetFood,
       begging: harvestFeedBegging,
     }),
-    [harvestFeedBegging, harvestFeedConvertedFood, harvestFeedSelections, harvestPending?.foodUsed],
+    [harvestFeedBegging, harvestFeedNetFood, harvestFeedSelections, harvestPending?.foodUsed],
   )
 
   const reset = useCallback(() => {
     setBakeExchangeCounts({})
     setAnytimeExchangeCounts({})
     setHarvestFeedCounts({})
+    setHarvestFeedSelectionOrder([])
   }, [])
 
   return {

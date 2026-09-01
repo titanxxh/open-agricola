@@ -554,6 +554,7 @@ export const zh = {
     harvestFeedSubtitle: '{player} 需要 {count} 食物',
     harvestFeedRate: '1 {resource} → {food} 食物',
     harvestFeedBasic: '基础',
+    harvestFeedBasicSource: '基础转化',
     harvestFeedConfirm: '确认喂养',
     harvestFeedProgress: '{fed}/{required} · 乞讨 {begging}',
     harvestHeating: '供暖',

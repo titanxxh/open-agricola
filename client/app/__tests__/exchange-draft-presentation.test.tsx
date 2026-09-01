@@ -14,6 +14,9 @@ vi.mock('../../services/card-meta', () => ({
     C105_BasketCarrier: {
       exchanges: [{ from: { food: 2 }, to: { wood: 1, reed: 1, grain: 1 }, max: 1, triggers: ['harvest'] }],
     },
+    C109_SchnappsDistiller: {
+      exchanges: [{ from: { vegetable: 1 }, to: { food: 5 }, max: 1, triggers: ['harvest'] }],
+    },
   })[id],
 }))
 
@@ -199,7 +202,7 @@ describe('useExchangeDraftPresentation', () => {
       })
     })
     act(() => result.current.harvestFeed.updateCount('C105_BasketCarrier-ex0', 1))
-    expect(result.current.harvestFeed.convertedFood).toBe(-2)
+    expect(result.current.harvestFeed.convertedFood).toBe(0)
     expect(result.current.harvestFeed.begging).toBe(0)
 
     act(() => result.current.reset())
@@ -207,5 +210,34 @@ describe('useExchangeDraftPresentation', () => {
     expect(result.current.anytime.counts).toEqual({})
     expect(result.current.harvestFeed.counts['__basic__-ex0']).toBe(0)
     expect(Object.values(result.current.harvestFeed.counts).every((count) => count === 0)).toBe(true)
+  })
+
+  it('submits harvest exchanges in the order selected by the player', () => {
+    const player = mkPlayer({
+      resources: { ...emptyResources, vegetable: 1 },
+      occupationPlayed: ['C105_BasketCarrier', 'C109_SchnappsDistiller'],
+    })
+    const { result } = renderHook(() => useExchangeDraftPresentation({
+      state: { players: [player] },
+      pendingChoice: { promptKey: undefined, options: [], playerIndex: 0, spaceId: 'test' },
+      interactionPresentationPlan: {
+        kind: 'harvest-feed',
+        playerIndex: 0,
+        remaining: 4,
+        foodUsed: 0,
+      },
+      locale: 'en',
+      cardLabel: (id) => id,
+      getCardMeta: () => undefined,
+    }))
+
+    act(() => result.current.harvestFeed.updateCount('C109_SchnappsDistiller-ex0', 1))
+    act(() => result.current.harvestFeed.updateCount('C105_BasketCarrier-ex0', 1))
+
+    expect(result.current.harvestFeed.counts['C105_BasketCarrier-ex0']).toBe(1)
+    expect(result.current.harvestFeed.selections.map((selection) => selection.sourceId)).toEqual([
+      'C109_SchnappsDistiller',
+      'C105_BasketCarrier',
+    ])
   })
 })

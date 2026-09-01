@@ -143,7 +143,6 @@ import {
 } from '../cards/major/supply.ts'
 import {
   BASIC_CONVERSION_SOURCE_ID,
-  BASIC_CONVERSION_SOURCE_NAME,
   getBasicConversionExchange,
 } from '../cards/basic-conversion.ts'
 import { appendImmediateEvents, type ImmediateEventDraft } from '../events/append.ts'
@@ -1856,6 +1855,9 @@ export class GameCore {
       const sourceId = trade.sourceId ?? trade.source
       return !!sourceId
         && getRemainingHarvestExchangeUses(player, sourceId, trade.max, this.state.round) > 0
+        && (player.improvements.includes(sourceId)
+          || player.minorPlayed.includes(sourceId)
+          || player.occupationPlayed.includes(sourceId))
     })
     return harvestExchange || getExchangesInWindow(player, 'anytime', this.state).some((trade) =>
       canAffordTrade(player, trade),
@@ -4590,26 +4592,23 @@ export class GameCore {
     const lookupExchange = (
       sourceId: string,
       idx: number,
-    ): { exchange: import('../contract/cards').CardExchange; sourceName: string } | undefined => {
+    ): import('../contract/cards').CardExchange | undefined => {
       if (sourceId === BASIC_CONVERSION_SOURCE_ID) {
-        const exchange = getBasicConversionExchange(idx)
-        return exchange ? { exchange, sourceName: BASIC_CONVERSION_SOURCE_NAME } : undefined
+        return getBasicConversionExchange(idx)
       }
       let card:
-        | { name: string; exchanges?: readonly import('../contract/cards').CardExchange[] }
+        | { exchanges?: readonly import('../contract/cards').CardExchange[] }
         | undefined
       if (player.improvements.includes(sourceId)) card = getMajorCard(sourceId)
       else if (player.minorPlayed.includes(sourceId)) card = getRegisteredMinorImprovement(sourceId)
       else if (player.occupationPlayed.includes(sourceId)) card = getRegisteredOccupation(sourceId)
       if (!card) return undefined
-      const exchange = card.exchanges?.[idx]
-      return exchange ? { exchange, sourceName: card.name } : undefined
+      return card.exchanges?.[idx]
     }
 
     const perSourceUsed = new Map<string, number>()
     type ResolvedSel = (typeof selections)[number] & {
       _exchange: import('../contract/cards').CardExchange
-      _sourceName: string
     }
     const resolvedSelections: ResolvedSel[] = []
     let resourceDraft: Partial<Resource> = { ...player.resources }
@@ -4622,7 +4621,7 @@ export class GameCore {
       ) return this.respond(false, 'invalid harvest feed selections')
       const resolved = lookupExchange(sel.sourceId, sel.exchangeIndex)
       if (!resolved) return this.respond(false, 'invalid harvest feed selections')
-      const { exchange, sourceName } = resolved
+      const exchange = resolved
       const triggers = exchange.triggers ?? []
       if (!triggers.includes('harvest') && !triggers.includes('anytime')) {
         return this.respond(false, 'invalid harvest feed selections')
@@ -4650,7 +4649,7 @@ export class GameCore {
       if (!hasValidResources(resourceDraft)) {
         return this.respond(false, 'invalid harvest feed selections')
       }
-      resolvedSelections.push({ ...sel, _exchange: exchange, _sourceName: sourceName })
+      resolvedSelections.push({ ...sel, _exchange: exchange })
     }
 
     this.pushHistory()
@@ -4685,7 +4684,7 @@ export class GameCore {
       const feedConvertedEvents = appendImmediateEvents(this.state, [{
         type: 'harvest.feedConverted',
         playerId: player.id,
-        source: sel._sourceName,
+        source: sel.sourceId,
         cost: costMap,
         food: gainMap,
       }], { actorPlayerId: player.id })

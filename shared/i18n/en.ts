@@ -567,6 +567,7 @@ export const en = {
     harvestFeedSubtitle: '{player} needs {count} food',
     harvestFeedRate: '1 {resource} → {food} food',
     harvestFeedBasic: 'Basic',
+    harvestFeedBasicSource: 'Basic conversion',
     harvestFeedConfirm: 'Confirm feeding',
     harvestFeedProgress: '{fed}/{required} · Begging {begging}',
     harvestHeating: 'Heat Home',

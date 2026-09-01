@@ -119,7 +119,7 @@ describe('C109_SchnappsDistiller — metadata exchange', () => {
     expect(convertedEvents).toEqual([
       expect.objectContaining({
         playerId: response.state.players[0]!.id,
-        source: 'Schnapps Distiller',
+        source: CARD_ID,
         cost: { vegetable: 1 },
         food: { food: 5 },
       }),
