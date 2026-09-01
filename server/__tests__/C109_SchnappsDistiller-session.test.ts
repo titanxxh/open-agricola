@@ -66,22 +66,64 @@ describe('C109_SchnappsDistiller — metadata exchange', () => {
     let response = session.performRoundEnd()
     expect(response.interaction.stateId).toBe('wait')
     if (response.interaction.stateId !== 'wait') throw new Error('expected harvest feed')
-    expect(response.interaction.request.kind).toBe('feed')
+    expect(response.interaction).toMatchObject({
+      playerIndex: 0,
+      request: {
+        kind: 'feed',
+        remaining: 2,
+        foodUsed: 0,
+        maxTradeTimesBySourceId: { [CARD_ID]: 1 },
+      },
+    })
+    expect(response.scores).toHaveLength(2)
 
     response = session.resolveChoice(0, 'confirm', {
-      selections: [{ sourceId: CARD_ID, exchangeIndex: 0, count: 2 }],
+      selections: [{
+        sourceId: CARD_ID,
+        exchangeIndex: 0,
+        count: 2,
+        sourceName: 'Schnapps Distiller',
+      }],
     })
 
     expect(response.ok).toBe(true)
     expect(response.state.players[0]!.resources).toMatchObject({
       vegetable: 1,
-      food: 5,
+      food: 3,
       begging: 0,
     })
-    expect(response.state.log).toContainEqual(expect.objectContaining({
-      key: 'log.harvestFeedConvert',
-      params: expect.objectContaining({ cost: { vegetable: 1 }, food: { food: 5 } }),
-    }))
+    expect(response.state.players[0]!.cardStates[CARD_ID]?.extraData?.harvestExchangeUsage)
+      .toEqual({ round: 4, count: 1 })
+    expect(response.state).toMatchObject({ round: 5, roundPhase: 'work' })
+    expect(response.interaction.stateId).toBe('idle')
+    expect(response.scores).toHaveLength(2)
+
+    const convertedEvents = response.state.events.filter((event) => event.type === 'harvest.feedConverted')
+    const feedingEvents = response.state.events.filter((event) =>
+      event.type === 'resource.paid' && event.paymentFor === 'feeding',
+    )
+    expect(convertedEvents).toEqual([
+      expect.objectContaining({
+        playerId: response.state.players[0]!.id,
+        source: 'Schnapps Distiller',
+        cost: { vegetable: 1 },
+        food: { food: 5 },
+      }),
+    ])
+    expect(feedingEvents).toEqual([
+      expect.objectContaining({ resources: expect.objectContaining({ food: 2 }) }),
+    ])
+    expect(convertedEvents[0]!.seq).toBeLessThan(feedingEvents[0]!.seq)
+    expect(response.state.log).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        key: 'log.harvestFeedConvert',
+        params: expect.objectContaining({ cost: { vegetable: 1 }, food: { food: 5 } }),
+      }),
+      expect.objectContaining({
+        key: 'log.harvestFeedDetail',
+        params: expect.objectContaining({ resources: expect.objectContaining({ food: 2 }) }),
+      }),
+    ]))
   })
 
   it('declines the optional harvest exchange and leaves the vegetable for normal feeding', () => {
@@ -98,6 +140,22 @@ describe('C109_SchnappsDistiller — metadata exchange', () => {
       food: 0,
       begging: 2,
     })
+    expect(response.state.players[0]!.cardStates[CARD_ID]?.extraData?.harvestExchangeUsage)
+      .toBeUndefined()
+    expect(response.state.events.some((event) => event.type === 'harvest.feedConverted')).toBe(false)
+    expect(response.state.events).toContainEqual(expect.objectContaining({
+      type: 'resource.paid',
+      paymentFor: 'feeding',
+      resources: expect.objectContaining({ begging: 2 }),
+    }))
+    expect(response.state.log.some((entry) => entry.key === 'log.harvestFeedConvert')).toBe(false)
+    expect(response.state.log).toContainEqual(expect.objectContaining({
+      key: 'log.harvestFeedDetail',
+      params: expect.objectContaining({ resources: expect.objectContaining({ begging: 2 }) }),
+    }))
+    expect(response.state).toMatchObject({ round: 5, roundPhase: 'work' })
+    expect(response.interaction.stateId).toBe('idle')
+    expect(response.scores).toHaveLength(2)
   })
 
   it('does not offer or execute the exchange during a work-phase action', () => {
@@ -117,7 +175,12 @@ describe('C109_SchnappsDistiller — metadata exchange', () => {
 
     expect(response.ok).toBe(true)
     expect(response.state.players[0]!.resources).toMatchObject({ vegetable: 1, food: 0 })
+    expect(response.state.players[0]!.cardStates[CARD_ID]?.extraData?.harvestExchangeUsage)
+      .toBeUndefined()
+    expect(response.state.events.some((event) => event.type === 'harvest.feedConverted')).toBe(false)
+    expect(response.state.log.some((entry) => entry.key === 'log.harvestFeedConvert')).toBe(false)
     expect(response.interaction.anytimeActions.some((action) => action.sourceCard === CARD_ID)).toBe(false)
+    expect(response.scores).toHaveLength(2)
   })
 
   it('declares a single harvest exchange (1 vegetable -> 5 food, max:1)', () => {
