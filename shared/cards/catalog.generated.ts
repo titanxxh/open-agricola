@@ -10647,7 +10647,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
       "Immediately after each time you use the __Traveling Players__ accumulation space, you can place another person on an action space of your choice, regardless whether or not the action space is occupied."
     ],
     "rules": [
-      "The additional person cannot be placed on __Meeting Place__."
+      "No card, including this one, can allow you to use __Meeting Place__ if it is already occupied."
     ],
     "cost": {},
     "players": "4+",

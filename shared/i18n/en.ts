@@ -1070,7 +1070,7 @@ export const en = {
     D134_OysterEater: { name: 'Oyster Eater', description: 'Each time the __Fishing__ accumulation space is used, you get 1 bonus <SCORE> and must skip placing your next person that round. (You can place the person on a later turn.)' },
     D137_TradeTeacher: { name: 'Trade Teacher', description: 'Each time after you use a __Lessons__ action space, you can buy up to 2 different goods: <GRAIN>, <STONE>, <SHEEP>, and <PIG> for 1 <FOOD> each; <CATTLE> and <VEGETABLE> for 2 <FOOD> each.' },
     D150_GodlySpouse: { name: 'Godly Spouse', description: 'Each time you take a __Family Growth__ action with the second person you place in a round, return the first person you placed home, unless it is on the __Meeting Place__ action space.' },
-    D151_SpinDoctor: { rules: 'The additional person cannot be placed on __Meeting Place__.' },
+    D151_SpinDoctor: { rules: 'No card, including this one, can allow you to use __Meeting Place__ if it is already occupied.' },
     D157_PartyOrganizer: { name: 'Party Organizer', description: 'As soon as the next player but you gains their 5th person, you immediately get 8 <FOOD> (not retroactively). During scoring, if only you have 5 people, you get 3 bonus <SCORE>.' },
     D158_BeanCounter: { name: 'Bean Counter', description: 'Each time you use an action space on round spaces 1 to 8, place 1 <FOOD> on this card. Each time this cards has 3 <FOOD> on it, move the <FOOD> to your supply.' },
     D167_PureBreeder: { name: 'Pure Breeder', description: 'You immediately get 1 <WOOD>. After each round that does not end with a harvest, you can breed exactly one type of animal. (This is not considered a breeding phase.)' },

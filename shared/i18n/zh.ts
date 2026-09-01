@@ -1054,7 +1054,7 @@ export const zh = {
     D134_OysterEater: { name: '牡蛎食者', description: '每当 __Fishing__ 累积格被使用时，你获得 1 额外 <SCORE> 且必须跳过该回合你下一名工人的放置。（可在之后回合再放置。）' },
     D137_TradeTeacher: { name: '贸易导师', description: '每当你使用 __Lessons__ 行动位后，你可以购买至多 2 种不同资源：<GRAIN>、<STONE>、<SHEEP>、<PIG> 各需 1 <FOOD>；<CATTLE> 与 <VEGETABLE> 各需 2 <FOOD>。' },
     D150_GodlySpouse: { name: '虔诚配偶', description: '每当你在同一回合放置的第二名工人执行 __Family Growth__ 行动时，除非该工人在 __Meeting Place__ 上，否则将你放置的第一名工人送回家。' },
-    D151_SpinDoctor: { rules: '此次额外放人不能选择 __Meeting Place__。' },
+    D151_SpinDoctor: { rules: '包括本牌在内，任何卡牌都不能让你使用已被占用的 __Meeting Place__。' },
     D157_PartyOrganizer: { name: '宴会筹办者', description: '当下一位非你玩家获得第 5 名工人时，你立即获得 8 <FOOD>（不追溯）。计分时若只有你拥有 5 名工人，获得 3 额外 <SCORE>。' },
     D158_BeanCounter: { name: '算盘先生', description: '每当你在第 1 至 8 回合的行动位上行动时，在本牌上放 1 <FOOD>。每当本牌上有 3 <FOOD> 时，将其移至供给区。' },
     D167_PureBreeder: { name: '纯种饲育者', description: '立即获得 1 <WOOD>。每个未以收获结束的回合后，你可以繁殖恰好一种动物。（不视为繁殖阶段。）' },

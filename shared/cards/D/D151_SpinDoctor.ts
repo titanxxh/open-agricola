@@ -18,7 +18,7 @@ const listener: CardListenerRegistration = {
     if (!isTravelingPlayersSpaceId(context.space?.id)) return
     if (workersAvailable(context.state, context.player) <= 0) return
     const constraints = context.state.actionSpaces
-      .filter((space) => space.id !== 'meeting-place')
+      .filter((space) => space.id !== 'meeting-place' || !isSpaceOccupied(space))
       .map((space) => space.id)
     return {
       flow: {
@@ -71,7 +71,7 @@ export const D151_SpinDoctor = defineOccupationCard({
     number: 151,
     category: 'ACTIONS_BOOSTER',
     desc: ['Immediately after each time you use the __Traveling Players__ accumulation space, you can place another person on an action space of your choice, regardless whether or not the action space is occupied.'],
-    rules: ['The additional person cannot be placed on __Meeting Place__.'],
+    rules: ['No card, including this one, can allow you to use __Meeting Place__ if it is already occupied.'],
     cost: {},
     players: '4+',
   },
