@@ -122,7 +122,12 @@ describe('reap action private-field-phase trigger', () => {
         },
       },
     } as unknown as PlayerState
-    const state = { players: [player] } as unknown as GameState
+    const state = {
+      players: [player],
+      harvestReapSummary: {
+        p1: { resources: {}, grainFields: 0, vegetableFields: 0, harvestedPositions: [] },
+      },
+    } as unknown as GameState
 
     const result = action!.execute({
       state,
@@ -136,6 +141,7 @@ describe('reap action private-field-phase trigger', () => {
     expect(player.resources.grain).toBe(1)
     expect(player.resources.wood).toBe(1)
     expect(player.cardStates.E068_CherryOrchard?.extraData?.cardFieldStacks).toEqual([])
+    expect(state.harvestReapSummary?.p1?.harvestedPositions).toEqual([])
     expect(events.map((event) => (event as { from?: { kind?: string } }).from?.kind)).toEqual([
       undefined,
       'field',

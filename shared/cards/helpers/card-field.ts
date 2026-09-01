@@ -221,6 +221,15 @@ export const makeCardFieldImpl = (
         for (const [crop, amount] of perCropAmount) {
           entry.resources[crop] = (entry.resources[crop] ?? 0) + amount
         }
+        if (
+          perCropAmount.size > 0 &&
+          !entry.harvestedPositions?.some(({ row, col }) => row === -1 && col === baseCol)
+        ) {
+          entry.harvestedPositions = [
+            ...(entry.harvestedPositions ?? []),
+            { row: -1, col: baseCol },
+          ]
+        }
       }
     }
     const events = [...perCropAmount].map(([crop, amount]) => ({

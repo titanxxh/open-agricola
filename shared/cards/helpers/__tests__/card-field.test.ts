@@ -111,13 +111,19 @@ describe('makeCardFieldImpl', () => {
     it('累加到 summary.resources[crop]', () => {
       const impl = makeCardFieldImpl('D075_WoodField', { allowedCrops: ['wood'], capacity: 2 })
       const player = createPlayer({
-        cardStates: { D075_WoodField: { extraData: { cardFieldStacks: [{ crop: 'wood', remaining: 3 }, { crop: 'wood', remaining: 1 }] } } },
+        cardStates: { D075_WoodField: { extraData: { cardFieldStacks: [{ crop: 'wood', remaining: 1 }, { crop: 'wood', remaining: 3 }] } } },
       })
       const state = createState(player)
       initSummary(state, player.id)
       impl.effect.onHarvestFieldPhase!(state, player)
       expect(state.harvestReapSummary![player.id].resources.wood).toBe(2)
+      expect(state.harvestReapSummary![player.id].harvestedPositions).toEqual([
+        { row: -1, col: 4075 },
+      ])
       expect(player.resources.wood).toBe(2)
+      expect(player.cardStates.D075_WoodField?.extraData?.cardFieldStacks).toEqual([
+        { crop: 'wood', remaining: 2 },
+      ])
     })
   })
 
