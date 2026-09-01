@@ -793,11 +793,15 @@ export class Engine {
    */
   insertFlowAfterPendingChoice(flow: ActionFlow, ownerPlayerId?: string): void {
     const envelope = this.peekPendingEnvelope()
+    const pendingHost = this.peekPendingHost()
     const insertionTargetId = envelope?.ownerNodeId ?? this._pendingNodeIdRef.value
     if (!insertionTargetId) return
     const flowNode = ownerPlayerId
       ? buildOwnedFlowNode(this._internals(), flow, ownerPlayerId)
       : buildFlowNode(this._internals(), flow)
+    if (pendingHost?.mandatory === true) {
+      enforceCompositeContinuationMandatory(flowNode)
+    }
     this.tree.insertAfter(insertionTargetId, [flowNode])
   }
 }

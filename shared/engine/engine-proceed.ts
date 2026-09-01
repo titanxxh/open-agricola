@@ -445,6 +445,7 @@ const buildDeferredHostNode = (
     executionContext.actionContext,
   )
   node.ownerPlayerId = hostNode.ownerPlayerId
+  node.mandatory = hostNode.mandatory
   node.internalHostNodeId = hostNode.id
   node.deferredHostResult = result
   node.deferredAfterHostCommitChildren =
@@ -678,6 +679,9 @@ const executeActivateCardAction = (
       insertedNodes.forEach((insertedNode) =>
         stampContinuationParentHost(insertedNode, continuationParentHostNodeId))
     }
+    if (node.mandatory === true) {
+      insertedNodes.forEach(enforceCompositeContinuationMandatory)
+    }
     if (insertedNodes.length > 0) {
       int.tree.insertAfter(node.id, insertedNodes)
     }
@@ -742,6 +746,7 @@ const executeDeferredHostAction = (
       executionContext.player.id,
     )
     if (afterHostCommitNodes.length > 0) {
+      afterHostCommitNodes.forEach(enforceCompositeContinuationMandatory)
       const continuationNode = buildDeferredHostContinuationNode(int, node, result)
       node.resolve(result)
       int.tree.insertAfter(node.id, [...afterHostCommitNodes, continuationNode])
@@ -1495,6 +1500,9 @@ export function engineProceed(
     }
     if (result.type === 'flow') {
       const flowNode = buildOwnedFlowNode(int, result.flow, context.player.id)
+      if (node.mandatory === true) {
+        enforceCompositeContinuationMandatory(flowNode)
+      }
       if (node.continuationParentHostNodeId) {
         stampContinuationParentHost(flowNode, node.continuationParentHostNodeId)
       }

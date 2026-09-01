@@ -373,7 +373,7 @@ shared/engine/
 
 - `ownerPlayerId`：跨玩家执行 owner；继承自 ancestor/frame，child explicit owner 优先。
 - `optional` / `optionalActive` / `optionalPromptKey`：optional accept/skip 状态；`xor` / `or` 保留直接 `__skip__` 选项。
-- `mandatory`：已选择 / 已接受的强制 continuation 会同时标记 host node 和 descendant `ActionNode`；后续 leaf 不可执行时返回 mandatory blocked，session 转成 `engine-blocked`（undo-only），避免只执行 composite 的前半段。
+- `mandatory`：已选择 / 已接受的强制 continuation 会同时标记 host node 和 descendant `ActionNode`；internal `afterHostCommit` child，以及 mandatory node 动态返回或注入的每层 flow，都会递归继承该标记。后续 leaf 不可执行时返回 mandatory blocked，session 转成 `engine-blocked`（undo-only），不能静默完成部分 continuation。
 - `selectedChildId`：`XorNode` 和 trigger-select `ParallelNode` 的运行态选择指针，会进入 cursor restore；用于让已选择的 composite branch / provider flow 在 pending、undo、WS restore 后继续从同一分支推进。
 - `resolveAfterSelection`：trigger-select 的 one-shot 变体，选中的 child 执行完后直接 resolve parent；用于 extra-turn provider selection，避免选择一个 provider 后继续展示同层其他 provider。
 - `pending: PendingEnvelope | null`：等待输入的数据 envelope。`InteractionRequest` 是 WS/session protocol，不是 tree node。leaf request、`xor` / `or`、optional、trigger-select parallel 和 synthetic confirm/feed/farm-select 都通过 pending envelope 暂停并 cursor-restore。
@@ -706,6 +706,7 @@ Card listener 区域默认只匹配已打出卡：`zones` 省略等价于 `['pla
 - `improvement` / `occupation` 的 `onBuy` 使用 `afterHostCommitListeners`：先完成 mandatory payment，再由 host `completeInternalChildren` 提交卡牌，随后触发 onBuy，最后才进入 host `during` / `immediatelyAfter` / `after`。
 - `stables` 保持 `farm.stableBuilt -> resource.paid(stables) -> after-stables effects`：农场 mutation 仍是 host action 的事实，但 mandatory payment 会在 reaction 花费这些资源前结算。
 - `fencing` 明确是 `beforeHostListeners`，避免 `A034_Loppers` 这类 after-fencing 效果先于 mandatory fence pay 结算而饿死支付。
+- mandatory 传播不改变 fencing 结算顺序：先校验合法布局，再结算支付，最后提交权威 fence；不得因此允许 `seq:[pay, apply-*]`。
 
 禁止的形态：
 
@@ -713,7 +714,7 @@ Card listener 区域默认只匹配已打出卡：`zones` 省略等价于 `['pla
 - 顶层 `apply-*` effect 文件。
 - `PlayerState` payment scratchpad 或跨 action 临时支付槽位。
 
-`activate-card-effect` 是 internal child，用 `paymentInfoFrom` 从 internal result map 读取 `paymentInfo`，再执行 `onBuy` 等 card-effect hook；阶段 reaction dispatcher 也使用该 child 执行 harvest field / before-end card-effect activation。stage activation 可携带 `ownerPlayerId` / `targetPlayerId` / stage hook metadata，并在 `ParallelNode(mode='trigger-select')` preview 中用 cloned state/player 评估 applicable / doable / mandatory pass。flow-returning handler 返回 flow 即视为可执行；direct-mutation void handler 若在 clone 上产生变更，也视为可执行，但真实 mutation 只在玩家选择该 activation 后落地。choice flow 的真实 max / options 由后续 action leaf 再按 live state 生成或校验。trigger-select pass gate 以 preview 后的结果为准：显式 mandatory 或 enabled non-before non-optional result 会禁用 pass，root `flow.optional === true` 可允许 pass；before-end stage activation 继续以 `beforeEndGameMandatory` 为准，即使该 activation 是 no-flow direct mutation；`before` trigger 继续由原 action continuation 判定 pass 是否可用。`onBuy` 的 `paymentInfo` 路径不读取 stage target metadata。`occupation-gate` 是 no-op internal gate，只给需要先展示/执行其他节点、但 OR 分支可执行性仍必须按 occupation 判断的 flow 使用。卡牌购买的 onBuy / 多卡业务继续留在 card-effect 或 host action completion 中，不要塞回 top-level effect。
+`activate-card-effect` 是 internal child，用 `paymentInfoFrom` 从 internal result map 读取 `paymentInfo`，再执行 `onBuy` 等 card-effect hook；`afterHostCommit` activation 是 mandatory，其返回 flow 会递归继承该义务。阶段 reaction dispatcher 也使用该 child 执行 harvest field / before-end card-effect activation。stage activation 可携带 `ownerPlayerId` / `targetPlayerId` / stage hook metadata，并在 `ParallelNode(mode='trigger-select')` preview 中用 cloned state/player 评估 applicable / doable / mandatory pass。flow-returning handler 返回 flow 即视为可执行；direct-mutation void handler 若在 clone 上产生变更，也视为可执行，但真实 mutation 只在玩家选择该 activation 后落地。choice flow 的真实 max / options 由后续 action leaf 再按 live state 生成或校验。trigger-select pass gate 以 preview 后的结果为准：显式 mandatory 或 enabled non-before non-optional result 会禁用 pass，root `flow.optional === true` 可允许 pass；before-end stage activation 继续以 `beforeEndGameMandatory` 为准，即使该 activation 是 no-flow direct mutation；`before` trigger 继续由原 action continuation 判定 pass 是否可用。`onBuy` 的 `paymentInfo` 路径不读取 stage target metadata。`occupation-gate` 是 no-op internal gate，只给需要先展示/执行其他节点、但 OR 分支可执行性仍必须按 occupation 判断的 flow 使用。卡牌购买的 onBuy / 多卡业务继续留在 card-effect 或 host action completion 中，不要塞回 top-level effect。
 
 `PaymentResourceMap` 覆盖真实资源、supply token 和卡牌提供的虚拟支付资源：`fence` / `stable` 与 `wood` / `food` 一样进入 `cost`、`payLeaf`、payment solver、`resourcesPaid`、`PaymentInfo` 和 `resource.paid`；虚拟支付资源不进入 `cost`，但会在 `PaymentSolution.resourcesPaid` / payment choice label 中以稳定 key 出现。支付 supply token 时只增加 `player.supplyTokensConsumed`，不修改已建 `fenceSegments` / `stableTiles`；所有“还能建多少 fence / stable”的读取必须走 `getOwnOrdinaryFenceBuildLimit()` / `getOwnOrdinaryFenceReserveCount()` / `getAvailableStableSupplyCount()`，不能再使用固定 15 / 4 上限。
 

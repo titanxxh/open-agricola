@@ -349,6 +349,7 @@ const buildDeferredHostNode = (
     executionContext.actionContext,
   )
   node.ownerPlayerId = hostNode.ownerPlayerId
+  node.mandatory = hostNode.mandatory
   node.internalHostNodeId = hostNode.id
   node.deferredHostResult = result
   node.deferredAfterHostCommitChildren =
@@ -804,6 +805,9 @@ export function engineResolveChoice(
       }
       if (result.type === 'flow') {
         const flowNode = buildOwnedFlowNode(int, result.flow, context.player.id)
+        if (child.mandatory === true) {
+          enforceCompositeContinuationMandatory(flowNode)
+        }
         if (child.continuationParentHostNodeId) {
           stampContinuationParentHost(flowNode, child.continuationParentHostNodeId)
         }
@@ -1181,6 +1185,9 @@ export function engineResolveChoice(
     }
     if (result.type === 'flow') {
       const flowNode = buildOwnedFlowNode(int, result.flow, context.player.id)
+      if (pendingActionNode?.mandatory === true) {
+        enforceCompositeContinuationMandatory(flowNode)
+      }
       if (pendingActionNode?.continuationParentHostNodeId) {
         stampContinuationParentHost(flowNode, pendingActionNode.continuationParentHostNodeId)
       }
