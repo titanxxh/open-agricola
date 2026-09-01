@@ -61,7 +61,7 @@ const setupHarvestSession = () => {
 }
 
 describe('C109_SchnappsDistiller — metadata exchange', () => {
-  it('executes the harvest exchange through GameSession and caps a submitted count of 2 at 1', () => {
+  it('rejects an over-limit harvest exchange and accepts a legal retry', () => {
     const session = setupHarvestSession()
     let response = session.performRoundEnd()
     expect(response.interaction.stateId).toBe('wait')
@@ -77,11 +77,25 @@ describe('C109_SchnappsDistiller — metadata exchange', () => {
     })
     expect(response.scores).toHaveLength(2)
 
+    const before = session.getState()
     response = session.resolveChoice(0, 'confirm', {
       selections: [{
         sourceId: CARD_ID,
         exchangeIndex: 0,
         count: 2,
+        sourceName: 'forged client label',
+      }],
+    })
+
+    expect(response.ok).toBe(false)
+    expect(response.state).toEqual(before.state)
+    expect(response.interaction).toEqual(before.interaction)
+
+    response = session.resolveChoice(0, 'confirm', {
+      selections: [{
+        sourceId: CARD_ID,
+        exchangeIndex: 0,
+        count: 1,
         sourceName: 'Schnapps Distiller',
       }],
     })

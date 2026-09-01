@@ -77,6 +77,8 @@ describe('C012_CattleFarm session', () => {
     expect(resp.interaction.stateId).toBe('wait')
     if (resp.interaction.stateId !== 'wait') return
     expect(resp.interaction.request.kind).toBe('animal-reorg')
+    const beforeInteraction = resp.interaction
+    const before = session.getState()
 
     resp = session.resolveChoice(0, 'confirm', {
       zones: [
@@ -91,9 +93,12 @@ describe('C012_CattleFarm session', () => {
       ],
     })
 
-    expect(resp.ok).toBe(true)
-    expect(resp.state.players[0]!.resources.sheep).toBe(0)
-    expect(resp.state.players[0]!.resources.cattle).toBe(0)
-    expect(resp.state.players[0]!.cardStates?.C012_CattleFarm?.extraData ?? {}).toEqual({})
+    expect(resp.ok).toBe(false)
+    expect(resp.state).toEqual(before.state)
+    expect(resp.interaction).toMatchObject({
+      stateId: 'wait',
+      playerIndex: beforeInteraction.playerIndex,
+      request: beforeInteraction.request,
+    })
   })
 })

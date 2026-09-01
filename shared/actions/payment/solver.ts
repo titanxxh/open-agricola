@@ -124,6 +124,7 @@ const computeLifecycleOptions = (
       player,
       computeOptions(state, idx, effectiveCost, ctx),
       ctx.reserveResources,
+      isComplexCost(effectiveCost) ? effectiveCost.resourceReserve : undefined,
     ),
   }
 }
@@ -146,6 +147,7 @@ const computeOptions = (
     player,
     computeAllBuyableCombinations(player, cost, ctx.playedCards, costTypeArg, state),
     ctx.reserveResources,
+    cost.resourceReserve,
   )
 }
 

@@ -1,15 +1,23 @@
 import type { Resource } from '../../../shared/contract/types'
 import type { HarvestFeedOption } from './use-harvest-flow'
 
-/**
- * Max value for a harvest-feed option's counter. Per from-key constraint:
- *   sum_over_other_options(from[k] * count) + target.count * target.from[k]
- *     <= player.resources[k]
- *
- * The target option's current count is excluded from "usedByOthers", so the
- * cap returned is the absolute upper bound the user could set the counter to
- * regardless of its current value.
- */
+const projectResources = (
+  resources: Partial<Resource>,
+  option: Pick<HarvestFeedOption, 'from' | 'to'>,
+  count: number,
+) => {
+  const projected = { ...resources }
+  for (const [rawKey, amount] of Object.entries(option.from)) {
+    const key = rawKey as keyof Resource
+    projected[key] = (projected[key] ?? 0) - amount * count
+  }
+  for (const [rawKey, amount] of Object.entries(option.to)) {
+    const key = rawKey as keyof Resource
+    projected[key] = (projected[key] ?? 0) + amount * count
+  }
+  return projected
+}
+
 export const computeHarvestFeedCounterMax = (
   target: HarvestFeedOption,
   allOptions: readonly HarvestFeedOption[],
@@ -19,20 +27,28 @@ export const computeHarvestFeedCounterMax = (
   const targetFromKeys = Object.keys(target.from) as (keyof Resource)[]
   if (targetFromKeys.length === 0) return 0
 
+  let projected: Partial<Resource> = { ...playerResources }
+  let beforeTarget = true
+  for (const option of allOptions) {
+    if (option.id === target.id) {
+      beforeTarget = false
+      continue
+    }
+    const count = counts[option.id] ?? 0
+    if (count <= 0) continue
+    projected = projectResources(
+      projected,
+      beforeTarget ? option : { from: option.from, to: {} },
+      count,
+    )
+    if (Object.values(projected).some((amount) => amount < 0)) return 0
+  }
+
   let maxTimes = Number.POSITIVE_INFINITY
   for (const k of targetFromKeys) {
     const need = (target.from[k] ?? 0) as number
     if (need <= 0) continue
-    const have = playerResources[k] ?? 0
-    let usedByOthers = 0
-    for (const o of allOptions) {
-      if (o.id === target.id) continue
-      const c = counts[o.id] ?? 0
-      const f = (o.from[k] ?? 0) as number
-      usedByOthers += c * f
-    }
-    const remaining = have - usedByOthers
-    const cap = Math.floor(remaining / need)
+    const cap = Math.floor((projected[k] ?? 0) / need)
     if (cap < maxTimes) maxTimes = cap
   }
   const resourceMax = Math.max(0, Number.isFinite(maxTimes) ? maxTimes : 0)

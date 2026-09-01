@@ -1,11 +1,20 @@
 import { describe, expect, it, vi } from 'vitest'
 
-vi.mock('../../../../shared/cards/registry-display', () => ({
-  getMinorImprovement: () => undefined,
-  getOccupation: () => undefined,
-  getRegisteredMinorImprovement: () => undefined,
-  getRegisteredOccupation: () => undefined,
-  majorImprovementIds: [],
+vi.mock('../../../services/card-meta', () => ({
+  getCardMeta: (id: string) => ({
+    C059_SchnappsDistillery: {
+      exchanges: [{ from: { vegetable: 1 }, to: { food: 5 }, max: 1, triggers: ['harvest'] }],
+    },
+    C105_BasketCarrier: {
+      exchanges: [{ from: { food: 2 }, to: { wood: 1, reed: 1, grain: 1 }, max: 1, triggers: ['harvest'] }],
+    },
+    B104_SheepWalker: {
+      exchanges: [{ from: { sheep: 1 }, to: { food: 1 }, triggers: ['anytime'] }],
+    },
+    Major_Fireplace1: {
+      exchanges: [{ from: { sheep: 1 }, to: { food: 2 }, triggers: ['anytime'] }],
+    },
+  })[id],
 }))
 
 import { buildHarvestFeedOptions } from '../use-harvest-flow'
@@ -67,6 +76,15 @@ describe('buildHarvestFeedOptions', () => {
     })
     const options = buildHarvestFeedOptions(player, 'en', cardLabel)
     expect(options.find((o) => o.sourceId === 'C059_SchnappsDistillery')).toBeDefined()
+  })
+
+  it('lists an initially unaffordable harvest exchange', () => {
+    const player = mkPlayer({
+      resources: { ...emptyResources, food: 0 },
+      occupationPlayed: ['C105_BasketCarrier'],
+    })
+    const options = buildHarvestFeedOptions(player, 'en', cardLabel)
+    expect(options.find((o) => o.sourceId === 'C105_BasketCarrier')).toBeDefined()
   })
 
   it('lists anytime card exchanges (e.g. B104 SheepWalker)', () => {

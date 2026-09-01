@@ -46,6 +46,7 @@ const drainHarvest = (session: GameSession, feedSelections: Record<number, FeedS
     } else {
       break
     }
+    if (!resp.ok) throw new Error(resp.error ?? 'failed to drain harvest')
   }
   return resp
 }
@@ -136,7 +137,7 @@ describe('E153_StoneSculptor harvest integration', () => {
     expect(finalP1.cardStates?.[CARD_ID]?.extraData?.bonusVpEarned).toBe(1)
   })
 
-  it('max:1 caps a single-harvest selection: count=2 only spends 1 stone, +1 bonusVp', () => {
+  it('rejects a count above max without mutating the feeding draft, then accepts count=1', () => {
     const { session, state } = setupHarvestRound(4)
     const p1 = state.players[0]!
     p1.occupationPlayed.push(CARD_ID)
@@ -146,19 +147,35 @@ describe('E153_StoneSculptor harvest integration', () => {
     state.players[1]!.resources.food = 5
     session.loadState(state)
 
-    const resp = drainHarvest(session, {
-      0: [
-        {
-          count: 2, // request 2 — capped at 1 by exchange.max
-          sourceId: CARD_ID,
-          exchangeIndex: 0,
-          sourceName: 'Stone Sculptor',
-        },
-      ],
+    let resp = session.performRoundEnd()
+    expect(resp.interaction).toMatchObject({
+      stateId: 'wait',
+      playerIndex: 0,
+      request: { kind: 'feed', maxTradeTimesBySourceId: { [CARD_ID]: 1 } },
     })
+    const before = session.getState()
+
+    resp = session.resolveChoice(0, 'confirm', { selections: [{
+      count: 2,
+      sourceId: CARD_ID,
+      exchangeIndex: 0,
+      sourceName: 'Stone Sculptor',
+    }] })
+
+    expect(resp.ok).toBe(false)
+    expect(resp.state).toEqual(before.state)
+    expect(resp.interaction).toEqual(before.interaction)
+
+    resp = session.resolveChoice(0, 'confirm', { selections: [{
+      count: 1,
+      sourceId: CARD_ID,
+      exchangeIndex: 0,
+      sourceName: 'Stone Sculptor',
+    }] })
 
     const finalP1 = resp.state.players[0]!
-    expect(finalP1.resources.stone).toBe(4) // only 1 spent
+    expect(resp.ok).toBe(true)
+    expect(finalP1.resources.stone).toBe(4)
     expect(finalP1.cardStates?.[CARD_ID]?.extraData?.bonusVpEarned).toBe(1)
   })
 
@@ -208,7 +225,7 @@ describe('E153_StoneSculptor harvest integration', () => {
     expect(trades.find((t) => t.sourceId === CARD_ID)).toBeUndefined()
   })
 
-  it('zero stone: passing exchangeIndex with count=1 still capped to 0 actually-applied', () => {
+  it('rejects count=1 with zero stone and accepts an empty retry', () => {
     const { session, state } = setupHarvestRound(4)
     const p1 = state.players[0]!
     p1.occupationPlayed.push(CARD_ID)
@@ -218,11 +235,25 @@ describe('E153_StoneSculptor harvest integration', () => {
     state.players[1]!.resources.food = 5
     session.loadState(state)
 
-    const resp = drainHarvest(session, {
-      0: [{ count: 1, sourceId: CARD_ID, exchangeIndex: 0 }],
+    let resp = session.performRoundEnd()
+    expect(resp.interaction).toMatchObject({
+      stateId: 'wait',
+      playerIndex: 0,
+      request: { kind: 'feed' },
     })
+    const before = session.getState()
+
+    resp = session.resolveChoice(0, 'confirm', { selections: [
+      { count: 1, sourceId: CARD_ID, exchangeIndex: 0 },
+    ] })
+
+    expect(resp.ok).toBe(false)
+    expect(resp.state).toEqual(before.state)
+    expect(resp.interaction).toEqual(before.interaction)
+
+    resp = session.resolveChoice(0, 'confirm', { selections: [] })
     const finalP1 = resp.state.players[0]!
-    // No stone to spend → no bonusVp credited.
+    expect(resp.ok).toBe(true)
     expect(finalP1.cardStates?.[CARD_ID]?.extraData?.bonusVpEarned).toBeUndefined()
   })
 })

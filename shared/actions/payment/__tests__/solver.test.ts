@@ -434,6 +434,35 @@ describe('PaymentSolver', () => {
       expect(player.resources.food).toBe(2)
     })
 
+    it('filters lifecycle options that would exhaust a reserved resource pool', () => {
+      const player = makePlayerWithResources({ wood: 2 })
+      const state = makeState(player)
+      const cost = {
+        fee: { wood: 2 },
+        resourceReserve: {
+          resources: ['wood', 'clay', 'reed', 'stone'],
+          minimum: 1,
+        },
+      } as const
+
+      const failed = PaymentSolver.resolvePayment(state, 0, cost, {
+        actionId: 'pay',
+        costType: 'none',
+      })
+
+      expect(failed).toEqual({ type: 'failed', reason: 'cannot-afford' })
+      expect(player.resources.wood).toBe(2)
+
+      player.resources.clay = 1
+      const paid = PaymentSolver.resolvePayment(state, 0, cost, {
+        actionId: 'pay',
+        costType: 'none',
+      })
+
+      expect(paid.type).toBe('paid')
+      expect(player.resources).toMatchObject({ wood: 0, clay: 1 })
+    })
+
     it('returns required returned-card provenance in the payment receipt', () => {
       const player = makePlayerWithResources({ clay: 2 })
       player.improvements = ['Major_ClayOven']

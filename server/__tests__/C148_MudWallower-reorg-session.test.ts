@@ -77,7 +77,7 @@ describe('C148_MudWallower reorg-after sync (zone-based)', () => {
     ]))
   })
 
-  it('C148 S3: currently accepts a sheep card-zone submission by discarding it and lowering held', () => {
+  it('C148 S3: rejects a sheep card-zone submission atomically and accepts a legal retry', () => {
     const session = setupWorkPhase({ boar: 1, held: 1 })
     const state = session.getState().state
     state.players[0]!.resources.sheep = 1
@@ -90,24 +90,29 @@ describe('C148_MudWallower reorg-after sync (zone-based)', () => {
       request: { kind: 'animal-reorg' },
     })
 
+    const before = session.getState()
     response = session.resolveChoice(0, 'confirm', [
       { id: 'house', zoneType: 'house', animalType: 'boar', animalCount: 1 },
       { id: `card:${CARD_ID}`, zoneType: 'card', animalType: 'sheep', animalCount: 1 },
     ] as unknown as Record<string, unknown>)
 
+    expect(response.ok).toBe(false)
+    expect(response.error).toBe('log.reorganizeFail')
+    expect(response.state).toEqual(before.state)
+    expect(response.interaction).toEqual(before.interaction)
+
+    response = session.resolveChoice(0, 'confirm', [
+      { id: 'house', zoneType: 'house', animalType: 'sheep', animalCount: 1 },
+      { id: `card:${CARD_ID}`, zoneType: 'card', animalType: 'boar', animalCount: 1 },
+    ] as unknown as Record<string, unknown>)
+
     expect(response.ok, response.error).toBe(true)
-    expect(response.state.players[0]!.resources.sheep).toBe(0)
     expect(response.state.players[0]!).toMatchObject({
       resources: { boar: 1 },
-      houseAnimalType: 'boar',
+      houseAnimalType: 'sheep',
       houseAnimalCount: 1,
     })
-    expect(response.state.players[0]!.cardStates[CARD_ID]?.counters?.held).toBe(0)
-    expect(response.state.events).toContainEqual(expect.objectContaining({
-      type: 'farm.animalDiscarded',
-      animals: { sheep: 1 },
-      reason: 'noRoom',
-    }))
+    expect(response.state.players[0]!.cardStates[CARD_ID]?.counters?.held).toBe(1)
   })
 
   it('C148 S3: an ordinary boar gained with held zero has no card zone and is housed elsewhere', () => {

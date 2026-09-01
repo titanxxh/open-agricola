@@ -20,6 +20,7 @@ import type {
   PaymentSolution,
   PlayerState,
   Resource,
+  ResourceReserve,
 } from '../../../contract/types'
 import { isComplexCost } from './affordability'
 import { computeAllBuyableCombinations, sortPaymentSolutions } from './enumerate'
@@ -108,12 +109,20 @@ export const filterPaymentSolutionsByReserve = (
   player: PlayerState,
   solutions: PaymentSolution[],
   reserveResources: Partial<Resource> | undefined,
+  resourceReserve?: ResourceReserve,
 ) =>
   solutions.filter((solution) =>
     preservesResourceReserve(
       player.resources,
       solution.resourcesPaid,
       reserveResources,
+    ) && (
+      !resourceReserve || resourceReserve.resources.reduce(
+        (total, resource) => total
+          + (player.resources[resource] ?? 0)
+          - (solution.resourcesPaid[resource] ?? 0),
+        0,
+      ) >= resourceReserve.minimum
     ),
   )
 
@@ -224,6 +233,7 @@ export const resolveCostPaymentSelection = (
       options.state,
     ),
     options.reserveResources,
+    isComplexCost(cost) ? cost.resourceReserve : undefined,
   )
   return resolvePaymentSolutionSelection(
     solutions,

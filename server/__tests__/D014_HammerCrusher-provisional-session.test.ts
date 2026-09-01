@@ -732,7 +732,7 @@ describe('D014 Hammer Crusher provisional continuation', () => {
     })
   })
 
-  it('D014 S3 accepts a room plan that breaks renovation and leaves the engine blocked', () => {
+  it('D014 S3 exposes undoAction when a room plan leaves the engine blocked', () => {
     const session = setup({
       buildingTycoon: false,
       playerCount: 4,
@@ -756,11 +756,32 @@ describe('D014 Hammer Crusher provisional continuation', () => {
     expect(response.ok).toBe(true)
     expect(response.interaction.stateId === 'wait' ? response.interaction.request.kind : undefined)
       .toBe('engine-blocked')
+    expect(response.interaction.allowedCommands).toEqual(['undoStep', 'undoAction'])
     expect(response.state.players[0]).toMatchObject({
       houseType: 'clay',
       rooms: 3,
       resources: { clay: 0, reed: 0, stone: 3 },
     })
+
+    const fallback = session.undoAction()
+    expect(fallback.ok).toBe(true)
+    expect(fallback.interaction).toMatchObject({
+      stateId: 'idle',
+      allowedCommands: ['takeAction'],
+    })
+    expect(fallback.state.players[0]).toMatchObject({
+      houseType: 'clay',
+      rooms: 2,
+      resources: { clay: 3, reed: 1, stone: 3 },
+    })
+    expect(fallback.state.actionSpaces.find((space) => space.id === 'house-redevelopment')?.takenBy)
+      .toEqual([])
+    expect(fallback.state.events.some((event) =>
+      event.type === 'worker.placed' && event.spaceId === 'house-redevelopment',
+    )).toBe(false)
+    expect(fallback.publicEventCancellations?.some(
+      (entry) => entry.reason === 'undoAction' && entry.canceledEventIds.length > 0,
+    )).toBe(true)
   })
 
   it('D014 S4 does not trigger on a wood-to-clay renovation', () => {

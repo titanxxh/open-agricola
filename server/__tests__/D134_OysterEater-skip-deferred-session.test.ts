@@ -124,7 +124,7 @@ describe('D134_OysterEater skip-next-placement (onBeforePlayerTurn)', () => {
     expect(resp.state.currentPlayerIndex).toBe(0)
   })
 
-  it('D134 S4 carries an unused same-round skip into the next round', () => {
+  it('D134 S4 clears an unused same-round skip before the next work phase', () => {
     const session = new GameSession(134, undefined, { playerCount: 4 })
     stabilizeRandomHands(session.state.players)
     const state = session.getState().state
@@ -151,13 +151,16 @@ describe('D134_OysterEater skip-next-placement (onBeforePlayerTurn)', () => {
     expect(response.state.round).toBe(2)
     expect(response.state.currentPlayerIndex).toBe(0)
     expect(response.state.players[0]!.cardStates?.D134_OysterEater?.extraData?.skipNextPlacement)
-      .toBe(1)
+      .toBeUndefined()
+    const skippedBefore = response.state.events.filter((event) =>
+      event.type === 'turn.skipped' && event.playerId === owner.id,
+    ).length
     response = session.takeAction(0, 'day-laborer')
     expect(response.ok).toBe(true)
     response = drainPending(session, response)
     expect(response.state.currentPlayerIndex).toBe(1)
     expect(response.state.players[0]!.cardStates?.D134_OysterEater?.extraData?.skipNextPlacement)
-      .toBe(1)
+      .toBeUndefined()
 
     for (const [playerIndex, spaceId] of [[1, 'forest'], [2, 'clay-pit'], [3, 'reed-bank']] as const) {
       response = session.takeAction(playerIndex, spaceId)
@@ -165,12 +168,10 @@ describe('D134_OysterEater skip-next-placement (onBeforePlayerTurn)', () => {
       response = drainPending(session, response)
     }
 
-    expect(response.state.events).toContainEqual(expect.objectContaining({
-      type: 'turn.skipped',
-      playerId: owner.id,
-      reason: 'cardEffect',
-    }))
-    expect(response.state.currentPlayerIndex).toBe(1)
+    expect(response.state.events.filter((event) =>
+      event.type === 'turn.skipped' && event.playerId === owner.id,
+    )).toHaveLength(skippedBefore)
+    expect(response.state.currentPlayerIndex).toBe(0)
     expect(response.state.players[0]!.cardStates?.D134_OysterEater?.extraData?.skipNextPlacement)
       .toBeUndefined()
   })

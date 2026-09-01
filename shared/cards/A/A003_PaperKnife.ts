@@ -53,6 +53,7 @@ registerSelectionEffect(EFFECT_ID, ({
   return {
     type: 'leaf',
     actionId: 'occupation',
+    optional: true,
     sourceCard: CARD_ID,
     params: { exactCost: {}, allowedCards: [pick] },
   }
