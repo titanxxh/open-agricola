@@ -239,5 +239,9 @@ describe('useExchangeDraftPresentation', () => {
       'C109_SchnappsDistiller',
       'C105_BasketCarrier',
     ])
+
+    act(() => result.current.harvestFeed.updateCount('C109_SchnappsDistiller-ex0', -1))
+    expect(result.current.harvestFeed.counts['C109_SchnappsDistiller-ex0']).toBe(1)
+    expect(result.current.harvestFeed.counts['C105_BasketCarrier-ex0']).toBe(1)
   })
 })

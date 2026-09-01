@@ -18,6 +18,25 @@ const projectResources = (
   return projected
 }
 
+export const canApplyHarvestFeedCounts = (
+  allOptions: readonly HarvestFeedOption[],
+  counts: Record<string, number>,
+  playerResources: Resource,
+): boolean => {
+  let projected: Partial<Resource> = { ...playerResources }
+  const sourceUses = new Map<string, number>()
+  for (const option of allOptions) {
+    const count = counts[option.id] ?? 0
+    if (count <= 0) continue
+    const sourceUsed = sourceUses.get(option.sourceId) ?? 0
+    if (option.max !== undefined && sourceUsed + count > option.max) return false
+    sourceUses.set(option.sourceId, sourceUsed + count)
+    projected = projectResources(projected, option, count)
+    if (Object.values(projected).some((amount) => amount < 0)) return false
+  }
+  return true
+}
+
 export const computeHarvestFeedCounterMax = (
   target: HarvestFeedOption,
   allOptions: readonly HarvestFeedOption[],
@@ -28,19 +47,11 @@ export const computeHarvestFeedCounterMax = (
   if (targetFromKeys.length === 0) return 0
 
   let projected: Partial<Resource> = { ...playerResources }
-  let beforeTarget = true
   for (const option of allOptions) {
-    if (option.id === target.id) {
-      beforeTarget = false
-      continue
-    }
+    if (option.id === target.id) break
     const count = counts[option.id] ?? 0
     if (count <= 0) continue
-    projected = projectResources(
-      projected,
-      beforeTarget ? option : { from: option.from, to: {} },
-      count,
-    )
+    projected = projectResources(projected, option, count)
     if (Object.values(projected).some((amount) => amount < 0)) return 0
   }
 
@@ -61,5 +72,12 @@ export const computeHarvestFeedCounterMax = (
   const sourceMax = target.max === undefined
     ? resourceMax
     : Math.max(0, target.max - sourceUsedByOthers)
-  return Math.min(resourceMax, sourceMax)
+  for (let candidate = Math.min(resourceMax, sourceMax); candidate >= 0; candidate -= 1) {
+    if (canApplyHarvestFeedCounts(
+      allOptions,
+      { ...counts, [target.id]: candidate },
+      playerResources,
+    )) return candidate
+  }
+  return 0
 }
