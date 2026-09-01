@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import {
+  familySize,
   setActiveWorkerCount,
   setWorkersAtHome,
   workersAvailable,
@@ -8,6 +9,7 @@ import {
 } from '../../shared/domain/player'
 import { hasPendingExtraTurn } from '../../shared/cards/card-effects'
 import type { SessionResponse } from '../../shared/session/session-core'
+import { autoAdvanceRoundEnd } from '../../tests/llm-card-gen/session-helpers'
 import '../../shared/cards/A/A092_AdoptiveParents'
 
 const A92 = 'A092_AdoptiveParents'
@@ -56,28 +58,33 @@ const setupRotation = (opts: {
   food?: number
   newborns?: number
   p1Workers?: number
+  adultWorkers?: number
+  round?: number
   forfeited?: boolean
   holdA92?: boolean
 } = {}) => {
   const food = opts.food ?? 3
   const newborns = opts.newborns ?? 1
   const p1Workers = opts.p1Workers ?? 1
+  const adultWorkers = opts.adultWorkers ?? 0
   const holdA92 = opts.holdA92 ?? true
 
-  const session = new GameSession()
+  const session = new GameSession(undefined, undefined, { playerCount: 2 })
   const state = session.getState().state
-  state.players = state.players.slice(0, 2)
   state.currentPlayerIndex = 1
-  state.round = 1
+  state.round = opts.round ?? 1
   state.roundPhase = 'work'
 
   const p0 = state.players[0]!
-  setActiveWorkerCount(p0, Math.max(1, newborns))
+  setActiveWorkerCount(p0, Math.max(1, newborns + adultWorkers))
   setWorkersAtHome(state, p0, 0)
   const parkSpaces = ['forest', 'clay-pit', 'reed-bank', 'fishing']
   const active = p0.workers
     .filter((w) => w.isActive)
     .sort((a, b) => Number(a.id) - Number(b.id))
+  active.forEach((worker, index) => {
+    worker.isNewborn = index < newborns
+  })
   for (let i = 0; i < newborns && i < active.length; i++) {
     const w = active[i]!
     w.isNewborn = true
@@ -98,6 +105,39 @@ const setupRotation = (opts: {
   setWorkersAtHome(state, p1, p1Workers)
 
   placeholderHands(state)
+  session.loadState(state)
+  return session
+}
+
+const setupPlayedAfterGrowth = () => {
+  const session = new GameSession(1, undefined, { playerCount: 2 })
+  const state = session.getState().state
+  state.currentPlayerIndex = 0
+  state.round = 2
+  state.roundPhase = 'work'
+  placeholderHands(state)
+
+  const player = state.players[0]!
+  setActiveWorkerCount(player, 3)
+  const workers = player.workers
+    .filter((worker) => worker.isActive)
+    .sort((a, b) => Number(a.id) - Number(b.id))
+  workers.forEach((worker) => {
+    worker.isNewborn = false
+  })
+  workers[2]!.isNewborn = true
+  state.actionSpaces.find((space) => space.id === 'forest')!.takenBy = [
+    { playerId: player.id, workerId: workers[0]!.id },
+  ]
+  state.actionSpaces.find((space) => space.id === 'wish-children')!.takenBy = [
+    { playerId: player.id, workerId: workers[2]!.id },
+  ]
+  player.occupationHand = [A92]
+  player.resources.food = 3
+
+  const opponent = state.players[1]!
+  setActiveWorkerCount(opponent, 1)
+  setWorkersAtHome(state, opponent, 1)
   session.loadState(state)
   return session
 }
@@ -133,6 +173,29 @@ const driveToP0ExtraTurn = (session: GameSession): SessionResponse => {
 }
 
 describe('A92 AdoptiveParents — extra-turn (capability B)', () => {
+  it('A092 S1: Adoptive Parents played after growth can trigger in the same work phase', () => {
+    const session = setupPlayedAfterGrowth()
+
+    const played = session.takeAction(0, 'lessons')
+    expect(played.ok).toBe(true)
+    expect(played.state.players[0]!.occupationPlayed).toContain(A92)
+    expect(newbornCount(played.state.players[0]!)).toBe(1)
+    expect(hasPendingExtraTurn(played.state, played.state.players[0]!)).toBe(true)
+
+    drainConfirms(session, played)
+    const opponentAction = session.takeAction(1, placeableSpaces(session)[0]!)
+    expect(opponentAction.ok).toBe(true)
+    const offer = drainConfirms(session, opponentAction)
+    expect(reqKind(offer)).toBe('choice')
+
+    const used = session.resolveChoice(0, branchValue(offer, 0))
+    expect(used.ok).toBe(true)
+    expect(used.state.round).toBe(2)
+    expect(used.state.players[0]!.resources.food).toBe(2)
+    expect(newbornCount(used.state.players[0]!)).toBe(0)
+    expect(['farm-select', 'choice']).toContain(reqKind(used))
+  })
+
   it('rotation STOPS on the out-of-workers A92 player and offers use/forfeit', () => {
     const session = setupRotation()
     const pre = session.getState()
@@ -150,7 +213,7 @@ describe('A92 AdoptiveParents — extra-turn (capability B)', () => {
     expect(optLabels(r)).toEqual(['actions.pay.name', 'actions.special-effect.name'])
   })
 
-  it('USE: pay 1 food, promote offspring, place it; then proceed normally', () => {
+  it('A092 S2: after rotation passed the owner, accepting promotes and immediately places the child', () => {
     const session = setupRotation({ food: 3 })
     const offer = driveToP0ExtraTurn(session)
     expect(reqKind(offer)).toBe('choice')
@@ -175,33 +238,45 @@ describe('A92 AdoptiveParents — extra-turn (capability B)', () => {
     expect(hasPendingExtraTurn(after.state, after.state.players[0]!)).toBe(false)
   })
 
-  it('USE again: still owed an extra turn while another offspring remains', () => {
+  it('A092 S5: two newborns can each be promoted for one food in the same round', () => {
     const session = setupRotation({ food: 3, newborns: 2 })
     const offer = driveToP0ExtraTurn(session)
     expect(reqKind(offer)).toBe('choice')
 
-    // First use (branch 0) → pay 1 food + promote the first offspring. One
-    // offspring remains, so P0 is still owed an extra turn this round.
     const used = session.resolveChoice(0, branchValue(offer, 0))
     expect(used.ok).toBe(true)
     const afterUse = session.getState()
     expect(afterUse.state.players[0]!.resources.food).toBe(2)
     expect(newbornCount(afterUse.state.players[0]!)).toBe(1)
     expect(hasPendingExtraTurn(afterUse.state, afterUse.state.players[0]!)).toBe(true)
-    // It is still P0's turn (rotation has not handed control to the opponent).
     expect(session.getState().state.currentPlayerIndex).toBe(0)
+
+    const firstPlaced = session.resolveChoice(0, placeableSpaces(session)[0]!)
+    expect(firstPlaced.ok).toBe(true)
+    const secondOffer = drainConfirms(session, firstPlaced)
+    expect(secondOffer.state.round).toBe(1)
+    expect(reqKind(secondOffer)).toBe('choice')
+
+    const secondUse = session.resolveChoice(0, branchValue(secondOffer, 0))
+    expect(secondUse.ok).toBe(true)
+    expect(secondUse.state.round).toBe(1)
+    expect(secondUse.state.players[0]!.resources.food).toBe(1)
+    expect(newbornCount(secondUse.state.players[0]!)).toBe(0)
+    expect(['farm-select', 'choice']).toContain(reqKind(secondUse))
   })
 
-  it('FORFEIT: marks forfeited and the rotation no longer stops on P0', () => {
+  it('A092 S3: declining use leaves food and the newborn unchanged', () => {
     const session = setupRotation()
     const offer = driveToP0ExtraTurn(session)
     expect(reqKind(offer)).toBe('choice')
+    const foodBefore = offer.state.players[0]!.resources.food
 
     // Choose "forfeit" (branch 1).
     const forfeited = session.resolveChoice(0, branchValue(offer, 1))
     expect(forfeited.ok).toBe(true)
 
     const after = session.getState()
+    expect(after.state.players[0]!.resources.food).toBe(foodBefore)
     expect(after.state.players[0]!.cardStates?.[A92]?.extraData?.forfeitedThisRound).toBe(true)
     // Offspring still parked but no longer offered.
     expect(newbornCount(after.state.players[0]!)).toBe(1)
@@ -221,7 +296,7 @@ describe('A92 AdoptiveParents — extra-turn (capability B)', () => {
     expect(after.state.round).toBe(2)
   })
 
-  it('NOT TRIGGERED: no offspring → rotation does not stop on P0', () => {
+  it('A092 S4: no newborn or zero food exposes no usable Adoptive Parents branch', () => {
     const session = setupRotation({ newborns: 0, p1Workers: 1 })
     // setupRotation forces ≥1 newborn; scrub P0 to a clean "no offspring" state.
     const st = session.getState().state
@@ -242,13 +317,45 @@ describe('A92 AdoptiveParents — extra-turn (capability B)', () => {
     const after = drainConfirms(session, taken)
     expect(reqKind(after)).not.toBe('choice')
     expect(after.state.round).toBe(2)
-  })
 
-  it('NOT TRIGGERED: insufficient food → not offered', () => {
-    const session = setupRotation({ food: 0 })
-    const snap = session.getState()
+    const noFood = setupRotation({ food: 0, p1Workers: 2 })
+    const snap = noFood.getState()
     expect(newbornCount(snap.state.players[0]!)).toBe(1)
     expect(hasPendingExtraTurn(snap.state, snap.state.players[0]!)).toBe(false)
+    const noFoodAction = noFood.takeAction(1, placeableSpaces(noFood)[0]!)
+    expect(noFoodAction.ok).toBe(true)
+    const afterNoFood = drainConfirms(noFood, noFoodAction)
+    expect(reqKind(afterNoFood)).not.toBe('choice')
+    expect(afterNoFood.state.players[0]!.resources.food).toBe(0)
+    expect(newbornCount(afterNoFood.state.players[0]!)).toBe(1)
+  })
+
+  it('A092 S6: a promoted child is fed as an adult in the harvest', () => {
+    const session = setupRotation({
+      food: 7,
+      newborns: 1,
+      adultWorkers: 2,
+      p1Workers: 1,
+      round: 4,
+    })
+    const offer = driveToP0ExtraTurn(session)
+    expect(reqKind(offer)).toBe('choice')
+    expect(familySize(offer.state.players[0]!)).toBe(3)
+
+    const used = session.resolveChoice(0, branchValue(offer, 0))
+    expect(used.ok).toBe(true)
+    expect(used.state.players[0]!.resources.food).toBe(6)
+    expect(newbornCount(used.state.players[0]!)).toBe(0)
+
+    const placed = session.resolveChoice(0, placeableSpaces(session)[0]!)
+    expect(placed.ok).toBe(true)
+    const afterHarvest = autoAdvanceRoundEnd(session)
+
+    expect(afterHarvest.state.round).toBe(5)
+    expect(familySize(afterHarvest.state.players[0]!)).toBe(3)
+    expect(newbornCount(afterHarvest.state.players[0]!)).toBe(0)
+    expect(afterHarvest.state.players[0]!.resources.food).toBe(0)
+    expect(afterHarvest.state.players[0]!.resources.begging).toBe(0)
   })
 
   it('NOT TRIGGERED: already forfeited this round → not offered', () => {

@@ -4,6 +4,12 @@ import { GameSession } from '../game/authoritative-session'
 import '../../shared/cards/B/B129_Seatmate'
 
 const CARD_ID = 'B129_Seatmate'
+const FIXED_HANDS = [
+  { occupation: 'A116_WoodCutter', minor: 'A004_Baseboards' },
+  { occupation: 'B116_Shoreforester', minor: 'B003_Moonshine' },
+  { occupation: 'C109_SchnappsDistiller', minor: 'C004_WritingBoards' },
+  { occupation: 'E113_Godmother', minor: 'E007_Pumpernickel' },
+]
 
 type RoleAtR13 = 'owner' | 'left' | 'right' | 'opposite'
 
@@ -14,10 +20,10 @@ const PLACEHOLDER_HAND = ['__test_placeholder__']
 const setup = (opts: { playerCount: 2 | 3 | 4; round?: number; takenByR13?: RoleAtR13[] }) => {
   const session = new GameSession(undefined, undefined, { playerCount: opts.playerCount })
   const state = session.getState().state
-  for (const p of state.players) {
-    p.minorHand = [...PLACEHOLDER_HAND]
-    p.occupationHand = [...PLACEHOLDER_HAND]
-  }
+  state.players.forEach((player, index) => {
+    player.minorHand = [FIXED_HANDS[index]?.minor ?? PLACEHOLDER_HAND[0]!]
+    player.occupationHand = [FIXED_HANDS[index]?.occupation ?? PLACEHOLDER_HAND[0]!]
+  })
   state.round = opts.round ?? 13
   const ownerIdx = 0
   const ownerId = state.players[ownerIdx]!.id
@@ -56,7 +62,7 @@ const readR13 = (session: GameSession, r13Id: string) =>
 
 describe('B129_Seatmate session', () => {
   it.each<[RoleAtR13]>([['left'], ['right']])(
-    'Test 1: 3p neighbour-only occupies r13, owner enters OK (%s)',
+    'B129 S1: three-player neighbor occupancy permits owner entry (%s)',
     (neighbour) => {
       const { session, ownerId, r13Id, playerIds, idxMap } = setup({
         playerCount: 3,
@@ -75,7 +81,7 @@ describe('B129_Seatmate session', () => {
   )
 
   it.each<[RoleAtR13]>([['left'], ['right']])(
-    'Test 2: 4p neighbour-only occupies r13, opposite empty, owner enters OK (%s)',
+    'B129 S2: four-player neighbor occupancy permits entry while opposite is empty (%s)',
     (neighbour) => {
       const { session, ownerId, r13Id, playerIds, idxMap } = setup({
         playerCount: 4,
@@ -95,7 +101,7 @@ describe('B129_Seatmate session', () => {
     },
   )
 
-  it('Test 3: 4p opposite-only occupies r13, owner entry BLOCKED', () => {
+  it('B129 S3: four-player opposite-only occupancy blocks entry without changing the space', () => {
     const { session, r13Id, playerIds, idxMap } = setup({
       playerCount: 4,
       takenByR13: ['opposite'],
@@ -110,7 +116,7 @@ describe('B129_Seatmate session', () => {
     expect(session.getActionAvailability(0)[r13Id]).toBe(false)
   })
 
-  it('Test 4: 4p neighbour AND opposite occupy r13, owner entry BLOCKED', () => {
+  it('B129 S3: four-player neighbor and opposite occupancy also blocks entry', () => {
     const { session, r13Id, playerIds, idxMap } = setup({
       playerCount: 4,
       takenByR13: ['left', 'opposite'],
@@ -125,7 +131,7 @@ describe('B129_Seatmate session', () => {
     expect(session.getActionAvailability(0)[r13Id]).toBe(false)
   })
 
-  it('Test 5(a): round < 13, listener short-circuits via round guard', () => {
+  it('B129 S5: round 13 space cannot be entered before round 13', () => {
     const { session, r13Id, playerIds, idxMap } = setup({
       playerCount: 4,
       round: 12,
@@ -141,7 +147,7 @@ describe('B129_Seatmate session', () => {
     expect(session.getActionAvailability(0)[r13Id]).toBe(false)
   })
 
-  it('Test 5(b): r13 occupied by owner only, listener short-circuits owner-only', () => {
+  it('B129 S4: owner already occupying round 13 cannot enter again', () => {
     const { session, ownerId, r13Id } = setup({
       playerCount: 4,
       takenByR13: ['owner'],
@@ -159,7 +165,7 @@ describe('B129_Seatmate session', () => {
     [3, 'left'],
     [4, 'left'],
   ])(
-    'Test 5(c): %ip owner plus neighbour occupy r13, owner entry BLOCKED (%s)',
+    'B129 S4: %ip owner plus neighbor occupancy remains blocked (%s)',
     (playerCount, neighbour) => {
       const { session, ownerId, r13Id, playerIds, idxMap } = setup({
         playerCount,
@@ -191,7 +197,7 @@ describe('B129_Seatmate session', () => {
     expect(session.getActionAvailability(0)[r13Id]).toBe(false)
   })
 
-  it('Test 5(e): B129 does not affect non-r13 spaces', () => {
+  it('B129 S5: Seatmate does not affect occupied non-round-13 spaces', () => {
     const { session, r13Id, playerIds, idxMap } = setup({
       playerCount: 4,
       takenByR13: ['left'],

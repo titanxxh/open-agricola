@@ -1,151 +1,90 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
-
-import { setWorkersAtHome } from '../../shared/domain/player'
-import '../../shared/cards/D/D160_Midwife'
+import { setActiveWorkerCount, setWorkersAtHome } from '../../shared/domain/player'
 import { recordRoundPlacement } from '../../shared/cards/helpers/round-placement'
-import type { ActionChoiceOption } from '../../shared/contract/types'
-import { confirmPlayerSwitch } from './_helpers/pending-confirms'
+
+import '../../shared/cards/D/D160_Midwife'
+
+const CARD_ID = 'D160_Midwife'
+
+const setup = (
+  currentPlayerIndex: number,
+  spaceId: 'wish-children' | 'urgent-wish-children' = 'wish-children',
+  priorPlacement = false,
+) => {
+  const session = new GameSession(160, undefined, { playerCount: 4 })
+  stabilizeRandomHands(session.state.players)
+  const state = session.getState().state
+  state.currentPlayerIndex = currentPlayerIndex
+  state.round = spaceId === 'urgent-wish-children' ? 5 : 2
+  state.roundActionOrder = state.roundActionOrder.map((id) => id === spaceId ? null : id)
+  state.roundActionOrder[0] = spaceId
+  for (const player of state.players) {
+    player.minorHand = ['__test_placeholder__']
+    player.occupationHand = ['__test_placeholder__']
+    setActiveWorkerCount(player, 2)
+    setWorkersAtHome(state, player, 2)
+  }
+  const owner = state.players[0]!
+  owner.occupationPlayed.push(CARD_ID)
+  owner.resources.grain = 0
+  owner.rooms = 3
+  const actor = state.players[currentPlayerIndex]!
+  actor.rooms = 3
+  if (priorPlacement) recordRoundPlacement(actor, 'forest', actor.workers[0]!.id)
+  const space = state.actionSpaces.find((entry) => entry.id === spaceId)
+  if (!space) throw new Error(`${spaceId} space missing`)
+  space.takenBy = []
+  session.loadState(state)
+  return session
+}
 
 describe('D160_Midwife session', () => {
-  const setup = (currentPlayerIndex = 0) => {
-    const session = new GameSession()
-    stabilizeRandomHands(session.state.players)
-    const state = session.getState().state
-    state.players = state.players.slice(0, 2)
-    state.currentPlayerIndex = currentPlayerIndex
-
-    // wish-children opens in round 6 (stage 2)
-    state.round = 6
-
-    // Reveal wish-children action space
-    const wishIdx = state.roundActionOrder.indexOf('wish-children')
-    if (wishIdx === -1) {
-      // If not found, assign it to a slot
-      for (let i = 0; i < state.roundActionOrder.length; i++) {
-        if (state.roundActionOrder[i] === null) {
-          state.roundActionOrder[i] = 'wish-children'
-          break
-        }
-      }
-    }
-
-    const owner = state.players[0]!
-    owner.occupationPlayed.push('D160_Midwife')
-    setWorkersAtHome(state, owner, 2)
-    owner.resources.grain = 0
-    // Owner needs room for family growth to not block
-    owner.rooms = 3
-
-    const opponent = state.players[1]!
-    setWorkersAtHome(state, opponent, 2) // Opponent needs room for family growth
-    opponent.rooms = 3
-
-    session.loadState(state)
-    return session
-  }
-
-  it('owner gains 1 grain when opponent uses wish-children', () => {
+  it('D160 S1 owner gains one grain from an opponent first-placement Family Growth', () => {
     const session = setup(1)
-    const s = session.getState().state
-    // Check if wish-children is available
-    const wishSpace = s.actionSpaces.find((sp) => sp.id === 'wish-children')
-    if (!wishSpace) return
+    expect(session.getState().actionAvailability?.['wish-children']).toBe(true)
 
-    const grainBefore = s.players[0]!.resources.grain
+    const response = session.takeAction(1, 'wish-children')
 
-    let resp = session.takeAction(1, 'wish-children')
-    if (!resp.ok) return // space may not be open yet
-
-    // Walk through player switches and choices for card effect
-    while (resp.interaction.stateId === 'wait' && resp.interaction.request.kind === 'confirm-player-switch') {
-      resp = confirmPlayerSwitch(session)
-    }
-
-    // Handle minor improvement choice from wish-children flow (skip it)
-    if (resp.interaction.stateId === 'wait') {
-      const skipOption = resp.interaction.request.options?.find((o: ActionChoiceOption) => o.value === '__skip__')
-      if (skipOption) {
-        resp = session.resolveChoice(1, '__skip__')
-      }
-    }
-
-    while (resp.interaction.stateId === 'wait' && resp.interaction.request.kind === 'confirm-player-switch') {
-      resp = confirmPlayerSwitch(session)
-    }
-
-    const after = session.getState().state
-    expect(after.players[0]!.resources.grain).toBe(grainBefore + 1)
+    expect(response.ok).toBe(true)
+    expect(response.state.players[0]!.resources.grain).toBe(1)
   })
 
-  it('does not trigger when owner uses wish-children', () => {
+  it('D160 S2 owner gains one grain from an opponent first-placement urgent Family Growth', () => {
+    const session = setup(1, 'urgent-wish-children')
+    expect(session.getState().actionAvailability?.['urgent-wish-children']).toBe(true)
+
+    const response = session.takeAction(1, 'urgent-wish-children')
+
+    expect(response.ok).toBe(true)
+    expect(response.state.players[0]!.resources.grain).toBe(1)
+  })
+
+  it('D160 S3 owner gains nothing when Family Growth is not the opponent first placement', () => {
+    const session = setup(1, 'wish-children', true)
+
+    const response = session.takeAction(1, 'wish-children')
+
+    expect(response.ok).toBe(true)
+    expect(response.state.players[0]!.resources.grain).toBe(0)
+  })
+
+  it('D160 S4 owner gains nothing from their own Family Growth', () => {
     const session = setup(0)
-    const s = session.getState().state
-    const wishSpace = s.actionSpaces.find((sp) => sp.id === 'wish-children')
-    if (!wishSpace) return
 
-    const grainBefore = s.players[0]!.resources.grain
+    const response = session.takeAction(0, 'wish-children')
 
-    let resp = session.takeAction(0, 'wish-children')
-    if (!resp.ok) return
-
-    while (resp.interaction.stateId === 'wait' && resp.interaction.request.kind === 'confirm-player-switch') {
-      resp = confirmPlayerSwitch(session)
-    }
-
-    // Skip minor improvement
-    if (resp.interaction.stateId === 'wait') {
-      const skipOption = resp.interaction.request.options?.find((o: ActionChoiceOption) => o.value === '__skip__')
-      if (skipOption) {
-        resp = session.resolveChoice(0, '__skip__')
-      }
-    }
-
-    const after = session.getState().state
-    // Owner should NOT get grain — scope is 'opponent'
-    expect(after.players[0]!.resources.grain).toBe(grainBefore)
+    expect(response.ok).toBe(true)
+    expect(response.state.players[0]!.resources.grain).toBe(0)
   })
 
-  it('does not trigger when opponent already placed a farmer this round (not first)', () => {
+  it('D160 S5 owner gains nothing from an opponent non-Family-Growth placement', () => {
     const session = setup(1)
-    const s = session.getState().state
-    const wishSpace = s.actionSpaces.find((sp) => sp.id === 'wish-children')
-    if (!wishSpace) return
 
-    // Pretend opponent already placed one farmer earlier this round.
-    recordRoundPlacement(s.players[1]!, 'forest', s.players[1]!.workers[0]!.id)
-    session.loadState(s)
+    const response = session.takeAction(1, 'day-laborer')
 
-    const grainBefore = session.getState().state.players[0]!.resources.grain
-
-    let resp = session.takeAction(1, 'wish-children')
-    if (!resp.ok) return
-
-    while (resp.interaction.stateId === 'wait' && resp.interaction.request.kind === 'confirm-player-switch') {
-      resp = confirmPlayerSwitch(session)
-    }
-    if (resp.interaction.stateId === 'wait') {
-      const skipOption = resp.interaction.request.options?.find((o: ActionChoiceOption) => o.value === '__skip__')
-      if (skipOption) resp = session.resolveChoice(1, '__skip__')
-    }
-    while (resp.interaction.stateId === 'wait' && resp.interaction.request.kind === 'confirm-player-switch') {
-      resp = confirmPlayerSwitch(session)
-    }
-
-    const after = session.getState().state
-    // Opponent's wish-children was NOT their first placement → no grain
-    expect(after.players[0]!.resources.grain).toBe(grainBefore)
-  })
-
-  it('does not trigger on non-family-growth spaces', () => {
-    const session = setup(1)
-    const grainBefore = session.getState().state.players[0]!.resources.grain
-
-    const resp = session.takeAction(1, 'day-laborer')
-    expect(resp.ok).toBe(true)
-
-    const after = session.getState().state
-    expect(after.players[0]!.resources.grain).toBe(grainBefore)
+    expect(response.ok).toBe(true)
+    expect(response.state.players[0]!.resources.grain).toBe(0)
   })
 })

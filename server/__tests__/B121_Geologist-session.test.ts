@@ -6,6 +6,12 @@ import { setWorkersAtHome } from '../../shared/domain/player'
 import '../../shared/cards/B/B121_Geologist'
 
 const CARD_ID = 'B121_Geologist'
+const FIXED_HANDS = [
+  { occupation: 'A116_WoodCutter', minor: 'A004_Baseboards' },
+  { occupation: 'B116_Shoreforester', minor: 'B003_Moonshine' },
+  { occupation: 'C109_SchnappsDistiller', minor: 'C004_WritingBoards' },
+  { occupation: 'E113_Godmother', minor: 'E007_Pumpernickel' },
+]
 
 describe('B121_Geologist session', () => {
   const setup = (playerCount: 2 | 3 | 4 = 2) => {
@@ -13,6 +19,10 @@ describe('B121_Geologist session', () => {
     stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, playerCount)
+    state.players.forEach((player, index) => {
+      player.occupationHand = [FIXED_HANDS[index]!.occupation]
+      player.minorHand = [FIXED_HANDS[index]!.minor]
+    })
     state.currentPlayerIndex = 0
     state.round = 1
 
@@ -33,25 +43,29 @@ describe('B121_Geologist session', () => {
     return session
   }
 
-  it('gains 1 extra clay when using Forest', () => {
+  it('B121 S1: Forest grants its accumulation and one extra clay', () => {
     const session = setup(2)
     const before = session.getState().state.players[0]!.resources.clay
+    const woodBefore = session.getState().state.players[0]!.resources.wood
     const resp = session.takeAction(0, 'forest')
     expect(resp.ok).toBe(true)
     const after = resp.state.players[0]!
     expect(after.resources.clay).toBe(before + 1)
+    expect(after.resources.wood).toBe(woodBefore + 3)
   })
 
-  it('gains 1 extra clay when using Reed Bank', () => {
+  it('B121 S2: Reed Bank grants its accumulation and one extra clay', () => {
     const session = setup(2)
     const before = session.getState().state.players[0]!.resources.clay
+    const reedBefore = session.getState().state.players[0]!.resources.reed
     const resp = session.takeAction(0, 'reed-bank')
     expect(resp.ok).toBe(true)
     const after = resp.state.players[0]!
     expect(after.resources.clay).toBe(before + 1)
+    expect(after.resources.reed).toBe(reedBefore + 1)
   })
 
-  it('does NOT trigger on Clay Pit in a 2-player game', () => {
+  it('B121 S4: Clay Pit grants no extra clay with two players', () => {
     const session = setup(2)
     const before = session.getState().state.players[0]!.resources.clay
     const resp = session.takeAction(0, 'clay-pit')
@@ -61,7 +75,7 @@ describe('B121_Geologist session', () => {
     expect(after.resources.clay).toBe(before + 2)
   })
 
-  it('DOES trigger on Clay Pit in a 3+ player game', () => {
+  it('B121 S3: Clay Pit grants one extra clay with three players', () => {
     const session = setup(3)
     const before = session.getState().state.players[0]!.resources.clay
     const resp = session.takeAction(0, 'clay-pit')
@@ -70,11 +84,18 @@ describe('B121_Geologist session', () => {
     expect(after.resources.clay).toBe(before + 2 + 1)
   })
 
-  it('does not trigger on unrelated spaces', () => {
+  it('B121 S5: unrelated and opponent actions grant the owner no clay', () => {
     const session = setup(2)
     const before = session.getState().state.players[0]!.resources.clay
     const resp = session.takeAction(0, 'day-laborer')
     expect(resp.ok).toBe(true)
     expect(resp.state.players[0]!.resources.clay).toBe(before)
+
+    const state = session.getState().state
+    state.currentPlayerIndex = 1
+    session.loadState(state)
+    const opponent = session.takeAction(1, 'forest')
+    expect(opponent.ok).toBe(true)
+    expect(opponent.state.players[0]!.resources.clay).toBe(before)
   })
 })

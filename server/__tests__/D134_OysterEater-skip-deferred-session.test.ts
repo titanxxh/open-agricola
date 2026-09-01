@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
+import { markAllWorkersUsed, setActiveWorkerCount } from '../../shared/domain/player'
 
 import '../../shared/cards/D/D134_OysterEater'
 import type { SessionResponse } from '../../shared/session/session-core'
@@ -29,11 +30,14 @@ const drainPending = (session: GameSession, resp: SessionResponse) => {
  */
 describe('D134_OysterEater skip-next-placement (onBeforePlayerTurn)', () => {
   it('owner skips their next labor turn when flag is set', () => {
-    const session = new GameSession()
+    const session = new GameSession(134, undefined, { playerCount: 4 })
     stabilizeRandomHands(session.state.players)
     const state = session.getState().state
-    state.players = state.players.slice(0, 2)
-    state.currentPlayerIndex = 1
+    state.currentPlayerIndex = 3
+    for (const player of state.players) {
+      player.minorHand = ['__test_placeholder__']
+      player.occupationHand = ['__test_placeholder__']
+    }
 
     const owner = state.players[0]!
     owner.occupationPlayed.push('D134_OysterEater')
@@ -46,7 +50,7 @@ describe('D134_OysterEater skip-next-placement (onBeforePlayerTurn)', () => {
 
     // p1 (opponent) takes fishing → triggers the scope:any listener which
     // writes skipNextPlacement = 1 onto owner (p0).
-    let resp = session.takeAction(1, 'fishing')
+    let resp = session.takeAction(3, 'fishing')
     expect(resp.ok).toBe(true)
     resp = drainPending(session, resp)
 
@@ -65,11 +69,14 @@ describe('D134_OysterEater skip-next-placement (onBeforePlayerTurn)', () => {
   })
 
   it('owner skips only once when flag is 1', () => {
-    const session = new GameSession()
+    const session = new GameSession(134, undefined, { playerCount: 4 })
     stabilizeRandomHands(session.state.players)
     const state = session.getState().state
-    state.players = state.players.slice(0, 2)
-    state.currentPlayerIndex = 1
+    state.currentPlayerIndex = 3
+    for (const player of state.players) {
+      player.minorHand = ['__test_placeholder__']
+      player.occupationHand = ['__test_placeholder__']
+    }
 
     const owner = state.players[0]!
     owner.occupationPlayed.push('D134_OysterEater')
@@ -84,7 +91,7 @@ describe('D134_OysterEater skip-next-placement (onBeforePlayerTurn)', () => {
 
     // p1 day-laborer → confirmNextPlayer → onBeforePlayerTurn fires for p0,
     // sees flag=1, decrements to 0, returns skipTurn → bounce back to p1.
-    let resp = session.takeAction(1, 'day-laborer')
+    let resp = session.takeAction(3, 'day-laborer')
     expect(resp.ok).toBe(true)
     resp = drainPending(session, resp)
 
@@ -95,11 +102,14 @@ describe('D134_OysterEater skip-next-placement (onBeforePlayerTurn)', () => {
   })
 
   it('does not skip when flag is absent', () => {
-    const session = new GameSession()
+    const session = new GameSession(134, undefined, { playerCount: 4 })
     stabilizeRandomHands(session.state.players)
     const state = session.getState().state
-    state.players = state.players.slice(0, 2)
-    state.currentPlayerIndex = 1
+    state.currentPlayerIndex = 3
+    for (const player of state.players) {
+      player.minorHand = ['__test_placeholder__']
+      player.occupationHand = ['__test_placeholder__']
+    }
 
     const owner = state.players[0]!
     owner.occupationPlayed.push('D134_OysterEater')
@@ -107,10 +117,61 @@ describe('D134_OysterEater skip-next-placement (onBeforePlayerTurn)', () => {
 
     session.loadState(state)
 
-    let resp = session.takeAction(1, 'day-laborer')
+    let resp = session.takeAction(3, 'day-laborer')
     expect(resp.ok).toBe(true)
     resp = drainPending(session, resp)
 
     expect(resp.state.currentPlayerIndex).toBe(0)
+  })
+
+  it('D134 S4 carries an unused same-round skip into the next round', () => {
+    const session = new GameSession(134, undefined, { playerCount: 4 })
+    stabilizeRandomHands(session.state.players)
+    const state = session.getState().state
+    state.currentPlayerIndex = 3
+    state.round = 1
+    state.roundPhase = 'work'
+    for (const [index, player] of state.players.entries()) {
+      player.minorHand = ['__test_placeholder__']
+      player.occupationHand = ['__test_placeholder__']
+      setActiveWorkerCount(player, index < 2 ? 2 : 1)
+      if (index < 3) markAllWorkersUsed(state, player)
+    }
+    const owner = state.players[0]!
+    owner.occupationPlayed.push('D134_OysterEater')
+    const fishingSpace = state.actionSpaces.find((space) => space.id === 'fishing')
+    if (!fishingSpace) throw new Error('fishing space missing')
+    fishingSpace.resources.food = 1
+    session.loadState(state)
+
+    let response = session.takeAction(3, 'fishing')
+    expect(response.ok).toBe(true)
+    response = drainPending(session, response)
+
+    expect(response.state.round).toBe(2)
+    expect(response.state.currentPlayerIndex).toBe(0)
+    expect(response.state.players[0]!.cardStates?.D134_OysterEater?.extraData?.skipNextPlacement)
+      .toBe(1)
+    response = session.takeAction(0, 'day-laborer')
+    expect(response.ok).toBe(true)
+    response = drainPending(session, response)
+    expect(response.state.currentPlayerIndex).toBe(1)
+    expect(response.state.players[0]!.cardStates?.D134_OysterEater?.extraData?.skipNextPlacement)
+      .toBe(1)
+
+    for (const [playerIndex, spaceId] of [[1, 'forest'], [2, 'clay-pit'], [3, 'reed-bank']] as const) {
+      response = session.takeAction(playerIndex, spaceId)
+      expect(response.ok).toBe(true)
+      response = drainPending(session, response)
+    }
+
+    expect(response.state.events).toContainEqual(expect.objectContaining({
+      type: 'turn.skipped',
+      playerId: owner.id,
+      reason: 'cardEffect',
+    }))
+    expect(response.state.currentPlayerIndex).toBe(1)
+    expect(response.state.players[0]!.cardStates?.D134_OysterEater?.extraData?.skipNextPlacement)
+      .toBeUndefined()
   })
 })

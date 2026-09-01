@@ -3,10 +3,39 @@ import { getCardEffect } from '../../shared/cards/card-effects'
 import { getRegisteredCardListeners, executeCardListener, type CardListenerContext } from '../../shared/cards/card-listeners'
 import { computeAnimalZones } from '../../shared/domain/animal-zones'
 import type { GameState, PlayerState, ActionSpace } from '../../shared/contract/types'
+import { GameSession } from '../game/authoritative-session'
+import {
+  markAllWorkersUsed,
+  setActiveWorkerCount,
+  setNewbornCount,
+  setWorkersAtHome,
+} from '../../shared/domain/player'
+import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 
 import '../../shared/cards/C/C148_MudWallower'
 
 const CARD_ID = 'C148_MudWallower'
+
+const setupSession = (actorIndex: number, counter = 0, held = 0) => {
+  const session = new GameSession(148, undefined, { playerCount: 4 })
+  stabilizeRandomHands(session.state.players)
+  const state = session.getState().state
+  state.currentPlayerIndex = actorIndex
+  state.round = 5
+  state.roundPhase = 'work'
+  state.players.forEach((player, index) => {
+    setWorkersAtHome(state, player, 2)
+    player.minorHand = [`__c148_minor_p${index + 1}__`]
+    player.occupationHand = [`__c148_occupation_p${index + 1}__`]
+  })
+  const owner = state.players[0]!
+  owner.occupationPlayed = [CARD_ID]
+  owner.cardStates = {
+    [CARD_ID]: { counters: { counter, held }, infobox: `${counter} / 4` },
+  }
+  session.loadState(state)
+  return session
+}
 
 const createPlayer = (id = 'p1'): PlayerState =>
   ({
@@ -259,5 +288,118 @@ describe('C148_MudWallower', () => {
 
     // held remains at 1 (no upward sync)
     expect(player.cardStates?.[CARD_ID]?.counters?.held).toBe(1)
+  })
+})
+
+describe('C148 Mud Wallower public session', () => {
+  it.each([
+    { counter: 0, expected: 1 },
+    { counter: 1, expected: 2 },
+    { counter: 2, expected: 3 },
+  ])('C148 S1: owner accumulation use advances counter $counter to $expected without gaining a boar', ({ counter, expected }) => {
+    const session = setupSession(0, counter)
+    const response = session.takeAction(0, 'forest')
+
+    expect(response.ok, response.error).toBe(true)
+    expect(response.state.players[0]!.cardStates[CARD_ID]?.counters).toMatchObject({
+      counter: expected,
+      held: 0,
+    })
+    expect(response.state.players[0]!.resources.boar).toBe(0)
+  })
+
+  it('C148 S1: the fourth owner accumulation use resets the counter and puts the gained boar on the card', () => {
+    const session = setupSession(0, 3)
+    const response = session.takeAction(0, 'forest')
+
+    expect(response.ok, response.error).toBe(true)
+    expect(response.state.players[0]!.cardStates[CARD_ID]?.counters).toMatchObject({
+      counter: 0,
+      held: 1,
+    })
+    expect(response.state.players[0]!.resources.boar).toBe(1)
+    expect(response.interaction).toMatchObject({
+      stateId: 'wait',
+      promptKey: 'ui.interactionAnimalReorg',
+      request: {
+        kind: 'animal-reorg',
+        zones: expect.arrayContaining([
+          expect.objectContaining({
+            id: `card:${CARD_ID}`,
+            animalType: 'boar',
+            animalCount: 1,
+            capacity: 1,
+          }),
+        ]),
+      },
+    })
+  })
+
+  it('C148 S2: opponent accumulation use and owner non-accumulation use do not advance the counter', () => {
+    const opponentSession = setupSession(1)
+    const opponentResponse = opponentSession.takeAction(1, 'forest')
+
+    expect(opponentResponse.ok, opponentResponse.error).toBe(true)
+    expect(opponentResponse.state.players[0]!.cardStates[CARD_ID]?.counters?.counter).toBe(0)
+
+    const ownerSession = setupSession(0)
+    const ownerResponse = ownerSession.takeAction(0, 'day-laborer')
+
+    expect(ownerResponse.ok, ownerResponse.error).toBe(true)
+    expect(ownerResponse.state.players[0]!.cardStates[CARD_ID]?.counters?.counter).toBe(0)
+  })
+
+  it('C148 S7: two held boars breed and the newborn is housed outside the card', () => {
+    const session = new GameSession(148, undefined, { playerCount: 4 })
+    stabilizeRandomHands(session.state.players)
+    const state = session.getState().state
+    state.round = 4
+    state.roundPhase = 'work'
+    state.players.forEach((player, index) => {
+      player.minorHand = [`__c148_minor_p${index + 1}__`]
+      player.occupationHand = [`__c148_occupation_p${index + 1}__`]
+      markAllWorkersUsed(state, player)
+      setActiveWorkerCount(player, 2)
+      setNewbornCount(player, 0)
+      player.resources.food = 8
+    })
+    const owner = state.players[0]!
+    owner.occupationPlayed = [CARD_ID]
+    owner.cardStates = {
+      [CARD_ID]: { counters: { counter: 0, held: 2 }, infobox: '0 / 4' },
+    }
+    owner.resources.boar = 2
+    session.loadState(state)
+
+    let response = session.performRoundEnd()
+
+    expect(response.ok, response.error).toBe(true)
+    expect(response.interaction).toMatchObject({
+      stateId: 'wait',
+      request: {
+        kind: 'animal-reorg',
+        zones: expect.arrayContaining([
+          expect.objectContaining({
+            id: `card:${CARD_ID}`,
+            animalType: 'boar',
+            animalCount: 3,
+            capacity: 2,
+          }),
+        ]),
+      },
+    })
+
+    response = session.resolveChoice(0, 'confirm', [
+      { id: 'house', zoneType: 'house', animalType: 'boar', animalCount: 1 },
+      { id: `card:${CARD_ID}`, zoneType: 'card', animalType: 'boar', animalCount: 2 },
+    ] as unknown as Record<string, unknown>)
+
+    expect(response.ok, response.error).toBe(true)
+    expect(response.state.players[0]!.resources.boar).toBe(3)
+    expect(response.state.players[0]!).toMatchObject({
+      houseAnimalType: 'boar',
+      houseAnimalCount: 1,
+    })
+    expect(response.state.players[0]!.cardStates[CARD_ID]?.counters?.held).toBe(2)
   })
 })

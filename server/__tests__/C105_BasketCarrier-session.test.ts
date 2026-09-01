@@ -9,6 +9,23 @@ import { confirmNextPlayer } from './_helpers/pending-confirms'
 
 const CARD_ID = 'C105_BasketCarrier'
 const HOME_BREWER = 'C110_HomeBrewer'
+const FIXED_HANDS = [
+  { occupation: '__c105_occupation_p1__', minor: '__c105_minor_p1__' },
+  { occupation: '__c105_occupation_p2__', minor: '__c105_minor_p2__' },
+  { occupation: '__c105_occupation_p3__', minor: '__c105_minor_p3__' },
+  { occupation: '__c105_occupation_p4__', minor: '__c105_minor_p4__' },
+]
+
+const makeFourPlayerSession = () => {
+  const session = new GameSession(105, undefined, { playerCount: 4 })
+  stabilizeRandomHands(session.state.players)
+  const state = session.getState().state
+  state.players.forEach((player, index) => {
+    player.occupationHand = [FIXED_HANDS[index]!.occupation]
+    player.minorHand = [FIXED_HANDS[index]!.minor]
+  })
+  return { session, state }
+}
 
 const makePlayer = (overrides: Partial<PlayerState> = {}): PlayerState => ({
   id: 'p1', name: 'P1', color: 'red',
@@ -46,11 +63,60 @@ describe('C105_BasketCarrier — reverse trade metadata', () => {
     expect(trades[0]!.from.food).toBe(2)
   })
 
-  it('can prepare grain before Home Brewer resolves at the end of the field phase', () => {
-    const session = new GameSession()
-    stabilizeRandomHands(session.state.players)
-    const state = session.getState().state
-    state.players = state.players.slice(0, 2)
+  it('C105 S3: is absent in the work phase and unavailable in harvest with only one food', () => {
+    const outside = makeFourPlayerSession()
+    outside.state.round = 3
+    outside.state.roundPhase = 'work'
+    outside.state.currentPlayerIndex = 0
+    outside.state.players[0]!.occupationPlayed = [CARD_ID]
+    outside.state.players[0]!.resources.food = 2
+    outside.session.loadState(outside.state)
+
+    const workResponse = outside.session.takeAction(0, 'day-laborer')
+
+    expect(workResponse.ok, workResponse.error).toBe(true)
+    expect(workResponse.interaction.anytimeActions.some((action) => action.sourceCard === CARD_ID)).toBe(false)
+    expect(workResponse.state.events.some((event) =>
+      event.type === 'resource.exchanged' && event.exchangeSource === CARD_ID,
+    )).toBe(false)
+    expect(workResponse.state.players[0]!.resources).toMatchObject({
+      food: 4,
+      wood: 0,
+      reed: 0,
+      grain: 0,
+    })
+
+    const insufficient = makeFourPlayerSession()
+    insufficient.state.round = 4
+    insufficient.state.roundPhase = 'work'
+    insufficient.state.players.forEach((player) => {
+      markAllWorkersUsed(insufficient.state, player)
+      setActiveWorkerCount(player, 2)
+      setNewbornCount(player, 0)
+      player.resources.food = 10
+    })
+    insufficient.state.players[0]!.resources.food = 1
+    insufficient.state.players[0]!.occupationPlayed = [CARD_ID]
+    insufficient.session.loadState(insufficient.state)
+
+    const harvestResponse = insufficient.session.performRoundEnd()
+
+    expect(harvestResponse.ok, harvestResponse.error).toBe(true)
+    expect(harvestResponse.interaction.stateId).toBe('idle')
+    expect(harvestResponse.state.players[0]!.resources).toMatchObject({
+      food: 0,
+      wood: 0,
+      reed: 0,
+      grain: 0,
+      begging: 3,
+    })
+    expect(harvestResponse.state.events.some((event) =>
+      event.type === 'resource.exchanged' && event.exchangeSource === CARD_ID,
+    )).toBe(false)
+  })
+
+  it('C105 S4: prepares grain before Home Brewer resolves at the end of the field phase', () => {
+    const { session, state } = makeFourPlayerSession()
     state.round = 4
     state.roundPhase = 'work'
 
@@ -101,13 +167,9 @@ describe('C105_BasketCarrier — reverse trade metadata', () => {
   it.each([
     ['already has the wanted good', { food: 6, grain: 1, fields: [], homeBrewer: true }],
     ['will reap the wanted good', { food: 6, grain: 0, fields: [{ row: 0, col: 0, stacks: [{ kind: 'grain' as const, remaining: 2 }] }], homeBrewer: true }],
-    ['cannot afford the harvest exchange', { food: 1, grain: 0, fields: [], homeBrewer: true }],
     ['has no pre-field consumer', { food: 6, grain: 0, fields: [], homeBrewer: false }],
   ])('does not open harvest preparation when the player %s', (_name, setup) => {
-    const session = new GameSession()
-    stabilizeRandomHands(session.state.players)
-    const state = session.getState().state
-    state.players = state.players.slice(0, 2)
+    const { session, state } = makeFourPlayerSession()
     state.round = 4
     state.roundPhase = 'work'
     state.players.forEach((player) => {
@@ -136,11 +198,8 @@ describe('C105_BasketCarrier — reverse trade metadata', () => {
     }
   })
 
-  it('reverse trade applies bidirectionally via confirmHarvestFeed (food -2, wood/reed/grain +1)', () => {
-    const session = new GameSession()
-    stabilizeRandomHands(session.state.players)
-    const state = session.getState().state
-    state.players = state.players.slice(0, 2)
+  it('C105 S1: accepts the harvest trade once and caps a submitted count of two', () => {
+    const { session, state } = makeFourPlayerSession()
     state.round = 4
 
     state.players.forEach((p) => {
@@ -174,9 +233,8 @@ describe('C105_BasketCarrier — reverse trade metadata', () => {
     while (safety-- > 0 && resp.interaction.stateId === 'wait') {
       if (resp.interaction.request.kind === 'feed') {
         if (resp.interaction.playerIndex === 0 && !confirmedReverse) {
-          // Submit reverse trade selection: 1 invocation of C105 trade.
           resp = session.resolveChoice(0, 'confirm', { selections: [
-            { sourceId: CARD_ID, exchangeIndex: 0, count: 1 },
+            { sourceId: CARD_ID, exchangeIndex: 0, count: 2 },
           ] })
           confirmedReverse = true
         } else {
@@ -205,11 +263,8 @@ describe('C105_BasketCarrier — reverse trade metadata', () => {
     expect(p1.resources.begging).toBe(0)
   })
 
-  it('reverse trade declined: empty selections leaves food untouched (or pays begging if short)', () => {
-    const session = new GameSession()
-    stabilizeRandomHands(session.state.players)
-    const state = session.getState().state
-    state.players = state.players.slice(0, 2)
+  it('C105 S2: declining the harvest trade preserves the two food left after feeding', () => {
+    const { session, state } = makeFourPlayerSession()
     state.round = 4
 
     state.players.forEach((p) => {
