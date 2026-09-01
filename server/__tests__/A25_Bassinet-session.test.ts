@@ -10,6 +10,8 @@ import {
 } from '../../shared/domain/player'
 import { addWorkerRef } from '../../shared/domain/space'
 import type { GameState, PlayerState } from '../../shared/contract/types'
+import { appendImmediateEvents } from '../../shared/events/append'
+import { computeAllowedPlacementSpaces } from '../../shared/actions/helpers/placement-availability'
 import { confirmNextPlayer } from './_helpers/pending-confirms'
 
 import '../../shared/cards/A/A025_Bassinet'
@@ -27,7 +29,7 @@ const giveP2Bassinet = (state: GameState) => {
 
 /**
  * Simulate player `p` placing worker `workerId` on space `spaceId` by directly
- * mutating state: add WorkerRef to the space and record the round placement.
+ * mutating state: add WorkerRef, emit the placement event, and record the round placement.
  * Does NOT execute the action flow — only the bookkeeping that A25's logic reads.
  */
 const simulatePlacement = (
@@ -39,6 +41,10 @@ const simulatePlacement = (
   const space = state.actionSpaces.find((s) => s.id === spaceId)
   if (!space) throw new Error(`space not found: ${spaceId}`)
   addWorkerRef(space, p.id, workerId)
+  appendImmediateEvents(state, [{ type: 'worker.placed', workerId, spaceId }], {
+    actorPlayerId: p.id,
+    sourceActionId: spaceId,
+  })
   recordRoundPlacement(p, spaceId, workerId)
 }
 
@@ -120,6 +126,18 @@ describe('A025_Bassinet session', () => {
     expect(farmland.takenBy[0]!.playerId).toBe('p2')
   })
 
+  it('does not reuse work placement chronology outside the work phase', () => {
+    const session = baseSetup()
+    const state = session.getState().state
+    simulatePlacement(state, state.players[0]!, 'farmland', '1')
+    state.roundPhase = 'harvest'
+    session.loadState(state)
+
+    const loaded = session.getState().state
+    expect(computeAllowedPlacementSpaces(loaded, loaded.players[1]!)
+      .some((entry) => entry.spaceId === 'farmland')).toBe(false)
+  })
+
   it('case 3: second non-accum space — rejected', () => {
     const session = baseSetup()
 
@@ -144,8 +162,10 @@ describe('A025_Bassinet session', () => {
     }
     advanceTurn(session)
 
+    expect(session.getState().actionAvailability?.['meeting-place']).toBe(false)
     resp = session.takeAction(1, 'meeting-place')
     expect(resp.ok).toBe(false)
+    expect(resp.scores).toHaveLength(2)
   })
 
   it('case 5: FG + newborn = 2 people on FG space, rejected', () => {
@@ -285,13 +305,11 @@ describe('A025_Bassinet session', () => {
     expect(resp.ok).toBe(false)
   })
 
-  it('case 11: undo restores takenBy', () => {
+  it('case 11: undo restores placement eligibility', () => {
     const session = baseSetup()
-    const state = session.getState().state
-    const p1 = state.players[0]!
-    simulatePlacement(state, p1, 'farmland', '1')
-    state.currentPlayerIndex = 1
-    session.loadState(state)
+    expect(completeFarmland(session, 0).ok).toBe(true)
+    advanceTurn(session)
+    expect(session.getState().actionAvailability?.farmland).toBe(true)
 
     const resp = session.takeAction(1, 'farmland')
     expect(resp.ok).toBe(true)
@@ -305,6 +323,16 @@ describe('A025_Bassinet session', () => {
     farmland = undoResp.state.actionSpaces.find((s) => s.id === 'farmland')!
     expect(farmland.takenBy).toHaveLength(1)
     expect(farmland.takenBy[0]!.playerId).toBe('p1')
+    expect(undoResp.state.events.filter((event) =>
+      event.type === 'worker.placed' && event.spaceId === 'farmland',
+    )).toHaveLength(1)
+    expect(undoResp.state.log.filter((entry) =>
+      entry.key === 'log.placeFarmer' && entry.params?.action === 'actions.farmland.name',
+    )).toHaveLength(1)
+    expect(undoResp.interaction.stateId).toBe('idle')
+    expect(undoResp.actionAvailability?.farmland).toBe(true)
+    expect(undoResp.scores).toHaveLength(2)
+    expect(completeFarmland(session, 1).ok).toBe(true)
   })
 
   it('only the Bassinet owner can follow another player onto the occupied space', () => {
@@ -330,6 +358,7 @@ describe('A025_Bassinet session', () => {
     expect(completeFarmland(session, 0).ok).toBe(true)
     advanceTurn(session)
 
+    expect(session.getState().actionAvailability?.farmland).toBe(true)
     expect(session.takeAction(1, 'farmland').ok).toBe(true)
   })
 
@@ -356,7 +385,10 @@ describe('A025_Bassinet session', () => {
     }
 
     expect(resp.state.actionSpaces.find((space) => space.id === 'wish-children')!.takenBy).toHaveLength(1)
-    expect(session.takeAction(1, 'wish-children').ok).toBe(false)
+    expect(session.getState().actionAvailability?.['wish-children']).toBe(false)
+    const rejected = session.takeAction(1, 'wish-children')
+    expect(rejected.ok).toBe(false)
+    expect(rejected.scores).toHaveLength(2)
   })
 
   it('recognizes an earlier first non-accumulating space when played mid-round', () => {
@@ -396,37 +428,40 @@ describe('A025_Bassinet session', () => {
     expect(resp.state.actionSpaces.find((space) => space.id === 'farmland')!.takenBy).toHaveLength(2)
   })
 
-  it('reorders the first space after Meeting Place changes the start player', () => {
+  it('preserves the first space after Meeting Place changes the start player', () => {
     const session = baseSetup()
-    const state = session.getState().state
-    const owner = state.players[1]!
-    owner.minorPlayed = owner.minorPlayed.filter((id) => id !== CARD_ID)
-    owner.minorHand = [CARD_ID]
-    owner.resources.wood = 1
-    owner.resources.reed = 1
-    session.loadState(state)
 
     expect(completeFarmland(session, 0).ok).toBe(true)
     advanceTurn(session)
     let resp = session.takeAction(1, 'meeting-place')
     expect(resp.ok).toBe(true)
-    if (resp.interaction.stateId === 'wait') {
-      const improvement = resp.interaction.request.options?.find((option) =>
-        option.value.startsWith('action-improvement-'))
-      expect(improvement).toBeDefined()
-      resp = session.resolveChoice(1, improvement!.value)
+    if (resp.interaction.stateId === 'wait' && resp.interaction.request.options?.some((option) => option.value === '__skip__')) {
+      resp = session.resolveChoice(1, '__skip__')
     }
-    expect(resp.state.players[1]!.minorPlayed).toContain(CARD_ID)
-    expect(resp.state.players[1]!.resources.wood).toBe(0)
-    expect(resp.state.players[1]!.resources.reed).toBe(0)
+    expect(resp.state.players[1]!.startPlayer).toBe(true)
     advanceTurn(session)
     expect(session.takeAction(0, 'forest').ok).toBe(true)
     advanceTurn(session)
 
-    resp = session.takeAction(1, 'farmland')
-    expect(resp.ok).toBe(false)
-    expect(resp.error).toBe('space unavailable')
-    expect(resp.state.actionSpaces.find((space) => space.id === 'farmland')!.takenBy).toHaveLength(1)
+    expect(session.getState().actionAvailability?.farmland).toBe(true)
+    resp = completeFarmland(session, 1)
+    expect(resp.ok).toBe(true)
+    expect(resp.state.actionSpaces.find((space) => space.id === 'farmland')!.takenBy).toHaveLength(2)
+    expect(resp.interaction.stateId).toBe('wait')
+    if (resp.interaction.stateId === 'wait') expect(resp.interaction.request.kind).toBe('confirm-next-player')
+    expect(resp.state.events).toContainEqual(expect.objectContaining({
+      type: 'worker.placed',
+      actorPlayerId: resp.state.players[1]!.id,
+      spaceId: 'farmland',
+    }))
+    expect(resp.state.log).toContainEqual(expect.objectContaining({
+      key: 'log.placeFarmer',
+      params: expect.objectContaining({
+        player: resp.state.players[1]!.name,
+        action: 'actions.farmland.name',
+      }),
+    }))
+    expect(resp.scores).toHaveLength(2)
   })
 
   it('selects a new first non-accumulating action in the next work phase', () => {
@@ -448,12 +483,14 @@ describe('A025_Bassinet session', () => {
     expect(resp.ok).toBe(true)
     advanceTurn(session)
 
+    expect(session.getState().actionAvailability?.['grain-seeds']).toBe(true)
     resp = session.takeAction(1, 'grain-seeds')
     expect(resp.ok).toBe(true)
     expect(resp.state.actionSpaces.find((space) => space.id === 'grain-seeds')!.takenBy).toHaveLength(2)
+    expect(resp.scores).toHaveLength(2)
   })
 
-  it('reconstructs slot order when one player acts twice before another', () => {
+  it('uses actual chronology when one player acts twice before another', () => {
     const session = new GameSession(25, undefined, { playerCount: 4 })
     stabilizeRandomHands(session.state.players)
     const state = session.getState().state
@@ -480,7 +517,22 @@ describe('A025_Bassinet session', () => {
     next.currentPlayerIndex = 3
     session.loadState(next)
 
-    expect(session.takeAction(3, 'day-laborer').ok).toBe(false)
-    expect(session.takeAction(3, 'grain-seeds').ok).toBe(true)
+    expect(next.events.filter((event) => event.type === 'worker.placed').slice(-3).map((event) => event.spaceId))
+      .toEqual(['forest', 'day-laborer', 'grain-seeds'])
+    expect(session.getState().actionAvailability?.['day-laborer']).toBe(true)
+    expect(session.getState().actionAvailability?.['grain-seeds']).toBe(false)
+    expect(session.takeAction(3, 'grain-seeds').ok).toBe(false)
+    const followed = session.takeAction(3, 'day-laborer')
+    expect(followed.ok).toBe(true)
+    expect(followed.state.actionSpaces.find((space) => space.id === 'day-laborer')!.takenBy).toHaveLength(2)
+    expect(followed.interaction.stateId).toBe('wait')
+    if (followed.interaction.stateId === 'wait') {
+      expect(followed.interaction.request.kind).toBe('confirm-next-player')
+    }
+    expect(followed.state.log).toContainEqual(expect.objectContaining({
+      key: 'log.placeFarmer',
+      params: expect.objectContaining({ action: 'actions.day-laborer.name' }),
+    }))
+    expect(followed.scores).toHaveLength(4)
   })
 })

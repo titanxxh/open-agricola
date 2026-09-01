@@ -2,7 +2,6 @@ import { defineMinorCard } from '../card-source'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import type { ActionChoiceOption, GameState } from '../../contract/types'
-import { getRoundPlacementOrder } from '../helpers/round-placement'
 import { countPeopleOnSpace } from '../helpers/space-occupancy'
 import { OCCUPIED_SPACE_CHOICE_PREFIX } from '../../actions/helpers/placement-constants'
 import type { CardImpl } from '../registry'
@@ -10,23 +9,17 @@ import type { CardImpl } from '../registry'
 const CARD_ID = 'A025_Bassinet'
 const MEETING_PLACE_ID = 'meeting-place'
 
-function findFirstNonAccumSpaceThisRound(state: GameState): string | null {
-  const startIdx = state.players.findIndex((p) => p.startPlayer)
-  const N = state.players.length
-  if (N === 0 || startIdx < 0) return null
-  const turnOrder = Array.from({ length: N }, (_, i) => state.players[(startIdx + i) % N])
-  const maxSlots = Math.max(0, ...turnOrder.map((p) => getRoundPlacementOrder(p).length))
-
-  for (let slot = 0; slot < maxSlots; slot++) {
-    for (const p of turnOrder) {
-      const placements = getRoundPlacementOrder(p)
-      if (slot >= placements.length) continue
-      const spaceId = placements[slot]
-      const space = state.actionSpaces.find((s) => s.id === spaceId)
-      if (!space) continue
-      if (Object.keys(space.gainPerRound).length > 0) continue
-      return spaceId
-    }
+function findFirstNonAccumSpaceThisWorkPhase(state: GameState): string | null {
+  if (state.roundPhase !== 'work') return null
+  for (const event of state.events) {
+    if (
+      event.round !== state.round ||
+      event.phase !== 'work' ||
+      event.type !== 'worker.placed'
+    ) continue
+    const space = state.actionSpaces.find((candidate) => candidate.id === event.spaceId)
+    if (!space || Object.keys(space.gainPerRound).length > 0) continue
+    return space.id
   }
   return null
 }
@@ -37,7 +30,7 @@ const computeArgsListener: CardListenerRegistration = {
   phases: ['computeArgs' as ActionHookPhase],
   actions: ['place-farmer'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
-    const targetId = findFirstNonAccumSpaceThisRound(context.state)
+    const targetId = findFirstNonAccumSpaceThisWorkPhase(context.state)
     if (!targetId) return
     if (targetId === MEETING_PLACE_ID) return
     if (countPeopleOnSpace(context.state, targetId) !== 1) return
