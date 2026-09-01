@@ -75,6 +75,9 @@ describe('E004 Thunderbolt native session', () => {
     expect(response.interaction.stateId).toBe('wait')
     if (response.interaction.stateId !== 'wait') return
     expect(response.interaction.request.kind).toBe('selection')
+    const eventCount = response.state.events.length
+    const logCount = response.state.log.length
+    const scoresBefore = structuredClone(response.scores)
 
     response = session.commitSelectionChoice(0, { positions: [{ row: 0, col: 2 }] })
 
@@ -89,6 +92,26 @@ describe('E004 Thunderbolt native session', () => {
       { kind: 'grain', remaining: 1 },
     ])
     expect(response.state.players[1]!.minorHand).toContain(CARD_ID)
+    expect(response.state.events.slice(eventCount)).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        type: 'farm.cropRemoved',
+        sourceCardId: CARD_ID,
+        reason: 'cardEffect',
+        crops: [{
+          location: { kind: 'field', playerId: player.id, row: 0, col: 2 },
+          crop: 'grain',
+          amount: 3,
+        }],
+      }),
+    ]))
+    expect(response.state.log).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        key: 'log.farmCropRemoved',
+        params: expect.objectContaining({ player: 'PlayerA', crops: { grain: 3 } }),
+      }),
+    ]))
+    expect(response.state.log.length).toBeGreaterThan(logCount)
+    expect(response.scores.map((score) => score.playerId)).toEqual(scoresBefore.map((score) => score.playerId))
   })
 
   it('allows declining without changing any grain field', () => {
@@ -103,17 +126,23 @@ describe('E004 Thunderbolt native session', () => {
     expect(response.interaction.stateId).toBe('wait')
     if (response.interaction.stateId !== 'wait') return
     expect(response.interaction.request.options?.some((option) => option.value === '__skip__')).toBe(true)
+    const eventCount = response.state.events.length
+    const scoresBefore = structuredClone(response.scores)
     response = session.resolveChoice(0, '__skip__')
 
     expect(response.ok, response.error).toBe(true)
     expect(response.state.players[0]!.resources.wood).toBe(woodBefore)
     expect(response.state.players[0]!.fields[0]!.stacks).toEqual([{ kind: 'grain', remaining: 2 }])
     expect(response.state.players[1]!.minorHand).toContain(CARD_ID)
+    expect(response.state.events.slice(eventCount).some((event) => event.type === 'farm.cropRemoved')).toBe(false)
+    expect(response.state.log.some((entry) => entry.key === 'log.farmCropRemoved')).toBe(false)
+    expect(response.scores).toEqual(scoresBefore)
   })
 
   it('does not allow buying with no grain field', () => {
     const session = setup()
     const woodBefore = session.state.players[0]!.resources.wood
+    const scoresBefore = structuredClone(session.getState().scores)
 
     const response = buyThunderbolt(session)
 
@@ -121,29 +150,143 @@ describe('E004 Thunderbolt native session', () => {
     expect(response.state.players[0]!.resources.wood).toBe(woodBefore)
     expect(response.state.players[0]!.minorHand).toContain(CARD_ID)
     expect(response.state.players[1]!.minorHand).not.toContain(CARD_ID)
+    expect(response.interaction.stateId === 'wait' ? response.interaction.request.kind : response.interaction.stateId)
+      .not.toBe('selection')
+    expect(response.state.events.some((event) => event.type === 'farm.cropRemoved')).toBe(false)
+    expect(response.state.log.some((entry) => entry.key === 'log.farmCropRemoved')).toBe(false)
+    expect(response.scores).toEqual(scoresBefore)
   })
 
-  it('currently ignores an E070 grain field when Thunderbolt is bought', () => {
+  it('removes E070 grain and offers its opposite-crop sow', () => {
+    const session = setup()
+    const player = session.state.players[0]!
+    player.minorPlayed.push(CROP_ROTATION_FIELD)
+    player.cardStates[CROP_ROTATION_FIELD] = {
+      extraData: { cardFieldStacks: [{ crop: 'grain', remaining: 2 }] },
+    }
+    player.fields = [{ row: 0, col: 2, stacks: [] }]
+    player.resources.vegetable = 1
+    session.loadState(session.state)
+    const woodBefore = player.resources.wood
+    const scoresBefore = structuredClone(session.getState().scores)
+
+    let response = enterSelection(session, buyThunderbolt(session))
+
+    expect(response.interaction.stateId).toBe('wait')
+    if (response.interaction.stateId !== 'wait') return
+    expect(response.interaction.request.kind).toBe('selection')
+    expect(response.interaction.request.selection?.selectablePositions).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ row: -1, col: 5070, sourceCard: CROP_ROTATION_FIELD }),
+      ]),
+    )
+    const eventCount = response.state.events.length
+    const logCount = response.state.log.length
+
+    response = session.commitSelectionChoice(0, { positions: [{ row: -1, col: 5070 }] })
+
+    expect(response.ok, response.error).toBe(true)
+    expect(response.state.players[0]!.resources.wood).toBe(woodBefore + 4)
+    expect(response.state.players[0]!.resources.vegetable).toBe(1)
+    expect(response.state.players[0]!.cardStates[CROP_ROTATION_FIELD]?.extraData?.cardFieldStacks).toEqual([])
+    expect(response.scores).toEqual(scoresBefore)
+    expect(response.interaction.stateId).toBe('wait')
+    if (response.interaction.stateId !== 'wait') return
+    expect(response.interaction.promptKey).toBe('ui.interactionOptionalAction')
+    const sowOption = response.interaction.request.options?.find(
+      (option) => option.value !== '__skip__' && option.sourceCard === CROP_ROTATION_FIELD,
+    )
+    expect(sowOption).toBeDefined()
+
+    response = session.resolveChoice(0, sowOption!.value)
+
+    expect(response.ok, response.error).toBe(true)
+    expect(response.state.players[0]!.resources.vegetable).toBe(0)
+    expect(response.state.players[0]!.cardStates[CROP_ROTATION_FIELD]?.extraData?.cardFieldStacks).toEqual([
+      { crop: 'vegetable', remaining: 2 },
+    ])
+    expect(response.state.players[0]!.fields[0]!.stacks).toEqual([])
+    expect(response.state.players[1]!.minorHand).toContain(CARD_ID)
+    expect(response.state.events.slice(eventCount)).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        type: 'farm.cropRemoved',
+        sourceCardId: CARD_ID,
+        reason: 'cardEffect',
+        crops: [{
+          location: { kind: 'card', playerId: player.id, cardId: CROP_ROTATION_FIELD },
+          crop: 'grain',
+          amount: 2,
+        }],
+      }),
+      expect.objectContaining({
+        type: 'farm.sown',
+        sourceCardId: CROP_ROTATION_FIELD,
+        sows: [{
+          location: { kind: 'field', playerId: player.id, row: -1, col: 5070 },
+          crop: 'vegetable',
+          added: 2,
+        }],
+      }),
+    ]))
+    expect(response.state.log).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        key: 'log.farmCropRemoved',
+        params: expect.objectContaining({ player: 'PlayerA', crops: { grain: 2 } }),
+      }),
+      expect.objectContaining({ key: 'log.sow', params: { player: 'PlayerA' } }),
+    ]))
+    expect(response.state.log.length).toBeGreaterThan(logCount)
+    expect(response.interaction.stateId).toBe('wait')
+    if (response.interaction.stateId === 'wait') {
+      expect(response.interaction.request.kind).toBe('confirm-next-player')
+    }
+    expect(response.scores.map((score) => score.playerId)).toEqual(scoresBefore.map((score) => score.playerId))
+    expect(response.scores[0]!.categories.find((category) => category.key === 'vegetables')?.quantity).toBe(0)
+    expect(response.scores[0]!.total).toBe(scoresBefore[0]!.total - 2)
+  })
+
+  it('completes E070 removal without a sow interaction when vegetable is unavailable', () => {
     const session = setup()
     const player = session.state.players[0]!
     player.minorPlayed.push(CROP_ROTATION_FIELD)
     player.cardStates[CROP_ROTATION_FIELD] = {
       extraData: { cardFieldStacks: [{ crop: 'grain', remaining: 1 }] },
     }
-    player.resources.vegetable = 1
+    player.resources.vegetable = 0
     session.loadState(session.state)
     const woodBefore = player.resources.wood
+    const scoresBefore = structuredClone(session.getState().scores)
 
-    const response = buyThunderbolt(session)
+    let response = enterSelection(session, buyThunderbolt(session))
+    expect(response.interaction.stateId).toBe('wait')
+    if (response.interaction.stateId !== 'wait') return
+    const eventCount = response.state.events.length
+    const logCount = response.state.log.length
+
+    response = session.commitSelectionChoice(0, { positions: [{ row: -1, col: 5070 }] })
 
     expect(response.ok, response.error).toBe(true)
-    expect(response.interaction.stateId === 'wait' ? response.interaction.request.kind : response.interaction.stateId)
-      .not.toBe('selection')
-    expect(response.state.players[0]!.resources.wood).toBe(woodBefore)
-    expect(response.state.players[0]!.resources.vegetable).toBe(1)
-    expect(response.state.players[0]!.cardStates[CROP_ROTATION_FIELD]?.extraData?.cardFieldStacks).toEqual([
-      { crop: 'grain', remaining: 1 },
-    ])
+    expect(response.state.players[0]!.resources.wood).toBe(woodBefore + 2)
+    expect(response.state.players[0]!.resources.vegetable).toBe(0)
+    expect(response.state.players[0]!.cardStates[CROP_ROTATION_FIELD]?.extraData?.cardFieldStacks).toEqual([])
+    expect(response.state.events.slice(eventCount)).toEqual(expect.arrayContaining([
+      expect.objectContaining({ type: 'farm.cropRemoved', reason: 'cardEffect' }),
+    ]))
+    expect(response.state.log).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        key: 'log.farmCropRemoved',
+        params: expect.objectContaining({ player: 'PlayerA', crops: { grain: 1 } }),
+      }),
+    ]))
+    expect(response.state.log.length).toBeGreaterThan(logCount)
+    expect(response.state.events.slice(eventCount).some((event) => event.type === 'farm.sown')).toBe(false)
+    expect(response.state.log.some((entry) => entry.key === 'log.sow')).toBe(false)
+    expect(response.interaction.stateId).toBe('wait')
+    if (response.interaction.stateId === 'wait') {
+      expect(response.interaction.request.kind).toBe('confirm-next-player')
+      expect(response.interaction.sourceCard).not.toBe(CROP_ROTATION_FIELD)
+    }
     expect(response.state.players[1]!.minorHand).toContain(CARD_ID)
+    expect(response.scores).toEqual(scoresBefore)
   })
 })

@@ -1,4 +1,5 @@
 import type { ActionFlow, GameState, PlayerState, ProtectedObservation } from '../../contract/types'
+import type { EventSink } from '../../contract/events'
 
 export type SelectionEffectContext = {
   player: PlayerState
@@ -9,6 +10,7 @@ export type SelectionEffectContext = {
   sourceCard: string | undefined
   state: GameState
   actionContext?: Record<string, unknown>
+  eventSink?: EventSink
   reportProtectedObservation?: (observation: ProtectedObservation) => void
 }
 
