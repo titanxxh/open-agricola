@@ -92,17 +92,18 @@ const ownFence = (player: PlayerState, edge: string): FenceSegment => ({
 })
 
 const setup = (options: SetupOptions = {}) => {
-  const session = new GameSession(1)
+  const session = new GameSession(1, undefined, { playerCount: 4 })
   const state = session.getState().state
-  state.players = state.players.slice(0, 2)
   state.currentPlayerIndex = 0
   state.round = 1
   state.roundPhase = 'work'
 
   const player = state.players[0]!
-  const next = state.players[1]!
-  setWorkersAtHome(state, player, 2)
-  setWorkersAtHome(state, next, 2)
+  state.players.forEach((candidate) => {
+    setWorkersAtHome(state, candidate, 2)
+    candidate.occupationHand = ['__test_placeholder__']
+    candidate.minorHand = ['__test_placeholder__']
+  })
   player.resources = {
     ...player.resources,
     wood: options.wood ?? 2,
@@ -115,10 +116,7 @@ const setup = (options: SetupOptions = {}) => {
   ]
   player.occupationHand = [CARD_ID]
   player.occupationPlayed = []
-  player.minorHand = ['__test_placeholder__']
   player.minorPlayed = options.woodPalisades ? ['B030_WoodPalisades'] : []
-  next.occupationHand = ['__test_placeholder__']
-  next.minorHand = ['__test_placeholder__']
 
   if (options.existingPasture) {
     player.fenceSegments = TWO_CELL.map((edge) => ownFence(player, edge))
@@ -159,7 +157,7 @@ const expectFarmSelect = (
   }
 }
 
-const playB149ToFencing = (session: GameSession) => {
+const playB149 = (session: GameSession) => {
   let resp = session.takeAction(0, 'lessons')
   expect(resp.ok).toBe(true)
   if (resp.interaction.stateId === 'wait') {
@@ -169,6 +167,11 @@ const playB149ToFencing = (session: GameSession) => {
     }
   }
   expect(resp.ok).toBe(true)
+  return resp
+}
+
+const playB149ToFencing = (session: GameSession) => {
+  const resp = playB149(session)
   expectFarmSelect(resp)
   return resp
 }
@@ -415,5 +418,59 @@ describe('B149 Open Air Farmer session', () => {
     expect(stableResult.request.kind).toBe('farm-select')
     if (stableResult.request.kind !== 'farm-select') return
     expect(stableResult.request.farm.maxSelections).toBe(1)
+  })
+
+  it('plays B149 but skips its effect when fewer than three stable supply tokens remain', () => {
+    const session = setup({ wood: 2 })
+    const state = session.getState().state
+    const player = state.players[0]!
+    player.stableTiles = [
+      { row: 0, col: 4 },
+      { row: 1, col: 4 },
+      { row: 2, col: 4 },
+    ]
+    session.loadState(state)
+
+    const resp = playB149(session)
+    const updated = resp.state.players[0]!
+
+    expect(updated.occupationPlayed).toContain(CARD_ID)
+    expect(getAvailableStableSupplyCount(resp.state, updated)).toBe(1)
+    expect(updated.supplyTokensConsumed?.stable).toBeUndefined()
+    expect(updated.resources.wood).toBe(2)
+    expect(updated.fenceSegments).toHaveLength(0)
+    expect(resp.interaction.promptKey).not.toBe('ui.interactionFenceSelect')
+  })
+
+  it('plays B149 and removes three stables but skips fencing when two wood cannot be paid', () => {
+    const session = setup({ wood: 1 })
+
+    const resp = playB149(session)
+    const player = resp.state.players[0]!
+
+    expect(player.occupationPlayed).toContain(CARD_ID)
+    expect(player.supplyTokensConsumed?.stable).toBe(3)
+    expect(player.resources.wood).toBe(1)
+    expect(player.fenceSegments).toHaveLength(0)
+    expect(resp.interaction.promptKey).not.toBe('ui.interactionFenceSelect')
+  })
+
+  it('plays B149 and removes three stables but skips fencing when no farmyard space is free', () => {
+    const session = setup({ wood: 2 })
+    const state = session.getState().state
+    const player = state.players[0]!
+    player.fields = Array.from({ length: 3 }, (_, row) =>
+      Array.from({ length: 5 }, (_, col) => ({ row, col, stacks: [] })),
+    ).flat().filter(({ row, col }) => row !== 2 || col > 1)
+    session.loadState(state)
+
+    const resp = playB149(session)
+    const updated = resp.state.players[0]!
+
+    expect(updated.occupationPlayed).toContain(CARD_ID)
+    expect(updated.supplyTokensConsumed?.stable).toBe(3)
+    expect(updated.fields).toHaveLength(13)
+    expect(updated.fenceSegments).toHaveLength(0)
+    expect(resp.interaction.promptKey).not.toBe('ui.interactionFenceSelect')
   })
 })
