@@ -173,6 +173,7 @@ export class HookDispatcher {
     context: ActionExecutionContext & { actionId: string },
     result: ActionExecutionResult,
   ) {
+    if (context.actionId === 'place-farmer') return []
     const actionResults = runActionHooks({ ...context, phase: 'computeArgs', result })
     const listenerContext = { ...context, phase: 'computeArgs' as const, result }
     const matched = getMatchingListeners(listenerContext)

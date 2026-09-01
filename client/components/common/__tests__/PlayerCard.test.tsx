@@ -119,8 +119,8 @@ describe('PlayerCard dual-type rendering (alsoCountsAs)', () => {
       'D151_SpinDoctor',
       'occupation' as const,
       'Immediately after each time you use',
-      'The additional person cannot be placed on',
-      '此次额外放人不能选择',
+      'No card, including this one, can allow you to use',
+      '任何卡牌都不能让你使用已被占用的',
     ],
   ])('renders audited supplemental rules for %s', (
     cardId,
