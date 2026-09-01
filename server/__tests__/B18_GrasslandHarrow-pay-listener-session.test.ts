@@ -5,6 +5,8 @@ import { getCardEffect } from '../../shared/cards/card-effects'
 import { specialEffectAction } from '../../shared/actions/effects/special-effect'
 import { futureMeeplesAction } from '../../shared/actions/effects/internal/future-meeples'
 import type { GameState, PlayerState, ActionSpace, ActionFlow } from '../../shared/contract/types'
+import { markAllWorkersUsed, setActiveWorkerCount, setWorkersAtHome } from '../../shared/domain/player'
+import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 
 import '../../shared/cards/B/B018_GrasslandHarrow'
 
@@ -267,5 +269,159 @@ describe('B18 GrasslandHarrow — after-pay listener', () => {
         resources: { field: 1 },
       }),
     ])
+  })
+})
+
+const FIXED_HANDS = [
+  { occupation: 'A116_WoodCutter', minor: 'A004_Baseboards' },
+  { occupation: 'B116_Shoreforester', minor: 'B003_Moonshine' },
+]
+
+const purchaseSession = ({ round = 3, wood = 3, clay = 1, occupations = 2 } = {}) => {
+  const session = new GameSession(18, undefined, { playerCount: 2 })
+  stabilizeRandomHands(session.state.players)
+  const state = session.getState().state
+  state.currentPlayerIndex = 0
+  state.round = round
+  state.roundPhase = 'work'
+  state.players.forEach((player, index) => {
+    setActiveWorkerCount(player, 2)
+    setWorkersAtHome(state, player, 2)
+    player.occupationHand = [FIXED_HANDS[index]!.occupation]
+    player.minorHand = [FIXED_HANDS[index]!.minor]
+    player.resources.food = 10
+  })
+  const player = state.players[0]!
+  player.minorHand = [CARD_ID]
+  player.occupationPlayed = ['A103_Portmonger', 'B119_Lumberjack'].slice(0, occupations)
+  player.resources = { ...player.resources, wood, clay, reed: 0, stone: 0 }
+  session.loadState(state)
+  return session
+}
+
+const playB18 = (session: GameSession) => {
+  let resp = session.takeAction(0, 'meeting-place')
+  expect(resp.ok).toBe(true)
+  if (resp.interaction.stateId !== 'wait') return resp
+  const improvementOption = resp.interaction.request.options?.find((option) => option.value.startsWith('action-improvement-'))
+  if (improvementOption) resp = session.resolveChoice(0, improvementOption.value)
+  if (resp.state.players[0]!.minorPlayed.includes(CARD_ID)) return resp
+  expect(resp.interaction.stateId).toBe('wait')
+  if (resp.interaction.stateId !== 'wait') return resp
+  const cardOption = resp.interaction.request.options?.find((option) => option.value === CARD_ID)
+  expect(cardOption).toBeDefined()
+  return session.resolveChoice(0, cardOption!.value)
+}
+
+const dueFieldSession = () => {
+  const session = new GameSession(18, undefined, { playerCount: 2 })
+  stabilizeRandomHands(session.state.players)
+  const state = session.getState().state
+  state.round = 1
+  state.roundPhase = 'work'
+  state.players.forEach((player, index) => {
+    player.occupationHand = [FIXED_HANDS[index]!.occupation]
+    player.minorHand = [FIXED_HANDS[index]!.minor]
+    player.resources.food = 10
+    markAllWorkersUsed(state, player)
+  })
+  const player = state.players[0]!
+  player.startPlayer = true
+  player.minorPlayed = [CARD_ID]
+  state.futureMeeples = [{
+    id: 'B018-parity-field',
+    cardId: CARD_ID,
+    playerId: player.id,
+    round: 2,
+    actionId: null,
+    resources: { field: 1 } as never,
+  }]
+  session.loadState(state)
+  return session
+}
+
+describe('B018 parity batch-02 characterization', () => {
+  it('B018 S1: post-payment building resources schedule one field at current round plus reserve', () => {
+    const resp = playB18(purchaseSession())
+
+    expect(resp.ok).toBe(true)
+    expect(resp.state.players[0]!.minorPlayed).toContain(CARD_ID)
+    expect(resp.state.players[0]!.resources).toMatchObject({ wood: 1, clay: 1 })
+    expect(resp.state.futureMeeples).toEqual([
+      expect.objectContaining({ cardId: CARD_ID, round: 5, resources: { field: 1 } }),
+    ])
+  })
+
+  it('B018 S2: fewer than two occupations excludes Grassland Harrow without spending resources', () => {
+    const session = purchaseSession({ occupations: 1 })
+    const woodBefore = session.getState().state.players[0]!.resources.wood
+    const resp = session.takeAction(0, 'meeting-place')
+
+    expect(resp.ok).toBe(true)
+    expect(resp.state.players[0]!.minorHand).toContain(CARD_ID)
+    expect(resp.state.players[0]!.minorPlayed).not.toContain(CARD_ID)
+    expect(resp.state.players[0]!.resources.wood).toBe(woodBefore)
+    expect(resp.state.futureMeeples).toEqual([])
+
+    expect(session.undoStep().ok).toBe(true)
+    const retryState = session.getState().state
+    retryState.players[0]!.occupationPlayed.push('B119_Lumberjack')
+    session.loadState(retryState)
+    const retry = playB18(session)
+    expect(retry.ok).toBe(true)
+    expect(retry.state.players[0]!.minorPlayed).toContain(CARD_ID)
+    expect(retry.state.players[0]!.resources.wood).toBe(woodBefore - 2)
+  })
+
+  it('B018 S3: OA plays with zero post-payment building resources and schedules no field', () => {
+    const resp = playB18(purchaseSession({ wood: 2, clay: 0 }))
+
+    expect(resp.ok).toBe(true)
+    expect(resp.state.players[0]!.minorPlayed).toContain(CARD_ID)
+    expect(resp.state.players[0]!.resources).toMatchObject({ wood: 0, clay: 0, reed: 0, stone: 0 })
+    expect(resp.state.futureMeeples).toEqual([])
+  })
+
+  it('B018 S4: OA clamps a target after round 14 to round 14', () => {
+    const resp = playB18(purchaseSession({ round: 13, wood: 4, clay: 0 }))
+
+    expect(resp.ok).toBe(true)
+    expect(resp.state.players[0]!.minorPlayed).toContain(CARD_ID)
+    expect(resp.state.futureMeeples).toEqual([
+      expect.objectContaining({ cardId: CARD_ID, round: 14, resources: { field: 1 } }),
+    ])
+  })
+
+  it('B018 S5: accepting the due field plows once for free and consumes the token', () => {
+    const session = dueFieldSession()
+    let resp = session.performRoundEnd()
+    expect(resp.interaction.stateId).toBe('wait')
+    if (resp.interaction.stateId !== 'wait') throw new Error('expected optional future field')
+    const accept = resp.interaction.request.options?.find((option) => option.value !== '__skip__')
+    expect(accept).toBeDefined()
+    resp = session.resolveChoice(0, accept!.value)
+    expect(resp.interaction.stateId).toBe('wait')
+    if (resp.interaction.stateId !== 'wait') throw new Error('expected plow selection')
+    const tile = resp.interaction.request.farm.selectableTiles[0]
+    expect(tile).toBeDefined()
+
+    resp = session.commitSelectionChoice(0, { tile })
+
+    expect(resp.ok).toBe(true)
+    expect(resp.state.players[0]!.fields).toHaveLength(1)
+    expect(resp.state.futureMeeples).toEqual([])
+  })
+
+  it('B018 S6: declining the due field consumes the token without plowing', () => {
+    const session = dueFieldSession()
+    let resp = session.performRoundEnd()
+    expect(resp.interaction.stateId).toBe('wait')
+    if (resp.interaction.stateId !== 'wait') throw new Error('expected optional future field')
+
+    resp = session.resolveChoice(0, '__skip__')
+
+    expect(resp.ok).toBe(true)
+    expect(resp.state.players[0]!.fields).toEqual([])
+    expect(resp.state.futureMeeples).toEqual([])
   })
 })

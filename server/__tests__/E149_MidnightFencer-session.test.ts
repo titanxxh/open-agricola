@@ -106,14 +106,17 @@ const buildTile00 = (session: GameSession, sources: Record<string, string>) =>
   })
 
 describe('E149 Midnight Fencer', () => {
-  it('round 13 card hook does not offer borrowed fencing', () => {
+  it('round 13 public round end does not offer borrowed fencing', () => {
     const session = setupHarvest()
     const state = session.getState().state
     state.round = 13
+    session.loadState(state)
 
-    const flow = getCardEffect(CARD_ID)?.onStartHarvest?.(state, state.players[0]!)
+    const resp = session.performRoundEnd()
 
-    expect(flow).toBeUndefined()
+    expect(resp.interaction.stateId === 'wait' ? resp.interaction.sourceCard : undefined).not.toBe(CARD_ID)
+    expect(resp.state.players[0]!.cardStates?.[CARD_ID]?.extraData?.offered).toBeUndefined()
+    expect(resp.state.players[0]!.fenceSegments).toHaveLength(0)
   })
 
   it('round 14 4-player accept builds real borrowed fences and consumes donor reserves', () => {
@@ -182,6 +185,7 @@ describe('E149 Midnight Fencer', () => {
 
   it('skip marks the harvest offer and does not create owed fences', () => {
     const session = setupHarvest({ donorConsumed: [0, 0, 13, 15] })
+    const woodBefore = session.getState().state.players[0]!.resources.wood
 
     let resp = session.performRoundEnd()
     resp = skipOptional(session, resp)
@@ -190,6 +194,7 @@ describe('E149 Midnight Fencer', () => {
     expect(owner.cardStates?.[CARD_ID]?.extraData?.offered).toBe(true)
     expect(owner.cardStates?.[CARD_ID]?.extraData?.owedFences).toBeUndefined()
     expect(owner.fenceSegments).toHaveLength(0)
+    expect(owner.resources.wood).toBe(woodBefore)
     expect(resp.interaction.stateId === 'wait' ? resp.interaction.sourceCard : undefined).not.toBe(CARD_ID)
   })
 
@@ -226,6 +231,17 @@ describe('E149 Midnight Fencer', () => {
     })
     expect(palisade.ok).toBe(false)
     expect(palisade.error).toBe('SEGMENT_TYPE_NOT_ALLOWED')
+
+    resp = buildTile00(session, {
+      'H-0-0': 'p2',
+      'H-1-0': 'p2',
+      'V-0-0': 'p3',
+      'V-0-1': 'p3',
+    })
+    expect(resp.ok).toBe(true)
+    expect(resp.state.players[0]!.fenceSegments).toHaveLength(4)
+    expect(resp.state.players[1]!.supplyTokensConsumed?.fence).toBe(2)
+    expect(resp.state.players[2]!.supplyTokensConsumed?.fence).toBe(15)
   })
 
   it('lets an owner with 15 own fences build borrowed fences beyond the own limit', () => {

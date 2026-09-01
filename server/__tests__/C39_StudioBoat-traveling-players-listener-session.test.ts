@@ -5,11 +5,35 @@ import {
   type CardListenerContext,
 } from '../../shared/cards/card-listeners'
 import type { GameState, PlayerState, ActionSpace } from '../../shared/contract/types'
+import { GameSession } from '../game/authoritative-session'
+import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 
 import '../../shared/cards/C/C039_StudioBoat'
 
 const CARD_ID = 'C039_StudioBoat'
 const LISTENER_ID = 'C39-studio-boat-traveling-players-vp'
+const FIXED_HANDS = [
+  { occupation: '__c039_occupation_p1__', minor: '__c039_minor_p1__' },
+  { occupation: '__c039_occupation_p2__', minor: '__c039_minor_p2__' },
+  { occupation: '__c039_occupation_p3__', minor: '__c039_minor_p3__' },
+  { occupation: '__c039_occupation_p4__', minor: '__c039_minor_p4__' },
+]
+
+const setupFourPlayerSession = (actorIndex: number) => {
+  const session = new GameSession(39, undefined, { playerCount: 4 })
+  stabilizeRandomHands(session.state.players)
+  const state = session.getState().state
+  state.currentPlayerIndex = actorIndex
+  state.round = 1
+  state.roundPhase = 'work'
+  state.players.forEach((player, index) => {
+    player.occupationHand = [FIXED_HANDS[index]!.occupation]
+    player.minorHand = [FIXED_HANDS[index]!.minor]
+  })
+  state.players[0]!.minorPlayed = [CARD_ID]
+  session.loadState(state)
+  return session
+}
 
 const createPlayer = (id = 'p1', minorPlayed: string[] = []): PlayerState =>
   ({
@@ -127,5 +151,31 @@ describe('C039_StudioBoat — traveling-players bonus VP listener', () => {
     } as unknown as CardListenerContext)
 
     expect(result).toBeUndefined()
+  })
+})
+
+describe('C039 Studio Boat four-player session', () => {
+  it.each([
+    { actorIndex: 0, expectedBonusVp: 1 },
+    { actorIndex: 1, expectedBonusVp: 0 },
+  ])('C039 S3: four-player actor $actorIndex uses global Traveling Players and leaves owner at $expectedBonusVp bonus VP', ({ actorIndex, expectedBonusVp }) => {
+    const session = setupFourPlayerSession(actorIndex)
+    const before = session.getState().state
+
+    expect(before.actionSpaces.some((space) => space.id === CARD_ID)).toBe(false)
+    expect(before.actionSpaces.some((space) => space.id === 'traveling-players')).toBe(true)
+
+    const response = session.takeAction(actorIndex, 'traveling-players')
+
+    expect(response.ok, response.error).toBe(true)
+    expect(response.state.players[0]!.cardStates[CARD_ID]?.counters?.bonusVp ?? 0).toBe(expectedBonusVp)
+  })
+
+  it('C039 S4: the owner gains no bonus VP on a non-Traveling-Players action', () => {
+    const session = setupFourPlayerSession(0)
+    const response = session.takeAction(0, 'day-laborer')
+
+    expect(response.ok, response.error).toBe(true)
+    expect(response.state.players[0]!.cardStates[CARD_ID]?.counters?.bonusVp ?? 0).toBe(0)
   })
 })

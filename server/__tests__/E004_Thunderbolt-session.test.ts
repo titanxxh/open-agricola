@@ -8,16 +8,25 @@ import '../../shared/cards/E/E070_CropRotationField'
 
 const CARD_ID = 'E004_Thunderbolt'
 const CROP_ROTATION_FIELD = 'E070_CropRotationField'
+const FIXED_HANDS = [
+  { occupation: '__test_occupation_p1__', minor: CARD_ID },
+  { occupation: '__test_occupation_p2__', minor: '__test_minor_p2__' },
+  { occupation: '__test_occupation_p3__', minor: '__test_minor_p3__' },
+  { occupation: '__test_occupation_p4__', minor: '__test_minor_p4__' },
+]
 
 const setup = () => {
-  const session = new GameSession(404)
+  const session = new GameSession(404, undefined, { playerCount: 4 })
   stabilizeRandomHands(session.state.players)
   const state = session.getState().state
-  state.players = state.players.slice(0, 2)
   state.currentPlayerIndex = 0
   state.round = 1
   state.roundPhase = 'work'
-  state.players.forEach((entry, index) => setWorkersAtHome(state, entry, index === 0 ? 2 : 0))
+  state.players.forEach((entry, index) => {
+    entry.occupationHand = [FIXED_HANDS[index]!.occupation]
+    entry.minorHand = [FIXED_HANDS[index]!.minor]
+    setWorkersAtHome(state, entry, index === 0 ? 2 : 0)
+  })
   state.players[0]!.minorHand = [CARD_ID]
   session.loadState(state)
   return session

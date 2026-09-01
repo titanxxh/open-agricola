@@ -128,14 +128,18 @@ describe('C148 MudWallower — after-pay sync listener', () => {
     expect(player.cardStates![CARD_ID]!.counters!.held).toBe(2)
   })
 
-  it('real GameSession pay action emits resource.paid and syncs held to remaining boar', () => {
-    const session = new GameSession(undefined, undefined, { playerCount: 2 })
+  it('C148 S5: a public pay action permanently lowers held to the remaining boar count', () => {
+    const session = new GameSession(148, undefined, { playerCount: 4 })
     stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.currentPlayerIndex = 0
     state.round = 1
     state.roundPhase = 'work'
     state.actionSpaces.push(createPayBoarSpace(1))
+    state.players.forEach((participant, index) => {
+      participant.minorHand = [`__c148_minor_p${index + 1}__`]
+      participant.occupationHand = [`__c148_occupation_p${index + 1}__`]
+    })
 
     const player = state.players[0]!
     setWorkersAtHome(state, player, 2)
@@ -156,6 +160,44 @@ describe('C148 MudWallower — after-pay sync listener', () => {
     ]))
     expect(resp.state.players[0]!.resources.boar).toBe(1)
     expect(resp.state.players[0]!.cardStates?.[CARD_ID]?.counters?.held).toBe(1)
+  })
+
+  it('C148 S6: cooking a held boar through the Fireplace exchange permanently lowers held', () => {
+    const session = new GameSession(148, undefined, { playerCount: 4 })
+    stabilizeRandomHands(session.state.players)
+    const state = session.getState().state
+    state.currentPlayerIndex = 0
+    state.round = 1
+    state.roundPhase = 'work'
+    state.players.forEach((participant, index) => {
+      participant.minorHand = [`__c148_minor_p${index + 1}__`]
+      participant.occupationHand = [`__c148_occupation_p${index + 1}__`]
+    })
+    const player = state.players[0]!
+    setWorkersAtHome(state, player, 2)
+    player.occupationPlayed = [CARD_ID]
+    player.cardStates = { [CARD_ID]: { counters: { counter: 0, held: 1 } } }
+    player.resources = { ...player.resources, boar: 1, food: 0 }
+    player.improvements = ['Major_Fireplace1']
+    state.availableMajorImprovements = state.availableMajorImprovements.filter(
+      (cardId) => cardId !== 'Major_Fireplace1',
+    )
+    session.loadState(state)
+
+    expect(session.takeAction(0, 'farmland').ok).toBe(true)
+    let response = session.takeAnytimeAction(0, 'exchange')
+    expect(response.ok, response.error).toBe(true)
+    expect(response.interaction).toMatchObject({
+      stateId: 'wait',
+      request: { kind: 'choice' },
+    })
+
+    response = session.resolveChoice(0, 'bulk:1=1')
+    response = resolveTriggerIfPresent(session, response, CARD_ID)
+
+    expect(response.ok, response.error).toBe(true)
+    expect(response.state.players[0]!.resources).toMatchObject({ boar: 0, food: 2 })
+    expect(response.state.players[0]!.cardStates[CARD_ID]?.counters?.held).toBe(0)
   })
 
   it('does not sync when no boar paid (e.g. wood/food only payment)', () => {

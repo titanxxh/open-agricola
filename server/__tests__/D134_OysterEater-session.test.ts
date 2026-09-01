@@ -8,11 +8,14 @@ import { confirmNextPlayer, confirmPlayerSwitch } from './_helpers/pending-confi
 
 describe('D134_OysterEater session', () => {
   const setup = (currentPlayerIndex: number) => {
-    const session = new GameSession()
+    const session = new GameSession(134, undefined, { playerCount: 4 })
     stabilizeRandomHands(session.state.players)
     const state = session.getState().state
-    state.players = state.players.slice(0, 2)
     state.currentPlayerIndex = currentPlayerIndex
+    for (const player of state.players) {
+      player.minorHand = ['__test_placeholder__']
+      player.occupationHand = ['__test_placeholder__']
+    }
 
     const owner = state.players[0]!
     owner.occupationPlayed.push('D134_OysterEater')
@@ -40,7 +43,7 @@ describe('D134_OysterEater session', () => {
     return resp
   }
 
-  it('grants 1 bonus VP to owner when opponent fishes', () => {
+  it('D134 S1 grants one bonus VP to the owner when an opponent fishes', () => {
     const session = setup(1)
 
     let resp = session.takeAction(1, 'fishing')
@@ -51,7 +54,7 @@ describe('D134_OysterEater session', () => {
     expect(after.players[0]!.cardStates?.D134_OysterEater?.counters?.bonusVp).toBe(1)
   })
 
-  it('grants 1 bonus VP to owner when owner fishes (scope: any)', () => {
+  it('D134 S2 grants one bonus VP to the owner when the owner fishes', () => {
     const session = setup(0)
 
     let resp = session.takeAction(0, 'fishing')
@@ -77,7 +80,7 @@ describe('D134_OysterEater session', () => {
     expect(extra?.skipNextPlacement).toBe(1)
   })
 
-  it('does not trigger on non-fishing actions', () => {
+  it('D134 S3 does not trigger on non-Fishing actions', () => {
     const session = setup(1)
 
     let resp = session.takeAction(1, 'day-laborer')

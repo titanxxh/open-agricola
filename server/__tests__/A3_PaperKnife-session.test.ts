@@ -190,9 +190,8 @@ const OCC_D = 'A119_FirewoodCollector'
  */
 const makeSession = (opts: { wood?: number; gameSeed?: number; occHand?: string[] } = {}) => {
   const { wood = 1, gameSeed = 42, occHand = [OCC_A, OCC_B, OCC_C, OCC_D] } = opts
-  const session = new GameSession(gameSeed, undefined, { playerCount: 4 })
+  const session = new GameSession(gameSeed, undefined, { playerCount: 2 })
   const state = session.getState().state
-  state.players = state.players.slice(0, 2)
   state.currentPlayerIndex = 0
   state.round = 1
   state.roundPhase = 'work'
@@ -208,6 +207,8 @@ const makeSession = (opts: { wood?: number; gameSeed?: number; occHand?: string[
   const p1 = state.players[1]!
   setActiveWorkerCount(p1, 2)
   setWorkersAtHome(state, p1, 2)
+  p1.minorHand = ['__test_placeholder__']
+  p1.occupationHand = ['__test_placeholder__']
   p1.resources.food = 5
 
   session.loadState(state)
@@ -249,7 +250,7 @@ const playA3 = (session: GameSession) => {
 // Case 1: onBuy emits a selection pending with kind='occupation-hand', min=max=3
 // ---------------------------------------------------------------------------
 describe('A003_PaperKnife session-tier: flow', () => {
-  it('case 1: onBuy emits occupation-hand selection pending with min=max=3', () => {
+  it('A003 S2: playing Paper Knife pays one wood, passes it left, and requires exactly three occupations', () => {
     const session = makeSession({ wood: 1 })
 
     const resp = playA3(session)
@@ -284,7 +285,7 @@ describe('A003_PaperKnife session-tier: flow', () => {
   // ---------------------------------------------------------------------------
   // Case 2: commitSelection plays one of the chosen 3 for free
   // ---------------------------------------------------------------------------
-  it('case 2: committing 3 cards plays exactly one of them for free', () => {
+  it('A003 S3: accepting the revealed occupation plays exactly one selected card for free', () => {
     const session = makeSession({ wood: 1, gameSeed: 42 })
 
     const a3Resp = playA3(session)
@@ -326,6 +327,26 @@ describe('A003_PaperKnife session-tier: flow', () => {
     expect(playedFromSelection).toContain(pick)
   })
 
+  it('A003 S4: OA immediately plays the revealed occupation without offering a decline branch', () => {
+    const session = makeSession({ wood: 1, gameSeed: 42 })
+    const a3Resp = playA3(session)
+    expect(a3Resp.interaction.stateId).toBe('wait')
+
+    const resp = session.commitSelectionChoice(0, { cardIds: [OCC_A, OCC_B, OCC_C] })
+
+    expect(resp.ok).toBe(true)
+    const player = resp.state.players[0]!
+    const pick = player.cardStates?.[SESSION_CARD_ID]?.extraData?.pick as string | undefined
+    expect(pick).toBeDefined()
+    expect(player.occupationPlayed).toEqual([pick])
+    expect(player.occupationHand).toEqual(expect.arrayContaining([OCC_D]))
+    expect(player.resources.food).toBe(3)
+    expect(resp.interaction.stateId).toBe('wait')
+    if (resp.interaction.stateId !== 'wait') return
+    expect(resp.interaction.request.kind).toBe('confirm-next-player')
+    expect(resp.interaction.request.options ?? []).toEqual([])
+  })
+
   // ---------------------------------------------------------------------------
   // Case 3: Deterministic — same seed + same 3 committed → same pick
   // ---------------------------------------------------------------------------
@@ -355,7 +376,7 @@ describe('A003_PaperKnife session-tier: flow', () => {
   // ---------------------------------------------------------------------------
   // Case 4: Undo cannot cross the random-pick boundary
   // ---------------------------------------------------------------------------
-  it('case 4: undoStep is blocked after the random pick (undo boundary)', () => {
+  it('A003 S5: undo is rejected after the random occupation has been revealed', () => {
     const session = makeSession({ wood: 1 })
 
     const a3Resp = playA3(session)
@@ -384,43 +405,30 @@ describe('A003_PaperKnife session-tier: flow', () => {
   // ---------------------------------------------------------------------------
   // Case 5: Prerequisite — fewer than 3 occupations rejects play
   // ---------------------------------------------------------------------------
-  it('case 5: A3 is not offered / is blocked when fewer than 3 occupations in hand', () => {
-    // Only 2 occupations — "3 Occupations In Hand" prerequisite should block A3.
-    // The exact mechanism depends on whether the prerequisite filters at offer-time or
-    // execution-time. Both behaviors are acceptable — we assert either:
-    //   (a) meeting-place offers no choice containing A3 (filtered out), OR
-    //   (b) meeting-place offers a choice but resolving A3 returns ok:false.
-    // Note: when the only available minor improvement is blocked, meeting-place may
-    // auto-skip and go directly to confirmNextPlayer — that also counts as (a).
+  it('A003 S1: fewer than three occupations rejects Paper Knife without polluting retry state', () => {
     const session = makeSession({ wood: 1, occHand: [OCC_A, OCC_B] })
 
-    const mpResp = session.takeAction(0, 'meeting-place')
-    expect(mpResp.ok).toBe(true)
+    const blocked = session.takeAction(0, 'meeting-place')
+    expect(blocked.ok).toBe(true)
+    expect(blocked.interaction.stateId).toBe('wait')
+    if (blocked.interaction.stateId !== 'wait') return
+    expect(blocked.interaction.request.kind).toBe('confirm-next-player')
+    expect(blocked.interaction.request.options ?? []).toEqual([])
+    expect(blocked.state.players[0]!.minorHand).toContain(SESSION_CARD_ID)
+    expect(blocked.state.players[1]!.minorHand).not.toContain(SESSION_CARD_ID)
+    expect(blocked.state.players[0]!.resources.wood).toBe(1)
 
-    // If the pending type is not 'choice', A3 was filtered and the action ended early — pass.
-    if (mpResp.interaction.stateId !== 'wait') {
-      // meeting-place ended without offering A3 (prerequisite enforced at offer time) — OK
-      return
-    }
+    const undone = session.undoStep()
+    expect(undone.ok).toBe(true)
+    const retryState = session.getState().state
+    retryState.players[0]!.occupationHand.push(OCC_C)
+    session.loadState(retryState)
 
-    const improvementOption = mpResp.interaction.request.options?.find(o => o.value.startsWith('action-improvement-'))
-    const cardPrompt = improvementOption
-      ? session.resolveChoice(0, improvementOption.value)
-      : mpResp
-    expect(cardPrompt.ok).toBe(true)
-    if (cardPrompt.interaction.stateId !== 'wait') {
-      return
-    }
-
-    const a3Option = cardPrompt.interaction.request.options?.find(o => o.value === SESSION_CARD_ID)
-    if (!a3Option) {
-      // A3 was correctly excluded from the choice options — prerequisite enforced at offer time
-      return
-    }
-
-    // If A3 is offered despite the prerequisite, resolving must fail at execution time
-    const resp = session.resolveChoice(0, a3Option.value)
-    expect(resp.ok).toBe(false)
+    const retry = playA3(session)
+    expect(retry.ok).toBe(true)
+    expect(retry.interaction.stateId).toBe('wait')
+    if (retry.interaction.stateId !== 'wait') return
+    expect(retry.interaction.request.selection?.kind).toBe('occupation-hand')
   })
 
   // ---------------------------------------------------------------------------

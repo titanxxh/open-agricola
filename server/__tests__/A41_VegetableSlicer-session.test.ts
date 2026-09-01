@@ -7,12 +7,18 @@ import type { ActionExecutionResult, ActionSpace, GameState, PlayerState } from 
 import { setWorkersAtHome } from '../../shared/domain/player'
 
 import '../../shared/cards/A/A041_VegetableSlicer'
+import '../../shared/cards/A/A060_OrientalFireplace'
 
 const CARD_ID = 'A041_VegetableSlicer'
 const FIREPLACE_ID = 'Major_Fireplace1'
 const COOKING_HEARTH_ID = 'Major_CookingHearth1'
 const FIREPLACE3_ID = 'Major_Fireplace3'
 const COOKING_HEARTH3_ID = 'Major_CookingHearth3'
+const ORIENTAL_FIREPLACE_ID = 'A060_OrientalFireplace'
+const FIXED_HANDS = [
+  { occupation: 'A116_WoodCutter', minor: 'A004_Baseboards' },
+  { occupation: 'B116_Shoreforester', minor: 'B003_Moonshine' },
+]
 
 const createPlayer = (): PlayerState =>
   ({
@@ -123,7 +129,7 @@ const paidForImprovement = (
 })
 
 describe('A041_VegetableSlicer improvement listener', () => {
-  it('triggers through the real major improvement action flow', () => {
+  it('A041 S2: returning a major Fireplace for a Cooking Hearth grants two wood and one vegetable', () => {
     const session = new GameSession(1)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
@@ -145,11 +151,11 @@ describe('A041_VegetableSlicer improvement listener', () => {
       grain: 0,
       vegetable: 0,
     }
-    player.minorHand = ['__test_placeholder__']
-    player.occupationHand = ['__test_placeholder__']
+    player.minorHand = [FIXED_HANDS[0]!.minor]
+    player.occupationHand = [FIXED_HANDS[0]!.occupation]
 
-    state.players[1]!.minorHand = ['__test_placeholder__']
-    state.players[1]!.occupationHand = ['__test_placeholder__']
+    state.players[1]!.minorHand = [FIXED_HANDS[1]!.minor]
+    state.players[1]!.occupationHand = [FIXED_HANDS[1]!.occupation]
     session.loadState(state)
 
     const resp = session.takeAction(0, 'major-improvement')
@@ -309,5 +315,91 @@ describe('A041_VegetableSlicer improvement listener', () => {
     } as unknown as CardListenerContext)
 
     expect(hookResult).toBeUndefined()
+  })
+})
+
+const improvementSession = ({ returnedCard, clay = 0 }: { returnedCard?: string; clay?: number }) => {
+  const session = new GameSession(41, undefined, { playerCount: 2 })
+  const state = session.getState().state
+  state.currentPlayerIndex = 0
+  state.roundPhase = 'work'
+  state.availableMajorImprovements = [COOKING_HEARTH_ID]
+  state.players.forEach((player, index) => {
+    setWorkersAtHome(state, player, 1)
+    player.minorHand = [FIXED_HANDS[index]!.minor]
+    player.occupationHand = [FIXED_HANDS[index]!.occupation]
+  })
+  const player = state.players[0]!
+  player.minorPlayed = [CARD_ID]
+  if (returnedCard === ORIENTAL_FIREPLACE_ID) player.minorPlayed.push(returnedCard)
+  else if (returnedCard) player.improvements = [returnedCard]
+  player.resources = { ...player.resources, clay, wood: 0, vegetable: 0 }
+  session.loadState(state)
+  return session
+}
+
+const playA41 = () => {
+  const session = new GameSession(41, undefined, { playerCount: 2 })
+  const state = session.getState().state
+  state.currentPlayerIndex = 0
+  state.roundPhase = 'work'
+  state.players.forEach((player, index) => {
+    setWorkersAtHome(state, player, 1)
+    player.minorHand = [FIXED_HANDS[index]!.minor]
+    player.occupationHand = [FIXED_HANDS[index]!.occupation]
+  })
+  state.players[0]!.minorHand = [CARD_ID]
+  state.players[0]!.resources.wood = 1
+  state.players[0]!.resources.vegetable = 0
+  session.loadState(state)
+
+  let resp = session.takeAction(0, 'meeting-place')
+  expect(resp.ok).toBe(true)
+  if (resp.interaction.stateId !== 'wait') return resp
+  const improvementOption = resp.interaction.request.options?.find((option) => option.value.startsWith('action-improvement-'))
+  if (improvementOption) resp = session.resolveChoice(0, improvementOption.value)
+  if (resp.state.players[0]!.minorPlayed.includes(CARD_ID)) return resp
+  expect(resp.interaction.stateId).toBe('wait')
+  if (resp.interaction.stateId !== 'wait') return resp
+  const cardOption = resp.interaction.request.options?.find((option) => option.value === CARD_ID)
+  expect(cardOption).toBeDefined()
+  return session.resolveChoice(0, cardOption!.value)
+}
+
+const buyCookingHearth = (session: GameSession) => {
+  const resp = session.takeAction(0, 'major-improvement')
+  if (resp.state.players[0]!.improvements.includes(COOKING_HEARTH_ID)) return resp
+  expect(resp.interaction.stateId).toBe('wait')
+  if (resp.interaction.stateId !== 'wait') return resp
+  const option = resp.interaction.request.options?.find((entry) => entry.value === COOKING_HEARTH_ID)
+  expect(option).toBeDefined()
+  return session.resolveChoice(0, option!.value)
+}
+
+describe('A041 parity batch-02 characterization', () => {
+  it('A041 S1: playing Vegetable Slicer costs one wood and grants no retroactive reward', () => {
+    const resp = playA41()
+
+    expect(resp.ok).toBe(true)
+    expect(resp.state.players[0]!.minorPlayed).toContain(CARD_ID)
+    expect(resp.state.players[0]!.resources.wood).toBe(0)
+    expect(resp.state.players[0]!.resources.vegetable).toBe(0)
+  })
+
+  it('A041 S3: buying a Cooking Hearth with clay grants no Vegetable Slicer reward', () => {
+    const resp = buyCookingHearth(improvementSession({ clay: 4 }))
+
+    expect(resp.ok).toBe(true)
+    expect(resp.state.players[0]!.improvements).toContain(COOKING_HEARTH_ID)
+    expect(resp.state.players[0]!.resources).toMatchObject({ clay: 0, wood: 0, vegetable: 0 })
+  })
+
+  it('A041 S4: OA upgrades Oriental Fireplace but grants no Vegetable Slicer reward', () => {
+    const resp = buyCookingHearth(improvementSession({ returnedCard: ORIENTAL_FIREPLACE_ID }))
+
+    expect(resp.ok).toBe(true)
+    expect(resp.state.players[0]!.improvements).toContain(COOKING_HEARTH_ID)
+    expect(resp.state.players[0]!.minorPlayed).not.toContain(ORIENTAL_FIREPLACE_ID)
+    expect(resp.state.players[0]!.resources).toMatchObject({ wood: 0, vegetable: 0 })
   })
 })

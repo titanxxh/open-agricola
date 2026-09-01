@@ -4,15 +4,20 @@ import {
   computeAnimalZones,
   computeInvalidAnimalsForZone,
 } from '../../shared/domain/animal-zones'
+import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 
 import '../../shared/cards/C/C148_MudWallower'
 
 describe('C148_MudWallower getInvalidAnimals', () => {
   const setup = (held: number) => {
-    const session = new GameSession()
+    const session = new GameSession(148, undefined, { playerCount: 4 })
+    stabilizeRandomHands(session.state.players)
     const state = session.getState().state
-    state.players = state.players.slice(0, 2)
     state.currentPlayerIndex = 0
+    state.players.forEach((participant, index) => {
+      participant.minorHand = [`__c148_minor_p${index + 1}__`]
+      participant.occupationHand = [`__c148_occupation_p${index + 1}__`]
+    })
     const player = state.players[0]!
     player.occupationPlayed.push('C148_MudWallower')
     player.cardStates = player.cardStates ?? {}

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { GameSession } from '../game/authoritative-session'
+import { GameSession, type SessionResponse } from '../game/authoritative-session'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 import { getCardEffect, runCardEffectHook } from '../../shared/cards/card-effects'
 import { computeExtraSowableFields } from '../../shared/cards/card-effects'
@@ -14,6 +14,12 @@ import { resolveTriggerIfPresent } from './_helpers/trigger-select'
 const CARD_ID = 'E070_CropRotationField'
 const OTHER_EXTRA_CARD_ID = 'E069_MelonPatch'
 const harvestRounds = [4, 7, 9, 11, 13, 14]
+const FIXED_HANDS = [
+  { occupation: '__test_occupation_p1__', minor: '__test_minor_p1__' },
+  { occupation: '__test_occupation_p2__', minor: '__test_minor_p2__' },
+  { occupation: '__test_occupation_p3__', minor: '__test_minor_p3__' },
+  { occupation: '__test_occupation_p4__', minor: '__test_minor_p4__' },
+]
 
 const setup = (options?: {
   grain?: number
@@ -22,16 +28,20 @@ const setup = (options?: {
   round?: number
   cardCrop?: { crop: 'grain' | 'vegetable'; remaining: number } | null
 }) => {
-  const session = new GameSession()
+  const session = new GameSession(70, undefined, { playerCount: 4 })
   stabilizeRandomHands(session.state.players)
   const state = session.getState().state
-  state.players = state.players.slice(0, 2)
   state.currentPlayerIndex = 0
   state.round = options?.round ?? 1
   state.roundPhase = 'work'
   // Ensure grain-utilization is available
   state.roundActionOrder = state.roundActionOrder.map(() => null)
   state.roundActionOrder[0] = 'grain-utilization'
+
+  state.players.forEach((entry, index) => {
+    entry.occupationHand = [FIXED_HANDS[index]!.occupation]
+    entry.minorHand = [FIXED_HANDS[index]!.minor]
+  })
 
   const player = state.players[0]!
   player.workersAvailable = options?.round && harvestRounds.includes(options.round) ? 0 : 2
@@ -62,6 +72,48 @@ const setup = (options?: {
   return session
 }
 
+const setupPlay = (occupationCount: number) => {
+  const session = new GameSession(70, undefined, { playerCount: 4 })
+  stabilizeRandomHands(session.state.players)
+  const state = session.getState().state
+  state.currentPlayerIndex = 0
+  state.round = 1
+  state.roundPhase = 'work'
+  state.players.forEach((player, index) => {
+    player.occupationHand = [FIXED_HANDS[index]!.occupation]
+    player.minorHand = [FIXED_HANDS[index]!.minor]
+  })
+  const player = state.players[0]!
+  player.minorHand = [CARD_ID]
+  player.occupationPlayed = Array.from({ length: occupationCount }, (_, index) => `__occupation_${index}__`)
+  session.loadState(state)
+  return session
+}
+
+const openMinorPrompt = (session: GameSession) => {
+  let response = session.takeAction(0, 'meeting-place')
+  expect(response.ok, response.error).toBe(true)
+  if (response.interaction.stateId !== 'wait') return response
+  if (response.interaction.request.options?.some((option) => option.value === CARD_ID)) return response
+  const improvement = response.interaction.request.options?.find((option) =>
+    option.value.startsWith('action-improvement-'),
+  )
+  if (improvement) response = session.resolveChoice(0, improvement.value)
+  return response
+}
+
+const cardOption = (response: SessionResponse) => response.interaction.stateId === 'wait'
+  ? response.interaction.request.options?.find((option) => option.value === CARD_ID)
+  : undefined
+
+const playMinor = (session: GameSession) => {
+  const response = openMinorPrompt(session)
+  if (response.state.players[0]!.minorPlayed.includes(CARD_ID)) return response
+  const option = cardOption(response)
+  expect(option).toBeDefined()
+  return session.resolveChoice(0, option!.value)
+}
+
 const addMinorCard = (
   session: GameSession,
   cardId: string,
@@ -75,6 +127,17 @@ const addMinorCard = (
 }
 
 describe('E070_CropRotationField session', () => {
+  it('requires one occupation to play through the public minor-improvement flow', () => {
+    const blocked = openMinorPrompt(setupPlay(0))
+    expect(cardOption(blocked)).toBeUndefined()
+    expect(blocked.state.players[0]!.minorHand).toContain(CARD_ID)
+
+    const allowed = playMinor(setupPlay(1))
+    expect(allowed.ok, allowed.error).toBe(true)
+    expect(allowed.state.players[0]!.minorHand).not.toContain(CARD_ID)
+    expect(allowed.state.players[0]!.minorPlayed).toContain(CARD_ID)
+  })
+
   describe('extra sowable field', () => {
     it('card registers as extra sowable field when empty (grain + veg allowed)', () => {
       const session = setup({ grain: 1, vegetable: 1 })
@@ -217,6 +280,33 @@ describe('E070_CropRotationField session', () => {
         ),
       ).toBeUndefined()
     })
+
+    it('can decline grain after the last vegetable is harvested', () => {
+      const session = setup({
+        round: 4,
+        grain: 1,
+        vegetable: 0,
+        cardCrop: { crop: 'vegetable', remaining: 1 },
+      })
+
+      let resp = session.performRoundEnd()
+      resp = resolveTriggerIfPresent(session, resp, CARD_ID)
+      expect(resp.interaction.stateId).toBe('wait')
+      if (resp.interaction.stateId !== 'wait') return
+      const skip = resp.interaction.request.options?.find((option) => option.value === '__skip__')
+      expect(skip).toBeDefined()
+      resp = session.resolveChoice(resp.interaction.playerIndex, skip!.value)
+
+      expect(resp.state.players[0]!.resources.vegetable).toBe(1)
+      expect(resp.state.players[0]!.resources.grain).toBe(1)
+      expect(
+        readCardExtraData<{ crop: string; remaining: number }[]>(
+          resp.state.players[0]!,
+          CARD_ID,
+          'cardFieldStacks',
+        ) ?? [],
+      ).toEqual([])
+    })
   })
 
   describe('harvest', () => {
@@ -238,6 +328,7 @@ describe('E070_CropRotationField session', () => {
       )!
       expect(stacks).toBeDefined()
       expect(stacks[0].remaining).toBe(2)
+      expect(resp.interaction.stateId === 'wait' ? resp.interaction.sourceCard : undefined).not.toBe(CARD_ID)
     })
 
     it('crop cleared when remaining reaches 0', () => {
@@ -344,6 +435,27 @@ describe('E070_CropRotationField session', () => {
         'cardFieldStacks',
       )
       expect(stacks ?? []).toEqual([]) // still cleared
+    })
+
+    it('last grain harvested without vegetable completes without an E070 prompt', () => {
+      const session = setup({
+        round: 4,
+        grain: 0,
+        vegetable: 0,
+        cardCrop: { crop: 'grain', remaining: 1 },
+      })
+
+      const resp = session.performRoundEnd()
+
+      expect(resp.state.players[0]!.resources.grain).toBe(1)
+      expect(
+        readCardExtraData<{ crop: string; remaining: number }[]>(
+          resp.state.players[0]!,
+          CARD_ID,
+          'cardFieldStacks',
+        ) ?? [],
+      ).toEqual([])
+      expect(resp.interaction.stateId === 'wait' ? resp.interaction.sourceCard : undefined).not.toBe(CARD_ID)
     })
 
     it('no harvest when card has no crop', () => {
