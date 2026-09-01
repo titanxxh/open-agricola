@@ -962,7 +962,7 @@ cardField?: {
 
 `shared/cards/helpers/card-field.ts:makeCardFieldImpl(cardId, def, options?)` 是工厂，按
 `def` 派生 `onComputeSowableFields` / `onSowExtraField` / `onHarvestFieldPhase` / `sow-isDoable`
-listener。单卡只声明配置 + 可选 `onReap` 回调处理副作用，文件行数贴近甚至少于 参考实现。
+listener。单卡只声明配置 + 可选 `onReap` / `onCropRemoved` 回调处理副作用，文件行数贴近甚至少于参考实现。
 
 虚拟 tile col 由
 `deriveVirtualTileCol(cardId, slotIdx) = deckOrdinal*1000 + cardNumber + slotIdx`
@@ -970,7 +970,9 @@ listener。单卡只声明配置 + 可选 `onReap` 回调处理副作用，文�
 
 每个已有作物的槽都会投影为虚拟 `Field`，并与普通田共用 `computeHarvestCount()`。同一 Card Field 的多个槽以 card id 共享 `groupKey`，选择数量上只算一块 Logical Field；田地数量 modifier 只作用于规范化后选中的一个槽，普通 Reap 仍会收割所有已有作物的槽。
 
-副作用 `onReap` 回调签名：
+`getCroppedCardFields()` 把这些已有作物的虚拟槽提供给明确支持 Card Field 的规则。`removeCardFieldCrop()` 把选中的虚拟槽还原为 Logical Field，移除该卡各槽中的目标作物，写回 `cardFieldStacks`，发出一个 card location 的 `farm.cropRemoved` 事件，然后才分派该卡的通用移除回调。helper 不按选择卡或目标卡分支；调用方只需把返回的 `ActionFlow` 与自身效果组合。
+
+副作用回调签名：
 
 ```ts
 onReap?: (ctx: {
@@ -983,9 +985,21 @@ onReap?: (ctx: {
   trigger: ReapTrigger
   sourceCard?: string
 }) => ActionFlow | void
+
+onCropRemoved?: (ctx: {
+  state: GameState
+  player: PlayerState
+  crop: ExtraSowableCrop
+  amount: number
+  isLast: boolean
+  cardId: string
+  reason: FarmCropRemovedEvent['reason']
+  trigger?: ReapTrigger
+  sourceCard?: string
+}) => ActionFlow | void
 ```
 
-多 crop 各调一次回调；返回多个 flow 时基建用普通 `parallel` 包装。对齐 参考实现 `$this->field = true`
+`onReap` 只在 reap 时运行，保留收获专属语义；`onCropRemoved` 在每次真实作物移除时运行（包括 reap），使“每次移除”效果不依赖移除来源。多 crop 各调一次回调；reap 返回多个 flow 时基建用普通 `parallel` 包装。对齐参考实现 `$this->field = true`
 + `getFieldDetails()` + `onPlayerAfterReap` 语义。
 
 **Harvest reap log 时序**：`harvestReapSummary` 初始化已从 `continueHarvestReap` 提前到

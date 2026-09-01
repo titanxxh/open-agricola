@@ -569,8 +569,8 @@ _Avoid_: 规则执行逻辑
 _Avoid_: 为单卡新增 PlayerState / GameState 顶层字段
 
 **Card Field**:
-一张已打出卡提供的虚拟田，可包含多个播种 / 收获槽并参与“田”的计数；通过 `CardDefinition.cardField` 和 card-field helper 声明。
-_Avoid_: Harvest hook
+一张已打出卡提供的虚拟田，可包含多个播种 / 收获槽，并参与“田”的计数、播种、收获、作物选择与移除；具体规则仍负责筛选来源、作物与时机。
+_Avoid_: 实体田、Sow Slot、Harvest Slot
 
 **Logical Field**:
 规则计数中的一块田。普通田各自是一块 Logical Field；同一 Card Field 的多个槽可以共享 `groupKey`，整体只算一块 Logical Field。

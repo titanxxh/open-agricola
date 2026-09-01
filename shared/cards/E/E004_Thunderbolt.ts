@@ -2,20 +2,48 @@ import { defineMinorCard } from '../card-source'
 import { registerSelectionEffect } from '../../actions/helpers/selection-effect-registry'
 import { fieldTopStack } from '../../domain/field'
 import type { CardImpl } from '../registry'
+import { getCroppedCardFields, removeCardFieldCrop } from '../helpers/card-field'
+import { parseFarmPositionKey } from '../../domain/farm-position-selection'
+import { gainLeaf } from '../helpers/pay-gain-node'
 
 const CARD_ID = 'E004_Thunderbolt'
 
-registerSelectionEffect('remove-all-grain-for-wood', ({ player, positions }) => {
+registerSelectionEffect('remove-all-grain-for-wood', ({
+  state,
+  player,
+  positions,
+  sourceCard,
+  eventSink,
+}) => {
   for (const key of positions) {
-    const [r, c] = key.split('-').map(Number)
-    const field = player.fields.find(f => f.row === r && f.col === c)
-    if (!field) continue
-    const top = fieldTopStack(field)
-    if (top && top.kind === 'grain') {
+    const tile = parseFarmPositionKey(key)
+    if (!tile) continue
+    const field = player.fields.find(f => f.row === tile.row && f.col === tile.col)
+    const top = field ? fieldTopStack(field) : undefined
+    if (field && top?.kind === 'grain') {
       const grainCount = top.remaining
       field.stacks.pop()
-      player.resources.wood = (player.resources.wood ?? 0) + grainCount * 2
+      eventSink?.emit<'farm.cropRemoved'>({
+        type: 'farm.cropRemoved',
+        sourceCardId: sourceCard,
+        crops: [{
+          location: { kind: 'field', playerId: player.id, row: field.row, col: field.col },
+          crop: 'grain',
+          amount: grainCount,
+        }],
+        reason: 'cardEffect',
+      })
+      return gainLeaf(CARD_ID, { wood: grainCount * 2 })
     }
+    const removed = removeCardFieldCrop(state, player, tile, {
+      sourceCard,
+      eventSink,
+    })
+    if (!removed || removed.crop !== 'grain') continue
+    const gain = gainLeaf(CARD_ID, { wood: removed.amount * 2 })
+    return removed.flow
+      ? { type: 'seq', children: [gain, removed.flow] }
+      : gain
   }
 })
 
@@ -23,8 +51,20 @@ const cardImpl = {
   effect: {
   id: CARD_ID,
   onBuy: (_state, player) => {
-    const grainFields = player.fields.filter(f => fieldTopStack(f)?.kind === 'grain')
-    if (grainFields.length === 0) return
+    const selectableTiles = [
+      ...player.fields
+        .filter((field) => fieldTopStack(field)?.kind === 'grain')
+        .map((field) => ({ row: field.row, col: field.col })),
+      ...getCroppedCardFields(player)
+        .filter(({ field }) => fieldTopStack(field)?.kind === 'grain')
+        .map(({ tile, sourceCard, groupKey, cardFieldSlot }) => ({
+          ...tile,
+          sourceCard,
+          groupKey,
+          cardFieldSlot,
+        })),
+    ]
+    if (selectableTiles.length === 0) return
 
     return {
       type: 'leaf',
@@ -33,7 +73,7 @@ const cardImpl = {
       optional: true,
       actionContext: {
         selectionKind: 'farm-position',
-        positionFilter: 'has-grain',
+        selectableTiles,
         maxSelections: 1,
         selectionEffect: 'remove-all-grain-for-wood',
       },

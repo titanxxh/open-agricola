@@ -65,6 +65,7 @@ export const selectionAction: ActionDefinition = {
     sourceCard,
     actionContext,
     state,
+    eventSink,
     reportProtectedObservation,
   }, choice, payload) => {
     if (choice === 'cancel') return { type: 'fail', errorKey: 'log.action', recoverable: true }
@@ -116,6 +117,7 @@ export const selectionAction: ActionDefinition = {
         sourceCard,
         state,
         actionContext,
+        eventSink,
         reportProtectedObservation,
       })
       if (followup) {

@@ -983,13 +983,15 @@ cardField?: {
 }
 ```
 
-`shared/cards/helpers/card-field.ts:makeCardFieldImpl(cardId, def, options?)` derives `onComputeSowableFields`, `onSowExtraField`, `onHarvestFieldPhase`, and a `sow-isDoable` listener from the definition. An individual card declares only the configuration and an optional `onReap` callback for side effects, keeping the file near or below its the reference counterpart's size.
+`shared/cards/helpers/card-field.ts:makeCardFieldImpl(cardId, def, options?)` derives `onComputeSowableFields`, `onSowExtraField`, `onHarvestFieldPhase`, and a `sow-isDoable` listener from the definition. An individual card declares only the configuration and optional `onReap` / `onCropRemoved` callbacks for side effects, keeping the file near or below its reference counterpart's size.
 
 Virtual tile columns derive from `deriveVirtualTileCol(cardId, slotIdx) = deckOrdinal*1000 + cardNumber + slotIdx`, preventing cross-deck collisions. Capacity slots for adjacent numbers in one deck require auditing; the current 11 cards all have capacity at most three, leaving ample margin.
 
 Each occupied slot is projected as a virtual `Field` and uses the same `computeHarvestCount()` pipeline as an ordinary field. Multiple slots on one Card Field share the card id as `groupKey`, so they are one Logical Field for selection limits; a field-count modifier applies once to the canonical selected slot, while normal Reap still harvests every occupied slot.
 
-The side-effect callback is:
+`getCroppedCardFields()` exposes those occupied virtual slots to rules that explicitly support Card Fields. `removeCardFieldCrop()` resolves a selected virtual slot back to its Logical Field, removes the selected crop across that card's stacks, writes `cardFieldStacks`, emits one `farm.cropRemoved` event with a card location, and only then dispatches the card's generic removal callback. The helper contains no selecting-card or target-card branch; callers compose any returned `ActionFlow` with their own effect.
+
+The side-effect callbacks are:
 
 ```ts
 onReap?: (ctx: {
@@ -1002,9 +1004,21 @@ onReap?: (ctx: {
   trigger: ReapTrigger
   sourceCard?: string
 }) => ActionFlow | void
+
+onCropRemoved?: (ctx: {
+  state: GameState
+  player: PlayerState
+  crop: ExtraSowableCrop
+  amount: number
+  isLast: boolean
+  cardId: string
+  reason: FarmCropRemovedEvent['reason']
+  trigger?: ReapTrigger
+  sourceCard?: string
+}) => ActionFlow | void
 ```
 
-The callback runs once per crop. Infrastructure wraps multiple returned flows in ordinary `parallel`. This matches the reference `$this->field = true`, `getFieldDetails()`, and `onPlayerAfterReap` semantics.
+`onReap` runs only for reap and preserves harvest-specific card semantics. `onCropRemoved` runs for every real crop removal, including reap, so effects worded as “each time you remove” do not depend on the removal source. Each callback runs once per crop; the reap infrastructure wraps multiple returned flows in ordinary `parallel`. This matches the reference `$this->field = true`, `getFieldDetails()`, and `onPlayerAfterReap` semantics.
 
 **Harvest reap-log ordering.** `harvestReapSummary` initialization moved from `continueHarvestReap` to the earlier `continueHarvestFieldStart`. Infrastructure accumulates `summary.resources[crop]` during `onHarvestFieldPhase`, so `log.reapDetail` contains both ordinary-field and Card Field production. Previously the Card Field accumulation happened before summary initialization and was discarded. The summary is not a field-phase local; it remains until `onAfterHarvest` finishes.
 
