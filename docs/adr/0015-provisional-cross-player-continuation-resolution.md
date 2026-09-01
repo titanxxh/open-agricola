@@ -2,14 +2,21 @@
 
 - Status: Accepted
 - Date: 2026-08-29
+- Amended: 2026-09-01
 
 ## Context
 
 An action can be initially unreachable until another player responds, as with A132 Publican enabling an opponent's Sow. A nested action can also hand control to another player before its mandatory parent continuation is known to remain reachable, as when D014 Hammer Crusher builds a room, triggers D128 Building Tycoon, and then can no longer renovate. Treating every foreign confirmation as an immediate permanent undo boundary either rejects the first case or can strand the second in a non-recoverable `engine-blocked` state. A flat rollback scope is also insufficient when mandatory continuations nest or a provisional flow produces a random result or new hidden information that players cannot forget.
 
+A committed occupation or improvement can also produce a mandatory `afterHostCommit` continuation. If that continuation blocks after the host choice came from a Protected Observation, ordinary manual undo cannot cross the observation boundary, while restoring to before disclosure would let the player reroll or forget the revealed result.
+
 ## Decision
 
 An unresolved mandatory continuation uses a Provisional Continuation Scope when its pre-resolution chain first crosses a rollback hazard: control switches to another player or the current command produces a Protected Observation. The host action has been committed to but its core effect has not executed. A nested action may already have executed inside that chain, as with Hammer Crusher's Construct, while an ordinary `after` response to a completed top-level action remains final.
+
+Once a host is committed, every dynamically returned or injected descendant of a mandatory `afterHostCommit` continuation remains mandatory. If a descendant cannot execute and no earlier rollback hazard exists, the engine exposes `engine-blocked`; `undoStep` remains ordinary history traversal and `undoAction` is the explicit Rule Action fallback.
+
+A mandatory `afterHostCommit` continuation is a narrow exception to the pre-resolution opening rule. When the host choice came from a pending interaction created after a Protected Observation was published, the session opens its scope at that already-published interaction checkpoint. If the continuation becomes impossible, explicit `undoAction` aborts to the same choice and the same cached observation, restoring the host, payment, and mandatory follow-ups. It never restores to before the observation.
 
 Scopes follow mandatory-host ancestry. Multiple helpers for the same host share one scope. A genuinely nested mandatory host creates a child scope: child failure restores only the child checkpoint, child success merges its effects into the parent, and an unguarded parent failure still restores the whole nested subtree.
 
@@ -31,4 +38,4 @@ This is an Engine/Session semantic and must not special-case card or action IDs.
 
 ## Considered alternatives
 
-A single flat checkpoint cannot isolate nested-host failure. Publishing protected observations and later restoring state leaks player knowledge. Preparing and reserving every ActionFlow before execution could prevent both failures, but would require an exact execution witness, dry-run semantics, and protocol changes across all actions. This design uses nested checkpoints and runtime guards now, and adds a general permit only when a concrete rule cannot pass the observation gate.
+A single flat checkpoint cannot isolate nested-host failure. Publishing protected observations and later restoring state leaks player knowledge. Preparing and reserving every ActionFlow before execution could prevent both failures, but would require an exact execution witness, dry-run semantics, and protocol changes across all actions. Pre-disabling the host choice would require the same static simulation, while changing payment order would alter card semantics. This design uses nested checkpoints and runtime guards now, and adds a general permit only when a concrete rule cannot pass the observation gate.

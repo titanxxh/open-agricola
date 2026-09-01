@@ -362,6 +362,7 @@ export type ProvisionalContinuationScope = {
   rollbackInteractionKey: string
   failedCommandsAtCheckpoint: FailedAuthoritativeCommand[]
   guarded: boolean
+  fallbackCommand?: 'undoAction'
 }
 
 type ActiveCommandSettlement = {
@@ -1285,6 +1286,22 @@ export class GameCore {
     this.activeCommandSettlement.protectedObservations.push(structuredClone(observation))
   }
 
+  private checkpointRestoresProtectedChoice(
+    settlement: ActiveCommandSettlement,
+    frameId: string,
+  ): boolean {
+    if (
+      settlement.command.type !== 'choice' ||
+      settlement.checkpoint.state.pendingUndoBoundary !== true
+    ) return false
+    const frame = settlement.checkpoint.engineStackCursor.frames.find(
+      (candidate) => candidate.frameId === frameId,
+    )
+    return frame?.engineSnapshot.pendingData.some(
+      ({ pending }) => pending.request.kind === 'choice',
+    ) === true
+  }
+
   private markProvisionalHostBlocked(frame: EngineFrame, nodeId: string): boolean {
     const scope = this.provisionalContinuationScopes.find((entry) =>
       entry.frameId === frame.frameId && entry.hostNodeId === nodeId,
@@ -1292,6 +1309,44 @@ export class GameCore {
     if (!scope || !this.activeCommandSettlement) return false
     this.activeCommandSettlement.abortScopeId = scope.id
     return true
+  }
+
+  private openPostHostFallbackScope(settlement: ActiveCommandSettlement): void {
+    const frame = this.engineStack.current()
+    const cursor = this.engineStack.peekPendingCursor()
+    const view = this.engineStack.peekPendingView()
+    if (
+      !frame?.frameId ||
+      !cursor ||
+      view?.request.kind !== 'engine-blocked' ||
+      !this.checkpointRestoresProtectedChoice(settlement, frame.frameId) ||
+      this.provisionalContinuationScopes.some((scope) =>
+        scope.frameId === frame.frameId && scope.hostNodeId === cursor.hostNodeId)
+    ) return
+    this.provisionalContinuationScopes.push({
+      id: `provisional-scope-${this.nextProvisionalScopeId++}`,
+      frameId: frame.frameId,
+      hostNodeId: cursor.hostNodeId,
+      checkpoint: settlement.checkpoint,
+      rollbackCommand: settlement.command,
+      rollbackInteractionKey: settlement.interactionKey,
+      failedCommandsAtCheckpoint: settlement.failedCommandSnapshot.map((entry) => ({ ...entry })),
+      guarded: false,
+      fallbackCommand: 'undoAction',
+    })
+    settlement.provisional = true
+  }
+
+  private activeUndoActionFallbackScope(): ProvisionalContinuationScope | undefined {
+    const frame = this.engineStack.current()
+    const cursor = this.engineStack.peekPendingCursor()
+    const view = this.engineStack.peekPendingView()
+    if (!frame?.frameId || !cursor || view?.request.kind !== 'engine-blocked') return undefined
+    return this.provisionalContinuationScopes.find((scope) =>
+      scope.frameId === frame.frameId &&
+      scope.hostNodeId === cursor.hostNodeId &&
+      scope.fallbackCommand === 'undoAction',
+    )
   }
 
   private checkpointRestoresOptionalChoice(scope: ProvisionalContinuationScope): boolean {
@@ -1471,6 +1526,7 @@ export class GameCore {
           ? { ...scope, parentScopeId: undefined }
           : scope)
     }
+    this.openPostHostFallbackScope(settlement)
     this.refreshFailedAuthoritativeCommands()
     if (!settlement.provisional) return response
     return {
@@ -2596,6 +2652,7 @@ export class GameCore {
   }
 
   private canUndoActionNow(): boolean {
+    if (this.activeUndoActionFallbackScope()) return true
     if (this.state.pendingUndoBoundary === true) return false
     if (this.isFailedAuthoritativeCommand(normalizedCommand('undoAction', null, {}))) return false
     if (this.actionStartIndex === null) return false
@@ -5634,6 +5691,8 @@ export class GameCore {
 
   private undoActionInContext(): SessionResponse {
     if (this.state.gameOver) return this.respond(false, 'game is over')
+    const fallbackScope = this.activeUndoActionFallbackScope()
+    if (fallbackScope) return this.abortProvisionalScope(fallbackScope)
     if (!this.canUndoActionNow()) {
       if (
         this.state.pendingUndoBoundary === true ||
