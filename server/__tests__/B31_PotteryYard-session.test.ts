@@ -69,16 +69,33 @@ const scoreCategory = (resp: ReturnType<GameSession['getState']>, key: string) =
 
 describe('B031_PotteryYard session', () => {
   it('cannot be played without Pottery or an upgrade', () => {
-    const resp = enterMinorChoice(setupPurchase('none'))
+    const session = setupPurchase('none')
+    const scoreBefore = session.getState().scores[0]!.total
+    const resp = enterMinorChoice(session)
+    expect(resp.interaction.stateId).toBe('wait')
+    if (resp.interaction.stateId !== 'wait') return
+    expect(resp.interaction.request.options?.some((option) => option.value === CARD_ID) ?? false).toBe(false)
     expect(resp.state.players[0]!.minorHand).toContain(CARD_ID)
     expect(resp.state.players[0]!.minorPlayed).not.toContain(CARD_ID)
+    expect(resp.state.log.some((entry) =>
+      entry.key === 'log.playMinorImprovement' && entry.params?.improvements === CARD_ID,
+    )).toBe(false)
+    expect(resp.scores[0]!.total).toBe(scoreBefore)
   })
 
   it.each(['major', 'upgrade'] as const)('can be played with %s Pottery identity', (pottery) => {
     const session = setupPurchase(pottery)
+    const scoreBefore = session.getState().scores[0]!.total
     const resp = enterMinorChoice(session)
     expect(resp.ok).toBe(true)
+    expect(resp.interaction.stateId === 'wait' ? resp.interaction.request.kind : resp.interaction.stateId)
+      .toBe('confirm-next-player')
     expect(resp.state.players[0]!.minorPlayed).toContain(CARD_ID)
+    expect(resp.state.log).toContainEqual(expect.objectContaining({
+      key: 'log.playMinorImprovement',
+      params: expect.objectContaining({ improvements: CARD_ID }),
+    }))
+    expect(resp.scores[0]!.total).toBe(scoreBefore + 3)
   })
 
   it('scores 2 bonus VP for two orthogonally adjacent unused spaces and keeps their penalty', () => {
@@ -87,11 +104,19 @@ describe('B031_PotteryYard session', () => {
     expect(scoreCategory(resp, 'empty')?.quantity).toBe(2)
     expect(scoreCategory(resp, 'empty')?.total).toBe(-2)
     expect(scoreCategory(resp, 'cards')?.total).toBe(1)
+    expect(resp.interaction.stateId).toBe('idle')
+    expect(resp.state.log.some((entry) =>
+      entry.key === 'log.cardEffectGain' && entry.params?.cardId === CARD_ID,
+    )).toBe(false)
   })
 
   it('does not score for two unused spaces that touch only diagonally', () => {
     const resp = setupScoring([{ row: 1, col: 2 }, { row: 2, col: 3 }])
     expect(scoreCategory(resp, 'cardBonusVp')?.total ?? 0).toBe(0)
     expect(scoreCategory(resp, 'empty')?.total).toBe(-2)
+    expect(resp.interaction.stateId).toBe('idle')
+    expect(resp.state.log.some((entry) =>
+      entry.key === 'log.cardEffectGain' && entry.params?.cardId === CARD_ID,
+    )).toBe(false)
   })
 })
