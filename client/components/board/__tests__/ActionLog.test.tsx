@@ -113,6 +113,27 @@ describe('ActionLog', () => {
     expect(screen.getAllByRole('listitem').length).toBeGreaterThan(0)
   })
 
+  it('localizes stable harvest exchange source ids', () => {
+    const { container } = render(
+      <ActionLog
+        locale="zh"
+        currentRound={1}
+        log={[{
+          key: 'log.harvestFeedConvert',
+          params: {
+            player: '玩家A',
+            source: '__basic__',
+            cost: { grain: 1 },
+            food: { food: 1 },
+          },
+        }]}
+      />,
+    )
+
+    expect(container.textContent).toContain('基础转化')
+    expect(container.textContent).not.toContain('__basic__')
+  })
+
   it('explains provisional rollback outcomes', () => {
     render(
       <ActionLog

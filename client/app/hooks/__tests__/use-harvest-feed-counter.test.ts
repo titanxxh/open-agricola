@@ -74,4 +74,16 @@ describe('computeHarvestFeedCounterMax', () => {
       resources,
     )).toBe(0)
   })
+
+  it('shares a source max across exchange rows', () => {
+    const first = { ...opt('tier-1', { grain: 1 }), sourceId: 'D062_BeerTap', max: 1 }
+    const second = { ...opt('tier-2', { grain: 1 }), sourceId: 'D062_BeerTap', max: 1 }
+
+    expect(computeHarvestFeedCounterMax(
+      second,
+      [first, second],
+      { 'tier-1': 1, 'tier-2': 0 },
+      playerResources,
+    )).toBe(0)
+  })
 })

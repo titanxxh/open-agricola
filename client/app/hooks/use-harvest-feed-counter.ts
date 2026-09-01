@@ -52,5 +52,14 @@ export const computeHarvestFeedCounterMax = (
     if (cap < maxTimes) maxTimes = cap
   }
   const resourceMax = Math.max(0, Number.isFinite(maxTimes) ? maxTimes : 0)
-  return Math.min(resourceMax, target.max ?? resourceMax)
+  const sourceUsedByOthers = allOptions.reduce(
+    (sum, option) => option.id !== target.id && option.sourceId === target.sourceId
+      ? sum + (counts[option.id] ?? 0)
+      : sum,
+    0,
+  )
+  const sourceMax = target.max === undefined
+    ? resourceMax
+    : Math.max(0, target.max - sourceUsedByOthers)
+  return Math.min(resourceMax, sourceMax)
 }

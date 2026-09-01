@@ -2,6 +2,8 @@ import { describe, it, expect } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { getExchangesInWindow, applyTrade } from '../../shared/actions/effects/exchange'
 import { PaymentSolver } from '../../shared/actions/payment'
+import { markAllWorkersUsed, setActiveWorkerCount } from '../../shared/domain/player'
+import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 
 import '../../shared/cards/C/C062_CookeryExtension'
 
@@ -158,6 +160,32 @@ describe('C62 CookeryExtension', () => {
 })
 
 describe('C62 + harvest feed integration (simplified)', () => {
+  it('does not open a feed wait when its only derived harvest trades are unaffordable', () => {
+    const session = new GameSession(62)
+    stabilizeRandomHands(session.state.players)
+    const state = session.getState().state
+    state.players = state.players.slice(0, 2)
+    state.round = 4
+    state.roundPhase = 'work'
+    for (const player of state.players) {
+      markAllWorkersUsed(state, player)
+      setActiveWorkerCount(player, 0)
+      player.resources.food = 0
+    }
+    const player = state.players[0]!
+    setActiveWorkerCount(player, 1)
+    seedC62(state, player.id)
+    seedCookery(state, FIREPLACE1, player.id)
+    session.loadState(state)
+
+    const response = session.performRoundEnd()
+
+    expect(response.interaction.stateId === 'wait'
+      && response.interaction.request.kind === 'feed'
+      && response.interaction.playerIndex === 0).toBe(false)
+    expect(response.state.players[0]!.resources.begging).toBe(2)
+  })
+
   // Note: simplified per plan task 9 fallback. Driving the live
   // confirmHarvestFeed path with derived sourceIds requires
   // game-core.ts:lookupCard() to resolve composite sourceIds (e.g.

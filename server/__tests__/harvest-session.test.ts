@@ -106,7 +106,7 @@ describe('harvest session flow', () => {
       expect.objectContaining({
         type: 'harvest.feedConverted',
         playerId: playerB.id,
-        source: 'Basic conversion',
+        source: '__basic__',
         cost: { grain: 1 },
         food: { food: 1 },
       }),
@@ -149,7 +149,7 @@ describe('harvest session flow', () => {
           key: 'log.harvestFeedConvert',
           params: expect.objectContaining({
             player: 'PlayerB',
-            source: 'Basic conversion',
+            source: '__basic__',
           }),
         }),
         expect.objectContaining({

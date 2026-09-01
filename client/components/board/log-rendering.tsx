@@ -479,6 +479,11 @@ export const prepareLogEntry = (
     typeof params.cost === 'object' &&
     typeof params.food === 'object'
   ) {
+    if (typeof params.source === 'string') {
+      params.source = params.source === '__basic__'
+        ? t(locale, 'ui.harvestFeedBasicSource')
+        : resolveCardDisplayName(locale, params.source)
+    }
     richParams.cost = (
       <ResourceLine locale={locale} resources={params.cost as Partial<Resource>} />
     )
