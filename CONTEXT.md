@@ -246,6 +246,10 @@ _Avoid_: 旧 `PendingAction` union、前端 pending 状态机
 一次 pending 被玩家选择后继续执行的后续 flow 或阶段恢复。复杂卡牌的“下一步选择”应走显式 pending / continuation。
 _Avoid_: 共享临时槽位、前端偷补流程
 
+**Mandatory Continuation（强制续行）**:
+玩家已接受或规则已承诺、不可再跳过的后续义务。它的动态后代 flow 必须继续保持 mandatory；无法执行时进入 undo-only blocked 或回退到规则定义的安全边界，不能静默完成。
+_Avoid_: optional flow、Mandatory Saturation、Continuation Guard
+
 **Provisional Continuation Scope（暂定 continuation 作用域）**:
 Action Execution Scope 内，围绕已承诺但尚未执行本体的 mandatory host action 前置结算而建立的暂定结果边界；它在前置链首次切换玩家或产生受保护观察时开启。真正嵌套的 mandatory host 形成子作用域；未受保证的作用域可以整体撤销，受保证后则约束后续结算不得再次破坏 host continuation。
 _Avoid_: 数据库 Transaction、普通 Undo Scope、已完成 action 的 after response、Interaction Presentation Draft

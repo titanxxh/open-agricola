@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession, type SessionResponse } from '../game/authoritative-session'
-import { setWorkersAtHome } from '../../shared/domain/player'
+import { setWorkersAtHome, workersAvailable } from '../../shared/domain/player'
 import { stablesAction } from '../../shared/actions/effects/stables'
 import { getAvailableStableSupplyCount } from '../../shared/domain/supply-tokens'
 import type {
@@ -157,6 +157,16 @@ const expectFarmSelect = (
   }
 }
 
+const expectEngineBlocked = (resp: SessionResponse) => {
+  expect(resp.interaction.stateId).toBe('wait')
+  if (resp.interaction.stateId !== 'wait') throw new Error('expected engine-blocked')
+  expect(resp.interaction.playerIndex).toBe(0)
+  expect(resp.interaction.promptKey).toBe('ui.interactionEngineBlocked')
+  expect(resp.interaction.request.kind).toBe('engine-blocked')
+  expect(resp.interaction.allowedCommands).toEqual(['undoStep', 'undoAction'])
+  expect(resp.interaction.anytimeActions).toEqual([])
+}
+
 const playB149 = (session: GameSession) => {
   let resp = session.takeAction(0, 'lessons')
   expect(resp.ok).toBe(true)
@@ -215,6 +225,44 @@ const paidWoodEvents = (state: GameState) =>
     return payment.type === 'resource.paid' && (payment.resources?.wood ?? 0) > 0
   })
 
+const snapshotRuleAction = (session: GameSession) => {
+  const response = session.getState()
+  const state = response.state
+  const player = state.players[0]!
+  return {
+    resources: clone(player.resources),
+    supplyTokensConsumed: clone(player.supplyTokensConsumed),
+    fenceSegments: clone(player.fenceSegments),
+    pastures: clone(player.pastures),
+    occupationHand: clone(player.occupationHand),
+    occupationPlayed: clone(player.occupationPlayed),
+    workersAvailable: workersAvailable(state, player),
+    lessonsTakenBy: clone(state.actionSpaces.find((space) => space.id === 'lessons')?.takenBy),
+    events: clone(state.events),
+    log: clone(state.log),
+    scores: clone(response.scores),
+  }
+}
+
+const expectRuleActionSnapshot = (
+  response: SessionResponse,
+  before: ReturnType<typeof snapshotRuleAction>,
+) => {
+  const state = response.state
+  const player = state.players[0]!
+  expect(player.resources).toEqual(before.resources)
+  expect(player.supplyTokensConsumed).toEqual(before.supplyTokensConsumed)
+  expect(player.fenceSegments).toEqual(before.fenceSegments)
+  expect(player.pastures).toEqual(before.pastures)
+  expect(player.occupationHand).toEqual(before.occupationHand)
+  expect(player.occupationPlayed).toEqual(before.occupationPlayed)
+  expect(workersAvailable(state, player)).toBe(before.workersAvailable)
+  expect(state.actionSpaces.find((space) => space.id === 'lessons')?.takenBy).toEqual(before.lessonsTakenBy)
+  expect(state.events).toEqual(before.events)
+  expect(state.log).toEqual(before.log)
+  expect(response.scores).toEqual(before.scores)
+}
+
 describe('B149 Open Air Farmer session', () => {
   it('playing B149 consumes three stable supply tokens but no wood before fencing', () => {
     const session = setup({ wood: 2 })
@@ -250,6 +298,34 @@ describe('B149 Open Air Farmer session', () => {
         resources: { wood: 2 },
       }),
     ])
+  })
+
+  it('undoes a successful fence step and then the complete B149 rule action', () => {
+    const session = setup({ wood: 2 })
+    const before = snapshotRuleAction(session)
+    playB149ToFencing(session)
+
+    const committed = session.commitSelectionChoice(0, {
+      edges: TWO_CELL,
+      palisadeEdges: [],
+      extraWood: 0,
+    })
+    expect(committed.ok).toBe(true)
+    expect(committed.state.players[0]!.resources.wood).toBe(0)
+    expect(committed.state.players[0]!.fenceSegments).toHaveLength(6)
+    expect(committed.state.players[0]!.pastures).toHaveLength(1)
+
+    const undoStep = session.undoStep()
+    expect(undoStep.ok).toBe(true)
+    expectFarmSelect(undoStep)
+    expect(undoStep.state.players[0]!.resources.wood).toBe(2)
+    expect(undoStep.state.players[0]!.supplyTokensConsumed?.stable).toBe(3)
+    expect(undoStep.state.players[0]!.fenceSegments).toHaveLength(0)
+    expect(undoStep.state.players[0]!.pastures).toHaveLength(0)
+
+    const undoAction = session.undoAction()
+    expect(undoAction.ok).toBe(true)
+    expectRuleActionSnapshot(undoAction, before)
   })
 
   it('invalid fencing does not consume fixed wood and the pending can still complete once', () => {
@@ -320,7 +396,7 @@ describe('B149 Open Air Farmer session', () => {
     expect(updated.fenceSegments.filter((segment) => segment.type === 'palisade')).toHaveLength(3)
   })
 
-  it('does not enter B149 fencing when only two ordinary fence tokens remain', () => {
+  it('blocks the mandatory B149 continuation when only two ordinary fence tokens remain', () => {
     const session = setup({ wood: 20, woodPalisades: true })
     const state = session.getState().state
     const player = state.players[0]!
@@ -337,8 +413,7 @@ describe('B149 Open Air Farmer session', () => {
     }
 
     expect(resp.ok).toBe(true)
-    expect(resp.interaction.promptKey).not.toBe('ui.interactionFenceSelect')
-    expect(resp.interaction.sourceCard).not.toBe(CARD_ID)
+    expectEngineBlocked(resp)
   })
 
   it('cancel does not consume fixed wood or complete the onBuy fencing sequence', () => {
@@ -420,7 +495,7 @@ describe('B149 Open Air Farmer session', () => {
     expect(stableResult.request.farm.maxSelections).toBe(1)
   })
 
-  it('plays B149 but skips its effect when fewer than three stable supply tokens remain', () => {
+  it('blocks the mandatory B149 continuation when fewer than three stable supply tokens remain', () => {
     const session = setup({ wood: 2 })
     const state = session.getState().state
     const player = state.players[0]!
@@ -439,11 +514,12 @@ describe('B149 Open Air Farmer session', () => {
     expect(updated.supplyTokensConsumed?.stable).toBeUndefined()
     expect(updated.resources.wood).toBe(2)
     expect(updated.fenceSegments).toHaveLength(0)
-    expect(resp.interaction.promptKey).not.toBe('ui.interactionFenceSelect')
+    expectEngineBlocked(resp)
   })
 
-  it('plays B149 and removes three stables but skips fencing when two wood cannot be paid', () => {
+  it('blocks without committing wood or fences when B149 fixed wood cannot be paid', () => {
     const session = setup({ wood: 1 })
+    const before = snapshotRuleAction(session)
 
     const resp = playB149(session)
     const player = resp.state.players[0]!
@@ -452,10 +528,16 @@ describe('B149 Open Air Farmer session', () => {
     expect(player.supplyTokensConsumed?.stable).toBe(3)
     expect(player.resources.wood).toBe(1)
     expect(player.fenceSegments).toHaveLength(0)
-    expect(resp.interaction.promptKey).not.toBe('ui.interactionFenceSelect')
+    expect(player.pastures).toHaveLength(0)
+    expect(fencingPayments(resp.state)).toHaveLength(0)
+    expectEngineBlocked(resp)
+
+    const undoAction = session.undoAction()
+    expect(undoAction.ok).toBe(true)
+    expectRuleActionSnapshot(undoAction, before)
   })
 
-  it('plays B149 and removes three stables but skips fencing when no farmyard space is free', () => {
+  it('blocks the mandatory B149 continuation when no size-two pasture can be built', () => {
     const session = setup({ wood: 2 })
     const state = session.getState().state
     const player = state.players[0]!
@@ -471,6 +553,7 @@ describe('B149 Open Air Farmer session', () => {
     expect(updated.supplyTokensConsumed?.stable).toBe(3)
     expect(updated.fields).toHaveLength(13)
     expect(updated.fenceSegments).toHaveLength(0)
-    expect(resp.interaction.promptKey).not.toBe('ui.interactionFenceSelect')
+    expect(updated.pastures).toHaveLength(0)
+    expectEngineBlocked(resp)
   })
 })

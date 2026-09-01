@@ -377,6 +377,10 @@ describe('engine internal children', () => {
       'internal-onbuy-flow-probe.payment=2',
       'internal-onbuy-choice-probe.execute',
     ])
+    const insertedActions = engine._internals().tree.allNodes()
+      .filter((node): node is ActionNode => node instanceof ActionNode)
+    expect(insertedActions.find((node) => node.actionId === onBuyProbe.id)?.mandatory).toBe(true)
+    expect(insertedActions.find((node) => node.actionId === choiceProbe.id)?.mandatory).toBe(true)
 
     expect(engine.resolveChoice('selected', { state, player, space }).type).toBe('ok')
     const finalStep = runUntilDone(engine, { state, player, space })
