@@ -44,6 +44,7 @@ const buyPumpernickel = (session: GameSession) => {
 describe('E007 Pumpernickel native session', () => {
   it('pays 1 grain, gains 4 food, and passes to the next player', () => {
     const session = setup()
+    const scoreBefore = session.getState().scores[0]!.total
 
     const response = buyPumpernickel(session)
 
@@ -56,5 +57,13 @@ describe('E007 Pumpernickel native session', () => {
       resources: { grain: 1 },
       paymentFor: 'minor-improvement',
     }))
+    expect(response.interaction.stateId === 'wait'
+      ? response.interaction.request.kind
+      : response.interaction.stateId).toBe('confirm-next-player')
+    expect(response.state.log).toContainEqual(expect.objectContaining({
+      key: 'log.cardEffectGain',
+      params: expect.objectContaining({ cardId: CARD_ID, gain: { food: 4 } }),
+    }))
+    expect(response.scores[0]!.total).toBe(scoreBefore - 2)
   })
 })

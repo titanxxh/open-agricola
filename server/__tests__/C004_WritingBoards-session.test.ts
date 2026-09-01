@@ -59,6 +59,7 @@ describe('C004_WritingBoards session', () => {
     'pays 1 food, gains 1 wood per played occupation (%i), then passes',
     (occupationCount) => {
       const session = setup(occupationCount)
+      const scoreBefore = session.getState().scores[0]!.total
 
       const response = buyMinor(session, session.takeAction(0, 'meeting-place'))
 
@@ -69,6 +70,17 @@ describe('C004_WritingBoards session', () => {
       })
       expect(response.state.players[0]!.minorPlayed).not.toContain(CARD_ID)
       expect(response.state.players[1]!.minorHand).toContain(CARD_ID)
+      expect(response.interaction.stateId === 'wait'
+        ? response.interaction.request.kind
+        : response.interaction.stateId).toBe('confirm-next-player')
+      expect(response.state.log).toContainEqual(expect.objectContaining({
+        key: 'log.cardEffectPay',
+        params: expect.objectContaining({ cardId: CARD_ID, cost: { food: 1 } }),
+      }))
+      expect(response.state.log.some((entry) =>
+        entry.key === 'log.cardEffectGain' && entry.params?.cardId === CARD_ID,
+      )).toBe(occupationCount > 0)
+      expect(response.scores[0]!.total).toBe(scoreBefore)
     },
   )
 })

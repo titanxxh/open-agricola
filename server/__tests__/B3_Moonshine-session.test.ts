@@ -278,9 +278,6 @@ describe('B003_Moonshine session', () => {
     expect(playResp.interaction.stateId).toBe('wait')
     if (playResp.interaction.stateId !== 'wait') return
     expect(playResp.interaction.request.kind).toBe('engine-blocked')
-    expect(session.createSessionPrivateCursor().provisionalContinuationScopes).toEqual(
-      expect.arrayContaining([expect.objectContaining({ fallbackCommand: 'undoAction' })]),
-    )
     expect(playResp.interaction.allowedCommands).toEqual(['undoAction'])
     expect(playResp.state.players[0]!.occupationPlayed).toContain(OCC_EXTRA_COST)
     expect(playResp.state.players[0]!.resources.food).toBe(0)

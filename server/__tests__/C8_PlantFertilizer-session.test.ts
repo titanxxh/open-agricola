@@ -83,6 +83,7 @@ describe('C8 PlantFertilizer session', () => {
     buyer.resources.grain = 0
     buyer.resources.wood = 0
     session.loadState(state)
+    const scoreBefore = session.getState().scores[0]!.total
 
     let response = buyMinor(session, session.takeAction(0, 'meeting-place'))
     expect(response.interaction.stateId).toBe('wait')
@@ -101,6 +102,14 @@ describe('C8 PlantFertilizer session', () => {
     expect(result.resources).toMatchObject({ grain: 0, wood: 0 })
     expect(result.minorPlayed).not.toContain(CARD_ID)
     expect(response.state.players[1]!.minorHand).toContain(CARD_ID)
+    expect(response.interaction.stateId === 'wait'
+      ? response.interaction.request.kind
+      : response.interaction.stateId).toBe('confirm-next-player')
+    expect(response.state.log).toContainEqual(expect.objectContaining({
+      key: 'log.farmCropAdded',
+      params: expect.objectContaining({ crops: { grain: 1, wood: 1 } }),
+    }))
+    expect(response.scores[0]!.total).toBe(scoreBefore)
   })
 
   it('public buy can decline without changing any eligible field and still passes', () => {
@@ -109,6 +118,7 @@ describe('C8 PlantFertilizer session', () => {
     const buyer = state.players[0]!
     buyer.fields = [{ row: 0, col: 1, stacks: [{ kind: 'vegetable', remaining: 1 }] }]
     session.loadState(state)
+    const scoreBefore = session.getState().scores[0]!.total
 
     let response = buyMinor(session, session.takeAction(0, 'meeting-place'))
     expect(response.interaction.stateId).toBe('wait')
@@ -119,6 +129,11 @@ describe('C8 PlantFertilizer session', () => {
       remaining: 1,
     })
     expect(response.state.players[1]!.minorHand).toContain(CARD_ID)
+    expect(response.interaction.stateId === 'wait'
+      ? response.interaction.request.kind
+      : response.interaction.stateId).toBe('confirm-next-player')
+    expect(response.state.log.some((entry) => entry.key === 'log.farmCropAdded')).toBe(false)
+    expect(response.scores[0]!.total).toBe(scoreBefore)
   })
 
   it('public buy skips empty, total-2, and Mud Patch animal zones', () => {
@@ -131,6 +146,7 @@ describe('C8 PlantFertilizer session', () => {
     ]
     buyer.minorPlayed.push('A011_MudPatch')
     session.loadState(state)
+    const scoreBefore = session.getState().scores[0]!.total
 
     const response = buyMinor(session, session.takeAction(0, 'meeting-place'))
 
@@ -138,10 +154,12 @@ describe('C8 PlantFertilizer session', () => {
       { row: 0, col: 0, stacks: [] },
       { row: 0, col: 1, stacks: [{ kind: 'grain', remaining: 2 }] },
     ])
-    if (response.interaction.stateId === 'wait') {
-      expect(response.interaction.promptKey).not.toBe('ui.interactionOptionalAction')
-    }
+    expect(response.interaction.stateId === 'wait'
+      ? response.interaction.request.kind
+      : response.interaction.stateId).toBe('confirm-next-player')
+    expect(response.state.log.some((entry) => entry.key === 'log.farmCropAdded')).toBe(false)
     expect(response.state.players[1]!.minorHand).toContain(CARD_ID)
+    expect(response.scores[0]!.total).toBe(scoreBefore)
   })
 
   it('onBuy returns no flow when no field is eligible', () => {

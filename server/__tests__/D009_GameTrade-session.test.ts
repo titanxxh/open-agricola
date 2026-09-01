@@ -65,6 +65,7 @@ describe('D009_GameTrade session', () => {
       },
     ]
     session.loadState(state)
+    const scoreBefore = session.getState().scores[0]!.total
 
     let response = buyMinor(session, session.takeAction(0, 'meeting-place'))
 
@@ -88,5 +89,13 @@ describe('D009_GameTrade session', () => {
       expect.objectContaining({ id: 'boar-pasture', animalType: 'boar', animalCount: 1 }),
       expect.objectContaining({ id: 'cattle-pasture', animalType: 'cattle', animalCount: 1 }),
     ]))
+    expect(response.interaction.stateId === 'wait'
+      ? response.interaction.request.kind
+      : response.interaction.stateId).toBe('confirm-next-player')
+    expect(response.state.log).toContainEqual(expect.objectContaining({
+      key: 'log.cardEffectGain',
+      params: expect.objectContaining({ cardId: CARD_ID, gain: { boar: 1, cattle: 1 } }),
+    }))
+    expect(response.scores[0]!.total).toBe(scoreBefore + 2)
   })
 })

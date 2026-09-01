@@ -64,6 +64,7 @@ const playA4 = (session: GameSession) => {
 describe('A004_Baseboards session — altCosts', () => {
   it('food cost: gains 1 wood per room and passes Baseboards', () => {
     const session = setup({ food: 2, grain: 0, rooms: 2 })
+    const scoreBefore = session.getState().scores[0]!.total
     const resp = playA4(session)
     expect(resp.ok).toBe(true)
     expect(resp.interaction.stateId === 'wait' ? resp.interaction.request.kind : resp.interaction.stateId).toBe('confirm-next-player')
@@ -72,15 +73,26 @@ describe('A004_Baseboards session — altCosts', () => {
     expect(resp.state.players[0]!.resources.wood).toBe(7)
     expect(resp.state.players[0]!.minorPlayed).not.toContain(CARD_ID)
     expect(resp.state.players[1]!.minorHand).toContain(CARD_ID)
+    expect(resp.state.log).toContainEqual(expect.objectContaining({
+      key: 'log.cardEffectGain',
+      params: expect.objectContaining({ cardId: CARD_ID, gain: { wood: 2 } }),
+    }))
+    expect(resp.scores[0]!.total).toBe(scoreBefore)
   })
 
   it('grain cost: gains an additional wood when rooms exceed people', () => {
     const session = setup({ food: 0, grain: 1, rooms: 3 })
+    const scoreBefore = session.getState().scores[0]!.total
     const resp = playA4(session)
     expect(resp.interaction.stateId === 'wait' ? resp.interaction.request.kind : resp.interaction.stateId).toBe('confirm-next-player')
     expect(resp.state.players[0]!.resources.food).toBe(0)
     expect(resp.state.players[0]!.resources.grain).toBe(0)
     expect(resp.state.players[0]!.resources.wood).toBe(9)
+    expect(resp.state.log).toContainEqual(expect.objectContaining({
+      key: 'log.cardEffectGain',
+      params: expect.objectContaining({ cardId: CARD_ID, gain: { wood: 4 } }),
+    }))
+    expect(resp.scores[0]!.total).toBe(scoreBefore - 2)
   })
 
   it('food=2, grain=1 → multi-solution → selectPayment choice', () => {

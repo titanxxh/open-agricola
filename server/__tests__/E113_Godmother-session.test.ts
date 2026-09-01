@@ -29,12 +29,21 @@ describe('E113 Godmother native session', () => {
     const player = session.state.players[0]!
     const familyBefore = familySize(player)
     const vegetablesBefore = player.resources.vegetable
+    const scoreBefore = session.getState().scores[0]!.total
 
     const response = session.takeAction(0, 'wish-children')
 
     expect(response.ok, response.error).toBe(true)
     expect(familySize(response.state.players[0]!)).toBe(familyBefore + 1)
     expect(response.state.players[0]!.resources.vegetable).toBe(vegetablesBefore + 1)
+    expect(response.interaction.stateId === 'wait'
+      ? response.interaction.request.kind
+      : response.interaction.stateId).toBe('confirm-next-player')
+    expect(response.state.log).toContainEqual(expect.objectContaining({
+      key: 'log.cardEffectGain',
+      params: expect.objectContaining({ cardId: CARD_ID, gain: { vegetable: 1 } }),
+    }))
+    expect(response.scores[0]!.total).toBe(scoreBefore + 5)
   })
 
   it('gains exactly 1 vegetable after Family Growth without room', () => {
@@ -42,12 +51,21 @@ describe('E113 Godmother native session', () => {
     const player = session.state.players[0]!
     const familyBefore = familySize(player)
     const vegetablesBefore = player.resources.vegetable
+    const scoreBefore = session.getState().scores[0]!.total
 
     const response = session.takeAction(0, 'urgent-wish-children')
 
     expect(response.ok, response.error).toBe(true)
     expect(familySize(response.state.players[0]!)).toBe(familyBefore + 1)
     expect(response.state.players[0]!.resources.vegetable).toBe(vegetablesBefore + 1)
+    expect(response.interaction.stateId === 'wait'
+      ? response.interaction.request.kind
+      : response.interaction.stateId).toBe('confirm-next-player')
+    expect(response.state.log).toContainEqual(expect.objectContaining({
+      key: 'log.cardEffectGain',
+      params: expect.objectContaining({ cardId: CARD_ID, gain: { vegetable: 1 } }),
+    }))
+    expect(response.scores[0]!.total).toBe(scoreBefore + 5)
   })
 
   it('does not gain a vegetable after an unrelated action', () => {
@@ -55,11 +73,19 @@ describe('E113 Godmother native session', () => {
     const player = session.state.players[0]!
     const familyBefore = familySize(player)
     const vegetablesBefore = player.resources.vegetable
+    const scoreBefore = session.getState().scores[0]!.total
 
     const response = session.takeAction(0, 'day-laborer')
 
     expect(response.ok, response.error).toBe(true)
     expect(familySize(response.state.players[0]!)).toBe(familyBefore)
     expect(response.state.players[0]!.resources.vegetable).toBe(vegetablesBefore)
+    expect(response.interaction.stateId === 'wait'
+      ? response.interaction.request.kind
+      : response.interaction.stateId).toBe('confirm-next-player')
+    expect(response.state.log.some((entry) =>
+      entry.key === 'log.cardEffectGain' && entry.params?.cardId === CARD_ID,
+    )).toBe(false)
+    expect(response.scores[0]!.total).toBe(scoreBefore)
   })
 })
