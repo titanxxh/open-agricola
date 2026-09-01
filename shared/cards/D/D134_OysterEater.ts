@@ -59,6 +59,10 @@ const listener: CardListenerRegistration = {
 
 const effect: CardEffect = {
   id: CARD_ID,
+  onBeforeStartOfTurn: (_state, player) => {
+    const extra = player.cardStates?.[CARD_ID]?.extraData
+    if (extra) delete extra.skipNextPlacement
+  },
   onBeforePlayerTurn: (_state, player) => {
     const remaining = (player.cardStates?.[CARD_ID]?.extraData as { skipNextPlacement?: number } | undefined)
       ?.skipNextPlacement ?? 0

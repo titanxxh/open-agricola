@@ -456,6 +456,11 @@ describe('E070_CropRotationField session', () => {
         ) ?? [],
       ).toEqual([])
       expect(resp.interaction.stateId === 'wait' ? resp.interaction.sourceCard : undefined).not.toBe(CARD_ID)
+      expect(resp.interaction.stateId === 'wait'
+        ? resp.interaction.request.options?.some((option) => option.sourceCard === CARD_ID) ?? false
+        : false).toBe(false)
+      expect(resp.state.events.some((event) => event.type === 'farm.sown')).toBe(false)
+      expect(resp.state.log.some((entry) => entry.key === 'log.sow')).toBe(false)
     })
 
     it('no harvest when card has no crop', () => {

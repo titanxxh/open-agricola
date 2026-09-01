@@ -380,6 +380,29 @@ export const reorganizeAction: ActionDefinition = {
         ? (rawPayload as { zones: ZoneAssignment[] }).zones
         : undefined
     if (!zones) return { type: 'fail', errorKey: 'log.reorganizeFail' }
+    const playerIndex = ctx.state.players.indexOf(ctx.player)
+    const cardZones = new Map(
+      playerBoard(ctx.state, playerIndex).animals.zones()
+        .filter((zone) => zone.zoneType === 'card')
+        .map((zone) => [zone.id, zone]),
+    )
+    for (const assignment of zones) {
+      const zone = cardZones.get(assignment.id)
+      if (!zone) {
+        if (assignment.zoneType === 'card') {
+          return { type: 'fail', errorKey: 'log.reorganizeFail', recoverable: true }
+        }
+        continue
+      }
+      const allowed = new Set(getAllowedAnimalTypesForZone(ctx.state, ctx.player, zone))
+      const counts = readAnimalCountsForZoneAssignment(assignment)
+      if (
+        assignment.zoneType !== 'card'
+        || animalKeysForState(ctx.state).some((animal) => (counts[animal] ?? 0) > 0 && !allowed.has(animal))
+      ) {
+        return { type: 'fail', errorKey: 'log.reorganizeFail', recoverable: true }
+      }
+    }
     const before = animalTotals(ctx.state, ctx.player)
     applyReorganizeMutate(ctx.state, ctx.player, zones)
     const after = animalTotals(ctx.state, ctx.player)

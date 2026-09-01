@@ -344,7 +344,8 @@ export const useExchangeDraftPresentation = ({
   const harvestFeedConvertedFood = useMemo(
     () =>
       harvestFeedSelections.reduce(
-        (sum, entry) => sum + entry.count * ((entry.to.food as number) ?? 0),
+        (sum, entry) =>
+          sum + entry.count * (((entry.to.food as number) ?? 0) - ((entry.from.food as number) ?? 0)),
         0,
       ),
     [harvestFeedSelections],
@@ -354,7 +355,7 @@ export const useExchangeDraftPresentation = ({
     : null
   const harvestFeedBegging = Math.max(
     0,
-    (harvestPending?.remaining ?? 0) - harvestFeedConvertedFood,
+    (harvestPending?.remaining ?? 0) - Math.max(0, harvestFeedConvertedFood),
   )
   const harvestFeedSummary = useMemo(
     () => buildHarvestFeedSummary({

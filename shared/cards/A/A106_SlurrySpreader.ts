@@ -1,4 +1,4 @@
-import { defineMinorCard } from '../card-source'
+import { defineOccupationCard } from '../card-source'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import { fieldHasCrop } from '../../domain/field'
 import type { CardImpl } from '../registry'
@@ -27,7 +27,7 @@ const cardImpl = {
   reaches: [] as readonly string[],
 } satisfies CardImpl
 
-export const A106_SlurrySpreader = defineMinorCard({
+export const A106_SlurrySpreader = defineOccupationCard({
   meta: {
     id: CARD_ID,
     name: 'Slurry Spreader',

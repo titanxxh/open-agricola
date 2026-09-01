@@ -26,7 +26,7 @@ const setup = () => {
   state.players = state.players.slice(0, 2)
 
   const player = state.players[0]!
-  player.minorPlayed.push(CARD_ID)
+  player.occupationPlayed.push(CARD_ID)
 
   return { state, player }
 }
@@ -99,9 +99,9 @@ describe('A106_SlurrySpreader session', () => {
     })
 
     const player = state.players[0]!
-    player.minorPlayed.push(CARD_ID)
+    player.occupationPlayed.push(CARD_ID)
     player.playedCards = player.playedCards ?? []
-    player.playedCards.push(`minor:${CARD_ID}`)
+    player.playedCards.push(`occupation:${CARD_ID}`)
     player.fields = [{ row: 0, col: 0, stacks: [{ kind: 'grain', remaining: 1 }] }]
 
     session.loadState(state)
@@ -169,20 +169,6 @@ const makeTypeSession = (type: 'occupation' | 'minor') => {
   return session
 }
 
-const playMinor = (session: GameSession) => {
-  let resp = session.takeAction(0, 'meeting-place')
-  expect(resp.ok).toBe(true)
-  if (resp.interaction.stateId !== 'wait') return resp
-  const improvementOption = resp.interaction.request.options?.find((option) => option.value.startsWith('action-improvement-'))
-  if (improvementOption) resp = session.resolveChoice(0, improvementOption.value)
-  if (resp.state.players[0]!.minorPlayed.includes(CARD_ID)) return resp
-  expect(resp.interaction.stateId).toBe('wait')
-  if (resp.interaction.stateId !== 'wait') return resp
-  const cardOption = resp.interaction.request.options?.find((option) => option.value === CARD_ID)
-  expect(cardOption).toBeDefined()
-  return session.resolveChoice(0, cardOption!.value)
-}
-
 const makeHarvestSession = (fields: PlayerState['fields']) => {
   const session = new GameSession(106, undefined, { playerCount: 2 })
   stabilizeRandomHands(session.state.players)
@@ -198,8 +184,8 @@ const makeHarvestSession = (fields: PlayerState['fields']) => {
     player.resources.food = 10
   })
   const player = state.players[0]!
-  player.minorPlayed = [CARD_ID]
-  player.playedCards = [`minor:${CARD_ID}`]
+  player.occupationPlayed = [CARD_ID]
+  player.playedCards = [`occupation:${CARD_ID}`]
   player.fields = fields
   session.loadState(state)
   return session
@@ -228,25 +214,25 @@ const finishHarvest = (session: GameSession) => {
 }
 
 describe('A106 parity batch-02 characterization', () => {
-  it('A106 S1: OA resolves Lessons without playing minor-typed Slurry Spreader', () => {
+  it('A106 S1: Lessons plays Slurry Spreader as an occupation', () => {
     const session = makeTypeSession('occupation')
     const resp = session.takeAction(0, 'lessons')
 
     expect(resp.ok).toBe(true)
-    expect(resp.interaction.stateId).toBe('wait')
-    if (resp.interaction.stateId === 'wait') {
-      expect(resp.interaction.request.kind).toBe('confirm-next-player')
-    }
-    expect(resp.state.players[0]!.occupationHand).toEqual([CARD_ID])
-    expect(resp.state.players[0]!.occupationPlayed).not.toContain(CARD_ID)
+    expect(resp.state.players[0]!.occupationHand).not.toContain(CARD_ID)
+    expect(resp.state.players[0]!.occupationPlayed).toContain(CARD_ID)
   })
 
-  it('A106 S2: OA treats Slurry Spreader as a minor improvement', () => {
-    const resp = playMinor(makeTypeSession('minor'))
+  it('A106 S2: Meeting Place does not play Slurry Spreader as a minor improvement', () => {
+    const session = makeTypeSession('minor')
+    const resp = session.takeAction(0, 'meeting-place')
 
     expect(resp.ok).toBe(true)
-    expect(resp.state.players[0]!.minorHand).not.toContain(CARD_ID)
-    expect(resp.state.players[0]!.minorPlayed).toContain(CARD_ID)
+    expect(resp.state.players[0]!.minorHand).toContain(CARD_ID)
+    expect(resp.state.players[0]!.minorPlayed).not.toContain(CARD_ID)
+    if (resp.interaction.stateId === 'wait') {
+      expect(resp.interaction.request.options?.some((option) => option.value === CARD_ID) ?? false).toBe(false)
+    }
   })
 
   it('A106 S3: an emptied grain field grants two food during the real harvest', () => {

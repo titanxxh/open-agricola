@@ -1679,7 +1679,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     ],
     "cost": {},
     "players": "1+",
-    "kind": "minor"
+    "kind": "occupation"
   },
   {
     "id": "A107_Catcher",

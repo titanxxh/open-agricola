@@ -9,6 +9,7 @@ import { confirmNextPlayer } from './_helpers/pending-confirms'
 
 const CARD_ID = 'C105_BasketCarrier'
 const HOME_BREWER = 'C110_HomeBrewer'
+const SCHNAPPS_DISTILLERY = 'C059_SchnappsDistillery'
 const FIXED_HANDS = [
   { occupation: '__c105_occupation_p1__', minor: '__c105_minor_p1__' },
   { occupation: '__c105_occupation_p2__', minor: '__c105_minor_p2__' },
@@ -63,7 +64,7 @@ describe('C105_BasketCarrier — reverse trade metadata', () => {
     expect(trades[0]!.from.food).toBe(2)
   })
 
-  it('C105 S3: is absent in the work phase and unavailable in harvest with only one food', () => {
+  it('C105 S3: is absent in the work phase but still opens the harvest draft with only one food', () => {
     const outside = makeFourPlayerSession()
     outside.state.round = 3
     outside.state.roundPhase = 'work'
@@ -102,15 +103,21 @@ describe('C105_BasketCarrier — reverse trade metadata', () => {
     const harvestResponse = insufficient.session.performRoundEnd()
 
     expect(harvestResponse.ok, harvestResponse.error).toBe(true)
-    expect(harvestResponse.interaction.stateId).toBe('idle')
-    expect(harvestResponse.state.players[0]!.resources).toMatchObject({
+    expect(harvestResponse.interaction.stateId).toBe('wait')
+    expect(harvestResponse.interaction.stateId === 'wait' && harvestResponse.interaction.request.kind).toBe('feed')
+    expect(harvestResponse.interaction.stateId === 'wait'
+      && harvestResponse.interaction.request.kind === 'feed'
+      && harvestResponse.interaction.request.maxTradeTimesBySourceId?.[CARD_ID]).toBe(1)
+
+    const declined = insufficient.session.resolveChoice(0, 'confirm', { selections: [] })
+    expect(declined.state.players[0]!.resources).toMatchObject({
       food: 0,
       wood: 0,
       reed: 0,
       grain: 0,
       begging: 3,
     })
-    expect(harvestResponse.state.events.some((event) =>
+    expect(declined.state.events.some((event) =>
       event.type === 'resource.exchanged' && event.exchangeSource === CARD_ID,
     )).toBe(false)
   })
@@ -198,7 +205,7 @@ describe('C105_BasketCarrier — reverse trade metadata', () => {
     }
   })
 
-  it('C105 S1: accepts the harvest trade once and caps a submitted count of two', () => {
+  it('C105 S1: rejects a submitted count above max atomically, then accepts one use', () => {
     const { session, state } = makeFourPlayerSession()
     state.round = 4
 
@@ -233,8 +240,17 @@ describe('C105_BasketCarrier — reverse trade metadata', () => {
     while (safety-- > 0 && resp.interaction.stateId === 'wait') {
       if (resp.interaction.request.kind === 'feed') {
         if (resp.interaction.playerIndex === 0 && !confirmedReverse) {
-          resp = session.resolveChoice(0, 'confirm', { selections: [
+          const before = session.getState()
+          const rejected = session.resolveChoice(0, 'confirm', { selections: [
             { sourceId: CARD_ID, exchangeIndex: 0, count: 2 },
+          ] })
+          expect(rejected.ok).toBe(false)
+          expect(rejected.state.players[0]).toEqual(before.state.players[0])
+          expect(rejected.state.events).toEqual(before.state.events)
+          expect(rejected.state.log).toEqual(before.state.log)
+          expect(rejected.interaction).toEqual(before.interaction)
+          resp = session.resolveChoice(0, 'confirm', { selections: [
+            { sourceId: CARD_ID, exchangeIndex: 0, count: 1 },
           ] })
           confirmedReverse = true
         } else {
@@ -307,5 +323,58 @@ describe('C105_BasketCarrier — reverse trade metadata', () => {
     expect(p1.resources.wood).toBe(0)
     expect(p1.resources.reed).toBe(0)
     expect(p1.resources.grain).toBe(0)
+  })
+
+  it('C105 S5: an earlier harvest exchange can produce the food used by Basket Carrier', () => {
+    const session = new GameSession(105, undefined, { playerCount: 2 })
+    stabilizeRandomHands(session.state.players)
+    const state = session.getState().state
+    state.round = 4
+    state.roundPhase = 'work'
+    state.players.forEach((player) => {
+      markAllWorkersUsed(state, player)
+      setActiveWorkerCount(player, 2)
+      setNewbornCount(player, 0)
+      player.resources.food = 10
+      player.occupationHand = ['__test_placeholder__']
+      player.minorHand = ['__test_placeholder__']
+      player.improvements = []
+      player.minorPlayed = []
+      player.occupationPlayed = []
+    })
+    const player = state.players[0]!
+    player.resources.food = 1
+    player.resources.vegetable = 1
+    player.minorPlayed = [SCHNAPPS_DISTILLERY]
+    player.occupationPlayed = [CARD_ID]
+    session.loadState(state)
+
+    let resp = session.performRoundEnd()
+    expect(resp.interaction.stateId).toBe('wait')
+    expect(resp.interaction.stateId === 'wait' && resp.interaction.request.kind).toBe('feed')
+    const before = session.getState()
+    const reversed = session.resolveChoice(0, 'confirm', { selections: [
+      { sourceId: CARD_ID, exchangeIndex: 0, count: 1 },
+      { sourceId: SCHNAPPS_DISTILLERY, exchangeIndex: 0, count: 1 },
+    ] })
+    expect(reversed.ok).toBe(false)
+    expect(reversed.state.players[0]).toEqual(before.state.players[0])
+    expect(reversed.state.events).toEqual(before.state.events)
+    expect(reversed.interaction).toEqual(before.interaction)
+
+    resp = session.resolveChoice(0, 'confirm', { selections: [
+      { sourceId: SCHNAPPS_DISTILLERY, exchangeIndex: 0, count: 1 },
+      { sourceId: CARD_ID, exchangeIndex: 0, count: 1 },
+    ] })
+
+    expect(resp.ok).toBe(true)
+    expect(resp.state.players[0]!.resources).toMatchObject({
+      food: 0,
+      vegetable: 0,
+      wood: 1,
+      reed: 1,
+      grain: 1,
+      begging: 0,
+    })
   })
 })

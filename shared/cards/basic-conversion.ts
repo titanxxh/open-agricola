@@ -1,6 +1,7 @@
 import type { CardExchange } from '../contract/cards'
 
 export const BASIC_CONVERSION_SOURCE_ID = '__basic__'
+export const BASIC_CONVERSION_SOURCE_NAME = 'Basic conversion'
 
 export const basicConversionExchanges: readonly CardExchange[] = [
   {

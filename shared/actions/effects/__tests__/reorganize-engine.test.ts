@@ -226,7 +226,7 @@ describe('reorganizeAction.resolveChoice', () => {
     expect(ctx.player.resources.boar).toBe(1)
   })
 
-  it('normalizes counters-held card zones before adding them to totals', () => {
+  it('rejects disallowed animals in counters-held card zones before mutation', () => {
     const ctx = makeCtx({
       player: {
         occupationPlayed: ['C148_MudWallower'],
@@ -237,6 +237,7 @@ describe('reorganizeAction.resolveChoice', () => {
       },
     })
 
+    const before = structuredClone(ctx.player)
     const result = reorganizeAction.resolveChoice!(
       ctx,
       'confirm',
@@ -250,9 +251,12 @@ describe('reorganizeAction.resolveChoice', () => {
       }] as unknown as Record<string, unknown>,
     )
 
-    expect(result.type).toBe('ok')
-    expect(ctx.player.resources.sheep).toBe(0)
-    expect(ctx.player.resources.boar).toBe(0)
+    expect(result).toEqual({
+      type: 'fail',
+      errorKey: 'log.reorganizeFail',
+      recoverable: true,
+    })
+    expect(ctx.player).toEqual(before)
   })
 
   it('filters invalid card animals before clamping capacity', () => {
@@ -282,7 +286,7 @@ describe('reorganizeAction.resolveChoice', () => {
     expect(ctx.player.resources.cattle).toBe(1)
   })
 
-  it('rejects horses from Wildlife Reserve card zones', () => {
+  it('rejects horses from Wildlife Reserve card zones before mutation', () => {
     const ctx = makeCtx({
       state: { enableFarmersOfTheMoor: true },
       player: {
@@ -291,6 +295,7 @@ describe('reorganizeAction.resolveChoice', () => {
       },
     })
 
+    const before = structuredClone(ctx.player)
     const result = reorganizeAction.resolveChoice!(
       ctx,
       'confirm',
@@ -304,11 +309,12 @@ describe('reorganizeAction.resolveChoice', () => {
       }] as unknown as Record<string, unknown>,
     )
 
-    expect(result.type).toBe('ok')
-    expect(ctx.player.resources.sheep).toBe(1)
-    expect(ctx.player.resources.boar).toBe(1)
-    expect(ctx.player.resources.cattle).toBe(1)
-    expect(ctx.player.resources.horse).toBe(0)
+    expect(result).toEqual({
+      type: 'fail',
+      errorKey: 'log.reorganizeFail',
+      recoverable: true,
+    })
+    expect(ctx.player).toEqual(before)
   })
 
   it('keeps M084 out of editable animal reorg zones', () => {

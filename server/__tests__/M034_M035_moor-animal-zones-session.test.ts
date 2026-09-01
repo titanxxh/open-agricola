@@ -141,6 +141,7 @@ describe('M034/M035 Farmers of the Moor animal zones', () => {
       zone.cardId === HOME_WOOD
     )
     expect(homeWoodZone).toBeDefined()
+    const before = session.getState()
 
     const placed = session.resolveChoice(0, 'confirm', {
       zones: [
@@ -154,13 +155,9 @@ describe('M034/M035 Farmers of the Moor animal zones', () => {
       ],
     })
 
-    expect(placed.ok).toBe(true)
-    expect(placed.state.players[0]!.resources.sheep).toBe(0)
-    expect(placed.state.events).toContainEqual(expect.objectContaining({
-      type: 'farm.animalDiscarded',
-      animals: { sheep: 1 },
-      reason: 'noRoom',
-    }))
+    expect(placed.ok).toBe(false)
+    expect(placed.state).toEqual(before.state)
+    expect(placed.interaction).toEqual(before.interaction)
   })
 
   it('M034 drops animals from a card zone after the backing forest disappears', () => {

@@ -22,7 +22,8 @@ const afterPayListener: CardListenerRegistration = {
       0,
     )
     if (reserve <= 0) return
-    const targetRound = Math.min(14, context.state.round + reserve)
+    const targetRound = context.state.round + reserve
+    if (targetRound > 14) return
     return {
       sourceCard: CARD_ID,
       flow: {
@@ -39,6 +40,10 @@ const afterPayListener: CardListenerRegistration = {
 
 const cardImpl = {
   listeners: [afterPayListener],
+  getBaseCosts: () => ({
+    fee: { wood: 2 },
+    resourceReserve: { resources: BUILDING_RESOURCES, minimum: 1 },
+  }),
   effect: {
     id: CARD_ID,
   },

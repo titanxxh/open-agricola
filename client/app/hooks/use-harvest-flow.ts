@@ -65,7 +65,7 @@ export const buildHarvestFeedOptions = (
     if (!exchanges) return
     exchanges.forEach((ex, idx) => {
       if (!isHarvestFeedTrigger(ex)) return
-      if (!playerCanAfford(player, ex)) return
+      if (!(ex.triggers ?? []).includes('harvest') && !playerCanAfford(player, ex)) return
       const sourceMax = maxTradeTimesBySourceId?.[sourceId]
       if (sourceMax !== undefined && sourceMax <= 0) return
       options.push({

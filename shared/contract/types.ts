@@ -56,6 +56,11 @@ export type CardStatGained = Partial<Resource> & PseudoResourceMap
 
 export type ResourceKey = keyof Resource
 
+export type ResourceReserve = {
+  resources: readonly ResourceKey[]
+  minimum: number
+}
+
 export type OrdinaryCardType = 'occupation' | 'minor'
 
 export type OrdinaryCardDecks = {
@@ -233,6 +238,7 @@ export type ComplexCost = {
   trades?: Trade[]
   paymentResourceProviders?: CardProvidedPaymentResourceProvider[]
   paymentBudget?: PaymentResourceMap
+  resourceReserve?: ResourceReserve
   cards?: { type: string; list: string[]; cost?: PaymentResourceMap; required?: boolean }
   bonuses?: Bonus[]
   costResourceRemovals?: AppliedCostResourceRemoval[]

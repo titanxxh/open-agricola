@@ -143,6 +143,7 @@ import {
 } from '../cards/major/supply.ts'
 import {
   BASIC_CONVERSION_SOURCE_ID,
+  BASIC_CONVERSION_SOURCE_NAME,
   getBasicConversionExchange,
 } from '../cards/basic-conversion.ts'
 import { appendImmediateEvents, type ImmediateEventDraft } from '../events/append.ts'
@@ -154,6 +155,7 @@ import {
   PublicEventArchivePayloadError,
 } from '../events/archive.ts'
 import { PaymentSolver } from '../actions/payment'
+import { convertResources, exchangeToTrade, hasValidResources } from '../actions/helpers/trades.ts'
 import {
   isMajorImprovementPlayable,
   isMinorImprovementPlayable,
@@ -1853,7 +1855,6 @@ export class GameCore {
     const harvestExchange = getExchangesInWindow(player, 'harvest', this.state).some((trade) => {
       const sourceId = trade.sourceId ?? trade.source
       return !!sourceId
-        && canAffordTrade(player, trade)
         && getRemainingHarvestExchangeUses(player, sourceId, trade.max, this.state.round) > 0
     })
     return harvestExchange || getExchangesInWindow(player, 'anytime', this.state).some((trade) =>
@@ -4579,7 +4580,6 @@ export class GameCore {
     const pendingRemaining = feedRequest.remaining
     const pendingFoodUsed = feedRequest.foodUsed
     const pendingFeedQueue = feedRequest.feedQueue ?? []
-    this.pushHistory()
     const player = this.state.players[playerIndex]
     if (!player) return this.respond(false, 'invalid player')
 
@@ -4590,33 +4590,46 @@ export class GameCore {
     const lookupExchange = (
       sourceId: string,
       idx: number,
-    ): import('../contract/cards').CardExchange | undefined => {
+    ): { exchange: import('../contract/cards').CardExchange; sourceName: string } | undefined => {
       if (sourceId === BASIC_CONVERSION_SOURCE_ID) {
-        return getBasicConversionExchange(idx)
+        const exchange = getBasicConversionExchange(idx)
+        return exchange ? { exchange, sourceName: BASIC_CONVERSION_SOURCE_NAME } : undefined
       }
       let card:
-        | { exchanges?: readonly import('../contract/cards').CardExchange[] }
+        | { name: string; exchanges?: readonly import('../contract/cards').CardExchange[] }
         | undefined
       if (player.improvements.includes(sourceId)) card = getMajorCard(sourceId)
       else if (player.minorPlayed.includes(sourceId)) card = getRegisteredMinorImprovement(sourceId)
       else if (player.occupationPlayed.includes(sourceId)) card = getRegisteredOccupation(sourceId)
-      return card?.exchanges?.[idx]
+      if (!card) return undefined
+      const exchange = card.exchanges?.[idx]
+      return exchange ? { exchange, sourceName: card.name } : undefined
     }
 
-    // Enforce per-card exchange `max` (sourceId-level aggregate cap so that
-    // multi-tier cards like D62 BeerTap collapse to one tier per harvest).
     const perSourceUsed = new Map<string, number>()
     type ResolvedSel = (typeof selections)[number] & {
-      _exchange?: import('../contract/cards').CardExchange
+      _exchange: import('../contract/cards').CardExchange
+      _sourceName: string
     }
-    const cappedSelections: ResolvedSel[] = selections.map((sel) => {
-      if (!sel.sourceId || sel.count <= 0) return sel
-      const exchange = lookupExchange(sel.sourceId, sel.exchangeIndex)
-      if (!exchange) return sel
-      let capped = sel.count
+    const resolvedSelections: ResolvedSel[] = []
+    let resourceDraft: Partial<Resource> = { ...player.resources }
+    for (const sel of selections) {
+      if (
+        !sel.sourceId
+        || !Number.isSafeInteger(sel.exchangeIndex)
+        || !Number.isSafeInteger(sel.count)
+        || sel.count <= 0
+      ) return this.respond(false, 'invalid harvest feed selections')
+      const resolved = lookupExchange(sel.sourceId, sel.exchangeIndex)
+      if (!resolved) return this.respond(false, 'invalid harvest feed selections')
+      const { exchange, sourceName } = resolved
+      const triggers = exchange.triggers ?? []
+      if (!triggers.includes('harvest') && !triggers.includes('anytime')) {
+        return this.respond(false, 'invalid harvest feed selections')
+      }
       if (exchange.max !== undefined) {
         const usedSoFar = perSourceUsed.get(sel.sourceId) ?? 0
-        const sourceLimit = (exchange.triggers ?? []).includes('harvest')
+        const sourceLimit = triggers.includes('harvest')
           ? getRemainingHarvestExchangeUses(
               player,
               exchange.sourceId ?? sel.sourceId,
@@ -4624,85 +4637,75 @@ export class GameCore {
               this.state.round,
             )
           : exchange.max
-        const remaining = Math.max(0, sourceLimit - usedSoFar)
-        capped = Math.min(sel.count, remaining)
-        perSourceUsed.set(sel.sourceId, usedSoFar + capped)
+        if (usedSoFar + sel.count > sourceLimit) {
+          return this.respond(false, 'invalid harvest feed selections')
+        }
+        perSourceUsed.set(sel.sourceId, usedSoFar + sel.count)
       }
-      return { ...sel, count: capped, _exchange: exchange }
-    })
+      resourceDraft = convertResources(
+        resourceDraft,
+        exchangeToTrade(exchange, sel.sourceId),
+        sel.count,
+      )
+      if (!hasValidResources(resourceDraft)) {
+        return this.respond(false, 'invalid harvest feed selections')
+      }
+      resolvedSelections.push({ ...sel, _exchange: exchange, _sourceName: sourceName })
+    }
 
+    this.pushHistory()
     const usedResources: Partial<Resource> = { food: pendingFoodUsed }
-    for (const sel of cappedSelections) {
-      if (sel.count <= 0) continue
+    for (const sel of resolvedSelections) {
       const exchange = sel._exchange
-      if (exchange) {
-        // Bidirectional application: subtract `from`, add `to`. Caps per-key
-        // by player's available resources (per-key `from` quantity allowed).
-        let times = sel.count
-        for (const [k, v] of Object.entries(exchange.from)) {
-          const need = (v as number) * times
-          const have = (player.resources as Record<string, number>)[k] ?? 0
-          if (need > have) {
-            // Scale down to whole-times that the player can actually afford.
-            times = Math.min(times, Math.floor(have / Math.max(1, v as number)))
-          }
+      const times = sel.count
+      const costMap: Record<string, number> = {}
+      for (const [k, v] of Object.entries(exchange.from)) {
+        const total = (v as number) * times
+        if (isAnimalResourceKey(k)) {
+          applyAnimalPayment(player, this.state, k, total)
+        } else {
+          ;(player.resources as Record<string, number>)[k] -= total
         }
-        if (times <= 0) continue
-        // Subtract `from`
-        const costMap: Record<string, number> = {}
-        for (const [k, v] of Object.entries(exchange.from)) {
-          const total = (v as number) * times
-          if (isAnimalResourceKey(k)) {
-            applyAnimalPayment(player, this.state, k, total)
-          } else {
-            ;(player.resources as Record<string, number>)[k] -= total
-          }
-          costMap[k] = total
-          usedResources[k as keyof Resource] = (usedResources[k as keyof Resource] ?? 0) + total
-          incResourceConverted(player, k as keyof Resource, total)
+        costMap[k] = total
+        usedResources[k as keyof Resource] = (usedResources[k as keyof Resource] ?? 0) + total
+        incResourceConverted(player, k as keyof Resource, total)
+      }
+      const gainMap: Record<string, number> = {}
+      for (const [k, v] of Object.entries(exchange.to)) {
+        const total = (v as number) * times
+        ;(player.resources as Record<string, number>)[k] += total
+        gainMap[k] = total
+        if (k === 'food') {
+          const fromKey0 = (Object.keys(exchange.from)[0] ?? null) as
+            | keyof Resource
+            | null
+          if (fromKey0) addFoodFromConversion(player, fromKey0, total)
         }
-        // Add `to`
-        const gainMap: Record<string, number> = {}
-        for (const [k, v] of Object.entries(exchange.to)) {
-          const total = (v as number) * times
-          ;(player.resources as Record<string, number>)[k] += total
-          gainMap[k] = total
-          if (k === 'food') {
-            // Per-key conversion stat: only meaningful for forward (* -> food)
-            // trades; reverse trades log under usedResources but skip food
-            // conversion stats.
-            const fromKey0 = (Object.keys(exchange.from)[0] ?? null) as
-              | keyof Resource
-              | null
-            if (fromKey0) addFoodFromConversion(player, fromKey0, total)
-          }
-        }
-        const feedConvertedEvents = appendImmediateEvents(this.state, [{
-          type: 'harvest.feedConverted',
-          playerId: player.id,
-          source: sel.sourceName ?? 'Harvest conversion',
-          cost: costMap,
-          food: gainMap,
-        }], { actorPlayerId: player.id })
-        this.dispatchHarvestFeedConversionListeners(player, feedConvertedEvents)
-        if ((exchange.triggers ?? []).includes('harvest') && exchange.max !== undefined) {
-          recordHarvestExchangeUses(
-            player,
-            exchange.sourceId ?? sel.sourceId,
-            this.state.round,
-            times,
-          )
-        }
-        // Dispatch CardExchange.sideEffect (e.g. E153 StoneSculptor bonusVp).
-        if (exchange.sideEffect && times > 0) {
-          PaymentSolver.applyTradeSideEffect(
-            this.state,
-            player,
-            exchange.sideEffect,
-            times,
-            sel.sourceId ?? exchange.sourceId ?? 'unknown',
-          )
-        }
+      }
+      const feedConvertedEvents = appendImmediateEvents(this.state, [{
+        type: 'harvest.feedConverted',
+        playerId: player.id,
+        source: sel._sourceName,
+        cost: costMap,
+        food: gainMap,
+      }], { actorPlayerId: player.id })
+      this.dispatchHarvestFeedConversionListeners(player, feedConvertedEvents)
+      if ((exchange.triggers ?? []).includes('harvest') && exchange.max !== undefined) {
+        recordHarvestExchangeUses(
+          player,
+          exchange.sourceId ?? sel.sourceId,
+          this.state.round,
+          times,
+        )
+      }
+      if (exchange.sideEffect && times > 0) {
+        PaymentSolver.applyTradeSideEffect(
+          this.state,
+          player,
+          exchange.sideEffect,
+          times,
+          sel.sourceId ?? exchange.sourceId ?? 'unknown',
+        )
       }
     }
     const foodUsed = Math.min(player.resources.food, pendingRemaining)

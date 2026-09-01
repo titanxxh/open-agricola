@@ -55,4 +55,23 @@ describe('computeHarvestFeedCounterMax', () => {
     // sheep 2, target's own count is excluded from "usedByOthers"; remaining is 2
     expect(max).toBe(2)
   })
+
+  it('uses resources produced by an earlier selected exchange', () => {
+    const producer = opt('producer', { vegetable: 1 }, { food: 5 })
+    const target = { ...opt('target', { food: 2 }, { wood: 1, reed: 1, grain: 1 }), max: 1 }
+    const resources = { ...emptyResources, vegetable: 1 }
+
+    expect(computeHarvestFeedCounterMax(
+      target,
+      [producer, target],
+      { producer: 1, target: 0 },
+      resources,
+    )).toBe(1)
+    expect(computeHarvestFeedCounterMax(
+      target,
+      [target, producer],
+      { producer: 1, target: 0 },
+      resources,
+    )).toBe(0)
+  })
 })

@@ -1,10 +1,21 @@
 // @vitest-environment jsdom
 import { act, renderHook } from '@testing-library/react'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { emptyResources } from '../../../shared/contract/state-constants'
 import type { ActionChoiceOption, PlayerState } from '../../../shared/contract/types'
 import type { InteractionPresentationPlan } from '../interaction-presentation'
 import { useExchangeDraftPresentation } from '../exchange-draft-presentation'
+
+vi.mock('../../services/card-meta', () => ({
+  getCardMeta: (id: string) => ({
+    C059_SchnappsDistillery: {
+      exchanges: [{ from: { vegetable: 1 }, to: { food: 5 }, max: 1, triggers: ['harvest'] }],
+    },
+    C105_BasketCarrier: {
+      exchanges: [{ from: { food: 2 }, to: { wood: 1, reed: 1, grain: 1 }, max: 1, triggers: ['harvest'] }],
+    },
+  })[id],
+}))
 
 const mkPlayer = (overrides: Partial<PlayerState> = {}): PlayerState =>
   ({
@@ -57,8 +68,10 @@ const tradeOption = (
 describe('useExchangeDraftPresentation', () => {
   it('owns bake, anytime exchange, and harvest feed draft counts and payloads', () => {
     const player = mkPlayer({
-      resources: { ...emptyResources, grain: 3, boar: 2 },
+      resources: { ...emptyResources, grain: 3, vegetable: 1, boar: 2 },
       improvements: ['Major_CookingHearth1'],
+      minorPlayed: ['C059_SchnappsDistillery'],
+      occupationPlayed: ['C105_BasketCarrier'],
     })
     const state = { players: [player] }
     const cardLabel = (id: string) => id
@@ -138,6 +151,7 @@ describe('useExchangeDraftPresentation', () => {
     expect(result.current.anytime.summary.food).toBe(6)
     expect(result.current.anytime.summary.boar).toBe(2)
 
+    player.resources.food = 2
     act(() => {
       rerender({
         plan: {
@@ -164,6 +178,29 @@ describe('useExchangeDraftPresentation', () => {
     expect(result.current.harvestFeed.summary.food).toBe(3)
     expect(result.current.harvestFeed.summary.grain).toBe(2)
     expect(result.current.harvestFeed.begging).toBe(1)
+
+    act(() => result.current.harvestFeed.reset())
+    act(() => result.current.harvestFeed.updateCount('C059_SchnappsDistillery-ex0', 1))
+    act(() => result.current.harvestFeed.updateCount('C105_BasketCarrier-ex0', 1))
+    expect(result.current.harvestFeed.convertedFood).toBe(3)
+    expect(result.current.harvestFeed.begging).toBe(0)
+    expect(result.current.harvestFeed.summary.food).toBe(6)
+
+    act(() => result.current.harvestFeed.reset())
+    act(() => {
+      rerender({
+        plan: {
+          kind: 'harvest-feed',
+          playerIndex: 0,
+          remaining: 0,
+          foodUsed: 0,
+        },
+        options: [],
+      })
+    })
+    act(() => result.current.harvestFeed.updateCount('C105_BasketCarrier-ex0', 1))
+    expect(result.current.harvestFeed.convertedFood).toBe(-2)
+    expect(result.current.harvestFeed.begging).toBe(0)
 
     act(() => result.current.reset())
     expect(result.current.bake.counts).toEqual({})

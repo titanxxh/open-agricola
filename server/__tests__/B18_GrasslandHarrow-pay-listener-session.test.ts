@@ -152,7 +152,7 @@ describe('B18 GrasslandHarrow — after-pay listener', () => {
     }
   })
 
-  it('clamps target round to 14', () => {
+  it('does not queue a field when the target round is after round 14', () => {
     const listener = findListener('B18-grassland-harrow-after-pay')!
     const player = createPlayer()
     player.resources = { ...player.resources, wood: 5, clay: 5, stone: 5, reed: 5 }
@@ -163,14 +163,23 @@ describe('B18 GrasslandHarrow — after-pay listener', () => {
       sourceCard: CARD_ID,
       result: { type: 'ok', resourcesPaid: {} },
     } as unknown as CardListenerContext)
-    expect(result?.flow).toBeDefined()
-    const flow = result!.flow as Extract<ActionFlow, { type: 'leaf' }>
-    const req = flow.params!.__futureMeepleRequest
-    if (req && typeof req === 'object' && 'entries' in req) {
-      expect(req.entries[0]!.round).toBe(14)
-    } else {
-      throw new Error('expected entries-shaped future request')
-    }
+    expect(result).toBeUndefined()
+  })
+
+  it('queues a field when the target is exactly round 14', () => {
+    const listener = findListener('B18-grassland-harrow-after-pay')!
+    const player = createPlayer()
+    player.resources = { ...player.resources, wood: 1 }
+    const state = createState(13, player)
+    const result = executeCardListener(listener, {
+      state, player, space: createSpace('improvement'),
+      actionId: 'pay', phase: 'after',
+      sourceCard: CARD_ID,
+      result: { type: 'ok', resourcesPaid: { wood: 2 } },
+    } as unknown as CardListenerContext)
+    const flow = result?.flow as Extract<ActionFlow, { type: 'leaf' }> | undefined
+    const req = flow?.params?.__futureMeepleRequest
+    expect(req && typeof req === 'object' && 'entries' in req ? req.entries[0]?.round : undefined).toBe(14)
   })
 
   it('no trigger when sourceCard is another card (B18 only fires on its own pay)', () => {
@@ -373,23 +382,47 @@ describe('B018 parity batch-02 characterization', () => {
     expect(retry.state.players[0]!.resources.wood).toBe(woodBefore - 2)
   })
 
-  it('B018 S3: OA plays with zero post-payment building resources and schedules no field', () => {
-    const resp = playB18(purchaseSession({ wood: 2, clay: 0 }))
-
+  it('B018 S3: a payment that exhausts building resources is rejected atomically and can be retried', () => {
+    const session = purchaseSession({ wood: 2, clay: 0 })
+    session.state.players[0]!.minorHand.push('A004_Baseboards')
+    let resp = session.takeAction(0, 'meeting-place')
     expect(resp.ok).toBe(true)
-    expect(resp.state.players[0]!.minorPlayed).toContain(CARD_ID)
-    expect(resp.state.players[0]!.resources).toMatchObject({ wood: 0, clay: 0, reed: 0, stone: 0 })
-    expect(resp.state.futureMeeples).toEqual([])
+    const improvementOption = resp.interaction.stateId === 'wait'
+      ? resp.interaction.request.options?.find((option) => option.value.startsWith('action-improvement-'))
+      : undefined
+    if (improvementOption) resp = session.resolveChoice(0, improvementOption.value)
+    expect(resp.interaction.stateId).toBe('wait')
+    if (resp.interaction.stateId !== 'wait') throw new Error('expected improvement choice')
+    expect(resp.interaction.request.options?.some((option) => option.value === CARD_ID) ?? false).toBe(false)
+
+    const before = session.getState()
+    resp = session.resolveChoice(0, CARD_ID)
+
+    expect(resp.ok).toBe(false)
+    expect(resp.state.players[0]!.resources).toEqual(before.state.players[0]!.resources)
+    expect(resp.state.players[0]!.minorHand).toEqual(before.state.players[0]!.minorHand)
+    expect(resp.state.players[0]!.minorPlayed).toEqual(before.state.players[0]!.minorPlayed)
+    expect(resp.state.futureMeeples).toEqual(before.state.futureMeeples)
+    expect(resp.state.log).toEqual(before.state.log)
+    expect(resp.interaction).toEqual(before.interaction)
+
+    expect(session.undoAction().ok).toBe(true)
+    session.state.players[0]!.resources.clay = 1
+    const retry = playB18(session)
+    expect(retry.ok).toBe(true)
+    expect(retry.state.players[0]!.minorPlayed).toContain(CARD_ID)
+    expect(retry.state.players[0]!.resources).toMatchObject({ wood: 0, clay: 1 })
+    expect(retry.state.futureMeeples).toEqual([
+      expect.objectContaining({ cardId: CARD_ID, round: 4, resources: { field: 1 } }),
+    ])
   })
 
-  it('B018 S4: OA clamps a target after round 14 to round 14', () => {
+  it('B018 S4: a target after round 14 plays the card without scheduling a field', () => {
     const resp = playB18(purchaseSession({ round: 13, wood: 4, clay: 0 }))
 
     expect(resp.ok).toBe(true)
     expect(resp.state.players[0]!.minorPlayed).toContain(CARD_ID)
-    expect(resp.state.futureMeeples).toEqual([
-      expect.objectContaining({ cardId: CARD_ID, round: 14, resources: { field: 1 } }),
-    ])
+    expect(resp.state.futureMeeples).toEqual([])
   })
 
   it('B018 S5: accepting the due field plows once for free and consumes the token', () => {

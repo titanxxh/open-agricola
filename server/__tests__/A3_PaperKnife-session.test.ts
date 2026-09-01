@@ -17,7 +17,7 @@
  *     • rollAndCacheCardPick → caches pick in cardStates[CARD_ID].extraData.pick
  *     • state.pendingUndoBoundary = true
  *     • returns occupation leaf { exactCost: {}, allowedCards: [pick] }
- *   occupation auto-resolves (single option) → occupation played for free + onBuy fires
+ *   occupation prompt offers the revealed card or decline
  *
  * Current (simplified) impl: directly mutates occupationHand → occupationPlayed in onBuy,
  * never emits a selection pending, and skips the played occupation's onBuy.
@@ -299,35 +299,44 @@ describe('A003_PaperKnife session-tier: flow', () => {
 
     expect(commitResp.ok).toBe(true)
 
+    expect(commitResp.interaction.stateId).toBe('wait')
+    if (commitResp.interaction.stateId !== 'wait') return
     const p0 = commitResp.state.players[0]!
+    const pick = p0.cardStates?.[SESSION_CARD_ID]?.extraData?.pick as string | undefined
+    expect(pick).toBeDefined()
+    const acceptOption = commitResp.interaction.request.options?.find((option) => option.value !== '__skip__')
+    expect(acceptOption?.sourceCard).toBe(SESSION_CARD_ID)
+    expect(commitResp.interaction.request.options?.some((option) => option.value === '__skip__')).toBe(true)
+    expect(p0.occupationPlayed).toEqual([])
+    expect(p0.occupationHand).toEqual([OCC_A, OCC_B, OCC_C, OCC_D])
+
+    const acceptResp = session.resolveChoice(0, acceptOption!.value)
+    expect(acceptResp.ok).toBe(true)
+    const acceptedPlayer = acceptResp.state.players[0]!
 
     // Exactly one of [OCC_A, OCC_B, OCC_C] must be in occupationPlayed
     const playedFromSelection = [OCC_A, OCC_B, OCC_C].filter(id =>
-      p0.occupationPlayed.includes(id)
+      acceptedPlayer.occupationPlayed.includes(id)
     )
     expect(playedFromSelection).toHaveLength(1)
 
     // The other two of the committed 3 must remain in occupationHand
-    const remaining = [OCC_A, OCC_B, OCC_C].filter(id => !p0.occupationPlayed.includes(id))
+    const remaining = [OCC_A, OCC_B, OCC_C].filter(id => !acceptedPlayer.occupationPlayed.includes(id))
     expect(remaining).toHaveLength(2)
     for (const id of remaining) {
-      expect(p0.occupationHand).toContain(id)
+      expect(acceptedPlayer.occupationHand).toContain(id)
     }
 
     // OCC_D (not committed) must be untouched in hand
-    expect(p0.occupationHand).toContain(OCC_D)
-    expect(p0.occupationPlayed).not.toContain(OCC_D)
+    expect(acceptedPlayer.occupationHand).toContain(OCC_D)
+    expect(acceptedPlayer.occupationPlayed).not.toContain(OCC_D)
 
     // No food paid (exactCost: {} = free play)
-    expect(p0.resources.food).toBe(3)
-
-    // cardStates must record the pick under extraData.pick
-    const pick = p0.cardStates?.[SESSION_CARD_ID]?.extraData?.pick as string | undefined
-    expect(pick).toBeDefined()
+    expect(acceptedPlayer.resources.food).toBe(3)
     expect(playedFromSelection).toContain(pick)
   })
 
-  it('A003 S4: OA immediately plays the revealed occupation without offering a decline branch', () => {
+  it('A003 S4: declining the revealed occupation leaves every occupation in hand', () => {
     const session = makeSession({ wood: 1, gameSeed: 42 })
     const a3Resp = playA3(session)
     expect(a3Resp.interaction.stateId).toBe('wait')
@@ -338,13 +347,19 @@ describe('A003_PaperKnife session-tier: flow', () => {
     const player = resp.state.players[0]!
     const pick = player.cardStates?.[SESSION_CARD_ID]?.extraData?.pick as string | undefined
     expect(pick).toBeDefined()
-    expect(player.occupationPlayed).toEqual([pick])
-    expect(player.occupationHand).toEqual(expect.arrayContaining([OCC_D]))
+    expect(player.occupationPlayed).toEqual([])
+    expect(player.occupationHand).toEqual([OCC_A, OCC_B, OCC_C, OCC_D])
     expect(player.resources.food).toBe(3)
     expect(resp.interaction.stateId).toBe('wait')
     if (resp.interaction.stateId !== 'wait') return
-    expect(resp.interaction.request.kind).toBe('confirm-next-player')
-    expect(resp.interaction.request.options ?? []).toEqual([])
+    expect(resp.interaction.request.options?.find((option) => option.value !== '__skip__')?.sourceCard).toBe(SESSION_CARD_ID)
+    expect(resp.interaction.request.options?.some((option) => option.value === '__skip__')).toBe(true)
+
+    const declined = session.resolveChoice(0, '__skip__')
+    expect(declined.ok).toBe(true)
+    expect(declined.state.players[0]!.occupationPlayed).toEqual([])
+    expect(declined.state.players[0]!.occupationHand).toEqual([OCC_A, OCC_B, OCC_C, OCC_D])
+    expect(declined.state.players[0]!.resources.food).toBe(3)
   })
 
   // ---------------------------------------------------------------------------
@@ -383,7 +398,7 @@ describe('A003_PaperKnife session-tier: flow', () => {
     expect(a3Resp.interaction.stateId).toBe('wait')
     if (a3Resp.interaction.stateId !== 'wait') return
 
-    // Commit — triggers the roll, sets pendingUndoBoundary, auto-plays the occupation
+    // Commit — triggers the roll and sets pendingUndoBoundary
     const commitResp = session.commitSelectionChoice(0, { cardIds: [OCC_A, OCC_B, OCC_C] })
     expect(commitResp.ok).toBe(true)
 
@@ -396,10 +411,14 @@ describe('A003_PaperKnife session-tier: flow', () => {
     expect(undoResp.ok).toBe(false)
     expect(undoResp.error).toBe('cannot undo past boundary')
 
-    // The cached pick must survive the failed undo
-    const stateAfterUndo = session.getState().state
+    // The revealed prompt and player state must survive the failed undo
+    const afterUndo = session.getState()
+    const stateAfterUndo = afterUndo.state
     const pickAfter = stateAfterUndo.players[0]?.cardStates?.[SESSION_CARD_ID]?.extraData?.pick
-    expect(pickAfter).toBeDefined()
+    expect(pickAfter).toBe(pick)
+    expect(stateAfterUndo.players[0]!.occupationHand).toEqual([OCC_A, OCC_B, OCC_C, OCC_D])
+    expect(stateAfterUndo.players[0]!.occupationPlayed).toEqual([])
+    expect(afterUndo.interaction).toEqual(commitResp.interaction)
   })
 
   // ---------------------------------------------------------------------------
@@ -462,9 +481,15 @@ describe('A003_PaperKnife session-tier: flow', () => {
     const commitResp = session.commitSelectionChoice(0, { cardIds: [OCC_A, OCC_B, OCC_C] })
     expect(commitResp.ok).toBe(true)
 
-    const p0After = commitResp.state.players[0]!
-    const pick = p0After.cardStates?.[SESSION_CARD_ID]?.extraData?.pick as string | undefined
+    expect(commitResp.interaction.stateId).toBe('wait')
+    if (commitResp.interaction.stateId !== 'wait') return
+    const pick = commitResp.state.players[0]!.cardStates?.[SESSION_CARD_ID]?.extraData?.pick as string | undefined
     expect(pick).toBeDefined()
+    const acceptOption = commitResp.interaction.request.options?.find((option) => option.value !== '__skip__')
+    expect(acceptOption).toBeDefined()
+    const acceptResp = session.resolveChoice(0, acceptOption!.value)
+    expect(acceptResp.ok).toBe(true)
+    const p0After = acceptResp.state.players[0]!
     // The pick must be in occupationPlayed
     expect(p0After.occupationPlayed).toContain(pick)
 
