@@ -3,6 +3,9 @@ import { reap } from '../reap'
 import type { DraftGameEvent } from '../../../contract/events'
 import type { GameState, PlayerState, Field } from '../../../contract/types'
 import * as cardListeners from '../../../cards/card-listeners'
+import { makeCardFieldImpl } from '../../../cards/helpers/card-field'
+import '../../../cards/B/B068_Beanfield'
+import '../../../cards/D/D075_WoodField'
 
 const mkState = (): Pick<GameState, 'players'> => ({ players: [] as PlayerState[] })
 
@@ -203,5 +206,101 @@ describe('reap with stacks', () => {
     expect(crops).toContain('grain')
     expect(crops).toContain('stone')
     expect(crops).not.toContain('vegetable')
+  })
+
+  it('emits crop events and dispatches generic listeners before Card Field owner callbacks', () => {
+    const order: string[] = []
+    makeCardFieldImpl('A001_OrderField', { allowedCrops: ['grain'], capacity: 1 }, {
+      onReap: () => { order.push('owner') },
+    })
+    vi.spyOn(cardListeners, 'runCardListeners').mockImplementation(() => {
+      order.push('listener')
+      return []
+    })
+    const player = {
+      id: 'p1',
+      ...mkPlayer([]),
+      minorPlayed: ['A001_OrderField'],
+      occupationPlayed: [],
+      improvements: [],
+      cardStates: {
+        A001_OrderField: { extraData: { cardFieldStacks: [{ crop: 'grain', remaining: 1 }] } },
+      },
+    } as PlayerState
+
+    reap({ players: [player], round: 4 } as GameState, player, {
+      emit: (event) => { order.push(event.type) },
+      emitMany: (events) => { order.push(...events.map((event) => event.type)) },
+    })
+
+    expect(order).toEqual(['farm.cropRemoved', 'resource.moved', 'listener', 'owner'])
+  })
+
+  it('reaps Farmyard, single-slot, and multi-slot Card Fields through one summary', () => {
+    const spy = vi.spyOn(cardListeners, 'runCardListeners').mockImplementation(() => [])
+    const events: DraftGameEvent[] = []
+    const player = {
+      id: 'p1',
+      ...mkPlayer([{ stacks: [{ kind: 'grain', remaining: 2 }], row: 0, col: 0 }]),
+      minorPlayed: ['B068_Beanfield', 'D075_WoodField'],
+      occupationPlayed: [],
+      improvements: [],
+      cardStates: {
+        B068_Beanfield: { extraData: { cardFieldStacks: [{ crop: 'vegetable', remaining: 2 }] } },
+        D075_WoodField: {
+          extraData: {
+            cardFieldStacks: [
+              { crop: 'wood', remaining: 1 },
+              { crop: 'wood', remaining: 2 },
+            ],
+          },
+        },
+      },
+    } as PlayerState
+    const state = { players: [player], round: 4 } as GameState
+
+    const result = reap(state, player, {
+      emit: (event) => events.push(event),
+      emitMany: (nextEvents) => events.push(...nextEvents),
+    })
+
+    expect(player.resources).toMatchObject({ grain: 1, vegetable: 1, wood: 2 })
+    expect(player.fields[0]?.stacks).toEqual([{ kind: 'grain', remaining: 1 }])
+    expect(player.cardStates.B068_Beanfield?.extraData?.cardFieldStacks).toEqual([
+      { crop: 'vegetable', remaining: 1 },
+    ])
+    expect(player.cardStates.D075_WoodField?.extraData?.cardFieldStacks).toEqual([
+      null,
+      { crop: 'wood', remaining: 1 },
+    ])
+    expect(result.reapSummary).toMatchObject({
+      resources: { grain: 1, vegetable: 1, wood: 2 },
+      grainFields: 1,
+      vegetableFields: 1,
+      harvestedPositions: [
+        { row: 0, col: 0 },
+        { row: -1, col: 2068 },
+        { row: -1, col: 4075 },
+      ],
+    })
+    expect(result.reapSummary.harvestedCrops).toEqual([
+      { row: 0, col: 0, crop: 'grain', amount: 1, sources: ['base'] },
+      { row: -1, col: 2068, crop: 'vegetable', amount: 1, sources: ['base'] },
+      { row: -1, col: 4075, crop: 'wood', amount: 1, sources: ['base'] },
+      { row: -1, col: 4076, crop: 'wood', amount: 1, sources: ['base'] },
+    ])
+    expect(result.reapSummary.harvestCountApplications).toEqual([
+      { row: 0, col: 0, crop: 'grain', count: 1, sources: ['base'], tags: [], scope: 'top-stack' },
+      { row: -1, col: 2068, crop: 'vegetable', count: 1, sources: ['base'], tags: [], scope: 'top-stack' },
+      { row: -1, col: 4075, crop: 'wood', count: 1, sources: ['base'], tags: [], scope: 'top-stack' },
+      { row: -1, col: 4076, crop: 'wood', count: 1, sources: ['base'], tags: [], scope: 'top-stack' },
+    ])
+    expect(events.filter((event) => event.type === 'farm.cropRemoved')).toHaveLength(4)
+    expect(events.filter((event) => event.type === 'resource.moved')).toHaveLength(4)
+    expect(spy.mock.calls.map((call) => call[0].extraData)).toEqual([
+      expect.objectContaining({ crop: 'grain', amount: 1 }),
+      expect.objectContaining({ crop: 'vegetable', amount: 1 }),
+      expect.objectContaining({ crop: 'wood', amount: 2 }),
+    ])
   })
 })

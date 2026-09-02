@@ -143,12 +143,11 @@ describe('D072_StableManure session', () => {
     expect(selection.interaction.stateId).toBe('wait')
     if (selection.interaction.stateId !== 'wait') throw new Error('expected selection')
     expect(selection.interaction.request.selection?.selectablePositions).toEqual([
-      { row: -1, col: 4075, sourceCard: 'D075_WoodField', groupKey: 'D075_WoodField', cardFieldSlot: 0 },
       { row: -1, col: 4076, sourceCard: 'D075_WoodField', groupKey: 'D075_WoodField', cardFieldSlot: 1 },
     ])
 
     const committed = session.commitSelectionChoice(0, {
-      positions: [{ row: -1, col: 4075 }, { row: -1, col: 4076 }],
+      positions: [{ row: -1, col: 4076 }],
     })
     expect(committed.ok).toBe(true)
     autoAdvanceRoundEnd(session)
@@ -162,7 +161,7 @@ describe('D072_StableManure session', () => {
     expect(harvested.cardStates.D072_StableManure?.extraData?.selectedPositions).toBeUndefined()
   })
 
-  it('does not apply Grain Thief selection thresholds to card fields', () => {
+  it('applies Grain Thief selection thresholds to card fields', () => {
     const { session } = setupHarvest(1)
     const state = session.getState().state
     const player = state.players[0]!
@@ -180,6 +179,13 @@ describe('D072_StableManure session', () => {
     if (selection.interaction.stateId !== 'wait') throw new Error('expected selection')
     expect(selection.interaction.request.selection?.selectablePositions).toEqual([
       { row: 0, col: 0, groupKey: '0-0' },
+      {
+        row: -1,
+        col: 5070,
+        sourceCard: 'E070_CropRotationField',
+        groupKey: 'E070_CropRotationField',
+        cardFieldSlot: 0,
+      },
     ])
   })
 
@@ -201,13 +207,18 @@ describe('D072_StableManure session', () => {
     }
     session.loadState(state)
 
-    chooseStableManureSelection(session)
+    const selection = chooseStableManureSelection(session)
+    expect(selection.interaction.stateId === 'wait'
+      ? selection.interaction.request.selection?.selectablePositions
+      : []).toEqual([{
+      row: -1,
+      col: 5082,
+      sourceCard: 'E080_RockGarden',
+      groupKey: 'E080_RockGarden',
+      cardFieldSlot: 2,
+    }])
     const committed = session.commitSelectionChoice(0, {
-      positions: [
-        { row: -1, col: 5080 },
-        { row: -1, col: 5081 },
-        { row: -1, col: 5082 },
-      ],
+      positions: [{ row: -1, col: 5082 }],
     })
     expect(committed.ok).toBe(true)
     autoAdvanceRoundEnd(session)

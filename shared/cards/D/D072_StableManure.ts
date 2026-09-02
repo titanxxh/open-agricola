@@ -6,40 +6,44 @@ import {
   computeHarvestSelectionThreshold,
   registerHarvestCountModifier,
 } from '../../actions/helpers/harvest-count-registry'
-import { fieldIsEmpty, fieldTopStack, fieldTotalRemaining } from '../../domain/field'
+import { fieldIsEmpty, fieldTotalRemaining } from '../../domain/field'
 import { getUnfencedStableCountForCards } from '../../domain/stables'
 import type { CardImpl } from '../registry'
-import { getCroppedCardFields } from '../helpers/card-field'
+import { getLogicalFields } from '../helpers/card-field'
 
 const CARD_ID = 'D072_StableManure'
-registerHarvestCountModifier(CARD_ID, ({ player, field }) => {
+registerHarvestCountModifier(CARD_ID, ({ player, field, logicalField }) => {
   const selected = readCardExtraData<string[]>(player, CARD_ID, 'selectedPositions') ?? []
-  if (!selected.includes(positionKey(field))) return
+  const selectedField = logicalField
+    ? logicalField.slots.some((slot) => selected.includes(positionKey(slot.tile)))
+    : selected.includes(positionKey(field))
+  if (!selectedField) return
   if (fieldIsEmpty(field)) return
   return { delta: 1, sources: [CARD_ID] }
 })
 
-const eligibleFields = (state: GameState, player: PlayerState) => {
-  const fields = [
-    ...player.fields.map((field) => ({
-      field,
-      tile: { row: field.row, col: field.col },
-      groupKey: positionKey(field),
-      sourceCard: undefined,
-      cardFieldSlot: undefined,
-    })),
-    ...getCroppedCardFields(player),
-  ]
-  return fields.filter(({ field }) => {
-    const top = fieldTopStack(field)
-    if (!top) return false
+const eligibleFields = (state: GameState, player: PlayerState) =>
+  getLogicalFields(player).flatMap((logicalField) => {
+    const slot = [...logicalField.slots].reverse().find((candidate) => candidate.stack)
+    if (!slot) return []
+    const field = {
+      row: logicalField.row,
+      col: logicalField.col,
+      stacks: logicalField.stacks.map((stack) => ({ ...stack })),
+    }
     const min = computeHarvestSelectionThreshold(state, player, field, {
       sourceCard: CARD_ID,
       baseThreshold: 2,
+      logicalField,
     }).threshold
-    return fieldTotalRemaining(field) >= min
+    if (fieldTotalRemaining(field) < min) return []
+    return [{
+      tile: slot.tile,
+      groupKey: logicalField.kind === 'farmyard' ? positionKey(logicalField) : logicalField.groupKey,
+      sourceCard: logicalField.sourceCard,
+      cardFieldSlot: logicalField.kind === 'card' ? slot.index : undefined,
+    }]
   })
-}
 
 const cardImpl = {
   effect: {
@@ -49,8 +53,7 @@ const cardImpl = {
     if (unfencedCount === 0) return
 
     const croppedFields = eligibleFields(state, player)
-    const logicalFieldCount = new Set(croppedFields.map(({ groupKey }) => groupKey)).size
-    if (logicalFieldCount === 0) return
+    if (croppedFields.length === 0) return
 
     return {
       type: 'leaf',
@@ -59,7 +62,7 @@ const cardImpl = {
       optional: true,
       actionContext: {
         selectionKind: 'farm-position',
-        maxSelections: Math.min(unfencedCount, logicalFieldCount),
+        maxSelections: Math.min(unfencedCount, croppedFields.length),
         selectableTiles: croppedFields.map(({ tile, groupKey, sourceCard, cardFieldSlot }) => ({
           ...tile,
           groupKey,

@@ -6,9 +6,8 @@ import type {
 } from '../../contract/types'
 import type { DraftGameEvent, EventSink, FarmCropRemovedEvent } from '../../contract/events'
 import { readCardExtraData, writeCardExtraData } from './card-state'
-import { defaultReapTrigger, dispatchReapListener, type ReapTrigger } from '../../actions/helpers/reap-listener'
+import { defaultReapTrigger, type ReapTrigger } from '../../actions/helpers/reap-listener'
 import { appendImmediateEvents } from '../../events/append'
-import { computeHarvestCount } from '../../actions/helpers/harvest-count-registry'
 
 type Crop = ExtraSowableCrop
 
@@ -92,19 +91,6 @@ const readSlots = (
 const writeSlots = (player: PlayerState, cardId: string, slots: CardFieldSlot[]) =>
   writeCardExtraData(player, cardId, 'cardFieldStacks', slots)
 
-type CardFieldReapRunOptions = {
-  trigger?: ReapTrigger
-  sourceCard?: string
-  eventSink?: EventSink
-  updateHarvestSummary?: boolean
-}
-
-type CardFieldReaper = (
-  state: GameState,
-  player: PlayerState,
-  options?: CardFieldReapRunOptions,
-) => ActionFlow | undefined
-
 export type CardFieldCropRemovalResult = {
   crop: Crop
   amount: number
@@ -124,7 +110,6 @@ type CardFieldCropRemover = (
   options?: CardFieldCropRemovalOptions,
 ) => CardFieldCropRemovalResult | undefined
 
-const cardFieldReapers = new Map<string, CardFieldReaper>()
 const cardFieldCropRemovers = new Map<string, CardFieldCropRemover>()
 const cardFieldOptions = new Map<string, CardFieldOptions>()
 
@@ -185,10 +170,12 @@ export type LogicalFieldMutationOptions = {
   eventSink?: EventSink
   reason?: FarmCropRemovedEvent['reason']
   emitEvents?: boolean
+  trigger?: ReapTrigger
+  deferOwnerCallbacks?: boolean
 }
 
 export type LogicalFieldMutationResult =
-  | { ok: true; crop?: Crop; amount?: number; flow?: ActionFlow }
+  | { ok: true; crop?: Crop; amount?: number; flow?: ActionFlow; ownerCallback?: () => ActionFlow | undefined }
   | { ok: false; error: 'invalid-target' | 'invalid-amount' | 'invalid-crop' | 'occupied' | 'empty' }
 
 const farmyardFieldId = (field: Pick<Field, 'row' | 'col'>) =>
@@ -328,21 +315,44 @@ export const mutateLogicalFields = (
     }],
     reason: options.reason ?? 'cardEffect',
   })
-  const cardRemovalFlow = (
+  const cardRemovalCallback = (
     cardId: string,
     crop: Crop,
     amount: number,
     slots: CardFieldSlot[],
-  ) => cardFieldOptions.get(cardId)?.onCropRemoved?.({
-    state,
-    player,
-    crop,
-    amount,
-    isLast: !slots.some((candidate) => candidate?.crop === crop),
-    cardId,
-    reason: options.reason ?? 'cardEffect',
-    sourceCard: options.sourceCard,
-  })
+  ) => {
+    const owner = cardFieldOptions.get(cardId)
+    const isLast = !slots.some((candidate) => candidate?.crop === crop)
+    return (): ActionFlow | undefined => {
+      const flows: ActionFlow[] = []
+      if (options.reason === 'reap') {
+        const reapFlow = owner?.onReap?.({
+          state,
+          player,
+          crop,
+          amount,
+          isLast,
+          cardId,
+          trigger: options.trigger ?? defaultReapTrigger(),
+          sourceCard: options.sourceCard,
+        })
+        if (reapFlow) appendFlowChildren(flows, reapFlow)
+      }
+      const removedFlow = owner?.onCropRemoved?.({
+        state,
+        player,
+        crop,
+        amount,
+        isLast,
+        cardId,
+        reason: options.reason ?? 'cardEffect',
+        ...(options.trigger ? { trigger: options.trigger } : {}),
+        sourceCard: options.sourceCard,
+      })
+      if (removedFlow) appendFlowChildren(flows, removedFlow)
+      return flows.length === 1 ? flows[0] : toParallelFlow(flows)
+    }
+  }
   const place = (
     requestedTarget: LogicalFieldMutationTarget,
     crop: Crop,
@@ -425,7 +435,9 @@ export const mutateLogicalFields = (
       : { ...stack, remaining: stack.remaining - amount }
     writeSlots(player, card.cardId, card.slots)
     emitRemoved(card, crop, amount)
-    const flow = cardRemovalFlow(card.cardId, crop, amount, card.slots)
+    const ownerCallback = cardRemovalCallback(card.cardId, crop, amount, card.slots)
+    if (options.deferOwnerCallbacks) return { ok: true, crop, amount, ownerCallback }
+    const flow = ownerCallback()
     return { ok: true, crop, amount, ...(flow ? { flow } : {}) }
   }
   const replace = (
@@ -456,7 +468,7 @@ export const mutateLogicalFields = (
     writeSlots(player, card.cardId, card.slots)
     emitRemoved(card, previous.crop, previous.remaining)
     emitAdded(card, crop, amount)
-    const flow = cardRemovalFlow(card.cardId, previous.crop, previous.remaining, card.slots)
+    const flow = cardRemovalCallback(card.cardId, previous.crop, previous.remaining, card.slots)()
     return { ok: true, ...(flow ? { flow } : {}) }
   }
   return { place, grow, remove, replace }
@@ -472,7 +484,7 @@ export type CroppedCardField = {
 
 export const getCroppedCardFields = (player: PlayerState): CroppedCardField[] =>
   playedCardIds(player).flatMap((cardId) => {
-    if (!cardFieldReapers.has(cardId)) return []
+    if (!cardFieldDefs.has(cardId)) return []
     return readSlots(player, cardId).flatMap((stack, slotIdx) => {
       if (!stack) return []
       const tile = { row: -1, col: deriveVirtualTileCol(cardId, slotIdx) }
@@ -507,18 +519,6 @@ export const removeCardFieldCrop = (
   )
 }
 
-export const reapAllCardFields = (
-  state: GameState,
-  player: PlayerState,
-  options: CardFieldReapRunOptions = {},
-): ActionFlow | undefined => {
-  const children: ActionFlow[] = []
-  for (const cardId of playedCardIds(player)) {
-    appendFlowChildren(children, cardFieldReapers.get(cardId)?.(state, player, options))
-  }
-  return toParallelFlow(children)
-}
-
 export const makeCardFieldImpl = (
   cardId: string,
   def: CardFieldDef,
@@ -527,104 +527,6 @@ export const makeCardFieldImpl = (
   const baseCol = parseCardBaseCol(cardId)
   cardFieldDefs.set(cardId, def)
   cardFieldOptions.set(cardId, options ?? {})
-
-  const reapCardField = (
-    state: GameState,
-    player: PlayerState,
-    runOptions: CardFieldReapRunOptions = {},
-  ): ActionFlow | undefined => {
-    const slots = readSlots(player, cardId, def)
-    if (slots.every((slot) => slot === null)) return
-    const trigger = runOptions.trigger ?? defaultReapTrigger()
-    const perCropAmount = new Map<Crop, number>()
-    const nextSlots = slots.map((slot) => slot ? { ...slot } : null)
-    for (const [slotIdx, stack] of nextSlots.entries()) {
-      if (!stack) continue
-      const field: Field = {
-        row: -1,
-        col: baseCol + slotIdx,
-        stacks: [{ kind: stack.crop, remaining: stack.remaining }],
-      }
-      const amount = computeHarvestCount(state, player, field).count
-      stack.remaining -= amount
-      player.resources[stack.crop] += amount
-      if (amount > 0) perCropAmount.set(stack.crop, (perCropAmount.get(stack.crop) ?? 0) + amount)
-      if (stack.remaining <= 0) nextSlots[slotIdx] = null
-    }
-    if (runOptions.updateHarvestSummary !== false) {
-      const entry = state.harvestReapSummary?.[player.id]
-      if (entry) {
-        for (const [crop, amount] of perCropAmount) {
-          entry.resources[crop] = (entry.resources[crop] ?? 0) + amount
-        }
-        if (
-          perCropAmount.size > 0 &&
-          !entry.harvestedPositions?.some(({ row, col }) => row === -1 && col === baseCol)
-        ) {
-          entry.harvestedPositions = [
-            ...(entry.harvestedPositions ?? []),
-            { row: -1, col: baseCol },
-          ]
-        }
-      }
-    }
-    const events = [...perCropAmount].map(([crop, amount]) => ({
-      type: 'resource.moved' as const,
-      resources: { [crop]: amount },
-      from: { kind: 'card' as const, playerId: player.id, cardId },
-      to: { kind: 'player' as const, playerId: player.id },
-      reason: 'reap' as const,
-      trigger,
-      sourceCardId: cardId,
-    }))
-    if (runOptions.eventSink) {
-      events.forEach((event) => runOptions.eventSink!.emit<'resource.moved'>(event))
-    } else if (Number.isSafeInteger(state.round) && state.round > 0) {
-      appendImmediateEvents(
-        state,
-        events,
-        { actorPlayerId: player.id, sourceActionId: 'reap', sourceCardId: cardId },
-      )
-    }
-    writeSlots(player, cardId, nextSlots)
-    const flows: ActionFlow[] = []
-    for (const [crop, amount] of perCropAmount) {
-      appendFlowChildren(
-        flows,
-        dispatchReapListener(state, player, crop, amount, undefined, {
-          trigger,
-          sourceCard: runOptions.sourceCard,
-        }),
-      )
-      const stillHas = nextSlots.some((slot) => slot?.crop === crop)
-      const flow = options?.onReap?.({
-        state,
-        player,
-        crop,
-        amount,
-        isLast: !stillHas,
-        cardId,
-        trigger,
-        sourceCard: runOptions.sourceCard,
-      })
-      if (flow) appendFlowChildren(flows, flow)
-      const removedFlow = options?.onCropRemoved?.({
-        state,
-        player,
-        crop,
-        amount,
-        isLast: !stillHas,
-        cardId,
-        reason: 'reap',
-        trigger,
-        sourceCard: runOptions.sourceCard,
-      })
-      if (removedFlow) appendFlowChildren(flows, removedFlow)
-    }
-    return toParallelFlow(flows)
-  }
-
-  cardFieldReapers.set(cardId, reapCardField)
 
   cardFieldCropRemovers.set(cardId, (
     state,
@@ -735,9 +637,6 @@ export const makeCardFieldImpl = (
         return true
       },
 
-      onHarvestFieldPhase: (state, player): ActionFlow | void => {
-        return reapCardField(state, player, { trigger: defaultReapTrigger() })
-      },
     },
     reaches: [],
   } satisfies CardImpl

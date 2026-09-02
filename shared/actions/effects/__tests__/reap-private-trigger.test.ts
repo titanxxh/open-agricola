@@ -145,6 +145,7 @@ describe('reap action private-field-phase trigger', () => {
     expect(events.map((event) => (event as { from?: { kind?: string } }).from?.kind)).toEqual([
       undefined,
       'field',
+      undefined,
       'card',
     ])
     expect(listenerSpy.mock.calls.map((call) => call[0].extraData)).toEqual([

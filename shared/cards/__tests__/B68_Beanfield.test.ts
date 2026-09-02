@@ -6,6 +6,7 @@ import type { GameState, PlayerState, ActionSpace } from '../../contract/types'
 import '../B/B068_Beanfield'
 import { B068_Beanfield as B68Card } from '../../cards/B/B068_Beanfield'
 import type { CardListenerContext } from '../card-listeners'
+import { reap } from '../../actions/effects/reap'
 
 const CARD_ID = 'B068_Beanfield'
 
@@ -126,32 +127,29 @@ describe('B068_Beanfield', () => {
     })
   })
 
-  describe('onHarvestFieldPhase', () => {
+  describe('shared reap', () => {
     it('harvests 1 vegetable and decrements remaining', () => {
-      const effect = getCardEffect(CARD_ID)!
       const player = createPlayer()
       player.cardStates = { [CARD_ID]: { extraData: { cardFieldStacks: [{ crop: 'vegetable', remaining: 2 }] } } } as any
       const state = createState(player)
-      effect.onHarvestFieldPhase!(state, player)
+      reap(state, player)
       expect(player.resources.vegetable).toBe(1)
       expect(player.cardStates![CARD_ID]!.extraData!.cardFieldStacks).toEqual([{ crop: 'vegetable', remaining: 1 }])
     })
 
     it('clears card crop when last vegetable is harvested', () => {
-      const effect = getCardEffect(CARD_ID)!
       const player = createPlayer()
       player.cardStates = { [CARD_ID]: { extraData: { cardFieldStacks: [{ crop: 'vegetable', remaining: 1 }] } } } as any
       const state = createState(player)
-      effect.onHarvestFieldPhase!(state, player)
+      reap(state, player)
       expect(player.resources.vegetable).toBe(1)
       expect(player.cardStates![CARD_ID]!.extraData!.cardFieldStacks).toEqual([null])
     })
 
     it('does nothing when card has no crop', () => {
-      const effect = getCardEffect(CARD_ID)!
       const player = createPlayer()
       const state = createState(player)
-      effect.onHarvestFieldPhase!(state, player)
+      reap(state, player)
       expect(player.resources.vegetable).toBe(0)
     })
   })

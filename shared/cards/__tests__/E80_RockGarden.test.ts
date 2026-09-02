@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import { E080_RockGarden_impl } from '../E/E080_RockGarden'
 import type { PlayerState } from '../../contract/types'
+import { reap } from '../../actions/effects/reap'
 
 const CARD_ID = 'E080_RockGarden'
 const ROW = -1
@@ -92,7 +93,7 @@ describe('E80 Rock Garden', () => {
       } as never,
     })
     const state = { players: [player] } as never
-    E080_RockGarden_impl.effect!.onHarvestFieldPhase!(state, player)
+    reap(state, player)
     expect(player.resources.stone).toBe(3)
     expect(player.cardStates?.[CARD_ID]?.extraData?.cardFieldStacks).toEqual([
       { crop: 'stone', remaining: 1 },
@@ -117,7 +118,7 @@ describe('E80 Rock Garden', () => {
       } as never,
     })
     const state = { players: [player] } as never
-    E080_RockGarden_impl.effect!.onHarvestFieldPhase!(state, player)
+    reap(state, player)
     expect(player.resources.stone).toBe(3)
     expect(player.cardStates?.[CARD_ID]?.extraData?.cardFieldStacks).toEqual([null, null, null])
   })

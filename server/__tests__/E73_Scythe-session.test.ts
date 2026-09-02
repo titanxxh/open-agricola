@@ -8,6 +8,7 @@ import type { ActionFlow, ActionSpace, Field } from '../../shared/contract/types
 import { getAdHocAction } from '../../shared/actions/helpers/ad-hoc-action-registry'
 import { reap } from '../../shared/actions/effects/reap'
 import { specialEffectAction } from '../../shared/actions/effects/special-effect'
+import '../../shared/cards/D/D075_WoodField'
 
 const CARD_ID = 'E073_Scythe'
 
@@ -22,10 +23,56 @@ const setupSession = () => {
   const state = session.getState().state
   state.players = state.players.slice(0, 2)
   state.round = 4
+  state.players.forEach((player) => {
+    player.minorHand = ['__test_placeholder__']
+    player.occupationHand = ['__test_placeholder__']
+  })
   return { session, state }
 }
 
 describe('E073_Scythe session — token model + reap full stack', () => {
+  it('full-reaps every occupied slot of one Card Field', () => {
+    const { session, state } = setupSession()
+    const player = state.players[0]!
+    player.minorPlayed.push(CARD_ID, 'D075_WoodField')
+    player.cardStates.D075_WoodField = {
+      extraData: {
+        cardFieldStacks: [
+          { crop: 'wood', remaining: 2 },
+          { crop: 'wood', remaining: 2 },
+        ],
+      },
+    }
+    session.loadState(state)
+
+    const flow = getCardEffect(CARD_ID)!.onStartHarvestFieldPhase!(state, player)
+    expect(flow).toMatchObject({
+      type: 'xor',
+      children: [{
+        actionId: 'card_E073_Scythe_harvest-field',
+        sourceCard: CARD_ID,
+        params: { fieldId: 'card:D075_WoodField' },
+      }],
+    })
+    const action = getAdHocAction('card_E073_Scythe_harvest-field')!
+    expect(action.execute({
+      state,
+      player,
+      params: { fieldId: 'card:D075_WoodField' },
+      sourceCard: CARD_ID,
+    } as Parameters<typeof action.execute>[0]).type).toBe('ok')
+
+    const result = reap(state, player)
+
+    expect(player.resources.wood).toBe(4)
+    expect(player.cardStates.D075_WoodField?.extraData?.cardFieldStacks).toEqual([null, null])
+    expect(result.reapSummary.harvestedPositions).toEqual([{ row: -1, col: 4075 }])
+    expect(result.reapSummary.harvestCountApplications).toEqual([
+      expect.objectContaining({ row: -1, col: 4075, crop: 'wood', count: 2, scope: 'field' }),
+      expect.objectContaining({ row: -1, col: 4076, crop: 'wood', count: 2, scope: 'field' }),
+    ])
+  })
+
   it('triggers when a field has at least 2 crops total (single-stack ≥2)', () => {
     const { session, state } = setupSession()
     const player = state.players[0]!
@@ -76,7 +123,7 @@ describe('E073_Scythe session — token model + reap full stack', () => {
     expect(flow!.type).toBe('xor')
     const xor = flow as Extract<ActionFlow, { type: 'xor' }>
     expect(xor.children).toHaveLength(1)
-    expect((xor.children[0] as Extract<ActionFlow, { type: 'leaf' }>).params).toEqual({ fieldIndex: 1 })
+    expect((xor.children[0] as Extract<ActionFlow, { type: 'leaf' }>).params).toEqual({ fieldId: 'farmyard:0:1' })
   })
 
   it('does NOT trigger when no fields planted', () => {
@@ -115,13 +162,13 @@ describe('E073_Scythe session — token model + reap full stack', () => {
 
     const firstChild = xor.children[0] as Extract<ActionFlow, { type: 'leaf' }>
     expect(firstChild.actionId).toBe('card_E073_Scythe_harvest-field')
-    expect(firstChild.params).toEqual({ fieldIndex: 0 })
+    expect(firstChild.params).toEqual({ fieldId: 'farmyard:0:0' })
 
     const adHoc = getAdHocAction('card_E073_Scythe_harvest-field')!
     const result = adHoc.execute({
       state,
       player,
-      params: { fieldIndex: 0 },
+      params: { fieldId: 'farmyard:0:0' },
       sourceCard: CARD_ID,
     } as Parameters<typeof adHoc.execute>[0])
 
@@ -164,7 +211,7 @@ describe('E073_Scythe session — token model + reap full stack', () => {
     const result = adHoc.execute({
       state,
       player,
-      params: { fieldIndex: 0 },
+      params: { fieldId: 'farmyard:0:0' },
       sourceCard: CARD_ID,
     } as Parameters<typeof adHoc.execute>[0])
 
@@ -196,7 +243,7 @@ describe('E073_Scythe session — token model + reap full stack', () => {
     const result = adHoc.execute({
       state,
       player,
-      params: { fieldIndex: 0 },
+      params: { fieldId: 'farmyard:0:0' },
       sourceCard: CARD_ID,
     } as Parameters<typeof adHoc.execute>[0])
 
@@ -227,7 +274,7 @@ describe('E073_Scythe session — token model + reap full stack', () => {
     adHoc.execute({
       state,
       player,
-      params: { fieldIndex: 0 },
+      params: { fieldId: 'farmyard:0:0' },
       sourceCard: CARD_ID,
     } as Parameters<typeof adHoc.execute>[0])
 
