@@ -1,7 +1,7 @@
 import { defineMinorCard } from '../card-source'
 import { gainLeaf } from '../helpers/pay-gain-node'
-import { fieldHasCrop, fieldIsEmpty } from '../../domain/field'
 import type { CardImpl } from '../registry'
+import { getLogicalFields } from '../helpers/card-field'
 
 const CARD_ID = 'B061_ThreeFieldRotation'
 
@@ -9,9 +9,10 @@ const cardImpl = {
   effect: {
   id: CARD_ID,
   onStartHarvestFieldPhase: (_state, player) => {
-    const hasGrain = player.fields.some(f => fieldHasCrop(f, 'grain'))
-    const hasVeg = player.fields.some(f => fieldHasCrop(f, 'vegetable'))
-    const hasEmpty = player.fields.some(f => fieldIsEmpty(f))
+    const fields = getLogicalFields(player)
+    const hasGrain = fields.some((field) => field.stacks.some((stack) => stack.kind === 'grain'))
+    const hasVeg = fields.some((field) => field.stacks.some((stack) => stack.kind === 'vegetable'))
+    const hasEmpty = fields.some((field) => field.stacks.length === 0)
     if (!hasGrain || !hasVeg || !hasEmpty) return
     return gainLeaf(CARD_ID, { food: 3 })
   },

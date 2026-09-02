@@ -1,13 +1,14 @@
 import { defineMinorCard } from '../card-source'
 import { queueFutureMeeplesFlow } from '../../actions/effects/internal/future-meeples'
-import { fieldHasCrop } from '../../domain/field'
 import type { CardImpl } from '../registry'
+import { getLogicalFields } from '../helpers/card-field'
 
 const CARD_ID = 'B045_StrawberryPatch'
 
 const cardImpl = {
   prerequisiteCheck: (player) =>
-    player.fields.filter((f) => fieldHasCrop(f, 'vegetable')).length >= 2,
+    getLogicalFields(player)
+      .filter((field) => field.stacks.some((stack) => stack.kind === 'vegetable')).length >= 2,
   effect: {
   id: CARD_ID,
   onBuy: (state, player) => {

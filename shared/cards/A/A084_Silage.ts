@@ -1,8 +1,8 @@
 import { defineMinorCard } from '../card-source'
 import type { ActionDefinition, ActionFlow } from '../../contract/types'
-import { fieldHasCrop, fieldTopStack, fieldPopIfDepleted } from '../../domain/field'
 import { registerAdHocAction } from '../../actions/helpers/ad-hoc-action-registry'
 import type { CardImpl } from '../registry'
+import { getLogicalFields, mutateLogicalFields } from '../helpers/card-field'
 
 const CARD_ID = 'A084_Silage'
 const PAY_GRAIN_ACTION_ID = 'card_A084_Silage_pay-grain-any'
@@ -18,23 +18,21 @@ const payGrainAnyAction: ActionDefinition = {
   roundAvailable: 1,
   gainPerRound: {},
   canBeExecutedByPlayer: () => true,
-  execute: ({ player }) => {
+  execute: ({ state, player, eventSink }) => {
     if (player.resources.grain >= 1) {
       player.resources.grain -= 1
       return { type: 'ok' }
     }
-    const grainField = player.fields.find((f) => {
-      const top = fieldTopStack(f)
-      return top?.kind === 'grain' && top.remaining > 0
-    })
-    if (grainField) {
-      const top = fieldTopStack(grainField)
-      if (top) {
-        top.remaining -= 1
-        fieldPopIfDepleted(grainField)
-      }
-      return { type: 'ok' }
-    }
+    const grainField = getLogicalFields(player).map((field) => ({
+      field,
+      top: [...field.slots].reverse().find((slot) => slot.stack),
+    })).find(({ top }) => top?.stack?.kind === 'grain')
+    if (!grainField?.top) return { type: 'fail', errorKey: 'log.exchangeFail' }
+    const removed = mutateLogicalFields(state, player, {
+      sourceCard: CARD_ID,
+      eventSink,
+    }).remove({ fieldId: grainField.field.id, slot: grainField.top.index }, 1)
+    if (removed.ok) return removed.flow ? { type: 'flow', flow: removed.flow } : { type: 'ok' }
     return { type: 'fail', errorKey: 'log.exchangeFail' }
   },
 }
@@ -46,11 +44,13 @@ const cardImpl = {
   id: CARD_ID,
   onReturnHome: (state, player) => {
     if (harvestRounds.includes(state.round)) return
-    if (player.fields.length < 2) return
+    const fields = getLogicalFields(player)
+    if (fields.length < 2) return
 
     // Check grain availability (reserve or field)
-    const hasGrain = player.resources.grain >= 1 ||
-      player.fields.some((f) => fieldHasCrop(f, 'grain'))
+    const hasGrain = player.resources.grain >= 1 || fields.some(
+      (field) => [...field.slots].reverse().find((slot) => slot.stack)?.stack?.kind === 'grain',
+    )
     if (!hasGrain) return
 
     const breedableTypes = BREEDABLE_TYPES.filter(

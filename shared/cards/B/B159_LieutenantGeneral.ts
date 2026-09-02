@@ -3,6 +3,7 @@ import type { CardListenerContext, CardListenerRegistration } from '../card-list
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
+import { getFarmyardFields } from '../helpers/card-field'
 
 const CARD_ID = 'B159_LieutenantGeneral'
 /**
@@ -29,7 +30,7 @@ const listener: CardListenerRegistration = {
     // After the plow action, the trigger player (opponent) has the new field.
     // If they have 2+ fields, the newly plowed field was adjacent to an existing one.
     const triggerPlayer = context.triggerPlayer ?? context.player
-    if (triggerPlayer.fields.length < 2) return
+    if (getFarmyardFields(triggerPlayer).length < 2) return
     const reward = context.state.round === 14 ? { grain: 1 } : { food: 1 }
     return { flow: gainLeaf(CARD_ID, reward), sourceCard: CARD_ID }
   },

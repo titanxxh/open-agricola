@@ -29,6 +29,10 @@ const setup = (options?: {
   const state = session.getState().state
   state.players = state.players.slice(0, playerCount)
   state.currentPlayerIndex = 0
+  state.players.forEach((player) => {
+    player.minorHand = ['__test_placeholder__']
+    player.occupationHand = ['__test_placeholder__']
+  })
 
   const player = state.players[0]!
   if (options?.fields) {

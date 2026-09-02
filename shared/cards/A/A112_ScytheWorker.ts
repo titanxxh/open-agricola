@@ -9,24 +9,36 @@ import {
 } from '../../actions/helpers/harvest-count-registry'
 import type { GameState, PlayerState } from '../../contract/types'
 import type { CardImpl } from '../registry'
+import { getLogicalFields } from '../helpers/card-field'
 
 const CARD_ID = 'A112_ScytheWorker'
-registerHarvestCountModifier(CARD_ID, ({ player, field }) => {
+registerHarvestCountModifier(CARD_ID, ({ player, field, logicalField }) => {
   const selected = readCardExtraData<string[]>(player, CARD_ID, 'selectedPositions') ?? []
-  if (!selected.includes(positionKey(field))) return
+  const selectedField = logicalField
+    ? logicalField.slots.some((slot) => selected.includes(positionKey(slot.tile)))
+    : selected.includes(positionKey(field))
+  if (!selectedField) return
   const top = fieldTopStack(field)
   if (top?.kind !== 'grain') return
   return { delta: 1, sources: [CARD_ID] }
 })
 
 const eligibleFields = (state: GameState, player: PlayerState) => {
-  return player.fields.filter((field) => {
+  return getLogicalFields(player).flatMap((logicalField) => {
+    const slot = [...logicalField.slots].reverse().find((candidate) => candidate.stack)
+    if (!slot) return []
+    const field = {
+      row: logicalField.row,
+      col: logicalField.col,
+      stacks: logicalField.stacks.map((stack) => ({ ...stack })),
+    }
     const top = fieldTopStack(field)
     const min = computeHarvestSelectionThreshold(state, player, field, {
       sourceCard: CARD_ID,
       baseThreshold: 2,
+      logicalField,
     }).threshold
-    return top?.kind === 'grain' && top.remaining >= min
+    return top?.kind === 'grain' && top.remaining >= min ? [{ logicalField, slot }] : []
   })
 }
 
@@ -47,7 +59,16 @@ const cardImpl = {
       actionContext: {
         selectionKind: 'farm-position',
         maxSelections: fields.length,
-        selectableTiles: fields.map(({ row, col }) => ({ row, col })),
+        selectableTiles: fields.map(({ logicalField, slot }) => ({
+          ...slot.tile,
+          ...(logicalField.sourceCard
+            ? {
+                sourceCard: logicalField.sourceCard,
+                groupKey: logicalField.groupKey,
+                cardFieldSlot: slot.index,
+              }
+            : {}),
+        })),
       },
     }
   },

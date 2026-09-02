@@ -11,6 +11,7 @@ import { A112_ScytheWorker_impl } from '../A/A112_ScytheWorker'
 import { D072_StableManure_impl } from '../D/D072_StableManure'
 import { E112_GrainThief_impl } from '../E/E112_GrainThief'
 import '../E/E073_Scythe'
+import '../B/B113_PatchCaregiver'
 
 const makePlayer = (fields: Field[]): PlayerState => ({
   id: 'p1',
@@ -252,6 +253,39 @@ describe('A112 and D72 harvest count integration', () => {
       },
     })
     expect((flow as { actionContext?: Record<string, unknown> }).actionContext?.selectionEffect).toBeUndefined()
+  })
+
+  it('A112 selects a Card Field once and harvests one additional grain', () => {
+    vi.spyOn(cardListeners, 'runCardListeners').mockImplementation(() => [])
+    const player = makePlayer([])
+    player.occupationPlayed.push('A112_ScytheWorker', 'B113_PatchCaregiver')
+    player.cardStates.B113_PatchCaregiver = {
+      extraData: { cardFieldStacks: [{ crop: 'grain', remaining: 3 }] },
+    }
+    const state = makeState(player)
+
+    expect(A112_ScytheWorker_impl.effect.onStartHarvestFieldPhase!(state, player)).toMatchObject({
+      actionContext: {
+        maxSelections: 1,
+        selectableTiles: [{
+          row: -1,
+          col: 2113,
+          sourceCard: 'B113_PatchCaregiver',
+          groupKey: 'B113_PatchCaregiver',
+          cardFieldSlot: 0,
+        }],
+      },
+    })
+    player.cardStates.A112_ScytheWorker = {
+      extraData: { selectedPositions: ['-1-2113'] },
+    }
+    const result = reap(state, player)
+
+    expect(player.resources.grain).toBe(2)
+    expect(player.cardStates.B113_PatchCaregiver?.extraData?.cardFieldStacks).toEqual([
+      { crop: 'grain', remaining: 1 },
+    ])
+    expect(result.reapSummary.grainFields).toBe(1)
   })
 
   it('D72 adds one harvest count to selected crop fields and reports its source', () => {

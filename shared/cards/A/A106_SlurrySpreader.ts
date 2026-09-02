@@ -1,7 +1,7 @@
 import { defineOccupationCard } from '../card-source'
 import { gainLeaf } from '../helpers/pay-gain-node'
-import { fieldHasCrop } from '../../domain/field'
 import type { CardImpl } from '../registry'
+import { getLogicalFields } from '../helpers/card-field'
 
 const CARD_ID = 'A106_SlurrySpreader'
 
@@ -13,8 +13,9 @@ const cardImpl = {
     const summary = state.harvestReapSummary?.[player.id]
     if (!summary) return
 
-    const remainingGrainFields = player.fields.filter((field) => fieldHasCrop(field, 'grain')).length
-    const remainingVegetableFields = player.fields.filter((field) => fieldHasCrop(field, 'vegetable')).length
+    const fields = getLogicalFields(player)
+    const remainingGrainFields = fields.filter((field) => field.stacks.some((stack) => stack.kind === 'grain')).length
+    const remainingVegetableFields = fields.filter((field) => field.stacks.some((stack) => stack.kind === 'vegetable')).length
 
     const depletedGrainFields = Math.max(0, (summary.grainFields ?? 0) - remainingGrainFields)
     const depletedVegetableFields = Math.max(0, (summary.vegetableFields ?? 0) - remainingVegetableFields)

@@ -3,6 +3,8 @@ import { GameSession } from '../game/authoritative-session'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 
 import '../../shared/cards/A/A071_ClearingSpade'
+import '../../shared/cards/B/B068_Beanfield'
+import '../../shared/cards/C/C070_LettucePatch'
 import type { AnytimeAction } from '../../shared/contract/types';
 
 describe('A071_ClearingSpade session', () => {
@@ -133,5 +135,43 @@ describe('A071_ClearingSpade session', () => {
     expect(sourceField.stacks[0]?.remaining ?? 0).toBe(1)
     expect(targetField.stacks[0]?.kind).toBe('vegetable')
     expect(targetField.stacks[0]?.remaining ?? 0).toBe(1)
+  })
+
+  it('moves a crop between compatible Card Fields', () => {
+    const session = setup([])
+    const state = session.getState().state
+    const player = state.players[0]!
+    player.minorPlayed.push('B068_Beanfield', 'C070_LettucePatch')
+    player.cardStates.B068_Beanfield = {
+      extraData: { cardFieldStacks: [{ crop: 'vegetable', remaining: 2 }] },
+    }
+    player.cardStates.C070_LettucePatch = {
+      extraData: { cardFieldStacks: [null] },
+    }
+    session.loadState(state)
+    enterActiveInteraction(session)
+
+    let resp = session.takeAnytimeAction(0, 'A71-clearing-spade-anytime')
+    expect(resp.ok).toBe(true)
+    resp = session.commitSelectionChoice(0, { positions: [{ row: -1, col: 2068 }] })
+    expect(resp.ok).toBe(true)
+    expect(resp.interaction.stateId === 'wait'
+      ? resp.interaction.request.selection?.selectablePositions
+      : []).toEqual([{
+      row: -1,
+      col: 3070,
+      sourceCard: 'C070_LettucePatch',
+      groupKey: 'C070_LettucePatch',
+      cardFieldSlot: 0,
+    }])
+    resp = session.commitSelectionChoice(0, { positions: [{ row: -1, col: 3070 }] })
+
+    expect(resp.ok).toBe(true)
+    expect(resp.state.players[0]!.cardStates.B068_Beanfield?.extraData?.cardFieldStacks).toEqual([
+      { crop: 'vegetable', remaining: 1 },
+    ])
+    expect(resp.state.players[0]!.cardStates.C070_LettucePatch?.extraData?.cardFieldStacks).toEqual([
+      { crop: 'vegetable', remaining: 1 },
+    ])
   })
 })

@@ -1,6 +1,6 @@
 import { defineMinorCard } from '../card-source'
-import { fieldHasCrop } from '../../domain/field'
 import type { CardImpl } from '../registry'
+import { getLogicalFields } from '../helpers/card-field'
 
 const CARD_ID = 'A007_GardenersKnife'
 
@@ -8,8 +8,9 @@ const cardImpl = {
   effect: {
   id: CARD_ID,
   onBuy: (_state, player) => {
-    const grainFields = player.fields.filter((f) => fieldHasCrop(f, 'grain')).length
-    const vegFields = player.fields.filter((f) => fieldHasCrop(f, 'vegetable')).length
+    const fields = getLogicalFields(player)
+    const grainFields = fields.filter((field) => field.stacks.some((stack) => stack.kind === 'grain')).length
+    const vegFields = fields.filter((field) => field.stacks.some((stack) => stack.kind === 'vegetable')).length
     if (grainFields === 0 && vegFields === 0) return
     const params: Record<string, number> = {}
     if (grainFields > 0) params.food = grainFields

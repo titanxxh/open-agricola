@@ -3,8 +3,8 @@ import type { CardListenerRegistration, CardListenerContext } from '../card-list
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { canSow, isUnconditionalSow } from '../../actions/effects/sow'
 import { gainLeaf } from '../helpers/pay-gain-node'
-import { fieldIsEmpty } from '../../domain/field'
 import type { CardImpl } from '../registry'
+import { getLogicalFields } from '../helpers/card-field'
 
 const CARD_ID = 'A065_SeedPellets'
 const beforeSowListener: CardListenerRegistration = {
@@ -28,7 +28,7 @@ const isDoableListener: CardListenerRegistration = {
     if (context.actionContext?.skipBeforeTriggers === true) return
     if (!isUnconditionalSow(context.actionContext)) return
     if (canSow(context.player)) return
-    if (!context.player.fields.some((field) => fieldIsEmpty(field))) return
+    if (!getLogicalFields(context.player).some((field) => field.stacks.length === 0)) return
     return { doable: true }
   },
 }

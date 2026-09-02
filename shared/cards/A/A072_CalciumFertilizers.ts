@@ -1,22 +1,25 @@
 import { defineMinorCard } from '../card-source'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
-import { fieldTopStack } from '../../domain/field'
 import { parsePositionKey, positionKey } from '../../domain/farm'
-import type { ActionDefinition, Field } from '../../contract/types'
-import type { FarmCropAddedEvent } from '../../contract/events'
+import type { ActionDefinition } from '../../contract/types'
 import { registerAdHocAction } from '../../actions/helpers/ad-hoc-action-registry'
 import type { CardImpl } from '../registry'
+import {
+  getFarmyardFields,
+  getLogicalFields,
+  mutateLogicalFields,
+  type LogicalField,
+} from '../helpers/card-field'
 
 const CARD_ID = 'A072_CalciumFertilizers'
 const GROW_ACTION_ID = 'card_A072_CalciumFertilizers_growTopCrop'
 
-const growableTop = (field: Field) => {
-  const top = fieldTopStack(field)
-  return top
-    && top.remaining >= 1
-    && (top.kind === 'grain' || top.kind === 'vegetable')
-    && field.stacks.every((stack) => stack.kind === top.kind)
+const growableTop = (field: LogicalField) => {
+  const top = [...field.slots].reverse().find((slot) => slot.stack)
+  return top?.stack
+    && (top.stack.kind === 'grain' || top.stack.kind === 'vegetable')
+    && field.stacks.every((stack) => stack.kind === top.stack!.kind)
     ? top
     : undefined
 }
@@ -28,33 +31,20 @@ const growTopCropAction: ActionDefinition = {
   roundAvailable: 1,
   gainPerRound: {},
   canBeExecutedByPlayer: (_state, player) => player.minorPlayed.includes(CARD_ID),
-  execute: ({ player, params, eventSink }) => {
+  execute: ({ state, player, params, eventSink }) => {
     const positions = (params as { positions?: unknown } | undefined)?.positions
     if (!Array.isArray(positions) || positions.some((value) => typeof value !== 'string')) {
       return { type: 'fail', errorKey: 'log.actionFail' }
     }
-    const crops: FarmCropAddedEvent['crops'] = []
+    const mutations = mutateLogicalFields(state, player, { sourceCard: CARD_ID, eventSink })
     for (const key of positions) {
       const position = parsePositionKey(key)
-      const field = position && player.fields.find(
-        (candidate) => candidate.row === position.row && candidate.col === position.col,
+      const field = position && getLogicalFields(player).find(
+        (candidate) => candidate.slots.some((slot) => positionKey(slot.tile) === positionKey(position)),
       )
       const top = field && growableTop(field)
       if (!field || !top) continue
-      top.remaining += 1
-      crops.push({
-        location: { kind: 'field', playerId: player.id, row: field.row, col: field.col },
-        crop: top.kind,
-        amount: 1,
-      })
-    }
-    if (crops.length > 0) {
-      eventSink?.emit<'farm.cropAdded'>({
-        type: 'farm.cropAdded',
-        sourceCardId: CARD_ID,
-        crops,
-        reason: 'cardEffect',
-      })
+      mutations.grow({ fieldId: field.id, slot: top.index }, 1)
     }
     return { type: 'ok' }
   },
@@ -71,10 +61,10 @@ const listener: CardListenerRegistration = {
     if (!context.space) return
     if (context.space.id !== 'eastern-quarry' && context.space.id !== 'western-quarry') return
 
-    // Find planted fields with crops remaining
-    const positions = context.player.fields.flatMap((field) => (
-      growableTop(field) ? [positionKey(field)] : []
-    ))
+    const positions = getLogicalFields(context.player).flatMap((field) => {
+      const top = growableTop(field)
+      return top ? [positionKey(top.tile)] : []
+    })
     if (positions.length === 0) return
     return {
       flow: {
@@ -90,6 +80,7 @@ const listener: CardListenerRegistration = {
 
 const cardImpl = {
   listeners: [listener],
+  prerequisiteCheck: (player) => getFarmyardFields(player).length === 0,
   reaches: [] as readonly string[],
 } satisfies CardImpl
 

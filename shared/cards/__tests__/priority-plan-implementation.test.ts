@@ -529,10 +529,11 @@ describe('priority plan implementations', () => {
       { row: 0, col: 1, stacks: [{ kind: 'grain', remaining: 1 }] },
     ]
 
-    const result = getCardEffect('A064_BarleyMill')?.onAfterReap?.(
-      createState(player),
-      player,
-    )
+    const state = createState(player)
+    state.harvestReapSummary = {
+      [player.id]: { resources: { grain: 2 }, grainFields: 2, vegetableFields: 0 },
+    }
+    const result = getCardEffect('A064_BarleyMill')?.onAfterReap?.(state, player)
 
     expect(result).toMatchObject({
       type: 'seq',
