@@ -187,7 +187,7 @@ Undo 与 provisional scope rollback 的 runtime `publicEventCancellations` 是�
 - **卡牌局部状态**：`cardStates`（见 §8.3）
 - **工人身份**：`workers: Worker[]`，固定 5 槽 id `'1'..'5'`，`isActive` / `isNewborn` 标记
 
-`Field.stacks: CropStack[]`：底堆在 `[0]`，顶堆在末尾。Sow 必须空田（`fieldIsEmpty`）；Reap 只收顶堆，`remaining===0` 时 pop；混合田同时计入 grain 田与 veg 田。所有访问走 `shared/domain/field.ts` helper。
+`PlayerState.fields` 是 Farmyard Field 的私有存储。卡牌规则使用 §8.5 的 Logical Field 边界；只有几何与版图占位规则才显式请求 Farmyard Field。`Field.stacks: CropStack[]` 的底堆在 `[0]`，顶堆在末尾。
 
 ### 4.4 ClientCommand（已收敛）
 
@@ -963,17 +963,15 @@ cardField?: {
 }
 ```
 
-`shared/cards/helpers/card-field.ts:makeCardFieldImpl(cardId, def, options?)` 是工厂，按
-`def` 派生 `onComputeSowableFields` / `onSowExtraField` / `onHarvestFieldPhase` / `sow-isDoable`
-listener。单卡只声明配置 + 可选 `onReap` / `onCropRemoved` 回调处理副作用，文件行数贴近甚至少于参考实现。
+`shared/cards/helpers/card-field.ts:makeCardFieldImpl(cardId, def, options?)` 注册 Card Field owner 并派生播种集成。单卡只声明配置，以及可选的 `onReap` / `onCropRemoved` owner 副作用回调。
 
 虚拟 tile col 由
 `deriveVirtualTileCol(cardId, slotIdx) = deckOrdinal*1000 + cardNumber + slotIdx`
 派生，跨 deck 不冲突；同 deck 邻号 capacity 占位需 audit（当前 11 张卡 capacity≤3，安全余量充足）。
 
-每个已有作物的槽都会投影为虚拟 `Field`，并与普通田共用 `computeHarvestCount()`。同一 Card Field 的多个槽以 card id 共享 `groupKey`，选择数量上只算一块 Logical Field；田地数量 modifier 只作用于规范化后选中的一个槽，普通 Reap 仍会收割所有已有作物的槽。
+卡牌侧接口只有三个入口。`getLogicalFields(player)` 按确定顺序返回不可变投影，包含 Farmyard Field 和所有已打出且已注册的 Card Field，也包含固定容量中的空槽。`getFarmyardFields(player)` 是犁地、围栏、相邻、版图占位与 Field tile 几何规则显式使用的窄查询。`mutateLogicalFields(state, player, options?)` 提供具名的 `place`、`grow`、`remove` 与原子 `replace` 操作；它先验证目标，再经 Farmyard 或 Card State owner adapter 写入。
 
-`getCroppedCardFields()` 把这些已有作物的虚拟槽提供给明确支持 Card Field 的规则。`removeCardFieldCrop()` 把选中的虚拟槽还原为 Logical Field，移除该卡各槽中的目标作物，写回 `cardFieldStacks`，发出一个 card location 的 `farm.cropRemoved` 事件，然后才分派该卡的通用移除回调。helper 不按选择卡或目标卡分支；调用方只需把返回的 `ActionFlow` 与自身效果组合。
+Card Field 无论容量多少都只有一个稳定 Logical Field id 和 `groupKey`；固定槽在其他槽清空后仍保留稳定选择坐标。`card-field.ts` 内的底层 Farmyard adapter 是 Card Impl 代码唯一可直接访问 `PlayerState.fields` 的位置。`check:card-impl-boundaries` 扫描 A–E、Farmers of the Moor、major、community 与生产 helper，不论 receiver 名称都拒绝名为 `fields` 的属性或 bracket 访问，并且没有遗留文件 allowlist。
 
 副作用回调签名：
 
@@ -1002,18 +1000,11 @@ onCropRemoved?: (ctx: {
 }) => ActionFlow | void
 ```
 
-`onReap` 只在 reap 时运行，保留收获专属语义；`onCropRemoved` 在每次真实作物移除时运行（包括 reap），使“每次移除”效果不依赖移除来源。多 crop 各调一次回调；reap 返回多个 flow 时基建用普通 `parallel` 包装。对齐参考实现 `$this->field = true`
-+ `getFieldDetails()` + `onPlayerAfterReap` 语义。
+`onReap` 只在 reap 时运行，保留收获专属语义；`onCropRemoved` 在每次真实作物移除时运行（包括 reap）。每种作物在共享写入后回调一次，返回的 flow 进入普通 `parallel` reaction。
 
 selection effect 返回移除回调的 `ActionFlow` 时，引擎先完成这个动态 child，再推进 selection 所在父流程的下一个 continuation。因此，被移除作物立即触发的效果总先于移除卡自身的后续行动结算。
 
-**Harvest reap log 时序**：`harvestReapSummary` 初始化已从 `continueHarvestReap` 提前到
-`continueHarvestFieldStart`，基建在 `onHarvestFieldPhase` 内累加 `summary.resources[crop]`，
-让 `log.reapDetail` 同时包含普通 field 与 cardField 产出（之前 cardField 累加发生在
-summary 初始化前会被丢弃）。该 summary 的生命周期不是 field phase 局部变量，必须延续到
-`onAfterHarvest` 完成后再清理。
-
-`reap` 的 private trigger 复用同一套 Card Field reaper registry，但传入 `updateHarvestSummary: false`，避免私人田地阶段污染普通 Harvest 日志 summary。
+`reap` action 是两个存储 owner 唯一共用的收割实现。它遍历 Logical Field 的已有作物槽，统一经过 `computeHarvestCount()`，通过 `mutateLogicalFields()` 持久化移除，并产生一致的资源、Harvest Count application（包括零产出记录）、已收作物/位置/田数、作物事件、通用 listener 与 owner 回调。多槽 Card Field 会收割每个已有作物的槽，但每种作物只按一块 Logical Field 计数。Private Field Phase 用 private trigger 进入同一 action，不写完整 Harvest summary。
 
 当前迁移到该 helper 的 11 张卡：B68 / D75 / E80 / D25 / E72 / C70 / E68 / E69 / E70 /
 B113 / B141。

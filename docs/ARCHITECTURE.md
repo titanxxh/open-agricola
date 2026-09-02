@@ -189,7 +189,7 @@ Initially, only rules events with `visibility: 'public'` may enter `GameState.ev
 - **Card-local state:** `cardStates`, described in section 8.3
 - **Worker identity:** `workers: Worker[]`, with five fixed slots identified by `'1'..'5'` and marked by `isActive` and `isNewborn`
 
-`Field.stacks: CropStack[]` stores the bottom stack at index 0 and the top stack last. Sow requires an empty field through `fieldIsEmpty`. Reap takes only the top stack and pops it when `remaining === 0`. A mixed field counts as both a grain and vegetable field. All access goes through helpers in `shared/domain/field.ts`.
+`PlayerState.fields` is the private storage of Farmyard Fields. Card-facing rules use the Logical Field boundary described in section 8.5; only geometry and board-occupancy rules request Farmyard Fields explicitly. `Field.stacks: CropStack[]` stores the bottom stack at index 0 and the top stack last.
 
 ### 4.4 ClientCommand
 
@@ -986,13 +986,13 @@ cardField?: {
 }
 ```
 
-`shared/cards/helpers/card-field.ts:makeCardFieldImpl(cardId, def, options?)` derives `onComputeSowableFields`, `onSowExtraField`, `onHarvestFieldPhase`, and a `sow-isDoable` listener from the definition. An individual card declares only the configuration and optional `onReap` / `onCropRemoved` callbacks for side effects, keeping the file near or below its reference counterpart's size.
+`shared/cards/helpers/card-field.ts:makeCardFieldImpl(cardId, def, options?)` registers the Card Field owner and derives its sow integration. An individual card declares only the configuration and optional `onReap` / `onCropRemoved` callbacks for owner-specific side effects.
 
 Virtual tile columns derive from `deriveVirtualTileCol(cardId, slotIdx) = deckOrdinal*1000 + cardNumber + slotIdx`, preventing cross-deck collisions. Capacity slots for adjacent numbers in one deck require auditing; the current 11 cards all have capacity at most three, leaving ample margin.
 
-Each occupied slot is projected as a virtual `Field` and uses the same `computeHarvestCount()` pipeline as an ordinary field. Multiple slots on one Card Field share the card id as `groupKey`, so they are one Logical Field for selection limits; a field-count modifier applies once to the canonical selected slot, while normal Reap still harvests every occupied slot.
+The card-facing interface has three entry points. `getLogicalFields(player)` returns an immutable, deterministic projection of Farmyard Fields plus every registered played Card Field, including empty fixed-capacity slots. `getFarmyardFields(player)` is the explicit narrower query for plowing, fencing, adjacency, board occupancy, and other Field-tile geometry. `mutateLogicalFields(state, player, options?)` supplies named `place`, `grow`, `remove`, and atomic `replace` operations; it validates the target before writing through the owning Farmyard or Card State adapter.
 
-`getCroppedCardFields()` exposes those occupied virtual slots to rules that explicitly support Card Fields. `removeCardFieldCrop()` resolves a selected virtual slot back to its Logical Field, removes the selected crop across that card's stacks, writes `cardFieldStacks`, emits one `farm.cropRemoved` event with a card location, and only then dispatches the card's generic removal callback. The helper contains no selecting-card or target-card branch; callers compose any returned `ActionFlow` with their own effect.
+A Card Field has one stable Logical Field id and one `groupKey` regardless of capacity. Its fixed slots retain stable selection coordinates when another slot becomes empty. The low-level Farmyard adapter inside `card-field.ts` is the only Card Impl code allowed to access `PlayerState.fields` directly. `check:card-impl-boundaries` rejects property or bracket access named `fields` in production A–E, Farmers of the Moor, major, community, and helper sources, regardless of receiver name and without a legacy allowlist.
 
 The side-effect callbacks are:
 
@@ -1021,13 +1021,11 @@ onCropRemoved?: (ctx: {
 }) => ActionFlow | void
 ```
 
-`onReap` runs only for reap and preserves harvest-specific card semantics. `onCropRemoved` runs for every real crop removal, including reap, so effects worded as “each time you remove” do not depend on the removal source. Each callback runs once per crop; the reap infrastructure wraps multiple returned flows in ordinary `parallel`. This matches the reference `$this->field = true`, `getFieldDetails()`, and `onPlayerAfterReap` semantics.
+`onReap` runs only for reap and preserves harvest-specific card semantics. `onCropRemoved` runs for every real crop removal, including reap. Each callback runs after the shared mutation and once per crop; returned flows join the ordinary `parallel` reaction.
 
 When a selection effect returns a removal callback's `ActionFlow`, the engine resolves that dynamic child before advancing to the selection's next parent continuation. Immediate effects caused by the removed crop therefore finish before the removing card's own follow-up action.
 
-**Harvest reap-log ordering.** `harvestReapSummary` initialization moved from `continueHarvestReap` to the earlier `continueHarvestFieldStart`. Infrastructure accumulates `summary.resources[crop]` during `onHarvestFieldPhase`, so `log.reapDetail` contains both ordinary-field and Card Field production. Previously the Card Field accumulation happened before summary initialization and was discarded. The summary is not a field-phase local; it remains until `onAfterHarvest` finishes.
-
-A private `reap` trigger reuses the same Card Field reaper registry with `updateHarvestSummary: false`, preventing a private-field phase from contaminating ordinary Harvest log summary.
+The `reap` action is the single reaping implementation for both storage owners. It iterates occupied Logical Field slots through `computeHarvestCount()`, persists removal through `mutateLogicalFields()`, and produces the same resources, Harvest Count applications (including zero-yield applications), harvested crops/positions/field counts, crop events, generic listeners, and owner callbacks. Multi-slot Card Fields reap every occupied slot but count once per Logical Field and crop. Private Field Phases enter the same action with a private trigger and do not write the full-Harvest summary.
 
 The 11 cards currently migrated to this helper are B68, D75, E80, D25, E72, C70, E68, E69, E70, B113, and B141.
 

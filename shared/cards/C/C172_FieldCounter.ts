@@ -15,11 +15,8 @@ const countPlowedFields = (
     .filter((event): event is Extract<GameEvent | DraftGameEvent, { type: 'farm.fieldPlowed' }> =>
       event.type === 'farm.fieldPlowed',
     )
-    .reduce(
-      (sum, event) =>
-        sum + event.fields.filter((field) => field.playerId === playerId).length,
-      0,
-    )
+    .reduce((sum, { fields }) =>
+      sum + fields.filter((field) => field.playerId === playerId).length, 0)
 
 const afterOpponentPlowListener: CardListenerRegistration = {
   id: 'C172-field-counter-after-opponent-plow',

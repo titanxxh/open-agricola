@@ -91,26 +91,6 @@ const readSlots = (
 const writeSlots = (player: PlayerState, cardId: string, slots: CardFieldSlot[]) =>
   writeCardExtraData(player, cardId, 'cardFieldStacks', slots)
 
-export type CardFieldCropRemovalResult = {
-  crop: Crop
-  amount: number
-  flow?: ActionFlow
-}
-
-export type CardFieldCropRemovalOptions = {
-  reason?: FarmCropRemovedEvent['reason']
-  sourceCard?: string
-  eventSink?: EventSink
-}
-
-type CardFieldCropRemover = (
-  state: GameState,
-  player: PlayerState,
-  slotIdx: number,
-  options?: CardFieldCropRemovalOptions,
-) => CardFieldCropRemovalResult | undefined
-
-const cardFieldCropRemovers = new Map<string, CardFieldCropRemover>()
 const cardFieldOptions = new Map<string, CardFieldOptions>()
 
 const appendFlowChildren = (children: ActionFlow[], flow: ActionFlow | undefined) => {
@@ -130,16 +110,6 @@ const playedCardIds = (player: PlayerState): string[] => [
   ...(player.minorPlayed ?? []),
   ...(player.occupationPlayed ?? []),
 ]
-
-export const hasAnyCardFieldCrops = (player: PlayerState): boolean =>
-  playedCardIds(player).some((cardId) =>
-    cardFieldDefs.has(cardId) && readSlots(player, cardId).some((slot) => slot !== null),
-  )
-
-export const hasCardFieldCrop = (player: PlayerState, crop: Crop): boolean =>
-  playedCardIds(player).some((cardId) =>
-    cardFieldDefs.has(cardId) && readSlots(player, cardId).some((slot) => slot?.crop === crop),
-  )
 
 export type LogicalFieldSlot = Readonly<{
   index: number
@@ -483,51 +453,6 @@ export const mutateLogicalFields = (
   return { place, grow, remove, replace }
 }
 
-export type CroppedCardField = {
-  field: Field
-  tile: FarmTilePosition
-  sourceCard: string
-  groupKey: string
-  cardFieldSlot: number
-}
-
-export const getCroppedCardFields = (player: PlayerState): CroppedCardField[] =>
-  playedCardIds(player).flatMap((cardId) => {
-    if (!cardFieldDefs.has(cardId)) return []
-    return readSlots(player, cardId).flatMap((stack, slotIdx) => {
-      if (!stack) return []
-      const tile = { row: -1, col: deriveVirtualTileCol(cardId, slotIdx) }
-      return [{
-        field: {
-          ...tile,
-          stacks: [{ kind: stack.crop, remaining: stack.remaining }],
-        },
-        tile,
-        sourceCard: cardId,
-        groupKey: cardId,
-        cardFieldSlot: slotIdx,
-      }]
-    })
-  })
-
-export const removeCardFieldCrop = (
-  state: GameState,
-  player: PlayerState,
-  tile: FarmTilePosition,
-  options: CardFieldCropRemovalOptions = {},
-): CardFieldCropRemovalResult | undefined => {
-  const field = getCroppedCardFields(player).find(
-    (candidate) => candidate.tile.row === tile.row && candidate.tile.col === tile.col,
-  )
-  if (!field) return
-  return cardFieldCropRemovers.get(field.sourceCard)?.(
-    state,
-    player,
-    field.cardFieldSlot,
-    options,
-  )
-}
-
 export const makeCardFieldImpl = (
   cardId: string,
   def: CardFieldDef,
@@ -536,57 +461,6 @@ export const makeCardFieldImpl = (
   const baseCol = parseCardBaseCol(cardId)
   cardFieldDefs.set(cardId, def)
   cardFieldOptions.set(cardId, options ?? {})
-
-  cardFieldCropRemovers.set(cardId, (
-    state,
-    player,
-    slotIdx,
-    runOptions = {},
-  ) => {
-    const slots = readSlots(player, cardId, def)
-    const stack = slots[slotIdx]
-    if (!stack) return
-    const crop = stack.crop
-    const available = slots.reduce(
-      (sum, candidate) => sum + (candidate?.crop === crop ? candidate.remaining : 0),
-      0,
-    )
-    if (available <= 0) return
-    for (const [index, candidate] of slots.entries()) {
-      if (candidate?.crop === crop) slots[index] = null
-    }
-    writeSlots(player, cardId, slots)
-    const event = {
-      type: 'farm.cropRemoved' as const,
-      sourceCardId: runOptions.sourceCard,
-      crops: [{
-        location: { kind: 'card' as const, playerId: player.id, cardId },
-        crop,
-        amount: available,
-      }],
-      reason: runOptions.reason ?? 'cardEffect',
-    }
-    if (runOptions.eventSink) {
-      runOptions.eventSink.emit<'farm.cropRemoved'>(event)
-    } else if (Number.isSafeInteger(state.round) && state.round > 0) {
-      appendImmediateEvents(state, [event], {
-        actorPlayerId: player.id,
-        sourceActionId: 'card-field-crop-removal',
-        sourceCardId: runOptions.sourceCard,
-      })
-    }
-    const flow = options?.onCropRemoved?.({
-      state,
-      player,
-      crop,
-      amount: available,
-      isLast: !slots.some((candidate) => candidate?.crop === crop),
-      cardId,
-      reason: event.reason,
-      sourceCard: runOptions.sourceCard,
-    })
-    return { crop, amount: available, ...(flow ? { flow } : {}) }
-  })
 
   const tileMatchesCard = (tile: FarmTilePosition): number | null => {
     if (tile.row !== -1) return null

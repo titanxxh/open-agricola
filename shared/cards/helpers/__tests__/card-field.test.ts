@@ -7,7 +7,6 @@ import {
   getLogicalFields,
   makeCardFieldImpl,
   mutateLogicalFields,
-  removeCardFieldCrop,
 } from '../card-field'
 import { reap } from '../../../actions/effects/reap'
 
@@ -370,70 +369,6 @@ describe('makeCardFieldImpl', () => {
       const flow = reap(state, player).reactionFlow as { type: 'parallel'; children: any[] }
       expect(flow.type).toBe('parallel')
       expect(flow.children).toHaveLength(2)
-    })
-  })
-
-  describe('crop removal', () => {
-    it('removes one logical card-field crop and dispatches its generic callback and event', () => {
-      const events: DraftGameEvent[] = []
-      const eventSink: EventSink = {
-        emit: (event) => { events.push(event) },
-        emitMany: (nextEvents) => { events.push(...nextEvents) },
-      }
-      let reaped = false
-      let removed: { amount: number; isLast: boolean; reason: string } | undefined
-      makeCardFieldImpl('A001_TestField', { allowedCrops: ['grain', 'vegetable'], capacity: 3 }, {
-        onReap: () => { reaped = true },
-        onCropRemoved: ({ amount, isLast, reason }) => {
-          removed = { amount, isLast, reason }
-          return { type: 'leaf', actionId: 'noop', sourceCard: 'A001_TestField' }
-        },
-      })
-      const player = createPlayer({
-        minorPlayed: ['A001_TestField'],
-        cardStates: {
-          A001_TestField: {
-            extraData: {
-              cardFieldStacks: [
-                { crop: 'grain', remaining: 2 },
-                { crop: 'vegetable', remaining: 1 },
-                { crop: 'grain', remaining: 1 },
-              ],
-            },
-          },
-        },
-      })
-      const state = createState(player)
-
-      const result = removeCardFieldCrop(state, player, { row: -1, col: 1001 }, {
-        sourceCard: 'A002_TestRemover',
-        eventSink,
-      })
-
-      expect(result).toMatchObject({
-        crop: 'grain',
-        amount: 3,
-        flow: { type: 'leaf', actionId: 'noop' },
-      })
-      expect(reaped).toBe(false)
-      expect(removed).toEqual({ amount: 3, isLast: true, reason: 'cardEffect' })
-      expect(player.cardStates.A001_TestField?.extraData?.cardFieldStacks).toEqual([
-        null,
-        { crop: 'vegetable', remaining: 1 },
-        null,
-      ])
-      expect(events).toEqual([
-        expect.objectContaining({
-          type: 'farm.cropRemoved',
-          sourceCardId: 'A002_TestRemover',
-          crops: [{
-            location: { kind: 'card', playerId: player.id, cardId: 'A001_TestField' },
-            crop: 'grain',
-            amount: 3,
-          }],
-          reason: 'cardEffect',
-        }),
-      ])
     })
   })
 

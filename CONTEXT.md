@@ -60,6 +60,18 @@ _Avoid_: Farmers
 玩家的领域状态：资源、工人、房间、田地、动物、手牌、已打出卡、`cardStates`、supply token 消耗等。
 _Avoid_: RoomPlayer、浏览器连接、登录用户
 
+**Logical Field（逻辑田）**:
+规则文本中非几何语义的 Field 身份，统一包含 Farmyard Field 与已打出且已注册的 Card Field；田地数量、空置/种植状态、作物、播种、生长、移除和收割默认使用该口径。
+_Avoid_: `PlayerState.fields` 存储、农场坐标、只统计已有作物的虚拟槽
+
+**Farmyard Field（农场田）**:
+占据农场版图坐标、存储在玩家农场状态中的田地；只有犁地、围栏、相邻、占位、Field tile 等几何规则明确使用该口径。
+_Avoid_: Card Field、所有规则文本中的 Field
+
+**Card Field（卡牌田）**:
+由已打出卡牌拥有、存储在 `cardStates` 且没有农场几何位置的 Logical Field；固定容量槽即使为空也保留稳定身份，多槽仍只算一块 Logical Field。
+_Avoid_: Farmyard Field、把每个槽算成独立田、把卡牌状态搬入 `PlayerState.fields`
+
 **Player Lookup Query**:
 领域层把 `playerId` 解析为 `PlayerState` 或 `playerIndex` 的统一查询边界；规则、session 和 effect 代码通过它读取玩家身份映射。
 _Avoid_: RoomPlayer seat/auth 查找、前端视角切换、本地 UI player 选择
