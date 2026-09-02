@@ -2,30 +2,20 @@ import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { runCardEffectHook } from '../../shared/cards/card-effects'
 import type { ActionFlow } from '../../shared/contract/types'
+import { runSelectionEffect } from '../../shared/actions/helpers/selection-effect-registry'
 
 import '../../shared/cards/C/C063_CraftBrewery'
+import '../../shared/cards/B/B113_PatchCaregiver'
 
-/**
- * C63 Craft Brewery — Sprint 7b2 F2 update.
- *
- * The reference `C063_CraftBrewery::onPlayerHarvestFeedingPhase`:
- *   - 1 grain field on the board: auto SE eatSingleFieldGrain($field) +
- *     payGain GRAIN -> FOOD 4 + SCORE 2.
- *   - 2+ grain fields: SE eatFieldGrain prompts the player to pick which
- *     field, then payGain.
- *
- * Implementation: route the field-grain decrement through the
- * `special-effect` leaf with kind `remove-field-crop` (engine-mediated,
- * preserves undo / replay). The first field with grain is auto-selected.
- * **§2.5 simplification:** multi grain field player-pick is NOT
- * implemented; first matching field is auto-chosen. Implementing the
- * picker requires a new `eat-field-grain` SE kind + UI plumbing.
- */
 describe('C063_CraftBrewery session (verify-only)', () => {
   const setup = () => {
     const session = new GameSession()
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
+    state.players.forEach((candidate) => {
+      candidate.minorHand = ['__test_placeholder__']
+      candidate.occupationHand = ['__test_placeholder__']
+    })
     state.currentPlayerIndex = 0
     state.round = 1
     const player = state.players[0]!
@@ -34,7 +24,7 @@ describe('C063_CraftBrewery session (verify-only)', () => {
     return { session, state, player }
   }
 
-  it('returns optional seq with SE remove-field-crop + pay/gain when supply has grain and one field has grain', () => {
+  it('returns optional seq with field selection + pay/gain when supply has grain and one field has grain', () => {
     const { session, state, player } = setup()
     player.resources.grain = 2
     player.fields.push({
@@ -55,24 +45,60 @@ describe('C063_CraftBrewery session (verify-only)', () => {
     expect(seq.type).toBe('seq')
     expect(seq.optional).toBe(true)
     expect(seq.children.map((c) => (c as Extract<ActionFlow, { type: 'leaf' }>).actionId)).toEqual([
-      'special-effect',
+      'selection',
       'pay-resources',
       'gain',
       'bonus-vp',
       'bonus-vp',
     ])
-    const se = seq.children[0] as Extract<ActionFlow, { type: 'leaf' }>
-    expect(se.actionId).toBe('special-effect')
-    expect(se.sourceCard).toBe('C063_CraftBrewery')
-    expect(se.params).toEqual({ kind: 'remove-field-crop', crop: 'grain', minRemaining: 1 })
+    const selection = seq.children[0] as Extract<ActionFlow, { type: 'leaf' }>
+    expect(selection.actionId).toBe('selection')
+    expect(selection.sourceCard).toBe('C063_CraftBrewery')
+    expect(selection.actionContext).toMatchObject({
+      selectionKind: 'farm-position',
+      selectableTiles: [{ row: 1, col: 0 }],
+      minSelections: 1,
+      maxSelections: 1,
+    })
     const pay = seq.children[1] as Extract<ActionFlow, { type: 'leaf' }>
     expect(pay.params).toEqual({ grain: 1 })
     const gain = seq.children[2] as Extract<ActionFlow, { type: 'leaf' }>
     expect(gain.params).toEqual({ food: 4 })
 
-    // Engine-mediated: hook itself does NOT mutate fields anymore. The SE
-    // leaf decrements the field crop when the player accepts the optional seq.
     expect(player.fields[0]!.stacks[0]?.remaining).toBe(1)
+  })
+
+  it('selects grain from a Card Field through the Logical Field mutation seam', () => {
+    const { state, player } = setup()
+    player.resources.grain = 2
+    player.occupationPlayed.push('B113_PatchCaregiver')
+    player.cardStates.B113_PatchCaregiver = {
+      extraData: { cardFieldStacks: [{ crop: 'grain', remaining: 2 }] },
+    }
+
+    const flow = runCardEffectHook(state, player, 'C063_CraftBrewery', 'onHarvestFeedingPhase')
+    const selection = flow?.type === 'seq' ? flow.children[0] : undefined
+    expect(selection).toMatchObject({
+      actionContext: {
+        selectionKind: 'farm-position',
+        selectableTiles: [expect.objectContaining({ row: -1, col: 2113 })],
+        minSelections: 1,
+        maxSelections: 1,
+        selectionEffect: 'c63-craft-brewery-remove-grain',
+      },
+    })
+
+    runSelectionEffect('c63-craft-brewery-remove-grain', {
+      state,
+      player,
+      positions: ['-1-2113'],
+      cards: [],
+      sourceCard: 'C063_CraftBrewery',
+    })
+
+    expect(player.cardStates.B113_PatchCaregiver?.extraData?.cardFieldStacks).toEqual([
+      { crop: 'grain', remaining: 1 },
+    ])
   })
 
   it('returns null when player has no grain in supply', () => {

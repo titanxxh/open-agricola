@@ -7,6 +7,7 @@ import { runCardEffectHook } from '../../shared/cards/card-effects'
 import { markAllWorkersUsed, setActiveWorkerCount } from '../../shared/domain/player'
 import '../../shared/cards/D/D126_FieldCultivator'
 import { autoAdvanceRoundEnd } from '../../tests/llm-card-gen/session-helpers'
+import '../../shared/cards/B/B068_Beanfield'
 
 const CARD_ID = 'D126_FieldCultivator'
 
@@ -84,6 +85,22 @@ describe('D126_FieldCultivator session', () => {
     const player = session.getState().state.players[0]!
     const stack = getCardStack(player, CARD_ID)
     expect(stack.length).toBe(7) // unchanged
+  })
+
+  it('does not pop a good when only a Card Field is harvested', () => {
+    const session = setup()
+    const state = session.getState().state
+    const player = state.players[0]!
+    player.minorPlayed.push('B068_Beanfield')
+    player.cardStates.B068_Beanfield = {
+      extraData: { cardFieldStacks: [{ crop: 'vegetable', remaining: 1 }] },
+    }
+    session.loadState(state)
+
+    autoAdvanceRoundEnd(session)
+
+    expect(session.getState().state.players[0]!.resources.vegetable).toBe(1)
+    expect(getCardStack(session.getState().state.players[0]!, CARD_ID)).toHaveLength(7)
   })
 
   it('no pop when stack is empty', () => {

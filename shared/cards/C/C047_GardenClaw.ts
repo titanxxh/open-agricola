@@ -1,6 +1,6 @@
 import { defineMinorCard } from '../card-source'
 import { queueFutureMeeples, futureMeeplesNode } from '../../actions/effects/internal/future-meeples'
-import { fieldIsEmpty } from '../../domain/field'
+import { getLogicalFields } from '../helpers/card-field'
 import type { CardImpl } from '../registry'
 
 const CARD_ID = 'C047_GardenClaw'
@@ -9,7 +9,7 @@ const cardImpl = {
   effect: {
   id: CARD_ID,
   onBuy: (state, player) => {
-    const plantedFields = player.fields.filter((f) => !fieldIsEmpty(f)).length
+    const plantedFields = getLogicalFields(player).filter((field) => field.stacks.length > 0).length
     if (plantedFields === 0) return
     const count = plantedFields * 3
     queueFutureMeeples(state, {

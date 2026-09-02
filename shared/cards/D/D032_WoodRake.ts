@@ -1,5 +1,5 @@
 import { defineMinorCard } from '../card-source'
-import { fieldTotalRemaining } from '../../domain/field'
+import { getLogicalFields } from '../helpers/card-field'
 import type { CardImpl } from '../registry'
 
 const CARD_ID = 'D032_WoodRake'
@@ -12,8 +12,8 @@ const cardImpl = {
 
     // Count all crop tokens in all fields before final harvest
     let totalCrops = 0
-    for (const field of player.fields) {
-      totalCrops += fieldTotalRemaining(field)
+    for (const field of getLogicalFields(player)) {
+      totalCrops += field.stacks.reduce((sum, stack) => sum + stack.remaining, 0)
     }
     if (totalCrops < 7) return
 

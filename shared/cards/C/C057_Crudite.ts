@@ -2,62 +2,87 @@ import { defineMinorCard } from '../card-source'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { payGainFlow, gainLeaf } from '../helpers/pay-gain-node'
-import type { ActionFlow, FarmTilePosition, Field } from '../../contract/types'
-import { fieldTopStack } from '../../domain/field'
+import type { ActionDefinition, ActionFlow, GameState, PlayerState } from '../../contract/types'
+import type { EventSink } from '../../contract/events'
 import { registerSelectionEffect } from '../../actions/helpers/selection-effect-registry'
+import { registerAdHocAction } from '../../actions/helpers/ad-hoc-action-registry'
 import type { CardImpl } from '../registry'
+import { getLogicalFields, mutateLogicalFields, type LogicalFieldSlot } from '../helpers/card-field'
+import { parsePositionKey, positionKey } from '../../domain/farm'
 
 const CARD_ID = 'C057_Crudite'
 const ANYTIME_ID = 'C57-crudite-anytime'
 const SELECTION_EFFECT = 'c57-crudite-remove-field-vegetables'
+const SINGLE_ACTION = 'card_C057_Crudite_remove-vegetable'
 
-const eligibleFields = (player: { fields: Field[] }): Field[] =>
-  player.fields.filter((field) => {
-    const top = fieldTopStack(field)
-    return top?.kind === 'vegetable' && top.remaining >= 2
+const eligibleFields = (player: PlayerState) =>
+  getLogicalFields(player).flatMap((field) => {
+    const slot = [...field.slots].reverse().find((candidate) => candidate.stack)
+    return slot?.stack?.kind === 'vegetable' && slot.stack.remaining >= 2 ? [{ field, slot }] : []
   })
 
-const positionsForFields = (fields: Field[]): FarmTilePosition[] =>
-  fields.map(({ row, col }) => ({ row, col }))
-
-const removeVegetablesAndGain = (positions: FarmTilePosition[]): ActionFlow => ({
-  type: 'seq',
-  children: [
-    {
-      type: 'leaf',
-      actionId: 'special-effect',
-      sourceCard: CARD_ID,
-      params: {
-        kind: 'remove-field-crops',
-        crop: 'vegetable',
-        minRemaining: 2,
-        positions,
-      },
-    },
-    gainLeaf(CARD_ID, { food: positions.length * 4 }),
-  ],
+const selectionTile = (field: ReturnType<typeof getLogicalFields>[number], slot: LogicalFieldSlot) => ({
+  ...slot.tile,
+  ...(field.sourceCard ? { sourceCard: field.sourceCard, groupKey: field.groupKey, cardFieldSlot: slot.index } : {}),
 })
 
-const selectionFlow = (fields: Field[]): ActionFlow => ({
+const selectionFlow = (fields: ReturnType<typeof eligibleFields>): ActionFlow => ({
   type: 'leaf',
   actionId: 'selection',
   sourceCard: CARD_ID,
   actionContext: {
     selectionKind: 'farm-position',
-    selectableTiles: positionsForFields(fields),
+    selectableTiles: fields.map(({ field, slot }) => selectionTile(field, slot)),
     minSelections: 1,
     maxSelections: fields.length,
     selectionEffect: SELECTION_EFFECT,
   },
 })
 
-registerSelectionEffect(SELECTION_EFFECT, ({ positions }) => {
-  const selected = positions.map((position) => {
-    const [row, col] = position.split('-').map(Number)
-    return { row, col }
+const removeVegetablesAndGain = (
+  state: GameState,
+  player: PlayerState,
+  positions: string[],
+  eventSink?: EventSink,
+): ActionFlow | undefined => {
+  const eligible = new Map(eligibleFields(player).map(({ field, slot }) => [positionKey(slot.tile), { field, slot }]))
+  const selected = positions.map((key) => {
+    const position = parsePositionKey(key)
+    return position ? eligible.get(positionKey(position)) : undefined
   })
-  return removeVegetablesAndGain(selected)
+  if (selected.some((entry) => !entry) || new Set(positions).size !== positions.length) return
+  const mutations = mutateLogicalFields(state, player, { sourceCard: CARD_ID, eventSink })
+  const children: ActionFlow[] = []
+  for (const entry of selected) {
+    const removed = mutations.remove({ fieldId: entry!.field.id, slot: entry!.slot.index }, 1)
+    if (!removed.ok) return
+    if (removed.flow) children.push(removed.flow)
+  }
+  children.push(gainLeaf(CARD_ID, { food: selected.length * 4 }))
+  return { type: 'seq', children }
+}
+
+registerSelectionEffect(SELECTION_EFFECT, ({ state, player, positions, eventSink }) => {
+  return removeVegetablesAndGain(state, player, positions, eventSink)
 })
+
+const singleAction: ActionDefinition = {
+  id: SINGLE_ACTION,
+  nameKey: 'actions.special-effect.name',
+  descriptionKey: 'actions.special-effect.description',
+  roundAvailable: 1,
+  gainPerRound: {},
+  canBeExecutedByPlayer: () => true,
+  execute: ({ state, player, params, eventSink }) => {
+    const position = (params as { position?: unknown } | undefined)?.position
+    const flow = typeof position === 'string'
+      ? removeVegetablesAndGain(state, player, [position], eventSink)
+      : undefined
+    return flow ? { type: 'flow', flow } : { type: 'fail', errorKey: 'log.actionFail' }
+  },
+}
+
+registerAdHocAction(singleAction)
 
 const anytimeListener: CardListenerRegistration = {
   id: ANYTIME_ID,
@@ -66,11 +91,15 @@ const anytimeListener: CardListenerRegistration = {
   handler: (context: CardListenerContext): ActionHookResult | void => {
     const fields = eligibleFields(context.player)
     if (fields.length === 0) return
-    const flow = fields.length === 1
-      ? removeVegetablesAndGain(positionsForFields(fields))
-      : selectionFlow(fields)
     return {
-      flow,
+      flow: fields.length === 1
+        ? {
+            type: 'leaf',
+            actionId: SINGLE_ACTION,
+            params: { position: positionKey(fields[0]!.slot.tile) },
+            sourceCard: CARD_ID,
+          }
+        : selectionFlow(fields),
       sourceCard: CARD_ID,
       labelKey: 'cards.C057_Crudite.anytime',
     }

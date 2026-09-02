@@ -1,5 +1,5 @@
 import { defineOccupationCard } from '../card-source'
-import { fieldIsEmpty } from '../../domain/field'
+import { getFarmyardFields } from '../helpers/card-field'
 import type { CardImpl } from '../registry'
 
 const CARD_ID = 'C161_PotatoDigger'
@@ -8,7 +8,7 @@ const cardImpl = {
   effect: {
   id: CARD_ID,
   onBuy: (_state, player) => {
-    const emptyFields = player.fields.filter((f) => fieldIsEmpty(f)).length
+    const emptyFields = getFarmyardFields(player).filter((field) => field.stacks.length === 0).length
     let n = 0
     if (emptyFields >= 2) n = 1
     if (emptyFields >= 4) n = 2

@@ -1,6 +1,6 @@
 import { defineMinorCard } from '../card-source'
 import { gainLeaf } from '../helpers/pay-gain-node'
-import { fieldIsEmpty } from '../../domain/field'
+import { getLogicalFields } from '../helpers/card-field'
 import type { CardImpl } from '../registry'
 
 const CARD_ID = 'D005_FieldClay'
@@ -9,7 +9,7 @@ const cardImpl = {
   effect: {
   id: CARD_ID,
   onBuy: (_state, player) => {
-    const plantedCount = player.fields.filter((f) => !fieldIsEmpty(f)).length
+    const plantedCount = getLogicalFields(player).filter((field) => field.stacks.length > 0).length
     if (plantedCount > 0) {
       return { type: 'seq', children: [gainLeaf(CARD_ID, { clay: plantedCount })] }
     }

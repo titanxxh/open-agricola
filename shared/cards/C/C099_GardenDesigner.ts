@@ -1,5 +1,5 @@
 import { defineOccupationCard } from '../card-source'
-import { fieldIsEmpty } from '../../domain/field'
+import { getLogicalFields } from '../helpers/card-field'
 import type { CardImpl } from '../registry'
 import type { BonusScoreLevel } from '../card-effects'
 import { paretoOptimal } from '../helpers/pareto-bonus'
@@ -10,7 +10,7 @@ const cardImpl = {
   effect: {
     id: CARD_ID,
     computeCostedBonus: (_state, player, _ctx) => {
-      const emptyFields = player.fields.filter((f) => fieldIsEmpty(f)).length
+      const emptyFields = getLogicalFields(player).filter((field) => field.stacks.length === 0).length
       if (emptyFields === 0) return [{ cost: {}, score: 0 }]
       const food = player.resources.food ?? 0
       const raw: BonusScoreLevel[] = []

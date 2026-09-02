@@ -1,38 +1,45 @@
 import { defineOccupationCard } from '../card-source'
 import { gainLeaf, payLeaf } from '../helpers/pay-gain-node'
-import { fieldHasCrop } from '../../domain/field'
 import type { CardImpl } from '../registry'
+import { getLogicalFields } from '../helpers/card-field'
+import type { ActionFlow } from '../../contract/types'
 
 const CARD_ID = 'D113_FoodMerchant'
+type SequenceFlow = { type: 'seq'; optional?: boolean; children: ActionFlow[] }
+
+const purchaseFlow = (food: number, vegetable: number): SequenceFlow => ({
+  type: 'seq',
+  children: [
+    payLeaf({ cardId: CARD_ID, cost: { food } }),
+    gainLeaf(CARD_ID, { vegetable }),
+  ],
+})
 
 const cardImpl = {
   effect: {
   id: CARD_ID,
   onAfterReap: (_state, player) => {
-    // Count grain fields that were harvested
-    const grainFields = player.fields.filter(f => fieldHasCrop(f, 'grain'))
-    // Check harvestReapSummary for grain fields harvested
-    const grainHarvested = _state.harvestReapSummary?.[player.id]?.grainFields ?? 0
-    if (grainHarvested <= 0) return
-    if (player.resources.food < 2) return
-    // Determine cheapest cost: 2 food if any grain field is now empty (remaining === 0), else 3
-    // A grain field that was harvested and is now empty means remaining went to 0 and crop was set to null.
-    // After reap, fields with remaining === 0 have crop set to null.
-    // So we check: any field that had grain and now has remaining === 0 (just harvested last grain).
-    // But reap() sets crop to null when remaining hits 0, so we can't check crop === 'grain' for empty fields.
-    // Instead, check the summary: if grainHarvested > grainFields.length, some fields were depleted.
-    // Actually: grainFields are fields that STILL have crop === 'grain' (they have remaining > 0 after harvest).
-    // So if grainHarvested > grainFields.length, at least one grain field was depleted.
-    const hasDepletedGrainField = grainHarvested > grainFields.length
-    const cost = hasDepletedGrainField ? 2 : 3
-    if (player.resources.food < cost) return
+    const grainHarvested = _state.harvestReapSummary?.[player.id]?.harvestedCrops
+      ?.filter((entry) => entry.crop === 'grain') ?? []
+    const fields = getLogicalFields(player)
+    const costs = grainHarvested.flatMap((harvested) => {
+      const depleted = !fields.some((field) => field.slots.some((slot) =>
+        slot.tile.row === harvested.row && slot.tile.col === harvested.col && slot.stack?.kind === 'grain',
+      ))
+      return Array.from({ length: harvested.amount }, (_, index) =>
+        depleted && index === harvested.amount - 1 ? 2 : 3)
+    }).sort((a, b) => a - b)
+    let totalFood = 0
+    const choices = costs.flatMap((cost, index) => {
+      totalFood += cost
+      return totalFood <= player.resources.food ? [purchaseFlow(totalFood, index + 1)] : []
+    })
+    if (choices.length === 0) return
+    if (choices.length === 1) return { ...choices[0], optional: true }
     return {
-      type: 'seq',
+      type: 'xor',
       optional: true,
-      children: [
-        payLeaf({ cardId: CARD_ID, cost: { food: cost } }),
-        gainLeaf(CARD_ID, { vegetable: 1 }),
-      ],
+      children: choices,
     }
   },
 },

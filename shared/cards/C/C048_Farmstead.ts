@@ -5,12 +5,13 @@ import { gainLeaf } from '../helpers/pay-gain-node'
 import { readCardExtraData } from '../helpers/card-state'
 import type { PlayerState } from '../../contract/types'
 import type { CardImpl } from '../registry'
+import { getFarmyardFields } from '../helpers/card-field'
 
 const CARD_ID = 'C048_Farmstead'
 const countUsedTiles = (player: PlayerState): number => {
   const used = new Set<string>()
   for (const tile of player.roomTiles) used.add(`${tile.row},${tile.col}`)
-  for (const field of player.fields) used.add(`${field.row},${field.col}`)
+  for (const field of getFarmyardFields(player)) used.add(`${field.row},${field.col}`)
   for (const tile of player.stableTiles) used.add(`${tile.row},${tile.col}`)
   for (const pasture of player.pastures) {
     for (const tile of pasture.tiles ?? []) used.add(`${tile.row},${tile.col}`)

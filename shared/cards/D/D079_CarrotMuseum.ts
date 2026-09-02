@@ -1,5 +1,5 @@
 import { defineMinorCard } from '../card-source'
-import { fieldHasCrop } from '../../domain/field'
+import { getLogicalFields } from '../helpers/card-field'
 import type { CardImpl } from '../registry'
 
 const CARD_ID = 'D079_CarrotMuseum'
@@ -10,8 +10,8 @@ const cardImpl = {
   onAfterRoundEnd: (state, player) => {
     if (![8, 10, 12].includes(state.round)) return
 
-    const vegFields = player.fields.filter(
-      (f) => fieldHasCrop(f, 'vegetable'),
+    const vegFields = getLogicalFields(player).filter(
+      (field) => field.stacks.some((stack) => stack.kind === 'vegetable'),
     ).length
     const veg = player.resources.vegetable ?? 0
 

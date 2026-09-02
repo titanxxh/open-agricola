@@ -1,5 +1,5 @@
 import { defineOccupationCard } from '../card-source'
-import { fieldHasCrop } from '../../domain/field'
+import { getLogicalFields } from '../helpers/card-field'
 import type { CardImpl } from '../registry'
 
 const CARD_ID = 'D153_WealthyMan'
@@ -20,8 +20,8 @@ const cardImpl = {
     const threshold = harvestGrainFieldThreshold[state.round]
     if (threshold === undefined) return
 
-    const grainFieldCount = player.fields.filter(
-      (f) => fieldHasCrop(f, 'grain'),
+    const grainFieldCount = getLogicalFields(player).filter(
+      (field) => field.stacks.some((stack) => stack.kind === 'grain'),
     ).length
     if (grainFieldCount < threshold) return
 

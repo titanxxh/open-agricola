@@ -1,5 +1,5 @@
 import { defineMinorCard } from '../card-source'
-import { fieldIsEmpty } from '../../domain/field'
+import { getLogicalFields } from '../helpers/card-field'
 import type { CardImpl } from '../registry'
 
 const CARD_ID = 'C033_GreeningPlan'
@@ -8,7 +8,7 @@ const cardImpl = {
   effect: {
   id: CARD_ID,
   computeBonusScore: (_state, player) => {
-    const emptyFields = player.fields.filter((f) => fieldIsEmpty(f)).length
+    const emptyFields = getLogicalFields(player).filter((field) => field.stacks.length === 0).length
     if (emptyFields >= 6) return 5
     if (emptyFields >= 5) return 3
     if (emptyFields >= 4) return 2

@@ -6,6 +6,7 @@ import type { ActionFlow, FarmTilePosition, GameState, PlayerState } from '../..
 import { resolveNonSkipChoice, resolveSkipChoice, resolveTriggerIfPresent } from './_helpers/trigger-select'
 
 import '../../shared/cards/C/C057_Crudite'
+import '../../shared/cards/B/B068_Beanfield'
 
 const CARD_ID = 'C057_Crudite'
 const ANYTIME_ID = 'C57-crudite-anytime'
@@ -69,7 +70,7 @@ const setupSession = (fieldCounts = [3, 2, 1]) => {
   return session
 }
 
-const setupAnytimeSession = (fieldCounts = [3, 2, 1]) => {
+const setupAnytimeSession = (fieldCounts = [3, 2, 1], cardFieldRemaining?: number) => {
   const session = new GameSession()
   const state = session.getState().state
   state.players = state.players.slice(0, 2)
@@ -88,6 +89,12 @@ const setupAnytimeSession = (fieldCounts = [3, 2, 1]) => {
     col,
     stacks: [{ kind: 'vegetable' as const, remaining }],
   }))
+  if (cardFieldRemaining !== undefined) {
+    player.minorPlayed.push('B068_Beanfield')
+    player.cardStates.B068_Beanfield = {
+      extraData: { cardFieldStacks: [{ crop: 'vegetable', remaining: cardFieldRemaining }] },
+    }
+  }
   session.loadState(state)
   const resp = session.takeAction(0, 'farmland')
   expect(resp.ok).toBe(true)
@@ -249,6 +256,21 @@ describe('C057_Crudite', () => {
     expect(resp.interaction.stateId === 'wait' ? resp.interaction.sourceCard : undefined).not.toBe(CARD_ID)
     expect(fieldCountsOf(player)).toEqual([1, 1])
     expect(player.resources.food).toBe(24)
+  })
+
+  it('anytime selection removes a vegetable from a Card Field', () => {
+    const session = setupAnytimeSession([3], 2)
+    let resp = session.takeAnytimeAction(0, ANYTIME_ID)
+    expect(resp.ok).toBe(true)
+    expectC57Selection(resp)
+
+    resp = selectPositions(session, [{ row: -1, col: 2068 }])
+    expect(resp.ok).toBe(true)
+    expect(resp.state.players[0]!.cardStates.B068_Beanfield?.extraData?.cardFieldStacks).toEqual([
+      { crop: 'vegetable', remaining: 1 },
+    ])
+    expect(resp.state.players[0]!.fields[0]!.stacks[0]!.remaining).toBe(3)
+    expect(resp.state.players[0]!.resources.food).toBe(24)
   })
 
   it('invalid source selection A+C does not partially mutate fields or food', () => {

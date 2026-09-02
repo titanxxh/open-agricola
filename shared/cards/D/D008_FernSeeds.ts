@@ -1,15 +1,16 @@
 import { defineMinorCard } from '../card-source'
 import { gainLeaf } from '../helpers/pay-gain-node'
-import { fieldIsEmpty, fieldHasCrop } from '../../domain/field'
+import { getLogicalFields } from '../helpers/card-field'
 import type { CardImpl } from '../registry'
 
 const CARD_ID = 'D008_FernSeeds'
 
 const cardImpl = {
   prerequisiteCheck: (player) => {
-    const empty = player.fields.filter(fieldIsEmpty).length
-    const planted = player.fields.filter(
-      (f) => fieldHasCrop(f, 'grain') || fieldHasCrop(f, 'vegetable'),
+    const fields = getLogicalFields(player)
+    const empty = fields.filter((field) => field.stacks.length === 0).length
+    const planted = fields.filter((field) =>
+      field.stacks.some((stack) => stack.kind === 'grain' || stack.kind === 'vegetable'),
     ).length
     return empty >= 1 && planted >= 2
   },

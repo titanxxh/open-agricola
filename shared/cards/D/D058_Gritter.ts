@@ -15,7 +15,7 @@ const listener: CardListenerRegistration = {
   handler: (context: CardListenerContext): ActionHookResult | void => {
     const sowedVegetable = (context.actionEvents ?? context.transactionEvents).some(
       (event) => event.type === 'farm.sown' && (event as Pick<FarmSownEvent, 'sows'>).sows.some((sow) =>
-        sow.location.kind === 'field' &&
+        (sow.location.kind === 'field' || sow.location.kind === 'card') &&
         sow.location.playerId === context.player.id &&
         sow.crop === 'vegetable',
       ),

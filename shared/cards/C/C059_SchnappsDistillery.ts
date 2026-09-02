@@ -1,5 +1,5 @@
 import { defineMinorCard } from '../card-source'
-import { fieldHasCrop, fieldFindStackOfKind } from '../../domain/field'
+import { getLogicalFields } from '../helpers/card-field'
 import type { CardImpl } from '../registry'
 
 const CARD_ID = 'C059_SchnappsDistillery'
@@ -8,9 +8,10 @@ const cardImpl = {
   effect: {
   id: CARD_ID,
   computeBonusScore: (_state, player) => {
-    const veg = player.resources.vegetable + player.fields
-      .filter((f) => fieldHasCrop(f, 'vegetable'))
-      .reduce((sum, f) => sum + (fieldFindStackOfKind(f, 'vegetable')?.remaining ?? 0), 0)
+    const veg = player.resources.vegetable + getLogicalFields(player)
+      .flatMap((field) => field.stacks)
+      .filter((stack) => stack.kind === 'vegetable')
+      .reduce((sum, stack) => sum + stack.remaining, 0)
     if (veg >= 6) return 2
     if (veg >= 5) return 1
     return 0

@@ -4,6 +4,7 @@ import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import { countTriggerCardsAs } from '../helpers/trigger-snapshot'
 import type { CardImpl } from '../registry'
+import { getFarmyardFields } from '../helpers/card-field'
 
 const CARD_ID = 'D042_EducationBonus'
 const GAINS = [null, 'grain', 'clay', 'reed', 'stone', 'vegetable'] as const
@@ -17,7 +18,7 @@ const listener: CardListenerRegistration = {
     const n = countTriggerCardsAs(context, context.player, 'occupation')
     if (n > 6) return
     if (n === 6) {
-      const canPlow = context.player.fields.length < 5 // rough check for available farm tiles
+      const canPlow = getFarmyardFields(context.player).length < 5 // rough check for available farm tiles
       if (!canPlow) return
       return {
         flow: {

@@ -1,40 +1,52 @@
 import { defineMinorCard } from '../card-source'
-/**
- * C63 Craft Brewery — In the feeding phase of each harvest, exchange 1 grain
- * from supply + 1 grain from a field for 4 food + 2 bonus VP.
- *
- * The reference `onPlayerHarvestFeedingPhase`:
- *   - 1 grain field: SE eatSingleFieldGrain + payGain.
- *   - 2+ grain fields: SE eatFieldGrain prompts player to pick which field.
- *
- * Implementation: route field-grain decrement through the engine via the
- * `special-effect` leaf (kind `remove-field-crop`, crop:grain,
- * minRemaining:1) instead of mutating `player.fields` imperatively. This
- * preserves undo / replay semantics. **§2.5 simplification:** when 2+ grain
- * fields exist the player is NOT asked to pick — the SE picks the first
- * matching field. Implementing the picker requires a new SE kind + UI.
- */
-
-import { fieldHasCrop } from '../../domain/field'
+import { registerSelectionEffect } from '../../actions/helpers/selection-effect-registry'
+import { parsePositionKey, positionKey } from '../../domain/farm'
 import type { CardImpl } from '../registry'
+import { getLogicalFields, mutateLogicalFields } from '../helpers/card-field'
 
 const CARD_ID = 'C063_CraftBrewery'
+const SELECTION_EFFECT = 'c63-craft-brewery-remove-grain'
+
+registerSelectionEffect(SELECTION_EFFECT, ({ state, player, positions, eventSink }) => {
+  const position = positions.length === 1 ? parsePositionKey(positions[0]!) : undefined
+  const field = position && getLogicalFields(player).find((candidate) =>
+    candidate.slots.some((slot) => positionKey(slot.tile) === positionKey(position)),
+  )
+  const slot = field && [...field.slots].reverse().find((candidate) => candidate.stack)
+  if (!field || slot?.stack?.kind !== 'grain') return
+  const removed = mutateLogicalFields(state, player, { sourceCard: CARD_ID, eventSink })
+    .remove({ fieldId: field.id, slot: slot.index }, 1)
+  return removed.ok ? removed.flow : undefined
+})
 
 const cardImpl = {
   effect: {
     id: CARD_ID,
     onHarvestFeedingPhase: (_state, player) => {
       if (player.resources.grain < 1) return
-      const hasGrainField = player.fields.some((f) => fieldHasCrop(f, 'grain'))
-      if (!hasGrainField) return
+      const grainFields = getLogicalFields(player).flatMap((field) => {
+        const slot = [...field.slots].reverse().find((candidate) => candidate.stack)
+        if (slot?.stack?.kind !== 'grain') return []
+        return [{
+          ...slot.tile,
+          ...(field.sourceCard ? { sourceCard: field.sourceCard, groupKey: field.groupKey, cardFieldSlot: slot.index } : {}),
+        }]
+      })
+      if (grainFields.length === 0) return
       return {
         type: 'seq',
         optional: true,
         children: [
           {
             type: 'leaf',
-            actionId: 'special-effect',
-            params: { kind: 'remove-field-crop', crop: 'grain', minRemaining: 1 },
+            actionId: 'selection',
+            actionContext: {
+              selectionKind: 'farm-position',
+              selectableTiles: grainFields,
+              minSelections: 1,
+              maxSelections: 1,
+              selectionEffect: SELECTION_EFFECT,
+            },
             sourceCard: CARD_ID,
           },
           { type: 'leaf', actionId: 'pay-resources', params: { grain: 1 }, sourceCard: CARD_ID },

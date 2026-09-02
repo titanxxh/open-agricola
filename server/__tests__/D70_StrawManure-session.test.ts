@@ -4,13 +4,14 @@ import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 
 import { markAllWorkersUsed, setActiveWorkerCount } from '../../shared/domain/player'
 import '../../shared/cards/D/D070_StrawManure'
+import '../../shared/cards/B/B068_Beanfield'
 import { autoAdvanceRoundEnd } from '../../tests/llm-card-gen/session-helpers'
 import { resolveNonSkipChoice, resolveSkipChoice, resolveTriggerIfPresent } from './_helpers/trigger-select'
 
 const CARD_ID = 'D070_StrawManure'
 
 describe('D070_StrawManure session', () => {
-  const setupHarvest = () => {
+  const setupHarvest = (includeCardField = false) => {
     const session = new GameSession()
     stabilizeRandomHands(session.state.players)
     const state = session.getState().state
@@ -32,6 +33,12 @@ describe('D070_StrawManure session', () => {
       { row: 0, col: 1, stacks: [{ kind: 'vegetable', remaining: 1 }] },
       { row: 0, col: 2, stacks: [{ kind: 'grain', remaining: 3 }] },
     ]
+    if (includeCardField) {
+      player.minorPlayed.push('B068_Beanfield')
+      player.cardStates.B068_Beanfield = {
+        extraData: { cardFieldStacks: [{ crop: 'vegetable', remaining: 2 }] },
+      }
+    }
 
     session.loadState(state)
     return { session, player: state.players[0]! }
@@ -84,6 +91,21 @@ describe('D070_StrawManure session', () => {
     const p = session.getState().state.players[0]!
     // Grain not spent: initial 3 + 1 from harvest = 4
     expect(p.resources.grain).toBe(4)
+  })
+
+  it('adds and then reaps a vegetable on a selected Card Field', () => {
+    const { session } = setupHarvest(true)
+
+    let resp = session.performRoundEnd()
+    resp = resolveTriggerIfPresent(session, resp, CARD_ID)
+    resp = resolveNonSkipChoice(session, resp)
+    resp = session.commitSelectionChoice(0, { positions: [{ row: -1, col: 2068 }] })
+    expect(resp.ok).toBe(true)
+
+    autoAdvanceRoundEnd(session)
+
+    expect(session.getState().state.players[0]!.cardStates.B068_Beanfield?.extraData?.cardFieldStacks)
+      .toEqual([{ crop: 'vegetable', remaining: 2 }])
   })
 
   it('does not trigger when player has no grain', () => {
