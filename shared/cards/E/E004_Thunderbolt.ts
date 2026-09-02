@@ -1,8 +1,7 @@
 import { defineMinorCard } from '../card-source'
 import { registerSelectionEffect } from '../../actions/helpers/selection-effect-registry'
-import { fieldTopStack } from '../../domain/field'
 import type { CardImpl } from '../registry'
-import { getCroppedCardFields, removeCardFieldCrop } from '../helpers/card-field'
+import { getLogicalFields, mutateLogicalFields } from '../helpers/card-field'
 import { parseFarmPositionKey } from '../../domain/farm-position-selection'
 import { gainLeaf } from '../helpers/pay-gain-node'
 
@@ -18,32 +17,27 @@ registerSelectionEffect('remove-all-grain-for-wood', ({
   for (const key of positions) {
     const tile = parseFarmPositionKey(key)
     if (!tile) continue
-    const field = player.fields.find(f => f.row === tile.row && f.col === tile.col)
-    const top = field ? fieldTopStack(field) : undefined
-    if (field && top?.kind === 'grain') {
-      const grainCount = top.remaining
-      field.stacks.pop()
-      eventSink?.emit<'farm.cropRemoved'>({
-        type: 'farm.cropRemoved',
-        sourceCardId: sourceCard,
-        crops: [{
-          location: { kind: 'field', playerId: player.id, row: field.row, col: field.col },
-          crop: 'grain',
-          amount: grainCount,
-        }],
-        reason: 'cardEffect',
-      })
-      return gainLeaf(CARD_ID, { wood: grainCount * 2 })
+    const field = getLogicalFields(player).find((candidate) =>
+      candidate.kind === 'farmyard'
+        ? candidate.row === tile.row && candidate.col === tile.col
+        : candidate.slots.some((slot) => slot.tile.row === tile.row && slot.tile.col === tile.col),
+    )
+    if (!field || field.stacks.at(-1)?.kind !== 'grain') continue
+    const mutations = mutateLogicalFields(state, player, { sourceCard, eventSink })
+    const slots = field.kind === 'farmyard'
+      ? [undefined]
+      : field.slots.filter((slot) => slot.stack?.kind === 'grain').map((slot) => slot.index)
+    let grainCount = 0
+    let flow
+    for (const slot of slots) {
+      const removed = mutations.remove({ fieldId: field.id, ...(slot === undefined ? {} : { slot }) })
+      if (!removed.ok || removed.crop !== 'grain') continue
+      grainCount += removed.amount ?? 0
+      flow = removed.flow ?? flow
     }
-    const removed = removeCardFieldCrop(state, player, tile, {
-      sourceCard,
-      eventSink,
-    })
-    if (!removed || removed.crop !== 'grain') continue
-    const gain = gainLeaf(CARD_ID, { wood: removed.amount * 2 })
-    return removed.flow
-      ? { type: 'seq', children: [gain, removed.flow] }
-      : gain
+    if (grainCount === 0) continue
+    const gain = gainLeaf(CARD_ID, { wood: grainCount * 2 })
+    return flow ? { type: 'seq', children: [gain, flow] } : gain
   }
 })
 
@@ -51,19 +45,17 @@ const cardImpl = {
   effect: {
   id: CARD_ID,
   onBuy: (_state, player) => {
-    const selectableTiles = [
-      ...player.fields
-        .filter((field) => fieldTopStack(field)?.kind === 'grain')
-        .map((field) => ({ row: field.row, col: field.col })),
-      ...getCroppedCardFields(player)
-        .filter(({ field }) => fieldTopStack(field)?.kind === 'grain')
-        .map(({ tile, sourceCard, groupKey, cardFieldSlot }) => ({
-          ...tile,
-          sourceCard,
-          groupKey,
-          cardFieldSlot,
-        })),
-    ]
+    const selectableTiles = getLogicalFields(player).flatMap((field) => {
+      if (field.stacks.at(-1)?.kind !== 'grain') return []
+      if (field.kind === 'farmyard') return [{ row: field.row, col: field.col }]
+      const slot = field.slots.find((candidate) => candidate.stack?.kind === 'grain')
+      return slot ? [{
+        ...slot.tile,
+        sourceCard: field.sourceCard,
+        groupKey: field.groupKey,
+        cardFieldSlot: slot.index,
+      }] : []
+    })
     if (selectableTiles.length === 0) return
 
     return {

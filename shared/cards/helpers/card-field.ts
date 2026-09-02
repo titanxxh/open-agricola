@@ -4,7 +4,7 @@ import type { ExtraSowableField, ExtraSowableCrop } from '../card-effects'
 import type {
   ActionFlow, FarmTilePosition, Field, GameState, PlayerState,
 } from '../../contract/types'
-import type { EventSink, FarmCropRemovedEvent } from '../../contract/events'
+import type { DraftGameEvent, EventSink, FarmCropRemovedEvent } from '../../contract/events'
 import { readCardExtraData, writeCardExtraData } from './card-state'
 import { canSow } from '../../actions/effects/sow'
 import { defaultReapTrigger, dispatchReapListener, type ReapTrigger } from '../../actions/helpers/reap-listener'
@@ -127,6 +127,7 @@ type CardFieldCropRemover = (
 
 const cardFieldReapers = new Map<string, CardFieldReaper>()
 const cardFieldCropRemovers = new Map<string, CardFieldCropRemover>()
+const cardFieldOptions = new Map<string, CardFieldOptions>()
 
 const appendFlowChildren = (children: ActionFlow[], flow: ActionFlow | undefined) => {
   if (!flow) return
@@ -178,8 +179,16 @@ export type LogicalFieldTarget = {
   slot?: number
 }
 
+export type LogicalFieldMutationTarget = LogicalFieldTarget | FarmTilePosition
+
+export type LogicalFieldMutationOptions = {
+  sourceCard?: string
+  eventSink?: EventSink
+  reason?: FarmCropRemovedEvent['reason']
+}
+
 export type LogicalFieldMutationResult =
-  | { ok: true; crop?: Crop; amount?: number }
+  | { ok: true; crop?: Crop; amount?: number; flow?: ActionFlow }
   | { ok: false; error: 'invalid-target' | 'invalid-amount' | 'invalid-crop' | 'occupied' | 'empty' }
 
 const farmyardFieldId = (field: Pick<Field, 'row' | 'col'>) =>
@@ -240,10 +249,27 @@ export const getLogicalFields = (player: PlayerState): readonly LogicalField[] =
 
 const validAmount = (amount: number) => Number.isSafeInteger(amount) && amount > 0
 
-export const mutateLogicalFields = (_state: GameState, player: PlayerState) => {
+export const mutateLogicalFields = (
+  state: GameState,
+  player: PlayerState,
+  options: LogicalFieldMutationOptions = {},
+) => {
   const validateCardFields = () => {
     for (const cardId of playedCardIds(player)) {
       if (cardFieldDefs.has(cardId)) readSlots(player, cardId)
+    }
+  }
+  const normalizeTarget = (target: LogicalFieldMutationTarget): LogicalFieldTarget | undefined => {
+    if ('fieldId' in target) return target
+    const farmyard = player.fields.find((field) => field.row === target.row && field.col === target.col)
+    if (farmyard) return { fieldId: farmyardFieldId(farmyard) }
+    for (const cardId of playedCardIds(player)) {
+      const def = cardFieldDefs.get(cardId)
+      if (!def || target.row !== -1) continue
+      const slot = target.col - deriveVirtualTileCol(cardId, 0)
+      if (Number.isSafeInteger(slot) && slot >= 0 && slot < def.capacity) {
+        return { fieldId: `card:${cardId}`, slot }
+      }
     }
   }
   const farmyardTarget = (target: LogicalFieldTarget) =>
@@ -258,17 +284,78 @@ export const mutateLogicalFields = (_state: GameState, player: PlayerState) => {
     if (!Number.isSafeInteger(slot) || slot < 0 || slot >= def.capacity) return
     return { cardId, def, slot, slots: readSlots(player, cardId, def) }
   }
+  const emit = <T extends DraftGameEvent['type']>(event: DraftGameEvent<T>) => {
+    if (options.eventSink) {
+      options.eventSink.emitMany([event])
+    } else if (Number.isSafeInteger(state.round) && state.round > 0) {
+      appendImmediateEvents(state, [event], {
+        actorPlayerId: player.id,
+        sourceActionId: 'logical-field-mutation',
+        sourceCardId: options.sourceCard,
+      })
+    }
+  }
+  const emitAdded = (
+    target: Field | { cardId: string },
+    crop: Crop,
+    amount: number,
+  ) => emit<'farm.cropAdded'>({
+    type: 'farm.cropAdded',
+    sourceCardId: options.sourceCard,
+    crops: [{
+      location: 'cardId' in target
+        ? { kind: 'card', playerId: player.id, cardId: target.cardId }
+        : { kind: 'field', playerId: player.id, row: target.row, col: target.col },
+      crop,
+      amount,
+    }],
+    reason: 'cardEffect',
+  })
+  const emitRemoved = (
+    target: Field | { cardId: string },
+    crop: Crop,
+    amount: number,
+  ) => emit<'farm.cropRemoved'>({
+    type: 'farm.cropRemoved',
+    sourceCardId: options.sourceCard,
+    crops: [{
+      location: 'cardId' in target
+        ? { kind: 'card', playerId: player.id, cardId: target.cardId }
+        : { kind: 'field', playerId: player.id, row: target.row, col: target.col },
+      crop,
+      amount,
+    }],
+    reason: options.reason ?? 'cardEffect',
+  })
+  const cardRemovalFlow = (
+    cardId: string,
+    crop: Crop,
+    amount: number,
+    slots: CardFieldSlot[],
+  ) => cardFieldOptions.get(cardId)?.onCropRemoved?.({
+    state,
+    player,
+    crop,
+    amount,
+    isLast: !slots.some((candidate) => candidate?.crop === crop),
+    cardId,
+    reason: options.reason ?? 'cardEffect',
+    sourceCard: options.sourceCard,
+  })
   const place = (
-    target: LogicalFieldTarget,
+    requestedTarget: LogicalFieldMutationTarget,
     crop: Crop,
     amount: number,
   ): LogicalFieldMutationResult => {
     validateCardFields()
     if (!validAmount(amount)) return { ok: false, error: 'invalid-amount' }
+    const target = normalizeTarget(requestedTarget)
+    if (!target) return { ok: false, error: 'invalid-target' }
     const field = farmyardTarget(target)
     if (field) {
       if (field.stacks.length > 0) return { ok: false, error: 'occupied' }
       field.stacks.push({ kind: crop, remaining: amount })
+      emitAdded(field, crop, amount)
       return { ok: true }
     }
     const card = cardTarget(target)
@@ -277,19 +364,23 @@ export const mutateLogicalFields = (_state: GameState, player: PlayerState) => {
     if (card.slots[card.slot]) return { ok: false, error: 'occupied' }
     card.slots[card.slot] = { crop, remaining: amount }
     writeSlots(player, card.cardId, card.slots)
+    emitAdded(card, crop, amount)
     return { ok: true }
   }
   const grow = (
-    target: LogicalFieldTarget,
+    requestedTarget: LogicalFieldMutationTarget,
     amount = 1,
   ): LogicalFieldMutationResult => {
     validateCardFields()
     if (!validAmount(amount)) return { ok: false, error: 'invalid-amount' }
+    const target = normalizeTarget(requestedTarget)
+    if (!target) return { ok: false, error: 'invalid-target' }
     const field = farmyardTarget(target)
     if (field) {
       const stack = field.stacks[target.slot ?? field.stacks.length - 1]
       if (!stack) return { ok: false, error: 'empty' }
       stack.remaining += amount
+      emitAdded(field, stack.kind, amount)
       return { ok: true, crop: stack.kind, amount }
     }
     const card = cardTarget(target)
@@ -298,13 +389,16 @@ export const mutateLogicalFields = (_state: GameState, player: PlayerState) => {
     if (!stack) return { ok: false, error: 'empty' }
     stack.remaining += amount
     writeSlots(player, card.cardId, card.slots)
+    emitAdded(card, stack.crop, amount)
     return { ok: true, crop: stack.crop, amount }
   }
   const remove = (
-    target: LogicalFieldTarget,
+    requestedTarget: LogicalFieldMutationTarget,
     requestedAmount?: number,
   ): LogicalFieldMutationResult => {
     validateCardFields()
+    const target = normalizeTarget(requestedTarget)
+    if (!target) return { ok: false, error: 'invalid-target' }
     const field = farmyardTarget(target)
     if (field) {
       const slot = target.slot ?? field.stacks.length - 1
@@ -315,6 +409,7 @@ export const mutateLogicalFields = (_state: GameState, player: PlayerState) => {
       const crop = stack.kind
       stack.remaining -= amount
       if (stack.remaining === 0) field.stacks.splice(slot, 1)
+      emitRemoved(field, crop, amount)
       return { ok: true, crop, amount }
     }
     const card = cardTarget(target)
@@ -328,29 +423,40 @@ export const mutateLogicalFields = (_state: GameState, player: PlayerState) => {
       ? null
       : { ...stack, remaining: stack.remaining - amount }
     writeSlots(player, card.cardId, card.slots)
-    return { ok: true, crop, amount }
+    emitRemoved(card, crop, amount)
+    const flow = cardRemovalFlow(card.cardId, crop, amount, card.slots)
+    return { ok: true, crop, amount, ...(flow ? { flow } : {}) }
   }
   const replace = (
-    target: LogicalFieldTarget,
+    requestedTarget: LogicalFieldMutationTarget,
     crop: Crop,
     amount: number,
   ): LogicalFieldMutationResult => {
     validateCardFields()
     if (!validAmount(amount)) return { ok: false, error: 'invalid-amount' }
+    const target = normalizeTarget(requestedTarget)
+    if (!target) return { ok: false, error: 'invalid-target' }
     const field = farmyardTarget(target)
     if (field) {
       const slot = target.slot ?? field.stacks.length - 1
-      if (!field.stacks[slot]) return { ok: false, error: 'empty' }
+      const previous = field.stacks[slot]
+      if (!previous) return { ok: false, error: 'empty' }
       field.stacks[slot] = { kind: crop, remaining: amount }
+      emitRemoved(field, previous.kind, previous.remaining)
+      emitAdded(field, crop, amount)
       return { ok: true }
     }
     const card = cardTarget(target)
     if (!card) return { ok: false, error: 'invalid-target' }
     if (!card.def.allowedCrops.includes(crop)) return { ok: false, error: 'invalid-crop' }
-    if (!card.slots[card.slot]) return { ok: false, error: 'empty' }
+    const previous = card.slots[card.slot]
+    if (!previous) return { ok: false, error: 'empty' }
     card.slots[card.slot] = { crop, remaining: amount }
     writeSlots(player, card.cardId, card.slots)
-    return { ok: true }
+    emitRemoved(card, previous.crop, previous.remaining)
+    emitAdded(card, crop, amount)
+    const flow = cardRemovalFlow(card.cardId, previous.crop, previous.remaining, card.slots)
+    return { ok: true, ...(flow ? { flow } : {}) }
   }
   return { place, grow, remove, replace }
 }
@@ -419,6 +525,7 @@ export const makeCardFieldImpl = (
 ): CardImpl => {
   const baseCol = parseCardBaseCol(cardId)
   cardFieldDefs.set(cardId, def)
+  cardFieldOptions.set(cardId, options ?? {})
 
   const reapCardField = (
     state: GameState,

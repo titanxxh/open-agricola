@@ -168,6 +168,62 @@ describe('logical field boundary', () => {
     expect(player.fields[0]?.stacks).toEqual([])
     expect(player.cardStates.B068_Beanfield?.extraData?.cardFieldStacks).toHaveLength(2)
   })
+
+  it('rejects stale replacement atomically and dispatches Card Field removal callbacks', () => {
+    const events: DraftGameEvent[] = []
+    const eventSink: EventSink = {
+      emit: (event) => { events.push(event) },
+      emitMany: (nextEvents) => { events.push(...nextEvents) },
+    }
+    let removed = false
+    makeCardFieldImpl('A001_TestField', { allowedCrops: ['grain'], capacity: 1 }, {
+      onCropRemoved: () => {
+        removed = true
+        return { type: 'leaf', actionId: 'noop', sourceCard: 'A001_TestField' }
+      },
+    })
+    const player = createPlayer({
+      minorPlayed: ['A001_TestField'],
+      cardStates: {
+        A001_TestField: {
+          extraData: { cardFieldStacks: [{ crop: 'grain', remaining: 2 }] },
+        },
+      },
+    })
+    const mutations = mutateLogicalFields(createState(player), player, {
+      sourceCard: 'A002_TestRemover',
+      eventSink,
+    })
+
+    expect(mutations.replace({ row: -1, col: 1001 }, 'vegetable', 2)).toEqual({
+      ok: false,
+      error: 'invalid-crop',
+    })
+    expect(player.cardStates.A001_TestField?.extraData?.cardFieldStacks).toEqual([
+      { crop: 'grain', remaining: 2 },
+    ])
+    expect(events).toEqual([])
+
+    expect(mutations.remove({ row: -1, col: 1001 })).toMatchObject({
+      ok: true,
+      crop: 'grain',
+      amount: 2,
+      flow: { type: 'leaf', actionId: 'noop' },
+    })
+    expect(removed).toBe(true)
+    expect(player.cardStates.A001_TestField?.extraData?.cardFieldStacks).toEqual([null])
+    expect(events).toEqual([
+      expect.objectContaining({
+        type: 'farm.cropRemoved',
+        sourceCardId: 'A002_TestRemover',
+        crops: [{
+          location: { kind: 'card', playerId: player.id, cardId: 'A001_TestField' },
+          crop: 'grain',
+          amount: 2,
+        }],
+      }),
+    ])
+  })
 })
 
 describe('makeCardFieldImpl', () => {

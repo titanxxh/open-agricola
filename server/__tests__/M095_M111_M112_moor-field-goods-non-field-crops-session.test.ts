@@ -207,6 +207,41 @@ describe('Moor field goods and non-field crop spaces', () => {
       .toEqual(['0-1'])
   })
 
+  it('M095 places food on an empty Card Field and claims it when that field is sown', () => {
+    const session = setup()
+    const player = session.state.players[0]!
+    player.minorHand = ['M095_FallowFields']
+    player.occupationPlayed = ['B113_PatchCaregiver']
+    player.cardStates.B113_PatchCaregiver = {}
+    session.loadState(session.state)
+
+    let resp = playMinor(session, 'M095_FallowFields')
+    expect(resp.interaction.stateId === 'wait'
+      ? resp.interaction.request.selection?.selectablePositions
+      : []).toEqual([{
+      row: -1,
+      col: 2113,
+      sourceCard: 'B113_PatchCaregiver',
+      groupKey: 'B113_PatchCaregiver',
+      cardFieldSlot: 0,
+    }])
+    resp = commitPositions(session, resp, [{ row: -1, col: 2113 }])
+    expect(statesOf(resp.state.players[0]!, 'M095_FallowFields', 'field-goods-token'))
+      .toEqual([expect.objectContaining({ spaceKey: '-1-2113', resources: { food: 2 } })])
+
+    resetOwnTurn(session)
+    session.state.players[0]!.resources.grain = 1
+    session.loadState(session.state)
+    resp = sow(session, [{ row: -1, col: 2113, crop: 'grain' }])
+
+    const after = resp.state.players[0]!
+    expect(after.resources.food).toBe(2)
+    expect(after.cardStates.B113_PatchCaregiver?.extraData?.cardFieldStacks).toEqual([
+      { crop: 'grain', remaining: 3 },
+    ])
+    expect(statesOf(after, 'M095_FallowFields', 'field-goods-token')).toEqual([])
+  })
+
   it('M095 claims during private field phase but not ordinary harvest reap', () => {
     const session = setup()
     const player = session.state.players[0]!
@@ -378,6 +413,55 @@ describe('Moor field goods and non-field crop spaces', () => {
       },
     ])
     expect(after.resources.fuel).toBe(3)
+  })
+
+  it('M112 grows a qualifying Card Field and ignores a wrong-crop Card Field', () => {
+    const target = { row: 2, col: 0 }
+    const session = setup()
+    const player = session.state.players[0]!
+    player.minorPlayed = ['M112_PeatAshFertilizer']
+    player.occupationPlayed = ['B113_PatchCaregiver']
+    player.cardStates.B113_PatchCaregiver = {
+      extraData: { cardFieldStacks: [{ crop: 'grain', remaining: 2 }] },
+    }
+    player.farmTerrain = [{ ...target, kind: 'moor' }]
+    session.loadState(session.state)
+    const eventCount = session.state.events.length
+
+    let resp = takeSpecialAt(session, 'cut-peat', target)
+    expect(resp.interaction.stateId === 'wait' ? resp.interaction.sourceCard : undefined)
+      .toBe('M112_PeatAshFertilizer')
+    resp = acceptOptional(session, resp)
+
+    expect(resp.state.players[0]!.cardStates.B113_PatchCaregiver?.extraData?.cardFieldStacks)
+      .toEqual([{ crop: 'grain', remaining: 3 }])
+    expect(resp.state.events.slice(eventCount)).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        type: 'farm.cropAdded',
+        sourceCardId: 'M112_PeatAshFertilizer',
+        crops: [expect.objectContaining({
+          location: { kind: 'card', playerId: player.id, cardId: 'B113_PatchCaregiver' },
+          crop: 'grain',
+          amount: 1,
+        })],
+      }),
+    ]))
+
+    const negative = setup()
+    const negativePlayer = negative.state.players[0]!
+    negativePlayer.minorPlayed = ['M112_PeatAshFertilizer']
+    negativePlayer.occupationPlayed = ['B113_PatchCaregiver']
+    negativePlayer.cardStates.B113_PatchCaregiver = {
+      extraData: { cardFieldStacks: [{ crop: 'wood', remaining: 2 }] },
+    }
+    negativePlayer.farmTerrain = [{ ...target, kind: 'moor' }]
+    negative.loadState(negative.state)
+
+    const unchanged = takeSpecialAt(negative, 'cut-peat', target)
+    expect(unchanged.interaction.stateId === 'wait' ? unchanged.interaction.sourceCard : undefined)
+      .not.toBe('M112_PeatAshFertilizer')
+    expect(unchanged.state.players[0]!.cardStates.B113_PatchCaregiver?.extraData?.cardFieldStacks)
+      .toEqual([{ crop: 'wood', remaining: 2 }])
   })
 })
 

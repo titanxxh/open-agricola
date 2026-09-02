@@ -49,6 +49,7 @@ import {
   addConsumedSupplyTokenCount,
   getOwnOrdinaryFenceReserveCount,
 } from '../../domain/supply-tokens'
+import { getLogicalFields, mutateLogicalFields } from '../../cards/helpers/card-field'
 
 export type PlantAdditionalGoodLocation =
   | { kind: 'field'; row: number; col: number }
@@ -378,24 +379,13 @@ export const specialEffectAction: ActionDefinition = {
         return { type: 'ok' }
       }
       case 'grow-field-and-non-field-crops': {
-        const crops: Array<{
-          location: { kind: 'field'; playerId: string; row: number; col: number }
-          crop: 'grain' | 'vegetable'
-          amount: number
-        }> = []
-        for (const field of target.fields) {
-          const stack = field.stacks.find((entry) =>
-            (entry.kind === 'grain' || entry.kind === 'vegetable') && entry.remaining > 0,
+        const mutations = mutateLogicalFields(state, target, { sourceCard, eventSink })
+        for (const field of getLogicalFields(target)) {
+          const slot = field.slots.find((entry) =>
+            (entry.stack?.kind === 'grain' || entry.stack?.kind === 'vegetable') &&
+            entry.stack.remaining > 0,
           )
-          if (!stack) continue
-          const crop = stack.kind
-          if (crop !== 'grain' && crop !== 'vegetable') continue
-          stack.remaining += 1
-          crops.push({
-            location: { kind: 'field', playerId: target.id, row: field.row, col: field.col },
-            crop,
-            amount: 1,
-          })
+          if (slot) mutations.grow({ fieldId: field.id, slot: slot.index })
         }
         target.farmyardSpaceStates = getFarmyardSpaceStates(target).map((entry) => {
           if (
@@ -411,14 +401,6 @@ export const specialEffectAction: ActionDefinition = {
             crop: { ...entry.crop, remaining: entry.crop.remaining + 1 },
           }
         })
-        if (crops.length > 0) {
-          eventSink?.emit<'farm.cropAdded'>({
-            type: 'farm.cropAdded',
-            sourceCardId: sourceCard,
-            crops,
-            reason: 'cardEffect',
-          })
-        }
         return { type: 'ok' }
       }
       case 'consume-supply-token': {

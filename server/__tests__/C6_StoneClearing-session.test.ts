@@ -27,6 +27,10 @@ describe('C006_StoneClearing session (reference-aligned)', () => {
     state.players = state.players.slice(0, 2)
     state.currentPlayerIndex = 0
     state.round = 1
+    for (const participant of state.players) {
+      participant.minorHand = ['__test_placeholder__']
+      participant.occupationHand = ['__test_placeholder__']
+    }
     const player = state.players[0]!
     player.minorPlayed.push('C006_StoneClearing')
     player.fields = fields
@@ -137,6 +141,35 @@ describe('C006_StoneClearing session (reference-aligned)', () => {
     expect(result.reapSummary.vegetableFields).toBe(0)
     expect(result.reapSummary.resources.stone).toBe(2)
     expect(result.reapSummary.harvestedPositions!.length).toBe(3)
+  })
+
+  it('places stone on an eligible empty Card Field without changing planted fields', () => {
+    const session = setupWithFields([
+      { row: 1, col: 0, stacks: [{ kind: 'grain', remaining: 2 }] },
+    ])
+    const state = session.getState().state
+    const player = state.players[0]!
+    player.occupationPlayed.push('B113_PatchCaregiver')
+    player.cardStates.B113_PatchCaregiver = {}
+    const eventCount = state.events.length
+
+    runCardEffectHook(state, player, 'C006_StoneClearing', 'onBuy')
+
+    expect(player.fields[0]?.stacks).toEqual([{ kind: 'grain', remaining: 2 }])
+    expect(player.cardStates.B113_PatchCaregiver?.extraData?.cardFieldStacks).toEqual([
+      { crop: 'stone', remaining: 1 },
+    ])
+    expect(state.events.slice(eventCount)).toEqual([
+      expect.objectContaining({
+        type: 'farm.cropAdded',
+        sourceCardId: 'C006_StoneClearing',
+        crops: [expect.objectContaining({
+          location: { kind: 'card', playerId: player.id, cardId: 'B113_PatchCaregiver' },
+          crop: 'stone',
+          amount: 1,
+        })],
+      }),
+    ])
   })
 })
 
