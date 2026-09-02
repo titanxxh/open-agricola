@@ -4,10 +4,11 @@ import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import type { AnimalZone } from '../../domain'
 import type { ActionFlow, PlayerState } from '../../contract/types'
 import type { FarmSownEvent } from '../../contract/events'
-import { fieldTopStack } from '../../domain/field'
 import { registerSelectionEffect } from '../../actions/helpers/selection-effect-registry'
 import { extraCropPlacementActionContext } from '../../actions/helpers/extra-crop-placement-context'
 import type { CardImpl } from '../registry'
+import { getLogicalFields, mutateLogicalFields } from '../helpers/card-field'
+import { parseFarmPositionKey } from '../../domain/farm-position-selection'
 
 const CARD_ID = 'B115_TinsmithMaster'
 const SELECTION_EFFECT = 'B115-tinsmith-master-add-additional-good'
@@ -37,25 +38,20 @@ const getFreshlySownFields = (context: CardListenerContext) => {
         return [[`${location.row}-${location.col}`, sow.crop] as const]
       }),
   )
-  return context.player.fields.filter((field) => {
-    const crop = cropByPosition.get(`${field.row}-${field.col}`)
-    const top = fieldTopStack(field)
-    return !!crop && !!top && top.kind === crop && top.remaining > 0
+  return getLogicalFields(context.player).flatMap((field) => {
+    const slot = field.slots.find((candidate) => {
+      const crop = cropByPosition.get(`${candidate.tile.row}-${candidate.tile.col}`)
+      return !!crop && candidate.stack?.kind === crop && candidate.stack.remaining > 0
+    })
+    return slot ? [{ field, slot }] : []
   })
 }
 
-registerSelectionEffect(SELECTION_EFFECT, ({ player, positions }) => {
-  const selected = positions.map((key) => {
-    const [r, c] = key.split('-').map(Number)
-    const field = player.fields.find((f) => f.row === r && f.col === c)
-    const top = field ? fieldTopStack(field) : null
-    if (!field || !top) return null
-    return top
-  })
-  const selectedStacks = selected.filter((top): top is NonNullable<typeof top> => top !== null)
-  if (selectedStacks.length !== selected.length) return
-  for (const top of selectedStacks) {
-    top.remaining += 1
+registerSelectionEffect(SELECTION_EFFECT, ({ state, player, positions, sourceCard, eventSink }) => {
+  const mutations = mutateLogicalFields(state, player, { sourceCard, eventSink })
+  for (const key of positions) {
+    const tile = parseFarmPositionKey(key)
+    if (tile) mutations.grow(tile)
   }
 })
 
@@ -75,7 +71,14 @@ const afterSowListener: CardListenerRegistration = {
         optional: true,
         actionContext: extraCropPlacementActionContext({
           selectionKind: 'farm-position',
-          selectableTiles: freshFields.map(({ row, col }) => ({ row, col })),
+          selectableTiles: freshFields.map(({ field, slot }) => field.kind === 'farmyard'
+            ? { row: field.row, col: field.col }
+            : {
+                ...slot.tile,
+                sourceCard: field.sourceCard,
+                groupKey: field.groupKey,
+                cardFieldSlot: slot.index,
+              }),
           minSelections: 1,
           maxSelections: freshFields.length,
           selectionEffect: SELECTION_EFFECT,

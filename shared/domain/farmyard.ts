@@ -569,6 +569,12 @@ export const validateSowSelection = <T extends PlayerFarmState>(
     wood: 0,
     stone: 0,
   }
+  const farmyardCropCount: Record<SowSelection['crop'], number> = {
+    grain: 0,
+    vegetable: 0,
+    wood: 0,
+    stone: 0,
+  }
   for (const selection of selections) {
     const row = Number(selection?.row)
     const col = Number(selection?.col)
@@ -605,8 +611,9 @@ export const validateSowSelection = <T extends PlayerFarmState>(
       ? (options.extraGroupKeys?.get(key) ?? key)
       : key
     usedGroups.add(groupKey)
-    if (isExtraField) continue
     cropCount[crop] += 1
+    if (isExtraField) continue
+    farmyardCropCount[crop] += 1
   }
   if (
     typeof options.maxSelections === 'number' &&
@@ -651,8 +658,8 @@ export const validateSowSelection = <T extends PlayerFarmState>(
     fields: updatedFields,
     resources: {
       ...normalized.resources,
-      grain: (normalized.resources?.grain ?? 0) - cropCount.grain,
-      vegetable: (normalized.resources?.vegetable ?? 0) - cropCount.vegetable,
+      grain: (normalized.resources?.grain ?? 0) - farmyardCropCount.grain,
+      vegetable: (normalized.resources?.vegetable ?? 0) - farmyardCropCount.vegetable,
     },
   }
   return { ok: true, player: updated as T }
