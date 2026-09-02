@@ -7,6 +7,7 @@ import { computeFencedRegions } from '../../domain/farmyard'
 import { positionKey } from '../../domain/farm'
 import { readCardExtraData, writeCardExtraData } from '../helpers/card-state'
 import { registerAdHocAction } from '../../actions/helpers/ad-hoc-action-registry'
+import { getFarmyardFields } from '../helpers/card-field'
 
 const CARD_ID = 'M038_NatureReserve'
 const RESERVE_TILES_KEY = 'natureReserveTiles'
@@ -73,7 +74,7 @@ const activateReserveTiles = (player: PlayerState) => {
   const reserves = reserveTiles(player)
   if (reserves.length === 0) return
   const terrainKeys = new Set((player.farmTerrain ?? []).map(positionKey))
-  const fieldKeys = new Set(player.fields.map(positionKey))
+  const fieldKeys = new Set(getFarmyardFields(player).map(positionKey))
   const regions = fencedRegions(player)
   const pastureRegions = new Set(player.pastures.map((pasture) => regionKey(pasture.tiles ?? [])))
   const stableKeys = new Set(player.stableTiles.map(positionKey))

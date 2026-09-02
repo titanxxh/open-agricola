@@ -12,6 +12,7 @@ import {
   getPlacementBlockedFarmyardSpaceKeys,
 } from '../../domain/farmyard-space-states'
 import type { CardImpl } from '../registry'
+import { getLogicalFields } from '../helpers/card-field'
 
 const CARD_ID = 'M111_NoTillFarming'
 const DISCARD_EFFECT = 'm111-no-till-farming-discard-crops'
@@ -126,7 +127,7 @@ const cardImpl = {
     },
   },
   listeners: [anytimeListener],
-  prerequisiteCheck: (player) => player.fields.length >= 2,
+  prerequisiteCheck: (player) => getLogicalFields(player).length >= 2,
   reaches: [] as readonly string[],
 } satisfies CardImpl
 

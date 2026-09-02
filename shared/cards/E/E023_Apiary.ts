@@ -1,5 +1,6 @@
 import { defineMinorCard } from '../card-source'
 import type { CardImpl } from '../registry'
+import { getLogicalFields } from '../helpers/card-field'
 
 const CARD_ID = 'E023_Apiary'
 
@@ -7,7 +8,7 @@ const cardImpl = {
   effect: {
   id: CARD_ID,
   onBeforeReturnHome: (_state, player) => {
-    if (player.fields.length === 0) return
+    if (getLogicalFields(player).length === 0) return
     return {
       type: 'seq',
       optional: true,

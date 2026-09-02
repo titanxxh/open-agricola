@@ -3,12 +3,10 @@ import type { CardDefinition } from '../../contract/cards'
 import { getRegisteredMinorImprovement } from '../registry-display'
 import { getMajorCard } from '../major'
 import { collectCardsAs } from './card-type'
-import { fieldHasCrop } from '../../domain/field'
 import { countUnusedFarmyardSpaces } from '../../domain/farm'
 import { getActiveCardRegistry } from '../active-registry'
-import { readCardExtraData } from './card-state'
 import type { AnimalKey } from '../../contract/animals'
-import { getFarmyardFields } from './card-field'
+import { getFarmyardFields, getLogicalFields } from './card-field'
 
 type CardPrerequisiteSource = Pick<
   CardDefinition,
@@ -24,30 +22,8 @@ const countAllImprovements = (player: PlayerState) =>
 const countMajorImprovements = (player: PlayerState) =>
   collectCardsAs(player, 'major').length
 
-const countCardFields = (player: PlayerState) =>
-  player.minorPlayed.filter((id) => {
-    const card = getRegisteredMinorImprovement(id)
-    return !!card?.providesField
-  }).length
-
 const countFields = (player: PlayerState) =>
-  player.fields.length + countCardFields(player)
-
-const playedCardIds = (player: PlayerState): string[] => [
-  ...(player.improvements ?? []),
-  ...(player.minorPlayed ?? []),
-  ...(player.occupationPlayed ?? []),
-]
-
-const countCardFieldsWithCrop = (player: PlayerState, crop: string) =>
-  playedCardIds(player).reduce((count, cardId) => {
-    const stacks = readCardExtraData<Array<{ crop?: string; remaining?: number } | null>>(
-      player,
-      cardId,
-      'cardFieldStacks',
-    ) ?? []
-    return count + stacks.filter((stack) => stack?.crop === crop && (stack.remaining ?? 0) > 0).length
-  }, 0)
+  getLogicalFields(player).length
 
 const countFieldTiles = (player: PlayerState) =>
   getFarmyardFields(player).length
@@ -109,8 +85,10 @@ const meetsTextClause = (player: PlayerState, clause: string) => {
 
   const grainFieldsMatch = trimmed.match(/^(\d+)\s+Grain Fields?$/i)
   if (grainFieldsMatch) {
-    const grainFields = player.fields.filter((f) => fieldHasCrop(f, 'grain'))
-    return grainFields.length + countCardFieldsWithCrop(player, 'grain') >= Number(grainFieldsMatch[1])
+    const grainFields = getLogicalFields(player).filter((field) =>
+      field.stacks.some((stack) => stack.kind === 'grain'),
+    )
+    return grainFields.length >= Number(grainFieldsMatch[1])
   }
 
   const pastureMatch = trimmed.match(/^(\d+)\s+Pastures?$/i)

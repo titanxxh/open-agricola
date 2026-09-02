@@ -3,11 +3,12 @@ import type { CardListenerContext, CardListenerRegistration } from '../card-list
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { buildSowFarmInteraction } from '../../domain/farmyard-interaction'
 import type { CardImpl } from '../registry'
+import { getLogicalFields } from '../helpers/card-field'
 
 const CARD_ID = 'M058_PeatFertilizer'
 
 const canSow = (context: CardListenerContext) => {
-  if (context.player.fields.length < 2) return false
+  if (getLogicalFields(context.player).length < 2) return false
   const farm = buildSowFarmInteraction(context.player)
   return farm.farmType === 'sow' && farm.selectableFields.length > 0
 }
@@ -27,7 +28,7 @@ const listener: CardListenerRegistration = {
 }
 
 const cardImpl = {
-  prerequisiteCheck: (player) => player.fields.length >= 2,
+  prerequisiteCheck: (player) => getLogicalFields(player).length >= 2,
   listeners: [listener],
   reaches: [] as readonly string[],
 } satisfies CardImpl

@@ -1,5 +1,6 @@
 import { defineMinorCard } from '../card-source'
 import type { CardImpl } from '../registry'
+import { getLogicalFields } from '../helpers/card-field'
 
 const CARD_ID = 'E026_Sundial'
 const TRIGGER_ROUNDS = new Set([7, 9])
@@ -9,7 +10,7 @@ const cardImpl = {
   id: CARD_ID,
   onBeforeReturnHome: (state, player) => {
     if (!TRIGGER_ROUNDS.has(state.round)) return
-    if (player.fields.length === 0) return
+    if (getLogicalFields(player).length === 0) return
     return {
       type: 'seq',
       optional: true,
