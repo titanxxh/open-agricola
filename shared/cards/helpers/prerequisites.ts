@@ -8,6 +8,7 @@ import { countUnusedFarmyardSpaces } from '../../domain/farm'
 import { getActiveCardRegistry } from '../active-registry'
 import { readCardExtraData } from './card-state'
 import type { AnimalKey } from '../../contract/animals'
+import { getFarmyardFields } from './card-field'
 
 type CardPrerequisiteSource = Pick<
   CardDefinition,
@@ -40,13 +41,16 @@ const playedCardIds = (player: PlayerState): string[] => [
 
 const countCardFieldsWithCrop = (player: PlayerState, crop: string) =>
   playedCardIds(player).reduce((count, cardId) => {
-    const stacks = readCardExtraData<Array<{ crop?: string; remaining?: number }>>(
+    const stacks = readCardExtraData<Array<{ crop?: string; remaining?: number } | null>>(
       player,
       cardId,
       'cardFieldStacks',
     ) ?? []
-    return count + stacks.filter((stack) => stack.crop === crop && (stack.remaining ?? 0) > 0).length
+    return count + stacks.filter((stack) => stack?.crop === crop && (stack.remaining ?? 0) > 0).length
   }, 0)
+
+const countFieldTiles = (player: PlayerState) =>
+  getFarmyardFields(player).length
 
 const cardHasBaking = (cardId: string) =>
   getMajorCard(cardId)?.isBaking
@@ -169,7 +173,7 @@ const meetsTextClause = (player: PlayerState, clause: string) => {
   }
 
   if (/^No Field Tiles$/i.test(trimmed)) {
-    return countFields(player) === 0
+    return countFieldTiles(player) === 0
   }
 
   if (/^No Unused Farmyard Spaces$/i.test(trimmed)) {
@@ -184,7 +188,7 @@ const meetsTextClause = (player: PlayerState, clause: string) => {
 
   const exactFieldTilesMatch = trimmed.match(/^Exactly\s+(\d+)\s+Field Tiles?$/i)
   if (exactFieldTilesMatch) {
-    return countFields(player) === Number(exactFieldTilesMatch[1])
+    return countFieldTiles(player) === Number(exactFieldTilesMatch[1])
   }
 
   return true

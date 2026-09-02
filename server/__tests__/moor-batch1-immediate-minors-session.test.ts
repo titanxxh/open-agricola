@@ -183,7 +183,7 @@ describe('Moor Batch 1 immediate resource minors', () => {
     player.minorHand = ['M022_EcologicalNiche']
     player.minorPlayed = ['B068_Beanfield']
     player.cardStates = {
-      B068_Beanfield: { extraData: { cardFieldStacks: [{ crop: 'grain', remaining: 1 }] } },
+      B068_Beanfield: { extraData: { cardFieldStacks: [{ crop: 'vegetable', remaining: 1 }] } },
     }
 
     const resp = playMinor(session, 'M022_EcologicalNiche')
@@ -194,11 +194,11 @@ describe('Moor Batch 1 immediate resource minors', () => {
     tied.state.players[0]!.minorHand = ['M022_EcologicalNiche']
     tied.state.players[0]!.minorPlayed = ['B068_Beanfield']
     tied.state.players[0]!.cardStates = {
-      B068_Beanfield: { extraData: { cardFieldStacks: [{ crop: 'grain', remaining: 1 }] } },
+      B068_Beanfield: { extraData: { cardFieldStacks: [{ crop: 'vegetable', remaining: 1 }] } },
     }
     tied.state.players[1]!.minorPlayed = ['B068_Beanfield']
     tied.state.players[1]!.cardStates = {
-      B068_Beanfield: { extraData: { cardFieldStacks: [{ crop: 'grain', remaining: 1 }] } },
+      B068_Beanfield: { extraData: { cardFieldStacks: [{ crop: 'vegetable', remaining: 1 }] } },
     }
 
     const noReward = playMinor(tied, 'M022_EcologicalNiche', false)

@@ -140,7 +140,7 @@ describe('reap action private-field-phase trigger', () => {
 
     expect(player.resources.grain).toBe(1)
     expect(player.resources.wood).toBe(1)
-    expect(player.cardStates.E068_CherryOrchard?.extraData?.cardFieldStacks).toEqual([])
+    expect(player.cardStates.E068_CherryOrchard?.extraData?.cardFieldStacks).toEqual([null])
     expect(state.harvestReapSummary?.p1?.harvestedPositions).toEqual([])
     expect(events.map((event) => (event as { from?: { kind?: string } }).from?.kind)).toEqual([
       undefined,
@@ -224,7 +224,7 @@ describe('reap action private-field-phase trigger', () => {
     expect(actor.resources.grain).toBe(1)
     expect(actor.resources.wood).toBe(1)
     expect(actor.fields[0]!.stacks).toEqual([])
-    expect(actor.cardStates.E068_CherryOrchard?.extraData?.cardFieldStacks).toEqual([])
+    expect(actor.cardStates.E068_CherryOrchard?.extraData?.cardFieldStacks).toEqual([null])
     expect(opponent.resources.vegetable).toBe(0)
     expect(opponent.resources.wood).toBe(0)
     expect(opponent.fields[0]!.stacks).toEqual([{ kind: 'vegetable', remaining: 1 }])
@@ -298,7 +298,7 @@ describe('reap action private-field-phase trigger', () => {
 
     expect(player.resources.grain).toBe(1)
     expect(player.resources.food).toBe(0)
-    expect(player.cardStates.E072_ArtichokeField?.extraData?.cardFieldStacks).toEqual([])
+    expect(player.cardStates.E072_ArtichokeField?.extraData?.cardFieldStacks).toEqual([null])
     expect(result.type).toBe('ok')
   })
 })

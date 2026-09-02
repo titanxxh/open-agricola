@@ -305,7 +305,7 @@ describe('E070_CropRotationField session', () => {
           CARD_ID,
           'cardFieldStacks',
         ) ?? [],
-      ).toEqual([])
+      ).toEqual([null])
     })
   })
 
@@ -348,7 +348,7 @@ describe('E070_CropRotationField session', () => {
         CARD_ID,
         'cardFieldStacks',
       )
-      expect(stacks ?? []).toEqual([]) // cleared
+      expect(stacks ?? []).toEqual([null])
     })
 
     it('last grain harvested with vegetable available -> optional sow flow returned', () => {
@@ -386,7 +386,7 @@ describe('E070_CropRotationField session', () => {
         CARD_ID,
         'cardFieldStacks',
       )
-      expect(stacks ?? []).toEqual([]) // cleared
+      expect(stacks ?? []).toEqual([null])
 
       // Verify selectedPositions was set
       const selectedPositions = readCardExtraData<string[]>(player, CARD_ID, 'selectedPositions')
@@ -434,7 +434,7 @@ describe('E070_CropRotationField session', () => {
         CARD_ID,
         'cardFieldStacks',
       )
-      expect(stacks ?? []).toEqual([]) // still cleared
+      expect(stacks ?? []).toEqual([null])
     })
 
     it('last grain harvested without vegetable completes without an E070 prompt', () => {
@@ -454,7 +454,7 @@ describe('E070_CropRotationField session', () => {
           CARD_ID,
           'cardFieldStacks',
         ) ?? [],
-      ).toEqual([])
+      ).toEqual([null])
       expect(resp.interaction.stateId === 'wait' ? resp.interaction.sourceCard : undefined).not.toBe(CARD_ID)
       expect(resp.interaction.stateId === 'wait'
         ? resp.interaction.request.options?.some((option) => option.sourceCard === CARD_ID) ?? false

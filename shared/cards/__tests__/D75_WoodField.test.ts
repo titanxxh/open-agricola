@@ -59,7 +59,10 @@ describe('D75 Wood Field', () => {
     const ok = D075_WoodField_impl.effect!.onSowExtraField!(player, { row: ROW, col: COL_BASE }, 'wood')
     expect(ok).toBe(true)
     expect(player.resources.wood).toBe(1)
-    expect(player.cardStates?.[CARD_ID]?.extraData?.cardFieldStacks).toEqual([{ crop: 'wood', remaining: 3 }])
+    expect(player.cardStates?.[CARD_ID]?.extraData?.cardFieldStacks).toEqual([
+      { crop: 'wood', remaining: 3 },
+      null,
+    ])
   })
 
   it('onHarvestFieldPhase decrements every stack and adds wood per stack', () => {
@@ -84,7 +87,7 @@ describe('D75 Wood Field', () => {
     const state = { players: [player] } as never
     D075_WoodField_impl.effect!.onHarvestFieldPhase!(state, player)
     expect(player.resources.wood).toBe(2)
-    expect(player.cardStates?.[CARD_ID]?.extraData?.cardFieldStacks).toEqual([])
+    expect(player.cardStates?.[CARD_ID]?.extraData?.cardFieldStacks).toEqual([null, null])
   })
 
   it('isDoable listener fires when normal fields full + wood >= 1', () => {

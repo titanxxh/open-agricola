@@ -156,6 +156,7 @@ describe('D072_StableManure session', () => {
     const harvested = session.getState().state.players[0]!
     expect(harvested.resources.wood).toBe(3)
     expect(harvested.cardStates.D075_WoodField?.extraData?.cardFieldStacks).toEqual([
+      null,
       { crop: 'wood', remaining: 1 },
     ])
     expect(harvested.cardStates.D072_StableManure?.extraData?.selectedPositions).toBeUndefined()
@@ -214,6 +215,7 @@ describe('D072_StableManure session', () => {
     const harvested = session.getState().state.players[0]!
     expect(harvested.resources.stone).toBe(4)
     expect(harvested.cardStates.E080_RockGarden?.extraData?.cardFieldStacks).toEqual([
+      null,
       { crop: 'stone', remaining: 1 },
       { crop: 'stone', remaining: 1 },
     ])

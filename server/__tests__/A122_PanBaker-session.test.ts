@@ -89,6 +89,7 @@ describe('A122 Pan Baker session', () => {
     expect(resp.state.players[0]!.resources).toMatchObject({ wood: 0, clay: 2, grain: 0 })
     expect(readCardExtraData(resp.state.players[0]!, 'D075_WoodField', 'cardFieldStacks')).toEqual([
       { crop: 'wood', remaining: 3 },
+      null,
     ])
   })
 

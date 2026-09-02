@@ -144,7 +144,7 @@ describe('B068_Beanfield', () => {
       const state = createState(player)
       effect.onHarvestFieldPhase!(state, player)
       expect(player.resources.vegetable).toBe(1)
-      expect(player.cardStates![CARD_ID]!.extraData!.cardFieldStacks).toEqual([])
+      expect(player.cardStates![CARD_ID]!.extraData!.cardFieldStacks).toEqual([null])
     })
 
     it('does nothing when card has no crop', () => {
