@@ -3,7 +3,7 @@ import { fieldIsEmpty, fieldTotalRemaining } from '../../domain/field'
 import { readCardExtraData } from '../helpers/card-state'
 import { wrapOptional } from '../../actions/flow'
 import type { ActionFlow } from '../../contract/types'
-import type { CardFieldStack } from '../helpers/card-field'
+import type { CardFieldSlot } from '../helpers/card-field'
 import type { PlantAdditionalGoodLocation } from '../../actions/effects/special-effect'
 import type { CardImpl } from '../registry'
 
@@ -23,9 +23,9 @@ const cardImpl = {
 
       const cardFieldHolders = [...player.minorPlayed, ...player.occupationPlayed]
       for (const cardId of cardFieldHolders) {
-        const stacks = readCardExtraData<CardFieldStack[]>(player, cardId, 'cardFieldStacks')
+        const stacks = readCardExtraData<CardFieldSlot[]>(player, cardId, 'cardFieldStacks')
         if (!stacks || stacks.length === 0) continue
-        const total = stacks.reduce((acc, s) => acc + s.remaining, 0)
+        const total = stacks.reduce((acc, slot) => acc + (slot?.remaining ?? 0), 0)
         if (total !== 1) continue
         locations.push({ kind: 'card-field', cardId })
       }

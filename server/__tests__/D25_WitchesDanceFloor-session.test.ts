@@ -300,7 +300,7 @@ describe('D025_WitchesDanceFloor session', () => {
       effect.onHarvestFieldPhase!(state, player)
       expect(player.resources.vegetable).toBe(2)
       const afterSecond = player.cardStates[CARD_ID]?.extraData?.cardFieldStacks
-      expect(afterSecond).toEqual([])
+      expect(afterSecond).toEqual([null])
     })
   })
 

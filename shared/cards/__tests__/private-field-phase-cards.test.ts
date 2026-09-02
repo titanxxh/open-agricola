@@ -119,9 +119,9 @@ describe('Private Field Phase cards', () => {
 
   it('E25 Bumper Crop runs Private Field Phase when only Card Fields have crops', () => {
     const player = playerWithFields([])
-    player.minorPlayed = ['B113_PlantBreeder']
+    player.minorPlayed = ['B113_PatchCaregiver']
     player.cardStates = {
-      B113_PlantBreeder: { extraData: { cardFieldStacks: [{ crop: 'grain', remaining: 1 }] } },
+      B113_PatchCaregiver: { extraData: { cardFieldStacks: [{ crop: 'grain', remaining: 1 }] } },
     }
 
     expect(E025_BumperCrop_impl.effect.onBuy!(state(player), player)).toEqual({

@@ -165,44 +165,6 @@ describe('C070_LettucePatch session', () => {
       expect(children[1].params).toEqual({ food: 4 })
     })
 
-    it('onHarvestFieldPhase offers quantity choices for each vegetable reaped from the card', () => {
-      const session = new GameSession()
-      stabilizeRandomHands(session.state.players)
-      const state = session.getState().state
-      state.players = state.players.slice(0, 2)
-      state.round = 4
-
-      const player = state.players[0]!
-      player.minorPlayed.push(CARD_ID)
-      player.resources.vegetable = 0
-      player.cardStates[CARD_ID] = {
-        extraData: {
-          cardFieldStacks: [
-            { crop: 'vegetable', remaining: 1 },
-            { crop: 'vegetable', remaining: 1 },
-          ],
-        },
-      }
-
-      session.loadState(state)
-
-      const effect = getCardEffect(CARD_ID)
-      expect(effect).toBeDefined()
-      const flow = effect!.onHarvestFieldPhase!(state, player) as Extract<ActionFlow, { type: 'parallel' }>
-      const conversion = flow.children[0] as Extract<ActionFlow, { type: 'xor' }>
-
-      expect(player.resources.vegetable).toBe(2)
-      expect(conversion.type).toBe('xor')
-      expect(conversion.optional).toBe(true)
-      expect(conversion.children).toHaveLength(2)
-      const first = conversion.children[0] as Extract<ActionFlow, { type: 'seq' }>
-      const second = conversion.children[1] as Extract<ActionFlow, { type: 'seq' }>
-      expect(first.children[0]).toMatchObject({ actionId: 'pay', params: { vegetable: 1 } })
-      expect(first.children[1]).toMatchObject({ actionId: 'gain', params: { food: 4 } })
-      expect(second.children[0]).toMatchObject({ actionId: 'pay', params: { vegetable: 2 } })
-      expect(second.children[1]).toMatchObject({ actionId: 'gain', params: { food: 8 } })
-    })
-
     it('full harvest integration: harvests veg and player can convert to food', () => {
       const session = setup({ round: 4, vegetable: 0 })
 
@@ -282,7 +244,7 @@ describe('C070_LettucePatch session', () => {
 
       // Stack should be cleared
       const stacks = player.cardStates[CARD_ID]?.extraData?.cardFieldStacks as any[]
-      expect(stacks ?? []).toEqual([])
+      expect(stacks ?? []).toEqual([null])
     })
 
     it('crop cleared - full integration with performRoundEnd', () => {
@@ -305,7 +267,7 @@ describe('C070_LettucePatch session', () => {
       const playerAfter = resp.state.players[0]!
       expect(playerAfter.resources.vegetable).toBe(1)
       const stacks = playerAfter.cardStates[CARD_ID]?.extraData?.cardFieldStacks as any[]
-      expect(stacks ?? []).toEqual([])
+      expect(stacks ?? []).toEqual([null])
     })
   })
 

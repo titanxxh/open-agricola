@@ -91,12 +91,16 @@ describe('E080_RockGarden session', () => {
     expect(playerAfter.resources.stone).toBe(0)
     expect(readCardExtraData(playerAfter, CARD_ID, 'cardFieldStacks')).toEqual([
       { crop: 'stone', remaining: 2 },
+      null,
+      null,
     ])
 
     runCardEffectHook(resp.state, playerAfter, CARD_ID, 'onHarvestFieldPhase')
     expect(playerAfter.resources.stone).toBe(1)
     expect(readCardExtraData(playerAfter, CARD_ID, 'cardFieldStacks')).toEqual([
       { crop: 'stone', remaining: 1 },
+      null,
+      null,
     ])
   })
 
@@ -167,6 +171,6 @@ describe('E080_RockGarden session', () => {
       total += player.resources.stone - before
     }
     expect(total).toBe(6)
-    expect(readCardExtraData(player, CARD_ID, 'cardFieldStacks')).toEqual([])
+    expect(readCardExtraData(player, CARD_ID, 'cardFieldStacks')).toEqual([null, null, null])
   })
 })

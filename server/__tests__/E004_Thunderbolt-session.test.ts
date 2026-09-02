@@ -197,7 +197,7 @@ describe('E004 Thunderbolt native session', () => {
     expect(response.ok, response.error).toBe(true)
     expect(response.state.players[0]!.resources.wood).toBe(woodBefore + 4)
     expect(response.state.players[0]!.resources.vegetable).toBe(1)
-    expect(response.state.players[0]!.cardStates[CROP_ROTATION_FIELD]?.extraData?.cardFieldStacks).toEqual([])
+    expect(response.state.players[0]!.cardStates[CROP_ROTATION_FIELD]?.extraData?.cardFieldStacks).toEqual([null])
     expect(response.scores).toEqual(scoresBefore)
     expect(response.interaction.stateId).toBe('wait')
     if (response.interaction.stateId !== 'wait') return
@@ -277,7 +277,7 @@ describe('E004 Thunderbolt native session', () => {
     expect(response.ok, response.error).toBe(true)
     expect(response.state.players[0]!.resources.wood).toBe(woodBefore + 2)
     expect(response.state.players[0]!.resources.vegetable).toBe(0)
-    expect(response.state.players[0]!.cardStates[CROP_ROTATION_FIELD]?.extraData?.cardFieldStacks).toEqual([])
+    expect(response.state.players[0]!.cardStates[CROP_ROTATION_FIELD]?.extraData?.cardFieldStacks).toEqual([null])
     expect(response.state.events.slice(eventCount)).toEqual(expect.arrayContaining([
       expect.objectContaining({ type: 'farm.cropRemoved', reason: 'cardEffect' }),
     ]))

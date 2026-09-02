@@ -180,7 +180,7 @@ describe('E072_ArtichokeField session', () => {
       expect(playerAfter.resources.grain).toBe(1)
       // Stack should be cleared
       const stacks = playerAfter.cardStates[CARD_ID]?.extraData?.cardFieldStacks as any[]
-      expect(stacks ?? []).toEqual([])
+      expect(stacks ?? []).toEqual([null])
     })
 
     /**
@@ -220,7 +220,7 @@ describe('E072_ArtichokeField session', () => {
       }
       expect(player.resources.grain).toBe(3)
       expect(player.resources.food).toBe(3)
-      expect(player.cardStates[CARD_ID]?.extraData?.cardFieldStacks ?? []).toEqual([])
+      expect(player.cardStates[CARD_ID]?.extraData?.cardFieldStacks ?? []).toEqual([null])
     })
 
     it('multi-harvest food totals equal reference expectation (2 vegetable → 2 food bonus)', () => {
@@ -241,7 +241,7 @@ describe('E072_ArtichokeField session', () => {
       }
       expect(player.resources.vegetable).toBe(2)
       expect(player.resources.food).toBe(2)
-      expect(player.cardStates[CARD_ID]?.extraData?.cardFieldStacks ?? []).toEqual([])
+      expect(player.cardStates[CARD_ID]?.extraData?.cardFieldStacks ?? []).toEqual([null])
     })
 
     it('no harvest crop → no bonus food (parity with the reference "harvested>=1" guard)', () => {

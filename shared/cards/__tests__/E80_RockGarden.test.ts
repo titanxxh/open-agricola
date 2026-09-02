@@ -69,7 +69,11 @@ describe('E80 Rock Garden', () => {
     const ok = E080_RockGarden_impl.effect!.onSowExtraField!(player, { row: ROW, col: COL_BASE }, 'stone')
     expect(ok).toBe(true)
     expect(player.resources.stone).toBe(2)
-    expect(player.cardStates?.[CARD_ID]?.extraData?.cardFieldStacks).toEqual([{ crop: 'stone', remaining: 2 }])
+    expect(player.cardStates?.[CARD_ID]?.extraData?.cardFieldStacks).toEqual([
+      { crop: 'stone', remaining: 2 },
+      null,
+      null,
+    ])
   })
 
   it('onHarvestFieldPhase decrements every stack and adds stone per stack', () => {
@@ -115,7 +119,7 @@ describe('E80 Rock Garden', () => {
     const state = { players: [player] } as never
     E080_RockGarden_impl.effect!.onHarvestFieldPhase!(state, player)
     expect(player.resources.stone).toBe(3)
-    expect(player.cardStates?.[CARD_ID]?.extraData?.cardFieldStacks).toEqual([])
+    expect(player.cardStates?.[CARD_ID]?.extraData?.cardFieldStacks).toEqual([null, null, null])
   })
 
   it('isDoable listener fires when normal fields full + stone >= 1', () => {

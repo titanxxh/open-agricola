@@ -1,7 +1,14 @@
 import { describe, expect, it } from 'vitest'
 import type { GameState, HarvestReapSummary, PlayerState } from '../../../contract/types'
 import type { DraftGameEvent, EventSink } from '../../../contract/events'
-import { makeCardFieldImpl, deriveVirtualTileCol, removeCardFieldCrop } from '../card-field'
+import {
+  deriveVirtualTileCol,
+  getFarmyardFields,
+  getLogicalFields,
+  makeCardFieldImpl,
+  mutateLogicalFields,
+  removeCardFieldCrop,
+} from '../card-field'
 
 const emptyResources = () => ({
   wood: 0, clay: 0, reed: 0, stone: 0, food: 0,
@@ -54,6 +61,114 @@ const initSummary = (state: GameState, pid: string) => {
   state.harvestReapSummary = state.harvestReapSummary ?? {}
   state.harvestReapSummary[pid] = { resources: {}, grainFields: 0, vegetableFields: 0, harvestedPositions: [] } as HarvestReapSummary
 }
+
+describe('logical field boundary', () => {
+  it('projects deterministic immutable Farmyard and Card Fields with fixed stable slots', () => {
+    makeCardFieldImpl('D075_WoodField', { allowedCrops: ['wood'], capacity: 2 })
+    const player = createPlayer({
+      fields: [
+        { row: 1, col: 2, stacks: [] },
+        { row: 0, col: 1, stacks: [{ kind: 'grain', remaining: 2 }] },
+      ],
+      minorPlayed: ['D075_WoodField'],
+      cardStates: {
+        D075_WoodField: {
+          extraData: { cardFieldStacks: [null, { crop: 'wood', remaining: 2 }] },
+        },
+      },
+    })
+
+    const fields = getLogicalFields(player)
+
+    expect(fields.map((field) => field.id)).toEqual([
+      'farmyard:0:1',
+      'farmyard:1:2',
+      'card:D075_WoodField',
+    ])
+    expect(fields[2]).toMatchObject({
+      kind: 'card',
+      row: -1,
+      col: 4075,
+      sourceCard: 'D075_WoodField',
+      groupKey: 'D075_WoodField',
+      stacks: [{ kind: 'wood', remaining: 2 }],
+      slots: [
+        { index: 0, tile: { row: -1, col: 4075 }, stack: null },
+        { index: 1, tile: { row: -1, col: 4076 }, stack: { kind: 'wood', remaining: 2 } },
+      ],
+    })
+    expect(Object.isFrozen(fields)).toBe(true)
+    expect(Object.isFrozen(fields[2]?.slots)).toBe(true)
+    expect(getFarmyardFields(player).map((field) => field.id)).toEqual([
+      'farmyard:0:1',
+      'farmyard:1:2',
+    ])
+    expect(player.fields[0]?.row).toBe(1)
+  })
+
+  it('persists named mutations through both owners without renumbering Card Field slots', () => {
+    makeCardFieldImpl('D075_WoodField', { allowedCrops: ['wood'], capacity: 2 })
+    const player = createPlayer({
+      fields: [{ row: 0, col: 0, stacks: [] }],
+      minorPlayed: ['D075_WoodField'],
+      cardStates: {
+        D075_WoodField: {
+          extraData: {
+            cardFieldStacks: [
+              { crop: 'wood', remaining: 1 },
+              { crop: 'wood', remaining: 2 },
+            ],
+          },
+        },
+      },
+    })
+    const mutations = mutateLogicalFields(createState(player), player)
+
+    expect(mutations.place({ fieldId: 'farmyard:0:0' }, 'stone', 1)).toEqual({ ok: true })
+    expect(mutations.remove({ fieldId: 'card:D075_WoodField', slot: 0 })).toMatchObject({
+      ok: true,
+      crop: 'wood',
+      amount: 1,
+    })
+
+    expect(player.fields[0]?.stacks).toEqual([{ kind: 'stone', remaining: 1 }])
+    expect(player.cardStates.D075_WoodField?.extraData?.cardFieldStacks).toEqual([
+      null,
+      { crop: 'wood', remaining: 2 },
+    ])
+    expect(getLogicalFields(player)[1]?.slots[1]).toMatchObject({
+      index: 1,
+      tile: { row: -1, col: 4076 },
+      stack: { kind: 'wood', remaining: 2 },
+    })
+  })
+
+  it('fails malformed Card Field state before changing either owner', () => {
+    makeCardFieldImpl('B068_Beanfield', { allowedCrops: ['vegetable'], capacity: 1 })
+    const player = createPlayer({
+      fields: [{ row: 0, col: 0, stacks: [] }],
+      minorPlayed: ['B068_Beanfield'],
+      cardStates: {
+        B068_Beanfield: {
+          extraData: {
+            cardFieldStacks: [
+              { crop: 'vegetable', remaining: 2 },
+              { crop: 'vegetable', remaining: 2 },
+            ],
+          },
+        },
+      },
+    })
+
+    expect(() => mutateLogicalFields(createState(player), player).place(
+      { fieldId: 'farmyard:0:0' },
+      'grain',
+      3,
+    )).toThrow(/B068_Beanfield/)
+    expect(player.fields[0]?.stacks).toEqual([])
+    expect(player.cardStates.B068_Beanfield?.extraData?.cardFieldStacks).toHaveLength(2)
+  })
+})
 
 describe('makeCardFieldImpl', () => {
   describe('virtualTileCol derivation', () => {
@@ -122,6 +237,7 @@ describe('makeCardFieldImpl', () => {
       ])
       expect(player.resources.wood).toBe(2)
       expect(player.cardStates.D075_WoodField?.extraData?.cardFieldStacks).toEqual([
+        null,
         { crop: 'wood', remaining: 2 },
       ])
     })
@@ -153,7 +269,7 @@ describe('makeCardFieldImpl', () => {
       initSummary(state, player.id)
       impl.effect.onHarvestFieldPhase!(state, player)
       expect(received).toEqual({ crop: 'wood', isLast: true })
-      expect(player.cardStates!.E068_CherryOrchard.extraData.cardFieldStacks).toEqual([])
+      expect(player.cardStates!.E068_CherryOrchard.extraData.cardFieldStacks).toEqual([null])
     })
     it('multi-crop: each crop reports isLast independently', () => {
       const received: { crop: string; isLast: boolean }[] = []
@@ -250,7 +366,9 @@ describe('makeCardFieldImpl', () => {
       expect(reaped).toBe(false)
       expect(removed).toEqual({ amount: 3, isLast: true, reason: 'cardEffect' })
       expect(player.cardStates.A001_TestField?.extraData?.cardFieldStacks).toEqual([
+        null,
         { crop: 'vegetable', remaining: 1 },
+        null,
       ])
       expect(events).toEqual([
         expect.objectContaining({

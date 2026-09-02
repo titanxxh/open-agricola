@@ -91,6 +91,26 @@ describe('prerequisites: providesField card-provided fields', () => {
     expect(meetsCardPrerequisites(player, card)).toBe(false)
   })
 
+  it('Card Fields do not count as Field Tiles', () => {
+    const cardField = { minorPlayed: ['C070_LettucePatch'] }
+    expect(meetsCardPrerequisites(makePlayer(cardField), { prerequisite: 'No Field Tiles' })).toBe(true)
+    expect(meetsCardPrerequisites(makePlayer({
+      ...cardField,
+      fields: [
+        { row: 0, col: 0, stacks: [] },
+        { row: 0, col: 1, stacks: [] },
+      ],
+    }), { prerequisite: 'Exactly 3 Field Tiles' })).toBe(false)
+    expect(meetsCardPrerequisites(makePlayer({
+      ...cardField,
+      fields: [
+        { row: 0, col: 0, stacks: [] },
+        { row: 0, col: 1, stacks: [] },
+        { row: 0, col: 2, stacks: [] },
+      ],
+    }), { prerequisite: 'Exactly 3 Field Tiles' })).toBe(true)
+  })
+
   it('supports animal count clauses', () => {
     const player = makePlayer({
       resources: { sheep: 1 },

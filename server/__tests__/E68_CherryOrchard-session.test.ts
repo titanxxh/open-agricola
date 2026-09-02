@@ -206,6 +206,6 @@ describe('E068_CherryOrchard session', () => {
 
     expect(playerAfter.resources.wood).toBe(1)
     expect(playerAfter.resources.vegetable).toBe(1)
-    expect(readCardExtraData<CardCrop[]>(playerAfter, CARD_ID, 'cardFieldStacks') ?? []).toEqual([])
+    expect(readCardExtraData<CardCrop[]>(playerAfter, CARD_ID, 'cardFieldStacks') ?? []).toEqual([null])
   })
 })

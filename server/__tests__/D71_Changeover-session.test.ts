@@ -222,7 +222,7 @@ describe('D071 Changeover session', () => {
     const eventCount = response.state.events.length
     response = session.commitSelectionChoice(0, { positions: [{ row: -1, col: 4075 }] })
 
-    expect(response.state.players[0]!.cardStates[WOOD_FIELD]?.extraData?.cardFieldStacks).toEqual([])
+    expect(response.state.players[0]!.cardStates[WOOD_FIELD]?.extraData?.cardFieldStacks).toEqual([null, null])
     response = resolveNonSkipChoice(session, response)
     expect(response.interaction.stateId === 'wait' && response.interaction.request.kind === 'farm-select'
       ? response.interaction.request.farm.selectableFields
@@ -238,6 +238,7 @@ describe('D071 Changeover session', () => {
     expect(response.state.players[0]!.resources.wood).toBe(0)
     expect(response.state.players[0]!.cardStates[WOOD_FIELD]?.extraData?.cardFieldStacks).toEqual([
       { crop: 'wood', remaining: 3 },
+      null,
     ])
     expect(response.state.events.slice(eventCount)).toEqual(expect.arrayContaining([
       expect.objectContaining({
@@ -277,7 +278,7 @@ describe('D071 Changeover session', () => {
 
     expect(response.interaction.stateId === 'wait' ? response.interaction.sourceCard : undefined)
       .toBe(CROP_ROTATION_FIELD)
-    expect(response.state.players[0]!.cardStates[CROP_ROTATION_FIELD]?.extraData?.cardFieldStacks).toEqual([])
+    expect(response.state.players[0]!.cardStates[CROP_ROTATION_FIELD]?.extraData?.cardFieldStacks).toEqual([null])
     if (acceptRotation) {
       response = resolveNonSkipChoice(session, response)
       expect(response.state.players[0]!.cardStates[CROP_ROTATION_FIELD]?.extraData?.cardFieldStacks).toEqual([

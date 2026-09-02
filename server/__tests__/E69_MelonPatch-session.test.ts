@@ -154,7 +154,7 @@ describe('E069_MelonPatch session', () => {
       expect(player.resources.vegetable).toBe(vegBefore + 1)
       // Stack should be cleared
       const stacks = player.cardStates[CARD_ID]?.extraData?.cardFieldStacks as any[]
-      expect(stacks ?? []).toEqual([])
+      expect(stacks ?? []).toEqual([null])
       // Should return optional plow
       expect(flow).toBeDefined()
       expect(flow!.type).toBe('parallel')

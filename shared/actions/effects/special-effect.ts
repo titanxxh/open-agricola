@@ -131,10 +131,10 @@ type CardFieldStack = {
 }
 
 const readGrowableStack = <S extends { remaining: number }>(
-  stacks: readonly S[],
+  stacks: readonly (S | null)[],
   errCtx: string,
 ): S => {
-  const stack = stacks.find((s) => s.remaining >= 1)
+  const stack = stacks.find((entry): entry is S => entry !== null && entry.remaining >= 1)
   if (!stack) {
     throw new Error(`plant-additional-good: no stack with remaining>=1 on ${errCtx}`)
   }

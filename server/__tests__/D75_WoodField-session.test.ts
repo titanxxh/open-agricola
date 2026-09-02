@@ -94,6 +94,7 @@ describe('D075_WoodField session', () => {
     expect(playerAfter.resources.wood).toBe(0)
     expect(readCardExtraData(playerAfter, CARD_ID, 'cardFieldStacks')).toEqual([
       { crop: 'wood', remaining: 3 },
+      null,
     ])
 
     // Drive a single harvest tick directly: onHarvestFieldPhase is the unit
@@ -102,6 +103,7 @@ describe('D075_WoodField session', () => {
     expect(playerAfter.resources.wood).toBe(1)
     expect(readCardExtraData(playerAfter, CARD_ID, 'cardFieldStacks')).toEqual([
       { crop: 'wood', remaining: 2 },
+      null,
     ])
   })
 
@@ -167,6 +169,6 @@ describe('D075_WoodField session', () => {
       total += player.resources.wood - before
     }
     expect(total).toBe(6)
-    expect(readCardExtraData(player, CARD_ID, 'cardFieldStacks')).toEqual([])
+    expect(readCardExtraData(player, CARD_ID, 'cardFieldStacks')).toEqual([null, null])
   })
 })
