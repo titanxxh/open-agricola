@@ -13,8 +13,49 @@ export type CardImplBoundaryViolation = {
   line?: number
   cardId: string
   referencedCardId?: string
-  kind?: 'cross-card-reference' | 'trailing-live-played-count'
+  kind?: 'cross-card-reference' | 'trailing-live-played-count' | 'direct-field-storage'
   message?: string
+}
+
+const FARMYARD_FIELD_OWNER = path.join('shared', 'cards', 'helpers', 'card-field.ts')
+
+const isFarmyardFieldOwner = (file: string): boolean => {
+  const normalized = path.normalize(file)
+  return normalized === FARMYARD_FIELD_OWNER || normalized.endsWith(`${path.sep}${FARMYARD_FIELD_OWNER}`)
+}
+
+const isFieldsAccess = (node: ts.Node): node is ts.PropertyAccessExpression | ts.ElementAccessExpression => {
+  if (ts.isPropertyAccessExpression(node)) return node.name.text === 'fields'
+  if (!ts.isElementAccessExpression(node) || !node.argumentExpression) return false
+  const argument = unwrapExpression(node.argumentExpression)
+  return (
+    ts.isStringLiteral(argument)
+    || ts.isNoSubstitutionTemplateLiteral(argument)
+  ) && argument.text === 'fields'
+}
+
+export function checkFieldStorageBoundaries(files: string[]): CardImplBoundaryViolation[] {
+  const violations: CardImplBoundaryViolation[] = []
+  for (const file of files) {
+    if (isFarmyardFieldOwner(file)) continue
+    const sourceText = fs.readFileSync(file, 'utf8')
+    const sourceFile = ts.createSourceFile(file, sourceText, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS)
+    const visit = (node: ts.Node): void => {
+      if (isFieldsAccess(node)) {
+        const { line } = sourceFile.getLineAndCharacterOfPosition(node.getStart(sourceFile))
+        violations.push({
+          file,
+          line: line + 1,
+          cardId: cardIdFromFile(file),
+          kind: 'direct-field-storage',
+          message: 'direct fields access bypasses the Logical/Farmyard Field boundary',
+        })
+      }
+      ts.forEachChild(node, visit)
+    }
+    visit(sourceFile)
+  }
+  return violations
 }
 
 export type CardImplBoundaryResult = {
@@ -415,10 +456,25 @@ export function walkProductionCardFiles(repoRoot: string): string[] {
   return files
 }
 
+export function walkProductionFieldBoundaryFiles(repoRoot: string): string[] {
+  const files: string[] = []
+  for (const dirName of ['A', 'B', 'C', 'D', 'E', 'M', 'major', 'community', 'helpers']) {
+    const dir = path.join(repoRoot, 'shared', 'cards', dirName)
+    if (!fs.existsSync(dir)) continue
+    for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+      if (entry.isFile() && entry.name.endsWith('.ts') && !entry.name.endsWith('.test.ts')) {
+        files.push(path.join(dir, entry.name))
+      }
+    }
+  }
+  return files.sort()
+}
+
 async function runCli(): Promise<void> {
   const repoRoot = path.resolve(__dirname, '..')
   const warnOnly = process.argv.includes('--warn-only')
   const files = walkProductionCardFiles(repoRoot)
+  const fieldBoundaryFiles = walkProductionFieldBoundaryFiles(repoRoot)
   const { ALL_CARD_IMPLS } = await import('../shared/cards/register-all')
   const runtimeCards = files.flatMap((file): RuntimeCardImpl[] => {
     const cardId = cardIdFromFile(file)
@@ -426,6 +482,8 @@ async function runCli(): Promise<void> {
     return impl ? [{ cardId, file, listeners: impl.listeners }] : []
   })
   const result = checkCardImplBoundaries(files, runtimeCards)
+  if (fieldBoundaryFiles.length === 0) result.scopeErrors.push('no production field-boundary files scanned')
+  result.violations.push(...checkFieldStorageBoundaries(fieldBoundaryFiles))
   if (result.scopeErrors.length > 0) {
     console.warn('[check-card-impl-boundaries] invalid scan scope:')
     for (const error of result.scopeErrors) console.warn(`  ${error}`)
@@ -434,7 +492,8 @@ async function runCli(): Promise<void> {
   if (result.violations.length === 0) {
     console.log(
       `[check-card-impl-boundaries] checked ${result.filesChecked} Card Sources, `
-      + `${result.listenerHandlersChecked} listeners, ${result.trailingListenerHandlersChecked} trailing listeners; `
+      + `${fieldBoundaryFiles.length} field-boundary files, ${result.listenerHandlersChecked} listeners, `
+      + `${result.trailingListenerHandlersChecked} trailing listeners; `
       + 'no boundary violations found',
     )
     process.exit(0)

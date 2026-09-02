@@ -5,7 +5,9 @@ import { describe, expect, it } from 'vitest'
 import {
   cardImplBoundaryExitCode,
   checkCardImplBoundaries,
+  checkFieldStorageBoundaries,
   walkProductionCardFiles,
+  walkProductionFieldBoundaryFiles,
 } from '../check-card-impl-boundaries'
 
 const writeFixture = (root: string, rel: string, content: string): string => {
@@ -408,6 +410,57 @@ describe('check-card-impl-boundaries', () => {
     ].join('\n'))
 
     expect(walkProductionCardFiles(root)).not.toContain(helper)
+  })
+
+  it('rejects property and bracket fields access through any receiver name', () => {
+    const root = mkdtempSync(path.join(tmpdir(), 'card-impl-boundaries-'))
+    const property = writeFixture(
+      root,
+      'shared/cards/A/A001_Shelter.ts',
+      'export const count = alternateReceiver.fields.length',
+    )
+    const bracket = writeFixture(
+      root,
+      'shared/cards/helpers/example.ts',
+      "export const count = renamed['fields'].length",
+    )
+
+    expect(checkFieldStorageBoundaries([property, bracket])).toEqual([
+      expect.objectContaining({ file: property, kind: 'direct-field-storage', line: 1 }),
+      expect.objectContaining({ file: bracket, kind: 'direct-field-storage', line: 1 }),
+    ])
+  })
+
+  it('allows boundary calls and direct storage only in the Farmyard adapter', () => {
+    const root = mkdtempSync(path.join(tmpdir(), 'card-impl-boundaries-'))
+    const card = writeFixture(root, 'shared/cards/A/A001_Shelter.ts', [
+      'getLogicalFields(player)',
+      'getFarmyardFields(player)',
+      'mutateLogicalFields(state, player)',
+    ].join('\n'))
+    const owner = writeFixture(
+      root,
+      'shared/cards/helpers/card-field.ts',
+      "player.fields; player['fields']",
+    )
+
+    expect(checkFieldStorageBoundaries([card, owner])).toEqual([])
+  })
+
+  it('scans every production Card Impl field-boundary directory', () => {
+    const root = mkdtempSync(path.join(tmpdir(), 'card-impl-boundaries-'))
+    const expected = ['A', 'B', 'C', 'D', 'E', 'M', 'major', 'community', 'helpers'].map((dir) =>
+      writeFixture(root, `shared/cards/${dir}/example.ts`, 'export const value = 1'),
+    )
+
+    expect(walkProductionFieldBoundaryFiles(root)).toEqual(expected.sort())
+  })
+
+  it('has no direct field-storage bypass in production Card Impls', () => {
+    const repoRoot = path.resolve(__dirname, '..', '..')
+    const files = walkProductionFieldBoundaryFiles(repoRoot)
+
+    expect(checkFieldStorageBoundaries(files)).toEqual([])
   })
 
   it('keeps single-card state out of generic animal runtime files', () => {
