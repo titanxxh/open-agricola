@@ -9,6 +9,9 @@ import { positionKey } from '../../domain/farm'
 import { playerBoard, type SowSelection } from '../../domain'
 import { buildSowFarmInteraction } from '../../domain/farmyard-interaction'
 import { handleSowExtraField } from '../../cards/card-effects'
+import { getLogicalFields, mutateLogicalFields } from '../../cards/helpers/card-field'
+
+const sowedAmount = (crop: SowSelection['crop']) => crop === 'grain' || crop === 'wood' ? 3 : 2
 
 export const getEmptyFields = (player: PlayerState) =>
   player.fields.filter(fieldIsEmpty)
@@ -33,7 +36,7 @@ export const sowCrop = (
     return { type: 'fail', errorKey: 'log.sowFail' }
   }
   player.resources[crop] = have - 1
-  const remaining = crop === 'grain' ? 3 : 2
+  const remaining = sowedAmount(crop)
   emptyField.stacks.push({ kind: crop, remaining })
   return { type: 'ok' }
 }
@@ -105,10 +108,25 @@ const finalizeSow = (
     return { type: 'fail', errorKey: validated.error?.code ?? 'log.action' }
   }
   const nextPlayer = JSON.parse(JSON.stringify(validated.player)) as PlayerState
+  const logicalTargets = new Map(
+    getLogicalFields(nextPlayer).flatMap((field) => field.kind === 'card'
+      ? field.slots.map((slot) => [positionKey(slot.tile), { fieldId: field.id, slot: slot.index }] as const)
+      : []),
+  )
+  const mutations = mutateLogicalFields(ctx.state, nextPlayer, { emitEvents: false })
   if (extraAllowedCrops.size > 0) {
     for (const sel of crops) {
       const key = positionKey({ row: sel.row, col: sel.col })
       if (extraAllowedCrops.has(key)) {
+        const logicalTarget = logicalTargets.get(key)
+        if (logicalTarget) {
+          const amount = sowedAmount(sel.crop)
+          if (!mutations.place(logicalTarget, sel.crop, amount).ok) {
+            return { type: 'fail', errorKey: 'invalid extra sow field' }
+          }
+          nextPlayer.resources[sel.crop] -= 1
+          continue
+        }
         const handled = handleSowExtraField(nextPlayer, { row: sel.row, col: sel.col }, sel.crop)
         if (!handled) return { type: 'fail', errorKey: 'invalid extra sow field' }
       }
@@ -120,7 +138,7 @@ const finalizeSow = (
     sows: crops.map((crop) => ({
       location: { kind: 'field', playerId: player.id, row: crop.row, col: crop.col },
       crop: crop.crop,
-      added: crop.crop === 'grain' ? 3 : crop.crop === 'vegetable' ? 2 : 1,
+      added: sowedAmount(crop.crop),
     })),
   })
   return { type: 'ok' }

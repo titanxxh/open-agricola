@@ -17,7 +17,7 @@ const COL_BASE = 4075
 
 const setup = (options?: {
   wood?: number
-  stacks?: { crop: 'wood'; remaining: number }[]
+  stacks?: Array<{ crop: 'wood'; remaining: number } | null>
 }) => {
   const session = new GameSession()
   stabilizeRandomHands(session.state.players)
@@ -149,6 +149,24 @@ describe('D075_WoodField session', () => {
       { crop: 'wood', remaining: 2 },
       { crop: 'wood', remaining: 2 },
     ])
+  })
+
+  it('rejects sowing 1 wood across both slots atomically', () => {
+    const session = setup({ wood: 1, stacks: [null, null] })
+
+    let response = session.takeAction(0, 'grain-utilization')
+    expect(response.ok, response.error).toBe(true)
+    response = session.commitSelectionChoice(0, {
+      crops: [
+        { row: ROW, col: COL_BASE, crop: 'wood' },
+        { row: ROW, col: COL_BASE + 1, crop: 'wood' },
+      ],
+    })
+
+    expect(response.ok).toBe(false)
+    expect(response.error).toBe('NOT_ENOUGH_SEEDS')
+    expect(response.state.players[0]!.resources.wood).toBe(1)
+    expect(readCardExtraData(response.state.players[0]!, CARD_ID, 'cardFieldStacks')).toEqual([null, null])
   })
 
   it('clears all stacks after 3 harvest ticks against a fully sown 2-stack card', () => {

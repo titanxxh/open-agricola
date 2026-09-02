@@ -2,9 +2,9 @@ import { defineMinorCard } from '../card-source'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { gainLeaf } from '../helpers/pay-gain-node'
-import { fieldHasCrop, fieldTotalRemaining } from '../../domain/field'
 import { isUnconditionalSow } from '../../actions/effects/sow'
 import type { CardImpl } from '../registry'
+import type { FarmSownEvent } from '../../contract/events'
 
 const CARD_ID = 'A079_GardenHoe'
 const listener: CardListenerRegistration = {
@@ -14,10 +14,14 @@ const listener: CardListenerRegistration = {
   actions: ['sow'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (!isUnconditionalSow(context.actionContext)) return
-    const hasVegetable = context.player.fields.some(
-      (field) => fieldHasCrop(field, 'vegetable') && fieldTotalRemaining(field) > 0,
+    const sowedVegetable = (context.actionEvents ?? context.transactionEvents).some(
+      (event) => event.type === 'farm.sown' && (event as Pick<FarmSownEvent, 'sows'>).sows.some((sow) =>
+        sow.location.kind === 'field' &&
+        sow.location.playerId === context.player.id &&
+        sow.crop === 'vegetable',
+      ),
     )
-    if (!hasVegetable) return
+    if (!sowedVegetable) return
     return { flow: gainLeaf(CARD_ID, { clay: 1, stone: 1 }), sourceCard: CARD_ID }
   },
 }

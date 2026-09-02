@@ -6,7 +6,6 @@ import type {
 } from '../../contract/types'
 import type { DraftGameEvent, EventSink, FarmCropRemovedEvent } from '../../contract/events'
 import { readCardExtraData, writeCardExtraData } from './card-state'
-import { canSow } from '../../actions/effects/sow'
 import { defaultReapTrigger, dispatchReapListener, type ReapTrigger } from '../../actions/helpers/reap-listener'
 import { appendImmediateEvents } from '../../events/append'
 import { computeHarvestCount } from '../../actions/helpers/harvest-count-registry'
@@ -185,6 +184,7 @@ export type LogicalFieldMutationOptions = {
   sourceCard?: string
   eventSink?: EventSink
   reason?: FarmCropRemovedEvent['reason']
+  emitEvents?: boolean
 }
 
 export type LogicalFieldMutationResult =
@@ -285,6 +285,7 @@ export const mutateLogicalFields = (
     return { cardId, def, slot, slots: readSlots(player, cardId, def) }
   }
   const emit = <T extends DraftGameEvent['type']>(event: DraftGameEvent<T>) => {
+    if (options.emitEvents === false) return
     if (options.eventSink) {
       options.eventSink.emitMany([event])
     } else if (Number.isSafeInteger(state.round) && state.round > 0) {
@@ -689,7 +690,10 @@ export const makeCardFieldImpl = (
     phases: ['isDoable'],
     actions: ['sow'],
     handler: ({ player }) => {
-      if (canSow(player)) return
+      if (
+        getFarmyardFields(player).some((field) => field.stacks.length === 0)
+        && (player.resources.grain > 0 || player.resources.vegetable > 0)
+      ) return
       const slots = readSlots(player, cardId, def)
       if (slots.every((slot) => slot !== null)) return
       const hasAny = def.allowedCrops.some((c) => (player.resources[c] ?? 0) > 0)

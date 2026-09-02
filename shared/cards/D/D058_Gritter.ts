@@ -2,8 +2,9 @@ import { defineMinorCard } from '../card-source'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { gainLeaf } from '../helpers/pay-gain-node'
-import { fieldHasCrop, fieldFindStackOfKind } from '../../domain/field'
 import type { CardImpl } from '../registry'
+import { getLogicalFields } from '../helpers/card-field'
+import type { FarmSownEvent } from '../../contract/events'
 
 const CARD_ID = 'D058_Gritter'
 const listener: CardListenerRegistration = {
@@ -12,19 +13,18 @@ const listener: CardListenerRegistration = {
   phases: ['after' as ActionHookPhase],
   actions: ['sow'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
-    // Check if any vegetable was sown (any field has vegetable crop)
-    const vegetableFields = context.player.fields.filter((f) => fieldHasCrop(f, 'vegetable'))
-    // We compare to the last result to detect if vegetable was just sown
-    // Since sow doesn't return resource gained info, check if a vegetable field exists
-    const n = vegetableFields.length
-    if (n <= 0) return
-    // Only trigger if a vegetable was actually sown this action
-    // We detect by checking if any field was just seeded (remaining > 0 indicates sowing happened)
-    // Rule: only triggers if at least one vegetable was sown this action
-    // We approximate: trigger only when we can confirm vegetable was sown
-    // Use the last-sown detection: check if any vegetable field has remaining crops
-    const justSowed = vegetableFields.some((f) => (fieldFindStackOfKind(f, 'vegetable')?.remaining ?? 0) > 0)
-    if (!justSowed) return
+    const sowedVegetable = (context.actionEvents ?? context.transactionEvents).some(
+      (event) => event.type === 'farm.sown' && (event as Pick<FarmSownEvent, 'sows'>).sows.some((sow) =>
+        sow.location.kind === 'field' &&
+        sow.location.playerId === context.player.id &&
+        sow.crop === 'vegetable',
+      ),
+    )
+    if (!sowedVegetable) return
+    const n = getLogicalFields(context.player).filter((field) =>
+      field.stacks.some((stack) => stack.kind === 'vegetable' && stack.remaining > 0),
+    ).length
+    if (n === 0) return
     return { flow: gainLeaf(CARD_ID, { food: n }), sourceCard: CARD_ID }
   },
 }
