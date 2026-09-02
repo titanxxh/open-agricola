@@ -4,6 +4,7 @@ import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { getStoredResource, setStoredResource } from '../helpers/card-storage'
 import type { Resource } from '../../contract/types'
 import type { CardImpl } from '../registry'
+import { getFarmyardFields } from '../helpers/card-field'
 
 const CARD_ID = 'A144_Sequestrator'
 const getOwner = (context: CardListenerContext) =>
@@ -59,7 +60,7 @@ const plowListener = createStorageReleaseListener({
   id: 'A144-sequestrator-after-plow',
   actionId: 'plow',
   resource: 'clay',
-  shouldTrigger: (player) => player.fields.length >= 5,
+  shouldTrigger: (player) => getFarmyardFields(player).length >= 5,
 })
 
 const cardImpl = {

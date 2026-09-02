@@ -2,8 +2,8 @@ import { defineMinorCard } from '../card-source'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { payGainNode } from '../helpers/pay-gain-node'
-import { fieldHasCrop } from '../../domain/field'
 import type { CardImpl } from '../registry'
+import { getLogicalFields } from '../helpers/card-field'
 
 const CARD_ID = 'A030_BakingSheet'
 const listener: CardListenerRegistration = {
@@ -22,7 +22,8 @@ const listener: CardListenerRegistration = {
 
 const cardImpl = {
   listeners: [listener],
-  prerequisiteCheck: (player) => player.fields.every((f) => !fieldHasCrop(f, 'grain')),
+  prerequisiteCheck: (player) => getLogicalFields(player)
+    .every((field) => field.stacks.every((stack) => stack.kind !== 'grain')),
   reaches: [] as readonly string[],
 } satisfies CardImpl
 

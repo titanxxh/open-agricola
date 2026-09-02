@@ -1,5 +1,6 @@
 import { defineOccupationCard } from '../card-source'
 import type { CardImpl } from '../registry'
+import { getFarmyardFields } from '../helpers/card-field'
 
 const CARD_ID = 'A085_Homekeeper'
 const isAdjacent = (a: { row: number; col: number }, b: { row: number; col: number }) =>
@@ -13,7 +14,7 @@ const cardImpl = {
 
     const pastureTiles = player.pastures.flatMap((pasture) => pasture.tiles)
     const hasQualifyingRoom = player.roomTiles.some((roomTile) => {
-      const adjacentToField = player.fields.some((field) => isAdjacent(roomTile, field))
+      const adjacentToField = getFarmyardFields(player).some((field) => isAdjacent(roomTile, field))
       if (!adjacentToField) return false
       return pastureTiles.some((pastureTile) => isAdjacent(roomTile, pastureTile))
     })

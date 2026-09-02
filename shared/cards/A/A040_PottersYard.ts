@@ -6,6 +6,7 @@ import { writeCardExtraData, readCardExtraData } from '../helpers/card-state'
 import { countUnusedFarmyardSpaces } from '../../domain/farm'
 import type { ActionFlow } from '../../contract/types'
 import type { CardImpl } from '../registry'
+import { getFarmyardFields } from '../helpers/card-field'
 
 const CARD_ID = 'A040_PottersYard'
 /**
@@ -30,7 +31,7 @@ const FARM_COLS = 5
 const getUsedTiles = (player: CardListenerContext['player']): Set<string> => {
   const used = new Set<string>()
   player.roomTiles.forEach((t) => used.add(`${t.row},${t.col}`))
-  player.fields.forEach((f) => used.add(`${f.row},${f.col}`))
+  getFarmyardFields(player).forEach((field) => used.add(`${field.row},${field.col}`))
   player.stableTiles.forEach((t) => used.add(`${t.row},${t.col}`))
   player.pastures.flatMap((p) => p.tiles ?? []).forEach((t) => used.add(`${t.row},${t.col}`))
   return used

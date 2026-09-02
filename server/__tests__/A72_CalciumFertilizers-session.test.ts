@@ -3,6 +3,7 @@ import { GameSession } from '../game/authoritative-session'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 
 import '../../shared/cards/A/A072_CalciumFertilizers'
+import '../../shared/cards/B/B113_PatchCaregiver'
 
 const CARD_ID = 'A072_CalciumFertilizers'
 
@@ -51,6 +52,35 @@ describe('A072_CalciumFertilizers session', () => {
     // Each grain field should have +1 remaining
     expect(p.fields[0]!.stacks[0]?.remaining ?? 0).toBe(3)
     expect(p.fields[1]!.stacks[0]?.remaining ?? 0).toBe(2)
+  })
+
+  it('adds 1 crop to a planted Card Field', () => {
+    const session = setup()
+    const state = session.getState().state
+    const player = state.players[0]!
+    player.occupationPlayed.push('B113_PatchCaregiver')
+    player.cardStates.B113_PatchCaregiver = {
+      extraData: { cardFieldStacks: [{ crop: 'grain', remaining: 2 }] },
+    }
+    session.loadState(state)
+
+    const resp = session.takeAction(0, 'eastern-quarry')
+
+    expect(resp.ok).toBe(true)
+    expect(resp.state.players[0]!.cardStates.B113_PatchCaregiver?.extraData?.cardFieldStacks).toEqual([
+      { crop: 'grain', remaining: 3 },
+    ])
+    expect(resp.state.events).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        type: 'farm.cropAdded',
+        sourceCardId: CARD_ID,
+        crops: [{
+          location: { kind: 'card', playerId: player.id, cardId: 'B113_PatchCaregiver' },
+          crop: 'grain',
+          amount: 1,
+        }],
+      }),
+    ]))
   })
 
   it('adds the crop to the top of a same-crop multi-stack field', () => {

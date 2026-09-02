@@ -9,6 +9,7 @@ import {
 } from '../helpers/card-state'
 import type { CardImpl } from '../registry'
 import { getAvailableStableSupplyCount } from '../../domain/supply-tokens'
+import { getFarmyardFields } from '../helpers/card-field'
 
 const CARD_ID = 'B085_FarmHand'
 
@@ -60,7 +61,7 @@ const playerHasCard = (player: PlayerState) =>
 
 export const getFarmHandCandidates = (player: PlayerState): FarmTilePosition[] => {
   const fieldKeys = new Set(
-    player.fields.map((f) => positionKey({ row: f.row, col: f.col })),
+    getFarmyardFields(player).map((field) => positionKey(field)),
   )
   const candidates: FarmTilePosition[] = []
   for (let r = 0; r < FARM_ROWS - 1; r++) {

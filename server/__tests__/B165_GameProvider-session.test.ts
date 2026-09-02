@@ -4,6 +4,7 @@ import { GameSession } from '../game/authoritative-session'
 import { markAllWorkersUsed, setActiveWorkerCount } from '../../shared/domain/player'
 import type { FarmTilePosition, PlayerState } from '../../shared/contract/types'
 import '../../shared/cards/B/B165_GameProvider'
+import '../../shared/cards/B/B113_PatchCaregiver'
 import { resolveNonSkipChoice, resolveTriggerIfPresent } from './_helpers/trigger-select'
 
 const CARD_ID = 'B165_GameProvider'
@@ -71,6 +72,33 @@ describe('B165_GameProvider session', () => {
     const player = resp.state.players[0]!
     expect(player.resources.boar).toBe(1)
     expect(fieldCounts(player)).toEqual([1, 2, 2])
+  })
+
+  it('lets player discard grain from one Card Field', () => {
+    const session = setupHarvest([])
+    const state = session.getState().state
+    const player = state.players[0]!
+    player.occupationPlayed.push('B113_PatchCaregiver')
+    player.cardStates.B113_PatchCaregiver = {
+      extraData: { cardFieldStacks: [{ crop: 'grain', remaining: 3 }] },
+    }
+    session.loadState(state)
+    let resp = acceptB165(session)
+
+    expect(resp.interaction.request.selection?.selectablePositions).toEqual([{
+      row: -1,
+      col: 2113,
+      sourceCard: 'B113_PatchCaregiver',
+      groupKey: 'B113_PatchCaregiver',
+      cardFieldSlot: 0,
+    }])
+    resp = selectPositions(session, [{ row: -1, col: 2113 }])
+
+    expect(resp.ok).toBe(true)
+    expect(resp.state.players[0]!.resources.boar).toBe(1)
+    expect(resp.state.players[0]!.cardStates.B113_PatchCaregiver?.extraData?.cardFieldStacks).toEqual([
+      { crop: 'grain', remaining: 1 },
+    ])
   })
 
   it('rejects exactly 2 selected grain fields without mutating grain or boar', () => {

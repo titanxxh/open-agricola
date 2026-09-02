@@ -1,7 +1,7 @@
 import { defineMinorCard } from '../card-source'
 import { gainLeaf } from '../helpers/pay-gain-node'
-import { fieldIsEmpty } from '../../domain/field'
 import type { CardImpl } from '../registry'
+import { getFarmyardFields } from '../helpers/card-field'
 
 const CARD_ID = 'A011_MudPatch'
 
@@ -10,7 +10,7 @@ const cardImpl = {
   id: CARD_ID,
   onBuy: (_state, _player) => gainLeaf(CARD_ID, { boar: 1 }),
   onComputeAnimalZones: (player, zones, _state) => {
-    const emptyFields = player.fields.filter(f => fieldIsEmpty(f)).length
+    const emptyFields = getFarmyardFields(player).filter((field) => field.stacks.length === 0).length
     if (emptyFields === 0) return
     zones.push({
       id: `card:${CARD_ID}`,

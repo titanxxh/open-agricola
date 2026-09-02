@@ -156,6 +156,7 @@ export type LogicalField = Readonly<{
   slots: readonly LogicalFieldSlot[]
   sourceCard?: string
   groupKey: string
+  allowedCrops?: readonly Crop[]
 }>
 
 export type LogicalFieldTarget = {
@@ -188,7 +189,7 @@ export const getFarmyardFields = (player: PlayerState): readonly LogicalField[] 
     [...player.fields]
       .sort((a, b) => a.row - b.row || a.col - b.col)
       .map((field): LogicalField => {
-        const stacks = Object.freeze(field.stacks.map(freezeStack))
+        const stacks = Object.freeze((field.stacks ?? []).map(freezeStack))
         return Object.freeze({
           id: farmyardFieldId(field),
           kind: 'farmyard',
@@ -228,6 +229,7 @@ const getCardFields = (player: PlayerState): readonly LogicalField[] =>
         slots: logicalSlots,
         sourceCard: cardId,
         groupKey: cardId,
+        allowedCrops: Object.freeze([...cardFieldDefs.get(cardId)!.allowedCrops]),
       })
     })
 
@@ -364,8 +366,15 @@ export const mutateLogicalFields = (
     if (!target) return { ok: false, error: 'invalid-target' }
     const field = farmyardTarget(target)
     if (field) {
-      if (field.stacks.length > 0) return { ok: false, error: 'occupied' }
-      field.stacks.push({ kind: crop, remaining: amount })
+      if (target.slot === undefined) {
+        if (field.stacks.length > 0) return { ok: false, error: 'occupied' }
+        field.stacks.push({ kind: crop, remaining: amount })
+      } else {
+        if (!Number.isSafeInteger(target.slot) || target.slot < 0 || target.slot > field.stacks.length) {
+          return { ok: false, error: 'invalid-target' }
+        }
+        field.stacks.splice(target.slot, 0, { kind: crop, remaining: amount })
+      }
       emitAdded(field, crop, amount)
       return { ok: true }
     }

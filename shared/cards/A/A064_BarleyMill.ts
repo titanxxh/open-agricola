@@ -1,6 +1,5 @@
 import { defineMinorCard } from '../card-source'
 import { gainLeaf } from '../helpers/pay-gain-node'
-import { fieldHasCrop, fieldTotalRemaining } from '../../domain/field'
 import type { CardImpl } from '../registry'
 
 const CARD_ID = 'A064_BarleyMill'
@@ -9,10 +8,7 @@ const cardImpl = {
   effect: {
   id: CARD_ID,
   onAfterReap: (_state, player) => {
-    const grainFields = _state.harvestReapSummary?.[player.id]?.grainFields
-      ?? player.fields.filter(
-        (field) => fieldHasCrop(field, 'grain') && fieldTotalRemaining(field) > 0,
-      ).length
+    const grainFields = _state.harvestReapSummary?.[player.id]?.grainFields ?? 0
     if (grainFields <= 0) return
     return {
       type: 'seq',

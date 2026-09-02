@@ -1,6 +1,7 @@
 import { defineMinorCard } from '../card-source'
 import type { CardImpl } from '../registry'
 import { playerHasCardCapability } from '../helpers/card-type'
+import { getFarmyardFields } from '../helpers/card-field'
 
 const CARD_ID = 'B031_PotteryYard'
 
@@ -14,7 +15,7 @@ const cardImpl = {
     // Build a set of all used tile positions on the 3x5 farm board.
     const usedTiles = new Set<string>()
     player.roomTiles.forEach((t) => usedTiles.add(`${t.row},${t.col}`))
-    player.fields.forEach((f) => usedTiles.add(`${f.row},${f.col}`))
+    getFarmyardFields(player).forEach((field) => usedTiles.add(`${field.row},${field.col}`))
     player.stableTiles.forEach((t) => usedTiles.add(`${t.row},${t.col}`))
     player.pastures.flatMap((p) => p.tiles ?? []).forEach((t) => usedTiles.add(`${t.row},${t.col}`))
 

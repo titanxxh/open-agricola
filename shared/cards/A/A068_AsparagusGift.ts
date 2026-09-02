@@ -4,8 +4,8 @@ import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import { readCardExtraData } from '../helpers/card-state'
 import { getFenceCount } from '../../actions/effects/fencing'
-import { fieldIsEmpty } from '../../domain/field'
 import type { CardImpl } from '../registry'
+import { getLogicalFields } from '../helpers/card-field'
 
 const CARD_ID = 'A068_AsparagusGift'
 const FENCES_BEFORE_KEY = 'fencesBefore'
@@ -47,7 +47,7 @@ const afterListener: CardListenerRegistration = {
 
 const cardImpl = {
   listeners: [beforeListener, afterListener],
-  prerequisiteCheck: (player) => player.fields.some(fieldIsEmpty),
+  prerequisiteCheck: (player) => getLogicalFields(player).some((field) => field.stacks.length === 0),
   reaches: [] as readonly string[],
 } satisfies CardImpl
 

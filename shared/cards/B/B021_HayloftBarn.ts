@@ -4,7 +4,6 @@ import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import type { ActionFlow, PlayerState } from '../../contract/types'
 import { readCardExtraData, writeCardExtraData, writeCardInfobox } from '../helpers/card-state'
 import { gainLeaf } from '../helpers/pay-gain-node'
-import { fieldHasCrop } from '../../domain/field'
 import { familySize, hasInactiveWorkerInSupply } from '../../domain/player'
 import type { CardImpl } from '../registry'
 import { hasExchangeGained, hasResourceMovedToPlayer } from '../helpers/event-provenance'
@@ -89,8 +88,7 @@ const cardImpl = {
   },
   // Also detect grain from harvest (reap phase)
   onAfterReap: (state, player) => {
-    const grainFields = state.harvestReapSummary?.[player.id]?.grainFields
-      ?? player.fields.filter((field) => fieldHasCrop(field, 'grain')).length
+    const grainFields = state.harvestReapSummary?.[player.id]?.grainFields ?? 0
     if (grainFields <= 0) return
     const foodCount = readCardExtraData<number>(player, CARD_ID, 'foodCount') ?? 0
     if (foodCount <= 0) return

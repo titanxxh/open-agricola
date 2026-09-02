@@ -1,15 +1,22 @@
 import { defineOccupationCard } from '../card-source'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
-import { fieldHasCrop, fieldFindStackOfKind } from '../../domain/field'
 import { parsePositionKey, positionKey } from '../../domain/farm'
 import { isLessonsSpaceId } from '../helpers/lessons-spaces'
 import type { ActionDefinition } from '../../contract/types'
 import { registerAdHocAction } from '../../actions/helpers/ad-hoc-action-registry'
 import type { CardImpl } from '../registry'
+import { getLogicalFields, mutateLogicalFields, type LogicalField } from '../helpers/card-field'
 
 const CARD_ID = 'A113_HeresyTeacher'
 const INSERT_ACTION_ID = 'card_A113_HeresyTeacher_insertVegetable'
+
+const insertionTarget = (field: LogicalField) => {
+  if (field.stacks.some((stack) => stack.kind === 'vegetable')) return
+  const grain = field.slots.find((slot) => slot.stack?.kind === 'grain' && slot.stack.remaining >= 3)
+  if (!grain || field.kind !== 'farmyard') return
+  return { position: grain.tile, slot: 0 }
+}
 
 const insertVegetableAction: ActionDefinition = {
   id: INSERT_ACTION_ID,
@@ -18,21 +25,19 @@ const insertVegetableAction: ActionDefinition = {
   roundAvailable: 1,
   gainPerRound: {},
   canBeExecutedByPlayer: (_state, player) => player.occupationPlayed.includes(CARD_ID),
-  execute: ({ player, params }) => {
+  execute: ({ state, player, params, eventSink }) => {
     const positions = (params as { positions?: unknown } | undefined)?.positions
     if (!Array.isArray(positions) || positions.some((value) => typeof value !== 'string')) {
       return { type: 'fail', errorKey: 'log.actionFail' }
     }
+    const mutations = mutateLogicalFields(state, player, { sourceCard: CARD_ID, eventSink })
     for (const key of positions) {
       const position = parsePositionKey(key)
-      const field = position && player.fields.find(
-        (candidate) => candidate.row === position.row && candidate.col === position.col,
+      const field = position && getLogicalFields(player).find(
+        (candidate) => candidate.slots.some((slot) => positionKey(slot.tile) === positionKey(position)),
       )
-      if (!field) continue
-      const grain = fieldFindStackOfKind(field, 'grain')
-      if (grain && grain.remaining >= 3 && !fieldHasCrop(field, 'vegetable')) {
-        field.stacks.unshift({ kind: 'vegetable', remaining: 1 })
-      }
+      const target = field && insertionTarget(field)
+      if (field && target) mutations.place({ fieldId: field.id, slot: target.slot }, 'vegetable', 1)
     }
     return { type: 'ok' }
   },
@@ -47,10 +52,9 @@ const listener: CardListenerRegistration = {
   actions: ['place-farmer'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (!context.space || !isLessonsSpaceId(context.space.id)) return
-    const positions = context.player.fields.flatMap((field) => {
-      const grain = fieldFindStackOfKind(field, 'grain')
-      const hasVeg = fieldHasCrop(field, 'vegetable')
-      return grain && grain.remaining >= 3 && !hasVeg ? [positionKey(field)] : []
+    const positions = getLogicalFields(context.player).flatMap((field) => {
+      const target = insertionTarget(field)
+      return target ? [positionKey(target.position)] : []
     })
     if (positions.length === 0) return
     return {
