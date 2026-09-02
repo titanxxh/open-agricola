@@ -58,21 +58,21 @@ const playD83 = (session: GameSession) => {
 }
 
 describe('D083_Pigswill session — altCosts', () => {
-  it('food=2, grain=0 → auto-pay food (single solution)', () => {
+  it('D083 S1: food=2 and grain=0 auto-pays food', () => {
     const session = setup({ food: 2, grain: 0 })
     const resp = playD83(session)
     expect(resp.interaction.stateId === 'wait' ? resp.interaction.request.kind : resp.interaction.stateId).toBe('confirm-next-player')
     expect(resp.state.players[0]!.resources.food).toBe(0)
   })
 
-  it('food=0, grain=1 → auto-pay grain', () => {
+  it('D083 S2: food=0 and grain=1 auto-pays grain', () => {
     const session = setup({ food: 0, grain: 1 })
     const resp = playD83(session)
     expect(resp.interaction.stateId === 'wait' ? resp.interaction.request.kind : resp.interaction.stateId).toBe('confirm-next-player')
     expect(resp.state.players[0]!.resources.grain).toBe(0)
   })
 
-  it('food=2, grain=1 → multi-solution → selectPayment choice', () => {
+  it('D083 supplemental: both costs available require a payment choice', () => {
     const session = setup({ food: 2, grain: 1 })
     const resp = playD83(session)
     expect(resp.interaction.stateId).toBe('wait')
@@ -81,11 +81,48 @@ describe('D083_Pigswill session — altCosts', () => {
     expect(resp.interaction.request.options?.length).toBeGreaterThanOrEqual(2)
   })
 
-  it('food=1, grain=0 → not buyable', () => {
+  it('D083 supplemental: neither complete cost keeps Pigswill unavailable', () => {
     const session = setup({ food: 1, grain: 0 })
     const resp = enterImprovementChoice(session)
     if (resp.interaction.stateId !== 'wait') return
     const d83Option = resp.interaction.request.options?.find((o) => o.value === CARD_ID)
     expect(d83Option).toBeUndefined()
+  })
+})
+
+const setupTrigger = () => {
+  const session = setup({ food: 0, grain: 0 })
+  const state = session.getState().state
+  const player = state.players[0]!
+  player.minorHand = ['__test_placeholder__']
+  player.minorPlayed = [CARD_ID]
+  player.resources.wood = 4
+  player.resources.boar = 0
+  session.loadState(state)
+  return session
+}
+
+describe('D083 Pigswill parity trigger', () => {
+  it('D083 S3: using Fencing gains one boar before completing a one-space pasture', () => {
+    const session = setupTrigger()
+    const selection = session.takeAction(0, 'fencing')
+    expect(selection.ok, selection.error).toBe(true)
+
+    const response = session.commitSelectionChoice(0, {
+      edges: ['H-0-0', 'H-1-0', 'V-0-0', 'V-0-1'],
+      extraWood: 0,
+    })
+
+    expect(response.ok, response.error).toBe(true)
+    expect(response.state.players[0]!.resources.boar).toBe(1)
+    expect(response.state.players[0]!.pastures).toHaveLength(1)
+    expect(response.state.players[0]!.resources.wood).toBe(0)
+  })
+
+  it('D083 S4: an unrelated action grants no boar', () => {
+    const response = setupTrigger().takeAction(0, 'day-laborer')
+
+    expect(response.ok, response.error).toBe(true)
+    expect(response.state.players[0]!.resources.boar).toBe(0)
   })
 })

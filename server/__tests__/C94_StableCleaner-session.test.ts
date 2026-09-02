@@ -17,6 +17,69 @@ const LISTENER_ID = 'C94-stable-cleaner-anytime'
 const findListener = (id: string) =>
   getRegisteredCardListeners().find((l) => l.id === id)
 
+const setupParity = ({ inHand = false, wood = 0, food = 0 } = {}) => {
+  const session = new GameSession()
+  stabilizeRandomHands(session.state.players)
+  const state = session.getState().state
+  state.players = state.players.slice(0, 2)
+  state.currentPlayerIndex = 0
+  const player = state.players[0]!
+  player.occupationHand = inHand ? [CARD_ID] : ['__test_placeholder__']
+  player.occupationPlayed = inHand ? [] : [CARD_ID]
+  player.resources = { ...player.resources, wood, food }
+  session.loadState(state)
+  return session
+}
+
+describe('C094 Stable Cleaner parity', () => {
+  it('C094 S1: playing Stable Cleaner through Lessons keeps the occupation in play', () => {
+    const response = setupParity({ inHand: true }).takeAction(0, 'lessons')
+
+    expect(response.ok, response.error).toBe(true)
+    expect(response.state.players[0]!.occupationPlayed).toContain(CARD_ID)
+  })
+
+  it('C094 S2: the anytime action builds two stables for two wood and two food', () => {
+    const session = setupParity({ wood: 2, food: 2 })
+    const action = session.takeAction(0, 'farmland')
+    expect(action.interaction.anytimeActions.some((entry) => entry.id === LISTENER_ID)).toBe(true)
+
+    const selection = session.takeAnytimeAction(0, LISTENER_ID)
+    expect(selection.interaction.stateId).toBe('wait')
+    if (selection.interaction.stateId !== 'wait' || selection.interaction.request.farm.farmType !== 'stable') return
+    const response = session.commitSelectionChoice(0, {
+      stables: selection.interaction.request.farm.selectableTiles.slice(0, 2),
+    })
+
+    expect(response.ok, response.error).toBe(true)
+    expect(response.state.players[0]!.stableTiles).toHaveLength(2)
+    expect(response.state.players[0]!.resources).toMatchObject({ wood: 0, food: 0 })
+  })
+
+  it('C094 S3: lacking either wood or food keeps the anytime action unavailable', () => {
+    const noWood = setupParity({ food: 1 }).takeAction(0, 'farmland')
+    const noFood = setupParity({ wood: 1 }).takeAction(0, 'farmland')
+
+    expect(noWood.interaction.anytimeActions.some((entry) => entry.id === LISTENER_ID)).toBe(false)
+    expect(noFood.interaction.anytimeActions.some((entry) => entry.id === LISTENER_ID)).toBe(false)
+  })
+
+  it('C094 S4: completing the stable action makes Stable Cleaner available again', () => {
+    const session = setupParity({ wood: 2, food: 2 })
+    session.takeAction(0, 'farmland')
+    const selection = session.takeAnytimeAction(0, LISTENER_ID)
+    expect(selection.interaction.stateId).toBe('wait')
+    if (selection.interaction.stateId !== 'wait' || selection.interaction.request.farm.farmType !== 'stable') return
+
+    const response = session.commitSelectionChoice(0, {
+      stables: [selection.interaction.request.farm.selectableTiles[0]!],
+    })
+
+    expect(response.ok, response.error).toBe(true)
+    expect(response.interaction.anytimeActions.some((entry) => entry.id === LISTENER_ID)).toBe(true)
+  })
+})
+
 /**
  * C94 Stable Cleaner — At any time, you can take the Build Stables action
  * without placing a person. If you do, each stable costs you 1 wood + 1 food.

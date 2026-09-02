@@ -76,7 +76,19 @@ const findStableBuiltStables = (events: readonly GameEvent[]) =>
     .flatMap((event) => event.stables)
 
 describe('B85 FarmHand — build through Build Stables farm-select', () => {
-  it('solo-builds the FarmHand stable from the stable farm-select', () => {
+  it('B085 S1: playing Farm Hand through Lessons keeps the occupation in play', () => {
+    const session = setupBuildStables({
+      occupationHand: [CARD_ID],
+      occupationPlayed: [],
+    } as Partial<PlayerState>)
+
+    const response = session.takeAction(0, 'lessons')
+
+    expect(response.ok, response.error).toBe(true)
+    expect(response.state.players[0]!.occupationPlayed).toContain(CARD_ID)
+  })
+
+  it('B085 S2: Farm Expansion builds the special stable for two wood in a 2x2 field block', () => {
     const session = setupBuildStables()
     const resp = enterStableSelect(session)
     expect(resp.interaction.stateId).toBe('wait')
@@ -149,7 +161,7 @@ describe('B85 FarmHand — build through Build Stables farm-select', () => {
     ])
   })
 
-  it('does not place the FarmHand stable in any animal zone or loose stable capacity', () => {
+  it('B085 S5-S6: the special stable provides one room and no animal capacity', () => {
     const session = setupBuildStables()
     enterStableSelect(session)
     const commit = session.commitSelectionChoice(0, { farmHand: FARM_HAND_TILE })
@@ -186,7 +198,7 @@ describe('B85 FarmHand — build through Build Stables farm-select', () => {
     expect(readFarmHandPosition(commit.state.players[0]!)).toBeUndefined()
   })
 
-  it('offers no further FarmHand position once the card is used (flagged)', () => {
+  it('B085 S4: the special stable cannot be built a second time', () => {
     const session = setupBuildStables()
     enterStableSelect(session)
     const first = session.commitSelectionChoice(0, { farmHand: FARM_HAND_TILE })
@@ -220,7 +232,7 @@ describe('B85 FarmHand — candidate detection', () => {
     expect(getFarmHandCandidates(player)).toEqual([FARM_HAND_TILE])
   })
 
-  it('returns no candidate when the four field tiles are not a contiguous 2×2', () => {
+  it('B085 S3: four fields outside a 2x2 block do not offer the special stable', () => {
     const session = setupBuildStables({
       fields: [
         { row: 0, col: 0, stacks: [] },

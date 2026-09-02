@@ -216,7 +216,7 @@ const chooseCardIfPrompted = (
 }
 
 describe('formatCost card session regressions', () => {
-  it('C002_Stable builds its free stable after paying only the card wood cost', () => {
+  it('C002 S1: paying the card wood builds one free stable and passes Stable', () => {
     const session = setupMinor('C002_Stable')
     const state = session.getState().state
     state.players[0]!.resources.wood = 1
@@ -236,7 +236,7 @@ describe('formatCost card session regressions', () => {
     expect(built.state.players[1]!.minorHand).toContain('C002_Stable')
   })
 
-  it('C002_Stable does not allow cancelling the mandatory free stable', () => {
+  it('C002 S2: the mandatory free stable cannot be declined and remains legally completable', () => {
     const session = setupMinor('C002_Stable')
     const state = session.getState().state
     state.players[0]!.resources.wood = 1
@@ -251,6 +251,22 @@ describe('formatCost card session regressions', () => {
     expect(cancelled.interaction.stateId).toBe('wait')
     expect(cancelled.state.players[0]!.stableTiles).toEqual([])
     expect(cancelled.state.players[1]!.minorHand).toContain('C002_Stable')
+
+    const built = session.commitSelectionChoice(0, { stables: [{ row: 0, col: 0 }] })
+    expect(built.ok, built.error).toBe(true)
+    expect(built.state.players[0]!.stableTiles).toContainEqual({ row: 0, col: 0 })
+  })
+
+  it('C002 S3: no wood keeps Stable unavailable', () => {
+    const session = setupMinor('C002_Stable')
+    const action = session.takeAction(0, 'meeting-place')
+    expect(action.ok).toBe(true)
+    expect(action.interaction.stateId).toBe('wait')
+    if (action.interaction.stateId !== 'wait') return
+    const actionOption = action.interaction.request.options?.find((entry) => entry.value.startsWith('action-improvement-'))
+    expect(actionOption).toBeUndefined()
+    expect(action.state.players[0]!.minorHand).toContain('C002_Stable')
+    expect(action.state.players[0]!.stableTiles).toEqual([])
   })
 
   it('E001_PoleBarns offers free stables after the card cost consumes all wood', () => {

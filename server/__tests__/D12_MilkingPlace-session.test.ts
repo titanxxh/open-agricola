@@ -1,19 +1,31 @@
 import { describe, expect, it } from 'vitest'
-import { GameSession } from '../game/authoritative-session'
+import { GameSession, type SessionResponse } from '../game/authoritative-session'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 import { computeAnimalZones } from '../../shared/domain/animal-zones'
 
-import { markAllWorkersUsed, setActiveWorkerCount } from '../../shared/domain/player'
+import { markAllWorkersUsed, setActiveWorkerCount, setWorkersAtHome } from '../../shared/domain/player'
 import '../../shared/cards/D/D012_MilkingPlace'
 import { autoAdvanceRoundEnd } from '../../tests/llm-card-gen/session-helpers'
 
+const CARD_ID = 'D012_MilkingPlace'
+
+const playMinor = (session: GameSession): SessionResponse => {
+  let response = session.takeAction(0, 'meeting-place')
+  if (!response.state.players[0]!.minorHand.includes(CARD_ID)) return response
+  if (response.interaction.stateId !== 'wait') return response
+  const improvement = response.interaction.request.options?.find((option) =>
+    option.value.startsWith('action-improvement-'))
+  if (improvement) response = session.resolveChoice(0, improvement.value)
+  if (!response.state.players[0]!.minorHand.includes(CARD_ID)) return response
+  if (response.interaction.stateId !== 'wait') return response
+  const card = response.interaction.request.options?.find((option) => option.value === CARD_ID)
+  expect(card).toBeDefined()
+  return session.resolveChoice(0, card!.value)
+}
+
 describe('D012_MilkingPlace session', () => {
-  /**
-   * D012_MilkingPlace is not in catalog.ts, so devPlayCard misclassifies it as
-   * an occupation. We manually push it into minorPlayed instead.
-   */
   const setup = () => {
-    const session = new GameSession()
+    const session = new GameSession(12, undefined, { playerCount: 2 })
     stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
@@ -21,13 +33,37 @@ describe('D012_MilkingPlace session', () => {
     state.round = 1
 
     const player = state.players[0]!
-    // Manually add to minorPlayed since devPlayCard can't resolve non-catalog minors
-    player.minorPlayed.push('D012_MilkingPlace')
+    player.minorPlayed.push(CARD_ID)
     session.loadState(state)
     return session
   }
 
-  it('removes house zone after card is played', () => {
+  it('D012 S1: playing Milking Place pays one grain and leaves it in play', () => {
+    const session = new GameSession(12, undefined, { playerCount: 2 })
+    stabilizeRandomHands(session.state.players)
+    const state = session.getState().state
+    state.currentPlayerIndex = 0
+    state.round = 1
+    state.roundPhase = 'work'
+    const player = state.players[0]!
+    setWorkersAtHome(state, player, 2)
+    player.minorHand = [CARD_ID]
+    player.occupationHand = ['__test_placeholder__']
+    player.resources.grain = 1
+    state.players[1]!.minorHand = ['__test_placeholder__']
+    state.players[1]!.occupationHand = ['__test_placeholder__']
+    session.loadState(state)
+
+    const response = playMinor(session)
+
+    expect(response.ok, response.error).toBe(true)
+    expect(response.state.players[0]!.resources.grain).toBe(0)
+    expect(response.state.players[0]!.minorPlayed).toContain(CARD_ID)
+    expect(response.scores[0]!.categories.find((category) => category.key === 'cards')?.entries)
+      .toContainEqual(expect.objectContaining({ cardId: CARD_ID, score: 1 }))
+  })
+
+  it('D012 S3: Milking Place removes the house animal zone', () => {
     const session = setup()
     const state = session.getState().state
     const player = state.players[0]!
@@ -37,8 +73,8 @@ describe('D012_MilkingPlace session', () => {
     expect(houseZone).toBeUndefined()
   })
 
-  it('house zone exists without the card', () => {
-    const session = new GameSession()
+  it('D012 S4: without Milking Place the house animal zone has capacity one', () => {
+    const session = new GameSession(12, undefined, { playerCount: 2 })
     stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
@@ -53,7 +89,7 @@ describe('D012_MilkingPlace session', () => {
     expect(houseZone!.capacity).toBe(1)
   })
 
-  it('grants 1 food during harvest feeding phase', () => {
+  it('D012 S2: Milking Place grants one food during harvest feeding', () => {
     const session = setup()
     const state = session.getState().state
 
@@ -79,8 +115,8 @@ describe('D012_MilkingPlace session', () => {
     expect(playerAfter.resources.food).toBe(0)
   })
 
-  it('without card, same setup results in begging', () => {
-    const session = new GameSession()
+  it('without card, same harvest setup results in begging', () => {
+    const session = new GameSession(12, undefined, { playerCount: 2 })
     stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)

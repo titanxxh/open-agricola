@@ -4,7 +4,8 @@ import type { GameState, PlayerState, ActionSpace , ActionFlow } from '../../sha
 import { isSyntheticLinkedOccupancy } from '../../shared/domain/space'
 import { getAdHocAction } from '../../shared/actions/helpers/ad-hoc-action-registry'
 import { createTriggerSnapshot } from '../../shared/cards/helpers/trigger-snapshot'
-import { GameSession } from '../game/authoritative-session'
+import { GameSession, type SessionResponse } from '../game/authoritative-session'
+import { markAllWorkersUsed, setWorkersAtHome } from '../../shared/domain/player'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 
 import '../../shared/cards/C/C023_JobContract'
@@ -207,6 +208,37 @@ describe('C023_JobContract listener', () => {
 })
 
 describe('C023_JobContract session flow', () => {
+  const setupPlay = (withOccupation: boolean) => {
+    const session = new GameSession(23, undefined, { playerCount: 2 })
+    stabilizeRandomHands(session.state.players)
+    const state = session.getState().state
+    state.currentPlayerIndex = 0
+    state.round = 14
+    state.availableMajorImprovements = []
+    state.players.forEach((player) => {
+      setWorkersAtHome(state, player, 2)
+      player.minorHand = ['__test_placeholder__']
+      player.occupationHand = ['__test_placeholder__']
+    })
+    state.players[0]!.minorHand = [CARD_ID]
+    state.players[0]!.occupationPlayed = withOccupation ? ['A116_WoodCutter'] : []
+    session.loadState(state)
+    return session
+  }
+
+  const playCard = (session: GameSession) => {
+    let response: SessionResponse = session.takeAction(0, 'major-improvement')
+    for (let step = 0; step < 3 && response.state.players[0]!.minorHand.includes(CARD_ID); step++) {
+      if (response.interaction.stateId !== 'wait') break
+      const option = response.interaction.request.options?.find((candidate) =>
+        candidate.value === CARD_ID || candidate.value.startsWith('action-improvement-'),
+      )
+      if (!option) break
+      response = session.resolveChoice(0, option.value)
+    }
+    return response
+  }
+
   const setupSession = () => {
     const session = new GameSession()
     stabilizeRandomHands(session.state.players)
@@ -226,7 +258,14 @@ describe('C023_JobContract session flow', () => {
     return session
   }
 
-  it('occupies lessons only after the player accepts and plays the occupation', () => {
+  it('C023 S1: with no occupations Job Contract can be played at no cost', () => {
+    const response = playCard(setupPlay(false))
+
+    expect(response.ok, response.error).toBe(true)
+    expect(response.state.players[0]!.minorPlayed).toContain(CARD_ID)
+  })
+
+  it('C023 S2: accepting after Day Laborer plays an occupation and occupies Lessons with a linked person', () => {
     const session = setupSession()
     let resp = session.takeAction(0, 'day-laborer')
 
@@ -249,7 +288,7 @@ describe('C023_JobContract session flow', () => {
     expect(resp.scores).toHaveLength(2)
   })
 
-  it('does not occupy lessons when the player skips', () => {
+  it('C023 S3: declining after Day Laborer leaves Lessons unoccupied and the occupation in hand', () => {
     const session = setupSession()
     let resp = session.takeAction(0, 'day-laborer')
     expect(resp.interaction.stateId).toBe('wait')
@@ -260,5 +299,48 @@ describe('C023_JobContract session flow', () => {
     expect(resp.state.actionSpaces.find((space) => space.id === 'lessons')?.takenBy).toEqual([])
     expect(resp.state.log.length).toBeGreaterThan(0)
     expect(resp.scores).toHaveLength(2)
+  })
+
+  it('C023 S4: an occupied Lessons space prevents the Job Contract offer', () => {
+    const session = setupSession()
+    const state = session.getState().state
+    const lessons = state.actionSpaces.find((space) => space.id === 'lessons')!
+    lessons.takenBy = [{
+      playerId: state.players[1]!.id,
+      workerId: state.players[1]!.workers[0]!.id,
+    }]
+    session.loadState(state)
+
+    const response = session.takeAction(0, 'day-laborer')
+
+    expect(response.ok, response.error).toBe(true)
+    expect(response.interaction.stateId === 'wait' ? response.interaction.request.kind : response.interaction.stateId)
+      .toBe('confirm-next-player')
+    expect(response.state.players[0]!.occupationPlayed).not.toContain('A113_HeresyTeacher')
+    expect(response.state.actionSpaces.find((space) => space.id === 'lessons')!.takenBy).toHaveLength(1)
+  })
+
+  it('C023 S5: the linked Lessons occupancy is removed at round end', () => {
+    const session = setupSession()
+    let response = session.takeAction(0, 'day-laborer')
+    expect(response.interaction.stateId).toBe('wait')
+    if (response.interaction.stateId !== 'wait') return
+    const accept = response.interaction.request.options.find((option) => option.value !== '__skip__')
+    expect(accept).toBeDefined()
+    response = session.resolveChoice(0, accept!.value)
+    response.state.players.forEach((player) => markAllWorkersUsed(response.state, player))
+    session.loadState(response.state)
+
+    response = session.performRoundEnd()
+
+    expect(response.ok, response.error).toBe(true)
+    expect(response.state.actionSpaces.find((space) => space.id === 'lessons')!.takenBy).toEqual([])
+  })
+
+  it('C023 S6: a played occupation keeps Job Contract unavailable', () => {
+    const response = playCard(setupPlay(true))
+
+    expect(response.state.players[0]!.minorHand).toContain(CARD_ID)
+    expect(response.state.players[0]!.minorPlayed).not.toContain(CARD_ID)
   })
 })
