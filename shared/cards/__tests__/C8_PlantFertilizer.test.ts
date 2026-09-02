@@ -1,6 +1,10 @@
 import { describe, it, expect } from 'vitest'
 import { C008_PlantFertilizer_impl } from '../C/C008_PlantFertilizer'
 import type { PlayerState, ActionFlow } from '../../contract/types'
+import '../B/B068_Beanfield'
+import '../B/B113_PatchCaregiver'
+import '../B/B141_FieldCaretaker'
+import '../D/D075_WoodField'
 
 const CARD_ID = 'C008_PlantFertilizer'
 
@@ -174,9 +178,9 @@ describe('C8 PlantFertilizer onBuy — eligibility & shape', () => {
 
   it('includes occupation card-field holders (e.g. B113/B141) when sum-of-remaining===1', () => {
     const player = blankPlayer({
-      occupationPlayed: ['B113_PlantBreeder'],
+      occupationPlayed: ['B113_PatchCaregiver'],
       cardStates: {
-        B113_PlantBreeder: { extraData: { cardFieldStacks: [{ crop: 'grain', remaining: 1 }] } },
+        B113_PatchCaregiver: { extraData: { cardFieldStacks: [{ crop: 'grain', remaining: 1 }] } },
       },
     })
     const flow = runOnBuy(player)!
@@ -184,7 +188,7 @@ describe('C8 PlantFertilizer onBuy — eligibility & shape', () => {
     const leaf = seq.children![0]! as Extract<ActionFlow, { type: 'leaf' }>
     expect(leaf.params).toEqual({
       kind: 'plant-additional-good',
-      locations: [{ kind: 'card-field', cardId: 'B113_PlantBreeder' }],
+      locations: [{ kind: 'card-field', cardId: 'B113_PatchCaregiver' }],
     })
   })
 

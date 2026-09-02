@@ -2,17 +2,28 @@ import { defineMinorCard } from '../card-source'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { registerSelectionEffect } from '../../actions/helpers/selection-effect-registry'
-import { fieldIsEmpty } from '../../domain/field'
 import type { CardImpl } from '../registry'
+import { getLogicalFields, mutateLogicalFields } from '../helpers/card-field'
+import { parsePositionKey, positionKey } from '../../domain/farm'
 
 const CARD_ID = 'C018_RollOverPlow'
-registerSelectionEffect('discard-all-crops', ({ player, positions }) => {
-  for (const key of positions) {
-    const [r, c] = key.split('-').map(Number)
-    const field = player.fields.find(f => f.row === r && f.col === c)
-    if (field && !fieldIsEmpty(field)) {
-      field.stacks.length = 0
-    }
+registerSelectionEffect('discard-all-crops', ({ state, player, positions, eventSink }) => {
+  const position = positions.length === 1 ? parsePositionKey(positions[0]!) : undefined
+  const field = position && getLogicalFields(player).find((candidate) =>
+    candidate.slots.some((slot) => positionKey(slot.tile) === positionKey(position)),
+  )
+  if (!field || field.stacks.length === 0) return
+  const mutations = mutateLogicalFields(state, player, { sourceCard: CARD_ID, eventSink })
+  const flows = field.slots
+    .filter((slot) => slot.stack)
+    .sort((a, b) => b.index - a.index)
+    .flatMap((slot) => {
+      const removed = mutations.remove({ fieldId: field.id, slot: slot.index })
+      return removed.ok && removed.flow ? [removed.flow] : []
+    })
+  if (flows.length === 1) return flows[0]
+  if (flows.length > 1) {
+    return { type: 'parallel', children: flows }
   }
 })
 
@@ -22,7 +33,7 @@ const anytimeListener: CardListenerRegistration = {
   phases: ['anytime' as ActionHookPhase],
   preScoring: true,
   handler: (context: CardListenerContext): ActionHookResult | void => {
-    const plantedFields = context.player.fields.filter(f => !fieldIsEmpty(f))
+    const plantedFields = getLogicalFields(context.player).filter((field) => field.stacks.length > 0)
     if (plantedFields.length < 3) return
     return {
       flow: {
@@ -34,7 +45,18 @@ const anytimeListener: CardListenerRegistration = {
             sourceCard: CARD_ID,
             actionContext: {
               selectionKind: 'farm-position',
-              positionFilter: 'has-crop',
+              selectableTiles: plantedFields.map((field) => {
+                const slot = [...field.slots].reverse().find((candidate) => candidate.stack)!
+                return {
+                  ...slot.tile,
+                  ...(field.sourceCard ? {
+                    sourceCard: field.sourceCard,
+                    groupKey: field.groupKey,
+                    cardFieldSlot: slot.index,
+                  } : {}),
+                }
+              }),
+              minSelections: 1,
               maxSelections: 1,
               selectionEffect: 'discard-all-crops',
             },

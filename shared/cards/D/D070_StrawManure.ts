@@ -1,19 +1,30 @@
 import { defineMinorCard } from '../card-source'
 import type { ActionFlow } from '../../contract/types'
 import { registerSelectionEffect } from '../../actions/helpers/selection-effect-registry'
-import { fieldFindStackOfKind, fieldHasCrop } from '../../domain/field'
 import type { CardImpl } from '../registry'
+import { getLogicalFields, mutateLogicalFields } from '../helpers/card-field'
+import { parsePositionKey, positionKey } from '../../domain/farm'
 
 const CARD_ID = 'D070_StrawManure'
-registerSelectionEffect('add-vegetable', ({ player, positions }) => {
-  for (const key of positions) {
-    const [r, c] = key.split('-').map(Number)
-    const field = player.fields.find(f => f.row === r && f.col === c)
-    if (field) {
-      const vegStack = fieldFindStackOfKind(field, 'vegetable')
-      if (vegStack) vegStack.remaining += 1
-    }
+registerSelectionEffect('add-vegetable', ({ state, player, positions, eventSink }) => {
+  const fields = positions.map((key) => {
+    const position = parsePositionKey(key)
+    const field = position && getLogicalFields(player).find((candidate) =>
+      candidate.slots.some((slot) => positionKey(slot.tile) === positionKey(position)),
+    )
+    const slot = field && [...field.slots].reverse().find((candidate) => candidate.stack)
+    return field && slot?.stack?.kind === 'vegetable' ? { field, slot } : undefined
+  })
+  if (fields.some((field) => !field) || new Set(fields.map((entry) => entry?.field.id)).size !== fields.length) return
+  const mutations = mutateLogicalFields(state, player, { sourceCard: CARD_ID, eventSink })
+  const flows: ActionFlow[] = []
+  for (const entry of fields) {
+    const grown = mutations.grow({ fieldId: entry!.field.id, slot: entry!.slot.index }, 1)
+    if (!grown.ok) return
+    if (grown.flow) flows.push(grown.flow)
   }
+  if (flows.length === 1) return flows[0]
+  if (flows.length > 1) return { type: 'parallel', children: flows }
 })
 
 const cardImpl = {
@@ -23,7 +34,14 @@ const cardImpl = {
   onStartHarvestFieldPhase: (_state, player) => {
     // Need grain to pay and at least one vegetable field with crops
     if ((player.resources.grain ?? 0) < 1) return
-    const vegFields = player.fields.filter(f => fieldHasCrop(f, 'vegetable'))
+    const vegFields = getLogicalFields(player).flatMap((field) => {
+      const slot = [...field.slots].reverse().find((candidate) => candidate.stack)
+      if (slot?.stack?.kind !== 'vegetable') return []
+      return [{
+        ...slot.tile,
+        ...(field.sourceCard ? { sourceCard: field.sourceCard, groupKey: field.groupKey, cardFieldSlot: slot.index } : {}),
+      }]
+    })
     if (vegFields.length === 0) return
 
     const children: ActionFlow[] = [
@@ -39,7 +57,8 @@ const cardImpl = {
         sourceCard: CARD_ID,
         actionContext: {
           selectionKind: 'farm-position',
-          positionFilter: 'has-vegetable',
+          selectableTiles: vegFields,
+          minSelections: 1,
           maxSelections: 2,
           selectionEffect: 'add-vegetable',
         },

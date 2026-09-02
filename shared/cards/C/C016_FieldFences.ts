@@ -4,6 +4,7 @@ import type { CardImpl } from '../registry'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import type { ActionFlow, FarmTilePosition, PlayerState } from '../../contract/types'
+import { getFarmyardFields } from '../helpers/card-field'
 
 const CARD_ID = 'C016_FieldFences'
 const FLAG_KEY = 'c16Active'
@@ -53,7 +54,7 @@ const C16FenceListener: CardListenerRegistration = {
   actions: ['fence'],
   handler: (ctx: CardListenerContext): ActionHookResult | void => {
     if (!isC16Active(ctx.player)) return
-    const fieldEdges = fieldEdgeIds(ctx.player.fields.map((f) => ({ row: f.row, col: f.col })))
+    const fieldEdges = fieldEdgeIds(getFarmyardFields(ctx.player).map(({ row, col }) => ({ row, col })))
     const params = ctx.params as { newFenceEdges?: string[] } | undefined
     const newFenceEdges = params?.newFenceEdges
     if (newFenceEdges === undefined) {

@@ -3,7 +3,6 @@ import type { CardListenerContext, CardListenerRegistration } from '../card-list
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { getStoredResource } from '../helpers/card-storage'
 import { sumResourceMovedToPlayer } from '../helpers/event-provenance'
-import { fieldHasCrop } from '../../domain/field'
 import type { DraftGameEvent, ResourceExchangedEvent } from '../../contract/events'
 import type { CardImpl } from '../registry'
 
@@ -74,11 +73,10 @@ const cardImpl = {
   effect: {
   id: CARD_ID,
   onAfterReap: (_state, player) => {
-    const grainFields = _state.harvestReapSummary?.[player.id]?.grainFields
-      ?? player.fields.filter((field) => fieldHasCrop(field, 'grain')).length
-    if (grainFields <= 0) return
+    const grainHarvested = _state.harvestReapSummary?.[player.id]?.resources.grain ?? 0
+    if (grainHarvested <= 0) return
     const availableClay = getStoredResource(player, CARD_ID, 'clay')
-    const clayToGain = Math.min(availableClay, grainFields)
+    const clayToGain = Math.min(availableClay, grainHarvested)
     if (clayToGain <= 0) return
     return {
       type: 'seq',

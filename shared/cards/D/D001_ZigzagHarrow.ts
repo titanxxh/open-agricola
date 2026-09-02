@@ -2,6 +2,7 @@ import { defineMinorCard } from '../card-source'
 import type { CardImpl } from '../registry'
 import type { FarmTilePosition, PlayerState } from '../../contract/types'
 import { FARM_COLS, FARM_ROWS, positionKey } from '../../domain/farm'
+import { getFarmyardFields } from '../helpers/card-field'
 
 const CARD_ID = 'D001_ZigzagHarrow'
 type Dir = 'W' | 'N' | 'E' | 'S'
@@ -28,7 +29,7 @@ const DIR_RING: Dir[] = ['W', 'N', 'E', 'S', 'W']
  */
 export const computeZigzagCandidates = (player: PlayerState): FarmTilePosition[] => {
   const fieldKeys = new Set<string>(
-    player.fields.map((f) => positionKey({ row: f.row, col: f.col })),
+    getFarmyardFields(player).map((field) => positionKey(field)),
   )
   if (fieldKeys.size === 0) return []
 
@@ -41,7 +42,7 @@ export const computeZigzagCandidates = (player: PlayerState): FarmTilePosition[]
     candidates.push({ row, col })
   }
 
-  player.fields.forEach((field) => {
+  getFarmyardFields(player).forEach((field) => {
     let aroundFields = 0
     for (const dir of DIR_RING) {
       const delta = DIR_DELTA[dir]

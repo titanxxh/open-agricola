@@ -7,6 +7,7 @@ import { EXTRA_CROP_PLACEMENT_CONTEXT_KEY, isExtraCropPlacementActionContext } f
 
 import '../../shared/cards/C/C069_LandConsolidation'
 import '../../shared/cards/B/B115_TinsmithMaster'
+import '../../shared/cards/B/B113_PatchCaregiver'
 import '../../shared/cards/E/E071_CowPatty'
 
 const c69AnytimeVisible = (resp: ReturnType<GameSession['takeAction']>) =>
@@ -127,5 +128,32 @@ describe('C069_LandConsolidation session', () => {
     session.loadState(state)
 
     expect(c69AnytimeVisible(session.getState())).toBe(true)
+  })
+
+  it('replaces grain with vegetable on a compatible Card Field', () => {
+    const session = new GameSession(803, undefined, { playerCount: 2 })
+    stabilizeRandomHands(session.state.players)
+    const state = session.getState().state
+    state.players = state.players.slice(0, 2)
+    state.currentPlayerIndex = 0
+    const player = state.players[0]!
+    setWorkersAtHome(state, player, 2)
+    player.minorPlayed.push('C069_LandConsolidation')
+    player.occupationPlayed.push('B113_PatchCaregiver')
+    player.cardStates.B113_PatchCaregiver = {
+      extraData: { cardFieldStacks: [{ crop: 'grain', remaining: 3 }] },
+    }
+    session.loadState(state)
+
+    const started = session.takeAction(0, 'farmland')
+    expect(c69AnytimeVisible(started)).toBe(true)
+    let resp = session.takeAnytimeAction(0, 'C69-land-consolidation-anytime')
+    expect(resp.interaction.stateId).toBe('wait')
+    resp = session.commitSelectionChoice(0, { positions: [{ row: -1, col: 2113 }] })
+
+    expect(resp.ok).toBe(true)
+    expect(resp.state.players[0]!.cardStates.B113_PatchCaregiver?.extraData?.cardFieldStacks).toEqual([
+      { crop: 'vegetable', remaining: 1 },
+    ])
   })
 })

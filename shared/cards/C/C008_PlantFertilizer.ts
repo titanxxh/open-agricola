@@ -1,9 +1,7 @@
 import { defineMinorCard } from '../card-source'
-import { fieldIsEmpty, fieldTotalRemaining } from '../../domain/field'
-import { readCardExtraData } from '../helpers/card-state'
 import { wrapOptional } from '../../actions/flow'
 import type { ActionFlow } from '../../contract/types'
-import type { CardFieldSlot } from '../helpers/card-field'
+import { getLogicalFields } from '../helpers/card-field'
 import type { PlantAdditionalGoodLocation } from '../../actions/effects/special-effect'
 import type { CardImpl } from '../registry'
 
@@ -15,19 +13,10 @@ const cardImpl = {
     onBuy: (_state, player): ActionFlow | undefined => {
       const locations: PlantAdditionalGoodLocation[] = []
 
-      for (const f of player.fields) {
-        if (fieldIsEmpty(f)) continue
-        if (fieldTotalRemaining(f) !== 1) continue
-        locations.push({ kind: 'field', row: f.row, col: f.col })
-      }
-
-      const cardFieldHolders = [...player.minorPlayed, ...player.occupationPlayed]
-      for (const cardId of cardFieldHolders) {
-        const stacks = readCardExtraData<CardFieldSlot[]>(player, cardId, 'cardFieldStacks')
-        if (!stacks || stacks.length === 0) continue
-        const total = stacks.reduce((acc, slot) => acc + (slot?.remaining ?? 0), 0)
-        if (total !== 1) continue
-        locations.push({ kind: 'card-field', cardId })
+      for (const field of getLogicalFields(player)) {
+        if (field.stacks.reduce((sum, stack) => sum + stack.remaining, 0) !== 1) continue
+        if (field.kind === 'farmyard') locations.push({ kind: 'field', row: field.row, col: field.col })
+        else locations.push({ kind: 'card-field', cardId: field.sourceCard! })
       }
 
       if (locations.length === 0) return undefined

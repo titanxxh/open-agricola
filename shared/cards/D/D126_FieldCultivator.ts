@@ -2,6 +2,7 @@ import { defineOccupationCard } from '../card-source'
 import { pushToCardStack, getCardStack, writeCardInfobox } from '../helpers/card-state'
 import type { ActionFlow, PlayerState } from '../../contract/types'
 import type { CardImpl } from '../registry'
+import { getFarmyardFields } from '../helpers/card-field'
 
 const CARD_ID = 'D126_FieldCultivator'
 /**
@@ -31,7 +32,9 @@ const cardImpl = {
     // Count how many fields were harvested this reap
     const summary = state.harvestReapSummary?.[player.id]
     if (!summary) return
-    const fieldsHarvested = (summary.grainFields ?? 0) + (summary.vegetableFields ?? 0)
+    const farmyardFields = new Set(getFarmyardFields(player).map((field) => `${field.row}-${field.col}`))
+    const fieldsHarvested = summary.harvestedPositions
+      ?.filter((position) => farmyardFields.has(`${position.row}-${position.col}`)).length ?? 0
     if (fieldsHarvested <= 0) return
 
     const popsNeeded = Math.min(fieldsHarvested, stack.length)

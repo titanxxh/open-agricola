@@ -1,6 +1,7 @@
 import { defineMinorCard } from '../card-source'
 import { FARM_COLS, FARM_ROWS, positionKey } from '../../domain/farm'
 import type { CardImpl } from '../registry'
+import { getFarmyardFields } from '../helpers/card-field'
 
 const CARD_ID = 'D037_Sculpture'
 
@@ -9,8 +10,8 @@ const cardImpl = {
     if (!state) return true
     const used = new Set<string>()
     player.roomTiles.forEach((tile) => used.add(positionKey(tile)))
-    player.fields.forEach((field) =>
-      used.add(positionKey({ row: field.row, col: field.col })),
+    getFarmyardFields(player).forEach((field) =>
+      used.add(positionKey(field)),
     )
     player.stableTiles.forEach((tile) => used.add(positionKey(tile)))
     player.pastures.forEach((pasture) =>

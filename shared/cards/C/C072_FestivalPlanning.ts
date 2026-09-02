@@ -1,7 +1,6 @@
 import { defineMinorCard } from '../card-source'
 import type { CardImpl } from '../registry'
-import { fieldIsEmpty } from '../../domain/field'
-import { hasAnyCardFieldCrops } from '../helpers/card-field'
+import { getLogicalFields } from '../helpers/card-field'
 
 const CARD_ID = 'C072_FestivalPlanning'
 
@@ -9,7 +8,7 @@ const cardImpl = {
   effect: {
   id: CARD_ID,
   onBuy: (_state, player) => {
-    const hasCrops = player.fields.some((f) => !fieldIsEmpty(f)) || hasAnyCardFieldCrops(player)
+    const hasCrops = getLogicalFields(player).some((field) => field.stacks.length > 0)
     return {
       type: 'seq' as const,
       children: [

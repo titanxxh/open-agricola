@@ -1,6 +1,6 @@
 import { defineMinorCard } from '../card-source'
 import { gainLeaf } from '../helpers/pay-gain-node'
-import { fieldHasCrop } from '../../domain/field'
+import { getLogicalFields } from '../helpers/card-field'
 import type { CardImpl } from '../registry'
 
 const CARD_ID = 'D061_BaleofStraw'
@@ -11,8 +11,8 @@ const cardImpl = {
   onStartHarvest: (_state, player) => {
 
     // Count grain fields (fields with grain crop planted)
-    const grainFieldCount = player.fields.filter(
-      (f) => fieldHasCrop(f, 'grain'),
+    const grainFieldCount = getLogicalFields(player).filter(
+      (field) => field.stacks.some((stack) => stack.kind === 'grain'),
     ).length
     if (grainFieldCount < 3) return
 

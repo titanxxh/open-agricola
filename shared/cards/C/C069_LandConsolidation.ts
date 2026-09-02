@@ -1,49 +1,34 @@
 import { defineMinorCard } from '../card-source'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
-import type { ActionDefinition } from '../../contract/types'
-import { fieldTopStack, fieldTotalRemaining } from '../../domain/field'
-import { registerAdHocAction } from '../../actions/helpers/ad-hoc-action-registry'
+import { registerSelectionEffect } from '../../actions/helpers/selection-effect-registry'
 import { isExtraCropPlacementActionContext } from '../../actions/helpers/extra-crop-placement-context'
 import type { CardImpl } from '../registry'
+import { getLogicalFields, mutateLogicalFields } from '../helpers/card-field'
+import { parsePositionKey, positionKey } from '../../domain/farm'
 
 const CARD_ID = 'C069_LandConsolidation'
-const SWAP_ACTION_ID = 'card_C069_LandConsolidation_swap'
+const SELECTION_EFFECT = 'c69-land-consolidation-swap'
 
 const hasExtraCropPending = (context: CardListenerContext): boolean => {
   return isExtraCropPlacementActionContext(context.actionContext)
 }
 
-const swapFieldGrainToVegAction: ActionDefinition = {
-  id: SWAP_ACTION_ID,
-  nameKey: 'actions.swap-field-grain-to-veg.name',
-  descriptionKey: 'actions.swap-field-grain-to-veg.description',
-  roundAvailable: 1,
-  gainPerRound: {},
-  canBeExecutedByPlayer: () => true,
-  execute: ({ player, params }) => {
-    const row = (params as { row?: number } | undefined)?.row
-    const col = (params as { col?: number } | undefined)?.col
-    if (row === undefined || col === undefined) {
-      return { type: 'fail', errorKey: 'log.actionFail' }
-    }
-    const field = player.fields.find((f) => f.row === row && f.col === col)
-    if (!field || field.stacks.length !== 1) {
-      return { type: 'fail', errorKey: 'log.actionFail' }
-    }
-    const stack = field.stacks[0]
-    if (!stack || stack.kind !== 'grain' || stack.remaining !== 3) {
-      return { type: 'fail', errorKey: 'log.actionFail' }
-    }
-    stack.kind = 'vegetable'
-    stack.remaining = 1
-    return {
-      type: 'ok',
-    }
-  },
-}
-
-registerAdHocAction(swapFieldGrainToVegAction)
+registerSelectionEffect(SELECTION_EFFECT, ({ state, player, positions, eventSink }) => {
+  const position = positions.length === 1 ? parsePositionKey(positions[0]!) : undefined
+  const field = position && getLogicalFields(player).find((candidate) =>
+    candidate.slots.some((slot) => positionKey(slot.tile) === positionKey(position)),
+  )
+  const slot = field && [...field.slots].reverse().find((candidate) => candidate.stack)
+  const total = field?.stacks.reduce((sum, stack) => sum + stack.remaining, 0) ?? 0
+  if (
+    !field || slot?.stack?.kind !== 'grain' || slot.stack.remaining !== 3 || total !== 3 ||
+    (field.allowedCrops && !field.allowedCrops.includes('vegetable'))
+  ) return
+  const replaced = mutateLogicalFields(state, player, { sourceCard: CARD_ID, eventSink })
+    .replace({ fieldId: field.id, slot: slot.index }, 'vegetable', 1)
+  return replaced.ok ? replaced.flow : undefined
+})
 
 /**
  * C69 Land Consolidation (MinorImprovement, C, 69)
@@ -58,37 +43,31 @@ const anytimeListener: CardListenerRegistration = {
   preScoring: true,
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (hasExtraCropPending(context)) return
-    const qualifying = context.player.fields.filter((f) => {
-      const top = fieldTopStack(f)
-      return !!top && top.kind === 'grain' && top.remaining === 3 && fieldTotalRemaining(f) === 3
+    const qualifying = getLogicalFields(context.player).flatMap((field) => {
+      const slot = [...field.slots].reverse().find((candidate) => candidate.stack)
+      const total = field.stacks.reduce((sum, stack) => sum + stack.remaining, 0)
+      if (
+        slot?.stack?.kind !== 'grain' || slot.stack.remaining !== 3 || total !== 3 ||
+        (field.allowedCrops && !field.allowedCrops.includes('vegetable'))
+      ) return []
+      return [{
+        ...slot.tile,
+        ...(field.sourceCard ? { sourceCard: field.sourceCard, groupKey: field.groupKey, cardFieldSlot: slot.index } : {}),
+      }]
     })
     if (qualifying.length === 0) return
-
-    if (qualifying.length === 1) {
-      const field = qualifying[0]!
-      return {
-        flow: {
-          type: 'leaf',
-          actionId: SWAP_ACTION_ID,
-          params: { row: field.row, col: field.col },
-          sourceCard: CARD_ID,
-        },
-        sourceCard: CARD_ID,
-        labelKey: 'cards.C069_LandConsolidation.anytime',
-      }
-    }
-
     return {
       flow: {
-        type: 'xor',
-        children: qualifying.map((field) => ({
-          type: 'leaf' as const,
-          actionId: SWAP_ACTION_ID,
-          params: { row: field.row, col: field.col },
-          sourceCard: CARD_ID,
-          choiceLabelKey: 'ui.interactionFieldChoice',
-          choiceLabelParams: { row: field.row, col: field.col },
-        })),
+        type: 'leaf',
+        actionId: 'selection',
+        sourceCard: CARD_ID,
+        actionContext: {
+          selectionKind: 'farm-position',
+          selectableTiles: qualifying,
+          minSelections: 1,
+          maxSelections: 1,
+          selectionEffect: SELECTION_EFFECT,
+        },
       },
       sourceCard: CARD_ID,
       labelKey: 'cards.C069_LandConsolidation.anytime',

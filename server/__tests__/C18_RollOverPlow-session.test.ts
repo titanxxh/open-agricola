@@ -3,12 +3,13 @@ import { GameSession } from '../game/authoritative-session'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 
 import '../../shared/cards/C/C018_RollOverPlow'
+import '../../shared/cards/B/B113_PatchCaregiver'
 import type { AnytimeAction } from '../../shared/contract/types';
 
 const CARD_ID = 'C018_RollOverPlow'
 
 describe('C018_RollOverPlow session', () => {
-  const setup = (options?: { includeEmptyField?: boolean }) => {
+  const setup = (options?: { includeEmptyField?: boolean; includeCardField?: boolean }) => {
     const session = new GameSession()
     stabilizeRandomHands(session.state.players)
     const state = session.getState().state
@@ -27,6 +28,12 @@ describe('C018_RollOverPlow session', () => {
     ]
     if (options?.includeEmptyField) {
       player.fields.push({ row: 1, col: 3, stacks: [] })
+    }
+    if (options?.includeCardField) {
+      player.occupationPlayed.push('B113_PatchCaregiver')
+      player.cardStates.B113_PatchCaregiver = {
+        extraData: { cardFieldStacks: [{ crop: 'grain', remaining: 2 }] },
+      }
     }
 
     session.loadState(state)
@@ -115,6 +122,29 @@ describe('C018_RollOverPlow session', () => {
       kind: 'grain',
       remaining: 3,
     })
+  })
+
+  it('discards crops from a selected Card Field before plowing', () => {
+    const session = setup({ includeCardField: true })
+    enterActiveInteraction(session)
+
+    let resp = session.takeAnytimeAction(0, 'C18-roll-over-plow-anytime')
+    expect(resp.ok).toBe(true)
+    expect(resp.interaction.stateId).toBe('wait')
+    if (resp.interaction.stateId !== 'wait') throw new Error('expected selection choice')
+    expect(resp.interaction.request.kind).toBe('selection')
+    if (resp.interaction.request.kind !== 'selection') throw new Error('expected selection request')
+    expect(resp.interaction.request.selection.selectablePositions).toContainEqual(
+      expect.objectContaining({ row: -1, col: 2113, sourceCard: 'B113_PatchCaregiver' }),
+    )
+
+    resp = session.commitSelectionChoice(0, { positions: [{ row: -1, col: 2113 }] })
+    expect(resp.ok).toBe(true)
+    expect(resp.interaction.stateId).toBe('wait')
+    expect(resp.interaction.stateId === 'wait' ? resp.interaction.promptKey : undefined)
+      .toBe('ui.interactionPlowSelect')
+    expect(resp.state.players[0]!.cardStates.B113_PatchCaregiver?.extraData?.cardFieldStacks)
+      .toEqual([null])
   })
 
   it('rejects selecting an empty field for discard before plow interaction starts', () => {
