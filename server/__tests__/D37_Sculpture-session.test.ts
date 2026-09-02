@@ -1,78 +1,84 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
-import { meetsCardPrerequisites } from '../../shared/cards/helpers/prerequisites'
+import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
+import { getAllTilePositions, positionKey } from '../../shared/domain/farm'
+import { setWorkersAtHome } from '../../shared/domain/player'
 
 import '../../shared/cards/D/D037_Sculpture'
-import { D037_Sculpture } from '../../shared/cards/D/D037_Sculpture'
 
-describe('D037_Sculpture session', () => {
-  const setup = () => {
-    const session = new GameSession()
-    const state = session.getState().state
-    state.players = state.players.slice(0, 2)
-    state.currentPlayerIndex = 0
-    return session
+const CARD_ID = 'D037_Sculpture'
+
+const setup = ({ round, unused, stone }: { round: number; unused: number; stone: number }) => {
+  const session = new GameSession(1)
+  stabilizeRandomHands(session.state.players)
+  const state = session.getState().state
+  state.players = state.players.slice(0, 2)
+  state.currentPlayerIndex = 0
+  state.round = round
+  state.roundPhase = 'work'
+  const player = state.players[0]!
+  setWorkersAtHome(state, player, 2)
+  player.minorHand = [CARD_ID]
+  player.occupationHand = ['__test_placeholder__']
+  player.resources.stone = stone
+  const occupied = new Set(player.roomTiles.map(positionKey))
+  player.fields = getAllTilePositions()
+    .filter((tile) => !occupied.has(positionKey(tile)))
+    .slice(0, 13 - unused)
+    .map((tile) => ({ ...tile, stacks: [] }))
+  const improvement = state.actionSpaces.find((space) => space.id === 'major-improvement')
+  if (!improvement) throw new Error('major-improvement missing')
+  improvement.takenBy = []
+  session.loadState(state)
+  return session
+}
+
+const enterImprovementChoice = (session: GameSession) => {
+  let response = session.takeAction(0, 'major-improvement')
+  if (response.interaction.stateId !== 'wait') return response
+  const action = response.interaction.request.options?.find((candidate) => {
+    return candidate.value.startsWith('action-improvement-')
+  })
+  if (action) response = session.resolveChoice(0, action.value)
+  return response
+}
+
+const cardOption = (session: GameSession) => {
+  const response = enterImprovementChoice(session)
+  if (response.interaction.stateId !== 'wait') return { response, option: undefined }
+  return {
+    response,
+    option: response.interaction.request.options?.find((candidate) => candidate.value === CARD_ID),
   }
+}
 
-  it('playable early: many rounds left, few used tiles', () => {
-    const session = setup()
-    const state = session.getState().state
-    state.round = 1
-    const player = state.players[0]!
-    // Default: 2 rooms consumed. 13 tiles unused. roundsLeft=13 > 13? false
-    // Adjust: 1 room only consumes 1 tile? default is 2 rooms. Let's force.
-    player.roomTiles = [{ row: 2, col: 0 }]
-    player.fields = []
-    player.stableTiles = []
-    player.pastures = []
-    // used = 1, unused = 14, roundsLeft = 13 → 13 > 14 false
-    expect(meetsCardPrerequisites(player, D037_Sculpture, state.round, state)).toBe(false)
-    // Add more used tiles: 10 more → used=11, unused=4, roundsLeft=13 → 13>4 true
-    player.fields = [
-      { row: 0, col: 0, crop: null, remaining: 0 },
-      { row: 0, col: 1, crop: null, remaining: 0 },
-      { row: 0, col: 2, crop: null, remaining: 0 },
-      { row: 0, col: 3, crop: null, remaining: 0 },
-      { row: 0, col: 4, crop: null, remaining: 0 },
-      { row: 1, col: 0, crop: null, remaining: 0 },
-      { row: 1, col: 1, crop: null, remaining: 0 },
-      { row: 1, col: 2, crop: null, remaining: 0 },
-      { row: 1, col: 3, crop: null, remaining: 0 },
-      { row: 1, col: 4, crop: null, remaining: 0 },
-    ]
-    expect(meetsCardPrerequisites(player, D037_Sculpture, state.round, state)).toBe(true)
+describe('D037 Sculpture parity', () => {
+  it('D037 S1: two rounds left and one unused farm space allow Sculpture for one stone', () => {
+    const session = setup({ round: 12, unused: 1, stone: 1 })
+    const { response: offered, option } = cardOption(session)
+
+    const response = option ? session.resolveChoice(0, option.value) : offered
+
+    expect(response.ok, response.error).toBe(true)
+    expect(response.state.players[0]!.resources.stone).toBe(0)
+    expect(response.state.players[0]!.minorPlayed).toContain(CARD_ID)
   })
 
-  it('playable late only if few unused tiles', () => {
-    const session = setup()
-    const state = session.getState().state
-    state.round = 12
-    const player = state.players[0]!
-    // roundsLeft = 2, need unused < 2
-    player.roomTiles = [
-      { row: 0, col: 0 },
-      { row: 0, col: 1 },
-      { row: 0, col: 2 },
-      { row: 0, col: 3 },
-      { row: 0, col: 4 },
-      { row: 1, col: 0 },
-      { row: 1, col: 1 },
-      { row: 1, col: 2 },
-      { row: 1, col: 3 },
-      { row: 1, col: 4 },
-      { row: 2, col: 0 },
-      { row: 2, col: 1 },
-      { row: 2, col: 2 },
-      { row: 2, col: 3 },
-    ]
-    player.fields = []
-    player.stableTiles = []
-    player.pastures = []
-    // used = 14, unused = 1, roundsLeft = 2 → 2 > 1 true
-    expect(meetsCardPrerequisites(player, D037_Sculpture, state.round, state)).toBe(true)
+  it('D037 S2: equality between rounds left and unused spaces keeps Sculpture unavailable', () => {
+    const { response, option } = cardOption(setup({ round: 12, unused: 2, stone: 1 }))
+    expect(option).toBeUndefined()
+    expect(response.state.players[0]!.minorHand).toContain(CARD_ID)
+  })
 
-    // Remove one tile → unused = 2, 2 > 2 false
-    player.roomTiles = player.roomTiles.slice(0, 13)
-    expect(meetsCardPrerequisites(player, D037_Sculpture, state.round, state)).toBe(false)
+  it('D037 S3: more unused spaces than rounds left keeps Sculpture unavailable', () => {
+    const { response, option } = cardOption(setup({ round: 2, unused: 13, stone: 1 }))
+    expect(option).toBeUndefined()
+    expect(response.state.players[0]!.minorHand).toContain(CARD_ID)
+  })
+
+  it('D037 S4: no stone keeps an otherwise legal Sculpture unavailable', () => {
+    const { response, option } = cardOption(setup({ round: 12, unused: 1, stone: 0 }))
+    expect(option).toBeUndefined()
+    expect(response.state.players[0]!.minorHand).toContain(CARD_ID)
   })
 })

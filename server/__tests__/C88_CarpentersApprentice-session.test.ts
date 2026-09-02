@@ -10,6 +10,87 @@ import { readCardResourceStats } from '../../shared/cards/helpers/card-state'
 import '../../shared/cards/C/C088_CarpentersApprentice'
 import '../../shared/cards/B/B030_WoodPalisades'
 
+const CARD_ID = 'C088_CarpentersApprentice'
+
+describe('C088 Carpenter\'s Apprentice parity', () => {
+  it('C088 S1: playing Carpenter\'s Apprentice through Lessons keeps the occupation in play', () => {
+    const session = new GameSession()
+    stabilizeRandomHands(session.state.players)
+    const state = session.getState().state
+    state.players = state.players.slice(0, 2)
+    state.currentPlayerIndex = 0
+    state.players[0]!.occupationHand = [CARD_ID]
+    session.loadState(state)
+
+    let response = session.takeAction(0, 'lessons')
+    if (response.interaction.stateId === 'wait') {
+      const option = response.interaction.request.options?.find((candidate) => candidate.value === CARD_ID)
+      if (option) response = session.resolveChoice(0, option.value)
+    }
+
+    expect(response.ok, response.error).toBe(true)
+    expect(response.state.players[0]!.occupationPlayed).toContain(CARD_ID)
+  })
+
+  it('C088 S2: a wooden room costs three wood and two reed', () => {
+    const session = new GameSession()
+    stabilizeRandomHands(session.state.players)
+    const state = session.getState().state
+    state.players = state.players.slice(0, 2)
+    state.currentPlayerIndex = 0
+    const player = state.players[0]!
+    player.occupationPlayed = [CARD_ID]
+    player.occupationHand = ['__test_placeholder__']
+    player.minorHand = ['__test_placeholder__']
+    player.resources = { ...player.resources, wood: 3, reed: 2 }
+    session.loadState(state)
+
+    let response = session.takeAction(0, 'farm-expansion')
+    if (response.interaction.stateId === 'wait') {
+      const option = response.interaction.request.options?.find(
+        (candidate) => candidate.labelKey === 'actions.construct.name',
+      )
+      if (option) response = session.resolveChoice(0, option.value)
+    }
+    expect(response.interaction.stateId).toBe('wait')
+    if (response.interaction.stateId !== 'wait' || response.interaction.request.farm.farmType !== 'room') return
+
+    response = session.commitSelectionChoice(0, {
+      rooms: [response.interaction.request.farm.selectableTiles[0]!],
+    })
+
+    expect(response.ok, response.error).toBe(true)
+    expect(response.state.players[0]!.rooms).toBe(3)
+    expect(response.state.players[0]!.resources).toMatchObject({ wood: 0, reed: 0 })
+  })
+
+  it('C088 S3: the third and fourth stables each cost one wood', () => {
+    const session = new GameSession()
+    stabilizeRandomHands(session.state.players)
+    const state = session.getState().state
+    state.players = state.players.slice(0, 2)
+    state.currentPlayerIndex = 0
+    const player = state.players[0]!
+    player.occupationPlayed = [CARD_ID]
+    player.occupationHand = ['__test_placeholder__']
+    player.minorHand = ['__test_placeholder__']
+    player.resources = { ...player.resources, wood: 2, reed: 0 }
+    player.stableTiles = [{ row: 0, col: 3 }, { row: 0, col: 4 }]
+    session.loadState(state)
+
+    const selection = session.takeAction(0, 'farm-expansion')
+    expect(selection.interaction.stateId).toBe('wait')
+    if (selection.interaction.stateId !== 'wait' || selection.interaction.request.farm.farmType !== 'stable') return
+    const response = session.commitSelectionChoice(0, {
+      stables: selection.interaction.request.farm.selectableTiles.slice(0, 2),
+    })
+
+    expect(response.ok, response.error).toBe(true)
+    expect(response.state.players[0]!.stableTiles).toHaveLength(4)
+    expect(response.state.players[0]!.resources.wood).toBe(0)
+  })
+})
+
 const makeFencePlayer = (fenceCount: number, wood = 0): PlayerState => {
   const session = new GameSession()
   stabilizeRandomHands(session.state.players)
@@ -327,7 +408,7 @@ describe('C88 — fence 折扣经 collectComputeCostsForFarmChoice 聚合', () =
 })
 
 describe('C88 — fence 折扣 Session 端到端(第 13-14 个免费)', () => {
-  it('0 fence 一次造 14 个 fence:第 13/14 个免费,wood 12→0', () => {
+  it('C088 S4: 0 fence 一次造 14 个 fence:第 13/14 个免费,wood 12→0', () => {
     const session = new GameSession()
     stabilizeRandomHands(session.state.players)
     const state = session.getState().state

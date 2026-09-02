@@ -3,7 +3,7 @@ import { GameSession, type SessionResponse } from '../game/authoritative-session
 import { executeCardListener, getRegisteredCardListeners, type CardListenerContext } from '../../shared/cards/card-listeners'
 import { getRoundPersonPlacementOrder, recordRoundPlacement } from '../../shared/cards/helpers/round-placement'
 import type { ActionFlow } from '../../shared/contract/types'
-import { setActiveWorkerCount, workersAvailable } from '../../shared/domain/player'
+import { setActiveWorkerCount, setWorkersAtHome, workersAvailable } from '../../shared/domain/player'
 import { addWorkerRef, removeWorkerRef } from '../../shared/domain/space'
 import { appendImmediateEvents } from '../../shared/events/append'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
@@ -15,6 +15,20 @@ import '../../shared/cards/D/D024_BrotherlyLove'
 import '../../shared/cards/D/D103_CanalBoatman'
 
 const CARD_ID = 'D024_BrotherlyLove'
+
+const playMinor = (session: GameSession): SessionResponse => {
+  let response = session.takeAction(0, 'meeting-place')
+  if (!response.state.players[0]!.minorHand.includes(CARD_ID)) return response
+  if (response.interaction.stateId !== 'wait') return response
+  const improvement = response.interaction.request.options?.find((option) =>
+    option.value.startsWith('action-improvement-'))
+  if (improvement) response = session.resolveChoice(0, improvement.value)
+  if (!response.state.players[0]!.minorHand.includes(CARD_ID)) return response
+  if (response.interaction.stateId !== 'wait') return response
+  const card = response.interaction.request.options?.find((option) => option.value === CARD_ID)
+  expect(card).toBeDefined()
+  return session.resolveChoice(0, card!.value)
+}
 
 const setup = (options: { familySize?: number; placements?: number; withCard?: boolean } = {}) => {
   const session = new GameSession(42, undefined, { playerCount: 2 })
@@ -58,7 +72,30 @@ const acceptOptional = (session: GameSession, response: SessionResponse) => {
 }
 
 describe('D024 Brotherly Love session', () => {
-  it('offers an immediate fourth placement after the third person and only reuses that worker space', () => {
+  it('D024 S1: playing Brotherly Love pays one food and leaves it in play', () => {
+    const session = new GameSession(24, undefined, { playerCount: 2 })
+    stabilizeRandomHands(session.state.players)
+    const state = session.getState().state
+    state.currentPlayerIndex = 0
+    state.round = 3
+    state.roundPhase = 'work'
+    const player = state.players[0]!
+    setWorkersAtHome(state, player, 2)
+    player.minorHand = [CARD_ID]
+    player.occupationHand = ['__test_placeholder__']
+    player.resources.food = 1
+    state.players[1]!.minorHand = ['__test_placeholder__']
+    state.players[1]!.occupationHand = ['__test_placeholder__']
+    session.loadState(state)
+
+    const response = playMinor(session)
+
+    expect(response.ok, response.error).toBe(true)
+    expect(response.state.players[0]!.resources.food).toBe(0)
+    expect(response.state.players[0]!.minorPlayed).toContain(CARD_ID)
+  })
+
+  it('D024 S2: after the third placement offers only that occupied space for the fourth person', () => {
     const session = setup()
     const before = session.getState().state
     const eventCount = before.events.length
@@ -97,7 +134,7 @@ describe('D024 Brotherly Love session', () => {
       .filter((entry) => entry.key === 'log.placeFarmer')).toHaveLength(2)
   })
 
-  it('declines the immediate placement and switches to the next player', () => {
+  it('D024 S3: the optional immediate fourth placement can be declined', () => {
     const session = setup()
 
     let response = session.takeAction(0, 'day-laborer')
@@ -123,7 +160,7 @@ describe('D024 Brotherly Love session', () => {
     ['without the card', { withCard: false }],
     ['with three family members', { familySize: 3 }],
     ['after only the second person', { placements: 1 }],
-  ])('does not trigger %s', (_label, options) => {
+  ])('D024 S4: does not trigger %s', (_label, options) => {
     const session = setup(options)
 
     const response = session.takeAction(0, 'day-laborer')

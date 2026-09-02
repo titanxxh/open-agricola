@@ -1,9 +1,11 @@
 import { describe, expect, it } from 'vitest'
-import { GameSession } from '../game/authoritative-session'
+import { GameSession, type SessionResponse } from '../game/authoritative-session'
 import { runCardEffectHook } from '../../shared/cards/card-effects'
 import { reap } from '../../shared/actions/effects/reap'
 import { fieldIsEmpty } from '../../shared/domain/field'
+import { markAllWorkersUsed, setWorkersAtHome } from '../../shared/domain/player'
 import type { ActionFlow } from '../../shared/contract/types'
+import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 
 import '../../shared/cards/C/C006_StoneClearing'
 import '../../shared/cards/D/D063_Lynchet'
@@ -39,6 +41,101 @@ const buyStoneClearing = (
   return session.resolveChoice(0, cardOption!.value)
 }
 
+const setupPublic = ({ planted = false, cardField = false } = {}) => {
+  const session = new GameSession(6, undefined, { playerCount: 2 })
+  const state = session.getState().state
+  stabilizeRandomHands(state.players)
+  state.currentPlayerIndex = 0
+  state.round = 4
+  state.players.forEach((player) => {
+    setWorkersAtHome(state, player, 2)
+    player.minorHand = ['__test_placeholder__']
+    player.occupationHand = ['__test_placeholder__']
+    player.resources.food = 20
+  })
+  const owner = state.players[0]!
+  owner.minorHand = [CARD_ID]
+  owner.resources.stone = 0
+  owner.fields = planted
+    ? [
+        { row: 0, col: 2, stacks: [{ kind: 'grain', remaining: 2 }] },
+        { row: 1, col: 2, stacks: [{ kind: 'grain', remaining: 2 }] },
+      ]
+    : [
+        { row: 0, col: 2, stacks: [] },
+        { row: 1, col: 2, stacks: [] },
+        { row: 2, col: 2, stacks: [{ kind: 'grain', remaining: 2 }] },
+      ]
+  if (cardField) {
+    owner.fields = []
+    owner.minorPlayed.push('D075_WoodField')
+    owner.cardStates.D075_WoodField = { extraData: { cardFieldStacks: [null, null] } }
+  }
+  session.loadState(state)
+  return session
+}
+
+const playMinor = (session: GameSession) => {
+  let response: SessionResponse = session.takeAction(0, 'meeting-place')
+  if (response.interaction.stateId !== 'wait') return response
+  const improvement = response.interaction.request.options?.find((option) =>
+    option.value.startsWith('action-improvement-'),
+  )
+  if (!improvement) return response
+  response = session.resolveChoice(0, improvement.value)
+  if (response.interaction.stateId !== 'wait') return response
+  const card = response.interaction.request.options?.find((option) => option.value === CARD_ID)
+  if (!card) return response
+  return session.resolveChoice(0, card.value)
+}
+
+describe('C006 Stone Clearing parity', () => {
+  it('C006 S1: Stone Clearing places one stone on each empty field but skips planted fields', () => {
+    const response = playMinor(setupPublic())
+
+    expect(response.ok, response.error).toBe(true)
+    expect(response.state.players[0]!.resources).toMatchObject({ food: 19, stone: 0 })
+    expect(response.state.players[0]!.fields.map((field) => field.stacks)).toEqual([
+      [{ kind: 'stone', remaining: 1 }],
+      [{ kind: 'stone', remaining: 1 }],
+      [{ kind: 'grain', remaining: 2 }],
+    ])
+    expect(response.state.players[1]!.minorHand).toContain(CARD_ID)
+  })
+
+  it('C006 S2: the next field phase harvests one stone from each marked field', () => {
+    const session = setupPublic()
+    const played = playMinor(session)
+    played.state.players.forEach((player) => markAllWorkersUsed(played.state, player))
+    session.loadState(played.state)
+
+    const response = session.performRoundEnd()
+
+    expect(response.ok, response.error).toBe(true)
+    expect(response.state.players[0]!.resources.stone).toBe(2)
+    expect(response.state.players[0]!.fields.slice(0, 2).every(fieldIsEmpty)).toBe(true)
+  })
+
+  it('C006 S3: no empty fields places no stone but still pays and passes', () => {
+    const response = playMinor(setupPublic({ planted: true }))
+
+    expect(response.ok, response.error).toBe(true)
+    expect(response.state.players[0]!.resources).toMatchObject({ food: 19, stone: 0 })
+    expect(response.state.players[0]!.fields.every((field) => field.stacks[0]?.kind === 'grain')).toBe(true)
+    expect(response.state.players[1]!.minorHand).toContain(CARD_ID)
+  })
+
+  it('C006 S4: an empty Wood Field card receives exactly one stone as one logical field', () => {
+    const response = playMinor(setupPublic({ cardField: true }))
+
+    expect(response.ok, response.error).toBe(true)
+    expect(response.state.players[0]!.cardStates.D075_WoodField?.extraData?.cardFieldStacks).toEqual([
+      { crop: 'stone', remaining: 1 },
+      null,
+    ])
+    expect(response.state.players[0]!.resources.stone).toBe(0)
+  })
+})
 describe('C006_StoneClearing session (reference-aligned)', () => {
   const setupWithFields = (fields: Array<{ row: number; col: number; stacks: Array<{ kind: 'grain' | 'vegetable' | 'stone'; remaining: number }> }>) => {
     const session = new GameSession()

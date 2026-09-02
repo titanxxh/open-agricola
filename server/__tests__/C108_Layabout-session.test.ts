@@ -5,11 +5,10 @@ import { markAllWorkersUsed, setActiveWorkerCount } from '../../shared/domain/pl
 import { autoAdvanceRoundEnd } from '../../tests/llm-card-gen/session-helpers'
 
 import '../../shared/cards/C/C108_Layabout'
-import '../../shared/cards/E/E117_PipeSmoker'
 
 const CARD_ID = 'C108_Layabout'
 
-const setupHarvest = (round: number) => {
+const setupHarvest = (round: number, layaboutInHand = false) => {
   const session = new GameSession()
   stabilizeRandomHands(session.state.players)
   const state = session.getState().state
@@ -19,13 +18,14 @@ const setupHarvest = (round: number) => {
   state.currentPlayerIndex = 0
   state.players[0]!.startPlayer = true
   state.players[1]!.startPlayer = false
-  state.players.forEach((player) => {
-    markAllWorkersUsed(state, player)
+  state.players.forEach((player, index) => {
+    if (!layaboutInHand || index !== 0) markAllWorkersUsed(state, player)
     setActiveWorkerCount(player, 1)
     player.resources.food = 5
     player.resources.grain = 0
     player.resources.wood = 0
   })
+  if (layaboutInHand) state.players[0]!.occupationHand = [CARD_ID]
   return { session, state }
 }
 
@@ -44,12 +44,22 @@ const addHarvestFarm = (state: ReturnType<typeof setupHarvest>['state'], playerI
 }
 
 describe('C108_Layabout session', () => {
-  it('skips the owner\'s whole next harvest while other players harvest normally', () => {
-    const { session, state } = setupHarvest(4)
+  it('C108 S1: playing Layabout through Lessons marks the next harvest to be skipped', () => {
+    const { session } = setupHarvest(4, true)
+
+    const response = session.takeAction(0, 'lessons')
+
+    expect(response.ok, response.error).toBe(true)
+    expect(response.state.players[0]!.occupationPlayed).toContain(CARD_ID)
+    expect(response.state.players[0]!.cardStates[CARD_ID]?.extraData?.skipNextHarvest).toBe(true)
+  })
+
+  it('C108 S2: skips the owner\'s whole next harvest while other players harvest normally', () => {
+    const { session, state } = setupHarvest(4, true)
     addHarvestFarm(state, 0)
     addHarvestFarm(state, 1)
-    session.devPlayCard(0, CARD_ID)
-    session.devPlayCard(0, 'E117_PipeSmoker')
+    const played = session.takeAction(0, 'lessons')
+    expect(played.ok, played.error).toBe(true)
 
     expect(state.players[0]!.cardStates[CARD_ID]?.extraData?.skipNextHarvest).toBe(true)
 
@@ -67,7 +77,7 @@ describe('C108_Layabout session', () => {
     expect(participant.resources).toMatchObject({ food: 3, grain: 1, sheep: 3, begging: 0 })
   })
 
-  it('does not reuse a skip marker from an earlier harvest', () => {
+  it('C108 S3: does not reuse a skip marker from an earlier harvest', () => {
     const { session, state } = setupHarvest(7)
     addHarvestFarm(state, 0)
     state.players[0]!.occupationPlayed.push(CARD_ID)

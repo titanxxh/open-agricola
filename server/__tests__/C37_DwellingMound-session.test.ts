@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
-import { GameSession } from '../game/authoritative-session'
+import { GameSession, type SessionResponse } from '../game/authoritative-session'
 import { readCardResourceStats, writeCardExtraData } from '../../shared/cards/helpers/card-state'
+import { setWorkersAtHome } from '../../shared/domain/player'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 
 import '../../shared/cards/A/A040_PottersYard'
@@ -31,8 +32,55 @@ const setupPlowMaker = (food: number, withPottersYard = false) => {
   return session
 }
 
+const setupPlay = (round: number) => {
+  const session = new GameSession(37, undefined, { playerCount: 2 })
+  stabilizeRandomHands(session.state.players)
+  const state = session.getState().state
+  state.currentPlayerIndex = 0
+  state.round = round
+  state.players.forEach((player) => {
+    setWorkersAtHome(state, player, 2)
+    player.minorHand = ['__test_placeholder__']
+    player.occupationHand = ['__test_placeholder__']
+  })
+  state.players[0]!.minorHand = [CARD_ID]
+  state.players[0]!.resources.food = 1
+  session.loadState(state)
+  return session
+}
+
+const playMinor = (session: GameSession) => {
+  let response: SessionResponse = session.takeAction(0, 'meeting-place')
+  if (response.interaction.stateId !== 'wait') return response
+  const improvement = response.interaction.request.options?.find((option) =>
+    option.value.startsWith('action-improvement-'),
+  )
+  if (!improvement) return response
+  response = session.resolveChoice(0, improvement.value)
+  if (response.interaction.stateId !== 'wait') return response
+  const card = response.interaction.request.options?.find((option) => option.value === CARD_ID)
+  if (!card) return response
+  return session.resolveChoice(0, card.value)
+}
+
 describe('C37 Dwelling Mound session', () => {
-  it('attributes the additional food paid for plowing', () => {
+  it('C037 S1: Dwelling Mound can be played in round three for one food', () => {
+    const response = playMinor(setupPlay(3))
+
+    expect(response.ok, response.error).toBe(true)
+    expect(response.state.players[0]!.resources.food).toBe(0)
+    expect(response.state.players[0]!.minorPlayed).toContain(CARD_ID)
+  })
+
+  it('C037 S2: Dwelling Mound is unavailable after round three', () => {
+    const response = playMinor(setupPlay(4))
+
+    expect(response.state.players[0]!.resources.food).toBe(1)
+    expect(response.state.players[0]!.minorHand).toContain(CARD_ID)
+    expect(response.state.players[0]!.minorPlayed).not.toContain(CARD_ID)
+  })
+
+  it('C037 S3: each new field costs one food after Dwelling Mound is in play', () => {
     const session = new GameSession()
     stabilizeRandomHands(session.state.players)
     const state = session.getState().state
@@ -54,7 +102,7 @@ describe('C37 Dwelling Mound session', () => {
     expect(readCardResourceStats(after, CARD_ID)?.paid).toEqual({ food: 1 })
   })
 
-  it('does not record an unaffordable plow', () => {
+  it('C037 S4: without food OA marks Farmland unavailable and rejects action entry', () => {
     const session = new GameSession()
     stabilizeRandomHands(session.state.players)
     const state = session.getState().state

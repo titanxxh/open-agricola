@@ -37,7 +37,22 @@ describe('C101_StallHolder session', () => {
     return resp
   }
 
-  it('with 0 unfenced stables: pay 2 grain, gain 1 VP + 1 food', () => {
+  it('C101 S1: playing Stall Holder through Lessons keeps the occupation in play', () => {
+    const session = new GameSession()
+    stabilizeRandomHands(session.state.players)
+    const state = session.getState().state
+    state.players = state.players.slice(0, 2)
+    state.currentPlayerIndex = 0
+    state.players[0]!.occupationHand = ['C101_StallHolder']
+    session.loadState(state)
+
+    const response = session.takeAction(0, 'lessons')
+
+    expect(response.ok, response.error).toBe(true)
+    expect(response.state.players[0]!.occupationPlayed).toContain('C101_StallHolder')
+  })
+
+  it('C101 S2: with 0 unfenced stables pay 2 grain and gain 1 VP plus 1 food', () => {
     const session = setup({ stableCount: 0 })
 
     enterActiveInteraction(session)
@@ -52,7 +67,7 @@ describe('C101_StallHolder session', () => {
     expect(isCardFlagged(player, 'C101_StallHolder')).toBe(true)
   })
 
-  it('with 3 unfenced stables: pay 2 grain, gain 1 VP + 4 food', () => {
+  it('C101 S3: with 3 unfenced stables pay 2 grain and gain 1 VP plus 4 food', () => {
     const session = setup({ stableCount: 3 })
 
     enterActiveInteraction(session)
@@ -67,7 +82,7 @@ describe('C101_StallHolder session', () => {
     expect(isCardFlagged(player, 'C101_StallHolder')).toBe(true)
   })
 
-  it('counts the B85 FarmHand stable as unfenced (card-facing count)', () => {
+  it('C101 supplemental: counts the B85 FarmHand stable as unfenced', () => {
     const session = setup({ stableCount: 0 })
     const state = session.getState().state
     const player = state.players[0]!
@@ -84,7 +99,7 @@ describe('C101_StallHolder session', () => {
     expect(resp.state.players[0]!.resources.food).toBe(2) // 1 unfenced stable + 1
   })
 
-  it('not available without 2 grain', () => {
+  it('C101 S4: fewer than 2 grain keeps Stall Holder unavailable', () => {
     const session = setup()
     const state = session.getState().state
     const player = state.players[0]!
@@ -96,7 +111,7 @@ describe('C101_StallHolder session', () => {
     expect(anytimeIds).not.toContain('C101-stall-holder-anytime')
   })
 
-  it('once per round: flagged after use', () => {
+  it('C101 S5: Stall Holder can be used only once in the same round', () => {
     const session = setup()
 
     enterActiveInteraction(session)
