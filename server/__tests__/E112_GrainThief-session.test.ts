@@ -5,6 +5,7 @@ import { markAllWorkersUsed } from '../../shared/domain/player'
 import type { ActionChoiceOption, ActionFlow, FarmTilePosition, Field, PlayerState } from '../../shared/contract/types'
 
 import '../../shared/cards/E/E112_GrainThief'
+import '../../shared/cards/B/B113_PatchCaregiver'
 
 const CARD_ID = 'E112_GrainThief'
 
@@ -114,6 +115,44 @@ const expectE112Selection = (resp: ReturnType<GameSession['performRoundEnd']>) =
 }
 
 describe('E112_GrainThief harvest timing', () => {
+  it('leaves grain on a selected Card Field and grants supply grain', () => {
+    const session = setupSession()
+    const player = session.state.players[0]!
+    player.fields = []
+    player.occupationPlayed.push('B113_PatchCaregiver')
+    player.cardStates.B113_PatchCaregiver = {
+      extraData: { cardFieldStacks: [{ crop: 'grain', remaining: 2 }] },
+    }
+    session.loadState(session.state)
+
+    let resp = session.performRoundEnd()
+    resp = selectE112Trigger(session, resp)
+    resp = acceptOptional(session, resp)
+    expect(resp.interaction.stateId === 'wait'
+      ? resp.interaction.request.selection?.selectablePositions
+      : []).toEqual([{
+      row: -1,
+      col: 2113,
+      sourceCard: 'B113_PatchCaregiver',
+      groupKey: 'B113_PatchCaregiver',
+      cardFieldSlot: 0,
+    }])
+    resp = session.commitSelectionChoice(0, { positions: [{ row: -1, col: 2113 }] })
+
+    expect(resp.ok, resp.error).toBe(true)
+    expect(resp.state.players[0]!.resources.grain).toBe(1)
+    expect(resp.state.players[0]!.cardStates.B113_PatchCaregiver?.extraData?.cardFieldStacks).toEqual([
+      { crop: 'grain', remaining: 2 },
+    ])
+    expect(resp.state.events).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        type: 'resource.moved',
+        sourceCardId: CARD_ID,
+        resources: { grain: 1 },
+      }),
+    ]))
+  })
+
   it('start field phase offers optional selection for grain fields and does not reap or gain immediately', () => {
     const effect = getCardEffect(CARD_ID)
     expect(effect).toBeDefined()

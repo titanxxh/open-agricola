@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
-import { runCardEffectHook } from '../../shared/cards/card-effects'
 import { readCardExtraData } from '../../shared/cards/helpers/card-state'
+import { reap } from '../../shared/actions/effects/reap'
 import { E080_RockGarden } from '../../shared/cards/E/E080_RockGarden'
 import {
   getMinorImprovementCard,
@@ -95,7 +95,7 @@ describe('E080_RockGarden session', () => {
       null,
     ])
 
-    runCardEffectHook(resp.state, playerAfter, CARD_ID, 'onHarvestFieldPhase')
+    reap(resp.state, playerAfter)
     expect(playerAfter.resources.stone).toBe(1)
     expect(readCardExtraData(playerAfter, CARD_ID, 'cardFieldStacks')).toEqual([
       { crop: 'stone', remaining: 1 },
@@ -143,7 +143,7 @@ describe('E080_RockGarden session', () => {
       { crop: 'stone', remaining: 2 },
     ])
 
-    runCardEffectHook(resp.state, playerAfter, CARD_ID, 'onHarvestFieldPhase')
+    reap(resp.state, playerAfter)
     expect(playerAfter.resources.stone).toBe(3)
     expect(readCardExtraData(playerAfter, CARD_ID, 'cardFieldStacks')).toEqual([
       { crop: 'stone', remaining: 1 },
@@ -167,7 +167,7 @@ describe('E080_RockGarden session', () => {
     let total = 0
     for (let i = 0; i < 2; i++) {
       const before = player.resources.stone
-      runCardEffectHook(state, player, CARD_ID, 'onHarvestFieldPhase')
+      reap(state, player)
       total += player.resources.stone - before
     }
     expect(total).toBe(6)

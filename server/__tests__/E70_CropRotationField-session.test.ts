@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession, type SessionResponse } from '../game/authoritative-session'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
-import { getCardEffect, runCardEffectHook } from '../../shared/cards/card-effects'
 import { computeExtraSowableFields } from '../../shared/cards/card-effects'
 import { readCardExtraData, writeCardExtraData } from '../../shared/cards/helpers/card-state'
 import { buildSowFarmInteraction } from '../../shared/domain/farmyard-interaction'
@@ -351,92 +350,6 @@ describe('E070_CropRotationField session', () => {
       expect(stacks ?? []).toEqual([null])
     })
 
-    it('last grain harvested with vegetable available -> optional sow flow returned', () => {
-      // Test the hook directly using runCardEffectHook
-      const session = setup({
-        round: 4,
-        grain: 0,
-        vegetable: 1,
-        cardCrop: { crop: 'grain', remaining: 1 },
-      })
-
-      const state = session.getState().state
-      const player = state.players[0]!
-
-      const flow = runCardEffectHook(state, player, CARD_ID, 'onHarvestFieldPhase')
-      expect(flow).not.toBeNull()
-      expect(flow!.type).toBe('parallel')
-      const sow = (flow as Extract<ActionFlow, { type: 'parallel' }>).children[0] as Extract<ActionFlow, { type: 'leaf' }>
-      expect(sow.actionId).toBe('sow')
-      expect(sow.optional).toBe(true)
-      expect(sow.sourceCard).toBe(CARD_ID)
-      expect(sow.actionContext).toEqual({
-        allowedFields: 'fromSelectedFields',
-        sourceCard: CARD_ID,
-        cropType: 'vegetable',
-        minSelections: 1,
-        maxSelections: 1,
-        autoResolveSingleSelection: true,
-      })
-
-      // Verify state changes
-      expect(player.resources.grain).toBe(1) // gained 1 grain
-      const stacks = readCardExtraData<{ crop: string; remaining: number }[]>(
-        player,
-        CARD_ID,
-        'cardFieldStacks',
-      )
-      expect(stacks ?? []).toEqual([null])
-
-      // Verify selectedPositions was set
-      const selectedPositions = readCardExtraData<string[]>(player, CARD_ID, 'selectedPositions')
-      expect(selectedPositions).toEqual(['-1-5070'])
-    })
-
-    it('last vegetable harvested with grain available -> optional sow flow returned', () => {
-      const session = setup({
-        round: 4,
-        grain: 1,
-        vegetable: 0,
-        cardCrop: { crop: 'vegetable', remaining: 1 },
-      })
-
-      const state = session.getState().state
-      const player = state.players[0]!
-
-      const flow = runCardEffectHook(state, player, CARD_ID, 'onHarvestFieldPhase')
-      expect(flow).not.toBeNull()
-      expect(flow!.type).toBe('parallel')
-      const sow = (flow as Extract<ActionFlow, { type: 'parallel' }>).children[0] as Extract<ActionFlow, { type: 'leaf' }>
-      expect(sow.actionId).toBe('sow')
-      expect(sow.optional).toBe(true)
-
-      expect(player.resources.vegetable).toBe(1) // gained 1 vegetable
-    })
-
-    it('last grain harvested without vegetable available -> no flow returned', () => {
-      const session = setup({
-        round: 4,
-        grain: 0,
-        vegetable: 0,
-        cardCrop: { crop: 'grain', remaining: 1 },
-      })
-
-      const state = session.getState().state
-      const player = state.players[0]!
-
-      const flow = runCardEffectHook(state, player, CARD_ID, 'onHarvestFieldPhase')
-      expect(flow).toBeNull() // no opposite seeds
-
-      expect(player.resources.grain).toBe(1) // still harvested
-      const stacks = readCardExtraData<{ crop: string; remaining: number }[]>(
-        player,
-        CARD_ID,
-        'cardFieldStacks',
-      )
-      expect(stacks ?? []).toEqual([null])
-    })
-
     it('last grain harvested without vegetable completes without an E070 prompt', () => {
       const session = setup({
         round: 4,
@@ -469,12 +382,8 @@ describe('E070_CropRotationField session', () => {
         grain: 0,
       })
 
-      const state = session.getState().state
-      const player = state.players[0]!
-
-      const flow = runCardEffectHook(state, player, CARD_ID, 'onHarvestFieldPhase')
-      expect(flow).toBeNull()
-      expect(player.resources.grain).toBe(0) // no change
+      const resp = session.performRoundEnd()
+      expect(resp.state.players[0]!.resources.grain).toBe(0)
     })
   })
 

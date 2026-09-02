@@ -1,10 +1,12 @@
 import type { Field, GameState, PlayerState } from '../../contract/types'
 import { fieldTotalRemaining } from '../../domain/field'
+import type { LogicalField } from '../../cards/helpers/card-field'
 
 export type HarvestCountModifierContext = {
   state: GameState
   player: PlayerState
   field: Field
+  logicalField?: LogicalField
 }
 
 export type HarvestSelectionThresholdContext = HarvestCountModifierContext & {
@@ -58,17 +60,18 @@ export const computeHarvestCount = (
   state: GameState,
   player: PlayerState,
   field: Field,
+  options: { baseCount?: number; logicalField?: LogicalField } = {},
 ) => {
   const sources = new Set<string>(['base'])
   const tags = new Set<string>()
-  let count = 1
+  let count = options.baseCount ?? 1
   let override: number | undefined
   let overrideSources: string[] | undefined
   let scope: 'top-stack' | 'field' = 'top-stack'
   const deltaSources: string[] = []
 
   for (const [cardId, modifier] of modifiers) {
-    const result = modifier({ state, player, field })
+    const result = modifier({ state, player, field, logicalField: options.logicalField })
     if (!result) continue
     const nextSources = result.sources?.length ? result.sources : [cardId]
     result.tags?.forEach((tag) => tags.add(tag))
@@ -102,6 +105,7 @@ export const computeHarvestSelectionThreshold = (
   options: {
     sourceCard: string
     baseThreshold: number
+    logicalField?: LogicalField
   },
 ) => {
   let threshold = options.baseThreshold
@@ -111,6 +115,7 @@ export const computeHarvestSelectionThreshold = (
       state,
       player,
       field,
+      logicalField: options.logicalField,
       sourceCard: options.sourceCard,
       baseThreshold: options.baseThreshold,
     })

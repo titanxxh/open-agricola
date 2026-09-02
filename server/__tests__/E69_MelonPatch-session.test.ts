@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 import { getCardEffect, computeExtraSowableFields } from '../../shared/cards/card-effects'
+import { reap } from '../../shared/actions/effects/reap'
 
 import { markAllWorkersUsed } from '../../shared/domain/player'
 import '../../shared/cards/E/E069_MelonPatch'
@@ -114,10 +115,8 @@ describe('E069_MelonPatch session', () => {
       }
       session.loadState(state)
 
-      const effect = getCardEffect(CARD_ID)
-      expect(effect).toBeDefined()
       const vegBefore = player.resources.vegetable
-      const flow = effect!.onHarvestFieldPhase!(state, player)
+      const flow = reap(state, player).reactionFlow
       expect(player.resources.vegetable).toBe(vegBefore + 1)
       // remaining was 2, now 1 — no plow since not last
       expect(flow).toBeUndefined()
@@ -134,8 +133,7 @@ describe('E069_MelonPatch session', () => {
       }
       session.loadState(state)
 
-      const effect = getCardEffect(CARD_ID)
-      const flow = effect!.onHarvestFieldPhase!(state, player)
+      const flow = reap(state, player).reactionFlow
       expect(flow).toBeUndefined()
     })
 
@@ -148,9 +146,8 @@ describe('E069_MelonPatch session', () => {
       }
       session.loadState(state)
 
-      const effect = getCardEffect(CARD_ID)
       const vegBefore = player.resources.vegetable
-      const flow = effect!.onHarvestFieldPhase!(state, player)
+      const flow = reap(state, player).reactionFlow
       expect(player.resources.vegetable).toBe(vegBefore + 1)
       // Stack should be cleared
       const stacks = player.cardStates[CARD_ID]?.extraData?.cardFieldStacks as any[]

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
-import { getCardEffect } from '../../shared/cards/card-effects'
+import { reap } from '../../shared/actions/effects/reap'
 
 import { markAllWorkersUsed } from '../../shared/domain/player'
 import '../../shared/cards/C/C070_LettucePatch'
@@ -135,9 +135,7 @@ describe('C070_LettucePatch session', () => {
 
       session.loadState(state)
 
-      const effect = getCardEffect(CARD_ID)
-      expect(effect).toBeDefined()
-      const flow = effect!.onHarvestFieldPhase!(state, player)
+      const flow = reap(state, player).reactionFlow
 
       // Should have harvested 1 vegetable
       expect(player.resources.vegetable).toBe(1)
@@ -236,8 +234,7 @@ describe('C070_LettucePatch session', () => {
 
       session.loadState(state)
 
-      const effect = getCardEffect(CARD_ID)
-      effect!.onHarvestFieldPhase!(state, player)
+      reap(state, player)
 
       // Vegetable should have been harvested
       expect(player.resources.vegetable).toBe(1)

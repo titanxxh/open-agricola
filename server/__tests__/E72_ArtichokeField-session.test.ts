@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
-import { getCardEffect, computeExtraSowableFields } from '../../shared/cards/card-effects'
+import { computeExtraSowableFields } from '../../shared/cards/card-effects'
+import { reap } from '../../shared/actions/effects/reap'
 
 import { markAllWorkersUsed } from '../../shared/domain/player'
 import '../../shared/cards/E/E072_ArtichokeField'
@@ -213,10 +214,9 @@ describe('E072_ArtichokeField session', () => {
       }
       session.loadState(state)
 
-      const effect = getCardEffect(CARD_ID)!
       // Drive 4 harvests — last one is a no-op once remaining=0.
       for (let i = 0; i < 4; i++) {
-        effect.onHarvestFieldPhase!(state, player)
+        reap(state, player)
       }
       expect(player.resources.grain).toBe(3)
       expect(player.resources.food).toBe(3)
@@ -235,9 +235,8 @@ describe('E072_ArtichokeField session', () => {
       }
       session.loadState(state)
 
-      const effect = getCardEffect(CARD_ID)!
       for (let i = 0; i < 3; i++) {
-        effect.onHarvestFieldPhase!(state, player)
+        reap(state, player)
       }
       expect(player.resources.vegetable).toBe(2)
       expect(player.resources.food).toBe(2)
@@ -253,8 +252,7 @@ describe('E072_ArtichokeField session', () => {
       // No stacks set — empty card field.
       session.loadState(state)
 
-      const effect = getCardEffect(CARD_ID)!
-      effect.onHarvestFieldPhase!(state, player)
+      reap(state, player)
       expect(player.resources.food).toBe(0)
     })
 
@@ -268,12 +266,9 @@ describe('E072_ArtichokeField session', () => {
       }
       session.loadState(state)
 
-      // Test the effect hook directly
-      const effect = getCardEffect(CARD_ID)
-      expect(effect).toBeDefined()
       const foodBefore = player.resources.food
       const vegBefore = player.resources.vegetable
-      effect!.onHarvestFieldPhase!(state, player)
+      reap(state, player)
       expect(player.resources.vegetable).toBe(vegBefore + 1)
       expect(player.resources.food).toBe(foodBefore + 1)
     })

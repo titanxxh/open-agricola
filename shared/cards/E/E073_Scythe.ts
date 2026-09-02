@@ -1,10 +1,11 @@
 import { defineMinorCard } from '../card-source'
 import type { ActionDefinition, ActionFlow } from '../../contract/types'
-import { fieldTopStack, fieldTotalRemaining } from '../../domain/field'
+import { fieldTotalRemaining } from '../../domain/field'
 import { registerAdHocAction } from '../../actions/helpers/ad-hoc-action-registry'
 import { registerHarvestCountModifier } from '../../actions/helpers/harvest-count-registry'
 import { readCardExtraData, writeCardExtraData } from '../helpers/card-state'
 import type { CardImpl } from '../registry'
+import { getLogicalFields } from '../helpers/card-field'
 
 const CARD_ID = 'E073_Scythe'
 
@@ -21,21 +22,27 @@ const scytheHarvestFieldAction: ActionDefinition = {
   gainPerRound: {},
   canBeExecutedByPlayer: () => true,
   execute: ({ player, params }) => {
-    const fieldIndex = params?.fieldIndex as number | undefined
-    if (fieldIndex === undefined) return { type: 'fail', errorKey: 'log.actionFail' }
-    const field = player.fields[fieldIndex]
-    if (!field || fieldTotalRemaining(field) < 2) return { type: 'fail', errorKey: 'log.actionFail' }
-    writeCardExtraData(player, CARD_ID, FULL_REAP_POSITION_KEY, fieldKey(field.row, field.col))
+    const fieldId = params?.fieldId as string | undefined
+    const field = getLogicalFields(player).find((candidate) => candidate.id === fieldId)
+    if (!field || field.stacks.reduce((sum, stack) => sum + stack.remaining, 0) < 2) {
+      return { type: 'fail', errorKey: 'log.actionFail' }
+    }
+    const slot = [...field.slots].reverse().find((candidate) => candidate.stack)
+    if (!slot) return { type: 'fail', errorKey: 'log.actionFail' }
+    writeCardExtraData(player, CARD_ID, FULL_REAP_POSITION_KEY, fieldKey(slot.tile.row, slot.tile.col))
     return { type: 'ok' }
   },
 }
 
 registerAdHocAction(scytheHarvestFieldAction)
 
-registerHarvestCountModifier(CARD_ID, ({ player, field }) => {
+registerHarvestCountModifier(CARD_ID, ({ player, field, logicalField }) => {
   if (!player.minorPlayed?.includes(CARD_ID)) return
   const selected = readCardExtraData<string>(player, CARD_ID, FULL_REAP_POSITION_KEY)
-  if (selected !== fieldKey(field.row, field.col)) return
+  const selectedField = logicalField
+    ? logicalField.slots.some((slot) => selected === fieldKey(slot.tile.row, slot.tile.col))
+    : selected === fieldKey(field.row, field.col)
+  if (!selectedField) return
   return {
     override: fieldTotalRemaining(field),
     sources: [CARD_ID],
@@ -48,17 +55,16 @@ const cardImpl = {
   effect: {
     id: CARD_ID,
     onStartHarvestFieldPhase: (_state, player) => {
-      const harvestable = player.fields
-        .map((f, i) => ({ field: f, index: i }))
-        .filter(({ field }) => fieldTotalRemaining(field) >= 2)
+      const harvestable = getLogicalFields(player)
+        .filter((field) => field.stacks.reduce((sum, stack) => sum + stack.remaining, 0) >= 2)
       if (harvestable.length === 0) return
-      const children: ActionFlow[] = harvestable.map(({ field, index }) => {
-        const top = fieldTopStack(field)
-        const total = fieldTotalRemaining(field)
+      const children: ActionFlow[] = harvestable.map((field) => {
+        const top = field.stacks.at(-1)
+        const total = field.stacks.reduce((sum, stack) => sum + stack.remaining, 0)
         return {
           type: 'leaf' as const,
           actionId: HARVEST_ACTION_ID,
-          params: { fieldIndex: index },
+          params: { fieldId: field.id },
           sourceCard: CARD_ID,
           choiceLabelKey: 'ui.interactionScytheField',
           choiceLabelParams: { crop: top?.kind ?? null, amount: total },

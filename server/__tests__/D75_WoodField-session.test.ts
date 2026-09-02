@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
-import { runCardEffectHook } from '../../shared/cards/card-effects'
 import { readCardExtraData } from '../../shared/cards/helpers/card-state'
+import { reap } from '../../shared/actions/effects/reap'
 import { D075_WoodField } from '../../shared/cards/D/D075_WoodField'
 import {
   getMinorImprovementCard,
@@ -99,7 +99,7 @@ describe('D075_WoodField session', () => {
 
     // Drive a single harvest tick directly: onHarvestFieldPhase is the unit
     // of work — running it on the post-sow state must hand back 1 wood.
-    runCardEffectHook(resp.state, playerAfter, CARD_ID, 'onHarvestFieldPhase')
+    reap(resp.state, playerAfter)
     expect(playerAfter.resources.wood).toBe(1)
     expect(readCardExtraData(playerAfter, CARD_ID, 'cardFieldStacks')).toEqual([
       { crop: 'wood', remaining: 2 },
@@ -143,7 +143,7 @@ describe('D075_WoodField session', () => {
       { crop: 'wood', remaining: 3 },
     ])
 
-    runCardEffectHook(resp.state, playerAfter, CARD_ID, 'onHarvestFieldPhase')
+    reap(resp.state, playerAfter)
     expect(playerAfter.resources.wood).toBe(2)
     expect(readCardExtraData(playerAfter, CARD_ID, 'cardFieldStacks')).toEqual([
       { crop: 'wood', remaining: 2 },
@@ -183,7 +183,7 @@ describe('D075_WoodField session', () => {
     let total = 0
     for (let i = 0; i < 3; i++) {
       const before = player.resources.wood
-      runCardEffectHook(state, player, CARD_ID, 'onHarvestFieldPhase')
+      reap(state, player)
       total += player.resources.wood - before
     }
     expect(total).toBe(6)

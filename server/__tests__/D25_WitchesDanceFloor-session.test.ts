@@ -21,6 +21,7 @@ import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 import { getCardEffect, computeExtraSowableFields } from '../../shared/cards/card-effects'
+import { reap } from '../../shared/actions/effects/reap'
 import { meetsCardPrerequisites } from '../../shared/cards/helpers/prerequisites'
 import { getPlayerBakeRates } from '../../shared/cards/helpers/exchange-registry'
 import { computeScores } from '../../shared/domain/scoring'
@@ -263,8 +264,7 @@ describe('D025_WitchesDanceFloor session', () => {
       if (!player.cardStates[CARD_ID]) player.cardStates[CARD_ID] = {}
       player.cardStates[CARD_ID].extraData = { cardFieldStacks: [{ crop: 'grain', remaining: 3 }] }
 
-      const effect = getCardEffect(CARD_ID)!
-      effect.onHarvestFieldPhase!(state, player)
+      reap(state, player)
 
       expect(player.resources.grain).toBe(1)
       const stacks = player.cardStates[CARD_ID]?.extraData?.cardFieldStacks as
@@ -286,10 +286,8 @@ describe('D025_WitchesDanceFloor session', () => {
       if (!player.cardStates[CARD_ID]) player.cardStates[CARD_ID] = {}
       player.cardStates[CARD_ID].extraData = { cardFieldStacks: [{ crop: 'vegetable', remaining: 2 }] }
 
-      const effect = getCardEffect(CARD_ID)!
-
       // First harvest
-      effect.onHarvestFieldPhase!(state, player)
+      reap(state, player)
       expect(player.resources.vegetable).toBe(1)
       const afterFirst = player.cardStates[CARD_ID]?.extraData?.cardFieldStacks as
         | { crop: string; remaining: number }[]
@@ -297,7 +295,7 @@ describe('D025_WitchesDanceFloor session', () => {
       expect(afterFirst).toEqual([{ crop: 'vegetable', remaining: 1 }])
 
       // Second harvest
-      effect.onHarvestFieldPhase!(state, player)
+      reap(state, player)
       expect(player.resources.vegetable).toBe(2)
       const afterSecond = player.cardStates[CARD_ID]?.extraData?.cardFieldStacks
       expect(afterSecond).toEqual([null])

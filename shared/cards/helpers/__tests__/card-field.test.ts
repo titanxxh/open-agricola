@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import type { GameState, HarvestReapSummary, PlayerState } from '../../../contract/types'
+import type { GameState, PlayerState } from '../../../contract/types'
 import type { DraftGameEvent, EventSink } from '../../../contract/events'
 import {
   deriveVirtualTileCol,
@@ -9,6 +9,7 @@ import {
   mutateLogicalFields,
   removeCardFieldCrop,
 } from '../card-field'
+import { reap } from '../../../actions/effects/reap'
 
 const emptyResources = () => ({
   wood: 0, clay: 0, reed: 0, stone: 0, food: 0,
@@ -56,11 +57,6 @@ const createState = (player: PlayerState): GameState => ({
   pendingFutureMeeples: [],
   gameOver: false,
 } as GameState)
-
-const initSummary = (state: GameState, pid: string) => {
-  state.harvestReapSummary = state.harvestReapSummary ?? {}
-  state.harvestReapSummary[pid] = { resources: {}, grainFields: 0, vegetableFields: 0, harvestedPositions: [] } as HarvestReapSummary
-}
 
 describe('logical field boundary', () => {
   it('projects deterministic immutable Farmyard and Card Fields with fixed stable slots', () => {
@@ -278,17 +274,17 @@ describe('makeCardFieldImpl', () => {
     })
   })
 
-  describe('onHarvestFieldPhase: reapSummary accumulation', () => {
+  describe('shared reap: summary accumulation', () => {
     it('累加到 summary.resources[crop]', () => {
-      const impl = makeCardFieldImpl('D075_WoodField', { allowedCrops: ['wood'], capacity: 2 })
+      makeCardFieldImpl('D075_WoodField', { allowedCrops: ['wood'], capacity: 2 })
       const player = createPlayer({
+        minorPlayed: ['D075_WoodField'],
         cardStates: { D075_WoodField: { extraData: { cardFieldStacks: [{ crop: 'wood', remaining: 1 }, { crop: 'wood', remaining: 3 }] } } },
       })
       const state = createState(player)
-      initSummary(state, player.id)
-      impl.effect.onHarvestFieldPhase!(state, player)
-      expect(state.harvestReapSummary![player.id].resources.wood).toBe(2)
-      expect(state.harvestReapSummary![player.id].harvestedPositions).toEqual([
+      const result = reap(state, player)
+      expect(result.reapSummary.resources.wood).toBe(2)
+      expect(result.reapSummary.harvestedPositions).toEqual([
         { row: -1, col: 4075 },
       ])
       expect(player.resources.wood).toBe(2)
@@ -299,45 +295,45 @@ describe('makeCardFieldImpl', () => {
     })
   })
 
-  describe('onHarvestFieldPhase: isLast semantics', () => {
+  describe('shared reap: isLast semantics', () => {
     it('isLast=false when more remaining on card', () => {
       let received: { crop: string; isLast: boolean } | null = null
-      const impl = makeCardFieldImpl('D075_WoodField', { allowedCrops: ['wood'], capacity: 2 }, {
+      makeCardFieldImpl('D075_WoodField', { allowedCrops: ['wood'], capacity: 2 }, {
         onReap: (ctx) => { received = { crop: ctx.crop, isLast: ctx.isLast } },
       })
       const player = createPlayer({
+        minorPlayed: ['D075_WoodField'],
         cardStates: { D075_WoodField: { extraData: { cardFieldStacks: [{ crop: 'wood', remaining: 3 }, { crop: 'wood', remaining: 1 }] } } },
       })
       const state = createState(player)
-      initSummary(state, player.id)
-      impl.effect.onHarvestFieldPhase!(state, player)
+      reap(state, player)
       expect(received).toEqual({ crop: 'wood', isLast: false })
     })
     it('isLast=true when last unit on card', () => {
       let received: { crop: string; isLast: boolean } | null = null
-      const impl = makeCardFieldImpl('E068_CherryOrchard', { allowedCrops: ['wood'], capacity: 1 }, {
+      makeCardFieldImpl('E068_CherryOrchard', { allowedCrops: ['wood'], capacity: 1 }, {
         onReap: (ctx) => { received = { crop: ctx.crop, isLast: ctx.isLast } },
       })
       const player = createPlayer({
+        minorPlayed: ['E068_CherryOrchard'],
         cardStates: { E068_CherryOrchard: { extraData: { cardFieldStacks: [{ crop: 'wood', remaining: 1 }] } } },
       })
       const state = createState(player)
-      initSummary(state, player.id)
-      impl.effect.onHarvestFieldPhase!(state, player)
+      reap(state, player)
       expect(received).toEqual({ crop: 'wood', isLast: true })
       expect(player.cardStates!.E068_CherryOrchard.extraData.cardFieldStacks).toEqual([null])
     })
     it('multi-crop: each crop reports isLast independently', () => {
       const received: { crop: string; isLast: boolean }[] = []
-      const impl = makeCardFieldImpl('E070_CropRotationField', { allowedCrops: ['grain', 'vegetable'], capacity: 2 }, {
+      makeCardFieldImpl('E070_CropRotationField', { allowedCrops: ['grain', 'vegetable'], capacity: 2 }, {
         onReap: (ctx) => { received.push({ crop: ctx.crop, isLast: ctx.isLast }) },
       })
       const player = createPlayer({
+        minorPlayed: ['E070_CropRotationField'],
         cardStates: { E070_CropRotationField: { extraData: { cardFieldStacks: [{ crop: 'grain', remaining: 1 }, { crop: 'vegetable', remaining: 1 }] } } },
       })
       const state = createState(player)
-      initSummary(state, player.id)
-      impl.effect.onHarvestFieldPhase!(state, player)
+      reap(state, player)
       expect(received).toHaveLength(2)
       expect(received).toEqual(expect.arrayContaining([
         { crop: 'grain', isLast: true },
@@ -346,32 +342,32 @@ describe('makeCardFieldImpl', () => {
     })
   })
 
-  describe('onHarvestFieldPhase: ActionFlow collection', () => {
+  describe('shared reap: ActionFlow collection', () => {
     it('single onReap flow → wrap in parallel', () => {
-      const impl = makeCardFieldImpl('E068_CherryOrchard', { allowedCrops: ['wood'], capacity: 1 }, {
+      makeCardFieldImpl('E068_CherryOrchard', { allowedCrops: ['wood'], capacity: 1 }, {
         onReap: () => ({ type: 'leaf', actionId: 'noop', sourceCard: 'E068_CherryOrchard' }),
       })
       const player = createPlayer({
+        minorPlayed: ['E068_CherryOrchard'],
         cardStates: { E068_CherryOrchard: { extraData: { cardFieldStacks: [{ crop: 'wood', remaining: 1 }] } } },
       })
       const state = createState(player)
-      initSummary(state, player.id)
-      const flow = impl.effect.onHarvestFieldPhase!(state, player)
+      const flow = reap(state, player).reactionFlow
       expect(flow).toMatchObject({
         type: 'parallel',
         children: [{ type: 'leaf', actionId: 'noop' }],
       })
     })
     it('multiple onReap flows → wrap in parallel', () => {
-      const impl = makeCardFieldImpl('E070_CropRotationField', { allowedCrops: ['grain', 'vegetable'], capacity: 2 }, {
+      makeCardFieldImpl('E070_CropRotationField', { allowedCrops: ['grain', 'vegetable'], capacity: 2 }, {
         onReap: (ctx) => ({ type: 'leaf', actionId: `flow-${ctx.crop}`, sourceCard: 'E070_CropRotationField' }),
       })
       const player = createPlayer({
+        minorPlayed: ['E070_CropRotationField'],
         cardStates: { E070_CropRotationField: { extraData: { cardFieldStacks: [{ crop: 'grain', remaining: 1 }, { crop: 'vegetable', remaining: 1 }] } } },
       })
       const state = createState(player)
-      initSummary(state, player.id)
-      const flow = impl.effect.onHarvestFieldPhase!(state, player) as { type: 'parallel'; children: any[] }
+      const flow = reap(state, player).reactionFlow as { type: 'parallel'; children: any[] }
       expect(flow.type).toBe('parallel')
       expect(flow.children).toHaveLength(2)
     })
