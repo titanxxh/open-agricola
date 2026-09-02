@@ -25,13 +25,16 @@ const specialEffectLeaf = (
 })
 
 const fieldPosition = (
-  location: { kind: string; row?: number; col?: number },
-): FarmTilePosition | undefined =>
-  location.kind === 'field' &&
-  Number.isFinite(location.row) &&
-  Number.isFinite(location.col)
-    ? { row: location.row!, col: location.col! }
-    : undefined
+  player: CardListenerContext['player'],
+  location: { kind: string; row?: number; col?: number; cardId?: string },
+): FarmTilePosition | undefined => {
+  if (location.kind === 'field' && Number.isFinite(location.row) && Number.isFinite(location.col)) {
+    return { row: location.row!, col: location.col! }
+  }
+  if (location.kind !== 'card' || !location.cardId) return
+  const field = getLogicalFields(player).find((candidate) => candidate.sourceCard === location.cardId)
+  return field ? { row: field.row, col: field.col } : undefined
+}
 
 const isFarmSownEvent = (
   event: CardListenerContext['transactionEvents'][number],
@@ -70,7 +73,7 @@ const eventPositions = (context: CardListenerContext): FarmTilePosition[] => {
     return events.flatMap((event) =>
       isFarmSownEvent(event)
         ? event.sows.flatMap((sow) => {
-            const pos = fieldPosition(sow.location)
+            const pos = fieldPosition(context.player, sow.location)
             return pos ? [pos] : []
           })
         : [],
@@ -84,7 +87,7 @@ const eventPositions = (context: CardListenerContext): FarmTilePosition[] => {
   return events.flatMap((event) =>
     isFarmCropRemovedEvent(event) && event.reason === 'reap'
       ? event.crops.flatMap((crop) => {
-          const pos = fieldPosition(crop.location)
+          const pos = fieldPosition(context.player, crop.location)
           return pos ? [pos] : []
         })
       : [],

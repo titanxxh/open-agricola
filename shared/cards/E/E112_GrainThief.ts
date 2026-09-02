@@ -82,7 +82,7 @@ registerHarvestCountModifier(CARD_ID, ({ player, field, logicalField }) => {
 
 registerHarvestSelectionThresholdModifier(CARD_ID, ({ player, field, logicalField }) => {
   if (!player.occupationPlayed?.includes(CARD_ID)) return
-  if (!logicalField && !player.fields.some((candidate) => fieldKey(candidate) === fieldKey(field))) return
+  if (!logicalField) return
   const top = fieldTopStack(field)
   if (top?.kind !== 'grain') return
   return { threshold: 1, sources: [CARD_ID] }

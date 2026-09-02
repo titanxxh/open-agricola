@@ -1,11 +1,10 @@
 import type { ActionFlow, PlayerState, Resource } from '../../contract/types'
-import { countFieldsWithCrop } from '../../domain/field'
 import { countUnusedFarmyardSpaces } from '../../domain/farmyard-usage'
 import { getStableCountForCards } from '../../domain/stables'
 import { initCardState } from '../__stubs__/helpers'
 import { getPlayerBakeRates } from '../helpers/exchange-registry'
 import { collectCardsAs } from '../helpers/card-type'
-import { hasCardFieldCrop } from '../helpers/card-field'
+import { getLogicalFields } from '../helpers/card-field'
 
 type CraftReward = {
   ids: readonly string[]
@@ -32,13 +31,13 @@ export const countTerrain = (player: PlayerState, kind: 'forest' | 'moor') =>
 export const unusedFarmyardSpaces = countUnusedFarmyardSpaces
 
 export const hasFarmShape = (player: PlayerState) =>
-  player.fields.length > 0 || player.pastures.length > 0 || getStableCountForCards(player) > 0
+  getLogicalFields(player).length > 0 || player.pastures.length > 0 || getStableCountForCards(player) > 0
 
 export const hasStableOrPasture = (player: PlayerState) =>
   getStableCountForCards(player) > 0 || player.pastures.length > 0
 
 export const hasGrowingCrop = (player: PlayerState, crop: 'grain' | 'vegetable') =>
-  countFieldsWithCrop(player.fields, crop) > 0 || hasCardFieldCrop(player, crop)
+  getLogicalFields(player).some((field) => field.stacks.some((stack) => stack.kind === crop))
 
 export const bestBakeFood = (player: PlayerState) =>
   Math.max(0, ...getPlayerBakeRates(player).map((rate) => rate.rate))

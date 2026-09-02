@@ -1,13 +1,13 @@
 import { defineMinorCard } from '../card-source'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
-import { positionKey } from '../../domain/farm'
+import { parsePositionKey, positionKey } from '../../domain/farm'
 import { registerSelectionEffect } from '../../actions/helpers/selection-effect-registry'
 import { extraCropPlacementActionContext } from '../../actions/helpers/extra-crop-placement-context'
 import type { ActionFlow, PlayerState } from '../../contract/types'
 import type { FarmSownEvent } from '../../contract/events'
-import { fieldTopStack } from '../../domain/field'
 import type { CardImpl } from '../registry'
+import { getFarmyardFields, mutateLogicalFields } from '../helpers/card-field'
 
 const CARD_ID = 'E071_CowPatty'
 
@@ -34,15 +34,18 @@ const countCattleOnBoard = (player: PlayerState): number => {
  * filter to those adjacent to pastures, then offer an optional selection.
  */
 
-registerSelectionEffect('cow-patty-bonus-crop', ({ player, positions }) => {
+registerSelectionEffect('cow-patty-bonus-crop', ({ state, player, positions, eventSink }) => {
   const [key] = positions
   if (!key) return
-  const [r, c] = key.split('-').map(Number)
-  const field = player.fields.find((f) => f.row === r && f.col === c)
+  const position = parsePositionKey(key)
+  const field = position && getFarmyardFields(player).find((candidate) =>
+    candidate.row === position.row && candidate.col === position.col,
+  )
   if (!field) return
-  const top = fieldTopStack(field)
-  if (!top) return
-  top.remaining += 1
+  const top = field.slots.at(-1)
+  if (!top?.stack) return
+  mutateLogicalFields(state, player, { sourceCard: CARD_ID, eventSink })
+    .grow({ fieldId: field.id, slot: top.index }, 1)
 })
 
 /**
@@ -84,9 +87,9 @@ const getFreshlySownFields = (context: CardListenerContext) => {
         return [[`${location.row}-${location.col}`, sow.crop] as const]
       }),
   )
-  return context.player.fields.filter((field) => {
+  return getFarmyardFields(context.player).filter((field) => {
     const crop = cropByPosition.get(`${field.row}-${field.col}`)
-    const top = fieldTopStack(field)
+    const top = field.stacks.at(-1)
     return !!crop && !!top && top.kind === crop && top.remaining > 0
   })
 }

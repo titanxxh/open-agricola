@@ -1,7 +1,7 @@
 import { defineOccupationCard } from '../card-source'
 import { gainLeaf } from '../helpers/pay-gain-node'
-import { fieldHasCrop, fieldFindStackOfKind } from '../../domain/field'
 import type { CardImpl } from '../registry'
+import { getLogicalFields } from '../helpers/card-field'
 
 const CARD_ID = 'E135_Pickler'
 const roundsLeftWoodBonus = (state: { round: number }): number => {
@@ -23,9 +23,10 @@ const cardImpl = {
   },
   computeBonusScore: (state, player) => {
     const totalVeg = (p: typeof player) =>
-      (p.resources.vegetable ?? 0) + p.fields
-        .filter((f) => fieldHasCrop(f, 'vegetable'))
-        .reduce((sum, f) => sum + (fieldFindStackOfKind(f, 'vegetable')?.remaining ?? 0), 0)
+      (p.resources.vegetable ?? 0) + getLogicalFields(p)
+        .flatMap((field) => field.stacks)
+        .filter((stack) => stack.kind === 'vegetable')
+        .reduce((sum, stack) => sum + stack.remaining, 0)
     const myVeg = totalVeg(player)
     const maxVeg = Math.max(...state.players.map(totalVeg))
     return myVeg === maxVeg && myVeg > 0 ? 3 : 0

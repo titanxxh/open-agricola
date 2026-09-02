@@ -1,6 +1,7 @@
 import { defineOccupationCard } from '../card-source'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
+import { getLogicalFields } from '../helpers/card-field'
 
 const CARD_ID = 'E107_LandSurveyor'
 
@@ -9,7 +10,7 @@ const cardImpl = {
   id: CARD_ID,
   onHarvestFieldPhase: (_state, player) => {
 
-    const fieldCount = player.fields.length
+    const fieldCount = getLogicalFields(player).length
     let food = 0
     if (fieldCount >= 7) food = 4
     else if (fieldCount >= 6) food = 3

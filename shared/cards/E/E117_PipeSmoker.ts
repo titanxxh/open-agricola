@@ -1,7 +1,7 @@
 import { defineOccupationCard } from '../card-source'
 import { gainLeaf } from '../helpers/pay-gain-node'
-import { fieldHasCrop } from '../../domain/field'
 import type { CardImpl } from '../registry'
+import { getLogicalFields } from '../helpers/card-field'
 
 const CARD_ID = 'E117_PipeSmoker'
 
@@ -10,8 +10,8 @@ const cardImpl = {
   id: CARD_ID,
   onStartHarvest: (_state, player) => {
 
-    const grainFieldCount = player.fields.filter(
-      (f) => fieldHasCrop(f, 'grain'),
+    const grainFieldCount = getLogicalFields(player).filter(
+      (field) => field.stacks.some((stack) => stack.kind === 'grain'),
     ).length
     if (grainFieldCount < 1) return
 

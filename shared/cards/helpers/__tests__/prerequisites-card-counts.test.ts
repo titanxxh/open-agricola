@@ -1,32 +1,10 @@
 import { describe, expect, it } from 'vitest'
 import type { PlayerState } from '../../../contract/types'
 import { meetsCardPrerequisites } from '../prerequisites'
-import { MinorImprovement } from '../../registry-display'
-import { registerAdHocMinorImprovement } from '../../registry-runtime'
 import { C070_LettucePatch } from '../../../cards/C/C070_LettucePatch'
-
-// Register a throwaway field-providing minor for this test file only
-registerAdHocMinorImprovement(
-  new MinorImprovement({
-    id: 'TEST_FieldProvider',
-    name: 'Test Field Provider',
-    deck: 'X',
-    number: 999,
-    desc: [],
-    providesField: true,
-  }),
-)
-
-// Register a plain minor without providesField for regression check
-registerAdHocMinorImprovement(
-  new MinorImprovement({
-    id: 'TEST_PlainMinor',
-    name: 'Test Plain Minor',
-    deck: 'X',
-    number: 998,
-    desc: [],
-  }),
-)
+import '../../../cards/B/B068_Beanfield'
+import '../../../cards/B/B113_PatchCaregiver'
+import '../../../cards/B/B141_FieldCaretaker'
 
 type MinimalPlayer = Pick<
   PlayerState,
@@ -61,10 +39,10 @@ function makePlayer(overrides: Partial<MinimalPlayer> = {}): PlayerState {
 }
 
 describe('prerequisites: providesField card-provided fields', () => {
-  it('TEST_FieldProvider in minorPlayed counts toward field requirement (1 real + 1 card = 2)', () => {
+  it('a registered Card Field counts toward a field requirement', () => {
     const player = makePlayer({
       fields: [{ crop: null, amount: 0 } as unknown as PlayerState['fields'][0]],
-      minorPlayed: ['TEST_FieldProvider'],
+      minorPlayed: ['C070_LettucePatch'],
     })
     const card = { prerequisite: '2 Fields' }
     expect(meetsCardPrerequisites(player, card)).toBe(true)
@@ -213,7 +191,7 @@ describe('prerequisites: Card Fields with crops', () => {
 
   it('Card Field grain stacks alone satisfy "2 Grain Fields"', () => {
     const player = makePlayer({
-      minorPlayed: ['B113_PatchCaregiver', 'B141_FieldCaretaker'],
+      occupationPlayed: ['B113_PatchCaregiver', 'B141_FieldCaretaker'],
       cardStates: {
         B113_PatchCaregiver: { extraData: { cardFieldStacks: [{ crop: 'grain', remaining: 1 }] } },
         B141_FieldCaretaker: { extraData: { cardFieldStacks: [{ crop: 'grain', remaining: 1 }] } },
@@ -226,9 +204,9 @@ describe('prerequisites: Card Fields with crops', () => {
   it('ordinary grain field plus Card Field grain stack satisfies "2 Grain Fields"', () => {
     const player = makePlayer({
       fields: [{ row: 1, col: 1, stacks: [{ kind: 'grain', remaining: 1 }] } as unknown as PlayerState['fields'][0]],
-      minorPlayed: ['TEST_FieldProvider'],
+      occupationPlayed: ['B113_PatchCaregiver'],
       cardStates: {
-        TEST_FieldProvider: { extraData: { cardFieldStacks: [{ crop: 'grain', remaining: 1 }] } },
+        B113_PatchCaregiver: { extraData: { cardFieldStacks: [{ crop: 'grain', remaining: 1 }] } },
       },
     })
 
@@ -246,9 +224,9 @@ describe('prerequisites: Card Fields with crops', () => {
   it('non-grain Card Fields do not count toward "2 Grain Fields"', () => {
     const player = makePlayer({
       fields: [{ row: 1, col: 1, stacks: [{ kind: 'grain', remaining: 1 }] } as unknown as PlayerState['fields'][0]],
-      minorPlayed: ['TEST_FieldProvider'],
+      minorPlayed: ['B068_Beanfield'],
       cardStates: {
-        TEST_FieldProvider: { extraData: { cardFieldStacks: [{ crop: 'vegetable', remaining: 1 }] } },
+        B068_Beanfield: { extraData: { cardFieldStacks: [{ crop: 'vegetable', remaining: 1 }] } },
       },
     })
 
@@ -260,7 +238,7 @@ describe('prerequisites: Card Fields with crops', () => {
       fields: [{ row: 1, col: 1, stacks: [{ kind: 'grain', remaining: 1 }] } as unknown as PlayerState['fields'][0]],
     })
     const opponent = makePlayer({
-      minorPlayed: ['B113_PatchCaregiver', 'B141_FieldCaretaker'],
+      occupationPlayed: ['B113_PatchCaregiver', 'B141_FieldCaretaker'],
       cardStates: {
         B113_PatchCaregiver: { extraData: { cardFieldStacks: [{ crop: 'grain', remaining: 1 }] } },
         B141_FieldCaretaker: { extraData: { cardFieldStacks: [{ crop: 'grain', remaining: 1 }] } },

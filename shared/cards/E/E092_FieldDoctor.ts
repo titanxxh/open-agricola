@@ -6,6 +6,7 @@ import { familySize, hasInactiveWorkerInSupply } from '../../domain/player'
 import { positionKey } from '../../domain/farm'
 import { getExtraRoomCapacity } from '../card-effects'
 import type { CardImpl } from '../registry'
+import { getFarmyardFields } from '../helpers/card-field'
 
 const CARD_ID = 'E092_FieldDoctor'
 const REQUIRED_FIELD_KEYS = ['0-0', '0-1', '1-1', '2-1'] as const
@@ -18,7 +19,7 @@ const WISH_CHILDREN_SPACE_IDS = new Set([
 const checkRoomsSurroundedByFields = (context: CardListenerContext): boolean => {
   const player = context.player
   if (player.rooms !== 2) return false
-  const fieldKeys = new Set(player.fields.map(positionKey))
+  const fieldKeys = new Set(getFarmyardFields(player).map(positionKey))
   return REQUIRED_FIELD_KEYS.every((key) => fieldKeys.has(key))
 }
 
