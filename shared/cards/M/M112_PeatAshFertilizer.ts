@@ -3,11 +3,12 @@ import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import type { CardListenerContext, CardListenerRegistration } from '../card-listeners'
 import { getFarmyardSpaceStates } from '../../domain/farmyard-space-states'
 import type { CardImpl } from '../registry'
+import { getLogicalFields } from '../helpers/card-field'
 
 const CARD_ID = 'M112_PeatAshFertilizer'
 
 const hasGrowableCrops = (context: CardListenerContext) =>
-  context.player.fields.some((field) =>
+  getLogicalFields(context.player).some((field) =>
     field.stacks.some((stack) =>
       (stack.kind === 'grain' || stack.kind === 'vegetable') && stack.remaining > 0,
     ),

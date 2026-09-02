@@ -4,11 +4,11 @@ import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import type { CardListenerContext, CardListenerRegistration } from '../card-listeners'
 import type { ActionFlow, FarmTilePosition } from '../../contract/types'
 import type { DraftGameEvent, FarmCropRemovedEvent, FarmSownEvent } from '../../contract/events'
-import { fieldIsEmpty } from '../../domain/field'
 import { positionKey } from '../../domain/farm'
 import { hasClaimableFieldGoodsTokens } from '../../domain/farmyard-space-token-claims'
 import { addFarmyardSpaceState } from '../../domain/farmyard-space-states'
 import type { CardImpl } from '../registry'
+import { getLogicalFields, type LogicalField } from '../helpers/card-field'
 
 const CARD_ID = 'M095_FallowFields'
 const SELECTION_EFFECT = 'm095-fallow-fields-place-food'
@@ -43,6 +43,27 @@ const isFarmCropRemovedEvent = (
 ): event is QueryableFarmCropRemovedEvent =>
   event.type === 'farm.cropRemoved'
 
+const selectionTile = (field: LogicalField) => field.kind === 'farmyard'
+  ? { row: field.row, col: field.col }
+  : {
+      row: field.row,
+      col: field.col,
+      sourceCard: field.sourceCard,
+      groupKey: field.groupKey,
+      cardFieldSlot: 0,
+    }
+
+const canonicalPosition = (player: CardListenerContext['player'], position: FarmTilePosition) => {
+  const field = getLogicalFields(player).find((candidate) =>
+    candidate.kind === 'farmyard'
+      ? candidate.row === position.row && candidate.col === position.col
+      : candidate.slots.some((slot) =>
+          slot.tile.row === position.row && slot.tile.col === position.col,
+        ),
+  )
+  return field ? { row: field.row, col: field.col } : position
+}
+
 const eventPositions = (context: CardListenerContext): FarmTilePosition[] => {
   const events = context.actionEvents ?? context.transactionEvents
   if (context.actionId === 'sow') {
@@ -72,9 +93,9 @@ const eventPositions = (context: CardListenerContext): FarmTilePosition[] => {
 
 registerSelectionEffect(SELECTION_EFFECT, ({ player, positions }) => {
   const fields = new Set(
-    player.fields
-      .filter(fieldIsEmpty)
-      .map((field) => positionKey({ row: field.row, col: field.col })),
+    getLogicalFields(player)
+      .filter((field) => field.stacks.length === 0)
+      .map((field) => positionKey(field)),
   )
   for (const spaceKey of positions) {
     if (!fields.has(spaceKey)) continue
@@ -94,9 +115,9 @@ const listener: CardListenerRegistration = {
   phases: ['after' as ActionHookPhase],
   actions: ['sow', 'reap'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
-    const positions = eventPositions(context)
-    if (positions.length === 0) return
     const player = context.ownerPlayer ?? context.player
+    const positions = eventPositions(context).map((position) => canonicalPosition(player, position))
+    if (positions.length === 0) return
     if (!hasClaimableFieldGoodsTokens(player, CARD_ID, positions)) return
     return {
       flow: specialEffectLeaf({ kind: 'claim-field-goods-tokens', positions }),
@@ -109,9 +130,9 @@ const cardImpl = {
   effect: {
     id: CARD_ID,
     onBuy: (_state, player) => {
-      const selectableTiles = player.fields
-        .filter(fieldIsEmpty)
-        .map((field) => ({ row: field.row, col: field.col }))
+      const selectableTiles = getLogicalFields(player)
+        .filter((field) => field.stacks.length === 0)
+        .map(selectionTile)
         .filter((tile) => !hasClaimableFieldGoodsTokens(player, CARD_ID, [tile]))
       if (selectableTiles.length === 0) return
       return {
