@@ -1,13 +1,35 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
-import { readCardResourceStats } from '../../shared/cards/helpers/card-state'
+import { readCardResourceStats, writeCardExtraData } from '../../shared/cards/helpers/card-state'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 
+import '../../shared/cards/A/A040_PottersYard'
 import '../../shared/cards/C/C037_DwellingMound'
 import '../../shared/cards/C/C158_ForestCampaigner'
+import '../../shared/cards/D/D090_PlowMaker'
 
 const CARD_ID = 'C037_DwellingMound'
 const FOREST_CAMPAIGNER_ID = 'C158_ForestCampaigner'
+const PLOW_MAKER_ID = 'D090_PlowMaker'
+const POTTERS_YARD_ID = 'A040_PottersYard'
+
+const setupPlowMaker = (food: number, withPottersYard = false) => {
+  const session = new GameSession(42)
+  stabilizeRandomHands(session.state.players)
+  const state = session.getState().state
+  state.players = state.players.slice(0, 2)
+  state.currentPlayerIndex = 0
+  const player = state.players[0]!
+  player.minorPlayed.push(CARD_ID)
+  player.occupationPlayed.push(PLOW_MAKER_ID)
+  player.resources = { ...player.resources, food, clay: 0 }
+  if (withPottersYard) {
+    player.minorPlayed.push(POTTERS_YARD_ID)
+    writeCardExtraData(player, POTTERS_YARD_ID, 'clayRemaining', 2)
+  }
+  session.loadState(state)
+  return session
+}
 
 describe('C37 Dwelling Mound session', () => {
   it('attributes the additional food paid for plowing', () => {
@@ -98,5 +120,93 @@ describe('C37 Dwelling Mound session', () => {
     expect(readCardResourceStats(response.state.players[0]!, FOREST_CAMPAIGNER_ID)?.gained)
       .toEqual({ food: 1 })
     expect(readCardResourceStats(response.state.players[0]!, CARD_ID)?.paid).toEqual({ food: 1 })
+  })
+
+  it('charges the Plow Maker extra field and the Farmland field separately', () => {
+    const session = setupPlowMaker(3)
+
+    let response = session.takeAction(0, 'farmland')
+    expect(response.ok, response.error).toBe(true)
+    expect(response.interaction.stateId).toBe('wait')
+    if (response.interaction.stateId !== 'wait') throw new Error('expected Plow Maker choice')
+    const plowMaker = response.interaction.request.options?.find(
+      (option) => option.sourceCard === PLOW_MAKER_ID && option.value !== '__skip__',
+    )
+    expect(plowMaker).toBeDefined()
+
+    response = session.resolveChoice(0, plowMaker!.value)
+    expect(response.ok, response.error).toBe(true)
+    expect(response.state.players[0]!.resources.food).toBe(2)
+    expect(response.interaction.stateId).toBe('wait')
+    if (response.interaction.stateId !== 'wait') throw new Error('expected first plow')
+    const firstTile = response.interaction.request.farm?.selectableTiles[0]
+    expect(firstTile).toBeDefined()
+
+    response = session.commitSelectionChoice(0, { tile: firstTile })
+    expect(response.ok, response.error).toBe(true)
+    expect(response.state.players[0]!.resources.food).toBe(1)
+    expect(response.state.players[0]!.fields).toHaveLength(1)
+    expect(readCardResourceStats(response.state.players[0]!, CARD_ID)?.paid).toEqual({ food: 1 })
+    expect(response.interaction.stateId).toBe('wait')
+    if (response.interaction.stateId !== 'wait') throw new Error('expected second plow')
+    const secondTile = response.interaction.request.farm?.selectableTiles[0]
+    expect(secondTile).toBeDefined()
+
+    response = session.commitSelectionChoice(0, { tile: secondTile })
+    expect(response.ok, response.error).toBe(true)
+    expect(response.state.players[0]!.resources.food).toBe(0)
+    expect(response.state.players[0]!.fields).toHaveLength(2)
+    expect(readCardResourceStats(response.state.players[0]!, CARD_ID)?.paid).toEqual({ food: 2 })
+    expect(readCardResourceStats(response.state.players[0]!, PLOW_MAKER_ID)?.paid).toEqual({ food: 1 })
+  })
+
+  it('settles Potter\'s Yard after the first field before charging the second field', () => {
+    const session = setupPlowMaker(2, true)
+
+    let response = session.takeAction(0, 'farmland')
+    expect(response.ok, response.error).toBe(true)
+    expect(response.interaction.stateId).toBe('wait')
+    if (response.interaction.stateId !== 'wait') throw new Error('expected Plow Maker choice')
+    const plowMaker = response.interaction.request.options?.find(
+      (option) => option.sourceCard === PLOW_MAKER_ID && option.value !== '__skip__',
+    )
+    expect(plowMaker).toBeDefined()
+
+    response = session.resolveChoice(0, plowMaker!.value)
+    expect(response.ok, response.error).toBe(true)
+    expect(response.state.players[0]!.resources.food).toBe(1)
+    expect(response.interaction.stateId).toBe('wait')
+    if (response.interaction.stateId !== 'wait') throw new Error('expected first plow')
+    const firstTile = response.interaction.request.farm?.selectableTiles[0]
+    expect(firstTile).toBeDefined()
+
+    response = session.commitSelectionChoice(0, { tile: firstTile })
+    expect(response.ok, response.error).toBe(true)
+    expect(response.state.players[0]!.resources).toMatchObject({ food: 0, clay: 1 })
+    expect(response.state.players[0]!.fields).toHaveLength(1)
+    expect(response.interaction.stateId).toBe('wait')
+    if (response.interaction.stateId !== 'wait') throw new Error("expected Potter's Yard choice")
+    const exchange = response.interaction.request.options?.find(
+      (option) => option.sourceCard === POTTERS_YARD_ID && option.value !== '__skip__',
+    )
+    expect(exchange).toBeDefined()
+
+    response = session.resolveChoice(0, exchange!.value)
+    expect(response.ok, response.error).toBe(true)
+    expect(response.state.players[0]!.resources).toMatchObject({ food: 2, clay: 0 })
+    expect(response.state.players[0]!.fields).toHaveLength(1)
+    expect(response.interaction.stateId).toBe('wait')
+    if (response.interaction.stateId !== 'wait') throw new Error('expected second plow')
+    const secondTile = response.interaction.request.farm?.selectableTiles[0]
+    expect(secondTile).toBeDefined()
+
+    response = session.commitSelectionChoice(0, { tile: secondTile })
+    expect(response.ok, response.error).toBe(true)
+    expect(response.state.players[0]!.resources).toMatchObject({ food: 1, clay: 1 })
+    expect(response.state.players[0]!.fields).toHaveLength(2)
+    expect(readCardResourceStats(response.state.players[0]!, CARD_ID)?.paid).toEqual({ food: 2 })
+    expect(readCardResourceStats(response.state.players[0]!, PLOW_MAKER_ID)?.paid).toEqual({ food: 1 })
+    expect(readCardResourceStats(response.state.players[0]!, POTTERS_YARD_ID)?.gained)
+      .toEqual({ clay: 2, food: 2 })
   })
 })
