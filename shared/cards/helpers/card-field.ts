@@ -77,7 +77,7 @@ const readSlots = (
     if (
       !value ||
       typeof value !== 'object' ||
-      !def.allowedCrops.includes((value as CardFieldStack).crop) ||
+      !Object.hasOwn(RHYTHM, (value as CardFieldStack).crop) ||
       !Number.isSafeInteger((value as CardFieldStack).remaining) ||
       (value as CardFieldStack).remaining <= 0
     ) {
@@ -143,6 +143,7 @@ export type LogicalFieldMutationOptions = {
   emitEvents?: boolean
   trigger?: ReapTrigger
   deferOwnerCallbacks?: boolean
+  allowNonSowCrop?: boolean
 }
 
 export type LogicalFieldMutationResult =
@@ -350,7 +351,9 @@ export const mutateLogicalFields = (
     }
     const card = cardTarget(target)
     if (!card) return { ok: false, error: 'invalid-target' }
-    if (!card.def.allowedCrops.includes(crop)) return { ok: false, error: 'invalid-crop' }
+    if (!options.allowNonSowCrop && !card.def.allowedCrops.includes(crop)) {
+      return { ok: false, error: 'invalid-crop' }
+    }
     if (card.slots[card.slot]) return { ok: false, error: 'occupied' }
     card.slots[card.slot] = { crop, remaining: amount }
     writeSlots(player, card.cardId, card.slots)

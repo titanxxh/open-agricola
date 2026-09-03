@@ -36,6 +36,10 @@ _Avoid_: Start Player Marker、`currentPlayerIndex`、`roundActionOrder`
 当前 Work Phase 内实际发生的人员放置先后。起始玩家标记转移不会重排已发生的放置，额外或连续放置保留其真实位置；新 Work Phase 重新开始。
 _Avoid_: Round Work Order、Start Player Marker
 
+**Person Placement Order（人员放置序号）**:
+Work Placement Chronology 中真正放下一名人员的先后顺序。同一人员在行动格间搬迁不推进序号；正常放置临时人员会推进序号，人员被召回后再次正常放置也会再次推进。牌面所说的“第 N 个人”使用此口径。
+_Avoid_: 原始行动使用历史、不同人员身份计数、Round Work Order
+
 **Rule Audit Lead（规则审计线索）**:
 来自上游提交、issue 描述或静态代码阅读的待验证规则风险；必须先在当前 `main` 复现可观察错误，才能升级为 Rule Alignment Gap 或 Rule Flow Defect。
 _Avoid_: 已确认缺陷、直接修复依据

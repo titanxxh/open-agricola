@@ -27,7 +27,9 @@ const cardImpl = makeCardFieldImpl(
   CARD_ID,
   { allowedCrops: ['vegetable'], capacity: 1 },
   {
-    onReap: ({ amount }) => convertVegetablesFlow(amount),
+    onReap: ({ crop, amount }) => crop === 'vegetable'
+      ? convertVegetablesFlow(amount)
+      : undefined,
   },
 )
 

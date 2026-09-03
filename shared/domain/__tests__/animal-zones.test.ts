@@ -4,6 +4,7 @@ import type { GameState, PlayerState } from '../../contract/types.ts'
 import { getActiveCardRegistry } from '../../cards/active-registry.ts'
 import {
   buildCardAnimalZoneId,
+  areRequiredEmptyZoneGroupsSatisfied,
   canAccommodateAllAnimals,
   canAccommodateAnimalTotals,
   computeAnimalZones,
@@ -190,6 +191,58 @@ describe('AnimalZones', () => {
 
     expect(canAccommodateAnimalTotals(state, player, { sheep: 2 })).toBe(true)
     expect(canAccommodateAnimalTotals(state, player, { sheep: 1, boar: 1 })).toBe(false)
+  })
+
+  it('requires every tagged empty-zone group to retain an empty member', () => {
+    expect(areRequiredEmptyZoneGroupsSatisfied([
+      { requiredEmptyZoneGroupIds: ['all'], animalCount: 2 },
+      { requiredEmptyZoneGroupIds: ['all', 'stabled'], animalCount: 0 },
+      { requiredEmptyZoneGroupIds: ['stabled'], animalCount: 1 },
+    ])).toBe(true)
+
+    expect(areRequiredEmptyZoneGroupsSatisfied([
+      { requiredEmptyZoneGroupIds: ['all'], animalCount: 0 },
+      { requiredEmptyZoneGroupIds: ['all', 'stabled'], animalCount: 1 },
+      { requiredEmptyZoneGroupIds: ['stabled'], animalCount: 1 },
+    ])).toBe(false)
+  })
+
+  it('checks required empty-zone groups at the accommodation solver terminal', () => {
+    const state = { players: [] } as unknown as GameState
+    const player = playerWithPasture({
+      minorPlayed: ['D012_MilkingPlace', TEST_CARD],
+      pastures: [
+        {
+          id: 'p1',
+          size: 1,
+          tiles: [{ row: 0, col: 0 }],
+          stables: 0,
+          animalType: null,
+          animalCount: 0,
+        },
+        {
+          id: 'p2',
+          size: 1,
+          tiles: [{ row: 0, col: 1 }],
+          stables: 0,
+          animalType: null,
+          animalCount: 0,
+        },
+      ],
+    })
+    const reg = getActiveCardRegistry()
+    if (!reg) throw new Error('no active registry')
+    reg.setEffect({
+      id: TEST_CARD,
+      onComputeAnimalZones: (_player, zones) => {
+        zones
+          .filter((zone) => zone.zoneType === 'pasture')
+          .forEach((zone) => { zone.requiredEmptyZoneGroupIds = ['pastures'] })
+      },
+    })
+
+    expect(canAccommodateAnimalTotals(state, player, { sheep: 2 })).toBe(true)
+    expect(canAccommodateAnimalTotals(state, player, { sheep: 2, boar: 2 })).toBe(false)
   })
 
   it('checks add-only animals against final totals', () => {

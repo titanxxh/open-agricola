@@ -10,7 +10,7 @@ const cardImpl = makeCardFieldImpl(
   { allowedCrops: ['grain', 'vegetable'], capacity: 1 },
   {
     onCropRemoved: ({ player, crop, isLast }) => {
-      if (!isLast) return
+      if ((crop !== 'grain' && crop !== 'vegetable') || !isLast) return
       const oppositeCrop = crop === 'grain' ? 'vegetable' : 'grain'
       if ((player.resources[oppositeCrop] ?? 0) < 1) return
       writeCardExtraData(player, CARD_ID, 'selectedPositions', [VIRTUAL_KEY])

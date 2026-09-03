@@ -31,22 +31,68 @@ const setup = (workers = 2) => {
 const chooseSpinDoctor = (session: GameSession, response: SessionResponse) => {
   expect(response.interaction.stateId).toBe('wait')
   if (response.interaction.stateId !== 'wait') return response
-  expect(response.interaction.request.options?.some((option) => option.value === 'flow-0')).toBe(true)
-  return session.resolveChoice(0, 'flow-0')
+  const options = response.interaction.request.options ?? []
+  const choice = options.find((option) => option.sourceCard === CARD_ID && option.value !== '__skip__')
+    ?? (response.interaction.sourceCard === CARD_ID
+      ? options.find((option) => option.value !== '__skip__')
+      : undefined)
+  expect(choice).toBeDefined()
+  return session.resolveChoice(0, choice!.value)
 }
 
-const enterExtraPlacement = (session: GameSession) => {
-  let response = chooseSpinDoctor(session, session.takeAction(0, 'traveling-players'))
-  response = chooseSpinDoctor(session, response)
+const advanceToSpinDoctorPlacement = (session: GameSession, initial: SessionResponse) => {
+  let response = initial
+  for (let step = 0; step < 3; step += 1) {
+    const choices = choicesOf(response)
+    if (choices.some((choice) =>
+      choice.startsWith('allow-occupied:')
+      || response.state.actionSpaces.some((space) => space.id === choice),
+    )) break
+    response = chooseSpinDoctor(session, response)
+  }
   expect(response.ok, response.error).toBe(true)
   expect(response.interaction.stateId).toBe('wait')
   return response
 }
 
+const enterExtraPlacement = (session: GameSession) =>
+  advanceToSpinDoctorPlacement(session, session.takeAction(0, 'traveling-players'))
+
 const choicesOf = (response: SessionResponse) =>
   response.interaction.stateId === 'wait'
     ? response.interaction.request.options?.map((option) => option.value) ?? []
     : []
+
+const triggerOptionFor = (response: SessionResponse, sourceCard: string) => {
+  expect(response.interaction.stateId).toBe('wait')
+  if (response.interaction.stateId !== 'wait') throw new Error('expected wait')
+  expect(response.interaction.request.kind).toBe('select-trigger')
+  const option = response.interaction.request.options?.find((entry) => entry.sourceCard === sourceCard)
+  expect(option).toBeDefined()
+  return option!
+}
+
+const setupWithBrotherlyLove = () => {
+  const session = setup()
+  const state = session.getState().state
+  const player = state.players[0]!
+  setActiveWorkerCount(player, 4)
+  player.minorPlayed.push(BROTHERLY_LOVE_ID)
+  const meetingWorkerId = player.workers[0]!.id
+  const forestWorkerId = player.workers[1]!.id
+  state.actionSpaces.find((space) => space.id === 'meeting-place')!.takenBy = [{
+    playerId: player.id,
+    workerId: meetingWorkerId,
+  }]
+  state.actionSpaces.find((space) => space.id === 'forest')!.takenBy = [{
+    playerId: player.id,
+    workerId: forestWorkerId,
+  }]
+  recordRoundPlacement(player, 'meeting-place', meetingWorkerId)
+  recordRoundPlacement(player, 'forest', forestWorkerId)
+  session.loadState(state)
+  return { session, meetingWorkerId, forestWorkerId }
+}
 
 const finishTurn = (session: GameSession, response: SessionResponse) => {
   expect(response.interaction.stateId).toBe('wait')
@@ -168,27 +214,24 @@ describe('D151 Spin Doctor native session', () => {
     finishTurn(session, response)
   })
 
-  it('blocks another card from injecting an occupied Meeting Place', () => {
-    const session = setup()
-    const state = session.getState().state
-    const player = state.players[0]!
-    setActiveWorkerCount(player, 4)
-    player.minorPlayed.push(BROTHERLY_LOVE_ID)
-    const meetingWorkerId = player.workers[0]!.id
-    const forestWorkerId = player.workers[1]!.id
-    state.actionSpaces.find((space) => space.id === 'meeting-place')!.takenBy = [{
-      playerId: player.id,
-      workerId: meetingWorkerId,
-    }]
-    state.actionSpaces.find((space) => space.id === 'forest')!.takenBy = [{
-      playerId: player.id,
-      workerId: forestWorkerId,
-    }]
-    recordRoundPlacement(player, 'meeting-place', meetingWorkerId)
-    recordRoundPlacement(player, 'forest', forestWorkerId)
-    session.loadState(state)
+  it('selects Spin Doctor alongside Brotherly Love and rederives both triggers after undo', () => {
+    const { session, meetingWorkerId, forestWorkerId } = setupWithBrotherlyLove()
+    const before = snapshot(session.getState())
+    let response = session.takeAction(0, 'traveling-players')
+    expect(triggerOptionFor(response, CARD_ID)).toBeDefined()
+    expect(triggerOptionFor(response, BROTHERLY_LOVE_ID)).toBeDefined()
 
-    let response = enterExtraPlacement(session)
+    response = session.resolveChoice(0, triggerOptionFor(response, CARD_ID).value)
+    expect(response.interaction.stateId === 'wait' ? response.interaction.sourceCard : undefined)
+      .toBe(CARD_ID)
+
+    const undone = session.undoStep()
+    expect(undone.ok, undone.error).toBe(true)
+    expect(triggerOptionFor(undone, CARD_ID)).toBeDefined()
+    expect(triggerOptionFor(undone, BROTHERLY_LOVE_ID)).toBeDefined()
+
+    response = session.resolveChoice(0, triggerOptionFor(undone, CARD_ID).value)
+    response = advanceToSpinDoctorPlacement(session, response)
     expect(response.state.actionSpaces.find((space) => space.id === 'meeting-place')?.takenBy)
       .toHaveLength(1)
     expect(choicesOf(response)).toContain('allow-occupied:forest')
@@ -199,8 +242,52 @@ describe('D151 Spin Doctor native session', () => {
     response = session.resolveChoice(0, 'allow-occupied:forest')
     expect(response.ok, response.error).toBe(true)
     expect(response.state.actionSpaces.find((space) => space.id === 'meeting-place')?.takenBy)
-      .toEqual([{ playerId: player.id, workerId: meetingWorkerId }])
+      .toEqual([{ playerId: response.state.players[0]!.id, workerId: meetingWorkerId }])
     expect(response.state.actionSpaces.find((space) => space.id === 'forest')?.takenBy)
+      .toHaveLength(2)
+    expect(newEvents(before, response)).toContainEqual(expect.objectContaining({
+      type: 'worker.placed',
+      spaceId: 'forest',
+      viaCardId: CARD_ID,
+    }))
+    expect(newLogs(before, response).filter((entry) => entry.key === 'log.placeFarmer'))
+      .toHaveLength(2)
+    finishTurn(session, response)
+  })
+
+  it('selects Brotherly Love alongside Spin Doctor and limits its occupied choice to the third space', () => {
+    const { session, meetingWorkerId, forestWorkerId } = setupWithBrotherlyLove()
+    const before = snapshot(session.getState())
+    let response = session.takeAction(0, 'traveling-players')
+    expect(triggerOptionFor(response, CARD_ID)).toBeDefined()
+    expect(triggerOptionFor(response, BROTHERLY_LOVE_ID)).toBeDefined()
+
+    response = session.resolveChoice(0, triggerOptionFor(response, BROTHERLY_LOVE_ID).value)
+    expect(response.interaction.stateId === 'wait' ? response.interaction.sourceCard : undefined)
+      .toBe(BROTHERLY_LOVE_ID)
+    const accept = response.interaction.stateId === 'wait'
+      ? response.interaction.request.options?.find((option) => option.value !== '__skip__')
+      : undefined
+    expect(accept).toBeDefined()
+    response = session.resolveChoice(0, accept!.value)
+    expect(choicesOf(response)).toContain('allow-occupied:traveling-players')
+    expect(choicesOf(response)).not.toContain('allow-occupied:meeting-place')
+    expect(choicesOf(response)).not.toContain('allow-occupied:forest')
+
+    response = session.resolveChoice(0, 'allow-occupied:traveling-players')
+    expect(response.ok, response.error).toBe(true)
+    expect(response.state.actionSpaces.find((space) => space.id === 'meeting-place')?.takenBy)
+      .toEqual([{ playerId: response.state.players[0]!.id, workerId: meetingWorkerId }])
+    expect(response.state.actionSpaces.find((space) => space.id === 'forest')?.takenBy)
+      .toEqual([{ playerId: response.state.players[0]!.id, workerId: forestWorkerId }])
+    expect(response.state.actionSpaces.find((space) => space.id === 'traveling-players')?.takenBy)
+      .toHaveLength(2)
+    expect(newEvents(before, response)).toContainEqual(expect.objectContaining({
+      type: 'worker.placed',
+      spaceId: 'traveling-players',
+      viaCardId: BROTHERLY_LOVE_ID,
+    }))
+    expect(newLogs(before, response).filter((entry) => entry.key === 'log.placeFarmer'))
       .toHaveLength(2)
     finishTurn(session, response)
   })

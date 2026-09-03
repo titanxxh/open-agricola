@@ -49,6 +49,7 @@ export type AnimalZone = {
   exclusiveCardZoneLimit?: number
   capacityCounterKey?: string
   capacityLossOnPayment?: boolean
+  requiredEmptyZoneGroupIds?: string[]
 }
 
 type AnimalType = AnimalKey
@@ -133,6 +134,19 @@ export const readAnimalCountsForZoneAssignment = (value: unknown): AnimalCounts 
   if (typeof assignment.animalCount !== 'number' || !Number.isFinite(assignment.animalCount)) return counts
   counts[assignment.animalType] = Math.max(0, Math.floor(assignment.animalCount))
   return counts
+}
+
+export const areRequiredEmptyZoneGroupsSatisfied = (
+  zones: readonly Pick<AnimalZone, 'requiredEmptyZoneGroupIds' | 'animalCount' | 'animalCounts'>[],
+): boolean => {
+  const groupIds = new Set(zones.flatMap((zone) => zone.requiredEmptyZoneGroupIds ?? []))
+  return [...groupIds].every((groupId) => zones.some((zone) =>
+    zone.requiredEmptyZoneGroupIds?.includes(groupId)
+    && Math.max(
+      sumAnimalCounts(readAnimalCountsForZoneAssignment(zone)),
+      Math.max(0, zone.animalCount ?? 0),
+    ) === 0,
+  ))
 }
 
 const isAnimalKeyForState = (state: GameState, value: unknown): value is AnimalType =>
@@ -664,7 +678,7 @@ export const canAccommodateAnimalTotals = (
     ).join('|')}`
   const placeFrom = (index: number, currentZones: AnimalAccommodationWorkZone[]): boolean => {
     const type = animals[index]
-    if (!type) return true
+    if (!type) return areRequiredEmptyZoneGroupsSatisfied(currentZones)
     const key = stateKey(index, currentZones)
     if (failedStates.has(key)) return false
     for (let i = 0; i < currentZones.length; i += 1) {

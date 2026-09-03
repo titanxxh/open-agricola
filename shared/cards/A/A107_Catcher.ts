@@ -2,7 +2,7 @@ import { defineOccupationCard } from '../card-source'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { gainLeaf } from '../helpers/pay-gain-node'
-import { getRoundPlacementOrder } from '../helpers/round-placement'
+import { getRoundPersonPlacementOrder } from '../helpers/round-placement'
 import type { CardImpl } from '../registry'
 
 const CARD_ID = 'A107_Catcher'
@@ -25,8 +25,8 @@ const listener: CardListenerRegistration = {
   actions: ['collect'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (!isBuildingResourceSpace(context.space)) return
-    // getRoundPlacementOrder includes the current placement (after place-farmer)
-    const placed = getRoundPlacementOrder(context.player).length
+    // Includes the current person placement (after place-farmer).
+    const placed = getRoundPersonPlacementOrder(context.player).length
     const n = countBuildingResources(context.space)
     if (
       (placed === 1 && n === 5) ||

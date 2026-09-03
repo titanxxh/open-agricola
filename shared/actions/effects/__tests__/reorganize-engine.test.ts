@@ -1,11 +1,13 @@
-import { describe, it, expect } from 'vitest'
+import { afterEach, describe, it, expect } from 'vitest'
 import { reorganizeAction } from '../reorganize'
+import { breedAction } from '../breed'
 import type {
   ActionExecutionContext,
   ActionSpace,
   GameState,
   PlayerState,
 } from '../../../contract/types'
+import { getActiveCardRegistry } from '../../../cards/active-registry'
 import '../../../cards/B/B012_Stockyard'
 import '../../../cards/C/C011_WildlifeReserve'
 import '../../../cards/C/C148_MudWallower'
@@ -13,6 +15,25 @@ import '../../../cards/M/M033_NightPasture'
 import '../../../cards/M/M084_BogPony'
 
 const NIGHT_PASTURE = 'M033_NightPasture'
+const REQUIRED_EMPTY_TEST_CARD = '__TEST_required_empty_zone__'
+
+afterEach(() => {
+  getActiveCardRegistry()?.removeEffectsWhere((id) => id === REQUIRED_EMPTY_TEST_CARD)
+})
+
+const registerRequiredEmptyPastures = () => {
+  const registry = getActiveCardRegistry()
+  if (!registry) throw new Error('no active registry')
+  registry.setEffect({
+    id: REQUIRED_EMPTY_TEST_CARD,
+    onComputeAnimalZones: (_player, zones) => {
+      zones
+        .filter((zone) => zone.zoneType === 'pasture')
+        .forEach((zone) => { zone.requiredEmptyZoneGroupIds = ['test-pastures'] })
+    },
+    enforceReorganizeOnLastHarvest: () => true,
+  })
+}
 
 const dummySpace: ActionSpace = {
   id: '__subflow:reorganize',
@@ -116,6 +137,61 @@ describe('reorganizeAction.execute', () => {
       capacity: 1,
     })
   })
+
+  it('emits required empty-zone group metadata', () => {
+    registerRequiredEmptyPastures()
+    const ctx = makeCtx({
+      player: {
+        minorPlayed: [REQUIRED_EMPTY_TEST_CARD],
+        pastures: [{
+          id: 'pasture-1',
+          size: 1,
+          tiles: [{ row: 0, col: 0 }],
+          stables: 0,
+          animalType: null,
+          animalCount: 0,
+        }],
+      },
+    })
+
+    const result = reorganizeAction.execute(ctx)
+
+    expect(result.type).toBe('request')
+    if (result.type !== 'request' || result.request.kind !== 'animal-reorg') throw new Error('not animal-reorg')
+    expect(result.request.zones.find((zone) => zone.id === 'pasture-1')).toMatchObject({
+      requiredEmptyZoneGroupIds: ['test-pastures'],
+      capacity: 2,
+    })
+  })
+})
+
+describe('breedAction.execute', () => {
+  it('propagates required empty-zone groups to a direct breed reorganization request', () => {
+    registerRequiredEmptyPastures()
+    const ctx = makeCtx({
+      state: { round: 14 },
+      actionContext: { sourceCard: 'harvest' },
+      player: {
+        minorPlayed: [REQUIRED_EMPTY_TEST_CARD],
+        pastures: [{
+          id: 'pasture-1',
+          size: 1,
+          tiles: [{ row: 0, col: 0 }],
+          stables: 0,
+          animalType: null,
+          animalCount: 0,
+        }],
+      },
+    })
+
+    const result = breedAction.execute(ctx)
+
+    expect(result.type).toBe('request')
+    if (result.type !== 'request' || result.request.kind !== 'animal-reorg') throw new Error('not animal-reorg')
+    expect(result.request.zones.find((zone) => zone.id === 'pasture-1')).toMatchObject({
+      requiredEmptyZoneGroupIds: ['test-pastures'],
+    })
+  })
 })
 
 describe('reorganizeAction.resolveChoice', () => {
@@ -140,6 +216,85 @@ describe('reorganizeAction.resolveChoice', () => {
       recoverable: true,
     })
     expect(ctx.player).toEqual(before)
+  })
+
+  it('rejects an assignment that leaves every member of a required-empty group occupied', () => {
+    registerRequiredEmptyPastures()
+    const ctx = makeCtx({
+      player: {
+        minorPlayed: [REQUIRED_EMPTY_TEST_CARD],
+        resources: { sheep: 2 } as never,
+        pastures: [
+          {
+            id: 'pasture-1',
+            size: 1,
+            tiles: [{ row: 0, col: 0 }],
+            stables: 0,
+            animalType: 'sheep',
+            animalCount: 1,
+          },
+          {
+            id: 'pasture-2',
+            size: 1,
+            tiles: [{ row: 0, col: 1 }],
+            stables: 0,
+            animalType: 'sheep',
+            animalCount: 1,
+          },
+        ],
+      },
+    })
+    const before = structuredClone(ctx.player)
+
+    const result = reorganizeAction.resolveChoice!(ctx, 'confirm', [
+      { id: 'pasture-1', zoneType: 'pasture', animalType: 'sheep', animalCount: 1 },
+      { id: 'pasture-2', zoneType: 'pasture', animalType: 'sheep', animalCount: 1 },
+    ] as unknown as Record<string, unknown>)
+
+    expect(result).toEqual({
+      type: 'fail',
+      errorKey: 'log.reorganizeFail',
+      recoverable: true,
+    })
+    expect(ctx.player).toEqual(before)
+  })
+
+  it('accepts any empty group member without changing capacity or animal totals', () => {
+    registerRequiredEmptyPastures()
+    const ctx = makeCtx({
+      player: {
+        minorPlayed: [REQUIRED_EMPTY_TEST_CARD],
+        resources: { sheep: 2 } as never,
+        pastures: [
+          {
+            id: 'pasture-1',
+            size: 1,
+            tiles: [{ row: 0, col: 0 }],
+            stables: 0,
+            animalType: 'sheep',
+            animalCount: 1,
+          },
+          {
+            id: 'pasture-2',
+            size: 1,
+            tiles: [{ row: 0, col: 1 }],
+            stables: 0,
+            animalType: 'sheep',
+            animalCount: 1,
+          },
+        ],
+      },
+    })
+
+    const result = reorganizeAction.resolveChoice!(ctx, 'confirm', [
+      { id: 'pasture-1', zoneType: 'pasture', animalType: 'sheep', animalCount: 2 },
+      { id: 'pasture-2', zoneType: 'pasture', animalType: null, animalCount: 0 },
+    ] as unknown as Record<string, unknown>)
+
+    expect(result.type).toBe('ok')
+    expect(ctx.player.resources.sheep).toBe(2)
+    expect(ctx.player.pastures.map((pasture) => pasture.animalCount)).toEqual([2, 0])
+    expect(ctx.player.pastures.map((pasture) => pasture.size * 2 * (2 ** pasture.stables))).toEqual([2, 2])
   })
 
   it('confirm with zones reduces reserve sheep when assigned to pasture', () => {

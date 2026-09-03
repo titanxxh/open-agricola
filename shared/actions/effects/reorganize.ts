@@ -9,6 +9,7 @@ import type {
 import { animalKeysForState, type AnimalKey } from '../../contract/animals'
 import { playerBoard } from '../../domain'
 import {
+  areRequiredEmptyZoneGroupsSatisfied,
   buildCardAnimalZoneId,
   getAllowedAnimalTypesForZone,
   normalizeAnimalCountsForZone,
@@ -356,6 +357,7 @@ export const reorganizeAction: ActionDefinition = {
       ...(zone.countsFarmyardSpaceAsUnused !== undefined ? { countsFarmyardSpaceAsUnused: zone.countsFarmyardSpaceAsUnused } : {}),
       ...(zone.displaySource ? { displaySource: zone.displaySource } : {}),
       ...(zone.exclusiveCardZoneLimit !== undefined ? { exclusiveCardZoneLimit: zone.exclusiveCardZoneLimit } : {}),
+      ...(zone.requiredEmptyZoneGroupIds ? { requiredEmptyZoneGroupIds: zone.requiredEmptyZoneGroupIds } : {}),
       capacity: zone.capacity,
     }))
     return {
@@ -381,8 +383,9 @@ export const reorganizeAction: ActionDefinition = {
         : undefined
     if (!zones) return { type: 'fail', errorKey: 'log.reorganizeFail' }
     const playerIndex = ctx.state.players.indexOf(ctx.player)
+    const computedZones = playerBoard(ctx.state, playerIndex).animals.zones()
     const cardZones = new Map(
-      playerBoard(ctx.state, playerIndex).animals.zones()
+      computedZones
         .filter((zone) => zone.zoneType === 'card')
         .map((zone) => [zone.id, zone]),
     )
@@ -402,6 +405,25 @@ export const reorganizeAction: ActionDefinition = {
       ) {
         return { type: 'fail', errorKey: 'log.reorganizeFail', recoverable: true }
       }
+    }
+    const finalZones = computedZones.map((zone) => {
+      const assignment = zones.find((candidate) =>
+        candidate.id === zone.id && candidate.zoneType === zone.zoneType,
+      )
+      const animalCounts = normalizeAnimalCountsForZone(
+        ctx.state,
+        ctx.player,
+        zone,
+        assignment,
+      )
+      return {
+        ...zone,
+        animalCounts,
+        animalCount: sumAnimalCounts(animalCounts),
+      }
+    })
+    if (!areRequiredEmptyZoneGroupsSatisfied(finalZones)) {
+      return { type: 'fail', errorKey: 'log.reorganizeFail', recoverable: true }
     }
     const before = animalTotals(ctx.state, ctx.player)
     applyReorganizeMutate(ctx.state, ctx.player, zones)

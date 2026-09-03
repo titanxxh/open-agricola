@@ -947,7 +947,7 @@ export const A123_FrameBuilder = defineOccupationCard({
 
 - `pay-gain-node.ts` —— "支付后得收益 / 支付后追加行动 / 返还到当前格再得"模板
 - `stage-effects.ts` —— 阶段型 card-effects 标记 / 即时支付 / bonus VP / 单次收获兑换
-- `card-state.ts` / `round-placement.ts` —— 一次性卡牌 `flagged/extraData` + 本轮放人顺序
+- `card-state.ts` / `round-placement.ts` —— 一次性卡牌 `flagged/extraData`、原始 Work Placement Chronology 与 Person Placement Order；“第 N 个人”排除同一工人搬迁，但包含正常放置的临时人员及召回后再次正常放置的人员
 - `action-snapshot.ts` —— §6.5 定义的当前 Turn Scope 身份和起点快照；按行动计算的 delta 属于 action transaction，不读取这里
 - `card-held-workers.ts` —— 见 §8.3
 - `card-field.ts` —— "卡牌即田"声明式工厂，详见 §8.5
@@ -970,6 +970,8 @@ cardField?: {
 派生，跨 deck 不冲突；同 deck 邻号 capacity 占位需 audit（当前 11 张卡 capacity≤3，安全余量充足）。
 
 卡牌侧接口只有三个入口。`getLogicalFields(player)` 按确定顺序返回不可变投影，包含 Farmyard Field 和所有已打出且已注册的 Card Field，也包含固定容量中的空槽。`getFarmyardFields(player)` 是犁地、围栏、相邻、版图占位与 Field tile 几何规则显式使用的窄查询。`mutateLogicalFields(state, player, options?)` 提供具名的 `place`、`grow`、`remove` 与原子 `replace` 操作；它先验证目标，再经 Farmyard 或 Card State owner adapter 写入。
+
+Field storage 接受 grain、vegetable、wood、stone 四种合法 field good。Card Field 的 `allowedCrops` 表示普通 Sow 能力，不是存储 schema。`place` 默认执行该白名单，卡牌效果可显式绕过；普通 Sow 与 `replace` 仍受白名单限制。Owner callback 必须先检查实际 good，再执行特定作物副作用。
 
 Card Field 无论容量多少都只有一个稳定 Logical Field id 和 `groupKey`；固定槽在其他槽清空后仍保留稳定选择坐标。`card-field.ts` 内的底层 Farmyard adapter 是 Card Impl 代码唯一可直接访问 `PlayerState.fields` 的位置。`check:card-impl-boundaries` 扫描 A–E、Farmers of the Moor、major、community 与生产 helper，不论 receiver 名称都拒绝名为 `fields` 的属性或 bracket 访问，并且没有遗留文件 allowlist。
 
@@ -1078,6 +1080,8 @@ shared/domain/
 farm-position backed card zones 和 hosted card zones 可把动物写入 `cardStates[cardId].extraData.animalCountsByZone`。Hosted Card Animal Zone 写入 card owner 的 card state，但统计、支付、capacity search、pending animal 检测和 reorg 操作按 `animalOwnerPlayerId` 归属到 Animal Owner；breeding phase 会把带 `breedingOwnerPlayerId` 的 zone 计入 breeding owner、并从 Animal Owner 的临时繁殖计数中扣除。reorg / capacity rewrite 按 `ownerPlayerId` 路由写回 card owner，同一卡只替换当前 Animal Owner 的 entries，不能清掉其他玩家借用同一卡的动物。所有普通 holder writer 都必须在 `animalCountsByZone` entry 上持久化 `cardId` / `ownerPlayerId` / `animalOwnerPlayerId`，跨玩家扣减只能消费显式属于目标 Animal Owner 的 entry。`serializeState` 会把当前玩家可见的 owner played-card zones、farm-position card zones 和 borrowed played-card zones 分别派生成 `SerializedPlayerState.playedCardAnimalZones`、`farmCardAnimalZones`、`borrowedPlayedCardAnimalZones`，让前端在非 reorg 状态也能展示 owner Played Cards、FarmBoard、Played Cards “by others” 的 0/N 卡牌动物区；active reorg 的 `InteractionAnimalReorgZone` draft 必须透传 owner metadata，覆盖该只读 projection 并启用控件。动物统计和消费 helper（例如 `getAssignedAnimalsByType()` / `subtractAnimalsFromBoard()`）必须同时读写 legacy `animalCounts` / `held` 与 per-zone `animalCountsByZone`，否则后续 reorg 会从 stale per-zone state 重新 hydrate 已消费动物。`exclusiveCardZoneLimit` / `allowedAnimalTypes` 是后端算出的 zone metadata，必须随 `InteractionAnimalReorgZone` 传给前端；前者由统一 reorg helper 阻止超过 limit 的多 zone 分配，后者用于 UI 禁用后端一定会拒绝的动物类型。前端不写具体卡牌 id 规则。
 
 任何 reorg 状态变更前，后端若发现 card zone 中存在不在允许集合内的动物，会拒绝整次提交，绝不静默过滤该动物。
+
+`AnimalZone.requiredEmptyZoneGroupIds` 在不改变 zone capacity 的前提下声明最终分配约束：每个 group id 至少要有一个 tagged zone 为空，同一 zone 可以属于多个 group。`canAccommodateAnimalTotals()` 在搜索终点检查该约束，pending payload 通过 `InteractionAnimalReorgZone` 透传，`reorganize` 在 mutation 前拒绝非法分配，前端也只做同一套通用确认门禁。卡牌只负责标记 zone，并在打出后形成非法分配时请求重整；共享路径不读取卡牌 id。
 
 farm-position backed card animal zone 使用 `AnimalZone.farmPosition` / `countsFarmyardSpaceAsUnused` / `displaySource:'farm-position'` 进入 `InteractionAnimalReorgZone`，前端 FarmBoard 只把后端给出的 zone 渲染到对应农场格，不自行判断合法格。普通单 zone animal-holder 继续写 `cardStates[cardId].extraData.animalCounts`；同一卡多农场格 zone 写 `cardStates[cardId].extraData.animalCountsByZone[zoneId]`，并随非空 zone 持久化 `capacity` / `allowedAnimalType` / `allowedAnimalTypes` / `farmPosition` 供非 active reorg 状态继续显示。zone 消失时由 animal reorg 写回清理。需要“多个候选格但只能选一个”的卡牌使用 `exclusiveCardZoneLimit`，避免同一卡多个候选 zone 同时容纳动物。
 

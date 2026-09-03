@@ -57,17 +57,19 @@ describe('computeAnimalZones', () => {
     expect(zones[1]).toMatchObject({ zoneType: 'stable', capacity: 1 })
   })
 
-  it('respects E033_BeaverColony blocked pasture', () => {
+  it('keeps E033_BeaverColony stabled-pasture capacity', () => {
     const player = createPlayer({
       minorPlayed: ['E033_BeaverColony'],
       pastures: [makePasture('p1', 2, 1), makePasture('p2', 3, 0)],
     })
     const zones = computeAnimalZones(player)
-    expect(zones.find((z) => z.id === 'p1')!.capacity).toBe(0)
+    expect(zones.find((z) => z.id === 'p1')!.capacity).toBe(8)
+    expect(zones.find((z) => z.id === 'p1')!.requiredEmptyZoneGroupIds).toHaveLength(1)
     expect(zones.find((z) => z.id === 'p2')!.capacity).toBe(6)
+    expect(zones.find((z) => z.id === 'p2')!.requiredEmptyZoneGroupIds).toBeUndefined()
   })
 
-  it('keeps the blocked pasture at 0 regardless of E33/A12 card order', () => {
+  it('combines the E33 constraint with A12 capacity regardless of card order', () => {
     const cardOrders = [
       ['E033_BeaverColony', 'A012_DrinkingTrough'],
       ['A012_DrinkingTrough', 'E033_BeaverColony'],
@@ -79,7 +81,8 @@ describe('computeAnimalZones', () => {
         pastures: [makePasture('p1', 2, 1), makePasture('p2', 3, 0)],
       })
       const zones = computeAnimalZones(player)
-      expect(zones.find((z) => z.id === 'p1')!.capacity).toBe(0)
+      expect(zones.find((z) => z.id === 'p1')!.capacity).toBe(10)
+      expect(zones.find((z) => z.id === 'p1')!.requiredEmptyZoneGroupIds).toHaveLength(1)
       expect(zones.find((z) => z.id === 'p2')!.capacity).toBe(8)
     }
   })

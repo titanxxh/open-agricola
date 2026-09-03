@@ -2,7 +2,7 @@ import { defineOccupationCard } from '../card-source'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { gainLeaf } from '../helpers/pay-gain-node'
-import { getRoundPlacementOrder } from '../helpers/round-placement'
+import { getRoundPersonPlacementOrder } from '../helpers/round-placement'
 import type { CardImpl } from '../registry'
 
 const CARD_ID = 'A163_BuildingExpert'
@@ -23,7 +23,7 @@ const listener: CardListenerRegistration = {
   actions: ['place-farmer'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (!context.space || context.space.id !== 'resource-market-4') return
-    const placed = getRoundPlacementOrder(context.player).length
+    const placed = getRoundPersonPlacementOrder(context.player).length
     const resource = PLACEMENT_TO_RESOURCE[placed]
     if (!resource) return
     return { flow: gainLeaf(CARD_ID, { [resource]: 1 }), sourceCard: CARD_ID }

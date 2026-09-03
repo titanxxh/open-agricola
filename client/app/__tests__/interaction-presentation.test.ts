@@ -88,13 +88,15 @@ const reorgZone = (id: string): InteractionAnimalReorgZone => ({
   capacity: 2,
 })
 
-const waitAnimalReorg = (): InteractionState => ({
+const waitAnimalReorg = (
+  zones: InteractionAnimalReorgZone[] = [reorgZone('pasture-1')],
+): InteractionState => ({
   stateId: 'wait',
   playerIndex: 0,
   promptKey: 'ui.interactionReorgAnimalsTitle' as never,
   request: {
     kind: 'animal-reorg',
-    zones: [reorgZone('pasture-1')],
+    zones,
   },
   allowedCommands: ['resolveChoice', 'undoStep'],
   anytimeActions: [],
@@ -460,6 +462,28 @@ describe('Interaction Presentation', () => {
       value: 'confirm',
       payload: { fuelUsed: 2, woodToFuel: 1 },
     })
+  })
+
+  it('rejects animal reorg confirmation until a required group member is empty', () => {
+    const requestZones = [
+      { ...reorgZone('pasture-1'), requiredEmptyZoneGroupIds: ['pastures'] },
+      { ...reorgZone('pasture-2'), requiredEmptyZoneGroupIds: ['pastures'] },
+    ]
+    const occupiedDraft = requestZones.map(({ requiredEmptyZoneGroupIds: _, ...zone }) => zone)
+
+    expect(buildInteractionSubmitCommand(waitAnimalReorg(requestZones), {
+      value: 'confirm',
+      animalReorgZones: occupiedDraft,
+    })).toEqual({ kind: 'rejected' })
+
+    const emptySecondPasture = [
+      { ...reorgZone('pasture-1'), animalCount: 2 },
+      { ...reorgZone('pasture-2'), animalType: null, animalCount: 0 },
+    ]
+    expect(buildInteractionSubmitCommand(waitAnimalReorg(requestZones), {
+      value: 'confirm',
+      animalReorgZones: emptySecondPasture,
+    })).toMatchObject({ kind: 'resolveChoice' })
   })
 
   it('builds feed and handoff submit commands', () => {

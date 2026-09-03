@@ -2,7 +2,7 @@ import { defineOccupationCard } from '../card-source'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { gainLeaf } from '../helpers/pay-gain-node'
-import { getRoundPlacementOrder } from '../helpers/round-placement'
+import { getRoundPersonPlacementOrder } from '../helpers/round-placement'
 import type { CardImpl } from '../registry'
 
 const CARD_ID = 'C119_SkillfulRenovator'
@@ -12,7 +12,7 @@ const afterRenovateListener: CardListenerRegistration = {
   phases: ['after' as ActionHookPhase],
   actions: ['renovate-house'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
-    const placed = getRoundPlacementOrder(context.player).length
+    const placed = getRoundPersonPlacementOrder(context.player).length
     if (placed <= 0) return
     return { flow: gainLeaf(CARD_ID, { wood: placed }), sourceCard: CARD_ID }
   },

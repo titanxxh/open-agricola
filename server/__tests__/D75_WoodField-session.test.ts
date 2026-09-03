@@ -107,6 +107,23 @@ describe('D075_WoodField session', () => {
     ])
   })
 
+  it('rejects stone through the real sow interaction without spending it', () => {
+    const session = setup({ wood: 1 })
+    session.state.players[0]!.resources.stone = 1
+
+    let response = session.takeAction(0, 'grain-utilization')
+    expect(response.ok).toBe(true)
+
+    response = session.commitSelectionChoice(0, {
+      crops: [{ row: ROW, col: COL_BASE, crop: 'stone' }],
+    })
+
+    expect(response.ok).toBe(false)
+    expect(response.error).toBe('INVALID_CROP')
+    expect(response.state.players[0]!.resources.stone).toBe(1)
+    expect(readCardExtraData(response.state.players[0]!, CARD_ID, 'cardFieldStacks')).toBeUndefined()
+  })
+
   it('sows 2 wood across 2 slots in a single sow action and gains 2 wood on the next harvest', () => {
     const session = setup({ wood: 2 })
 

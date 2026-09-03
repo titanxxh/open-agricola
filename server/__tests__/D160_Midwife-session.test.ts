@@ -2,9 +2,13 @@ import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 import { setActiveWorkerCount, setWorkersAtHome } from '../../shared/domain/player'
-import { recordRoundPlacement } from '../../shared/cards/helpers/round-placement'
+import {
+  getRoundPersonPlacementDetails,
+  recordRoundPlacement,
+} from '../../shared/cards/helpers/round-placement'
+import { runCardListeners } from '../../shared/cards/card-listeners'
 
-import '../../shared/cards/D/D160_Midwife'
+import { D160_Midwife_impl } from '../../shared/cards/D/D160_Midwife'
 
 const CARD_ID = 'D160_Midwife'
 
@@ -86,5 +90,30 @@ describe('D160_Midwife session', () => {
 
     expect(response.ok).toBe(true)
     expect(response.state.players[0]!.resources.grain).toBe(0)
+  })
+
+  it('D160 treats a same-person relocation to Family Growth as the first person', () => {
+    const session = setup(1)
+    const state = session.getState().state
+    const actor = state.players[1]!
+    recordRoundPlacement(actor, 'farm-expansion', actor.workers[0]!.id)
+    recordRoundPlacement(actor, 'wish-children', actor.workers[0]!.id, true)
+
+    const results = runCardListeners({
+      state,
+      player: actor,
+      space: state.actionSpaces.find((space) => space.id === 'wish-children')!,
+      actionId: 'place-farmer',
+      phase: 'after',
+    }, [D160_Midwife_impl.listeners[0]!])
+
+    expect(getRoundPersonPlacementDetails(actor)).toHaveLength(1)
+    expect(results).toHaveLength(1)
+    expect(results[0]?.sourceCard).toBe(CARD_ID)
+    expect(results[0]?.flow).toEqual(expect.objectContaining({
+      type: 'leaf',
+      actionId: 'gain',
+      params: { grain: 1 },
+    }))
   })
 })
