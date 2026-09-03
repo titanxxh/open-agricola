@@ -1,6 +1,6 @@
 import { defineOccupationCard } from '../card-source'
 import { gainLeaf } from '../helpers/pay-gain-node'
-import { playerBoard } from '../../domain'
+import { canAccommodateAllAnimals } from '../../domain/animal-zones'
 import type { ActionFlow } from '../../contract/types'
 import type { CardImpl } from '../registry'
 
@@ -16,12 +16,8 @@ const cardImpl = {
   onBuy: () => gainLeaf(CARD_ID, { wood: 1 }),
   onAfterRoundEnd: (state, player) => {
     if (harvestRounds.includes(state.round)) return // harvest round — skip
-    const totalAnimals = BREEDABLE.reduce((sum, t) => sum + player.resources[t], 0)
-    const idx = state.players.indexOf(player)
-    const cap = playerBoard(state, idx).animals.totalCapacity()
-    if (totalAnimals >= cap) return // no capacity for new animal
     const children: ActionFlow[] = BREEDABLE
-      .filter((t) => player.resources[t] >= 2)
+      .filter((t) => player.resources[t] >= 2 && canAccommodateAllAnimals(state, player, [t]))
       .map((t) => ({
         type: 'leaf' as const,
         actionId: 'gain',
