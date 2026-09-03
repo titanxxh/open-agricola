@@ -5,8 +5,12 @@ import { getRoundPersonPlacementOrder, recordRoundPlacement } from '../../shared
 import type { ActionFlow } from '../../shared/contract/types'
 import { setActiveWorkerCount, workersAvailable } from '../../shared/domain/player'
 import { addWorkerRef, removeWorkerRef } from '../../shared/domain/space'
+import { appendImmediateEvents } from '../../shared/events/append'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 
+import '../../shared/cards/A/A025_Bassinet'
+import '../../shared/cards/C/C037_DwellingMound'
+import '../../shared/cards/C/C158_ForestCampaigner'
 import '../../shared/cards/D/D024_BrotherlyLove'
 import '../../shared/cards/D/D103_CanalBoatman'
 
@@ -182,15 +186,59 @@ describe('D024 Brotherly Love session', () => {
     expect(choicesOf(response)).not.toContain('allow-occupied:day-laborer')
   })
 
-  it('does not reuse the third worker space when another worker also occupies it', () => {
+  it('reuses the third worker space when Bassinet placed it beside another worker', () => {
     const session = setup()
+    const state = session.getState().state
+    const player = state.players[0]!
+    const other = state.players[1]!
+    player.minorPlayed.push('A025_Bassinet')
+    const dayLaborer = state.actionSpaces.find((space) => space.id === 'day-laborer')!
+    addWorkerRef(dayLaborer, other.id, '2')
+    appendImmediateEvents(state, [{ type: 'worker.placed', workerId: '2', spaceId: dayLaborer.id }], {
+      actorPlayerId: other.id,
+      sourceActionId: dayLaborer.id,
+    })
+    session.loadState(state)
+
     let response = session.takeAction(0, 'day-laborer')
-    const dayLaborer = session.state.actionSpaces.find((space) => space.id === 'day-laborer')!
-    addWorkerRef(dayLaborer, session.state.players[1]!.id, '2')
+    expect(response.ok, response.error).toBe(true)
+    expect(response.state.actionSpaces.find((space) => space.id === dayLaborer.id)?.takenBy)
+      .toHaveLength(2)
 
     response = acceptOptional(session, response)
 
-    expect(choicesOf(response)).not.toContain('allow-occupied:day-laborer')
+    expect(choicesOf(response)).toContain('allow-occupied:day-laborer')
+  })
+
+  it('keeps hook-payable Farmland as the fourth placement reuse option', () => {
+    const session = setup()
+    const state = session.getState().state
+    const player = state.players[0]!
+    player.minorPlayed.push('C037_DwellingMound')
+    player.occupationPlayed.push('C158_ForestCampaigner')
+    player.resources.food = 0
+    for (const space of state.actionSpaces) {
+      if ((space.gainPerRound.wood ?? 0) > 0) space.resources.wood = 0
+    }
+    state.actionSpaces.find((space) => space.id === 'forest')!.resources.wood = 8
+    session.loadState(state)
+
+    let response = session.takeAction(0, 'farmland')
+    expect(response.ok, response.error).toBe(true)
+    expect(response.state.players[0]!.resources.food).toBe(1)
+    expect(response.interaction.stateId).toBe('wait')
+    if (response.interaction.stateId !== 'wait') throw new Error('expected Farmland plow')
+    const tile = response.interaction.request.farm?.selectableTiles[0]
+    expect(tile).toBeDefined()
+
+    response = session.commitSelectionChoice(0, { tile })
+    expect(response.ok, response.error).toBe(true)
+    expect(response.state.players[0]!.resources.food).toBe(0)
+    expect(response.state.players[0]!.fields).toHaveLength(1)
+
+    response = acceptOptional(session, response)
+
+    expect(choicesOf(response)).toContain('allow-occupied:farmland')
   })
 
   it('offers the fourth person when D103 places the third person on its card', () => {

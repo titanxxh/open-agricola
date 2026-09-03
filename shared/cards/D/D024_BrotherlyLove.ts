@@ -47,10 +47,8 @@ const computeArgsListener: CardListenerRegistration = {
     const space = findActionSpaceByWorker(context.state, context.player.id, workerId)
     if (
       !space ||
-      !space.canBeExecutedByPlayer(context.state, context.player) ||
-      space.takenBy.length !== 1 ||
-      space.takenBy[0]?.playerId !== context.player.id ||
-      space.takenBy[0]?.workerId !== workerId
+      !space.takenBy.some((worker) =>
+        worker.playerId === context.player.id && worker.workerId === workerId)
     ) return
     const option: ActionChoiceOption = {
       value: `${OCCUPIED_SPACE_CHOICE_PREFIX}${space.id}`,
