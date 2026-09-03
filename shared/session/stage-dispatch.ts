@@ -166,6 +166,7 @@ export class StageDispatch {
         })
         if (!flow) continue
         this.startFlow(flow, hook, currentPlayerIndex, currentCardIndex + 1, currentPlayerIndex, {
+          ...extra,
           resumeAfterCardId: cardId,
         })
         return true

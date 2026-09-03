@@ -263,6 +263,8 @@ const startElderRound = (round: number) => {
 describe('E096 Elder parity', () => {
   it('E096 S1: at the start of round one Elder can be played free without placing a person', () => {
     const { session, response: offered } = startElderRound(1)
+    const forestWoodBefore = offered.state.actionSpaces.find((space) => space.id === 'forest')!.resources.wood
+    expect(forestWoodBefore).toBe(3)
     let response = resolveNonSkipChoice(session, offered)
     if (response.interaction.stateId === 'wait') {
       const option = response.interaction.request.options?.find((candidate) => candidate.value === 'E096_Elder')
@@ -272,6 +274,8 @@ describe('E096 Elder parity', () => {
     expect(response.ok, response.error).toBe(true)
     expect(response.state.players[0]!.occupationPlayed).toContain('E096_Elder')
     expect(response.state.actionSpaces.every((space) => space.takenBy.length === 0)).toBe(true)
+    expect(response.state.actionSpaces.find((space) => space.id === 'forest')!.resources.wood)
+      .toBe(forestWoodBefore)
   })
 
   it('E096 S2: declining the round-one Elder offer leaves the card in hand', () => {
