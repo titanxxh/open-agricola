@@ -6,6 +6,7 @@ import { isThroughTheSeasonsSeason } from '../seasons/rules'
 
 type ActionEntryQueryOptions = {
   vetoesAction?: (space: ActionSpace) => boolean
+  isActionDoable?: (space: ActionSpace, baseDoable: boolean) => boolean
 }
 
 type ActionEntryAvailabilityOptions = {
@@ -20,7 +21,10 @@ export const canEnterActionSpace = (
 ): boolean => {
   if (isSpaceBlocked(space)) return false
   if (!canUseExclusiveSpace(space, player, state)) return false
-  if (space.strictCanExecute && !space.canBeExecutedByPlayer(state, player)) return false
+  if (space.strictCanExecute) {
+    const baseDoable = space.canBeExecutedByPlayer(state, player)
+    if (!(options.isActionDoable?.(space, baseDoable) ?? baseDoable)) return false
+  }
   if (
     space.id === 'fencing' &&
     isThroughTheSeasonsSeason(state, 'spring') &&
@@ -32,6 +36,7 @@ export const canEnterActionSpace = (
     const allowed = computeAllowedPlacementSpaces(state, player)
     if (!allowed.some((entry) => entry.spaceId === space.id)) return false
   }
+  if (space.strictCanExecute && options.isActionDoable) return true
   return options.vetoesAction?.(space) !== true
 }
 

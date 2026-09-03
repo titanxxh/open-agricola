@@ -133,6 +133,8 @@ export const takeAction = (
   if (!space) return core.emitResponse(false, 'space unavailable')
   if (!canEnterActionSpace(state, player, space, {
     vetoesAction: (entry) => core.listenersVetoIsDoableCheck(player, entry),
+    isActionDoable: (entry, baseDoable) =>
+      core.applyIsDoableCheck(player, entry, baseDoable),
   })) {
     return core.emitResponse(false, 'space unavailable')
   }

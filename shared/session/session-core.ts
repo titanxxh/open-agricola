@@ -688,6 +688,13 @@ export class GameCore {
   listenersVetoIsDoableCheck(player: PlayerState, space: ActionSpace): boolean {
     return this.listenersVetoIsDoable(player, space)
   }
+  applyIsDoableCheck(player: PlayerState, space: ActionSpace, baseDoable: boolean): boolean {
+    return this.hookDispatcher.applyIsDoable(
+      { state: this.state, player, space, actionId: space.id },
+      space,
+      baseDoable,
+    )
+  }
   /** @internal Harvest phase trampoline — kicks off the beforeHarvest stage hook chain. */
   invokeHarvestFromBeforeHarvest(): SessionResponse { return this.withCtx(() => this.continueHarvestFromBeforeHarvest()) }
   /** @internal Harvest phase trampoline — kicks off the breed-phase continuation chain. */
