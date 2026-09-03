@@ -51,8 +51,37 @@ const beforePlaceFarmerListener: CardListenerRegistration = {
   },
 }
 
+const isDoableListener: CardListenerRegistration = {
+  id: 'C158-forest-campaigner-isdoable-action-space',
+  cardIds: [CARD_ID],
+  phases: ['isDoable' as ActionHookPhase],
+  handler: (context: CardListenerContext): ActionHookResult | void => {
+    if (context.doable) return
+    if (context.actionId !== context.space.id) return
+    if (context.actionContext?.skipBeforeTriggers === true) return
+    if (countWoodOnAccumulationSpaces(context.state) < WOOD_THRESHOLD) return
+    const player = {
+      ...context.player,
+      resources: {
+        ...context.player.resources,
+        food: (context.player.resources.food ?? 0) + 1,
+      },
+    }
+    const state = {
+      ...context.state,
+      players: context.state.players.map((entry) => entry.id === player.id ? player : entry),
+    }
+    if (context.space.canBeExecutedByPlayer.call(context.space, state, player, {
+      sourceCard: context.sourceCard,
+      actionContext: context.actionContext,
+    })) {
+      return { doable: true }
+    }
+  },
+}
+
 const cardImpl = {
-  listeners: [beforePlaceFarmerListener],
+  listeners: [beforePlaceFarmerListener, isDoableListener],
   reaches: [] as readonly string[],
 } satisfies CardImpl
 
