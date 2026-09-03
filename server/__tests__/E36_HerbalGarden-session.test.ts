@@ -2,7 +2,11 @@ import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 import { computeAnimalZones } from '../../shared/domain/animal-zones'
+import { markAllWorkersUsed } from '../../shared/domain/player'
 
+import '../../shared/cards/A/A165_PigBreeder'
+import '../../shared/cards/D/D167_PureBreeder'
+import '../../shared/cards/E/E033_BeaverColony'
 import '../../shared/cards/E/E036_HerbalGarden'
 
 const CARD_ID = 'E036_HerbalGarden'
@@ -215,5 +219,88 @@ describe('E036_HerbalGarden session', () => {
     expect(response.ok, response.error).toBe(true)
     expect(response.state.players[0]!.resources.sheep).toBe(3)
     expect(response.state.players[0]!.pastures.map((pasture) => pasture.animalCount)).toEqual([0, 2, 1])
+  })
+
+  it('does not let A165 breed into the pasture reserved by E036', () => {
+    const session = new GameSession(36165, undefined, { playerCount: 2 })
+    stabilizeRandomHands(session.state.players)
+    const state = session.getState().state
+    state.round = 12
+    state.players.forEach((player) => markAllWorkersUsed(state, player))
+    const player = state.players[0]!
+    player.minorPlayed.push(CARD_ID)
+    player.occupationPlayed.push('A165_PigBreeder')
+    player.resources.boar = 2
+    player.resources.sheep = 1
+    player.pastures = [
+      {
+        id: 'boar-pasture',
+        size: 1,
+        tiles: [{ row: 0, col: 0 }],
+        stables: 0,
+        animalType: 'boar',
+        animalCount: 2,
+      },
+      {
+        id: 'reserved-pasture',
+        size: 1,
+        tiles: [{ row: 0, col: 1 }],
+        stables: 0,
+        animalType: null,
+        animalCount: 0,
+      },
+    ]
+    player.houseAnimalType = 'sheep'
+    player.houseAnimalCount = 1
+    session.loadState(state)
+
+    const response = session.performRoundEnd()
+
+    expect(response.ok, response.error).toBe(true)
+    expect(response.state.players[0]!.resources.boar).toBe(2)
+    expect(response.interaction.stateId).toBe('idle')
+    expect(response.state.round).toBe(13)
+  })
+
+  it('does not offer D167 breeding into the stabled pasture reserved by E033', () => {
+    const session = new GameSession(33167, undefined, { playerCount: 2 })
+    stabilizeRandomHands(session.state.players)
+    const state = session.getState().state
+    state.round = 1
+    state.players.forEach((player) => markAllWorkersUsed(state, player))
+    const player = state.players[0]!
+    player.minorPlayed.push('E033_BeaverColony')
+    player.occupationPlayed.push('D167_PureBreeder')
+    player.resources.sheep = 4
+    player.resources.boar = 1
+    player.pastures = [
+      {
+        id: 'sheep-pasture',
+        size: 1,
+        tiles: [{ row: 0, col: 0 }],
+        stables: 1,
+        animalType: 'sheep',
+        animalCount: 4,
+      },
+      {
+        id: 'reserved-stabled-pasture',
+        size: 1,
+        tiles: [{ row: 0, col: 1 }],
+        stables: 1,
+        animalType: null,
+        animalCount: 0,
+      },
+    ]
+    player.stableTiles = [{ row: 0, col: 0 }, { row: 0, col: 1 }]
+    player.houseAnimalType = 'boar'
+    player.houseAnimalCount = 1
+    session.loadState(state)
+
+    const response = session.performRoundEnd()
+
+    expect(response.ok, response.error).toBe(true)
+    expect(response.state.players[0]!.resources.sheep).toBe(4)
+    expect(response.interaction.stateId).toBe('idle')
+    expect(response.state.round).toBe(2)
   })
 })
