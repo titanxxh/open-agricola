@@ -4,8 +4,10 @@ import { setWorkersAtHome } from '../../shared/domain/player'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 
 import '../../shared/cards/A/A086_AnimalTamer'
+import '../../shared/cards/C/C134_CowPrince'
 
 const CARD_ID = 'A086_AnimalTamer'
+const COW_PRINCE_ID = 'C134_CowPrince'
 
 const setup = ({
   played = true,
@@ -125,5 +127,23 @@ describe('A086 Animal Tamer parity', () => {
     expect(response.state.players[0]!.resources).toMatchObject({ sheep: 1, boar: 1 })
     expect(response.state.players[0]!.houseAnimalType).toBe('sheep')
     expect(response.state.players[0]!.houseAnimalCount).toBe(1)
+  })
+
+  it('A086 S6: two cattle in two rooms score two Cow Prince bonus points', () => {
+    const session = setup()
+    session.state.round = 14
+    session.state.players[0]!.occupationPlayed.push(COW_PRINCE_ID)
+    session.state.actionSpaces.find((space) => space.id === 'cattle-market')!.resources.cattle = 2
+    session.loadState(session.state)
+    const pending = animalReorg(session.takeAction(0, 'cattle-market'))
+
+    const response = session.resolveChoice(0, 'confirm', [
+      { id: 'house', zoneType: 'house', animalType: 'cattle', animalCount: 2 },
+    ] as unknown as Record<string, unknown>)
+
+    expect(response.ok, response.error).toBe(true)
+    expect(response.state.players[0]).toMatchObject({ houseAnimalType: 'cattle', houseAnimalCount: 2 })
+    expect(response.scores[0]!.categories.find((category) => category.key === 'cardBonusVp')?.entries)
+      .toContainEqual(expect.objectContaining({ cardId: COW_PRINCE_ID, score: 2 }))
   })
 })

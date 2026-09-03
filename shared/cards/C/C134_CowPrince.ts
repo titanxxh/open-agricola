@@ -9,7 +9,7 @@ const cardImpl = {
   computeBonusScore: (_state, player) => {
     let count = 0
     count += player.pastures.filter((p) => p.animalType === 'cattle' && p.animalCount > 0).length
-    if (player.houseAnimalType === 'cattle' && player.houseAnimalCount > 0) count += 1
+    if (player.houseAnimalType === 'cattle') count += Math.min(player.rooms, player.houseAnimalCount)
     count += Object.values(player.stableAnimals ?? {}).filter((t) => t === 'cattle').length
     return count
   },
