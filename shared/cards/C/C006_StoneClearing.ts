@@ -8,7 +8,10 @@ const cardImpl = {
   effect: {
     id: CARD_ID,
     onBuy: (state, player) => {
-      const mutations = mutateLogicalFields(state, player, { sourceCard: CARD_ID })
+      const mutations = mutateLogicalFields(state, player, {
+        sourceCard: CARD_ID,
+        allowNonSowCrop: true,
+      })
       for (const field of getLogicalFields(player)) {
         if (field.stacks.length === 0) mutations.place({ fieldId: field.id }, 'stone', 1)
       }

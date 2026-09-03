@@ -2,7 +2,7 @@ import { defineOccupationCard } from '../card-source'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { isCardFlagged } from '../helpers/card-state'
-import { getRoundPlacementDetails } from '../helpers/round-placement'
+import { getRoundPersonPlacementDetails } from '../helpers/round-placement'
 import type { CardImpl } from '../registry'
 
 const CARD_ID = 'D150_GodlySpouse'
@@ -15,7 +15,7 @@ const afterWishChildrenListener: CardListenerRegistration = {
   actions: ['family-growth'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (isCardFlagged(context.player, CARD_ID)) return
-    const placements = getRoundPlacementDetails(context.player)
+    const placements = getRoundPersonPlacementDetails(context.player)
     if (placements.length !== 2) return
 
     // Rule: "unless the first is on Meeting Place" — drop the workerId in that

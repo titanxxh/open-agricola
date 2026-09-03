@@ -11,10 +11,11 @@ export const getRoundPlacementDetails = (player: PlayerState): RoundPlacementEnt
 export const getRoundPlacementOrder = (player: PlayerState): string[] =>
   getRoundPlacementDetails(player).map(e => e.spaceId)
 
+export const getRoundPersonPlacementDetails = (player: PlayerState): RoundPlacementEntry[] =>
+  getRoundPlacementDetails(player).filter((entry) => entry.relocation !== true)
+
 export const getRoundPersonPlacementOrder = (player: PlayerState): string[] =>
-  getRoundPlacementDetails(player)
-    .filter((entry) => entry.relocation !== true)
-    .map(({ spaceId }) => spaceId)
+  getRoundPersonPlacementDetails(player).map(({ spaceId }) => spaceId)
 
 export const recordRoundPlacement = (
   player: PlayerState,

@@ -1,11 +1,13 @@
 import { defineMinorCard } from '../card-source'
 import type { CardListenerContext, CardListenerRegistration } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
-import { playerBoard, type AnimalZone, getPastureCapacity } from '../../domain'
+import { playerBoard } from '../../domain'
+import { areRequiredEmptyZoneGroupsSatisfied } from '../../domain/animal-zones'
 import { sumResourceMovedToPlayer } from '../helpers/event-provenance'
 import type { CardImpl } from '../registry'
 
 const CARD_ID = 'E033_BeaverColony'
+const REQUIRED_EMPTY_GROUP_ID = `${CARD_ID}:stabled-pastures`
 const REED_ACTION_SPACES = new Set(['reed-bank', 'resource-market-4'])
 
 const reedMovedFromActionSpace = (context: CardListenerContext): number => {
@@ -47,38 +49,27 @@ const afterGainListener: CardListenerRegistration = {
 const cardImpl = {
   listeners: [afterCollectListener, afterGainListener],
   effect: {
-  id: CARD_ID,
-  onBuy: (state, player) => {
-    const idx = state.players.indexOf(player)
-    playerBoard(state, idx).animals.enforceCapacity()
+    id: CARD_ID,
+    onBuy: (state, player) => {
+      const idx = state.players.indexOf(player)
+      if (idx < 0) return
+      if (areRequiredEmptyZoneGroupsSatisfied(playerBoard(state, idx).animals.zones())) return
+      return { type: 'leaf', actionId: 'reorganize', sourceCard: CARD_ID }
+    },
+    onComputeAnimalZones: (player, zones, _state) => {
+      for (const zone of zones) {
+        if (
+          zone.zoneType !== 'pasture'
+          || typeof zone.pastureIndex !== 'number'
+          || (player.pastures[zone.pastureIndex]?.stables ?? 0) <= 0
+        ) continue
+        zone.requiredEmptyZoneGroupIds ??= []
+        if (!zone.requiredEmptyZoneGroupIds.includes(REQUIRED_EMPTY_GROUP_ID)) {
+          zone.requiredEmptyZoneGroupIds.push(REQUIRED_EMPTY_GROUP_ID)
+        }
+      }
+    },
   },
-  onComputeAnimalZones: (player, zones, _state) => {
-    const stabledPastures = zones.filter(
-      (zone): zone is AnimalZone & { zoneType: 'pasture'; pastureIndex: number } =>
-        zone.zoneType === 'pasture' &&
-        typeof zone.pastureIndex === 'number' &&
-        !!player.pastures[zone.pastureIndex] &&
-        player.pastures[zone.pastureIndex]!.stables > 0,
-    )
-    if (stabledPastures.length === 0) return
-    const blocked = stabledPastures.reduce((smallest, zone) => {
-      const smallestPasture = player.pastures[smallest.pastureIndex]!
-      const currentPasture = player.pastures[zone.pastureIndex]!
-      return getPastureCapacity(currentPasture) < getPastureCapacity(smallestPasture)
-        ? zone
-        : smallest
-    })
-    blocked.blocked = true
-    blocked.capacity = 0
-  },
-  /**
-   * The reference `Models/the reference::getInvalidAnimals` (E33 branch):
-   * pasture-with-stable restriction. We enforce via `onComputeAnimalZones`
-   * setting cap=0 on the smallest stabled pasture, which forces overflow
-   * on reorg. Hook returns [] because the constraint is not card-zone-local.
-   */
-  getInvalidAnimals: () => [],
-},
   reaches: [] as readonly string[],
 } satisfies CardImpl
 

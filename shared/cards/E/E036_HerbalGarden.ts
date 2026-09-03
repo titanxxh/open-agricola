@@ -1,35 +1,29 @@
 import { defineMinorCard } from '../card-source'
 import type { CardImpl } from '../registry'
+import { playerBoard } from '../../domain'
+import { areRequiredEmptyZoneGroupsSatisfied } from '../../domain/animal-zones'
 
 const CARD_ID = 'E036_HerbalGarden'
+const REQUIRED_EMPTY_GROUP_ID = `${CARD_ID}:pastures`
 
 const cardImpl = {
   effect: {
     id: CARD_ID,
-    onComputeAnimalZones: (_player, zones, _state) => {
-      // At least one pasture must contain no animals.
-      // Find the best pasture to block: prefer one that's already empty,
-      // otherwise pick the one with the smallest capacity.
-      const pastures = zones.filter(z => z.zoneType === 'pasture')
-      if (pastures.length === 0) return
-      // First try to find an already-empty pasture (animalCount === 0)
-      const emptyPasture = pastures.find(p => (p.animalCount ?? 0) === 0)
-      if (emptyPasture) {
-        emptyPasture.capacity = 0
-        return
-      }
-      // No empty pasture — block the one with smallest capacity
-      const sorted = [...pastures].sort((a, b) => a.capacity - b.capacity)
-      sorted[0]!.capacity = 0
+    onBuy: (state, player) => {
+      const playerIndex = state.players.indexOf(player)
+      if (playerIndex < 0) return
+      if (areRequiredEmptyZoneGroupsSatisfied(playerBoard(state, playerIndex).animals.zones())) return
+      return { type: 'leaf', actionId: 'reorganize', sourceCard: CARD_ID }
     },
-    /**
-     * The reference `Models/the reference::getInvalidAnimals` (E36 branch):
-     * "at least one pasture must contain no animals". We enforce via
-     * `onComputeAnimalZones` setting cap=0 on a chosen pasture, forcing
-     * overflow on reorg. Hook returns [] because the constraint is not
-     * card-zone-local.
-     */
-    getInvalidAnimals: () => [],
+    onComputeAnimalZones: (_player, zones, _state) => {
+      for (const zone of zones) {
+        if (zone.zoneType !== 'pasture') continue
+        zone.requiredEmptyZoneGroupIds ??= []
+        if (!zone.requiredEmptyZoneGroupIds.includes(REQUIRED_EMPTY_GROUP_ID)) {
+          zone.requiredEmptyZoneGroupIds.push(REQUIRED_EMPTY_GROUP_ID)
+        }
+      }
+    },
   },
   reaches: [] as readonly string[],
 } satisfies CardImpl

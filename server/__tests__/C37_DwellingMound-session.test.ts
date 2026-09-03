@@ -41,10 +41,22 @@ describe('C37 Dwelling Mound session', () => {
     player.resources = { ...player.resources, food: 0 }
     session.loadState(state)
 
-    const action = session.takeAction(0, 'farmland')
-    expect(action.ok).toBe(true)
-    const rejected = session.commitSelectionChoice(0, { tile: { row: 0, col: 1 } })
+    const beforeResponse = session.getState()
+    expect(beforeResponse.actionAvailability?.farmland).toBe(false)
+    const beforeTakenBy = structuredClone(
+      beforeResponse.state.actionSpaces.find((space) => space.id === 'farmland')?.takenBy,
+    )
+    const beforeWorkers = structuredClone(beforeResponse.state.players[0]!.workers)
+    const beforeFields = structuredClone(beforeResponse.state.players[0]!.fields)
+    const rejected = session.takeAction(0, 'farmland')
     expect(rejected.ok).toBe(false)
+    expect(rejected.error).toBe('space unavailable')
+    expect(rejected.interaction.stateId).toBe('idle')
+    expect(rejected.state.actionSpaces.find((space) => space.id === 'farmland')?.takenBy)
+      .toEqual(beforeTakenBy)
+    expect(rejected.state.players[0]!.workers).toEqual(beforeWorkers)
+    expect(rejected.state.players[0]!.fields).toEqual(beforeFields)
+    expect(rejected.state.players[0]!.resources.food).toBe(0)
     expect(readCardResourceStats(rejected.state.players[0]!, CARD_ID)).toBeUndefined()
   })
 })

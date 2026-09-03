@@ -7,19 +7,38 @@ import type { ActionFlow } from '../../shared/contract/types'
 
 import '../../shared/cards/C/C006_StoneClearing'
 import '../../shared/cards/D/D063_Lynchet'
+import '../../shared/cards/D/D075_WoodField'
 import '../../shared/cards/A/A011_MudPatch'
+import '../../shared/cards/C/C070_LettucePatch'
+import '../../shared/cards/E/E068_CherryOrchard'
+import '../../shared/cards/E/E069_MelonPatch'
+import '../../shared/cards/E/E070_CropRotationField'
+import '../../shared/cards/E/E072_ArtichokeField'
 
-/**
- * C6 Stone Clearing — full the reference alignment.
- *
- * The reference `C006_StoneClearing::onBuy` places 1 STONE meeple on each empty field;
- * those fields are considered planted until the next field-phase reap, where
- * the standard reap path moves the stone to the player's reserve.
- *
- * Implementation: onBuy directly pushes `{kind:'stone', remaining:1}` to each
- * empty `player.fields` entry. No leaf is returned — stone is granted by the
- * reap main path next harvest.
- */
+const CARD_ID = 'C006_StoneClearing'
+
+const buyStoneClearing = (
+  session: GameSession,
+  response: ReturnType<GameSession['takeAction']>,
+) => {
+  expect(response.interaction.stateId).toBe('wait')
+  if (response.interaction.stateId !== 'wait') return response
+  let cardPrompt = response
+  if (!cardPrompt.interaction.request.options?.some((option) => option.value === CARD_ID)) {
+    const improvementOption = cardPrompt.interaction.request.options?.find((option) =>
+      option.value.startsWith('action-improvement-'),
+    )
+    expect(improvementOption).toBeDefined()
+    cardPrompt = session.resolveChoice(0, improvementOption!.value)
+    expect(cardPrompt.ok).toBe(true)
+    if (cardPrompt.interaction.stateId !== 'wait') return cardPrompt
+  }
+  if (cardPrompt.state.players[1]!.minorHand.includes(CARD_ID)) return cardPrompt
+  const cardOption = cardPrompt.interaction.request.options?.find((option) => option.value === CARD_ID)
+  expect(cardOption).toBeDefined()
+  return session.resolveChoice(0, cardOption!.value)
+}
+
 describe('C006_StoneClearing session (reference-aligned)', () => {
   const setupWithFields = (fields: Array<{ row: number; col: number; stacks: Array<{ kind: 'grain' | 'vegetable' | 'stone'; remaining: number }> }>) => {
     const session = new GameSession()
@@ -37,6 +56,37 @@ describe('C006_StoneClearing session (reference-aligned)', () => {
     session.loadState(state)
     return session
   }
+
+  it('fills an empty farm field and D75 slot through a real 2-player purchase', () => {
+    const session = new GameSession(42)
+    const state = session.getState().state
+    state.players = state.players.slice(0, 2)
+    state.currentPlayerIndex = 0
+    state.round = 1
+    for (const participant of state.players) {
+      participant.minorHand = ['__test_placeholder__']
+      participant.occupationHand = ['__test_placeholder__']
+    }
+    const player = state.players[0]!
+    player.minorHand = [CARD_ID]
+    player.occupationPlayed = ['__test_occupation__']
+    player.minorPlayed.push('D075_WoodField')
+    player.cardStates.D075_WoodField = { extraData: { cardFieldStacks: [null, null] } }
+    player.fields = [{ row: 1, col: 0, stacks: [] }]
+    player.resources.food = 1
+    session.loadState(state)
+
+    const response = buyStoneClearing(session, session.takeAction(0, 'meeting-place'))
+
+    expect(response.ok).toBe(true)
+    expect(response.state.players[0]!.resources.food).toBe(0)
+    expect(response.state.players[0]!.fields[0]!.stacks).toEqual([{ kind: 'stone', remaining: 1 }])
+    expect(response.state.players[0]!.cardStates.D075_WoodField.extraData?.cardFieldStacks).toEqual([
+      { crop: 'stone', remaining: 1 },
+      null,
+    ])
+    expect(response.state.players[1]!.minorHand).toContain(CARD_ID)
+  })
 
   it('onBuy returns no leaf and does not grant stone immediately', () => {
     const session = setupWithFields([
@@ -170,6 +220,86 @@ describe('C006_StoneClearing session (reference-aligned)', () => {
         })],
       }),
     ])
+  })
+
+  it('places stone only in slot 0 of an empty D75 Wood Field and reaps it normally', () => {
+    const session = setupWithFields([{ row: 1, col: 0, stacks: [] }])
+    const state = session.getState().state
+    const player = state.players[0]!
+    player.minorPlayed.push('D075_WoodField')
+    player.cardStates.D075_WoodField = {
+      extraData: { cardFieldStacks: [null, null] },
+    }
+    const beforeStone = player.resources.stone
+
+    runCardEffectHook(state, player, 'C006_StoneClearing', 'onBuy')
+
+    expect(player.fields[0]?.stacks).toEqual([{ kind: 'stone', remaining: 1 }])
+    expect(player.cardStates.D075_WoodField.extraData?.cardFieldStacks).toEqual([
+      { crop: 'stone', remaining: 1 },
+      null,
+    ])
+
+    const result = reap(state, player)
+    expect(player.resources.stone - beforeStone).toBe(2)
+    expect(result.reapSummary.resources.stone).toBe(2)
+    expect(player.cardStates.D075_WoodField.extraData?.cardFieldStacks).toEqual([null, null])
+  })
+
+  it('leaves a partially occupied D75 Wood Field unchanged', () => {
+    const session = setupWithFields([])
+    const state = session.getState().state
+    const player = state.players[0]!
+    player.minorPlayed.push('D075_WoodField')
+    player.cardStates.D075_WoodField = {
+      extraData: {
+        cardFieldStacks: [{ crop: 'wood', remaining: 2 }, null],
+      },
+    }
+
+    runCardEffectHook(state, player, 'C006_StoneClearing', 'onBuy')
+
+    expect(player.cardStates.D075_WoodField.extraData?.cardFieldStacks).toEqual([
+      { crop: 'wood', remaining: 2 },
+      null,
+    ])
+  })
+
+  it.each([
+    'C070_LettucePatch',
+    'E068_CherryOrchard',
+    'E069_MelonPatch',
+    'E070_CropRotationField',
+  ])('does not run %s crop-specific callbacks for harvested stone', (cardId) => {
+    const session = setupWithFields([])
+    const state = session.getState().state
+    const player = state.players[0]!
+    player.minorPlayed.push(cardId)
+    player.cardStates[cardId] = {}
+    player.resources.grain = 1
+    player.resources.vegetable = 1
+
+    runCardEffectHook(state, player, 'C006_StoneClearing', 'onBuy')
+    const result = reap(state, player)
+
+    expect(result.reapSummary.resources.stone).toBe(1)
+    expect(result.reactionFlow).toBeUndefined()
+    expect(player.cardStates[cardId]?.extraData?.selectedPositions).toBeUndefined()
+  })
+
+  it('runs E72 Artichoke Field callback for harvested stone because it accepts any good', () => {
+    const session = setupWithFields([])
+    const state = session.getState().state
+    const player = state.players[0]!
+    player.minorPlayed.push('E072_ArtichokeField')
+    player.cardStates.E072_ArtichokeField = {}
+    const beforeFood = player.resources.food
+
+    runCardEffectHook(state, player, 'C006_StoneClearing', 'onBuy')
+    const result = reap(state, player)
+
+    expect(result.reapSummary.resources.stone).toBe(1)
+    expect(player.resources.food - beforeFood).toBe(1)
   })
 })
 

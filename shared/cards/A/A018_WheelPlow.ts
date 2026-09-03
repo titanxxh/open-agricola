@@ -2,7 +2,7 @@ import { defineMinorCard } from '../card-source'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { isCardFlagged } from '../helpers/card-state'
-import { getRoundPlacementOrder } from '../helpers/round-placement'
+import { getRoundPersonPlacementOrder } from '../helpers/round-placement'
 import type { CardImpl } from '../registry'
 
 const CARD_ID = 'A018_WheelPlow'
@@ -17,7 +17,7 @@ const listener: CardListenerRegistration = {
     if (isCardFlagged(context.player, CARD_ID)) return
     if (!context.space || !TRIGGER_SPACES.has(context.space.id)) return
     // Must be the first person placed this round (placement count is 1 after placing)
-    if (getRoundPlacementOrder(context.player).length !== 1) return
+    if (getRoundPersonPlacementOrder(context.player).length !== 1) return
     return {
       flow: {
         type: 'seq',

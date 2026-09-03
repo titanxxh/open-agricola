@@ -1077,6 +1077,7 @@ export type InteractionAnimalReorgZone = {
   countsFarmyardSpaceAsUnused?: boolean
   displaySource?: 'played-card' | 'farm-position' | 'borrowed-played-card'
   exclusiveCardZoneLimit?: number
+  requiredEmptyZoneGroupIds?: string[]
 }
 
 export type InteractionFarmSelection =

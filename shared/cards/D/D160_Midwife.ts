@@ -2,7 +2,7 @@ import { defineOccupationCard } from '../card-source'
 import type { CardListenerContext, CardListenerRegistration } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { gainLeaf } from '../helpers/pay-gain-node'
-import { getRoundPlacementOrder } from '../helpers/round-placement'
+import { getRoundPersonPlacementOrder } from '../helpers/round-placement'
 import type { CardImpl } from '../registry'
 
 const CARD_ID = 'D160_Midwife'
@@ -31,7 +31,7 @@ const listener: CardListenerRegistration = {
     // Rule: opponent's first farmer this round only.
     // recordRoundPlacement runs before the 'after' hook fires, so the just-placed
     // farmer is already counted — first farmer means exactly 1 placement so far.
-    const placements = getRoundPlacementOrder(context.player)
+    const placements = getRoundPersonPlacementOrder(context.player)
     if (placements.length !== 1) return
     return { flow: gainLeaf(CARD_ID, { grain: 1 }), sourceCard: CARD_ID }
   },

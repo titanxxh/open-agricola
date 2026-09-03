@@ -141,6 +141,7 @@ export const breedAction: ActionDefinition = {
         ...(zone.countsFarmyardSpaceAsUnused !== undefined ? { countsFarmyardSpaceAsUnused: zone.countsFarmyardSpaceAsUnused } : {}),
         ...(zone.displaySource ? { displaySource: zone.displaySource } : {}),
         ...(zone.exclusiveCardZoneLimit !== undefined ? { exclusiveCardZoneLimit: zone.exclusiveCardZoneLimit } : {}),
+        ...(zone.requiredEmptyZoneGroupIds ? { requiredEmptyZoneGroupIds: zone.requiredEmptyZoneGroupIds } : {}),
         capacity: zone.capacity,
       }))
       return {

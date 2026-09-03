@@ -393,6 +393,24 @@ const cropsFromSowSelections = (
     })
     .filter((entry): entry is { row: number; col: number; crop: 'grain' | 'vegetable' | 'wood' | 'stone' } => !!entry)
 
+const areRequiredEmptyAnimalZoneGroupsSatisfied = (
+  requestZones: readonly InteractionAnimalReorgZone[],
+  assignedZones: readonly InteractionAnimalReorgZone[],
+): boolean => {
+  const assignmentsById = new Map(assignedZones.map((zone) => [zone.id, zone]))
+  const groupIds = new Set(requestZones.flatMap((zone) => zone.requiredEmptyZoneGroupIds ?? []))
+  const animalCount = (zone: InteractionAnimalReorgZone | undefined) => {
+    if (!zone) return 0
+    const countFromMap = Object.values(zone.animalCounts ?? {})
+      .reduce((sum, count) => sum + (count ?? 0), 0)
+    return Math.max(countFromMap, zone.animalCount)
+  }
+  return [...groupIds].every((groupId) => requestZones.some((zone) =>
+    zone.requiredEmptyZoneGroupIds?.includes(groupId)
+    && animalCount(assignmentsById.get(zone.id)) === 0,
+  ))
+}
+
 const buildInteractionSubmitCommandUnchecked = (
   interaction: ClientInteractionState,
   draft: InteractionSubmitDraft,
@@ -406,6 +424,12 @@ const buildInteractionSubmitCommandUnchecked = (
   }
   if (interaction.request.kind === 'animal-reorg') {
     const zones = [...(draft.animalReorgZones ?? interaction.request.zones)]
+    if (
+      draft.value === 'confirm'
+      && !areRequiredEmptyAnimalZoneGroupsSatisfied(interaction.request.zones, zones)
+    ) {
+      return { kind: 'rejected' }
+    }
     return {
       kind: 'resolveChoice',
       playerIndex: interaction.playerIndex,

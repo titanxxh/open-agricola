@@ -7,8 +7,8 @@ const cardImpl = makeCardFieldImpl(
   CARD_ID,
   { allowedCrops: ['vegetable'], capacity: 1 },
   {
-    onReap: ({ isLast }) => {
-      if (!isLast) return
+    onReap: ({ crop, isLast }) => {
+      if (crop !== 'vegetable' || !isLast) return
       return { type: 'leaf', actionId: 'plow', sourceCard: CARD_ID, optional: true }
     },
   },

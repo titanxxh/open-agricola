@@ -138,6 +138,34 @@ describe('logical field boundary', () => {
     })
   })
 
+  it('limits off-crop Card Field placement to an explicit card-effect bypass', () => {
+    makeCardFieldImpl('D075_WoodField', { allowedCrops: ['wood'], capacity: 2 })
+    const player = createPlayer({ minorPlayed: ['D075_WoodField'] })
+    const state = createState(player)
+
+    expect(mutateLogicalFields(state, player).place(
+      { fieldId: 'card:D075_WoodField' },
+      'stone',
+      1,
+    )).toEqual({ ok: false, error: 'invalid-crop' })
+
+    const cardEffectMutations = mutateLogicalFields(state, player, { allowNonSowCrop: true })
+    expect(cardEffectMutations.place(
+      { fieldId: 'card:D075_WoodField' },
+      'stone',
+      1,
+    )).toEqual({ ok: true })
+    expect(getLogicalFields(player)[0]?.slots).toEqual([
+      expect.objectContaining({ index: 0, stack: { kind: 'stone', remaining: 1 } }),
+      expect.objectContaining({ index: 1, stack: null }),
+    ])
+    expect(cardEffectMutations.replace(
+      { fieldId: 'card:D075_WoodField' },
+      'grain',
+      3,
+    )).toEqual({ ok: false, error: 'invalid-crop' })
+  })
+
   it('fails malformed Card Field state before changing either owner', () => {
     makeCardFieldImpl('B068_Beanfield', { allowedCrops: ['vegetable'], capacity: 1 })
     const player = createPlayer({
