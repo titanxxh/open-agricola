@@ -72,7 +72,7 @@ const acceptOptional = (session: GameSession, response: SessionResponse) => {
 }
 
 describe('D024 Brotherly Love session', () => {
-  it('D024 S1: playing Brotherly Love pays one food and leaves it in play', () => {
+  it('D024 S1: Brotherly Love costs one food and stays in play', () => {
     const session = new GameSession(24, undefined, { playerCount: 2 })
     stabilizeRandomHands(session.state.players)
     const state = session.getState().state
@@ -95,7 +95,7 @@ describe('D024 Brotherly Love session', () => {
     expect(response.state.players[0]!.minorPlayed).toContain(CARD_ID)
   })
 
-  it('D024 S2: after the third placement offers only that occupied space for the fourth person', () => {
+  it('D024 S2: after the third placement exposes only the third occupied space for the fourth person', () => {
     const session = setup()
     const before = session.getState().state
     const eventCount = before.events.length
@@ -156,11 +156,21 @@ describe('D024 Brotherly Love session', () => {
     ])
   })
 
+  it('D024 S4: a three-person family gets no immediate fourth placement', () => {
+    const session = setup({ familySize: 3 })
+
+    const response = session.takeAction(0, 'day-laborer')
+
+    expect(response.ok, response.error).toBe(true)
+    expect(choicesOf(response)).not.toContain('__skip__')
+    expect(response.interaction.stateId === 'wait' ? response.interaction.request.kind : response.interaction.stateId)
+      .toBe('confirm-next-player')
+  })
+
   it.each([
     ['without the card', { withCard: false }],
-    ['with three family members', { familySize: 3 }],
     ['after only the second person', { placements: 1 }],
-  ])('D024 S4: does not trigger %s', (_label, options) => {
+  ])('does not trigger %s', (_label, options) => {
     const session = setup(options)
 
     const response = session.takeAction(0, 'day-laborer')

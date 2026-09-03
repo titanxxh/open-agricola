@@ -111,14 +111,15 @@ describe('E036 Herbal Garden parity', () => {
     )).toBe(false)
   })
 
-  it('E036 S3: OA does not force reorganization when Herbal Garden invalidates the only pasture', () => {
+  it('E036 S3: playing Herbal Garden with animals in the only pasture forces reorganization', () => {
     const session = setupMinor('E036_HerbalGarden', { resources: { wood: 1 } })
     session.state.players[0]!.pastures = [pasture('p1', [{ row: 1, col: 1 }], 1)]
 
     const response = playMinor(session, 'E036_HerbalGarden')
 
+    expect(response.ok, response.error).toBe(true)
     expect(response.interaction.stateId === 'wait' ? response.interaction.request.kind : undefined)
-      .toBe('confirm-next-player')
+      .toBe('animal-reorg')
     expect(response.state.players[0]!.pastures[0]!.animalCount).toBe(1)
   })
 

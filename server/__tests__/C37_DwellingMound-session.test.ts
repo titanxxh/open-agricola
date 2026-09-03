@@ -102,7 +102,7 @@ describe('C37 Dwelling Mound session', () => {
     expect(readCardResourceStats(after, CARD_ID)?.paid).toEqual({ food: 1 })
   })
 
-  it('C037 S4: without food OA marks Farmland unavailable and rejects action entry', () => {
+  it('C037 S4: without food a new field cannot be placed', () => {
     const session = new GameSession()
     stabilizeRandomHands(session.state.players)
     const state = session.getState().state
