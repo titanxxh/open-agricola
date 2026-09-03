@@ -1,5 +1,5 @@
 import { defineOccupationCard } from '../card-source'
-import type { BonusModifier } from '../../contract/types'
+import type { BonusModifier, TradeModifier } from '../../contract/types'
 import type { CardListenerRegistration } from '../card-listeners'
 import type { ActionHookPhase } from '../../actions/hooks'
 import type { CardImpl } from '../registry'
@@ -12,7 +12,7 @@ const CARD_ID = 'A143_Stonecutter'
  * Reference: onPlayerComputeCardCosts (improvements), onPlayerComputeCostsConstruct,
  * onPlayerComputeCostsRenovation.
  *
- * For construct and renovation we use BonusModifier (the modifier system).
+ * For construct and renovation we use the modifier system.
  * For improvements (majors/minors) we append sourced card-purchase cost candidates.
  */
 
@@ -29,10 +29,12 @@ const cardImpl = {
   listeners: [improvementCostListener],
   modifiers: [
     {
-      type: 'bonus',
+      type: 'trade',
       cardId: CARD_ID,
       appliesTo: ['construct'],
-      discount: { stone: 1 },
+      from: {},
+      to: { stone: 1 },
+      scope: 'unit',
     },
     {
       type: 'bonus',
@@ -41,7 +43,7 @@ const cardImpl = {
       discount: { stone: 1 },
       optional: false,
     },
-  ] as BonusModifier[],
+  ] as (TradeModifier | BonusModifier)[],
   reaches: [] as readonly string[],
 } satisfies CardImpl
 

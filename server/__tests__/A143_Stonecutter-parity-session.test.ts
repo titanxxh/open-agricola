@@ -101,18 +101,18 @@ describe('A143 Stonecutter parity', () => {
     expect(response.state.players[0]!.resources).toMatchObject({ wood: 0, stone: 0 })
   })
 
-  it('A143 S4: eight stone cannot pay for two stone rooms', () => {
+  it('A143 S4: eight stone pays for two stone rooms', () => {
     const session = setup({ houseType: 'stone', resources: { stone: 8, reed: 4 } })
     const selection = openRoomSelection(session)
     if (selection.interaction.stateId !== 'wait' || selection.interaction.request.farm.farmType !== 'room') return
-    expect(selection.interaction.request.farm.maxSelections).toBe(1)
+    expect(selection.interaction.request.farm.maxSelections).toBe(2)
     const [roomA, roomB] = selection.interaction.request.farm.selectableTiles
 
     const response = session.commitSelectionChoice(0, { rooms: [roomA!, roomB!] })
 
-    expect(response.ok).toBe(false)
-    expect(response.state.players[0]!.rooms).toBe(2)
-    expect(response.state.players[0]!.resources).toMatchObject({ stone: 8, reed: 4 })
+    expect(response.ok, response.error).toBe(true)
+    expect(response.state.players[0]!.rooms).toBe(4)
+    expect(response.state.players[0]!.resources).toMatchObject({ stone: 0, reed: 0 })
   })
 
   it('A143 S5: a two-room clay-to-stone renovation costs one fewer stone', () => {

@@ -46,6 +46,7 @@ export type StageResumeState = {
     triggerActionId?: string | null
     resumeAfterCardId?: string | null
     anytimeActionTaken?: boolean
+    roundPreparationAlreadyApplied?: boolean
   }
 }
 

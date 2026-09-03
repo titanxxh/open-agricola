@@ -764,12 +764,7 @@ export class GameCore {
     // Refresh round-start snapshot so that subsequent takeAction / undo logic
     // sees the post-draft hands rather than the initial empty-handed snapshot.
     this.state.roundStartSnapshot = this.buildRoundSnapshot(this.state)
-    if (
-      this.state.phase === 'playing' &&
-      this.state.futureMeeples.some((entry) => entry.round === this.state.round)
-    ) {
-      this.continueCurrentFutureMeepleActions()
-    }
+    if (this.state.phase === 'playing') this.continueBeforeStartOfTurn(0, 0, true)
   }
   /** @internal Round phase — read the captured pre-action player snapshot. */
   getActionStartPlayerSnapshot(): PlayerState | null { return this.actionStartPlayerSnapshot }
@@ -839,7 +834,13 @@ export class GameCore {
       onHarvest: (stageResume) => { this.continueHarvestEffects(stageResume.playerIndex, stageResume.cardIndex) },
       onEndHarvest: (stageResume) => { this.continueEndHarvestEffects(stageResume.playerIndex, stageResume.cardIndex) },
       onAfterHarvest: (stageResume) => { this.continueAfterHarvestEffects(stageResume.playerIndex, stageResume.cardIndex) },
-      onBeforeStartOfTurn: (stageResume) => { this.continueBeforeStartOfTurn(stageResume.playerIndex, stageResume.cardIndex) },
+      onBeforeStartOfTurn: (stageResume) => {
+        this.continueBeforeStartOfTurn(
+          stageResume.playerIndex,
+          stageResume.cardIndex,
+          stageResume.extra?.roundPreparationAlreadyApplied === true,
+        )
+      },
       onBeforeWork: (stageResume) => { this.continueAfterFutureMeepleActions(stageResume.playerIndex, stageResume.cardIndex) },
       onRoundStart: (stageResume) => { this.continueAfterBeforeWork(stageResume.playerIndex, stageResume.cardIndex) },
       futureMeepleReceives: () => { this.continueFutureMeepleAnytimeWindow() },
@@ -3450,9 +3451,23 @@ export class GameCore {
     }
   }
 
-  private continueBeforeStartOfTurn(playerIndex = 0, cardIndex = 0): SessionResponse {
-    if (this.stageDispatch.continueStageHook('onBeforeStartOfTurn', playerIndex, cardIndex)) {
+  private continueBeforeStartOfTurn(
+    playerIndex = 0,
+    cardIndex = 0,
+    roundPreparationAlreadyApplied = false,
+  ): SessionResponse {
+    if (this.stageDispatch.continueStageHook(
+      'onBeforeStartOfTurn',
+      playerIndex,
+      cardIndex,
+      roundPreparationAlreadyApplied ? { roundPreparationAlreadyApplied: true } : undefined,
+    )) {
       return this.respond()
+    }
+    if (roundPreparationAlreadyApplied) {
+      return this.state.futureMeeples.some((entry) => entry.round === this.state.round)
+        ? this.continueCurrentFutureMeepleActions()
+        : this.respond()
     }
     this.state.players.forEach((player) => {
       resetRoundPlacements(player)
