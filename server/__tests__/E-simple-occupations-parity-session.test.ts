@@ -104,8 +104,8 @@ describe('E117 Pipe Smoker parity', () => {
     expect(pipeSmokerHarvest().state.players[0]!.resources.wood).toBe(0)
   })
 
-  it('E117 S4: OA ignores a grain field card when checking Pipe Smoker', () => {
-    expect(pipeSmokerHarvest({ cardField: true }).state.players[0]!.resources.wood).toBe(0)
+  it('E117 S4: a grain field card alone grants two wood at the start of harvest', () => {
+    expect(pipeSmokerHarvest({ cardField: true }).state.players[0]!.resources.wood).toBe(2)
   })
 })
 

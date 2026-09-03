@@ -198,7 +198,7 @@ describe('E112 Grain Thief parity', () => {
     expect(response.state.players[0]!.resources.grain).toBe(2)
   })
 
-  it('E112 S5: OA does not offer Grain Thief for a grain-bearing card field alone', () => {
+  it('E112 S5: a grain-bearing card field alone offers Grain Thief', () => {
     const session = setupOccupation('E112_GrainThief', { played: true, round: 4 })
     const state = session.getState().state
     state.players.forEach((player) => {
@@ -212,13 +212,19 @@ describe('E112 Grain Thief parity', () => {
     ])
     session.loadState(state)
 
-    const response = autoAdvanceRoundEnd(session)
+    const selection = openGrainThiefSelection(session)
+    expect(selection.interaction.stateId).toBe('wait')
+    if (selection.interaction.stateId !== 'wait') throw new Error('expected Grain Thief selection')
+    const position = selection.interaction.request.selection?.selectablePositions[0]
+    expect(position).toMatchObject({ sourceCard: 'E070_CropRotationField' })
+
+    const response = session.commitSelectionChoice(0, { positions: [position!] })
 
     expect(readCardExtraData<{ crop: string; remaining: number }[]>(
       response.state.players[0]!,
       'E070_CropRotationField',
       'cardFieldStacks',
-    )).toEqual([{ crop: 'grain', remaining: 1 }])
+    )).toEqual([{ crop: 'grain', remaining: 2 }])
     expect(response.state.players[0]!.resources.grain).toBe(1)
   })
 })
