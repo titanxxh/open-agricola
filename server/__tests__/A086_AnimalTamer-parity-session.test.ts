@@ -76,7 +76,7 @@ describe('A086 Animal Tamer parity', () => {
     expect(response.state.players[0]!.resources).toMatchObject({ wood: 0, grain: 1 })
   })
 
-  it('A086 S3: the two-room house advertises capacity two but stores only one sheep', () => {
+  it('A086 S3: the two-room house stores two sheep', () => {
     const session = setup()
     session.state.actionSpaces.find((space) => space.id === 'sheep-market')!.resources.sheep = 2
     const pending = animalReorg(session.takeAction(0, 'sheep-market'))
@@ -88,10 +88,8 @@ describe('A086 Animal Tamer parity', () => {
     ] as unknown as Record<string, unknown>)
 
     expect(response.ok, response.error).toBe(true)
-    expect(response.interaction.stateId === 'wait' ? response.interaction.request.kind : undefined)
-      .toBe('animal-reorg')
     expect(response.state.players[0]!.resources.sheep).toBe(2)
-    expect(response.state.players[0]!.houseAnimalCount).toBe(1)
+    expect(response.state.players[0]!.houseAnimalCount).toBe(2)
   })
 
   it('A086 S4: without Animal Tamer the house holds only one animal total', () => {

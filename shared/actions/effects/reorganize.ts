@@ -179,7 +179,9 @@ export const applyReorganizeMutate = (
   const houseZone = zones.find((z) => z.zoneType === 'house')
   const houseAnimalType = normalizeAnimalType(houseZone?.animalType)
   player.houseAnimalType = houseAnimalType
-  player.houseAnimalCount = houseAnimalType && (houseZone?.animalCount ?? 0) > 0 ? 1 : 0
+  player.houseAnimalCount = houseAnimalType
+    ? Math.max(0, Math.min(cap('house'), Math.floor(houseZone?.animalCount ?? 0)))
+    : 0
 
   const stable: Record<string, AnimalKey | null> = {}
   zones

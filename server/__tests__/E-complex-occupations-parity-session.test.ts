@@ -117,13 +117,10 @@ describe('E108 Blackberry Farmer parity', () => {
   it('E108 S4: scheduled food is received at the start of its round', () => {
     const { session, response } = blackberryFences(5)
     const state = response.state
-    state.round = 6
-    state.roundPhase = 'preparation'
+    state.players.forEach((player) => markAllWorkersUsed(state, player))
     session.loadState(state)
 
-    const received = (session as unknown as {
-      continueBeforeStartOfTurn: () => SessionResponse
-    }).continueBeforeStartOfTurn()
+    const received = autoAdvanceRoundEnd(session)
 
     expect(received.state.players[0]!.resources.food).toBe(1)
     expect(received.state.futureMeeples.filter((entry) => entry.cardId === 'E108_BlackberryFarmer'))
@@ -230,13 +227,36 @@ describe('E112 Grain Thief parity', () => {
 })
 
 const startElderRound = (round: number) => {
-  const session = setupOccupation('E096_Elder', { round })
+  if (round === 1) {
+    const session = new GameSession(12, undefined, {
+      playerCount: 2,
+      deckIds: ['E'],
+      draftMode: 'simultaneous',
+      draftPoolSize: 7,
+    })
+    let response = session.getState()
+    for (let step = 0; step < 64 && response.state.phase === 'draft' && response.state.draft; step++) {
+      const draft = response.state.draft
+      const seatId = draft.seatOrder.find((id) => {
+        const pick = draft.pendingPicks[id]
+        return !pick || (pick.occ === null && pick.minor === null)
+      })
+      if (!seatId) throw new Error('expected an unsubmitted draft seat')
+      const pool = draft.pools[seatId]!
+      response = session.submitDraftPick(seatId, {
+        occCardId: pool.occ.includes('E096_Elder') ? 'E096_Elder' : pool.occ[0],
+        minorCardId: pool.minor[0],
+      })
+      expect(response.ok, response.error).toBe(true)
+    }
+    expect(response.state.phase).toBe('playing')
+    return { session, response }
+  }
+  const session = setupOccupation('E096_Elder', { round: round - 1 })
   const state = session.getState().state
-  state.roundPhase = 'preparation'
+  state.players.forEach((player) => markAllWorkersUsed(state, player))
   session.loadState(state)
-  const response = (session as unknown as {
-    continueBeforeStartOfTurn: () => SessionResponse
-  }).continueBeforeStartOfTurn()
+  const response = session.performRoundEnd()
   return { session, response }
 }
 

@@ -522,8 +522,6 @@ export const normalizeState = (raw: GameState): GameState => {
     if (!normalized.houseAnimalType || normalized.houseAnimalCount <= 0) {
       normalized.houseAnimalType = null
       normalized.houseAnimalCount = 0
-    } else {
-      normalized.houseAnimalCount = Math.min(1, normalized.houseAnimalCount)
     }
     return normalized
   })

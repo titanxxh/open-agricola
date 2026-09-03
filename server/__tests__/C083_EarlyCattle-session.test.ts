@@ -59,6 +59,8 @@ describe('C083 Early Cattle parity', () => {
 
     expect(response.ok, response.error).toBe(true)
     expect(response.state.players[0]!.pastures[0]).toMatchObject({ animalType: 'cattle', animalCount: 2 })
+    expect(response.scores[0]!.categories.find((category) => category.key === 'cards')?.entries)
+      .toContainEqual(expect.objectContaining({ cardId: CARD_ID, score: -3 }))
   })
 
   it('C083 S2: no pasture keeps Early Cattle unavailable', () => {
