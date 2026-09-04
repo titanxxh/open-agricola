@@ -371,11 +371,12 @@ describe('C029 Beer Table parity', () => {
     expect(response.state.players[0]!.resources.wood).toBe(0)
   })
 
-  it('C029 S2: OA allows Beer Table despite grain already in supply', () => {
+  it('C029 S2: grain already in supply keeps Beer Table unavailable', () => {
     const session = beer(false, 1)
-    expect(cardIsOffered(session, 'C029_BeerTable')).toBe(true)
+    expect(cardIsOffered(session, 'C029_BeerTable')).toBe(false)
     const response = playMinor(beer(false, 1), 'C029_BeerTable')
-    expect(response.state.players[0]!.minorPlayed).toContain('C029_BeerTable')
+    expect(response.state.players[0]!.minorPlayed).not.toContain('C029_BeerTable')
+    expect(response.state.players[0]!.resources).toMatchObject({ wood: 2, grain: 1 })
   })
 
   it('C029 S3: after reaping grain may pay it for two bonus points and one food per opponent', () => {

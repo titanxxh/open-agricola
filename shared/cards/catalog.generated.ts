@@ -6127,10 +6127,12 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "vp": 1,
     "altCosts": [
       {
-        "clay": 2
+        "clay": 2,
+        "reed": 1
       },
       {
-        "wood": 2
+        "wood": 2,
+        "reed": 1
       }
     ],
     "kind": "minor"
@@ -9649,6 +9651,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
       "wood": 1,
       "clay": 2
     },
+    "maxRound": 8,
     "prerequisite": "Play in Round 8 or Before",
     "kind": "minor"
   },

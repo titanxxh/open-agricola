@@ -97,12 +97,12 @@ describe('D005 Field Clay parity', () => {
     expect(response.state.players[1]!.minorHand).toContain('D005_FieldClay')
   })
 
-  it('D005 S2: OA allows Field Clay with no planted field and grants no clay', () => {
+  it('D005 S2: no planted field keeps Field Clay unavailable', () => {
     const session = setupMinor({ cardId: 'D005_FieldClay', resources: { food: 1 } })
-    expect(cardIsOffered(session, 'D005_FieldClay')).toBe(true)
+    expect(cardIsOffered(session, 'D005_FieldClay')).toBe(false)
     const response = playMinor(setupMinor({ cardId: 'D005_FieldClay', resources: { food: 1 } }), 'D005_FieldClay')
-    expect(response.state.players[0]!.resources).toMatchObject({ food: 0, clay: 0 })
-    expect(response.state.players[1]!.minorHand).toContain('D005_FieldClay')
+    expect(response.state.players[0]!.resources).toMatchObject({ food: 1, clay: 0 })
+    expect(response.state.players[0]!.minorHand).toContain('D005_FieldClay')
   })
 })
 
@@ -241,15 +241,12 @@ describe('D079 Carrot Museum parity', () => {
     expect(response.state.players[0]!.minorPlayed).toContain('D079_CarrotMuseum')
   })
 
-  it('D079 S2: OA allows Carrot Museum after round eight', () => {
+  it('D079 S2: round nine keeps Carrot Museum unavailable', () => {
     const session = setupMinor({
       cardId: 'D079_CarrotMuseum', resources: { wood: 1, clay: 2 }, round: 9,
     })
-    expect(cardIsOffered(session, 'D079_CarrotMuseum')).toBe(true)
-    const response = playMinor(setupMinor({
-      cardId: 'D079_CarrotMuseum', resources: { wood: 1, clay: 2 }, round: 9,
-    }), 'D079_CarrotMuseum')
-    expect(response.state.players[0]!.minorPlayed).toContain('D079_CarrotMuseum')
+    expect(cardIsOffered(session, 'D079_CarrotMuseum')).toBe(false)
+    expect(session.state.players[0]!.minorPlayed).not.toContain('D079_CarrotMuseum')
   })
 
   const roundEnd = (round: number) => {

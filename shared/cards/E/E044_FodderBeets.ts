@@ -1,10 +1,12 @@
 import { defineMinorCard } from '../card-source'
 import { queueFutureMeeples, futureMeeplesNode } from '../../actions/effects/internal/future-meeples'
+import { getFarmyardFields } from '../helpers/card-field'
 import type { CardImpl } from '../registry'
 
 const CARD_ID = 'E044_FodderBeets'
 
 const cardImpl = {
+  prerequisiteCheck: (player) => getFarmyardFields(player).length >= 3,
   effect: {
   id: CARD_ID,
   onBuy: (state, player) => {

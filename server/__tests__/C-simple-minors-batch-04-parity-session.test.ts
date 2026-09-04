@@ -238,26 +238,27 @@ describe('C077 Clay Supply parity', () => {
 })
 
 describe('C044 Chicken Coop parity', () => {
-  it('C044 S1: OA pays two wood without the printed reed fee and schedules eight food', () => {
+  it('C044 S1: pays two wood plus one reed and schedules eight food', () => {
     const response = playMinor(setupMinor({
       cardId: 'C044_ChickenCoop', resources: { wood: 2, reed: 1 }, round: 5,
     }), 'C044_ChickenCoop')
-    expect(response.state.players[0]!.resources).toMatchObject({ wood: 0, reed: 1 })
+    expect(response.state.players[0]!.resources).toMatchObject({ wood: 0, reed: 0 })
     expect(futureRounds(response.state, 'C044_ChickenCoop', 'food')).toEqual([6, 7, 8, 9, 10, 11, 12, 13])
   })
 
-  it('C044 S2: OA may pay two clay without the printed reed fee', () => {
+  it('C044 S2: may pay two clay plus one reed', () => {
     const response = playMinor(setupMinor({
       cardId: 'C044_ChickenCoop', resources: { clay: 2, reed: 1 }, round: 5,
     }), 'C044_ChickenCoop')
-    expect(response.state.players[0]!.resources).toMatchObject({ clay: 0, reed: 1 })
+    expect(response.state.players[0]!.resources).toMatchObject({ clay: 0, reed: 0 })
   })
 
-  it('C044 S3: OA allows Chicken Coop with two wood and no reed', () => {
+  it('C044 S3: lacking the additional reed keeps Chicken Coop unavailable', () => {
     const session = setupMinor({ cardId: 'C044_ChickenCoop', resources: { wood: 2 }, round: 5 })
-    expect(cardIsOffered(session, 'C044_ChickenCoop')).toBe(true)
+    expect(cardIsOffered(session, 'C044_ChickenCoop')).toBe(false)
     const response = playMinor(setupMinor({ cardId: 'C044_ChickenCoop', resources: { wood: 2 }, round: 5 }), 'C044_ChickenCoop')
-    expect(response.state.players[0]!.minorPlayed).toContain('C044_ChickenCoop')
+    expect(response.state.players[0]!.minorPlayed).not.toContain('C044_ChickenCoop')
+    expect(response.state.players[0]!.resources.wood).toBe(2)
   })
 })
 

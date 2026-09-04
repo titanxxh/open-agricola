@@ -42,6 +42,7 @@ export const D079_CarrotMuseum = defineMinorCard({
     desc: ["At the end of rounds 8, 10, and 12, you get 1 <STONE> for each <VEGETABLE> <FIELD> you have and a number of <WOOD> equal to the number of <VEGETABLE> in your supply."],
     vp: 2,
     cost: { wood: 1, clay: 2 },
+    maxRound: 8,
     prerequisite: "Play in Round 8 or Before",
   },
   impl: cardImpl,

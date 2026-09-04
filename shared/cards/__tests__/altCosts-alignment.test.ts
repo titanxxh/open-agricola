@@ -6,7 +6,7 @@ import { getMinorImprovementCard } from '../catalog'
 const cases: Array<{ id: string; altCosts: Record<string, number>[] }> = [
   { id: 'B048_ForestStone', altCosts: [{ wood: 2 }, { stone: 1 }] },
   { id: 'C040_CanvasSack', altCosts: [{ grain: 1 }, { reed: 1 }] },
-  { id: 'C044_ChickenCoop', altCosts: [{ clay: 2 }, { wood: 2 }] },
+  { id: 'C044_ChickenCoop', altCosts: [{ clay: 2, reed: 1 }, { wood: 2, reed: 1 }] },
   { id: 'D080_BrickHammer', altCosts: [{ wood: 1 }, { food: 1 }] },
   { id: 'E030_ChildsToy', altCosts: [{ wood: 1 }, { clay: 1 }] },
   { id: 'E052_Cubbyhole', altCosts: [{ wood: 1 }, { clay: 1 }] },

@@ -310,11 +310,11 @@ describe('E044 Fodder Beets parity', () => {
     expect(futureRounds(response.state, 'E044_FodderBeets', 'food')).toEqual([5, 7, 9, 11, 13])
   })
 
-  it('E044 S2: OA allows Fodder Beets with fewer than three fields', () => {
+  it('E044 S2: fewer than three fields keeps Fodder Beets unavailable', () => {
     const session = withFields(2)
-    expect(cardIsOffered(session, 'E044_FodderBeets')).toBe(true)
+    expect(cardIsOffered(session, 'E044_FodderBeets')).toBe(false)
     const response = playMinor(withFields(2), 'E044_FodderBeets')
-    expect(response.state.players[0]!.minorPlayed).toContain('E044_FodderBeets')
+    expect(response.state.players[0]!.minorPlayed).not.toContain('E044_FodderBeets')
   })
 
   it('E044 S3: round twelve keeps only the round-thirteen food', () => {
