@@ -26,7 +26,7 @@ describe('E151 Delivery Nurse strict action entry', () => {
     session.loadState(state)
 
     expect(session.getState().actionAvailability?.['wish-children']).toBe(true)
-    let response = session.takeAction(0, 'wish-children')
+    const response = session.takeAction(0, 'wish-children')
 
     expect(response.ok, response.error).toBe(true)
     expect(familySize(response.state.players[0]!)).toBe(3)
