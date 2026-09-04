@@ -10,11 +10,28 @@ import {
   symlinkSync,
 } from 'node:fs'
 import { tmpdir } from 'node:os'
-import { join, dirname, resolve } from 'node:path'
+import { createRequire } from 'node:module'
+import { basename, join, dirname, resolve } from 'node:path'
 import { execFileSync } from 'node:child_process'
 import { generatePrFiles } from '../code-gen'
 
 const REPO_ROOT = resolve(__dirname, '../../..')
+
+const resolveInstalledNodeModules = (): string => {
+  const runtimeRequire = createRequire(import.meta.url)
+  let current = dirname(runtimeRequire.resolve('typescript/package.json'))
+  while (dirname(current) !== current) {
+    if (
+      basename(current) === 'node_modules' &&
+      existsSync(join(current, '.bin/tsc')) &&
+      existsSync(join(current, '.bin/tsx'))
+    ) {
+      return current
+    }
+    current = dirname(current)
+  }
+  throw new Error('could not locate installed node_modules with tsc and tsx')
+}
 
 // Slow test: copies repo into tmpdir, writes generated files, runs tsc + generate.
 // Validates that the 4-file PR output from `generatePrFiles` is self-consistent:
@@ -90,10 +107,8 @@ const CARD_IMPL = { effect: { id: CARD_ID, onHarvest: () => gainLeaf(CARD_ID, { 
           cpSync(src, join(tmp, entry), { recursive: true })
         }
         // Symlink node_modules instead of copying (saves several minutes).
-        const nm = join(REPO_ROOT, 'node_modules')
-        if (existsSync(nm)) {
-          symlinkSync(nm, join(tmp, 'node_modules'), 'dir')
-        }
+        const nm = resolveInstalledNodeModules()
+        symlinkSync(nm, join(tmp, 'node_modules'), 'dir')
 
         // Redirect tsBuildInfoFile so we don't write into the symlinked
         // node_modules of the real repo. tsconfig is JSONC (has comments),
