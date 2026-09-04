@@ -4,7 +4,7 @@
 
 > 本文是 [`card_implementation_status.md`](card_implementation_status.md) 的中文镜像；英文版是规范文档。
 
-> 生成/更新日期：2026-09-02。本文件替代 `docs/card_desc_audit.md`、`docs/card_progress.md`、`docs/master-plan.md`、`docs/bad-smell.md`。参考实现唯一基准：`参考实现`。
+> 生成/更新日期：2026-09-04。本文件替代 `docs/card_desc_audit.md`、`docs/card_progress.md`、`docs/master-plan.md`、`docs/bad-smell.md`。参考实现唯一基准：`参考实现`。
 
 ## 2. 问题优先汇总
 
@@ -92,6 +92,9 @@
 
 | 事项 | 当前代码证据 | 后续约束 |
 |---|---|---|
+| Future Schedule 目标语义 | `future-meeples.ts`、`future-meeples-entries.test.ts`、A019/B041/B044/D022/D147/E028、ADR 0018 | Exact Future Target 保留声明的目标轮，只有满足 `current round < target <= 14` 才进入计划；Future Prefix 只保留截至第 14 轮仍存在的连续后缀。共享 resolver 不得把缺失目标钳制到第 14 轮；确有不同映射的卡牌必须在调用点显式声明。 |
+| Strict Action Entry | `Action Entry Query`、`PlayerActionSpaceConfig`、`strictCanExecute`、E151、ADR 0018 | 卡牌创建的行动格默认严格，因此 availability 投影与权威 `takeAction` 在放置工人前执行同一个卡牌条件。标准复合行动格保持显式 opt-in，因为 OR flow 即使普通 child 当前不可执行，也可能仍有合法 replacement 或 skip 语义。 |
+| Granted Rule Action | `family-growth`、A021/A093/B092/C021/D010、ADR 0018 | 卡牌授予规则动作时直接调用该动作。授予 Family Growth 不等于展开整个 Wish for Children 行动格，因此不会附带放置工人或可选小发展。 |
 | 普通围栏计数与事件语义 | `FenceSegment.type`、`getFenceCount()`、`farm.fenceBuilt.newFenceEdges`、`hasOrdinaryFenceBuiltEvent()`、E001/B027/D089 | 印刷 `<FENCE>` 的数量和触发只计算普通 `type='fence'` segment，包括农场上的借用普通围栏，但排除 Wood Palisades。确实关心任意围地 segment 或农场物件的消费者可继续读取广义 `farm.fenceBuilt.fences` 事件字段。 |
 | Metadata 审计覆盖需要随字段演进同步 | `STABLE` cost 和 `passing` 已覆盖；当前 literal mismatch 为 0 | 新增 metadata 字段时同步加 fixture，避免统计口径回退。 |
 | 后端权威的 action / pending 合同 | `allowedCommands`、typed request、`commitSelection`、`engine-resolve` protected cancel、`resolveEngineChoice`、bare improvement choice ids | 新增交互必须显式暴露 command / options 并由后端校验；major/minor improvement choice value 使用裸 `cardId`，旧 `major:` / `minor:` 只作为 parser 兼容输入，支付 option 保留 `pay:*` 命名空间；不要恢复 encoded choice shortcut、old pending cursor 或前端裁定规则。 |
