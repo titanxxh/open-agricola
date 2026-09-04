@@ -28,8 +28,6 @@ export const queueFutureMeeplesFlow = (
   return futureMeeplesNode()
 }
 
-const clampRound = (round: number) => Math.max(1, Math.min(14, round))
-
 const addResourceCounts = (
   target: FutureMeepleResourceMap,
   addition: FutureMeepleResourceMap,
@@ -68,8 +66,8 @@ export const resolveFutureMeepleRequests = (state: GameState, eventSink?: EventS
     const queuedEntries: { round: number; resources?: FutureMeepleResourceMap; roomType?: NonNullable<GameState['futureMeeples'][number]['roomType']> }[] = []
     if ('entries' in request) {
       for (const entry of request.entries) {
-        const round = clampRound(entry.round)
-        if (round <= state.round) continue
+        const round = entry.round
+        if (!Number.isInteger(round) || round <= state.round || round > 14) continue
         const resources: FutureMeepleResourceMap = {}
         if (entry.resources) addResourceCounts(resources, entry.resources)
         const queued = {
@@ -90,8 +88,8 @@ export const resolveFutureMeepleRequests = (state: GameState, eventSink?: EventS
         })
       }
     } else {
-      const startRound = clampRound(request.startRound)
-      const endRound = clampRound(request.startRound + request.count - 1)
+      const startRound = Math.max(1, state.round + 1, request.startRound)
+      const endRound = Math.min(14, request.startRound + request.count - 1)
       for (let round = startRound; round <= endRound; round += 1) {
         const actionId = state.roundActionOrder[round - 1] ?? null
         const resources: FutureMeepleResourceMap = {}

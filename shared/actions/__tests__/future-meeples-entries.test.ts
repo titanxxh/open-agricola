@@ -58,6 +58,29 @@ describe('resolveFutureMeepleRequests — entries form', () => {
     expect(state.futureMeeples[0]!.round).toBe(8)
   })
 
+  it('preserves exact target identity and discards targets after round fourteen', () => {
+    const state = createMinimalState({ round: 13 })
+    state.pendingFutureMeeples = [{
+      cardId: 'ExactTargets',
+      playerId: 'p1',
+      entries: [
+        { round: 14, resources: { food: 1 } },
+        { round: 15, resources: { wood: 1 } },
+        { round: 16, resources: { clay: 1 } },
+      ],
+    }]
+
+    resolveFutureMeepleRequests(state)
+
+    expect(state.futureMeeples).toEqual([
+      expect.objectContaining({
+        cardId: 'ExactTargets',
+        round: 14,
+        resources: { food: 1 },
+      }),
+    ])
+  })
+
   it('works alongside simple form requests', () => {
     const state = createMinimalState({ round: 2 })
     state.pendingFutureMeeples = [
@@ -82,6 +105,47 @@ describe('resolveFutureMeepleRequests — entries form', () => {
     expect(simpleEntries).toHaveLength(2)
     expect(entriesEntries).toHaveLength(1)
     expect(entriesEntries[0]!.resources).toEqual({ reed: 2 })
+  })
+
+  it('keeps only the not-yet-started part of a future prefix through round fourteen', () => {
+    const state = createMinimalState({ round: 13 })
+    state.pendingFutureMeeples = [
+      {
+        cardId: 'LatePrefix',
+        playerId: 'p1',
+        startRound: 14,
+        count: 3,
+        resources: { food: 1 },
+      },
+      {
+        cardId: 'MissingPrefix',
+        playerId: 'p1',
+        startRound: 15,
+        count: 2,
+        resources: { wood: 1 },
+      },
+    ]
+
+    resolveFutureMeepleRequests(state)
+
+    expect(state.futureMeeples.map((entry) => [entry.cardId, entry.round])).toEqual([
+      ['LatePrefix', 14],
+    ])
+  })
+
+  it('drops the elapsed part of a prefix instead of recreating past rounds', () => {
+    const state = createMinimalState({ round: 5 })
+    state.pendingFutureMeeples = [{
+      cardId: 'StartedPrefix',
+      playerId: 'p1',
+      startRound: 4,
+      count: 4,
+      resources: { reed: 1 },
+    }]
+
+    resolveFutureMeepleRequests(state)
+
+    expect(state.futureMeeples.map((entry) => entry.round)).toEqual([6, 7])
   })
 })
 

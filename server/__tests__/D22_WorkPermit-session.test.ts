@@ -64,14 +64,14 @@ describe('D022_WorkPermit card effect', () => {
     }
   })
 
-  it('onBuy clamps target round to 14', () => {
+  it('onBuy preserves an out-of-range target so no earlier round can trigger it', () => {
     const player = createPlayer('p1', { wood: 5, clay: 5, stone: 5, reed: 5, food: 1 })
     const state = createState(10, [player])
     const effect = getCardEffect(CARD_ID)
     effect!.onBuy!(state, player)
     const req = state.pendingFutureMeeples[0]!
     if ('entries' in req) {
-      expect(req.entries[0]!.round).toBe(14)
+      expect(req.entries[0]!.round).toBe(30)
     }
   })
 

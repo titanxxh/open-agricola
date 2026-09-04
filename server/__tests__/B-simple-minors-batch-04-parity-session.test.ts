@@ -229,21 +229,34 @@ describe('B036 Bottles parity', () => {
 })
 
 describe('B041 Hauberg parity', () => {
-  it('B041 S1: OA fixes the four-round sequence to wood, pig, wood, pig', () => {
-    const response = playMinor(setupMinor({
+  it('B041 S1: choosing wood first schedules wood, pig, wood, pig', () => {
+    const session = setupMinor({
       cardId: 'B041_Hauberg', resources: { food: 3 }, occupationsPlayed: 3, round: 5,
-    }), 'B041_Hauberg')
+    })
+    let response = playMinor(session, 'B041_Hauberg')
+    expect(response.interaction.stateId).toBe('wait')
+    if (response.interaction.stateId !== 'wait') throw new Error('expected Hauberg ordering choice')
+    expect(response.interaction.sourceCard).toBe('B041_Hauberg')
+    const choices = response.interaction.request.options?.filter((option) => option.value !== '__skip__') ?? []
+    expect(choices).toHaveLength(2)
+    response = session.resolveChoice(0, choices[0]!.value)
     expect(response.state.players[0]!.resources.food).toBe(0)
     expect(futureRounds(response.state, 'B041_Hauberg', 'wood')).toEqual([6, 6, 8, 8])
     expect(futureRounds(response.state, 'B041_Hauberg', 'boar')).toEqual([7, 9])
   })
 
-  it('B041 S2: OA offers no pig-first ordering choice', () => {
-    const response = playMinor(setupMinor({
+  it('B041 S2: choosing pig first schedules pig, wood, pig, wood', () => {
+    const session = setupMinor({
       cardId: 'B041_Hauberg', resources: { food: 3 }, occupationsPlayed: 3, round: 5,
-    }), 'B041_Hauberg')
-    expect(response.interaction.stateId === 'wait' ? response.interaction.sourceCard : undefined).not.toBe('B041_Hauberg')
-    expect(futureRounds(response.state, 'B041_Hauberg', 'boar')).toEqual([7, 9])
+    })
+    let response = playMinor(session, 'B041_Hauberg')
+    expect(response.interaction.stateId).toBe('wait')
+    if (response.interaction.stateId !== 'wait') throw new Error('expected Hauberg ordering choice')
+    const choices = response.interaction.request.options?.filter((option) => option.value !== '__skip__') ?? []
+    expect(choices).toHaveLength(2)
+    response = session.resolveChoice(0, choices[1]!.value)
+    expect(futureRounds(response.state, 'B041_Hauberg', 'wood')).toEqual([7, 7, 9, 9])
+    expect(futureRounds(response.state, 'B041_Hauberg', 'boar')).toEqual([6, 8])
   })
 
   it('B041 S3: fewer than three occupations keeps Hauberg unavailable', () => {
@@ -252,12 +265,17 @@ describe('B041 Hauberg parity', () => {
     }), 'B041_Hauberg')).toBe(false)
   })
 
-  it('B041 S4: OA clamps all late Hauberg goods onto round 14', () => {
-    const response = playMinor(setupMinor({
+  it('B041 S4: late Hauberg keeps only the chosen sequence entry for round 14', () => {
+    const session = setupMinor({
       cardId: 'B041_Hauberg', resources: { food: 3 }, occupationsPlayed: 3, round: 13,
-    }), 'B041_Hauberg')
-    expect(futureRounds(response.state, 'B041_Hauberg', 'wood')).toEqual([14, 14, 14, 14])
-    expect(futureRounds(response.state, 'B041_Hauberg', 'boar')).toEqual([14, 14])
+    })
+    let response = playMinor(session, 'B041_Hauberg')
+    if (response.interaction.stateId !== 'wait') throw new Error('expected Hauberg ordering choice')
+    const choice = response.interaction.request.options?.find((option) => option.value !== '__skip__')
+    expect(choice).toBeDefined()
+    response = session.resolveChoice(0, choice!.value)
+    expect(futureRounds(response.state, 'B041_Hauberg', 'wood')).toEqual([14, 14])
+    expect(futureRounds(response.state, 'B041_Hauberg', 'boar')).toEqual([])
   })
 })
 
@@ -272,11 +290,11 @@ describe('B044 Chick Stable parity', () => {
     })
   }
 
-  it('B044 S3: OA clamps both late Chick Stable placements onto round 14', () => {
+  it('B044 S3: late Chick Stable drops target rounds after round 14', () => {
     const response = playMinor(setupMinor({
       cardId: 'B044_ChickStable', resources: { wood: 1 }, round: 11,
     }), 'B044_ChickStable')
-    expect(futureRounds(response.state, 'B044_ChickStable', 'food')).toEqual([14, 14, 14, 14])
+    expect(futureRounds(response.state, 'B044_ChickStable', 'food')).toEqual([14, 14])
   })
 })
 

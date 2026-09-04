@@ -8,7 +8,7 @@ const cardImpl = {
   effect: {
   id: CARD_ID,
   onBuy: (state, player) => {
-    const triggerRound = Math.min(state.round + 3, 14)
+    const triggerRound = state.round + 3
     writeCardExtraData(player, CARD_ID, 'triggerRound', triggerRound)
     writeCardInfobox(player, CARD_ID, `Round ${triggerRound}`)
   },

@@ -34,7 +34,7 @@ const cardImpl = {
       (player.resources.stone ?? 0) +
       (player.resources.reed ?? 0)
     if (buildingResources <= 0) return
-    const targetRound = Math.min(14, state.round + buildingResources)
+    const targetRound = state.round + buildingResources
     writeCardExtraData(player, CARD_ID, TARGET_ROUND_KEY, targetRound)
     writeCardInfobox(player, CARD_ID, `Round ${targetRound}`)
     return queueFutureMeeplesFlow(state, {
