@@ -6,6 +6,8 @@ import type { CardImpl } from '../registry'
 const CARD_ID = 'D005_FieldClay'
 
 const cardImpl = {
+  prerequisiteCheck: (player) =>
+    getLogicalFields(player).some((field) => field.stacks.length > 0),
   effect: {
   id: CARD_ID,
   onBuy: (_state, player) => {

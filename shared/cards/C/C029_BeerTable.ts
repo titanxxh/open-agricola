@@ -5,6 +5,7 @@ import type { CardImpl } from '../registry'
 const CARD_ID = 'C029_BeerTable'
 
 const cardImpl = {
+  prerequisiteCheck: (player) => (player.resources.grain ?? 0) === 0,
   effect: {
   id: CARD_ID,
   preHarvestGoodsWanted: ['grain'],

@@ -155,7 +155,6 @@ describe('E021 Sheep Rug parity', () => {
   const withSheep = (count: number) => {
     const session = setupMinor('E021_SheepRug', { resources: { sheep: count } })
     const player = session.state.players[0]!
-    player.resources.sheep = 0
     player.pastures = count > 0 ? [{
       id: 'sheep-pasture', size: 2, tiles: [{ row: 0, col: 1 }, { row: 0, col: 2 }],
       stables: 0, animalType: 'sheep', animalCount: count,
@@ -164,12 +163,13 @@ describe('E021 Sheep Rug parity', () => {
     return session
   }
 
-  it('E021 S1: OA recognizes four sheep for the prerequisite but cannot pay one from the farm', () => {
+  it('E021 S1: four sheep on the farm allow Sheep Rug to be played for one sheep', () => {
     const session = withSheep(4)
-    expect(cardIsOffered(session, 'E021_SheepRug')).toBe(false)
+    expect(cardIsOffered(session, 'E021_SheepRug')).toBe(true)
     const response = playMinor(withSheep(4), 'E021_SheepRug')
-    expect(response.state.players[0]!.minorPlayed).not.toContain('E021_SheepRug')
-    expect(response.state.players[0]!.pastures[0]!.animalCount).toBe(4)
+    expect(response.state.players[0]!.minorPlayed).toContain('E021_SheepRug')
+    expect(response.state.players[0]!.resources.sheep).toBe(3)
+    expect(response.state.players[0]!.pastures[0]!.animalCount).toBe(3)
   })
 
   it('E021 S2: fewer than four sheep keeps it unavailable', () => {

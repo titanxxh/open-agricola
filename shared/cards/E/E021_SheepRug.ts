@@ -1,24 +1,13 @@
 import { defineMinorCard } from '../card-source'
 import type { CardListenerContext, CardListenerRegistration } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
-import type { ActionChoiceOption, PlayerState } from '../../contract/types'
+import type { ActionChoiceOption } from '../../contract/types'
 import { isSpaceOccupied } from '../../domain/space'
+import { getAssignedAnimalsByType } from '../../domain/animals'
 import { OCCUPIED_SPACE_CHOICE_PREFIX } from '../../actions/helpers/placement-constants'
 import type { CardImpl } from '../registry'
 
 const CARD_ID = 'E021_SheepRug'
-const countSheepOnBoard = (player: PlayerState): number => {
-  let total = 0
-  for (const pasture of player.pastures) {
-    if (pasture.animalType === 'sheep') total += pasture.animalCount
-  }
-  if (player.houseAnimalType === 'sheep') total += player.houseAnimalCount
-  for (const animal of Object.values(player.stableAnimals ?? {})) {
-    if (animal === 'sheep') total += 1
-  }
-  return total
-}
-
 const WISH_SPACE_IDS = ['wish-children', 'urgent-wish-children']
 
 const computeArgsListener: CardListenerRegistration = {
@@ -44,7 +33,7 @@ const computeArgsListener: CardListenerRegistration = {
 }
 
 const cardImpl = {
-  prerequisiteCheck: (player) => countSheepOnBoard(player) >= 4,
+  prerequisiteCheck: (player, state) => getAssignedAnimalsByType(player, state).sheep >= 4,
   listeners: [computeArgsListener],
   reaches: [] as readonly string[],
 } satisfies CardImpl
