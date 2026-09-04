@@ -18,9 +18,8 @@ const cardImpl = {
         payLeaf({ cardId: CARD_ID, cost: { food: 1 } }),
         {
           type: 'leaf',
-          actionId: 'wish-children',
+          actionId: 'family-growth',
           sourceCard: CARD_ID,
-          actionContext: { trueAction: false },
         },
       ],
     }

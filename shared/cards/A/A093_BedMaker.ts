@@ -26,9 +26,8 @@ const listener: CardListenerRegistration = {
           },
           {
             type: 'leaf',
-            actionId: 'wish-children',
+            actionId: 'family-growth',
             sourceCard: CARD_ID,
-            actionContext: { constraints: ['freeRoom'], trueAction: false },
           },
         ],
       },

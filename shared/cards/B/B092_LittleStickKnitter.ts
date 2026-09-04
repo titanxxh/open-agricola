@@ -15,11 +15,9 @@ const listener: CardListenerRegistration = {
     return {
       flow: {
         type: 'leaf',
-        actionId: 'wish-children',
+        actionId: 'family-growth',
         optional: true,
         sourceCard: CARD_ID,
-        // Family growth with free room only (no extra room needed)
-        actionContext: { constraints: ['freeRoom'], trueAction: false },
       },
       sourceCard: CARD_ID,
     }
