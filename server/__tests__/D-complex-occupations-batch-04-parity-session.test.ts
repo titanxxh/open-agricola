@@ -333,10 +333,10 @@ describe('D147 Trap Builder parity', () => {
     expect(futureRounds(response.state, 'D147_TrapBuilder', 'boar')).toEqual([8])
   })
 
-  it('D147 S2: OA clamps all three future goods onto round fourteen', () => {
+  it('D147 S2: late Trap Builder drops target rounds after round fourteen', () => {
     const response = takeDayLaborer(13)
-    expect(futureRounds(response.state, 'D147_TrapBuilder', 'food')).toEqual([14, 14])
-    expect(futureRounds(response.state, 'D147_TrapBuilder', 'boar')).toEqual([14])
+    expect(futureRounds(response.state, 'D147_TrapBuilder', 'food')).toEqual([14])
+    expect(futureRounds(response.state, 'D147_TrapBuilder', 'boar')).toEqual([])
   })
 })
 

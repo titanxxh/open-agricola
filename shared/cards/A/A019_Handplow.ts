@@ -8,7 +8,7 @@ const cardImpl = {
   effect: {
   id: CARD_ID,
   onBuy: (state, player) => {
-    const targetRound = Math.min(14, state.round + 5)
+    const targetRound = state.round + 5
     return queueFutureMeeplesFlow(state, {
       cardId: CARD_ID,
       playerId: player.id,

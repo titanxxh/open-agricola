@@ -265,13 +265,13 @@ describe('A019 Handplow parity', () => {
     expectFuture(response.state, 'A019_Handplow', [14], { field: 1 })
   })
 
-  it('A019 S3: OA clamps the Handplow field to round 14 when current round plus five is after round 14', () => {
+  it('A019 S3: a Handplow target after round 14 schedules no future field', () => {
     const response = playMinor(setupMinor({
       cardId: 'A019_Handplow', resources: { wood: 1 }, round: 12,
     }), 'A019_Handplow')
 
     expect(response.state.players[0]!.minorPlayed).toContain('A019_Handplow')
-    expectFuture(response.state, 'A019_Handplow', [14], { field: 1 })
+    expectFuture(response.state, 'A019_Handplow', [], { field: 1 })
   })
 
   it('A019 S4: accepting the due Handplow field allows one free plow and consumes the token', () => {
@@ -338,13 +338,13 @@ describe('A044 Pond Hut parity', () => {
     expectFuture(response.state, 'A044_PondHut', [14], { food: 1 })
   })
 
-  it('A044 S5: OA clamps all three late Pond Hut placements onto round 14', () => {
+  it('A044 S5: Pond Hut schedules no food when no later round space exists', () => {
     const response = playMinor(setupMinor({
       cardId: 'A044_PondHut', resources: { wood: 1 }, occupations: 2, round: 14,
     }), 'A044_PondHut')
 
     expect(response.state.players[0]!.minorPlayed).toContain('A044_PondHut')
-    expectFuture(response.state, 'A044_PondHut', [14], { food: 1 })
+    expectFuture(response.state, 'A044_PondHut', [], { food: 1 })
   })
 
   it('A044 S6: due Pond Hut food is received at the start of the next round', () => {
@@ -398,7 +398,7 @@ describe('A047 Trellises parity', () => {
     expectFuture(response.state, 'A047_Trellises', [14], { food: 1 })
   })
 
-  it('A047 S4: OA clamps late Trellises food onto round 14 when played in round 14', () => {
+  it('A047 S4: Trellises schedules no food when no later round space exists', () => {
     const session = setupMinor({ cardId: 'A047_Trellises', resources: { wood: 1 }, round: 14 })
     setFences(session.state.players[0]!, 3)
     session.loadState(session.state)
@@ -406,7 +406,7 @@ describe('A047 Trellises parity', () => {
     const response = playMinor(session, 'A047_Trellises')
 
     expect(response.state.players[0]!.minorPlayed).toContain('A047_Trellises')
-    expectFuture(response.state, 'A047_Trellises', [14], { food: 1 })
+    expectFuture(response.state, 'A047_Trellises', [], { food: 1 })
   })
 
   it('A047 S5: due Trellises food is received at the start of the next round', () => {

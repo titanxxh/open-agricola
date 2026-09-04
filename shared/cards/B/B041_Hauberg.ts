@@ -1,25 +1,43 @@
 import { defineMinorCard } from '../card-source'
-import { queueFutureMeeplesFlow } from '../../actions/effects/internal/future-meeples'
+import { futureMeeplesNode } from '../../actions/effects/internal/future-meeples'
+import type { ActionFlow, FutureMeepleResourceMap } from '../../contract/types'
 import type { CardImpl } from '../registry'
 
 const CARD_ID = 'B041_Hauberg'
 
+const orderingChoice = (
+  playerId: string,
+  baseRound: number,
+  first: 'wood' | 'boar',
+): ActionFlow => {
+  const second = first === 'wood' ? 'boar' : 'wood'
+  const resourceAt = (resource: 'wood' | 'boar'): FutureMeepleResourceMap =>
+    resource === 'wood' ? { wood: 2 } : { boar: 1 }
+  return {
+    ...futureMeeplesNode({
+      cardId: CARD_ID,
+      playerId,
+      entries: [first, second, first, second].map((resource, index) => ({
+        round: baseRound + index + 1,
+        resources: resourceAt(resource),
+      })),
+    }),
+    choiceLabelKey: `resources.${first}`,
+    sourceCard: CARD_ID,
+  }
+}
+
 const cardImpl = {
   effect: {
   id: CARD_ID,
-  onBuy: (state, player) => {
-    const base = state.round
-    return queueFutureMeeplesFlow(state, {
-      cardId: CARD_ID,
-      playerId: player.id,
-      entries: [
-        { round: base + 1, resources: { wood: 2 } },
-        { round: base + 2, resources: { boar: 1 } },
-        { round: base + 3, resources: { wood: 2 } },
-        { round: base + 4, resources: { boar: 1 } },
-      ],
-    })
-  },
+  onBuy: (state, player) => ({
+    type: 'xor',
+    children: [
+      orderingChoice(player.id, state.round, 'wood'),
+      orderingChoice(player.id, state.round, 'boar'),
+    ],
+    sourceCard: CARD_ID,
+  }),
 },
   reaches: [] as readonly string[],
 } satisfies CardImpl

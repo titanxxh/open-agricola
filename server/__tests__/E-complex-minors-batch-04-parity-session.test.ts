@@ -256,9 +256,9 @@ describe('E028 Bookmark parity', () => {
     expect(readCardExtraData(response.state.players[0]!, 'E028_Bookmark', 'triggerRound')).toBe(5)
   })
 
-  it('E028 S2: OA clamps an out-of-range trigger to round fourteen', () => {
+  it('E028 S2: Bookmark preserves its out-of-range target without triggering early', () => {
     const response = playMinor(setupMinor('E028_Bookmark', { round: 13, resources: { wood: 1 } }), 'E028_Bookmark')
-    expect(readCardExtraData(response.state.players[0]!, 'E028_Bookmark', 'triggerRound')).toBe(14)
+    expect(readCardExtraData(response.state.players[0]!, 'E028_Bookmark', 'triggerRound')).toBe(16)
   })
 })
 
