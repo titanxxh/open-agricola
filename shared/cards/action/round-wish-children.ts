@@ -7,6 +7,7 @@ export const wishChildren: ActionDefinition = {
   descriptionKey: 'actions.wish-children.description',
   roundAvailable: 2,
   gainPerRound: {},
+  strictCanExecute: true,
   canBeExecutedByPlayer: deriveCanBeExecutedByFlow(),
   execute: () => ({ type: 'ok' }),
   flow: {

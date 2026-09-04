@@ -180,7 +180,7 @@ describe('E081 Alchemists Lab parity', () => {
     expect(response.state.players[0]!.resources.food).toBe(owner.resources.food + 1)
   })
 
-  it('E081 S5: OA marks a foodless visitor unavailable but public takeAction still accepts it', () => {
+  it('E081 S5: rejects a foodless visitor at the authoritative action entry', () => {
     const session = setupMinor({ cardId: 'E081_AlchemistsLab', played: true })
     const visitor = session.state.players[1]!
     session.state.currentPlayerIndex = 1
@@ -188,10 +188,11 @@ describe('E081 Alchemists Lab parity', () => {
     session.loadState(session.state)
     expect(session.getState().actionAvailability?.E081_AlchemistsLab).toBe(false)
     const response = session.takeAction(1, 'E081_AlchemistsLab')
-    expect(response.ok, response.error).toBe(true)
+    expect(response.ok).toBe(false)
+    expect(response.error).toBe('space unavailable')
     expect(response.state.players[1]!.resources).toMatchObject({ food: 0, wood: 1 })
     expect(response.state.players[0]!.resources.food).toBe(0)
-    expect(response.state.actionSpaces.find((space) => space.id === 'E081_AlchemistsLab')!.takenBy).toHaveLength(1)
+    expect(response.state.actionSpaces.find((space) => space.id === 'E081_AlchemistsLab')!.takenBy).toHaveLength(0)
   })
 })
 

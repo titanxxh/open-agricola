@@ -69,6 +69,7 @@ export const modestWishChildren56: ActionDefinition = {
   gainPerRound: {},
   players: [5, 6],
   linkedGroupId: 'lessons-modest-children-56',
+  strictCanExecute: true,
   canBeExecutedByPlayer: deriveCanBeExecutedByFlow(),
   execute: () => ({ type: 'ok' }),
   flow: {

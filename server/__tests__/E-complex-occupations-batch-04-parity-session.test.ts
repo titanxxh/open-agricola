@@ -156,12 +156,14 @@ describe('E092 Field Doctor parity', () => {
     expect(isCardFlagged(response.state.players[0]!, 'E092_FieldDoctor')).toBe(true)
   })
 
-  it('E092 S2: OA marks wrong-position fields unavailable but public takeAction still accepts them', () => {
+  it('E092 S2: rejects wrong-position fields at the authoritative action entry', () => {
     const session = setup(false)
     expect(session.getState().actionAvailability?.['wish-children']).toBe(false)
     const response = session.takeAction(0, 'wish-children')
-    expect(response.ok, response.error).toBe(true)
+    expect(response.ok).toBe(false)
+    expect(response.error).toBe('space unavailable')
     expect(familySize(response.state.players[0]!)).toBe(2)
+    expect(response.state.actionSpaces.find((space) => space.id === 'wish-children')?.takenBy).toHaveLength(0)
   })
 })
 

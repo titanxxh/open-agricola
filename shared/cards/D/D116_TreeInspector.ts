@@ -37,7 +37,7 @@ const cardImpl = {
       }
     }
   },
-  onRoundStart: (state) => {
+  onBeforeStartOfTurn: (state) => {
     const revealedAction = state.roundActionOrder[state.round - 1]
     if (revealedAction !== 'western-quarry' && revealedAction !== 'eastern-quarry') return
     const space = findActionSpaceById(state, CARD_ID)
