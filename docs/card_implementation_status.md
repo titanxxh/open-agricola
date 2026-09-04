@@ -4,7 +4,7 @@
 
 > [`card_implementation_status.md`](card_implementation_status.md) is canonical. This file has a maintained Chinese mirror at [`card_implementation_status_zh.md`](card_implementation_status_zh.md).
 
-> Generated and last updated on 2026-09-02. This file replaces `docs/card_desc_audit.md`, `docs/card_progress.md`, `docs/master-plan.md`, and `docs/bad-smell.md`. The sole the reference reference is the reference implementation.
+> Generated and last updated on 2026-09-04. This file replaces `docs/card_desc_audit.md`, `docs/card_progress.md`, `docs/master-plan.md`, and `docs/bad-smell.md`. The sole the reference reference is the reference implementation.
 
 ## 2. Open issues by priority
 
@@ -92,6 +92,9 @@ This review found no new "front-end only adjudication rules" path, nor an open c
 
 |matter|Current code evidence|Subsequent constraints|
 |---|---|---|
+| Future Schedule target semantics | `future-meeples.ts`, `future-meeples-entries.test.ts`, A019/B041/B044/D022/D147/E028, ADR 0018 | Exact Future Targets preserve their declared round and are discarded outside `current round < target <= 14`; Future Prefixes retain only the still-existing contiguous suffix through round 14. The shared resolver must not clamp missing targets onto round 14. A card with intentionally different mapping must declare it at the call site. |
+| Strict Action Entry | `Action Entry Query`, `PlayerActionSpaceConfig`, `strictCanExecute`, E151, ADR 0018 | Card-created Action Spaces are strict by default, so availability projection and authoritative `takeAction` enforce the same card predicate before placing a worker. Standard composite Action Spaces remain opt-in because an OR flow can have legal replacement or skip semantics even when its ordinary children are not currently executable. |
+| Granted Rule Action | `family-growth`, A021/A093/B092/C021/D010, ADR 0018 | A card that grants a rule action invokes that action directly. Granting Family Growth does not expand the entire Wish for Children Action Space and therefore does not inherit worker placement or its optional Minor Improvement branch. |
 | Ordinary-fence count and event semantics | `FenceSegment.type`, `getFenceCount()`, `farm.fenceBuilt.newFenceEdges`, `hasOrdinaryFenceBuiltEvent()`, E001/B027/D089 | Printed `<FENCE>` counts and triggers use ordinary `type='fence'` segments, including borrowed ordinary fences on the farm, but exclude Wood Palisades. Consumers that intentionally care about any enclosing segment or farmyard good may continue to use the broad `farm.fenceBuilt.fences` event payload. |
 |Metadata audit coverage needs to be synchronized with field evolution|`STABLE` cost and `passing` are covered; current literal mismatch is 0|When adding metadata fields, add the matching fixture at the same time to avoid statistical caliber rollback.|
 |Backend authoritative action/pending contract| `allowedCommands`, typed request, `commitSelection`, `engine-resolve` protected cancel, `resolveEngineChoice`, bare improvement choice ids |New interactions must explicitly expose command/options and be verified by the backend; major/minor improvement choice value uses bare`cardId`,old`major:` / `minor:`Only available as parser compatible input, paid option reserved`pay:*`namespace; do not restore encoded choice shortcut, old pending cursor, or front-end arbitration rules.|
