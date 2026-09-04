@@ -76,7 +76,7 @@ describe('worker-identity: family growth pushes newborn to FG space takenBy', ()
     expect(placements[0]).toBe('wish-children')
   })
 
-  it('family growth blocked when rooms <= familySize: familySize unchanged, no newborn activated', () => {
+  it('wish-children rejects entry when rooms <= familySize', () => {
     const session = setup()
     const state = session.getState().state
     const player = state.players[0]!
@@ -85,10 +85,9 @@ describe('worker-identity: family growth pushes newborn to FG space takenBy', ()
     setActiveWorkerCount(player, 2)
     session.loadState(state)
 
-    // takeAction still returns ok:true (soft fail — the action fails but the call succeeds),
-    // but the family growth effect should not apply.
     const resp = session.takeAction(0, 'wish-children')
-    expect(resp.ok).toBe(true)
+    expect(resp.ok).toBe(false)
+    expect(resp.error).toBe('space unavailable')
 
     const p1 = resp.state.players[0]!
     // familySize stays at 2 — growth was blocked
@@ -98,6 +97,7 @@ describe('worker-identity: family growth pushes newborn to FG space takenBy', ()
     const worker3 = p1.workers.find((w) => w.id === '3')
     expect(worker3!.isActive).toBe(false)
     expect(worker3!.isNewborn).toBe(false)
+    expect(resp.state.actionSpaces.find((space) => space.id === 'wish-children')?.takenBy).toEqual([])
   })
 
   it('urgent-wish-children: grows family without room check, newborn joins space', () => {
