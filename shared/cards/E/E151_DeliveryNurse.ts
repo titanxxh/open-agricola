@@ -2,17 +2,24 @@ import { defineOccupationCard } from '../card-source'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { isCardFlagged } from '../helpers/card-state'
-import { familySize } from '../../domain/player'
+import { familySize, hasInactiveWorkerInSupply } from '../../domain/player'
 import { animalKeysForState } from '../../contract/animals'
 import type { CardImpl } from '../registry'
 
 const CARD_ID = 'E151_DeliveryNurse'
+const WISH_CHILDREN_SPACE_IDS = new Set([
+  'wish-children',
+  'urgent-wish-children',
+  'modest-wish-children-56',
+])
 
 const canUseDeliveryNurse = (context: CardListenerContext): boolean => {
+  if (!WISH_CHILDREN_SPACE_IDS.has(context.space.id)) return false
   if (context.actionContext?.skipRoomCheck === true) return false
   if (context.actionContext?.checkedReplaceAction === true) return false
   if (isCardFlagged(context.player, CARD_ID)) return false
   if (animalKeysForState(context.state).some((animal) => (context.player.resources[animal] ?? 0) <= 0)) return false
+  if (!hasInactiveWorkerInSupply(context.player)) return false
   return context.player.rooms <= familySize(context.player)
 }
 /**
