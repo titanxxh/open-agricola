@@ -346,6 +346,10 @@ _Avoid_: 行动格 mutation、卡牌特定行动选择规则、前端规则推�
 会话层判断当前玩家是否能通过普通回合行动入口进入某个 Action Space 的统一查询边界；Session 可用性投影和 `takeAction` 入口校验共用它。
 _Avoid_: Action Space mutation、卡牌购买可用性、RoomPlayer 席位校验、前端本地视角选择
 
+**Strict Action Entry（严格行动入口）**:
+必须在可用性投影和权威 `takeAction` 入口同时满足自身可执行条件的 Action Space；卡牌创建的行动格默认属于此类，标准复合行动格仅在规则要求时显式启用。
+_Avoid_: 只禁用 UI、把所有 OR Action Space 全局设为严格、执行后静默跳过
+
 **Season Action Space（季节行动格）**:
 Through the Seasons 变体中的四季行动格。四个季节行动格都属于公开 Action Space，但只有当前季节的行动格可进入；非当前季节格保持可见但不可执行。
 _Avoid_: 前端按钮、虚拟卡牌、Blocked Action Space
@@ -519,6 +523,22 @@ _Avoid_: 玩家可直接选择的公开行动
 **Future Receive**:
 回合开始时玩家从 future meeple / round card 拿回先前放置资源的 receive 语义。它属于内部阶段流程，但对卡牌语义等同于一次 Receive，不等同于普通 Gain。
 _Avoid_: Gain、Action Space collect、round growth accumulation
+
+**Future Schedule（未来轮计划）**:
+卡牌把资源、组件或后续行动绑定到尚未开始的真实轮次；计划只存在于第 1–14 轮，越界目标不会被改写到另一轮。
+_Avoid_: Round Growth、把越界目标钳制到第 14 轮
+
+**Exact Future Target（精确未来目标）**:
+Future Schedule 中逐项指定的轮次；每项保持原轮次身份，只有满足 `current round < target <= 14` 时才进入计划。
+_Avoid_: Future Prefix、越界合并、目标轮平移
+
+**Future Prefix（未来连续前缀）**:
+Future Schedule 中从指定起点开始、长度有限的一段连续轮次；游戏只保留其中仍真实存在且尚未开始的前缀。
+_Avoid_: Exact Future Target、把缺失后缀堆到最后一轮
+
+**Granted Rule Action（授予的规则动作）**:
+卡牌效果直接授予的领域动作，例如 `family-growth`；它不自动包含同名 Action Space 的其他附带动作、占格或小发展机会。
+_Avoid_: 展开整个 Action Space、模拟放置工人、继承行动格附带选择
 
 **Action Hook**:
 行动生命周期扩展点，如 `isDoable`、`computeReplace`、`computeCosts`、`before`、`during`、`after`、`anytime`。通常由卡牌注册。
