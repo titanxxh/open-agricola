@@ -260,12 +260,8 @@ describe('C104 — multi-select session (player action space)', () => {
 
     const response = session.takeAction(0, CARD_ID)
 
-    expect(response.ok).toBe(true)
-    expect(response.interaction).toMatchObject({
-      stateId: 'wait',
-      playerIndex: 0,
-      request: { kind: 'confirm-next-player' },
-    })
+    expect(response.ok).toBe(false)
+    expect(response.error).toBe('space unavailable')
     expect(response.state.players[0]!.resources).toEqual(before)
     expect(response.state.players[0]!.cardStates[CARD_ID]?.extraData?.used).toBe(4)
   })
@@ -276,12 +272,8 @@ describe('C104 — multi-select session (player action space)', () => {
 
     const response = session.takeAction(1, CARD_ID)
 
-    expect(response.ok).toBe(true)
-    expect(response.interaction).toMatchObject({
-      stateId: 'wait',
-      playerIndex: 1,
-      request: { kind: 'confirm-next-player' },
-    })
+    expect(response.ok).toBe(false)
+    expect(response.error).toBe('space unavailable')
     expect(response.state.players[1]!.resources).toEqual(before)
     expect(response.state.players[1]!.cardStates[CARD_ID]?.extraData?.used).toBeUndefined()
   })

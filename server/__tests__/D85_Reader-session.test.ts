@@ -63,11 +63,12 @@ const expectFamilyGrowth = (session: GameSession, grows: boolean) => {
   const before = familySize(beforeState.state.players[0]!)
   const beforeScore = farmersScore(beforeState)
   const response = session.takeAction(0, 'wish-children')
-  expect(response.ok, response.error).toBe(true)
+  expect(response.ok, response.error).toBe(grows)
+  if (!grows) expect(response.error).toBe('space unavailable')
   expect(familySize(response.state.players[0]!)).toBe(before + (grows ? 1 : 0))
   expect(response.state.players[0]!.rooms).toBe(2)
-  expect(response.interaction.stateId).toBe('wait')
-  if (response.interaction.stateId === 'wait') {
+  if (grows) expect(response.interaction.stateId).toBe('wait')
+  if (grows && response.interaction.stateId === 'wait') {
     expect(response.interaction.request.kind).toBe('confirm-next-player')
   }
   expect(response.state.events.filter((event) =>
@@ -79,7 +80,7 @@ const expectFamilyGrowth = (session: GameSession, grows: boolean) => {
     expect(familyGrowthLogs[0]!.params).toEqual({ player: beforeState.state.players[0]!.name })
   }
   expect(farmersScore(response)).toBe(beforeScore + (grows ? 3 : 0))
-  if (
+  if (grows &&
     response.interaction.stateId === 'wait' &&
     response.interaction.request.kind === 'confirm-next-player'
   ) {
