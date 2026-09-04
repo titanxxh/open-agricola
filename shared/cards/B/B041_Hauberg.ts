@@ -13,11 +13,12 @@ const orderingChoice = (
   const second = first === 'wood' ? 'boar' : 'wood'
   const resourceAt = (resource: 'wood' | 'boar'): FutureMeepleResourceMap =>
     resource === 'wood' ? { wood: 2 } : { boar: 1 }
+  const sequence: ('wood' | 'boar')[] = [first, second, first, second]
   return {
     ...futureMeeplesNode({
       cardId: CARD_ID,
       playerId,
-      entries: [first, second, first, second].map((resource, index) => ({
+      entries: sequence.map((resource, index) => ({
         round: baseRound + index + 1,
         resources: resourceAt(resource),
       })),
