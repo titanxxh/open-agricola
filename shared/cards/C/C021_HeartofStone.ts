@@ -14,10 +14,9 @@ const cardImpl = {
     if (familySize(player) >= player.roomTiles.length) return
     return {
       type: 'leaf',
-      actionId: 'wish-children',
+      actionId: 'family-growth',
       optional: true,
       sourceCard: CARD_ID,
-      actionContext: { constraints: ['freeRoom'], trueAction: false },
     }
   },
 },

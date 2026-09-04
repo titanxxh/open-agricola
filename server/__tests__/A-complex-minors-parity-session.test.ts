@@ -232,7 +232,7 @@ describe('A021 Family Friendly Home parity', () => {
     expect(cardIsOffered(setupMinor({ cardId: 'A021_FamilyFriendHome' }), 'A021_FamilyFriendHome')).toBe(false)
   })
 
-  it('A021 S3: OA grants food but no family member after a true room build with a spare room', () => {
+  it('A021 S3: a true room build with a spare room grants food and one family member', () => {
     const session = setupMinor({
       cardId: 'A021_FamilyFriendHome', resources: { wood: 5, reed: 2 }, played: true, round: 5,
     })
@@ -252,7 +252,7 @@ describe('A021 Family Friendly Home parity', () => {
     expect(response.ok, response.error).toBe(true)
     expect(response.state.players[0]!.rooms).toBe(4)
     expect(response.state.players[0]!.resources.food).toBe(1)
-    expect(familySize(response.state.players[0]!)).toBe(2)
+    expect(familySize(response.state.players[0]!)).toBe(3)
   })
 
   it('A021 S4: building from a full house does not trigger Family Friendly Home', () => {

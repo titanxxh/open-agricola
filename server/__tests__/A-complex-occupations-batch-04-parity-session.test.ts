@@ -156,12 +156,12 @@ describe('A093 Bed Maker parity', () => {
     return { session, response }
   }
 
-  it('A093 S1: OA pays one wood and one grain after a room but does not complete the extra family growth', () => {
+  it('A093 S1: paying one wood and one grain after a room completes the extra family growth', () => {
     const { session, response: offered } = buildRoom(1)
     const response = chooseNonSkip(session, offered, 'A093_BedMaker')
 
     expect(response.state.players[0]!.resources).toMatchObject({ wood: 0, grain: 0 })
-    expect(familySize(response.state.players[0]!)).toBe(2)
+    expect(familySize(response.state.players[0]!)).toBe(3)
   })
 
   it('A093 S2: declining Bed Maker after building preserves its wood and grain', () => {

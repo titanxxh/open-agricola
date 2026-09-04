@@ -131,13 +131,13 @@ describe('B092 Little Stick Knitter parity', () => {
     })
   }
 
-  it('B092 S2: OA accepts the round-five Sheep Market effect but does not grow the family', () => {
+  it('B092 S2: accepting the round-five Sheep Market effect grows the family', () => {
     const session = sheepMarketSession(5)
     const before = familySize(session.state.players[0]!)
     const first = placeMarketSheep(session, session.takeAction(0, 'sheep-market'))
     const response = resolveNonSkip(session, first, 'B092_LittleStickKnitter')
     expect(response.ok, response.error).toBe(true)
-    expect(familySize(response.state.players[0]!)).toBe(before)
+    expect(familySize(response.state.players[0]!)).toBe(before + 1)
   })
 
   it('B092 S3: Little Stick Knitter family growth may be declined', () => {
