@@ -34,12 +34,16 @@ describe('E028_Bookmark session', () => {
     expect(triggerRound).toBe(5)
   })
 
-  it('onBuy clamps triggerRound to max 14', () => {
+  it('preserves an exact trigger round beyond round 14 without firing early', () => {
     const session = setup(13)
     const state = session.getState().state
     const player = state.players[0]!
     const triggerRound = readCardExtraData<number>(player, CARD_ID, 'triggerRound')
-    expect(triggerRound).toBe(14)
+    expect(triggerRound).toBe(16)
+
+    state.round = 14
+    player.occupationHand.push('A097_Freshman')
+    expect(runCardEffectHook(state, player, CARD_ID, 'onBeforeStartOfTurn')).toBeNull()
   })
 
   it('at trigger round, offers free occupation play', () => {

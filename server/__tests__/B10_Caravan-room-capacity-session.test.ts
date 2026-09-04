@@ -99,7 +99,8 @@ describe('B010 parity batch-02 characterization', () => {
     blocked.loadState(blockedState)
     expect(blocked.getActionAvailability(0)['wish-children']).toBe(false)
     const blockedResp = blocked.takeAction(0, 'wish-children')
-    expect(blockedResp.ok).toBe(true)
+    expect(blockedResp.ok).toBe(false)
+    expect(blockedResp.error).toBe('space unavailable')
     expect(familySize(blockedResp.state.players[0]!)).toBe(2)
 
     const resp = setupSession(true).takeAction(0, 'wish-children')

@@ -378,7 +378,7 @@ describe('C042_RavenousHunger', () => {
     expect(treeInspector.resources.wood).toBe(3)
 
     state.roundActionOrder[state.round - 1] = 'eastern-quarry'
-    D116_TreeInspector_impl.effect!.onRoundStart!(state, state.players[0]!)
+    D116_TreeInspector_impl.effect!.onBeforeStartOfTurn!(state, state.players[0]!)
     expect(treeInspector.resources.wood).toBe(0)
   })
 
