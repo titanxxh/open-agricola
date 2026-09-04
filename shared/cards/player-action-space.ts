@@ -57,6 +57,7 @@ export const createPlayerActionSpaces = (state: GameState): ActionSpace[] => {
         id: cardId,
         roundAvailable: 1,
         gainPerRound: { ...config.gainPerRound },
+        strictCanExecute: def.strictCanExecute ?? true,
         resources: { ...emptyResources },
         takenBy: [],
       } as ActionSpace)

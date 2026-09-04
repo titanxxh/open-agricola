@@ -91,18 +91,19 @@ describe('D116 Tree Inspector parity', () => {
     expect(response.state.players[0]!.resources.wood).toBe(1)
   })
 
-  it('D116 S2: OA accepts another player using the private space without reward', () => {
+  it('D116 S2: rejects another player using the private space', () => {
     const session = setupOccupation('D116_TreeInspector', { played: true, round: 5 })
     session.state.currentPlayerIndex = 1
     session.loadState(session.state)
     expect(session.getState().actionAvailability?.D116_TreeInspector).toBe(false)
     const response = session.takeAction(1, 'D116_TreeInspector')
-    expect(response.ok, response.error).toBe(true)
+    expect(response.ok).toBe(false)
+    expect(response.error).toBe('space unavailable')
     expect(response.state.players[1]!.resources.wood).toBe(0)
-    expect(response.state.actionSpaces.find((space) => space.id === 'D116_TreeInspector')?.takenBy).toHaveLength(1)
+    expect(response.state.actionSpaces.find((space) => space.id === 'D116_TreeInspector')?.takenBy).toHaveLength(0)
   })
 
-  it('D116 S3: OA revealing Western Quarry discards both stored and newly accumulated wood', () => {
+  it('D116 S3: revealing Western Quarry discards stored wood before one new wood accumulates', () => {
     const session = setupOccupation('D116_TreeInspector', { played: true, round: 6 })
     const state = session.getState().state
     const space = state.actionSpaces.find((candidate) => candidate.id === 'D116_TreeInspector')!
@@ -112,7 +113,7 @@ describe('D116 Tree Inspector parity', () => {
     session.loadState(state)
     const response = session.performRoundEnd()
     expect(response.state.round).toBe(7)
-    expect(response.state.actionSpaces.find((candidate) => candidate.id === 'D116_TreeInspector')?.resources.wood).toBe(0)
+    expect(response.state.actionSpaces.find((candidate) => candidate.id === 'D116_TreeInspector')?.resources.wood).toBe(1)
   })
 })
 
@@ -159,11 +160,13 @@ describe('D127 Hardworking Man parity', () => {
     expect(response.state.players[0]!.resources.food).toBe(2)
   })
 
-  it('D127 S2: OA accepts Hardworking Man when an opponent has no more rooms', () => {
+  it('D127 S2: rejects Hardworking Man when an opponent has no more rooms', () => {
     const session = setup(false)
     expect(session.getState().actionAvailability?.D127_HardworkingMan).toBe(false)
     const response = session.takeAction(0, 'D127_HardworkingMan')
-    expect(response.ok, response.error).toBe(true)
+    expect(response.ok).toBe(false)
+    expect(response.error).toBe('space unavailable')
+    expect(response.state.actionSpaces.find((space) => space.id === 'D127_HardworkingMan')?.takenBy).toHaveLength(0)
   })
 })
 

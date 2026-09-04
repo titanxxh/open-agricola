@@ -179,28 +179,30 @@ describe('A162 Forest Tallyman parity', () => {
     expect(response.state.players[0]!.resources).toMatchObject({ clay: 2, wood: 3 })
   })
 
-  it('A162 S3: OA accepts a no-reward placement while Clay Pit is unoccupied', () => {
+  it('A162 S3: rejects Forest Tallyman while Clay Pit is unoccupied', () => {
     const session = setupForestTallyman({ occupied: false })
     expect(session.getState().actionAvailability?.A162_ForestTallyman).toBe(false)
 
     const response = session.takeAction(0, 'A162_ForestTallyman')
 
-    expect(response.ok, response.error).toBe(true)
+    expect(response.ok).toBe(false)
+    expect(response.error).toBe('space unavailable')
     expect(response.state.players[0]!.resources).toMatchObject({ clay: 0, wood: 0 })
     expect(response.state.actionSpaces.find((space) => space.id === 'A162_ForestTallyman')?.takenBy)
-      .toHaveLength(1)
+      .toHaveLength(0)
   })
 
-  it('A162 S4: OA accepts a no-reward placement by a non-owner on the private space', () => {
+  it('A162 S4: rejects a non-owner on the private Forest Tallyman space', () => {
     const session = setupForestTallyman({ actor: 3 })
     expect(session.getState().actionAvailability?.A162_ForestTallyman).toBe(false)
 
     const response = session.takeAction(3, 'A162_ForestTallyman')
 
-    expect(response.ok, response.error).toBe(true)
+    expect(response.ok).toBe(false)
+    expect(response.error).toBe('space unavailable')
     expect(response.state.players[3]!.resources).toMatchObject({ clay: 0, wood: 0 })
     expect(response.state.actionSpaces.find((space) => space.id === 'A162_ForestTallyman')?.takenBy)
-      .toEqual([{ playerId: response.state.players[3]!.id, workerId: '1' }])
+      .toEqual([])
   })
 })
 

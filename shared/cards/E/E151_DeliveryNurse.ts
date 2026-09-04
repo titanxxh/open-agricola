@@ -7,6 +7,14 @@ import { animalKeysForState } from '../../contract/animals'
 import type { CardImpl } from '../registry'
 
 const CARD_ID = 'E151_DeliveryNurse'
+
+const canUseDeliveryNurse = (context: CardListenerContext): boolean => {
+  if (context.actionContext?.skipRoomCheck === true) return false
+  if (context.actionContext?.checkedReplaceAction === true) return false
+  if (isCardFlagged(context.player, CARD_ID)) return false
+  if (animalKeysForState(context.state).some((animal) => (context.player.resources[animal] ?? 0) <= 0)) return false
+  return context.player.rooms <= familySize(context.player)
+}
 /**
  * E151 Delivery Nurse — Once this game, if you have all types of animals,
  * you can use any __Wish for Children__ action space even without room.
@@ -25,13 +33,10 @@ const computeReplaceListener: CardListenerRegistration = {
   phases: ['computeReplace' as ActionHookPhase],
   actions: ['family-growth'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
-    if (isCardFlagged(context.player, CARD_ID)) return
-    if (animalKeysForState(context.state).some((animal) => (context.player.resources[animal] ?? 0) <= 0)) return
-    // Only activate if player has no room for a child (family-growth would fail)
-    if (context.player.rooms > familySize(context.player)) return
+    if (!canUseDeliveryNurse(context)) return
     return {
-      actionId: 'family-growth',
-      flow: {
+      decline: true,
+      alternativeFlow: {
         type: 'seq',
         children: [
           {
@@ -48,8 +53,19 @@ const computeReplaceListener: CardListenerRegistration = {
   },
 }
 
+const isDoableListener: CardListenerRegistration = {
+  id: 'E151-delivery-nurse-isdoable-wish-children',
+  cardIds: [CARD_ID],
+  phases: ['isDoable' as ActionHookPhase],
+  actions: ['family-growth'],
+  handler: (context: CardListenerContext): ActionHookResult | void => {
+    if (!canUseDeliveryNurse(context)) return
+    return { doable: true }
+  },
+}
+
 const cardImpl = {
-  listeners: [computeReplaceListener],
+  listeners: [computeReplaceListener, isDoableListener],
   reaches: [] as readonly string[],
 } satisfies CardImpl
 
