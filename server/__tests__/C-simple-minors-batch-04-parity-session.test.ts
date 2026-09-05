@@ -199,17 +199,17 @@ describe('C007 Blade Shears parity', () => {
 })
 
 describe('C040 Canvas Sack parity', () => {
-  it('C040 S1: OA pays the grain as card cost but grants no vegetable', () => {
+  it('C040 S1: pays grain once and gains one vegetable', () => {
     const session = setupMinor({ cardId: 'C040_CanvasSack', resources: { grain: 1 } })
     const response = playMinor(session, 'C040_CanvasSack')
-    expect(response.state.players[0]!.resources).toMatchObject({ grain: 0, vegetable: 0 })
+    expect(response.state.players[0]!.resources).toMatchObject({ grain: 0, vegetable: 1 })
     expect(response.interaction.stateId === 'wait' ? response.interaction.request.kind : '').toBe('confirm-next-player')
   })
 
-  it('C040 S2: OA pays the reed as card cost but grants no wood', () => {
+  it('C040 S2: pays reed once and gains four wood', () => {
     const session = setupMinor({ cardId: 'C040_CanvasSack', resources: { reed: 1 } })
     const response = playMinor(session, 'C040_CanvasSack')
-    expect(response.state.players[0]!.resources).toMatchObject({ reed: 0, wood: 0 })
+    expect(response.state.players[0]!.resources).toMatchObject({ reed: 0, wood: 4 })
     expect(response.interaction.stateId === 'wait' ? response.interaction.request.kind : '').toBe('confirm-next-player')
   })
 
