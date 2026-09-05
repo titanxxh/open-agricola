@@ -37,7 +37,7 @@ describe('A102_Grocer session', () => {
     const player = state.players[0]!
     const stack = getCardStack(player, 'A102_Grocer')
     expect(stack).toEqual([
-      'wood', 'grain', 'reed', 'stone', 'vegetable', 'clay', 'reed', 'vegetable',
+      'vegetable', 'reed', 'clay', 'vegetable', 'stone', 'reed', 'grain', 'wood',
     ])
     expect(stack.length).toBe(8)
   })
@@ -83,12 +83,12 @@ describe('A102_Grocer session', () => {
     expect(anytimeIds).not.toContain('A102-grocer-anytime')
   })
 
-  it('taking top: pay 1 food, gain vegetable (top of stack)', () => {
+  it('taking top: pay 1 food, gain wood (top of stack)', () => {
     const session = setup()
     const state = session.getState().state
     const player = state.players[0]!
     player.resources.food = 5
-    player.resources.vegetable = 0
+    player.resources.wood = 0
     session.loadState(state)
 
     enterActiveInteraction(session)
@@ -98,40 +98,40 @@ describe('A102_Grocer session', () => {
 
     const updatedPlayer = resp.state.players[0]!
     expect(updatedPlayer.resources.food).toBe(4) // 5 - 1
-    expect(updatedPlayer.resources.vegetable).toBe(1) // 0 + 1 (top was vegetable)
+    expect(updatedPlayer.resources.wood).toBe(1)
     // Stack should now have 7 items
     const stack = getCardStack(updatedPlayer, 'A102_Grocer')
     expect(stack.length).toBe(7)
-    expect(stack[stack.length - 1]).toBe('reed') // new top
+    expect(stack[stack.length - 1]).toBe('grain')
   })
 
-  it('second take: gain reed (new top after first take)', () => {
+  it('second take: gain grain (new top after first take)', () => {
     const session = setup()
     const state = session.getState().state
     const player = state.players[0]!
     player.resources.food = 5
-    player.resources.vegetable = 0
-    player.resources.reed = 0
+    player.resources.wood = 0
+    player.resources.grain = 0
     session.loadState(state)
 
     enterActiveInteraction(session)
 
-    // First take: vegetable
+    // First take: wood
     const resp1 = session.takeAnytimeAction(0, 'A102-grocer-anytime')
     expect(resp1.ok).toBe(true)
-    expect(resp1.state.players[0]!.resources.vegetable).toBe(1)
+    expect(resp1.state.players[0]!.resources.wood).toBe(1)
 
-    // Second take: reed
+    // Second take: grain
     const resp2 = session.takeAnytimeAction(0, 'A102-grocer-anytime')
     expect(resp2.ok).toBe(true)
 
     const updatedPlayer = resp2.state.players[0]!
     expect(updatedPlayer.resources.food).toBe(3) // 5 - 2
-    expect(updatedPlayer.resources.reed).toBe(1)
-    expect(updatedPlayer.resources.vegetable).toBe(1)
+    expect(updatedPlayer.resources.grain).toBe(1)
+    expect(updatedPlayer.resources.wood).toBe(1)
     const stack = getCardStack(updatedPlayer, 'A102_Grocer')
     expect(stack.length).toBe(6)
-    expect(stack[stack.length - 1]).toBe('clay') // new top
+    expect(stack[stack.length - 1]).toBe('reed')
   })
 
   it('can drain the entire stack', () => {
