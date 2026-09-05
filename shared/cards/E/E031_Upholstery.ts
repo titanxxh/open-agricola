@@ -2,6 +2,7 @@ import { defineMinorCard } from '../card-source'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import type { CardImpl } from '../registry'
+import { getStoredResource } from '../helpers/card-storage'
 
 const CARD_ID = 'E031_Upholstery'
 const listener: CardListenerRegistration = {
@@ -15,7 +16,9 @@ const listener: CardListenerRegistration = {
     if (!builtId || builtId === CARD_ID) return
     // Cap: number of rooms in house
     const roomCount = context.player.roomTiles.length
-    if (roomCount <= 0) return
+    const storedReed = getStoredResource(context.player, CARD_ID, 'reed')
+    if (roomCount <= 0 || storedReed >= roomCount) return
+    if (context.player.resources.reed < 1) return
     return {
       flow: {
         type: 'seq',
@@ -23,7 +26,13 @@ const listener: CardListenerRegistration = {
         children: [
           {
             type: 'leaf',
-            actionId: 'return-to-space',
+            actionId: 'pay',
+            params: { reed: 1 },
+            sourceCard: CARD_ID,
+          },
+          {
+            type: 'leaf',
+            actionId: 'store-on-card',
             params: { reed: 1 },
             sourceCard: CARD_ID,
           },

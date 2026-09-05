@@ -297,8 +297,8 @@ describe('E031 Upholstery parity', () => {
     const { session, response: initial } = afterImprovement(0)
     const response = chooseNonSkip(session, initial, 'E031_Upholstery')
     expect(response.state.players[0]!.resources.reed).toBe(0)
-    expect(response.state.players[0]!.cardStates.E031_Upholstery?.counters).toMatchObject({ reed: 0, bonusVp: 1 })
-    expect(response.state.actionSpaces.find((space) => space.id === 'major-improvement')!.resources.reed).toBe(1)
+    expect(response.state.players[0]!.cardStates.E031_Upholstery?.counters).toMatchObject({ reed: 1, bonusVp: 1 })
+    expect(response.state.actionSpaces.find((space) => space.id === 'major-improvement')!.resources.reed).toBe(0)
   })
 
   it('E031 S2: the reward may be declined', () => {
@@ -308,9 +308,9 @@ describe('E031 Upholstery parity', () => {
     expect(response.state.players[0]!.cardStates.E031_Upholstery?.counters?.reed ?? 0).toBe(0)
   })
 
-  it('E031 S3: OA ignores the stored-reed room cap and offers another reward', () => {
+  it('E031 S3: stored reed equal to room count blocks another reward', () => {
     const { response } = afterImprovement(2)
-    expect(response.interaction.stateId === 'wait' ? response.interaction.sourceCard : undefined).toBe('E031_Upholstery')
+    expect(response.interaction.stateId === 'wait' ? response.interaction.sourceCard : undefined).not.toBe('E031_Upholstery')
   })
 })
 
