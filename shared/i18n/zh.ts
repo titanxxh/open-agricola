@@ -167,6 +167,9 @@ export const zh = {
         prompt: '选择要计分的木头+石头对数',
         scorePairs: '计分 {pairs} 对（{score} 额外分）',
       },
+      D098_Transactor: {
+        prompt: '拿走游戏板上的所有建材？',
+      },
       E132_VeggieLover: {
         prompt: '选择要兑换的粮食+蔬菜对数',
         scorePairs: '兑换 {pairs} 对（{score} 额外分）',
