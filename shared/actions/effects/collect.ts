@@ -10,6 +10,11 @@ type CollectableResource = (typeof COLLECTABLE_RESOURCES)[number]
 const isCollectableResource = (value: unknown): value is CollectableResource =>
   typeof value === 'string' && COLLECTABLE_RESOURCES.includes(value as CollectableResource)
 
+const readAllActionSpaceResourceTypes = (value: unknown): CollectableResource[] | null => {
+  if (!Array.isArray(value) || value.length === 0 || !value.every(isCollectableResource)) return null
+  return [...new Set(value)]
+}
+
 const positiveResources = (resources: Partial<Resource>): Partial<Resource> => {
   const out: Partial<Resource> = {}
   Object.entries(resources).forEach(([key, value]) => {
@@ -58,6 +63,32 @@ export const collectAction: ActionDefinition = {
   gainPerRound: {},
   canBeExecutedByPlayer: () => true,
   execute: ({ state, player, space, actionContext, eventSink }) => {
+    const hasAllSpaceRequest = actionContext?.allActionSpaceResourceTypes !== undefined
+    const allActionSpaceResourceTypes = hasAllSpaceRequest
+      ? readAllActionSpaceResourceTypes(actionContext.allActionSpaceResourceTypes)
+      : null
+    if (hasAllSpaceRequest) {
+      if (!allActionSpaceResourceTypes) {
+        return { type: 'fail', errorKey: 'log.collectInvalidPartial' }
+      }
+      const total: Partial<Resource> = {}
+      for (const actionSpace of state.actionSpaces) {
+        const fromSpace: Partial<Resource> = {}
+        for (const resource of allActionSpaceResourceTypes) {
+          const amount = actionSpace.resources[resource] ?? 0
+          if (amount <= 0) continue
+          actionSpace.resources[resource] = 0
+          player.resources[resource] = (player.resources[resource] ?? 0) + amount
+          fromSpace[resource] = amount
+          total[resource] = (total[resource] ?? 0) + amount
+        }
+        emitCollectedResources(eventSink, player.id, actionSpace.id, fromSpace)
+      }
+      trackWorkPhaseBuildingResources(state, player.id, total)
+      addResourcesFromBoard(player, total)
+      return { type: 'ok' as const, resourcesGained: total }
+    }
+
     const spaceIdHint = actionContext?.spaceId as string | undefined
     let targetSpace: ActionSpace | undefined
     if (spaceIdHint) {

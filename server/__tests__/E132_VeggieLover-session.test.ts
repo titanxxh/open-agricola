@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession, type SessionResponse } from '../game/authoritative-session'
 import { getCardEffect } from '../../shared/cards/card-effects'
-import type { ActionFlow, PlayerState } from '../../shared/contract/types'
+import type { ActionFlow } from '../../shared/contract/types'
 import { computeScores } from '../../shared/domain/scoring'
 import { markAllWorkersUsed, setActiveWorkerCount } from '../../shared/domain/player'
 import { rehydrateState, serializeSessionSnapshot } from '../../shared/session/serialization'

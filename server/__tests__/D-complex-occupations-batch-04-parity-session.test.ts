@@ -366,18 +366,19 @@ describe('D098 Transactor parity', () => {
   }
 
   it('D098 S1: before the final harvest collects all board building resources', () => {
-    const { response } = finishRound(14)
+    const { session, response: offered } = finishRound(14)
+    const response = chooseNonSkip(session, offered, 'D098_Transactor')
     expect(response.state.players[0]!.resources).toMatchObject({ wood: 2, clay: 3 })
     expect(response.state.actionSpaces.find((space) => space.id === 'forest')!.resources.wood).toBe(0)
     expect(response.state.actionSpaces.find((space) => space.id === 'fishing')!.resources.food).toBe(4)
   })
 
-  it('D098 S2: OA auto-collects and exposes no decline choice', () => {
-    const { response } = finishRound(14)
-    expect(response.state.players[0]!.resources.wood).toBe(2)
-    expect(response.interaction.stateId === 'wait'
-      ? response.interaction.request.options?.some((option) => option.value === '__skip__' && option.sourceCard === 'D098_Transactor')
-      : false).toBe(false)
+  it('D098 S2: may decline without collecting board resources', () => {
+    const { session, response: offered } = finishRound(14)
+    expect(offered.state.players[0]!.resources.wood).toBe(0)
+    const response = chooseSkip(session, offered, 'D098_Transactor')
+    expect(response.state.players[0]!.resources.wood).toBe(0)
+    expect(response.state.actionSpaces.find((space) => space.id === 'forest')!.resources.wood).toBe(2)
   })
 
   it('D098 S3: does not collect before a nonfinal harvest', () => {
