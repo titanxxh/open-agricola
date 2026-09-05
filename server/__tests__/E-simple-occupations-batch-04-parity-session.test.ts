@@ -91,7 +91,7 @@ describe('E168 Animal Tamers Apprentice parity', () => {
     expect(familySize(response.state.players[0]!)).toBe(2)
   })
 
-  it('E168 S5: OA treats a house pet as freeing an occupied room and grants a sheep', () => {
+  it('E168 S5: a house pet does not free an occupied room', () => {
     const session = setupOccupation('E168_AnimalTamersApprentice', {
       playerCount: 4, played: true, round: 5, resources: { food: 20 },
     })
@@ -103,8 +103,29 @@ describe('E168 Animal Tamers Apprentice parity', () => {
     player.roomTiles = [{ row: 0, col: 0 }, { row: 1, col: 0 }]
     player.houseAnimalType = 'sheep'
     player.houseAnimalCount = 1
+    player.resources.sheep = 1
     session.loadState(state)
     const response = session.performRoundEnd()
+    expect(response.state.players[0]!.resources.sheep).toBe(1)
+    expect(response.state.players[0]!.houseAnimalType).toBe('sheep')
+    expect(response.state.players[0]!.houseAnimalCount).toBe(1)
+  })
+
+  it('E168 S6: extra housing leaves one physical room unoccupied', () => {
+    const session = setupOccupation('E168_AnimalTamersApprentice', {
+      playerCount: 4, played: true, round: 5, resources: { food: 20 },
+    })
+    const state = session.getState().state
+    state.players.forEach((player) => { markAllWorkersUsed(state, player); player.resources.food = 20 })
+    const player = state.players[0]!
+    setActiveWorkerCount(player, 2)
+    player.rooms = 2
+    player.roomTiles = [{ row: 0, col: 0 }, { row: 1, col: 0 }]
+    player.minorPlayed = ['B010_Caravan']
+    session.loadState(state)
+
+    const response = session.performRoundEnd()
+
     expect(response.state.players[0]!.resources.sheep).toBe(1)
   })
 })
