@@ -1,5 +1,5 @@
 import { defineOccupationCard } from '../card-source'
-import { payGainFlow } from '../helpers/pay-gain-node'
+import { gainLeaf, payGainFlow } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
 
 const CARD_ID = 'A166_Haydryer'
@@ -10,6 +10,7 @@ const cardImpl = {
   onBeforeHarvest: (_state, player) => {
     const pastureCount = player.pastures.length
     const cost = Math.max(0, 4 - pastureCount)
+    if (cost === 0) return gainLeaf(CARD_ID, { cattle: 1 })
     return payGainFlow({
       cardId: CARD_ID,
       cost: { food: cost },

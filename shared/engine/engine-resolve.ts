@@ -436,6 +436,9 @@ export function engineResolveChoice(
           int.pendingNodeIdRef.value = null
           return rollbackAndReturn(int, { type: 'fail', errorKey: 'log.buildRoomFail' })
         }
+        if (child instanceof ActionNode && child.params?.commitOnTriggerSelection === true) {
+          child.optionalActive = true
+        }
         int.pendingNodeIdRef.value = null
         return { type: 'ok' }
       }
@@ -473,6 +476,9 @@ export function engineResolveChoice(
       if (!child) {
         int.pendingNodeIdRef.value = null
         return rollbackAndReturn(int, { type: 'fail', errorKey: 'log.buildRoomFail' })
+      }
+      if (child instanceof ActionNode && child.params?.commitOnTriggerSelection === true) {
+        child.optionalActive = true
       }
       int.pendingNodeIdRef.value = null
       return { type: 'ok' }

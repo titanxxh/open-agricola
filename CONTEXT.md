@@ -326,6 +326,10 @@ _Avoid_: Session 直接调用 `_internals()`、Session 按 node class 分支、�
 阶段推进时负责发现并触发卡牌阶段效果、阶段 reaction、before-end 玩家分发，并写入后续可恢复的阶段 continuation。
 _Avoid_: Round/Harvest 业务顺序、响应生成、前端交互展示
 
+**Before-Harvest Reaction Window（收获前反应窗口）**:
+每次 Harvest 开始前，按窗口开启时的 Start Player Marker 冻结顺时针玩家顺序，并让每名玩家决定其同时可用的卡牌反应结算顺序；mandatory 反应不能被 Pass，跳过本次 Harvest 不跳过该窗口。
+_Avoid_: 固定座位序扫描、跨玩家 trigger-select、把 skip-harvest 当成 skip-before-harvest
+
 **Sub-flow**:
 由阶段、hook、anytime 或系统流程插入的嵌套执行帧，例如 `animal-reorg`、`harvest-feed`、`confirm-next-player`。
 _Avoid_: 顶层游戏状态机
@@ -439,6 +443,10 @@ _Avoid_: Payment Path、resource.paid、整笔行动支付归属
 终局计分选择中被声明为“已用于某张卡计分”的资源占用；它影响其他终局资源计分可读取的剩余资源，但不表示玩家真实资源被支付或移除。
 _Avoid_: Payment Pipeline、真实资源支付、tiebreaker 资源扣减
 
+**Pre-Scoring Payment（计分前支付）**:
+Before-End Player Dispatch 中由玩家选择并实际移出供应的资源支付；被支付资源不会参加之后的基础类别、卡牌奖励或其他计分前效果。
+_Avoid_: Scoring Reserve、只在计分副本中预留资源、自动最大化计分档位
+
 **Card Bonus VP**:
 由已打出卡牌产生的非印刷分数，包括主要改良资源计分、计分卡牌效果、卡牌局部状态累计分和 Scoring Reserve bonus；它和 Cards / 卡牌分（卡牌本身印刷 VP）分开统计。
 统一 score category 是 `cardBonusVp`，不保留旧 `cardsBonus` / `cardStateBonusVp` / `cardBonus` shape。
@@ -479,6 +487,10 @@ _Avoid_: newborn、暂时在行动格或卡牌上的 worker、尚未出生的 in
 **Effective Housing Capacity（有效住房容量）**:
 玩家当前住房可以容纳的家庭成员数量，由房间和提供额外居住空间的卡牌共同决定。它用于判断需要住房的家庭增长是否有空间，和房间数量、家庭成员 token 上限都不是同一个概念。
 _Avoid_: 房间数量、家庭成员 token supply
+
+**Renovation Prohibition（翻修禁令）**:
+由已打出卡牌持续施加的玩家级规则能力，禁止该玩家执行任何 Renovate House 规则动作；行动格、卡牌授予动作、费用预览和权威执行必须读取同一能力。
+_Avoid_: 只隐藏翻修按钮、只阻止某一个翻修行动格、卡牌 id 特判
 
 **Farm Fence Segment Count（农场围栏段数）**:
 当前玩家农场边上已经建出的围栏类边段数量，包含 own ordinary fence、borrowed fence 和 palisade。它描述农场版图上的围栏段展示与几何，不代表玩家自己的 ordinary fence supply。
