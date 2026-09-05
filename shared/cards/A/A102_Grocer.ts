@@ -7,10 +7,10 @@ import type { CardImpl } from '../registry'
 
 const CARD_ID = 'A102_Grocer'
 /**
- * Stack order (bottom to top): wood, grain, reed, stone, vegetable, clay, reed, vegetable
+ * Stack order (bottom to top): vegetable, reed, clay, vegetable, stone, reed, grain, wood
  * Player pays 1 food to take the top good at any time.
  */
-const STACK_ITEMS = ['wood', 'grain', 'reed', 'stone', 'vegetable', 'clay', 'reed', 'vegetable']
+const STACK_ITEMS = ['vegetable', 'reed', 'clay', 'vegetable', 'stone', 'reed', 'grain', 'wood']
 
 const anytimeListener: CardListenerRegistration = {
   id: 'A102-grocer-anytime',

@@ -268,18 +268,18 @@ describe('A102 Grocer parity', () => {
   it('A102 S1: playing Grocer places the eight goods in the printed stack order', () => {
     const session = setup(0)
     expect(getCardStack(session.state.players[0]!, 'A102_Grocer')).toEqual([
-      'wood', 'grain', 'reed', 'stone', 'vegetable', 'clay', 'reed', 'vegetable',
+      'vegetable', 'reed', 'clay', 'vegetable', 'stone', 'reed', 'grain', 'wood',
     ])
   })
 
-  it('A102 S2: OA pays one food to buy vegetable from the top of the Grocer stack', () => {
+  it('A102 S2: pays one food to buy wood from the top of the Grocer stack', () => {
     const session = setup(1)
     session.takeAction(0, 'farmland')
 
     const response = session.takeAnytimeAction(0, 'A102-grocer-anytime')
 
     expect(response.ok, response.error).toBe(true)
-    expect(response.state.players[0]!.resources).toMatchObject({ food: 0, vegetable: 1, wood: 0 })
+    expect(response.state.players[0]!.resources).toMatchObject({ food: 0, vegetable: 0, wood: 1 })
     expect(getCardStack(response.state.players[0]!, 'A102_Grocer')).toHaveLength(7)
   })
 
