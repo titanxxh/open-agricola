@@ -21,7 +21,11 @@ const cardImpl = {
       .map((space) => ({
         type: 'leaf',
         actionId: 'collect',
-        actionContext: { spaceId: space.id, resourceTypes: BUILDING_RESOURCES },
+        actionContext: {
+          spaceId: space.id,
+          targetSpaceId: space.id,
+          resourceTypes: BUILDING_RESOURCES,
+        },
         sourceCard: CARD_ID,
       }))
     return {
