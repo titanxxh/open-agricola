@@ -47,8 +47,6 @@ const cardImpl = {
   id: CARD_ID,
   onBuy: (_state, player) => {
     pushToCardStack(player, CARD_ID, ['wood', 'wood', 'wood', 'wood', 'wood', 'wood'])
-    // Return flow to give 1 wood immediately ("including this one")
-    return { type: 'leaf', actionId: 'pop-card-stack', sourceCard: CARD_ID }
   },
 },
   reaches: [] as readonly string[],
