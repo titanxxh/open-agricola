@@ -17,6 +17,7 @@ import { canExecuteWithCostPreview } from '../helpers/cost-preview'
 import { PaymentSolver } from '../payment'
 import { mergeResources } from '../../utils/resources'
 import { buildInternalPayChild } from '../helpers/pay-child'
+import { playerHasCardCapability } from '../../cards/helpers/card-type'
 
 type RenovationTarget = Exclude<PlayerState['houseType'], 'wood'>
 
@@ -141,6 +142,7 @@ export const buildRenovationPlan = (
   player: PlayerState,
   target: RenovationTarget,
 ): RenovationPlan | null => {
+  if (playerHasCardCapability(player, 'blocksRenovation')) return null
   const isLegal =
     (player.houseType === 'wood' && (target === 'clay' || target === 'stone'))
     || (player.houseType === 'clay' && target === 'stone')
@@ -222,7 +224,8 @@ const flattenRenovationCost = (cost: ComplexCost): Partial<Resource> => {
 
 const renovateHouseCostPreview: ActionCostPreview = {
   isStructurallyPossible: ({ player }) =>
-    player.houseType === 'wood' || player.houseType === 'clay',
+    !playerHasCardCapability(player, 'blocksRenovation') &&
+    (player.houseType === 'wood' || player.houseType === 'clay'),
   canExecute: (context, costOverride) => {
     const { player, params } = context
     const plan = planForContext(player, params)
@@ -248,6 +251,7 @@ const renovateHouseCostPreview: ActionCostPreview = {
 }
 
 const baseRenovationOptions = (player: PlayerState): ActionChoiceOption[] => {
+  if (playerHasCardCapability(player, 'blocksRenovation')) return []
   if (player.houseType === 'wood') {
     return [
       { value: 'clay', labelKey: 'ui.interactionRenovateToClay' },

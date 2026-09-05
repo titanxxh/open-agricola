@@ -7,6 +7,7 @@ export const farmRedevelopment: ActionDefinition = {
   descriptionKey: 'actions.farm-redevelopment.description',
   roundAvailable: 1,
   gainPerRound: {},
+  strictCanExecute: true,
   canBeExecutedByPlayer: deriveCanBeExecutedByFlow(),
   execute: () => ({ type: 'ok' }),
   flow: {

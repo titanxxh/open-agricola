@@ -79,6 +79,7 @@ export type CardDefinition = {
   preventsHandDiscard?: boolean
   animalHolder?: boolean
   blocksHouseAnimalZones?: boolean
+  blocksRenovation?: boolean
   waresSalesmanGains?: readonly Partial<Resource>[]
   mustBePlayedViaMinorAction?: boolean
   requiresFarmersOfTheMoor?: boolean
