@@ -1,5 +1,5 @@
 import { execFileSync } from 'node:child_process'
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { chmodSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
@@ -18,6 +18,10 @@ const script = readFileSync('restart-local.sh', 'utf8')
 const RESOLVER = script.slice(
   script.indexOf('MAIN_REPO_DIR='),
   script.indexOf('# Anchor persistent dev state'),
+)
+const TOOL_RESOLVER = script.slice(
+  script.indexOf('# Linked worktrees intentionally share'),
+  script.indexOf('if ! command -v lsof'),
 )
 
 /**
@@ -38,6 +42,16 @@ const makeRepo = (): string => {
   execFileSync('git', ['add', '.'], { cwd: dir })
   execFileSync('git', ['commit', '-qm', 'init'], { cwd: dir })
   return dir
+}
+
+const installFakeTools = (root: string): void => {
+  const bin = join(root, 'node_modules', '.bin')
+  mkdirSync(bin, { recursive: true })
+  for (const tool of ['tsx', 'vite']) {
+    const path = join(bin, tool)
+    writeFileSync(path, '#!/bin/sh\nexit 0\n')
+    chmodSync(path, 0o755)
+  }
 }
 
 /**
@@ -108,5 +122,24 @@ describe('restart-local env anchoring', () => {
 
     expect(resolved.envFile).toBe(join(main, '.env'))
     expect(resolved.probe).toBe('')
+  })
+})
+
+describe('restart-local dependency anchoring', () => {
+  it('uses the main repo tools when a linked worktree has no local install', () => {
+    const main = makeRepo()
+    installFakeTools(main)
+    const worktree = join(main, '.worktree', 'feature')
+    execFileSync('git', ['worktree', 'add', '-q', '-b', 'feature', worktree], { cwd: main })
+
+    const output = execFileSync('bash', ['-c', [
+      'set -euo pipefail',
+      `SCRIPT_DIR=${JSON.stringify(worktree)}`,
+      `MAIN_REPO_DIR=${JSON.stringify(main)}`,
+      TOOL_RESOLVER,
+      'echo "NODE_BIN_DIR=$NODE_BIN_DIR"',
+    ].join('\n')], { encoding: 'utf8' })
+
+    expect(output.trim()).toBe(`NODE_BIN_DIR=${join(main, 'node_modules', '.bin')}`)
   })
 })
