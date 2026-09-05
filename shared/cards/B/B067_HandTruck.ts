@@ -27,7 +27,7 @@ const listener: CardListenerRegistration = {
     return {
       flow: {
         type: 'seq',
-        optional: true,
+        optional: context.player.resources.grain > 0,
         children: [
           gainLeaf(CARD_ID, { grain: workerCount }),
         ],

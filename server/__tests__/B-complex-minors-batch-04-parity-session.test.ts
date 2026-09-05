@@ -313,20 +313,15 @@ describe('B067 Hand Truck parity', () => {
     return session
   }
 
-  it('B067 S2: two people on accumulation spaces offer two grain but OA still allows skipping it', () => {
+  it('B067 S2: two people on accumulation spaces force two grain before mandatory baking', () => {
     const session = bakeSession(2, 0)
     const response = session.takeAction(0, 'grain-utilization')
     expect(response.ok, response.error).toBe(true)
+    expect(response.state.players[0]!.resources.grain).toBe(2)
     expect(response.interaction.stateId).toBe('wait')
     if (response.interaction.stateId !== 'wait') return
-    expect(response.interaction.sourceCard).toBe('B067_HandTruck')
-    expect(response.interaction.request.options?.some((option) => option.value === '__skip__')).toBe(true)
-    const accept = response.interaction.request.options?.find((option) => option.value !== '__skip__')
-    expect(accept).toBeDefined()
-    const baked = session.resolveChoice(0, accept!.value)
-    expect(baked.state.players[0]!.resources.grain).toBe(2)
-    expect(baked.interaction.stateId).toBe('wait')
-    expect(baked.interaction.stateId === 'wait' ? baked.interaction.promptKey : '').toMatch(/^ui\.interactionBakeBread/)
+    expect(response.interaction.sourceCard).not.toBe('B067_HandTruck')
+    expect(response.interaction.promptKey).toMatch(/^ui\.interactionBakeBread/)
   })
 
   it('B067 S3: no person on an accumulation space grants no Hand Truck grain', () => {
