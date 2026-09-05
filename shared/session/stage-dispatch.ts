@@ -286,7 +286,7 @@ export class StageDispatch {
     for (const cardId of cards) {
       const effect = getCardEffect(cardId)
       if (!effect?.[hook]) continue
-      const previewFlow = options.inferMandatoryFromPreview
+      const preview = options.inferMandatoryFromPreview
         ? this.previewStageEffectFlow(hook, player, cardId)
         : undefined
       const activation = this.buildStageEffectActivationFlow(
@@ -294,10 +294,15 @@ export class StageDispatch {
         hook,
         player.id,
         player.id,
-        options.inferMandatoryFromPreview ? previewFlow?.optional !== true : true,
-        options.inferMandatoryFromPreview ? { commitOnTriggerSelection: true } : {},
+        options.inferMandatoryFromPreview ? false : true,
+        options.inferMandatoryFromPreview
+          ? { commitOnTriggerSelection: true, previewApplicable: preview?.applicable === true }
+          : {},
       )
-      if (previewFlow?.promptKey) activation.promptKey = previewFlow.promptKey
+      if (options.inferMandatoryFromPreview && preview?.applicable) {
+        activation.optional = preview.flow?.optional === true ? true : undefined
+      }
+      if (preview?.flow?.promptKey) activation.promptKey = preview.flow.promptKey
       children.push(activation)
     }
     return children
@@ -307,11 +312,16 @@ export class StageDispatch {
     hook: StageCardEffectHook,
     player: PlayerState,
     cardId: string,
-  ): ActionFlow | null | undefined {
+  ): { flow: ActionFlow | null; applicable: boolean } | undefined {
     const previewState = cloneState(this.state)
     const previewPlayer = previewState.players.find((entry) => entry.id === player.id)
     if (!previewPlayer) return undefined
-    return runCardEffectHook(previewState, previewPlayer, cardId, hook)
+    const before = JSON.stringify({ state: previewState, player: previewPlayer })
+    const flow = runCardEffectHook(previewState, previewPlayer, cardId, hook)
+    return {
+      flow,
+      applicable: flow !== null || JSON.stringify({ state: previewState, player: previewPlayer }) !== before,
+    }
   }
 
   continueBeforeHarvestReactionHook(
@@ -328,10 +338,16 @@ export class StageDispatch {
         player,
         { inferMandatoryFromPreview: true },
       )
-      if (children.length === 0) continue
+      if (children.length === 0 || !children.some((child) =>
+        child.type === 'leaf' && child.actionContext?.previewApplicable === true,
+      )) continue
       const flow = children.length === 1
         ? children[0]!
-        : { type: 'parallel' as const, mode: 'trigger-select' as const, children }
+        : {
+            type: 'parallel' as const,
+            mode: 'trigger-select' as const,
+            children: children.map((child) => ({ ...child, optional: true })),
+          }
       this.startFlow(
         flow,
         'onBeforeHarvest',
