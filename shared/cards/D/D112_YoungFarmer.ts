@@ -8,10 +8,10 @@ import { isSpaceOccupied } from '../../domain/space'
 import type { CardImpl } from '../registry'
 
 const CARD_ID = 'D112_YoungFarmer'
-const duringListener: CardListenerRegistration = {
-  id: 'D112-young-farmer-during-place-farmer',
+const beforeListener: CardListenerRegistration = {
+  id: 'D112-young-farmer-before-place-farmer',
   cardIds: [CARD_ID],
-  phases: ['during' as ActionHookPhase],
+  phases: ['before' as ActionHookPhase],
   actions: ['place-farmer'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (context.space?.id !== 'major-improvement') return
@@ -61,7 +61,7 @@ const computeArgsListener: CardListenerRegistration = {
 }
 
 const cardImpl = {
-  listeners: [duringListener, afterListener, computeArgsListener],
+  listeners: [beforeListener, afterListener, computeArgsListener],
   reaches: [] as readonly string[],
 } satisfies CardImpl
 

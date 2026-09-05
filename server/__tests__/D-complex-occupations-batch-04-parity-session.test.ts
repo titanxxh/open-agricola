@@ -205,21 +205,29 @@ describe('D112 Young Farmer parity', () => {
     return fireplace ? session.resolveChoice(0, fireplace.value) : response
   }
 
-  it('D112 S1: OA builds the major improvement but grants neither grain nor sow', () => {
+  it('D112 S1: Major Improvement grants one grain and may immediately sow it', () => {
     const session = setup()
-    const response = buildFireplace(session)
+    let response = buildFireplace(session)
     expect(response.state.players[0]!.improvements).toContain('Major_Fireplace1')
+    expect(response.state.players[0]!.resources.grain).toBe(1)
+    response = chooseNonSkip(session, response, 'D112_YoungFarmer')
+    expect(response.interaction.stateId).toBe('wait')
+    if (response.interaction.stateId !== 'wait') return
+    expect(response.interaction.request.farm?.farmType).toBe('sow')
+    const field = response.interaction.request.farm?.farmType === 'sow'
+      ? response.interaction.request.farm.selectableFields[0]!.tile
+      : undefined
+    expect(field).toBeDefined()
+    response = session.commitSelectionChoice(0, { crops: [{ ...field!, crop: 'grain' }] })
     expect(response.state.players[0]!.resources.grain).toBe(0)
-    expect(response.interaction.stateId === 'wait' ? response.interaction.sourceCard : undefined)
-      .not.toBe('D112_YoungFarmer')
+    expect(response.state.players[0]!.fields[0]!.stacks[0]).toMatchObject({ kind: 'grain', remaining: 3 })
   })
 
-  it('D112 S2: OA exposes no optional sow to decline after Major Improvement', () => {
+  it('D112 S2: declining optional sow preserves the gained grain', () => {
     const session = setup()
-    const response = buildFireplace(session)
-    expect(response.interaction.stateId === 'wait' ? response.interaction.request.kind : undefined)
-      .not.toBe('farm-select')
-    expect(response.state.players[0]!.resources.grain).toBe(0)
+    const response = chooseSkip(session, buildFireplace(session), 'D112_YoungFarmer')
+    expect(response.state.players[0]!.resources.grain).toBe(1)
+    expect(response.state.players[0]!.fields[0]!.stacks).toEqual([])
   })
 })
 

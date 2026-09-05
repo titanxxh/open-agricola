@@ -55,13 +55,13 @@ const createState = (...players: PlayerState[]): GameState =>
 const findListener = (id: string) => getRegisteredCardListeners().find(l => l.id === id)
 
 describe('D112_YoungFarmer', () => {
-  it('gains 1 grain during place-farmer on major-improvement', () => {
-    const listener = findListener('D112-young-farmer-during-place-farmer')!
+  it('gains 1 grain before resolving major-improvement after placement', () => {
+    const listener = findListener('D112-young-farmer-before-place-farmer')!
     expect(listener).toBeDefined()
     const player = createPlayer()
     const result = executeCardListener(listener, {
       state: createState(player), player, space: createSpace('major-improvement'),
-      actionId: 'place-farmer', phase: 'during',
+      actionId: 'place-farmer', phase: 'before',
     } as unknown as CardListenerContext)
     expect(result).toBeDefined()
     const leaf = result!.flow as Extract<ActionFlow, { type: 'leaf' }>
@@ -84,11 +84,11 @@ describe('D112_YoungFarmer', () => {
   })
 
   it('does not trigger for non-major-improvement spaces', () => {
-    const listener = findListener('D112-young-farmer-during-place-farmer')!
+    const listener = findListener('D112-young-farmer-before-place-farmer')!
     const player = createPlayer()
     const result = executeCardListener(listener, {
       state: createState(player), player, space: createSpace('farmland'),
-      actionId: 'place-farmer', phase: 'during',
+      actionId: 'place-farmer', phase: 'before',
     } as unknown as CardListenerContext)
     expect(result).toBeUndefined()
   })
