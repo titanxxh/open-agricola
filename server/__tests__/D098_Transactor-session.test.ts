@@ -8,6 +8,7 @@ import { rehydrateState, serializeSessionSnapshot } from '../../shared/session/s
 import '../../shared/cards/D/D098_Transactor'
 import '../../shared/cards/D/D146_Porter'
 import '../../shared/cards/B/B162_ForestClearer'
+import '../../shared/cards/A/A142_Cordmaker'
 
 const CARD_ID = 'D098_Transactor'
 const FOLLOW_UP_CARD = 'TEST_D098FollowUp'
@@ -167,6 +168,21 @@ describe('D098 Transactor final-harvest choice', () => {
 
     expect(resolved.state.players[0]!.resources.wood).toBe(2)
     expect(resolved.state.players[0]!.resources.food).toBe(20)
+  })
+
+  it('preserves the source-space context for each collection', () => {
+    const session = setupFinalHarvest(false)
+    session.state.players[0]!.occupationPlayed.push('A142_Cordmaker')
+    session.state.actionSpaces.find((space) => space.id === 'reed-bank')!.resources.reed = 2
+    session.loadState(session.state)
+
+    const offered = session.performRoundEnd()
+    const accept = expectChoice(offered)
+    const response = session.resolveChoice(0, accept.value)
+
+    expect(response.interaction.stateId).toBe('wait')
+    if (response.interaction.stateId !== 'wait') return
+    expect(response.interaction.sourceCard).toBe('A142_Cordmaker')
   })
 
   it('undo restores both the player supply and action-space resources', () => {
