@@ -20,6 +20,7 @@ import { defineOccupationCard } from '../card-source'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import type { ActionFlow } from '../../contract/types'
 import type { CardImpl } from '../registry'
+import { getRoundActionSlot } from '../helpers/round-action-topology'
 
 const CARD_ID = 'C156_HoofCaregiver'
 
@@ -27,6 +28,7 @@ const cardImpl = {
   effect: {
     id: CARD_ID,
     onBuy: (state, _player): ActionFlow | undefined => {
+      if (getRoundActionSlot(state, 'cattle-market') === null) return undefined
       const cattleMarket = state.actionSpaces.find((s) => s.id === 'cattle-market')
       if (!cattleMarket) return undefined
       cattleMarket.resources.cattle = (cattleMarket.resources.cattle ?? 0) + 1

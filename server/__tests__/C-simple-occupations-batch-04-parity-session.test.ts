@@ -184,8 +184,8 @@ describe('C155 Food Distributor parity', () => {
     return session.performRoundEnd()
   }
 
-  it('C155 S2: OA counts all occupied action spaces instead of only round spaces', () => {
-    expect(returnHome(5, 5, 2).state.players[0]!.resources.food).toBe(28)
+  it('C155 S2: counts only occupied revealed round action spaces', () => {
+    expect(returnHome(5, 5, 2).state.players[0]!.resources.food).toBe(22)
   })
 
   it('C155 S3: does not pay again in a later returning-home phase', () => {
@@ -247,22 +247,25 @@ describe('C139 Basketmakers Wife parity', () => {
 })
 
 describe('C156 Hoof Caregiver parity', () => {
-  const playAtRound = (round: number) => {
-    const session = setupOccupation('C156_HoofCaregiver', { playerCount: 4, round })
+  const playWithCattleMarket = (revealed: boolean) => {
+    const session = setupOccupation('C156_HoofCaregiver', { playerCount: 4, round: 14 })
+    const cattleMarketRound = session.state.roundActionOrder.indexOf('cattle-market') + 1
+    if (cattleMarketRound <= 0) throw new Error('cattle-market round slot missing')
+    session.state.round = revealed ? cattleMarketRound : cattleMarketRound - 1
     setSpaceResource(session.state, 'cattle-market', 'cattle', 2)
     session.loadState(session.state)
     return playOccupation(session, 'C156_HoofCaregiver')
   }
 
   it('C156 S1: revealed Cattle Market gains rewards equal to cattle after adding one', () => {
-    const response = playAtRound(8)
+    const response = playWithCattleMarket(true)
     expect(response.state.actionSpaces.find((space) => space.id === 'cattle-market')?.resources.cattle).toBe(3)
     expect(response.state.players[0]!.resources).toMatchObject({ grain: 3, food: 3 })
   })
 
-  it('C156 S2: OA also triggers while Cattle Market is unrevealed', () => {
-    const response = playAtRound(7)
-    expect(response.state.actionSpaces.find((space) => space.id === 'cattle-market')?.resources.cattle).toBe(3)
-    expect(response.state.players[0]!.resources).toMatchObject({ grain: 3, food: 3 })
+  it('C156 S2: does not trigger while Cattle Market is unrevealed', () => {
+    const response = playWithCattleMarket(false)
+    expect(response.state.actionSpaces.find((space) => space.id === 'cattle-market')?.resources.cattle).toBe(2)
+    expect(response.state.players[0]!.resources).toMatchObject({ grain: 0, food: 0 })
   })
 })

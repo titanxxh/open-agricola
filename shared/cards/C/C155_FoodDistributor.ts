@@ -3,6 +3,7 @@ import { gainLeaf } from '../helpers/pay-gain-node'
 import { isCardFlagged, setCardFlag } from '../helpers/card-state'
 import { writeCardExtraData, readCardExtraData } from '../helpers/card-state'
 import { isSpaceOccupied } from '../../domain/space'
+import { getRoundActionSlot } from '../helpers/round-action-topology'
 import type { CardImpl } from '../registry'
 
 const CARD_ID = 'C155_FoodDistributor'
@@ -25,7 +26,7 @@ const cardImpl = {
     }
     // Count occupied round 1-14 action spaces (non-board action spaces that have a farmer)
     const occupiedCount = state.actionSpaces.filter(
-      (s) => isSpaceOccupied(s) && (s.roundAvailable ?? 1) >= 1 && (s.roundAvailable ?? 1) <= 14,
+      (s) => isSpaceOccupied(s) && getRoundActionSlot(state, s.id) !== null,
     ).length
     // Flag so it doesn't fire again
     setCardFlag(player, CARD_ID, true)

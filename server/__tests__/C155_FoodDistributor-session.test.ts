@@ -51,7 +51,7 @@ const createState = (player: PlayerState, occupiedSpaces: number): GameState => 
   return {
     round: 3, currentPlayerIndex: 0, players: [player],
     actionSpaces: spaces, log: [], roundStartSnapshot: null,
-    roundActionOrder: Array.from({ length: 14 }).map(() => null),
+    roundActionOrder: Array.from({ length: 14 }).map((_, index) => `space-${index}`),
     gameSeed: 1, availableMajorImprovements: [],
     futureMeeples: [], pendingFutureMeeples: [],
     gameOver: false, workPhaseObtainedResources: {},
@@ -82,12 +82,12 @@ describe('C155_FoodDistributor', () => {
     expect(effect).toBeDefined()
 
     const player = createPlayer()
-    // Simulate purchase on round 3
+    // Simulate purchase on round 5, after five round spaces are revealed.
     player.cardStates = {
-      [CARD_ID]: { extraData: { purchaseRound: 3 } },
+      [CARD_ID]: { extraData: { purchaseRound: 5 } },
     }
     const state = createState(player, 5)
-    state.round = 3
+    state.round = 5
 
     const flow = effect!.onStartReturnHome!(state, player)
     expect(flow).toBeDefined()

@@ -17,6 +17,9 @@ describe('C156_HoofCaregiver session', () => {
     const session = new GameSession()
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
+    const cattleMarketRound = state.roundActionOrder.indexOf('cattle-market') + 1
+    if (cattleMarketRound <= 0) throw new Error('cattle-market round slot missing')
+    state.round = cattleMarketRound
     const player = state.players[0]!
     player.occupationPlayed.push(CARD_ID)
 
@@ -49,19 +52,23 @@ describe('C156_HoofCaregiver session', () => {
     expect(leafFlow!.params).toMatchObject({ grain: 3, food: 3 })
   })
 
-  it('onBuy returns undefined when cattle-market action space is absent', () => {
-    // C156 requires the cattle-market reveal. Strip it from the state to
-    // simulate the reference "card not yet revealed" guard (`if (!$revealed) return`).
+  it('onBuy returns undefined when cattle-market exists but is not revealed', () => {
     const session = new GameSession()
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
     const player = state.players[0]!
     player.occupationPlayed.push(CARD_ID)
-    state.actionSpaces = state.actionSpaces.filter((s) => s.id !== 'cattle-market')
+    const cattleMarketRound = state.roundActionOrder.indexOf('cattle-market') + 1
+    if (cattleMarketRound <= 0) throw new Error('cattle-market round slot missing')
+    state.round = cattleMarketRound - 1
+    const cattleMarket = state.actionSpaces.find((s) => s.id === 'cattle-market')!
+    expect(cattleMarket).toBeDefined()
+    cattleMarket.resources.cattle = 2
     session.loadState(state)
 
     const effect = getCardEffect(CARD_ID)
     const flow = effect!.onBuy!(state, player)
     expect(flow).toBeUndefined()
+    expect(cattleMarket.resources.cattle).toBe(2)
   })
 })
