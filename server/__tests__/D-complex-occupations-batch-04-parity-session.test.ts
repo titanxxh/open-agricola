@@ -423,11 +423,11 @@ describe('D093 Sheep Inspector parity', () => {
 })
 
 describe('D118 Bonehead parity', () => {
-  it('D118 S1: OA triggers both onBuy and after-occupation and receives two wood', () => {
+  it('D118 S1: playing Bonehead receives one wood including itself', () => {
     const response = playOccupation(setupOccupation('D118_Bonehead'), 'D118_Bonehead')
-    expect(response.state.players[0]!.resources.wood).toBe(2)
+    expect(response.state.players[0]!.resources.wood).toBe(1)
     expect(getCardStack(response.state.players[0]!, 'D118_Bonehead')).toEqual([
-      'wood', 'wood', 'wood', 'wood',
+      'wood', 'wood', 'wood', 'wood', 'wood',
     ])
   })
 
