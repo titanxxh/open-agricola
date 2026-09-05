@@ -34,6 +34,7 @@ export const B033_Mantlepiece = defineMinorCard({
     vp: -3,
     prerequisite: 'Clay or Stone House',
     extraVp: true,
+    blocksRenovation: true,
   },
   impl: cardImpl,
 })

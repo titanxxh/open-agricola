@@ -164,6 +164,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     },
     "prerequisite": "Still in Wooden House",
     "mustBePlayedViaMajorImprovementAction": true,
+    "blocksRenovation": true,
     "evenMoreSet": true,
     "kind": "minor"
   },
@@ -3209,6 +3210,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "vp": -3,
     "prerequisite": "Clay or Stone House",
     "extraVp": true,
+    "blocksRenovation": true,
     "kind": "minor"
   },
   {

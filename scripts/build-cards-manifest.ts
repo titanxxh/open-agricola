@@ -58,6 +58,7 @@ export type CardMeta = {
   preventsHandDiscard?: boolean
   animalHolder?: boolean
   blocksHouseAnimalZones?: boolean
+  blocksRenovation?: boolean
   waresSalesmanGains?: unknown
   mustBePlayedViaMinorAction?: boolean
   requiresFarmersOfTheMoor?: boolean
@@ -93,7 +94,7 @@ const META_FIELDS = new Set([
   'occupationPrerequisites', 'improvementPrerequisites', 'implemented',
   'evenMoreSet', 'extraVp', 'providesField', 'providesOccupation', 'isField',
   'fireplaceIdentity', 'cookingHearthIdentity', 'ovenIdentity', 'firewoodBuildTrigger', 'joineryIdentity', 'potteryIdentity',
-  'preventsHandDiscard', 'animalHolder', 'blocksHouseAnimalZones',
+  'preventsHandDiscard', 'animalHolder', 'blocksHouseAnimalZones', 'blocksRenovation',
   'waresSalesmanGains', 'mustBePlayedViaMinorAction',
   'requiresFarmersOfTheMoor', 'heatingRoomDiscount', 'heatingFuelCap',
   'heatingWoodToFuelDiscount',

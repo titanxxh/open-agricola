@@ -206,15 +206,21 @@ describe('A010 Wooden Shed parity', () => {
     expect(familySize(response.state.players[0]!)).toBe(3)
   })
 
-  it('A010 S5: OA currently allows renovation despite Wooden Shed', () => {
+  it('A010 S5: Wooden Shed rejects renovation before placing a worker', () => {
     const session = setupMinor({
       cardId: 'A010_WoodenShed', resources: { clay: 2, reed: 1 }, played: true, round: 14,
     })
+    const beforeWorkers = session.state.actionSpaces
+      .find((space) => space.id === 'house-redevelopment')?.takenBy.length
 
     const response = session.takeAction(0, 'house-redevelopment')
 
-    expect(response.ok, response.error).toBe(true)
-    expect(response.state.players[0]!.houseType).toBe('clay')
+    expect(response.ok).toBe(false)
+    expect(response.error).toBe('space unavailable')
+    expect(response.state.players[0]!.houseType).toBe('wood')
+    expect(response.state.players[0]!.resources).toMatchObject({ clay: 2, reed: 1 })
+    expect(response.state.actionSpaces.find((space) => space.id === 'house-redevelopment')?.takenBy)
+      .toHaveLength(beforeWorkers ?? 0)
   })
 })
 

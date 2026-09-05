@@ -7,6 +7,7 @@ export const houseRedevelopment: ActionDefinition = {
   descriptionKey: 'actions.house-redevelopment.description',
   roundAvailable: 1,
   gainPerRound: {},
+  strictCanExecute: true,
   canBeExecutedByPlayer: deriveCanBeExecutedByFlow(),
   execute: () => ({ type: 'ok' }),
   flow: {

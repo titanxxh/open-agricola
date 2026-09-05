@@ -71,6 +71,7 @@ export type CardCapability =
   | 'potteryIdentity'
   | 'animalHolder'
   | 'blocksHouseAnimalZones'
+  | 'blocksRenovation'
 
 export type PlayedCardDefinitionOptions = {
   asType?: CardType

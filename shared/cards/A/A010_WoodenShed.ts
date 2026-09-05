@@ -23,6 +23,7 @@ export const A010_WoodenShed = defineMinorCard({
     cost: { wood: 2, reed: 1 },
     prerequisite: 'Still in Wooden House',
     mustBePlayedViaMajorImprovementAction: true,
+    blocksRenovation: true,
     evenMoreSet: true,
   },
   impl: cardImpl,

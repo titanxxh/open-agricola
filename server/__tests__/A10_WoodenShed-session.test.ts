@@ -3,6 +3,7 @@ import { GameSession } from '../game/authoritative-session'
 import { getExtraRoomCapacity } from '../../shared/cards/card-effects'
 import { meetsCardPrerequisites } from '../../shared/cards/helpers/prerequisites'
 import { isMinorImprovementPlayable, playMinorImprovement } from '../../shared/actions/effects/improvement'
+import { buildRenovationPlan, canRenovate } from '../../shared/actions/effects/renovation'
 
 import '../../shared/cards/A/A010_WoodenShed'
 import { A010_WoodenShed } from '../../shared/cards/A/A010_WoodenShed'
@@ -41,6 +42,17 @@ describe('A010_WoodenShed session', () => {
     expect(getExtraRoomCapacity(player)).toBe(0)
     player.minorPlayed.push(CARD_ID)
     expect(getExtraRoomCapacity(player)).toBe(1)
+  })
+
+  it('blocks direct renovation planning when played', () => {
+    const session = setup()
+    const player = session.getState().state.players[0]!
+    player.minorPlayed.push(CARD_ID)
+    player.resources.clay = player.rooms
+    player.resources.reed = 1
+
+    expect(buildRenovationPlan(player, 'clay')).toBeNull()
+    expect(canRenovate(player)).toBe(false)
   })
 
   describe('Major-Improvement-action gate', () => {
