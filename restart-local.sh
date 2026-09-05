@@ -2,8 +2,6 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-BACKEND_BIN="$SCRIPT_DIR/node_modules/.bin/tsx"
-FRONTEND_BIN="$SCRIPT_DIR/node_modules/.bin/vite"
 PNPM_BIN="${PNPM_BIN:-pnpm}"
 BACKEND_PORT=5175
 FRONTEND_PORT=5173
@@ -55,10 +53,22 @@ REPLAY_VIEWER_ROOT="${REPLAY_VIEWER_ROOT:-$SHARED_DATA_DIR/replay-viewers}"
 REPLAY_ASSET_ROOT="${REPLAY_ASSET_ROOT:-$SHARED_DATA_DIR/replay-assets}"
 REPLAY_REMOVAL_LEDGER_PATH="${REPLAY_REMOVAL_LEDGER_PATH:-$SHARED_DATA_DIR/replay-removals.jsonl}"
 
-if [ ! -x "$BACKEND_BIN" ] || [ ! -x "$FRONTEND_BIN" ]; then
+# Linked worktrees intentionally share the main checkout's installed
+# dependencies. Prefer a complete local install, then fall back to the main
+# checkout instead of assuming every worktree has its own node_modules/.bin.
+LOCAL_NODE_BIN="$SCRIPT_DIR/node_modules/.bin"
+MAIN_NODE_BIN="$MAIN_REPO_DIR/node_modules/.bin"
+if [ -x "$LOCAL_NODE_BIN/tsx" ] && [ -x "$LOCAL_NODE_BIN/vite" ]; then
+  NODE_BIN_DIR="$LOCAL_NODE_BIN"
+elif [ -x "$MAIN_NODE_BIN/tsx" ] && [ -x "$MAIN_NODE_BIN/vite" ]; then
+  NODE_BIN_DIR="$MAIN_NODE_BIN"
+else
   echo "Error: dependencies are missing. Run: pnpm install"
   exit 1
 fi
+BACKEND_BIN="$NODE_BIN_DIR/tsx"
+FRONTEND_BIN="$NODE_BIN_DIR/vite"
+export PATH="$NODE_BIN_DIR:$PATH"
 
 if ! command -v lsof >/dev/null 2>&1; then
   echo "Error: lsof is required but not installed."
