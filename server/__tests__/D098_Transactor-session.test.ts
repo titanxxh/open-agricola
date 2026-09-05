@@ -7,6 +7,7 @@ import { rehydrateState, serializeSessionSnapshot } from '../../shared/session/s
 
 import '../../shared/cards/D/D098_Transactor'
 import '../../shared/cards/D/D146_Porter'
+import '../../shared/cards/B/B162_ForestClearer'
 
 const CARD_ID = 'D098_Transactor'
 const FOLLOW_UP_CARD = 'TEST_D098FollowUp'
@@ -150,6 +151,21 @@ describe('D098 Transactor final-harvest choice', () => {
     const resolved = session.resolveChoice(0, accept.value)
 
     expect(resolved.state.players[0]!.resources.wood).toBe(4)
+    expect(resolved.state.players[0]!.resources.food).toBe(20)
+  })
+
+  it('does not combine separate action spaces for exact-amount collect listeners', () => {
+    const session = setupFinalHarvest(false)
+    session.state.players[0]!.occupationPlayed.push('B162_ForestClearer')
+    session.state.actionSpaces.find((space) => space.id === 'forest')!.resources.wood = 1
+    session.state.actionSpaces.find((space) => space.id === 'clay-pit')!.resources.wood = 1
+    session.loadState(session.state)
+
+    const offered = session.performRoundEnd()
+    const accept = expectChoice(offered)
+    const resolved = session.resolveChoice(0, accept.value)
+
+    expect(resolved.state.players[0]!.resources.wood).toBe(2)
     expect(resolved.state.players[0]!.resources.food).toBe(20)
   })
 
