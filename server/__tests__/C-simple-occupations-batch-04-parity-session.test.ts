@@ -146,14 +146,14 @@ describe('C111 Small Animal Breeder parity', () => {
   it('C111 S1: food equal to the upcoming round number grants one food', () => {
     const response = nextRound(6)
     expect(response.state.round).toBe(6)
-    expect(response.state.players[0]!.resources.food).toBe(6)
+    expect(response.state.players[0]!.resources.food).toBe(7)
   })
 
   it('C111 S2: food below the upcoming round number grants no food', () => {
     expect(nextRound(5).state.players[0]!.resources.food).toBe(5)
   })
 
-  it('C111 S3: food above OA current-plus-one threshold grants one food', () => {
+  it('C111 S3: food above the upcoming round number grants one food', () => {
     expect(nextRound(7).state.players[0]!.resources.food).toBe(8)
   })
 })

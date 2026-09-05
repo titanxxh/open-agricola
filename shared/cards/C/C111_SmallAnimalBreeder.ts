@@ -8,8 +8,7 @@ const cardImpl = {
   effect: {
   id: CARD_ID,
   onBeforeStartOfTurn: (state, player) => {
-    // upcoming round = state.round + 1 (round hasn't been incremented yet at this hook)
-    const upcomingRound = state.round + 1
+    const upcomingRound = state.round
     if ((player.resources.food ?? 0) >= upcomingRound) {
       return gainLeaf(CARD_ID, { food: 1 })
     }
