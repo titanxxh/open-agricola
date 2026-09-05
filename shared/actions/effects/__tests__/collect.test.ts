@@ -31,38 +31,28 @@ const makeCtx = (actionContext?: Record<string, unknown>): TestContext => {
 }
 
 describe('collect.execute', () => {
-  it('collects selected resource types from every action space as one action result', () => {
-    const ctx = makeCtx({ allActionSpaceResourceTypes: ['wood', 'clay', 'reed', 'stone'] })
-    ctx.space.resources = { ...ctx.space.resources, wood: 2, food: 4 }
-    ctx.state.actionSpaces.push({
-      ...ctx.space,
-      id: 'clay-pit',
-      resources: { ...ctx.space.resources, wood: 0, clay: 3, food: 0 },
+  it('collects selected resource types from one named action space', () => {
+    const ctx = makeCtx({
+      spaceId: 'wood-cutter',
+      resourceTypes: ['wood', 'clay', 'reed', 'stone'],
     })
+    ctx.space.resources = { ...ctx.space.resources, wood: 2, clay: 3, food: 4 }
 
     const result = collectAction.execute(ctx)
 
     expect(result).toMatchObject({ type: 'ok', resourcesGained: { wood: 2, clay: 3 } })
     expect(ctx.player.resources).toMatchObject({ wood: 2, clay: 3, food: 0 })
-    expect(ctx.state.actionSpaces[0]!.resources).toMatchObject({ wood: 0, food: 4 })
-    expect(ctx.state.actionSpaces[1]!.resources.clay).toBe(0)
-    expect(ctx.capturedEvents).toEqual([
-      expect.objectContaining({
-        type: 'resource.moved',
-        resources: { wood: 2 },
-        from: { kind: 'actionSpace', spaceId: 'wood-cutter' },
-      }),
-      expect.objectContaining({
-        type: 'resource.moved',
-        resources: { clay: 3 },
-        from: { kind: 'actionSpace', spaceId: 'clay-pit' },
-      }),
-    ])
+    expect(ctx.space.resources).toMatchObject({ wood: 0, clay: 0, food: 4 })
+    expect(ctx.capturedEvents).toEqual([expect.objectContaining({
+      type: 'resource.moved',
+      resources: { wood: 2, clay: 3 },
+      from: { kind: 'actionSpace', spaceId: 'wood-cutter' },
+    })])
     expect(ctx.player.stats.resourcesFromBoard).toMatchObject({ wood: 2, clay: 3 })
   })
 
-  it('rejects an invalid all-space resource request without draining the current space', () => {
-    const ctx = makeCtx({ allActionSpaceResourceTypes: ['wood', 'unknown'] })
+  it('rejects an invalid resource-type list without draining the space', () => {
+    const ctx = makeCtx({ spaceId: 'wood-cutter', resourceTypes: ['wood', 'unknown'] })
 
     expect(collectAction.execute(ctx)).toEqual({
       type: 'fail',

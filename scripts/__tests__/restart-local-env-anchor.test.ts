@@ -1,5 +1,5 @@
 import { execFileSync } from 'node:child_process'
-import { chmodSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { chmodSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
@@ -20,7 +20,7 @@ const RESOLVER = script.slice(
   script.indexOf('# Anchor persistent dev state'),
 )
 const TOOL_RESOLVER = script.slice(
-  script.indexOf('# Linked worktrees intentionally share'),
+  script.indexOf('LOCAL_NODE_BIN='),
   script.indexOf('if ! command -v lsof'),
 )
 
@@ -52,6 +52,9 @@ const installFakeTools = (root: string): void => {
     writeFileSync(path, '#!/bin/sh\nexit 0\n')
     chmodSync(path, 0o755)
   }
+  const dependency = join(root, 'node_modules', 'fake-dependency')
+  mkdirSync(dependency, { recursive: true })
+  writeFileSync(join(dependency, 'index.js'), 'module.exports = true\n')
 }
 
 /**
@@ -129,7 +132,9 @@ describe('restart-local dependency anchoring', () => {
   it('uses the main repo tools when a linked worktree has no local install', () => {
     const main = makeRepo()
     installFakeTools(main)
-    const worktree = join(main, '.worktree', 'feature')
+    const worktreeRoot = mkdtempSync(join(tmpdir(), 'external-worktree-'))
+    dirs.push(worktreeRoot)
+    const worktree = join(worktreeRoot, 'feature')
     execFileSync('git', ['worktree', 'add', '-q', '-b', 'feature', worktree], { cwd: main })
 
     const output = execFileSync('bash', ['-c', [
@@ -137,9 +142,15 @@ describe('restart-local dependency anchoring', () => {
       `SCRIPT_DIR=${JSON.stringify(worktree)}`,
       `MAIN_REPO_DIR=${JSON.stringify(main)}`,
       TOOL_RESOLVER,
+      'cd "$SCRIPT_DIR"',
+      'node -e "require(\'fake-dependency\')"',
       'echo "NODE_BIN_DIR=$NODE_BIN_DIR"',
     ].join('\n')], { encoding: 'utf8' })
 
     expect(output.trim()).toBe(`NODE_BIN_DIR=${join(main, 'node_modules', '.bin')}`)
+    expect(readFileSync(join(worktree, 'node_modules', '.bin', 'tsx'), 'utf8')).toContain('exit 0')
+    expect(realpathSync(join(worktree, 'node_modules', 'fake-dependency'))).toBe(
+      realpathSync(join(main, 'node_modules', 'fake-dependency')),
+    )
   })
 })

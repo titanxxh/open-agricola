@@ -10,7 +10,7 @@ type CollectableResource = (typeof COLLECTABLE_RESOURCES)[number]
 const isCollectableResource = (value: unknown): value is CollectableResource =>
   typeof value === 'string' && COLLECTABLE_RESOURCES.includes(value as CollectableResource)
 
-const readAllActionSpaceResourceTypes = (value: unknown): CollectableResource[] | null => {
+const readResourceTypes = (value: unknown): CollectableResource[] | null => {
   if (!Array.isArray(value) || value.length === 0 || !value.every(isCollectableResource)) return null
   return [...new Set(value)]
 }
@@ -63,32 +63,6 @@ export const collectAction: ActionDefinition = {
   gainPerRound: {},
   canBeExecutedByPlayer: () => true,
   execute: ({ state, player, space, actionContext, eventSink }) => {
-    const hasAllSpaceRequest = actionContext?.allActionSpaceResourceTypes !== undefined
-    const allActionSpaceResourceTypes = hasAllSpaceRequest
-      ? readAllActionSpaceResourceTypes(actionContext.allActionSpaceResourceTypes)
-      : null
-    if (hasAllSpaceRequest) {
-      if (!allActionSpaceResourceTypes) {
-        return { type: 'fail', errorKey: 'log.collectInvalidPartial' }
-      }
-      const total: Partial<Resource> = {}
-      for (const actionSpace of state.actionSpaces) {
-        const fromSpace: Partial<Resource> = {}
-        for (const resource of allActionSpaceResourceTypes) {
-          const amount = actionSpace.resources[resource] ?? 0
-          if (amount <= 0) continue
-          actionSpace.resources[resource] = 0
-          player.resources[resource] = (player.resources[resource] ?? 0) + amount
-          fromSpace[resource] = amount
-          total[resource] = (total[resource] ?? 0) + amount
-        }
-        emitCollectedResources(eventSink, player.id, actionSpace.id, fromSpace)
-      }
-      trackWorkPhaseBuildingResources(state, player.id, total)
-      addResourcesFromBoard(player, total)
-      return { type: 'ok' as const, resourcesGained: total }
-    }
-
     const spaceIdHint = actionContext?.spaceId as string | undefined
     let targetSpace: ActionSpace | undefined
     if (spaceIdHint) {
@@ -106,8 +80,25 @@ export const collectAction: ActionDefinition = {
     }
     const resource = actionContext?.resource
     const amount = actionContext?.amount
+    const hasResourceTypes = actionContext?.resourceTypes !== undefined
+    const resourceTypes = hasResourceTypes ? readResourceTypes(actionContext.resourceTypes) : null
 
     if (spaceIdHint) {
+      if (hasResourceTypes) {
+        if (!resourceTypes) return { type: 'fail', errorKey: 'log.collectInvalidPartial' }
+        const gained: Partial<Resource> = {}
+        for (const resourceType of resourceTypes) {
+          const available = targetSpace.resources[resourceType] ?? 0
+          if (available <= 0) continue
+          targetSpace.resources[resourceType] = 0
+          player.resources[resourceType] = (player.resources[resourceType] ?? 0) + available
+          gained[resourceType] = available
+        }
+        trackWorkPhaseBuildingResources(state, player.id, gained)
+        addResourcesFromBoard(player, gained)
+        emitCollectedResources(eventSink, player.id, targetSpace.id, gained)
+        return { type: 'ok' as const, resourcesGained: gained }
+      }
       if (!isCollectableResource(resource) || typeof amount !== 'number' || !Number.isFinite(amount) || amount <= 0) {
         return { type: 'fail', errorKey: 'log.collectInvalidPartial' }
       }

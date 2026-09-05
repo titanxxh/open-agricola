@@ -1,4 +1,5 @@
 import { defineOccupationCard } from '../card-source'
+import type { ActionFlow } from '../../contract/types'
 import type { CardImpl } from '../registry'
 
 const CARD_ID = 'D098_Transactor'
@@ -13,14 +14,23 @@ const cardImpl = {
       BUILDING_RESOURCES.some((resource) => (space.resources[resource] ?? 0) > 0),
     )
     if (!hasBuildingResources) return
+    const children: ActionFlow[] = state.actionSpaces
+      .filter((space) =>
+        BUILDING_RESOURCES.some((resource) => (space.resources[resource] ?? 0) > 0),
+      )
+      .map((space) => ({
+        type: 'leaf',
+        actionId: 'collect',
+        actionContext: { spaceId: space.id, resourceTypes: BUILDING_RESOURCES },
+        sourceCard: CARD_ID,
+      }))
     return {
-      type: 'leaf',
-      actionId: 'collect',
+      type: 'seq',
       optional: true,
       promptKey: 'ui.cards.D098_Transactor.prompt',
-      actionContext: { allActionSpaceResourceTypes: BUILDING_RESOURCES },
+      children,
       sourceCard: CARD_ID,
-    }
+    } satisfies ActionFlow
   },
 },
   reaches: [] as readonly string[],

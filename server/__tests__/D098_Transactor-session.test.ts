@@ -6,6 +6,7 @@ import { markAllWorkersUsed, setActiveWorkerCount } from '../../shared/domain/pl
 import { rehydrateState, serializeSessionSnapshot } from '../../shared/session/serialization'
 
 import '../../shared/cards/D/D098_Transactor'
+import '../../shared/cards/D/D146_Porter'
 
 const CARD_ID = 'D098_Transactor'
 const FOLLOW_UP_CARD = 'TEST_D098FollowUp'
@@ -135,6 +136,21 @@ describe('D098 Transactor final-harvest choice', () => {
     expect(repeated.ok).toBe(false)
     expect(repeated.state.players[0]!.resources.wood).toBe(2)
     expect(spaceResources(repeated, 'forest').wood).toBe(0)
+  })
+
+  it('keeps separate action-space amounts separate for collect listeners', () => {
+    const session = setupFinalHarvest(false)
+    session.state.players[0]!.occupationPlayed.push('D146_Porter')
+    session.state.actionSpaces.find((space) => space.id === 'forest')!.resources.wood = 2
+    session.state.actionSpaces.find((space) => space.id === 'clay-pit')!.resources.wood = 2
+    session.loadState(session.state)
+
+    const offered = session.performRoundEnd()
+    const accept = expectChoice(offered)
+    const resolved = session.resolveChoice(0, accept.value)
+
+    expect(resolved.state.players[0]!.resources.wood).toBe(4)
+    expect(resolved.state.players[0]!.resources.food).toBe(20)
   })
 
   it('undo restores both the player supply and action-space resources', () => {

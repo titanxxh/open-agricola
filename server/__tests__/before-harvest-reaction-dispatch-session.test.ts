@@ -10,6 +10,7 @@ import { confirmPlayerSwitch } from './_helpers/pending-confirms'
 
 const OPTIONAL = 'TEST_BeforeHarvestOptional'
 const MANDATORY = 'TEST_BeforeHarvestMandatory'
+const DYNAMIC_OPTIONAL = 'TEST_BeforeHarvestDynamicOptional'
 const SKIP_HARVEST_ROUND_KEY = 'skipHarvestRound'
 
 const setPlaceholderHands = (session: GameSession) => {
@@ -164,6 +165,49 @@ describe('Before-Harvest reaction dispatch', () => {
     expect(remaining.request.options).not.toEqual(expect.arrayContaining([
       expect.objectContaining({ value: OPTIONAL }),
     ]))
+  })
+
+  it('recomputes mandatory status when an earlier reaction makes a card applicable', () => {
+    const session = setupRoundFour(2)
+    const player = session.state.players[0]!
+    player.resources.food = 0
+    player.occupationPlayed = [MANDATORY, DYNAMIC_OPTIONAL]
+    requireActiveCardRegistry('before-harvest live mandatory test').setEffect(mandatoryEffect)
+    requireActiveCardRegistry('before-harvest live mandatory test').setEffect({
+      id: DYNAMIC_OPTIONAL,
+      onBeforeHarvest: (_state, target) => {
+        if (target.resources.food < 1) return
+        return {
+          type: 'leaf',
+          actionId: 'gain',
+          params: { wood: 1 },
+          sourceCard: DYNAMIC_OPTIONAL,
+          optional: true,
+        }
+      },
+    })
+    session.loadState(session.state)
+
+    let response = session.performRoundEnd()
+    const first = expectWait(response, 0)
+    expect(first.request.kind).toBe('select-trigger')
+    expect(first.request.options).toEqual(expect.arrayContaining([
+      expect.objectContaining({ value: MANDATORY }),
+      expect.objectContaining({ value: '__pass__', disabled: true }),
+    ]))
+    expect(first.request.options).not.toEqual(expect.arrayContaining([
+      expect.objectContaining({ value: DYNAMIC_OPTIONAL }),
+    ]))
+
+    response = session.resolveChoice(0, MANDATORY)
+
+    const remaining = expectWait(response, 0)
+    expect(remaining.request.kind).toBe('select-trigger')
+    expect(remaining.request.options).toEqual(expect.arrayContaining([
+      expect.objectContaining({ value: DYNAMIC_OPTIONAL }),
+      expect.objectContaining({ value: '__pass__' }),
+    ]))
+    expect(remaining.request.options.find((option) => option.value === '__pass__')?.disabled).not.toBe(true)
   })
 
   it('does not skip the Before-Harvest window for a player who skips the Harvest itself', () => {

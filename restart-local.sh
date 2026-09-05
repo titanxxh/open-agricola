@@ -53,14 +53,26 @@ REPLAY_VIEWER_ROOT="${REPLAY_VIEWER_ROOT:-$SHARED_DATA_DIR/replay-viewers}"
 REPLAY_ASSET_ROOT="${REPLAY_ASSET_ROOT:-$SHARED_DATA_DIR/replay-assets}"
 REPLAY_REMOVAL_LEDGER_PATH="${REPLAY_REMOVAL_LEDGER_PATH:-$SHARED_DATA_DIR/replay-removals.jsonl}"
 
-# Linked worktrees intentionally share the main checkout's installed
-# dependencies. Prefer a complete local install, then fall back to the main
-# checkout instead of assuming every worktree has its own node_modules/.bin.
+# Linked worktrees may share the main checkout's installed dependencies.
+# Materialize missing top-level entries as symlinks so Node/Vite can resolve
+# bare imports relative to source files even when the worktree lives outside
+# the main checkout's parent directory. Existing local entries always win.
 LOCAL_NODE_BIN="$SCRIPT_DIR/node_modules/.bin"
 MAIN_NODE_BIN="$MAIN_REPO_DIR/node_modules/.bin"
 if [ -x "$LOCAL_NODE_BIN/tsx" ] && [ -x "$LOCAL_NODE_BIN/vite" ]; then
   NODE_BIN_DIR="$LOCAL_NODE_BIN"
 elif [ -x "$MAIN_NODE_BIN/tsx" ] && [ -x "$MAIN_NODE_BIN/vite" ]; then
+  mkdir -p "$SCRIPT_DIR/node_modules"
+  while IFS= read -r -d '' dependency; do
+    dependency_name="$(basename "$dependency")"
+    case "$dependency_name" in
+      .vite|.vite-temp|.tmp) continue ;;
+    esac
+    local_dependency="$SCRIPT_DIR/node_modules/$dependency_name"
+    if [ ! -e "$local_dependency" ] && [ ! -L "$local_dependency" ]; then
+      ln -s "$dependency" "$local_dependency"
+    fi
+  done < <(find "$MAIN_REPO_DIR/node_modules" -mindepth 1 -maxdepth 1 -print0)
   NODE_BIN_DIR="$MAIN_NODE_BIN"
 else
   echo "Error: dependencies are missing. Run: pnpm install"
