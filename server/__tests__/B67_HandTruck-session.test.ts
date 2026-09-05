@@ -11,8 +11,10 @@ const setupHandTruckBakeSession = () => {
   const state = session.getState().state
   state.players = state.players.slice(0, 2)
   state.currentPlayerIndex = 0
+  state.round = 14
+  state.roundPhase = 'work'
   const player = state.players[0]!
-  player.occupationPlayed.push('B067_HandTruck')
+  player.minorPlayed.push(CARD_ID)
   player.resources.grain = 1
   player.improvements.push('Major_Fireplace1')
   player.minorHand = ['__test_placeholder__']
@@ -24,6 +26,23 @@ const setupHandTruckBakeSession = () => {
 }
 
 describe('B067_HandTruck session', () => {
+  it('forces the grain gain when it is required to make baking doable', () => {
+    const { session } = setupHandTruckBakeSession()
+    session.state.players[0]!.resources.grain = 0
+    session.state.players[0]!.resources.food = 0
+    session.loadState(session.state)
+
+    const resp = session.takeAction(0, 'grain-utilization')
+
+    expect(resp.ok, resp.error).toBe(true)
+    expect(resp.state.players[0]!.resources.grain).toBe(0)
+    expect(resp.state.players[0]!.resources.food).toBe(2)
+    expect(resp.interaction.stateId).toBe('wait')
+    if (resp.interaction.stateId !== 'wait') return
+    expect(resp.interaction.sourceCard).not.toBe(CARD_ID)
+    expect(resp.interaction.request.kind).toBe('confirm-next-player')
+  })
+
   it('accepting optional grain continues to the mandatory bake prompt', () => {
     const { session } = setupHandTruckBakeSession()
 
@@ -70,7 +89,7 @@ describe('B067_HandTruck session', () => {
     state.players = state.players.slice(0, 2)
     state.currentPlayerIndex = 0
     const player = state.players[0]!
-    player.occupationPlayed.push(CARD_ID)
+    player.minorPlayed.push(CARD_ID)
     player.resources.grain = 0
     player.improvements = []
     player.minorHand = ['__test_placeholder__']
