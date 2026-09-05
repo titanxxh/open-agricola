@@ -167,6 +167,10 @@ export const en = {
         prompt: 'Choose how many wood and stone pairs to score',
         scorePairs: 'Score {pairs} pairs ({score} bonus VP)',
       },
+      E132_VeggieLover: {
+        prompt: 'Choose how many grain and vegetable pairs to exchange',
+        scorePairs: 'Exchange {pairs} pairs ({score} bonus VP)',
+      },
       D132_HideFarmer: {
         optional: 'Hide unused farmyard spaces?',
         markSpaces: {

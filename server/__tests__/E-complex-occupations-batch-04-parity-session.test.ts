@@ -425,20 +425,29 @@ describe('E132 Veggie Lover parity', () => {
     expect(response.state.players[0]!.resources).toMatchObject({ grain: 1, vegetable: 1 })
   })
 
-  it('E132 S3: three crop pairs contribute six bonus points at game end', () => {
+  it('E132 S3: three chosen crop pairs contribute six bonus points at game end', () => {
     const session = setupOccupation('E132_VeggieLover', {
       playerCount: 3, played: true, round: 14, resources: { grain: 3, vegetable: 3 },
     })
-    expect(cardBonusScore(session.getState(), 'E132_VeggieLover')).toBe(6)
+    let response = session.invokeAfterRoundEnd()
+    expect(response.interaction.stateId).toBe('wait')
+    response = session.resolveChoice(0, 'E132_VeggieLover:pairs:3')
+    expect(cardBonusScore(response, 'E132_VeggieLover')).toBe(6)
   })
 
-  it('E132 S4: OA auto-selects all three affordable pairs without a lower-score choice', () => {
+  it('E132 S4: offers every affordable scoring pair count', () => {
     const session = setupOccupation('E132_VeggieLover', {
       playerCount: 3, played: true, round: 14, resources: { grain: 3, vegetable: 3 },
     })
     const response = session.invokeAfterRoundEnd()
-    expect(response.interaction.stateId).toBe('gameover')
-    expect(cardBonusScore(response, 'E132_VeggieLover')).toBe(6)
+    expect(response.interaction.stateId).toBe('wait')
+    if (response.interaction.stateId !== 'wait') return
+    expect(response.interaction.request.options?.map((option) => option.value)).toEqual([
+      'E132_VeggieLover:pairs:0',
+      'E132_VeggieLover:pairs:1',
+      'E132_VeggieLover:pairs:2',
+      'E132_VeggieLover:pairs:3',
+    ])
   })
 })
 

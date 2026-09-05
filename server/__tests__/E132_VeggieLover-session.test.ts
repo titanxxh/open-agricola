@@ -1,48 +1,53 @@
 import { describe, expect, it } from 'vitest'
-import { GameSession } from '../game/authoritative-session'
+import { GameSession, type SessionResponse } from '../game/authoritative-session'
 import { getCardEffect } from '../../shared/cards/card-effects'
-import type { GameState, PlayerState, Resource } from '../../shared/contract/types'
+import type { ActionFlow, PlayerState } from '../../shared/contract/types'
 import { computeScores } from '../../shared/domain/scoring'
+import { markAllWorkersUsed, setActiveWorkerCount } from '../../shared/domain/player'
+import { rehydrateState, serializeSessionSnapshot } from '../../shared/session/serialization'
 
 import '../../shared/cards/E/E132_VeggieLover'
-import type { ActionFlow } from '../../shared/contract/types'
 
 const CARD_ID = 'E132_VeggieLover'
+const CHOICE_PREFIX = `${CARD_ID}:pairs:`
 
-const emptyResources = (): Resource => ({
-  wood: 0, clay: 0, reed: 0, stone: 0, food: 0,
-  grain: 0, vegetable: 0, sheep: 0, boar: 0, cattle: 0, begging: 0,
-})
+const choiceValue = (pairs: number) => `${CHOICE_PREFIX}${pairs}`
 
-const createPlayer = (id = 'p1'): PlayerState => ({
-  id, name: id, color: 'red',
-  resources: emptyResources(),
-  workers: [
-    { id: '1', isActive: true, isNewborn: false },
-    { id: '2', isActive: true, isNewborn: false },
-    { id: '3', isActive: false, isNewborn: false },
-    { id: '4', isActive: false, isNewborn: false },
-    { id: '5', isActive: false, isNewborn: false },
-  ],
-  rooms: 2, houseType: 'wood',
-  fields: [], fences: 0,
-  roomTiles: [{ row: 0, col: 0 }, { row: 0, col: 1 }],
-  stableTiles: [],
-  improvements: [], minorHand: [], minorPlayed: [],
-  occupationHand: [], occupationPlayed: [],houseAnimalType: null, houseAnimalCount: 0, stableAnimals: {},
-  pastures: [], fenceSegments: [],
-  majorEffects: { wellRounds: 0 }, startPlayer: false,
-  cardStates: {},
-}) as PlayerState
+const setupEndGameSession = (grain: number, vegetable: number) => {
+  const session = new GameSession(132, undefined, { playerCount: 3 })
+  const state = session.getState().state
+  state.currentPlayerIndex = 0
+  state.round = 14
+  state.roundPhase = 'work'
+  state.gameOver = false
+  state.players.forEach((player) => {
+    markAllWorkersUsed(state, player)
+    setActiveWorkerCount(player, 0)
+    player.minorHand = ['__test_placeholder__']
+    player.occupationHand = ['__test_placeholder__']
+    player.occupationPlayed = []
+    player.minorPlayed = []
+    player.improvements = []
+    player.cardStates = {}
+  })
+  state.players[0]!.occupationPlayed = [CARD_ID]
+  state.players[0]!.resources.grain = grain
+  state.players[0]!.resources.vegetable = vegetable
+  session.loadState(state)
+  return session
+}
 
-const createState = (...players: PlayerState[]): GameState => ({
-  round: 14, currentPlayerIndex: 0, players,
-  actionSpaces: [], log: [], roundStartSnapshot: null,
-  roundActionOrder: Array.from({ length: 14 }).map(() => null),
-  gameSeed: 1, availableMajorImprovements: [],
-  futureMeeples: [], pendingFutureMeeples: [],
-  gameOver: true, workPhaseObtainedResources: {},
-}) as GameState
+const expectPairChoice = (response: SessionResponse, values: string[]) => {
+  expect(response.interaction.stateId).toBe('wait')
+  if (response.interaction.stateId !== 'wait') throw new Error('expected wait')
+  expect(response.interaction.playerIndex).toBe(0)
+  expect(response.interaction.request.kind).toBe('choice')
+  expect(response.interaction.promptKey).toBe('ui.cards.E132_VeggieLover.prompt')
+  expect(response.interaction.request.options?.map((option) => option.value)).toEqual(values)
+}
+
+const scoreCategory = (response: SessionResponse, key: string) =>
+  computeScores(response.state)[0]!.categories.find((category) => category.key === key)
 
 describe('E132_VeggieLover session', () => {
   it('offers optional feeding exchange when player has grain and vegetable', () => {
@@ -62,7 +67,7 @@ describe('E132_VeggieLover session', () => {
     const flow = effect!.onHarvestFeedingPhase!(state, player)
     expect(flow).toBeDefined()
     expect(flow!.type).toBe('seq')
-    expect((flow as Extract<ActionFlow, { type: 'leaf' }>).optional).toBe(true)
+    expect((flow as Extract<ActionFlow, { type: 'seq' }>).optional).toBe(true)
   })
 
   it('returns undefined when player has no grain', () => {
@@ -78,8 +83,7 @@ describe('E132_VeggieLover session', () => {
     session.loadState(state)
 
     const effect = getCardEffect(CARD_ID)
-    const flow = effect!.onHarvestFeedingPhase!(state, player)
-    expect(flow).toBeUndefined()
+    expect(effect!.onHarvestFeedingPhase!(state, player)).toBeUndefined()
   })
 
   it('returns undefined when player has no vegetable', () => {
@@ -95,53 +99,81 @@ describe('E132_VeggieLover session', () => {
     session.loadState(state)
 
     const effect = getCardEffect(CARD_ID)
-    const flow = effect!.onHarvestFeedingPhase!(state, player)
-    expect(flow).toBeUndefined()
+    expect(effect!.onHarvestFeedingPhase!(state, player)).toBeUndefined()
   })
 
-  it('scoring: 2 grain + 2 vegetable → 4 bonus VP', () => {
-    const player = createPlayer()
-    player.occupationPlayed = [CARD_ID]
-    player.resources.grain = 2
-    player.resources.vegetable = 2
+  it('offers zero through three pairs and truly pays the selected pair before scoring', () => {
+    const session = setupEndGameSession(3, 3)
 
-    const [result] = computeScores(createState(player))
-    const bonusCat = result.categories.find(c => c.key === 'cardBonusVp')
-    expect(bonusCat).toBeDefined()
-    expect(bonusCat!.total).toBe(4)
+    const offered = session.invokeAfterRoundEnd()
+    expectPairChoice(offered, [
+      choiceValue(0),
+      choiceValue(1),
+      choiceValue(2),
+      choiceValue(3),
+    ])
+
+    const resolved = session.resolveChoice(0, choiceValue(1))
+
+    expect(resolved.interaction.stateId).toBe('gameover')
+    expect(resolved.state.players[0]!.resources).toMatchObject({ grain: 2, vegetable: 2 })
+    expect(resolved.state.players[0]!.cardStates[CARD_ID]?.counters?.bonusVp).toBe(2)
+    expect(resolved.state.players[0]!.cardStates[CARD_ID]?.extraData?.scoringReserveBonus).toBeUndefined()
+    expect(scoreCategory(resolved, 'grains')?.quantity).toBe(2)
+    expect(scoreCategory(resolved, 'vegetables')?.quantity).toBe(2)
+    expect(scoreCategory(resolved, 'cardBonusVp')?.entries).toContainEqual(
+      expect.objectContaining({ cardId: CARD_ID, score: 2 }),
+    )
   })
 
-  it('scoring: 1 grain + 3 vegetable → 2 bonus VP (limited by grain)', () => {
-    const player = createPlayer()
-    player.occupationPlayed = [CARD_ID]
-    player.resources.grain = 1
-    player.resources.vegetable = 3
+  it('choosing zero changes neither resources nor bonus state', () => {
+    const session = setupEndGameSession(3, 3)
+    const offered = session.invokeAfterRoundEnd()
+    expectPairChoice(offered, [
+      choiceValue(0),
+      choiceValue(1),
+      choiceValue(2),
+      choiceValue(3),
+    ])
 
-    const [result] = computeScores(createState(player))
-    const bonusCat = result.categories.find(c => c.key === 'cardBonusVp')
-    expect(bonusCat).toBeDefined()
-    expect(bonusCat!.total).toBe(2)
+    const resolved = session.resolveChoice(0, choiceValue(0))
+
+    expect(resolved.state.players[0]!.resources).toMatchObject({ grain: 3, vegetable: 3 })
+    expect(resolved.state.players[0]!.cardStates[CARD_ID]).toBeUndefined()
+    expect(scoreCategory(resolved, 'cardBonusVp')).toBeUndefined()
   })
 
-  it('scoring: capped at 3 sets (6 VP)', () => {
-    const player = createPlayer()
-    player.occupationPlayed = [CARD_ID]
-    player.resources.grain = 5
-    player.resources.vegetable = 5
+  it('limits choices to crops not already committed to a Scoring Reserve', () => {
+    const session = setupEndGameSession(3, 3)
+    session.state.players[0]!.cardStates = {
+      TEST_Reserve: {
+        extraData: {
+          scoringReserveBonus: { reserved: { grain: 2 }, score: 1 },
+        },
+      },
+    }
+    session.loadState(session.state)
 
-    const [result] = computeScores(createState(player))
-    const bonusCat = result.categories.find(c => c.key === 'cardBonusVp')
-    expect(bonusCat).toBeDefined()
-    expect(bonusCat!.total).toBe(6)
+    const offered = session.invokeAfterRoundEnd()
+
+    expectPairChoice(offered, [choiceValue(0), choiceValue(1)])
   })
 
-  it('scoring: 0 VP when card not played', () => {
-    const player = createPlayer()
-    player.resources.grain = 5
-    player.resources.vegetable = 5
+  it('restores a pending pair choice and rejects a repeated command after scoring', () => {
+    const session = setupEndGameSession(2, 2)
+    const offered = session.invokeAfterRoundEnd()
+    expectPairChoice(offered, [choiceValue(0), choiceValue(1), choiceValue(2)])
+    const snapshot = serializeSessionSnapshot(session.state, session)
+    const restored = new GameSession(rehydrateState(JSON.parse(JSON.stringify(snapshot))))
 
-    const [result] = computeScores(createState(player))
-    const bonusCat = result.categories.find(c => c.key === 'cardBonusVp')
-    expect(bonusCat).toBeUndefined()
+    const resolved = restored.resolveChoice(0, choiceValue(2))
+
+    expect(resolved.state.players[0]!.resources).toMatchObject({ grain: 0, vegetable: 0 })
+    expect(resolved.state.players[0]!.cardStates[CARD_ID]?.counters?.bonusVp).toBe(4)
+    expect(resolved.interaction.stateId).toBe('gameover')
+    const repeated = restored.resolveChoice(0, choiceValue(2))
+    expect(repeated.ok).toBe(false)
+    expect(repeated.state.players[0]!.resources).toMatchObject({ grain: 0, vegetable: 0 })
+    expect(repeated.state.players[0]!.cardStates[CARD_ID]?.counters?.bonusVp).toBe(4)
   })
 })

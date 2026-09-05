@@ -167,6 +167,10 @@ export const zh = {
         prompt: '选择要计分的木头+石头对数',
         scorePairs: '计分 {pairs} 对（{score} 额外分）',
       },
+      E132_VeggieLover: {
+        prompt: '选择要兑换的粮食+蔬菜对数',
+        scorePairs: '兑换 {pairs} 对（{score} 额外分）',
+      },
       D132_HideFarmer: {
         optional: '隐藏未使用农场格？',
         markSpaces: {
