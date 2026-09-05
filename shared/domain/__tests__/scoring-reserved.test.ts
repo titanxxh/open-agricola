@@ -122,7 +122,7 @@ describe('selected Scoring Reserve bonus scoring', () => {
     expect(getCategory(result, 'cardStateBonusVp')).toBeUndefined()
   })
 
-  it('applies selected scoring reserve before automatic costed-bonus solver work', () => {
+  it('does not auto-score Veggie Lover after another card reserves crops', () => {
     const player = createPlayer()
     const sourceCard = 'TEST_ScoringReserveCard'
     player.occupationPlayed = [sourceCard, 'E132_VeggieLover']
@@ -143,8 +143,8 @@ describe('selected Scoring Reserve bonus scoring', () => {
 
     expect(getCategory(result, 'cardBonusVp')).toEqual(
       expect.objectContaining({
-        total: 7,
-        entries: expect.arrayContaining([
+        total: 5,
+        entries: [
           {
             type: 'bonus',
             score: 5,
@@ -152,13 +152,7 @@ describe('selected Scoring Reserve bonus scoring', () => {
             cardType: 'occupation',
             reserved: { grain: 2 },
           },
-          {
-            type: 'bonus',
-            cardId: 'E132_VeggieLover',
-            cardType: 'occupation',
-            score: 2,
-          },
-        ]),
+        ],
       }),
     )
   })
