@@ -21,11 +21,19 @@ import type { GameCore, SessionResponse } from '../session-core.ts'
  * call (caller is free to mutate / iterate).
  */
 export const getHarvestPlayerIndices = (state: GameState): number[] => {
+  return getBeforeHarvestPlayerIndices(state)
+    .filter((index) => !isPlayerSkippingCurrentHarvest(state, state.players[index]!))
+}
+
+/**
+ * Compute the frozen seat order for the Before-Harvest reaction window.
+ * This window precedes harvest-skip activation, so every player participates.
+ */
+export const getBeforeHarvestPlayerIndices = (state: GameState): number[] => {
   const players = state.players
   const startIdx = computeStartPlayerIdx(state)
   return players
     .map((_, offset) => (startIdx + offset) % players.length)
-    .filter((index) => !isPlayerSkippingCurrentHarvest(state, players[index]!))
 }
 
 /**

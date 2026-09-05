@@ -1499,7 +1499,10 @@ export function engineProceed(
         stampContinuationParentHost(insertedNode, node.continuationParentHostNodeId!))
     }
     if (result.type === 'flow') {
-      const flowNode = buildOwnedFlowNode(int, result.flow, context.player.id)
+      const committedFlow = node.actionContext?.commitOnTriggerSelection === true
+        ? { ...result.flow, optional: undefined }
+        : result.flow
+      const flowNode = buildOwnedFlowNode(int, committedFlow, context.player.id)
       if (node.mandatory === true) {
         enforceCompositeContinuationMandatory(flowNode)
       }

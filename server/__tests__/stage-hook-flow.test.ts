@@ -364,6 +364,38 @@ describe('stage hook flows', () => {
     })
   })
 
+  it('makes A166_Haydryer mandatory when four pastures reduce its cost to zero', () => {
+    const session = new GameSession()
+    stabilizeRandomHands(session.state.players)
+    const state = session.getState().state
+    state.players = state.players.slice(0, 2)
+    state.round = 4
+    state.players.forEach((player) => {
+      markAllWorkersUsed(state, player)
+      player.minorHand = ['__test_placeholder__']
+      player.occupationHand = ['__test_placeholder__']
+    })
+    const player = state.players[0]!
+    player.occupationPlayed = ['A166_Haydryer']
+    player.resources.food = 0
+    player.pastures = Array.from({ length: 4 }, (_, index) => ({
+      id: `pasture-${index}`,
+      size: 1,
+      tiles: [{ row: index, col: 0 }],
+      stables: 0,
+      animalType: null,
+      animalCount: 0,
+    }))
+    session.loadState(state)
+
+    const response = session.performRoundEnd()
+
+    expect(response.state.players[0]!.resources.cattle).toBe(1)
+    expect(response.interaction.stateId).toBe('wait')
+    if (response.interaction.stateId !== 'wait') return
+    expect(response.interaction.request.kind).toBe('animal-reorg')
+  })
+
   it('runs D099_EarthenwarePotter through after-harvest flow on round 14', () => {
     const session = new GameSession()
     stabilizeRandomHands(session.state.players)

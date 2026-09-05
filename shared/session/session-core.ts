@@ -827,7 +827,9 @@ export class GameCore {
       },
       reportProtectedObservation: (observation) => this.reportProtectedObservation(observation),
     }, {
-      onBeforeHarvest: (stageResume) => { this.continueHarvestFromBeforeHarvest(stageResume.playerIndex, stageResume.cardIndex) },
+      onBeforeHarvest: (stageResume) => {
+        this.continueHarvestFromBeforeHarvest(stageResume.playerIndex, stageResume.extra)
+      },
       harvestPrepWindow: (stageResume) => { this.continueHarvestPrepWindow(stageResume.playerIndex) },
       onAfterReap: (stageResume) => { this.continueAfterReapEffects(stageResume.playerIndex, stageResume.cardIndex) },
       afterHarvestReapReaction: (stageResume) => { this.continueAfterReapEffects(stageResume.playerIndex, stageResume.cardIndex) },
@@ -3125,8 +3127,13 @@ export class GameCore {
     return this.finishCompletedActionTurn(playerIndex)
   }
 
-  private continueHarvestFromBeforeHarvest(playerIndex = 0, cardIndex = 0): SessionResponse {
-    if (this.stageDispatch.continueStageHook('onBeforeHarvest', playerIndex, cardIndex)) {
+  private continueHarvestFromBeforeHarvest(
+    orderOffset = 0,
+    extra?: StageResumeState['extra'],
+  ): SessionResponse {
+    const playerOrder = extra?.beforeHarvestPlayerOrder
+      ?? harvestPhase.getBeforeHarvestPlayerIndices(this.state)
+    if (this.stageDispatch.continueBeforeHarvestReactionHook(playerOrder, orderOffset)) {
       return this.respond()
     }
     activatePendingHarvestSkips(this.state)

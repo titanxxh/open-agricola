@@ -34,6 +34,14 @@ OA 之前的 action listener 已有 `ParallelNode(mode='trigger-select')`，但�
    - `_extraTurnSkipCountsByCard`
    - `_extraTurnConsumedCountsByCard`
    这样多张 provider 卡并存时，消耗的是具体来源卡的一次 opportunity。
+7. `onBeforeHarvest` 进入同一 `activate-card-effect` reaction dispatch：
+   - 窗口开启时按 Start Player Marker 冻结顺时针 target-player 顺序，不按原始 seat index 扫描。
+   - Before Harvest 发生在 skip-harvest 过滤之前，因此该窗口不排除跳过本次 Harvest 的玩家。
+   - 每个 target player 独立收集自己的 applicable activation，不跨玩家合并 trigger-select。
+   - 单个 applicable child 直接展开；多个 child 才进入 `ParallelNode(mode='trigger-select')`。
+   - activation 的 mandatory / optional 由 live cloned-state preview 返回的 root flow 推导；每次选择后重新预览剩余 child。
+   - mandatory activation 未完成时禁止 Pass；完成后 Pass 只跳过当前 target player 剩余的 optional activation。
+   - handler 只构造可重放 flow，真实状态修改必须落在选中后执行的 action leaf。
 
 ## Consequences
 
@@ -43,12 +51,14 @@ OA 之前的 action listener 已有 `ParallelNode(mode='trigger-select')`，但�
 - `M057_Taps`、`A092_AdoptiveParents` 和未来 extra-turn provider 可以共存，不再互相遮蔽。
 - Undo 后不需要保存旧 pending options；恢复到 action start / step 后重新派生 trigger-select。
 - Harvest field stage hook 与 before-end hook 走同一 activation 模型，减少手写 dispatcher 差异。
+- Before Harvest 与其他 reaction window 使用同一多卡选序语义；共享资源竞争由冻结的 start-player order 决定，后位玩家从前位结算后的 live state 重新派生可用效果。
 
 约束：
 
 - Reaction hook 应返回可重放 `ActionFlow`，状态修改落到 action leaf。尚未迁入 generic reaction dispatcher 的 direct stage hook 仍保持串行扫描，新增同类能力应优先接入 activation 模型。
 - Compute / query hook 不能进入 trigger-select；费用、可达性、计分等聚合必须继续保持确定性和无玩家排序选择。
 - 测试不能断言同一时机多卡按打出区顺序自动执行；必须断言 trigger-select、来源卡选择、pass / mandatory gate 和 undo 重新派生。
+- Before Harvest 的冻结玩家顺序和当前 order cursor 属于可恢复的阶段 continuation；序列化恢复不得重新读取可能已经变化的 Start Player Marker，也不得复用旧 pending options。
 
 ## Alternatives considered
 

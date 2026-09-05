@@ -4,6 +4,7 @@ import type { BeforeEndGameScope, FlowCardEffectHook } from '../cards/card-effec
 import { isPlayerSkippingCurrentHarvest } from '../cards/helpers/harvest-skip.ts'
 import type { ActionFlow, GameState, PlayerState, ProtectedObservation } from '../contract/types.ts'
 import type { Engine, EngineFrame } from '../engine/index.ts'
+import { cloneState } from './state-bootstrap.ts'
 
 export type StageResumeState = {
   hook:
@@ -47,6 +48,7 @@ export type StageResumeState = {
     resumeAfterCardId?: string | null
     anytimeActionTaken?: boolean
     roundPreparationAlreadyApplied?: boolean
+    beforeHarvestPlayerOrder?: number[]
   }
 }
 
@@ -274,6 +276,7 @@ export class StageDispatch {
   private collectOwnStageReactionActivationFlows(
     hook: StageCardEffectHook,
     player: PlayerState,
+    options: { inferMandatoryFromPreview?: boolean } = {},
   ): ActionFlow[] {
     const children: ActionFlow[] = []
     const cards = [
@@ -283,9 +286,63 @@ export class StageDispatch {
     for (const cardId of cards) {
       const effect = getCardEffect(cardId)
       if (!effect?.[hook]) continue
-      children.push(this.buildStageEffectActivationFlow(cardId, hook, player.id, player.id))
+      const previewFlow = options.inferMandatoryFromPreview
+        ? this.previewStageEffectFlow(hook, player, cardId)
+        : undefined
+      const activation = this.buildStageEffectActivationFlow(
+        cardId,
+        hook,
+        player.id,
+        player.id,
+        options.inferMandatoryFromPreview ? previewFlow?.optional !== true : true,
+        options.inferMandatoryFromPreview ? { commitOnTriggerSelection: true } : {},
+      )
+      if (previewFlow?.promptKey) activation.promptKey = previewFlow.promptKey
+      children.push(activation)
     }
     return children
+  }
+
+  private previewStageEffectFlow(
+    hook: StageCardEffectHook,
+    player: PlayerState,
+    cardId: string,
+  ): ActionFlow | null | undefined {
+    const previewState = cloneState(this.state)
+    const previewPlayer = previewState.players.find((entry) => entry.id === player.id)
+    if (!previewPlayer) return undefined
+    return runCardEffectHook(previewState, previewPlayer, cardId, hook)
+  }
+
+  continueBeforeHarvestReactionHook(
+    playerOrder: readonly number[],
+    orderOffset = 0,
+  ): boolean {
+    for (let currentOffset = orderOffset; currentOffset < playerOrder.length; currentOffset += 1) {
+      const currentPlayerIndex = playerOrder[currentOffset]
+      if (currentPlayerIndex === undefined) continue
+      const player = this.state.players[currentPlayerIndex]
+      if (!player) continue
+      const children = this.collectOwnStageReactionActivationFlows(
+        'onBeforeHarvest',
+        player,
+        { inferMandatoryFromPreview: true },
+      )
+      if (children.length === 0) continue
+      const flow = children.length === 1
+        ? children[0]!
+        : { type: 'parallel' as const, mode: 'trigger-select' as const, children }
+      this.startFlow(
+        flow,
+        'onBeforeHarvest',
+        currentPlayerIndex,
+        0,
+        currentOffset + 1,
+        { beforeHarvestPlayerOrder: [...playerOrder] },
+      )
+      return true
+    }
+    return false
   }
 
   private continueStageReactionHook(
