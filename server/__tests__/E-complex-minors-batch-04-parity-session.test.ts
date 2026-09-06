@@ -196,10 +196,32 @@ describe('E021 Sheep Rug parity', () => {
     expect(familySize(response.state.players[0]!)).toBe(before + 1)
   })
 
-  it('E021 S4: OA still permits sharing when two opposing workers occupy the space', () => {
+  it('E021 S3: an opposing adult and newborn still count as one person for sharing', () => {
     const session = occupiedWish(2)
+    session.state.players[1]!.workers[1]!.isNewborn = true
+    session.loadState(session.state)
+
     expect(session.getState().actionAvailability?.['wish-children']).toBe(true)
     expect(session.takeAction(0, 'wish-children').ok).toBe(true)
+  })
+
+  it('E021 S4: two opposing workers keep the occupied space unavailable', () => {
+    const session = occupiedWish(2)
+    const before = session.getState()
+    const familyBefore = familySize(before.state.players[0]!)
+    const workersBefore = structuredClone(before.state.players[0]!.workers)
+    const occupantsBefore = structuredClone(
+      before.state.actionSpaces.find((space) => space.id === 'wish-children')!.takenBy,
+    )
+
+    expect(before.actionAvailability?.['wish-children']).toBe(false)
+    const response = session.takeAction(0, 'wish-children')
+    expect(response.ok).toBe(false)
+    expect(response.error).toBe('space unavailable')
+    expect(familySize(response.state.players[0]!)).toBe(familyBefore)
+    expect(response.state.players[0]!.workers).toEqual(workersBefore)
+    expect(response.state.actionSpaces.find((space) => space.id === 'wish-children')!.takenBy)
+      .toEqual(occupantsBefore)
   })
 })
 

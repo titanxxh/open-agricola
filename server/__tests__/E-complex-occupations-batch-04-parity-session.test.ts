@@ -464,11 +464,17 @@ describe('E135 Pickler parity', () => {
     session.state.players[1]!.resources.vegetable = 2
     session.state.players[2]!.resources.vegetable = 1
     session.loadState(session.state)
-    expect(cardBonusScore(session.getState(), 'E135_Pickler')).toBe(3)
+    const response = session.getState()
+    expect(cardBonusScore(response, 'E135_Pickler', 0)).toBe(3)
+    expect(cardBonusScore(response, 'E135_Pickler', 1)).toBe(3)
+    expect(cardBonusScore(response, 'E135_Pickler', 2)).toBe(0)
   })
 
-  it('E135 S3: OA awards no bonus when every player has zero vegetables', () => {
+  it('E135 S3: every player tied at zero vegetables scores three bonus points', () => {
     const session = setupOccupation('E135_Pickler', { playerCount: 3, played: true })
-    expect(cardBonusScore(session.getState(), 'E135_Pickler')).toBe(0)
+    const response = session.getState()
+    expect(cardBonusScore(response, 'E135_Pickler', 0)).toBe(3)
+    expect(cardBonusScore(response, 'E135_Pickler', 1)).toBe(3)
+    expect(cardBonusScore(response, 'E135_Pickler', 2)).toBe(3)
   })
 })
