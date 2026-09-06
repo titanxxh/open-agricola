@@ -54,7 +54,7 @@ const simulatePlacement = (
  * a placement on meeting-place + one at-home worker for the onBuy-triggered
  * place-farmer step).
  */
-const setup = (options?: { activeWorkers?: number }) => {
+const setup = (options?: { activeWorkers?: number; reed?: number }) => {
   const session = new GameSession()
   stabilizeRandomHands(session.state.players)
   const state = session.getState().state
@@ -67,7 +67,7 @@ const setup = (options?: { activeWorkers?: number }) => {
   setActiveWorkerCount(p1, active)
   setWorkersAtHome(state, p1, active)
   p1.minorHand = [CARD_ID, FILLER_MINOR]
-  p1.resources = { ...p1.resources, reed: 1 }
+  p1.resources = { ...p1.resources, reed: options?.reed ?? 1 }
 
   session.loadState(state)
   return session
@@ -94,7 +94,7 @@ const buyC22ViaMeetingPlace = (session: GameSession) => {
 }
 
 describe('C022_BasketChair session', () => {
-  it('case 1 — golden path: recall first-placed worker onto C22 + place extra farmer on ClayPit', () => {
+  it('C022 S1: paying one reed can recall the first placed person and immediately place another', () => {
     const session = setup({ activeWorkers: 3 })
     simulatePlacement(session, 0, 'forest', '1')
 
@@ -139,7 +139,29 @@ describe('C022_BasketChair session', () => {
     expect(getWorkerHeldOnCard(resp.state.players[0]!, CARD_ID)).toBe('1')
   })
 
-  it('case 2 — skip path: declining the onBuy seq leaves the first placement untouched', () => {
+  it('C022 S2: lacking reed keeps Basket Chair unavailable and leaves the first placement untouched', () => {
+    const session = setup({ activeWorkers: 3, reed: 0 })
+    simulatePlacement(session, 0, 'forest', '1')
+
+    let resp = session.takeAction(0, 'meeting-place')
+    expect(resp.ok, resp.error).toBe(true)
+    expect(resp.interaction.stateId).toBe('wait')
+    if (resp.interaction.stateId !== 'wait') return
+    const acceptMinor = resp.interaction.request.options?.find((option) => option.value !== '__skip__')
+    expect(acceptMinor).toBeDefined()
+    resp = session.resolveChoice(0, acceptMinor!.value)
+
+    expect(resp.interaction.stateId).toBe('wait')
+    expect(resp.interaction.stateId === 'wait'
+      ? (resp.interaction.request.options ?? []).some((option) => option.value === CARD_ID)
+      : false).toBe(false)
+    expect(resp.state.players[0]!.minorHand).toContain(CARD_ID)
+    expect(resp.state.players[0]!.resources.reed).toBe(0)
+    expect(resp.state.actionSpaces.find((space) => space.id === 'forest')!.takenBy)
+      .toContainEqual(expect.objectContaining({ playerId: 'p1', workerId: '1' }))
+  })
+
+  it('C022 S3: declining the optional recall leaves the first placement untouched', () => {
     const session = setup({ activeWorkers: 3 })
     simulatePlacement(session, 0, 'forest', '1')
 
@@ -187,7 +209,22 @@ describe('C022_BasketChair session', () => {
     expect(flow).toBeUndefined()
   })
 
-  it('case 5 — no at-home worker for step 2: onBuy emits no flow', () => {
+  it('C022 S4: a first placement on Meeting Place cannot be recalled by Basket Chair', () => {
+    const session = setup({ activeWorkers: 2 })
+
+    const resp = buyC22ViaMeetingPlace(session)
+
+    expect(resp.ok, resp.error).toBe(true)
+    expect(resp.state.players[0]!.minorPlayed).toContain(CARD_ID)
+    expect(resp.state.actionSpaces.find((space) => space.id === 'meeting-place')!.takenBy)
+      .toContainEqual(expect.objectContaining({ playerId: 'p1', workerId: '1' }))
+    expect(getWorkerHeldOnCard(resp.state.players[0]!, CARD_ID)).toBeUndefined()
+    const c22Choice = resp.interaction.stateId === 'wait'
+      && (resp.interaction.request.options ?? []).some((option) => option.sourceCard === CARD_ID)
+    expect(c22Choice).toBe(false)
+  })
+
+  it('C022 S5: with no other person at home Basket Chair offers no recall', () => {
     // Setup: 2 active workers, worker 1 prefabbed on forest. After
     // takeAction('meeting-place') worker 2 goes on meeting-place and
     // workersAvailable = 0 — the place-farmer step would fail. The onBuy guard
@@ -210,6 +247,32 @@ describe('C022_BasketChair session', () => {
     // Forest is still occupied by the prefab worker.
     const forest = resp.state.actionSpaces.find((s) => s.id === 'forest')!
     expect(forest.takenBy.some((t) => t.playerId === 'p1' && t.workerId === '1')).toBe(true)
+  })
+
+  it('C022 S6: recalling from Wish for Children moves only the adult and leaves the newborn', () => {
+    const session = setup({ activeWorkers: 4 })
+    simulatePlacement(session, 0, 'wish-children', '1')
+    const withAdult = session.getState().state
+    const player = withAdult.players[0]!
+    const newborn = player.workers.find((worker) => worker.id === '3')!
+    newborn.isNewborn = true
+    addWorkerRef(withAdult.actionSpaces.find((space) => space.id === 'wish-children')!, player.id, newborn.id)
+    session.loadState(withAdult)
+
+    let resp = buyC22ViaMeetingPlace(session)
+    expect(resp.interaction.stateId).toBe('wait')
+    if (resp.interaction.stateId !== 'wait') return
+    const accept = resp.interaction.request.options?.find((option) => option.value !== '__skip__')
+    expect(accept).toBeDefined()
+    resp = session.resolveChoice(0, accept!.value)
+
+    expect(getWorkerHeldOnCard(resp.state.players[0]!, CARD_ID)).toBe('1')
+    expect(resp.state.actionSpaces.find((space) => space.id === 'wish-children')!.takenBy)
+      .toContainEqual(expect.objectContaining({ playerId: 'p1', workerId: '3' }))
+    expect(resp.interaction.stateId).toBe('wait')
+    expect(resp.interaction.stateId === 'wait'
+      ? resp.interaction.request.options?.some((option) => option.value === 'clay-pit')
+      : false).toBe(true)
   })
 
   it('case 6 — re-placing on freed origin: Forest can be reused by the extra place-farmer', () => {

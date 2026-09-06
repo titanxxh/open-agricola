@@ -1,158 +1,199 @@
 import { describe, expect, it } from 'vitest'
-import { getCardEffect } from '../../shared/cards/card-effects'
-import type { GameState, PlayerState } from '../../shared/contract/types'
+import { GameSession, type SessionResponse } from '../game/authoritative-session'
+import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
+import {
+  inactiveWorkersInSupply,
+  markAllWorkersUsed,
+  setActiveWorkerCount,
+  setWorkersAtHome,
+  workersAtHome,
+} from '../../shared/domain/player'
 
-import { D022_WorkPermit } from '../../shared/cards/D/D022_WorkPermit'
-import { meetsCardPrerequisites } from '../../shared/cards/helpers/prerequisites'
-import { GameSession } from '../game/authoritative-session'
-import type { ActionFlow } from '../../shared/contract/types'
+import '../../shared/cards/D/D022_WorkPermit'
 
 const CARD_ID = 'D022_WorkPermit'
+const FILLER = '__test_placeholder__'
 
-const createPlayer = (
-  id = 'p1',
-  resources: Partial<Record<string, number>> = {},
-): PlayerState =>
-  ({
-    id, name: id, color: 'red',
-    resources: {
-      wood: 0, clay: 0, reed: 0, stone: 0, food: 0,
+const setupPurchase = ({
+  round = 5, food = 1, wood = 1, clay = 0, reed = 0, stone = 0, supplyFarmer = true,
+} = {}) => {
+  const session = new GameSession(6022, undefined, { playerCount: 2 })
+  stabilizeRandomHands(session.state.players)
+  const state = session.getState().state
+  state.currentPlayerIndex = 0
+  state.round = round
+  state.roundPhase = 'work'
+  state.availableMajorImprovements = []
+  state.players.forEach((player, index) => {
+    setActiveWorkerCount(player, index === 0 && !supplyFarmer ? 5 : 2)
+    setWorkersAtHome(state, player, index === 0 ? player.workers.filter((worker) => worker.isActive).length : 0)
+    player.minorHand = [FILLER]
+    player.occupationHand = [FILLER]
+    player.minorPlayed = []
+    player.occupationPlayed = []
+    player.improvements = []
+    player.cardStates = {}
+    player.resources = {
+      ...player.resources,
+      wood: index === 0 ? wood : 0,
+      clay: index === 0 ? clay : 0,
+      reed: index === 0 ? reed : 0,
+      stone: index === 0 ? stone : 0,
+      food: index === 0 ? food : 20,
       grain: 0, vegetable: 0, sheep: 0, boar: 0, cattle: 0, begging: 0,
-      ...resources,
-    },
-    workers: [
-      { id: '1', isActive: true, isNewborn: false },
-      { id: '2', isActive: true, isNewborn: false },
-      { id: '3', isActive: false, isNewborn: false },
-      { id: '4', isActive: false, isNewborn: false },
-      { id: '5', isActive: false, isNewborn: false },
-    ],
-    rooms: 2, houseType: 'wood' as const,
-    fields: [], fences: 0, roomTiles: [{ row: 0, col: 0 }, { row: 1, col: 0 }],
-    stableTiles: [],
-    improvements: [], minorHand: [], minorPlayed: [],
-    occupationHand: [], occupationPlayed: [],houseAnimalType: null, houseAnimalCount: 0, stableAnimals: {},
-    pastures: [], fenceSegments: [],
-    majorEffects: { wellRounds: 0 }, startPlayer: false,
-    activeModifiers: [],
-    cardStates: {},
-  }) as unknown as PlayerState
-
-const createState = (round: number, players: PlayerState[]): GameState =>
-  ({
-    round, currentPlayerIndex: 0, players,
-    actionSpaces: [], log: [], roundStartSnapshot: null,
-    roundActionOrder: Array.from({ length: 14 }).map(() => null),
-    gameSeed: 1, availableMajorImprovements: [],
-    futureMeeples: [], pendingFutureMeeples: [],
-    gameOver: false, workPhaseObtainedResources: {},
-  }) as unknown as GameState
-
-describe('D022_WorkPermit card effect', () => {
-  it('onBuy queues a future-meeple at current + building resources', () => {
-    const player = createPlayer('p1', { wood: 1, clay: 2, stone: 0, reed: 1, food: 1 })
-    const state = createState(3, [player])
-    const effect = getCardEffect(CARD_ID)
-    expect(effect).toBeDefined()
-    const flow = effect!.onBuy!(state, player)
-    expect(flow).toBeDefined()
-    expect(state.pendingFutureMeeples.length).toBe(1)
-    const req = state.pendingFutureMeeples[0]!
-    if ('entries' in req) {
-      // 3 + 1 + 2 + 0 + 1 = 7
-      expect(req.entries.map((e) => e.round)).toEqual([7])
     }
   })
+  state.players[0]!.minorHand = [CARD_ID, FILLER]
+  state.actionSpaces.find((space) => space.id === 'major-improvement')!.takenBy = []
+  session.loadState(state)
+  return session
+}
 
-  it('onBuy preserves an out-of-range target so no earlier round can trigger it', () => {
-    const player = createPlayer('p1', { wood: 5, clay: 5, stone: 5, reed: 5, food: 1 })
-    const state = createState(10, [player])
-    const effect = getCardEffect(CARD_ID)
-    effect!.onBuy!(state, player)
-    const req = state.pendingFutureMeeples[0]!
-    if ('entries' in req) {
-      expect(req.entries[0]!.round).toBe(30)
-    }
+const enterMinor = (session: GameSession): SessionResponse => {
+  let response = session.takeAction(0, 'major-improvement')
+  if (response.interaction.stateId !== 'wait') return response
+  if (!response.interaction.request.options?.some((option) => option.value === CARD_ID)) {
+    const branch = response.interaction.request.options?.find((option) =>
+      option.value.startsWith('action-improvement-'))
+    if (branch) response = session.resolveChoice(response.interaction.playerIndex, branch.value)
+  }
+  return response
+}
+
+const play = (session: GameSession): SessionResponse => {
+  let response = enterMinor(session)
+  if (!response.state.players[0]!.minorHand.includes(CARD_ID)) return response
+  if (response.interaction.stateId !== 'wait') return response
+  const card = response.interaction.request.options?.find((option) => option.value === CARD_ID)
+  if (card) response = session.resolveChoice(response.interaction.playerIndex, card.value)
+  return response
+}
+
+const offered = (response: SessionResponse) => response.interaction.stateId === 'wait'
+  && (response.interaction.request.options?.some((option) => option.value === CARD_ID) ?? false)
+
+const workPermitRounds = (response: SessionResponse) => response.state.futureMeeples
+  .filter((entry) => entry.cardId === CARD_ID)
+  .map((entry) => entry.round)
+  .sort((left, right) => left - right)
+
+const setupDue = (buildingResources: { wood?: number; clay?: number; reed?: number; stone?: number } = { wood: 1 }) => {
+  const session = setupPurchase({ food: 21, wood: 0, ...buildingResources })
+  const purchase = play(session)
+  expect(purchase.ok, purchase.error).toBe(true)
+  const state = session.getState().state
+  state.players.forEach((player) => {
+    player.minorHand = [FILLER]
+    player.occupationHand = [FILLER]
+    player.resources.food = 20
+    markAllWorkersUsed(state, player)
+  })
+  session.loadState(state)
+  return session
+}
+
+const acceptWorkPermit = (session: GameSession, response: SessionResponse) => {
+  expect(response.interaction.stateId).toBe('wait')
+  if (response.interaction.stateId !== 'wait') return response
+  expect(response.interaction.sourceCard).toBe(CARD_ID)
+  const accept = response.interaction.request.options?.find((option) => option.value !== '__skip__')
+  expect(accept).toBeDefined()
+  return session.resolveChoice(response.interaction.playerIndex, accept!.value)
+}
+
+describe('D022 Work Permit parity', () => {
+  it('D022 S1: one building resource schedules the next round and costs one food while OA keeps the supply person', () => {
+    const session = setupPurchase()
+    const supplyBefore = inactiveWorkersInSupply(session.state.players[0]!).length
+
+    const response = play(session)
+
+    expect(response.ok, response.error).toBe(true)
+    expect(response.state.players[0]!.minorPlayed).toContain(CARD_ID)
+    expect(response.state.players[0]!.resources).toMatchObject({ food: 0, wood: 1 })
+    expect(workPermitRounds(response)).toEqual([6])
+    expect(inactiveWorkersInSupply(response.state.players[0]!)).toHaveLength(supplyBefore)
   })
 
-  it('onBuy does nothing when the player has 0 building resources', () => {
-    const player = createPlayer('p1', { wood: 0, clay: 0, stone: 0, reed: 0, food: 5 })
-    const state = createState(3, [player])
-    const effect = getCardEffect(CARD_ID)
-    const flow = effect!.onBuy!(state, player)
-    expect(flow).toBeUndefined()
-    expect(state.pendingFutureMeeples.length).toBe(0)
-  })
+  it('D022 S2: every building resource unit contributes one round without being consumed', () => {
+    const response = play(setupPurchase({ wood: 1, clay: 2, reed: 1 }))
 
-  it('onRoundStart offers an optional place-farmer at target round', () => {
-    const player = createPlayer('p1', { wood: 1, clay: 1, stone: 0, reed: 0, food: 1 })
-    player.minorPlayed.push(CARD_ID)
-    const state = createState(3, [player])
-    const effect = getCardEffect(CARD_ID)
-    effect!.onBuy!(state, player)
-    // target round = 3 + 2 = 5
-    state.round = 5
-    const flow = effect!.onRoundStart!(state, player)
-    expect(flow).toBeDefined()
-    expect((flow as Extract<ActionFlow, { type: 'leaf' }>).type).toBe('seq')
-    expect((flow as Extract<ActionFlow, { type: 'leaf' }>).optional).toBe(true)
-    expect((flow as Extract<ActionFlow, { type: 'seq' }>).children[0].actionId).toBe('place-farmer')
-    expect((flow as Extract<ActionFlow, { type: 'seq' }>).children[0].sourceCard).toBe(CARD_ID)
-  })
-
-  it('onRoundStart does nothing when not at target round', () => {
-    const player = createPlayer('p1', { wood: 1 })
-    player.minorPlayed.push(CARD_ID)
-    const state = createState(3, [player])
-    const effect = getCardEffect(CARD_ID)
-    effect!.onBuy!(state, player)
-    state.round = 5
-    const flow = effect!.onRoundStart!(state, player)
-    expect(flow).toBeUndefined()
-  })
-
-  it('onRoundStart fires only once per round (flag guard)', () => {
-    const player = createPlayer('p1', { wood: 1 })
-    player.minorPlayed.push(CARD_ID)
-    const state = createState(3, [player])
-    const effect = getCardEffect(CARD_ID)
-    effect!.onBuy!(state, player)
-    state.round = 4 // 3 + 1
-    const first = effect!.onRoundStart!(state, player)
-    expect(first).toBeDefined()
-    const second = effect!.onRoundStart!(state, player)
-    expect(second).toBeUndefined()
-  })
-
-  describe('prerequisite "At Least 1 Building Resource"', () => {
-    it('blocks when player has no building resources', () => {
-      const session = new GameSession()
-      const state = session.getState().state
-      const player = state.players[0]!
-      player.resources.wood = 0
-      player.resources.stone = 0
-      player.resources.clay = 0
-      player.resources.reed = 0
-      expect(meetsCardPrerequisites(player, D022_WorkPermit, state.round, state)).toBe(false)
+    expect(response.ok, response.error).toBe(true)
+    expect(workPermitRounds(response)).toEqual([9])
+    expect(response.state.players[0]!.resources).toMatchObject({
+      wood: 1, clay: 2, reed: 1, stone: 0, food: 0,
     })
+  })
 
-    it('blocks when no worker is available even with resources', () => {
-      const session = new GameSession()
-      const state = session.getState().state
-      const player = state.players[0]!
-      player.resources.wood = 1
-      // Place all workers on action spaces
-      const space = state.actionSpaces[0]!
-      space.takenBy = player.workers.map((w) => ({ playerId: player.id, workerId: w.id }))
-      expect(meetsCardPrerequisites(player, D022_WorkPermit, state.round, state)).toBe(false)
-    })
+  it('D022 S3: without a building resource Work Permit is unavailable and pays nothing', () => {
+    const response = enterMinor(setupPurchase({ wood: 0 }))
 
-    it('allows when player has at least 1 resource and a worker in reserve', () => {
-      const session = new GameSession()
-      const state = session.getState().state
-      const player = state.players[0]!
-      player.resources.wood = 1
-      expect(meetsCardPrerequisites(player, D022_WorkPermit, state.round, state)).toBe(true)
-    })
+    expect(offered(response)).toBe(false)
+    expect(response.state.players[0]!.minorHand).toContain(CARD_ID)
+    expect(response.state.players[0]!.resources.food).toBe(1)
+    expect(workPermitRounds(response)).toEqual([])
+  })
+
+  it('D022 S4: characterize OA allowing Work Permit with no person in supply', () => {
+    const session = setupPurchase({ supplyFarmer: false })
+    expect(inactiveWorkersInSupply(session.state.players[0]!)).toHaveLength(0)
+
+    const response = play(session)
+
+    expect(response.ok, response.error).toBe(true)
+    expect(response.state.players[0]!.minorPlayed).toContain(CARD_ID)
+    expect(response.state.players[0]!.resources.food).toBe(0)
+    expect(workPermitRounds(response)).toEqual([6])
+  })
+
+  it('D022 S5: a target after round fourteen still plays and pays but schedules no person', () => {
+    const response = play(setupPurchase({ round: 13, wood: 1, clay: 1 }))
+
+    expect(response.ok, response.error).toBe(true)
+    expect(response.state.players[0]!.minorPlayed).toContain(CARD_ID)
+    expect(response.state.players[0]!.resources.food).toBe(0)
+    expect(workPermitRounds(response)).toEqual([])
+  })
+
+  it('D022 S6: characterize OA using a regular person for the target-round placement', () => {
+    const session = setupDue()
+    let response = acceptWorkPermit(session, session.performRoundEnd())
+    expect(response.interaction.stateId).toBe('wait')
+    if (response.interaction.stateId !== 'wait') return
+    expect(response.interaction.request.options?.map((option) => option.value)).toContain('forest')
+    response = session.resolveChoice(response.interaction.playerIndex, 'forest')
+
+    expect(response.ok, response.error).toBe(true)
+    expect(response.state.round).toBe(6)
+    expect(response.state.players[0]!.workers.filter((worker) => worker.isActive)).toHaveLength(2)
+    expect(workersAtHome(response.state, response.state.players[0]!)).toHaveLength(1)
+    expect(inactiveWorkersInSupply(response.state.players[0]!)).toHaveLength(3)
+    expect(response.state.actionSpaces.find((space) => space.id === 'forest')!.takenBy)
+      .toContainEqual(expect.objectContaining({ playerId: response.state.players[0]!.id }))
+  })
+
+  it('D022 S7: the target-round extra placement may be declined without consuming a person', () => {
+    const session = setupDue()
+    let response = session.performRoundEnd()
+    expect(response.interaction.stateId).toBe('wait')
+    if (response.interaction.stateId !== 'wait') return
+    expect(response.interaction.sourceCard).toBe(CARD_ID)
+
+    response = session.resolveChoice(response.interaction.playerIndex, '__skip__')
+
+    expect(response.ok, response.error).toBe(true)
+    expect(response.state.round).toBe(6)
+    expect(workersAtHome(response.state, response.state.players[0]!)).toHaveLength(2)
+    expect(inactiveWorkersInSupply(response.state.players[0]!)).toHaveLength(3)
+    expect(response.state.actionSpaces.find((space) => space.id === 'forest')!.takenBy)
+      .not.toContainEqual(expect.objectContaining({ playerId: response.state.players[0]!.id }))
+  })
+
+  it('D022 S8: before the target round Work Permit offers no extra placement', () => {
+    const response = setupDue({ wood: 1, clay: 1 }).performRoundEnd()
+
+    expect(response.state.round).toBe(6)
+    expect(response.interaction.stateId !== 'wait' || response.interaction.sourceCard !== CARD_ID).toBe(true)
+    expect(workPermitRounds(response)).toEqual([7])
   })
 })

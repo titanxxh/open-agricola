@@ -1,145 +1,146 @@
 import { describe, expect, it } from 'vitest'
-import { GameSession } from '../game/authoritative-session'
-import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
+import { GameSession, type SessionResponse } from '../game/authoritative-session'
 import { isCardFlagged } from '../../shared/cards/helpers/card-state'
-import { resolveFutureMeepleRequests } from '../../shared/actions/effects/internal/future-meeples'
-import { applyFutureMeeples } from '../../shared/session/state-bootstrap'
+import { markAllWorkersUsed, setWorkersAtHome } from '../../shared/domain/player'
+import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 
 import '../../shared/cards/A/A120_ClayHutBuilder'
 
-describe('A120_ClayHutBuilder session', () => {
-  const setup = (options?: { houseType?: 'wood' | 'clay' | 'stone'; round?: number }) => {
-    const session = new GameSession()
-    stabilizeRandomHands(session.state.players)
-    const state = session.getState().state
-    state.players = state.players.slice(0, 2)
-    state.currentPlayerIndex = 0
-    state.round = options?.round ?? 1
+const CARD_ID = 'A120_ClayHutBuilder'
+const FILLER = '__test_placeholder__'
 
-    const player = state.players[0]!
-    player.occupationHand.push('A120_ClayHutBuilder')
-    player.houseType = options?.houseType ?? 'wood'
-    session.loadState(state)
-    session.devPlayCard(0, 'A120_ClayHutBuilder')
-    return session
+const setup = ({
+  houseType = 'wood',
+  played = false,
+  flagged = false,
+  round = 5,
+}: {
+  houseType?: 'wood' | 'clay' | 'stone'
+  played?: boolean
+  flagged?: boolean
+  round?: number
+} = {}) => {
+  const session = new GameSession(5120, undefined, { playerCount: 2 })
+  stabilizeRandomHands(session.state.players)
+  const state = session.getState().state
+  state.currentPlayerIndex = 0
+  state.round = round
+  state.roundPhase = 'work'
+  state.availableMajorImprovements = []
+  state.players.forEach((player) => {
+    player.minorHand = [FILLER]
+    player.occupationHand = [FILLER]
+    player.resources.food = 0
+    setWorkersAtHome(state, player, 2)
+  })
+  const player = state.players[0]!
+  player.occupationHand = played ? [FILLER] : [CARD_ID]
+  player.occupationPlayed = played ? [CARD_ID] : []
+  player.houseType = houseType
+  player.resources.clay = 2
+  player.resources.stone = 2
+  player.resources.reed = 1
+  if (flagged) player.cardStates[CARD_ID] = { flagged: true }
+  const redevelopment = state.actionSpaces.find((space) => space.id === 'house-redevelopment')
+  if (!redevelopment) throw new Error('missing house-redevelopment')
+  redevelopment.roundAvailable = 1
+  redevelopment.takenBy = []
+  session.loadState(state)
+  return session
+}
+
+const playOccupation = (session: GameSession): SessionResponse => {
+  const response = session.takeAction(0, 'lessons')
+  if (!response.state.players[0]!.occupationHand.includes(CARD_ID)) return response
+  if (response.interaction.stateId !== 'wait') return response
+  const card = response.interaction.request.options?.find((option) => option.value === CARD_ID)
+  expect(card).toBeDefined()
+  return session.resolveChoice(response.interaction.playerIndex, card!.value)
+}
+
+const renovate = (session: GameSession): SessionResponse => {
+  let response = session.takeAction(0, 'house-redevelopment')
+  expect(response.ok, response.error).toBe(true)
+  for (let step = 0; step < 8 && response.interaction.stateId === 'wait'; step++) {
+    if (response.interaction.promptKey === 'ui.interactionChooseRenovationTarget') {
+      const targetType = response.state.players[0]!.houseType === 'wood' ? 'clay' : 'stone'
+      const target = response.interaction.request.options?.find((option) => option.value === targetType)
+      expect(target).toBeDefined()
+      response = session.resolveChoice(response.interaction.playerIndex, target!.value)
+      continue
+    }
+    const skip = response.interaction.request.options?.find((option) =>
+      option.value === '__skip__' || option.value === 'skip')
+    if (!skip) break
+    response = session.resolveChoice(response.interaction.playerIndex, skip.value)
   }
+  return response
+}
 
-  it('onBuy does nothing when player lives in wooden house', () => {
-    const session = setup({ houseType: 'wood' })
-    const state = session.getState().state
+const clayEntries = (response: SessionResponse) => response.state.futureMeeples
+  .filter((entry) => entry.cardId === CARD_ID)
 
-    expect(state.pendingFutureMeeples.length).toBe(0)
-    expect(isCardFlagged(state.players[0]!, 'A120_ClayHutBuilder')).toBe(false)
+describe('A120 Clay Hut Builder parity', () => {
+  it('A120 S1: playing Clay Hut Builder in a wooden house schedules nothing', () => {
+    const response = playOccupation(setup())
+
+    expect(response.ok, response.error).toBe(true)
+    expect(response.state.players[0]!.occupationPlayed).toContain(CARD_ID)
+    expect(clayEntries(response)).toEqual([])
+    expect(isCardFlagged(response.state.players[0]!, CARD_ID)).toBe(false)
   })
 
-  it('onBuy queues 5 rounds of 2 clay when player has clay house', () => {
-    const session = setup({ houseType: 'clay', round: 3 })
-    const state = session.getState().state
+  it('A120 S2: playing Clay Hut Builder in a clay house schedules two clay for five rounds', () => {
+    const response = playOccupation(setup({ houseType: 'clay' }))
+    const entries = clayEntries(response)
 
-    expect(state.pendingFutureMeeples.length).toBe(1)
-    expect(state.pendingFutureMeeples[0]).toMatchObject({
-      cardId: 'A120_ClayHutBuilder',
-      playerId: state.players[0]!.id,
-      startRound: 4,
-      count: 5,
-      resources: { clay: 2 },
+    expect(entries.map((entry) => entry.round)).toEqual([6, 7, 8, 9, 10])
+    entries.forEach((entry) => expect(entry.resources).toEqual({ clay: 2 }))
+    expect(isCardFlagged(response.state.players[0]!, CARD_ID)).toBe(true)
+  })
+
+  it('A120 S3: the first renovation out of wood schedules two clay for five rounds', () => {
+    const response = renovate(setup({ played: true }))
+    const entries = clayEntries(response)
+
+    expect(response.state.players[0]!.houseType).toBe('clay')
+    expect(entries.map((entry) => entry.round)).toEqual([6, 7, 8, 9, 10])
+    entries.forEach((entry) => expect(entry.resources).toEqual({ clay: 2 }))
+    expect(isCardFlagged(response.state.players[0]!, CARD_ID)).toBe(true)
+  })
+
+  it('A120 S4: after its first trigger a later renovation schedules no additional clay', () => {
+    const response = renovate(setup({ houseType: 'clay', played: true, flagged: true }))
+
+    expect(response.state.players[0]!.houseType).toBe('stone')
+    expect(clayEntries(response)).toEqual([])
+  })
+
+  it('A120 S5: scheduled clay is received at the next round start', () => {
+    const session = setup({ houseType: 'clay' })
+    playOccupation(session)
+    const state = session.getState().state
+    state.players.forEach((player) => {
+      markAllWorkersUsed(state, player)
+      player.resources.food = 20
+      player.minorHand = [FILLER]
+      player.occupationHand = [FILLER]
     })
-    expect(isCardFlagged(state.players[0]!, 'A120_ClayHutBuilder')).toBe(true)
-
-    resolveFutureMeepleRequests(state)
-    expect(state.futureMeeples).toHaveLength(5)
-    expect(state.futureMeeples.map((e) => e.round)).toEqual([4, 5, 6, 7, 8])
-    state.futureMeeples.forEach((entry) => {
-      expect(entry.resources).toEqual({ clay: 2 })
-    })
-  })
-
-  it('onBuy queues 2 clay when player has stone house', () => {
-    const session = setup({ houseType: 'stone', round: 1 })
-    const state = session.getState().state
-
-    expect(state.pendingFutureMeeples.length).toBe(1)
-    expect(isCardFlagged(state.players[0]!, 'A120_ClayHutBuilder')).toBe(true)
-  })
-
-  it('clay is collected at round start', () => {
-    const session = setup({ houseType: 'clay', round: 1 })
-    const state = session.getState().state
-    const player = state.players[0]!
-    const clayBefore = player.resources.clay
-
-    resolveFutureMeepleRequests(state)
-    state.round = 2
-    applyFutureMeeples(state)
-
-    expect(player.resources.clay).toBe(clayBefore + 2)
-    expect(state.futureMeeples).toHaveLength(4)
-  })
-
-  it('after renovation from wood to clay, triggers and places future meeples', () => {
-    const session = setup({ houseType: 'wood', round: 5 })
-    const state = session.getState().state
-    const player = state.players[0]!
-
-    // Ensure not flagged yet
-    expect(isCardFlagged(player, 'A120_ClayHutBuilder')).toBe(false)
-    expect(state.pendingFutureMeeples.length).toBe(0)
-
-    // Set up renovation resources: wood house -> clay house needs clay=rooms + 1 reed
-    player.resources.clay = player.rooms + 10
-    player.resources.reed = 10
-
-    // Make house-redevelopment action space available
-    const houseRedevSpace = state.actionSpaces.find((s) => s.id === 'house-redevelopment')
-    if (houseRedevSpace) {
-      houseRedevSpace.roundAvailable = 1
-      houseRedevSpace.takenBy = []
-    }
+    const clayBefore = state.players[0]!.resources.clay
     session.loadState(state)
 
-    const resp = session.takeAction(0, 'house-redevelopment')
-    expect(resp.ok).toBe(true)
+    const response = session.performRoundEnd()
 
-    const updatedState = session.getState().state
-    const updatedPlayer = updatedState.players[0]!
-    expect(updatedPlayer.houseType).not.toBe('wood')
-    expect(isCardFlagged(updatedPlayer, 'A120_ClayHutBuilder')).toBe(true)
-    // Future meeples should be queued or resolved
-    const clayEntries = updatedState.futureMeeples.filter(
-      (e) => e.cardId === 'A120_ClayHutBuilder',
-    )
-    expect(clayEntries.length).toBeGreaterThan(0)
+    expect(response.state.round).toBe(6)
+    expect(response.state.players[0]!.resources.clay).toBe(clayBefore + 2)
+    expect(clayEntries(response).map((entry) => entry.round)).toEqual([7, 8, 9, 10])
   })
 
-  it('does not trigger twice (card is flagged after first activation)', () => {
-    const session = setup({ houseType: 'clay', round: 3 })
-    const state = session.getState().state
+  it('A120 S6: late activation schedules clay only on rounds that still exist', () => {
+    const response = playOccupation(setup({ houseType: 'stone', round: 12 }))
+    const entries = clayEntries(response)
 
-    // Already triggered onBuy: flagged
-    expect(isCardFlagged(state.players[0]!, 'A120_ClayHutBuilder')).toBe(true)
-    resolveFutureMeepleRequests(state)
-    const count = state.futureMeeples.length
-
-    // Set up renovation
-    const player = state.players[0]!
-    player.resources.stone = player.rooms + 10
-    player.resources.reed = 10
-
-    const farmRedevSpace = state.actionSpaces.find((s) => s.id === 'farm-redevelopment')
-    if (farmRedevSpace) {
-      farmRedevSpace.roundAvailable = 1
-      farmRedevSpace.takenBy = []
-    }
-    session.loadState(state)
-
-    const resp = session.takeAction(0, 'farm-redevelopment')
-    if (resp.ok) {
-      const updatedState = session.getState().state
-      const newEntries = updatedState.futureMeeples.filter(
-        (e) => e.cardId === 'A120_ClayHutBuilder',
-      )
-      // Should not have added more entries
-      expect(newEntries.length).toBeLessThanOrEqual(count)
-    }
+    expect(entries.map((entry) => entry.round)).toEqual([13, 14])
+    entries.forEach((entry) => expect(entry.resources).toEqual({ clay: 2 }))
   })
 })

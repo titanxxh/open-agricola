@@ -1,209 +1,208 @@
 import { describe, expect, it } from 'vitest'
-import { GameSession } from '../game/authoritative-session'
+import { GameSession, type SessionResponse } from '../game/authoritative-session'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
-import { getCardEffect } from '../../shared/cards/card-effects'
-import type { Resource } from '../../shared/contract/types'
+import { setWorkersAtHome } from '../../shared/domain/player'
 
 import '../../shared/cards/E/E078_SleightofHand'
 
 const CARD_ID = 'E078_SleightofHand'
+const FILLER = '__test_placeholder__'
+const OCCUPATIONS = ['__test_occupation_1__', '__test_occupation_2__', '__test_occupation_3__']
 
-const setupPlaySession = (resources?: Partial<Resource>) => {
-  const session = new GameSession()
+type BuildingResources = {
+  wood: number
+  clay: number
+  reed: number
+  stone: number
+  food: number
+}
+
+const setup = ({
+  occupations = 3, wood = 2, clay = 1, reed = 0, stone = 0, food = 0,
+}: Partial<BuildingResources> & { occupations?: number } = {}) => {
+  const session = new GameSession(7078, undefined, { playerCount: 2 })
   stabilizeRandomHands(session.state.players)
   const state = session.getState().state
-  state.players = state.players.slice(0, 2)
   state.currentPlayerIndex = 0
+  state.round = 5
+  state.roundPhase = 'work'
+  state.availableMajorImprovements = []
+  state.actionSpaces.forEach((space) => { space.takenBy = [] })
+  state.players.forEach((player, index) => {
+    player.minorHand = [FILLER]
+    player.occupationHand = [FILLER]
+    setWorkersAtHome(state, player, index === 0 ? 2 : 0)
+  })
   const player = state.players[0]!
   player.minorHand = [CARD_ID]
-  player.occupationPlayed = ['occ-1', 'occ-2', 'occ-3']
-  player.resources.wood = 2
-  player.resources.clay = 1
-  player.resources.stone = 0
-  Object.assign(player.resources, resources)
-  state.players[1]!.minorHand = ['__test_placeholder__']
-  state.players[1]!.occupationHand = ['__test_placeholder__']
+  player.occupationPlayed = OCCUPATIONS.slice(0, occupations)
+  Object.assign(player.resources, {
+    wood, clay, reed, stone, food, grain: 0, vegetable: 0,
+  })
   session.loadState(state)
   return session
 }
 
+const resources = (response: SessionResponse): BuildingResources => {
+  const stock = response.state.players[0]!.resources
+  return {
+    wood: stock.wood,
+    clay: stock.clay,
+    reed: stock.reed,
+    stone: stock.stone,
+    food: stock.food,
+  }
+}
+
+const isBatchPrompt = (response: SessionResponse) => response.interaction.stateId === 'wait'
+  && response.interaction.request.kind === 'resource-batch-exchange-select'
+
 const playUntilBatchPrompt = (session: GameSession) => {
-  let resp = session.takeAction(0, 'meeting-place')
+  let response = session.takeAction(0, 'meeting-place')
   for (let safety = 0; safety < 20; safety += 1) {
-    expect(resp.ok).toBe(true)
-    if (
-      resp.interaction.stateId === 'wait' &&
-      resp.interaction.request.kind === 'resource-batch-exchange-select'
-    ) {
-      return resp
-    }
-    if (resp.interaction.stateId !== 'wait') break
-    const next = resp.interaction.request.options?.find((option) => option.value !== '__skip__' && option.value !== 'cancel')
+    expect(response.ok, response.error).toBe(true)
+    if (isBatchPrompt(response)) return response
+    if (response.interaction.stateId !== 'wait') break
+    const next = response.interaction.request.options?.find((option) =>
+      option.value === CARD_ID
+      || (option.value !== '__skip__' && option.value !== 'cancel'))
     if (!next) break
-    resp = session.resolveChoice(resp.interaction.playerIndex, next.value)
+    response = session.resolveChoice(response.interaction.playerIndex, next.value)
   }
   throw new Error('resource batch prompt not reached')
 }
 
-describe('E078_SleightofHand session', () => {
-  it('onBuy creates one batch exchange request leaf', () => {
-    const session = new GameSession()
-    stabilizeRandomHands(session.state.players)
-    const state = session.getState().state
-    state.players = state.players.slice(0, 2)
-    const player = state.players[0]!
-    player.minorPlayed.push(CARD_ID)
-    player.resources.wood = 2
-    player.resources.clay = 1
-    session.loadState(state)
+const commitExchange = (session: GameSession, discard: Record<string, number>, receive: Record<string, number>) =>
+  session.commitSelectionChoice(0, { resourceBatchExchange: { discard, receive } })
 
-    const flow = getCardEffect(CARD_ID)!.onBuy!(state, player)
+const expectRejectedWithoutMutation = (
+  session: GameSession,
+  discard: Record<string, number>,
+  receive: Record<string, number>,
+  error: string,
+) => {
+  const before = JSON.parse(JSON.stringify(session.getState()))
 
-    expect(flow).toMatchObject({
-      type: 'leaf',
-      actionId: 'exchange',
-      sourceCard: CARD_ID,
-      actionContext: {
-        batchExchange: {
-          cardId: CARD_ID,
-          maxTotal: 4,
-        },
-      },
-    })
+  const response = commitExchange(session, discard, receive)
+
+  expect(response.ok).toBe(false)
+  expect(response.error).toBe(error)
+  expect(JSON.parse(JSON.stringify(session.getState()))).toEqual(before)
+  expect(isBatchPrompt(response)).toBe(true)
+}
+
+describe('E078 Sleight of Hand parity', () => {
+  it('E078 S1: three occupations allow Sleight of Hand to be played for no resources and open its exchange', () => {
+    const session = setup()
+    const before = resources(session.getState())
+
+    const response = playUntilBatchPrompt(session)
+
+    expect(response.state.players[0]!.minorPlayed).toContain(CARD_ID)
+    expect(resources(response)).toEqual(before)
+    expect(isBatchPrompt(response)).toBe(true)
   })
 
-  it('onBuy returns undefined when player has no building resources', () => {
-    const session = new GameSession()
-    stabilizeRandomHands(session.state.players)
-    const state = session.getState().state
-    state.players = state.players.slice(0, 2)
-    const player = state.players[0]!
-    player.resources.wood = 0
-    player.resources.clay = 0
-    player.resources.reed = 0
-    player.resources.stone = 0
-    session.loadState(state)
+  it('E078 S2: two occupations keep Sleight of Hand unavailable', () => {
+    const session = setup({ occupations: 2 })
 
-    expect(getCardEffect(CARD_ID)!.onBuy!(state, player)).toBeUndefined()
+    const response = session.takeAction(0, 'meeting-place')
+
+    expect(response.ok, response.error).toBe(true)
+    expect(response.state.players[0]!.minorHand).toContain(CARD_ID)
+    expect(response.state.players[0]!.minorPlayed).not.toContain(CARD_ID)
+    expect(JSON.stringify(response.interaction)).not.toContain(CARD_ID)
   })
 
-  it('playing the card resolves one normalized batch resource.exchanged event', () => {
-    const session = setupPlaySession()
-    let resp = playUntilBatchPrompt(session)
-    expect(resp.interaction.stateId).toBe('wait')
-    if (resp.interaction.stateId !== 'wait') throw new Error('expected wait')
-    expect(resp.interaction.request.kind).toBe('resource-batch-exchange-select')
-
-    resp = session.commitSelectionChoice(0, {
-      resourceBatchExchange: {
-        discard: { wood: 2, clay: 1 },
-        receive: { wood: 1, stone: 2 },
-      },
-    })
-
-    const player = resp.state.players[0]!
-    expect(player.resources.wood).toBe(1)
-    expect(player.resources.clay).toBe(0)
-    expect(player.resources.stone).toBe(2)
-    expect(resp.state.events).toEqual(expect.arrayContaining([
-      expect.objectContaining({
-        type: 'resource.exchanged',
-        sourceCardId: CARD_ID,
-        paid: { wood: 1, clay: 1 },
-        gained: { stone: 2 },
-      }),
-    ]))
-  })
-
-  it('0/0 batch exchange skips without emitting resource.exchanged', () => {
-    const session = setupPlaySession()
-    let resp = playUntilBatchPrompt(session)
-    expect(resp.interaction.stateId).toBe('wait')
-    resp = session.commitSelectionChoice(0, {
-      resourceBatchExchange: { discard: {}, receive: {} },
-    })
-    expect(resp.ok).toBe(true)
-    expect(resp.state.events).not.toEqual(expect.arrayContaining([
-      expect.objectContaining({ type: 'resource.exchanged', sourceCardId: CARD_ID }),
-    ]))
-  })
-
-  it('rejects batch exchange when discard and receive totals differ', () => {
-    const session = setupPlaySession()
-    const resp = playUntilBatchPrompt(session)
-    const rejected = session.commitSelectionChoice(0, {
-      resourceBatchExchange: {
-        discard: { wood: 1 },
-        receive: { stone: 2 },
-      },
-    })
-
-    expect(resp.interaction.stateId).toBe('wait')
-    expect(rejected.ok).toBe(false)
-    expect(rejected.error).toBe('resource-batch.error.total-mismatch')
-  })
-
-  it('rejects batch exchange when discarding more than available', () => {
-    const session = setupPlaySession()
+  it('E078 S3: a mixed three-resource exchange pays and receives equal quantities', () => {
+    const session = setup()
     playUntilBatchPrompt(session)
 
-    const rejected = session.commitSelectionChoice(0, {
-      resourceBatchExchange: {
-        discard: { wood: 3 },
-        receive: { stone: 3 },
-      },
-    })
+    const response = commitExchange(
+      session,
+      { wood: 2, clay: 1 },
+      { wood: 1, stone: 2 },
+    )
 
-    expect(rejected.ok).toBe(false)
-    expect(rejected.error).toBe('resource-batch.error.invalid-discard-wood')
+    expect(response.ok, response.error).toBe(true)
+    expect(resources(response)).toEqual({ wood: 1, clay: 0, reed: 0, stone: 2, food: 0 })
   })
 
-  it('rejects batch exchange when total exceeds max', () => {
-    const session = setupPlaySession({ wood: 4, clay: 1 })
+  it('E078 S4: exchanging zero resources declines the optional exchange without changing resources', () => {
+    const session = setup()
+    const prompt = playUntilBatchPrompt(session)
+    const before = resources(prompt)
+
+    const response = commitExchange(session, {}, {})
+
+    expect(response.ok, response.error).toBe(true)
+    expect(resources(response)).toEqual(before)
+    expect(isBatchPrompt(response)).toBe(false)
+  })
+
+  it('E078 S5: rejects an exchange whose receive total exceeds its discard total and fully rolls back', () => {
+    const session = setup()
     playUntilBatchPrompt(session)
 
-    const rejected = session.commitSelectionChoice(0, {
-      resourceBatchExchange: {
-        discard: { wood: 4, clay: 1 },
-        receive: { stone: 4, reed: 1 },
-      },
-    })
-
-    expect(rejected.ok).toBe(false)
-    expect(rejected.error).toBe('resource-batch.error.too-many')
+    expectRejectedWithoutMutation(
+      session,
+      { wood: 1 },
+      { stone: 2 },
+      'resource-batch.error.total-mismatch',
+    )
   })
 
-  it('rejects batch exchange with invalid receive resource', () => {
-    const session = setupPlaySession()
+  it('E078 S6: rejects discarding more resources than held and fully rolls back', () => {
+    const session = setup()
     playUntilBatchPrompt(session)
 
-    const rejected = session.commitSelectionChoice(0, {
-      resourceBatchExchange: {
-        discard: { wood: 1 },
-        receive: { food: 1 },
-      },
-    })
-
-    expect(rejected.ok).toBe(false)
-    expect(rejected.error).toBe('resource-batch.error.invalid-receive-food')
+    expectRejectedWithoutMutation(
+      session,
+      { wood: 3 },
+      { stone: 3 },
+      'resource-batch.error.invalid-discard-wood',
+    )
   })
 
-  it('opens the batch prompt even without any normal exchange action source', () => {
-    const session = setupPlaySession()
-    const state = session.getState().state
-  const player = state.players[0]!
-  player.improvements = []
-  player.occupationPlayed = ['occ-1', 'occ-2', 'occ-3']
-    player.minorPlayed = [CARD_ID]
-    player.resources.wood = 1
-    player.resources.clay = 0
-    player.resources.reed = 0
-    player.resources.stone = 0
-    session.loadState(state)
+  it('E078 S7: rejects an equal exchange of more than four building resources and fully rolls back', () => {
+    const session = setup({ wood: 4, clay: 1 })
+    playUntilBatchPrompt(session)
 
-    const resp = playUntilBatchPrompt(session)
-    expect(resp.interaction.stateId).toBe('wait')
-    expect(resp.interaction.stateId === 'wait' && resp.interaction.request.kind)
-      .toBe('resource-batch-exchange-select')
+    expectRejectedWithoutMutation(
+      session,
+      { wood: 4, clay: 1 },
+      { stone: 4, reed: 1 },
+      'resource-batch.error.too-many',
+    )
+  })
+
+  it('E078 S8: rejects food as a received non-building resource and fully rolls back', () => {
+    const session = setup()
+    playUntilBatchPrompt(session)
+
+    expectRejectedWithoutMutation(
+      session,
+      { wood: 1 },
+      { food: 1 },
+      'resource-batch.error.invalid-receive-food',
+    )
+  })
+
+  it('E078 S9: no building resources still allow the card play but skip the exchange prompt', () => {
+    const session = setup({ wood: 0, clay: 0, reed: 0, stone: 0 })
+    let response = session.takeAction(0, 'meeting-place')
+    for (let safety = 0; safety < 20 && !response.state.players[0]!.minorPlayed.includes(CARD_ID); safety += 1) {
+      expect(response.ok, response.error).toBe(true)
+      if (response.interaction.stateId !== 'wait') break
+      const next = response.interaction.request.options?.find((option) =>
+        option.value === CARD_ID
+        || (option.value !== '__skip__' && option.value !== 'cancel'))
+      if (!next) break
+      response = session.resolveChoice(response.interaction.playerIndex, next.value)
+    }
+
+    expect(response.state.players[0]!.minorPlayed).toContain(CARD_ID)
+    expect(resources(response)).toEqual({ wood: 0, clay: 0, reed: 0, stone: 0, food: 0 })
+    expect(isBatchPrompt(response)).toBe(false)
   })
 })

@@ -1,200 +1,171 @@
 import { describe, expect, it } from 'vitest'
-import { GameSession } from '../game/authoritative-session'
+import { GameSession, type SessionResponse } from '../game/authoritative-session'
+import { setWorkersAtHome } from '../../shared/domain/player'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
+import { resolveTriggerIfPresent } from './_helpers/trigger-select'
 
 import '../../shared/cards/A/A137_RiverineShepherd'
 
 const CARD_ID = 'A137_RiverineShepherd'
+const FILLER = '__test_placeholder__'
 
-describe('A137_RiverineShepherd session', () => {
-  /**
-   * Setup with A137 already played.
-   * Both sheep-market and reed-bank have accumulated resources.
-   * Player 0 has a pasture for sheep placement.
-   */
-  const setup = () => {
-    const session = new GameSession()
-    stabilizeRandomHands(session.state.players)
+const setup = ({ played = true, reed = 3, sheep = 2 } = {}) => {
+    const session = new GameSession(5137, undefined, { playerCount: 3 })
     const state = session.getState().state
-    state.players = state.players.slice(0, 2)
+    stabilizeRandomHands(state.players)
     state.currentPlayerIndex = 0
+    state.round = 14
+    state.roundPhase = 'work'
+    state.players.forEach((candidate) => {
+      candidate.minorHand = [FILLER]
+      candidate.occupationHand = [FILLER]
+      setWorkersAtHome(state, candidate, 2)
+    })
 
     const player = state.players[0]!
-    player.occupationPlayed.push(CARD_ID)
-
-    // Give player a pasture for sheep accommodation
+    player.occupationHand = played ? [FILLER] : [CARD_ID]
+    player.occupationPlayed = played ? [CARD_ID] : []
+    player.resources = {
+      ...player.resources,
+      wood: 0, clay: 0, reed: 0, stone: 0, food: 0, grain: 0, vegetable: 0,
+      sheep: 0, boar: 0, cattle: 0,
+    }
+    player.houseAnimalType = null
+    player.houseAnimalCount = 0
+    player.stableAnimals = {}
     player.pastures = [
       {
-        id: 'p1',
-        size: 4,
-        tiles: [{ row: 0, col: 0 }, { row: 0, col: 1 }, { row: 1, col: 0 }, { row: 1, col: 1 }],
-        stables: 1,
+        id: 'riverine-pasture',
+        size: 1,
+        tiles: [{ row: 0, col: 1 }],
+        stables: 0,
         animalType: null,
         animalCount: 0,
       },
     ]
 
-    // Set up accumulation spaces with resources
-    const sheepMarket = state.actionSpaces.find((s) => s.id === 'sheep-market')
-    if (sheepMarket) sheepMarket.resources.sheep = 2
-
-    const reedBank = state.actionSpaces.find((s) => s.id === 'reed-bank')
-    if (reedBank) reedBank.resources.reed = 3
+    state.actionSpaces.find((space) => space.id === 'sheep-market')!.resources.sheep = sheep
+    state.actionSpaces.find((space) => space.id === 'reed-bank')!.resources.reed = reed
 
     session.loadState(state)
     return session
+}
+
+const playOccupation = (session: GameSession) => {
+  const response = session.takeAction(0, 'lessons')
+  expect(response.ok, response.error).toBe(true)
+  if (!response.state.players[0]!.occupationHand.includes(CARD_ID)) return response
+  if (response.interaction.stateId !== 'wait') return response
+  const option = response.interaction.request.options?.find((candidate) => candidate.value === CARD_ID)
+  expect(option, JSON.stringify(response.interaction)).toBeDefined()
+  return session.resolveChoice(response.interaction.playerIndex, option!.value)
+}
+
+const placeSheep = (session: GameSession, response: SessionResponse) => {
+  if (response.interaction.stateId !== 'wait' || response.interaction.request.kind !== 'animal-reorg') {
+    return response
   }
+  const pasture = response.interaction.request.zones.find((zone) => zone.id === 'riverine-pasture')
+  expect(pasture).toBeDefined()
+  return session.resolveChoice(response.interaction.playerIndex, 'confirm', {
+    zones: [{
+      id: 'riverine-pasture',
+      zoneType: 'pasture',
+      animalType: 'sheep',
+      animalCount: response.state.players[0]!.resources.sheep,
+    }],
+  })
+}
 
-  it('offers optional reed when using sheep-market (reed-bank has reed)', () => {
-    const session = setup()
-    const state = session.getState().state
-    const reedBefore = state.players[0]!.resources.reed
-    const reedBankBefore = state.actionSpaces.find((s) => s.id === 'reed-bank')!.resources.reed
-    session.loadState(state)
-
-    // Use sheep-market; sheep collection triggers animalReorg first
-    let resp = session.takeAction(0, 'sheep-market')
-    expect(resp.ok).toBe(true)
-    expect(resp.interaction.stateId).toBe('wait')
-
-    // Confirm animal reorg (place sheep in pasture)
-    resp = session.resolveChoice(0, 'confirm', [
-      { id: 'p1', zoneType: 'pasture', animalType: 'sheep', animalCount: 2 },
-    ])
-
-    // After animal reorg, the card offers optional reed gain
-    // It may auto-accept or present a choice depending on flow handling
-    // Check that reed was gained
-    const p = resp.state.players[0]!
-    if (resp.interaction.stateId === 'wait') {
-      // Accept the optional reed
-      const acceptOption = resp.interaction.request.options?.find(
-        (o) => o.value !== '__skip__',
-      )
-      if (acceptOption) {
-        resp = session.resolveChoice(0, acceptOption.value)
-      }
+const resolveRiverine = (session: GameSession, initial: SessionResponse, accept: boolean) => {
+  let response = initial
+  let handled = false
+  for (let step = 0; step < 8; step++) {
+    if (response.interaction.stateId === 'wait' && response.interaction.request.kind === 'animal-reorg') {
+      response = placeSheep(session, response)
+      continue
     }
-
-    // Handle possible additional animalReorg if needed
-    if (resp.interaction.stateId === 'wait' && resp.interaction.stateId === 'wait' ? resp.interaction.promptKey : undefined === 'ui.interactionAnimalReorg') {
-      resp = session.resolveChoice(0, 'confirm', [
-        { id: 'p1', zoneType: 'pasture', animalType: 'sheep', animalCount: 2 },
-      ])
+    if (response.interaction.stateId === 'wait' && response.interaction.request.kind === 'select-trigger') {
+      const next = resolveTriggerIfPresent(session, response, CARD_ID)
+      if (next === response) break
+      response = next
+      continue
     }
-
-    expect(resp.state.players[0]!.resources.reed).toBe(reedBefore + 1)
-    expect(resp.state.actionSpaces.find((s) => s.id === 'reed-bank')!.resources.reed).toBe(reedBankBefore - 1)
-  })
-
-  it('offers optional sheep when using reed-bank (sheep-market has sheep)', () => {
-    const session = setup()
-    const state = session.getState().state
-    const sheepBefore = state.players[0]!.resources.sheep
-    const sheepMarketBefore = state.actionSpaces.find((s) => s.id === 'sheep-market')!.resources.sheep
-    session.loadState(state)
-
-    // Use reed-bank
-    let resp = session.takeAction(0, 'reed-bank')
-    expect(resp.ok).toBe(true)
-
-    // Reed-bank gives reed, then the card offers optional sheep
-    const p = resp.state.players[0]!
-    if (resp.interaction.stateId === 'wait') {
-      // Accept the optional sheep
-      const acceptOption = resp.interaction.request.options?.find(
-        (o) => o.value !== '__skip__',
-      )
-      if (acceptOption) {
-        resp = session.resolveChoice(0, acceptOption.value)
-      }
-    }
-
-    // Handle animalReorg if sheep was gained
-    if (resp.interaction.stateId === 'wait' && resp.interaction.stateId === 'wait' ? resp.interaction.promptKey : undefined === 'ui.interactionAnimalReorg') {
-      resp = session.resolveChoice(0, 'confirm', [
-        { id: 'p1', zoneType: 'pasture', animalType: 'sheep', animalCount: sheepBefore + 1 },
-      ])
-    }
-
-    expect(resp.state.players[0]!.resources.sheep).toBe(sheepBefore + 1)
-    expect(resp.state.actionSpaces.find((s) => s.id === 'sheep-market')!.resources.sheep).toBe(sheepMarketBefore - 1)
-  })
-
-  it('does NOT offer reed when using sheep-market if reed-bank has no reed', () => {
-    const session = setup()
-    const state = session.getState().state
-    // Empty the reed-bank
-    const reedBank = state.actionSpaces.find((s) => s.id === 'reed-bank')
-    if (reedBank) reedBank.resources.reed = 0
-
-    const reedBefore = state.players[0]!.resources.reed
-    session.loadState(state)
-
-    let resp = session.takeAction(0, 'sheep-market')
-    expect(resp.ok).toBe(true)
-    expect(resp.interaction.stateId).toBe('wait')
-
-    resp = session.resolveChoice(0, 'confirm', [
-      { id: 'p1', zoneType: 'pasture', animalType: 'sheep', animalCount: 2 },
-    ])
-
-    // No reed should be gained — card should not have triggered
-    expect(resp.state.players[0]!.resources.reed).toBe(reedBefore)
-  })
-
-  it('does NOT offer sheep when using reed-bank if sheep-market has no sheep', () => {
-    const session = setup()
-    const state = session.getState().state
-    // Empty the sheep-market
-    const sheepMarket = state.actionSpaces.find((s) => s.id === 'sheep-market')
-    if (sheepMarket) sheepMarket.resources.sheep = 0
-
-    const sheepBefore = state.players[0]!.resources.sheep
-    session.loadState(state)
-
-    const resp = session.takeAction(0, 'reed-bank')
-    expect(resp.ok).toBe(true)
-
-    // No sheep should be gained
-    expect(resp.state.players[0]!.resources.sheep).toBe(sheepBefore)
-  })
-
-  it('does NOT trigger on unrelated action spaces', () => {
-    const session = setup()
-    const state = session.getState().state
-    const reedBefore = state.players[0]!.resources.reed
-    const sheepBefore = state.players[0]!.resources.sheep
-    session.loadState(state)
-
-    const resp = session.takeAction(0, 'farmland')
-    expect(resp.ok).toBe(true)
-
-    // No extra resources gained
-    expect(resp.state.players[0]!.resources.reed).toBe(reedBefore)
-    expect(resp.state.players[0]!.resources.sheep).toBe(sheepBefore)
-  })
-
-  it('does NOT trigger if player does not have the card', () => {
-    const session = setup()
-    const state = session.getState().state
-    // Remove the card
-    state.players[0]!.occupationPlayed = state.players[0]!.occupationPlayed.filter(
-      (id) => id !== CARD_ID,
+    if (response.interaction.stateId !== 'wait') break
+    const cardOption = response.interaction.request.options?.find((option) =>
+      option.sourceCard === CARD_ID && option.value !== '__skip__')
+    if (!cardOption) break
+    response = session.resolveChoice(
+      response.interaction.playerIndex,
+      accept ? cardOption.value : '__skip__',
     )
+    handled = true
+  }
+  return { response, handled }
+}
 
-    const reedBefore = state.players[0]!.resources.reed
-    session.loadState(state)
+describe('A137 Riverine Shepherd parity', () => {
+  it('A137 S1: Riverine Shepherd is played as the first occupation without paying food in a three-player game', () => {
+    const response = playOccupation(setup({ played: false }))
 
-    let resp = session.takeAction(0, 'sheep-market')
-    expect(resp.ok).toBe(true)
-    expect(resp.interaction.stateId).toBe('wait')
+    expect(response.ok, response.error).toBe(true)
+    expect(response.state.players[0]!.occupationPlayed).toContain(CARD_ID)
+    expect(response.state.players[0]!.resources.food).toBe(0)
+  })
 
-    resp = session.resolveChoice(0, 'confirm', [
-      { id: 'p1', zoneType: 'pasture', animalType: 'sheep', animalCount: 2 },
-    ])
+  it('A137 S2: using Sheep Market may take exactly one reed from Reed Bank', () => {
+    const session = setup({ reed: 3, sheep: 1 })
 
-    // No reed gained
-    expect(resp.state.players[0]!.resources.reed).toBe(reedBefore)
+    const { response, handled } = resolveRiverine(session, session.takeAction(0, 'sheep-market'), true)
+
+    expect(handled).toBe(true)
+    expect(response.state.players[0]!.resources).toMatchObject({ sheep: 1, reed: 1 })
+    expect(response.state.players[0]!.pastures[0]).toMatchObject({
+      id: 'riverine-pasture', animalType: 'sheep', animalCount: 1,
+    })
+    expect(response.state.actionSpaces.find((space) => space.id === 'reed-bank')!.resources.reed).toBe(2)
+  })
+
+  it('A137 S3: using Reed Bank may take exactly one sheep from Sheep Market and keep it', () => {
+    const session = setup({ reed: 2, sheep: 2 })
+
+    const { response, handled } = resolveRiverine(session, session.takeAction(0, 'reed-bank'), true)
+
+    expect(handled).toBe(true)
+    expect(response.state.players[0]!.resources).toMatchObject({ reed: 2, sheep: 1 })
+    expect(response.state.players[0]!.pastures[0]).toMatchObject({
+      id: 'riverine-pasture', animalType: 'sheep', animalCount: 1,
+    })
+    expect(response.state.actionSpaces.find((space) => space.id === 'sheep-market')!.resources.sheep).toBe(1)
+  })
+
+  it('A137 S4: the extra good may be declined', () => {
+    const session = setup({ reed: 3, sheep: 1 })
+
+    const { response, handled } = resolveRiverine(session, session.takeAction(0, 'sheep-market'), false)
+
+    expect(handled).toBe(true)
+    expect(response.state.players[0]!.resources).toMatchObject({ sheep: 1, reed: 0 })
+    expect(response.state.actionSpaces.find((space) => space.id === 'reed-bank')!.resources.reed).toBe(3)
+  })
+
+  it('A137 S5: an empty corresponding space offers no extra good', () => {
+    const session = setup({ reed: 0, sheep: 1 })
+
+    const { response, handled } = resolveRiverine(session, session.takeAction(0, 'sheep-market'), true)
+
+    expect(handled).toBe(false)
+    expect(response.state.players[0]!.resources).toMatchObject({ sheep: 1, reed: 0 })
+  })
+
+  it('A137 S6: a different action space offers no extra good', () => {
+    const session = setup({ reed: 3, sheep: 2 })
+
+    const { response, handled } = resolveRiverine(session, session.takeAction(0, 'day-laborer'), true)
+
+    expect(handled).toBe(false)
+    expect(response.state.players[0]!.resources).toMatchObject({ food: 2, reed: 0, sheep: 0 })
+    expect(response.state.actionSpaces.find((space) => space.id === 'reed-bank')!.resources.reed).toBe(3)
+    expect(response.state.actionSpaces.find((space) => space.id === 'sheep-market')!.resources.sheep).toBe(2)
   })
 })

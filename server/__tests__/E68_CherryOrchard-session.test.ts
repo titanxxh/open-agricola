@@ -1,211 +1,191 @@
 import { describe, expect, it } from 'vitest'
-import { GameSession } from '../game/authoritative-session'
-import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
-import { computeExtraSowableFields } from '../../shared/cards/card-effects'
+import { GameSession, type SessionResponse } from '../game/authoritative-session'
+import { markAllWorkersUsed, setWorkersAtHome } from '../../shared/domain/player'
 import { readCardExtraData, writeCardExtraData } from '../../shared/cards/helpers/card-state'
-import { validateSowSelection } from '../../shared/domain/farmyard'
-import { E068_CherryOrchard } from '../../shared/cards/E/E068_CherryOrchard'
-
-import { markAllWorkersUsed } from '../../shared/domain/player'
+import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 import { resolveTriggerIfPresent } from './_helpers/trigger-select'
+
+import '../../shared/cards/E/E068_CherryOrchard'
+
 const CARD_ID = 'E068_CherryOrchard'
+const FILLER = '__test_placeholder__'
 const VIRTUAL_TILE = { row: -1, col: 5068 }
-const harvestRounds = [4, 7, 9, 11, 13, 14]
 
-const loadCard = () => import('../../shared/cards/E/E068_CherryOrchard')
+type CardCrop = { crop: 'wood'; remaining: number } | null
 
-type CardCrop = { crop: 'wood'; remaining: number }
-
-describe('E068_CherryOrchard display', () => {
-  it('describes wood sowing and harvesting as grain-like', () => {
-    expect(E068_CherryOrchard.desc.join(' ')).toContain('sow and harvest <WOOD> as you would <GRAIN>')
-  })
-})
-
-const setup = (options?: {
-  withCard?: boolean
-  grain?: number
+const setup = ({
+  played = false, wood = 0, grain = 0, vegetable = 0, cardWood, round = 14,
+  normalFields = 0,
+}: {
+  played?: boolean
   wood?: number
+  grain?: number
   vegetable?: number
-  fields?: { row: number; col: number; stacks: { kind: 'grain' | 'vegetable'; remaining: number }[] }[]
+  cardWood?: number
   round?: number
-  cardCrop?: CardCrop | null
-}) => {
-  const session = new GameSession()
+  normalFields?: number
+} = {}) => {
+  const session = new GameSession(7068, undefined, { playerCount: 2 })
   stabilizeRandomHands(session.state.players)
   const state = session.getState().state
-  state.players = state.players.slice(0, 2)
   state.currentPlayerIndex = 0
-  state.round = options?.round ?? 1
+  state.round = round
   state.roundPhase = 'work'
-  state.roundActionOrder = state.roundActionOrder.map(() => null)
-  state.roundActionOrder[0] = 'grain-utilization'
-
-  const player = state.players[0]!
-  player.workersAvailable =
-    options?.round && harvestRounds.includes(options.round) ? 0 : 2
-  player.resources.food = 10
-  player.resources.grain = options?.grain ?? 0
-  player.resources.wood = options?.wood ?? 0
-  player.resources.vegetable = options?.vegetable ?? 0
-  player.fields = options?.fields ?? []
-
-  if (options?.withCard ?? true) {
-    player.minorPlayed.push(CARD_ID)
+  state.availableMajorImprovements = []
+  state.actionSpaces.forEach((space) => { space.takenBy = [] })
+  state.players.forEach((player, index) => {
+    player.minorHand = [FILLER]
+    player.occupationHand = [FILLER]
+    player.minorPlayed = []
+    player.occupationPlayed = []
+    player.improvements = []
+    player.cardStates = {}
+    player.fields = []
+    Object.assign(player.resources, {
+      wood: 0, clay: 0, reed: 0, stone: 0, food: 20,
+      grain: 0, vegetable: 0, sheep: 0, boar: 0, cattle: 0, begging: 0,
+    })
+    setWorkersAtHome(state, player, index === 0 ? 2 : 0)
+  })
+  const owner = state.players[0]!
+  owner.minorHand = played ? [FILLER] : [CARD_ID]
+  owner.minorPlayed = played ? [CARD_ID] : []
+  Object.assign(owner.resources, { wood, grain, vegetable })
+  owner.fields = Array.from({ length: normalFields }, (_, index) => ({
+    row: 0, col: index, stacks: [],
+  }))
+  if (cardWood !== undefined) {
+    writeCardExtraData(owner, CARD_ID, 'cardFieldStacks', [
+      cardWood > 0 ? { crop: 'wood', remaining: cardWood } : null,
+    ])
   }
-
-  if (options?.cardCrop !== undefined) {
-    const stacks = options.cardCrop === null ? [] : [options.cardCrop]
-    writeCardExtraData(player, CARD_ID, 'cardFieldStacks', stacks)
+  if ([4, 7, 9, 11, 13, 14].includes(round) && cardWood !== undefined) {
+    state.players.forEach((player) => markAllWorkersUsed(state, player))
   }
-
-  if (options?.round && harvestRounds.includes(options.round)) {
-    for (const current of state.players) {
-      markAllWorkersUsed(state, current)
-      current.resources.food = 10
-    }
-    state.players[0]!.resources.grain = options?.grain ?? 0
-    state.players[0]!.resources.wood = options?.wood ?? 0
-    state.players[0]!.resources.vegetable = options?.vegetable ?? 0
-  }
-
   session.loadState(state)
   return session
 }
 
-describe('E068_CherryOrchard session', () => {
-  it('allows wood only on extra sow fields', () => {
-    const session = setup({
-      withCard: false,
-      wood: 1,
-      fields: [{ row: 0, col: 0, stacks: [] }],
-    })
-    const player = session.getState().state.players[0]!
+const options = (response: SessionResponse) => response.interaction.stateId === 'wait'
+  ? response.interaction.request.options ?? []
+  : []
 
-    const extraFieldResult = validateSowSelection(
-      player,
-      [{ row: VIRTUAL_TILE.row, col: VIRTUAL_TILE.col, crop: 'wood' }],
-      {
-        extraAllowedCrops: new Map([
-          [`${VIRTUAL_TILE.row}-${VIRTUAL_TILE.col}`, ['wood']],
-        ]),
-      },
-    )
+const enterMinor = (session: GameSession) => {
+  let response = session.takeAction(0, 'major-improvement')
+  if (response.interaction.stateId !== 'wait') return response
+  if (!options(response).some((option) => option.value === CARD_ID)) {
+    const branch = options(response).find((option) => option.value.startsWith('action-improvement-'))
+    if (branch) response = session.resolveChoice(response.interaction.playerIndex, branch.value)
+  }
+  return response
+}
 
-    expect(extraFieldResult.ok).toBe(true)
-    if (extraFieldResult.ok) {
-      expect(extraFieldResult.player.resources.wood).toBe(1)
-    }
+const play = (session: GameSession) => {
+  let response = enterMinor(session)
+  if (!response.state.players[0]!.minorHand.includes(CARD_ID)) return response
+  if (response.interaction.stateId !== 'wait') return response
+  const card = options(response).find((option) => option.value === CARD_ID)
+  if (card) response = session.resolveChoice(response.interaction.playerIndex, card.value)
+  return response
+}
 
-    const regularFieldResult = validateSowSelection(player, [
-      { row: 0, col: 0, crop: 'wood' },
-    ])
-    expect(regularFieldResult).toEqual({
-      ok: false,
-      error: { code: 'INVALID_CROP' },
-    })
+const enterSow = (session: GameSession) => {
+  const response = session.takeAction(0, 'grain-utilization')
+  expect(response.ok, response.error).toBe(true)
+  expect(response.interaction.stateId).toBe('wait')
+  return response
+}
+
+const sowOrchard = (session: GameSession, crop: 'wood' | 'grain' | 'vegetable') => {
+  enterSow(session)
+  return session.commitSelectionChoice(0, { crops: [{ ...VIRTUAL_TILE, crop }] })
+}
+
+const cardStacks = (response: SessionResponse) =>
+  readCardExtraData<CardCrop[]>(response.state.players[0]!, CARD_ID, 'cardFieldStacks')
+
+const fieldScore = (response: SessionResponse) =>
+  response.scores[0]!.categories.find((category) => category.key === 'fields')
+
+describe('E068 Cherry Orchard parity', () => {
+  it('E068 S1: Cherry Orchard can be played for free with no prerequisite', () => {
+    const response = play(setup())
+
+    expect(response.ok, response.error).toBe(true)
+    expect(response.state.players[0]!.minorPlayed).toContain(CARD_ID)
   })
 
-  it('exposes a wood-only virtual field and stores wood crop state after sow', async () => {
-    await loadCard()
+  it('E068 S2: one wood sows Cherry Orchard as a three-wood stack', () => {
+    const response = sowOrchard(setup({ played: true, wood: 1 }), 'wood')
 
-    const session = setup({
-      wood: 2,
-      fields: [{ row: 0, col: 0, stacks: [{ kind: 'grain', remaining: 2 }] }],
-    })
-    const player = session.getState().state.players[0]!
-
-    const extras = computeExtraSowableFields(player)
-    expect(extras).toEqual([
-      {
-        tile: VIRTUAL_TILE,
-        allowedCrops: ['wood'],
-        sourceCard: CARD_ID,
-        groupKey: undefined,
-      },
-    ])
-
-    let resp = session.takeAction(0, 'grain-utilization')
-    expect(resp.ok).toBe(true)
-
-    expect(resp.ok).toBe(true)
-
-    resp = session.commitSelectionChoice(0, {
-      crops: [{ row: VIRTUAL_TILE.row, col: VIRTUAL_TILE.col, crop: 'wood' }],
-    })
-    expect(resp.ok).toBe(true)
-
-    const playerAfter = resp.state.players[0]!
-    expect(playerAfter.resources.wood).toBe(1)
-    expect(readCardExtraData<CardCrop[]>(playerAfter, CARD_ID, 'cardFieldStacks')).toEqual([
-      { crop: 'wood', remaining: 3 },
-    ])
+    expect(response.ok, response.error).toBe(true)
+    expect(response.state.players[0]!.resources.wood).toBe(0)
+    expect(cardStacks(response)).toEqual([{ crop: 'wood', remaining: 3 }])
   })
 
-  it('exposes sourceCard on the sow interaction for the orchard virtual tile', async () => {
-    await loadCard()
+  it('E068 S3: Cherry Orchard rejects grain atomically and still accepts a wood retry', () => {
+    const session = setup({ played: true, wood: 1, grain: 1 })
+    enterSow(session)
 
-    const session = setup({
-      wood: 2,
-      fields: [{ row: 0, col: 0, stacks: [{ kind: 'grain', remaining: 2 }] }],
+    const rejected = session.commitSelectionChoice(0, {
+      crops: [{ ...VIRTUAL_TILE, crop: 'grain' }],
     })
+    expect(rejected.ok).toBe(false)
+    expect(rejected.state.players[0]!.resources).toMatchObject({ wood: 1, grain: 1 })
+    expect(cardStacks(rejected) ?? [null]).toEqual([null])
 
-    const resp = session.takeAction(0, 'grain-utilization')
-    expect(resp.ok).toBe(true)
-
-    expect(resp.ok).toBe(true)
-    expect(resp.interaction.stateId).toBe('wait')
-
-    if (resp.interaction.stateId !== 'wait' || resp.interaction.request.farm.farmType !== 'sow') {
-      throw new Error('expected sow interaction')
-    }
-
-    expect(resp.interaction.request.farm.selectableFields).toContainEqual({
-      tile: VIRTUAL_TILE,
-      allowedCrops: ['wood'],
-      sourceCard: CARD_ID,
-      groupKey: undefined,
+    const retried = session.commitSelectionChoice(0, {
+      crops: [{ ...VIRTUAL_TILE, crop: 'wood' }],
     })
+    expect(retried.ok, retried.error).toBe(true)
+    expect(retried.state.players[0]!.resources).toMatchObject({ wood: 0, grain: 1 })
+    expect(cardStacks(retried)).toEqual([{ crop: 'wood', remaining: 3 }])
   })
 
-  it('rejects grain on the orchard virtual tile', async () => {
-    await loadCard()
+  it('E068 S4: Cherry Orchard rejects vegetable sowing', () => {
+    const session = setup({ played: true, wood: 1, vegetable: 1 })
+    enterSow(session)
 
-    const session = setup({
-      grain: 1,
-      wood: 1,
-      fields: [{ row: 0, col: 0, stacks: [{ kind: 'grain', remaining: 2 }] }],
+    const response = session.commitSelectionChoice(0, {
+      crops: [{ ...VIRTUAL_TILE, crop: 'vegetable' }],
     })
 
-    let resp = session.takeAction(0, 'grain-utilization')
-    expect(resp.ok).toBe(true)
-
-    expect(resp.ok).toBe(true)
-
-    resp = session.commitSelectionChoice(0, {
-      crops: [{ row: VIRTUAL_TILE.row, col: VIRTUAL_TILE.col, crop: 'grain' }],
-    })
-    expect(resp.ok).toBe(false)
-    expect(readCardExtraData<CardCrop[]>(session.getState().state.players[0]!, CARD_ID, 'cardFieldStacks')).toBeUndefined()
-    expect(session.getState().state.players[0]!.resources.wood).toBe(1)
+    expect(response.ok).toBe(false)
+    expect(response.state.players[0]!.resources).toMatchObject({ wood: 1, vegetable: 1 })
+    expect(cardStacks(response) ?? [null]).toEqual([null])
   })
 
-  it('gives 1 vegetable on the last harvested wood and clears card state', async () => {
-    await loadCard()
+  it('E068 S5: harvesting a non-last wood gives no vegetable', () => {
+    const response = setup({ played: true, cardWood: 3, round: 4 }).performRoundEnd()
 
-    const session = setup({
-      round: 4,
-      wood: 0,
-      vegetable: 0,
-      cardCrop: { crop: 'wood', remaining: 1 },
-    })
+    expect(response.ok, response.error).toBe(true)
+    expect(response.state.round).toBe(5)
+    expect(response.state.players[0]!.resources).toMatchObject({ wood: 1, vegetable: 0 })
+    expect(cardStacks(response)).toEqual([{ crop: 'wood', remaining: 2 }])
+  })
 
-    let resp = session.performRoundEnd()
-    resp = resolveTriggerIfPresent(session, resp, CARD_ID)
-    const playerAfter = resp.state.players[0]!
+  it('E068 S6: harvesting the last wood also gives one vegetable', () => {
+    const session = setup({ played: true, cardWood: 1, round: 4 })
 
-    expect(playerAfter.resources.wood).toBe(1)
-    expect(playerAfter.resources.vegetable).toBe(1)
-    expect(readCardExtraData<CardCrop[]>(playerAfter, CARD_ID, 'cardFieldStacks') ?? []).toEqual([null])
+    const response = resolveTriggerIfPresent(session, session.performRoundEnd(), CARD_ID)
+
+    expect(response.ok, response.error).toBe(true)
+    expect(response.state.round).toBe(5)
+    expect(response.state.players[0]!.resources).toMatchObject({ wood: 1, vegetable: 1 })
+    expect(cardStacks(response)).toEqual([null])
+  })
+
+  it('E068 S7: an empty Cherry Orchard gives no vegetable during harvest', () => {
+    const response = setup({ played: true, cardWood: 0, round: 4 }).performRoundEnd()
+
+    expect(response.ok, response.error).toBe(true)
+    expect(response.state.players[0]!.resources).toMatchObject({ wood: 0, vegetable: 0 })
+    expect(cardStacks(response)).toEqual([null])
+  })
+
+  it('E068 S8: Cherry Orchard counts as one field at final scoring', () => {
+    const response = setup({ played: true, normalFields: 1 }).getState()
+
+    expect(fieldScore(response)).toMatchObject({ quantity: 2, total: 1 })
   })
 })

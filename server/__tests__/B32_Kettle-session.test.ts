@@ -1,96 +1,140 @@
 import { describe, expect, it } from 'vitest'
-import { GameSession } from '../game/authoritative-session'
+import { GameSession, type SessionResponse } from '../game/authoritative-session'
+import { setWorkersAtHome } from '../../shared/domain/player'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
-import { getCardEffect } from '../../shared/cards/card-effects'
-import type { PlayerState, GameState } from '../../shared/contract/types'
+import { confirmNextPlayer } from './_helpers/pending-confirms'
 
 import '../../shared/cards/B/B032_Kettle'
 
 const CARD_ID = 'B032_Kettle'
+const FILLER = '__test_placeholder__'
 
-const bonusScore = (state: GameState, player: PlayerState) => {
-  const handler = getCardEffect(CARD_ID)?.computeBonusScore
-  if (!handler) return 0
-  const result = handler(state, player)
-  return typeof result === 'number' ? result : 0
-}
-
-const setup = () => {
-  const session = new GameSession()
+const setup = ({ grainField = true, clay = 1, grain = 0 } = {}) => {
+  const session = new GameSession(5232, undefined, { playerCount: 2 })
   stabilizeRandomHands(session.state.players)
   const state = session.getState().state
-  state.players = state.players.slice(0, 2)
   state.currentPlayerIndex = 0
-  state.round = 1
-
+  state.round = 5
+  state.roundPhase = 'work'
+  state.availableMajorImprovements = []
+  state.players.forEach((player) => {
+    player.minorHand = [FILLER]
+    player.occupationHand = [FILLER]
+    setWorkersAtHome(state, player, 2)
+  })
   const player = state.players[0]!
-  player.minorPlayed.push(CARD_ID)
-  // give plenty of grain so any of the trades is doable
-  player.resources = { ...player.resources, grain: 10, food: 0 }
-  // farmland action will trigger the anytime-exchange interaction
+  player.minorHand = [CARD_ID]
+  player.fields = grainField
+    ? [{ row: 0, col: 2, stacks: [{ kind: 'grain', remaining: 1 }] }]
+    : []
+  player.resources = {
+    ...player.resources,
+    wood: 0, clay, reed: 0, stone: 0, food: 0, grain, vegetable: 0,
+  }
   session.loadState(state)
   return session
 }
 
-const enter = (session: GameSession) => {
-  const resp = session.takeAction(0, 'farmland')
-  expect(resp.ok).toBe(true)
-  return resp
+const enterMinor = (session: GameSession) => {
+  let response = session.takeAction(0, 'major-improvement')
+  expect(response.ok, response.error).toBe(true)
+  if (response.interaction.stateId !== 'wait') return response
+  const improvement = response.interaction.request.options?.find((candidate) =>
+    candidate.value.startsWith('action-improvement-'))
+  if (improvement) response = session.resolveChoice(response.interaction.playerIndex, improvement.value)
+  return response
 }
 
-describe('B032_Kettle session', () => {
-  it('1-grain trade gives 3 food and 0 bonus VP', () => {
-    const session = setup()
-    enter(session)
-    let resp = session.takeAnytimeAction(0, 'exchange')
-    expect(resp.ok).toBe(true)
-    // bulk:0=1 → trade index 0 (grain→3food) once
-    resp = session.resolveChoice(0, 'bulk:0=1')
-    expect(resp.ok).toBe(true)
-    const player = resp.state.players[0]!
-    expect(player.resources.grain).toBe(9)
-    expect(player.resources.food).toBe(3)
-    expect(bonusScore(resp.state, player)).toBe(0)
+const playKettle = (session: GameSession) => {
+  let response = enterMinor(session)
+  if (!response.state.players[0]!.minorHand.includes(CARD_ID)) return response
+  if (response.interaction.stateId !== 'wait') return response
+  const card = response.interaction.request.options?.find((candidate) => candidate.value === CARD_ID)
+  if (card) response = session.resolveChoice(response.interaction.playerIndex, card.value)
+  return response
+}
+
+const exchange = (session: GameSession, exchangeIndex: number) => {
+  let response = session.takeAnytimeAction(0, 'exchange')
+  expect(response.ok, response.error).toBe(true)
+  response = session.resolveChoice(0, `bulk:${exchangeIndex}=1`)
+  expect(response.ok, response.error).toBe(true)
+  return response
+}
+
+const returnTurnToKettleOwner = (session: GameSession) => {
+  let response = confirmNextPlayer(session)
+  expect(response.ok, response.error).toBe(true)
+  response = session.takeAction(1, 'forest')
+  expect(response.ok, response.error).toBe(true)
+  expect(response.interaction.stateId === 'wait' ? response.interaction.request.kind : response.interaction.stateId)
+    .toBe('confirm-next-player')
+  response = confirmNextPlayer(session)
+  expect(response.ok, response.error).toBe(true)
+  expect(response.state.currentPlayerIndex).toBe(0)
+  return response
+}
+
+const bonusVp = (response: SessionResponse) =>
+  response.scores[0]!.categories.find((category) => category.key === 'cardBonusVp')?.entries
+    .find((entry) => 'cardId' in entry && entry.cardId === CARD_ID)?.score ?? 0
+
+describe('B032 Kettle parity', () => {
+  it('B032 S1: one grain field and one clay play Kettle and pay the clay', () => {
+    const response = playKettle(setup())
+
+    expect(response.ok, response.error).toBe(true)
+    expect(response.state.players[0]!.minorPlayed).toContain(CARD_ID)
+    expect(response.state.players[0]!.resources.clay).toBe(0)
   })
 
-  it('3-grain trade gives 4 food and +1 bonus VP', () => {
-    const session = setup()
-    enter(session)
-    let resp = session.takeAnytimeAction(0, 'exchange')
-    // bulk:1=1 → trade index 1 (3 grain → 4 food + 1 bonus VP)
-    resp = session.resolveChoice(0, 'bulk:1=1')
-    expect(resp.ok).toBe(true)
-    const player = resp.state.players[0]!
-    expect(player.resources.grain).toBe(7)
-    expect(player.resources.food).toBe(4)
-    expect(bonusScore(resp.state, player)).toBe(1)
+  it('B032 S2: without a grain field Kettle remains unavailable without spending clay', () => {
+    const response = enterMinor(setup({ grainField: false }))
+
+    expect(response.interaction.stateId).toBe('wait')
+    if (response.interaction.stateId !== 'wait') return
+    expect(response.interaction.request.options?.some((option) => option.value === CARD_ID) ?? false).toBe(false)
+    expect(response.state.players[0]!.minorHand).toContain(CARD_ID)
+    expect(response.state.players[0]!.resources.clay).toBe(1)
   })
 
-  it('5-grain trade gives 5 food and +2 bonus VP', () => {
-    const session = setup()
-    enter(session)
-    let resp = session.takeAnytimeAction(0, 'exchange')
-    resp = session.resolveChoice(0, 'bulk:2=1')
-    expect(resp.ok).toBe(true)
-    const player = resp.state.players[0]!
-    expect(player.resources.grain).toBe(5)
-    expect(player.resources.food).toBe(5)
-    expect(bonusScore(resp.state, player)).toBe(2)
+  it('B032 S3: without clay Kettle remains unavailable even with a grain field', () => {
+    const response = enterMinor(setup({ clay: 0 }))
+
+    expect(response.interaction.stateId).toBe('wait')
+    if (response.interaction.stateId !== 'wait') return
+    expect(response.interaction.request.options?.some((option) => option.value === CARD_ID) ?? false).toBe(false)
+    expect(response.state.players[0]!.minorHand).toContain(CARD_ID)
   })
 
-  it('bonus VP accumulates across multiple trades', () => {
-    const session = setup()
-    enter(session)
-    // first 3-grain
-    let resp = session.takeAnytimeAction(0, 'exchange')
-    resp = session.resolveChoice(0, 'bulk:1=1')
-    // second 5-grain
-    resp = session.takeAnytimeAction(0, 'exchange')
-    resp = session.resolveChoice(0, 'bulk:2=1')
-    expect(resp.ok).toBe(true)
-    const player = resp.state.players[0]!
-    expect(player.resources.grain).toBe(2) // 10 - 3 - 5
-    expect(player.resources.food).toBe(9) // 4 + 5
-    expect(bonusScore(resp.state, player)).toBe(3) // 1 + 2
+  for (const [scenario, index, grain, food, bonus] of [
+    ['S4', 0, 1, 3, 0],
+    ['S5', 1, 3, 4, 1],
+    ['S6', 2, 5, 5, 2],
+  ] as const) {
+    it(`B032 ${scenario}: exchanging ${grain} grain yields ${food} food and ${bonus} bonus points`, () => {
+      const session = setup({ grain })
+      playKettle(session)
+      returnTurnToKettleOwner(session)
+
+      const response = exchange(session, index)
+
+      expect(response.state.players[0]!.resources.grain).toBe(0)
+      expect(response.state.players[0]!.resources.food).toBe(food)
+      expect(bonusVp(response)).toBe(bonus)
+    })
+  }
+
+  it('B032 S7: bonus points accumulate across separate three- and five-grain exchanges', () => {
+    const session = setup({ grain: 8 })
+    playKettle(session)
+    returnTurnToKettleOwner(session)
+
+    exchange(session, 1)
+    const response = exchange(session, 2)
+
+    expect(response.state.players[0]!.resources.grain).toBe(0)
+    expect(response.state.players[0]!.resources.food).toBe(9)
+    expect(bonusVp(response)).toBe(3)
   })
 })

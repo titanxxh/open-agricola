@@ -1,185 +1,249 @@
 import { describe, expect, it } from 'vitest'
-import { getCardEffect, getExtraRoomCapacity } from '../../shared/cards/card-effects'
-import { runSelectionEffect } from '../../shared/actions/helpers/selection-effect-registry'
-import { getAvailableStableSupplyCount } from '../../shared/domain/supply-tokens'
-import type { GameState, PlayerState , ActionFlow } from '../../shared/contract/types'
+import { GameSession, type SessionResponse } from '../game/authoritative-session'
+import { setWorkersAtHome } from '../../shared/domain/player'
+import { getExtraRoomCapacity } from '../../shared/cards/card-effects'
+import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 
 import '../../shared/cards/E/E076_LumberPile'
 import '../../shared/cards/B/B085_FarmHand'
 
 const CARD_ID = 'E076_LumberPile'
-const FIELD_EFFECT = 'lumber-pile-return-stables'
+const FARM_HAND = 'B085_FarmHand'
+const FILLER = '__test_placeholder__'
 
-const createPlayer = (id = 'p1'): PlayerState =>
-  ({
-    id, name: id, color: 'red',
-    resources: {
-      wood: 0, clay: 0, reed: 0, stone: 0, food: 0,
-      grain: 0, vegetable: 0, sheep: 0, boar: 0, cattle: 0, begging: 0,
-    },
-    workers: [
-      { id: '1', isActive: true, isNewborn: false },
-      { id: '2', isActive: true, isNewborn: false },
-      { id: '3', isActive: false, isNewborn: false },
-      { id: '4', isActive: false, isNewborn: false },
-      { id: '5', isActive: false, isNewborn: false },
-    ],
-    rooms: 2, houseType: 'wood' as const,
-    fields: [], fences: 0, roomTiles: [{ row: 0, col: 0 }, { row: 1, col: 0 }],
-    stableTiles: [],
-    improvements: [], minorHand: [], minorPlayed: [],
-    occupationHand: [], occupationPlayed: [],houseAnimalType: null, houseAnimalCount: 0, stableAnimals: {},
-    pastures: [], fenceSegments: [],
-    majorEffects: { wellRounds: 0 }, startPlayer: false,
-    activeModifiers: [],
-    cardStates: {},
-  }) as unknown as PlayerState
+type Position = { row: number; col: number }
 
-const createState = (players: PlayerState[]): GameState =>
-  ({
-    round: 1, currentPlayerIndex: 0, players,
-    actionSpaces: [], log: [], roundStartSnapshot: null,
-    roundActionOrder: Array.from({ length: 14 }).map(() => null),
-    gameSeed: 1, availableMajorImprovements: [],
-    futureMeeples: [], pendingFutureMeeples: [],
-    gameOver: false, workPhaseObtainedResources: {},
-  }) as unknown as GameState
-
-describe('E076_LumberPile card effect', () => {
-  it('onBuy returns undefined when the player has no stables', () => {
-    const player = createPlayer('p1')
+const setup = ({
+  normalStables = [], farmHand = false, wood = 0,
+}: {
+  normalStables?: Position[]
+  farmHand?: boolean
+  wood?: number
+} = {}) => {
+  const session = new GameSession(7076, undefined, { playerCount: 2 })
+  stabilizeRandomHands(session.state.players)
+  const state = session.getState().state
+  state.currentPlayerIndex = 0
+  state.round = 14
+  state.roundPhase = 'work'
+  state.actionSpaces.forEach((space) => { space.takenBy = [] })
+  state.players.forEach((player, index) => {
+    player.minorHand = [FILLER]
+    player.occupationHand = [FILLER]
+    player.minorPlayed = []
+    player.occupationPlayed = []
+    player.cardStates = {}
     player.stableTiles = []
-    const state = createState([player])
-    const effect = getCardEffect(CARD_ID)
-    expect(effect).toBeDefined()
-    const flow = effect!.onBuy!(state, player)
-    expect(flow).toBeUndefined()
-  })
-
-  it('onBuy offers an optional selection with max 3 stables', () => {
-    const player = createPlayer('p1')
-    player.stableTiles = [
-      { row: 0, col: 0 }, { row: 0, col: 1 },
-      { row: 1, col: 0 }, { row: 1, col: 1 },
-    ]
-    const state = createState([player])
-    const effect = getCardEffect(CARD_ID)
-    const flow = effect!.onBuy!(state, player) as Extract<ActionFlow, { type: 'seq' }>
-    expect(flow).toBeDefined()
-    expect(flow.type).toBe('seq')
-    expect(flow.optional).toBe(true)
-    const leaf = flow.children[0]
-    expect(leaf.actionId).toBe('selection')
-    expect(leaf.actionContext.selectionEffect).toBe(FIELD_EFFECT)
-    expect(leaf.actionContext.selectionKind).toBe('farm-position')
-    expect(leaf.actionContext.maxSelections).toBe(3)
-    expect(leaf.actionContext.selectableTiles.length).toBe(4)
-  })
-
-  it('selection-effect removes up to 3 stables and grants 3 wood each', () => {
-    const player = createPlayer('p1')
-    player.stableTiles = [
-      { row: 0, col: 0 }, { row: 0, col: 1 },
-      { row: 1, col: 0 }, { row: 1, col: 1 },
-    ]
-    const initialWood = player.resources.wood
-    runSelectionEffect(FIELD_EFFECT, {
-      player,
-      positions: ['0-0', '0-1', '1-0'],
-      sourceCard: CARD_ID,
+    Object.assign(player.resources, {
+      wood: index === 0 ? wood : 0, clay: 0, reed: 0, stone: 0, food: 20,
+      grain: 0, vegetable: 0, sheep: 0, boar: 0, cattle: 0, begging: 0,
     })
-    expect(player.stableTiles).toHaveLength(1)
-    expect(player.stableTiles[0]).toEqual({ row: 1, col: 1 })
-    expect(player.resources.wood).toBe(initialWood + 9)
+    setWorkersAtHome(state, player, index === 0 ? 2 : 0)
   })
-
-  it('selection-effect caps at 3 stables even if more are selected', () => {
-    const player = createPlayer('p1')
-    player.stableTiles = [
-      { row: 0, col: 0 }, { row: 0, col: 1 },
-      { row: 1, col: 0 }, { row: 1, col: 1 },
-    ]
-    const initialWood = player.resources.wood
-    runSelectionEffect(FIELD_EFFECT, {
-      player,
-      positions: ['0-0', '0-1', '1-0', '1-1'],
-      sourceCard: CARD_ID,
-    })
-    expect(player.stableTiles).toHaveLength(1)
-    expect(player.resources.wood).toBe(initialWood + 9)
-  })
-
-  it('selection-effect awards nothing when no stables are selected', () => {
-    const player = createPlayer('p1')
-    player.stableTiles = [{ row: 0, col: 0 }]
-    const initialWood = player.resources.wood
-    runSelectionEffect(FIELD_EFFECT, {
-      player,
-      positions: [],
-      sourceCard: CARD_ID,
-    })
-    expect(player.stableTiles).toHaveLength(1)
-    expect(player.resources.wood).toBe(initialWood)
-  })
-
-  it('lists the B85 FarmHand tile alongside normal stables and returns it for 3 wood', () => {
-    const player = createPlayer('p1')
-    player.occupationPlayed.push('B085_FarmHand')
-    player.stableTiles = [{ row: 0, col: 0 }, { row: 0, col: 1 }]
-    player.cardStates = {
-      B085_FarmHand: {
-        flagged: true,
-        extraData: { position: { row: 3, col: 2 } },
-      },
+  const owner = state.players[0]!
+  owner.minorHand = [CARD_ID]
+  owner.stableTiles = normalStables
+  if (farmHand) {
+    owner.occupationPlayed = [FARM_HAND]
+    owner.cardStates[FARM_HAND] = {
+      flagged: true,
+      extraData: { position: { row: 2, col: 4 } },
     }
-    const state = createState([player])
-    const flow = getCardEffect(CARD_ID)!.onBuy!(state, player) as Extract<ActionFlow, { type: 'seq' }>
-    const leaf = flow.children[0]
-    expect(leaf.actionContext.selectableTiles).toEqual([
-      { row: 0, col: 0 },
-      { row: 0, col: 1 },
-      { row: 3, col: 2 },
+  }
+  session.loadState(state)
+  return session
+}
+
+const options = (response: SessionResponse) => response.interaction.stateId === 'wait'
+  ? response.interaction.request.options ?? []
+  : []
+
+const play = (session: GameSession) => {
+  let response = session.takeAction(0, 'meeting-place')
+  for (let safety = 0; safety < 20 && response.state.players[0]!.minorHand.includes(CARD_ID); safety += 1) {
+    expect(response.ok, response.error).toBe(true)
+    if (response.interaction.stateId !== 'wait') break
+    const next = options(response).find((option) => option.value === CARD_ID)
+      ?? options(response).find((option) => option.value !== '__skip__' && option.value !== 'cancel')
+    if (!next) break
+    response = session.resolveChoice(response.interaction.playerIndex, next.value)
+  }
+  return response
+}
+
+const enterSelection = (session: GameSession, response: SessionResponse) => {
+  let current = response
+  for (let safety = 0; safety < 5; safety += 1) {
+    if (current.interaction.stateId !== 'wait') return current
+    if (current.interaction.request.kind === 'selection') return current
+    const next = options(current).find((option) =>
+      option.sourceCard === CARD_ID && option.value !== '__skip__')
+      ?? options(current).find((option) => option.value.startsWith('flow-'))
+    if (!next) return current
+    current = session.resolveChoice(current.interaction.playerIndex, next.value)
+  }
+  return current
+}
+
+const playToSelection = (session: GameSession) => enterSelection(session, play(session))
+
+const commitPositions = (session: GameSession, positions: Position[]) =>
+  session.commitSelectionChoice(0, { positions })
+
+const stablePositions = (response: SessionResponse) => response.state.players[0]!.stableTiles
+  .map(({ row, col }) => ({ row, col }))
+  .sort((left, right) => left.row - right.row || left.col - right.col)
+
+const hasFarmHand = (response: SessionResponse) =>
+  response.state.players[0]!.cardStates[FARM_HAND]?.extraData?.position !== undefined
+
+const expectSelection = (response: SessionResponse, maxSelections: number) => {
+  expect(response.interaction).toMatchObject({
+    stateId: 'wait',
+    sourceCard: CARD_ID,
+    request: { kind: 'selection' },
+  })
+  if (response.interaction.stateId !== 'wait') return
+  expect(response.interaction.request.selection?.maxSelections).toBe(maxSelections)
+}
+
+describe('E076 Lumber Pile parity', () => {
+  it('E076 S1: Lumber Pile is free to play and with no stable grants no wood or prompt', () => {
+    const response = play(setup())
+
+    expect(response.ok, response.error).toBe(true)
+    expect(response.state.players[0]!.minorPlayed).toContain(CARD_ID)
+    expect(response.state.players[0]!.resources.wood).toBe(0)
+    expect(response.interaction.stateId === 'wait' ? response.interaction.sourceCard : undefined)
+      .not.toBe(CARD_ID)
+  })
+
+  it('E076 S2: returning one normal stable gains three wood', () => {
+    const session = setup({ normalStables: [{ row: 0, col: 2 }] })
+    const selection = playToSelection(session)
+    expectSelection(selection, 1)
+
+    const response = commitPositions(session, [{ row: 0, col: 2 }])
+
+    expect(response.ok, response.error).toBe(true)
+    expect(stablePositions(response)).toEqual([])
+    expect(response.state.players[0]!.resources.wood).toBe(3)
+  })
+
+  it('E076 S3: returning three of four normal stables gains nine wood and leaves one', () => {
+    const session = setup({ normalStables: [
+      { row: 0, col: 1 }, { row: 0, col: 2 }, { row: 0, col: 3 }, { row: 0, col: 4 },
+    ] })
+    const selection = playToSelection(session)
+    expectSelection(selection, 3)
+
+    const response = commitPositions(session, [
+      { row: 0, col: 1 }, { row: 0, col: 2 }, { row: 0, col: 3 },
     ])
 
-    const initialWood = player.resources.wood
-    expect(getExtraRoomCapacity(player)).toBe(1)
-    runSelectionEffect(FIELD_EFFECT, {
-      player,
-      positions: ['0-0', '3-2', '0-1'],
-      sourceCard: CARD_ID,
-    })
-    expect(player.resources.wood).toBe(initialWood + 9)
-    expect(player.stableTiles).toEqual([])
-    expect(player.cardStates!.B085_FarmHand!.extraData?.position).toBeUndefined()
-    // once-per-game flag persists so B85 cannot be re-used.
-    expect(player.cardStates!.B085_FarmHand!.flagged).toBe(true)
-    expect(getExtraRoomCapacity(player)).toBe(0)
+    expect(response.ok, response.error).toBe(true)
+    expect(stablePositions(response)).toEqual([{ row: 0, col: 4 }])
+    expect(response.state.players[0]!.resources.wood).toBe(9)
   })
 
-  it('returning the B85 FarmHand tile releases its stable supply token', () => {
-    const player = createPlayer('p1')
-    player.stableTiles = [
-      { row: 0, col: 0 },
-      { row: 1, col: 0 },
-      { row: 2, col: 0 },
-    ]
-    player.cardStates = {
-      B085_FarmHand: {
-        flagged: true,
-        extraData: { position: { row: 3, col: 2 } },
-      },
-    }
-    const state = createState([player])
-    expect(getAvailableStableSupplyCount(state, player)).toBe(0)
+  it('E076 S4: declining Lumber Pile returns no stable and gains no wood', () => {
+    const session = setup({ normalStables: [{ row: 0, col: 2 }] })
+    let response = play(session)
+    expect(options(response).some((option) => option.value === '__skip__')).toBe(true)
 
-    runSelectionEffect(FIELD_EFFECT, {
-      player,
-      positions: ['3-2'],
-      sourceCard: CARD_ID,
-      state,
-      cards: [],
+    response = session.resolveChoice(0, '__skip__')
+
+    expect(response.ok, response.error).toBe(true)
+    expect(stablePositions(response)).toEqual([{ row: 0, col: 2 }])
+    expect(response.state.players[0]!.resources.wood).toBe(0)
+  })
+
+  it('E076 S5: rejects a nonexistent stable coordinate and fully rolls back', () => {
+    const session = setup({ normalStables: [{ row: 0, col: 2 }] })
+    playToSelection(session)
+    const before = JSON.parse(JSON.stringify(session.getState()))
+
+    const response = commitPositions(session, [{ row: 2, col: 4 }])
+
+    expect(response.ok).toBe(false)
+    expect(response.error).toBe('invalid selection position')
+    expect(JSON.parse(JSON.stringify(session.getState()))).toEqual(before)
+  })
+
+  it('E076 S6: rejects a duplicate stable coordinate and fully rolls back', () => {
+    const session = setup({ normalStables: [{ row: 0, col: 2 }] })
+    playToSelection(session)
+    const before = JSON.parse(JSON.stringify(session.getState()))
+
+    const response = commitPositions(session, [{ row: 0, col: 2 }, { row: 0, col: 2 }])
+
+    expect(response.ok).toBe(false)
+    expect(response.error).toBe('duplicate selection position')
+    expect(JSON.parse(JSON.stringify(session.getState()))).toEqual(before)
+  })
+
+  it('E076 S7: selecting more than three normal stables is rejected atomically', () => {
+    const session = setup({ normalStables: [
+      { row: 0, col: 1 }, { row: 0, col: 2 }, { row: 0, col: 3 }, { row: 0, col: 4 },
+    ] })
+    playToSelection(session)
+    const before = JSON.parse(JSON.stringify(session.getState()))
+
+    const response = commitPositions(session, [
+      { row: 0, col: 1 }, { row: 0, col: 2 }, { row: 0, col: 3 }, { row: 0, col: 4 },
+    ])
+
+    expect(response.ok).toBe(false)
+    expect(response.error).toBe('too many selection positions')
+    expect(JSON.parse(JSON.stringify(session.getState()))).toEqual(before)
+  })
+
+  it('E076 S8: returning Farm Hand and two normal stables gains nine wood', () => {
+    const session = setup({
+      normalStables: [{ row: 0, col: 1 }, { row: 0, col: 2 }], farmHand: true,
     })
+    const selection = playToSelection(session)
+    expectSelection(selection, 3)
 
-    expect(getAvailableStableSupplyCount(state, player)).toBe(1)
+    const response = commitPositions(session, [
+      { row: 2, col: 4 }, { row: 0, col: 1 }, { row: 0, col: 2 },
+    ])
+
+    expect(response.ok, response.error).toBe(true)
+    expect(hasFarmHand(response)).toBe(false)
+    expect(stablePositions(response)).toEqual([])
+    expect(response.state.players[0]!.resources.wood).toBe(9)
+  })
+
+  it('E076 S9: selecting three normal stables keeps Farm Hand and gains nine wood', () => {
+    const session = setup({
+      normalStables: [{ row: 0, col: 1 }, { row: 0, col: 2 }, { row: 0, col: 3 }],
+      farmHand: true,
+    })
+    const selection = playToSelection(session)
+    expectSelection(selection, 3)
+
+    const response = commitPositions(session, [
+      { row: 0, col: 1 }, { row: 0, col: 2 }, { row: 0, col: 3 },
+    ])
+
+    expect(response.ok, response.error).toBe(true)
+    expect(hasFarmHand(response)).toBe(true)
+    expect(stablePositions(response)).toEqual([])
+    expect(response.state.players[0]!.resources.wood).toBe(9)
+  })
+
+  it('E076 S10: returning Farm Hand alone gains three wood and removes its room capacity', () => {
+    const session = setup({ farmHand: true })
+    expect(getExtraRoomCapacity(session.state.players[0]!)).toBe(1)
+    const selection = playToSelection(session)
+    expectSelection(selection, 1)
+
+    const response = commitPositions(session, [{ row: 2, col: 4 }])
+
+    expect(response.ok, response.error).toBe(true)
+    expect(hasFarmHand(response)).toBe(false)
+    expect(response.state.players[0]!.resources.wood).toBe(3)
+    expect(getExtraRoomCapacity(response.state.players[0]!)).toBe(0)
   })
 })
