@@ -2,8 +2,9 @@ import { describe, expect, it } from 'vitest'
 import { getRegisteredCardListeners, executeCardListener, type CardListenerContext } from '../../shared/cards/card-listeners'
 import type { ActionChoiceOption, GameState, PlayerState, ActionSpace, Resource } from '../../shared/contract/types'
 
-import { GameSession } from '../game/authoritative-session'
+import { GameSession, type SessionResponse } from '../game/authoritative-session'
 import { markAllWorkersUsed, setWorkersAtHome } from '../../shared/domain/player'
+import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 import '../../shared/cards/C/C042_RavenousHunger'
 import '../../shared/cards/C/C076_WoodCart'
 import { D116_TreeInspector_impl } from '../../shared/cards/D/D116_TreeInspector'
@@ -77,7 +78,8 @@ const resources = (values: Partial<Resource> = {}): Resource => ({
 })
 
 const setupSession = () => {
-  const session = new GameSession(undefined, undefined, { playerCount: 2 })
+  const session = new GameSession(5042, undefined, { playerCount: 2 })
+  stabilizeRandomHands(session.state.players)
   const state = session.getState().state
   state.players = state.players.slice(0, 2)
   state.currentPlayerIndex = 0
@@ -107,6 +109,39 @@ const setupSession = () => {
   session.loadState(state)
   return session
 }
+
+const setupPlaySession = (grain: number) => {
+  const session = setupSession()
+  const state = session.getState().state
+  state.availableMajorImprovements = []
+  const player = state.players[0]!
+  player.minorPlayed = player.minorPlayed.filter((cardId) => cardId !== CARD_ID)
+  player.minorHand = [CARD_ID]
+  player.resources.grain = grain
+  session.loadState(state)
+  return session
+}
+
+const enterMinor = (session: GameSession): SessionResponse => {
+  let response = session.takeAction(0, 'major-improvement')
+  if (response.interaction.stateId !== 'wait') return response
+  const improvement = response.interaction.request.options?.find((candidate) =>
+    candidate.value.startsWith('action-improvement-'))
+  if (improvement) response = session.resolveChoice(response.interaction.playerIndex, improvement.value)
+  return response
+}
+
+const play = (session: GameSession): SessionResponse => {
+  let response = enterMinor(session)
+  if (!response.state.players[0]!.minorHand.includes(CARD_ID)) return response
+  if (response.interaction.stateId !== 'wait') return response
+  const card = response.interaction.request.options?.find((candidate) => candidate.value === CARD_ID)
+  if (card) response = session.resolveChoice(response.interaction.playerIndex, card.value)
+  return response
+}
+
+const offered = (response: SessionResponse) => response.interaction.stateId === 'wait'
+  && (response.interaction.request.options?.some((candidate) => candidate.value === CARD_ID) ?? false)
 
 const waitOptions = (resp: ReturnType<GameSession['getState']>): ActionChoiceOption[] => {
   expect(resp.interaction.stateId).toBe('wait')
@@ -170,6 +205,22 @@ const setupPetLoverSession = () => {
 }
 
 describe('C042_RavenousHunger', () => {
+  it('C042 S1: paying one grain plays Ravenous Hunger', () => {
+    const response = play(setupPlaySession(1))
+
+    expect(response.ok, response.error).toBe(true)
+    expect(response.state.players[0]!.minorPlayed).toContain(CARD_ID)
+    expect(response.state.players[0]!.resources.grain).toBe(0)
+  })
+
+  it('C042 S2: lacking grain keeps Ravenous Hunger unavailable', () => {
+    const response = enterMinor(setupPlaySession(0))
+
+    expect(offered(response)).toBe(false)
+    expect(response.state.players[0]!.minorHand).toContain(CARD_ID)
+    expect(response.state.players[0]!.resources.grain).toBe(0)
+  })
+
   it('after vegetable-seeds: offers one extra placement constrained to accumulation spaces', () => {
     const listener = findListener('C42-ravenous-hunger-after-place-farmer')
     expect(listener).toBeDefined()
@@ -278,7 +329,7 @@ describe('C042_RavenousHunger', () => {
     expect(result).toBeUndefined()
   })
 
-  it('after vegetable-seeds offers optional second placement restricted to accumulation spaces', () => {
+  it('C042 S3: Vegetable Seeds offers another placement restricted to accumulation spaces', () => {
     const session = setupSession()
 
     let resp = session.takeAction(0, 'vegetable-seeds')
@@ -315,7 +366,7 @@ describe('C042_RavenousHunger', () => {
     expect(resp.interaction.request.kind).not.toBe('choice')
   })
 
-  it('second placement on an accumulation space collects and gains one extra accumulating resource', () => {
+  it('C042 S5: the extra Forest placement collects its pile and one additional wood', () => {
     const session = setupSession()
 
     let resp = session.takeAction(0, 'vegetable-seeds')
@@ -330,7 +381,7 @@ describe('C042_RavenousHunger', () => {
     expect(readCardResourceStats(resp.state.players[0]!, CARD_ID)?.gained.wood).toBe(1)
   })
 
-  it('offers Tree Inspector and gains one wood beyond the wood on its action space', () => {
+  it('C042 S8: a player-owned accumulation space is legal and grants one extra accumulating good', () => {
     const session = setupTreeInspectorSession()
 
     let resp = session.takeAction(0, 'vegetable-seeds')
@@ -421,7 +472,7 @@ describe('C042_RavenousHunger', () => {
     }))
   })
 
-  it('skip grants no accumulation bonus', () => {
+  it('C042 S4: declining after Vegetable Seeds places no second person and grants no accumulation bonus', () => {
     const session = setupSession()
 
     const resp = session.takeAction(0, 'vegetable-seeds')
@@ -431,5 +482,30 @@ describe('C042_RavenousHunger', () => {
     expect(skipped.ok).toBe(true)
     expect(skipped.state.players[0]!.resources.vegetable).toBe(1)
     expect(skipped.state.players[0]!.resources.wood).toBe(0)
+  })
+
+  it('C042 S6: using a non-Vegetable-Seeds action offers no extra placement', () => {
+    const session = setupSession()
+
+    const response = session.takeAction(0, 'forest')
+
+    expect(response.ok, response.error).toBe(true)
+    expect(response.state.players[0]!.resources.wood).toBe(3)
+    expect(response.interaction.stateId === 'wait' ? response.interaction.request.kind : response.interaction.stateId)
+      .not.toBe('choice')
+  })
+
+  it('C042 S7: Vegetable Seeds offers no extra placement when no other person remains', () => {
+    const session = setupSession()
+    const state = session.getState().state
+    setWorkersAtHome(state, state.players[0]!, 1)
+    session.loadState(state)
+
+    const response = session.takeAction(0, 'vegetable-seeds')
+
+    expect(response.ok, response.error).toBe(true)
+    expect(response.state.players[0]!.resources.vegetable).toBe(1)
+    expect(response.interaction.stateId === 'wait' ? response.interaction.request.kind : response.interaction.stateId)
+      .not.toBe('choice')
   })
 })

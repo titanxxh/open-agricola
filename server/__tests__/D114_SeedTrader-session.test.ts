@@ -1,110 +1,134 @@
 import { describe, expect, it } from 'vitest'
-import { GameSession } from '../game/authoritative-session'
+import { GameSession, type SessionResponse } from '../game/authoritative-session'
+import { setWorkersAtHome } from '../../shared/domain/player'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
-import { getCardEffect } from '../../shared/cards/card-effects'
-import type { AnytimeAction, ActionFlow } from '../../shared/contract/types'
 
 import '../../shared/cards/D/D114_SeedTrader'
 
 const CARD_ID = 'D114_SeedTrader'
+const ANYTIME_ID = 'D114-seed-trader-anytime'
 
-/**
- * D114 Seed Trader (Sprint 7a F5+F6).
- *
- * The reference `Cards/D/the reference`:
- *   onBuy: createResourceInLocation cardId for [GRAIN, GRAIN, VEG, VEG]
- *   isListeningTo: isAnytime && resources-on-card non-empty
- *   onPlayerAtAnytime: XOR (PAY food:2 → take 1 grain) | (PAY food:3 → take 1 veg)
- */
-describe('D114_SeedTrader session', () => {
-  const setup = (
-    options?: { food?: number; grainOnCard?: number; vegOnCard?: number; play?: boolean },
-  ) => {
-    const session = new GameSession()
-    stabilizeRandomHands(session.state.players)
-    const state = session.getState().state
-    state.players = state.players.slice(0, 2)
-    state.currentPlayerIndex = 0
-    state.round = 1
-    const player = state.players[0]!
-    player.occupationPlayed.push(CARD_ID)
-    player.resources.food = options?.food ?? 5
-    player.cardStates ??= {}
-    player.cardStates[CARD_ID] = {
-      counters: {
-        grain: options?.grainOnCard ?? 2,
-        vegetable: options?.vegOnCard ?? 2,
-      },
-      extraData: {},
+const setup = ({
+  played = true, food = 5, grainOnCard = 2, vegetableOnCard = 2,
+} = {}) => {
+  const session = new GameSession(6114, undefined, { playerCount: 2 })
+  stabilizeRandomHands(session.state.players)
+  const state = session.getState().state
+  state.currentPlayerIndex = 0
+  state.round = 5
+  state.roundPhase = 'work'
+  state.actionSpaces.forEach((space) => { space.takenBy = [] })
+  state.players.forEach((player) => {
+    player.minorHand = ['__test_placeholder__']
+    player.occupationHand = ['__test_placeholder__']
+    player.minorPlayed = []
+    player.occupationPlayed = []
+    player.cardStates = {}
+    player.resources = {
+      ...player.resources, wood: 0, clay: 0, reed: 0, stone: 0, food: 20, grain: 0,
+      vegetable: 0, sheep: 0, boar: 0, cattle: 0, begging: 0,
     }
-    session.loadState(state)
-    return session
+    setWorkersAtHome(state, player, 2)
+  })
+  const owner = state.players[0]!
+  owner.occupationHand = played ? ['__test_placeholder__'] : [CARD_ID]
+  owner.occupationPlayed = played ? [CARD_ID] : []
+  owner.resources.food = food
+  if (played) {
+    owner.cardStates[CARD_ID] = {
+      counters: { grain: grainOnCard, vegetable: vegetableOnCard },
+    }
   }
+  session.loadState(state)
+  return session
+}
 
-  it('onBuy returns store-on-card leaf with grain:2 + vegetable:2', () => {
-    const session = new GameSession()
-    stabilizeRandomHands(session.state.players)
-    const state = session.getState().state
-    const player = state.players[0]!
-    const effect = getCardEffect(CARD_ID)
-    expect(effect).toBeDefined()
-    const flow = effect!.onBuy!(state, player) as Extract<ActionFlow, { type: 'leaf' }>
-    expect(flow.type).toBe('leaf')
-    expect(flow.actionId).toBe('store-on-card')
-    expect(flow.params).toEqual({ grain: 2, vegetable: 2 })
-    expect(flow.sourceCard).toBe(CARD_ID)
+const chooseCardIfNeeded = (session: GameSession, response: SessionResponse, cardId: string) => {
+  if (response.interaction.stateId !== 'wait') return response
+  const option = response.interaction.request.options?.find((candidate) => candidate.value === cardId)
+  return option ? session.resolveChoice(response.interaction.playerIndex, option.value) : response
+}
+
+const openAnytimeWindow = (session: GameSession) => session.takeAction(0, 'farmland')
+
+const anytimeIds = (response: SessionResponse) =>
+  response.interaction.anytimeActions.map((action) => action.id)
+
+describe('D114 Seed Trader parity', () => {
+  it('D114 S1: playing Seed Trader places two grain and two vegetables on the card', () => {
+    const session = setup({ played: false })
+
+    const response = chooseCardIfNeeded(session, session.takeAction(0, 'lessons'), CARD_ID)
+
+    expect(response.ok, response.error).toBe(true)
+    expect(response.state.players[0]!.occupationPlayed).toContain(CARD_ID)
+    expect(response.state.players[0]!.cardStates[CARD_ID]?.counters).toMatchObject({
+      grain: 2, vegetable: 2,
+    })
   })
 
-  it('anytime listed when card has goods and food>=2', () => {
-    const session = setup()
-    const resp = session.takeAction(0, 'farmland')
-    expect(resp.ok).toBe(true)
-    const ids = resp.interaction.anytimeActions.map((a: AnytimeAction) => a.id)
-    expect(ids).toContain('D114-seed-trader-anytime')
+  it('D114 S2: paying two food at any time buys one grain from Seed Trader', () => {
+    const session = setup({ food: 2, vegetableOnCard: 0 })
+    const pending = openAnytimeWindow(session)
+    expect(anytimeIds(pending)).toContain(ANYTIME_ID)
+
+    const response = session.takeAnytimeAction(0, ANYTIME_ID)
+
+    expect(response.ok, response.error).toBe(true)
+    expect(response.state.players[0]).toMatchObject({
+      resources: { food: 0, grain: 1 },
+      cardStates: { [CARD_ID]: { counters: { grain: 1, vegetable: 0 } } },
+    })
   })
 
-  it('anytime hidden after card emptied', () => {
-    const session = setup({ grainOnCard: 0, vegOnCard: 0 })
-    const resp = session.takeAction(0, 'farmland')
-    const ids = resp.interaction.anytimeActions.map((a: AnytimeAction) => a.id)
-    expect(ids).not.toContain('D114-seed-trader-anytime')
+  it('D114 S3: paying three food at any time buys one vegetable from Seed Trader', () => {
+    const session = setup({ food: 3, grainOnCard: 0 })
+    const pending = openAnytimeWindow(session)
+    expect(anytimeIds(pending)).toContain(ANYTIME_ID)
+
+    const response = session.takeAnytimeAction(0, ANYTIME_ID)
+
+    expect(response.ok, response.error).toBe(true)
+    expect(response.state.players[0]).toMatchObject({
+      resources: { food: 0, vegetable: 1 },
+      cardStates: { [CARD_ID]: { counters: { grain: 0, vegetable: 1 } } },
+    })
   })
 
-  it('anytime hidden when food < 2', () => {
-    const session = setup({ food: 1 })
-    const resp = session.takeAction(0, 'farmland')
-    const ids = resp.interaction.anytimeActions.map((a: AnytimeAction) => a.id)
-    expect(ids).not.toContain('D114-seed-trader-anytime')
+  it('D114 S4: Seed Trader can sell both grain in the same action window', () => {
+    const session = setup({ food: 4, vegetableOnCard: 0 })
+    openAnytimeWindow(session)
+
+    const first = session.takeAnytimeAction(0, ANYTIME_ID)
+    expect(first.ok, first.error).toBe(true)
+    const second = session.takeAnytimeAction(0, ANYTIME_ID)
+
+    expect(second.ok, second.error).toBe(true)
+    expect(second.state.players[0]).toMatchObject({
+      resources: { food: 0, grain: 2 },
+      cardStates: { [CARD_ID]: { counters: { grain: 0, vegetable: 0 } } },
+    })
+    expect(anytimeIds(second)).not.toContain(ANYTIME_ID)
   })
 
-  it('anytime visible with food=2 and grain on card (only grain branch)', () => {
-    const session = setup({ food: 2 })
-    const resp = session.takeAction(0, 'farmland')
-    const ids = resp.interaction.anytimeActions.map((a: AnytimeAction) => a.id)
-    expect(ids).toContain('D114-seed-trader-anytime')
+  it('D114 S5: two food cannot buy a remaining vegetable', () => {
+    const session = setup({ food: 2, grainOnCard: 0, vegetableOnCard: 1 })
+    const pending = openAnytimeWindow(session)
+
+    expect(anytimeIds(pending)).not.toContain(ANYTIME_ID)
+    const response = session.takeAnytimeAction(0, ANYTIME_ID)
+    expect(response.ok).toBe(false)
+    expect(response.state.players[0]).toMatchObject({
+      resources: { food: 2, vegetable: 0 },
+      cardStates: { [CARD_ID]: { counters: { grain: 0, vegetable: 1 } } },
+    })
   })
 
-  it('triggering grain branch: pay 2 food, gain 1 grain, deplete card grain by 1', () => {
-    const session = setup({ food: 2, grainOnCard: 2, vegOnCard: 0 })
-    session.takeAction(0, 'farmland')
-    const resp = session.takeAnytimeAction(0, 'D114-seed-trader-anytime')
-    expect(resp.ok).toBe(true)
-    const player = resp.state.players[0]!
-    expect(player.resources.food).toBe(0)
-    expect(player.resources.grain).toBe(1)
-    expect(player.cardStates?.[CARD_ID]?.counters?.grain).toBe(1)
-  })
+  it('D114 S6: Seed Trader is unavailable after all four stored crops are gone', () => {
+    const session = setup({ food: 10, grainOnCard: 0, vegetableOnCard: 0 })
+    const pending = openAnytimeWindow(session)
 
-  it('not flag-gated: can be triggered multiple times same round', () => {
-    const session = setup({ food: 4, grainOnCard: 2, vegOnCard: 0 })
-    session.takeAction(0, 'farmland')
-    const r1 = session.takeAnytimeAction(0, 'D114-seed-trader-anytime')
-    expect(r1.ok).toBe(true)
-    const r2 = session.takeAnytimeAction(0, 'D114-seed-trader-anytime')
-    expect(r2.ok).toBe(true)
-    const player = r2.state.players[0]!
-    expect(player.resources.food).toBe(0)
-    expect(player.resources.grain).toBe(2)
-    expect(player.cardStates?.[CARD_ID]?.counters?.grain).toBe(0)
+    expect(anytimeIds(pending)).not.toContain(ANYTIME_ID)
+    expect(session.takeAnytimeAction(0, ANYTIME_ID).ok).toBe(false)
   })
 })

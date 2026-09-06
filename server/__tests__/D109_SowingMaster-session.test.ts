@@ -1,97 +1,103 @@
 import { describe, expect, it } from 'vitest'
-import { GameSession } from '../game/authoritative-session'
+import { GameSession, type SessionResponse } from '../game/authoritative-session'
+import { setWorkersAtHome } from '../../shared/domain/player'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
-import { runCardEffectHook } from '../../shared/cards/card-effects'
 
 import '../../shared/cards/D/D109_SowingMaster'
-import type { ActionChoiceOption } from '../../shared/contract/types'
-import type { ActionFlow } from '../../shared/contract/types'
-import { confirmPlayerSwitch } from './_helpers/pending-confirms'
 
 const CARD_ID = 'D109_SowingMaster'
 
-describe('D109_SowingMaster session', () => {
-  const setup = () => {
-    const session = new GameSession()
-    stabilizeRandomHands(session.state.players)
-    const state = session.getState().state
-    state.players = state.players.slice(0, 2)
-    state.currentPlayerIndex = 0
-    state.round = 1
+const setup = ({ played = true, grain = 0 }: { played?: boolean; grain?: number } = {}) => {
+  const session = new GameSession(6109, undefined, { playerCount: 2 })
+  stabilizeRandomHands(session.state.players)
+  const state = session.getState().state
+  state.currentPlayerIndex = 0
+  state.round = 14
+  state.roundPhase = 'work'
+  state.actionSpaces.forEach((space) => { space.takenBy = [] })
+  state.players.forEach((player) => {
+    player.minorHand = ['__test_placeholder__']
+    player.occupationHand = ['__test_placeholder__']
+    player.minorPlayed = []
+    player.occupationPlayed = []
+    player.cardStates = {}
+    player.fields = []
+    player.resources = {
+      ...player.resources,
+      wood: 0, clay: 0, reed: 0, stone: 0, food: 0, grain: 0, vegetable: 0,
+      sheep: 0, boar: 0, cattle: 0, begging: 0,
+    }
+    setWorkersAtHome(state, player, 2)
+  })
+  const owner = state.players[0]!
+  owner.occupationHand = played ? ['__test_placeholder__'] : [CARD_ID]
+  owner.occupationPlayed = played ? [CARD_ID] : []
+  owner.resources.grain = grain
+  session.loadState(state)
+  return session
+}
 
-    const player = state.players[0]!
-    player.occupationHand.push(CARD_ID)
-    session.loadState(state)
-    session.devPlayCard(0, CARD_ID)
-    return session
+const chooseCardIfNeeded = (session: GameSession, response: SessionResponse, cardId: string) => {
+  if (response.interaction.stateId !== 'wait') return response
+  const option = response.interaction.request.options?.find((candidate) => candidate.value === cardId)
+  return option ? session.resolveChoice(response.interaction.playerIndex, option.value) : response
+}
+
+const finishSow = (session: GameSession, response: SessionResponse, row: number, col: number) => {
+  let current = response
+  if (current.interaction.stateId === 'wait' && current.interaction.request.options) {
+    const sow = current.interaction.request.options.find((option) => option.labelKey === 'actions.sow.name')
+    if (sow) current = session.resolveChoice(current.interaction.playerIndex, sow.value)
   }
+  expect(current.interaction.stateId).toBe('wait')
+  if (current.interaction.stateId !== 'wait') return current
+  expect(current.interaction.request.farm.farmType).toBe('sow')
+  return session.commitSelectionChoice(0, { crops: [{ row, col, crop: 'grain' }] })
+}
 
-  it('onBuy grants 1 wood', () => {
-    const session = new GameSession()
-    stabilizeRandomHands(session.state.players)
-    const state = session.getState().state
-    state.players = state.players.slice(0, 2)
-    const player = state.players[0]!
-    player.occupationPlayed.push(CARD_ID)
+describe('D109 Sowing Master parity', () => {
+  it('D109 S1: playing Sowing Master through Lessons immediately gains one wood', () => {
+    const session = setup({ played: false })
 
-    const flow = runCardEffectHook(state, player, CARD_ID, 'onBuy')
-    expect(flow).not.toBeNull()
-    expect(flow!.type).toBe('leaf')
-    expect((flow as Extract<ActionFlow, { type: 'leaf' }>).actionId).toBe('gain')
-    expect((flow as Extract<ActionFlow, { type: 'leaf' }>).params).toEqual({ wood: 1 })
+    const response = chooseCardIfNeeded(session, session.takeAction(0, 'lessons'), CARD_ID)
+
+    expect(response.ok, response.error).toBe(true)
+    expect(response.state.players[0]!.occupationPlayed).toContain(CARD_ID)
+    expect(response.state.players[0]!.resources.wood).toBe(1)
   })
 
-  it('gains 2 food when using grain-utilization', () => {
-    const session = setup()
+  it('D109 S2: using Grain Utilization to sow gains two food', () => {
+    const session = setup({ grain: 1 })
     const state = session.getState().state
-    // Grain utilization requires grain in hand and a field to sow
-    const player = state.players[0]!
-    player.resources.grain = 2
-    player.fields = [{ row: 0, col: 0, stacks: [] }]
+    state.players[0]!.fields = [{ row: 0, col: 0, stacks: [] }]
     session.loadState(state)
 
-    const foodBefore = session.getState().state.players[0]!.resources.food
+    const response = finishSow(session, session.takeAction(0, 'grain-utilization'), 0, 0)
 
-    let resp = session.takeAction(0, 'grain-utilization')
-    expect(resp.ok).toBe(true)
-
-    // grain-utilization may require sowing choices — handle them. Stop when the
-    // farm-select interaction comes up so we can submit the crops payload.
-    while (resp.interaction.stateId === 'wait' && resp.interaction?.stateId !== 'wait') {
-      const nonSkip = resp.interaction.request.options?.find((o: ActionChoiceOption) => o.value !== '__skip__')
-      if (nonSkip) {
-        resp = session.resolveChoice(0, nonSkip.value)
-      } else {
-        resp = session.resolveChoice(0, '__skip__')
-      }
-    }
-    // Submit the sow selection.
-    if (resp.interaction?.stateId === 'wait') {
-      resp = session.commitSelectionChoice(0, { crops: [{ row: 0, col: 0, crop: 'grain' }] })
-    }
-
-    while (resp.interaction.stateId === 'wait' && resp.interaction.request.kind === 'confirm-player-switch') {
-      resp = confirmPlayerSwitch(session)
-    }
-
-    const after = session.getState().state
-    expect(after.players[0]!.resources.food).toBe(foodBefore + 2)
+    expect(response.ok, response.error).toBe(true)
+    expect(response.state.players[0]!.resources).toMatchObject({ grain: 0, food: 2 })
   })
 
-  it('does not trigger on non-matching action spaces', () => {
+  it('D109 S3: using Cultivation gains two food after placing the farmer', () => {
     const session = setup()
-    const foodBefore = session.getState().state.players[0]!.resources.food
 
-    let resp = session.takeAction(0, 'day-laborer')
-    expect(resp.ok).toBe(true)
+    let response = session.takeAction(0, 'cultivation')
+    expect(response.interaction.stateId).toBe('wait')
+    if (response.interaction.stateId !== 'wait') return
+    const field = response.interaction.request.farm.selectableTiles[0]!
+    response = session.commitSelectionChoice(0, { tile: field })
 
-    while (resp.interaction.stateId === 'wait' && resp.interaction.request.kind === 'confirm-player-switch') {
-      resp = confirmPlayerSwitch(session)
-    }
+    expect(response.ok, response.error).toBe(true)
+    expect(response.state.players[0]!.fields).toHaveLength(1)
+    expect(response.state.players[0]!.resources.food).toBe(2)
+  })
 
-    const after = session.getState().state
-    // Day laborer gives food but SowingMaster should NOT add extra 2 food
-    // Day laborer gives 2 food normally, so check relative to that
-    expect(after.players[0]!.resources.food).toBe(foodBefore + 2) // only day-laborer food
+  it('D109 S4: using an unrelated action space grants no Sowing Master food', () => {
+    const session = setup()
+
+    const response = session.takeAction(0, 'day-laborer')
+
+    expect(response.ok, response.error).toBe(true)
+    expect(response.state.players[0]!.resources.food).toBe(2)
   })
 })

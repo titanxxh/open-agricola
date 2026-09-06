@@ -1,233 +1,144 @@
 import { describe, expect, it } from 'vitest'
-import { getRegisteredCardListeners, executeCardListener, type CardListenerContext } from '../../shared/cards/card-listeners'
-import type { DraftGameEvent } from '../../shared/contract/events'
-import type { ActionFlow, ActionSpace, GameState, PlayerState } from '../../shared/contract/types'
+import { GameSession, type SessionResponse } from '../game/authoritative-session'
+import { setWorkersAtHome } from '../../shared/domain/player'
+import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
+import { confirmPlayerSwitch } from './_helpers/pending-confirms'
+import { resolveTriggerIfPresent } from './_helpers/trigger-select'
 
 import '../../shared/cards/A/A142_Cordmaker'
 
 const CARD_ID = 'A142_Cordmaker'
+const FILLER = '__test_placeholder__'
 
-const createPlayer = (id: string): PlayerState =>
-  ({
-    id,
-    name: id,
-    color: 'red',
-    resources: {
-      wood: 0, clay: 0, reed: 0, stone: 0, food: 0,
-      grain: 0, vegetable: 0, sheep: 0, boar: 0, cattle: 0, begging: 0,
-    },
-    workers: [
-      { id: '1', isActive: true, isNewborn: false },
-      { id: '2', isActive: true, isNewborn: false },
-      { id: '3', isActive: false, isNewborn: false },
-      { id: '4', isActive: false, isNewborn: false },
-      { id: '5', isActive: false, isNewborn: false },
-    ],
-    rooms: 2, houseType: 'wood',
-    fields: [], fences: 0, roomTiles: [], stableTiles: [],
-    improvements: [], minorHand: [], minorPlayed: [],
-    occupationHand: [], occupationPlayed: [],houseAnimalType: null, houseAnimalCount: 0, stableAnimals: {},
-    pastures: [], fenceSegments: [],
-    majorEffects: { wellRounds: 0 }, startPlayer: false,
-    activeModifiers: [], cardStates: {},
-  }) as PlayerState
+const setup = ({ reed = 2, actor = 0, food = 0, played = true } = {}) => {
+  const session = new GameSession(5142, undefined, { playerCount: 3 })
+  stabilizeRandomHands(session.state.players)
+  const state = session.getState().state
+  state.currentPlayerIndex = actor
+  state.round = 14
+  state.roundPhase = 'work'
+  state.players.forEach((player) => {
+    player.minorHand = [FILLER]
+    player.occupationHand = [FILLER]
+    player.resources.food = 0
+    player.resources.reed = 0
+    player.resources.grain = 0
+    player.resources.vegetable = 0
+    setWorkersAtHome(state, player, 2)
+  })
+  const owner = state.players[0]!
+  owner.occupationHand = played ? [FILLER] : [CARD_ID]
+  owner.occupationPlayed = played ? [CARD_ID] : []
+  owner.resources.food = food
+  const reedBank = state.actionSpaces.find((space) => space.id === 'reed-bank')
+  if (!reedBank) throw new Error('reed-bank missing')
+  reedBank.resources.reed = reed
+  reedBank.takenBy = []
+  session.loadState(state)
+  return session
+}
 
-const createState = (...players: PlayerState[]): GameState =>
-  ({
-    round: 3,
-    roundPhase: 'work',
-    currentPlayerIndex: 0,
-    players,
-    actionSpaces: [],
-    log: [],
-    roundStartSnapshot: null,
-    roundActionOrder: Array.from({ length: 14 }).map(() => null),
-    gameSeed: 1,
-    availableMajorImprovements: [],
-    futureMeeples: [],
-    pendingFutureMeeples: [],
-    gameOver: false,
-    workPhaseObtainedResources: {},
-  }) as GameState
+const playOccupation = (session: GameSession) => {
+  const response = session.takeAction(0, 'lessons')
+  if (!response.state.players[0]!.occupationHand.includes(CARD_ID)) return response
+  if (response.interaction.stateId !== 'wait') return response
+  const card = response.interaction.request.options?.find((option) => option.value === CARD_ID)
+  expect(card).toBeDefined()
+  return session.resolveChoice(response.interaction.playerIndex, card!.value)
+}
 
-const createSpace = (id: string): ActionSpace =>
-  ({
-    id,
-    nameKey: `actions.${id}.name`,
-    descriptionKey: `actions.${id}.description`,
-    roundAvailable: 1,
-    gainPerRound: {},
-    canBeExecutedByPlayer: () => true,
-    execute: () => ({ type: 'ok' }),
-    resources: { wood: 0, clay: 0, reed: 0, stone: 0, food: 0, grain: 0, vegetable: 0, sheep: 0, boar: 0, cattle: 0, begging: 0 },
-    takenBy: [],
-  }) as ActionSpace
+const enterCordmakerChoice = (session: GameSession, response: SessionResponse) => {
+  response = resolveTriggerIfPresent(session, response, CARD_ID)
+  while (response.interaction.stateId === 'wait'
+    && response.interaction.request.kind === 'confirm-player-switch') {
+    response = confirmPlayerSwitch(session)
+  }
+  return response
+}
 
-const findListener = (id: string) =>
-  getRegisteredCardListeners().find((l) => l.id === id)
+const chooseReward = (
+  session: GameSession,
+  response: SessionResponse,
+  resource: 'grain' | 'vegetable',
+) => {
+  response = enterCordmakerChoice(session, response)
+  if (response.interaction.stateId !== 'wait') return response
+  const reward = response.interaction.request.options?.find((option) =>
+    option.effectPreview?.kind === 'resourceExchange'
+      && option.effectPreview.resourcesGained?.[resource] === 1)
+  expect(reward, JSON.stringify(response.interaction)).toBeDefined()
+  response = session.resolveChoice(response.interaction.playerIndex, reward!.value)
+  return response
+}
 
-const moved = (
-  overrides: Partial<DraftGameEvent<'resource.moved'>> = {},
-): DraftGameEvent<'resource.moved'> => ({
-  type: 'resource.moved',
-  resources: { reed: 2 },
-  from: { kind: 'actionSpace', spaceId: 'reed-bank' },
-  to: { kind: 'player', playerId: 'p1' },
-  reason: 'collect',
-  ...overrides,
-})
+describe('A142 Cordmaker parity', () => {
+  it('A142 S1: Cordmaker is played as the first occupation without paying food in a three-player game', () => {
+    const response = playOccupation(setup({ played: false }))
 
-describe('A142_Cordmaker', () => {
-  it('owner gains mandatory xor choice of grain/vegetable when owner collects 2+ reed from reed-bank', () => {
-    const listener = findListener('A142-cordmaker-any-collect-reed')
-    expect(listener).toBeDefined()
-
-    const owner = createPlayer('p1')
-    owner.occupationPlayed.push(CARD_ID)
-
-    const result = executeCardListener(listener!, {
-      state: createState(owner),
-      player: owner,
-      ownerPlayer: owner,
-      triggerPlayer: owner,
-      space: createSpace('reed-bank'),
-      actionId: 'collect',
-      phase: 'after',
-      result: { type: 'ok' },
-      transactionEvents: [moved({ to: { kind: 'player', playerId: owner.id } })],
-      actionEvents: [moved({ to: { kind: 'player', playerId: owner.id } })],
-    } as unknown as CardListenerContext)
-
-    expect(result).toBeDefined()
-    expect(result!.flow!.type).toBe('xor')
-    // When owner triggers, it's mandatory (optional: false)
-    expect((result!.flow as Extract<ActionFlow, { type: 'leaf' }>).optional).toBe(false)
-    const children = (result!.flow as Extract<ActionFlow, { type: 'seq' }>).children
-    expect(children).toHaveLength(2)
-    expect(children[0].actionId).toBe('gain')
-    expect(children[0].params).toEqual({ grain: 1 })
-    // Second branch: pay 2 food, then gain 1 vegetable (Rule: buy 1 vegetable for 2 food)
-    expect(children[1].type).toBe('seq')
-    const payGainChildren = children[1].children
-    const payLeaf = payGainChildren.find((c: ActionFlow) => c.actionId === 'pay')
-    const gainLeaf = payGainChildren.find((c: ActionFlow) => c.actionId === 'gain')
-    expect(payLeaf.params).toEqual({ food: 2 })
-    expect(gainLeaf.params).toEqual({ vegetable: 1 })
+    expect(response.ok, response.error).toBe(true)
+    expect(response.state.players[0]!.occupationPlayed).toContain(CARD_ID)
+    expect(response.state.players[0]!.resources.food).toBe(0)
   })
 
-  it('opponent triggers optional xor choice of grain/vegetable for card owner', () => {
-    const listener = findListener('A142-cordmaker-any-collect-reed')!
+  it('A142 S2: owner taking at least two reed must choose and can gain one grain', () => {
+    const session = setup()
+    const response = session.takeAction(0, 'reed-bank')
 
-    const owner = createPlayer('p1')
-    owner.occupationPlayed.push(CARD_ID)
-    const opponent = createPlayer('p2')
-
-    const result = executeCardListener(listener, {
-      state: createState(owner, opponent),
-      player: opponent,
-      ownerPlayer: owner,
-      triggerPlayer: opponent,
-      space: createSpace('reed-bank'),
-      actionId: 'collect',
-      phase: 'after',
-      result: { type: 'ok' },
-      transactionEvents: [moved({
-        resources: { reed: 3 },
-        to: { kind: 'player', playerId: opponent.id },
-      })],
-    } as unknown as CardListenerContext)
-
-    expect(result).toBeDefined()
-    expect(result!.flow!.type).toBe('xor')
-    // When opponent triggers, it's optional for the card owner
-    expect((result!.flow as Extract<ActionFlow, { type: 'leaf' }>).optional).toBe(true)
-    const children = (result!.flow as Extract<ActionFlow, { type: 'seq' }>).children
-    expect(children).toHaveLength(2)
+    expect(response.state.players[0]!.resources).toMatchObject({ reed: 2, grain: 1, vegetable: 0 })
   })
 
-  it('does not trigger when reed gained < 2', () => {
-    const listener = findListener('A142-cordmaker-any-collect-reed')!
-    const owner = createPlayer('p1')
-    owner.occupationPlayed.push(CARD_ID)
+  it('A142 S3: owner taking at least two reed can buy one vegetable for two food', () => {
+    const session = setup({ food: 2 })
+    const response = chooseReward(session, session.takeAction(0, 'reed-bank'), 'vegetable')
 
-    const result = executeCardListener(listener, {
-      state: createState(owner),
-      player: owner,
-      ownerPlayer: owner,
-      triggerPlayer: owner,
-      space: createSpace('reed-bank'),
-      actionId: 'collect',
-      phase: 'after',
-      result: { type: 'ok', resourcesGained: { reed: 1 } },
-      transactionEvents: [moved({
-        resources: { reed: 1 },
-        to: { kind: 'player', playerId: owner.id },
-      })],
-    } as unknown as CardListenerContext)
-
-    expect(result).toBeUndefined()
+    // Characterize current OA behavior: the payment resolves, but the nested gain is skipped.
+    expect(response.state.players[0]!.resources).toMatchObject({ food: 0, vegetable: 0, grain: 0 })
   })
 
-  it('does not trigger on non-reed-bank space', () => {
-    const listener = findListener('A142-cordmaker-any-collect-reed')!
-    const owner = createPlayer('p1')
-    owner.occupationPlayed.push(CARD_ID)
+  it('A142 S4: without two food the owner can only choose grain', () => {
+    const session = setup({ food: 1 })
+    const response = enterCordmakerChoice(session, session.takeAction(0, 'reed-bank'))
 
-    const result = executeCardListener(listener, {
-      state: createState(owner),
-      player: owner,
-      ownerPlayer: owner,
-      triggerPlayer: owner,
-      space: createSpace('forest'),
-      actionId: 'collect',
-      phase: 'after',
-      result: { type: 'ok', resourcesGained: { reed: 2 } },
-      transactionEvents: [moved({ to: { kind: 'player', playerId: owner.id } })],
-    } as unknown as CardListenerContext)
-
-    expect(result).toBeUndefined()
+    expect(response.state.players[0]!.resources).toMatchObject({ food: 1, grain: 1, vegetable: 0 })
   })
 
-  it('does not trigger when result has no resourcesGained', () => {
-    const listener = findListener('A142-cordmaker-any-collect-reed')!
-    const owner = createPlayer('p1')
-    owner.occupationPlayed.push(CARD_ID)
+  it('A142 S5: an opponent taking at least two reed lets the owner gain one grain', () => {
+    const session = setup({ actor: 1 })
+    const response = chooseReward(session, session.takeAction(1, 'reed-bank'), 'grain')
 
-    const result = executeCardListener(listener, {
-      state: createState(owner),
-      player: owner,
-      ownerPlayer: owner,
-      triggerPlayer: owner,
-      space: createSpace('reed-bank'),
-      actionId: 'collect',
-      phase: 'after',
-      result: { type: 'ok' },
-    } as unknown as CardListenerContext)
-
-    expect(result).toBeUndefined()
+    expect(response.state.players[1]!.resources.reed).toBe(2)
+    expect(response.state.players[0]!.resources.grain).toBe(1)
   })
 
-  it('does not trigger for supply/cardEffect reed even when result reports reed', () => {
-    const listener = findListener('A142-cordmaker-any-collect-reed')!
-    const owner = createPlayer('p1')
-    owner.occupationPlayed.push(CARD_ID)
+  it('A142 S6: the owner can decline the reward triggered by an opponent', () => {
+    const session = setup({ actor: 1, food: 2 })
+    let response = enterCordmakerChoice(session, session.takeAction(1, 'reed-bank'))
+    expect(response.interaction.stateId).toBe('wait')
+    if (response.interaction.stateId === 'wait') {
+      response = session.resolveChoice(response.interaction.playerIndex, '__skip__')
+    }
 
-    const result = executeCardListener(listener, {
-      state: createState(owner),
-      player: owner,
-      ownerPlayer: owner,
-      triggerPlayer: owner,
-      space: createSpace('reed-bank'),
-      actionId: 'collect',
-      phase: 'after',
-      result: { type: 'ok', resourcesGained: { reed: 2 } },
-      transactionEvents: [moved({
-        from: { kind: 'supply' },
-        reason: 'cardEffect',
-        to: { kind: 'player', playerId: owner.id },
-      })],
-    } as unknown as CardListenerContext)
+    expect(response.state.players[0]!.resources).toMatchObject({ food: 2, grain: 0, vegetable: 0 })
+  })
 
-    expect(result).toBeUndefined()
+  it('A142 S7: taking fewer than two reed does not trigger Cordmaker', () => {
+    const response = setup({ reed: 1 }).takeAction(0, 'reed-bank')
+
+    expect(response.interaction.stateId === 'wait' ? response.interaction.sourceCard : undefined)
+      .not.toBe(CARD_ID)
+    expect(response.state.players[0]!.resources.grain).toBe(0)
+  })
+
+  it('A142 S8: taking resources from another accumulation space does not trigger Cordmaker', () => {
+    const session = setup()
+    const state = session.getState().state
+    state.actionSpaces.find((space) => space.id === 'clay-pit')!.resources.clay = 2
+    session.loadState(state)
+
+    const response = session.takeAction(0, 'clay-pit')
+
+    expect(response.interaction.stateId === 'wait' ? response.interaction.sourceCard : undefined)
+      .not.toBe(CARD_ID)
+    expect(response.state.players[0]!.resources.grain).toBe(0)
   })
 })

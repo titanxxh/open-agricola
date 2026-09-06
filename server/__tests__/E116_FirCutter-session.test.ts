@@ -1,275 +1,147 @@
 import { describe, expect, it } from 'vitest'
-import { GameSession } from '../game/authoritative-session'
-import { getRegisteredCardListeners, executeCardListener } from '../../shared/cards/card-listeners'
-import type { CardListenerContext } from '../../shared/cards/card-listeners'
+import { GameSession, type SessionResponse } from '../game/authoritative-session'
+import { setActiveWorkerCount, setWorkersAtHome } from '../../shared/domain/player'
+import {
+  getRoundPersonPlacementDetails,
+  recordRoundPlacement,
+} from '../../shared/cards/helpers/round-placement'
+import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 
-import { markAllWorkersUsed, setActiveWorkerCount, setWorkersAtHome } from '../../shared/domain/player'
-import { addWorkerRef } from '../../shared/domain/space'
-import { recordRoundPlacement } from '../../shared/cards/helpers/round-placement'
 import '../../shared/cards/E/E116_FirCutter'
-import { mkActionSpace } from '../../shared/cards/__tests__/fixtures'
 
 const CARD_ID = 'E116_FirCutter'
+const FILLER = '__test_placeholder__'
+const PRIOR_SPACES = ['forest', 'clay-pit', 'reed-bank', 'fishing']
 
-const findListener = (id: string) =>
-  getRegisteredCardListeners().find((l) => l.id === id)
+const setup = ({
+  played = true, ordinal = 1, actor = 0,
+}: {
+  played?: boolean
+  ordinal?: number
+  actor?: number
+} = {}) => {
+  const session = new GameSession(7116, undefined, { playerCount: 2 })
+  stabilizeRandomHands(session.state.players)
+  const state = session.getState().state
+  state.currentPlayerIndex = actor
+  state.round = 14
+  state.roundPhase = 'work'
+  state.availableMajorImprovements = []
+  state.actionSpaces.forEach((space) => {
+    space.takenBy = []
+    if (space.id === 'sheep-market') space.resources.sheep = 0
+    if (space.id === 'pig-market') space.resources.boar = 0
+    if (space.id === 'cattle-market') space.resources.cattle = 0
+  })
+  state.players.forEach((player, index) => {
+    setActiveWorkerCount(player, index === actor ? ordinal : 2)
+    setWorkersAtHome(state, player, index === actor ? ordinal : 0)
+    player.minorHand = [FILLER]
+    player.occupationHand = [FILLER]
+    player.minorPlayed = []
+    player.occupationPlayed = []
+    player.improvements = []
+    player.cardStates = {}
+    Object.assign(player.resources, {
+      wood: 0, clay: 0, reed: 0, stone: 0, food: 20, grain: 0, vegetable: 0,
+      sheep: 0, boar: 0, cattle: 0, begging: 0,
+    })
+  })
 
-const recordPlacements = (player: Parameters<typeof recordRoundPlacement>[0], count: number) => {
-  for (let index = 0; index < count; index += 1) {
-    recordRoundPlacement(player, `test-space-${index}`, String(index + 1))
+  const owner = state.players[0]!
+  owner.occupationHand = played ? [FILLER] : [CARD_ID]
+  owner.occupationPlayed = played ? [CARD_ID] : []
+  const actingPlayer = state.players[actor]!
+  const workers = actingPlayer.workers.filter((worker) => worker.isActive)
+  for (let index = 0; index < ordinal - 1; index += 1) {
+    const space = state.actionSpaces.find((candidate) => candidate.id === PRIOR_SPACES[index])!
+    space.takenBy.push({ playerId: actingPlayer.id, workerId: workers[index]!.id })
+    recordRoundPlacement(actingPlayer, space.id, workers[index]!.id)
   }
+  session.loadState(state)
+  return session
 }
 
-describe('E116_FirCutter session', () => {
-  it('onBuy: gains 1 food when card is played', () => {
-    const listener = findListener('E116-fir-cutter-onbuy')
-    expect(listener).toBeDefined()
+const settleFirCutter = (session: GameSession, initial: SessionResponse) => {
+  let response = initial
+  for (let step = 0; step < 8 && response.interaction.stateId === 'wait'; step += 1) {
+    if (response.interaction.request.kind === 'confirm-next-player'
+      || response.interaction.request.kind === 'confirm-player-switch') break
+    const options = response.interaction.request.options ?? []
+    const cardChoice = options.find((option) =>
+      (option.sourceCard === CARD_ID || option.value === CARD_ID)
+        && option.value !== '__skip__')
+    if (!cardChoice) break
+    response = session.resolveChoice(response.interaction.playerIndex, cardChoice.value)
+  }
+  return response
+}
 
-    const session = new GameSession()
+const playFirCutter = (session: GameSession) => {
+  let response = session.takeAction(0, 'lessons')
+  if (response.interaction.stateId === 'wait'
+    && response.state.players[0]!.occupationHand.includes(CARD_ID)) {
+    const card = response.interaction.request.options?.find((option) => option.value === CARD_ID)
+    expect(card, JSON.stringify(response.interaction, null, 2)).toBeDefined()
+    response = session.resolveChoice(response.interaction.playerIndex, card!.value)
+  }
+  return settleFirCutter(session, response)
+}
+
+const useSpace = (session: GameSession, actor: number, spaceId: string) =>
+  settleFirCutter(session, session.takeAction(actor, spaceId))
+
+describe('E116 Fir Cutter parity', () => {
+  it('E116 S1: playing Fir Cutter immediately gains one food', () => {
+    const session = setup({ played: false })
     const state = session.getState().state
-    state.players = state.players.slice(0, 2)
-    const player = state.players[0]!
-    player.occupationPlayed = [CARD_ID]
+    state.players[0]!.resources.food = 0
+    session.loadState(state)
 
-    const result = executeCardListener(listener!, {
-      state,
-      player,
-      space: mkActionSpace({ id: 'meeting-place' }),
-      actionId: 'occupation',
-      phase: 'after',
-      choice: CARD_ID,
-      result: { type: 'ok' },
-    } as CardListenerContext)
+    const response = playFirCutter(session)
 
-    expect(result).toBeDefined()
-    expect(result!.flow?.type).toBe('leaf')
-    if (result!.flow?.type === 'leaf') {
-      expect(result!.flow.params).toEqual({ food: 1 })
-    }
+    expect(response.ok, response.error).toBe(true)
+    expect(response.state.players[0]!.occupationPlayed).toContain(CARD_ID)
+    expect(response.state.players[0]!.resources.food).toBe(1)
   })
 
-  it('onBuy: does not trigger for other occupation', () => {
-    const listener = findListener('E116-fir-cutter-onbuy')
-    expect(listener).toBeDefined()
+  for (const { scenario, ordinal, spaceId, expectedWood } of [
+    { scenario: 'S2', ordinal: 1, spaceId: 'sheep-market', expectedWood: 1 },
+    { scenario: 'S3', ordinal: 2, spaceId: 'pig-market', expectedWood: 1 },
+    { scenario: 'S4', ordinal: 3, spaceId: 'cattle-market', expectedWood: 2 },
+    { scenario: 'S5', ordinal: 4, spaceId: 'sheep-market', expectedWood: 2 },
+    { scenario: 'S6', ordinal: 5, spaceId: 'pig-market', expectedWood: 3 },
+  ]) {
+    it(`E116 ${scenario}: the ${ordinal}th person on an animal market gains ${expectedWood} wood`, () => {
+      const session = setup({ ordinal })
 
-    const session = new GameSession()
+      const response = useSpace(session, 0, spaceId)
+
+      expect(response.ok, response.error).toBe(true)
+      expect(response.state.players[0]!.resources.wood).toBe(expectedWood)
+      expect(getRoundPersonPlacementDetails(response.state.players[0]!)).toHaveLength(ordinal)
+    })
+  }
+
+  it('E116 S7: a non-animal accumulation space grants no wood', () => {
+    const session = setup()
     const state = session.getState().state
-    state.players = state.players.slice(0, 2)
-    const player = state.players[0]!
-    player.occupationPlayed = [CARD_ID]
+    state.actionSpaces.find((space) => space.id === 'forest')!.resources.wood = 0
+    session.loadState(state)
 
-    const result = executeCardListener(listener!, {
-      state,
-      player,
-      space: mkActionSpace({ id: 'meeting-place' }),
-      actionId: 'occupation',
-      phase: 'after',
-      choice: 'A114_SeasonalWorker',
-      result: { type: 'ok' },
-    } as CardListenerContext)
+    const response = useSpace(session, 0, 'forest')
 
-    expect(result).toBeUndefined()
+    expect(response.ok, response.error).toBe(true)
+    expect(response.state.players[0]!.resources.wood).toBe(0)
   })
 
-  it('gains 1 wood with 1st farmer on sheep-market', () => {
-    const listener = findListener('E116-fir-cutter-after-animal-market')
-    expect(listener).toBeDefined()
+  it('E116 S8: an opponent using an animal market grants the Fir Cutter owner no wood', () => {
+    const session = setup({ actor: 1 })
 
-    const session = new GameSession()
-    const state = session.getState().state
-    state.players = state.players.slice(0, 2)
-    const player = state.players[0]!
-    player.occupationPlayed = [CARD_ID]
-    setActiveWorkerCount(player, 2)
-    setWorkersAtHome(state, player, 1)
-    recordPlacements(player, 1)
+    const response = useSpace(session, 1, 'sheep-market')
 
-    const result = executeCardListener(listener!, {
-      state,
-      player,
-      space: mkActionSpace({ id: 'sheep-market' }),
-      actionId: 'place-farmer',
-      phase: 'after',
-      result: { type: 'ok' },
-    } as CardListenerContext)
-
-    expect(result).toBeDefined()
-    expect(result!.flow?.type).toBe('leaf')
-    if (result!.flow?.type === 'leaf') {
-      expect(result!.flow.params).toEqual({ wood: 1 })
-    }
+    expect(response.ok, response.error).toBe(true)
+    expect(response.state.players[0]!.resources.wood).toBe(0)
+    expect(response.state.players[1]!.resources.wood).toBe(0)
   })
-
-  it('gains 1 wood with 2nd farmer on pig-market', () => {
-    const listener = findListener('E116-fir-cutter-after-animal-market')
-    expect(listener).toBeDefined()
-
-    const session = new GameSession()
-    const state = session.getState().state
-    state.players = state.players.slice(0, 2)
-    const player = state.players[0]!
-    player.occupationPlayed = [CARD_ID]
-    setActiveWorkerCount(player, 3)
-    setWorkersAtHome(state, player, 1) // 2 farmers placed
-    recordPlacements(player, 2)
-
-    const result = executeCardListener(listener!, {
-      state,
-      player,
-      space: mkActionSpace({ id: 'pig-market' }),
-      actionId: 'place-farmer',
-      phase: 'after',
-      result: { type: 'ok' },
-    } as CardListenerContext)
-
-    expect(result).toBeDefined()
-    expect(result!.flow?.type).toBe('leaf')
-    if (result!.flow?.type === 'leaf') {
-      expect(result!.flow.params).toEqual({ wood: 1 })
-    }
-  })
-
-  it('does not count a newborn as an earlier placement', () => {
-    const listener = findListener('E116-fir-cutter-after-animal-market')
-    expect(listener).toBeDefined()
-
-    const session = new GameSession()
-    const state = session.getState().state
-    state.players = state.players.slice(0, 2)
-    const player = state.players[0]!
-    player.occupationPlayed = [CARD_ID]
-    setActiveWorkerCount(player, 3)
-    const workers = player.workers.filter((worker) => worker.isActive)
-    workers[2]!.isNewborn = true
-    const firstSpace = state.actionSpaces.find((space) => space.id === 'day-laborer')!
-    const sheepMarket = state.actionSpaces.find((space) => space.id === 'sheep-market')!
-    addWorkerRef(firstSpace, player.id, workers[0]!.id)
-    addWorkerRef(sheepMarket, player.id, workers[1]!.id)
-    recordRoundPlacement(player, firstSpace.id, workers[0]!.id)
-    recordRoundPlacement(player, sheepMarket.id, workers[1]!.id)
-
-    const result = executeCardListener(listener!, {
-      state,
-      player,
-      space: sheepMarket,
-      actionId: 'place-farmer',
-      phase: 'after',
-      result: { type: 'ok' },
-    } as CardListenerContext)
-
-    expect(result?.flow?.type).toBe('leaf')
-    if (result?.flow?.type === 'leaf') {
-      expect(result.flow.params).toEqual({ wood: 1 })
-    }
-  })
-
-  it('gains 2 wood with 3rd farmer on cattle-market', () => {
-    const listener = findListener('E116-fir-cutter-after-animal-market')
-    expect(listener).toBeDefined()
-
-    const session = new GameSession()
-    const state = session.getState().state
-    state.players = state.players.slice(0, 2)
-    const player = state.players[0]!
-    player.occupationPlayed = [CARD_ID]
-    setActiveWorkerCount(player, 4)
-    setWorkersAtHome(state, player, 1) // 3 farmers placed
-    recordPlacements(player, 3)
-
-    const result = executeCardListener(listener!, {
-      state,
-      player,
-      space: mkActionSpace({ id: 'cattle-market' }),
-      actionId: 'place-farmer',
-      phase: 'after',
-      result: { type: 'ok' },
-    } as CardListenerContext)
-
-    expect(result).toBeDefined()
-    expect(result!.flow?.type).toBe('leaf')
-    if (result!.flow?.type === 'leaf') {
-      expect(result!.flow.params).toEqual({ wood: 2 })
-    }
-  })
-
-  it('gains 2 wood with 4th farmer', () => {
-    const listener = findListener('E116-fir-cutter-after-animal-market')
-    expect(listener).toBeDefined()
-
-    const session = new GameSession()
-    const state = session.getState().state
-    state.players = state.players.slice(0, 2)
-    const player = state.players[0]!
-    player.occupationPlayed = [CARD_ID]
-    setActiveWorkerCount(player, 5)
-    setWorkersAtHome(state, player, 1) // 4 farmers placed
-    recordPlacements(player, 4)
-
-    const result = executeCardListener(listener!, {
-      state,
-      player,
-      space: mkActionSpace({ id: 'sheep-market' }),
-      actionId: 'place-farmer',
-      phase: 'after',
-      result: { type: 'ok' },
-    } as CardListenerContext)
-
-    expect(result).toBeDefined()
-    expect(result!.flow?.type).toBe('leaf')
-    if (result!.flow?.type === 'leaf') {
-      expect(result!.flow.params).toEqual({ wood: 2 })
-    }
-  })
-
-  it('gains 3 wood with 5th farmer', () => {
-    const listener = findListener('E116-fir-cutter-after-animal-market')
-    expect(listener).toBeDefined()
-
-    const session = new GameSession()
-    const state = session.getState().state
-    state.players = state.players.slice(0, 2)
-    const player = state.players[0]!
-    player.occupationPlayed = [CARD_ID]
-    setActiveWorkerCount(player, 5)
-    markAllWorkersUsed(state, player) // 5 farmers placed
-    recordPlacements(player, 5)
-    const result = executeCardListener(listener!, {
-      state,
-      player,
-      space: mkActionSpace({ id: 'sheep-market' }),
-      actionId: 'place-farmer',
-      phase: 'after',
-      result: { type: 'ok' },
-    } as CardListenerContext)
-
-    expect(result).toBeDefined()
-    expect(result!.flow?.type).toBe('leaf')
-    if (result!.flow?.type === 'leaf') {
-      expect(result!.flow.params).toEqual({ wood: 3 })
-    }
-  })
-
-  it('does not trigger on non-animal-market spaces', () => {
-    const listener = findListener('E116-fir-cutter-after-animal-market')
-    expect(listener).toBeDefined()
-
-    const session = new GameSession()
-    const state = session.getState().state
-    state.players = state.players.slice(0, 2)
-    const player = state.players[0]!
-    player.occupationPlayed = [CARD_ID]
-    setActiveWorkerCount(player, 2)
-    setWorkersAtHome(state, player, 1)
-    const result = executeCardListener(listener!, {
-      state,
-      player,
-      space: mkActionSpace({ id: 'forest' }),
-      actionId: 'place-farmer',
-      phase: 'after',
-      result: { type: 'ok' },
-    } as CardListenerContext)
-
-    expect(result).toBeUndefined()
-  })
-
 })

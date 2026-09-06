@@ -5,6 +5,8 @@ import type { GameState, PlayerState, ActionSpace } from '../../shared/contract/
 import { GameSession } from '../game/authoritative-session'
 import { markAllWorkersUsed, setWorkersAtHome } from '../../shared/domain/player'
 import { specialEffectAction } from '../../shared/actions/effects/special-effect'
+import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
+import { resolveTriggerIfPresent } from './_helpers/trigger-select'
 import '../../shared/cards/C/C093_InnerDistrictsDirector'
 import type { ActionFlow } from '../../shared/contract/types'
 
@@ -56,6 +58,68 @@ const createState = (player: PlayerState): GameState => {
 }
 
 const findListener = (id: string) => getRegisteredCardListeners().find(l => l.id === id)
+
+const FILLER = '__test_placeholder__'
+
+const setupParity = ({ played = true, workersAtHome = 2 } = {}) => {
+  const session = new GameSession(5093, undefined, { playerCount: 2 })
+  stabilizeRandomHands(session.state.players)
+  const state = session.getState().state
+  state.currentPlayerIndex = 0
+  state.round = 5
+  state.roundPhase = 'work'
+  state.availableMajorImprovements = []
+  state.players.forEach((player) => {
+    player.minorHand = [FILLER]
+    player.occupationHand = [FILLER]
+    player.resources = {
+      ...player.resources, wood: 0, clay: 0, reed: 0, stone: 0, food: 20, grain: 0,
+      vegetable: 0, sheep: 0, boar: 0, cattle: 0,
+    }
+    setWorkersAtHome(state, player, 2)
+  })
+  const player = state.players[0]!
+  player.occupationHand = played ? [FILLER] : [CARD_ID]
+  player.occupationPlayed = played ? [CARD_ID] : []
+  setWorkersAtHome(state, player, workersAtHome)
+  const forest = state.actionSpaces.find((space) => space.id === 'forest')!
+  const clayPit = state.actionSpaces.find((space) => space.id === 'clay-pit')!
+  forest.resources = { ...forest.resources, wood: 3, stone: 0 }
+  clayPit.resources = { ...clayPit.resources, clay: 2, stone: 0 }
+  session.loadState(state)
+  return session
+}
+
+const playOccupation = (session: GameSession) => {
+  let response = session.takeAction(0, 'lessons')
+  if (response.interaction.stateId !== 'wait') return response
+  const option = response.interaction.request.options?.find((candidate) => candidate.value === CARD_ID)
+  if (option) response = session.resolveChoice(response.interaction.playerIndex, option.value)
+  return response
+}
+
+const resolveCardTrigger = (session: GameSession, response: ReturnType<GameSession['takeAction']>) =>
+  resolveTriggerIfPresent(session, response, CARD_ID)
+
+const chooseNonSkip = (session: GameSession, response: ReturnType<GameSession['takeAction']>) => {
+  expect(response.interaction.stateId).toBe('wait')
+  if (response.interaction.stateId !== 'wait') throw new Error('expected optional choice')
+  const option = response.interaction.request.options?.find((candidate) => candidate.value !== '__skip__')
+  expect(option).toBeDefined()
+  return session.resolveChoice(response.interaction.playerIndex, option!.value)
+}
+
+const acceptCard = (session: GameSession, response: ReturnType<GameSession['takeAction']>) =>
+  chooseNonSkip(session, resolveCardTrigger(session, response))
+
+const countStone = (response: ReturnType<GameSession['takeAction']>, spaceId: string) =>
+  response.state.actionSpaces.find((space) => space.id === spaceId)?.resources.stone ?? 0
+
+const playerWorkersOn = (response: ReturnType<GameSession['takeAction']>, spaceId: string) => {
+  const playerId = response.state.players[0]!.id
+  return response.state.actionSpaces.find((space) => space.id === spaceId)?.takenBy
+    .filter((worker) => worker.playerId === playerId).length ?? 0
+}
 
 describe('C093_InnerDistrictsDirector', () => {
   it('returns a special-effect flow that places 1 stone on clay-pit when using forest', () => {
@@ -204,5 +268,98 @@ describe('C093_InnerDistrictsDirector', () => {
     resp = session.resolveChoice(0, '__skip__')
 
     expect(resp.state.actionSpaces.find((s) => s.id === 'clay-pit')!.resources.stone ?? 0).toBe(0)
+  })
+
+  it('C093 S1: Inner Districts Director can be played as the first occupation for no food', () => {
+    const session = setupParity({ played: false })
+    const state = session.getState().state
+    state.players[0]!.resources.food = 0
+    session.loadState(state)
+
+    const response = playOccupation(session)
+
+    expect(response.ok, response.error).toBe(true)
+    expect(response.state.players[0]!.occupationPlayed).toContain(CARD_ID)
+    expect(response.state.players[0]!.resources.food).toBe(0)
+  })
+
+  it('C093 S2: after Forest, accepting adds stone to Clay Pit and permits another placement', () => {
+    const session = setupParity()
+    let response = acceptCard(session, session.takeAction(0, 'forest'))
+
+    expect(countStone(response, 'clay-pit')).toBe(1)
+    response = chooseNonSkip(session, response)
+    expect(response.interaction.stateId).toBe('wait')
+    if (response.interaction.stateId !== 'wait') throw new Error('expected placement choice')
+    expect(response.interaction.request.options?.some((option) => option.value === 'day-laborer')).toBe(true)
+    response = session.resolveChoice(response.interaction.playerIndex, 'day-laborer')
+
+    expect(response.ok, response.error).toBe(true)
+    expect(response.state.players[0]!.resources).toMatchObject({ wood: 3, food: 22 })
+    expect(playerWorkersOn(response, 'forest')).toBe(1)
+    expect(playerWorkersOn(response, 'day-laborer')).toBe(1)
+  })
+
+  it('C093 S3: after Clay Pit, stone can be added to Forest while declining the extra placement', () => {
+    const session = setupParity()
+    let response = acceptCard(session, session.takeAction(0, 'clay-pit'))
+
+    expect(countStone(response, 'forest')).toBe(1)
+    expect(response.interaction.stateId).toBe('wait')
+    if (response.interaction.stateId !== 'wait') throw new Error('expected optional placement')
+    response = session.resolveChoice(response.interaction.playerIndex, '__skip__')
+
+    expect(response.state.players[0]!.resources.clay).toBe(2)
+    expect(playerWorkersOn(response, 'clay-pit')).toBe(1)
+    expect(playerWorkersOn(response, 'day-laborer')).toBe(0)
+  })
+
+  it('C093 S4: declining the card after Forest adds no stone and places no extra person', () => {
+    const session = setupParity()
+    let response = resolveCardTrigger(session, session.takeAction(0, 'forest'))
+    expect(response.interaction.stateId).toBe('wait')
+    if (response.interaction.stateId !== 'wait') throw new Error('expected card choice')
+
+    response = session.resolveChoice(response.interaction.playerIndex, '__skip__')
+
+    expect(countStone(response, 'clay-pit')).toBe(0)
+    expect(playerWorkersOn(response, 'forest')).toBe(1)
+    expect(response.state.actionSpaces.flatMap((space) => space.takenBy)
+      .filter((worker) => worker.playerId === response.state.players[0]!.id)).toHaveLength(1)
+  })
+
+  it('C093 S5: a non-Forest, non-Clay-Pit placement does not trigger the card', () => {
+    const response = setupParity().takeAction(0, 'day-laborer')
+
+    expect(response.ok, response.error).toBe(true)
+    expect(countStone(response, 'forest')).toBe(0)
+    expect(countStone(response, 'clay-pit')).toBe(0)
+    expect(response.interaction.stateId === 'wait' ? response.interaction.sourceCard : undefined)
+      .not.toBe(CARD_ID)
+  })
+
+  it('C093 S6: with no person left, accepting still adds stone but offers no extra placement', () => {
+    const session = setupParity({ workersAtHome: 1 })
+    const response = acceptCard(session, session.takeAction(0, 'forest'))
+
+    expect(countStone(response, 'clay-pit')).toBe(1)
+    expect(playerWorkersOn(response, 'forest')).toBe(1)
+    expect(response.interaction.stateId === 'wait' ? response.interaction.sourceCard : undefined)
+      .not.toBe(CARD_ID)
+  })
+
+  it('C093 S7: the extra Clay Pit placement can trigger the ability a second time in one turn', () => {
+    const session = setupParity()
+    let response = acceptCard(session, session.takeAction(0, 'forest'))
+    response = chooseNonSkip(session, response)
+    expect(response.interaction.stateId).toBe('wait')
+    if (response.interaction.stateId !== 'wait') throw new Error('expected placement choice')
+    response = session.resolveChoice(response.interaction.playerIndex, 'clay-pit')
+    response = acceptCard(session, response)
+
+    expect(response.state.players[0]!.resources).toMatchObject({ wood: 3, clay: 2, stone: 1 })
+    expect(countStone(response, 'forest')).toBe(1)
+    expect(playerWorkersOn(response, 'forest')).toBe(1)
+    expect(playerWorkersOn(response, 'clay-pit')).toBe(1)
   })
 })

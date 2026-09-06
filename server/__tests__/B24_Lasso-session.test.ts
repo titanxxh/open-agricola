@@ -1,63 +1,50 @@
 import { describe, expect, it } from 'vitest'
-import { GameSession } from '../game/authoritative-session'
+import { GameSession, type SessionResponse } from '../game/authoritative-session'
 import { setWorkersAtHome } from '../../shared/domain/player'
-import { isCardFlagged } from '../../shared/cards/helpers/card-state'
-import type { ActionChoiceOption, ActionSpace, Resource } from '../../shared/contract/types'
+import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
+import type { ActionChoiceOption, Resource } from '../../shared/contract/types'
+
 import '../../shared/cards/B/B024_Lasso'
 
 const CARD_ID = 'B024_Lasso'
+const FILLER = '__test_placeholder__'
 const MARKET_SPACES = ['sheep-market', 'pig-market', 'cattle-market']
 
 const resources = (values: Partial<Resource> = {}): Resource => ({
-  wood: 0,
-  clay: 0,
-  reed: 0,
-  stone: 0,
-  food: 0,
-  grain: 0,
-  vegetable: 0,
-  sheep: 0,
-  boar: 0,
-  cattle: 0,
-  begging: 0,
-  ...values,
+  wood: 0, clay: 0, reed: 0, stone: 0, food: 0, grain: 0, vegetable: 0,
+  sheep: 0, boar: 0, cattle: 0, begging: 0, ...values,
 })
 
-const setup = () => {
-  const session = new GameSession(undefined, undefined, { playerCount: 2 })
+const setup = ({ played = true, reed = 1 } = {}) => {
+  const session = new GameSession(5224, undefined, { playerCount: 2 })
+  stabilizeRandomHands(session.state.players)
   const state = session.getState().state
-  state.players = state.players.slice(0, 2)
   state.currentPlayerIndex = 0
   state.round = 14
   state.roundPhase = 'work'
-
+  state.availableMajorImprovements = []
   for (const player of state.players) {
     setWorkersAtHome(state, player, 2)
-    player.minorHand = ['__test_placeholder__']
-    player.occupationHand = ['__test_placeholder__']
+    player.minorHand = [FILLER]
+    player.occupationHand = [FILLER]
   }
-
   const player = state.players[0]!
-  player.minorPlayed.push(CARD_ID)
-  player.resources = resources()
-  player.pastures = [
-    {
-      id: 'p1',
-      size: 4,
-      tiles: [{ row: 0, col: 0 }, { row: 0, col: 1 }, { row: 1, col: 0 }, { row: 1, col: 1 }],
-      stables: 1,
-      animalType: null,
-      animalCount: 0,
-    },
-  ]
-
+  player.minorHand = played ? [FILLER] : [CARD_ID]
+  player.minorPlayed = played ? [CARD_ID] : []
+  player.resources = resources({ reed, food: 20 })
+  player.pastures = [{
+    id: 'p1',
+    size: 4,
+    tiles: [{ row: 0, col: 0 }, { row: 0, col: 1 }, { row: 1, col: 0 }, { row: 1, col: 1 }],
+    stables: 1,
+    animalType: null,
+    animalCount: 0,
+  }]
   for (const space of state.actionSpaces) {
     space.takenBy = []
     space.roundAvailable = Math.min(space.roundAvailable, 14)
   }
-
-  const forest = state.actionSpaces.find((space) => space.id === 'forest')!
-  forest.resources.wood = 3
+  state.actionSpaces.find((space) => space.id === 'forest')!.resources.wood = 3
   state.actionSpaces.find((space) => space.id === 'sheep-market')!.resources.sheep = 0
   state.actionSpaces.find((space) => space.id === 'pig-market')!.resources.boar = 0
   state.actionSpaces.find((space) => space.id === 'cattle-market')!.resources.cattle = 0
@@ -65,133 +52,116 @@ const setup = () => {
   return session
 }
 
-const waitOptions = (resp: ReturnType<GameSession['getState']>): ActionChoiceOption[] => {
-  expect(resp.interaction.stateId).toBe('wait')
-  if (resp.interaction.stateId !== 'wait') return []
-  expect(resp.interaction.request.kind).toBe('choice')
-  return resp.interaction.request.options ?? []
+const enterMinor = (session: GameSession) => {
+  let response = session.takeAction(0, 'major-improvement')
+  expect(response.ok, response.error).toBe(true)
+  if (response.interaction.stateId !== 'wait') return response
+  const improvement = response.interaction.request.options?.find((candidate) =>
+    candidate.value.startsWith('action-improvement-'))
+  if (improvement) response = session.resolveChoice(response.interaction.playerIndex, improvement.value)
+  return response
 }
 
-const acceptOptional = (session: GameSession, resp: ReturnType<GameSession['getState']>) => {
-  const accept = waitOptions(resp).find((option) => option.value !== '__skip__')
+const playLasso = (session: GameSession) => {
+  let response = enterMinor(session)
+  if (!response.state.players[0]!.minorHand.includes(CARD_ID)) return response
+  if (response.interaction.stateId !== 'wait') return response
+  const card = response.interaction.request.options?.find((candidate) => candidate.value === CARD_ID)
+  if (card) response = session.resolveChoice(response.interaction.playerIndex, card.value)
+  return response
+}
+
+const waitOptions = (response: SessionResponse): ActionChoiceOption[] => {
+  expect(response.interaction.stateId).toBe('wait')
+  if (response.interaction.stateId !== 'wait') return []
+  expect(response.interaction.request.kind).toBe('choice')
+  return response.interaction.request.options ?? []
+}
+
+const acceptLasso = (session: GameSession, response: SessionResponse) => {
+  const accept = waitOptions(response).find((option) => option.value !== '__skip__')
   expect(accept).toBeDefined()
-  return session.resolveChoice(0, accept!.value)
+  return session.resolveChoice(response.interaction.playerIndex, accept!.value)
 }
 
-const placedSpaces = (session: GameSession) =>
-  session.getState().state.actionSpaces
-    .filter((space) => space.takenBy.some((worker) => worker.playerId === 'p1'))
-    .map((space) => space.id)
+const placedSpaces = (response: SessionResponse) => response.state.actionSpaces
+  .filter((space) => space.takenBy.some((worker) => worker.playerId === 'p1'))
+  .map((space) => space.id)
+  .sort()
 
-describe('B024_Lasso session', () => {
-  it('after a non-market first placement does not offer a second placement when no animal market is legal', () => {
-    const session = setup()
-    const state = session.getState().state
-    for (const spaceId of MARKET_SPACES) {
-      state.actionSpaces.find((space) => space.id === spaceId)!.takenBy = [
-        { playerId: 'p2', workerId: '1' },
-      ]
-    }
-    session.loadState(state)
+describe('B024 Lasso parity', () => {
+  it('B024 S1: paying one reed plays Lasso', () => {
+    const response = playLasso(setup({ played: false }))
 
-    const resp = session.takeAction(0, 'forest')
-
-    expect(resp.ok).toBe(true)
-    expect(resp.interaction.request.kind).not.toBe('choice')
-    expect(isCardFlagged(resp.state.players[0]!, CARD_ID)).toBe(false)
+    expect(response.ok, response.error).toBe(true)
+    expect(response.state.players[0]!.minorPlayed).toContain(CARD_ID)
+    expect(response.state.players[0]!.resources.reed).toBe(0)
   })
 
-  it('after a non-market first placement offers only animal markets for the second placement', () => {
-    const session = setup()
+  it('B024 S2: without reed Lasso remains unavailable', () => {
+    const response = enterMinor(setup({ played: false, reed: 0 }))
 
-    let resp = session.takeAction(0, 'forest')
-    expect(resp.ok).toBe(true)
-    expect(waitOptions(resp).map((option) => option.value)).toContain('__skip__')
-
-    resp = acceptOptional(session, resp)
-    const options = waitOptions(resp).map((option) => option.value)
-
-    expect(options).toEqual(MARKET_SPACES)
+    expect(response.interaction.stateId).toBe('wait')
+    if (response.interaction.stateId !== 'wait') return
+    expect(response.interaction.request.options?.some((option) => option.value === CARD_ID) ?? false).toBe(false)
+    expect(response.state.players[0]!.minorHand).toContain(CARD_ID)
   })
 
-  it('after a non-market first placement offers only legal animal markets', () => {
+  it('B024 S3: after a non-market placement Lasso restricts the second person to animal markets', () => {
     const session = setup()
-    const state = session.getState().state
-    state.actionSpaces.find((space) => space.id === 'pig-market')!.takenBy = [
-      { playerId: 'p2', workerId: '1' },
-    ]
-    state.actionSpaces.find((space) => space.id === 'cattle-market')!.takenBy = [
-      { playerId: 'p2', workerId: '2' },
-    ]
-    session.loadState(state)
+    let response = session.takeAction(0, 'forest')
 
-    let resp = session.takeAction(0, 'forest')
-    expect(resp.ok).toBe(true)
-    resp = acceptOptional(session, resp)
+    response = acceptLasso(session, response)
+    expect(waitOptions(response).map((option) => option.value)).toEqual(MARKET_SPACES)
+    response = session.resolveChoice(0, 'sheep-market')
 
-    expect(resp.ok).toBe(true)
-    expect(placedSpaces(session).sort()).toEqual(['forest', 'sheep-market'])
+    expect(response.ok, response.error).toBe(true)
+    expect(placedSpaces(response)).toEqual(['forest', 'sheep-market'])
+    expect(response.interaction.stateId === 'wait' && response.interaction.request.kind === 'choice'
+      ? response.interaction.request.options?.map((option) => option.value)
+      : []).not.toContain('__skip__')
   })
 
-  it('after an animal-market first placement does not offer a second placement when no target is legal', () => {
+  it('B024 S4: after an animal-market placement Lasso allows any legal second space', () => {
     const session = setup()
-    const state = session.getState().state
-    for (const space of state.actionSpaces) {
-      if (space.id !== 'sheep-market') {
-        space.takenBy = [{ playerId: 'p2', workerId: '1' }]
-      }
-    }
-    session.loadState(state)
+    let response = session.takeAction(0, 'sheep-market')
 
-    const resp = session.takeAction(0, 'sheep-market')
-
-    expect(resp.ok).toBe(true)
-    expect(resp.interaction.request.kind).not.toBe('choice')
-    expect(isCardFlagged(resp.state.players[0]!, CARD_ID)).toBe(false)
-  })
-
-  it('after an animal-market first placement offers any legal second target and runs target action flow', () => {
-    const session = setup()
-
-    let resp = session.takeAction(0, 'sheep-market')
-    expect(resp.ok).toBe(true)
-    resp = acceptOptional(session, resp)
-
-    const options = waitOptions(resp).map((option) => option.value)
+    response = acceptLasso(session, response)
+    const options = waitOptions(response).map((option) => option.value)
     expect(options).toContain('forest')
-    expect(options).toContain('farmland')
+    response = session.resolveChoice(0, 'forest')
 
-    resp = session.resolveChoice(0, 'forest')
-
-    expect(resp.ok).toBe(true)
-    expect(resp.state.players[0]!.resources.wood).toBe(3)
-    expect(resp.state.actionSpaces.find((space: ActionSpace) => space.id === 'forest')!.resources.wood).toBe(0)
+    expect(response.ok, response.error).toBe(true)
+    expect(placedSpaces(response)).toEqual(['forest', 'sheep-market'])
+    expect(response.state.players[0]!.resources.wood).toBe(3)
   })
 
-  it('skip keeps only the first placement', () => {
+  it('B024 S5: declining Lasso keeps only the first placement', () => {
     const session = setup()
+    const offered = session.takeAction(0, 'forest')
 
-    const resp = session.takeAction(0, 'forest')
-    expect(resp.ok).toBe(true)
-    const skipped = session.resolveChoice(0, '__skip__')
+    const response = session.resolveChoice(offered.interaction.playerIndex, '__skip__')
 
-    expect(skipped.ok).toBe(true)
-    expect(placedSpaces(session)).toEqual(['forest'])
-    expect(isCardFlagged(skipped.state.players[0]!, CARD_ID)).toBe(false)
+    expect(response.ok, response.error).toBe(true)
+    expect(placedSpaces(response)).toEqual(['forest'])
   })
 
-  it('does not recursively trigger from the second placement', () => {
+  it('B024 S6: a non-market placement offers no Lasso action when every animal market is occupied', () => {
     const session = setup()
+    const state = session.getState().state
+    MARKET_SPACES.forEach((spaceId, index) => {
+      state.actionSpaces.find((space) => space.id === spaceId)!.takenBy = [
+        { playerId: 'p2', workerId: state.players[1]!.workers[index]!.id },
+      ]
+    })
+    session.loadState(state)
 
-    let resp = session.takeAction(0, 'forest')
-    expect(resp.ok).toBe(true)
-    resp = acceptOptional(session, resp)
-    resp = session.resolveChoice(0, 'sheep-market')
+    const response = session.takeAction(0, 'forest')
 
-    expect(resp.ok).toBe(true)
-    expect(placedSpaces(session).sort()).toEqual(['forest', 'sheep-market'])
-    if (resp.interaction.stateId === 'wait' && resp.interaction.request.kind === 'choice') {
-      expect(resp.interaction.request.options?.map((option) => option.value)).not.toContain('__skip__')
-    }
+    expect(response.ok, response.error).toBe(true)
+    expect(placedSpaces(response)).toEqual(['forest'])
+    expect(response.interaction.stateId === 'wait' && response.interaction.request.kind === 'choice'
+      ? response.interaction.request.options?.map((option) => option.value)
+      : []).not.toContain('__skip__')
   })
 })

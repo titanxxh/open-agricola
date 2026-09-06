@@ -1,151 +1,146 @@
 import { describe, expect, it } from 'vitest'
-import { GameSession } from '../game/authoritative-session'
-import { readCardExtraData } from '../../shared/cards/helpers/card-state'
-import { runCardEffectHook } from '../../shared/cards/card-effects'
+import { GameSession, type SessionResponse } from '../game/authoritative-session'
+import { markAllWorkersUsed, setWorkersAtHome } from '../../shared/domain/player'
+import { readCardExtraData, writeCardExtraData, writeCardInfobox } from '../../shared/cards/helpers/card-state'
+import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 
-import { setWorkersAtHome } from '../../shared/domain/player'
 import '../../shared/cards/E/E056_RomanPot'
 
 const CARD_ID = 'E056_RomanPot'
+const FILLER = '__test_placeholder__'
 
-const setup = (options?: { playerCount?: number; foodCount?: number }) => {
-  const playerCount = options?.playerCount ?? 2
-  const session = new GameSession()
+const setup = ({
+  played = false, clay = 1, food = 20, firstPlayerIndex = 1, round = 1, cardFood = 4,
+} = {}) => {
+  const session = new GameSession(7056, undefined, { playerCount: 3 })
+  stabilizeRandomHands(session.state.players)
   const state = session.getState().state
-  state.players = state.players.slice(0, playerCount)
   state.currentPlayerIndex = 0
-  state.round = 1
-
-  const player = state.players[0]!
-  setWorkersAtHome(state, player, 2)
-  player.resources.food = 5
-  player.resources.clay = 5
-
-  // Manually add card since it's not in catalog.ts
-  player.minorPlayed.push(CARD_ID)
-  if (!player.cardStates) player.cardStates = {}
-  player.cardStates[CARD_ID] = {
-    extraData: { foodCount: options?.foodCount ?? 4 },
-    infobox: `${options?.foodCount ?? 4} Food`,
+  state.round = round
+  state.roundPhase = 'work'
+  state.availableMajorImprovements = []
+  state.actionSpaces.forEach((space) => { space.takenBy = [] })
+  state.players.forEach((player, index) => {
+    player.startPlayer = index === firstPlayerIndex
+    player.minorHand = [FILLER]
+    player.occupationHand = [FILLER]
+    player.minorPlayed = []
+    player.occupationPlayed = []
+    player.improvements = []
+    player.cardStates = {}
+    player.resources = {
+      ...player.resources,
+      wood: 0, clay: index === 0 ? clay : 0, reed: 0, stone: 0, food: index === 0 ? food : 20,
+      grain: 0, vegetable: 0, sheep: 0, boar: 0, cattle: 0, begging: 0,
+    }
+    setWorkersAtHome(state, player, index === 0 ? 2 : 0)
+  })
+  const owner = state.players[0]!
+  owner.minorHand = played ? [FILLER] : [CARD_ID, FILLER]
+  if (played) {
+    owner.minorPlayed = [CARD_ID]
+    writeCardExtraData(owner, CARD_ID, 'foodCount', cardFood)
+    writeCardInfobox(owner, CARD_ID, `${cardFood} Food`)
   }
-
+  state.roundFirstPlayerId = state.players[firstPlayerIndex]!.id
   session.loadState(state)
   return session
 }
 
-describe('E056_RomanPot session', () => {
-  it('onBuy sets foodCount to 4', () => {
-    const session = new GameSession()
-    const state = session.getState().state
-    state.players = state.players.slice(0, 2)
-    const player = state.players[0]!
-    player.minorPlayed.push(CARD_ID)
-    if (!player.cardStates) player.cardStates = {}
+const enterMinor = (session: GameSession) => {
+  let response = session.takeAction(0, 'major-improvement')
+  if (response.interaction.stateId !== 'wait') return response
+  if (!response.interaction.request.options?.some((option) => option.value === CARD_ID)) {
+    const branch = response.interaction.request.options?.find((option) =>
+      option.value.startsWith('action-improvement-'))
+    if (branch) response = session.resolveChoice(response.interaction.playerIndex, branch.value)
+  }
+  return response
+}
 
-    // Trigger onBuy manually
-    runCardEffectHook(state, player, CARD_ID, 'onBuy')
-    expect(readCardExtraData<number>(player, CARD_ID, 'foodCount')).toBe(4)
+const play = (session: GameSession) => {
+  let response = enterMinor(session)
+  if (!response.state.players[0]!.minorHand.includes(CARD_ID)) return response
+  if (response.interaction.stateId !== 'wait') return response
+  const card = response.interaction.request.options?.find((option) => option.value === CARD_ID)
+  if (card) response = session.resolveChoice(response.interaction.playerIndex, card.value)
+  return response
+}
+
+const offered = (response: SessionResponse) => response.interaction.stateId === 'wait'
+  && (response.interaction.request.options?.some((option) => option.value === CARD_ID) ?? false)
+
+const cardFood = (response: SessionResponse) =>
+  readCardExtraData<number>(response.state.players[0]!, CARD_ID, 'foodCount') ?? 0
+
+const finishRound = (session: GameSession) => {
+  const state = session.getState().state
+  state.players.forEach((player) => {
+    markAllWorkersUsed(state, player)
+    player.minorHand = [FILLER]
+    player.occupationHand = [FILLER]
+  })
+  session.loadState(state)
+  return session.performRoundEnd()
+}
+
+describe('E056 Roman Pot parity', () => {
+  it('E056 S1: paying one clay plays Roman Pot and places four food on it', () => {
+    const response = play(setup())
+
+    expect(response.ok, response.error).toBe(true)
+    expect(response.state.players[0]!.minorPlayed).toContain(CARD_ID)
+    expect(response.state.players[0]!.resources.clay).toBe(0)
+    expect(cardFood(response)).toBe(4)
   })
 
-  it('last player in frozen turn order gets 1 food at start of work phase', () => {
-    const session = new GameSession(undefined, undefined, { playerCount: 3 })
-    const state = session.getState().state
-    state.players = state.players.slice(0, 3)
-    state.round = 1
-    state.roundFirstPlayerId = state.players[1]!.id
+  it('E056 S2: without one clay Roman Pot is unavailable', () => {
+    const response = enterMinor(setup({ clay: 0 }))
 
-    const lastPlayer = state.players[0]!
-    lastPlayer.minorPlayed.push(CARD_ID)
-    if (!lastPlayer.cardStates) lastPlayer.cardStates = {}
-    lastPlayer.cardStates[CARD_ID] = {
-      extraData: { foodCount: 4 },
-      infobox: '4 Food',
-    }
-    lastPlayer.resources.food = 5
-
-    session.loadState(state)
-
-    const hook = runCardEffectHook(state, lastPlayer, CARD_ID, 'onRoundStart')
-    // The hook should return a gain flow for last player
-    expect(hook).toBeDefined()
-    expect(hook?.type).toBe('leaf')
+    expect(offered(response)).toBe(false)
+    expect(response.state.players[0]!.minorHand).toContain(CARD_ID)
+    expect(cardFood(response)).toBe(0)
   })
 
-  it('physical last player does NOT get food when not last in frozen turn order', () => {
-    const session = new GameSession(undefined, undefined, { playerCount: 3 })
-    const state = session.getState().state
-    state.players = state.players.slice(0, 3)
-    state.round = 1
-    state.roundFirstPlayerId = state.players[1]!.id
+  it('E056 S3: the last player in cyclic turn order receives one food at work phase start', () => {
+    const response = finishRound(setup({ played: true, firstPlayerIndex: 1 }))
 
-    const physicalLastPlayer = state.players[2]!
-    physicalLastPlayer.minorPlayed.push(CARD_ID)
-    if (!physicalLastPlayer.cardStates) physicalLastPlayer.cardStates = {}
-    physicalLastPlayer.cardStates[CARD_ID] = {
-      extraData: { foodCount: 4 },
-      infobox: '4 Food',
-    }
-    physicalLastPlayer.resources.food = 5
-
-    session.loadState(state)
-
-    const hook = runCardEffectHook(state, physicalLastPlayer, CARD_ID, 'onRoundStart')
-    expect(hook).toBeNull()
+    expect(response.state.round).toBe(2)
+    expect(response.state.players[0]!.resources.food).toBe(21)
+    expect(cardFood(response)).toBe(3)
   })
 
-  it('does not release food when card is empty', () => {
-    const session = new GameSession()
-    const state = session.getState().state
-    state.players = state.players.slice(0, 2)
-    state.round = 1
+  it('E056 S4: a Roman Pot owner who is not last in turn order receives no food', () => {
+    const response = finishRound(setup({ played: true, firstPlayerIndex: 0 }))
 
-    const lastPlayer = state.players[1]!
-    lastPlayer.minorPlayed.push(CARD_ID)
-    if (!lastPlayer.cardStates) lastPlayer.cardStates = {}
-    lastPlayer.cardStates[CARD_ID] = {
-      extraData: { foodCount: 0 },
-      infobox: '0 Food',
-    }
-
-    session.loadState(state)
-
-    const hook = runCardEffectHook(state, lastPlayer, CARD_ID, 'onRoundStart')
-    expect(hook).toBeNull()
+    expect(response.state.round).toBe(2)
+    expect(response.state.players[0]!.resources.food).toBe(20)
+    expect(cardFood(response)).toBe(4)
   })
 
-  it('foodCount decrements each time food is released', () => {
-    const session = new GameSession()
-    const state = session.getState().state
-    state.players = state.players.slice(0, 2)
-    state.round = 1
+  it('E056 S5: an empty Roman Pot gives no further food even to the last player', () => {
+    const response = finishRound(setup({ played: true, firstPlayerIndex: 1, cardFood: 0 }))
 
-    const lastPlayer = state.players[1]!
-    lastPlayer.minorPlayed.push(CARD_ID)
-    if (!lastPlayer.cardStates) lastPlayer.cardStates = {}
-    lastPlayer.cardStates[CARD_ID] = {
-      extraData: { foodCount: 3 },
-      infobox: '3 Food',
+    expect(response.state.players[0]!.resources.food).toBe(20)
+    expect(cardFood(response)).toBe(0)
+  })
+
+  it('E056 S6: Roman Pot can release exactly four food across eligible work phase starts', () => {
+    for (const remaining of [4, 3, 2, 1, 0]) {
+      const response = finishRound(setup({
+        played: true, firstPlayerIndex: 1, cardFood: remaining,
+      }))
+      expect(response.state.players[0]!.resources.food).toBe(remaining > 0 ? 21 : 20)
+      expect(cardFood(response)).toBe(Math.max(remaining - 1, 0))
     }
+  })
 
-    session.loadState(state)
+  it('E056 S7: Roman Pot contributes its printed one point at scoring', () => {
+    const response = play(setup())
+    const cardEntry = response.scores?.[0]?.categories
+      .find((category) => category.key === 'cards')?.entries
+      .find((entry) => entry.cardId === CARD_ID)
 
-    // First trigger
-    let hook = runCardEffectHook(state, lastPlayer, CARD_ID, 'onRoundStart')
-    expect(hook).toBeDefined()
-    expect(readCardExtraData<number>(lastPlayer, CARD_ID, 'foodCount')).toBe(2)
-
-    // Second trigger
-    hook = runCardEffectHook(state, lastPlayer, CARD_ID, 'onRoundStart')
-    expect(hook).toBeDefined()
-    expect(readCardExtraData<number>(lastPlayer, CARD_ID, 'foodCount')).toBe(1)
-
-    // Third trigger
-    hook = runCardEffectHook(state, lastPlayer, CARD_ID, 'onRoundStart')
-    expect(hook).toBeDefined()
-    expect(readCardExtraData<number>(lastPlayer, CARD_ID, 'foodCount')).toBe(0)
-
-    // Fourth trigger - empty
-    hook = runCardEffectHook(state, lastPlayer, CARD_ID, 'onRoundStart')
-    expect(hook).toBeNull()
+    expect(cardEntry?.score).toBe(1)
   })
 })

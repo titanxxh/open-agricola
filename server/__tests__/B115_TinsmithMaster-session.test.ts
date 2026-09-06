@@ -8,6 +8,7 @@ import type { ActionChoiceOption, FarmTilePosition } from '../../shared/contract
 import '../../shared/cards/B/B115_TinsmithMaster'
 
 const CARD_ID = 'B115_TinsmithMaster'
+const FILLER = '__test_placeholder__'
 
 describe('B115_TinsmithMaster session', () => {
   const setupForSow = (options?: {
@@ -29,11 +30,16 @@ describe('B115_TinsmithMaster session', () => {
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
     state.currentPlayerIndex = 0
-    state.round = 1
+    state.round = options?.pastures ? 14 : 1
     state.roundPhase = 'work'
     state.roundActionOrder = state.roundActionOrder.map(() => null)
-    state.roundActionOrder[0] = 'grain-utilization'
+    state.roundActionOrder[0] = options?.withCard === false ? 'lessons' : 'grain-utilization'
+    state.roundActionOrder[1] = 'sheep-market'
 
+    state.players.forEach((candidate) => {
+      candidate.minorHand = [FILLER]
+      candidate.occupationHand = [FILLER]
+    })
     const player = state.players[0]!
     setWorkersAtHome(state, player, 2)
     player.resources.food = 10
@@ -42,17 +48,85 @@ describe('B115_TinsmithMaster session', () => {
     player.fields = options?.fields ?? []
     player.pastures = options?.pastures ?? []
 
-    if (options?.withCard ?? true) {
-      player.occupationPlayed.push(CARD_ID)
-    }
+    player.occupationPlayed = options?.withCard ?? true ? [CARD_ID] : []
+    player.occupationHand = options?.withCard ?? true ? [FILLER] : [CARD_ID]
 
     session.loadState(state)
     return session
   }
 
+  const playOccupation = (session: GameSession) => {
+    const response = session.takeAction(0, 'lessons')
+    if (!response.state.players[0]!.occupationHand.includes(CARD_ID)) return response
+    expect(response.interaction.stateId).toBe('wait')
+    if (response.interaction.stateId !== 'wait') return response
+    const option = response.interaction.request.options?.find((candidate) => candidate.value === CARD_ID)
+    expect(option, JSON.stringify(response.interaction)).toBeDefined()
+    return session.resolveChoice(0, option!.value)
+  }
+
+  const placeMarketSheep = (session: GameSession, pastureCount: number, houseCount: number) => {
+    const state = session.getState().state
+    state.actionSpaces.find((space) => space.id === 'sheep-market')!.resources.sheep = pastureCount + houseCount
+    session.loadState(state)
+    const pending = session.takeAction(0, 'sheep-market')
+    expect(pending.ok, pending.error).toBe(true)
+    expect(pending.interaction).toMatchObject({ stateId: 'wait', request: { kind: 'animal-reorg' } })
+    return session.resolveChoice(0, 'confirm', {
+      zones: [
+        { id: 'p1', zoneType: 'pasture', animalType: 'sheep', animalCount: pastureCount },
+        ...(houseCount > 0
+          ? [{ id: 'house', zoneType: 'house', animalType: 'sheep', animalCount: houseCount }]
+          : []),
+      ],
+    })
+  }
+
+  it('B115 S1: playing Tinsmith Master through Lessons leaves it in play', () => {
+    const response = playOccupation(setupForSow({ withCard: false }))
+
+    expect(response.ok, response.error).toBe(true)
+    expect(response.state.players[0]!.occupationPlayed).toContain(CARD_ID)
+  })
+
   // --- Animal capacity tests ---
 
   describe('pasture capacity', () => {
+    it('B115 S2: a one-space pasture without a stable holds three sheep', () => {
+      const session = setupForSow({
+        pastures: [{
+          id: 'p1', size: 1, tiles: [{ row: 0, col: 0 }], stables: 0,
+          animalType: null, animalCount: 0,
+        }],
+      })
+
+      const response = placeMarketSheep(session, 3, 0)
+
+      expect(response.ok, response.error).toBe(true)
+      expect(response.state.players[0]!.pastures[0]).toMatchObject({
+        animalType: 'sheep', animalCount: 3,
+      })
+    })
+
+    it('B115 S3: a one-space pasture with a stable still holds only four sheep', () => {
+      const session = setupForSow({
+        pastures: [{
+          id: 'p1', size: 1, tiles: [{ row: 0, col: 0 }], stables: 1,
+          animalType: null, animalCount: 0,
+        }],
+      })
+      const state = session.getState().state
+      state.players[0]!.stableTiles = [{ row: 0, col: 0 }]
+      session.loadState(state)
+
+      const response = placeMarketSheep(session, 4, 1)
+
+      expect(response.ok, response.error).toBe(true)
+      expect(response.state.players[0]!.pastures[0]).toMatchObject({
+        animalType: 'sheep', animalCount: 4,
+      })
+    })
+
     it('adds +1 capacity to pastures without stables', () => {
       const session = setupForSow({
         pastures: [
@@ -171,7 +245,7 @@ describe('B115_TinsmithMaster session', () => {
     const selectPositions = (session: GameSession, positions: FarmTilePosition[]) =>
       session.commitSelectionChoice(0, { positions })
 
-    it('offers optional selection and adds 1 bonus crop when sowing grain in 1 field', () => {
+    it('B115 S4: accepting after sowing grain adds one crop to the normal stack', () => {
       const session = setupForSow({
         grain: 2,
         fields: [{ row: 0, col: 0, stacks: [] }],
@@ -197,7 +271,7 @@ describe('B115_TinsmithMaster session', () => {
       expect(field?.stacks[0]?.remaining ?? 0).toBe(4)
     })
 
-    it('skip leaves a single eligible field at its normal sow count', () => {
+    it('B115 S5: declining after sowing leaves the normal crop count', () => {
       const session = setupForSow({
         grain: 2,
         fields: [{ row: 0, col: 0, stacks: [] }],
@@ -217,7 +291,7 @@ describe('B115_TinsmithMaster session', () => {
       expect(field?.stacks[0]?.remaining ?? 0).toBe(3)
     })
 
-    it('offers optional selection and adds 1 bonus vegetable when sowing vegetable in 1 field', () => {
+    it('B115 S6: accepting after sowing vegetables adds one vegetable', () => {
       const session = setupForSow({
         vegetable: 2,
         fields: [{ row: 0, col: 0, stacks: [] }],
@@ -266,7 +340,7 @@ describe('B115_TinsmithMaster session', () => {
       expect(field?.stacks[0]?.remaining ?? 0).toBe(3) // normal grain sow, no bonus
     })
 
-    it('only adds bonus crop to selected freshly sown fields', () => {
+    it('B115 S7: after sowing two fields the bonus may be limited to one selected field', () => {
       const session = setupForSow({
         grain: 3,
         fields: [

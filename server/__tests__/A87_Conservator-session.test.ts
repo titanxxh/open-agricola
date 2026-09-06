@@ -251,3 +251,127 @@ describe('A087_Conservator session sourceCard', () => {
     expect(resp.interaction.request.options?.find((option) => option.value === 'stone')?.sourceCard).toBe(CARD_ID)
   })
 })
+
+const playOccupation = (session: GameSession) => {
+  const response = session.takeAction(0, 'lessons')
+  if (!response.state.players[0]!.occupationHand.includes(CARD_ID)) return response
+  if (response.interaction.stateId !== 'wait') return response
+  const card = response.interaction.request.options?.find((option) => option.value === CARD_ID)
+  expect(card).toBeDefined()
+  return session.resolveChoice(response.interaction.playerIndex, card!.value)
+}
+
+const renovate = (session: GameSession, target?: 'clay' | 'stone') => {
+  let response = session.takeAction(0, 'house-redevelopment')
+  if (response.interaction.stateId === 'wait'
+    && response.interaction.promptKey === 'ui.interactionChooseRenovationTarget') {
+    expect(target).toBeDefined()
+    const option = response.interaction.request.options?.find((candidate) => candidate.value === target)
+    expect(option).toBeDefined()
+    response = session.resolveChoice(response.interaction.playerIndex, option!.value)
+  }
+  return response
+}
+
+describe('A087 Conservator parity', () => {
+  it('A087 S1: Conservator is played as the first occupation without paying food', () => {
+    const session = setup({ playA87: false })
+    const state = session.getState().state
+    state.round = 6
+    state.players.forEach((player) => {
+      player.minorHand = ['__test_placeholder__']
+      player.occupationHand = ['__test_placeholder__']
+      player.resources.food = 0
+    })
+    state.players[0]!.occupationHand = [CARD_ID]
+    setWorkersAtHome(state, state.players[0]!, 2)
+    session.loadState(state)
+
+    const response = playOccupation(session)
+
+    expect(response.ok, response.error).toBe(true)
+    expect(response.state.players[0]!.occupationPlayed).toContain(CARD_ID)
+    expect(response.state.players[0]!.resources.food).toBe(0)
+  })
+
+  it('A087 S2: a wooden two-room house can renovate directly to stone for two stone and one reed', () => {
+    const session = setup({
+      houseType: 'wood', rooms: 2, resources: { clay: 0, stone: 2, reed: 1 },
+    })
+    const state = session.getState().state
+    state.round = 6
+    setWorkersAtHome(state, state.players[0]!, 2)
+    session.loadState(state)
+
+    const response = renovate(session, 'stone')
+
+    expect(response.ok, response.error).toBe(true)
+    expect(response.state.players[0]!.houseType).toBe('stone')
+    expect(response.state.players[0]!.resources).toMatchObject({ stone: 0, reed: 0 })
+  })
+
+  it('A087 S3: when both renovation paths are affordable the player can choose direct stone', () => {
+    const session = setup({
+      houseType: 'wood', rooms: 2, resources: { clay: 2, stone: 2, reed: 1 },
+    })
+    const state = session.getState().state
+    state.round = 6
+    setWorkersAtHome(state, state.players[0]!, 2)
+    session.loadState(state)
+
+    const response = renovate(session, 'stone')
+
+    expect(response.ok, response.error).toBe(true)
+    expect(response.state.players[0]!.houseType).toBe('stone')
+    expect(response.state.players[0]!.resources).toMatchObject({ clay: 2, stone: 0, reed: 0 })
+  })
+
+  it('A087 S4: Conservator can be declined by choosing the normal wood-to-clay renovation', () => {
+    const session = setup({
+      houseType: 'wood', rooms: 2, resources: { clay: 2, stone: 2, reed: 1 },
+    })
+    const state = session.getState().state
+    state.round = 6
+    setWorkersAtHome(state, state.players[0]!, 2)
+    session.loadState(state)
+
+    const response = renovate(session, 'clay')
+
+    expect(response.ok, response.error).toBe(true)
+    expect(response.state.players[0]!.houseType).toBe('clay')
+    expect(response.state.players[0]!.resources).toMatchObject({ clay: 0, stone: 2, reed: 0 })
+  })
+
+  it('A087 S5: without Conservator stone resources alone do not enable a wood-house renovation', () => {
+    const session = setup({
+      playA87: false, houseType: 'wood', rooms: 2, resources: { clay: 0, stone: 2, reed: 1 },
+    })
+    const state = session.getState().state
+    state.round = 6
+    setWorkersAtHome(state, state.players[0]!, 2)
+    session.loadState(state)
+
+    const response = session.takeAction(0, 'house-redevelopment')
+
+    expect(response.ok).toBe(false)
+    expect(response.state.players[0]!.houseType).toBe('wood')
+    expect(response.state.players[0]!.resources).toMatchObject({ stone: 2, reed: 1 })
+    expect(response.state.actionSpaces.find((space) => space.id === 'house-redevelopment')?.takenBy).toEqual([])
+  })
+
+  it('A087 S6: a clay house follows the normal renovation path to stone', () => {
+    const session = setup({
+      houseType: 'clay', rooms: 2, resources: { stone: 2, reed: 1 },
+    })
+    const state = session.getState().state
+    state.round = 6
+    setWorkersAtHome(state, state.players[0]!, 2)
+    session.loadState(state)
+
+    const response = renovate(session)
+
+    expect(response.ok, response.error).toBe(true)
+    expect(response.state.players[0]!.houseType).toBe('stone')
+    expect(response.state.players[0]!.resources).toMatchObject({ stone: 0, reed: 0 })
+  })
+})

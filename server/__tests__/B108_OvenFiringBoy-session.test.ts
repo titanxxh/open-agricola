@@ -1,94 +1,144 @@
 import { describe, expect, it } from 'vitest'
-import { GameSession } from '../game/authoritative-session'
+import { GameSession, type SessionResponse } from '../game/authoritative-session'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
-
 import { setWorkersAtHome } from '../../shared/domain/player'
+import { resolveTriggerIfPresent } from './_helpers/trigger-select'
 import '../../shared/cards/B/B108_OvenFiringBoy'
 
-describe('B108_OvenFiringBoy session', () => {
-  const setup = () => {
-    const session = new GameSession()
-    stabilizeRandomHands(session.state.players)
-    const state = session.getState().state
-    state.players = state.players.slice(0, 2)
-    state.currentPlayerIndex = 0
-    state.round = 1
+const CARD_ID = 'B108_OvenFiringBoy'
+const FILLER = '__test_placeholder__'
 
-    const player = state.players[0]!
-    player.occupationHand.push('B108_OvenFiringBoy')
-    player.resources.grain = 3
-    player.resources.food = 0
-    player.resources.wood = 0
+const setup = ({
+  played = true, actor = 0, grain = 1, fireplace = true, playerCount = 4,
+}: { played?: boolean; actor?: number; grain?: number; fireplace?: boolean; playerCount?: number } = {}) => {
+  const session = new GameSession(5508, undefined, { playerCount })
+  stabilizeRandomHands(session.state.players)
+  const state = session.getState().state
+  state.currentPlayerIndex = actor
+  state.round = 5
+  state.roundPhase = 'work'
+  state.players.forEach((player) => {
     setWorkersAtHome(state, player, 2)
-    state.players[1]!.workersAvailable = 2
+    player.minorHand = [FILLER]
+    player.occupationHand = [FILLER]
+    player.resources = {
+      ...player.resources, wood: 0, clay: 0, reed: 0, stone: 0, food: 0, grain: 0, vegetable: 0,
+    }
+  })
+  const owner = state.players[0]!
+  owner.occupationHand = played ? [FILLER] : [CARD_ID]
+  owner.occupationPlayed = played ? [CARD_ID] : []
+  owner.resources.grain = grain
+  owner.improvements = fireplace ? ['Major_Fireplace1'] : []
+  if (fireplace) {
+    state.availableMajorImprovements = state.availableMajorImprovements
+      .filter((id) => id !== 'Major_Fireplace1')
+  }
+  for (const [spaceId, wood] of [['forest', 3], ['grove', 2], ['copse', 1]] as const) {
+    const space = state.actionSpaces.find((candidate) => candidate.id === spaceId)
+    if (space) space.resources.wood = wood
+  }
+  state.actionSpaces.find((space) => space.id === 'clay-pit')!.resources.clay = 1
+  session.loadState(state)
+  return session
+}
 
-    // Ensure wood space has accumulated resources
-    const forest = state.actionSpaces.find((s) => s.id === 'forest')
-    if (forest) forest.resources.wood = 3
+const play = (session: GameSession) => {
+  const response = session.takeAction(0, 'lessons')
+  expect(response.ok, response.error).toBe(true)
+  if (!response.state.players[0]!.occupationHand.includes(CARD_ID)) return response
+  expect(response.interaction.stateId).toBe('wait')
+  if (response.interaction.stateId !== 'wait') return response
+  const option = response.interaction.request.options?.find((candidate) => candidate.value === CARD_ID)
+  expect(option, JSON.stringify(response.interaction)).toBeDefined()
+  return session.resolveChoice(response.interaction.playerIndex, option!.value)
+}
 
-    session.loadState(state)
-    session.devPlayCard(0, 'B108_OvenFiringBoy')
-    return session
+const enterBake = (session: GameSession, response: SessionResponse) =>
+  resolveTriggerIfPresent(session, response, CARD_ID)
+
+const bakeOnce = (session: GameSession, response: SessionResponse) => {
+  response = enterBake(session, response)
+  if (response.interaction.stateId === 'wait' && response.interaction.sourceCard === CARD_ID) {
+    const accept = response.interaction.request.options?.find((option) => option.value !== '__skip__')
+    expect(accept, JSON.stringify(response.interaction)).toBeDefined()
+    response = session.resolveChoice(response.interaction.playerIndex, accept!.value)
+  }
+  if (response.interaction.stateId !== 'wait'
+    || response.interaction.request.kind === 'confirm-next-player') return response
+  expect(response.interaction.stateId).toBe('wait')
+  if (response.interaction.stateId !== 'wait') return response
+  const fireplace = response.interaction.request.options?.find((option) =>
+    option.value === 'Major_Fireplace1' || option.sourceCard === 'Major_Fireplace1')
+  expect(fireplace, JSON.stringify(response.interaction)).toBeDefined()
+  response = session.resolveChoice(response.interaction.playerIndex, fireplace!.value)
+  if (response.interaction.stateId === 'wait'
+    && response.interaction.promptKey === 'ui.interactionBakeBreadCount') {
+    const one = response.interaction.request.options?.find((option) =>
+      option.value === 'count-Major_Fireplace1-1')
+    expect(one, JSON.stringify(response.interaction)).toBeDefined()
+    response = session.resolveChoice(response.interaction.playerIndex, one!.value)
+  }
+  return response
+}
+
+describe('B108 Oven Firing Boy parity', () => {
+  it('B108 S1: playing Oven Firing Boy through Lessons leaves it in play', () => {
+    const response = play(setup({ played: false, playerCount: 2 }))
+
+    expect(response.ok, response.error).toBe(true)
+    expect(response.state.players[0]!.occupationPlayed).toContain(CARD_ID)
+  })
+
+  for (const [scenario, spaceId, wood] of [
+    ['S2', 'forest', 3],
+    ['S3', 'grove', 2],
+    ['S4', 'copse', 1],
+  ] as const) {
+    it(`B108 ${scenario}: its owner using ${spaceId} can bake one grain with a Fireplace`, () => {
+      const session = setup()
+
+      const response = bakeOnce(session, session.takeAction(0, spaceId))
+
+      expect(response.ok, response.error).toBe(true)
+      expect(response.state.players[0]!.resources).toMatchObject({ wood, grain: 0, food: 2 })
+    })
   }
 
-  it('triggers bake bread opportunity when using forest', () => {
+  it('B108 S5: declining the Forest bake keeps grain and food unchanged while collecting wood', () => {
     const session = setup()
+    const offered = enterBake(session, session.takeAction(0, 'forest'))
+    expect(offered.interaction.stateId).toBe('wait')
+    if (offered.interaction.stateId !== 'wait') return
+    expect(offered.interaction.request.options?.some((option) => option.value === '__skip__')).toBe(true)
 
-    // Player needs a baking improvement to actually bake bread
-    // Without one, the bake-bread action is not doable.
-    // The listener should still trigger and provide the action.
-    const resp = session.takeAction(0, 'forest')
-    expect(resp.ok).toBe(true)
+    const response = session.resolveChoice(offered.interaction.playerIndex, '__skip__')
 
-    // Player collected wood from forest
-    const after = session.getState().state
-    expect(after.players[0]!.resources.wood).toBe(3) // accumulated wood
+    expect(response.ok, response.error).toBe(true)
+    expect(response.state.players[0]!.resources).toMatchObject({ wood: 3, grain: 1, food: 0 })
   })
 
-  it('does not trigger on non-wood accumulation spaces', () => {
-    const session = setup()
-    const state = session.getState().state
+  for (const [scenario, spaceId, expected] of [
+    ['S6', 'clay-pit', { clay: 1, grain: 1, food: 0 }],
+    ['S7', 'day-laborer', { grain: 1, food: 2 }],
+  ] as const) {
+    it(`B108 ${scenario}: ${spaceId} does not offer the Oven Firing Boy bake`, () => {
+      const response = setup().takeAction(0, spaceId)
 
-    const clayPit = state.actionSpaces.find((s) => s.id === 'clay-pit')
-    if (clayPit) clayPit.resources.clay = 2
-    session.loadState(state)
+      expect(response.ok, response.error).toBe(true)
+      expect(response.interaction.stateId === 'wait' ? response.interaction.sourceCard : undefined)
+        .not.toBe(CARD_ID)
+      expect(response.state.players[0]!.resources).toMatchObject(expected)
+    })
+  }
 
-    const resp = session.takeAction(0, 'clay-pit')
-    expect(resp.ok).toBe(true)
+  it('B108 S8: an opponent using Forest does not give the card owner a bake action', () => {
+    const response = setup({ actor: 1 }).takeAction(1, 'forest')
 
-    // No bake bread should have triggered (only wood spaces)
-    const after = session.getState().state
-    expect(after.players[0]!.resources.food).toBe(0) // no food gained
-  })
-
-  it('does not trigger for opponent on wood spaces', () => {
-    const session = setup()
-    const state = session.getState().state
-    state.currentPlayerIndex = 1
-    state.players[1]!.resources.wood = 0
-    session.loadState(state)
-
-    const resp = session.takeAction(1, 'forest')
-    expect(resp.ok).toBe(true)
-
-    // Opponent used forest but card owner should not get bake bread
-    const after = session.getState().state
-    expect(after.players[0]!.resources.food).toBe(0)
-  })
-
-  it('does not trigger on day-laborer (not a wood space)', () => {
-    const session = setup()
-    const state = session.getState().state
-    const foodBefore = state.players[0]!.resources.food
-    session.loadState(state)
-
-    const resp = session.takeAction(0, 'day-laborer')
-    expect(resp.ok).toBe(true)
-
-    // Day laborer gives some food but no bake bread was triggered
-    // We just verify the action completed normally without bake-bread choice
-    const after = session.getState().state
-    // Day laborer typically gives 2 food in 2-player — no extra bake bread
-    expect(after.players[0]!.resources.food).toBeGreaterThanOrEqual(foodBefore)
+    expect(response.ok, response.error).toBe(true)
+    expect(response.interaction.stateId === 'wait' ? response.interaction.sourceCard : undefined)
+      .not.toBe(CARD_ID)
+    expect(response.state.players[0]!.resources).toMatchObject({ grain: 1, food: 0 })
+    expect(response.state.players[1]!.resources.wood).toBe(3)
   })
 })
