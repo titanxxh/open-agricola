@@ -10,6 +10,17 @@ import type { CardImpl } from '../registry'
 const CARD_ID = 'E021_SheepRug'
 const WISH_SPACE_IDS = ['wish-children', 'urgent-wish-children']
 
+const countNonNewbornPeople = (
+  state: CardListenerContext['state'],
+  space: CardListenerContext['space'],
+): number =>
+  space.takenBy.filter((workerRef) => {
+    const worker = state.players
+      .find((candidate) => candidate.id === workerRef.playerId)
+      ?.workers.find((candidate) => candidate.id === workerRef.workerId)
+    return worker?.isNewborn !== true
+  }).length
+
 const computeArgsListener: CardListenerRegistration = {
   id: 'E21-sheep-rug-compute-args-place-farmer',
   cardIds: [CARD_ID],
@@ -21,6 +32,7 @@ const computeArgsListener: CardListenerRegistration = {
       const space = context.state.actionSpaces.find((s) => s.id === spaceId)
       if (!space) continue
       if (!isSpaceOccupied(space)) continue
+      if (countNonNewbornPeople(context.state, space) > 1) continue
       if (!space.canBeExecutedByPlayer(context.state, context.player)) continue
       extraOptions.push({
         value: `${OCCUPIED_SPACE_CHOICE_PREFIX}${spaceId}`,

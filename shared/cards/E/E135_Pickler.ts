@@ -21,15 +21,16 @@ const cardImpl = {
     if (wood <= 0) return
     return gainLeaf(CARD_ID, { wood })
   },
-  computeBonusScore: (state, player) => {
-    const totalVeg = (p: typeof player) =>
-      (p.resources.vegetable ?? 0) + getLogicalFields(p)
+  computeSharedPostScore: (state) => {
+    const totalVeg = (player: (typeof state.players)[number]) =>
+      (player.resources.vegetable ?? 0) + getLogicalFields(player)
         .flatMap((field) => field.stacks)
         .filter((stack) => stack.kind === 'vegetable')
         .reduce((sum, stack) => sum + stack.remaining, 0)
-    const myVeg = totalVeg(player)
     const maxVeg = Math.max(...state.players.map(totalVeg))
-    return myVeg === maxVeg && myVeg > 0 ? 3 : 0
+    return state.players.flatMap((player) =>
+      totalVeg(player) === maxVeg ? [{ playerId: player.id, score: 3 }] : [],
+    )
   },
 },
   reaches: [] as readonly string[],

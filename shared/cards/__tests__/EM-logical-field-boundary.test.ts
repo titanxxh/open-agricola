@@ -83,7 +83,9 @@ describe('E/M Logical Field consumers', () => {
       extraData: { cardFieldStacks: [{ crop: 'vegetable', remaining: 2 }] },
     }
     expect(E117_PipeSmoker_impl.effect.onStartHarvest!(state, player)).toBeUndefined()
-    expect(E135_Pickler_impl.effect.computeBonusScore!(state, player)).toBe(3)
+    expect(E135_Pickler_impl.effect.computeSharedPostScore!(state, player, [])).toEqual([
+      { playerId: player.id, score: 3 },
+    ])
   })
 })
 
