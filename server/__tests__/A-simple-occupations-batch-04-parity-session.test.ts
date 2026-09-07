@@ -216,6 +216,7 @@ const setupPigBreederRound = ({ round = 12, boar = 2, capacity = true } = {}) =>
   })
   const player = state.players[0]!
   player.resources.boar = boar
+  player.resources.sheep = capacity ? 0 : 1
   player.houseAnimalType = capacity ? null : 'sheep'
   player.houseAnimalCount = capacity ? 0 : 1
   player.stableAnimals = {}
@@ -270,7 +271,7 @@ describe('A165 Pig Breeder parity', () => {
     expect(response.state.players[0]!.resources.boar).toBe(1)
   })
 
-  it('A165 S5: two pigs with no free animal capacity do not breed', () => {
+  it('A165 S5: a newborn pig is discarded when no animal capacity is free', () => {
     const session = setupPigBreederRound({ capacity: false })
     let response = session.performRoundEnd()
     if (response.interaction.stateId === 'wait' && response.interaction.request.kind === 'animal-reorg') {
@@ -282,6 +283,7 @@ describe('A165 Pig Breeder parity', () => {
       })
     }
 
+    expect(response.ok, response.error).toBe(true)
     expect(response.state.players[0]!.resources.boar).toBe(2)
   })
 })

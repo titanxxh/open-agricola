@@ -27,6 +27,7 @@ import { collectComputeExchanges } from '../../cards/card-listeners'
 import { isMajorCardId } from '../../cards/helpers/card-type'
 import { dispatchTradeAppliedListener } from '../helpers/trade-applied-listener'
 import { exchangeToTrade } from '../helpers/trades'
+import { getPlacedAnimalsByType } from '../../domain/animal-zones'
 import { readCardExtraData, writeCardExtraData } from '../../cards/helpers/card-state'
 import {
   applyAnimalPayment,
@@ -214,12 +215,15 @@ export const canAffordTrade = (
   player: PlayerState,
   trade: Trade,
   times: number = 1,
+  state?: GameState,
 ): boolean => {
   const fromResources = trade.from
   const resourceKeys = Object.keys(fromResources) as ResourceKey[]
 
+  const placed = trade.fromFarmyard && state ? getPlacedAnimalsByType(player, state) : undefined
   return resourceKeys.every((key) => {
     const requiredAmount = (fromResources[key] ?? 0) * times
+    if (trade.fromFarmyard && isAnimalResourceKey(key) && (placed?.[key] ?? 0) < requiredAmount) return false
     return (player.resources[key] ?? 0) >= requiredAmount
   })
 }
@@ -268,17 +272,18 @@ export const recordHarvestExchangeUses = (
  * @param trade - Trade definition with optional max limit
  * @returns Maximum times the trade can be applied
  */
-export const getMaxTradeTimes = (player: PlayerState, trade: Trade): number => {
+export const getMaxTradeTimes = (player: PlayerState, trade: Trade, state?: GameState): number => {
   const fromResources = trade.from
   const resourceKeys = Object.keys(fromResources) as ResourceKey[]
 
   // Calculate max times based on player resources
   let maxFromResources = Infinity
+  const placed = trade.fromFarmyard && state ? getPlacedAnimalsByType(player, state) : undefined
   for (const key of resourceKeys) {
     const requiredPerTrade = fromResources[key] ?? 0
     if (requiredPerTrade > 0) {
       const timesFromThisResource = Math.floor(
-        (player.resources[key] ?? 0) / requiredPerTrade,
+        Math.min(player.resources[key] ?? 0, trade.fromFarmyard && isAnimalResourceKey(key) ? placed?.[key] ?? 0 : Infinity) / requiredPerTrade,
       )
       maxFromResources = Math.min(maxFromResources, timesFromThisResource)
     }
@@ -437,7 +442,7 @@ const getPlayerCookeryTrades = (player: PlayerState, state?: GameState): Trade[]
 
 const hasAffordableCookeryTrade = (player: PlayerState, state?: GameState): boolean => {
   for (const trade of getExchangesInWindow(player, 'anytime', state)) {
-    if (canAffordTrade(player, trade, 1)) return true
+    if (canAffordTrade(player, trade, 1, state)) return true
   }
   return false
 }
@@ -445,14 +450,14 @@ const hasAffordableCookeryTrade = (player: PlayerState, state?: GameState): bool
 const hasAffordableTradeForIds = (
   player: PlayerState,
   tradeIds: string[],
-  _state?: GameState,
+  state?: GameState,
   maxTradeTimesBySourceId?: Record<string, number>,
 ): boolean => {
   for (const trade of getExchangesByTradeIds(player, tradeIds)) {
     const sourceId = trade.sourceId ?? trade.source
     const contextMax = sourceId ? maxTradeTimesBySourceId?.[sourceId] : undefined
     if (contextMax !== undefined && contextMax <= 0) continue
-    if (canAffordTrade(player, trade, 1)) return true
+    if (canAffordTrade(player, trade, 1, state)) return true
   }
   return false
 }
@@ -514,10 +519,10 @@ const buildExchangeOptions = (
   const options: ActionChoiceOption[] = []
   for (let i = 0; i < trades.length; i++) {
     const trade = trades[i]
-    if (!canAffordTrade(player, trade, 1)) continue
+    if (!canAffordTrade(player, trade, 1, state)) continue
     const sourceId = trade.sourceId ?? trade.source
     const contextMax = sourceId ? maxTradeTimesBySourceId?.[sourceId] : undefined
-    const max = Math.min(getMaxTradeTimes(player, trade), contextMax ?? Infinity)
+    const max = Math.min(getMaxTradeTimes(player, trade, state), contextMax ?? Infinity)
     if (max <= 0) continue
     options.push({
       value: `trade:${i}:${max}`,
@@ -561,7 +566,7 @@ const resolveExchangeChoice = (
       if (!trade) return
       const sourceId = trade.sourceId ?? trade.source
       const contextMax = sourceId ? maxTradeTimesBySourceId?.[sourceId] : undefined
-      const max = Math.min(getMaxTradeTimes(player, trade), contextMax ?? Infinity)
+      const max = Math.min(getMaxTradeTimes(player, trade, state), contextMax ?? Infinity)
       const times = Math.min(count, max)
       if (times > 0) {
         const preResources = { ...player.resources }
@@ -602,7 +607,7 @@ const resolveExchangeChoice = (
     const trade = trades[index]
     if (!trade) return { type: 'ok' }
     const count = parts[2] ? Number(parts[2]) : 1
-    const max = getMaxTradeTimes(player, trade)
+    const max = getMaxTradeTimes(player, trade, state)
     const sourceId = trade.sourceId ?? trade.source
     const contextMax = sourceId ? maxTradeTimesBySourceId?.[sourceId] : undefined
     const boundedMax = Math.min(max, contextMax ?? Infinity)
@@ -682,7 +687,7 @@ export const anytimeExchangeAction: ActionDefinition = {
       return BUILDING_RESOURCES.some((resource) => (player.resources[resource] ?? 0) > 0)
     }
     const directTrade = readDirectTrade(ctx?.actionContext)
-    if (directTrade) return canAffordTrade(player, directTrade, 1)
+    if (directTrade) return canAffordTrade(player, directTrade, 1, state)
     const tradeIds = (ctx?.actionContext as { tradeIds?: string[] } | undefined)?.tradeIds
     const maxTradeTimesBySourceId = readMaxTradeTimesBySourceId(ctx?.actionContext)
     if (tradeIds && tradeIds.length > 0) {
@@ -714,7 +719,7 @@ export const anytimeExchangeAction: ActionDefinition = {
     }
     const directTrade = readDirectTrade(actionContext)
     if (directTrade) {
-      if (!canAffordTrade(player, directTrade, 1)) {
+      if (!canAffordTrade(player, directTrade, 1, state)) {
         return { type: 'fail', errorKey: 'log.actionNoExchange' }
       }
       const animalPaymentPreference = readAnimalPaymentPreference(actionContext)

@@ -5,6 +5,7 @@ import { markAllWorkersUsed, setActiveWorkerCount } from '../../shared/domain/pl
 import '../../shared/cards/D/D060_LargePottery'
 import '../../shared/cards/B/B104_SheepWalker'
 import '../../shared/cards/E/E058_LunchtimeBeer'
+import '../../shared/cards/M/M081_PeatBoat'
 import { autoAdvanceRoundEnd } from '../../tests/llm-card-gen/session-helpers'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 describe('harvest session flow', () => {
@@ -360,6 +361,35 @@ describe('harvest session flow', () => {
     expect(p.pastures[0]).toMatchObject({ animalType: null, animalCount: 0 })
     // No food produced -> full 2-food deficit goes to begging.
     expect(p.resources.begging).toBe(2)
+  })
+
+  it.each([0, 1])('does not spend newly acquired sheep through B104 in the same feed batch with %i placed sheep', (placed) => {
+    const { session, state, playerA } = setupSinglePlayerHarvest()
+    state.enableFarmersOfTheMoor = true
+    playerA.occupationPlayed.push('B104_SheepWalker')
+    playerA.minorPlayed.push('M081_PeatBoat')
+    playerA.resources.fuel = 2
+    playerA.resources.sheep = placed
+    playerA.houseAnimalType = placed ? 'sheep' : null
+    playerA.houseAnimalCount = placed
+    session.loadState(state)
+    const pending = skipPostReapAnytime(session, session.performRoundEnd())
+    expect(pending.interaction).toMatchObject({ stateId: 'wait', request: {
+      kind: 'feed', maxTradeTimesBySourceId: { B104_SheepWalker: placed },
+    } })
+    const peatTrade = { sourceId: 'M081_PeatBoat', exchangeIndex: 4, count: 1 }
+    const walkerTrade = { sourceId: 'B104_SheepWalker', exchangeIndex: 2, count: 1 }
+    const rejected = session.resolveChoice(0, 'confirm', { selections: [
+      peatTrade, ...Array.from({ length: placed + 1 }, () => walkerTrade),
+    ] })
+    expect(rejected.ok).toBe(false)
+    expect(rejected.state).toEqual(pending.state)
+    expect(rejected.interaction).toEqual(pending.interaction)
+    const accepted = session.resolveChoice(0, 'confirm', { selections: [
+      peatTrade, ...Array.from({ length: placed }, () => walkerTrade),
+    ] })
+    expect(accepted.ok, accepted.error).toBe(true)
+    expect(accepted.state.players[0]!.resources).toMatchObject({ sheep: 1, stone: placed })
   })
 
   it('reorganizes a boar gained from B104 during the final harvest feed', () => {

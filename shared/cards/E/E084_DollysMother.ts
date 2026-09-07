@@ -6,6 +6,15 @@ const CARD_ID = 'E084_DollysMother'
 const cardImpl = {
   effect: {
   id: CARD_ID,
+  onComputeAnimalZones: (_player, zones) => {
+    zones.push({
+      id: `card:${CARD_ID}`,
+      zoneType: 'card',
+      cardId: CARD_ID,
+      capacity: 1,
+      allowedAnimalType: 'sheep',
+    })
+  },
   computeBreedThreshold: (_state, _player, animalType, { sourceCard }) => {
     if (sourceCard !== 'harvest') return
     if (animalType !== 'sheep') return

@@ -96,7 +96,7 @@ const arrangeChampionAnimals = (session: GameSession, response: SessionResponse)
         return {
           ...zone,
           animalType,
-          animalCount: Math.min(player.resources[animalType], zone.capacity),
+          animalCount: Math.min(player.resources[animalType] - (player.houseAnimalType === animalType ? player.houseAnimalCount : 0), zone.capacity),
         }
       }
     }
@@ -173,21 +173,21 @@ describe('E133 Champion Breeder parity', () => {
     expect(bonusVp(response)).toBe(2)
   })
 
-  it('E133 S6: a discarded newborn still counts toward the two-animal threshold', () => {
+  it('E133 S6: a discarded newborn does not count toward the two-animal threshold', () => {
     const response = finishHarvest(setup({
       breedingTypes: ['sheep', 'boar'], blockedTypes: ['boar'],
     }))
 
     expect(response.state.players[0]!.resources).toMatchObject({ sheep: 3, boar: 2, cattle: 1 })
-    expect(bonusVp(response)).toBe(1)
+    expect(bonusVp(response)).toBe(0)
   })
 
-  it('E133 S7: one discarded newborn does not reduce three births from the two-point tier', () => {
+  it('E133 S7: one discarded newborn reduces three births to the one-point tier', () => {
     const response = finishHarvest(setup({
       breedingTypes: [...ANIMAL_TYPES], blockedTypes: ['cattle'],
     }))
 
     expect(response.state.players[0]!.resources).toMatchObject({ sheep: 3, boar: 4, cattle: 2 })
-    expect(bonusVp(response)).toBe(2)
+    expect(bonusVp(response)).toBe(1)
   })
 })

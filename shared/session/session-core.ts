@@ -131,10 +131,11 @@ import { resetRoundPlacements } from '../cards/helpers/round-placement.ts'
 import { familySize, findPlayerById, findPlayerIndexById, hasPlayer, smallestAvailableWorker } from '../domain/player.ts'
 import { animalKeysForState, type AnimalKey } from '../contract/animals.ts'
 import { applyAnimalPayment, isAnimalResourceKey } from '../domain/animal-payment.ts'
-import { getAllowedAnimalTypesForZone, readAnimalCountsForZoneAssignment } from '../domain/animal-zones.ts'
+import { getAllowedAnimalTypesForZone, getPlacedAnimalsByType, readAnimalCountsForZoneAssignment } from '../domain/animal-zones.ts'
 import { getRegisteredMinorImprovement, getRegisteredOccupation } from '../cards/registry-display'
 import {
   canAffordTrade,
+  getMaxTradeTimes,
   getExchangesInWindow,
   getRemainingHarvestExchangeUses,
   recordHarvestExchangeUses,
@@ -1788,7 +1789,7 @@ export class GameCore {
   private startReorganizeSubFlow(
     playerIndex: number,
     trigger: import('../actions/effects/reorganize').ReorganizeTrigger,
-    resumeExtra: { originPlayerIndex?: number | null; triggerActionId?: string | null } = {},
+    resumeExtra: { originPlayerIndex?: number | null; triggerActionId?: string | null; harvestBreedPlacementMinimums?: unknown } = {},
   ): void {
     const visibleFrame = this.engineStack.current()
     const visiblePlayerIndex = visibleFrame
@@ -1804,7 +1805,7 @@ export class GameCore {
     const flow: ActionFlow = {
       type: 'leaf',
       actionId: 'reorganize',
-      actionContext: { trigger },
+      actionContext: { trigger, harvestBreedPlacementMinimums: resumeExtra.harvestBreedPlacementMinimums },
     }
     this.engineStack.push({
       engine: this.createFlowEngine(flow, playerIndex),
@@ -2007,7 +2008,7 @@ export class GameCore {
           || player.occupationPlayed.includes(sourceId))
     })
     return harvestExchange || getExchangesInWindow(player, 'anytime', this.state).some((trade) =>
-      canAffordTrade(player, trade),
+      canAffordTrade(player, trade, 1, this.state),
     )
   }
 
@@ -2015,9 +2016,10 @@ export class GameCore {
     const limits: Record<string, number> = {}
     for (const trade of getExchangesInWindow(player, 'harvest', this.state)) {
       const sourceId = trade.sourceId ?? trade.source
-      if (!sourceId || trade.max === undefined) continue
+      if (!sourceId || (trade.max === undefined && !trade.fromFarmyard)) continue
       const remaining = getRemainingHarvestExchangeUses(player, sourceId, trade.max, this.state.round)
-      limits[sourceId] = Math.max(limits[sourceId] ?? 0, remaining)
+      const available = trade.fromFarmyard ? Math.min(remaining, getMaxTradeTimes(player, trade, this.state)) : remaining
+      limits[sourceId] = Math.max(limits[sourceId] ?? 0, available)
     }
     return limits
   }
@@ -2060,7 +2062,7 @@ export class GameCore {
     const maxTradeTimesBySourceId: Record<string, number> = {}
     for (const trade of getExchangesInWindow(player, 'harvest', this.state)) {
       const sourceId = trade.sourceId ?? trade.source
-      if (!sourceId || !canAffordTrade(player, trade)) continue
+      if (!sourceId || !canAffordTrade(player, trade, 1, this.state)) continue
       if (!Object.entries(trade.to).some(([resource, amount]) =>
         (amount ?? 0) > 0 && wanted.has(resource as ResourceKey),
       )) continue
@@ -4251,7 +4253,11 @@ export class GameCore {
         // Parent frame stays on the stack; reorganize sub-flow is pushed on
         // top. When it completes, StageDispatch resumes onReorganizeComplete
         // and calls back into the reorganize continuation.
-        this.startReorganizeSubFlow(pIdx, 'anytime')
+        this.startReorganizeSubFlow(pIdx, 'anytime', {
+          harvestBreedPlacementMinimums: step.type === 'ok' && step.result.type === 'ok'
+            ? step.result.extraData?.harvestBreedPlacementMinimums
+            : undefined,
+        })
         return
       }
     }
@@ -4517,6 +4523,7 @@ export class GameCore {
 
     const resolvedActionId = this.peekHostPendingActionId()
     const protectedDirectCancel = isProtectedActionCancel(resolvedActionId, value)
+    const reorgCheckpoint = requestKind === 'animal-reorg' ? this.createCommandCheckpoint() : undefined
 
     const optionalHost = this.engine.peekPendingHost()
     if (value !== '__skip__' && optionalHost?.optional && !optionalHost.optionalActive
@@ -4553,6 +4560,7 @@ export class GameCore {
       if (result.recoverable === true) {
         const guarded = this.provisionalContinuationScopes.find((scope) => scope.guarded)
         if (guarded && this.activeCommandSettlement) return this.rejectCurrentCommand(this.activeCommandSettlement, guarded)
+        if (reorgCheckpoint) this.restoreCommandCheckpoint(reorgCheckpoint)
         return this.respond(false, result.errorKey ?? 'action failed')
       }
       if (this.completionScopes.length > 0) throw new ActionCompletionFailure(result.errorKey ?? 'action failed')
@@ -4761,6 +4769,7 @@ export class GameCore {
     }
     const resolvedSelections: ResolvedSel[] = []
     let resourceDraft: Partial<Resource> = { ...player.resources }
+    const placedAnimals = getPlacedAnimalsByType(player, this.state)
     for (const sel of selections) {
       if (
         !sel.sourceId
@@ -4789,6 +4798,13 @@ export class GameCore {
           return this.respond(false, 'invalid harvest feed selections')
         }
         perSourceUsed.set(sel.sourceId, usedSoFar + sel.count)
+      }
+      for (const animal of animalKeysForState(this.state)) {
+        const cost = (exchange.from[animal] ?? 0) * sel.count
+        if (exchange.fromFarmyard && cost > (placedAnimals[animal] ?? 0)) {
+          return this.respond(false, 'invalid harvest feed selections')
+        }
+        placedAnimals[animal] = Math.max(0, (placedAnimals[animal] ?? 0) - cost)
       }
       resourceDraft = convertResources(
         resourceDraft,

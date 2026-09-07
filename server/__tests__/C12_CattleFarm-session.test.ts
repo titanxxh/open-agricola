@@ -152,7 +152,7 @@ describe('C012_CattleFarm session', () => {
     expect(response.state.players[0]!.cardStates[CARD_ID]?.extraData?.animalCounts).toEqual({ cattle: 1 })
   })
 
-  it('C012 S7: assigning cattle beyond pasture count is accepted but clipped to capacity', () => {
+  it('C012 S7: rejects cattle beyond pasture count atomically and accepts a legal retry', () => {
     const session = setup(1)
     const pending = openReorganization(session, { sheep: 1, cattle: 2 })
 
@@ -160,11 +160,20 @@ describe('C012_CattleFarm session', () => {
       assignment(pending, `card:${CARD_ID}`, 'cattle', 2),
       assignment(pending, 'house', 'sheep', 1),
     ] as unknown as Record<string, unknown>)
-    expect(rejected.ok).toBe(true)
-    expect(rejected.state.players[0]!.resources).toMatchObject({ sheep: 1, cattle: 1 })
-    expect(rejected.state.players[0]!.cardStates[CARD_ID]?.extraData?.animalCounts)
+    expect(rejected.ok).toBe(false)
+    expect(rejected.error).toBe('log.reorganizeFail')
+    expect(rejected.state).toEqual(pending.state)
+    expect(rejected.interaction).toEqual(pending.interaction)
+    const response = session.resolveChoice(0, 'confirm', [
+      assignment(pending, `card:${CARD_ID}`, 'cattle', 1),
+      assignment(pending, 'p1', 'cattle', 1),
+      assignment(pending, 'house', 'sheep', 1),
+    ])
+    expect(response.ok, response.error).toBe(true)
+    expect(response.state.players[0]!.resources).toMatchObject({ sheep: 1, cattle: 2 })
+    expect(response.state.players[0]!.cardStates[CARD_ID]?.extraData?.animalCounts)
       .toEqual({ cattle: 1 })
-    expect(rejected.interaction.stateId).toBe('idle')
+    expect(response.interaction.stateId).toBe('idle')
   })
 
   it('card zone exists with capacity equal to pasture count', () => {

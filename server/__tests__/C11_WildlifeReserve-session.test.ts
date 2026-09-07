@@ -127,19 +127,28 @@ describe('C011 Wildlife Reserve parity', () => {
       .toEqual({ sheep: 1, boar: 1, cattle: 1 })
   })
 
-  it('C011 S5: characterize OA accepting two assigned sheep by keeping one and discarding one', () => {
+  it('C011 S5: rejects two assigned sheep atomically and accepts a legal retry', () => {
     const session = setup({ played: true })
     let response = collectAnimals(session, { sheep: 2, boar: 0, cattle: 0 })
     expect(response.interaction).toMatchObject({ stateId: 'wait', request: { kind: 'animal-reorg' } })
 
+    const before = session.getState()
     response = session.resolveChoice(0, 'confirm', [
       wildlifeAssignment({ sheep: 2 }),
     ] as unknown as Record<string, unknown>)
 
+    expect(response.ok).toBe(false)
+    expect(response.error).toBe('log.reorganizeFail')
+    expect(response.state).toEqual(before.state)
+    expect(response.interaction).toEqual(before.interaction)
+    response = session.resolveChoice(0, 'confirm', [
+      wildlifeAssignment({ sheep: 1 }),
+      { id: 'house', zoneType: 'house', animalType: 'sheep', animalCount: 1 },
+    ])
     expect(response.ok, response.error).toBe(true)
     expect(response.interaction.stateId === 'wait' ? response.interaction.request.kind : response.interaction.stateId)
       .toBe('confirm-next-player')
-    expect(response.state.players[0]!.resources.sheep).toBe(1)
+    expect(response.state.players[0]!.resources.sheep).toBe(2)
     expect(response.state.players[0]!.cardStates[CARD_ID]?.extraData?.animalCounts)
       .toEqual({ sheep: 1 })
   })

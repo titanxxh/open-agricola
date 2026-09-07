@@ -340,7 +340,9 @@ const clearInactiveCardZoneStorage = (
     if (activeCardIds.has(cardId)) continue
     const extraData = player.cardStates?.[cardId]?.extraData
     if (!extraData || typeof extraData !== 'object') continue
+    const preserved = preservedCardZoneEntries(extraData, player.id, new Set())
     clearAnimalHolderStorage(extraData as Record<string, unknown>)
+    if (Object.keys(preserved).length > 0) extraData.animalCountsByZone = preserved
   }
 }
 
@@ -401,6 +403,21 @@ const writeCardZoneStorage = (
     delete extraData.animalType
     delete extraData.held
   }
+}
+
+export const syncCardAnimalStorage = (state: GameState, player: PlayerState): void => {
+  writeCardZoneStorage(state, player, computeAnimalZones(player, state).filter((zone) =>
+    zone.zoneType === 'card' && !isCounterBackedAnimalZone(zone),
+  ))
+}
+
+export const getPlacedAnimalsByType = (player: PlayerState, state: GameState): AnimalCounts => {
+  const counts = createAnimalCounts(state.enableFarmersOfTheMoor === true)
+  for (const zone of computeAnimalZones(player, state)) {
+    const assigned = normalizeAnimalCountsForZone(state, player, zone, zone)
+    for (const animal of animalKeysForState(state)) counts[animal] = (counts[animal] ?? 0) + (assigned[animal] ?? 0)
+  }
+  return counts
 }
 
 const reserveCardZoneAnimals = (

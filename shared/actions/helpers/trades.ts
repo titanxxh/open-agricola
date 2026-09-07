@@ -31,6 +31,7 @@ export const hasValidResources = (resources: Partial<Resource>): boolean => {
 export const exchangeToTrade = (ex: CardExchange, fallbackId: string): Trade => ({
   from: ex.from,
   to: ex.to,
+  ...(ex.fromFarmyard ? { fromFarmyard: true } : {}),
   max: ex.max,
   sourceId: ex.sourceId ?? fallbackId,
   sideEffect: ex.sideEffect,

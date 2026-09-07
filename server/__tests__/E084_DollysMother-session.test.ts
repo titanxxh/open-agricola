@@ -124,7 +124,7 @@ describe("E084 Dolly's Mother parity", () => {
     expect(response.state.players[0]!.minorHand).toContain(CARD_ID)
   })
 
-  it("E084 S3: Dolly's Mother provides no card zone, so a sheep cannot join the occupied house", () => {
+  it("E084 S3: Dolly's Mother holds one sheep beside an occupied house", () => {
     const session = setup({ played: true, sheep: 0, boar: 1, round: 14 })
 
     const pending = session.takeAction(0, 'sheep-market')
@@ -132,14 +132,19 @@ describe("E084 Dolly's Mother parity", () => {
     expect(pending.ok, pending.error).toBe(true)
     expect(pending.interaction).toMatchObject({ stateId: 'wait', request: { kind: 'animal-reorg' } })
     if (pending.interaction.stateId !== 'wait' || pending.interaction.request.kind !== 'animal-reorg') return
-    expect(pending.interaction.request.zones.some((zone) => zone.id === `card:${CARD_ID}`)).toBe(false)
+    const cardZone = pending.interaction.request.zones.find((zone) => zone.id === `card:${CARD_ID}`)
+    expect(cardZone).toMatchObject({ capacity: 1, allowedAnimalType: 'sheep' })
     const house = pending.interaction.request.zones.find((zone) => zone.id === 'house')
     expect(house).toBeDefined()
     const response = session.resolveChoice(0, 'confirm', {
-      zones: [{ ...house!, animalType: 'boar', animalCount: 1 }],
+      zones: [
+        { ...house!, animalType: 'boar', animalCount: 1 },
+        { ...cardZone!, animalType: 'sheep', animalCount: 1 },
+      ],
     })
     expect(response.ok, response.error).toBe(true)
-    expect(response.state.players[0]!.resources).toMatchObject({ sheep: 0, boar: 1 })
+    expect(response.state.players[0]!.resources).toMatchObject({ sheep: 1, boar: 1 })
+    expect(response.state.players[0]!.cardStates[CARD_ID]?.extraData?.animalCounts).toEqual({ sheep: 1 })
   })
 
   it("E084 S4: one sheep breeds one newborn during a harvest", () => {

@@ -8,7 +8,7 @@ import type {
   PlayerState,
 } from '../../contract/types'
 import type { EventSink } from '../../contract/events'
-import { animalKeysForState } from '../../contract/animals'
+import { animalKeysForState, type AnimalKey } from '../../contract/animals'
 import { playerBoard, getTotalAnimalCapacity } from '../../domain'
 import {
   computeAnimalZones,
@@ -75,15 +75,18 @@ export const breed = (
   player: PlayerState,
   opts: BreedOptions,
   eventSink?: EventSink,
-): { breedSummary: HarvestBreedSummary } => {
+): { breedSummary: HarvestBreedSummary; placementMinimums: Partial<Record<AnimalKey, number>> } => {
   const types = opts.animalTypes ?? animalKeysForState(state)
   let freeCapacity = getTotalAnimalCapacity(player, state)
   const summary: HarvestBreedSummary = { resources: {}, animalTypes: 0, animalCount: 0 }
+  const placementMinimums: Partial<Record<AnimalKey, number>> = {}
   for (const type of types) {
     if (freeCapacity <= 0) break
     const ctx = { sourceCard: opts.sourceCard }
     const breedableCount = getBreedableAnimalCount(state, player, type, breedingAnimalCount(state, player, type), ctx)
-    if (breedableCount < getBreedThreshold(state, player, type, ctx)) continue
+    const threshold = getBreedThreshold(state, player, type, ctx)
+    if (breedableCount < threshold) continue
+    placementMinimums[type] = Math.max(0, threshold - (breedableCount - (player.resources[type] ?? 0))) + 1
     player.resources[type] += 1
     summary.resources[type] = 1
     summary.animalTypes += 1
@@ -97,7 +100,7 @@ export const breed = (
       source: opts.sourceCard === 'harvest' ? 'harvest' : 'cardEffect',
     })
   }
-  return { breedSummary: summary }
+  return { breedSummary: summary, placementMinimums }
 }
 
 type BreedActionContext = {
@@ -115,7 +118,7 @@ export const breedAction: ActionDefinition = {
   execute: ({ state, player, actionContext, eventSink }): ActionExecutionResult => {
     const ctx = (actionContext ?? {}) as BreedActionContext
     const sourceCard = ctx.sourceCard ?? 'unknown'
-    const { breedSummary } = breed(state, player, {
+    const { breedSummary, placementMinimums } = breed(state, player, {
       animalTypes: ctx.animalTypes ?? undefined,
       sourceCard,
     }, eventSink)
@@ -156,7 +159,7 @@ export const breedAction: ActionDefinition = {
     // the reorganize sub-flow — this preserves the legacy `'animalReorg'`
     // behaviour without short-circuiting the engine's hook pipeline.
     if (breedSummary.animalCount > 0) {
-      return { type: 'ok' }
+      return { type: 'ok', ...(sourceCard === 'harvest' ? { extraData: { harvestBreedPlacementMinimums: placementMinimums } } : {}) }
     }
     // Rule: in round 14 (last harvest), some cards (B104 SheepWalker, B35
     // HookKnife, A153 PigOwner, ...) force a reorg even with no newborn so the
