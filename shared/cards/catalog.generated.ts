@@ -4364,6 +4364,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
         "to": {
           "boar": 1
         },
+        "fromFarmyard": true,
         "triggers": [
           "harvest"
         ]
@@ -4375,6 +4376,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
         "to": {
           "vegetable": 1
         },
+        "fromFarmyard": true,
         "triggers": [
           "harvest"
         ]
@@ -4386,6 +4388,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
         "to": {
           "stone": 1
         },
+        "fromFarmyard": true,
         "triggers": [
           "harvest"
         ]

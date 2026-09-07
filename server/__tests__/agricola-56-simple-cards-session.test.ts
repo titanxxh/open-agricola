@@ -343,8 +343,7 @@ describe('Agricola 5-6 simple occupation cards', () => {
 
     resp = session.resolveChoice(0, 'confirm', {
       zones: [
-        { id: 'card:B169_LivestockSustainer', zoneType: 'card', cardId: 'B169_LivestockSustainer', animalType: 'sheep', animalCount: 1 },
-        { id: 'card:B169_LivestockSustainer', zoneType: 'card', cardId: 'B169_LivestockSustainer', animalType: 'boar', animalCount: 1 },
+        { id: 'card:B169_LivestockSustainer', zoneType: 'card', cardId: 'B169_LivestockSustainer', animalType: null, animalCount: 2, animalCounts: { sheep: 1, boar: 1 } },
       ],
     })
 
@@ -435,8 +434,7 @@ describe('Agricola 5-6 simple occupation cards', () => {
     expect(resp.ok).toBe(true)
     resp = session.resolveChoice(0, 'confirm', {
       zones: [
-        { id: 'card:B169_LivestockSustainer', zoneType: 'card', cardId: 'B169_LivestockSustainer', animalType: 'sheep', animalCount: 1 },
-        { id: 'card:B169_LivestockSustainer', zoneType: 'card', cardId: 'B169_LivestockSustainer', animalType: 'boar', animalCount: 1 },
+        { id: 'card:B169_LivestockSustainer', zoneType: 'card', cardId: 'B169_LivestockSustainer', animalType: null, animalCount: 2, animalCounts: { sheep: 1, boar: 1 } },
       ],
     })
     expect(resp.ok).toBe(true)

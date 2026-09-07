@@ -356,7 +356,7 @@ describe('reorganizeAction.resolveChoice', () => {
     expect(ctx.player.resources.horse).toBe(1)
   })
 
-  it('normalizes mixed animalCounts on same-type unkeyed card zones', () => {
+  it('rejects mixed animalCounts on same-type unkeyed card zones', () => {
     const ctx = makeCtx({
       player: {
         minorPlayed: ['B012_Stockyard'],
@@ -376,8 +376,8 @@ describe('reorganizeAction.resolveChoice', () => {
       }] as unknown as Record<string, unknown>,
     )
 
-    expect(result.type).toBe('ok')
-    expect(ctx.player.resources.sheep).toBe(0)
+    expect(result).toEqual({ type: 'fail', errorKey: 'log.reorganizeFail', recoverable: true })
+    expect(ctx.player.resources.sheep).toBe(1)
     expect(ctx.player.resources.boar).toBe(1)
   })
 
@@ -414,7 +414,7 @@ describe('reorganizeAction.resolveChoice', () => {
     expect(ctx.player).toEqual(before)
   })
 
-  it('filters invalid card animals before clamping capacity', () => {
+  it('rejects invalid card animals instead of clamping capacity', () => {
     const ctx = makeCtx({
       player: {
         minorPlayed: ['C011_WildlifeReserve'],
@@ -435,8 +435,8 @@ describe('reorganizeAction.resolveChoice', () => {
       }] as unknown as Record<string, unknown>,
     )
 
-    expect(result.type).toBe('ok')
-    expect(ctx.player.resources.sheep).toBe(1)
+    expect(result).toEqual({ type: 'fail', errorKey: 'log.reorganizeFail', recoverable: true })
+    expect(ctx.player.resources.sheep).toBe(2)
     expect(ctx.player.resources.boar).toBe(1)
     expect(ctx.player.resources.cattle).toBe(1)
   })

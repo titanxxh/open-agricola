@@ -335,11 +335,12 @@ describe('C164 German Heath Keeper parity', () => {
       }
       if (response.interaction.request.kind !== 'animal-reorg') break
       const index = response.interaction.playerIndex
-      const animal = index === 0 ? 'sheep' : 'boar'
+      const animal = index === 0 && response.state.players[index]!.resources.sheep > 0 ? 'sheep' : 'boar'
       const zone = response.interaction.request.zones.find((candidate) => candidate.zoneType === 'pasture')
       response = session.resolveChoice(index, 'confirm', {
         zones: [{ ...zone!, animalType: animal, animalCount: 1 }],
       })
+      expect(response.ok, response.error).toBe(true)
     }
     return response
   }

@@ -138,20 +138,28 @@ describe('C086 Livestock Feeder parity', () => {
     expect(cardZone(pending)).toBeUndefined()
   })
 
-  it('C086 S4: an over-capacity assignment is accepted but clipped to current grain capacity', () => {
+  it('C086 S4: rejects an over-capacity assignment atomically and accepts a legal retry', () => {
     const session = setup({ grain: 1 })
     const pending = openReorganization(session, { sheep: 2 })
 
-    const response = session.resolveChoice(0, 'confirm', [
+    const rejected = session.resolveChoice(0, 'confirm', [
       assignToCard(pending, { sheep: 2 }),
     ] as unknown as Record<string, unknown>)
 
+    expect(rejected.ok).toBe(false)
+    expect(rejected.error).toBe('log.reorganizeFail')
+    expect(rejected.state).toEqual(pending.state)
+    expect(rejected.interaction).toEqual(pending.interaction)
+    const response = session.resolveChoice(0, 'confirm', [
+      assignToCard(pending, { sheep: 1 }),
+      { id: 'house', zoneType: 'house', animalType: 'sheep', animalCount: 1 },
+    ])
     expect(response.ok, response.error).toBe(true)
-    expect(response.state.players[0]!.resources.sheep).toBe(1)
+    expect(response.state.players[0]!.resources.sheep).toBe(2)
     expect(cardAnimals(response)).toEqual({ sheep: 1 })
   })
 
-  it('C086 S5: sowing the last grain leaves the sheep stored on the now-absent card zone', () => {
+  it.each([true, false])('C086 S5: sowing the last grain clears stale storage and lets the player keep the sheep: %s', (keep) => {
     const session = setup({ grain: 1, sheep: 1, held: { sheep: 1 } })
     const state = session.getState().state
     state.players[0]!.fields = [{ row: 0, col: 0, stacks: [] }]
@@ -162,7 +170,17 @@ describe('C086 Livestock Feeder parity', () => {
     expect(response.ok, response.error).toBe(true)
     expect(response.state.players[0]!.resources).toMatchObject({ grain: 0, sheep: 1 })
     expect(response.state.players[0]!.houseAnimalCount).toBe(0)
-    expect(cardAnimals(response)).toEqual({ sheep: 1 })
+    expect(cardAnimals(response)?.sheep ?? 0).toBe(0)
+    expect(response.interaction).toMatchObject({ stateId: 'wait', request: { kind: 'animal-reorg' } })
+    expect(cardZone(response)).toBeUndefined()
+    const result = session.resolveChoice(0, 'confirm', { zones: keep
+      ? [{ id: 'house', zoneType: 'house', animalType: 'sheep', animalCount: 1 }]
+      : [] })
+    expect(result.ok, result.error).toBe(true)
+    expect(result.state.players[0]!.resources.sheep).toBe(keep ? 1 : 0)
+    expect(result.state.players[0]!.houseAnimalCount).toBe(keep ? 1 : 0)
+    expect(cardAnimals(result)?.sheep ?? 0).toBe(0)
+    expect(result.state.log.some((entry) => entry.key === 'log.reorganizeDiscard')).toBe(!keep)
   })
 
   it('C086 S6: current grain count, not the amount when played, determines later capacity', () => {

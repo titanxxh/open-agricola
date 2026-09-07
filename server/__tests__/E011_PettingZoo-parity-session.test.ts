@@ -144,13 +144,20 @@ describe('E011 Petting Zoo parity', () => {
     expect(response.state.players[0]!.resources).toMatchObject({ sheep: 1, boar: 1, cattle: 0 })
   })
 
-  it('E011 S4: assigning more animals than the room-count capacity is accepted, clipped, and completes', () => {
+  it('E011 S4: rejects animals beyond room capacity atomically and accepts a legal retry', () => {
     const session = setup({ played: true, pastureTile: { row: 0, col: 1 } })
     const pending = openReorganization(session, { sheep: 1, boar: 1, cattle: 1 })
 
-    const response = session.resolveChoice(0, 'confirm', [
+    const rejected = session.resolveChoice(0, 'confirm', [
       assignment({ sheep: 1, boar: 1, cattle: 1 }),
     ] as unknown as Record<string, unknown>)
+    expect(rejected.ok).toBe(false)
+    expect(rejected.error).toBe('log.reorganizeFail')
+    expect(rejected.state).toEqual(pending.state)
+    expect(rejected.interaction).toEqual(pending.interaction)
+    const response = session.resolveChoice(0, 'confirm', [
+      assignment({ sheep: 1, boar: 1 }),
+    ])
     expect(response.ok, response.error).toBe(true)
     expect(heldAnimals(response)).toEqual({ sheep: 1, boar: 1 })
     expect(response.state.players[0]!.resources).toMatchObject({ sheep: 1, boar: 1, cattle: 0 })

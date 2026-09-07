@@ -49,6 +49,64 @@ describe('reorganizeAction engine sub-flow integration', () => {
     expect(resp.interaction.request.zones.length).toBeGreaterThan(0)
   })
 
+  const boarAssignment = { id: 'pasture-1', zoneType: 'pasture', animalType: 'boar', animalCount: 1 }
+
+  it.each([
+    ['missing payload', undefined],
+    ['unknown zone', [{ ...boarAssignment, id: 'missing' }]],
+    ['wrong zone type', [{ ...boarAssignment, zoneType: 'house' }]],
+    ['duplicate zone', [boarAssignment, boarAssignment]],
+    ['negative count', [{ ...boarAssignment, animalCount: -1 }]],
+    ['fractional count', [{ ...boarAssignment, animalCount: 0.5 }]],
+    ['nonfinite count', [{ ...boarAssignment, animalCount: Infinity }]],
+    ['unknown animal', [{ ...boarAssignment, animalType: 'wood' }]],
+    ['disabled horse', [{ ...boarAssignment, animalType: 'horse' }]],
+    ['missing species', [{ ...boarAssignment, animalType: null }]],
+    ['over capacity', [{ ...boarAssignment, animalCount: 5, capacity: 99 }]],
+    ['over inventory', [{ ...boarAssignment, animalCount: 2 }]],
+    ['mixed pasture', [{ ...boarAssignment, animalType: null, animalCount: 2, animalCounts: { sheep: 1, boar: 1 } }]],
+    ['inconsistent counts', [{ ...boarAssignment, animalCounts: { boar: 2 } }]],
+    ['negative species count', [{ ...boarAssignment, animalCounts: { boar: -1 } }]],
+    ['unknown species key', [{ ...boarAssignment, animalCounts: { boar: 1, wood: 1 } }]],
+    ['null zone', [null]],
+  ])('rejects %s atomically and accepts the next legal assignment', (_name, payload) => {
+    const session = setupWorkPhase()
+    const pending = session.takeAction(0, 'pig-market')
+    const rejected = session.resolveChoice(0, 'confirm', payload)
+    expect(rejected.ok).toBe(false)
+    expect(rejected.error).toBe('log.reorganizeFail')
+    expect(rejected.state).toEqual(pending.state)
+    expect(rejected.interaction).toEqual(pending.interaction)
+    expect(rejected.scores).toEqual(pending.scores)
+    const accepted = session.resolveChoice(0, 'confirm', { zones: [boarAssignment] })
+    expect(accepted.ok, accepted.error).toBe(true)
+    expect(accepted.state.players[0]!.pastures[0]).toMatchObject({ animalType: 'boar', animalCount: 1 })
+    expect(accepted.state.players[0]!.resources.boar).toBe(1)
+  })
+
+  it('replaces an occupied zone species and treats omitted and zero-count zones as empty', () => {
+    const session = setupWorkPhase()
+    const state = session.getState().state
+    const player = state.players[0]!
+    player.resources.sheep = 1
+    player.pastures[0]!.animalType = 'sheep'
+    player.pastures[0]!.animalCount = 1
+    player.stableTiles = [{ row: 2, col: 4 }]
+    session.loadState(state)
+    session.takeAction(0, 'pig-market')
+    const response = session.resolveChoice(0, 'confirm', [
+      boarAssignment,
+      { id: 'stable:2-4', zoneType: 'stable', animalType: 'sheep', animalCount: 0 },
+    ])
+    expect(response.ok, response.error).toBe(true)
+    expect(response.state.players[0]!.resources).toMatchObject({ sheep: 0, boar: 1 })
+    expect(response.state.players[0]!.stableAnimals['2-4']).toBeNull()
+    expect(response.state.players[0]!.houseAnimalCount).toBe(0)
+    expect(response.state.players[0]!.pastures[0]).toMatchObject({ animalType: 'boar', animalCount: 1 })
+    expect(response.state.log.find((entry) => entry.key === 'log.reorganizeDiscard')?.params?.resources)
+      .toEqual({ sheep: 1 })
+  })
+
   it('active animal-reorg interaction zones include hosted Night Pasture metadata', () => {
     const session = setupWorkPhase()
     const state = session.getState().state

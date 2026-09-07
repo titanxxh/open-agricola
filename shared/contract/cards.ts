@@ -10,6 +10,7 @@ export type ExchangeWindow = 'anytime' | 'harvest' | 'bake-bread'
 export type CardExchange = {
   from: Partial<Resource>
   to: Partial<Resource>
+  fromFarmyard?: boolean
   max?: number
   sourceId?: string
   /**

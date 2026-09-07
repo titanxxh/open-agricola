@@ -95,16 +95,17 @@ describe('B104 Sheep Walker parity', () => {
     })
   }
 
-  it('B104 S5: an unaccommodated sheep is nevertheless offered and exchanged', () => {
+  it.each(['boar', 'vegetable', 'stone'])('B104 S5: an unaccommodated sheep cannot be exchanged for %s', (destination) => {
     const session = setupWorkPhase({ accommodated: false })
     const before = session.getState()
 
     expect(before.interaction.anytimeActions.map((action) => action.id))
-      .toContain('B104-sheep-walker-stone')
-    const response = session.takeAnytimeAction(0, 'B104-sheep-walker-stone')
+      .not.toContain(`B104-sheep-walker-${destination}`)
+    const response = session.takeAnytimeAction(0, `B104-sheep-walker-${destination}`)
 
-    expect(response.ok, response.error).toBe(true)
-    expect(response.state.players[0]!.resources).toMatchObject({ sheep: 0, stone: 1 })
+    expect(response.ok).toBe(false)
+    expect(response.state).toEqual(before.state)
+    expect(response.interaction).toEqual(before.interaction)
   })
 })
 

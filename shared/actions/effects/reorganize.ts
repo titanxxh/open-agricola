@@ -14,11 +14,13 @@ import {
   getAllowedAnimalTypesForZone,
   normalizeAnimalCountsForZone,
   readAnimalCountsForZoneAssignment,
+  syncCardAnimalStorage,
   type AnimalZone,
 } from '../../domain/animal-zones'
 import {
   createAnimalCounts,
   readAnimalHolderCounts,
+  singleAnimalType,
   sumAnimalCounts,
   writeAnimalHolderCounts,
 } from '../../domain/animal-holder-state'
@@ -265,6 +267,8 @@ export const applyReorganizeMutate = (
     const extraData = { ...((nextState.extraData as Record<string, unknown> | undefined) ?? {}) }
     writeAnimalHolderCounts(extraData, createAnimalCounts())
     delete extraData.animalCountsByZone
+    const preserved = preservedHostedZoneEntries(existing, player.id, new Set())
+    if (Object.keys(preserved).length > 0) extraData.animalCountsByZone = preserved
     nextState.extraData = extraData
     player.cardStates![cardId] = nextState
   }
@@ -325,6 +329,57 @@ const positiveAnimals = (
   return result
 }
 
+const validateAssignments = (
+  state: GameState,
+  player: PlayerState,
+  computed: AnimalZone[],
+  assignments: unknown[],
+): ZoneAssignment[] | undefined => {
+  const keys = animalKeysForState(state)
+  const totals = createAnimalCounts(state.enableFarmersOfTheMoor === true)
+  const byId = new Map<string, ZoneAssignment>()
+  for (const value of assignments) {
+    if (!value || typeof value !== 'object') return
+    const assignment = value as ZoneAssignment
+    const zone = computed.find((candidate) => candidate.id === assignment.id)
+    if (!zone || byId.has(zone.id) || zone.zoneType !== assignment.zoneType) return
+    if (!Number.isSafeInteger(assignment.animalCount) || assignment.animalCount < 0) return
+    if (assignment.animalCount > zone.capacity) return
+    if (assignment.animalType !== null && !keys.includes(assignment.animalType)) return
+    if (assignment.animalCounts !== undefined) {
+      if (!assignment.animalCounts || typeof assignment.animalCounts !== 'object' || Array.isArray(assignment.animalCounts)) return
+      if (Object.entries(assignment.animalCounts).some(([key, count]) =>
+        !keys.includes(key as AnimalKey) || !Number.isSafeInteger(count) || count < 0,
+      )) return
+      if (sumAnimalCounts(assignment.animalCounts) !== assignment.animalCount) return
+      if (assignment.animalType && assignment.animalCount > 0 && assignment.animalCounts[assignment.animalType] !== assignment.animalCount) return
+    }
+    const counts = readAnimalCountsForZoneAssignment(assignment)
+    if (sumAnimalCounts(counts) !== assignment.animalCount) return
+    const normalized = normalizeAnimalCountsForZone(
+      state, player, zone.zoneType === 'card' ? zone : { ...zone, animalType: null }, assignment,
+    )
+    if (keys.some((key) => (counts[key] ?? 0) !== (normalized[key] ?? 0))) return
+    addAnimalCounts(totals, counts, keys)
+    byId.set(zone.id, { ...assignment, animalType: singleAnimalType(counts) })
+  }
+  if (keys.some((key) => (totals[key] ?? 0) > (player.resources[key] ?? 0))) return
+  const finalZones = computed.map((zone) => ({
+    ...zone,
+    animalCount: byId.get(zone.id)?.animalCount ?? 0,
+    animalCounts: readAnimalCountsForZoneAssignment(byId.get(zone.id)),
+  }))
+  if (!areRequiredEmptyZoneGroupsSatisfied(finalZones)) return
+  for (const zone of finalZones) {
+    if (zone.exclusiveCardZoneLimit === undefined) continue
+    const occupied = finalZones.filter((candidate) =>
+      candidate.cardId === zone.cardId && candidate.ownerPlayerId === zone.ownerPlayerId && candidate.animalCount > 0,
+    ).length
+    if (occupied > zone.exclusiveCardZoneLimit) return
+  }
+  return [...byId.values()]
+}
+
 export const reorganizeAction: ActionDefinition = {
   id: 'reorganize',
   nameKey: 'actions.reorganize.name',
@@ -369,6 +424,7 @@ export const reorganizeAction: ActionDefinition = {
   },
   execute: (ctx): ActionExecutionResult => {
     const trigger = (ctx.actionContext?.trigger as ReorganizeTrigger) ?? 'anytime'
+    syncCardAnimalStorage(ctx.state, ctx.player)
     // NOTE: zones are computed here at emit-time and travel inside `request`.
     // However, GameCore.buildInteraction() in shared/session/session-core.ts still
     // recomputes zones via buildAnimalReorgZones() during the transitional
@@ -410,58 +466,30 @@ export const reorganizeAction: ActionDefinition = {
       }
     }
     const rawPayload = payload as unknown
-    const zones = Array.isArray(rawPayload)
-      ? rawPayload as ZoneAssignment[]
+    const assignments = Array.isArray(rawPayload)
+      ? rawPayload
       : typeof rawPayload === 'object' && rawPayload !== null && Array.isArray((rawPayload as { zones?: unknown }).zones)
         ? (rawPayload as { zones: ZoneAssignment[] }).zones
         : undefined
-    if (!zones) return { type: 'fail', errorKey: 'log.reorganizeFail' }
+    if (!assignments) return { type: 'fail', errorKey: 'log.reorganizeFail', recoverable: true }
     const playerIndex = ctx.state.players.indexOf(ctx.player)
     const computedZones = playerBoard(ctx.state, playerIndex).animals.zones()
-    const cardZones = new Map(
-      computedZones
-        .filter((zone) => zone.zoneType === 'card')
-        .map((zone) => [zone.id, zone]),
-    )
-    for (const assignment of zones) {
-      const zone = cardZones.get(assignment.id)
-      if (!zone) {
-        if (assignment.zoneType === 'card') {
-          return { type: 'fail', errorKey: 'log.reorganizeFail', recoverable: true }
-        }
-        continue
-      }
-      const allowed = new Set(getAllowedAnimalTypesForZone(ctx.state, ctx.player, zone))
-      const counts = readAnimalCountsForZoneAssignment(assignment)
-      if (
-        assignment.zoneType !== 'card'
-        || animalKeysForState(ctx.state).some((animal) => (counts[animal] ?? 0) > 0 && !allowed.has(animal))
-      ) {
-        return { type: 'fail', errorKey: 'log.reorganizeFail', recoverable: true }
-      }
-    }
-    const finalZones = computedZones.map((zone) => {
-      const assignment = zones.find((candidate) =>
-        candidate.id === zone.id && candidate.zoneType === zone.zoneType,
-      )
-      const animalCounts = normalizeAnimalCountsForZone(
-        ctx.state,
-        ctx.player,
-        zone,
-        assignment,
-      )
-      return {
-        ...zone,
-        animalCounts,
-        animalCount: sumAnimalCounts(animalCounts),
-      }
-    })
-    if (!areRequiredEmptyZoneGroupsSatisfied(finalZones)) {
+    const zones = validateAssignments(ctx.state, ctx.player, computedZones, assignments)
+    if (!zones) {
       return { type: 'fail', errorKey: 'log.reorganizeFail', recoverable: true }
     }
     const before = animalTotals(ctx.state, ctx.player)
     applyReorganizeMutate(ctx.state, ctx.player, zones)
     const after = animalTotals(ctx.state, ctx.player)
+    const minimums = ctx.actionContext?.harvestBreedPlacementMinimums as Partial<Record<AnimalKey, number>> | undefined
+    const summary = ctx.state.harvestBreedSummary?.[ctx.player.id]
+    if (minimums && summary) {
+      for (const animal of animalKeysForState(ctx.state)) {
+        if ((after[animal] ?? 0) < (minimums[animal] ?? Infinity)) delete summary.resources[animal]
+      }
+      summary.animalTypes = Object.keys(summary.resources).length
+      summary.animalCount = sumAnimalCounts(summary.resources)
+    }
     const assigned = positiveAnimals(ctx.state, after)
     if (Object.keys(assigned).length > 0) {
       ctx.eventSink?.emit<'farm.animalMoved'>({

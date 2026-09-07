@@ -113,6 +113,7 @@ export type TradeSideEffect =
 export type Trade = {
   from: Partial<Resource>
   to: Partial<Resource>
+  fromFarmyard?: boolean
   max?: number
   scope?: 'action' | 'unit'   // default 'action' (back-compat)
   groupId?: string
