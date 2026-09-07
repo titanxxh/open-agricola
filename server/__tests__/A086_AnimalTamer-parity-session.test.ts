@@ -115,18 +115,27 @@ describe('A086 Animal Tamer parity', () => {
     session.state.actionSpaces.find((space) => space.id === 'pig-market')!.resources.boar = 1
     session.loadState(session.state)
     const pending = animalReorg(session.takeAction(0, 'pig-market'))
+    const before = JSON.stringify({ state: pending.state, interaction: pending.interaction })
 
     const response = session.resolveChoice(0, 'confirm', [
       { id: 'house', zoneType: 'house', animalType: 'sheep', animalCount: 1 },
       { id: 'house', zoneType: 'house', animalType: 'boar', animalCount: 1 },
     ] as unknown as Record<string, unknown>)
 
-    expect(response.ok, response.error).toBe(true)
+    expect(response.ok).toBe(false)
+    expect(response.error).toBe('log.reorganizeFail')
+    expect(JSON.stringify({ state: response.state, interaction: response.interaction })).toBe(before)
     expect(response.interaction.stateId === 'wait' ? response.interaction.request.kind : undefined)
       .toBe('animal-reorg')
     expect(response.state.players[0]!.resources).toMatchObject({ sheep: 1, boar: 1 })
     expect(response.state.players[0]!.houseAnimalType).toBe('sheep')
     expect(response.state.players[0]!.houseAnimalCount).toBe(1)
+
+    const retry = session.resolveChoice(0, 'confirm', [
+      { id: 'house', zoneType: 'house', animalType: 'sheep', animalCount: 1 },
+    ] as unknown as Record<string, unknown>)
+    expect(retry.ok, retry.error).toBe(true)
+    expect(retry.state.players[0]!.resources).toMatchObject({ sheep: 1, boar: 0 })
   })
 
   it('A086 S6: two cattle in two rooms score two Cow Prince bonus points', () => {

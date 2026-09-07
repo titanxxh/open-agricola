@@ -40,6 +40,7 @@ const setup = ({
       vegetable: 0, sheep: 0, boar: 0, cattle: 0,
     }
     player.pastures = []
+    player.stableTiles = []
     setWorkersAtHome(state, player, 2)
   })
   const player = state.players[0]!
@@ -51,12 +52,14 @@ const setup = ({
   player.resources.sheep = sheep
   player.resources.boar = boar
   if (sheep > 0) {
+    player.stableTiles.push({ row: 0, col: 2 })
     player.pastures.push({
       id: 'sheep-pasture', size: 1, tiles: [{ row: 0, col: 2 }], stables: 1,
       animalType: 'sheep', animalCount: sheep,
     })
   }
   if (boar > 0) {
+    player.stableTiles.push({ row: 0, col: 3 })
     player.pastures.push({
       id: 'boar-pasture', size: 1, tiles: [{ row: 0, col: 3 }], stables: 1,
       animalType: 'boar', animalCount: boar,
@@ -203,7 +206,9 @@ describe('C084 Perennial Rye parity', () => {
   it('C084 S8: with sheep and pigs breedable exactly one selected type breeds', () => {
     const response = usePerennialRye(setup({ played: true, sheep: 2, boar: 2 }), 'boar')
 
+    expect(response.ok, response.error).toBe(true)
     expect(response.state.players[0]!.resources).toMatchObject({ grain: 0, sheep: 2, boar: 3 })
+    expect(isCardFlagged(response.state.players[0]!, CARD_ID)).toBe(true)
   })
 
   it('C084 S9: the used marker clears at the next round start', () => {
