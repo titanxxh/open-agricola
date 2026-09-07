@@ -90,12 +90,15 @@ describe('D011_LawnFertilizer session', () => {
 
   it('D011 S3 Lawn Fertilizer leaves a size-two pasture at four and safely rejects a fifth', () => {
     const session = setup({ size: 2, boar: 4 })
-    takePigMarket(session)
+    const pending = takePigMarket(session)
+    const before = JSON.stringify({ state: pending.state, interaction: pending.interaction })
 
     let response = session.resolveChoice(0, 'confirm', [
       { id: 'p1', zoneType: 'pasture', animalType: 'boar', animalCount: 5 },
     ] as unknown as Record<string, unknown>)
-    expect(response.ok).toBe(true)
+    expect(response.ok).toBe(false)
+    expect(response.error).toBe('log.reorganizeFail')
+    expect(JSON.stringify({ state: response.state, interaction: response.interaction })).toBe(before)
     expect(response.interaction.stateId === 'wait' ? response.interaction.request.kind : undefined)
       .toBe('animal-reorg')
     expect(response.state.players[0]!.pastures[0]!.animalCount).toBe(4)
@@ -128,6 +131,8 @@ describe('D011_LawnFertilizer session', () => {
     let response = session.resolveChoice(0, 'confirm', [
       { id: 'p1', zoneType: 'pasture', animalType: 'boar', animalCount: 3 },
     ] as unknown as Record<string, unknown>)
+    expect(response.ok).toBe(false)
+    expect(response.error).toBe('log.reorganizeFail')
     expect(response.interaction.stateId === 'wait' ? response.interaction.request.kind : undefined)
       .toBe('animal-reorg')
     expect(response.state.players[0]!.pastures[0]!.animalCount).toBe(2)
