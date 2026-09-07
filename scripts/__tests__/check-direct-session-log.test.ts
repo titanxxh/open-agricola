@@ -466,6 +466,24 @@ describe('check-direct-session-log', () => {
     ]))
   })
 
+  it('allows completion-query logs while rejecting sibling constructors and direct appends', () => {
+    const root = mkdtempSync(path.join(tmpdir(), 'direct-session-log-'))
+    writeFixture(root, 'shared/engine/engine.ts', [
+      'export class Engine {',
+      '  canComplete() {',
+      '    const log = new LogStore()',
+      '    this.log.append(entry)',
+      '  }',
+      '  other() { return new LogStore() }',
+      '}',
+    ].join('\n'))
+
+    expect(findDirectSessionLogViolations(root)).toEqual([
+      expect.objectContaining({ line: 4, kind: 'log-store-append' }),
+      expect.objectContaining({ line: 6, kind: 'log-store-constructor' }),
+    ])
+  })
+
   it('rejects forbidden LogStore constructors outside session core', () => {
     const root = mkdtempSync(path.join(tmpdir(), 'direct-session-log-'))
     writeFixture(root, 'shared/session/bad.ts', [
