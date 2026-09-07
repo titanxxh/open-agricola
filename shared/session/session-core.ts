@@ -1,3 +1,6 @@
+import { isFlowDerivedDoable } from '../actions/flow'
+import { applyActionPlacement } from './action-entry-query'
+import { selectWorkerForMoorAction } from '../moor/heating'
 import type {
   DraftGameEvent,
   EventSink,
@@ -43,6 +46,7 @@ import { validateSelectionEffect } from '../actions/helpers/selection-effect-reg
 import {
   applyIsDoableHooksDetailed,
   clearActionHooks,
+  hasMatchingActionHooks,
 } from '../actions/hooks.ts'
 import { finalizeDraft } from '../draft/draft-manager.ts'
 import type { DraftPickPayload } from '../draft/types.ts'
@@ -101,7 +105,7 @@ import * as setupPhase from './phases/setup.ts'
 import * as roundPhase from './phases/round.ts'
 import * as harvestPhase from './phases/harvest.ts'
 import * as draftPhase from './phases/draft.ts'
-import { getCardModifiers } from '../cards/card-modifiers.ts'
+import { ensureCardModifiers } from '../cards/card-modifiers.ts'
 import { getCardEffect, getHarvestBreedOrderPriority } from '../cards/card-effects.ts'
 import { runCardEffectHook } from '../cards/card-effects.ts'
 import { StageDispatch, type StageResumeState } from './stage-dispatch.ts'
@@ -110,8 +114,8 @@ import {
   type PendingInteractionProjectionInput,
 } from './interaction-state-adapter.ts'
 import { positionKey } from '../domain/farm.ts'
-import { getMatchingListeners, executeCardListener, listenerOwnerOptions, runCardListeners } from '../cards/card-listeners.ts'
-import { buildPhaseTrailingNodes } from '../engine/engine-utils.ts'
+import { collectBeforePlacementFlows, getMatchingListeners, executeCardListener, listenerOwnerOptions, runCardListeners } from '../cards/card-listeners.ts'
+import { buildPhaseTrailingNodes, cloneRuleState } from '../engine/engine-utils.ts'
 import { createTriggerSnapshot } from '../cards/helpers/trigger-snapshot.ts'
 import { Scoring, playerBoard, type PlayerScoreSummary } from '../domain'
 import { reap } from '../actions/effects/reap.ts'
@@ -371,6 +375,7 @@ type ActiveCommandSettlement = {
   checkpoint: SessionCommandCheckpoint
   interactionKey: string
   scopeSnapshot: ProvisionalContinuationScope[]
+  completionScopeSnapshot: ProvisionalContinuationScope[]
   failedCommandSnapshot: FailedAuthoritativeCommand[]
   protectedObservations: ProtectedObservation[]
   provisional: boolean
@@ -381,7 +386,10 @@ export type SessionPrivateCursor = Omit<SessionCommandCheckpoint, 'state'> & {
   provisionalContinuationScopes: ProvisionalContinuationScope[]
   failedAuthoritativeCommands: FailedAuthoritativeCommand[]
   nextProvisionalScopeId: number
+  completionScopes: ProvisionalContinuationScope[]
 }
+
+class ActionCompletionFailure extends Error {}
 
 const cloneCommandValue = <T>(value: T): T => {
   if (Array.isArray(value)) return value.map((entry) => cloneCommandValue(entry)) as T
@@ -587,6 +595,7 @@ export class GameCore {
   private nextActionToken = 1
   private turnOwnerPlayerIndex: number | null = null
   private provisionalContinuationScopes: ProvisionalContinuationScope[] = []
+  private completionScopes: ProvisionalContinuationScope[] = []
   private failedAuthoritativeCommands: FailedAuthoritativeCommand[] = []
   private activeCommandSettlement: ActiveCommandSettlement | null = null
   private commandSettlementDepth = 0
@@ -688,12 +697,77 @@ export class GameCore {
   listenersVetoIsDoableCheck(player: PlayerState, space: ActionSpace): boolean {
     return this.listenersVetoIsDoable(player, space)
   }
+  private requiresCompletionSearch(player: PlayerState, space: ActionSpace, baseDoable: boolean): boolean {
+    const inspect = (flow: ActionFlow, seen = new Set<string>()): { required: number; actionIds: string[] } => {
+      if (flow.optional) return { required: 0, actionIds: [] }
+      if (flow.type === 'leaf') {
+        if (flow.expandFlow && !seen.has(flow.actionId)) {
+          const nested = this.registry.get(flow.actionId)?.flow
+          if (nested) return inspect(nested, new Set([...seen, flow.actionId]))
+        }
+        return { required: 1, actionIds: [flow.actionId] }
+      }
+      const children = flow.children.map((child) => inspect(child, seen))
+      return {
+        required: flow.type === 'or' || flow.type === 'xor'
+          ? Math.min(...children.map((child) => child.required), Infinity)
+          : children.reduce((total, child) => total + child.required, 0),
+        actionIds: [...new Set(children.flatMap((child) => child.actionIds))],
+      }
+    }
+
+    const shape = space.flow ? inspect(space.flow, new Set([space.id])) : { required: 1, actionIds: [space.id] }
+    const actionIds = new Set([space.id, 'place-farmer', ...shape.actionIds])
+    for (const actionId of actionIds) {
+      const context = { state: this.state, player, space, actionId }
+      if (!baseDoable && hasMatchingActionHooks({ ...context, phase: 'isDoable' })) return true
+      if (!baseDoable && getMatchingListeners({ ...context, phase: 'isDoable' }).length > 0) return true
+      if (hasMatchingActionHooks({ ...context, phase: 'computeReplace' })) return true
+      if (getMatchingListeners({ ...context, phase: 'computeReplace' }).length > 0) return true
+      if (hasMatchingActionHooks({ ...context, phase: 'before' })) return true
+      if (!baseDoable && getMatchingListeners({ ...context, phase: 'before' }).length > 0) return true
+      for (const phase of ['before', 'during', 'immediatelyAfter', 'after'] as const) {
+        if (getMatchingListeners({ ...context, phase })
+          .some((entry) => entry.registration.mandatory === true)) {
+          return true
+        }
+      }
+    }
+    return shape.required > 1
+      || shape.actionIds.some((actionId) => this.registry.get(actionId)?.getCompletionChoices)
+      || (baseDoable && !!space.flow && !isFlowDerivedDoable(space.canBeExecutedByPlayer))
+  }
   applyIsDoableCheck(player: PlayerState, space: ActionSpace, baseDoable: boolean): boolean {
-    return this.hookDispatcher.applyIsDoable(
-      { state: this.state, player, space, actionId: space.id },
-      space,
-      baseDoable,
-    )
+    if (!this.requiresCompletionSearch(player, space, baseDoable)) {
+      return baseDoable && !this.listenersVetoIsDoable(player, space)
+    }
+    const query = () => {
+      if (this.listenersVetoIsDoable(player, space)) return false
+      const state = cloneRuleState(this.state)
+      const queryPlayer = state.players.find((entry) => entry.id === player.id)!
+      const querySpace = state.actionSpaces.find((entry) => entry.id === space.id)!
+      if (querySpace.strictCanExecute && querySpace.flow && !isFlowDerivedDoable(querySpace.canBeExecutedByPlayer)
+        && !querySpace.canBeExecutedByPlayer.call(querySpace, state, queryPlayer)) return false
+      const worker = selectWorkerForMoorAction(state, queryPlayer, space.id)
+      if (!worker) return false
+      applyActionPlacement(state, queryPlayer, querySpace, worker.id, this.nextActionToken)
+      const beforeFlows = collectBeforePlacementFlows(state, queryPlayer, querySpace)
+      const engine = Engine.fromAction(space.id, {
+        registry: this.registry,
+        hooks: this.hookDispatcher,
+        log: new LogStore(),
+        requireRootCompletion: true,
+      }, player.id)
+      engine.injectBeforeFlows(beforeFlows, undefined, player.id)
+      const completion = engine.canComplete({ state, player: queryPlayer, space: querySpace })
+      if (completion !== undefined) return completion
+      return this.hookDispatcher.applyIsDoable(
+        { state: this.state, player, space, actionId: space.id },
+        space,
+        baseDoable,
+      )
+    }
+    return query()
   }
   /** @internal Harvest phase trampoline — kicks off the beforeHarvest stage hook chain. */
   invokeHarvestFromBeforeHarvest(): SessionResponse { return this.withCtx(() => this.continueHarvestFromBeforeHarvest()) }
@@ -973,6 +1047,7 @@ export class GameCore {
       provisionalContinuationScopes: this.provisionalContinuationScopes,
       failedAuthoritativeCommands: this.failedAuthoritativeCommands,
       nextProvisionalScopeId: this.nextProvisionalScopeId,
+      completionScopes: this.completionScopes,
     })) as SessionPrivateCursor
   }
 
@@ -981,12 +1056,14 @@ export class GameCore {
       provisionalContinuationScopes,
       failedAuthoritativeCommands,
       nextProvisionalScopeId,
+      completionScopes,
       ...runtime
     } = structuredClone(cursor)
     this.restoreCommandCheckpoint({ state: this.state, ...runtime })
     this.provisionalContinuationScopes = provisionalContinuationScopes
     this.failedAuthoritativeCommands = failedAuthoritativeCommands
     this.nextProvisionalScopeId = nextProvisionalScopeId
+    this.completionScopes = completionScopes
   }
 
   createCommandCheckpoint(): SessionCommandCheckpoint {
@@ -1180,6 +1257,7 @@ export class GameCore {
         ...scope,
         failedCommandsAtCheckpoint: scope.failedCommandsAtCheckpoint.map((entry) => ({ ...entry })),
       })),
+      completionScopeSnapshot: [...this.completionScopes],
       failedCommandSnapshot: this.failedAuthoritativeCommands.map((entry) => ({ ...entry })),
       protectedObservations: [],
       provisional: this.provisionalContinuationScopes.length > 0,
@@ -1210,15 +1288,18 @@ export class GameCore {
         if (warnings.length > 0) {
           this.restoreCommandCheckpoint(settlement.checkpoint)
           this.provisionalContinuationScopes = settlement.scopeSnapshot
+          this.completionScopes = settlement.completionScopeSnapshot
           this.failedAuthoritativeCommands = settlement.failedCommandSnapshot
           this.cardWarnings.push(...warnings)
           return this.respond(false, warnings.join('; '))
         }
         return this.settleAuthoritativeCommand(response, settlement)
       } catch (error) {
+        if (error instanceof ActionCompletionFailure) return this.recoverCompletionFailure(error)
         const warnings = this.cardWarnings.slice(settlement.checkpoint.cardWarningCount)
         this.restoreCommandCheckpoint(settlement.checkpoint)
         this.provisionalContinuationScopes = settlement.scopeSnapshot
+        this.completionScopes = settlement.completionScopeSnapshot
         this.failedAuthoritativeCommands = settlement.failedCommandSnapshot
         this.cardWarnings.push(...warnings)
         throw error
@@ -1227,6 +1308,53 @@ export class GameCore {
         this.commandSettlementDepth = 0
       }
     })
+  }
+
+  recordCompletionScope(hostNodeId = ''): void {
+    const settlement = this.activeCommandSettlement
+    const frame = this.engineStack.current()
+    if (!settlement || !frame?.frameId) return
+    if (this.completionScopes.some((scope) => scope.frameId === frame.frameId && scope.hostNodeId === hostNodeId)) return
+    this.completionScopes.push({
+      id: `completion-scope-${this.nextProvisionalScopeId++}`,
+      frameId: frame.frameId,
+      hostNodeId,
+      checkpoint: hostNodeId ? this.createCommandCheckpoint() : settlement.checkpoint,
+      rollbackCommand: settlement.command,
+      rollbackInteractionKey: settlement.interactionKey,
+      failedCommandsAtCheckpoint: settlement.failedCommandSnapshot.map((entry) => ({ ...entry })),
+      guarded: false,
+    })
+  }
+
+  private recoverCompletionFailure(error: ActionCompletionFailure): SessionResponse {
+    while (this.completionScopes.length > 0) {
+      const scope = this.completionScopes.pop()!
+      const rollback = this.abortProvisionalScope(scope)
+      if (!scope.hostNodeId) {
+        return { ...rollback, ok: false, error: error.message, durableTransition: true }
+      }
+      const playerIndex = rollback.interaction.stateId === 'wait' ? rollback.interaction.playerIndex : -1
+      if (rollback.interaction.stateId !== 'wait' || rollback.interaction.request.kind !== 'choice' || playerIndex < 0 || !rollback.interaction.request.options?.some((option) => option.value === '__skip__')) continue
+      const settlement = this.createActiveCommandSettlement(normalizedCommand('choice', playerIndex, { value: '__skip__' }))
+      const active = this.activeCommandSettlement
+      this.activeCommandSettlement = settlement
+      try {
+        const declined = this.resolveEngineChoice(playerIndex, '__skip__', false)
+        if (!declined.ok) continue
+        const response = this.settleAuthoritativeCommand(declined, settlement)
+        return {
+          ...response,
+          durableTransition: true,
+          publicEventCancellations: [...(rollback.publicEventCancellations ?? []), ...(response.publicEventCancellations ?? [])],
+        }
+      } catch (failure) {
+        if (!(failure instanceof ActionCompletionFailure)) throw failure
+      } finally {
+        this.activeCommandSettlement = active
+      }
+    }
+    throw error
   }
 
   private mandatoryContinuationProbes(): Array<MandatoryContinuationProbe & { frameId: string }> {
@@ -1246,6 +1374,7 @@ export class GameCore {
   }
 
   private openProvisionalScopesForRisk(): void {
+    this.completionScopes = []
     const settlement = this.activeCommandSettlement
     if (!settlement) return
     const probes = this.mandatoryContinuationProbes()
@@ -1435,6 +1564,7 @@ export class GameCore {
   ): SessionResponse {
     this.restoreCommandCheckpoint(settlement.checkpoint)
     this.provisionalContinuationScopes = settlement.scopeSnapshot
+    this.completionScopes = settlement.completionScopeSnapshot
     this.failedAuthoritativeCommands = settlement.failedCommandSnapshot
     if (failedScope) {
       this.rememberFailedAuthoritativeCommand(settlement.command, settlement.interactionKey)
@@ -1497,6 +1627,12 @@ export class GameCore {
     response: SessionResponse,
     settlement: ActiveCommandSettlement,
   ): SessionResponse {
+    this.completionScopes = this.completionScopes.filter((scope) => {
+      const frame = this.engineStack.allFrames().find((entry) => entry.frameId === scope.frameId)
+      if (!frame) return false
+      if (!scope.hostNodeId) return true
+      return frame.engine.snapshot().treeCursor.some((node) => node.id === scope.hostNodeId && node.state !== 'resolved')
+    })
     if (settlement.abortScopeId) {
       const scope = this.provisionalContinuationScopes.find((entry) => entry.id === settlement.abortScopeId)
       if (scope) {
@@ -1595,6 +1731,7 @@ export class GameCore {
 
   private engineDeps() {
     return {
+      completionChecks: true,
       registry: this.registry,
       hooks: this.hookDispatcher,
       log: this.engineLog,
@@ -2531,6 +2668,8 @@ export class GameCore {
       state: this.state,
       player,
       space,
+      continuationOwnerPlayerId: this.currentFrameOwnerPlayerId(player.id),
+      provisionalContinuation: this.provisionalContinuationScopes.some((scope) => !scope.guarded),
       emitPrivateEvent: (event: PrivateGameEvent) => this.emitResponsePrivateEvent(event),
       reportProtectedObservation: (observation: ProtectedObservation) =>
         this.reportProtectedObservation(observation),
@@ -3831,6 +3970,11 @@ export class GameCore {
       const step = frame.engine.proceed(this.buildEngineExecutionContext(player, space))
       this.flushEngineLog()
 
+      if (this.completionScopes.length > 0 && (
+        (step.type === 'blocked' && step.mandatory === true)
+        || (step.type === 'ok' && step.result.type === 'fail')
+      )) throw new ActionCompletionFailure('mandatory action failed')
+
       if (step.type === 'blocked' && step.mandatory === true && step.actionId) {
         if (this.markProvisionalHostBlocked(frame, step.nodeId)) return
         this.engineStack.clearDeferredPlayerSwitch()
@@ -4028,6 +4172,7 @@ export class GameCore {
               return
             }
             if (result.type === 'fail') {
+              if (this.completionScopes.length > 0) throw new ActionCompletionFailure(result.errorKey ?? 'action failed')
               if (!frame.stageResume) {
                 this.cleanupFailedWorkerPlacement(space, player, activeActionContext)
               }
@@ -4118,11 +4263,9 @@ export class GameCore {
 
   /**
    * Returns true when at least one global action hook or card listener for the
-   * `isDoable` phase explicitly vetoes the action. Unlike the full
-   * `applyIsDoable` path, this skips `space.canBeExecutedByPlayer` — that is
-   * conservative for OR-flow actions and would over-block normal cases like
-   * "OR(sow, bake-bread)" where every child is currently undoable but the
-   * engine still wants to enter and present a skip-only choice.
+   * `isDoable` phase explicitly vetoes the action. It starts from `true` so
+   * base unavailability does not masquerade as a listener veto while the
+   * completion query evaluates the full action separately.
    */
   private listenersVetoIsDoable(player: PlayerState, space: ActionSpace): boolean {
     const actionHookDoable = applyIsDoableHooksDetailed(
@@ -4148,11 +4291,7 @@ export class GameCore {
 
   private isActionSpaceAvailableToPlayer(player: PlayerState, space: ActionSpace): boolean {
     return canProjectActionEntry(this.state, player, space, {
-      isActionDoable: (entry, baseDoable) => this.hookDispatcher.applyIsDoable(
-        { state: this.state, player, space: entry, actionId: entry.id },
-        entry,
-        baseDoable,
-      ),
+      isActionDoable: (entry, baseDoable) => this.applyIsDoableCheck(player, entry, baseDoable),
     })
   }
 
@@ -4187,11 +4326,7 @@ export class GameCore {
     const player = this.state.players[playerIndex]
     if (!player) return {}
     const availability = computeActionEntryAvailability(this.state, player, {
-      isActionDoable: (space, baseDoable) => this.hookDispatcher.applyIsDoable(
-        { state: this.state, player, space, actionId: space.id },
-        space,
-        baseDoable,
-      ),
+      isActionDoable: (space, baseDoable) => this.applyIsDoableCheck(player, space, baseDoable),
     })
     for (const spaceId of Object.keys(availability)) {
       if (this.isFailedAuthoritativeCommand(normalizedCommand(
@@ -4352,8 +4487,6 @@ export class GameCore {
       ? this.effectiveOwnerIndexForFrame(frame, cursor?.hostNodeId, view)
       : -1
     const pendingOptions = view?.choices ?? []
-    const pendingSnapshot = pendingContextSnapshot(cursor)
-    const pendingActionContext = pendingSnapshot?.actionContext
     const pendingSourceCard = view?.sourceCard ?? choicesSourceCard(pendingOptions)
     // 'choice' (typed), 'animal-reorg' (pending-envelope commit pathway), and any
     // ChoiceNode-emitted untyped request all flow through the engine's
@@ -4385,29 +4518,12 @@ export class GameCore {
     const resolvedActionId = this.peekHostPendingActionId()
     const protectedDirectCancel = isProtectedActionCancel(resolvedActionId, value)
 
+    const optionalHost = this.engine.peekPendingHost()
+    if (value !== '__skip__' && optionalHost?.optional && !optionalHost.optionalActive
+      && frame?.ownerPlayerIndex === playerIndex) this.recordCompletionScope(optionalHost.id)
+
     if (pushHistoryEntry && !protectedDirectCancel) {
       this.pushHistory(false, frame?.undoBoundaryOnResolve === true)
-    }
-    // Card-effect resolveChoice hook: if the pending choice has a sourceCard with a
-    // registered CardEffect.resolveChoice, give the card a chance to produce a follow-up
-    // ActionFlow that runs after the engine's own choice resolution.
-    let insertedCardFollowUpFlow = false
-    if (pendingSourceCard && !protectedDirectCancel) {
-      const cardEffect = getCardEffect(pendingSourceCard)
-      if (cardEffect?.resolveChoice) {
-        const cardFlow = cardEffect.resolveChoice(this.state, player, value, {
-          sourceCard: pendingSourceCard,
-          actionContext: pendingActionContext,
-          emitPrivateEvent: (event) => this.emitResponsePrivateEvent(event),
-          reportProtectedObservation: (observation) => this.reportProtectedObservation(observation),
-        })
-        if (cardFlow && this.engine) {
-          // Insert the follow-up so it runs after the engine finishes resolving the choice.
-          // Mirrors the `{ type: 'flow' }` branch of the engine's own resolveChoice.
-          this.engineStack.insertFlowAfterPendingChoice(cardFlow, player.id)
-          insertedCardFollowUpFlow = true
-        }
-      }
     }
     const result = this.engine.resolveChoice(
       value,
@@ -4415,7 +4531,7 @@ export class GameCore {
       payload,
     )
     this.flushEngineLog()
-    if (frame && (result.type === 'flow' || insertedCardFollowUpFlow)) {
+    if (frame && (result.type === 'flow' || (result.type === 'ok' && result.extraData?.cardChoiceFollowUp === true))) {
       this.pushNestedReturnPointForFrame(frame, pendingPlayerIndex)
     }
     if (result.type === 'ok' && resolvedActionId && !isInjectedAnytimeResult(result)) {
@@ -4435,8 +4551,11 @@ export class GameCore {
     }
     if (result.type === 'fail') {
       if (result.recoverable === true) {
+        const guarded = this.provisionalContinuationScopes.find((scope) => scope.guarded)
+        if (guarded && this.activeCommandSettlement) return this.rejectCurrentCommand(this.activeCommandSettlement, guarded)
         return this.respond(false, result.errorKey ?? 'action failed')
       }
+      if (this.completionScopes.length > 0) throw new ActionCompletionFailure(result.errorKey ?? 'action failed')
       endTurnScope(this.state.players[frame?.ownerPlayerIndex ?? playerIndex] ?? player)
       this.engineStack.pop()
       this.actionStartIndex = null
@@ -5211,8 +5330,11 @@ export class GameCore {
     }
     if (result.type === 'fail') {
       if (result.recoverable === true) {
+        const guarded = this.provisionalContinuationScopes.find((scope) => scope.guarded)
+        if (guarded && this.activeCommandSettlement) return this.rejectCurrentCommand(this.activeCommandSettlement, guarded)
         return this.respond(false, result.errorKey ?? 'action failed')
       }
+      if (this.completionScopes.length > 0) throw new ActionCompletionFailure(result.errorKey ?? 'action failed')
       endTurnScope(this.state.players[frame?.ownerPlayerIndex ?? playerIndex] ?? player)
       this.engineStack.pop()
       this.actionStartIndex = null
@@ -5298,6 +5420,7 @@ export class GameCore {
       }, { resourceCounts: counts })
       // Effect 校验失败应直接 respond(false)，pending envelope 保留，让前端再次提交合法选择。
       if (result?.type === 'fail') {
+        if (!result.recoverable && this.completionScopes.length > 0) throw new ActionCompletionFailure(result.errorKey ?? 'action failed')
         this.flushEngineLog()
         return this.respond(false, result.errorKey ?? 'invalid resource-quantity selection')
       }
@@ -5329,6 +5452,7 @@ export class GameCore {
         ...this.buildEngineExecutionContext(player, space),
       }, { resourceBatchExchange: batch })
       if (result?.type === 'fail') {
+        if (!result.recoverable && this.completionScopes.length > 0) throw new ActionCompletionFailure(result.errorKey ?? 'action failed')
         this.flushEngineLog()
         return this.respond(false, result.errorKey ?? 'invalid resource batch exchange')
       }
@@ -5370,6 +5494,10 @@ export class GameCore {
       const result = this.engine?.resolveChoice('confirm', {
         ...this.buildEngineExecutionContext(this.state.players[playerIndex]!, space),
       }, { cards: cardIds })
+      if (result?.type === 'fail') {
+        if (!result.recoverable && this.completionScopes.length > 0) throw new ActionCompletionFailure(result.errorKey ?? 'action failed')
+        return this.respond(false, result.errorKey ?? 'invalid selection')
+      }
       if (result?.type === 'ok') {
         this.recordActionResultDetails(
           result,
@@ -5402,6 +5530,10 @@ export class GameCore {
     const result = this.engine?.resolveChoice('confirm', {
       ...this.buildEngineExecutionContext(this.state.players[playerIndex]!, space),
     }, { positions: validation.positionStrings })
+    if (result?.type === 'fail') {
+      if (!result.recoverable && this.completionScopes.length > 0) throw new ActionCompletionFailure(result.errorKey ?? 'action failed')
+      return this.respond(false, result.errorKey ?? 'invalid selection')
+    }
     if (result?.type === 'ok') {
       this.recordActionResultDetails(
         result,
@@ -5578,11 +5710,7 @@ export class GameCore {
         player.extraOccupationsFromCards.push(cardId)
       }
     }
-    getCardModifiers(cardId).forEach((modifier) => {
-      if (!player.activeModifiers.some((m) => JSON.stringify(m) === JSON.stringify(modifier))) {
-        player.activeModifiers.push(modifier)
-      }
-    })
+    ensureCardModifiers(player, cardId)
     // Trigger onBuy hook (creates PlayerActionCard action spaces, etc.)
     runCardEffectHook(this.state, player, cardId, 'onBuy', undefined, {
       reportProtectedObservation: (observation) => this.reportProtectedObservation(observation),

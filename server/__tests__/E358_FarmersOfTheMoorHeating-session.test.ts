@@ -641,12 +641,6 @@ describe('Farmers of the Moor heating, sick workers, and Infirmary', () => {
     expect(resp.ok).toBe(true)
     expect(resp.interaction.stateId).toBe('wait')
     if (resp.interaction.stateId !== 'wait') return
-    const peatHutOption = resp.interaction.request.options?.find((option) => option.sourceCard === 'M032_PeatHut')
-    expect(peatHutOption).toBeDefined()
-    resp = session.resolveChoice(0, peatHutOption!.value)
-    expect(resp.ok).toBe(true)
-    expect(resp.interaction.stateId).toBe('wait')
-    if (resp.interaction.stateId !== 'wait') return
     expect(resp.interaction.request.farm?.farmType).toBe('room')
     const room = resp.interaction.request.farm?.selectableTiles[0]
     expect(room).toBeDefined()

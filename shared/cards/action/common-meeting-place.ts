@@ -1,5 +1,5 @@
 import type { ActionDefinition } from '../../contract/types'
-import { wrapOptional } from '../../actions/flow'
+import { deriveCanBeExecutedByFlow, wrapOptional } from '../../actions/flow'
 
 export const meetingPlace: ActionDefinition = {
   id: 'meeting-place',
@@ -9,7 +9,7 @@ export const meetingPlace: ActionDefinition = {
   roundAvailable: 1,
   gainPerRound: {},
   players: [2, 3, 4, 5, 6],
-  canBeExecutedByPlayer: () => true,
+  canBeExecutedByPlayer: deriveCanBeExecutedByFlow(),
   execute: () => ({ type: 'ok' }),
   flow: {
     type: 'seq',

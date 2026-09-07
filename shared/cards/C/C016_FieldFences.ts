@@ -49,6 +49,7 @@ const setFlagFlow = (value: boolean): ActionFlow => ({
 
 const C16FenceListener: CardListenerRegistration = {
   id: 'C16-fence-discount',
+  monotoneFenceCost: true,
   cardIds: [CARD_ID],
   phases: ['computeCosts' as ActionHookPhase],
   actions: ['fence'],

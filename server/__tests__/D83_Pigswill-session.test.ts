@@ -83,10 +83,10 @@ describe('D083_Pigswill session — altCosts', () => {
 
   it('D083 supplemental: neither complete cost keeps Pigswill unavailable', () => {
     const session = setup({ food: 1, grain: 0 })
-    const resp = enterImprovementChoice(session)
-    if (resp.interaction.stateId !== 'wait') return
-    const d83Option = resp.interaction.request.options?.find((o) => o.value === CARD_ID)
-    expect(d83Option).toBeUndefined()
+    expect(session.getActionAvailability(0)['major-improvement']).toBe(false)
+    const resp = session.takeAction(0, 'major-improvement')
+    expect(resp.ok).toBe(false)
+    expect(resp.state.players[0]!.minorHand).toContain(CARD_ID)
   })
 })
 

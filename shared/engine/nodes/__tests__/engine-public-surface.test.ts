@@ -10,6 +10,7 @@ import { Engine } from '../../engine'
  */
 describe('Engine surface guard', () => {
   const PUBLIC_API = [
+    'canComplete',
     'injectBeforeFlows',
     'proceed',
     'resolveChoice',
@@ -37,7 +38,7 @@ describe('Engine surface guard', () => {
     'hasPendingHostRequiringExternalResolution',
   ]
 
-  it('public API matches the S4c target surface (5 methods)', () => {
+  it('public API matches the intended surface', () => {
     const proto = Engine.prototype
     const ownMethods = Object.getOwnPropertyNames(proto)
       .filter((name) => name !== 'constructor')
@@ -48,7 +49,7 @@ describe('Engine surface guard', () => {
     expect(ownMethods).toEqual(expected)
   })
 
-  it('public API count is exactly 5', () => {
-    expect(PUBLIC_API.length).toBe(5)
+  it('public API count is exactly 6', () => {
+    expect(PUBLIC_API.length).toBe(6)
   })
 })

@@ -96,7 +96,7 @@ describe('stable payment session', () => {
     expect(paidIndex).toBeLessThan(afterStablesIndex)
   })
 
-  it('does not offer build stables when consumed stable tokens exhaust reserve', () => {
+  it('keeps Farm Expansion unavailable when neither rooms nor stables can complete', () => {
     const session = new GameSession()
     stabilizeRandomHands(session.state.players)
     const state = session.getState().state
@@ -110,10 +110,10 @@ describe('stable payment session', () => {
     player.supplyTokensConsumed = { stable: 4 }
     session.loadState(state)
 
+    expect(session.getActionAvailability(0)['farm-expansion']).toBe(false)
     const resp = session.takeAction(0, 'farm-expansion')
-    expect(resp.ok).toBe(true)
-    const options = resp.interaction.stateId === 'wait' ? resp.interaction.request.options ?? [] : []
-    expect(options.some((option) => option.labelKey === 'actions.stables.name')).toBe(false)
+    expect(resp.ok).toBe(false)
+    expect(resp.state.actionSpaces.find((space) => space.id === 'farm-expansion')!.takenBy).toEqual([])
   })
 
   it('rejects empty stable selection on farm-expansion', () => {

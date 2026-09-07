@@ -91,23 +91,19 @@ describe('C168_AnimalCatcher session', () => {
     expect(player.resources.food).toBe(14)
   })
 
-  it('choosing original gain gives 2 food without animal cost', () => {
+  it('automatically uses the original gain when the animal cost is unreachable', () => {
     const session = setup({ round: 1, food: 5 })
 
-    let resp = session.takeAction(0, 'day-laborer')
+    const resp = session.takeAction(0, 'day-laborer')
     expect(resp.ok).toBe(true)
     expect(resp.interaction.stateId).toBe('wait')
-    if (resp.interaction.stateId !== 'wait') return
-
-    // Choose original gain (last option)
-    const lastOption = resp.interaction.request.options[resp.interaction.request.options?.length - 1]!
-    resp = session.resolveChoice(0, lastOption.value)
-    expect(resp.ok).toBe(true)
-
-    resp = drainPending(session, resp)
+    if (resp.interaction.stateId === 'wait') {
+      expect(resp.interaction.request.kind).toBe('confirm-next-player')
+    }
 
     const player = resp.state.players[0]!
-    expect(player.resources.food).toBe(7) // 5 + 2
+    expect(player.resources.food).toBe(7)
+    expect(player.resources).toMatchObject({ sheep: 0, boar: 0, cattle: 0 })
   })
 
   it('food cost decreases in later rounds', () => {

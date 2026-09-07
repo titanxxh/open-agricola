@@ -3,6 +3,7 @@ import { registerPlayerActionSpace, createPlayerActionSpaces } from '../player-a
 import { readCardExtraData } from '../helpers/card-state'
 import type { ActionFlow } from '../../contract/types'
 import type { CardImpl } from '../registry'
+import { selectionSubsets } from '../../engine/interaction-choices'
 
 const CARD_ID = 'C104_Collector'
 
@@ -35,6 +36,11 @@ registerPlayerActionSpace({
     canBeExecutedByPlayer: (_state, player) => {
       if (player.id !== ownerId) return false
       return (readCardExtraData<number>(player, CARD_ID, 'used') ?? 0) < 4
+    },
+    getCompletionChoices: function* ({ player }) {
+      const useCount = (readCardExtraData<number>(player, CARD_ID, 'used') ?? 0) + 1
+      const needed = USES_TO_RESOURCES[useCount] ?? 6
+      for (const resources of selectionSubsets(RESOURCE_TYPES, needed, needed)) yield { value: resources.join(',') }
     },
     // Read-only: peek at the next useCount to compute `needed`. Mutation
     // (used += 1, begging += 1, resource gains) is deferred to resolveChoice

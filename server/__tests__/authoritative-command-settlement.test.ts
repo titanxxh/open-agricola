@@ -110,7 +110,8 @@ describe('authoritative command settlement', () => {
       execute: ({ player, state: executionState }) => {
         player.resources.wood += 4
         executionState.rngTick = (executionState.rngTick ?? 0) + 1
-        throw new Error('test command failure')
+        if (executionState === session.state) throw new Error('test command failure')
+        return { type: 'ok' }
       },
     }
     ;(session as unknown as { registry: { register: (entry: ActionDefinition) => void } })

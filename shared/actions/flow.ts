@@ -11,7 +11,9 @@ import type {
 import { HookDispatcher } from '../engine/dispatcher'
 
 const deferredFlowDoableFns = new WeakSet<CanBeExecutedByPlayer>()
-const flowHookDispatcher = new HookDispatcher()
+const flowDerivedDoableFns = new WeakSet<CanBeExecutedByPlayer>()
+let flowHookDispatcher: HookDispatcher | undefined
+const getFlowHookDispatcher = () => flowHookDispatcher ??= new HookDispatcher()
 
 const emptyResources: Resource = {
   wood: 0,
@@ -52,11 +54,15 @@ export const deriveCanBeExecutedByFlow = (): CanBeExecutedByPlayer => {
     throw new Error('flow-derived canBeExecutedByPlayer has not been initialized')
   }
   deferredFlowDoableFns.add(placeholder)
+  flowDerivedDoableFns.add(placeholder)
   return placeholder
 }
 
-const isDeferredFlowDoable = (fn: CanBeExecutedByPlayer) =>
+export const isDeferredFlowDoable = (fn: CanBeExecutedByPlayer) =>
   deferredFlowDoableFns.has(fn)
+
+export const isFlowDerivedDoable = (fn: CanBeExecutedByPlayer) =>
+  flowDerivedDoableFns.has(fn)
 
 const asActionSpace = (
   action: ActionDefinition,
@@ -103,7 +109,7 @@ const applyChildActionDoable = (
     )
   }
 
-  return flowHookDispatcher.applyIsDoable(
+  return getFlowHookDispatcher().applyIsDoable(
     {
       state: context.state,
       player: context.player,
@@ -217,5 +223,6 @@ export const initializeFlowDerivedCanBeExecutedByPlayer = (
     )
   }
 
+  flowDerivedDoableFns.add(action.canBeExecutedByPlayer)
   return action
 }

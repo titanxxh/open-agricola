@@ -92,6 +92,7 @@ const canStartConstruct = (
     costOverride: costDelta,
     exactCost: PaymentSolver.readExactCost(actionContext),
     actionContext,
+    costAdjustments,
   })
   if (farm.farmType !== 'room') return false
   return farm.selectableTiles.length > 0 && (farm.maxSelections ?? 0) > 0
@@ -268,30 +269,12 @@ export const constructAction: ActionDefinition = {
     const { state, player, costs, actionContext } = context
     const idx = state.players.indexOf(player)
     const costDelta = PaymentSolver.readConstructCostDelta(actionContext, costs)
-    let farm = playerBoard(state, idx).farmInteraction.selectableTiles('room', {
+    const farm = playerBoard(state, idx).farmInteraction.selectableTiles('room', {
       costOverride: costDelta,
       exactCost: PaymentSolver.readExactCost(actionContext),
       actionContext,
+      costAdjustments: readConstructCostAdjustments(context),
     })
-    const roomFarm = farm.farmType === 'room' ? farm : undefined
-    if (roomFarm) {
-      const maxBuildableRooms = PaymentSolver.getMaxBuildableRooms(
-        player,
-        costs,
-        actionContext,
-        readConstructCostAdjustments(context),
-      )
-      let selectedRoomFarm = roomFarm
-      if (maxBuildableRooms > roomFarm.maxSelections) {
-        const fallbackFarm = playerBoard(state, idx).farmInteraction.selectableTiles('room', {
-          exactCost: { max: maxBuildableRooms },
-          actionContext,
-        })
-        if (fallbackFarm.farmType === 'room') selectedRoomFarm = fallbackFarm
-      }
-      selectedRoomFarm.maxSelections = Math.min(selectedRoomFarm.selectableTiles.length, maxBuildableRooms)
-      farm = selectedRoomFarm
-    }
     return {
       type: 'request',
       request: {

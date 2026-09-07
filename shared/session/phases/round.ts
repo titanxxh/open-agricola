@@ -13,7 +13,7 @@
 
 import type { ActionFlow, GameState, PlayerState } from '../../contract/types.ts'
 import { workersAvailable } from '../../domain/player.ts'
-import { addLinkedSpaceBlocks, addWorkerRef, findActionSpaceById } from '../../domain/space.ts'
+import { findActionSpaceById } from '../../domain/space.ts'
 import {
   createMoorSpecialActionSpace,
   validateMoorSpecialAction,
@@ -22,10 +22,8 @@ import {
 import { MOOR_SPECIAL_ACTION_APPLY_ACTION_ID } from '../../moor/special-action-flow.ts'
 import type { MoorSpecialActionId } from '../../moor/types.ts'
 import { hasHealthyWorkerAtHome, selectWorkerForMoorAction } from '../../moor/heating.ts'
-import { canEnterActionSpace } from '../action-entry-query.ts'
-import { incPlacedFarmers } from '../../session/stats.ts'
+import { applyActionPlacement, canEnterActionSpace } from '../action-entry-query.ts'
 import { endTurnScope, recordActionSnapshot } from '../../cards/helpers/action-snapshot.ts'
-import { recordRoundPlacement } from '../../cards/helpers/round-placement.ts'
 import { collectBeforePlacementFlows, runCardListeners } from '../../cards/card-listeners.ts'
 import { shouldSkipPlayerTurn, hasPendingExtraTurn, collectExtraTurnFlow, skipPendingExtraTurn } from '../../cards/card-effects.ts'
 import { tagInjectedAnytimeFlow } from '../../engine/action-context-flags.ts'
@@ -146,19 +144,7 @@ export const takeAction = (
   player._activeActionBonusSources = []
   core.setActionStartPlayerSnapshot(core.cloneSessionPlayer(player))
   core.resetActionResultDetails()
-  recordActionSnapshot(player, core.allocActionToken())
-  addWorkerRef(space, player.id, worker.id)
-  addLinkedSpaceBlocks(state, space, player.id, worker.id)
-  appendImmediateEvents(state, [{
-    type: 'worker.placed',
-    workerId: worker.id,
-    spaceId,
-  }], {
-    actorPlayerId: player.id,
-    sourceActionId: spaceId,
-  })
-  recordRoundPlacement(player, spaceId, worker?.id ?? '?')
-  incPlacedFarmers(player)
+  applyActionPlacement(state, player, space, worker.id, core.allocActionToken())
 
   core.pushEngineFrame({
     engine: core.createEngineForSpace(spaceId),
@@ -172,6 +158,7 @@ export const takeAction = (
     reason: 'top-level',
   })
 
+  core.recordCompletionScope()
   const beforeFlows = collectBeforePlacementFlows(state, player, space)
   if (beforeFlows.length > 0) {
     core.peekEngineFrame()?.engine.injectBeforeFlows(beforeFlows, { state, player, space })

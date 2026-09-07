@@ -5,7 +5,7 @@ import { getMinorImprovement } from '../../cards/registry-display'
 import { returnCardToBoard } from '../../cards/helpers/return-card'
 import { takeMajorImprovementFromSupply } from '../../cards/major/supply'
 import { incMajorBuilt, incMinorBuilt, incOccupationBuilt, recordDraftPlayed } from '../../session/stats'
-import { getCardModifiers } from '../../cards/card-modifiers'
+import { ensureCardModifiers } from '../../cards/card-modifiers'
 import { activateCardEffect } from '../effects/internal/activate-card-effect'
 import {
   cardEffectHandChangedEvent,
@@ -108,11 +108,7 @@ const applyMinorImprovementPurchase = (
     }
   }
 
-  getCardModifiers(improvement.id).forEach((modifier) => {
-    if (!player.activeModifiers.some((m) => JSON.stringify(m) === JSON.stringify(modifier))) {
-      player.activeModifiers.push(modifier)
-    }
-  })
+  ensureCardModifiers(player, improvement.id)
   return { passing: false }
 }
 
@@ -133,6 +129,7 @@ export const commitImprovementPurchaseLifecycle = ({
     reportProtectedObservation?.({
       kind: 'hidden-information',
       recipientPlayerIds: state.players.map((entry) => entry.id),
+      knownToPlayerIds: [player.id],
     })
   }
   let passResult: ApplyMinorResult | null = null

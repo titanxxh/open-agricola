@@ -102,6 +102,7 @@ const fenceIsDoableListener: CardListenerRegistration = {
 
 const fenceCostListener: CardListenerRegistration = {
   id: 'C88-carpenters-apprentice-costs-fence',
+  monotoneFenceCost: true,
   cardIds: [CARD_ID],
   phases: ['computeCosts' as ActionHookPhase],
   actions: ['fence'],

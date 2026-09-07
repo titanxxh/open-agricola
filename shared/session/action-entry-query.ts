@@ -1,6 +1,10 @@
 import type { ActionSpace, GameState, PlayerState } from '../contract/types'
 import { canEnterSpace, canUseExclusiveSpace, computeAllowedPlacementSpaces } from '../actions/helpers/placement-availability'
-import { isSpaceBlocked, isSpaceOccupied } from '../domain/space'
+import { addLinkedSpaceBlocks, addWorkerRef, isSpaceBlocked, isSpaceOccupied } from '../domain/space'
+import { recordActionSnapshot } from '../cards/helpers/action-snapshot'
+import { recordRoundPlacement } from '../cards/helpers/round-placement'
+import { incPlacedFarmers } from './stats'
+import { appendImmediateEvents } from '../events/append'
 import { canMoorWorkerEnterSpace } from '../moor/heating'
 import { isThroughTheSeasonsSeason } from '../seasons/rules'
 
@@ -13,6 +17,25 @@ type ActionEntryAvailabilityOptions = {
   isActionDoable: (space: ActionSpace, baseDoable: boolean) => boolean
 }
 
+export const applyActionPlacement = (
+  state: GameState,
+  player: PlayerState,
+  space: ActionSpace,
+  workerId: string,
+  actionToken: number,
+): void => {
+  player._activeActionBonusSources = []
+  recordActionSnapshot(player, actionToken)
+  addWorkerRef(space, player.id, workerId)
+  addLinkedSpaceBlocks(state, space, player.id, workerId)
+  appendImmediateEvents(state, [{ type: 'worker.placed', workerId, spaceId: space.id }], {
+    actorPlayerId: player.id,
+    sourceActionId: space.id,
+  })
+  recordRoundPlacement(player, space.id, workerId)
+  incPlacedFarmers(player)
+}
+
 export const canEnterActionSpace = (
   state: GameState,
   player: PlayerState,
@@ -21,7 +44,7 @@ export const canEnterActionSpace = (
 ): boolean => {
   if (isSpaceBlocked(space)) return false
   if (!canUseExclusiveSpace(space, player, state)) return false
-  if (space.strictCanExecute) {
+  if (space.strictCanExecute || options.isActionDoable) {
     const baseDoable = space.canBeExecutedByPlayer(state, player)
     if (!(options.isActionDoable?.(space, baseDoable) ?? baseDoable)) return false
   }
@@ -36,7 +59,7 @@ export const canEnterActionSpace = (
     const allowed = computeAllowedPlacementSpaces(state, player)
     if (!allowed.some((entry) => entry.spaceId === space.id)) return false
   }
-  if (space.strictCanExecute && options.isActionDoable) return true
+  if (options.isActionDoable) return true
   return options.vetoesAction?.(space) !== true
 }
 

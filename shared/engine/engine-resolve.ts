@@ -1035,7 +1035,7 @@ export function engineResolveChoice(
   int.hooks.during({ ...executionContext, ...pendingEventReadContext(completedEvents), actionId: committedActionId }, result)
   if (
     result.type === 'fail' &&
-    (result.recoverable === true || pendingEnvelope?.request.kind === 'farm-select') &&
+    (result.recoverable === true || (!int.completionChecks && pendingEnvelope?.request.kind === 'farm-select')) &&
     pendingHost &&
     pendingEnvelope
   ) {

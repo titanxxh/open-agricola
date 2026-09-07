@@ -159,7 +159,7 @@ describe('C112_Thresher session', () => {
     expect(hasSkip).toBe(true)
   })
 
-  it('grain-utilization without the card and 0 grain + 0 veg falls through', () => {
+  it('keeps grain-utilization unavailable without the card or a completable child', () => {
     const session = setup({ withCard: false, grain: 0 })
     const state = session.getState().state
     state.players[0]!.resources.food = 2
@@ -169,11 +169,7 @@ describe('C112_Thresher session', () => {
     ]
     session.loadState(state)
 
-    const resp = session.takeAction(0, 'grain-utilization')
-    // Without the card, no before-hook fires. sow / bake-bread are both
-    // undoable. The action resolves immediately without offering a choice,
-    // ending in confirmNextPlayer (or none) rather than choice.
-    expect(resp.ok).toBe(true)
-    expect(resp.interaction.stateId === 'wait' ? resp.interaction.request.kind : resp.interaction.stateId).toBe('confirm-next-player')
+    expect(session.getActionAvailability(0)['grain-utilization']).toBe(false)
+    expect(session.takeAction(0, 'grain-utilization').ok).toBe(false)
   })
 })

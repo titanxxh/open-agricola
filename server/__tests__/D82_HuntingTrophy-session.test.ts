@@ -21,7 +21,7 @@ describe('D082_HuntingTrophy session', () => {
     player.rooms = 2
     player.resources = {
       ...player.resources,
-      wood: 1,
+      wood: 2,
       clay: 0,
       stone: 2,
       reed: 1,
@@ -41,7 +41,7 @@ describe('D082_HuntingTrophy session', () => {
     return { session, player }
   }
 
-  it('farm-redevelopment can reach the fence prompt with only 1 wood and no modifier mutation', () => {
+  it('farm-redevelopment can reach the fence prompt with 2 wood and no modifier mutation', () => {
     const { session, player } = setupFarmRedevelopment()
 
     const resp = session.takeAction(0, 'farm-redevelopment')

@@ -71,6 +71,8 @@ type EngineContext = {
   state: ActionExecutionContext['state']
   player: ActionExecutionContext['player']
   space: ActionExecutionContext['space']
+  continuationOwnerPlayerId?: string
+  provisionalContinuation?: boolean
   emitPrivateEvent?: ActionExecutionContext['emitPrivateEvent']
   reportProtectedObservation?: ActionExecutionContext['reportProtectedObservation']
 }
@@ -541,7 +543,6 @@ const buildOptionalPrompt = (
     resolveSubtree(node)
     return { type: 'ok', nodeId: node.id, result: { type: 'ok' } }
   }
-
   const label = getChoiceLabel(node, int.registry) ?? {
     labelKey: actionNode.choiceLabelKey ?? action.nameKey,
     labelParams: actionNode.choiceLabelParams,
@@ -987,7 +988,7 @@ export function engineProceed(
         resolveSubtree(node)
         return { type: 'ok', nodeId: node.id, result: { type: 'ok' } }
       }
-      return { type: 'blocked', nodeId: node.id }
+      return { type: 'blocked', nodeId: node.id, mandatory: node.mandatory === true }
     }
     int.pendingNodeIdRef.value = node.id
     const compositeCtxSnapshot = {

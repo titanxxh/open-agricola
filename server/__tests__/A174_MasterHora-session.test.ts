@@ -129,7 +129,7 @@ describe('A174 Master Hora', () => {
     })
   })
 
-  it('enters engine-blocked if the host action becomes impossible after the before flow', () => {
+  it('rejects entry if the host action cannot complete after the before flow', () => {
     const session = setup()
     const state = session.getState().state
     const player = state.players[0]!
@@ -139,15 +139,13 @@ describe('A174 Master Hora', () => {
     if (!houseBuilding) throw new Error('missing house-building-56')
     houseBuilding.canBeExecutedByPlayer = () => true
 
-    let resp = session.takeAction(0, 'house-building-56')
+    const resp = session.takeAction(0, 'house-building-56')
 
-    const accept = findA174Option(resp)
-    expect(accept).toBeDefined()
-    resp = session.resolveChoice(0, accept!.value)
-
-    expect(resp.interaction.stateId).toBe('wait')
-    if (resp.interaction.stateId !== 'wait') throw new Error('expected engine-blocked')
-    expect(resp.interaction.request.kind).toBe('engine-blocked')
-    expect(resp.interaction.allowedCommands).toEqual(['undoStep', 'undoAction'])
+    expect(resp.ok).toBe(false)
+    expect(resp.error).toBe('space unavailable')
+    expect(resp.interaction.stateId).toBe('idle')
+    expect(resp.state.players[0]!.resources.food).toBe(1)
+    expect(resp.state.players[0]!.resources.vegetable).toBe(0)
+    expect(resp.state.actionSpaces.find((space) => space.id === 'house-building-56')?.takenBy).toHaveLength(0)
   })
 })

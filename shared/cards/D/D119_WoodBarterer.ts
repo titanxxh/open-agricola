@@ -1,3 +1,4 @@
+import type { ActionFlow } from '../../contract/types'
 import { defineOccupationCard } from '../card-source'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
@@ -5,13 +6,18 @@ import { gainLeaf, payThenGainActionFlow } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
 
 const CARD_ID = 'D119_WoodBarterer'
+const containsBuildingAction = (flow: ActionFlow): boolean => flow.type === 'leaf'
+  ? ['fence', 'construct'].includes(flow.actionId)
+  : flow.children.some(containsBuildingAction)
+
 const beforeListener: CardListenerRegistration = {
-  id: 'D119-wood-barterer-before-fence-construct',
+  id: 'D119-wood-barterer-before-placement',
   cardIds: [CARD_ID],
   phases: ['before' as ActionHookPhase],
-  actions: ['fence', 'construct'],
+  actions: ['place-farmer'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (context.trueAction === false) return
+    if (!context.space.flow || !containsBuildingAction(context.space.flow)) return
     return {
       flow: {
         type: 'xor',
@@ -36,21 +42,8 @@ const beforeListener: CardListenerRegistration = {
   },
 }
 
-const isDoableListener: CardListenerRegistration = {
-  id: 'D119-wood-barterer-isdoable',
-  cardIds: [CARD_ID],
-  phases: ['isDoable' as ActionHookPhase],
-  actions: ['fence', 'construct'],
-  handler: (context: CardListenerContext): ActionHookResult | void => {
-    if (context.doable) return
-    if (context.actionContext?.skipBeforeTriggers === true) return
-    if (context.trueAction === false) return
-    return { doable: true }
-  },
-}
-
 const cardImpl = {
-  listeners: [beforeListener, isDoableListener],
+  listeners: [beforeListener],
   reaches: [] as readonly string[],
 } satisfies CardImpl
 

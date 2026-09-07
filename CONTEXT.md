@@ -350,6 +350,10 @@ _Avoid_: 行动格 mutation、卡牌特定行动选择规则、前端规则推�
 会话层判断当前玩家是否能通过普通回合行动入口进入某个 Action Space 的统一查询边界；Session 可用性投影和 `takeAction` 入口校验共用它。
 _Avoid_: Action Space mutation、卡牌购买可用性、RoomPlayer 席位校验、前端本地视角选择
 
+**Action Completion Reachability（行动完成可达性）**:
+从当前规则状态出发，存在一条遵守触发时点、合法选择、费用和版图约束，并完成目标行动及其 Mandatory Continuation 的路径。它不保证玩家任意后续选择都会成功。
+_Avoid_: 只判断行动能开始、只计算 before 的资源收益、保证所有选择都能完成
+
 **Strict Action Entry（严格行动入口）**:
 必须在可用性投影和权威 `takeAction` 入口同时满足自身可执行条件的 Action Space；卡牌创建的行动格默认属于此类，标准复合行动格仅在规则要求时显式启用。
 _Avoid_: 只禁用 UI、把所有 OR Action Space 全局设为严格、执行后静默跳过

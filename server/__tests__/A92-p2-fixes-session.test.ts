@@ -369,8 +369,8 @@ describe('A92 P2 fixes', () => {
     })
   })
 
-  describe('T2: rollback failed extra-turn target action', () => {
-    it('failed target action removes the promoted worker from the selected action space', () => {
+  describe('T2: reject unreachable extra-turn target actions', () => {
+    it('failed target action does not place the promoted worker', () => {
       const session = setupRotation({ food: 3, newborns: 2 })
       const failingSpaceId = addFailingActionSpace(session)
 
@@ -381,11 +381,11 @@ describe('A92 P2 fixes', () => {
       expect(['farm-select', 'choice']).toContain(reqKind(used))
 
       const failed = session.resolveChoice(0, failingSpaceId)
-      expect(failed.ok).toBe(true)
+      expect(failed.ok).toBe(false)
       const p0 = session.getState().state.players[0]!
       const failingSpace = session.getState().state.actionSpaces.find((space) => space.id === failingSpaceId)!
       expect(failingSpace.takenBy.filter((ref) => ref.playerId === p0.id)).toHaveLength(0)
-      expect(readActionSnapshotToken(p0)).toBeUndefined()
+      expect(readActionSnapshotToken(p0)).toBeDefined()
     })
 
     it('failed allow-occupied target action removes the newly placed worker, not an older worker', () => {
@@ -426,7 +426,7 @@ describe('A92 P2 fixes', () => {
         )
 
         const failed = session.resolveChoice(0, `${OCCUPIED_SPACE_CHOICE_PREFIX}${failingSpaceId}`)
-        expect(failed.ok).toBe(true)
+        expect(failed.ok).toBe(false)
 
         const after = session.getState().state.actionSpaces.find((space) => space.id === failingSpaceId)!
         expect(after.takenBy).toEqual([{ playerId: p0.id, workerId: oldWorker.id }])
@@ -448,7 +448,7 @@ describe('A92 P2 fixes', () => {
       expect(['farm-select', 'choice']).toContain(reqKind(used))
 
       const failed = session.resolveChoice(0, failingSpaceId)
-      expect(failed.ok).toBe(true)
+      expect(failed.ok).toBe(false)
 
       const p0 = session.getState().state.players[0]!
       const failingSpace = session.getState().state.actionSpaces.find((space) => space.id === failingSpaceId)!

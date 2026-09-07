@@ -48,6 +48,7 @@ export type CardListenerRegistration = {
   zones?: CardListenerZone[]
   mandatory?: boolean
   preScoring?: boolean
+  monotoneFenceCost?: boolean
   blockedAnytimeInteractionKinds?: readonly InteractionRequest['kind'][]
   /**
    * Card-purchase cost candidate transform (Candidate Closure, ADR 0004).
@@ -123,13 +124,29 @@ const matchesListener = (
   return true
 }
 
-const getBaseListeners = (): CardListenerRegistration[] => {
+const playerListenerCardIds = (player: PlayerState): string[] => [
+    ...(player.improvements ?? []),
+    ...(player.minorPlayed ?? []),
+    ...(player.occupationPlayed ?? []),
+    ...(player.minorHand ?? []),
+    ...(player.occupationHand ?? []),
+]
+
+const listenerCardIds = (context: CardListenerContext): string[] => [
+  ...playerListenerCardIds(context.player),
+  ...(context.state.players ?? []).flatMap(playerListenerCardIds),
+]
+
+const getBaseListeners = (context?: CardListenerContext): CardListenerRegistration[] => {
   const active = getActiveCardRegistry()
-  return active ? active.getAllListeners() : []
+  if (!active) return []
+  return context
+    ? active.getCandidateListeners(listenerCardIds(context))
+    : active.getAllListeners()
 }
 
-const getAllListeners = (): CardListenerRegistration[] => {
-  const base = getBaseListeners()
+const getAllListeners = (context?: CardListenerContext): CardListenerRegistration[] => {
+  const base = getBaseListeners(context)
   const sessionCtx = getCurrentSessionContext()
   if (!sessionCtx || sessionCtx.customListeners.length === 0) return base
   return [...base, ...sessionCtx.customListeners]
@@ -139,7 +156,7 @@ const getOrderedListeners = (
   context: CardListenerContext,
   listeners?: readonly CardListenerRegistration[],
 ) =>
-  (listeners ? [...listeners] : getAllListeners())
+  (listeners ? [...listeners] : getAllListeners(context))
     .filter((registration) => matchesListener(registration, context))
     .sort((left, right) => left.id.localeCompare(right.id))
 

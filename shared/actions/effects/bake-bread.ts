@@ -7,6 +7,7 @@ import type {
 import type { EventSink } from '../../contract/events'
 import { getPlayerBakeRates } from '../../cards/helpers/exchange-registry'
 import { addFoodFromConversion, incResourceConverted } from '../../session/stats'
+import { resourceAllocations, selectionOrders } from '../../engine/interaction-choices'
 
 type BakeRate = ReturnType<typeof getPlayerBakeRates>[number]
 
@@ -172,6 +173,15 @@ export const bakeBreadAction: ActionDefinition = {
   descriptionKey: 'actions.bake-bread.description',
   roundAvailable: 1,
   gainPerRound: {},
+  getCompletionChoices: function* ({ player }) {
+    const limits = Object.fromEntries(getPlayerBakeRates(player).map((rate) => [rate.cardId, Math.min(rate.max, player.resources.grain)]))
+    for (const counts of resourceAllocations(limits, player.resources.grain)) {
+      if (Object.keys(counts).length === 0) continue
+      for (const entries of selectionOrders(Object.entries(counts))) {
+        yield { value: `bulk:${entries.map(([card, count]) => `${card}=${count}`).join(',')}` }
+      }
+    }
+  },
   canBeExecutedByPlayer: (_state, player) => canBakeBreadDirectly(player),
   execute: ({ player }) => {
     const options = buildBakeBreadOptions(player)

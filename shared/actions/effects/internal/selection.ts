@@ -5,6 +5,7 @@ import {
   validateFarmPositionSelection,
 } from '../../../domain/farm-position-selection'
 import { runSelectionEffect, validateSelectionEffect } from '../../helpers/selection-effect-registry'
+import { buildFarmPositionSelectionInteraction } from '../../../domain/farmyard-interaction'
 
 const validateFarmPositions = (
   positions: string[],
@@ -40,7 +41,7 @@ export const selectionAction: ActionDefinition = {
   roundAvailable: 1,
   gainPerRound: {},
   canBeExecutedByPlayer: () => true,
-  execute: ({ actionContext }) => {
+  execute: ({ player, actionContext }) => {
     const kind = (actionContext?.selectionKind as string | undefined) ?? 'farm-position'
     const promptKey =
       kind === 'occupation-hand'
@@ -51,10 +52,11 @@ export const selectionAction: ActionDefinition = {
     return {
       type: 'request',
       request: {
-        kind: 'choice',
-        options: [
-          { value: 'confirm', labelKey: 'ui.interactionSelectionConfirm' },
-        ],
+        kind: 'selection',
+        selection: kind === 'occupation-hand'
+          ? { kind: 'occupation-hand', selectableCards: player.occupationHand, maxSelections, minSelections }
+          : buildFarmPositionSelectionInteraction(player, actionContext),
+        options: [{ value: 'confirm', labelKey: 'ui.interactionSelectionConfirm' }],
       },
       promptKey,
       promptParams: { maxSelections, minSelections },

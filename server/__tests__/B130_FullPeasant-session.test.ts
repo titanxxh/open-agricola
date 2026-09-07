@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
-import { setFencesForTest } from '../../shared/cards/__tests__/__fixtures__/fence'
 
 import { setWorkersAtHome } from '../../shared/domain/player'
 import '../../shared/cards/B/B130_FullPeasant'
@@ -29,6 +28,7 @@ const setup = (options?: {
     grain: 2,
     wood: 10,
   }
+  player.fields = [{ row: 0, col: 2, stacks: [] }]
   state.players[1]!.workersAvailable = 2
 
   if (options?.withCard ?? true) {
@@ -44,13 +44,28 @@ const setup = (options?: {
   return session
 }
 
+const completeGrainUtilization = (session: GameSession) => {
+  let response = session.takeAction(0, 'grain-utilization')
+  expect(response.ok, response.error).toBe(true)
+  expect(response.interaction.stateId).toBe('wait')
+  if (response.interaction.stateId !== 'wait') return response
+  expect(response.interaction.request.kind).toBe('farm-select')
+  if (response.interaction.request.kind !== 'farm-select') return response
+
+  const field = response.interaction.request.farm.selectableFields[0]
+  expect(field).toBeDefined()
+  if (!field) return response
+  response = session.commitSelectionChoice(0, {
+    crops: [{ ...field.tile, crop: 'grain' }],
+  })
+  expect(response.ok, response.error).toBe(true)
+  return response
+}
+
 describe('B130_FullPeasant session', () => {
   it('offers optional chain after placing on grain-utilization when fencing is unoccupied', () => {
     const session = setup({ withCard: true, food: 3 })
-    const resp = session.takeAction(0, 'grain-utilization')
-    expect(resp.ok).toBe(true)
-    // Grain utilization auto-resolves (no field to sow, no oven to bake); the
-    // B130 after-place-farmer optional chain becomes the first pending choice.
+    const resp = completeGrainUtilization(session)
     expect(resp.interaction.stateId).toBe('wait')
     if (resp.interaction.stateId !== 'wait') return
     const hasSkip = resp.interaction.request.options?.some((o) => o.value === '__skip__')
@@ -63,8 +78,7 @@ describe('B130_FullPeasant session', () => {
   it('pays 1 food and chains to fence when accepting from grain-utilization', () => {
     const session = setup({ withCard: true, food: 3 })
     const placedBefore = session.getState().state.players[0]!.stats?.placedFarmers ?? 0
-    let resp = session.takeAction(0, 'grain-utilization')
-    expect(resp.ok).toBe(true)
+    let resp = completeGrainUtilization(session)
     expect(resp.interaction.stateId).toBe('wait')
     if (resp.interaction.stateId !== 'wait') return
 
@@ -87,8 +101,7 @@ describe('B130_FullPeasant session', () => {
   it('skipping the chain leaves the worker on grain-utilization (placedFarmers +1)', () => {
     const session = setup({ withCard: true, food: 3 })
     const placedBefore = session.getState().state.players[0]!.stats?.placedFarmers ?? 0
-    let resp = session.takeAction(0, 'grain-utilization')
-    expect(resp.ok).toBe(true)
+    let resp = completeGrainUtilization(session)
     if (resp.interaction.stateId !== 'wait') return
     resp = session.resolveChoice(0, '__skip__')
     const grainSpace = resp.state.actionSpaces.find((s) => s.id === 'grain-utilization')!
@@ -102,8 +115,7 @@ describe('B130_FullPeasant session', () => {
     const session = setup({ withCard: true, food: 3 })
     const stateBefore = session.getState().state
     const activeBefore = stateBefore.players[0]!.workers.filter((w) => w.isActive).length
-    let resp = session.takeAction(0, 'grain-utilization')
-    expect(resp.ok).toBe(true)
+    let resp = completeGrainUtilization(session)
     if (resp.interaction.stateId !== 'wait') return
     const accept = (resp.interaction.request.options ?? []).find((o) => o.value !== '__skip__')!
     resp = session.resolveChoice(0, accept.value)
@@ -112,31 +124,19 @@ describe('B130_FullPeasant session', () => {
 
   it('does not offer chain when the other space is occupied', () => {
     const session = setup({ withCard: true, food: 3, fencingOccupied: true })
-    let resp = session.takeAction(0, 'grain-utilization')
-    expect(resp.ok).toBe(true)
-    if (resp.interaction.stateId !== 'wait') return
-    // Skip grain-utilization's sow/bake
-    resp = session.resolveChoice(0, '__skip__')
-    // After place-farmer hooks: B130 should NOT have triggered (fencing occupied).
-    // So the engine should be done → no choice pending.
+    const resp = completeGrainUtilization(session)
     expect(resp.interaction.stateId === 'wait' ? resp.interaction.request.kind : resp.interaction.stateId).toBe('confirm-next-player')
   })
 
   it('does not offer chain when player has no food', () => {
     const session = setup({ withCard: true, food: 0 })
-    let resp = session.takeAction(0, 'grain-utilization')
-    expect(resp.ok).toBe(true)
-    if (resp.interaction.stateId !== 'wait') return
-    resp = session.resolveChoice(0, '__skip__')
+    const resp = completeGrainUtilization(session)
     expect(resp.interaction.stateId === 'wait' ? resp.interaction.request.kind : resp.interaction.stateId).toBe('confirm-next-player')
   })
 
   it('does not offer chain without the card', () => {
     const session = setup({ withCard: false, food: 3 })
-    let resp = session.takeAction(0, 'grain-utilization')
-    expect(resp.ok).toBe(true)
-    if (resp.interaction.stateId !== 'wait') return
-    resp = session.resolveChoice(0, '__skip__')
+    const resp = completeGrainUtilization(session)
     expect(resp.interaction.stateId === 'wait' ? resp.interaction.request.kind : resp.interaction.stateId).toBe('confirm-next-player')
   })
 
@@ -152,7 +152,6 @@ describe('B130_FullPeasant session', () => {
     const session = setup({ withCard: true, food: 3, fencingOccupied: false, grainOccupied: false })
     // Make sure round allows fencing and grain-utilization
     const state = session.getState().state
-    setFencesForTest(state.players[0]!, 5)
     state.players[0]!.resources.wood = 10
     session.loadState(state)
 

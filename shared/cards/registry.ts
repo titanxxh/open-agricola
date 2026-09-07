@@ -52,6 +52,7 @@ export type RegistrySnapshot = {
 
 export class CardRegistry {
   private readonly listenersByCard = new Map<string, CardListenerRegistration[]>()
+  private listenersWithoutCardIds: CardListenerRegistration[] | null = null
   private readonly effectsByCard = new Map<string, CardEffect>()
   private readonly modifiersByCard = new Map<string, CostModifier[]>()
   private readonly prereqChecksByCard = new Map<string, PrerequisiteHandler>()
@@ -63,6 +64,7 @@ export class CardRegistry {
     if (impl.listeners && impl.listeners.length > 0) {
       for (const listener of impl.listeners) setCardListenerSource(listener, cardId)
       this.listenersByCard.set(cardId, impl.listeners)
+      this.listenersWithoutCardIds = null
       if (options.protected) {
         for (const listener of impl.listeners) this.protectedListenerIds.add(listener.id)
       }
@@ -88,6 +90,7 @@ export class CardRegistry {
     const filtered = existing.filter((l) => l.id !== listener.id)
     filtered.push(listener)
     this.listenersByCard.set(cardId, filtered)
+    this.listenersWithoutCardIds = null
   }
 
   /**
@@ -117,6 +120,7 @@ export class CardRegistry {
         this.listenersByCard.set(cardId, kept)
       }
     }
+    this.listenersWithoutCardIds = null
   }
 
   /** Remove effects matching a predicate. */
@@ -167,6 +171,7 @@ export class CardRegistry {
     for (const [cardId, listeners] of other.listenersByCard) {
       this.listenersByCard.set(cardId, [...listeners])
     }
+    this.listenersWithoutCardIds = null
     for (const [cardId, effect] of other.effectsByCard) {
       this.effectsByCard.set(cardId, effect)
     }
@@ -203,6 +208,7 @@ export class CardRegistry {
     const listeners = this.listenersByCard.get(cardId) ?? []
     for (const listener of listeners) this.protectedListenerIds.delete(listener.id)
     this.listenersByCard.delete(cardId)
+    this.listenersWithoutCardIds = null
     this.effectsByCard.delete(cardId)
     this.protectedEffectIds.delete(cardId)
     this.modifiersByCard.delete(cardId)
@@ -212,6 +218,22 @@ export class CardRegistry {
 
   getListenersFor(cardId: string): CardListenerRegistration[] {
     return this.listenersByCard.get(cardId) ?? []
+  }
+
+  getCandidateListeners(cardIds: Iterable<string>): CardListenerRegistration[] {
+    this.listenersWithoutCardIds ??= this.getAllListeners().filter(
+      (listener) => !listener.cardIds?.length,
+    )
+    const result: CardListenerRegistration[] = []
+    const seen = new Set<CardListenerRegistration>()
+    const append = (listener: CardListenerRegistration) => {
+      if (seen.has(listener)) return
+      seen.add(listener)
+      result.push(listener)
+    }
+    this.listenersWithoutCardIds.forEach(append)
+    new Set(cardIds).forEach((cardId) => this.getListenersFor(cardId).forEach(append))
+    return result
   }
 
   getAllListeners(): CardListenerRegistration[] {

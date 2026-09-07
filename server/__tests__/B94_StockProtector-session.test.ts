@@ -84,7 +84,7 @@ describe('B094_StockProtector session', () => {
     expect(resp.state.actionSpaces.find((space) => space.id === 'day-laborer')!.takenBy).toHaveLength(1)
   })
 
-  it('B094 S5: blocks after gaining two wood if fencing is still not doable', () => {
+  it('B094 S5: rejects entry without gaining wood if fencing is still not doable', () => {
     const session = new GameSession()
     stabilizeRandomHands(session.state.players)
     const state = session.getState().state
@@ -98,12 +98,11 @@ describe('B094_StockProtector session', () => {
     session.loadState(state)
 
     const resp = session.takeAction(0, 'fencing')
-    expect(resp.ok).toBe(true)
-    expect(resp.state.players[0]!.resources.wood).toBe(2)
-    expect(resp.interaction.stateId).toBe('wait')
-    if (resp.interaction.stateId !== 'wait') throw new Error('expected wait')
-    expect(resp.interaction.request.kind).toBe('engine-blocked')
-    expect(resp.interaction.allowedCommands).toEqual(['undoStep', 'undoAction'])
+    expect(resp.ok).toBe(false)
+    expect(resp.error).toBe('space unavailable')
+    expect(resp.interaction.stateId).toBe('idle')
+    expect(resp.state.players[0]!.resources.wood).toBe(0)
+    expect(resp.state.actionSpaces.find((space) => space.id === 'fencing')?.takenBy).toHaveLength(0)
   })
 
   it('B094 S4: declining the post-Fencing option places no second person', () => {

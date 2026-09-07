@@ -87,11 +87,8 @@ describe('C070_LettucePatch session', () => {
     it('does NOT allow sowing grain in the card field', () => {
       const session = setup({ grain: 2, vegetable: 0 })
 
-      let resp = session.takeAction(0, 'grain-utilization')
-      expect(resp.ok).toBe(true)
-      // Sow should fail because no fields and card only allows vegetable.
-      resp = session.resolveChoice(0, 'sow')
-      expect(resp.ok).toBe(false)
+      expect(session.getActionAvailability(0)['grain-utilization']).toBe(false)
+      expect(session.takeAction(0, 'grain-utilization').ok).toBe(false)
     })
   })
 
@@ -207,11 +204,8 @@ describe('C070_LettucePatch session', () => {
       }
       session.loadState(state)
 
-      let resp = session.takeAction(0, 'grain-utilization')
-      expect(resp.ok).toBe(true)
-      // Should fail — no empty fields and card already has crop.
-      resp = session.resolveChoice(0, 'sow')
-      expect(resp.ok).toBe(false)
+      expect(session.getActionAvailability(0)['grain-utilization']).toBe(false)
+      expect(session.takeAction(0, 'grain-utilization').ok).toBe(false)
     })
   })
 
@@ -288,10 +282,8 @@ describe('C070_LettucePatch session', () => {
         fields: [], // no normal fields
       })
 
-      let resp = session.takeAction(0, 'grain-utilization')
-      expect(resp.ok).toBe(true)
-      resp = session.resolveChoice(0, 'sow')
-      expect(resp.ok).toBe(false)
+      expect(session.getActionAvailability(0)['grain-utilization']).toBe(false)
+      expect(session.takeAction(0, 'grain-utilization').ok).toBe(false)
     })
   })
 })

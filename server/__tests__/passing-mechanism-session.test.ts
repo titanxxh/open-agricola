@@ -185,6 +185,7 @@ describe('passing-mechanism: receiver behavior', () => {
     const { session, state } = setupPassingSession({ buyerMinorHand: ['C001_Overhaul'] })
     state.players[0]!.occupationPlayed = ['__test_occ_a__', '__test_occ_b__']
     state.players[0]!.resources.wood = 1
+    state.players[1]!.resources.clay = 2
     session.loadState(state)
 
     session.takeAction(0, 'meeting-place')
