@@ -210,7 +210,8 @@ describe('D095 Site Manager parity', () => {
 
     const response = session.takeAction(0, 'major-improvement')
 
-    expect(response.ok, response.error).toBe(true)
+    expect(response.ok).toBe(false)
+    expect(response.error).toBe('space unavailable')
     expect(JSON.stringify(response.interaction)).not.toContain('Major_Fireplace1')
     expect(response.state.players[0]!.improvements).not.toContain('Major_Fireplace1')
     expect(response.state.players[0]!.resources).toMatchObject({ clay: 1, food: 1 })

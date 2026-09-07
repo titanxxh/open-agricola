@@ -101,9 +101,10 @@ describe('B011 Feedyard parity', () => {
 
     expect(response.state.players[0]!.minorHand).toContain(CARD_ID)
     expect(response.state.players[0]!.resources).toMatchObject({ clay: 1, grain: 0 })
-    expect(response.interaction.stateId).toBe('wait')
-    if (response.interaction.stateId !== 'wait') return
-    expect((response.interaction.request.options ?? []).some((option) => option.value === CARD_ID)).toBe(false)
+    expect(response.ok).toBe(false)
+    expect(response.error).toBe('space unavailable')
+    expect(response.interaction.stateId).toBe('idle')
+    expect(response.state.actionSpaces.find((space) => space.id === 'major-improvement')!.takenBy).toEqual([])
   })
 
   it('B011 S3: two pastures let Feedyard hold two different animal types and discard a third', () => {

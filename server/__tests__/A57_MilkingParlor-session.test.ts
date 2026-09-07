@@ -45,7 +45,10 @@ const setup = ({
   player.rooms = player.roomTiles.length
   player.fields = []
   player.stableTiles = [{ row: 0, col: 1 }]
-  player.pastures = [{ id: 'milking-parlor-pasture', tiles: pastureTiles }]
+  player.pastures = [
+    { id: 'sheep', tiles: pastureTiles.slice(0, 2), size: 2, stables: 1, animalType: sheep > 0 ? 'sheep' : null, animalCount: sheep },
+    { id: 'cattle', tiles: pastureTiles.slice(2), size: 2, stables: 0, animalType: cattle > 0 ? 'cattle' : null, animalCount: cattle },
+  ]
 
   const opponent = state.players[1]!
   setWorkersAtHome(state, opponent, 2)
@@ -93,6 +96,7 @@ describe('A057 Milking Parlor parity', () => {
 
     cases.forEach((entry) => {
       const response = play(setup(entry))
+      expect(response.ok, response.error).toBe(true)
       expect(
         response.state.players[0]!.resources.food,
         `${entry.sheep} sheep and ${entry.cattle} cattle`,
@@ -103,6 +107,7 @@ describe('A057 Milking Parlor parity', () => {
   it('A057 S3: sheep and cattle rewards add together and cap at the printed maxima', () => {
     const response = play(setup({ sheep: 5, cattle: 4 }))
 
+    expect(response.ok, response.error).toBe(true)
     expect(response.state.players[0]!.resources.food).toBe(8)
     expect(response.state.players[0]!.minorPlayed).toContain(CARD_ID)
   })

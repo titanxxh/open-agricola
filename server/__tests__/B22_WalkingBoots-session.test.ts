@@ -123,8 +123,9 @@ describe('B022 Walking Boots parity', () => {
     expect(response.state.players[0]!.minorHand).toContain(CARD_ID)
     expect(response.state.players[0]!.minorPlayed).not.toContain(CARD_ID)
     expect(response.state.players[0]!.resources.food).toBe(0)
-    expect(response.interaction.stateId).toBe('wait')
-    if (response.interaction.stateId !== 'wait') return
-    expect((response.interaction.request.options ?? []).some((option) => option.value === CARD_ID)).toBe(false)
+    expect(response.ok).toBe(false)
+    expect(response.error).toBe('space unavailable')
+    expect(response.interaction.stateId).toBe('idle')
+    expect(response.state.actionSpaces.find((space) => space.id === 'major-improvement')!.takenBy).toEqual([])
   })
 })
