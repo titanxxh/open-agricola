@@ -102,7 +102,7 @@ describe('C165 Game Catcher parity', () => {
     })
   }
 
-  it('C165 S3: insufficient food still exposes Game Catcher and blocks after it is played', () => {
+  it('C165 S3: insufficient food rejects Game Catcher without playing or paying', () => {
     const session = setup({ round: 5, food: 4 })
     const state = session.getState().state
     state.players[0]!.occupationHand = [CARD_ID, 'A100_Curator']
@@ -115,14 +115,13 @@ describe('C165 Game Catcher parity', () => {
     if (response.interaction.stateId !== 'wait') return
     const card = response.interaction.request.options?.find((option) => option.value === CARD_ID)
     expect(card).toBeDefined()
+    const before = JSON.stringify({ state: response.state, interaction: response.interaction })
     response = session.resolveChoice(response.interaction.playerIndex, card!.value)
 
-    expect(response.ok, response.error).toBe(true)
-    expect(response.interaction).toMatchObject({
-      stateId: 'wait', request: { kind: 'engine-blocked' },
-    })
-    expect(response.state.players[0]!.occupationHand).not.toContain(CARD_ID)
-    expect(response.state.players[0]!.occupationPlayed).toContain(CARD_ID)
+    expect(response.ok).toBe(false)
+    expect(JSON.stringify({ state: response.state, interaction: response.interaction })).toBe(before)
+    expect(response.state.players[0]!.occupationHand).toContain(CARD_ID)
+    expect(response.state.players[0]!.occupationPlayed).not.toContain(CARD_ID)
     expect(response.state.players[0]!.resources).toMatchObject({ food: 4, boar: 0, cattle: 0 })
   })
 

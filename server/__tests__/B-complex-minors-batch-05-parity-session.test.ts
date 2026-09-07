@@ -85,9 +85,10 @@ describe('B068 Beanfield parity', () => {
 
     expect(response.state.players[0]!.minorHand).toContain(BEANFIELD)
     expect(response.state.players[0]!.resources.food).toBe(1)
-    expect(response.interaction.stateId).toBe('wait')
-    if (response.interaction.stateId !== 'wait') return
-    expect((response.interaction.request.options ?? []).some((option) => option.value === BEANFIELD)).toBe(false)
+    expect(response.ok).toBe(false)
+    expect(response.error).toBe('space unavailable')
+    expect(response.interaction.stateId).toBe('idle')
+    expect(response.state.actionSpaces.find((space) => space.id === 'major-improvement')!.takenBy).toEqual([])
   })
 
   it('B068 S3: Beanfield accepts vegetable sowing and receives the normal two vegetables', () => {

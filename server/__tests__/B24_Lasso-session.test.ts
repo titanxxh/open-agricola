@@ -99,11 +99,11 @@ describe('B024 Lasso parity', () => {
   })
 
   it('B024 S2: without reed Lasso remains unavailable', () => {
-    const response = enterMinor(setup({ played: false, reed: 0 }))
+    const response = setup({ played: false, reed: 0 }).takeAction(0, 'major-improvement')
 
-    expect(response.interaction.stateId).toBe('wait')
-    if (response.interaction.stateId !== 'wait') return
-    expect(response.interaction.request.options?.some((option) => option.value === CARD_ID) ?? false).toBe(false)
+    expect(response.ok).toBe(false)
+    expect(response.error).toBe('space unavailable')
+    expect(response.interaction.stateId).toBe('idle')
     expect(response.state.players[0]!.minorHand).toContain(CARD_ID)
   })
 

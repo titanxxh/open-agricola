@@ -152,8 +152,10 @@ describe('A084 Silage parity', () => {
   })
 
   it('A084 S2: one field keeps Silage unavailable', () => {
-    const response = openMinorPrompt(purchaseSession(1))
+    const response = purchaseSession(1).takeAction(0, 'major-improvement')
 
+    expect(response.ok).toBe(false)
+    expect(response.error).toBe('space unavailable')
     expect(response.interaction.stateId === 'wait'
       ? response.interaction.request.options?.some((option) => option.value === CARD_ID) ?? false
       : false).toBe(false)

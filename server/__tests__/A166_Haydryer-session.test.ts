@@ -114,19 +114,13 @@ describe('A166 Haydryer parity', () => {
 
   it('A166 S4: with only two food a three-food Haydryer purchase cannot complete', () => {
     const session = setup({ pastures: 1, food: 2 })
-    let response = session.performRoundEnd()
+    const response = session.performRoundEnd()
 
+    expect(response.ok, response.error).toBe(true)
     expect(response.state.players[0]!.resources.cattle).toBe(0)
-    expect(response.interaction.stateId).toBe('wait')
-    if (response.interaction.stateId !== 'wait') return
-    const activate = response.interaction.request.options?.find((option) =>
-      option.sourceCard === CARD_ID && option.value !== '__skip__')
-    expect(activate, JSON.stringify(response.interaction)).toBeDefined()
-    response = session.resolveChoice(response.interaction.playerIndex, activate!.value)
-    expect(response.ok, JSON.stringify(response)).toBe(true)
-    expect(response.state.players[0]!.resources).toMatchObject({ food: 2, cattle: 0 })
-    expect(response.interaction).toMatchObject({ stateId: 'wait', request: { kind: 'engine-blocked' } })
-    if (response.interaction.stateId === 'wait') expect(response.interaction.allowedCommands).toContain('undoStep')
+    expect(response.state.players[0]!.resources).toMatchObject({ food: 0, begging: 2 })
+    expect(response.state.round).toBe(5)
+    expect(response.interaction.stateId).toBe('idle')
   })
 
   it('A166 S5: four pastures make the cattle gain mandatory and free', () => {

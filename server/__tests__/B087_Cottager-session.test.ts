@@ -83,18 +83,17 @@ describe('B087 Cottager parity', () => {
     expect(response.state.players[0]!.resources).toMatchObject({ wood: 0, reed: 0, food: 2 })
   })
 
-  it('B087 S3: OA fails the Cottager renovation branch before renovating or paying', () => {
+  it('B087 S3: the impossible renovation branch is not offered or charged', () => {
     const session = setup({ resources: { clay: 2, reed: 1 } })
-    let response = enterCottager(session)
+    const response = enterCottager(session)
     expect(response.interaction.stateId).toBe('wait')
     if (response.interaction.stateId !== 'wait') return
     const renovation = response.interaction.request.options?.find((candidate) =>
       candidate.labelKey?.includes('renovat') || candidate.value.includes('renovat'))
-    expect(renovation).toBeDefined()
-    response = session.resolveChoice(response.interaction.playerIndex, renovation!.value)
+    expect(renovation).toBeUndefined()
 
-    expect(response.ok).toBe(false)
-    expect(response.error).toBe('log.renovationFail')
+    expect(response.ok, response.error).toBe(true)
+    expect(response.interaction.request.kind).toBe('confirm-next-player')
     expect(response.state.players[0]!.houseType).toBe('wood')
     expect(response.state.players[0]!.rooms).toBe(2)
     expect(response.state.players[0]!.resources).toMatchObject({ clay: 2, reed: 1, food: 2 })

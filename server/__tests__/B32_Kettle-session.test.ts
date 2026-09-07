@@ -89,21 +89,21 @@ describe('B032 Kettle parity', () => {
   })
 
   it('B032 S2: without a grain field Kettle remains unavailable without spending clay', () => {
-    const response = enterMinor(setup({ grainField: false }))
+    const response = setup({ grainField: false }).takeAction(0, 'major-improvement')
 
-    expect(response.interaction.stateId).toBe('wait')
-    if (response.interaction.stateId !== 'wait') return
-    expect(response.interaction.request.options?.some((option) => option.value === CARD_ID) ?? false).toBe(false)
+    expect(response.ok).toBe(false)
+    expect(response.error).toBe('space unavailable')
+    expect(response.interaction.stateId).toBe('idle')
     expect(response.state.players[0]!.minorHand).toContain(CARD_ID)
     expect(response.state.players[0]!.resources.clay).toBe(1)
   })
 
   it('B032 S3: without clay Kettle remains unavailable even with a grain field', () => {
-    const response = enterMinor(setup({ clay: 0 }))
+    const response = setup({ clay: 0 }).takeAction(0, 'major-improvement')
 
-    expect(response.interaction.stateId).toBe('wait')
-    if (response.interaction.stateId !== 'wait') return
-    expect(response.interaction.request.options?.some((option) => option.value === CARD_ID) ?? false).toBe(false)
+    expect(response.ok).toBe(false)
+    expect(response.error).toBe('space unavailable')
+    expect(response.interaction.stateId).toBe('idle')
     expect(response.state.players[0]!.minorHand).toContain(CARD_ID)
   })
 

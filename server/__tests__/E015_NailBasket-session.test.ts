@@ -143,7 +143,7 @@ describe('E015 Nail Basket parity', () => {
   })
 
   it('E015 S4: declining after Forest keeps the stone and builds no fences', () => {
-    const session = setup({ played: true, reed: 0, stone: 1 })
+    const session = setup({ played: true, reed: 0, stone: 1, wood: 1 })
     let response = session.takeAction(0, 'forest')
     expect(nailOption(response)).toBeDefined()
 

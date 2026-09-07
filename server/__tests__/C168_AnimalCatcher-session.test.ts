@@ -26,14 +26,16 @@ const setup = (options?: { round?: number; food?: number }) => {
     {
       id: 'pasture-0',
       tiles: [{ row: 2, col: 0 }, { row: 2, col: 1 }],
-      stableCount: 0,
+      size: 2,
+      stables: 0,
       animalType: null,
       animalCount: 0,
     },
     {
       id: 'pasture-1',
       tiles: [{ row: 2, col: 2 }],
-      stableCount: 0,
+      size: 1,
+      stables: 0,
       animalType: null,
       animalCount: 0,
     },
