@@ -406,13 +406,8 @@ describe('E070_CropRotationField session', () => {
         cardCrop: { crop: 'grain', remaining: 3 },
       })
 
-      let resp = session.takeAction(0, 'grain-utilization')
-      expect(resp.ok).toBe(true)
-      // OR(sow, bake-bread) is structurally doable, but selecting sow when the
-      // card already has a crop and the player has no regular fields surfaces
-      // as fail because canSow returns false.
-      resp = session.resolveChoice(0, 'sow')
-      expect(resp.ok).toBe(false)
+      expect(session.getActionAvailability(0)['grain-utilization']).toBe(false)
+      expect(session.takeAction(0, 'grain-utilization').ok).toBe(false)
     })
   })
 })

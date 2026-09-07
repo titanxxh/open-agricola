@@ -107,17 +107,19 @@ describe('CardEffect.resolveChoice hook', () => {
   })
 
   it('resolveChoice handler is invoked when a pending choice with matching sourceCard is resolved', () => {
+    const activeSession: { current?: GameSession } = {}
     const invocations: { choice: string; ctx: { sourceCard: string } }[] = []
 
     requireActiveCardRegistry('card-effect-resolve-choice').setEffect({
       id: TEST_CARD_ID,
       onBuy: () => buildTestOnBuyFlow(),
       resolveChoice: (_state, _player, choice, ctx) => {
-        invocations.push({ choice, ctx })
+        if (_state === activeSession.current?.state) invocations.push({ choice, ctx })
       },
     })
 
     const session = makeSession()
+    activeSession.current = session
 
     // takeAction on lessons auto-resolves occupation when only one occupation
     // is in hand (engine.maybeBuildChoiceCandidates short-circuits with 1 option).
@@ -226,12 +228,13 @@ describe('CardEffect.resolveChoice hook', () => {
   })
 
   it('resolveChoice handler is NOT called when sourceCard does not match', () => {
+    const activeSession: { current?: GameSession } = {}
     let handlerCalled = false
     requireActiveCardRegistry('card-effect-resolve-choice').setEffect({
       id: TEST_CARD_ID,
       onBuy: () => buildTestOnBuyFlow(),
-      resolveChoice: () => {
-        handlerCalled = true
+      resolveChoice: (state) => {
+        if (state === activeSession.current?.state) handlerCalled = true
       },
     })
 
@@ -239,6 +242,7 @@ describe('CardEffect.resolveChoice hook', () => {
     // sourceCard === TEST_CARD_ID.  We test this by verifying the handler is
     // never called when there is no pending choice with our sourceCard.
     const session = makeSession()
+    activeSession.current = session
     // day-laborer: no pending choice produced (all resources granted immediately)
     const resp = session.takeAction(0, 'day-laborer')
     expect(resp.ok).toBe(true)

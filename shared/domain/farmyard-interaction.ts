@@ -6,7 +6,7 @@ import type {
   PlayerState,
   Resource,
 } from '../contract/types.ts'
-import { PaymentSolver } from '../actions/payment'
+import { PaymentSolver, type ConstructCostAdjustments } from '../actions/payment'
 import { collectLockedFarmTileKeys, computeExtraSowableFields } from '../cards/card-effects.ts'
 import { readCardExtraData } from '../cards/helpers/card-state.ts'
 import { getFarmyardTilePositions, positionKey } from './farm.ts'
@@ -66,6 +66,7 @@ export const buildRoomFarmInteraction = (
   player: PlayerState,
   costOverride?: Partial<Resource>,
   actionContext?: Record<string, unknown>,
+  costAdjustments?: ConstructCostAdjustments,
 ): InteractionFarmSelection => {
   const normalized = normalizePlayerFarm(player)
   const occupied = new Set(normalized.roomTiles.map(positionKey))
@@ -82,7 +83,7 @@ export const buildRoomFarmInteraction = (
   })
   const maxSelections = Math.min(
     selectableTiles.length,
-    PaymentSolver.getMaxBuildableRooms(player, costOverride, actionContext),
+    PaymentSolver.getMaxBuildableRooms(player, costOverride, actionContext, costAdjustments),
   )
   const reachableTiles = getReachableRoomTiles(
     normalized,
@@ -345,6 +346,7 @@ export type FarmSelectKind =
 
 export type SelectableTilesOpts = {
   costOverride?: Partial<Resource>
+  costAdjustments?: ConstructCostAdjustments
   exactCost?: ExactCost
   actionContext?: Record<string, unknown>
   spaceId?: string
@@ -385,6 +387,7 @@ export class FarmInteraction {
           this.player,
           cost,
           opts?.exactCost ? { ...(ctx ?? {}), exactCost: opts.exactCost } : ctx,
+          opts?.costAdjustments,
         )
       case 'stable':
         return buildStableFarmInteraction(this.player, cost, {

@@ -5,6 +5,7 @@ import type { ActionFlow } from '../../contract/types'
 const getFlow = (): ActionFlow => {
   const result = D119_WoodBarterer_impl.listeners[0]!.handler({
     trueAction: true,
+    space: { flow: { type: 'leaf', actionId: 'construct' } },
     doable: true,
   } as never)
   expect(result?.flow).toBeDefined()

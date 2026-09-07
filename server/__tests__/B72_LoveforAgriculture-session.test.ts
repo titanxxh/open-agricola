@@ -160,11 +160,8 @@ describe('B072_LoveforAgriculture session', () => {
         ],
       })
 
-      let resp = session.takeAction(0, 'grain-utilization')
-      expect(resp.ok).toBe(true)
-      // Sow should fail because no fields or eligible pastures.
-      resp = session.resolveChoice(0, 'sow')
-      expect(resp.ok).toBe(false)
+      expect(session.getActionAvailability(0)['grain-utilization']).toBe(false)
+      expect(session.takeAction(0, 'grain-utilization').ok).toBe(false)
     })
 
     it('allows sowing in field AND pasture simultaneously', () => {

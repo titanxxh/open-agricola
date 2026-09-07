@@ -13,7 +13,7 @@ import type { EngineStackCursor } from '../engine'
 import type { SessionPrivateCursor, StateWithCursor } from './session-core'
 import { createActionSpaces } from '../actions'
 import { normalizeState } from '../session/state-bootstrap'
-import { getCardModifiers } from '../cards/card-modifiers'
+import { ensureCardModifiers } from '../cards/card-modifiers'
 import { createPlayerActionSpaces } from '../cards/player-action-space'
 import { normalizeBlockedBy, normalizeTakenBy } from '../domain/space'
 import { collectBuiltSpecialStables, type BuiltSpecialStable } from '../cards/card-effects'
@@ -791,18 +791,8 @@ export const serializeStateForPlayer = (
 
 export const rebuildActiveModifiers = (state: GameState): GameState => {
   state.players.forEach((player) => {
-    const existing = player.activeModifiers ?? []
-    const next = [...existing]
     const playedCardIds = [...(player.minorPlayed ?? []), ...(player.occupationPlayed ?? [])]
-    playedCardIds.forEach((cardId) => {
-      const modifiers = getCardModifiers(cardId)
-      modifiers.forEach((modifier) => {
-        if (!next.some((entry) => JSON.stringify(entry) === JSON.stringify(modifier))) {
-          next.push(modifier)
-        }
-      })
-    })
-    player.activeModifiers = next
+    playedCardIds.forEach((cardId) => ensureCardModifiers(player, cardId))
     // Ensure extraOccupationsFromCards is initialized
     if (!player.extraOccupationsFromCards) {
       player.extraOccupationsFromCards = []

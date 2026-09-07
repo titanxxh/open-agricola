@@ -49,13 +49,12 @@ describe('canStartFencing entry-guard', () => {
         wood: 0, clay: 0, reed: 0, stone: 0, food: 0,
         grain: 0, vegetable: 0, sheep: 0, boar: 0, cattle: 0, begging: 0,
       },
-      minorPlayed: ['E016_BriarHedge'],
     })
     expect(canStartFencing(fakeState, player, { wood: -4 })).toBe(true)
   })
 
   it('returns false when fence cap is already reached even with override discount', () => {
-    const fenceSegments = Array.from({ length: maxFences - 1 }, (_, i) => ({
+    const fenceSegments = Array.from({ length: maxFences }, (_, i) => ({
       edge: `H-0-${i}`, type: 'fence' as const,
     }))
     const player = createPlayer({

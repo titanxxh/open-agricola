@@ -2,7 +2,7 @@
 
 - Status: Accepted
 - Date: 2026-08-29
-- Amended: 2026-09-01
+- Amended: 2026-09-07
 
 ## Context
 
@@ -14,7 +14,7 @@ A committed occupation or improvement can also produce a mandatory `afterHostCom
 
 An unresolved mandatory continuation uses a Provisional Continuation Scope when its pre-resolution chain first crosses a rollback hazard: control switches to another player or the current command produces a Protected Observation. The host action has been committed to but its core effect has not executed. A nested action may already have executed inside that chain, as with Hammer Crusher's Construct, while an ordinary `after` response to a completed top-level action remains final.
 
-Once a host is committed, every dynamically returned or injected descendant of a mandatory `afterHostCommit` continuation remains mandatory. If a descendant cannot execute and no earlier rollback hazard exists, the engine exposes `engine-blocked`; `undoStep` remains ordinary history traversal and `undoAction` is the explicit Rule Action fallback.
+Once a host is committed, every dynamically returned or injected descendant of a mandatory `afterHostCommit` continuation remains mandatory. Outside the deterministic failure recovery described below, if a descendant cannot execute and no earlier rollback hazard exists, the engine exposes `engine-blocked`; `undoStep` remains ordinary history traversal and `undoAction` is the explicit Rule Action fallback.
 
 A mandatory `afterHostCommit` continuation is a narrow exception to the pre-resolution opening rule. When the host choice came from a pending interaction created after a Protected Observation was published, the session opens its scope at that already-published interaction checkpoint. If the continuation becomes impossible, explicit `undoAction` aborts to the same choice and the same cached observation, restoring the host, payment, and mandatory follow-ups. It never restores to before the observation.
 
@@ -38,4 +38,18 @@ This is an Engine/Session semantic and must not special-case card or action IDs.
 
 ## Considered alternatives
 
+The original cross-player decision below remains applicable. The Issue #830 extension accepts the additional cost of exhaustive preflight for deterministic owner-controlled flows while retaining these cross-player and observation boundaries.
+
 A single flat checkpoint cannot isolate nested-host failure. Publishing protected observations and later restoring state leaks player knowledge. Preparing and reserving every ActionFlow before execution could prevent both failures, but would require an exact execution witness, dry-run semantics, and protocol changes across all actions. Pre-disabling the host choice would require the same static simulation, while changing payment order would alter card semantics. This design uses nested checkpoints and runtime guards now, and adds a general permit only when a concrete rule cannot pass the observation gate.
+
+## Deterministic reachability and failure recovery (Issue #830)
+
+This extension is implemented by `Engine.canComplete()`, action-level deterministic choice adapters, pre-resolution option filtering, and private Session completion scopes. Native Session tests cover the shared reachability and rollback boundaries plus the six Issue #830 cards.
+
+Deterministic choices controlled by the acting player use Action Completion Reachability to validate entry and accepting choices. An isolated execution must find a legal path through correctly timed before reactions, actual payments, farm selections, and mandatory continuations. A successful path permits entry; failure requires exhausting all legal branches. Search must not return unknown, fall back to the old predicate, or reject an action because of a depth, node, or elapsed-time budget. Exact equivalent-state elimination is permitted. Missing deterministic input enumeration is an implementation gap. Cross-player assistance, random outcomes, and new hidden information retain the existing provisional rules above.
+
+Enumerated choices that would make the required continuation impossible are unavailable. Structured submissions are revalidated before publication; an invalid proposal restores its command checkpoint and retains the previous legal interaction. A query never consumes resources, activations, state, or public/private events, and a successful query does not waive submission validation.
+
+If an accepted deterministic optional follow-up becomes impossible to complete, system recovery restores that entire follow-up to its pre-acceptance state, ends the failed activation, and resumes its parent if the parent remains completable. Recovery includes payment, gains, card state, trigger bookkeeping, and the engine cursor. For Saddler this restores the additional food payment while allowing the major purchase to finish. Failure of a required purchase restores that purchase; failure of the Action Space's own obligation restores the placement and its dependent effects. A failed input with other legal alternatives remains an input rejection, not cancellation of the whole follow-up. Recovery must revalidate ancestor obligations and respect existing Protected Observation and cross-player boundaries. It is explicit system rollback, never silent completion of an unfulfilled mandatory action.
+
+This choice preserves successful parent operations and rules out partial payment or occupation of an unusable Action Space. The rejected alternatives were rejecting unproven actions after a search cutoff, optimistic fallback after a cutoff, and canceling the entire placement for every optional follow-up failure. Exhaustive search may be expensive; its actual work and latency must be measured rather than hidden behind a rule-changing cutoff. Existing checkpoints, event cancellation, failed-attempt handling, and durable cursor persistence remain the recovery mechanisms.

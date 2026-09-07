@@ -69,12 +69,10 @@ describe('D066_PotterCeramics session', () => {
   it('does not offer D66 when player has no bake source', () => {
     const session = setup({ improvements: [], clay: 1, grain: 0 })
 
+    expect(session.getActionAvailability(0)['grain-utilization']).toBe(false)
     const resp = session.takeAction(0, 'grain-utilization')
 
-    expect(resp.ok).toBe(true)
-    if (resp.interaction.stateId === 'wait' && resp.interaction.promptKey === 'ui.interactionSelectTrigger') {
-      expect(resp.interaction.request.options?.map((option) => option.value)).not.toContain(CARD_ID)
-    }
+    expect(resp.ok).toBe(false)
   })
 
   it('can skip D66 after B26 replacement chooses bake plus fences when fencing can continue without it', () => {

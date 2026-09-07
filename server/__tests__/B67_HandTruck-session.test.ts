@@ -98,11 +98,10 @@ describe('B067_HandTruck session', () => {
     forest.takenBy = [{ playerId: player.id, workerId: '1' }]
     session.loadState(state)
 
+    expect(session.getActionAvailability(0)['grain-utilization']).toBe(false)
     const resp = session.takeAction(0, 'grain-utilization')
 
-    expect(resp.ok).toBe(true)
-    expect(resp.interaction.stateId === 'wait' ? resp.interaction.sourceCard : undefined).not.toBe(CARD_ID)
-    expect(resp.interaction.stateId === 'wait' ? resp.interaction.promptKey : undefined).not.toBe('ui.interactionEngineBlocked')
+    expect(resp.ok).toBe(false)
     expect(resp.state.players[0]!.resources.grain).toBe(0)
   })
 })

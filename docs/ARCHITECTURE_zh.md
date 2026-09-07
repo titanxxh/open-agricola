@@ -697,7 +697,17 @@ Card listener 区域默认只匹配已打出卡：`zones` 省略等价于 `['pla
 
 手牌 listener 只用于“卡牌存在于手牌时就必须监听历史”的卡牌局部规则。它仍必须遵守 state-pure flow builder 约束：只读当前 transaction events / state，状态更新通过返回 flow 落到本卡 `cardStates[cardId]`。当该卡仍在手牌中时，per-viewer serialization 必须对非 owner 隐藏对应 `cardStates[cardId]`、以该手牌卡为 source 的 public events、由这些事件派生的 log entry、过滤后的 event/archive seq cursor、runtime `publicEventCancellations` 和按手牌 id keyed 的 `cardAvailability`，避免从局部历史或可打出性元数据反推隐藏手牌。禁止为了单卡历史需求新增 `PlayerState.stats` / `GameState` 顶层全局 stat；没有该卡的对局不应为该卡维护额外历史。
 
-### 7.5.2 Pay child 架构不变量
+### 7.5.2 行动完成可达性
+
+行动格可用性与权威入口共用 `GameCore.applyIsDoableCheck()`。当前谓词不足以证明完成时，查询会复制规则状态、投影工人放置及目标已知的 `before` flow，再用普通引擎流水线调用 `Engine.canComplete()`。搜索通过真实 `proceed()` / `resolveChoice()` 状态转换分支，并由 action 的 `getCompletionChoices()` 枚举结构化请求。找到一条完成路径即可成功；否则穷尽全部确定性合法分支。只允许消除 state 与 cursor 都相同的循环，不设深度、节点数或耗时截断；缺少确定性输入适配器属于实现错误。跨玩家决定、随机结果与新公开的隐藏信息继续遵守 ADR 0015 的 provisional 边界。
+
+只有不存在特殊围栏 policy，且所有匹配的围栏费用 listener 都声明 `monotoneFenceCost` 时，围栏枚举才可剪掉付不起费用的严格超集。该声明表示增加围栏边不会让原本付不起的候选变得可支付。
+
+查询独占复制后的 state、cursor、事件事务、日志与 protected-observation sink，因此不会消费资源或触发器，也不会发布 public/private 输出。接受后无法完成的可枚举 `choice` / `select-trigger` 选项会在展示前过滤或禁用；结构化提交用同一 payload 在权威 mutation 前重验，拒绝时保留 pending。真实命令始终从 live state 重新校验执行，不重放搜索 witness。
+
+每次顶层放人在命令入口记录 completion scope；接受 optional 子树前记录更窄的 scope。若未预见的确定性失败到达 mandatory 步骤，Session 恢复包含该义务的最小 scope：optional 子树回退后按拒绝继续父流程；行动格自身义务失败则恢复放人与依赖它的 `before` 效果。scope 与 checkpoint 只进入私有 cursor，可跨重连恢复；Protected Observation 或跨玩家 continuation 仍使用 ADR 0015 的严格 provisional scope。
+
+### 7.5.3 Pay child 架构不变量
 
 `pay` 是 internal settlement child；public host action 负责业务 mutation、事件事实和 completion。不要把业务 mutation 放回 `pay`，也不要用 `seq:[pay, apply-*]` 或顶层 `apply-*` effect 表达同一件事。
 

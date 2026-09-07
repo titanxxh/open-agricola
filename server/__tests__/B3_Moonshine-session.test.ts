@@ -19,8 +19,7 @@
 
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
-import { setWorkersAtHome, setActiveWorkerCount, workersAvailable } from '../../shared/domain/player'
-import { authoritativeCommandKey } from '../../shared/contract/authoritative-command'
+import { setWorkersAtHome, setActiveWorkerCount } from '../../shared/domain/player'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 
 // Force card modules to register their effects.
@@ -256,7 +255,7 @@ describe('B003_Moonshine session', () => {
     expect(p1After.occupationHand.length).toBeGreaterThan(0)
   })
 
-  it('returns a blocked B149 play to the same revealed B3 choice', () => {
+  it('disables a revealed B149 play that cannot complete', () => {
     const session = makeSession({
       food: 2,
       occupationHand: [OCC_EXTRA_COST],
@@ -266,7 +265,7 @@ describe('B003_Moonshine session', () => {
     const b3Resp = playB3(session)
     expect(b3Resp.interaction.stateId).toBe('wait')
     if (b3Resp.interaction.stateId !== 'wait') return
-    expect(b3Resp.interaction.request.options?.find((option) => option.value === 'play')?.disabled).not.toBe(true)
+    expect(b3Resp.interaction.request.options?.find((option) => option.value === 'play')?.disabled).toBe(true)
     const revealed = b3Resp.state.players[0]!.cardStates?.[CARD_ID]?.extraData?.occ
     expect(revealed).toBe(OCC_EXTRA_COST)
     const beforeEvents = structuredClone(b3Resp.state.events)
@@ -274,52 +273,19 @@ describe('B003_Moonshine session', () => {
     const beforeScores = structuredClone(b3Resp.scores)
 
     const playResp = session.resolveChoice(0, 'play')
-    expect(playResp.ok).toBe(true)
+    expect(playResp.ok).toBe(false)
     expect(playResp.interaction.stateId).toBe('wait')
     if (playResp.interaction.stateId !== 'wait') return
-    expect(playResp.interaction.request.kind).toBe('engine-blocked')
-    expect(playResp.interaction.allowedCommands).toEqual(['undoAction'])
-    expect(playResp.state.players[0]!.occupationPlayed).toContain(OCC_EXTRA_COST)
-    expect(playResp.state.players[0]!.resources.food).toBe(0)
+    expect(playResp.interaction.sourceCard).toBe(CARD_ID)
+    expect(playResp.interaction.promptKey).toBe('cards.B003_Moonshine.choice')
+    expect(playResp.state.players[0]!.occupationHand).toContain(OCC_EXTRA_COST)
+    expect(playResp.state.players[0]!.occupationPlayed).not.toContain(OCC_EXTRA_COST)
+    expect(playResp.state.players[0]!.resources.food).toBe(2)
     expect(playResp.state.players[0]!.supplyTokensConsumed?.stable).toBe(3)
     expect(playResp.state.players[0]!.fenceSegments).toHaveLength(0)
-
-    const fallback = session.undoAction()
-    expect(fallback.ok).toBe(true)
-    expect(fallback.interaction.stateId).toBe('wait')
-    if (fallback.interaction.stateId !== 'wait') return
-    expect(fallback.interaction.sourceCard).toBe(CARD_ID)
-    expect(fallback.interaction.promptKey).toBe('cards.B003_Moonshine.choice')
-    expect(fallback.interaction.promptParams).toEqual({ cardId: revealed })
-    expect(fallback.interaction.request.options?.map((option) => option.value).sort()).toEqual(['pass', 'play'])
-
-    const restored = fallback.state.players[0]!
-    expect(restored.cardStates?.[CARD_ID]?.extraData?.occ).toBe(revealed)
-    expect(restored.occupationHand).toContain(OCC_EXTRA_COST)
-    expect(restored.occupationPlayed).not.toContain(OCC_EXTRA_COST)
-    expect(restored.resources.food).toBe(2)
-    expect(restored.supplyTokensConsumed?.stable).toBe(3)
-    expect(restored.fenceSegments).toHaveLength(0)
-    expect(restored.pastures).toHaveLength(0)
-    expect(restored.minorHand).not.toContain(CARD_ID)
-    expect(fallback.state.players[1]!.minorHand).toContain(CARD_ID)
-    expect(workersAvailable(fallback.state, restored)).toBe(1)
-    expect(fallback.state.actionSpaces.find((space) => space.id === 'meeting-place')?.takenBy)
-      .toEqual([expect.objectContaining({ playerId: restored.id })])
-    expect(fallback.state.events.filter((event) => event.type !== 'continuation.restored')).toEqual(beforeEvents)
-    expect(fallback.state.log.filter((entry) => entry.key !== 'log.provisionalContinuationRollback')).toEqual(beforeLog)
-    expect(fallback.scores).toEqual(beforeScores)
-    expect(fallback.interaction.rejectedCommandKeys).toContain(authoritativeCommandKey(
-      'choice',
-      0,
-      { value: 'play', payload: undefined },
-    ))
-
-    expect(session.undoStep()).toMatchObject({ ok: false, error: 'cannot undo past boundary' })
-    expect(session.resolveChoice(0, 'play')).toMatchObject({
-      ok: false,
-      error: 'command unavailable until game state changes',
-    })
+    expect(playResp.state.events).toEqual(beforeEvents)
+    expect(playResp.state.log).toEqual(beforeLog)
+    expect(playResp.scores).toEqual(beforeScores)
 
     const passResp = session.resolveChoice(0, 'pass')
     expect(passResp.ok).toBe(true)

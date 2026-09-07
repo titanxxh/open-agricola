@@ -1,9 +1,12 @@
+import { getFarmyardEdgeIds } from '../../../domain/farm'
 import { describe, expect, it } from 'vitest'
 import { canStartFencing, fenceAction } from '../fencing'
 import type {
+  ActionExecutionContext,
   ActionAvailabilityContext,
   FenceSegment,
   GameState,
+  InteractionRequest,
   PlayerState,
 } from '../../../contract/types'
 
@@ -32,7 +35,7 @@ const createOrdinaryFenceSegments = (
   source: FenceSegment['source'] = { kind: 'own', ownerPlayerId: 'p1' },
 ): FenceSegment[] =>
   Array.from({ length: count }, (_, index) => ({
-    edge: `test-edge-${index}`,
+    edge: getFarmyardEdgeIds(createPlayer())[index]!,
     type: 'fence',
     source,
   }))
@@ -76,7 +79,7 @@ describe('canStartFencing with costOverride', () => {
     ).toBe(true)
   })
 
-  it('allows explicit total max below the normal action minimum', () => {
+  it('rejects a total max that cannot enclose any area', () => {
     const player = createPlayer()
 
     expect(
@@ -86,7 +89,7 @@ describe('canStartFencing with costOverride', () => {
           costPolicy: { fence: { wood: 0 } },
         },
       }),
-    ).toBe(true)
+    ).toBe(false)
   })
 
   it('applies costOverride discounts to nested fencePolicy costPolicy checks', () => {
@@ -105,7 +108,7 @@ describe('canStartFencing with costOverride', () => {
     expect(canStartFencing(fakeState, player, { wood: -4 }, actionContext)).toBe(true)
   })
 
-  it('allows explicit total max when supply only has fewer fences left', () => {
+  it('rejects insufficient supply when no existing fence can help close an area', () => {
     const player = createPlayer({
       supplyTokensConsumed: { fence: 13 },
     })
@@ -117,15 +120,15 @@ describe('canStartFencing with costOverride', () => {
           costPolicy: { fence: { wood: 0 } },
         },
       }),
-    ).toBe(true)
+    ).toBe(false)
   })
 
   it('ignores flat segmentBounds and costPolicy actionContext fields', () => {
     const player = createPlayer({
-      fenceSegments: createOrdinaryFenceSegments(12),
+      fenceSegments: [],
     })
     expect(
-      canStartFencing(fakeState, player, { wood: -3 }, {
+      canStartFencing(fakeState, player, undefined, {
         segmentBounds: { fence: { min: 2 } },
         costPolicy: { fence: { wood: 0 } },
       }),
@@ -231,5 +234,41 @@ describe('canStartFencing with costOverride', () => {
         },
       }),
     ).toBe(false)
+  })
+
+  it('uses the fixed extra wood from the farm request', () => {
+    const player = createPlayer()
+    player.roomTiles = [{ row: 0, col: 0 }, { row: 1, col: 0 }]
+    player.fields = [
+      { row: 0, col: 1, stacks: [] }, { row: 0, col: 2, stacks: [] },
+      { row: 0, col: 3, stacks: [] }, { row: 0, col: 4, stacks: [] },
+      { row: 1, col: 1, stacks: [] }, { row: 1, col: 2, stacks: [] },
+      { row: 1, col: 3, stacks: [] }, { row: 1, col: 4, stacks: [] },
+      { row: 2, col: 0, stacks: [] }, { row: 2, col: 1, stacks: [] },
+      { row: 2, col: 2, stacks: [] }, { row: 2, col: 3, stacks: [] },
+    ]
+    const state = { ...fakeState, players: [player] }
+    const context = {
+      state,
+      player,
+      space: { id: 'farm-redevelopment' },
+      actionContext: {
+        fencePolicy: {
+          segmentBounds: { total: { min: 4, max: 4 } },
+          costPolicy: { fence: { wood: 0 } },
+        },
+      },
+    } as unknown as ActionExecutionContext
+    const request: InteractionRequest = {
+      kind: 'farm-select',
+      farm: { farmType: 'fence', selectableEdges: getFarmyardEdgeIds(player), extraWood: 0 },
+      options: [{ value: 'confirm', labelKey: 'ui.interactionFenceConfirm' }],
+    }
+
+    expect(fenceAction.getCompletionChoices!(context, request)[Symbol.iterator]().next().done).toBe(false)
+    expect([...fenceAction.getCompletionChoices!(context, {
+      ...request,
+      farm: { ...request.farm, extraWood: 1 },
+    })]).toHaveLength(0)
   })
 })

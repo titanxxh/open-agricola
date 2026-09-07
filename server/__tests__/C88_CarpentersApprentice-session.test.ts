@@ -97,8 +97,13 @@ const makeFencePlayer = (fenceCount: number, wood = 0): PlayerState => {
   const state = session.getState().state
   const p = state.players[0]!
   p.occupationPlayed.push('C088_CarpentersApprentice')
-  p.fenceSegments = Array.from({ length: fenceCount }, (_, i) => ({
-    edge: `fence-stub-${i}`,
+  const edges = [
+    'H-0-0', 'H-0-1', 'H-0-2', 'H-0-3', 'H-0-4',
+    'H-1-0', 'H-1-1', 'H-1-2', 'H-1-3', 'H-1-4',
+    'V-0-0', 'V-0-5', 'V-0-1', 'V-0-2', 'V-0-3',
+  ]
+  p.fenceSegments = edges.slice(0, fenceCount).map((edge) => ({
+    edge,
     type: 'fence' as const,
   }))
   p.resources.wood = wood

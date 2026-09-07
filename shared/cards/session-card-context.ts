@@ -47,7 +47,10 @@ const displayOnlyCardJson = (cardJson: CustomCardData['cardJson']): CardDefiniti
 
 // ── Session context class ───────────────────────────────────────────────────
 
+class CompletionQueryFailure extends Error {}
+
 export class SessionCardContext {
+  private completionQueryDepth = 0
   readonly customEffects = new Map<string, CardEffect>()
   readonly customListeners: CardListenerRegistration[] = []
   readonly customMinors = new Map<string, CardDefinition>()
@@ -60,7 +63,20 @@ export class SessionCardContext {
     this.warnings = warnings
   }
 
+  queryCompletion(run: () => boolean | undefined): boolean | undefined {
+    this.completionQueryDepth += 1
+    try {
+      return run()
+    } catch (error) {
+      if (error instanceof CompletionQueryFailure) return undefined
+      throw error
+    } finally {
+      this.completionQueryDepth -= 1
+    }
+  }
+
   reportWarning(warning: string): void {
+    if (this.completionQueryDepth > 0) throw new CompletionQueryFailure(warning)
     if (!this.warnings.includes(warning)) this.warnings.push(warning)
   }
 

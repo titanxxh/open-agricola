@@ -33,6 +33,7 @@ const isHouseRedev = (context: CardListenerContext): boolean =>
 
 const farmRedevFenceCostListener: CardListenerRegistration = {
   id: 'D82-hunting-trophy-farm-redevelopment-fence-compute-costs',
+  monotoneFenceCost: true,
   cardIds: [CARD_ID],
   phases: ['computeCosts' as ActionHookPhase],
   actions: ['fence'],

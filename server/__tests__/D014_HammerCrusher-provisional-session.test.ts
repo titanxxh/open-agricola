@@ -689,19 +689,19 @@ describe('D014 Hammer Crusher provisional continuation', () => {
       buildingTycoon: false,
       playerCount: 4,
       clay: 3,
-      reed: 1,
-      stone: 2,
+      reed: 2,
+      stone: 3,
     })
 
     let response = session.takeAction(0, 'house-redevelopment')
     expect(response.interaction.stateId).toBe('wait')
-    expect(response.state.players[0]!.resources).toMatchObject({ clay: 5, reed: 2, stone: 2 })
+    expect(response.state.players[0]!.resources).toMatchObject({ clay: 5, reed: 3, stone: 3 })
     response = advanceSwitches(session, session.resolveChoice(0, '__skip__'))
 
     expect(response.state.players[0]).toMatchObject({
       houseType: 'stone',
       rooms: 2,
-      resources: { clay: 5, reed: 1, stone: 0 },
+      resources: { clay: 5, reed: 2, stone: 1 },
     })
   })
 
@@ -732,35 +732,15 @@ describe('D014 Hammer Crusher provisional continuation', () => {
     })
   })
 
-  it('D014 S3 exposes undoAction when a room plan leaves the engine blocked', () => {
-    const session = setup({
-      buildingTycoon: false,
-      playerCount: 4,
-      clay: 3,
-      reed: 1,
-      stone: 3,
-    })
-    let response = session.takeAction(0, 'house-redevelopment')
-    if (response.interaction.stateId !== 'wait') throw new Error('expected Construct choice')
-    const construct = response.interaction.request.options.find((option) => option.value !== '__skip__')
-    response = session.resolveChoice(0, construct!.value)
-    let rejected = 0
-    while (response.interaction.stateId === 'wait' && response.interaction.request.kind === 'farm-select') {
-      const room = response.interaction.request.farm.selectableTiles[0]
-      if (!room) break
-      response = session.commitSelectionChoice(0, { rooms: [room] })
-      rejected += 1
-    }
-
-    expect(rejected).toBeGreaterThan(0)
+  it('D014 S3 skips room construction that would make renovation impossible', () => {
+    const session = setup({ buildingTycoon: false, playerCount: 4, clay: 3, reed: 1, stone: 3 })
+    const response = session.takeAction(0, 'house-redevelopment')
     expect(response.ok).toBe(true)
     expect(response.interaction.stateId === 'wait' ? response.interaction.request.kind : undefined)
-      .toBe('engine-blocked')
-    expect(response.interaction.allowedCommands).toEqual(['undoStep', 'undoAction'])
+      .not.toBe('engine-blocked')
     expect(response.state.players[0]).toMatchObject({
-      houseType: 'clay',
-      rooms: 3,
-      resources: { clay: 0, reed: 0, stone: 3 },
+      houseType: 'stone', rooms: 2,
+      resources: { clay: 5, reed: 1, stone: 1 },
     })
 
     const fallback = session.undoAction()

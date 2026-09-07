@@ -20,6 +20,7 @@ const countAvailableBorderEdges = (player: { fenceSegments?: { edge: string }[] 
 
 const E16FenceListener: CardListenerRegistration = {
   id: 'E16-fence-discount',
+  monotoneFenceCost: true,
   cardIds: [CARD_ID],
   phases: ['computeCosts' as ActionHookPhase],
   actions: ['fence'],

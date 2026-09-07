@@ -703,7 +703,17 @@ By default, a card listener matches only played cards. Omitting `zones` is equiv
 
 A hand listener is only for a card-local rule that must observe history while the card remains in hand. It still obeys the state-pure flow-builder boundary: it reads current transaction events and state, then returns a flow that writes its own `cardStates[cardId]`. While the card remains hidden in hand, per-viewer serialization must hide its `cardStates[cardId]`, public events sourced from that hand card, derived log entries, filtered event and archive sequence cursors, runtime `publicEventCancellations`, and hand-ID-keyed `cardAvailability` from nonowners. This prevents hidden-hand inference from local history or playability metadata. Do not add a top-level `PlayerState.stats` or `GameState` statistic for one card's history. Games without that card should not maintain its history.
 
-#### 7.5.2 Pay-child architecture invariants
+#### 7.5.2 Action completion reachability
+
+Action-space availability and authoritative entry share `GameCore.applyIsDoableCheck()`. When the current predicate is insufficient, the query clones rule state, projects the worker placement and its target-known `before` flows, then calls `Engine.canComplete()` against the ordinary engine pipeline. The search branches through real `proceed()` / `resolveChoice()` transitions and action-provided `getCompletionChoices()` adapters for structured requests. It stops after finding one completed path or exhausting every deterministic legal branch; it may eliminate only an identical state-and-cursor cycle and has no depth, node, or elapsed-time cutoff. A missing deterministic adapter is an implementation error. Cross-player decisions, random outcomes, and newly revealed hidden information retain the provisional boundary in ADR 0015.
+
+Fence enumeration may prune unaffordable strict supersets only when no special fence policy applies and every matching fence-cost listener declares `monotoneFenceCost`. The declaration means adding fence edges cannot make an unaffordable candidate affordable.
+
+The query owns cloned state, cursor, event transaction, log, and protected-observation sinks, so it cannot consume resources or triggers or publish public/private output. Enumerable `choice` and `select-trigger` options whose accepted subtree cannot complete are filtered or disabled before presentation. Structured submissions are checked with the same payload before mutating authoritative state; rejection preserves the pending interaction. The actual command always revalidates and executes from live state rather than replaying a search witness.
+
+Every top-level placement records a completion scope at command entry. Accepting an optional subtree records a narrower scope before that acceptance. If an unforeseen deterministic failure reaches a mandatory step, Session restores the smallest scope containing that obligation; an optional subtree is then declined and its parent resumes, while failure of the action-space obligation restores the placement and its dependent `before` effects. These scopes and checkpoints are private cursor state and survive reconnect. Protected or cross-player continuations continue to use the stricter provisional scopes from ADR 0015.
+
+#### 7.5.3 Pay-child architecture invariants
 
 `pay` is an internal settlement child. The public host action owns business mutation, event facts, and completion. Do not move business mutation back into `pay`, and do not model one operation as `seq:[pay, apply-*]` or a top-level `apply-*` effect.
 

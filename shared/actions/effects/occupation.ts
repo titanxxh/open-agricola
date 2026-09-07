@@ -3,7 +3,7 @@ import type { EventSink } from '../../contract/events'
 import { getOccupation } from '../../cards/registry-display'
 import { runCardListeners } from '../../cards/card-listeners'
 import { PaymentSolver } from '../payment'
-import { getCardModifiers } from '../../cards/card-modifiers'
+import { ensureCardModifiers } from '../../cards/card-modifiers'
 import { activateCardEffect } from './internal/activate-card-effect'
 import { addCardResourceGained } from '../../cards/helpers/card-state'
 import { incOccupationBuilt, recordDraftPlayed } from '../../session/stats'
@@ -122,11 +122,7 @@ export const playOccupation = (
   if (state) {
     recordDraftPlayed(player, occupation.id, state.round)
   }
-  getCardModifiers(occupation.id).forEach((modifier) => {
-    if (!player.activeModifiers.some((m) => JSON.stringify(m) === JSON.stringify(modifier))) {
-      player.activeModifiers.push(modifier)
-    }
-  })
+  ensureCardModifiers(player, occupation.id)
   // Trigger onBuy hook — if it returns a flow, propagate it to the engine
   if (state) {
     const activation = activateCardEffect(state, player, occupation.id, 'onBuy')
@@ -150,11 +146,7 @@ const applyOccupationPlay = (
     incOccupationBuilt(player)
     recordDraftPlayed(player, occupationId, state.round)
   }
-  getCardModifiers(occupationId).forEach((modifier) => {
-    if (!player.activeModifiers.some((m) => JSON.stringify(m) === JSON.stringify(modifier))) {
-      player.activeModifiers.push(modifier)
-    }
-  })
+  ensureCardModifiers(player, occupationId)
 }
 
 const commitOccupationPlay = (
@@ -172,6 +164,7 @@ const commitOccupationPlay = (
     reportProtectedObservation?.({
       kind: 'hidden-information',
       recipientPlayerIds: state.players.map((entry) => entry.id),
+      knownToPlayerIds: [player.id],
     })
   }
   applyOccupationPlay(state, player, occupationId)

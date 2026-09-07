@@ -671,6 +671,7 @@ export type ActionAvailabilityContext = {
 export type ProtectedObservation = {
   kind: 'random' | 'hidden-information'
   recipientPlayerIds: string[]
+  knownToPlayerIds?: string[]
 }
 
 export type ActionExecutionContext = {
@@ -855,6 +856,10 @@ export type ActionDefinition = {
     choice: string,
     payload?: Record<string, unknown>,
   ) => ActionExecutionResult
+  getCompletionChoices?: (
+    context: ActionExecutionContext,
+    request: InteractionRequest,
+  ) => Iterable<{ value: string; payload?: Record<string, unknown> }>
   completeInternalChildren?: (
     context: ActionMutationContext,
     result: Extract<ActionExecutionResult, { type: 'ok' }>,

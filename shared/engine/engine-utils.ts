@@ -41,6 +41,12 @@ import { pendingEnvelopeChoices } from './pending-validation'
 import { findPlayerById, findPlayerIndexById } from '../domain/player'
 import { suppressBeforeListeners } from './action-context-flags'
 
+export const cloneRuleState = (state: GameState): GameState => {
+  const copy = JSON.parse(JSON.stringify({ ...state, publicEventArchive: [], nextPublicEventArchivePacketSeq: 1 })) as GameState
+  copy.actionSpaces = copy.actionSpaces.map((space, index) => ({ ...state.actionSpaces[index], ...space }))
+  return copy
+}
+
 /**
  * S4c PR5 — module-private utilities extracted from `Engine`. Each function
  * accepts an `EngineInternals` snapshot (`int`) instead of `this` access, so

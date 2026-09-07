@@ -83,12 +83,21 @@ describe('B161_Weakling session', () => {
     const player = state.players[0]!
     state.round = 5
     player.occupationPlayed.push(SWAGMAN_ID)
-    player.resources.wood = 0
+    player.resources.wood = 2
     player.resources.reed = 0
     session.loadState(state)
     const before = player.resources.vegetable
 
     let resp = session.takeAction(0, 'farm-expansion')
+    expect(resp.ok, resp.error).toBe(true)
+    expect(resp.interaction.stateId).toBe('wait')
+    if (resp.interaction.stateId !== 'wait') throw new Error('expected stable prompt')
+    expect(resp.interaction.request.kind).toBe('farm-select')
+    if (resp.interaction.request.kind !== 'farm-select') throw new Error('expected stable prompt')
+    expect(resp.interaction.request.farm.farmType).toBe('stable')
+    if (resp.interaction.request.farm.farmType !== 'stable') throw new Error('expected stable prompt')
+    const stable = resp.interaction.request.farm.selectableTiles[0]!
+    resp = session.commitSelectionChoice(0, { stables: [stable] })
     resp = resolveTriggerIfPresent(session, resp, SWAGMAN_ID)
     resp = resolveNonSkipChoice(session, resp)
     resp = resolveTriggerIfPresent(session, resp, CARD_ID)
