@@ -31,7 +31,6 @@ import {
 } from '../../domain/animals'
 import { findPlayerById } from '../../domain/player'
 import { notifyAnimalsRemovedFromCardEffects } from '../../cards/card-effects'
-import { resourceAllocations, type CompletionChoice } from '../../engine/interaction-choices'
 
 export type ReorganizeTrigger =
   | 'anytime'
@@ -387,37 +386,6 @@ export const reorganizeAction: ActionDefinition = {
   descriptionKey: 'actions.reorganize.description',
   roundAvailable: 1,
   gainPerRound: {},
-  getCompletionChoices: function* ({ state, player }, request): Generator<CompletionChoice> {
-    if (request.kind !== 'animal-reorg') return
-    const zones = request.zones
-    function* assign(index: number, remaining: Record<string, number>, selected: ZoneAssignment[]): Generator<CompletionChoice> {
-      if (index === zones.length) {
-        yield { value: 'confirm', payload: { zones: selected } }
-        return
-      }
-      const zone = zones[index]!
-      const allowed = zone.allowedAnimalTypes ?? (zone.allowedAnimalType ? [zone.allowedAnimalType] : animalKeysForState(state))
-      const available = Object.fromEntries(allowed.map((animal) => [animal, remaining[animal] ?? 0]))
-      const capacity = Number.isFinite(zone.capacity) ? Math.max(0, Math.floor(zone.capacity)) : 0
-      for (const animalCounts of resourceAllocations(available, capacity)) {
-        const entries = Object.entries(animalCounts)
-        if (zone.zoneType !== 'card' && entries.length > 1) continue
-        const next = { ...remaining }
-        for (const [animal, count] of entries) next[animal] = (next[animal] ?? 0) - count
-        yield* assign(index + 1, next, [...selected, {
-          id: zone.id,
-          zoneType: zone.zoneType,
-          cardId: zone.cardId,
-          ownerPlayerId: zone.ownerPlayerId,
-          animalOwnerPlayerId: zone.animalOwnerPlayerId,
-          animalType: entries.length === 1 ? entries[0]![0] as AnimalKey : null,
-          animalCount: entries.reduce((sum, [, count]) => sum + count, 0),
-          animalCounts,
-        }])
-      }
-    }
-    yield* assign(0, animalTotals(state, player), [])
-  },
   canBeExecutedByPlayer: () => true,
   costPreview: {
     isStructurallyPossible: () => true,

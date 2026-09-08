@@ -1,4 +1,4 @@
-import type { ActionChoiceOption, ActionExecutionContext, PlayerState, Resource, SupplyTokenCounts } from '../contract/types'
+import type { ActionChoiceOption, ActionExecutionContext, ActionFlow, PlayerState, Resource, SupplyTokenCounts } from '../contract/types'
 import type { ActionHookResult } from '../actions/hooks'
 import {
   applyPureResourceFlowPreview,
@@ -39,6 +39,7 @@ export type TriggerSelectEvaluation = {
 }
 
 export type TriggerSelectEvaluationOptions = {
+  canStartFlow?: (flow: ActionFlow, context: ActionExecutionContext) => boolean
   canContinueWithoutTriggers?: (actionId: string, resources?: Resource) => boolean
   canReachContinuationThroughTriggers?: (actionId: string, resources?: Resource) => boolean
 }
@@ -223,10 +224,13 @@ const evaluateChildDoable = (
   result: ActionHookResult | undefined,
   state: ActionExecutionContext['state'],
   player: PlayerState,
+  context: ActionExecutionContext,
+  options: TriggerSelectEvaluationOptions,
 ): boolean => {
   if (!resultHasApplicabilitySignal(result)) return false
   if (typeof result?.doable === 'boolean') return result.doable
   if (result?.flow) {
+    if (options.canStartFlow) return options.canStartFlow({ ...result.flow, optional: false }, { ...context, state, player })
     return canPreviewPureResourceFlow(result.flow)
       ? isPureResourceFlowCurrentlyPayable(result.flow, player.resources, previewAvailability(state, player))
       : true
@@ -382,7 +386,7 @@ export const evaluateTriggerSelect = (
         resultHasApplicabilitySignal(result)
       : true
     const doable = previewable
-      ? (applicable ? evaluateChildDoable(result, previewState, previewPlayer) : false)
+      ? (applicable ? evaluateChildDoable(result, previewState, previewPlayer, context, evalOptions) : false)
       : true
     const resourcesAfter = doable && previewPlayer.id === context.player.id
       ? previewResourcesAfterChild(result, previewState, previewPlayer)

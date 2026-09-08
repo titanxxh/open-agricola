@@ -138,6 +138,7 @@ export class HookDispatcher {
     context: ActionExecutionContext & { actionId: string },
     action: ActionDefinition,
     initialDoable: boolean,
+    canStartBefore?: () => boolean,
   ) {
     let doable = this.applyCostPreviewDoable(context, action, initialDoable)
     const actionHookDoable = applyIsDoableHooksDetailed(context, doable)
@@ -154,7 +155,7 @@ export class HookDispatcher {
         doable = true
       }
     }
-    return doable
+    return doable || (!vetoed && canStartBefore?.() === true)
   }
 
   computeCosts(context: ActionExecutionContext & { actionId: string }) {

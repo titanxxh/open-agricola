@@ -10,7 +10,6 @@ import { Engine } from '../../engine'
  */
 describe('Engine surface guard', () => {
   const PUBLIC_API = [
-    'canComplete',
     'injectBeforeFlows',
     'proceed',
     'resolveChoice',
@@ -23,6 +22,7 @@ describe('Engine surface guard', () => {
   // or new private addition. Does NOT count toward public-API surface.
   const PRIVATE_HELPERS = [
     '_internals',
+    'offerBeforeAnytimeWindow',
     'hasPendingChoiceCompositeAncestor',
     'insertFlowAfterPendingChoice',
     'getEffectiveOwnerPlayerId',
@@ -49,7 +49,7 @@ describe('Engine surface guard', () => {
     expect(ownMethods).toEqual(expected)
   })
 
-  it('public API count is exactly 6', () => {
-    expect(PUBLIC_API.length).toBe(6)
+  it('public API count is exactly 5', () => {
+    expect(PUBLIC_API.length).toBe(5)
   })
 })

@@ -312,7 +312,7 @@ const finalizeStables = (
     return { type: 'fail', errorKey: 'log.buildStableFail' }
   }
   const placementError = stables.length > 0 ? validateStablePlacement(ctx, stables) : undefined
-  if (placementError) return placementError
+  if (placementError?.type === 'fail') return { ...placementError, recoverable: true }
   const costResolution = resolveStableTotalCostWithDiscount(
     ctx.state,
     ctx.player,
@@ -454,13 +454,13 @@ export const stablesAction: ActionDefinition = {
       )
       const totalUnits = stables.length + (farmHand ? 1 : 0)
       if (totalUnits === 0) {
-        return { type: 'fail', errorKey: 'NO_SELECTION' }
+        return { type: 'fail', errorKey: 'NO_SELECTION', recoverable: true }
       }
       if (totalUnits > getAvailableStableSupplyCount(ctx.state, ctx.player)) {
-        return { type: 'fail', errorKey: 'log.buildStableFail' }
+        return { type: 'fail', errorKey: 'log.buildStableFail', recoverable: true }
       }
       const placementError = stables.length > 0 ? validateStablePlacement(ctx, stables) : undefined
-      if (placementError) return placementError
+      if (placementError?.type === 'fail') return { ...placementError, recoverable: true }
       const costResolution = resolveStableTotalCostWithDiscount(
         ctx.state,
         ctx.player,
@@ -468,13 +468,13 @@ export const stablesAction: ActionDefinition = {
         ctx.costs,
         totalUnits,
       )
-      if (!costResolution) return { type: 'fail', errorKey: 'log.buildStableFail' }
+      if (!costResolution) return { type: 'fail', errorKey: 'log.buildStableFail', recoverable: true }
       const payment = PaymentSolver.resolveTypedFlatPaymentSelection(
         ctx.player,
         costResolution.paymentCost,
         'pay:stable',
         undefined,
-        { type: 'fail', errorKey: 'log.buildStableFail' },
+        { type: 'fail', errorKey: 'log.buildStableFail', recoverable: true },
         'stables',
         ctx.state,
       )
@@ -490,11 +490,11 @@ export const stablesAction: ActionDefinition = {
         }
       }
       if (payment.type === 'fail') {
-        return { type: 'fail', errorKey: 'log.buildStableFail' }
+        return { type: 'fail', errorKey: 'log.buildStableFail', recoverable: true }
       }
       return finalizeStables(ctx, stables, undefined, farmHand)
     }
 
-    return { type: 'fail', errorKey: 'log.buildStableFail' }
+    return { type: 'fail', errorKey: 'log.buildStableFail', recoverable: true }
   },
 }

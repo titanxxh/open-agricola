@@ -17,12 +17,13 @@ const setupBakeViaC60 = (
     stone?: number
   } = {},
 ) => {
-  const session = new GameSession()
+  const session = new GameSession(6060, undefined, { playerCount: 2 })
   stabilizeRandomHands(session.state.players)
   const state = session.getState().state
   state.players = state.players.slice(0, 2)
   state.currentPlayerIndex = 0
   state.round = 1
+  state.roundActionOrder = ['grain-utilization', ...state.roundActionOrder.filter((id) => id !== 'grain-utilization')]
   state.roundPhase = 'work'
 
   const player = state.players[0]!
@@ -146,42 +147,27 @@ describe('C060_SmallPottersOven server session', () => {
     expect(resp.state.players[0]!.resources.food).toBe(5)
   })
 
-  it('keeps Grain Utilization unavailable when the resulting mandatory bake has no option', () => {
-    const session = setupBakeViaC60(0)
-
-    expect(session.getActionAvailability(0)['grain-utilization']).toBe(false)
-    const resp = session.takeAction(0, 'grain-utilization')
-    expect(resp.ok).toBe(false)
-    expect(resp.state.players[0]!.improvements).not.toContain('Major_ClayOven')
-    expect(resp.state.players[0]!.resources).toMatchObject({ grain: 0, clay: 3, stone: 1, food: 0 })
-    expect(
-      resp.state.actionSpaces
-        .find((space) => space.id === 'grain-utilization')
-        ?.takenBy.some((worker) => worker.playerId === resp.state.players[0]!.id),
-    ).toBe(false)
+  it.each([{ clay: 3, stone: 1 }, { clay: 4, stone: 4 }])('blocks a completed oven purchase with no grain and restores it through undoAction: %j', (resources) => {
+    const session = setupBakeViaC60(0, resources)
+    const initial = JSON.parse(JSON.stringify(session.state))
+    expect(session.getActionAvailability(0)['grain-utilization']).toBe(true)
+    let resp = session.takeAction(0, 'grain-utilization')
+    resp = resolveTriggerIfPresent(session, resp, 'C060_SmallPottersOven')
+    const build = resp.interaction.request.options!.find((option) => option.value !== '__skip__')!
+    resp = session.resolveChoice(0, build.value)
+    expect(resp.ok, resp.error).toBe(true)
+    expect(resp.interaction.request.kind).toBe('engine-blocked')
+    expect(resp.state.players[0]!.improvements).toContain('Major_ClayOven')
+    expect(resp.state.players[0]!.resources).toMatchObject({ clay: resources.clay - 3, stone: resources.stone - 1, grain: 0 })
+    resp = session.undoAction(0)
+    expect(resp.ok, resp.error).toBe(true)
+    expect(resp.state.players[0]!.resources).toEqual(initial.players[0].resources)
+    expect(resp.state.players[0]!.improvements).toEqual(initial.players[0].improvements)
+    expect(resp.state.availableMajorImprovements).toEqual(initial.availableMajorImprovements)
+    expect(resp.state.actionSpaces.find((space) => space.id === 'grain-utilization')!.takenBy).toEqual([])
   })
 
-  it('does not build an oven when the original mandatory bake cannot complete', () => {
-    const session = setupBakeViaC60(0, {
-      clay: 4,
-      stone: 4,
-    })
-    const state = session.getState().state
-    state.availableMajorImprovements = ['Major_ClayOven', 'Major_StoneOven']
-    session.loadState(state)
-
-    expect(session.getActionAvailability(0)['grain-utilization']).toBe(false)
-    const resp = session.takeAction(0, 'grain-utilization')
-    expect(resp.ok).toBe(false)
-    expect(resp.state.players[0]!.improvements).toEqual([])
-    expect(resp.state.availableMajorImprovements).toEqual(expect.arrayContaining([
-      'Major_ClayOven',
-      'Major_StoneOven',
-    ]))
-    expect(resp.state.players[0]!.resources).toMatchObject({ grain: 0, clay: 4, stone: 4, food: 0 })
-  })
-
-  it('rejects a C60 build choice if grain disappears before selection', () => {
+  it('blocks after a C60 build when grain disappears and undoStep restores the purchase choice', () => {
     const session = setupBakeViaC60(0, {
       extraPlayedCards: ['D106_WhiskyDistiller'],
     })
@@ -198,9 +184,11 @@ describe('C060_SmallPottersOven server session', () => {
     resp.state.players[0]!.resources.grain = 0
     resp = session.resolveChoice(0, buildOption!.value)
 
-    expect(resp.ok).toBe(false)
-    expect(resp.interaction.stateId).toBe('wait')
-    if (resp.interaction.stateId !== 'wait') return
+    expect(resp.ok).toBe(true)
+    expect(resp.interaction.request.kind).toBe('engine-blocked')
+    expect(resp.state.players[0]!.improvements).toContain('Major_ClayOven')
+    resp = session.undoStep(0)
+    expect(resp.ok).toBe(true)
     expect(resp.interaction.promptKey).toBe('ui.interactionSmallPottersOvenBuild')
     expect(resp.state.players[0]!.improvements).not.toContain('Major_ClayOven')
     expect(resp.state.players[0]!.resources).toMatchObject({ grain: 0, clay: 3, stone: 1, food: 0 })
@@ -224,6 +212,9 @@ describe('C060_SmallPottersOven server session', () => {
     expect(resp.ok).toBe(true)
     expect(resp.interaction.stateId).toBe('wait')
     if (resp.interaction.stateId !== 'wait') return
+    expect(resp.interaction.promptKey).toBe('ui.interactionOptionalAction')
+    resp = session.resolveChoice(0, '__skip__')
+    expect(resp.ok, resp.error).toBe(true)
     expect(resp.interaction.request.kind).toBe('confirm-next-player')
     expect(resp.state.players[0]!.resources.grain).toBe(0)
     expect(resp.state.players[0]!.resources.food).toBe(5)

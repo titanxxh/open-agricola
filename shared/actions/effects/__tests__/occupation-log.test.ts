@@ -173,7 +173,7 @@ describe('occupation play result', () => {
     ]))
   })
 
-  it('returns ok when a card-driven occupation prompt has no playable options', () => {
+  it('rejects a card-driven occupation prompt with no playable options', () => {
     const state = createState()
     const player = createPlayer({
       occupationHand: ['B093_Confidant'],
@@ -201,7 +201,7 @@ describe('occupation play result', () => {
       eventSink: { emit: () => {} },
     })
 
-    expect(result.type).toBe('ok')
+    expect(result.type).toBe('fail')
     expect(player.occupationPlayed).not.toContain('B093_Confidant')
   })
 
@@ -370,10 +370,7 @@ describe('occupation play result', () => {
       expect(choiceStep.type).toBe('choice')
       player.resources.food = 0
       const resolved = engine.resolveChoice('C116_FurnitureMaker', context)
-      expect(resolved.type).toBe('ok')
-      const finalStep = proceedUntilDone(engine, context)
-
-      expect(['done', 'blocked']).toContain(finalStep.type)
+      expect(resolved.type).toBe('fail')
       expect(player.occupationPlayed).not.toContain('C116_FurnitureMaker')
       expect(player.resources.wood).toBe(0)
       expect(privateEvents).toEqual([])

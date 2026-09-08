@@ -72,7 +72,7 @@ describe('B176 Village Idiot', () => {
       actionContext: { trueAction: false },
     } as unknown as ActionExecutionContext)
 
-    expect(result.type).toBe('ok')
+    expect(result.type).toBe('fail')
     expect(player.occupationPlayed).toEqual([CARD_ID])
     expect(player.occupationHand).toContain('A174_MasterHora')
   })

@@ -69,12 +69,15 @@ describe('A094_LazySowman session', () => {
     expect(resp.state.actionSpaces.find((space) => space.id === 'day-laborer')?.takenBy.some((t) => t.playerId === resp.state.players[1]!.id)).toBe(true)
   })
 
-  it('keeps the action unavailable when no worker would remain for the replacement', () => {
+  it('blocks after placement when no worker remains for the replacement until undo', () => {
     const session = setup({ withCard: true, workersAvailable: 1 })
 
-    expect(session.getActionAvailability(0)['grain-utilization']).toBe(false)
-    const resp = session.takeAction(0, 'grain-utilization')
-    expect(resp.ok).toBe(false)
+    expect(session.getActionAvailability(0)['grain-utilization']).toBe(true)
+    let resp = session.takeAction(0, 'grain-utilization')
+    expect(resp.ok).toBe(true)
+    expect(resp.interaction.request.kind).toBe('engine-blocked')
+    resp = session.undoAction(0)
+    expect(resp.ok).toBe(true)
     expect(workersAvailable(resp.state, resp.state.players[0]!)).toBe(1)
     expect(resp.state.players[0]!.cardStates?.A094_LazySowman).toBeUndefined()
   })

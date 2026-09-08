@@ -68,6 +68,8 @@ describe('B026 Agrarian Fences parity', () => {
   it('B026 S2: Grain Utilization can build fences without seeds or baking', () => {
     const session = setup()
     let response = outerSowBranch(session)
+    const fences = response.interaction.request.options!.find((option) => option.labelKey === 'actions.fencing.name')!
+    response = session.resolveChoice(0, fences.value)
     expect(response.interaction.stateId).toBe('wait')
     if (response.interaction.stateId !== 'wait') return
     expect(response.interaction.request.farm?.farmType).toBe('fence')

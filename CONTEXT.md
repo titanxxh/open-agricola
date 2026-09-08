@@ -298,6 +298,14 @@ _Avoid_: Turn、ActionNode、单独的资源增减 / 支付 / 选择
 一项 Rule Action 的完整结算边界，覆盖该行动的选择、continuation、响应和后置效果。同一 Turn 内的多个 Rule Action 各自使用独立作用域，但共用 Turn Scope。
 _Avoid_: 用 Turn Scope 代替、为单独的资源增减 / 支付 / 选择新建作用域
 
+**Undo Step（撤销一步）**:
+在允许的撤销边界内恢复到上一玩家操作之前；可连续撤销，但一步不等于整个可选效果或 Rule Action。
+_Avoid_: 跳过未完成义务、仅返还资源、撤销其他玩家已确认的回应
+
+**Undo Action（撤销行动）**:
+恢复当前 Rule Action 的起点；若 Protected Observation 之后的强制续行只能使用安全恢复点，则回到保留原观察结果的选择。
+_Avoid_: 撤销整个 Turn、重掷或重新抽取、无条件越过撤销边界
+
 **Engine**:
 节点树执行层，核心包括 `Engine`、`EngineStack`、`engineProceed`、`engineResolve`、`BaseNode`、`ActionNode`、`OrNode`、`XorNode`、`ParallelNode`。
 _Avoid_: 新建并行状态机
@@ -347,7 +355,7 @@ _Avoid_: ActionDefinition、ActionNode
 _Avoid_: 行动格 mutation、卡牌特定行动选择规则、前端规则推断
 
 **Action Entry Query**:
-会话层判断当前玩家是否能通过普通回合行动入口进入某个 Action Space 的统一查询边界；Session 可用性投影和 `takeAction` 入口校验共用它。
+会话层判断当前玩家是否能通过普通回合行动入口进入某个 Action Space 的统一查询边界；Session 可用性投影和 `takeAction` 入口校验共用它。准入允许行动开始，不承诺后续选择和 Mandatory Continuation 已被证明能够全部完成。
 _Avoid_: Action Space mutation、卡牌购买可用性、RoomPlayer 席位校验、前端本地视角选择
 
 **Action Completion Reachability（行动完成可达性）**:

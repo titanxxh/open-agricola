@@ -10,6 +10,7 @@ import { BaseNode } from './base'
  */
 export class OrNode extends BaseNode {
   public children: EngineNode[]
+  public selectedChildId: string | null = null
   public promptKey?: PromptKey
   public emittedChoices: ActionChoiceOption[] = []
   public emittedPromptKey?: PromptKey
@@ -42,6 +43,7 @@ export class OrNode extends BaseNode {
   protected cursorData() {
     return {
       childrenIds: this.children.map((c) => c.id),
+      selectedChildId: this.selectedChildId,
       promptKey: this.promptKey,
       emittedChoices: this.emittedChoices,
       emittedPromptKey: this.emittedPromptKey,

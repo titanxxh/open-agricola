@@ -99,8 +99,8 @@ describe('C095 Basket Weaver parity', () => {
 
   it('C095 S3: with one reed and no stone cannot pay for the immediate Basket build', () => {
     const session = setup({ reed: 1, stone: 0 })
-    const response = resolveBasketWeaverTrigger(session, playBasketWeaver(session))
-
+    const response = playBasketWeaver(session)
+    expect(response.interaction.request.options?.find((option) => option.value === CARD_ID)?.disabled).toBe(true)
     expect(response.ok, response.error).toBe(true)
     expect(response.state.players[0]!.occupationPlayed).toContain(CARD_ID)
     expect(response.state.players[0]!.improvements).not.toContain(BASKET)

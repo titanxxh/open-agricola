@@ -1,3 +1,4 @@
+import { evaluateFlowDoable } from '../actions/flow'
 import type {
   ActionExecutionContext,
   ActionExecutionResult,
@@ -41,6 +42,7 @@ import {
   pendingEnvelopeFromHostNode,
   resolveSubtree,
   stampBeforeHostNode,
+  setEngineBlockedPending,
   stampContinuationParentHost,
 } from './engine-utils'
 import { withInjectedAnytimeResultFlag } from './action-context-flags'
@@ -168,8 +170,8 @@ const rollbackAndReturn = (
   return result
 }
 
-const rememberXorSelection = (node: OrNode | XorNode, targetNode: EngineNode | undefined): void => {
-  if (node instanceof XorNode && targetNode) node.selectedChildId = targetNode.id
+const rememberBranchSelection = (node: OrNode | XorNode, targetNode: EngineNode | undefined): void => {
+  if (targetNode) node.selectedChildId = targetNode.id
 }
 
 const resolveXorIfSelectedBranchComplete = (node: XorNode): void => {
@@ -185,6 +187,7 @@ const triggerSelectEvaluationOptions = (
   int: EngineInternals,
   context: ActionExecutionContext,
 ): TriggerSelectEvaluationOptions => ({
+  canStartFlow: (flow, flowContext) => evaluateFlowDoable(flow, flowContext, (actionId) => int.registry.get(actionId)),
   canContinueWithoutTriggers: (actionId, resources) =>
     canActionContinueWithoutBeforeTriggers(
       int,
@@ -200,6 +203,8 @@ const triggerSelectEvaluationOptions = (
       scopedContext.state,
       scopedContext.player,
       {
+        params: scopedContext.params,
+        space: scopedContext.space,
         sourceCard: scopedContext.sourceCard,
         actionContext: scopedContext.actionContext,
       },
@@ -500,9 +505,20 @@ export function engineResolveChoice(
         node.optionalActive = true
       }
       const targetNode = node.children.find((item) => item.id === choice)
-      rememberXorSelection(node, targetNode)
+      rememberBranchSelection(node, targetNode)
       const child = targetNode ? findActionNode(targetNode) : null
       if (!child) {
+        int.pendingNodeIdRef.value = null
+        return { type: 'ok' }
+      }
+      const beginsWithChoice = (target: EngineNode): boolean => {
+        if (target instanceof OrNode || target instanceof XorNode || target instanceof ParallelNode) return true
+        if (target instanceof ActionNode) return false
+        const children = 'children' in target ? target.children as EngineNode[] : []
+        return !!children[0] && beginsWithChoice(children[0])
+      }
+      if (targetNode && beginsWithChoice(targetNode)) {
+        enforceSelectedTargetMandatory(targetNode)
         int.pendingNodeIdRef.value = null
         return { type: 'ok' }
       }
@@ -542,7 +558,7 @@ export function engineResolveChoice(
         child.resolve({ type: 'ok' })
         const selectedTarget = node.children[targetIndex] ?? targetNode!
         enforceSelectedTargetMandatory(selectedTarget)
-        rememberXorSelection(node, selectedTarget)
+        rememberBranchSelection(node, selectedTarget)
         int.pendingNodeIdRef.value = null
         return { type: 'ok' }
       }
@@ -571,6 +587,7 @@ export function engineResolveChoice(
         const deferredAction = findActionNode(deferredTarget)
         if (deferredAction) {
           deferredAction.beforePhaseResolved = true
+          deferredAction.beforeAnytimeAvailable = true
           beforeActivateNodes.forEach((beforeNode) =>
             stampBeforeHostNode(beforeNode, deferredAction.id))
         }
@@ -589,13 +606,15 @@ export function engineResolveChoice(
           executionContext.state,
           executionContext.player,
           {
+            params: executionContext.params,
+            space: executionContext.space,
             sourceCard: executionContext.sourceCard,
             actionContext: executionContext.actionContext,
           },
         ),
       )
       if (!doable) {
-        int.pendingNodeIdRef.value = null
+        setEngineBlockedPending(int, child.id, actionId)
         return rollbackAndReturn(int, { type: 'fail', errorKey: 'log.buildRoomFail' })
       }
       const costResults = int.hooks.computeCosts({
@@ -612,12 +631,14 @@ export function engineResolveChoice(
       const eventBuffer = createBufferedEventSink()
       let completedEvents: GameEvent[] = []
       child.bodyStarted = true
+      child.beforeAnytimeAvailable = false
       const result = action.execute({
         ...executionContext,
         eventSink: eventBuffer.sink,
       })
       if (result.type === 'fail') {
         eventFrame.rollback()
+        setEngineBlockedPending(int, child.id, actionId)
         return rollbackAndReturn(int, result)
       }
       if (result.type !== 'request') {
@@ -930,6 +951,8 @@ export function engineResolveChoice(
         executionContext.state,
         executionContext.player,
         {
+          params: executionContext.params,
+          space: executionContext.space,
           sourceCard: executionContext.sourceCard,
           actionContext: executionContext.actionContext,
         },
@@ -1035,7 +1058,7 @@ export function engineResolveChoice(
   int.hooks.during({ ...executionContext, ...pendingEventReadContext(completedEvents), actionId: committedActionId }, result)
   if (
     result.type === 'fail' &&
-    (result.recoverable === true || (!int.completionChecks && pendingEnvelope?.request.kind === 'farm-select')) &&
+    result.recoverable === true &&
     pendingHost &&
     pendingEnvelope
   ) {

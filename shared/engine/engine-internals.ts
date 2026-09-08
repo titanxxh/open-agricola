@@ -30,6 +30,4 @@ export interface EngineInternals {
   internalChildResults: Map<string, Record<string, ActionExecutionResult>>
   counterRef: { value: number }
   pendingNodeIdRef: { value: string | null }
-  probing?: boolean
-  completionChecks?: boolean
 }

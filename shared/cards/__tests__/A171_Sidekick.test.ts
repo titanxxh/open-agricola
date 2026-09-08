@@ -34,6 +34,7 @@ const setupContext = (options: {
   const target = state.actionSpaces.find((space) => space.id === (options.targetSpaceId ?? 'vegetable-seeds'))!
   target.takenBy = options.targetOccupied ? [{ playerId: state.players[1]!.id, workerId: '1' }] : []
   target.blockedBy = options.targetBlocked ? [{ playerId: state.players[1]!.id, workerId: '1', sourceSpaceId: 'linked' }] : []
+  target.strictCanExecute = true
   target.canBeExecutedByPlayer = () => options.targetExecutable ?? true
   const space = state.actionSpaces.find((candidate) => candidate.id === (options.currentSpaceId ?? 'pig-market'))!
   return {

@@ -732,15 +732,19 @@ describe('D014 Hammer Crusher provisional continuation', () => {
     })
   })
 
-  it('D014 S3 skips room construction that would make renovation impossible', () => {
+  it('D014 S3 requires explicit undo when accepted construction leaves renovation impossible', () => {
     const session = setup({ buildingTycoon: false, playerCount: 4, clay: 3, reed: 1, stone: 3 })
-    const response = session.takeAction(0, 'house-redevelopment')
-    expect(response.ok).toBe(true)
-    expect(response.interaction.stateId === 'wait' ? response.interaction.request.kind : undefined)
-      .not.toBe('engine-blocked')
+    let response = advanceSwitches(session, session.takeAction(0, 'house-redevelopment'))
+    const construct = response.interaction.request.options?.find((option) => option.value !== '__skip__')
+    expect(construct).toBeDefined()
+    response = session.resolveChoice(0, construct!.value)
+    const room = response.interaction.request.farm.selectableTiles[0]!
+    response = session.commitSelectionChoice(0, { rooms: [room] })
+    expect(response.ok, response.error).toBe(true)
+    expect(response.interaction.request.kind).toBe('engine-blocked')
     expect(response.state.players[0]).toMatchObject({
-      houseType: 'stone', rooms: 2,
-      resources: { clay: 5, reed: 1, stone: 1 },
+      houseType: 'clay', rooms: 3,
+      resources: { clay: 0, reed: 0, stone: 3 },
     })
 
     const fallback = session.undoAction()

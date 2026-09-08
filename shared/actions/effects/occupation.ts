@@ -350,7 +350,9 @@ export const hasPlayableOccupationChoice = (
 ) => {
   const cost = getOccupationActionBaseCost(player, spaceId, params)
   if (!cost) return false
-  return buildPlayableOccupationOptions(state, player, cost, { id: spaceId } as ActionSpace, spaceId).length > 0
+  const allowedCards = (params as { allowedCards?: string[] } | undefined)?.allowedCards
+  return buildPlayableOccupationOptions(state, player, cost, { id: spaceId } as ActionSpace, spaceId)
+    .some((option) => !allowedCards || allowedCards.includes(option.value))
 }
 
 export const canAffordOccupationActionCost = (
@@ -466,11 +468,12 @@ export const playOccupationAction: ActionDefinition = {
   descriptionKey: 'actions.lessons.description',
   roundAvailable: 1,
   gainPerRound: {},
-  canBeExecutedByPlayer: () => true,
+  canBeExecutedByPlayer: (state, player, context) =>
+    hasPlayableOccupationChoice(state, player, context?.space?.id ?? 'lessons', context?.params),
   execute: ({ state, player, space, params }) => {
     const typed = params as { allowedCards?: string[] } | undefined
     const cost = getOccupationActionBaseCost(player, space.id, params)
-    if (!cost) return { type: 'ok' }
+    if (!cost) return { type: 'fail', errorKey: 'log.occupationFail' }
     let playableOptions = buildPlayableOccupationOptions(
       state,
       player,
@@ -482,7 +485,7 @@ export const playOccupationAction: ActionDefinition = {
       playableOptions = playableOptions.filter(opt => typed.allowedCards!.includes(opt.value))
     }
     if (playableOptions.length === 0) {
-      return { type: 'ok' }
+      return { type: 'fail', errorKey: 'log.occupationFail' }
     }
     return {
       type: 'request',

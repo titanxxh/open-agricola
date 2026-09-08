@@ -1,5 +1,4 @@
 import { defineOccupationCard } from '../card-source'
-import { selectionSubsets } from '../../engine/interaction-choices'
 import type {
   ActionChoiceOption,
   ActionDefinition,
@@ -102,10 +101,6 @@ const choosePairsAction: ActionDefinition = {
   roundAvailable: 1,
   gainPerRound: {},
   canBeExecutedByPlayer: () => true,
-  getCompletionChoices: function* ({ player }) {
-    const needed = Math.min(6, countAllImprovements(player))
-    for (const pairs of selectionSubsets(PAIRS.map(([key]) => key), needed, needed)) yield { value: pairs.join(',') }
-  },
   execute: ({ player, eventSink }) => {
     const n = Math.min(6, countAllImprovements(player))
     if (n <= 0) {

@@ -1,4 +1,3 @@
-import { getCurrentSessionContext } from '../cards/session-card-context'
 import type {
   ActionExecutionResult,
   ProtectedObservation,
@@ -31,22 +30,16 @@ import { eventsToLogEntries } from '../events/log-mapper'
 import type { EngineInternals } from './engine-internals'
 import {
   buildOwnedFlowNode,
-  buildChoiceExecutionContext,
-  cloneRuleState,
   buildFlowNode,
   effectiveOwnerPlayerId,
   enforceCompositeContinuationMandatory,
   isActionStrictlyDoableWithoutBeforeTriggers,
   pendingEnvelopeFromHostNode,
   snapshotCompositeEmit,
-  resolveSubtree,
+  setEngineBlockedPending,
 } from './engine-utils'
 import { engineProceed } from './engine-proceed'
 import { engineResolveChoice } from './engine-resolve'
-import { animalKeysForState } from '../contract/animals'
-import { playerBoard } from '../domain/player-board'
-import { readAnimalCountsForZoneAssignment } from '../domain/animal-zones'
-import { interactionChoices } from './interaction-choices'
 import { getCardEffect } from '../cards/card-effects'
 import { resolveChoiceSourceCard } from './nodes/interaction-helpers'
 import { isPendingChoiceValueAllowed, pendingEnvelopeChoices } from './pending-validation'
@@ -56,7 +49,6 @@ type EngineDeps = {
   registry: ActionRegistry
   hooks: HookDispatcher
   log: LogStore
-  completionChecks?: boolean
   requireRootCompletion?: boolean
 }
 
@@ -65,7 +57,6 @@ type EngineContext = {
   player: PlayerState
   space: ActionSpace
   continuationOwnerPlayerId?: string
-  provisionalContinuation?: boolean
   reportProtectedObservation?: (observation: ProtectedObservation) => void
   emitPrivateEvent?: ActionExecutionContext['emitPrivateEvent']
 }
@@ -151,6 +142,7 @@ const restoreSharedCursorData = (node: EngineNode, data: Record<string, unknown>
   if (typeof data.optionalPromptKey === 'string') {
     node.optionalPromptKey = data.optionalPromptKey as PromptKey
   }
+  if (typeof data.beforeAnytimeAvailable === 'boolean') node.beforeAnytimeAvailable = data.beforeAnytimeAvailable
   if (typeof data.mandatory === 'boolean') node.mandatory = data.mandatory
   if (data.pending && typeof data.pending === 'object') {
     node.setPending(data.pending as PendingEnvelope)
@@ -247,6 +239,7 @@ const restoreTreeFromCursor = (cursors: NodeCursor[]): EngineNode | null => {
       }
       case 'or': {
         const or = new OrNode(cursor.id, buildChildren(), data.promptKey as PromptKey | undefined)
+        or.selectedChildId = typeof data.selectedChildId === 'string' ? data.selectedChildId : null
         or.emittedChoices = (data.emittedChoices as ActionChoiceOption[] | undefined) ?? []
         or.emittedPromptKey = data.emittedPromptKey as PromptKey | undefined
         or.emittedPromptParams = data.emittedPromptParams as Record<string, unknown> | undefined
@@ -293,8 +286,6 @@ export class Engine {
   private internalChildResults: EngineInternals['internalChildResults'] = new Map()
   private _pendingNodeIdRef: { value: string | null } = { value: null }
   private _counterRef: { value: number } = { value: 0 }
-  private probing = false
-  private completionChecks: boolean
 
   static fromRoot(root: EngineNode, deps: EngineDeps): Engine {
     if (deps.requireRootCompletion) enforceCompositeContinuationMandatory(root)
@@ -374,8 +365,6 @@ export class Engine {
       internalChildResults: this.internalChildResults,
       counterRef: this._counterRef,
       pendingNodeIdRef: this._pendingNodeIdRef,
-      probing: this.probing,
-      completionChecks: this.completionChecks,
     }
   }
   /**
@@ -615,6 +604,7 @@ export class Engine {
     const nextUnresolved = this.tree.nextUnresolved()
     if (ctx && nextUnresolved) {
       enforceCompositeContinuationMandatory(nextUnresolved)
+      nextUnresolved.beforeAnytimeAvailable = true
     }
     if (nextUnresolved) {
       this.tree.insertBefore(nextUnresolved.id, flowNodes)
@@ -683,19 +673,25 @@ export class Engine {
     return false
   }
 
-  setEngineBlockedPending(nodeId: string, actionId: string): boolean {
+  offerBeforeAnytimeWindow(nodeId: string): boolean {
     const node = this.tree.findNodeById(nodeId)
-    if (!node) return false
+    if (!node?.beforeAnytimeAvailable) return false
+    node.beforeAnytimeAvailable = false
+    const options = [{ value: 'continue', labelKey: 'ui.interactionContinue' }]
     node.setPending({
       hostNodeId: node.id,
-      request: { kind: 'engine-blocked', actionId },
-      choices: [],
-      promptKey: 'ui.interactionEngineBlocked',
-      pendingActionId: actionId,
+      request: { kind: 'choice', options },
+      choices: options,
+      promptKey: 'ui.interactionBeforeAnytime',
+      syntheticKind: 'before-action-anytime',
       ownerNodeId: null,
     })
     this._pendingNodeIdRef.value = node.id
     return true
+  }
+
+  setEngineBlockedPending(nodeId: string, actionId: string): boolean {
+    return setEngineBlockedPending(this._internals(), nodeId, actionId)
   }
 
   restore(snapshot: {
@@ -784,197 +780,10 @@ export class Engine {
     this.registry = params.registry
     this.hooks = params.hooks
     this.log = params.log
-    this.completionChecks = params.completionChecks === true
   }
 
   proceed(context: EngineContext): EngineStepResult {
-    while (true) {
-      const hadPending = this.peekPendingEnvelope() !== null
-      const step = engineProceed(this._internals(), context)
-      if (hadPending || !this.completionChecks || this.probing || context.provisionalContinuation || step.type !== 'choice') return step
-      if (context.continuationOwnerPlayerId && context.continuationOwnerPlayerId !== context.player.id) return step
-      const pending = this.peekPendingEnvelope()
-      if (pending?.pendingActionId === INTERACTION_ONLY_ACTION_ID) return step
-      if (pending?.request.kind !== 'choice' && pending?.request.kind !== 'select-trigger') return step
-      if (pending.request.kind === 'choice' && pending.request.structuredChoicePrefixes?.length) return step
-      const host = this.peekPendingHost()
-      const canSkipEmptyOr = host instanceof OrNode && host.optional
-        && step.choice.options.every((option) => this.canComplete(context, { value: option.value }, host.id) === false)
-      const unavailable = step.choice.options.filter((option) => !option.disabled
-        && this.canComplete(context, { value: option.value }) === false)
-      for (const option of unavailable) {
-        option.disabled = true
-        option.disabledReasonKey = 'ui.interactionTriggerUnavailable'
-      }
-      if (canSkipEmptyOr) {
-        resolveSubtree(host!)
-        host!.clearPending()
-        this._pendingNodeIdRef.value = null
-        return { type: 'ok', nodeId: step.nodeId, result: { type: 'ok' } }
-      }
-      const enabled = step.choice.options.filter((option) => !option.disabled)
-      if (host instanceof OrNode || (host instanceof XorNode && !host.optional)) {
-        step.choice.options.splice(0, step.choice.options.length, ...enabled)
-      }
-      if (host?.optional && !host.optionalActive && enabled.length === 1 && enabled[0]!.value === '__skip__') {
-        engineResolveChoice(this._internals(), '__skip__', context)
-        return { type: 'ok', nodeId: step.nodeId, result: { type: 'ok' } }
-      }
-      if (enabled.length === 0) {
-        return { type: 'blocked', nodeId: step.nodeId, mandatory: host?.mandatory }
-      }
-      return step
-    }
-  }
-
-  canComplete(
-    context: EngineContext,
-    selection?: { value: string; payload?: Record<string, unknown>; onFailure?: (result: Extract<ActionExecutionResult, { type: 'fail' }>) => void },
-    boundaryNodeId?: string,
-  ): boolean | undefined {
-    const query = () => {
-      const unavailable = Symbol('protected observation')
-      const attempt = <T>(operation: () => T): T | typeof unavailable => {
-        try {
-          return operation()
-        } catch (error) {
-          if (error === unavailable) return unavailable
-          throw error
-        }
-      }
-      const cloneContext = (source: EngineContext): EngineContext => {
-        const state = cloneRuleState(source.state)
-        return {
-          state,
-          player: state.players.find((player) => player.id === source.player.id) ?? cloneSnapshotValue(source.player),
-          space: state.actionSpaces.find((space) => space.id === source.space.id)
-            ?? { ...source.space, ...cloneSnapshotValue(source.space) },
-          reportProtectedObservation: (observation) => {
-            if (observation.kind === 'random' || !observation.knownToPlayerIds?.includes(context.player.id)) {
-              throw unavailable
-            }
-          },
-        }
-      }
-      const fork = (engine: Engine): Engine => {
-        const copy = Engine.fromFlow({ type: 'seq', children: [] }, {
-          registry: this.registry,
-          hooks: this.hooks,
-          log: new LogStore(),
-        })
-        copy.restore(cloneSnapshotValue(engine.snapshot()))
-        copy.probing = true
-        return copy
-      }
-      const animalCount = (current: EngineContext) => animalKeysForState(current.state)
-        .reduce((sum, animal) => sum + (current.player.resources[animal] ?? 0), 0)
-      const addReorganization = (engine: Engine, current: EngineContext) => {
-        if (current.player.id !== context.player.id) return false
-        engine.injectBeforeFlows([{ type: 'leaf', actionId: 'reorganize', actionContext: { trigger: 'anytime' } }], undefined, current.player.id)
-        return true
-      }
-      const visited = new Set<string>()
-      const search = (engine: Engine, current: EngineContext): boolean | undefined => {
-        while (true) {
-          const next = engine.tree.nextUnresolved()
-          if (next instanceof ActionNode && next.actionId === INTERACTION_ONLY_ACTION_ID) return true
-          if (boundaryNodeId) {
-            let ancestor = next
-            while (ancestor && ancestor.id !== boundaryNodeId) ancestor = engine.tree.findParent(ancestor.id)
-            if (!ancestor) return true
-          }
-          const key = JSON.stringify({ state: current.state, cursor: engine.snapshot() })
-          if (visited.has(key)) return false
-          visited.add(key)
-          const nextNodeId = engine.peekNextUnresolvedNodeId()
-          const ownerPlayerId = nextNodeId
-            ? engine.getEffectiveOwnerPlayerId(nextNodeId, context.continuationOwnerPlayerId ?? context.player.id)
-            : current.player.id
-          const player = current.state.players.find((entry) => entry.id === ownerPlayerId)
-            ?? (current.player.id === ownerPlayerId ? current.player : undefined)
-          if (!player) return false
-          const executionContext = { ...current, player }
-          const animalsBefore = animalCount(executionContext)
-          const step = attempt(() => engine.proceed(executionContext))
-          if (step === unavailable) return undefined
-          if (step.type === 'done') {
-            const index = current.state.players.findIndex((entry) => entry.id === player.id)
-            const assigned = index < 0 ? animalsBefore : playerBoard(current.state, index).animals.zones()
-              .reduce((sum, zone) => sum + Object.values(readAnimalCountsForZoneAssignment(zone)).reduce((total, count) => total + (count ?? 0), 0), 0)
-            if (animalCount(executionContext) <= assigned) return true
-            if (!addReorganization(engine, executionContext)) return undefined
-            continue
-          }
-          if (step.type === 'blocked') {
-            return step.mandatory !== true && (next instanceof OrNode || next instanceof XorNode)
-          }
-          if (step.type === 'ok') {
-            if (step.result.type === 'fail') return false
-            if (animalCount(executionContext) > animalsBefore && !addReorganization(engine, executionContext)) return undefined
-            continue
-          }
-          const pending = engine.peekPendingEnvelope()
-          if (!pending) return false
-          if (player.id !== context.player.id) return undefined
-          const host = engine.peekPendingHost()
-          const actionId = pending.pendingActionId ?? (host instanceof ActionNode ? host.actionId : undefined)
-          if (pending.request.kind === 'animal-reorg' && actionId !== 'reorganize') {
-            engine.insertFlowAfterPendingChoice({ type: 'leaf', actionId: 'reorganize', actionContext: { trigger: 'anytime' } }, player.id)
-            engine.acknowledgePendingActionRequest()
-            continue
-          }
-          if (pending.request.kind !== 'choice' && pending.request.kind !== 'select-trigger'
-            && pending.request.kind !== 'selection' && pending.request.kind !== 'farm-select'
-            && pending.request.kind !== 'animal-reorg'
-            && pending.request.kind !== 'resource-quantity-select' && pending.request.kind !== 'resource-batch-exchange-select') {
-            throw new Error(`Missing completion choices for ${actionId ?? 'composite'}: ${pending.request.kind}`)
-          }
-          const action = actionId ? this.registry.get(actionId) : undefined
-          if (host instanceof OrNode && host.optional
-            && pendingEnvelopeChoices(pending).every((option) => engine.canComplete(executionContext, { value: option.value }, host.id) === false)) {
-            resolveSubtree(host)
-            host.clearPending()
-            engine._pendingNodeIdRef.value = null
-            continue
-          }
-          if (pending.request.kind === 'farm-select' || pending.request.kind === 'selection' || pendingEnvelopeChoices(pending).length !== 1) {
-            engine.flushEventTransaction(executionContext)
-          }
-          const choices = action?.getCompletionChoices?.(
-            buildChoiceExecutionContext(executionContext, pending.contextSnapshot as Parameters<typeof buildChoiceExecutionContext>[1]),
-            pending.request,
-          ) ?? interactionChoices(pending.request)
-          let unknown = false
-          for (const option of choices) {
-            const branch = fork(engine)
-            const branchContext = cloneContext(executionContext)
-            const result = attempt(() => branch.resolveChoice(option.value, branchContext, option.payload))
-            if (result === unavailable) {
-              unknown = true
-              continue
-            }
-            if (result.type === 'fail') continue
-            const complete = search(branch, branchContext)
-            if (complete === true) return true
-            if (complete === undefined) unknown = true
-          }
-          return unknown ? undefined : false
-        }
-      }
-      const engine = fork(this)
-      const current = cloneContext(context)
-      if (selection) {
-        const result = attempt(() => engine.resolveChoice(selection.value, current, selection.payload))
-        if (result === unavailable) return undefined
-        if (result.type === 'fail') {
-          selection.onFailure?.(result)
-          return false
-        }
-      }
-      return search(engine, current)
-    }
-    const sessionContext = getCurrentSessionContext()
-    return sessionContext ? sessionContext.queryCompletion(query) : query()
+    return engineProceed(this._internals(), context)
   }
 
   /**
@@ -987,16 +796,15 @@ export class Engine {
     context: EngineContext,
     payload?: Record<string, unknown>,
   ): ActionExecutionResult {
-    let rejection: Extract<ActionExecutionResult, { type: 'fail' }> | undefined
-    if (this.completionChecks && !this.probing && !context.provisionalContinuation
-      && this.peekPendingEnvelope()?.pendingActionId !== INTERACTION_ONLY_ACTION_ID
-      && (!context.continuationOwnerPlayerId || context.continuationOwnerPlayerId === context.player.id)
-      && this.canComplete(context, { value: choice, payload, onFailure: (result) => { rejection = result } }) === false) {
-      return { ...rejection, type: 'fail', errorKey: rejection?.errorKey ?? 'log.action', recoverable: true }
-    }
     const pending = this.peekPendingEnvelope()
+    if (pending?.syntheticKind === 'before-action-anytime') {
+      if (choice !== 'continue') return { type: 'fail', errorKey: 'log.action', recoverable: true }
+      this.peekPendingHost()?.clearPending()
+      this._pendingNodeIdRef.value = null
+      return { type: 'ok' }
+    }
     let cardFlow: ActionFlow | void = undefined
-    if ((this.completionChecks || this.probing) && pending
+    if (pending
       && (pending.request.kind === 'choice' || pending.request.kind === 'select-trigger' || pending.request.kind === 'animal-reorg')
       && isPendingChoiceValueAllowed(pending, choice)
       && !isProtectedActionCancel(pending.pendingActionId, choice)) {

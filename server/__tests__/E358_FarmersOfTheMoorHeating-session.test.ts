@@ -639,8 +639,8 @@ describe('Farmers of the Moor heating, sick workers, and Infirmary', () => {
 
     let resp = session.takeAction(0, 'house-redevelopment')
     expect(resp.ok).toBe(true)
-    expect(resp.interaction.stateId).toBe('wait')
-    if (resp.interaction.stateId !== 'wait') return
+    const replacement = resp.interaction.request.options!.find((option) => option.sourceCard === 'M032_PeatHut')!
+    resp = session.resolveChoice(0, replacement.value)
     expect(resp.interaction.request.farm?.farmType).toBe('room')
     const room = resp.interaction.request.farm?.selectableTiles[0]
     expect(room).toBeDefined()

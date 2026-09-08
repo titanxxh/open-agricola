@@ -13,6 +13,7 @@ export type PromptKey =
   | 'ui.interactionFlowSelect'
   | 'ui.interactionOptionalAction'
   | 'ui.interactionEngineBlocked'
+  | 'ui.interactionBeforeAnytime'
   // Farm action prompts (with both bare and -Select suffix variants)
   | 'ui.interactionPlow' | 'ui.interactionPlowSelect'
   | 'ui.interactionSow' | 'ui.interactionSowSelect'

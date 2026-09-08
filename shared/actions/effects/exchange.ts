@@ -12,9 +12,6 @@ import type {
 import type { DraftGameEvent, EventSink } from '../../contract/events'
 import type { PromptKey } from '../../contract/prompt-keys'
 import { PaymentSolver } from '../payment'
-import { cloneRuleState } from '../../engine/engine-utils'
-import { createBufferedEventSink } from '../../engine/card-trigger-events'
-import { interactionChoices } from '../../engine/interaction-choices'
 import { trackWorkPhaseBuildingResources } from '../../session/work-phase-resources'
 import { addFoodFromConversion, incResourceConverted } from '../../session/stats'
 import {
@@ -653,33 +650,6 @@ export const anytimeExchangeAction: ActionDefinition = {
   descriptionKey: 'actions.exchange.description',
   roundAvailable: 1,
   gainPerRound: {},
-  getCompletionChoices: function* ({ state, player, actionContext }, request) {
-    if (request.kind !== 'choice' || !request.structuredChoicePrefixes?.includes('bulk:')) {
-      yield* interactionChoices(request)
-      return
-    }
-    yield { value: 'cancel' }
-    const { trades } = buildExchangeOptions(player, actionContext?.tradeIds as string[] | undefined, state, readMaxTradeTimesBySourceId(actionContext))
-    function* extend(current: PlayerState, entries: string[], used: Set<number>): Generator<{ value: string }> {
-      for (let index = 0; index < trades.length; index += 1) {
-        if (used.has(index)) continue
-        const trade = trades[index]!
-        const source = trade.sourceId ?? trade.source
-        const max = Math.min(getMaxTradeTimes(current, trade),
-          source ? readMaxTradeTimesBySourceId(actionContext)?.[source] ?? Infinity : Infinity)
-        for (let count = 1; count <= max; count += 1) {
-          const nextEntries = [...entries, `${index}=${count}`]
-          const value = `bulk:${nextEntries.join(',')}`
-          yield { value }
-          const copy = cloneRuleState(state)
-          const nextPlayer = copy.players.find((entry) => entry.id === player.id)!
-          resolveExchangeChoice(copy, nextPlayer, value, actionContext, createBufferedEventSink().sink)
-          yield* extend(nextPlayer, nextEntries, new Set([...used, index]))
-        }
-      }
-    }
-    yield* extend(player, [], new Set())
-  },
   anytime: true,
   canBeExecutedByPlayer: (state, player, ctx) => {
     const batch = ctx?.actionContext?.batchExchange as { maxTotal?: number } | undefined

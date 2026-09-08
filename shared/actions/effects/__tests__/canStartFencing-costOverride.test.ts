@@ -259,16 +259,9 @@ describe('canStartFencing with costOverride', () => {
         },
       },
     } as unknown as ActionExecutionContext
-    const request: InteractionRequest = {
-      kind: 'farm-select',
-      farm: { farmType: 'fence', selectableEdges: getFarmyardEdgeIds(player), extraWood: 0 },
-      options: [{ value: 'confirm', labelKey: 'ui.interactionFenceConfirm' }],
-    }
-
-    expect(fenceAction.getCompletionChoices!(context, request)[Symbol.iterator]().next().done).toBe(false)
-    expect([...fenceAction.getCompletionChoices!(context, {
-      ...request,
-      farm: { ...request.farm, extraWood: 1 },
-    })]).toHaveLength(0)
+    const edges = ['H-2-4', 'H-3-4', 'V-2-4', 'V-2-5']
+    expect(fenceAction.resolveChoice!(context, 'confirm', { edges, extraWood: 1 })).toMatchObject({ type: 'fail' })
+    expect(player.fenceSegments).toEqual([])
+    expect(fenceAction.resolveChoice!(context, 'confirm', { edges, extraWood: 0 }).type).toBe('ok')
   })
 })

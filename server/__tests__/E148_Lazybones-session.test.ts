@@ -122,7 +122,7 @@ describe('E148_Lazybones session', () => {
   it('no trigger for unmarked spaces', () => {
     const session = setup()
 
-    const resp = session.takeAction(1, 'lessons')
+    const resp = session.takeAction(1, 'forest')
     expect(resp.ok).toBe(true)
 
     const owner = resp.state.players[0]!

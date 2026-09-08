@@ -91,11 +91,13 @@ describe('A174 Master Hora', () => {
     resp = session.resolveChoice(0, accept!.value)
 
     expect(resp.interaction.stateId).toBe('wait')
-    if (resp.interaction.stateId !== 'wait') throw new Error('expected turn confirmation')
-    expect(resp.interaction.request.kind).toBe('confirm-next-player')
+    if (resp.interaction.stateId !== 'wait') throw new Error('expected blocked')
+    expect(resp.interaction.request.kind).toBe('engine-blocked')
     expect(resp.state.players[0]!.resources.food).toBe(0)
     expect(resp.state.players[0]!.resources.vegetable).toBe(1)
     expect(resp.state.players[0]!.occupationPlayed).not.toContain('A123_FrameBuilder')
+    const undone = session.undoAction(0)
+    expect(undone.state.players[0]!.resources).toMatchObject({ food: 1, vegetable: 0 })
   })
 
   it('offers the vegetable purchase before resolving an extra place-farmer target on an extension space', () => {
@@ -129,7 +131,7 @@ describe('A174 Master Hora', () => {
     })
   })
 
-  it('rejects entry if the host action cannot complete after the before flow', () => {
+  it('allows the before attempt and restores an unavailable host through explicit undo', () => {
     const session = setup()
     const state = session.getState().state
     const player = state.players[0]!
@@ -139,11 +141,12 @@ describe('A174 Master Hora', () => {
     if (!houseBuilding) throw new Error('missing house-building-56')
     houseBuilding.canBeExecutedByPlayer = () => true
 
-    const resp = session.takeAction(0, 'house-building-56')
-
-    expect(resp.ok).toBe(false)
-    expect(resp.error).toBe('space unavailable')
-    expect(resp.interaction.stateId).toBe('idle')
+    let resp = session.takeAction(0, 'house-building-56')
+    expect(resp.ok).toBe(true)
+    resp = session.resolveChoice(0, findA174Option(resp)!.value)
+    expect(resp.interaction.request.kind).toBe('engine-blocked')
+    resp = session.undoAction(0)
+    expect(resp.ok).toBe(true)
     expect(resp.state.players[0]!.resources.food).toBe(1)
     expect(resp.state.players[0]!.resources.vegetable).toBe(0)
     expect(resp.state.actionSpaces.find((space) => space.id === 'house-building-56')?.takenBy).toHaveLength(0)
