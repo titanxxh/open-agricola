@@ -1,67 +1,76 @@
 import { defineMinorCard } from '../card-source'
-import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
-import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
-import { getCardStack, pushToCardStack, isCardFlagged, setCardFlag, writeCardInfobox } from '../helpers/card-state'
+import { registerAdHocAction } from '../../actions/helpers/ad-hoc-action-registry'
+import { getCardStack, pushToCardStack, popFromCardStack, isCardFlagged, setCardFlag, writeCardInfobox } from '../helpers/card-state'
+import { hasInactiveWorkerInSupply } from '../../domain/player'
+import { supplyWorkerTurnFlow, consumeSupplyWorkerTurn } from '../helpers/supply-worker-flow'
+import type { ActionDefinition, PlayerState } from '../../contract/types'
 import type { CardImpl } from '../registry'
-import type { PlayerState } from '../../contract/types'
 
 const CARD_ID = 'E022_GuestRoom'
+const FOOD_ACTION = `card_${CARD_ID}_food`
+
 const updateInfobox = (player: PlayerState) => {
-  const stack = getCardStack(player, CARD_ID)
-  writeCardInfobox(player, CARD_ID, `${stack.length} Food`)
+  writeCardInfobox(player, CARD_ID, `${getCardStack(player, CARD_ID).length} Food`)
 }
 
-const anytimeListener: CardListenerRegistration = {
-  id: 'E22-guest-room-anytime',
-  cardIds: [CARD_ID],
-  phases: ['anytime' as ActionHookPhase],
-  handler: (context: CardListenerContext): ActionHookResult | void => {
-    if (isCardFlagged(context.player, CARD_ID)) return
-    const stack = getCardStack(context.player, CARD_ID)
-    if (stack.length <= 0) return
-
-    // Compute what infobox will say after 1 food is removed
-    const newCount = stack.length - 1
-
+const foodAction: ActionDefinition = {
+  id: FOOD_ACTION,
+  nameKey: 'cards.E022_GuestRoom.storeFood',
+  descriptionKey: 'cards.E022_GuestRoom.storeFood',
+  roundAvailable: 1,
+  gainPerRound: {},
+  canBeExecutedByPlayer: (_state, player, context) =>
+    context?.params?.mode !== 'spend' || getCardStack(player, CARD_ID).length > 0,
+  execute: ({ player, params, eventSink }) => {
+    if (params?.mode === 'spend') {
+      if (getCardStack(player, CARD_ID).length === 0) return { type: 'fail', errorKey: 'log.actionFail' }
+      popFromCardStack(player, CARD_ID)
+      updateInfobox(player)
+      eventSink?.emit<'card.stackChanged'>({ type: 'card.stackChanged', cardId: CARD_ID, targetPlayerId: player.id, resources: { food: 1 }, delta: -1, reason: 'discard' })
+      return { type: 'ok' }
+    }
     return {
-      flow: {
-        type: 'seq',
-        children: [
-          // Pop 'food' from card stack → gives +1 food to player
-          { type: 'leaf', actionId: 'pop-card-stack', sourceCard: CARD_ID },
-          // Pay the food back → net 0 for player, card loses 1 food
-          { type: 'leaf', actionId: 'pay', params: { food: 1 }, sourceCard: CARD_ID },
-          // Flag card (once per round)
-          { type: 'leaf', actionId: 'special-effect', sourceCard: CARD_ID, params: { kind: 'set-flag', flag: true } },
-          // Grow family without room
-          { type: 'leaf', actionId: 'family-growth', sourceCard: CARD_ID, actionContext: { skipRoomCheck: true } },
-          // Update infobox
-          { type: 'leaf', actionId: 'special-effect', sourceCard: CARD_ID, params: { kind: 'set-infobox', text: `${newCount} Food` } },
-        ],
+      type: 'request',
+      request: {
+        kind: 'resource-quantity-select',
+        cardId: CARD_ID,
+        availableByResource: { food: player.resources.food },
+        promptKey: 'cards.E022_GuestRoom.storeFood',
+        requireAtLeastOne: false,
       },
-      sourceCard: CARD_ID,
-      labelKey: 'cards.E022_GuestRoom.anytime',
     }
   },
+  resolveChoice: ({ player, eventSink }, _choice, payload) => {
+    const counts = (payload as { resourceCounts?: Record<string, unknown> } | undefined)?.resourceCounts
+    const count = counts?.food ?? 0
+    if (!counts || typeof count !== 'number' || !Number.isInteger(count) || count < 0 || count > player.resources.food ||
+      Object.entries(counts).some(([resource, amount]) => resource !== 'food' && amount !== 0)) {
+      return { type: 'fail', errorKey: 'log.actionFail', recoverable: true }
+    }
+    player.resources.food -= count
+    pushToCardStack(player, CARD_ID, Array.from({ length: count }, () => 'food'))
+    updateInfobox(player)
+    if (count > 0) eventSink?.emit<'card.stackChanged'>({ type: 'card.stackChanged', cardId: CARD_ID, targetPlayerId: player.id, resources: { food: count }, delta: count, reason: 'store' })
+    return { type: 'ok' }
+  },
 }
+
+registerAdHocAction(foodAction)
 
 const cardImpl = {
-  listeners: [anytimeListener],
   effect: {
-  id: CARD_ID,
-  onBuy: (_state, player) => {
-    const foodToStore = player.resources.food
-    if (foodToStore > 0) {
-      const items = Array.from({ length: foodToStore }, () => 'food')
-      pushToCardStack(player, CARD_ID, items)
-      player.resources.food = 0
-    }
-    updateInfobox(player)
+    id: CARD_ID,
+    onBuy: () => ({ type: 'leaf', actionId: FOOD_ACTION, sourceCard: CARD_ID }),
+    onRoundStart: (_state, player) => { setCardFlag(player, CARD_ID, false) },
+    extraTurnBeforeWorkers: true,
+    contributeExtraTurn: (state, player) => {
+      if (isCardFlagged(player, CARD_ID) || getCardStack(player, CARD_ID).length === 0 || !hasInactiveWorkerInSupply(player)) return
+      return supplyWorkerTurnFlow(state, player, CARD_ID, [
+        { type: 'leaf', actionId: FOOD_ACTION, sourceCard: CARD_ID, params: { mode: 'spend' } },
+        consumeSupplyWorkerTurn(CARD_ID),
+      ])
+    },
   },
-  onBeforeStartOfTurn: (_state, player) => {
-    setCardFlag(player, CARD_ID, false)
-  },
-},
   reaches: [] as readonly string[],
 } satisfies CardImpl
 

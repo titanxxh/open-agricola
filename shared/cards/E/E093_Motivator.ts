@@ -1,7 +1,9 @@
 import { defineOccupationCard } from '../card-source'
 import { getRoundPlacementOrder } from '../helpers/round-placement'
 import { hasNoUnusedFarmyardSpaces } from '../../domain/farm'
-import { workersAvailable } from '../../domain/player'
+import { hasInactiveWorkerInSupply } from '../../domain/player'
+import { isCardFlagged, setCardFlag } from '../helpers/card-state'
+import { supplyWorkerTurnFlow, consumeSupplyWorkerTurn } from '../helpers/supply-worker-flow'
 import type { CardImpl } from '../registry'
 
 const CARD_ID = 'E093_Motivator'
@@ -9,22 +11,12 @@ const CARD_ID = 'E093_Motivator'
 const cardImpl = {
   effect: {
   id: CARD_ID,
-  onBeforeStartOfTurn: (state, player) => {
-    if (getRoundPlacementOrder(player).length !== 0) return
-    if (!hasNoUnusedFarmyardSpaces(player)) return
-    if (workersAvailable(state, player) <= 0) return
-    return {
-      type: 'seq',
-      optional: true,
-      children: [
-        {
-          type: 'leaf',
-          actionId: 'place-farmer',
-          sourceCard: CARD_ID,
-          actionContext: { trueAction: false, extraPlacement: true },
-        },
-      ],
-    }
+  extraTurnBeforeWorkers: true,
+  onRoundStart: (_state, player) => { setCardFlag(player, CARD_ID, false) },
+  contributeExtraTurn: (state, player) => {
+    if (getRoundPlacementOrder(player).length !== 0 || isCardFlagged(player, CARD_ID)) return
+    if (!hasNoUnusedFarmyardSpaces(player) || !hasInactiveWorkerInSupply(player)) return
+    return supplyWorkerTurnFlow(state, player, CARD_ID, [consumeSupplyWorkerTurn(CARD_ID)])
   },
 },
   reaches: [] as readonly string[],

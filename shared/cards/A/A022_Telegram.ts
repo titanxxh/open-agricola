@@ -1,7 +1,8 @@
 import { defineMinorCard } from '../card-source'
-import { writeCardExtraData, readCardExtraData, writeCardInfobox, setCardFlag, isCardFlagged } from '../helpers/card-state'
+import { writeCardExtraData, readCardExtraData, writeCardInfobox, isCardFlagged } from '../helpers/card-state'
 import { getOwnOrdinaryFenceReserveCount } from '../../domain/supply-tokens'
-import { workersAvailable } from '../../domain/player'
+import { hasInactiveWorkerInSupply } from '../../domain/player'
+import { supplyWorkerTurnFlow, consumeSupplyWorkerTurn } from '../helpers/supply-worker-flow'
 import type { CardImpl } from '../registry'
 
 const CARD_ID = 'A022_Telegram'
@@ -17,28 +18,11 @@ const cardImpl = {
       writeCardInfobox(player, CARD_ID, `Round ${targetRound}`)
     }
   },
-  onBeforeStartOfTurn: (state, player) => {
-    const triggerRound = readCardExtraData<number>(player, CARD_ID, 'triggerRound')
-    if (triggerRound === undefined || state.round !== triggerRound) return
-    if (isCardFlagged(player, CARD_ID)) return
-    // The reference `Telegram::activate` checks `hasFarmerInReserve` before inserting the
-    // extra-placement node — without an unplaced worker, the trigger is wasted
-    // (and the player loses the once-per-game flag). We mirror that guard via
-    // `workersAvailable(state, player)`.
-    if (workersAvailable(state, player) === 0) return
-    setCardFlag(player, CARD_ID, true)
-    return {
-      type: 'seq',
-      optional: true,
-      children: [
-        {
-          type: 'leaf',
-          actionId: 'place-farmer',
-          sourceCard: CARD_ID,
-          actionContext: { trueAction: false, extraPlacement: true },
-        },
-      ],
-    }
+  extraTurnBeforeWorkers: true,
+  contributeExtraTurn: (state, player) => {
+    if (readCardExtraData<number>(player, CARD_ID, 'triggerRound') !== state.round) return
+    if (isCardFlagged(player, CARD_ID) || !hasInactiveWorkerInSupply(player)) return
+    return supplyWorkerTurnFlow(state, player, CARD_ID, [consumeSupplyWorkerTurn(CARD_ID)])
   },
 },
   prerequisiteCheck: (player) => getOwnOrdinaryFenceReserveCount(player) >= 1,

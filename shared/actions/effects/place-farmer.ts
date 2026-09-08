@@ -7,6 +7,7 @@ import type {
   PlayerState,
 } from '../../contract/types'
 import { recordRoundPlacement } from '../../cards/helpers/round-placement'
+import { writeActionSnapshotExtraData } from '../../cards/helpers/action-snapshot'
 import {
   addLinkedSpaceBlocks,
   addWorkerRef,
@@ -15,12 +16,14 @@ import {
   findActionSpaceByWorker,
   removeWorkerRef,
 } from '../../domain/space'
-import { inactiveWorkersInSupply, smallestAvailableWorker } from '../../domain/player'
+import { smallestAvailableWorker } from '../../domain/player'
+import { selectWorkerForMoorAction } from '../../moor/heating'
+import { findSupplyWorker } from '../../domain/supply-workers'
+import type { SupplyWorkerSource } from '../../contract/types'
 import { incPlacedFarmers } from '../../session/stats'
 import { computeAllowedPlacementSpaces } from '../helpers/placement-availability'
 import { OCCUPIED_SPACE_CHOICE_PREFIX } from '../helpers/placement-constants'
 import { collectBeforePlacementFlows } from '../../cards/card-listeners'
-import { writeCardExtraData } from '../../cards/helpers/card-state'
 
 export { OCCUPIED_SPACE_CHOICE_PREFIX } from '../helpers/placement-constants'
 
@@ -37,7 +40,7 @@ const placeFarmer = (
   player: PlayerState,
   space: ActionSpace,
 ): ActionExecutionResult & { workerId?: string } => {
-  const worker = smallestAvailableWorker(state, player)
+  const worker = selectWorkerForMoorAction(state, player, space.id)
   if (!worker) {
     return { type: 'fail', errorKey: 'log.placeFarmerFail' }
   }
@@ -47,18 +50,27 @@ const placeFarmer = (
   return { type: 'ok', workerId: worker.id }
 }
 
+const readSupplySource = (
+  context: Record<string, unknown> | undefined,
+): SupplyWorkerSource | undefined => {
+  const source = context?.workerSource
+  if (!source || typeof source !== 'object' || !('kind' in source) || source.kind !== 'supply') return
+  if (!('disposition' in source) || (
+    source.disposition !== 'return-to-supply' && source.disposition !== 'remove-from-game'
+  )) return
+  if ('workerId' in source && typeof source.workerId !== 'string') return
+  return source as SupplyWorkerSource
+}
+
 const readTemporarySupplyWorker = (
   player: PlayerState,
-  actionContext: Record<string, unknown> | undefined,
+  context: Record<string, unknown> | undefined,
+  sourceCard?: string,
 ) => {
-  if (actionContext?.fromSupply !== true || actionContext?.temporaryFromSupply !== true) return null
-  const workerId = actionContext.temporaryWorkerId
-  if (typeof workerId !== 'string') return null
-  return (player.workers ?? []).find((worker) =>
-    worker.id === workerId &&
-    worker.isActive !== true &&
-    worker.removedFromSupply === true,
-  ) ?? null
+  const source = readSupplySource(context)
+  if (!source) return
+  const workerId = typeof context?.supplyWorkerId === 'string' ? context.supplyWorkerId : source.workerId
+  return findSupplyWorker(player, sourceCard, workerId)
 }
 
 const placeTemporarySupplyWorker = (
@@ -82,8 +94,9 @@ export const placeFarmerAction: ActionDefinition = {
   roundAvailable: 1,
   gainPerRound: {},
   canBeExecutedByPlayer: (state, player, context) =>
-    smallestAvailableWorker(state, player) !== null ||
-    readTemporarySupplyWorker(player, context?.actionContext) !== null,
+    context?.actionContext?.workerSource !== undefined
+      ? readTemporarySupplyWorker(player, context.actionContext, context.sourceCard) !== undefined
+      : smallestAvailableWorker(state, player) !== null,
   execute: ({ state, player, sourceCard, actionContext, eventSink }) => {
     // viaCardJump branch (Sprint 5 mech-A): move farmer + return flow leaf so
     // the engine runs the second placement through the standard ActionNode path.
@@ -168,16 +181,22 @@ export const placeFarmerAction: ActionDefinition = {
       return { type: 'flow', flow: targetLeaf }
     }
 
-    const temporarySupplyWorker = readTemporarySupplyWorker(player, actionContext)
-    if (actionContext?.fromSupply && !temporarySupplyWorker) {
-      const supply = inactiveWorkersInSupply(player)[0]
-      if (!supply) return { type: 'fail', errorKey: 'log.placeFarmerFail' }
-      supply.isActive = true
+    const temporarySupplyWorker = readTemporarySupplyWorker(player, actionContext, sourceCard)
+    if (actionContext?.workerSource !== undefined) {
+      const source = readSupplySource(actionContext)
+      if (!source || !temporarySupplyWorker) return { type: 'fail', errorKey: 'log.placeFarmerFail' }
+      actionContext.supplyWorkerId = temporarySupplyWorker.id
+      temporarySupplyWorker.supplyUse = {
+        sourceCard,
+        disposition: source.disposition,
+        status: 'pending',
+        returnRound: state.round,
+      }
     }
     let allowed = computeAllowedPlacementSpaces(state, player, {
       sourceCard,
       actionContext,
-      ignoreWorkerAvailability: temporarySupplyWorker !== null,
+      ignoreWorkerAvailability: temporarySupplyWorker !== undefined,
     })
     // The reference `constraints` (e.g. C125 Nightworker restricts to building-resource
     // accumulation spaces of types the player has 0 of). Caller passes a
@@ -216,11 +235,14 @@ export const placeFarmerAction: ActionDefinition = {
     const targetSpace = findActionSpaceById(state, targetSpaceId)
     if (!targetSpace) return { type: 'fail', errorKey: 'log.placeFarmerFail' }
 
-    const temporarySupplyWorker = readTemporarySupplyWorker(player, actionContext)
+    const temporarySupplyWorker = readTemporarySupplyWorker(player, actionContext, sourceCard)
+    if (actionContext?.workerSource !== undefined && !temporarySupplyWorker) {
+      return { type: 'fail', errorKey: 'log.placeFarmerFail' }
+    }
     let allowed = computeAllowedPlacementSpaces(state, player, {
       sourceCard,
       actionContext,
-      ignoreWorkerAvailability: temporarySupplyWorker !== null,
+      ignoreWorkerAvailability: temporarySupplyWorker !== undefined,
     })
     const constraints = actionContext?.constraints as string[] | undefined
     if (Array.isArray(constraints) && constraints.length > 0) {
@@ -236,29 +258,20 @@ export const placeFarmerAction: ActionDefinition = {
       ? placeTemporarySupplyWorker(state, player, targetSpace, temporarySupplyWorker.id)
       : placeFarmer(state, player, targetSpace)
     if (placeResult.type === 'fail') return placeResult
+    incPlacedFarmers(player)
+    writeActionSnapshotExtraData(player, 'placedWorkerId', placeResult.workerId)
+    if (temporarySupplyWorker?.supplyUse) temporarySupplyWorker.supplyUse.status = 'temporary'
     eventSink?.emit<'worker.placed'>({
       type: 'worker.placed',
       workerId: placeResult.workerId!,
       spaceId: targetSpaceId,
       ...(sourceCard ? { viaCardId: sourceCard } : {}),
     })
-    // B22 WalkingBoots-style fromSupply + markForRemoval pattern: when a
-    // card pushes a temporary worker from supply and wants to retract it on
-    // the next return-home, record the chosen space id on the source card's
-    // extraData so the card's own onReturnHome listener can find the worker
-    // it placed (cardStates.<sourceCard>.extraData.markedSpaceId).
-    if (
-      sourceCard &&
-      actionContext?.fromSupply &&
-      actionContext?.markForRemoval
-    ) {
-      writeCardExtraData(player, sourceCard, 'markedSpaceId', targetSpaceId)
-    }
     const actionContextWrite = {
       targetSpaceId,
       placedWorkerId: placeResult.workerId,
     }
-    const targetActionContext = { ...(actionContext ?? {}), ...actionContextWrite }
+    const targetActionContext = { ...(actionContext ?? {}), ...actionContextWrite, ...(temporarySupplyWorker ? { trueAction: true } : {}) }
     if (actionContext) {
       actionContext.targetSpaceId = targetSpaceId
       actionContext.placedWorkerId = placeResult.workerId

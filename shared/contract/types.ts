@@ -300,11 +300,23 @@ export type Field = {
   col: number
 }
 
+export type SupplyWorkerSource = {
+  kind: 'supply'
+  disposition: 'return-to-supply' | 'remove-from-game'
+  workerId?: string
+}
+
 export type Worker = {
   id: string
   isActive: boolean
   isNewborn: boolean
   removedFromSupply?: boolean
+  supplyUse?: {
+    sourceCard?: string
+    disposition: SupplyWorkerSource['disposition']
+    status: 'reserved' | 'pending' | 'temporary'
+    returnRound?: number
+  }
 }
 
 export type WorkerRef = {

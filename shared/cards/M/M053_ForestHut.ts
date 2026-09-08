@@ -1,12 +1,15 @@
 import { defineMinorCard } from '../card-source'
 import { registerSelectionEffect } from '../../actions/helpers/selection-effect-registry'
+import { registerAdHocAction } from '../../actions/helpers/ad-hoc-action-registry'
 import type { ActionHookPhase } from '../../actions/hooks'
 import type { CardListenerContext, CardListenerRegistration } from '../card-listeners'
-import { readCardExtraData, writeCardExtraData } from '../helpers/card-state'
+import { readCardExtraData, writeCardExtraData, isCardFlagged } from '../helpers/card-state'
 import { inactiveWorkersInSupply } from '../../domain/player'
+import { reserveSupplyWorker } from '../../domain/supply-workers'
+import { supplyWorkerTurnFlow, consumeSupplyWorkerTurn } from '../helpers/supply-worker-flow'
 import { parsePositionKey } from '../../domain/farm'
 import { getVisibleTerrainTiles } from '../../moor/farm-terrain'
-import type { ActionFlow, FarmTilePosition } from '../../contract/types'
+import type { FarmTilePosition } from '../../contract/types'
 import type { CardImpl } from '../registry'
 
 const CARD_ID = 'M053_ForestHut'
@@ -14,6 +17,7 @@ const SELECTION_EFFECT = 'M053-forest-hut-bind'
 const TEMP_WORKER_KEY = 'temporaryWorkerId'
 const BOUND_FOREST_KEY = 'boundForest'
 const FARM_TERRAIN_MARKERS_KEY = 'farmTerrainMarkers'
+const UNLOCK_ACTION = `card_${CARD_ID}_unlock`
 
 const sameTile = (a: FarmTilePosition | undefined, b: FarmTilePosition | undefined) =>
   !!a && !!b && a.row === b.row && a.col === b.col
@@ -53,11 +57,8 @@ const selectedForestRemovalTiles = (context: CardListenerContext): FarmTilePosit
 registerSelectionEffect(SELECTION_EFFECT, ({ player, positions }) => {
   const tile = parsePositionKey(positions[0] ?? '')
   if (!tile) return
-  const worker = inactiveWorkersInSupply(player)[0]
+  const worker = reserveSupplyWorker(player, CARD_ID)
   if (!worker) return
-  worker.isActive = false
-  worker.isNewborn = false
-  worker.removedFromSupply = true
   writeCardExtraData(player, CARD_ID, TEMP_WORKER_KEY, worker.id)
   writeCardExtraData(player, CARD_ID, BOUND_FOREST_KEY, tile)
   writeCardExtraData(player, CARD_ID, FARM_TERRAIN_MARKERS_KEY, [{
@@ -69,22 +70,22 @@ registerSelectionEffect(SELECTION_EFFECT, ({ player, positions }) => {
   }])
 })
 
-const unlockFlow = (workerId: string): ActionFlow => ({
-  type: 'seq',
-  optional: true,
-  children: [{
-    type: 'leaf',
-    actionId: 'place-farmer',
-    sourceCard: CARD_ID,
-    actionContext: {
-      trueAction: false,
-      extraPlacement: true,
-      fromSupply: true,
-      temporaryFromSupply: true,
-      temporaryWorkerId: workerId,
-      markForRemoval: true,
-    },
-  }],
+registerAdHocAction({
+  id: UNLOCK_ACTION,
+  nameKey: 'actions.special-effect.name',
+  descriptionKey: 'actions.special-effect.description',
+  roundAvailable: 1,
+  gainPerRound: {},
+  canBeExecutedByPlayer: () => true,
+  execute: ({ state, player }) => {
+    const workerId = readCardExtraData<string>(player, CARD_ID, TEMP_WORKER_KEY)
+    const worker = player.workers.find((entry) => entry.id === workerId)
+    if (!worker?.supplyUse || worker.supplyUse.sourceCard !== CARD_ID || worker.supplyUse.status !== 'reserved') return { type: 'ok' }
+    worker.supplyUse.returnRound = state.round
+    writeCardExtraData(player, CARD_ID, BOUND_FOREST_KEY, undefined)
+    writeCardExtraData(player, CARD_ID, FARM_TERRAIN_MARKERS_KEY, [])
+    return { type: 'ok' }
+  },
 })
 
 const unlockListener: CardListenerRegistration = {
@@ -98,28 +99,8 @@ const unlockListener: CardListenerRegistration = {
     const workerId = readCardExtraData<string>(context.player, CARD_ID, TEMP_WORKER_KEY)
     if (!workerId) return
     const worker = (context.player.workers ?? []).find((entry) => entry.id === workerId)
-    if (!worker || worker.isActive || worker.removedFromSupply !== true) return
-    return {
-      flow: {
-        type: 'seq',
-        children: [
-          {
-            type: 'leaf',
-            actionId: 'special-effect',
-            sourceCard: CARD_ID,
-            params: { kind: 'set-extra-data', key: BOUND_FOREST_KEY, value: undefined },
-          },
-          {
-            type: 'leaf',
-            actionId: 'special-effect',
-            sourceCard: CARD_ID,
-            params: { kind: 'set-extra-data', key: FARM_TERRAIN_MARKERS_KEY, value: [] },
-          },
-          unlockFlow(workerId),
-        ],
-      },
-      sourceCard: CARD_ID,
-    }
+    if (!worker?.supplyUse || worker.supplyUse.sourceCard !== CARD_ID || worker.supplyUse.status !== 'reserved') return
+    return { flow: { type: 'leaf', actionId: UNLOCK_ACTION, sourceCard: CARD_ID } }
   },
 }
 
@@ -144,23 +125,17 @@ const cardImpl = {
         },
       }
     },
-    onReturnHome: (state, player) => {
-      if (readCardExtraData<FarmTilePosition>(player, CARD_ID, BOUND_FOREST_KEY)) return
+    extraTurnBeforeWorkers: true,
+    contributeExtraTurn: (state, player) => {
+      if (isCardFlagged(player, CARD_ID)) return
       const workerId = readCardExtraData<string>(player, CARD_ID, TEMP_WORKER_KEY)
-      if (!workerId) return
-      state.actionSpaces.forEach((space) => {
-        space.takenBy = space.takenBy.filter((worker) =>
-          !(worker.playerId === player.id && worker.workerId === workerId),
-        )
-      })
-      const worker = (player.workers ?? []).find((entry) => entry.id === workerId)
-      if (worker) {
-        worker.isActive = false
-        worker.isNewborn = false
-        worker.removedFromSupply = false
-      }
+      const worker = player.workers.find((entry) => entry.id === workerId)
+      if (worker?.supplyUse?.status !== 'reserved' || worker.supplyUse.returnRound !== state.round) return
+      return supplyWorkerTurnFlow(state, player, CARD_ID, [consumeSupplyWorkerTurn(CARD_ID)], worker.id)
+    },
+    onReturnHome: (_state, player) => {
+      if (readCardExtraData<FarmTilePosition>(player, CARD_ID, BOUND_FOREST_KEY)) return
       writeCardExtraData(player, CARD_ID, TEMP_WORKER_KEY, undefined)
-      writeCardExtraData(player, CARD_ID, 'markedSpaceId', undefined)
       writeCardExtraData(player, CARD_ID, FARM_TERRAIN_MARKERS_KEY, [])
     },
   },

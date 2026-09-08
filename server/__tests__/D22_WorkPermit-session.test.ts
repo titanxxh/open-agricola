@@ -1,3 +1,5 @@
+import { chooseSupplyWorkerTurn, takeNormalWorkerTurn } from './_helpers/supply-worker-turn'
+import { confirmNextPlayer } from './_helpers/pending-confirms'
 import { describe, expect, it } from 'vitest'
 import { GameSession, type SessionResponse } from '../game/authoritative-session'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
@@ -93,16 +95,12 @@ const setupDue = (buildingResources: { wood?: number; clay?: number; reed?: numb
 }
 
 const acceptWorkPermit = (session: GameSession, response: SessionResponse) => {
-  expect(response.interaction.stateId).toBe('wait')
-  if (response.interaction.stateId !== 'wait') return response
-  expect(response.interaction.sourceCard).toBe(CARD_ID)
-  const accept = response.interaction.request.options?.find((option) => option.value !== '__skip__')
-  expect(accept).toBeDefined()
-  return session.resolveChoice(response.interaction.playerIndex, accept!.value)
+  expect(response.ok, response.error).toBe(true)
+  return chooseSupplyWorkerTurn(session, CARD_ID)
 }
 
 describe('D022 Work Permit parity', () => {
-  it('D022 S1: one building resource schedules the next round and costs one food while OA keeps the supply person', () => {
+  it('D022 S1: one building resource reserves a supply person for the next round and costs one food', () => {
     const session = setupPurchase()
     const supplyBefore = inactiveWorkersInSupply(session.state.players[0]!).length
 
@@ -112,7 +110,7 @@ describe('D022 Work Permit parity', () => {
     expect(response.state.players[0]!.minorPlayed).toContain(CARD_ID)
     expect(response.state.players[0]!.resources).toMatchObject({ food: 0, wood: 1 })
     expect(workPermitRounds(response)).toEqual([6])
-    expect(inactiveWorkersInSupply(response.state.players[0]!)).toHaveLength(supplyBefore)
+    expect(inactiveWorkersInSupply(response.state.players[0]!)).toHaveLength(supplyBefore - 1)
   })
 
   it('D022 S2: every building resource unit contributes one round without being consumed', () => {
@@ -134,16 +132,13 @@ describe('D022 Work Permit parity', () => {
     expect(workPermitRounds(response)).toEqual([])
   })
 
-  it('D022 S4: characterize OA allowing Work Permit with no person in supply', () => {
+  it('D022 S4: Work Permit is unavailable without a supply person and pays nothing', () => {
     const session = setupPurchase({ supplyFarmer: false })
-    expect(inactiveWorkersInSupply(session.state.players[0]!)).toHaveLength(0)
-
-    const response = play(session)
-
-    expect(response.ok, response.error).toBe(true)
-    expect(response.state.players[0]!.minorPlayed).toContain(CARD_ID)
-    expect(response.state.players[0]!.resources.food).toBe(0)
-    expect(workPermitRounds(response)).toEqual([6])
+    const response = enterMinor(session)
+    expect(offered(response)).toBe(false)
+    expect(response.state.players[0]!.minorHand).toContain(CARD_ID)
+    expect(response.state.players[0]!.resources.food).toBe(1)
+    expect(workPermitRounds(response)).toEqual([])
   })
 
   it('D022 S5: a target after round fourteen still plays and pays but schedules no person', () => {
@@ -155,7 +150,7 @@ describe('D022 Work Permit parity', () => {
     expect(workPermitRounds(response)).toEqual([])
   })
 
-  it('D022 S6: characterize OA using a regular person for the target-round placement', () => {
+  it('D022 S6: uses a supply person for the target-round placement and keeps regular people at home', () => {
     const session = setupDue()
     let response = acceptWorkPermit(session, session.performRoundEnd())
     expect(response.interaction.stateId).toBe('wait')
@@ -166,27 +161,32 @@ describe('D022 Work Permit parity', () => {
     expect(response.ok, response.error).toBe(true)
     expect(response.state.round).toBe(6)
     expect(response.state.players[0]!.workers.filter((worker) => worker.isActive)).toHaveLength(2)
-    expect(workersAtHome(response.state, response.state.players[0]!)).toHaveLength(1)
-    expect(inactiveWorkersInSupply(response.state.players[0]!)).toHaveLength(3)
+    expect(workersAtHome(response.state, response.state.players[0]!)).toHaveLength(2)
+    expect(inactiveWorkersInSupply(response.state.players[0]!)).toHaveLength(2)
     expect(response.state.actionSpaces.find((space) => space.id === 'forest')!.takenBy)
-      .toContainEqual(expect.objectContaining({ playerId: response.state.players[0]!.id }))
+      .toContainEqual(expect.objectContaining({ playerId: response.state.players[0]!.id, workerId: '3' }))
   })
 
-  it('D022 S7: the target-round extra placement may be declined without consuming a person', () => {
+  it('D022 S7: the target-round opportunity can be declined after normal placements finish', () => {
     const session = setupDue()
-    let response = session.performRoundEnd()
-    expect(response.interaction.stateId).toBe('wait')
-    if (response.interaction.stateId !== 'wait') return
-    expect(response.interaction.sourceCard).toBe(CARD_ID)
-
-    response = session.resolveChoice(response.interaction.playerIndex, '__skip__')
-
+    expect(session.performRoundEnd().ok).toBe(true)
+    for (const spaceId of ['forest', 'day-laborer', 'clay-pit', 'reed-bank']) {
+      const response = takeNormalWorkerTurn(session, spaceId)
+      expect(response.ok, response.error).toBe(true)
+      expect(confirmNextPlayer(session).ok).toBe(true)
+    }
+    const offered = session.getState()
+    expect(offered.interaction.stateId).toBe('wait')
+    if (offered.interaction.stateId !== 'wait') return
+    const decline = offered.interaction.request.options?.find((option) => option.labelKey === 'ui.interactionDecline')
+    expect(decline).toBeDefined()
+    const declined = session.resolveChoice(offered.interaction.playerIndex, decline!.value)
+    expect(declined.ok, declined.error).toBe(true)
+    const response = confirmNextPlayer(session)
     expect(response.ok, response.error).toBe(true)
-    expect(response.state.round).toBe(6)
+    expect(response.state.round, JSON.stringify(response.interaction)).toBe(7)
     expect(workersAtHome(response.state, response.state.players[0]!)).toHaveLength(2)
     expect(inactiveWorkersInSupply(response.state.players[0]!)).toHaveLength(3)
-    expect(response.state.actionSpaces.find((space) => space.id === 'forest')!.takenBy)
-      .not.toContainEqual(expect.objectContaining({ playerId: response.state.players[0]!.id }))
   })
 
   it('D022 S8: before the target round Work Permit offers no extra placement', () => {
@@ -195,5 +195,7 @@ describe('D022 Work Permit parity', () => {
     expect(response.state.round).toBe(6)
     expect(response.interaction.stateId !== 'wait' || response.interaction.sourceCard !== CARD_ID).toBe(true)
     expect(workPermitRounds(response)).toEqual([7])
+    expect(inactiveWorkersInSupply(response.state.players[0]!)).toHaveLength(2)
+    expect(response.state.players[0]!.workers.find((worker) => worker.id === '3')?.supplyUse?.status).toBe('reserved')
   })
 })

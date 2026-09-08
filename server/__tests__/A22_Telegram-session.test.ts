@@ -1,3 +1,6 @@
+import { confirmNextPlayer } from './_helpers/pending-confirms'
+import { inactiveWorkersInSupply, workersAtHome } from '../../shared/domain/player'
+import { chooseSupplyWorkerTurn, takeNormalWorkerTurn } from './_helpers/supply-worker-turn'
 import { describe, expect, it } from 'vitest'
 import { GameSession, type SessionResponse } from '../game/authoritative-session'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
@@ -72,12 +75,8 @@ const setupDue = ({ supplyFarmer = true } = {}) => {
 }
 
 const acceptTelegram = (session: GameSession, response: SessionResponse) => {
-  expect(response.interaction.stateId).toBe('wait')
-  if (response.interaction.stateId !== 'wait') return response
-  expect(response.interaction.sourceCard).toBe(CARD_ID)
-  const accept = response.interaction.request.options?.find((option) => option.value !== '__skip__')
-  expect(accept).toBeDefined()
-  return session.resolveChoice(response.interaction.playerIndex, accept!.value)
+  expect(response.ok, response.error).toBe(true)
+  return chooseSupplyWorkerTurn(session, CARD_ID)
 }
 
 describe('A022 Telegram parity', () => {
@@ -88,6 +87,7 @@ describe('A022 Telegram parity', () => {
     expect(response.state.players[0]!.minorPlayed).toContain(CARD_ID)
     expect(readCardExtraData<number>(response.state.players[0]!, CARD_ID, 'triggerRound')).toBe(2)
     expect(response.state.players[0]!.resources.food).toBe(0)
+    expect(inactiveWorkersInSupply(response.state.players[0]!)).toHaveLength(3)
   })
 
   it('A022 S2: no fence in supply keeps Telegram unavailable without payment', () => {
@@ -107,7 +107,7 @@ describe('A022 Telegram parity', () => {
     expect(response.state.players[0]!.resources.food).toBe(0)
   })
 
-  it('A022 S4: in the target round Telegram places on Forest without adding a supply person', () => {
+  it('A022 S4: in the target round Telegram places a supply person without adding a family member', () => {
     const session = setupDue()
     let response = acceptTelegram(session, session.performRoundEnd())
     expect(response.interaction.stateId).toBe('wait')
@@ -119,16 +119,45 @@ describe('A022 Telegram parity', () => {
     expect(response.state.round).toBe(2)
     expect(response.state.players[0]!.workers.filter((worker) => worker.isActive)).toHaveLength(2)
     expect(response.state.actionSpaces.find((space) => space.id === 'forest')!.takenBy)
-      .toContainEqual(expect.objectContaining({ playerId: response.state.players[0]!.id }))
+      .toContainEqual(expect.objectContaining({ playerId: response.state.players[0]!.id, workerId: '3' }))
   })
 
-  it('A022 S5: OA offers target-round Telegram even with no person in supply', () => {
+  it('A022 S5: Telegram offers no supply placement when no person remains in supply', () => {
     const response = setupDue({ supplyFarmer: false }).performRoundEnd()
 
     expect(response.state.round).toBe(2)
-    expect(response.interaction.stateId).toBe('wait')
-    if (response.interaction.stateId !== 'wait') return
-    expect(response.interaction.sourceCard).toBe(CARD_ID)
+    expect(response.interaction.stateId).toBe('idle')
     expect(response.state.players[0]!.workers.filter((worker) => worker.isActive)).toHaveLength(5)
   })
+
+  it('A022 permits an ordinary placement before its supply turn and expires after returning home', () => {
+    const session = setupPurchase()
+    expect(play(session).ok).toBe(true)
+    expect(confirmNextPlayer(session).ok).toBe(true)
+    for (const spaceId of ['forest', 'clay-pit', 'reed-bank']) {
+      expect(takeNormalWorkerTurn(session, spaceId).ok).toBe(true)
+      expect(confirmNextPlayer(session).ok).toBe(true)
+    }
+    expect(session.state.round).toBe(2)
+    expect(takeNormalWorkerTurn(session, 'day-laborer').ok).toBe(true)
+    expect(confirmNextPlayer(session).ok).toBe(true)
+    expect(session.takeAction(1, 'clay-pit').ok).toBe(true)
+    expect(confirmNextPlayer(session).ok).toBe(true)
+    chooseSupplyWorkerTurn(session, CARD_ID)
+    const placed = session.resolveChoice(0, 'forest')
+    expect(placed.ok, placed.error).toBe(true)
+    expect(workersAtHome(placed.state, placed.state.players[0]!)).toHaveLength(1)
+    expect(placed.state.actionSpaces.find((space) => space.id === 'forest')!.takenBy)
+      .toContainEqual({ playerId: placed.state.players[0]!.id, workerId: '3' })
+    expect(confirmNextPlayer(session).state.currentPlayerIndex).toBe(1)
+    for (const spaceId of ['reed-bank', 'grain-seeds']) {
+      expect(takeNormalWorkerTurn(session, spaceId).ok).toBe(true)
+      expect(confirmNextPlayer(session).ok).toBe(true)
+    }
+    const returned = session.getState()
+    expect(returned.state.round).toBe(3)
+    expect(returned.interaction.stateId).toBe('idle')
+    expect(inactiveWorkersInSupply(returned.state.players[0]!)).toHaveLength(3)
+  })
+
 })

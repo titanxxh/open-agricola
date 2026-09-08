@@ -492,6 +492,18 @@ _Avoid_: 固定 15 fence / 4 stable 上限
 玩家可拥有或激活的家庭成员 token 总上限；通常来自玩家的 worker token supply，也可以被卡牌改变。它限制家庭成员总数，但不表示当前住房是否足够。
 _Avoid_: 当前家庭成员数、当前可放工人数、有效住房容量
 
+**Supply Person（供应人物）**:
+由卡牌允许从玩家个人供应中取出并暂时使用的一个人物实体；这次使用不是家庭增长。
+_Avoid_: 新生儿、永久家庭成员、无限生成的额外人物
+
+**Reserved Supply Person（已预留供应人物）**:
+因卡牌从个人供应中取出、被指定用途占用的那一个人物。预留期间不能被其他效果再次从供应中领取，也不能用于家庭增长。
+_Avoid_: 仍在供应中的人物、已永久移出游戏的人物、卡牌持有的普通家庭成员
+
+**Supply Placement Opportunity（供应人物放置机会）**:
+卡牌授予在指定时机使用一名可用供应人物的资格；资格本身不预留人物。
+_Avoid_: 已预留供应人物、永久家庭成员、尚未执行的家庭增长
+
 **Removed Family Token（已移除家庭成员 token）**:
 被卡牌永久移出玩家 family token supply 的 worker token。它不再是可通过 family growth 激活的 inactive worker，也不计入家庭成员 token 上限。
 _Avoid_: newborn、暂时在行动格或卡牌上的 worker、尚未出生的 inactive worker

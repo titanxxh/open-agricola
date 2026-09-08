@@ -975,7 +975,7 @@ export const zh = {
     D092_ChildOmbudsman: { name: '儿童监察员', description: '从第 5 回合起，若你有房间，在每次工人行动结束时，你可以用该工人进行一次 __Family Growth__ 行动。若如此，获得 2 负 <SCORE>。' },
     E010_StrawHat: { name: '草帽', description: '在第 3 与第 6 回合工作阶段结束时，你可以将你的工人从 __Farmland__ 行动位移到一个未被占用的行动位并执行该行动，或获得 1 <FOOD>。' },
     E016_BriarHedge: { name: '荆棘篱笆', description: '你在农场板边缘建造围栏时无需支付木材。' },
-    E022_GuestRoom: { name: '客房', description: '立即从供给区在本牌上放任意数量 <FOOD>。每回合一次，你可以从本牌弃 1 <FOOD>，在该回合放置一名工人。' },
+    E022_GuestRoom: { name: '客房', description: '立即从供应区在本牌上放任意数量 <FOOD>。每轮一次，你可以从本牌弃 1 <FOOD>，在该轮放置一名供应人物。' },
     E027_PiggyBank: { name: '存钱罐', description: '每个工作阶段结束时，你可以在本牌上不可回收地放 1 <FOOD>。任何时候，你可以弃掉本牌上的 6 <FOOD>，免费建造一个大改良。' },
     E030_ChildsToy: { name: '儿童玩具', description: '每次收获喂养阶段，你的每个新生人口需要 2 <FOOD>（而非 1）。' },
     E033_BeaverColony: { name: '河狸栖地', description: '从现在起，你有畜栏的一块牧场不能容纳动物。每当你从行动位获得 <REED> 时，获得 1 额外 <SCORE>。' },
@@ -1181,6 +1181,7 @@ export const zh = {
     futureMeepleRemoved: '{player} 移除 {cardId} 的未来工人记录（{rounds}）',
     futureMeepleResolved: '{player} 结算 {cardId} 在第 {round} 回合的未来工人{roomType}{resources}',
     workerReturned: '回收工人{destination}',
+    workerRemoved: '人物被永久移出游戏',
     workerDestinationHome: '回家',
     workerDestinationReserve: '到预备区',
     workerDestinationSupply: '到供应区',
@@ -1822,6 +1823,7 @@ export const zh = {
       anytime: '木锯：付1食物 → 获1木材',
     },
     E022_GuestRoom: {
+      storeFood: '选择存入客房的食物数量',
       anytime: '客房：付1食物 → 获1食物',
     },
     E027_PiggyBank: {

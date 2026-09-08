@@ -1,98 +1,117 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
-import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
-import { runCardEffectHook } from '../../shared/cards/card-effects'
-import { getCardStack } from '../../shared/cards/helpers/card-state'
-
-import { familySize } from '../../shared/domain/player'
-import '../../shared/cards/E/E022_GuestRoom'
+import { getCardStack, pushToCardStack } from '../../shared/cards/helpers/card-state'
+import { familySize, inactiveWorkersInSupply, setActiveWorkerCount, workersAtHome } from '../../shared/domain/player'
+import { confirmNextPlayer } from './_helpers/pending-confirms'
+import { chooseSupplyWorkerTurn, takeNormalWorkerTurn } from './_helpers/supply-worker-turn'
 
 const CARD_ID = 'E022_GuestRoom'
 
-describe('E022_GuestRoom session', () => {
-  const setup = (food = 5) => {
-    const session = new GameSession()
-    stabilizeRandomHands(session.state.players)
+const setup = () => {
+  const session = new GameSession(8022, undefined, { playerCount: 2 })
+  const state = session.getState().state
+  state.round = 5
+  state.roundPhase = 'work'
+  state.currentPlayerIndex = 0
+  state.availableMajorImprovements = []
+  state.actionSpaces.forEach((space) => { space.takenBy = [] })
+  state.players.forEach((player, index) => {
+    player.minorHand = index === 0 ? [CARD_ID] : ['__test_placeholder__']
+    player.occupationHand = ['__test_placeholder__']
+    player.minorPlayed = []
+    player.occupationPlayed = []
+    player.improvements = []
+    player.cardStates = {}
+    player.resources.food = index === 0 ? 5 : 20
+    player.resources.wood = index === 0 ? 4 : 0
+    player.resources.reed = index === 0 ? 1 : 0
+  })
+  session.loadState(state)
+  return session
+}
+
+const buy = (session: GameSession) => {
+  let response = session.takeAction(0, 'major-improvement')
+  for (let step = 0; step < 3 && response.interaction.stateId === 'wait' &&
+    response.interaction.request.kind !== 'resource-quantity-select'; step++) {
+    const options = response.interaction.request.options ?? []
+    const option = options.find((entry) => entry.value === CARD_ID)
+      ?? options.find((entry) => entry.value.startsWith('action-improvement-'))
+    expect(option, JSON.stringify(response.interaction)).toBeDefined()
+    response = session.resolveChoice(0, option!.value)
+    expect(response.ok, response.error).toBe(true)
+  }
+  expect(response.ok, response.error).toBe(true)
+  expect(response.interaction).toMatchObject({ stateId: 'wait', request: { kind: 'resource-quantity-select' } })
+  expect(response.state.players[0]!.resources).toMatchObject({ wood: 0, reed: 0, food: 5 })
+  return response
+}
+
+describe('E022 Guest Room supply placements', () => {
+  it.each([0, 2, 5])('stores the chosen %i food through the purchase selection', (food) => {
+    const session = setup()
+    buy(session)
+    const response = session.commitSelectionChoice(0, { resourceCounts: { food } })
+    expect(response.ok, response.error).toBe(true)
+    expect(response.state.players[0]!.minorPlayed).toContain(CARD_ID)
+    expect(response.state.players[0]!.resources.food).toBe(5 - food)
+    expect(getCardStack(response.state.players[0]!, CARD_ID)).toEqual(Array.from({ length: food }, () => 'food'))
+  })
+
+  it('rejects an invalid amount atomically and keeps the purchase selection', () => {
+    const session = setup()
+    const pending = buy(session)
+    const before = JSON.stringify(pending.state.players[0])
+    for (const food of [-1, 6, 1.5]) {
+      const response = session.commitSelectionChoice(0, { resourceCounts: { food } })
+      expect(response.ok).toBe(false)
+      expect(JSON.stringify(response.state.players[0])).toBe(before)
+      expect(response.interaction).toEqual(pending.interaction)
+    }
+    expect(session.commitSelectionChoice(0, { resourceCounts: { food: 2 } }).ok).toBe(true)
+  })
+
+  it('spends one card food for a normal rotation turn and becomes available again next round', () => {
+    const session = setup()
+    buy(session)
+    expect(session.commitSelectionChoice(0, { resourceCounts: { food: 2 } }).ok).toBe(true)
+    expect(confirmNextPlayer(session).ok).toBe(true)
+    expect(session.takeAction(1, 'forest').ok).toBe(true)
+    expect(confirmNextPlayer(session).ok).toBe(true)
+    const workerId = inactiveWorkersInSupply(session.state.players[0]!)[0]!.id
+    const pending = chooseSupplyWorkerTurn(session, CARD_ID)
+    expect(getCardStack(pending.state.players[0]!, CARD_ID)).toHaveLength(1)
+    expect(pending.state.players[0]!.resources.food).toBe(3)
+    const placed = session.resolveChoice(0, 'day-laborer')
+    expect(placed.ok, placed.error).toBe(true)
+    expect(placed.state.actionSpaces.find((space) => space.id === 'day-laborer')!.takenBy)
+      .toContainEqual({ playerId: placed.state.players[0]!.id, workerId })
+    expect(familySize(placed.state.players[0]!)).toBe(2)
+    expect(workersAtHome(placed.state, placed.state.players[0]!)).toHaveLength(1)
+    expect(confirmNextPlayer(session).state.currentPlayerIndex).toBe(1)
+    expect(session.takeAction(1, 'clay-pit').ok).toBe(true)
+    const again = confirmNextPlayer(session)
+    expect(again.ok, again.error).toBe(true)
+    expect(again.interaction.stateId).toBe('idle')
+    expect(again.interaction.anytimeActions.map((action) => action.id)).not.toContain('E22-guest-room-anytime')
+    expect(takeNormalWorkerTurn(session, 'reed-bank').ok).toBe(true)
+    const nextRound = confirmNextPlayer(session)
+    expect(nextRound.ok, nextRound.error).toBe(true)
+    expect(nextRound.state.round, JSON.stringify(nextRound.interaction)).toBe(6)
+    const next = chooseSupplyWorkerTurn(session, CARD_ID)
+    expect(getCardStack(next.state.players[0]!, CARD_ID)).toHaveLength(0)
+    expect(familySize(next.state.players[0]!)).toBe(2)
+  })
+
+  it.each(['no-food', 'no-supply'] as const)('does not offer a placement with %s', (reason) => {
+    const session = setup()
     const state = session.getState().state
-    state.players = state.players.slice(0, 2)
-    state.currentPlayerIndex = 0
-    state.round = 1
-
-    const player = state.players[0]!
-    player.resources.food = food
-    player.minorPlayed.push(CARD_ID)
-
-    // Manually trigger onBuy
-    runCardEffectHook(state, player, CARD_ID, 'onBuy')
-
+    state.players[0]!.minorPlayed = [CARD_ID]
+    if (reason === 'no-supply') {
+      setActiveWorkerCount(state.players[0]!, 5)
+      pushToCardStack(state.players[0]!, CARD_ID, ['food'])
+    }
     session.loadState(state)
-    return session
-  }
-
-  /** Enter an active interaction that keeps the engine alive (multi-step). */
-  const enterActiveInteraction = (session: GameSession) => {
-    const resp = session.takeAction(0, 'farmland')
-    expect(resp.ok).toBe(true)
-    return resp
-  }
-
-  it('onBuy stores all food on card stack and zeroes player food', () => {
-    const session = setup(5)
-    const state = session.getState().state
-    const player = state.players[0]!
-    expect(player.resources.food).toBe(0)
-    const stack = getCardStack(player, CARD_ID)
-    expect(stack.length).toBe(5)
-    expect(stack.every((item) => item === 'food')).toBe(true)
-  })
-
-  it('onBuy with 0 food stores empty stack', () => {
-    const session = setup(0)
-    const state = session.getState().state
-    const player = state.players[0]!
-    const stack = getCardStack(player, CARD_ID)
-    expect(stack.length).toBe(0)
-  })
-
-  it('anytime action uses 1 food from card for family growth', () => {
-    const session = setup(3)
-
-    // Enter an active interaction (farmland stays in choice state)
-    enterActiveInteraction(session)
-
-    // Now take anytime action
-    const anytimeResp = session.takeAnytimeAction(0, 'E22-guest-room-anytime')
-    expect(anytimeResp.ok).toBe(true)
-
-    const player = anytimeResp.state.players[0]!
-    // Family should grow
-    expect(familySize(player)).toBe(3) // started with 2
-    // Food on card should decrease (stack: 3 → 2)
-    const stack = getCardStack(player, CARD_ID)
-    expect(stack.length).toBe(2)
-  })
-
-  it('anytime action not available when card has no food', () => {
-    const session = setup(0) // onBuy stores 0 food
-
-    const resp = enterActiveInteraction(session)
-
-    // Anytime should not be listed
-    const anytimeIds = resp.interaction.anytimeActions.map((a: AnytimeAction) => a.id)
-    expect(anytimeIds).not.toContain('E22-guest-room-anytime')
-  })
-
-  it('anytime limited to once per round', () => {
-    const session = setup(5)
-
-    enterActiveInteraction(session)
-
-    // First anytime: should succeed
-    const anytime1 = session.takeAnytimeAction(0, 'E22-guest-room-anytime')
-    expect(anytime1.ok).toBe(true)
-
-    // Second anytime: should fail (flagged)
-    const anytime2 = session.takeAnytimeAction(0, 'E22-guest-room-anytime')
-    expect(anytime2.ok).toBe(false)
+    expect(session.getState().interaction.stateId).toBe('idle')
   })
 })

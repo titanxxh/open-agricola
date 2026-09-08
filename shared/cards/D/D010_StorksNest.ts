@@ -1,6 +1,6 @@
 import { defineMinorCard } from '../card-source'
 import { payLeaf } from '../helpers/pay-gain-node'
-import { familySize } from '../../domain/player'
+import { familySize, hasInactiveWorkerInSupply } from '../../domain/player'
 import type { CardImpl } from '../registry'
 
 const CARD_ID = 'D010_StorksNest'
@@ -11,6 +11,7 @@ const cardImpl = {
   onStartReturnHome: (_state, player) => {
     if (player.rooms <= familySize(player)) return
     if (player.resources.food < 1) return
+    if (!hasInactiveWorkerInSupply(player)) return
     return {
       type: 'seq',
       optional: true,

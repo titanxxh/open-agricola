@@ -288,6 +288,7 @@ export type CardEffect = {
    */
   contributeExtraTurn?: (state: GameState, player: PlayerState) => ActionFlow | void
   countExtraTurns?: (state: GameState, player: PlayerState) => number
+  extraTurnBeforeWorkers?: boolean
   onBeforeWork?: FlowEffectHandler
   onRoundStart?: FlowEffectHandler
   onHarvest?: FlowEffectHandler
@@ -828,9 +829,26 @@ const extraTurnActivationFlow = (cardId: string): ActionFlow => ({
 export const collectExtraTurnFlow = (
   state: GameState,
   player: PlayerState,
+  withWorkers = false,
 ): { flow: ActionFlow; cardId?: string } | null => {
   const contributions = collectExtraTurnContributions(state, player)
+    .filter((entry) => !withWorkers || getCardEffect(entry.cardId)?.extraTurnBeforeWorkers === true)
   if (contributions.length === 0) return null
+  if (withWorkers) {
+    return {
+      flow: {
+        type: 'xor',
+        children: [
+          {
+            type: 'leaf',
+            actionId: 'place-farmer',
+            choiceLabelKey: 'actions.place-farmer.name',
+          },
+          ...contributions.map((entry) => extraTurnActivationFlow(entry.cardId)),
+        ],
+      },
+    }
+  }
   if (contributions.length === 1) {
     const contribution = contributions[0]!
     return { flow: contribution.flow, cardId: contribution.cardId }
