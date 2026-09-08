@@ -639,7 +639,7 @@ export function engineResolveChoice(
       if (result.type === 'fail') {
         eventFrame.rollback()
         setEngineBlockedPending(int, child.id, actionId)
-        return rollbackAndReturn(int, result)
+        return result
       }
       if (result.type !== 'request') {
         emitCardTriggered(int, eventFrame.sink, executionContext, actionId, {
@@ -1086,7 +1086,7 @@ export function engineResolveChoice(
     return result.recoverable === true ? result : { type: 'fail', errorKey: result.errorKey, recoverable: true }
   }
   if (result.type === 'fail') {
-    return rollbackAndReturn(int, result)
+    return pendingHost?.mandatory ? result : rollbackAndReturn(int, result)
   }
   if (result.type === 'request' && result.request.kind === 'choice') {
     // Merge ActionDef-declared actionContext patches into the pending context.

@@ -57,6 +57,33 @@ const pay = (food: number): ActionFlow => ({ type: 'leaf', actionId: '__completi
 describe('action admission and blocked recovery through public Session commands', () => {
   afterEach(() => unregisterActionHook('__review_replace__'))
 
+  it.each(['or', 'xor', 'choice'] as const)('retains prior gain events when a sole mandatory %s step fails', (type) => {
+    const { session, registry } = setup({ type: 'seq', children: [
+      { type: 'leaf', actionId: 'gain', params: { food: 1 } },
+      type === 'choice' ? { type: 'leaf', actionId: '__failed_branch__' }
+        : { type, children: [{ type: 'leaf', actionId: '__failed_branch__' }] },
+    ] })
+    const fail: ActionDefinition['execute'] = ({ player, eventSink }) => {
+      eventSink?.emit({ type: 'resource.moved', resources: { wood: 1 }, from: { kind: 'supply' }, to: { kind: 'player', playerId: player.id }, reason: 'gain' })
+      return { type: 'fail', errorKey: 'log.action' }
+    }
+    registry.register({
+      ...registry.get('gain')!, id: '__failed_branch__',
+      execute: type === 'choice' ? () => ({ type: 'request', promptKey: 'log.action', request: { kind: 'choice', options: [{ value: 'fail', label: 'Fail' }] } }) : fail,
+      resolveChoice: fail,
+    })
+    const response = session.takeAction(0, 'forest')
+    expect(response.interaction.request.kind).toBe('engine-blocked')
+    expect(response.state.players[0]!.resources).toMatchObject({ food: 1, wood: 0 })
+    const gains = response.state.events.filter((event) => event.type === 'resource.moved' && event.resources.food === 1)
+    expect(gains).toHaveLength(1)
+    expect(response.state.events.some((event) => event.type === 'resource.moved' && event.resources.wood === 1)).toBe(false)
+    const undone = session.undoAction(0)
+    expect(undone.state.players[0]!.resources.food).toBe(0)
+    expect(undone.state.events.some((event) => event.id === gains[0]!.id)).toBe(false)
+    expect(undone.publicEventCancellations?.some((entry) => entry.canceledEventIds.includes(gains[0]!.id))).toBe(true)
+  })
+
   it.each(['direct', 'input', 'composite'] as const)('keeps a hidden draw unpublished when a future required payment is unavailable, continuation=%s', (continuation) => {
     const { session } = setup({ type: 'seq', children: [
       { type: 'leaf', actionId: 'draw-ordinary-cards', sourceCard: '__protected_draw__', actionContext: { cardType: 'occupation', count: 1 } },

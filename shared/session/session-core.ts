@@ -1340,6 +1340,10 @@ export class GameCore {
     if (this.markProvisionalHostBlocked(frame, host.id)) return true
     const actionId = frame.engine.peekPendingEnvelope()?.pendingActionId ?? frame.spaceId
     frame.engine.setEngineBlockedPending(host.id, actionId)
+    const player = this.state.players[this.effectiveOwnerIndexForFrame(frame, host.id)]!
+    const space = this.getSpaceById(frame.spaceId) ?? this.createSyntheticSpace(frame.spaceId)
+    frame.engine.flushEventTransaction({ state: this.state, player, space })
+    this.flushEngineLog()
     return true
   }
 
