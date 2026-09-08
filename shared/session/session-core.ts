@@ -1245,6 +1245,12 @@ export class GameCore {
         this.state,
         space,
         ownerPlayerId,
+        {
+          protectedObservations: this.activeCommandSettlement?.protectedObservations,
+          activeHostNodeIds: new Set(this.provisionalContinuationScopes
+            .filter((scope) => scope.frameId === frame.frameId)
+            .map((scope) => scope.hostNodeId)),
+        },
       ).map((probe) => ({ ...probe, frameId: frame.frameId! })))
     }
     return probes
@@ -1298,8 +1304,8 @@ export class GameCore {
 
   private reportProtectedObservation(observation: ProtectedObservation): void {
     if (!this.activeCommandSettlement) return
-    this.openProvisionalScopesForRisk()
     this.activeCommandSettlement.protectedObservations.push(structuredClone(observation))
+    this.openProvisionalScopesForRisk()
   }
 
   private checkpointRestoresProtectedChoice(
@@ -1512,6 +1518,7 @@ export class GameCore {
     response: SessionResponse,
     settlement: ActiveCommandSettlement,
   ): SessionResponse {
+    if (settlement.protectedObservations.length > 0) this.openProvisionalScopesForRisk()
     if (settlement.abortScopeId) {
       const scope = this.provisionalContinuationScopes.find((entry) => entry.id === settlement.abortScopeId)
       if (scope) {
@@ -1520,7 +1527,7 @@ export class GameCore {
           : this.abortProvisionalScope(scope)
       }
     }
-    const probes = new Map(this.mandatoryContinuationProbes().map((probe) => [
+    const probes = new Map((this.provisionalContinuationScopes.length > 0 ? this.mandatoryContinuationProbes() : []).map((probe) => [
       `${probe.frameId}:${probe.nodeId}`,
       probe,
     ]))

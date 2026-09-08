@@ -234,7 +234,7 @@ export function canStartNode(int: EngineInternals, context: FlowDoableContext, n
   if (node instanceof ActionNode) {
     const action = int.registry.get(node.actionId)
     if (!action) return false
-    const actionContext = node.beforePhaseResolved
+    const actionContext = node.beforePhaseResolved || context.actionContext?.skipBeforeTriggers === true
       ? { ...node.actionContext, skipBeforeTriggers: true }
       : node.actionContext
     const targetSpaceId = actionContext?.targetSpaceId
@@ -247,6 +247,10 @@ export function canStartNode(int: EngineInternals, context: FlowDoableContext, n
   }
   const children = getNodeChildren(node).filter((child) => child.getState() !== 'resolved')
   if (node instanceof OrNode || node instanceof XorNode) {
+    if (node.selectedChildId) {
+      const selected = children.find((child) => child.id === node.selectedChildId)
+      return !selected || canStartNode(int, { ...context, player }, selected)
+    }
     return children.some((child) => canStartNode(int, { ...context, player }, child))
   }
   return children.length === 0 || children[0]!.optional === true || canStartNode(int, { ...context, player }, children[0]!)

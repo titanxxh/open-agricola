@@ -614,8 +614,8 @@ export function engineResolveChoice(
         ),
       )
       if (!doable) {
-        setEngineBlockedPending(int, child.id, actionId)
-        return rollbackAndReturn(int, { type: 'fail', errorKey: 'log.buildRoomFail' })
+        int.pendingNodeIdRef.value = null
+        return { type: 'ok' }
       }
       const costResults = int.hooks.computeCosts({
         ...executionContext,
