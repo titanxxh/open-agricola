@@ -348,6 +348,64 @@ describe('supply worker combinations through Session', () => {
 })
 
 describe('temporary people at harvest and scoring', () => {
+  it('keeps Walking Boots occupancy for Turnip Farmer and Food Distributor without triggering Seed Researcher', () => {
+    const session = setup(2, false, (state) => {
+      const player = state.players[0]!
+      player.minorPlayed = []
+      player.minorHand = ['B022_WalkingBoots']
+      player.occupationPlayed = ['C097_SeedResearcher', 'A141_TurnipFarmer', 'C155_FoodDistributor']
+      player.cardStates.C155_FoodDistributor = { extraData: { purchaseRound: 5 } }
+      state.roundActionOrder.splice(0, 2, 'major-improvement', 'vegetable-seeds')
+      for (const [spaceId, owner, workerId] of [
+        ['forest', 0, '1'], ['day-laborer', 1, '1'], ['vegetable-seeds', 1, '2'],
+      ] as const) {
+        state.actionSpaces.find((space) => space.id === spaceId)!.takenBy = [{ playerId: state.players[owner]!.id, workerId }]
+      }
+    })
+    expect(session.takeAction(0, 'major-improvement').ok).toBe(true)
+    expect(chooseCard(session, 'B022_WalkingBoots').ok).toBe(true)
+    expect(session.resolveChoice(0, 'grain-seeds').ok).toBe(true)
+    const completed = confirmNextPlayer(session)
+    expect(completed.ok, completed.error).toBe(true)
+    expect(completed.state.round).toBe(6)
+    expect(completed.state.players[0]!.resources).toMatchObject({ food: 24, grain: 1, vegetable: 1 })
+    expect(completed.state.players[0]!.workers.find((worker) => worker.id === '3')?.removedFromSupply).toBe(true)
+  })
+
+  it('offers Night-School Student after removing a Walking Boots person while preserving Bohemian occupancy', () => {
+    const session = setup(2, false, (state) => {
+      const player = state.players[0]!
+      player.minorPlayed = []
+      player.minorHand = ['B022_WalkingBoots']
+      player.occupationPlayed = ['A152_NightSchoolStudent', 'A157_Bohemian']
+      player.occupationHand = ['A100_Curator', 'A092_AdoptiveParents']
+      state.roundActionOrder[0] = 'major-improvement'
+      for (const [spaceId, owner, workerId] of [
+        ['forest', 0, '1'], ['day-laborer', 1, '1'], ['reed-bank', 1, '2'],
+      ] as const) {
+        state.actionSpaces.find((space) => space.id === spaceId)!.takenBy = [{ playerId: state.players[owner]!.id, workerId }]
+      }
+    })
+    expect(session.takeAction(0, 'major-improvement').ok).toBe(true)
+    expect(chooseCard(session, 'B022_WalkingBoots').ok).toBe(true)
+    expect(session.resolveChoice(0, 'lessons').ok).toBe(true)
+    const played = session.resolveChoice(0, 'A100_Curator')
+    expect(played.ok, played.error).toBe(true)
+    const food = played.state.players[0]!.resources.food
+    const returning = confirmNextPlayer(session)
+    expect(returning.ok, returning.error).toBe(true)
+    expect(returning.interaction.sourceCard).toBe('A152_NightSchoolStudent')
+    const accept = returning.interaction.request?.options?.find((option) => option.value !== '__skip__')
+    expect(accept).toBeDefined()
+    expect(session.resolveChoice(0, accept!.value).ok).toBe(true)
+    const completed = chooseCard(session, 'A092_AdoptiveParents')
+    expect(completed.ok, completed.error).toBe(true)
+    expect(completed.state.round).toBe(6)
+    expect(completed.state.players[0]!.occupationPlayed).toContain('A092_AdoptiveParents')
+    expect(completed.state.players[0]!.resources.food).toBe(food - 1)
+    expect(completed.state.players[0]!.workers.find((worker) => worker.id === '3')?.removedFromSupply).toBe(true)
+  })
+
   it('does not award Swimming Class or Curator for a Walking Boots person removed from Fishing', () => {
     const session = setup(4, false, (state) => {
       const player = state.players[0]!

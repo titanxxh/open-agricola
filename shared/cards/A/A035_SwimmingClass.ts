@@ -1,5 +1,5 @@
 import { defineMinorCard } from '../card-source'
-import { getReturnHomePlacements } from '../helpers/round-placement'
+import { getReturningPersonPlacements } from '../helpers/round-placement'
 import { newbornCount } from '../../domain/player'
 import type { CardImpl } from '../registry'
 
@@ -9,9 +9,7 @@ const cardImpl = {
   effect: {
   id: CARD_ID,
   onStartReturnHome: (state, player) => {
-    if (!getReturnHomePlacements(state).some((entry) =>
-      entry.spaceId === 'fishing' && entry.playerId === player.id && entry.disposition !== 'remove-from-game',
-    )) return
+    if (!getReturningPersonPlacements(state).some((entry) => entry.spaceId === 'fishing' && entry.playerId === player.id)) return
     const newborns = newbornCount(player)
     if (newborns <= 0) return
     // 2 bonus VP per newborn
