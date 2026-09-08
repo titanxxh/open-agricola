@@ -500,7 +500,7 @@ A092_AdoptiveParents 引入轮转层额外回合机制（#203+#204）。provider
 
 `inactiveWorkersInSupply()` 排除预留、待放置、临时人物和已永久移除的组件。`availableWorkers()` 包含被召回版图外的临时人物，但家庭人数、住房、喂养和人物分仍只读取永久成员。`returnSupplyWorkers()` 在全部 `onBeforeReturnHome` 之后、`onStartReturnHome` 之前清理同一 ID 的所有位置，并执行原处置；召回和移动不改变该处置。已归还的人物立即可用于增员；没有到期归还轮次的预留跨归家保留，由卡牌在指定时机释放或解锁。既有 blocked / anytime / undo 与 Protected Observation 边界保持不变。
 
-已确认的供应人物模型区分预留与放置机会。D022 在目标轮开始时释放预留 ID；使用 D022 前，增员或另一供应效果可以先消耗该人物。D022 实际使用时需要重新找到可用供应人物并锁定其 ID。将原人物一直预留到使用或拒绝，会违反已接受规则和最后一个人物的 Session 回归。
+已确认的供应人物模型区分预留与放置机会。D022 在目标轮的 `onBeforeStartOfTurn` 释放预留 ID，早于未来资源结算和全部 `onRoundStart` 效果；使用 D022 前，增员或另一供应效果可以先消耗该人物。D022 实际使用时需要重新找到可用供应人物并锁定其 ID。将原人物一直预留到使用或拒绝，会违反已接受规则和最后一个人物的 Session 回归。
 
 供应机会沿用其他强制流程的当前步骤准入，不保证前面的支付或效果完成后仍有合法目标：E022 接受使用后若无合法目标，已扣卡上粮、使用标记和待放人物保留在 `engine-blocked`，直到显式 undo 恢复。不为这些 provider 增加后续目标预检或自动退款。依据：[已确认模型](https://github.com/titanxxh/open-agricola/issues/841#issuecomment-5582219668)和 [Session 验收方案](https://github.com/titanxxh/open-agricola/issues/842#issuecomment-5582333821)。
 

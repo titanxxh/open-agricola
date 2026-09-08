@@ -46,7 +46,7 @@ const cardImpl = {
       entries: [{ round: targetRound, resources: {} }],
     })
   },
-  onRoundStart: (state, player) => {
+  onBeforeStartOfTurn: (state, player) => {
     if (readCardExtraData<number>(player, CARD_ID, TARGET_ROUND_KEY) !== state.round) return
     const workerId = readCardExtraData<string>(player, CARD_ID, 'reservedWorkerId')
     const worker = player.workers.find((entry) => entry.id === workerId)
