@@ -3,6 +3,7 @@ import { ALL_ANIMAL_KEYS, type AnimalKey } from '../contract/animals'
 import { computeAnimalZones, type AnimalZone } from './animal-zones'
 import { getAssignedAnimalsByType, subtractAnimalsFromBoard } from './animals'
 import { consumeAnimalPaymentFromCardEffects } from '../cards/card-effects'
+import { syncHarvestBreedPlacement } from './harvest-breed-placement'
 
 export type AnimalPaymentCounterSource = {
   kind: 'cardCounter'
@@ -103,6 +104,7 @@ export const applyAnimalPayment = (
 ): void => {
   const total = Math.max(0, Math.floor(amount))
   const originalResource = player.resources[animal] ?? 0
+  syncHarvestBreedPlacement(state, player)
   let remaining = total
   for (const source of preference?.prefer ?? []) {
     if (remaining <= 0) break
@@ -121,4 +123,5 @@ export const applyAnimalPayment = (
     remaining -= takeFromCardCounter(player, source, remaining)
   }
   player.resources[animal] = Math.max(0, originalResource - total)
+  syncHarvestBreedPlacement(state, player)
 }

@@ -87,6 +87,7 @@ export type InteractionPresentationPlan =
       remaining: number
       foodUsed: number
       maxTradeTimesBySourceId?: Record<string, number>
+      placedAnimals?: Extract<InteractionRequest, { kind: 'feed' }>['placedAnimals']
     }
   | {
       kind: 'heating'
@@ -317,6 +318,7 @@ export const buildInteractionPresentationPlan = (
       remaining: interaction.request.remaining,
       foodUsed: interaction.request.foodUsed,
       maxTradeTimesBySourceId: interaction.request.maxTradeTimesBySourceId,
+      placedAnimals: interaction.request.placedAnimals,
     }
   }
   if (interaction.request.kind === 'heating') {

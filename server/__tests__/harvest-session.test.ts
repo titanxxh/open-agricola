@@ -363,6 +363,34 @@ describe('harvest session flow', () => {
     expect(p.resources.begging).toBe(2)
   })
 
+  it('publishes placed balances and rejects a farmyard trade after cooking the only placed sheep', () => {
+    const { session, state, playerA } = setupSinglePlayerHarvest()
+    state.enableFarmersOfTheMoor = true
+    playerA.improvements.push('Major_Fireplace1')
+    playerA.occupationPlayed.push('B104_SheepWalker')
+    playerA.minorPlayed.push('M081_PeatBoat')
+    playerA.resources.sheep = 1
+    playerA.resources.fuel = 2
+    playerA.houseAnimalType = 'sheep'
+    playerA.houseAnimalCount = 1
+    session.loadState(state)
+    const pending = skipPostReapAnytime(session, session.performRoundEnd())
+    expect(pending.interaction).toMatchObject({ stateId: 'wait', request: {
+      kind: 'feed', placedAnimals: { sheep: 1 }, maxTradeTimesBySourceId: { B104_SheepWalker: 1 },
+    } })
+    const fireplace = { sourceId: 'Major_Fireplace1', exchangeIndex: 0, count: 1 }
+    const peat = { sourceId: 'M081_PeatBoat', exchangeIndex: 4, count: 1 }
+    const rejected = session.resolveChoice(0, 'confirm', { selections: [
+      peat, fireplace, { sourceId: 'B104_SheepWalker', exchangeIndex: 2, count: 1 },
+    ] })
+    expect(rejected.ok).toBe(false)
+    expect(rejected.state).toEqual(pending.state)
+    expect(rejected.interaction).toEqual(pending.interaction)
+    const accepted = session.resolveChoice(0, 'confirm', { selections: [peat, fireplace] })
+    expect(accepted.ok, accepted.error).toBe(true)
+    expect(accepted.state.players[0]!.resources).toMatchObject({ sheep: 1, stone: 0, begging: 0 })
+  })
+
   it.each([0, 1])('does not spend newly acquired sheep through B104 in the same feed batch with %i placed sheep', (placed) => {
     const { session, state, playerA } = setupSinglePlayerHarvest()
     state.enableFarmersOfTheMoor = true

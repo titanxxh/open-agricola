@@ -1,3 +1,4 @@
+import { syncHarvestBreedPlacement } from '../../domain/harvest-breed-placement'
 import type {
   ActionDefinition,
   ActionExecutionResult,
@@ -479,17 +480,22 @@ export const reorganizeAction: ActionDefinition = {
       return { type: 'fail', errorKey: 'log.reorganizeFail', recoverable: true }
     }
     const before = animalTotals(ctx.state, ctx.player)
+    const placement = syncHarvestBreedPlacement(ctx.state, ctx.player)
     applyReorganizeMutate(ctx.state, ctx.player, zones)
     const after = animalTotals(ctx.state, ctx.player)
-    const minimums = ctx.actionContext?.harvestBreedPlacementMinimums as Partial<Record<AnimalKey, number>> | undefined
     const summary = ctx.state.harvestBreedSummary?.[ctx.player.id]
-    if (minimums && summary) {
+    if (placement && summary) {
       for (const animal of animalKeysForState(ctx.state)) {
-        if ((after[animal] ?? 0) < (minimums[animal] ?? Infinity)) delete summary.resources[animal]
+        if ((after[animal] ?? 0) < (placement.minimums[animal] ?? Infinity)) {
+          delete summary.resources[animal]
+          delete placement.minimums[animal]
+        }
       }
+      placement.animalCounts = after
       summary.animalTypes = Object.keys(summary.resources).length
       summary.animalCount = sumAnimalCounts(summary.resources)
     }
+    if (ctx.actionContext?.harvestBreedPlacementMinimums) delete ctx.state.harvestBreedPlacement?.[ctx.player.id]
     const assigned = positiveAnimals(ctx.state, after)
     if (Object.keys(assigned).length > 0) {
       ctx.eventSink?.emit<'farm.animalMoved'>({

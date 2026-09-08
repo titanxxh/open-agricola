@@ -3553,6 +3553,7 @@ export class GameCore {
     }
     delete this.state.harvestReapSummary
     delete this.state.harvestBreedSummary
+    delete this.state.harvestBreedPlacement
     return this.finalizeRound()
   }
 
@@ -5033,6 +5034,7 @@ export class GameCore {
     }
     const harvestOrder = this.getHarvestPlayerIndices()
     this.state.harvestBreedSummary = {}
+    this.state.harvestBreedPlacement = {}
 
     // E58 LunchtimeBeer-style cards opt out of breeding for the current round.
     const breedOrder = harvestOrder.filter((index) => {

@@ -13,6 +13,7 @@
 
 import type { ActionFlow, GameState, PlayerState } from '../../contract/types.ts'
 import { workersAvailable } from '../../domain/player.ts'
+import { getPlacedAnimalsByType } from '../../domain/animal-zones.ts'
 import { findActionSpaceById } from '../../domain/space.ts'
 import {
   createMoorSpecialActionSpace,
@@ -302,7 +303,10 @@ export const startFeedSubFlow = (
   const options = [{ value: 'confirm', labelKey: 'ui.interactionConfirm' }]
   core.pushSyntheticPendingFrame({
     hostNodeId: core.mintSyntheticNodeId('interaction:feed'),
-    request: { kind: 'feed', remaining, foodUsed, feedQueue, maxTradeTimesBySourceId },
+    request: {
+      kind: 'feed', remaining, foodUsed, feedQueue, maxTradeTimesBySourceId,
+      placedAnimals: getPlacedAnimalsByType(core.state.players[playerIndex]!, core.state),
+    },
     choices: options,
     promptKey: 'ui.harvestFeed',
     ownerNodeId: null,

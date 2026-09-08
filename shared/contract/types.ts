@@ -630,6 +630,10 @@ export type GameState = {
   workPhaseObtainedResources: Record<string, Partial<Resource>>
   harvestReapSummary?: Record<string, HarvestReapSummary>
   harvestBreedSummary?: Record<string, HarvestBreedSummary>
+  harvestBreedPlacement?: Record<string, {
+    minimums: Partial<Record<AnimalKey, number>>
+    animalCounts: Partial<Record<AnimalKey, number>>
+  }>
   /**
    * Number of feeding phases that have completed (incremented once at the
    * start of each breeding phase, after all players have fed).
@@ -963,6 +967,7 @@ export type InteractionRequest =
       foodUsed: number
       feedQueue?: FeedQueueEntry[]
       maxTradeTimesBySourceId?: Record<string, number>
+      placedAnimals?: Partial<Pick<Resource, AnimalKey>>
     }
   | {
       kind: 'heating'

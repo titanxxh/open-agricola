@@ -1,4 +1,5 @@
 import type { Resource } from '../../../shared/contract/types'
+import { ALL_ANIMAL_KEYS, type AnimalKey } from '../../../shared/contract/animals'
 import type { HarvestFeedOption } from './use-harvest-flow'
 
 const projectResources = (
@@ -22,8 +23,10 @@ export const canApplyHarvestFeedCounts = (
   allOptions: readonly HarvestFeedOption[],
   counts: Record<string, number>,
   playerResources: Resource,
+  placedAnimals: Partial<Pick<Resource, AnimalKey>> = {},
 ): boolean => {
   let projected: Partial<Resource> = { ...playerResources }
+  const placed = { ...placedAnimals }
   const sourceUses = new Map<string, number>()
   for (const option of allOptions) {
     const count = counts[option.id] ?? 0
@@ -31,6 +34,11 @@ export const canApplyHarvestFeedCounts = (
     const sourceUsed = sourceUses.get(option.sourceId) ?? 0
     if (option.max !== undefined && sourceUsed + count > option.max) return false
     sourceUses.set(option.sourceId, sourceUsed + count)
+    for (const animal of ALL_ANIMAL_KEYS) {
+      const cost = (option.from[animal] ?? 0) * count
+      if (option.fromFarmyard && cost > (placed[animal] ?? 0)) return false
+      placed[animal] = Math.max(0, (placed[animal] ?? 0) - cost)
+    }
     projected = projectResources(projected, option, count)
     if (Object.values(projected).some((amount) => amount < 0)) return false
   }
@@ -42,6 +50,7 @@ export const computeHarvestFeedCounterMax = (
   allOptions: readonly HarvestFeedOption[],
   counts: Record<string, number>,
   playerResources: Resource,
+  placedAnimals: Partial<Pick<Resource, AnimalKey>> = {},
 ): number => {
   const targetFromKeys = Object.keys(target.from) as (keyof Resource)[]
   if (targetFromKeys.length === 0) return 0
@@ -77,6 +86,7 @@ export const computeHarvestFeedCounterMax = (
       allOptions,
       { ...counts, [target.id]: candidate },
       playerResources,
+      placedAnimals,
     )) return candidate
   }
   return 0

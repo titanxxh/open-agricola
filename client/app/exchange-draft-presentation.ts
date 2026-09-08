@@ -267,6 +267,9 @@ export const useExchangeDraftPresentation = ({
   )
 
   const isHarvestFeedExchange = interactionPresentationPlan.kind === 'harvest-feed'
+  const harvestFeedPlacedAnimals = interactionPresentationPlan.kind === 'harvest-feed'
+    ? interactionPresentationPlan.placedAnimals
+    : undefined
   const harvestFeedPlayer =
     isHarvestFeedExchange && state && interactionPresentationPlan.kind === 'harvest-feed'
       ? state.players[interactionPresentationPlan.playerIndex] ?? null
@@ -309,11 +312,12 @@ export const useExchangeDraftPresentation = ({
             orderedHarvestFeedOptions,
             activeHarvestFeedCounts,
             harvestFeedPlayer.resources,
+            harvestFeedPlacedAnimals,
           )
         : 0
     })
     return limits
-  }, [activeHarvestFeedCounts, harvestFeedPlayer, orderedHarvestFeedOptions])
+  }, [activeHarvestFeedCounts, harvestFeedPlayer, harvestFeedPlacedAnimals, orderedHarvestFeedOptions])
   const updateHarvestFeedCount = useCallback((id: string, delta: number) => {
     const current = activeHarvestFeedCounts[id] ?? 0
     const option = harvestFeedOptions.find((entry) => entry.id === id)
@@ -323,6 +327,7 @@ export const useExchangeDraftPresentation = ({
       orderedHarvestFeedOptions,
       activeHarvestFeedCounts,
       harvestFeedPlayer.resources,
+      harvestFeedPlacedAnimals,
     )
     const nextValue = Math.max(0, Math.min(current + delta, max))
     if (nextValue === current) return
@@ -331,6 +336,7 @@ export const useExchangeDraftPresentation = ({
       orderedHarvestFeedOptions,
       nextCounts,
       harvestFeedPlayer.resources,
+      harvestFeedPlacedAnimals,
     )) return
     setHarvestFeedCounts(nextCounts)
     setHarvestFeedSelectionOrder((prev) => current === 0
@@ -338,7 +344,7 @@ export const useExchangeDraftPresentation = ({
       : nextValue === 0
         ? prev.filter((entry) => entry !== id)
         : prev)
-  }, [activeHarvestFeedCounts, harvestFeedOptions, harvestFeedPlayer, orderedHarvestFeedOptions])
+  }, [activeHarvestFeedCounts, harvestFeedOptions, harvestFeedPlayer, harvestFeedPlacedAnimals, orderedHarvestFeedOptions])
   const resetHarvestFeedCounts = useCallback(() => {
     const nextCounts: Record<string, number> = {}
     harvestFeedOptionIds.forEach((id) => {
