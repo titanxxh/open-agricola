@@ -203,6 +203,39 @@ describe('supply worker combinations through Session', () => {
     expect(inactiveWorkersInSupply(returned.state.players[0]!)).toHaveLength(3)
   })
 
+  it.each([true, false])('releases a due person before Quarry growth with Heart of Stone played first=%s', (first) => {
+    const session = setup(4, false, (state) => {
+      const player = state.players[0]!
+      player.minorPlayed = first
+        ? ['C021_HeartofStone', 'D022_WorkPermit']
+        : ['D022_WorkPermit', 'C021_HeartofStone']
+      player.cardStates = { D022_WorkPermit: { extraData: { targetRound: 6, reservedWorkerId: '5' } } }
+      player.workers.find((worker) => worker.id === '5')!.supplyUse = {
+        sourceCard: 'D022_WorkPermit', disposition: 'return-to-supply', status: 'reserved',
+      }
+      player.rooms = 5
+      player.roomTiles = Array.from({ length: 5 }, (_, col) => ({ row: 2, col }))
+      state.roundActionOrder[5] = 'western-quarry'
+      state.players.forEach((entry) => setWorkersAtHome(state, entry, 0))
+    })
+    expect(inactiveWorkersInSupply(session.state.players[0]!)).toHaveLength(0)
+    const due = session.performRoundEnd()
+    expect(due.ok, due.error).toBe(true)
+    expect(due.state.round).toBe(6)
+    expect(due.interaction.stateId).toBe('wait')
+    expect(due.interaction.sourceCard).toBe('C021_HeartofStone')
+    expect(inactiveWorkersInSupply(due.state.players[0]!)).toHaveLength(1)
+    const accept = due.interaction.request?.options?.find((option) => option.value !== '__skip__')
+    expect(accept).toBeDefined()
+    const grown = session.resolveChoice(0, accept!.value)
+    expect(grown.ok, grown.error).toBe(true)
+    expect(familySize(grown.state.players[0]!)).toBe(5)
+    expect(grown.state.players[0]!.workers.find((worker) => worker.id === '5'))
+      .toMatchObject({ isActive: true, isNewborn: true })
+    expect(inactiveWorkersInSupply(grown.state.players[0]!)).toHaveLength(0)
+    expect(grown.interaction.stateId).toBe('idle')
+  })
+
   it('releases a due Work Permit person before ordinary family growth consumes the last token', () => {
     const session = setup(4, false, (state) => {
       const player = state.players[0]!
