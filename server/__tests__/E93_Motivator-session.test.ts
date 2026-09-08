@@ -6,8 +6,12 @@ import { chooseSupplyWorkerTurn, takeNormalWorkerTurn } from './_helpers/supply-
 
 const CARD_ID = 'E093_Motivator'
 
-const setup = (condition: 'full' | 'gap' | 'no-supply' | 'no-card' = 'full') => {
-  const session = new GameSession(4059, undefined, { playerCount: 2 })
+const setup = (condition: 'full' | 'gap' | 'no-supply' | 'no-card' = 'full', moor = false) => {
+  const session = new GameSession(4059, undefined, {
+    playerCount: 2,
+    enableFarmersOfTheMoor: moor,
+    allowIncompleteFarmersOfTheMoorMinorDeal: moor,
+  })
   const state = session.getState().state
   state.round = 6
   state.roundPhase = 'work'
@@ -22,6 +26,7 @@ const setup = (condition: 'full' | 'gap' | 'no-supply' | 'no-card' = 'full') => 
     player.resources.food = 20
     player.resources.wood = 0
     player.cardStates = {}
+    if (moor) player.farmTerrain = []
   })
   const player = state.players[0]!
   player.occupationPlayed = condition === 'no-card' ? [] : [CARD_ID]
@@ -73,5 +78,43 @@ describe('E093 Motivator normal rotation', () => {
 
   it.each(['gap', 'no-supply', 'no-card'] as const)('has no supply opportunity with %s', (condition) => {
     expect(setup(condition).getState().interaction.stateId).toBe('idle')
+  })
+
+  it('forfeits the first-turn opportunity after a Moor special action and restores it with undo', () => {
+    const session = setup('full', true)
+    const takeHiringFair = () => {
+      let response = session.getState()
+      expect(response.interaction.stateId).toBe('wait')
+      if (response.interaction.stateId !== 'wait') return response
+      const special = response.interaction.request.options?.find((option) => option.labelKey === 'actions.moor-special-action-choice.name')
+      expect(special).toBeDefined()
+      response = session.resolveChoice(0, special!.value)
+      expect(response.ok, response.error).toBe(true)
+      expect(response.interaction.stateId).toBe('wait')
+      if (response.interaction.stateId !== 'wait') return response
+      const hiring = response.interaction.request.options?.find((option) => option.labelKey === 'moor.specialActions.hiring-fair')
+      expect(hiring).toBeDefined()
+      return session.resolveChoice(0, hiring!.value)
+    }
+    const taken = takeHiringFair()
+    expect(taken.ok, taken.error).toBe(true)
+    expect(taken.state.players[0]!.resources.food).toBe(21)
+    expect(workersAtHome(taken.state, taken.state.players[0]!)).toHaveLength(2)
+    expect(inactiveWorkersInSupply(taken.state.players[0]!)).toHaveLength(3)
+    expect(taken.state.events.filter((event) => event.type === 'worker.placed')).toHaveLength(0)
+    const undone = session.undoAction(0)
+    expect(undone.ok, undone.error).toBe(true)
+    expect(undone.state.players[0]!.resources.food).toBe(20)
+    expect(undone.state.players[0]!.cardStates[CARD_ID]?.flagged).not.toBe(true)
+    expect(undone.interaction.stateId).toBe('wait')
+    if (undone.interaction.stateId !== 'wait') return
+    expect(undone.interaction.request.options?.some((option) => option.sourceCard === CARD_ID)).toBe(true)
+    expect(takeHiringFair().ok).toBe(true)
+    expect(confirmNextPlayer(session).state.currentPlayerIndex).toBe(1)
+    expect(session.takeAction(1, 'day-laborer').ok).toBe(true)
+    const secondTurn = confirmNextPlayer(session)
+    expect(secondTurn.ok, secondTurn.error).toBe(true)
+    expect(secondTurn.state.currentPlayerIndex).toBe(0)
+    expect(secondTurn.interaction.stateId).toBe('idle')
   })
 })

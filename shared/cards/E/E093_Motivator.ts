@@ -13,6 +13,7 @@ const cardImpl = {
   id: CARD_ID,
   extraTurnBeforeWorkers: true,
   onRoundStart: (_state, player) => { setCardFlag(player, CARD_ID, false) },
+  onEndTurn: (_state, player) => { setCardFlag(player, CARD_ID, true) },
   contributeExtraTurn: (state, player) => {
     if (getRoundPlacementOrder(player).length !== 0 || isCardFlagged(player, CARD_ID)) return
     if (!hasNoUnusedFarmyardSpaces(player) || !hasInactiveWorkerInSupply(player)) return
