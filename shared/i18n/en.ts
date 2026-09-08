@@ -1197,6 +1197,7 @@ export const en = {
     futureMeepleRemoved: '{player} removes future worker entries from {cardId} ({rounds})',
     futureMeepleResolved: '{player} resolves future worker from {cardId} in round {round}{roomType}{resources}',
     workerReturned: 'Worker(s) return {destination}',
+    workerRemoved: 'Person removed from the game',
     workerDestinationHome: 'home',
     workerDestinationReserve: 'to reserve',
     workerDestinationSupply: 'to supply',
@@ -1812,6 +1813,7 @@ export const en = {
       anytime: 'Wood Saw: Pay 1 Food → 1 Wood',
     },
     E022_GuestRoom: {
+      storeFood: 'Choose how much food to store on Guest Room',
       anytime: 'Guest Room: Pay 1 Food → 1 Food',
     },
     E027_PiggyBank: {

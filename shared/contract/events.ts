@@ -170,7 +170,7 @@ export type WorkerPlacedEvent = GameEventBase<'worker.placed'> & {
 
 export type WorkerReturnedEvent = GameEventBase<'worker.returned'> & {
   workers: Array<{ playerId: string; workerId: string }>
-  to: 'home' | 'reserve' | 'supply'
+  to: 'home' | 'reserve' | 'supply' | 'removed'
 }
 
 export type WorkerPromotedEvent = GameEventBase<'worker.promoted'> & {

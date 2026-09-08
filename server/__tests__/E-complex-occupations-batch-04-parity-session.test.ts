@@ -1,4 +1,6 @@
+import { workersAtHome } from '../../shared/domain/player'
 import { describe, expect, it } from 'vitest'
+import { chooseSupplyWorkerTurn } from './_helpers/supply-worker-turn'
 import { GameSession, type SessionResponse } from '../game/authoritative-session'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 import { confirmPlayerSwitch } from './_helpers/pending-confirms'
@@ -171,17 +173,23 @@ describe('E093 Motivator parity', () => {
   const nextRound = (full: boolean) => {
     const session = setupOccupation('E093_Motivator', { played: true, round: 5, resources: { food: 20 } })
     if (full) fillFarm(session.state.players[0]!)
+    session.state.players[0]!.cardStates.E093_Motivator = { flagged: true }
     session.state.players.forEach((player) => { markAllWorkersUsed(session.state, player); player.resources.food = 20 })
     session.loadState(session.state)
     return { session, response: session.performRoundEnd() }
   }
 
   it('E093 S1: a full farm offers an extra person placement at the first turn', () => {
-    const { session, response: initial } = nextRound(true)
-    const response = chooseNonSkip(session, initial, 'E093_Motivator')
+    const { session } = nextRound(true)
+    const response = chooseSupplyWorkerTurn(session, 'E093_Motivator')
     expect(response.interaction.stateId).toBe('wait')
     if (response.interaction.stateId !== 'wait') return
     expect(response.interaction.request.options?.some((option) => option.value === 'day-laborer')).toBe(true)
+    const placed = session.resolveChoice(0, 'day-laborer')
+    expect(placed.ok, placed.error).toBe(true)
+    expect(placed.state.actionSpaces.find((space) => space.id === 'day-laborer')!.takenBy)
+      .toContainEqual({ playerId: placed.state.players[0]!.id, workerId: '3' })
+    expect(workersAtHome(placed.state, placed.state.players[0]!)).toHaveLength(2)
   })
 
   it('E093 S2: an unused farmyard space prevents the extra placement', () => {

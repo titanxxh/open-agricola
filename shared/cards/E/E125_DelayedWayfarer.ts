@@ -2,30 +2,12 @@ import { defineOccupationCard } from '../card-source'
 import { readCardExtraData, writeCardExtraData } from '../helpers/card-state'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import type { ActionFlow } from '../../contract/types'
-import type { ActionHookPhase } from '../../actions/hooks'
 import type { CardImpl } from '../registry'
 import { hasInactiveWorkerInSupply } from '../../domain/player'
 
 const CARD_ID = 'E125_DelayedWayfarer'
 
 const PLAYED_ROUND_KEY = 'playedRound'
-
-/**
- * E125 Delayed Wayfarer (Occupation):
- *
- * Rule:
- *   When you play this card, you immediately get 1 building resource of your
- *   choice and, once all people have been placed this round, you can place a
- *   person from your supply.
- *
- * Implementation:
- *   - onBuy: Record current round + XOR choice of 1 building resource.
- *   - onAllWorkersPlaced: When all players' workers are placed and it's the
- *     same round this card was played, offer an optional place-farmer with
- *     fromSupply: true. Clears the round flag regardless of player choice.
- *   - isDoable listener: Overrides place-farmer doability when fromSupply is
- *     set and the player has an inactive worker in supply.
- */
 
 const buildingChoiceFlow = (): ActionFlow => ({
   type: 'xor',
@@ -38,16 +20,6 @@ const buildingChoiceFlow = (): ActionFlow => ({
 })
 
 const cardImpl = {
-  listeners: [{
-  id: 'E125-isDoable-place-farmer-from-supply',
-  cardIds: [CARD_ID],
-  phases: ['isDoable' as ActionHookPhase],
-  actions: ['place-farmer'],
-  handler: (context) => {
-    if (!context.actionContext?.fromSupply) return
-    if (hasInactiveWorkerInSupply(context.player)) return { doable: true }
-  },
-}],
   effect: {
   id: CARD_ID,
   onBuy: (state, player) => {
@@ -68,7 +40,7 @@ const cardImpl = {
           type: 'leaf',
           actionId: 'place-farmer',
           sourceCard: CARD_ID,
-          actionContext: { trueAction: false, extraPlacement: true, fromSupply: true },
+          actionContext: { trueAction: false, extraPlacement: true, workerSource: { kind: 'supply', disposition: 'return-to-supply' } },
         },
       ],
     }

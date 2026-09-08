@@ -67,6 +67,7 @@ export type StageDispatchHost = {
 export type StageContinuationTable = Record<StageResumeState['hook'], (stageResume: StageResumeState) => void>
 
 const stageReactionHooks = new Set<StageResumeState['hook']>([
+  'onAllWorkersPlaced',
   'onStartHarvestFieldPhase',
   'onHarvestFieldPhase',
   'onEndHarvestFieldPhase',

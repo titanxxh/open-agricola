@@ -4,7 +4,7 @@
 
 > 本文是 [`card_implementation_status.md`](card_implementation_status.md) 的中文镜像；英文版是规范文档。
 
-> 生成/更新日期：2026-09-07。本文件替代 `docs/card_desc_audit.md`、`docs/card_progress.md`、`docs/master-plan.md`、`docs/bad-smell.md`。参考实现唯一基准：`参考实现`。
+> 生成/更新日期：2026-09-08。本文件替代 `docs/card_desc_audit.md`、`docs/card_progress.md`、`docs/master-plan.md`、`docs/bad-smell.md`。参考实现唯一基准：`参考实现`。
 
 ## 2. 问题优先汇总
 
@@ -125,6 +125,7 @@
 | 收割后 anytime 窗口 | `continuePostReapAnytimeWindow()`、`PendingSyntheticKind='post-reap-anytime'`、`buildAnytimeEntries()`、`HarvestReapSummary.harvestedPositions`、D071 | `onHarvest` 完成后、喂食计算前，按 Harvest 顺序提供当前可执行的 anytime action。每次 flow 后按实时状态重建，空玩家直接跳过，Pass 推进；D071 以本次 Harvest 实际收割过的田与当前恰含 1 个作物的 Logical Field 的交集，派生普通田和 Card Field 候选。喂食读取最终实时资源，真实 `feed` / `heating` pending 仍锁定。Session 主路径不含 D071 分支。 |
 | 准备阶段观察、工作阶段前时点、本轮顺序冻结与放人时序 | `CardEffect.onBeforeStartOfTurn`、`CardEffect.onBeforeWork`、`action.accumulated`、`roundFirstPlayerId`、`continueAfterFutureMeepleActions()`、`findFirstNonAccumSpaceThisWorkPhase()`、`worker.placed`、A025/B081/B116/C125/E056 | 准备阶段观察者在 `onBeforeStartOfTurn` 保存增长前状态；全局增长随后在工作阶段前与工作阶段开始效果之前提交同轮、无卡牌来源的 `action.accumulated` 事实。B116 将 Reed Bank 为空的快照与 `{ reed: 1 }` 配对，因此中途的 before-work 领取既不会压掉奖励，也不会伪造每次准备阶段至多一次的奖励。future-meeple 行动完成后，卡面写明“工作阶段开始前”的卡牌通过 `onBeforeWork` 结算；全部 flow 完成后才进入现有 `onRoundStart` 工作阶段开始时点。本轮起始玩家在这些 hook 前冻结，因此实时标记转移从下一轮生效，顺序消费者仍使用本轮冻结顺序。若 before-work placement 用完起始玩家工人而其他玩家仍可行动，工作入口沿该顺序推进；若实际放人后所有玩家都已用完工人，则立即进入 all-workers-placed 级联。pending 恢复不得重复 preparation。冻结的工作顺序只控制轮转；依赖放人先后的规则读取同轮 work phase 的 `worker.placed` 真实时序，因此后续标记转移或连续放人不会重写历史，undo 与新 Work Phase 则恢复或重启候选。 |
 | Extra-turn provider selection | `collectExtraTurnContributions()`、`collectExtraTurnFlow()`、`activate-extra-turn`、`ParallelNode.resolveAfterSelection`、`XorNode.selectedChildId`、`_extraTurnSkipCountsByCard` / `_extraTurnConsumedCountsByCard` | 多张卡同时贡献 turn-rotation extra action 时，先用 one-shot `ParallelNode(mode='trigger-select')` 展示 provider activation；trigger-select child 可是 `activate-extra-turn` 这类非 `activate-card` internal action，选中后才展开该卡自己的 flow。provider 展开后的嵌套 `xor(seq(...))` 会记录 selected branch 并完整 drain，避免只执行第一步 pay 后提前完成。单 provider 仍直接展开以减少 UI 噪音。skip-turn / forced consume 不再用玩家级 global counter，而是按 cardId 写 per-source skip/consume count；只有无交互 skip fallback 使用稳定卡牌顺序消费一个 source。真实 activation 时若 provider 已不再贡献 flow，会 fail 而不是静默消费 provider prompt。 |
+| 供应人物生命周期 | `Worker.supplyUse`、`inactiveWorkersInSupply()`、`place-farmer.workerSource`、`returnSupplyWorkers()`、`extraTurnBeforeWorkers` | 有限人物 ID 预留或锁定时不激活家庭成员。A022/B022/D022/E022/E093/E125/M053 共用正常轮转、召回后可用性、按 ID 移动和归家处置。统一清理先于归家开始增员；D010 要求供应仍有人物。沿用既有 anytime、blocked、undo 和受保护观察语义。 |
 | 规则 Turn Scope 生命周期 | `action-snapshot.ts`、`turn-scope`、`move-farmer-to-space`、`finishCompletedActionTurn()`、`E10_StrawHat-session.test.ts`、`A94_LazySowman-session.test.ts` | 普通放人与 Moor 行动由 session 入口开启一个 Turn Scope。D051/E010 的卡牌驱动移动把选定目标行动完整包在新 scope 内，E010 每名实际移动的工人获得不同的单调 token。scope 覆盖目标行动的 follow-up、动物重整与回合结束 hook；移动人员产生的 Turn 会把普通人员行动的触发身份传给这些 hook，再于下一名工人选择前关闭。真实执行“在你的回合”效果时必须存在拥有者的活动 scope；进入行动前的可行性查询可以投影当前轮转玩家即将开启的 scope。因此 A094 在拥有者自己的行动面板上仍可用，但不能替换其他玩家回合中赠送的播种行动。完成或中止的顶层行动都会清除活动快照。轮转机会与逐行动资源 transaction 仍是独立概念。 |
 | 阶段 hook 恢复与可变 played-card 列表 | `stageResume.extra.resumeAfterCardId`、`resolveStageStartCardIndex()` | 如果阶段 hook 子流程会移除当前卡牌，resume 不能只依赖旧 numeric index；必须按上一个 card id 恢复，card 已移除时从旧 index 前一位继续，避免跳过同阶段后续卡牌。 |
 | 终局计分与 card bonus VP 统一模型 | `shared/domain/scoring.ts`、`scoring-reserve.ts`、`ScoreEntry.type='bonus'`、`cardStates[cardId].counters.bonusVp`、`CardEffect.computeBonusScore`、`cardBonusVp` category、B132、ScoringPad / compact score 测试 | 所有非印刷卡牌奖励分进入 `cardBonusVp`；不要读取或兼容旧 `cardsBonus` / `cardStateBonusVp` / `cardBonus` score key。Scoring Reserve 只占用终局计分资源，不扣真实资源；pre-scoring 支出使合并 reserve 不可支付时，整组选择失效。每个卡牌奖励分来源只能进入该 category 一次：通用计分已读取 `cardStates[cardId].counters.bonusVp`，因此把已获得奖励分存入该 counter 的卡牌不得再从 `computeBonusScore` 返回同一数值；B132 的已收获蔬菜 counter 是其唯一来源。 |
@@ -167,6 +168,8 @@
 注：React/Suspense、CDN、browser fallback 等属于平台/浏览器正常术语，不视为卡牌架构风险。
 
 ## 6. 基础设施待办
+
+供应人物身份、预留、正常轮转和归家处置已由 §5 与 `docs/ARCHITECTURE.md` §6.4 的共享边界支持；卡牌时机与费用保留在卡内。
 
 当前没有开放的基础设施 umbrella 待办。已完成的 Before-End Player Dispatch、Scoring Reserve、printed-cost helper、extra-turn 轮转、family token supply、Major Improvement stack supply、card boundary guard、single-layer terrain selection flow、FoM immediate resource minor helper、pasture / harvest / breeding / scoring / stable / special-stable 等历史条目已按需归并到 §5 架构约束或 §12 单卡备注，不再在本节保留完成清单。
 
@@ -288,5 +291,5 @@ Hook 归属由 `ALL_CARD_IMPLS` 派生，不在此镜像一份会漂移的副本
 | `D179_Bullcatcher` | 已接受差异 | 参考实现 implemented=false；OA 作为 5+ 扩展产品实现。注册 owner-only action space，round slot 3 与 round slot 6 对应行动格都 occupied 且 owner 仍有可用工人时可用，使用后获得 1 cattle + 2 food。 |
 | `D180_PartTimeWorker` | 已接受差异 | 参考实现 implemented=false；OA 作为 5+ 扩展产品实现。after collect 读取本次从该 accumulation space 移到玩家的 `resource.moved` goods map，exact 2/4/6 分别可选返还 1/2/3 goods 到该格并获得 sheep/boar/cattle；`return-to-space` leaf 从 `resource.moved.from.spaceId` 派生并显式携带被收取格的 `targetSpaceId`，card-granted placement 收取非外层行动格时也返还到正确格；混合资源枚举所有合法返还组合，且与其他 `return-to-space` optional flow 串行共存，不把后续返还资源计入触发。 |
 | `E010_StrawHat` | 已接受差异 | Farmland 上每个 worker 分别选择获得 1 food 或精确移动该 worker。移动复用共享普通放人合法性；即使牌面写着“未占用”，容量或 modifier 允许的已占用目标仍可选择；目标行动的普通 `isDoable` 否决仍然生效。 |
-| `E022_GuestRoom` | 已接受差异 | 已接受的行为 / 产品差异 |
+| `E022_GuestRoom` | 已接受差异 | 参考实现 banned，OA 按产品策略保留。 |
 | `E070_CropRotationField` | 已接受差异 | 没有相反作物种子时，不可执行的可选播种分支自动跳过，不显示拒绝提示。 |

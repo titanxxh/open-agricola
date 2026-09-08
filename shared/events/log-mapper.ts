@@ -560,7 +560,7 @@ const mapFutureMeepleRemoved = (
 })
 
 const mapWorkerReturned = (event: WorkerReturnedEvent): LogEntry => ({
-  key: 'log.workerReturned',
+  key: event.to === 'removed' ? 'log.workerRemoved' : 'log.workerReturned',
   params: {
     destination: event.to,
   },

@@ -1,10 +1,12 @@
+import type { GameState } from '../../shared/contract/types'
+import { chooseSupplyWorkerTurn } from './_helpers/supply-worker-turn'
+import { confirmNextPlayer } from './_helpers/pending-confirms'
 import { describe, expect, it } from 'vitest'
 import { GameSession, type SessionResponse } from '../game/authoritative-session'
 import { readCardExtraData } from '../../shared/cards/helpers/card-state'
 import {
   familySize,
   inactiveWorkersInSupply,
-  markAllWorkersUsed,
   setActiveWorkerCount,
   setWorkersAtHome,
   workersAtHome,
@@ -24,7 +26,7 @@ const setup = ({
   playedRound?: number
   supply?: boolean
   ownerAtHome?: number
-} = {}) => {
+} = {}, configure?: (state: GameState) => void) => {
   const session = new GameSession(7125, undefined, { playerCount: 2 })
   stabilizeRandomHands(session.state.players)
   const state = session.getState().state
@@ -50,6 +52,7 @@ const setup = ({
   owner.occupationHand = played ? [FILLER] : [CARD_ID]
   owner.occupationPlayed = played ? [CARD_ID] : []
   if (played) owner.cardStates[CARD_ID] = { extraData: { playedRound } }
+  configure?.(state)
   session.loadState(state)
   return session
 }
@@ -101,10 +104,10 @@ const acceptWayfarerPlacement = (
 }
 
 describe('E125 Delayed Wayfarer parity', () => {
-  it('E125 S1: playing the occupation offers all four building resources and grants the chosen one', () => {
+  it.each(['wood', 'clay', 'reed', 'stone'] as const)('E125 S1: offers all four resources and grants only the chosen %s', (resource) => {
     const session = setup({ played: false, ownerAtHome: 2 })
 
-    const { offered, response } = playDelayedWayfarer(session, 'stone')
+    const { offered, response } = playDelayedWayfarer(session, resource)
 
     expect(response.ok, response.error).toBe(true)
     expect(offered.map((option) => option.effectPreview?.kind === 'resourceExchange'
@@ -114,7 +117,7 @@ describe('E125 Delayed Wayfarer parity', () => {
     ]))
     expect(response.state.players[0]!.occupationPlayed).toContain(CARD_ID)
     expect(response.state.players[0]!.resources).toMatchObject({
-      wood: 0, clay: 0, reed: 0, stone: 1,
+      wood: 0, clay: 0, reed: 0, stone: 0, [resource]: 1,
     })
     expect(readCardExtraData<number>(response.state.players[0]!, CARD_ID, 'playedRound')).toBe(5)
   })
@@ -139,7 +142,7 @@ describe('E125 Delayed Wayfarer parity', () => {
     expect(optionsOf(response).some((option) => option.value === '__skip__')).toBe(true)
   })
 
-  it('E125 S4: accepting permanently activates a supply person before placing it', () => {
+  it('E125 S4: accepting uses a temporary supply person and returns it without growing the family', () => {
     const session = setup()
     const before = session.getState().state.players[0]!
     expect(familySize(before)).toBe(2)
@@ -150,9 +153,10 @@ describe('E125 Delayed Wayfarer parity', () => {
     expect(response.ok, response.error).toBe(true)
     expect(response.state.round).toBe(6)
     expect(response.state.players[0]!.resources.food).toBe(2)
-    expect(familySize(response.state.players[0]!)).toBe(3)
-    expect(workersAtHome(response.state, response.state.players[0]!)).toHaveLength(3)
-    expect(inactiveWorkersInSupply(response.state.players[0]!)).toHaveLength(2)
+    expect(response.state.events).toContainEqual(expect.objectContaining({ type: 'worker.placed', workerId: '3', spaceId: 'day-laborer', viaCardId: CARD_ID }))
+    expect(familySize(response.state.players[0]!)).toBe(2)
+    expect(workersAtHome(response.state, response.state.players[0]!)).toHaveLength(2)
+    expect(inactiveWorkersInSupply(response.state.players[0]!)).toHaveLength(3)
     expect(readCardExtraData<number>(response.state.players[0]!, CARD_ID, 'playedRound')).toBe(-1)
   })
 
@@ -190,4 +194,59 @@ describe('E125 Delayed Wayfarer parity', () => {
     expect(hasWayfarerOption(response)).toBe(false)
     expect(inactiveWorkersInSupply(response.state.players[0]!)).toHaveLength(3)
   })
+
+  it("E125 waits for another player's normal rotation supply opportunity", () => {
+    const session = setup({}, (state) => {
+      state.currentPlayerIndex = 1
+      state.players[1]!.minorPlayed = ['A022_Telegram']
+      state.players[1]!.cardStates.A022_Telegram = { extraData: { triggerRound: 5 } }
+    })
+    expect(hasWayfarerOption(session.getState())).toBe(false)
+    expect(session.performRoundEnd().ok).toBe(false)
+    chooseSupplyWorkerTurn(session, 'A022_Telegram')
+    expect(session.resolveChoice(1, 'forest').ok).toBe(true)
+    const ending = confirmNextPlayer(session)
+    expect(ending.ok, ending.error).toBe(true)
+    expect(hasWayfarerOption(ending)).toBe(true)
+    const returned = acceptWayfarerPlacement(session, ending, 'day-laborer')
+    expect(returned.state.round).toBe(6)
+    expect(inactiveWorkersInSupply(returned.state.players[0]!)).toHaveLength(3)
+    expect(inactiveWorkersInSupply(returned.state.players[1]!)).toHaveLength(3)
+  })
+
+  it('E125 shares closing trigger selection with Iron Hoe and restores its pending person on undo', () => {
+    const session = setup({}, (state) => {
+      const player = state.players[0]!
+      player.minorPlayed = ['E020_IronHoe']
+      state.actionSpaces = state.actionSpaces.filter((space) => space.id !== '__test-worker-sink__')
+      state.actionSpaces.forEach((space) => { space.takenBy = [] })
+      state.actionSpaces.find((space) => space.id === 'grain-seeds')!.takenBy.push({ playerId: player.id, workerId: '1' })
+      state.actionSpaces.find((space) => space.id === 'vegetable-seeds')!.takenBy.push({ playerId: player.id, workerId: '2' })
+      state.actionSpaces.find((space) => space.id === 'forest')!.takenBy.push({ playerId: state.players[1]!.id, workerId: '1' })
+      state.actionSpaces.find((space) => space.id === 'clay-pit')!.takenBy.push({ playerId: state.players[1]!.id, workerId: '2' })
+    })
+    let response = session.performRoundEnd()
+    expect(response.ok, response.error).toBe(true)
+    expect(optionsOf(response).map((option) => option.sourceCard)).toEqual(expect.arrayContaining([CARD_ID, 'E020_IronHoe']))
+    response = acceptWayfarerPlacement(session, response, '__wait_for_target__')
+    expect(response.interaction.promptKey).toBe('ui.interactionPlaceFarmerExtra')
+    expect(inactiveWorkersInSupply(response.state.players[0]!)).toHaveLength(2)
+    response = session.undoStep(0)
+    expect(response.ok, response.error).toBe(true)
+    response = acceptWayfarerPlacement(session, response, 'day-laborer')
+    expect(response.ok, response.error).toBe(true)
+    for (let step = 0; step < 3 && response.interaction.stateId === 'wait' && response.interaction.request.kind !== 'farm-select'; step++) {
+      const option = optionsOf(response).find((entry) => entry.sourceCard === 'E020_IronHoe' && entry.value !== '__skip__')
+      expect(option, JSON.stringify(response.interaction)).toBeDefined()
+      response = session.resolveChoice(0, option!.value)
+      expect(response.ok, response.error).toBe(true)
+    }
+    response = session.commitSelectionChoice(0, { tile: { row: 0, col: 0 } })
+    expect(response.ok, response.error).toBe(true)
+    expect(response.state.round).toBe(6)
+    expect(response.state.players[0]!.fields).toHaveLength(1)
+    expect(response.state.events.filter((event) => event.type === 'worker.placed' && event.viaCardId === CARD_ID)).toHaveLength(1)
+    expect(inactiveWorkersInSupply(response.state.players[0]!)).toHaveLength(3)
+  })
+
 })

@@ -84,7 +84,8 @@ import {
   incResourceConverted,
 } from '../session/stats.ts'
 import { getMinorImprovement } from '../cards/registry-display.ts'
-import { endTurnScope } from '../cards/helpers/action-snapshot.ts'
+import { endTurnScope, readActionSnapshotExtraData } from '../cards/helpers/action-snapshot.ts'
+import { returnSupplyWorkers } from '../domain/supply-workers.ts'
 import {
   registerCustomCard,
   getCustomMinorImprovementIds,
@@ -3140,7 +3141,9 @@ export class GameCore {
   }
 
   private endTurnTriggerActionId(frame: EngineFrame): string | null {
-    return frame.source.kind === 'action' ? 'place-farmer' : null
+    const player = this.state.players[frame.ownerPlayerIndex]
+    return frame.source.kind === 'action' || (player && readActionSnapshotExtraData<string>(player, 'placedWorkerId'))
+      ? 'place-farmer' : null
   }
 
   private continueEndTurnHooks(
@@ -3702,6 +3705,7 @@ export class GameCore {
     this.history = []
     this.actionStartIndex = null
     if (workComplete && placedBeforeWork) return this.continueAllWorkersPlacedHooks()
+    roundPhase.startPendingExtraTurnIfAny(this)
     return this.respond()
   }
 
@@ -4854,6 +4858,13 @@ export class GameCore {
     if (this.stageDispatch.continueStageHook('onBeforeReturnHome', playerIndex, cardIndex)) {
       return this.respond()
     }
+    for (const returned of returnSupplyWorkers(this.state)) {
+      appendImmediateEvents(this.state, [{
+        type: 'worker.returned',
+        workers: returned.workers,
+        to: returned.disposition === 'remove-from-game' ? 'removed' : 'supply',
+      }])
+    }
     return this.continueStartReturnHomeHooks()
   }
 
@@ -5092,6 +5103,7 @@ export class GameCore {
 
   private loadStateInContext(raw: unknown): SessionResponse {
     this.restoreStateSnapshotInContext(raw)
+    roundPhase.startPendingExtraTurnIfAny(this)
     return this.respond()
   }
 

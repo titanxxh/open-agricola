@@ -185,7 +185,7 @@ Undo 与 provisional scope rollback 的 runtime `publicEventCancellations` 是�
 - 持续效果：`majorEffects` / `activeModifiers`
 - Supply token：`supplyTokensConsumed` 记录被永久消耗的 fence / stable 组件；可用上限由 helper 动态计算
 - **卡牌局部状态**：`cardStates`（见 §8.3）
-- **工人身份**：`workers: Worker[]`，固定 5 槽 id `'1'..'5'`，`isActive` / `isNewborn` 标记
+- **工人身份**：`workers: Worker[]`，固定 5 槽 id `'1'..'5'`。`isActive` / `isNewborn` 表示永久家庭成员；可选的 `supplyUse` 记录供应人物的预留、待放置或临时放置状态、来源、归还轮次，以及退回供应或永久移除的处置。
 
 `PlayerState.fields` 是 Farmyard Field 的私有存储。卡牌规则使用 §8.5 的 Logical Field 边界；只有几何与版图占位规则才显式请求 Farmyard Field。`Field.stacks: CropStack[]` 的底堆在 `[0]`，顶堆在末尾。
 
@@ -485,16 +485,20 @@ type SessionResponse = {
 
 ### 6.4 round.ts 额外回合轮转扩展点（contributeExtraTurn / hasPendingExtraTurn）
 
-A092_AdoptiveParents 引入轮转层的**额外回合**机制（#203+#204），发生在玩家普通工人耗尽**之后**，与 `onBeforePlayerTurn` 的 `skipTurn` 在回合开始前的负向跳过相反。
+A092_AdoptiveParents 引入轮转层额外回合机制（#203+#204）。provider 默认在普通工人耗尽后生效；声明 `extraTurnBeforeWorkers: true` 的 provider 也能在正常轮转中与普通放人并列选择。完成任一选择都只占一次 turn，随后轮到下一位有资格的玩家。
 
 - `contributeExtraTurn?: (state, player) => ActionFlow | void`：`CardEffect` 上的 hook，可用时返回本卡 provider 的 ActionFlow，否则 `void`。它**不**经 `runCardEffectHook` 自动执行，而是被 `shared/session/phases/round.ts` 的轮转 gating **主动消费**。
 - `collectExtraTurnContributions(state, player)` 是单一真相源：同一轮转点枚举所有 provider，`hasPendingExtraTurn(state, player)` 只判断是否存在 provider，`collectExtraTurnFlow(state, player)` 把 provider 编译成真实交互。单 provider 直接展开，多个 provider 进入 one-shot `ParallelNode(mode='trigger-select')`，每个 child 是 internal `activate-extra-turn` leaf；玩家先选来源卡，选中后才展开该卡自己的 flow。provider flow 可以继续包含 `xor(seq(...))` 这类嵌套交互，选中分支必须完整 drain 后才算 provider 完成。
 - 多次机会卡可配内部 adjunct `countExtraTurns`，让 mandatory skip-turn / forced consume 只消费一个 extra-turn opportunity。剩余机会按来源卡计算：`_extraTurnSkipCountsByCard` 和 `_extraTurnConsumedCountsByCard` 记录每张卡已跳过 / 已强制消费次数；`countPendingExtraTurns(state, player)` 与 `consumePendingExtraTurns(state, player)` 复用 provider 聚合，不再使用玩家级全局 counter。无交互 skip fallback 只在必须自动前进时按稳定卡牌顺序消费一个 source。
 - round.ts 三处 gating：选下一活跃玩家（`workersAvailable(state, p) > 0 || hasPendingExtraTurn(state, p)`，`nextSeatedPlayerIdx`）、round-work 完成谓词（全员 `workersAvailable <= 0 && !hasPendingExtraTurn`，`roundWorkComplete`）、轮转 skip 循环（0-worker 玩家若 `hasPendingExtraTurn` 则停轮以便注入 flow）。都把"有 pending extra turn"的玩家视为仍有资格、不提前跳过。
-- extra-turn pending 注入统一走 `startPendingExtraTurnIfAny(core)`；`confirm-next-player` 轮转和 `undoStep` / `undoAction` 的 history restore 后复用同一入口。Undo 只在当前玩家已经停在 0-worker extra-turn seat 且 engine stack 为空时重建 pending flow，不重新执行完整 seat-walk。
-- A92 provider 表现为 XOR[use, forfeit]；选 Forfeit（放弃）即退出本轮后续。A92 触发条件：普通工人耗尽但仍持未激活后代（newborn），对齐 参考实现 `stLabor` 里 adoptive / Telegram / Work Permit 等并列的 supply-placement 选项（pull model）。M057 provider 选中后进入 Moor special action 的卡牌 / 版图选择 flow，仍会触发普通 special action before / after listener。
+- `startPendingExtraTurnIfAny(core)` 是唯一注入入口，由 work 阶段开始、确认下一玩家、载入状态和撤销恢复共用；仅在当前座位的 engine stack 为空时注入。有普通工人时，符合条件的 provider 与普通放人、合法 Moor 特别行动并列；没有普通工人时沿用单 provider 或一次性来源选择。供应机会只有在普通工人耗尽后才能放弃；选择普通放人保留后续机会，但要求本轮首次放置的卡除外。
+- A92 provider 表现为 XOR[use, forfeit]；选择 Forfeit 即退出本轮后续，仍使用原有 newborn 生命周期。M057 选中后进入 Moor 特别行动卡牌与版图选择 flow，保留普通特别行动的 before / after listener。
 
-**与 `onBeforePlayerTurn` / `skipTurn` 的区别**：`skipTurn`（如 D134_OysterEater，返回 `{ skipTurn: true }`，镜像 参考实现 `Globals::setSkipNext`）在玩家回合**开始前**让轮转 `continue` 跳过该玩家整个回合（负向）；`contributeExtraTurn` 在玩家工人**耗尽后**让轮转**不提前跳过**、追加一次额外放工（正向）。术语见 `CONTEXT.md` 的 *Extra Turn / Forfeit*。
+`skipTurn`（例如 D134_OysterEater 返回 `{ skipTurn: true }`）在 turn 开始前跳过当前玩家；`contributeExtraTurn` 让仍有机会的 provider 留在轮转中，`extraTurnBeforeWorkers` 允许在普通工人耗尽前选择。术语见 `CONTEXT.md` 的 *Extra Turn / Forfeit*。
+
+供应放置通过 `place-farmer` 的 `actionContext.workerSource: { kind: 'supply', disposition, workerId? }` 声明。执行时先锁定一个有限人物 ID，再展示目标；提交、目标行动、事件、联动占位、移动和撤销始终沿用该 ID。目标行动使用正常行动语义并计入放人统计；卡牌放置在既有 Turn Scope 中记录人物行动身份，使回合结束 hook 收到与普通放人相同的 trigger。
+
+`inactiveWorkersInSupply()` 排除预留、待放置、临时人物和已永久移除的组件。`availableWorkers()` 包含被召回版图外的临时人物，但家庭人数、住房、喂养和人物分仍只读取永久成员。`returnSupplyWorkers()` 在全部 `onBeforeReturnHome` 之后、`onStartReturnHome` 之前清理同一 ID 的所有位置，并执行原处置；召回和移动不改变该处置。已归还的人物立即可用于增员；没有到期归还轮次的预留跨归家保留，由卡牌在指定时机释放或解锁。既有 blocked / anytime / undo 与 Protected Observation 边界保持不变。
 
 ### 6.5 回合作用域与行动执行作用域
 
@@ -762,7 +766,7 @@ Harvest outcome summary 是本次 Harvest 的事实，不是中间日志缓存�
 
 `reap` 是可由 ActionFlow/internal 执行的内部 action；私人田地收获通过 `trigger: { phase: 'private-field-phase', cardId: sourceCard }` 进入同一 action，不启动完整 Harvest：先收获普通田，再收获 Card Field，并跳过 Harvest summary 写入；普通田和 Card Field 的 `immediatelyAfter.reap` 反应同样合并成普通 `parallel` flow。
 
-`onAllWorkersPlaced` 在所有人本轮工人放完且 `performRoundEnd` 之前触发；`place-farmer` 的 `params.fromSupply` 模式可在该阶段把 supply worker 标 active 后立即放置。`place-farmer` 也支持 `actionContext.temporaryFromSupply + temporaryWorkerId` 放置由卡牌保留的 supply worker；该 worker 不标 active、不计 family/housing/feeding/scoring，生命周期由卡牌在 `onReturnHome` 清理。
+`onAllWorkersPlaced` 在所有玩家耗尽普通放人和正常轮转 provider 后、归家前执行。每名玩家的 activation 复用 `ParallelNode(mode='trigger-select')`，可自行选择同时发生的收尾效果顺序。供应放置使用 §6.4 的有限人物身份和统一清理，不激活永久家庭成员。
 
 阶段 hook 已可返回 `ActionFlow`（`continueStageHook` / `continueAllWorkersPlacedHooks`），用于"hook 触发子流程"统一走 `EngineStack.push`。future meeple 在 round-start 分三步结算：`futureMeepleReceives` 先把到期普通资源按 player 合并成一个内部 `receive` action transaction，`resource.moved.reason='receive'` 且每个 entry 保留自己的 `sourceCardId`，因此 Receive listener 会触发一次，Gain listener 不会被隐式触发；`futureActionAnytimeWindow` 再只遍历拥有到期 action token 的玩家，没有当前可执行标准 `exchange` 的玩家直接跳过，每个嵌套 flow 后都按实时状态重算该兑换。卡牌来源的 anytime 能力不进入该窗口，避免为未来回合安排的效果赶在当前轮 `onRoundStart` 前触发；最后 `futureMeepleActions` 才构造行动可行性并由 `applyFutureMeeples` 消费 token，把 `field` 转成 optional `plow`、`stable` 转成 optional 免费 `stables`。entry 可携带 `actionContext`，因此 D91 这类付费行动可以使用 receive transaction 或兑换窗口刚获得的资源。下一轮会在 `onBeforeStartOfTurn` 前从实时起始玩家标记冻结 `roundFirstPlayerId`；随后先用 `onBeforeWork` 结算卡面写明"工作阶段开始前"的卡牌。此时转移标记会立即生效，但只影响下一轮的冻结结果。这些 flow 全部完成后，再进入作为现有工作阶段开始时点的普通 `onRoundStart`；工作阶段入口和 E56 Roman Pot 等顺序消费者均从冻结 ID 派生循环顺序。若 before-work placement 已用完该玩家的工人而其他玩家仍可行动，入口会沿同一冻结顺序推进到首个可行动玩家；若实际的 before-work placement 用完所有玩家的工人，则立即进入正常的 all-workers-placed 级联，而没有实际放人的空轮仍保持 idle。两个 stage 恢复时都不会重复 round-start 初始化。
 

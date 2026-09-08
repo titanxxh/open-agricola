@@ -3,27 +3,26 @@ import { queueFutureMeeplesFlow } from '../../actions/effects/internal/future-me
 import {
   isCardFlagged,
   readCardExtraData,
-  setCardFlag,
   writeCardExtraData,
   writeCardInfobox,
 } from '../helpers/card-state'
-import { workersAvailable } from '../../domain/player'
-import type { ActionFlow } from '../../contract/types'
+import { hasInactiveWorkerInSupply } from '../../domain/player'
+import { reserveSupplyWorker, releaseSupplyWorker } from '../../domain/supply-workers'
+import { supplyWorkerTurnFlow, consumeSupplyWorkerTurn } from '../helpers/supply-worker-flow'
 import type { CardImpl } from '../registry'
 
 const CARD_ID = 'D022_WorkPermit'
 const TARGET_ROUND_KEY = 'targetRound'
 
 const cardImpl = {
-  prerequisiteCheck: (player, state) => {
+  prerequisiteCheck: (player) => {
     const totalBuildRes =
       (player.resources.wood ?? 0)
       + (player.resources.stone ?? 0)
       + (player.resources.clay ?? 0)
       + (player.resources.reed ?? 0)
     if (totalBuildRes === 0) return false
-    if (!state) return true
-    return workersAvailable(state, player) > 0
+    return hasInactiveWorkerInSupply(player)
   },
   effect: {
   id: CARD_ID,
@@ -35,6 +34,10 @@ const cardImpl = {
       (player.resources.reed ?? 0)
     if (buildingResources <= 0) return
     const targetRound = state.round + buildingResources
+    if (targetRound > 14) return
+    const worker = reserveSupplyWorker(player, CARD_ID)
+    if (!worker) return
+    writeCardExtraData(player, CARD_ID, 'reservedWorkerId', worker.id)
     writeCardExtraData(player, CARD_ID, TARGET_ROUND_KEY, targetRound)
     writeCardInfobox(player, CARD_ID, `Round ${targetRound}`)
     return queueFutureMeeplesFlow(state, {
@@ -44,26 +47,17 @@ const cardImpl = {
     })
   },
   onRoundStart: (state, player) => {
-    const targetRound = readCardExtraData<number>(
-      player,
-      CARD_ID,
-      TARGET_ROUND_KEY,
-    )
-    if (targetRound !== state.round) return
-    if (isCardFlagged(player, CARD_ID)) return
-    setCardFlag(player, CARD_ID, true)
-    return {
-      type: 'seq',
-      optional: true,
-      children: [
-        {
-          type: 'leaf',
-          actionId: 'place-farmer',
-          sourceCard: CARD_ID,
-          actionContext: { trueAction: false, extraPlacement: true },
-        },
-      ],
-    } as ActionFlow
+    if (readCardExtraData<number>(player, CARD_ID, TARGET_ROUND_KEY) !== state.round) return
+    const workerId = readCardExtraData<string>(player, CARD_ID, 'reservedWorkerId')
+    const worker = player.workers.find((entry) => entry.id === workerId)
+    if (worker?.supplyUse?.sourceCard === CARD_ID) releaseSupplyWorker(state, player, worker)
+    writeCardExtraData(player, CARD_ID, 'reservedWorkerId', undefined)
+  },
+  extraTurnBeforeWorkers: true,
+  contributeExtraTurn: (state, player) => {
+    if (readCardExtraData<number>(player, CARD_ID, TARGET_ROUND_KEY) !== state.round) return
+    if (isCardFlagged(player, CARD_ID) || !hasInactiveWorkerInSupply(player)) return
+    return supplyWorkerTurnFlow(state, player, CARD_ID, [consumeSupplyWorkerTurn(CARD_ID)])
   },
 },
   reaches: [] as readonly string[],

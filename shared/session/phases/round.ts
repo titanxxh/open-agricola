@@ -20,7 +20,7 @@ import {
   validateMoorSpecialAction,
   type MoorSpecialActionPayload,
 } from '../../moor/special-actions.ts'
-import { MOOR_SPECIAL_ACTION_APPLY_ACTION_ID } from '../../moor/special-action-flow.ts'
+import { MOOR_SPECIAL_ACTION_APPLY_ACTION_ID, MOOR_SPECIAL_ACTION_CHOICE_ACTION_ID } from '../../moor/special-action-flow.ts'
 import type { MoorSpecialActionId } from '../../moor/types.ts'
 import { hasHealthyWorkerAtHome, selectWorkerForMoorAction } from '../../moor/heating.ts'
 import { applyActionPlacement, canEnterActionSpace } from '../action-entry-query.ts'
@@ -73,9 +73,16 @@ export const startPendingExtraTurnIfAny = (core: GameCore): boolean => {
   if (core.engineStackDepth() > 0) return false
   const state = core.state
   const current = state.players[state.currentPlayerIndex]
-  if (!current || workersAvailable(state, current) > 0) return false
-  const extra = collectExtraTurnFlow(state, current)
+  if (!current || state.roundPhase !== 'work' || state.gameOver || state.phase !== 'playing') return false
+  const extra = collectExtraTurnFlow(state, current, workersAvailable(state, current) > 0)
   if (!extra) return false
+  if (state.enableFarmersOfTheMoor && hasHealthyWorkerAtHome(state, current) && extra.flow.type === 'xor' && !extra.cardId) {
+    extra.flow.children.push({
+      type: 'leaf',
+      actionId: MOOR_SPECIAL_ACTION_CHOICE_ACTION_ID,
+      actionContext: { mode: 'take-card-action' },
+    })
+  }
 
   core.appendHistory(true)
   core.setTurnOwner(state.currentPlayerIndex)
