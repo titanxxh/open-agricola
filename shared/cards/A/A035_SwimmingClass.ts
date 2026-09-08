@@ -1,5 +1,5 @@
 import { defineMinorCard } from '../card-source'
-import { spaceHasPlayer } from '../../domain/space'
+import { getReturnHomePlacements } from '../helpers/round-placement'
 import { newbornCount } from '../../domain/player'
 import type { CardImpl } from '../registry'
 
@@ -9,9 +9,7 @@ const cardImpl = {
   effect: {
   id: CARD_ID,
   onStartReturnHome: (state, player) => {
-    // Check if this player has a farmer on the Fishing space
-    const fishingSpace = state.actionSpaces.find((s) => s.id === 'fishing')
-    if (!fishingSpace || !spaceHasPlayer(fishingSpace, player.id)) return
+    if (!getReturnHomePlacements(state).some((entry) => entry.spaceId === 'fishing' && entry.playerId === player.id)) return
     const newborns = newbornCount(player)
     if (newborns <= 0) return
     // 2 bonus VP per newborn

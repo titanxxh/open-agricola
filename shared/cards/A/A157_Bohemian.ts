@@ -1,6 +1,6 @@
 import { defineOccupationCard } from '../card-source'
 import { gainLeaf } from '../helpers/pay-gain-node'
-import { isSpaceOccupied } from '../../domain/space'
+import { getReturnHomePlacements } from '../helpers/round-placement'
 import { LESSONS_SPACE_IDS } from '../helpers/lessons-spaces'
 import type { CardImpl } from '../registry'
 
@@ -10,11 +10,12 @@ const cardImpl = {
   effect: {
   id: CARD_ID,
   onStartReturnHome: (state, _player) => {
+    const occupied = new Set(getReturnHomePlacements(state).map((entry) => entry.spaceId))
     // At least one lessons space must be unoccupied
     const anyUnoccupied = LESSONS_SPACE_IDS.some(
       (id) => {
         const space = state.actionSpaces.find((s) => s.id === id)
-        return !!space && !isSpaceOccupied(space)
+        return !!space && !occupied.has(space.id)
       },
     )
     if (!anyUnoccupied) return

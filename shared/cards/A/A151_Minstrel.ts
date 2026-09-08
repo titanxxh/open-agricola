@@ -1,5 +1,5 @@
 import { defineOccupationCard } from '../card-source'
-import { isSpaceOccupied } from '../../domain/space'
+import { getReturnHomePlacements } from '../helpers/round-placement'
 import { jumpLeaf } from '../helpers/jump-leaf'
 import type { CardImpl } from '../registry'
 
@@ -29,6 +29,7 @@ const cardImpl = {
   effect: {
     id: CARD_ID,
     onStartReturnHome: (state, _player) => {
+      const occupied = new Set(getReturnHomePlacements(state).map((entry) => entry.spaceId))
       const unoccupied: string[] = []
       for (const actionId of STAGE_1_ACTIONS) {
         const space = state.actionSpaces.find((s) => s.id === actionId)
@@ -36,7 +37,7 @@ const cardImpl = {
         const roundOrder = state.roundActionOrder
         const posIndex = roundOrder.indexOf(actionId)
         if (posIndex < 0 || posIndex + 1 > state.round) continue
-        if (!isSpaceOccupied(space)) unoccupied.push(actionId)
+        if (!occupied.has(actionId)) unoccupied.push(actionId)
       }
 
       if (unoccupied.length !== 1) return
