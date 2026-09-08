@@ -83,14 +83,21 @@ describe('A100 Curator parity', () => {
     expect(response.state.players[0]!.resources.food).toBe(0)
   })
 
-  it('A100 S2: characterize three used accumulation spaces after their resources were taken', () => {
-    const response = setup({ food: 1, remainingResources: false }).performRoundEnd()
+  it('A100 S2: three people returning from emptied accumulation spaces still qualify', () => {
+    const session = setup({ food: 1, remainingResources: false })
+    const response = acceptCurator(session, session.performRoundEnd())
 
-    expect(response.state.players[0]!.resources.food).toBe(1)
-    expect(bonusVp(response)).toBe(0)
-    expect(response.interaction.stateId === 'wait'
-      ? (response.interaction.request.options?.some((option) => option.sourceCard === CARD_ID) ?? false)
-      : false).toBe(false)
+    expect(response.ok, response.error).toBe(true)
+    expect(response.state.players[0]!.resources.food).toBe(0)
+    expect(bonusVp(response)).toBe(1)
+  })
+
+  it('counts three people returning from two accumulation spaces', () => {
+    const session = setup({ spaces: ['forest', 'forest', 'clay-pit'] })
+    const response = acceptCurator(session, session.performRoundEnd())
+    expect(response.ok, response.error).toBe(true)
+    expect(response.state.players[0]!.resources.food).toBe(0)
+    expect(bonusVp(response)).toBe(1)
   })
 
   it('A100 S3: with resources remaining on three used accumulation spaces the point can be bought', () => {

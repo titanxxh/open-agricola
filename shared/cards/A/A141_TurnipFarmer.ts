@@ -1,6 +1,6 @@
 import { defineOccupationCard } from '../card-source'
 import { gainLeaf } from '../helpers/pay-gain-node'
-import { isSpaceOccupied } from '../../domain/space'
+import { getReturnHomePlacements } from '../helpers/round-placement'
 import type { CardImpl } from '../registry'
 
 const CARD_ID = 'A141_TurnipFarmer'
@@ -9,10 +9,9 @@ const cardImpl = {
   effect: {
   id: CARD_ID,
   onStartReturnHome: (state, _player) => {
-    const dayLaborer = state.actionSpaces.find((s) => s.id === 'day-laborer')
-    const grainSeeds = state.actionSpaces.find((s) => s.id === 'grain-seeds')
-    if (!dayLaborer || !grainSeeds) return
-    if (!isSpaceOccupied(dayLaborer) || !isSpaceOccupied(grainSeeds)) return
+    const returning = getReturnHomePlacements(state)
+    if (!returning.some((entry) => entry.spaceId === 'day-laborer') ||
+      !returning.some((entry) => entry.spaceId === 'grain-seeds')) return
     return gainLeaf(CARD_ID, { vegetable: 1 })
   },
 },

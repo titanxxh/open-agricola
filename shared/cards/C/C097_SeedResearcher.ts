@@ -1,6 +1,6 @@
 import { defineOccupationCard } from '../card-source'
 import { gainLeaf } from '../helpers/pay-gain-node'
-import { isSpaceOccupied } from '../../domain/space'
+import { getReturnHomePlacements } from '../helpers/round-placement'
 import type { CardImpl } from '../registry'
 
 const CARD_ID = 'C097_SeedResearcher'
@@ -9,10 +9,9 @@ const cardImpl = {
   effect: {
   id: CARD_ID,
   onStartReturnHome: (state, player) => {
-    const grainSeeds = state.actionSpaces.find((s) => s.id === 'grain-seeds')
-    const vegSeeds = state.actionSpaces.find((s) => s.id === 'vegetable-seeds')
-    if (!grainSeeds || !vegSeeds) return
-    if (!isSpaceOccupied(grainSeeds) || !isSpaceOccupied(vegSeeds)) return
+    const returning = getReturnHomePlacements(state)
+    if (!returning.some((entry) => entry.spaceId === 'grain-seeds') ||
+      !returning.some((entry) => entry.spaceId === 'vegetable-seeds')) return
 
     if (player.occupationHand.length === 0) {
       return gainLeaf(CARD_ID, { food: 2 })

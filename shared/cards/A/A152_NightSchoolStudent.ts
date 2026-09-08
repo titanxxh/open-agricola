@@ -1,6 +1,6 @@
 import { defineOccupationCard } from '../card-source'
-import { isSpaceOccupied } from '../../domain/space'
-import { LESSONS_SPACE_IDS } from '../helpers/lessons-spaces'
+import { getReturnHomePlacements } from '../helpers/round-placement'
+import { isLessonsSpaceId } from '../helpers/lessons-spaces'
 import type { CardImpl } from '../registry'
 
 const CARD_ID = 'A152_NightSchoolStudent'
@@ -9,11 +9,7 @@ const cardImpl = {
   effect: {
   id: CARD_ID,
   onStartReturnHome: (state, player) => {
-    // Check if any lessons space is occupied
-    const lessonsOccupied = LESSONS_SPACE_IDS.some((id) => {
-      const s = state.actionSpaces.find((space) => space.id === id)
-      return !!s && isSpaceOccupied(s)
-    })
+    const lessonsOccupied = getReturnHomePlacements(state).some((entry) => isLessonsSpaceId(entry.spaceId))
     if (lessonsOccupied) return
     if (player.occupationHand.length === 0) return
     return {

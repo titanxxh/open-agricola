@@ -1,9 +1,29 @@
-import type { PlayerState } from '../../contract/types'
+import type { GameState, PlayerState, WorkerRef } from '../../contract/types'
 import { ensureCardState } from './card-state'
 
 const ROUND_PLACEMENT_CARD_ID = '__roundPlacement__'
 
 export type RoundPlacementEntry = { spaceId: string; workerId: string; relocation?: true }
+type ReturnHomePlacement = WorkerRef & { spaceId: string }
+
+const currentPlacements = (state: GameState): ReturnHomePlacement[] =>
+  state.actionSpaces.flatMap((space) => space.takenBy.map((worker) => ({ ...worker, spaceId: space.id })))
+
+export const recordReturnHomePlacements = (state: GameState): void => {
+  const placements = currentPlacements(state)
+  for (const player of state.players) {
+    const cs = ensureCardState(player, ROUND_PLACEMENT_CARD_ID)
+    cs.extraData = { ...cs.extraData, returnHomePlacements: placements.filter((entry) => entry.playerId === player.id) }
+  }
+}
+
+export const getReturnHomePlacements = (state: GameState): ReturnHomePlacement[] => {
+  const snapshots = state.players.map((player) =>
+    player.cardStates?.[ROUND_PLACEMENT_CARD_ID]?.extraData?.returnHomePlacements as ReturnHomePlacement[] | undefined,
+  )
+  return snapshots.some((entries) => entries !== undefined)
+    ? snapshots.flatMap((entries) => entries ?? []) : currentPlacements(state)
+}
 
 export const getRoundPlacementDetails = (player: PlayerState): RoundPlacementEntry[] =>
   (player.cardStates?.[ROUND_PLACEMENT_CARD_ID]?.extraData?.placements as RoundPlacementEntry[] | undefined) ?? []
@@ -32,4 +52,5 @@ export const recordRoundPlacement = (
 export const resetRoundPlacements = (player: PlayerState): void => {
   const cs = ensureCardState(player, ROUND_PLACEMENT_CARD_ID)
   cs.extraData = { ...(cs.extraData ?? {}), placements: [] }
+  delete cs.extraData.returnHomePlacements
 }

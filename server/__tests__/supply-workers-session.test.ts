@@ -307,6 +307,123 @@ describe('supply worker combinations through Session', () => {
 })
 
 describe('temporary people at harvest and scoring', () => {
+  it('preserves global occupied spaces for Seed Researcher, Turnip Farmer, and Food Distributor', () => {
+    const session = setup(2, false, (state) => {
+      const player = state.players[0]!
+      player.occupationPlayed = ['C097_SeedResearcher', 'A141_TurnipFarmer', 'C155_FoodDistributor']
+      player.cardStates.C155_FoodDistributor = { extraData: { purchaseRound: 5 } }
+      state.roundActionOrder[0] = 'vegetable-seeds'
+      for (const [spaceId, owner, workerId] of [
+        ['forest', 0, '1'], ['clay-pit', 0, '2'], ['day-laborer', 1, '1'], ['vegetable-seeds', 1, '2'],
+      ] as const) {
+        state.actionSpaces.find((space) => space.id === spaceId)!.takenBy = [{ playerId: state.players[owner]!.id, workerId }]
+      }
+    })
+    chooseSupplyWorkerTurn(session, GUEST_ROOM)
+    expect(session.resolveChoice(0, 'grain-seeds').ok).toBe(true)
+    const returning = confirmNextPlayer(session)
+    expect(returning.ok, returning.error).toBe(true)
+    expect(returning.interaction.sourceCard).toBe('C097_SeedResearcher')
+    const foodOnly = returning.interaction.request?.options?.find((option) => option.labelKey !== 'ui.interactionSeedResearcher')
+    expect(foodOnly).toBeDefined()
+    const completed = session.resolveChoice(0, foodOnly!.value)
+    expect(completed.ok, completed.error).toBe(true)
+    expect(completed.state.round).toBe(6)
+    expect(completed.state.players[0]!.resources).toMatchObject({ food: 23, grain: 1, vegetable: 1 })
+  })
+
+  it('does not reopen a stage-one action for Minstrel after returning its temporary person', () => {
+    const session = setup(2, false, (state) => {
+      const player = state.players[0]!
+      player.occupationPlayed = ['A151_Minstrel']
+      player.resources.grain = 2
+      player.fields = [{ row: 0, col: 0, crop: null, remaining: 0 }, { row: 0, col: 1, crop: null, remaining: 0 }]
+      state.roundActionOrder.splice(0, 4, 'sheep-market', 'grain-utilization', 'fencing', 'major-improvement')
+      for (const [spaceId, owner, workerId] of [
+        ['major-improvement', 0, '1'], ['fencing', 0, '2'], ['sheep-market', 1, '1'], ['day-laborer', 1, '2'],
+      ] as const) {
+        state.actionSpaces.find((space) => space.id === spaceId)!.takenBy = [{ playerId: state.players[owner]!.id, workerId }]
+      }
+    })
+    chooseSupplyWorkerTurn(session, GUEST_ROOM)
+    let response = session.resolveChoice(0, 'grain-utilization')
+    expect(response.ok, response.error).toBe(true)
+    const sow = response.interaction.request?.options?.find((option) => option.labelKey === 'actions.sow.name')
+    if (sow) response = session.resolveChoice(0, sow.value)
+    expect(response.ok, response.error).toBe(true)
+    expect(session.commitSelectionChoice(0, { crops: [{ row: 0, col: 0, crop: 'grain' }] }).ok).toBe(true)
+    const completed = confirmNextPlayer(session)
+    expect(completed.ok, completed.error).toBe(true)
+    expect(completed.state.round).toBe(6)
+    expect(completed.state.players[0]!.resources.grain).toBe(1)
+    expect(completed.state.players[0]!.fields[1]!.crop).toBeNull()
+  })
+
+  it('does not treat Lessons as vacant for Night-School Student or Bohemian after a temporary return', () => {
+    const session = setup(2, false, (state) => {
+      const player = state.players[0]!
+      player.occupationPlayed = ['A152_NightSchoolStudent', 'A157_Bohemian']
+      player.occupationHand = ['A100_Curator', 'A092_AdoptiveParents', '__test_placeholder__']
+      for (const [spaceId, owner, workerId] of [
+        ['forest', 0, '1'], ['clay-pit', 0, '2'], ['day-laborer', 1, '1'], ['reed-bank', 1, '2'],
+      ] as const) {
+        state.actionSpaces.find((space) => space.id === spaceId)!.takenBy = [{ playerId: state.players[owner]!.id, workerId }]
+      }
+    })
+    chooseSupplyWorkerTurn(session, GUEST_ROOM)
+    expect(session.resolveChoice(0, 'lessons').ok).toBe(true)
+    const played = session.resolveChoice(0, 'A100_Curator')
+    expect(played.ok, played.error).toBe(true)
+    expect(played.state.players[0]!.occupationPlayed).toContain('A100_Curator')
+    const food = played.state.players[0]!.resources.food
+    const completed = confirmNextPlayer(session)
+    expect(completed.ok, completed.error).toBe(true)
+    expect(completed.state.round).toBe(6)
+    expect(completed.state.players[0]!.resources.food).toBe(food)
+    expect(completed.state.players[0]!.occupationHand).toContain('A092_AdoptiveParents')
+  })
+
+  it.each(['live', 'snapshot'])('preserves a temporary Fishing return for Swimming Class and Curator, mode=%s', (mode) => {
+    const session = setup(3, false, (state) => {
+      const player = state.players[0]!
+      player.minorPlayed.push('A035_SwimmingClass')
+      player.occupationPlayed = ['A100_Curator']
+      player.rooms = 3
+      player.roomTiles = [{ row: 2, col: 0 }, { row: 2, col: 1 }, { row: 2, col: 2 }]
+      player.workers.find((worker) => worker.id === '3')!.isNewborn = true
+      const placements = [
+        ['forest', 0, '1'], ['clay-pit', 0, '2'], ['wish-children', 0, '3'],
+        ['day-laborer', 1, '1'], ['reed-bank', 1, '2'],
+      ] as const
+      for (const [spaceId, owner, workerId] of placements) {
+        const space = state.actionSpaces.find((entry) => entry.id === spaceId)!
+        space.takenBy = [{ playerId: state.players[owner]!.id, workerId }]
+        space.resources = { ...space.resources, wood: 0, clay: 0, reed: 0, food: 0 }
+      }
+      state.actionSpaces.find((space) => space.id === 'fishing')!.resources.food = 4
+    })
+    chooseSupplyWorkerTurn(session, GUEST_ROOM)
+    expect(session.resolveChoice(0, 'fishing').ok).toBe(true)
+    const returning = confirmNextPlayer(session)
+    expect(returning.ok, returning.error).toBe(true)
+    expect(returning.state.players[0]!.cardStates.A035_SwimmingClass?.counters?.bonusVp).toBe(2)
+    expect(returning.interaction.stateId).toBe('wait')
+    expect(returning.interaction.sourceCard).toBe('A100_Curator')
+    expect(returning.state.actionSpaces.find((space) => space.id === 'fishing')!.takenBy).toEqual([])
+    expect(inactiveWorkersInSupply(returning.state.players[0]!)).toHaveLength(2)
+    const resumed = mode === 'snapshot'
+      ? new GameSession(rehydrateState(JSON.parse(JSON.stringify(serializeSessionSnapshot(session.state, session)))))
+      : session
+    const accept = resumed.getState().interaction.request?.options?.find((option) => option.value !== '__skip__')
+    expect(accept).toBeDefined()
+    const completed = resumed.resolveChoice(0, accept!.value)
+    expect(completed.ok, completed.error).toBe(true)
+    expect(completed.state.round).toBe(6)
+    expect(completed.state.players[0]!.resources.food).toBe(23)
+    expect(completed.state.players[0]!.cardStates.A100_Curator?.counters?.bonusVp).toBe(1)
+    expect(completed.state.players[0]!.cardStates.A035_SwimmingClass?.counters?.bonusVp).toBe(2)
+  })
+
   it.each([7, 14])('does not add a family member, feeding cost, or person score in round %i', (round) => {
     const session = setup(2, false, (state) => {
       state.round = round

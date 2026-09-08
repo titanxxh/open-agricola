@@ -2,7 +2,7 @@ import { defineOccupationCard } from '../card-source'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import { isCardFlagged, setCardFlag } from '../helpers/card-state'
 import { writeCardExtraData, readCardExtraData } from '../helpers/card-state'
-import { isSpaceOccupied } from '../../domain/space'
+import { getReturnHomePlacements } from '../helpers/round-placement'
 import { getRoundActionSlot } from '../helpers/round-action-topology'
 import type { CardImpl } from '../registry'
 
@@ -24,10 +24,9 @@ const cardImpl = {
       setCardFlag(player, CARD_ID, true)
       return
     }
-    // Count occupied round 1-14 action spaces (non-board action spaces that have a farmer)
-    const occupiedCount = state.actionSpaces.filter(
-      (s) => isSpaceOccupied(s) && getRoundActionSlot(state, s.id) !== null,
-    ).length
+    const occupiedCount = new Set(getReturnHomePlacements(state)
+      .filter((entry) => getRoundActionSlot(state, entry.spaceId) !== null)
+      .map((entry) => entry.spaceId)).size
     // Flag so it doesn't fire again
     setCardFlag(player, CARD_ID, true)
     if (occupiedCount <= 0) return

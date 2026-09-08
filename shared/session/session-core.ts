@@ -125,7 +125,7 @@ import {
   activatePendingHarvestSkips,
   isPlayerSkippingCurrentHarvest,
 } from '../cards/helpers/harvest-skip.ts'
-import { resetRoundPlacements } from '../cards/helpers/round-placement.ts'
+import { recordReturnHomePlacements, resetRoundPlacements } from '../cards/helpers/round-placement.ts'
 import { familySize, findPlayerById, findPlayerIndexById, hasPlayer, smallestAvailableWorker } from '../domain/player.ts'
 import { animalKeysForState, type AnimalKey } from '../contract/animals.ts'
 import { applyAnimalPayment, isAnimalResourceKey } from '../domain/animal-payment.ts'
@@ -4858,6 +4858,7 @@ export class GameCore {
     if (this.stageDispatch.continueStageHook('onBeforeReturnHome', playerIndex, cardIndex)) {
       return this.respond()
     }
+    recordReturnHomePlacements(this.state)
     for (const returned of returnSupplyWorkers(this.state)) {
       appendImmediateEvents(this.state, [{
         type: 'worker.returned',
