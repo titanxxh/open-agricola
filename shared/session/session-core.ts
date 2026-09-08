@@ -4367,6 +4367,7 @@ export class GameCore {
           keepCardId,
         })
         if (!result.ok) return this.respond(false, result.error)
+        roundPhase.startPendingExtraTurnIfAny(this)
         return this.respond(true, undefined, result.privateEvents)
       },
     )

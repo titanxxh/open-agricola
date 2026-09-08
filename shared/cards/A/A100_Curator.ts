@@ -13,7 +13,8 @@ const cardImpl = {
       (space) => Object.values(space.gainPerRound ?? {}).some((value) => value > 0),
     ).map((space) => space.id))
     const farmersOnAccumulation = new Set(getReturnHomePlacements(state)
-      .filter((entry) => entry.playerId === player.id && !entry.synthetic && accumulationSpaces.has(entry.spaceId))
+      .filter((entry) => entry.playerId === player.id && !entry.synthetic &&
+        entry.disposition !== 'remove-from-game' && accumulationSpaces.has(entry.spaceId))
       .map((entry) => entry.workerId)).size
     if (farmersOnAccumulation < 3) return
     if ((player.resources.food ?? 0) < 1) return

@@ -174,13 +174,15 @@ describe('B022 Walking Boots parity', () => {
     expect(response.state.log).toContainEqual(expect.objectContaining({ key: 'log.workerRemoved' }))
   })
 
-  it('B022 stays blocked when the only supply person is reserved and undo restores the two food', () => {
+  it.each(['M053_ForestHut', 'D022_WorkPermit'])('B022 stays blocked when %s reserves the only supply person and undo restores the two food', (sourceCard) => {
     const session = setup(4, (state) => {
       const player = state.players[0]!
-      player.minorPlayed = ['M053_ForestHut']
-      player.cardStates.M053_ForestHut = { extraData: { temporaryWorkerId: '5', boundForest: { row: 0, col: 0 } } }
+      player.minorPlayed = [sourceCard]
+      player.cardStates[sourceCard] = { extraData: sourceCard === 'M053_ForestHut'
+        ? { temporaryWorkerId: '5', boundForest: { row: 0, col: 0 } }
+        : { reservedWorkerId: '5', targetRound: 6 } }
       player.workers.find((worker) => worker.id === '5')!.supplyUse = {
-        sourceCard: 'M053_ForestHut', disposition: 'return-to-supply', status: 'reserved',
+        sourceCard, disposition: 'return-to-supply', status: 'reserved',
       }
     })
     const response = play(session)
