@@ -17,6 +17,12 @@ vi.mock('../../services/card-meta', () => ({
     C109_SchnappsDistiller: {
       exchanges: [{ from: { vegetable: 1 }, to: { food: 5 }, max: 1, triggers: ['harvest'] }],
     },
+    Major_Fireplace1: {
+      exchanges: [{ from: { sheep: 1 }, to: { food: 2 }, triggers: ['anytime'] }],
+    },
+    B104_SheepWalker: {
+      exchanges: [{ from: { sheep: 1 }, to: { stone: 1 }, triggers: ['anytime'], fromFarmyard: true }],
+    },
   })[id],
 }))
 
@@ -69,6 +75,32 @@ const tradeOption = (
 })
 
 describe('useExchangeDraftPresentation', () => {
+  it('updates farmyard-only limits in the selected feeding order', () => {
+    const player = mkPlayer({
+      resources: { ...emptyResources, sheep: 2 },
+      improvements: ['Major_Fireplace1'],
+      occupationPlayed: ['B104_SheepWalker'],
+    })
+    const { result } = renderHook(() => useExchangeDraftPresentation({
+      state: { players: [player] },
+      pendingChoice: null,
+      interactionPresentationPlan: {
+        kind: 'harvest-feed', playerIndex: 0, remaining: 2, foodUsed: 0,
+        placedAnimals: { sheep: 1 }, maxTradeTimesBySourceId: { B104_SheepWalker: 1 },
+      },
+      locale: 'en',
+      cardLabel: (id: string) => id,
+      getCardMeta: () => undefined,
+    }))
+    act(() => result.current.harvestFeed.updateCount('Major_Fireplace1-ex0', 1))
+    act(() => result.current.harvestFeed.updateCount('B104_SheepWalker-ex0', 1))
+    expect(result.current.harvestFeed.selections.map((selection) => selection.sourceId)).toEqual(['Major_Fireplace1'])
+    act(() => result.current.harvestFeed.reset())
+    act(() => result.current.harvestFeed.updateCount('B104_SheepWalker-ex0', 1))
+    act(() => result.current.harvestFeed.updateCount('Major_Fireplace1-ex0', 1))
+    expect(result.current.harvestFeed.selections.map((selection) => selection.sourceId)).toEqual(['B104_SheepWalker', 'Major_Fireplace1'])
+  })
+
   it('owns bake, anytime exchange, and harvest feed draft counts and payloads', () => {
     const player = mkPlayer({
       resources: { ...emptyResources, grain: 3, vegetable: 1, boar: 2 },

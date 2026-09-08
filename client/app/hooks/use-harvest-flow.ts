@@ -23,6 +23,7 @@ export type HarvestFeedOption = {
   from: Partial<Resource>
   to: Partial<Resource>
   max?: number
+  fromFarmyard?: boolean
 }
 
 export type HarvestContext = {
@@ -76,6 +77,7 @@ export const buildHarvestFeedOptions = (
         from: { ...ex.from },
         to: { ...ex.to },
         max: sourceMax === undefined ? ex.max : Math.min(ex.max ?? sourceMax, sourceMax),
+        ...(ex.fromFarmyard ? { fromFarmyard: true } : {}),
       })
     })
   }

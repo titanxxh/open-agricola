@@ -125,6 +125,13 @@ export const breedAction: ActionDefinition = {
     if (sourceCard === 'harvest') {
       state.harvestBreedSummary ??= {}
       state.harvestBreedSummary[player.id] = breedSummary
+      if (breedSummary.animalCount > 0) {
+        state.harvestBreedPlacement ??= {}
+        state.harvestBreedPlacement[player.id] = {
+          minimums: { ...placementMinimums },
+          animalCounts: Object.fromEntries(animalKeysForState(state).map((animal) => [animal, player.resources[animal] ?? 0])),
+        }
+      }
     }
     const buildReorgRequest = (): ActionExecutionResult => {
       const idx = state.players.indexOf(player)

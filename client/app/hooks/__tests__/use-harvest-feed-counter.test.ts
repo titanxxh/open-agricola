@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { computeHarvestFeedCounterMax } from '../use-harvest-feed-counter'
+import { canApplyHarvestFeedCounts, computeHarvestFeedCounterMax } from '../use-harvest-feed-counter'
 import { emptyResources } from '../../../../shared/contract/state-constants'
 import type { HarvestFeedOption } from '../use-harvest-flow'
 import type { Resource } from '../../../../shared/contract/types'
@@ -19,6 +19,26 @@ const opt = (
 
 describe('computeHarvestFeedCounterMax', () => {
   const playerResources: Resource = { ...emptyResources, sheep: 2, grain: 3 }
+
+  it('debits placed animals before a later farmyard-only conversion', () => {
+    const fireplace = opt('fireplace', { sheep: 1 }, { food: 2 })
+    const walker = { ...opt('walker', { sheep: 1 }, { stone: 1 }), fromFarmyard: true, max: 1 }
+    expect(computeHarvestFeedCounterMax(
+      walker,
+      [fireplace, walker],
+      { fireplace: 1 },
+      playerResources,
+      { sheep: 1 },
+    )).toBe(0)
+  })
+
+  it('does not credit newly gained animals to the placed balance', () => {
+    const producer = opt('producer', { food: 1 }, { sheep: 1 })
+    const walker = { ...opt('walker', { sheep: 1 }, { stone: 1 }), fromFarmyard: true }
+    const resources = { ...emptyResources, food: 1, sheep: 1 }
+    expect(canApplyHarvestFeedCounts([producer, walker], { producer: 1, walker: 2 }, resources, { sheep: 1 })).toBe(false)
+    expect(canApplyHarvestFeedCounts([producer, walker], { producer: 1, walker: 1 }, resources, { sheep: 1 })).toBe(true)
+  })
 
   it('returns floor(have / from[k]) when no other option shares the key', () => {
     const target = opt('A', { grain: 1 })

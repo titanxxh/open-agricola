@@ -30,7 +30,77 @@ const arrange = (session: GameSession, sheep: number, boar: number) => session.r
   { id: 'boar', zoneType: 'pasture', animalType: 'boar', animalCount: boar },
 ])
 
+const startBreedingWithExchanges = (withPeatBoat = false) => {
+  const session = setup('D115_FodderPlanter')
+  const state = session.getState().state
+  state.players[0]!.improvements = ['Major_Fireplace1']
+  if (withPeatBoat) {
+    state.enableFarmersOfTheMoor = true
+    state.players[0]!.minorPlayed = ['M081_PeatBoat']
+    for (const player of state.players) player.resources.fuel = 20
+  }
+  session.loadState(state)
+  let response = session.performRoundEnd()
+  for (let i = 0; i < 10 && response.interaction.stateId === 'wait' && response.interaction.request.kind !== 'animal-reorg'; i++) {
+    response = response.interaction.request.kind === 'feed'
+      ? session.resolveChoice(response.interaction.playerIndex, 'confirm', { selections: [] })
+      : response.interaction.request.kind === 'heating'
+        ? session.resolveChoice(response.interaction.playerIndex, 'confirm', { fuelUsed: response.interaction.request.required })
+        : session.resolveChoice(response.interaction.playerIndex, '__skip__')
+    expect(response.ok, response.error).toBe(true)
+  }
+  expect(response.interaction).toMatchObject({ stateId: 'wait', request: { kind: 'animal-reorg' } })
+  return session
+}
+
 describe('harvest rewards count placed newborn animals', () => {
+  it('keeps a newborn eligible after cooking a parent during breeding reorganization', () => {
+    const session = startBreedingWithExchanges()
+    let response = session.takeAnytimeAction(0, 'exchange')
+    expect(response.ok, response.error).toBe(true)
+    response = session.resolveChoice(0, 'bulk:0=1')
+    expect(response.ok, response.error).toBe(true)
+    expect(response.state.players[0]!.resources.sheep).toBe(2)
+    response = arrange(session, 2, 2)
+    expect(response.ok, response.error).toBe(true)
+    expect(response.state.harvestBreedSummary?.[response.state.players[0]!.id]).toEqual({ resources: { sheep: 1 }, animalTypes: 1, animalCount: 1 })
+    expect(response.interaction).toMatchObject({ stateId: 'wait', promptKey: 'ui.interactionFodderPlanterSow' })
+  })
+
+  it.each([
+    { cooked: 0, kept: 3, eligible: false },
+    { cooked: 0, kept: 4, eligible: true },
+    { cooked: 3, kept: 1, eligible: false },
+  ])('keeps gained sheep separate from newborns: $cooked cooked, $kept kept', ({ cooked, kept, eligible }) => {
+    const session = startBreedingWithExchanges(true)
+    if (cooked > 0) {
+      expect(session.takeAnytimeAction(0, 'exchange').ok).toBe(true)
+      const response = session.resolveChoice(0, `bulk:0=${cooked}`)
+      expect(response.ok, response.error).toBe(true)
+      expect(response.state.players[0]!.resources.sheep).toBe(0)
+    }
+    let response = session.takeAnytimeAction(0, 'exchange')
+    expect(response.ok, response.error).toBe(true)
+    if (response.interaction.stateId !== 'wait') throw new Error('expected exchange')
+    const gain = response.interaction.request.options?.find((option) =>
+      option.sourceCard === 'M081_PeatBoat' && option.effectPreview?.kind === 'resourceExchange'
+      && (option.effectPreview.resourcesGained.sheep ?? 0) > 0,
+    )
+    expect(gain).toBeDefined()
+    response = session.resolveChoice(0, `bulk:${gain!.value.split(':')[1]}=1`)
+    expect(response.ok, response.error).toBe(true)
+    expect(response.state.players[0]!.resources.sheep).toBe(4 - cooked)
+    response = arrange(session, kept, 2)
+    expect(response.ok, response.error).toBe(true)
+    if (eligible) {
+      expect(response.interaction).toMatchObject({ stateId: 'wait', promptKey: 'ui.interactionFodderPlanterSow' })
+      expect(response.state.harvestBreedSummary?.[response.state.players[0]!.id].resources).toEqual({ sheep: 1 })
+    } else {
+      expect(response.state.round).toBe(5)
+      expect(response.interaction.stateId).toBe('idle')
+    }
+  })
+
   it.each(['C071_Slurry', 'D115_FodderPlanter', 'E090_DungCollector', 'E134_Omnifarmer'])('%s does not trigger when all newborn animals are discarded', (cardId) => {
     const session = setup(cardId)
     expect(session.performRoundEnd().interaction).toMatchObject({ stateId: 'wait', request: { kind: 'animal-reorg' } })
