@@ -57,6 +57,73 @@ const pay = (food: number): ActionFlow => ({ type: 'leaf', actionId: '__completi
 describe('action admission and blocked recovery through public Session commands', () => {
   afterEach(() => unregisterActionHook('__review_replace__'))
 
+  it.each(['direct', 'input', 'composite'] as const)('keeps a hidden draw unpublished when a future required payment is unavailable, continuation=%s', (continuation) => {
+    const { session } = setup({ type: 'seq', children: [
+      { type: 'leaf', actionId: 'draw-ordinary-cards', sourceCard: '__protected_draw__', actionContext: { cardType: 'occupation', count: 1 } },
+      ...(continuation !== 'direct' ? [{ type: 'leaf' as const, actionId: 'plow' }] : []),
+      continuation === 'composite' ? { type: 'xor', children: [pay(1)] } : pay(1),
+    ] })
+    session.state.ordinaryCardDecks.occupation = ['A116_WoodCutter']
+    const response = session.takeAction(0, 'forest')
+    expect(response.state.players[0]!.occupationHand).toEqual(['__test_placeholder__'])
+    expect(response.state.ordinaryCardDecks.occupation).toEqual(['A116_WoodCutter'])
+    expect(response.privateEvents).toBeUndefined()
+    expect(response.state.actionSpaces.find((space) => space.id === 'forest')!.takenBy).toEqual([])
+    expect(response.interaction.request?.kind).not.toBe('engine-blocked')
+    expect(session.takeAction(0, 'forest').ok).toBe(false)
+  })
+
+  it.each(['paid', 'optional', 'alternative'] as const)('publishes a hidden draw when its %s continuation remains valid', (kind) => {
+    const { session } = setup({ type: 'seq', children: [
+      { type: 'leaf', actionId: 'draw-ordinary-cards', sourceCard: '__protected_draw__', actionContext: { cardType: 'occupation', count: 1 } },
+      kind === 'alternative' ? { type: 'xor', children: [pay(1), { type: 'leaf', actionId: 'gain', params: { wood: 1 } }] }
+        : { ...pay(1), optional: kind === 'optional' },
+    ] }, kind === 'paid' ? 1 : 0)
+    session.state.ordinaryCardDecks.occupation = ['A116_WoodCutter']
+    const response = session.takeAction(0, 'forest')
+    expect(response.ok, response.error).toBe(true)
+    expect(response.state.players[0]!.occupationHand).toContain('A116_WoodCutter')
+    expect(response.state.ordinaryCardDecks.occupation).toEqual([])
+    expect(finishChoices(session, response).interaction.request?.kind).not.toBe('engine-blocked')
+  })
+
+  it('keeps a hidden draw unpublished when its mandatory continuation is returned after the observation', () => {
+    const { session, registry } = setup({ type: 'leaf', actionId: '__draw_then_pay__', sourceCard: '__protected_draw__', actionContext: { cardType: 'occupation', count: 1 } })
+    const draw = registry.get('draw-ordinary-cards')!
+    registry.register({
+      ...draw, id: '__draw_then_pay__', execute: (context) => {
+        draw.execute(context)
+        return { type: 'flow', flow: pay(1) }
+      },
+    })
+    session.state.ordinaryCardDecks.occupation = ['A116_WoodCutter']
+    const response = session.takeAction(0, 'forest')
+    expect(response.state.players[0]!.occupationHand).toEqual(['__test_placeholder__'])
+    expect(response.state.ordinaryCardDecks.occupation).toEqual(['A116_WoodCutter'])
+    expect(response.privateEvents).toBeUndefined()
+    expect(response.state.actionSpaces.find((space) => space.id === 'forest')!.takenBy).toEqual([])
+  })
+
+  it.each(['or', 'xor'] as const)('offers anytime recovery when an offered %s branch becomes unavailable before selection', (type) => {
+    const { session } = setup({ type, children: [pay(2), { type: 'leaf', actionId: 'gain', params: { wood: 1 } }] }, 2)
+    session.state.players[0]!.occupationPlayed = ['A102_Grocer']
+    session.state.players[0]!.cardStates.A102_Grocer = { stack: ['reed', 'wood'] }
+    let response = session.takeAction(0, 'forest')
+    const value = response.interaction.request.options![0]!.value
+    response = session.takeAnytimeAction(0, 'A102-grocer-anytime')
+    expect(response.state.players[0]!.resources.food).toBe(1)
+    response = session.resolveChoice(0, value)
+    expect(response.ok, response.error).toBe(true)
+    expect(response.interaction.promptKey).toBe('ui.interactionBeforeAnytime')
+    response = session.resolveChoice(0, 'continue')
+    expect(response.interaction.request.kind).toBe('engine-blocked')
+    expect(response.state.players[0]!.resources).toMatchObject({ food: 1, wood: 1 })
+    expect(session.undoStep(0).interaction.promptKey).toBe('ui.interactionBeforeAnytime')
+    response = session.undoAction(0)
+    expect(response.state.players[0]!.resources).toMatchObject({ food: 2, wood: 0 })
+    expect(response.state.players[0]!.cardStates.A102_Grocer?.stack).toEqual(['reed', 'wood'])
+  })
+
   it.each(['reed', 'wood'] as const)('offers anytime before a required payment with no before listener, buying %s', (resource) => {
     const flow: ActionFlow = { type: 'seq', children: [pay(1), {
       type: 'leaf', actionId: '__completion_pay__', params: { cost: { reed: 1 } },

@@ -31,6 +31,7 @@ import type { EngineInternals } from './engine-internals'
 import {
   buildOwnedFlowNode,
   buildFlowNode,
+  canStartNode,
   effectiveOwnerPlayerId,
   enforceCompositeContinuationMandatory,
   isActionStrictlyDoableWithoutBeforeTriggers,
@@ -527,16 +528,34 @@ export class Engine {
     state: GameState,
     space: ActionSpace,
     frameOwnerPlayerId: string,
+    options: {
+      protectedObservations?: readonly ProtectedObservation[]
+      activeHostNodeIds?: ReadonlySet<string>
+    } = {},
   ): MandatoryContinuationProbe[] {
     return this.tree.allNodes()
-      .filter((node): node is ActionNode =>
-        node instanceof ActionNode &&
+      .filter((node): node is ActionNode | OrNode | XorNode =>
+        (node instanceof ActionNode ? !node.bodyStarted : node instanceof OrNode || node instanceof XorNode) &&
         node.mandatory === true &&
-        node.beforePhaseResolved &&
-        !node.bodyStarted &&
         node.getState() === 'ready',
       )
+      .filter((node) => {
+        if (!(node instanceof ActionNode && node.beforePhaseResolved) && !options.activeHostNodeIds?.has(node.id)) {
+          if ((node instanceof OrNode || node instanceof XorNode) && node.selectedChildId) return false
+          const ownerPlayerId = effectiveOwnerPlayerId(this._internals(), node.id, frameOwnerPlayerId) ?? frameOwnerPlayerId
+          if (!options.protectedObservations?.some((observation) => !observation.knownToPlayerIds?.includes(ownerPlayerId))) return false
+        }
+        let current: EngineNode | null = node
+        while (current) {
+          if (current.optional === true && current.optionalActive === false) return false
+          const parent = this.tree.findParent(current.id)
+          if ((parent instanceof OrNode || parent instanceof XorNode) && parent.selectedChildId !== current.id) return false
+          current = parent
+        }
+        return true
+      })
       .map((node) => {
+        const actionNode = node instanceof ActionNode ? node : undefined
         const ownerPlayerId = effectiveOwnerPlayerId(
           this._internals(),
           node.id,
@@ -544,34 +563,34 @@ export class Engine {
         ) ?? frameOwnerPlayerId
         const clonedState = cloneSnapshotValue(state)
         const player = clonedState.players.find((entry) => entry.id === ownerPlayerId)
-        const targetSpaceId = typeof node.actionContext?.targetSpaceId === 'string'
-          ? node.actionContext.targetSpaceId
+        const targetSpaceId = typeof actionNode?.actionContext?.targetSpaceId === 'string'
+          ? actionNode.actionContext.targetSpaceId
           : space.id
         const clonedSpace = clonedState.actionSpaces.find((entry) => entry.id === targetSpaceId)
           ?? cloneSnapshotValue(space)
         const transactionEvents = cloneSnapshotValue(this.events.currentTransactionEvents())
-        const strictDoable = !!player && isActionStrictlyDoableWithoutBeforeTriggers(
-          this._internals(), {
-            state: clonedState,
-            player,
-            space: clonedSpace,
-            params: node.params ? cloneSnapshotValue(node.params) : undefined,
-            sourceCard: node.sourceCard,
-            actionContext: {
-              ...(node.actionContext ? cloneSnapshotValue(node.actionContext) : {}),
-              skipBeforeTriggers: true,
-            },
-            transactionEvents,
-            eventQuery: createEventQuery(transactionEvents),
+        const context = player ? {
+          state: clonedState,
+          player,
+          space: clonedSpace,
+          params: actionNode?.params ? cloneSnapshotValue(actionNode.params) : undefined,
+          sourceCard: actionNode?.sourceCard,
+          actionContext: {
+            ...(actionNode?.actionContext ? cloneSnapshotValue(actionNode.actionContext) : {}),
+            skipBeforeTriggers: true,
           },
-          node.actionId,
-        )
+          transactionEvents,
+          eventQuery: createEventQuery(transactionEvents),
+        } : undefined
+        const strictDoable = !!context && (actionNode
+          ? isActionStrictlyDoableWithoutBeforeTriggers(this._internals(), context, actionNode.actionId)
+          : canStartNode(this._internals(), context, node))
         return {
           nodeId: node.id,
-          actionId: node.actionId,
+          actionId: actionNode?.actionId ?? space.id,
           ownerPlayerId,
-          ...(node.continuationParentHostNodeId
-            ? { parentHostNodeId: node.continuationParentHostNodeId }
+          ...(actionNode?.continuationParentHostNodeId
+            ? { parentHostNodeId: actionNode.continuationParentHostNodeId }
             : {}),
           strictDoable,
         }
