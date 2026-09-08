@@ -94,7 +94,7 @@
 |---|---|---|
 | Future Schedule 目标语义 | `future-meeples.ts`、`future-meeples-entries.test.ts`、A019/B041/B044/D022/D147/E028、ADR 0018 | Exact Future Target 保留声明的目标轮，只有满足 `current round < target <= 14` 才进入计划；Future Prefix 只保留截至第 14 轮仍存在的连续后缀。共享 resolver 不得把缺失目标钳制到第 14 轮；确有不同映射的卡牌必须在调用点显式声明。 |
 | Strict Action Entry | `Action Entry Query`、`PlayerActionSpaceConfig`、`strictCanExecute`、E151、ADR 0018 | 卡牌创建的行动格默认严格，因此 availability 投影与权威 `takeAction` 在放置工人前执行同一个卡牌条件。标准复合行动格保持显式 opt-in，因为 OR flow 即使普通 child 当前不可执行，也可能仍有合法 replacement 或 skip 语义。 |
-| 当前步骤准入与 blocked 恢复 | `evaluateFlowDoable()`、`canStartBefore()`、`engine-blocked`、ADR 0015、A088/D049/D088/D119/D121/E128 | 当前原子步骤或适用 before 能开始即可准入；SEQ 检查下一步，OR/XOR 检查分支入口。必选续行失败保留效果，等待显式 undo。Before 后仅在当前 anytime 列表非空时提供继续窗口。不再预演整条流程；支付和围栏几何检查保留。 |
+| 当前步骤准入与 blocked 恢复 | `evaluateFlowDoable()`、`canStartBefore()`、`engine-blocked`、ADR 0015、A088/D049/D088/D119/D121/E128 | 当前原子步骤或适用 before 能开始即可准入；SEQ 检查下一步，OR/XOR 检查分支入口。必选续行失败保留效果，等待显式 undo。必选宿主执行本体前仅在当前合法 anytime 列表非空时提供继续窗口，即使没有触发 before listener。不再预演整条流程；支付和围栏几何检查保留。 |
 | Granted Rule Action | `family-growth`、A021/A093/B092/C021/D010、ADR 0018 | 卡牌授予规则动作时直接调用该动作。授予 Family Growth 不等于展开整个 Wish for Children 行动格，因此不会附带放置工人或可选小发展。 |
 | 普通围栏计数与事件语义 | `FenceSegment.type`、`getFenceCount()`、`farm.fenceBuilt.newFenceEdges`、`hasOrdinaryFenceBuiltEvent()`、E001/B027/D089 | 印刷 `<FENCE>` 的数量和触发只计算普通 `type='fence'` segment，包括农场上的借用普通围栏，但排除 Wood Palisades。确实关心任意围地 segment 或农场物件的消费者可继续读取广义 `farm.fenceBuilt.fences` 事件字段。 |
 | Metadata 审计覆盖需要随字段演进同步 | `STABLE` cost 和 `passing` 已覆盖；当前 literal mismatch 为 0 | 新增 metadata 字段时同步加 fixture，避免统计口径回退。 |

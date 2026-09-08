@@ -15,7 +15,7 @@ import { getSuppressedBeforeListenerIds, suppressBeforeListeners } from '../engi
 import { withSkippedComputeReplaceListeners } from '../engine/replace-guard'
 
 const deferredFlowDoableFns = new WeakSet<CanBeExecutedByPlayer>()
-const flowDerivedDoableFns = new WeakSet<CanBeExecutedByPlayer>()
+const flowDerivedDoableFns = new WeakMap<CanBeExecutedByPlayer, FlowActionResolver | undefined>()
 let flowHookDispatcher: HookDispatcher | undefined
 const getFlowHookDispatcher = () => flowHookDispatcher ??= new HookDispatcher()
 
@@ -55,7 +55,7 @@ export const deriveCanBeExecutedByFlow = (): CanBeExecutedByPlayer => {
     throw new Error('flow-derived canBeExecutedByPlayer has not been initialized')
   }
   deferredFlowDoableFns.add(placeholder)
-  flowDerivedDoableFns.add(placeholder)
+  flowDerivedDoableFns.set(placeholder, undefined)
   return placeholder
 }
 
@@ -100,34 +100,35 @@ const applyChildActionDoable = (
   if (strictDoable === false) return false
   const hooks = getFlowHookDispatcher()
   const replacement = hooks.applyComputeReplace({ ...context, actionId })
+  const canStartAlternative = () => replacement.alternatives.some((alternative) => evaluateFlowDoable(alternative.flow, {
+    ...context,
+    sourceCard: alternative.sourceCard ?? context.sourceCard,
+    actionContext: withSkippedComputeReplaceListeners(context.actionContext, alternative.replacementListenerIds),
+  }, resolveAction, nextSeenActionIds))
   if (replacement.actionId !== actionId) {
     const replaced = resolveAction(replacement.actionId)
-    return !!replaced && applyChildActionDoable(replacement.actionId, replaced, {
+    return (!!replaced && applyChildActionDoable(replacement.actionId, replaced, {
       ...context,
       sourceCard: replacement.sourceCard ?? context.sourceCard,
       actionContext: { ...context.actionContext, checkedReplaceAction: true },
-    }, resolveAction, nextSeenActionIds)
+    }, resolveAction, nextSeenActionIds)) || canStartAlternative()
   }
 
-  let doable = strictDoable ?? (!isDeferredFlowDoable(action.canBeExecutedByPlayer) && action.canBeExecutedByPlayer.call(
+  let doable = strictDoable ?? (!isFlowDerivedDoable(action.canBeExecutedByPlayer) && action.canBeExecutedByPlayer.call(
     context.space,
     context.state,
     context.player,
     childCanBeExecutedContext(context),
   ))
   if (!doable && action.flow) {
-    doable = evaluateFlowDoable(action.flow, context, resolveAction, nextSeenActionIds)
+    doable = evaluateFlowDoable(action.flow, context, flowDerivedDoableFns.get(action.canBeExecutedByPlayer) ?? resolveAction, nextSeenActionIds)
   }
 
   return hooks.applyIsDoable(
     { ...context, actionId },
     action,
     doable,
-    () => replacement.alternatives.some((alternative) => evaluateFlowDoable(alternative.flow, {
-      ...context,
-      sourceCard: alternative.sourceCard ?? context.sourceCard,
-      actionContext: withSkippedComputeReplaceListeners(context.actionContext, alternative.replacementListenerIds),
-    }, resolveAction, nextSeenActionIds)) || canStartBefore(actionId, context, resolveAction, nextSeenActionIds),
+    () => canStartAlternative() || canStartBefore(actionId, context, resolveAction, nextSeenActionIds),
   )
 }
 
@@ -242,10 +243,10 @@ export const initializeFlowDerivedCanBeExecutedByPlayer = (
         actionContext: context?.actionContext,
       },
       resolveAction,
-      new Set([action.id]),
+      new Set([`${action.id}:${JSON.stringify(context?.params ?? {})}`]),
     )
   }
 
-  flowDerivedDoableFns.add(action.canBeExecutedByPlayer)
+  flowDerivedDoableFns.set(action.canBeExecutedByPlayer, resolveAction)
   return action
 }

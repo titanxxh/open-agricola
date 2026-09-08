@@ -703,7 +703,7 @@ Card listener 区域默认只匹配已打出卡：`zones` 省略等价于 `['pla
 
 引擎在状态变化后重新评估 before 候选，每次 activation 只消费一次。已接受的根行动和必选续行会向复合后代传播义务。选中分支不能返回父选择以逃过未履行的义务；明确 optional 节点在接受前仍可跳过。必选叶节点或复合节点不可执行时产生 `engine-blocked`；普通失败保留先前效果，等待玩家显式 `undoStep` 或 `undoAction`。无效结构化提交恢复命令检查点并保留原交互。
 
-before 完成后宿主仍不可行时，仅当当前合法 anytime 列表非空才提供“继续”窗口，不分析相关性或未来是否成功。Anytime 执行后回到同一窗口；继续按钮严格重验宿主，不重复 before。继续失败或最初没有 anytime 时进入 blocked。原有阶段与 provisional guard 仍然有效。Pending 与 before 单次消费状态随 engine cursor 序列化，撤销使用既有命令和 Rule Action 历史。
+必选宿主在执行本体前仍不可行时，仅当当前合法 anytime 列表非空才提供“继续”窗口，包括没有触发任何 before listener 的情况；不分析相关性或未来是否成功。Anytime 执行后回到同一窗口；继续按钮严格重验宿主，不重复 before。继续失败或最初没有 anytime 时进入 blocked。原有阶段与 provisional guard 仍然有效。Pending 与 before 单次消费状态随 engine cursor 序列化，撤销使用既有命令和 Rule Action 历史。
 
 不再有通用整流程搜索、确定性输入适配器或普通 completion scope。支付求解、动物容量和围栏几何仍属于原子规则检查。只有不存在特殊围栏 policy，且所有匹配的围栏费用 listener 都声明 `monotoneFenceCost` 时，围栏候选才可剪掉付不起费用的严格超集。跨玩家恢复、Protected Observation 门禁和保留同一已揭示选择的 fallback 继续遵守 ADR 0015 的 provisional 语义。
 

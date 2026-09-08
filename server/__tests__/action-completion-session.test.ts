@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it } from 'vitest'
 import { GameSession, type SessionResponse } from '../game/authoritative-session'
 import type { ActionDefinition, ActionFlow } from '../../shared/contract/types'
 import type { CardListenerRegistration } from '../../shared/cards/card-listeners'
@@ -6,6 +6,8 @@ import { requireActiveCardRegistry } from '../../shared/cards/active-registry'
 import { setWorkersAtHome } from '../../shared/domain/player'
 import { payAction } from '../../shared/actions/effects/pay'
 import type { ActionRegistry } from '../../shared/engine/registry'
+import { deriveCanBeExecutedByFlow, initializeFlowDerivedCanBeExecutedByPlayer } from '../../shared/actions/flow'
+import { registerActionHook, unregisterActionHook } from '../../shared/actions/hooks'
 
 const setup = (flow: ActionFlow, food = 0) => {
   const session = new GameSession(830, undefined, { playerCount: 2 })
@@ -53,6 +55,87 @@ const finishChoices = (session: GameSession, response: SessionResponse): Session
 const pay = (food: number): ActionFlow => ({ type: 'leaf', actionId: '__completion_pay__', params: { cost: { food } } })
 
 describe('action admission and blocked recovery through public Session commands', () => {
+  afterEach(() => unregisterActionHook('__review_replace__'))
+
+  it.each(['reed', 'wood'] as const)('offers anytime before a required payment with no before listener, buying %s', (resource) => {
+    const flow: ActionFlow = { type: 'seq', children: [pay(1), {
+      type: 'leaf', actionId: '__completion_pay__', params: { cost: { reed: 1 } },
+    }] }
+    let { session } = setup(flow, 2)
+    session.state.players[0]!.occupationPlayed = ['A102_Grocer']
+    session.state.players[0]!.cardStates.A102_Grocer = { stack: [resource] }
+    let response = session.takeAction(0, 'forest')
+    expect(response.ok, response.error).toBe(true)
+    expect(response.interaction).toMatchObject({ promptKey: 'ui.interactionBeforeAnytime', playerIndex: 0 })
+    expect(response.state.players[0]!.resources.food).toBe(1)
+    expect(response.interaction.anytimeActions.some((action) => action.id === 'A102-grocer-anytime')).toBe(true)
+    const state = JSON.parse(JSON.stringify(session.state))
+    const cursor = session.createSessionPrivateCursor()
+    session = setup(flow).session
+    session.loadState(state)
+    session.restoreSessionPrivateCursor(cursor)
+    expect(session.takeAnytimeAction(1, 'A102-grocer-anytime').ok).toBe(false)
+    response = session.takeAnytimeAction(0, 'A102-grocer-anytime')
+    expect(response.ok, response.error).toBe(true)
+    expect(response.interaction.promptKey).toBe('ui.interactionBeforeAnytime')
+    expect(response.state.players[0]!.resources).toMatchObject({ food: 0, [resource]: 1 })
+    response = session.resolveChoice(0, 'continue')
+    expect(response.ok, response.error).toBe(true)
+    expect(response.interaction.request?.kind === 'engine-blocked').toBe(resource === 'wood')
+    expect(response.state.players[0]!.resources.reed).toBe(0)
+    expect(session.undoStep(0).interaction.promptKey).toBe('ui.interactionBeforeAnytime')
+    response = session.undoAction(0)
+    expect(response.state.players[0]!.resources).toMatchObject({ food: 2, reed: 0, wood: 0 })
+    expect(response.state.players[0]!.cardStates.A102_Grocer?.stack).toEqual([resource])
+    expect(response.state.actionSpaces.find((space) => space.id === 'forest')!.takenBy).toEqual([])
+  })
+
+  it.each(['direct', 'parameterized', 'mutual'] as const)('rejects a %s recursive derived flow without overflowing availability', (kind) => {
+    const params = kind === 'parameterized' ? { food: 1 } : undefined
+    const { session, registry } = setup({ type: 'leaf', actionId: '__recursive_A__', params })
+    const first: ActionDefinition = {
+      ...registry.get('forest')!, id: '__recursive_A__', canBeExecutedByPlayer: deriveCanBeExecutedByFlow(),
+      flow: { type: 'leaf', actionId: kind === 'mutual' ? '__recursive_B__' : '__recursive_A__', params },
+    }
+    const second: ActionDefinition = {
+      ...first, id: '__recursive_B__', canBeExecutedByPlayer: deriveCanBeExecutedByFlow(),
+      flow: { type: 'leaf', actionId: first.id },
+    }
+    for (const action of [first, second]) registry.register(action)
+    for (const action of [first, second]) initializeFlowDerivedCanBeExecutedByPlayer(action, (id) => registry.get(id))
+    const forest = session.state.actionSpaces.find((space) => space.id === 'forest')!
+    forest.canBeExecutedByPlayer = deriveCanBeExecutedByFlow()
+    initializeFlowDerivedCanBeExecutedByPlayer(forest, (id) => registry.get(id))
+    expect(session.getActionAvailability(0).forest).toBe(false)
+    expect(session.takeAction(0, 'forest').ok).toBe(false)
+    expect(forest.takenBy).toEqual([])
+    expect(first.canBeExecutedByPlayer.call(forest, session.state, session.state.players[0]!, { params })).toBe(false)
+  })
+
+  it.each([false, true])('keeps a legal alternative when the replacement ID is unavailable, nested=%s', (nested) => {
+    const child: ActionFlow = { type: 'leaf', actionId: '__review_original__' }
+    const { session, registry } = setup(nested ? { type: 'or', children: [child] } : child)
+    const forest = session.state.actionSpaces.find((space) => space.id === 'forest')!
+    registry.register({ ...registry.get('forest')!, id: '__review_original__', flow: undefined })
+    registry.register({ ...registry.get('__review_original__')!, id: '__review_unavailable__', canBeExecutedByPlayer: () => false })
+    forest.canBeExecutedByPlayer = deriveCanBeExecutedByFlow()
+    initializeFlowDerivedCanBeExecutedByPlayer(forest, (id) => registry.get(id))
+    registerActionHook({
+      id: '__review_replace__', actions: ['__review_original__'], phases: ['computeReplace'],
+      handler: () => ({ actionId: '__review_unavailable__' }),
+    })
+    session.state.players[0]!.occupationPlayed = ['__review_alternative__']
+    session.withCtx(() => requireActiveCardRegistry('replacement alternative regression').registerListener({
+      id: '__review_alternative__', cardIds: ['__review_alternative__'], actions: ['__review_original__'], phases: ['computeReplace'],
+      handler: () => ({ decline: true, alternativeFlow: { type: 'leaf', actionId: 'gain', params: { wood: 1 } } }),
+    }))
+    expect(session.getActionAvailability(0).forest).toBe(true)
+    const response = finishChoices(session, session.takeAction(0, 'forest'))
+    expect(response.interaction.request?.kind).not.toBe('engine-blocked')
+    expect(response.state.players[0]!.resources.wood).toBe(1)
+    expect(response.state.actionSpaces.find((space) => space.id === 'forest')!.takenBy).toHaveLength(1)
+  })
+
   it('allows the player to choose the enabling before order and leaves state and private cursor unchanged while querying', () => {
     const { session } = setup({ type: 'seq', children: [pay(1)] })
     before(session, '__completion_B__', '__completion_pay__', { type: 'seq', optional: true, children: [

@@ -675,7 +675,7 @@ export class Engine {
 
   offerBeforeAnytimeWindow(nodeId: string): boolean {
     const node = this.tree.findNodeById(nodeId)
-    if (!node?.beforeAnytimeAvailable) return false
+    if (!node || node.beforeAnytimeAvailable === false || (node instanceof ActionNode && node.bodyStarted)) return false
     node.beforeAnytimeAvailable = false
     const options = [{ value: 'continue', labelKey: 'ui.interactionContinue' }]
     node.setPending({
