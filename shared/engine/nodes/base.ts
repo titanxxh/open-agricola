@@ -19,6 +19,7 @@ export abstract class BaseNode implements EngineNode {
   public optionalActive?: boolean
   public optionalPromptKey?: PromptKey
   public mandatory?: boolean
+  public beforeAnytimeAvailable?: boolean
   public pending?: PendingEnvelope | null
   protected nodeState: NodeState
 
@@ -92,6 +93,7 @@ export abstract class BaseNode implements EngineNode {
     if (this.optional !== undefined) data.optional = this.optional
     if (this.optionalActive !== undefined) data.optionalActive = this.optionalActive
     if (this.optionalPromptKey !== undefined) data.optionalPromptKey = this.optionalPromptKey
+    if (this.beforeAnytimeAvailable !== undefined) data.beforeAnytimeAvailable = this.beforeAnytimeAvailable
     if (this.mandatory !== undefined) data.mandatory = this.mandatory
     if (this.pending !== undefined && this.pending !== null) data.pending = this.pending
     return data

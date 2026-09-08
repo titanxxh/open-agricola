@@ -1,3 +1,4 @@
+import { evaluateFlowDoable } from '../actions/flow'
 import type {
   ActionExecutionContext,
   ActionExecutionResult,
@@ -39,6 +40,7 @@ import {
   buildListenerEvent,
   buildOwnedFlowNode,
   canActionContinueWithoutBeforeTriggers,
+  canStartNode,
   enforceCompositeContinuationMandatory,
   findActionNode,
   getNodeDescriptionPreview,
@@ -72,7 +74,6 @@ type EngineContext = {
   player: ActionExecutionContext['player']
   space: ActionExecutionContext['space']
   continuationOwnerPlayerId?: string
-  provisionalContinuation?: boolean
   emitPrivateEvent?: ActionExecutionContext['emitPrivateEvent']
   reportProtectedObservation?: ActionExecutionContext['reportProtectedObservation']
 }
@@ -258,6 +259,7 @@ const triggerSelectEvaluationOptions = (
   int: EngineInternals,
   context: ActionExecutionContext,
 ): TriggerSelectEvaluationOptions => ({
+  canStartFlow: (flow, flowContext) => evaluateFlowDoable(flow, flowContext, (actionId) => int.registry.get(actionId)),
   canContinueWithoutTriggers: (actionId, resources) =>
     canActionContinueWithoutBeforeTriggers(
       int,
@@ -273,6 +275,8 @@ const triggerSelectEvaluationOptions = (
       scopedContext.state,
       scopedContext.player,
       {
+        params: scopedContext.params,
+        space: scopedContext.space,
         sourceCard: scopedContext.sourceCard,
         actionContext: scopedContext.actionContext,
       },
@@ -527,18 +531,7 @@ const buildOptionalPrompt = (
     emitPrivateEvent: context.emitPrivateEvent,
     reportProtectedObservation: context.reportProtectedObservation,
   }
-  const doable = int.hooks.applyIsDoable(
-    { ...executionContext, ...currentEventReadContext(int), actionId: actionNode.actionId },
-    action,
-    action.canBeExecutedByPlayer(
-      executionContext.state,
-      executionContext.player,
-      {
-        sourceCard: executionContext.sourceCard,
-        actionContext: executionContext.actionContext,
-      },
-    ),
-  )
+  const doable = canStartNode(int, { ...executionContext, ...currentEventReadContext(int) }, node)
   if (!doable) {
     resolveSubtree(node)
     return { type: 'ok', nodeId: node.id, result: { type: 'ok' } }
@@ -700,6 +693,7 @@ const executeDeferredHostAction = (
   if (!result) return { type: 'blocked', nodeId: node.id, actionId: node.actionId }
   const blockedResult = blockingBeforeHostChildResult(int, node)
   if (blockedResult) {
+    if (node.mandatory) return { type: 'blocked', nodeId: node.id, actionId: node.actionId, mandatory: true }
     recordDeferredHostResult(int, node, blockedResult)
     node.resolve(blockedResult)
     commitIfEngineComplete(int, context, blockedResult)
@@ -940,18 +934,7 @@ export function engineProceed(
         }
         const action = int.registry.get(entry.actionNode.actionId)
         if (!action) return null
-        const doable = int.hooks.applyIsDoable(
-          { ...executionContext, ...currentEventReadContext(int), actionId: entry.actionNode.actionId },
-          action,
-          action.canBeExecutedByPlayer(
-            executionContext.state,
-            executionContext.player,
-            {
-              sourceCard: executionContext.sourceCard,
-              actionContext: executionContext.actionContext,
-            },
-          ),
-        )
+        const doable = canStartNode(int, { ...executionContext, ...currentEventReadContext(int) }, entry.node)
         if (!doable) return null
         const baseLabel = getChoiceLabel(entry.node, int.registry)
         if (!baseLabel) return null
@@ -1159,6 +1142,7 @@ export function engineProceed(
     )
     if (beforeActivateNodes.length > 0 && !node.beforePhaseResolved) {
       node.beforePhaseResolved = true
+      node.beforeAnytimeAvailable = true
       beforeActivateNodes.forEach((beforeNode) => stampBeforeHostNode(beforeNode, node.id))
       enforceCompositeContinuationMandatory(node)
       int.tree.insertBefore(node.id, beforeActivateNodes)
@@ -1172,6 +1156,8 @@ export function engineProceed(
         executionContext.state,
         executionContext.player,
         {
+          params: executionContext.params,
+          space: executionContext.space,
           sourceCard: executionContext.sourceCard,
           actionContext: executionContext.actionContext,
         },
@@ -1222,6 +1208,7 @@ export function engineProceed(
       eventBuffer.sink,
     )
     node.bodyStarted = true
+    node.beforeAnytimeAvailable = false
     const rawResult = optInChoice ?? action.execute({
       ...executionContext,
       eventSink: eventBuffer.sink,
@@ -1242,6 +1229,7 @@ export function engineProceed(
       recordEventLogDerivation(int, completedEvents, result)
     }
     if (result.type === 'fail') {
+      if (node.mandatory) return { type: 'blocked', nodeId: node.id, actionId: replacedActionId, mandatory: true }
       int.events.rollbackTransaction()
       clearEventLogDerivations(int)
       recordInternalChildResult(int, node, result)

@@ -216,14 +216,95 @@ describe('D119 Wood Barterer session', () => {
     expect(response.interaction.request.kind).not.toBe('engine-blocked')
   })
 
-  it('does not combine mutually exclusive wood gain and reed exchange before renovation', () => {
+  it('blocks after choosing wood when renovation still needs reed, and restores the placement on undo', () => {
     const session = setup({ houseType: 'clay', resources: { stone: 2 } })
-    expect(session.getActionAvailability(0)['farm-redevelopment']).toBe(false)
-    const response = session.takeAction(0, 'farm-redevelopment')
-    expect(response.ok).toBe(false)
+    expect(session.getActionAvailability(0)['farm-redevelopment']).toBe(true)
+    const response = applyWoodBarterer(session, session.takeAction(0, 'farm-redevelopment'), {}, { wood: 2 })
+    expect(response.ok, response.error).toBe(true)
+    expect(response.interaction.request.kind).toBe('engine-blocked')
     expect(response.state.players[0]!.houseType).toBe('clay')
-    expect(response.state.players[0]!.resources).toMatchObject({ wood: 0, reed: 0, stone: 2 })
-    expect(response.state.actionSpaces.find((space) => space.id === 'farm-redevelopment')?.takenBy).toEqual([])
+    expect(response.state.players[0]!.resources).toMatchObject({ wood: 2, reed: 0, stone: 2 })
+    const undone = session.undoAction(0)
+    expect(undone.ok, undone.error).toBe(true)
+    expect(undone.state.players[0]!.resources).toMatchObject({ wood: 0, reed: 0, stone: 2 })
+    expect(undone.state.actionSpaces.find((space) => space.id === 'farm-redevelopment')?.takenBy).toEqual([])
+  })
+
+  it('waits after before for Grocer, then rechecks renovation only when continued', () => {
+    const session = setup({ houseType: 'clay', resources: { stone: 2, food: 1 } })
+    const state = session.getState().state
+    state.players[0]!.occupationPlayed.push('A102_Grocer')
+    state.players[0]!.cardStates.A102_Grocer = { stack: ['reed'] }
+    session.loadState(state)
+    let response = applyWoodBarterer(session, session.takeAction(0, 'farm-redevelopment'), {}, { wood: 2 })
+    expect(response.interaction).toMatchObject({ stateId: 'wait', playerIndex: 0, request: { kind: 'choice' } })
+    expect(response.interaction.anytimeActions.map((entry) => entry.id)).toContain('A102-grocer-anytime')
+    response = session.takeAnytimeAction(0, 'A102-grocer-anytime')
+    expect(response.ok, response.error).toBe(true)
+    expect(response.state.players[0]!.resources).toMatchObject({ food: 0, reed: 1, wood: 2, stone: 2 })
+    expect(response.state.players[0]!.houseType).toBe('clay')
+    expect(response.interaction.request.kind).toBe('choice')
+    response = session.resolveChoice(0, 'continue')
+    expect(response.ok, response.error).toBe(true)
+    expect(response.state.players[0]!.houseType).toBe('stone')
+    expect(response.state.players[0]!.resources).toMatchObject({ food: 0, reed: 0, wood: 2, stone: 0 })
+  })
+
+  it.each([false, true])('keeps the continue window across multiple anytime actions, reconnect=%s', (reconnect) => {
+    let session = setup({ houseType: 'clay', resources: { stone: 2, food: 2 } })
+    const initial = session.getState().state
+    initial.players[0]!.occupationPlayed.push('A102_Grocer')
+    initial.players[0]!.cardStates.A102_Grocer = { stack: ['reed', 'wood'] }
+    session.loadState(initial)
+    let response = applyWoodBarterer(session, session.takeAction(0, 'farm-redevelopment'), {}, { wood: 2 })
+    const beforeQuery = JSON.stringify({ state: session.state, cursor: session.createSessionPrivateCursor() })
+    session.getActionAvailability(0)
+    expect(JSON.stringify({ state: session.state, cursor: session.createSessionPrivateCursor() })).toBe(beforeQuery)
+    expect(session.resolveChoice(1, 'continue').ok).toBe(false)
+    expect(session.takeAnytimeAction(1, 'A102-grocer-anytime').ok).toBe(false)
+    if (reconnect) {
+      const state = JSON.parse(JSON.stringify(session.state))
+      const cursor = session.createSessionPrivateCursor()
+      session = new GameSession(6119, undefined, { playerCount: 2 })
+      session.loadState(state)
+      session.restoreSessionPrivateCursor(cursor)
+    }
+    response = session.takeAnytimeAction(0, 'A102-grocer-anytime')
+    expect(response.state.players[0]!.resources).toMatchObject({ food: 1, wood: 3, reed: 0 })
+    expect(response.interaction.promptKey).toBe('ui.interactionBeforeAnytime')
+    response = session.undoStep(0)
+    expect(response.ok, response.error).toBe(true)
+    expect(response.state.players[0]!.resources).toMatchObject({ food: 2, wood: 2, reed: 0 })
+    expect(response.interaction.promptKey).toBe('ui.interactionBeforeAnytime')
+    session.takeAnytimeAction(0, 'A102-grocer-anytime')
+    response = session.takeAnytimeAction(0, 'A102-grocer-anytime')
+    expect(response.state.players[0]!.resources).toMatchObject({ food: 0, wood: 3, reed: 1 })
+    expect(response.interaction.promptKey).toBe('ui.interactionBeforeAnytime')
+    response = session.resolveChoice(0, 'continue')
+    expect(response.state.players[0]!.houseType).toBe('stone')
+    expect(response.state.players[0]!.resources).toMatchObject({ food: 0, wood: 3, reed: 0, stone: 0 })
+  })
+
+  it.each([false, true])('offers unrelated anytime and blocks a still-impossible continue, useAnytime=%s', (useAnytime) => {
+    const session = setup({ houseType: 'clay', resources: { stone: 2, food: 1 } })
+    const state = session.getState().state
+    state.players[0]!.occupationPlayed.push('A102_Grocer')
+    state.players[0]!.cardStates.A102_Grocer = { stack: ['wood'] }
+    session.loadState(state)
+    let response = applyWoodBarterer(session, session.takeAction(0, 'farm-redevelopment'), {}, { wood: 2 })
+    expect(response.interaction.promptKey).toBe('ui.interactionBeforeAnytime')
+    if (useAnytime) {
+      response = session.takeAnytimeAction(0, 'A102-grocer-anytime')
+      expect(response.interaction.promptKey).toBe('ui.interactionBeforeAnytime')
+      expect(response.interaction.anytimeActions).toEqual([])
+    }
+    response = session.resolveChoice(0, 'continue')
+    expect(response.interaction.request.kind).toBe('engine-blocked')
+    expect(response.state.players[0]!.resources).toMatchObject({ wood: useAnytime ? 3 : 2, reed: 0, stone: 2 })
+    expect(session.resolveChoice(0, 'continue').ok).toBe(false)
+    response = session.undoAction(0)
+    expect(response.state.players[0]!.resources).toMatchObject({ food: 1, wood: 0, reed: 0, stone: 2 })
+    expect(response.state.players[0]!.cardStates.A102_Grocer?.stack).toEqual(['wood'])
   })
 
   it('D119 S8: a Cottager card-granted room action does not trigger Wood Barterer', () => {

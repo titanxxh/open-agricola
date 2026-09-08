@@ -84,7 +84,7 @@ describe('B094_StockProtector session', () => {
     expect(resp.state.actionSpaces.find((space) => space.id === 'day-laborer')!.takenBy).toHaveLength(1)
   })
 
-  it('B094 S5: rejects entry without gaining wood if fencing is still not doable', () => {
+  it('B094 S5: blocks after gaining wood if fencing is still not doable, then explicitly undoes', () => {
     const session = new GameSession()
     stabilizeRandomHands(session.state.players)
     const state = session.getState().state
@@ -97,10 +97,12 @@ describe('B094_StockProtector session', () => {
 
     session.loadState(state)
 
-    const resp = session.takeAction(0, 'fencing')
-    expect(resp.ok).toBe(false)
-    expect(resp.error).toBe('space unavailable')
-    expect(resp.interaction.stateId).toBe('idle')
+    let resp = session.takeAction(0, 'fencing')
+    expect(resp.ok).toBe(true)
+    expect(resp.interaction.request.kind).toBe('engine-blocked')
+    expect(resp.state.players[0]!.resources.wood).toBe(2)
+    resp = session.undoAction(0)
+    expect(resp.ok).toBe(true)
     expect(resp.state.players[0]!.resources.wood).toBe(0)
     expect(resp.state.actionSpaces.find((space) => space.id === 'fencing')?.takenBy).toHaveLength(0)
   })

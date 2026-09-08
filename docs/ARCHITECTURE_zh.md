@@ -697,15 +697,15 @@ Card listener 区域默认只匹配已打出卡：`zones` 省略等价于 `['pla
 
 手牌 listener 只用于“卡牌存在于手牌时就必须监听历史”的卡牌局部规则。它仍必须遵守 state-pure flow builder 约束：只读当前 transaction events / state，状态更新通过返回 flow 落到本卡 `cardStates[cardId]`。当该卡仍在手牌中时，per-viewer serialization 必须对非 owner 隐藏对应 `cardStates[cardId]`、以该手牌卡为 source 的 public events、由这些事件派生的 log entry、过滤后的 event/archive seq cursor、runtime `publicEventCancellations` 和按手牌 id keyed 的 `cardAvailability`，避免从局部历史或可打出性元数据反推隐藏手牌。禁止为了单卡历史需求新增 `PlayerState.stats` / `GameState` 顶层全局 stat；没有该卡的对局不应为该卡维护额外历史。
 
-### 7.5.2 行动完成可达性
+### 7.5.2 当前步骤准入、before 与 blocked 恢复
 
-行动格可用性与权威入口共用 `GameCore.applyIsDoableCheck()`。当前谓词不足以证明完成时，查询会复制规则状态、投影工人放置及目标已知的 `before` flow，再用普通引擎流水线调用 `Engine.canComplete()`。搜索通过真实 `proceed()` / `resolveChoice()` 状态转换分支，并由 action 的 `getCompletionChoices()` 枚举结构化请求。找到一条完成路径即可成功；否则穷尽全部确定性合法分支。只允许消除 state 与 cursor 都相同的循环，不设深度、节点数或耗时截断；缺少确定性输入适配器属于实现错误。跨玩家决定、随机结果与新公开的隐藏信息继续遵守 ADR 0015 的 provisional 边界。
+行动格可用性与权威入口共用 `GameCore.applyIsDoableCheck()` 和 flow 准入 helper。原子判断携带 params、sourceCard、actionContext、owner、目标行动格、实际费用修正与替代行动信息。当前步骤可执行，或适用的 before 可以开始，就允许尝试；不保证整条流程能够完成。SEQ 检查下一步，OR/XOR 检查是否有分支可以开始。显式 veto 和放人限制仍然有效。查询不消费资源、触发、事件或私有 cursor。
 
-只有不存在特殊围栏 policy，且所有匹配的围栏费用 listener 都声明 `monotoneFenceCost` 时，围栏枚举才可剪掉付不起费用的严格超集。该声明表示增加围栏边不会让原本付不起的候选变得可支付。
+引擎在状态变化后重新评估 before 候选，每次 activation 只消费一次。已接受的根行动和必选续行会向复合后代传播义务。选中分支不能返回父选择以逃过未履行的义务；明确 optional 节点在接受前仍可跳过。必选叶节点或复合节点不可执行时产生 `engine-blocked`；普通失败保留先前效果，等待玩家显式 `undoStep` 或 `undoAction`。无效结构化提交恢复命令检查点并保留原交互。
 
-查询独占复制后的 state、cursor、事件事务、日志与 protected-observation sink，因此不会消费资源或触发器，也不会发布 public/private 输出。接受后无法完成的可枚举 `choice` / `select-trigger` 选项会在展示前过滤或禁用；结构化提交用同一 payload 在权威 mutation 前重验，拒绝时保留 pending。真实命令始终从 live state 重新校验执行，不重放搜索 witness。
+before 完成后宿主仍不可行时，仅当当前合法 anytime 列表非空才提供“继续”窗口，不分析相关性或未来是否成功。Anytime 执行后回到同一窗口；继续按钮严格重验宿主，不重复 before。继续失败或最初没有 anytime 时进入 blocked。原有阶段与 provisional guard 仍然有效。Pending 与 before 单次消费状态随 engine cursor 序列化，撤销使用既有命令和 Rule Action 历史。
 
-每次顶层放人在命令入口记录 completion scope；接受 optional 子树前记录更窄的 scope。若未预见的确定性失败到达 mandatory 步骤，Session 恢复包含该义务的最小 scope：optional 子树回退后按拒绝继续父流程；行动格自身义务失败则恢复放人与依赖它的 `before` 效果。scope 与 checkpoint 只进入私有 cursor，可跨重连恢复；Protected Observation 或跨玩家 continuation 仍使用 ADR 0015 的严格 provisional scope。
+不再有通用整流程搜索、确定性输入适配器或普通 completion scope。支付求解、动物容量和围栏几何仍属于原子规则检查。只有不存在特殊围栏 policy，且所有匹配的围栏费用 listener 都声明 `monotoneFenceCost` 时，围栏候选才可剪掉付不起费用的严格超集。跨玩家恢复、Protected Observation 门禁和保留同一已揭示选择的 fallback 继续遵守 ADR 0015 的 provisional 语义。
 
 ### 7.5.3 Pay child 架构不变量
 

@@ -114,7 +114,8 @@ describe('A166 Haydryer parity', () => {
 
   it('A166 S4: with only two food a three-food Haydryer purchase cannot complete', () => {
     const session = setup({ pastures: 1, food: 2 })
-    const response = session.performRoundEnd()
+    let response = session.performRoundEnd()
+    if (response.interaction.stateId === 'wait') response = session.resolveChoice(0, '__skip__')
 
     expect(response.ok, response.error).toBe(true)
     expect(response.state.players[0]!.resources.cattle).toBe(0)

@@ -117,6 +117,33 @@ describe('D049 Bookshelf session', () => {
     expect(response.state.players[0]!.resources.food).toBe(2)
   })
 
+  it('cannot keep Bookshelf food without playing an occupation, including after reconnect', () => {
+    let session = setup()
+    const initial = session.getState().state
+    const initialCardStates = structuredClone(initial.players[0]!.cardStates)
+    initial.players[0]!.occupationHand = [FILLER]
+    session.loadState(initial)
+    expect(session.getActionAvailability(0).lessons).toBe(true)
+    let response = session.takeAction(0, 'lessons')
+    expect(response.ok, response.error).toBe(true)
+    expect(response.interaction.request.kind).toBe('engine-blocked')
+    expect(response.state.players[0]!.resources.food).toBe(3)
+    expect(response.state.players[0]!.occupationPlayed).toEqual(PLAYED_OCCUPATIONS)
+    const state = JSON.parse(JSON.stringify(session.state))
+    const cursor = session.createSessionPrivateCursor()
+    session = new GameSession(2049, undefined, { playerCount: 2 })
+    session.loadState(state)
+    session.restoreSessionPrivateCursor(cursor)
+    expect(session.getState().interaction.request.kind).toBe('engine-blocked')
+    expect(session.takeAction(0, 'forest').ok).toBe(false)
+    expect(session.takeAnytimeAction(0, 'exchange').ok).toBe(false)
+    response = session.undoAction(0)
+    expect(response.ok, response.error).toBe(true)
+    expect(response.state.players[0]!.resources.food).toBe(0)
+    expect(response.state.actionSpaces.find((space) => space.id === 'lessons')!.takenBy).toEqual([])
+    expect(response.state.players[0]!.cardStates).toEqual(initialCardStates)
+  })
+
   it('D049 S4: a Bookshelf owned by another player does not trigger for the acting player', () => {
     const response = playOccupation(setup({ owner: 1, food: 1 }))
 

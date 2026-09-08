@@ -117,30 +117,6 @@ describe('Engine flow nodes', () => {
   setActiveCardRegistry(new CardRegistry())
   })
 
-  it('proves a complete payment and farm selection path without mutating the caller', () => {
-    const player = createPlayer()
-    player.resources.food = 1
-    player.roomTiles = [{ row: 0, col: 0 }, { row: 1, col: 0 }]
-    const state = createState()
-    state.players = [player]
-    const registry = new ActionRegistry()
-    registry.register(payAction)
-    registry.register(plowAction)
-    const engine = Engine.fromFlow({
-      type: 'seq',
-      children: [
-        { type: 'leaf', actionId: 'pay', params: { cost: { food: 1 } } },
-        { type: 'leaf', actionId: 'plow' },
-      ],
-    }, { registry, hooks: new HookDispatcher(), log: new LogStore() }, player.id)
-    const context = { state, player, space: createSpace(plowAction) }
-    const before = JSON.stringify({ state, cursor: engine.snapshot() })
-    expect(engine.canComplete(context)).toBe(true)
-    expect(JSON.stringify({ state, cursor: engine.snapshot() })).toBe(before)
-    player.resources.food = 0
-    expect(engine.canComplete(context)).toBe(false)
-  })
-
   it('dynamic result.flow targetPlayerId scopes only the targeted subtree', () => {
     const p1 = createPlayer()
     const p2 = { ...createPlayer(), id: 'p2', name: 'P2', color: 'blue' as const }
@@ -671,9 +647,11 @@ describe('Engine flow nodes', () => {
       listenerId: String(child.params.listenerId),
       mandatory: false,
     }))
+    const registry = new ActionRegistry()
+    registry.register(payAction)
     const engine = new Engine({
       tree: new EngineTree(triggerSelect),
-      registry: new ActionRegistry(),
+      registry,
       hooks: new HookDispatcher(),
       log: new LogStore(),
     })

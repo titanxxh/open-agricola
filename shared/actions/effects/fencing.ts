@@ -57,7 +57,6 @@ import {
   readPendingFenceBonus,
 } from '../../cards/helpers/pending-fence-bonus'
 import { isThroughTheSeasonsSeason } from '../../seasons/rules'
-import { interactionChoices, selectionSubsets, type CompletionChoice } from '../../engine/interaction-choices'
 
 export const maxFences = MAX_ORDINARY_FENCE_PIECES
 export const maxPastureCells = 15
@@ -372,7 +371,7 @@ export const canStartFencing = (
     farm: buildFenceFarmInteraction(player, space.id, actionContext),
     options: [{ value: 'confirm', labelKey: 'ui.interactionFenceConfirm' }],
   }
-  return !fenceCompletionChoices({ state, player, space, actionContext }, request, costOverride).next().done
+  return !affordableFencePlans({ state, player, space, actionContext }, request, costOverride).next().done
 }
 
 type FencePayload = {
@@ -664,13 +663,27 @@ const finalizeFence = (
   }
 }
 
-function* fenceCompletionChoices(
+function* selectionSubsets<T>(items: readonly T[], min: number, max: number): Generator<T[]> {
+  function* choose(start: number, remaining: number, selected: T[]): Generator<T[]> {
+    if (remaining === 0) {
+      yield selected
+      return
+    }
+    for (let index = start; index <= items.length - remaining; index += 1) {
+      yield* choose(index + 1, remaining - 1, [...selected, items[index]!])
+    }
+  }
+  for (let count = min; count <= Math.min(max, items.length); count += 1) {
+    yield* choose(0, count, [])
+  }
+}
+
+function* affordableFencePlans(
   context: ActionExecutionContext,
   request: InteractionRequest,
   costOverride?: Partial<Resource>,
-): Generator<CompletionChoice> {
+): Generator<FencePayload> {
   if (request.kind !== 'farm-select' || request.farm.farmType !== 'fence') {
-    yield* interactionChoices(request)
     return
   }
   const { state, player, space } = context
@@ -716,7 +729,7 @@ function* fenceCompletionChoices(
   const seeds = new Map<string, string[]>()
   let minimalAffordable = false
   const board = boardForPlayer(state, player)
-  function* submit(edges: string[], palisadeEdges: string[], fenceSources?: Record<string, string>): Generator<CompletionChoice> {
+  function* submit(edges: string[], palisadeEdges: string[], fenceSources?: Record<string, string>): Generator<FencePayload> {
     const adjustment = computeFenceCostAdjustment(state, player, edges, palisadeEdges, space, policy)
     if (costOverride) {
       adjustment.freeFences += Math.max(0, -(costOverride.wood ?? 0))
@@ -738,15 +751,15 @@ function* fenceCompletionChoices(
     const key = JSON.stringify(payload)
     if (seen.has(key)) return
     seen.add(key)
-    yield { value: 'confirm', payload }
+    yield payload
   }
-  function* allocate(edges: string[], palisadeEdges: string[]): Generator<CompletionChoice> {
+  function* allocate(edges: string[], palisadeEdges: string[]): Generator<FencePayload> {
     if (!isBorrowedFenceSourcePolicy(policy.sourcePolicy)) {
       yield* submit(edges, palisadeEdges)
       return
     }
     const donors = Object.entries(policy.sourcePolicy.donorCaps)
-    function* assign(index: number, sources: Record<string, string>, counts: Record<string, number>): Generator<CompletionChoice> {
+    function* assign(index: number, sources: Record<string, string>, counts: Record<string, number>): Generator<FencePayload> {
       if (index === edges.length) { yield* submit(edges, palisadeEdges, sources); return }
       for (const [donor, cap] of donors) {
         if ((counts[donor] ?? 0) >= cap) continue
@@ -810,7 +823,6 @@ export const fenceAction: ActionDefinition = {
   descriptionKey: 'actions.fencing.description',
   roundAvailable: 1,
   gainPerRound: {},
-  getCompletionChoices: fenceCompletionChoices,
   canBeExecutedByPlayer: (state, player, context) =>
     canStartFencing(state, player, undefined, context?.actionContext),
   costPreview: {
@@ -935,7 +947,7 @@ export const fenceAction: ActionDefinition = {
         lockedKeys,
       })
       if (!validated.ok) {
-        return fenceFail(validated.error?.code ?? 'log.fencingFail', currentPolicy)
+        return { type: 'fail', errorKey: validated.error?.code ?? 'log.fencingFail', recoverable: true }
       }
       const paymentCost = buildFencePaymentCost(
         validated.payableWoodCost,
@@ -943,14 +955,14 @@ export const fenceAction: ActionDefinition = {
         currentPolicy,
       )
       if (!canAffordFencePayment(validated.player as unknown as PlayerState, paymentCost, ctx.state)) {
-        return fenceFail('NOT_ENOUGH_WOOD', currentPolicy)
+        return { type: 'fail', errorKey: 'NOT_ENOUGH_WOOD', recoverable: true }
       }
       const payment = PaymentSolver.resolveTypedFlatPaymentSelection(
         validated.player as unknown as PlayerState,
         paymentCost,
         'pay:fence',
         undefined,
-        { type: 'fail', errorKey: 'log.fencingFail' },
+        { type: 'fail', errorKey: 'log.fencingFail', recoverable: true },
         'fencing',
         ctx.state,
       )
@@ -968,11 +980,11 @@ export const fenceAction: ActionDefinition = {
         }
       }
       if (payment.type === 'fail') {
-        return { type: 'fail', errorKey: 'log.fencingFail' }
+        return { type: 'fail', errorKey: 'log.fencingFail', recoverable: true }
       }
       return finalizeFence(ctx, edges, palisadeEdges, extraWood, fenceSources, undefined, policy)
     }
 
-    return { type: 'fail', errorKey: 'log.fencingFail' }
+    return { type: 'fail', errorKey: 'log.fencingFail', recoverable: true }
   },
 }

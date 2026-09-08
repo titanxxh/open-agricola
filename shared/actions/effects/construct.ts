@@ -312,13 +312,13 @@ export const constructAction: ActionDefinition = {
     if (payload && choice === 'confirm') {
       const rooms = (payload as { rooms?: FarmTilePosition[] }).rooms
       if (!Array.isArray(rooms) || rooms.length === 0) {
-        return { type: 'fail', errorKey: 'NO_SELECTION' }
+        return { type: 'fail', errorKey: 'NO_SELECTION', recoverable: true }
       }
       const lockedKeys = collectLockedFarmTileKeys(ctx.player)
       const idx = ctx.state.players.indexOf(ctx.player)
       const selection = playerBoard(ctx.state, idx).farmyard.canBuildRoom(rooms, lockedKeys)
       if (!selection.ok) {
-        return { type: 'fail', errorKey: selection.code ?? 'log.buildRoomFail' }
+        return { type: 'fail', errorKey: selection.code ?? 'log.buildRoomFail', recoverable: true }
       }
 
       const maxBuildableRooms = PaymentSolver.getMaxBuildableRooms(
@@ -328,7 +328,7 @@ export const constructAction: ActionDefinition = {
         readConstructCostAdjustments(ctx),
       )
       if (rooms.length > maxBuildableRooms) {
-        return { type: 'fail', errorKey: 'log.buildRoomFail' }
+        return { type: 'fail', errorKey: 'log.buildRoomFail', recoverable: true }
       }
 
       const payment = PaymentSolver.resolveRoomPaymentSelection(
@@ -351,11 +351,11 @@ export const constructAction: ActionDefinition = {
         }
       }
       if (payment.type === 'fail') {
-        return { type: 'fail', errorKey: 'log.buildRoomFail' }
+        return { type: 'fail', errorKey: 'log.buildRoomFail', recoverable: true }
       }
       return finalizeRoom(ctx, rooms, undefined)
     }
 
-    return { type: 'fail', errorKey: 'log.buildRoomFail' }
+    return { type: 'fail', errorKey: 'log.buildRoomFail', recoverable: true }
   },
 }

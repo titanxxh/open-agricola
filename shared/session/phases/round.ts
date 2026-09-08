@@ -159,7 +159,6 @@ export const takeAction = (
     reason: 'top-level',
   })
 
-  core.recordCompletionScope()
   const beforeFlows = collectBeforePlacementFlows(state, player, space)
   if (beforeFlows.length > 0) {
     core.peekEngineFrame()?.engine.injectBeforeFlows(beforeFlows, { state, player, space })

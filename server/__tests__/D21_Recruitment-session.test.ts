@@ -114,8 +114,9 @@ describe('D021 Recruitment parity', () => {
     const session = setup()
     const before = session.getState().state.players[0]!.workers.filter((worker) => worker.isActive).length
 
-    const response = session.takeAction(0, 'major-improvement')
-
+    let response = session.takeAction(0, 'major-improvement')
+    const replacement = recruitmentOption(response)!
+    response = session.resolveChoice(0, replacement.value)
     expect(response.ok, response.error).toBe(true)
     expect(response.state.players[0]!.workers.filter((worker) => worker.isActive)).toHaveLength(before + 1)
   })

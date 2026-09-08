@@ -65,6 +65,37 @@ const expectWait = (response: SessionResponse, playerIndex: number) => {
 }
 
 describe('Before-Harvest reaction dispatch', () => {
+  it('keeps an accepted stage continuation blocked until undoStep restores its choice', () => {
+    const session = setupRoundFour(2)
+    const cardId = 'TEST_BeforeHarvestPaidContinuation'
+    session.state.players[0]!.occupationPlayed = [cardId]
+    session.state.players[0]!.resources.food = 1
+    session.withCtx(() => requireActiveCardRegistry('stage blocked undo test').setEffect({
+      id: cardId,
+      onBeforeHarvest: () => ({ type: 'seq', optional: true, sourceCard: cardId, children: [
+        { type: 'leaf', actionId: 'pay', params: { cost: { food: 1 } }, sourceCard: cardId },
+        { type: 'leaf', actionId: 'pay', params: { cost: { food: 1 } }, sourceCard: cardId },
+      ] }),
+    }))
+    session.loadState(session.state)
+    let response = session.performRoundEnd()
+    const offered = expectWait(response, 0)
+    const accept = offered.request.options!.find((option) => option.value !== '__skip__')!
+    expect(accept).toBeDefined()
+    response = session.resolveChoice(0, accept.value)
+    expect(response.ok, response.error).toBe(true)
+    expect(response.interaction.request.kind).toBe('engine-blocked')
+    expect(response.interaction.anytimeActions).toEqual([])
+    expect(response.state.players[0]!.resources.food).toBe(0)
+    response = session.undoStep(0)
+    expect(response.ok, response.error).toBe(true)
+    expect(response.state.players[0]!.resources.food).toBe(1)
+    expect(response.interaction.request.options?.some((option) => option.value === '__skip__')).toBe(true)
+    response = session.resolveChoice(0, '__skip__')
+    expect(response.ok, response.error).toBe(true)
+    expect(response.interaction.stateId).not.toBe('wait')
+  })
+
   it('starts from the Start Player Marker and wraps through seat order', () => {
     const session = setupRoundFour()
     session.state.players[1]!.startPlayer = true

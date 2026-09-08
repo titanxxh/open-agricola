@@ -227,6 +227,8 @@ export const en = {
     interactionConfirmButton: 'Confirm',
     interactionFarmSelectConfirm: 'Confirm',
     interactionFarmSelectCancel: 'Cancel',
+    interactionBeforeAnytime: 'You can use an anytime action before trying to continue.',
+    interactionContinue: 'Continue',
     interactionEngineBlocked: 'This required action cannot continue. Undo to choose a different path.',
     interactionConfirmSwitch: 'Confirm switch',
     interactionPlayerSwitchPrompt: 'Card effect triggers for {player}. Confirm player switch.',

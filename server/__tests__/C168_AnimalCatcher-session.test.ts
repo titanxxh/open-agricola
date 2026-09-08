@@ -93,11 +93,13 @@ describe('C168_AnimalCatcher session', () => {
     expect(player.resources.food).toBe(14)
   })
 
-  it('automatically uses the original gain when the animal cost is unreachable', () => {
+  it('allows the player to choose the original gain without proving the animal branch', () => {
     const session = setup({ round: 1, food: 5 })
 
-    const resp = session.takeAction(0, 'day-laborer')
+    let resp = session.takeAction(0, 'day-laborer')
     expect(resp.ok).toBe(true)
+    const original = resp.interaction.request.options!.find((option) => option.effectPreview?.resourcesGained?.food === 2 || option.sourceCard !== CARD_ID)!
+    resp = session.resolveChoice(0, original.value)
     expect(resp.interaction.stateId).toBe('wait')
     if (resp.interaction.stateId === 'wait') {
       expect(resp.interaction.request.kind).toBe('confirm-next-player')

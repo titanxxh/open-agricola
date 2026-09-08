@@ -1,3 +1,4 @@
+import { isActionDoableInFlowContext, type FlowDoableContext } from '../actions/flow'
 import type {
   ActionDefinition,
   ChoiceEffectPreview,
@@ -40,12 +41,6 @@ import { applyComputeCostResults } from './compute-cost-results'
 import { pendingEnvelopeChoices } from './pending-validation'
 import { findPlayerById, findPlayerIndexById } from '../domain/player'
 import { suppressBeforeListeners } from './action-context-flags'
-
-export const cloneRuleState = (state: GameState): GameState => {
-  const copy = JSON.parse(JSON.stringify({ ...state, publicEventArchive: [], nextPublicEventArchivePacketSeq: 1 })) as GameState
-  copy.actionSpaces = copy.actionSpaces.map((space, index) => ({ ...state.actionSpaces[index], ...space }))
-  return copy
-}
 
 /**
  * S4c PR5 — module-private utilities extracted from `Engine`. Each function
@@ -139,17 +134,12 @@ const collectActionNodes = (node: EngineNode): ActionNode[] => {
 }
 
 export function enforceSelectedTargetMandatory(node: EngineNode): void {
-  node.mandatory = true
-  collectActionNodes(node).forEach((actionNode) => {
-    actionNode.mandatory = true
-  })
+  enforceCompositeContinuationMandatory(node)
 }
 
 export function enforceCompositeContinuationMandatory(node: EngineNode): void {
   node.mandatory = true
-  collectActionNodes(node).forEach((actionNode) => {
-    actionNode.mandatory = true
-  })
+  getNodeChildren(node).forEach(enforceCompositeContinuationMandatory)
 }
 
 export function stampOwner(node: EngineNode, ownerPlayerId: string): EngineNode {
@@ -193,6 +183,7 @@ function copySharedNodeMetadata(source: EngineNode, target: EngineNode): EngineN
   target.optionalActive = source.optionalActive
   target.optionalPromptKey = source.optionalPromptKey
   target.mandatory = source.mandatory
+  target.beforeAnytimeAvailable = source.beforeAnytimeAvailable
   const pending = source.getPending()
   if (pending) target.setPending(pending)
   return target
@@ -221,6 +212,44 @@ export function findActionNode(node: EngineNode): ActionNode | null {
     }
   }
   return null
+}
+
+export function setEngineBlockedPending(int: EngineInternals, nodeId: string, actionId: string): boolean {
+  const node = int.tree.findNodeById(nodeId)
+  if (!node) return false
+  node.setPending({
+    hostNodeId: node.id,
+    request: { kind: 'engine-blocked', actionId },
+    choices: [],
+    promptKey: 'ui.interactionEngineBlocked',
+    pendingActionId: actionId,
+    ownerNodeId: null,
+  })
+  int.pendingNodeIdRef.value = node.id
+  return true
+}
+
+export function canStartNode(int: EngineInternals, context: FlowDoableContext, node: EngineNode): boolean {
+  const player = context.state.players.find((entry) => entry.id === node.ownerPlayerId) ?? context.player
+  if (node instanceof ActionNode) {
+    const action = int.registry.get(node.actionId)
+    if (!action) return false
+    const actionContext = node.beforePhaseResolved
+      ? { ...node.actionContext, skipBeforeTriggers: true }
+      : node.actionContext
+    const targetSpaceId = actionContext?.targetSpaceId
+    const space = context.state.actionSpaces.find((entry) => entry.id === targetSpaceId) ?? context.space
+    return isActionDoableInFlowContext({
+      ...context, actionId: node.actionId, action, player, space,
+      params: node.params, sourceCard: node.sourceCard, actionContext,
+      resolveAction: (actionId) => int.registry.get(actionId),
+    })
+  }
+  const children = getNodeChildren(node).filter((child) => child.getState() !== 'resolved')
+  if (node instanceof OrNode || node instanceof XorNode) {
+    return children.some((child) => canStartNode(int, { ...context, player }, child))
+  }
+  return children.length === 0 || children[0]!.optional === true || canStartNode(int, { ...context, player }, children[0]!)
 }
 
 export function buildActivationActionNodes(
@@ -427,16 +456,11 @@ export function cloneNode(int: EngineInternals, node: EngineNode): EngineNode {
     clone.emittedRequest = node.emittedRequest
     return copySharedNodeMetadata(node, clone)
   }
-  if (node instanceof OrNode) {
-    return copySharedNodeMetadata(node, new OrNode(
-      `${node.id}-clone-${int.counterRef.value++}`,
-      node.children.map((child) => cloneNode(int, child)),
-      node.promptKey,
-    ))
-  }
-  if (node instanceof XorNode) {
+  if (node instanceof OrNode || node instanceof XorNode) {
     const children = node.children.map((child) => cloneNode(int, child))
-    const clone = new XorNode(`${node.id}-clone-${int.counterRef.value++}`, children, node.promptKey)
+    const clone = node instanceof OrNode
+      ? new OrNode(`${node.id}-clone-${int.counterRef.value++}`, children, node.promptKey)
+      : new XorNode(`${node.id}-clone-${int.counterRef.value++}`, children, node.promptKey)
     if (node.selectedChildId) {
       const selectedIndex = node.children.findIndex((child) => child.id === node.selectedChildId)
       clone.selectedChildId = selectedIndex >= 0 ? children[selectedIndex]?.id ?? null : null
@@ -965,12 +989,14 @@ const canStartFlowWithoutBeforeTriggers = (
       context.state,
       context.player,
       {
+        params: flow.params,
+        space: context.space,
         sourceCard,
         actionContext,
       },
     )
     return int.hooks.applyIsDoable(
-      { ...context, actionId: flow.actionId, sourceCard, actionContext },
+      { ...context, params: flow.params, actionId: flow.actionId, sourceCard, actionContext },
       action,
       doable,
     )
@@ -1002,6 +1028,8 @@ export const canActionContinueWithoutBeforeTriggers = (
     scopedContext.state,
     scopedContext.player,
     {
+      params: scopedContext.params,
+      space: scopedContext.space,
       sourceCard: scopedContext.sourceCard,
       actionContext,
     },
@@ -1043,6 +1071,8 @@ export const isActionStrictlyDoableWithoutBeforeTriggers = (
     replacedContext,
     action,
     action.canBeExecutedByPlayer(context.state, context.player, {
+      params: replacedContext.params,
+      space: replacedContext.space,
       sourceCard: replacedContext.sourceCard,
       actionContext,
     }),

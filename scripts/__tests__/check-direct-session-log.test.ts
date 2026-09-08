@@ -466,7 +466,7 @@ describe('check-direct-session-log', () => {
     ]))
   })
 
-  it('allows completion-query logs while rejecting sibling constructors and direct appends', () => {
+  it('rejects obsolete completion-query log constructors and direct appends', () => {
     const root = mkdtempSync(path.join(tmpdir(), 'direct-session-log-'))
     writeFixture(root, 'shared/engine/engine.ts', [
       'export class Engine {',
@@ -479,6 +479,7 @@ describe('check-direct-session-log', () => {
     ].join('\n'))
 
     expect(findDirectSessionLogViolations(root)).toEqual([
+      expect.objectContaining({ line: 3, kind: 'log-store-constructor' }),
       expect.objectContaining({ line: 4, kind: 'log-store-append' }),
       expect.objectContaining({ line: 6, kind: 'log-store-constructor' }),
     ])

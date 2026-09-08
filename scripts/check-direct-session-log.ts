@@ -534,9 +534,6 @@ const scanFile = (repoRoot: string, fullPath: string): DirectSessionLogViolation
   }
 
   const allowedBlocks = allowedLogStoreAppendBlocks(rel, source)
-  const completionQueryBlock = rel === 'shared/engine/engine.ts'
-    ? findFunctionBlock(source, 'canComplete')
-    : null
   const visit = (
     node: ts.Node,
     stateLikeNames: ReadonlySet<string>,
@@ -734,10 +731,7 @@ const scanFile = (repoRoot: string, fullPath: string): DirectSessionLogViolation
         scopedLogStoreConstructorAliases,
       )
       && !allowedLogStoreConstructorFiles.has(rel)
-      && !allowedTestLogStoreConstructor(rel)
-      && !(completionQueryBlock
-        && node.getStart(sourceFile) >= completionQueryBlock.start
-        && node.getEnd() <= completionQueryBlock.end)) {
+      && !allowedTestLogStoreConstructor(rel)) {
       addViolation(node, 'log-store-constructor')
     }
 

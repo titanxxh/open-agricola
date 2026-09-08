@@ -103,7 +103,7 @@ describe('B075_WoodWorkshop session', () => {
     expect(resp.interaction.promptKey).toBe('ui.confirmNextPlayer')
   })
 
-  it('rejects entry without gaining B75 wood if no improvement is playable', () => {
+  it('blocks after gaining B75 wood and restores the attempt with undo', () => {
     const session = setup({
       wood: 0,
       food: 0,
@@ -112,10 +112,12 @@ describe('B075_WoodWorkshop session', () => {
       availableMajors: [],
     })
 
-    const resp = session.takeAction(0, 'major-improvement')
-    expect(resp.ok).toBe(false)
-    expect(resp.error).toBe('space unavailable')
-    expect(resp.interaction.stateId).toBe('idle')
+    let resp = session.takeAction(0, 'major-improvement')
+    expect(resp.ok).toBe(true)
+    expect(resp.interaction.request.kind).toBe('engine-blocked')
+    expect(resp.state.players[0]!.resources.wood).toBe(1)
+    resp = session.undoAction(0)
+    expect(resp.ok).toBe(true)
     expect(resp.state.players[0]!.resources.wood).toBe(0)
     expect(resp.state.actionSpaces.find((space) => space.id === 'major-improvement')?.takenBy).toHaveLength(0)
   })

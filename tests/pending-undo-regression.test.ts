@@ -98,7 +98,7 @@ describe('pending choice types + undo regression', () => {
       expect(hasAvailableAction(session, 'farm-expansion')).toBe(true)
     })
 
-    it('major-improvement is unavailable when Wood Workshop does not unlock an improvement', () => {
+    it('major-improvement permits a Wood Workshop attempt without proving the later purchase', () => {
       const state = createInitialState(42)
       const player = state.players[0]!
       state.roundActionOrder = openRoundAction('major-improvement')
@@ -108,7 +108,7 @@ describe('pending choice types + undo regression', () => {
       const session = new GameSession(state)
       session.devPlayCard(0, 'B075_WoodWorkshop')
 
-      expect(hasAvailableAction(session, 'major-improvement')).toBe(false)
+      expect(hasAvailableAction(session, 'major-improvement')).toBe(true)
     })
 
     it('major-improvement is available when Wood Workshop gain unlocks an improvement', () => {

@@ -644,6 +644,8 @@ export type GameState = {
 }
 
 export type CanBeExecutedByPlayerContext = {
+  params?: Record<string, unknown>
+  space?: ActionSpace
   /**
    * The card id that originated this action invocation, if any. Forwarded so
    * doable checks can route through the same per-card cost/effect modifiers
@@ -861,10 +863,6 @@ export type ActionDefinition = {
     choice: string,
     payload?: Record<string, unknown>,
   ) => ActionExecutionResult
-  getCompletionChoices?: (
-    context: ActionExecutionContext,
-    request: InteractionRequest,
-  ) => Iterable<{ value: string; payload?: Record<string, unknown> }>
   completeInternalChildren?: (
     context: ActionMutationContext,
     result: Extract<ActionExecutionResult, { type: 'ok' }>,

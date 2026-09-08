@@ -369,8 +369,8 @@ describe('A92 P2 fixes', () => {
     })
   })
 
-  describe('T2: reject unreachable extra-turn target actions', () => {
-    it('failed target action does not place the promoted worker', () => {
+  describe('T2: blocked extra-turn target actions and explicit undo', () => {
+    it('undoStep removes the promoted worker after a failed target', () => {
       const session = setupRotation({ food: 3, newborns: 2 })
       const failingSpaceId = addFailingActionSpace(session)
 
@@ -381,14 +381,16 @@ describe('A92 P2 fixes', () => {
       expect(['farm-select', 'choice']).toContain(reqKind(used))
 
       const failed = session.resolveChoice(0, failingSpaceId)
-      expect(failed.ok).toBe(false)
+      expect(failed.ok).toBe(true)
+      expect(failed.interaction.request.kind).toBe('engine-blocked')
+      expect(session.undoStep(0).ok).toBe(true)
       const p0 = session.getState().state.players[0]!
       const failingSpace = session.getState().state.actionSpaces.find((space) => space.id === failingSpaceId)!
       expect(failingSpace.takenBy.filter((ref) => ref.playerId === p0.id)).toHaveLength(0)
       expect(readActionSnapshotToken(p0)).toBeDefined()
     })
 
-    it('failed allow-occupied target action removes the newly placed worker, not an older worker', () => {
+    it('undoStep removes only the newly placed worker after an occupied target fails', () => {
       const session = setupRotation({ food: 3, newborns: 2 })
       const failingSpaceId = addFailingActionSpace(session)
       const state = session.getState().state
@@ -426,7 +428,9 @@ describe('A92 P2 fixes', () => {
         )
 
         const failed = session.resolveChoice(0, `${OCCUPIED_SPACE_CHOICE_PREFIX}${failingSpaceId}`)
-        expect(failed.ok).toBe(false)
+        expect(failed.ok).toBe(true)
+      expect(failed.interaction.request.kind).toBe('engine-blocked')
+      expect(session.undoStep(0).ok).toBe(true)
 
         const after = session.getState().state.actionSpaces.find((space) => space.id === failingSpaceId)!
         expect(after.takenBy).toEqual([{ playerId: p0.id, workerId: oldWorker.id }])
@@ -438,7 +442,7 @@ describe('A92 P2 fixes', () => {
       }
     })
 
-    it('auto-resolved target failure removes the promoted worker from the selected action space', () => {
+    it('undoStep removes the promoted worker after an auto-resolved target fails', () => {
       const session = setupRotation({ food: 3, newborns: 2 })
       const failingSpaceId = addAutoResolveFailingActionSpace(session)
 
@@ -448,7 +452,9 @@ describe('A92 P2 fixes', () => {
       expect(['farm-select', 'choice']).toContain(reqKind(used))
 
       const failed = session.resolveChoice(0, failingSpaceId)
-      expect(failed.ok).toBe(false)
+      expect(failed.ok).toBe(true)
+      expect(failed.interaction.request.kind).toBe('engine-blocked')
+      expect(session.undoStep(0).ok).toBe(true)
 
       const p0 = session.getState().state.players[0]!
       const failingSpace = session.getState().state.actionSpaces.find((space) => space.id === failingSpaceId)!

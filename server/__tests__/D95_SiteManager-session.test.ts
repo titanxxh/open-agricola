@@ -68,7 +68,8 @@ const playSiteManager = (session: GameSession) => {
   }
   if (response.interaction.stateId === 'wait'
     && response.interaction.request.kind === 'select-trigger') {
-    const trigger = response.interaction.request.options.find((candidate) => candidate.value === CARD_ID)
+    const trigger = response.interaction.request.options.find((candidate) => candidate.value === CARD_ID && !candidate.disabled)
+    if (!trigger) return response
     expect(trigger, JSON.stringify(response.interaction)).toBeDefined()
     response = session.resolveChoice(response.interaction.playerIndex, trigger!.value)
   }

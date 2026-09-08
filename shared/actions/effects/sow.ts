@@ -105,7 +105,7 @@ const finalizeSow = (
     },
   )
   if (!validated.ok) {
-    return { type: 'fail', errorKey: validated.error?.code ?? 'log.action' }
+    return { type: 'fail', errorKey: validated.error?.code ?? 'log.action', recoverable: true }
   }
   const nextPlayer = JSON.parse(JSON.stringify(validated.player)) as PlayerState
   const logicalTargets = new Map(
@@ -192,9 +192,9 @@ export const sowAction: ActionDefinition = {
     }
     if (choice === 'confirm' && payload) {
       const crops = (payload as { crops?: SowSelection[] }).crops
-      if (!Array.isArray(crops)) return { type: 'fail', errorKey: 'log.action' }
+      if (!Array.isArray(crops)) return { type: 'fail', errorKey: 'log.action', recoverable: true }
       return finalizeSow(ctx, crops)
     }
-    return { type: 'fail', errorKey: 'log.action' }
+    return { type: 'fail', errorKey: 'log.action', recoverable: true }
   },
 }

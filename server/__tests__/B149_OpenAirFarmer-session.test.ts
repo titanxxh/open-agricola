@@ -253,12 +253,13 @@ const expectRuleActionSnapshot = (
   expect(response.scores).toEqual(before.scores)
 }
 
-const expectB149Unavailable = (session: GameSession) => {
+const expectB149BlockedAndUndo = (session: GameSession) => {
   const before = snapshotRuleAction(session)
-  const response = session.takeAction(0, 'lessons')
-  expect(response.ok).toBe(false)
-  expect(response.error).toBe('space unavailable')
-  expect(response.interaction.stateId).toBe('idle')
+  let response = session.takeAction(0, 'lessons')
+  expect(response.ok).toBe(true)
+  expect(response.interaction.request.kind).toBe('engine-blocked')
+  response = session.undoAction(0)
+  expect(response.ok).toBe(true)
   expectRuleActionSnapshot(response, before)
   return response
 }
@@ -396,14 +397,14 @@ describe('B149 Open Air Farmer session', () => {
     expect(updated.fenceSegments.filter((segment) => segment.type === 'palisade')).toHaveLength(3)
   })
 
-  it('rejects B149 when only two ordinary fence tokens remain', () => {
+  it('blocks and undoes B149 when only two ordinary fence tokens remain', () => {
     const session = setup({ wood: 20, woodPalisades: true })
     const state = session.getState().state
     const player = state.players[0]!
     player.supplyTokensConsumed = { fence: 13 }
     session.loadState(state)
 
-    const resp = expectB149Unavailable(session)
+    const resp = expectB149BlockedAndUndo(session)
     expect(resp.state.players[0]!.supplyTokensConsumed?.fence).toBe(13)
     expect(resp.state.players[0]!.occupationPlayed).not.toContain(CARD_ID)
   })
@@ -487,7 +488,7 @@ describe('B149 Open Air Farmer session', () => {
     expect(stableResult.request.farm.maxSelections).toBe(1)
   })
 
-  it('rejects B149 when fewer than three stable supply tokens remain', () => {
+  it('blocks and undoes B149 when fewer than three stable supply tokens remain', () => {
     const session = setup({ wood: 2 })
     const state = session.getState().state
     const player = state.players[0]!
@@ -498,7 +499,7 @@ describe('B149 Open Air Farmer session', () => {
     ]
     session.loadState(state)
 
-    const resp = expectB149Unavailable(session)
+    const resp = expectB149BlockedAndUndo(session)
     const updated = resp.state.players[0]!
 
     expect(updated.occupationPlayed).not.toContain(CARD_ID)
@@ -508,10 +509,10 @@ describe('B149 Open Air Farmer session', () => {
     expect(updated.fenceSegments).toHaveLength(0)
   })
 
-  it('rejects B149 without committing anything when its fixed wood cannot be paid', () => {
+  it('blocks and undoes B149 when its fixed wood cannot be paid', () => {
     const session = setup({ wood: 1 })
 
-    const resp = expectB149Unavailable(session)
+    const resp = expectB149BlockedAndUndo(session)
     const player = resp.state.players[0]!
 
     expect(player.occupationPlayed).not.toContain(CARD_ID)
@@ -522,7 +523,7 @@ describe('B149 Open Air Farmer session', () => {
     expect(fencingPayments(resp.state)).toHaveLength(0)
   })
 
-  it('rejects B149 when no size-two pasture can be built', () => {
+  it('blocks and undoes B149 when no size-two pasture can be built', () => {
     const session = setup({ wood: 2 })
     const state = session.getState().state
     const player = state.players[0]!
@@ -531,7 +532,7 @@ describe('B149 Open Air Farmer session', () => {
     ).flat().filter(({ row, col }) => row !== 2 || col > 1)
     session.loadState(state)
 
-    const resp = expectB149Unavailable(session)
+    const resp = expectB149BlockedAndUndo(session)
     const updated = resp.state.players[0]!
 
     expect(updated.occupationPlayed).not.toContain(CARD_ID)

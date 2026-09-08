@@ -176,10 +176,9 @@ describe('E131 Market Master parity', () => {
     const offered = session.takeAction(0, 'traveling-players')
 
     expect(offered.ok, offered.error).toBe(true)
-    expect(offersMarketMaster(offered)).toBe(true)
-    const response = acceptMarketMaster(session, offered)
-    expect(response.state.players[0]!.occupationHand).toContain(TARGET_ID)
-    expect(response.state.players[0]!.resources.food).toBe(0)
+    expect(offersMarketMaster(offered)).toBe(false)
+    expect(offered.state.players[0]!.occupationHand).toContain(TARGET_ID)
+    expect(offered.state.players[0]!.resources.food).toBe(0)
   })
 
   it('E131 S7: the Market Master occupation costs exactly one food even after three occupations', () => {

@@ -278,14 +278,14 @@ export const plowAction: ActionDefinition = {
         | { tile?: unknown }
         | undefined
       const tile = farmPayload?.tile
-      if (!isPlowTileAllowed(tile, ctx.actionContext)) return { type: 'fail', errorKey: 'log.action' }
+      if (!isPlowTileAllowed(tile, ctx.actionContext)) return { type: 'fail', errorKey: 'log.action', recoverable: true }
       const validated = playerBoard(ctx.state, idx).farmyard.canPlow(
         tile,
         lockedKeys,
         readPlowValidationOptions(ctx.actionContext),
       )
       if (!validated.ok) {
-        return { type: 'fail', errorKey: validated.error?.code ?? 'log.action' }
+        return { type: 'fail', errorKey: validated.error?.code ?? 'log.action', recoverable: true }
       }
       return finalizePlow(ctx, tile, choice)
     }
@@ -293,24 +293,24 @@ export const plowAction: ActionDefinition = {
     // First call: client submitted tile geometry alongside `confirm`.
     if (payload && choice === 'confirm') {
       const tile = (payload as { tile?: unknown }).tile
-      if (!isPlowTileAllowed(tile, ctx.actionContext)) return { type: 'fail', errorKey: 'log.action' }
+      if (!isPlowTileAllowed(tile, ctx.actionContext)) return { type: 'fail', errorKey: 'log.action', recoverable: true }
       const validated = playerBoard(ctx.state, idx).farmyard.canPlow(
         tile,
         lockedKeys,
         readPlowValidationOptions(ctx.actionContext),
       )
       if (!validated.ok) {
-        return { type: 'fail', errorKey: validated.error?.code ?? 'log.action' }
+        return { type: 'fail', errorKey: validated.error?.code ?? 'log.action', recoverable: true }
       }
       const selectedTile = tile as FarmTilePosition
       const resolvedCost = resolvePlowCost(ctx.actionContext, ctx.costs)
-      if (!resolvedCost) return { type: 'fail', errorKey: 'log.action' }
+      if (!resolvedCost) return { type: 'fail', errorKey: 'log.action', recoverable: true }
       const payment = PaymentSolver.resolveTypedFlatPaymentSelection(
         validated.player as unknown as PlayerState,
         sanitizePayableCost(resolvedCost),
         'pay:plow',
         undefined,
-        { type: 'fail', errorKey: 'log.action' },
+        { type: 'fail', errorKey: 'log.action', recoverable: true },
         'plow',
         ctx.state,
       )
@@ -326,11 +326,11 @@ export const plowAction: ActionDefinition = {
         }
       }
       if (payment.type === 'fail') {
-        return { type: 'fail', errorKey: 'log.action' }
+        return { type: 'fail', errorKey: 'log.action', recoverable: true }
       }
       return finalizePlow(ctx, selectedTile, undefined)
     }
 
-    return { type: 'fail', errorKey: 'log.action' }
+    return { type: 'fail', errorKey: 'log.action', recoverable: true }
   },
 }

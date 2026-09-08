@@ -23,6 +23,7 @@ export type EngineNode = {
   optionalActive?: boolean
   optionalPromptKey?: PromptKey
   mandatory?: boolean
+  beforeAnytimeAvailable?: boolean
   pending?: PendingEnvelope | null
   getState(): NodeState
   getArgs(): Record<string, unknown>
@@ -50,6 +51,7 @@ export type PendingSyntheticKind =
   | 'feed'
   | 'heating'
   | 'post-reap-anytime'
+  | 'before-action-anytime'
   | 'confirm-next-player'
   | 'confirm-player-switch'
   | 'farm-select'

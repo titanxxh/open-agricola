@@ -227,6 +227,8 @@ export const zh = {
     interactionConfirmButton: '确认',
     interactionFarmSelectConfirm: '确认',
     interactionFarmSelectCancel: '取消',
+    interactionBeforeAnytime: '可以先使用随时行动，再尝试继续。',
+    interactionContinue: '继续',
     interactionEngineBlocked: '这个强制行动无法继续。请撤销并选择其他路径。',
     interactionConfirmSwitch: '确认切换',
     interactionPlayerSwitchPrompt: '卡牌效果触发，需切换到 {player} 执行。',
