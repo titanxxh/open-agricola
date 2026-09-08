@@ -72,6 +72,7 @@ const combineFlows = (flows: ActionFlow[]): ActionFlow | undefined => {
 export const startPendingExtraTurnIfAny = (core: GameCore): boolean => {
   if (core.engineStackDepth() > 0) return false
   const state = core.state
+  if (hasPendingOrdinaryCardDrawChoice(state)) return false
   const current = state.players[state.currentPlayerIndex]
   if (!current || state.roundPhase !== 'work' || state.gameOver || state.phase !== 'playing') return false
   const extra = collectExtraTurnFlow(state, current, workersAvailable(state, current) > 0)

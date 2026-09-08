@@ -1,13 +1,18 @@
-import type { GameState, PlayerState, WorkerRef } from '../../contract/types'
+import type { GameState, PlayerState, SupplyWorkerSource, WorkerRef } from '../../contract/types'
 import { ensureCardState } from './card-state'
 
 const ROUND_PLACEMENT_CARD_ID = '__roundPlacement__'
 
 export type RoundPlacementEntry = { spaceId: string; workerId: string; relocation?: true }
-type ReturnHomePlacement = WorkerRef & { spaceId: string }
+type ReturnHomePlacement = WorkerRef & { spaceId: string; disposition?: SupplyWorkerSource['disposition'] }
 
 const currentPlacements = (state: GameState): ReturnHomePlacement[] =>
-  state.actionSpaces.flatMap((space) => space.takenBy.map((worker) => ({ ...worker, spaceId: space.id })))
+  state.actionSpaces.flatMap((space) => space.takenBy.map((worker) => ({
+    ...worker,
+    spaceId: space.id,
+    disposition: state.players.find((player) => player.id === worker.playerId)
+      ?.workers.find((entry) => entry.id === worker.workerId)?.supplyUse?.disposition,
+  })))
 
 export const recordReturnHomePlacements = (state: GameState): void => {
   const placements = currentPlacements(state)

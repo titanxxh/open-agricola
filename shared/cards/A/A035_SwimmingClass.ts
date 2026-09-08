@@ -9,7 +9,9 @@ const cardImpl = {
   effect: {
   id: CARD_ID,
   onStartReturnHome: (state, player) => {
-    if (!getReturnHomePlacements(state).some((entry) => entry.spaceId === 'fishing' && entry.playerId === player.id)) return
+    if (!getReturnHomePlacements(state).some((entry) =>
+      entry.spaceId === 'fishing' && entry.playerId === player.id && entry.disposition !== 'remove-from-game',
+    )) return
     const newborns = newbornCount(player)
     if (newborns <= 0) return
     // 2 bonus VP per newborn

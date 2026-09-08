@@ -8,6 +8,7 @@ import { GameSession } from '../game/authoritative-session'
 import { pushToCardStack, getCardStack } from '../../shared/cards/helpers/card-state'
 import { familySize, inactiveWorkersInSupply, setActiveWorkerCount, setWorkersAtHome, workersAtHome } from '../../shared/domain/player'
 import { serializeSessionSnapshot, rehydrateState } from '../../shared/session/serialization'
+import { startOrdinaryCardDrawChoice } from '../../shared/session/ordinary-card-draw'
 import { confirmNextPlayer } from './_helpers/pending-confirms'
 import { chooseSupplyWorkerTurn, takeNormalWorkerTurn } from './_helpers/supply-worker-turn'
 
@@ -47,6 +48,46 @@ const setup = (family = 2, secondSource = false, configure?: (state: GameState) 
 }
 
 describe('supply worker identity through Session', () => {
+  it.each(['load', 'rotation'])('waits for all ordinary card draws before offering a supply turn after %s', (mode) => {
+    const startDraws = (state: GameState) => {
+      for (const cardType of ['minor', 'occupation'] as const) {
+        expect(startOrdinaryCardDrawChoice(state, {
+          playerId: state.players[0]!.id, cardType, count: 3,
+        }).ok).toBe(true)
+      }
+    }
+    const session = setup(2, false, (state) => {
+      if (mode === 'load') startDraws(state)
+      else state.currentPlayerIndex = 1
+    })
+    if (mode === 'rotation') {
+      expect(session.takeAction(1, 'forest').ok).toBe(true)
+      startDraws(session.state)
+      expect(confirmNextPlayer(session).ok).toBe(true)
+    }
+    const waiting = session.getState()
+    expect(waiting.state.currentPlayerIndex).toBe(0)
+    expect(waiting.interaction.stateId).toBe('idle')
+    expect(session.takeAction(0, 'fishing').error).toBe('ordinary card draw choice in progress')
+    expect(session.resolveChoice(0, 'fishing').ok).toBe(false)
+    expect(getCardStack(session.state.players[0]!, GUEST_ROOM)).toHaveLength(2)
+    expect(inactiveWorkersInSupply(session.state.players[0]!)).toHaveLength(3)
+    const choices = Object.values(waiting.state.ordinaryCardDrawChoices)
+    expect(choices).toHaveLength(2)
+    const first = session.resolveOrdinaryCardDrawChoice(0, choices[0]!.id, choices[0]!.candidates[0]!)
+    expect(first.ok, first.error).toBe(true)
+    expect(first.interaction.stateId).toBe('idle')
+    const last = session.resolveOrdinaryCardDrawChoice(0, choices[1]!.id, choices[1]!.candidates[0]!)
+    expect(last.ok, last.error).toBe(true)
+    expect(last.interaction.stateId).toBe('wait')
+    expect(last.state.ordinaryCardDrawChoices).toEqual({})
+    chooseSupplyWorkerTurn(session, GUEST_ROOM)
+    const placed = session.resolveChoice(0, 'fishing')
+    expect(placed.ok, placed.error).toBe(true)
+    expect(placed.state.actionSpaces.find((space) => space.id === 'fishing')!.takenBy)
+      .toContainEqual({ playerId: placed.state.players[0]!.id, workerId: '3' })
+  })
+
   it('locks the supply person before placement and preserves the normal family and rotation', () => {
     const session = setup()
     const workerId = inactiveWorkersInSupply(session.state.players[0]!)[0]!.id
@@ -307,6 +348,39 @@ describe('supply worker combinations through Session', () => {
 })
 
 describe('temporary people at harvest and scoring', () => {
+  it('does not award Swimming Class or Curator for a Walking Boots person removed from Fishing', () => {
+    const session = setup(4, false, (state) => {
+      const player = state.players[0]!
+      player.minorPlayed = ['A035_SwimmingClass']
+      player.minorHand = ['B022_WalkingBoots']
+      player.occupationPlayed = ['A100_Curator']
+      player.rooms = 4
+      player.roomTiles = Array.from({ length: 4 }, (_, col) => ({ row: 2, col }))
+      player.workers.find((worker) => worker.id === '4')!.isNewborn = true
+      state.roundActionOrder[0] = 'major-improvement'
+      for (const [spaceId, owner, workerId] of [
+        ['forest', 0, '1'], ['clay-pit', 0, '2'], ['wish-children', 0, '4'],
+        ['day-laborer', 1, '1'], ['reed-bank', 1, '2'],
+      ] as const) {
+        state.actionSpaces.find((space) => space.id === spaceId)!.takenBy = [{ playerId: state.players[owner]!.id, workerId }]
+      }
+      state.actionSpaces.find((space) => space.id === 'fishing')!.resources.food = 4
+    })
+    expect(session.takeAction(0, 'major-improvement').ok).toBe(true)
+    expect(chooseCard(session, 'B022_WalkingBoots').ok).toBe(true)
+    const placed = session.resolveChoice(0, 'fishing')
+    expect(placed.ok, placed.error).toBe(true)
+    expect(placed.state.actionSpaces.find((space) => space.id === 'fishing')!.takenBy)
+      .toContainEqual({ playerId: placed.state.players[0]!.id, workerId: '5' })
+    const returned = confirmNextPlayer(session)
+    expect(returned.ok, returned.error).toBe(true)
+    expect(returned.state.players[0]!.cardStates.A035_SwimmingClass?.counters?.bonusVp ?? 0).toBe(0)
+    expect(returned.state.players[0]!.cardStates.A100_Curator?.counters?.bonusVp ?? 0).toBe(0)
+    expect(returned.state.round).toBe(6)
+    expect(returned.state.players[0]!.resources.food).toBe(26)
+    expect(returned.state.players[0]!.workers.find((worker) => worker.id === '5')?.removedFromSupply).toBe(true)
+  })
+
   it('preserves global occupied spaces for Seed Researcher, Turnip Farmer, and Food Distributor', () => {
     const session = setup(2, false, (state) => {
       const player = state.players[0]!
