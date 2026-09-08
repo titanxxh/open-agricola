@@ -1,6 +1,6 @@
 import { defineOccupationCard } from '../card-source'
 import { gainLeaf } from '../helpers/pay-gain-node'
-import { getReturnHomePlacements } from '../helpers/round-placement'
+import { getReturningPersonPlacements } from '../helpers/round-placement'
 import type { CardImpl } from '../registry'
 
 const CARD_ID = 'C097_SeedResearcher'
@@ -9,7 +9,7 @@ const cardImpl = {
   effect: {
   id: CARD_ID,
   onStartReturnHome: (state, player) => {
-    const returning = getReturnHomePlacements(state)
+    const returning = getReturningPersonPlacements(state)
     if (!returning.some((entry) => entry.spaceId === 'grain-seeds') ||
       !returning.some((entry) => entry.spaceId === 'vegetable-seeds')) return
 

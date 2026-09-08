@@ -30,6 +30,9 @@ export const getReturnHomePlacements = (state: GameState): ReturnHomePlacement[]
     ? snapshots.flatMap((entries) => entries ?? []) : currentPlacements(state)
 }
 
+export const getReturningPersonPlacements = (state: GameState): ReturnHomePlacement[] =>
+  getReturnHomePlacements(state).filter((entry) => !entry.synthetic && entry.disposition !== 'remove-from-game')
+
 export const getRoundPlacementDetails = (player: PlayerState): RoundPlacementEntry[] =>
   (player.cardStates?.[ROUND_PLACEMENT_CARD_ID]?.extraData?.placements as RoundPlacementEntry[] | undefined) ?? []
 

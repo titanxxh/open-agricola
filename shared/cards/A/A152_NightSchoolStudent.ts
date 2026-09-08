@@ -1,5 +1,5 @@
 import { defineOccupationCard } from '../card-source'
-import { getReturnHomePlacements } from '../helpers/round-placement'
+import { getReturningPersonPlacements } from '../helpers/round-placement'
 import { isLessonsSpaceId } from '../helpers/lessons-spaces'
 import type { CardImpl } from '../registry'
 
@@ -9,7 +9,7 @@ const cardImpl = {
   effect: {
   id: CARD_ID,
   onStartReturnHome: (state, player) => {
-    const lessonsOccupied = getReturnHomePlacements(state).some((entry) => isLessonsSpaceId(entry.spaceId))
+    const lessonsOccupied = getReturningPersonPlacements(state).some((entry) => isLessonsSpaceId(entry.spaceId))
     if (lessonsOccupied) return
     if (player.occupationHand.length === 0) return
     return {

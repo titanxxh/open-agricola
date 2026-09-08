@@ -1,6 +1,6 @@
 import { defineOccupationCard } from '../card-source'
 import { payLeaf } from '../helpers/pay-gain-node'
-import { getReturnHomePlacements } from '../helpers/round-placement'
+import { getReturningPersonPlacements } from '../helpers/round-placement'
 import type { CardImpl } from '../registry'
 
 const CARD_ID = 'A100_Curator'
@@ -12,9 +12,8 @@ const cardImpl = {
     const accumulationSpaces = new Set(state.actionSpaces.filter(
       (space) => Object.values(space.gainPerRound ?? {}).some((value) => value > 0),
     ).map((space) => space.id))
-    const farmersOnAccumulation = new Set(getReturnHomePlacements(state)
-      .filter((entry) => entry.playerId === player.id && !entry.synthetic &&
-        entry.disposition !== 'remove-from-game' && accumulationSpaces.has(entry.spaceId))
+    const farmersOnAccumulation = new Set(getReturningPersonPlacements(state)
+      .filter((entry) => entry.playerId === player.id && accumulationSpaces.has(entry.spaceId))
       .map((entry) => entry.workerId)).size
     if (farmersOnAccumulation < 3) return
     if ((player.resources.food ?? 0) < 1) return
