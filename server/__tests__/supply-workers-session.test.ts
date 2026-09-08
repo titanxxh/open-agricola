@@ -317,6 +317,39 @@ const supplyPay = (cost: { food?: number; reed?: number }): ActionFlow => ({
 })
 
 describe('supply placement uses existing before and recovery boundaries', () => {
+  it('keeps an accepted placement with no legal target blocked until explicit undo', () => {
+    const session = setup(2, false, (state) => {
+      const playerId = state.players[1]!.id
+      state.actionSpaces.forEach((space) => {
+        if (space.id === 'forest') space.takenBy = [{ playerId, workerId: '1' }]
+        else if (space.id !== 'farm-expansion') {
+          space.blockedBy = [{ playerId, workerId: '1', sourceSpaceId: 'forest' }]
+        }
+      })
+    })
+    const menu = session.getState()
+    expect(menu.interaction.stateId).toBe('wait')
+    if (menu.interaction.stateId !== 'wait') return
+    const use = menu.interaction.request.options?.find((option) => option.sourceCard === GUEST_ROOM)
+    expect(use?.disabled).not.toBe(true)
+    expect(use).toBeDefined()
+    const blocked = session.resolveChoice(0, use!.value)
+    expect(blocked.ok, blocked.error).toBe(true)
+    expect(blocked.interaction.request?.kind, JSON.stringify(blocked.interaction)).toBe('engine-blocked')
+    expect(getCardStack(blocked.state.players[0]!, GUEST_ROOM)).toHaveLength(1)
+    expect(blocked.state.players[0]!.cardStates[GUEST_ROOM]?.flagged).toBe(true)
+    expect(blocked.state.players[0]!.workers.find((worker) => worker.id === '3')?.supplyUse?.status).toBe('pending')
+    expect(blocked.state.events.filter((event) => event.type === 'worker.placed')).toHaveLength(0)
+    expect(blocked.state.currentPlayerIndex).toBe(0)
+    expect(blocked.state.round).toBe(5)
+    const undone = session.undoAction(0)
+    expect(undone.ok, undone.error).toBe(true)
+    expect(getCardStack(undone.state.players[0]!, GUEST_ROOM)).toHaveLength(2)
+    expect(undone.state.players[0]!.cardStates[GUEST_ROOM]?.flagged).not.toBe(true)
+    expect(inactiveWorkersInSupply(undone.state.players[0]!)).toHaveLength(3)
+    expect(undone.interaction.stateId).toBe('wait')
+  })
+
   it.each([1, 2])('runs an enabling before once, with mandatory food cost %i', (food) => {
     const session = setupRuleFlow({ type: 'seq', children: [supplyPay({ food })] })
     const cardId = '__supply_before__'
