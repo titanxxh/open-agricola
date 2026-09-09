@@ -68,9 +68,11 @@ describe('C/D Logical Field consumers', () => {
     })
     expect(D008_FernSeeds_impl.prerequisiteCheck!(player)).toBe(true)
     expect(C033_GreeningPlan_impl.effect.computeBonusScore!(state, player)).toBe(1)
-    expect(C099_GardenDesigner_impl.effect.computeCostedBonus!(state, player, {})).toContainEqual({
-      cost: { food: 2 },
-      score: 2,
+    expect(C099_GardenDesigner_impl.effect.onBeforeEndGame!(state, player)).toMatchObject({
+      actionId: 'emit-choice',
+      params: { options: expect.arrayContaining([
+        expect.objectContaining({ effectPreview: { kind: 'resourceExchange', resourcesPaid: { food: 2 }, bonusVp: 2 } }),
+      ]) },
     })
     const festival = C072_FestivalPlanning_impl.effect.onBuy!(state, player)
     expect(festival.type === 'seq' ? festival.children[0] : undefined).toMatchObject({ actionId: 'reap' })

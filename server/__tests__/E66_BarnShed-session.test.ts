@@ -149,14 +149,18 @@ describe('E066 Barn Shed parity', () => {
     expect(response.state.players[1]!.resources.wood).toBe(2)
   })
 
-  it('E066 S7: OA has no Forest action space in a solo game, so the printed solo trigger cannot occur', () => {
+  it('E066 S7: solo Forest grants its accumulated wood and Barn Shed grain', () => {
     const session = setup({ played: true, wood: 0, playerCount: 1 })
+    const forest = session.getState().state.actionSpaces.find((space) => space.id === 'forest')
+    expect(forest).toBeDefined()
+    expect(forest).toMatchObject({ gainPerRound: { wood: 2 }, descriptionKey: 'actions.forest.soloDescription' })
+    const wood = forest!.resources.wood
+    expect(wood).toBeGreaterThan(0)
 
     const response = session.takeAction(0, 'forest')
 
-    expect(session.getState().state.actionSpaces.some((space) => space.id === 'forest')).toBe(false)
-    expect(response.ok).toBe(false)
-    expect(response.state.players[0]!.resources).toMatchObject({ grain: 0, wood: 0 })
+    expect(response.ok, response.error).toBe(true)
+    expect(response.state.players[0]!.resources).toMatchObject({ grain: 1, wood })
   })
 
   it('E066 S8: another player using an unrelated space gives no Barn Shed grain', () => {

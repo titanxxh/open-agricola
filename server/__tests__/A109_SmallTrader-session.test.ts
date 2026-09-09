@@ -78,12 +78,36 @@ describe('A109 Small Trader parity', () => {
     expect(response.state.players[0]!.resources).toMatchObject({ clay: 0, food: 0 })
   })
 
-  it('A109 S4: OA also grants three food when Meeting Place plays a minor', () => {
+  it('A109 S4: Meeting Place minor improvements do not grant Small Trader food', () => {
     const session = setup()
     const response = chooseCard(session, session.takeAction(0, 'meeting-place'), MINOR_ID)
 
     expect(response.ok, response.error).toBe(true)
     expect(response.state.players[0]!.minorPlayed).toContain(MINOR_ID)
+    expect(response.state.players[0]!.resources.food).toBe(0)
+  })
+  it('rewards a minor played through a card-granted major-or-minor action', () => {
+    const session = setup()
+    const state = session.state
+    const owner = state.players[0]!
+    owner.minorPlayed = ['A023_StoneCompany']
+    owner.minorHand = ['E047_SyrupTap']
+    owner.resources.wood = 1
+    state.availableMajorImprovements = []
+    state.actionSpaces.find((space) => space.id === 'western-quarry')!.resources.stone = 1
+    session.loadState(state)
+    let response = session.takeAction(0, 'western-quarry')
+    for (let step = 0; step < 8 && response.interaction.stateId === 'wait'; step++) {
+      const options = response.interaction.request.options ?? []
+      const option = options.find((candidate) => candidate.value === 'A023_StoneCompany')
+        ?? options.find((candidate) => candidate.value === 'E047_SyrupTap')
+        ?? options.find((candidate) => candidate.value !== '__skip__' && candidate.value !== 'confirm')
+      if (!option) break
+      response = session.resolveChoice(0, option.value)
+    }
+    expect(response.ok, response.error).toBe(true)
+    expect(response.state.players[0]!.minorPlayed).toContain('E047_SyrupTap')
     expect(response.state.players[0]!.resources.food).toBe(3)
   })
+
 })

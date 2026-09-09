@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { GameSession } from '../game/authoritative-session'
+import { GameSession, type SessionResponse } from '../game/authoritative-session'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 import { getCardEffect } from '../../shared/cards/card-effects'
 import {
@@ -93,6 +93,13 @@ const buyC22ViaMeetingPlace = (session: GameSession) => {
   return session.resolveChoice(0, c22Option.value)
 }
 
+const acceptExtraPlacement = (session: GameSession, response: SessionResponse) => {
+  expect(response.interaction.stateId).toBe('wait')
+  const accept = response.interaction.request.options?.find((option) => option.value !== '__skip__')
+  expect(accept).toBeDefined()
+  return session.resolveChoice(0, accept!.value)
+}
+
 describe('C022_BasketChair session', () => {
   it('C022 S1: paying one reed can recall the first placed person and immediately place another', () => {
     const session = setup({ activeWorkers: 3 })
@@ -120,7 +127,7 @@ describe('C022_BasketChair session', () => {
     expect(getWorkerHeldOnCard(resp.state.players[0]!, CARD_ID)).toBe('1')
     expect(workersAvailable(resp.state, resp.state.players[0]!)).toBe(1)
 
-    // Next pending is the place-farmer choice.
+    resp = acceptExtraPlacement(session, resp)
     expect(resp.interaction.stateId).toBe('wait')
     if (resp.interaction.stateId !== 'wait') return
     const clayPitOption = resp.interaction.request.options?.find((o) => o.value === 'clay-pit')
@@ -224,29 +231,39 @@ describe('C022_BasketChair session', () => {
     expect(c22Choice).toBe(false)
   })
 
-  it('C022 S5: with no other person at home Basket Chair offers no recall', () => {
-    // Setup: 2 active workers, worker 1 prefabbed on forest. After
-    // takeAction('meeting-place') worker 2 goes on meeting-place and
-    // workersAvailable = 0 — the place-farmer step would fail. The onBuy guard
-    // must catch this and offer no seq.
+  it('can hold the recalled worker and decline placing another person', () => {
+    const session = setup({ activeWorkers: 3 })
+    simulatePlacement(session, 0, 'forest', '1')
+    const offered = buyC22ViaMeetingPlace(session)
+    const accept = offered.interaction.request.options?.find((option) => option.value !== '__skip__')
+    expect(accept).toBeDefined()
+    const recalled = session.resolveChoice(0, accept!.value)
+    expect(getWorkerHeldOnCard(recalled.state.players[0]!, CARD_ID)).toBe('1')
+    const response = session.resolveChoice(0, '__skip__')
+    expect(response.ok, response.error).toBe(true)
+    expect(getWorkerHeldOnCard(response.state.players[0]!, CARD_ID)).toBe('1')
+    expect(workersAvailable(response.state, response.state.players[0]!)).toBe(1)
+  })
+
+  it('C022 S5: without another person Basket Chair still recalls the first worker', () => {
     const session = setup({ activeWorkers: 2 })
     simulatePlacement(session, 0, 'forest', '1')
+    const offered = buyC22ViaMeetingPlace(session)
+    expect(offered.interaction.stateId).toBe('wait')
+    if (offered.interaction.stateId !== 'wait') return
+    const accept = offered.interaction.request.options?.find((option) => option.value !== '__skip__')
+    expect(accept).toBeDefined()
 
-    const resp = buyC22ViaMeetingPlace(session)
-    expect(resp.ok).toBe(true)
-    expect(resp.state.players[0]!.minorPlayed).toContain(CARD_ID)
-    // Nothing from C22 should still be pending: no accept/skip prompt,
-    // definitely no holdWorkerOnCard mutation.
-    if (resp.interaction.stateId === 'wait') {
-      const c22Accept = resp.interaction.request.options?.find(
-        (o) => (o as { sourceCard?: string }).sourceCard === CARD_ID,
-      )
-      expect(c22Accept).toBeUndefined()
-    }
-    expect(getWorkerHeldOnCard(resp.state.players[0]!, CARD_ID)).toBeUndefined()
-    // Forest is still occupied by the prefab worker.
-    const forest = resp.state.actionSpaces.find((s) => s.id === 'forest')!
-    expect(forest.takenBy.some((t) => t.playerId === 'p1' && t.workerId === '1')).toBe(true)
+    const response = session.resolveChoice(0, accept!.value)
+
+    expect(response.ok, response.error).toBe(true)
+    expect(getWorkerHeldOnCard(response.state.players[0]!, CARD_ID)).toBe('1')
+    expect(response.state.actionSpaces.find((space) => space.id === 'forest')!.takenBy).toEqual([])
+    expect(response.interaction.stateId === 'wait' ? response.interaction.request.kind : null)
+      .not.toBe('engine-blocked')
+    const undone = session.undoStep(0)
+    expect(undone.ok, undone.error).toBe(true)
+    expect(getWorkerHeldOnCard(undone.state.players[0]!, CARD_ID)).toBeUndefined()
   })
 
   it('C022 S6: recalling from Wish for Children moves only the adult and leaves the newborn', () => {
@@ -270,6 +287,7 @@ describe('C022_BasketChair session', () => {
     expect(resp.state.actionSpaces.find((space) => space.id === 'wish-children')!.takenBy)
       .toContainEqual(expect.objectContaining({ playerId: 'p1', workerId: '3' }))
     expect(resp.interaction.stateId).toBe('wait')
+    resp = acceptExtraPlacement(session, resp)
     expect(resp.interaction.stateId === 'wait'
       ? resp.interaction.request.options?.some((option) => option.value === 'clay-pit')
       : false).toBe(true)
@@ -290,6 +308,7 @@ describe('C022_BasketChair session', () => {
     const acceptOption = (resp.interaction.request.options ?? []).find((o) => o.value !== '__skip__')!
 
     resp = session.resolveChoice(0, acceptOption.value)
+    resp = acceptExtraPlacement(session, resp)
     expect(resp.interaction.stateId).toBe('wait')
     if (resp.interaction.stateId !== 'wait') return
     expect(resp.interaction.request.options?.some((o) => o.value === 'forest')).toBe(true)
@@ -316,6 +335,7 @@ describe('C022_BasketChair session', () => {
     if (resp.interaction.stateId !== 'wait') throw new Error('expected accept/skip choice')
     const acceptOption = (resp.interaction.request.options ?? []).find((o) => o.value !== '__skip__')!
     resp = session.resolveChoice(0, acceptOption.value)
+    resp = acceptExtraPlacement(session, resp)
     if (resp.interaction.stateId !== 'wait') throw new Error('expected place-farmer choice')
     resp = session.resolveChoice(0, 'clay-pit')
     expect(getWorkerHeldOnCard(resp.state.players[0]!, CARD_ID)).toBe('1')

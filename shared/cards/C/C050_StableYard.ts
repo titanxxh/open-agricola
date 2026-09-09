@@ -1,9 +1,11 @@
 import { defineMinorCard } from '../card-source'
+import { getStableCountForCards } from '../../domain/stables'
 import type { CardImpl } from '../registry'
 
 const CARD_ID = 'C050_StableYard'
 
 const cardImpl = {
+  prerequisiteCheck: (player) => getStableCountForCards(player) >= 3 && player.pastures.length >= 3,
   effect: {
   id: CARD_ID,
   onBuy: (state, _player) => {

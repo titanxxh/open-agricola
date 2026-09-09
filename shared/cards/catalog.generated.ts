@@ -10065,6 +10065,12 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     ],
     "cost": {},
     "players": "1+",
+    "waresSalesmanGains": [
+      {
+        "stone": 1,
+        "reed": 1
+      }
+    ],
     "exchanges": [
       {
         "from": {
@@ -10713,6 +10719,12 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     ],
     "cost": {},
     "players": "4+",
+    "waresSalesmanGains": [
+      {
+        "wood": 1,
+        "reed": 1
+      }
+    ],
     "exchanges": [
       {
         "from": {

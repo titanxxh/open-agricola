@@ -25,10 +25,11 @@ const cardImpl = {
         ],
       }
     },
-    computeBonusScore: (state, player) => {
-      const myPastures = player.pastures.length
+    computeSharedPostScore: (state) => {
       const maxPastures = Math.max(...state.players.map((p) => p.pastures.length))
-      return myPastures === maxPastures && myPastures > 0 ? 2 : 0
+      return state.players
+        .filter((player) => player.pastures.length === maxPastures)
+        .map((player) => ({ playerId: player.id, score: 2 }))
     },
   },
   reaches: [] as readonly string[],

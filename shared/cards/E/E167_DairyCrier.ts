@@ -9,7 +9,7 @@ const cardImpl = {
   effect: {
   id: CARD_ID,
   onBuy: (state, _player) => {
-    const children: ActionFlow[] = [gainLeaf(CARD_ID, { cattle: 1 })]
+    const children: ActionFlow[] = []
 
     // Each player chooses 2 sheep or 2 food
     for (const p of state.players) {
@@ -35,6 +35,7 @@ const cardImpl = {
       })
     }
 
+    children.push(gainLeaf(CARD_ID, { cattle: 1 }))
     return { type: 'seq', children }
   },
 },

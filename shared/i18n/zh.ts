@@ -163,6 +163,13 @@ export const zh = {
         prompt: '选择要计分的建材套数',
         scoreSets: '计分 {sets} 套（{score} 额外分）',
       },
+      A084_Silage: {
+        reserve: '支付供应区的粮食',
+        field: '支付田地（{row}，{col}）上的粮食',
+      },
+      C099_GardenDesigner: {
+        invest: '支付 {food} 食物，获得 {score} 额外分',
+      },
       C133_Soldier: {
         prompt: '选择要计分的木头+石头对数',
         scorePairs: '计分 {pairs} 对（{score} 额外分）',
@@ -663,7 +670,7 @@ export const zh = {
     'sheep-market': { name: '羊市场', description: '每回合累积 1 羊' },
     'pig-market': { name: '猪市场', description: '每回合累积 1 野猪' },
     'cattle-market': { name: '牛市场', description: '每回合累积 1 牛' },
-    forest: { name: '森林', description: '每回合累积 3 木材' },
+    forest: { name: '森林', description: '每回合累积 3 木材', soloDescription: '每回合累积 2 木材' },
     copse: { name: '小树林', description: '每回合累积 1 木材' },
     grove: { name: '树林', description: '每回合累积 2 木材' },
     'clay-pit': { name: '黏土坑', description: '每回合累积 1 黏土' },

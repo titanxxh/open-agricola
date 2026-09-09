@@ -221,17 +221,16 @@ describe('computeScores', () => {
     )
   })
 
-  it('counts isField cards (D75/E80/etc) as +1 logical field each', () => {
+  it('counts only farmyard fields in the base field score', () => {
     const player = createPlayer()
     player.fields = [
-      { row: 0, col: 0, stacks: [] },  // 1 normal field
+      { row: 0, col: 0, stacks: [] },
     ]
-    player.minorPlayed = ['D075_WoodField', 'E080_RockGarden']  // 2 isField cards
+    player.minorPlayed = ['D075_WoodField', 'E080_RockGarden']
     const [result] = computeScores(createState(player))
     const byKey = new Map(result.categories.map((item) => [item.key, item]))
-    // 1 normal field + 2 isField cards = 3 logical fields → range '3' → 2 VP
-    expect(byKey.get('fields')?.quantity).toBe(3)
-    expect(byKey.get('fields')?.total).toBe(2)
+    expect(byKey.get('fields')?.quantity).toBe(1)
+    expect(byKey.get('fields')?.total).toBe(-1)
   })
 
   it('counts mixed-stack field as both grain and vegetable field', () => {

@@ -239,6 +239,7 @@ export type ComplexCost = {
   trades?: Trade[]
   paymentResourceProviders?: CardProvidedPaymentResourceProvider[]
   paymentBudget?: PaymentResourceMap
+  minimumResourcesPaid?: PaymentResourceMap
   resourceReserve?: ResourceReserve
   cards?: { type: string; list: string[]; cost?: PaymentResourceMap; required?: boolean }
   bonuses?: Bonus[]

@@ -17,11 +17,8 @@ const listener: CardListenerRegistration = {
     const placements = getRoundPersonPlacementDetails(context.player)
     if (placements.length !== 2) return
 
-    // Drop workerId when first is on Meeting Place — recall becomes a no-op
-    // while the log decoration still fires.
     const first = placements[0]!
-    const targetWorkerId =
-      first.spaceId.startsWith(MEETING_PLACE_PREFIX) ? undefined : first.workerId
+    if (first.spaceId.startsWith(MEETING_PLACE_PREFIX)) return
 
     return {
       flow: {
@@ -29,7 +26,7 @@ const listener: CardListenerRegistration = {
         actionId: 'recall-placed-worker',
         sourceCard: CARD_ID,
         params: {
-          workerId: targetWorkerId,
+          workerId: first.workerId,
           noOpIfMissing: true,
           logCardTrigger: true,
         },

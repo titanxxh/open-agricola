@@ -127,21 +127,21 @@ describe('E136 Animal Husbandry Worker parity', () => {
     expect(optionsOf(response).some((option) => option.sourceCard === CARD_ID)).toBe(false)
   })
 
-  it('E136 S5: a non-owner who alone has the most pastures receives no shared score', () => {
-    const response = setup({ played: true, pastureCounts: [1, 2, 0] }).getState()
+  it('E136 S5: non-owners tied for the most pastures both score', () => {
+    const response = setup({ played: true, pastureCounts: [1, 2, 2] }).getState()
 
-    expect([0, 1, 2].map((index) => cardBonusScore(response, index))).toEqual([0, 0, 0])
+    expect([0, 1, 2].map((index) => cardBonusScore(response, index))).toEqual([0, 2, 2])
   })
 
-  it('E136 S6: only the owner scores when tied for the most positive pasture count', () => {
-    const response = setup({ played: true, pastureCounts: [2, 2, 1] }).getState()
+  it('E136 S6: the owner scores when alone with the most pastures', () => {
+    const response = setup({ played: true, pastureCounts: [3, 1, 2] }).getState()
 
     expect([0, 1, 2].map((index) => cardBonusScore(response, index))).toEqual([2, 0, 0])
   })
 
-  it('E136 S7: no player scores when all are tied at zero pastures', () => {
+  it('E136 S7: all players score when tied at zero pastures', () => {
     const response = setup({ played: true }).getState()
 
-    expect([0, 1, 2].map((index) => cardBonusScore(response, index))).toEqual([0, 0, 0])
+    expect([0, 1, 2].map((index) => cardBonusScore(response, index))).toEqual([2, 2, 2])
   })
 })

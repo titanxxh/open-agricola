@@ -3,33 +3,10 @@ import type { CardListenerRegistration, CardListenerContext } from '../card-list
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import type { CardCostCandidate } from '../../contract/types'
 import type { CardImpl } from '../registry'
-import { isMajorImprovementAvailable } from '../major/supply'
+import { isMajorImprovementPlayable } from '../../actions/helpers/improvement-helpers'
 
 const CARD_ID = 'C095_BasketWeaver'
 const TARGET_MAJOR = 'Major_Basket'
-
-/**
- * C95 Basket Weaver (Occupation, 1+ players).
- *
- * Rule: When you play this card, immediately build the
- * Basketmaker's Workshop (Major_Basket) for 1 STONE and 1 REED instead of the
- * normal 2 REED + 2 STONE cost.
- *
- * The reference implementation:
- *   - onBuy → flag card, perform improvement action limited to Major_Basket
- *     with trueAction=false, unflag.
- *   - onPlayerComputeCardCosts: if flagged AND target is Major_Basket, override
- *     trades to { stone: 1, reed: 1 }.
- *
- * Here:
- *   - occupation after-listener triggered when this card is played →
- *     offer optional improvement-any with allowedPurchases = [Major_Basket]
- *     and sourceCard = CARD_ID (so the candidate listener can scope the
- *     fixed-price candidate via context.actionCardId).
- *   - computeCosts listener on improvement-any keyed off context.actionCardId
- *     === CARD_ID and context.cardId === Major_Basket → appends a sourced
- *     fixed-price candidate { stone: 1, reed: 1 } while keeping the original.
- */
 
 const onBuyListener: CardListenerRegistration = {
   id: 'C95-basket-weaver-onbuy',
@@ -38,12 +15,11 @@ const onBuyListener: CardListenerRegistration = {
   phases: ['after' as ActionHookPhase],
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (context.choice !== CARD_ID) return
-    if (!isMajorImprovementAvailable(context.state, TARGET_MAJOR)) return
+    if (!isMajorImprovementPlayable(context.state, context.player, TARGET_MAJOR, CARD_ID)) return
     return {
       flow: {
         type: 'leaf',
         actionId: 'improvement',
-        optional: true,
         sourceCard: CARD_ID,
         actionContext: { trueAction: false },
         params: {

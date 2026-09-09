@@ -1,4 +1,5 @@
 import { defineOccupationCard } from '../card-source'
+import { gainLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
 
 const CARD_ID = 'E124_MayorCandidate'
@@ -6,6 +7,7 @@ const CARD_ID = 'E124_MayorCandidate'
 const cardImpl = {
   effect: {
   id: CARD_ID,
+  onBuy: () => gainLeaf(CARD_ID, { wood: 2, stone: 2 }),
   computeBonusScore: (_state, player) => {
     return -((player.resources.wood ?? 0) + (player.resources.stone ?? 0))
   },

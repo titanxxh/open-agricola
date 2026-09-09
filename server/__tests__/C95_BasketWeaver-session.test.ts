@@ -69,14 +69,7 @@ const resolveBasketWeaverTrigger = (session: GameSession, response: SessionRespo
   return session.resolveChoice(response.interaction.playerIndex, trigger!.value)
 }
 
-const acceptBasketBuild = (session: GameSession, response: SessionResponse) => {
-  response = resolveBasketWeaverTrigger(session, response)
-  expect(response.interaction.stateId).toBe('wait')
-  if (response.interaction.stateId !== 'wait') return response
-  const accept = response.interaction.request.options?.find((option) => option.value !== '__skip__')
-  expect(accept, JSON.stringify(response.interaction)).toBeDefined()
-  return session.resolveChoice(response.interaction.playerIndex, accept!.value)
-}
+const acceptBasketBuild = resolveBasketWeaverTrigger
 
 describe('C095 Basket Weaver parity', () => {
   it('C095 S1: with exactly one reed and one stone resolves the immediate Basket build', () => {
@@ -100,7 +93,7 @@ describe('C095 Basket Weaver parity', () => {
   it('C095 S3: with one reed and no stone cannot pay for the immediate Basket build', () => {
     const session = setup({ reed: 1, stone: 0 })
     const response = playBasketWeaver(session)
-    expect(response.interaction.request.options?.find((option) => option.value === CARD_ID)?.disabled).toBe(true)
+    expect(response.interaction.request.options?.some((option) => option.value === CARD_ID)).not.toBe(true)
     expect(response.ok, response.error).toBe(true)
     expect(response.state.players[0]!.occupationPlayed).toContain(CARD_ID)
     expect(response.state.players[0]!.improvements).not.toContain(BASKET)
@@ -122,18 +115,13 @@ describe('C095 Basket Weaver parity', () => {
     })
   })
 
-  it('C095 S5: the immediate Basket build decline path is characterized', () => {
+  it('C095 S5: an affordable immediate build cannot be declined', () => {
     const session = setup()
-    let response = resolveBasketWeaverTrigger(session, playBasketWeaver(session))
-
-    expect(response.interaction.stateId).toBe('wait')
-    if (response.interaction.stateId !== 'wait') return
-    const skip = response.interaction.request.options?.find((option) => option.value === '__skip__')
-    expect(skip, JSON.stringify(response.interaction)).toBeDefined()
-    response = session.resolveChoice(response.interaction.playerIndex, skip!.value)
-
-    expect(response.state.players[0]!.occupationPlayed).toContain(CARD_ID)
-    expect(response.state.players[0]!.improvements).not.toContain(BASKET)
-    expect(response.state.players[0]!.resources).toMatchObject({ reed: 1, stone: 1 })
+    const response = resolveBasketWeaverTrigger(session, playBasketWeaver(session))
+    expect(response.state.players[0]!.improvements).toContain(BASKET)
+    expect(response.state.players[0]!.resources).toMatchObject({ reed: 0, stone: 0 })
+    const rejected = session.resolveChoice(0, '__skip__')
+    expect(rejected.ok).toBe(false)
+    expect(rejected.state.players[0]!.improvements).toContain(BASKET)
   })
 })

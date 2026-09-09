@@ -13,6 +13,7 @@ const cardImpl = {
     let wood3plusCount = 0
 
     for (const space of state.actionSpaces) {
+      if ((space.gainPerRound.wood ?? 0) <= 0) continue
       const woodAccum = space.resources.wood ?? 0
       if (woodAccum === 2) wood2Count += 1
       else if (woodAccum >= 3) wood3plusCount += 1

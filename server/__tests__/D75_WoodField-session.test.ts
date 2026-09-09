@@ -217,10 +217,10 @@ describe('D075 Wood Field parity', () => {
     ])
   })
 
-  it('D075 S8: both slots count as one logical field at final scoring', () => {
+  it('D075 S8: both card slots are excluded from base field scoring', () => {
     const response = setup({ normalFields: 1 }).getState()
 
-    expect(scoreCategory(response, 'fields')).toMatchObject({ quantity: 2, total: 1 })
+    expect(scoreCategory(response, 'fields')).toMatchObject({ quantity: 1, total: -1 })
   })
 
   it('D075 S9: wood planted on Wood Field does not count toward Joinery bonus scoring', () => {

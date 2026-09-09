@@ -121,6 +121,7 @@ export const isComplexCost = (
     'cards' in cost ||
     'bonuses' in cost ||
     'paymentResourceProviders' in cost ||
+    'minimumResourcesPaid' in cost ||
     'unitFee' in cost ||
     'nb' in cost
   )

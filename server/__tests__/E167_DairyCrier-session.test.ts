@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession, type SessionResponse } from '../game/authoritative-session'
 import { setWorkersAtHome } from '../../shared/domain/player'
+import { rehydrateState, serializeSessionSnapshot } from '../../shared/session/serialization'
 import { setFencesForTest } from '../../shared/cards/__tests__/__fixtures__/fence'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 
@@ -175,14 +176,30 @@ describe('E167 Dairy Crier parity', () => {
     expect(response.state.players[0]!.resources.cattle).toBe(1)
   })
 
-  it('E167 S6: the owner receives the cattle before the four reward choices', () => {
+  it('E167 S6: the owner receives cattle only after all four reward choices', () => {
     const session = setup()
+    const pending = playDairyCrier(session)
 
-    const response = playDairyCrier(session)
-
-    expect(response.state.players[0]!.resources.cattle).toBe(1)
-    expect(response.interaction.stateId).toBe('wait')
-    if (response.interaction.stateId !== 'wait') return
-    expect(response.interaction.request.kind).toBe('animal-reorg')
+    expect(pending.state.players[0]!.resources.cattle).toBe(0)
+    expect(pending.interaction.stateId).toBe('wait')
+    const response = resolveDairyCrier(session, pending, ['food', 'food', 'food', 'food'])
+    const gains = response.state.events.filter((event) => event.type === 'resource.moved'
+      && event.sourceCardId === CARD_ID && event.to.kind === 'player')
+    expect(gains.map((event) => ({ resources: event.resources, to: event.to }))).toEqual([
+      ...response.state.players.map((player) => ({ resources: { food: 2 }, to: { kind: 'player', playerId: player.id } })),
+      { resources: { cattle: 1 }, to: { kind: 'player', playerId: response.state.players[0]!.id } },
+    ])
   })
+  it('restores the reward sequence before granting the final cattle', () => {
+    const session = setup()
+    const pending = playDairyCrier(session)
+    expect(pending.state.players[0]!.resources.cattle).toBe(0)
+    const snapshot = serializeSessionSnapshot(session.state, session)
+    const restored = new GameSession(rehydrateState(JSON.parse(JSON.stringify(snapshot))))
+    const response = resolveDairyCrier(restored, restored.getState(), ['food', 'sheep', 'pass', 'food'])
+    expect(response.ok, response.error).toBe(true)
+    expect(response.state.players.map((player) => player.resources.food)).toEqual([2, 0, 0, 2])
+    expect(response.state.players[0]!.resources.cattle).toBe(1)
+  })
+
 })

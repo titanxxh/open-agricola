@@ -4,6 +4,7 @@ import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
 import { isMinorCardId } from '../helpers/card-type'
+import { readImprovementTypes } from '../../actions/effects/improvement'
 
 const CARD_ID = 'A109_SmallTrader'
 const listener: CardListenerRegistration = {
@@ -12,6 +13,7 @@ const listener: CardListenerRegistration = {
   phases: ['after' as ActionHookPhase],
   actions: ['improvement'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
+    if (readImprovementTypes(context).length !== 2) return
     const choice = context.choice
     const cardId = choice?.replace(/^major:/, '').replace(/^minor:/, '')
     if (!cardId || !isMinorCardId(cardId)) return

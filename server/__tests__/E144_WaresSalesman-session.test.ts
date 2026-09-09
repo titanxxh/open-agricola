@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { GameSession, type SessionResponse } from '../game/authoritative-session'
 import { setWorkersAtHome } from '../../shared/domain/player'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
+import { getCardDefinitionById } from '../../shared/cards/helpers/card-type'
 import { confirmPlayerSwitch } from './_helpers/pending-confirms'
 
 import '../../shared/cards/E/E144_WaresSalesman'
@@ -126,6 +127,36 @@ const chooseWaresGain = (session: GameSession, response: SessionResponse, resour
   return settleSwitches(session, session.resolveChoice(settled.interaction.playerIndex, choice!.value))
 }
 
+const CONVERSION_REWARDS = {
+  A108_MushroomCollector: [{ wood: 1, reed: 1 }],
+  A138_Harpooner: [{ wood: 1, reed: 1 }],
+  A056_Basket: [{ wood: 1, reed: 1 }],
+  C153_PatternMaker: [{ wood: 1, reed: 1 }],
+  A034_Loppers: [{ wood: 1, reed: 1 }],
+  A048_ShavingHorse: [{ wood: 1, reed: 1 }],
+  A159_JoineroftheSea: [{ wood: 1, reed: 1 }],
+  B042_ForestInn: [{ wood: 1, reed: 1 }],
+  B053_SculptureCourse: [{ wood: 1, reed: 1 }, { stone: 1, reed: 1 }],
+  B109_PaperMaker: [{ wood: 1, reed: 1 }],
+  C055_Studio: [{ wood: 1, reed: 1 }, { clay: 1, reed: 1 }, { stone: 1, reed: 1 }],
+  D155_Ebonist: [{ wood: 1, reed: 1 }],
+  D133_BeerTentOperator: [{ wood: 1, reed: 1 }],
+  E054_Contraband: [{ wood: 1, reed: 1 }, { clay: 1, reed: 1 }, { reed: 2 }, { stone: 1, reed: 1 }],
+  E106_EmergencySeller: [{ wood: 1, reed: 1 }, { clay: 1, reed: 1 }, { reed: 2 }, { stone: 1, reed: 1 }],
+  Major_Joinery: [{ wood: 1, reed: 1 }],
+  A040_PottersYard: [{ clay: 1, reed: 1 }],
+  D060_LargePottery: [{ clay: 1, reed: 1 }],
+  D107_Bellfounder: [{ clay: 1, reed: 1 }],
+  E039_Paintbrush: [{ clay: 1, reed: 1 }],
+  Major_Pottery: [{ clay: 1, reed: 1 }],
+  C139_BasketmakersWife: [{ reed: 2 }],
+  D046_PelletPress: [{ reed: 2 }],
+  E109_BraidMaker: [{ reed: 2 }],
+  Major_Basket: [{ reed: 2 }],
+  D108_StoneCarver: [{ stone: 1, reed: 1 }],
+  E153_StoneSculptor: [{ stone: 1, reed: 1 }],
+}
+
 describe('E144 Wares Salesman parity', () => {
   it('E144 S1: Wares Salesman can be played as the first occupation in a four-player game', () => {
     const response = playOccupation(setup({ played: false }), 0, CARD_ID)
@@ -205,17 +236,24 @@ describe('E144 Wares Salesman parity', () => {
     })
   })
 
-  it('E144 S8: OA does not reward Ebonist because its trigger metadata is missing', () => {
-    const response = playOccupation(setup({ targetId: 'D155_Ebonist' }), 0, 'D155_Ebonist')
-
+  it.each([0, 1])('E144 S8: Ebonist played by player %i rewards the owner', (actor) => {
+    const response = playOccupation(setup({ actor, targetId: 'D155_Ebonist' }), actor, 'D155_Ebonist')
     expect(response.ok, response.error).toBe(true)
-    expect(response.state.players[0]!.resources).toMatchObject({ wood: 0, reed: 0 })
+    expect(response.state.players[0]!.resources).toMatchObject({ wood: 1, reed: 1 })
+    if (actor !== 0) expect(response.state.players[actor]!.resources).toMatchObject({ wood: 0, reed: 0 })
   })
 
-  it('E144 S9: OA does not reward Stone Carver because its trigger metadata is missing', () => {
-    const response = playOccupation(setup({ targetId: 'D108_StoneCarver' }), 0, 'D108_StoneCarver')
-
+  it.each([0, 1])('E144 S9: Stone Carver played by player %i rewards the owner', (actor) => {
+    const response = playOccupation(setup({ actor, targetId: 'D108_StoneCarver' }), actor, 'D108_StoneCarver')
     expect(response.ok, response.error).toBe(true)
-    expect(response.state.players[0]!.resources).toMatchObject({ stone: 0, reed: 0 })
+    expect(response.state.players[0]!.resources).toMatchObject({ stone: 1, reed: 1 })
+    if (actor !== 0) expect(response.state.players[actor]!.resources).toMatchObject({ stone: 0, reed: 0 })
+  })
+
+  it('keeps all twenty-seven conversion reward declarations', () => {
+    setup()
+    for (const [cardId, gains] of Object.entries(CONVERSION_REWARDS)) {
+      expect(getCardDefinitionById(cardId)?.waresSalesmanGains, cardId).toEqual(gains)
+    }
   })
 })

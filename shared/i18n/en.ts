@@ -163,6 +163,13 @@ export const en = {
         prompt: 'Choose how many sets of building resources to score',
         scoreSets: 'Score {sets} sets ({score} bonus VP)',
       },
+      A084_Silage: {
+        reserve: 'Grain from your supply',
+        field: 'Grain from field ({row}, {col})',
+      },
+      C099_GardenDesigner: {
+        invest: 'Pay {food} food for {score} bonus VP',
+      },
       C133_Soldier: {
         prompt: 'Choose how many wood and stone pairs to score',
         scorePairs: 'Score {pairs} pairs ({score} bonus VP)',
@@ -679,7 +686,7 @@ export const en = {
     'sheep-market': { name: 'Sheep Market', description: 'Accumulate sheep' },
     'pig-market': { name: 'Pig Market', description: 'Accumulate boar' },
     'cattle-market': { name: 'Cattle Market', description: 'Accumulate cattle' },
-    forest: { name: 'Forest', description: 'Accumulate 3 wood each round' },
+    forest: { name: 'Forest', description: 'Accumulate 3 wood each round', soloDescription: 'Accumulate 2 wood each round' },
     copse: { name: 'Copse', description: 'Accumulate 1 wood each round' },
     grove: { name: 'Grove', description: 'Accumulate 2 wood each round' },
     'clay-pit': { name: 'Clay Pit', description: 'Accumulate 1 clay each round' },

@@ -228,6 +228,10 @@ const grange = (fields: number, animals: Partial<Resource>) => {
   player.fields = Array.from({ length: fields }, (_, index) => ({
     row: Math.floor(index / 4), col: (index % 4) + 1, stacks: [],
   }))
+  player.pastures = (['sheep', 'boar', 'cattle'] as const).map((animal, index) => ({
+    id: `grange-${animal}`, size: 1, tiles: [{ row: 2, col: index + 1 }], stables: 0,
+    animalType: animals[animal] ? animal : null, animalCount: animals[animal] ?? 0,
+  }))
   session.loadState(session.state)
   return session
 }
@@ -241,18 +245,18 @@ describe('B037 Grange parity', () => {
     expect(printedVp(response, 'B037_Grange')).toBe(3)
   })
 
-  it('B037 S2: characterize five fields even with all animal types', () => {
+  it('B037 S2: rejects five fields even with all animal types', () => {
     const response = playMinor(grange(5, { sheep: 1, boar: 1, cattle: 1 }), 'B037_Grange')
 
-    expect(response.state.players[0]!.minorPlayed).toContain('B037_Grange')
-    expect(response.state.players[0]!.resources.food).toBe(1)
+    expect(response.state.players[0]!.minorPlayed).not.toContain('B037_Grange')
+    expect(response.state.players[0]!.resources.food).toBe(0)
   })
 
-  it('B037 S3: characterize six fields with one animal type missing', () => {
+  it('B037 S3: rejects six fields with one animal type missing', () => {
     const response = playMinor(grange(6, { sheep: 1, boar: 1 }), 'B037_Grange')
 
-    expect(response.state.players[0]!.minorPlayed).toContain('B037_Grange')
-    expect(response.state.players[0]!.resources.food).toBe(1)
+    expect(response.state.players[0]!.minorPlayed).not.toContain('B037_Grange')
+    expect(response.state.players[0]!.resources.food).toBe(0)
   })
 })
 

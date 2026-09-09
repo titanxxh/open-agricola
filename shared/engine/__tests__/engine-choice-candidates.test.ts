@@ -13,7 +13,7 @@ import { Engine } from '../engine'
 import { EngineTree } from '../tree'
 import { HookDispatcher } from '../dispatcher'
 import { LogStore } from '../log-store'
-import { ActionNode, SequenceNode } from '../nodes'
+import { ActionNode, SequenceNode, OrNode, XorNode } from '../nodes'
 import { clearActionHooks } from '../../actions/hooks'
 
 const createState = () =>
@@ -106,6 +106,51 @@ describe('Engine — getBaseChoiceOptions opt-in flow', () => {
     clearActionHooks()
     setActiveCardRegistry(new CardRegistry())
   })
+
+  for (const Composite of [OrNode, XorNode]) {
+    it.each([0, 1, 2])(`${Composite.name} uses candidate filtering after branch selection (%i options)`, (count) => {
+      const calls: { value: string; params: Record<string, unknown> | undefined }[] = []
+      const action = buildOptInAction([
+        { value: 'first', labelKey: 'first' },
+        { value: 'second', labelKey: 'second' },
+      ], calls)
+      action.costPreview = {
+        isStructurallyPossible: () => true,
+        canExecute: (context) => context.params?.selectedOption === undefined
+          || context.params.selectedOption === 'first' && count > 0
+          || context.params.selectedOption === 'second' && count > 1,
+        getBaseCost: () => ({}),
+      }
+      const registry = new ActionRegistry()
+      registry.register(action)
+      registry.register({ ...action, id: 'alternative', getBaseChoiceOptions: undefined, execute: () => ({ type: 'ok' }) })
+      const engine = new Engine({
+        tree: new EngineTree(new Composite('root', [
+          new ActionNode('selected', action.id), new ActionNode('alternative', 'alternative'),
+        ])),
+        registry, hooks: new HookDispatcher(), log: new LogStore(),
+      })
+      const context = { state: createState(), player: createPlayer(), space: createSpace(action) }
+      expect(engine.proceed(context).type).toBe('choice')
+      const before = engine.snapshot()
+      const result = engine.resolveChoice('selected', context)
+      if (count === 0) {
+        expect(result.type).toBe('fail')
+        expect(calls).toHaveLength(0)
+      } else if (count === 1) {
+        expect(result.type).toBe('ok')
+        expect(calls).toEqual([{ value: 'first', params: { selectedOption: 'first' } }])
+      } else {
+        expect(result.type).toBe('request')
+        const pending = engine.snapshot()
+        engine.restore(pending)
+        expect(engine.resolveChoice('second', context).type).toBe('ok')
+        expect(calls[0]!.value).toBe('second')
+      }
+      engine.restore(before)
+      expect(engine.proceed(context).type).toBe('choice')
+    })
+  }
 
   it('auto-resolves silently when only one base option is affordable (no UI prompt)', () => {
     const resolveCalls: { value: string; params: Record<string, unknown> | undefined }[] = []
