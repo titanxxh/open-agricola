@@ -183,9 +183,9 @@ describe('E068 Cherry Orchard parity', () => {
     expect(cardStacks(response)).toEqual([null])
   })
 
-  it('E068 S8: Cherry Orchard counts as one field at final scoring', () => {
+  it('E068 S8: Cherry Orchard is excluded from base field scoring', () => {
     const response = setup({ played: true, normalFields: 1 }).getState()
 
-    expect(fieldScore(response)).toMatchObject({ quantity: 2, total: 1 })
+    expect(fieldScore(response)).toMatchObject({ quantity: 1, total: -1 })
   })
 })

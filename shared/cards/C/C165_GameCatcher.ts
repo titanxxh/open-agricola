@@ -1,11 +1,34 @@
 import { defineOccupationCard } from '../card-source'
 import { payLeaf, gainLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
+import type { Resource } from '../../contract/types'
+import { collectOccupationActionPaymentOptions } from '../../actions/effects/occupation'
 
 const CARD_ID = 'C165_GameCatcher'
 const harvestRounds = [4, 7, 9, 11, 13, 14]
 
 const cardImpl = {
+  listeners: [{
+    id: 'C165-game-catcher-reserve-food',
+    cardIds: [CARD_ID],
+    zones: ['hand'],
+    actions: ['occupation'],
+    phases: ['isDoable'],
+    handler: (context) => {
+      if (context.choice !== CARD_ID) return
+      const food = harvestRounds.filter((round) => round >= context.state.round).length
+      const options = collectOccupationActionPaymentOptions(
+        context.state,
+        context.player,
+        CARD_ID,
+        (context.extraData?.occupationBaseCost ?? {}) as Partial<Resource>,
+        context.actionCardId,
+      )
+      return options.some((option) => context.player.resources.food - (option.resourcesPaid.food ?? 0) >= food)
+        ? { reserveResources: { food } }
+        : { doable: false }
+    },
+  }],
   effect: {
   id: CARD_ID,
   onBuy: (state, _player) => {

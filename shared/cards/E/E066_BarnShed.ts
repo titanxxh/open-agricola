@@ -5,20 +5,15 @@ import { defineMinorCard } from '../card-source'
 
 const CARD_ID = 'E066_BarnShed'
 
-/**
- * E66 Barn Shed — Each time another player uses the Forest accumulation space,
- * card owner gets 1 grain.
- *
- * scope 'opponent' — fires when an opponent uses Forest, owner gains 1 grain.
- */
 const listener: CardListenerRegistration = {
   id: 'E66-barn-shed-opponent-forest',
   cardIds: [CARD_ID],
   actions: ['place-farmer'],
   phases: ['after' as ActionHookPhase],
-  scope: 'opponent',
+  scope: 'any',
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (context.space?.id !== 'forest') return
+    if (context.state.players.length > 1 && context.triggerPlayer?.id === context.ownerPlayer?.id) return
     return { flow: gainLeaf(CARD_ID, { grain: 1 }), sourceCard: CARD_ID }
   },
 }

@@ -570,7 +570,7 @@ type ActionDefinition = {
 
 Hook 不进 `ActionDefinition`，由 `hooks.ts` 显式注册（卡牌文件内部）。
 
-`getBaseChoiceOptions` opt-in 选项流：base + `computeChoiceCandidates` 注入 → 按 `value` 去重 → `costPreview.canExecute` 过滤 → 0 候选 fail / 1 直跳 `resolveChoice` / ≥2 标准 prompt。当前消费者：`renovate-house` + `A087_Conservator`。与传统 `execute()→choice→computeArgs.extraOptions` 路径互斥。`renovate-house` 的 card-authored exact/free cost 通过 `actionContext.exactCost` 表达，和 construct / stables / plow 的 参考实现 `formatCost` 语义一致。
+`getBaseChoiceOptions` opt-in 选项流：base + `computeChoiceCandidates` 注入 → 按 `value` 去重 → `costPreview.canExecute` 过滤 → 0 候选 fail / 1 直跳 `resolveChoice` / ≥2 标准 prompt。当前消费者：`renovate-house` + `A087_Conservator`。与传统 `execute()→choice→computeArgs.extraOptions` 路径互斥。`renovate-house` 的 card-authored exact/free cost 通过 `actionContext.exactCost` 表达，和 construct / stables / plow 的 参考实现 `formatCost` 语义一致。 普通叶子和 OR/XOR 内选中的叶子共用此管线，包括按 selectedOption 重算费用；Silage 的粮食来源选择也复用该入口。
 
 ### 7.3 effects/ 自动发现
 
@@ -607,6 +607,7 @@ Hook 不进 `ActionDefinition`，由 `hooks.ts` 显式注册（卡牌文件内�
 - `CostResourceRemovalModifier` —— `type:'remove-resource'` 在枚举前从 `fee` / `fees` / `unitFee` 结构化删除指定资源键，并在 `costResourceRemovals` 保留约束来源和各费用路径的实际减免量；用于 C014 这类“不再需要某资源”的规则。该约束会在每次后置 bonus 后再次应用，因此 E123 不能使用已删除费用，D013 等成本 bonus 也不能把该资源重新加入；最终减免通过 `PaymentSolution.bonusReductions` 写入 Cost Attribution。
 - `paymentResourceProviders` —— 卡牌 / hook 提供的虚拟支付资源。provider 在卡牌内部声明稳定 key、可用量、可覆盖的真实成本资源以及执行时的消费来源；它不写入 `fee` / `fees` / `PlayerState.resources`，只在 `PaymentSolution.resourcesPaid` 中以自身 key 出现，并由 executor 消耗来源状态。
 - `paymentBudget` —— 对最终 `PaymentSolution.resourcesPaid` 的资源上限过滤。它不提供资源、不改变成本候选，也不提前限制几何/单位数量；必须在 trades / bonuses / paymentResourceProviders / cards 都生成最终支付方案后检查。
+- `minimumResourcesPaid`：最终 `PaymentSolution.resourcesPaid` 的下限，在替代支付、折扣之后、最优方案裁剪之前校验。改善流程通过 `actionContext.minimumResourcesPaid` 传入；候选准入和支付子节点复用同一个受约束预览。
 - `resourceReserve` —— 支付后声明的资源池总量必须至少保留指定数量。它只过滤最终支付方案，不改变成本候选或支付执行。
 - `Bonus.capDiscountAtCost` —— 把可变折扣封顶到当前正费用，但仍是后置 bonus；“不再需要某资源”必须使用 `CostResourceRemovalModifier`，不能用任意大 capped discount 模拟。普通 bonus choice 必须能完整应用折扣，不能靠 clamp 产生 no-op 或部分折扣。
 - `Bonus.trackChoiceIndex` —— 默认记录 multi-choice 的 `bonusChoiceIndex`，表示玩家选了第几个 choice；它本身不是 dominance pruning 的豁免理由。
@@ -994,6 +995,8 @@ cardField?: {
 卡牌侧接口只有三个入口。`getLogicalFields(player)` 按确定顺序返回不可变投影，包含 Farmyard Field 和所有已打出且已注册的 Card Field，也包含固定容量中的空槽。`getFarmyardFields(player)` 是犁地、围栏、相邻、版图占位与 Field tile 几何规则显式使用的窄查询。`mutateLogicalFields(state, player, options?)` 提供具名的 `place`、`grow`、`remove` 与原子 `replace` 操作；它先验证目标，再经 Farmyard 或 Card State owner adapter 写入。
 
 Field storage 接受 grain、vegetable、wood、stone 四种合法 field good。Card Field 的 `allowedCrops` 表示普通 Sow 能力，不是存储 schema。`place` 默认执行该白名单，卡牌效果可显式绕过；普通 Sow 与 `replace` 仍受白名单限制。Owner callback 必须先检查实际 good，再执行特定作物副作用。
+
+基础田地计分只统计 Farmyard Field；Card Field 继续参与 Logical Field 规则、播种与收割。
 
 Card Field 无论容量多少都只有一个稳定 Logical Field id 和 `groupKey`；固定槽在其他槽清空后仍保留稳定选择坐标。`card-field.ts` 内的底层 Farmyard adapter 是 Card Impl 代码唯一可直接访问 `PlayerState.fields` 的位置。`check:card-impl-boundaries` 扫描 A–E、Farmers of the Moor、major、community 与生产 helper，不论 receiver 名称都拒绝名为 `fields` 的属性或 bracket 访问，并且没有遗留文件 allowlist。
 

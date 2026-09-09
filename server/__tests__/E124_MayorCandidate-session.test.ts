@@ -64,12 +64,12 @@ const mayorCandidateBonus = (response: SessionResponse) =>
     .find((entry) => entry.type === 'bonus' && entry.cardId === CARD_ID)?.score ?? 0
 
 describe('E124 Mayor Candidate parity', () => {
-  it('E124 S1: OA plays Mayor Candidate but grants no immediate wood or stone', () => {
+  it('E124 S1: playing Mayor Candidate grants two wood and two stone', () => {
     const response = playMayorCandidate(setup())
 
     expect(response.ok, response.error).toBe(true)
     expect(response.state.players[0]!.occupationPlayed).toContain(CARD_ID)
-    expect(response.state.players[0]!.resources).toMatchObject({ wood: 0, stone: 0 })
+    expect(response.state.players[0]!.resources).toMatchObject({ wood: 2, stone: 2 })
   })
 
   it('E124 S2: no wood or stone in reserve scores no Mayor Candidate penalty', () => {

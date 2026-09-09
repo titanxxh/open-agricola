@@ -170,6 +170,8 @@ Note: React/Suspense, CDN, browser fallback, etc. are normal terms for the platf
 
 ## 6. Infrastructure backlog
 
+Shared payment enumeration supports `ComplexCost.minimumResourcesPaid` after discounts and substitutions, before optimal-solution pruning. Improvement candidates and submission share this constraint. Nested OR/XOR leaves reuse the ordinary choice-candidate pipeline. Base field scoring counts only Farmyard Fields; card-driven terminal investments use explicit choices and real payments. Mandatory occupation follow-up food reuses the existing lesson-payment preview and `reserveResources` contract.
+
 Supply person identity, reservation, normal rotation, and return-home disposition are implemented through the shared boundaries in §5 and `docs/ARCHITECTURE.md` §6.4; card timing and costs remain local.
 
 There is currently no open infrastructure umbrella pending. Completed historical items such as Before-End Player Dispatch, Scoring Reserve, printed-cost helper, extra-turn rotation, family token supply, Major Improvement stack supply, card boundary guard, single-layer terrain selection flow, FoM immediate resource minor helper, pasture / harvest / breeding / scoring / stable / special-stable, etc. have been merged into §5 Architecture Constraints or §12 Single Card Remarks as needed, and the completion list is no longer maintained in this section.

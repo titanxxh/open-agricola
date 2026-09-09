@@ -1,6 +1,6 @@
 import { defineOccupationCard } from '../card-source'
 import { markCardCounterIfBoughtByRound, hasCardCounter } from '../helpers/stage-effects'
-import { payGainFlow } from '../helpers/pay-gain-node'
+import { payGainActionFlow } from '../helpers/pay-gain-node'
 import { familySize } from '../../domain/player'
 import type { CardImpl } from '../registry'
 
@@ -17,11 +17,10 @@ const cardImpl = {
     if (state.round < 14) return
     const n = Math.min(player.resources.clay ?? 0, familySize(player))
     if (n <= 0) return
-    return payGainFlow({
+    return payGainActionFlow({
       cardId: CARD_ID,
       cost: { clay: n },
       gain: { score: n },
-      promptKey: 'ui.interactionEarthenwarePotter',
     })
   },
 },

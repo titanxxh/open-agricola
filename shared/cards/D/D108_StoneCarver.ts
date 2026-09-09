@@ -12,6 +12,7 @@ export const D108_StoneCarver = defineOccupationCard({
     desc: ['Each harvest, you can use this card to turn exactly 1 <STONE> into 3 <FOOD>.'],
     cost: {},
     players: '1+',
+    waresSalesmanGains: [{ stone: 1, reed: 1 }],
     exchanges: [
         { from: { stone: 1 }, to: { food: 3 }, max: 1, sourceId: CARD_ID, triggers: ['harvest'] },
       ],

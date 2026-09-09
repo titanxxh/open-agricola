@@ -1251,7 +1251,9 @@ export const computeAllBuyableCombinations = (
   }
 
   const budgetedSolutions = paymentSolutions.filter((solution) =>
-    withinPaymentBudget(solution, effectiveCost.paymentBudget),
+    withinPaymentBudget(solution, effectiveCost.paymentBudget)
+      && Object.entries(effectiveCost.minimumResourcesPaid ?? {}).every(([resource, amount]) =>
+        (solution.resourcesPaid[resource as PaymentResourceKey] ?? 0) >= (amount ?? 0)),
   )
   const result = sortPaymentSolutions(keepOnlyOptimals(budgetedSolutions))
   if (canUseCache) solutionCache.set(cacheKey, result)

@@ -35,17 +35,17 @@ const countCattleOnBoard = (player: PlayerState): number => {
  */
 
 registerSelectionEffect('cow-patty-bonus-crop', ({ state, player, positions, eventSink }) => {
-  const [key] = positions
-  if (!key) return
-  const position = parsePositionKey(key)
-  const field = position && getFarmyardFields(player).find((candidate) =>
-    candidate.row === position.row && candidate.col === position.col,
-  )
-  if (!field) return
-  const top = field.slots.at(-1)
-  if (!top?.stack) return
-  mutateLogicalFields(state, player, { sourceCard: CARD_ID, eventSink })
-    .grow({ fieldId: field.id, slot: top.index }, 1)
+  for (const key of positions) {
+    const position = parsePositionKey(key)
+    const field = position && getFarmyardFields(player).find((candidate) =>
+      candidate.row === position.row && candidate.col === position.col,
+    )
+    if (!field) continue
+    const top = field.slots.at(-1)
+    if (!top?.stack) continue
+    mutateLogicalFields(state, player, { sourceCard: CARD_ID, eventSink })
+      .grow({ fieldId: field.id, slot: top.index }, 1)
+  }
 })
 
 /**
@@ -114,7 +114,7 @@ const afterSowListener: CardListenerRegistration = {
           selectionKind: 'farm-position',
           selectableTiles: eligible.map(({ row, col }) => ({ row, col })),
           minSelections: 1,
-          maxSelections: 1,
+          maxSelections: eligible.length,
           selectionEffect: 'cow-patty-bonus-crop',
         }),
       } as ActionFlow,

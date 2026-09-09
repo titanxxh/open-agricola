@@ -177,7 +177,7 @@ describe('A/B Logical Field consumers', () => {
     setCardField(player, 'B068_Beanfield', [null])
 
     expect(A084_Silage_impl.effect.onReturnHome!(state, player)).toMatchObject({ type: 'xor' })
-    expect(getAdHocAction('card_A084_Silage_pay-grain-any')!.execute({ state, player } as never)).toEqual({ type: 'ok' })
+    expect(getAdHocAction('card_A084_Silage_pay-grain-any')!.resolveChoice!({ state, player } as never, 'card:B113_PatchCaregiver')).toEqual({ type: 'ok' })
     expect(player.cardStates.B113_PatchCaregiver?.extraData?.cardFieldStacks).toEqual([
       { crop: 'grain', remaining: 1 },
     ])

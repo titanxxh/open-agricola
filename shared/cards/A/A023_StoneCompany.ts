@@ -22,7 +22,7 @@ const listener: CardListenerRegistration = {
             type: 'leaf',
             actionId: 'improvement',
             sourceCard: CARD_ID,
-            actionContext: { purchaseCondition: CARD_ID },
+            actionContext: { minimumResourcesPaid: { stone: 1 } },
           },
         ],
       },

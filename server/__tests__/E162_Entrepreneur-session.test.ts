@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { GameSession, type SessionResponse } from '../game/authoritative-session'
 import { getCardStack, pushToCardStack } from '../../shared/cards/helpers/card-state'
 import { markAllWorkersUsed, setWorkersAtHome } from '../../shared/domain/player'
+import { rehydrateState, serializeSessionSnapshot } from '../../shared/session/serialization'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 
 import '../../shared/cards/E/E162_Entrepreneur'
@@ -17,7 +18,7 @@ const setup = ({
   storedFood?: number
   resources?: Partial<{ wood: number; clay: number; reed: number; stone: number }>
 } = {}) => {
-  const session = new GameSession(7162, undefined, { playerCount: 4 })
+  const session = new GameSession(7162, undefined, { playerCount: 2 })
   stabilizeRandomHands(session.state.players)
   const state = session.getState().state
   state.currentPlayerIndex = 0
@@ -71,6 +72,7 @@ const resolveEntrepreneur = (
   session: GameSession,
   initial: SessionResponse,
   mode: 'store' | 'discard' | 'pass',
+  resource: 'wood' | 'stone' = 'wood',
 ) => {
   let response = initial
   for (let step = 0; step < 8 && response.interaction.stateId === 'wait'; step++) {
@@ -82,10 +84,11 @@ const resolveEntrepreneur = (
       response = session.resolveChoice(response.interaction.playerIndex, skip.value)
       break
     }
-    const preferred = options.find((option) =>
+    const preferred = options.find((option) => option.effectPreview?.resourcesGained?.[resource] === 1)
+      ?? options.find((option) =>
       option.sourceCard === CARD_ID && (mode === 'discard'
-        ? option.labelKey === 'actions.pop-card-stack.name'
-        : option.labelKey !== 'actions.pop-card-stack.name' && option.value !== '__skip__'),
+        ? option.labelKey === 'ui.interactionEntrepreneurDiscard'
+        : option.labelKey !== 'ui.interactionEntrepreneurDiscard' && option.value !== '__skip__'),
     )
     const option = preferred
       ?? cardOptions.find((candidate) => candidate.value !== '__skip__')
@@ -97,7 +100,7 @@ const resolveEntrepreneur = (
 }
 
 describe('E162 Entrepreneur parity', () => {
-  it('E162 S1: Entrepreneur can be played as the first occupation in a four-player game', () => {
+  it('E162 S1: Entrepreneur can be played as the first occupation in a two-player game', () => {
     const response = playEntrepreneur(setup({ played: false, food: 0 }))
 
     expect(response.ok, response.error).toBe(true)
@@ -105,36 +108,58 @@ describe('E162 Entrepreneur parity', () => {
     expect(response.state.players[0]!.resources.food).toBe(0)
   })
 
-  it('E162 S2: storing one food auto-picks wood instead of offering every missing resource', () => {
+  it('E162 S2: storing food lets the player choose a missing resource', () => {
     const session = setup({ food: 1 })
 
-    const response = resolveEntrepreneur(session, startNextRound(session), 'store')
+    const response = resolveEntrepreneur(session, startNextRound(session), 'store', 'stone')
 
     expect(response.ok, response.error).toBe(true)
     expect(response.state.players[0]!.resources).toMatchObject({
-      food: 0, wood: 1, clay: 0, reed: 0, stone: 0,
+      food: 0, wood: 0, clay: 0, reed: 0, stone: 1,
     })
     expect(getCardStack(response.state.players[0]!, CARD_ID)).toEqual(['food'])
   })
 
-  it('E162 S3: taking stored food returns it to supply and auto-picks wood', () => {
+  it('E162 S3: discarding stored food grants the chosen resource without returning food', () => {
     const session = setup({ food: 0, storedFood: 1 })
 
     const response = resolveEntrepreneur(session, startNextRound(session), 'discard')
 
     expect(response.ok, response.error).toBe(true)
     expect(response.state.players[0]!.resources).toMatchObject({
-      food: 1, wood: 1, clay: 0, reed: 0, stone: 0,
+      food: 0, wood: 1, clay: 0, reed: 0, stone: 0,
     })
     expect(getCardStack(response.state.players[0]!, CARD_ID)).toEqual([])
   })
 
-  it('E162 S4: when both food sources exist the player may take the stored food', () => {
+  it('E162 S4: when both food sources exist the player may discard the stored food', () => {
     const session = setup({ food: 1, storedFood: 1 })
 
     const response = resolveEntrepreneur(session, startNextRound(session), 'discard')
 
-    expect(response.state.players[0]!.resources).toMatchObject({ food: 2, wood: 1 })
+    expect(response.state.players[0]!.resources).toMatchObject({ food: 1, wood: 1 })
+    expect(getCardStack(response.state.players[0]!, CARD_ID)).toEqual([])
+  })
+
+  it('restores a pending resource choice and undoes discarding stored food', () => {
+    const session = setup({ food: 1, storedFood: 1, resources: { clay: 1, reed: 1 } })
+    const offered = startNextRound(session)
+    const discard = optionsOf(offered).find((option) => option.labelKey === 'ui.interactionEntrepreneurDiscard')
+    expect(discard, JSON.stringify(offered.interaction)).toBeDefined()
+    const pending = session.resolveChoice(0, discard!.value)
+    expect(getCardStack(pending.state.players[0]!, CARD_ID)).toEqual([])
+    expect(pending.state.players[0]!.resources.food).toBe(1)
+    const snapshot = serializeSessionSnapshot(session.state, session)
+    const restored = new GameSession(rehydrateState(JSON.parse(JSON.stringify(snapshot))))
+
+    const undone = session.undoStep(0)
+    expect(undone.ok, undone.error).toBe(true)
+    expect(getCardStack(undone.state.players[0]!, CARD_ID)).toEqual(['food'])
+    expect(undone.state.players[0]!.resources.food).toBe(1)
+
+    const response = resolveEntrepreneur(restored, restored.getState(), 'discard', 'stone')
+    expect(response.ok, response.error).toBe(true)
+    expect(response.state.players[0]!.resources).toMatchObject({ food: 1, wood: 0, stone: 1 })
     expect(getCardStack(response.state.players[0]!, CARD_ID)).toEqual([])
   })
 

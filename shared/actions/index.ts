@@ -148,6 +148,9 @@ export const createActionSpaces = (playerCount?: number): ActionSpace[] =>
     )
     .map((action) => ({
       ...action,
+      ...(playerCount === 1 && action.id === forest.id
+        ? { gainPerRound: { wood: 2 }, descriptionKey: 'actions.forest.soloDescription' }
+        : {}),
       resources: { ...emptyResources },
       takenBy: [],
       blockedBy: [],

@@ -1,6 +1,5 @@
 import { defineMinorCard } from '../card-source'
 import { getRoundPlacementDetails } from '../helpers/round-placement'
-import { workersAvailable } from '../../domain/player'
 import { removeSyntheticLinkedOccupancyRefs } from '../../domain/space'
 import { registerAdHocAction } from '../../actions/helpers/ad-hoc-action-registry'
 import type { ActionDefinition } from '../../contract/types'
@@ -40,10 +39,6 @@ const cardImpl = {
     if (!origin.takenBy.some(
       (t) => t.playerId === player.id && t.workerId === first.workerId,
     )) return
-    // targetCardHold keeps the recalled worker off "home", so the place-farmer
-    // step needs a separate at-home farmer. Guard up-front, matching the reference's
-    // isDoable propagation.
-    if (workersAvailable(state, player) < 1) return
 
     const cleanupFlow = first.spaceId === 'day-laborer'
       ? [{
@@ -68,6 +63,7 @@ const cardImpl = {
         {
           type: 'leaf',
           actionId: 'place-farmer',
+          optional: true,
           sourceCard: CARD_ID,
           actionContext: { trueAction: false, extraPlacement: true },
         },

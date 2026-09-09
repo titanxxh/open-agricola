@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession, type SessionResponse } from '../game/authoritative-session'
 import { markAllWorkersUsed, setWorkersAtHome } from '../../shared/domain/player'
+import { rehydrateState, serializeSessionSnapshot } from '../../shared/session/serialization'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 import { resolveTriggerIfPresent } from './_helpers/trigger-select'
 
@@ -96,14 +97,15 @@ const roundSession = ({
   }))
   player.pastures = [
     {
-      id: 'silage-sheep', size: 1, tiles: [{ row: 1, col: 0 }], stables: 1,
+      id: 'silage-sheep', size: 1, tiles: [{ row: 1, col: 2 }], stables: 1,
       animalType: sheep > 0 ? 'sheep' : null, animalCount: sheep,
     },
     {
-      id: 'silage-boar', size: 1, tiles: [{ row: 1, col: 1 }], stables: 1,
+      id: 'silage-boar', size: 1, tiles: [{ row: 1, col: 3 }], stables: 1,
       animalType: boar > 0 ? 'boar' : null, animalCount: boar,
     },
   ]
+  player.stableTiles = [{ row: 1, col: 2 }, { row: 1, col: 3 }]
   player.houseAnimalType = null
   player.houseAnimalCount = 0
   player.stableAnimals = {}
@@ -167,7 +169,7 @@ describe('A084 Silage parity', () => {
     let response = chooseAnimal(session, cardPrompt(session), 'boar')
     response = placeAnimals(session, response)
 
-    expect(response.state.players[0]!.resources).toMatchObject({ grain: 0, sheep: 2, boar: 3 })
+    expect(response.state.players[0]!.resources, JSON.stringify(response.interaction)).toMatchObject({ grain: 0, sheep: 2, boar: 3 })
   })
 
   it('A084 S4: with no reserve grain, Silage removes one grain from a field and breeds', () => {
@@ -221,13 +223,39 @@ describe('A084 Silage parity', () => {
     expect(hasSilageOffer(response)).toBe(false)
   })
 
-  it('A084 S10: with reserve and field grain, Silage automatically spends reserve grain', () => {
+  it('restores and undoes a chosen field payment', () => {
     const session = roundSession({ reserveGrain: 1, fieldGrain: 2 })
-    let response = chooseAnimal(session, cardPrompt(session), 'sheep')
+    const pending = chooseAnimal(session, cardPrompt(session), 'sheep')
+    const option = pending.interaction.request.options?.find((candidate) => candidate.value.startsWith('farmyard:'))
+    expect(option).toBeDefined()
+    const snapshot = serializeSessionSnapshot(session.state, session)
+    const restored = new GameSession(rehydrateState(JSON.parse(JSON.stringify(snapshot))))
+    const paid = restored.resolveChoice(0, option!.value)
+    expect(paid.ok, paid.error).toBe(true)
+    expect(paid.state.players[0]!.fields[0]!.stacks[0]!.remaining).toBe(1)
+    expect(paid.state.players[0]!.resources.grain).toBe(1)
+    const undone = restored.undoStep(0)
+    expect(undone.ok, undone.error).toBe(true)
+    expect(undone.state.players[0]!.fields[0]!.stacks[0]!.remaining).toBe(2)
+    expect(undone.state.players[0]!.resources.sheep).toBe(2)
+  })
+
+  it.each(['reserve', 'farmyard:2:2', 'farmyard:2:3'])('A084 S10: chooses grain from %s when several sources exist', (source) => {
+    const session = roundSession({ reserveGrain: 1, fieldGrain: 2 })
+    session.state.players[0]!.fields = [2, 3].map((col) => ({ row: 2, col, stacks: [{ kind: 'grain', remaining: 2 }] }))
+    session.loadState(session.state)
+    const offered = chooseAnimal(session, cardPrompt(session), 'sheep')
+    expect(offered.interaction.stateId).toBe('wait')
+    expect(offered.interaction.request.options?.map((option) => option.value))
+      .toEqual(['reserve', 'farmyard:2:2', 'farmyard:2:3'])
+
+    let response = session.resolveChoice(0, source)
     response = placeAnimals(session, response)
 
-    expect(response.state.players[0]!.resources.grain).toBe(0)
-    expect(response.state.players[0]!.fields[0]!.stacks[0]!.remaining).toBe(2)
+    expect(response.ok, response.error).toBe(true)
+    expect(response.state.players[0]!.resources.grain).toBe(source === 'reserve' ? 0 : 1)
+    expect(response.state.players[0]!.fields.map((field) => field.stacks[0]!.remaining))
+      .toEqual([source === 'farmyard:2:2' ? 1 : 2, source === 'farmyard:2:3' ? 1 : 2])
     expect(response.state.players[0]!.resources.sheep).toBe(3)
   })
 })

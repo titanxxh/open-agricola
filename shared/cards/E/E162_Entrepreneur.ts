@@ -1,7 +1,8 @@
 import { defineOccupationCard } from '../card-source'
-import { getCardStack } from '../helpers/card-state'
+import { getCardStack, popFromCardStack } from '../helpers/card-state'
 import { gainLeaf } from '../helpers/pay-gain-node'
-import type { ActionFlow, Resource } from '../../contract/types'
+import type { ActionDefinition, ActionFlow, Resource } from '../../contract/types'
+import { registerAdHocAction } from '../../actions/helpers/ad-hoc-action-registry'
 import type { CardImpl } from '../registry'
 
 const CARD_ID = 'E162_Entrepreneur'
@@ -9,6 +10,26 @@ const BUILDING_RESOURCES: (keyof Resource)[] = ['wood', 'clay', 'reed', 'stone']
 
 const getMissingBuildingResources = (player: { resources: Resource }): (keyof Resource)[] =>
   BUILDING_RESOURCES.filter((res) => (player.resources[res] ?? 0) === 0)
+
+const DISCARD_FOOD = `card_${CARD_ID}_discardFood`
+const discardFood: ActionDefinition = {
+  id: DISCARD_FOOD,
+  nameKey: 'ui.interactionEntrepreneurDiscard',
+  descriptionKey: 'ui.interactionEntrepreneurDiscard',
+  roundAvailable: 1,
+  gainPerRound: {},
+  canBeExecutedByPlayer: (_state, player) => getCardStack(player, CARD_ID).length > 0,
+  execute: ({ player, eventSink }) => {
+    if (getCardStack(player, CARD_ID).length === 0) return { type: 'fail', errorKey: 'log.actionFail' }
+    popFromCardStack(player, CARD_ID)
+    eventSink?.emit<'card.stackChanged'>({
+      type: 'card.stackChanged', cardId: CARD_ID, targetPlayerId: player.id,
+      resources: { food: 1 }, delta: -1, reason: 'discard',
+    })
+    return { type: 'ok' }
+  },
+}
+registerAdHocAction(discardFood)
 
 const cardImpl = {
   effect: {
@@ -23,8 +44,10 @@ const cardImpl = {
     const hasStoredFood = stack.length > 0
     if (!hasFood && !hasStoredFood) return
 
-    // Auto-pick first missing resource
-    const gainResource = missingResources[0]!
+    const gain: ActionFlow = {
+      type: 'xor',
+      children: missingResources.map((resource) => gainLeaf(CARD_ID, { [resource]: 1 })),
+    }
 
     const children: ActionFlow[] = []
 
@@ -35,7 +58,7 @@ const cardImpl = {
         children: [
           { type: 'leaf', actionId: 'pay', params: { food: 1 }, sourceCard: CARD_ID },
           { type: 'leaf', actionId: 'push-to-card-stack', sourceCard: CARD_ID, params: { item: 'food' } },
-          gainLeaf(CARD_ID, { [gainResource]: 1 }),
+          gain,
         ],
       })
     }
@@ -46,8 +69,8 @@ const cardImpl = {
         type: 'seq',
         choiceLabelKey: 'ui.interactionEntrepreneurDiscard',
         children: [
-          { type: 'leaf', actionId: 'pop-card-stack', sourceCard: CARD_ID },
-          gainLeaf(CARD_ID, { [gainResource]: 1 }),
+          { type: 'leaf', actionId: DISCARD_FOOD, sourceCard: CARD_ID },
+          gain,
         ],
       })
     }

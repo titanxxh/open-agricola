@@ -416,12 +416,7 @@ describe('stage hook flows', () => {
     }
 
     session.loadState(state)
-    let resp = session.performRoundEnd()
-    expect(resp.interaction.stateId).toBe('wait')
-    expect(resp.interaction.stateId === 'wait' ? resp.interaction.promptKey : undefined)
-      .toBe('ui.interactionEarthenwarePotter')
-
-    resp = chooseFirstOption(session, 0)
+    const resp = session.performRoundEnd()
     expect(resp.interaction.stateId).toBe('gameover')
     expect(resp.state.gameOver).toBe(true)
     expect(resp.state.players[0]!.resources.clay).toBe(0)

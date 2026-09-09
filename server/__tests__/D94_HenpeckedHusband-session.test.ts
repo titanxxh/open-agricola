@@ -173,7 +173,7 @@ describe('D094 Henpecked Husband parity', () => {
     expect(triggerCount(response)).toBe(1)
   })
 
-  it('D094 S3: characterize Meeting Place exemption through a real second-person room build', () => {
+  it('D094 S3: preserves both workers for the Meeting Place exemption through a real second-person room build', () => {
     const session = setup({ firstSpace: 'meeting-place' })
     const placements = getRoundPersonPlacementDetails(session.state.players[0]!)
     const firstId = placements[0]!.workerId
@@ -184,9 +184,9 @@ describe('D094 Henpecked Husband parity', () => {
 
     expect(response.ok, response.error).toBe(true)
     expect(workerOn(response, 'meeting-place', firstId)).toBe(true)
-    expect(workerOn(response, 'farm-expansion', secondId)).toBe(false)
+    expect(workerOn(response, 'farm-expansion', secondId)).toBe(true)
     expect(response.state.players[0]!.rooms).toBe(3)
-    expect(triggerCount(response)).toBe(1)
+    expect(triggerCount(response)).toBe(0)
   })
 
   it('D094 S4: a room built by the first placed person recalls nobody', () => {

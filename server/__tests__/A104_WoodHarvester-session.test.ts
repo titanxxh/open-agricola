@@ -64,9 +64,9 @@ describe('A104 Wood Harvester parity', () => {
     expect(response.state.players[0]!.resources).toMatchObject({ wood: 0, food: 16 })
   })
 
-  it('A104 S4: OA counts wood sitting on a non-wood accumulation space', () => {
-    const response = autoAdvanceRoundEnd(setup({ spaceWood: { 'clay-pit': 2 } }))
+  it('A104 S4: ignores wood sitting on non-wood accumulation spaces', () => {
+    const response = autoAdvanceRoundEnd(setup({ spaceWood: { 'clay-pit': 2, 'reed-bank': 3 } }))
 
-    expect(response.state.players[0]!.resources).toMatchObject({ wood: 1, food: 16 })
+    expect(response.state.players[0]!.resources).toMatchObject({ wood: 0, food: 16 })
   })
 })

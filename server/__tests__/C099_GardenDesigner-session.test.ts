@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession, type SessionResponse } from '../game/authoritative-session'
 import { markAllWorkersUsed, setActiveWorkerCount } from '../../shared/domain/player'
+import { autoAdvanceRoundEnd } from '../../tests/llm-card-gen/session-helpers'
+import { rehydrateState, serializeSessionSnapshot } from '../../shared/session/serialization'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 
 import '../../shared/cards/C/C099_GardenDesigner'
@@ -42,22 +44,20 @@ const setup = ({ emptyFields = 1, scoringFood = 1 } = {}) => {
   return session
 }
 
-const finishFinalHarvest = (session: GameSession) => {
-  let response = session.performRoundEnd()
-  for (let step = 0; step < 8 && !response.state.gameOver; step += 1) {
-    expect(response.interaction.stateId).toBe('wait')
-    if (response.interaction.stateId !== 'wait') break
-    const { request, playerIndex } = response.interaction
-    if (request.kind === 'confirm-player-switch') {
-      response = session.resolveChoice(request.fromPlayerIndex, 'confirm')
-      continue
-    }
-    const skip = request.options?.find((option) => option.value === '__skip__')
-    expect(skip, JSON.stringify(response.interaction)).toBeDefined()
-    response = session.resolveChoice(playerIndex, skip!.value)
-  }
+const choiceValue = (food: number, score: number) => `${CARD_ID}:food:${food}:score:${score}`
+
+const finishFinalHarvest = (session: GameSession, food = 0, score = 0, shouldChoose = true) => {
+  let chosen = false
+  const response = autoAdvanceRoundEnd(session, {
+    onChoice: (interaction) => {
+      const option = interaction.request.options?.find((candidate) => candidate.value === choiceValue(food, score))
+      expect(option, JSON.stringify(interaction)).toBeDefined()
+      chosen = true
+      return session.resolveChoice(interaction.playerIndex, option!.value)
+    },
+  })
+  expect(chosen).toBe(shouldChoose)
   expect(response.state.gameOver).toBe(true)
-  expect(response.interaction.stateId).toBe('gameover')
   return response
 }
 
@@ -68,41 +68,87 @@ const gardenDesignerBonus = (response: SessionResponse) =>
   category(response, 'cardBonusVp')?.entries
     .find((entry) => 'cardId' in entry && entry.cardId === CARD_ID)?.score ?? 0
 
-describe('C099 Garden Designer parity', () => {
-  for (const [scenario, scoringFood, bonus] of [
-    ['S1', 1, 1],
-    ['S2', 4, 2],
-    ['S3', 7, 3],
-  ] as const) {
-    it(`C099 ${scenario}: one empty field automatically reserves ${scoringFood} food for ${bonus} bonus VP`, () => {
-      const response = finishFinalHarvest(setup({ scoringFood }))
+describe('C099 Garden Designer scoring choices', () => {
+  it.each([[1, 1], [4, 2], [7, 3]])('pays %i food for %i bonus VP in one empty field', (food, score) => {
+    const session = setup({ scoringFood: food })
+    const response = finishFinalHarvest(session, food, score)
 
-      expect(gardenDesignerBonus(response)).toBe(bonus)
-      expect(category(response, 'fields')).toMatchObject({ quantity: 1, total: -1 })
-      expect(response.state.players[0]!.resources.food).toBe(scoringFood)
-    })
-  }
-
-  it('C099 S4: the optimal Garden Designer exchange is applied without a decline prompt', () => {
-    const response = finishFinalHarvest(setup({ scoringFood: 7 }))
-
-    expect(gardenDesignerBonus(response)).toBe(3)
-    expect(response.state.players[0]!.resources.food).toBe(7)
-    expect(response.interaction.stateId).toBe('gameover')
+    expect(gardenDesignerBonus(response)).toBe(score)
+    expect(response.state.players[0]!.resources.food).toBe(0)
+    expect(category(response, 'fields')).toMatchObject({ quantity: 1, total: -1 })
+    expect(gardenDesignerBonus(session.getState())).toBe(score)
+    expect(session.getState().state.players[0]!.resources.food).toBe(0)
+    const repeated = session.resolveChoice(0, choiceValue(food, score))
+    expect(repeated.ok).toBe(false)
+    expect(repeated.state.players[0]!.resources.food).toBe(0)
   })
 
-  it('C099 S5: without an empty field Garden Designer neither prompts nor scores', () => {
-    const response = finishFinalHarvest(setup({ emptyFields: 0, scoringFood: 7 }))
+  it.each([[0, 0], [1, 1], [4, 2], [7, 3], [8, 4]])('allows a chosen investment of %i food for %i VP across two fields', (food, score) => {
+    const response = finishFinalHarvest(setup({ emptyFields: 2, scoringFood: 8 }), food, score)
+    expect(gardenDesignerBonus(response)).toBe(score)
+    expect(response.state.players[0]!.resources.food).toBe(8 - food)
+  })
 
+  it.each([{ emptyFields: 0, scoringFood: 7 }, { emptyFields: 2, scoringFood: 0 }])('does not prompt without a payable scoring option: %j', (options) => {
+    const response = finishFinalHarvest(setup(options), 0, 0, false)
     expect(gardenDesignerBonus(response)).toBe(0)
-    expect(response.state.players[0]!.resources.food).toBe(7)
+    expect(response.state.players[0]!.resources.food).toBe(options.scoringFood)
   })
 
-  it('C099 S6: two empty fields automatically reserve eight food for four bonus VP', () => {
-    const response = finishFinalHarvest(setup({ emptyFields: 2, scoringFood: 8 }))
+  it('can invest in an empty Card Field without adding base field points', () => {
+    const session = setup({ emptyFields: 0, scoringFood: 4 })
+    session.state.players[0]!.minorPlayed = ['B068_Beanfield']
+    session.loadState(session.state)
+    const response = finishFinalHarvest(session, 4, 2)
+    expect(gardenDesignerBonus(response)).toBe(2)
+    expect(category(response, 'fields')).toMatchObject({ quantity: 0, total: -1 })
+  })
 
-    expect(gardenDesignerBonus(response)).toBe(4)
-    expect(category(response, 'fields')).toMatchObject({ quantity: 2, total: 1 })
-    expect(response.state.players[0]!.resources.food).toBe(8)
+  it.each([CARD_ID, 'C133_Soldier'])('supports terminal trigger order starting with %s', (first) => {
+    const session = setup({ scoringFood: 7 })
+    const owner = session.state.players[0]!
+    owner.occupationPlayed.push('C133_Soldier')
+    owner.resources.wood = 1
+    owner.resources.stone = 1
+    session.loadState(session.state)
+    let invested = false
+    const response = autoAdvanceRoundEnd(session, {
+      onChoice: (interaction) => {
+        const options = interaction.request.options ?? []
+        const trigger = options.find((option) => option.value === first)
+          ?? options.find((option) => option.value === CARD_ID || option.value === 'C133_Soldier')
+        if (trigger) return session.resolveChoice(0, trigger.value)
+        const investment = options.find((option) => option.value === choiceValue(4, 2))
+        if (investment) {
+          invested = true
+          const paid = session.resolveChoice(0, investment.value)
+          if (!paid.state.gameOver) {
+            const undone = session.undoStep(0)
+            expect(undone.ok, undone.error).toBe(true)
+            expect(undone.state.players[0]!.resources.food).toBe(7)
+            return session.resolveChoice(0, investment.value)
+          }
+          return paid
+        }
+        return session.resolveChoice(0, 'C133_Soldier:pairs:0')
+      },
+    })
+    expect(invested).toBe(true)
+    expect(gardenDesignerBonus(response)).toBe(2)
+    expect(response.state.players[0]!.resources.food).toBe(3)
+  })
+
+  it('restores a pending investment and rejects an invented payment', () => {
+    const session = setup({ emptyFields: 2, scoringFood: 8 })
+    const pending = session.performRoundEnd()
+    expect(pending.interaction.stateId).toBe('wait')
+    const snapshot = serializeSessionSnapshot(session.state, session)
+    const restored = new GameSession(rehydrateState(JSON.parse(JSON.stringify(snapshot))))
+    const rejected = restored.resolveChoice(0, choiceValue(3, 9))
+    expect(rejected.ok).toBe(false)
+    expect(rejected.state.players[0]!.resources.food).toBe(8)
+    const response = finishFinalHarvest(restored, 7, 3)
+    expect(response.state.players[0]!.resources.food).toBe(1)
+    expect(gardenDesignerBonus(response)).toBe(3)
   })
 })

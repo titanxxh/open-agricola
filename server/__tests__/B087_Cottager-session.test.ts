@@ -83,7 +83,7 @@ describe('B087 Cottager parity', () => {
     expect(response.state.players[0]!.resources).toMatchObject({ wood: 0, reed: 0, food: 2 })
   })
 
-  it('B087 S3: the renovation branch can be offered but blocks until undoStep restores the choice', () => {
+  it('B087 S3: the renovation branch pays its selected cost and can be undone', () => {
     const session = setup({ resources: { clay: 2, reed: 1 } })
     let response = enterCottager(session)
     expect(response.interaction.stateId).toBe('wait')
@@ -92,7 +92,9 @@ describe('B087 Cottager parity', () => {
       candidate.labelKey?.includes('renovat') || candidate.value.includes('renovat'))
     expect(renovation).toBeDefined()
     response = session.resolveChoice(0, renovation!.value)
-    expect(response.interaction.request.kind).toBe('engine-blocked')
+    expect(response.ok, response.error).toBe(true)
+    expect(response.state.players[0]!.houseType).toBe('clay')
+    expect(response.state.players[0]!.resources).toMatchObject({ clay: 0, reed: 0, food: 2 })
     response = session.undoStep(0)
     expect(response.ok, response.error).toBe(true)
     expect(response.state.players[0]!.houseType).toBe('wood')

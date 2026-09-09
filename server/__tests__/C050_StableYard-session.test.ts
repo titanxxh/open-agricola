@@ -85,12 +85,12 @@ describe('C050 Stable Yard parity', () => {
     expect(printedVp(response)).toBe(1)
   })
 
-  it('C050 S2: characterize OA allowing Stable Yard with only two stables and three pastures', () => {
+  it('C050 S2: two stables and three pastures cannot play Stable Yard', () => {
     const response = enterMinor(setup({ stables: 2 }))
 
     expect(offered(response)).toBe(false)
-    expect(response.state.players[0]!.minorPlayed).toContain(CARD_ID)
-    expect(response.state.players[0]!.resources.food).toBe(9)
+    expect(response.state.players[0]!.minorHand).toContain(CARD_ID)
+    expect(response.state.players[0]!.resources.food).toBe(0)
   })
 
   it('C050 S3: three stables with two pastures keep Stable Yard unavailable', () => {
@@ -99,6 +99,18 @@ describe('C050 Stable Yard parity', () => {
     expect(offered(response)).toBe(false)
     expect(response.state.players[0]!.minorHand).toContain(CARD_ID)
     expect(response.state.players[0]!.resources.food).toBe(0)
+  })
+
+  it('counts the Farm Hand special stable toward the three-stable prerequisite', () => {
+    const session = setup({ stables: 2 })
+    const owner = session.state.players[0]!
+    owner.occupationPlayed = ['B085_FarmHand']
+    owner.cardStates.B085_FarmHand = { extraData: { position: { row: 1, col: 1 } } }
+    session.loadState(session.state)
+    const response = play(session)
+    expect(response.ok, response.error).toBe(true)
+    expect(response.state.players[0]!.minorPlayed).toContain(CARD_ID)
+    expect(response.state.players[0]!.resources.food).toBe(9)
   })
 
   it('C050 S4: playing Stable Yard in round fourteen grants no food', () => {

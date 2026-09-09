@@ -6,5 +6,5 @@ export const forest = createAccumulatingAction({
   descriptionKey: 'actions.forest.description',
   roundAvailable: 1,
   gainPerRound: { wood: 3 },
-  players: [2, 3, 4, 5, 6],
+  players: [1, 2, 3, 4, 5, 6],
 })

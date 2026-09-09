@@ -72,22 +72,7 @@ const startHarvest = (session: GameSession) => {
   return response
 }
 
-const acceptEarthenwarePotter = (session: GameSession, start: SessionResponse) => {
-  const response = start
-  expect(response.interaction).toMatchObject({
-    stateId: 'wait',
-    promptKey: 'ui.interactionEarthenwarePotter',
-    sourceCard: CARD_ID,
-  })
-  if (response.interaction.stateId !== 'wait') return response
-  const accept = response.interaction.request.options?.find((option) => option.value !== '__skip__')
-  expect(accept, JSON.stringify(response.interaction)).toBeDefined()
-  const resolved = session.resolveChoice(response.interaction.playerIndex, accept!.value)
-  expect(resolved.ok, resolved.error).toBe(true)
-  return resolved
-}
-
-const finishHarvest = (session: GameSession) => acceptEarthenwarePotter(session, startHarvest(session))
+const finishHarvest = startHarvest
 
 const bonusVp = (response: SessionResponse) =>
   response.state.players[0]!.cardStates[CARD_ID]?.counters?.bonusVp ?? 0
@@ -152,17 +137,15 @@ describe('D099 Earthenware Potter parity', () => {
     expect(JSON.stringify(response.interaction)).not.toContain(CARD_ID)
   })
 
-  it('D099 S9: OA exposes a decline branch for the final-harvest conversion', () => {
+  it('D099 S9: the mandatory conversion cannot be declined or scored twice', () => {
     const session = setup({ clay: 2 })
-    const offered = startHarvest(session)
-    expect(offered.interaction.stateId).toBe('wait')
-    if (offered.interaction.stateId !== 'wait') return
-    expect(offered.interaction.request.options?.some((option) => option.value === '__skip__')).toBe(true)
-
-    const response = session.resolveChoice(offered.interaction.playerIndex, '__skip__')
+    const response = startHarvest(session)
 
     expect(response.ok, response.error).toBe(true)
-    expect(response.state.players[0]!.resources.clay).toBe(2)
-    expect(bonusVp(response)).toBe(0)
+    expect(response.state.players[0]!.resources.clay).toBe(0)
+    expect(bonusVp(response)).toBe(2)
+    expect(JSON.stringify(response.interaction)).not.toContain('__skip__')
+    expect(bonusVp(session.getState())).toBe(2)
+    expect(session.getState().state.players[0]!.resources.clay).toBe(0)
   })
 })

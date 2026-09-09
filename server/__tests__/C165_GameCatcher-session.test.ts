@@ -102,28 +102,27 @@ describe('C165 Game Catcher parity', () => {
     })
   }
 
-  it('C165 S3: insufficient food blocks the played Game Catcher until undoStep', () => {
-    const session = setup({ round: 5, food: 4 })
+  it.each([
+    { food: 4, earlier: false, discount: false, allowed: false },
+    { food: 5, earlier: false, discount: false, allowed: true },
+    { food: 5, earlier: true, discount: false, allowed: false },
+    { food: 6, earlier: true, discount: false, allowed: true },
+    { food: 5, earlier: true, discount: true, allowed: true },
+  ])('C165 S3: reserves the mandatory food after actual lesson costs: %j', (scenario) => {
+    const session = setup({ round: 5, food: scenario.food, playerCount: 2 })
     const state = session.getState().state
-    state.players[0]!.occupationHand = [CARD_ID, 'A100_Curator']
+    const owner = state.players[0]!
+    owner.occupationHand = [CARD_ID, 'A100_Curator', 'A116_WoodCutter']
+    owner.occupationPlayed = scenario.earlier ? ['__test_previous__'] : []
+    if (scenario.discount) owner.activeModifiers = [{ type: 'bonus', appliesTo: ['occupation'], discount: { food: 1 } }]
     session.loadState(state)
-
-    let response = session.takeAction(0, 'lessons')
-
-    expect(response.ok, response.error).toBe(true)
-    expect(response.interaction.stateId).toBe('wait')
-    if (response.interaction.stateId !== 'wait') return
-    const card = response.interaction.request.options?.find((option) => option.value === CARD_ID)
-    expect(card).toBeDefined()
-    response = session.resolveChoice(response.interaction.playerIndex, card!.value)
-    expect(response.ok).toBe(true)
-    expect(response.interaction.request.kind).toBe('engine-blocked')
-    expect(response.state.players[0]!.occupationPlayed).toContain(CARD_ID)
-    response = session.undoStep(0)
-    expect(response.ok).toBe(true)
-    expect(response.state.players[0]!.occupationHand).toContain(CARD_ID)
-    expect(response.state.players[0]!.occupationPlayed).not.toContain(CARD_ID)
-    expect(response.state.players[0]!.resources).toMatchObject({ food: 4, boar: 0, cattle: 0 })
+    const offered = session.takeAction(0, 'lessons')
+    expect(offered.ok, offered.error).toBe(true)
+    expect(offered.interaction.request.options?.some((option) => option.value === CARD_ID)).toBe(scenario.allowed)
+    const response = session.resolveChoice(0, CARD_ID)
+    expect(response.ok).toBe(scenario.allowed)
+    expect(response.state.players[0]!.occupationPlayed.includes(CARD_ID)).toBe(scenario.allowed)
+    expect(response.state.players[0]!.resources.food).toBe(scenario.allowed ? 0 : scenario.food)
   })
 
   it('C165 S4: Game Catcher deducts only the current cost when extra food is available', () => {

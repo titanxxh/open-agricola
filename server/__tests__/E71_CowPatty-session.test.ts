@@ -211,25 +211,27 @@ describe('E071 Cow Patty parity', () => {
     expect(cropCount(response, 'grain', 0, 4)).toBe(3)
   })
 
-  it('E071 S9: OA rejects selecting both eligible fields because its Cow Patty prompt is capped at one', () => {
+  it.each([true, false])('E071 S9: can grow all or a subset of eligible fields (%s)', (all) => {
     const session = setup({
-      played: true, grain: 2, fields: [{ row: 1, col: 1 }, { row: 1, col: 3 }],
+      played: true, grain: 1, vegetable: 1, fields: [{ row: 1, col: 1 }, { row: 1, col: 3 }],
     })
-
-    let response = acceptCowPatty(session, sow(session, [
-      { row: 1, col: 1, crop: 'grain' }, { row: 1, col: 3, crop: 'grain' },
+    const pending = acceptCowPatty(session, sow(session, [
+      { row: 1, col: 1, crop: 'grain' }, { row: 1, col: 3, crop: 'vegetable' },
     ]))
-    expect(response.interaction.stateId === 'wait'
-      ? response.interaction.request.selection?.selectablePositions
-      : undefined).toEqual([{ row: 1, col: 1 }, { row: 1, col: 3 }])
-    expect(response.interaction.stateId === 'wait'
-      ? response.interaction.request.selection?.maxSelections
-      : undefined).toBe(1)
-    response = select(session, [{ row: 1, col: 1 }, { row: 1, col: 3 }])
+    const before = JSON.stringify(pending.state)
+    const rejected = select(session, [{ row: 1, col: 1 }, { row: 1, col: 1 }])
+    expect(rejected.ok).toBe(false)
+    expect(JSON.stringify(rejected.state)).toBe(before)
 
-    expect(response.ok).toBe(false)
-    expect(cropCount(response, 'grain', 1, 1)).toBe(3)
-    expect(cropCount(response, 'grain', 1, 3)).toBe(3)
+    const response = select(session, all ? [{ row: 1, col: 1 }, { row: 1, col: 3 }] : [{ row: 1, col: 3 }])
+
+    expect(response.ok, response.error).toBe(true)
+    expect(cropCount(response, 'grain', 1, 1)).toBe(all ? 4 : 3)
+    expect(cropCount(response, 'vegetable', 1, 3)).toBe(3)
+    const undone = session.undoStep(0)
+    expect(undone.ok, undone.error).toBe(true)
+    expect(cropCount(undone, 'grain', 1, 1)).toBe(3)
+    expect(cropCount(undone, 'vegetable', 1, 3)).toBe(2)
   })
 
   it('E071 S10: Cow Patty contributes its printed one point at scoring', () => {

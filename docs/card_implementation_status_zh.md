@@ -169,6 +169,8 @@
 
 ## 6. 基础设施待办
 
+共享支付枚举支持 `ComplexCost.minimumResourcesPaid`，在折扣和替代支付后、最优方案裁剪前校验；改善候选和提交共用该约束。嵌套 OR/XOR 叶子复用普通候选管线。基础田地计分只统计 Farmyard Field；卡牌终局投入通过明确选择和真实支付结算。职业后续必付食物复用已有课费支付预览及 `reserveResources` 契约。
+
 供应人物身份、预留、正常轮转和归家处置已由 §5 与 `docs/ARCHITECTURE.md` §6.4 的共享边界支持；卡牌时机与费用保留在卡内。
 
 当前没有开放的基础设施 umbrella 待办。已完成的 Before-End Player Dispatch、Scoring Reserve、printed-cost helper、extra-turn 轮转、family token supply、Major Improvement stack supply、card boundary guard、single-layer terrain selection flow、FoM immediate resource minor helper、pasture / harvest / breeding / scoring / stable / special-stable 等历史条目已按需归并到 §5 架构约束或 §12 单卡备注，不再在本节保留完成清单。

@@ -1,10 +1,18 @@
 import { defineMinorCard } from '../card-source'
 import { gainLeaf } from '../helpers/pay-gain-node'
+import { getFarmyardFields } from '../helpers/card-field'
+import { getPlacedAnimalsByType } from '../../domain/animal-zones'
 import type { CardImpl } from '../registry'
 
 const CARD_ID = 'B037_Grange'
 
 const cardImpl = {
+  prerequisiteCheck: (player, state) => {
+    if (!state) return false
+    const animals = getPlacedAnimalsByType(player, state)
+    return getFarmyardFields(player).length >= 6
+      && animals.sheep >= 1 && animals.boar >= 1 && animals.cattle >= 1
+  },
   effect: {
   id: CARD_ID,
   onBuy: (_state, _player) => gainLeaf(CARD_ID, { food: 1 }),

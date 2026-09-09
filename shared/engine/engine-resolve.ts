@@ -37,6 +37,7 @@ import {
   enforceCompositeContinuationMandatory,
   enforceSelectedTargetMandatory,
   findActionNode,
+  maybeBuildChoiceCandidates,
   normalizeFollowUpAction,
   pendingCursorFromEnvelope,
   pendingEnvelopeFromHostNode,
@@ -632,7 +633,13 @@ export function engineResolveChoice(
       let completedEvents: GameEvent[] = []
       child.bodyStarted = true
       child.beforeAnytimeAvailable = false
-      const result = action.execute({
+      const result = maybeBuildChoiceCandidates(
+        int,
+        { ...executionContext, ...currentEventReadContext(int) },
+        action,
+        actionId,
+        eventBuffer.sink,
+      ) ?? action.execute({
         ...executionContext,
         eventSink: eventBuffer.sink,
       })

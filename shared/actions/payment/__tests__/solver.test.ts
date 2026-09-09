@@ -46,6 +46,19 @@ describe('PaymentSolver', () => {
     PaymentSolver.clearCache()
   })
 
+  it('filters actual minimum payments before removing dominated alternatives', () => {
+    const player = makePlayerWithResources({ wood: 2, stone: 2 })
+    const state = makeState(player)
+    const cost = { fees: [{ wood: 1 }, { wood: 1, stone: 1 }], minimumResourcesPaid: { stone: 1 } }
+    expect(PaymentSolver.computeOptions(state, 0, cost, ctx).map((option) => option.resourcesPaid))
+      .toEqual([{ wood: 1, stone: 1 }])
+    expect(PaymentSolver.computeOptions(state, 0, { ...cost, minimumResourcesPaid: undefined }, ctx)
+      .map((option) => option.resourcesPaid)).toMatchObject([{ wood: 1, stone: 0 }])
+    const traded = { fee: { stone: 1 }, trades: [{ from: { wood: 1 }, to: { stone: 1 }, max: 1 }], minimumResourcesPaid: { stone: 1 } }
+    expect(PaymentSolver.computeOptions(state, 0, traded, ctx).every((option) => option.resourcesPaid.stone === 1)).toBe(true)
+    expect(PaymentSolver.computeOptions(state, 0, { ...cost, fees: [{ wood: 1 }] }, ctx)).toEqual([])
+  })
+
   describe('computeOptions', () => {
     it('returns empty array when player cannot afford simple cost', () => {
       const state = makeState(makePlayerWithResources({ wood: 0 }))

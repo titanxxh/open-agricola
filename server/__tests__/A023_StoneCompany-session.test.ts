@@ -163,20 +163,48 @@ describe('A023 Stone Company parity', () => {
     expect(response.state.players[0]!.minorHand).toContain(STONE_MINOR)
   })
 
-  it('A023 S6: characterize that a stone-free improvement is not filtered from the Quarry action', () => {
+  it('A023 S6: filters out stone-free improvements from the Quarry action', () => {
     const session = setup({ resources: { wood: 3 }, hand: [STONE_FREE_MINOR, STONE_MINOR] })
     const response = enterStoneCompanyImprovement(session, 'western-quarry')
 
-    expect(optionValues(response)).toEqual(expect.arrayContaining([STONE_FREE_MINOR, STONE_MINOR]))
+    expect(optionValues(response)).not.toContain(STONE_FREE_MINOR)
+    expect(response.state.players[0]!.minorPlayed.includes(STONE_MINOR) || optionValues(response).includes(STONE_MINOR)).toBe(true)
   })
 
-  it('A023 S7: characterize a stone-free improvement as a usable Quarry follow-up', () => {
+  it.each([false, true])('requires stone after a stone discount (optional=%s)', (optional) => {
+    const session = setup({ resources: { wood: 2 }, hand: [STONE_MINOR] })
+    session.state.players[0]!.activeModifiers = [{
+      type: 'bonus', cardId: '__test_stone_discount__', appliesTo: ['minor-improvement'],
+      discount: { stone: 1 }, optional,
+    }]
+    session.loadState(session.state)
+    let response = enterStoneCompanyImprovement(session, 'western-quarry')
+    if (optionValues(response).includes(STONE_MINOR)) response = session.resolveChoice(0, STONE_MINOR)
+    expect(response.state.players[0]!.minorPlayed.includes(STONE_MINOR)).toBe(optional)
+    expect(response.state.players[0]!.resources.stone).toBe(optional ? 0 : 1)
+  })
+
+  it('cannot substitute wood for the required actual stone payment', () => {
+    const session = setup({ resources: { wood: 3 }, hand: [STONE_MINOR] })
+    session.state.players[0]!.activeModifiers = [{
+      type: 'trade', cardId: '__test_stone_trade__', appliesTo: ['minor-improvement'],
+      from: { wood: 1 }, to: { stone: 1 }, max: 1,
+    }]
+    session.loadState(session.state)
+    let response = enterStoneCompanyImprovement(session, 'western-quarry')
+    if (optionValues(response).includes(STONE_MINOR)) response = session.resolveChoice(0, STONE_MINOR)
+    expect(response.ok, response.error).toBe(true)
+    expect(response.state.players[0]!.minorPlayed).toContain(STONE_MINOR)
+    expect(response.state.players[0]!.resources).toMatchObject({ wood: 2, stone: 0 })
+  })
+
+  it('A023 S7: does not offer a stone-free improvement as a Quarry follow-up', () => {
     const session = setup({ resources: { wood: 2 }, hand: [STONE_FREE_MINOR] })
     const response = enterStoneCompanyImprovement(session, 'western-quarry')
 
     expect(
       response.state.players[0]!.minorPlayed.includes(STONE_FREE_MINOR)
       || optionValues(response).includes(STONE_FREE_MINOR),
-    ).toBe(true)
+    ).toBe(false)
   })
 })

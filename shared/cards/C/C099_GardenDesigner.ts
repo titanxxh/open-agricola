@@ -1,30 +1,62 @@
 import { defineOccupationCard } from '../card-source'
 import { getLogicalFields } from '../helpers/card-field'
 import type { CardImpl } from '../registry'
-import type { BonusScoreLevel } from '../card-effects'
-import { paretoOptimal } from '../helpers/pareto-bonus'
+import type { ActionChoiceOption, PlayerState } from '../../contract/types'
+import { sumSelectedScoringReserve } from '../../domain/scoring-reserve'
+import { payGainActionFlow } from '../helpers/pay-gain-node'
 
 const CARD_ID = 'C099_GardenDesigner'
+
+const scoringOptions = (player: PlayerState): ActionChoiceOption[] => {
+  const emptyFields = getLogicalFields(player).filter((field) => field.stacks.length === 0).length
+  const food = player.resources.food - (sumSelectedScoringReserve(player).food ?? 0)
+  const options = new Map<string, ActionChoiceOption>()
+  for (let n7 = 0; n7 <= emptyFields; n7++) {
+    for (let n4 = 0; n4 + n7 <= emptyFields; n4++) {
+      for (let n1 = 0; n1 + n4 + n7 <= emptyFields; n1++) {
+        const cost = 7 * n7 + 4 * n4 + n1
+        if (cost > food) continue
+        const score = 3 * n7 + 2 * n4 + n1
+        const value = `${CARD_ID}:food:${cost}:score:${score}`
+        options.set(value, {
+          value,
+          labelKey: 'ui.cards.C099_GardenDesigner.invest',
+          labelParams: { food: cost, score },
+          sourceCard: CARD_ID,
+          effectPreview: { kind: 'resourceExchange', resourcesPaid: { food: cost }, bonusVp: score },
+        })
+      }
+    }
+  }
+  return [...options.values()]
+}
 
 const cardImpl = {
   effect: {
     id: CARD_ID,
-    computeCostedBonus: (_state, player, _ctx) => {
-      const emptyFields = getLogicalFields(player).filter((field) => field.stacks.length === 0).length
-      if (emptyFields === 0) return [{ cost: {}, score: 0 }]
-      const food = player.resources.food ?? 0
-      const raw: BonusScoreLevel[] = []
-      for (let n7 = 0; n7 <= emptyFields; n7++) {
-        for (let n4 = 0; n4 + n7 <= emptyFields; n4++) {
-          for (let n1 = 0; n1 + n4 + n7 <= emptyFields; n1++) {
-            const foodCost = 7 * n7 + 4 * n4 + 1 * n1
-            if (foodCost > food) continue
-            const score = 3 * n7 + 2 * n4 + 1 * n1
-            raw.push({ cost: foodCost === 0 ? {} : { food: foodCost }, score })
-          }
-        }
+    beforeEndGameMandatory: true,
+    onBeforeEndGame: (_state, player) => {
+      const options = scoringOptions(player)
+      if (options.length <= 1) return
+      return {
+        type: 'leaf',
+        actionId: 'emit-choice',
+        sourceCard: CARD_ID,
+        targetPlayerId: player.id,
+        params: { promptKey: 'ui.interactionExchangeChoice', options },
       }
-      return paretoOptimal(raw)
+    },
+    resolveChoice: (_state, player, choice) => {
+      const option = scoringOptions(player).find((candidate) => candidate.value === choice)
+      const preview = option?.effectPreview
+      if (preview?.kind !== 'resourceExchange') return
+      const food = preview.resourcesPaid?.food ?? 0
+      if (food <= 0) return
+      return payGainActionFlow({
+        cardId: CARD_ID,
+        cost: { food },
+        gain: { score: preview.bonusVp ?? 0 },
+      })
     },
   },
   reaches: [] as readonly string[],
