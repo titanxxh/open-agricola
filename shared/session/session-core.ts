@@ -2257,8 +2257,8 @@ export class GameCore {
     if (!policy.allowed) return []
     const context = this.getActiveInteractionContext()
     if (!context) return []
-    const blockedIds = new Set(policy.blockedIds)
     const { player, space } = context
+    const blockedIds = new Set([...policy.blockedIds, ...this.engineStack.getActiveAnytimeActionIds(player.id)])
     const anytimeEntries: { descriptor: AnytimeAction; flow: ActionFlow }[] = []
     const pendingSnapshot = this.peekHostContextSnapshot()
     const pendingSourceCard = this.peekPendingSourceCard()
@@ -2322,7 +2322,16 @@ export class GameCore {
       })
     }
 
-    return anytimeEntries
+    return anytimeEntries.map(({ descriptor, flow }) => ({
+      descriptor,
+      flow: {
+        type: 'seq',
+        anytimeActionId: descriptor.id,
+        targetPlayerId: player.id,
+        sourceCard: descriptor.sourceCard ?? flow.sourceCard,
+        children: [flow],
+      },
+    }))
   }
 
   private buildAnimalReorgZones(

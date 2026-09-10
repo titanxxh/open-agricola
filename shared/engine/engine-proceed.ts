@@ -1102,6 +1102,12 @@ export function engineProceed(
     emitChoice: () => {},
   }
   const leafStep = node.step(leafCtx)
+  if (leafStep.kind === 'done') {
+    node.resolve()
+    const result = { type: 'ok' } as const
+    commitIfEngineComplete(int, context, result)
+    return { type: 'ok', nodeId: node.id, result }
+  }
   if (leafStep.kind === 'execute' && node instanceof ActionNode) {
     if (isActivateCardActionNode(node)) {
       return executeActivateCardAction(int, context, node)

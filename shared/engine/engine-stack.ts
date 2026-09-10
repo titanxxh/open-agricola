@@ -161,6 +161,10 @@ export class EngineStack {
     return this.frames
   }
 
+  getActiveAnytimeActionIds(playerId: string): string[] {
+    return this.frames.flatMap((frame) => frame.engine.getActiveAnytimeActionIds(playerId))
+  }
+
   clear(): void {
     this.frames.length = 0
   }

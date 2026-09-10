@@ -8,7 +8,7 @@ const isCompositeNode = (node: EngineNode) =>
   node instanceof OrNode ||
   node instanceof XorNode
 
-const hasStartedDescendant = (node: EngineNode): boolean => {
+export const hasStartedDescendant = (node: EngineNode): boolean => {
   if (node.getPending() !== null) return true
   if (node instanceof SequenceNode || node instanceof ParallelNode || node instanceof OrNode || node instanceof XorNode) {
     return node.children.some((child) =>
@@ -209,6 +209,7 @@ export class EngineTree {
           const next = visit(child)
           if (next) return next
         }
+        if (node instanceof SequenceNode && node.anytimeActionId && node.getState() === 'ready') return node
         if (composite.getState() === 'resolved') {
           composite.resolve()
         }

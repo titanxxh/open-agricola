@@ -836,6 +836,7 @@ export type ActionFlow =
     }
   | {
       type: 'seq' | 'or' | 'xor' | 'parallel'
+      anytimeActionId?: string
       promptKey?: PromptKey
       children: ActionFlow[]
       optionId?: string

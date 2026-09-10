@@ -183,14 +183,11 @@ describe('anytime current-step admission', () => {
     const original = structuredClone(before.interaction)
     expect(offered(before)).toBe(true)
     const started = session.takeAnytimeAction(0, TROWEL_ANYTIME)
-    expect(request(started).options).toContainEqual(expect.objectContaining({ value: 'continue' }))
+    expect(request(started).kind).toBe('engine-blocked')
+    expect(offered(started)).toBe(false)
     expect(started.state.players[0]).toMatchObject({
       houseType: 'clay', resources: { clay: 2, reed: 1, stone: 0 },
     })
-    const continued = session.resolveChoice(0, 'continue')
-    expect(continued.state.players[0]!.resources).toMatchObject({ clay: 2, reed: 1, stone: 0 })
-    expect(request(continued).kind).toBe('engine-blocked')
-    expect(session.undoStep().ok).toBe(true)
     const undone = session.undoStep()
     expect(undone.interaction).toEqual(original)
     expect(undone.state.players[0]!.resources).toMatchObject({ clay: 0, reed: 0, stone: 0 })

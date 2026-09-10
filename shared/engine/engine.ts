@@ -21,7 +21,7 @@ import type { EngineNode, EngineStepResult, NodeCursor } from './types'
 import type { PendingEnvelope } from './types'
 import { ActionRegistry } from './registry'
 import { HookDispatcher } from './dispatcher'
-import { EngineTree } from './tree'
+import { EngineTree, hasStartedDescendant } from './tree'
 import { LogStore } from './log-store'
 import { INTERACTION_ONLY_ACTION_ID } from './engine-stack'
 import { EventStore } from '../events/store'
@@ -224,9 +224,12 @@ const restoreTreeFromCursor = (cursors: NodeCursor[]): EngineNode | null => {
         node = action
         break
       }
-      case 'sequence':
-        node = new SequenceNode(cursor.id, buildChildren())
+      case 'sequence': {
+        const sequence = new SequenceNode(cursor.id, buildChildren())
+        sequence.anytimeActionId = typeof data.anytimeActionId === 'string' ? data.anytimeActionId : undefined
+        node = sequence
         break
+      }
       case 'parallel': {
         const parallel = new ParallelNode(cursor.id, buildChildren())
         if (data.mode === 'trigger-select') parallel.mode = 'trigger-select'
@@ -659,6 +662,15 @@ export class Engine {
     }
   }
 
+
+  getActiveAnytimeActionIds(playerId: string): string[] {
+    return this.tree.allNodes().flatMap((node) =>
+      node instanceof SequenceNode && node.anytimeActionId &&
+      node.ownerPlayerId === playerId && !node.isResolved() && hasStartedDescendant(node)
+        ? [node.anytimeActionId]
+        : [],
+    )
+  }
 
   snapshot() {
     const nodes = this.tree.allNodes()
