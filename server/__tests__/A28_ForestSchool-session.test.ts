@@ -7,6 +7,8 @@ import { setWorkersAtHome, workersAvailable } from '../../shared/domain/player'
 import '../../shared/cards/A/A028_ForestSchool'
 import '../../shared/cards/A/A123_FrameBuilder'
 
+const CARD_ID = 'A028_ForestSchool'
+
 const setup = (withForestSchool: boolean, options?: { playerCount?: number; spaceId?: string }) => {
   const playerCount = options?.playerCount ?? 2
   const spaceId = options?.spaceId ?? 'lessons'
@@ -40,7 +42,43 @@ const setup = (withForestSchool: boolean, options?: { playerCount?: number; spac
 }
 
 describe('A028_ForestSchool session', () => {
-  it('makes occupied lessons available only when the card is played', () => {
+  it('A028 S1: paying one wood and one clay plays Forest School', () => {
+    const session = new GameSession(7028, undefined, { playerCount: 2 })
+    stabilizeRandomHands(session.state.players)
+    const state = session.getState().state
+    state.currentPlayerIndex = 0
+    state.round = 5
+    state.roundPhase = 'work'
+    state.availableMajorImprovements = []
+    state.players.forEach((candidate) => {
+      setWorkersAtHome(state, candidate, 2)
+      candidate.minorHand = ['__test_placeholder__']
+      candidate.occupationHand = ['__test_placeholder__']
+      candidate.resources.wood = 0
+      candidate.resources.clay = 0
+    })
+    state.players[0]!.minorHand = [CARD_ID]
+    state.players[0]!.resources.wood = 1
+    state.players[0]!.resources.clay = 1
+    session.loadState(state)
+
+    let response = session.takeAction(0, 'meeting-place')
+    for (let guard = 0; guard < 6 && response.state.players[0]!.minorHand.includes(CARD_ID); guard += 1) {
+      if (response.interaction.stateId !== 'wait') break
+      const card = response.interaction.request.options?.find((option) => option.value === CARD_ID)
+      const branch = response.interaction.request.options?.find((option) =>
+        option.value.startsWith('action-improvement-'))
+      const next = card ?? branch
+      if (!next) break
+      response = session.resolveChoice(response.interaction.playerIndex, next.value)
+    }
+
+    expect(response.ok, response.error).toBe(true)
+    expect(response.state.players[0]!.minorPlayed).toContain(CARD_ID)
+    expect(response.state.players[0]!.resources).toMatchObject({ wood: 0, clay: 0 })
+  })
+
+  it('A028 S3: occupied ordinary Lessons remains usable through the public action entry', () => {
     const withCard = setup(true).getState()
     expect(withCard.ok).toBe(true)
     expect(withCard.interaction.stateId).toBe('idle')
@@ -55,7 +93,7 @@ describe('A028_ForestSchool session', () => {
     expect(failedTake.error).toBe('space unavailable')
   })
 
-  it('makes occupied lessons-3 available in a 3-player game', () => {
+  it('A028 S2: occupied three-player Lessons remains usable and two food can be replaced by wood', () => {
     const withCard = setup(true, { playerCount: 3, spaceId: 'lessons-3' }).getState()
     expect(withCard.ok).toBe(true)
     expect(withCard.interaction.stateId).toBe('idle')
@@ -70,7 +108,7 @@ describe('A028_ForestSchool session', () => {
     expect(failedTake.error).toBe('space unavailable')
   })
 
-  it('surfaces a payment choice for the wood→food trade and honours it', () => {
+  it('A028 payment regression: one-food occupation cost exposes and honours the wood replacement', () => {
     const session = setup(true)
 
     // D152_Patron triggers `before` on occupation and grants +2 food.
@@ -108,7 +146,7 @@ describe('A028_ForestSchool session', () => {
     // Player still receives D152 Patron's +2 food, but the only viable
     // payment path is direct food — the pay leaf should auto-resolve and
     // never surface a selectPayment prompt.
-    const session = new GameSession()
+    const session = new GameSession(undefined, undefined, { playerCount: 2 })
     stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.players = state.players.slice(0, 2)
