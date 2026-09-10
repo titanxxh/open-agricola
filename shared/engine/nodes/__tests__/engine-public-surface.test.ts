@@ -22,6 +22,7 @@ describe('Engine surface guard', () => {
   // or new private addition. Does NOT count toward public-API surface.
   const PRIVATE_HELPERS = [
     '_internals',
+    'getActiveAnytimeActionIds',
     'offerBeforeAnytimeWindow',
     'hasPendingChoiceCompositeAncestor',
     'insertFlowAfterPendingChoice',

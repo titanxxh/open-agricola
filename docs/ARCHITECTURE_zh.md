@@ -912,6 +912,8 @@ Three consumers share this snapshot:
 
 Nested anytime flows are injected ahead of the current pending tree. Parent pending state remains on its original pending host as a `PendingEnvelope`; when the nested flow resolves, `EngineStack` resumes the parent frame and `buildInteraction()` surfaces the parent envelope again instead of going idle.
 
+每个 anytime 入口都在引擎 sequence 内运行，以入口 ID 和发起玩家标识。该 sequence 已开始且尚未结束时，`buildAnytimeEntries()` 会跨全部引擎 frame 排除同一玩家的同一入口；直接命令也使用该过滤结果。其他入口（包括同一卡牌的不同入口）仍按普通窗口策略判断。sequence 覆盖 before 效果、嵌套选择和后置响应，完成或显式跳过后解除限制，私有游标恢复与撤销保留这一生命周期。窗口中尚未选中的入口不受此限制。费用不足且没有其他合法 anytime 的续行进入既有 blocked / undo 路径。
+
 若 anytime flow 的终止 reaction 必须等整个 injected sequence 完成后才运行，可在最后一个 leaf 上写入 `INJECTED_ANYTIME_COMPLETION_CONTEXT_KEY`。completion listener 必须同时看到该 marker 与引擎添加的 injected-anytime marker，因此空栈顶层 anytime action 不会被误判为 suspended-flow completion。
 
 一次兑换提交可以包含多种配方及各自次数，作为一个 Exchange Batch 结算。如果整批结束后存在新获得且未安置的动物，且来源交互本身不是动物整理，exchange 通过 `internalChildren.afterHostListeners` 安排 `reorganize`，完成后再恢复被暂停的父交互。`CardExchange.blockedAnytimeInteractionKinds` 会复制到各条 `Trade`；系统 anytime 入口将来源请求类型保存在 `actionContext.anytimeInteractionKind`，统一用于准入、候选构造及提交校验（包括 bulk）。被禁用的配方保留 trade 索引，但不提供可执行选项。B104 用三条声明 `fromFarmyard`、`anytime` / `harvest` 及 `animal-reorg` 禁用条件的配方替代独立 listener，沿用包括到期行动准备在内的默认 exchange 窗口，不提供专属计分前机会。

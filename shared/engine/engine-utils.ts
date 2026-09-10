@@ -444,10 +444,12 @@ export function cloneNode(int: EngineInternals, node: EngineNode): EngineNode {
     return copySharedNodeMetadata(node, clone)
   }
   if (node instanceof SequenceNode) {
-    return copySharedNodeMetadata(node, new SequenceNode(
+    const clone = new SequenceNode(
       `${node.id}-clone-${int.counterRef.value++}`,
       node.children.map((child) => cloneNode(int, child)),
-    ))
+    )
+    clone.anytimeActionId = node.anytimeActionId
+    return copySharedNodeMetadata(node, clone)
   }
   if (node instanceof ParallelNode) {
     const clone = new ParallelNode(
@@ -780,6 +782,7 @@ export function buildFlowNode(
   const children = flow.children.map((child) => buildFlowNode(int, child, ownerPlayerId, optionId, idStyle))
   if (flow.type === 'seq') {
     const sequence = new SequenceNode(nextSequenceId(), children)
+    sequence.anytimeActionId = flow.anytimeActionId
     const node = flow.optional ? markOptional(sequence, flow.promptKey) : sequence
     return attachCompositeChoiceLabel(node, flow)
   }
