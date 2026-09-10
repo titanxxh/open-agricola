@@ -1,3 +1,6 @@
+import { type SessionResponse } from '../game/authoritative-session'
+import { setWorkersAtHome } from '../../shared/domain/player'
+
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
@@ -196,5 +199,120 @@ describe('B015_CarpentersBench session', () => {
     expect(invalid.error).toBe('NOT_ENOUGH_WOOD')
     expect(invalid.state.players[0]!.fenceSegments).toHaveLength(0)
     expect(invalid.interaction.promptKey).toBe('ui.interactionFenceSelect')
+  })
+})
+
+describe('B015 Carpenter\'s Bench parity', () => {
+  const CARD_ID = 'B015_CarpentersBench'
+
+  const FILLER = '__test_placeholder__'
+
+  const ONE_CELL = ['H-0-0', 'H-1-0', 'V-0-0', 'V-0-1']
+
+  const TWO_CELL_OUTER = ['H-0-0', 'H-0-1', 'H-1-0', 'H-1-1', 'V-0-0', 'V-0-2']
+
+  const THIRD_CELL = ['H-0-2', 'H-1-2', 'V-0-3']
+
+  const setup = ({ played = true, wood = 0, forestWood = 3 } = {}) => {
+    const session = new GameSession(6015, undefined, { playerCount: 2 })
+    stabilizeRandomHands(session.state.players)
+    const state = session.getState().state
+    state.currentPlayerIndex = 0
+    state.round = 14
+    state.roundPhase = 'work'
+    state.availableMajorImprovements = []
+    state.players.forEach((player) => {
+      setWorkersAtHome(state, player, 2)
+      player.minorHand = [FILLER]
+      player.occupationHand = [FILLER]
+      player.minorPlayed = []
+      player.occupationPlayed = []
+      player.pastures = []
+      player.fenceSegments = []
+      player.resources = {
+        ...player.resources,
+        wood: 0, clay: 0, reed: 0, stone: 0, food: 0, grain: 0, vegetable: 0,
+        sheep: 0, boar: 0, cattle: 0, begging: 0,
+      }
+    })
+    const owner = state.players[0]!
+    owner.minorHand = played ? [FILLER] : [CARD_ID]
+    owner.minorPlayed = played ? [CARD_ID] : []
+    owner.resources.wood = wood
+    state.actionSpaces.find((space) => space.id === 'forest')!.resources.wood = forestWood
+    session.loadState(state)
+    return session
+  }
+
+  const options = (response: SessionResponse) => response.interaction.stateId === 'wait'
+    ? response.interaction.request.options ?? []
+    : []
+
+  const enterBenchFence = (session: GameSession) => {
+    let response = session.takeAction(0, 'forest')
+    response = resolveTriggerIfPresent(session, response, CARD_ID)
+    if (response.interaction.stateId !== 'wait') return response
+    const accept = options(response).find((option) =>
+      option.value !== '__skip__' && (option.sourceCard === CARD_ID || option.value === CARD_ID))
+      ?? options(response).find((option) => option.value !== '__skip__')
+    expect(accept).toBeDefined()
+    return session.resolveChoice(response.interaction.playerIndex, accept!.value)
+  }
+
+  const takeForestToBenchChoice = (session: GameSession) =>
+    resolveTriggerIfPresent(session, session.takeAction(0, 'forest'), CARD_ID)
+
+  it('B015 S2: three wood taken from Forest can build exactly one new pasture with one free fence', () => {
+    const session = setup()
+    const fence = enterBenchFence(session)
+    expect(fence.interaction).toMatchObject({
+      stateId: 'wait', request: { kind: 'farm-select', farm: { farmType: 'fence' } },
+    })
+
+    const response = session.commitSelectionChoice(0, {
+      edges: ONE_CELL, palisadeEdges: [], extraWood: 0,
+    })
+
+    expect(response.ok, response.error).toBe(true)
+    expect(response.state.players[0]!.resources.wood).toBe(0)
+    expect(response.state.players[0]!.fenceSegments).toHaveLength(4)
+    expect(response.state.players[0]!.pastures).toHaveLength(1)
+  })
+
+  it('B015 S3: the Carpenter\'s Bench pasture may be declined and keeps all taken wood', () => {
+    const session = setup()
+    let response = takeForestToBenchChoice(session)
+    expect(options(response).some((option) => option.value === '__skip__')).toBe(true)
+
+    response = session.resolveChoice(0, '__skip__')
+
+    expect(response.state.players[0]!.resources.wood).toBe(3)
+    expect(response.state.players[0]!.fenceSegments).toHaveLength(0)
+  })
+
+  it('B015 S5: subdividing an existing pasture does not qualify as building a new pasture', () => {
+    const session = setup()
+    const state = session.getState().state
+    const owner = state.players[0]!
+    owner.fenceSegments = TWO_CELL_OUTER.map((edge) => ({ edge, type: 'fence' as const }))
+    owner.pastures = [{
+      id: 'existing', size: 2, tiles: [{ row: 0, col: 0 }, { row: 0, col: 1 }],
+      stables: 0, animalType: null, animalCount: 0,
+    }]
+    session.loadState(state)
+    enterBenchFence(session)
+
+    const invalid = session.commitSelectionChoice(0, {
+      edges: ['V-0-1'], palisadeEdges: [], extraWood: 0,
+    })
+    expect(invalid.ok).toBe(false)
+    expect(invalid.state.players[0]!.fenceSegments).toHaveLength(6)
+
+    const response = session.commitSelectionChoice(0, {
+      edges: THIRD_CELL, palisadeEdges: [], extraWood: 0,
+    })
+    expect(response.ok, response.error).toBe(true)
+    expect(response.state.players[0]!.pastures).toHaveLength(2)
+    expect(response.state.players[0]!.fenceSegments).toHaveLength(9)
   })
 })

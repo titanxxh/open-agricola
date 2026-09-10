@@ -1,3 +1,6 @@
+import { type SessionResponse } from '../game/authoritative-session'
+import { setWorkersAtHome } from '../../shared/domain/player'
+
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
@@ -337,4 +340,80 @@ describe('E091_PlowBuilder session', () => {
     expect(readCardExtraData<boolean>(player, CARD_ID, 'usedJoinery')).toBe(true)
   })
 
+})
+
+describe('E091 Plow Builder parity', () => {
+  const CARD_ID = 'E091_PlowBuilder'
+
+  const JOINERY = 'Major_Joinery'
+
+  const FILLER = '__test_placeholder__'
+
+  const options = (response: SessionResponse) => response.interaction.stateId === 'wait'
+    ? response.interaction.request.options ?? []
+    : []
+
+  const setup = ({
+    played = true, joineryAvailable = true, harvest = false, food = 20,
+  }: {
+    played?: boolean
+    joineryAvailable?: boolean
+    harvest?: boolean
+    food?: number
+  } = {}) => {
+    const session = new GameSession(6091, undefined, { playerCount: 2 })
+    stabilizeRandomHands(session.state.players)
+    const state = session.getState().state
+    state.currentPlayerIndex = 0
+    state.round = harvest ? 4 : 3
+    state.roundPhase = 'work'
+    state.actionSpaces.forEach((space) => { space.takenBy = [] })
+    state.players.forEach((player, index) => {
+      setActiveWorkerCount(player, harvest ? (index === 0 ? 1 : 0) : 2)
+      setWorkersAtHome(state, player, harvest ? 0 : 2)
+      player.minorHand = [FILLER]
+      player.occupationHand = [FILLER]
+      player.minorPlayed = []
+      player.occupationPlayed = []
+      player.improvements = []
+      player.cardStates = {}
+      Object.assign(player.resources, {
+        wood: 0, clay: 0, reed: 0, stone: 0, food: harvest ? 10 : 20,
+        grain: 0, vegetable: 0, sheep: 0, boar: 0, cattle: 0, begging: 0,
+      })
+      if (harvest) markAllWorkersUsed(state, player)
+    })
+    const owner = state.players[0]!
+    owner.occupationHand = played ? [FILLER] : [CARD_ID]
+    owner.occupationPlayed = played ? [CARD_ID] : []
+    owner.resources = {
+      ...owner.resources, wood: harvest ? 1 : 2, stone: harvest ? 0 : 2, food,
+    }
+    owner.minorHand = ['B007_Wage']
+    if (harvest) owner.improvements = [JOINERY]
+    if (!joineryAvailable) {
+      state.availableMajorImprovements = state.availableMajorImprovements
+        .filter((cardId) => cardId !== JOINERY)
+      state.players[1]!.improvements.push(JOINERY)
+    }
+    session.loadState(state)
+    return session
+  }
+
+  it('E091 S6: the harvest plow may be declined after using Joinery', () => {
+    const session = setup({ harvest: true, food: 5 })
+    let response = session.performRoundEnd()
+
+    expect(response.interaction.anytimeActions.map((action) => action.id))
+      .toContain('E91-plow-builder-anytime')
+    expect(response.state.players[0]!.resources.food).toBe(7)
+    if (response.interaction.stateId === 'wait'
+      && options(response).some((option) => option.value === '__skip__')) {
+      response = session.resolveChoice(response.interaction.playerIndex, '__skip__')
+    }
+
+    expect(response.ok, response.error).toBe(true)
+    expect(response.state.players[0]!.resources.food).toBe(5)
+    expect(response.state.players[0]!.fields).toHaveLength(0)
+  })
 })

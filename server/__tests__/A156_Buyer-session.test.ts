@@ -1,3 +1,6 @@
+import { type SessionResponse } from '../game/authoritative-session'
+import { setWorkersAtHome } from '../../shared/domain/player'
+
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
@@ -192,5 +195,89 @@ describe('A156_Buyer session', () => {
     expect(after.players[0]!.resources.food).toBe(foodBefore)
     // Reed should increase from the space accumulation, not from buyer
     expect(after.players[0]!.resources.reed).toBeGreaterThanOrEqual(reedBefore + 1)
+  })
+})
+
+describe('A156 Buyer parity', () => {
+  const CARD_ID = 'A156_Buyer'
+
+  const FILLER = '__test_placeholder__'
+
+  const setup = ({ actor = 1, food = 1, played = true } = {}) => {
+    const session = new GameSession(6156, undefined, { playerCount: 4 })
+    const state = session.getState().state
+    stabilizeRandomHands(state.players)
+    state.currentPlayerIndex = actor
+    state.round = 14
+    state.roundPhase = 'work'
+    state.players.forEach((player) => {
+      setWorkersAtHome(state, player, 2)
+      player.minorHand = [FILLER]
+      player.occupationHand = [FILLER]
+      player.minorPlayed = []
+      player.occupationPlayed = []
+      player.resources = {
+        ...player.resources, wood: 0, clay: 0, reed: 0, stone: 0, food: 0, grain: 0,
+        vegetable: 0, sheep: 0, boar: 0, cattle: 0,
+      }
+      player.houseAnimalType = null
+      player.houseAnimalCount = 0
+      player.pastures = []
+      player.stableAnimals = {}
+    })
+    const owner = state.players[0]!
+    owner.occupationHand = played ? [FILLER] : [CARD_ID]
+    owner.occupationPlayed = played ? [CARD_ID] : []
+    owner.resources.food = food
+    for (const [id, resource, count] of [
+      ['reed-bank', 'reed', 2],
+      ['western-quarry', 'stone', 2],
+      ['sheep-market', 'sheep', 1],
+    ] as const) {
+      const space = state.actionSpaces.find((candidate) => candidate.id === id)
+      if (!space) throw new Error(`missing ${id}`)
+      space.takenBy = []
+      space.resources[resource] = count
+    }
+    session.loadState(state)
+    return session
+  }
+
+  const enterBuyerChoice = (session: GameSession, response: SessionResponse) => {
+    while (response.interaction.stateId === 'wait'
+      && response.interaction.request.kind === 'confirm-player-switch') {
+      response = confirmPlayerSwitch(session)
+    }
+    return response
+  }
+
+  const acceptPurchase = (session: GameSession, response: SessionResponse) => {
+    response = enterBuyerChoice(session, response)
+    expect(response.interaction.stateId).toBe('wait')
+    if (response.interaction.stateId !== 'wait') return response
+    const purchase = response.interaction.request.options?.find((option) =>
+      option.sourceCard === CARD_ID && option.value !== '__skip__')
+      ?? response.interaction.request.options?.find((option) => option.value !== '__skip__')
+    expect(purchase, JSON.stringify(response.interaction)).toBeDefined()
+    return session.resolveChoice(response.interaction.playerIndex, purchase!.value)
+  }
+
+  it('A156 S4: without food the Buyer owner receives no purchasable offer', () => {
+    const session = setup({ food: 0 })
+    const response = enterBuyerChoice(session, session.takeAction(1, 'reed-bank'))
+
+    expect(response.state.players[0]!.resources).toMatchObject({ food: 0, reed: 0 })
+    expect(response.interaction.stateId === 'wait'
+      ? response.interaction.request.options?.some((option) =>
+        option.sourceCard === CARD_ID && option.value !== '__skip__') ?? false
+      : false).toBe(false)
+  })
+
+  it('A156 S5: an opponent Western Quarry use can be bought as one stone', () => {
+    const session = setup()
+    const response = acceptPurchase(session, session.takeAction(1, 'western-quarry'))
+
+    expect(response.state.players[0]!.resources).toMatchObject({ food: 0, stone: 1 })
+    expect(response.state.players[1]!.resources).toMatchObject({ food: 1, stone: 2 })
   })
 })

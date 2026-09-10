@@ -1,3 +1,6 @@
+import { type SessionResponse } from '../game/authoritative-session'
+import { markAllWorkersUsed, setActiveWorkerCount } from '../../shared/domain/player'
+
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
@@ -229,5 +232,151 @@ describe('E134_Omnifarmer session', () => {
 
     expect(done.state.harvestReapSummary).toBeUndefined()
     expect(done.state.harvestBreedSummary).toBeUndefined()
+  })
+})
+
+describe('E134 Omnifarmer parity', () => {
+  const CARD_ID = 'E134_Omnifarmer'
+
+  const FILLER = '__test_placeholder__'
+
+  type StoredGood = 'grain' | 'vegetable' | 'sheep' | 'boar' | 'cattle'
+
+  const setup = ({
+    played = true, crop = null as 'grain' | 'vegetable' | null, cropCount = 1,
+    sheep = 0, stored = [] as StoredGood[],
+  } = {}) => {
+    const session = new GameSession(6134, undefined, { playerCount: 3 })
+    stabilizeRandomHands(session.state.players)
+    const state = session.getState().state
+    state.currentPlayerIndex = 0
+    state.round = 4
+    state.roundPhase = 'work'
+    state.actionSpaces.forEach((space) => { space.takenBy = [] })
+    state.players.forEach((player) => {
+      player.minorHand = [FILLER]
+      player.occupationHand = [FILLER]
+      player.minorPlayed = []
+      player.occupationPlayed = []
+      player.cardStates = {}
+      player.fields = []
+      player.pastures = []
+      player.stableTiles = []
+      player.houseAnimalType = null
+      player.houseAnimalCount = 0
+      setActiveWorkerCount(player, 1)
+      markAllWorkersUsed(state, player)
+      Object.assign(player.resources, {
+        wood: 0, clay: 0, reed: 0, stone: 0, food: 20, grain: 0, vegetable: 0,
+        sheep: 0, boar: 0, cattle: 0, begging: 0,
+      })
+    })
+    const owner = state.players[0]!
+    owner.occupationHand = played ? [FILLER] : [CARD_ID]
+    owner.occupationPlayed = played ? [CARD_ID] : []
+    owner.cardStates = { [CARD_ID]: { extraData: { storedGoods: stored } } }
+    if (crop !== null) {
+      owner.fields = [{
+        row: 0, col: 1, stacks: [{ kind: crop, remaining: cropCount }],
+      }]
+    }
+    if (sheep > 0) {
+      owner.resources.sheep = sheep
+      owner.pastures = [{
+        id: 'sheep', animalType: 'sheep', animalCount: sheep, size: 2, stables: 1,
+        tiles: [{ row: 1, col: 1 }, { row: 1, col: 2 }],
+      }]
+      owner.stableTiles = [{ row: 1, col: 1 }]
+    }
+    if (!played) {
+      state.actionSpaces.forEach((space) => {
+        space.takenBy = space.takenBy.filter((worker) => worker.playerId !== owner.id)
+      })
+    }
+    session.loadState(state)
+    return session
+  }
+
+  const optionsOf = (response: SessionResponse) => response.interaction.stateId === 'wait'
+    ? response.interaction.request.options ?? []
+    : []
+
+  const advanceToOmnifarmer = (session: GameSession, initial?: SessionResponse) => {
+    let response = initial ?? session.performRoundEnd()
+    for (let step = 0; step < 12 && response.interaction.stateId === 'wait'; step += 1) {
+      if (response.interaction.promptKey === 'ui.interactionE134Prompt') return response
+      if (response.interaction.request.kind === 'feed') {
+        response = session.resolveChoice(response.interaction.playerIndex, 'confirm', { selections: [] })
+        continue
+      }
+      const skip = optionsOf(response).find((option) =>
+        option.value === '__skip__' || option.value === '__pass__')
+      if (!skip) break
+      response = session.resolveChoice(response.interaction.playerIndex, skip.value)
+    }
+    return response
+  }
+
+  const storedGoods = (response: SessionResponse): StoredGood[] =>
+    (response.state.players[0]!.cardStates?.[CARD_ID]?.extraData?.storedGoods as StoredGood[] | undefined) ?? []
+
+  it('E134 S2: one harvested grain may be stored irretrievably on Omnifarmer', () => {
+    const session = setup({ crop: 'grain', cropCount: 2 })
+    let response = advanceToOmnifarmer(session)
+    expect(optionsOf(response).map((option) => option.value)).toEqual(['skip', 'grain'])
+
+    response = session.resolveChoice(0, 'grain')
+
+    expect(storedGoods(response)).toEqual(['grain'])
+    expect(response.state.players[0]!.resources.grain).toBe(0)
+    expect(response.state.players[0]!.fields[0]!.stacks[0]!.remaining).toBe(1)
+  })
+
+  it('E134 S3: declining Omnifarmer keeps the harvested grain in supply', () => {
+    const session = setup({ crop: 'grain', cropCount: 2 })
+    let response = advanceToOmnifarmer(session)
+
+    response = session.resolveChoice(0, 'skip')
+
+    expect(storedGoods(response)).toEqual([])
+    expect(response.state.players[0]!.resources.grain).toBe(1)
+  })
+
+  it('E134 S4: a harvested crop type already stored is not offered again', () => {
+    const response = advanceToOmnifarmer(setup({
+      crop: 'grain', cropCount: 2, stored: ['grain'],
+    }))
+
+    expect(response.interaction.stateId === 'wait'
+      ? response.interaction.promptKey : undefined).not.toBe('ui.interactionE134Prompt')
+    expect(storedGoods(response)).toEqual(['grain'])
+    expect(response.state.players[0]!.resources.grain).toBe(1)
+  })
+
+  it('E134 S5: one newborn sheep may be stored after breeding', () => {
+    const session = setup({ sheep: 2 })
+    let response = session.performRoundEnd()
+    expect(response.interaction).toMatchObject({
+      stateId: 'wait', request: { kind: 'animal-reorg' },
+    })
+    response = session.resolveChoice(0, 'confirm', [{
+      id: 'sheep', zoneType: 'pasture', animalType: 'sheep', animalCount: 3,
+    }])
+    response = advanceToOmnifarmer(session, response)
+    expect(optionsOf(response).map((option) => option.value)).toEqual(['skip', 'sheep'])
+
+    response = session.resolveChoice(0, 'sheep')
+
+    expect(storedGoods(response)).toEqual(['sheep'])
+    expect(response.state.players[0]!.resources.sheep).toBe(2)
+  })
+
+  it('E134 S6: existing sheep without a newborn do not trigger Omnifarmer', () => {
+    const response = advanceToOmnifarmer(setup({ sheep: 1 }))
+
+    expect(response.interaction.stateId === 'wait'
+      ? response.interaction.promptKey : undefined).not.toBe('ui.interactionE134Prompt')
+    expect(storedGoods(response)).toEqual([])
+    expect(response.state.players[0]!.resources.sheep).toBe(1)
   })
 })

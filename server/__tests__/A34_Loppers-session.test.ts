@@ -1,3 +1,6 @@
+import { setWorkersAtHome } from '../../shared/domain/player'
+import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
+
 import { describe, expect, it } from 'vitest'
 import { GameSession, type SessionResponse } from '../game/authoritative-session'
 import { executeCardListener, getRegisteredCardListeners, type CardListenerContext } from '../../shared/cards/card-listeners'
@@ -366,5 +369,113 @@ describe('A34 Loppers — supply fence payment', () => {
     expect(resp.state.players[0]!.resources.food).toBe(0)
     expect(resp.state.players[0]!.supplyTokensConsumed?.fence).toBe(1)
     expect(resp.state.players[0]!.cardStates?.[CARD_ID]?.counters?.bonusVp).toBeUndefined()
+  })
+})
+
+describe('A034 Loppers parity', () => {
+  const CARD_ID = 'A034_Loppers'
+
+  const FILLER = '__test_placeholder__'
+
+  const OCCUPATIONS = ['A116_WoodCutter', 'B121_Geologist']
+
+  const edgesForTile = (row: number, col: number) => [
+    `H-${row}-${col}`,
+    `H-${row + 1}-${col}`,
+    `V-${row}-${col}`,
+    `V-${row}-${col + 1}`,
+  ]
+
+  const setup = ({ played = true, occupations = 2, wood = 0 } = {}) => {
+    const session = new GameSession(6034, undefined, { playerCount: 2 })
+    stabilizeRandomHands(session.state.players)
+    const state = session.getState().state
+    state.currentPlayerIndex = 0
+    state.round = 14
+    state.roundPhase = 'work'
+    state.availableMajorImprovements = []
+    state.players.forEach((player) => {
+      setWorkersAtHome(state, player, 2)
+      player.minorHand = [FILLER]
+      player.occupationHand = [FILLER]
+    })
+    const player = state.players[0]!
+    player.minorHand = played ? [FILLER] : [CARD_ID]
+    player.minorPlayed = played ? [CARD_ID] : []
+    player.occupationPlayed = OCCUPATIONS.slice(0, occupations)
+    player.resources = {
+      ...player.resources, wood, clay: 0, reed: 0, stone: 0, food: 0, grain: 0,
+      vegetable: 0, sheep: 0, boar: 0, cattle: 0,
+    }
+    session.loadState(state)
+    return session
+  }
+
+  const options = (response: SessionResponse) => response.interaction.stateId === 'wait'
+    ? response.interaction.request.options ?? []
+    : []
+
+  const enterMinor = (session: GameSession) => {
+    let response = session.takeAction(0, 'major-improvement')
+    if (response.interaction.stateId !== 'wait') return response
+    if (!options(response).some((option) => option.value === CARD_ID)) {
+      const improvement = options(response).find((option) => option.value.startsWith('action-improvement-'))
+      if (improvement) response = session.resolveChoice(0, improvement.value)
+    }
+    return response
+  }
+
+  const playCard = (session: GameSession) => {
+    const response = enterMinor(session)
+    if (!response.state.players[0]!.minorHand.includes(CARD_ID)) return response
+    const card = options(response).find((option) => option.value === CARD_ID)
+    expect(card).toBeDefined()
+    return session.resolveChoice(0, card!.value)
+  }
+
+  const fence = (session: GameSession) => {
+    let response = session.takeAction(0, 'fencing')
+    expect(response.ok, response.error).toBe(true)
+    expect(response.interaction.stateId).toBe('wait')
+    response = session.commitSelectionChoice(0, { edges: edgesForTile(1, 1), extraWood: 0 })
+    expect(response.ok, response.error).toBe(true)
+    return resolveTriggerIfPresent(session, response, CARD_ID)
+  }
+
+  const resolveLoppers = (session: GameSession, response: SessionResponse, accept: boolean) => {
+    expect(response.interaction.stateId).toBe('wait')
+    if (response.interaction.stateId !== 'wait') return response
+    const option = response.interaction.request.options?.find((candidate) => accept
+      ? candidate.value !== '__skip__'
+      : candidate.value === '__skip__')
+    expect(option).toBeDefined()
+    return session.resolveChoice(response.interaction.playerIndex, option!.value)
+  }
+
+  it('A034 S1: two occupations and one wood allow playing Loppers', () => {
+    const response = playCard(setup({ played: false, wood: 1 }))
+
+    expect(response.ok, response.error).toBe(true)
+    expect(response.state.players[0]!.minorPlayed).toContain(CARD_ID)
+    expect(response.state.players[0]!.resources.wood).toBe(0)
+  })
+
+  it('A034 S2: one occupation keeps Loppers unavailable', () => {
+    const response = enterMinor(setup({ played: false, occupations: 1, wood: 1 }))
+
+    expect(options(response).some((option) => option.value === CARD_ID)).toBe(false)
+    expect(response.state.players[0]!.minorHand).toContain(CARD_ID)
+    expect(response.state.players[0]!.resources.wood).toBe(1)
+  })
+
+  it('A034 S4: after fencing declining preserves the spare wood and supply fence', () => {
+    const session = setup({ wood: 5 })
+    const response = resolveLoppers(session, fence(session), false)
+
+    expect(response.ok, response.error).toBe(true)
+    expect(response.state.players[0]!.fenceSegments).toHaveLength(4)
+    expect(response.state.players[0]!.resources).toMatchObject({ wood: 1, food: 0 })
+    expect(response.state.players[0]!.supplyTokensConsumed?.fence).toBeUndefined()
+    expect(response.state.players[0]!.cardStates[CARD_ID]?.counters?.bonusVp ?? 0).toBe(0)
   })
 })

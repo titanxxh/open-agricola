@@ -1,3 +1,7 @@
+import { type SessionResponse } from '../game/authoritative-session'
+import { markAllWorkersUsed, setWorkersAtHome } from '../../shared/domain/player'
+import { confirmNextPlayer } from './_helpers/pending-confirms'
+
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
@@ -134,5 +138,85 @@ describe('D122_ClayCarrier session', () => {
 
     // Flag should be cleared
     expect(isCardFlagged(player, 'D122_ClayCarrier')).toBe(false)
+  })
+})
+
+describe('D122 Clay Carrier parity', () => {
+  const CARD_ID = 'D122_ClayCarrier'
+
+  const ANYTIME_ID = 'D122-clay-carrier-anytime'
+
+  const FILLER = '__test_placeholder__'
+
+  const setup = ({ played = true, food = 0 } = {}) => {
+    const session = new GameSession(6122, undefined, { playerCount: 2 })
+    stabilizeRandomHands(session.state.players)
+    const state = session.getState().state
+    state.currentPlayerIndex = 0
+    state.round = 1
+    state.roundPhase = 'work'
+    state.actionSpaces.forEach((space) => { space.takenBy = [] })
+    state.players.forEach((player, index) => {
+      setWorkersAtHome(state, player, index === 0 ? 2 : 0)
+      player.minorHand = [FILLER]
+      player.occupationHand = [FILLER]
+      player.minorPlayed = []
+      player.occupationPlayed = []
+      player.cardStates = {}
+      player.resources = {
+        ...player.resources, wood: 0, clay: 0, reed: 0, stone: 0, food: 0, grain: 0,
+        vegetable: 0, sheep: 0, boar: 0, cattle: 0, begging: 0,
+      }
+    })
+    const owner = state.players[0]!
+    owner.occupationHand = played ? [FILLER] : [CARD_ID]
+    owner.occupationPlayed = played ? [CARD_ID] : []
+    owner.resources.food = food
+    session.loadState(state)
+    return session
+  }
+
+  const options = (response: SessionResponse) => response.interaction.stateId === 'wait'
+    ? response.interaction.request.options ?? []
+    : []
+
+  const playOccupation = (session: GameSession) => {
+    let response = session.takeAction(0, 'lessons')
+    expect(response.ok, response.error).toBe(true)
+    if (!response.state.players[0]!.occupationHand.includes(CARD_ID)) return response
+    const card = options(response).find((option) => option.value === CARD_ID)
+    expect(card, JSON.stringify(response.interaction)).toBeDefined()
+    if (card) response = session.resolveChoice(response.interaction.playerIndex, card.value)
+    return response
+  }
+
+  const enterActiveInteraction = (session: GameSession) => {
+    const response = session.takeAction(0, 'grain-seeds')
+    expect(response.ok, response.error).toBe(true)
+    return response
+  }
+
+  it('D122 S1: playing Clay Carrier immediately gains two clay', () => {
+    const response = playOccupation(setup({ played: false }))
+
+    expect(response.state.players[0]!.occupationPlayed).toContain(CARD_ID)
+    expect(response.state.players[0]!.resources.clay).toBe(2)
+  })
+
+  it('D122 S5: Clay Carrier becomes available again at the next round start', () => {
+    const session = setup({ food: 4 })
+    enterActiveInteraction(session)
+    const used = session.takeAnytimeAction(0, ANYTIME_ID)
+    expect(used.ok, used.error).toBe(true)
+    if (used.interaction.stateId === 'wait'
+      && used.interaction.request.kind === 'confirm-next-player') confirmNextPlayer(session)
+    session.state.players.forEach((player) => markAllWorkersUsed(session.state, player))
+
+    const nextRound = session.performRoundEnd()
+
+    expect(nextRound.ok, nextRound.error).toBe(true)
+    expect(nextRound.interaction.anytimeActions.map((action) => action.id)).toContain(ANYTIME_ID)
+    const response = session.takeAnytimeAction(0, ANYTIME_ID)
+    expect(response.state.players[0]!.resources).toMatchObject({ food: 0, clay: 4 })
   })
 })

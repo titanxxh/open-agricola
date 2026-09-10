@@ -1,3 +1,6 @@
+import '../../shared/cards/B/B113_PatchCaregiver'
+import '../../shared/cards/B/B141_FieldCaretaker'
+
 import { describe, expect, it } from 'vitest'
 import { GameSession, type SessionResponse } from '../game/authoritative-session'
 import { C014_StrawThatchedRoof } from '../../shared/cards/C/C014_StrawThatchedRoof'
@@ -176,5 +179,101 @@ describe('C014 Straw-Thatched Roof session', () => {
     expect(renovationAfter.state.log).toEqual(renovationBefore.state.log)
     expect(renovationAfter.scores).toEqual(renovationBefore.scores)
     expect(renovationAfter.state).toEqual(renovationBefore.state)
+  })
+})
+
+describe('C014 Straw-Thatched Roof parity', () => {
+  const CARD_ID = 'C014_StrawThatchedRoof'
+
+  const setup = ({
+    played = false,
+    grainFields = 3,
+    cardFields = false,
+  }: {
+    played?: boolean
+    grainFields?: number
+    cardFields?: boolean
+  } = {}) => {
+    const playerCount = cardFields ? 3 : 2
+    const session = new GameSession(14, undefined, { playerCount })
+    const state = session.getState().state
+    stabilizeRandomHands(state.players)
+    state.currentPlayerIndex = 0
+    state.round = 14
+    state.roundPhase = 'work'
+    state.actionSpaces.forEach((space) => { space.takenBy = [] })
+
+    const player = state.players[0]!
+    setWorkersAtHome(state, player, 2)
+    player.resources = {
+      ...player.resources,
+      wood: 0, clay: 0, reed: 0, stone: 0, food: 0, grain: 0, vegetable: 0,
+    }
+    player.minorHand = played ? ['__test_placeholder__'] : [CARD_ID]
+    player.minorPlayed = played ? [CARD_ID] : []
+    player.fields = Array.from({ length: grainFields }, (_, index) => ({
+      row: Math.floor(index / 5),
+      col: index % 5,
+      stacks: [{ kind: 'grain' as const, remaining: 1 }],
+    }))
+
+    if (cardFields) {
+      player.fields = [{ row: 0, col: 2, stacks: [{ kind: 'grain', remaining: 1 }] }]
+      player.occupationPlayed = ['B113_PatchCaregiver', 'B141_FieldCaretaker']
+      player.cardStates.B113_PatchCaregiver = {
+        extraData: { cardFieldStacks: [{ crop: 'grain', remaining: 1 }] },
+      }
+      player.cardStates.B141_FieldCaretaker = {
+        extraData: { cardFieldStacks: [{ crop: 'grain', remaining: 1 }] },
+      }
+    }
+
+    session.loadState(state)
+    return session
+  }
+
+  const enterMinorChoice = (session: GameSession) => {
+    let response = session.takeAction(0, 'meeting-place')
+    if (response.interaction.stateId !== 'wait') return response
+    const improvement = response.interaction.request.options?.find((option) =>
+      option.value.startsWith('action-improvement-'))
+    if (improvement) response = session.resolveChoice(0, improvement.value)
+    return response
+  }
+
+  const playMinor = (session: GameSession) => {
+    let response = enterMinorChoice(session)
+    if (!response.state.players[0]!.minorHand.includes(CARD_ID)) return response
+    if (response.interaction.stateId !== 'wait') return response
+    const card = response.interaction.request.options?.find((option) =>
+      option.value === CARD_ID || option.value === `minor:${CARD_ID}`)
+    if (!card) return response
+    response = session.resolveChoice(0, card.value)
+    return response
+  }
+
+  it('C014 S1: three planted grain fields allow Straw-Thatched Roof to be played for free', () => {
+    const response = playMinor(setup())
+
+    expect(response.ok, response.error).toBe(true)
+    expect(response.state.players[0]!.minorPlayed).toContain(CARD_ID)
+  })
+
+  it('C014 S2: only two planted grain fields keep Straw-Thatched Roof unavailable', () => {
+    const response = enterMinorChoice(setup({ grainFields: 2 }))
+
+    expect(response.state.players[0]!.minorHand).toContain(CARD_ID)
+    expect(response.interaction.stateId === 'wait'
+      ? response.interaction.request.options?.some((option) =>
+        option.value === CARD_ID || option.value === `minor:${CARD_ID}`) ?? false
+      : false).toBe(false)
+  })
+
+  it('C014 S3: one farmyard grain field and two grain Card Fields satisfy the prerequisite', () => {
+    const response = playMinor(setup({ cardFields: true }))
+
+    expect(response.ok, response.error).toBe(true)
+    expect(response.state.players).toHaveLength(3)
+    expect(response.state.players[0]!.minorPlayed).toContain(CARD_ID)
   })
 })

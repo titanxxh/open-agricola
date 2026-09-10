@@ -1,3 +1,7 @@
+import { type SessionResponse } from '../game/authoritative-session'
+import { markAllWorkersUsed, setWorkersAtHome } from '../../shared/domain/player'
+import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
+
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import '../../shared/cards/B/B157_Salter'
@@ -228,5 +232,129 @@ describe('B157_Salter session', () => {
     const fms = resp.state.futureMeeples
     expect(fms.length).toBe(1)
     expect(fms[0].round).toBe(14)
+  })
+})
+
+describe('B157 Salter parity', () => {
+  const CARD_ID = 'B157_Salter'
+
+  const ANYTIME_ID = 'B157-salter-anytime'
+
+  const FILLER = '__test_placeholder__'
+
+  type AnimalCounts = Partial<Record<'sheep' | 'boar' | 'cattle', number>>
+
+  const setup = ({
+    played = true, farm = {}, reserve = {}, round = 5,
+  }: { played?: boolean; farm?: AnimalCounts; reserve?: AnimalCounts; round?: number } = {}) => {
+    const session = new GameSession(6157 + round, undefined, { playerCount: 4 })
+    const state = session.getState().state
+    stabilizeRandomHands(state.players)
+    state.currentPlayerIndex = 0
+    state.round = round
+    state.roundPhase = 'work'
+    state.actionSpaces.forEach((space) => { space.takenBy = [] })
+    state.players.forEach((player) => {
+      setWorkersAtHome(state, player, 2)
+      player.minorHand = [FILLER]
+      player.occupationHand = [FILLER]
+      player.minorPlayed = []
+      player.occupationPlayed = []
+      player.resources = {
+        ...player.resources, wood: 0, clay: 0, reed: 0, stone: 0, food: 20, grain: 0,
+        vegetable: 0, sheep: 0, boar: 0, cattle: 0, begging: 0,
+      }
+      player.pastures = []
+      player.stableAnimals = {}
+      player.houseAnimalType = null
+      player.houseAnimalCount = 0
+    })
+    const owner = state.players[0]!
+    owner.occupationHand = played ? [FILLER] : [CARD_ID]
+    owner.occupationPlayed = played ? [CARD_ID] : []
+    owner.resources.sheep = (farm.sheep ?? 0) + (reserve.sheep ?? 0)
+    owner.resources.boar = (farm.boar ?? 0) + (reserve.boar ?? 0)
+    owner.resources.cattle = (farm.cattle ?? 0) + (reserve.cattle ?? 0)
+    if ((farm.sheep ?? 0) > 0) {
+      owner.pastures.push({
+        id: 'salter-sheep-pasture', size: 2, tiles: [{ row: 1, col: 0 }], stables: 1,
+        animalType: 'sheep', animalCount: farm.sheep!,
+      })
+    }
+    if ((farm.boar ?? 0) > 0) {
+      owner.stableTiles = [{ row: 1, col: 1 }]
+      owner.stableAnimals['1-1'] = 'boar'
+    }
+    if ((farm.cattle ?? 0) > 0) {
+      owner.houseAnimalType = 'cattle'
+      owner.houseAnimalCount = farm.cattle!
+    }
+    session.loadState(state)
+    return session
+  }
+
+  const enterInteraction = (session: GameSession) => {
+    const response = session.takeAction(0, 'farmland')
+    expect(response.ok, response.error).toBe(true)
+    return response
+  }
+
+  const anytimeIds = (response: SessionResponse) => response.interaction.anytimeActions
+    .map((action) => action.id)
+
+  const expandedFutureFoodRounds = (response: SessionResponse) => response.state.futureMeeples
+    .filter((entry) => entry.cardId === CARD_ID && (entry.resources.food ?? 0) > 0)
+    .flatMap((entry) => Array.from({ length: entry.resources.food ?? 0 }, () => entry.round))
+    .sort((left, right) => left - right)
+
+  const assigned = (response: SessionResponse, type: 'sheep' | 'boar' | 'cattle') => {
+    const player = response.state.players[0]!
+    if (type === 'sheep') return player.pastures
+      .filter((pasture) => pasture.animalType === 'sheep')
+      .reduce((sum, pasture) => sum + pasture.animalCount, 0)
+    if (type === 'boar') return Object.values(player.stableAnimals)
+      .filter((animal) => animal === 'boar').length
+    return player.houseAnimalType === 'cattle' ? player.houseAnimalCount : 0
+  }
+
+  for (const { scenario, animal, rounds } of [
+    { scenario: 'S2', animal: 'sheep' as const, rounds: [6, 7, 8] },
+    { scenario: 'S3', animal: 'boar' as const, rounds: [6, 7, 8, 9, 10] },
+    { scenario: 'S4', animal: 'cattle' as const, rounds: [6, 7, 8, 9, 10, 11, 12] },
+  ]) {
+    it(`B157 ${scenario}: salting one farm ${animal} removes it and schedules its future food`, () => {
+      const session = setup({ farm: { [animal]: 1 } })
+      const entered = enterInteraction(session)
+      expect(anytimeIds(entered)).toContain(ANYTIME_ID)
+
+      const response = session.takeAnytimeAction(0, ANYTIME_ID)
+
+      expect(response.ok, response.error).toBe(true)
+      expect(assigned(response, animal)).toBe(0)
+      expect(expandedFutureFoodRounds(response)).toEqual(rounds)
+    })
+  }
+
+  it('B157 S9: with no animal on the farm Salter is unavailable', () => {
+    const response = enterInteraction(setup())
+
+    expect(anytimeIds(response)).not.toContain(ANYTIME_ID)
+  })
+
+  it('B157 S12: the first scheduled food is received at the start of the next round', () => {
+    const session = setup({ farm: { sheep: 1 }, round: 5 })
+    enterInteraction(session)
+    const salted = session.takeAnytimeAction(0, ANYTIME_ID)
+    expect(expandedFutureFoodRounds(salted)).toEqual([6, 7, 8])
+    const state = session.getState().state
+    state.players.forEach((player) => markAllWorkersUsed(state, player))
+    session.loadState(state)
+
+    const response = session.performRoundEnd()
+
+    expect(response.ok, response.error).toBe(true)
+    expect(response.state.round).toBe(6)
+    expect(response.state.players[0]!.resources.food).toBe(21)
+    expect(expandedFutureFoodRounds(response)).toEqual([7, 8])
   })
 })

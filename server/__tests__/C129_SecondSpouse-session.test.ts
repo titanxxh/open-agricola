@@ -154,3 +154,79 @@ describe('C129_SecondSpouse session', () => {
     expect(session.getState().actionAvailability?.['urgent-wish-children']).toBe(true)
   })
 })
+
+describe('C129 Second Spouse parity', () => {
+  const CARD_ID = 'C129_SecondSpouse'
+
+  const FILLER = '__test_placeholder__'
+
+  const setup = ({ played = true } = {}) => {
+    const session = new GameSession(6129, undefined, { playerCount: 3 })
+    stabilizeRandomHands(session.state.players)
+    const state = session.getState().state
+    state.currentPlayerIndex = 0
+    state.round = 14
+    state.roundPhase = 'work'
+    state.roundActionOrder = state.roundActionOrder.map(() => null)
+    state.roundActionOrder[0] = 'urgent-wish-children'
+    state.roundActionOrder[1] = 'wish-children'
+    state.roundActionOrder[2] = 'lessons'
+    state.roundActionOrder[3] = 'forest'
+    state.actionSpaces.forEach((space) => {
+      space.takenBy = []
+      if (['urgent-wish-children', 'wish-children', 'lessons', 'forest'].includes(space.id)) {
+        space.roundAvailable = 1
+      }
+    })
+    state.players.forEach((player) => {
+      setWorkersAtHome(state, player, 2)
+      player.rooms = 3
+      player.roomTiles = [{ row: 0, col: 0 }, { row: 1, col: 0 }, { row: 2, col: 0 }]
+      player.minorHand = [FILLER]
+      player.occupationHand = [FILLER]
+      player.minorPlayed = []
+      player.occupationPlayed = []
+      player.cardStates = {}
+      player.resources.food = 20
+    })
+    const owner = state.players[0]!
+    owner.occupationHand = played ? [FILLER] : [CARD_ID]
+    owner.occupationPlayed = played ? [CARD_ID] : []
+    session.loadState(state)
+    return session
+  }
+
+  const resetCurrentPlayer = (session: GameSession, playerIndex: number) => {
+    const state = session.getState().state
+    state.currentPlayerIndex = playerIndex
+    session.loadState(state)
+  }
+
+  it('C129 S2: the owner may use Urgent Wish occupied by another player first person', () => {
+    const session = setup()
+    resetCurrentPlayer(session, 1)
+    const opponent = session.takeAction(1, 'urgent-wish-children')
+    expect(opponent.ok, opponent.error).toBe(true)
+    resetCurrentPlayer(session, 0)
+
+    const response = session.takeAction(0, 'urgent-wish-children')
+
+    expect(response.ok, response.error).toBe(true)
+    expect(familySize(response.state.players[0]!)).toBe(3)
+    expect(familySize(response.state.players[1]!)).toBe(3)
+  })
+
+  it('C129 S3: another player second person on Urgent Wish does not unlock it', () => {
+    const session = setup()
+    resetCurrentPlayer(session, 1)
+    expect(session.takeAction(1, 'forest').ok).toBe(true)
+    resetCurrentPlayer(session, 1)
+    expect(session.takeAction(1, 'urgent-wish-children').ok).toBe(true)
+    resetCurrentPlayer(session, 0)
+
+    expect(session.getActionAvailability(0)['urgent-wish-children']).toBe(false)
+    const response = session.takeAction(0, 'urgent-wish-children')
+    expect(response.ok).toBe(false)
+    expect(familySize(response.state.players[0]!)).toBe(2)
+  })
+})

@@ -123,3 +123,64 @@ describe('A122 Pan Baker session', () => {
     expect(resp.state.players[0]!.resources).toMatchObject({ wood: 1, clay: 2, food: 0 })
   })
 })
+
+describe('A122 Pan Baker parity', () => {
+  const CARD_ID = 'A122_PanBaker'
+
+  const WOOD_FIELD = 'D075_WoodField'
+
+  const FILLER = '__test_placeholder__'
+
+  const setup = ({
+    played = true, actor = 0, woodField = false, ownerWood = 0, ownerClay = 0,
+  } = {}) => {
+    const session = new GameSession(6122, undefined, { playerCount: 2 })
+    const state = session.getState().state
+    stabilizeRandomHands(state.players)
+    state.currentPlayerIndex = actor
+    state.round = 14
+    state.roundPhase = 'work'
+    state.roundActionOrder = state.roundActionOrder.map(() => null)
+    state.roundActionOrder[9] = 'grain-utilization'
+    state.players.forEach((player) => {
+      setWorkersAtHome(state, player, 2)
+      player.minorHand = [FILLER]
+      player.occupationHand = [FILLER]
+      player.minorPlayed = []
+      player.occupationPlayed = []
+      player.improvements = []
+      player.fields = []
+      player.resources = {
+        ...player.resources, wood: 0, clay: 0, reed: 0, stone: 0, food: 0, grain: 0,
+        vegetable: 0, sheep: 0, boar: 0, cattle: 0,
+      }
+    })
+    const owner = state.players[0]!
+    owner.occupationHand = played ? [FILLER] : [CARD_ID]
+    owner.occupationPlayed = played ? [CARD_ID] : []
+    owner.minorPlayed = woodField ? [WOOD_FIELD] : []
+    owner.resources.wood = ownerWood
+    owner.resources.clay = ownerClay
+    if (actor === 1) {
+      const opponent = state.players[1]!
+      opponent.resources.grain = 1
+      opponent.fields = [{ row: 1, col: 0, crop: null, remaining: 0 }]
+    }
+    session.loadState(state)
+    return session
+  }
+
+  it('A122 S3: a non-Grain-Utilization action grants no wood or clay', () => {
+    const response = setup().takeAction(0, 'day-laborer')
+
+    expect(response.ok, response.error).toBe(true)
+    expect(response.state.players[0]!.resources).toMatchObject({ wood: 0, clay: 0 })
+  })
+
+  it('A122 S4: an opponent using Grain Utilization grants the owner no resources', () => {
+    const response = setup({ actor: 1 }).takeAction(1, 'grain-utilization')
+
+    expect(response.ok, response.error).toBe(true)
+    expect(response.state.players[0]!.resources).toMatchObject({ wood: 0, clay: 0 })
+  })
+})

@@ -1,3 +1,6 @@
+import { type SessionResponse } from '../game/authoritative-session'
+import { setWorkersAtHome } from '../../shared/domain/player'
+
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
@@ -144,5 +147,113 @@ describe('D148_DomesticianExpert session', () => {
     expect(zones.find(z => z.id === 'card:D148_DomesticianExpert')).toBeUndefined()
     // D12 also strips the house zone
     expect(zones.find(z => z.zoneType === 'house')).toBeUndefined()
+  })
+})
+
+describe('D148 Domestician Expert parity', () => {
+  const CARD_ID = 'D148_DomesticianExpert'
+
+  const CARD_ZONE = `card:${CARD_ID}`
+
+  const FILLER = '__test_placeholder__'
+
+  const setup = ({ played = true, sheep = 0, boar = 0, extraRoom = false, milkingPlace = false } = {}) => {
+    const session = new GameSession(6148, undefined, { playerCount: 4 })
+    stabilizeRandomHands(session.state.players)
+    const state = session.getState().state
+    state.currentPlayerIndex = 0
+    state.round = 14
+    state.roundPhase = 'work'
+    state.players.forEach((player) => {
+      setWorkersAtHome(state, player, 2)
+      player.minorHand = [FILLER]
+      player.occupationHand = [FILLER]
+      player.minorPlayed = []
+      player.occupationPlayed = []
+      player.resources = {
+        ...player.resources,
+        wood: 0, clay: 0, reed: 0, stone: 0, food: 20, grain: 0, vegetable: 0,
+        sheep: 0, boar: 0, cattle: 0, begging: 0,
+      }
+    })
+    const player = state.players[0]!
+    player.occupationHand = played ? [FILLER] : [CARD_ID]
+    player.occupationPlayed = played ? [CARD_ID] : []
+    if (extraRoom) {
+      player.roomTiles = [{ row: 0, col: 0 }, { row: 0, col: 1 }, { row: 1, col: 0 }]
+      player.rooms = 3
+    }
+    if (milkingPlace) player.minorPlayed.push('D012_MilkingPlace')
+    state.actionSpaces.find((space) => space.id === 'sheep-market')!.resources.sheep = sheep
+    state.actionSpaces.find((space) => space.id === 'pig-market')!.resources.boar = boar
+    session.loadState(state)
+    return session
+  }
+
+  const cardZone = (response: SessionResponse) => {
+    if (response.interaction.stateId !== 'wait' || response.interaction.request.kind !== 'animal-reorg') {
+      return undefined
+    }
+    return response.interaction.request.zones.find((zone) => zone.id === CARD_ZONE)
+  }
+
+  const assignToCard = (response: SessionResponse, animalType: 'sheep' | 'boar', animalCount: number) => ({
+    ...cardZone(response)!, animalType, animalCount, animalCounts: { [animalType]: animalCount },
+  })
+
+  it('D148 S2: one adjacent room pair holds two sheep on their shared border', () => {
+    const session = setup({ sheep: 2 })
+    const pending = session.takeAction(0, 'sheep-market')
+    expect(cardZone(pending)).toMatchObject({ capacity: 2, allowedAnimalType: 'sheep' })
+
+    const response = session.resolveChoice(0, 'confirm', {
+      zones: [assignToCard(pending, 'sheep', 2)],
+    })
+
+    expect(response.ok, response.error).toBe(true)
+    expect(response.state.players[0]!.cardStates[CARD_ID]?.extraData).toMatchObject({
+      held: 2, animalType: 'sheep',
+    })
+  })
+
+  it('D148 S3: two adjacent room pairs hold four sheep', () => {
+    const session = setup({ sheep: 4, extraRoom: true })
+    const pending = session.takeAction(0, 'sheep-market')
+    expect(cardZone(pending)).toMatchObject({ capacity: 4, allowedAnimalType: 'sheep' })
+
+    const response = session.resolveChoice(0, 'confirm', {
+      zones: [assignToCard(pending, 'sheep', 4)],
+    })
+
+    expect(response.ok, response.error).toBe(true)
+    expect(response.state.players[0]!.cardStates[CARD_ID]?.extraData).toMatchObject({
+      held: 4, animalType: 'sheep',
+    })
+  })
+
+  it('D148 S4: a room border rejects boars while the ordinary house holds only one', () => {
+    const session = setup({ boar: 2 })
+    const pending = session.takeAction(0, 'pig-market')
+    expect(cardZone(pending)).toMatchObject({ capacity: 2, allowedAnimalType: 'sheep' })
+
+    const rejected = session.resolveChoice(0, 'confirm', {
+      zones: [assignToCard(pending, 'boar', 2)],
+    })
+    expect(rejected.ok).toBe(false)
+    expect(rejected.state).toEqual(pending.state)
+
+    const response = session.resolveChoice(0, 'confirm', {
+      zones: [{ id: 'house', zoneType: 'house', animalType: 'boar', animalCount: 1 }],
+    })
+    expect(response.ok, response.error).toBe(true)
+    expect(response.state.players[0]!.resources.boar).toBe(1)
+    expect(response.state.players[0]!.houseAnimalCount).toBe(1)
+  })
+
+  it('D148 S5: Milking Place removes the Domestician Expert room-border zone', () => {
+    const response = setup({ sheep: 1, milkingPlace: true }).takeAction(0, 'sheep-market')
+
+    expect(response.interaction).toMatchObject({ stateId: 'wait', request: { kind: 'animal-reorg' } })
+    expect(cardZone(response)).toBeUndefined()
   })
 })

@@ -119,3 +119,67 @@ describe('A077_Hod session', () => {
     expect(after.players[0]!.resources.clay).toBe(clayBefore)
   })
 })
+
+describe('A077_Hod session', () => {
+  const CARD_ID = 'A077_Hod'
+
+  const setup = (currentPlayerIndex = 0, played = true) => {
+    const session = new GameSession(6077, undefined, { playerCount: 2 })
+    stabilizeRandomHands(session.state.players)
+    const state = session.getState().state
+    state.players = state.players.slice(0, 2)
+    state.currentPlayerIndex = currentPlayerIndex
+    state.round = 1
+
+    const owner = state.players[0]!
+    owner.minorHand = played ? ['__test_placeholder__'] : [CARD_ID]
+    owner.occupationHand = ['__test_placeholder__']
+    owner.minorPlayed = played ? [CARD_ID] : []
+    setWorkersAtHome(state, owner, 2)
+    owner.resources.clay = 0
+    owner.resources.wood = 1
+
+    owner.pastures = [{
+      id: 'p1', size: 4,
+      tiles: [{ row: 0, col: 0 }, { row: 0, col: 1 }, { row: 1, col: 0 }, { row: 1, col: 1 }],
+      stables: 1, animalType: null, animalCount: 0,
+    }]
+
+    const opponent = state.players[1]!
+    opponent.minorHand = ['__test_placeholder__']
+    opponent.occupationHand = ['__test_placeholder__']
+    setWorkersAtHome(state, opponent, 2)
+    opponent.pastures = [{
+      id: 'p2', size: 4,
+      tiles: [{ row: 2, col: 0 }, { row: 2, col: 1 }, { row: 3, col: 0 }, { row: 3, col: 1 }],
+      stables: 1, animalType: null, animalCount: 0,
+    }]
+
+    const pigMarket = state.actionSpaces.find((s) => s.id === 'pig-market')
+    if (pigMarket) pigMarket.resources.boar = 1
+
+    session.loadState(state)
+    return session
+  }
+
+  it('A077 S1: paying one wood to play Hod immediately gains one clay', () => {
+    const session = setup(0, false)
+    let response = session.takeAction(0, 'major-improvement')
+    if (response.state.players[0]!.minorHand.includes(CARD_ID) && response.interaction.stateId === 'wait') {
+      if (!response.interaction.request.options?.some((option) => option.value === CARD_ID)) {
+        const improvement = response.interaction.request.options?.find((option) =>
+          option.value.startsWith('action-improvement-'))
+        if (improvement) response = session.resolveChoice(0, improvement.value)
+      }
+      if (response.state.players[0]!.minorHand.includes(CARD_ID) && response.interaction.stateId === 'wait') {
+        const card = response.interaction.request.options?.find((option) => option.value === CARD_ID)
+        expect(card).toBeDefined()
+        response = session.resolveChoice(0, card!.value)
+      }
+    }
+
+    expect(response.ok, response.error).toBe(true)
+    expect(response.state.players[0]!.minorPlayed).toContain(CARD_ID)
+    expect(response.state.players[0]!.resources).toMatchObject({ wood: 0, clay: 1 })
+  })
+})

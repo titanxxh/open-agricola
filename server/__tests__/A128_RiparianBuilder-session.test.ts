@@ -1,3 +1,6 @@
+import { type SessionResponse } from '../game/authoritative-session'
+import type { Resource } from '../../shared/contract/types'
+
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
@@ -330,5 +333,119 @@ describe('A128_RiparianBuilder session', () => {
     if (resp.interaction.stateId !== 'wait') return
     expect(resp.interaction.request.kind).toBe('farm-select')
     expect(resp.interaction.request.farm.farmType).toBe('room')
+  })
+})
+
+describe('A128 Riparian Builder parity', () => {
+  const CARD_ID = 'A128_RiparianBuilder'
+
+  const FILLER = '__test_placeholder__'
+
+  const setup = ({
+    actor = 1, played = true, houseType = 'wood' as 'wood' | 'clay' | 'stone', resources = {},
+  }: {
+    actor?: number
+    played?: boolean
+    houseType?: 'wood' | 'clay' | 'stone'
+    resources?: Partial<Resource>
+  } = {}) => {
+    const session = new GameSession(6128, undefined, { playerCount: 3 })
+    const state = session.getState().state
+    stabilizeRandomHands(state.players)
+    state.currentPlayerIndex = actor
+    state.round = 14
+    state.roundPhase = 'work'
+    state.actionSpaces.forEach((space) => { space.takenBy = [] })
+    state.players.forEach((player) => {
+      setWorkersAtHome(state, player, 2)
+      player.minorHand = [FILLER]
+      player.occupationHand = [FILLER]
+      player.minorPlayed = []
+      player.occupationPlayed = []
+      player.cardStates = {}
+      player.resources = {
+        ...player.resources, wood: 0, clay: 0, reed: 0, stone: 0, food: 0, grain: 0,
+        vegetable: 0, sheep: 0, boar: 0, cattle: 0, begging: 0,
+      }
+    })
+    const owner = state.players[0]!
+    owner.occupationHand = played ? [FILLER] : [CARD_ID]
+    owner.occupationPlayed = played ? [CARD_ID] : []
+    owner.houseType = houseType
+    Object.assign(owner.resources, resources)
+    const reedBank = state.actionSpaces.find((space) => space.id === 'reed-bank')
+    if (!reedBank) throw new Error('reed-bank space missing')
+    reedBank.resources.reed = 2
+    session.loadState(state)
+    return session
+  }
+
+  const enterGrantedConstruct = (session: GameSession, initial: SessionResponse) => {
+    let response = initial
+    while (response.interaction.stateId === 'wait'
+      && response.interaction.request.kind === 'confirm-player-switch') {
+      response = confirmPlayerSwitch(session)
+    }
+    expect(response.interaction.stateId).toBe('wait')
+    if (response.interaction.stateId !== 'wait') return response
+    const construct = response.interaction.request.options?.find((option) =>
+      option.value !== '__skip__' && option.sourceCard === CARD_ID)
+      ?? response.interaction.request.options?.find((option) => option.value !== '__skip__')
+    expect(construct, JSON.stringify(response.interaction)).toBeDefined()
+    return session.resolveChoice(response.interaction.playerIndex, construct!.value)
+  }
+
+  const sourceCards = (option: ActionChoiceOption): string[] => {
+    const preview = option.effectPreview as { sourceCards?: string[] } | undefined
+    return preview?.sourceCards ?? []
+  }
+
+  const buildGrantedRoom = (session: GameSession) => {
+    let response = enterGrantedConstruct(session, session.takeAction(1, 'reed-bank'))
+    expect(response.interaction).toMatchObject({
+      stateId: 'wait', request: { kind: 'farm-select', farm: { farmType: 'room', maxSelections: 1 } },
+    })
+    if (response.interaction.stateId !== 'wait'
+      || response.interaction.request.farm?.farmType !== 'room') return response
+    const room = response.interaction.request.farm.selectableTiles[0]
+    expect(room).toBeDefined()
+    response = session.commitSelectionChoice(response.interaction.playerIndex, { rooms: [room!] })
+    if (response.interaction.stateId === 'wait'
+      && response.interaction.promptKey === 'prompt.selectPayment') {
+      const payment = response.interaction.request.options?.find((option) =>
+        sourceCards(option).includes(CARD_ID))
+      expect(payment, JSON.stringify(response.interaction)).toBeDefined()
+      response = session.resolveChoice(response.interaction.playerIndex, payment!.value)
+    }
+    return response
+  }
+
+  for (const { scenario, houseType, resources } of [
+    { scenario: 'S3', houseType: 'clay', resources: { clay: 4, reed: 2 } },
+    { scenario: 'S4', houseType: 'stone', resources: { stone: 3, reed: 2 } },
+    { scenario: 'S5', houseType: 'wood', resources: { wood: 5, reed: 2 } },
+  ] as const) {
+    it(`A128 ${scenario}: the granted ${houseType} room uses the card-specific cost`, () => {
+      const response = buildGrantedRoom(setup({ houseType, resources }))
+
+      expect(response.ok, response.error).toBe(true)
+      expect(response.state.players[0]!.rooms).toBe(3)
+      expect(response.state.players[0]!.resources).toMatchObject({
+        wood: 0, clay: 0, stone: 0, reed: 0,
+      })
+      expect(response.state.players[1]!.resources.reed).toBe(2)
+    })
+  }
+
+  it('A128 S6: the owners Reed Bank use and an opponents non-Reed action do not trigger it', () => {
+    const ownUse = setup({ actor: 0 }).takeAction(0, 'reed-bank')
+    expect(ownUse.state.players[0]!.rooms).toBe(2)
+    expect(ownUse.interaction.stateId === 'wait' ? ownUse.interaction.sourceCard : undefined)
+      .not.toBe(CARD_ID)
+
+    const nonTarget = setup().takeAction(1, 'day-laborer')
+    expect(nonTarget.state.players[0]!.rooms).toBe(2)
+    expect(nonTarget.interaction.stateId === 'wait' ? nonTarget.interaction.sourceCard : undefined)
+      .not.toBe(CARD_ID)
   })
 })

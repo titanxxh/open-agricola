@@ -1,3 +1,6 @@
+import { type SessionResponse } from '../game/authoritative-session'
+import { setWorkersAtHome } from '../../shared/domain/player'
+
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
@@ -231,5 +234,92 @@ describe('C053_GypsysCrock session', () => {
     fire('Major_Fireplace1', 2)
     const cookedAfter = player.cardStates?.['C053_GypsysCrock']?.extraData?.cookedCount
     expect(cookedAfter).toBe(2)
+  })
+})
+
+describe("C053 Gypsy's Crock parity", () => {
+  const CARD_ID = 'C053_GypsysCrock'
+
+  const FILLER = '__test_placeholder__'
+
+  const setup = ({
+    played = true,
+    resources = {},
+  }: {
+    played?: boolean
+    resources?: Partial<{
+      clay: number
+      food: number
+      sheep: number
+      boar: number
+      vegetable: number
+    }>
+  } = {}) => {
+    const session = new GameSession(53, undefined, { playerCount: 2 })
+    const state = session.getState().state
+    stabilizeRandomHands(state.players)
+    state.currentPlayerIndex = 0
+    state.round = 5
+    state.roundPhase = 'work'
+    state.actionSpaces.forEach((space) => { space.takenBy = [] })
+    state.players.forEach((player) => {
+      setWorkersAtHome(state, player, 2)
+      player.minorHand = [FILLER]
+      player.occupationHand = [FILLER]
+      player.minorPlayed = []
+      player.occupationPlayed = []
+      player.improvements = []
+      player.resources = {
+        ...player.resources,
+        wood: 0, clay: 0, reed: 0, stone: 0, food: 0, grain: 0, vegetable: 0,
+        sheep: 0, boar: 0, cattle: 0,
+      }
+    })
+
+    const player = state.players[0]!
+    player.minorHand = played ? [FILLER] : [CARD_ID]
+    player.minorPlayed = played ? [CARD_ID] : []
+    player.improvements = played ? ['Major_Fireplace1'] : []
+    player.resources = {
+      ...player.resources,
+      clay: played ? 0 : 2,
+      ...resources,
+    }
+    if (played) {
+      state.availableMajorImprovements = state.availableMajorImprovements.filter(
+        (cardId) => cardId !== 'Major_Fireplace1',
+      )
+    }
+
+    session.loadState(state)
+    return session
+  }
+
+  const enterActiveInteraction = (session: GameSession) => {
+    const response = session.takeAction(0, 'farmland')
+    expect(response.ok, response.error).toBe(true)
+    return response
+  }
+
+  const cook = (
+    session: GameSession,
+    response: SessionResponse,
+    trades: string,
+  ) => {
+    expect(response.interaction.anytimeActions.map((action) => action.id)).toContain('exchange')
+    let current = session.takeAnytimeAction(0, 'exchange')
+    expect(current.ok, current.error).toBe(true)
+    expect(current.interaction.stateId).toBe('wait')
+    current = session.resolveChoice(0, trades)
+    expect(current.ok, current.error).toBe(true)
+    return current
+  }
+
+  it("C053 S6: cooking one vegetable in each of two separate batches gains no Gypsy's Crock food", () => {
+    const session = setup({ resources: { vegetable: 2 } })
+    let response = cook(session, enterActiveInteraction(session), 'bulk:3=1')
+    response = cook(session, response, 'bulk:3=1')
+
+    expect(response.state.players[0]!.resources).toMatchObject({ vegetable: 0, food: 4 })
   })
 })

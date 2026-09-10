@@ -1,3 +1,5 @@
+import { type SessionResponse } from '../game/authoritative-session'
+
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
@@ -334,5 +336,221 @@ describe('B27 Toolbox session', () => {
 
     expect(resp.interaction.stateId === 'wait' ? resp.interaction.request.kind : resp.interaction.stateId).toBe('confirm-next-player')
     expect(isCardFlagged(resp.state.players[0]!, CARD_ID)).toBe(false)
+  })
+})
+
+describe('B027 Toolbox parity', () => {
+  const CARD_ID = 'B027_Toolbox'
+
+  const PLACEHOLDER = '__test_placeholder__'
+
+  const TOOLBOX_MAJORS = ['Major_Basket', 'Major_Joinery', 'Major_Pottery']
+
+  const ONE_TILE_FENCE = ['H-0-0', 'H-1-0', 'V-0-0', 'V-0-1']
+
+  const setup = ({
+    played = true, resources = {},
+  }: {
+    played?: boolean
+    resources?: Partial<{ wood: number; clay: number; reed: number; stone: number; food: number }>
+  } = {}) => {
+    const session = new GameSession(6027, undefined, { playerCount: 2 })
+    stabilizeRandomHands(session.state.players)
+    const state = session.getState().state
+    state.currentPlayerIndex = 0
+    state.round = 14
+    state.roundPhase = 'work'
+    state.availableMajorImprovements = [...TOOLBOX_MAJORS, 'Major_Well']
+    state.players.forEach((player, index) => {
+      setWorkersAtHome(state, player, index === 0 ? 2 : 0)
+      player.minorHand = [PLACEHOLDER]
+      player.occupationHand = [PLACEHOLDER]
+      player.minorPlayed = []
+      player.occupationPlayed = []
+      player.improvements = []
+      player.fields = []
+      player.pastures = []
+      player.stableTiles = []
+      player.fenceSegments = []
+      player.resources = {
+        ...player.resources,
+        wood: 0, clay: 0, reed: 0, stone: 0, food: 0, grain: 0, vegetable: 0,
+        sheep: 0, boar: 0, cattle: 0, begging: 0,
+      }
+    })
+    const owner = state.players[0]!
+    owner.minorHand = played ? [PLACEHOLDER] : [CARD_ID]
+    owner.minorPlayed = played ? [CARD_ID] : []
+    owner.resources = { ...owner.resources, ...resources }
+    session.loadState(state)
+    return session
+  }
+
+  const options = (response: SessionResponse) => response.interaction.stateId === 'wait'
+    ? response.interaction.request.options ?? []
+    : []
+
+  const resolveToolboxTrigger = (session: GameSession, response: SessionResponse) => {
+    if (response.interaction.stateId !== 'wait'
+      || response.interaction.request.kind !== 'select-trigger') return response
+    const trigger = options(response).find((option) => option.sourceCard === CARD_ID)
+    expect(trigger).toBeDefined()
+    return session.resolveChoice(response.interaction.playerIndex, trigger!.value)
+  }
+
+  const advanceFarmExpansion = (
+    session: GameSession,
+    response: SessionResponse,
+    build: { room?: boolean; stable?: boolean },
+  ) => {
+    let builtRoom = false
+    let builtStable = false
+    for (let guard = 0; guard < 30 && response.interaction.stateId === 'wait'; guard++) {
+      if (response.interaction.promptKey === 'ui.interactionToolboxImprovement') return response
+      if (response.interaction.request.kind === 'select-trigger') {
+        response = resolveToolboxTrigger(session, response)
+        continue
+      }
+      if (response.interaction.promptKey === 'prompt.selectPayment') {
+        const payment = options(response)[0]
+        expect(payment).toBeDefined()
+        response = session.resolveChoice(response.interaction.playerIndex, payment!.value)
+        continue
+      }
+      if (response.interaction.request.kind === 'farm-select') {
+        const farm = response.interaction.request.farm
+        const tile = farm.selectableTiles[0]
+        expect(tile).toBeDefined()
+        if (farm.farmType === 'room') {
+          response = session.commitSelectionChoice(response.interaction.playerIndex, { rooms: [tile!] })
+          builtRoom = true
+        } else if (farm.farmType === 'stable') {
+          response = session.commitSelectionChoice(response.interaction.playerIndex, { stables: [tile!] })
+          builtStable = true
+        } else {
+          throw new Error(`unexpected farm type ${farm.farmType}`)
+        }
+        continue
+      }
+      const choices = options(response)
+      const room = choices.find((option) => option.labelKey === 'actions.construct.name')
+      const stable = choices.find((option) => option.labelKey === 'actions.stables.name')
+      const done = choices.find((option) => option.value === '__done__')
+      if (build.room && !builtRoom && room) {
+        response = session.resolveChoice(response.interaction.playerIndex, room.value)
+        continue
+      }
+      if (build.stable && !builtStable && stable) {
+        response = session.resolveChoice(response.interaction.playerIndex, stable.value)
+        continue
+      }
+      if (done) {
+        response = session.resolveChoice(response.interaction.playerIndex, done.value)
+        continue
+      }
+      break
+    }
+    return response
+  }
+
+  const buildWithFarmExpansion = (
+    session: GameSession,
+    build: { room?: boolean; stable?: boolean },
+  ) => advanceFarmExpansion(session, session.takeAction(0, 'farm-expansion'), build)
+
+  const advanceFencing = (session: GameSession) => {
+    let response = session.takeAction(0, 'fencing')
+    expect(response.interaction.stateId).toBe('wait')
+    response = session.commitSelectionChoice(0, {
+      edges: ONE_TILE_FENCE, palisadeEdges: [], extraWood: 0,
+    })
+    response = resolveToolboxTrigger(session, response)
+    return response
+  }
+
+  const enterToolboxMajors = (session: GameSession, response: SessionResponse) => {
+    expect(response.interaction).toMatchObject({
+      stateId: 'wait', promptKey: 'ui.interactionToolboxImprovement', sourceCard: CARD_ID,
+    })
+    if (response.interaction.stateId !== 'wait') return response
+    const accept = options(response).find((option) => option.value !== '__skip__')
+    expect(accept).toBeDefined()
+    return session.resolveChoice(response.interaction.playerIndex, accept!.value)
+  }
+
+  const buyToolboxMajor = (session: GameSession, response: SessionResponse, cardId: string) => {
+    response = enterToolboxMajors(session, response)
+    if (response.state.players[0]!.improvements.includes(cardId)) return response
+    expect(options(response).map((option) => option.value)).toContain(cardId)
+    return session.resolveChoice(response.interaction.playerIndex ?? 0, cardId)
+  }
+
+  it('B027 S2: after building a room Toolbox can buy Joinery at normal cost', () => {
+    const session = setup({ resources: { wood: 7, reed: 2, stone: 2 } })
+    const response = buyToolboxMajor(
+      session, buildWithFarmExpansion(session, { room: true }), 'Major_Joinery',
+    )
+
+    expect(response.ok, response.error).toBe(true)
+    expect(response.state.players[0]!.roomTiles).toHaveLength(3)
+    expect(response.state.players[0]!.improvements).toContain('Major_Joinery')
+    expect(response.state.players[0]!.resources).toMatchObject({ wood: 0, reed: 0, stone: 0 })
+  })
+
+  it('B027 S3: the Toolbox purchase after building a room may be declined', () => {
+    const session = setup({ resources: { wood: 7, reed: 2, stone: 2 } })
+    const pending = buildWithFarmExpansion(session, { room: true })
+    expect(pending.interaction.stateId).toBe('wait')
+    if (pending.interaction.stateId !== 'wait') return
+
+    const response = session.resolveChoice(pending.interaction.playerIndex, '__skip__')
+
+    expect(response.ok, response.error).toBe(true)
+    expect(response.state.players[0]!.roomTiles).toHaveLength(3)
+    expect(response.state.players[0]!.improvements).not.toContain('Major_Joinery')
+    expect(response.state.players[0]!.resources).toMatchObject({ wood: 2, stone: 2 })
+  })
+
+  it('B027 S4: after building a stable Toolbox can buy Basketmaker Workshop at normal cost', () => {
+    const session = setup({ resources: { wood: 2, reed: 2, stone: 2 } })
+    const response = buyToolboxMajor(
+      session, buildWithFarmExpansion(session, { stable: true }), 'Major_Basket',
+    )
+
+    expect(response.ok, response.error).toBe(true)
+    expect(response.state.players[0]!.stableTiles).toHaveLength(1)
+    expect(response.state.players[0]!.improvements).toContain('Major_Basket')
+    expect(response.state.players[0]!.resources).toMatchObject({ wood: 0, reed: 0, stone: 0 })
+  })
+
+  it('B027 S5: after building fences Toolbox can buy Pottery at normal cost', () => {
+    const session = setup({ resources: { wood: 4, clay: 2, stone: 2 } })
+    const response = buyToolboxMajor(session, advanceFencing(session), 'Major_Pottery')
+
+    expect(response.ok, response.error).toBe(true)
+    expect(response.state.players[0]!.fenceSegments).toHaveLength(4)
+    expect(response.state.players[0]!.improvements).toContain('Major_Pottery')
+    expect(response.state.players[0]!.resources).toMatchObject({ wood: 0, clay: 0, stone: 0 })
+  })
+
+  it('B027 S7: after building with no affordable listed major Toolbox skips an empty prompt', () => {
+    const session = setup({ resources: { wood: 5, reed: 2 } })
+    const response = buildWithFarmExpansion(session, { room: true })
+
+    expect(response.ok, response.error).toBe(true)
+    expect(response.state.players[0]!.roomTiles).toHaveLength(3)
+    expect(response.interaction.stateId === 'wait'
+      && response.interaction.sourceCard === CARD_ID).toBe(false)
+  })
+
+  it('B027 S8: the Toolbox purchase window contains only Joinery, Pottery, and Basketmaker Workshop', () => {
+    const session = setup({
+      resources: { wood: 7, clay: 2, reed: 4, stone: 2 },
+    })
+    const response = enterToolboxMajors(session, buildWithFarmExpansion(session, { room: true }))
+
+    expect(new Set(options(response).map((option) => option.value)))
+      .toEqual(new Set(TOOLBOX_MAJORS))
+    expect(options(response).map((option) => option.value)).not.toContain('Major_Well')
   })
 })

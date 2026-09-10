@@ -1,3 +1,8 @@
+import { type SessionResponse } from '../game/authoritative-session'
+import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
+import '../../shared/cards/A/A125_Priest'
+import '../../shared/cards/B/B099_Tutor'
+
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { setWorkersAtHome } from '../../shared/domain/player'
@@ -199,5 +204,102 @@ describe('B049_Scales session', () => {
       cardType: 'occupation',
       sourceActionId: 'occupation',
     }))
+  })
+})
+
+describe('B049 Scales parity', () => {
+  const CARD_ID = 'B049_Scales'
+
+  const BUCKSAW_ID = 'A037_Bucksaw'
+
+  const PRIEST_ID = 'A125_Priest'
+
+  const PLACEHOLDER = '__test_placeholder__'
+
+  const setup = ({
+    played = true, occupations = 0, wood = played ? 0 : 1, stone = 0, food = 0,
+  }: {
+    played?: boolean
+    occupations?: number
+    wood?: number
+    stone?: number
+    food?: number
+  } = {}) => {
+    const session = new GameSession(6049, undefined, { playerCount: 2 })
+    stabilizeRandomHands(session.state.players)
+    const state = session.getState().state
+    state.currentPlayerIndex = 0
+    state.round = 14
+    state.roundPhase = 'work'
+    state.availableMajorImprovements = ['Major_Joinery']
+    state.players.forEach((player, index) => {
+      setWorkersAtHome(state, player, index === 0 ? 2 : 0)
+      player.minorHand = [PLACEHOLDER]
+      player.occupationHand = [PLACEHOLDER]
+      player.minorPlayed = []
+      player.occupationPlayed = []
+      player.improvements = []
+      player.resources = {
+        ...player.resources,
+        wood: 0, clay: 0, reed: 0, stone: 0, food: 0, grain: 0, vegetable: 0,
+        sheep: 0, boar: 0, cattle: 0, begging: 0,
+      }
+    })
+    const owner = state.players[0]!
+    owner.minorHand = played ? [PLACEHOLDER] : [CARD_ID]
+    owner.minorPlayed = played ? [CARD_ID] : []
+    owner.occupationPlayed = ['B099_Tutor', PRIEST_ID].slice(0, occupations)
+    owner.resources = { ...owner.resources, wood, stone, food }
+    session.loadState(state)
+    return session
+  }
+
+  const options = (response: SessionResponse) => response.interaction.stateId === 'wait'
+    ? response.interaction.request.options ?? []
+    : []
+
+  const playMinor = (session: GameSession, cardId: string) => {
+    let response = session.takeAction(0, 'meeting-place')
+    if (response.interaction.stateId !== 'wait') return response
+    if (!options(response).some((option) => option.value === cardId)) {
+      const improvement = options(response).find((option) =>
+        option.value.startsWith('action-improvement-'))
+      if (!improvement) return response
+      response = session.resolveChoice(response.interaction.playerIndex, improvement.value)
+    }
+    if (response.interaction.stateId !== 'wait') return response
+    const card = options(response).find((option) => option.value === cardId)
+    if (!card) return response
+    response = session.resolveChoice(response.interaction.playerIndex, card.value)
+    return resolveTriggerIfPresent(session, response, CARD_ID)
+  }
+
+  it('B049 S1: with no occupation paying one wood plays Scales without rewarding its own play', () => {
+    const response = playMinor(setup({ played: false }), CARD_ID)
+
+    expect(response.ok, response.error).toBe(true)
+    expect(response.state.players[0]!.minorPlayed).toContain(CARD_ID)
+    expect(response.state.players[0]!.resources).toMatchObject({ wood: 0, food: 0 })
+  })
+
+  it('B049 S2: an occupation keeps Scales unavailable without spending its wood', () => {
+    const response = playMinor(setup({ played: false, occupations: 1 }), CARD_ID)
+
+    expect(response.state.players[0]!.minorHand).toContain(CARD_ID)
+    expect(response.state.players[0]!.minorPlayed).not.toContain(CARD_ID)
+    expect(response.state.players[0]!.resources).toMatchObject({ wood: 1, food: 0 })
+  })
+
+  it('B049 S6: a normal improvement grants no food while the card counts remain unequal', () => {
+    const session = setup({ wood: 1 })
+    const state = session.getState().state
+    state.players[0]!.minorHand = [BUCKSAW_ID]
+    session.loadState(state)
+
+    const response = playMinor(session, BUCKSAW_ID)
+
+    expect(response.ok, response.error).toBe(true)
+    expect(response.state.players[0]!.minorPlayed).toContain(BUCKSAW_ID)
+    expect(response.state.players[0]!.resources.food).toBe(0)
   })
 })

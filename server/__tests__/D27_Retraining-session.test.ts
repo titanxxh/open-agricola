@@ -1,3 +1,6 @@
+import { type SessionResponse } from '../game/authoritative-session'
+import { resolveTriggerIfPresent } from './_helpers/trigger-select'
+
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
@@ -272,5 +275,155 @@ describe('D027_Retraining listeners', () => {
     expect(accepted.state.players[0]!.improvements).not.toContain('Major_Joinery')
     expect(accepted.state.availableMajorImprovements).toContain('Major_Joinery')
     expect(accepted.state.availableMajorImprovements).not.toContain('Major_Pottery')
+  })
+})
+
+describe('D027 Retraining parity', () => {
+  const CARD_ID = 'D027_Retraining'
+
+  const FILLER = '__test_placeholder__'
+
+  const options = (response: SessionResponse) => response.interaction.stateId === 'wait'
+    ? response.interaction.request.options ?? []
+    : []
+
+  const setup = ({
+    played = true, occupations = 1, major, targetOwner = -1,
+  }: {
+    played?: boolean
+    occupations?: number
+    major?: 'Major_Joinery' | 'Major_Pottery'
+    targetOwner?: number
+  } = {}) => {
+    const session = new GameSession(6027, undefined, { playerCount: 2 })
+    const state = session.getState().state
+    stabilizeRandomHands(state.players)
+    state.currentPlayerIndex = 0
+    state.round = 14
+    state.roundPhase = 'work'
+    state.actionSpaces.forEach((space) => {
+      space.takenBy = []
+      if (space.id === 'house-redevelopment') space.roundAvailable = 1
+    })
+    state.players.forEach((player, index) => {
+      setWorkersAtHome(state, player, index === 0 ? 2 : 0)
+      player.minorHand = [FILLER]
+      player.occupationHand = [FILLER]
+      player.minorPlayed = []
+      player.occupationPlayed = []
+      player.improvements = []
+      player.cardStates = {}
+      player.houseType = 'wood'
+      player.rooms = 2
+      player.resources = {
+        ...player.resources,
+        wood: 0, clay: 0, reed: 0, stone: 0, food: 0, grain: 0, vegetable: 0,
+        sheep: 0, boar: 0, cattle: 0, begging: 0,
+      }
+    })
+    const owner = state.players[0]!
+    owner.minorHand = played ? [FILLER] : [CARD_ID]
+    owner.minorPlayed = played ? [CARD_ID] : []
+    owner.occupationPlayed = occupations > 0 ? ['A100_Curator'] : []
+    owner.resources = { ...owner.resources, food: played ? 0 : 1, clay: 2, reed: 1 }
+    if (major) {
+      owner.improvements.push(major)
+      state.availableMajorImprovements = state.availableMajorImprovements.filter(
+        (cardId) => cardId !== major,
+      )
+    }
+    if (targetOwner >= 0) {
+      const target = major === 'Major_Pottery' ? 'Major_Basket' : 'Major_Pottery'
+      state.players[targetOwner]!.improvements.push(target)
+      state.availableMajorImprovements = state.availableMajorImprovements.filter(
+        (cardId) => cardId !== target,
+      )
+    }
+    session.loadState(state)
+    return session
+  }
+
+  const playMinor = (session: GameSession) => {
+    let response = session.takeAction(0, 'meeting-place')
+    for (let guard = 0; guard < 8 && response.state.players[0]!.minorHand.includes(CARD_ID); guard += 1) {
+      if (response.interaction.stateId !== 'wait') break
+      const card = options(response).find((option) =>
+        option.value === CARD_ID || option.value === `minor:${CARD_ID}`)
+      const branch = options(response).find((option) => option.value.startsWith('action-improvement-'))
+      const next = card ?? branch
+      if (!next) break
+      response = session.resolveChoice(response.interaction.playerIndex, next.value)
+      if (response.interaction.stateId === 'wait'
+        && response.interaction.promptKey === 'prompt.selectPayment') {
+        const payment = options(response).find((option) => option.value !== 'cancel')
+        expect(payment).toBeDefined()
+        response = session.resolveChoice(response.interaction.playerIndex, payment!.value)
+      }
+    }
+    return response
+  }
+
+  const renovate = (session: GameSession) => {
+    let response = session.takeAction(0, 'house-redevelopment')
+    for (let guard = 0; guard < 10 && response.interaction.stateId === 'wait'; guard += 1) {
+      if (response.interaction.promptKey === 'ui.interactionChooseRenovationTarget') {
+        response = session.resolveChoice(response.interaction.playerIndex, 'clay')
+        continue
+      }
+      if (response.interaction.promptKey === 'prompt.selectPayment') {
+        const payment = options(response).find((option) => option.value !== 'cancel')
+        expect(payment).toBeDefined()
+        response = session.resolveChoice(response.interaction.playerIndex, payment!.value)
+        continue
+      }
+      if (response.interaction.request.kind === 'select-trigger'
+        && options(response).some((option) =>
+          option.value === CARD_ID || option.sourceCard === CARD_ID)) {
+        response = resolveTriggerIfPresent(session, response, CARD_ID)
+        continue
+      }
+      break
+    }
+    return response
+  }
+
+  it('D027 S1: one occupation and one food allow Retraining to be played', () => {
+    const response = playMinor(setup({ played: false }))
+
+    expect(response.ok, response.error).toBe(true)
+    expect(response.state.players[0]!.minorPlayed).toContain(CARD_ID)
+    expect(response.state.players[0]!.resources.food).toBe(0)
+  })
+
+  it('D027 S2: without an occupation Retraining remains unavailable', () => {
+    const response = playMinor(setup({ played: false, occupations: 0 }))
+
+    expect(response.state.players[0]!.minorHand).toContain(CARD_ID)
+    expect(response.state.players[0]!.minorPlayed).not.toContain(CARD_ID)
+    expect(response.state.players[0]!.resources.food).toBe(1)
+  })
+
+  it('D027 S5: renovating exchanges Pottery for the available Basketmaker', () => {
+    const session = setup({ major: 'Major_Pottery' })
+    let response = renovate(session)
+    expect(options(response).map((option) => option.value)).toContain('__skip__')
+    const accept = options(response).find((option) => option.value !== '__skip__')
+    expect(accept).toBeDefined()
+    response = session.resolveChoice(response.interaction.playerIndex, accept!.value)
+
+    expect(response.ok, response.error).toBe(true)
+    expect(response.state.players[0]!.improvements).toContain('Major_Basket')
+    expect(response.state.players[0]!.improvements).not.toContain('Major_Pottery')
+    expect(response.state.availableMajorImprovements).toContain('Major_Pottery')
+  })
+
+  it('D027 S6: no exchange is offered when the target major is unavailable', () => {
+    const response = renovate(setup({ major: 'Major_Joinery', targetOwner: 1 }))
+
+    expect(response.ok, response.error).toBe(true)
+    expect(response.state.players[0]!.houseType).toBe('clay')
+    expect(response.state.players[0]!.improvements).toContain('Major_Joinery')
+    expect(response.state.players[1]!.improvements).toContain('Major_Pottery')
+    expect(JSON.stringify(response.interaction)).not.toContain(CARD_ID)
   })
 })

@@ -1,3 +1,8 @@
+import { type SessionResponse } from '../game/authoritative-session'
+import { setWorkersAtHome } from '../../shared/domain/player'
+import { getFarmyardTilePositions } from '../../shared/domain/farm'
+import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
+
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { computeScores , ScoreEntry } from '../../shared/domain/scoring'
@@ -297,5 +302,122 @@ describe('B38 FutureBuildingSite — session', () => {
       const player = state.players[0]!
       expect(meetsCardPrerequisites(player, B038_FutureBuildingSite, state.round, state)).toBe(true)
     })
+  })
+})
+
+describe('B038 Future Building Site parity', () => {
+  const CARD_ID = 'B038_FutureBuildingSite'
+
+  const PLACEHOLDER = '__test_placeholder__'
+
+  const LOCKED: FarmTilePosition[] = [
+    { row: 0, col: 0 },
+    { row: 1, col: 1 },
+    { row: 2, col: 1 },
+  ]
+
+  const setup = ({
+    played = true, round = 4, resources = {},
+  }: {
+    played?: boolean
+    round?: number
+    resources?: Partial<{ wood: number; clay: number; reed: number; stone: number; food: number }>
+  } = {}) => {
+    const session = new GameSession(6038, undefined, { playerCount: 3 })
+    stabilizeRandomHands(session.state.players)
+    const state = session.getState().state
+    state.currentPlayerIndex = 0
+    state.round = round
+    state.roundPhase = 'work'
+    state.availableMajorImprovements = []
+    state.players.forEach((player, index) => {
+      setWorkersAtHome(state, player, index === 0 ? 2 : 0)
+      player.minorHand = [PLACEHOLDER]
+      player.occupationHand = [PLACEHOLDER]
+      player.minorPlayed = []
+      player.occupationPlayed = []
+      player.improvements = []
+      player.fields = []
+      player.pastures = []
+      player.stableTiles = []
+      player.fenceSegments = []
+      player.resources = {
+        ...player.resources,
+        wood: 0, clay: 0, reed: 0, stone: 0, food: 0, grain: 0, vegetable: 0,
+        sheep: 0, boar: 0, cattle: 0, begging: 0,
+      }
+    })
+    const owner = state.players[0]!
+    owner.minorHand = played ? [PLACEHOLDER] : [CARD_ID]
+    owner.minorPlayed = played ? [CARD_ID] : []
+    owner.resources = { ...owner.resources, ...resources }
+    if (played) {
+      owner.cardStates = {
+        ...owner.cardStates,
+        [CARD_ID]: { extraData: { locked: LOCKED } },
+      }
+    }
+    session.loadState(state)
+    return session
+  }
+
+  const options = (response: SessionResponse) => response.interaction.stateId === 'wait'
+    ? response.interaction.request.options ?? []
+    : []
+
+  const playMinor = (session: GameSession) => {
+    let response = session.takeAction(0, 'meeting-place')
+    if (response.interaction.stateId !== 'wait') return response
+    if (!options(response).some((option) => option.value === CARD_ID)) {
+      const improvement = options(response).find((option) =>
+        option.value.startsWith('action-improvement-'))
+      if (!improvement) return response
+      response = session.resolveChoice(response.interaction.playerIndex, improvement.value)
+    }
+    if (response.interaction.stateId !== 'wait') return response
+    const card = options(response).find((option) => option.value === CARD_ID)
+    if (!card) return response
+    return session.resolveChoice(response.interaction.playerIndex, card.value)
+  }
+
+  const storedLocked = (response: SessionResponse): FarmTilePosition[] =>
+    response.state.players[0]!.cardStates?.[CARD_ID]?.extraData?.locked as FarmTilePosition[] ?? []
+
+  const cardScore = (response: SessionResponse) => {
+    const player = response.state.players[0]!
+    const summary = computeScores(response.state).find((entry) => entry.playerId === player.id)!
+    const cards = summary.categories.find((category) => category.key === 'cards')!
+    return cards.entries.find((entry) => 'cardId' in entry && entry.cardId === CARD_ID)?.score ?? 0
+  }
+
+  it('B038 S1: round four plays Future Building Site, locks adjacent empty spaces, and scores three points', () => {
+    const response = playMinor(setup({ played: false }))
+
+    expect(response.ok, response.error).toBe(true)
+    expect(response.state.players[0]!.minorPlayed).toContain(CARD_ID)
+    expect(new Set(storedLocked(response).map(positionKey))).toEqual(new Set(LOCKED.map(positionKey)))
+    expect(cardScore(response)).toBe(3)
+  })
+
+  it('B038 S8: after every non-locked farm space is used, a formerly locked space can be plowed', () => {
+    const session = setup()
+    const state = session.getState().state
+    const owner = state.players[0]!
+    const roomKeys = new Set(owner.roomTiles.map(positionKey))
+    const lockedKeys = new Set(LOCKED.map(positionKey))
+    owner.fields = getFarmyardTilePositions(owner)
+      .filter((tile) => !roomKeys.has(positionKey(tile)) && !lockedKeys.has(positionKey(tile)))
+      .map((tile) => ({ ...tile, stacks: [] }))
+    session.loadState(state)
+
+    let response = session.takeAction(0, 'farmland')
+    expect(response.interaction.stateId).toBe('wait')
+    if (response.interaction.stateId !== 'wait') return
+    expect(response.interaction.request.farm.selectableTiles.map(positionKey))
+      .toContain(positionKey(LOCKED[0]!))
+    response = session.commitSelectionChoice(0, { tile: LOCKED[0]! })
+
+    expect(response.ok, response.error).toBe(true)
+    expect(response.state.players[0]!.fields).toContainEqual(expect.objectContaining(LOCKED[0]!))
   })
 })
