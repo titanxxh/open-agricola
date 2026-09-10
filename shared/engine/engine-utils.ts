@@ -886,7 +886,7 @@ export function resolveTrueAction(actionContext?: Record<string, unknown>) {
 }
 
 export function buildListenerEvent(
-  executionContext: Pick<ActionExecutionContext, 'sourceCard' | 'actionContext'>,
+  executionContext: Pick<ActionExecutionContext, 'sourceCard' | 'actionContext' | 'params'>,
   extraEvent: Record<string, unknown> = {},
 ) {
   const actionContext = executionContext.actionContext
@@ -897,6 +897,7 @@ export function buildListenerEvent(
     sourceCard: executionContext.sourceCard,
     ...(executionContext.actionContext ?? {}),
     ...(actionContext ? { actionContext } : {}),
+    ...(executionContext.params ? { params: { ...executionContext.params } } : {}),
     trueAction: resolveTrueAction(executionContext.actionContext),
   }
 }

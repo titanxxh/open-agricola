@@ -632,6 +632,7 @@ export class Engine {
     const flowNodes = flows.map((flow) => ownerPlayerId
       ? buildOwnedFlowNode(internals, flow, ownerPlayerId)
       : buildFlowNode(internals, flow))
+    if (!ctx) flowNodes.forEach(enforceCompositeContinuationMandatory)
     const nextUnresolved = this.tree.nextUnresolved()
     if (ctx && nextUnresolved) {
       enforceCompositeContinuationMandatory(nextUnresolved)
