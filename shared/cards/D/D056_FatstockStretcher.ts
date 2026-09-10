@@ -1,51 +1,23 @@
 import { defineMinorCard } from '../card-source'
 import type { CardListenerRegistration } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
-import { readCardExtraData } from '../helpers/card-state'
+import { createEventQuery } from '../../events/query'
+import { getCardDefinitionById } from '../helpers/card-type'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
 
 const CARD_ID = 'D056_FatstockStretcher'
-const beforeExchangeListener: CardListenerRegistration = {
-  id: 'D56-fatstock-stretcher-before-exchange',
-  cardIds: [CARD_ID],
-  phases: ['before' as ActionHookPhase],
-  actions: ['exchange'],
-  handler: (context): ActionHookResult | void => {
-    return {
-      flow: {
-        type: 'seq',
-        children: [
-          {
-            type: 'leaf',
-            actionId: 'special-effect',
-            sourceCard: CARD_ID,
-            params: { kind: 'set-extra-data', key: 'sheepBefore', value: context.player.resources.sheep },
-          },
-          {
-            type: 'leaf',
-            actionId: 'special-effect',
-            sourceCard: CARD_ID,
-            params: { kind: 'set-extra-data', key: 'boarBefore', value: context.player.resources.boar },
-          },
-        ],
-      },
-      sourceCard: CARD_ID,
-    }
-  },
-}
-
 const afterExchangeListener: CardListenerRegistration = {
   id: 'D56-fatstock-stretcher-after-exchange',
   cardIds: [CARD_ID],
   phases: ['after' as ActionHookPhase],
   actions: ['exchange'],
   handler: (context): ActionHookResult | void => {
-    const sheepBefore = readCardExtraData<number>(context.player, CARD_ID, 'sheepBefore') ?? 0
-    const boarBefore = readCardExtraData<number>(context.player, CARD_ID, 'boarBefore') ?? 0
-    const sheepLost = sheepBefore - context.player.resources.sheep
-    const boarLost = boarBefore - context.player.resources.boar
-    const bonus = Math.max(0, sheepLost) + Math.max(0, boarLost)
+    const bonus = createEventQuery(context.actionEvents ?? context.transactionEvents)
+      .filter('resource.exchanged', (event) =>
+        event.paidFrom.kind === 'player' && event.paidFrom.playerId === context.player.id &&
+        (event.gained.food ?? 0) > 0 && !!getCardDefinitionById(event.exchangeSource ?? '')?.isCookery,
+      ).reduce((sum, event) => sum + (event.paid.sheep ?? 0) + (event.paid.boar ?? 0), 0)
     if (bonus <= 0) return
     return {
       flow: gainLeaf(CARD_ID, { food: bonus }),
@@ -55,7 +27,7 @@ const afterExchangeListener: CardListenerRegistration = {
 }
 
 const cardImpl = {
-  listeners: [beforeExchangeListener, afterExchangeListener],
+  listeners: [afterExchangeListener],
   reaches: [] as readonly string[],
 } satisfies CardImpl
 

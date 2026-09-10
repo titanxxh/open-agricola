@@ -47,6 +47,7 @@ const afterGainListener: CardListenerRegistration = {
 }
 
 const cardImpl = {
+  prerequisiteCheck: (player) => player.pastures.some((pasture) => pasture.stables > 0),
   listeners: [afterCollectListener, afterGainListener],
   effect: {
     id: CARD_ID,

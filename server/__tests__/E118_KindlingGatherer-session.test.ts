@@ -114,7 +114,7 @@ describe('E118_KindlingGatherer action-space provenance', () => {
       expect.objectContaining({
         type: 'resource.moved',
         resources: expect.objectContaining({ food: 2 }),
-        from: expect.objectContaining({ kind: 'supply' }),
+        from: expect.objectContaining({ kind: 'actionSpace', spaceId: 'day-laborer' }),
         to: expect.objectContaining({ kind: 'player', playerId: player.id }),
         reason: 'gain',
       }),

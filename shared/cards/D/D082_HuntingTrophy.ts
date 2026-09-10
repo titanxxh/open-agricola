@@ -1,6 +1,9 @@
 import { defineMinorCard } from '../card-source'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
+import { getExchangesInWindow } from '../../actions/effects/exchange'
+import { getCardDefinitionById } from '../helpers/card-type'
+import { payLeaf } from '../helpers/pay-gain-node'
 import type { Bonus, Trade } from '../../contract/types'
 import { canStartFencing } from '../../actions/effects/fencing'
 import type { CardImpl } from '../registry'
@@ -10,26 +13,11 @@ const FARM_REDEV = 'farm-redevelopment'
 
 const HOUSE_REDEV = 'house-redevelopment'
 
-/**
- * D82 Hunting Trophy (MinorImprovement)
- *
- * The reference behavior:
- *   1. Improvements built on HouseRedevelopment cost 1 building resource of
- *      player's choice less. Gated by `actionCardId == 'ActionHouseRedevelopment'`.
- *   2. Fences built on FarmRedevelopment cost a total of 3 wood less.
- *
- * Implementation:
- *   - Effect 1: `computeCosts` on house-redevelopment's improvement leaf emits
- *     a Bonus with 4 chooseOne entries (one per building resource).
- *   - Effect 2: `computeCosts` on farm-redevelopment's fence leaf discounts
- *     3 wood; `isDoable` mirrors that discount for the fence entry guard.
- */
-
 const isFarmRedev = (context: CardListenerContext): boolean =>
-  context.space?.id === FARM_REDEV
+  (context.actionCardId ?? context.space?.id) === FARM_REDEV
 
 const isHouseRedev = (context: CardListenerContext): boolean =>
-  context.space?.id === HOUSE_REDEV
+  (context.actionCardId ?? context.space?.id) === HOUSE_REDEV
 
 const farmRedevFenceCostListener: CardListenerRegistration = {
   id: 'D82-hunting-trophy-farm-redevelopment-fence-compute-costs',
@@ -85,6 +73,26 @@ const improvementCostListener: CardListenerRegistration = {
 }
 
 const cardImpl = {
+  prerequisiteCheck: (player) => player.resources.boar >= 1,
+  effect: {
+    id: CARD_ID,
+    onBuy: (state, player) => ({
+      type: 'xor',
+      children: [
+        { ...payLeaf({ cardId: CARD_ID, cost: { boar: 1 } }), optionId: 'return-boar', choiceLabelKey: 'ui.interactionHuntingTrophyReturn' },
+        ...getExchangesInWindow(player, 'anytime', state).filter((trade) =>
+          trade.from.boar === 1 && Object.keys(trade.from).length === 1 && (trade.to.food ?? 0) > 0 &&
+          getCardDefinitionById(trade.sourceId ?? '')?.isCookery,
+        ).map((trade) => ({
+          type: 'leaf' as const, actionId: 'exchange', sourceCard: CARD_ID,
+          optionId: `cook:${trade.sourceId}`,
+          choiceLabelKey: 'ui.interactionResourceExchange',
+          choiceLabelParams: { resourcesPaid: trade.from, resourcesGained: trade.to },
+          actionContext: { directTrade: trade },
+        })),
+      ],
+    }),
+  },
   listeners: [
     farmRedevFenceCostListener,
     farmRedevFenceIsDoableListener,
@@ -101,6 +109,7 @@ export const D082_HuntingTrophy = defineMinorCard({
     number: 82,
     category: 'BUILDING_RESOURCE_PROVIDER',
     desc: [
+        'To play this card, you must return or cook 1 <PIG>.',
         'Improvements built on __House Redevelopment__ cost you 1 building resource of your choice less. <FENCE> built on __Farm Redevelopment__ cost you a total of 3 <WOOD> less.',
       ],
     vp: 1,

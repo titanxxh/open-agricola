@@ -18,7 +18,7 @@ const listener: CardListenerRegistration = {
     const builtId = choice.replace(/^major:/, '').replace(/^minor:/, '')
     if (!builtId) return
     const allCosts = getPrintedImprovementCostCandidates(context.state, context.player, builtId).filter(
-      (cost) => Object.keys(cost).length > 0,
+      (cost) => Object.keys(cost).length > 0 && !('stable' in cost) && !('fence' in cost),
     )
     if (allCosts.length === 0) return
     const gainChildren = allCosts.map((cost) => gainLeaf(CARD_ID, cost))

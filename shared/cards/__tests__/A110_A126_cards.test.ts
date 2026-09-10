@@ -96,7 +96,7 @@ describe('A110_Roughcaster', () => {
     expect(result).toBeUndefined()
   })
 
-  it('gains 3 food after renovate with stone house', () => {
+  it('gains 3 food after clay-to-stone renovation', () => {
     const listener = findListener('A110-roughcaster-after-renovate')
     expect(listener).toBeDefined()
     const player = createPlayer()
@@ -105,6 +105,7 @@ describe('A110_Roughcaster', () => {
     const result = executeCardListener(listener!, {
       state: createState(player), player, space: createSpace('renovate-house'),
       actionId: 'renovate-house', phase: 'after',
+      actionEvents: [{ type: 'farm.renovated', playerId: player.id, from: 'clay', to: 'stone', rooms: 2 }],
     } as unknown as CardListenerContext)
     expect(result?.flow?.type).toBe('leaf')
     if (result?.flow?.type === 'leaf') {

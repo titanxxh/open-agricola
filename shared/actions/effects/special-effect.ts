@@ -343,7 +343,7 @@ export const specialEffectAction: ActionDefinition = {
         })
         return { type: 'ok' }
       case 'add-farmyard-space-state':
-        addFarmyardSpaceState(target, p.state)
+        addFarmyardSpaceState(target, p.state, eventSink)
         return { type: 'ok' }
       case 'claim-farmyard-goods-tokens': {
         const gained = claimFarmyardGoodsTokens(target, sourceCard)

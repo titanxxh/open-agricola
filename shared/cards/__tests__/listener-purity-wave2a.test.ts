@@ -844,7 +844,7 @@ describe('listener purity wave 2a', () => {
     ])
   })
 
-  it('E51 WhaleOil occupation listener returns reset leaves before gain without mutating cardStates', () => {
+  it('E51 WhaleOil occupation listener returns gain while preserving stored food', () => {
     const p = player(E51, {
       cardStates: { [E51]: { extraData: { foodCount: 1 }, infobox: '1 Food' } },
     })
@@ -861,19 +861,7 @@ describe('listener purity wave 2a', () => {
     ).handler(ctx)
 
     expectCardStatesUnchanged(p, before, 'E51 owner')
-    expectSeqLeaves(result?.flow, [
-      {
-        actionId: 'special-effect',
-        sourceCard: E51,
-        params: { kind: 'set-extra-data', key: 'foodCount', value: 0 },
-      },
-      {
-        actionId: 'special-effect',
-        sourceCard: E51,
-        params: { kind: 'set-infobox', text: '0 Food' },
-      },
-      { actionId: 'gain', sourceCard: E51, params: { food: 1 } },
-    ])
+    expect(result?.flow).toMatchObject({ actionId: 'gain', sourceCard: E51, params: { food: 1 } })
   })
 
   it('E91 PlowBuilder trade-applied listener returns usedJoinery leaf without mutating cardStates', () => {

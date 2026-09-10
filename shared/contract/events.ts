@@ -147,6 +147,7 @@ export type FarmFenceConsumedEvent = GameEventBase<'farm.fenceConsumed'> & {
 }
 
 export type FarmAnimalMovedEvent = GameEventBase<'farm.animalMoved'> & {
+  newlyPlacedOnFarmyard?: Partial<Pick<Resource, AnimalKey>>
   animals: Partial<Pick<Resource, AnimalKey>>
   from?: ResourceLocation
   to?: ResourceLocation

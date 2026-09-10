@@ -52,13 +52,7 @@ const occupationListener: CardListenerRegistration = {
     const foodCount = readCardExtraData<number>(context.player, CARD_ID, 'foodCount') ?? 0
     if (foodCount <= 0) return
     return {
-      flow: {
-        type: 'seq',
-        children: [
-          ...setStoredFoodFlow(0),
-          gainLeaf(CARD_ID, { food: foodCount }),
-        ],
-      },
+      flow: gainLeaf(CARD_ID, { food: foodCount }),
       sourceCard: CARD_ID,
     }
   },

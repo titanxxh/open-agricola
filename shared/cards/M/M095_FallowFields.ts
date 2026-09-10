@@ -94,7 +94,7 @@ const eventPositions = (context: CardListenerContext): FarmTilePosition[] => {
   )
 }
 
-registerSelectionEffect(SELECTION_EFFECT, ({ player, positions }) => {
+registerSelectionEffect(SELECTION_EFFECT, ({ player, positions, eventSink }) => {
   const fields = new Set(
     getLogicalFields(player)
       .filter((field) => field.stacks.length === 0)
@@ -108,7 +108,7 @@ registerSelectionEffect(SELECTION_EFFECT, ({ player, positions }) => {
       kind: 'field-goods-token',
       resources: { food: 2 },
       claimPolicy: 'when-sowed',
-    })
+    }, eventSink)
   }
 })
 

@@ -1,7 +1,6 @@
 import { defineMinorCard } from '../card-source'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
-import { readImprovementTypes } from '../../actions/effects/improvement'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import { getPrintedImprovementResourceCost } from '../../actions/helpers/improvement-helpers'
 import type { CardImpl } from '../registry'
@@ -13,7 +12,6 @@ const listener: CardListenerRegistration = {
   phases: ['after' as ActionHookPhase],
   actions: ['improvement'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
-    if (!readImprovementTypes(context).includes('major')) return
     const choice = context.choice ?? ''
     const builtId = choice.replace(/^major:/, '').replace(/^minor:/, '')
     if (!builtId) return

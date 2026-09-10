@@ -65,7 +65,7 @@ describe('D026_CarpentersYard', () => {
       space: createSpace('major-improvement'),
       actionId: 'improvement',
       phase: 'immediatelyAfter',
-      cardId: 'Major_Well',
+      choice: 'Major_Well',
       trueAction: true,
     })
     expect(result).toBeDefined()
@@ -86,7 +86,7 @@ describe('D026_CarpentersYard', () => {
       space: createSpace('major-improvement'),
       actionId: 'improvement',
       phase: 'immediatelyAfter',
-      cardId: 'Major_Joinery',
+      choice: 'Major_Joinery',
       trueAction: true,
     })
     expect(result).toBeDefined()
@@ -104,7 +104,7 @@ describe('D026_CarpentersYard', () => {
       space: createSpace('major-improvement'),
       actionId: 'improvement',
       phase: 'immediatelyAfter',
-      cardId: 'Major_ClayOven',
+      choice: 'Major_ClayOven',
       trueAction: true,
     })
     expect(result).toBeUndefined()
@@ -121,7 +121,7 @@ describe('D026_CarpentersYard', () => {
       space: createSpace('major-improvement'),
       actionId: 'improvement',
       phase: 'immediatelyAfter',
-      cardId: 'Major_Well',
+      choice: 'Major_Well',
       trueAction: true,
     })
     expect(result).toBeUndefined()
@@ -137,7 +137,7 @@ describe('D026_CarpentersYard', () => {
       space: createSpace('major-improvement'),
       actionId: 'improvement',
       phase: 'immediatelyAfter',
-      cardId: 'Major_Well',
+      choice: 'Major_Well',
       trueAction: false,
     })
     expect(result).toBeUndefined()

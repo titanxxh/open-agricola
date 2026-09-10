@@ -1,74 +1,48 @@
 import { defineOccupationCard } from '../card-source'
 import type { CardListenerRegistration } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
-import { readCardExtraData, getCardStack } from '../helpers/card-state'
+import { getCardStack } from '../helpers/card-state'
 import { payLeaf } from '../helpers/pay-gain-node'
-import type { ActionFlow } from '../../contract/types'
+import { createEventQuery } from '../../events/query'
 import type { CardImpl } from '../registry'
 
 const CARD_ID = 'E085_MasterTanner'
-const beforeExchangeListener: CardListenerRegistration = {
-  id: 'E85-master-tanner-before-exchange',
-  cardIds: [CARD_ID],
-  phases: ['before' as ActionHookPhase],
-  actions: ['exchange'],
-  handler: (context): ActionHookResult | void => {
-    return {
-      flow: {
-        type: 'seq',
-        children: [
-          {
-            type: 'leaf',
-            actionId: 'special-effect',
-            sourceCard: CARD_ID,
-            params: { kind: 'set-extra-data', key: 'boarBefore', value: context.player.resources.boar },
-          },
-          {
-            type: 'leaf',
-            actionId: 'special-effect',
-            sourceCard: CARD_ID,
-            params: { kind: 'set-extra-data', key: 'cattleBefore', value: context.player.resources.cattle },
-          },
-        ],
-      },
-      sourceCard: CARD_ID,
-    }
-  },
-}
-
 const afterExchangeListener: CardListenerRegistration = {
   id: 'E85-master-tanner-after-exchange',
   cardIds: [CARD_ID],
   phases: ['after' as ActionHookPhase],
   actions: ['exchange'],
   handler: (context): ActionHookResult | void => {
-    const boarBefore = readCardExtraData<number>(context.player, CARD_ID, 'boarBefore') ?? 0
-    const cattleBefore = readCardExtraData<number>(context.player, CARD_ID, 'cattleBefore') ?? 0
-    const boarLost = Math.max(0, boarBefore - context.player.resources.boar)
-    const cattleLost = Math.max(0, cattleBefore - context.player.resources.cattle)
-    const animalsCooked = boarLost + cattleLost
-    if (animalsCooked <= 0) return
-
-    // Auto-place food on card: pay 1 food + push 'food' to stack, per animal cooked.
-    // Only place as many as the player can afford (they should have food from cooking).
-    const toPlace = Math.min(animalsCooked, context.player.resources.food)
+    const toPlace = createEventQuery(context.actionEvents ?? context.transactionEvents)
+      .filter('resource.exchanged', (event) =>
+        event.paidFrom.kind === 'player' && event.paidFrom.playerId === context.player.id &&
+        event.gainedTo.kind === 'player' && event.gainedTo.playerId === context.player.id,
+      ).reduce((sum, event) => sum + Math.min(
+        (event.paid.boar ?? 0) + (event.paid.cattle ?? 0), event.gained.food ?? 0,
+      ), 0)
     if (toPlace <= 0) return
-
-    const children: ActionFlow[] = []
-    for (let i = 0; i < toPlace; i++) {
-      children.push(payLeaf({ cardId: CARD_ID, cost: { food: 1 } }))
-      children.push({ type: 'leaf', actionId: 'push-to-card-stack', sourceCard: CARD_ID, params: { item: 'food' } })
-    }
-
     return {
-      flow: { type: 'seq', children },
+      flow: {
+        type: 'xor', optional: true, promptKey: 'ui.interactionFlowSelect',
+        children: Array.from({ length: toPlace }, (_, index) => ({
+          type: 'seq',
+          choiceLabelKey: 'ui.interactionMasterTannerStoreCount',
+          choiceLabelParams: { count: index + 1 },
+          children: [
+            payLeaf({ cardId: CARD_ID, cost: { food: index + 1 } }),
+            ...Array.from({ length: index + 1 }, () => ({
+              type: 'leaf' as const, actionId: 'push-to-card-stack', sourceCard: CARD_ID, params: { item: 'food' },
+            })),
+          ],
+        })),
+      },
       sourceCard: CARD_ID,
     }
   },
 }
 
 const cardImpl = {
-  listeners: [beforeExchangeListener, afterExchangeListener],
+  listeners: [afterExchangeListener],
   effect: {
   id: CARD_ID,
   computeExtraRoomCapacity: (player) => {

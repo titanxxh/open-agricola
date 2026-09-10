@@ -1,5 +1,5 @@
 import { defineOccupationCard } from '../card-source'
-import { payLeaf } from '../helpers/pay-gain-node'
+import { findTravelingPlayersSpace } from '../helpers/action-space-categories'
 import type { CardImpl } from '../registry'
 
 const CARD_ID = 'E152_BargainHunter'
@@ -7,14 +7,16 @@ const CARD_ID = 'E152_BargainHunter'
 const cardImpl = {
   effect: {
   id: CARD_ID,
-  onRoundStart: (_state, player) => {
+  onRoundStart: (state, player) => {
+    const space = findTravelingPlayersSpace(state.actionSpaces)
+    if (!space) return
     if ((player.resources.food ?? 0) < 1) return
     if (player.minorHand.length === 0) return
     return {
       type: 'seq',
       optional: true,
       children: [
-        payLeaf({ cardId: CARD_ID, cost: { food: 1 } }),
+        { type: 'leaf', actionId: 'return-to-space', sourceCard: CARD_ID, params: { food: 1 }, actionContext: { targetSpaceId: space.id } },
         {
           type: 'leaf',
           actionId: 'improvement',

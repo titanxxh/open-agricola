@@ -37,7 +37,7 @@ const makePlayer = (id: string, resources: Partial<Resource> = {}): PlayerState 
 const callGain = (
   player: PlayerState,
   params: Record<string, unknown>,
-  state: GameState = { players: [player], workPhaseObtainedResources: {} } as unknown as GameState,
+  state: GameState = { players: [player], workPhaseObtainedResources: {}, actionSpaces: [] } as unknown as GameState,
   extra: Partial<{ sourceCard: string }> = {},
 ) => {
   const capturedEvents: DraftGameEvent[] = []
@@ -71,7 +71,7 @@ describe('bonus resource actions', () => {
         begging: 0,
       },
     } as unknown as PlayerState
-    const state = { players: [player], workPhaseObtainedResources: {} } as unknown as GameState
+    const state = { players: [player], workPhaseObtainedResources: {}, actionSpaces: [] } as unknown as GameState
     const result = bonusWoodAction.execute({
       state,
       player,
@@ -128,7 +128,7 @@ describe('bonus resource actions', () => {
   it('emits one resource.moved event per actual recipient', () => {
     const player = makePlayer('p1')
     const other = makePlayer('p2')
-    const state = { players: [player, other], workPhaseObtainedResources: {} } as unknown as GameState
+    const state = { players: [player, other], workPhaseObtainedResources: {}, actionSpaces: [] } as unknown as GameState
     const { result, capturedEvents } = callGain(player, { food: 1, recipientMode: 'others' }, state)
     expect(result.type).toBe('ok')
     expect(capturedEvents).toEqual([
@@ -142,11 +142,35 @@ describe('bonus resource actions', () => {
     ])
   })
 
+  it.each([3, 4])('checks the complete transfer to two recipients with %i food', (food) => {
+    const payer = makePlayer('p1', { food })
+    const recipients = [makePlayer('p2'), makePlayer('p3')]
+    const state = { players: [payer, ...recipients], workPhaseObtainedResources: {}, actionSpaces: [] } as unknown as GameState
+    const params = { food: 2, payerId: payer.id, recipientMode: 'others' }
+    expect(gainAction.canBeExecutedByPlayer(state, payer, { params })).toBe(food === 4)
+    const { result, capturedEvents } = callGain(payer, params, state)
+    expect(result.type).toBe(food === 4 ? 'ok' : 'fail')
+    expect(payer.resources.food).toBe(food === 4 ? 0 : 3)
+    expect(recipients.map((player) => player.resources.food)).toEqual(food === 4 ? [2, 2] : [0, 0])
+    expect(capturedEvents).toHaveLength(food === 4 ? 2 : 0)
+    if (result.type === 'ok') {
+      expect(result.extraData?.actionDetailDeltas).toEqual([{ playerId: payer.id, costs: { food: 4 } }])
+    }
+  })
+
+  it('rejects a missing payer without creating resources or events', () => {
+    const player = makePlayer('p1')
+    const { result, capturedEvents } = callGain(player, { food: 2, payerId: 'missing' })
+    expect(result.type).toBe('fail')
+    expect(player.resources.food).toBe(0)
+    expect(capturedEvents).toEqual([])
+  })
+
   it('payerId: emits resource.moved from payer to recipient when payer actually pays', () => {
     const actor = makePlayer('p1')
     const payer = makePlayer('payer', { food: 3 })
     const recipient = makePlayer('recipient')
-    const state = { players: [actor, payer, recipient], workPhaseObtainedResources: {} } as unknown as GameState
+    const state = { players: [actor, payer, recipient], workPhaseObtainedResources: {}, actionSpaces: [] } as unknown as GameState
     const { result, capturedEvents } = callGain(actor, {
       food: 2,
       payerId: 'payer',

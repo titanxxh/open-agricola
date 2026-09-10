@@ -104,9 +104,8 @@ describe('E051_WhaleOil session', () => {
     }
     const resp2 = session.resolveChoice(0, occupationOption.value)
 
-    // After playing the occupation, foodCount should be 0
     const updated = resp2.state.players[0]!
-    expect(readCardExtraData<number>(updated, CARD_ID, 'foodCount')).toBe(0)
+    expect(readCardExtraData<number>(updated, CARD_ID, 'foodCount')).toBe(3)
     // Player should have gained 3 food from card (5 + 3 = 8, minus occupation cost)
     // Occupation cost is 0 for first occupation, so food should be >= 8
     expect(updated.resources.food).toBeGreaterThanOrEqual(8)

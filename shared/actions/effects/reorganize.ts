@@ -447,6 +447,22 @@ export const reorganizeAction: ActionDefinition = {
     if (!zones) {
       return { type: 'fail', errorKey: 'log.reorganizeFail', recoverable: true }
     }
+    const newlyPlacedOnFarmyard: Partial<Record<AnimalKey, number>> = {}
+    const assignmentsById = new Map(zones.map((zone) => [zone.id, zone]))
+    for (const animal of animalKeysForState(ctx.state)) {
+      let farmyardAdded = 0
+      let movedExisting = 0
+      for (const zone of computedZones) {
+        const previous = readAnimalCountsForZoneAssignment(zone)[animal] ?? 0
+        const next = readAnimalCountsForZoneAssignment(assignmentsById.get(zone.id))[animal] ?? 0
+        movedExisting += Math.max(0, previous - next)
+        if (zone.zoneType !== 'card' || (zone.farmPosition && zone.ownerPlayerId === ctx.player.id)) {
+          farmyardAdded += Math.max(0, next - previous)
+        }
+      }
+      const added = Math.max(0, farmyardAdded - movedExisting)
+      if (added > 0) newlyPlacedOnFarmyard[animal] = added
+    }
     const before = animalTotals(ctx.state, ctx.player)
     const placement = syncHarvestBreedPlacement(ctx.state, ctx.player)
     applyReorganizeMutate(ctx.state, ctx.player, zones)
@@ -469,6 +485,7 @@ export const reorganizeAction: ActionDefinition = {
       ctx.eventSink?.emit<'farm.animalMoved'>({
         type: 'farm.animalMoved',
         animals: assigned,
+        newlyPlacedOnFarmyard,
       })
     }
     const discarded = discardedAnimals(ctx.state, before, after)

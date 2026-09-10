@@ -153,7 +153,7 @@ describe('B138_ForestGuardian session — opponent pays food on 5+ wood collect'
     expect(opponent.resources.food).toBe(opponentFoodBefore - 1)
   })
 
-  it('gain payerId clamps at 0 when opponent has insufficient food', () => {
+  it('gain payerId rejects an insufficient transfer without minting food', () => {
     const { state, owner, opponent } = setup()
     opponent.resources.food = 0
     const space = mkActionSpace({ id: 'forest' })
@@ -171,7 +171,7 @@ describe('B138_ForestGuardian session — opponent pays food on 5+ wood collect'
     })
 
     expect(opponent.resources.food).toBe(0)
-    expect(owner.resources.food).toBe(6) // owner still credited
+    expect(owner.resources.food).toBe(5)
   })
 
   it('logs opponent payment cost on the forest action detail', () => {

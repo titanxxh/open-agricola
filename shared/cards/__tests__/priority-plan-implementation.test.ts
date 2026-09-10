@@ -447,20 +447,11 @@ describe('priority plan implementations', () => {
   })
 
   it('C120 Agricultural Labourer stores 8 clay when played', () => {
-    const listener = findListener('C120-agricultural-labourer-after-play')
     const player = createPlayer()
     player.occupationPlayed = ['C120_AgriculturalLabourer']
+    const result = getCardEffect('C120_AgriculturalLabourer')?.onBuy?.(createState(player), player)
 
-    const result = executeCardListener(listener!, {
-      state: createState(player),
-      player,
-      space: createSpace('occupation'),
-      actionId: 'occupation',
-      phase: 'after',
-      choice: 'C120_AgriculturalLabourer',
-    } as unknown as CardListenerContext)
-
-    expect(result?.flow).toMatchObject({
+    expect(result).toMatchObject({
       type: 'leaf',
       actionId: 'store-on-card',
       params: { clay: 8 },

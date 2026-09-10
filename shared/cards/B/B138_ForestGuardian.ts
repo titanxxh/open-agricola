@@ -32,6 +32,7 @@ const collectListener: CardListenerRegistration = {
   actions: ['collect'],
   phases: ['before' as ActionHookPhase],
   scope: 'opponent',
+  mandatory: true,
   handler: (context: CardListenerContext): ActionHookResult | void => {
     const spaceId = context.space?.id
     if (!isWoodAccumulationSpaceId(spaceId)) return

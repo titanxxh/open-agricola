@@ -36,7 +36,7 @@ const eventKeysByType: Record<string, readonly string[]> = {
   'farm.stableBuilt': ['stables'],
   'farm.fenceBuilt': ['fences', 'newFenceEdges', 'newPastures'],
   'farm.fenceConsumed': ['count', 'reason'],
-  'farm.animalMoved': ['animals', 'from', 'to'],
+  'farm.animalMoved': ['animals', 'from', 'to', 'newlyPlacedOnFarmyard'],
   'farm.animalDiscarded': ['animals', 'reason'],
   'farm.animalBred': ['animals', 'source'],
   'worker.placed': ['workerId', 'spaceId', 'viaCardId'],
@@ -465,6 +465,7 @@ const assertKnownEventDetails = (type: string, event: Record<string, unknown>): 
       return
     case 'farm.animalMoved':
       assertResourceMap(event.animals, 'animals')
+      if (event.newlyPlacedOnFarmyard !== undefined) assertResourceMap(event.newlyPlacedOnFarmyard, 'newlyPlacedOnFarmyard')
       if (event.from !== undefined) assertResourceLocation(event.from, 'from')
       if (event.to !== undefined) assertResourceLocation(event.to, 'to')
       return

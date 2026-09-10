@@ -1,4 +1,4 @@
-import type { ActionDefinition, PlayerState, Resource } from '../../contract/types'
+import type { ActionDefinition, ActionSpace, GameState, PlayerState, Resource } from '../../contract/types'
 import type { EventSink, ResourceLocation } from '../../contract/events'
 import { addCardResourceGained } from '../../cards/helpers/card-state'
 import { gainConfigByActionId } from '../factories/gain'
@@ -61,76 +61,64 @@ const emitGainEvent = (
   })
 }
 
+const resolveGain = (
+  state: GameState,
+  player: PlayerState,
+  space?: ActionSpace,
+  params?: Record<string, unknown>,
+) => {
+  const { recipientPlayerId, recipientMode, payerId, ...rawGain } = (params ?? {}) as {
+    recipientPlayerId?: string
+    recipientMode?: 'self' | 'others'
+    payerId?: string
+  } & Partial<Resource>
+  const gained = positiveResources(Object.keys(rawGain).length > 0
+    ? rawGain : gainConfigByActionId.get(space?.id ?? '') ?? {})
+  const target = recipientPlayerId ? findPlayerById(state, recipientPlayerId) : player
+  const recipients = recipientMode === 'others'
+    ? state.players.filter((entry) => entry.id !== player.id)
+    : target ? [target] : []
+  const payer = payerId ? findPlayerById(state, payerId) : undefined
+  const paid: Partial<Resource> = payerId
+    ? Object.fromEntries(Object.entries(gained).map(([key, amount]) => [key, amount * recipients.length]))
+    : {}
+  return { gained, recipients, payerId, payer, paid }
+}
+
+const canTransferGain = ({ payerId, payer, paid }: ReturnType<typeof resolveGain>) =>
+  !payerId || (payer !== undefined && Object.entries(paid).every(([key, amount]) =>
+    (payer.resources[key as keyof Resource] ?? 0) >= amount))
+
 export const gainAction: ActionDefinition = {
   id: 'gain',
   nameKey: 'actions.gain.name',
   descriptionKey: 'actions.gain.description',
   roundAvailable: 1,
   gainPerRound: {},
-  canBeExecutedByPlayer: () => true,
+  canBeExecutedByPlayer: (state, player, context) =>
+    canTransferGain(resolveGain(state, player, context?.space, context?.params)),
   execute: ({ state, player, space, params, sourceCard, actionContext, eventSink }) => {
-    const {
-      recipientPlayerId,
-      recipientMode,
-      payerId,
-      ...rawGain
-    } = (params ?? {}) as {
-      recipientPlayerId?: string
-      recipientMode?: 'self' | 'others'
-      payerId?: string
-    } & Partial<Resource>
-
-    const gain = (Object.keys(rawGain).length > 0
-      ? rawGain
-      : gainConfigByActionId.get(space.id)) as Partial<Resource> | undefined
-    if (!gain) {
-      return { type: 'ok' as const, resourcesGained: {} }
-    }
-
-    const gained: Record<string, number> = {}
-    Object.keys(gain).forEach((key) => {
-      const amount = gain[key as keyof typeof gain] ?? 0
-      if (amount > 0) {
-        gained[key] = amount
-      }
-    })
-
-    let recipients: PlayerState[]
-    if (recipientMode === 'others') {
-      recipients = state.players.filter((entry) => entry.id !== player.id)
-    } else if (recipientPlayerId) {
-      const target = findPlayerById(state, recipientPlayerId)
-      recipients = target ? [target] : []
-    } else {
-      recipients = [player]
-    }
-
-    const paid: Partial<Resource> = {}
-    if (payerId) {
-      const payer = findPlayerById(state, payerId)
-      if (payer) {
-        Object.entries(gained).forEach(([key, amount]) => {
-          const k = key as keyof Resource
-          const before = payer.resources[k] ?? 0
-          const paidAmount = Math.min(before, amount)
-          if (paidAmount > 0) {
-            paid[k] = (paid[k] ?? 0) + paidAmount
-          }
-          payer.resources[k] = Math.max(0, before - amount)
-        })
+    const transfer = resolveGain(state, player, space, params)
+    if (!canTransferGain(transfer)) return { type: 'fail', errorKey: 'log.exchangeFail' }
+    const { gained, recipients, payerId, payer, paid } = transfer
+    if (payer) {
+      for (const [key, amount] of Object.entries(paid)) {
+        payer.resources[key as keyof Resource] -= amount
       }
     }
 
     for (const recipient of recipients) {
-      gainResources(recipient, gain)
+      gainResources(recipient, gained)
       emitGainEvent(
         eventSink,
         recipient,
         gained,
         sourceCard,
         player.id,
-        payerId ? { playerId: payerId, resources: paid } : undefined,
-        actionContext?.sourceLocation as ResourceLocation | undefined,
+        payerId ? { playerId: payerId, resources: gained } : undefined,
+        (actionContext?.sourceLocation as ResourceLocation | undefined) ??
+          (!sourceCard && state.actionSpaces.some((entry) => entry.id === space.id)
+            ? { kind: 'actionSpace', spaceId: space.id } : undefined),
       )
       if (recipient.id === player.id) {
         trackWorkPhaseBuildingResources(state, recipient.id, gained)

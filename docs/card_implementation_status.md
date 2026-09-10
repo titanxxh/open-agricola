@@ -10,6 +10,8 @@
 
 The reference PHP path is relative by defaultthe reference implementation;The OA path is relative to this warehouse by default.
 
+The 26 remaining card fixes from [Issue #848](https://github.com/titanxxh/open-agricola/issues/848) are implemented with native Session regressions under #854–#870. PR #853 already completed the original A097/C140 replacement defects; the shared replacement tests also cover B154's occupation prerequisite through Freshman's free action. The independent follow-ups below remain outside that 28-card issue.
+
 | Priority | Scope | Open work |
 |---|---|---|
 | P2 | `B026_AgrarianFences` | Separate card-rule follow-up: the printed rule replaces one of the two Grain Utilization actions, while the current listeners also offer original-action-plus-fence branches and lack a shared once-per-use limit. Source mismatch identified; correcting that quota and the extra-action branches is outside the shared-mechanism change. |
@@ -24,7 +26,8 @@ Unless the product direction changes, the following is not considered a current 
 
 |category|cards|
 |---|---|
-|Use schema-up metadata instead of the reference custom`isBuyable` | `A003_PaperKnife`, `B056_Brook`, `B074_ThickForest`, `B154_SheepKeeper` |
+| Reseller excludes an entire printed-cost candidate containing a stable or fence component and preserves its once-per-game opportunity when no supported candidate remains. This scope does not rule out future component refunds, tracked in [#849](https://github.com/titanxxh/open-agricola/issues/849). | `E146_Reseller` |
+|Use schema-up metadata instead of the reference custom`isBuyable` | `A003_PaperKnife`, `B056_Brook`, `B074_ThickForest` |
 |the reference is not implemented, but OA has product extensions/rewrites| `A113_HeresyTeacher`, `A169_OffSiter`, `A170_Hayward`, `A171_Sidekick`, `A173_ClayThief`, `A174_MasterHora`, `A177_Middleman`, `A180_AnimalBrander`, `B170_CorralBuilder`, `B171_GreenhouseBuilder`, `B173_Sweeper`, `B175_FieldOverseer`, `B176_VillageIdiot`, `B178_TagAlong`, `B179_WildBoarHunter`, `C169_FastMason`, `C170_AmateurFencer`, `C171_YoungArtist`, `C172_FieldCounter`, `C173_TopOuter`, `C175_VillageTeacher`, `C180_Trapper`, `D025_WitchesDanceFloor`, `D170_FoldBuilder`, `D171_SeniorTeacher`, `D173_TownClerk`, `D175_Countryman`, `D176_Woodshacker`, `D178_SubstituteTeacher`, `D179_Bullcatcher`, `D180_PartTimeWorker` |
 |the reference banned, but OA retained| `A131_CraftTeacher`, `A133_Braggart`, `A014_CarpentersHammer`, `A033_BigCountry`, `A039_Chapel`, `A048_ShavingHorse`, `A082_WorkCertificate`, `A097_Freshman`, `B010_Caravan`, `B117_Informant`, `B132_EstateMaster`, `B151_LittlePeasant`, `B015_CarpentersBench`, `B161_Weakling`, `B021_HayloftBarn`, `B022_WalkingBoots`, `C102_TreeGuard`, `C125_Nightworker`, `C028_TeachersDesk`, `C031_WritingChamber`, `C003_CarriageTrip`, `C060_SmallPottersOven`, `C063_CraftBrewery`, `C099_GardenDesigner`, `D137_TradeTeacher`, `D019_PulverizerPlow`, `D021_Recruitment`, `D033_SummerHouse`, `D004_CrossCutWood`, `D074_RoyalWood`, `D092_ChildOmbudsman`, `D097_BeggingStudent`, `E022_GuestRoom` |
 |the reference stable / FarmHand model differences| `B085_FarmHand` |
@@ -176,6 +179,8 @@ Shared action replacement uses one explicit source menu before the original opti
 
 ## 6. Infrastructure backlog
 
+The #848 shared gaps are covered: payer-backed gains check the complete transfer before moving resources; explicit mandatory listener flows retain their obligation even when activated without a trigger menu; occupation prerequisites apply to ordinary and free entry; improvement preview and payment preserve the granting action's context. Farmyard placement uses `farm.animalMoved.newlyPlacedOnFarmyard` and physical-field `resource.moved` events. Writing Chamber consumes the existing complete post-score summary, including individual negative entries, without changing other scoring cards' input. Component refunds remain a separate accepted limitation tracked by #849.
+
 Shared payment enumeration supports `ComplexCost.minimumResourcesPaid` after discounts and substitutions, before optimal-solution pruning. Improvement candidates and submission share this constraint. Nested OR/XOR leaves reuse the ordinary choice-candidate pipeline. Base field scoring counts only Farmyard Fields; card-driven terminal investments use explicit choices and real payments. Mandatory occupation follow-up food reuses the existing lesson-payment preview and `reserveResources` contract.
 
 Supply person identity, reservation, normal rotation, and return-home disposition are implemented through the shared boundaries in §5 and `docs/ARCHITECTURE.md` §6.4; card timing and costs remain local.
@@ -253,7 +258,6 @@ The full per-card table is no longer maintained here. Every card not listed belo
 | `B117_Informant` | Accepted difference |the reference banned, but OA retained according to product policy|
 | `B132_EstateMaster` | Accepted difference |the reference banned, but OA retained according to product policy|
 | `B151_LittlePeasant` | Accepted difference |the reference banned, but OA retained according to product policy|
-| `B154_SheepKeeper` | Accepted difference |schema-up prerequisite / isBuyable metadata difference|
 | `B161_Weakling` | Accepted difference |the reference banned, but OA retained according to product policy|
 | `B170_CorralBuilder` | Accepted difference |the reference implemented=false; OA is implemented as a 5+ extension. The round start of Pig Market / Cattle Market reveal is triggered independently, and optionally executes B2-style to free exactly 1 pasture non-action fence flow; if one pasture is illegal, there will be no compensation.|
 | `B171_GreenhouseBuilder` | Accepted difference |the reference implemented=false; OA is implemented as a 5+ extension. Register owner-only dynamic action space, only those that have been revealed before the current round and are executable by owner`fencing` / `house-redevelopment` / `vegetable-seeds`printed spaces expose corresponding branches.|

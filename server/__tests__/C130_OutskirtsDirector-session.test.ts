@@ -1,229 +1,170 @@
 import { describe, expect, it } from 'vitest'
-import { getRegisteredCardListeners, executeCardListener, type CardListenerContext } from '../../shared/cards/card-listeners'
-import type { GameState, PlayerState, ActionSpace } from '../../shared/contract/types'
+import { GameSession, type SessionResponse } from '../game/authoritative-session'
+import { setWorkersAtHome } from '../../shared/domain/player'
+import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
+import { resolveTriggerIfPresent } from './_helpers/trigger-select'
 
-import { markAllWorkersUsed } from '../../shared/domain/player'
-import { specialEffectAction } from '../../shared/actions/effects/special-effect'
 import '../../shared/cards/C/C130_OutskirtsDirector'
-import type { ActionFlow } from '../../shared/contract/types'
 
 const CARD_ID = 'C130_OutskirtsDirector'
+const FILLER = '__test_placeholder__'
 
-const createPlayer = (id = 'p1'): PlayerState =>
-  ({
-    id, name: id, color: 'red',
-    resources: {
-      wood: 0, clay: 0, reed: 0, stone: 0, food: 5,
-      grain: 0, vegetable: 0, sheep: 0, boar: 0, cattle: 0, begging: 0,
-    },
-    workers: [
-      { id: '1', isActive: true, isNewborn: false },
-      { id: '2', isActive: true, isNewborn: false },
-      { id: '3', isActive: false, isNewborn: false },
-      { id: '4', isActive: false, isNewborn: false },
-      { id: '5', isActive: false, isNewborn: false },
-    ],
-    rooms: 2, houseType: 'wood',
-    fields: [], fences: 0, roomTiles: [], stableTiles: [],
-    improvements: [], minorHand: [], minorPlayed: [],
-    occupationHand: [], occupationPlayed: [CARD_ID],houseAnimalType: null, houseAnimalCount: 0, stableAnimals: {},
-    pastures: [], fenceSegments: [],
-    majorEffects: { wellRounds: 0 }, startPlayer: false,
-    activeModifiers: [],
-  }) as PlayerState
-
-const createSpace = (id: string): ActionSpace =>
-  ({
-    id, nameKey: `actions.${id}.name`, descriptionKey: `actions.${id}.description`,
-    roundAvailable: 1, gainPerRound: {},
-    canBeExecutedByPlayer: () => true, execute: () => ({ type: 'ok' }),
-    resources: { wood: 0, clay: 0, reed: 0, stone: 0, food: 0, grain: 0, vegetable: 0, sheep: 0, boar: 0, cattle: 0, begging: 0 },
-    takenBy: [],
-  }) as ActionSpace
-
-const createState = (player: PlayerState): GameState => {
-  const groveSpace = createSpace('grove')
-  const hollowSpace = createSpace('hollow-4')
-  return {
-    round: 1, currentPlayerIndex: 0, players: [player],
-    actionSpaces: [groveSpace, hollowSpace], log: [], roundStartSnapshot: null,
-    roundActionOrder: Array.from({ length: 14 }).map(() => null),
-    gameSeed: 1, availableMajorImprovements: [],
-    futureMeeples: [], pendingFutureMeeples: [],
-    gameOver: false, workPhaseObtainedResources: {},
-  } as GameState
+const setup = ({ played = true, workersAtHome = 2 } = {}) => {
+  const session = new GameSession(6130, undefined, { playerCount: 3 })
+  const state = session.getState().state
+  stabilizeRandomHands(state.players)
+  state.currentPlayerIndex = 0
+  state.round = 5
+  state.roundPhase = 'work'
+  state.actionSpaces.forEach((space) => { space.takenBy = [] })
+  state.players.forEach((player) => {
+    setWorkersAtHome(state, player, 2)
+    player.minorHand = [FILLER]
+    player.occupationHand = [FILLER]
+    player.minorPlayed = []
+    player.occupationPlayed = []
+    player.resources = {
+      ...player.resources, wood: 0, clay: 0, reed: 0, stone: 0, food: 20, grain: 0,
+      vegetable: 0, sheep: 0, boar: 0, cattle: 0, begging: 0,
+    }
+  })
+  const owner = state.players[0]!
+  owner.occupationHand = played ? [FILLER] : [CARD_ID]
+  owner.occupationPlayed = played ? [CARD_ID] : []
+  setWorkersAtHome(state, owner, workersAtHome)
+  const grove = state.actionSpaces.find((space) => space.id === 'grove')!
+  const hollow = state.actionSpaces.find((space) => space.id === 'hollow')!
+  grove.resources = { ...grove.resources, wood: 3, reed: 0 }
+  hollow.resources = { ...hollow.resources, clay: 2, reed: 0 }
+  session.loadState(state)
+  return session
 }
 
-const findListener = (id: string) => getRegisteredCardListeners().find(l => l.id === id)
+const options = (response: SessionResponse) => response.interaction.stateId === 'wait'
+  ? response.interaction.request.options ?? []
+  : []
 
-describe('C130_OutskirtsDirector', () => {
-  it('returns a special-effect flow that places 2 reed on hollow-4 when using grove', () => {
-    const listener = findListener('C130-outskirts-director-after-place-farmer')
-    expect(listener).toBeDefined()
+const playOccupation = (session: GameSession) => {
+  const response = session.takeAction(0, 'lessons')
+  if (!response.state.players[0]!.occupationHand.includes(CARD_ID)) return response
+  if (response.interaction.stateId !== 'wait') return response
+  const card = options(response).find((option) => option.value === CARD_ID)
+  expect(card, JSON.stringify(response.interaction)).toBeDefined()
+  return session.resolveChoice(response.interaction.playerIndex, card!.value)
+}
 
-    const player = createPlayer()
-    const state = createState(player)
-    const groveSpace = state.actionSpaces.find(s => s.id === 'grove')!
-    const hollowSpace = state.actionSpaces.find(s => s.id === 'hollow-4')!
+const resolveCardTrigger = (session: GameSession, response: SessionResponse) =>
+  resolveTriggerIfPresent(session, response, CARD_ID)
 
-    expect(hollowSpace.resources.reed).toBe(0)
+const chooseNonSkip = (session: GameSession, response: SessionResponse) => {
+  expect(response.interaction.stateId).toBe('wait')
+  if (response.interaction.stateId !== 'wait') return response
+  const option = options(response).find((candidate) => candidate.value !== '__skip__')
+  expect(option, JSON.stringify(response.interaction)).toBeDefined()
+  return session.resolveChoice(response.interaction.playerIndex, option!.value)
+}
 
-    const result = executeCardListener(listener!, {
-      state, player, space: groveSpace,
-      actionId: 'place-farmer', phase: 'after',
-    } as unknown as CardListenerContext)
+const acceptCard = (session: GameSession, response: SessionResponse) =>
+  chooseNonSkip(session, resolveCardTrigger(session, response))
 
-    expect(hollowSpace.resources.reed).toBe(0)
-    expect(result).toBeDefined()
-    expect(result!.flow!.type).toBe('seq')
-    const children = (result!.flow as Extract<ActionFlow, { type: 'seq' }>).children
-    expect(children[0]).toMatchObject({
-      actionId: 'special-effect',
-      sourceCard: CARD_ID,
-      params: { kind: 'add-resource-to-space', spaceId: 'hollow-4', resource: 'reed', amount: 2 },
-    })
-    expect(children[1]).toMatchObject({ actionId: 'place-farmer', optional: true })
+const resourceOn = (response: SessionResponse, spaceId: string, resource: 'reed') =>
+  response.state.actionSpaces.find((space) => space.id === spaceId)?.resources[resource] ?? 0
 
-    specialEffectAction.execute({
-      state,
-      player,
-      space: groveSpace,
-      sourceCard: CARD_ID,
-      params: (children[0] as Extract<ActionFlow, { type: 'leaf' }>).params,
-    })
-    expect(hollowSpace.resources.reed).toBe(2)
+const workersOn = (response: SessionResponse, spaceId: string) => {
+  const playerId = response.state.players[0]!.id
+  return response.state.actionSpaces.find((space) => space.id === spaceId)?.takenBy
+    .filter((worker) => worker.playerId === playerId).length ?? 0
+}
+
+describe('C130 Outskirts Director parity', () => {
+  it('C130 S1: Outskirts Director is played as the first occupation in a three-player game', () => {
+    const response = playOccupation(setup({ played: false }))
+
+    expect(response.ok, response.error).toBe(true)
+    expect(response.state.players).toHaveLength(3)
+    expect(response.state.players[0]!.occupationPlayed).toContain(CARD_ID)
   })
 
-  it('returns a special-effect flow that places 2 reed on grove when using hollow-4', () => {
-    const listener = findListener('C130-outskirts-director-after-place-farmer')
-    expect(listener).toBeDefined()
+  it('C130 S2: after Grove, accepting adds two reed to Hollow and permits another placement', () => {
+    const session = setup()
+    let response = acceptCard(session, session.takeAction(0, 'grove'))
 
-    const player = createPlayer()
-    const state = createState(player)
-    const groveSpace = state.actionSpaces.find(s => s.id === 'grove')!
-    const hollowSpace = state.actionSpaces.find(s => s.id === 'hollow-4')!
+    expect(resourceOn(response, 'hollow', 'reed')).toBe(2)
+    expect(response.interaction.stateId).toBe('wait')
+    if (response.interaction.stateId !== 'wait') return
+    response = chooseNonSkip(session, response)
+    expect(options(response).some((option) => option.value === 'day-laborer')).toBe(true)
+    response = session.resolveChoice(response.interaction.playerIndex, 'day-laborer')
 
-    expect(groveSpace.resources.reed).toBe(0)
-
-    const result = executeCardListener(listener!, {
-      state, player, space: hollowSpace,
-      actionId: 'place-farmer', phase: 'after',
-    } as unknown as CardListenerContext)
-
-    expect(groveSpace.resources.reed).toBe(0)
-    expect(result?.flow?.type).toBe('seq')
-    const children = (result!.flow as Extract<ActionFlow, { type: 'seq' }>).children
-    expect(children[0]).toMatchObject({
-      actionId: 'special-effect',
-      sourceCard: CARD_ID,
-      params: { kind: 'add-resource-to-space', spaceId: 'grove', resource: 'reed', amount: 2 },
-    })
-    expect(children[1]).toMatchObject({ actionId: 'place-farmer', optional: true })
+    expect(response.ok, response.error).toBe(true)
+    expect(response.state.players[0]!.resources).toMatchObject({ wood: 3, food: 22 })
+    expect(workersOn(response, 'grove')).toBe(1)
+    expect(workersOn(response, 'day-laborer')).toBe(1)
   })
 
-  it('returns only the add-resource leaf when no workers are available', () => {
-    const listener = findListener('C130-outskirts-director-after-place-farmer')
-    expect(listener).toBeDefined()
+  it('C130 S3: after Hollow, accepting adds two reed to Grove while the extra placement may be declined', () => {
+    const session = setup()
+    let response = acceptCard(session, session.takeAction(0, 'hollow'))
 
-    const player = createPlayer()
-    const state = createState(player)
-    markAllWorkersUsed(state, player)
+    expect(resourceOn(response, 'grove', 'reed')).toBe(2)
+    expect(response.interaction.stateId).toBe('wait')
+    if (response.interaction.stateId === 'wait') {
+      response = session.resolveChoice(response.interaction.playerIndex, '__skip__')
+    }
 
-    const result = executeCardListener(listener!, {
-      state, player, space: state.actionSpaces.find(s => s.id === 'grove')!,
-      actionId: 'place-farmer', phase: 'after',
-    } as unknown as CardListenerContext)
-
-    expect(result?.flow).toMatchObject({
-      type: 'leaf',
-      actionId: 'special-effect',
-      sourceCard: CARD_ID,
-      params: { kind: 'add-resource-to-space', spaceId: 'hollow-4', resource: 'reed', amount: 2 },
-    })
-    expect(state.actionSpaces.find(s => s.id === 'hollow-4')!.resources.reed).toBe(0)
+    expect(response.state.players[0]!.resources.clay).toBe(2)
+    expect(workersOn(response, 'hollow')).toBe(1)
+    expect(workersOn(response, 'day-laborer')).toBe(0)
   })
 
-  it('does not trigger on unrelated spaces', () => {
-    const listener = findListener('C130-outskirts-director-after-place-farmer')
-    expect(listener).toBeDefined()
+  it('C130 S4: declining the entire effect places no reed', () => {
+    const session = setup()
+    let response = resolveCardTrigger(session, session.takeAction(0, 'grove'))
+    expect(response.interaction.stateId).toBe('wait')
+    if (response.interaction.stateId === 'wait') {
+      response = session.resolveChoice(response.interaction.playerIndex, '__skip__')
+    }
 
-    const player = createPlayer()
-    const state = createState(player)
-
-    const result = executeCardListener(listener!, {
-      state, player, space: createSpace('forest'),
-      actionId: 'place-farmer', phase: 'after',
-    } as unknown as CardListenerContext)
-
-    expect(result).toBeUndefined()
+    expect(resourceOn(response, 'hollow', 'reed')).toBe(0)
+    expect(workersOn(response, 'grove')).toBe(1)
+    expect(response.state.actionSpaces.flatMap((space) => space.takenBy)
+      .filter((worker) => worker.playerId === response.state.players[0]!.id)).toHaveLength(1)
   })
 
-  // 3p variant: grove + hollow (no hollow-4)
-  it('3p variant: places 2 reed on hollow when using grove', () => {
-    const listener = findListener('C130-outskirts-director-after-place-farmer')
-    expect(listener).toBeDefined()
+  it('C130 S5: a non-Grove, non-Hollow placement does not trigger Outskirts Director', () => {
+    const response = setup().takeAction(0, 'day-laborer')
 
-    const player = createPlayer()
-    const groveSpace = createSpace('grove')
-    const hollowSpace = createSpace('hollow')
-    const state = {
-      round: 1, currentPlayerIndex: 0, players: [player],
-      actionSpaces: [groveSpace, hollowSpace], log: [], roundStartSnapshot: null,
-      roundActionOrder: Array.from({ length: 14 }).map(() => null),
-      gameSeed: 1, availableMajorImprovements: [],
-      futureMeeples: [], pendingFutureMeeples: [],
-      gameOver: false, workPhaseObtainedResources: {},
-    } as unknown as GameState
-
-    expect(hollowSpace.resources.reed).toBe(0)
-
-    const result = executeCardListener(listener!, {
-      state, player, space: groveSpace,
-      actionId: 'place-farmer', phase: 'after',
-    } as unknown as CardListenerContext)
-
-    expect(hollowSpace.resources.reed).toBe(0)
-    expect(result?.flow?.type).toBe('seq')
-    const children = (result!.flow as Extract<ActionFlow, { type: 'seq' }>).children
-    expect(children[0]).toMatchObject({
-      actionId: 'special-effect',
-      sourceCard: CARD_ID,
-      params: { kind: 'add-resource-to-space', spaceId: 'hollow', resource: 'reed', amount: 2 },
-    })
-    expect(children[1]).toMatchObject({ actionId: 'place-farmer', optional: true })
+    expect(response.ok, response.error).toBe(true)
+    expect(resourceOn(response, 'grove', 'reed')).toBe(0)
+    expect(resourceOn(response, 'hollow', 'reed')).toBe(0)
+    expect(response.interaction.stateId === 'wait' ? response.interaction.sourceCard : undefined)
+      .not.toBe(CARD_ID)
   })
 
-  it('3p variant: places 2 reed on grove when using hollow', () => {
-    const listener = findListener('C130-outskirts-director-after-place-farmer')
-    expect(listener).toBeDefined()
+  it('C130 S6: with no person left, accepting still adds two reed to the paired space', () => {
+    const session = setup({ workersAtHome: 1 })
+    const response = acceptCard(session, session.takeAction(0, 'grove'))
 
-    const player = createPlayer()
-    const groveSpace = createSpace('grove')
-    const hollowSpace = createSpace('hollow')
-    const state = {
-      round: 1, currentPlayerIndex: 0, players: [player],
-      actionSpaces: [groveSpace, hollowSpace], log: [], roundStartSnapshot: null,
-      roundActionOrder: Array.from({ length: 14 }).map(() => null),
-      gameSeed: 1, availableMajorImprovements: [],
-      futureMeeples: [], pendingFutureMeeples: [],
-      gameOver: false, workPhaseObtainedResources: {},
-    } as unknown as GameState
+    expect(resourceOn(response, 'hollow', 'reed')).toBe(2)
+    expect(workersOn(response, 'grove')).toBe(1)
+    expect(response.interaction.stateId === 'wait' ? response.interaction.sourceCard : undefined)
+      .not.toBe(CARD_ID)
+  })
 
-    expect(groveSpace.resources.reed).toBe(0)
+  it('C130 S7: the extra Hollow placement can trigger Outskirts Director a second time', () => {
+    const session = setup()
+    let response = acceptCard(session, session.takeAction(0, 'grove'))
+    expect(response.interaction.stateId).toBe('wait')
+    if (response.interaction.stateId !== 'wait') return
+    response = chooseNonSkip(session, response)
+    response = session.resolveChoice(response.interaction.playerIndex, 'hollow')
+    response = acceptCard(session, response)
 
-    const result = executeCardListener(listener!, {
-      state, player, space: hollowSpace,
-      actionId: 'place-farmer', phase: 'after',
-    } as unknown as CardListenerContext)
-
-    expect(groveSpace.resources.reed).toBe(0)
-    expect(result?.flow?.type).toBe('seq')
-    const children = (result!.flow as Extract<ActionFlow, { type: 'seq' }>).children
-    expect(children[0]).toMatchObject({
-      actionId: 'special-effect',
-      sourceCard: CARD_ID,
-      params: { kind: 'add-resource-to-space', spaceId: 'grove', resource: 'reed', amount: 2 },
-    })
-    expect(children[1]).toMatchObject({ actionId: 'place-farmer', optional: true })
+    expect(response.state.players[0]!.resources).toMatchObject({ wood: 3, clay: 2 })
+    expect(resourceOn(response, 'grove', 'reed')).toBe(2)
+    expect(response.state.players[0]!.resources.reed).toBe(2)
+    expect(resourceOn(response, 'hollow', 'reed')).toBe(0)
+    expect(workersOn(response, 'grove')).toBe(1)
+    expect(workersOn(response, 'hollow')).toBe(1)
   })
 })
