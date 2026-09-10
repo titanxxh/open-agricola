@@ -1,9 +1,12 @@
 import { describe, expect, it } from 'vitest'
-import { GameSession } from '../game/authoritative-session'
+import { GameSession, type SessionResponse } from '../game/authoritative-session'
 import { familySize, setActiveWorkerCount, setWorkersAtHome } from '../../shared/domain/player'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 
 import '../../shared/cards/A/A026_SleepingCorner'
+
+const CARD_ID = 'A026_SleepingCorner'
+const FILLER = '__test_placeholder__'
 
 const setup = (occupants: Array<{ player: number; worker: number; newborn?: boolean }>) => {
   const session = new GameSession(9826, undefined, { playerCount: 3 })
@@ -20,14 +23,14 @@ const setup = (occupants: Array<{ player: number; worker: number; newborn?: bool
   state.players.forEach((player, index) => {
     setActiveWorkerCount(player, 2)
     setWorkersAtHome(state, player, index === 0 ? 2 : 0)
-    player.minorHand = ['__test_placeholder__']
-    player.occupationHand = ['__test_placeholder__']
+    player.minorHand = [FILLER]
+    player.occupationHand = [FILLER]
     player.minorPlayed = []
     player.occupationPlayed = []
     player.cardStates = {}
   })
   const owner = state.players[0]!
-  owner.minorPlayed = ['A026_SleepingCorner']
+  owner.minorPlayed = [CARD_ID]
   owner.rooms = 3
   owner.roomTiles = Array.from({ length: 3 }, (_, row) => ({ row, col: 0 }))
 
@@ -42,7 +45,72 @@ const setup = (occupants: Array<{ player: number; worker: number; newborn?: bool
   return session
 }
 
+const setupForPlay = (grainFields: number) => {
+  const session = new GameSession(7026, undefined, { playerCount: 2 })
+  stabilizeRandomHands(session.state.players)
+  const state = session.getState().state
+  state.currentPlayerIndex = 0
+  state.round = 5
+  state.roundPhase = 'work'
+  state.actionSpaces.forEach((space) => { space.takenBy = [] })
+  state.players.forEach((player) => {
+    setActiveWorkerCount(player, 2)
+    setWorkersAtHome(state, player, 2)
+    player.minorHand = [FILLER]
+    player.occupationHand = [FILLER]
+    player.minorPlayed = []
+    player.occupationPlayed = []
+    player.cardStates = {}
+  })
+  const owner = state.players[0]!
+  owner.minorHand = [CARD_ID]
+  owner.resources.wood = 1
+  owner.fields = Array.from({ length: grainFields }, (_, index) => ({
+    row: 0, col: 2 + index, stacks: [{ kind: 'grain' as const, remaining: 1 }],
+  }))
+  session.loadState(state)
+  return session
+}
+
+const options = (response: SessionResponse) => response.interaction.stateId === 'wait'
+  ? response.interaction.request.options ?? []
+  : []
+
+const enterMinor = (session: GameSession) => {
+  let response = session.takeAction(0, 'meeting-place')
+  if (response.interaction.stateId === 'wait'
+    && !options(response).some((option) => option.value === CARD_ID)) {
+    const branch = options(response).find((option) => option.value.startsWith('action-improvement-'))
+    if (branch) response = session.resolveChoice(response.interaction.playerIndex, branch.value)
+  }
+  return response
+}
+
+const playMinor = (session: GameSession) => {
+  let response = enterMinor(session)
+  if (response.interaction.stateId === 'wait') {
+    const card = options(response).find((option) => option.value === CARD_ID)
+    if (card) response = session.resolveChoice(response.interaction.playerIndex, card.value)
+  }
+  return response
+}
+
 describe('A026 Sleeping Corner through Session', () => {
+  it('A026 S1: two grain fields and one wood allow Sleeping Corner to be played', () => {
+    const response = playMinor(setupForPlay(2))
+
+    expect(response.ok, response.error).toBe(true)
+    expect(response.state.players[0]!.minorPlayed).toContain(CARD_ID)
+    expect(response.state.players[0]!.resources.wood).toBe(0)
+  })
+
+  it('A026 S2: fewer than two grain fields keep Sleeping Corner unavailable', () => {
+    const response = enterMinor(setupForPlay(1))
+
+    expect(options(response).some((option) => option.value === CARD_ID)).toBe(false)
+    expect(response.state.players[0]!.minorHand).toContain(CARD_ID)
+  })
+
   it.each([
     { label: 'one opposing adult', occupants: [{ player: 1, worker: 0 }] },
     {
