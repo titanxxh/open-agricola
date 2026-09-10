@@ -200,8 +200,8 @@ describe('Through the Seasons Summer rules', () => {
 
     expect(resp.ok).toBe(true)
     expect(resp.interaction.stateId).toBe('wait')
-    if (resp.interaction.stateId !== 'wait') throw new Error('expected Freshman prompt')
-    expect(resp.interaction.promptKey).toBe('ui.interactionFreshmanOccupation')
+    expect(resp.state.players[0]!.occupationPlayed).toContain('A114_SeasonalWorker')
+    expect(resp.interaction.promptKey).toBe('ui.interactionSelectTrigger')
   })
 
   it('adds one grain to Day Laborer in Summer', () => {

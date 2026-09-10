@@ -584,9 +584,7 @@ describe('Engine pipeline phase order', () => {
     expect(committed).toBe(true)
     expect(receivedCosts).toEqual({ wood: -1 })
     expect(phases).toEqual([
-      'computeReplace',
       'before',
-      'computeReplace',
       'canBeExecutedByPlayer',
       'computeCosts',
     ])

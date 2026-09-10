@@ -14,11 +14,11 @@ import {
   ActionNode,
   OrNode,
   ParallelNode,
+  SequenceNode,
   XorNode,
 } from './nodes'
 import { resolveChoiceSourceCard } from './nodes/interaction-helpers'
 import {
-  buildReplaceChoiceFlow,
   getChoiceLabel,
   getNodeSourceCard,
   getReplaceAwareChoiceLabel,
@@ -39,7 +39,9 @@ import {
   buildFollowUpNodes,
   buildListenerEvent,
   buildOwnedFlowNode,
+  buildReplacementChoiceNode,
   canActionContinueWithoutBeforeTriggers,
+  getBeforeContinuationContext,
   canStartNode,
   enforceCompositeContinuationMandatory,
   findActionNode,
@@ -258,19 +260,23 @@ const commitOpenEventTransaction = (
 const triggerSelectEvaluationOptions = (
   int: EngineInternals,
   context: ActionExecutionContext,
+  node: ParallelNode,
 ): TriggerSelectEvaluationOptions => ({
   canStartFlow: (flow, flowContext) => evaluateFlowDoable(flow, flowContext, (actionId) => int.registry.get(actionId)),
-  canContinueWithoutTriggers: (actionId, resources) =>
-    canActionContinueWithoutBeforeTriggers(
+  canContinueWithoutTriggers: (actionId, resources) => {
+    const hostContext = getBeforeContinuationContext(int, context, node, actionId)
+    return canActionContinueWithoutBeforeTriggers(
       int,
-      { ...context, ...currentEventReadContext(int) },
-      actionId,
+      { ...hostContext, ...currentEventReadContext(int) },
+      hostContext.actionId,
       resources,
-    ),
+    )
+  },
   canReachContinuationThroughTriggers: (actionId, resources) => {
-    const action = int.registry.get(actionId)
+    const hostContext = getBeforeContinuationContext(int, context, node, actionId)
+    const action = int.registry.get(hostContext.actionId)
     if (!action) return false
-    const scopedContext = withResourcePreview(context, resources)
+    const scopedContext = withResourcePreview(hostContext, resources)
     const directDoable = action.canBeExecutedByPlayer(
       scopedContext.state,
       scopedContext.player,
@@ -282,7 +288,7 @@ const triggerSelectEvaluationOptions = (
       },
     )
     return int.hooks.applyIsDoable(
-      { ...scopedContext, ...currentEventReadContext(int), actionId },
+      { ...scopedContext, ...currentEventReadContext(int), actionId: hostContext.actionId },
       action,
       directDoable,
     )
@@ -535,6 +541,20 @@ const buildOptionalPrompt = (
   if (!doable) {
     resolveSubtree(node)
     return { type: 'ok', nodeId: node.id, result: { type: 'ok' } }
+  }
+  let replacementTarget = node
+  while (replacementTarget instanceof SequenceNode && replacementTarget.children.length === 1) {
+    replacementTarget = replacementTarget.children[0]!
+  }
+  if (replacementTarget === actionNode) {
+    const replacementContext = { ...executionContext, ...currentEventReadContext(int) }
+    const replacement = int.hooks.applyComputeReplace({ ...replacementContext, actionId: actionNode.actionId })
+    const choiceNode = buildReplacementChoiceNode(int, replacementContext, actionNode, replacement, node)
+    if (choiceNode) {
+      int.tree.insertAfter(node.id, [choiceNode])
+      resolveSubtree(node)
+      return { type: 'ok', nodeId: node.id, result: { type: 'ok' } }
+    }
   }
   const label = getChoiceLabel(node, int.registry) ?? {
     labelKey: actionNode.choiceLabelKey ?? action.nameKey,
@@ -919,6 +939,7 @@ export function engineProceed(
       node: EngineNode
       actionNode: ActionNode
     }[]
+    const replacementOriginalNodeId = node instanceof XorNode ? node.replacementOriginalNodeId : undefined
     const options = availableActions
       .map((entry) => {
         const actionContext = actionContextForNode(entry.actionNode, int)
@@ -935,10 +956,16 @@ export function engineProceed(
         const action = int.registry.get(entry.actionNode.actionId)
         if (!action) return null
         const doable = canStartNode(int, { ...executionContext, ...currentEventReadContext(int) }, entry.node)
-        if (!doable) return null
+        const originalReplacementBranch = entry.nodeId === replacementOriginalNodeId
+        if (!doable && !(originalReplacementBranch && entry.node.optional)) return null
+        if (originalReplacementBranch) {
+          return { value: entry.nodeId, labelKey: 'ui.interactionDoNotReplace' }
+        }
         const baseLabel = getChoiceLabel(entry.node, int.registry)
         if (!baseLabel) return null
-        const label = getReplaceAwareChoiceLabel(
+        const label = node instanceof XorNode && replacementOriginalNodeId
+          ? { ...baseLabel, sourceCard: node.replacementSourceCards?.[entry.nodeId] }
+          : getReplaceAwareChoiceLabel(
           entry.actionNode,
           { ...executionContext, ...currentEventReadContext(int) },
           baseLabel,
@@ -985,7 +1012,7 @@ export function engineProceed(
       : (node.promptKey ?? 'ui.interactionFlowSelect')
     node.setPending({
       hostNodeId: node.id,
-      request: { kind: 'choice', options },
+      request: { kind: 'choice', options, ...(replacementOriginalNodeId ? { requiresExplicitChoice: true } : {}) },
       choices: options,
       promptKey: compositePromptKey,
       promptParams: undefined,
@@ -1030,7 +1057,7 @@ export function engineProceed(
       const evaluation = evaluateTriggerSelect(
         node,
         { ...context, ...currentEventReadContext(int) },
-        triggerSelectEvaluationOptions(int, context),
+        triggerSelectEvaluationOptions(int, context, node),
       )
       const options = evaluation.options
       if (options.length === 0) {
@@ -1083,7 +1110,9 @@ export function engineProceed(
       return executeDeferredHostAction(int, context, node)
     }
     const actionContext = actionContextForNode(node, int)
-    const replaceResult = int.hooks.applyComputeReplace({
+    const replaceResult = node.resolvedReplacement
+      ? { ...node.resolvedReplacement, alternatives: [] }
+      : int.hooks.applyComputeReplace({
       ...context,
       ...currentEventReadContext(int),
       space: resolveExecutionSpace(context.state, context.space, actionContext),
@@ -1094,23 +1123,15 @@ export function engineProceed(
     })
     const replacedActionId = replaceResult.actionId
     const replaceSourceCard = replaceResult.sourceCard ?? node.sourceCard
-    if (replaceResult.alternatives.length > 0) {
-      const flowNode = buildOwnedFlowNode(int,
-        buildReplaceChoiceFlow(
-          node,
-          replaceResult.alternatives.map((alternative) => ({
-            ...alternative,
-            flow: applyDefaultSourceCardToFlow(alternative.flow, alternative.sourceCard),
-          })),
-          replacedActionId,
-        ),
-        context.player.id,
-      )
-      enforceCompositeContinuationMandatory(flowNode)
-      int.tree.insertAfter(node.id, [flowNode])
+    const replacementNode = buildReplacementChoiceNode(int, {
+      ...context, ...currentEventReadContext(int),
+    }, node, replaceResult)
+    if (replacementNode) {
+      int.tree.insertAfter(node.id, [replacementNode])
       node.resolve({ type: 'ok' })
       return { type: 'ok', nodeId: node.id, result: { type: 'ok' } }
     }
+    node.resolvedReplacement = { actionId: replacedActionId, sourceCard: replaceSourceCard }
     const action = int.registry.get(replacedActionId)
     if (!action) {
       return { type: 'blocked', nodeId: node.id }

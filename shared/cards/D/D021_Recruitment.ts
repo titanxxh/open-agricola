@@ -13,7 +13,7 @@ const CARD_ID = 'D021_Recruitment'
  * Minor Improvement action, you can take a Family Growth action instead.
  *
  * Rule:
- *  - onPlayerComputeReplaceImprovement: returns WISHCHILDREN with optional flag,
+ *  - onPlayerComputeReplaceImprovement: returns WISHCHILDREN,
  *    when event types contains MINOR and trueAction and round >= 5.
  *  - checkArgs: MINOR in args['types'] && trueAction && Globals::getTurn() >= 5
  *  - onPlayerIsDoable: allow the IMPROVEMENT action when checkArgs true (so the
@@ -23,7 +23,7 @@ const CARD_ID = 'D021_Recruitment'
  *  - computeReplace listener on both 'minor-improvement' and 'improvement-any'
  *    (our engine's equivalents of MINOR / IMPROVEMENT entry points).
  *  - Returns decline=true with an alternativeFlow that triggers
- *    'wish-children-growth' (the standard family-growth action) as optional.
+ *    'wish-children-growth' (the standard family-growth action) after explicit selection.
  *  - Only fires when round >= 5 AND player has room in the house
  *    (rooms + extraRoomCapacity > familySize).
  *  - isDoable listener: keeps the action available even when the player has
@@ -37,6 +37,7 @@ const hasHouseRoom = (player: CardListenerContext['player']) =>
   effectiveRooms(player) > familySize(player)
 
 const shouldOfferReplace = (context: CardListenerContext) => {
+  if (context.actionContext?.checkedReplaceAction) return false
   if (context.state.round < 5) return false
   if (!hasHouseRoom(context.player)) return false
   if (context.actionContext?.trueAction === false) return false
@@ -56,7 +57,6 @@ const computeReplaceListener: CardListenerRegistration = {
       decline: true,
       alternativeFlow: {
         type: 'seq',
-        optional: true,
         children: [
           {
             type: 'leaf',
@@ -78,9 +78,7 @@ const isDoableListener: CardListenerRegistration = {
   handler: (context: CardListenerContext): ActionHookResult | void => {
     const types = readImprovementTypes(context)
     if (!types.includes('minor')) return
-    if (context.state.round < 5) return
-    if (!hasHouseRoom(context.player)) return
-    if (context.actionContext?.trueAction === false) return
+    if (!shouldOfferReplace(context)) return
     return { doable: true }
   },
 }

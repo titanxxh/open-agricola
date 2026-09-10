@@ -152,7 +152,12 @@ describe('E092 Field Doctor parity', () => {
   }
 
   it('E092 S1: four surrounding fields allow one family growth without room', () => {
-    const response = setup(true).takeAction(0, 'wish-children')
+    const session = setup(true)
+    const offered = session.takeAction(0, 'wish-children')
+    expect(familySize(offered.state.players[0]!)).toBe(2)
+    expect(isCardFlagged(offered.state.players[0]!, 'E092_FieldDoctor')).toBe(false)
+    const replacement = offered.interaction.request.options.find((option) => option.sourceCard === 'E092_FieldDoctor')!
+    const response = session.resolveChoice(0, replacement.value)
     expect(response.ok, response.error).toBe(true)
     expect(familySize(response.state.players[0]!)).toBe(3)
     expect(isCardFlagged(response.state.players[0]!, 'E092_FieldDoctor')).toBe(true)

@@ -200,7 +200,11 @@ describe('A094 Lazy Sowman parity', () => {
     const session = setup()
     let response = session.takeAction(0, 'grain-utilization')
     expect(response.interaction.stateId).toBe('wait')
-    if (response.interaction.stateId !== 'wait') throw new Error('expected extra placement')
+    if (response.interaction.stateId !== 'wait') throw new Error('expected replacement choice')
+    const replacement = response.interaction.request.options.find((option) => option.sourceCard === 'A094_LazySowman')!
+    response = session.resolveChoice(0, replacement.value)
+    const place = response.interaction.request.options.find((option) => option.value !== '__skip__')!
+    response = session.resolveChoice(0, place.value)
     expect(response.interaction.request.options?.map((option) => option.value)).toContain('allow-occupied:day-laborer')
 
     response = session.resolveChoice(0, 'allow-occupied:day-laborer')
@@ -220,7 +224,7 @@ describe('A094 Lazy Sowman parity', () => {
     const session = setup({ grain: 1 })
     let response = session.takeAction(0, 'grain-utilization')
     if (response.interaction.stateId !== 'wait') throw new Error('expected choice')
-    const sow = response.interaction.request.options?.find((option) => option.labelKey === 'actions.sow.name')
+    const sow = response.interaction.request.options?.find((option) => option.labelKey === 'ui.interactionDoNotReplace')
     expect(sow).toBeDefined()
     response = session.resolveChoice(0, sow!.value)
     if (response.interaction.stateId !== 'wait') throw new Error('expected sow selection')
@@ -436,7 +440,7 @@ describe('A119 Firewood Collector parity', () => {
         return session.commitSelectionChoice(0, { crops: [{ ...field!.tile, crop: 'grain' }] })
       }
     }
-    const sow = response.interaction.request.options?.find((option) => option.labelKey === 'actions.sow.name')
+    const sow = response.interaction.request.options?.find((option) => option.labelKey === 'ui.interactionDoNotReplace')
     const plow = response.interaction.request.options?.find((option) => option.labelKey === 'actions.plow.name')
     const option = actionId === 'grain-utilization' ? sow : plow
     if (!option) return response

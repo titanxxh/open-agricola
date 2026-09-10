@@ -56,7 +56,12 @@ describe('E092_FieldDoctor session', () => {
     const session = setup('wish-children', SURROUNDING_FIELDS)
 
     expect(session.getState().actionAvailability?.['wish-children']).toBe(true)
-    const response = session.takeAction(0, 'wish-children')
+    const offered = session.takeAction(0, 'wish-children')
+    expect(familySize(offered.state.players[0]!)).toBe(2)
+    expect(offered.state.players[0]!.cardStates[CARD_ID]?.flagged).not.toBe(true)
+    expect(offered.interaction.request.options).toHaveLength(1)
+    const replacement = offered.interaction.request.options!.find((option) => option.sourceCard === CARD_ID)!
+    const response = session.resolveChoice(0, replacement.value)
     expect(response.ok).toBe(true)
     expect(familySize(response.state.players[0]!)).toBe(3)
     expect(newbornCount(response.state.players[0]!)).toBe(1)

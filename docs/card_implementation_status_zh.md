@@ -4,13 +4,17 @@
 
 > 本文是 [`card_implementation_status.md`](card_implementation_status.md) 的中文镜像；英文版是规范文档。
 
-> 生成/更新日期：2026-09-08。本文件替代 `docs/card_desc_audit.md`、`docs/card_progress.md`、`docs/master-plan.md`、`docs/bad-smell.md`。参考实现唯一基准：`参考实现`。
+> 生成/更新日期：2026-09-10。本文件替代 `docs/card_desc_audit.md`、`docs/card_progress.md`、`docs/master-plan.md`、`docs/bad-smell.md`。参考实现唯一基准：`参考实现`。
 
 ## 2. 问题优先汇总
 
 参考实现 PHP 路径默认相对 `参考实现`；OA 路径默认相对本仓库。
 
-当前没有开放的问题优先条目。
+| 优先级 | 范围 | 待处理事项 |
+|---|---|---|
+| P2 | `B026_AgrarianFences` | 独立牌义后续：牌面只允许替换 Grain Utilization 的两个行动之一，当前 listener 还提供原行动加围栏的分支，且缺少同次用格共享的替换次数限制。已发现源码与牌面不一致；次数和额外行动分支修正不纳入本次通用机制修改。 |
+| P2 | `E151_DeliveryNurse` | 独立资格后续：应通过共享额外房间容量规则判断空位，而不是只比较实体房间数。源码核对已发现差异，修复前补 Session 复现。 |
+| P2 | `C168_AnimalCatcher` | 独立来源调查：替换按 Day Laborer 行动格和来源排除匹配 `gain`，可能匹配同格附加奖励。需验证只替换行动格基础奖励。目前是源码风险，尚非已复现的 Session 故障。 |
 
 ## 3. 已接受差异
 
@@ -167,13 +171,13 @@
 
 注：React/Suspense、CDN、browser fallback 等属于平台/浏览器正常术语，不视为卡牌架构风险。
 
+通用行动替换在原行动的可选提示前显示统一来源菜单，唯一替代也必须明确选择。选中子树保留内部选择及可选步骤，必需续行在 before、pending、重连和撤销过程中保持承诺。每个 leaf 保存替换决定，producer 守卫以行动机会为边界，既保留行动身份，也允许新授予的行动格重新计算替换。共同契约覆盖 #850–#852 的 11 张牌迁移及普通自定义替代，以架构文档和可执行 Session 测试为准。B026 次数、E151 容量、C168 来源的独立后续保留在 §2。
+
 ## 6. 基础设施待办
 
 共享支付枚举支持 `ComplexCost.minimumResourcesPaid`，在折扣和替代支付后、最优方案裁剪前校验；改善候选和提交共用该约束。嵌套 OR/XOR 叶子复用普通候选管线。基础田地计分只统计 Farmyard Field；卡牌终局投入通过明确选择和真实支付结算。职业后续必付食物复用已有课费支付预览及 `reserveResources` 契约。
 
 供应人物身份、预留、正常轮转和归家处置已由 §5 与 `docs/ARCHITECTURE.md` §6.4 的共享边界支持；卡牌时机与费用保留在卡内。
-
-当前没有开放的基础设施 umbrella 待办。已完成的 Before-End Player Dispatch、Scoring Reserve、printed-cost helper、extra-turn 轮转、family token supply、Major Improvement stack supply、card boundary guard、single-layer terrain selection flow、FoM immediate resource minor helper、pasture / harvest / breeding / scoring / stable / special-stable 等历史条目已按需归并到 §5 架构约束或 §12 单卡备注，不再在本节保留完成清单。
 
 **浏览器本地工坊试玩沙盒**（PR #619 / wayfinder #605，已完成）：新增 `client/local-sandbox/` 的浏览器端自定义卡编译 + 执行基础设施，`VITE_SANDBOX_EXECUTOR=browser` 时工坊试玩全程在浏览器运行。复用 shared 的 AST validator + compiler，在 Web Worker 内用 `new Function` 执行卡代码，执行语义与服务端 isolated-vm executor 由 `server/__tests__/local-sandbox-parity.test.ts` 钉死等价。**边界**：仅服务单人工坊试玩 dry-run（作者自己的卡），不服务真实多人对局——真实对局卡代码执行仍走服务端 isolated-vm，后端权威不变（accepted divergence，见 §3）。**安全**：浏览器执行器非硬隔离，用 strict mode + shadow globals + worker capability removal 三层深度防御；第三方 published 卡的权威隔离由服务端保证。详见 `docs/ARCHITECTURE.md` §12.5 与 `docs/CUSTOM_CARD_SANDBOX.md` §8。
 

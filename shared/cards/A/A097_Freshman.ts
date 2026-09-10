@@ -1,22 +1,27 @@
 import { defineOccupationCard } from '../card-source'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
+import { isOccupationPlayable } from '../../actions/effects/occupation'
 import { isCardFlagged } from '../helpers/card-state'
 import type { CardImpl } from '../registry'
 
 const CARD_ID = 'A097_Freshman'
+const canReplaceBake = (context: CardListenerContext) =>
+  !context.actionContext?.checkedReplaceAction &&
+  !isCardFlagged(context.player, CARD_ID) &&
+  context.player.occupationHand.some((cardId) =>
+    isOccupationPlayable(context.state, context.player, cardId, {}, context.space?.id))
 const computeReplaceListener: CardListenerRegistration = {
   id: 'A97-freshman-replace-bake',
   cardIds: [CARD_ID],
   phases: ['computeReplace' as ActionHookPhase],
   actions: ['bake-bread'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
-    if (isCardFlagged(context.player, CARD_ID)) return
+    if (!canReplaceBake(context)) return
     return {
       decline: true,
       alternativeFlow: {
         type: 'seq',
-        optional: true,
         promptKey: 'ui.interactionFreshmanOccupation',
         choiceLabelKey: 'ui.interactionFreshmanOccupation',
         children: [
@@ -54,8 +59,7 @@ const isDoableBakeListener: CardListenerRegistration = {
   phases: ['isDoable' as ActionHookPhase],
   actions: ['bake-bread'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
-    if (isCardFlagged(context.player, CARD_ID)) return
-    if (context.player.occupationHand.length <= 0) return
+    if (!canReplaceBake(context)) return
     return { doable: true }
   },
 }

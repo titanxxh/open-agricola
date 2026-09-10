@@ -196,6 +196,15 @@ const restoreTreeFromCursor = (cursors: NodeCursor[]): EngineNode | null => {
           data.internalResultKey as string | undefined,
           data.internalPaymentInfoFrom as string | undefined,
         )
+        if (data.resolvedReplacement && typeof data.resolvedReplacement === 'object') {
+          const replacement = data.resolvedReplacement as { actionId?: unknown; sourceCard?: unknown }
+          if (typeof replacement.actionId === 'string') {
+            action.resolvedReplacement = {
+              actionId: replacement.actionId,
+              sourceCard: typeof replacement.sourceCard === 'string' ? replacement.sourceCard : undefined,
+            }
+          }
+        }
         action.beforePhaseResolved = data.beforePhaseResolved === true
         action.bodyStarted = data.bodyStarted === true
         action.continuationParentHostNodeId = typeof data.continuationParentHostNodeId === 'string'
@@ -255,6 +264,8 @@ const restoreTreeFromCursor = (cursors: NodeCursor[]): EngineNode | null => {
         xor.selectedChildId = typeof data.selectedChildId === 'string'
           ? data.selectedChildId
           : null
+        xor.replacementOriginalNodeId = typeof data.replacementOriginalNodeId === 'string' ? data.replacementOriginalNodeId : undefined
+        xor.replacementSourceCards = data.replacementSourceCards as XorNode['replacementSourceCards']
         xor.emittedChoices = (data.emittedChoices as ActionChoiceOption[] | undefined) ?? []
         xor.emittedPromptKey = data.emittedPromptKey as PromptKey | undefined
         xor.emittedPromptParams = data.emittedPromptParams as Record<string, unknown> | undefined
@@ -574,16 +585,17 @@ export class Engine {
           player,
           space: clonedSpace,
           params: actionNode?.params ? cloneSnapshotValue(actionNode.params) : undefined,
-          sourceCard: actionNode?.sourceCard,
+          sourceCard: actionNode?.resolvedReplacement?.sourceCard ?? actionNode?.sourceCard,
           actionContext: {
             ...(actionNode?.actionContext ? cloneSnapshotValue(actionNode.actionContext) : {}),
+            ...(actionNode?.resolvedReplacement ? { checkedReplaceAction: true } : {}),
             skipBeforeTriggers: true,
           },
           transactionEvents,
           eventQuery: createEventQuery(transactionEvents),
         } : undefined
         const strictDoable = !!context && (actionNode
-          ? isActionStrictlyDoableWithoutBeforeTriggers(this._internals(), context, actionNode.actionId)
+          ? isActionStrictlyDoableWithoutBeforeTriggers(this._internals(), context, actionNode.resolvedReplacement?.actionId ?? actionNode.actionId)
           : canStartNode(this._internals(), context, node))
         return {
           nodeId: node.id,

@@ -3,6 +3,7 @@ import type { CardListenerContextInput } from '../../cards/card-listeners'
 import { canSpaceAcceptWorker, filterActionSpacesByIds, findActionSpaceById, isSpaceBlocked } from '../../domain/space'
 import { canMoorWorkerEnterSpace } from '../../moor/heating'
 import { getMatchingListeners, executeCardListener, listenerOwnerOptions } from '../../cards/card-listeners'
+import { resetComputeReplaceGuards } from '../../engine/replace-guard'
 import { runActionHooks } from '../hooks'
 import { isActionDoableInFlowContext } from '../flow'
 import { OCCUPIED_SPACE_CHOICE_PREFIX } from './placement-constants'
@@ -58,6 +59,7 @@ const canExecutePlacementSpace = (
   space: ActionSpace,
   contextOverrides: PlacementContextOverrides,
 ): boolean => {
+  const actionContext = resetComputeReplaceGuards(contextOverrides.actionContext)
   if (contextOverrides.isActionDoable) {
     const baseDoable = space.canBeExecutedByPlayer.call(
       space,
@@ -65,7 +67,7 @@ const canExecutePlacementSpace = (
       player,
       {
         sourceCard: contextOverrides.sourceCard,
-        actionContext: contextOverrides.actionContext,
+        actionContext,
       },
     )
     return contextOverrides.isActionDoable(space, baseDoable)
@@ -77,7 +79,7 @@ const canExecutePlacementSpace = (
     player,
     space,
     sourceCard: contextOverrides.sourceCard,
-    actionContext: contextOverrides.actionContext,
+    actionContext,
     resolveAction: (actionId) => findActionSpaceById(state, actionId),
   })
 }

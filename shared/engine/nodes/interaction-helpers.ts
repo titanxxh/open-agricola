@@ -184,17 +184,16 @@ function markFlowSkippedComputeReplaceListeners(
 export function buildReplaceChoiceFlow(
   actionNode: Pick<
     ActionNode,
-    'actionId' | 'params' | 'sourceCard' | 'actionContext' | 'choiceLabelKey' | 'choiceLabelParams'
+    'actionId' | 'params' | 'sourceCard' | 'actionContext' | 'choiceLabelKey' | 'choiceLabelParams' | 'optional' | 'optionalPromptKey'
   >,
   alternatives: ComputeReplaceResult['alternatives'],
   replacedActionId: string,
 ): ActionFlow {
-  const guardedAlternatives = alternatives.flatMap((alternative) => {
-    const guarded = markFlowSkippedComputeReplaceListeners(
+  const guardedAlternatives = alternatives.map((alternative) => {
+    return markFlowSkippedComputeReplaceListeners(
       alternative.flow,
       alternative.replacementListenerIds,
     )
-    return guarded.type === 'xor' ? guarded.children : [guarded]
   })
   return {
     type: 'xor',
@@ -203,6 +202,8 @@ export function buildReplaceChoiceFlow(
       {
         type: 'leaf',
         actionId: replacedActionId,
+        optional: actionNode.optional,
+        promptKey: actionNode.optionalPromptKey,
         params: actionNode.params,
         sourceCard: actionNode.sourceCard,
         actionContext: markCheckedReplaceAction(actionNode.actionContext),

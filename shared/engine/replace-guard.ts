@@ -23,3 +23,11 @@ export const withSkippedComputeReplaceListeners = (
     [SKIP_COMPUTE_REPLACE_LISTENER_IDS]: [...new Set([...existing, ...normalized])],
   }
 }
+
+export const resetComputeReplaceGuards = (
+  actionContext?: Record<string, unknown>,
+): Record<string, unknown> => ({
+  ...actionContext,
+  checkedReplaceAction: false,
+  [SKIP_COMPUTE_REPLACE_LISTENER_IDS]: [],
+})

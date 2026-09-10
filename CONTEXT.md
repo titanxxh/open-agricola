@@ -294,6 +294,14 @@ _Avoid_: Action Execution Scope、跨 Turn 复用身份或起点状态
 一次完整使用行动格，或规则明确授予的一次命名行动。Rule Action 可以发生在 Turn 内，也可以在阶段或 anytime 窗口中脱离 Turn 执行；选择和 continuation 只是该行动的结算过程。
 _Avoid_: Turn、ActionNode、单独的资源增减 / 支付 / 选择
 
+**Action Replacement（行动替换）**:
+规则允许玩家在原行动开始前，选择用另一项效果替代该行动机会。替代效果是否构成命名行动、包含哪些必需或可选步骤，仍由对应规则决定。
+_Avoid_: 额外获得原行动、支付成本替换、将所有替代效果视为相同行动
+
+**Replacement Selection（替换选择）**:
+玩家在适用的替代效果与不替换之间作出的明确选择；只有一个可执行替代也需要玩家选择。不替换保留原行动既有的可选性和义务，选择替代则承诺其必需步骤。
+_Avoid_: 原行动的执行确认、自动使用唯一替代、通过拒绝替换跳过必需行动
+
 **Action Execution Scope（行动执行作用域）**:
 一项 Rule Action 的完整结算边界，覆盖该行动的选择、continuation、响应和后置效果。同一 Turn 内的多个 Rule Action 各自使用独立作用域，但共用 Turn Scope。
 _Avoid_: 用 Turn Scope 代替、为单独的资源增减 / 支付 / 选择新建作用域

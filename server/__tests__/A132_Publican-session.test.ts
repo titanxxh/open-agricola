@@ -637,7 +637,7 @@ describe('A132_Publican session', () => {
     expect(resp.interaction.stateId).toBe('wait')
     if (resp.interaction.stateId !== 'wait') return
     const sowOption = resp.interaction.request.options.find(
-      (option) => option.labelKey === 'actions.sow.name',
+      (option) => option.labelKey === 'ui.interactionDoNotReplace',
     )
     expect(sowOption).toBeDefined()
 

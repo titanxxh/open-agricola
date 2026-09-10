@@ -2,6 +2,7 @@ import { defineMinorCard } from '../card-source'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import { collectComputeCostsForFarmChoice } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
+import { getSkipComputeReplaceListenerIds } from '../../engine/replace-guard'
 import { canStartFencing } from '../../actions/effects/fencing'
 import type { CardImpl } from '../registry'
 
@@ -108,7 +109,8 @@ const isDoableListener: CardListenerRegistration = {
   actions: ['sow'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (context.space?.id !== 'grain-utilization') return
-    if (context.doable) return
+    if (context.doable || context.actionContext?.checkedReplaceAction) return
+    if (getSkipComputeReplaceListenerIds(context.actionContext).includes(computeReplaceListener.id)) return
     // Make sow doable if fencing is possible (the card adds fence as an alternative)
     if (canStartFencing(context.state, context.player, previewFenceCostOverride(context))) {
       return { doable: true }
@@ -123,7 +125,8 @@ const isDoableBakeListener: CardListenerRegistration = {
   actions: ['bake-bread'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (context.space?.id !== 'grain-utilization') return
-    if (context.doable) return
+    if (context.doable || context.actionContext?.checkedReplaceAction) return
+    if (getSkipComputeReplaceListenerIds(context.actionContext).includes(computeReplaceBakeListener.id)) return
     if (canStartFencing(context.state, context.player, previewFenceCostOverride(context))) {
       return { doable: true }
     }

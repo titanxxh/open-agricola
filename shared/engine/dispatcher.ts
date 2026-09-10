@@ -115,7 +115,7 @@ export class HookDispatcher {
         if (typeof result.actionId === 'string') {
           actionId = result.actionId
         }
-        if (resultSourceCard) {
+        if (resultSourceCard && !(result.decline && result.alternativeFlow)) {
           sourceCard = resultSourceCard
         }
         if (result.decline && result.alternativeFlow) {

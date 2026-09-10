@@ -25,13 +25,13 @@ const setup = ({ wood = 4, grain = 0, field = false, played = true } = {}) => {
   return session
 }
 
-const outerSowBranch = (session: GameSession) => {
+const outerSowBranch = (session: GameSession, action = 'sow') => {
   const response = session.takeAction(0, 'grain-utilization')
   expect(response.ok, response.error).toBe(true)
   expect(response.interaction.stateId).toBe('wait')
   if (response.interaction.stateId !== 'wait') return response
   const option = response.interaction.request.options?.find((candidate) =>
-    candidate.labelParams?.actionNameKey === 'actions.sow.name'
+    candidate.labelParams?.actionNameKey === `actions.${action}.name`
   )
   expect(option).toBeDefined()
   return session.resolveChoice(0, option!.value)
@@ -65,40 +65,26 @@ describe('B026 Agrarian Fences parity', () => {
     expect(response.state.players[0]!.minorPlayed).toContain(CARD_ID)
   })
 
-  it('B026 S2: Grain Utilization can build fences without seeds or baking', () => {
+  it.each(['sow', 'bake-bread'])('requires explicit replacement before fencing through %s', (action) => {
     const session = setup()
-    let response = outerSowBranch(session)
-    const fences = response.interaction.request.options!.find((option) => option.labelKey === 'actions.fencing.name')!
-    response = session.resolveChoice(0, fences.value)
-    expect(response.interaction.stateId).toBe('wait')
-    if (response.interaction.stateId !== 'wait') return
+    let response = outerSowBranch(session, action)
+    expect(response.interaction.promptKey).toBe('ui.interactionSelectReplacement')
+    expect(response.interaction.request.options).toHaveLength(1)
+    expect(response.state.players[0]!.resources.wood).toBe(4)
+    const source = response.interaction.request.options!.find((option) => option.sourceCard === CARD_ID)!
+    response = session.resolveChoice(0, source.value)
     expect(response.interaction.request.farm?.farmType).toBe('fence')
-
-    response = session.commitSelectionChoice(0, { edges: FENCE_EDGES, extraWood: 0 })
-
+    response = session.commitSelectionChoice(0, { edges: FENCE_EDGES, palisadeEdges: [], extraWood: 0 })
     expect(response.ok, response.error).toBe(true)
     expect(response.state.players[0]!.resources.wood).toBe(0)
     expect(response.state.players[0]!.fenceSegments).toHaveLength(4)
-  })
-
-  it('B026 S3: Grain Utilization can sow and then build fences', () => {
-    const session = setup({ grain: 1, field: true })
-    let response = outerSowBranch(session)
-    response = chooseLabel(session, response, 'ui.interactionAgrarianFencesSowAndFence')
-    response = commitSow(session, response)
-
-    response = session.commitSelectionChoice(0, { edges: FENCE_EDGES, extraWood: 0 })
-
-    expect(response.ok, response.error).toBe(true)
-    expect(response.state.players[0]!.resources).toMatchObject({ grain: 0, wood: 0 })
-    expect(response.state.players[0]!.fields[0]!.stacks).toEqual([{ kind: 'grain', remaining: 3 }])
-    expect(response.state.players[0]!.fenceSegments).toHaveLength(4)
+    expect(response.state.players[0]!.pastures).toHaveLength(1)
   })
 
   it('B026 S4: Grain Utilization can retain its normal sow without fencing', () => {
     const session = setup({ grain: 1, field: true })
     let response = outerSowBranch(session)
-    response = chooseLabel(session, response, 'actions.sow.name')
+    response = chooseLabel(session, response, 'ui.interactionDoNotReplace')
 
     response = commitSow(session, response)
 

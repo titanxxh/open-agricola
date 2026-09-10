@@ -4,13 +4,17 @@
 
 > [`card_implementation_status.md`](card_implementation_status.md) is canonical. This file has a maintained Chinese mirror at [`card_implementation_status_zh.md`](card_implementation_status_zh.md).
 
-> Generated and last updated on 2026-09-08. This file replaces `docs/card_desc_audit.md`, `docs/card_progress.md`, `docs/master-plan.md`, and `docs/bad-smell.md`. The sole the reference reference is the reference implementation.
+> Generated and last updated on 2026-09-10. This file replaces `docs/card_desc_audit.md`, `docs/card_progress.md`, `docs/master-plan.md`, and `docs/bad-smell.md`. The sole the reference reference is the reference implementation.
 
 ## 2. Open issues by priority
 
 The reference PHP path is relative by defaultthe reference implementation;The OA path is relative to this warehouse by default.
 
-There are currently no open issue priority entries.
+| Priority | Scope | Open work |
+|---|---|---|
+| P2 | `B026_AgrarianFences` | Separate card-rule follow-up: the printed rule replaces one of the two Grain Utilization actions, while the current listeners also offer original-action-plus-fence branches and lack a shared once-per-use limit. Source mismatch identified; correcting that quota and the extra-action branches is outside the shared-mechanism change. |
+| P2 | `E151_DeliveryNurse` | Separate eligibility follow-up: compare room availability through the shared extra-room-capacity rules instead of only physical room count. Source review identified the discrepancy; add a Session reproduction before fixing it. |
+| P2 | `C168_AnimalCatcher` | Separate provenance investigation: the replacement matches `gain` by Day Laborer space and source exclusion, which may also match an additional reward. Verify that only the space's base reward is replaced. This is a source-level risk, not a reproduced Session failure. |
 
 ## 3. Accepted differences
 
@@ -168,13 +172,13 @@ Physical supply-row rules use `isBottomRowMajorImprovement()` and `getAvailableB
 
 Note: React/Suspense, CDN, browser fallback, etc. are normal terms for the platform/browser and are not considered card architecture risks.
 
+Shared action replacement uses one explicit source menu before the original optional prompt, including singleton replacements. Selected subtrees retain internal choices and optional children; required continuations remain committed across before, pending, reconnect, and undo. Per-leaf replacement decisions and opportunity-scoped producer guards preserve action identity and let newly granted action spaces calculate replacements again. This covers the eleven-card migration in #850–#852 and ordinary custom alternatives; architecture and executable Session coverage define the shared contract. The independent B026 quota, E151 capacity, and C168 provenance follow-ups remain in §2.
+
 ## 6. Infrastructure backlog
 
 Shared payment enumeration supports `ComplexCost.minimumResourcesPaid` after discounts and substitutions, before optimal-solution pruning. Improvement candidates and submission share this constraint. Nested OR/XOR leaves reuse the ordinary choice-candidate pipeline. Base field scoring counts only Farmyard Fields; card-driven terminal investments use explicit choices and real payments. Mandatory occupation follow-up food reuses the existing lesson-payment preview and `reserveResources` contract.
 
 Supply person identity, reservation, normal rotation, and return-home disposition are implemented through the shared boundaries in §5 and `docs/ARCHITECTURE.md` §6.4; card timing and costs remain local.
-
-There is currently no open infrastructure umbrella pending. Completed historical items such as Before-End Player Dispatch, Scoring Reserve, printed-cost helper, extra-turn rotation, family token supply, Major Improvement stack supply, card boundary guard, single-layer terrain selection flow, FoM immediate resource minor helper, pasture / harvest / breeding / scoring / stable / special-stable, etc. have been merged into §5 Architecture Constraints or §12 Single Card Remarks as needed, and the completion list is no longer maintained in this section.
 
 **Browser local workshop trial sandbox** (PR #619 / wayfinder #605, completed): New`client/local-sandbox/`browser-side custom card compilation + execution infrastructure,`VITE_SANDBOX_EXECUTOR=browser`The whole demo of Time Workshop runs in the browser. Reuse shared AST validator + compiler and use it within Web Worker`new Function`Execute card code, execution semantics and server-side isolated-vm executor by`server/__tests__/local-sandbox-parity.test.ts`Crucify equivalence. **Boundary**: It only serves the dry-run of the single workshop trial (the author's own card), and does not serve the real multiplayer game - the code execution of the real game card still goes through the server-side isolated-vm, and the back-end authority remains unchanged (accepted divergence, see §3). **Security**: The browser executor is not hard-isolated, using strict mode + shadow globals + worker capability removal three-layer defense in depth; the authoritative isolation of third-party published cards is guaranteed by the server. See details`docs/ARCHITECTURE.md`§12.5 and`docs/CUSTOM_CARD_SANDBOX.md` §8.
 

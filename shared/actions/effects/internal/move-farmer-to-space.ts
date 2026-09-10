@@ -8,6 +8,7 @@ import {
   findActionSpaceByWorker,
   removeWorkerRef,
 } from '../../../domain/space'
+import { resetComputeReplaceGuards } from '../../../engine/replace-guard'
 import { computeAllowedPlacementSpaces, type AllowedPlacement } from '../../helpers/placement-availability'
 
 /**
@@ -123,7 +124,7 @@ export const moveFarmerToSpaceAction: ActionDefinition = {
       ...(sourceCard ? { viaCardId: sourceCard } : {}),
     })
 
-    const targetActionContext = { ...(actionContext ?? {}), targetSpaceId: targetSpace.id }
+    const targetActionContext = { ...resetComputeReplaceGuards(actionContext), targetSpaceId: targetSpace.id }
     if (actionContext) actionContext.targetSpaceId = targetSpace.id
     const targetFlow: ActionFlow = {
       type: 'leaf',

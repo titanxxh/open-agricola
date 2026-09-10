@@ -634,11 +634,15 @@ describe('Farmers of the Moor heating, sick workers, and Infirmary', () => {
     const player = session.state.players[0]!
     player.minorPlayed = ['M032_PeatHut']
     player.resources.fuel = 0
+    player.cardStates.M032_PeatHut = { flagged: false }
+    const resources = { ...player.resources }
     expect(getExtraRoomCapacity(player)).toBe(1)
     expect(familySize(player)).toBe(2)
 
     let resp = session.takeAction(0, 'house-redevelopment')
     expect(resp.ok).toBe(true)
+    expect(resp.interaction.request.options).toHaveLength(1)
+    expect(resp.state.players[0]!.rooms).toBe(2)
     const replacement = resp.interaction.request.options!.find((option) => option.sourceCard === 'M032_PeatHut')!
     resp = session.resolveChoice(0, replacement.value)
     expect(resp.interaction.request.farm?.farmType).toBe('room')
@@ -657,6 +661,29 @@ describe('Farmers of the Moor heating, sick workers, and Infirmary', () => {
     expect(after.resources.clay).toBe(0)
     expect(after.resources.reed).toBe(0)
     expect(getExtraRoomCapacity(after)).toBe(0)
+    expect(after.resources).toEqual(resources)
+    expect(familySize(after)).toBe(2)
+    expect(after.cardStates.M032_PeatHut).toBeUndefined()
+    expect(resp.state.events.filter((event) => event.type === 'farm.roomBuilt')).toHaveLength(1)
+    expect(resp.state.events.filter((event) => event.type === 'card.returnedToBoard' && event.cardId === 'M032_PeatHut')).toHaveLength(1)
+    expect(resp.state.events.some((event) => event.type === 'farm.renovated')).toBe(false)
+  })
+
+  it('keeps Peat Hut when the player explicitly chooses and pays for normal renovation', () => {
+    const session = prepareMoorHeatingSession()
+    const player = session.state.players[0]!
+    player.minorPlayed = ['M032_PeatHut']
+    player.resources.clay = 2
+    player.resources.reed = 1
+    const offered = session.takeAction(0, 'house-redevelopment')
+    const original = offered.interaction.request.options!.find((option) => option.labelKey === 'ui.interactionDoNotReplace')!
+    const response = session.resolveChoice(0, original.value)
+    expect(response.ok, response.error).toBe(true)
+    expect(response.state.players[0]!.houseType).toBe('clay')
+    expect(response.state.players[0]!.resources).toMatchObject({ clay: 0, reed: 0 })
+    expect(response.state.players[0]!.minorPlayed).toContain('M032_PeatHut')
+    expect(response.state.events.filter((event) => event.type === 'farm.renovated')).toHaveLength(1)
+    expect(response.state.events.some((event) => event.type === 'farm.roomBuilt')).toBe(false)
   })
 
   it('does not offer Peat Hut replacement when no wooden room can be built', () => {

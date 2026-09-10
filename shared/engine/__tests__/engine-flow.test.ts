@@ -1616,11 +1616,11 @@ describe('Engine flow nodes', () => {
     if (choiceStep.type !== 'choice') return
     expect(choiceStep.choice.options.map((option) => option.labelKey)).toEqual([
       'ui.interactionLazySowmanPlace',
-      'actions.construct.name',
+      'ui.interactionDoNotReplace',
     ])
 
     const originalOption = choiceStep.choice.options.find(
-      (option) => option.labelKey === 'actions.construct.name',
+      (option) => option.labelKey === 'ui.interactionDoNotReplace',
     )
     expect(originalOption).toBeDefined()
 
@@ -1712,7 +1712,7 @@ describe('Engine flow nodes', () => {
     expect(topChoice.choice.options.map((option) => option.labelKey)).toEqual([
       'test.replacementA',
       'test.replacementB',
-      'actions.construct.name',
+      'ui.interactionDoNotReplace',
     ])
     const replacementBOption = topChoice.choice.options.find(
       (option) => option.labelKey === 'test.replacementB',
@@ -1724,7 +1724,7 @@ describe('Engine flow nodes', () => {
     if (nestedChoice.type !== 'choice') return
     expect(nestedChoice.choice.options.map((option) => option.labelKey)).toEqual([
       'test.replacementA',
-      'actions.construct.name',
+      'ui.interactionDoNotReplace',
     ])
 
     const originalEngine = makeEngine()
@@ -1733,7 +1733,7 @@ describe('Engine flow nodes', () => {
     expect(originalChoice.type).toBe('choice')
     if (originalChoice.type !== 'choice') return
     const originalOption = originalChoice.choice.options.find(
-      (option) => option.labelKey === 'actions.construct.name',
+      (option) => option.labelKey === 'ui.interactionDoNotReplace',
     )
     expect(originalOption).toBeDefined()
     expect(originalEngine.resolveChoice(originalOption!.value, { state, player, space }).type).toBe('ok')
