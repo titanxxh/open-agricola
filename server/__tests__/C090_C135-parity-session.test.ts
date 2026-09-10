@@ -114,7 +114,19 @@ describe('C100 Butler parity', () => {
   it('C100 S1: Butler is playable in round eleven', () => expect(playOccupation(setup({ cardId: 'C100_Butler', played: false, round: 11 }), 'C100_Butler').state.players[0]!.occupationPlayed).toContain('C100_Butler'))
   it('C100 S2: more rooms than people scores four points', () => { const s = setup({ cardId: 'C100_Butler', round: 14 }); s.state.players[0]!.rooms = 3; s.loadState(s.state); expect(bonus(s.getState(), 'C100_Butler')).toBe(4) })
   it('C100 S3: equal rooms and people scores zero', () => expect(bonus(setup({ cardId: 'C100_Butler', round: 14 }).getState(), 'C100_Butler')).toBe(0))
-  it('C100 S4: OA plays Butler after round eleven and still scores it', () => { const s = setup({ cardId: 'C100_Butler', played: false, round: 12 }); const r = playOccupation(s, 'C100_Butler'); expect(r.state.players[0]!.occupationPlayed).toContain('C100_Butler'); r.state.players[0]!.rooms = 3; s.loadState(r.state); expect(bonus(s.getState(), 'C100_Butler')).toBe(4) })
+  it('C100 S4: after round eleven OA rejects Butler and preserves the placement state', () => {
+    const session = setup({ cardId: 'C100_Butler', played: false, round: 12 })
+    session.state.players[0]!.rooms = 3
+    session.loadState(session.state)
+    const before = JSON.stringify(session.getState().state)
+    const response = playOccupation(session, 'C100_Butler')
+    expect(response.ok).toBe(false)
+    expect(JSON.stringify(response.state)).toBe(before)
+    expect(response.state.players[0]!.occupationHand).toContain('C100_Butler')
+    expect(response.state.players[0]!.occupationPlayed).not.toContain('C100_Butler')
+    expect(bonus(response, 'C100_Butler')).toBe(0)
+    expect(session.takeAction(0, 'day-laborer').ok).toBe(true)
+  })
 })
 
 describe('C122 Bricklayer parity', () => {

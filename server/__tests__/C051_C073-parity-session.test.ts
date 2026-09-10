@@ -394,13 +394,36 @@ describe('C062 Cookery Extension parity', () => {
     const response = playMinor(setup({ cardId: 'C062_CookeryExtension', played: false, resources: { clay: 2 } }), 'C062_CookeryExtension')
     expect(response.state.players[0]!.minorPlayed).toContain('C062_CookeryExtension')
   })
-  it('C062 S2: OA public feeding does not expose its doubled Fireplace exchange', () => {
-    const session = setup({ cardId: 'C062_CookeryExtension', round: 4, resources: { vegetable: 1 } })
-    session.state.players[0]!.improvements = ['Major_Fireplace1']; prepareHarvest(session)
-    const response = session.performRoundEnd()
-    expect(response.interaction.stateId === 'wait' && response.interaction.request.kind === 'feed'
-      ? options(response).some((option) => JSON.stringify(option).includes('C062_CookeryExtension'))
-      : false).toBe(false)
+  it('C062 S2: OA public feeding rejects the doubled Fireplace exchange without mutating state', () => {
+    const session = setup({ cardId: 'C062_CookeryExtension', round: 4, resources: { vegetable: 2 } })
+    session.state.players[0]!.improvements = ['Major_Fireplace1']
+    prepareHarvest(session, 2)
+    expect(session.getState().state.players[0]!.resources).toMatchObject({ vegetable: 2, food: 20 })
+    let offered = session.performRoundEnd()
+    expect(offered.ok, offered.error).toBe(true)
+    expect(offered.interaction).toMatchObject({ stateId: 'wait', spaceId: '__subflow:post-reap-anytime' })
+    offered = session.takeAnytimeAction(0, 'exchange')
+    expect(offered.ok, offered.error).toBe(true)
+    expect(options(offered).some((option) => option.sourceCard === 'Major_Fireplace1')).toBe(true)
+    expect(options(offered).some((option) => option.sourceCard?.startsWith('C062_CookeryExtension'))).toBe(false)
+    offered = session.resolveChoice(0, 'cancel')
+    expect(offered.ok, offered.error).toBe(true)
+    offered = session.resolveChoice(0, '__skip__')
+    expect(offered.ok, offered.error).toBe(true)
+    expect(offered.interaction, JSON.stringify(offered.interaction)).toMatchObject({
+      stateId: 'wait', playerIndex: 0, request: { kind: 'feed', remaining: 0, foodUsed: 4 },
+    })
+    expect(offered.state.players[0]!.resources).toMatchObject({ vegetable: 2, food: 16 })
+    const before = JSON.stringify(offered.state)
+    const rejected = session.resolveChoice(0, 'confirm', { selections: [{
+      sourceId: 'C062_CookeryExtension::Major_Fireplace1', exchangeIndex: 0, count: 1,
+    }] })
+    expect(rejected.ok).toBe(false)
+    expect(JSON.stringify(rejected.state)).toBe(before)
+    expect(rejected.interaction).toMatchObject({ stateId: 'wait', request: { kind: 'feed' } })
+    const finished = session.resolveChoice(0, 'confirm', { selections: [] })
+    expect(finished.ok, finished.error).toBe(true)
+    expect(finished.state.players[0]!.resources).toMatchObject({ vegetable: 2, food: 16 })
   })
 })
 

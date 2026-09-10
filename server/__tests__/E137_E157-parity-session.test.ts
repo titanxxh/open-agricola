@@ -239,7 +239,12 @@ describe('E148-E157 parity', () => {
   })
   it('E151 S2: all animal types allow no-room family growth once', () => {
     const s = setup({ cardId: 'E151_DeliveryNurse', round: 10, resources: { sheep: 1, boar: 1, cattle: 1 } })
-    const r = s.takeAction(0, 'wish-children')
+    expect(s.getState().state.players[0]!.resources).toMatchObject({ sheep: 1, boar: 1, cattle: 1 })
+    let r = s.takeAction(0, 'wish-children')
+    expect(r.ok, r.error).toBe(true)
+    expect(r.interaction.stateId, JSON.stringify(r.interaction)).toBe('wait')
+    r = choose(s, r, (option) => option.sourceCard === 'E151_DeliveryNurse')
+    expect(r.ok, r.error).toBe(true)
     expect(familySize(r.state.players[0]!)).toBe(3)
     expect(r.state.players[0]!.cardStates.E151_DeliveryNurse?.flagged).toBe(true)
   })
