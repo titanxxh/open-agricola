@@ -1,3 +1,5 @@
+import { setWorkersAtHome } from '../../shared/domain/player'
+
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
@@ -359,5 +361,120 @@ describe('A072_CalciumFertilizers session', () => {
     expect(resp.ok).toBe(true)
     // Card should work — field gets +1
     expect(resp.state.players[0]!.fields[0]!.stacks[0]?.remaining ?? 0).toBe(3)
+  })
+})
+
+describe('A072_CalciumFertilizers session', () => {
+  const CARD_ID = 'A072_CalciumFertilizers'
+
+  const setup = (round = 4) => {
+    const session = new GameSession(6072, undefined, { playerCount: 2 })
+    stabilizeRandomHands(session.state.players)
+    const state = session.getState().state
+    state.players = state.players.slice(0, 2)
+    state.currentPlayerIndex = 0
+    state.round = round
+    state.roundPhase = 'work'
+
+    const player = state.players[0]!
+    setWorkersAtHome(state, player, 2)
+    player.minorHand = ['__test_placeholder__']
+    player.occupationHand = ['__test_placeholder__']
+    player.minorPlayed.push(CARD_ID)
+    state.players[1]!.minorHand = ['__test_placeholder__']
+    state.players[1]!.occupationHand = ['__test_placeholder__']
+
+    const easternQuarry = state.actionSpaces.find((s) => s.id === 'eastern-quarry')
+    if (easternQuarry) easternQuarry.resources.stone = 2
+
+    const westernQuarry = state.actionSpaces.find((s) => s.id === 'western-quarry')
+    if (westernQuarry) westernQuarry.resources.stone = 2
+
+    session.loadState(state)
+    return session
+  }
+
+  it('A072 S2: having a field tile keeps Calcium Fertilizers unavailable', () => {
+    const session = new GameSession(6172, undefined, { playerCount: 2 })
+    stabilizeRandomHands(session.state.players)
+    const state = session.getState().state
+    state.players = state.players.slice(0, 2)
+    state.currentPlayerIndex = 0
+    state.round = 1
+    state.roundPhase = 'work'
+    state.availableMajorImprovements = []
+
+    const player = state.players[0]!
+    setWorkersAtHome(state, player, 2)
+
+    player.fields = [
+      { row: 0, col: 3, stacks: [] },
+    ]
+
+    player.minorHand = [CARD_ID]
+    player.occupationHand = ['__test_placeholder__']
+    state.players[1]!.minorHand = ['__test_placeholder__']
+    state.players[1]!.occupationHand = ['__test_placeholder__']
+
+    session.loadState(state)
+
+    let resp = session.takeAction(0, 'meeting-place')
+    expect(resp.ok, resp.error).toBe(true)
+    if (resp.interaction.stateId === 'wait'
+      && !resp.interaction.request.options?.some((option) => option.value === CARD_ID)) {
+      const improvement = resp.interaction.request.options?.find((option) =>
+        option.value.startsWith('action-improvement-'))
+      if (improvement) resp = session.resolveChoice(0, improvement.value)
+    }
+
+
+    if (resp.interaction.stateId === 'wait') {
+
+      const a72Option = resp.interaction.request.options?.find(
+        (option) => option.value === CARD_ID,
+      )
+      expect(a72Option).toBeUndefined()
+    } else {
+
+      expect(resp.interaction.stateId === 'wait' ? resp.interaction.request.kind : resp.interaction.stateId).toBe('confirm-next-player')
+    }
+  })
+
+  it('A072 S1: with no field tiles Calcium Fertilizers can be played for free', () => {
+    const session = new GameSession(6272, undefined, { playerCount: 2 })
+    stabilizeRandomHands(session.state.players)
+    const state = session.getState().state
+    state.currentPlayerIndex = 0
+    state.round = 1
+    state.roundPhase = 'work'
+    state.availableMajorImprovements = []
+
+    const player = state.players[0]!
+    setWorkersAtHome(state, player, 2)
+    player.fields = []
+    player.minorHand = [CARD_ID]
+    player.occupationHand = ['__test_placeholder__']
+    state.players[1]!.minorHand = ['__test_placeholder__']
+    state.players[1]!.occupationHand = ['__test_placeholder__']
+
+    session.loadState(state)
+
+    let resp = session.takeAction(0, 'meeting-place')
+    expect(resp.ok, resp.error).toBe(true)
+    if (resp.state.players[0]!.minorHand.includes(CARD_ID) && resp.interaction.stateId === 'wait') {
+      if (!resp.interaction.request.options?.some((option) => option.value === CARD_ID)) {
+        const improvement = resp.interaction.request.options?.find((option) =>
+          option.value.startsWith('action-improvement-'))
+        if (improvement) resp = session.resolveChoice(0, improvement.value)
+      }
+      if (resp.state.players[0]!.minorHand.includes(CARD_ID) && resp.interaction.stateId === 'wait') {
+        const card = resp.interaction.request.options?.find((option) => option.value === CARD_ID)
+        expect(card).toBeDefined()
+        resp = session.resolveChoice(0, card!.value)
+      }
+    }
+
+    expect(resp.ok, resp.error).toBe(true)
+    expect(resp.state.players[0]!.minorPlayed).toContain(CARD_ID)
   })
 })

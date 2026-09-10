@@ -1,3 +1,7 @@
+import { setWorkersAtHome } from '../../shared/domain/player'
+import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
+import '../../shared/cards/C/C133_Soldier'
+
 import { describe, expect, it } from 'vitest'
 import { GameSession, type SessionResponse } from '../game/authoritative-session'
 import type { PlayerState } from '../../shared/contract/types'
@@ -250,5 +254,66 @@ describe('C133_Soldier before-end scoring choice', () => {
         ]),
       }),
     )
+  })
+})
+
+describe('C133 Soldier parity', () => {
+  const CARD_ID = 'C133_Soldier'
+
+  const JOINERY_ID = 'Major_Joinery'
+
+  const FILLER = '__test_placeholder__'
+
+  const setup = ({
+    played = true, wood = 0, stone = 0, joinery = false,
+  } = {}) => {
+    const session = new GameSession(6133, undefined, { playerCount: 3 })
+    const state = session.getState().state
+    stabilizeRandomHands(state.players)
+    state.currentPlayerIndex = 0
+    state.round = 14
+    state.roundPhase = 'work'
+    state.gameOver = false
+    state.actionSpaces.forEach((space) => { space.takenBy = [] })
+    state.players.forEach((player) => {
+      setActiveWorkerCount(player, 0)
+      setWorkersAtHome(state, player, 0)
+      markAllWorkersUsed(state, player)
+      player.minorHand = [FILLER]
+      player.occupationHand = [FILLER]
+      player.minorPlayed = []
+      player.occupationPlayed = []
+      player.improvements = []
+      player.cardStates = {}
+      player.resources = {
+        ...player.resources, wood: 0, clay: 0, reed: 0, stone: 0, food: 20, grain: 0,
+        vegetable: 0, sheep: 0, boar: 0, cattle: 0, begging: 0,
+      }
+    })
+    const owner = state.players[0]!
+    owner.occupationHand = played ? [FILLER] : [CARD_ID]
+    owner.occupationPlayed = played ? [CARD_ID] : []
+    owner.resources.wood = wood
+    owner.resources.stone = stone
+    owner.improvements = joinery ? [JOINERY_ID] : []
+    if (!played) {
+      setActiveWorkerCount(owner, 2)
+      setWorkersAtHome(state, owner, 2)
+    }
+    session.loadState(state)
+    return session
+  }
+
+  const cardBonusEntries = (response: SessionResponse) =>
+    computeScores(response.state)[0]!.categories
+      .find((category) => category.key === 'cardBonusVp')?.entries ?? []
+
+  it('C133 S5: without a complete wood and stone pair Soldier gives no scoring choice', () => {
+    const response = setup({ wood: 3, stone: 0 }).invokeAfterRoundEnd()
+
+    expect(response.ok, response.error).toBe(true)
+    expect(response.state.gameOver).toBe(true)
+    expect(response.interaction.stateId).toBe('gameover')
+    expect(cardBonusEntries(response).some((entry) => entry.cardId === CARD_ID)).toBe(false)
   })
 })

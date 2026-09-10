@@ -1,3 +1,5 @@
+import { setWorkersAtHome } from '../../shared/domain/player'
+
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
@@ -175,5 +177,71 @@ describe('E161_ElderBaker session integration', () => {
     if (!resp.ok || resp.interaction.stateId !== 'wait') return
     const values = (resp.interaction.request.options ?? []).map((o) => o.value)
     expect(values).not.toContain(STONE_OVEN_ID)
+  })
+})
+
+describe('E161 Elder Baker parity', () => {
+  const CARD_ID = 'E161_ElderBaker'
+
+  const STONE_OVEN_ID = 'Major_StoneOven'
+
+  const FILLER = '__test_placeholder__'
+
+  const baseSession = ({
+    played = true, grain = 0, stoneOvenAvailable = true,
+  }: { played?: boolean; grain?: number; stoneOvenAvailable?: boolean } = {}) => {
+    const session = new GameSession(6161, undefined, { playerCount: 4 })
+    stabilizeRandomHands(session.state.players)
+    const state = session.getState().state
+    state.currentPlayerIndex = 0
+    state.round = 5
+    state.roundPhase = 'work'
+    state.actionSpaces.forEach((space) => { space.takenBy = [] })
+    state.players.forEach((player, index) => {
+      setWorkersAtHome(state, player, 2)
+      player.minorHand = [FILLER]
+      player.occupationHand = [FILLER]
+      player.minorPlayed = []
+      player.occupationPlayed = []
+      player.improvements = []
+      player.cardStates = {}
+      Object.assign(player.resources, {
+        wood: 0, clay: index === 0 ? 1 : 0, reed: 0, stone: index === 0 ? 3 : 0,
+        food: 20, grain: index === 0 ? grain : 0, vegetable: 0, sheep: 0, boar: 0,
+        cattle: 0, begging: 0,
+      })
+    })
+    const owner = state.players[0]!
+    owner.occupationHand = played ? [FILLER] : [CARD_ID]
+    owner.occupationPlayed = played ? [CARD_ID] : []
+    if (!stoneOvenAvailable) {
+      state.availableMajorImprovements = state.availableMajorImprovements
+        .filter((cardId) => cardId !== STONE_OVEN_ID)
+    }
+    session.loadState(state)
+    return session
+  }
+
+  const setupPlayed = (configuration: { grain?: number; stoneOvenAvailable?: boolean } = {}) => {
+    return baseSession({ ...configuration, played: true })
+  }
+
+  it('E161 S2: the owner uses the private Elder Baker action space to gain three grain', () => {
+    const response = setupPlayed().takeAction(0, CARD_ID)
+
+    expect(response.ok, response.error).toBe(true)
+    expect(response.state.players[0]!.resources.grain).toBe(3)
+  })
+
+  it('E161 S3: a non-owner cannot use the private Elder Baker action space', () => {
+    const session = setupPlayed()
+    const before = session.getState()
+    const response = session.takeAction(1, CARD_ID)
+
+    expect(session.getActionAvailability(1)[CARD_ID]).toBe(false)
+    expect(response.ok).toBe(false)
+    expect(response.state.players[1]!.resources.grain).toBe(0)
+    expect(response.state.actionSpaces.find((space) => space.id === CARD_ID)?.takenBy)
+      .toEqual(before.state.actionSpaces.find((space) => space.id === CARD_ID)?.takenBy)
   })
 })

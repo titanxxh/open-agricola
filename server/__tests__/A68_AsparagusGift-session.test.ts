@@ -1,3 +1,5 @@
+import { setWorkersAtHome } from '../../shared/domain/player'
+
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
@@ -93,5 +95,68 @@ describe('A68 Asparagus Gift — session', () => {
       player.fields = [{ row: 0, col: 0, stacks: [] }]
       expect(meetsCardPrerequisites(player, A068_AsparagusGift, state.round, state)).toBe(true)
     })
+  })
+})
+
+describe('A68 Asparagus Gift — session', () => {
+  const CARD_ID = 'A068_AsparagusGift'
+
+  const setupPlay = (withEmptyField: boolean) => {
+    const session = new GameSession(6068, undefined, { playerCount: 2 })
+    stabilizeRandomHands(session.state.players)
+    const state = session.getState().state
+    state.currentPlayerIndex = 0
+    state.roundPhase = 'work'
+    const player = state.players[0]!
+    setWorkersAtHome(state, player, 2)
+    player.minorHand = [CARD_ID, 'A025_Bassinet']
+    player.occupationHand = ['__test_placeholder__']
+    player.fields = withEmptyField ? [{ row: 0, col: 3, stacks: [] }] : []
+    player.resources.wood = 1
+    player.resources.reed = 1
+    state.players[1]!.minorHand = ['__test_placeholder__']
+    state.players[1]!.occupationHand = ['__test_placeholder__']
+    session.loadState(state)
+    return session
+  }
+
+  const offeredMinorIds = (session: GameSession) => {
+    let resp = session.takeAction(0, 'major-improvement')
+    expect(resp.ok, resp.error).toBe(true)
+    if (resp.state.players[0]!.minorHand.includes(CARD_ID)
+      && resp.interaction.stateId === 'wait'
+      && !resp.interaction.request.options?.some((option) => option.value === CARD_ID)) {
+      const enter = resp.interaction.request.options?.find((option) => option.value.startsWith('action-improvement-'))
+      if (enter) resp = session.resolveChoice(0, enter.value)
+    }
+    expect(resp.interaction.stateId).toBe('wait')
+    return resp.interaction.stateId === 'wait'
+      ? resp.interaction.request.options?.map((option) => option.value) ?? []
+      : []
+  }
+
+  it('A068 S1: an unplanted field allows playing Asparagus Gift for free', () => {
+    const session = setupPlay(true)
+    let resp = session.takeAction(0, 'major-improvement')
+    if (resp.state.players[0]!.minorHand.includes(CARD_ID)
+      && resp.interaction.stateId === 'wait'
+      && !resp.interaction.request.options?.some((option) => option.value === CARD_ID)) {
+      const enter = resp.interaction.request.options?.find((option) => option.value.startsWith('action-improvement-'))
+      if (enter) resp = session.resolveChoice(0, enter.value)
+    }
+    if (resp.state.players[0]!.minorHand.includes(CARD_ID)) {
+      expect(resp.interaction.stateId).toBe('wait')
+      if (resp.interaction.stateId !== 'wait') return
+      const card = resp.interaction.request.options?.find((option) => option.value === CARD_ID)
+      expect(card).toBeDefined()
+      resp = session.resolveChoice(0, card!.value)
+    }
+
+    expect(resp.ok, resp.error).toBe(true)
+    expect(resp.state.players[0]!.minorPlayed).toContain(CARD_ID)
+  })
+
+  it('A068 S2: without an unplanted field Asparagus Gift is not offered', () => {
+    expect(offeredMinorIds(setupPlay(false))).not.toContain(CARD_ID)
   })
 })

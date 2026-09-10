@@ -1,3 +1,7 @@
+import { type SessionResponse } from '../game/authoritative-session'
+import { setWorkersAtHome } from '../../shared/domain/player'
+import { resolveSkipChoice, resolveTriggerIfPresent } from './_helpers/trigger-select'
+
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
@@ -312,5 +316,149 @@ describe('D072_StableManure session', () => {
     if (resp.interaction.stateId === 'wait') {
       expect(resp.interaction.promptKey).not.toBe('ui.interactionOptionalAction')
     }
+  })
+})
+
+describe('D072 Stable Manure parity', () => {
+  const CARD_ID = 'D072_StableManure'
+
+  const WOOD_FIELD = 'D075_WoodField'
+
+  const GRAIN_THIEF = 'E112_GrainThief'
+
+  const FILLER = '__test_placeholder__'
+
+  const OCCUPATIONS = ['A100_Curator', 'A125_Priest']
+
+  const options = (response: SessionResponse) => response.interaction.stateId === 'wait'
+    ? response.interaction.request.options ?? []
+    : []
+
+  const setup = ({
+    played = true, occupations = 0, stableCount = 1, harvest = true,
+    fields = [{ kind: 'grain' as const, remaining: 3 }, { kind: 'vegetable' as const, remaining: 2 }],
+    woodFieldSlots = [] as number[], grainThief = false,
+  }: {
+    played?: boolean
+    occupations?: number
+    stableCount?: number
+    harvest?: boolean
+    fields?: Array<{ kind: 'grain' | 'vegetable'; remaining: number }>
+    woodFieldSlots?: number[]
+    grainThief?: boolean
+  } = {}) => {
+    const session = new GameSession(6072, undefined, { playerCount: 2 })
+    const state = session.getState().state
+    stabilizeRandomHands(state.players)
+    state.currentPlayerIndex = 0
+    state.round = 4
+    state.roundPhase = 'work'
+    state.actionSpaces.forEach((space) => { space.takenBy = [] })
+    state.players.forEach((player, index) => {
+      player.minorHand = [FILLER]
+      player.occupationHand = [FILLER]
+      player.minorPlayed = []
+      player.occupationPlayed = []
+      player.improvements = []
+      player.fields = []
+      player.stableTiles = []
+      player.pastures = []
+      player.cardStates = {}
+      player.resources = {
+        ...player.resources,
+        wood: 0, clay: 0, reed: 0, stone: 0, food: 20, grain: 0, vegetable: 0,
+        sheep: 0, boar: 0, cattle: 0, begging: 0,
+      }
+      if (harvest) {
+        markAllWorkersUsed(state, player)
+        setActiveWorkerCount(player, 1)
+      } else {
+        setWorkersAtHome(state, player, index === 0 ? 2 : 0)
+      }
+    })
+
+    const owner = state.players[0]!
+    owner.minorHand = played ? [FILLER] : [CARD_ID]
+    owner.minorPlayed = played ? [CARD_ID] : []
+    owner.occupationPlayed = OCCUPATIONS.slice(0, occupations)
+    if (grainThief) owner.occupationPlayed.push(GRAIN_THIEF)
+    owner.fields = fields.map((field, index) => ({
+      row: 0, col: index + 2, stacks: field.remaining > 0 ? [{ ...field }] : [],
+    }))
+    owner.stableTiles = Array.from({ length: stableCount }, (_, index) => ({
+      row: 2, col: index + 1,
+    }))
+    if (woodFieldSlots.length > 0) {
+      owner.minorPlayed.push(WOOD_FIELD)
+      owner.cardStates[WOOD_FIELD] = {
+        extraData: {
+          cardFieldStacks: woodFieldSlots.map((remaining) => ({ crop: 'wood', remaining })),
+        },
+      }
+    }
+    session.loadState(state)
+    return session
+  }
+
+  const enterMinorChoice = (session: GameSession) => {
+    let response = session.takeAction(0, 'meeting-place')
+    if (response.interaction.stateId !== 'wait') return response
+    const improvement = options(response).find((option) =>
+      option.value.startsWith('action-improvement-'))
+    if (improvement) response = session.resolveChoice(response.interaction.playerIndex, improvement.value)
+    return response
+  }
+
+  const playMinor = (session: GameSession) => {
+    let response = enterMinorChoice(session)
+    if (response.interaction.stateId !== 'wait') return response
+    const card = options(response).find((option) =>
+      option.value === CARD_ID || option.value === `minor:${CARD_ID}`)
+    if (card) response = session.resolveChoice(response.interaction.playerIndex, card.value)
+    return response
+  }
+
+  const fieldRemaining = (response: SessionResponse, col: number) =>
+    response.state.players[0]!.fields.find((field) => field.row === 0 && field.col === col)
+      ?.stacks[0]?.remaining ?? 0
+
+  it('D072 S1: at most one occupation allows Stable Manure to be played for free', () => {
+    const response = playMinor(setup({ played: false, occupations: 1, harvest: false }))
+
+    expect(response.ok, response.error).toBe(true)
+    expect(response.state.players[0]!.minorPlayed).toContain(CARD_ID)
+  })
+
+  it('D072 S2: two occupations keep Stable Manure unavailable', () => {
+    const response = enterMinorChoice(setup({ played: false, occupations: 2, harvest: false }))
+
+    expect(options(response).some((option) =>
+      option.value === CARD_ID || option.value === `minor:${CARD_ID}`)).toBe(false)
+    expect(response.state.players[0]!.minorHand).toContain(CARD_ID)
+  })
+
+  it('D072 S5: the harvest effect may be declined and only normal reaping occurs', () => {
+    const session = setup({ stableCount: 2 })
+    let response = session.performRoundEnd()
+    response = resolveTriggerIfPresent(session, response, CARD_ID)
+    response = resolveSkipChoice(session, response)
+    response = autoAdvanceRoundEnd(session)
+
+    expect(response.state.players[0]!.resources).toMatchObject({ grain: 1, vegetable: 1 })
+    expect(fieldRemaining(response, 2)).toBe(2)
+    expect(fieldRemaining(response, 3)).toBe(1)
+  })
+
+  it('D072 S7: an ordinary field with only one crop is ineligible for Stable Manure', () => {
+    const session = setup({
+      stableCount: 1, fields: [{ kind: 'grain', remaining: 1 }],
+    })
+    let response = session.performRoundEnd()
+
+    expect(response.interaction.stateId === 'wait' ? response.interaction.sourceCard : undefined)
+      .not.toBe(CARD_ID)
+    response = autoAdvanceRoundEnd(session)
+    expect(response.state.players[0]!.resources.grain).toBe(1)
+    expect(fieldRemaining(response, 2)).toBe(0)
   })
 })

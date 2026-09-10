@@ -1,3 +1,6 @@
+import { type SessionResponse } from '../game/authoritative-session'
+import { setWorkersAtHome } from '../../shared/domain/player'
+
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
@@ -160,5 +163,140 @@ describe('D070_StrawManure session', () => {
     if (resp.interaction.stateId === 'wait') {
       expect(resp.interaction.promptKey).not.toBe('ui.interactionOptionalAction')
     }
+  })
+})
+
+describe('D070 Straw Manure parity', () => {
+  const CARD_ID = 'D070_StrawManure'
+
+  const CARD_FIELD = 'B068_Beanfield'
+
+  const FILLER = '__test_placeholder__'
+
+  const options = (response: SessionResponse) => response.interaction.stateId === 'wait'
+    ? response.interaction.request.options ?? []
+    : []
+
+  const setup = ({
+    played = true, grain = 1, ordinaryFields = [2, 1], cardField = 0, harvest = true,
+  }: {
+    played?: boolean
+    grain?: number
+    ordinaryFields?: number[]
+    cardField?: number
+    harvest?: boolean
+  } = {}) => {
+    const session = new GameSession(6070, undefined, { playerCount: 2 })
+    const state = session.getState().state
+    stabilizeRandomHands(state.players)
+    state.currentPlayerIndex = 0
+    state.round = 4
+    state.roundPhase = 'work'
+    state.actionSpaces.forEach((space) => { space.takenBy = [] })
+    state.players.forEach((player, index) => {
+      player.minorHand = [FILLER]
+      player.occupationHand = [FILLER]
+      player.minorPlayed = []
+      player.occupationPlayed = []
+      player.fields = []
+      player.cardStates = {}
+      Object.assign(player.resources, {
+        wood: 0, clay: 0, reed: 0, stone: 0, food: 20, grain: 0, vegetable: 0,
+        sheep: 0, boar: 0, cattle: 0, begging: 0,
+      })
+      if (harvest) {
+        markAllWorkersUsed(state, player)
+        setActiveWorkerCount(player, 1)
+      } else {
+        setWorkersAtHome(state, player, index === 0 ? 2 : 0)
+      }
+    })
+
+    const owner = state.players[0]!
+    owner.minorHand = played ? [FILLER] : [CARD_ID]
+    owner.minorPlayed = played ? [CARD_ID] : []
+    owner.resources.grain = grain
+    owner.fields = ordinaryFields.map((remaining, col) => ({
+      row: 0, col: col + 2,
+      stacks: remaining > 0 ? [{ kind: 'vegetable' as const, remaining }] : [],
+    }))
+    if (cardField > 0) {
+      owner.minorPlayed.push(CARD_FIELD)
+      owner.cardStates[CARD_FIELD] = {
+        extraData: { cardFieldStacks: [{ crop: 'vegetable', remaining: cardField }] },
+      }
+    }
+    session.loadState(state)
+    return session
+  }
+
+  const enterMinorChoice = (session: GameSession) => {
+    let response = session.takeAction(0, 'meeting-place')
+    if (response.interaction.stateId !== 'wait') return response
+    const improvement = options(response).find((option) =>
+      option.value.startsWith('action-improvement-'))
+    if (improvement) response = session.resolveChoice(response.interaction.playerIndex, improvement.value)
+    return response
+  }
+
+  const playMinor = (session: GameSession) => {
+    let response = enterMinorChoice(session)
+    if (response.interaction.stateId !== 'wait') return response
+    const card = options(response).find((option) =>
+      option.value === CARD_ID || option.value === `minor:${CARD_ID}`)
+    if (card) response = session.resolveChoice(response.interaction.playerIndex, card.value)
+    return response
+  }
+
+  const acceptHarvestEffect = (session: GameSession) => {
+    let response = session.performRoundEnd()
+    response = resolveTriggerIfPresent(session, response, CARD_ID)
+    return resolveNonSkipChoice(session, response)
+  }
+
+  const fieldRemaining = (response: SessionResponse, col: number) =>
+    response.state.players[0]!.fields.find((field) => field.row === 0 && field.col === col)
+      ?.stacks[0]?.remaining ?? 0
+
+  it('D070 S1: two fields allow Straw Manure to be played for free', () => {
+    const response = playMinor(setup({ played: false, ordinaryFields: [0, 0], harvest: false }))
+
+    expect(response.ok, response.error).toBe(true)
+    expect(response.state.players[0]!.minorPlayed).toContain(CARD_ID)
+  })
+
+  it('D070 S2: one field keeps Straw Manure unavailable', () => {
+    const response = enterMinorChoice(setup({ played: false, ordinaryFields: [0], harvest: false }))
+
+    expect(options(response).some((option) =>
+      option.value === CARD_ID || option.value === `minor:${CARD_ID}`)).toBe(false)
+    expect(response.state.players[0]!.minorHand).toContain(CARD_ID)
+  })
+
+  it('D070 S4: paying one grain adds one vegetable to each of two selected fields', () => {
+    const session = setup()
+    let response = acceptHarvestEffect(session)
+    response = session.commitSelectionChoice(0, {
+      positions: [{ row: 0, col: 2 }, { row: 0, col: 3 }],
+    })
+    response = autoAdvanceRoundEnd(session)
+
+    expect(response.state.players[0]!.resources).toMatchObject({ grain: 0, vegetable: 2 })
+    expect(fieldRemaining(response, 2)).toBe(2)
+    expect(fieldRemaining(response, 3)).toBe(1)
+  })
+
+  it('D070 S7: a planted Card Field is selectable together with an ordinary field', () => {
+    const session = setup({ ordinaryFields: [1], cardField: 2 })
+    let response = acceptHarvestEffect(session)
+    response = session.commitSelectionChoice(0, {
+      positions: [{ row: 0, col: 2 }, { row: -1, col: 2068 }],
+    })
+    response = autoAdvanceRoundEnd(session)
+
+    expect(response.state.players[0]!.resources).toMatchObject({ grain: 0, vegetable: 2 })
+    expect(fieldRemaining(response, 2)).toBe(1)
+    expect(response.state.players[0]!.cardStates[CARD_FIELD]?.extraData?.cardFieldStacks)
+      .toEqual([{ crop: 'vegetable', remaining: 2 }])
   })
 })

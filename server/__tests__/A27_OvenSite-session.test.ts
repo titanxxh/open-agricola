@@ -1,3 +1,7 @@
+import { type SessionResponse } from '../game/authoritative-session'
+import { setWorkersAtHome } from '../../shared/domain/player'
+import '../../shared/cards/A/A060_OrientalFireplace'
+
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
@@ -192,5 +196,99 @@ describe('A027_OvenSite session', () => {
       player.improvements = ['Major_Fireplace1', 'Major_CookingHearth1']
       expect(meetsCardPrerequisites(player, A027_OvenSite, state.round, state)).toBe(true)
     })
+  })
+})
+
+describe('A027 Oven Site parity', () => {
+  const CARD_ID = 'A027_OvenSite'
+
+  const FILLER = '__test_placeholder__'
+
+  const setup = ({
+    fireplace = 'Major_Fireplace1' as string | null,
+    hearth = true,
+    resources = {},
+  }: {
+    fireplace?: string | null
+    hearth?: boolean
+    resources?: Partial<Record<'clay' | 'stone' | 'grain', number>>
+  } = {}) => {
+    const session = new GameSession(6027, undefined, { playerCount: 2 })
+    stabilizeRandomHands(session.state.players)
+    const state = session.getState().state
+    state.currentPlayerIndex = 0
+    state.round = 14
+    state.roundPhase = 'work'
+    state.availableMajorImprovements = ['Major_ClayOven', 'Major_StoneOven']
+    state.players.forEach((player) => {
+      setWorkersAtHome(state, player, 2)
+      player.minorHand = [FILLER]
+      player.occupationHand = [FILLER]
+    })
+    const player = state.players[0]!
+    player.minorHand = [CARD_ID]
+    player.minorPlayed = fireplace === 'A060_OrientalFireplace' ? [fireplace] : []
+    player.improvements = [
+      ...(fireplace && fireplace !== 'A060_OrientalFireplace' ? [fireplace] : []),
+      ...(hearth ? ['Major_CookingHearth1'] : []),
+    ]
+    player.resources = {
+      ...player.resources, wood: 0, clay: 0, reed: 0, stone: 0, food: 0, grain: 0,
+      vegetable: 0, sheep: 0, boar: 0, cattle: 0, ...resources,
+    }
+    session.loadState(state)
+    return session
+  }
+
+  const options = (response: SessionResponse) => response.interaction.stateId === 'wait'
+    ? response.interaction.request.options ?? []
+    : []
+
+  const enterMinor = (session: GameSession) => {
+    let response = session.takeAction(0, 'major-improvement')
+    if (response.interaction.stateId !== 'wait') return response
+    if (!options(response).some((option) => option.value === CARD_ID)) {
+      const improvement = options(response).find((option) => option.value.startsWith('action-improvement-'))
+      if (improvement) response = session.resolveChoice(0, improvement.value)
+    }
+    return response
+  }
+
+  const playCard = (session: GameSession) => {
+    const response = enterMinor(session)
+    if (!response.state.players[0]!.minorHand.includes(CARD_ID)) return response
+    const card = options(response).find((option) => option.value === CARD_ID)
+    expect(card).toBeDefined()
+    return session.resolveChoice(0, card!.value)
+  }
+
+  const chooseOven = (session: GameSession, ovenId: 'Major_ClayOven' | 'Major_StoneOven') => {
+    let response = playCard(session)
+    expect(response.ok, response.error).toBe(true)
+    expect(response.interaction.stateId).toBe('wait')
+    const enter = options(response).find((option) => option.value !== '__skip__')
+    expect(enter).toBeDefined()
+    response = session.resolveChoice(0, enter!.value)
+    const oven = options(response).find((option) => option.value === ovenId)
+    expect(oven).toBeDefined()
+    return session.resolveChoice(0, oven!.value)
+  }
+
+  it('A027 S4: Oriental Fireplace counts as the Fireplace prerequisite', () => {
+    const response = playCard(setup({ fireplace: 'A060_OrientalFireplace' }))
+
+    expect(response.ok, response.error).toBe(true)
+    expect(response.state.players[0]!.minorPlayed).toEqual(
+      expect.arrayContaining(['A060_OrientalFireplace', CARD_ID]),
+    )
+    expect(response.state.players[0]!.resources.wood).toBe(2)
+  })
+
+  it('A027 S6: the immediate Stone Oven costs exactly one clay and one stone', () => {
+    const response = chooseOven(setup({ resources: { clay: 1, stone: 1 } }), 'Major_StoneOven')
+
+    expect(response.ok, response.error).toBe(true)
+    expect(response.state.players[0]!.improvements).toContain('Major_StoneOven')
+    expect(response.state.players[0]!.resources).toMatchObject({ clay: 0, stone: 0, wood: 2 })
   })
 })

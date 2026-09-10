@@ -1,3 +1,6 @@
+import { type SessionResponse } from '../game/authoritative-session'
+import '../../shared/cards/A/A125_Priest'
+
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
@@ -156,5 +159,138 @@ describe('B025_BreadPaddle session', () => {
 
     resp = session.resolveChoice(0, occId)
     expect(resp.ok).toBe(true)
+  })
+})
+
+describe('B025 Bread Paddle parity', () => {
+  const CARD_ID = 'B025_BreadPaddle'
+
+  const OCCUPATION_ID = 'A125_Priest'
+
+  const FIREPLACE_ID = 'Major_Fireplace1'
+
+  const FILLER = '__test_placeholder__'
+
+  const setup = ({
+    played = true, wood = played ? 0 : 1, fireplace = true, grain = played ? 1 : 0,
+  }: {
+    played?: boolean
+    wood?: number
+    fireplace?: boolean
+    grain?: number
+  } = {}) => {
+    const session = new GameSession(6025, undefined, { playerCount: 2 })
+    stabilizeRandomHands(session.state.players)
+    const state = session.getState().state
+    state.currentPlayerIndex = 0
+    state.round = 14
+    state.roundPhase = 'work'
+    state.availableMajorImprovements = []
+    state.players.forEach((player) => {
+      setWorkersAtHome(state, player, 2)
+      player.minorHand = [FILLER]
+      player.occupationHand = [FILLER]
+      player.minorPlayed = []
+      player.occupationPlayed = []
+      player.improvements = []
+      player.resources = {
+        ...player.resources,
+        wood: 0, clay: 0, reed: 0, stone: 0, food: 0, grain: 0, vegetable: 0,
+        sheep: 0, boar: 0, cattle: 0, begging: 0,
+      }
+    })
+    const owner = state.players[0]!
+    owner.minorHand = played ? [FILLER] : [CARD_ID]
+    owner.minorPlayed = played ? [CARD_ID] : []
+    owner.occupationHand = played ? [OCCUPATION_ID] : [FILLER]
+    owner.improvements = played && fireplace ? [FIREPLACE_ID] : []
+    owner.resources.wood = wood
+    owner.resources.grain = grain
+    session.loadState(state)
+    return session
+  }
+
+  const options = (response: SessionResponse) => response.interaction.stateId === 'wait'
+    ? response.interaction.request.options ?? []
+    : []
+
+  const enterMinor = (session: GameSession) => {
+    let response = session.takeAction(0, 'meeting-place')
+    if (response.interaction.stateId !== 'wait') return response
+    const improvement = options(response).find((option) =>
+      option.value.startsWith('action-improvement-'))
+    if (improvement) response = session.resolveChoice(response.interaction.playerIndex, improvement.value)
+    return response
+  }
+
+  const playMinor = (session: GameSession) => {
+    let response = enterMinor(session)
+    if (!response.state.players[0]!.minorHand.includes(CARD_ID)) return response
+    if (response.interaction.stateId === 'wait') {
+      const card = options(response).find((option) => option.value === CARD_ID)
+      if (card) response = session.resolveChoice(response.interaction.playerIndex, card.value)
+    }
+    return response
+  }
+
+  const playOccupation = (session: GameSession) => {
+    let response = session.takeAction(0, 'lessons')
+    if (!response.state.players[0]!.occupationHand.includes(OCCUPATION_ID)) return response
+    if (response.interaction.stateId === 'wait') {
+      const occupation = options(response).find((option) => option.value === OCCUPATION_ID)
+      if (occupation) response = session.resolveChoice(response.interaction.playerIndex, occupation.value)
+    }
+    return resolveTriggerIfPresent(session, response, CARD_ID)
+  }
+
+  const acceptBreadPaddle = (session: GameSession, response: SessionResponse) => {
+    if (response.interaction.stateId !== 'wait') return response
+    const accept = options(response).find((option) => option.value !== '__skip__')
+    if (!accept) return response
+    return session.resolveChoice(response.interaction.playerIndex, accept.value)
+  }
+
+  it('B025 S1: paying one wood plays Bread Paddle and immediately gains one food', () => {
+    const response = playMinor(setup({ played: false }))
+
+    expect(response.ok, response.error).toBe(true)
+    expect(response.state.players[0]!.minorPlayed).toContain(CARD_ID)
+    expect(response.state.players[0]!.resources).toMatchObject({ wood: 0, food: 1 })
+  })
+
+  it('B025 S2: after playing an occupation Bread Paddle can bake one grain', () => {
+    const session = setup()
+    let response = acceptBreadPaddle(session, playOccupation(session))
+    expect(response.interaction).toMatchObject({
+      stateId: 'wait', promptKey: 'ui.interactionOptionalAction', sourceCard: CARD_ID,
+    })
+    response = acceptBreadPaddle(session, response)
+
+    expect(response.ok, response.error).toBe(true)
+    expect(response.state.players[0]!.occupationPlayed).toContain(OCCUPATION_ID)
+    expect(response.state.players[0]!.resources).toMatchObject({ grain: 0, food: 2 })
+  })
+
+  it('B025 S3: the Bread Paddle bake after an occupation may be declined', () => {
+    const session = setup()
+    const selected = playOccupation(session)
+    const pending = acceptBreadPaddle(session, selected)
+    expect(options(pending).some((option) => option.value === '__skip__'), JSON.stringify(pending.interaction))
+      .toBe(true)
+
+    const response = session.resolveChoice(pending.interaction.playerIndex, '__skip__')
+
+    expect(response.ok, response.error).toBe(true)
+    expect(response.state.players[0]!.occupationPlayed).toContain(OCCUPATION_ID)
+    expect(response.state.players[0]!.resources).toMatchObject({ grain: 1, food: 0 })
+  })
+
+  it('B025 S4: without a baking improvement an occupation grants no conversion', () => {
+    const response = playOccupation(setup({ fireplace: false }))
+
+    expect(response.ok, response.error).toBe(true)
+    expect(response.state.players[0]!.occupationPlayed).toContain(OCCUPATION_ID)
+    expect(response.state.players[0]!.resources).toMatchObject({ grain: 1, food: 0 })
+    expect(response.interaction.stateId === 'wait' && response.interaction.sourceCard === CARD_ID).toBe(false)
   })
 })

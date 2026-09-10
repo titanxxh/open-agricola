@@ -1,3 +1,5 @@
+import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
+
 import { describe, expect, it } from 'vitest'
 import { GameSession, type SessionResponse } from '../game/authoritative-session'
 import { markAllWorkersUsed, setActiveWorkerCount } from '../../shared/domain/player'
@@ -387,5 +389,92 @@ describe('D132_HideFarmer session', () => {
     expect(resp.ok).toBe(true)
     expect(getCategory(resp, 0, 'empty')?.total).toBe(0)
     expect(getCategory(resp, 0, 'cardBonusVp')?.total).toBe(3)
+  })
+})
+
+describe('D132 Hide Farmer parity', () => {
+  const CARD_ID = 'D132_HideFarmer'
+
+  const FILLER = '__test_placeholder__'
+
+  const options = (response: SessionResponse) => response.interaction.stateId === 'wait'
+    ? response.interaction.request.options ?? []
+    : []
+
+  const setFarmWithUnusedSpaces = (player: SessionResponse['state']['players'][number], unused: number) => {
+    const used = 15 - unused
+    player.roomTiles = []
+    player.fields = []
+    player.stableTiles = []
+    player.pastures = []
+    player.fenceSegments = []
+    let placed = 0
+    for (let row = 0; row < 3; row += 1) {
+      for (let col = 0; col < 5 && placed < used; col += 1) {
+        if (placed < 2) player.roomTiles.push({ row, col })
+        else player.fields.push({ row, col, stacks: [] })
+        placed += 1
+      }
+    }
+    player.rooms = player.roomTiles.length
+  }
+
+  const setupScoring = ({ food = 2, unused = 3, played = true } = {}) => {
+    const session = new GameSession(6132, undefined, { playerCount: 3 })
+    stabilizeRandomHands(session.state.players)
+    const state = session.getState().state
+    state.currentPlayerIndex = 0
+    state.round = 14
+    state.roundPhase = 'work'
+    state.gameOver = false
+    state.players.forEach((player) => {
+      markAllWorkersUsed(state, player)
+      setActiveWorkerCount(player, 0)
+      player.minorHand = [FILLER]
+      player.occupationHand = [FILLER]
+      player.minorPlayed = []
+      player.occupationPlayed = []
+      player.improvements = []
+      player.cardStates = {}
+      player.resources = {
+        ...player.resources,
+        food: 0, wood: 0, clay: 0, reed: 0, stone: 0, grain: 0, vegetable: 0,
+        sheep: 0, boar: 0, cattle: 0, begging: 0,
+      }
+      setFarmWithUnusedSpaces(player, 3)
+    })
+    const owner = state.players[0]!
+    owner.occupationPlayed = played ? [CARD_ID] : []
+    owner.resources.food = food
+    setFarmWithUnusedSpaces(owner, unused)
+    session.loadState(state)
+    return session
+  }
+
+  const startScoring = (session: GameSession) => session.invokeAfterRoundEnd()
+
+  const acceptHideFarmer = (session: GameSession, response: SessionResponse) => {
+    expect(response.interaction.stateId).toBe('wait')
+    const use = options(response).find((option) => option.value !== '__skip__'
+      && option.sourceCard === CARD_ID)
+    expect(use, JSON.stringify(response.interaction)).toBeDefined()
+    return use ? session.resolveChoice(response.interaction.playerIndex, use.value) : response
+  }
+
+  const emptyScore = (response: SessionResponse) => response.scores?.[0]?.categories
+    .find((category) => category.key === 'empty')
+
+  it('D132 S4: available food caps how many unused spaces can be hidden', () => {
+    const session = setupScoring({ food: 1 })
+    let response = acceptHideFarmer(session, startScoring(session))
+    if (response.interaction.stateId === 'wait'
+      && response.interaction.request.kind === 'resource-quantity-select') {
+      expect(response.interaction.request.availableByResource.food).toBe(1)
+    }
+    response = session.commitSelectionChoice(0, { resourceCounts: { food: 1 } })
+
+    expect(response.ok, response.error).toBe(true)
+    expect(response.state.players[0]!.resources.food).toBe(0)
+    expect(emptyScore(response)).toMatchObject({ quantity: 2, total: -2 })
   })
 })

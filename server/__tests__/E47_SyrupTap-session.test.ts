@@ -1,3 +1,6 @@
+import { type SessionResponse } from '../game/authoritative-session'
+import { markAllWorkersUsed, setWorkersAtHome } from '../../shared/domain/player'
+
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
@@ -212,5 +215,115 @@ describe('E047_SyrupTap session', () => {
       (fm) => fm.cardId === CARD_ID,
     )
     expect(futureMeeples.length).toBe(0)
+  })
+})
+
+describe('E047 Syrup Tap parity', () => {
+  const CARD_ID = 'E047_SyrupTap'
+
+  const FOREST_OWNER = 'C162_ForestOwner'
+
+  const FILLER = '__test_placeholder__'
+
+  const setup = ({
+    played = true, playerCount = 2, round = 1, resources = {},
+  }: {
+    played?: boolean
+    playerCount?: number
+    round?: number
+    resources?: Partial<{ wood: number; stone: number }>
+  } = {}) => {
+    const session = new GameSession(6047 + round, undefined, { playerCount })
+    stabilizeRandomHands(session.state.players)
+    const state = session.getState().state
+    state.currentPlayerIndex = 0
+    state.round = round
+    state.roundPhase = 'work'
+    state.availableMajorImprovements = []
+    state.actionSpaces.forEach((space) => { space.takenBy = [] })
+    state.players.forEach((player) => {
+      setWorkersAtHome(state, player, 2)
+      player.minorHand = [FILLER]
+      player.occupationHand = [FILLER]
+      player.minorPlayed = []
+      player.occupationPlayed = []
+      Object.assign(player.resources, {
+        wood: 0, clay: 0, reed: 0, stone: 0, food: 20, grain: 0, vegetable: 0,
+        sheep: 0, boar: 0, cattle: 0, begging: 0,
+      })
+    })
+    const owner = state.players[0]!
+    owner.minorHand = played ? [FILLER] : [CARD_ID]
+    owner.minorPlayed = played ? [CARD_ID] : []
+    Object.assign(owner.resources, resources)
+    session.loadState(state)
+    return session
+  }
+
+  const options = (response: SessionResponse) => response.interaction.stateId === 'wait'
+    ? response.interaction.request.options ?? []
+    : []
+
+  const setActionResources = (session: GameSession, spaceId: string, resources: { wood?: number; clay?: number }) => {
+    const state = session.getState().state
+    const space = state.actionSpaces.find((candidate) => candidate.id === spaceId)
+    if (!space) throw new Error(`missing action space ${spaceId}`)
+    Object.assign(space.resources, { wood: 0, clay: 0, ...resources })
+    session.loadState(state)
+  }
+
+  const futureFood = (response: SessionResponse) => response.state.futureMeeples
+    .filter((entry) => entry.cardId === CARD_ID && entry.resources.food === 1)
+    .map((entry) => entry.round)
+    .sort((left, right) => left - right)
+
+  const playForestOwner = (session: GameSession) => {
+    const state = session.getState().state
+    state.currentPlayerIndex = 0
+    state.players[0]!.occupationHand = [FOREST_OWNER]
+    session.loadState(state)
+
+    let response = session.takeAction(0, 'lessons')
+    expect(response.ok, response.error).toBe(true)
+    if (response.state.players[0]!.occupationPlayed.includes(FOREST_OWNER)) return response
+    if (response.interaction.stateId !== 'wait') return response
+    const occupation = options(response).find((option) => option.value === FOREST_OWNER)
+    expect(occupation, JSON.stringify(response.interaction)).toBeDefined()
+    response = session.resolveChoice(response.interaction.playerIndex, occupation!.value)
+    expect(response.ok, response.error).toBe(true)
+    expect(response.state.players[0]!.occupationPlayed).toContain(FOREST_OWNER)
+    expect(response.state.actionSpaces.some((space) => space.id === FOREST_OWNER)).toBe(true)
+    return response
+  }
+
+  it('E047 S3: the scheduled food is received at the start of the next round', () => {
+    const session = setup()
+    setActionResources(session, 'forest', { wood: 3 })
+    let response = session.takeAction(0, 'forest')
+    expect(futureFood(response)).toEqual([2])
+
+    const state = session.getState().state
+    state.players.forEach((player) => markAllWorkersUsed(state, player))
+    session.loadState(state)
+    response = session.performRoundEnd()
+
+    expect(response.state.round).toBe(2)
+    expect(response.state.players[0]!.resources.food).toBe(21)
+    expect(futureFood(response)).toEqual([])
+  })
+
+  it('E047 S6: wood given to the owner when an opponent uses Forest Owner schedules no food', () => {
+    const session = setup({ playerCount: 4 })
+    playForestOwner(session)
+    const state = session.getState().state
+    state.currentPlayerIndex = 1
+    session.loadState(state)
+
+    const response = session.takeAction(1, FOREST_OWNER)
+
+    expect(response.ok, response.error).toBe(true)
+    expect(response.state.players[1]!.resources.wood).toBe(3)
+    expect(response.state.players[0]!.resources.wood).toBe(1)
+    expect(futureFood(response)).toEqual([])
   })
 })

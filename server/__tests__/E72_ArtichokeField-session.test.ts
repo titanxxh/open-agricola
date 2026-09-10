@@ -1,3 +1,6 @@
+import { type SessionResponse } from '../game/authoritative-session'
+import { setWorkersAtHome } from '../../shared/domain/player'
+
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
@@ -272,5 +275,121 @@ describe('E072_ArtichokeField session', () => {
       expect(player.resources.vegetable).toBe(vegBefore + 1)
       expect(player.resources.food).toBe(foodBefore + 1)
     })
+  })
+})
+
+describe('E072 Artichoke Field parity', () => {
+  const CARD_ID = 'E072_ArtichokeField'
+
+  const FILLER = '__test_placeholder__'
+
+  const OCCUPATIONS = ['A100_Curator', 'A116_WoodCutter']
+
+  const setup = ({
+    played = false, occupations = 2, wood = 1, grain = 0, vegetable = 0,
+    cardCrop, round = 14, ordinaryFields = 0,
+  }: {
+    played?: boolean
+    occupations?: number
+    wood?: number
+    grain?: number
+    vegetable?: number
+    cardCrop?: { crop: 'grain' | 'vegetable'; remaining: number }
+    round?: number
+    ordinaryFields?: number
+  } = {}) => {
+    const session = new GameSession(6072, undefined, { playerCount: 2 })
+    stabilizeRandomHands(session.state.players)
+    const state = session.getState().state
+    state.currentPlayerIndex = 0
+    state.round = round
+    state.roundPhase = 'work'
+    state.roundActionOrder = [
+      'grain-utilization',
+      ...state.roundActionOrder.filter((id) => id !== 'grain-utilization'),
+    ]
+    state.availableMajorImprovements = []
+    state.actionSpaces.forEach((space) => { space.takenBy = [] })
+    state.players.forEach((player, index) => {
+      setWorkersAtHome(state, player, index === 0 ? 2 : 0)
+      player.minorHand = [FILLER]
+      player.occupationHand = [FILLER]
+      player.minorPlayed = []
+      player.occupationPlayed = []
+      player.improvements = []
+      player.cardStates = {}
+      player.fields = []
+      Object.assign(player.resources, {
+        wood: 0, clay: 0, reed: 0, stone: 0, food: 20, grain: 0, vegetable: 0,
+        sheep: 0, boar: 0, cattle: 0, begging: 0,
+      })
+    })
+    const owner = state.players[0]!
+    owner.minorHand = played ? [FILLER] : [CARD_ID]
+    owner.minorPlayed = played ? [CARD_ID] : []
+    owner.occupationPlayed = OCCUPATIONS.slice(0, occupations)
+    owner.resources.wood = wood
+    owner.resources.grain = grain
+    owner.resources.vegetable = vegetable
+    owner.fields = Array.from({ length: ordinaryFields }, (_, col) => ({
+      row: 2, col: col + 1, stacks: [],
+    }))
+    if (cardCrop) {
+      owner.cardStates[CARD_ID] = { extraData: { cardFieldStacks: [cardCrop] } }
+    }
+    if (round === 4) {
+      state.players.forEach((player) => markAllWorkersUsed(state, player))
+    }
+    session.loadState(state)
+    return session
+  }
+
+  const options = (response: SessionResponse) => response.interaction.stateId === 'wait'
+    ? response.interaction.request.options ?? []
+    : []
+
+  const enterMinor = (session: GameSession) => {
+    let response = session.takeAction(0, 'meeting-place')
+    if (response.interaction.stateId !== 'wait') return response
+    if (!options(response).some((option) => option.value === CARD_ID)) {
+      const improvement = options(response).find((option) =>
+        option.value.startsWith('action-improvement-'))
+      if (improvement) response = session.resolveChoice(response.interaction.playerIndex, improvement.value)
+    }
+    return response
+  }
+
+  const play = (session: GameSession) => {
+    let response = enterMinor(session)
+    if (!response.state.players[0]!.minorHand.includes(CARD_ID)) return response
+    if (response.interaction.stateId !== 'wait') return response
+    const card = options(response).find((option) => option.value === CARD_ID)
+    if (card) response = session.resolveChoice(response.interaction.playerIndex, card.value)
+    return response
+  }
+
+  it('E072 S1: two occupations and one wood play Artichoke Field for one printed point', () => {
+    const response = play(setup())
+
+    expect(response.ok, response.error).toBe(true)
+    expect(response.state.players[0]!.minorPlayed).toContain(CARD_ID)
+    expect(response.state.players[0]!.resources.wood).toBe(0)
+    expect(response.scores[0]!.categories.find((category) => category.key === 'cards')?.entries)
+      .toContainEqual(expect.objectContaining({ cardId: CARD_ID, score: 1 }))
+  })
+
+  it('E072 S2: fewer than two occupations keep Artichoke Field unavailable', () => {
+    const response = enterMinor(setup({ occupations: 1 }))
+
+    expect(options(response).some((option) => option.value === CARD_ID)).toBe(false)
+    expect(response.state.players[0]!.minorHand).toContain(CARD_ID)
+    expect(response.state.players[0]!.resources.wood).toBe(1)
+  })
+
+  it('E072 S7: Artichoke Field is excluded from ordinary-field scoring', () => {
+    const response = setup({ played: true, wood: 0, ordinaryFields: 1 }).getState()
+
+    expect(response.scores[0]!.categories.find((category) => category.key === 'fields'))
+      .toMatchObject({ quantity: 1, total: -1 })
   })
 })

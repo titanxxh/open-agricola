@@ -255,3 +255,152 @@ describe('A048_ShavingHorse session', () => {
       .toHaveLength(2)
   })
 })
+
+describe('A048_ShavingHorse session', () => {
+  const CARD_ID = 'A048_ShavingHorse'
+
+  type SetupOptions = {
+    forestWood?: number
+    playerWood?: number
+    playerFood?: number
+    cardPlayed?: boolean
+  }
+
+  const setup = (options: SetupOptions = {}) => {
+    const session = new GameSession()
+    stabilizeRandomHands(session.state.players)
+    const state = session.getState().state
+    state.players = state.players.slice(0, 2)
+    state.currentPlayerIndex = 0
+    state.round = 1
+
+    const player = state.players[0]!
+    setWorkersAtHome(state, player, 2)
+    if (options.cardPlayed !== false) {
+      player.minorPlayed.push(CARD_ID)
+    }
+    player.resources.wood = options.playerWood ?? 0
+    player.resources.food = options.playerFood ?? 0
+
+    const forest = state.actionSpaces.find((s) => s.id === 'forest')!
+    forest.resources.wood = options.forestWood ?? 3
+
+    session.loadState(state)
+    return session
+  }
+
+  const resolveShavingHorseTriggerIfPresent = (
+    session: GameSession,
+    resp: ReturnType<GameSession['takeAction']>,
+  ) => {
+    if (resp.interaction.stateId !== 'wait') return resp
+    if (resp.interaction.request.kind !== 'select-trigger') return resp
+    const option = resp.interaction.request.options?.find((entry) => entry.value === CARD_ID)
+    expect(option).toBeDefined()
+    return session.resolveChoice(resp.interaction.playerIndex ?? 0, option!.value)
+  }
+
+  it('A048 S1: paying one wood plays Shaving Horse', () => {
+    const session = new GameSession(6048, undefined, { playerCount: 2 })
+    stabilizeRandomHands(session.state.players)
+    const state = session.getState().state
+    state.currentPlayerIndex = 0
+    state.roundPhase = 'work'
+    const player = state.players[0]!
+    setWorkersAtHome(state, player, 2)
+    player.minorHand = [CARD_ID]
+    player.occupationHand = ['__test_placeholder__']
+    player.resources.wood = 1
+    state.players[1]!.minorHand = ['__test_placeholder__']
+    state.players[1]!.occupationHand = ['__test_placeholder__']
+    session.loadState(state)
+
+    let resp = session.takeAction(0, 'major-improvement')
+    expect(resp.ok, resp.error).toBe(true)
+    if (resp.state.players[0]!.minorHand.includes(CARD_ID)
+      && resp.interaction.stateId === 'wait'
+      && !resp.interaction.request.options?.some((option) => option.value === CARD_ID)) {
+      const enter = resp.interaction.request.options?.find((option) => option.value.startsWith('action-improvement-'))
+      if (enter) resp = session.resolveChoice(0, enter.value)
+    }
+    if (resp.state.players[0]!.minorHand.includes(CARD_ID)) {
+      expect(resp.interaction.stateId).toBe('wait')
+      if (resp.interaction.stateId !== 'wait') return
+      const card = resp.interaction.request.options?.find((option) => option.value === CARD_ID)
+      expect(card).toBeDefined()
+      resp = session.resolveChoice(0, card!.value)
+    }
+
+    expect(resp.ok, resp.error).toBe(true)
+    expect(resp.state.players[0]!.minorPlayed).toContain(CARD_ID)
+    expect(resp.state.players[0]!.resources.wood).toBe(0)
+  })
+
+  it('A048 S5a: no Shaving Horse in play means obtaining wood triggers no exchange', () => {
+    const session = setup({ forestWood: 3, playerWood: 4, cardPlayed: false })
+    const resp = session.takeAction(0, 'forest')
+    expect(resp.ok).toBe(true)
+    expect(resp.interaction.stateId === 'wait' ? resp.interaction.request.kind : resp.interaction.stateId).toBe('confirm-next-player')
+    expect(resp.state.players[0]!.resources.wood).toBe(7)
+    expect(resp.state.players[0]!.resources.food).toBe(0)
+  })
+
+  it('A048 S5b: obtaining wood but remaining below five wood triggers no exchange', () => {
+    const session = setup({ forestWood: 3, playerWood: 1 })
+    const resp = session.takeAction(0, 'forest')
+    expect(resp.ok).toBe(true)
+    expect(resp.interaction.stateId === 'wait' ? resp.interaction.request.kind : resp.interaction.stateId).toBe('confirm-next-player')
+    expect(resp.state.players[0]!.resources.wood).toBe(4)
+    expect(resp.state.players[0]!.resources.food).toBe(0)
+  })
+
+  it('A048 S5c: taking an empty wood space while already above five wood triggers no exchange', () => {
+    const session = setup({ forestWood: 0, playerWood: 6 })
+    const resp = session.takeAction(0, 'forest')
+    expect(resp.ok).toBe(true)
+    expect(resp.interaction.stateId === 'wait' ? resp.interaction.request.kind : resp.interaction.stateId).toBe('confirm-next-player')
+    expect(resp.state.players[0]!.resources.wood).toBe(6)
+    expect(resp.state.players[0]!.resources.food).toBe(0)
+  })
+
+  it('A048 S2: obtaining wood and reaching five wood may exchange one wood for three food', () => {
+    const session = setup({ forestWood: 3, playerWood: 2 }) // after collect: 5
+    const resp = resolveShavingHorseTriggerIfPresent(session, session.takeAction(0, 'forest'))
+    expect(resp.ok).toBe(true)
+    expect(resp.interaction.stateId).toBe('wait')
+    if (resp.interaction.stateId !== 'wait') return
+    expect(resp.interaction.request.options).toHaveLength(2)
+
+    expect(resp.state.players[0]!.resources.wood).toBe(5)
+    expect(resp.state.players[0]!.resources.food).toBe(0)
+
+    const acceptOption = (resp.interaction.request.options ?? []).find((o) => o.value !== '__skip__')!
+    const resp2 = session.resolveChoice(0, acceptOption.value)
+    expect(resp2.ok).toBe(true)
+    expect(resp2.state.players[0]!.resources.wood).toBe(4)
+    expect(resp2.state.players[0]!.resources.food).toBe(3)
+  })
+
+  it('A048 S3: the five-wood exchange may be declined', () => {
+    const session = setup({ forestWood: 3, playerWood: 2 })
+    const resp = resolveShavingHorseTriggerIfPresent(session, session.takeAction(0, 'forest'))
+    expect(resp.ok).toBe(true)
+    expect(resp.interaction.stateId).toBe('wait')
+    if (resp.interaction.stateId !== 'wait') return
+
+    const resp2 = session.resolveChoice(0, '__skip__')
+    expect(resp2.ok).toBe(true)
+    expect(resp2.state.players[0]!.resources.wood).toBe(5)
+    expect(resp2.state.players[0]!.resources.food).toBe(0)
+  })
+
+  it('A048 S4: reaching seven wood makes the exchange mandatory', () => {
+    const session = setup({ forestWood: 3, playerWood: 4 }) // after collect: 7
+    const resp = resolveShavingHorseTriggerIfPresent(session, session.takeAction(0, 'forest'))
+    expect(resp.ok).toBe(true)
+
+    expect(resp.interaction.stateId === 'wait' ? resp.interaction.request.kind : resp.interaction.stateId).toBe('confirm-next-player')
+    expect(resp.state.players[0]!.resources.wood).toBe(6)
+    expect(resp.state.players[0]!.resources.food).toBe(3)
+  })
+})

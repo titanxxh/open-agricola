@@ -1,3 +1,5 @@
+import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
+
 import { describe, expect, it } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
@@ -221,5 +223,65 @@ describe('C025_SteamMachine session', () => {
     const source = readFileSync(join(process.cwd(), 'shared/cards/C/C025_SteamMachine.ts'), 'utf8')
 
     expect(source).not.toMatch(/A92|Adoptive|adoptive|hasAdoptive|cardStates/)
+  })
+})
+
+describe('C025 Steam Machine parity', () => {
+  const CARD_ID = 'C025_SteamMachine'
+
+  const setup = ({
+    played = true,
+    lastPerson = true,
+    grain = 1,
+  }: {
+    played?: boolean
+    lastPerson?: boolean
+    grain?: number
+  } = {}) => {
+    const session = new GameSession(25, undefined, { playerCount: 2 })
+    const state = session.getState().state
+    stabilizeRandomHands(state.players)
+    state.currentPlayerIndex = 0
+    state.round = 5
+    state.roundPhase = 'work'
+    state.actionSpaces.forEach((space) => { space.takenBy = [] })
+
+    const player = state.players[0]!
+    setActiveWorkerCount(player, 2)
+    setWorkersAtHome(state, player, lastPerson ? 1 : 2)
+    player.resources = {
+      ...player.resources,
+      wood: played ? 0 : 2, food: 0, grain,
+    }
+    player.minorHand = played ? ['__test_placeholder__'] : [CARD_ID]
+    player.minorPlayed = played ? [CARD_ID] : []
+    player.improvements = played ? ['Major_Fireplace1'] : []
+
+    const forest = state.actionSpaces.find((space) => space.id === 'forest')
+    if (!forest) throw new Error('forest missing')
+    forest.resources.wood = 1
+
+    session.loadState(state)
+    return session
+  }
+
+  it('C025 S4: an accumulation action with another regular person at home does not trigger', () => {
+    const response = setup({ lastPerson: false }).takeAction(0, 'forest')
+
+    expect(response.ok, response.error).toBe(true)
+    expect(response.interaction.stateId === 'wait'
+      ? response.interaction.sourceCard
+      : undefined).not.toBe(CARD_ID)
+    expect(response.state.players[0]!.resources).toMatchObject({ grain: 1, food: 0, wood: 1 })
+  })
+
+  it('C025 S5: the last person on a non-accumulation action space does not trigger', () => {
+    const response = setup().takeAction(0, 'day-laborer')
+
+    expect(response.ok, response.error).toBe(true)
+    expect(response.interaction.stateId === 'wait'
+      ? response.interaction.sourceCard
+      : undefined).not.toBe(CARD_ID)
+    expect(response.state.players[0]!.resources).toMatchObject({ grain: 1, food: 2 })
   })
 })

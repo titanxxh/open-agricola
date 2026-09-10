@@ -1,3 +1,5 @@
+import { setWorkersAtHome } from '../../shared/domain/player'
+
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
@@ -94,5 +96,62 @@ describe('C121_ClayKneader session', () => {
     const after = session.getState().state
     // No clay gained from ClayKneader
     expect(after.players[0]!.resources.clay).toBe(clayBefore)
+  })
+})
+
+describe('C121 Clay Kneader parity', () => {
+  const CARD_ID = 'C121_ClayKneader'
+
+  const FILLER = '__test_placeholder__'
+
+  const setup = ({ played = true, actor = 0 } = {}) => {
+    const session = new GameSession(6121, undefined, { playerCount: 2 })
+    const state = session.getState().state
+    stabilizeRandomHands(state.players)
+    state.currentPlayerIndex = actor
+    state.round = 6
+    state.roundPhase = 'work'
+    state.actionSpaces.forEach((space) => { space.takenBy = [] })
+    state.players.forEach((player) => {
+      setWorkersAtHome(state, player, 2)
+      player.minorHand = [FILLER]
+      player.occupationHand = [FILLER]
+      player.minorPlayed = []
+      player.occupationPlayed = []
+      player.resources = {
+        ...player.resources, wood: 0, clay: 0, reed: 0, stone: 0, food: 20, grain: 0,
+        vegetable: 0, sheep: 0, boar: 0, cattle: 0, begging: 0,
+      }
+    })
+    const owner = state.players[0]!
+    owner.occupationHand = played ? [FILLER] : [CARD_ID]
+    owner.occupationPlayed = played ? [CARD_ID] : []
+    session.loadState(state)
+    return session
+  }
+
+  const playOccupation = (session: GameSession) => {
+    const response = session.takeAction(0, 'lessons')
+    if (!response.state.players[0]!.occupationHand.includes(CARD_ID)) return response
+    if (response.interaction.stateId !== 'wait') return response
+    const card = response.interaction.request.options?.find((option) => option.value === CARD_ID)
+    expect(card, JSON.stringify(response.interaction)).toBeDefined()
+    return session.resolveChoice(response.interaction.playerIndex, card!.value)
+  }
+
+  it('C121 S1: playing Clay Kneader immediately grants one wood and two clay', () => {
+    const response = playOccupation(setup({ played: false }))
+
+    expect(response.ok, response.error).toBe(true)
+    expect(response.state.players[0]!.occupationPlayed).toContain(CARD_ID)
+    expect(response.state.players[0]!.resources).toMatchObject({ wood: 1, clay: 2 })
+  })
+
+  it('C121 S5: an opponent using Grain Seeds gives the owner no clay', () => {
+    const response = setup({ actor: 1 }).takeAction(1, 'grain-seeds')
+
+    expect(response.ok, response.error).toBe(true)
+    expect(response.state.players[0]!.resources.clay).toBe(0)
+    expect(response.state.players[1]!.resources).toMatchObject({ grain: 1, clay: 0 })
   })
 })

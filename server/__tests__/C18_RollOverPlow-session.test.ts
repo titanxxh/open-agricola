@@ -1,3 +1,6 @@
+import { type SessionResponse } from '../game/authoritative-session'
+import { setWorkersAtHome } from '../../shared/domain/player'
+
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
@@ -195,5 +198,85 @@ describe('C018_RollOverPlow session', () => {
     expect(resp.ok).toBe(true)
     const ids = resp.interaction.anytimeActions.map((a: AnytimeAction) => a.id)
     expect(ids).not.toContain('C18-roll-over-plow-anytime')
+  })
+})
+
+describe('C018 Roll-Over Plow parity', () => {
+  const CARD_ID = 'C018_RollOverPlow'
+
+  const ANYTIME_ID = 'C18-roll-over-plow-anytime'
+
+  const setup = ({
+    played = true,
+    planted = [3, 2, 1],
+    cardField = false,
+    empty = false,
+  }: {
+    played?: boolean
+    planted?: number[]
+    cardField?: boolean
+    empty?: boolean
+  } = {}) => {
+    const session = new GameSession(18, undefined, { playerCount: 3 })
+    const state = session.getState().state
+    stabilizeRandomHands(state.players)
+    state.currentPlayerIndex = 0
+    state.round = 14
+    state.roundPhase = 'work'
+    state.actionSpaces.forEach((space) => { space.takenBy = [] })
+
+    const player = state.players[0]!
+    setWorkersAtHome(state, player, 2)
+    player.resources = { ...player.resources, wood: played ? 0 : 2 }
+    player.minorHand = played ? ['__test_placeholder__'] : [CARD_ID]
+    player.minorPlayed = played ? [CARD_ID] : []
+    player.fields = planted.map((remaining, index) => ({
+      row: 0, col: index + 2,
+      stacks: [{ kind: index === 1 ? 'vegetable' as const : 'grain' as const, remaining }],
+    }))
+    if (empty) player.fields.push({ row: 1, col: 2, stacks: [] })
+    if (cardField) {
+      player.occupationPlayed = ['B113_PatchCaregiver']
+      player.cardStates.B113_PatchCaregiver = {
+        extraData: { cardFieldStacks: [{ crop: 'grain', remaining: 2 }] },
+      }
+    }
+
+    session.loadState(state)
+    return session
+  }
+
+  const enterActiveInteraction = (session: GameSession) => {
+    const response = session.takeAction(0, 'farmland')
+    expect(response.ok, response.error).toBe(true)
+    return response
+  }
+
+  const startRollOverPlow = (session: GameSession, response: SessionResponse) => {
+    expect(response.interaction.anytimeActions.map((action) => action.id)).toContain(ANYTIME_ID)
+    const next = session.takeAnytimeAction(0, ANYTIME_ID)
+    expect(next.ok, next.error).toBe(true)
+    expect(next.interaction).toMatchObject({ stateId: 'wait', request: { kind: 'selection' } })
+    return next
+  }
+
+  it('C018 S5: an empty field is not selectable and an invalid submission leaves a legal retry', () => {
+    const session = setup({ empty: true })
+    let response = startRollOverPlow(session, enterActiveInteraction(session))
+    expect(response.interaction.stateId).toBe('wait')
+    if (response.interaction.stateId !== 'wait' || response.interaction.request.kind !== 'selection') return
+    expect(response.interaction.request.selection.selectablePositions)
+      .not.toContainEqual(expect.objectContaining({ row: 1, col: 2 }))
+
+    const rejected = session.commitSelectionChoice(0, { positions: [{ row: 1, col: 2 }] })
+    expect(rejected.ok).toBe(false)
+    expect(rejected.state.players[0]!.fields.find((field) =>
+      field.row === 0 && field.col === 2)?.stacks).toEqual([{ kind: 'grain', remaining: 3 }])
+
+    response = session.commitSelectionChoice(0, { positions: [{ row: 0, col: 2 }] })
+    expect(response.ok, response.error).toBe(true)
+    expect(response.interaction).toMatchObject({ stateId: 'wait', request: { kind: 'farm-select' } })
+    expect(response.state.players[0]!.fields.find((field) =>
+      field.row === 0 && field.col === 2)?.stacks).toEqual([])
   })
 })

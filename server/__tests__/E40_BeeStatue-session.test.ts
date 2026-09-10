@@ -1,3 +1,6 @@
+import { type SessionResponse } from '../game/authoritative-session'
+import { setWorkersAtHome } from '../../shared/domain/player'
+
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
@@ -80,5 +83,91 @@ describe('E040_BeeStatue session', () => {
     expect(updatedPlayer.resources.grain).toBe(0)
     const stack = getCardStack(updatedPlayer, 'E040_BeeStatue')
     expect(stack.length).toBe(5) // unchanged
+  })
+})
+
+describe('E040 Bee Statue parity', () => {
+  const CARD_ID = 'E040_BeeStatue'
+
+  const FILLER = '__test_placeholder__'
+
+  const FULL_STACK = ['vegetable', 'stone', 'grain', 'stone', 'grain']
+
+  const setup = ({ played = true, stack }: { played?: boolean; stack?: string[] } = {}) => {
+    const session = new GameSession(6040, undefined, { playerCount: 2 })
+    stabilizeRandomHands(session.state.players)
+    const state = session.getState().state
+    state.currentPlayerIndex = 0
+    state.round = 1
+    state.roundPhase = 'work'
+    state.availableMajorImprovements = []
+    state.players.forEach((player, index) => {
+      setWorkersAtHome(state, player, 2)
+      player.minorHand = [FILLER]
+      player.occupationHand = [FILLER]
+      player.minorPlayed = []
+      player.occupationPlayed = []
+      player.cardStates = {}
+      Object.assign(player.resources, {
+        wood: 0, clay: 0, reed: 0, stone: 0, food: index === 0 ? 0 : 20,
+        grain: 0, vegetable: 0, sheep: 0, boar: 0, cattle: 0, begging: 0,
+      })
+    })
+    const owner = state.players[0]!
+    owner.minorHand = played ? [FILLER] : [CARD_ID]
+    owner.minorPlayed = played ? [CARD_ID] : []
+    owner.resources.clay = played ? 0 : 2
+    if (played) owner.cardStates[CARD_ID] = { stack: stack ?? [...FULL_STACK] }
+    state.actionSpaces.forEach((space) => { space.takenBy = [] })
+    session.loadState(state)
+    return session
+  }
+
+  const options = (response: SessionResponse) => response.interaction.stateId === 'wait'
+    ? response.interaction.request.options ?? []
+    : []
+
+  const playMinor = (session: GameSession) => {
+    let response = session.takeAction(0, 'meeting-place')
+    if (response.interaction.stateId !== 'wait') return response
+    if (!options(response).some((option) => option.value === CARD_ID)) {
+      const improvement = options(response).find((option) =>
+        option.value.startsWith('action-improvement-'))
+      if (improvement) response = session.resolveChoice(response.interaction.playerIndex, improvement.value)
+    }
+    if (!response.state.players[0]!.minorHand.includes(CARD_ID)) return response
+    if (response.interaction.stateId !== 'wait') return response
+    const card = options(response).find((option) => option.value === CARD_ID)
+    expect(card).toBeDefined()
+    return session.resolveChoice(response.interaction.playerIndex, card!.value)
+  }
+
+  it('E040 S1: paying two clay plays Bee Statue with its fixed five-good stack', () => {
+    const response = playMinor(setup({ played: false }))
+
+    expect(response.ok, response.error).toBe(true)
+    expect(response.state.players[0]!.minorPlayed).toContain(CARD_ID)
+    expect(response.state.players[0]!.resources.clay).toBe(0)
+    expect(response.state.players[0]!.cardStates[CARD_ID]?.stack).toEqual(FULL_STACK)
+  })
+
+  it('E040 S2: successive Day Laborer uses take grain, stone, grain, stone, then vegetable', () => {
+    let session = setup()
+    const expected = ['grain', 'stone', 'grain', 'stone', 'vegetable'] as const
+
+    for (const resource of expected) {
+      const before = session.state.players[0]!.resources[resource]
+      const response = session.takeAction(0, 'day-laborer')
+      expect(response.ok, response.error).toBe(true)
+      expect(response.state.players[0]!.resources[resource]).toBe(before + 1)
+      if ((response.state.players[0]!.cardStates[CARD_ID]?.stack?.length ?? 0) > 0) {
+        const next = setup({ stack: response.state.players[0]!.cardStates[CARD_ID]!.stack })
+        next.state.players[0]!.resources = { ...response.state.players[0]!.resources }
+        next.loadState(next.state)
+        session = next
+      }
+    }
+
+    expect(session.state.players[0]!.cardStates[CARD_ID]?.stack).toEqual([])
   })
 })

@@ -1,3 +1,7 @@
+import { setWorkersAtHome } from '../../shared/domain/player'
+import '../../shared/cards/D/D056_FatstockStretcher'
+import '../../shared/cards/D/D062_BeerTap'
+
 import { describe, expect, it } from 'vitest'
 import { GameSession, type SessionResponse } from '../game/authoritative-session'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
@@ -343,5 +347,162 @@ describe('D096_Furnisher session', () => {
     expect(flow!.type).toBe('leaf')
     expect((flow as Extract<ActionFlow, { type: 'leaf' }>).actionId).toBe('gain')
     expect((flow as Extract<ActionFlow, { type: 'leaf' }>).params).toEqual({ wood: 2 })
+  })
+})
+
+describe('D096 Furnisher parity', () => {
+  const CARD_ID = 'D096_Furnisher'
+
+  const MINOR_A = 'D056_FatstockStretcher'
+
+  const MAJOR = 'Major_Fireplace1'
+
+  const FILLER = '__test_placeholder__'
+
+  const options = (response: SessionResponse) => response.interaction.stateId === 'wait'
+    ? response.interaction.request.options ?? []
+    : []
+
+  const setup = ({
+    played = true, resources = {}, minors = [], major = false,
+  }: {
+    played?: boolean
+    resources?: Partial<SessionResponse['state']['players'][number]['resources']>
+    minors?: string[]
+    major?: boolean
+  } = {}) => {
+    const session = new GameSession(6096, undefined, { playerCount: 2 })
+    stabilizeRandomHands(session.state.players)
+    const state = session.getState().state
+    state.currentPlayerIndex = 0
+    state.round = 14
+    state.roundPhase = 'work'
+    state.actionSpaces.forEach((space) => { space.takenBy = [] })
+    state.players.forEach((player) => {
+      setWorkersAtHome(state, player, 2)
+      player.minorHand = [FILLER]
+      player.occupationHand = [FILLER]
+      player.minorPlayed = []
+      player.occupationPlayed = []
+      player.improvements = []
+      player.resources = {
+        ...player.resources,
+        food: 0, wood: 0, clay: 0, reed: 0, stone: 0, grain: 0, vegetable: 0,
+        sheep: 0, boar: 0, cattle: 0, begging: 0,
+      }
+    })
+    const player = state.players[0]!
+    player.occupationHand = played ? [FILLER] : [CARD_ID]
+    player.occupationPlayed = played ? [CARD_ID] : []
+    player.minorHand = minors.length > 0 ? [...minors] : [FILLER]
+    player.resources = { ...player.resources, ...resources }
+    if (major && !state.availableMajorImprovements.includes(MAJOR)) {
+      state.availableMajorImprovements.push(MAJOR)
+    }
+    session.loadState(state)
+    return session
+  }
+
+  const buildRooms = (session: GameSession, count: number) => {
+    let response = session.takeAction(0, 'farm-expansion')
+    expect(response.ok, response.error).toBe(true)
+    if (response.interaction.stateId === 'wait'
+      && response.interaction.request.kind !== 'farm-select') {
+      const construct = options(response).find((option) => option.labelKey === 'actions.construct.name')
+      expect(construct, JSON.stringify(response.interaction)).toBeDefined()
+      if (!construct) return response
+      response = session.resolveChoice(response.interaction.playerIndex, construct.value)
+    }
+    expect(response.interaction.stateId).toBe('wait')
+    if (response.interaction.stateId !== 'wait' || response.interaction.request.kind !== 'farm-select') {
+      return response
+    }
+    const rooms = response.interaction.request.farm.selectableTiles.slice(0, count)
+    expect(rooms).toHaveLength(count)
+    return session.commitSelectionChoice(0, { rooms })
+  }
+
+  const chooseFurnisherCount = (session: GameSession, response: SessionResponse, count: number) => {
+    expect(response.interaction.stateId).toBe('wait')
+    expect(response.interaction.stateId === 'wait' ? response.interaction.sourceCard : undefined)
+      .toBe(CARD_ID)
+    const countChoice = options(response).find((option) => option.labelParams?.count === count)
+    expect(countChoice, JSON.stringify(response.interaction)).toBeDefined()
+    return countChoice
+      ? session.resolveChoice(response.interaction.playerIndex, countChoice.value)
+      : response
+  }
+
+  const chooseImprovement = (session: GameSession, response: SessionResponse, cardId: string) => {
+    for (let guard = 0; guard < 6 && response.interaction.stateId === 'wait'; guard += 1) {
+      const player = response.state.players[0]!
+      if (player.improvements.includes(cardId) || player.minorPlayed.includes(cardId)) break
+      const choices = options(response)
+      const card = choices.find((option) =>
+        option.value === cardId || option.value === `minor:${cardId}`)
+      if (card) {
+        response = session.resolveChoice(response.interaction.playerIndex, card.value)
+        continue
+      }
+      if (response.interaction.promptKey === 'prompt.selectPayment') {
+        const payment = choices.find((option) => option.value.startsWith('pay:')) ?? choices[0]
+        expect(payment, JSON.stringify(response.interaction)).toBeDefined()
+        response = session.resolveChoice(response.interaction.playerIndex, payment!.value)
+        continue
+      }
+      const enter = choices.find((option) => option.value.startsWith('action-improvement-'))
+        ?? choices.find((option) => option.labelKey?.includes('improvement'))
+      expect(enter, JSON.stringify(response.interaction)).toBeDefined()
+      if (!enter) break
+      response = session.resolveChoice(response.interaction.playerIndex, enter.value)
+    }
+    return response
+  }
+
+  it('D096 S2: one new room permits one one-wood minor for free', () => {
+    const session = setup({ resources: { wood: 5, reed: 2 }, minors: [MINOR_A] })
+    let response = chooseFurnisherCount(session, buildRooms(session, 1), 1)
+    response = chooseImprovement(session, response, MINOR_A)
+
+    expect(response.ok, response.error).toBe(true)
+    expect(response.state.players[0]!.rooms).toBe(3)
+    expect(response.state.players[0]!.minorPlayed).toContain(MINOR_A)
+    expect(response.state.players[0]!.resources.wood).toBe(0)
+  })
+
+  it('D096 S5: building only a stable grants no Furnisher improvement', () => {
+    const session = setup({ resources: { wood: 2 }, minors: [MINOR_A] })
+    let response = session.takeAction(0, 'farm-expansion')
+    if (response.interaction.stateId === 'wait'
+      && response.interaction.request.kind !== 'farm-select') {
+      const stable = options(response).find((option) => [
+        'actions.stable.name', 'actions.stables.name', 'actions.buildStables.name',
+      ].includes(option.labelKey ?? ''))
+      expect(stable, JSON.stringify(response.interaction)).toBeDefined()
+      if (!stable) return
+      response = session.resolveChoice(response.interaction.playerIndex, stable.value)
+    }
+    expect(response.interaction.stateId === 'wait'
+      && response.interaction.request.kind === 'farm-select'
+      ? response.interaction.request.farm.farmType
+      : undefined).toBe('stable')
+    if (response.interaction.stateId !== 'wait' || response.interaction.request.kind !== 'farm-select') return
+    const tile = response.interaction.request.farm.selectableTiles[0]!
+    response = session.commitSelectionChoice(0, { stables: [tile] })
+
+    expect(response.ok, response.error).toBe(true)
+    expect(response.state.players[0]!.stableTiles).toHaveLength(1)
+    expect(response.interaction.stateId === 'wait' ? response.interaction.sourceCard : undefined)
+      .not.toBe(CARD_ID)
+  })
+
+  it('D096 S6: an improvement without a wood cost is still eligible', () => {
+    const session = setup({ resources: { wood: 5, reed: 2, clay: 2 }, major: true })
+    let response = chooseFurnisherCount(session, buildRooms(session, 1), 1)
+    response = chooseImprovement(session, response, MAJOR)
+
+    expect(response.ok, response.error).toBe(true)
+    expect(response.state.players[0]!.improvements).toContain(MAJOR)
+    expect(response.state.players[0]!.resources.clay).toBe(0)
   })
 })

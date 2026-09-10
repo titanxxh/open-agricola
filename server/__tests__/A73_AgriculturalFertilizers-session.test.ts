@@ -1,3 +1,5 @@
+import { setWorkersAtHome } from '../../shared/domain/player'
+
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
@@ -149,6 +151,101 @@ describe('A073_AgriculturalFertilizers session', () => {
     if (resp.interaction.stateId !== 'wait') return
 
     // A73 should not be in the playable options (no pasture)
+    const a73Option = resp.interaction.request.options?.find(
+      (option) => option.value === CARD_ID,
+    )
+    expect(a73Option).toBeUndefined()
+  })
+})
+
+describe('A073_AgriculturalFertilizers session', () => {
+  const CARD_ID = 'A073_AgriculturalFertilizers'
+
+  const setupFencing = () => {
+    const session = new GameSession()
+    stabilizeRandomHands(session.state.players)
+    const state = session.getState().state
+    state.players = state.players.slice(0, 2)
+    state.currentPlayerIndex = 0
+
+    const player = state.players[0]!
+    player.minorPlayed.push(CARD_ID)
+    player.resources.wood = 20
+    player.resources.grain = 3
+    player.resources.vegetable = 1
+
+    player.fields = [
+      { row: 0, col: 3, crop: null, remaining: 0 },
+      { row: 0, col: 4, crop: null, remaining: 0 },
+    ]
+
+    session.loadState(state)
+    return session
+  }
+
+  it('A073 S1: a pasture allows playing Agricultural Fertilizers for free', () => {
+    const session = new GameSession(6073, undefined, { playerCount: 2 })
+    stabilizeRandomHands(session.state.players)
+    const state = session.getState().state
+    state.currentPlayerIndex = 0
+    state.roundPhase = 'work'
+    const player = state.players[0]!
+    setWorkersAtHome(state, player, 2)
+    player.minorHand = [CARD_ID]
+    player.occupationHand = ['__test_placeholder__']
+    player.pastures = [{
+      id: 'prerequisite', size: 1, tiles: [{ row: 2, col: 4 }], stables: 0,
+      animalType: null, animalCount: 0,
+    }]
+    state.players[1]!.minorHand = ['__test_placeholder__']
+    state.players[1]!.occupationHand = ['__test_placeholder__']
+    session.loadState(state)
+
+    let resp = session.takeAction(0, 'major-improvement')
+    if (resp.state.players[0]!.minorHand.includes(CARD_ID)
+      && resp.interaction.stateId === 'wait'
+      && !resp.interaction.request.options?.some((option) => option.value === CARD_ID)) {
+      const enter = resp.interaction.request.options?.find((option) => option.value.startsWith('action-improvement-'))
+      if (enter) resp = session.resolveChoice(0, enter.value)
+    }
+    if (resp.state.players[0]!.minorHand.includes(CARD_ID)) {
+      expect(resp.interaction.stateId).toBe('wait')
+      if (resp.interaction.stateId !== 'wait') return
+      const card = resp.interaction.request.options?.find((option) => option.value === CARD_ID)
+      expect(card).toBeDefined()
+      resp = session.resolveChoice(0, card!.value)
+    }
+
+    expect(resp.ok, resp.error).toBe(true)
+    expect(resp.state.players[0]!.minorPlayed).toContain(CARD_ID)
+  })
+
+  it('A073 S2: without a pasture Agricultural Fertilizers is not offered', () => {
+    const session = new GameSession()
+    stabilizeRandomHands(session.state.players)
+    const state = session.getState().state
+    state.players = state.players.slice(0, 2)
+    state.currentPlayerIndex = 0
+    state.round = 1
+
+    const player = state.players[0]!
+
+    player.pastures = []
+
+
+
+
+
+
+    player.minorHand = ['A025_Bassinet', CARD_ID]
+
+    session.loadState(state)
+
+    const resp = session.takeAction(0, 'meeting-place')
+    expect(resp.ok).toBe(true)
+    expect(resp.interaction.stateId).toBe('wait')
+    if (resp.interaction.stateId !== 'wait') return
+
     const a73Option = resp.interaction.request.options?.find(
       (option) => option.value === CARD_ID,
     )

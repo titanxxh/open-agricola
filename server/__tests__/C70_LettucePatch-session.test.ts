@@ -1,3 +1,6 @@
+import { type SessionResponse } from '../game/authoritative-session'
+import { setActiveWorkerCount, setWorkersAtHome } from '../../shared/domain/player'
+
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
@@ -285,5 +288,189 @@ describe('C070_LettucePatch session', () => {
       expect(session.getActionAvailability(0)['grain-utilization']).toBe(false)
       expect(session.takeAction(0, 'grain-utilization').ok).toBe(false)
     })
+  })
+})
+
+describe('C070 Lettuce Patch parity', () => {
+  const CARD_ID = 'C070_LettucePatch'
+
+  const FILLER = '__test_placeholder__'
+
+  const VIRTUAL_TILE = { row: -1, col: 3070 }
+
+  const OCCUPATIONS = ['A100_Curator', 'A125_Priest', 'B113_PatchCaregiver']
+
+  type CardCrop = { crop: 'vegetable'; remaining: number } | null
+
+  const setup = ({
+    played = true, occupations = 3, vegetable = 0, grain = 0, cardVegetables,
+    round = 10, scoring = false,
+  }: {
+    played?: boolean
+    occupations?: number
+    vegetable?: number
+    grain?: number
+    cardVegetables?: number
+    round?: number
+    scoring?: boolean
+  } = {}) => {
+    const session = new GameSession(6070, undefined, { playerCount: 2 })
+    const state = session.getState().state
+    stabilizeRandomHands(state.players)
+    state.currentPlayerIndex = 0
+    state.round = round
+    state.roundPhase = 'work'
+    state.roundActionOrder = state.roundActionOrder.map(() => null)
+    state.roundActionOrder[0] = 'grain-utilization'
+    state.actionSpaces.forEach((space) => { space.takenBy = [] })
+    state.players.forEach((player, index) => {
+      setWorkersAtHome(state, player, index === 0 ? 2 : 0)
+      player.minorHand = [FILLER]
+      player.occupationHand = [FILLER]
+      player.minorPlayed = []
+      player.occupationPlayed = []
+      player.cardStates = {}
+      player.fields = []
+      player.resources = {
+        ...player.resources,
+        wood: 0, clay: 0, reed: 0, stone: 0, food: 20, grain: 0, vegetable: 0,
+        sheep: 0, boar: 0, cattle: 0, begging: 0,
+      }
+    })
+
+    const owner = state.players[0]!
+    owner.minorHand = played ? [FILLER] : [CARD_ID]
+    owner.minorPlayed = played ? [CARD_ID] : []
+    owner.occupationPlayed = OCCUPATIONS.slice(0, occupations)
+    owner.resources.grain = grain
+    owner.resources.vegetable = vegetable
+    if (cardVegetables !== undefined) {
+      const stacks: CardCrop[] = [cardVegetables > 0
+        ? { crop: 'vegetable', remaining: cardVegetables }
+        : null]
+      owner.cardStates[CARD_ID] = { extraData: { cardFieldStacks: stacks } }
+    }
+
+    if (scoring || [4, 7, 9, 11, 13, 14].includes(round) && cardVegetables !== undefined) {
+      state.players.forEach((player) => {
+        markAllWorkersUsed(state, player)
+        if (scoring) setActiveWorkerCount(player, 0)
+      })
+    }
+
+    session.loadState(state)
+    return session
+  }
+
+  const options = (response: SessionResponse) => response.interaction.stateId === 'wait'
+    ? response.interaction.request.options ?? []
+    : []
+
+  const enterMinor = (session: GameSession) => {
+    let response = session.takeAction(0, 'meeting-place')
+    if (response.interaction.stateId !== 'wait') return response
+    if (!options(response).some((option) => option.value === CARD_ID)) {
+      const improvement = options(response).find((option) =>
+        option.value.startsWith('action-improvement-'))
+      if (improvement) response = session.resolveChoice(response.interaction.playerIndex, improvement.value)
+    }
+    return response
+  }
+
+  const playMinor = (session: GameSession) => {
+    let response = enterMinor(session)
+    if (!response.state.players[0]!.minorHand.includes(CARD_ID)) return response
+    if (response.interaction.stateId !== 'wait') return response
+    const card = options(response).find((option) =>
+      option.value === CARD_ID || option.value === `minor:${CARD_ID}`)
+    if (card) response = session.resolveChoice(response.interaction.playerIndex, card.value)
+    return response
+  }
+
+  const resolveHarvest = (session: GameSession, acceptConversion: boolean) => {
+    let response = session.performRoundEnd()
+    for (let guard = 0; guard < 50 && response.interaction.stateId === 'wait'; guard += 1) {
+      const interaction = response.interaction
+      if (interaction.request.kind === 'feed') {
+        response = session.resolveChoice(interaction.playerIndex, 'confirm', { selections: [] })
+        continue
+      }
+      const interactionOptions = interaction.request.options ?? []
+      if (interaction.request.kind === 'select-trigger') {
+        const trigger = interactionOptions.find((option) =>
+          option.value === CARD_ID || option.sourceCard === CARD_ID)
+        const fallback = interactionOptions.find((option) => option.value === '__done__')
+          ?? interactionOptions[0]
+        if (!trigger && !fallback) break
+        response = session.resolveChoice(interaction.playerIndex, (trigger ?? fallback)!.value)
+        continue
+      }
+      if (interaction.sourceCard === CARD_ID
+        || interactionOptions.some((option) => option.sourceCard === CARD_ID)) {
+        const chosen = acceptConversion
+          ? interactionOptions.find((option) => option.value !== '__skip__')
+          : interactionOptions.find((option) => option.value === '__skip__')
+        expect(chosen, JSON.stringify(interaction)).toBeDefined()
+        response = session.resolveChoice(interaction.playerIndex, chosen!.value)
+        continue
+      }
+      const next = interactionOptions.find((option) => option.value === '__done__')
+        ?? interactionOptions.find((option) => option.value === '__skip__')
+        ?? interactionOptions[0]
+      if (!next) break
+      response = session.resolveChoice(interaction.playerIndex, next.value)
+    }
+    return response
+  }
+
+  const cardStack = (response: SessionResponse): CardCrop[] =>
+    response.state.players[0]!.cardStates[CARD_ID]?.extraData?.cardFieldStacks as CardCrop[] ?? []
+
+  it('C070 S1: three occupations allow Lettuce Patch to be played for free', () => {
+    const response = playMinor(setup({ played: false }))
+
+    expect(response.ok, response.error).toBe(true)
+    expect(response.state.players[0]!.minorPlayed).toContain(CARD_ID)
+  })
+
+  it('C070 S2: only two occupations keep Lettuce Patch unavailable', () => {
+    const response = enterMinor(setup({ played: false, occupations: 2 }))
+
+    expect(response.state.players[0]!.minorHand).toContain(CARD_ID)
+    expect(options(response).some((option) =>
+      option.value === CARD_ID || option.value === `minor:${CARD_ID}`)).toBe(false)
+  })
+
+  it('C070 S4: grain cannot be sown on Lettuce Patch', () => {
+    const session = setup({ grain: 1 })
+
+    const started = session.takeAction(0, 'grain-utilization')
+    expect(started.ok, started.error).toBe(true)
+    expect(started.interaction).toMatchObject({
+      stateId: 'wait', request: { kind: 'farm-select', farm: { farmType: 'sow' } },
+    })
+    if (started.interaction.stateId !== 'wait'
+      || started.interaction.request.kind !== 'farm-select') return
+    const cardField = started.interaction.request.farm.selectableFields.find((field) =>
+      field.tile.row === VIRTUAL_TILE.row && field.tile.col === VIRTUAL_TILE.col)
+    expect(cardField).toBeUndefined()
+
+    const rejected = session.commitSelectionChoice(0, {
+      crops: [{ ...VIRTUAL_TILE, crop: 'grain' }],
+    })
+
+    expect(rejected.ok).toBe(false)
+    expect(rejected.state.players[0]!.resources.grain).toBe(1)
+    expect(cardStack(rejected)).toEqual([])
+  })
+
+  it('C070 S8: Lettuce Patch scores one card point but adds no basic field', () => {
+    const response = resolveHarvest(setup({ round: 14, scoring: true }), false)
+    const fields = response.scores[0]!.categories.find((category) => category.key === 'fields')
+    const cards = response.scores[0]!.categories.find((category) => category.key === 'cards')
+
+    expect(response.state.gameOver).toBe(true)
+    expect(fields).toMatchObject({ quantity: 0, total: -1 })
+    expect(cards?.entries).toContainEqual(expect.objectContaining({ cardId: CARD_ID, score: 1 }))
   })
 })

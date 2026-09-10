@@ -1,3 +1,8 @@
+import { type SessionResponse } from '../game/authoritative-session'
+import { setWorkersAtHome } from '../../shared/domain/player'
+import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
+import '../../shared/cards/E/E005_NightLoot'
+
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { getCardEffect } from '../../shared/cards/card-effects'
@@ -189,4 +194,149 @@ describe('E005_NightLoot session', () => {
     })
   })
 
+})
+
+describe('E005 Night Loot parity', () => {
+  const CARD_ID = 'E005_NightLoot'
+
+  const FILLER = '__test_placeholder__'
+
+  const BUILDING = ['wood', 'clay', 'reed', 'stone'] as const
+
+  const setup = ({
+    playerCount = 2, spaceResources = {},
+  }: {
+    playerCount?: number
+    spaceResources?: Record<string, Partial<Resource>>
+  } = {}) => {
+    const session = new GameSession(6005, undefined, { playerCount })
+    stabilizeRandomHands(session.state.players)
+    const state = session.getState().state
+    state.currentPlayerIndex = 0
+    state.round = 14
+    state.roundPhase = 'work'
+    state.availableMajorImprovements = []
+    state.players.forEach((player, index) => {
+      setWorkersAtHome(state, player, 2)
+      player.minorHand = [FILLER]
+      player.occupationHand = [FILLER]
+      player.minorPlayed = []
+      player.occupationPlayed = []
+      player.cardStates = {}
+      Object.assign(player.resources, {
+        wood: 0, clay: 0, reed: 0, stone: 0, food: index === 0 ? 2 : 20,
+        grain: 0, vegetable: 0, sheep: 0, boar: 0, cattle: 0, begging: 0,
+      })
+    })
+    state.players[0]!.minorHand = [CARD_ID]
+    state.actionSpaces.forEach((space) => {
+      space.takenBy = []
+      for (const resource of BUILDING) space.resources[resource] = 0
+      Object.assign(space.resources, spaceResources[space.id] ?? {})
+    })
+    session.loadState(state)
+    return session
+  }
+
+  const options = (response: SessionResponse) => response.interaction.stateId === 'wait'
+    ? response.interaction.request.options ?? []
+    : []
+
+  const playMinor = (session: GameSession) => {
+    let response = session.takeAction(0, 'meeting-place')
+    if (response.interaction.stateId !== 'wait') return response
+    if (!options(response).some((option) => option.value === CARD_ID)) {
+      const improvement = options(response).find((option) =>
+        option.value.startsWith('action-improvement-'))
+      if (improvement) response = session.resolveChoice(response.interaction.playerIndex, improvement.value)
+    }
+    if (!response.state.players[0]!.minorHand.includes(CARD_ID)) return response
+    if (response.interaction.stateId !== 'wait') return response
+    const card = options(response).find((option) => option.value === CARD_ID)
+    expect(card).toBeDefined()
+    return session.resolveChoice(response.interaction.playerIndex, card!.value)
+  }
+
+  const chooseGain = (
+    session: GameSession, response: SessionResponse, gains: Partial<Resource>,
+  ) => {
+    if (Object.entries(gains).every(([resource, amount]) =>
+      response.state.players[0]!.resources[resource as keyof Resource] >= (amount ?? 0))) {
+      return response
+    }
+    expect(response.interaction.stateId).toBe('wait')
+    if (response.interaction.stateId !== 'wait') return response
+    const choice = options(response).find((option) => {
+      const description = JSON.stringify(option.descriptionPreview ?? option)
+      return Object.entries(gains).every(([resource, amount]) =>
+        option.effectPreview?.resourcesGained?.[resource as keyof Resource] === amount
+        || (amount === 1 && description.includes(`\"resource\":\"${resource}\"`)))
+    })
+    expect(choice, JSON.stringify(response.interaction)).toBeDefined()
+    return session.resolveChoice(response.interaction.playerIndex, choice!.value)
+  }
+
+  const space = (response: SessionResponse, id: string) =>
+    response.state.actionSpaces.find((candidate) => candidate.id === id)!
+
+  it('E005 S1: paying two food passes Night Loot and takes two different building resources', () => {
+    const session = setup({ spaceResources: { forest: { wood: 3 }, 'clay-pit': { clay: 2 } } })
+    const response = chooseGain(session, playMinor(session), { wood: 1, clay: 1 })
+
+    expect(response.ok, response.error).toBe(true)
+    expect(response.state.players[1]!.minorHand).toContain(CARD_ID)
+    expect(response.state.players[0]!.minorPlayed).not.toContain(CARD_ID)
+    expect(response.state.players[0]!.resources).toMatchObject({ food: 0, wood: 1, clay: 1 })
+    expect(space(response, 'forest').resources.wood).toBe(2)
+    expect(space(response, 'clay-pit').resources.clay).toBe(1)
+  })
+
+  it('E005 S2: with one available building-resource type Night Loot takes only one good', () => {
+    const session = setup({ spaceResources: { forest: { wood: 3 } } })
+    const response = chooseGain(session, playMinor(session), { wood: 1 })
+
+    expect(response.state.players[0]!.resources.wood).toBe(1)
+    expect(space(response, 'forest').resources.wood).toBe(2)
+  })
+
+  it('E005 S3: with no building resources on accumulation spaces Night Loot has no effect', () => {
+    const response = playMinor(setup())
+
+    expect(response.state.players[1]!.minorHand).toContain(CARD_ID)
+    expect(response.state.players[0]!.resources).toMatchObject({
+      food: 0, wood: 0, clay: 0, reed: 0, stone: 0,
+    })
+  })
+
+  it('E005 S4: wood on two accumulation spaces still permits taking only one wood', () => {
+    const session = setup({
+      playerCount: 4, spaceResources: { forest: { wood: 3 }, copse: { wood: 2 } },
+    })
+    const offered = playMinor(session)
+
+    expect(options(offered).every((option) => option.effectPreview?.resourcesGained?.wood !== 2))
+      .toBe(true)
+    const response = chooseGain(session, offered, { wood: 1 })
+    expect(response.state.players[0]!.resources.wood).toBe(1)
+  })
+
+  it('E005 S5: a forged duplicate choice is rejected atomically and a legal retry succeeds', () => {
+    const session = setup({
+      playerCount: 4,
+      spaceResources: { forest: { wood: 3 }, copse: { wood: 2 }, 'clay-pit': { clay: 2 } },
+    })
+    let response = playMinor(session)
+    expect(options(response).every((option) => option.effectPreview?.resourcesGained?.wood !== 2))
+      .toBe(true)
+    response = session.resolveChoice(0, 'forged-duplicate-wood-pair')
+
+    expect(response.ok).toBe(false)
+    expect(response.state.players[0]!.resources).toMatchObject({ wood: 0, clay: 0 })
+    expect(space(response, 'forest').resources.wood).toBe(3)
+    expect(space(response, 'copse').resources.wood).toBe(2)
+    response = chooseGain(session, response, { wood: 1, clay: 1 })
+
+    expect(response.ok, response.error).toBe(true)
+    expect(response.state.players[0]!.resources).toMatchObject({ wood: 1, clay: 1 })
+  })
 })

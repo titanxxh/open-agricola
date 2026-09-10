@@ -1,3 +1,9 @@
+import { type SessionResponse } from '../game/authoritative-session'
+import { markAllWorkersUsed, setActiveWorkerCount, setWorkersAtHome } from '../../shared/domain/player'
+import { autoAdvanceRoundEnd } from '../../tests/llm-card-gen/session-helpers'
+import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
+import '../../shared/cards/D/D084_FeedPellets'
+
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { executeCardListener } from '../../shared/cards/card-listeners'
@@ -235,5 +241,215 @@ describe('D036_BreedRegistry session', () => {
     player.houseAnimalCount = 1
 
     expect(D036_BreedRegistry_impl.prerequisiteCheck?.(player, state)).toBe(false)
+  })
+})
+
+describe('D036 Breed Registry parity', () => {
+  const CARD_ID = 'D036_BreedRegistry'
+
+  const FEED_PELLETS = 'D084_FeedPellets'
+
+  const FILLER = '__test_placeholder__'
+
+  const options = (response: SessionResponse) => response.interaction.stateId === 'wait'
+    ? response.interaction.request.options ?? []
+    : []
+
+  const setup = ({
+    played = false, sheep = 0, fireplace = false, round = 14, harvest = false,
+  }: {
+    played?: boolean
+    sheep?: number
+    fireplace?: boolean
+    round?: number
+    harvest?: boolean
+  } = {}) => {
+    const session = new GameSession(6036, undefined, { playerCount: 2 })
+    const state = session.getState().state
+    stabilizeRandomHands(state.players)
+    state.currentPlayerIndex = 0
+    state.round = round
+    state.roundPhase = 'work'
+    state.actionSpaces.forEach((space) => { space.takenBy = [] })
+    state.players.forEach((player, index) => {
+      player.minorHand = [FILLER]
+      player.occupationHand = [FILLER]
+      player.minorPlayed = []
+      player.occupationPlayed = []
+      player.improvements = []
+      player.cardStates = {}
+      player.pastures = []
+      player.stableTiles = []
+      player.houseAnimalType = null
+      player.houseAnimalCount = 0
+      Object.assign(player.resources, {
+        wood: 0, clay: 0, reed: 0, stone: 0, food: 20, grain: 0, vegetable: 0,
+        sheep: 0, boar: 0, cattle: 0, begging: 0,
+      })
+      if (harvest) {
+        markAllWorkersUsed(state, player)
+        setActiveWorkerCount(player, index === 0 ? 1 : 0)
+      } else {
+        setWorkersAtHome(state, player, index === 0 ? 2 : 0)
+      }
+    })
+    const owner = state.players[0]!
+    owner.minorHand = played ? [FILLER] : [CARD_ID]
+    owner.minorPlayed = played ? [CARD_ID] : []
+    if (sheep > 0) {
+      owner.resources.sheep = sheep
+      owner.houseAnimalType = 'sheep'
+      owner.houseAnimalCount = sheep
+    }
+    if (fireplace) {
+      owner.improvements = ['Major_Fireplace1']
+      state.availableMajorImprovements = state.availableMajorImprovements.filter(
+        (cardId) => cardId !== 'Major_Fireplace1',
+      )
+    }
+    session.loadState(state)
+    return session
+  }
+
+  const enterMinorChoice = (session: GameSession) => {
+    let response = session.takeAction(0, 'meeting-place')
+    if (response.interaction.stateId !== 'wait') return response
+    const improvement = options(response).find((option) =>
+      option.value.startsWith('action-improvement-'))
+    if (improvement) response = session.resolveChoice(response.interaction.playerIndex, improvement.value)
+    return response
+  }
+
+  const playMinor = (session: GameSession, cardId = CARD_ID) => {
+    let response = enterMinorChoice(session)
+    if (response.interaction.stateId !== 'wait') return response
+    const card = options(response).find((option) =>
+      option.value === cardId || option.value === `minor:${cardId}`)
+    if (card) response = session.resolveChoice(response.interaction.playerIndex, card.value)
+    return response
+  }
+
+  const bonusScore = (response: SessionResponse) => response.scores[0]!.categories
+    .find((category) => category.key === 'cardBonusVp')?.entries
+    .find((entry) => 'cardId' in entry && entry.cardId === CARD_ID)?.score ?? 0
+
+  const addSheepPasture = (session: GameSession, capacityFour = false, sheep = 0) => {
+    const state = session.getState().state
+    const owner = state.players[0]!
+    owner.pastures = [{
+      id: 'sheep-pasture', size: 1, tiles: [{ row: 0, col: 2 }],
+      stables: capacityFour ? 1 : 0, animalType: sheep > 0 ? 'sheep' : null, animalCount: sheep,
+    }]
+    owner.stableTiles = capacityFour ? [{ row: 0, col: 2 }] : []
+    owner.resources.sheep = sheep
+    session.loadState(state)
+  }
+
+  const collectMarketSheep = (session: GameSession, sheep: number) => {
+    addSheepPasture(session, sheep > 2)
+    const state = session.getState().state
+    const market = state.actionSpaces.find((space) => space.id === 'sheep-market')
+    if (!market) throw new Error('sheep-market missing')
+    market.resources.sheep = sheep
+    session.loadState(state)
+
+    let response = session.takeAction(0, 'sheep-market')
+    expect(response.interaction).toMatchObject({ stateId: 'wait', request: { kind: 'animal-reorg' } })
+    response = session.resolveChoice(0, 'confirm', [
+      { id: 'sheep-pasture', zoneType: 'pasture', animalType: 'sheep', animalCount: sheep },
+    ])
+    expect(response.ok, response.error).toBe(true)
+    return response
+  }
+
+  it('D036 S1: with no sheep Breed Registry is played for free', () => {
+    const response = playMinor(setup())
+
+    expect(response.ok, response.error).toBe(true)
+    expect(response.state.players[0]!.minorPlayed).toContain(CARD_ID)
+  })
+
+  it('D036 S3: gaining no non-breeding sheep grants three bonus points', () => {
+    const response = setup({ played: true }).getState()
+
+    expect(bonusScore(response)).toBe(3)
+  })
+
+  it('D036 S4: gaining two sheep from Sheep Market still grants three bonus points', () => {
+    const response = collectMarketSheep(setup({ played: true }), 2)
+
+    expect(response.state.players[0]!.resources.sheep).toBe(2)
+    expect(response.state.players[0]!.cardStates[CARD_ID]?.extraData?.boardSheep).toBe(2)
+    expect(bonusScore(response)).toBe(3)
+  })
+
+  it('D036 S5: gaining three sheep from Sheep Market grants no bonus points', () => {
+    const response = collectMarketSheep(setup({ played: true }), 3)
+
+    expect(response.state.players[0]!.resources.sheep).toBe(3)
+    expect(response.state.players[0]!.cardStates[CARD_ID]?.extraData?.boardSheep).toBe(3)
+    expect(bonusScore(response)).toBe(0)
+  })
+
+  it('D036 S6: a sheep born during breeding does not count toward the two-sheep limit', () => {
+    const session = setup({ played: true, round: 4, harvest: true })
+    addSheepPasture(session, true, 2)
+
+    let response = session.performRoundEnd()
+    for (let guard = 0; guard < 20
+      && response.interaction.stateId === 'wait'
+      && response.interaction.request.kind !== 'animal-reorg'; guard += 1) {
+      response = response.interaction.request.kind === 'feed'
+        ? session.resolveChoice(response.interaction.playerIndex, 'confirm', { selections: [] })
+        : session.resolveChoice(response.interaction.playerIndex, '__skip__')
+    }
+    expect(response.interaction).toMatchObject({ stateId: 'wait', request: { kind: 'animal-reorg' } })
+    response = session.resolveChoice(0, 'confirm', [
+      { id: 'sheep-pasture', zoneType: 'pasture', animalType: 'sheep', animalCount: 3 },
+    ])
+    response = autoAdvanceRoundEnd(session)
+
+    expect(response.state.players[0]!.resources.sheep).toBe(3)
+    expect(response.state.players[0]!.cardStates[CARD_ID]?.extraData?.boardSheep ?? 0).toBe(0)
+    expect(bonusScore(response)).toBe(3)
+  })
+
+  it('D036 S7: a sheep gained from a card counts toward the two-sheep limit', () => {
+    const session = setup({ played: true })
+    const state = session.getState().state
+    state.players[0]!.minorHand = [FEED_PELLETS]
+    session.loadState(state)
+
+    let response = playMinor(session, FEED_PELLETS)
+    if (response.interaction.stateId === 'wait' && response.interaction.request.kind === 'animal-reorg') {
+      response = session.resolveChoice(0, 'confirm', [
+        { id: 'house', zoneType: 'house', animalType: 'sheep', animalCount: 1 },
+      ])
+    }
+
+    expect(response.state.players[0]!.resources.sheep).toBe(1)
+    expect(response.state.players[0]!.cardStates[CARD_ID]?.extraData?.cardSheep).toBe(1)
+    expect(bonusScore(response)).toBe(3)
+  })
+
+  it('D036 S8: turning a gained sheep into food removes the bonus', () => {
+    const session = setup({ played: true, fireplace: true })
+    const state = session.getState().state
+    const market = state.actionSpaces.find((space) => space.id === 'sheep-market')
+    if (!market) throw new Error('sheep-market missing')
+    market.resources.sheep = 1
+    session.loadState(state)
+
+    let response = session.takeAction(0, 'sheep-market')
+    expect(response.interaction).toMatchObject({ stateId: 'wait', request: { kind: 'animal-reorg' } })
+    expect(response.interaction.anytimeActions.map((action) => action.id)).toContain('exchange')
+    response = session.takeAnytimeAction(0, 'exchange')
+    expect(response.ok, response.error).toBe(true)
+    response = session.resolveChoice(0, 'bulk:0=1')
+
+    expect(response.ok, response.error).toBe(true)
+    expect(response.state.players[0]!.resources).toMatchObject({ sheep: 0, food: 22 })
+    expect(response.state.players[0]!.cardStates[CARD_ID]?.extraData?.sheepConvertedToFood).toBe(true)
+    expect(bonusScore(response)).toBe(0)
   })
 })

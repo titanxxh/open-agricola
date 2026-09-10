@@ -1,3 +1,6 @@
+import { type SessionResponse } from '../game/authoritative-session'
+import { resolveTriggerIfPresent } from './_helpers/trigger-select'
+
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
@@ -128,5 +131,107 @@ describe('A139_HollowWarden session', () => {
     // Owner should not get bonus food
     const owner = resp.state.players[0]!
     expect(owner.resources.food).toBe(session.getState().state.players[0]!.resources.food)
+  })
+})
+
+describe('A139 Hollow Warden parity', () => {
+  const CARD_ID = 'A139_HollowWarden'
+
+  const FIREPLACE = 'Major_Fireplace1'
+
+  const FILLER = '__test_placeholder__'
+
+  const setup = ({ actor = 0, played = true, clay = 0 } = {}) => {
+    const session = new GameSession(6139, undefined, { playerCount: 4 })
+    const state = session.getState().state
+    stabilizeRandomHands(state.players)
+    state.currentPlayerIndex = actor
+    state.round = 14
+    state.roundPhase = 'work'
+    state.availableMajorImprovements = [FIREPLACE, 'Major_Well']
+    state.actionSpaces.forEach((space) => { space.takenBy = [] })
+    state.players.forEach((player) => {
+      setWorkersAtHome(state, player, 2)
+      player.minorHand = [FILLER]
+      player.occupationHand = [FILLER]
+      player.minorPlayed = []
+      player.occupationPlayed = []
+      player.improvements = []
+      player.cardStates = {}
+      player.resources = {
+        ...player.resources, wood: 0, clay: 0, reed: 0, stone: 0, food: 0, grain: 0,
+        vegetable: 0, sheep: 0, boar: 0, cattle: 0, begging: 0,
+      }
+    })
+    const owner = state.players[0]!
+    owner.occupationHand = played ? [FILLER] : [CARD_ID]
+    owner.occupationPlayed = played ? [CARD_ID] : []
+    owner.resources.clay = clay
+    const hollow = state.actionSpaces.find((space) => space.id === 'hollow-4')
+    if (!hollow) throw new Error('hollow-4 space missing')
+    hollow.resources.clay = 3
+    session.loadState(state)
+    return session
+  }
+
+  const playOccupation = (session: GameSession) => {
+    let response = session.takeAction(0, 'lessons')
+    expect(response.ok, response.error).toBe(true)
+    if (response.state.players[0]!.occupationHand.includes(CARD_ID)) {
+      expect(response.interaction.stateId).toBe('wait')
+      if (response.interaction.stateId !== 'wait') return response
+      const card = response.interaction.request.options?.find((option) => option.value === CARD_ID)
+      expect(card, JSON.stringify(response.interaction)).toBeDefined()
+      response = session.resolveChoice(response.interaction.playerIndex, card!.value)
+    }
+    return resolveTriggerIfPresent(session, response, CARD_ID)
+  }
+
+  const enterFireplaceChoice = (session: GameSession, initial: SessionResponse) => {
+    let response = initial
+    for (let step = 0; step < 5; step += 1) {
+      if (response.state.players[0]!.improvements.includes(FIREPLACE)) return response
+      if (response.interaction.stateId !== 'wait') return response
+      if (response.interaction.request.options?.some((option) => option.value === FIREPLACE)) {
+        return response
+      }
+      const enter = response.interaction.request.options?.find((option) =>
+        option.value !== '__skip__' && option.value !== 'cancel')
+      expect(enter, JSON.stringify(response.interaction)).toBeDefined()
+      response = session.resolveChoice(response.interaction.playerIndex, enter!.value)
+    }
+    return response
+  }
+
+  it('A139 S1: Hollow Warden is played through Lessons and its immediate action may be declined', () => {
+    const session = setup({ played: false, clay: 2 })
+    let response = playOccupation(session)
+    expect(response.interaction.stateId).toBe('wait')
+    if (response.interaction.stateId === 'wait') {
+      response = session.resolveChoice(response.interaction.playerIndex, '__skip__')
+    }
+
+    expect(response.ok, response.error).toBe(true)
+    expect(response.state.players[0]!.occupationPlayed).toContain(CARD_ID)
+    expect(response.state.players[0]!.improvements).not.toContain(FIREPLACE)
+    expect(response.state.players[0]!.resources.clay).toBe(2)
+  })
+
+  it('A139 S2: its immediate Major Improvement action offers only Fireplaces and can build one', () => {
+    const session = setup({ played: false, clay: 2 })
+    let response = enterFireplaceChoice(session, playOccupation(session))
+    if (!response.state.players[0]!.improvements.includes(FIREPLACE)) {
+      expect(response.interaction.stateId).toBe('wait')
+      if (response.interaction.stateId !== 'wait') return
+      const majorIds = response.interaction.request.options
+        ?.map((option) => option.value).filter((value) => value.startsWith('Major_')) ?? []
+      expect(majorIds).toEqual([FIREPLACE])
+      response = session.resolveChoice(response.interaction.playerIndex, FIREPLACE)
+    }
+
+    expect(response.ok, response.error).toBe(true)
+    expect(response.state.players[0]!.improvements).toContain(FIREPLACE)
+    expect(response.state.players[0]!.improvements).not.toContain('Major_Well')
+    expect(response.state.players[0]!.resources.clay).toBe(0)
   })
 })
