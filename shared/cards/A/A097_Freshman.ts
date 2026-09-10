@@ -1,7 +1,7 @@
 import { defineOccupationCard } from '../card-source'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
-import { isOccupationPlayable } from '../../actions/effects/occupation'
+import { hasPlayableOccupationChoice } from '../../actions/effects/occupation'
 import { isCardFlagged } from '../helpers/card-state'
 import type { CardImpl } from '../registry'
 
@@ -9,8 +9,7 @@ const CARD_ID = 'A097_Freshman'
 const canReplaceBake = (context: CardListenerContext) =>
   !context.actionContext?.checkedReplaceAction &&
   !isCardFlagged(context.player, CARD_ID) &&
-  context.player.occupationHand.some((cardId) =>
-    isOccupationPlayable(context.state, context.player, cardId, {}, context.space?.id))
+  hasPlayableOccupationChoice(context.state, context.player, context.space.id, { exactCost: {} })
 const computeReplaceListener: CardListenerRegistration = {
   id: 'A97-freshman-replace-bake',
   cardIds: [CARD_ID],
