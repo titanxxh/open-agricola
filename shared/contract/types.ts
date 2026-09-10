@@ -968,7 +968,7 @@ export type FarmSelectType = 'plow' | 'sow' | 'fence' | 'room' | 'stable'
 export type SelectionKind = 'farm-position' | 'occupation-hand'
 
 export type InteractionRequest =
-  | { kind: 'choice'; options: ActionChoiceOption[]; structuredChoicePrefixes?: string[] }
+  | { kind: 'choice'; options: ActionChoiceOption[]; structuredChoicePrefixes?: string[]; requiresExplicitChoice?: boolean }
   | { kind: 'animal-reorg'; zones: InteractionAnimalReorgZone[] }
   | { kind: 'confirm-next-player'; nextPlayerIndex: number }
   | { kind: 'confirm-player-switch'; fromPlayerIndex: number; toPlayerIndex: number }

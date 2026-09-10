@@ -377,6 +377,8 @@ export const zh = {
     interactionOptionalSkipAction: '跳过{action}',
     interactionOptionalSkipCard: '不使用{card}',
     interactionFlowSelect: '请选择要执行的动作',
+    interactionSelectReplacement: '请选择替代效果，或不替换',
+    interactionDoNotReplace: '不替换',
     interactionUseAbility: '使用能力',
   interactionUseGrowOffspring: '激活后代（付 1 食物）',
     interactionDecline: '放弃',

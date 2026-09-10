@@ -4034,6 +4034,7 @@ export class GameCore {
         if (frame.engine.hasPendingHostRequiringExternalResolution(pendingActionCanResolve)) {
           return
         }
+        if (pendingView?.request.kind === 'choice' && pendingView.request.requiresExplicitChoice) return
         if (step.choice.options.length === 1) {
           let autoOptions = step.choice.options
           while (autoOptions.length === 1) {
@@ -4054,6 +4055,7 @@ export class GameCore {
               this.flushLeafActionDetail(resolvedActionId, false)
             }
             if (result.type === 'request' && result.request.kind === 'choice') {
+              if (result.request.requiresExplicitChoice) return
               const requestOptions = result.request.options
               if (requestOptions.length === 1) {
                 if (requestOptions[0]?.disabled === true) return

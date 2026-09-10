@@ -16,7 +16,6 @@ import {
   ParallelNode,
   XorNode,
 } from './nodes'
-import { buildReplaceChoiceFlow } from './nodes/interaction-helpers'
 import type { EngineInternals } from './engine-internals'
 import {
   isPendingChoiceValueAllowed,
@@ -30,9 +29,11 @@ import {
   buildPhaseTrailingNodes,
   buildChoiceExecutionContext,
   buildOwnedFlowNode,
+  buildReplacementChoiceNode,
   buildFollowUpNodes,
   buildListenerEvent,
   canActionContinueWithoutBeforeTriggers,
+  getBeforeContinuationContext,
   cloneNode,
   enforceCompositeContinuationMandatory,
   enforceSelectedTargetMandatory,
@@ -187,19 +188,23 @@ const resolveXorIfSelectedBranchComplete = (node: XorNode): void => {
 const triggerSelectEvaluationOptions = (
   int: EngineInternals,
   context: ActionExecutionContext,
+  node: ParallelNode,
 ): TriggerSelectEvaluationOptions => ({
   canStartFlow: (flow, flowContext) => evaluateFlowDoable(flow, flowContext, (actionId) => int.registry.get(actionId)),
-  canContinueWithoutTriggers: (actionId, resources) =>
-    canActionContinueWithoutBeforeTriggers(
+  canContinueWithoutTriggers: (actionId, resources) => {
+    const hostContext = getBeforeContinuationContext(int, context, node, actionId)
+    return canActionContinueWithoutBeforeTriggers(
       int,
-      { ...context, ...currentEventReadContext(int) },
-      actionId,
+      { ...hostContext, ...currentEventReadContext(int) },
+      hostContext.actionId,
       resources,
-    ),
+    )
+  },
   canReachContinuationThroughTriggers: (actionId, resources) => {
-    const action = int.registry.get(actionId)
+    const hostContext = getBeforeContinuationContext(int, context, node, actionId)
+    const action = int.registry.get(hostContext.actionId)
     if (!action) return false
-    const scopedContext = withResourcePreview(context, resources)
+    const scopedContext = withResourcePreview(hostContext, resources)
     const directDoable = action.canBeExecutedByPlayer(
       scopedContext.state,
       scopedContext.player,
@@ -211,7 +216,7 @@ const triggerSelectEvaluationOptions = (
       },
     )
     return int.hooks.applyIsDoable(
-      { ...scopedContext, ...currentEventReadContext(int), actionId },
+      { ...scopedContext, ...currentEventReadContext(int), actionId: hostContext.actionId },
       action,
       directDoable,
     )
@@ -420,7 +425,7 @@ export function engineResolveChoice(
         const offered = evaluateTriggerSelect(
           node,
           { ...triggerContext, ...currentEventReadContext(int) },
-          triggerSelectEvaluationOptions(int, triggerContext),
+          triggerSelectEvaluationOptions(int, triggerContext, node),
         ).options
         if (offered.length === 0) {
           node.resolveRemainingTriggerChildrenForPass()
@@ -462,7 +467,7 @@ export function engineResolveChoice(
       const offered = evaluateTriggerSelect(
         node,
         { ...triggerContext, ...currentEventReadContext(int) },
-        triggerSelectEvaluationOptions(int, triggerContext),
+        triggerSelectEvaluationOptions(int, triggerContext, node),
       ).options
       if (offered.length === 0) {
         node.resolveRemainingTriggerChildrenForPass()
@@ -518,7 +523,11 @@ export function engineResolveChoice(
         const children = 'children' in target ? target.children as EngineNode[] : []
         return !!children[0] && beginsWithChoice(children[0])
       }
-      if (targetNode && beginsWithChoice(targetNode)) {
+      if (targetNode && (
+        beginsWithChoice(targetNode) ||
+        (node instanceof XorNode && node.replacementOriginalNodeId && targetNode.optional && !targetNode.optionalActive) ||
+        (child.ownerPlayerId && child.ownerPlayerId !== context.player.id)
+      )) {
         enforceSelectedTargetMandatory(targetNode)
         int.pendingNodeIdRef.value = null
         return { type: 'ok' }
@@ -534,26 +543,19 @@ export function engineResolveChoice(
         emitPrivateEvent: context.emitPrivateEvent,
         reportProtectedObservation: context.reportProtectedObservation,
       }
-      const replaceResult = int.hooks.applyComputeReplace({
+      const replaceResult = child.resolvedReplacement
+        ? { ...child.resolvedReplacement, alternatives: [] }
+        : int.hooks.applyComputeReplace({
         ...executionContext,
         ...currentEventReadContext(int),
         actionId: child.actionId,
       })
       const actionId = replaceResult.actionId
       executionContext.sourceCard = replaceResult.sourceCard ?? child.sourceCard
-      if (replaceResult.alternatives.length > 0) {
-        const flowNode = buildOwnedFlowNode(int,
-          buildReplaceChoiceFlow(
-            child,
-            replaceResult.alternatives.map((alternative) => ({
-              ...alternative,
-              flow: applyDefaultSourceCardToFlow(alternative.flow, alternative.sourceCard),
-            })),
-            actionId,
-          ),
-          context.player.id,
-        )
-        enforceCompositeContinuationMandatory(flowNode)
+      const flowNode = buildReplacementChoiceNode(int, {
+        ...executionContext, ...currentEventReadContext(int),
+      }, child, replaceResult)
+      if (flowNode) {
         const targetIndex = node.children.indexOf(targetNode!)
         int.tree.insertAfter(child.id, [flowNode])
         child.resolve({ type: 'ok' })
@@ -563,6 +565,7 @@ export function engineResolveChoice(
         int.pendingNodeIdRef.value = null
         return { type: 'ok' }
       }
+      child.resolvedReplacement = { actionId, sourceCard: executionContext.sourceCard }
       enforceSelectedTargetMandatory(targetNode!)
       const action = int.registry.get(actionId)
       if (!action) {
@@ -916,7 +919,9 @@ export function engineResolveChoice(
   let committedActionId = actionId
   let committedAction = action
   if (choice !== 'cancel') {
-    const replaceResult = int.hooks.applyComputeReplace({
+    const replaceResult = pendingActionNode?.resolvedReplacement
+      ? pendingActionNode.resolvedReplacement
+      : int.hooks.applyComputeReplace({
       ...executionContext,
       ...pendingEventReadContext(),
       actionId,

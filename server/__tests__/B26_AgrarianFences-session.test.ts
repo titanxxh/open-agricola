@@ -87,9 +87,10 @@ describe('B026_AgrarianFences session', () => {
     expect(resp.interaction.request.options.map((option) => option.labelKey)).toEqual([
       'ui.interactionUseCard',
       'actions.fencing.name',
-      'ui.interactionAgrarianFencesSowAndFence',
-      'actions.sow.name',
+      'ui.interactionDoNotReplace',
     ])
+    const agrarianFences = resp.interaction.request.options.find((option) => option.sourceCard === 'B026_AgrarianFences')!
+    resp = session.resolveChoice(0, agrarianFences.value)
     const sowAndFence = resp.interaction.request.options.find(
       (option) => option.labelKey === 'ui.interactionAgrarianFencesSowAndFence',
     )
@@ -101,11 +102,11 @@ describe('B026_AgrarianFences session', () => {
     if (resp.interaction.stateId !== 'wait') return
     expect(resp.interaction.request.options.map((option) => option.labelKey)).toEqual([
       'ui.interactionUseCard',
-      'actions.sow.name',
+      'ui.interactionDoNotReplace',
     ])
 
     const originalSow = resp.interaction.request.options.find(
-      (option) => option.labelKey === 'actions.sow.name',
+      (option) => option.labelKey === 'ui.interactionDoNotReplace',
     )
     expect(originalSow).toBeDefined()
     resp = session.resolveChoice(0, originalSow!.value)

@@ -115,6 +115,8 @@ describe('D021 Recruitment parity', () => {
     const before = session.getState().state.players[0]!.workers.filter((worker) => worker.isActive).length
 
     let response = session.takeAction(0, 'major-improvement')
+    expect(options(response)).toHaveLength(1)
+    expect(response.state.players[0]!.workers.filter((worker) => worker.isActive)).toHaveLength(before)
     const replacement = recruitmentOption(response)!
     response = session.resolveChoice(0, replacement.value)
     expect(response.ok, response.error).toBe(true)
@@ -128,7 +130,10 @@ describe('D021 Recruitment parity', () => {
     const normal = options(response).find((option) => option.sourceCard !== CARD_ID)
     expect(normal).toBeDefined()
     response = session.resolveChoice(response.interaction.playerIndex, normal!.value)
-    if (response.interaction.stateId === 'wait') {
+    const accept = options(response).find((option) => option.value !== '__skip__')
+    expect(accept).toBeDefined()
+    response = session.resolveChoice(0, accept!.value)
+    if (response.state.players[0]!.minorHand.includes(NORMAL_MINOR_ID)) {
       const card = options(response).find((option) => option.value === NORMAL_MINOR_ID)
       expect(card).toBeDefined()
       response = session.resolveChoice(response.interaction.playerIndex, card!.value)

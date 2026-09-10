@@ -18,6 +18,7 @@ export class ActionNode extends BaseNode {
   public effectPreview?: ChoiceEffectPreview
   public choiceLabelKey?: string
   public choiceLabelParams?: Record<string, unknown>
+  public resolvedReplacement?: { actionId: string; sourceCard?: string }
   public beforePhaseResolved = false
   public bodyStarted = false
   public continuationParentHostNodeId?: string
@@ -111,6 +112,7 @@ export class ActionNode extends BaseNode {
       effectPreview: this.effectPreview,
       choiceLabelKey: this.choiceLabelKey,
       choiceLabelParams: this.choiceLabelParams,
+      resolvedReplacement: this.resolvedReplacement,
       beforePhaseResolved: this.beforePhaseResolved,
       bodyStarted: this.bodyStarted,
       continuationParentHostNodeId: this.continuationParentHostNodeId,

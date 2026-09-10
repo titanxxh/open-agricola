@@ -22,7 +22,8 @@ import {
   SequenceNode,
   XorNode,
 } from './nodes'
-import { attachChoiceLabel, resolveChoiceSourceCard } from './nodes/interaction-helpers'
+import { attachChoiceLabel, buildReplaceChoiceFlow, resolveChoiceSourceCard } from './nodes/interaction-helpers'
+import type { ComputeReplaceResult } from './dispatcher'
 import type { EngineNode } from './types'
 import type { PendingCursor, PendingEnvelope, PendingSyntheticKind, PendingView } from './types'
 import type { EngineInternals } from './engine-internals'
@@ -232,16 +233,19 @@ export function setEngineBlockedPending(int: EngineInternals, nodeId: string, ac
 export function canStartNode(int: EngineInternals, context: FlowDoableContext, node: EngineNode): boolean {
   const player = context.state.players.find((entry) => entry.id === node.ownerPlayerId) ?? context.player
   if (node instanceof ActionNode) {
-    const action = int.registry.get(node.actionId)
+    const actionId = node.resolvedReplacement?.actionId ?? node.actionId
+    const action = int.registry.get(actionId)
     if (!action) return false
-    const actionContext = node.beforePhaseResolved || context.actionContext?.skipBeforeTriggers === true
-      ? { ...node.actionContext, skipBeforeTriggers: true }
-      : node.actionContext
+    const actionContext: Record<string, unknown> = {
+      ...node.actionContext,
+      ...(node.resolvedReplacement ? { checkedReplaceAction: true } : {}),
+      ...(node.beforePhaseResolved || context.actionContext?.skipBeforeTriggers === true ? { skipBeforeTriggers: true } : {}),
+    }
     const targetSpaceId = actionContext?.targetSpaceId
     const space = context.state.actionSpaces.find((entry) => entry.id === targetSpaceId) ?? context.space
     return isActionDoableInFlowContext({
-      ...context, actionId: node.actionId, action, player, space,
-      params: node.params, sourceCard: node.sourceCard, actionContext,
+      ...context, actionId, action, player, space,
+      params: node.params, sourceCard: node.resolvedReplacement?.sourceCard ?? node.sourceCard, actionContext,
       resolveAction: (actionId) => int.registry.get(actionId),
     })
   }
@@ -433,6 +437,7 @@ export function cloneNode(int: EngineInternals, node: EngineNode): EngineNode {
       node.actionContext,
       node.effectPreview,
     )
+    clone.resolvedReplacement = node.resolvedReplacement
     clone.beforePhaseResolved = node.beforePhaseResolved
     clone.bodyStarted = node.bodyStarted
     clone.continuationParentHostNodeId = node.continuationParentHostNodeId
@@ -468,6 +473,13 @@ export function cloneNode(int: EngineInternals, node: EngineNode): EngineNode {
     if (node.selectedChildId) {
       const selectedIndex = node.children.findIndex((child) => child.id === node.selectedChildId)
       clone.selectedChildId = selectedIndex >= 0 ? children[selectedIndex]?.id ?? null : null
+    }
+    if (node instanceof XorNode && clone instanceof XorNode && node.replacementOriginalNodeId) {
+      const originalIndex = node.children.findIndex((child) => child.id === node.replacementOriginalNodeId)
+      clone.replacementOriginalNodeId = children[originalIndex]?.id
+      clone.replacementSourceCards = Object.fromEntries(children.map((child, index) => [
+        child.id, node.replacementSourceCards?.[node.children[index]!.id],
+      ]))
     }
     clone.emittedChoices = [...node.emittedChoices]
     clone.emittedPromptKey = node.emittedPromptKey
@@ -805,6 +817,36 @@ export function buildOwnedFlowNode(
   return stampOwner(buildFlowNode(int, flow, ownerPlayerId), ownerPlayerId)
 }
 
+export function buildReplacementChoiceNode(
+  int: EngineInternals,
+  context: FlowDoableContext,
+  actionNode: ActionNode,
+  replacement: ComputeReplaceResult,
+  optionalHost?: EngineNode,
+): XorNode | undefined {
+  if (replacement.alternatives.length === 0) return undefined
+  const flow = buildReplaceChoiceFlow(
+    { ...actionNode, optional: optionalHost?.optional, optionalPromptKey: optionalHost?.optionalPromptKey },
+    replacement.alternatives.map((alternative) => ({
+      ...alternative,
+      flow: applyDefaultSourceCardToFlow(alternative.flow, alternative.sourceCard),
+    })),
+    replacement.actionId,
+  )
+  const node = buildOwnedFlowNode(int, flow, context.player.id) as XorNode
+  node.replacementSourceCards = Object.fromEntries(node.children.slice(0, -1).map((child, index) => [
+    child.id, replacement.alternatives[index]!.sourceCard,
+  ]))
+  const original = node.children.at(-1)!
+  const alternatives = node.children.slice(0, -1).filter((child) => canStartNode(int, context, child))
+  if (alternatives.length === 0) return undefined
+  node.children = [...alternatives, original]
+  node.replacementOriginalNodeId = original.id
+  node.promptKey = 'ui.interactionSelectReplacement'
+  enforceCompositeContinuationMandatory(node)
+  return node
+}
+
 /**
  * Walk a flow subtree and stamp outer `actionContext` / `sourceCard` onto
  * every leaf — used by the leaf `expandFlow` path so the inner flow's
@@ -1013,6 +1055,28 @@ const canStartFlowWithoutBeforeTriggers = (
   return flow.children.some((child) =>
     canStartFlowWithoutBeforeTriggers(int, context, child),
   )
+}
+
+export function getBeforeContinuationContext(
+  int: EngineInternals,
+  context: ActionExecutionContext,
+  node: ParallelNode,
+  actionId: string,
+): ActionExecutionContext & { actionId: string } {
+  const activation = node.children.find((child) =>
+    isActivateCardActionNode(child) && child.params.phase === 'before' && child.params.actionId === actionId)
+  const hostId = activation && isActivateCardActionNode(activation) ? activation.params.beforeHostNodeId : undefined
+  const host = hostId ? int.tree.findNodeById(hostId) : undefined
+  if (!(host instanceof ActionNode)) return { ...context, actionId }
+  return {
+    ...context,
+    actionId: host.resolvedReplacement?.actionId ?? host.actionId,
+    player: context.state.players.find((player) => player.id === host.ownerPlayerId) ?? context.player,
+    space: context.state.actionSpaces.find((space) => space.id === host.actionContext?.targetSpaceId) ?? context.space,
+    params: host.params,
+    sourceCard: host.resolvedReplacement?.sourceCard ?? host.sourceCard,
+    actionContext: { ...host.actionContext, ...(host.resolvedReplacement ? { checkedReplaceAction: true } : {}) },
+  }
 }
 
 export const canActionContinueWithoutBeforeTriggers = (

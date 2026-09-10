@@ -51,7 +51,7 @@ const isDoableListener: CardListenerRegistration = {
   actions: ['renovate-house'],
   phases: ['isDoable' as ActionHookPhase],
   handler: (context: CardListenerContext): ActionHookResult | void => {
-    if (context.doable === true) return
+    if (context.doable === true || context.actionContext?.checkedReplaceAction) return
     if (!canConvert(context)) return
     return { doable: true }
   },

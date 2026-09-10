@@ -78,7 +78,7 @@ describe('D066_PotterCeramics session', () => {
   it('can skip D66 after B26 replacement chooses bake plus fences when fencing can continue without it', () => {
     const session = setup({
       clay: 1,
-      grain: 0,
+      grain: 1,
       extraPlayedCards: ['B026_AgrarianFences'],
     })
     const state = session.getState().state
@@ -102,6 +102,9 @@ describe('D066_PotterCeramics session', () => {
     expect(resp.ok).toBe(true)
     expect(resp.interaction.stateId).toBe('wait')
     if (resp.interaction.stateId !== 'wait') return
+    expect(resp.interaction.promptKey).toBe('ui.interactionSelectReplacement')
+    const source = resp.interaction.request.options!.find((option) => option.sourceCard === 'B026_AgrarianFences')!
+    resp = session.resolveChoice(0, source.value)
     expect(resp.interaction.promptKey).toBe('ui.interactionFlowSelect')
     const bakeAndFence = resp.interaction.request.options?.find(
       (option) => option.labelKey === 'ui.interactionAgrarianFencesBakeAndFence',
@@ -116,6 +119,7 @@ describe('D066_PotterCeramics session', () => {
     expect(resp.interaction.sourceCard).toBe(CARD_ID)
 
     resp = session.resolveChoice(0, '__skip__')
+    if (resp.interaction.promptKey === 'ui.interactionBakeBreadChoice') resp = session.resolveChoice(0, 'Major_Fireplace1')
 
     expect(resp.ok).toBe(true)
     expect(resp.state.players[0]!.resources.clay).toBe(1)

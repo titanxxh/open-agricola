@@ -11,6 +11,7 @@ export type PromptKey =
   | 'ui.harvestFeed'
   | 'ui.harvestHeating'
   | 'ui.interactionFlowSelect'
+  | 'ui.interactionSelectReplacement'
   | 'ui.interactionOptionalAction'
   | 'ui.interactionEngineBlocked'
   | 'ui.interactionBeforeAnytime'

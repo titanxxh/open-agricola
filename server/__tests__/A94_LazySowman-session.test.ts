@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { GameSession } from '../game/authoritative-session'
+import { GameSession, type SessionResponse } from '../game/authoritative-session'
 import { confirmPlayerSwitch } from './_helpers/pending-confirms'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 import { setWorkersAtHome, workersAvailable } from '../../shared/domain/player'
@@ -47,6 +47,16 @@ const setup = (options?: {
   return session
 }
 
+const acceptReplacement = (session: GameSession, response: SessionResponse) => {
+  expect(response.interaction.promptKey).toBe('ui.interactionSelectReplacement')
+  const replacement = response.interaction.request.options!.find((option) => option.sourceCard === CARD_ID)!
+  let selected = session.resolveChoice(0, replacement.value)
+  expect(selected.interaction.request.options!.some((option) => option.value === '__skip__')).toBe(true)
+  const place = selected.interaction.request.options!.find((option) => option.value !== '__skip__')!
+  selected = session.resolveChoice(0, place.value)
+  return selected
+}
+
 describe('A094_LazySowman session', () => {
   it('turns unavailable sow into an immediate extra place-farmer flow', () => {
     const session = setup({ withCard: true, meetingPlaceOccupied: false })
@@ -55,6 +65,7 @@ describe('A094_LazySowman session', () => {
     expect(resp.ok).toBe(true)
     expect(resp.interaction.stateId).toBe('wait')
     if (resp.interaction.stateId !== 'wait') return
+    resp = acceptReplacement(session, resp)
     expect(resp.interaction.promptKey).toBe('ui.interactionPlaceFarmerExtra')
     expect(resp.interaction.request.options?.map((option) => option.value)).toContain('allow-occupied:day-laborer')
     expect(resp.interaction.request.options?.map((option) => option.value)).not.toContain('meeting-place')
@@ -89,11 +100,11 @@ describe('A094_LazySowman session', () => {
     expect(resp.ok).toBe(true)
     expect(resp.interaction.stateId).toBe('wait')
     if (resp.interaction.stateId !== 'wait') return
-    expect(resp.interaction.request.options?.map((option) => option.labelKey)).toContain('actions.sow.name')
+    expect(resp.interaction.request.options?.map((option) => option.labelKey)).toContain('ui.interactionDoNotReplace')
     expect(resp.interaction.request.options?.map((option) => option.labelKey)).toContain('ui.interactionUseCard')
     expect(resp.state.players[0]!.cardStates?.A094_LazySowman).toBeUndefined()
 
-    const sowOption = resp.interaction.request.options?.find((option) => option.labelKey === 'actions.sow.name')
+    const sowOption = resp.interaction.request.options?.find((option) => option.labelKey === 'ui.interactionDoNotReplace')
     expect(sowOption).toBeDefined()
 
     resp = session.resolveChoice(0, sowOption!.value)
@@ -123,6 +134,7 @@ describe('A094_LazySowman session', () => {
     expect(resp.ok).toBe(true)
     expect(resp.interaction.stateId).toBe('wait')
     if (resp.interaction.stateId !== 'wait') return
+    resp = acceptReplacement(session, resp)
     expect(resp.interaction.promptKey).toBe('ui.interactionPlaceFarmerExtra')
   })
 
@@ -144,7 +156,7 @@ describe('A094_LazySowman session', () => {
     expect(resp.ok).toBe(true)
     expect(resp.interaction.stateId).toBe('wait')
     if (resp.interaction.stateId !== 'wait') return
-    expect(resp.interaction.request.options?.map((option) => option.labelKey)).toContain('actions.sow.name')
+    expect(resp.interaction.request.options?.map((option) => option.labelKey)).toContain('ui.interactionDoNotReplace')
     expect(resp.interaction.request.options?.map((option) => option.labelKey)).toContain('ui.interactionUseCard')
   })
 

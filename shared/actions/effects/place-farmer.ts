@@ -6,6 +6,7 @@ import type {
   GameState,
   PlayerState,
 } from '../../contract/types'
+import { resetComputeReplaceGuards } from '../../engine/replace-guard'
 import { recordRoundPlacement } from '../../cards/helpers/round-placement'
 import { writeActionSnapshotExtraData } from '../../cards/helpers/action-snapshot'
 import {
@@ -166,9 +167,9 @@ export const placeFarmerAction: ActionDefinition = {
         actionId: targetSpaceId,
         expandFlow: true,
         sourceCard,
-        actionContext: { ...actionContext },
+        actionContext: resetComputeReplaceGuards(actionContext),
       }
-      const beforeFlows = collectBeforePlacementFlows(state, player, targetSpace, actionContext)
+      const beforeFlows = collectBeforePlacementFlows(state, player, targetSpace, resetComputeReplaceGuards(actionContext))
       if (beforeFlows.length > 0) {
         return {
           type: 'flow',
@@ -271,7 +272,7 @@ export const placeFarmerAction: ActionDefinition = {
       targetSpaceId,
       placedWorkerId: placeResult.workerId,
     }
-    const targetActionContext = { ...(actionContext ?? {}), ...actionContextWrite, ...(temporarySupplyWorker ? { trueAction: true } : {}) }
+    const targetActionContext = { ...resetComputeReplaceGuards(actionContext), ...actionContextWrite, ...(temporarySupplyWorker ? { trueAction: true } : {}) }
     if (actionContext) {
       actionContext.targetSpaceId = targetSpaceId
       actionContext.placedWorkerId = placeResult.workerId

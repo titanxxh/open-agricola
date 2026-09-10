@@ -7,6 +7,8 @@ export class XorNode extends BaseNode {
   public children: EngineNode[]
   public promptKey?: PromptKey
   public selectedChildId: string | null = null
+  public replacementOriginalNodeId?: string
+  public replacementSourceCards?: Record<string, string | undefined>
   public emittedChoices: ActionChoiceOption[] = []
   public emittedPromptKey?: PromptKey
   public emittedPromptParams?: Record<string, unknown>
@@ -36,6 +38,8 @@ export class XorNode extends BaseNode {
       childrenIds: this.children.map((c) => c.id),
       promptKey: this.promptKey,
       selectedChildId: this.selectedChildId,
+      replacementOriginalNodeId: this.replacementOriginalNodeId,
+      replacementSourceCards: this.replacementSourceCards,
       emittedChoices: this.emittedChoices,
       emittedPromptKey: this.emittedPromptKey,
       emittedPromptParams: this.emittedPromptParams,

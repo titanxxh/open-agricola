@@ -277,20 +277,19 @@ describe('B103 Field Merchant parity', () => {
   it('B103 S2: declining a Minor Improvement action gains one food', () => {
     const session = setupOccupation('B103_FieldMerchant', { played: true, round: 5 })
     let response = session.takeAction(0, 'meeting-place')
-    if (response.interaction.stateId !== 'wait') throw new Error('expected improvement branch')
-    const improvement = response.interaction.request.options?.find((option) => option.value !== '__skip__')
-    expect(improvement).toBeDefined()
-    response = session.resolveChoice(0, improvement!.value)
-    if (response.interaction.stateId !== 'wait') throw new Error('expected Field Merchant branch')
-    const merchant = response.interaction.request.options?.find((option) => option.sourceCard === 'B103_FieldMerchant')
-    expect(merchant?.effectPreview?.resourcesGained).toMatchObject({ food: 1 })
-    response = session.resolveChoice(0, merchant!.value)
+    expect(response.interaction.promptKey).toBe('ui.interactionSelectReplacement')
+    const merchant = response.interaction.request.options!.find((option) => option.sourceCard === 'B103_FieldMerchant')!
+    expect(response.state.players[0]!.resources.food).toBe(0)
+    response = session.resolveChoice(0, merchant.value)
     expect(response.state.players[0]!.resources).toMatchObject({ food: 1, vegetable: 0 })
   })
 
   it('B103 S3: declining a Major or Minor Improvement action may gain one vegetable', () => {
     const session = setupOccupation('B103_FieldMerchant', { played: true, round: 14 })
-    const response = session.takeAction(0, 'major-improvement')
+    let response = session.takeAction(0, 'major-improvement')
+    const source = response.interaction.request.options!.find((option) => option.sourceCard === 'B103_FieldMerchant')!
+    response = session.resolveChoice(0, source.value)
+    expect(response.interaction.promptKey).toBe('ui.interactionFieldMerchantChoose')
     expect(response.interaction.stateId).toBe('wait')
     if (response.interaction.stateId !== 'wait') return
     const merchant = response.interaction.request.options?.find((option) =>

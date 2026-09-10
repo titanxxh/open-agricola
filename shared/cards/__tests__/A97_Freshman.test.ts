@@ -77,7 +77,7 @@ describe('A097_Freshman', () => {
     expect(grainUtilization.canBeExecutedByPlayer(createState(player), player)).toBe(true)
   })
 
-  it('returns optional replace flow that flags card and plays occupation for free', () => {
+  it('returns a committed replacement flow that flags card and plays occupation for free', () => {
     const listener = findListener('A97-freshman-replace-bake')
     const player = createPlayer()
     player.occupationHand = ['A123_FrameBuilder']
@@ -93,7 +93,6 @@ describe('A097_Freshman', () => {
     expect(result?.decline).toBe(true)
     expect(result?.alternativeFlow).toEqual({
       type: 'seq',
-      optional: true,
       promptKey: 'ui.interactionFreshmanOccupation',
       choiceLabelKey: 'ui.interactionFreshmanOccupation',
       children: [

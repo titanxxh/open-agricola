@@ -383,6 +383,8 @@ export const en = {
     interactionOptionalSkipAction: 'Skip {action}',
     interactionOptionalSkipCard: 'Do not use {card}',
     interactionFlowSelect: 'Choose an action',
+    interactionSelectReplacement: 'Choose a replacement or keep the original action',
+    interactionDoNotReplace: 'Do not replace',
     interactionUseAbility: 'Use ability',
   interactionUseGrowOffspring: 'Activate offspring (pay 1 food)',
     interactionDecline: 'Decline',

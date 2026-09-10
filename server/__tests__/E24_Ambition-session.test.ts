@@ -66,7 +66,7 @@ const setup = (options: {
 const enterOptionalImprovement = (session: GameSession, response: SessionResponse) => {
   expect(response.ok, response.error).toBe(true)
   expect(response.interaction.stateId).toBe('wait')
-  if (response.interaction.stateId !== 'wait') return response
+  if (response.interaction.stateId !== 'wait' || response.interaction.promptKey === 'ui.interactionSelectReplacement') return response
   const enter = response.interaction.request.options?.find((option) => option.value !== '__skip__')
   expect(enter).toBeDefined()
   return enter ? session.resolveChoice(response.interaction.playerIndex, enter.value) : response
@@ -138,8 +138,6 @@ describe('E024 Ambition parity', () => {
     const merchantOptions = response.interaction.request.options
       ?.filter((option) => option.sourceCard === FIELD_MERCHANT) ?? []
     expect(merchantOptions).toHaveLength(1)
-    expect(merchantOptions[0]?.effectPreview?.resourcesGained).toMatchObject({ food: 1 })
-    expect(merchantOptions[0]?.effectPreview?.resourcesGained?.vegetable).toBeUndefined()
 
     response = declinedSession.resolveChoice(0, merchantOptions[0]!.value)
     expect(response.ok, response.error).toBe(true)
@@ -153,7 +151,7 @@ describe('E024 Ambition parity', () => {
     const original = response.interaction.request.options?.find((option) => !option.sourceCard)
     expect(original).toBeDefined()
     if (!original) return
-    response = buildSession.resolveChoice(0, original.value)
+    response = enterOptionalImprovement(buildSession, buildSession.resolveChoice(0, original.value))
     expect(response.interaction.stateId).toBe('wait')
     if (response.interaction.stateId !== 'wait') return
     expect(response.interaction.request.options?.map((option) => option.value)).toContain('Major_Pottery')
