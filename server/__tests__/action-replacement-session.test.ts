@@ -20,6 +20,7 @@ import '../../shared/cards/A/A116_WoodCutter'
 import '../../shared/cards/B/B025_BreadPaddle'
 import '../../shared/cards/B/B097_Scholar'
 import '../../shared/cards/D/D138_PetLover'
+import '../../shared/cards/E/E101_Blighter'
 
 const setup = () => {
   const session = new GameSession(850, undefined, { playerCount: 2 })
@@ -71,6 +72,34 @@ const customOpportunity = (session: GameSession, flow: ActionFlow) => {
 }
 
 describe('explicit action replacement through GameSession', () => {
+  it('blocks a frozen host when only a new replacement becomes doable during before', () => {
+    const session = setup()
+    const actionId = '__frozen_host__'
+    const registry = customOpportunity(session, { type: 'leaf', actionId, params: { wood: 1 } })
+    registry.register({ ...gainAction, id: actionId, canBeExecutedByPlayer: (_state, player) => player.resources.food >= 2 })
+    registerListener(session, {
+      id: '__late_doability__', cardIds: ['__late_doability__'], actions: [actionId], phases: ['computeReplace', 'isDoable'],
+      handler: (context) => {
+        if (context.actionContext?.checkedReplaceAction || context.player.resources.food < 1) return
+        return context.phase === 'isDoable' ? { doable: true } : {
+          decline: true, alternativeFlow: { type: 'leaf', actionId: 'gain', params: { vegetable: 1 } },
+        }
+      },
+    })
+    registerListener(session, {
+      id: '__host_before__', cardIds: ['__host_before__'], actions: [actionId], phases: ['before'], mandatory: true,
+      handler: () => ({ flow: { type: 'leaf', actionId: 'gain', params: { food: 1 } } }),
+    })
+    const response = session.takeAction(0, 'forest')
+    expect(response.ok, response.error).toBe(true)
+    expect(response.interaction.request.kind).toBe('engine-blocked')
+    expect(response.state.players[0]!.resources).toMatchObject({ food: 1, wood: 0, vegetable: 0 })
+    const undone = session.undoAction(0)
+    expect(undone.ok, undone.error).toBe(true)
+    expect(undone.state.players[0]!.resources).toMatchObject({ food: 0, wood: 0, vegetable: 0 })
+    expect(undone.state.actionSpaces.find((space) => space.id === 'forest')!.takenBy).toEqual([])
+  })
+
   it('cannot skip an enabling before trigger using a replacement that appeared after selection', () => {
     const session = setup()
     const actionId = '__strict_payment__'
@@ -296,6 +325,22 @@ describe('explicit action replacement through GameSession', () => {
     expect(session.getActionAvailability(0)['grain-utilization']).toBe(false)
     const response = session.takeAction(0, 'grain-utilization')
     expect(response.ok).toBe(false)
+    expect(response.state.actionSpaces.find((space) => space.id === 'grain-utilization')!.takenBy).toEqual([])
+  })
+
+  it('does not offer Freshman when Blighter vetoes every occupation choice', () => {
+    const session = setup()
+    const player = session.state.players[0]!
+    player.occupationPlayed = ['A097_Freshman', 'E101_Blighter']
+    player.occupationHand = ['A114_SeasonalWorker']
+    player.improvements = []
+    player.resources.grain = 0
+    expect(session.getActionAvailability(0)['grain-utilization']).toBe(false)
+    const response = session.takeAction(0, 'grain-utilization')
+    expect(response.ok).toBe(false)
+    expect(response.state.players[0]!.occupationHand).toEqual(['A114_SeasonalWorker'])
+    expect(response.state.players[0]!.cardStates.A097_Freshman?.flagged).not.toBe(true)
+    expect(response.state.players[0]!.resources).toMatchObject({ food: 0, grain: 0 })
     expect(response.state.actionSpaces.find((space) => space.id === 'grain-utilization')!.takenBy).toEqual([])
   })
 

@@ -1170,8 +1170,9 @@ export function engineProceed(
       return { type: 'ok', nodeId: node.id, result: { type: 'ok' } }
     }
     const doabilityEventReadContext = currentEventReadContext(int)
+    const doabilityActionContext = { ...executionContext.actionContext, checkedReplaceAction: true }
     const doable = int.hooks.applyIsDoable(
-      { ...executionContext, ...doabilityEventReadContext, actionId: replacedActionId },
+      { ...executionContext, actionContext: doabilityActionContext, ...doabilityEventReadContext, actionId: replacedActionId },
       action,
       action.canBeExecutedByPlayer(
         executionContext.state,
@@ -1180,7 +1181,7 @@ export function engineProceed(
           params: executionContext.params,
           space: executionContext.space,
           sourceCard: executionContext.sourceCard,
-          actionContext: executionContext.actionContext,
+          actionContext: doabilityActionContext,
         },
       ),
     )

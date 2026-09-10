@@ -603,8 +603,9 @@ export function engineResolveChoice(
         int.pendingNodeIdRef.value = null
         return { type: 'ok' }
       }
+      const doabilityActionContext = { ...executionContext.actionContext, checkedReplaceAction: true }
       const doable = int.hooks.applyIsDoable(
-        { ...executionContext, ...currentEventReadContext(int), actionId },
+        { ...executionContext, actionContext: doabilityActionContext, ...currentEventReadContext(int), actionId },
         action,
         action.canBeExecutedByPlayer(
           executionContext.state,
@@ -613,7 +614,7 @@ export function engineResolveChoice(
             params: executionContext.params,
             space: executionContext.space,
             sourceCard: executionContext.sourceCard,
-            actionContext: executionContext.actionContext,
+            actionContext: doabilityActionContext,
           },
         ),
       )
@@ -956,8 +957,9 @@ export function engineResolveChoice(
       int.tree.insertBefore(pendingActionNode.id, beforeActivateNodes)
       return { type: 'ok' }
     }
+    const doabilityActionContext = { ...executionContext.actionContext, checkedReplaceAction: true }
     const doable = int.hooks.applyIsDoable(
-      { ...executionContext, ...pendingEventReadContext(), actionId: committedActionId },
+      { ...executionContext, actionContext: doabilityActionContext, ...pendingEventReadContext(), actionId: committedActionId },
       committedAction,
       committedAction.canBeExecutedByPlayer(
         executionContext.state,
@@ -966,7 +968,7 @@ export function engineResolveChoice(
           params: executionContext.params,
           space: executionContext.space,
           sourceCard: executionContext.sourceCard,
-          actionContext: executionContext.actionContext,
+          actionContext: doabilityActionContext,
         },
       ),
     )
