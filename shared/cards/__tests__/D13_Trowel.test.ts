@@ -215,7 +215,7 @@ const enterActiveInteraction = (session: GameSession) => {
 
 describe('D013_Trowel session integration', () => {
   it('anytime entry surfaces for a wood-house owner', () => {
-    const session = setupSession({ houseType: 'wood' })
+    const session = setupSession({ houseType: 'wood', resources: { stone: 2, reed: 2, food: 2 } })
     const resp = enterActiveInteraction(session)
     const ids = resp.interaction.anytimeActions.map((a) => a.id)
     expect(ids).toContain('D13-trowel-anytime')
@@ -267,15 +267,11 @@ describe('D013_Trowel session integration', () => {
     })
     const resp = enterActiveInteraction(session)
     const entry = resp.interaction.anytimeActions.find((a) => a.id === 'D13-trowel-anytime')
-    // The anytime build path filters via applyIsDoable; if resources are
-    // insufficient for the only legal target (stone), the entry should not
-    // surface or the underlying renovate-house probe should refuse it. We
-    // accept either: missing entry, or present-but-unusable on invocation.
-    if (entry) {
-      const ret = session.takeAnytimeAction(0, 'D13-trowel-anytime')
-      expect(ret.state.players[0]!.houseType).toBe('wood')
-    } else {
-      expect(entry).toBeUndefined()
-    }
+    expect(entry).toBeUndefined()
+    const interaction = structuredClone(resp.interaction)
+    const ret = session.takeAnytimeAction(0, 'D13-trowel-anytime')
+    expect(ret.ok).toBe(false)
+    expect(ret.state.players[0]!.houseType).toBe('wood')
+    expect(ret.interaction).toEqual(interaction)
   })
 })

@@ -401,6 +401,8 @@ Listener activation is an internal leaf: `ActionNode(actionId='activate-card')`.
 - `snapshot()` / `restore(snapshot)`: serialize and rebuild the tree, including `nodeStates`, pending envelope, owner, optional, and trigger metadata.
 - `hasPendingChoiceCompositeAncestor()`: tell anytime handling whether execution is inside a branch ancestor.
 
+Card-sourced anytime entries use `evaluateFlowDoable()` at the shared list builder; command validation and harvest/pre-scoring windows consume that same list. The probe ignores only the root optional flag and uses the new flow's own source, parameters, and action context. It preserves current-step admission, including legal before/replacement paths and gains preceding later payments. Existing card guards still apply to composite flows with bookkeeping prefixes. An unavailable direct invocation is rejected before history or engine mutation. Accepted anytime flows carry mandatory obligations in both idle and interrupted interactions, including their required descendants; failure retains any interrupted host and uses the existing blocked/explicit-undo policy. Inner optional choices retain their skip behavior. Listener activation events preserve the host action parameters alongside source and action context, so trigger previews and execution use the same selected renovation target as admission.
+
 ### 5.4 EngineStack
 
 `EngineStack` in `engine-stack.ts` owns `EngineFrame[]`:

@@ -1,4 +1,4 @@
-import { canStartBefore, isActionDoableInFlowContext, isFlowDerivedDoable } from '../actions/flow'
+import { canStartBefore, evaluateFlowDoable, isActionDoableInFlowContext, isFlowDerivedDoable } from '../actions/flow'
 import type {
   DraftGameEvent,
   EventSink,
@@ -720,11 +720,15 @@ export class GameCore {
   /** @internal Round phase — read engineSource (used by takeAnytimeAction). */
   peekEngineSource(): EngineSource | null { return this.engineSource }
   /** @internal Round phase — engine context for ad-hoc anytime invocations. */
-  buildAdhocEngineFrame(actionId: string, sourceCard: string | undefined, flowOverride?: ActionFlow): {
+  buildAdhocEngineFrame(actionId: string, sourceCard: string | undefined, flowOverride?: ActionFlow, requireRootCompletion = false): {
     engine: import('../engine').Engine; source: EngineSource
   } {
     const flow: ActionFlow = flowOverride ?? { type: 'leaf', actionId, sourceCard }
-    return { engine: this.createFlowEngine(flow), source: { kind: 'flow', flow } }
+    const ownerPlayerId = this.state.players[this.activePlayerIndex ?? this.state.currentPlayerIndex]?.id
+    return {
+      engine: Engine.fromFlow(flow, { ...this.engineDeps(), requireRootCompletion }, ownerPlayerId),
+      source: { kind: 'flow', flow },
+    }
   }
   /** @internal Round phase — enumerate currently-available anytime entries for the active interaction context. */
   listAnytimeEntries(): { descriptor: AnytimeAction; flow: ActionFlow }[] { return this.buildAnytimeEntries() }
@@ -2298,6 +2302,11 @@ export class GameCore {
       if (interactionKind && entry.registration.blockedAnytimeInteractionKinds?.includes(interactionKind)) continue
       const result = executeCardListener(entry.registration, anytimeContext, listenerOwnerOptions(entry))
       if (!result?.flow) continue
+      if (!evaluateFlowDoable(
+        { ...result.flow, optional: false },
+        { state: this.state, player, space },
+        (actionId) => this.registry.get(actionId),
+      )) continue
       // anytime listeners are queried during build (idempotent peek), not
       // fire — do not increment used here. The increment is done when the
       // player actually picks the anytime entry and triggers the flow.
