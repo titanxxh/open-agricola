@@ -8,10 +8,11 @@ const cardImpl = {
   effect: {
   id: CARD_ID,
   onBeforeEndGame: (_state, player) => {
-    const majors = collectCardsAs(player, 'major').length
-    const minors = player.minorPlayed.length
+    const majors = collectCardsAs(player, 'major')
+    const minors = collectCardsAs(player, 'minor')
     const occupations = player.occupationPlayed.length
-    const n = Math.min(majors, minors, occupations)
+    const distinctImprovements = new Set([...majors, ...minors]).size
+    const n = Math.min(majors.length, minors.length, Math.floor(distinctImprovements / 2), occupations)
     if (n > 0) {
       player.resources.vegetable += n
     }

@@ -1,23 +1,21 @@
 import { defineMinorCard } from '../card-source'
+import { buildRenovationPlan, canRenovate } from '../../actions/effects/renovation'
+import type { CardListenerRegistration } from '../card-listeners'
 import type { BonusModifier } from '../../contract/types'
 import type { CardImpl } from '../registry'
 
 const CARD_ID = 'C013_WoodSlideHammer'
 
-/**
- * C13 Wood Slide Hammer:
- * On your first renovation (i.e. while still wood-roofed), if you have at
- * least 5 rooms, you get a 2 stone discount on the renovation cost.
- *
- * Rule: onPlayerComputeCostsRenovation, gated by roomType==='wood' && rooms>=5,
- * adds bonus -2 stone.
- *
- * Implementation: BonusModifier with conditions { houseTypeWood, minNumRooms:5 }.
- * `getModifiersForCostType` evaluates conditions against the player's current
- * state for non-construct cost types, so once the player renovates to clay /
- * stone (or has fewer than 5 rooms) the modifier is automatically filtered
- * out.
- */
+const choiceCandidateListener: CardListenerRegistration = {
+  id: 'C13-wood-slide-hammer-stone-target',
+  cardIds: [CARD_ID],
+  phases: ['computeChoiceCandidates'],
+  actions: ['renovate-house'],
+  handler: ({ player }) => {
+    if (player.houseType !== 'wood' || player.rooms < 5) return
+    return { extraOptions: [{ value: 'stone', labelKey: 'ui.interactionRenovateToStone', sourceCard: CARD_ID }] }
+  },
+}
 
 export const C013_WoodSlideHammer = defineMinorCard({
   meta: {
@@ -30,6 +28,17 @@ export const C013_WoodSlideHammer = defineMinorCard({
     cost: { wood: 1 },
   },
   impl: {
+  listeners: [choiceCandidateListener, {
+    id: 'C13-wood-slide-hammer-stone-isdoable',
+    cardIds: [CARD_ID],
+    phases: ['isDoable'],
+    actions: ['renovate-house'],
+    handler: ({ player, doable }) => {
+      if (doable || player.houseType !== 'wood' || player.rooms < 5) return
+      if (!canRenovate(player, undefined, buildRenovationPlan(player, 'stone'))) return
+      return { doable: true }
+    },
+  }],
   modifiers: [{
         type: 'bonus',
         cardId: CARD_ID,

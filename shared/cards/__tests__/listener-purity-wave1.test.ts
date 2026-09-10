@@ -278,25 +278,7 @@ describe('listener purity wave 1', () => {
 
     const result = listener.handler(ctx)
 
-    expect(result?.flow).toEqual({
-      type: 'seq',
-      children: [
-        {
-          type: 'leaf',
-          actionId: 'special-effect',
-          sourceCard: WOLF_CARD_ID,
-          params: { kind: 'pop-card-stack-top' },
-        },
-        {
-          type: 'leaf',
-          actionId: 'gain',
-          sourceCard: WOLF_CARD_ID,
-          params: { boar: 1 },
-          choiceLabelKey: undefined,
-          choiceLabelParams: undefined,
-        },
-      ],
-    })
+    expect(result?.flow).toMatchObject({ type: 'xor', optional: true })
     expect(result?.sourceCard).toBe(WOLF_CARD_ID)
     expect(JSON.stringify(ctx.player.cardStates)).toBe(before)
   })

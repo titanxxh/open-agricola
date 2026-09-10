@@ -32,25 +32,6 @@ const grainRewardFlow = (
   }
 }
 
-const onPlayListener: CardListenerRegistration = {
-  id: 'C120-agricultural-labourer-after-play',
-  cardIds: [CARD_ID],
-  phases: ['after' as ActionHookPhase],
-  actions: ['occupation'],
-  handler: (context: CardListenerContext): ActionHookResult | void => {
-    if (context.choice !== CARD_ID) return
-    return {
-      flow: {
-        type: 'leaf',
-        actionId: 'store-on-card',
-        params: { clay: 8 },
-        sourceCard: CARD_ID,
-      },
-      sourceCard: CARD_ID,
-    }
-  },
-}
-
 const gainListener: CardListenerRegistration = {
   id: 'C120-agricultural-labourer-after-gain',
   cardIds: [CARD_ID],
@@ -69,9 +50,10 @@ const gainListener: CardListenerRegistration = {
 }
 
 const cardImpl = {
-  listeners: [onPlayListener, gainListener],
+  listeners: [gainListener],
   effect: {
   id: CARD_ID,
+  onBuy: () => ({ type: 'leaf', actionId: 'store-on-card', sourceCard: CARD_ID, params: { clay: 8 } }),
   onAfterReap: (_state, player) => {
     const grainHarvested = _state.harvestReapSummary?.[player.id]?.resources.grain ?? 0
     if (grainHarvested <= 0) return

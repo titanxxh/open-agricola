@@ -2,7 +2,7 @@ import { defineMinorCard } from '../card-source'
 import type { CardListenerContext, CardListenerRegistration } from '../card-listeners'
 import type { ActionFlow } from '../../contract/types'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
-import { getAssignedAnimalsByType } from '../../domain/animals'
+import { getAssignedAnimalCount, getAssignedAnimalsByType } from '../../domain/animals'
 import {
   isCardFlagged,
   readCardExtraData,
@@ -118,6 +118,7 @@ const afterListener: CardListenerRegistration = {
 }
 
 const cardImpl = {
+  prerequisiteCheck: (player, state) => getAssignedAnimalCount(player, state) === 0,
   listeners: [beforeListener, afterListener],
   reaches: [] as readonly string[],
 } satisfies CardImpl

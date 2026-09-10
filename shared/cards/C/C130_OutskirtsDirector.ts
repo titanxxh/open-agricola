@@ -7,19 +7,6 @@ import { pairedSpaceIdFor } from '../helpers/space-pairing'
 import type { CardImpl } from '../registry'
 
 const CARD_ID = 'C130_OutskirtsDirector'
-/**
- * C130 Outskirts Director:
- * Each time you use Grove or Hollow, place 2 REED from the general supply
- * on the other space. If you do, you can immediately place another person.
- *
- * Rule: After PlaceFarmer on Grove → place 2 reed on Hollow (and vice versa).
- * In 4-player games, the Hollow accumulation space is 'hollow-4' (different
- * gain rate). We use `pairedSpaceIdFor` to resolve the variant.
- *
- * OA behavior: the reed placement is mandatory after the trigger and is not
- * declined together with the optional extra placement.
- */
-
 const addReedToSpaceFlow = (spaceId: string): ActionFlow => ({
   type: 'leaf',
   actionId: 'special-effect',
@@ -61,24 +48,15 @@ const listener: CardListenerRegistration = {
 
     const addResourceFlow = addReedToSpaceFlow(otherSpace.id)
 
-    if (workersAvailable(context.state, context.player) <= 0) {
-      return {
-        flow: addResourceFlow,
-        sourceCard: CARD_ID,
-      }
-    }
-
     return {
       flow: {
         type: 'seq',
+        optional: true,
         children: [
           addResourceFlow,
-          {
-            type: 'leaf',
-            actionId: 'place-farmer',
-            optional: true,
-            sourceCard: CARD_ID,
-          },
+          ...(workersAvailable(context.state, context.player) > 0 ? [{
+            type: 'leaf' as const, actionId: 'place-farmer', optional: true, sourceCard: CARD_ID,
+          }] : []),
         ],
       } as ActionFlow,
       sourceCard: CARD_ID,

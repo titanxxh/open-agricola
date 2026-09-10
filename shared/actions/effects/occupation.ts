@@ -1,5 +1,6 @@
 import type { ActionChoiceOption, ActionDefinition, ActionExecutionResult, ActionSpace, ComplexCost, GameState, InternalActionChild, InternalActionChildren, PaymentSolution, PlayerState, ProtectedObservation, Resource } from '../../contract/types'
 import type { EventSink } from '../../contract/events'
+import { meetsCardPrerequisites } from '../../cards/helpers/prerequisites'
 import { getOccupation } from '../../cards/registry-display'
 import { runCardListeners } from '../../cards/card-listeners'
 import { PaymentSolver } from '../payment'
@@ -70,7 +71,8 @@ export const isOccupationPlayable = (
   actionCardId?: string,
 ) => {
   const occupation = getOccupation(occupationId)
-  if (!occupation || !player.occupationHand.includes(occupation.id)) return false
+  if (!occupation || !player.occupationHand.includes(occupation.id)
+    || !meetsCardPrerequisites(player, occupation, state.round, state)) return false
   return canAffordOccupationPreviewCost(
     state,
     player,
@@ -91,7 +93,8 @@ export const playOccupation = (
   if (!occupation) {
     return { type: 'fail', errorKey: 'log.occupationFail' }
   }
-  if (!player.occupationHand.includes(occupation.id)) {
+  if (!player.occupationHand.includes(occupation.id)
+    || !meetsCardPrerequisites(player, occupation, state?.round, state)) {
     return { type: 'fail', errorKey: 'log.occupationFail' }
   }
   const cost = buildOccupationCostProvider(player, occupationId, costOverride)()
@@ -287,7 +290,7 @@ const buildPlayableOccupationOptions = (
         !!occupation,
     )
     .filter((occupation) =>
-      canAffordOccupationPreviewCost(
+      isOccupationPlayable(
         state,
         player,
         occupation.id,
@@ -499,7 +502,8 @@ export const playOccupationAction: ActionDefinition = {
       return { type: 'fail', errorKey: 'log.occupationFail' }
     }
     const occupation = getOccupation(choice)
-    if (!occupation || !player.occupationHand.includes(occupation.id)) {
+    if (!occupation || !player.occupationHand.includes(occupation.id)
+    || !meetsCardPrerequisites(player, occupation, state.round, state)) {
       return { type: 'fail', errorKey: 'log.occupationFail' }
     }
     const baseCost = getOccupationActionBaseCost(player, space.id, params)

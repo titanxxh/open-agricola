@@ -463,22 +463,23 @@ export const canAffordInjectedImprovement = (
   state: GameState,
   player: PlayerState,
   rawValue: string,
+  actionCardId = 'minor-improvement',
 ): boolean => {
   const parsed = parseImprovementChoice(rawValue)
   if (parsed.kind === 'major') {
-    return canAffordMajorImprovement(state, player, parsed.id, 'minor-improvement')
+    return canAffordMajorImprovement(state, player, parsed.id, actionCardId)
   }
   if (parsed.kind === 'minor') {
     const minor = getMinorImprovement(parsed.id)
     if (!minor) return false
-    return canAffordMinorImprovement(state, player, minor, 'minor-improvement')
+    return canAffordMinorImprovement(state, player, minor, actionCardId)
   }
   if (isMajorCardId(parsed.id)) {
-    return canAffordMajorImprovement(state, player, parsed.id, 'minor-improvement')
+    return canAffordMajorImprovement(state, player, parsed.id, actionCardId)
   }
   const minor = getMinorImprovement(parsed.id)
   if (minor) {
-    return canAffordMinorImprovement(state, player, minor, 'minor-improvement')
+    return canAffordMinorImprovement(state, player, minor, actionCardId)
   }
   return false
 }

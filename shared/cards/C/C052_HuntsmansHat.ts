@@ -6,20 +6,6 @@ import { sumResourceMovedFromActionSpace } from '../helpers/event-provenance'
 import type { CardImpl } from '../registry'
 
 const CARD_ID = 'C052_HuntsmansHat'
-/**
- * C52 Huntsman's Hat — For each new pig you get from the effect of an action
- * space, you also get 1 food.
- *
- * Rule: `isListeningTo` matches any Gain event with `fromActionSpace` true,
- * and `onPlayerAfterGain` sums obtained PIG meeples → emits gainNode([FOOD => N]).
- * The reference also modifies the AnimalMarket placeFarmerFlow (sheep+food xor
- * boar+food xor pay-food→cattle) — NOT implemented since we have no
- * AnimalMarket action space (registered as §2.5 simplification).
- *
- * Implementation: generic listener on `phase: 'after'` for the union of
- * `gain` / `collect` / `receive` actions (mirrors E53 BoarSpear pattern).
- * Reads action-space `resource.moved` events and emits 1 food per boar gained.
- */
 const TRACKED_ACTIONS = ['gain', 'collect', 'receive'] as const
 
 const huntsmansHatListener: CardListenerRegistration = {

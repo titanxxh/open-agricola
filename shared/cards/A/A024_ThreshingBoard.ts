@@ -7,9 +7,9 @@ const CARD_ID = 'A024_ThreshingBoard'
 const TRIGGER_SPACES = new Set(['farmland', 'cultivation'])
 
 const listener: CardListenerRegistration = {
-  id: 'A24-threshing-board-after-place-farmer',
+  id: 'A24-threshing-board-before-place-farmer',
   cardIds: [CARD_ID],
-  phases: ['after' as ActionHookPhase],
+  phases: ['before' as ActionHookPhase],
   actions: ['place-farmer'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (!context.space || !TRIGGER_SPACES.has(context.space.id)) return

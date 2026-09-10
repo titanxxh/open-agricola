@@ -693,7 +693,7 @@ const executeActivateCardAction = (
       insertedNodes.forEach((insertedNode) =>
         stampContinuationParentHost(insertedNode, continuationParentHostNodeId))
     }
-    if (node.mandatory === true) {
+    if (node.mandatory === true || params.mandatory === true) {
       insertedNodes.forEach(enforceCompositeContinuationMandatory)
     }
     if (insertedNodes.length > 0) {

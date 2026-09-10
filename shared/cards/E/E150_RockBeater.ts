@@ -3,7 +3,7 @@ import type { CardListenerRegistration, CardListenerContext } from '../card-list
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import type { ActionChoiceOption } from '../../contract/types'
 import { OCCUPIED_SPACE_CHOICE_PREFIX } from '../../actions/helpers/placement-constants'
-import { isSpaceOccupied } from '../../domain/space'
+import { isSpaceOccupied, spaceHasPlayer } from '../../domain/space'
 import type { CardImpl } from '../registry'
 import { constructUnitDiscountTrade } from '../helpers/construct-cost'
 
@@ -28,7 +28,7 @@ const computeArgsListener: CardListenerRegistration = {
   handler: (context: CardListenerContext): ActionHookResult | void => {
     const space = context.state.actionSpaces.find((s) => s.id === 'resource-market-4')
     // Only add when occupied by another player
-    if (!space || !isSpaceOccupied(space)) return
+    if (!space || !isSpaceOccupied(space) || spaceHasPlayer(space, context.player.id)) return
     if (!space.canBeExecutedByPlayer(context.state, context.player)) return
     const extraOptions: ActionChoiceOption[] = [
       {

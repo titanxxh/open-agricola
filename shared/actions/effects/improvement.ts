@@ -1,4 +1,4 @@
-import type { ActionDefinition, ActionExecutionResult, GameState, InternalActionChild, InternalActionChildren, PaymentResourceMap, PlayerState } from '../../contract/types'
+import type { ActionDefinition, ActionExecutionResult, ActionSpace, GameState, InternalActionChild, InternalActionChildren, PaymentResourceMap, PlayerState } from '../../contract/types'
 import { getMinorImprovement } from '../../cards/registry-display'
 import { CardPurchasePayment, PaymentSolver } from '../payment'
 import type { CardPurchasePreview } from '../payment'
@@ -323,17 +323,20 @@ const constrainedImprovementPreview = (
   }
 }
 
+const costActionCardId = (context?: { sourceCard?: string; space?: Pick<ActionSpace, 'id'> }) =>
+  context?.sourceCard ?? context?.space?.id ?? 'improvement'
+
 const meetsMinimumPayment = (
   state: GameState,
   player: PlayerState,
   choice: string,
-  context?: { sourceCard?: string; actionContext?: Record<string, unknown> },
+  context?: { sourceCard?: string; space?: Pick<ActionSpace, 'id'>; actionContext?: Record<string, unknown> },
 ) => {
   const minimum = context?.actionContext?.minimumResourcesPaid as PaymentResourceMap | undefined
   if (!minimum) return true
   const { kind, id } = parseImprovementChoice(choice)
   if (!kind) return false
-  const preview = constrainedImprovementPreview(state, player, kind, id, context?.sourceCard, minimum)
+  const preview = constrainedImprovementPreview(state, player, kind, id, costActionCardId(context), minimum)
   return !!preview && CardPurchasePayment.hasPaymentOption({
     state, player, playerIndex: state.players.indexOf(player), kind, cardId: id, preview,
   })
@@ -345,7 +348,7 @@ const buildImprovementInternalChildren = (
   choice: string,
   actionCardId: string,
   trueAction?: boolean,
-  _types?: readonly ImprovementType[],
+  sourceCard?: string,
   minimumResourcesPaid?: PaymentResourceMap,
 ): InternalActionChildren | null => {
   const parsed = parseImprovementChoice(choice)
@@ -376,7 +379,7 @@ const buildImprovementInternalChildren = (
     costType,
     improvementKind: kind,
   }
-  const actionContext = privateHandChangeContext(actionCardId, kind, id, trueAction)
+  const actionContext = privateHandChangeContext(sourceCard, kind, id, trueAction)
   if (actionContext) {
     Object.assign(payActionContext, actionContext)
   }
@@ -408,14 +411,14 @@ export const improvementAction: ActionDefinition = {
     const allowedMinor = types.includes('minor')
     const isMinorOnly = types.length === 1 && types[0] === 'minor'
     if (allowedMajor &&
-      buildMajorImprovementOptions(state, player, context?.sourceCard)
+      buildMajorImprovementOptions(state, player, costActionCardId(context))
         .some((option) => meetsMinimumPayment(state, player, option.value, context))) {
       return true
     }
     if (allowedMinor) {
       const minorOpts = isMinorOnly
-        ? buildPlayableMinorOptions(state, player, context?.sourceCard, types)
-        : buildMinorImprovementOptions(state, player, context?.sourceCard, undefined, types)
+        ? buildPlayableMinorOptions(state, player, costActionCardId(context), types)
+        : buildMinorImprovementOptions(state, player, costActionCardId(context), undefined, types)
       if (minorOpts.some((option) => meetsMinimumPayment(state, player, option.value, context))) return true
       const extras = collectComputeChoiceCandidates(
         state,
@@ -424,16 +427,16 @@ export const improvementAction: ActionDefinition = {
         { ...(context?.actionContext ?? {}), types },
         context?.sourceCard,
       )
-      if (extras.some((opt) => canAffordInjectedImprovement(state, player, opt.value)
+      if (extras.some((opt) => canAffordInjectedImprovement(state, player, opt.value, costActionCardId(context))
         && meetsMinimumPayment(state, player, opt.value, context))) {
         return true
       }
     }
     return false
   },
-  execute: ({ state, player, sourceCard, params, actionContext }) => {
+  execute: ({ state, player, space, sourceCard, params, actionContext }) => {
     const types = readImprovementTypes({ params, actionContext })
-    const actionCardId = sourceCard ?? 'improvement'
+    const actionCardId = costActionCardId({ sourceCard, space })
     const isMinorOnly = types.length === 1 && types[0] === 'minor'
     const allowedPurchases = Array.isArray((params as { allowedPurchases?: string[] } | undefined)?.allowedPurchases)
       ? (params as { allowedPurchases?: string[] }).allowedPurchases
@@ -462,9 +465,9 @@ export const improvementAction: ActionDefinition = {
         seen.add(o.value)
         return true
       })
-      .filter((o) => canAffordInjectedImprovement(state, player, o.value))
+      .filter((o) => canAffordInjectedImprovement(state, player, o.value, actionCardId))
     const options = [...majorOpts, ...baseMinor, ...extraMinor]
-      .filter((option) => meetsMinimumPayment(state, player, option.value, { sourceCard, actionContext }))
+      .filter((option) => meetsMinimumPayment(state, player, option.value, { sourceCard, space, actionContext }))
     if (options.length === 0) {
       return types.includes('major')
         ? { type: 'fail', errorKey: 'log.improvementFail' }
@@ -476,9 +479,9 @@ export const improvementAction: ActionDefinition = {
       promptKey: 'ui.interactionChooseImprovement',
     }
   },
-  resolveChoice: ({ state, player, sourceCard, params, actionContext }, choice) => {
-    const actionCardId = sourceCard ?? 'improvement'
-    if (!meetsMinimumPayment(state, player, choice, { sourceCard, actionContext })) {
+  resolveChoice: ({ state, player, space, sourceCard, params, actionContext }, choice) => {
+    const actionCardId = costActionCardId({ sourceCard, space })
+    if (!meetsMinimumPayment(state, player, choice, { sourceCard, space, actionContext })) {
       return { type: 'fail', errorKey: 'log.improvementFail' }
     }
     const internalChildren = buildImprovementInternalChildren(
@@ -487,7 +490,7 @@ export const improvementAction: ActionDefinition = {
       choice,
       actionCardId,
       readTrueAction(params, actionContext),
-      readImprovementTypes({ params, actionContext }),
+      sourceCard,
       actionContext?.minimumResourcesPaid as PaymentResourceMap | undefined,
     )
     if (!internalChildren) return { type: 'fail', errorKey: 'log.improvementFail' }
@@ -499,7 +502,7 @@ export const improvementAction: ActionDefinition = {
       ? parsed.kind
       : isMajorCardId(parsed.id) ? 'major' : 'minor'
     const actionContextForCommit = privateHandChangeContext(
-      actionCardId,
+      sourceCard,
       kind,
       improvementId,
       readTrueAction(params, actionContext),

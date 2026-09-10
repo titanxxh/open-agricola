@@ -2,7 +2,9 @@ import { defineMinorCard } from '../card-source'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import type { CardImpl } from '../registry'
-import { isMajorImprovementAvailable } from '../major/supply'
+import { readImprovementTypes } from '../../actions/effects/improvement'
+import { parseImprovementChoice } from '../../actions/helpers/improvement-helpers'
+import { isMajorImprovementAvailable, filterAvailableMajorImprovementIds } from '../major/supply'
 
 const CARD_ID = 'D026_CarpentersYard'
 const ALLOWED_CARDS = ['Major_Well', 'Major_Joinery']
@@ -13,8 +15,9 @@ const afterImprovementListener: CardListenerRegistration = {
   phases: ['immediatelyAfter' as ActionHookPhase],
   actions: ['improvement'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
-    if (context.trueAction === false) return
-    const playedCardId = context.cardId
+    if (context.trueAction === false || context.actionContext?.trueAction === false) return
+    if (!readImprovementTypes(context).includes('major')) return
+    const playedCardId = parseImprovementChoice(context.choice ?? '').id
     if (!playedCardId || !ALLOWED_CARDS.includes(playedCardId)) return
 
     const otherCard = playedCardId === 'Major_Well' ? 'Major_Joinery' : 'Major_Well'
@@ -32,6 +35,7 @@ const afterImprovementListener: CardListenerRegistration = {
             actionContext: { trueAction: false },
             params: {
               allowedPurchases: [otherCard],
+              types: ['major'],
             },
           },
         ],
@@ -42,8 +46,18 @@ const afterImprovementListener: CardListenerRegistration = {
 }
 
 const cardImpl = {
-  listeners: [afterImprovementListener],
-  reaches: [] as readonly string[],
+  listeners: [afterImprovementListener, {
+    id: 'D26-carpenters-yard-minor-candidates',
+    cardIds: [CARD_ID], actions: ['improvement'], phases: ['computeChoiceCandidates'],
+    handler: (context) => {
+      const types = readImprovementTypes(context)
+      if (types.length !== 1 || types[0] !== 'minor' || context.actionContext?.trueAction === false) return
+      return { extraOptions: filterAvailableMajorImprovementIds(context.state, ALLOWED_CARDS).map((id) => ({
+        value: id, labelKey: `improvements.${id}.name`, sourceCard: CARD_ID,
+      })) }
+    },
+  }],
+  reaches: ALLOWED_CARDS as readonly string[],
 } satisfies CardImpl
 
 export const D026_CarpentersYard = defineMinorCard({

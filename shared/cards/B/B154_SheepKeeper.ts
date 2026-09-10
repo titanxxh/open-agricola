@@ -1,3 +1,4 @@
+import { getAssignedAnimalsByType } from '../../domain/animals'
 import { defineOccupationCard } from '../card-source'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
@@ -12,7 +13,7 @@ const anytimeListener: CardListenerRegistration = {
   phases: ['anytime' as ActionHookPhase],
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (isCardFlagged(context.player, CARD_ID)) return
-    if (context.player.resources.sheep < 7) return
+    if (getAssignedAnimalsByType(context.player, context.state).sheep < 7) return
     return {
       flow: {
         type: 'seq',
@@ -31,7 +32,7 @@ const anytimeListener: CardListenerRegistration = {
 }
 
 const cardImpl = {
-  prerequisiteCheck: (player) => player.resources.sheep < 7,
+  prerequisiteCheck: (player, state) => getAssignedAnimalsByType(player, state).sheep < 7,
   listeners: [anytimeListener],
   reaches: [] as readonly string[],
 } satisfies CardImpl

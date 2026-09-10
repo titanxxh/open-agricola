@@ -1,6 +1,7 @@
 import { defineOccupationCard } from '../card-source'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
+import { createEventQuery } from '../../events/query'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
 
@@ -22,7 +23,9 @@ const renovateListener: CardListenerRegistration = {
   phases: ['after' as ActionHookPhase],
   actions: ['renovate-house'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
-    if (context.player.houseType !== 'stone') return
+    if (!createEventQuery(context.actionEvents ?? context.transactionEvents).has('farm.renovated', (event) =>
+      event.playerId === context.player.id && event.from === 'clay' && event.to === 'stone',
+    )) return
     return { flow: gainLeaf(CARD_ID, { food: 3 }), sourceCard: CARD_ID }
   },
 }

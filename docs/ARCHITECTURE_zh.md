@@ -160,6 +160,8 @@ ESLint 三层强制（`eslint.config.js`）：
 
 `events` 是公共结构化规则事件流，位于 `GameState.log` 下层。后端规则执行时先写 `GameEvent`，再由 mapper 派生 UI log、动画提示、审计报告和未来 replay；`log` 仍是当前可见文字日志，不作为规则来源。`GameState.log` 是由 public events 派生出来的 UI 缓存。规则代码不直接写 `state.log`；允许的写入点只有命名 cache writer：`appendImmediateEvents()` 的 mapper 结果，以及 `GameCore.flushEngineLog()` 从 engine `LogStore` 刷出的 mapper 结果。`pnpm run check:direct-session-log` 守住这个边界。客户端还会按 `seq` 增量消费部分 public events，转成本地 transient notification、action/farm/fence highlight 和 resource animation；首次 snapshot 只初始化 cursor，不回放历史事件。该 cue 层只服务 UI 反馈，不作为规则来源。旧 action-result detail 也通过 `action.detailLogged` 这类公开事件进入 mapper，而不是直接把规则事实写进 `state.log`。`nextEventSeq` 是持久化事件序号游标，`normalizeState` 会丢弃不符合公开事件 envelope/schema/json/size guard 的旧事件并从最大 `seq` 继续。
 
+`farm.animalMoved.newlyPlacedOnFarmyard` 记录待安置动物实际进入实体农场区域的数量。重组提交按区域比较数量，用所有已有区域的减少量抵扣农场区域的增加量，再截断至零；旧动物搬迁优先占用农场增加量，剩余才算新动物。仅存入纯牌上区域或旧动物换区不计。通过 `farmPosition` 绑定动物所有者农场格的 card zone（如 Home Wood、Horse Trough）仍算实体农场区域。它是聚合放置事实，不引入动物个体身份。`addFarmyardSpaceState(..., eventSink)` 将货物的正增量发为到实体田格的 `resource.moved`；逻辑卡牌田仍是独立位置。
+
 每个 public `GameEvent['type']` 都必须列入 `shared/events/event-mapping-policy.ts`。该 policy 记录 Action Log、public notification、board/farm highlight、resource animation 和 replay 是否 mapped、conditionally mapped 或 intentionally silent。`eventsToLogEntries()` 不向 `GameState.log` 写 generic fallback rows；replay-only summaries 保留在客户端 timeline layer。新增 event type 时，同一个 PR 必须同时补 policy、mapper fixtures 和文档。
 
 `buildLogPresentationPlan()` 是 Action Log 展示关系的单一来源：`rows` 表示可见日志，`consumedEvents` 表示已被更丰富日志吸收的事件，`suppressedEvents` 表示按事件自身语义明确不生成 Action Log 行的事件。客户端 timeline 只按这些结构化 event ref 过滤，不得通过玩家名、资源数量、卡牌 id 或跨 archive packet 猜测事件对应关系。纯普通资源的 `futureMeeple.resolved` 由后续 `resource.moved(reason='receive')` 展示实际入账，因此进入 `suppressedEvents`；带房间或 field/stable/forest/moor 独立效果的结算仍保留独立日志。
@@ -584,6 +586,10 @@ Hook 不进 `ActionDefinition`，由 `hooks.ts` 显式注册（卡牌文件内�
 
 额外加作物的 follow-up selection 通过 `actionContext.extraCropPlacement` 表达 provenance；pending / anytime 构造必须从 `contextSnapshot.actionContext` 传递该 marker，后续卡牌只读语义 marker，不判断创建 pending 的 sourceCard id。
 
+`gain` 先解析所有接收者。由付款方出资时，必须足额支付单人数量乘以接收人数；失败不改变任一方资源，事件来源保留付款方。其余来源先取显式 `actionContext.sourceLocation`，卡牌发放保留卡牌来源，普通行动格发放标记行动格。`return-to-space` 可通过 `actionContext.targetSpaceId` 指定其他实时行动格；付款及移动事件使用同一目标。
+
+职业可用性、选择提交及直接／免费打出统一调用卡牌前置检查。改善费用预览和付款一致地使用授予者 `sourceCard` 或实体行动格 ID 作为 `actionCardId`；私有手牌展示仅使用真实 source card。卡内折扣由此可辨别行动来源，同时不会把行动格 ID 当作私有卡牌。
+
 ### 7.4 payment/
 
 `shared/actions/payment/`：
@@ -737,6 +743,8 @@ Card listener 区域默认只匹配已打出卡：`zones` 省略等价于 `['pla
 `activate-card-effect` 是 internal child，用 `paymentInfoFrom` 从 internal result map 读取 `paymentInfo`，再执行 `onBuy` 等 card-effect hook；`afterHostCommit` activation 是 mandatory，其返回 flow 会递归继承该义务。阶段 reaction dispatcher 也使用该 child 执行 harvest field / before-end card-effect activation。stage activation 可携带 `ownerPlayerId` / `targetPlayerId` / stage hook metadata，并在 `ParallelNode(mode='trigger-select')` preview 中用 cloned state/player 评估 applicable / doable / mandatory pass。flow-returning handler 返回 flow 即视为可执行；direct-mutation void handler 若在 clone 上产生变更，也视为可执行，但真实 mutation 只在玩家选择该 activation 后落地。choice flow 的真实 max / options 由后续 action leaf 再按 live state 生成或校验。trigger-select pass gate 以 preview 后的结果为准：显式 mandatory 或 enabled non-before non-optional result 会禁用 pass，root `flow.optional === true` 可允许 pass；before-end stage activation 继续以 `beforeEndGameMandatory` 为准，即使该 activation 是 no-flow direct mutation；`before` trigger 继续由原 action continuation 判定 pass 是否可用。`onBuy` 的 `paymentInfo` 路径不读取 stage target metadata。`occupation-gate` 是 no-op internal gate，只给需要先展示/执行其他节点、但 OR 分支可执行性仍必须按 occupation 判断的 flow 使用。卡牌购买的 onBuy / 多卡业务继续留在 card-effect 或 host action completion 中，不要塞回 top-level effect。
 
 `PaymentResourceMap` 覆盖真实资源、supply token 和卡牌提供的虚拟支付资源：`fence` / `stable` 与 `wood` / `food` 一样进入 `cost`、`payLeaf`、payment solver、`resourcesPaid`、`PaymentInfo` 和 `resource.paid`；虚拟支付资源不进入 `cost`，但会在 `PaymentSolution.resourcesPaid` / payment choice label 中以稳定 key 出现。支付 supply token 时只增加 `player.supplyTokensConsumed`，不修改已建 `fenceSegments` / `stableTiles`；所有“还能建多少 fence / stable”的读取必须走 `getOwnOrdinaryFenceBuildLimit()` / `getOwnOrdinaryFenceReserveCount()` / `getAvailableStableSupplyCount()`，不能再使用固定 15 / 4 上限。
+
+声明 `mandatory: true` 的 listener，即使是唯一激活项、没有触发菜单，也会将强制义务传入其返回流程。无法足额转账时进入可撤销的阻塞，不会结束行动。
 
 ### 7.6 阶段型 Hook（按触发顺序）
 

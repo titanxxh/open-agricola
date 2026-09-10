@@ -1,6 +1,8 @@
 import { defineOccupationCard } from '../card-source'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase } from '../../actions/hooks'
+import { readImprovementTypes } from '../../actions/effects/improvement'
+import { filterAvailableMajorImprovementIds } from '../major/supply'
 import type { CardCostCandidate } from '../../contract/types'
 import type { CardImpl } from '../registry'
 
@@ -38,7 +40,17 @@ const computeCostsListener: CardListenerRegistration = {
 }
 
 const cardImpl = {
-  listeners: [computeCostsListener],
+  listeners: [computeCostsListener, {
+    id: 'E109-braid-maker-minor-basket',
+    cardIds: [CARD_ID], actions: ['improvement'], phases: ['computeChoiceCandidates'],
+    handler: (context) => {
+      const types = readImprovementTypes(context)
+      if (types.length !== 1 || types[0] !== 'minor' || context.actionContext?.trueAction === false) return
+      return { extraOptions: filterAvailableMajorImprovementIds(context.state, ['Major_Basket']).map((id) => ({
+        value: id, labelKey: `improvements.${id}.name`, sourceCard: CARD_ID,
+      })) }
+    },
+  }],
   reaches: [] as readonly string[],
 } satisfies CardImpl
 
@@ -56,7 +68,7 @@ export const E109_BraidMaker = defineOccupationCard({
     players: '1+',
     waresSalesmanGains: [{ reed: 2 }],
     exchanges: [
-        { from: { reed: 1 }, to: { food: 2 }, max: 1, triggers: ['anytime'] },
+        { from: { reed: 1 }, to: { food: 2 }, max: 1, triggers: ['harvest'] },
       ],
   },
   impl: cardImpl,

@@ -9334,7 +9334,6 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
         "to": {
           "food": 3
         },
-        "max": 1,
         "sourceId": "D062_BeerTap",
         "triggers": [
           "harvest"
@@ -9347,7 +9346,6 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
         "to": {
           "food": 6
         },
-        "max": 1,
         "sourceId": "D062_BeerTap",
         "triggers": [
           "harvest"
@@ -9360,7 +9358,6 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
         "to": {
           "food": 9
         },
-        "max": 1,
         "sourceId": "D062_BeerTap",
         "triggers": [
           "harvest"
@@ -9700,6 +9697,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "number": 82,
     "category": "BUILDING_RESOURCE_PROVIDER",
     "desc": [
+      "To play this card, you must return or cook 1 <PIG>.",
       "Improvements built on __House Redevelopment__ cost you 1 building resource of your choice less. <FENCE> built on __Farm Redevelopment__ cost you a total of 3 <WOOD> less."
     ],
     "vp": 1,
@@ -12834,7 +12832,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
         },
         "max": 1,
         "triggers": [
-          "anytime"
+          "harvest"
         ]
       }
     ],

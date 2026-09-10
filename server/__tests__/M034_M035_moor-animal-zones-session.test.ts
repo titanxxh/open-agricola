@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 
 import { GameSession } from '../game/authoritative-session'
 import type { Resource } from '../../shared/contract/types'
-import { setActiveWorkerCount, setWorkersAtHome } from '../../shared/domain/player'
+import { markAllWorkersUsed, setActiveWorkerCount, setWorkersAtHome } from '../../shared/domain/player'
 import { countUnusedFarmyardSpaces } from '../../shared/domain/farmyard-usage'
 
 const PLACEHOLDER = '__test_placeholder__'
@@ -74,6 +74,32 @@ const setup = (playedCards: string[]) => {
 }
 
 describe('M034/M035 Farmers of the Moor animal zones', () => {
+  it.each([HOME_WOOD, HORSE_TROUGH])('B140 counts a new horse placed on the physical farm through %s', (cardId) => {
+    const { session, player } = setup([cardId])
+    player.occupationPlayed.push('B140_FarmyardWorker')
+    const card = findSpecialCardFor(session, 'horse-market')
+    let response = session.takeSpecialAction(0, card.id, 'horse-market')
+    expect(response.ok, response.error).toBe(true)
+    if (response.interaction.stateId !== 'wait' || response.interaction.request.kind !== 'animal-reorg') {
+      throw new Error('expected animal reorganization')
+    }
+    const zone = response.interaction.request.zones.find((entry) => entry.cardId === cardId)
+    expect(zone?.farmPosition).toBeDefined()
+    response = session.resolveChoice(0, 'confirm', { zones: [{
+      id: zone!.id, zoneType: 'card', cardId, animalType: 'horse', animalCount: 1,
+    }] })
+    expect(response.ok, response.error).toBe(true)
+    expect(response.state.events).toEqual(expect.arrayContaining([expect.objectContaining({
+      type: 'farm.animalMoved', newlyPlacedOnFarmyard: { horse: 1 },
+    })]))
+    expect(response.state.players[0]!.cardStates.B140_FarmyardWorker?.flagged).toBe(true)
+    const food = response.state.players[0]!.resources.food
+    const state = session.getState().state
+    state.players.forEach((entry) => markAllWorkersUsed(state, entry))
+    session.loadState(state)
+    response = session.performRoundEnd()
+    expect(response.state.players[0]!.resources.food).toBe(food + 2)
+  })
   it('M034 adds one non-sheep animal zone on each visible forest space', () => {
     const { session } = setup([HOME_WOOD])
     const card = findSpecialCardFor(session, 'horse-market')

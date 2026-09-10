@@ -19,7 +19,11 @@ export const returnToSpaceAction: ActionDefinition = {
   costPreview: {
     getBaseCost: ({ params }) => params ?? {},
   },
-  execute: ({ player, space, params }) => {
+  execute: ({ state, player, space, params, actionContext, eventSink }) => {
+    const target = typeof actionContext?.targetSpaceId === 'string'
+      ? state.actionSpaces.find((entry) => entry.id === actionContext.targetSpaceId) : space
+    if (!target) return { type: 'fail', errorKey: 'log.exchangeFail' }
+    const resources: Partial<Resource> = {}
     if (!canReturnResourcesToSpace(player.resources, params)) {
       return { type: 'fail', errorKey: 'log.exchangeFail' }
     }
@@ -27,7 +31,12 @@ export const returnToSpaceAction: ActionDefinition = {
       if (typeof value !== 'number' || value <= 0) return
       const resourceKey = key as keyof Resource
       player.resources[resourceKey] -= value
-      space.resources[resourceKey] += value
+      target.resources[resourceKey] = (target.resources[resourceKey] ?? 0) + value
+      resources[resourceKey] = value
+    })
+    if (Object.keys(resources).length > 0) eventSink?.emit<'resource.moved'>({
+      type: 'resource.moved', resources, from: { kind: 'player', playerId: player.id },
+      to: { kind: 'actionSpace', spaceId: target.id }, reason: 'return',
     })
     return { type: 'ok' }
   },

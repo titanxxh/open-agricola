@@ -1,4 +1,5 @@
-import type { FarmyardSpaceState, PlayerState } from '../contract/types'
+import type { EventSink } from '../contract/events'
+import type { FarmyardSpaceState, PlayerState, Resource } from '../contract/types'
 
 const positionKey = (tile: { row: number; col: number }) => `${tile.row}-${tile.col}`
 
@@ -66,7 +67,11 @@ export const getPlacementBlockedFarmyardSpaceKeys = (player: Pick<PlayerState, '
 export const addFarmyardSpaceState = (
   player: PlayerState,
   state: FarmyardSpaceState,
+  eventSink?: EventSink,
 ) => {
+  const previous = getFarmyardSpaceStates(player).find((entry) =>
+    entry.spaceKey === state.spaceKey && entry.kind === state.kind && entry.sourceCardId === state.sourceCardId,
+  )
   const next = normalizeFarmyardSpaceStates([
     ...getFarmyardSpaceStates(player).filter((entry) =>
       !(entry.spaceKey === state.spaceKey && entry.kind === state.kind && entry.sourceCardId === state.sourceCardId),
@@ -74,6 +79,19 @@ export const addFarmyardSpaceState = (
     state,
   ])
   player.farmyardSpaceStates = next
+  const tile = parsePositionKey(state.spaceKey)
+  const resources: Partial<Resource> = {}
+  for (const resource of Object.keys(state.resources ?? {}) as Array<keyof Resource>) {
+    const added = (state.resources?.[resource] ?? 0) - (previous?.resources?.[resource] ?? 0)
+    if (added > 0) resources[resource] = added
+  }
+  if (tile && Object.keys(resources).length > 0) {
+    eventSink?.emit<'resource.moved'>({
+      type: 'resource.moved', sourceCardId: state.sourceCardId,
+      resources, from: { kind: 'supply' },
+      to: { kind: 'field', playerId: player.id, ...tile }, reason: 'cardEffect',
+    })
+  }
 }
 
 export const farmyardSpaceStateForTile = (

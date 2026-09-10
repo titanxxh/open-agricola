@@ -691,22 +691,15 @@ describe('listener purity wave 2b/c', () => {
     })
   })
 
-  it('D56 FatstockStretcher before-exchange snapshots animals by flow only', () => {
-    const p = player('D056_FatstockStretcher', { resources: resource({ sheep: 2, boar: 1 }) })
+  it('D56 reacts to a completed animal exchange without mutating live state', () => {
+    const p = player('D056_FatstockStretcher', { resources: resource({ food: 7 }) })
     const game = state([p])
     const before = stateSnapshot(game)
-
-    const result = listenerById(D056_FatstockStretcher_impl.listeners, 'D56-fatstock-stretcher-before-exchange')
-      .handler(context(p, { state: game, actionId: 'exchange', phase: 'before' }))
-
+    const actionEvents = [{ ...exchangedByPlayer({ sheep: 2, boar: 1 }, { food: 7 }, p.id), exchangeSource: 'Major_Fireplace1' }]
+    const result = listenerById(D056_FatstockStretcher_impl.listeners, 'D56-fatstock-stretcher-after-exchange')
+      .handler(context(p, { state: game, actionId: 'exchange', phase: 'after', actionEvents, transactionEvents: actionEvents }))
     expectUnchanged(before, game)
-    expect(result?.flow).toMatchObject({
-      type: 'seq',
-      children: [
-        { type: 'leaf', actionId: 'special-effect', sourceCard: 'D056_FatstockStretcher', params: { kind: 'set-extra-data', key: 'sheepBefore', value: 2 } },
-        { type: 'leaf', actionId: 'special-effect', sourceCard: 'D056_FatstockStretcher', params: { kind: 'set-extra-data', key: 'boarBefore', value: 1 } },
-      ],
-    })
+    expect(result?.flow).toMatchObject({ type: 'leaf', actionId: 'gain', params: { food: 3 } })
   })
 
   it('D74 RoyalWood after construct accumulates wood spent by flow only', () => {
@@ -872,22 +865,16 @@ describe('listener purity wave 2b/c', () => {
     })
   })
 
-  it('E85 MasterTanner before-exchange snapshots animals by flow only', () => {
-    const p = player('E085_MasterTanner', { resources: resource({ boar: 2, cattle: 1 }) })
+  it('E85 reacts to a completed animal exchange without mutating live state', () => {
+    const p = player('E085_MasterTanner', { resources: resource({ food: 10 }) })
     const game = state([p])
     const before = stateSnapshot(game)
-
-    const result = listenerById(E085_MasterTanner_impl.listeners, 'E85-master-tanner-before-exchange')
-      .handler(context(p, { state: game, actionId: 'exchange', phase: 'before' }))
-
+    const actionEvents = [{ ...exchangedByPlayer({ boar: 2, cattle: 1 }, { food: 10 }, p.id), exchangeSource: 'Major_Fireplace1' }]
+    const result = listenerById(E085_MasterTanner_impl.listeners, 'E85-master-tanner-after-exchange')
+      .handler(context(p, { state: game, actionId: 'exchange', phase: 'after', actionEvents, transactionEvents: actionEvents }))
     expectUnchanged(before, game)
-    expect(result?.flow).toMatchObject({
-      type: 'seq',
-      children: [
-        { type: 'leaf', actionId: 'special-effect', sourceCard: 'E085_MasterTanner', params: { kind: 'set-extra-data', key: 'boarBefore', value: 2 } },
-        { type: 'leaf', actionId: 'special-effect', sourceCard: 'E085_MasterTanner', params: { kind: 'set-extra-data', key: 'cattleBefore', value: 1 } },
-      ],
-    })
+    expect(result?.flow).toMatchObject({ type: 'xor', optional: true })
+    if (result?.flow?.type === 'xor') expect(result.flow.children).toHaveLength(3)
   })
 
   it('E148 Lazybones removes reserved space and builds stable by owner-targeted flow only', () => {

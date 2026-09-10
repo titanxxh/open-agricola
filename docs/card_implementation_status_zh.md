@@ -10,6 +10,8 @@
 
 参考实现 PHP 路径默认相对 `参考实现`；OA 路径默认相对本仓库。
 
+[Issue #848](https://github.com/titanxxh/open-agricola/issues/848) 剩余 26 张牌已按 #854–#870 实现，并补充原生 Session 回归。原 A097/C140 替换缺陷已由 PR #853 完成；本次共享替换回归还覆盖 Freshman 免费职业入口中的 B154 前置检查。下表独立后续仍不属于该 28 张牌议题。
+
 | 优先级 | 范围 | 待处理事项 |
 |---|---|---|
 | P2 | `B026_AgrarianFences` | 独立牌义后续：牌面只允许替换 Grain Utilization 的两个行动之一，当前 listener 还提供原行动加围栏的分支，且缺少同次用格共享的替换次数限制。已发现源码与牌面不一致；次数和额外行动分支修正不纳入本次通用机制修改。 |
@@ -24,7 +26,8 @@
 
 | 类别 | 卡牌 |
 |---|---|
-| 用 schema-up metadata 替代 参考实现 custom `isBuyable` | `A003_PaperKnife`, `B056_Brook`, `B074_ThickForest`, `B154_SheepKeeper` |
+| Reseller 排除包含畜栏或围栏组件的整条印刷费用候选；没有受支持候选时保留一次性机会。本期边界不排除未来支持组件返还，由 [#849](https://github.com/titanxxh/open-agricola/issues/849) 继续跟踪。 | `E146_Reseller` |
+| 用 schema-up metadata 替代 参考实现 custom `isBuyable` | `A003_PaperKnife`, `B056_Brook`, `B074_ThickForest` |
 | 参考实现未实现，但 OA 有产品扩展/重写 | `A113_HeresyTeacher`, `A169_OffSiter`, `A170_Hayward`, `A171_Sidekick`, `A173_ClayThief`, `A174_MasterHora`, `A177_Middleman`, `A180_AnimalBrander`, `B170_CorralBuilder`, `B171_GreenhouseBuilder`, `B173_Sweeper`, `B175_FieldOverseer`, `B176_VillageIdiot`, `B178_TagAlong`, `B179_WildBoarHunter`, `C169_FastMason`, `C170_AmateurFencer`, `C171_YoungArtist`, `C172_FieldCounter`, `C173_TopOuter`, `C175_VillageTeacher`, `C180_Trapper`, `D025_WitchesDanceFloor`, `D170_FoldBuilder`, `D171_SeniorTeacher`, `D173_TownClerk`, `D175_Countryman`, `D176_Woodshacker`, `D178_SubstituteTeacher`, `D179_Bullcatcher`, `D180_PartTimeWorker` |
 | 参考实现 banned，但 OA 保留 | `A131_CraftTeacher`, `A133_Braggart`, `A014_CarpentersHammer`, `A033_BigCountry`, `A039_Chapel`, `A048_ShavingHorse`, `A082_WorkCertificate`, `A097_Freshman`, `B010_Caravan`, `B117_Informant`, `B132_EstateMaster`, `B151_LittlePeasant`, `B015_CarpentersBench`, `B161_Weakling`, `B021_HayloftBarn`, `B022_WalkingBoots`, `C102_TreeGuard`, `C125_Nightworker`, `C028_TeachersDesk`, `C031_WritingChamber`, `C003_CarriageTrip`, `C060_SmallPottersOven`, `C063_CraftBrewery`, `C099_GardenDesigner`, `D137_TradeTeacher`, `D019_PulverizerPlow`, `D021_Recruitment`, `D033_SummerHouse`, `D004_CrossCutWood`, `D074_RoyalWood`, `D092_ChildOmbudsman`, `D097_BeggingStudent`, `E022_GuestRoom` |
 | 参考实现 stable / FarmHand 模型差异 | `B085_FarmHand` |
@@ -175,6 +178,8 @@
 
 ## 6. 基础设施待办
 
+#848 的共享缺口已补齐：付款方出资的 gain 先校验完整转账再移动资源；显式 mandatory listener 即使不经过触发菜单也保留强制义务；普通及免费职业入口统一校验前置；改善预览与付款保留授予行动的上下文。农场货物放置采用 `farm.animalMoved.newlyPlacedOnFarmyard` 和实体田格的 `resource.moved` 事件。Writing Chamber 复用已有完整 post-score summary 读取独立负分条目，不改变其他计分卡的输入。组件退款仍为 #849 跟踪的独立已接受限制。
+
 共享支付枚举支持 `ComplexCost.minimumResourcesPaid`，在折扣和替代支付后、最优方案裁剪前校验；改善候选和提交共用该约束。嵌套 OR/XOR 叶子复用普通候选管线。基础田地计分只统计 Farmyard Field；卡牌终局投入通过明确选择和真实支付结算。职业后续必付食物复用已有课费支付预览及 `reserveResources` 契约。
 
 供应人物身份、预留、正常轮转和归家处置已由 §5 与 `docs/ARCHITECTURE.md` §6.4 的共享边界支持；卡牌时机与费用保留在卡内。
@@ -252,7 +257,6 @@ Hook 归属由 `ALL_CARD_IMPLS` 派生，不在此镜像一份会漂移的副本
 | `B117_Informant` | 已接受差异 | 参考实现 banned，但 OA 按产品策略保留 |
 | `B132_EstateMaster` | 已接受差异 | 参考实现 banned，但 OA 按产品策略保留 |
 | `B151_LittlePeasant` | 已接受差异 | 参考实现 banned，但 OA 按产品策略保留 |
-| `B154_SheepKeeper` | 已接受差异 | schema-up prerequisite / isBuyable metadata 差异 |
 | `B161_Weakling` | 已接受差异 | 参考实现 banned，但 OA 按产品策略保留 |
 | `B170_CorralBuilder` | 已接受差异 | 参考实现 implemented=false；OA 作为 5+ 扩展产品实现。Pig Market / Cattle Market reveal 的 round start 独立触发，可选执行 B2-style 免费恰好 1 格牧场 non-action fence flow；若一格牧场非法则不补偿。 |
 | `B171_GreenhouseBuilder` | 已接受差异 | 参考实现 implemented=false；OA 作为 5+ 扩展产品实现。注册 owner-only dynamic action space，只按当前 round 之前已 reveal 且 owner 可执行的 `fencing` / `house-redevelopment` / `vegetable-seeds` printed spaces 暴露对应分支。 |
