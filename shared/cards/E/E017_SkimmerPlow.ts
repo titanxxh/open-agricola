@@ -41,8 +41,7 @@ const reduceSownCropsListener: CardListenerRegistration = {
         | { kind: 'card'; playerId?: string; cardId: string }
     } =>
       (sow.location.kind === 'field' || sow.location.kind === 'card') &&
-      sow.location.playerId === context.player.id &&
-      (sow.crop === 'grain' || sow.crop === 'vegetable'),
+      sow.location.playerId === context.player.id,
     )
     if (sows.length === 0) return
     return {

@@ -7,10 +7,12 @@ export const sowOptions = (response: SessionResponse) => response.interaction.st
   ? response.interaction.request.options ?? []
   : []
 
-export const setupSowingSession = ({ cardId, grain = 0, vegetable = 0 }: {
+export const setupSowingSession = ({ cardId, grain = 0, vegetable = 0, wood = 0, stone = 0 }: {
   cardId: string
   grain?: number
   vegetable?: number
+  wood?: number
+  stone?: number
 }) => {
   const session = new GameSession(9811, undefined, { playerCount: 2 })
   stabilizeRandomHands(session.state.players)
@@ -40,6 +42,8 @@ export const setupSowingSession = ({ cardId, grain = 0, vegetable = 0 }: {
   player.minorPlayed = [cardId]
   player.resources.grain = grain
   player.resources.vegetable = vegetable
+  player.resources.wood = wood
+  player.resources.stone = stone
   session.loadState(state)
   return session
 }
@@ -58,7 +62,7 @@ export const commitFirstPlow = (session: GameSession, response: SessionResponse)
 
 export const sowCrops = (
   session: GameSession,
-  crops: Array<{ row: number; col: number; crop: 'grain' | 'vegetable' }>,
+  crops: Array<{ row: number; col: number; crop: 'grain' | 'vegetable' | 'wood' | 'stone' }>,
 ) => {
   let response = session.takeAction(0, 'grain-utilization')
   if (response.interaction.stateId === 'wait' && response.interaction.request.kind !== 'farm-select') {
