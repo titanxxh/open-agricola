@@ -39,7 +39,7 @@ const cardHasCookery = (cardId: string) =>
   ?? false
 
 const countBakingImprovements = (player: PlayerState) =>
-  collectCardsAs(player, 'major').filter(cardHasBaking).length
+  [...new Set([...player.improvements, ...player.minorPlayed])].filter(cardHasBaking).length
 
 const countCookingImprovements = (player: PlayerState) =>
   collectCardsAs(player, 'major').filter(cardHasCookery).length

@@ -10,11 +10,12 @@ export const sessionOptions = (response: SessionResponse) => response.interactio
   : []
 
 export const setupMinorSession = ({
-  cardId, resources, improvements = [], houseType = 'wood',
+  cardId, resources, improvements = [], minorPlayed = [], houseType = 'wood',
 }: {
   cardId: string
   resources: Partial<Record<'wood' | 'clay' | 'reed' | 'stone' | 'grain', number>>
   improvements?: string[]
+  minorPlayed?: string[]
   houseType?: 'wood' | 'clay' | 'stone'
 }) => {
   const session = new GameSession(9701)
@@ -41,6 +42,7 @@ export const setupMinorSession = ({
   const player = state.players[0]!
   player.minorHand = [cardId]
   player.improvements = improvements
+  player.minorPlayed = minorPlayed
   player.houseType = houseType
   Object.assign(player.resources, resources)
   session.loadState(state)
