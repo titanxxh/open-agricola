@@ -35,9 +35,15 @@ const cardImpl = {
   onBuy: () => ({
     type: 'seq' as const,
     children: [
-      payLeaf({ cardId: CARD_ID, cost: { food: 1 } }),
-      gainLeaf(CARD_ID, { stone: 2 }),
       { type: 'leaf' as const, actionId: 'special-effect', sourceCard: CARD_ID, params: { kind: 'set-flag', flag: true } },
+      {
+        type: 'seq' as const,
+        optional: true,
+        children: [
+          payLeaf({ cardId: CARD_ID, cost: { food: 1 } }),
+          gainLeaf(CARD_ID, { stone: 2 }),
+        ],
+      },
     ],
   }),
   onBeforeStartOfTurn: (_state, player) => {

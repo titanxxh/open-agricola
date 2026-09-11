@@ -9,6 +9,7 @@ import type {
   ResourceBatchExchangePayload,
   Trade,
   ResourceKey,
+  FeedExchangeCatalogEntry,
 } from '../../contract/types'
 import type { DraftGameEvent, EventSink } from '../../contract/events'
 import type { PromptKey } from '../../contract/prompt-keys'
@@ -24,6 +25,7 @@ import type { CardExchange, ExchangeWindow } from '../../contract/cards'
 import { getMajorCard } from '../../cards/major'
 import { collectComputeExchanges } from '../../cards/card-listeners'
 import { isMajorCardId } from '../../cards/helpers/card-type'
+import { BASIC_CONVERSION_SOURCE_ID, basicConversionExchanges } from '../../cards/basic-conversion'
 import { dispatchTradeAppliedListener } from '../helpers/trade-applied-listener'
 import { exchangeToTrade } from '../helpers/trades'
 import { getPlacedAnimalsByType } from '../../domain/animal-zones'
@@ -386,6 +388,69 @@ const playedCardIds = (player: PlayerState): readonly string[] => [
   ...player.minorPlayed,
   ...player.occupationPlayed,
 ]
+
+type ResolvedFeedExchange = FeedExchangeCatalogEntry & {
+  trade: Trade
+  window: 'harvest' | 'anytime'
+}
+
+export const getFeedExchangeCatalog = (
+  player: PlayerState,
+  state: GameState,
+): ResolvedFeedExchange[] => {
+  const entries: ResolvedFeedExchange[] = []
+  basicConversionExchanges.forEach((exchange, exchangeIndex) => {
+    const trade = exchangeToTrade(exchange, BASIC_CONVERSION_SOURCE_ID)
+    entries.push({
+      sourceId: BASIC_CONVERSION_SOURCE_ID,
+      exchangeIndex,
+      from: { ...exchange.from },
+      to: { ...exchange.to },
+      max: exchange.max,
+      fromFarmyard: exchange.fromFarmyard,
+      trade,
+      window: 'anytime',
+    })
+  })
+  for (const cardId of playedCardIds(player)) {
+    getCardExchanges(cardId, state).forEach((exchange, exchangeIndex) => {
+      const triggers = exchange.triggers ?? []
+      const window = triggers.includes('harvest')
+        ? 'harvest'
+        : triggers.includes('anytime') ? 'anytime' : undefined
+      if (!window) return
+      const trade = exchangeToTrade(exchange, cardId)
+      entries.push({
+        sourceId: trade.sourceId ?? cardId,
+        exchangeIndex,
+        from: { ...trade.from },
+        to: { ...trade.to },
+        max: trade.max,
+        fromFarmyard: trade.fromFarmyard,
+        trade,
+        window,
+      })
+    })
+  }
+  const nextIndexBySource = new Map<string, number>()
+  for (const trade of collectComputeExchanges(state, player, 'harvest')) {
+    const sourceId = trade.sourceId ?? trade.source
+    if (!sourceId) continue
+    const exchangeIndex = nextIndexBySource.get(sourceId) ?? 0
+    nextIndexBySource.set(sourceId, exchangeIndex + 1)
+    entries.push({
+      sourceId,
+      exchangeIndex,
+      from: { ...trade.from },
+      to: { ...trade.to },
+      max: trade.max,
+      fromFarmyard: trade.fromFarmyard,
+      trade,
+      window: 'harvest',
+    })
+  }
+  return entries
+}
 
 /**
  * Scan all played cards for exchanges visible in the given window.

@@ -398,6 +398,8 @@ listener activation 是 internal action leaf：`ActionNode(actionId='activate-ca
 
 卡牌提供的 anytime 入口在共享列表构建处使用 `evaluateFlowDoable()`；命令校验及收获 / 计分前窗口读取同一列表。探测只忽略根节点的 optional 标记，使用新 flow 自己的来源、参数和行动上下文。准入仍只检查当前步骤，保留合法 before / replacement，以及先获得资源再支付后续费用的路径。带记账前缀的复合 flow 仍保留已有卡牌前置检查。不可用的直接调用在修改 history 或引擎前拒绝。从空闲状态发起或注入等待中引擎的已接受 anytime flow 及其必需后续节点都带 mandatory 义务；失败时保留被中断的宿主（如有），使用已有 blocked / 显式 undo 规则。内部 optional 选择仍可跳过。Listener activation event 除来源和行动上下文外也保留宿主行动参数，确保触发器预览和执行使用与准入一致的翻修目标。
 
+如果接受某个 anytime 会消耗持有者当前工作阶段的回合，而不是插入另一个行动，该 listener 必须声明 `replacesTurn: true`。这种入口只在工作阶段的 idle 交互中提供；Session 在注入 flow 前建立普通 Turn Scope 与行动快照，结算完成后沿用人员行动相同的回合结束 hook 和玩家轮转。活动行动、阶段 flow 或嵌套 anytime 窗口内不得提供回合替代。E062 Sour Dough 是参考实现。
+
 ### 5.4 EngineStack（子流程栈）
 
 `EngineStack`（`engine-stack.ts`）持有 `EngineFrame[]`：
@@ -501,6 +503,8 @@ A092_AdoptiveParents 引入轮转层额外回合机制（#203+#204）。provider
 `skipTurn`（例如 D134_OysterEater 返回 `{ skipTurn: true }`）在 turn 开始前跳过当前玩家；`contributeExtraTurn` 让仍有机会的 provider 留在轮转中，`extraTurnBeforeWorkers` 允许在普通工人耗尽前选择。术语见 `CONTEXT.md` 的 *Extra Turn / Forfeit*。
 
 供应放置通过 `place-farmer` 的 `actionContext.workerSource: { kind: 'supply', disposition, workerId? }` 声明。执行时先锁定一个有限人物 ID，再展示目标；提交、目标行动、事件、联动占位、移动和撤销始终沿用该 ID。目标行动使用正常行动语义并计入放人统计；卡牌放置在既有 Turn Scope 中记录人物行动身份，使回合结束 hook 收到与普通放人相同的 trigger。
+
+卡牌只使用行动格而不放置人物时，通过 `place-farmer` 携带 `actionContext.viaCardJump: true`、`targetSpaceId` 且不提供 `workerId`。这个 worker-less 分支不要求或修改人物，不产生 `worker.placed`，也不增加放人统计。卡牌必须先用 `isActionDoableInFlowContext()` 校验目标；执行阶段再展开目标行动的普通 flow，使 replacement、费用、listener 和提交校验保持权威。A151 Minstrel 在普通人物全部放出后的归家阶段使用该路径。
 
 `inactiveWorkersInSupply()` 排除预留、待放置、临时人物和已永久移除的组件。`availableWorkers()` 包含被召回版图外的临时人物，但家庭人数、住房、喂养和人物分仍只读取永久成员。`returnSupplyWorkers()` 在全部 `onBeforeReturnHome` 之后、`onStartReturnHome` 之前清理同一 ID 的所有位置，并执行原处置；召回和移动不改变该处置。已归还的人物立即可用于增员；没有到期归还轮次的预留跨归家保留，由卡牌在指定时机释放或解锁。清理前，`recordReturnHomePlacements()` 将全部归家前移动结束后的最终版图位置存入既有的玩家 `__roundPlacement__` 记录。归家占位效果通过 `getReturnHomePlacements()` 读取该快照，不再读取实时占位；已归还的供应人物仍被计入，刚清空的格子也不会错误产生归家机会。每条记录保留供应人物的处置：占位判断仍包含已移除人物的历史位置，而 `getReturningPersonPlacements()` 排除合成占位及 `remove-from-game`。Swimming Class、Curator、Seed Researcher、Night-School Student 使用归还人物视图；Turnip Farmer、Minstrel、Bohemian、Food Distributor 使用归家开始时的占位。快照随 pending 序列化和 undo 恢复，由 `resetRoundPlacements()` 在下一轮清除；实时 WorkerRef 仍是放置真源。Curator 按不同归家人物 ID 计数，并通过 `gainPerRound` 识别已取空的累积格。既有 blocked / anytime / undo 与 Protected Observation 边界保持不变。
 
@@ -921,6 +925,8 @@ Nested anytime flows are injected ahead of the current pending tree. Parent pend
 若 anytime flow 的终止 reaction 必须等整个 injected sequence 完成后才运行，可在最后一个 leaf 上写入 `INJECTED_ANYTIME_COMPLETION_CONTEXT_KEY`。completion listener 必须同时看到该 marker 与引擎添加的 injected-anytime marker，因此空栈顶层 anytime action 不会被误判为 suspended-flow completion。
 
 一次兑换提交可以包含多种配方及各自次数，作为一个 Exchange Batch 结算。如果整批结束后存在新获得且未安置的动物，且来源交互本身不是动物整理，exchange 通过 `internalChildren.afterHostListeners` 安排 `reorganize`，完成后再恢复被暂停的父交互。`CardExchange.blockedAnytimeInteractionKinds` 会复制到各条 `Trade`；系统 anytime 入口将来源请求类型保存在 `actionContext.anytimeInteractionKind`，统一用于准入、候选构造及提交校验（包括 bulk）。被禁用的配方保留 trade 索引，但不提供可执行选项。B104 用三条声明 `fromFarmyard`、`anytime` / `harvest` 及 `animal-reorg` 禁用条件的配方替代独立 listener，沿用包括到期行动准备在内的默认 exchange 窗口，不提供专属计分前机会。
+
+收获喂食请求会发布权威 `exchangeCatalog`。每条记录用稳定的 `(sourceId, exchangeIndex)` 标识当前可用配方，并投影 `from`、`to`、`max` 与 `fromFarmyard`。目录存在时，客户端只按该目录构建兑换草稿，不再从卡牌 metadata 重建动态 listener 提供的兑换。提交前，服务端必须同时匹配最初下发目录和按实时状态重建的目录，再进行任何资源修改；因此动态 Harvest exchange 能进入 UI，而伪造、过期或超限配方会被原子拒绝。
 
 OA-vs-the reference design notes:
 

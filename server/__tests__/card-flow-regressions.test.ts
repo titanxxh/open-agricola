@@ -50,8 +50,8 @@ describe('card flow regressions', () => {
     expect(skip).toBeDefined()
 
     resp = session.resolveChoice(0, skip!.value)
-    expect(resp.state.players[0]!.cardStates?.A017_ReclamationPlow?.flagged).toBeFalsy()
-    expect(resp.state.players[0]!.cardStates?.A017_ReclamationPlow?.infobox).toBeUndefined()
+    expect(resp.state.players[0]!.cardStates?.A017_ReclamationPlow?.flagged).toBe(true)
+    expect(resp.state.players[0]!.cardStates?.A017_ReclamationPlow?.infobox).toBe('✓')
     expect(resp.interaction.stateId === 'wait' ? resp.interaction.request.kind : resp.interaction.stateId).toBe('confirm-next-player')
   })
 

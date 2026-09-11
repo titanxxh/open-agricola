@@ -1,4 +1,6 @@
 import { defineOccupationCard } from '../card-source'
+import { isActionDoableInFlowContext } from '../../actions/flow'
+import { getActionDefinition } from '../../actions/index'
 import { getReturnHomePlacements } from '../helpers/round-placement'
 import { jumpLeaf } from '../helpers/jump-leaf'
 import type { CardImpl } from '../registry'
@@ -43,6 +45,17 @@ const cardImpl = {
       if (unoccupied.length !== 1) return
 
       const targetSpaceId = unoccupied[0]!
+      const targetSpace = state.actionSpaces.find((space) => space.id === targetSpaceId)
+      if (!targetSpace || !isActionDoableInFlowContext({
+        actionId: targetSpaceId,
+        action: targetSpace,
+        state,
+        player: _player,
+        space: targetSpace,
+        sourceCard: CARD_ID,
+        actionContext: { viaCardJump: true, sourceCard: CARD_ID, targetSpaceId },
+        resolveAction: getActionDefinition,
+      })) return
 
       return {
         type: 'seq',

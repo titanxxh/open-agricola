@@ -1,7 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
-import { getExchangesInWindow, applyTrade } from '../../shared/actions/effects/exchange'
-import { PaymentSolver } from '../../shared/actions/payment'
+import { getExchangesInWindow } from '../../shared/actions/effects/exchange'
 import { markAllWorkersUsed, setActiveWorkerCount } from '../../shared/domain/player'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 
@@ -159,7 +158,7 @@ describe('C62 CookeryExtension', () => {
   })
 })
 
-describe('C62 + harvest feed integration (simplified)', () => {
+describe('C62 + harvest feed integration', () => {
   it('does not open a feed wait when its only derived harvest trades are unaffordable', () => {
     const session = new GameSession(62)
     stabilizeRandomHands(session.state.players)
@@ -186,52 +185,82 @@ describe('C62 + harvest feed integration (simplified)', () => {
     expect(response.state.players[0]!.resources.begging).toBe(2)
   })
 
-  // Note: simplified per plan task 9 fallback. Driving the live
-  // confirmHarvestFeed path with derived sourceIds requires
-  // game-core.ts:lookupCard() to resolve composite sourceIds (e.g.
-  // 'C062_CookeryExtension::Major_Fireplace1') back to a card; today it only
-  // looks for sourceId directly in improvements/minorPlayed/occupationPlayed
-  // arrays, so derived trades are silently skipped. Rather than expand the
-  // main path, this test exercises the trade-application semantics directly:
-  // resolve the derived trade via getExchangesInWindow, apply it via
-  // applyTrade + applyTradeSideEffect (exactly what the harvest-feed path
-  // would dispatch), and assert the per-cookery flag + resource deltas.
-  it('applying a C62-derived trade: vegetable -1, food +4, usedCookeryIds=[Major_Fireplace1]', () => {
-    const session = new GameSession()
+  const setupFeed = () => {
+    const session = new GameSession(6200, undefined, { playerCount: 2 })
+    stabilizeRandomHands(session.state.players)
     const state = session.getState().state
-    state.players = state.players.slice(0, 2)
-    const p1 = state.players[0]!
-    p1.minorPlayed = [...p1.minorPlayed, C62]
-    p1.improvements = [...p1.improvements, FIREPLACE1]
-    p1.cardStates = {
-      ...(p1.cardStates ?? {}),
-      [C62]: { extraData: { usedCookeryIds: [] } },
-    }
-    p1.resources.vegetable = 1
-    p1.resources.food = 0
-    session.loadState(state)
-
-    const trades = getExchangesInWindow(p1, 'harvest', state)
-    const derived = trades.find((t) => t.sourceId === `${C62}::${FIREPLACE1}` && t.from?.vegetable === 1)
-    expect(derived).toBeDefined()
-    expect(derived!.to.food).toBe(4)
-    expect(derived!.sideEffect).toEqual({
-      type: 'pushExtraDataValue',
-      sourceCard: C62,
-      key: 'usedCookeryIds',
-      value: FIREPLACE1,
+    state.round = 4
+    state.roundPhase = 'work'
+    state.players.forEach((player) => {
+      markAllWorkersUsed(state, player)
+      setActiveWorkerCount(player, 0)
+      player.resources.food = 20
     })
+    const player = state.players[0]!
+    setActiveWorkerCount(player, 1)
+    player.resources.food = 0
+    player.resources.vegetable = 1
+    seedC62(state, player.id)
+    seedCookery(state, FIREPLACE1, player.id)
+    session.loadState(state)
+    let offered = session.performRoundEnd()
+    if (
+      offered.interaction.stateId === 'wait'
+      && offered.interaction.request.kind === 'choice'
+      && offered.interaction.request.options?.some((option) => option.value === '__skip__')
+    ) {
+      offered = session.resolveChoice(offered.interaction.playerIndex, '__skip__')
+    }
+    expect(offered.interaction).toMatchObject({
+      stateId: 'wait',
+      playerIndex: 0,
+      request: { kind: 'feed' },
+    })
+    if (offered.interaction.stateId !== 'wait' || offered.interaction.request.kind !== 'feed') {
+      throw new Error('expected C62 harvest feed')
+    }
+    const exchange = offered.interaction.request.exchangeCatalog?.find((entry) =>
+      entry.sourceId === `${C62}::${FIREPLACE1}` && entry.from.vegetable === 1,
+    )
+    expect(exchange).toMatchObject({ from: { vegetable: 1 }, to: { food: 4 }, max: 1 })
+    return { session, offered, exchange: exchange! }
+  }
 
-    applyTrade(p1, derived!, 1)
-    PaymentSolver.applyTradeSideEffect(state, p1, derived!.sideEffect!, 1, derived!.sourceId ?? 'unknown')
+  it('executes the doubled exchange through the authoritative feed command', () => {
+    const { session, exchange } = setupFeed()
+    const response = session.resolveChoice(0, 'confirm', { selections: [{
+      sourceId: exchange.sourceId, exchangeIndex: exchange.exchangeIndex, count: 1,
+    }] })
 
-    expect(p1.resources.vegetable).toBe(0)
-    expect(p1.resources.food).toBe(4)
-    expect(p1.cardStates?.[C62]?.extraData?.usedCookeryIds).toEqual([FIREPLACE1])
+    expect(response.ok, response.error).toBe(true)
+    expect(response.state.players[0]!.resources).toMatchObject({ vegetable: 0, food: 2, begging: 0 })
+    expect(response.state.players[0]!.cardStates?.[C62]?.extraData?.usedCookeryIds).toEqual([FIREPLACE1])
+    expect(response.state.events).toContainEqual(expect.objectContaining({
+      type: 'harvest.feedConverted', source: `${C62}::${FIREPLACE1}`,
+      cost: { vegetable: 1 }, food: { food: 4 },
+    }))
+  })
 
-    // After the side-effect dispatched, listener filters out Fireplace1.
-    const tradesAfter = getExchangesInWindow(p1, 'harvest', state)
-    const stillDerived = tradesAfter.find((t) => t.sourceId === `${C62}::${FIREPLACE1}`)
-    expect(stillDerived).toBeUndefined()
+  it('rejects a forged or over-limit derived source atomically and permits retry', () => {
+    const { session, offered, exchange } = setupFeed()
+    const before = JSON.stringify({ state: offered.state, interaction: offered.interaction })
+    const forged = session.resolveChoice(0, 'confirm', { selections: [{
+      sourceId: `${C62}::Major_Fireplace2`, exchangeIndex: exchange.exchangeIndex, count: 1,
+    }] })
+    expect(forged.ok).toBe(false)
+    expect(JSON.stringify({ state: forged.state, interaction: forged.interaction })).toBe(before)
+
+    const duplicate = session.resolveChoice(0, 'confirm', { selections: [
+      { sourceId: exchange.sourceId, exchangeIndex: exchange.exchangeIndex, count: 1 },
+      { sourceId: exchange.sourceId, exchangeIndex: exchange.exchangeIndex, count: 1 },
+    ] })
+    expect(duplicate.ok).toBe(false)
+    expect(JSON.stringify({ state: duplicate.state, interaction: duplicate.interaction })).toBe(before)
+
+    const accepted = session.resolveChoice(0, 'confirm', { selections: [{
+      sourceId: exchange.sourceId, exchangeIndex: exchange.exchangeIndex, count: 1,
+    }] })
+    expect(accepted.ok, accepted.error).toBe(true)
+    expect(accepted.state.players[0]!.resources.vegetable).toBe(0)
   })
 })

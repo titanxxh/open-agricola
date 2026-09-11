@@ -1086,9 +1086,11 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "vp": 1,
     "altCosts": [
       {
+        "wood": 1,
         "clay": 4
       },
       {
+        "wood": 1,
         "stone": 2
       }
     ],
@@ -7035,7 +7037,6 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     ],
     "cost": {},
     "players": "1+",
-    "maxRound": 11,
     "extraVp": true,
     "kind": "occupation"
   },

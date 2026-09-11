@@ -49,6 +49,12 @@ export type CardListenerRegistration = {
   mandatory?: boolean
   preScoring?: boolean
   allowAnytimeReentry?: boolean
+  /**
+   * This anytime entry is a complete replacement for the owner's current
+   * turn opportunity. Turn replacements are only offered from an idle work
+   * phase and advance normal turn rotation after their flow completes.
+   */
+  replacesTurn?: boolean
   monotoneFenceCost?: boolean
   blockedAnytimeInteractionKinds?: readonly InteractionRequest['kind'][]
   /**

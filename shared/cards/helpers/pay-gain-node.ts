@@ -250,11 +250,14 @@ const returnToSpaceThenGainActionFlow = ({
   cost,
   gain,
   choiceLabelKey,
-}: ReturnToSpaceThenGainFlowOptions): SequenceFlow =>
-  buildSequenceNode(undefined, [
+}: ReturnToSpaceThenGainFlowOptions): SequenceFlow => {
+  const { resources } = splitCardGain(gain)
+  return buildSequenceNode(undefined, [
     { type: 'leaf', actionId: 'return-to-space', params: cost, sourceCard: cardId, choiceLabelKey },
-    gainLeaf(cardId, gain),
+    ...bonusVpLeaves(cardId, gain),
+    ...(Object.keys(resources).length > 0 ? [gainLeaf(cardId, gain)] : []),
   ])
+}
 
 export const returnToSpaceThenGainFlow = ({
   cardId,

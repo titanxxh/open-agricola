@@ -3,6 +3,7 @@ import { GameSession } from '../game/authoritative-session'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 import { setCardFlag, isCardFlagged } from '../../shared/cards/helpers/card-state'
 import { runCardEffectHook } from '../../shared/cards/card-effects'
+import { setWorkersAtHome } from '../../shared/domain/player'
 
 import '../../shared/cards/C/C143_StoneBuyer'
 import type { AnytimeAction } from '../../shared/contract/types';
@@ -21,9 +22,44 @@ describe('C143_StoneBuyer session', () => {
     player.occupationHand.push('C143_StoneBuyer')
     player.resources.food = 5
     player.resources.stone = 0
+    player.occupationPlayed.push('C143_StoneBuyer')
     session.loadState(state)
-    session.devPlayCard(0, 'C143_StoneBuyer')
     return session
+  }
+
+  const playThroughLessons = (accept: boolean) => {
+    const session = new GameSession(7143, undefined, { playerCount: 3 })
+    stabilizeRandomHands(session.state.players)
+    const state = session.state
+    state.currentPlayerIndex = 0
+    state.round = 5
+    state.roundPhase = 'work'
+    state.actionSpaces.forEach((space) => { space.takenBy = [] })
+    state.players.forEach((candidate, index) => {
+      setWorkersAtHome(state, candidate, index === 0 ? 2 : 0)
+      candidate.minorHand = ['__test_placeholder__']
+      candidate.occupationHand = ['__test_placeholder__']
+      candidate.occupationPlayed = []
+      candidate.cardStates = {}
+      candidate.resources.food = 5
+      candidate.resources.stone = 0
+    })
+    state.players[0]!.occupationHand = ['C143_StoneBuyer']
+    session.loadState(state)
+
+    let response = session.takeAction(0, 'lessons')
+    if (response.state.players[0]!.occupationHand.includes('C143_StoneBuyer')) {
+      expect(response.interaction.stateId).toBe('wait')
+      if (response.interaction.stateId !== 'wait') return { session, response }
+      response = session.resolveChoice(0, 'C143_StoneBuyer')
+    }
+    expect(response.interaction.stateId).toBe('wait')
+    if (response.interaction.stateId !== 'wait') return { session, response }
+    const choice = accept
+      ? response.interaction.request.options?.find((option) => option.value !== '__skip__')
+      : response.interaction.request.options?.find((option) => option.value === '__skip__')
+    expect(choice, JSON.stringify(response.interaction, null, 2)).toBeDefined()
+    return { session, response: session.resolveChoice(response.interaction.playerIndex, choice!.value) }
   }
 
   const enterActiveInteraction = (session: GameSession) => {
@@ -32,7 +68,7 @@ describe('C143_StoneBuyer session', () => {
     return resp
   }
 
-  it('onBuy: returns a seq flow that pays 1 food, gains 2 stone, and flags card', () => {
+  it('onBuy: flags this round before offering the optional two-stone purchase', () => {
     const session = setup()
     const state = session.getState().state
     const player = state.players[0]!
@@ -40,12 +76,33 @@ describe('C143_StoneBuyer session', () => {
     expect(flow).not.toBeNull()
     expect(flow!.type).toBe('seq')
     const children = (flow as Extract<ActionFlow, { type: 'seq' }>).children
-    expect(children).toHaveLength(3)
-    expect(children[0].actionId).toBe('pay')
-    expect(children[0].params).toEqual({ food: 1 })
-    expect(children[1].actionId).toBe('gain')
-    expect(children[1].params).toEqual({ stone: 2 })
-    expect(children[2]).toMatchObject({ actionId: 'special-effect', params: { kind: 'set-flag', flag: true } })
+    expect(children).toHaveLength(2)
+    expect(children[0]).toMatchObject({ actionId: 'special-effect', params: { kind: 'set-flag', flag: true } })
+    expect(children[1]).toMatchObject({ type: 'seq', optional: true })
+    if (children[1]?.type !== 'seq') throw new Error('expected optional purchase sequence')
+    expect(children[1].children[0]).toMatchObject({ actionId: 'pay', params: { food: 1 } })
+    expect(children[1].children[1]).toMatchObject({ actionId: 'gain', params: { stone: 2 } })
+  })
+
+  it('accepts the on-play offer through Session and buys exactly two stone for one food', () => {
+    const { response } = playThroughLessons(true)
+
+    expect(response.ok, response.error).toBe(true)
+    expect(response.state.players[0]!.occupationPlayed).toContain('C143_StoneBuyer')
+    expect(response.state.players[0]!.resources).toMatchObject({ food: 4, stone: 2 })
+    expect(isCardFlagged(response.state.players[0]!, 'C143_StoneBuyer')).toBe(true)
+  })
+
+  it('declines the on-play offer without paying food or gaining stone', () => {
+    const { session, response } = playThroughLessons(false)
+
+    expect(response.ok, response.error).toBe(true)
+    expect(response.state.players[0]!.occupationPlayed).toContain('C143_StoneBuyer')
+    expect(response.state.players[0]!.resources).toMatchObject({ food: 5, stone: 0 })
+    expect(isCardFlagged(response.state.players[0]!, 'C143_StoneBuyer')).toBe(true)
+    const active = session.takeAction(0, 'farmland')
+    expect(active.interaction.anytimeActions.map((action) => action.id))
+      .not.toContain('C143-stone-buyer-anytime')
   })
 
   it('anytime not available same round when flagged from onBuy', () => {

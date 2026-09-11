@@ -35,7 +35,7 @@ const cardImpl = {
     if (storedFood <= 0) return
     return {
       type: 'leaf',
-      actionId: 'take-from-card',
+      actionId: 'gain',
       params: { food: storedFood },
       sourceCard: CARD_ID,
     }

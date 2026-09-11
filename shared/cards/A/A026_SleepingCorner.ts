@@ -3,7 +3,7 @@ import type { CardListenerRegistration, CardListenerContext } from '../card-list
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import type { ActionChoiceOption } from '../../contract/types'
 import { OCCUPIED_SPACE_CHOICE_PREFIX } from '../../actions/effects/place-farmer'
-import { isSpaceOccupied, spaceHasPlayer } from '../../domain/space'
+import { isSpaceOccupied } from '../../domain/space'
 import type { CardImpl } from '../registry'
 
 const CARD_ID = 'A026_SleepingCorner'
@@ -27,7 +27,17 @@ const computeArgsListener: CardListenerRegistration = {
       (s) => s.id === 'wish-children' || s.id === 'urgent-wish-children',
     )
     const extraOptions: ActionChoiceOption[] = wishChildrenSpaces
-      .filter((s) => isSpaceOccupied(s) && !spaceHasPlayer(s, context.player.id))
+      .filter((space) => {
+        if (!isSpaceOccupied(space)) return false
+        if (space.takenBy.some((ref) => ref.playerId === context.player.id)) return false
+        const otherAdultWorkers = space.takenBy.filter((ref) => {
+          if (ref.synthetic) return false
+          const owner = context.state.players.find((candidate) => candidate.id === ref.playerId)
+          const worker = owner?.workers.find((candidate) => candidate.id === ref.workerId)
+          return worker?.isActive === true && worker.isNewborn === false
+        })
+        return otherAdultWorkers.length === 1
+      })
       .map((s) => ({
         value: `${OCCUPIED_SPACE_CHOICE_PREFIX}${s.id}`,
         labelKey: s.nameKey,

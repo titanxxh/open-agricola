@@ -2,8 +2,9 @@ import { defineMinorCard } from '../card-source'
 import type { CardListenerContext, CardListenerRegistration } from '../card-listeners'
 import type { ActionFlow } from '../../contract/types'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
-import type { ActionSpace, PlayerState, Pasture } from '../../contract/types'
-import { isCardFlagged } from '../helpers/card-state'
+import type { ActionSpace } from '../../contract/types'
+import { getAssignedAnimalsByType } from '../../domain/animals'
+import { isCardFlagged, readCardExtraData } from '../helpers/card-state'
 import { sumResourceMovedFromActionSpace } from '../helpers/event-provenance'
 import type { CardImpl } from '../registry'
 
@@ -11,6 +12,7 @@ const CARD_ID = 'A017_ReclamationPlow'
 type AnimalType = 'sheep' | 'boar' | 'cattle'
 
 const USED_INFOBOX = '✓'
+const ANIMALS_BEFORE_KEY = 'animalsBeforeCollecting'
 
 const isAnimalAccumulationSpace = (space: ActionSpace): boolean => {
   const gainPerRound = space.gainPerRound ?? {}
@@ -19,25 +21,20 @@ const isAnimalAccumulationSpace = (space: ActionSpace): boolean => {
          (gainPerRound.cattle ?? 0) > 0
 }
 
-const getAnimalCountByType = (player: PlayerState): Record<AnimalType, number> => ({
-  sheep: (player.houseAnimalType === 'sheep' ? player.houseAnimalCount : 0) +
-    Object.values(player.stableAnimals ?? {}).filter((a) => a === 'sheep').length +
-    (player.pastures ?? []).reduce((sum: number, p: Pasture) => sum + (p.animalType === 'sheep' ? p.animalCount : 0), 0),
-  boar: (player.houseAnimalType === 'boar' ? player.houseAnimalCount : 0) +
-    Object.values(player.stableAnimals ?? {}).filter((a) => a === 'boar').length +
-    (player.pastures ?? []).reduce((sum: number, p: Pasture) => sum + (p.animalType === 'boar' ? p.animalCount : 0), 0),
-  cattle: (player.houseAnimalType === 'cattle' ? player.houseAnimalCount : 0) +
-    Object.values(player.stableAnimals ?? {}).filter((a) => a === 'cattle').length +
-    (player.pastures ?? []).reduce((sum: number, p: Pasture) => sum + (p.animalType === 'cattle' ? p.animalCount : 0), 0),
-})
-
 const buildReclamationPlowUseFlow = (): ActionFlow => ({
-  type: 'leaf',
-  actionId: 'plow',
-  sourceCard: CARD_ID,
-  optional: true,
-  promptKey: 'ui.interactionReclamationPlow',
-  choiceLabelKey: 'ui.interactionReclamationPlowUse',
+  type: 'seq',
+  children: [
+    specialEffect({ kind: 'set-flag', flag: true }),
+    specialEffect({ kind: 'set-infobox', text: USED_INFOBOX }),
+    {
+      type: 'leaf',
+      actionId: 'plow',
+      sourceCard: CARD_ID,
+      optional: true,
+      promptKey: 'ui.interactionReclamationPlow',
+      choiceLabelKey: 'ui.interactionReclamationPlowUse',
+    },
+  ],
 })
 
 const specialEffect = (params: Record<string, unknown>): ActionFlow => ({
@@ -55,6 +52,26 @@ const countObtainedAnimalFromActionSpace = (
   return sumResourceMovedFromActionSpace(events, animalType, (event) =>
     event.to.kind === 'player' && event.to.playerId === context.player.id,
   )
+}
+
+const reclamationPlowBeforeCollectListener: CardListenerRegistration = {
+  id: 'A17-reclamation-plow-before',
+  cardIds: [CARD_ID],
+  phases: ['before' as ActionHookPhase],
+  actions: ['collect'],
+  handler: (context: CardListenerContext): ActionHookResult | void => {
+    if (!isAnimalAccumulationSpace(context.space)) return
+    if (isCardFlagged(context.player, CARD_ID)) return
+    return {
+      flow: specialEffect({
+        kind: 'set-extra-data',
+        key: ANIMALS_BEFORE_KEY,
+        value: getAssignedAnimalsByType(context.player, context.state),
+      }),
+      sourceCard: CARD_ID,
+      countCardUse: false,
+    }
+  },
 }
 
 const reclamationPlowAfterCollectListener: CardListenerRegistration = {
@@ -75,38 +92,25 @@ const reclamationPlowAfterCollectListener: CardListenerRegistration = {
     const totalObtained = obtainedAnimals.sheep + obtainedAnimals.boar + obtainedAnimals.cattle
     if (totalObtained <= 0) return
 
-    const animalsAfterCollecting = getAnimalCountByType(player)
+    const animalsBeforeCollecting = readCardExtraData<Record<AnimalType, number>>(
+      player,
+      CARD_ID,
+      ANIMALS_BEFORE_KEY,
+    )
+    if (!animalsBeforeCollecting) return
+
+    const animalsAfterCollecting = getAssignedAnimalsByType(player, context.state)
     for (const animalType of ['sheep', 'boar', 'cattle'] as AnimalType[]) {
-      if (animalsAfterCollecting[animalType] < obtainedAnimals[animalType]) return
+      if (animalsAfterCollecting[animalType] <
+        animalsBeforeCollecting[animalType] + obtainedAnimals[animalType]) return
     }
 
     return { flow: buildReclamationPlowUseFlow() }
   },
 }
 
-const reclamationPlowAfterPlowListener: CardListenerRegistration = {
-  id: 'A17-reclamation-plow-after-plow',
-  cardIds: [CARD_ID],
-  phases: ['after' as ActionHookPhase],
-  actions: ['plow'],
-  handler: (context: CardListenerContext): ActionHookResult | void => {
-    if (context.sourceCard !== CARD_ID) return
-    if (isCardFlagged(context.player, CARD_ID)) return
-    return {
-      flow: {
-        type: 'seq',
-        children: [
-          specialEffect({ kind: 'set-flag', flag: true }),
-          specialEffect({ kind: 'set-infobox', text: USED_INFOBOX }),
-        ],
-      },
-      sourceCard: CARD_ID,
-    }
-  },
-}
-
 const cardImpl = {
-  listeners: [reclamationPlowAfterCollectListener, reclamationPlowAfterPlowListener],
+  listeners: [reclamationPlowBeforeCollectListener, reclamationPlowAfterCollectListener],
   reaches: [] as readonly string[],
 } satisfies CardImpl
 

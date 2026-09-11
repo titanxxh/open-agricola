@@ -953,6 +953,15 @@ export type FeedQueueEntry = {
   needsFeed?: boolean
 }
 
+export type FeedExchangeCatalogEntry = {
+  sourceId: string
+  exchangeIndex: number
+  from: Partial<Resource>
+  to: Partial<Resource>
+  max?: number
+  fromFarmyard?: boolean
+}
+
 export type SubFlowKind =
   | 'choice'
   | 'animal-reorg'
@@ -980,6 +989,7 @@ export type InteractionRequest =
       remaining: number
       foodUsed: number
       feedQueue?: FeedQueueEntry[]
+      exchangeCatalog?: FeedExchangeCatalogEntry[]
       maxTradeTimesBySourceId?: Record<string, number>
       placedAnimals?: Partial<Pick<Resource, AnimalKey>>
     }

@@ -7,6 +7,7 @@ import { D155_Ebonist as DisplayD155 } from '../../shared/cards/D/D155_Ebonist'
 import { D155_Ebonist as RuntimeD155 } from '../../shared/cards/D/D155_Ebonist'
 import { getExchangesInWindow } from '../../shared/actions/effects/exchange'
 import type { PlayerState } from '../../shared/contract/types'
+import { BASIC_CONVERSION_SOURCE_ID } from '../../shared/cards/basic-conversion'
 
 const CARD_ID = 'D155_Ebonist'
 
@@ -138,6 +139,38 @@ describe('D155 Ebonist parity', () => {
     expect(response.ok, response.error).toBe(true)
     expect(response.state.players[0]!.resources).toMatchObject({
       wood: 1, grain: 1, food: 0, begging: 0,
+    })
+  })
+
+  it('allows an earlier harvest exchange to fund a later basic conversion', () => {
+    const session = setup({ food: 2, harvest: true })
+    let response = session.performRoundEnd()
+    expect(response.interaction).toMatchObject({
+      stateId: 'wait',
+      playerIndex: 0,
+      request: {
+        kind: 'feed',
+        exchangeCatalog: expect.arrayContaining([
+          expect.objectContaining({
+            sourceId: BASIC_CONVERSION_SOURCE_ID,
+            exchangeIndex: 0,
+            from: { grain: 1 },
+            to: { food: 1 },
+          }),
+        ]),
+      },
+    })
+
+    response = session.resolveChoice(0, 'confirm', {
+      selections: [
+        ...ebonistTrade,
+        { sourceId: BASIC_CONVERSION_SOURCE_ID, exchangeIndex: 0, count: 1 },
+      ],
+    })
+
+    expect(response.ok, response.error).toBe(true)
+    expect(response.state.players[0]!.resources).toMatchObject({
+      wood: 0, grain: 0, food: 0, begging: 0,
     })
   })
 })

@@ -753,6 +753,40 @@ describe('specialEffectAction — mutation dispatcher', () => {
       ])
     })
 
+    it('decrements a selected Card Field through the Logical Field boundary', () => {
+      const player = makePlayer()
+      const events: DraftGameEvent[] = []
+      player.occupationPlayed = ['B113_PatchCaregiver']
+      player.cardStates.B113_PatchCaregiver = {
+        extraData: { cardFieldStacks: [{ crop: 'grain', remaining: 3 }] },
+      }
+
+      const result = specialEffectAction.execute({
+        ...makeCtx(
+          player,
+          { kind: 'remove-field-crops', crop: 'grain', positions: [{ row: -1, col: 2113 }] },
+          CARD_ID,
+        ),
+        eventSink: makeEventSink(events),
+      })
+
+      expect(result.type).toBe('ok')
+      expect(player.cardStates.B113_PatchCaregiver?.extraData?.cardFieldStacks).toEqual([
+        { crop: 'grain', remaining: 2 },
+      ])
+      expect(events).toEqual([
+        expect.objectContaining({
+          type: 'farm.cropRemoved',
+          reason: 'cardEffect',
+          crops: [expect.objectContaining({
+            location: { kind: 'card', playerId: player.id, cardId: 'B113_PatchCaregiver' },
+            crop: 'grain',
+            amount: 1,
+          })],
+        }),
+      ])
+    })
+
     it('fails atomically when any selected field is not a valid source', () => {
       const player = makePlayer()
       player.fields = [

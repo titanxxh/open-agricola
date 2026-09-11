@@ -19,12 +19,13 @@ const cardImpl = {
     if (wood <= 0) return
     return gainLeaf(CARD_ID, { wood })
   },
-  computeBonusScore: (state, player) => {
-    const fencedStables = (p: typeof player) =>
-      p.pastures.reduce((sum, past) => sum + past.stables, 0)
-    const myCount = fencedStables(player)
+  computeSharedPostScore: (state) => {
+    const fencedStables = (player: (typeof state.players)[number]) =>
+      player.pastures.reduce((sum, pasture) => sum + pasture.stables, 0)
     const maxCount = Math.max(...state.players.map(fencedStables))
-    return myCount === maxCount && myCount > 0 ? 2 : 0
+    return state.players.flatMap((player) =>
+      fencedStables(player) === maxCount ? [{ playerId: player.id, score: 2 }] : [],
+    )
   },
 },
   reaches: [] as readonly string[],

@@ -7,6 +7,7 @@ import { getAllTilePositions } from '../../shared/domain/farm'
 import { getCardEffect } from '../../shared/cards/card-effects'
 import { getAvailableStableSupplyCount } from '../../shared/domain/supply-tokens'
 import type { ActionChoiceOption, ActionFlow } from '../../shared/contract/types'
+import { confirmPlayerSwitch } from './_helpers/pending-confirms'
 import '../../shared/cards/E/E148_Lazybones'
 
 const CARD_ID = 'E148_Lazybones'
@@ -34,6 +35,26 @@ describe('E148_Lazybones session', () => {
     setWorkersAtHome(state, opponent, 2)
     session.loadState(state)
     return session
+  }
+
+  const placeLazybonesStable = (session: GameSession, actionId: string, chooseLast = false) => {
+    let offered = session.takeAction(1, actionId)
+    expect(offered.ok, offered.error).toBe(true)
+    while (offered.interaction.stateId === 'wait' && offered.interaction.request.kind === 'confirm-player-switch') {
+      offered = confirmPlayerSwitch(session)
+    }
+    expect(offered.interaction.stateId).toBe('wait')
+    expect(offered.interaction.stateId === 'wait' ? offered.interaction.request.kind : undefined)
+      .toBe('farm-select')
+    if (offered.interaction.stateId !== 'wait' || offered.interaction.request.kind !== 'farm-select') {
+      throw new Error('expected Lazybones stable selection')
+    }
+    expect(offered.interaction.playerIndex).toBe(0)
+    expect(offered.interaction.request.farm.farmType).toBe('stable')
+    const tiles = offered.interaction.request.farm.selectableTiles
+    expect(tiles.length).toBeGreaterThan(1)
+    const tile = chooseLast ? tiles.at(-1)! : tiles[0]!
+    return { offered, tile, response: session.commitSelectionChoice(0, { stables: [tile] }) }
   }
 
   it('onBuy offers selectable action-space choices up to dynamic reserve', () => {
@@ -91,14 +112,15 @@ describe('E148_Lazybones session', () => {
     expect(flow).toBeUndefined()
   })
 
-  it('owner receives free stable when opponent uses grain-seeds', () => {
+  it('owner chooses any legal free stable position when opponent uses grain-seeds', () => {
     const session = setup()
-
-    const resp = session.takeAction(1, 'grain-seeds')
-    expect(resp.ok).toBe(true)
+    const woodBefore = session.state.players[0]!.resources.wood
+    const { tile, response: resp } = placeLazybonesStable(session, 'grain-seeds', true)
+    expect(resp.ok, resp.error).toBe(true)
 
     const owner = resp.state.players[0]!
-    expect(owner.stableTiles.length).toBe(1)
+    expect(owner.stableTiles).toEqual([tile])
+    expect(owner.resources.wood).toBe(woodBefore)
 
     const spaces = owner.cardStates?.[CARD_ID]?.extraData?.reservedActionSpaces as string[]
     expect(spaces).not.toContain('grain-seeds')
@@ -108,8 +130,8 @@ describe('E148_Lazybones session', () => {
   it('owner receives free stable when opponent uses day-laborer', () => {
     const session = setup()
 
-    const resp = session.takeAction(1, 'day-laborer')
-    expect(resp.ok).toBe(true)
+    const { response: resp } = placeLazybonesStable(session, 'day-laborer')
+    expect(resp.ok, resp.error).toBe(true)
 
     const owner = resp.state.players[0]!
     expect(owner.stableTiles.length).toBe(1)
@@ -134,8 +156,8 @@ describe('E148_Lazybones session', () => {
   it('no trigger after stable already collected from a space', () => {
     const session = setup()
 
-    let resp = session.takeAction(1, 'grain-seeds')
-    expect(resp.ok).toBe(true)
+    let resp = placeLazybonesStable(session, 'grain-seeds').response
+    expect(resp.ok, resp.error).toBe(true)
     expect(resp.state.players[0]!.stableTiles.length).toBe(1)
 
     const state = session.getState().state
@@ -192,5 +214,63 @@ describe('E148_Lazybones session', () => {
       entry.key === 'log.cardEffectGain' &&
       entry.params?.cardId === CARD_ID,
     )).toBe(false)
+  })
+
+  it('returns the stable to supply when every otherwise empty tile is placement-locked', () => {
+    const session = setup()
+    const state = session.getState().state
+    const [locked, ...occupied] = getAllTilePositions()
+    state.players[0]!.fields = occupied.map((tile) => ({
+      row: tile.row,
+      col: tile.col,
+      stacks: [],
+    }))
+    state.players[0]!.farmyardSpaceStates = [{
+      spaceKey: `${locked!.row}-${locked!.col}`,
+      sourceCardId: '__test_lock__',
+      kind: 'blocked-farmyard-space',
+      blocksPlacement: true,
+    }]
+    session.loadState(state)
+
+    const response = session.takeAction(1, 'grain-seeds')
+
+    expect(response.ok, response.error).toBe(true)
+    expect(response.state.players[0]!.stableTiles).toEqual([])
+    expect(response.state.players[0]!.cardStates[CARD_ID]?.extraData?.reservedActionSpaces)
+      .not.toContain('grain-seeds')
+    expect(response.interaction.stateId === 'wait' ? response.interaction.request.kind : response.interaction.stateId)
+      .not.toBe('farm-select')
+  })
+
+  it('rejects an illegal position atomically and allows the owner to retry', () => {
+    const session = setup()
+    let offered = session.takeAction(1, 'grain-seeds')
+    while (offered.interaction.stateId === 'wait' && offered.interaction.request.kind === 'confirm-player-switch') {
+      offered = confirmPlayerSwitch(session)
+    }
+    expect(offered.interaction.stateId).toBe('wait')
+    expect(offered.interaction.stateId === 'wait' ? offered.interaction.request.kind : undefined)
+      .toBe('farm-select')
+    if (offered.interaction.stateId !== 'wait' || offered.interaction.request.kind !== 'farm-select') {
+      throw new Error('expected Lazybones stable selection')
+    }
+    const beforeOwner = structuredClone(offered.state.players[0])
+    const beforeOpponent = structuredClone(offered.state.players[1])
+    const beforeRequest = structuredClone(offered.interaction.request)
+    const rejected = session.commitSelectionChoice(0, { stables: [{ row: 99, col: 99 }] })
+    expect(rejected.ok).toBe(false)
+    expect(rejected.state.players[0]).toEqual(beforeOwner)
+    expect(rejected.state.players[1]).toEqual(beforeOpponent)
+    expect(rejected.interaction).toMatchObject({
+      stateId: 'wait',
+      playerIndex: 0,
+      request: beforeRequest,
+    })
+
+    const tile = offered.interaction.request.farm.selectableTiles.at(-1)!
+    const accepted = session.commitSelectionChoice(0, { stables: [tile] })
+    expect(accepted.ok, accepted.error).toBe(true)
+    expect(accepted.state.players[0]!.stableTiles).toContainEqual(tile)
   })
 })

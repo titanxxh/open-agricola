@@ -95,7 +95,9 @@ export const placeFarmerAction: ActionDefinition = {
   roundAvailable: 1,
   gainPerRound: {},
   canBeExecutedByPlayer: (state, player, context) =>
-    context?.actionContext?.workerSource !== undefined
+    context?.actionContext?.viaCardJump === true && context.actionContext.workerId === undefined
+      ? true
+      : context?.actionContext?.workerSource !== undefined
       ? readTemporarySupplyWorker(player, context.actionContext, context.sourceCard) !== undefined
       : smallestAvailableWorker(state, player) !== null,
   execute: ({ state, player, sourceCard, actionContext, eventSink }) => {

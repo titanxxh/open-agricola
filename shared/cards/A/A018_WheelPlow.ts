@@ -9,12 +9,13 @@ const CARD_ID = 'A018_WheelPlow'
 const TRIGGER_SPACES = new Set(['farmland', 'cultivation'])
 
 const listener: CardListenerRegistration = {
-  id: 'A18-wheel-plow-after-place-farmer',
+  id: 'A18-wheel-plow-after-plow',
   cardIds: [CARD_ID],
   phases: ['after' as ActionHookPhase],
-  actions: ['place-farmer'],
+  actions: ['plow'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (isCardFlagged(context.player, CARD_ID)) return
+    if (context.sourceCard === CARD_ID) return
     if (!context.space || !TRIGGER_SPACES.has(context.space.id)) return
     // Must be the first person placed this round (placement count is 1 after placing)
     if (getRoundPersonPlacementOrder(context.player).length !== 1) return

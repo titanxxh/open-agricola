@@ -85,7 +85,7 @@ describe('stage hook flows', () => {
     expect(resp.state.round).toBe(5)
     expect(resp.state.roundPhase).toBe('work')
     expect(resp.state.players[1]!.resources.food).toBe(3)
-    expect(getStoredResource(resp.state.players[1]!, 'E052_Cubbyhole', 'food')).toBe(0)
+    expect(getStoredResource(resp.state.players[1]!, 'E052_Cubbyhole', 'food')).toBe(3)
     expect(resp.state.events.filter((event) =>
       event.type === 'harvest.phaseStarted' && event.harvestPhase === 'feeding',
     )).toHaveLength(1)

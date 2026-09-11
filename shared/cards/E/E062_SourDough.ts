@@ -10,6 +10,7 @@ const anytimeListener: CardListenerRegistration = {
   id: 'E62-sour-dough-anytime',
   cardIds: [CARD_ID],
   phases: ['anytime' as ActionHookPhase],
+  replacesTurn: true,
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (isCardFlagged(context.player, CARD_ID)) return
     // All players must still have workers to place

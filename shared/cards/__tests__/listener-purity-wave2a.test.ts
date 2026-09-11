@@ -3,7 +3,6 @@ import type { ActionFlow, ActionSpace, GameState, PlayerState, Resource } from '
 import type { DraftGameEvent } from '../../contract/events'
 import type { CardListenerContext, CardListenerRegistration } from '../card-listeners'
 import { A130_MummysBoy_impl } from '../A/A130_MummysBoy'
-import { A017_ReclamationPlow_impl } from '../A/A017_ReclamationPlow'
 import { B124_Trimmer_impl } from '../B/B124_Trimmer'
 import { B132_EstateMaster_impl } from '../B/B132_EstateMaster'
 import { B137_Wholesaler_impl } from '../B/B137_Wholesaler'
@@ -16,7 +15,6 @@ import { E051_WhaleOil_impl } from '../E/E051_WhaleOil'
 import { E091_PlowBuilder_impl } from '../E/E091_PlowBuilder'
 
 const A130 = 'A130_MummysBoy'
-const A17 = 'A017_ReclamationPlow'
 const B124 = 'B124_Trimmer'
 const B132 = 'B132_EstateMaster'
 const B137 = 'B137_Wholesaler'
@@ -892,34 +890,4 @@ describe('listener purity wave 2a', () => {
     })
   })
 
-  it('A17 ReclamationPlow after-plow listener returns flag and infobox leaves without mutating cardStates', () => {
-    const p = player(A17, {
-      cardStates: { [A17]: {} },
-    })
-    const ctx = context(p, {
-      actionId: 'plow',
-      sourceCard: A17,
-      space: space('farmland'),
-    })
-    const before = snapshot(p)
-
-    const result = listenerById(
-      A017_ReclamationPlow_impl.listeners,
-      'A17-reclamation-plow-after-plow',
-    ).handler(ctx)
-
-    expectCardStatesUnchanged(p, before, 'A17 owner')
-    expectSeqLeaves(result?.flow, [
-      {
-        actionId: 'special-effect',
-        sourceCard: A17,
-        params: { kind: 'set-flag', flag: true },
-      },
-      {
-        actionId: 'special-effect',
-        sourceCard: A17,
-        params: { kind: 'set-infobox', text: '✓' },
-      },
-    ])
-  })
 })

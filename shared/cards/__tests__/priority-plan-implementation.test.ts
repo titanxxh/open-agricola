@@ -155,9 +155,10 @@ describe('priority plan implementations', () => {
     const flow = getCardEffect('E052_Cubbyhole')?.onStartHarvestFeedingPhase?.(createState(player), player)
     expect(flow).toMatchObject({
       type: 'leaf',
-      actionId: 'take-from-card',
+      actionId: 'gain',
       params: { food: 3 },
     })
+    expect(player.cardStates.E052_Cubbyhole?.counters?.food).toBe(3)
   })
 
   it('A29 Ale-Benches offers optional return-home payment flow', () => {

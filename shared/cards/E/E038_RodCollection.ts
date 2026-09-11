@@ -1,6 +1,7 @@
 import { defineMinorCard } from '../card-source'
 import type { CardListenerContext, CardListenerRegistration } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
+import type { ActionFlow } from '../../contract/types'
 import { readCardExtraData } from '../helpers/card-state'
 import type { CardImpl } from '../registry'
 
@@ -12,12 +13,31 @@ const afterCollectListener: CardListenerRegistration = {
   actions: ['collect'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (context.space?.id !== 'fishing') return
+    const maxWood = Math.min(2, context.player.resources.wood ?? 0)
+    if (maxWood <= 0) return
+    const children: ActionFlow[] = Array.from({ length: maxWood }, (_, index) => {
+      const wood = index + 1
+      return {
+        type: 'seq',
+        choiceLabelKey: 'ui.interactionResourceExchange',
+        choiceLabelParams: { resourcesPaid: { wood } },
+        children: [
+          { type: 'leaf', actionId: 'pay', sourceCard: CARD_ID, params: { wood } },
+          {
+            type: 'leaf',
+            actionId: 'special-effect',
+            sourceCard: CARD_ID,
+            params: { kind: 'increment-extra-data', key: 'woodCount', amount: wood },
+          },
+        ],
+      }
+    })
     return {
       flow: {
-        type: 'leaf',
-        actionId: 'special-effect',
-        sourceCard: CARD_ID,
-        params: { kind: 'increment-extra-data', key: 'woodCount', amount: 2 },
+        type: 'xor',
+        optional: true,
+        promptKey: 'ui.interactionFlowSelect',
+        children,
       },
       sourceCard: CARD_ID,
     }
@@ -27,15 +47,15 @@ const afterCollectListener: CardListenerRegistration = {
 const cardImpl = {
   listeners: [afterCollectListener],
   effect: {
-  id: CARD_ID,
-  computeBonusScore: (_state, player) => {
-    const wood = readCardExtraData<number>(player, CARD_ID, 'woodCount') ?? 0
-    // 1 VP per wood except at positions 1, 4, 7, 10 (1-indexed)
-    // i.e. no VP at 0-indexed positions 0, 3, 6, 9
-    // VP = wood - floor((wood + 2) / 3)
-    return wood - Math.floor((wood + 2) / 3)
+    id: CARD_ID,
+    computeBonusScore: (_state, player) => {
+      const wood = readCardExtraData<number>(player, CARD_ID, 'woodCount') ?? 0
+      // 1 VP per wood except at positions 1, 4, 7, 10 (1-indexed)
+      // i.e. no VP at 0-indexed positions 0, 3, 6, 9
+      // VP = wood - floor((wood + 2) / 3)
+      return wood - Math.floor((wood + 2) / 3)
+    },
   },
-},
   reaches: [] as readonly string[],
 } satisfies CardImpl
 

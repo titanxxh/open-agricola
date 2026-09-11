@@ -19,9 +19,14 @@ const cardImpl = {
     if (wood <= 0) return
     return gainLeaf(CARD_ID, { wood })
   },
-  computeBonusScore: (_state, _player, ctx) => {
-    // 3 VP if this player has no negative scoring categories
-    return (ctx.categories ?? []).some((cat) => cat.total < 0) ? 0 : 3
+  computeSharedPostScore: (_state, _owner, summaries) => {
+    return summaries.flatMap((summary) =>
+      summary.categories.some((category) =>
+        category.total < 0 || category.entries.some((entry) => entry.score < 0),
+      )
+        ? []
+        : [{ playerId: summary.playerId, score: 3 }],
+    )
   },
 },
   reaches: [] as readonly string[],
