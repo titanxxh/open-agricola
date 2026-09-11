@@ -116,7 +116,7 @@ describe('A151 Minstrel parity', () => {
       .state.players[0]!.occupationPlayed).toContain('A151_Minstrel')
   })
 
-  it('A151 S2: OA does not offer Minstrel when exactly one stage-one space is vacant', () => {
+  it('A151 S2: Minstrel offers the only legal vacant stage-one space', () => {
     const { session, state } = returnHomeSetup('A151_Minstrel')
     placeWorker(state, 0, 'fencing', '1')
     placeWorker(state, 1, 'sheep-market', '1')
@@ -125,10 +125,20 @@ describe('A151 Minstrel parity', () => {
     state.players[0]!.fields = [{ row: 0, col: 0, crop: null, remaining: 0 }]
     session.loadState(state)
     expect(session.getState().actionAvailability?.['grain-utilization']).toBe(true)
-    const response = endRound(session)
-    expect(response.interaction.stateId).toBe('idle')
-    expect(response.state.players[0]!.resources.grain).toBe(1)
-    expect(response.state.players[0]!.fields[0]!.crop).toBeNull()
+    let response = endRound(session)
+    expect(response.interaction).toMatchObject({ stateId: 'wait', sourceCard: 'A151_Minstrel' })
+    if (response.interaction.stateId !== 'wait') return
+    const accept = response.interaction.request.options?.find((option) => option.value !== '__skip__')
+    expect(accept, JSON.stringify(response.interaction)).toBeDefined()
+    response = session.resolveChoice(response.interaction.playerIndex, accept!.value)
+    if (response.interaction.stateId === 'wait' && response.interaction.request.kind === 'choice') {
+      const sow = response.interaction.request.options?.find((option) => option.labelKey === 'actions.sow.name')
+      expect(sow, JSON.stringify(response.interaction)).toBeDefined()
+      response = session.resolveChoice(response.interaction.playerIndex, sow!.value)
+    }
+    response = session.commitSelectionChoice(0, { crops: [{ row: 0, col: 0, crop: 'grain' }] })
+    expect(response.state.players[0]!.resources.grain).toBe(0)
+    expect(response.state.players[0]!.fields[0]!.stacks).toEqual([{ kind: 'grain', remaining: 3 }])
   })
 
   it('A151 S3: two vacant stage-one spaces offer no Minstrel action', () => {

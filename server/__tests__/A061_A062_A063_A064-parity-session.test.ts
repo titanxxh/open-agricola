@@ -111,10 +111,10 @@ describe('A061 Winnowing Fan parity', () => {
     expect(response.state.players[0]!.resources.reed).toBe(0)
   })
 
-  it('A061 S2: OA currently plays Winnowing Fan without a baking improvement', () => {
+  it('A061 S2: Winnowing Fan is unavailable without a baking improvement', () => {
     const response = playMinor(baseSession({ cardId: CARD_ID, resources: { reed: 1 } }), CARD_ID)
-    expect(response.state.players[0]!.minorPlayed).toContain(CARD_ID)
-    expect(response.state.players[0]!.resources.reed).toBe(0)
+    expect(response.state.players[0]!.minorPlayed).not.toContain(CARD_ID)
+    expect(response.state.players[0]!.resources.reed).toBe(1)
   })
 
   it('A061 S3: after the harvest field phase Winnowing Fan turns exactly one grain into fireplace food', () => {
@@ -158,12 +158,12 @@ describe('A062 Beer Keg parity', () => {
     expect(response.state.players[0]!.resources.wood).toBe(0)
   })
 
-  it('A062 S2: OA currently plays Beer Keg with fewer than two grain', () => {
+  it('A062 S2: Beer Keg is unavailable with fewer than two grain', () => {
     const response = playMinor(baseSession({
       cardId: CARD_ID, resources: { grain: 1, wood: 1 },
     }), CARD_ID)
-    expect(response.state.players[0]!.minorPlayed).toContain(CARD_ID)
-    expect(response.state.players[0]!.resources).toMatchObject({ grain: 1, wood: 0 })
+    expect(response.state.players[0]!.minorPlayed).not.toContain(CARD_ID)
+    expect(response.state.players[0]!.resources).toMatchObject({ grain: 1, wood: 1 })
   })
 
   for (const { scenario, grain, points } of [
@@ -257,19 +257,19 @@ describe('A063 Dutch Windmill parity', () => {
 describe('A064 Barley Mill parity', () => {
   const CARD_ID = 'A064_BarleyMill'
 
-  it('A064 S1: OA currently charges either four clay or two stone without the one-wood fee', () => {
+  it('A064 S1: each Barley Mill cost includes the shared one-wood fee', () => {
     for (const resources of [{ wood: 1, clay: 4 }, { wood: 1, stone: 2 }]) {
       const response = playMinor(baseSession({ cardId: CARD_ID, resources }), CARD_ID)
       expect(response.state.players[0]!.minorPlayed).toContain(CARD_ID)
-      expect(response.state.players[0]!.resources.wood).toBe(1)
+      expect(response.state.players[0]!.resources.wood).toBe(0)
       expect(response.state.players[0]!.resources[resources.clay ? 'clay' : 'stone']).toBe(0)
     }
   })
 
-  it('A064 S2: OA currently permits Barley Mill without the printed one-wood fee', () => {
+  it('A064 S2: Barley Mill is unavailable without the printed one-wood fee', () => {
     const response = playMinor(baseSession({ cardId: CARD_ID, resources: { clay: 4 } }), CARD_ID)
-    expect(response.state.players[0]!.minorPlayed).toContain(CARD_ID)
-    expect(response.state.players[0]!.resources).toMatchObject({ wood: 0, clay: 0 })
+    expect(response.state.players[0]!.minorPlayed).not.toContain(CARD_ID)
+    expect(response.state.players[0]!.resources).toMatchObject({ wood: 0, clay: 4 })
   })
 
   it('A064 S3: harvest gains one Barley Mill food per harvested grain field', () => {

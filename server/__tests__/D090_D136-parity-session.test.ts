@@ -312,13 +312,13 @@ describe('D135 and D136 shared scoring parity', () => {
     session.loadState(session.state)
     const response = session.getState()
     expect(bonus(response, 'D135_GardeningHeadOfficial', 0)).toBe(2)
-    expect(bonus(response, 'D135_GardeningHeadOfficial', 1)).toBe(0)
+    expect(bonus(response, 'D135_GardeningHeadOfficial', 1)).toBe(2)
   })
 
-  it('D135 S5: with no vegetables OA awards no tied players', () => {
+  it('D135 S5: with no vegetables all tied players score two points', () => {
     const response = setup({ cardId: 'D135_GardeningHeadOfficial', playerCount: 3, round: 14 }).getState()
-    expect(bonus(response, 'D135_GardeningHeadOfficial', 0)).toBe(0)
-    expect(bonus(response, 'D135_GardeningHeadOfficial', 1)).toBe(0)
+    expect(bonus(response, 'D135_GardeningHeadOfficial', 0)).toBe(2)
+    expect(bonus(response, 'D135_GardeningHeadOfficial', 1)).toBe(2)
   })
 
   it('D136 S3: tied leaders with fenced stables each score two points', () => {
@@ -333,12 +333,12 @@ describe('D135 and D136 shared scoring parity', () => {
     session.loadState(session.state)
     const response = session.getState()
     expect(bonus(response, 'D136_AnimalActivist', 0)).toBe(2)
-    expect(bonus(response, 'D136_AnimalActivist', 1)).toBe(0)
+    expect(bonus(response, 'D136_AnimalActivist', 1)).toBe(2)
   })
 
-  it('D136 S4: with no fenced stables OA awards no tied players', () => {
+  it('D136 S4: with no fenced stables all tied players score two points', () => {
     const response = setup({ cardId: 'D136_AnimalActivist', playerCount: 3, round: 14 }).getState()
-    expect(bonus(response, 'D136_AnimalActivist', 0)).toBe(0)
-    expect(bonus(response, 'D136_AnimalActivist', 1)).toBe(0)
+    expect(bonus(response, 'D136_AnimalActivist', 0)).toBe(2)
+    expect(bonus(response, 'D136_AnimalActivist', 1)).toBe(2)
   })
 })
