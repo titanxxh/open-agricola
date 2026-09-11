@@ -32,6 +32,7 @@ export const exchangeToTrade = (ex: CardExchange, fallbackId: string): Trade => 
   from: ex.from,
   to: ex.to,
   ...(ex.fromFarmyard ? { fromFarmyard: true } : {}),
+  ...(ex.blockedAnytimeInteractionKinds ? { blockedAnytimeInteractionKinds: ex.blockedAnytimeInteractionKinds } : {}),
   max: ex.max,
   sourceId: ex.sourceId ?? fallbackId,
   sideEffect: ex.sideEffect,

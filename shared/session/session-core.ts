@@ -2264,14 +2264,15 @@ export class GameCore {
     const pendingSourceCard = this.peekPendingSourceCard()
     const pendingActionContext = pendingSnapshot?.actionContext
     const interactionKind = options.nestedWindow ? 'choice' : this.engineStack.peekPendingView()?.request.kind
+    const actionContext = interactionKind ? { anytimeInteractionKind: interactionKind } : undefined
     for (const action of options.preScoringOnly ? [] : this.registry.values()) {
       if (!action.anytime) continue
       if (blockedIds.has(action.id)) continue
       if (action.idleOnly && (this.engineStack.depth() > 0 || options.nestedWindow)) continue
       const doable = this.hookDispatcher.applyIsDoable(
-        { state: this.state, player, space, actionId: action.id },
+        { state: this.state, player, space, actionId: action.id, actionContext },
         action,
-        action.canBeExecutedByPlayer(this.state, player),
+        action.canBeExecutedByPlayer(this.state, player, { actionContext }),
       )
       if (!doable) continue
       anytimeEntries.push({
@@ -2280,7 +2281,7 @@ export class GameCore {
           labelKey: action.nameKey,
           actionId: action.id,
         },
-        flow: { type: 'leaf', actionId: action.id },
+        flow: { type: 'leaf', actionId: action.id, ...(actionContext ? { actionContext } : {}) },
       })
     }
     // Card-sourced anytime actions via CardListener phases:['anytime']

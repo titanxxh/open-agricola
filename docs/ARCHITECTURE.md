@@ -935,6 +935,8 @@ Nested anytime flows are inserted ahead of the current pending tree. The parent 
 
 An anytime flow whose terminal reaction must run only after its full injected sequence may mark its final leaf with `INJECTED_ANYTIME_COMPLETION_CONTEXT_KEY`. Completion listeners require both that marker and the engine-added injected-anytime marker, so an idle top-level anytime action is not mistaken for a suspended-flow completion.
 
+One exchange submission may contain multiple recipes and quantities, settled as one Exchange Batch. When the batch leaves newly gained animals unplaced and the originating interaction is not already animal reorganization, the exchange action schedules `reorganize` through `internalChildren.afterHostListeners`; it completes before the suspended parent interaction resumes. `CardExchange.blockedAnytimeInteractionKinds` is copied to each `Trade`. The system anytime entry captures the originating request kind in `actionContext.anytimeInteractionKind`, used for admission, option construction and submission validation, including bulk payloads. Excluded recipes keep their trade indices but have no executable options. B104 uses three `fromFarmyard` recipes with `anytime` / `harvest` triggers and an `animal-reorg` exclusion, replacing its standalone listeners. It follows default exchange windows, including future-action preparation, without a dedicated pre-scoring opportunity.
+
 OA versus the reference design notes:
 
 - Reorganize is a system-driven subflow in OA, not a player-triggerable anytime action, so the policy never emits a `reorganize` entry.

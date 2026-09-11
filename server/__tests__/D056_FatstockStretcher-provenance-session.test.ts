@@ -135,7 +135,14 @@ describe('D056 Fatstock Stretcher parity', () => {
     const session = setup({ sheepWalker: true })
     enterActiveInteraction(session)
 
-    let response = session.takeAnytimeAction(0, 'B104-sheep-walker-stone')
+    let response = session.takeAnytimeAction(0, 'exchange')
+    if (response.interaction.stateId !== 'wait' || response.interaction.request.kind !== 'choice') throw new Error('expected exchange')
+    const stone = response.interaction.request.options.find((option) =>
+      option.sourceCard === 'B104_SheepWalker' && option.effectPreview?.kind === 'resourceExchange'
+      && option.effectPreview.resourcesGained.stone === 1,
+    )
+    expect(stone).toBeDefined()
+    response = session.resolveChoice(0, stone!.value)
     response = resolveTriggerIfPresent(session, response, CARD_ID)
 
     expect(response.ok, response.error).toBe(true)
