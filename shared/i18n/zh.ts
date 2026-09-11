@@ -1780,11 +1780,6 @@ export const zh = {
     C057_Crudite: {
       anytime: '蔬菜拼盘：弃田中蔬菜 → 获4食物',
     },
-    B104_SheepWalker: {
-      boar: '赶羊人：1羊 → 1野猪',
-      vegetable: '赶羊人：1羊 → 1蔬菜',
-      stone: '赶羊人：1羊 → 1石头',
-    },
     C064_CornSchnappsDistillery: {
       anytime: '玉米烧酒厂：付1谷物 → 获1食物',
     },

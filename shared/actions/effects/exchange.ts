@@ -1,6 +1,7 @@
 import type {
   ActionChoiceOption,
   ActionDefinition,
+  InteractionRequest,
   ActionExecutionResult,
   GameState,
   PlayerState,
@@ -12,6 +13,7 @@ import type {
 import type { DraftGameEvent, EventSink } from '../../contract/events'
 import type { PromptKey } from '../../contract/prompt-keys'
 import { PaymentSolver } from '../payment'
+import { animalKeysForState } from '../../contract/animals'
 import { trackWorkPhaseBuildingResources } from '../../session/work-phase-resources'
 import { addFoodFromConversion, incResourceConverted } from '../../session/stats'
 import {
@@ -437,26 +439,9 @@ export const getExchangesByTradeIds = (
 const getPlayerCookeryTrades = (player: PlayerState, state?: GameState): Trade[] =>
   getExchangesInWindow(player, 'anytime', state)
 
-const hasAffordableCookeryTrade = (player: PlayerState, state?: GameState): boolean => {
-  for (const trade of getExchangesInWindow(player, 'anytime', state)) {
-    if (canAffordTrade(player, trade, 1, state)) return true
-  }
-  return false
-}
-
-const hasAffordableTradeForIds = (
-  player: PlayerState,
-  tradeIds: string[],
-  state?: GameState,
-  maxTradeTimesBySourceId?: Record<string, number>,
-): boolean => {
-  for (const trade of getExchangesByTradeIds(player, tradeIds)) {
-    const sourceId = trade.sourceId ?? trade.source
-    const contextMax = sourceId ? maxTradeTimesBySourceId?.[sourceId] : undefined
-    if (contextMax !== undefined && contextMax <= 0) continue
-    if (canAffordTrade(player, trade, 1, state)) return true
-  }
-  return false
+const isTradeAllowed = (trade: Trade, actionContext?: Record<string, unknown>): boolean => {
+  const interactionKind = actionContext?.anytimeInteractionKind as InteractionRequest['kind'] | undefined
+  return !interactionKind || !trade.blockedAnytimeInteractionKinds?.includes(interactionKind)
 }
 
 const formatTradeLabel = (trade: Trade): string => {
@@ -495,6 +480,7 @@ const buildExchangeOptions = (
   tradeIds?: string[],
   state?: GameState,
   maxTradeTimesBySourceId?: Record<string, number>,
+  actionContext?: Record<string, unknown>,
 ): { options: ActionChoiceOption[]; trades: Trade[] } => {
   // Anytime cookery first; if tradeIds provided, merge listener-driven trades
   // (these may have empty triggers, e.g. E53 BoarSpear).
@@ -516,7 +502,7 @@ const buildExchangeOptions = (
   const options: ActionChoiceOption[] = []
   for (let i = 0; i < trades.length; i++) {
     const trade = trades[i]
-    if (!canAffordTrade(player, trade, 1, state)) continue
+    if (!isTradeAllowed(trade, actionContext) || !canAffordTrade(player, trade, 1, state)) continue
     const sourceId = trade.sourceId ?? trade.source
     const contextMax = sourceId ? maxTradeTimesBySourceId?.[sourceId] : undefined
     const max = Math.min(getMaxTradeTimes(player, trade, state), contextMax ?? Infinity)
@@ -548,10 +534,14 @@ const resolveExchangeChoice = (
     ? actionContext.harvestExchangeRound
     : undefined
   const animalPaymentPreference = readAnimalPaymentPreference(actionContext)
-  const { trades } = buildExchangeOptions(player, tradeIds, state, maxTradeTimesBySourceId)
+  const { trades } = buildExchangeOptions(player, tradeIds, state, maxTradeTimesBySourceId, actionContext)
   if (choice.startsWith('bulk:')) {
     const payload = choice.replace('bulk:', '').trim()
     if (!payload) return { type: 'ok' }
+    if (payload.split(',').some((entry) => {
+      const trade = trades[Number(entry.split('=')[0])]
+      return trade && !isTradeAllowed(trade, actionContext)
+    })) return { type: 'fail', errorKey: 'log.actionNoExchange', recoverable: true }
     let gained: Partial<Resource> = {}
     let paid: Partial<Resource> = {}
     payload.split(',').forEach((entry) => {
@@ -603,6 +593,7 @@ const resolveExchangeChoice = (
     const index = Number(parts[1])
     const trade = trades[index]
     if (!trade) return { type: 'ok' }
+    if (!isTradeAllowed(trade, actionContext)) return { type: 'fail', errorKey: 'log.actionNoExchange', recoverable: true }
     const count = parts[2] ? Number(parts[2]) : 1
     const max = getMaxTradeTimes(player, trade, state)
     const sourceId = trade.sourceId ?? trade.source
@@ -660,10 +651,8 @@ export const anytimeExchangeAction: ActionDefinition = {
     if (directTrade) return canAffordTrade(player, directTrade, 1, state)
     const tradeIds = (ctx?.actionContext as { tradeIds?: string[] } | undefined)?.tradeIds
     const maxTradeTimesBySourceId = readMaxTradeTimesBySourceId(ctx?.actionContext)
-    if (tradeIds && tradeIds.length > 0) {
-      return hasAffordableTradeForIds(player, tradeIds, state, maxTradeTimesBySourceId) || hasAffordableCookeryTrade(player, state)
-    }
-    return hasAffordableCookeryTrade(player, state)
+    return buildExchangeOptions(player, tradeIds, state, maxTradeTimesBySourceId, ctx?.actionContext)
+      .options.some((option) => option.value !== 'cancel')
   },
   execute: ({ state, player, actionContext, eventSink }) => {
     const batch = actionContext?.batchExchange as
@@ -722,7 +711,7 @@ export const anytimeExchangeAction: ActionDefinition = {
     }
     const filterIds = actionContext?.tradeIds as string[] | undefined
     const maxTradeTimesBySourceId = readMaxTradeTimesBySourceId(actionContext)
-    const { options: allOptions } = buildExchangeOptions(player, filterIds, state, maxTradeTimesBySourceId)
+    const { options: allOptions } = buildExchangeOptions(player, filterIds, state, maxTradeTimesBySourceId, actionContext)
     const filtered = filterIds && filterIds.length > 0
       ? allOptions.filter((opt) => {
           if (opt.value === 'cancel') return true
@@ -749,6 +738,15 @@ export const anytimeExchangeAction: ActionDefinition = {
     if (batch && batchPayload) {
       return resolveBatchExchange(state, player, batch, batchPayload, eventSink)
     }
-    return resolveExchangeChoice(state, player, choice, actionContext, eventSink)
+    const result = resolveExchangeChoice(state, player, choice, actionContext, eventSink)
+    if (result.type === 'ok' && actionContext?.anytimeInteractionKind !== 'animal-reorg') {
+      const placed = getPlacedAnimalsByType(player, state)
+      if (animalKeysForState(state).some((key) =>
+        (result.resourcesGained?.[key] ?? 0) > 0 && (player.resources[key] ?? 0) > (placed[key] ?? 0),
+      )) {
+        result.internalChildren = { afterHostListeners: [{ actionId: 'reorganize' }] }
+      }
+    }
+    return result
   },
 }

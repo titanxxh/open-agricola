@@ -1739,11 +1739,6 @@ export const en = {
     B083_MuddyPuddles: { anytime: 'Muddy Puddles: Pay 1 Clay → Take top good' },
     A153_PigOwner: { anytime: 'Pig Owner: 5+ Pigs → 3 Bonus VP' },
     B035_HookKnife: { anytime: 'Hook Knife: Sheep threshold → 2 Bonus VP' },
-    B104_SheepWalker: {
-      boar: 'Sheep Walker: 1 Sheep → 1 Boar',
-      vegetable: 'Sheep Walker: 1 Sheep → 1 Vegetable',
-      stone: 'Sheep Walker: 1 Sheep → 1 Stone',
-    },
     B154_SheepKeeper: { anytime: 'Sheep Keeper: 7+ Sheep → 3 VP + 2 Food' },
     C143_StoneBuyer: { anytime: 'Stone Buyer: Pay 2 Food → 1 Stone' },
     C101_StallHolder: { anytime: 'Stall Holder: Pay 2 Grain → 1 VP + Food' },

@@ -32,6 +32,7 @@ export type CardMeta = {
     to: Record<string, number>
     max?: number
     triggers?: string[]
+    blockedAnytimeInteractionKinds?: string[]
   }>
   players?: string
   prerequisite?: unknown

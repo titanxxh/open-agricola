@@ -1,6 +1,6 @@
 // Pure card-related types. Sourced from S6a split of shared/cards/types.ts.
 
-import type { Resource, PaymentResourceMap, TradeSideEffect, ComplexCost } from './types'
+import type { Resource, PaymentResourceMap, TradeSideEffect, ComplexCost, InteractionRequest } from './types'
 
 export type CardType = 'major' | 'minor' | 'occupation'
 export type PlayerActionCardType = Extract<CardType, 'minor' | 'occupation'>
@@ -11,6 +11,7 @@ export type CardExchange = {
   from: Partial<Resource>
   to: Partial<Resource>
   fromFarmyard?: boolean
+  blockedAnytimeInteractionKinds?: InteractionRequest['kind'][]
   max?: number
   sourceId?: string
   /**

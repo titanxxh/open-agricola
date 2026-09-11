@@ -4366,7 +4366,11 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
         },
         "fromFarmyard": true,
         "triggers": [
+          "anytime",
           "harvest"
+        ],
+        "blockedAnytimeInteractionKinds": [
+          "animal-reorg"
         ]
       },
       {
@@ -4378,7 +4382,11 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
         },
         "fromFarmyard": true,
         "triggers": [
+          "anytime",
           "harvest"
+        ],
+        "blockedAnytimeInteractionKinds": [
+          "animal-reorg"
         ]
       },
       {
@@ -4390,7 +4398,11 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
         },
         "fromFarmyard": true,
         "triggers": [
+          "anytime",
           "harvest"
+        ],
+        "blockedAnytimeInteractionKinds": [
+          "animal-reorg"
         ]
       }
     ],
