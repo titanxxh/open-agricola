@@ -401,7 +401,6 @@ export const getFeedExchangeCatalog = (
   const entries: ResolvedFeedExchange[] = []
   basicConversionExchanges.forEach((exchange, exchangeIndex) => {
     const trade = exchangeToTrade(exchange, BASIC_CONVERSION_SOURCE_ID)
-    if (!canAffordTrade(player, trade, 1, state)) return
     entries.push({
       sourceId: BASIC_CONVERSION_SOURCE_ID,
       exchangeIndex,
@@ -421,7 +420,6 @@ export const getFeedExchangeCatalog = (
         : triggers.includes('anytime') ? 'anytime' : undefined
       if (!window) return
       const trade = exchangeToTrade(exchange, cardId)
-      if (window === 'anytime' && !canAffordTrade(player, trade, 1, state)) return
       entries.push({
         sourceId: trade.sourceId ?? cardId,
         exchangeIndex,
