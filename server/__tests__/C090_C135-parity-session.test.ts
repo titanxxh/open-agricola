@@ -112,20 +112,17 @@ describe('C097 Seed Researcher parity', () => {
 
 describe('C100 Butler parity', () => {
   it('C100 S1: Butler is playable in round eleven', () => expect(playOccupation(setup({ cardId: 'C100_Butler', played: false, round: 11 }), 'C100_Butler').state.players[0]!.occupationPlayed).toContain('C100_Butler'))
-  it('C100 S2: more rooms than people scores four points', () => { const s = setup({ cardId: 'C100_Butler', round: 14 }); s.state.players[0]!.rooms = 3; s.loadState(s.state); expect(bonus(s.getState(), 'C100_Butler')).toBe(4) })
-  it('C100 S3: equal rooms and people scores zero', () => expect(bonus(setup({ cardId: 'C100_Butler', round: 14 }).getState(), 'C100_Butler')).toBe(0))
-  it('C100 S4: after round eleven OA rejects Butler and preserves the placement state', () => {
+  it('C100 S2: an on-time Butler with more rooms than people scores four points', () => { const s = setup({ cardId: 'C100_Butler', played: false, round: 11 }); s.state.players[0]!.rooms = 3; s.loadState(s.state); expect(bonus(playOccupation(s, 'C100_Butler'), 'C100_Butler')).toBe(4) })
+  it('C100 S3: an on-time Butler with equal rooms and people scores zero', () => { const s = setup({ cardId: 'C100_Butler', played: false, round: 11 }); expect(bonus(playOccupation(s, 'C100_Butler'), 'C100_Butler')).toBe(0) })
+  it('C100 S4: after round eleven Butler remains playable without its four-point reward', () => {
     const session = setup({ cardId: 'C100_Butler', played: false, round: 12 })
     session.state.players[0]!.rooms = 3
     session.loadState(session.state)
-    const before = JSON.stringify(session.getState().state)
     const response = playOccupation(session, 'C100_Butler')
-    expect(response.ok).toBe(false)
-    expect(JSON.stringify(response.state)).toBe(before)
-    expect(response.state.players[0]!.occupationHand).toContain('C100_Butler')
-    expect(response.state.players[0]!.occupationPlayed).not.toContain('C100_Butler')
+    expect(response.ok, response.error).toBe(true)
+    expect(response.state.players[0]!.occupationHand).not.toContain('C100_Butler')
+    expect(response.state.players[0]!.occupationPlayed).toContain('C100_Butler')
     expect(bonus(response, 'C100_Butler')).toBe(0)
-    expect(session.takeAction(0, 'day-laborer').ok).toBe(true)
   })
 })
 
@@ -179,7 +176,7 @@ describe('C131 Private Teacher parity', () => {
 describe('C134 Cow Prince parity', () => {
   it('C134 S1: Cow Prince is played as the first occupation', () => expect(playOccupation(setup({ cardId: 'C134_CowPrince', played: false, playerCount: 3 }), 'C134_CowPrince').state.players[0]!.occupationPlayed).toContain('C134_CowPrince'))
   it('C134 S2: two cattle held in two house rooms score two points', () => { const s = setup({ cardId: 'C134_CowPrince', playerCount: 3, round: 14 }); Object.assign(s.state.players[0]!, { houseAnimalType: 'cattle', houseAnimalCount: 2 }); s.loadState(s.state); expect(bonus(s.getState(), 'C134_CowPrince')).toBe(2) })
-  it('C134 S3: two cattle spread across a two-space pasture score two points', () => { const s = setup({ cardId: 'C134_CowPrince', playerCount: 3, round: 14 }); Object.assign(s.state.players[0]!, { resources: { ...s.state.players[0]!.resources, cattle: 2 }, pastures: [{ id: 'p', size: 2, tiles: [{ row: 0, col: 2 }, { row: 0, col: 3 }], stables: 0, animalType: 'cattle', animalCount: 2 }] }); s.loadState(s.state); expect(bonus(s.getState(), 'C134_CowPrince')).toBe(1) })
+  it('C134 S3: two cattle spread across a two-space pasture score two points', () => { const s = setup({ cardId: 'C134_CowPrince', playerCount: 3, round: 14 }); Object.assign(s.state.players[0]!, { resources: { ...s.state.players[0]!.resources, cattle: 2 }, pastures: [{ id: 'p', size: 2, tiles: [{ row: 0, col: 2 }, { row: 0, col: 3 }], stables: 0, animalType: 'cattle', animalCount: 2 }] }); s.loadState(s.state); expect(bonus(s.getState(), 'C134_CowPrince')).toBe(2) })
 })
 
 describe('C135 Constable parity', () => {
@@ -198,16 +195,16 @@ describe('C135 Constable parity', () => {
     }]
     Object.assign(player.resources, { grain: 1, vegetable: 1, sheep: 1, boar: 1, cattle: 1, begging: 0 })
   }
-  it('C135 S4: OA awards the shared no-negative-lines bonus only to the Constable owner', () => {
+  it('C135 S4: every player without a negative line receives the shared bonus', () => {
     const session = setup({ cardId: 'C135_Constable', playerCount: 3, round: 14 })
     session.state.players.forEach(removeNegativeLines)
     session.loadState(session.state)
-    expect([0, 1, 2].map((index) => bonus(session.getState(), 'C135_Constable', index))).toEqual([3, 0, 0])
+    expect([0, 1, 2].map((index) => bonus(session.getState(), 'C135_Constable', index))).toEqual([3, 3, 3])
   })
-  it('C135 S5: OA awards no other player even when only the owner has a negative line', () => {
+  it('C135 S5: eligible non-owners score even when the owner has a negative line', () => {
     const session = setup({ cardId: 'C135_Constable', playerCount: 3, round: 14 })
     session.state.players.slice(1).forEach(removeNegativeLines)
     session.loadState(session.state)
-    expect([0, 1, 2].map((index) => bonus(session.getState(), 'C135_Constable', index))).toEqual([0, 0, 0])
+    expect([0, 1, 2].map((index) => bonus(session.getState(), 'C135_Constable', index))).toEqual([0, 3, 3])
   })
 })

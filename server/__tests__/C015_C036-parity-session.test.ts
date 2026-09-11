@@ -444,7 +444,7 @@ describe('C036 Clay Deposit parity', () => {
     expect(
       response.state.players[0]!.cardStates.C036_ClayDeposit?.counters?.bonusVp ?? 0,
       JSON.stringify({ interaction: response.interaction, cardState: response.state.players[0]!.cardStates.C036_ClayDeposit, scores: response.scores[0] }),
-    ).toBe(0)
+    ).toBe(1)
   })
   it('C036 S3: the Clay Deposit exchange may be declined', () => {
     const response = collectClay(false)

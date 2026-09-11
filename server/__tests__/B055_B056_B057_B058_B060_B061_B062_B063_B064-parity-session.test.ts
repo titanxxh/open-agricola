@@ -172,10 +172,10 @@ describe('B056 Brook parity', () => {
     expect(response.state.players[0]!.resources.food).toBe(0)
   })
 
-  it('B056 S8: OA treats the four-player Hollow as one of the four spaces above Fishing', () => {
+  it('B056 S8: the multiplayer Hollow is not a Brook target', () => {
     const session = brook()
     const response = session.takeAction(0, 'hollow-4')
-    expect(response.state.players[0]!.resources.food).toBe(1)
+    expect(response.state.players[0]!.resources.food).toBe(0)
   })
 
   it('B056 S7: another action space grants no Brook food', () => {

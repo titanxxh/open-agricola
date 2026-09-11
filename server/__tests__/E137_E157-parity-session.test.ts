@@ -214,8 +214,17 @@ describe('E148-E157 parity', () => {
     const s = setup({ cardId: 'E148_Lazybones', actor: 1 })
     s.state.players[0]!.cardStates.E148_Lazybones = { extraData: { reservedActionSpaces: ['grain-seeds'] } }
     s.loadState(s.state)
-    const r = s.takeAction(1, 'grain-seeds')
-    expect(r.state.players[0]!.stableTiles).toHaveLength(1)
+    let r = s.takeAction(1, 'grain-seeds')
+    while (r.interaction.stateId === 'wait' && r.interaction.request.kind === 'confirm-player-switch') {
+      r = confirmPlayerSwitch(s)
+    }
+    expect(r.interaction).toMatchObject({
+      stateId: 'wait', playerIndex: 0, request: { kind: 'farm-select', farm: { farmType: 'stable' } },
+    })
+    if (r.interaction.stateId !== 'wait' || r.interaction.request.kind !== 'farm-select') return
+    const tile = r.interaction.request.farm.selectableTiles.at(-1)!
+    r = s.commitSelectionChoice(0, { stables: [tile] })
+    expect(r.state.players[0]!.stableTiles).toEqual([tile])
     expect(r.state.players[0]!.cardStates.E148_Lazybones?.extraData?.reservedActionSpaces).toEqual([])
   })
   it('E148 S3: playing Lazybones may reserve all four action spaces', () => {

@@ -97,8 +97,8 @@ describe('C138 Animal Feeder parity', () => {
 })
 
 describe('C143 Stone Buyer parity', () => {
-  it('C143 S1: OA automatically buys two stone for one food when Stone Buyer is played', () => { const s = setup({ cardId: 'C143_StoneBuyer', played: false, playerCount: 3, resources: { food: 1 } }); const r = playOccupation(s, 'C143_StoneBuyer'); expect(r.state.players[0]!.resources).toMatchObject({ food: 0, stone: 2 }) })
-  it('C143 S2: OA exposes no decline after playing Stone Buyer', () => { const s = setup({ cardId: 'C143_StoneBuyer', played: false, playerCount: 3, resources: { food: 1 } }); const r = playOccupation(s, 'C143_StoneBuyer'); expect(r.interaction.stateId === 'wait' ? options(r).some((option) => option.value === '__skip__') : false).toBe(false); expect(r.state.players[0]!.resources).toMatchObject({ food: 0, stone: 2 }) })
+  it('C143 S1: accepting the on-play offer buys two stone for one food', () => { const s = setup({ cardId: 'C143_StoneBuyer', played: false, playerCount: 3, resources: { food: 1 } }); const r = accept(s, playOccupation(s, 'C143_StoneBuyer'), 'C143_StoneBuyer'); expect(r.state.players[0]!.resources).toMatchObject({ food: 0, stone: 2 }) })
+  it('C143 S2: the on-play purchase may be declined', () => { const s = setup({ cardId: 'C143_StoneBuyer', played: false, playerCount: 3, resources: { food: 1 } }); const r = decline(s, playOccupation(s, 'C143_StoneBuyer'), 'C143_StoneBuyer'); expect(r.state.players[0]!.resources).toMatchObject({ food: 1, stone: 0 }) })
   it('C143 S3: next-round use buys one stone for two food once', () => { const s = setup({ cardId: 'C143_StoneBuyer', playerCount: 3, round: 6, resources: { food: 2 } }); const r = s.takeAnytimeAction(0, 'C143-stone-buyer-anytime'); expect(r.state.players[0]!.resources).toMatchObject({ food: 0, stone: 1 }); expect(r.interaction.anytimeActions.some((entry) => entry.id === 'C143-stone-buyer-anytime')).toBe(false) })
 })
 

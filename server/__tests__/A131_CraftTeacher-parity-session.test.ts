@@ -45,10 +45,14 @@ const chooseCard = (session: GameSession, response: SessionResponse, cardId: str
   if (cardId === CARD_ID
     && !response.state.players[response.interaction.stateId === 'wait' ? response.interaction.playerIndex : 0]!
       .occupationHand.includes(cardId)) return response
-  if (response.interaction.stateId !== 'wait') return response
-  const option = response.interaction.request.options?.find((candidate) => candidate.value === cardId)
-  expect(option, JSON.stringify(response.interaction)).toBeDefined()
-  return session.resolveChoice(response.interaction.playerIndex, option!.value)
+  for (let guard = 0; guard < 4 && response.interaction.stateId === 'wait'; guard += 1) {
+    const option = response.interaction.request.options?.find((candidate) => candidate.value === cardId)
+    if (option) return session.resolveChoice(response.interaction.playerIndex, option.value)
+    const enter = response.interaction.request.options?.find((candidate) => candidate.value !== '__skip__')
+    expect(enter, JSON.stringify(response.interaction)).toBeDefined()
+    response = session.resolveChoice(response.interaction.playerIndex, enter!.value)
+  }
+  expect.fail(`card ${cardId} was not offered: ${JSON.stringify(response.interaction)}`)
 }
 
 const buildMajor = (session: GameSession, cardId: string) =>
@@ -71,26 +75,19 @@ describe('A131 Craft Teacher parity', () => {
     expect(played.state.players[0]!.occupationPlayed).toContain(CARD_ID)
   })
 
-  it('A131 S2: OA offers no occupations after building Joinery', () => {
+  it.each([
+    ['S2', 'Major_Joinery'],
+    ['S3', 'Major_Pottery'],
+    ['S4', 'Major_Basket'],
+  ])('A131 %s: building %s offers up to two free occupations', (_scenario, majorId) => {
     const session = setup()
-    const response = buildMajor(session, 'Major_Joinery')
-    expect(response.state.players[0]!.occupationPlayed).toEqual([CARD_ID])
-    expect(response.state.players[0]!.occupationHand).toEqual(OCCUPATIONS)
+    let response = enterCraftTeacher(session, buildMajor(session, majorId), true)
+    for (const occupationId of OCCUPATIONS) {
+      response = chooseCard(session, response, occupationId)
+    }
+    expect(response.state.players[0]!.occupationPlayed).toEqual(expect.arrayContaining([CARD_ID, ...OCCUPATIONS]))
+    expect(response.state.players[0]!.occupationHand).toEqual([])
     expect(response.state.players[0]!.resources.food).toBe(0)
-  })
-
-  it('A131 S3: OA offers no occupations after building Pottery', () => {
-    const session = setup()
-    const response = buildMajor(session, 'Major_Pottery')
-    expect(response.state.players[0]!.occupationPlayed).toEqual([CARD_ID])
-    expect(response.state.players[0]!.occupationHand).toEqual(OCCUPATIONS)
-  })
-
-  it('A131 S4: OA offers no occupations after building Basket', () => {
-    const session = setup()
-    const response = buildMajor(session, 'Major_Basket')
-    expect(response.state.players[0]!.occupationHand).toEqual(OCCUPATIONS)
-    expect(response.interaction.stateId !== 'wait' || response.interaction.sourceCard !== CARD_ID).toBe(true)
   })
 
   it('A131 S5: building an unrelated major improvement offers no Craft Teacher occupations', () => {

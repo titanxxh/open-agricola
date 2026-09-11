@@ -432,7 +432,7 @@ describe('C063 Craft Brewery parity', () => {
     const response = playMinor(setup({ cardId: 'C063_CraftBrewery', played: false, resources: { wood: 2, clay: 1 } }), 'C063_CraftBrewery')
     expect(response.state.players[0]!.minorPlayed).toContain('C063_CraftBrewery')
   })
-  it('C063 S2: OA stops after removing field grain and omits the remaining Craft Brewery effects', () => {
+  it('C063 S2: Craft Brewery settles both grain costs, four food, and two points', () => {
     const session = setup({ cardId: 'C063_CraftBrewery', round: 4, resources: { grain: 1 } })
     session.state.players[0]!.fields = [{ row: 0, col: 2, stacks: [{ kind: 'grain', remaining: 2 }] }]; prepareHarvest(session)
     let response = session.performRoundEnd()
@@ -442,8 +442,8 @@ describe('C063 Craft Brewery parity', () => {
       response = session.commitSelectionChoice(0, { positions: [{ row: 0, col: 2 }] })
     }
     expect(response.state.players[0]!.fields[0]!.stacks).toHaveLength(0)
-    expect(response.state.players[0]!.resources).toMatchObject({ grain: 2, food: 18 })
-    expect(response.state.players[0]!.cardStates.C063_CraftBrewery?.counters?.bonusVp ?? 0).toBe(0)
+    expect(response.state.players[0]!.resources).toMatchObject({ grain: 1, food: 22 })
+    expect(response.state.players[0]!.cardStates.C063_CraftBrewery?.counters?.bonusVp ?? 0).toBe(2)
   })
   it('C063 S3: a field emptied by reaping suppresses Craft Brewery', () => {
     const session = setup({ cardId: 'C063_CraftBrewery', round: 4, resources: { grain: 1 } })

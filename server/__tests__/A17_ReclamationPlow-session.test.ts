@@ -136,7 +136,7 @@ describe('A017_ReclamationPlow session', () => {
     expect(resp.state.players[0]!.cardStates?.[CARD_ID]).toMatchObject({ flagged: true, infobox: '✓' })
   })
 
-  it('A017 S3: declining after full accommodation preserves the next-time opportunity in OA', () => {
+  it('A017 S3: declining after full accommodation consumes the next-time opportunity', () => {
     const session = new GameSession(7117, undefined, { playerCount: 2 })
     stabilizeRandomHands(session.state.players)
     const state = session.getState().state
@@ -156,7 +156,7 @@ describe('A017_ReclamationPlow session', () => {
 
     expect(resp.ok, resp.error).toBe(true)
     expect(resp.state.players[0]!.fields).toHaveLength(0)
-    expect(resp.state.players[0]!.cardStates?.[CARD_ID]?.flagged).toBeFalsy()
+    expect(resp.state.players[0]!.cardStates?.[CARD_ID]?.flagged).toBe(true)
   })
 
   it('does not let an existing animal hide a newly collected animal that was discarded', () => {
