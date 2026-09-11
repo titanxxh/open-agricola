@@ -111,47 +111,48 @@ describe('A026 Sleeping Corner through Session', () => {
     expect(response.state.players[0]!.minorHand).toContain(CARD_ID)
   })
 
-  it.each([
-    { label: 'one opposing adult', occupants: [{ player: 1, worker: 0 }] },
-    {
-      label: 'one opposing adult plus a newborn',
-      occupants: [{ player: 1, worker: 0 }, { player: 1, worker: 1, newborn: true }],
-    },
-  ])('offers and authoritatively accepts Wish for Children with $label', ({ occupants }) => {
-    const session = setup(occupants)
-    const beforeFamily = familySize(session.state.players[0]!)
+  it('A026 S3: one opposing adult still permits Wish for Children, including beside their newborn', () => {
+    for (const occupants of [
+      [{ player: 1, worker: 0 }],
+      [{ player: 1, worker: 0 }, { player: 1, worker: 1, newborn: true }],
+    ]) {
+      const session = setup(occupants)
+      const beforeFamily = familySize(session.state.players[0]!)
 
-    expect(session.getActionAvailability(0)['wish-children']).toBe(true)
-    const response = session.takeAction(0, 'wish-children')
+      expect(session.getActionAvailability(0)['wish-children']).toBe(true)
+      const response = session.takeAction(0, 'wish-children')
 
-    expect(response.ok, response.error).toBe(true)
-    expect(familySize(response.state.players[0]!)).toBe(beforeFamily + 1)
-    expect(response.state.actionSpaces.find((space) => space.id === 'wish-children')!.takenBy)
-      .toEqual(expect.arrayContaining([
-        expect.objectContaining({ playerId: response.state.players[0]!.id }),
-        expect.objectContaining({ playerId: response.state.players[1]!.id }),
-      ]))
+      expect(response.ok, response.error).toBe(true)
+      expect(familySize(response.state.players[0]!)).toBe(beforeFamily + 1)
+      expect(response.state.actionSpaces.find((space) => space.id === 'wish-children')!.takenBy)
+        .toEqual(expect.arrayContaining([
+          expect.objectContaining({ playerId: response.state.players[0]!.id }),
+          expect.objectContaining({ playerId: response.state.players[1]!.id }),
+        ]))
+    }
   })
 
-  it.each([
-    { label: 'two opposing adults', occupants: [{ player: 1, worker: 0 }, { player: 2, worker: 0 }] },
-    { label: 'an opposing newborn', occupants: [{ player: 1, worker: 0, newborn: true }] },
-    { label: 'the owner adult', occupants: [{ player: 0, worker: 0 }] },
-  ])('does not offer or accept the occupied space for $label', ({ occupants }) => {
-    const session = setup(occupants)
-    const before = session.getState()
-    const playerBefore = structuredClone(before.state.players[0])
-    const occupantsBefore = structuredClone(
-      before.state.actionSpaces.find((space) => space.id === 'wish-children')!.takenBy,
-    )
+  it('A026 S4: two opposing adults, a lone newborn, or the owner block the occupied space', () => {
+    for (const occupants of [
+      [{ player: 1, worker: 0 }, { player: 2, worker: 0 }],
+      [{ player: 1, worker: 0, newborn: true }],
+      [{ player: 0, worker: 0 }],
+    ]) {
+      const session = setup(occupants)
+      const before = session.getState()
+      const playerBefore = structuredClone(before.state.players[0])
+      const occupantsBefore = structuredClone(
+        before.state.actionSpaces.find((space) => space.id === 'wish-children')!.takenBy,
+      )
 
-    expect(before.actionAvailability?.['wish-children']).toBe(false)
-    const response = session.takeAction(0, 'wish-children')
+      expect(before.actionAvailability?.['wish-children']).toBe(false)
+      const response = session.takeAction(0, 'wish-children')
 
-    expect(response.ok).toBe(false)
-    expect(response.error).toBe('space unavailable')
-    expect(response.state.players[0]).toEqual(playerBefore)
-    expect(response.state.actionSpaces.find((space) => space.id === 'wish-children')!.takenBy)
-      .toEqual(occupantsBefore)
+      expect(response.ok).toBe(false)
+      expect(response.error).toBe('space unavailable')
+      expect(response.state.players[0]).toEqual(playerBefore)
+      expect(response.state.actionSpaces.find((space) => space.id === 'wish-children')!.takenBy)
+        .toEqual(occupantsBefore)
+    }
   })
 })

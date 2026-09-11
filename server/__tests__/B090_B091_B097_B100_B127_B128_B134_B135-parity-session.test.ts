@@ -43,7 +43,7 @@ const playOccupation = (session: GameSession, id: string) => {
     const option = choices(r).find((entry) => entry.value === id)
     if (option) r = session.resolveChoice(0, option.value)
   }
-  return r
+  return resolveTriggerIfPresent(session, r, id)
 }
 const accept = (session: GameSession, r: SessionResponse, id: string) => {
   r = resolveTriggerIfPresent(session, r, id)
@@ -157,15 +157,16 @@ describe('B100 Clutterer parity', () => {
     if (type === 'minor') { owner.minorHand = [id]; owner.resources.wood = 1 }
     else { owner.occupationHand = [id]; owner.resources.food = 1 }
     session.loadState(session.state)
-    return type === 'minor' ? (() => { let r = session.takeAction(0, 'meeting-place'); const branch = choices(r).find((o) => o.value.startsWith('action-improvement-')); if (branch) r = session.resolveChoice(0, branch.value); const card = choices(r).find((o) => o.value === id); return card ? session.resolveChoice(0, card.value) : r })() : playOccupation(session, id)
+    const response = type === 'minor' ? (() => { let r = session.takeAction(0, 'meeting-place'); const branch = choices(r).find((o) => o.value.startsWith('action-improvement-')); if (branch) r = session.resolveChoice(0, branch.value); const card = choices(r).find((o) => o.value === id); return card ? session.resolveChoice(0, card.value) : r })() : playOccupation(session, id)
+    return resolveTriggerIfPresent(session, response, 'B100_Clutterer')
   }
   it('B100 S2: an accumulation-space minor played later grants one bonus point', () => {
     expect(playLater('B017_ForestPlow', 'minor').state.players[0]!.cardStates.B100_Clutterer?.counters?.bonusVp).toBe(1)
   })
-  it('B100 S3: OA gives no Clutterer point for an accumulation-space occupation played later', () => {
+  it('B100 S3: an accumulation-space occupation played later grants one bonus point', () => {
     const response = playLater('A116_WoodCutter', 'occupation')
     expect(response.state.players[0]!.occupationPlayed).toContain('A116_WoodCutter')
-    expect(response.state.players[0]!.cardStates.B100_Clutterer?.counters?.bonusVp ?? 0).toBe(0)
+    expect(response.state.players[0]!.cardStates.B100_Clutterer?.counters?.bonusVp).toBe(1)
   })
   it('B100 S4: a later card without accumulation-space text grants no point', () => {
     expect(playLater('A125_Priest', 'occupation').state.players[0]!.cardStates.B100_Clutterer?.counters?.bonusVp ?? 0).toBe(0)
