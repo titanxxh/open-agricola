@@ -97,7 +97,7 @@ import { getActiveCardRegistry, setActiveCardRegistry, withActiveRegistry } from
 import { ensureCatalogLookupsInstalled } from '../cards/install-catalog-lookups.ts'
 import { ALL_CARD_IMPLS } from '../cards/register-all.ts'
 import { allOccupationCards, allMinorImprovementCards } from '../cards/catalog.ts'
-import { majorCardDefinitions } from '../cards/major/index.ts'
+import { getMajorCard, majorCardDefinitions } from '../cards/major/index.ts'
 import { resolveDevCardIdInput } from '../cards/dev-card-id.ts'
 import * as setupPhase from './phases/setup.ts'
 import * as roundPhase from './phases/round.ts'
@@ -130,24 +130,19 @@ import { familySize, findPlayerById, findPlayerIndexById, hasPlayer, smallestAva
 import { animalKeysForState, type AnimalKey } from '../contract/animals.ts'
 import { applyAnimalPayment, isAnimalResourceKey } from '../domain/animal-payment.ts'
 import { getAllowedAnimalTypesForZone, getPlacedAnimalsByType, readAnimalCountsForZoneAssignment } from '../domain/animal-zones.ts'
-import { getRegisteredMinorImprovement, getRegisteredOccupation } from '../cards/registry-display'
 import {
   canAffordTrade,
   getMaxTradeTimes,
   getExchangesInWindow,
+  getFeedExchangeCatalog,
   getRemainingHarvestExchangeUses,
   recordHarvestExchangeUses,
 } from '../actions/effects/exchange.ts'
-import { getMajorCard } from '../cards/major/index.ts'
 import {
   getAvailableMajorImprovementIds,
   returnMajorImprovementToSupply,
   takeMajorImprovementFromSupply,
 } from '../cards/major/supply.ts'
-import {
-  BASIC_CONVERSION_SOURCE_ID,
-  getBasicConversionExchange,
-} from '../cards/basic-conversion.ts'
 import { appendImmediateEvents, type ImmediateEventDraft } from '../events/append.ts'
 import { EventStore } from '../events/store.ts'
 import { prependDerivedLogEntries } from '../events/log-cache.ts'
@@ -731,7 +726,9 @@ export class GameCore {
     }
   }
   /** @internal Round phase — enumerate currently-available anytime entries for the active interaction context. */
-  listAnytimeEntries(): { descriptor: AnytimeAction; flow: ActionFlow }[] { return this.buildAnytimeEntries() }
+  listAnytimeEntries(): { descriptor: AnytimeAction; flow: ActionFlow; replacesTurn?: boolean }[] {
+    return this.buildAnytimeEntries()
+  }
 
   /** @internal — derive policy input from the current pending envelope. */
   private getAnytimePolicyInput(): AnytimePolicyInput {
@@ -1787,6 +1784,7 @@ export class GameCore {
       foodUsed,
       feedQueue,
       player ? this.getHarvestExchangeLimits(player) : undefined,
+      player ? getFeedExchangeCatalog(player, this.state).map(({ trade: _trade, window: _window, ...entry }) => entry) : undefined,
     )
   }
   private startPostReapAnytimeSubFlow(playerIndex: number): void {
@@ -2250,7 +2248,7 @@ export class GameCore {
     return view?.sourceCard ?? choicesSourceCard(view?.choices ?? [])
   }
 
-  private buildAnytimeEntries(options: { preScoringOnly?: boolean; nestedWindow?: boolean } = {}): { descriptor: AnytimeAction; flow: ActionFlow }[] {
+  private buildAnytimeEntries(options: { preScoringOnly?: boolean; nestedWindow?: boolean } = {}): { descriptor: AnytimeAction; flow: ActionFlow; replacesTurn?: boolean }[] {
     if (!this.canInterleaveAnytimeAction()) return []
     if (hasPendingOrdinaryCardDrawChoice(this.state)) return []
     const policy = this.computeAnytimePolicySnapshot()
@@ -2260,7 +2258,7 @@ export class GameCore {
     const { player, space } = context
     const blockedIds = new Set(policy.blockedIds)
     const activeIds = new Set(this.engineStack.getActiveAnytimeActionIds(player.id))
-    const anytimeEntries: { descriptor: AnytimeAction; flow: ActionFlow }[] = []
+    const anytimeEntries: { descriptor: AnytimeAction; flow: ActionFlow; replacesTurn?: boolean }[] = []
     const pendingSnapshot = this.peekHostContextSnapshot()
     const pendingSourceCard = this.peekPendingSourceCard()
     const pendingActionContext = pendingSnapshot?.actionContext
@@ -2303,6 +2301,7 @@ export class GameCore {
       if (options.preScoringOnly && entry.registration.preScoring !== true) continue
       if (blockedIds.has(entry.registration.id)) continue
       if (activeIds.has(entry.registration.id) && entry.registration.allowAnytimeReentry !== true) continue
+      if (entry.registration.replacesTurn && (this.engineStack.depth() > 0 || options.nestedWindow)) continue
       if (interactionKind && entry.registration.blockedAnytimeInteractionKinds?.includes(interactionKind)) continue
       const result = executeCardListener(entry.registration, anytimeContext, listenerOwnerOptions(entry))
       if (!result?.flow) continue
@@ -2322,11 +2321,13 @@ export class GameCore {
           sourceCard: entry.cardId,
         },
         flow: result.flow,
+        replacesTurn: entry.registration.replacesTurn,
       })
     }
 
-    return anytimeEntries.map(({ descriptor, flow }) => ({
+    return anytimeEntries.map(({ descriptor, flow, replacesTurn }) => ({
       descriptor,
+      replacesTurn,
       flow: {
         type: 'seq',
         anytimeActionId: descriptor.id,
@@ -4655,30 +4656,24 @@ export class GameCore {
     const player = this.state.players[playerIndex]
     if (!player) return this.respond(false, 'invalid player')
 
-    // Resolve each selection to its underlying CardExchange entry through the
-    // unified (sourceId, exchangeIndex) path. The synthetic '__basic__'
-    // sourceId resolves to the basic-conversion exchange table; everything
-    // else looks up the player's played majors / minors / occupations.
+    const currentCatalog = getFeedExchangeCatalog(player, this.state)
+    const offeredCatalog = feedRequest.exchangeCatalog ?? []
     const lookupExchange = (
       sourceId: string,
       idx: number,
-    ): import('../contract/cards').CardExchange | undefined => {
-      if (sourceId === BASIC_CONVERSION_SOURCE_ID) {
-        return getBasicConversionExchange(idx)
-      }
-      let card:
-        | { exchanges?: readonly import('../contract/cards').CardExchange[] }
-        | undefined
-      if (player.improvements.includes(sourceId)) card = getMajorCard(sourceId)
-      else if (player.minorPlayed.includes(sourceId)) card = getRegisteredMinorImprovement(sourceId)
-      else if (player.occupationPlayed.includes(sourceId)) card = getRegisteredOccupation(sourceId)
-      if (!card) return undefined
-      return card.exchanges?.[idx]
+    ) => {
+      const wasOffered = offeredCatalog.some((entry) =>
+        entry.sourceId === sourceId && entry.exchangeIndex === idx,
+      )
+      if (!wasOffered) return undefined
+      return currentCatalog.find((entry) =>
+        entry.sourceId === sourceId && entry.exchangeIndex === idx,
+      )
     }
 
     const perSourceUsed = new Map<string, number>()
     type ResolvedSel = (typeof selections)[number] & {
-      _exchange: import('../contract/cards').CardExchange
+      _exchange: ReturnType<typeof getFeedExchangeCatalog>[number]
     }
     const resolvedSelections: ResolvedSel[] = []
     let resourceDraft: Partial<Resource> = { ...player.resources }
@@ -4692,21 +4687,17 @@ export class GameCore {
       ) return this.respond(false, 'invalid harvest feed selections')
       const resolved = lookupExchange(sel.sourceId, sel.exchangeIndex)
       if (!resolved) return this.respond(false, 'invalid harvest feed selections')
-      const exchange = resolved
-      const triggers = exchange.triggers ?? []
-      if (!triggers.includes('harvest') && !triggers.includes('anytime')) {
-        return this.respond(false, 'invalid harvest feed selections')
-      }
-      if (exchange.max !== undefined) {
+      const exchange = resolved.trade
+      if (resolved.max !== undefined) {
         const usedSoFar = perSourceUsed.get(sel.sourceId) ?? 0
-        const sourceLimit = triggers.includes('harvest')
+        const sourceLimit = resolved.window === 'harvest'
           ? getRemainingHarvestExchangeUses(
               player,
-              exchange.sourceId ?? sel.sourceId,
-              exchange.max,
+              resolved.sourceId,
+              resolved.max,
               this.state.round,
             )
-          : exchange.max
+          : resolved.max
         if (usedSoFar + sel.count > sourceLimit) {
           return this.respond(false, 'invalid harvest feed selections')
         }
@@ -4727,13 +4718,14 @@ export class GameCore {
       if (!hasValidResources(resourceDraft)) {
         return this.respond(false, 'invalid harvest feed selections')
       }
-      resolvedSelections.push({ ...sel, _exchange: exchange })
+      resolvedSelections.push({ ...sel, _exchange: resolved })
     }
 
     this.pushHistory()
     const usedResources: Partial<Resource> = { food: pendingFoodUsed }
     for (const sel of resolvedSelections) {
-      const exchange = sel._exchange
+      const resolved = sel._exchange
+      const exchange = resolved.trade
       const times = sel.count
       const costMap: Record<string, number> = {}
       for (const [k, v] of Object.entries(exchange.from)) {
@@ -4767,10 +4759,10 @@ export class GameCore {
         food: gainMap,
       }], { actorPlayerId: player.id })
       this.dispatchHarvestFeedConversionListeners(player, feedConvertedEvents)
-      if ((exchange.triggers ?? []).includes('harvest') && exchange.max !== undefined) {
+      if (resolved.window === 'harvest' && resolved.max !== undefined) {
         recordHarvestExchangeUses(
           player,
-          exchange.sourceId ?? sel.sourceId,
+          resolved.sourceId,
           this.state.round,
           times,
         )

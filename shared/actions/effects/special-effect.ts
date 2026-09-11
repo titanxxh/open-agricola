@@ -1,5 +1,6 @@
 import type {
   ActionDefinition,
+  ActionFlow,
   FenceSegment,
   FenceSegmentType,
   GameState,
@@ -18,11 +19,9 @@ import {
 } from '../../cards/helpers/card-state'
 import { incCounter, initCardState } from '../../cards/__stubs__/helpers'
 import {
-  fieldDecrementTop,
   fieldFindStackOfKind,
   fieldHasCrop,
   fieldPopIfDepleted,
-  fieldTopStack,
 } from '../../domain/field'
 import { clearPendingFenceBonus } from '../../cards/helpers/pending-fence-bonus'
 import { removeFutureMeeples } from './internal/future-meeples'
@@ -508,7 +507,11 @@ export const specialEffectAction: ActionDefinition = {
         }
         const minRem = p.minRemaining ?? 1
         const seen = new Set<string>()
-        const fields = []
+        const targets: Array<{
+          logical: ReturnType<typeof getLogicalFields>[number]
+          slot?: number
+        }> = []
+        const logicalFields = getLogicalFields(target)
         for (const pos of p.positions) {
           if (!pos || typeof pos !== 'object') {
             return { type: 'fail', errorKey: 'log.specialEffectFail' }
@@ -522,27 +525,49 @@ export const specialEffectAction: ActionDefinition = {
             return { type: 'fail', errorKey: 'log.specialEffectFail' }
           }
           seen.add(key)
-          const field = target.fields.find((f) => f.row === row && f.col === col)
-          const top = field ? fieldTopStack(field) : undefined
-          if (!field || top?.kind !== p.crop || top.remaining < minRem) {
+          const logical = logicalFields.find((field) =>
+            field.kind === 'farmyard'
+              ? field.row === row && field.col === col
+              : field.slots.some((slot) => slot.tile.row === row && slot.tile.col === col),
+          )
+          const slot = logical?.kind === 'card'
+            ? logical.slots.find((candidate) => candidate.tile.row === row && candidate.tile.col === col)
+            : undefined
+          const stack = logical?.kind === 'card' ? slot?.stack : logical?.stacks.at(-1)
+          if (!logical || !stack || stack.kind !== p.crop || stack.remaining < minRem) {
             return { type: 'fail', errorKey: 'log.specialEffectFail' }
           }
-          fields.push(field)
+          targets.push({ logical, ...(slot ? { slot: slot.index } : {}) })
         }
-        for (const field of fields) {
-          fieldDecrementTop(field)
+        const mutations = mutateLogicalFields(state, target, {
+          sourceCard, reason: 'cardEffect', emitEvents: false, deferOwnerCallbacks: true,
+        })
+        const ownerFlows: ActionFlow[] = []
+        for (const entry of targets) {
+          const result = mutations.remove(
+            entry.logical.kind === 'card'
+              ? { fieldId: entry.logical.id, slot: entry.slot }
+              : { fieldId: entry.logical.id },
+            1,
+          )
+          if (!result.ok) return { type: 'fail', errorKey: 'log.specialEffectFail' }
+          const ownerFlow = result.ownerCallback?.()
+          if (ownerFlow) ownerFlows.push(ownerFlow)
         }
         eventSink?.emit<'farm.cropRemoved'>({
           type: 'farm.cropRemoved',
           sourceCardId: sourceCard,
-          crops: fields.map((field) => ({
-            location: { kind: 'field' as const, playerId: target.id, row: field.row, col: field.col },
+          crops: targets.map(({ logical }) => ({
+            location: logical.kind === 'card'
+              ? { kind: 'card' as const, playerId: target.id, cardId: logical.sourceCard! }
+              : { kind: 'field' as const, playerId: target.id, row: logical.row, col: logical.col },
             crop: p.crop,
             amount: 1,
           })),
           reason: 'cardEffect',
         })
-        return { type: 'ok' }
+        if (ownerFlows.length === 0) return { type: 'ok' }
+        return { type: 'flow', flow: ownerFlows.length === 1 ? ownerFlows[0]! : { type: 'parallel', children: ownerFlows } }
       }
       case 'consume-fence': {
         const count = p.count ?? 1

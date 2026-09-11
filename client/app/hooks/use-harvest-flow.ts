@@ -1,4 +1,4 @@
-import type { PlayerState, Resource } from '../../../shared/contract/types'
+import type { FeedExchangeCatalogEntry, PlayerState, Resource } from '../../../shared/contract/types'
 import type { Locale } from '../../../shared/i18n'
 import type { HarvestSummary } from '../../../shared/session/harvest-summary'
 import {
@@ -54,9 +54,32 @@ export const buildHarvestFeedOptions = (
   locale: Locale,
   cardLabel: (id: string) => string,
   maxTradeTimesBySourceId?: Record<string, number>,
+  exchangeCatalog?: readonly FeedExchangeCatalogEntry[],
 ): HarvestFeedOption[] => {
   const options: HarvestFeedOption[] = []
   const basicSourceName = locale === 'zh' ? '基础转化' : 'Basic conversion'
+  if (exchangeCatalog) {
+    return exchangeCatalog.flatMap((entry) => {
+      const sourceMax = maxTradeTimesBySourceId?.[entry.sourceId]
+      if (sourceMax !== undefined && sourceMax <= 0) return []
+      const [sourceCardId, derivedCardId] = entry.sourceId.split('::')
+      const sourceName = entry.sourceId === BASIC_CONVERSION_SOURCE_ID
+        ? basicSourceName
+        : derivedCardId
+          ? `${cardLabel(sourceCardId!)} · ${cardLabel(derivedCardId)}`
+          : cardLabel(entry.sourceId)
+      return [{
+        id: `${entry.sourceId}-ex${entry.exchangeIndex}`,
+        sourceName,
+        sourceId: entry.sourceId,
+        exchangeIndex: entry.exchangeIndex,
+        from: { ...entry.from },
+        to: { ...entry.to },
+        max: sourceMax === undefined ? entry.max : Math.min(entry.max ?? sourceMax, sourceMax),
+        ...(entry.fromFarmyard ? { fromFarmyard: true } : {}),
+      }]
+    })
+  }
 
   const pushFromExchanges = (
     sourceId: string,

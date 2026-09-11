@@ -12,7 +12,7 @@ import '../../shared/cards/A/A137_RiverineShepherd'
 
 const CARD_ID = 'A017_ReclamationPlow'
 const A137_ID = 'A137_RiverineShepherd'
-const LISTENER = A017_ReclamationPlow_impl.listeners[0]!
+const LISTENER = A017_ReclamationPlow_impl.listeners[1]!
 
 const moved = (
   overrides: Partial<DraftGameEvent<'resource.moved'>> = {},
@@ -38,6 +38,9 @@ const setupDirectContext = (
   player.minorPlayed.push(CARD_ID)
   player.houseAnimalType = 'sheep'
   player.houseAnimalCount = 1
+  player.cardStates[CARD_ID] = {
+    extraData: { animalsBeforeCollecting: { sheep: 0, boar: 0, cattle: 0 } },
+  }
   const space = {
     id: 'sheep-market',
     gainPerRound: { sheep: 1 },
@@ -83,16 +86,54 @@ describe('A017_ReclamationPlow session', () => {
       .toBe('ui.interactionReclamationPlow')
   })
 
+  it('does not let an existing animal hide a newly collected animal that was discarded', () => {
+    const session = new GameSession()
+    stabilizeRandomHands(session.state.players)
+    const state = session.getState().state
+    state.players = state.players.slice(0, 2)
+    state.currentPlayerIndex = 0
+
+    const player = state.players[0]!
+    player.minorPlayed.push(CARD_ID)
+    player.resources.sheep = 1
+    player.houseAnimalType = 'sheep'
+    player.houseAnimalCount = 1
+    player.pastures = [{
+      id: 'one-space', size: 1, tiles: [{ row: 0, col: 1 }],
+      stables: 0, animalType: null, animalCount: 0,
+    }]
+    state.actionSpaces.find((space) => space.id === 'sheep-market')!.resources.sheep = 2
+    session.loadState(state)
+
+    let response = session.takeAction(0, 'sheep-market')
+    expect(response.interaction).toMatchObject({ stateId: 'wait', request: { kind: 'animal-reorg' } })
+    response = session.resolveChoice(0, 'confirm', { zones: [
+      { id: 'house', zoneType: 'house', animalType: 'sheep', animalCount: 1 },
+      { id: 'one-space', zoneType: 'pasture', animalType: 'sheep', animalCount: 1 },
+    ] })
+
+    expect(response.ok, response.error).toBe(true)
+    expect(response.state.players[0]!.resources.sheep).toBe(2)
+    expect(response.state.events).toContainEqual(expect.objectContaining({
+      type: 'farm.animalDiscarded', animals: { sheep: 1 }, reason: 'noRoom',
+    }))
+    expect(response.interaction.stateId === 'wait' ? response.interaction.promptKey : undefined)
+      .not.toBe('ui.interactionReclamationPlow')
+    expect(response.state.players[0]!.cardStates[CARD_ID]?.flagged).not.toBe(true)
+  })
+
   it('uses action-space resource.moved events even when result has no resourcesGained', () => {
     const ctx = setupDirectContext([moved()], { type: 'ok' })
 
     const result = executeCardListener(LISTENER, ctx)
 
     expect(result?.flow).toMatchObject({
-      type: 'leaf',
-      actionId: 'plow',
-      sourceCard: CARD_ID,
-      optional: true,
+      type: 'seq',
+      children: [
+        { type: 'leaf', actionId: 'special-effect', sourceCard: CARD_ID, params: { kind: 'set-flag', flag: true } },
+        { type: 'leaf', actionId: 'special-effect', sourceCard: CARD_ID, params: { kind: 'set-infobox', text: '✓' } },
+        { type: 'leaf', actionId: 'plow', sourceCard: CARD_ID, optional: true },
+      ],
     })
   })
 

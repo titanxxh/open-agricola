@@ -86,6 +86,7 @@ export type InteractionPresentationPlan =
       playerIndex: number
       remaining: number
       foodUsed: number
+      exchangeCatalog?: Extract<InteractionRequest, { kind: 'feed' }>['exchangeCatalog']
       maxTradeTimesBySourceId?: Record<string, number>
       placedAnimals?: Extract<InteractionRequest, { kind: 'feed' }>['placedAnimals']
     }
@@ -317,6 +318,7 @@ export const buildInteractionPresentationPlan = (
       playerIndex: interaction.playerIndex,
       remaining: interaction.request.remaining,
       foodUsed: interaction.request.foodUsed,
+      exchangeCatalog: interaction.request.exchangeCatalog,
       maxTradeTimesBySourceId: interaction.request.maxTradeTimesBySourceId,
       placedAnimals: interaction.request.placedAnimals,
     }

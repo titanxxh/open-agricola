@@ -11,7 +11,7 @@
  * full inventory.
  */
 
-import type { ActionFlow, GameState, PlayerState } from '../../contract/types.ts'
+import type { ActionFlow, GameState, InteractionRequest, PlayerState } from '../../contract/types.ts'
 import { workersAvailable } from '../../domain/player.ts'
 import { getPlacedAnimalsByType } from '../../domain/animal-zones.ts'
 import { findActionSpaceById } from '../../domain/space.ts'
@@ -306,12 +306,13 @@ export const startFeedSubFlow = (
   foodUsed: number,
   feedQueue?: FeedQueueEntry[],
   maxTradeTimesBySourceId?: Record<string, number>,
+  exchangeCatalog?: Extract<InteractionRequest, { kind: 'feed' }>['exchangeCatalog'],
 ): void => {
   const options = [{ value: 'confirm', labelKey: 'ui.interactionConfirm' }]
   core.pushSyntheticPendingFrame({
     hostNodeId: core.mintSyntheticNodeId('interaction:feed'),
     request: {
-      kind: 'feed', remaining, foodUsed, feedQueue, maxTradeTimesBySourceId,
+      kind: 'feed', remaining, foodUsed, feedQueue, exchangeCatalog, maxTradeTimesBySourceId,
       placedAnimals: getPlacedAnimalsByType(core.state.players[playerIndex]!, core.state),
     },
     choices: options,
@@ -504,13 +505,25 @@ export const takeAnytimeAction = (
 
   const entry = core.listAnytimeEntries().find((c) => c.descriptor.id === actionId)
   if (!entry) return core.emitResponse(false, 'anytime action unavailable')
+  if (entry.replacesTurn && engine) {
+    return core.emitResponse(false, 'turn replacement unavailable during an active action')
+  }
 
   const activeSpaceId = core.readActiveSpaceId()
   if (engine && !activeSpaceId) {
     return core.emitResponse(false, 'no active engine')
   }
 
-  core.appendHistory()
+  core.appendHistory(entry.replacesTurn === true)
+  if (entry.replacesTurn) {
+    const owner = core.state.players[playerIndex]
+    if (!owner) return core.emitResponse(false, 'invalid player')
+    core.setTurnOwner(playerIndex)
+    owner._activeActionBonusSources = []
+    core.setActionStartPlayerSnapshot(core.cloneSessionPlayer(owner))
+    core.resetActionResultDetails()
+    recordActionSnapshot(owner, core.allocActionToken())
+  }
   if (engine) {
     const owner = core.state.players[playerIndex]
     engine.injectBeforeFlows([tagInjectedAnytimeFlow(entry.flow)], undefined, owner?.id)

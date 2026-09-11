@@ -5,7 +5,7 @@ import { gainLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
 
 const CARD_ID = 'B056_Brook'
-const BROOK_SPACES = new Set(['forest', 'clay-pit', 'reed-bank', 'hollow-4'])
+const FIXED_BROOK_SPACES = new Set(['forest', 'clay-pit', 'reed-bank'])
 
 const listener: CardListenerRegistration = {
   id: 'B56-brook-after-place-farmer',
@@ -13,7 +13,10 @@ const listener: CardListenerRegistration = {
   phases: ['after' as ActionHookPhase],
   actions: ['place-farmer'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
-    if (!BROOK_SPACES.has(context.space?.id ?? '')) return
+    const spaceId = context.space?.id
+    if (!spaceId) return
+    const roundOneSpaceId = context.state.roundActionOrder[0]
+    if (!FIXED_BROOK_SPACES.has(spaceId) && spaceId !== roundOneSpaceId) return
     return { flow: gainLeaf(CARD_ID, { food: 1 }), sourceCard: CARD_ID }
   },
 }

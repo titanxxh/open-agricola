@@ -98,13 +98,16 @@ describe('A045 Fire Protection Pond parity', () => {
     expect(response.state.players[0]!.resources.food).toBe(0)
   })
 
-  it('A045 S2: characterize playing Fire Protection Pond outside a wooden house', () => {
-    const response = playMinor(setup({ houseType: 'clay' }))
+  it('A045 S2: cannot play Fire Protection Pond outside a wooden house', () => {
+    const response = enterImprovementChoice(setup({ houseType: 'clay' }))
 
     expect(response.ok, response.error).toBe(true)
-    expect(response.state.players[0]!.minorHand).not.toContain(CARD_ID)
-    expect(response.state.players[0]!.minorPlayed).toContain(CARD_ID)
-    expect(response.state.players[0]!.resources.food).toBe(0)
+    expect(response.interaction.stateId === 'wait'
+      ? response.interaction.request.options?.some((option) => option.value === CARD_ID)
+      : false).toBe(false)
+    expect(response.state.players[0]!.minorHand).toContain(CARD_ID)
+    expect(response.state.players[0]!.minorPlayed).not.toContain(CARD_ID)
+    expect(response.state.players[0]!.resources.food).toBe(1)
   })
 
   it('A045 S3: the first renovation schedules one food for each of the next six rounds', () => {

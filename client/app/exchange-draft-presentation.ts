@@ -284,6 +284,9 @@ export const useExchangeDraftPresentation = ({
             interactionPresentationPlan.kind === 'harvest-feed'
               ? interactionPresentationPlan.maxTradeTimesBySourceId
               : undefined,
+            interactionPresentationPlan.kind === 'harvest-feed'
+              ? interactionPresentationPlan.exchangeCatalog
+              : undefined,
           )
         : [],
     [harvestFeedPlayer, locale, cardLabel, interactionPresentationPlan],

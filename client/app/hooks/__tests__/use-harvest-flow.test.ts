@@ -115,4 +115,25 @@ describe('buildHarvestFeedOptions', () => {
     const options = buildHarvestFeedOptions(player, 'en', cardLabel)
     expect(options.filter((o) => o.sourceId === 'B104_SheepWalker')).toHaveLength(0)
   })
+
+  it('renders the authoritative dynamic feed catalog', () => {
+    const player = mkPlayer({ resources: { ...emptyResources, vegetable: 1 } })
+    const options = buildHarvestFeedOptions(player, 'en', cardLabel, undefined, [{
+      sourceId: 'C062_CookeryExtension::Major_Fireplace1',
+      exchangeIndex: 3,
+      from: { vegetable: 1 },
+      to: { food: 4 },
+      max: 1,
+    }])
+
+    expect(options).toEqual([{
+      id: 'C062_CookeryExtension::Major_Fireplace1-ex3',
+      sourceName: 'C062_CookeryExtension · Major_Fireplace1',
+      sourceId: 'C062_CookeryExtension::Major_Fireplace1',
+      exchangeIndex: 3,
+      from: { vegetable: 1 },
+      to: { food: 4 },
+      max: 1,
+    }])
+  })
 })

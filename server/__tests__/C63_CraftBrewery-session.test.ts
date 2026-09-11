@@ -3,6 +3,8 @@ import { GameSession } from '../game/authoritative-session'
 import { runCardEffectHook } from '../../shared/cards/card-effects'
 import type { ActionFlow } from '../../shared/contract/types'
 import { runSelectionEffect } from '../../shared/actions/helpers/selection-effect-registry'
+import { setActiveWorkerCount } from '../../shared/domain/player'
+import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 
 import '../../shared/cards/C/C063_CraftBrewery'
 import '../../shared/cards/B/B113_PatchCaregiver'
@@ -46,7 +48,7 @@ describe('C063_CraftBrewery session (verify-only)', () => {
     expect(seq.optional).toBe(true)
     expect(seq.children.map((c) => (c as Extract<ActionFlow, { type: 'leaf' }>).actionId)).toEqual([
       'selection',
-      'pay-resources',
+      'pay',
       'gain',
       'bonus-vp',
       'bonus-vp',
@@ -140,5 +142,52 @@ describe('C063_CraftBrewery session (verify-only)', () => {
       'onHarvestFeedingPhase',
     )
     expect(flow).toBeNull()
+  })
+
+  it('settles field grain, supply grain, food, and two bonus points through harvest Session', () => {
+    const session = new GameSession(7063, undefined, { playerCount: 2 })
+    stabilizeRandomHands(session.state.players)
+    session.state.round = 4
+    session.state.players.forEach((candidate) => {
+      setActiveWorkerCount(candidate, 0)
+      candidate.minorHand = ['__test_placeholder__']
+      candidate.occupationHand = ['__test_placeholder__']
+      candidate.minorPlayed = []
+      candidate.occupationPlayed = []
+      candidate.cardStates = {}
+      candidate.fields = []
+      candidate.resources.food = 0
+      candidate.resources.grain = 0
+    })
+    const player = session.state.players[0]!
+    player.minorPlayed = ['C063_CraftBrewery']
+    player.resources.grain = 1
+    player.fields = [{
+      row: 1, col: 0, stacks: [{ kind: 'grain', remaining: 2 }],
+    }]
+    session.loadState(session.state)
+
+    let response = session.performRoundEnd()
+    expect(response.interaction.stateId).toBe('wait')
+    if (response.interaction.stateId !== 'wait') return
+    const accept = response.interaction.request.options?.find((option) => option.value !== '__skip__')
+    expect(accept, JSON.stringify(response.interaction, null, 2)).toBeDefined()
+    response = session.resolveChoice(response.interaction.playerIndex, accept!.value)
+    expect(response.interaction).toMatchObject({
+      stateId: 'wait', sourceCard: 'C063_CraftBrewery', request: { kind: 'selection' },
+    })
+    if (response.interaction.stateId !== 'wait' || response.interaction.request.kind !== 'selection') return
+    const position = response.interaction.request.selection.selectablePositions[0]!
+    response = session.commitSelectionChoice(0, { positions: [position] })
+    expect(response.interaction.stateId, JSON.stringify(response.interaction, null, 2)).toBe('idle')
+
+    expect(response.ok, response.error).toBe(true)
+    expect(response.state.players[0]!.fields[0]!.stacks[0]?.remaining ?? 0).toBe(0)
+    expect(response.state.players[0]!.resources).toMatchObject({ grain: 1, food: 4 })
+    expect(response.state.players[0]!.cardStates.C063_CraftBrewery?.counters?.bonusVp).toBe(2)
+    expect(response.state.events).toEqual(expect.arrayContaining([
+      expect.objectContaining({ type: 'resource.paid', sourceCardId: 'C063_CraftBrewery', resources: { grain: 1 } }),
+      expect.objectContaining({ type: 'resource.moved', sourceCardId: 'C063_CraftBrewery', resources: { food: 4 } }),
+    ]))
   })
 })

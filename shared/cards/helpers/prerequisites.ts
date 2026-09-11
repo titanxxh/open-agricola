@@ -128,6 +128,20 @@ const meetsTextClause = (player: PlayerState, clause: string) => {
     return countBakingImprovements(player) >= Number(bakingMatch[1])
   }
 
+  if (/^Baking Improvement$/i.test(trimmed)) {
+    return countBakingImprovements(player) >= 1
+  }
+
+  const supplyResourceMatch = trimmed.match(/^(\d+)\s+(Wood|Clay|Reed|Stone|Food|Grain|Vegetables?)\s+in Your Supply$/i)
+  if (supplyResourceMatch) {
+    const resource = supplyResourceMatch[2]!.toLowerCase().replace(/s$/, '') as keyof PlayerState['resources']
+    return (player.resources[resource] ?? 0) >= Number(supplyResourceMatch[1])
+  }
+
+  if (/^Still in Wooden House$/i.test(trimmed)) {
+    return player.houseType === 'wood'
+  }
+
   if (/^Cooking Improvement$/i.test(trimmed)) {
     return countCookingImprovements(player) >= 1
   }

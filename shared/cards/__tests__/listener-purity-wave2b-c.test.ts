@@ -877,7 +877,7 @@ describe('listener purity wave 2b/c', () => {
     if (result?.flow?.type === 'xor') expect(result.flow.children).toHaveLength(3)
   })
 
-  it('E148 Lazybones removes reserved space and builds stable by owner-targeted flow only', () => {
+  it('E148 Lazybones removes reserved space and asks the owner to place the stable', () => {
     const owner = player('E148_Lazybones', {
       id: 'owner',
       name: 'Owner',
@@ -908,7 +908,13 @@ describe('listener purity wave 2b/c', () => {
       type: 'seq',
       children: [
         { type: 'leaf', actionId: 'special-effect', sourceCard: 'E148_Lazybones', actionContext: { targetPlayerId: owner.id }, params: { kind: 'set-extra-data', key: 'reservedActionSpaces', value: ['farmland'] } },
-        { type: 'leaf', actionId: 'special-effect', sourceCard: 'E148_Lazybones', actionContext: { targetPlayerId: owner.id }, params: { kind: 'build-stable-on-first-empty-tile' } },
+        {
+          type: 'leaf',
+          actionId: 'stables',
+          sourceCard: 'E148_Lazybones',
+          targetPlayerId: owner.id,
+          actionContext: { max: 1, exactCost: { max: 1 } },
+        },
       ],
     })
   })

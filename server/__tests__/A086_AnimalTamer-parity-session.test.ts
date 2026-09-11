@@ -155,4 +155,31 @@ describe('A086 Animal Tamer parity', () => {
     expect(response.scores[0]!.categories.find((category) => category.key === 'cardBonusVp')?.entries)
       .toContainEqual(expect.objectContaining({ cardId: COW_PRINCE_ID, score: 2 }))
   })
+
+  it.each([
+    { tiles: 1, cattle: 3, expected: 1 },
+    { tiles: 2, cattle: 2, expected: 2 },
+    { tiles: 3, cattle: 1, expected: 1 },
+    { tiles: 2, cattle: 0, expected: 0 },
+  ])('Cow Prince scores $expected cattle-holding farm spaces for $tiles pasture tiles and $cattle cattle', ({ tiles, cattle, expected }) => {
+    const session = setup()
+    const player = session.state.players[0]!
+    player.occupationPlayed.push(COW_PRINCE_ID)
+    player.pastures = [{
+      id: 'cow-prince-pasture',
+      size: tiles,
+      tiles: Array.from({ length: tiles }, (_, col) => ({ row: 1, col })),
+      stables: 0,
+      animalType: cattle > 0 ? 'cattle' : null,
+      animalCount: cattle,
+    }]
+    player.resources.cattle = cattle
+    session.loadState(session.state)
+
+    const entries = session.getState().scores[0]!.categories
+      .find((category) => category.key === 'cardBonusVp')?.entries ?? []
+    const score = entries.find((entry) => entry.type === 'bonus' && entry.cardId === COW_PRINCE_ID)?.score ?? 0
+
+    expect(score).toBe(expected)
+  })
 })

@@ -4,10 +4,9 @@ import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import {
   actionSpaceTokenChoiceFlow,
   consumeActionSpaceToken,
-  ownerSpecialEffect,
   resolveActionSpaceTokenChoice,
 } from '../helpers/action-space-tokens'
-import { getNextEmptyTileForPlayer } from '../../domain/farm'
+import { buildStableFarmInteraction } from '../../domain/farmyard-interaction'
 import { getAvailableStableSupplyCount } from '../../domain/supply-tokens'
 import type { CardImpl } from '../registry'
 
@@ -30,10 +29,18 @@ const listener: CardListenerRegistration = {
     )
     if (!ownerPlayer) return
 
-    const reward = getNextEmptyTileForPlayer(ownerPlayer)
-      ? ownerSpecialEffect(CARD_ID, ownerPlayer.id, {
-          kind: 'build-stable-on-first-empty-tile',
-        })
+    const stableSelection = buildStableFarmInteraction(ownerPlayer, undefined, {
+      max: 1,
+      exactCost: { max: 1 },
+    })
+    const reward = stableSelection.farmType === 'stable' && stableSelection.maxSelections > 0
+      ? {
+          type: 'leaf' as const,
+          actionId: 'stables',
+          sourceCard: CARD_ID,
+          targetPlayerId: ownerPlayer.id,
+          actionContext: { max: 1, exactCost: { max: 1 } },
+        }
       : undefined
     return consumeActionSpaceToken({
       cardId: CARD_ID,

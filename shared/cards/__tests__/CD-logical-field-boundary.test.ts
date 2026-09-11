@@ -93,7 +93,8 @@ describe('C/D Logical Field consumers', () => {
     expect(D079_CarrotMuseum_impl.effect.onAfterRoundEnd!(state, player)).toMatchObject({
       params: { stone: 1, wood: 3 },
     })
-    expect(D135_GardeningHeadOfficial_impl.effect.computeBonusScore!(state, player)).toBe(2)
+    expect(D135_GardeningHeadOfficial_impl.effect.computeSharedPostScore!(state, player, []))
+      .toContainEqual({ playerId: player.id, score: 2 })
   })
 
   it('counts each grain Card Field once for harvest thresholds', () => {
