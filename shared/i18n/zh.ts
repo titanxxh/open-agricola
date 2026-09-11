@@ -1708,6 +1708,7 @@ export const zh = {
     M040_MoorFire: { anytime: '沼泽火：把最后 1 个沼泽变为田地' },
     M084_BogPony: { anytime: '沼泽矮马：横置 1 匹马获得 2 燃料' },
     M111_NoTillFarming: { anytime: '免耕农业：丢弃农场格上的作物' },
+    M126_CooperativeStore: { anytime: '合作商店：消耗1枚使用标记，交换1份建材' },
     D122_ClayCarrier: { anytime: '搬黏土工：付2食物 → 获2黏土' },
     D132_HideFarmer: {
       markSpaces: {
@@ -1805,7 +1806,7 @@ export const zh = {
       anytime: '种子商人：付1食物 → 获1谷物',
     },
     D124_Emissary: {
-      anytime: '使者：付1食物 → 获1食物',
+      anytime: '使者：放置1件商品 → 获1石头',
     },
     D013_Trowel: {
       anytime: '泥刀：升级到石屋',

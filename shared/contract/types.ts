@@ -866,6 +866,7 @@ export type ActionDefinition = {
   strictCanExecute?: boolean
   /** Mark as an anytime action that can interrupt the current flow. */
   anytime?: boolean
+  allowAnytimeReentry?: boolean
   idleOnly?: boolean
   canBeExecutedByPlayer: CanBeExecutedByPlayer
   isAlreadySatisfied?: (

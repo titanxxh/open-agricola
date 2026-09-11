@@ -86,6 +86,71 @@ const play = (session: GameSession) => {
 }
 
 describe('B104 Sheep Walker parity', () => {
+  it.each([false, true])('cooks a newly exchanged animal through nested exchange and resumes both hosts (restore=%s)', (restore) => {
+    let session = setupWorkPhase()
+    const state = session.getState().state
+    const player = state.players[0]!
+    player.resources.sheep = 2
+    player.pastures[0]!.animalCount = 2
+    player.improvements = ['Major_Fireplace1']
+    state.availableMajorImprovements = state.availableMajorImprovements.filter((id) => id !== 'Major_Fireplace1')
+    session.loadState(state)
+    const parent = snapshot(session.takeAction(0, 'farmland'))
+    const parentHost = session.peekEnginePendingEnvelope()?.hostNodeId
+    const choice = session.takeAnytimeAction(0, 'exchange')
+    const reorg = snapshot(session.resolveChoice(0, `bulk:${exchangeOption(choice, 'boar').value.split(':')[1]}=1`))
+    const reorgHost = session.peekEnginePendingEnvelope()?.hostNodeId
+    expect(reorg.ok, reorg.error).toBe(true)
+    expect(reorg.interaction.stateId === 'wait' && reorg.interaction.request.kind).toBe('animal-reorg')
+    expect(reorg.state.players[0]!.resources).toMatchObject({ sheep: 1, boar: 1, food: 0 })
+    expect(reorg.interaction.anytimeActions.map((action) => action.id)).toContain('exchange')
+
+    let nested = session.takeAnytimeAction(0, 'exchange')
+    expect(nested.ok, nested.error).toBe(true)
+    if (restore) {
+      session = new GameSession(JSON.parse(JSON.stringify({
+        state: nested.state,
+        sessionCursor: session.createSessionPrivateCursor(),
+      })))
+      expect(session.getState().interaction).toEqual(nested.interaction)
+      nested = session.getState()
+    }
+    if (nested.interaction.stateId !== 'wait' || nested.interaction.request.kind !== 'choice') throw new Error('expected nested exchange')
+    expect(nested.interaction.request.options.some((option) => option.sourceCard === B104)).toBe(false)
+    const cooking = nested.interaction.request.options.find((option) =>
+      option.sourceCard === 'Major_Fireplace1'
+      && option.effectPreview?.kind === 'resourceExchange'
+      && option.effectPreview.resourcesPaid.boar === 1,
+    )
+    expect(cooking).toBeDefined()
+    const cooked = session.resolveChoice(0, cooking!.value)
+    expect(cooked.ok, cooked.error).toBe(true)
+    expect(cooked.state.players[0]!.resources).toMatchObject({ sheep: 1, boar: 0, food: 2 })
+    if (cooked.interaction.stateId !== 'wait' || reorg.interaction.stateId !== 'wait') throw new Error('expected reorganization')
+    expect(cooked.interaction.request).toEqual(reorg.interaction.request)
+    expect(cooked.interaction.playerIndex).toBe(0)
+    expect(session.peekEnginePendingEnvelope()?.hostNodeId).toBe(reorgHost)
+    const resumed = session.resolveChoice(0, 'confirm', { zones: [
+      { id: 'sheep-pasture', zoneType: 'pasture', animalType: 'sheep', animalCount: 1 },
+    ] })
+    expect(resumed.ok, resumed.error).toBe(true)
+    if (resumed.interaction.stateId !== 'wait' || parent.interaction.stateId !== 'wait') throw new Error('expected plow')
+    expect(resumed.interaction.request).toEqual(parent.interaction.request)
+    expect(session.peekEnginePendingEnvelope()?.hostNodeId).toBe(parentHost)
+    expect(resumed.state.actionSpaces.find((space) => space.id === 'farmland')?.takenBy)
+      .toEqual(parent.state.actionSpaces.find((space) => space.id === 'farmland')?.takenBy)
+    const completed = session.commitSelectionChoice(0, { tile: { row: 0, col: 1 } })
+    expect(completed.ok, completed.error).toBe(true)
+    expect(completed.state.players[0]!.fields).toHaveLength(1)
+    expect(completed.state.players[0]!.resources).toMatchObject({ sheep: 1, boar: 0, food: 2 })
+    const exchanges = completed.state.events.filter((event) => event.type === 'resource.exchanged')
+    expect(exchanges).toHaveLength(2)
+    expect(exchanges).toEqual(expect.arrayContaining([
+      expect.objectContaining({ exchangeSource: B104, times: 1, paid: { sheep: 1 }, gained: { boar: 1 } }),
+      expect.objectContaining({ exchangeSource: 'Major_Fireplace1', times: 1, paid: { boar: 1 }, gained: { food: 2 } }),
+    ]))
+  })
+
   it.each([{ boar: 2, vegetable: 0 }, { boar: 1, vegetable: 1 }])('settles a whole batch %j before reorganizing and resuming plow', (gained) => {
     const session = setupWorkPhase()
     const state = session.getState().state
@@ -417,10 +482,12 @@ describe('B104 Sheep Walker anytime timing', () => {
       id.startsWith('B104-sheep-walker-') || id.startsWith('D124-emissary-'),
     )).toBe(false)
     expect(response.interaction.anytimeActions.map((action) => action.id)).not.toContain('exchange')
-    const rejected = session.takeAnytimeAction(0, 'exchange')
-    expect(rejected.ok).toBe(false)
-    expect(rejected.interaction).toEqual(response.interaction)
-    expect(snapshot(rejected).state).toEqual(response.state)
+    for (const actionId of ['exchange', 'D124-emissary-anytime']) {
+      const rejected = session.takeAnytimeAction(0, actionId)
+      expect(rejected.ok).toBe(false)
+      expect(rejected.interaction).toEqual(response.interaction)
+      expect(snapshot(rejected).state).toEqual(response.state)
+    }
 
     response = session.resolveChoice(0, 'confirm', [
       { id: 'sheep-pasture', zoneType: 'pasture', animalType: 'sheep', animalCount: 2 },

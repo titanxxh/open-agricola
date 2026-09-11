@@ -2258,7 +2258,8 @@ export class GameCore {
     const context = this.getActiveInteractionContext()
     if (!context) return []
     const { player, space } = context
-    const blockedIds = new Set([...policy.blockedIds, ...this.engineStack.getActiveAnytimeActionIds(player.id)])
+    const blockedIds = new Set(policy.blockedIds)
+    const activeIds = new Set(this.engineStack.getActiveAnytimeActionIds(player.id))
     const anytimeEntries: { descriptor: AnytimeAction; flow: ActionFlow }[] = []
     const pendingSnapshot = this.peekHostContextSnapshot()
     const pendingSourceCard = this.peekPendingSourceCard()
@@ -2268,6 +2269,7 @@ export class GameCore {
     for (const action of options.preScoringOnly ? [] : this.registry.values()) {
       if (!action.anytime) continue
       if (blockedIds.has(action.id)) continue
+      if (activeIds.has(action.id) && action.allowAnytimeReentry !== true) continue
       if (action.idleOnly && (this.engineStack.depth() > 0 || options.nestedWindow)) continue
       const doable = this.hookDispatcher.applyIsDoable(
         { state: this.state, player, space, actionId: action.id, actionContext },
@@ -2300,6 +2302,7 @@ export class GameCore {
       if (entry.ownerPlayerId !== player.id) continue
       if (options.preScoringOnly && entry.registration.preScoring !== true) continue
       if (blockedIds.has(entry.registration.id)) continue
+      if (activeIds.has(entry.registration.id) && entry.registration.allowAnytimeReentry !== true) continue
       if (interactionKind && entry.registration.blockedAnytimeInteractionKinds?.includes(interactionKind)) continue
       const result = executeCardListener(entry.registration, anytimeContext, listenerOwnerOptions(entry))
       if (!result?.flow) continue

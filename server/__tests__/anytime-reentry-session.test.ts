@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession, type SessionResponse } from '../game/authoritative-session'
 import { requireActiveCardRegistry } from '../../shared/cards/active-registry'
+import { gainLeaf, payLeaf } from '../../shared/cards/helpers/pay-gain-node'
+import { markAllWorkersUsed } from '../../shared/domain/player'
+import { actionDefinitions } from '../../shared/actions'
+import { internalActionDefinitions } from '../../shared/actions/internal-actions'
+import { ALL_CARD_IMPLS } from '../../shared/cards/register-all'
 
 const SOWER = 'C115_Sower'
 const SOWER_ANYTIME = 'C115-sower-anytime'
@@ -39,6 +44,110 @@ const restore = (session: GameSession) => new GameSession(JSON.parse(JSON.string
 })))
 
 describe('anytime reentry', () => {
+  it('enables reentry only for system exchange in shipped definitions', () => {
+    expect([...actionDefinitions, ...internalActionDefinitions].filter((action) => action.allowAnytimeReentry).map((action) => action.id)).toEqual(['exchange'])
+    expect(Object.values(ALL_CARD_IMPLS).flatMap((impl) => impl.listeners ?? []).filter((listener) => listener.allowAnytimeReentry)).toEqual([])
+  })
+
+  it.each(['exchange', 'bake', 'feed', 'heating'])('keeps the %s window restriction even when exchange permits reentry', (window) => {
+    const session = new GameSession(877, undefined, {
+      playerCount: 2,
+      enableFarmersOfTheMoor: true,
+      allowIncompleteFarmersOfTheMoorMinorDeal: true,
+    })
+    const state = session.getState().state
+    state.round = window === 'feed' || window === 'heating' ? 4 : 5
+    for (const player of state.players) {
+      player.minorHand = ['__test_placeholder__']
+      player.occupationHand = ['__test_placeholder__']
+      player.resources = { ...player.resources, food: 10, fuel: 10, grain: 0, vegetable: 0 }
+    }
+    state.players[0]!.improvements = ['Major_Fireplace1']
+    state.players[0]!.resources.grain = 2
+    state.players[0]!.resources.vegetable = 1
+    state.players[0]!.fields = []
+    if (window === 'feed' || window === 'heating') {
+      for (const player of state.players) markAllWorkersUsed(state, player)
+    }
+    session.loadState(state)
+    expect(offered(session.getState(), 'exchange')).toBe(true)
+    let response: SessionResponse
+    if (window === 'exchange') {
+      response = session.takeAnytimeAction(0, 'exchange')
+      expect(response.interaction.stateId === 'wait' && response.interaction.promptKey).toMatch(/^ui.interactionExchange/)
+    } else if (window === 'bake') {
+      response = session.takeAction(0, 'grain-utilization')
+      expect(response.interaction.stateId === 'wait' && response.interaction.promptKey).toMatch(/^ui.interactionBakeBread/)
+    } else {
+      expect(session.performRoundEnd().ok).toBe(true)
+      expect(session.peekEnginePendingEnvelope()?.syntheticKind).toBe('post-reap-anytime')
+      response = session.resolveChoice(0, '__skip__')
+      expect(request(response).kind).toBe('feed')
+      if (window === 'heating') response = session.resolveChoice(0, 'confirm', { selections: [] })
+      expect(request(response).kind).toBe(window)
+    }
+    expect(response.ok, response.error).toBe(true)
+    expect(offered(response, 'exchange')).toBe(false)
+    const before = JSON.stringify({ state: response.state, interaction: response.interaction, scores: response.scores })
+    const rejected = session.takeAnytimeAction(0, 'exchange')
+    expect(rejected.ok).toBe(false)
+    expect(JSON.stringify({ state: rejected.state, interaction: rejected.interaction, scores: rejected.scores })).toBe(before)
+  })
+
+  it.each([undefined, false, true])('uses a card entry reentry declaration without bypassing payment (allow=%s)', (allowAnytimeReentry) => {
+    const session = setup()
+    const cardId = '__TEST_anytime_reentry_permission__'
+    const player = session.state.players[0]!
+    player.minorPlayed = [cardId]
+    player.occupationPlayed = []
+    player.resources = { ...player.resources, food: 2, clay: 0, grain: 0, vegetable: 0 }
+    session.withCtx(() => requireActiveCardRegistry('anytime reentry declaration').registerListener({
+      id: cardId,
+      cardIds: [cardId],
+      phases: ['anytime'],
+      ...(allowAnytimeReentry === undefined ? {} : { allowAnytimeReentry }),
+      handler: () => ({
+        sourceCard: cardId,
+        flow: {
+          type: 'seq',
+          children: [
+            payLeaf({ cardId, cost: { food: 1 } }),
+            gainLeaf(cardId, { clay: 1 }),
+            { type: 'xor', children: [gainLeaf(cardId, { grain: 1 }), gainLeaf(cardId, { vegetable: 1 })] },
+          ],
+        },
+      }),
+    }))
+    const host = structuredClone(request(session.takeAction(0, 'farmland')))
+    const started = session.takeAnytimeAction(0, cardId)
+    const outer = structuredClone(request(started))
+    expect(started.state.players[0]!.resources).toMatchObject({ food: 1, clay: 1, grain: 0, vegetable: 0 })
+    expect(offered(started, cardId)).toBe(allowAnytimeReentry === true)
+    const before = { state: JSON.stringify(started.state), interaction: structuredClone(started.interaction) }
+    const nested = session.takeAnytimeAction(0, cardId)
+    if (allowAnytimeReentry === true) {
+      expect(request(nested).kind).toBe('choice')
+      expect(nested.state.players[0]!.resources).toMatchObject({ food: 0, clay: 2 })
+      expect(offered(nested, cardId)).toBe(false)
+      const unpaid = { state: JSON.stringify(nested.state), interaction: structuredClone(nested.interaction) }
+      const rejected = session.takeAnytimeAction(0, cardId)
+      expect(rejected.ok).toBe(false)
+      expect(JSON.stringify(rejected.state)).toBe(unpaid.state)
+      expect(rejected.interaction).toEqual(unpaid.interaction)
+      const resumed = session.resolveChoice(0, request(nested).options![0]!.value)
+      expect(request(resumed)).toEqual(outer)
+    } else {
+      expect(nested.ok).toBe(false)
+      expect(JSON.stringify(nested.state)).toBe(before.state)
+      expect(nested.interaction).toEqual(before.interaction)
+    }
+    const completed = session.resolveChoice(0, outer.options![1]!.value)
+    expect(request(completed)).toEqual(host)
+    expect(completed.state.players[0]!.resources).toMatchObject(allowAnytimeReentry === true
+      ? { food: 0, clay: 2, grain: 1, vegetable: 1 }
+      : { food: 1, clay: 1, grain: 0, vegetable: 1 })
+  })
+
   it.each([false, true])('blocks the active entry and permits another anytime (host=%s)', (hasHost) => {
     const session = setup()
     const original = hasHost ? session.takeAction(0, 'farmland') : session.getState()

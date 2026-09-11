@@ -1725,6 +1725,7 @@ export const en = {
     M040_MoorFire: { anytime: 'Moor Fire: Convert your last moor to a field' },
     M084_BogPony: { anytime: 'Bog Pony: Lie a horse down for 2 fuel' },
     M111_NoTillFarming: { anytime: 'No-Till Farming: Discard crops from farmyard spaces' },
+    M126_CooperativeStore: { anytime: 'Cooperative Store: Spend 1 use to exchange 1 building resource' },
     D122_ClayCarrier: { anytime: 'Clay Carrier: Pay 2 Food → 2 Clay' },
     D132_HideFarmer: {
       markSpaces: {
