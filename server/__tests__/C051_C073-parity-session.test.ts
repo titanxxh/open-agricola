@@ -394,36 +394,47 @@ describe('C062 Cookery Extension parity', () => {
     const response = playMinor(setup({ cardId: 'C062_CookeryExtension', played: false, resources: { clay: 2 } }), 'C062_CookeryExtension')
     expect(response.state.players[0]!.minorPlayed).toContain('C062_CookeryExtension')
   })
-  it('C062 S2: OA public feeding rejects the doubled Fireplace exchange without mutating state', () => {
-    const session = setup({ cardId: 'C062_CookeryExtension', round: 4, resources: { vegetable: 2 } })
+  it('C062 S2: harvest doubles one Fireplace vegetable exchange and limits it to once', () => {
+    const session = setup({ cardId: 'C062_CookeryExtension', round: 4, resources: { vegetable: 1 } })
     session.state.players[0]!.improvements = ['Major_Fireplace1']
     prepareHarvest(session, 2)
-    expect(session.getState().state.players[0]!.resources).toMatchObject({ vegetable: 2, food: 20 })
+    session.state.players[0]!.resources.food = 0
+    session.loadState(session.state)
     let offered = session.performRoundEnd()
-    expect(offered.ok, offered.error).toBe(true)
-    expect(offered.interaction).toMatchObject({ stateId: 'wait', spaceId: '__subflow:post-reap-anytime' })
-    offered = session.takeAnytimeAction(0, 'exchange')
-    expect(offered.ok, offered.error).toBe(true)
-    expect(options(offered).some((option) => option.sourceCard === 'Major_Fireplace1')).toBe(true)
-    expect(options(offered).some((option) => option.sourceCard?.startsWith('C062_CookeryExtension'))).toBe(false)
-    offered = session.resolveChoice(0, 'cancel')
-    expect(offered.ok, offered.error).toBe(true)
-    offered = session.resolveChoice(0, '__skip__')
-    expect(offered.ok, offered.error).toBe(true)
-    expect(offered.interaction, JSON.stringify(offered.interaction)).toMatchObject({
-      stateId: 'wait', playerIndex: 0, request: { kind: 'feed', remaining: 0, foodUsed: 4 },
-    })
-    expect(offered.state.players[0]!.resources).toMatchObject({ vegetable: 2, food: 16 })
-    const before = JSON.stringify(offered.state)
-    const rejected = session.resolveChoice(0, 'confirm', { selections: [{
-      sourceId: 'C062_CookeryExtension::Major_Fireplace1', exchangeIndex: 0, count: 1,
+    if (offered.interaction.stateId === 'wait'
+      && offered.interaction.request.kind === 'choice'
+      && options(offered).some((option) => option.value === '__skip__')) {
+      offered = session.resolveChoice(offered.interaction.playerIndex, '__skip__')
+    }
+    expect(offered.interaction).toMatchObject({ stateId: 'wait', request: { kind: 'feed' } })
+    if (offered.interaction.stateId !== 'wait' || offered.interaction.request.kind !== 'feed') {
+      throw new Error('expected Cookery Extension harvest feed')
+    }
+    const exchange = offered.interaction.request.exchangeCatalog?.find((entry) =>
+      entry.sourceId === 'C062_CookeryExtension::Major_Fireplace1'
+      && entry.from.vegetable === 1)
+    expect(exchange).toMatchObject({ from: { vegetable: 1 }, to: { food: 4 }, max: 1 })
+    const before = JSON.stringify({ state: offered.state, interaction: offered.interaction })
+    const duplicate = session.resolveChoice(0, 'confirm', { selections: [
+      { sourceId: exchange!.sourceId, exchangeIndex: exchange!.exchangeIndex, count: 1 },
+      { sourceId: exchange!.sourceId, exchangeIndex: exchange!.exchangeIndex, count: 1 },
+    ] })
+    expect(duplicate.ok).toBe(false)
+    expect(JSON.stringify({ state: duplicate.state, interaction: duplicate.interaction })).toBe(before)
+
+    const finished = session.resolveChoice(0, 'confirm', { selections: [{
+      sourceId: exchange!.sourceId, exchangeIndex: exchange!.exchangeIndex, count: 1,
     }] })
-    expect(rejected.ok).toBe(false)
-    expect(JSON.stringify(rejected.state)).toBe(before)
-    expect(rejected.interaction).toMatchObject({ stateId: 'wait', request: { kind: 'feed' } })
-    const finished = session.resolveChoice(0, 'confirm', { selections: [] })
     expect(finished.ok, finished.error).toBe(true)
-    expect(finished.state.players[0]!.resources).toMatchObject({ vegetable: 2, food: 16 })
+    expect(finished.state.players[0]!.resources).toMatchObject({ vegetable: 0, food: 0, begging: 0 })
+    expect(finished.state.events).toContainEqual(expect.objectContaining({
+      type: 'harvest.feedConverted',
+      source: 'C062_CookeryExtension::Major_Fireplace1',
+      cost: { vegetable: 1 },
+      food: { food: 4 },
+    }))
+    expect(finished.state.players[0]!.cardStates.C062_CookeryExtension?.extraData?.usedCookeryIds)
+      .toEqual(['Major_Fireplace1'])
   })
 })
 

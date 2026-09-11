@@ -75,18 +75,43 @@ describe('A131 Craft Teacher parity', () => {
     expect(played.state.players[0]!.occupationPlayed).toContain(CARD_ID)
   })
 
-  it.each([
-    ['S2', 'Major_Joinery'],
-    ['S3', 'Major_Pottery'],
-    ['S4', 'Major_Basket'],
-  ])('A131 %s: building %s offers up to two free occupations', (_scenario, majorId) => {
+  it('A131 S2: building Joinery may play two occupations without food costs', () => {
     const session = setup()
-    let response = enterCraftTeacher(session, buildMajor(session, majorId), true)
+    let response = enterCraftTeacher(session, buildMajor(session, 'Major_Joinery'), true)
     for (const occupationId of OCCUPATIONS) {
       response = chooseCard(session, response, occupationId)
     }
     expect(response.state.players[0]!.occupationPlayed).toEqual(expect.arrayContaining([CARD_ID, ...OCCUPATIONS]))
     expect(response.state.players[0]!.occupationHand).toEqual([])
+    expect(response.state.players[0]!.resources.food).toBe(0)
+  })
+
+  it('A131 S3: after building Pottery the second free occupation may be declined', () => {
+    const session = setup()
+    let response = enterCraftTeacher(session, buildMajor(session, 'Major_Pottery'), true)
+    response = chooseCard(session, response, OCCUPATIONS[0]!)
+    expect(response.interaction.stateId).toBe('wait')
+    expect(response.interaction.stateId === 'wait'
+      ? response.interaction.request.options?.some((option) => option.value === '__skip__')
+      : false).toBe(true)
+    response = session.resolveChoice(0, '__skip__')
+
+    expect(response.state.players[0]!.occupationPlayed).toEqual([CARD_ID, OCCUPATIONS[0]])
+    expect(response.state.players[0]!.occupationHand).toEqual([OCCUPATIONS[1]])
+    expect(response.state.players[0]!.resources.food).toBe(0)
+  })
+
+  it('A131 S4: after building Basket the entire occupation offer may be declined', () => {
+    const session = setup()
+    let response = resolveTriggerIfPresent(session, buildMajor(session, 'Major_Basket'), CARD_ID)
+    expect(response.interaction.stateId).toBe('wait')
+    expect(response.interaction.stateId === 'wait'
+      ? response.interaction.request.options?.some((option) => option.value === '__skip__')
+      : false).toBe(true)
+    response = session.resolveChoice(0, '__skip__')
+
+    expect(response.state.players[0]!.occupationPlayed).toEqual([CARD_ID])
+    expect(response.state.players[0]!.occupationHand).toEqual(OCCUPATIONS)
     expect(response.state.players[0]!.resources.food).toBe(0)
   })
 

@@ -136,20 +136,7 @@ describe('A018 Wheel Plow parity', () => {
     expect(response.state.players[0]!.cardStates[CARD_ID]?.flagged).toBeFalsy()
   })
 
-  it('A018 S5: first-person Cultivation may plow two additional fields', () => {
-    const session = setup()
-    let response = commitPlow(session, session.takeAction(0, 'cultivation'))
-    response = acceptWheelPlow(session, response)
-    response = commitPlow(session, response)
-    response = acceptWheelPlow(session, response)
-    response = commitPlow(session, response)
-
-    expect(response.ok, response.error).toBe(true)
-    expect(response.state.players[0]!.fields).toHaveLength(3)
-    expect(response.state.players[0]!.cardStates[CARD_ID]?.flagged).toBe(true)
-  })
-
-  it('builds both Cultivation bonus fields before the same action sows', () => {
+  it('A018 S5: Cultivation bonus fields participate in the same sow action', () => {
     const session = setupSowingSession({ cardId: CARD_ID, grain: 3 })
     session.state.players[0]!.occupationPlayed = OCCUPATIONS
     session.loadState(session.state)
