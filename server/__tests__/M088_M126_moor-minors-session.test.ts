@@ -5,10 +5,25 @@ import { gainAction } from '../../shared/actions/effects/gain'
 import { runCardEffectHook } from '../../shared/cards/card-effects'
 import { setActiveCardRegistry } from '../../shared/cards/active-registry'
 import { setActiveWorkerCount, setWorkersAtHome } from '../../shared/domain/player'
+import { getCardStack } from '../../shared/cards/helpers/card-state'
 import type { ActionFlow, ActionSpace, PlayerState, Resource } from '../../shared/contract/types'
 import type { AnytimeAction, SessionInteraction } from '../../shared/contract/types'
 
 const FILLER = '__test_placeholder__'
+const COOPERATIVE = 'M126_CooperativeStore'
+const COOPERATIVE_ANYTIME = 'M126-cooperative-store-anytime'
+
+const tradeOption = (response: ReturnType<GameSession['getState']>, from: keyof Resource, to: keyof Resource) => {
+  expect(response.ok, response.error).toBe(true)
+  if (response.interaction.stateId !== 'wait' || response.interaction.request.kind !== 'choice') throw new Error('expected resource exchange choice')
+  const option = response.interaction.request.options.find((candidate) =>
+    candidate.effectPreview?.kind === 'resourceExchange'
+    && candidate.effectPreview.resourcesPaid?.[from] === 1
+    && candidate.effectPreview.resourcesGained?.[to] === 1,
+  )
+  expect(option).toBeDefined()
+  return option!
+}
 
 const usage = (player: PlayerState, cardId: string) =>
   player.cardStates?.[cardId]?.counters?.usage ?? 0
@@ -218,25 +233,133 @@ describe('Moor Batch 1 counter and phase-listener minors', () => {
   it('M126 Cooperative Store initializes counters and trades one building resource for a different non-stone one', () => {
     const { session, player } = setup(['M126_CooperativeStore'])
     expect(usage(player, 'M126_CooperativeStore')).toBe(4)
-    setUsage(player, 'M126_CooperativeStore', 1)
     ;(['wood', 'clay', 'reed', 'stone'] as const).forEach((resource: keyof Pick<Resource, 'wood' | 'clay' | 'reed' | 'stone'>) => {
       player.resources[resource] = resource === 'wood' ? 1 : 0
     })
     session.loadState(session.state)
 
     const listed = enterInteraction(session)
-    const ids = actionIds(listed.interaction)
-    expect(ids).toContain('M126-cooperative-store-wood-to-clay')
-    expect(ids).toContain('M126-cooperative-store-wood-to-reed')
-    expect(ids).not.toContain('M126-cooperative-store-wood-to-wood')
-    expect(ids).not.toContain('M126-cooperative-store-wood-to-stone')
-
-    const resp = session.takeAnytimeAction(0, 'M126-cooperative-store-wood-to-clay')
+    expect(listed.interaction.anytimeActions.filter((action) => action.sourceCard === COOPERATIVE).map((action) => action.id)).toEqual([COOPERATIVE_ANYTIME])
+    const before = JSON.stringify(listed.state)
+    const choice = session.takeAnytimeAction(0, COOPERATIVE_ANYTIME)
+    expect(JSON.stringify(choice.state)).toBe(before)
+    expect(actionIds(choice.interaction)).not.toContain(COOPERATIVE_ANYTIME)
+    expect(tradeOption(choice, 'wood', 'reed')).toBeDefined()
+    if (choice.interaction.stateId !== 'wait' || choice.interaction.request.kind !== 'choice') throw new Error('expected choice')
+    expect(choice.interaction.request.options).toHaveLength(2)
+    const rejected = session.takeAnytimeAction(0, COOPERATIVE_ANYTIME)
+    expect(rejected.ok).toBe(false)
+    expect(JSON.stringify(rejected.state)).toBe(before)
+    const resp = session.resolveChoice(0, tradeOption(choice, 'wood', 'clay').value)
 
     expect(resp.ok).toBe(true)
     expect(resp.state.players[0]!.resources.wood).toBe(0)
     expect(resp.state.players[0]!.resources.clay).toBe(1)
-    expect(usage(resp.state.players[0]!, 'M126_CooperativeStore')).toBe(0)
-    expect(actionIds(resp.interaction)).not.toContain('M126-cooperative-store-wood-to-clay')
+    expect(usage(resp.state.players[0]!, 'M126_CooperativeStore')).toBe(3)
+    if (resp.interaction.stateId !== 'wait' || listed.interaction.stateId !== 'wait') throw new Error('expected plow')
+    expect(resp.interaction.request).toEqual(listed.interaction.request)
+    expect(resp.interaction.playerIndex).toBe(0)
+  })
+
+  it.each([
+    ['wood', 'clay'], ['wood', 'reed'], ['clay', 'wood'], ['clay', 'reed'],
+    ['reed', 'wood'], ['reed', 'clay'], ['stone', 'wood'], ['stone', 'clay'], ['stone', 'reed'],
+  ] as const)('M126 exchanges exactly one %s for one %s', (from, to) => {
+    const { session, player } = setup([COOPERATIVE])
+    player.resources = { ...player.resources, wood: 5, clay: 5, reed: 5, stone: 5 }
+    session.loadState(session.state)
+    enterInteraction(session)
+    const choice = session.takeAnytimeAction(0, COOPERATIVE_ANYTIME)
+    const completed = session.resolveChoice(0, tradeOption(choice, from, to).value)
+    expect(completed.ok, completed.error).toBe(true)
+    const updated = completed.state.players[0]!
+    expect(updated.resources[from]).toBe(4)
+    expect(updated.resources[to]).toBe(6)
+    expect(usage(updated, COOPERATIVE)).toBe(3)
+    expect(completed.state.events.filter((event) => event.type === 'resource.paid' && event.sourceCardId === COOPERATIVE))
+      .toEqual([expect.objectContaining({ resources: { [from]: 1 } })])
+    expect(completed.state.events.filter((event) => event.type === 'resource.moved' && event.sourceCardId === COOPERATIVE))
+      .toEqual([expect.objectContaining({ resources: { [to]: 1 } })])
+  })
+
+  it('M126 spends the last usage counter once and cannot activate again', () => {
+    const { session, player } = setup([COOPERATIVE])
+    setUsage(player, COOPERATIVE, 1)
+    session.loadState(session.state)
+    enterInteraction(session)
+    const choice = session.takeAnytimeAction(0, COOPERATIVE_ANYTIME)
+    const completed = session.resolveChoice(0, tradeOption(choice, 'wood', 'clay').value)
+    expect(completed.ok).toBe(true)
+    expect(usage(completed.state.players[0]!, COOPERATIVE)).toBe(0)
+    expect(actionIds(completed.interaction)).not.toContain(COOPERATIVE_ANYTIME)
+    const before = JSON.stringify(completed.state)
+    expect(session.takeAnytimeAction(0, COOPERATIVE_ANYTIME).ok).toBe(false)
+    expect(JSON.stringify(session.getState().state)).toBe(before)
+  })
+
+  it('M126 cannot activate without a building resource', () => {
+    const { session, player } = setup([COOPERATIVE])
+    player.resources = { ...player.resources, wood: 0, clay: 0, reed: 0, stone: 0 }
+    session.loadState(session.state)
+    const parent = enterInteraction(session)
+    expect(actionIds(parent.interaction)).not.toContain(COOPERATIVE_ANYTIME)
+    expect(session.takeAnytimeAction(0, COOPERATIVE_ANYTIME).ok).toBe(false)
+    expect(usage(session.state.players[0]!, COOPERATIVE)).toBe(4)
+  })
+
+  it('M126 restores resources, usage counters and the activation lock on undo', () => {
+    const { session } = setup([COOPERATIVE])
+    const parent = enterInteraction(session)
+    const resources = { ...parent.state.players[0]!.resources }
+    expect(session.takeAnytimeAction(0, COOPERATIVE_ANYTIME).ok).toBe(true)
+    const cancelled = session.undoStep()
+    expect(cancelled.ok).toBe(true)
+    expect(cancelled.interaction).toEqual(parent.interaction)
+    expect(cancelled.state.players[0]!.resources).toEqual(resources)
+    expect(usage(cancelled.state.players[0]!, COOPERATIVE)).toBe(4)
+    const choice = session.takeAnytimeAction(0, COOPERATIVE_ANYTIME)
+    expect(session.resolveChoice(0, tradeOption(choice, 'wood', 'clay').value).ok).toBe(true)
+    const undone = session.undoStep()
+    expect(undone.ok).toBe(true)
+    expect(undone.state.players[0]!.resources).toEqual(resources)
+    expect(usage(undone.state.players[0]!, COOPERATIVE)).toBe(4)
+    expect(actionIds(undone.interaction)).not.toContain(COOPERATIVE_ANYTIME)
+    expect(session.undoStep().interaction).toEqual(parent.interaction)
+  })
+
+  it('blocks an Emissary payment after a nested Cooperative Store exchange spends the selected good', () => {
+    const { session, player } = setup([COOPERATIVE])
+    player.occupationPlayed.push('D124_Emissary')
+    player.resources = { ...player.resources, wood: 1, clay: 2, reed: 0, stone: 0, food: 5 }
+    setUsage(player, COOPERATIVE, 1)
+    session.loadState(session.state)
+    enterInteraction(session)
+    const emissary = session.takeAnytimeAction(0, 'D124-emissary-anytime')
+    expect(emissary.ok).toBe(true)
+    const outer = structuredClone(emissary.interaction)
+    const wood = tradeOption(emissary, 'wood', 'stone')
+    expect(actionIds(emissary.interaction)).not.toContain('D124-emissary-anytime')
+    const store = session.takeAnytimeAction(0, COOPERATIVE_ANYTIME)
+    expect(actionIds(store.interaction)).not.toContain(COOPERATIVE_ANYTIME)
+    expect(actionIds(store.interaction)).not.toContain('D124-emissary-anytime')
+    const resumed = session.resolveChoice(0, tradeOption(store, 'wood', 'clay').value)
+    expect(resumed.ok).toBe(true)
+    if (resumed.interaction.stateId !== 'wait' || outer.stateId !== 'wait') throw new Error('expected Emissary choice')
+    expect(resumed.interaction.request).toEqual(outer.request)
+    expect(resumed.state.players[0]!.resources).toMatchObject({ wood: 0, clay: 3, stone: 0 })
+    expect(usage(resumed.state.players[0]!, COOPERATIVE)).toBe(0)
+    const before = JSON.stringify(resumed.state)
+    const blocked = session.resolveChoice(0, wood.value)
+    expect(blocked.ok, blocked.error).toBe(true)
+    expect(blocked.interaction).toMatchObject({
+      stateId: 'wait', request: { kind: 'engine-blocked', actionId: 'pay' }, anytimeActions: [],
+    })
+    expect(blocked.interaction.allowedCommands).toContain('undoAction')
+    expect(JSON.stringify(blocked.state)).toBe(before)
+    expect(getCardStack(blocked.state.players[0]!, 'D124_Emissary')).toEqual([])
+    expect(session.undoAction().ok).toBe(true)
+    expect(session.state.players[0]!.resources).toMatchObject({ wood: 1, clay: 2, stone: 0 })
+    expect(usage(session.state.players[0]!, COOPERATIVE)).toBe(1)
+    expect(session.state.actionSpaces.find((space) => space.id === 'farmland')!.takenBy).toHaveLength(0)
   })
 })

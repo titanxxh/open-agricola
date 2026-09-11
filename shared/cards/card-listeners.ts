@@ -48,6 +48,7 @@ export type CardListenerRegistration = {
   zones?: CardListenerZone[]
   mandatory?: boolean
   preScoring?: boolean
+  allowAnytimeReentry?: boolean
   monotoneFenceCost?: boolean
   blockedAnytimeInteractionKinds?: readonly InteractionRequest['kind'][]
   /**

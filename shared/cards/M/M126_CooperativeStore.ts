@@ -1,7 +1,7 @@
 import { defineMinorCard } from '../card-source'
 import type { CardListenerContext, CardListenerRegistration } from '../card-listeners'
-import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
-import type { Resource } from '../../contract/types'
+import type { ActionHookResult } from '../../actions/hooks'
+import type { ActionFlow } from '../../contract/types'
 import { gainLeaf, payLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
 import { initUsageCounters, setUsageCounterLeaf, usageCounters } from './moor-batch1-helpers'
@@ -10,36 +10,34 @@ const CARD_ID = 'M126_CooperativeStore'
 const BUILDING_RESOURCES = ['wood', 'clay', 'reed', 'stone'] as const
 const TARGET_RESOURCES = ['wood', 'clay', 'reed'] as const
 
-const buildListener = (
-  from: typeof BUILDING_RESOURCES[number],
-  to: typeof TARGET_RESOURCES[number],
-): CardListenerRegistration => ({
-  id: `M126-cooperative-store-${from}-to-${to}`,
+const anytimeListener: CardListenerRegistration = {
+  id: 'M126-cooperative-store-anytime',
   cardIds: [CARD_ID],
-  phases: ['anytime' as ActionHookPhase],
+  phases: ['anytime'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
     const usage = usageCounters(context.player, CARD_ID)
     if (usage <= 0) return
-    if ((context.player.resources[from] ?? 0) < 1) return
-    return {
-      flow: {
+    const children: ActionFlow[] = BUILDING_RESOURCES
+      .filter((from) => context.player.resources[from] >= 1)
+      .flatMap((from) => TARGET_RESOURCES.filter((to) => to !== from).map((to) => ({
         type: 'seq',
         children: [
-          payLeaf({ cardId: CARD_ID, cost: { [from]: 1 } }),
+          payLeaf({
+            cardId: CARD_ID,
+            cost: { [from]: 1 },
+            effectPreview: { kind: 'resourceExchange', resourcesPaid: { [from]: 1 }, resourcesGained: { [to]: 1 } },
+          }),
           setUsageCounterLeaf(CARD_ID, usage - 1),
-          gainLeaf(CARD_ID, { [to]: 1 } as Partial<Resource>),
+          gainLeaf(CARD_ID, { [to]: 1 }),
         ],
-      },
+      })))
+    if (children.length === 0) return
+    return {
+      flow: children.length === 1 ? children[0]! : { type: 'xor', children },
       sourceCard: CARD_ID,
     }
   },
-})
-
-const listeners = BUILDING_RESOURCES.flatMap((from) =>
-  TARGET_RESOURCES
-    .filter((to) => to !== from)
-    .map((to) => buildListener(from, to)),
-)
+}
 
 const cardImpl = {
   effect: {
@@ -48,7 +46,7 @@ const cardImpl = {
       initUsageCounters(player, CARD_ID, 4)
     },
   },
-  listeners,
+  listeners: [anytimeListener],
   reaches: [] as readonly string[],
 } satisfies CardImpl
 

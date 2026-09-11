@@ -912,7 +912,11 @@ Three consumers share this snapshot:
 
 Nested anytime flows are injected ahead of the current pending tree. Parent pending state remains on its original pending host as a `PendingEnvelope`; when the nested flow resolves, `EngineStack` resumes the parent frame and `buildInteraction()` surfaces the parent envelope again instead of going idle.
 
-每个 anytime 入口都在引擎 sequence 内运行，以入口 ID 和发起玩家标识。该 sequence 已开始且尚未结束时，`buildAnytimeEntries()` 会跨全部引擎 frame 排除同一玩家的同一入口；直接命令也使用该过滤结果。其他入口（包括同一卡牌的不同入口）仍按普通窗口策略判断。sequence 覆盖 before 效果、嵌套选择和后置响应，完成或显式跳过后解除限制，私有游标恢复与撤销保留这一生命周期。窗口中尚未选中的入口不受此限制。费用不足且没有其他合法 anytime 的续行进入既有 blocked / undo 路径。
+每个 anytime 入口都在引擎 sequence 内运行，以能力入口 ID 和发起玩家标识。默认情况下，该 sequence 已开始且尚未结束时，`buildAnytimeEntries()` 会跨全部引擎 frame 排除同一玩家的同一入口；直接命令也使用该过滤结果。其他能力（包括同一卡牌的不同能力）仍按普通窗口策略判断。sequence 覆盖 before 效果、支付、主体收益、嵌套选择、动物整理和后置响应，主体收益完成不会解除限制。完成或显式跳过后解除限制，私有游标恢复与撤销保留这一生命周期。窗口中尚未选中的入口不受此限制。费用不足且没有其他合法 anytime 的续行进入既有 blocked / undo 路径。
+
+系统 `ActionDefinition` 与卡牌 `CardListenerRegistration` 都支持 `allowAnytimeReentry?: boolean`。只有 `true` 豁免活动入口限制；窗口策略、归属与操作者检查、费用、使用次数、配方禁用与 continuation guard 仍全部生效。当前仅系统 `exchange` 开启。因此，exchange 引发的动物整理期间可以再次通过 exchange 烹饪，但 B104 配方仍被禁用；exchange／bake 选择、feed／heating 和下一玩家确认期间仍禁止 exchange。新增卡牌例外必须有合法、可达的使用场景及原生 Session 结算和恢复证据，人工测试 listener 只能证明引擎契约。这是设计时要求，不是运行时穷举预检；ADR-0015 当前步骤准入规则保持不变。
+
+同一 Anytime Ability 的商品或目标选项共享入口与限制。D124 和 M126 各提供一个卡牌 anytime 入口，具体选项在内部选择。每次发动结算一件商品或一组兑换；多个选项时先选择，再扣资源或使用标记，只有一个合法选项时沿用普通单选执行行为。反悔使用现有撤销及其可用性边界，不增加取消按钮或批量交互。D124 保留商品不得重复及原有时机规则，M126 保留四枚共享使用标记及原有时机规则。普通 XOR 在嵌套行动后仍保留原候选列表，实际付款使用当前资源；选项变得付不起时沿用既有 blocked / undo 行为。
 
 若 anytime flow 的终止 reaction 必须等整个 injected sequence 完成后才运行，可在最后一个 leaf 上写入 `INJECTED_ANYTIME_COMPLETION_CONTEXT_KEY`。completion listener 必须同时看到该 marker 与引擎添加的 injected-anytime marker，因此空栈顶层 anytime action 不会被误判为 suspended-flow completion。
 

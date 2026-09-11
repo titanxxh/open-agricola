@@ -642,6 +642,7 @@ export const anytimeExchangeAction: ActionDefinition = {
   roundAvailable: 1,
   gainPerRound: {},
   anytime: true,
+  allowAnytimeReentry: true,
   canBeExecutedByPlayer: (state, player, ctx) => {
     const batch = ctx?.actionContext?.batchExchange as { maxTotal?: number } | undefined
     if (batch) {

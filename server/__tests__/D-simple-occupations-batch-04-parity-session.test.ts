@@ -191,7 +191,7 @@ describe('D124 Emissary parity', () => {
 
   it('D124 S1: may place one wood on the card for one stone', () => {
     const session = setup()
-    const response = session.takeAnytimeAction(0, 'D124-emissary-wood')
+    const response = session.takeAnytimeAction(0, 'D124-emissary-anytime')
     expect(response.ok, response.error).toBe(true)
     expect(response.state.players[0]!.resources).toMatchObject({ wood: 1, stone: 1 })
     expect(getCardStack(response.state.players[0]!, 'D124_Emissary')).toContain('wood')
@@ -199,9 +199,14 @@ describe('D124 Emissary parity', () => {
 
   it('D124 S2: the same good cannot be placed twice', () => {
     const session = setup()
-    const first = session.takeAnytimeAction(0, 'D124-emissary-wood')
-    expect(first.interaction.anytimeActions.map((action) => action.id)).not.toContain('D124-emissary-wood')
-    expect(first.interaction.anytimeActions.map((action) => action.id)).toContain('D124-emissary-stone')
+    const first = session.takeAnytimeAction(0, 'D124-emissary-anytime')
+    expect(first.ok, first.error).toBe(true)
+    expect(first.interaction.anytimeActions.map((action) => action.id)).toContain('D124-emissary-anytime')
+    const second = session.takeAnytimeAction(0, 'D124-emissary-anytime')
+    expect(second.ok, second.error).toBe(true)
+    expect(second.state.players[0]!.resources).toMatchObject({ wood: 1, stone: 1 })
+    expect(getCardStack(second.state.players[0]!, 'D124_Emissary')).toEqual(['wood', 'stone'])
+    expect(second.interaction.anytimeActions.map((action) => action.id)).not.toContain('D124-emissary-anytime')
   })
 })
 

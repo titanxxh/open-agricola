@@ -1,6 +1,7 @@
 import { defineOccupationCard } from '../card-source'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
-import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
+import type { ActionHookResult } from '../../actions/hooks'
+import type { ActionFlow } from '../../contract/types'
 import { getCardStack } from '../helpers/card-state'
 import { gainLeaf, payLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
@@ -8,34 +9,39 @@ import type { CardImpl } from '../registry'
 const CARD_ID = 'D124_Emissary'
 const GOOD_TYPES = ['wood', 'clay', 'reed', 'stone', 'food', 'grain', 'vegetable', 'sheep', 'boar', 'cattle'] as const
 
-const listeners: CardListenerRegistration[] = GOOD_TYPES.map((good) => ({
-  id: `D124-emissary-${good}`,
+const anytimeListener: CardListenerRegistration = {
+  id: 'D124-emissary-anytime',
   cardIds: [CARD_ID],
-  phases: ['anytime' as ActionHookPhase],
+  phases: ['anytime'],
   preScoring: true,
   blockedAnytimeInteractionKinds: ['animal-reorg'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
     const placed = getCardStack(context.player, CARD_ID)
-    if (placed.includes(good)) return
-    if ((context.player.resources[good as keyof typeof context.player.resources] ?? 0) < 1) return
-    return {
-      flow: {
+    const children: ActionFlow[] = GOOD_TYPES
+      .filter((good) => !placed.includes(good) && context.player.resources[good] >= 1)
+      .map((good) => ({
         type: 'seq',
         children: [
-          payLeaf({ cardId: CARD_ID, cost: { [good]: 1 } }),
+          payLeaf({
+            cardId: CARD_ID,
+            cost: { [good]: 1 },
+            effectPreview: { kind: 'resourceExchange', resourcesPaid: { [good]: 1 }, resourcesGained: { stone: 1 } },
+          }),
           gainLeaf(CARD_ID, { stone: 1 }),
           { type: 'leaf', actionId: 'push-to-card-stack', sourceCard: CARD_ID, params: { item: good } },
         ],
-      },
+      }))
+    if (children.length === 0) return
+    return {
+      flow: children.length === 1 ? children[0]! : { type: 'xor', children },
       sourceCard: CARD_ID,
       labelKey: 'cards.D124_Emissary.anytime',
-      labelParams: { good },
     }
   },
-}))
+}
 
 const cardImpl = {
-  listeners,
+  listeners: [anytimeListener],
   reaches: [] as readonly string[],
 } satisfies CardImpl
 
