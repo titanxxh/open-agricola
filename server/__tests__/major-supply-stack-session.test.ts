@@ -141,6 +141,38 @@ const choosePaymentReturningCard = (session: GameSession, cardId: string) => {
 }
 
 describe('major improvement supply stacks', () => {
+  it.each([
+    ['Major_Fireplace1', 'Major_Fireplace2', 'Major_Fireplace3'],
+    ['Major_CookingHearth1', 'Major_CookingHearth2', 'Major_CookingHearth3'],
+  ])('%s currently reveals the duplicate before %s is bought', (cheaper, expensive, duplicate) => {
+    const session = prepareSixPlayerMajorSession()
+    const before = session.getState()
+    expect(before.state.players).toHaveLength(6)
+    expect(before.state.availableMajorImprovements).not.toContain(duplicate)
+
+    const state = buildMajor(session, cheaper)
+    expect(state.players[0]!.improvements).toContain(cheaper)
+    expect(state.availableMajorImprovements).toContain(expensive)
+    expect(state.availableMajorImprovements).toContain(duplicate)
+
+    resetMajorActionForPlayer0(session)
+    const response = session.takeAction(0, 'major-improvement')
+    expect(response.ok).toBe(true)
+    expect(response.interaction.stateId).toBe('wait')
+    expect(response.interaction.request.options?.map((option) => option.value)).toContain(duplicate)
+    const snapshot = structuredClone({
+      players: response.state.players,
+      availableMajorImprovements: response.state.availableMajorImprovements,
+    })
+    const rejected = session.resolveChoice(0, 'Major_Moor_Cookhouse1')
+    expect(rejected.ok).toBe(false)
+    expect(rejected.state.players).toEqual(snapshot.players)
+    expect(rejected.state.availableMajorImprovements).toEqual(snapshot.availableMajorImprovements)
+    expect(rejected.interaction.stateId).toBe('wait')
+    const accepted = session.resolveChoice(0, expensive)
+    expect(accepted.ok).toBe(true)
+  })
+
   it('keeps five-player major supply flat with the standard 10 majors', () => {
     const state = createInitialState(42, { playerCount: 5 })
 

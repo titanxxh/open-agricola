@@ -1,13 +1,12 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
-import { MEEPLE_SYMBOL_SPACE_IDS } from '../../shared/cards/helpers/action-space-categories'
 
 import '../../shared/cards/A/A177_Middleman'
 
 const CARD_ID = 'A177_Middleman'
 const ATTACHMENTS_KEY = 'actionSpaceAttachments'
 const expectedAttachments = () =>
-  MEEPLE_SYMBOL_SPACE_IDS.map((spaceId) => ({
+  ['lessons-56-2f', 'copse-56', 'lessons-56-variable', 'modest-wish-children-56', 'house-building-56', 'traveling-players-56'].map((spaceId) => ({
     spaceId,
     resources: { stone: 1, food: 1 },
   }))

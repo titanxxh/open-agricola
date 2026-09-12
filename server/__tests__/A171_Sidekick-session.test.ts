@@ -126,7 +126,7 @@ describe('A171 Sidekick session', () => {
     expect(resp.state.actionSpaces.find((space) => space.id === 'vegetable-seeds')?.takenBy).toEqual([])
   })
 
-  it('can chain from a fixed board action to its physical left action', () => {
+  it('currently chains from a fixed board action even though the card names action space cards', () => {
     const session = setup({
       spaceResources: {
         forest: { wood: 2 },

@@ -17,6 +17,31 @@ const setup = () => {
 }
 
 describe('B176 Village Idiot', () => {
+  it.each([5, 6])('currently retains the remaining occupation hand when played in a %i-player game', (playerCount) => {
+    const session = new GameSession(176, undefined, { playerCount })
+    const state = session.getState().state
+    for (const player of state.players) {
+      player.minorHand = ['__test_placeholder__']
+      player.occupationHand = ['__test_placeholder__']
+    }
+    state.currentPlayerIndex = 0
+    state.players[0]!.occupationHand = [CARD_ID, 'A174_MasterHora', 'D172_PutcherMaker']
+    state.players[0]!.resources.food = 4
+    session.loadState(state)
+
+    let response = session.takeAction(0, 'lessons')
+    expect(response.ok).toBe(true)
+    expect(response.interaction.stateId).toBe('wait')
+    expect(response.interaction.request.options?.map((option) => option.value)).toContain(CARD_ID)
+    response = session.resolveChoice(0, CARD_ID)
+    expect(response.ok).toBe(true)
+    expect(response.state.players).toHaveLength(playerCount)
+    expect(response.state.players[0]!.occupationPlayed).toEqual([CARD_ID])
+    expect(response.state.players[0]!.occupationHand).toEqual(['A174_MasterHora', 'D172_PutcherMaker'])
+    expect(response.state.players[0]!.resources.food).toBe(4)
+    expect(response.state.log.some((entry) => JSON.stringify(entry.params).includes(CARD_ID))).toBe(true)
+  })
+
   it('cannot be played when the player already has another occupation', () => {
     const session = setup()
     const state = session.getState().state

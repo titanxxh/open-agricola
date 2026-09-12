@@ -50,6 +50,19 @@ const resolveAnimalReorgs = (
 }
 
 describe('A180 Animal Brander', () => {
+  it('repeats only the selected boar option once for one food', () => {
+    const session = setup(1)
+    let response = session.takeAction(0, 'animal-market-56')
+    const boar = findOption(response, (option) => option.labelKey === 'actions.animal-market-56.option-boar')!
+    response = resolveAnimalReorgs(session, session.resolveChoice(0, boar.value), 'boar')
+    const doubled = findOption(response, (option) => option.sourceCard === CARD_ID)!
+    expect(doubled).toBeDefined()
+    response = resolveAnimalReorgs(session, session.resolveChoice(0, doubled.value), 'boar')
+    expect(response.ok).toBe(true)
+    expect(response.state.players[0]!.resources).toMatchObject({ food: 0, boar: 2, sheep: 0, cattle: 0 })
+    expect(findOption(response, (option) => option.sourceCard === CARD_ID)).toBeUndefined()
+  })
+
   it('offers a paid doubled Animal Market sheep branch while preserving the original action', () => {
     const session = setup()
 
