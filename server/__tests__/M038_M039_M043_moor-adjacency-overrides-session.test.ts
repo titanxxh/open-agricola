@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 
 import { GameSession } from '../game/authoritative-session'
 import { confirmNextPlayer } from './_helpers/pending-confirms'
+import { playMoorAuditMinor } from './_helpers/moor-rules-audit'
 import { playerBoard } from '../../shared/domain'
 import { setActiveWorkerCount, setWorkersAtHome } from '../../shared/domain/player'
 import { resetMoorSpecialActionCards } from '../../shared/moor/special-actions'
@@ -251,6 +252,29 @@ describe('M038/M039/M043 one-shot adjacency overrides', () => {
     expect(resp.state.players[0]!.pastures.some((pasture) =>
       pasture.tiles.some((tile) => tile.row === 0 && tile.col === 1),
     )).toBe(true)
+  })
+
+  it('M038 currently leaves cleared reserve land without a pasture after M021 removes its last moor', () => {
+    const session = setup('M038_NatureReserve', (player) => {
+      addPasture00(player)
+      player.farmTerrain = [{ row: 0, col: 1, kind: 'moor' }]
+    })
+    const fenced = commitFence(session, playMinor(session, 'M038_NatureReserve'), adjacentTerrainEdges)
+    expect(fenced.ok, fenced.error).toBe(true)
+    expect(fenced.state.players[0]!.pastures).toHaveLength(1)
+    confirmNextPlayer(session)
+    resetToPlayerTurn(session)
+    session.state.round = 14
+    session.state.players[0]!.resources.food = 4
+    session.loadState(session.state)
+    const played = playMoorAuditMinor(session, 'M021_PeatCuttingExpedition')
+    expect(played.interaction.request.selection?.kind).toBe('farm-position')
+    const cleared = session.commitSelectionChoice(0, { positions: [{ row: 0, col: 1 }] })
+    expect(cleared.ok, cleared.error).toBe(true)
+    expect(cleared.state.players[0]!.farmTerrain).toEqual([])
+    expect(cleared.state.players[0]!.resources.fuel).toBe(2)
+    expect(cleared.state.players[0]!.cardStates.M021_PeatCuttingExpedition?.counters?.bonusVp).toBe(1)
+    expect(cleared.state.players[0]!.pastures).toHaveLength(1)
   })
 
   it('M038 does not convert a Slash and Burn field into a pasture', () => {

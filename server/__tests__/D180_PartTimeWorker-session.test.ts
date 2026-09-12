@@ -53,6 +53,15 @@ const chooseFrom = (session: GameSession, resp: ReturnType<GameSession['getState
 }
 
 describe('D180 Part-Time Worker session', () => {
+  it.each([[4, 2, 'boar'], [6, 3, 'cattle']] as const)('leaves %i goods as the printed half and gains %s', (total, returned, animal) => {
+    const session = setup([CARD_ID], { wood: total })
+    const response = chooseFrom(session, session.takeAction(0, 'forest'), CARD_ID)
+    expect(response.ok).toBe(true)
+    expect(response.state.players[0]!.resources.wood).toBe(total - returned)
+    expect(response.state.players[0]!.resources[animal]).toBe(1)
+    expect(response.state.actionSpaces.find((space) => space.id === 'forest')!.resources.wood).toBe(returned)
+  })
+
   it('accepts exact two goods by returning one good and gaining a sheep', () => {
     const session = setup([CARD_ID], { wood: 2 })
 
