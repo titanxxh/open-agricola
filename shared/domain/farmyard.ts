@@ -212,6 +212,7 @@ type SowValidationOptions = {
   maxSelections?: number
   /** Minimum selected logical fields. Defaults to 1 to preserve ordinary sow validation. */
   minSelections?: number
+  allowedFieldKeys?: ReadonlySet<string>
   excludedFields?: FarmTilePosition[]
   /** Extra sowable fields keyed by position, with their allowed crops. */
   extraAllowedCrops?: Map<string, SowSelection['crop'][]>
@@ -560,6 +561,7 @@ export const validateSowSelection = <T extends PlayerFarmState>(
     options.normalFieldAllowedCrops ?? DEFAULT_NORMAL_FIELD_CROPS
   const used = new Set<string>()
   const usedGroups = new Set<string>()
+  const allowed = options.allowedFieldKeys
   const excluded = new Set(
     (options.excludedFields ?? []).map((field) => localPositionKey(field)),
   )
@@ -599,7 +601,7 @@ export const validateSowSelection = <T extends PlayerFarmState>(
       return { ok: false, error: { code: 'INVALID_POSITION' } }
     }
     if (used.has(key)) continue
-    if (excluded.has(key)) {
+    if (excluded.has(key) || (allowed !== undefined && !allowed.has(key))) {
       return { ok: false, error: { code: 'INVALID_POSITION' } }
     }
     const field = fieldMap.get(key)

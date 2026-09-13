@@ -382,22 +382,17 @@ export const useExchangeDraftPresentation = ({
   const harvestPending = interactionPresentationPlan.kind === 'harvest-feed'
     ? interactionPresentationPlan
     : null
-  const harvestFeedConvertedFood = Math.min(
-    harvestPending?.remaining ?? 0,
-    Math.max(0, harvestFeedNetFood),
-  )
-  const harvestFeedBegging = Math.max(
-    0,
-    (harvestPending?.remaining ?? 0) - Math.max(0, harvestFeedNetFood),
-  )
+  const availableFeedFood = Math.max(0, (harvestFeedPlayer?.resources.food ?? 0) + harvestFeedNetFood)
+  const harvestFeedConvertedFood = Math.min(harvestPending?.remaining ?? 0, availableFeedFood)
+  const harvestFeedBegging = Math.max(0, (harvestPending?.remaining ?? 0) - availableFeedFood)
   const harvestFeedSummary = useMemo(
     () => buildHarvestFeedSummary({
       selections: harvestFeedSelections,
       foodUsed: harvestPending?.foodUsed ?? 0,
-      convertedFood: harvestFeedNetFood,
+      convertedFood: harvestFeedConvertedFood,
       begging: harvestFeedBegging,
     }),
-    [harvestFeedBegging, harvestFeedNetFood, harvestFeedSelections, harvestPending?.foodUsed],
+    [harvestFeedBegging, harvestFeedConvertedFood, harvestFeedSelections, harvestPending?.foodUsed],
   )
 
   const reset = useCallback(() => {

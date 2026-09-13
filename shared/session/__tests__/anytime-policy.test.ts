@@ -16,8 +16,10 @@ describe('computeAnytimePolicy', () => {
       .toEqual({ allowed: false, reason: 'no-active-interaction' })
   })
 
-  it('rule 2 — feed → blocked', () => {
+  it('allows resumable anytime flows during feeding but not heating', () => {
     expect(computeAnytimePolicy(base({ interactionKind: 'feed' })))
+      .toEqual({ allowed: true, blockedIds: [] })
+    expect(computeAnytimePolicy(base({ interactionKind: 'heating' })))
       .toEqual({ allowed: false, reason: 'feed-window-locked' })
   })
 

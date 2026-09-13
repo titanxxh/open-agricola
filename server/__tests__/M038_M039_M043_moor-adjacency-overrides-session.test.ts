@@ -254,7 +254,7 @@ describe('M038/M039/M043 one-shot adjacency overrides', () => {
     )).toBe(true)
   })
 
-  it('M038 currently leaves cleared reserve land without a pasture after M021 removes its last moor', () => {
+  it('M038 creates a pasture after M021 removes the last moor from its reserve', () => {
     const session = setup('M038_NatureReserve', (player) => {
       addPasture00(player)
       player.farmTerrain = [{ row: 0, col: 1, kind: 'moor' }]
@@ -274,7 +274,7 @@ describe('M038/M039/M043 one-shot adjacency overrides', () => {
     expect(cleared.state.players[0]!.farmTerrain).toEqual([])
     expect(cleared.state.players[0]!.resources.fuel).toBe(2)
     expect(cleared.state.players[0]!.cardStates.M021_PeatCuttingExpedition?.counters?.bonusVp).toBe(1)
-    expect(cleared.state.players[0]!.pastures).toHaveLength(1)
+    expect(cleared.state.players[0]!.pastures).toHaveLength(2)
   })
 
   it('M038 does not convert a Slash and Burn field into a pasture', () => {

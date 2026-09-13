@@ -231,7 +231,7 @@ describe('Moor action listener minors', () => {
     const resp = buyMinor(session, 0, session.takeAction(0, 'meeting-place'), 'M023_EdgeOfTheForest')
 
     expect(resp.ok).toBe(true)
-    expect(resp.state.players[0]!.resources.food).toBe(foodBefore + 1)
+    expect(resp.state.players[0]!.resources.food).toBe(foodBefore + 2)
     expect(resp.state.players[0]!.resources.fuel).toBe(fuelBefore + 2)
     expect(resp.state.players[1]!.minorHand).toContain('M023_EdgeOfTheForest')
   })

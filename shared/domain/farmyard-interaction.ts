@@ -193,7 +193,7 @@ const getExcludedFieldKeys = (actionContext?: Record<string, unknown>) =>
       : [],
   )
 
-const getAllowedSelectedFieldKeys = (
+export const getAllowedSelectedFieldKeys = (
   player: PlayerState,
   actionContext?: Record<string, unknown>,
 ) =>

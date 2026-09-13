@@ -353,7 +353,7 @@ export const majorCardDefinitionsList: readonly (MajorCardDisplay & { kind: 'maj
     "deck": "major",
     "number": 11,
     "cost": {
-      "clay": 3
+      "clay": 4
     },
     "vp": 1,
     "extraVp": false,
@@ -438,7 +438,7 @@ export const majorCardDefinitionsList: readonly (MajorCardDisplay & { kind: 'maj
     "number": 12,
     "cost": {
       "fee": {
-        "clay": 5
+        "clay": 6
       },
       "cards": {
         "type": "Major",
@@ -536,7 +536,7 @@ export const majorCardDefinitionsList: readonly (MajorCardDisplay & { kind: 'maj
     "deck": "major",
     "number": 13,
     "cost": {
-      "wood": 1,
+      "clay": 1,
       "stone": 3
     },
     "vp": 4,
@@ -552,7 +552,7 @@ export const majorCardDefinitionsList: readonly (MajorCardDisplay & { kind: 'maj
     "deck": "major",
     "number": 14,
     "cost": {
-      "clay": 3,
+      "clay": 4,
       "stone": 1
     },
     "vp": 2,
@@ -587,7 +587,7 @@ export const majorCardDefinitionsList: readonly (MajorCardDisplay & { kind: 'maj
     "deck": "major",
     "number": 15,
     "cost": {
-      "clay": 1,
+      "clay": 2,
       "stone": 3
     },
     "vp": 3,
@@ -623,7 +623,7 @@ export const majorCardDefinitionsList: readonly (MajorCardDisplay & { kind: 'maj
     "number": 16,
     "cost": {
       "wood": 2,
-      "stone": 2
+      "stone": 3
     },
     "vp": 2,
     "extraVp": true,
@@ -649,7 +649,7 @@ export const majorCardDefinitionsList: readonly (MajorCardDisplay & { kind: 'maj
     "number": 17,
     "cost": {
       "clay": 2,
-      "stone": 2
+      "stone": 3
     },
     "vp": 2,
     "extraVp": true,
@@ -675,7 +675,7 @@ export const majorCardDefinitionsList: readonly (MajorCardDisplay & { kind: 'maj
     "number": 18,
     "cost": {
       "reed": 2,
-      "stone": 2
+      "stone": 3
     },
     "vp": 2,
     "extraVp": true,

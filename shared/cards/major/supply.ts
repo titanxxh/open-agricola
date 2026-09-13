@@ -26,10 +26,10 @@ export const sixPlayerDuplicateMajorImprovementIds = [
 ]
 
 const sixPlayerMajorSupplyTemplate: readonly MajorSupplyStack[] = [
-  { stackId: 'fireplace-1', familyId: 'fireplace', visibleId: 'Major_Fireplace1', cardIds: ['Major_Fireplace1', 'Major_Fireplace3'] },
-  { stackId: 'fireplace-2', familyId: 'fireplace', visibleId: 'Major_Fireplace2', cardIds: ['Major_Fireplace2'] },
-  { stackId: 'cooking-hearth-1', familyId: 'cooking-hearth', visibleId: 'Major_CookingHearth1', cardIds: ['Major_CookingHearth1', 'Major_CookingHearth3'] },
-  { stackId: 'cooking-hearth-2', familyId: 'cooking-hearth', visibleId: 'Major_CookingHearth2', cardIds: ['Major_CookingHearth2'] },
+  { stackId: 'fireplace-1', familyId: 'fireplace', visibleId: 'Major_Fireplace1', cardIds: ['Major_Fireplace1'] },
+  { stackId: 'fireplace-2', familyId: 'fireplace', visibleId: 'Major_Fireplace2', cardIds: ['Major_Fireplace2', 'Major_Fireplace3'] },
+  { stackId: 'cooking-hearth-1', familyId: 'cooking-hearth', visibleId: 'Major_CookingHearth1', cardIds: ['Major_CookingHearth1'] },
+  { stackId: 'cooking-hearth-2', familyId: 'cooking-hearth', visibleId: 'Major_CookingHearth2', cardIds: ['Major_CookingHearth2', 'Major_CookingHearth3'] },
   { stackId: 'clay-oven', familyId: 'clay-oven', visibleId: 'Major_ClayOven', cardIds: ['Major_ClayOven', 'Major_ClayOven2'] },
   { stackId: 'stone-oven', familyId: 'stone-oven', visibleId: 'Major_StoneOven', cardIds: ['Major_StoneOven', 'Major_StoneOven2'] },
   { stackId: 'well', familyId: 'well', visibleId: 'Major_Well', cardIds: ['Major_Well', 'Major_Well2'] },

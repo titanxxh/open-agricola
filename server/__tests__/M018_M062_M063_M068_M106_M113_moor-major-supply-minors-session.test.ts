@@ -140,7 +140,10 @@ describe('Moor major-supply and upgrade minors', () => {
     const player = session.state.players[0]!
     player.resources = fullResources({ reed: 1, clay: 2, stone: 1 })
 
-    const resp = playMinor(session, 'M062_HearthBrush')
+    const offered = playMinor(session, 'M062_HearthBrush')
+    const move = offered.interaction.request.options.find((option) => option.value !== '__skip__')!
+    const resp = session.resolveChoice(0, move.value)
+    expect(resp.ok).toBe(true)
 
     expect(stackFor(resp.state, 'stone-oven')).toMatchObject({
       visibleId: 'Major_Moor_TiledOven',
@@ -206,7 +209,10 @@ describe('Moor major-supply and upgrade minors', () => {
     const player = session.state.players[0]!
     player.improvements = ['Major_Fireplace1', 'Major_ClayOven']
 
-    const resp = playMinor(session, 'M063_PastoralLetter')
+    const offered = playMinor(session, 'M063_PastoralLetter')
+    const move = offered.interaction.request.options.find((option) => option.value !== '__skip__')!
+    const resp = session.resolveChoice(0, move.value)
+    expect(resp.ok).toBe(true)
 
     expect(stackFor(resp.state, 'well')).toMatchObject({
       visibleId: 'Major_Moor_VillageChurch',

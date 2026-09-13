@@ -127,8 +127,13 @@ describe('C018_RollOverPlow session', () => {
     })
   })
 
-  it('discards crops from a selected Card Field before plowing', () => {
+  it.each([false, true])('discards all crops from a selected Card Field before plowing, with buried crops: %s', (buried) => {
     const session = setup({ includeCardField: true })
+    if (buried) {
+      session.state.players[0]!.cardStates.B113_PatchCaregiver = {
+        extraData: { cardFieldStacks: [{ crop: 'grain', remaining: 2, below: [{ crop: 'vegetable', remaining: 1 }] }] },
+      }
+    }
     enterActiveInteraction(session)
 
     let resp = session.takeAnytimeAction(0, 'C18-roll-over-plow-anytime')

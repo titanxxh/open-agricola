@@ -87,7 +87,7 @@ describe('OA-only base card printed-rule audit', () => {
     expect(session.state.players[0]!.fields[0]!.stacks).toEqual([])
   })
 
-  it('A113 currently excludes a card field holding three grain from its Lessons reward', () => {
+  it('A113 buries a vegetable below three grain on a card field and harvests grain first', () => {
     const session = setup()
     const player = session.state.players[0]!
     player.occupationPlayed = ['A113_HeresyTeacher']
@@ -98,10 +98,17 @@ describe('OA-only base card printed-rule audit', () => {
     const response = session.takeAction(0, 'lessons')
     expect(response.ok, response.error).toBe(true)
     expect(response.state.players[0]!.occupationPlayed).toContain('A100_Curator')
-    expect(response.state.players[0]!.cardStates.D025_WitchesDanceFloor?.extraData?.cardFieldStacks).toEqual([{ crop: 'grain', remaining: 3 }])
+    expect(response.state.players[0]!.cardStates.D025_WitchesDanceFloor?.extraData?.cardFieldStacks).toEqual([
+      { crop: 'grain', remaining: 3, below: [{ crop: 'vegetable', remaining: 1 }] },
+    ])
+    for (const [index, round] of [4, 7, 9, 11].entries()) {
+      const harvested = harvest(session, round)
+      expect(harvested.state.players[0]!.resources).toMatchObject({ grain: Math.min(index + 1, 3), vegetable: index === 3 ? 1 : 0 })
+    }
+    expect(session.state.players[0]!.cardStates.D025_WitchesDanceFloor?.extraData?.cardFieldStacks).toEqual([null])
   })
 
-  it('D159 currently plays as an occupation without providing its printed anytime reed sale', () => {
+  it('D159 plays as an occupation and offers an interactive reed sale rather than an unconditional exchange', () => {
     const session = setup(4)
     session.state.players[0]!.occupationHand = ['D159_ReedSeller']
     session.state.players[0]!.resources.reed = 1
@@ -111,7 +118,7 @@ describe('OA-only base card printed-rule audit', () => {
     const response = session.takeAnytimeAction(0, 'exchange')
     expect(response.ok).toBe(false)
     expect(response.error).toBe('anytime action unavailable')
-    expect(response.interaction.anytimeActions.some((action) => action.sourceCard === 'D159_ReedSeller')).toBe(false)
+    expect(response.interaction.anytimeActions.some((action) => action.sourceCard === 'D159_ReedSeller')).toBe(true)
     expect(response.state.players[0]!.resources).toMatchObject({ reed: 1, food: 100 })
   })
 

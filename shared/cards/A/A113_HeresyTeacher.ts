@@ -14,8 +14,8 @@ const INSERT_ACTION_ID = 'card_A113_HeresyTeacher_insertVegetable'
 const insertionTarget = (field: LogicalField) => {
   if (field.stacks.some((stack) => stack.kind === 'vegetable')) return
   const grain = field.slots.find((slot) => slot.stack?.kind === 'grain' && slot.stack.remaining >= 3)
-  if (!grain || field.kind !== 'farmyard') return
-  return { position: grain.tile, slot: 0 }
+  if (!grain) return
+  return { position: grain.tile, slot: grain.index }
 }
 
 const insertVegetableAction: ActionDefinition = {
@@ -37,7 +37,7 @@ const insertVegetableAction: ActionDefinition = {
         (candidate) => candidate.slots.some((slot) => positionKey(slot.tile) === positionKey(position)),
       )
       const target = field && insertionTarget(field)
-      if (field && target) mutations.place({ fieldId: field.id, slot: target.slot }, 'vegetable', 1)
+      if (field && target) mutations.insertBottom({ fieldId: field.id, slot: target.slot }, 'vegetable', 1)
     }
     return { type: 'ok' }
   },

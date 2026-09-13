@@ -270,8 +270,11 @@ export type SharedPostScoreHandler = (
   summaries: PlayerScoreSummary[],
 ) => Array<{ playerId: string; score: number }>
 
+export type ResourceCommitment = { playerId: string; resources: Partial<Resource> }
+
 export type CardEffect = {
   id: string
+  computeResourceCommitments?: (state: GameState, owner: PlayerState) => readonly ResourceCommitment[]
   preHarvestGoodsWanted?: ResourceKey[]
   preHarvestGoodsWantedBeforeReap?: ResourceKey[]
   maySkipHarvestFieldPhase?: boolean
@@ -415,6 +418,27 @@ export const getCardEffect = (id: string): CardEffect | null => {
   if (custom) return custom
   const active = getActiveCardRegistry()
   return active?.getEffect(id) ?? null
+}
+
+export const resourceCommitmentsSatisfied = (state: GameState): boolean => {
+  const totals = new Map<string, Partial<Resource>>()
+  for (const owner of state.players) {
+    for (const cardId of [...owner.improvements, ...owner.minorPlayed, ...owner.occupationPlayed]) {
+      for (const commitment of getCardEffect(cardId)?.computeResourceCommitments?.(state, owner) ?? []) {
+        const total = totals.get(commitment.playerId) ?? {}
+        for (const [key, amount] of Object.entries(commitment.resources)) {
+          const resource = key as keyof Resource
+          total[resource] = (total[resource] ?? 0) + amount
+        }
+        totals.set(commitment.playerId, total)
+      }
+    }
+  }
+  return [...totals].every(([playerId, resources]) => {
+    const player = state.players.find((entry) => entry.id === playerId)
+    return player !== undefined && Object.entries(resources).every(([key, amount]) =>
+      (player.resources[key as keyof Resource] ?? 0) >= amount)
+  })
 }
 
 const isCustomCard = (id: string) => id.startsWith('CUSTOM_')

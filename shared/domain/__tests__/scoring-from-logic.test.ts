@@ -136,15 +136,12 @@ describe('computeScores', () => {
     const [result] = computeScores(createState(player))
     const cardBonusVp = result.categories.find((item) => item.key === 'cardBonusVp')
 
-    expect(cardBonusVp?.total).toBe(18)
-    expect(cardBonusVp?.entries).toEqual(expect.arrayContaining([
-      expect.objectContaining({ cardId: 'Major_Joinery', score: 3 }),
-      expect.objectContaining({ cardId: 'Major_Joinery2', score: 3 }),
-      expect.objectContaining({ cardId: 'Major_Pottery', score: 3 }),
-      expect.objectContaining({ cardId: 'Major_Pottery2', score: 3 }),
-      expect.objectContaining({ cardId: 'Major_Basket', score: 3 }),
-      expect.objectContaining({ cardId: 'Major_Basket2', score: 3 }),
-    ]))
+    expect(cardBonusVp?.total).toBe(9)
+    for (const ids of [['Major_Joinery', 'Major_Joinery2'], ['Major_Pottery', 'Major_Pottery2'], ['Major_Basket', 'Major_Basket2']]) {
+      expect(cardBonusVp?.entries.filter((entry) => entry.cardId && ids.includes(entry.cardId))
+        .reduce((sum, entry) => sum + entry.score, 0)).toBe(3)
+    }
+    expect(player.resources).toMatchObject({ wood: 7, clay: 7, reed: 5 })
   })
 
   it('scores horses only when Farmers of the Moor is enabled', () => {

@@ -1,5 +1,4 @@
 import { defineOccupationCard } from '../card-source'
-import { workersAvailable } from '../../domain/player'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import { createPlayerActionSpaces, registerPlayerActionSpace } from '../player-action-space'
 import { isRoundSpaceOccupied } from '../helpers/round-action-topology'
@@ -17,7 +16,6 @@ registerPlayerActionSpace({
     strictCanExecute: true,
     canBeExecutedByPlayer: (state, player) =>
       player.id === ownerId &&
-      workersAvailable(state, player) > 0 &&
       isRoundSpaceOccupied(state, 3) &&
       isRoundSpaceOccupied(state, 6),
     execute: () => ({

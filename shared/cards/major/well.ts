@@ -37,7 +37,7 @@ export const Major_Well2 = defineMajorCard({
   name: 'Well',
   deck: 'major',
   number: 13,
-  cost: { wood: 1, stone: 3 },
+  cost: { clay: 1, stone: 3 },
   vp: 4,
   extraVp: false,
   desc: ['[Put 1 <FOOD> on the 5 next turns. At the start of each turn, collect the <FOOD>]'],

@@ -58,6 +58,57 @@ const createState = (player: PlayerState): GameState => ({
 } as GameState)
 
 describe('logical field boundary', () => {
+  it.each([2, 4])('reaps %i crops across layers without adding a logical field or slot', (count) => {
+    const cardId = 'D025_WitchesDanceFloor'
+    makeCardFieldImpl(cardId, { allowedCrops: ['grain'], capacity: 1 })
+    const player = createPlayer({ minorPlayed: [cardId] })
+    const state = createState(player)
+    const mutations = mutateLogicalFields(state, player)
+    const target = { fieldId: `card:${cardId}`, slot: 0 }
+    expect(mutations.place(target, 'grain', 1).ok).toBe(true)
+    expect(mutations.insertBottom(target, 'vegetable', 2).ok).toBe(true)
+    expect(mutations.insertBottom(target, 'grain', 1).ok).toBe(true)
+    const fields = getLogicalFields(player)
+    expect(fields).toHaveLength(1)
+    expect(fields[0]!.slots).toHaveLength(1)
+    expect(fields[0]!.stacks).toEqual([
+      { kind: 'grain', remaining: 1 }, { kind: 'vegetable', remaining: 2 }, { kind: 'grain', remaining: 1 },
+    ])
+    expect(Object.isFrozen(fields[0]!.slots[0]!.layers[0])).toBe(true)
+    const result = reap(state, player, undefined, {
+      harvestCounts: { '-1-4025': { count, scope: count === 4 ? 'field' : 'top-stack' } },
+    })
+    expect(result.reapSummary.resources).toEqual(count === 4 ? { grain: 2, vegetable: 2 } : { grain: 1, vegetable: 1 })
+    expect(getLogicalFields(player)[0]!.stacks).toEqual(count === 4 ? [] : [
+      { kind: 'grain', remaining: 1 }, { kind: 'vegetable', remaining: 1 },
+    ])
+  })
+
+  it('retains a buried crop for last-crop callbacks and preserves layers when growing or replacing the top', () => {
+    const cardId = 'A001_LayeredTestField'
+    const removed: Array<{ crop: string; isLast: boolean }> = []
+    makeCardFieldImpl(cardId, { allowedCrops: ['grain', 'vegetable'], capacity: 1 }, {
+      onCropRemoved: ({ crop, isLast }) => { removed.push({ crop, isLast }) },
+    })
+    const player = createPlayer({ minorPlayed: [cardId] })
+    const mutations = mutateLogicalFields(createState(player), player)
+    const target = { fieldId: `card:${cardId}`, slot: 0 }
+    expect(mutations.place(target, 'grain', 1).ok).toBe(true)
+    expect(mutations.insertBottom(target, 'grain', 1).ok).toBe(true)
+    expect(mutations.grow(target).ok).toBe(true)
+    expect(mutations.remove(target, 2).ok).toBe(true)
+    expect(removed).toEqual([{ crop: 'grain', isLast: false }])
+    expect(mutations.insertBottom(target, 'vegetable', 1).ok).toBe(true)
+    expect(mutations.replace(target, 'vegetable', 2).ok).toBe(true)
+    expect(getLogicalFields(player)[0]!.stacks).toEqual([
+      { kind: 'vegetable', remaining: 1 }, { kind: 'vegetable', remaining: 2 },
+    ])
+    expect(mutations.place(target, 'grain', 3).ok).toBe(false)
+    expect(mutations.remove(target).ok).toBe(true)
+    expect(mutations.remove(target).ok).toBe(true)
+    expect(mutations.place(target, 'grain', 3).ok).toBe(true)
+  })
+
   it('projects deterministic immutable Farmyard and Card Fields with fixed stable slots', () => {
     makeCardFieldImpl('D075_WoodField', { allowedCrops: ['wood'], capacity: 2 })
     const player = createPlayer({

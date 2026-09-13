@@ -76,6 +76,18 @@ _Avoid_: Card Field、所有规则文本中的 Field
 由已打出卡牌拥有、存储在 `cardStates` 且没有农场几何位置的 Logical Field；固定容量槽即使为空也保留稳定身份，多槽仍只算一块 Logical Field。
 _Avoid_: Farmyard Field、把每个槽算成独立田、把卡牌状态搬入 `PlayerState.fields`
 
+**Crop Layer（作物层）**:
+同一播种槽内按上下顺序放置的一组同类作物。普通收获先取顶层，底层在上层耗尽后才能收获；增加作物层不增加 Logical Field 数量或播种槽容量。
+_Avoid_: 新田、额外播种槽、独立收获次数
+
+**Resource Commitment（资源承诺）**:
+玩家为尚未完成的交易承诺保留的资源，仍在其库存中但不能被其他操作挪用。只有成交才转移资源，未成交参与者不付款；它不等同于已支付费用或 Continuation Guard。
+_Avoid_: 预扣款、已成交、Continuation Guard
+
+**Player Feeding Settlement（逐玩家喂养结算）**:
+按收获顺序逐名玩家处理喂养支付、合法转换与缺食；尚未处理的玩家保有自己的库存，可响应当前交易。中途交互结束后继续同一喂养结算，不退还或重复扣除已付食物。
+_Avoid_: 全员预扣食物、提前发乞讨、重新开始喂养
+
 **Player Lookup Query**:
 领域层把 `playerId` 解析为 `PlayerState` 或 `playerIndex` 的统一查询边界；规则、session 和 effect 代码通过它读取玩家身份映射。
 _Avoid_: RoomPlayer seat/auth 查找、前端视角切换、本地 UI player 选择

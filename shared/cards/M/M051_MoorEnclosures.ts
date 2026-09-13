@@ -9,7 +9,7 @@ const cardImpl = {
     id: CARD_ID,
     onBuy: (_state, player) => buildFarmyardExtensionSelectionFlow(CARD_ID, player, true),
   },
-  prerequisiteCheck: (player) => player.houseType === 'clay',
+  prerequisiteCheck: (player) => player.houseType !== 'wood',
   reaches: [] as readonly string[],
 } satisfies CardImpl
 

@@ -229,16 +229,25 @@ const normalizeCropStack = (kind: unknown, remaining: unknown): CropStack | null
     ? { kind, remaining }
     : null
 
+const readCardFieldLayers = (extraData: Record<string, unknown> | undefined) => {
+  const slots = extraData?.cardFieldStacks
+  if (!Array.isArray(slots)) return null
+  return slots.flatMap((entry, slotIndex) => {
+    if (!entry || typeof entry !== 'object') return []
+    const slot = entry as { crop?: unknown; remaining?: unknown; below?: unknown[] }
+    const layers = [...(Array.isArray(slot.below) ? slot.below : []), slot]
+    return layers.flatMap((layer, layerIndex) => {
+      if (!layer || typeof layer !== 'object') return []
+      const value = layer as { crop?: unknown; remaining?: unknown }
+      const stack = normalizeCropStack(value.crop, value.remaining)
+      return stack ? [{ stack, slotIndex, top: layerIndex === layers.length - 1 }] : []
+    })
+  })
+}
+
 const readCardStacksFromExtraData = (extraData: Record<string, unknown> | undefined): CropStack[] | null => {
-  const rawCardFieldStacks = extraData?.cardFieldStacks
-  if (Array.isArray(rawCardFieldStacks) && rawCardFieldStacks.length > 0) {
-    return rawCardFieldStacks
-      .map((entry) => {
-        const stack = entry as { crop?: unknown; remaining?: unknown }
-        return normalizeCropStack(stack.crop, stack.remaining)
-      })
-      .filter((entry): entry is CropStack => !!entry)
-  }
+  const fieldLayers = readCardFieldLayers(extraData)
+  if (fieldLayers) return fieldLayers.map((layer) => layer.stack)
 
   const rawStacks = extraData?.stacks
   if (Array.isArray(rawStacks) && rawStacks.length > 0) {
@@ -305,9 +314,9 @@ const buildPlayedCardDisplays = (
       resourceStats: readCardResourceStats(displayPlayer, rawId),
       stack: c146Pairs ?? cardState?.stack ?? [],
       cardStacks,
-      cardStackSelectionTiles: cardStacks?.map((_, slotIdx) =>
-        cardSelectionTargets.find((position) => position.cardFieldSlot === slotIdx) ?? null,
-      ) ?? [],
+      cardStackSelectionTiles: readCardFieldLayers(rawExtraData)?.map((layer) =>
+        layer.top ? cardSelectionTargets.find((position) => position.cardFieldSlot === layer.slotIndex) ?? null : null,
+      ) ?? cardStacks?.map(() => null) ?? [],
       heldWorkerId: getWorkerHeldOnCard(displayPlayer, rawId),
       m084LyingHorses: rawId === M084_BOG_PONY_ID
         ? readBogPonyLyingHorseCountFromExtraData(rawExtraData)

@@ -5,6 +5,9 @@ import { computeAnimalZones } from '../domain/animal-zones'
 import { buildSowFarmInteraction } from '../domain/farmyard-interaction'
 import { startOrdinaryCardDrawChoice } from '../session/ordinary-card-draw'
 import { getParentCardDefinition } from './cards'
+import { countOccupations } from '../cards/helpers/prerequisites'
+import { collectCardsAs } from '../cards/helpers/card-type'
+import { getLogicalFields } from '../cards/helpers/card-field'
 import type { FatherParentCardId, FatherRequirement, FatherReward, FatherRewardEffect } from './types'
 
 export const COMPLETE_PARENT_FATHER_ACTION_ID = 'complete-parent-father'
@@ -29,11 +32,11 @@ const countPlayedCards = (
 ): number => {
   switch (requirement.cardType) {
     case 'occupation':
-      return player.occupationPlayed.length
+      return countOccupations(player)
     case 'minor-improvement':
       return player.minorPlayed.length
     case 'major-improvement':
-      return player.improvements.length
+      return collectCardsAs(player, 'major').length
     case 'improvement':
       return player.minorPlayed.length + player.improvements.length
     default:
@@ -86,7 +89,7 @@ export const isFatherRequirementSatisfied = (
         case 'room':
           return player.rooms >= requirement.amount
         case 'field':
-          return player.fields.length >= requirement.amount
+          return getLogicalFields(player).length >= requirement.amount
         case 'pasture':
           return player.pastures.length >= requirement.amount
         case 'stable':

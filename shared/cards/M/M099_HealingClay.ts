@@ -3,15 +3,15 @@ import type { CardListenerContext, CardListenerRegistration } from '../card-list
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { gainLeaf } from '../helpers/pay-gain-node'
 import type { CardImpl } from '../registry'
+import { getRoundPlacementDetails } from '../helpers/round-placement'
 
 const CARD_ID = 'M099_HealingClay'
 
 const usedSickWorker = (context: CardListenerContext): boolean => {
   const player = context.ownerPlayer ?? context.player
   const sick = new Set(player.sickWorkerIds ?? [])
-  return (context.space?.takenBy ?? []).some((worker) =>
-    worker.playerId === player.id && sick.has(worker.workerId),
-  )
+  const placement = getRoundPlacementDetails(player).at(-1)
+  return placement?.spaceId === context.space?.id && sick.has(placement.workerId)
 }
 
 const listener: CardListenerRegistration = {

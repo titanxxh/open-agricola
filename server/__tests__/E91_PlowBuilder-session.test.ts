@@ -142,6 +142,9 @@ describe('E091_PlowBuilder session', () => {
   it('uses Joinery during the real harvest, pays 1 food, and plows 1 field', () => {
     const session = setupHarvest()
     let resp = session.performRoundEnd()
+    const useJoinery = resp.interaction.request.options.find((option) => option.value !== '__skip__')!
+    resp = session.resolveChoice(0, useJoinery.value)
+    expect(resp.ok).toBe(true)
 
     expect(resp.state.roundPhase).toBe('harvest')
     expect(readCardExtraData<boolean>(resp.state.players[0]!, CARD_ID, 'usedJoinery')).toBe(true)
@@ -317,27 +320,15 @@ describe('E091_PlowBuilder session', () => {
     expect(readCardExtraData<boolean>(player, CARD_ID, 'usedJoinery')).toBe(false)
   })
 
-  it('Joinery onHarvest dispatches trade-applied → E91 sees usedJoinery', async () => {
-    // Integration: build a session, give the player Major_Joinery + wood,
-    // run Joinery's onHarvest hook, and confirm E91's trade-applied
-    // listener flipped the usedJoinery flag without any manual setup.
-    const session = new GameSession()
-    stabilizeRandomHands(session.state.players)
-    const state = session.getState().state
-    state.players = state.players.slice(0, 2)
-    state.roundPhase = 'harvest'
-    const player = state.players[0]!
-    player.occupationPlayed.push(CARD_ID)
-    player.improvements.push('Major_Joinery')
-    player.resources.wood = 1
-    player.resources.food = 0
-    session.loadState(state)
-
-    expect(readCardExtraData<boolean>(player, CARD_ID, 'usedJoinery')).toBeFalsy()
-    runCardEffectHook(state, player, 'Major_Joinery', 'onHarvest')
-    expect(player.resources.wood).toBe(0)
-    expect(player.resources.food).toBe(2)
-    expect(readCardExtraData<boolean>(player, CARD_ID, 'usedJoinery')).toBe(true)
+  it('declining Joinery leaves its wood and does not arm Plow Builder', () => {
+    const session = setupHarvest()
+    const offered = session.performRoundEnd()
+    expect(offered.interaction.sourceCard).toBe('Major_Joinery')
+    const response = session.resolveChoice(0, '__skip__')
+    expect(response.ok).toBe(true)
+    expect(response.state.players[0]!.resources.wood).toBe(1)
+    expect(readCardExtraData<boolean>(response.state.players[0]!, CARD_ID, 'usedJoinery')).toBeFalsy()
+    expect(response.interaction.anytimeActions.map((action) => action.id)).not.toContain('E91-plow-builder-anytime')
   })
 
 })
@@ -403,6 +394,9 @@ describe('E091 Plow Builder parity', () => {
   it('E091 S6: the harvest plow may be declined after using Joinery', () => {
     const session = setup({ harvest: true, food: 5 })
     let response = session.performRoundEnd()
+    const useJoinery = response.interaction.request.options.find((option) => option.value !== '__skip__')!
+    response = session.resolveChoice(0, useJoinery.value)
+    expect(response.ok).toBe(true)
 
     expect(response.interaction.anytimeActions.map((action) => action.id))
       .toContain('E91-plow-builder-anytime')

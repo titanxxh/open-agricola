@@ -269,7 +269,7 @@ describe('M050/M051 farmyard extension', () => {
 
     expect(meetsCardPrerequisites(player, M051_MoorEnclosures, session.state.round, session.state)).toBe(false)
     player.houseType = 'stone'
-    expect(meetsCardPrerequisites(player, M051_MoorEnclosures, session.state.round, session.state)).toBe(false)
+    expect(meetsCardPrerequisites(player, M051_MoorEnclosures, session.state.round, session.state)).toBe(true)
     player.houseType = 'clay'
     expect(meetsCardPrerequisites(player, M051_MoorEnclosures, session.state.round, session.state)).toBe(true)
   })

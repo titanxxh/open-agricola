@@ -216,7 +216,7 @@ describe('Moor complex special-action minors', () => {
     expect(resp.interaction.stateId === 'wait' ? resp.interaction.sourceCard : undefined).not.toBe('M055_ToolShed')
   })
 
-  it('M058 Peat Fertilizer offers normal Sow after Cut Peat only with 2 fields', () => {
+  it('M058 Peat Fertilizer checks two fields only when played', () => {
     expect(meetsCardPrerequisites(setup([], 8).player, M058_PeatFertilizer, 8, setup([], 8).state)).toBe(false)
 
     const { session, player } = setup(['M058_PeatFertilizer'])
@@ -238,7 +238,7 @@ describe('Moor complex special-action minors', () => {
     noFields.session.loadState(noFields.state)
     const hidden = takeSpecial(noFields.session, 'cut-peat', { row: MOOR_A.row, col: MOOR_A.col })
     expect(hidden.interaction.stateId === 'wait' ? hidden.interaction.sourceCard : undefined)
-      .not.toBe('M058_PeatFertilizer')
+      .toBe('M058_PeatFertilizer')
   })
 
   it('M059 Nature\'s Fertilizer sows only the field created by Slash and Burn', () => {

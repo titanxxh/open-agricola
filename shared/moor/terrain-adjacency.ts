@@ -1,16 +1,16 @@
 import type { FarmTilePosition, PlayerState } from '../contract/types'
-import { getAdjacentTilesForEdge, getFarmyardTileKeySet, positionKey } from '../domain/farm'
+import { getAdjacentTilesForEdge, getFarmyardEdgeIds, getFarmyardTileKeySet, positionKey } from '../domain/farm'
 
-export type FencedTerrainAdjacencyCounts = {
+export type TerrainAdjacencyCounts = {
   forestField: number
   forestMoor: number
 }
 
 type VisibleTileKind = 'field' | 'forest' | 'moor'
 
-export const countFencedTerrainAdjacencies = (
+export const countTerrainAdjacencies = (
   player: Pick<PlayerState, 'fields' | 'farmTerrain' | 'fenceSegments' | 'farmyardExtensions'>,
-): FencedTerrainAdjacencyCounts => {
+): TerrainAdjacencyCounts => {
   const farmyardKeys = getFarmyardTileKeySet(player)
   const fieldKeys = new Set(player.fields.map((field) => positionKey(field)))
   const terrainByKey = new Map((player.farmTerrain ?? []).map((tile) => [positionKey(tile), tile.kind]))
@@ -20,11 +20,8 @@ export const countFencedTerrainAdjacencies = (
     return terrainByKey.get(key)
   }
   const counts = { forestField: 0, forestMoor: 0 }
-  const seen = new Set<string>()
-  for (const segment of player.fenceSegments) {
-    if (segment.type !== 'fence' || seen.has(segment.edge)) continue
-    seen.add(segment.edge)
-    const adjacent = getAdjacentTilesForEdge(segment.edge)
+  for (const edge of getFarmyardEdgeIds(player)) {
+    const adjacent = getAdjacentTilesForEdge(edge)
     if (
       adjacent.length !== 2 ||
       adjacent.some((tile) => !farmyardKeys.has(positionKey(tile)))

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { PlayerState } from '../../contract/types'
-import { countFencedTerrainAdjacencies } from '../terrain-adjacency'
+import { countTerrainAdjacencies } from '../terrain-adjacency'
 import { makeBlankPlayer } from '../../domain/__tests__/helpers'
 
 const makePlayer = (overrides: Partial<PlayerState>): PlayerState => ({
@@ -10,7 +10,7 @@ const makePlayer = (overrides: Partial<PlayerState>): PlayerState => ({
 }) as PlayerState
 
 describe('terrain fence adjacency', () => {
-  it('returns zero without fences', () => {
+  it('counts adjacent terrain without fences', () => {
     const player = makePlayer({
       fields: [{ row: 0, col: 1, stacks: [] }],
       farmTerrain: [
@@ -19,7 +19,7 @@ describe('terrain fence adjacency', () => {
       ],
     })
 
-    expect(countFencedTerrainAdjacencies(player)).toEqual({ forestField: 0, forestMoor: 0 })
+    expect(countTerrainAdjacencies(player)).toEqual({ forestField: 1, forestMoor: 1 })
   })
 
   it('counts a single fenced forest-field edge', () => {
@@ -29,7 +29,7 @@ describe('terrain fence adjacency', () => {
       fenceSegments: [{ edge: 'V-0-1', type: 'fence' }],
     })
 
-    expect(countFencedTerrainAdjacencies(player)).toEqual({ forestField: 1, forestMoor: 0 })
+    expect(countTerrainAdjacencies(player)).toEqual({ forestField: 1, forestMoor: 0 })
   })
 
   it('counts multiple fenced forest-field and forest-moor edges', () => {
@@ -52,7 +52,7 @@ describe('terrain fence adjacency', () => {
       ],
     })
 
-    expect(countFencedTerrainAdjacencies(player)).toEqual({ forestField: 2, forestMoor: 2 })
+    expect(countTerrainAdjacencies(player)).toEqual({ forestField: 3, forestMoor: 3 })
   })
 
   it('does not count duplicate fence segments twice', () => {
@@ -65,6 +65,6 @@ describe('terrain fence adjacency', () => {
       ],
     })
 
-    expect(countFencedTerrainAdjacencies(player)).toEqual({ forestField: 1, forestMoor: 0 })
+    expect(countTerrainAdjacencies(player)).toEqual({ forestField: 1, forestMoor: 0 })
   })
 })

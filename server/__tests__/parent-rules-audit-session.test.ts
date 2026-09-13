@@ -273,7 +273,7 @@ describe('Parent printed-rule native audit', () => {
     }
   })
 
-  it.each(['PS01', 'PS05', 'PS07'] as const)('%s currently ignores the corresponding field, major, or occupation supplied by D025', (cardId) => {
+  it.each(['PS01', 'PS05', 'PS07'] as const)('%s counts the corresponding field, major, or occupation supplied by D025', (cardId) => {
     const session = setup('PR12', cardId)
     const player = session.state.players[0]!
     player.minorHand = ['D025_WitchesDanceFloor']
@@ -293,10 +293,23 @@ describe('Parent printed-rule native audit', () => {
     expect(session.resolveChoice(response.interaction.playerIndex, 'confirm').ok).toBe(true)
     session.state.currentPlayerIndex = 0
     session.loadState(session.state)
-    const before = structuredClone(session.state.players[0])
-    const rejected = session.takeAnytimeAction(0, 'complete-parent-father')
-    expect(rejected.ok).toBe(false)
-    expect(rejected.state.players[0]).toEqual(before)
-    expect(rejected.state.players[0]!.cardStates[cardId]?.extraData?.fatherCompletedTier).toBeUndefined()
+    const before = { ...session.state.players[0]!.resources }
+    response = session.takeAnytimeAction(0, 'complete-parent-father')
+    expect(response.ok, response.error).toBe(true)
+    if (response.interaction.stateId === 'wait' && response.interaction.request.kind === 'choice') {
+      response = session.resolveChoice(0, `${cardId}:1`)
+      expect(response.ok, response.error).toBe(true)
+    }
+    if (cardId === 'PS07') {
+      expect(response.interaction.request.kind).toBe('farm-select')
+      response = session.commitSelectionChoice(0, { crops: [{ row: 0, col: 0, crop: 'grain' }] })
+      expect(response.ok, response.error).toBe(true)
+      expect(response.state.players[0]!.fields[0]!.stacks).toEqual([{ kind: 'grain', remaining: 3 }])
+    } else {
+      const resource = cardId === 'PS01' ? 'stone' : 'wood'
+      expect(response.state.players[0]!.resources[resource]).toBe(before[resource] + 1)
+    }
+    expect(response.state.players[0]!.cardStates[cardId]?.extraData?.fatherCompletedTier).toBe(1)
+    expect(session.takeAnytimeAction(0, 'complete-parent-father').ok).toBe(false)
   })
 })

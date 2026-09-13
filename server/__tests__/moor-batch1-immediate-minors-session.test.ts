@@ -279,7 +279,7 @@ describe('Moor Batch 1 immediate resource minors', () => {
 
     expect(resp.state.players[0]!.resources).toMatchObject({
       wood: 3,
-      clay: 3,
+      clay: 0,
       reed: 2,
     })
 

@@ -27,8 +27,21 @@ const afterExchangeListener: CardListenerRegistration = {
   },
 }
 
+const feedingListener: CardListenerRegistration = {
+  id: 'M115-oak-bark-feeding',
+  cardIds: [CARD_ID],
+  actions: ['harvest-feed-conversion'],
+  phases: ['immediatelyAfter'],
+  handler: (context) => {
+    const count = context.eventQuery.filter('harvest.feedConverted', (event) =>
+      event.playerId === context.player.id && (event.food.food ?? 0) > 0,
+    ).reduce((sum, event) => sum + (event.cost.boar ?? 0) + (event.cost.cattle ?? 0) + (event.cost.horse ?? 0), 0)
+    if (count > 0) return { flow: gainLeaf(CARD_ID, { wood: count }), sourceCard: CARD_ID }
+  },
+}
+
 const cardImpl = {
-  listeners: [afterExchangeListener],
+  listeners: [afterExchangeListener, feedingListener],
   effect: {
     id: CARD_ID,
     onBuy: () => gainLeaf(CARD_ID, { wood: 2 }),

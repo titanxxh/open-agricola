@@ -906,7 +906,7 @@ Inputs (derived by `GameCore.getAnytimePolicyInput()` using the same node + comp
 - `interactionKind` — `node?.request?.kind ?? composite?.request?.kind`
 - `promptKey` — `node?.promptKey ?? composite?.promptKey`
 
-Output: `{ allowed: false, reason }` or `{ allowed: true, blockedIds }`. The rules are priority-ordered (first match wins): no-context → feed-locked → `confirm-next-player` allowed with `exchange` blocked → `confirm-player-switch` blocked → animal-reorg → exchange/bake-bread promptKey → stage-hook-chain default block → everything else allowed with no blocks.
+Output: `{ allowed: false, reason }` or `{ allowed: true, blockedIds }`. The rules are priority-ordered (first match wins): no-context → heating-locked → `confirm-next-player` allowed with `exchange` blocked → `confirm-player-switch` blocked → animal-reorg → exchange/bake-bread promptKey → stage-hook-chain default block → everything else allowed with no blocks.
 
 Three consumers share this snapshot:
 
@@ -918,7 +918,7 @@ Nested anytime flows are injected ahead of the current pending tree. Parent pend
 
 每个 anytime 入口都在引擎 sequence 内运行，以能力入口 ID 和发起玩家标识。默认情况下，该 sequence 已开始且尚未结束时，`buildAnytimeEntries()` 会跨全部引擎 frame 排除同一玩家的同一入口；直接命令也使用该过滤结果。其他能力（包括同一卡牌的不同能力）仍按普通窗口策略判断。sequence 覆盖 before 效果、支付、主体收益、嵌套选择、动物整理和后置响应，主体收益完成不会解除限制。完成或显式跳过后解除限制，私有游标恢复与撤销保留这一生命周期。窗口中尚未选中的入口不受此限制。费用不足且没有其他合法 anytime 的续行进入既有 blocked / undo 路径。
 
-系统 `ActionDefinition` 与卡牌 `CardListenerRegistration` 都支持 `allowAnytimeReentry?: boolean`。只有 `true` 豁免活动入口限制；窗口策略、归属与操作者检查、费用、使用次数、配方禁用与 continuation guard 仍全部生效。当前仅系统 `exchange` 开启。因此，exchange 引发的动物整理期间可以再次通过 exchange 烹饪，但 B104 配方仍被禁用；exchange／bake 选择、feed／heating 和下一玩家确认期间仍禁止 exchange。新增卡牌例外必须有合法、可达的使用场景及原生 Session 结算和恢复证据，人工测试 listener 只能证明引擎契约。这是设计时要求，不是运行时穷举预检；ADR-0015 当前步骤准入规则保持不变。
+系统 `ActionDefinition` 与卡牌 `CardListenerRegistration` 都支持 `allowAnytimeReentry?: boolean`。只有 `true` 豁免活动入口限制；窗口策略、归属与操作者检查、费用、使用次数、配方禁用与 continuation guard 仍全部生效。当前仅系统 `exchange` 开启。因此，exchange 引发的动物整理期间可以再次通过 exchange 烹饪，但 B104 配方仍被禁用；exchange／bake 选择、heating 和下一玩家确认期间仍禁止 exchange。喂养支持包含跨玩家选择的嵌套 anytime flow，结束后恢复同一笔尚未支付的喂养余额。新增卡牌例外必须有合法、可达的使用场景及原生 Session 结算和恢复证据，人工测试 listener 只能证明引擎契约。这是设计时要求，不是运行时穷举预检；ADR-0015 当前步骤准入规则保持不变。
 
 同一 Anytime Ability 的商品或目标选项共享入口与限制。D124 和 M126 各提供一个卡牌 anytime 入口，具体选项在内部选择。每次发动结算一件商品或一组兑换；多个选项时先选择，再扣资源或使用标记，只有一个合法选项时沿用普通单选执行行为。反悔使用现有撤销及其可用性边界，不增加取消按钮或批量交互。D124 保留商品不得重复及原有时机规则，M126 保留四枚共享使用标记及原有时机规则。普通 XOR 在嵌套行动后仍保留原候选列表，实际付款使用当前资源；选项变得付不起时沿用既有 blocked / undo 行为。
 
@@ -926,14 +926,17 @@ Nested anytime flows are injected ahead of the current pending tree. Parent pend
 
 一次兑换提交可以包含多种配方及各自次数，作为一个 Exchange Batch 结算。如果整批结束后存在新获得且未安置的动物，且来源交互本身不是动物整理，exchange 通过 `internalChildren.afterHostListeners` 安排 `reorganize`，完成后再恢复被暂停的父交互。`CardExchange.blockedAnytimeInteractionKinds` 会复制到各条 `Trade`；系统 anytime 入口将来源请求类型保存在 `actionContext.anytimeInteractionKind`，统一用于准入、候选构造及提交校验（包括 bulk）。被禁用的配方保留 trade 索引，但不提供可执行选项。B104 用三条声明 `fromFarmyard`、`anytime` / `harvest` 及 `animal-reorg` 禁用条件的配方替代独立 listener，沿用包括到期行动准备在内的默认 exchange 窗口，不提供专属计分前机会。
 
-收获喂食请求会发布权威 `exchangeCatalog`。每条记录用稳定的 `(sourceId, exchangeIndex)` 标识当前可用配方，并投影 `from`、`to`、`max` 与 `fromFarmyard`。目录存在时，客户端只按该目录构建兑换草稿，不再从卡牌 metadata 重建动态 listener 提供的兑换。提交前，服务端必须同时匹配最初下发目录和按实时状态重建的目录，再进行任何资源修改；因此动态 Harvest exchange 能进入 UI，而伪造、过期或超限配方会被原子拒绝。
+收获喂食请求会发布权威 `exchangeCatalog`。每条记录用稳定的 `(sourceId, exchangeIndex)` 标识当前可用配方，并投影 `from`、`to`、`max` 与 `fromFarmyard`。目录存在时，客户端只按该目录构建兑换草稿，不再从卡牌 metadata 重建动态 listener 提供的兑换。提交前，服务端必须同时匹配最新权威交互投影和按实时状态重建的目录，再进行任何资源修改；嵌套 anytime 结束后恢复喂养时刷新该投影；因此动态 Harvest exchange 能进入 UI，而伪造、过期或超限配方会被原子拒绝。
 
 OA-vs-the reference design notes:
 
 - Reorganize is a system-driven sub-flow in OA (not a player-triggerable anytime) — the policy never produces a `'reorganize'` entry to filter.
 - `postReapAnytimeWindow` 是 `onHarvest` 完成后、喂食状态计算前的通用开放窗口。它只查询普通 anytime registry / listener，不含卡牌 ID 分支；每次嵌套 flow 完成后重新计算能力，并跳过没有可执行能力的玩家。
 - `futureActionAnytimeWindow` 是到期资源完成真实 `receive` transaction 后、未来行动构造可行性前的窄化标准 `exchange` 窗口。它只对拥有到期 action token 的玩家开放，排除卡牌来源的 anytime 能力，并按实时状态重算且不含卡牌 ID 分支。
-- `feed` pending is locked in OA because `executeFeedingLogic()` freezes `remaining`/`foodUsed` into the InteractionRequest. The reference allows nested anytime in its `ST_HARVEST_FEED` flow because its predecessor is the `EXCHANGE` state, which has no fixed budget.
+- 喂养按收获顺序逐玩家结算。队列只保存玩家序号，不预扣全员食物；轮到该玩家才扣食。`foodUsed` 记录已付款，`remaining` 记录未付需求。合法嵌套 anytime 结束后恢复同一 pending host，刷新兑换目录及动物可用量，不重复预扣；只有玩家的合法喂养机会结束才判断乞讨。已经吃饱且没有收获兑换的玩家不增加确认步骤。
+- 普通 anytime 查询与鉴权使用当前 pending 节点的实际归属者；活动的 provisional continuation 保留原有 frame owner 辅助行动窗口及 guard 策略。阶段 synthetic host 与插入其中的真实选择分开处理，跨玩家确认及受保护观察沿用原有边界。
+- 官方 Card Effect 可声明只读 `computeResourceCommitments(state, owner)`，从卡内状态派生参与者必须保有的资源。Session 聚合并发承诺，若命令破坏承诺则在发布前恢复命令检查点。这不预扣款、不在 PaymentSolver 锁资，也不放宽 Continuation Guard；卡牌在一次原子成交中解除承诺并交换双方资源，见 ADR-0019。
+- 同步兑换反应支持立即执行的 `special-effect` 和 `gain` leaf，不执行 optional、选择或 pending flow。Listener 保持只读，资源和日志通过正常 event sink 产生。
 - Idle work-phase turns and `confirm-next-player` are acting-player anytime windows: legal anytime actions remain available before a worker is placed and before control passes to the next player. In `confirm-next-player`, `exchange` stays blocked to avoid recursive generic exchange prompts. `confirm-player-switch` remains blocked because it is a system-controlled cross-player transition inside another flow.
 - `stageResume`-bearing stage hook chains default to blocked to preserve the "system-driven hook chains do not yield to player anytime" invariant; the explicit allow-list (`animal-reorg`, exchange/bake-bread promptKey, and D132's `ui.cards.D132_HideFarmer.optional` before-endgame choice prompt) overrides this. D132's nested `resource-quantity-select` prompt stays blocked, because its max is frozen from current food/empty-space state and must not be resumed after arbitrary anytime changes.
 
@@ -993,7 +996,7 @@ export const A123_FrameBuilder = defineOccupationCard({
 ### 8.4 helpers 糖衣层（`shared/cards/helpers/`）
 
 - `pay-gain-node.ts` —— "支付后得收益 / 支付后追加行动 / 返还到当前格再得"模板
-- `stage-effects.ts` —— 阶段型 card-effects 标记 / 即时支付 / bonus VP / 单次收获兑换
+- `stage-effects.ts` —— 阶段型 card-effect 标记和每卡一次的可选收获兑换。作坊通过现有 exchange 执行器和交易事件提供使用／跳过流程，查询收获 hook 不会直接消耗材料。
 - `card-state.ts` / `round-placement.ts` —— 一次性卡牌 `flagged/extraData`、原始 Work Placement Chronology 与 Person Placement Order；“第 N 个人”排除同一工人搬迁，但包含正常放置的临时人员及召回后再次正常放置的人员
 - `action-snapshot.ts` —— §6.5 定义的当前 Turn Scope 身份和起点快照；按行动计算的 delta 属于 action transaction，不读取这里
 - `card-held-workers.ts` —— 见 §8.3
@@ -1016,9 +1019,11 @@ cardField?: {
 `deriveVirtualTileCol(cardId, slotIdx) = deckOrdinal*1000 + cardNumber + slotIdx`
 派生，跨 deck 不冲突；同 deck 邻号 capacity 占位需 audit（当前 11 张卡 capacity≤3，安全余量充足）。
 
-卡牌侧接口只有三个入口。`getLogicalFields(player)` 按确定顺序返回不可变投影，包含 Farmyard Field 和所有已打出且已注册的 Card Field，也包含固定容量中的空槽。`getFarmyardFields(player)` 是犁地、围栏、相邻、版图占位与 Field tile 几何规则显式使用的窄查询。`mutateLogicalFields(state, player, options?)` 提供具名的 `place`、`grow`、`remove` 与原子 `replace` 操作；它先验证目标，再经 Farmyard 或 Card State owner adapter 写入。
+卡牌侧接口只有三个入口。`getLogicalFields(player)` 按确定顺序返回不可变投影，包含 Farmyard Field 和所有已打出且已注册的 Card Field，也包含固定容量中的空槽。`getFarmyardFields(player)` 是犁地、围栏、相邻、版图占位与 Field tile 几何规则显式使用的窄查询。`mutateLogicalFields(state, player, options?)` 提供具名的 `place`、`insertBottom`、`grow`、`remove` 与原子 `replace` 操作；它先验证目标，再经 Farmyard 或 Card State owner adapter 写入。
 
 Field storage 接受 grain、vegetable、wood、stone 四种合法 field good。Card Field 的 `allowedCrops` 表示普通 Sow 能力，不是存储 schema。`place` 默认执行该白名单，卡牌效果可显式绕过；普通 Sow 与 `replace` 仍受白名单限制。Owner callback 必须先检查实际 good，再执行特定作物副作用。
+
+Card Field 固定槽存储顶层 `{ crop, remaining }`，可带按底到顶排列的 `below` 层。`insertBottom` 放置牌面授予的作物，不增加播种槽，也不应用普通播种白名单。投影同时提供全部作物层、各槽顶层和稳定身份。普通 Reap 每个非空槽取一枚，额外或整田收割可继续取下层；末枚回调检查所有层。客户端展示底层，但只有顶层映射回原固定槽的选择坐标，空槽不会造成错位。
 
 基础田地计分只统计 Farmyard Field；Card Field 继续参与 Logical Field 规则、播种与收割。
 

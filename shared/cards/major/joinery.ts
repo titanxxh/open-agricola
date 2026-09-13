@@ -1,19 +1,17 @@
 import { defineMajorCard } from '../card-source'
 import { createSingleHarvestExchange } from '../helpers/stage-effects'
-import { scoreByResourceTiers } from './helpers'
-import type { BonusScoringContext } from '../card-effects'
+import type { BonusScoreLevel } from '../card-effects'
 import type { GameState, PlayerState } from '../../contract/types'
 
 const buildJoineryImpl = (cardId: string) => ({
   effect: {
     id: cardId,
     onHarvest: createSingleHarvestExchange('wood', { food: 2 }, { sourceId: cardId }),
-    computeBonusScore: (_state: GameState, player: PlayerState, _ctx: BonusScoringContext) =>
-      scoreByResourceTiers(player.resources.wood ?? 0, [
-        { min: 7, score: 3 },
-        { min: 5, max: 6, score: 2 },
-        { min: 3, max: 4, score: 1 },
-      ]),
+    computeCostedBonus: (_state: GameState, player: PlayerState): BonusScoreLevel[] => [
+      { cost: {}, score: 0 },
+      ...[3, 5, 7].flatMap((amount, index) => player.resources.wood >= amount
+        ? [{ cost: { wood: amount }, score: index + 1 }] : []),
+    ],
   },
 })
 
@@ -44,7 +42,7 @@ export const Major_Joinery2 = defineMajorCard({
   name: 'Joinery',
   deck: 'major',
   number: 16,
-  cost: { wood: 2, stone: 2 },
+  cost: { wood: 2, stone: 3 },
   vp: 2,
   extraVp: true,
   joineryIdentity: true,

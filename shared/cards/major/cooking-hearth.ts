@@ -61,7 +61,7 @@ export const Major_CookingHearth3 = defineMajorCard({
   id: 'Major_CookingHearth3',
   number: 12,
   cost: {
-    fee: { clay: 5 },
+    fee: { clay: 6 },
     cards: { type: 'Major', list: ['Major_Fireplace1', 'Major_Fireplace2', 'Major_Fireplace3'] },
   },
   exchanges: [

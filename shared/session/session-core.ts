@@ -104,7 +104,7 @@ import * as roundPhase from './phases/round.ts'
 import * as harvestPhase from './phases/harvest.ts'
 import * as draftPhase from './phases/draft.ts'
 import { ensureCardModifiers } from '../cards/card-modifiers.ts'
-import { getCardEffect, getHarvestBreedOrderPriority } from '../cards/card-effects.ts'
+import { getCardEffect, getHarvestBreedOrderPriority, resourceCommitmentsSatisfied } from '../cards/card-effects.ts'
 import { runCardEffectHook } from '../cards/card-effects.ts'
 import { StageDispatch, type StageResumeState } from './stage-dispatch.ts'
 import {
@@ -706,6 +706,12 @@ export class GameCore {
   setCurrentPlayerIndex(idx: number): void { this.state.currentPlayerIndex = idx }
   /** @internal Round phase — read activePlayerIndex view (engineStack-derived). */
   readActivePlayerIndex(): number | null { return this.activePlayerIndex }
+  readAnytimePlayerIndex(): number | null {
+    const frame = this.engineStack.current()
+    if (!frame) return this.state.currentPlayerIndex
+    if (this.provisionalContinuationScopes.some((scope) => scope.frameId === frame.frameId)) return frame.ownerPlayerIndex
+    return this.effectiveOwnerIndexForFrame(frame, this.engineStack.peekPendingCursor()?.hostNodeId, this.engineStack.peekPendingView())
+  }
   /** @internal Round phase — read activeSpaceId view (engineStack-derived). */
   readActiveSpaceId(): string | null { return this.activeSpaceId }
   /** @internal Round phase — pushHistory + undoBoundary helper exposed for handlers. */
@@ -1524,6 +1530,12 @@ export class GameCore {
     response: SessionResponse,
     settlement: ActiveCommandSettlement,
   ): SessionResponse {
+    if (!resourceCommitmentsSatisfied(this.state)) {
+      this.restoreCommandCheckpoint(settlement.checkpoint)
+      this.provisionalContinuationScopes = settlement.scopeSnapshot
+      this.failedAuthoritativeCommands = settlement.failedCommandSnapshot
+      return this.respond(false, 'command would break a resource commitment')
+    }
     if (settlement.protectedObservations.length > 0) this.openProvisionalScopesForRisk()
     if (settlement.abortScopeId) {
       const scope = this.provisionalContinuationScopes.find((entry) => entry.id === settlement.abortScopeId)
@@ -2018,7 +2030,7 @@ export class GameCore {
   }
 
   private getActiveInteractionContext() {
-    const playerIndex = this.activePlayerIndex ?? (this.engineStack.depth() === 0 ? this.state.currentPlayerIndex : null)
+    const playerIndex = this.readAnytimePlayerIndex()
     const spaceId = this.activeSpaceId ?? (this.engineStack.depth() === 0 ? subflowSpaceId('top-level') : null)
     if (playerIndex === null || !spaceId) return null
     const player = this.state.players[playerIndex]
@@ -2369,6 +2381,14 @@ export class GameCore {
     promptKey,
     hasPendingHost,
   }: PendingInteractionProjectionInput): InteractionRequest {
+    if (request.kind === 'feed' && player) {
+      return {
+        ...request,
+        exchangeCatalog: getFeedExchangeCatalog(player, this.state).map(({ trade: _trade, window: _window, ...entry }) => entry),
+        maxTradeTimesBySourceId: this.getHarvestExchangeLimits(player),
+        placedAnimals: getPlacedAnimalsByType(player, this.state),
+      }
+    }
     if (request.kind === 'animal-reorg') {
       return {
         ...request,
@@ -3389,9 +3409,19 @@ export class GameCore {
     const next = feedQueue[0]
     if (!next) return this.startBreedPhase()
     const rest = feedQueue.slice(1)
-    if (next.needsFeed) {
-      this.startFeedSubFlow(next.index, next.remaining, next.foodUsed, rest)
-      return this.respond()
+    const player = this.state.players[next.index]!
+    const required = computeHarvestFeedingRequirement(this.state, player)
+    const foodUsed = Math.min(player.resources.food, required)
+    player.resources.food -= foodUsed
+    const remaining = required - foodUsed
+    this.startFeedSubFlow(next.index, remaining, foodUsed, rest)
+    if (this.hasAnyHarvestExchange(player) ||
+      (remaining > 0 && (player.resources.grain > 0 || player.resources.vegetable > 0 ||
+        this.buildAnytimeEntries().length > 0))) return this.respond()
+    this.engineStack.pop()
+    if (remaining > 0) player.resources.begging += remaining
+    if (foodUsed > 0 || remaining > 0) {
+      this.logHarvestResourceEntry('log.harvestFeedDetail', player, { food: foodUsed, ...(remaining > 0 ? { begging: remaining } : {}) })
     }
     return this.startHeatingOrContinue(next.index, rest)
   }
@@ -3406,51 +3436,7 @@ export class GameCore {
   }
 
   private executeFeedingLogic(): SessionResponse {
-    const harvestOrder = this.getHarvestPlayerIndices()
-    const feedQueue: FeedQueueEntry[] = []
-
-    for (const i of harvestOrder) {
-      const player = this.state.players[i]!
-      const required = computeHarvestFeedingRequirement(this.state, player)
-      const useFood = Math.min(player.resources.food, required)
-      player.resources.food -= useFood
-      const remaining = required - useFood
-
-      const hasHarvestExchange = this.hasAnyHarvestExchange(player)
-
-      if (remaining <= 0) {
-        // Even when feeding is satisfied, give the player a chance to
-        // engage harvest exchanges (e.g. C105 reverse trade spending bonus
-        // food → resources). Only skip if there's nothing useful to do.
-        if (!hasHarvestExchange) {
-          if (useFood > 0) {
-            this.logHarvestResourceEntry('log.harvestFeedDetail', player, { food: useFood })
-          }
-          feedQueue.push({ index: i, remaining: 0, foodUsed: useFood })
-          continue
-        }
-        feedQueue.push({ index: i, remaining: 0, foodUsed: useFood, needsFeed: true })
-        continue
-      }
-
-      const canConvert =
-        player.resources.grain > 0 ||
-        player.resources.vegetable > 0 ||
-        hasHarvestExchange
-
-      if (canConvert) {
-        feedQueue.push({ index: i, remaining, foodUsed: useFood, needsFeed: true })
-      } else {
-        player.resources.begging += remaining
-        this.logHarvestResourceEntry('log.harvestFeedDetail', player, {
-          food: useFood,
-          begging: remaining,
-        })
-        feedQueue.push({ index: i, remaining: 0, foodUsed: useFood })
-      }
-    }
-
-    return this.continueHarvestFeedingQueue(feedQueue)
+    return this.continueHarvestFeedingQueue(this.getHarvestPlayerIndices().map((index) => ({ index })))
   }
 
   private continueEndHarvestEffects(playerIndex = 0, cardIndex = 0): SessionResponse {
@@ -3995,7 +3981,7 @@ export class GameCore {
         // command. Predicate `isSyntheticInteractionFrame` (S-2) replaces
         // the previous hard-coded kind list so future synthetic frames
         // (Task 11+) inherit the right behaviour automatically.
-        if (isSyntheticInteractionFrame(frame)) {
+        if (isSyntheticInteractionFrame(frame) && pendingView?.syntheticKind) {
           if (
             frame.reason === 'post-reap-anytime' &&
             this.engineStack.peekPendingView()?.syntheticKind === 'post-reap-anytime'
@@ -4641,7 +4627,8 @@ export class GameCore {
     playerIndex: number,
     selections: FeedSelections,
   ): SessionResponse {
-    const request = this.engineStack.peekPendingView()?.request
+    const interaction = this.buildInteraction()
+    const request = interaction.stateId === 'wait' ? interaction.request : undefined
     const frame = this.engineStack.current()
     if (
       request?.kind !== 'feed' ||

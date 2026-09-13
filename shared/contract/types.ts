@@ -940,17 +940,8 @@ export type ResourceBatchExchangePayload = {
   receive: Partial<Record<keyof Resource, number>>
 }
 
-/**
- * Single entry in a harvest-feed queue: pinpoints which player still owes
- * food and how much, plus the food already consumed from that player's
- * mandatory pre-deduction (so the UI can display it). Used by the engine's
- * `InteractionRequest` `feed` payload and `GameCore.startFeedSubFlow`.
- */
 export type FeedQueueEntry = {
   index: number
-  remaining: number
-  foodUsed: number
-  needsFeed?: boolean
 }
 
 export type FeedExchangeCatalogEntry = {

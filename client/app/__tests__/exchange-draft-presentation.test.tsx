@@ -75,6 +75,17 @@ const tradeOption = (
 })
 
 describe('useExchangeDraftPresentation', () => {
+  it('includes food received during a nested trade when returning to feeding', () => {
+    const player = mkPlayer({ resources: { ...emptyResources, food: 2 } })
+    const { result } = renderHook(() => useExchangeDraftPresentation({
+      state: { players: [player] }, pendingChoice: null,
+      interactionPresentationPlan: { kind: 'harvest-feed', playerIndex: 0, remaining: 3, foodUsed: 1 },
+      locale: 'en', cardLabel: (id: string) => id, getCardMeta: () => undefined,
+    }))
+    expect(result.current.harvestFeed.begging).toBe(1)
+    expect(result.current.harvestFeed.convertedFood).toBe(2)
+  })
+
   it('updates farmyard-only limits in the selected feeding order', () => {
     const player = mkPlayer({
       resources: { ...emptyResources, sheep: 2 },
@@ -210,9 +221,9 @@ describe('useExchangeDraftPresentation', () => {
         to: { food: 1 },
       },
     ])
-    expect(result.current.harvestFeed.summary.food).toBe(3)
+    expect(result.current.harvestFeed.summary.food).toBe(4)
     expect(result.current.harvestFeed.summary.grain).toBe(2)
-    expect(result.current.harvestFeed.begging).toBe(1)
+    expect(result.current.harvestFeed.begging).toBe(0)
 
     act(() => result.current.harvestFeed.reset())
     act(() => result.current.harvestFeed.updateCount('C059_SchnappsDistillery-ex0', 1))

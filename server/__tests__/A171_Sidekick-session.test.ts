@@ -126,25 +126,20 @@ describe('A171 Sidekick session', () => {
     expect(resp.state.actionSpaces.find((space) => space.id === 'vegetable-seeds')?.takenBy).toEqual([])
   })
 
-  it('currently chains from a fixed board action even though the card names action space cards', () => {
+  it('does not chain from a fixed board action', () => {
     const session = setup({
       spaceResources: {
         forest: { wood: 2 },
       },
     })
 
-    let resp = session.takeAction(0, 'forest')
-    resp = resolveTriggerIfPresent(session, resp, CARD_ID)
-    const accept = acceptOption(resp)
-    expect(accept).toBeDefined()
-
-    resp = session.resolveChoice(0, accept!.value)
-
+    const resp = session.takeAction(0, 'forest')
+    expect(resp.ok).toBe(true)
+    expect(acceptOption(resp)).toBeUndefined()
     const owner = resp.state.players[0]!
-    expect(owner.resources).toMatchObject({ food: 1, wood: 2, grain: 1 })
-    expect(resp.state.actionSpaces.find((space) => space.id === 'grain-seeds')?.takenBy).toEqual([
-      { playerId: owner.id, workerId: '2' },
-    ])
+    expect(owner.resources).toMatchObject({ food: 2, wood: 2, grain: 0 })
+    expect(workersAvailable(resp.state, owner)).toBe(2)
+    expect(resp.state.actionSpaces.find((space) => space.id === 'grain-seeds')?.takenBy).toEqual([])
   })
 
   it('does not offer a fixed target vetoed by season doability after paying food', () => {

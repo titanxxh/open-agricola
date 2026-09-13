@@ -31,7 +31,7 @@ const costListener: CardListenerRegistration = {
 
 const cardImpl = {
   listeners: [costListener],
-  prerequisiteCheck: (player) => player.houseType === 'clay',
+  prerequisiteCheck: (player) => player.houseType !== 'wood',
   reaches: Object.keys(discountByTarget),
 } satisfies CardImpl
 

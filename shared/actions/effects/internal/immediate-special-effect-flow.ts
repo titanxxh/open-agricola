@@ -2,6 +2,7 @@ import type { ActionHookResult } from '../../hooks'
 import type { ActionFlow, ActionSpace, GameState, PlayerState } from '../../../contract/types'
 import type { EventSink } from '../../../contract/events'
 import { specialEffectAction } from '../special-effect'
+import { gainAction } from '../gain'
 import { noopEventSink } from '../../../events/noop'
 
 type ImmediateSpecialEffectInput = ActionHookResult | ActionFlow | undefined | void
@@ -33,8 +34,9 @@ const executeFlow = (
   if (!flow || ('optional' in flow && flow.optional)) return
 
   if (flow.type === 'leaf') {
-    if (flow.actionId !== 'special-effect') return
-    specialEffectAction.execute({
+    const action = flow.actionId === 'special-effect' ? specialEffectAction : flow.actionId === 'gain' ? gainAction : undefined
+    if (!action) return
+    action.execute({
       state,
       player,
       space,

@@ -74,37 +74,12 @@ describe('A171 Sidekick listener', () => {
     })
   })
 
-  it('offers the physical left fixed action when the current space is not a round action', () => {
-    expect(run(setupContext({ currentSpaceId: 'forest', targetSpaceId: 'grain-seeds' }))).toMatchObject({
-      sourceCard: CARD_ID,
-      flow: {
-        children: [
-          { actionId: 'pay', params: { food: 1 }, sourceCard: CARD_ID },
-          {
-            actionId: 'place-farmer-on-space',
-            sourceCard: CARD_ID,
-            params: { spaceId: 'grain-seeds', sourceCard: CARD_ID },
-            actionContext: { sidekickChain: ['forest'] },
-          },
-        ],
-      },
-    })
+  it('does not chain from a fixed action', () => {
+    expect(run(setupContext({ currentSpaceId: 'forest', targetSpaceId: 'grain-seeds' }))).toBeUndefined()
   })
 
-  it('offers a fixed action to the left of the first round slot', () => {
-    expect(run(setupContext({ currentSpaceId: 'sheep-market', targetSpaceId: 'farm-expansion' }))).toMatchObject({
-      flow: {
-        children: [
-          { actionId: 'pay', params: { food: 1 }, sourceCard: CARD_ID },
-          {
-            actionId: 'place-farmer-on-space',
-            sourceCard: CARD_ID,
-            params: { spaceId: 'farm-expansion', sourceCard: CARD_ID },
-            actionContext: { sidekickChain: ['sheep-market'] },
-          },
-        ],
-      },
-    })
+  it('does not chain to a fixed action left of the first round slot', () => {
+    expect(run(setupContext({ currentSpaceId: 'sheep-market', targetSpaceId: 'farm-expansion' }))).toBeUndefined()
   })
 
   it.each([

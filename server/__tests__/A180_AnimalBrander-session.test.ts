@@ -105,7 +105,7 @@ describe('A180 Animal Brander', () => {
     expect(resp.state.players[0]!.resources.food).toBe(0)
   })
 
-  it('does not offer the doubled sheep branch when the player starts Animal Market with no food', () => {
+  it.each([false, true])('can pay from the original sheep gain and accept the repeat: %s', (accept) => {
     const session = setup(0)
 
     let resp = session.takeAction(0, 'animal-market-56')
@@ -113,10 +113,13 @@ describe('A180 Animal Brander', () => {
     expect(sheep).toBeDefined()
 
     resp = session.resolveChoice(0, sheep!.value)
-    expect(resp.state.players[0]!.resources.sheep).toBe(1)
-    expect(resp.state.players[0]!.resources.food).toBe(1)
+    expect(resp.state.players[0]!.resources).toMatchObject({ sheep: 1, food: 1 })
     resp = resolveAnimalReorgs(session, resp, 'sheep')
-
+    const repeat = findOption(resp, (option) => option.sourceCard === CARD_ID)
+    expect(repeat).toBeDefined()
+    resp = resolveAnimalReorgs(session, session.resolveChoice(0, accept ? repeat!.value : '__skip__'), 'sheep')
+    expect(resp.ok, resp.error).toBe(true)
+    expect(resp.state.players[0]!.resources).toMatchObject({ sheep: accept ? 2 : 1, food: 1 })
     expect(findOption(resp, (option) => option.sourceCard === CARD_ID)).toBeUndefined()
   })
 

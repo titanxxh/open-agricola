@@ -291,7 +291,7 @@ describe('harvest session flow', () => {
       throw new Error('expected harvestFeed pending')
     }
     expect(resp.interaction.request).toMatchObject({ remaining: 0, foodUsed: 2 })
-    expect(resp.interaction.anytimeActions).toEqual([])
+    expect(resp.interaction.anytimeActions.map((action) => action.id)).toContain('exchange')
 
     resp = session.resolveChoice(0, 'confirm', { selections: [] })
     expect(resp.state.players[0]!.resources).toMatchObject({ clay: 1, food: 0, begging: 0 })

@@ -30,7 +30,7 @@ export function computeAnytimePolicy(input: AnytimePolicyInput): AnytimePolicy {
   if (!input.hasActiveContext) {
     return { allowed: false, reason: 'no-active-interaction' }
   }
-  if (input.interactionKind === 'feed' || input.interactionKind === 'heating') {
+  if (input.interactionKind === 'heating') {
     return { allowed: false, reason: 'feed-window-locked' }
   }
   if (input.interactionKind === 'engine-blocked') {
