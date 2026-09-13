@@ -694,6 +694,7 @@ import { D154_ChimneySweep } from './D/D154_ChimneySweep'
 import { D156_RetailDealer } from './D/D156_RetailDealer'
 import { D157_PartyOrganizer } from './D/D157_PartyOrganizer'
 import { D158_BeanCounter } from './D/D158_BeanCounter'
+import { D159_ReedSeller } from './D/D159_ReedSeller'
 import { D160_Midwife } from './D/D160_Midwife'
 import { D161_CabbageBuyer } from './D/D161_CabbageBuyer'
 import { D162_ClayFirer } from './D/D162_ClayFirer'
@@ -1708,6 +1709,7 @@ export const ALL_CARD_IMPLS: Readonly<Record<string, CardImpl>> = {
   'D156_RetailDealer': D156_RetailDealer.impl,
   'D157_PartyOrganizer': D157_PartyOrganizer.impl,
   'D158_BeanCounter': D158_BeanCounter.impl,
+  'D159_ReedSeller': D159_ReedSeller.impl,
   'D160_Midwife': D160_Midwife.impl,
   'D161_CabbageBuyer': D161_CabbageBuyer.impl,
   'D162_ClayFirer': D162_ClayFirer.impl,

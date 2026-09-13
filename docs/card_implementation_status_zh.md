@@ -4,7 +4,7 @@
 
 > 本文是 [`card_implementation_status.md`](card_implementation_status.md) 的中文镜像；英文版是规范文档。
 
-> 生成/更新日期：2026-09-10。本文件替代 `docs/card_desc_audit.md`、`docs/card_progress.md`、`docs/master-plan.md`、`docs/bad-smell.md`。参考实现唯一基准：`参考实现`。
+> 生成/更新日期：2026-09-13。本文件替代 `docs/card_desc_audit.md`、`docs/card_progress.md`、`docs/master-plan.md`、`docs/bad-smell.md`。参考实现唯一基准：`参考实现`。
 
 ## 2. 问题优先汇总
 
@@ -135,7 +135,7 @@
 | 计分前 anytime 窗口 | `CardListenerRegistration.preScoring`、`CardListenerRegistration.blockedAnytimeInteractionKinds`、`continuePreScoringWindow()`、`stageResume.hook='preScoringWindow'`、A102/C18/C46/C69/C87/C94/C101/C115/D13/D87/D114/D124/E13/E14/E27 | 所有 `onBeforeEndGame` target 完成后，只按玩家顺序提供已标记且当前可用的 anytime listener。完成一次卡牌 flow 后按实时状态重建该玩家窗口，Pass 才推进；没有可用 marked flow 的玩家直接跳过，所有玩家完成后才写入 `gameOver`。卡牌 listener 可声明在指定 pending interaction kind 中隐藏 anytime 能力，包括动物整理。 |
 | Harvest 交换窗口与喂食结算 | `CardEffect.preHarvestGoodsWanted`、`CardEffect.preHarvestGoodsWantedBeforeReap`、`CardEffect.maySkipHarvestFieldPhase`、`harvestPrepWindow`、`handleFeedResolved()`、`harvestExchangeUsage`、`harvest.feedConverted`、A61/C29/C54/C98/C105/C110/D70/E110 | `onStartHarvest` 前会把已打出卡牌的需求汇总，与当前存量加必然收割量比较；收割前需求则必须由当前存量独立覆盖。准备窗口只提供可支付、会产出缺少资源且有次数限制的 Harvest exchange。喂食草稿展示所有仍有次数的 Harvest exchange，按规范顺序推演选择，允许前一个交换的产出支付后一个交换；后端在任何状态变更前按实时资源和剩余次数验证完整有序计划，拒绝时保持状态与 pending 不变。随后用实时食物支付已冻结的剩余需求；只有多余食物留存，缺口才转为乞讨。 |
 | 整个收获的参与者排除 | `scheduleNextHarvestSkip()`、`activatePendingHarvestSkips()`、`isPlayerSkippingCurrentHarvest()`、C108 | 待生效标记在 `onBeforeHarvest` 后激活，此后从本次收获的全部玩家流程、持有者阶段 hook 和持有者卡牌 listener 中排除该玩家。标记按轮次生效且只消费一次；只跳过田地和繁殖的效果保持独立。 |
-| 收割后 anytime 窗口 | `continuePostReapAnytimeWindow()`、`PendingSyntheticKind='post-reap-anytime'`、`buildAnytimeEntries()`、`HarvestReapSummary.harvestedPositions`、D071 | `onHarvest` 完成后、喂食计算前，按 Harvest 顺序提供当前可执行的 anytime action。每次 flow 后按实时状态重建，空玩家直接跳过，Pass 推进；D071 以本次 Harvest 实际收割过的田与当前恰含 1 个作物的 Logical Field 的交集，派生普通田和 Card Field 候选。喂食读取最终实时资源，真实 `feed` / `heating` pending 仍锁定。Session 主路径不含 D071 分支。 |
+| 收割后 anytime 窗口 | `continuePostReapAnytimeWindow()`、`PendingSyntheticKind='post-reap-anytime'`、`buildAnytimeEntries()`、`HarvestReapSummary.harvestedPositions`、D071 | `onHarvest` 完成后、喂食计算前，按 Harvest 顺序提供当前可执行的 anytime action。每次 flow 后按实时状态重建，空玩家直接跳过，Pass 推进；D071 以本次 Harvest 实际收割过的田与当前恰含 1 个作物的 Logical Field 的交集，派生普通田和 Card Field 候选。喂食读取最终实时资源，允许可恢复的 anytime 交互；`heating` 仍锁定。Session 主路径不含 D071 分支。 |
 | 准备阶段观察、工作阶段前时点、本轮顺序冻结与放人时序 | `CardEffect.onBeforeStartOfTurn`、`CardEffect.onBeforeWork`、`action.accumulated`、`roundFirstPlayerId`、`continueAfterFutureMeepleActions()`、`findFirstNonAccumSpaceThisWorkPhase()`、`worker.placed`、A025/B081/B116/C125/E056 | 准备阶段观察者在 `onBeforeStartOfTurn` 保存增长前状态；全局增长随后在工作阶段前与工作阶段开始效果之前提交同轮、无卡牌来源的 `action.accumulated` 事实。B116 将 Reed Bank 为空的快照与 `{ reed: 1 }` 配对，因此中途的 before-work 领取既不会压掉奖励，也不会伪造每次准备阶段至多一次的奖励。future-meeple 行动完成后，卡面写明“工作阶段开始前”的卡牌通过 `onBeforeWork` 结算；全部 flow 完成后才进入现有 `onRoundStart` 工作阶段开始时点。本轮起始玩家在这些 hook 前冻结，因此实时标记转移从下一轮生效，顺序消费者仍使用本轮冻结顺序。若 before-work placement 用完起始玩家工人而其他玩家仍可行动，工作入口沿该顺序推进；若实际放人后所有玩家都已用完工人，则立即进入 all-workers-placed 级联。pending 恢复不得重复 preparation。冻结的工作顺序只控制轮转；依赖放人先后的规则读取同轮 work phase 的 `worker.placed` 真实时序，因此后续标记转移或连续放人不会重写历史，undo 与新 Work Phase 则恢复或重启候选。 |
 | Extra-turn provider selection | `collectExtraTurnContributions()`、`collectExtraTurnFlow()`、`activate-extra-turn`、`ParallelNode.resolveAfterSelection`、`XorNode.selectedChildId`、`_extraTurnSkipCountsByCard` / `_extraTurnConsumedCountsByCard` | 多张卡同时贡献 turn-rotation extra action 时，先用 one-shot `ParallelNode(mode='trigger-select')` 展示 provider activation；trigger-select child 可是 `activate-extra-turn` 这类非 `activate-card` internal action，选中后才展开该卡自己的 flow。provider 展开后的嵌套 `xor(seq(...))` 会记录 selected branch 并完整 drain，避免只执行第一步 pay 后提前完成。单 provider 仍直接展开以减少 UI 噪音。skip-turn / forced consume 不再用玩家级 global counter，而是按 cardId 写 per-source skip/consume count；只有无交互 skip fallback 使用稳定卡牌顺序消费一个 source。真实 activation 时若 provider 已不再贡献 flow，会 fail 而不是静默消费 provider prompt。 |
 | 供应人物生命周期 | `Worker.supplyUse`、`inactiveWorkersInSupply()`、`place-farmer.workerSource`、`returnSupplyWorkers()`、`extraTurnBeforeWorkers` | 有限人物 ID 预留或锁定时不激活家庭成员。A022/B022/D022/E022/E093/E125/M053 共用正常轮转、召回后可用性、按 ID 移动和归家处置。轮初到期预留通过 `onBeforeStartOfTurn` 释放，早于未来资源结算与 `onRoundStart` 增员。统一清理先于归家开始增员；D010 要求供应仍有人物。首回合资格在任一回合完成后消耗，包括 Moor 特别行动。归家占位效果共用 `__roundPlacement__` 中的最终位置快照，清理后仍保留临时人物证据；Curator 按已取空累积格上的人物计数。A035/A100/C097/A152 通过 `getReturningPersonPlacements()` 排除合成占位和永久移除的人物，A141/A151/A157/C155 的占位判断保留历史位置；普通抽牌全部选完后才恢复额外回合菜单。沿用既有 anytime、blocked、undo 和受保护观察语义。 |
@@ -183,6 +183,8 @@
 通用行动替换在原行动的可选提示前显示统一来源菜单，唯一替代也必须明确选择。选中子树保留内部选择及可选步骤，必需续行在 before、pending、重连和撤销过程中保持承诺。每个 leaf 保存替换决定，producer 守卫以行动机会为边界，既保留行动身份，也允许新授予的行动格重新计算替换。共同契约覆盖 #850–#852 的 11 张牌迁移及普通自定义替代，以架构文档和可执行 Session 测试为准。B026 次数、E151 容量、C168 来源的独立后续保留在 §2。
 
 ## 6. 基础设施待办
+
+Issue #893 补充不改变固定槽身份的 Card Field 作物分层；播种提交统一执行已选田授权，额外田非法提交保留可恢复待选。作坊收获兑换可拒绝，重复作坊计分共用 costed-bonus 资源预算。喂养逐玩家结算并支持可恢复跨玩家 anytime；资源承诺保留在卡内，由 Session 命令边界原子校验（ADR-0019）。上述机制有原生 Session 回归，不在核心流程添加卡号分支。
 
 #848 的共享缺口已补齐：付款方出资的 gain 先校验完整转账再移动资源；显式 mandatory listener 即使不经过触发菜单也保留强制义务；普通及免费职业入口统一校验前置；改善预览与付款保留授予行动的上下文。农场货物放置采用 `farm.animalMoved.newlyPlacedOnFarmyard` 和实体田格的 `resource.moved` 事件。Writing Chamber 复用已有完整 post-score summary 读取独立负分条目，不改变其他计分卡的输入。组件退款仍为 #849 跟踪的独立已接受限制。
 
@@ -243,16 +245,16 @@ Hook 归属由 `ALL_CARD_IMPLS` 派生，不在此镜像一份会漂移的副本
 | `A048_ShavingHorse` | 已接受差异 | 参考实现 banned，但 OA 按产品策略保留 |
 | `A082_WorkCertificate` | 已接受差异 | 参考实现 banned，但 OA 按产品策略保留；runtime 使用共享 partial-take helper 从 accumulation space 移除资源 |
 | `A097_Freshman` | 已接受差异 | 参考实现 banned，但 OA 按产品策略保留 |
-| `A113_HeresyTeacher` | 已接受差异 | 已接受的行为 / 产品差异 |
+| `A113_HeresyTeacher` | 已接受差异 | 参考实现无运行时；OA 按牌面对全部合格 Logical Field 在底部加菜，包含 Card Field。 |
 | `A131_CraftTeacher` | 已接受差异 | 参考实现 banned，但 OA 按产品策略保留 |
 | `A133_Braggart` | 已接受差异 | 参考实现 banned，但 OA 按产品策略保留 |
 | `A169_OffSiter` | 已接受差异 | 参考实现 implemented=false；OA 作为 5+ 扩展产品实现。统计 owner 已建 major improvement 与 alsoCountsAs major 小改的 printed wood/clay/reed/stone cost（含 fee cost），总数首次达到 9+ 后锁定提供 1 extra room capacity。 |
 | `A170_Hayward` | 已接受差异 | 参考实现 implemented=false；OA 作为 5+ 扩展产品实现。owner 可在 fencing legal 时通过 anytime action 触发普通 fence flow，不放置工人；该实现仍保留普通 fence listener 语义。 |
-| `A171_Sidekick` | 已接受差异 | 参考实现 implemented=false；OA 作为 5+ 扩展产品实现。owner 在版图行动格放人后，可选支付 1 food，通过 `place-farmer-on-space` 在物理左邻行动格放置另一个可用工人并执行目标行动；左邻按当前玩家数版图坐标解析，包含 round action card 与固定/扩展行动格，不跳过未揭示 round slot；target doability 按预留/支付该 1 food 后的资源判断，并复用 flow child doability 覆盖目标行动的 hook/listener veto，避免付费后目标行动无可执行选项；每步目标行动完成后再激活 cascaded after-place-farmer listener，继续向左检查，停止于无左邻、无 food、无工人、目标 occupied / blocked / 未开放 / 不可执行或 `sidekickChain` 已访问。 |
+| `A171_Sidekick` | 已接受差异 | 参考实现 implemented=false；OA 作为 5+ 扩展产品实现。owner 在行动卡放人后，可选支付 1 food，通过 `place-farmer-on-space` 在紧邻左侧已揭示行动卡放置另一个可用工人；固定版图行动格既不能启动也不能成为连锁目标，不跳过未揭示 round slot；target doability 按预留/支付该 1 food 后的资源判断，并复用 flow child doability 覆盖目标行动的 hook/listener veto，避免付费后目标行动无可执行选项；每步目标行动完成后再激活 cascaded after-place-farmer listener，继续向左检查，停止于无左邻、无 food、无工人、目标 occupied / blocked / 未开放 / 不可执行或 `sidekickChain` 已访问。 |
 | `A173_ClayThief` | 已接受差异 | 参考实现 implemented=false；OA 作为 5+ 扩展产品实现。round start 资源累积后若 hollow-56 有 clay 且未使用，可选标记 used / 更新 infobox，并收取 hollow-56 当前全部 clay；无 clay 或已 used 不触发。 |
 | `A174_MasterHora` | 已接受差异 | 参考实现 implemented=false；OA 作为 5+ 扩展产品实现。owner 在六个 5/6 灰色农夫 linked extension spaces 放人前（含 card-granted extra `place-farmer` 目标选择）可选 1 food -> 1 vegetable；共享当前步骤准入允许通过此 before 尝试；宿主随后仍不可用时等待合法 anytime 或进入 blocked，由玩家显式 undo。 |
 | `A177_Middleman` | 已接受差异 | 参考实现 implemented=false；OA 作为 5+ 扩展产品实现。打出时在当前 meeple-symbol extension spaces 放置 owner-only 1 stone + 1 food 附件；owner 后续精确使用该行动格时领取并清除该格附件，linked partner 不隐式领取，非 owner 不领取也不消耗；前端仅渲染后端序列化的附件资源和 owner hover 文本。 |
-| `A180_AnimalBrander` | 已接受差异 | 参考实现 implemented=false；OA 作为 5+ 扩展产品实现。animal-market-56 各原动物分支在本地 flow 表达；owner 选择具体分支并完成原结果后，可选额外付 1 food 重放同一 option。cattle 分支本地 pay/gain，不再注册独立 action；接受后总付 3 food 得 2 cattle，跳过则只保留原结果。 |
+| `A180_AnimalBrander` | 已接受差异 | 参考实现 implemented=false；OA 作为 5+ 扩展产品实现。animal-market-56 各原动物分支在本地 flow 表达；owner 选择具体分支并完成原结果后，可选额外付 1 food 重放同一 option。允许用原行动所得食物支付重复费用，零食物羊分支可最终得到二羊一食；cattle 分支本地 pay/gain，不再注册独立 action；接受后总付 3 food 得 2 cattle，跳过则只保留原结果。 |
 | `B010_Caravan` | 已接受差异 | 参考实现 banned，但 OA 按产品策略保留 |
 | `B015_CarpentersBench` | 已接受差异 | 参考实现 banned，但 OA 按产品策略保留；参考实现 `formatCost([WOOD => 1])` / `max` / `benchWood` 通过 `reserve-fence-bonus` + nested `fencePolicy` 表达：只建普通 fence、恰好 1 个新牧场、1 段免费，并用 `paymentBudget: { wood: collectedWood }` 限制最终实付普通 wood；通过 `fencePolicy.promptHintKey` 给前端提示“只能 1 个新牧场”；不注册全局 `fencing` 折扣，避免和 E16/C16 等 `computeCosts.fence` 再次叠加；不再用 `collectedWood + 1` 段数上限裁剪合法形状。 |
 | `B021_HayloftBarn` | 已接受差异 | 参考实现 banned，但 OA 按产品策略保留；通过 resource exchange 获得的 grain 已由 provenance helper 触发；空卡 family-growth 使用 `hasInactiveWorkerInSupply`，不会在仅剩 removed worker 时暴露生人 flow |
@@ -268,7 +270,7 @@ Hook 归属由 `ALL_CARD_IMPLS` 派生，不在此镜像一份会漂移的副本
 | `B171_GreenhouseBuilder` | 已接受差异 | 参考实现 implemented=false；OA 作为 5+ 扩展产品实现。注册 owner-only dynamic action space，只按当前 round 之前已 reveal 且 owner 可执行的 `fencing` / `house-redevelopment` / `vegetable-seeds` printed spaces 暴露对应分支。 |
 | `B173_Sweeper` | 已接受差异 | 参考实现 implemented=false；OA 作为 5+ 扩展产品实现。owner 使用 meeple-symbol extension space 后通过 shared stored-food cashout helper 在卡上放 1 food；一次性 anytime cashout 取走卡上 food、标记 used，职业仍计为已打出且后续不再累计。 |
 | `B175_FieldOverseer` | 已接受差异 | 参考实现 implemented=false；OA 作为 5+ 扩展产品实现。harvest field phase 结束时只统计其他玩家 `harvestReapSummary` 中的 grain field 数，3/4/6+ 按最高阈值给 food/grain/vegetable。 |
-| `B176_VillageIdiot` | 已接受差异 | 参考实现 implemented=false；OA 作为 5+ 扩展产品实现。通过 hand/played `occupation.isDoable` 与 `providesOccupation` minor 拦截保证其必须是且保持为 lone occupation，并在 opponent 使用 `meeting-place` 后给 owner 1 wood + 1 food。 |
+| `B176_VillageIdiot` | 已接受差异 | 参考实现 implemented=false；OA 作为 5+ 扩展产品实现。打出时丢弃其余职业手牌；通过 hand/played `occupation.isDoable` 与 `providesOccupation` minor 拦截保证其必须是且保持为 lone occupation，并在 opponent 使用 `meeting-place` 后给 owner 1 wood + 1 food。 |
 | `B178_TagAlong` | 已接受差异 | 参考实现 implemented=false；OA 作为 5+ 扩展产品实现。对手使用 Resource Market 变体后，owner 可选通过 `place-farmer-on-space` 把可用工人放到同一 occupied action space 并执行该行动；owner 自己使用、非 Resource Market、无可用工人或目标 blocked / 不可执行时不触发。 |
 | `B179_WildBoarHunter` | 已接受差异 | 参考实现 implemented=false；OA 作为 5+ 扩展产品实现。return home 前按实际 `takenBy` 占用统计 wood accumulation spaces，3+ 且 owner 有 wood 时可选 1 wood -> 1 boar。 |
 | `C003_CarriageTrip` | 已接受差异 | 参考实现 banned，但 OA 按产品策略保留 |
@@ -297,7 +299,7 @@ Hook 归属由 `ALL_CARD_IMPLS` 派生，不在此镜像一份会漂移的副本
 | `D092_ChildOmbudsman` | 已接受差异 | 参考实现 banned，但 OA 按产品策略保留 |
 | `D097_BeggingStudent` | 已接受差异 | 参考实现 banned，但 OA 按产品策略保留 |
 | `D137_TradeTeacher` | 已接受差异 | 参考实现 banned，但 OA 按产品策略保留 |
-| `D159_ReedSeller` | 排除 | 参考实现 implemented=false；OA 保留 data-only 定义 |
+| `D159_ReedSeller` | 已接受差异 | 参考实现没有运行时能力；OA 已实现公开逐席购买答复、卖方选买家和不预扣款的资源承诺，喂养中也可完成交易。 |
 | `D170_FoldBuilder` | 已接受差异 | 参考实现 implemented=false；OA 作为 5+ 扩展产品实现。注册 all-player dynamic action space；non-owner 先支付 owner 1 food，再执行 forbid-cancel fence flow 并获得 1 sheep；owner 使用不自付。 |
 | `D171_SeniorTeacher` | 已接受差异 | 参考实现 implemented=false；OA 作为 5+ 扩展产品实现。监听 opponent Lessons occupation payment 的 `pay.after`，通过 `sumActualPaidResource()` 按 `paymentSources` 还原实际 food 支付；非 Lessons、owner 自付、非 food replacement 不触发，实际付 food 时 owner 固定获得 exactly 1 food。 |
 | `D173_TownClerk` | 已接受差异 | 参考实现 implemented=false；OA 作为 5+ 扩展产品实现。任意玩家 built card `cardCountsAs(..., 'major')` 后在 owner 卡上放 1 food，包含 `alsoCountsAs: ['major']` 的 minor；ordinary minor 不触发；cashout 复用 shared stored-food helper。 |

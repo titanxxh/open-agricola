@@ -17,10 +17,10 @@ registerSelectionEffect('discard-all-crops', ({ state, player, positions, eventS
   const flows = field.slots
     .filter((slot) => slot.stack)
     .sort((a, b) => b.index - a.index)
-    .flatMap((slot) => {
+    .flatMap((slot) => slot.layers.flatMap(() => {
       const removed = mutations.remove({ fieldId: field.id, slot: slot.index })
       return removed.ok && removed.flow ? [removed.flow] : []
-    })
+    }))
   if (flows.length === 1) return flows[0]
   if (flows.length > 1) {
     return { type: 'parallel', children: flows }

@@ -1,8 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
-import { setWorkersAtHome } from '../../shared/domain/player'
+import { markAllWorkersUsed, setWorkersAtHome } from '../../shared/domain/player'
 import type { ActionChoiceOption } from '../../shared/contract/types'
-import { runCardEffectHook } from '../../shared/cards/card-effects'
 
 const prepareSixPlayerMajorSession = () => {
   const session = new GameSession(undefined, undefined, { playerCount: 6 })
@@ -90,7 +89,7 @@ describe('duplicate six-player major behavior', () => {
   it('Cooking Hearth return-cost can return Fireplace3 through stack-aware supply', () => {
     const session = prepareSixPlayerMajorSession()
 
-    buyMajor(session, 'Major_Fireplace1')
+    buyMajor(session, 'Major_Fireplace2')
     resetMajorActionForPlayer0(session)
     buyMajor(session, 'Major_Fireplace3')
     resetMajorActionForPlayer0(session)
@@ -106,9 +105,9 @@ describe('duplicate six-player major behavior', () => {
     }
 
     const player = resp.state.players[0]!
-    const fireplaceStack = readMajorSupply(session).find((stack) => stack.stackId === 'fireplace-1')
+    const fireplaceStack = readMajorSupply(session).find((stack) => stack.stackId === 'fireplace-2')
     expect(player.improvements).toEqual(expect.arrayContaining([
-      'Major_Fireplace1',
+      'Major_Fireplace2',
       'Major_CookingHearth1',
     ]))
     expect(player.improvements).not.toContain('Major_Fireplace3')
@@ -139,15 +138,22 @@ describe('duplicate six-player major behavior', () => {
       food: 0,
     }
 
+    state.round = 4
+    player.resources.grain = 0
+    for (const entry of state.players) markAllWorkersUsed(state, entry)
+    session.loadState(state)
+    let response = session.performRoundEnd()
     for (const cardId of player.improvements) {
-      runCardEffectHook(state, player, cardId, 'onHarvest')
+      expect(response.interaction.sourceCard).toBe(cardId)
+      const accept = response.interaction.request.options.find((option) => option.value !== '__skip__')!
+      response = session.resolveChoice(0, accept.value)
+      expect(response.ok).toBe(true)
     }
-
-    expect(player.resources).toMatchObject({
+    expect(response.state.players[0]!.resources).toMatchObject({
       wood: 0,
       clay: 0,
       reed: 0,
-      food: 14,
+      food: 10,
     })
   })
 })

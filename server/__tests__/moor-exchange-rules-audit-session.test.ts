@@ -1,9 +1,109 @@
 import { describe, expect, it } from 'vitest'
-import { setupMoorAudit, playMoorAuditMinor, startMoorAuditFeeding, advanceMoorAuditToRound } from './_helpers/moor-rules-audit'
+import { setupMoorAudit, playMoorAuditMinor, startMoorAuditFeeding, advanceMoorAuditToRound, acceptMoorAuditChoice } from './_helpers/moor-rules-audit'
 import { moveMajorImprovementToSupplyTop } from '../../shared/cards/major/supply'
-import { setWorkersAtHome } from '../../shared/domain/player'
+import { setWorkersAtHome, workersAvailable } from '../../shared/domain/player'
 
 describe('Moor exchange printed-rule native audit', () => {
+  it.each([
+    ['Major_Joinery', 'wood', 'Major_Moor_FurnitureStall'],
+    ['Major_Pottery', 'clay', 'Major_Moor_CeramicsStall'],
+    ['Major_Basket', 'reed', 'Major_Moor_BasketStall'],
+  ] as const)('M018 actually buys %s for two %s and one stone while preserving its passed-card follow-up', (target, resource, revealed) => {
+    const session = setupMoorAudit()
+    session.state.players[0]!.improvements = ['Major_Fireplace1', 'Major_ClayOven']
+    session.loadState(session.state)
+    const offered = playMoorAuditMinor(session, 'M018_RegisterOfCraftsmen')
+    expect(offered.interaction.request.options.map((option) => option.value)).toEqual(expect.arrayContaining(['Major_Joinery', 'Major_Pottery', 'Major_Basket']))
+    expect(offered.state.players[1]!.minorHand).toContain('M018_RegisterOfCraftsmen')
+    const before = { ...offered.state.players[0]!.resources }
+    const bought = session.resolveChoice(0, target)
+    expect(bought.ok, bought.error).toBe(true)
+    expect(bought.state.players[0]!.resources).toEqual({ ...before, [resource]: before[resource] - 2, stone: before.stone - 1 })
+    expect(bought.state.players[0]!.improvements).toContain(target)
+    expect(bought.state.availableMajorImprovements).toContain(revealed)
+    expect(bought.state.players[0]!.minorPlayed).not.toContain('M018_RegisterOfCraftsmen')
+    expect(bought.state.players[1]!.minorHand).toContain('M018_RegisterOfCraftsmen')
+    expect(workersAvailable(bought.state, bought.state.players[0]!)).toBe(1)
+    advanceMoorAuditToRound(session, 6)
+    const nextTarget = target === 'Major_Joinery' ? 'Major_Pottery' : 'Major_Joinery'
+    const stone = session.state.players[0]!.resources.stone
+    expect(session.takeAction(0, 'major-improvement').ok).toBe(true)
+    const next = session.resolveChoice(0, nextTarget)
+    expect(next.ok, next.error).toBe(true)
+    expect(next.state.players[0]!.resources.stone).toBe(stone - 2)
+  })
+
+  it.each([1, 2, 4])('M030 exchanges exactly two of %i sheep and finishes placement with the card passed left', (sheep) => {
+    for (const accept of [false, true]) {
+      const session = setupMoorAudit()
+      const player = session.state.players[0]!
+      player.resources.sheep = sheep
+      player.pastures = [
+        { id: 'sheep', size: 2, tiles: [{ row: 0, col: 0 }, { row: 0, col: 1 }], stables: 0, animalType: 'sheep', animalCount: sheep },
+        { id: 'horse', size: 1, tiles: [{ row: 0, col: 2 }], stables: 0, animalType: null, animalCount: 0 },
+      ]
+      player.minorHand = ['M030_FarmAnimalMarket']
+      session.loadState(session.state)
+      let response = session.takeAction(0, 'major-improvement')
+      expect(response.ok, response.error).toBe(true)
+      expect(response.interaction.request.options.some((option) => option.value === 'M030_FarmAnimalMarket')).toBe(true)
+      response = session.resolveChoice(0, 'M030_FarmAnimalMarket')
+      expect(response.ok, response.error).toBe(true)
+      expect(response.state.players[0]!.resources.food).toBe(19)
+      if (sheep >= 2) {
+        expect(response.interaction.sourceCard).toBe('M030_FarmAnimalMarket')
+        response = accept ? acceptMoorAuditChoice(session, response) : session.resolveChoice(0, '__skip__')
+      }
+      if (sheep >= 2 && accept) {
+        expect(response.interaction.request.kind).toBe('animal-reorg')
+        expect(response.state.players[0]!.resources).toMatchObject({ sheep: sheep - 2, cattle: 1, horse: 1 })
+        expect(response.state.players[1]!.minorHand).toContain('M030_FarmAnimalMarket')
+        const before = structuredClone(response.state.players[0])
+        const rejected = session.resolveChoice(0, 'confirm', { zones: [
+          { id: 'house', zoneType: 'house', animalType: 'cattle', animalCount: 2 },
+        ] })
+        expect(rejected.ok).toBe(false)
+        expect(rejected.state.players[0]).toEqual(before)
+        response = session.resolveChoice(0, 'confirm', { zones: [
+          { id: 'house', zoneType: 'house', animalType: 'cattle', animalCount: 1 },
+          { id: 'sheep', zoneType: 'pasture', animalType: sheep === 2 ? null : 'sheep', animalCount: sheep - 2 },
+          { id: 'horse', zoneType: 'pasture', animalType: 'horse', animalCount: 1 },
+        ] })
+      }
+      expect(response.ok, response.error).toBe(true)
+      expect(response.state.players[0]!.resources).toMatchObject({ sheep: sheep - (accept && sheep >= 2 ? 2 : 0), cattle: accept && sheep >= 2 ? 1 : 0, horse: accept && sheep >= 2 ? 1 : 0 })
+      expect(response.state.players[0]!.minorPlayed).not.toContain('M030_FarmAnimalMarket')
+      expect(response.state.players[1]!.minorHand).toContain('M030_FarmAnimalMarket')
+      expect(response.state.log.some((entry) => JSON.stringify(entry.params ?? {}).includes('M030_FarmAnimalMarket'))).toBe(true)
+    }
+  })
+
+  it.each([
+    ['Major_Moor_FurnitureStall', 'wood', 'clay'],
+    ['Major_Moor_CeramicsStall', 'clay', 'wood'],
+    ['Major_Moor_BasketStall', 'reed', 'wood'],
+    ['Major_Moor_BasketStall', 'reed', 'clay'],
+    ['Major_Moor_BasketStall', 'reed', 'stone'],
+  ] as const)('%s exchanges %s for %s and caps the requested quantity at the available resource', (cardId, from, to) => {
+    const session = setupMoorAudit()
+    session.state.players[0]!.improvements = [cardId]
+    session.state.players[0]!.resources[from] = 1
+    session.loadState(session.state)
+    const offered = session.takeAnytimeAction(0, 'exchange')
+    expect(offered.ok, offered.error).toBe(true)
+    const option = offered.interaction.request.options.find((entry) => entry.sourceCard === cardId && entry.effectPreview?.resourcesGained?.[to] === 1)!
+    expect(option).toBeDefined()
+    const index = option.value.split(':')[1]!
+    const before = structuredClone(offered.state.players)
+    const rejected = session.resolveChoice(1, `bulk:${index}=2`)
+    expect(rejected.ok).toBe(false)
+    expect(rejected.state.players).toEqual(before)
+    const traded = session.resolveChoice(0, `bulk:${index}=2`)
+    expect(traded.ok, traded.error).toBe(true)
+    expect(traded.state.players[0]!.resources).toEqual({ ...before[0]!.resources, [from]: 0, [to]: before[0]!.resources[to] + 1 })
+    expect(traded.state.players[1]).toEqual(before[1])
+  })
+
   it.each([
     ['Major_Moor_MuseumOfTheMoors', 'Major_Well', [1, 0, 0, 2]],
     ['Major_Moor_MuseumOfTheMoors', 'Major_Joinery', [1, 0, 0, 2]],
@@ -83,11 +183,11 @@ describe('Moor exchange printed-rule native audit', () => {
   })
 
   it.each(['Major_Moor_Cookhouse1', 'Major_Moor_Cookhouse2', 'Major_ClayOven'])(
-    'M026 currently omits the printed baking rate of %s from its purchase reward', (oven) => {
+    'M026 uses the printed baking rate of %s for its purchase reward', (oven) => {
       const session = setupMoorAudit()
       session.state.players[0]!.improvements = [oven]
       const response = playMoorAuditMinor(session, 'M026_ChimneyHood')
-      expect(response.state.players[0]!.resources).toMatchObject({ clay: 19, food: oven === 'Major_ClayOven' ? 25 : 20 })
+      expect(response.state.players[0]!.resources).toMatchObject({ clay: 19, food: oven === 'Major_ClayOven' ? 25 : 23 })
       expect(response.state.players[1]!.minorHand).toContain('M026_ChimneyHood')
     },
   )
@@ -181,7 +281,7 @@ describe('Moor exchange printed-rule native audit', () => {
   )
 
   it.each(['Major_Moor_Cookhouse1', 'Major_Moor_Cookhouse2'])(
-    '%s currently cannot bake bread after its real purchase despite its printed grain exchange', (cardId) => {
+    '%s bakes bread at its printed rate after its real purchase', (cardId) => {
       const session = setupMoorAudit(2, 14)
       moveMajorImprovementToSupplyTop(session.state, cardId)
       let response = session.takeAction(0, 'major-improvement')
@@ -198,13 +298,17 @@ describe('Moor exchange printed-rule native audit', () => {
       if (response.interaction.request.kind === 'confirm-next-player') expect(session.resolveChoice(response.interaction.playerIndex, 'confirm').ok).toBe(true)
       session.state.currentPlayerIndex = 0
       session.state.players[0]!.resources.grain = 2
-      setWorkersAtHome(session.state, session.state.players[0]!, 1)
+      setWorkersAtHome(session.state, session.state.players[0]!, 2)
       session.loadState(session.state)
-      const before = structuredClone(session.state.players[0])
-      const rejected = session.takeAction(0, 'grain-utilization')
+      const offered = session.takeAction(0, 'grain-utilization')
+      expect(offered.ok, offered.error).toBe(true)
+      const before = structuredClone(offered.state.players[0])
+      const rejected = session.resolveChoice(0, `bulk:${cardId}=3`)
       expect(rejected.ok).toBe(false)
-      expect(rejected.error).toBe('space unavailable')
       expect(rejected.state.players[0]).toEqual(before)
+      const baked = session.resolveChoice(0, `bulk:${cardId}=2`)
+      expect(baked.ok, baked.error).toBe(true)
+      expect(baked.state.players[0]!.resources).toMatchObject({ grain: 0, food: 26 })
     },
   )
 
@@ -243,7 +347,7 @@ describe('Moor exchange printed-rule native audit', () => {
     },
   )
 
-  it.each([2, 3])('M069 currently gives no bonus even with %i horses when a cattle is cooked through harvest feeding', (horses) => {
+  it.each([2, 3])('M069 checks %i horses before cattle are cooked through harvest feeding', (horses) => {
     const session = setupMoorAudit(2, 4)
     const player = session.state.players[0]!
     player.minorPlayed = ['M069_LeatherSaddle']
@@ -259,7 +363,7 @@ describe('Moor exchange printed-rule native audit', () => {
     ] })
     expect(response.ok, response.error).toBe(true)
     expect(response.state.players[0]!.resources.cattle).toBe(0)
-    expect(response.state.players[0]!.cardStates.M069_LeatherSaddle?.counters?.bonusVp ?? 0).toBe(0)
+    expect(response.state.players[0]!.cardStates.M069_LeatherSaddle?.counters?.bonusVp ?? 0).toBe(horses === 3 ? 1 : 0)
   })
 
   it('M108 rejects a second harvest conversion, then accepts one fuel-grain pair for five food', () => {

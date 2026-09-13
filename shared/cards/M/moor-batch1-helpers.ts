@@ -14,9 +14,9 @@ type CraftReward = {
 }
 
 const CRAFT_REWARDS: readonly CraftReward[] = [
-  { ids: ['Major_Joinery', 'Major_Joinery2', 'Major_Moor_FurnitureStall'], foodExchangeIds: ['Major_Joinery', 'Major_Joinery2'], resource: 'wood', amount: 3 },
-  { ids: ['Major_Pottery', 'Major_Pottery2', 'Major_Moor_CeramicsStall'], foodExchangeIds: ['Major_Pottery', 'Major_Pottery2'], resource: 'clay', amount: 3 },
-  { ids: ['Major_Basket', 'Major_Basket2', 'Major_Moor_BasketStall'], foodExchangeIds: ['Major_Basket', 'Major_Basket2'], resource: 'reed', amount: 2 },
+  { ids: ['Major_Joinery', 'Major_Joinery2'], resource: 'wood', amount: 3 },
+  { ids: ['Major_Pottery', 'Major_Pottery2'], resource: 'clay', amount: 3 },
+  { ids: ['Major_Basket', 'Major_Basket2'], resource: 'reed', amount: 2 },
 ]
 
 export const allImprovementCount = (player: PlayerState) =>

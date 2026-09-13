@@ -280,7 +280,7 @@ describe('Five-plus action printed-rule audit', () => {
     expect(response.state.players[0]!.fields[1]!.stacks).toEqual([])
   })
 
-  it('C179 Bovine Pioneer currently rewards subdividing an already fenced pasture', () => {
+  it('C179 Bovine Pioneer does not reward subdividing an already fenced pasture', () => {
     const session = setup('C179_BovinePioneer')
     session.state.players[0]!.resources.wood = 1
     session.state.players[0]!.pastures = [{ id: 'existing', size: 2, tiles: [{ row: 1, col: 1 }, { row: 1, col: 2 }], stables: 0, animalType: null, animalCount: 0 }]
@@ -291,7 +291,7 @@ describe('Five-plus action printed-rule audit', () => {
     const response = session.commitSelectionChoice(0, { edges: ['V-1-2'], extraWood: 0 })
     expect(response.ok).toBe(true)
     expect(response.state.players[0]!.pastures).toHaveLength(2)
-    expect(response.state.players[0]!.resources.cattle).toBe(1)
+    expect(response.state.players[0]!.resources.cattle).toBe(0)
   })
 
   it('A169 Off-Siter preserves extra capacity after the qualifying major is returned', () => {
@@ -323,7 +323,7 @@ describe('Five-plus action printed-rule audit', () => {
     expect(response.state.actionSpaces.find((space) => space.id === 'D178_SubstituteTeacher')!.takenBy).toHaveLength(1)
   })
 
-  it.each([1, 2])('D179 Bullcatcher currently resolves differently with %i available workers', (workers) => {
+  it.each([1, 2])('D179 Bullcatcher resolves with %i available workers', (workers) => {
     const session = setup('D179_Bullcatcher')
     for (const slot of [2, 5]) {
       const space = session.state.actionSpaces.find((entry) => entry.id === session.state.roundActionOrder[slot])!
@@ -333,12 +333,8 @@ describe('Five-plus action printed-rule audit', () => {
     session.loadState(session.state)
     const response = session.takeAction(0, 'D179_Bullcatcher')
     expect(response.ok).toBe(true)
-    expect(response.state.players[0]!.resources).toMatchObject({ cattle: workers === 1 ? 0 : 1, food: workers === 1 ? 5 : 7 })
-    if (workers === 1) {
-      expect(response.interaction.request.kind).toBe('engine-blocked')
-      const undone = session.undoAction(0)
-      expect(undone.ok).toBe(true)
-      expect(undone.state.actionSpaces.find((space) => space.id === 'D179_Bullcatcher')!.takenBy).toHaveLength(0)
-    }
+    expect(response.state.players[0]!.resources).toMatchObject({ cattle: 1, food: 7 })
+    expect(response.interaction.request.kind).not.toBe('engine-blocked')
+    expect(response.state.actionSpaces.find((space) => space.id === 'D179_Bullcatcher')!.takenBy).toHaveLength(1)
   })
 })

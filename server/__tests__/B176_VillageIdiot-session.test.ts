@@ -17,7 +17,7 @@ const setup = () => {
 }
 
 describe('B176 Village Idiot', () => {
-  it.each([5, 6])('currently retains the remaining occupation hand when played in a %i-player game', (playerCount) => {
+  it.each([5, 6])('discards the remaining occupation hand when played in a %i-player game', (playerCount) => {
     const session = new GameSession(176, undefined, { playerCount })
     const state = session.getState().state
     for (const player of state.players) {
@@ -37,7 +37,7 @@ describe('B176 Village Idiot', () => {
     expect(response.ok).toBe(true)
     expect(response.state.players).toHaveLength(playerCount)
     expect(response.state.players[0]!.occupationPlayed).toEqual([CARD_ID])
-    expect(response.state.players[0]!.occupationHand).toEqual(['A174_MasterHora', 'D172_PutcherMaker'])
+    expect(response.state.players[0]!.occupationHand).toEqual([])
     expect(response.state.players[0]!.resources.food).toBe(4)
     expect(response.state.log.some((entry) => JSON.stringify(entry.params).includes(CARD_ID))).toBe(true)
   })

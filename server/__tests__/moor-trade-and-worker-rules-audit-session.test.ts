@@ -4,7 +4,7 @@ import { confirmNextPlayer } from './_helpers/pending-confirms'
 import { markAllWorkersUsed } from '../../shared/domain/player'
 
 describe('Moor worker and conversion printed-rule audit', () => {
-  it('M099 currently rewards a healthy Infirmary visitor when its earlier visitor was sick', () => {
+  it('M099 rewards only the current sick Infirmary visitor', () => {
     const session = setupMoorAudit()
     const player = session.state.players[0]!
     player.minorPlayed = ['M099_HealingClay']
@@ -18,10 +18,10 @@ describe('Moor worker and conversion printed-rule audit', () => {
     response = session.takeAction(0, 'moor-infirmary')
     expect(response.ok, response.error).toBe(true)
     expect(response.state.actionSpaces.find((space) => space.id === 'moor-infirmary')!.takenBy).toHaveLength(2)
-    expect(response.state.players[0]!.resources.food).toBe(24)
+    expect(response.state.players[0]!.resources.food).toBe(23)
   })
 
-  it('M115 currently misses the wood reward for a boar cooked through harvest feeding', () => {
+  it('M115 grants the wood reward for a boar cooked through harvest feeding', () => {
     const session = setupMoorAudit(2, 4)
     const player = session.state.players[0]!
     player.minorPlayed = ['M115_OakBark']
@@ -45,6 +45,6 @@ describe('Moor worker and conversion printed-rule audit', () => {
       { sourceId: 'Major_Fireplace1', exchangeIndex: 1, count: 1, sourceName: 'Fireplace' },
     ] })
     expect(response.ok, response.error).toBe(true)
-    expect(response.state.players[0]!.resources).toMatchObject({ boar: 0, food: 0, wood: 20, begging: 0 })
+    expect(response.state.players[0]!.resources).toMatchObject({ boar: 0, food: 0, wood: 21, begging: 0 })
   })
 })

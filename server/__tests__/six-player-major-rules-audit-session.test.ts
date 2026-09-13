@@ -46,18 +46,18 @@ const purchase = (session: GameSession, cardId: string) => {
 }
 
 const purchaseCases = [
-  ['Major_Fireplace3', 'Major_Fireplace1', { clay: 3 }],
-  ['Major_CookingHearth3', 'Major_CookingHearth1', { clay: 5 }],
-  ['Major_Well2', 'Major_Well', { wood: 1, stone: 3 }],
-  ['Major_ClayOven2', 'Major_ClayOven', { clay: 3, stone: 1 }],
-  ['Major_StoneOven2', 'Major_StoneOven', { clay: 1, stone: 3 }],
-  ['Major_Joinery2', 'Major_Joinery', { wood: 2, stone: 2 }],
-  ['Major_Pottery2', 'Major_Pottery', { clay: 2, stone: 2 }],
-  ['Major_Basket2', 'Major_Basket', { reed: 2, stone: 2 }],
+  ['Major_Fireplace3', 'Major_Fireplace2', { clay: 4 }],
+  ['Major_CookingHearth3', 'Major_CookingHearth2', { clay: 6 }],
+  ['Major_Well2', 'Major_Well', { clay: 1, stone: 3 }],
+  ['Major_ClayOven2', 'Major_ClayOven', { clay: 4, stone: 1 }],
+  ['Major_StoneOven2', 'Major_StoneOven', { clay: 2, stone: 3 }],
+  ['Major_Joinery2', 'Major_Joinery', { wood: 2, stone: 3 }],
+  ['Major_Pottery2', 'Major_Pottery', { clay: 2, stone: 3 }],
+  ['Major_Basket2', 'Major_Basket', { reed: 2, stone: 3 }],
 ] as const
 
 describe('Six-player major printed-rule audit', () => {
-  it.each(purchaseCases)('%s currently charges the copied base cost after %s is acquired', (cardId, covering, cost) => {
+  it.each(purchaseCases)('%s charges its printed cost after %s is acquired', (cardId, covering, cost) => {
     const session = setup()
     const covered = nextPurchase(session)
     expect(covered.interaction.request.options?.map((option) => option.value)).not.toContain(cardId)
@@ -162,10 +162,11 @@ describe('Six-player major printed-rule audit', () => {
   })
 
   it.each([
-    ['Major_Joinery', 'Major_Joinery2', 'wood', 7],
-    ['Major_Pottery', 'Major_Pottery2', 'clay', 7],
-    ['Major_Basket', 'Major_Basket2', 'reed', 5],
-  ] as const)('%s and %s currently reuse the same scoring resources', (original, duplicate, resource, amount) => {
+    ['Major_Joinery', 'Major_Joinery2', 'wood', 7, 3],
+    ['Major_Joinery', 'Major_Joinery2', 'wood', 6, 2],
+    ['Major_Pottery', 'Major_Pottery2', 'clay', 7, 3],
+    ['Major_Basket', 'Major_Basket2', 'reed', 5, 3],
+  ] as const)('%s and %s allocate their scoring resources separately', (original, duplicate, resource, amount, score) => {
     const session = setup(14)
     const state = session.getState().state
     state.players[0]!.improvements = [original, duplicate]
@@ -173,7 +174,7 @@ describe('Six-player major printed-rule audit', () => {
     session.loadState(state)
     const response = session.getState()
     const bonus = response.scores[0]!.categories.find((category) => category.key === 'cardBonusVp')!
-    expect(bonus.entries.filter((entry) => entry.type === 'bonus').map((entry) => entry.score)).toEqual([3, 3])
+    expect(bonus.total).toBe(score)
     expect(response.state.players[0]!.resources[resource]).toBe(amount)
   })
 })

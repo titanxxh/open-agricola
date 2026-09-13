@@ -14,11 +14,7 @@ const isAnimalMarketOptionId = (value: unknown): value is AnimalMarketOptionId =
   value === 'animal-market-56:cattle'
 
 const requiredFoodAfterOriginal = (optionId: AnimalMarketOptionId) =>
-  optionId === 'animal-market-56:sheep'
-    ? 2
-    : optionId === 'animal-market-56:cattle'
-      ? 2
-      : 1
+  optionId === 'animal-market-56:cattle' ? 2 : 1
 
 const replayBranch = (optionId: AnimalMarketOptionId): ActionFlow => {
   if (optionId === 'animal-market-56:sheep') return gainLeaf(CARD_ID, { sheep: 1, food: 1 })

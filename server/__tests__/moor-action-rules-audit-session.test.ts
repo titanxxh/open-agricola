@@ -173,7 +173,10 @@ describe('Moor action printed-rule native audit', () => {
   ])('%s offers its moved-up major %s after a person action starting next round', (cardId, major) => {
     const session = setupMoorAudit()
     session.state.players[0]!.improvements = ['Major_Fireplace1', 'Major_Fireplace2']
-    const bought = playMoorAuditMinor(session, cardId!)
+    session.state.players[0]!.minorHand = [cardId!]
+    expect(session.takeAction(0, 'major-improvement').ok).toBe(true)
+    const offered = session.resolveChoice(0, cardId!)
+    const bought = acceptMoorAuditChoice(session, offered)
     expect(bought.state.availableMajorImprovements).toContain(major)
     expect(bought.state.players[0]!.improvements).not.toContain(major)
     advanceMoorAuditToRound(session, 6)

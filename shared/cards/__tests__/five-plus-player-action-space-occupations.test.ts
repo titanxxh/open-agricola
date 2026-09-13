@@ -212,7 +212,9 @@ describe('5+ player action space occupations', () => {
     expect(definition.canBeExecutedByPlayer(state, other)).toBe(false)
 
     setWorkersAtHome(state, owner, 0)
-    expect(definition.canBeExecutedByPlayer(state, owner)).toBe(false)
+    expect(definition.canBeExecutedByPlayer(state, owner)).toBe(true)
+    session.loadState(state)
+    expect(session.takeAction(0, 'D179_Bullcatcher').ok).toBe(false)
   })
 
   it('D179 Bullcatcher consumes a worker and grants 1 cattle plus 2 food', () => {

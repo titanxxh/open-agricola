@@ -41,7 +41,7 @@ export const Major_StoneOven2 = defineMajorCard({
   name: 'Stone Oven',
   deck: 'major',
   number: 15,
-  cost: { clay: 1, stone: 3 },
+  cost: { clay: 2, stone: 3 },
   vp: 3,
   extraVp: false,
   isBaking: true,

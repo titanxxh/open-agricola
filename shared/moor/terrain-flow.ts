@@ -7,11 +7,12 @@ import {
 } from '../domain/farm'
 import { getUsedFarmyardTileKeys } from '../domain/farmyard-usage'
 import { getPlacementBlockedFarmyardSpaceKeys } from '../domain/farmyard-space-states'
-import { registerSelectionEffect } from '../actions/helpers/selection-effect-registry'
+import { registerSelectionEffect, registerSelectionValidator } from '../actions/helpers/selection-effect-registry'
 import {
   coverVisibleTerrain,
   getVisibleFarmTerrain,
   getVisibleTerrainTiles,
+  hasVisibleTerrainWithoutCovered,
   removeVisibleTerrain,
   replaceTerrainWithField,
 } from './farm-terrain'
@@ -113,7 +114,8 @@ export const buildForestToMoorFlow = (
   player: PlayerState,
   maxSelections: number,
 ): ActionFlow | undefined => {
-  const selectableTiles = getTerrainTiles(player, 'forest')
+  const selectableTiles = getTerrainTiles(player, 'forest').filter((tile) =>
+    hasVisibleTerrainWithoutCovered(player, tile, 'forest'))
   if (selectableTiles.length === 0) return
   return buildTerrainSelectionLeaf({
     sourceCard,
@@ -186,7 +188,7 @@ const replaceTerrainKind = (
   const key = positionKey(tile)
   const entry = (player.farmTerrain ?? []).find((candidate) =>
     positionKey(candidate) === key && candidate.kind === fromKind)
-  if (!entry) return false
+  if (!entry || entry.covered !== undefined) return false
   entry.kind = toKind
   return true
 }
@@ -203,6 +205,14 @@ const addGain = (base: Partial<Resource>, next: Partial<Resource>, count: number
 
 const repeat = (count: number, factory: () => ActionFlow): ActionFlow[] =>
   Array.from({ length: Math.max(0, count) }, factory)
+
+registerSelectionValidator(TERRAIN_SELECTION_EFFECT, ({ player, positions, actionContext }) => {
+  if (actionContext?.terrainMode !== 'replace-kind' || !isTerrainKind(actionContext.terrainFromKind)) return
+  const kind = actionContext.terrainFromKind
+  if (parsePositions(positions).some((tile) => !hasVisibleTerrainWithoutCovered(player, tile, kind))) {
+    return 'invalid terrain selection'
+  }
+})
 
 registerSelectionEffect(TERRAIN_SELECTION_EFFECT, ({ player, positions, sourceCard, actionContext }) => {
   const mode = actionContext?.terrainMode

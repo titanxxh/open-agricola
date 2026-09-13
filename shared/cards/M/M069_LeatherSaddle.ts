@@ -39,8 +39,22 @@ const tradeAppliedListener: CardListenerRegistration = {
   },
 }
 
+const feedingListener: CardListenerRegistration = {
+  id: 'M069-leather-saddle-feeding',
+  cardIds: [CARD_ID],
+  actions: ['harvest-feed-conversion'],
+  phases: ['immediatelyAfter'],
+  handler: (context) => {
+    const cattle = context.eventQuery.filter('harvest.feedConverted', (event) =>
+      event.playerId === context.player.id && (event.food.food ?? 0) > 0 &&
+      (context.player.resources.horse ?? 0) + (event.cost.horse ?? 0) - (event.food.horse ?? 0) >= 3,
+    ).reduce((sum, event) => sum + (event.cost.cattle ?? 0), 0)
+    if (cattle > 0) return { flow: bonusFlow(cattle), sourceCard: CARD_ID }
+  },
+}
+
 const cardImpl = {
-  listeners: [tradeAppliedListener],
+  listeners: [tradeAppliedListener, feedingListener],
   prerequisiteCheck: (player) => (player.resources.horse ?? 0) >= 2,
   reaches: [] as readonly string[],
 } satisfies CardImpl

@@ -3,8 +3,31 @@ import type { CardListenerContext, CardListenerRegistration } from '../card-list
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { getMinorImprovement } from '../registry-display'
 import type { CardImpl } from '../registry'
+import type { ActionDefinition } from '../../contract/types'
+import { registerAdHocAction } from '../../actions/helpers/ad-hoc-action-registry'
+import { cardEffectHandChangedEvent } from '../../session/private-hand-events'
 
 const CARD_ID = 'B176_VillageIdiot'
+const DISCARD_ACTION_ID = 'card_B176_VillageIdiot_discardOccupations'
+
+const discardOccupations: ActionDefinition = {
+  id: DISCARD_ACTION_ID,
+  nameKey: 'actions.discard-from-hand.name',
+  descriptionKey: 'actions.discard-from-hand.description',
+  roundAvailable: 1,
+  gainPerRound: {},
+  canBeExecutedByPlayer: (_state, player) => player.occupationPlayed.includes(CARD_ID),
+  execute: ({ player, emitPrivateEvent }) => {
+    const discarded = player.occupationHand
+    player.occupationHand = []
+    if (discarded.length > 0) {
+      emitPrivateEvent?.(cardEffectHandChangedEvent(player.id, discarded, 'occupation', CARD_ID, DISCARD_ACTION_ID))
+    }
+    return { type: 'ok' }
+  },
+}
+
+registerAdHocAction(discardOccupations)
 
 const loneOccupationListener: CardListenerRegistration = {
   id: 'B176-village-idiot-lone-occupation',
@@ -53,6 +76,10 @@ const opponentMeetingPlaceListener: CardListenerRegistration = {
 }
 
 const cardImpl = {
+  effect: {
+    id: CARD_ID,
+    onBuy: () => ({ type: 'leaf', actionId: DISCARD_ACTION_ID, sourceCard: CARD_ID }),
+  },
   listeners: [loneOccupationListener, opponentMeetingPlaceListener],
   reaches: [] as readonly string[],
 } satisfies CardImpl

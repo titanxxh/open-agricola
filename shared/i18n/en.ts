@@ -155,6 +155,10 @@ export const en = {
       bonusVp: 'Bonus VP',
     },
     cards: {
+      D159_ReedSeller: {
+        offer: 'Reed Seller: Buy the offered reed or decline',
+        chooseBuyer: 'Reed Seller: Choose a willing buyer',
+      },
       parentFatherComplete: {
         prompt: 'Choose a father side quest reward',
         tier: 'Tier {tier}: {requirement} -> {reward}',
@@ -1806,6 +1810,13 @@ export const en = {
     },
     D114_SeedTrader: {
       anytime: 'Seed Trader: Pay 1 Food → 1 Grain',
+    },
+    D159_ReedSeller: {
+      anytime: 'Reed Seller: Sell 1 Reed',
+      offer: 'Buy the offered reed or decline',
+      buy: 'Buy 1 Reed for 2 Food',
+      decline: 'Decline',
+      chooseBuyer: 'Choose a buyer for the reed',
     },
     D013_Trowel: {
       anytime: 'Trowel: Renovate to Stone',

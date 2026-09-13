@@ -494,7 +494,7 @@ export const takeAnytimeAction = (
   }
 
   const engine = core.peekEngine()
-  const activeOwner = core.readActivePlayerIndex() ?? (engine ? null : core.state.currentPlayerIndex)
+  const activeOwner = core.readAnytimePlayerIndex()
   if (activeOwner === null) return core.emitResponse(false, 'no active interaction')
   if (playerIndex !== activeOwner) return core.emitResponse(false, 'not your turn')
 

@@ -87,6 +87,15 @@ describe('anytime reentry', () => {
       expect(request(response).kind).toBe(window)
     }
     expect(response.ok, response.error).toBe(true)
+    if (window === 'feed') {
+      expect(offered(response, 'exchange')).toBe(true)
+      const nested = session.takeAnytimeAction(0, 'exchange')
+      expect(nested.ok, nested.error).toBe(true)
+      const resumed = session.resolveChoice(0, 'cancel')
+      expect(resumed.ok).toBe(true)
+      expect(request(resumed).kind).toBe('feed')
+      return
+    }
     expect(offered(response, 'exchange')).toBe(false)
     const before = JSON.stringify({ state: response.state, interaction: response.interaction, scores: response.scores })
     const rejected = session.takeAnytimeAction(0, 'exchange')
@@ -319,7 +328,7 @@ describe('anytime reentry', () => {
     expect(offered(completed, cardId)).toBe(true)
   })
 
-  it('retains the initiating player restriction during a foreign optional choice', () => {
+  it('allows the responding player but not the initiating player during a foreign optional choice', () => {
     const session = setup()
     const cardId = '__TEST_anytime_foreign_plow__'
     for (const player of session.state.players) player.minorPlayed.push(cardId)
@@ -341,7 +350,7 @@ describe('anytime reentry', () => {
     expect(request(session.takeAnytimeAction(0, cardId))).toMatchObject({ kind: 'confirm-player-switch', toPlayerIndex: 1 })
     const opponent = session.resolveChoice(0, 'confirm')
     expect(request(opponent).options).toContainEqual(expect.objectContaining({ value: '__skip__' }))
-    expect(offered(opponent, cardId)).toBe(false)
+    expect(offered(opponent, cardId)).toBe(true)
     expect(session.getEngineStack().getActiveAnytimeActionIds(session.state.players[0]!.id)).toContain(cardId)
     expect(session.getEngineStack().getActiveAnytimeActionIds(session.state.players[1]!.id)).not.toContain(cardId)
     expect(session.takeAnytimeAction(0, cardId).ok).toBe(false)

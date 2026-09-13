@@ -8,7 +8,6 @@ import { getLogicalFields } from '../helpers/card-field'
 const CARD_ID = 'M058_PeatFertilizer'
 
 const canSow = (context: CardListenerContext) => {
-  if (getLogicalFields(context.player).length < 2) return false
   const farm = buildSowFarmInteraction(context.player)
   return farm.farmType === 'sow' && farm.selectableFields.length > 0
 }

@@ -183,7 +183,7 @@ describe('Moor Batch 1 scoring, cookery, and exchange minors', () => {
     expect(resp.state.players[0]!.resources).toMatchObject({ sheep: 1, cattle: 0, horse: 0 })
   })
 
-  it('M067 scores craft buildings and accepted FoM craft upgrades', () => {
+  it('M067 scores named craft buildings but not trade stalls', () => {
     const session = setup()
     const player = session.state.players[0]!
     player.minorHand = ['M067_ChamberOfCommerce']
@@ -193,7 +193,7 @@ describe('Moor Batch 1 scoring, cookery, and exchange minors', () => {
     const resp = playMinor(session, 'M067_ChamberOfCommerce')
 
     expect(resp.state.players[0]!.resources).toMatchObject({ wood: 1, reed: 1 })
-    expect(bonusVp(resp.state)).toBe(3)
+    expect(bonusVp(resp.state)).toBe(2)
 
     const noCraft = setup()
     noCraft.state.players[0]!.minorPlayed = ['M067_ChamberOfCommerce']

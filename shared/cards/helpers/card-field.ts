@@ -12,7 +12,7 @@ import { appendImmediateEvents } from '../../events/append'
 type Crop = ExtraSowableCrop
 
 export type CardFieldStack = { crop: Crop; remaining: number }
-export type CardFieldSlot = CardFieldStack | null
+export type CardFieldSlot = (CardFieldStack & { below?: CardFieldStack[] }) | null
 
 export type CardFieldDef = {
   allowedCrops: readonly Crop[]
@@ -83,7 +83,12 @@ const readSlots = (
     ) {
       throw new Error(`[card-field] invalid slot ${index} for ${cardId}`)
     }
-    slots[index] = { ...(value as CardFieldStack) }
+    const slot = value as NonNullable<CardFieldSlot>
+    if (slot.below !== undefined && (!Array.isArray(slot.below) || slot.below.some((layer) =>
+      !layer || !Object.hasOwn(RHYTHM, layer.crop) || !Number.isSafeInteger(layer.remaining) || layer.remaining <= 0))) {
+      throw new Error(`[card-field] invalid layers in slot ${index} for ${cardId}`)
+    }
+    slots[index] = { ...slot, ...(slot.below ? { below: slot.below.map((layer) => ({ ...layer })) } : {}) }
   }
   return slots
 }
@@ -115,6 +120,7 @@ export type LogicalFieldSlot = Readonly<{
   index: number
   tile: Readonly<FarmTilePosition>
   stack: Readonly<Field['stacks'][number]> | null
+  layers: readonly Readonly<Field['stacks'][number]>[]
 }>
 
 export type LogicalField = Readonly<{
@@ -171,6 +177,7 @@ export const getFarmyardFields = (player: PlayerState): readonly LogicalField[] 
             index,
             tile: Object.freeze({ row: field.row, col: field.col }),
             stack,
+            layers: Object.freeze([stack]),
           }))),
           groupKey: farmyardFieldId(field),
         })
@@ -189,6 +196,9 @@ const getCardFields = (player: PlayerState): readonly LogicalField[] =>
           index,
           tile: Object.freeze({ row: -1, col: deriveVirtualTileCol(cardId, index) }),
           stack,
+          layers: Object.freeze(slot
+            ? [...(slot.below ?? []).map((layer) => freezeStack({ kind: layer.crop, remaining: layer.remaining })), stack!]
+            : []),
         })
       }))
       return Object.freeze({
@@ -196,7 +206,7 @@ const getCardFields = (player: PlayerState): readonly LogicalField[] =>
         kind: 'card',
         row: -1,
         col: deriveVirtualTileCol(cardId, 0),
-        stacks: Object.freeze(logicalSlots.flatMap((slot) => slot.stack ? [slot.stack] : [])),
+        stacks: Object.freeze(logicalSlots.flatMap((slot) => slot.layers)),
         slots: logicalSlots,
         sourceCard: cardId,
         groupKey: cardId,
@@ -295,7 +305,7 @@ export const mutateLogicalFields = (
     slots: CardFieldSlot[],
   ) => {
     const owner = cardFieldOptions.get(cardId)
-    const isLast = !slots.some((candidate) => candidate?.crop === crop)
+    const isLast = !slots.some((candidate) => candidate?.crop === crop || candidate?.below?.some((layer) => layer.crop === crop))
     return (): ActionFlow | undefined => {
       const flows: ActionFlow[] = []
       if (options.reason === 'reap') {
@@ -360,6 +370,27 @@ export const mutateLogicalFields = (
     emitAdded(card, crop, amount)
     return { ok: true }
   }
+  const insertBottom = (
+    requestedTarget: LogicalFieldMutationTarget,
+    crop: Crop,
+    amount: number,
+  ): LogicalFieldMutationResult => {
+    validateCardFields()
+    if (!validAmount(amount)) return { ok: false, error: 'invalid-amount' }
+    const target = normalizeTarget(requestedTarget)
+    if (!target) return { ok: false, error: 'invalid-target' }
+    const field = farmyardTarget(target)
+    if (field) return place({ fieldId: target.fieldId, slot: 0 }, crop, amount)
+    const card = cardTarget(target)
+    if (!card) return { ok: false, error: 'invalid-target' }
+    const top = card.slots[card.slot]
+    card.slots[card.slot] = top
+      ? { ...top, below: [{ crop, remaining: amount }, ...(top.below ?? [])] }
+      : { crop, remaining: amount }
+    writeSlots(player, card.cardId, card.slots)
+    emitAdded(card, crop, amount)
+    return { ok: true }
+  }
   const grow = (
     requestedTarget: LogicalFieldMutationTarget,
     amount = 1,
@@ -412,9 +443,15 @@ export const mutateLogicalFields = (
     const amount = requestedAmount ?? stack.remaining
     if (!validAmount(amount) || amount > stack.remaining) return { ok: false, error: 'invalid-amount' }
     const crop = stack.crop
-    card.slots[card.slot] = amount === stack.remaining
-      ? null
-      : { ...stack, remaining: stack.remaining - amount }
+    if (amount === stack.remaining) {
+      const below = stack.below ?? []
+      const next = below.at(-1)
+      card.slots[card.slot] = next
+        ? { ...next, ...(below.length > 1 ? { below: below.slice(0, -1) } : {}) }
+        : null
+    } else {
+      card.slots[card.slot] = { ...stack, remaining: stack.remaining - amount }
+    }
     writeSlots(player, card.cardId, card.slots)
     emitRemoved(card, crop, amount)
     const ownerCallback = cardRemovalCallback(card.cardId, crop, amount, card.slots)
@@ -446,14 +483,14 @@ export const mutateLogicalFields = (
     if (!card.def.allowedCrops.includes(crop)) return { ok: false, error: 'invalid-crop' }
     const previous = card.slots[card.slot]
     if (!previous) return { ok: false, error: 'empty' }
-    card.slots[card.slot] = { crop, remaining: amount }
+    card.slots[card.slot] = { crop, remaining: amount, ...(previous.below ? { below: previous.below } : {}) }
     writeSlots(player, card.cardId, card.slots)
     emitRemoved(card, previous.crop, previous.remaining)
     emitAdded(card, crop, amount)
     const flow = cardRemovalCallback(card.cardId, previous.crop, previous.remaining, card.slots)()
     return { ok: true, ...(flow ? { flow } : {}) }
   }
-  return { place, grow, remove, replace }
+  return { place, insertBottom, grow, remove, replace }
 }
 
 export const makeCardFieldImpl = (

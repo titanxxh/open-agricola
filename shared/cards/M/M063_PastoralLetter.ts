@@ -32,6 +32,7 @@ const cardImpl = {
           type: 'leaf' as const,
           actionId: 'special-effect',
           sourceCard: CARD_ID,
+          optional: true,
           params: { kind: 'move-major-improvement-to-top', cardId: TARGET },
         },
       ],

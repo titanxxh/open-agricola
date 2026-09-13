@@ -53,7 +53,7 @@ export const Major_Fireplace3 = defineMajorCard({
   ...fireplace1,
   id: 'Major_Fireplace3',
   number: 11,
-  cost: { clay: 3 },
+  cost: { clay: 4 },
   exchanges: [
     { from: { sheep: 1 }, to: { food: 2 }, sourceId: 'Major_Fireplace3', triggers: ['anytime'] },
     { from: { boar: 1 }, to: { food: 2 }, sourceId: 'Major_Fireplace3', triggers: ['anytime'] },

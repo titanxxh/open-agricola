@@ -13,7 +13,7 @@ type CardPrerequisiteSource = Pick<
   'id' | 'prerequisite' | 'occupationPrerequisites' | 'improvementPrerequisites' | 'maxRound'
 >
 
-const countOccupations = (player: PlayerState) =>
+export const countOccupations = (player: PlayerState) =>
   player.occupationPlayed.length + (player.extraOccupationsFromCards?.length ?? 0)
 
 const countAllImprovements = (player: PlayerState) =>

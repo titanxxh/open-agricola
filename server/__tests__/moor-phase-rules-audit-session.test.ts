@@ -4,6 +4,69 @@ import { markAllWorkersUsed } from '../../shared/domain/player'
 import { getAllTilePositions } from '../../shared/domain/farm'
 
 describe('Moor delayed and harvest printed-rule audit', () => {
+  it('M079 offers the fourth printed delay from round four and delivers six fuel in round fourteen', () => {
+    const session = setupMoorAudit(2, 4)
+    let response = playMoorAuditMinor(session, 'M079_PeatSled')
+    expect(response.state.players[0]!.resources.wood).toBe(19)
+    expect(response.interaction.request.options).toHaveLength(4)
+    response = session.resolveChoice(0, response.interaction.request.options[3]!.value)
+    expect(response.ok, response.error).toBe(true)
+    expect(response.state.futureMeeples.filter((entry) => entry.cardId === 'M079_PeatSled')).toEqual([
+      expect.objectContaining({ round: 14, resources: { fuel: 6 } }),
+    ])
+    response = advanceMoorAuditToRound(session, 14)
+    expect(response.state.players[0]!.resources.fuel).toBe(24)
+    expect(response.state.futureMeeples.some((entry) => entry.cardId === 'M079_PeatSled')).toBe(false)
+    expect(response.interaction.sourceCard).not.toBe('M079_PeatSled')
+  })
+
+  it.each([12, 13, 14])('M079 resolves its last available delay or no future delay when played in round %i', (round) => {
+    const session = setupMoorAudit(2, round)
+    let response = playMoorAuditMinor(session, 'M079_PeatSled')
+    expect(response.state.players[0]!.resources.wood).toBe(19)
+    const scheduled = response.state.futureMeeples.filter((entry) => entry.cardId === 'M079_PeatSled')
+    expect(scheduled).toEqual(round === 12 ? [expect.objectContaining({ round: 14, resources: { fuel: 3 } })] : [])
+    expect(response.interaction.sourceCard).not.toBe('M079_PeatSled')
+    if (round === 12) {
+      response = advanceMoorAuditToRound(session, 14)
+      expect(response.state.players[0]!.resources.fuel).toBe(21)
+      expect(response.state.futureMeeples.some((entry) => entry.cardId === 'M079_PeatSled')).toBe(false)
+    }
+  })
+
+  it.each([[0, 0], [2, 0], [3, 1], [4, 1], [5, 2], [6, 2]] as const)(
+    'Major_Moor_PeatCharcoalKiln scores %i fuel for %i public bonus points after its purchase', (fuel, points) => {
+      const session = setupMoorAudit()
+      session.state.players[0]!.resources.fuel = fuel
+      expect(session.takeAction(0, 'major-improvement').ok).toBe(true)
+      const response = session.resolveChoice(0, 'Major_Moor_PeatCharcoalKiln')
+      expect(response.ok, response.error).toBe(true)
+      expect(response.state.players[0]!.resources).toMatchObject({ fuel, stone: 19 })
+      expect(response.state.players[0]!.improvements).toContain('Major_Moor_PeatCharcoalKiln')
+      expect(response.state.availableMajorImprovements).toContain('Major_Moor_MuseumOfTheMoors')
+      expect(response.scores![0]!.categories.find((category) => category.key === 'cardBonusVp')?.total ?? 0).toBe(points)
+    },
+  )
+
+  it.each([0, 1, 3])('Major_Moor_ForestersLodge publicly scores %i visible forests after felling a covering forest', (forests) => {
+    const session = setupMoorAudit()
+    const player = session.state.players[0]!
+    player.improvements = ['Major_Moor_ForestersLodge']
+    const empty = getAllTilePositions().filter((tile) => !player.roomTiles.some((room) => room.row === tile.row && room.col === tile.col))
+    player.farmTerrain = [
+      ...empty.slice(0, forests).map((tile) => ({ ...tile, kind: 'forest' as const })),
+      { ...empty[forests]!, kind: 'forest', covered: 'moor' },
+      { ...empty[forests + 1]!, kind: 'moor', covered: 'forest' },
+    ]
+    session.loadState(session.state)
+    const card = session.state.farmersOfTheMoor!.specialActionCards.find((entry) => entry.actions.includes('fell-trees'))!
+    const response = session.takeSpecialAction(0, card.id, 'fell-trees', { tile: empty[forests]! })
+    expect(response.ok, response.error).toBe(true)
+    expect(response.state.players[0]!.resources.wood).toBe(23)
+    expect(response.state.players[0]!.farmTerrain).toContainEqual({ ...empty[forests]!, kind: 'moor' })
+    expect(response.scores![0]!.categories.find((category) => category.key === 'cardBonusVp')?.total ?? 0).toBe(forests)
+  })
+
   it.each([0, 9])('M102 draws once with %i clay and passes left even when no food is earned', (clay) => {
     const session = setupMoorAudit(2, 4)
     const player = session.state.players[0]!
@@ -385,7 +448,7 @@ describe('Moor delayed and harvest printed-rule audit', () => {
     expect(session.state.players[0]!.resources).toMatchObject({ grain: 1, vegetable: 1 })
   })
 
-  it.each([0, 1])('M091 currently cannot decline Joinery conversion with %i wood to choose the Routine Work reward', (wood) => {
+  it.each([0, 1])('M091 can decline Joinery conversion with %i wood to choose the Routine Work reward', (wood) => {
     const session = setupMoorAudit(2, 4)
     const player = session.state.players[0]!
     player.minorPlayed = ['M091_RoutineWork']
@@ -394,10 +457,10 @@ describe('Moor delayed and harvest printed-rule audit', () => {
     player.resources.wood = wood
     player.resources.grain = 1
     let response = startMoorAuditFeeding(session)
-    expect(response.state.players[0]!.resources.wood).toBe(0)
-    expect(response.interaction.request.foodUsed).toBe(wood * 2)
-    expect(response.interaction.request.remaining).toBe(4 - wood * 2)
-    expect(response.state.players[0]!.cardStates.M091_RoutineWork?.extraData?.usedCraftBuildingIds).toEqual(wood ? ['Major_Joinery'] : [])
+    expect(response.state.players[0]!.resources.wood).toBe(wood)
+    expect(response.interaction.request.foodUsed).toBe(0)
+    expect(response.interaction.request.remaining).toBe(4)
+    expect(response.state.players[0]!.cardStates.M091_RoutineWork?.extraData?.usedCraftBuildingIds).toEqual([])
     let offers = 0
     for (let step = 0; step < 30 && response.state.round === 4; step++) {
       expect(response.ok, response.error).toBe(true)
@@ -414,7 +477,8 @@ describe('Moor delayed and harvest printed-rule audit', () => {
     }
     expect(response.ok, response.error).toBe(true)
     expect(response.state.round).toBe(5)
-    expect(offers).toBe(wood ? 0 : 1)
-    expect(response.state.players[0]!.resources.fuel).toBe(wood ? 18 : 19)
+    expect(offers).toBe(1)
+    expect(response.state.players[0]!.resources.fuel).toBe(19)
+    expect(response.state.players[0]!.resources.wood).toBe(wood)
   })
 })

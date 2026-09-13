@@ -230,15 +230,15 @@ describe('buildFarmBoardProjection', () => {
     })
   })
 
-  it('projects card-field selection onto the played card without expanding the farm', () => {
+  it.each([false, true])('projects card-field selection without expanding the farm, with buried crops: %s', (buried) => {
     const player = createPlayer({
       minorPlayed: ['D075_WoodField'],
       cardStates: {
         D075_WoodField: {
           extraData: {
             cardFieldStacks: [
-              { crop: 'wood', remaining: 2 },
-              { crop: 'wood', remaining: 2 },
+              buried ? null : { crop: 'wood', remaining: 2 },
+              { crop: 'wood', remaining: 2, ...(buried ? { below: [{ crop: 'vegetable', remaining: 1 }] } : {}) },
             ],
           },
         },
@@ -270,8 +270,11 @@ describe('buildFarmBoardProjection', () => {
     })
 
     expect(projection.farmGridColumns).toBe(11)
+    expect(projection.playedCardDisplays[0]?.cardStacks).toEqual(buried ? [
+      { kind: 'vegetable', remaining: 1 }, { kind: 'wood', remaining: 2 },
+    ] : [{ kind: 'wood', remaining: 2 }, { kind: 'wood', remaining: 2 }])
     expect(projection.playedCardDisplays[0]?.cardStackSelectionTiles).toEqual([
-      expect.objectContaining({ row: -1, col: 4075 }),
+      buried ? null : expect.objectContaining({ row: -1, col: 4075 }),
       expect.objectContaining({ row: -1, col: 4076 }),
     ])
   })

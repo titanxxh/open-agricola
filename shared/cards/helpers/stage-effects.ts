@@ -1,7 +1,6 @@
-import type { GameState, PlayerState, Resource } from '../../contract/types'
+import type { ActionFlow, GameState, PlayerState, Resource } from '../../contract/types'
 import { initCardState } from '../__stubs__/helpers'
-import { applyCardGain, type CardGain } from './card-gain'
-import { dispatchTradeAppliedListener } from '../../actions/helpers/trade-applied-listener'
+import type { CardGain } from './card-gain'
 
 export const markCardCounterIfBoughtByRound = (
   state: GameState,
@@ -24,30 +23,21 @@ export const hasCardCounter = (
 export const createSingleHarvestExchange = (
   resource: keyof Resource,
   gain: CardGain,
-  options?: { sourceId?: string },
-) => (state: GameState, player: PlayerState) => {
+  options: { sourceId: string },
+) => (_state: GameState, player: PlayerState): ActionFlow | undefined => {
   if ((player.resources[resource] ?? 0) <= 0) return
-  const preResources = { ...player.resources }
-  player.resources[resource] -= 1
-  applyCardGain(player, gain)
-  // Reference semantics: harvest-time conversions emit Exchange events. We mirror
-  // this by dispatching the synthetic 'trade-applied' listener so cards like
-  // E91 PlowBuilder can react to the source-card identity (e.g. Joinery).
-  if (options?.sourceId) {
-    const fromKey = resource as keyof Resource
-    dispatchTradeAppliedListener(
-      state,
-      player,
-      {
-        from: { [fromKey]: 1 } as Partial<Resource>,
-        to: gain as Partial<Resource>,
-        max: 1,
-        sourceId: options.sourceId,
-      },
-      1,
-      undefined,
-      [],
-      preResources,
-    )
+  return {
+    type: 'leaf',
+    actionId: 'exchange',
+    sourceCard: options.sourceId,
+    optional: true,
+    actionContext: {
+      directTrade: { from: { [resource]: 1 }, to: gain, max: 1, sourceId: options.sourceId },
+    },
+    effectPreview: {
+      kind: 'resourceExchange',
+      resourcesPaid: { [resource]: 1 },
+      resourcesGained: gain,
+    },
   }
 }

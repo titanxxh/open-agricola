@@ -147,11 +147,14 @@ const activateListener: CardListenerRegistration = {
   id: 'M038-nature-reserve-activate-cleared-terrain',
   cardIds: [CARD_ID],
   phases: ['after' as ActionHookPhase],
-  actions: ['fell-trees', 'cut-peat'],
-  handler: (): ActionHookResult => ({
-    flow: { type: 'leaf', actionId: ACTIVATE_ACTION_ID, sourceCard: CARD_ID },
-    sourceCard: CARD_ID,
-  }),
+  actions: ['fell-trees', 'cut-peat', 'selection'],
+  handler: (context): ActionHookResult | void => {
+    if (context.actionId === 'selection' && context.actionContext?.terrainMode !== 'remove') return
+    return {
+      flow: { type: 'leaf', actionId: ACTIVATE_ACTION_ID, sourceCard: CARD_ID },
+      sourceCard: CARD_ID,
+    }
+  },
 }
 
 const cardImpl = {

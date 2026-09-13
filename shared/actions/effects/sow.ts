@@ -7,7 +7,7 @@ import type {
 import { fieldIsEmpty } from '../../domain/field'
 import { positionKey } from '../../domain/farm'
 import { playerBoard, type SowSelection } from '../../domain'
-import { buildSowFarmInteraction } from '../../domain/farmyard-interaction'
+import { buildSowFarmInteraction, getAllowedSelectedFieldKeys } from '../../domain/farmyard-interaction'
 import { handleSowExtraField } from '../../cards/card-effects'
 import { getLogicalFields, mutateLogicalFields } from '../../cards/helpers/card-field'
 
@@ -61,6 +61,7 @@ const finalizeSow = (
   const minSelections = typeof ctx.actionContext?.minSelections === 'number'
     ? Math.max(0, Math.floor(ctx.actionContext.minSelections as number))
     : undefined
+  const allowedFieldKeys = getAllowedSelectedFieldKeys(player, ctx.actionContext) ?? undefined
   const excludedFields = Array.isArray(ctx.actionContext?.excludedFields)
     ? (ctx.actionContext.excludedFields as Array<{ row?: unknown; col?: unknown }>).filter(
         (field): field is { row: number; col: number } =>
@@ -98,6 +99,7 @@ const finalizeSow = (
     {
       maxSelections,
       minSelections,
+      allowedFieldKeys,
       excludedFields,
       extraAllowedCrops: extraAllowedCrops.size > 0 ? extraAllowedCrops : undefined,
       extraGroupKeys: extraGroupKeys.size > 0 ? extraGroupKeys : undefined,
@@ -122,13 +124,13 @@ const finalizeSow = (
         if (logicalTarget) {
           const amount = sowedAmount(sel.crop)
           if (!mutations.place(logicalTarget, sel.crop, amount).ok) {
-            return { type: 'fail', errorKey: 'invalid extra sow field' }
+            return { type: 'fail', errorKey: 'invalid extra sow field', recoverable: true }
           }
           nextPlayer.resources[sel.crop] -= 1
           continue
         }
         const handled = handleSowExtraField(nextPlayer, { row: sel.row, col: sel.col }, sel.crop)
-        if (!handled) return { type: 'fail', errorKey: 'invalid extra sow field' }
+        if (!handled) return { type: 'fail', errorKey: 'invalid extra sow field', recoverable: true }
       }
     }
   }

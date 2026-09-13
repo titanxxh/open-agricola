@@ -112,16 +112,23 @@ export const reap = (
     deferOwnerCallbacks: true,
   })
   for (const logicalField of getLogicalFields(player)) {
-    const slots = logicalField.slots.filter((slot) => slot.stack !== null)
-    if (slots.length === 0) continue
+    const occupiedSlots = logicalField.slots.filter((slot) => slot.stack !== null)
+    if (occupiedSlots.length === 0) continue
+    const slots = occupiedSlots.flatMap((slot) => slot.layers.map((stack, layerIndex) => ({
+      ...slot,
+      stack,
+      layerIndex,
+      key: `${slot.index}:${layerIndex}`,
+      top: layerIndex === slot.layers.length - 1,
+    })))
     const field = {
       row: logicalField.row,
       col: logicalField.col,
-      stacks: slots.map((slot) => ({ ...slot.stack! })),
+      stacks: logicalField.stacks.map((stack) => ({ ...stack })),
     }
     const override = options.harvestCounts?.[fieldKey(field.row, field.col)]
     const harvestCount = override ?? computeHarvestCount(state, player, field, {
-      baseCount: logicalField.kind === 'card' ? slots.length : 1,
+      baseCount: logicalField.kind === 'card' ? occupiedSlots.length : 1,
       logicalField,
     })
     let remainingCount = Math.max(0, Math.floor(harvestCount.count))
@@ -129,7 +136,7 @@ export const reap = (
     const tags = harvestCount.tags ?? []
     const scope = harvestCount.scope ?? 'top-stack'
     const supplyInsteadOfField = tags.includes('supply-instead-of-field') && !tags.includes('full-field-reap')
-    const planned = new Map<number, number>()
+    const planned = new Map<string, number>()
     const suppliedTop = supplyInsteadOfField ? fieldTopStack(field) : undefined
     const suppliedSlot = suppliedTop?.kind === 'grain' && suppliedTop.remaining > 0
       ? slots.at(-1)
@@ -161,24 +168,26 @@ export const reap = (
         )
       }
     }
-    const orderedSlots = logicalField.kind === 'card' ? slots : [...slots].reverse()
+    const orderedSlots = logicalField.kind === 'card'
+      ? [...slots].sort((a, b) => a.index - b.index || b.layerIndex - a.layerIndex)
+      : [...slots].reverse()
     const available = (slot: typeof slots[number]) => Math.max(
       0,
-      slot.stack!.remaining - (slot.index === suppliedSlot?.index ? 1 : 0) - (planned.get(slot.index) ?? 0),
+      slot.stack.remaining - (slot.key === suppliedSlot?.key ? 1 : 0) - (planned.get(slot.key) ?? 0),
     )
     const allocate = (slot: typeof slots[number], limit = remainingCount) => {
       const amount = Math.min(available(slot), remainingCount, limit)
       if (amount <= 0) return
-      planned.set(slot.index, (planned.get(slot.index) ?? 0) + amount)
+      planned.set(slot.key, (planned.get(slot.key) ?? 0) + amount)
       remainingCount -= amount
     }
     if (logicalField.kind === 'card' && scope !== 'field') {
-      orderedSlots.forEach((slot) => allocate(slot, 1))
+      orderedSlots.filter((slot) => slot.top).forEach((slot) => allocate(slot, 1))
     }
     orderedSlots.forEach((slot) => allocate(slot))
 
     for (const slot of orderedSlots) {
-      const amount = planned.get(slot.index) ?? 0
+      const amount = planned.get(slot.key) ?? 0
       if (amount <= 0 || !slot.stack) continue
       const removed = mutations.remove({ fieldId: logicalField.id, slot: slot.index }, amount)
       if (!removed.ok || !removed.crop) {

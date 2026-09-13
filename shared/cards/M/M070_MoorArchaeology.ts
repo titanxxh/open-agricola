@@ -24,7 +24,7 @@ const cardImpl = {
     id: CARD_ID,
     computeBonusScore: farmyardSpaceBonus(CARD_ID),
   },
-  prerequisiteCheck: (player) => player.houseType === 'clay',
+  prerequisiteCheck: (player) => player.houseType !== 'wood',
   reaches: [] as readonly string[],
 } satisfies CardImpl
 

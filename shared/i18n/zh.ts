@@ -155,6 +155,10 @@ export const zh = {
       bonusVp: '额外得分',
     },
     cards: {
+      D159_ReedSeller: {
+        offer: '芦苇商人：是否支付 2 食物购买芦苇？',
+        chooseBuyer: '芦苇商人：选择一名愿意购买的玩家',
+      },
       parentFatherComplete: {
         prompt: '选择父亲支线奖励',
         tier: '第 {tier} 档：{requirement} -> {reward}',
@@ -1807,6 +1811,13 @@ export const zh = {
     },
     D124_Emissary: {
       anytime: '使者：放置1件商品 → 获1石头',
+    },
+    D159_ReedSeller: {
+      anytime: '芦苇商人：出售 1 芦苇',
+      offer: '选择购买芦苇或放弃',
+      buy: '支付 2 食物购买 1 芦苇',
+      decline: '不购买',
+      chooseBuyer: '选择芦苇买家',
     },
     D013_Trowel: {
       anytime: '泥刀：升级到石屋',
