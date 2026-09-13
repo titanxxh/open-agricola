@@ -42,6 +42,29 @@ const setup = (options?: {
 }
 
 describe('B157_Salter session', () => {
+  it('keeps horses outside the salting catalog and rejects them without blocking the selection', () => {
+    const session = setup({
+      resources: { sheep: 2 },
+      pastures: [{ id: 'sheep', size: 1, tiles: [{ row: 0, col: 1 }], stables: 0, animalType: 'sheep', animalCount: 2 }],
+    })
+    session.state.enableFarmersOfTheMoor = true
+    const player = session.state.players[0]!
+    player.resources.horse = 1
+    player.pastures.push({ id: 'horse', size: 1, tiles: [{ row: 0, col: 2 }], stables: 0, animalType: 'horse', animalCount: 1 })
+    let response = session.takeAnytimeAction(0, 'B157-salter-anytime')
+    expect(response.ok, response.error).toBe(true)
+    expect(response.interaction.request.availableByResource).toEqual({ sheep: 2, boar: 0, cattle: 0 })
+    const before = structuredClone(response.state.players)
+    response = session.commitSelectionChoice(0, { resourceCounts: { horse: 1 } })
+    expect(response.ok).toBe(false)
+    expect(response.interaction.request.kind).toBe('resource-quantity-select')
+    expect(response.state.players).toEqual(before)
+    expect(response.state.futureMeeples).toEqual([])
+    response = session.commitSelectionChoice(0, { resourceCounts: { sheep: 1 } })
+    expect(response.ok, response.error).toBe(true)
+    expect(response.state.players[0]!.resources).toMatchObject({ sheep: 1, horse: 1 })
+  })
+
   it.each([1, 2])('refreshes animal quantities after cooking %i sheep and rejects stale counts without blocking', (cooked) => {
     let session = setup({
       resources: { sheep: 2, food: 0 },

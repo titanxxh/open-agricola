@@ -193,7 +193,8 @@ const cardImpl = {
     id: CARD_ID,
     projectInteractionRequest: (state, player, request, actionId) => {
       if (actionId !== PICK_ACTION_ID || request.kind !== 'resource-quantity-select') return request
-      return { ...request, availableByResource: getAssignedAnimalsByType(player, state) }
+      const { sheep, boar, cattle } = getAssignedAnimalsByType(player, state)
+      return { ...request, availableByResource: { sheep, boar, cattle } }
     },
   },
   reaches: [] as readonly string[],
