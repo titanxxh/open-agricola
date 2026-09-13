@@ -1815,6 +1815,7 @@ export const en = {
       anytime: 'Reed Seller: Sell 1 Reed',
       offer: 'Buy the offered reed or decline',
       buy: 'Buy 1 Reed for 2 Food',
+      buyDisabled: 'Not enough food (need 2)',
       decline: 'Decline',
       chooseBuyer: 'Choose a buyer for the reed',
     },

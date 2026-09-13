@@ -18,6 +18,47 @@ const selectedSpacesFromChoice = (value: string) =>
   value.startsWith(CHOICE_PREFIX) ? value.slice(CHOICE_PREFIX.length).split(',').filter(Boolean) : []
 
 describe('E148_Lazybones session', () => {
+  it.each([1, 4])('refreshes reservation choices after constructing %i stables', (built) => {
+    const session = new GameSession(8148, undefined, { playerCount: 2 })
+    for (const player of session.state.players) {
+      player.minorHand = ['__test_placeholder__']
+      player.occupationHand = ['__test_placeholder__']
+    }
+    const owner = session.state.players[0]!
+    owner.occupationHand = [CARD_ID]
+    owner.occupationPlayed = ['C094_StableCleaner']
+    owner.resources.food = 5
+    owner.resources.wood = 4
+    let response = session.takeAction(0, 'lessons')
+    if (!response.state.players[0]!.occupationPlayed.includes(CARD_ID)) response = session.resolveChoice(0, CARD_ID)
+    expect(response.ok, response.error).toBe(true)
+    const fourSpaces = `${CHOICE_PREFIX}${TRIGGER_SPACES.join(',')}`
+    expect(response.interaction.request.options.some((option) => option.value === fourSpaces)).toBe(true)
+    response = session.takeAnytimeAction(0, 'C94-stable-cleaner-anytime')
+    expect(response.ok, response.error).toBe(true)
+    expect(response.interaction.request.kind).toBe('farm-select')
+    const tiles = response.interaction.request.farm.selectableTiles.slice(0, built)
+    response = session.commitSelectionChoice(0, { stables: tiles })
+    expect(response.ok, response.error).toBe(true)
+    if (built === 4) {
+      expect(getAvailableStableSupplyCount(response.state, response.state.players[0]!)).toBe(0)
+      expect(response.state.players[0]!.cardStates[CARD_ID]?.extraData?.reservedActionSpaces).toBeUndefined()
+      expect(response.interaction.sourceCard).not.toBe(CARD_ID)
+      return
+    }
+    expect(getAvailableStableSupplyCount(response.state, response.state.players[0]!)).toBe(3)
+    expect(response.interaction.request.options.some((option) => option.value === fourSpaces)).toBe(false)
+    const before = structuredClone(response.state.players)
+    response = session.resolveChoice(0, fourSpaces)
+    expect(response.ok).toBe(false)
+    expect(response.state.players).toEqual(before)
+    expect(response.interaction.stateId).toBe('wait')
+    response = session.resolveChoice(0, `${CHOICE_PREFIX}${TRIGGER_SPACES.slice(0, 3).join(',')}`)
+    expect(response.ok, response.error).toBe(true)
+    expect(response.state.players[0]!.cardStates[CARD_ID]?.extraData?.reservedActionSpaces).toEqual(TRIGGER_SPACES.slice(0, 3))
+    expect(response.state.players[0]!.stableTiles).toEqual(tiles)
+  })
+
   const setup = (reservedActionSpaces = TRIGGER_SPACES) => {
     const session = new GameSession()
     stabilizeRandomHands(session.state.players)

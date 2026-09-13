@@ -60,6 +60,10 @@ registerAdHocAction(foodAction)
 const cardImpl = {
   effect: {
     id: CARD_ID,
+    projectInteractionRequest: (_state, player, request, actionId) => {
+      if (actionId !== FOOD_ACTION || request.kind !== 'resource-quantity-select') return request
+      return { ...request, availableByResource: { food: player.resources.food } }
+    },
     onBuy: () => ({ type: 'leaf', actionId: FOOD_ACTION, sourceCard: CARD_ID }),
     onRoundStart: (_state, player) => { setCardFlag(player, CARD_ID, false) },
     extraTurnBeforeWorkers: true,

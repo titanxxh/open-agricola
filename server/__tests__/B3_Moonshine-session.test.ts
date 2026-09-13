@@ -22,6 +22,7 @@ import { GameSession } from '../game/authoritative-session'
 import { authoritativeCommandKey } from '../../shared/contract/authoritative-command'
 import { setWorkersAtHome, setActiveWorkerCount, workersAvailable } from '../../shared/domain/player'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
+import { rehydrateState, serializeSessionSnapshot } from '../../shared/session/serialization'
 
 // Force card modules to register their effects.
 import '../../shared/cards/B/B003_Moonshine'
@@ -254,6 +255,47 @@ describe('B003_Moonshine session', () => {
     expect(p0After.occupationHand.length).toBe(1)
     // That occ is now in p1's hand
     expect(p1After.occupationHand.length).toBeGreaterThan(0)
+  })
+
+  it('enables the same revealed occupation after cooking in a restored purchase window', () => {
+    let session = makeSession({ food: 1, occupationHand: [OCC_A] })
+    const player = session.state.players[0]!
+    player.improvements = ['Major_Fireplace1']
+    player.resources.sheep = 1
+    player.houseAnimalType = 'sheep'
+    player.houseAnimalCount = 1
+    const offered = playB3(session)
+    expect(offered.interaction.request.options.find((option) => option.value === 'play')?.disabled).toBe(true)
+    const snapshot = serializeSessionSnapshot(session.state, session)
+    session = new GameSession(rehydrateState(JSON.parse(JSON.stringify(snapshot))))
+    let response = session.takeAnytimeAction(0, 'exchange')
+    expect(response.ok, response.error).toBe(true)
+    const cooking = response.interaction.request.options.find((option) =>
+      option.effectPreview?.kind === 'resourceExchange' && option.effectPreview.resourcesPaid?.sheep === 1)!
+    response = session.resolveChoice(0, cooking.value)
+    expect(response.ok, response.error).toBe(true)
+    expect(response.state.players[0]!.resources.food).toBe(3)
+    expect(response.interaction.request.options.find((option) => option.value === 'play')?.disabled).not.toBe(true)
+    expect(response.state.players[0]!.cardStates[CARD_ID]?.extraData?.occ).toBe(OCC_A)
+    const beforeReads = JSON.stringify({ events: response.state.events, log: response.state.log, scores: response.scores })
+    session.getState()
+    const read = session.getState()
+    expect(JSON.stringify({ events: read.state.events, log: read.state.log, scores: read.scores })).toBe(beforeReads)
+    response = session.undoStep(0)
+    expect(response.ok, response.error).toBe(true)
+    response = session.resolveChoice(0, 'cancel')
+    expect(response.ok, response.error).toBe(true)
+    expect(response.state.players[0]!.resources).toMatchObject({ food: 1, sheep: 1 })
+    expect(response.interaction.request.options.find((option) => option.value === 'play')?.disabled).toBe(true)
+    expect(response.state.players[0]!.cardStates[CARD_ID]?.extraData?.occ).toBe(OCC_A)
+    response = session.takeAnytimeAction(0, 'exchange')
+    expect(response.ok, response.error).toBe(true)
+    response = session.resolveChoice(0, cooking.value)
+    expect(response.ok, response.error).toBe(true)
+    response = session.resolveChoice(0, 'play')
+    expect(response.ok, response.error).toBe(true)
+    expect(response.state.players[0]!.resources.food).toBe(1)
+    expect(response.state.players[0]!.occupationPlayed.filter((id) => id === OCC_A)).toHaveLength(1)
   })
 
   it('returns a blocked B149 play to the same revealed B3 choice', () => {

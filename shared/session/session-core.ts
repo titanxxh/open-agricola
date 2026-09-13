@@ -1206,6 +1206,7 @@ export class GameCore {
     run: () => SessionResponse,
   ): SessionResponse {
     return this.withCtx(() => {
+      this.refreshPendingInteractionRequest()
       if (this.commandSettlementDepth > 0) return run()
       const command = normalizedCommand(type, playerIndex, payload)
       if (type === 'anytime' && !this.canInterleaveAnytimeAction()) {
@@ -2426,7 +2427,26 @@ export class GameCore {
     }
   }
 
+  private refreshPendingInteractionRequest(): void {
+    const frame = this.engineStack.current()
+    const envelope = this.engineStack.peekPendingEnvelope()
+    const view = this.engineStack.peekPendingView()
+    if (!frame || !envelope || !view?.sourceCard) return
+    const project = getCardEffect(view.sourceCard)?.projectInteractionRequest
+    if (!project) return
+    const player = this.state.players[this.effectiveOwnerIndexForFrame(frame, envelope.hostNodeId, view)]
+    if (!player) return
+    const request = project(this.state, player, envelope.request, envelope.pendingActionId)
+    if (request === envelope.request) return
+    frame.engine.peekPendingHost()?.setPending({
+      ...envelope,
+      request,
+      choices: request.kind === 'choice' ? request.options : envelope.choices,
+    })
+  }
+
   private buildInteraction(): InteractionState {
+    this.refreshPendingInteractionRequest()
     const interaction = deriveInteractionState({
       state: this.state,
       engineStack: this.engineStack,
@@ -3940,6 +3960,8 @@ export class GameCore {
       }
 
       if (step.type === 'choice') {
+        this.refreshPendingInteractionRequest()
+        step.choice.options = this.engineStack.peekPendingView()?.choices ?? step.choice.options
         // breed action (e.g. harvest reap or B104 last-harvest enforcement)
         // emits ActionExecutionResult { type: 'request', request: { kind:
         // 'animal-reorg' } } — the engine wraps it in the new 'request'

@@ -13,6 +13,15 @@ const KEY_OCC = 'occ'
 const cardImpl = {
   effect: {
   id: CARD_ID,
+  projectInteractionRequest: (_state, player, request, actionId) =>
+    actionId === 'emit-choice' && request.kind === 'choice' ? {
+      ...request,
+      options: request.options.map((option) => option.value === 'play' ? {
+        ...option,
+        disabled: player.resources.food < 2,
+        disabledReasonKey: player.resources.food < 2 ? `cards.${CARD_ID}.choicePlayDisabled` : undefined,
+      } : option),
+    } : request,
 
   onBuy: (state, player, _paymentInfo, ctx) => {
     if (player.occupationHand.length === 0) return

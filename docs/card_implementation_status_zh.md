@@ -184,6 +184,8 @@
 
 ## 6. 基础设施待办
 
+当前选项可用性由原生纯查询 `CardEffect.projectInteractionRequest` 实现：活动 pending 的选项及数量上限在展示与权威校验前刷新，覆盖嵌套 anytime、撤销和恢复。卡牌局部条件保留 pending 归属、随机观察、资源承诺和原有选项展示策略；未来必需流程继续沿用 ADR 0015 语义。
+
 Issue #893 补充不改变固定槽身份的 Card Field 作物分层；播种提交统一执行已选田授权，额外田非法提交保留可恢复待选。作坊收获兑换可拒绝，重复作坊计分共用 costed-bonus 资源预算。喂养逐玩家结算并支持可恢复跨玩家 anytime；资源承诺保留在卡内，由 Session 命令边界原子校验（ADR-0019）。上述机制有原生 Session 回归，不在核心流程添加卡号分支。
 
 #848 的共享缺口已补齐：付款方出资的 gain 先校验完整转账再移动资源；显式 mandatory listener 即使不经过触发菜单也保留强制义务；普通及免费职业入口统一校验前置；改善预览与付款保留授予行动的上下文。农场货物放置采用 `farm.animalMoved.newlyPlacedOnFarmyard` 和实体田格的 `resource.moved` 事件。Writing Chamber 复用已有完整 post-score summary 读取独立负分条目，不改变其他计分卡的输入。组件退款仍为 #849 跟踪的独立已接受限制。

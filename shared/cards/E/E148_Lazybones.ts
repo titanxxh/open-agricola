@@ -3,16 +3,27 @@ import type { CardListenerRegistration, CardListenerContext } from '../card-list
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import {
   actionSpaceTokenChoiceFlow,
+  actionSpaceTokenChoiceOptions,
   consumeActionSpaceToken,
   resolveActionSpaceTokenChoice,
 } from '../helpers/action-space-tokens'
 import { buildStableFarmInteraction } from '../../domain/farmyard-interaction'
 import { getAvailableStableSupplyCount } from '../../domain/supply-tokens'
 import type { CardImpl } from '../registry'
+import type { GameState, PlayerState } from '../../contract/types'
 
 const CARD_ID = 'E148_Lazybones'
 const TRIGGER_SPACES = ['grain-seeds', 'farmland', 'day-laborer', 'farm-expansion']
 const CHOICE_PREFIX = 'lazybones:'
+
+const choiceConfig = (state: GameState, player: PlayerState) => ({
+  cardId: CARD_ID,
+  spaces: TRIGGER_SPACES,
+  max: getAvailableStableSupplyCount(state, player),
+  choicePrefix: CHOICE_PREFIX,
+  choiceLabelKey: 'cards.E148_Lazybones.choice',
+  promptKey: 'cards.E148_Lazybones.name',
+})
 
 const listener: CardListenerRegistration = {
   id: 'E148-lazybones-opponent-trigger',
@@ -56,22 +67,13 @@ const cardImpl = {
   listeners: [listener],
   effect: {
     id: CARD_ID,
-    onBuy: (state, player) => actionSpaceTokenChoiceFlow({
-      cardId: CARD_ID,
-      spaces: TRIGGER_SPACES,
-      max: getAvailableStableSupplyCount(state, player),
-      choicePrefix: CHOICE_PREFIX,
-      choiceLabelKey: 'cards.E148_Lazybones.choice',
-      promptKey: 'cards.E148_Lazybones.name',
-    }),
+    projectInteractionRequest: (state, player, request, actionId) => {
+      if (actionId !== 'emit-choice' || request.kind !== 'choice') return request
+      return { ...request, options: actionSpaceTokenChoiceOptions(choiceConfig(state, player)) }
+    },
+    onBuy: (state, player) => actionSpaceTokenChoiceFlow(choiceConfig(state, player)),
     resolveChoice: (state, player, choice) => {
-      resolveActionSpaceTokenChoice(player, choice, {
-        cardId: CARD_ID,
-        spaces: TRIGGER_SPACES,
-        max: getAvailableStableSupplyCount(state, player),
-        choicePrefix: CHOICE_PREFIX,
-        choiceLabelKey: 'cards.E148_Lazybones.choice',
-      })
+      resolveActionSpaceTokenChoice(player, choice, choiceConfig(state, player))
     },
   },
   reaches: [] as readonly string[],

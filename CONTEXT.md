@@ -230,6 +230,10 @@ _Avoid_: 前端从 DOM 或规则代码推断可操作性
 等待玩家输入的结构化请求，常见 kind 有 `choice`、`farm-select`、`selection`、`animal-reorg`、`feed`、`confirm-next-player`、`confirm-player-switch`、`card-draft`。
 _Avoid_: 未类型化 pending blob
 
+**Choice Availability（选项可用性）**:
+玩家在当前规则状态下可合法提交的选择及其数量范围；资源、供给或资格变化后，可用性随之变化。它只约束当前选择，不承诺后续必需流程能够全部完成。
+_Avoid_: 首次展示时的候选快照、未来完整流程保证、前端规则裁定
+
 **Interaction Presentation**:
 前端把服务端 `InteractionState` 映射为具体交互展示面和提交动作的边界。它只消费服务端交互真相，不做规则裁定。
 _Avoid_: 后端规则裁定、Pending Envelope、DOM 状态推断

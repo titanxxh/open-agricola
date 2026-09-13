@@ -69,6 +69,69 @@ const gardenDesignerBonus = (response: SessionResponse) =>
     .find((entry) => 'cardId' in entry && entry.cardId === CARD_ID)?.score ?? 0
 
 describe('C099 Garden Designer scoring choices', () => {
+  it('adds newly affordable investments after a nested reed sale', () => {
+    const session = setup({ scoringFood: 1 })
+    session.state.players[0]!.occupationPlayed.push('D159_ReedSeller')
+    session.state.players[0]!.resources.reed = 1
+    let chosen = false
+    const response = autoAdvanceRoundEnd(session, {
+      onChoice: (interaction) => {
+        expect(interaction.request.options.some((option) => option.value === choiceValue(4, 2))).toBe(false)
+        let result = session.takeAnytimeAction(0, 'D159-reed-seller-anytime')
+        expect(result.ok, result.error).toBe(true)
+        while (result.interaction.request.kind === 'confirm-player-switch') {
+          result = session.resolveChoice(result.interaction.request.fromPlayerIndex, 'confirm')
+        }
+        expect(result.interaction.playerIndex).toBe(1)
+        result = session.resolveChoice(1, 'decline')
+        expect(result.ok, result.error).toBe(true)
+        while (result.interaction.request.kind === 'confirm-player-switch') {
+          result = session.resolveChoice(result.interaction.request.fromPlayerIndex, 'confirm')
+        }
+        expect(result.state.players[0]!.resources.food).toBe(4)
+        expect(result.interaction.request.options.some((option) => option.value === choiceValue(4, 2))).toBe(true)
+        chosen = true
+        return session.resolveChoice(0, choiceValue(4, 2))
+      },
+    })
+    expect(chosen).toBe(true)
+    expect(response.ok, response.error).toBe(true)
+    expect(response.state.gameOver).toBe(true)
+    expect(response.state.players[0]!.resources).toMatchObject({ food: 0, reed: 0 })
+    expect(gardenDesignerBonus(response)).toBe(2)
+  })
+
+  it('removes an unaffordable investment after a nested anytime payment without ending scoring', () => {
+    const session = setup({ scoringFood: 4 })
+    const owner = session.state.players[0]!
+    owner.occupationPlayed.push('C085_DenBuilder')
+    owner.houseType = 'clay'
+    owner.resources.grain = 1
+    let chosen = false
+    const response = autoAdvanceRoundEnd(session, {
+      onChoice: (interaction) => {
+        expect(interaction.request.options.some((option) => option.value === choiceValue(4, 2))).toBe(true)
+        let result = session.takeAnytimeAction(0, 'C85-den-builder-anytime')
+        expect(result.ok, result.error).toBe(true)
+        expect(result.state.players[0]!.resources.food).toBe(2)
+        expect(result.interaction.request.options.some((option) => option.value === choiceValue(4, 2))).toBe(false)
+        const before = structuredClone(result.state.players)
+        result = session.resolveChoice(0, choiceValue(4, 2))
+        expect(result.ok).toBe(false)
+        expect(result.state.players).toEqual(before)
+        expect(result.state.gameOver).toBe(false)
+        expect(gardenDesignerBonus(result)).toBe(0)
+        chosen = true
+        return session.resolveChoice(0, choiceValue(1, 1))
+      },
+    })
+    expect(chosen).toBe(true)
+    expect(response.ok, response.error).toBe(true)
+    expect(response.state.gameOver).toBe(true)
+    expect(response.state.players[0]!.resources.food).toBe(1)
+    expect(gardenDesignerBonus(response)).toBe(1)
+  })
+
   it.each([[1, 1], [4, 2], [7, 3]])('pays %i food for %i bonus VP in one empty field', (food, score) => {
     const session = setup({ scoringFood: food })
     const response = finishFinalHarvest(session, food, score)

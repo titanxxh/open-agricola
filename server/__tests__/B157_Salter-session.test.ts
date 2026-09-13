@@ -5,6 +5,7 @@ import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import '../../shared/cards/B/B157_Salter'
+import { rehydrateState, serializeSessionSnapshot } from '../../shared/session/serialization'
 
 const CARD_ID = 'B157_Salter'
 const placeholder = ['__test_placeholder__']
@@ -16,7 +17,7 @@ const setup = (options?: {
   stableAnimals?: Record<string, 'sheep'|'boar'|'cattle'|null>
   round?: number
 }) => {
-  const session = new GameSession()
+  const session = new GameSession(8157, undefined, { playerCount: 2 })
   const state = session.getState().state
   state.players = state.players.slice(0, 2)
   state.currentPlayerIndex = 0
@@ -41,6 +42,49 @@ const setup = (options?: {
 }
 
 describe('B157_Salter session', () => {
+  it.each([1, 2])('refreshes animal quantities after cooking %i sheep and rejects stale counts without blocking', (cooked) => {
+    let session = setup({
+      resources: { sheep: 2, food: 0 },
+      pastures: [{ id: 'sheep', size: 2, tiles: [{ row: 0, col: 1 }, { row: 0, col: 2 }], stables: 0, animalType: 'sheep', animalCount: 2 }],
+    })
+    session.state.players[0]!.improvements = ['Major_Fireplace1']
+    let response = session.takeAnytimeAction(0, 'B157-salter-anytime')
+    expect(response.interaction.request).toMatchObject({ kind: 'resource-quantity-select', availableByResource: { sheep: 2 } })
+    response = session.takeAnytimeAction(0, 'exchange')
+    expect(response.ok, response.error).toBe(true)
+    const cooking = response.interaction.request.options.find((option) =>
+      option.effectPreview?.kind === 'resourceExchange' && (option.effectPreview.resourcesPaid?.sheep ?? 0) > 0)!
+    response = session.resolveChoice(0, `bulk:${cooking.value.split(':')[1]}=${cooked}`)
+    expect(response.ok, response.error).toBe(true)
+    expect(response.state.players[0]!.resources).toMatchObject({ sheep: 2 - cooked, food: 2 * cooked })
+    expect(response.interaction.request).toMatchObject({ kind: 'resource-quantity-select', availableByResource: { sheep: 2 - cooked } })
+    session = new GameSession(rehydrateState(JSON.parse(JSON.stringify(serializeSessionSnapshot(session.state, session)))))
+    const restored = session.getState()
+    const before = structuredClone({ players: restored.state.players, futureMeeples: restored.state.futureMeeples, scores: restored.scores })
+    response = session.commitSelectionChoice(0, { resourceCounts: { sheep: 2, boar: 0, cattle: 0 } })
+    expect(response.ok).toBe(false)
+    expect(response.interaction.stateId).toBe('wait')
+    expect(response.interaction.request.kind).toBe('resource-quantity-select')
+    expect(response.state.players).toEqual(before.players)
+    expect(response.state.futureMeeples).toEqual(before.futureMeeples)
+    expect(response.scores).toEqual(before.scores)
+    if (cooked === 2) {
+      response = session.undoStep(0)
+      expect(response.ok, response.error).toBe(true)
+      expect(response.state.players[0]!.resources).toMatchObject({ sheep: 2, food: 0 })
+      response = session.resolveChoice(0, 'cancel')
+      expect(response.ok, response.error).toBe(true)
+      expect(response.interaction.request).toMatchObject({ kind: 'resource-quantity-select', availableByResource: { sheep: 2 } })
+      return
+    }
+    response = session.commitSelectionChoice(0, { resourceCounts: { sheep: 1, boar: 0, cattle: 0 } })
+    expect(response.ok, response.error).toBe(true)
+    expect(response.state.players[0]!.resources.sheep).toBe(0)
+    expect(response.state.players[0]!.pastures[0]!.animalCount).toBe(0)
+    expect(response.state.futureMeeples.map((entry) => ({ round: entry.round, food: entry.resources.food })))
+      .toEqual([{ round: 4, food: 1 }, { round: 5, food: 1 }, { round: 6, food: 1 }])
+  })
+
   it('多只触发: pending interaction kind=resource-quantity-select', () => {
     const session = setup({
       resources: { sheep: 2, cattle: 1 },

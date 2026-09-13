@@ -189,7 +189,13 @@ const anytimeListener: CardListenerRegistration = {
 
 const cardImpl = {
   listeners: [anytimeListener],
-  effect: { id: CARD_ID },
+  effect: {
+    id: CARD_ID,
+    projectInteractionRequest: (state, player, request, actionId) => {
+      if (actionId !== PICK_ACTION_ID || request.kind !== 'resource-quantity-select') return request
+      return { ...request, availableByResource: getAssignedAnimalsByType(player, state) }
+    },
+  },
   reaches: [] as readonly string[],
 } satisfies CardImpl
 

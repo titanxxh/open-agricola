@@ -7,14 +7,14 @@ import { requireActiveCardRegistry } from '../../shared/cards/active-registry'
 const CARD_ID = 'D159_ReedSeller'
 const SALE = 'D159-reed-seller-anytime'
 
-const setup = () => {
-  const session = new GameSession(893159, undefined, { playerCount: 4 })
+const setup = (playerCount = 4) => {
+  const session = new GameSession(893159, undefined, { playerCount })
   for (const player of session.state.players) {
     player.minorHand = ['__test_placeholder__']
     player.occupationHand = ['__test_placeholder__']
     player.resources.food = 3
   }
-  session.state.players[0]!.occupationHand = [CARD_ID]
+  session.state.players[0]!.occupationHand = [CARD_ID, '__test_placeholder__']
   session.state.players[0]!.resources.reed = 2
   let response = session.takeAction(0, 'lessons')
   if (!response.state.players[0]!.occupationPlayed.includes(CARD_ID)) response = session.resolveChoice(0, CARD_ID)
@@ -43,6 +43,67 @@ const answer = (session: GameSession, initial: SessionResponse, player: number, 
 }
 
 describe('D159 Reed Seller', () => {
+  it.each([0, 1, 2])('projects buyer affordability at %i food after restoring the sale', (food) => {
+    let session = setup(2)
+    session.state.players[1]!.resources.food = food
+    let response = confirmSwitches(session, session.takeAnytimeAction(0, SALE))
+    const resources = structuredClone(response.state.players.map((player) => player.resources))
+    const sale = structuredClone(response.state.players[0]!.cardStates[CARD_ID])
+    session = new GameSession(rehydrateState(JSON.parse(JSON.stringify(serializeSessionSnapshot(session.state, session)))))
+    response = session.getState()
+    expect(response.state.players.map((player) => player.resources)).toEqual(resources)
+    expect(response.state.players[0]!.cardStates[CARD_ID]).toEqual(sale)
+    const before = structuredClone(response.state.players)
+    expect(response.interaction.playerIndex).toBe(1)
+    const buy = response.interaction.request.options.find((option) => option.value === 'buy')!
+    expect(buy.disabled).toBe(food < 2)
+    const sync = session.buildSyncPayload(response, response.state.players[1]!.id)
+    expect(sync.interaction.playerIndex).toBe(1)
+    expect(sync.interaction.request.options.find((option) => option.value === 'buy')).toEqual(buy)
+    expect(response.interaction.request.options.find((option) => option.value === 'decline')?.disabled).not.toBe(true)
+    if (food < 2) {
+      expect(buy.disabledReasonKey).toBe('cards.D159_ReedSeller.buyDisabled')
+      response = session.resolveChoice(1, 'buy')
+      expect(response.ok).toBe(false)
+      expect(response.state.players).toEqual(before)
+    }
+    response = confirmSwitches(session, session.resolveChoice(1, food < 2 ? 'decline' : 'buy'))
+    expect(response.ok, response.error).toBe(true)
+    expect(response.state.players[0]!.resources).toMatchObject({ reed: 1, food: food < 2 ? 6 : 5 })
+    expect(response.state.players[1]!.resources.food).toBe(food < 2 ? food : 0)
+  })
+
+  it('refreshes the disabled purchase after the buyer cooks without settling twice', () => {
+    const session = setup(2)
+    const buyer = session.state.players[1]!
+    buyer.resources.food = 1
+    buyer.resources.sheep = 1
+    buyer.houseAnimalType = 'sheep'
+    buyer.houseAnimalCount = 1
+    buyer.improvements = ['Major_Fireplace1']
+    let response = confirmSwitches(session, session.takeAnytimeAction(0, SALE))
+    expect(response.interaction.request.options.find((option) => option.value === 'buy'))
+      .toMatchObject({ disabled: true, disabledReasonKey: expect.any(String) })
+    const before = structuredClone(response.state.players)
+    const rejected = session.resolveChoice(1, 'buy')
+    expect(rejected.ok).toBe(false)
+    expect(rejected.state.players).toEqual(before)
+    expect(rejected.interaction.playerIndex).toBe(1)
+    response = session.takeAnytimeAction(1, 'exchange')
+    expect(response.ok, response.error).toBe(true)
+    const cooking = response.interaction.request.options.find((option) =>
+      option.effectPreview?.kind === 'resourceExchange' && option.effectPreview.resourcesPaid?.sheep === 1)!
+    response = session.resolveChoice(1, cooking.value)
+    expect(response.ok, response.error).toBe(true)
+    expect(response.state.players[1]!.resources.food).toBe(3)
+    expect(response.interaction.request.options.find((option) => option.value === 'buy')?.disabled).not.toBe(true)
+    response = confirmSwitches(session, session.resolveChoice(1, 'buy'))
+    expect(response.ok, response.error).toBe(true)
+    expect(response.state.players[0]!.resources).toMatchObject({ food: 5, reed: 1 })
+    expect(response.state.players[1]!.resources).toMatchObject({ food: 1, reed: 1, sheep: 0 })
+    expect(response.state.players[0]!.cardStates[CARD_ID]?.extraData?.sale).toBeUndefined()
+  })
+
   it.each([false, true])('transfers only the chosen buyer payment when several players are willing: %s', (multiple) => {
     const session = setup()
     let response = session.takeAnytimeAction(0, SALE)

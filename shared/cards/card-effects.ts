@@ -1,4 +1,4 @@
-import type { ActionFlow, FarmTilePosition, GameState, Pasture, PaymentResourceMap, PlayerState, ProtectedObservation, Resource, ResourceKey } from '../contract/types'
+import type { ActionFlow, FarmTilePosition, GameState, InteractionRequest, Pasture, PaymentResourceMap, PlayerState, ProtectedObservation, Resource, ResourceKey } from '../contract/types'
 import type { PrivateGameEvent } from '../contract/private-events'
 import type { AnimalZone, PlayerScoreSummary, ScoreCategoryResult } from '../domain'
 import { getCurrentSessionContext } from './session-card-context'
@@ -274,6 +274,7 @@ export type ResourceCommitment = { playerId: string; resources: Partial<Resource
 
 export type CardEffect = {
   id: string
+  projectInteractionRequest?: (state: GameState, player: PlayerState, request: InteractionRequest, actionId: string | undefined) => InteractionRequest
   computeResourceCommitments?: (state: GameState, owner: PlayerState) => readonly ResourceCommitment[]
   preHarvestGoodsWanted?: ResourceKey[]
   preHarvestGoodsWantedBeforeReap?: ResourceKey[]
