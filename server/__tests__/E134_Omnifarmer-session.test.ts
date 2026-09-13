@@ -244,9 +244,9 @@ describe('E134 Omnifarmer parity', () => {
 
   const setup = ({
     played = true, crop = null as 'grain' | 'vegetable' | null, cropCount = 1,
-    sheep = 0, stored = [] as StoredGood[],
+    sheep = 0, stored = [] as StoredGood[], playerCount = 3,
   } = {}) => {
-    const session = new GameSession(6134, undefined, { playerCount: 3 })
+    const session = new GameSession(6134, undefined, { playerCount })
     stabilizeRandomHands(session.state.players)
     const state = session.getState().state
     state.currentPlayerIndex = 0
@@ -320,16 +320,43 @@ describe('E134 Omnifarmer parity', () => {
   const storedGoods = (response: SessionResponse): StoredGood[] =>
     (response.state.players[0]!.cardStates?.[CARD_ID]?.extraData?.storedGoods as StoredGood[] | undefined) ?? []
 
-  it('E134 S2: one harvested grain may be stored irretrievably on Omnifarmer', () => {
-    const session = setup({ crop: 'grain', cropCount: 2 })
+  it('keeps the deposit window but disables harvested grain already consumed during feeding', () => {
+    const session = setup({ crop: 'grain', cropCount: 2, playerCount: 2 })
+    session.state.players[0]!.resources.food = 1
+    let response = session.performRoundEnd()
+    while (response.interaction.stateId === 'wait' && response.interaction.request.kind !== 'feed') {
+      const skip = optionsOf(response).find((option) => option.value === '__skip__' || option.value === '__pass__')!
+      response = session.resolveChoice(response.interaction.playerIndex, skip.value)
+      expect(response.ok, response.error).toBe(true)
+    }
+    response = session.resolveChoice(0, 'confirm', { selections: [{ sourceId: '__basic__', exchangeIndex: 0, count: 1 }] })
+    expect(response.ok, response.error).toBe(true)
+    response = advanceToOmnifarmer(session, response)
+    expect(response.state.players[0]!.resources.grain).toBe(0)
+    expect(optionsOf(response).find((option) => option.value === 'grain')?.disabled).toBe(true)
+    const before = structuredClone(response.state.players)
+    response = session.resolveChoice(0, 'grain')
+    expect(response.ok).toBe(false)
+    expect(response.state.players).toEqual(before)
+    expect(response.interaction.promptKey).toBe('ui.interactionE134Prompt')
+    expect(storedGoods(response)).toEqual([])
+    response = session.resolveChoice(0, 'skip')
+    expect(response.ok, response.error).toBe(true)
+    expect(storedGoods(response)).toEqual([])
+  })
+
+  it.each([{ stored: [] }, { stored: ['vegetable'] }] satisfies { stored: StoredGood[] }[])('E134 S2: stores one harvested grain with prior goods %j', ({ stored }) => {
+    const session = setup({ crop: 'grain', cropCount: 2, stored, playerCount: 2 })
     let response = advanceToOmnifarmer(session)
     expect(optionsOf(response).map((option) => option.value)).toEqual(['skip', 'grain'])
 
     response = session.resolveChoice(0, 'grain')
 
-    expect(storedGoods(response)).toEqual(['grain'])
+    expect(storedGoods(response)).toEqual([...stored, 'grain'])
     expect(response.state.players[0]!.resources.grain).toBe(0)
     expect(response.state.players[0]!.fields[0]!.stacks[0]!.remaining).toBe(1)
+    expect(response.scores[0]!.categories.find((category) => category.key === 'cardBonusVp')?.total ?? 0)
+      .toBe(stored.length === 0 ? 0 : 3)
   })
 
   it('E134 S3: declining Omnifarmer keeps the harvested grain in supply', () => {

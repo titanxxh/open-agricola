@@ -51,6 +51,18 @@ const outcomeStorableTypes = (state: GameState, player: PlayerState): Storable[]
 const cardImpl = {
   effect: {
     id: CARD_ID,
+    projectInteractionRequest: (state, player, request, actionId) => {
+      if (actionId !== 'emit-choice' || request.kind !== 'choice') return request
+      const eligible = outcomeStorableTypes(state, player)
+      return {
+        ...request,
+        options: request.options.map((option) => {
+          if (option.value === 'skip') return option
+          const disabled = !eligible.includes(option.value as Storable) || (player.resources[option.value as Storable] ?? 0) <= 0
+          return { ...option, disabled, disabledReasonKey: disabled ? 'ui.interactionTriggerUnavailable' : undefined }
+        }),
+      }
+    },
     onAfterHarvest: (state, player) => {
       return buildChoiceFlow(outcomeStorableTypes(state, player))
     },

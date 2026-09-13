@@ -135,6 +135,15 @@ export const D159_ReedSeller = defineOccupationCard({
   impl: {
     effect: {
       id: CARD_ID,
+      projectInteractionRequest: (_state, player, request, actionId) =>
+        actionId === RESPOND && request.kind === 'choice' ? {
+          ...request,
+          options: request.options.map((option) => option.value === 'buy' ? {
+            ...option,
+            disabled: player.resources.food < 2,
+            disabledReasonKey: player.resources.food < 2 ? `cards.${CARD_ID}.buyDisabled` : undefined,
+          } : option),
+        } : request,
       computeResourceCommitments: (_state, owner) => {
         const sale = saleOf(owner)
         return sale ? [

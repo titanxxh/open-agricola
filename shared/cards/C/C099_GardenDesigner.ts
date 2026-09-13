@@ -34,6 +34,10 @@ const scoringOptions = (player: PlayerState): ActionChoiceOption[] => {
 const cardImpl = {
   effect: {
     id: CARD_ID,
+    projectInteractionRequest: (_state, player, request, actionId) => {
+      if (actionId !== 'emit-choice' || request.kind !== 'choice') return request
+      return { ...request, options: scoringOptions(player) }
+    },
     beforeEndGameMandatory: true,
     onBeforeEndGame: (_state, player) => {
       const options = scoringOptions(player)

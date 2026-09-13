@@ -30,7 +30,7 @@ const setup = () => {
   return session
 }
 
-const buy = (session: GameSession) => {
+const buy = (session: GameSession, food = 5) => {
   let response = session.takeAction(0, 'major-improvement')
   for (let step = 0; step < 3 && response.interaction.stateId === 'wait' &&
     response.interaction.request.kind !== 'resource-quantity-select'; step++) {
@@ -43,11 +43,39 @@ const buy = (session: GameSession) => {
   }
   expect(response.ok, response.error).toBe(true)
   expect(response.interaction).toMatchObject({ stateId: 'wait', request: { kind: 'resource-quantity-select' } })
-  expect(response.state.players[0]!.resources).toMatchObject({ wood: 0, reed: 0, food: 5 })
+  expect(response.state.players[0]!.resources).toMatchObject({ wood: 0, reed: 0, food })
   return response
 }
 
 describe('E022 Guest Room supply placements', () => {
+  it('refreshes food storage capacity after cooking without repeating the purchase', () => {
+    const session = setup()
+    const player = session.state.players[0]!
+    player.resources.food = 1
+    player.resources.sheep = 1
+    player.houseAnimalType = 'sheep'
+    player.houseAnimalCount = 1
+    player.improvements = ['Major_Fireplace1']
+    expect(buy(session, 1).interaction.request).toMatchObject({ availableByResource: { food: 1 } })
+    let response = session.takeAnytimeAction(0, 'exchange')
+    expect(response.ok, response.error).toBe(true)
+    const cooking = response.interaction.request.options.find((option) =>
+      option.effectPreview?.kind === 'resourceExchange' && option.effectPreview.resourcesPaid?.sheep === 1)!
+    response = session.resolveChoice(0, cooking.value)
+    expect(response.ok, response.error).toBe(true)
+    expect(response.interaction.request).toMatchObject({ kind: 'resource-quantity-select', availableByResource: { food: 3 } })
+    const before = structuredClone(response.state.players)
+    response = session.commitSelectionChoice(0, { resourceCounts: { food: 4 } })
+    expect(response.ok).toBe(false)
+    expect(response.state.players).toEqual(before)
+    expect(response.interaction.stateId).toBe('wait')
+    response = session.commitSelectionChoice(0, { resourceCounts: { food: 3 } })
+    expect(response.ok, response.error).toBe(true)
+    expect(response.state.players[0]!.resources).toMatchObject({ food: 0, wood: 0, reed: 0 })
+    expect(getCardStack(response.state.players[0]!, CARD_ID)).toEqual(['food', 'food', 'food'])
+    expect(response.state.players[0]!.minorPlayed.filter((id) => id === CARD_ID)).toHaveLength(1)
+  })
+
   it.each([0, 2, 5])('stores the chosen %i food through the purchase selection', (food) => {
     const session = setup()
     buy(session)

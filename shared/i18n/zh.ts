@@ -1816,6 +1816,7 @@ export const zh = {
       anytime: '芦苇商人：出售 1 芦苇',
       offer: '选择购买芦苇或放弃',
       buy: '支付 2 食物购买 1 芦苇',
+      buyDisabled: '食物不足（需要 2 食物）',
       decline: '不购买',
       chooseBuyer: '选择芦苇买家',
     },

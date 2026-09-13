@@ -34,29 +34,32 @@ const actionSpaceSubsets = (
   return subsets
 }
 
+export const actionSpaceTokenChoiceOptions = (
+  config: ActionSpaceTokenChoiceConfig,
+): ActionChoiceOption[] => [
+  {
+    value: config.choicePrefix,
+    labelKey: 'ui.interactionOptionalSkip',
+    sourceCard: config.cardId,
+  },
+  ...actionSpaceSubsets(config.spaces, config.max).map((spaces) => ({
+    value: `${config.choicePrefix}${spaces.join(',')}`,
+    labelKey: config.choiceLabelKey,
+    labelParams: { spaces: spaces.join(', ') },
+    sourceCard: config.cardId,
+  })),
+]
+
 export const actionSpaceTokenChoiceFlow = (
   config: ActionSpaceTokenChoiceConfig,
 ): ActionFlow | undefined => {
   if (config.max <= 0) return
-  const options: ActionChoiceOption[] = [
-    {
-      value: config.choicePrefix,
-      labelKey: 'ui.interactionOptionalSkip',
-      sourceCard: config.cardId,
-    },
-    ...actionSpaceSubsets(config.spaces, config.max).map((spaces) => ({
-      value: `${config.choicePrefix}${spaces.join(',')}`,
-      labelKey: config.choiceLabelKey,
-      labelParams: { spaces: spaces.join(', ') },
-      sourceCard: config.cardId,
-    })),
-  ]
   return {
     type: 'leaf',
     actionId: 'emit-choice',
     sourceCard: config.cardId,
     params: {
-      options,
+      options: actionSpaceTokenChoiceOptions(config),
       ...(config.promptKey ? { promptKey: config.promptKey } : {}),
     },
   }

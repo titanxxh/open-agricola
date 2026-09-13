@@ -312,6 +312,8 @@ WebSocket `ClientCommand.type` names do not exactly match `InteractionCommand`. 
 
 When a private choice concerns one card already visible in the recipient's hand, the producer may set `promptParams.cardId`. Interaction Presentation localizes that card name for the prompt and highlights the matching hand card; non-recipients receive `private-prompt` without `promptParams`.
 
+Native card effects may implement `CardEffect.projectInteractionRequest(state, player, request, actionId)` to derive current choice availability or resource quantity limits. The callback is a pure query scoped to its own pending action; it must preserve prompt metadata, accepted decisions, cached random observations, and execution progress. Session refreshes the active pending request and its choices before presentation, authoritative commands, and single-choice advancement, using the effective pending owner (including cross-player responses). The same refreshed envelope drives submission validation, nested-anytime resumption, undo, and restored sessions. Projection never reruns action execution, payment, drawing, logging, or future mandatory continuations; cards retain their existing hidden/disabled-option and automatic-advance policies.
+
 ### 4.7 ActionChoiceOption and Previews
 
 ```ts

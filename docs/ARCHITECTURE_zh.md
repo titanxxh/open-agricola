@@ -309,6 +309,8 @@ takeAction | resolveChoice | commitSelection | takeAnytimeAction | undoStep | un
 
 当私有选择围绕接收者手牌中已可见的某张牌时，生产方可以设置 `promptParams.cardId`。Interaction Presentation 会把该牌名本地化到提示文案中，并高亮对应手牌；非接收者只收到不含 `promptParams` 的 `private-prompt`。
 
+原生卡牌效果可实现 `CardEffect.projectInteractionRequest(state, player, request, actionId)`，派生当前选项可用性或资源数量上限。回调是仅作用于本卡 pending action 的纯查询，必须保留提示元数据、已接受决策、缓存的随机观察与执行进度。Session 在展示、权威命令及单选推进前，按有效 pending owner（含跨玩家响应）刷新活动 pending request 及其 choices；提交校验、嵌套 anytime 返回、撤销与存档恢复使用同一刷新结果。投影不得重跑行动执行、支付、抽牌、日志或未来必需流程；各卡保留已有的隐藏/禁用选项及自动推进策略。
+
 ### 4.7 ActionChoiceOption + previews
 
 ```ts
