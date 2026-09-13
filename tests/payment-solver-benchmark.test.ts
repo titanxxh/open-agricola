@@ -175,7 +175,7 @@ const measure = (scenario: Scenario, mode: Scenario['modes'][number]) => {
   }
 }
 
-describe.sequential('production PaymentSolver benchmark', () => {
+describe('production PaymentSolver benchmark', { concurrent: false }, () => {
   it.each(scenarios)('returns expected solutions: $name', (scenario) => {
     verify(scenario)
   })
