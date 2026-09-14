@@ -47,6 +47,7 @@ const ensureFixedDevRooms = (
   registry: RoomRegistry,
   persistence: RoomPersistence,
   checkpoint: RoomPersistenceCheckpoint,
+  gameContextStore: GameContextStore | undefined,
 ): void => {
   if (process.env.NODE_ENV === 'production') return
   const startupOptions = parseFixedDevRoomStartupOptions()
@@ -82,9 +83,10 @@ const ensureFixedDevRooms = (
         allowIncompleteFarmersOfTheMoorMinorDeal: startupOptions.allowIncompleteFarmersOfTheMoorMinorDeal === true,
       }
       registry.set(room)
-      checkpoint.recordState(room)
+      checkpoint.recordCreated(room)
     }
   }
+  gameContextStore?.restoreDevelopmentRooms()
 }
 
 const restoreRooms = (
@@ -349,7 +351,7 @@ export function createWsServer(
     onRoomRetired: (roomId) => committer?.retireRoom(roomId),
   })
 
-  ensureFixedDevRooms(registry, deps.persistence, checkpoint)
+  ensureFixedDevRooms(registry, deps.persistence, checkpoint, deps.gameContextStore)
   restoreRooms(
     registry,
     deps.persistence,
