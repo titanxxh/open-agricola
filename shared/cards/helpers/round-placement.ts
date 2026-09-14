@@ -1,4 +1,6 @@
 import type { GameState, PlayerState, SupplyWorkerSource, WorkerRef } from '../../contract/types'
+import { isInjectedAnytimeActionContext } from '../../engine/action-context-flags'
+import { readActionSnapshotExtraData } from './action-snapshot'
 import { ensureCardState } from './card-state'
 
 const ROUND_PLACEMENT_CARD_ID = '__roundPlacement__'
@@ -44,6 +46,16 @@ export const getRoundPersonPlacementDetails = (player: PlayerState): RoundPlacem
 
 export const getRoundPersonPlacementOrder = (player: PlayerState): string[] =>
   getRoundPersonPlacementDetails(player).map(({ spaceId }) => spaceId)
+
+export const isCurrentActionSecondPersonPlacement = (
+  player: PlayerState,
+  actionContext?: Record<string, unknown>,
+): boolean => {
+  if (isInjectedAnytimeActionContext(actionContext)) return false
+  const placements = getRoundPersonPlacementDetails(player)
+  if (placements.length !== 2) return false
+  return readActionSnapshotExtraData<string>(player, 'placedWorkerId') === placements[1]!.workerId
+}
 
 export const recordRoundPlacement = (
   player: PlayerState,

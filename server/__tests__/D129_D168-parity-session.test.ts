@@ -9,6 +9,7 @@ import { confirmPlayerSwitch } from './_helpers/pending-confirms'
 import { resolveTriggerIfPresent } from './_helpers/trigger-select'
 import { autoAdvanceRoundEnd } from '../../tests/llm-card-gen/session-helpers'
 
+import '../../shared/cards/D/D010_StorksNest'
 import '../../shared/cards/D/D129_LumberVirtuoso'
 import '../../shared/cards/D/D130_RecreationalCarpenter'
 import '../../shared/cards/D/D133_BeerTentOperator'
@@ -615,6 +616,11 @@ describe('D150 Godly Spouse parity', () => {
     recordRoundPlacement(player, firstSpace, firstWorker)
     session.loadState(state)
     let response = session.takeAction(0, 'wish-children')
+    if (response.interaction.stateId === 'wait'
+      && response.interaction.sourceCard === 'D150_GodlySpouse') {
+      expect(options(response), JSON.stringify(response.interaction))
+        .not.toContainEqual(expect.objectContaining({ value: '__skip__' }))
+    }
     if (response.interaction.stateId === 'wait') {
       const use = options(response).find((option) => option.labelKey === 'ui.interactionGodlySpouseUse'
         || option.sourceCard === 'D150_GodlySpouse' && option.value !== '__skip__')
@@ -623,7 +629,7 @@ describe('D150 Godly Spouse parity', () => {
     return { response, firstWorker }
   }
 
-  it('D150 S2: second-person family growth may return the first worker home', () => {
+  it('D150 S2: second-person family growth must return the first worker home', () => {
     const { response, firstWorker } = growAsSecond('forest')
     expect(familySize(response.state.players[0]!)).toBe(3)
     expect(workersAvailable(response.state, response.state.players[0]!)).toBe(1)
@@ -635,6 +641,35 @@ describe('D150 Godly Spouse parity', () => {
     const { response, firstWorker } = growAsSecond('meeting-place')
     expect(response.state.actionSpaces.find((space) => space.id === 'meeting-place')!.takenBy)
       .toContainEqual(expect.objectContaining({ workerId: firstWorker }))
+  })
+
+  it('D150 S4: family growth during the returning-home phase does not trigger Godly Spouse', () => {
+    const session = setup({
+      cardId: 'D150_GodlySpouse', playerCount: 4, round: 6, resources: { food: 21 },
+    })
+    const state = session.getState().state
+    const player = state.players[0]!
+    player.rooms = 3
+    player.minorPlayed = ['D010_StorksNest']
+    const workers = player.workers.filter((worker) => worker.isActive)
+    for (const [index, spaceId] of ['forest', 'clay-pit'].entries()) {
+      const worker = workers[index]!
+      state.actionSpaces.find((space) => space.id === spaceId)!.takenBy = [{
+        playerId: player.id, workerId: worker.id,
+      }]
+      recordRoundPlacement(player, spaceId, worker.id)
+    }
+    prepareRoundEnd(session)
+
+    let response = resolveTriggerIfPresent(session, session.performRoundEnd(), 'D010_StorksNest')
+    response = choose(session, response, (option) => option.value !== '__skip__')
+
+    expect(familySize(response.state.players[0]!)).toBe(3)
+    expect(response.state.events).not.toContainEqual(expect.objectContaining({
+      type: 'card.triggered',
+      sourceCardId: 'D150_GodlySpouse',
+      sourceActionId: 'recall-placed-worker',
+    }))
   })
 })
 

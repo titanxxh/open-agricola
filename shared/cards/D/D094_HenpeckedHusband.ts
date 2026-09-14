@@ -2,7 +2,7 @@ import { defineOccupationCard } from '../card-source'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import type { CardImpl } from '../registry'
-import { getRoundPersonPlacementDetails } from '../helpers/round-placement'
+import { getRoundPersonPlacementDetails, isCurrentActionSecondPersonPlacement } from '../helpers/round-placement'
 
 const CARD_ID = 'D094_HenpeckedHusband'
 const MEETING_PLACE_PREFIX = 'meeting-place'
@@ -14,8 +14,8 @@ const listener: CardListenerRegistration = {
   actions: ['construct'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (context.trueAction === false) return
+    if (!isCurrentActionSecondPersonPlacement(context.player, context.actionContext)) return
     const placements = getRoundPersonPlacementDetails(context.player)
-    if (placements.length !== 2) return
 
     const first = placements[0]!
     if (first.spaceId.startsWith(MEETING_PLACE_PREFIX)) return

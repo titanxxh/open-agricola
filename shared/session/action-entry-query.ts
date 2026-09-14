@@ -1,7 +1,7 @@
 import type { ActionSpace, GameState, PlayerState } from '../contract/types'
 import { canEnterSpace, canUseExclusiveSpace, computeAllowedPlacementSpaces } from '../actions/helpers/placement-availability'
 import { addLinkedSpaceBlocks, addWorkerRef, isSpaceBlocked, isSpaceOccupied } from '../domain/space'
-import { recordActionSnapshot } from '../cards/helpers/action-snapshot'
+import { recordActionSnapshot, writeActionSnapshotExtraData } from '../cards/helpers/action-snapshot'
 import { recordRoundPlacement } from '../cards/helpers/round-placement'
 import { incPlacedFarmers } from './stats'
 import { appendImmediateEvents } from '../events/append'
@@ -26,6 +26,7 @@ export const applyActionPlacement = (
 ): void => {
   player._activeActionBonusSources = []
   recordActionSnapshot(player, actionToken)
+  writeActionSnapshotExtraData(player, 'placedWorkerId', workerId)
   addWorkerRef(space, player.id, workerId)
   addLinkedSpaceBlocks(state, space, player.id, workerId)
   appendImmediateEvents(state, [{ type: 'worker.placed', workerId, spaceId: space.id }], {

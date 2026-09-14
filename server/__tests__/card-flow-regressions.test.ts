@@ -130,18 +130,7 @@ describe('card flow regressions', () => {
 
     session.loadState(state)
 
-    let resp = session.takeAction(0, 'wish-children')
-    expect(resp.interaction.stateId).toBe('wait')
-    expect(resp.interaction.stateId === 'wait' ? resp.interaction.promptKey : undefined)
-      .toBe('ui.interactionGodlySpouse')
-
-    if (resp.interaction.stateId !== 'wait') {
-      throw new Error('expected godly spouse choice')
-    }
-    const use = resp.interaction.request.options?.find((option) => option.labelKey === 'ui.interactionGodlySpouseUse')
-    expect(use).toBeDefined()
-
-    resp = session.resolveChoice(0, use!.value)
+    const resp = session.takeAction(0, 'wish-children')
     expect(familySize(resp.state.players[0]!)).toBe(3)
     expect(workersAvailable(resp.state, resp.state.players[0]!)).toBe(1)
     expect(resp.state.actionSpaces.find((space) => space.id === 'forest')?.takenBy).toEqual([])
