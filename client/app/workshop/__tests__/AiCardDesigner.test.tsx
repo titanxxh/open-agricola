@@ -330,6 +330,34 @@ describe('AiCardDesigner AI config header', () => {
     })
   })
 
+  it.each(['new', 'existing'])('cancels pending save feedback when the %s draft editor closes', async kind => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: false }))
+    const apiFetch = async (path: string, init?: RequestInit) => init?.method === 'POST'
+      ? new Response(JSON.stringify({ ok: true, id: existingCard.id }))
+      : apiFetchForExistingCard(path)
+    const { unmount } = render(
+      <LocaleProvider>
+        <AiCardDesigner
+          initialCard={{ ...existingCard, id: kind === 'new' ? '' : existingCard.id }}
+          onClose={() => {}}
+          apiFetch={apiFetch}
+        />
+      </LocaleProvider>,
+    )
+    await waitFor(() => expect(screen.getByRole('button', { name: '保存草稿' })).toBeEnabled())
+    const scheduled = vi.spyOn(globalThis, 'setTimeout')
+    const cancelled = vi.spyOn(globalThis, 'clearTimeout')
+    await userEvent.click(screen.getByRole('button', { name: '保存草稿' }))
+    expect(await screen.findByRole('button', { name: '已保存' })).toBeInTheDocument()
+    const feedbackTimer = scheduled.mock.results[
+      scheduled.mock.calls.findIndex(([, delay]) => delay === 3000)
+    ]?.value
+    expect(feedbackTimer).toBeDefined()
+    expect(cancelled).not.toHaveBeenCalledWith(feedbackTimer)
+    unmount()
+    expect(cancelled).toHaveBeenCalledWith(feedbackTimer)
+  })
+
   it('keeps Enter as a newline in the ability chat input', async () => {
     localStorage.setItem(
       'open-agricola-llm-config',
