@@ -1594,6 +1594,12 @@ export function AiCardDesigner({
   }, [error])
 
   useEffect(() => {
+    if (!saveSuccess) return
+    const timer = setTimeout(() => setSaveSuccess(false), 3000)
+    return () => clearTimeout(timer)
+  }, [saveSuccess])
+
+  useEffect(() => {
     if (
       controllerError
       || controllerState?.save.status === 'offline'
@@ -1790,7 +1796,6 @@ export function AiCardDesigner({
       }
       setCardIdInput(nextCardId)
       setSaveSuccess(true)
-      setTimeout(() => setSaveSuccess(false), 3000)
       return data.id
     } catch {
       setError(locale === 'zh' ? '网络错误' : 'Network error')
@@ -1818,7 +1823,6 @@ export function AiCardDesigner({
       setSaving(false)
       if (!saved) return null
       setSaveSuccess(true)
-      setTimeout(() => setSaveSuccess(false), 3000)
       refreshMyCards()
       return workspaceState.workspaceId
     }
