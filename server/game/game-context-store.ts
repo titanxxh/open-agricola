@@ -1,4 +1,5 @@
 import type Database from 'better-sqlite3'
+import { isDevRoom, isFixedDevRoom } from './room.ts'
 import type {
   CompletedGameContextDescriptor,
   GameContextLifecycle,
@@ -108,12 +109,37 @@ export class GameContextStore {
     return context?.lifecycle === 'active' ? context.expires_at : null
   }
 
+  restoreDevelopmentRooms(): void {
+    const rooms = this.db.prepare(`
+      SELECT room_id, lifecycle
+      FROM game_contexts
+      JOIN rooms ON rooms.id = game_contexts.room_id
+      WHERE lifecycle IN ('active', 'expired')
+    `).all() as Array<Pick<ContextRow, 'room_id' | 'lifecycle'>>
+    const restore = this.db.prepare(`
+      UPDATE game_contexts
+      SET lifecycle = 'active',
+          phase = (SELECT CASE WHEN status = 'waiting' THEN 'waiting' ELSE 'playing' END
+                   FROM rooms WHERE id = game_contexts.room_id),
+          expires_at = NULL,
+          updated_at = ?
+      WHERE room_id = ?
+    `)
+    this.db.transaction(() => {
+      for (const room of rooms) {
+        if (!isDevRoom(room.room_id)) continue
+        if (room.lifecycle === 'expired' && !isFixedDevRoom(room.room_id)) continue
+        restore.run(this.now(), room.room_id)
+      }
+    })()
+  }
+
   setActiveExpiry(roomId: string, expiresAt: number): void {
     this.db.prepare(`
       UPDATE game_contexts
       SET expires_at = ?, updated_at = ?
       WHERE room_id = ? AND lifecycle = 'active'
-    `).run(expiresAt, this.now(), roomId)
+    `).run(isDevRoom(roomId) ? null : expiresAt, this.now(), roomId)
   }
 
   clearActiveExpiry(roomId: string): void {
