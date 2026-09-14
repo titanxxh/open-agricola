@@ -673,9 +673,9 @@ const executeActivateCardAction = (
     if (result?.flow) {
       const flow = applyDefaultSourceCardToFlow(result.flow, result.sourceCard)
       recordGrantedActionsFromFlow(int, flow, effectPlayer, context.state, flowSourceCard(flow) ?? result.sourceCard)
-      insertedNodes.push(buildOwnedFlowNode(int, flow, effectPlayer.id))
+      insertedNodes.push(buildOwnedFlowNode(int, flow, effectPlayer.id, actionContext))
     }
-    insertedNodes.push(...buildFollowUpNodes(int, normalizedFollowUps, node.id, effectPlayer, context.state))
+    insertedNodes.push(...buildFollowUpNodes(int, normalizedFollowUps, node.id, effectPlayer, context.state, actionContext))
     const continuationParentHostNodeId = params.phase === 'before'
       ? params.beforeHostNodeId
       : node.continuationParentHostNodeId
@@ -799,7 +799,7 @@ const executeDeferredHostAction = (
       ? applyDefaultSourceCardToFlow(entry.flow, entry.sourceCard)
       : null)
     .filter((flow) => flow)
-    .map((flow) => buildOwnedFlowNode(int, flow as ActionFlow, context.player.id))
+    .map((flow) => buildOwnedFlowNode(int, flow as ActionFlow, context.player.id, executionContext.actionContext))
   const followUps = allActionHookResults
     .flatMap((entry) =>
       (entry.followUpActions ?? []).map((followUp) =>
@@ -855,7 +855,7 @@ const executeDeferredHostAction = (
     executionContext.player.id,
   )
   const trailingHookNodes = [
-    ...buildFollowUpNodes(int, followUps, node.id, context.player, context.state),
+    ...buildFollowUpNodes(int, followUps, node.id, context.player, context.state, executionContext.actionContext),
     ...immediateActivateNodes,
     ...afterActivateNodes,
     ...afterHostNodes,
@@ -869,7 +869,7 @@ const executeDeferredHostAction = (
       stampContinuationParentHost(insertedNode, node.continuationParentHostNodeId!))
   }
   if (result.type === 'flow') {
-    const flowNode = buildOwnedFlowNode(int, result.flow, context.player.id)
+    const flowNode = buildOwnedFlowNode(int, result.flow, context.player.id, executionContext.actionContext)
     if (node.continuationParentHostNodeId) {
       stampContinuationParentHost(flowNode, node.continuationParentHostNodeId)
     }
@@ -1449,7 +1449,7 @@ export function engineProceed(
         ? applyDefaultSourceCardToFlow(entry.flow, entry.sourceCard)
         : null)
       .filter((flow) => flow)
-      .map((flow) => buildOwnedFlowNode(int, flow as ActionFlow, context.player.id))
+      .map((flow) => buildOwnedFlowNode(int, flow as ActionFlow, context.player.id, executionContext.actionContext))
     const followUps = allActionHookResults
       .flatMap((entry) =>
         (entry.followUpActions ?? []).map((followUp) =>
@@ -1502,7 +1502,7 @@ export function engineProceed(
     // post-flow state. We therefore insert flow body FIRST (last call wins via
     // insertAfter), and trailing hooks AFTER the flow.
     const trailingHookNodes = [
-      ...buildFollowUpNodes(int, followUps, node.id, context.player, context.state),
+      ...buildFollowUpNodes(int, followUps, node.id, context.player, context.state, executionContext.actionContext),
       ...immediateActivateNodes,
       ...afterActivateNodes,
       ...afterHostNodes,
@@ -1519,7 +1519,7 @@ export function engineProceed(
       const committedFlow = node.actionContext?.commitOnTriggerSelection === true
         ? { ...result.flow, optional: undefined }
         : result.flow
-      const flowNode = buildOwnedFlowNode(int, committedFlow, context.player.id)
+      const flowNode = buildOwnedFlowNode(int, committedFlow, context.player.id, executionContext.actionContext)
       if (node.mandatory === true) {
         enforceCompositeContinuationMandatory(flowNode)
       }

@@ -9,6 +9,9 @@ import { confirmPlayerSwitch } from './_helpers/pending-confirms'
 import { resolveTriggerIfPresent } from './_helpers/trigger-select'
 import { autoAdvanceRoundEnd } from '../../tests/llm-card-gen/session-helpers'
 
+import '../../shared/cards/A/A093_BedMaker'
+import '../../shared/cards/A/A171_Sidekick'
+import '../../shared/cards/C/C087_Mason'
 import '../../shared/cards/D/D010_StorksNest'
 import '../../shared/cards/D/D129_LumberVirtuoso'
 import '../../shared/cards/D/D130_RecreationalCarpenter'
@@ -670,6 +673,84 @@ describe('D150 Godly Spouse parity', () => {
       sourceCardId: 'D150_GodlySpouse',
       sourceActionId: 'recall-placed-worker',
     }))
+  })
+
+  it('D150 S5: Sidekick placing the second person on Family Growth recalls the first person', () => {
+    const session = setup({
+      cardId: 'D150_GodlySpouse', playerCount: 2, round: 14, resources: { food: 1 },
+    })
+    const state = session.getState().state
+    const player = state.players[0]!
+    player.rooms = 3
+    player.occupationPlayed.push('A171_Sidekick')
+    state.roundActionOrder = state.roundActionOrder.map(() => null)
+    state.roundActionOrder[0] = 'wish-children'
+    state.roundActionOrder[1] = 'western-quarry'
+    session.loadState(state)
+
+    let response = session.takeAction(0, 'western-quarry')
+    expect(response.ok, response.error).toBe(true)
+    const firstWorker = response.state.actionSpaces.find((space) => space.id === 'western-quarry')!.takenBy[0]!
+    response = resolveTriggerIfPresent(session, response, 'A171_Sidekick')
+    response = choose(session, response, (option) => option.value !== '__skip__')
+
+    expect(response.ok, response.error).toBe(true)
+    expect(response.state.players[0]!.resources.food).toBe(0)
+    expect(familySize(response.state.players[0]!)).toBe(3)
+    expect(response.state.actionSpaces.find((space) => space.id === 'western-quarry')!.takenBy)
+      .not.toContainEqual(firstWorker)
+    expect(workersAvailable(response.state, response.state.players[0]!)).toBe(1)
+    expect(response.state.events).toContainEqual(expect.objectContaining({
+      type: 'card.triggered', sourceCardId: 'D150_GodlySpouse', sourceActionId: 'recall-placed-worker',
+    }))
+  })
+
+  it.each([false, true])('D150 S6: Bed Maker growth respects its originating placement (anytime=%s)', (anytime) => {
+    const session = setup({
+      cardId: 'D150_GodlySpouse', playerCount: 2, round: 14,
+      resources: { wood: 1, grain: 1, stone: 5, reed: 2 },
+    })
+    const state = session.getState().state
+    const player = state.players[0]!
+    player.occupationPlayed.push('A093_BedMaker', 'C087_Mason')
+    player.houseType = 'stone'
+    player.rooms = 4
+    player.roomTiles = Array.from({ length: 4 }, (_, col) => ({ row: 0, col }))
+    player.cardStates.C087_Mason = { extraData: { hasRoom: true } }
+    const firstWorker = { playerId: player.id, workerId: player.workers.find((worker) => worker.isActive)!.id }
+    state.actionSpaces.find((space) => space.id === 'forest')!.takenBy = [firstWorker]
+    recordRoundPlacement(player, 'forest', firstWorker.workerId)
+    session.loadState(state)
+
+    let response = session.takeAction(0, anytime ? 'farmland' : 'farm-expansion')
+    expect(response.ok, response.error).toBe(true)
+    if (anytime) response = session.takeAnytimeAction(0, 'C87-mason-anytime')
+    expect(response.interaction).toMatchObject({
+      stateId: 'wait', request: { kind: 'farm-select', farm: { farmType: 'room' } },
+    })
+    response = session.commitSelectionChoice(0, { rooms: [{ row: 0, col: 4 }] })
+    expect(response.ok, response.error).toBe(true)
+    expect(response.state.players[0]!.rooms).toBe(5)
+    response = resolveTriggerIfPresent(session, response, 'A093_BedMaker')
+    response = choose(session, response, (option) => option.value !== '__skip__')
+
+    expect(response.ok, response.error).toBe(true)
+    expect(familySize(response.state.players[0]!)).toBe(3)
+    expect(response.state.players[0]!.resources).toMatchObject({
+      wood: 0, grain: 0, stone: anytime ? 5 : 0, reed: anytime ? 2 : 0,
+    })
+    expect(response.state.actionSpaces.find((space) => space.id === 'forest')!.takenBy.some((worker) =>
+      worker.playerId === firstWorker.playerId && worker.workerId === firstWorker.workerId,
+    ))
+      .toBe(anytime)
+    expect(response.state.events.filter((event) =>
+      event.type === 'card.triggered' && event.sourceCardId === 'D150_GodlySpouse',
+    )).toHaveLength(anytime ? 0 : 1)
+    if (anytime) {
+      expect(response.interaction).toMatchObject({
+        stateId: 'wait', request: { kind: 'farm-select', farm: { farmType: 'plow' } },
+      })
+    }
   })
 })
 

@@ -54,7 +54,8 @@ export const isCurrentActionSecondPersonPlacement = (
   if (isInjectedAnytimeActionContext(actionContext)) return false
   const placements = getRoundPersonPlacementDetails(player)
   if (placements.length !== 2) return false
-  return readActionSnapshotExtraData<string>(player, 'placedWorkerId') === placements[1]!.workerId
+  const workerId = actionContext?.placedWorkerId ?? readActionSnapshotExtraData<string>(player, 'placedWorkerId')
+  return workerId === placements[1]!.workerId
 }
 
 export const recordRoundPlacement = (
