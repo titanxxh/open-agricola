@@ -78,6 +78,7 @@ describe('AiCardDesigner AI config header', () => {
     localStorage.clear()
     vi.restoreAllMocks()
     vi.unstubAllGlobals()
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: false }))
     apiFetchForExistingCard.mockClear()
     Element.prototype.scrollIntoView = vi.fn()
   })
@@ -118,8 +119,6 @@ describe('AiCardDesigner AI config header', () => {
   })
 
   it('loads the selected card into the editor when opened from detail', async () => {
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: false }))
-
     render(
       <LocaleProvider>
         <AiCardDesigner
@@ -137,7 +136,6 @@ describe('AiCardDesigner AI config header', () => {
   })
 
   it('copies the adopted source into a manually editable candidate', async () => {
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: false }))
     const apiFetch = vi.fn(async (path: string, init?: RequestInit) => {
       if (!init) return apiFetchForExistingCard(path)
       const body = JSON.parse(String(init.body)) as { draft: Record<string, unknown> }
@@ -169,8 +167,6 @@ describe('AiCardDesigner AI config header', () => {
   })
 
   it('uses the game card renderer for the live preview', async () => {
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: false }))
-
     const { container } = render(
       <LocaleProvider>
         <AiCardDesigner
@@ -197,7 +193,6 @@ describe('AiCardDesigner AI config header', () => {
   })
 
   it('shows and copies the card ID below the live preview', async () => {
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: false }))
     const user = userEvent.setup()
     const writeText = vi.spyOn(navigator.clipboard, 'writeText')
 
@@ -226,7 +221,6 @@ describe('AiCardDesigner AI config header', () => {
   })
 
   it('loads an author workspace directly from an editor card URL', async () => {
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: false }))
     const apiFetch = vi.fn(async (path: string) => {
       if (path.includes('scope=mine')) {
         return new Response(JSON.stringify({ ok: true, cards: [existingCard] }))
@@ -331,7 +325,6 @@ describe('AiCardDesigner AI config header', () => {
   })
 
   it.each(['new', 'existing'])('cancels pending save feedback when the %s draft editor closes', async kind => {
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: false }))
     const apiFetch = async (path: string, init?: RequestInit) => init?.method === 'POST'
       ? new Response(JSON.stringify({ ok: true, id: existingCard.id }))
       : apiFetchForExistingCard(path)
@@ -533,8 +526,6 @@ describe('AiCardDesigner AI config header', () => {
       'open-agricola-llm-config-art',
       JSON.stringify({ provider: 'gemini', apiKey: 'test', model: 'gemini-3.1-pro-preview' }),
     )
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: false }))
-
     render(
       <LocaleProvider>
         <AiCardDesigner
