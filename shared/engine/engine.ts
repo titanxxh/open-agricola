@@ -45,6 +45,7 @@ import { getCardEffect } from '../cards/card-effects'
 import { resolveChoiceSourceCard } from './nodes/interaction-helpers'
 import { isPendingChoiceValueAllowed, pendingEnvelopeChoices } from './pending-validation'
 import { isProtectedActionCancel } from './protected-action-cancel'
+import { isInjectedAnytimeActionContext, tagInjectedAnytimeFlow } from './action-context-flags'
 
 type EngineDeps = {
   registry: ActionRegistry
@@ -887,6 +888,8 @@ export class Engine {
     const pendingHost = this.peekPendingHost()
     const insertionTargetId = envelope?.ownerNodeId ?? this._pendingNodeIdRef.value
     if (!insertionTargetId) return
+    const snapshot = envelope?.contextSnapshot as { actionContext?: Record<string, unknown> } | undefined
+    if (isInjectedAnytimeActionContext(snapshot?.actionContext)) flow = tagInjectedAnytimeFlow(flow)
     const flowNode = ownerPlayerId
       ? buildOwnedFlowNode(this._internals(), flow, ownerPlayerId)
       : buildFlowNode(this._internals(), flow)

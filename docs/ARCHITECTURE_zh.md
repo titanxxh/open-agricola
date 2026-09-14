@@ -398,7 +398,7 @@ listener activation 是 internal action leaf：`ActionNode(actionId='activate-ca
 - `snapshot()` / `restore(snapshot)` —— 序列化与重建节点树（含 `nodeStates`、pending envelope、owner/optional/trigger metadata）。
 - `hasPendingChoiceCompositeAncestor()` —— 用于 anytime 判断是否处在分支祖先内。
 
-卡牌提供的 anytime 入口在共享列表构建处使用 `evaluateFlowDoable()`；命令校验及收获 / 计分前窗口读取同一列表。探测只忽略根节点的 optional 标记，使用新 flow 自己的来源、参数和行动上下文。准入仍只检查当前步骤，保留合法 before / replacement，以及先获得资源再支付后续费用的路径。带记账前缀的复合 flow 仍保留已有卡牌前置检查。不可用的直接调用在修改 history 或引擎前拒绝。从空闲状态发起或注入等待中引擎的已接受 anytime flow 及其必需后续节点都带 mandatory 义务；失败时保留被中断的宿主（如有），使用已有 blocked / 显式 undo 规则。内部 optional 选择仍可跳过。Listener activation event 除来源和行动上下文外也保留宿主行动参数，确保触发器预览和执行使用与准入一致的翻修目标。
+卡牌提供的 anytime 入口在共享列表构建处使用 `evaluateFlowDoable()`；命令校验及收获 / 计分前窗口读取同一列表。探测只忽略根节点的 optional 标记，使用新 flow 自己的来源、参数和行动上下文。准入仍只检查当前步骤，保留合法 before / replacement，以及先获得资源再支付后续费用的路径。带记账前缀的复合 flow 仍保留已有卡牌前置检查。不可用的直接调用在修改 history 或引擎前拒绝。从空闲状态发起或注入等待中引擎的已接受 anytime flow 及其必需后续节点都带 mandatory 义务；失败时保留被中断的宿主（如有），使用已有 blocked / 显式 undo 规则。内部 optional 选择仍可跳过。监听器、行动、替换及选择动态返回的 flow 和 follow-up action 会继承父上下文的 injected-anytime 来源标记，不继承 completion 标记或无关行动参数。Listener activation event 除来源和行动上下文外也保留宿主行动参数，确保触发器预览和执行使用与准入一致的翻修目标。
 
 如果接受某个 anytime 会消耗持有者当前工作阶段的回合，而不是插入另一个行动，该 listener 必须声明 `replacesTurn: true`。这种入口只在工作阶段的 idle 交互中提供；Session 在注入 flow 前建立普通 Turn Scope 与行动快照，结算完成后沿用人员行动相同的回合结束 hook 和玩家轮转。活动行动、阶段 flow 或嵌套 anytime 窗口内不得提供回合替代。E062 Sour Dough 是参考实现。
 
@@ -999,7 +999,7 @@ export const A123_FrameBuilder = defineOccupationCard({
 
 - `pay-gain-node.ts` —— "支付后得收益 / 支付后追加行动 / 返还到当前格再得"模板
 - `stage-effects.ts` —— 阶段型 card-effect 标记和每卡一次的可选收获兑换。作坊通过现有 exchange 执行器和交易事件提供使用／跳过流程，查询收获 hook 不会直接消耗材料。
-- `card-state.ts` / `round-placement.ts` —— 一次性卡牌 `flagged/extraData`、原始 Work Placement Chronology 与 Person Placement Order；“第 N 个人”排除同一工人搬迁，但包含正常放置的临时人员及召回后再次正常放置的人员
+- `card-state.ts` / `round-placement.ts` —— 一次性卡牌 `flagged/extraData`、原始 Work Placement Chronology 与 Person Placement Order；“第 N 个人”排除同一工人搬迁，但包含正常放置的临时人员及召回后再次正常放置的人员。限定第二人放置动作的效果使用 `isCurrentActionSecondPersonPlacement()`，优先对照当前行动上下文的 `placedWorkerId`，缺少该身份时才读取当前 action snapshot，并排除注入的 anytime 上下文。
 - `action-snapshot.ts` —— §6.5 定义的当前 Turn Scope 身份和起点快照；按行动计算的 delta 属于 action transaction，不读取这里
 - `card-held-workers.ts` —— 见 §8.3
 - `card-field.ts` —— "卡牌即田"声明式工厂，详见 §8.5

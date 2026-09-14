@@ -778,7 +778,7 @@ export function engineResolveChoice(
           ? applyDefaultSourceCardToFlow(entry.flow, entry.sourceCard)
           : null)
         .filter((flow) => flow)
-        .map((flow) => buildOwnedFlowNode(int, flow as ActionFlow, context.player.id))
+        .map((flow) => buildOwnedFlowNode(int, flow as ActionFlow, context.player.id, executionContext.actionContext))
       const followUps = allResults
         .flatMap((entry) =>
           (entry.followUpActions ?? []).map((followUp) =>
@@ -832,7 +832,7 @@ export function engineResolveChoice(
       // (resolveActionStep) for the same ordering rationale.
       const insertAnchor = node instanceof XorNode ? node.id : child.id
       const trailingHookNodes = [
-        ...buildFollowUpNodes(int, followUps, child.id, context.player, context.state),
+        ...buildFollowUpNodes(int, followUps, child.id, context.player, context.state, executionContext.actionContext),
         ...immediateActivateNodes,
         ...afterActivateNodes,
         ...afterHostNodes,
@@ -842,7 +842,7 @@ export function engineResolveChoice(
           stampContinuationParentHost(insertedNode, child.continuationParentHostNodeId!))
       }
       if (result.type === 'flow') {
-        const flowNode = buildOwnedFlowNode(int, result.flow, context.player.id)
+        const flowNode = buildOwnedFlowNode(int, result.flow, context.player.id, executionContext.actionContext)
         if (child.mandatory === true) {
           enforceCompositeContinuationMandatory(flowNode)
         }
@@ -1160,7 +1160,7 @@ export function engineResolveChoice(
       ? applyDefaultSourceCardToFlow(entry.flow, entry.sourceCard)
       : null)
     .filter((flow) => flow)
-    .map((flow) => buildOwnedFlowNode(int, flow as ActionFlow, context.player.id))
+    .map((flow) => buildOwnedFlowNode(int, flow as ActionFlow, context.player.id, executionContext.actionContext))
   const followUps = allResults
     .flatMap((entry) =>
       (entry.followUpActions ?? []).map((followUp) =>
@@ -1217,7 +1217,7 @@ export function engineResolveChoice(
   //   [..., insertionTarget, hookFlows..., flowNode, trailingHooks..., ...]
   if (insertionTargetId) {
     const trailingHookNodes = [
-      ...buildFollowUpNodes(int, followUps, insertionTargetId, context.player, context.state),
+      ...buildFollowUpNodes(int, followUps, insertionTargetId, context.player, context.state, executionContext.actionContext),
       ...immediateActivateNodes,
       ...afterActivateNodes,
       ...afterHostNodes,
@@ -1227,7 +1227,7 @@ export function engineResolveChoice(
         stampContinuationParentHost(insertedNode, pendingActionNode.continuationParentHostNodeId!))
     }
     if (result.type === 'flow') {
-      const flowNode = buildOwnedFlowNode(int, result.flow, context.player.id)
+      const flowNode = buildOwnedFlowNode(int, result.flow, context.player.id, executionContext.actionContext)
       if (pendingActionNode?.mandatory === true) {
         enforceCompositeContinuationMandatory(flowNode)
       }

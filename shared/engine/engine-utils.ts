@@ -41,7 +41,12 @@ import {
 import { applyComputeCostResults } from './compute-cost-results'
 import { pendingEnvelopeChoices } from './pending-validation'
 import { findPlayerById, findPlayerIndexById } from '../domain/player'
-import { suppressBeforeListeners } from './action-context-flags'
+import {
+  INJECTED_ANYTIME_ACTION_CONTEXT_KEY,
+  isInjectedAnytimeActionContext,
+  suppressBeforeListeners,
+  tagInjectedAnytimeFlow,
+} from './action-context-flags'
 
 /**
  * S4c PR5 — module-private utilities extracted from `Engine`. Each function
@@ -93,6 +98,7 @@ export function buildFollowUpNodes(
   baseId: string,
   player: PlayerState,
   state?: GameState,
+  actionContext?: Record<string, unknown>,
 ): EngineNode[] {
   return followUps
     .filter((followUp) => followUp)
@@ -112,6 +118,9 @@ export function buildFollowUpNodes(
         frame.complete(state)
       }
       const node = new ActionNode(`chain-${baseId}-${index}`, actionId, sourceCard)
+      if (isInjectedAnytimeActionContext(actionContext)) {
+        node.actionContext = { [INJECTED_ANYTIME_ACTION_CONTEXT_KEY]: true }
+      }
       node.ownerPlayerId = player.id
       return node
     })
@@ -816,7 +825,9 @@ export function buildOwnedFlowNode(
   int: EngineInternals,
   flow: ActionFlow,
   ownerPlayerId: string,
+  actionContext?: Record<string, unknown>,
 ): EngineNode {
+  if (isInjectedAnytimeActionContext(actionContext)) flow = tagInjectedAnytimeFlow(flow)
   return stampOwner(buildFlowNode(int, flow, ownerPlayerId), ownerPlayerId)
 }
 
@@ -836,7 +847,7 @@ export function buildReplacementChoiceNode(
     })),
     replacement.actionId,
   )
-  const node = buildOwnedFlowNode(int, flow, context.player.id) as XorNode
+  const node = buildOwnedFlowNode(int, flow, context.player.id, context.actionContext) as XorNode
   node.replacementSourceCards = Object.fromEntries(node.children.slice(0, -1).map((child, index) => [
     child.id, replacement.alternatives[index]!.sourceCard,
   ]))
