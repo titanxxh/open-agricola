@@ -2,7 +2,7 @@ import { defineOccupationCard } from '../card-source'
 import type { CardListenerRegistration, CardListenerContext } from '../card-listeners'
 import type { ActionHookPhase, ActionHookResult } from '../../actions/hooks'
 import { isCardFlagged } from '../helpers/card-state'
-import { getRoundPersonPlacementDetails } from '../helpers/round-placement'
+import { getRoundPersonPlacementDetails, isCurrentActionSecondPersonPlacement } from '../helpers/round-placement'
 import type { CardImpl } from '../registry'
 
 const CARD_ID = 'D150_GodlySpouse'
@@ -15,8 +15,8 @@ const afterWishChildrenListener: CardListenerRegistration = {
   actions: ['family-growth'],
   handler: (context: CardListenerContext): ActionHookResult | void => {
     if (isCardFlagged(context.player, CARD_ID)) return
+    if (!isCurrentActionSecondPersonPlacement(context.player, context.actionContext)) return
     const placements = getRoundPersonPlacementDetails(context.player)
-    if (placements.length !== 2) return
 
     // Rule: "unless the first is on Meeting Place" — drop the workerId in that
     // case so the recall is a no-op while flag/log decorations still fire.
@@ -35,7 +35,6 @@ const afterWishChildrenListener: CardListenerRegistration = {
           flagSourceCard: true,
           logCardTrigger: true,
         },
-        optional: true,
         promptKey: 'ui.interactionGodlySpouse',
         choiceLabelKey: 'ui.interactionGodlySpouseUse',
       },

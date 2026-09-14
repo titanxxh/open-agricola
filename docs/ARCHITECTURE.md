@@ -1020,7 +1020,7 @@ Production paths access cards only through `catalog.generated.ts` and `CardRegis
 
 - `pay-gain-node.ts`: templates for gain after payment, an appended action after payment, or returning resources to the current space before gaining.
 - `stage-effects.ts`: stage card-effect flags and optional once-per-card Harvest exchanges. Craft buildings expose a skip-or-convert flow through the existing exchange executor and trade events; querying the harvest hook does not consume materials.
-- `card-state.ts` and `round-placement.ts`: one-time `flagged` or `extraData` state, raw Work Placement Chronology, and Person Placement Order. Ordinal person effects exclude same-worker relocations but include normal temporary placements and a recalled worker's later normal placement.
+- `card-state.ts` and `round-placement.ts`: one-time `flagged` or `extraData` state, raw Work Placement Chronology, and Person Placement Order. Ordinal person effects exclude same-worker relocations but include normal temporary placements and a recalled worker's later normal placement. Effects scoped to the second person's placement use `isCurrentActionSecondPersonPlacement()`, which matches the second normal placement's worker against the active action snapshot's `placedWorkerId` and rejects injected anytime contexts.
 - `action-snapshot.ts`: the active Turn Scope identity and start snapshot described in section 6.5. Per-action deltas belong to action transactions, not this snapshot.
 - `card-held-workers.ts`: worker holding described in section 8.3.
 - `card-field.ts`: declarative card-as-field factory described below.

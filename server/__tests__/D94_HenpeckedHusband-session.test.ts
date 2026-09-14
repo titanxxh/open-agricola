@@ -8,6 +8,7 @@ import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
 
 import '../../shared/cards/D/D094_HenpeckedHusband'
 import '../../shared/cards/D/D127_HardworkingMan'
+import '../../shared/cards/E/E014_WoodSaw'
 
 const CARD_ID = 'D094_HenpeckedHusband'
 const HARDWORKING_MAN = 'D127_HardworkingMan'
@@ -239,5 +240,33 @@ describe('D094 Henpecked Husband parity', () => {
     expect(workerOn(response, HARDWORKING_MAN, firstId)).toBe(true)
     expect(getRoundPersonPlacementDetails(response.state.players[0]!)).toHaveLength(3)
     expect(triggerCount(response)).toBe(1)
+  })
+
+  it('D094 S8: a Wood Saw room build after the second placement does not recall the first person', () => {
+    const session = setup({ firstSpace: 'forest' })
+    const state = session.getState().state
+    const player = state.players[0]!
+    const firstId = getRoundPersonPlacementDetails(player)[0]!.workerId
+    player.minorPlayed.push('E014_WoodSaw')
+    setActiveWorkerCount(state.players[1]!, 3)
+    session.loadState(state)
+
+    let response = session.takeAction(0, 'farmland')
+    expect(response.interaction.anytimeActions).toContainEqual(
+      expect.objectContaining({ id: 'E14-wood-saw-anytime' }),
+    )
+    response = session.takeAnytimeAction(0, 'E14-wood-saw-anytime')
+    if (response.interaction.stateId === 'wait'
+      && response.interaction.request.kind === 'choice') {
+      const accept = options(response).find((option) => option.value !== '__skip__')
+      expect(accept).toBeDefined()
+      response = session.resolveChoice(response.interaction.playerIndex, accept!.value)
+    }
+    response = commitFarmSelection(session, response)
+
+    expect(response.ok, response.error).toBe(true)
+    expect(response.state.players[0]!.rooms).toBe(3)
+    expect(workerOn(response, 'forest', firstId)).toBe(true)
+    expect(triggerCount(response)).toBe(0)
   })
 })
