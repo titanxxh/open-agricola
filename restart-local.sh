@@ -602,6 +602,7 @@ else
   start_and_wait "frontend" "$FRONTEND_PORT" "$FRONTEND_LOG" env \
     NODE_ENV=development \
     BACKEND_HOST="$BIND_IP" \
+    VITE_WS_BASE="ws://$BIND_IP:$BACKEND_PORT/ws" \
     VITE_ENABLE_DEV_AUTH_SHORTCUTS=1 \
     "$FRONTEND_BIN" --host "$BIND_IP" --port "$FRONTEND_PORT" --strictPort
 fi

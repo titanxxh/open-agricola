@@ -391,6 +391,20 @@ describe('Interaction Presentation', () => {
         ],
       },
     })
+
+    expect(buildInteractionSubmitCommand(waitFarm({
+      farmType: 'sow',
+      selectableFields: [{ tile: { row: 0, col: 0 }, allowedCrops: ['grain'] }],
+      minSelections: 0,
+      maxSelections: 1,
+    }), {
+      value: 'confirm',
+      sowSelections: {},
+    })).toEqual({
+      kind: 'commitSelection',
+      playerIndex: 0,
+      payload: { crops: [] },
+    })
   })
 
   it('returns local farm errors instead of submitting incomplete farm drafts', () => {

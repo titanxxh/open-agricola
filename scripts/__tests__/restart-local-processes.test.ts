@@ -269,6 +269,8 @@ describe.skipIf(process.platform !== 'linux')('restart-local process cleanup', (
   it('leaves no detached process groups when frontend startup fails', async () => {
     const root = mkdtempSync(join(tmpdir(), 'oa-restart-processes-'))
     tempDirs.push(root)
+    const backendPort = await reservePort()
+    const frontendPort = await reservePort()
     const bin = join(root, 'bin')
     const nodeBin = join(root, 'node_modules/.bin')
     mkdirSync(bin, { recursive: true })
@@ -281,6 +283,7 @@ describe.skipIf(process.platform !== 'linux')('restart-local process cleanup', (
     const listenerPidFile = join(root, 'backend-listener.pid')
     const oldGroupFile = join(root, 'old-group.pid')
     const newGroupFile = join(root, 'new-group.pid')
+    const viteWsBaseFile = join(root, 'vite-ws-base')
     const server = join(root, 'server.cjs')
 
     writeFileSync(server, `
@@ -307,12 +310,15 @@ echo "$$" > "$TEST_NEW_GROUP_FILE"
 node "$TEST_SERVER" &
 wait
 `)
-    writeExecutable(join(nodeBin, 'vite'), '#!/bin/bash\nexit 1\n')
+    writeExecutable(join(nodeBin, 'vite'), `#!/bin/bash
+echo "$VITE_WS_BASE" > "$TEST_VITE_WS_BASE_FILE"
+exit 1
+`)
     writeExecutable(join(bin, 'pnpm'), '#!/bin/bash\nexit 0\n')
     writeExecutable(join(bin, 'ip'), '#!/bin/bash\necho "    inet 127.0.0.1/8 scope global eth0"\n')
     writeExecutable(join(bin, 'lsof'), `#!/bin/bash
 case "$*" in
-  *TCP:5175*)
+  *TCP:$TEST_BACKEND_PORT*)
     if [ -f "$TEST_LISTENER_MARKER" ]; then cat "$TEST_LISTENER_PID_FILE"; fi
     ;;
 esac
@@ -322,12 +328,16 @@ esac
       ...process.env,
       PATH: `${bin}:${process.env.PATH}`,
       PNPM_BIN: join(bin, 'pnpm'),
+      BACKEND_PORT: String(backendPort),
+      FRONTEND_PORT: String(frontendPort),
       REPLAY_VIEWER_BUILD_ID: 'test-viewer',
       GAME_BUILD_ID: 'test-game',
       TEST_LISTENER_MARKER: marker,
       TEST_LISTENER_PID_FILE: listenerPidFile,
       TEST_OLD_GROUP_FILE: oldGroupFile,
       TEST_NEW_GROUP_FILE: newGroupFile,
+      TEST_BACKEND_PORT: String(backendPort),
+      TEST_VITE_WS_BASE_FILE: viteWsBaseFile,
       TEST_SERVER: server,
     }
     spawn('setsid', [oldServer], {
@@ -355,6 +365,7 @@ esac
 
     expect(status).not.toBe(0)
     expect(existsSync(newGroupFile), `${stdout}\n${stderr}`).toBe(true)
+    expect(readFileSync(viteWsBaseFile, 'utf8').trim()).toBe(`ws://127.0.0.1:${backendPort}/ws`)
     const newGroup = Number(readFileSync(newGroupFile, 'utf8'))
     processGroups.push(newGroup)
     expect(processGroupExists(oldGroup)).toBe(false)
