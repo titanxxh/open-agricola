@@ -1,5 +1,6 @@
 import type {
   ActionDefinition,
+  ActionExecutionContext,
   ActionMutationContext,
   ActionExecutionResult,
   PlayerState,
@@ -50,10 +51,10 @@ const applyPlayerMutation = (target: PlayerState, source: PlayerState) => {
   Object.assign(target, source)
 }
 
-const finalizeSow = (
-  ctx: ActionMutationContext,
+export const validateSow = (
+  ctx: ActionExecutionContext,
   crops: SowSelection[],
-): ActionExecutionResult => {
+) => {
   const player = ctx.player
   const maxSelections = typeof ctx.actionContext?.maxSelections === 'number'
     ? Math.max(0, Math.floor(ctx.actionContext.maxSelections as number))
@@ -106,9 +107,18 @@ const finalizeSow = (
       normalFieldAllowedCrops,
     },
   )
+  return { validated, extraAllowedCrops }
+}
+
+const finalizeSow = (
+  ctx: ActionMutationContext,
+  crops: SowSelection[],
+): ActionExecutionResult => {
+  const { validated, extraAllowedCrops } = validateSow(ctx, crops)
   if (!validated.ok) {
     return { type: 'fail', errorKey: validated.error?.code ?? 'log.action', recoverable: true }
   }
+  const player = ctx.player
   const nextPlayer = JSON.parse(JSON.stringify(validated.player)) as PlayerState
   const logicalTargets = new Map(
     getLogicalFields(nextPlayer).flatMap((field) => field.kind === 'card'
@@ -157,6 +167,9 @@ export const sowAction: ActionDefinition = {
     return farm.farmType === 'sow' && farm.selectableFields.length > 0
   },
   execute: (ctx): ActionExecutionResult => {
+    if (Array.isArray(ctx.params?.crops)) {
+      return finalizeSow(ctx, ctx.params.crops as SowSelection[])
+    }
     const idx = ctx.state.players.indexOf(ctx.player)
     const farm = playerBoard(ctx.state, idx).farmInteraction.selectableTiles('sow', {
       actionContext: ctx.actionContext,

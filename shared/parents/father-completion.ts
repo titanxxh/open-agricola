@@ -3,6 +3,8 @@ import { animalKeysForState, type AnimalKey } from '../contract/animals'
 import { countUnusedFarmyardSpaces } from '../domain/farm'
 import { computeAnimalZones } from '../domain/animal-zones'
 import { buildSowFarmInteraction } from '../domain/farmyard-interaction'
+import { validateSow } from '../actions/effects/sow'
+import type { SowSelection } from '../domain'
 import { startOrdinaryCardDrawChoice } from '../session/ordinary-card-draw'
 import { getParentCardDefinition } from './cards'
 import { countOccupations } from '../cards/helpers/prerequisites'
@@ -164,18 +166,6 @@ const sowFieldLimit = (reward: FatherReward): number | null => {
   return match ? Number(match[1]) : null
 }
 
-const drawDecksAvailable = (state: GameState, reward: FatherReward): boolean => {
-  const drawTypes = drawTypesForReward(reward)
-  return drawTypes !== null && drawTypes.every((cardType) => state.ordinaryCardDecks[cardType].length >= 3)
-}
-
-const canResolveSowReward = (player: PlayerState, reward: FatherReward): boolean => {
-  const maxSelections = sowFieldLimit(reward)
-  if (maxSelections === null) return false
-  const farm = buildSowFarmInteraction(player, { maxSelections, minSelections: 1 })
-  return farm.farmType === 'sow' && farm.selectableFields.length > 0
-}
-
 const resourceCombinations = (count: number): BuildingResource[][] => {
   if (!Number.isInteger(count) || count <= 0 || count > BUILDING_RESOURCES.length) return []
   const out: BuildingResource[][] = []
@@ -194,12 +184,12 @@ const resourceCombinations = (count: number): BuildingResource[][] => {
   return out
 }
 
-const isSupportedFatherReward = (state: GameState, player: PlayerState, reward: FatherReward): boolean => {
+const isSupportedFatherReward = (reward: FatherReward): boolean => {
   if (isSimpleFatherReward(reward)) return true
   if (houseMaterialReward(reward) !== null) return true
-  if (drawTypesForReward(reward) !== null) return drawDecksAvailable(state, reward)
+  if (drawTypesForReward(reward) !== null) return true
   if (chooseBuildingResourceCount(reward) !== null) return true
-  if (sowFieldLimit(reward) !== null) return canResolveSowReward(player, reward)
+  if (sowFieldLimit(reward) !== null) return true
   return false
 }
 
@@ -311,7 +301,7 @@ export const satisfiedFatherCompletionOptions = (
   if (!definition || definition.kind !== 'father') return []
   return definition.rewards
     .filter((reward) =>
-      isSupportedFatherReward(state, player, reward) &&
+      isSupportedFatherReward(reward) &&
       isFatherRequirementSatisfied(state, player, reward.requirement),
     )
     .flatMap((reward) => optionsForReward(player, fatherId, reward))
@@ -420,14 +410,13 @@ const applyComplexFatherReward = (
 
   const drawTypes = drawTypesForReward(reward)
   if (drawTypes !== null) {
-    if (!drawTypes.every((cardType) => state.ordinaryCardDecks[cardType].length >= 3)) {
-      return { type: 'fail', errorKey: 'log.actionUnavailable' }
-    }
     for (const cardType of drawTypes) {
+      const count = Math.min(3, state.ordinaryCardDecks[cardType].length)
+      if (count === 0) continue
       const started = startOrdinaryCardDrawChoice(state, {
         playerId: player.id,
         cardType,
-        count: 3,
+        count,
         sourceCard: fatherId,
         sourceActionId: COMPLETE_PARENT_FATHER_ACTION_ID,
         reportProtectedObservation,
@@ -457,20 +446,17 @@ const applyComplexFatherReward = (
 
   const maxSelections = sowFieldLimit(reward)
   if (maxSelections !== null) {
-    if (!canResolveSowReward(player, reward)) return { type: 'fail', errorKey: 'log.actionUnavailable' }
+    const farm = buildSowFarmInteraction(player, { maxSelections, minSelections: 0 })
+    if (farm.farmType !== 'sow' || farm.selectableFields.length === 0) {
+      return { type: 'flow', flow: completedRewardFlow(fatherId, reward, []) }
+    }
     return {
       type: 'flow',
       flow: {
-        type: 'seq',
-        children: [
-          {
-            type: 'leaf',
-            actionId: 'sow',
-            sourceCard: fatherId,
-            actionContext: { maxSelections, minSelections: 1, trueAction: false },
-          },
-          ...completionMarkerSteps(fatherId, reward.tier),
-        ],
+        type: 'leaf',
+        actionId: COMPLETE_PARENT_FATHER_ACTION_ID,
+        sourceCard: fatherId,
+        actionContext: { fatherRewardChoice: choice },
       },
     }
   }
@@ -489,10 +475,26 @@ export const completeParentFatherAction: ActionDefinition = {
   canBeExecutedByPlayer: (state, player) =>
     state.currentPlayerIndex === state.players.indexOf(player) &&
     satisfiedFatherCompletionOptions(state, player).length > 0,
-  execute: ({ state, player }) => {
+  execute: ({ state, player, actionContext }) => {
     const fatherId = player.parentCards.father
     if (!fatherId) return { type: 'fail', errorKey: 'log.actionUnavailable' }
-    const options = satisfiedFatherCompletionOptions(state, player).map((entry) => entry.option)
+    const offered = satisfiedFatherCompletionOptions(state, player)
+    if (typeof actionContext?.fatherRewardChoice === 'string') {
+      const selected = offered.find((entry) => entry.option.value === actionContext.fatherRewardChoice)
+      const maxSelections = selected ? sowFieldLimit(selected.reward) : null
+      if (!selected || maxSelections === null) return { type: 'fail', errorKey: 'log.actionUnavailable' }
+      return {
+        type: 'request',
+        request: {
+          kind: 'farm-select',
+          farm: buildSowFarmInteraction(player, { maxSelections, minSelections: 0 }),
+          options: [{ value: 'confirm', labelKey: 'ui.interactionSowConfirm' }],
+        },
+        promptKey: 'ui.interactionSowSelect',
+        sourceCard: fatherId,
+      }
+    }
+    const options = offered.map((entry) => entry.option)
     if (options.length === 0) return { type: 'fail', errorKey: 'log.actionUnavailable' }
     return {
       type: 'request',
@@ -501,9 +503,33 @@ export const completeParentFatherAction: ActionDefinition = {
       sourceCard: fatherId,
     }
   },
-  resolveChoice: ({ state, player, reportProtectedObservation }, choice) => {
+  resolveChoice: (context, choice, payload) => {
+    const { state, player, actionContext, reportProtectedObservation } = context
     const fatherId = player.parentCards.father
     if (!fatherId) return { type: 'fail', errorKey: 'log.actionUnavailable' }
+    if (typeof actionContext?.fatherRewardChoice === 'string') {
+      const selected = satisfiedFatherCompletionOptions(state, player)
+        .find((entry) => entry.option.value === actionContext.fatherRewardChoice)
+      const maxSelections = selected ? sowFieldLimit(selected.reward) : null
+      if (!selected || maxSelections === null || choice !== 'confirm' || !Array.isArray(payload?.crops)) {
+        return { type: 'fail', errorKey: 'log.actionUnavailable', recoverable: true }
+      }
+      if (payload.crops.length > 0) {
+        const { validated } = validateSow({
+          ...context,
+          actionContext: { ...actionContext, maxSelections, trueAction: false },
+        }, payload.crops as SowSelection[])
+        if (!validated.ok) return { type: 'fail', errorKey: validated.error?.code ?? 'log.action', recoverable: true }
+      }
+      const steps: ActionFlow[] = payload.crops.length === 0 ? [] : [{
+        type: 'leaf',
+        actionId: 'sow',
+        sourceCard: fatherId,
+        params: { crops: payload.crops },
+        actionContext: { maxSelections, trueAction: false },
+      }]
+      return { type: 'flow', flow: completedRewardFlow(fatherId, selected.reward, steps) }
+    }
     const [choiceFatherId, tierText] = choice.split(':')
     const tier = Number(tierText)
     if (choiceFatherId !== fatherId || (tier !== 1 && tier !== 2 && tier !== 3)) {

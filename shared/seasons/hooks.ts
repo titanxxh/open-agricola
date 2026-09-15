@@ -1,5 +1,4 @@
 import { registerActionHook } from '../actions/hooks'
-import { canStartFencing } from '../actions/effects/fencing'
 import { gainResources } from '../actions/effects/gain'
 import { stablesAction } from '../actions/effects/stables'
 import { PaymentSolver } from '../actions/payment'
@@ -42,20 +41,6 @@ export const registerThroughTheSeasonsHooks = (): void => {
       if (!isThroughTheSeasonsSeason(context.state, 'winter')) return
       if (PaymentSolver.canAffordTypedFlatCost(context.player, { food: 1 }, 'plow', context.state)) return
       return { doable: false }
-    },
-  })
-
-  registerActionHook({
-    id: 'through-the-seasons:spring-fence-preview',
-    actions: ['fence', 'fencing'],
-    phases: ['isDoable'],
-    handler: (context) => {
-      if (!isThroughTheSeasonsSeason(context.state, 'spring')) return
-      if (context.doable) return
-      if (!PaymentSolver.canAffordTypedFlatCost(context.player, { wood: 1 }, 'fencing', context.state)) return
-      if (canStartFencing(context.state, context.player, { wood: -2 }, context.actionContext)) {
-        return { doable: true }
-      }
     },
   })
 
