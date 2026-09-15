@@ -564,7 +564,9 @@ const buildInteractionSubmitCommandUnchecked = (
     }
     if (farm.farmType === 'sow') {
       const crops = cropsFromSowSelections(draft.sowSelections)
-      if (crops.length === 0) return { kind: 'localFarmError', farmType: 'sow', error: 'NO_SELECTION' }
+      if (crops.length === 0 && (farm.minSelections ?? 1) > 0) {
+        return { kind: 'localFarmError', farmType: 'sow', error: 'NO_SELECTION' }
+      }
       return {
         kind: 'commitSelection',
         playerIndex: interaction.playerIndex,

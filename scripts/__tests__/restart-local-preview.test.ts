@@ -13,7 +13,7 @@ describe('restart-local preview mode', () => {
 
   it('builds the frontend and serves dist through vite preview', () => {
     expect(script).toContain('VITE_API_BASE="http://$BIND_IP:$BACKEND_PORT"')
-    expect(script).toContain('VITE_WS_BASE="ws://$BIND_IP:$BACKEND_PORT/ws"')
+    expect(script.match(/VITE_WS_BASE="ws:\/\/\$BIND_IP:\$BACKEND_PORT\/ws"/g)).toHaveLength(3)
     expect(script).toMatch(/VITE_ENABLE_DEV_AUTH_SHORTCUTS=1[\s\\]+"?\$PNPM_BIN"? run build/)
     expect(script).toContain('"$PNPM_BIN" run build')
     expect(script).toContain('"$FRONTEND_BIN" preview')
