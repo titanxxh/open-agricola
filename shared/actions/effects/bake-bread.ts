@@ -173,7 +173,7 @@ export const bakeBreadAction: ActionDefinition = {
   roundAvailable: 1,
   gainPerRound: {},
   canBeExecutedByPlayer: (_state, player) => canBakeBreadDirectly(player),
-  execute: ({ player }) => {
+  execute: ({ player, actionContext }) => {
     const options = buildBakeBreadOptions(player)
     if (options.length === 0) return { type: 'ok' }
     return {
@@ -182,6 +182,7 @@ export const bakeBreadAction: ActionDefinition = {
         kind: 'choice',
         options,
         structuredChoicePrefixes: ['bulk:'],
+        ...(actionContext?.requiresExplicitChoice === true ? { requiresExplicitChoice: true } : {}),
       },
       promptKey: 'ui.interactionBakeBreadChoice',
     }

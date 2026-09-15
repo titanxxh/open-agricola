@@ -1,6 +1,219 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { serializeStateForPlayer } from '../../shared/session/serialization'
+import { emptyResources } from '../../shared/session/state-bootstrap'
+import { markAllWorkersUsed } from '../../shared/domain/player'
+
+const auditSetup = (options: { draftParents?: boolean; draftMode?: 'simultaneous'; enableParentCards?: boolean; playerCount?: number } = {}) => {
+  const session = new GameSession(56124, undefined, {
+    playerCount: 2, parentSelectionSeed: 1, enableParentCards: true, draftPoolSize: 7, ...options,
+  })
+  for (const player of session.state.players) {
+    player.minorHand = ['__test_placeholder__']
+    player.occupationHand = ['__test_placeholder__']
+    player.resources.food = 50
+  }
+  expect(session.loadState(session.state).ok).toBe(true)
+  return session
+}
+
+const auditSnapshot = (session: GameSession) => JSON.parse(JSON.stringify(session.buildSyncPayload(session.getState(), null, 'debug')))
+
+const auditPrivacy = (session: GameSession) => {
+  const response = session.getState()
+  for (const viewer of ['p1', 'p2', null]) {
+    const payload = session.buildSyncPayload(response, viewer)
+    for (const player of response.state.players) {
+      const candidates = response.state.parentSelection?.candidates[player.id]
+      if (!candidates) continue
+      if (viewer === player.id) {
+        expect(payload.state.parentSelection!.candidates[player.id]).toEqual(candidates)
+      } else {
+        for (const id of [...candidates.mother, ...candidates.father]) expect(JSON.stringify(payload)).not.toContain(id)
+      }
+    }
+  }
+}
+
+const fixedDraft = (session: GameSession) => {
+  const pools = [
+    {
+      occ: ['A100_Curator', 'A101_CookeryOutfitter', 'A102_Grocer', 'A103_Portmonger', 'A104_WoodHarvester', 'A105_BarrowPusher', 'A106_SlurrySpreader'],
+      minor: ['A001_Shelter', 'A002_ShiftingCultivation', 'A003_PaperKnife', 'A004_Baseboards', 'A005_ClayEmbankment', 'A006_StorageBarn', 'A007_GardenersKnife'],
+    },
+    {
+      occ: ['A107_Catcher', 'A108_MushroomCollector', 'A109_SmallTrader', 'A110_Roughcaster', 'A111_WallBuilder', 'A112_ScytheWorker', 'A113_HeresyTeacher'],
+      minor: ['A008_FoodBasket', 'A009_YoungAnimalMarket', 'A010_WoodenShed', 'A011_MudPatch', 'A012_DrinkingTrough', 'A013_RenovationCompany', 'A014_CarpentersHammer'],
+    },
+  ]
+  session.state.draft!.pools = { p1: structuredClone(pools[0]!), p2: structuredClone(pools[1]!) }
+  expect(session.loadState(session.state).ok).toBe(true)
+  for (let round = 0; round < 6; round++) {
+    for (const player of session.state.players) {
+      expect(session.state.phase).toBe('draft')
+      expect(session.state.players[0]!.resources.wood).toBe(0)
+      expect(session.takeAction(0, 'forest').ok).toBe(false)
+      const pool = session.state.draft!.pools[player.id]!
+      const response = session.submitDraftPick(player.id, { occCardId: pool.occ[0]!, minorCardId: pool.minor[0]! })
+      expect(response.ok, response.error).toBe(true)
+    }
+  }
+  for (const [index, player] of session.state.players.entries()) {
+    expect(player.occupationHand).toEqual(Array.from({ length: 7 }, (_, round) => pools[(index + round) % 2]!.occ[round]))
+    expect(player.minorHand).toEqual(Array.from({ length: 7 }, (_, round) => pools[(index + round) % 2]!.minor[round]))
+  }
+}
+
+describe('Parents batch 1 setup audit', () => {
+  it.each([[0, 1], [1, 0]])('selection order %i then %i keeps candidates private and resolves rewards once', (first, second) => {
+    const session = auditSetup()
+    const candidates = structuredClone(session.state.parentSelection!.candidates)
+    for (const candidate of Object.values(candidates)) {
+      expect(candidate.mother).toHaveLength(2)
+      expect(candidate.father).toHaveLength(2)
+    }
+    expect(session.state.players[0]!.resources.wood).toBe(0)
+    auditPrivacy(session)
+    const selections = session.state.players.map((player) => ({ mother: candidates[player.id]!.mother[0]!, father: candidates[player.id]!.father[0]! }))
+    expect(selections[0]!.mother).toBe('PR10')
+    const submitted = session.submitParentSelection(first, selections[first]!)
+    expect(submitted.ok, submitted.error).toBe(true)
+    expect(submitted.state.phase).toBe('parent-selection')
+    expect(submitted.interaction.allowedCommands).toEqual([])
+    expect(submitted.state.players.map((player) => player.parentCards)).toEqual([{ mother: null, father: null }, { mother: null, father: null }])
+    expect(submitted.state.futureMeeples).toEqual([])
+    expect(submitted.state.events.filter((event) => event.type === 'parent.motherScheduled')).toEqual([])
+    auditPrivacy(session)
+    const completed = session.submitParentSelection(second, selections[second]!)
+    expect(completed.ok, completed.error).toBe(true)
+    expect(completed.state.phase).toBe('playing')
+    expect(completed.state.parentSelection).toBeNull()
+    expect(completed.interaction.stateId).toBe('idle')
+    expect(completed.state.players[0]!.resources.wood).toBe(1)
+    expect(completed.state.players.map((player) => player.parentCards)).toEqual(selections)
+    for (const viewer of ['p1', 'p2', null]) {
+      const payload = session.buildSyncPayload(completed, viewer)
+      expect(payload.state.players.map((player) => player.parentCards)).toEqual(selections)
+      for (const candidate of Object.values(candidates)) {
+        expect(JSON.stringify(payload)).not.toContain(candidate.mother[1])
+        expect(JSON.stringify(payload)).not.toContain(candidate.father[1])
+      }
+    }
+    expect(completed.state.log.filter((entry) => entry.key === 'log.parentMotherScheduled')).toHaveLength(2)
+    expect(session.takeAction(0, 'day-laborer').ok).toBe(true)
+    expect(session.state.players[0]!.resources.wood).toBe(1)
+    expect(session.state.futureMeeples.some((entry) => entry.cardId === 'PR10')).toBe(false)
+  })
+
+  it('invalid foreign and wrong-kind submissions preserve state and allow legal retries', () => {
+    const session = auditSetup()
+    const p1 = session.state.parentSelection!.candidates.p1!
+    const p2 = session.state.parentSelection!.candidates.p2!
+    for (const selection of [
+      { mother: p2.mother[0], father: p1.father[0] },
+      { mother: p1.mother[0], father: p2.father[0] },
+      { mother: p1.father[0], father: p1.mother[0] },
+    ]) {
+      const before = auditSnapshot(session)
+      const response = session.submitParentSelection(0, selection as Parameters<GameSession['submitParentSelection']>[1])
+      expect(response.ok).toBe(false)
+      expect(auditSnapshot(session)).toEqual(before)
+      auditPrivacy(session)
+    }
+    expect(session.submitParentSelection(0, { mother: p1.mother[0], father: p1.father[0] }).ok).toBe(true)
+    const before = auditSnapshot(session)
+    expect(session.submitParentSelection(0, { mother: p1.mother[1], father: p1.father[1] }).ok).toBe(false)
+    expect(auditSnapshot(session)).toEqual(before)
+    expect(session.submitParentSelection(1, { mother: p2.mother[0], father: p2.father[0] }).ok).toBe(true)
+    expect(session.state.phase).toBe('playing')
+    expect(session.state.players[0]!.resources.wood).toBe(1)
+  })
+
+  it.each([true, false])('fixed ordinary draft precedes parent resolution (draftParents=%s)', (draftParents) => {
+    const session = auditSetup({ draftMode: 'simultaneous', draftParents })
+    expect(session.state.phase).toBe('draft')
+    expect(session.state.players[0]!.resources.wood).toBe(0)
+    expect(session.takeAction(0, 'forest').ok).toBe(false)
+    expect(session.submitParentSelection(0, { mother: 'PR10', father: 'PS01' }).ok).toBe(false)
+    fixedDraft(session)
+    expect(session.state.phase).toBe(draftParents ? 'parent-selection' : 'playing')
+    expect(session.state.players[0]!.resources.wood).toBe(draftParents ? 0 : 1)
+    if (draftParents) {
+      auditPrivacy(session)
+      for (const [index, player] of session.state.players.entries()) {
+        const candidates = session.state.parentSelection!.candidates[player.id]!
+        expect(session.submitParentSelection(index, { mother: candidates.mother[0], father: candidates.father[0] }).ok).toBe(true)
+      }
+    }
+    expect(session.state.phase).toBe('playing')
+    expect(session.state.parentSelection).toBeNull()
+    expect(session.state.players[0]!.resources.wood).toBe(1)
+    expect(session.state.log.filter((entry) => entry.key === 'log.parentMotherScheduled')).toHaveLength(2)
+    expect(session.getState().state.players[0]!.resources.wood).toBe(1)
+  })
+
+  it('direct deal skips selection and awards PR10 only once before work', () => {
+    const session = auditSetup({ draftParents: false })
+    expect(session.state.phase).toBe('playing')
+    expect(session.state.parentSelection).toBeNull()
+    for (const kind of ['mother', 'father'] as const) {
+      expect(new Set(session.state.players.map((player) => player.parentCards[kind])).size).toBe(2)
+      expect(session.state.players.every((player) => player.parentCards[kind] !== null)).toBe(true)
+    }
+    expect(session.state.players[0]!.parentCards.mother).toBe('PR10')
+    expect(session.state.players[0]!.resources.wood).toBe(1)
+    expect(session.takeAction(0, 'day-laborer').ok).toBe(true)
+    expect(session.state.players[0]!.resources.wood).toBe(1)
+    expect(session.state.log.filter((entry) => entry.key === 'log.parentMotherScheduled')).toHaveLength(2)
+  })
+
+  it('disabled Parents rejects selection and has no rewards or fractional end score', () => {
+    const session = auditSetup({ enableParentCards: false })
+    const before = auditSnapshot(session)
+    expect(session.submitParentSelection(0, { mother: 'PR10', father: 'PS01' }).ok).toBe(false)
+    expect(auditSnapshot(session)).toEqual(before)
+    expect(session.state.parentSelection).toBeNull()
+    expect(session.state.futureMeeples).toEqual([])
+    for (const player of session.state.players) {
+      expect(player.parentCards).toEqual({ mother: null, father: null })
+      expect(player.resources).toEqual({ ...emptyResources, food: 50 })
+      markAllWorkersUsed(session.state, player)
+    }
+    session.state.round = 14
+    expect(session.loadState(session.state).ok).toBe(true)
+    let response = session.performRoundEnd()
+    for (let step = 0; step < 20 && !response.state.gameOver; step++) {
+      expect(response.ok, response.error).toBe(true)
+      if (response.interaction.request.kind === 'feed') response = session.resolveChoice(response.interaction.playerIndex, 'confirm', { selections: [] })
+      else if (response.interaction.request.kind === 'choice') response = session.resolveChoice(response.interaction.playerIndex, '__skip__')
+      else throw new Error(`unexpected end interaction: ${JSON.stringify(response.interaction)}`)
+    }
+    expect(response.state.gameOver).toBe(true)
+    expect(response.scores!.every((score) => Number.isInteger(score.total) && !score.categories.some((category) => category.key === 'parentCards'))).toBe(true)
+    expect(response.state.events.some((event) => event.type === 'parent.motherScheduled')).toBe(false)
+  })
+
+  it('six players receive all 12 mothers and fathers exactly once and finish selection', () => {
+    const session = auditSetup({ playerCount: 6 })
+    const candidates = structuredClone(session.state.parentSelection!.candidates)
+    for (const kind of ['mother', 'father'] as const) {
+      const dealt = Object.values(candidates).flatMap((candidate) => candidate[kind])
+      expect(dealt).toHaveLength(12)
+      expect(new Set(dealt).size).toBe(12)
+    }
+    for (const [index, player] of session.state.players.entries()) {
+      expect(candidates[player.id]!.mother).toHaveLength(2)
+      expect(candidates[player.id]!.father).toHaveLength(2)
+      const response = session.submitParentSelection(index, { mother: candidates[player.id]!.mother[0], father: candidates[player.id]!.father[0] })
+      expect(response.ok, response.error).toBe(true)
+      expect(response.state.phase).toBe(index === 5 ? 'playing' : 'parent-selection')
+    }
+    expect(session.state.parentSelection).toBeNull()
+    expect(session.getState().interaction.stateId).toBe('idle')
+    expect(session.state.players.every((player) => player.parentCards.mother && player.parentCards.father)).toBe(true)
+    expect(session.state.log.filter((entry) => entry.key === 'log.parentMotherScheduled')).toHaveLength(6)
+  })
+})
 
 describe('Parent Card selection setup', () => {
   it('deals one parent pair per player without parent selection when draftParents is false', () => {

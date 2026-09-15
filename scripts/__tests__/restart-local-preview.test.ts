@@ -46,8 +46,9 @@ describe('restart-local preview mode', () => {
   })
 
   it('does not require incomplete-minor startup options from serialized Moor game state', () => {
-    const resetScanner = script.match(/dev_rooms_without_farmers_of_the_moor\(\) \{[\s\S]*?\n\}/)?.[0] ?? ''
+    const resetScanner = script.match(/dev_rooms_without_variant\(\) \{[\s\S]*?^\}/m)?.[0] ?? ''
     expect(resetScanner).toContain('state.enableFarmersOfTheMoor !== true')
     expect(resetScanner).not.toContain('state.allowIncompleteFarmersOfTheMoorMinorDeal')
+    expect(script).toContain('dev_rooms_without_variant moor')
   })
 })

@@ -77,6 +77,7 @@ const summerBakeLeaf = (): ActionFlow => ({
   type: 'leaf',
   actionId: 'bake-bread',
   sourceCard: summerSourceCard,
+  actionContext: { requiresExplicitChoice: true },
   choiceLabelKey: 'actions.bake-bread.name',
 })
 

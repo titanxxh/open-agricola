@@ -26,6 +26,7 @@
 
 | 类别 | 卡牌 |
 |---|---|
+| 维护者裁定的普通牌堆耗尽边界：满足条件即可完成所选档位，每个适用牌类独立抽至多三张剩余牌并留一；空堆跳过，两类皆空也可完成，不降档、不洗牌、不后补。这是 OA 边界裁定，不是官方 FAQ。 | `PS03` |
 | Reseller 排除包含畜栏或围栏组件的整条印刷费用候选；没有受支持候选时保留一次性机会。本期边界不排除未来支持组件返还，由 [#849](https://github.com/titanxxh/open-agricola/issues/849) 继续跟踪。 | `E146_Reseller` |
 | 用 schema-up metadata 替代 参考实现 custom `isBuyable` | `A003_PaperKnife`, `B056_Brook`, `B074_ThickForest` |
 | 参考实现未实现，但 OA 有产品扩展/重写 | `A113_HeresyTeacher`, `A169_OffSiter`, `A170_Hayward`, `A171_Sidekick`, `A173_ClayThief`, `A174_MasterHora`, `A177_Middleman`, `A180_AnimalBrander`, `B170_CorralBuilder`, `B171_GreenhouseBuilder`, `B173_Sweeper`, `B175_FieldOverseer`, `B176_VillageIdiot`, `B178_TagAlong`, `B179_WildBoarHunter`, `C169_FastMason`, `C170_AmateurFencer`, `C171_YoungArtist`, `C172_FieldCounter`, `C173_TopOuter`, `C175_VillageTeacher`, `C180_Trapper`, `D025_WitchesDanceFloor`, `D170_FoldBuilder`, `D171_SeniorTeacher`, `D173_TownClerk`, `D175_Countryman`, `D176_Woodshacker`, `D178_SubstituteTeacher`, `D179_Bullcatcher`, `D180_PartTimeWorker` |

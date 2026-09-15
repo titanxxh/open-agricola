@@ -3,10 +3,10 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 PNPM_BIN="${PNPM_BIN:-pnpm}"
-BACKEND_PORT=5175
-FRONTEND_PORT=5173
-BACKEND_LOG="$SCRIPT_DIR/backend.log"
-FRONTEND_LOG="$SCRIPT_DIR/frontend.log"
+BACKEND_PORT="${BACKEND_PORT:-5175}"
+FRONTEND_PORT="${FRONTEND_PORT:-5173}"
+BACKEND_LOG="${BACKEND_LOG:-$SCRIPT_DIR/backend.log}"
+FRONTEND_LOG="${FRONTEND_LOG:-$SCRIPT_DIR/frontend.log}"
 
 # The main repo backing this checkout: the same directory when run normally,
 # and the original clone when run from a worktree.
@@ -329,13 +329,15 @@ EOF
   fi
 }
 
-dev_rooms_without_parent_cards() {
-  DB_PATH="$DB_PATH" node <<'EOF'
+dev_rooms_without_variant() {
+  local variant="$1"
+  DB_PATH="$DB_PATH" VARIANT="$variant" node <<'EOF'
 const fs = require('node:fs')
 const Database = require('better-sqlite3')
 
 const dbPath = process.env.DB_PATH
 if (!dbPath || !fs.existsSync(dbPath)) process.exit(0)
+const variant = process.env.VARIANT
 
 const db = new Database(dbPath, { readonly: true, fileMustExist: true })
 try {
@@ -345,96 +347,21 @@ try {
   const missing = rows.filter((row) => {
     if (!row.state_json) return true
     try {
-      return JSON.parse(row.state_json).enableParentCards !== true
-    } catch {
-      return true
-    }
-  })
-  if (missing.length > 0) console.log(missing.map((row) => row.id).join(', '))
-} finally {
-  db.close()
-}
-EOF
-}
-
-dev_rooms_without_direct_parent_cards() {
-  DB_PATH="$DB_PATH" node <<'EOF'
-const fs = require('node:fs')
-const Database = require('better-sqlite3')
-
-const dbPath = process.env.DB_PATH
-if (!dbPath || !fs.existsSync(dbPath)) process.exit(0)
-
-const db = new Database(dbPath, { readonly: true, fileMustExist: true })
-try {
-  const table = db.prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'rooms'").get()
-  if (!table) process.exit(0)
-  const rows = db.prepare("SELECT id, state_json FROM rooms WHERE id IN ('dev2', 'dev3', 'dev4', 'dev5', 'dev6')").all()
-  const missing = rows.filter((row) => {
-    if (!row.state_json) return true
-    try {
-      const state = JSON.parse(row.state_json)
-      if (state.enableParentCards !== true) return true
-      return !Array.isArray(state.players) || !state.players.every((player) =>
-        player.parentCards && player.parentCards.mother && player.parentCards.father
-      )
-    } catch {
-      return true
-    }
-  })
-  if (missing.length > 0) console.log(missing.map((row) => row.id).join(', '))
-} finally {
-  db.close()
-}
-EOF
-}
-
-dev_rooms_without_through_the_seasons() {
-  DB_PATH="$DB_PATH" node <<'EOF'
-const fs = require('node:fs')
-const Database = require('better-sqlite3')
-
-const dbPath = process.env.DB_PATH
-if (!dbPath || !fs.existsSync(dbPath)) process.exit(0)
-
-const db = new Database(dbPath, { readonly: true, fileMustExist: true })
-try {
-  const table = db.prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'rooms'").get()
-  if (!table) process.exit(0)
-  const rows = db.prepare("SELECT id, state_json FROM rooms WHERE id IN ('dev2', 'dev3', 'dev4', 'dev5', 'dev6')").all()
-  const missing = rows.filter((row) => {
-    if (!row.state_json) return true
-    try {
-      return JSON.parse(row.state_json).enableThroughTheSeasons !== true
-    } catch {
-      return true
-    }
-  })
-  if (missing.length > 0) console.log(missing.map((row) => row.id).join(', '))
-} finally {
-  db.close()
-}
-EOF
-}
-
-dev_rooms_without_farmers_of_the_moor() {
-  DB_PATH="$DB_PATH" node <<'EOF'
-const fs = require('node:fs')
-const Database = require('better-sqlite3')
-
-const dbPath = process.env.DB_PATH
-if (!dbPath || !fs.existsSync(dbPath)) process.exit(0)
-
-const db = new Database(dbPath, { readonly: true, fileMustExist: true })
-try {
-  const table = db.prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'rooms'").get()
-  if (!table) process.exit(0)
-  const rows = db.prepare("SELECT id, state_json FROM rooms WHERE id IN ('dev2', 'dev3', 'dev4', 'dev5', 'dev6')").all()
-  const missing = rows.filter((row) => {
-    if (!row.state_json) return true
-    try {
-      const state = JSON.parse(row.state_json)
-      return state.enableFarmersOfTheMoor !== true
+      const state = JSON.parse(row.state_json).state
+      switch (variant) {
+        case 'parents':
+          return state.enableParentCards !== true
+        case 'direct-parents':
+          return state.enableParentCards !== true || !Array.isArray(state.players) || !state.players.every((player) =>
+            player.parentCards && player.parentCards.mother && player.parentCards.father
+          )
+        case 'seasons':
+          return state.enableThroughTheSeasons !== true
+        case 'moor':
+          return state.enableFarmersOfTheMoor !== true
+        default:
+          return true
+      }
     } catch {
       return true
     }
@@ -583,22 +510,22 @@ else
   RESET_REASONS=()
   if [ "$PARENTS_ENABLED" -eq 1 ]; then
     if [ "$DRAFT_ENABLED" -eq 1 ]; then
-      MISSING_PARENT_ROOMS="$(dev_rooms_without_parent_cards)"
+      MISSING_PARENT_ROOMS="$(dev_rooms_without_variant parents)"
     else
-      MISSING_PARENT_ROOMS="$(dev_rooms_without_direct_parent_cards)"
+      MISSING_PARENT_ROOMS="$(dev_rooms_without_variant direct-parents)"
     fi
     if [ -n "$MISSING_PARENT_ROOMS" ]; then
       RESET_REASONS+=("existing fixed dev room(s) are not Parent Cards games: $MISSING_PARENT_ROOMS.")
     fi
   fi
   if [ "$SEASONS_ENABLED" -eq 1 ]; then
-    MISSING_SEASONS_ROOMS="$(dev_rooms_without_through_the_seasons)"
+    MISSING_SEASONS_ROOMS="$(dev_rooms_without_variant seasons)"
     if [ -n "$MISSING_SEASONS_ROOMS" ]; then
       RESET_REASONS+=("existing fixed dev room(s) are not Through the Seasons games: $MISSING_SEASONS_ROOMS.")
     fi
   fi
   if [ "$MOOR_ENABLED" -eq 1 ]; then
-    MISSING_MOOR_ROOMS="$(dev_rooms_without_farmers_of_the_moor)"
+    MISSING_MOOR_ROOMS="$(dev_rooms_without_variant moor)"
     if [ -n "$MISSING_MOOR_ROOMS" ]; then
       RESET_REASONS+=("existing fixed dev room(s) are not Farmers of the Moor games: $MISSING_MOOR_ROOMS.")
     fi
@@ -718,20 +645,20 @@ for n in 2 3 4 5 6; do
   fi
   echo "  ${n}-player room (room=dev${n})${marker}"
   for ((i = 1; i <= n; i += 1)); do
-    echo "    P${i}: http://${BIND_IP}:5173/?player=p${i}&transport=ws&room=dev${n}&devMode=1${DEV_ROOM_QUERY_SUFFIX}"
+    echo "    P${i}: http://${BIND_IP}:${FRONTEND_PORT}/?player=p${i}&transport=ws&room=dev${n}&devMode=1${DEV_ROOM_QUERY_SUFFIX}"
   done
 done
 echo ""
 echo "HTTP single-player (debug, non-persistent):"
-echo "  http://${BIND_IP}:5173/?player=p1"
+echo "  http://${BIND_IP}:${FRONTEND_PORT}/?player=p1"
 echo ""
 echo "Platform / workshop testing:"
 echo "  Logged-in dev workshop (auth shortcut as p1):"
-echo "    http://${BIND_IP}:5173/?page=workshop&player=p1&devMode=1"
+echo "    http://${BIND_IP}:${FRONTEND_PORT}/?page=workshop&player=p1&devMode=1"
 echo "  Login page (real account/session flow):"
-echo "    http://${BIND_IP}:5173/?page=login"
+echo "    http://${BIND_IP}:${FRONTEND_PORT}/?page=login"
 echo "  Logged-in dev lobby (auth shortcut as p1):"
-echo "    http://${BIND_IP}:5173/?player=p1&devMode=1"
+echo "    http://${BIND_IP}:${FRONTEND_PORT}/?player=p1&devMode=1"
 echo ""
 echo "Logs:"
 echo "  tail -f \"$BACKEND_LOG\""
