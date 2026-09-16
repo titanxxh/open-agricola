@@ -35,6 +35,7 @@ const RESULT: GameResult = {
   parentCards: false,
   throughTheSeasons: false,
   farmersOfTheMoor: false,
+  snakeOpening: false,
   players: [
     { playerIndex: 0, gamePlayerId: 'p1', userId: null, displayName: 'P1', score: 10 },
     { playerIndex: 1, gamePlayerId: 'p2', userId: null, displayName: 'P2', score: 9 },

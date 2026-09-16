@@ -33,6 +33,7 @@ type ResultRow = {
   enable_parent_cards: number
   enable_through_the_seasons: number
   enable_farmers_of_the_moor: number
+  enable_snake_opening: number
 }
 
 type ResultPlayerRow = {
@@ -214,7 +215,8 @@ export class GameContextStore {
     const result = this.db.prepare(`
       SELECT started_at, finished_at, rounds_played, player_count,
              enable_community_deck, enable_parent_cards,
-             enable_through_the_seasons, enable_farmers_of_the_moor
+             enable_through_the_seasons, enable_farmers_of_the_moor,
+             enable_snake_opening
       FROM game_results
       WHERE room_id = ?
     `).get(roomId) as ResultRow | undefined
@@ -248,6 +250,7 @@ export class GameContextStore {
         enableParentCards: result.enable_parent_cards === 1,
         enableThroughTheSeasons: result.enable_through_the_seasons === 1,
         enableFarmersOfTheMoor: result.enable_farmers_of_the_moor === 1,
+        enableSnakeOpening: result.enable_snake_opening === 1,
         players: players.map((player) => ({
           playerIndex: player.player_index,
           displayName: player.display_name,

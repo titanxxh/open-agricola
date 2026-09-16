@@ -854,6 +854,10 @@ export const buildLogPresentationPlan = (
         return presentationRows(event, [{ key: 'log.workStarted' }])
       }
 
+      if (event.type === 'snakeOpening.reversed') {
+        return presentationRows(event, [{ key: 'log.snakeOpeningReversed' }])
+      }
+
       if (event.type === 'returnHome.started') {
         return presentationRows(event, [{ key: 'log.returnHomeStarted' }])
       }

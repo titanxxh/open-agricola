@@ -55,7 +55,7 @@ describe('room result migration', () => {
     const { getDb } = await import('../db.ts')
     const db = getDb()
 
-    expect(db.prepare('SELECT MAX(version) AS version FROM schema_version').get()).toEqual({ version: 29 })
+    expect(db.prepare('SELECT MAX(version) AS version FROM schema_version').get()).toEqual({ version: 30 })
     expect(db.prepare("SELECT COUNT(*) AS count FROM rooms WHERE status = 'finished'").get()).toEqual({ count: 0 })
     expect(db.prepare('SELECT id, started_at FROM rooms ORDER BY id').all()).toEqual([
       { id: 'playing', started_at: 20 },
@@ -73,7 +73,10 @@ describe('room result migration', () => {
       'enable_parent_cards',
       'enable_through_the_seasons',
       'enable_farmers_of_the_moor',
+      'enable_snake_opening',
     ])
+    expect((db.pragma('table_info(rooms)') as Array<{ name: string }>).map(({ name }) => name))
+      .toContain('enable_snake_opening')
     db.close()
   })
 

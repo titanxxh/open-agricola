@@ -51,4 +51,23 @@ describe('round phase helpers', () => {
     const state = makeState(players)
     expect(nextSeatedPlayerIdx(state, players, 0)).toBe(1)
   })
+
+  it('nextSeatedPlayerIdx walks backwards and skips empty seats when reversed', () => {
+    const players = [
+      makePlayer('p0', false, 1),
+      makePlayer('p1', false, 0),
+      makePlayer('p2', false, 1),
+      makePlayer('p3', false, 1),
+    ]
+    const state = makeState(players)
+    expect(nextSeatedPlayerIdx(state, players, 2, -1)).toBe(0)
+    expect(nextSeatedPlayerIdx(state, players, 0, -1)).toBe(3)
+    expect(nextSeatedPlayerIdx(state, players, 3, -1)).toBe(2)
+  })
+
+  it('nextSeatedPlayerIdx returns current when walking backwards finds nobody else', () => {
+    const players = [makePlayer('p0', false, 0), makePlayer('p1', false, 1)]
+    const state = makeState(players)
+    expect(nextSeatedPlayerIdx(state, players, 1, -1)).toBe(1)
+  })
 })

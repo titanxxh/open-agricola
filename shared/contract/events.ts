@@ -322,6 +322,9 @@ export type RoundStartedEvent = GameEventBase<'round.started'> & {
 
 export type WorkStartedEvent = GameEventBase<'work.started'>
 
+/** Snake Opening: the round-1 Round Work Order has flipped for the rest of the work phase. */
+export type SnakeOpeningReversedEvent = GameEventBase<'snakeOpening.reversed'>
+
 export type ReturnHomeStartedEvent = GameEventBase<'returnHome.started'>
 
 export type HarvestStartedEvent = GameEventBase<'harvest.started'>
@@ -433,6 +436,7 @@ export type GameEvent =
   | CardPassedEvent
   | RoundStartedEvent
   | WorkStartedEvent
+  | SnakeOpeningReversedEvent
   | ReturnHomeStartedEvent
   | HarvestStartedEvent
   | HarvestPhaseStartedEvent

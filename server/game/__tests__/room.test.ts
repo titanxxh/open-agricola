@@ -12,6 +12,7 @@ import {
   resolveJoinRequestPlayerIndex,
   resolveJoinPlayerIndex,
   snapshotToRoom,
+  toRoomMeta,
 } from '../room.ts'
 
 const PRIMARY_DEV_ROOM_ID = FIXED_DEV_ROOMS[0]!.id
@@ -177,6 +178,41 @@ describe('room-manager seat assignment', () => {
     expect(room.session.state.players).toHaveLength(6)
   })
 
+  it('restores enableSnakeOpening from persisted room meta', () => {
+    const snakeRoom = snapshotToRoom({
+      id: 'snake-waiting',
+      serialized: null,
+      meta: {
+        createdBy: null,
+        maxPlayers: 2,
+        customCardDbIds: [],
+        enableSnakeOpening: true,
+        status: 'waiting',
+        players: [],
+      },
+      updatedAt: 0,
+    })
+    expect(snakeRoom.enableSnakeOpening).toBe(true)
+    expect(snakeRoom.session.state.enableSnakeOpening).toBe(true)
+    expect(toRoomMeta(snakeRoom).enableSnakeOpening).toBe(true)
+
+    const classicRoom = snapshotToRoom({
+      id: 'classic-waiting',
+      serialized: null,
+      meta: {
+        createdBy: null,
+        maxPlayers: 2,
+        customCardDbIds: [],
+        status: 'waiting',
+        players: [],
+      },
+      updatedAt: 0,
+    })
+    expect(classicRoom.enableSnakeOpening).toBe(false)
+    expect(classicRoom.session.state.enableSnakeOpening).toBe(false)
+    expect(toRoomMeta(classicRoom).enableSnakeOpening).toBe(false)
+  })
+
   it('defaults a legacy mid-stage Farmers of the Moor draft pool to seven', () => {
     const session = new GameSession(123, undefined, {
       playerCount: 2,
@@ -263,6 +299,18 @@ describe('room-manager seat assignment', () => {
       enableFarmersOfTheMoor: true,
       allowIncompleteFarmersOfTheMoorMinorDeal: true,
     })
+  })
+
+  it('builds Snake Opening fixed dev room options', () => {
+    expect(parseFixedDevRoomStartupOptions({ DEV_ENABLE_SNAKE_OPENING: 'true' })).toEqual({ enableSnakeOpening: true })
+    expect(parseFixedDevRoomStartupOptions({ DEV_ENABLE_SNAKE_OPENING: '1' })).toEqual({ enableSnakeOpening: true })
+    expect(parseFixedDevRoomStartupOptions({ DEV_ENABLE_SNAKE_OPENING: 'false' })).toEqual({})
+    expect(parseFixedDevRoomStartupOptions({})).toEqual({})
+    expect(buildFixedDevRoomInitialStateOptions(2, { enableSnakeOpening: true })).toEqual({
+      playerCount: 2,
+      enableSnakeOpening: true,
+    })
+    expect(buildFixedDevRoomInitialStateOptions(2, {})).toEqual({ playerCount: 2 })
   })
 
   it('builds parent-card draft fixed dev room options when draft is requested', () => {

@@ -264,6 +264,7 @@ export const publicEventMappingPolicy = {
   'parent.motherScheduled': silentPublicCues(mapped()),
   'round.started': silentPublicCues(mapped()),
   'work.started': silentPublicCues(mapped()),
+  'snakeOpening.reversed': silentPublicCues(mapped()),
   'returnHome.started': silentPublicCues(mapped()),
   'harvest.started': silentPublicCues(mapped()),
   'harvest.phaseStarted': silentPublicCues(mapped()),

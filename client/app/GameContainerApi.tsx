@@ -57,6 +57,7 @@ import {
   allowIncompleteFarmersOfTheMoorMinorDealFromQuery,
   canTakeVisibleMoorSpecialAction,
   enableFarmersOfTheMoorFromQuery,
+  enableSnakeOpeningFromQuery,
   enableThroughTheSeasonsFromQuery,
   devResourceKeysForState,
   getPendingMoorSpecialActionChoice,
@@ -309,6 +310,7 @@ const useTransportSetup = (
           const enableFarmersOfTheMoor = enableFarmersOfTheMoorFromQuery(window.location.search) || undefined
           const allowIncompleteFarmersOfTheMoorMinorDeal =
             allowIncompleteFarmersOfTheMoorMinorDealFromQuery(window.location.search) || undefined
+          const enableSnakeOpening = enableSnakeOpeningFromQuery(window.location.search) || undefined
           const hotseat = isHotseatSetupQuery(window.location.search) || undefined
           const sendCreateRoom = () => {
             ws.sendRoomCommand('createRoom', {
@@ -322,6 +324,7 @@ const useTransportSetup = (
               enableThroughTheSeasons,
               enableFarmersOfTheMoor,
               allowIncompleteFarmersOfTheMoorMinorDeal,
+              enableSnakeOpening,
               ...(draftParams ?? {}),
             })
           }

@@ -21,6 +21,7 @@ export type WorkshopSandboxSettingsLike = {
   enable_through_the_seasons: boolean
   enable_farmers_of_the_moor: boolean
   allow_incomplete_farmers_of_the_moor_minor_deal: boolean
+  enable_snake_opening: boolean
 }
 
 export const isBrowserSandbox = (): boolean => SANDBOX_EXECUTOR === 'browser'
@@ -40,6 +41,7 @@ export const buildLocalGameConfig = (
   enableThroughTheSeasons: settings.enable_through_the_seasons,
   enableFarmersOfTheMoor: settings.enable_farmers_of_the_moor,
   allowIncompleteFarmersOfTheMoorMinorDeal: settings.allow_incomplete_farmers_of_the_moor_minor_deal,
+  enableSnakeOpening: settings.enable_snake_opening,
 })
 
 export const stashLocalSandboxConfig = (config: LocalGameConfig, ownerKey: string): void => {

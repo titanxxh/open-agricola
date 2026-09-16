@@ -45,6 +45,17 @@ describe('restart-local preview mode', () => {
     expect(script).toContain('&enableFarmersOfTheMoor=true&allowIncompleteFarmersOfTheMoorMinorDeal=true')
   })
 
+  it('documents and wires --snake for fixed dev rooms', () => {
+    expect(script).toContain('[--snake]')
+    expect(script).toMatch(/SNAKE_ENABLED=0/)
+    expect(script).toMatch(/--snake\)\s*SNAKE_ENABLED=1/s)
+    expect(script).toContain('DEV_ENABLE_SNAKE_OPENING="$([ "$SNAKE_ENABLED" -eq 1 ] && echo true || echo false)"')
+    expect(script).toContain('&enableSnakeOpening=true')
+    expect(script).toContain('dev_rooms_without_variant snake')
+    const resetScanner = script.match(/dev_rooms_without_variant\(\) \{[\s\S]*?^\}/m)?.[0] ?? ''
+    expect(resetScanner).toContain('state.enableSnakeOpening !== true')
+  })
+
   it('does not require incomplete-minor startup options from serialized Moor game state', () => {
     const resetScanner = script.match(/dev_rooms_without_variant\(\) \{[\s\S]*?^\}/m)?.[0] ?? ''
     expect(resetScanner).toContain('state.enableFarmersOfTheMoor !== true')

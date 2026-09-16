@@ -91,6 +91,7 @@ const toInitialStateOptions = (config: LocalGameConfig): InitialStateOptions => 
     enableFarmersOfTheMoor,
     allowIncompleteFarmersOfTheMoorMinorDeal:
       enableFarmersOfTheMoor && config.allowIncompleteFarmersOfTheMoorMinorDeal === true,
+    enableSnakeOpening: config.enableSnakeOpening === true,
   }
 }
 

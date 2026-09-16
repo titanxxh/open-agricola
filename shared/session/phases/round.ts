@@ -43,13 +43,54 @@ export const nextSeatedPlayerIdx = (
   state: GameState,
   players: PlayerState[],
   current: number,
+  direction: 1 | -1 = 1,
+): number => walkSeats(state, players, current, direction, 1)
+
+const canTakeRotationTurn = (state: GameState, candidate: PlayerState | undefined): boolean =>
+  candidate !== undefined && (workersAvailable(state, candidate) > 0 || hasPendingExtraTurn(state, candidate))
+
+const walkSeats = (
+  state: GameState,
+  players: PlayerState[],
+  current: number,
+  direction: 1 | -1,
+  firstOffset: 0 | 1,
 ): number => {
-  for (let off = 1; off <= players.length; off++) {
-    const idx = (current + off) % players.length
-    const candidate = players[idx]
-    if (candidate && (workersAvailable(state, candidate) > 0 || hasPendingExtraTurn(state, candidate))) return idx
+  const count = players.length
+  for (let off = firstOffset; off <= count; off++) {
+    const idx = (((current + off * direction) % count) + count) % count
+    if (canTakeRotationTurn(state, players[idx])) return idx
   }
   return current
+}
+
+/** Seat index that opens this round's Round Work Order (frozen `roundFirstPlayerId`, else the live marker). */
+const roundWorkOrderStartIdx = (state: GameState): number => {
+  const frozen = state.players.findIndex((player) => player.id === state.roundFirstPlayerId)
+  return frozen === -1 ? computeStartPlayerIdx(state) : frozen
+}
+
+/**
+ * Work-phase rotation step. Identical to `nextSeatedPlayerIdx` unless Snake
+ * Opening is active in round 1: the first time the forward walk from `current`
+ * would wrap past the Round Work Order start, the order flips for the rest of
+ * the work phase and the walk restarts backwards from `current` itself, so the
+ * last seat of the forward pass places again immediately (reference behaviour).
+ */
+export const nextWorkRotationIdx = (state: GameState, current: number): number => {
+  const snake = state.enableSnakeOpening && state.round === 1 && state.roundPhase === 'work'
+    ? state.snakeOpening
+    : null
+  if (!snake) return nextSeatedPlayerIdx(state, state.players, current)
+  if (snake.reversed) return nextSeatedPlayerIdx(state, state.players, current, -1)
+  const count = state.players.length
+  const next = nextSeatedPlayerIdx(state, state.players, current)
+  const stepsToNext = ((next - current + count) % count) || count
+  const stepsToStart = ((roundWorkOrderStartIdx(state) - current + count) % count) || count
+  if (stepsToNext < stepsToStart) return next
+  snake.reversed = true
+  appendImmediateEvents(state, [{ type: 'snakeOpening.reversed' }])
+  return walkSeats(state, state.players, current, -1, 0)
 }
 
 /**
@@ -392,7 +433,7 @@ export const continueAfterReorganizeRoundEnd = (
   const player = core.state.players[playerIndex]!
   core.invokeFinalizeActionLog(player)
   if (!roundWorkComplete(core.state)) {
-    const next = nextSeatedPlayerIdx(core.state, core.state.players, core.state.currentPlayerIndex)
+    const next = nextWorkRotationIdx(core.state, core.state.currentPlayerIndex)
     startConfirmNextPlayer(core, playerIndex, next)
   }
 }
@@ -467,7 +508,7 @@ export const finishCompletedActionTurn = (
   core.setTurnOwner(null)
   core.clearEngineStack()
   if (!roundWorkComplete(core.state)) {
-    const next = nextSeatedPlayerIdx(core.state, core.state.players, core.state.currentPlayerIndex)
+    const next = nextWorkRotationIdx(core.state, core.state.currentPlayerIndex)
     startConfirmNextPlayer(core, playerIndex, next)
   } else {
     const startIdx = computeStartPlayerIdx(core.state)
@@ -600,7 +641,7 @@ export const handleConfirmNextPlayerResolved = (
     // turn (e.g. A92 AdoptiveParents), in which case the rotation stops on them
     // so the contributed flow can be offered below.
     if (workersAvailable(state, current) <= 0 && !hasPendingExtraTurn(state, current)) {
-      const next = nextSeatedPlayerIdx(state, state.players, state.currentPlayerIndex)
+      const next = nextWorkRotationIdx(state, state.currentPlayerIndex)
       if (next === state.currentPlayerIndex) break
       state.currentPlayerIndex = next
       continue
@@ -621,7 +662,7 @@ export const handleConfirmNextPlayerResolved = (
       playerId: current.id,
       reason: 'cardEffect',
     }], { actorPlayerId: current.id })
-    const next = nextSeatedPlayerIdx(state, state.players, state.currentPlayerIndex)
+    const next = nextWorkRotationIdx(state, state.currentPlayerIndex)
     if (next === state.currentPlayerIndex) {
       if (skippedExtraTurn) {
         safety = Math.max(safety, 1)

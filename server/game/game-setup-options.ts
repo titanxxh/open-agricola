@@ -16,6 +16,7 @@ export type GameSetupRequest = {
   enableThroughTheSeasons: boolean
   enableFarmersOfTheMoor: boolean
   allowIncompleteFarmersOfTheMoorMinorDeal: boolean
+  enableSnakeOpening: boolean
   draft: DraftSetupOptions | null
   /** One device plays every seat (see `Room.hotseat`). */
   hotseat: boolean
@@ -54,6 +55,7 @@ export const parseGameSetupRequest = (
   enableThroughTheSeasons: raw.enableThroughTheSeasons === true,
   enableFarmersOfTheMoor: raw.enableFarmersOfTheMoor === true,
   allowIncompleteFarmersOfTheMoorMinorDeal: raw.allowIncompleteFarmersOfTheMoorMinorDeal === true,
+  enableSnakeOpening: raw.enableSnakeOpening === true,
   draft,
   hotseat: raw.hotseat === true,
 })
@@ -66,6 +68,7 @@ export const buildInitialStateOptions = (request: GameSetupRequest): InitialStat
   enableThroughTheSeasons: request.enableThroughTheSeasons,
   enableFarmersOfTheMoor: request.enableFarmersOfTheMoor,
   allowIncompleteFarmersOfTheMoorMinorDeal: request.allowIncompleteFarmersOfTheMoorMinorDeal,
+  enableSnakeOpening: request.enableSnakeOpening,
   ...(request.draft
     ? { draftMode: request.draft.draftMode, draftPoolSize: request.draft.draftPoolSize }
     : {}),

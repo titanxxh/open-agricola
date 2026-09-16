@@ -92,7 +92,7 @@ usage() {
 Usage: ./restart-local.sh [--kill-only|--kill_only|-k]
                           [--players N | -p N | --players=N | -p=N]
                           [--parents] [--seasons] [--moor] [--draft] [--preview]
-                          [--intranet] [-h|--help]
+                          [--snake] [--intranet] [-h|--help]
 
 Without flags: stop any process on the frontend/backend ports, then start
 fresh backend (tsx) and frontend (vite) bound to 127.0.0.1, reachable only
@@ -108,6 +108,9 @@ are created automatically; each survives backend restarts independently.
   --seasons                      Enable Through the Seasons for fixed dev rooms.
   --moor                         Enable Farmers of the Moor for fixed dev
                                  rooms, allowing the incomplete FoM minor pool.
+  --snake                        Enable the Snake Opening variant for fixed dev
+                                 rooms (3 starting food, reversed round-1
+                                 second placement).
   --draft                        Start fixed dev rooms in simultaneous draft
                                  mode with draft pool size 7. Requires a reset.
   --preview                      Build the frontend and serve dist with
@@ -125,6 +128,7 @@ PLAYERS="4"
 PARENTS_ENABLED=0
 SEASONS_ENABLED=0
 MOOR_ENABLED=0
+SNAKE_ENABLED=0
 DRAFT_ENABLED=0
 PREVIEW_ENABLED=0
 INTRANET_ENABLED=0
@@ -156,6 +160,10 @@ while [ $# -gt 0 ]; do
       ;;
     --moor)
       MOOR_ENABLED=1
+      shift
+      ;;
+    --snake)
+      SNAKE_ENABLED=1
       shift
       ;;
     --draft)
@@ -359,6 +367,8 @@ try {
           return state.enableThroughTheSeasons !== true
         case 'moor':
           return state.enableFarmersOfTheMoor !== true
+        case 'snake':
+          return state.enableSnakeOpening !== true
         default:
           return true
       }
@@ -530,6 +540,12 @@ else
       RESET_REASONS+=("existing fixed dev room(s) are not Farmers of the Moor games: $MISSING_MOOR_ROOMS.")
     fi
   fi
+  if [ "$SNAKE_ENABLED" -eq 1 ]; then
+    MISSING_SNAKE_ROOMS="$(dev_rooms_without_variant snake)"
+    if [ -n "$MISSING_SNAKE_ROOMS" ]; then
+      RESET_REASONS+=("existing fixed dev room(s) are not Snake Opening games: $MISSING_SNAKE_ROOMS.")
+    fi
+  fi
   if [ "${#RESET_REASONS[@]}" -gt 0 ]; then
     RESET_REASON="${RESET_REASONS[*]}"
   fi
@@ -575,6 +591,7 @@ start_and_wait "backend" "$BACKEND_PORT" "$BACKEND_LOG" env \
   DEV_ENABLE_THROUGH_THE_SEASONS="$([ "$SEASONS_ENABLED" -eq 1 ] && echo true || echo false)" \
   DEV_ENABLE_FARMERS_OF_THE_MOOR="$([ "$MOOR_ENABLED" -eq 1 ] && echo true || echo false)" \
   DEV_ALLOW_INCOMPLETE_FARMERS_OF_THE_MOOR_MINOR_DEAL="$([ "$MOOR_ENABLED" -eq 1 ] && echo true || echo false)" \
+  DEV_ENABLE_SNAKE_OPENING="$([ "$SNAKE_ENABLED" -eq 1 ] && echo true || echo false)" \
   DEV_DRAFT_MODE="$([ "$DRAFT_ENABLED" -eq 1 ] && echo simultaneous || echo none)" \
   DEV_DRAFT_POOL_SIZE=7 \
   DB_DIR="$DB_DIR" \
@@ -635,6 +652,9 @@ if [ "$SEASONS_ENABLED" -eq 1 ]; then
 fi
 if [ "$MOOR_ENABLED" -eq 1 ]; then
   DEV_ROOM_QUERY_SUFFIX="${DEV_ROOM_QUERY_SUFFIX}&enableFarmersOfTheMoor=true&allowIncompleteFarmersOfTheMoorMinorDeal=true"
+fi
+if [ "$SNAKE_ENABLED" -eq 1 ]; then
+  DEV_ROOM_QUERY_SUFFIX="${DEV_ROOM_QUERY_SUFFIX}&enableSnakeOpening=true"
 fi
 if [ "$DRAFT_ENABLED" -eq 1 ]; then
   DEV_ROOM_QUERY_SUFFIX="${DEV_ROOM_QUERY_SUFFIX}&draftMode=simultaneous&draftPoolSize=7"

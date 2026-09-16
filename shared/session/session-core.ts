@@ -3711,6 +3711,7 @@ export class GameCore {
     if (this.state.round >= 2 && startIdx >= 0) {
       incFirstPlayer(this.state.players[startIdx]!)
     }
+    if (this.state.snakeOpening) this.state.snakeOpening.reversed = false
     this.state.roundPhase = 'work'
     appendImmediateEvents(this.state, [{ type: 'work.started' }])
     const workComplete = roundPhase.roundWorkComplete(this.state)

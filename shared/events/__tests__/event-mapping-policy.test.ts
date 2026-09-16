@@ -54,6 +54,7 @@ const expectedPublicEventTypes = [
   'resource.paid',
   'returnHome.started',
   'round.started',
+  'snakeOpening.reversed',
   'startPlayer.changed',
   'turn.skipped',
   'work.started',

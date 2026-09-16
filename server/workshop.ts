@@ -201,6 +201,7 @@ type SandboxSettings = {
   enable_through_the_seasons: boolean
   enable_farmers_of_the_moor: boolean
   allow_incomplete_farmers_of_the_moor_minor_deal: boolean
+  enable_snake_opening: boolean
   updated_at?: number
 }
 
@@ -210,6 +211,7 @@ type SandboxSettingsInput = {
   enable_through_the_seasons?: unknown
   enable_farmers_of_the_moor?: unknown
   allow_incomplete_farmers_of_the_moor_minor_deal?: unknown
+  enable_snake_opening?: unknown
 }
 
 const SANDBOX_DECK_IDS = ['A', 'B', 'C', 'D', 'E'] as const
@@ -239,13 +241,14 @@ const sanitizeSandboxSettings = (settings?: SandboxSettingsInput): SandboxSettin
     enable_through_the_seasons: settings?.enable_through_the_seasons === true,
     enable_farmers_of_the_moor: enableFarmersOfTheMoor,
     allow_incomplete_farmers_of_the_moor_minor_deal: enableFarmersOfTheMoor && settings?.allow_incomplete_farmers_of_the_moor_minor_deal === true,
+    enable_snake_opening: settings?.enable_snake_opening === true,
   }
 }
 
 const getSandboxSettings = (userId: string): SandboxSettings => {
   const db = getDb()
   const row = db.prepare(`
-    SELECT player_count, deck_ids_json, enable_through_the_seasons, enable_farmers_of_the_moor, allow_incomplete_farmers_of_the_moor_minor_deal, updated_at
+    SELECT player_count, deck_ids_json, enable_through_the_seasons, enable_farmers_of_the_moor, allow_incomplete_farmers_of_the_moor_minor_deal, enable_snake_opening, updated_at
     FROM sandbox_settings
     WHERE user_id = ?
   `).get(userId) as {
@@ -254,6 +257,7 @@ const getSandboxSettings = (userId: string): SandboxSettings => {
     enable_through_the_seasons: number
     enable_farmers_of_the_moor: number
     allow_incomplete_farmers_of_the_moor_minor_deal: number
+    enable_snake_opening: number
     updated_at: number
   } | undefined
   if (!row) {
@@ -263,6 +267,7 @@ const getSandboxSettings = (userId: string): SandboxSettings => {
       enable_through_the_seasons: false,
       enable_farmers_of_the_moor: false,
       allow_incomplete_farmers_of_the_moor_minor_deal: false,
+      enable_snake_opening: false,
     }
   }
   let rawDeckIds: unknown = []
@@ -278,6 +283,7 @@ const getSandboxSettings = (userId: string): SandboxSettings => {
     enable_through_the_seasons: row.enable_through_the_seasons === 1,
     enable_farmers_of_the_moor: enableFarmersOfTheMoor,
     allow_incomplete_farmers_of_the_moor_minor_deal: enableFarmersOfTheMoor && row.allow_incomplete_farmers_of_the_moor_minor_deal === 1,
+    enable_snake_opening: row.enable_snake_opening === 1,
     updated_at: row.updated_at,
   }
 }
@@ -296,15 +302,17 @@ const saveSandboxSettings = (userId: string, settings?: SandboxSettingsInput): S
       enable_through_the_seasons,
       enable_farmers_of_the_moor,
       allow_incomplete_farmers_of_the_moor_minor_deal,
+      enable_snake_opening,
       updated_at
     )
-    VALUES (?, ?, ?, ?, ?, ?, ?)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
     ON CONFLICT(user_id) DO UPDATE SET
       player_count = excluded.player_count,
       deck_ids_json = excluded.deck_ids_json,
       enable_through_the_seasons = excluded.enable_through_the_seasons,
       enable_farmers_of_the_moor = excluded.enable_farmers_of_the_moor,
       allow_incomplete_farmers_of_the_moor_minor_deal = excluded.allow_incomplete_farmers_of_the_moor_minor_deal,
+      enable_snake_opening = excluded.enable_snake_opening,
       updated_at = excluded.updated_at
   `).run(
     userId,
@@ -313,6 +321,7 @@ const saveSandboxSettings = (userId: string, settings?: SandboxSettingsInput): S
     next.enable_through_the_seasons ? 1 : 0,
     next.enable_farmers_of_the_moor ? 1 : 0,
     next.allow_incomplete_farmers_of_the_moor_minor_deal ? 1 : 0,
+    next.enable_snake_opening ? 1 : 0,
     next.updated_at,
   )
   return next

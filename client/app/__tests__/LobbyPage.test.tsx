@@ -40,6 +40,8 @@ vi.mock('../../contexts/LocaleContext', () => {
     'platform.createGame': 'Create Game',
     'platform.startHotseat': 'Start Hotseat Game',
     'platform.hotseatHint': 'Play every seat on one device.',
+    'platform.snakeOpening': 'Snake opening',
+    'platform.snakeOpeningHint': 'Every player starts with 3 food. In round 1, each player’s second person is placed in reverse turn order.',
     'platform.cancel': 'Cancel',
     'platform.joinGame': 'Join Game',
     'platform.joinRoomPlaceholder': 'Enter room ID',
@@ -122,6 +124,7 @@ describe('LobbyPage player count selection', () => {
     expect(setPage).toHaveBeenCalledWith('game', {
       transport: 'ws',
       maxPlayers: '6',
+      enableSnakeOpening: 'true',
     })
   })
 
@@ -142,6 +145,7 @@ describe('LobbyPage player count selection', () => {
       hotseat: '1',
       maxPlayers: '4',
       enableFarmersOfTheMoor: 'true',
+      enableSnakeOpening: 'true',
     })
   })
 
@@ -150,6 +154,28 @@ describe('LobbyPage player count selection', () => {
 
     render(<LobbyPage />)
     fireEvent.click(screen.getByRole('button', { name: 'Create Multiplayer Game' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Create Game' }))
+
+    expect(setPage).toHaveBeenCalledWith('game', {
+      transport: 'ws',
+      maxPlayers: '2',
+      enableSnakeOpening: 'true',
+    })
+  })
+
+  it('enables Snake opening by default and drops it from game setup when unchecked', () => {
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({ ok: true, rooms: [] }))))
+
+    render(<LobbyPage />)
+    fireEvent.click(screen.getByRole('button', { name: 'Create Multiplayer Game' }))
+
+    const snakeOpening = screen.getByRole('checkbox', { name: /Snake opening/ })
+    expect(snakeOpening).toBeChecked()
+    expect(screen.getByText('Every player starts with 3 food. In round 1, each player’s second person is placed in reverse turn order.'))
+      .toBeInTheDocument()
+
+    fireEvent.click(snakeOpening)
+    expect(snakeOpening).not.toBeChecked()
     fireEvent.click(screen.getByRole('button', { name: 'Create Game' }))
 
     expect(setPage).toHaveBeenCalledWith('game', {
@@ -170,6 +196,7 @@ describe('LobbyPage player count selection', () => {
       transport: 'ws',
       maxPlayers: '2',
       enableThroughTheSeasons: 'true',
+      enableSnakeOpening: 'true',
     })
   })
 
@@ -191,6 +218,7 @@ describe('LobbyPage player count selection', () => {
       enableThroughTheSeasons: 'true',
       enableFarmersOfTheMoor: 'true',
       allowIncompleteFarmersOfTheMoorMinorDeal: 'true',
+      enableSnakeOpening: 'true',
     })
   })
 
@@ -228,6 +256,7 @@ describe('LobbyPage player count selection', () => {
       maxPlayers: '2',
       enableCommunityDeck: 'true',
       customCards: 'reviewed-card-1',
+      enableSnakeOpening: 'true',
     })
   })
 
@@ -268,6 +297,7 @@ describe('LobbyPage player count selection', () => {
     expect(setPage).toHaveBeenLastCalledWith('game', {
       transport: 'ws',
       maxPlayers: '2',
+      enableSnakeOpening: 'true',
     })
 
     fireEvent.click(communityDeck)
@@ -278,6 +308,7 @@ describe('LobbyPage player count selection', () => {
       maxPlayers: '2',
       enableCommunityDeck: 'true',
       customCards: 'reviewed-card-1',
+      enableSnakeOpening: 'true',
     })
   })
 })

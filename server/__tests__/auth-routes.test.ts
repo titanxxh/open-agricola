@@ -148,6 +148,7 @@ vi.mock('../db.ts', () => {
       enable_through_the_seasons INTEGER NOT NULL DEFAULT 0,
       enable_farmers_of_the_moor INTEGER NOT NULL DEFAULT 0,
       allow_incomplete_farmers_of_the_moor_minor_deal INTEGER NOT NULL DEFAULT 0,
+      enable_snake_opening INTEGER NOT NULL DEFAULT 0,
       hotseat INTEGER NOT NULL DEFAULT 0,
       started_at INTEGER,
       replay_recording INTEGER,
@@ -172,7 +173,8 @@ vi.mock('../db.ts', () => {
       enable_community_deck INTEGER NOT NULL,
       enable_parent_cards INTEGER NOT NULL,
       enable_through_the_seasons INTEGER NOT NULL,
-      enable_farmers_of_the_moor INTEGER NOT NULL
+      enable_farmers_of_the_moor INTEGER NOT NULL,
+      enable_snake_opening INTEGER NOT NULL DEFAULT 0
     );
     CREATE TABLE game_result_players (
       room_id TEXT NOT NULL REFERENCES game_results(room_id) ON DELETE CASCADE,

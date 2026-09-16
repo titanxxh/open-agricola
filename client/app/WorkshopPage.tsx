@@ -75,6 +75,7 @@ export type SandboxSettings = {
   enable_through_the_seasons: boolean
   enable_farmers_of_the_moor: boolean
   allow_incomplete_farmers_of_the_moor_minor_deal: boolean
+  enable_snake_opening: boolean
 }
 
 const DEFAULT_SANDBOX_SETTINGS: SandboxSettings = {
@@ -83,6 +84,7 @@ const DEFAULT_SANDBOX_SETTINGS: SandboxSettings = {
   enable_through_the_seasons: false,
   enable_farmers_of_the_moor: false,
   allow_incomplete_farmers_of_the_moor_minor_deal: false,
+  enable_snake_opening: false,
 }
 
 export const SANDBOX_PLAYER_COUNTS = [2, 3, 4, 5, 6] as const
@@ -264,6 +266,7 @@ export function normalizeSandboxSettings(raw: unknown): SandboxSettings {
     enable_through_the_seasons: source.enable_through_the_seasons === true,
     enable_farmers_of_the_moor: enableFarmersOfTheMoor,
     allow_incomplete_farmers_of_the_moor_minor_deal: enableFarmersOfTheMoor && source.allow_incomplete_farmers_of_the_moor_minor_deal === true,
+    enable_snake_opening: source.enable_snake_opening === true,
   }
 }
 
@@ -274,6 +277,7 @@ function sandboxVariantLabels(
   const labels: string[] = []
   if (settings.enable_through_the_seasons) labels.push(t('platform.sandboxVariantThroughTheSeasons'))
   if (settings.enable_farmers_of_the_moor) labels.push(t('platform.sandboxVariantFarmersOfTheMoor'))
+  if (settings.enable_snake_opening) labels.push(t('platform.sandboxVariantSnakeOpening'))
   return labels
 }
 
@@ -924,6 +928,7 @@ function SandboxResetModal({
   const [allowIncompleteFarmersOfTheMoorMinorDeal, setAllowIncompleteFarmersOfTheMoorMinorDeal] = useState(
     currentSettings.allow_incomplete_farmers_of_the_moor_minor_deal,
   )
+  const [enableSnakeOpening, setEnableSnakeOpening] = useState(currentSettings.enable_snake_opening)
   const [publishedSearchInput, setPublishedSearchInput] = useState('')
   const [publishedSearch, setPublishedSearch] = useState('')
   const [loadingMine, setLoadingMine] = useState(false)
@@ -940,6 +945,7 @@ function SandboxResetModal({
     setEnableThroughTheSeasons(currentSettings.enable_through_the_seasons)
     setEnableFarmersOfTheMoor(currentSettings.enable_farmers_of_the_moor)
     setAllowIncompleteFarmersOfTheMoorMinorDeal(currentSettings.allow_incomplete_farmers_of_the_moor_minor_deal)
+    setEnableSnakeOpening(currentSettings.enable_snake_opening)
   }, [currentSettings])
 
   const loadMyCards = useCallback(async () => {
@@ -1012,6 +1018,7 @@ function SandboxResetModal({
         enable_through_the_seasons: enableThroughTheSeasons,
         enable_farmers_of_the_moor: enableFarmersOfTheMoor,
         allow_incomplete_farmers_of_the_moor_minor_deal: enableFarmersOfTheMoor && allowIncompleteFarmersOfTheMoorMinorDeal,
+        enable_snake_opening: enableSnakeOpening,
       })
       onClose()
     } finally {
@@ -1094,6 +1101,14 @@ function SandboxResetModal({
                     <span>{t('platform.sandboxAllowIncompleteFarmersOfTheMoorMinorDeal')}</span>
                   </label>
                 )}
+                <label className="ws-sandbox-toggle">
+                  <input
+                    type="checkbox"
+                    checked={enableSnakeOpening}
+                    onChange={event => setEnableSnakeOpening(event.target.checked)}
+                  />
+                  <span>{t('platform.sandboxVariantSnakeOpening')}</span>
+                </label>
               </div>
             </div>
           </div>
@@ -1175,6 +1190,7 @@ function SandboxResetModal({
               setEnableThroughTheSeasons(DEFAULT_SANDBOX_SETTINGS.enable_through_the_seasons)
               setEnableFarmersOfTheMoor(DEFAULT_SANDBOX_SETTINGS.enable_farmers_of_the_moor)
               setAllowIncompleteFarmersOfTheMoorMinorDeal(DEFAULT_SANDBOX_SETTINGS.allow_incomplete_farmers_of_the_moor_minor_deal)
+              setEnableSnakeOpening(DEFAULT_SANDBOX_SETTINGS.enable_snake_opening)
             }}
           >
             {t('platform.resetSandboxSettings')}
@@ -1541,6 +1557,7 @@ export function WorkshopPage() {
           enableThroughTheSeasons: sandboxSettings.enable_through_the_seasons,
           enableFarmersOfTheMoor: sandboxSettings.enable_farmers_of_the_moor,
           allowIncompleteFarmersOfTheMoorMinorDeal: sandboxSettings.allow_incomplete_farmers_of_the_moor_minor_deal,
+          enableSnakeOpening: sandboxSettings.enable_snake_opening,
         }),
       })
       const fallbackError = response.ok

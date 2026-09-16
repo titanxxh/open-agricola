@@ -25,6 +25,7 @@ export type CompletedGameContextDescriptor = {
     enableParentCards: boolean
     enableThroughTheSeasons: boolean
     enableFarmersOfTheMoor: boolean
+    enableSnakeOpening: boolean
     players: Array<{
       playerIndex: number
       displayName: string

@@ -267,11 +267,11 @@ describe('RoomCommitter', () => {
       roomVersion: 1,
       stepNo: 1,
     })
-    const second = room.session.devSetResources(1, { food: 3 })
+    const second = room.session.devSetResources(1, { food: 4 })
     const thirdIntent = replayIntentFromCommand({
       type: 'devSetResources',
       playerIndex: 1,
-      resources: { food: 3 },
+      resources: { food: 4 },
     })
     expect(committer.commit(room, second, thirdIntent!, 1)).toMatchObject({
       kind: 'committed',
@@ -302,7 +302,7 @@ describe('RoomCommitter', () => {
         room_version: 2,
         player_index: 1,
         command_type: 'devSetResources',
-        intent_json: '{"resources":{"food":3}}',
+        intent_json: '{"resources":{"food":4}}',
       },
     ])
   })
@@ -1012,7 +1012,7 @@ describe('RoomCommitter', () => {
     expect(restored.version).toBe(1)
     expect(persistence.loadReplayHead(room.id)?.missingPrefix).toBe(false)
 
-    const next = restored.session.devSetResources(1, { food: 3 })
+    const next = restored.session.devSetResources(1, { food: 4 })
     expect(recoveredCommitter.commit(restored, next, actionIntent!, 1)).toMatchObject({
       kind: 'committed',
       roomVersion: 2,
@@ -1087,7 +1087,7 @@ describe('RoomCommitter', () => {
       stepNo: 1,
     })
 
-    restored.session.devSetResources(1, { food: 3 })
+    restored.session.devSetResources(1, { food: 4 })
     restored.session.state.gameOver = true
     const next = restored.session.getState()
     expect(recoveredCommitter.commit(restored, next, actionIntent!, 1)).toMatchObject({

@@ -65,6 +65,8 @@ type ClientCommandBody =
       /** When true, enable the Farmers of the Moor game variant. Default false. */
       enableFarmersOfTheMoor?: boolean
       allowIncompleteFarmersOfTheMoorMinorDeal?: boolean
+      /** When true, enable the Snake Opening game variant. Default false. */
+      enableSnakeOpening?: boolean
       /** Optional simultaneous card-draft. Absent / 'none' keeps classic hand-deal behaviour. */
       draftMode?: DraftMode
       /** Pool size per card type (7..10). Only applied when draftMode === 'simultaneous'. */

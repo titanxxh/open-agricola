@@ -969,6 +969,19 @@ export function runMigrations(
         `)
       },
     },
+    {
+      version: 30,
+      run: (database) => {
+        // Snake Opening variant flag, persisted alongside the other variant
+        // toggles for rooms, archived results and workshop sandbox settings.
+        for (const table of ['rooms', 'game_results', 'sandbox_settings']) {
+          const columns = database.pragma(`table_info(${table})`) as Array<{ name: string }>
+          if (columns.length === 0) continue
+          if (columns.some(({ name }) => name === 'enable_snake_opening')) continue
+          database.exec(`ALTER TABLE ${table} ADD COLUMN enable_snake_opening INTEGER NOT NULL DEFAULT 0;`)
+        }
+      },
+    },
   ]
 
   const insert = db.prepare('INSERT INTO schema_version (version) VALUES (?)')

@@ -57,6 +57,25 @@ describe('hotseat game setup', () => {
     expect(state.enableThroughTheSeasons).toBe(false)
     expect(state.enableFarmersOfTheMoor).toBe(false)
     expect(state.enableParentCards).toBe(false)
+    expect(state.enableSnakeOpening).toBe(false)
+  })
+
+  it('maps enableSnakeOpening from the lobby payload into the initial state options', () => {
+    expect(parseGameSetupRequest({ enableSnakeOpening: true }, null).enableSnakeOpening).toBe(true)
+    expect(parseGameSetupRequest({}, null).enableSnakeOpening).toBe(false)
+    expect(parseGameSetupRequest({ enableSnakeOpening: 'yes' }, null).enableSnakeOpening).toBe(false)
+    expect(setupFromPayload({ maxPlayers: 2, enableSnakeOpening: true }).enableSnakeOpening).toBe(true)
+    expect(setupFromPayload({ maxPlayers: 2 }).enableSnakeOpening).toBe(false)
+  })
+
+  it('turns on Snake Opening when the lobby selected it', () => {
+    const session = new GameSession(4242, undefined, setupFromPayload({
+      maxPlayers: 2,
+      enableSnakeOpening: true,
+    }))
+    const state = session.getState().state
+    expect(state.enableSnakeOpening).toBe(true)
+    expect(state.snakeOpening).toEqual({ reversed: false })
   })
 
   it('rejects an invalid draft mode instead of silently dealing a classic hand', () => {

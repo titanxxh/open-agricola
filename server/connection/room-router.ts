@@ -539,6 +539,7 @@ function handleCreateRoom(ctx: ConnectionCtx, msg: Extract<ClientCommand, { type
     enableThroughTheSeasons: setup.enableThroughTheSeasons,
     enableFarmersOfTheMoor: setup.enableFarmersOfTheMoor,
     allowIncompleteFarmersOfTheMoorMinorDeal: setup.allowIncompleteFarmersOfTheMoorMinorDeal,
+    enableSnakeOpening: setup.enableSnakeOpening,
   }
   ctx.committer?.lockNewRoom(room)
   ctx.registry.set(room)
@@ -1031,6 +1032,7 @@ function handleNewGame(ctx: ConnectionCtx, msg: Extract<ClientCommand, { type: '
   const enableThroughTheSeasons = room.enableThroughTheSeasons ?? room.session.state.enableThroughTheSeasons
   const enableFarmersOfTheMoor = room.enableFarmersOfTheMoor ?? (room.session.state.enableFarmersOfTheMoor === true)
   const allowIncompleteFarmersOfTheMoorMinorDeal = room.allowIncompleteFarmersOfTheMoorMinorDeal ?? false
+  const enableSnakeOpening = room.enableSnakeOpening ?? (room.session.state.enableSnakeOpening === true)
   let created: ReturnType<typeof createIsolatedGameSession>
   try {
     created = createIsolatedGameSession(
@@ -1047,6 +1049,7 @@ function handleNewGame(ctx: ConnectionCtx, msg: Extract<ClientCommand, { type: '
         enableThroughTheSeasons,
         enableFarmersOfTheMoor,
         allowIncompleteFarmersOfTheMoorMinorDeal,
+        enableSnakeOpening,
       },
     )
   } catch (err) {
@@ -1106,6 +1109,7 @@ function handleNewGame(ctx: ConnectionCtx, msg: Extract<ClientCommand, { type: '
       room.enableThroughTheSeasons = enableThroughTheSeasons
       room.enableFarmersOfTheMoor = enableFarmersOfTheMoor
       room.allowIncompleteFarmersOfTheMoorMinorDeal = allowIncompleteFarmersOfTheMoorMinorDeal
+      room.enableSnakeOpening = enableSnakeOpening
       room.customCardDbIds = reloaded.loadedDbIds
       room.customCards = customCards
       ctx.committer?.lockNewRoom(room)
