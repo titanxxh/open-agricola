@@ -89,11 +89,11 @@ const lineNumberForIndex = (source: string, index: number): number =>
 const lineText = (source: string, line: number): string =>
   source.split('\n')[line - 1]?.trim() ?? ''
 
-const allowedTestLogStoreConstructor = (file: string): boolean =>
-  file.includes('/__tests__/') || file.endsWith('.test.ts')
+const TEST_FILE_PATTERN = /(?:^|\/)__tests__\/|\.(?:test|spec)\.[cm]?[jt]sx?$/
 
-const allowedTestLogCacheWriterCall = (file: string): boolean =>
-  file.includes('/__tests__/') || file.endsWith('.test.ts')
+const allowedTestLogStoreConstructor = (file: string): boolean => TEST_FILE_PATTERN.test(file)
+
+const allowedTestLogCacheWriterCall = (file: string): boolean => TEST_FILE_PATTERN.test(file)
 
 const findFunctionBlock = (
   sourceFile: ts.SourceFile,
@@ -236,58 +236,95 @@ const moduleRequestSpecifier = (expression: ts.Expression | undefined): string |
   return argument && ts.isStringLiteralLike(argument) ? argument.text : null
 }
 
-const collectImportedIdentifiers = (
-  sourceFile: ts.SourceFile,
-): {
+const moduleMemberRequest = (
+  expression: ts.Expression | undefined,
+): { specifier: string; member: string } | null => {
+  if (!expression) return null
+  const current = unwrapExpression(expression)
+  const receiver = accessReceiver(current)
+  const member = accessName(current)
+  const specifier = receiver ? moduleRequestSpecifier(receiver) : null
+  return specifier && member ? { specifier, member } : null
+}
+
+type Scope = {
+  stateLikeNames: Set<string>
+  stateLogAliases: Set<string>
+  logStoreAliases: Set<string>
+  logCacheWriterAliases: Set<string>
+  logStoreConstructorAliases: Set<string>
   logStoreClassNames: Set<string>
   logStoreClassNamespaces: Set<string>
   logCacheWriterNames: Set<string>
   logCacheWriterNamespaces: Set<string>
-} => {
-  const logStoreClassNames = new Set(['LogStore'])
-  const logStoreClassNamespaces = new Set<string>()
-  const logCacheWriterNames = new Set<string>()
-  const logCacheWriterNamespaces = new Set<string>()
-  const bindNamespace = (localName: string, specifier: string): void => {
-    logStoreClassNamespaces.add(localName)
-    if (isLogCacheModule(specifier)) logCacheWriterNamespaces.add(localName)
+}
+
+const forkScope = (scope: Scope): Scope =>
+  Object.fromEntries(Object.entries(scope).map(([key, names]) => [key, new Set(names)])) as Scope
+
+const shadowName = (scope: Scope, name: string): void => {
+  for (const names of Object.values(scope)) names.delete(name)
+}
+
+const reassignName = (scope: Scope, name: string): void => {
+  for (const [key, names] of Object.entries(scope)) if (key !== 'stateLikeNames') names.delete(name)
+}
+
+const bindModuleNamespace = (scope: Scope, localName: string, specifier: string): void => {
+  scope.logStoreClassNamespaces.add(localName)
+  if (isLogCacheModule(specifier)) scope.logCacheWriterNamespaces.add(localName)
+}
+
+const bindModuleMember = (scope: Scope, importedName: string, localName: string, specifier: string): void => {
+  if (importedName === 'LogStore') scope.logStoreClassNames.add(localName)
+  if (isLogCacheModule(specifier) && importedName === 'prependDerivedLogEntries') scope.logCacheWriterNames.add(localName)
+}
+
+const bindModuleRequest = (scope: Scope, name: ts.BindingName, initializer: ts.Expression): void => {
+  const specifier = moduleRequestSpecifier(initializer)
+  if (specifier && ts.isIdentifier(name)) bindModuleNamespace(scope, name.text, specifier)
+  if (specifier && ts.isObjectBindingPattern(name)) {
+    for (const element of name.elements) {
+      if (!ts.isIdentifier(element.name)) continue
+      const importedName = element.propertyName ? propertyNameText(element.propertyName) : element.name.text
+      if (importedName) bindModuleMember(scope, importedName, element.name.text, specifier)
+    }
   }
-  const bindNamed = (importedName: string, localName: string, specifier: string): void => {
-    if (importedName === 'LogStore') logStoreClassNames.add(localName)
-    if (isLogCacheModule(specifier) && importedName === 'prependDerivedLogEntries') logCacheWriterNames.add(localName)
+  const member = moduleMemberRequest(initializer)
+  if (member && ts.isIdentifier(name)) bindModuleMember(scope, member.member, name.text, member.specifier)
+}
+
+const createFileScope = (sourceFile: ts.SourceFile): Scope => {
+  const scope: Scope = {
+    stateLikeNames: new Set(['state']),
+    stateLogAliases: new Set(),
+    logStoreAliases: new Set(),
+    logCacheWriterAliases: new Set(),
+    logStoreConstructorAliases: new Set(),
+    logStoreClassNames: new Set(['LogStore']),
+    logStoreClassNamespaces: new Set(),
+    logCacheWriterNames: new Set(),
+    logCacheWriterNamespaces: new Set(),
   }
-  const visit = (node: ts.Node): void => {
-    if (ts.isImportDeclaration(node) && ts.isStringLiteral(node.moduleSpecifier)) {
-      const namedBindings = node.importClause?.namedBindings
+  for (const statement of sourceFile.statements) {
+    if (ts.isImportDeclaration(statement) && ts.isStringLiteral(statement.moduleSpecifier)) {
+      const namedBindings = statement.importClause?.namedBindings
       if (namedBindings && ts.isNamespaceImport(namedBindings)) {
-        bindNamespace(namedBindings.name.text, node.moduleSpecifier.text)
+        bindModuleNamespace(scope, namedBindings.name.text, statement.moduleSpecifier.text)
       }
       if (namedBindings && ts.isNamedImports(namedBindings)) {
         for (const specifier of namedBindings.elements) {
-          bindNamed(specifier.propertyName?.text ?? specifier.name.text, specifier.name.text, node.moduleSpecifier.text)
+          bindModuleMember(scope, specifier.propertyName?.text ?? specifier.name.text, specifier.name.text, statement.moduleSpecifier.text)
         }
       }
     }
-    if (ts.isImportEqualsDeclaration(node)
-      && ts.isExternalModuleReference(node.moduleReference)
-      && ts.isStringLiteralLike(node.moduleReference.expression)) {
-      bindNamespace(node.name.text, node.moduleReference.expression.text)
+    if (ts.isImportEqualsDeclaration(statement)
+      && ts.isExternalModuleReference(statement.moduleReference)
+      && ts.isStringLiteralLike(statement.moduleReference.expression)) {
+      bindModuleNamespace(scope, statement.name.text, statement.moduleReference.expression.text)
     }
-    if (ts.isVariableDeclaration(node)) {
-      const specifier = moduleRequestSpecifier(node.initializer)
-      if (specifier && ts.isIdentifier(node.name)) bindNamespace(node.name.text, specifier)
-      if (specifier && ts.isObjectBindingPattern(node.name)) {
-        for (const element of node.name.elements) {
-          if (ts.isOmittedExpression(element) || !ts.isIdentifier(element.name)) continue
-          const importedName = element.propertyName ? propertyNameText(element.propertyName) : element.name.text
-          if (importedName) bindNamed(importedName, element.name.text, specifier)
-        }
-      }
-    }
-    ts.forEachChild(node, visit)
   }
-  visit(sourceFile)
-  return { logStoreClassNames, logStoreClassNamespaces, logCacheWriterNames, logCacheWriterNamespaces }
+  return scope
 }
 
 const isStateLikeIdentifier = (name: string, stateLikeNames: ReadonlySet<string>): boolean =>
@@ -572,50 +609,23 @@ const scanFile = (repoRoot: string, fullPath: string): DirectSessionLogViolation
   const sourceFile = parseSource(fullPath)
   const source = sourceFile.text
   const violations: DirectSessionLogViolation[] = []
-  const {
-    logStoreClassNames,
-    logStoreClassNamespaces,
-    logCacheWriterNames,
-    logCacheWriterNamespaces,
-  } = collectImportedIdentifiers(sourceFile)
   const addViolation = (node: ts.Node, kind: DirectSessionLogViolationKind): void => {
     const line = lineNumberForIndex(source, node.getStart(sourceFile))
     violations.push({ file: rel, line, kind, text: lineText(source, line) })
   }
 
   const allowedBlocks = allowedLogStoreAppendBlocks(rel, sourceFile)
-  const visit = (
-    node: ts.Node,
-    stateLikeNames: ReadonlySet<string>,
-    stateLogAliases: ReadonlySet<string>,
-    logStoreAliases: ReadonlySet<string>,
-    logCacheWriterAliases: ReadonlySet<string>,
-    logStoreConstructorAliases: ReadonlySet<string>,
-  ): void => {
-    let scopedStateLikeNames = stateLikeNames
-    let scopedStateLogAliases = stateLogAliases
-    let scopedLogStoreAliases = logStoreAliases
-    let scopedLogCacheWriterAliases = logCacheWriterAliases
-    let scopedLogStoreConstructorAliases = logStoreConstructorAliases
+  const visit = (node: ts.Node, inherited: Scope): void => {
+    let scope = inherited
     if (ts.isSourceFile(node) || ts.isBlock(node) || ts.isFunctionLike(node)) {
-      scopedStateLikeNames = new Set(stateLikeNames)
-      scopedStateLogAliases = new Set(stateLogAliases)
-      scopedLogStoreAliases = new Set(logStoreAliases)
-      scopedLogCacheWriterAliases = new Set(logCacheWriterAliases)
-      scopedLogStoreConstructorAliases = new Set(logStoreConstructorAliases)
+      scope = forkScope(inherited)
       if (ts.isFunctionLike(node)) {
         for (const parameter of node.parameters) {
           const names: string[] = []
           collectBindingNames(parameter.name, names)
-          for (const name of names) {
-            ;(scopedStateLikeNames as Set<string>).delete(name)
-            scopedStateLogAliases.delete(name)
-            scopedLogStoreAliases.delete(name)
-            scopedLogCacheWriterAliases.delete(name)
-            scopedLogStoreConstructorAliases.delete(name)
-          }
+          for (const name of names) shadowName(scope, name)
           if (ts.isIdentifier(parameter.name) && includesGameStateType(parameter.type, sourceFile)) {
-            ;(scopedStateLikeNames as Set<string>).add(parameter.name.text)
+            scope.stateLikeNames.add(parameter.name.text)
           }
         }
       }
@@ -624,51 +634,46 @@ const scanFile = (repoRoot: string, fullPath: string): DirectSessionLogViolation
     if (ts.isVariableDeclaration(node)) {
       const names: string[] = []
       collectBindingNames(node.name, names)
-      for (const name of names) {
-        ;(scopedStateLikeNames as Set<string>).delete(name)
-        ;(scopedStateLogAliases as Set<string>).delete(name)
-        ;(scopedLogStoreAliases as Set<string>).delete(name)
-        ;(scopedLogCacheWriterAliases as Set<string>).delete(name)
-        ;(scopedLogStoreConstructorAliases as Set<string>).delete(name)
-      }
+      for (const name of names) shadowName(scope, name)
       if (node.initializer) {
+        bindModuleRequest(scope, node.name, node.initializer)
         if (ts.isIdentifier(node.name)
           && (includesGameStateType(node.type, sourceFile)
             || isGameStateExpression(node.initializer, sourceFile))) {
-          ;(scopedStateLikeNames as Set<string>).add(node.name.text)
+          scope.stateLikeNames.add(node.name.text)
         }
-        if (ts.isIdentifier(node.name) && isStateLogExpression(node.initializer, scopedStateLikeNames)) {
-          ;(scopedStateLogAliases as Set<string>).add(node.name.text)
+        if (ts.isIdentifier(node.name) && isStateLogExpression(node.initializer, scope.stateLikeNames)) {
+          scope.stateLogAliases.add(node.name.text)
         }
-        if (ts.isIdentifier(node.name) && isLogStoreExpression(node.initializer, scopedLogStoreAliases)) {
-          ;(scopedLogStoreAliases as Set<string>).add(node.name.text)
+        if (ts.isIdentifier(node.name) && isLogStoreExpression(node.initializer, scope.logStoreAliases)) {
+          scope.logStoreAliases.add(node.name.text)
         }
         if (ts.isIdentifier(node.name)
           && cacheWriterCallName(
             node.initializer,
-            logCacheWriterNames,
-            logCacheWriterNamespaces,
-            scopedLogCacheWriterAliases,
+            scope.logCacheWriterNames,
+            scope.logCacheWriterNamespaces,
+            scope.logCacheWriterAliases,
           )) {
-          ;(scopedLogCacheWriterAliases as Set<string>).add(node.name.text)
+          scope.logCacheWriterAliases.add(node.name.text)
         }
         if (ts.isIdentifier(node.name)
           && isLogStoreConstructorAliasSource(
             node.initializer,
-            logStoreClassNames,
-            logStoreClassNamespaces,
-            scopedLogStoreConstructorAliases,
+            scope.logStoreClassNames,
+            scope.logStoreClassNamespaces,
+            scope.logStoreConstructorAliases,
           )) {
-          ;(scopedLogStoreConstructorAliases as Set<string>).add(node.name.text)
+          scope.logStoreConstructorAliases.add(node.name.text)
         }
-        if (ts.isObjectBindingPattern(node.name) && isStateLikeExpression(node.initializer, scopedStateLikeNames)) {
+        if (ts.isObjectBindingPattern(node.name) && isStateLikeExpression(node.initializer, scope.stateLikeNames)) {
           for (const element of node.name.elements) {
             if (ts.isOmittedExpression(element)) continue
             const property = element.propertyName
             const bindingName = element.name
             const sourceName = property ? propertyNameText(property) : ts.isIdentifier(bindingName) ? bindingName.text : null
             if (sourceName === 'log' && ts.isIdentifier(bindingName)) {
-              ;(scopedStateLogAliases as Set<string>).add(bindingName.text)
+              scope.stateLogAliases.add(bindingName.text)
             }
           }
         }
@@ -683,17 +688,17 @@ const scanFile = (repoRoot: string, fullPath: string): DirectSessionLogViolation
             if (!ts.isIdentifier(bindingName)) continue
             const sourceName = property ? propertyNameText(property) : bindingName.text
             if (sourceName && isLogStoreBindingSource(node.initializer, sourceName)) {
-              ;(scopedLogStoreAliases as Set<string>).add(bindingName.text)
+              scope.logStoreAliases.add(bindingName.text)
             }
             if (sourceName === 'prependDerivedLogEntries'
               && namespace
-              && logCacheWriterNamespaces.has(namespace)) {
-              ;(scopedLogCacheWriterAliases as Set<string>).add(bindingName.text)
+              && scope.logCacheWriterNamespaces.has(namespace)) {
+              scope.logCacheWriterAliases.add(bindingName.text)
             }
             if (sourceName === 'LogStore'
               && namespace
-              && logStoreClassNamespaces.has(namespace)) {
-              ;(scopedLogStoreConstructorAliases as Set<string>).add(bindingName.text)
+              && scope.logStoreClassNamespaces.has(namespace)) {
+              scope.logStoreConstructorAliases.add(bindingName.text)
             }
           }
         }
@@ -703,32 +708,30 @@ const scanFile = (repoRoot: string, fullPath: string): DirectSessionLogViolation
     if (ts.isBinaryExpression(node)
       && node.operatorToken.kind === ts.SyntaxKind.EqualsToken
       && ts.isIdentifier(unwrapExpression(node.left))) {
-      const name = (unwrapExpression(node.left) as ts.Identifier).text
-      ;(scopedStateLogAliases as Set<string>).delete(name)
-      ;(scopedLogStoreAliases as Set<string>).delete(name)
-      ;(scopedLogCacheWriterAliases as Set<string>).delete(name)
-      ;(scopedLogStoreConstructorAliases as Set<string>).delete(name)
-      if (isStateLogExpression(node.right, scopedStateLikeNames)) {
-        ;(scopedStateLogAliases as Set<string>).add(name)
+      const target = unwrapExpression(node.left) as ts.Identifier
+      reassignName(scope, target.text)
+      bindModuleRequest(scope, target, node.right)
+      if (isStateLogExpression(node.right, scope.stateLikeNames)) {
+        scope.stateLogAliases.add(target.text)
       }
-      if (isLogStoreExpression(node.right, scopedLogStoreAliases)) {
-        ;(scopedLogStoreAliases as Set<string>).add(name)
+      if (isLogStoreExpression(node.right, scope.logStoreAliases)) {
+        scope.logStoreAliases.add(target.text)
       }
       if (cacheWriterCallName(
         node.right,
-        logCacheWriterNames,
-        logCacheWriterNamespaces,
-        scopedLogCacheWriterAliases,
+        scope.logCacheWriterNames,
+        scope.logCacheWriterNamespaces,
+        scope.logCacheWriterAliases,
       )) {
-        ;(scopedLogCacheWriterAliases as Set<string>).add(name)
+        scope.logCacheWriterAliases.add(target.text)
       }
       if (isLogStoreConstructorAliasSource(
         node.right,
-        logStoreClassNames,
-        logStoreClassNamespaces,
-        scopedLogStoreConstructorAliases,
+        scope.logStoreClassNames,
+        scope.logStoreClassNamespaces,
+        scope.logStoreConstructorAliases,
       )) {
-        ;(scopedLogStoreConstructorAliases as Set<string>).add(name)
+        scope.logStoreConstructorAliases.add(target.text)
       }
     }
 
@@ -736,28 +739,28 @@ const scanFile = (repoRoot: string, fullPath: string): DirectSessionLogViolation
       && node.operatorToken.kind === ts.SyntaxKind.EqualsToken
       && ts.isObjectLiteralExpression(unwrapExpression(node.left))) {
       for (const name of objectLiteralAliasAssignments(node.left, 'log')) {
-        ;(scopedStateLogAliases as Set<string>).delete(name)
-        ;(scopedLogStoreAliases as Set<string>).delete(name)
-        if (isStateLikeExpression(node.right, scopedStateLikeNames)) {
-          ;(scopedStateLogAliases as Set<string>).add(name)
+        scope.stateLogAliases.delete(name)
+        scope.logStoreAliases.delete(name)
+        if (isStateLikeExpression(node.right, scope.stateLikeNames)) {
+          scope.stateLogAliases.add(name)
         }
         if (isLogStoreBindingSource(node.right, 'log')) {
-          ;(scopedLogStoreAliases as Set<string>).add(name)
+          scope.logStoreAliases.add(name)
         }
       }
       const namespace = ts.isIdentifier(unwrapExpression(node.right))
         ? (unwrapExpression(node.right) as ts.Identifier).text
         : null
       for (const name of objectLiteralAliasAssignments(node.left, 'prependDerivedLogEntries')) {
-        ;(scopedLogCacheWriterAliases as Set<string>).delete(name)
-        if (namespace && logCacheWriterNamespaces.has(namespace)) {
-          ;(scopedLogCacheWriterAliases as Set<string>).add(name)
+        scope.logCacheWriterAliases.delete(name)
+        if (namespace && scope.logCacheWriterNamespaces.has(namespace)) {
+          scope.logCacheWriterAliases.add(name)
         }
       }
       for (const name of objectLiteralAliasAssignments(node.left, 'LogStore')) {
-        ;(scopedLogStoreConstructorAliases as Set<string>).delete(name)
-        if (namespace && logStoreClassNamespaces.has(namespace)) {
-          ;(scopedLogStoreConstructorAliases as Set<string>).add(name)
+        scope.logStoreConstructorAliases.delete(name)
+        if (namespace && scope.logStoreClassNamespaces.has(namespace)) {
+          scope.logStoreConstructorAliases.add(name)
         }
       }
     }
@@ -765,10 +768,10 @@ const scanFile = (repoRoot: string, fullPath: string): DirectSessionLogViolation
     if (!isAllowedStateLogWrite(rel, node, sourceFile)) {
       if ((ts.isBinaryExpression(node)
           && ts.isAssignmentOperator(node.operatorToken.kind)
-          && isStateLogMutationTarget(node.left, scopedStateLikeNames, scopedStateLogAliases))
-        || (ts.isDeleteExpression(node) && isStateLogMutationTarget(node.expression, scopedStateLikeNames, scopedStateLogAliases))
+          && isStateLogMutationTarget(node.left, scope.stateLikeNames, scope.stateLogAliases))
+        || (ts.isDeleteExpression(node) && isStateLogMutationTarget(node.expression, scope.stateLikeNames, scope.stateLogAliases))
         || ((ts.isPrefixUnaryExpression(node) || ts.isPostfixUnaryExpression(node))
-          && isStateLogMutationTarget(node.operand, scopedStateLikeNames, scopedStateLogAliases))) {
+          && isStateLogMutationTarget(node.operand, scope.stateLikeNames, scope.stateLogAliases))) {
         addViolation(node, 'state-log-write')
       }
     }
@@ -776,9 +779,9 @@ const scanFile = (repoRoot: string, fullPath: string): DirectSessionLogViolation
     if (ts.isNewExpression(node)
       && isLogStoreConstructorExpression(
         node.expression,
-        logStoreClassNames,
-        logStoreClassNamespaces,
-        scopedLogStoreConstructorAliases,
+        scope.logStoreClassNames,
+        scope.logStoreClassNamespaces,
+        scope.logStoreConstructorAliases,
       )
       && !allowedLogStoreConstructorFiles[rel]
       && !allowedTestLogStoreConstructor(rel)) {
@@ -792,28 +795,28 @@ const scanFile = (repoRoot: string, fullPath: string): DirectSessionLogViolation
         && calleeName
         && LOG_MUTATORS.has(calleeName)
         && receiver
-        && (isStateLogMutationTarget(receiver, scopedStateLikeNames, scopedStateLogAliases)
-          || isStateLogReceiverText(receiver, scopedStateLikeNames, sourceFile))) {
+        && (isStateLogMutationTarget(receiver, scope.stateLikeNames, scope.stateLogAliases)
+          || isStateLogReceiverText(receiver, scope.stateLikeNames, sourceFile))) {
         addViolation(node, 'state-log-write')
       }
       if (!isAllowedStateLogWrite(rel, node, sourceFile)
         && isObjectAssignCall(node)
         && !!node.arguments[0]
-        && (isStateLogMutationTarget(node.arguments[0]!, scopedStateLikeNames, scopedStateLogAliases)
-          || isObjectAssignStateLogWrite(node, scopedStateLikeNames))) {
+        && (isStateLogMutationTarget(node.arguments[0]!, scope.stateLikeNames, scope.stateLogAliases)
+          || isObjectAssignStateLogWrite(node, scope.stateLikeNames))) {
         addViolation(node, 'state-log-write')
       }
       if (calleeName === 'append'
         && receiver
-        && isLogStoreExpression(receiver, scopedLogStoreAliases)
+        && isLogStoreExpression(receiver, scope.logStoreAliases)
         && !isAllowedLogStoreAppend(node, sourceFile, allowedBlocks)) {
         addViolation(node, 'log-store-append')
       }
       if (cacheWriterCallName(
         node.expression,
-        logCacheWriterNames,
-        logCacheWriterNamespaces,
-        scopedLogCacheWriterAliases,
+        scope.logCacheWriterNames,
+        scope.logCacheWriterNamespaces,
+        scope.logCacheWriterAliases,
       )
         && rel !== 'shared/events/log-cache.ts'
         && !allowedTestLogCacheWriterCall(rel)
@@ -822,16 +825,9 @@ const scanFile = (repoRoot: string, fullPath: string): DirectSessionLogViolation
       }
     }
 
-    ts.forEachChild(node, (child) => visit(
-      child,
-      scopedStateLikeNames,
-      scopedStateLogAliases,
-      scopedLogStoreAliases,
-      scopedLogCacheWriterAliases,
-      scopedLogStoreConstructorAliases,
-    ))
+    ts.forEachChild(node, (child) => visit(child, scope))
   }
-  visit(sourceFile, new Set(['state']), new Set(), new Set(), new Set(), new Set())
+  visit(sourceFile, createFileScope(sourceFile))
 
   return violations
 }
