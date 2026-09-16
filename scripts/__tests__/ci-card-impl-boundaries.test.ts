@@ -14,6 +14,8 @@ const architectureChecks = [
   'pnpm run check:catalog-types',
   'pnpm run check:card-impl-boundaries',
   'pnpm run check:architecture-types',
+  'pnpm run check:architecture-tests',
+  'pnpm run check:prompt-sync -- --strict',
   'pnpm run check:dependencies',
   'pnpm run check:browser-boundaries',
 ]
@@ -25,6 +27,18 @@ describe('canonical architecture verification wiring', () => {
     }
 
     expect(pkg.scripts['check:architecture']?.split(' && ')).toEqual(architectureChecks)
+    const architectureTests = [
+      'shared/actions/effects/__tests__/architecture-guard.test.ts',
+      'shared/cards/__tests__/provenance-result-audit.test.ts',
+      'shared/events/__tests__/event-mapping-policy.test.ts',
+      'shared/session/__tests__/interaction-command-policy.test.ts',
+      'shared/cards/__tests__/card-source.test.ts',
+      'shared/contract/__tests__/prompt-keys.test.ts',
+      'client/services/__tests__/llmPrompts.test.ts',
+      'scripts/__tests__/ci-card-impl-boundaries.test.ts',
+    ]
+    expect(pkg.scripts['check:architecture-tests']?.split(' ')).toEqual(['vitest', 'run', ...architectureTests])
+    for (const file of architectureTests) expect(fs.existsSync(path.join(repoRoot, file))).toBe(true)
     expect(pkg.scripts['check:reaches']).toBeUndefined()
   })
 
