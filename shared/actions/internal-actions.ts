@@ -43,11 +43,13 @@ import { passMinorCardToLeftAction } from './effects/internal/pass-minor-card-to
 import { specialEffectAction } from './effects/special-effect'
 import { reapAction } from './effects/reap'
 import { completeParentFatherAction } from '../parents/father-completion'
-import { summerBreadOrSellAction, summerSellGrainAction } from '../seasons/internal-actions'
+import { createSummerBreadOrSellAction, summerSellGrainAction } from '../seasons/internal-actions'
 import { moorWoodToFuelAction } from '../moor/wood-to-fuel'
 import { moorSpecialActionAfterListenersAction, moorSpecialActionApplyAction, moorSpecialActionChoiceAction } from '../moor/special-action-flow'
 
-export const internalActionDefinitions: ActionDefinition[] = [
+import type { FlowActionResolver } from './flow'
+
+export const createInternalActionDefinitions = (resolveAction: FlowActionResolver): ActionDefinition[] => [
   futureMeeplesAction,
   collectAction,
   gainAction,
@@ -96,7 +98,7 @@ export const internalActionDefinitions: ActionDefinition[] = [
   reapAction,
   completeParentFatherAction,
   summerSellGrainAction,
-  summerBreadOrSellAction,
+  createSummerBreadOrSellAction(resolveAction),
   moorWoodToFuelAction,
   moorSpecialActionAfterListenersAction,
   moorSpecialActionApplyAction,

@@ -21,7 +21,7 @@ import { CARD_ID as IS_DOABLE_ID } from '../Stub_IsDoable_Override'
 import { CARD_ID as ON_RETURN_HOME_ID } from '../Stub_OnReturnHome_Accumulate'
 import { CARD_ID as SCOPE_OPPONENT_ID } from '../Stub_Scope_Opponent'
 import { runReturnHomeHooks } from '../../card-effects'
-import { internalActionDefinitions } from '../../../actions/internal-actions'
+import { internalActionDefinitions } from '../../../actions/index'
 import { getFenceCount } from '../../../actions/effects/fencing'
 import { requireActiveCardRegistry } from '../../active-registry'
 

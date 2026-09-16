@@ -10,27 +10,16 @@ import {
   removeVisibleTerrain,
   replaceTerrainWithField,
 } from './farm-terrain'
-import type { MoorSpecialActionCardState, MoorSpecialActionId } from './types'
+import type { MoorSpecialActionId } from './types'
 
 export type MoorSpecialActionPayload = {
   tile?: FarmTilePosition
 }
 
-const MOOR_SPECIAL_ACTION_IDS = new Set<string>([
-  'cut-peat',
-  'fell-trees',
-  'slash-and-burn',
-  'horse-market',
-  'hiring-fair',
-  'black-market',
-  'illicit-work',
-])
-
-export const isMoorSpecialActionId = (value: string): value is MoorSpecialActionId =>
-  MOOR_SPECIAL_ACTION_IDS.has(value)
-
-export const isMoorTerrainAction = (actionId: MoorSpecialActionId): boolean =>
-  actionId === 'cut-peat' || actionId === 'fell-trees' || actionId === 'slash-and-burn'
+import { isMoorTerrainAction } from '../projections/moor-special-actions'
+import { isMoorSpecialActionCardUsableByPlayer } from './special-action-availability'
+export { isMoorSpecialActionCardUsableByPlayer } from './special-action-availability'
+export { isMoorSpecialActionId, isMoorTerrainAction } from '../projections/moor-special-actions'
 
 const emptyResources = (): Resource => ({
   wood: 0,
@@ -59,15 +48,6 @@ export const createMoorSpecialActionSpace = (actionId: MoorSpecialActionId): Act
   resources: emptyResources(),
   takenBy: [],
 })
-
-export const isMoorSpecialActionCardUsableByPlayer = (
-  card: MoorSpecialActionCardState,
-  playerId: string,
-): boolean => {
-  if (card.location.kind === 'market') return true
-  if (card.location.kind === 'playerFaceUp') return card.location.playerId !== playerId
-  return false
-}
 
 const hasAdjacentField = (fields: readonly Field[], tile: FarmTilePosition): boolean => {
   const fieldKeys = new Set(fields.map((field) => positionKey(field)))

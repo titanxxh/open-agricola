@@ -1,6 +1,6 @@
 import type { ActionDefinition, ActionSpace, Resource } from '../contract/types'
 import { initializeFlowDerivedCanBeExecutedByPlayer } from './flow'
-import { internalActionDefinitions } from './internal-actions'
+import { createInternalActionDefinitions } from './internal-actions'
 import { getAdHocAction } from './helpers/ad-hoc-action-registry'
 import { cattleMarket } from '../cards/action/round-cattle-market'
 import { clayPit } from '../cards/action/common-clay-pit'
@@ -119,6 +119,8 @@ const baseActionDefinitions: ActionDefinition[] = [
   sideJob6,
   improvement6,
 ]
+
+export const internalActionDefinitions = createInternalActionDefinitions((id) => getActionDefinition(id))
 
 const actionDefinitionLookup = new Map(
   [...baseActionDefinitions, ...internalActionDefinitions].map((action) => [

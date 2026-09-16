@@ -7,7 +7,7 @@ import { Section } from '../components/common/Section'
 import { DangerButton } from '../components/common/DangerButton'
 import { API_BASE } from '../config'
 import { authErrorMessage } from './auth-errors'
-import { setPage } from './PageRouter'
+import { setPage } from '../utils/platform-page-url'
 
 type LinkedIdentity = {
   provider: 'github' | 'google'

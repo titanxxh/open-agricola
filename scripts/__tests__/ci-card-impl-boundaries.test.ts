@@ -13,6 +13,9 @@ const architectureChecks = [
   'pnpm run check:no-dsl -- --strict',
   'pnpm run check:catalog-types',
   'pnpm run check:card-impl-boundaries',
+  'pnpm run check:architecture-types',
+  'pnpm run check:dependencies',
+  'pnpm run check:browser-boundaries',
 ]
 
 describe('canonical architecture verification wiring', () => {

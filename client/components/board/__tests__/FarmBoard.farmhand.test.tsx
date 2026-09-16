@@ -3,7 +3,8 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, render } from '@testing-library/react'
 
-import type { PlayerState, Resource } from '../../../../shared/contract/types'
+import { getPlayerPanelSupplySummary } from '../../../../shared/domain/player-panel-summary'
+import type { GameState, PlayerState, Resource } from '../../../../shared/contract/types'
 import { FarmBoard, type FarmBoardProps } from '../FarmBoard'
 
 afterEach(() => cleanup())
@@ -66,6 +67,7 @@ const createProps = (
     players: [player],
     currentPlayer: player,
     displayPlayer: player,
+    playerPanelSummary: getPlayerPanelSupplySummary({ players: [player] } as GameState, player),
     devMode: false,
     currentStartPlayerId: '',
     nextStartPlayerId: '',

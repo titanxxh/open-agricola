@@ -11,7 +11,7 @@ type GainActionConfig = {
   players?: number[]
 }
 
-export const gainConfigByActionId = new Map<string, Partial<Resource>>()
+import { gainConfigByActionId } from '../gain-config'
 
 export const createGainAction = (config: GainActionConfig): ActionDefinition => {
   gainConfigByActionId.set(config.id, config.gain)

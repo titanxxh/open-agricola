@@ -27,7 +27,8 @@ const cases = {
 } satisfies Record<InteractionRequest['kind'], Case>
 
 describe('interaction command policy', () => {
-  it.each(Object.entries(cases))('maps %s', (kind, { channel, commands }) => {
+  it.each(Object.keys(cases) as Array<keyof typeof cases>)('maps %s', (kind) => {
+    const { channel, commands } = cases[kind]
     expect(interactionSubmitChannel(kind)).toBe(channel)
     expect(waitInteractionInputCommands(kind)).toEqual(commands)
   })

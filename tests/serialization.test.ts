@@ -46,6 +46,7 @@ describe('shared/session/serialization', () => {
       // projections.
       serialized.players.forEach((serializedPlayer, index) => {
         const {
+          lockedFarmTileKeys, playerPanelSummary, moorSpecialActionAvailability,
           specialStables,
           playedCardAnimalZones,
           farmCardAnimalZones,
@@ -54,6 +55,9 @@ describe('shared/session/serialization', () => {
           ...domainPlayer
         } = serializedPlayer
         expect(domainPlayer).toEqual(state.players[index])
+        expect(lockedFarmTileKeys).toEqual([])
+        expect(playerPanelSummary.housingCapacity.value).toBe(state.players[index]!.rooms)
+        expect(moorSpecialActionAvailability).toEqual({})
         expect(specialStables).toEqual([])
         expect(playedCardAnimalZones).toEqual([])
         expect(farmCardAnimalZones).toEqual([])

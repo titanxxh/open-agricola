@@ -158,7 +158,7 @@ const jsonSafe = JSON.parse(JSON.stringify(value ?? null))
 
 ## 3. 沙盒识别的 hook / phase / scope 白名单
 
-> **机器可校验段落（CI 会扫）**：本节的三个列表通过下面的标记块与 `shared/cards/card-effects.ts` 的 `cardEffectHooks`、`shared/custom-code/sandbox-listener-phases.ts` 的 `sandboxListenerPhases`、`shared/custom-code/sandbox-listener-scopes.ts` 的 `sandboxListenerScopes` 同源校验。**不要手动改下面这些标记块的格式**——会让 `pnpm run check:prompt-sync` 失败。
+> **机器可校验段落（CI 会扫）**：本节的三个列表通过下面的标记块与 `shared/projections/card-effect-hooks.ts` 的 `cardEffectHooks`、`shared/custom-code/sandbox-listener-phases.ts` 的 `sandboxListenerPhases`、`shared/custom-code/sandbox-listener-scopes.ts` 的 `sandboxListenerScopes` 同源校验。**不要手动改下面这些标记块的格式**——会让 `pnpm run check:prompt-sync` 失败。
 
 ### 3.1 `CARD_IMPL.effect` 可用 hook
 
@@ -714,7 +714,7 @@ const CARD_IMPL = {
 
 ### 9.2 修改 hook / phase / scope / denylist 代码 → 必须更新本文件
 
-- 在 `shared/cards/card-effects.ts` 的 `cardEffectHooks` 数组增删一项 → 改本文件 §3.1 同名 `prompt-sync` 块
+- 在 `shared/projections/card-effect-hooks.ts` 的 `cardEffectHooks` 数组增删一项 → 改本文件 §3.1 同名 `prompt-sync` 块
 - 在 `shared/custom-code/sandbox-listener-phases.ts` 的 `sandboxListenerPhases` 增删 phase → 改本文件 §3.2
 - 在 `shared/custom-code/sandbox-listener-scopes.ts` 的 `sandboxListenerScopes` 增删 scope → 改本文件 §3.4
 - 在 `shared/custom-code/ast-validator.ts` 的 `DENIED_IDENTIFIERS` / `DENIED_PROPERTY_ACCESS` 增删项 → 改本文件 §5.1 / §5.2

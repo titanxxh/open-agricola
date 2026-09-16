@@ -11,6 +11,7 @@
 import fs from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { walkSourceFiles } from './source-files'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
@@ -25,37 +26,21 @@ const DSL_KEYWORDS = [
   'DslCondition',
 ]
 
-const ALLOW_LIST_PATTERNS = [
-  /^CHANGELOG\.md$/,
-  /^scripts\/check-no-dsl\.ts$/,
-  /^scripts\/__tests__\/check-no-dsl\.test\.ts$/,
-  /^scripts\/__tests__\/fixtures\/dsl-samples\//,
-  // db.ts keeps the legacy `effect_dsl` column in v2/v3 migration SQL +
-  // drops it in v7 — the literal name still appears in the migration history
-  // even though new DBs end up with the column dropped.
-  /^server\/db\.ts$/,
-  /^server\/__tests__\/workshop-api\.test\.ts$/,
-]
+const DSL_EXCEPTIONS = new Map([
+  ['scripts/check-no-dsl.ts', 'The guard defines forbidden tokens'],
+  ['scripts/__tests__/check-no-dsl.test.ts', 'Regression tests exercise forbidden tokens'],
+  ['scripts/__tests__/fixtures/dsl-samples/dirty.ts', 'Intentional failing fixture'],
+  ['server/db.ts', 'Historical migration SQL drops the legacy column'],
+  ['server/__tests__/workshop-api.test.ts', 'Tests migrate historical database schemas'],
+])
 
-const SCAN_DIRS = ['shared', 'server', 'src', 'scripts']
-const SCAN_EXTS = new Set(['.ts', '.tsx', '.js', '.jsx', '.json'])
-const SKIP_DIRS = new Set(['node_modules', 'dist', '.git', '__stubs__'])
+const SCAN_DIRS = ['shared', 'server', 'client', 'replay-viewer', 'scripts', 'tests', 'e2e-tests']
 
 export type DslHit = { file: string; line: number; keyword: string; text: string }
 
-function walkDir(dir: string, repoRoot: string, out: string[] = []): string[] {
-  for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
-    if (SKIP_DIRS.has(entry.name)) continue
-    const full = path.join(dir, entry.name)
-    const rel = path.relative(repoRoot, full)
-    if (ALLOW_LIST_PATTERNS.some((rx) => rx.test(rel))) continue
-    if (entry.isDirectory()) {
-      walkDir(full, repoRoot, out)
-    } else if (SCAN_EXTS.has(path.extname(entry.name))) {
-      out.push(full)
-    }
-  }
-  return out
+export function scanDslFiles(repoRoot: string): string[] {
+  return SCAN_DIRS.flatMap(dir => walkSourceFiles(path.join(repoRoot, dir), /\.[cm]?[jt]sx?$|\.json$/))
+    .filter(file => !DSL_EXCEPTIONS.has(path.relative(repoRoot, file)))
 }
 
 export function findDslHits(files: string[]): DslHit[] {
@@ -77,11 +62,10 @@ export function findDslHits(files: string[]): DslHit[] {
 if (process.argv[1] && process.argv[1].endsWith('check-no-dsl.ts')) {
   const repoRoot = path.resolve(__dirname, '..')
   const strict = process.argv.includes('--strict')
-  const allFiles: string[] = []
-  for (const dir of SCAN_DIRS) {
-    const full = path.join(repoRoot, dir)
-    if (fs.existsSync(full)) walkDir(full, repoRoot, allFiles)
+  for (const [file, reason] of DSL_EXCEPTIONS) {
+    if (!reason || findDslHits([path.join(repoRoot, file)]).length === 0) throw new Error('stale DSL exception: ' + file)
   }
+  const allFiles = scanDslFiles(repoRoot)
   const hits = findDslHits(allFiles)
   if (hits.length === 0) {
     console.log('[check-no-dsl] ✓ no DSL keywords found')

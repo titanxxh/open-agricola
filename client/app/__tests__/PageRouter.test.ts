@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { beforeEach, describe, expect, it } from 'vitest'
 
-import { setPage } from '../PageRouter'
+import { setPage } from '../../utils/platform-page-url'
 
 describe('setPage URL hygiene', () => {
   beforeEach(() => {

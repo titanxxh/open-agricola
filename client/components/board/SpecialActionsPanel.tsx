@@ -1,6 +1,6 @@
 import type { Locale } from '../../../shared/i18n'
 import { t } from '../../../shared/i18n'
-import { isMoorSpecialActionCardUsableByPlayer } from '../../../shared/moor/special-actions'
+import type { SerializedPlayerState } from '../../../shared/session/serialization'
 import type { MoorSpecialActionCardState, MoorSpecialActionId } from '../../../shared/moor/types'
 import { publicAssetUrl } from '../../utils/public-asset-url'
 
@@ -13,6 +13,7 @@ type SpecialActionsPanelProps = {
   locale: Locale
   cards: MoorSpecialActionCardState[]
   currentPlayerId: string
+  availability: SerializedPlayerState['moorSpecialActionAvailability']
   canTakeSpecialAction: (card: MoorSpecialActionCardState, actionId: MoorSpecialActionId) => boolean
   selected: SelectedSpecialAction
   onTakeAction: (cardId: string, actionId: MoorSpecialActionId) => void
@@ -38,6 +39,7 @@ export function SpecialActionsPanel({
   locale,
   cards,
   currentPlayerId,
+  availability,
   canTakeSpecialAction,
   selected,
   onTakeAction,
@@ -49,7 +51,7 @@ export function SpecialActionsPanel({
       <div className="special-actions-panel__title">{t(locale, 'moor.specialActions.title')}</div>
       <div className="special-actions-panel__grid">
         {cards.map((card) => {
-          const cardUsable = isMoorSpecialActionCardUsableByPlayer(card, currentPlayerId)
+          const cardUsable = availability[card.id]?.cardUsable === true
           const cardLabel = card.actions.map((actionId) => specialActionLabel(locale, actionId)).join(' / ')
           return (
             <div

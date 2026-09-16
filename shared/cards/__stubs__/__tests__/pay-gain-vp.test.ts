@@ -9,7 +9,7 @@ import { ActionNode } from '../../../engine/nodes'
 import { clearActionHooks } from '../../../actions/hooks'
 import { registerStubCards, clearStubCards } from '../index'
 import { CARD_ID } from '../Stub_PayGainVp'
-import { internalActionDefinitions } from '../../../actions/internal-actions'
+import { internalActionDefinitions } from '../../../actions/index'
 import { computeScores } from '../../../domain/scoring'
 
 const gainAction = internalActionDefinitions.find(a => a.id === 'gain')!

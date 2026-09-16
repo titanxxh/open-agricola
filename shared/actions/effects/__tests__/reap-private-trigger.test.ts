@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { internalActionDefinitions } from '../../internal-actions'
+import { internalActionDefinitions } from '../../index'
 import type { GameState, PlayerState, Resource } from '../../../contract/types'
 import * as cardListeners from '../../../cards/card-listeners'
 import { makeCardFieldImpl } from '../../../cards/helpers/card-field'

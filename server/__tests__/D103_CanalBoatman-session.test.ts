@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
 import { stabilizeRandomHands } from './_helpers/stabilize-random-hands'
-import { internalActionDefinitions } from '../../shared/actions/internal-actions'
+import { internalActionDefinitions } from '../../shared/actions/index'
 import { executeCardListener, getRegisteredCardListeners, type CardListenerContext } from '../../shared/cards/card-listeners'
 import { getRoundPlacementOrder } from '../../shared/cards/helpers/round-placement'
 import type { ActionSpace, GameState, PlayerState , ActionFlow } from '../../shared/contract/types'

@@ -2,7 +2,7 @@
 import { cleanup, fireEvent, render, screen, within } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { LobbyPage } from '../LobbyPage'
-import { setPage } from '../PageRouter'
+import { setPage } from '../../utils/platform-page-url'
 
 const myRoomsResponse = vi.hoisted(() => ({ rooms: [] as unknown[] }))
 
@@ -63,7 +63,8 @@ vi.mock('../../contexts/LocaleContext', () => {
   }
 })
 
-vi.mock('../PageRouter', () => ({
+vi.mock('../../utils/platform-page-url', async (importOriginal) => ({
+  ...await importOriginal<typeof import('../../utils/platform-page-url')>(),
   setPage: vi.fn(),
 }))
 

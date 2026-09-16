@@ -4,7 +4,7 @@ import { requireActiveCardRegistry } from '../../shared/cards/active-registry'
 import { gainLeaf, payLeaf } from '../../shared/cards/helpers/pay-gain-node'
 import { markAllWorkersUsed } from '../../shared/domain/player'
 import { actionDefinitions } from '../../shared/actions'
-import { internalActionDefinitions } from '../../shared/actions/internal-actions'
+import { internalActionDefinitions } from '../../shared/actions/index'
 import { ALL_CARD_IMPLS } from '../../shared/cards/register-all'
 
 const SOWER = 'C115_Sower'

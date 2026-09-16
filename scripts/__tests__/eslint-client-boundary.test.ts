@@ -29,6 +29,7 @@ describe('main client import boundary', () => {
     '../../shared/cards/registry-runtime.js',
     '../../shared/cards/A/A001_Test',
     '../../shared/cards/E/E001_Test',
+    '../../shared/cards/M/M001_Test',
     '../../shared/cards/community/C001_Test',
     '../../shared/cards/major/Major_Test',
     '../../shared/cards/__stubs__/STUB_Test',
@@ -39,7 +40,7 @@ describe('main client import boundary', () => {
     `)
 
     expect(errors.map((error) => error.ruleId)).toEqual([
-      '@typescript-eslint/no-restricted-imports',
+      'architecture/imports',
     ])
   })
 
@@ -63,6 +64,7 @@ describe('main client import boundary', () => {
     '../../shared/cards/registry-runtime.js',
     '../../shared/cards/A/A001_Test',
     '../../shared/cards/E/E001_Test',
+    '../../shared/cards/M/M001_Test',
     '../../shared/cards/community/C001_Test',
     '../../shared/cards/major/Major_Test',
     '../../shared/cards/__stubs__/STUB_Test',
@@ -74,7 +76,7 @@ describe('main client import boundary', () => {
     `)
 
     expect(errors.map((error) => error.ruleId)).toEqual([
-      'no-restricted-syntax',
+      'architecture/imports',
     ])
   })
 

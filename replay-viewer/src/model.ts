@@ -9,7 +9,7 @@ import type {
   ReplaySegmentDescriptor,
   ReplayStepSummary,
 } from '../../shared/contract/protocol/replay'
-import { filterSerializedStateForPlayer } from '../../shared/session/serialization'
+import { filterSerializedStateForPlayer } from '../../shared/projections/serialized-state'
 
 export const validPerspective = (
   value: string | null,

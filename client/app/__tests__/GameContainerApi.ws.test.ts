@@ -186,7 +186,7 @@ describe('GameContainerApi WS player identity', () => {
     expect(shouldShowPendingChoiceInInteractionBar({ promptKey: 'ui.interactionExchangeChoice' })).toBe(false)
   })
 
-  it('disables Moor special actions when all workers at home are sick', () => {
+  it('uses authoritative Moor special action availability', () => {
     const player = {
       id: 'p1',
       resources: {
@@ -206,8 +206,8 @@ describe('GameContainerApi WS player identity', () => {
     } as MoorSpecialActionCardState
 
     expect(canTakeVisibleMoorSpecialAction(state, player, card, 'hiring-fair')).toBe(false)
-    player.sickWorkerIds = []
-    expect(canTakeVisibleMoorSpecialAction(state, player, card, 'hiring-fair')).toBe(true)
+    const availablePlayer = { ...player, moorSpecialActionAvailability: { [card.id]: { 'hiring-fair': true } } }
+    expect(canTakeVisibleMoorSpecialAction(state, availablePlayer, card, 'hiring-fair')).toBe(true)
   })
 
   it('maps compact score card bonus VP from the unified category only', () => {

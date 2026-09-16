@@ -1,5 +1,4 @@
-import type { GameState, PlayerState } from '../../../shared/contract/types'
-import { getPlayerPanelSupplySummary } from '../../../shared/domain/player-panel-summary'
+import type { ClientGameState } from '../../services/rehydrate'
 import {
   FarmBoard,
   type FarmBoardActions,
@@ -7,7 +6,7 @@ import {
 } from './FarmBoard'
 
 export interface PlayerFarmPanelProps {
-  state: GameState
+  state: ClientGameState
   viewedPlayerId: string
   view: Omit<
     FarmBoardView,
@@ -24,8 +23,8 @@ export function PlayerFarmPanel({
   actions,
   inlineCardStats,
 }: PlayerFarmPanelProps) {
-  const currentPlayer: PlayerState | undefined = state.players[state.currentPlayerIndex]
-  const displayPlayer: PlayerState | undefined =
+  const currentPlayer = state.players[state.currentPlayerIndex]
+  const displayPlayer =
     state.players.find((p) => p.id === viewedPlayerId) ?? currentPlayer
 
   if (!currentPlayer || !displayPlayer) return null
@@ -44,7 +43,7 @@ export function PlayerFarmPanel({
           currentPlayer,
           displayPlayer,
           infirmaryWorkerCount,
-          playerPanelSummary: getPlayerPanelSupplySummary(state, displayPlayer),
+          playerPanelSummary: displayPlayer.playerPanelSummary,
         }}
         actions={actions}
         inlineCardStats={inlineCardStats}

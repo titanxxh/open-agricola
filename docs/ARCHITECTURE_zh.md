@@ -20,7 +20,7 @@
 - **弱客户端**：前端只渲染、收集输入、管理本地 UI 临时态，不裁定规则。
 - **命令驱动**：前端只发"我要做什么"，后端校验、执行、落状态、产生日志后广播。
 - **单一领域实现**：行动 / 引擎 / 卡牌 / 回合 / 收获 / 计分统一放 `shared/`，前后端共用同一套领域模型。
-- **三层物理边界**：`shared/` ⇄ `server/` ⇄ `client/` 由 ESLint `no-restricted-imports` 强制（CI error）。
+- **三层物理边界**：`shared/` ⇄ `server/` ⇄ `client/` 由 ESLint `architecture/imports` 强制（CI error）。
 - **卡牌就地闭环**：卡牌特效写在卡牌文件内部，不向核心路径扩散。
 - **Supply token 也是支付资源**：fence / stable 这类玩家 supply 上限不能写死为 15 / 4；读取必须走 supply-token helper 或 payment resource pipeline。
 
@@ -107,8 +107,8 @@ e2e-tests/     Playwright 浏览器测试
 
 ESLint 三层强制（`eslint.config.js`）：
 - `client/{app,components,services,hooks,contexts,utils}/**` 禁 import `shared/session`、`shared/engine`、card source、card generated catalog 和 per-card impl modules；UI metadata 必须走 `public/cards-manifest.json` + `client/services/card-meta`
-- `client/sandbox/**` 全开
-- 附加 `no-restricted-syntax` 禁动态 `import('shared/session/...')` / `import('shared/engine/...')` / card impl-bootstrap 字面量绕过
+- 特权入口和 Worker 文件精确列于 `scripts/architecture-policy.mjs`；普通页面和回放不保留规则运行时例外
+- 统一解析后的 import 规则覆盖静态导入、重导出、字面量动态导入与 require，避免 flat config 覆盖
 - violation = CI error
 
 ---
@@ -1076,7 +1076,7 @@ B113 / B141。
 
 运行时跨卡身份/能力读取必须优先落到 `CardDefinition` typed metadata 和 played-card helper：`getPlayedCardDefinitions(player)`、`collectCardDefinitionsAs(player, type)`、`playerHasCardCapability(player, capability, { asType? })` 只检查 `player.improvements` / `player.minorPlayed` / `player.occupationPlayed`，手牌不参与；`asType` 复用 `cardCountsAs`，因此 dual-type card 仍按既有身份语义进入查询。当前已登记的通用 metadata 包括 `preventsHandDiscard`、`fireplaceIdentity`、`cookingHearthIdentity`、`ovenIdentity`、`firewoodBuildTrigger`、`potteryIdentity`、`animalHolder`、`blocksHouseAnimalZones`、`waresSalesmanGains`。这些字段属于 Card Source `meta`，可投影进 catalog / manifest，但不新增前端展示行为。`ovenIdentity` 在 OA 中表达 oven-family identity，包含 Oven Installation 这类 upgrade/minor，供 Oven Damper 等 oven-family 计分使用；这是项目内的有意抽象，不表示每张牌都必须提供 bake exchange 或触发 Firewood，升级牌可用 `firewoodBuildTrigger:false` 保留计分身份但退出 build-trigger 语义。已迁移路径包括 B146/C35 弃手牌禁止、B153 major identity scoring、C75/A27 fireplace/hearth/oven trigger、B31 pottery identity、E144 wares gain options、D86 animal-holder occupation filtering、D12 house animal zone blocking、M72 oven-family scoring。
 
-`check:card-impl-boundaries` 属于 `pnpm run check:architecture`；两份手动 CI workflow 与本机架构验证都复用这个唯一入口。生产 `shared/cards/A-E/M/*.ts` 中的运行时跨非 Major 卡 id 读取必须迁入通用 capability、action context provenance、harvest outcome、breeding threshold modifier、synthetic occupancy、trigger snapshot 等扩展点；`Major_*`、`reaches`、`allowedPurchases` 和 prerequisite candidate list 是明确例外。需要临时审计时可显式传 `--warn-only`，但不能作为合入验证路径。
+`check:card-impl-boundaries` 属于 `pnpm run check:architecture`；两份手动 CI workflow 与本机架构验证都复用这个唯一入口。生产 Card Source（包括嵌套普通卡、M、major 和 community） 中的运行时跨非 Major 卡 id 读取必须迁入通用 capability、action context provenance、harvest outcome、breeding threshold modifier、synthetic occupancy、trigger snapshot 等扩展点；`Major_*`、`reaches`、`allowedPurchases` 和 prerequisite candidate list 是明确例外。需要临时审计时可显式传 `--warn-only`，但不能作为合入验证路径。
 
 卡面文字明确点名另一张普通卡时，源卡可以把该目标作为 named printed target 使用；目标 id 必须出现在 `reaches` 或等价声明式 metadata 中，runtime 只允许做存在性 / 拥有者 / 是否已打出这类公开检查。源卡不得读取目标卡 `cardStates` / `counters` / `extraData` 等私有实现状态，也不得据此模拟目标卡能力分支；checker 例外必须绑定具体 source-target pair 和允许的读取形态，不能用粗粒度 allowlist 绕过边界。
 
@@ -1420,8 +1420,8 @@ BUG_REPORT_TOKEN_ACTIVE_KEY_ID
 | Bundle | 入口 | 路径 | 约束 |
 |---|---|---|---|
 | `client-app` | `client/main.tsx` | `client/{app,components,services,hooks,contexts,utils}/` | 走 WS；`shared/*` 只准用 `contract` / `domain` / `i18n`，卡牌展示走 manifest-backed `card-meta` + `custom-card-metadata` |
-| `client-sandbox` | `client/sandbox/index.tsx` | `client/sandbox/` | 懒加载 Workshop sandbox UI；规则仍由后端 sandbox 路径执行。该目录是前端唯一允许引入完整 `shared/*` 的边界 |
-| `local-sandbox-worker` | `client/local-sandbox/worker.ts`（`new Worker(new URL(...))` 懒加载） | `client/local-sandbox/` | 工坊试玩 browser 模式的引擎 Worker。worker 侧四文件（worker / worker-core / browser-runtime / browser-executor）允许完整 `shared/*`（eslint S6c 豁免）；`local-transport` / `persistence` / `workshop-launch` 被主 bundle 引用，对 shared 仅 type-only import，保证引擎不进主 bundle |
+| `client-sandbox` | `client/sandbox/index.tsx` | `client/sandbox/` | 懒加载 Workshop sandbox UI；规则仍由后端 sandbox 路径执行。权限仅适用于 `scripts/architecture-policy.mjs` 列出的精确入口和文件，不豁免整个目录 |
+| `local-sandbox-worker` | `client/local-sandbox/worker.ts`（`new Worker(new URL(...))` 懒加载） | `client/local-sandbox/` | 工坊试玩 browser 模式的引擎 Worker。worker 侧四文件（worker / worker-core / browser-runtime / browser-executor）允许完整 `shared/*`（精确文件权限）；`local-transport` / `persistence` / `workshop-launch` 被主 bundle 引用，对 shared 仅 type-only import，保证引擎不进主 bundle |
 | `replay-viewer` | `replay-viewer/src/main.tsx` | `replay-viewer/` | 无登录、Cookie、WS 或命令发送；只读取公开 Replay JSON，并复用归档时编译进去的显示过滤与棋盘投影 |
 
 主 bundle 预算：`scripts/check-bundle-size.ts` strict（main ≤ 550KB raw / ≤ 170KB gzip）。
@@ -1467,8 +1467,8 @@ BUG_REPORT_TOKEN_ACTIVE_KEY_ID
 `eslint.config.js` 关键规则：
 
 - `client/{app,components,services,hooks,contexts,utils}/**` 禁 import `shared/session`、`shared/engine`、card source、card generated catalog 和 per-card impl modules；UI metadata 必须走 `public/cards-manifest.json` + `client/services/card-meta`。
-- `client/sandbox/**` 全开。
-- `no-restricted-syntax` 禁动态字符串 `import('shared/session/...')` / `import('shared/engine/...')` / card impl-bootstrap 字面量绕过。
+- 特权入口和 Worker 文件精确列于 `scripts/architecture-policy.mjs`；普通页面和回放不保留规则运行时例外。
+- TypeScript 模块解析统一处理相对路径；非字面量依赖、生产代码导入被排除的源码、缺失根目录、语法错误和失效权限都会失败。模块 URL 必须指向已授权入口；Vite 闭包检查保留虚拟模块的依赖边。
 - `package.json` 已声明 `sideEffects` 给 bundler tree-shaking 基线。
 - violation = CI error。
 
@@ -1507,19 +1507,29 @@ GameContextRouter
 | Session | `server/__tests__/*.test.ts` | 直接实例化 `GameSession`，调 `takeAction` 等，断言 `resp.state` / `pending` / `interaction` / `ok` | ✅（slow 项目，按文件名 glob `[A-E][0-9]*-session.test.ts` 一卡一文件） |
 | E2E | `e2e-tests/*.spec.ts` | Playwright 双窗口浏览器，验证多人链路 | 手动 / Workflow |
 
+#### 后端展示投影
+
+`serializeState` 为每位玩家生成 `lockedFarmTileKeys`、`playerPanelSummary` 和 `moorSpecialActionAvailability`。同步和持久化计算前均激活所属 Session 上下文。实时页面、本地 Worker 页面和回放只读这些快照字段；恢复权威 PlayerState 时剥离它们。纯视角遮蔽位于 `shared/projections/serialized-state.ts`，不依赖规则运行时。历史 Viewer 和 payload 保持不可变；新增字段为加法扩展，由新 Viewer 消费。
+
+行动统一在 `shared/actions/index.ts` 装配；季节内部行动在构造时捕获完整解析器，保留基础、内部和 ad-hoc 行动的递归替换、alternative 和 before-flow 判断。主改元数据、gain 配置、页面导航和 LLM 流式调用分离为独立模块以消除反向导入。
+
 #### 架构 fitness 覆盖矩阵
 
 | 约束 | 可执行覆盖 | 边界 |
 |---|---|---|
-| `shared` / `server` / `client` 物理分层 | ESLint `no-restricted-imports` error | 测试目录有显式豁免；只检查 import，不证明 runtime ownership。 |
+| `shared` / `server` / `client` 物理分层 | ESLint `architecture/imports` error | 测试目录有显式豁免；只检查 import，不证明 runtime ownership。 |
 | Card Source scope 与跨卡引用 | `pnpm run check:card-impl-boundaries` | TypeScript AST 检查生产 Card Source 文件及同文件卡牌 ID 字面量或顶层 const 别名。`Major_*`、`reaches`、购买候选和前置候选是显式例外；不追踪跨文件数据流。source scope 为空或不匹配时失败。 |
+| 运行时循环依赖 | `pnpm run check:dependencies` | 所有运行时 SCC、自环和字面量动态导入环都会失败，不保留循环基线。显式 type-only 声明被擦除；verbatimModuleSyntax 下的行内 type specifier 仍加载模块。 |
+| 浏览器与回放隔离 | `pnpm run check:browser-boundaries` | 同时检查两个生产入口的源码传递依赖和真实 Vite 模块图。元数据权限精确到文件并附原因；新增 Worker 入口、越权进入沙盒和入口证据缺失都会失败。 |
+| 架构类型契约 | `pnpm run check:architecture-types` | `tsconfig.architecture.json` 对策略与检查器测试执行真正的 no-emit 类型检查，包括正反类型断言；Vitest 运行成功不等于类型通过。 |
+| 扫描完整性 | no-DSL、test-project coverage、Card Source 与 field-boundary 检查 | 根目录和语法必须有效；源码声明与全部已注册实现独立比对，支持 major 文件多声明。Parents 保持独立的元数据/运行时模型。 |
 | trailing listener snapshot | `pnpm run check:card-impl-boundaries` | 从解析后的 `ALL_CARD_IMPLS` 枚举 handler，其 ID 必须覆盖所有声明了 `impl` 的生产 Card Source。`during`、`immediatelyAfter`、`after` 中直接读取 `improvements` / `minorPlayed` / `occupationPlayed` 长度会失败；非 trailing 读取和 membership 检查仍允许。门禁只解析实际 handler 函数体，不跟踪 helper 调用或派生值。runtime scope 为空、不完整或无法解析时失败；runtime 诊断只标识卡牌与 listener，不伪造原始源码行号。 |
 | listener 状态纯净 | 行为测试与代码评审 | handler 必须保持 state-pure flow builder，但不声称存在全程序 TypeScript mutation proof；`check:card-impl-boundaries` 不执行该约束。 |
 | 生成目录与 Card Source 一致 | `pnpm run check:generated-cards-sync` | 结构化校验 source/catalog 相等，不硬编码卡牌数量。 |
 | `GameSession` 持有服务端命令边界 | `CONTEXT.md`、ADR-0014、review、三层 import error | 这是 ownership，不表示只有一个源文件包含赋值；不声称完成 whole-program mutation proof。 |
 | canonical 架构接线 | `pnpm run check:architecture` + `scripts/__tests__/ci-card-impl-boundaries.test.ts` | 两份 CI workflow 仅手动触发且各调用一次 aggregator；当前合入证据来自可信本机全量 CI。 |
 
-`vitest.config` 分多个 fast 子 project（`fast-shared` / `fast-cards` / `fast-card-runtime` / `fast-client` / `fast-server` / `fast-scripts` / `fast-tests`）以及 `slow` / `llm`。`pnpm test:fast` 先运行 `check:test-project-coverage`，确保新 fast projects 覆盖旧 fast 文件集合且没有重复。`pnpm test:fast` CI 默认；`pnpm test:slow` 单卡 session 测试；`pnpm run test:e2e` 需后端 + 前端在跑；`pnpm exec vitest run <file>` 单文件。
+`vitest.config` 分多个 fast 子 project（`fast-shared` / `fast-cards` / `fast-card-runtime` / `fast-client` / `fast-server` / `fast-scripts` / `fast-tests`）以及 `slow` / `llm`。`pnpm test:fast` 先运行 `check:test-project-coverage`，独立发现仓库测试文件，并确保每个文件恰好归属一个 fast、slow 或 LLM project。`pnpm test:fast` CI 默认；`pnpm test:slow` 单卡 session 测试；`pnpm run test:e2e` 需后端 + 前端在跑；`pnpm exec vitest run <file>` 单文件。
 
 ### 13.2 后端边界测试驱动入口
 
@@ -1590,7 +1600,7 @@ pnpm run build              # tsc + vite build
 
 1. **后端权威**：规则在 `shared/` + `server/`；前端不裁定。
 2. **三层物理边界**：`shared/` ⇄ `server/` ⇄ `client/`；ESLint CI error 强制。
-3. **双 client bundle**：`client-app` 不引 `shared/{engine,session,actions,cards,custom-code,draft}`；`client/sandbox` 全开。
+3. **双 client bundle**：`client-app` 不引 `shared/{engine,session,actions,cards,custom-code,draft}`；sandbox 和 Worker 仅按 `scripts/architecture-policy.mjs` 中的精确入口及文件授权。
 4. **WS 游戏主链路**：`/ws` 收 `ClientCommand`，发 `StateUpdateEnvelope`；Game Context、Replay 和 Bug Report 使用版本化 HTTP 产品接口。
 5. **InteractionState 是前端唯一真相**：`stateId ∈ {idle, wait, gameover}`；`wait` 下用 `request.kind` 分流。
 6. **节点树是唯一状态机**：`PendingAction` union 已消除；"等什么"由 `engine.peekPendingEnvelope()` / pending host 派生。

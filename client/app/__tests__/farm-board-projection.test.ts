@@ -31,7 +31,8 @@ const resources = (overrides: Partial<Resource> = {}): Resource => ({
   ...overrides,
 })
 
-const createPlayer = (overrides: Partial<PlayerState> = {}): PlayerState => ({
+const createPlayer = (overrides: Partial<PlayerState & { lockedFarmTileKeys: string[] }> = {}): PlayerState & { lockedFarmTileKeys: string[] } => ({
+  lockedFarmTileKeys: [],
   id: 'p1',
   name: 'Player 1',
   color: 'red',
@@ -376,6 +377,7 @@ describe('buildFarmBoardProjection', () => {
       fields: [{ row: 0, col: 1, stacks }],
       stableTiles: [{ row: 1, col: 0 }],
       farmTerrain: [{ row: 1, col: 1, kind: 'forest' }],
+      lockedFarmTileKeys: ['1-1'],
       farmyardSpaceStates: [{
         spaceKey: '1-1',
         sourceCardId: 'LockCard',

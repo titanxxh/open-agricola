@@ -11,6 +11,9 @@ import {
 } from '../check-card-impl-boundaries'
 
 const writeFixture = (root: string, rel: string, content: string): string => {
+  for (const directory of ['A', 'B', 'C', 'D', 'E', 'M', 'major', 'community', 'helpers', '__stubs__']) {
+    mkdirSync(path.join(root, 'shared/cards', directory), { recursive: true })
+  }
   const full = path.join(root, rel)
   mkdirSync(path.dirname(full), { recursive: true })
   writeFileSync(full, content)
@@ -18,6 +21,32 @@ const writeFixture = (root: string, rel: string, content: string): string => {
 }
 
 describe('check-card-impl-boundaries', () => {
+  it('fails closed on a missing deck and malformed source', () => {
+    const root = mkdtempSync(path.join(tmpdir(), 'card-scope-'))
+    expect(() => walkProductionCardFiles(root)).toThrow()
+    const file = writeFixture(root, 'shared/cards/A/A001_Broken.ts', 'export const =')
+    expect(() => checkCardImplBoundaries([file])).toThrow()
+  })
+
+  it('discovers nested, major and community Card Sources independently of filenames', () => {
+    const root = mkdtempSync(path.join(tmpdir(), 'card-scope-'))
+    const nested = writeFixture(root, 'shared/cards/A/nested/A999_Test.ts', "export const A999_Test = defineMinorCard({ meta: { id: 'A999_Test' } })")
+    const major = writeFixture(root, 'shared/cards/major/fixture.ts', "export const Major_One = defineMajorCard({ meta: { id: 'Major_One' } }); export const Major_Two = defineMajorCard({ meta: { id: 'Major_Two' } })")
+    const community = writeFixture(root, 'shared/cards/community/custom.ts', "export const CUSTOM_Test = defineMinorCard({ meta: { id: 'CUSTOM_Test' } })")
+    const files = walkProductionCardFiles(root)
+    expect(files).toEqual([nested, community, major].sort())
+    expect(checkCardImplBoundaries(files)).toMatchObject({ cardSourcesChecked: 4, scopeErrors: [] })
+  })
+
+  it('includes new card layouts in field-boundary scanning', () => {
+    const root = mkdtempSync(path.join(tmpdir(), 'card-layout-'))
+    const file = writeFixture(root, 'shared/cards/extra/CUSTOM_Probe.ts', "export const CUSTOM_Probe = defineMinorCard({ meta: { id: 'CUSTOM_Probe' }, impl: { effect: ({ player }) => player.fields.length } })")
+    expect(walkProductionCardFiles(root)).toContain(file)
+    const fields = walkProductionFieldBoundaryFiles(root)
+    expect(fields).toContain(file)
+    expect(checkFieldStorageBoundaries(fields)).not.toEqual([])
+  })
+
   it('fails when the production scope is empty', () => {
     const result = checkCardImplBoundaries([], [])
 

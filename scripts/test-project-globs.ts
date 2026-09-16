@@ -16,20 +16,6 @@ export const BASE_EXCLUDE = isInsideWorktree
 export const SHARED_EXCLUDE = [...BASE_EXCLUDE, LLM_GLOB]
 export const FAST_EXCLUDE = [...SHARED_EXCLUDE, ...SLOW_INCLUDE]
 
-export const LEGACY_FAST_INCLUDE = [
-  'shared/**/*.test.ts',
-  'shared/**/*.test.tsx',
-  'client/**/*.test.ts',
-  'client/**/*.test.tsx',
-  'tests/**/*.test.ts',
-  'scripts/**/__tests__/*.test.ts',
-  'server/__tests__/*.test.ts',
-  'server/game/**/__tests__/*.test.ts',
-  'server/connection/**/__tests__/*.test.ts',
-  'server/oauth/**/__tests__/*.test.ts',
-  'server/workshop-pr/__tests__/*.test.ts',
-]
-
 export const FAST_SHARED_INCLUDE = [
   'shared/**/*.test.ts',
   'shared/**/*.test.tsx',

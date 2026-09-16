@@ -1,7 +1,6 @@
 import type { ActionDefinition, ActionFlow, ActionSpace, Resource } from '../contract/types'
 import { bakeBreadAction } from '../actions/effects/bake-bread'
-import { isActionDoableInFlowContext } from '../actions/flow'
-import { getActionDefinition } from '../actions/index'
+import { isActionDoableInFlowContext, type FlowActionResolver } from '../actions/flow'
 
 export const summerSourceCard = 'through-the-seasons:summer'
 
@@ -21,6 +20,7 @@ const emptyResources: Resource = {
 
 const breadOrSellHostSpace = (
   candidate: ActionDefinition | ActionSpace | undefined,
+  summerBreadOrSellAction: ActionDefinition,
 ): ActionSpace => {
   if (candidate && 'resources' in candidate && 'takenBy' in candidate) return candidate
   return {
@@ -92,6 +92,7 @@ export const summerBreadOrSellFlow = (
   state: Parameters<ActionDefinition['canBeExecutedByPlayer']>[0],
   player: Parameters<ActionDefinition['canBeExecutedByPlayer']>[1],
   space: ActionSpace,
+  resolveAction: FlowActionResolver,
 ): ActionFlow | undefined => {
   const children: ActionFlow[] = []
   if (
@@ -102,7 +103,7 @@ export const summerBreadOrSellFlow = (
       player,
       space,
       sourceCard: summerSourceCard,
-      resolveAction: getActionDefinition,
+      resolveAction,
     })
   ) {
     children.push(summerBakeLeaf())
@@ -117,17 +118,20 @@ export const summerBreadOrSellFlow = (
   }
 }
 
-export const summerBreadOrSellAction: ActionDefinition = {
-  id: 'season-summer-bread-or-sell',
-  nameKey: 'actions.season-summer-farmers-market.option-bread-or-sell',
-  descriptionKey: 'actions.season-summer-farmers-market.option-bread-or-sell',
-  roundAvailable: 1,
-  gainPerRound: {},
-  canBeExecutedByPlayer: function (this: ActionDefinition | ActionSpace, state, player) {
-    return summerBreadOrSellFlow(state, player, breadOrSellHostSpace(this)) !== undefined
-  },
-  execute: ({ state, player, space }) => {
-    const flow = summerBreadOrSellFlow(state, player, space)
-    return flow ? { type: 'flow', flow } : { type: 'ok' }
-  },
+export const createSummerBreadOrSellAction = (resolveAction: FlowActionResolver): ActionDefinition => {
+  const action: ActionDefinition = {
+    id: 'season-summer-bread-or-sell',
+    nameKey: 'actions.season-summer-farmers-market.option-bread-or-sell',
+    descriptionKey: 'actions.season-summer-farmers-market.option-bread-or-sell',
+    roundAvailable: 1,
+    gainPerRound: {},
+    canBeExecutedByPlayer: function (this: ActionDefinition | ActionSpace, state, player) {
+      return summerBreadOrSellFlow(state, player, breadOrSellHostSpace(this, action), resolveAction) !== undefined
+    },
+    execute: ({ state, player, space }) => {
+      const flow = summerBreadOrSellFlow(state, player, space, resolveAction)
+      return flow ? { type: 'flow', flow } : { type: 'ok' }
+    },
+  }
+  return action
 }

@@ -1,3 +1,3 @@
 export * from './cards'
 export * from './ids'
-export * from './types'
+export type * from './types'

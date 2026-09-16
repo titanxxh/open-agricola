@@ -5,7 +5,7 @@ import { useLocale } from '../contexts/LocaleContext'
 import { LocaleSwitcher } from '../components/common/LocaleSwitcher'
 import { BrandMark } from '../components/common/BrandMark'
 import { authErrorMessage } from './auth-errors'
-import { setPage } from './PageRouter'
+import { setPage } from '../utils/platform-page-url'
 
 function safeReturnTo(raw: unknown): string | null {
   if (typeof raw !== 'string' || !raw.startsWith('/') || raw.startsWith('//') || raw.includes('\\')) return null

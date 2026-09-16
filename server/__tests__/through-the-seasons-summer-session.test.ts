@@ -1,4 +1,6 @@
 import { describe, expect, it } from 'vitest'
+import { registerActionHook, unregisterActionHook } from '../../shared/actions/hooks'
+import { registerAdHocAction } from '../../shared/actions/helpers/ad-hoc-action-registry'
 import { GameSession, type SessionResponse } from '../game/authoritative-session'
 import { markAllWorkersUsed, setActiveWorkerCount, setWorkersAtHome } from '../../shared/domain/player'
 import { emptyResources } from '../../shared/session/state-bootstrap'
@@ -486,6 +488,31 @@ describe('Through the Seasons Summer rules', () => {
     expect(resp.interaction.stateId).toBe('wait')
     expect(resp.state.players[0]!.occupationPlayed).toContain('A114_SeasonalWorker')
     expect(resp.interaction.promptKey).toBe('ui.interactionSelectTrigger')
+  })
+
+  it('resolves replacement doability and execution through the complete ad-hoc resolver', () => {
+    let doable = false
+    const id = 'card_architecture_summer_replacement'
+    registerAdHocAction({
+      id, nameKey: 'actions.gain.name', descriptionKey: 'actions.gain.description', roundAvailable: 1, gainPerRound: {},
+      canBeExecutedByPlayer: () => doable,
+      execute: ({ player }) => { player.resources.food += 1; return { type: 'ok' } },
+    })
+    const session = setupSummer()
+    registerActionHook({ id, actions: ['bake-bread'], phases: ['computeReplace'], handler: () => ({ actionId: id }) })
+    try {
+      fillFarmyardWithFields(session)
+      const player = session.state.players[0]!
+      player.resources.grain = 0
+      expect(availableIds(session)).not.toContain(summerActionId)
+      doable = true
+      expect(availableIds(session)).toContain(summerActionId)
+      const food = player.resources.food
+      const response = session.takeAction(0, summerActionId)
+      expect(response.ok).toBe(true)
+      expect(response.state.players[0]!.resources.food).toBe(food + 1)
+      expect(response.interaction).toEqual(session.getState().interaction)
+    } finally { unregisterActionHook(id); session.dispose() }
   })
 
   it('adds one grain to Day Laborer in Summer', () => {

@@ -169,45 +169,7 @@ export type CardEffectField = CardEffectHook
   | 'getInvalidAnimals'
   | 'getSpecialStablePositions' | 'applySpecialStable' | 'getBuiltSpecialStables'
 
-export const cardEffectHooks: CardEffectField[] = [
-  'onBuy',
-  'onBeforeWork',
-  'onRoundStart',
-  'onHarvest',
-  'onRoundEnd',
-  'onEndTurn',
-  'onReturnHome',
-  'onBeforeReturnHome',
-  'onStartReturnHome',
-  'onAfterRoundEnd',
-  'onBeforeHarvest',
-  'onStartHarvest',
-  'onStartHarvestFieldPhase',
-  'onHarvestFieldPhase',
-  'onEndHarvestFieldPhase',
-  'onAfterReap',
-  'onStartHarvestFeedingPhase',
-  'onHarvestFeedingPhase',
-  'onEndHarvestFeedingPhase',
-  'onEndHarvest',
-  'onAfterHarvest',
-  'onBeforeEndGame',
-  'onBeforeStartOfTurn',
-  'onBeforePlayerTurn',
-  'onAllWorkersPlaced',
-  'resolveChoice',
-  'contributeExtraTurn',
-  'computeBonusScore',
-  'computeSharedPostScore',
-  'computeCostedBonus',
-  'computeExtraRoomCapacity',
-  'computeHarvestBreedOrderPriority',
-  'onComputeAnimalZones',
-  'computeLockedFarmTiles',
-  'getInvalidAnimals',
-  'getBuiltSpecialStables',
-]
-
+export { cardEffectHooks } from '../projections/card-effect-hooks'
 type FlowEffectHandler = (
   state: GameState,
   player: PlayerState,

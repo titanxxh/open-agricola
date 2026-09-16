@@ -8,8 +8,8 @@ const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
 const cardsRoot = path.resolve(__dirname, '..')
 const repoRoot = path.resolve(__dirname, '../../..')
-const productionDeckDirs = ['A', 'B', 'C', 'D', 'E']
-const skippedDirectoryNames = new Set(['__tests__', '__stubs__', 'helpers'])
+const productionDeckDirs = ['A', 'B', 'C', 'D', 'E', 'M', 'major', 'community', 'helpers']
+const skippedDirectoryNames = new Set(['__tests__', '__stubs__'])
 const resultResourceFields = new Set(['resourcesGained', 'resourcesPaid'])
 const extraDataResourceFields = new Set(['resourcesGained', 'resourcesPaid', 'bonusUsed'])
 
@@ -36,6 +36,16 @@ type ShapeCheck = {
 }
 
 const allowedContextResultUses = {
+  'shared/cards/M/M053_ForestHut.ts': {
+    reason: 'reads selectedPositions from a successful choice result',
+    expectedContextResultReferences: 3,
+    expectedResultPaths: ['extraData', 'extraData.selectedPositions', 'type'],
+  },
+  'shared/cards/M/M059_NaturesFertilizer.ts': {
+    reason: 'reads selectedPositions from a successful choice result',
+    expectedContextResultReferences: 3,
+    expectedResultPaths: ['extraData', 'extraData.selectedPositions', 'type'],
+  },
   'shared/cards/A/A094_LazySowman.ts': {
     reason: 'computeArgs request kind guard for extra options',
     expectedContextResultReferences: 2,
@@ -193,7 +203,7 @@ function isIdentifierAlias(expression: ts.Expression, aliases: Set<string>): boo
 
 function isContextExpression(expression: ts.Expression, aliases?: ResultAliases): boolean {
   const unwrapped = unwrapExpression(expression)
-  return ts.isIdentifier(unwrapped) && (unwrapped.text === 'context' || aliases?.context.has(unwrapped.text))
+  return ts.isIdentifier(unwrapped) && (unwrapped.text === 'context' || (aliases?.context.has(unwrapped.text) ?? false))
 }
 
 function fallbackSourceExpression(expression: ts.Expression): ts.Expression {
@@ -224,6 +234,7 @@ function isResultExpression(expression: ts.Expression, aliases: ResultAliases): 
 function isExtraDataExpression(expression: ts.Expression, aliases: ResultAliases): boolean {
   const unwrapped = unwrapExpression(expression)
   if (isIdentifierAlias(unwrapped, aliases.extraData)) return true
+  if (ts.isConditionalExpression(unwrapped)) return isExtraDataExpression(unwrapped.whenTrue, aliases) || isExtraDataExpression(unwrapped.whenFalse, aliases)
   return (
     (ts.isPropertyAccessExpression(unwrapped) || ts.isElementAccessExpression(unwrapped)) &&
     accessPropertyName(unwrapped) === 'extraData' &&
@@ -422,6 +433,7 @@ function collectForbiddenReads(parsed: ParsedSource): string[] {
 function resultPathFor(expression: ts.Expression, aliases: ResultAliases): string[] | undefined {
   const unwrapped = unwrapExpression(expression)
   if (isContextResultExpression(unwrapped, aliases) || isIdentifierAlias(unwrapped, aliases.result)) return []
+  if (isIdentifierAlias(unwrapped, aliases.extraData)) return ['extraData']
   if (ts.isPropertyAccessExpression(unwrapped) || ts.isElementAccessExpression(unwrapped)) {
     const basePath = resultPathFor(unwrapped.expression, aliases)
     const propertyName = accessPropertyName(unwrapped)
@@ -526,6 +538,14 @@ function hasCallWithStringArg(sourceFile: ts.SourceFile, functionName: string, v
 }
 
 const requiredShapeChecks = {
+  'shared/cards/M/M053_ForestHut.ts': [{
+    label: 'excludes failed selection results',
+    check: (sourceFile) => hasResultStringComparison(sourceFile, 'type', ts.SyntaxKind.ExclamationEqualsEqualsToken, 'fail'),
+  }],
+  'shared/cards/M/M059_NaturesFertilizer.ts': [{
+    label: 'excludes failed selection results',
+    check: (sourceFile) => hasResultStringComparison(sourceFile, 'type', ts.SyntaxKind.ExclamationEqualsEqualsToken, 'fail'),
+  }],
   'shared/cards/A/A094_LazySowman.ts': [
     {
       label: 'guards request type',

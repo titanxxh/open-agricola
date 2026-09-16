@@ -41,3 +41,9 @@ export function buildPlatformPageUrl(
   const search = params.toString()
   return `${window.location.pathname}${search ? `?${search}` : ''}`
 }
+
+export function setPage(page: PlatformPage, extraParams?: Record<string, string>) {
+  const newUrl = buildPlatformPageUrl(page, extraParams)
+  window.history.pushState(null, '', newUrl)
+  window.dispatchEvent(new PopStateEvent('popstate'))
+}
