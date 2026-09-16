@@ -12,14 +12,15 @@ pnpm run check:architecture
 pnpm run lint:i18n
 pnpm test
 pnpm test:llm
-pnpm run check:prompt-sync -- --strict
 pnpm run build
 REPLAY_VIEWER_ROOT="$(mktemp -d)" pnpm run build:replay-viewer
 pnpm run check:bundle-size
 pnpm run check:community-deck
 ```
 
-`check:architecture` 是唯一架构门禁清单，包含 lint、测试 project scope、直接 session log、effect 文件清单、生成卡牌同步、strict no-DSL、catalog types、卡牌实现边界、架构契约类型检查、零循环依赖检查以及浏览器/Replay 真实构建隔离检查。两份 workflow 各调用它一次，meta-test 防止接线漂移。
+`check:architecture` 是唯一架构门禁清单，包含 lint、测试 project scope、直接 session log、effect 文件清单、生成卡牌同步、strict no-DSL、catalog types、卡牌实现边界、架构契约类型检查、架构契约测试、strict prompt-sync、零循环依赖检查以及浏览器/Replay 真实构建隔离检查。两份 workflow 各调用它一次，meta-test 防止接线漂移。
+
+`check:architecture-tests` 复用现有 Vitest project 配置，执行 effect 架构、资源事实来源审计、事件映射策略、交互命令策略、Card Source、PromptKey、LLM prompt 契约和 CI 接线测试。它们仍属于 `pnpm test` / `pnpm test:fast`，保证单独运行完整测试时不漏检；只跑架构入口也会执行这些断言。沙盒文档的名字集合同步由入口内的 strict prompt-sync 检查，完整 CI 无需再单独执行该命令。
 
 架构类型门禁执行 `tsc -p tsconfig.architecture.json --noEmit`，包含此前仅由 Vitest 执行的五组契约测试。依赖检查按 TypeScript 模块解析构图，运行时循环一律失败；仅显式 type-only 声明从运行时图移除。浏览器检查对主页面和 Replay Viewer 分别执行不写产物的 Vite 构建，验证真实传递依赖；普通页面不保留规则运行时基线。确切的沙盒入口、Worker 文件及纯元数据权限见 `scripts/architecture-policy.mjs`，未知入口和失效权限均失败。
 

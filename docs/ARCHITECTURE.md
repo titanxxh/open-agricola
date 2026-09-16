@@ -1541,6 +1541,8 @@ Action definitions are assembled once in `shared/actions/index.ts`. Seasonal int
 
 #### Architecture fitness coverage
 
+`pnpm run check:architecture` executes the architecture scripts, contract type checks, existing contract tests through `check:architecture-tests`, and strict sandbox prompt/documentation synchronization. The contract test selection covers effects, resource provenance, event mapping, interaction commands, Card Source, PromptKey, rendered LLM prompt contracts, and CI wiring. These tests retain their existing Vitest project ownership and also run under `pnpm test` / `pnpm test:fast`. Bundle size budgets remain a separate post-build check; browser dependency isolation is enforced by the architecture entry itself.
+
 | Invariant | Executable coverage | Boundary |
 |---|---|---|
 | Physical `shared` / `server` / `client` layering | ESLint `architecture/imports` errors | Tests have explicit exemptions; this checks imports, not runtime ownership. |
