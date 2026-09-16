@@ -213,24 +213,27 @@ const collectBindingNames = (name: ts.BindingName, out: string[]): void => {
   }
 }
 
-const normalizeModuleSpecifier = (specifier: string): string =>
-  specifier.replace(sourceExtensions, '').replace(/\/index$/, '')
+/** Repository modules are always imported by relative path; bare package specifiers never classify. */
+const normalizeRelativeSpecifier = (specifier: string): string | null =>
+  specifier.startsWith('.') ? specifier.replace(sourceExtensions, '').replace(/\/index$/, '') : null
 
 const isLogCacheModule = (specifier: string): boolean => {
-  const normalized = normalizeModuleSpecifier(specifier)
-  return normalized === './log-cache'
-    || normalized.endsWith('/log-cache')
-    || normalized === '../events'
-    || normalized.endsWith('/shared/events')
+  const normalized = normalizeRelativeSpecifier(specifier)
+  return normalized !== null
+    && (normalized === './log-cache'
+      || normalized.endsWith('/log-cache')
+      || normalized === '../events'
+      || normalized.endsWith('/shared/events'))
 }
 
 const isEngineModule = (specifier: string): boolean => {
-  const normalized = normalizeModuleSpecifier(specifier)
-  return normalized === './log-store'
-    || normalized.endsWith('/log-store')
-    || normalized === './engine'
-    || normalized === '../engine'
-    || normalized.endsWith('/engine')
+  const normalized = normalizeRelativeSpecifier(specifier)
+  return normalized !== null
+    && (normalized === './log-store'
+      || normalized.endsWith('/log-store')
+      || normalized === './engine'
+      || normalized === '../engine'
+      || normalized.endsWith('/engine'))
 }
 
 const moduleRequestSpecifier = (expression: ts.Expression | undefined): string | null => {
@@ -275,10 +278,6 @@ const shadowName = (scope: Scope, name: string): void => {
   for (const names of Object.values(scope)) names.delete(name)
 }
 
-const reassignName = (scope: Scope, name: string): void => {
-  for (const [key, names] of Object.entries(scope)) if (key !== 'stateLikeNames') names.delete(name)
-}
-
 const bindModuleNamespace = (scope: Scope, localName: string, specifier: string): void => {
   if (isEngineModule(specifier)) scope.logStoreClassNamespaces.add(localName)
   if (isLogCacheModule(specifier)) scope.logCacheWriterNamespaces.add(localName)
@@ -301,6 +300,11 @@ const bindModuleRequest = (scope: Scope, name: ts.BindingName, initializer: ts.E
   }
   const member = moduleMemberRequest(initializer)
   if (member && ts.isIdentifier(name)) bindModuleMember(scope, member.member, name.text, member.specifier)
+  const source = unwrapExpression(initializer)
+  if (ts.isIdentifier(source) && ts.isIdentifier(name)) {
+    if (scope.logStoreClassNamespaces.has(source.text)) scope.logStoreClassNamespaces.add(name.text)
+    if (scope.logCacheWriterNamespaces.has(source.text)) scope.logCacheWriterNamespaces.add(name.text)
+  }
 }
 
 const createRootScope = (): Scope => ({
@@ -315,8 +319,21 @@ const createRootScope = (): Scope => ({
   logCacheWriterNamespaces: new Set(),
 })
 
-/** Module bindings are hoisted within their scope so closures declared before the binding still resolve it. */
-const precollectModuleBindings = (scope: Scope, statements: readonly ts.Statement[]): void => {
+/**
+ * Every local declaration of a scope shadows inherited names before any closure in it is visited, and module
+ * bindings are hoisted the same way, so closures declared before the binding still resolve it.
+ */
+const precollectScopeBindings = (scope: Scope, statements: readonly ts.Statement[], sourceFile: ts.SourceFile): void => {
+  for (const statement of statements) {
+    const names: string[] = []
+    if (ts.isVariableStatement(statement)) {
+      for (const declaration of statement.declarationList.declarations) collectBindingNames(declaration.name, names)
+    }
+    if ((ts.isFunctionDeclaration(statement) || ts.isClassDeclaration(statement)) && statement.name) {
+      names.push(statement.name.text)
+    }
+    for (const name of names) shadowName(scope, name)
+  }
   for (const statement of statements) {
     if (ts.isImportDeclaration(statement) && ts.isStringLiteral(statement.moduleSpecifier)) {
       const namedBindings = statement.importClause?.namedBindings
@@ -336,7 +353,13 @@ const precollectModuleBindings = (scope: Scope, statements: readonly ts.Statemen
     }
     if (ts.isVariableStatement(statement)) {
       for (const declaration of statement.declarationList.declarations) {
-        if (declaration.initializer) bindModuleRequest(scope, declaration.name, declaration.initializer)
+        if (!declaration.initializer) continue
+        bindModuleRequest(scope, declaration.name, declaration.initializer)
+        if (ts.isIdentifier(declaration.name)
+          && (includesGameStateType(declaration.type, sourceFile)
+            || isGameStateExpression(declaration.initializer, sourceFile))) {
+          scope.stateLikeNames.add(declaration.name.text)
+        }
       }
     }
   }
@@ -632,7 +655,8 @@ const scanFile = (repoRoot: string, fullPath: string): DirectSessionLogViolation
   const allowedBlocks = allowedLogStoreAppendBlocks(rel, sourceFile)
   const visit = (node: ts.Node, inherited: Scope): void => {
     let scope = inherited
-    if (ts.isSourceFile(node) || ts.isBlock(node) || ts.isFunctionLike(node)) {
+    if (ts.isSourceFile(node) || ts.isBlock(node) || ts.isFunctionLike(node) || ts.isCatchClause(node)
+      || ts.isForStatement(node) || ts.isForInStatement(node) || ts.isForOfStatement(node)) {
       scope = forkScope(inherited)
       if (ts.isFunctionLike(node)) {
         for (const parameter of node.parameters) {
@@ -644,7 +668,7 @@ const scanFile = (repoRoot: string, fullPath: string): DirectSessionLogViolation
           }
         }
       }
-      if (ts.isSourceFile(node) || ts.isBlock(node)) precollectModuleBindings(scope, node.statements)
+      if (ts.isSourceFile(node) || ts.isBlock(node)) precollectScopeBindings(scope, node.statements, sourceFile)
     }
 
     if (ts.isVariableDeclaration(node)) {
@@ -725,7 +749,6 @@ const scanFile = (repoRoot: string, fullPath: string): DirectSessionLogViolation
       && node.operatorToken.kind === ts.SyntaxKind.EqualsToken
       && ts.isIdentifier(unwrapExpression(node.left))) {
       const target = unwrapExpression(node.left) as ts.Identifier
-      reassignName(scope, target.text)
       bindModuleRequest(scope, target, node.right)
       if (isStateLogExpression(node.right, scope.stateLikeNames)) {
         scope.stateLogAliases.add(target.text)
@@ -755,8 +778,6 @@ const scanFile = (repoRoot: string, fullPath: string): DirectSessionLogViolation
       && node.operatorToken.kind === ts.SyntaxKind.EqualsToken
       && ts.isObjectLiteralExpression(unwrapExpression(node.left))) {
       for (const name of objectLiteralAliasAssignments(node.left, 'log')) {
-        scope.stateLogAliases.delete(name)
-        scope.logStoreAliases.delete(name)
         if (isStateLikeExpression(node.right, scope.stateLikeNames)) {
           scope.stateLogAliases.add(name)
         }
@@ -768,13 +789,11 @@ const scanFile = (repoRoot: string, fullPath: string): DirectSessionLogViolation
         ? (unwrapExpression(node.right) as ts.Identifier).text
         : null
       for (const name of objectLiteralAliasAssignments(node.left, 'prependDerivedLogEntries')) {
-        scope.logCacheWriterAliases.delete(name)
         if (namespace && scope.logCacheWriterNamespaces.has(namespace)) {
           scope.logCacheWriterAliases.add(name)
         }
       }
       for (const name of objectLiteralAliasAssignments(node.left, 'LogStore')) {
-        scope.logStoreConstructorAliases.delete(name)
         if (namespace && scope.logStoreClassNamespaces.has(namespace)) {
           scope.logStoreConstructorAliases.add(name)
         }

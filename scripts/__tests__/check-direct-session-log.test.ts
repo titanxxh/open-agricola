@@ -287,6 +287,108 @@ describe('check-direct-session-log', () => {
     ])
   })
 
+  it('lets later local declarations shadow module bindings inside earlier closures', () => {
+    const root = createRoot()
+    writeFixture(root, 'server/late-shadow.ts', [
+      "import * as Events from '../shared/events'",
+      "import { LogStore } from '../shared/engine'",
+      'export function ok(state: any, entries: any[], localEvents: any, LocalStore: any) {',
+      '  {',
+      '    const invoke = () => [Events.prependDerivedLogEntries(state, entries), new LogStore()]',
+      '    const Events = localEvents',
+      '    class LogStore extends LocalStore {}',
+      '    return invoke()',
+      '  }',
+      '}',
+      'export function bad(state: any, entries: any[]) {',
+      '  const invoke = () => Events.prependDerivedLogEntries(state, entries)',
+      '  return invoke()',
+      '}',
+    ].join('\n'))
+
+    expect(findDirectSessionLogViolations(root)).toEqual([
+      expect.objectContaining({ file: 'server/late-shadow.ts', line: 12, kind: 'log-cache-writer-call' }),
+    ])
+  })
+
+  it('isolates catch and loop bindings from the enclosing scope', () => {
+    const root = createRoot()
+    writeFixture(root, 'server/catch-loop.cjs', [
+      "const Events = require('../shared/events')",
+      "const Engine = require('../shared/engine')",
+      'function bad(state, entries, list) {',
+      '  try { work() } catch (Events) { consume(Events) }',
+      '  for (const Engine of list) consume(Engine)',
+      '  Events.prependDerivedLogEntries(state, entries)',
+      '  return new Engine.LogStore()',
+      '}',
+      'module.exports = { bad }',
+    ].join('\n'))
+
+    expect(findDirectSessionLogViolations(root)).toEqual([
+      expect.objectContaining({ file: 'server/catch-loop.cjs', line: 6, kind: 'log-cache-writer-call' }),
+      expect.objectContaining({ file: 'server/catch-loop.cjs', line: 7, kind: 'log-store-constructor' }),
+    ])
+  })
+
+  it('propagates provenance through namespace aliases', () => {
+    const root = createRoot()
+    writeFixture(root, 'server/namespace-alias.cjs', [
+      "const Events = require('../shared/events')",
+      'const E = Events',
+      "const Engine = require('../shared/engine')",
+      'let E2',
+      'E2 = Engine',
+      'function bad(state, entries) {',
+      '  E.prependDerivedLogEntries(state, entries)',
+      '  return new E2.LogStore()',
+      '}',
+      'module.exports = { bad }',
+    ].join('\n'))
+
+    expect(findDirectSessionLogViolations(root)).toEqual([
+      expect.objectContaining({ file: 'server/namespace-alias.cjs', line: 7, kind: 'log-cache-writer-call' }),
+      expect.objectContaining({ file: 'server/namespace-alias.cjs', line: 8, kind: 'log-store-constructor' }),
+    ])
+  })
+
+  it('ignores external packages whose names end like repository modules', () => {
+    const root = createRoot()
+    writeFixture(root, 'server/vendor.ts', [
+      "import { LogStore as ExternalStore } from '@vendor/engine'",
+      "import * as VendorEngine from 'vendor-engine/log-store'",
+      "import * as VendorEvents from '@vendor/shared/events'",
+      "import { prependDerivedLogEntries as vendorWrite } from 'vendor/log-cache'",
+      'export function ok(state: any, entries: any[]) {',
+      '  vendorWrite(state, entries)',
+      '  VendorEvents.prependDerivedLogEntries(state, entries)',
+      '  return [new ExternalStore(), new VendorEngine.LogStore()]',
+      '}',
+    ].join('\n'))
+
+    expect(findDirectSessionLogViolations(root)).toEqual([])
+  })
+
+  it('keeps provenance alive across conditional reassignment', () => {
+    const root = createRoot()
+    writeFixture(root, 'server/conditional.cjs', [
+      "let Events = require('../shared/events')",
+      "let Store = require('../shared/engine').LogStore",
+      'function bad(state, entries, useStub, stub) {',
+      '  if (useStub) Events = stub',
+      '  Store = useStub ? stub : Store',
+      '  Events.prependDerivedLogEntries(state, entries)',
+      '  return new Store()',
+      '}',
+      'module.exports = { bad }',
+    ].join('\n'))
+
+    expect(findDirectSessionLogViolations(root)).toEqual([
+      expect.objectContaining({ file: 'server/conditional.cjs', line: 6, kind: 'log-cache-writer-call' }),
+      expect.objectContaining({ file: 'server/conditional.cjs', line: 7, kind: 'log-store-constructor' }),
+    ])
+  })
+
   it.each([
     'server/cache.test.cjs',
     'server/cache.spec.mts',
