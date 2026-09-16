@@ -40,9 +40,9 @@ const sorted = (values: readonly string[]): string[] =>
   [...values].sort((a, b) => a.localeCompare(b))
 
 export const checkEffectsFileList = (effectsDir: string): EffectsFileListCheck => {
-  if (!fs.statSync(effectsDir, { throwIfNoEntry: false })?.isDirectory()) {
-    throw new Error(`missing effects directory: ${effectsDir}`)
-  }
+  const stats = fs.lstatSync(effectsDir, { throwIfNoEntry: false })
+  if (stats?.isSymbolicLink()) throw new Error(`effects directory symlink requires explicit ownership: ${effectsDir}`)
+  if (!stats?.isDirectory()) throw new Error(`missing effects directory: ${effectsDir}`)
   const entries = fs.readdirSync(effectsDir, { withFileTypes: true })
   const symlink = entries.find((entry) => entry.isSymbolicLink())
   if (symlink) throw new Error(`effects symlink requires explicit ownership: ${path.join(effectsDir, symlink.name)}`)

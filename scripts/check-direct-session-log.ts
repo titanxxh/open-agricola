@@ -77,7 +77,9 @@ type FunctionBlock = {
 const scanRootFiles = (repoRoot: string): string[] =>
   SCAN_DIRS.flatMap((dir) => {
     const full = path.join(repoRoot, dir)
-    if (!fs.statSync(full, { throwIfNoEntry: false })?.isDirectory()) throw new Error(`missing scan root: ${dir}`)
+    const stats = fs.lstatSync(full, { throwIfNoEntry: false })
+    if (stats?.isSymbolicLink()) throw new Error(`scan root symlink requires explicit ownership: ${dir}`)
+    if (!stats?.isDirectory()) throw new Error(`missing scan root: ${dir}`)
     return walkSourceFiles(full)
   })
 
@@ -222,6 +224,18 @@ const isLogCacheModule = (specifier: string): boolean =>
   || specifier.endsWith('/shared/events/index')
   || specifier.endsWith('/shared/events/index.ts')
 
+const moduleRequestSpecifier = (expression: ts.Expression | undefined): string | null => {
+  if (!expression) return null
+  let current = unwrapExpression(expression)
+  if (ts.isAwaitExpression(current)) current = unwrapExpression(current.expression)
+  if (!ts.isCallExpression(current)) return null
+  const callee = unwrapExpression(current.expression)
+  const isRequire = ts.isIdentifier(callee) && callee.text === 'require'
+  if (!isRequire && callee.kind !== ts.SyntaxKind.ImportKeyword) return null
+  const argument = current.arguments[0] && unwrapExpression(current.arguments[0])
+  return argument && ts.isStringLiteralLike(argument) ? argument.text : null
+}
+
 const collectImportedIdentifiers = (
   sourceFile: ts.SourceFile,
 ): {
@@ -234,27 +248,45 @@ const collectImportedIdentifiers = (
   const logStoreClassNamespaces = new Set<string>()
   const logCacheWriterNames = new Set<string>()
   const logCacheWriterNamespaces = new Set<string>()
-  for (const statement of sourceFile.statements) {
-    if (!ts.isImportDeclaration(statement) || !ts.isStringLiteral(statement.moduleSpecifier)) continue
-    const clause = statement.importClause
-    const namedBindings = clause?.namedBindings
-    if (!namedBindings) continue
-    if (ts.isNamespaceImport(namedBindings)) {
-      logStoreClassNamespaces.add(namedBindings.name.text)
-    }
-    if (isLogCacheModule(statement.moduleSpecifier.text) && ts.isNamespaceImport(namedBindings)) {
-      logCacheWriterNamespaces.add(namedBindings.name.text)
-      continue
-    }
-    if (!ts.isNamedImports(namedBindings)) continue
-    for (const specifier of namedBindings.elements) {
-      const importedName = specifier.propertyName?.text ?? specifier.name.text
-      if (importedName === 'LogStore') logStoreClassNames.add(specifier.name.text)
-      if (isLogCacheModule(statement.moduleSpecifier.text) && importedName === 'prependDerivedLogEntries') {
-        logCacheWriterNames.add(specifier.name.text)
+  const bindNamespace = (localName: string, specifier: string): void => {
+    logStoreClassNamespaces.add(localName)
+    if (isLogCacheModule(specifier)) logCacheWriterNamespaces.add(localName)
+  }
+  const bindNamed = (importedName: string, localName: string, specifier: string): void => {
+    if (importedName === 'LogStore') logStoreClassNames.add(localName)
+    if (isLogCacheModule(specifier) && importedName === 'prependDerivedLogEntries') logCacheWriterNames.add(localName)
+  }
+  const visit = (node: ts.Node): void => {
+    if (ts.isImportDeclaration(node) && ts.isStringLiteral(node.moduleSpecifier)) {
+      const namedBindings = node.importClause?.namedBindings
+      if (namedBindings && ts.isNamespaceImport(namedBindings)) {
+        bindNamespace(namedBindings.name.text, node.moduleSpecifier.text)
+      }
+      if (namedBindings && ts.isNamedImports(namedBindings)) {
+        for (const specifier of namedBindings.elements) {
+          bindNamed(specifier.propertyName?.text ?? specifier.name.text, specifier.name.text, node.moduleSpecifier.text)
+        }
       }
     }
+    if (ts.isImportEqualsDeclaration(node)
+      && ts.isExternalModuleReference(node.moduleReference)
+      && ts.isStringLiteralLike(node.moduleReference.expression)) {
+      bindNamespace(node.name.text, node.moduleReference.expression.text)
+    }
+    if (ts.isVariableDeclaration(node)) {
+      const specifier = moduleRequestSpecifier(node.initializer)
+      if (specifier && ts.isIdentifier(node.name)) bindNamespace(node.name.text, specifier)
+      if (specifier && ts.isObjectBindingPattern(node.name)) {
+        for (const element of node.name.elements) {
+          if (ts.isOmittedExpression(element) || !ts.isIdentifier(element.name)) continue
+          const importedName = element.propertyName ? propertyNameText(element.propertyName) : element.name.text
+          if (importedName) bindNamed(importedName, element.name.text, specifier)
+        }
+      }
+    }
+    ts.forEachChild(node, visit)
   }
+  visit(sourceFile)
   return { logStoreClassNames, logStoreClassNamespaces, logCacheWriterNames, logCacheWriterNamespaces }
 }
 

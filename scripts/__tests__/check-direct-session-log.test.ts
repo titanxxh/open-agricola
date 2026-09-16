@@ -60,6 +60,84 @@ describe('check-direct-session-log', () => {
     expect(() => findDirectSessionLogViolations(root)).toThrow('source symlink')
   })
 
+  it('fails when a scan root is a symlink instead of following it', () => {
+    const root = createRoot()
+    rmSync(path.join(root, 'server'), { recursive: true })
+    mkdirSync(path.join(root, 'elsewhere'))
+    symlinkSync(path.join(root, 'elsewhere'), path.join(root, 'server'))
+
+    expect(() => findDirectSessionLogViolations(root)).toThrow('scan root symlink requires explicit ownership: server')
+  })
+
+  it.each(['coverage', 'dist', '.build', 'test-results', 'playwright-report'])('scans nested %s directories that git does not ignore', (dir) => {
+    const root = createRoot()
+    writeFixture(root, `server/${dir}/report.ts`, [
+      'export function bad(state) {',
+      "  state.log.push({ key: 'log.bad' })",
+      '}',
+    ].join('\n'))
+
+    expect(findDirectSessionLogViolations(root)).toEqual([
+      expect.objectContaining({
+        file: `server/${dir}/report.ts`,
+        line: 2,
+        kind: 'state-log-write',
+      }),
+    ])
+  })
+
+  it('tracks require, import-equals and dynamic import bindings like ESM imports', () => {
+    const root = createRoot()
+    writeFixture(root, 'server/bad.cjs', [
+      "const Events = require('../shared/events')",
+      "const { prependDerivedLogEntries: writeLogs } = require('../shared/events/log-cache')",
+      "const { LogStore: Store } = require('../shared/engine')",
+      "const Engine = require('../shared/engine')",
+      'function bad(state, entries) {',
+      '  Events.prependDerivedLogEntries(state, entries)',
+      '  writeLogs(state, entries)',
+      '  new Store()',
+      '  new Engine.LogStore()',
+      '}',
+      'module.exports = { bad }',
+    ].join('\n'))
+    writeFixture(root, 'server/bad.cts', [
+      "import Events = require('../shared/events')",
+      "import Engine = require('../shared/engine')",
+      'export function bad(state: any, entries: any[]) {',
+      '  Events.prependDerivedLogEntries(state, entries)',
+      '  new Engine.LogStore()',
+      '}',
+    ].join('\n'))
+    writeFixture(root, 'server/bad-dynamic.mts', [
+      "const { prependDerivedLogEntries } = await import('../shared/events/log-cache')",
+      "const { LogStore: DynamicStore } = await import('../shared/engine')",
+      'export function bad(state: any, entries: any[]) {',
+      '  prependDerivedLogEntries(state, entries)',
+      '  new DynamicStore()',
+      '}',
+    ].join('\n'))
+    writeFixture(root, 'server/bad-nested.cjs', [
+      'function bad(state, entries) {',
+      "  const Events = require('../shared/events')",
+      '  Events.prependDerivedLogEntries(state, entries)',
+      '}',
+      'module.exports = { bad }',
+    ].join('\n'))
+
+    expect(findDirectSessionLogViolations(root)).toEqual([
+      expect.objectContaining({ file: 'server/bad-dynamic.mts', line: 4, kind: 'log-cache-writer-call' }),
+      expect.objectContaining({ file: 'server/bad-dynamic.mts', line: 5, kind: 'log-store-constructor' }),
+      expect.objectContaining({ file: 'server/bad-nested.cjs', line: 3, kind: 'log-cache-writer-call' }),
+      expect.objectContaining({ file: 'server/bad.cjs', line: 6, kind: 'log-cache-writer-call' }),
+      expect.objectContaining({ file: 'server/bad.cjs', line: 7, kind: 'log-cache-writer-call' }),
+      expect.objectContaining({ file: 'server/bad.cjs', line: 8, kind: 'log-store-constructor' }),
+      expect.objectContaining({ file: 'server/bad.cjs', line: 9, kind: 'log-store-constructor' }),
+      expect.objectContaining({ file: 'server/bad.cts', line: 4, kind: 'log-cache-writer-call' }),
+      expect.objectContaining({ file: 'server/bad.cts', line: 5, kind: 'log-store-constructor' }),
+    ])
+  })
+
   it('reports stale exceptions until every excepted file and function exists', () => {
     const root = createRoot()
 

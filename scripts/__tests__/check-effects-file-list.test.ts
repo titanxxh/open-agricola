@@ -38,6 +38,17 @@ describe('check-effects-file-list', () => {
     expect(() => checkEffectsFileList(effectsDir)).toThrow('missing effects directory')
   })
 
+  it('fails when the effects directory itself is a symlink', () => {
+    const base = mkdtempSync(path.join(tmpdir(), 'effects-file-list-'))
+    const target = path.join(base, 'target')
+    mkdirSync(target)
+    for (const allowed of ALLOWED_EFFECT_FILES) writeFixture(target, allowed)
+    const effectsDir = path.join(base, 'effects')
+    symlinkSync(target, effectsDir)
+
+    expect(() => checkEffectsFileList(effectsDir)).toThrow('effects directory symlink requires explicit ownership')
+  })
+
   it('fails on top-level symlinks instead of skipping them', () => {
     const effectsDir = mkdtempSync(path.join(tmpdir(), 'effects-file-list-'))
     for (const allowed of ALLOWED_EFFECT_FILES) writeFixture(effectsDir, allowed)
