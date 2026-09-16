@@ -81,6 +81,7 @@ db.exec(`
     enable_through_the_seasons INTEGER NOT NULL DEFAULT 0,
     enable_farmers_of_the_moor INTEGER NOT NULL DEFAULT 0,
     allow_incomplete_farmers_of_the_moor_minor_deal INTEGER NOT NULL DEFAULT 0,
+    enable_snake_opening INTEGER NOT NULL DEFAULT 0,
       hotseat INTEGER NOT NULL DEFAULT 0,
     updated_at INTEGER NOT NULL
   );
@@ -1295,6 +1296,38 @@ const CARD_IMPL = {}
       expect(data.settings.enable_through_the_seasons).toBe(true)
       expect(data.settings.enable_farmers_of_the_moor).toBe(true)
       expect(data.settings.allow_incomplete_farmers_of_the_moor_minor_deal).toBe(true)
+      expect(data.settings.enable_snake_opening).toBe(false)
+    })
+
+    it('persists and reads back enable_snake_opening in sandbox settings', async () => {
+      const req = mockReq('POST', '/api/workshop/sandbox', {
+        workshop_card_ids: [cardDbId],
+        settings: {
+          player_count: 3,
+          deck_ids: ['A'],
+          enable_snake_opening: true,
+        },
+      }, 'tok-bob')
+      const res = mockRes()
+      await handleWorkshopRoute(req, res)
+      const saved = JSON.parse(res.body)
+      expect(saved.ok).toBe(true)
+      expect(saved.settings.enable_snake_opening).toBe(true)
+
+      const getReq = mockReq('GET', '/api/workshop/sandbox', null, 'tok-bob')
+      const getRes = mockRes()
+      await handleWorkshopRoute(getReq, getRes)
+      const data = JSON.parse(getRes.body)
+      expect(data.settings.enable_snake_opening).toBe(true)
+      expect(data.settings.enable_farmers_of_the_moor).toBe(false)
+
+      const offReq = mockReq('POST', '/api/workshop/sandbox', {
+        workshop_card_ids: [cardDbId],
+        settings: { player_count: 3, deck_ids: ['A'], enable_snake_opening: 'true' },
+      }, 'tok-bob')
+      const offRes = mockRes()
+      await handleWorkshopRoute(offReq, offRes)
+      expect(JSON.parse(offRes.body).settings.enable_snake_opening).toBe(false)
     })
   })
 })

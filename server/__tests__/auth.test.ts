@@ -178,7 +178,8 @@ vi.mock('../db.ts', () => {
       enable_community_deck INTEGER NOT NULL,
       enable_parent_cards INTEGER NOT NULL,
       enable_through_the_seasons INTEGER NOT NULL,
-      enable_farmers_of_the_moor INTEGER NOT NULL
+      enable_farmers_of_the_moor INTEGER NOT NULL,
+      enable_snake_opening INTEGER NOT NULL DEFAULT 0
     );
     CREATE TABLE game_result_players (
       room_id TEXT NOT NULL REFERENCES game_results(room_id) ON DELETE CASCADE,
@@ -853,8 +854,9 @@ describe('auth', () => {
       db.prepare(`
         INSERT INTO game_results (
           room_id, started_at, finished_at, rounds_played, player_count,
-          enable_community_deck, enable_parent_cards, enable_through_the_seasons, enable_farmers_of_the_moor
-        ) VALUES ('finished-room', ?, ?, 14, 2, 0, 0, 0, 0)
+          enable_community_deck, enable_parent_cards, enable_through_the_seasons, enable_farmers_of_the_moor,
+          enable_snake_opening
+        ) VALUES ('finished-room', ?, ?, 14, 2, 0, 0, 0, 0, 0)
       `).run(now - 1000, now)
       db.prepare(`
         INSERT INTO game_result_players (

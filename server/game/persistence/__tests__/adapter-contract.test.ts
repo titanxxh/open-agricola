@@ -31,6 +31,7 @@ const RESULT: GameResult = {
   parentCards: false,
   throughTheSeasons: false,
   farmersOfTheMoor: false,
+  snakeOpening: false,
   players: [{ playerIndex: 0, gamePlayerId: 'p1', userId: 'u', displayName: 'P1', score: 10 }],
 }
 
@@ -47,6 +48,7 @@ const setupSqlite = (): RoomPersistence => {
       enable_through_the_seasons INTEGER NOT NULL DEFAULT 0,
       enable_farmers_of_the_moor INTEGER NOT NULL DEFAULT 0,
       allow_incomplete_farmers_of_the_moor_minor_deal INTEGER NOT NULL DEFAULT 0,
+      enable_snake_opening INTEGER NOT NULL DEFAULT 0,
       hotseat INTEGER NOT NULL DEFAULT 0,
       started_at INTEGER, created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL);
     CREATE TABLE room_players (room_id TEXT NOT NULL REFERENCES rooms(id) ON DELETE CASCADE,
@@ -56,7 +58,8 @@ const setupSqlite = (): RoomPersistence => {
       room_id TEXT PRIMARY KEY, started_at INTEGER NOT NULL, finished_at INTEGER NOT NULL,
       rounds_played INTEGER NOT NULL, player_count INTEGER NOT NULL,
       enable_community_deck INTEGER NOT NULL, enable_parent_cards INTEGER NOT NULL,
-      enable_through_the_seasons INTEGER NOT NULL, enable_farmers_of_the_moor INTEGER NOT NULL);
+      enable_through_the_seasons INTEGER NOT NULL, enable_farmers_of_the_moor INTEGER NOT NULL,
+      enable_snake_opening INTEGER NOT NULL DEFAULT 0);
     CREATE TABLE game_result_players (
       room_id TEXT NOT NULL REFERENCES game_results(room_id) ON DELETE CASCADE,
       player_index INTEGER NOT NULL, game_player_id TEXT NOT NULL, user_id TEXT,

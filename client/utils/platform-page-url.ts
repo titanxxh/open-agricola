@@ -17,6 +17,7 @@ const PAGE_SCOPED_QUERY_KEYS = [
   'enableThroughTheSeasons',
   'enableFarmersOfTheMoor',
   'allowIncompleteFarmersOfTheMoorMinorDeal',
+  'enableSnakeOpening',
   'customCards',
   'embedded',
   'devMode',

@@ -32,6 +32,7 @@ const RESULT: GameResult = {
   parentCards: false,
   throughTheSeasons: true,
   farmersOfTheMoor: false,
+  snakeOpening: false,
   players: [
     { playerIndex: 0, gamePlayerId: 'p1', userId: null, displayName: 'Alice', score: 42 },
     { playerIndex: 1, gamePlayerId: 'p2', userId: 'live-u2', displayName: 'Bob', score: 35 },
@@ -58,6 +59,7 @@ const setupDb = (options?: Database.Options) => {
       enable_through_the_seasons INTEGER NOT NULL DEFAULT 0,
       enable_farmers_of_the_moor INTEGER NOT NULL DEFAULT 0,
       allow_incomplete_farmers_of_the_moor_minor_deal INTEGER NOT NULL DEFAULT 0,
+      enable_snake_opening INTEGER NOT NULL DEFAULT 0,
       hotseat INTEGER NOT NULL DEFAULT 0,
       started_at INTEGER,
       created_at INTEGER NOT NULL,
@@ -79,7 +81,8 @@ const setupDb = (options?: Database.Options) => {
       enable_community_deck INTEGER NOT NULL,
       enable_parent_cards INTEGER NOT NULL,
       enable_through_the_seasons INTEGER NOT NULL,
-      enable_farmers_of_the_moor INTEGER NOT NULL
+      enable_farmers_of_the_moor INTEGER NOT NULL,
+      enable_snake_opening INTEGER NOT NULL DEFAULT 0
     );
     CREATE TABLE game_result_players (
       room_id TEXT NOT NULL REFERENCES game_results(room_id) ON DELETE CASCADE,
@@ -185,6 +188,7 @@ describe('SqliteRoomPersistence', () => {
       enable_parent_cards: 0,
       enable_through_the_seasons: 1,
       enable_farmers_of_the_moor: 0,
+      enable_snake_opening: 0,
     })
     expect(db.prepare(`
       SELECT player_index, game_player_id, user_id, display_name, score
@@ -284,6 +288,7 @@ describe('SqliteRoomPersistence', () => {
       enableThroughTheSeasons: true,
       enableFarmersOfTheMoor: true,
       allowIncompleteFarmersOfTheMoorMinorDeal: true,
+      enableSnakeOpening: true,
     }
 
     p.save('r1', STATE, meta)
@@ -294,6 +299,28 @@ describe('SqliteRoomPersistence', () => {
       enableThroughTheSeasons: true,
       enableFarmersOfTheMoor: true,
       allowIncompleteFarmersOfTheMoorMinorDeal: true,
+      enableSnakeOpening: true,
+    })
+  })
+
+  it('round-trips enableSnakeOpening through save → load, restore and result archival', () => {
+    p.save('r1', STATE, { ...META, enableSnakeOpening: true })
+    p.save('r2', STATE, META)
+
+    expect(p.load('r1')?.meta.enableSnakeOpening).toBe(true)
+    expect(p.load('r2')?.meta.enableSnakeOpening).toBe(false)
+    expect(p.listRestorable({
+      now: NOW,
+      waitingTtlMs: WAITING_TTL,
+      playingTtlMs: PLAYING_TTL,
+    }).map((snap) => [snap.id, snap.meta.enableSnakeOpening]).sort()).toEqual([
+      ['r1', true],
+      ['r2', false],
+    ])
+
+    expect(p.complete({ ...RESULT, snakeOpening: true })).toEqual({ ok: true, archived: true })
+    expect(db.prepare('SELECT enable_snake_opening FROM game_results WHERE room_id = ?').get('r1')).toEqual({
+      enable_snake_opening: 1,
     })
   })
 

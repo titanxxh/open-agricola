@@ -669,6 +669,7 @@ export const handleGameRoute = async (
     let enableThroughTheSeasons = false
     let enableFarmersOfTheMoor = false
     let allowIncompleteFarmersOfTheMoorMinorDeal = false
+    let enableSnakeOpening = false
     const customCardVersions = new Map<string, string>()
     try {
       const body = JSON.parse(await readBody(req)) as {
@@ -680,6 +681,7 @@ export const handleGameRoute = async (
         enableThroughTheSeasons?: boolean
         enableFarmersOfTheMoor?: boolean
         allowIncompleteFarmersOfTheMoorMinorDeal?: boolean
+        enableSnakeOpening?: boolean
       }
       if (typeof body.seed === 'number') seed = body.seed
       if (Array.isArray(body.customCardIds)) {
@@ -709,6 +711,7 @@ export const handleGameRoute = async (
       enableThroughTheSeasons = body.enableThroughTheSeasons === true
       enableFarmersOfTheMoor = body.enableFarmersOfTheMoor === true
       allowIncompleteFarmersOfTheMoorMinorDeal = enableFarmersOfTheMoor && body.allowIncompleteFarmersOfTheMoorMinorDeal === true
+      enableSnakeOpening = body.enableSnakeOpening === true
     } catch { /* ignore */ }
 
     // Identify the requesting user (optional — allows loading own draft cards)
@@ -805,6 +808,7 @@ export const handleGameRoute = async (
         enableThroughTheSeasons,
         enableFarmersOfTheMoor,
         allowIncompleteFarmersOfTheMoorMinorDeal,
+        enableSnakeOpening,
       },
     )
     const sandboxSession = created.session

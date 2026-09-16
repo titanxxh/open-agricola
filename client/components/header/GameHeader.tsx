@@ -1,10 +1,11 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useId, useRef, useState } from 'react'
 import type { Locale } from '../../../shared/i18n'
 import { t } from '../../../shared/i18n'
 import type { GameState, PlayerState, RoundPhase } from '../../../shared/contract/types'
 import { harvestRounds } from '../../../shared/contract/state-constants'
 import { BrandMark } from '../common/BrandMark'
 import { LocaleSwitcher } from '../common/LocaleSwitcher'
+import { snakeOpeningPlacementOrders } from './snake-opening-orders'
 
 const PHASES_NORMAL: RoundPhase[] = ['preparation', 'work', 'returning-home']
 const PHASES_HARVEST: RoundPhase[] = ['preparation', 'work', 'returning-home', 'harvest', 'field', 'feeding', 'breeding']
@@ -30,6 +31,9 @@ type Props = {
   embedded?: boolean
 }
 
+const shouldShowSnakeOpeningPill = (state: GameState): boolean =>
+  state.enableSnakeOpening === true && state.round === 1 && !state.gameOver
+
 export const GameHeader = ({
   locale,
   state,
@@ -42,8 +46,10 @@ export const GameHeader = ({
 }: Props) => {
   const [menuOpen, setMenuOpen] = useState(false)
   const menuContainerRef = useRef<HTMLDivElement | null>(null)
+  const snakePopoverId = useId()
   const isHarvestRound = harvestRounds.includes(state.round)
   const phases = isHarvestRound ? PHASES_HARVEST : PHASES_NORMAL
+  const snakeOrders = shouldShowSnakeOpeningPill(state) ? snakeOpeningPlacementOrders(state) : null
 
   useEffect(() => {
     if (!menuOpen) return
@@ -85,6 +91,24 @@ export const GameHeader = ({
             </span>
           ))}
         </span>
+        {snakeOrders && (
+          <span className="header-snake-opening">
+            <span className="header-snake-pill" tabIndex={0} aria-describedby={snakePopoverId}>
+              {t(locale, 'ui.snakeOpening')}
+            </span>
+            <span className="header-snake-popover" role="tooltip" id={snakePopoverId}>
+              <span className="header-snake-popover__desc">{t(locale, 'ui.snakeOpeningDescription')}</span>
+              <span className="header-snake-popover__row">
+                <span className="header-snake-popover__label">{t(locale, 'ui.snakeOpeningFirstPlacement')}</span>
+                <span className="header-snake-popover__order">{snakeOrders.first.join(' → ')}</span>
+              </span>
+              <span className="header-snake-popover__row">
+                <span className="header-snake-popover__label">{t(locale, 'ui.snakeOpeningSecondPlacement')}</span>
+                <span className="header-snake-popover__order">{snakeOrders.second.join(' → ')}</span>
+              </span>
+            </span>
+          </span>
+        )}
       </div>
       <div className="header-right">
         {state.gameOver ? (

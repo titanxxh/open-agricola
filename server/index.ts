@@ -308,8 +308,8 @@ const createCompletedReplayFixture = () => {
       INSERT INTO game_results (
         room_id, started_at, finished_at, rounds_played, player_count,
         enable_community_deck, enable_parent_cards, enable_through_the_seasons,
-        enable_farmers_of_the_moor
-      ) VALUES (?, ?, ?, 1, 2, 0, 0, 0, 0)
+        enable_farmers_of_the_moor, enable_snake_opening
+      ) VALUES (?, ?, ?, 1, 2, 0, 0, 0, 0, 0)
     `).run(roomId, now - 1000, now)
     const scores = session.getState().scores ?? []
     const insertPlayer = db.prepare(`

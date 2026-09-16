@@ -66,6 +66,7 @@ const eventKeysByType: Record<string, readonly string[]> = {
   'parent.motherScheduled': ['playerId', 'cardId', 'targetRound', 'reward'],
   'round.started': ['round'],
   'work.started': [],
+  'snakeOpening.reversed': [],
   'returnHome.started': [],
   'harvest.started': [],
   'harvest.phaseStarted': ['harvestPhase'],

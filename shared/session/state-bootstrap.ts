@@ -569,6 +569,7 @@ export const normalizeState = (raw: GameState): GameState => {
   )
   const ordinaryCardDecks = normalizeOrdinaryCardDecks(raw, players, createSeed())
   const enableThroughTheSeasons = raw.enableThroughTheSeasons ?? false
+  const enableSnakeOpening = raw.enableSnakeOpening === true && players.length > 1
   const rawDraftPoolSize = raw.draftPoolSize ?? raw.draft?.poolSize
   const draftPoolSize = rawDraftPoolSize === undefined
     ? undefined
@@ -603,6 +604,8 @@ export const normalizeState = (raw: GameState): GameState => {
       : null,
     enableFarmersOfTheMoor,
     farmersOfTheMoor,
+    enableSnakeOpening,
+    snakeOpening: enableSnakeOpening ? { reversed: raw.snakeOpening?.reversed === true } : null,
     ordinaryCardDecks,
     ordinaryCardDrawChoices: raw.ordinaryCardDrawChoices ?? {},
     nextOrdinaryCardDrawChoiceSeq: raw.nextOrdinaryCardDrawChoiceSeq ?? 1,
@@ -626,6 +629,10 @@ export const cloneState = (state: GameState): GameState => {
   return normalizeState(raw)
 }
 
+/** Snake Opening is a multiplayer variant: a single seat has nothing to reverse and keeps the standard 2 food. */
+const isSnakeOpeningActive = (options: InitialStateOptions): boolean =>
+  options.enableSnakeOpening === true && Math.floor(options.playerCount ?? 2) > 1
+
 const createInitialPlayers = (
   seed: number,
   options: InitialStateOptions = {},
@@ -642,6 +649,7 @@ const createInitialPlayers = (
     allowIncompleteFarmersOfTheMoorMinorDeal = false,
   } = options
   const count = Math.max(1, Math.min(6, Math.floor(playerCount)))
+  const snakeOpening = isSnakeOpeningActive(options)
   let dealtHands = { minorHands: [] as string[][], occupationHands: [] as string[][] }
   if (draftMode !== 'simultaneous') {
     if (enableFarmersOfTheMoor) {
@@ -693,13 +701,14 @@ const createInitialPlayers = (
     { id: 'p6', name: 'PlayerF', color: 'purple', startPlayer: false },
   ]
   return base.slice(0, count).map((info, index) => {
+    const startingFood = snakeOpening || !info.startPlayer ? 3 : 2
     const player: PlayerState = {
       id: info.id,
       name: playerNames[index] ?? info.name,
       color: info.color,
       resources: enableFarmersOfTheMoor
-        ? { ...emptyResources, food: 2, fuel: 0, horse: 0 }
-        : { ...emptyResources, food: 2 },
+        ? { ...emptyResources, food: startingFood, fuel: 0, horse: 0 }
+        : { ...emptyResources, food: startingFood },
       workers: [
         { id: '1', isActive: true,  isNewborn: false },
         { id: '2', isActive: true,  isNewborn: false },
@@ -758,6 +767,7 @@ export const createInitialState = (
   const roundActionOrder = generateRoundActionOrder(gameSeed)
   const useDraft = options.draftMode === 'simultaneous'
   const players = createInitialPlayers(gameSeed, options)
+  const enableSnakeOpening = isSnakeOpeningActive(options)
   const enableFarmersOfTheMoor = options.enableFarmersOfTheMoor === true
   const farmersOfTheMoor = enableFarmersOfTheMoor
     ? createFarmersOfTheMoorState(players.map((player) => player.id), gameSeed)
@@ -947,6 +957,8 @@ export const createInitialState = (
       : null,
     enableFarmersOfTheMoor,
     farmersOfTheMoor,
+    enableSnakeOpening,
+    snakeOpening: enableSnakeOpening ? { reversed: false } : null,
     ordinaryCardDecks,
     ordinaryCardDrawChoices: {},
     nextOrdinaryCardDrawChoiceSeq: 1,

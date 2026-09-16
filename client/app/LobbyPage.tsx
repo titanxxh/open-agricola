@@ -53,6 +53,7 @@ export function LobbyPage() {
   const [enableThroughTheSeasons, setEnableThroughTheSeasons] = useState(false)
   const [enableFarmersOfTheMoor, setEnableFarmersOfTheMoor] = useState(false)
   const [allowIncompleteFarmersOfTheMoorMinorDeal, setAllowIncompleteFarmersOfTheMoorMinorDeal] = useState(false)
+  const [enableSnakeOpening, setEnableSnakeOpening] = useState(true)
   const showCommunityDeckToggle = import.meta.env.VITE_ENABLE_COMMUNITY_DECK === 'true'
 
   const fetchRooms = useCallback(async () => {
@@ -137,6 +138,9 @@ export function LobbyPage() {
       if (allowIncompleteFarmersOfTheMoorMinorDeal) {
         params.allowIncompleteFarmersOfTheMoorMinorDeal = 'true'
       }
+    }
+    if (enableSnakeOpening) {
+      params.enableSnakeOpening = 'true'
     }
     setPage('game', params)
   }
@@ -364,6 +368,18 @@ export function LobbyPage() {
                   )}
                 </>
               )}
+              <label className="community-deck-toggle">
+                <input
+                  type="checkbox"
+                  checked={enableSnakeOpening}
+                  onChange={(e) => setEnableSnakeOpening(e.target.checked)}
+                />
+                <span>
+                  {t('platform.snakeOpening')}
+                  <br />
+                  <span className="community-deck-toggle-hint">{t('platform.snakeOpeningHint')}</span>
+                </span>
+              </label>
               <label className="community-deck-toggle">
                 <input
                   type="checkbox"

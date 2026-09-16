@@ -115,6 +115,8 @@ export type InitialStateOptions = {
   enableThroughTheSeasons?: boolean
   enableFarmersOfTheMoor?: boolean
   allowIncompleteFarmersOfTheMoorMinorDeal?: boolean
+  /** Snake Opening variant; ignored for single-player games. Default false. */
+  enableSnakeOpening?: boolean
   draftParents?: boolean
   parentSelectionSeed?: number
   ordinaryCardDeckSeed?: number

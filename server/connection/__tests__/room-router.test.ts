@@ -661,6 +661,40 @@ describe('handleCreateRoom', () => {
     expect(ctx.currentRoom!.session.state.farmersOfTheMoor).not.toBeNull()
   })
 
+  it('forwards enableSnakeOpening into the created room session', () => {
+    const ctx = newCtx()
+    ctx.currentUserId = 'u1'
+    dispatch(ctx, { type: 'createRoom', maxPlayers: 2, enableSnakeOpening: true } as never)
+
+    expect(ctx.currentRoom!.enableSnakeOpening).toBe(true)
+    expect(ctx.currentRoom!.session.state.enableSnakeOpening).toBe(true)
+    expect(ctx.currentRoom!.session.state.snakeOpening).toEqual({ reversed: false })
+  })
+
+  it('leaves enableSnakeOpening off when createRoom omits it', () => {
+    const ctx = newCtx()
+    ctx.currentUserId = 'u1'
+    dispatch(ctx, { type: 'createRoom', maxPlayers: 2 })
+
+    expect(ctx.currentRoom!.enableSnakeOpening).toBe(false)
+    expect(ctx.currentRoom!.session.state.enableSnakeOpening).toBe(false)
+    expect(ctx.currentRoom!.session.state.snakeOpening).toBeNull()
+  })
+
+  it('preserves enableSnakeOpening when starting a new game', () => {
+    const ctx = newCtx()
+    ctx.currentUserId = 'u1'
+    dispatch(ctx, { type: 'createRoom', maxPlayers: 2, enableSnakeOpening: true } as never)
+    markRoomStarted(ctx)
+
+    dispatch(ctx, { type: 'newGame', seed: 309 })
+
+    expect(ctx.currentRoom!.session.state.gameSeed).toBe(309)
+    expect(ctx.currentRoom!.enableSnakeOpening).toBe(true)
+    expect(ctx.currentRoom!.session.state.enableSnakeOpening).toBe(true)
+    expect(ctx.currentRoom!.session.state.snakeOpening).toEqual({ reversed: false })
+  })
+
   it('preserves six seats when starting a new game', () => {
     const ctx = newCtx()
     ctx.currentUserId = 'u1'

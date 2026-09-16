@@ -45,9 +45,9 @@ const insertContext = (
       INSERT INTO game_results (
         room_id, started_at, finished_at, rounds_played, player_count,
         enable_community_deck, enable_parent_cards,
-        enable_through_the_seasons, enable_farmers_of_the_moor
+        enable_through_the_seasons, enable_farmers_of_the_moor, enable_snake_opening
       )
-      VALUES (?, ?, ?, 14, 2, 0, 0, 0, 0)
+      VALUES (?, ?, ?, 14, 2, 0, 0, 0, 0, 0)
     `).run(roomId, now - 1_000, now)
     db.prepare(`
       INSERT INTO game_result_players (

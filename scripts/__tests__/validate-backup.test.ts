@@ -122,7 +122,7 @@ describe('backup validation', () => {
       formatVersion: 1,
       ...metadata,
       sourceDatabaseSchemaVersion: 26,
-      targetDatabaseSchemaVersion: 29,
+      targetDatabaseSchemaVersion: 30,
       replaySchemaVersions: [1],
       roomCount: 1,
       replayCount: 1,

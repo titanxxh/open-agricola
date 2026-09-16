@@ -45,6 +45,7 @@ export type Room = {
   enableThroughTheSeasons?: boolean
   enableFarmersOfTheMoor?: boolean
   allowIncompleteFarmersOfTheMoorMinorDeal?: boolean
+  enableSnakeOpening?: boolean
   /**
    * Local hotseat: one person plays every seat from a single connection.
    * Such a room is hidden from the lobby list and only its creator can rejoin,
@@ -84,6 +85,7 @@ export type FixedDevRoomStartupOptions = {
   enableThroughTheSeasons?: boolean
   enableFarmersOfTheMoor?: boolean
   allowIncompleteFarmersOfTheMoorMinorDeal?: boolean
+  enableSnakeOpening?: boolean
   draftParents?: boolean
   draftMode?: 'simultaneous'
   draftPoolSize?: number
@@ -108,6 +110,9 @@ export const parseFixedDevRoomStartupOptions = (
   ) {
     options.allowIncompleteFarmersOfTheMoorMinorDeal = true
   }
+  if (env.DEV_ENABLE_SNAKE_OPENING === 'true' || env.DEV_ENABLE_SNAKE_OPENING === '1') {
+    options.enableSnakeOpening = true
+  }
   if (env.DEV_DRAFT_PARENTS === 'false' || env.DEV_DRAFT_PARENTS === '0') {
     options.draftParents = false
   }
@@ -130,6 +135,7 @@ export const buildFixedDevRoomInitialStateOptions = (
   ...(startupOptions.enableThroughTheSeasons ? { enableThroughTheSeasons: true } : {}),
   ...(startupOptions.enableFarmersOfTheMoor ? { enableFarmersOfTheMoor: true } : {}),
   ...(startupOptions.allowIncompleteFarmersOfTheMoorMinorDeal ? { allowIncompleteFarmersOfTheMoorMinorDeal: true } : {}),
+  ...(startupOptions.enableSnakeOpening ? { enableSnakeOpening: true } : {}),
   ...(startupOptions.draftParents === false ? { draftParents: false } : {}),
   ...(startupOptions.draftMode === 'simultaneous'
     ? {
@@ -191,6 +197,7 @@ export const toRoomMeta = (room: Room): RoomMeta => ({
   enableThroughTheSeasons: room.enableThroughTheSeasons ?? room.session.state.enableThroughTheSeasons,
   enableFarmersOfTheMoor: room.enableFarmersOfTheMoor ?? (room.session.state.enableFarmersOfTheMoor === true),
   allowIncompleteFarmersOfTheMoorMinorDeal: room.allowIncompleteFarmersOfTheMoorMinorDeal ?? false,
+  enableSnakeOpening: room.enableSnakeOpening ?? (room.session.state.enableSnakeOpening === true),
   hotseat: room.hotseat === true,
   status: getRoomStatus(room),
   players: roomSeatOwners(room),
@@ -306,6 +313,7 @@ const createSessionFromSnapshot = (
       enableThroughTheSeasons: snapshot.meta.enableThroughTheSeasons ?? false,
       enableFarmersOfTheMoor: snapshot.meta.enableFarmersOfTheMoor ?? false,
       allowIncompleteFarmersOfTheMoorMinorDeal: snapshot.meta.allowIncompleteFarmersOfTheMoorMinorDeal ?? false,
+      enableSnakeOpening: snapshot.meta.enableSnakeOpening ?? false,
     })
   }
   try {
@@ -323,6 +331,7 @@ const createSessionFromSnapshot = (
       enableThroughTheSeasons: snapshot.meta.enableThroughTheSeasons ?? false,
       enableFarmersOfTheMoor: snapshot.meta.enableFarmersOfTheMoor ?? false,
       allowIncompleteFarmersOfTheMoorMinorDeal: snapshot.meta.allowIncompleteFarmersOfTheMoorMinorDeal ?? false,
+      enableSnakeOpening: snapshot.meta.enableSnakeOpening ?? false,
     })
   }
 }
@@ -361,6 +370,7 @@ export const snapshotToRoom = (
     enableThroughTheSeasons: snapshot.meta.enableThroughTheSeasons ?? snapshot.serialized?.state?.enableThroughTheSeasons ?? false,
     enableFarmersOfTheMoor: snapshot.meta.enableFarmersOfTheMoor ?? (snapshot.serialized?.state?.enableFarmersOfTheMoor === true),
     allowIncompleteFarmersOfTheMoorMinorDeal: snapshot.meta.allowIncompleteFarmersOfTheMoorMinorDeal ?? false,
+    enableSnakeOpening: snapshot.meta.enableSnakeOpening ?? (snapshot.serialized?.state?.enableSnakeOpening === true),
     ...(snapshotRehydrationFailed ? { snapshotRehydrationFailed: true } : {}),
   }
 }

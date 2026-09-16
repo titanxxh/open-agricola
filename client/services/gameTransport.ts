@@ -466,7 +466,7 @@ export class WsGameTransport implements GameTransport {
     return () => { this.persistenceStatusListeners.delete(cb) }
   }
 
-  sendRoomCommand(type: 'createRoom', opts: { maxPlayers?: number; name?: string; customCardIds?: string[]; enableCommunityDeck?: boolean; enableParentCards?: boolean; draftParents?: boolean; enableThroughTheSeasons?: boolean; enableFarmersOfTheMoor?: boolean; allowIncompleteFarmersOfTheMoorMinorDeal?: boolean; draftMode?: 'none' | 'simultaneous'; draftPoolSize?: number; hotseat?: boolean }): void
+  sendRoomCommand(type: 'createRoom', opts: { maxPlayers?: number; name?: string; customCardIds?: string[]; enableCommunityDeck?: boolean; enableParentCards?: boolean; draftParents?: boolean; enableThroughTheSeasons?: boolean; enableFarmersOfTheMoor?: boolean; allowIncompleteFarmersOfTheMoorMinorDeal?: boolean; enableSnakeOpening?: boolean; draftMode?: 'none' | 'simultaneous'; draftPoolSize?: number; hotseat?: boolean }): void
   sendRoomCommand(type: 'joinRoom', opts: {
     roomId: string
     intent?: 'join' | 'resume'

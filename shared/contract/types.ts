@@ -598,6 +598,11 @@ export type MajorSupplyStack = {
   cardIds: string[]
 }
 
+export type SnakeOpeningState = {
+  /** True once the round-1 work rotation has wrapped and now walks the Round Work Order backwards. */
+  reversed: boolean
+}
+
 export type GameState = {
   round: number
   /** Top-level game phase. 'draft' while card draft is in progress; 'playing' for the normal game. */
@@ -638,6 +643,9 @@ export type GameState = {
   throughTheSeasons: ThroughTheSeasonsState | null
   enableFarmersOfTheMoor?: boolean
   farmersOfTheMoor?: FarmersOfTheMoorState | null
+  /** Snake Opening variant: every player starts with 3 food and the round-1 second placement runs in reverse Round Work Order. */
+  enableSnakeOpening: boolean
+  snakeOpening: SnakeOpeningState | null
   ordinaryCardDecks: OrdinaryCardDecks
   ordinaryCardDrawChoices: Record<string, OrdinaryCardDrawChoice>
   nextOrdinaryCardDrawChoiceSeq: number

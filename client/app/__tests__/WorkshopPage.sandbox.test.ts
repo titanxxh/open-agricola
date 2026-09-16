@@ -15,13 +15,20 @@ describe('WorkshopPage sandbox launch helpers', () => {
       enable_through_the_seasons: true,
       enable_farmers_of_the_moor: true,
       allow_incomplete_farmers_of_the_moor_minor_deal: true,
+      enable_snake_opening: true,
     })).toEqual({
       player_count: 6,
       deck_ids: ['A'],
       enable_through_the_seasons: true,
       enable_farmers_of_the_moor: true,
       allow_incomplete_farmers_of_the_moor_minor_deal: true,
+      enable_snake_opening: true,
     })
+  })
+
+  it('treats a missing or non-boolean snake opening setting as disabled', () => {
+    expect(normalizeSandboxSettings({ player_count: 2 }).enable_snake_opening).toBe(false)
+    expect(normalizeSandboxSettings({ player_count: 2, enable_snake_opening: 'true' }).enable_snake_opening).toBe(false)
   })
 
   it('includes the newly saved card id when launching before React state refreshes', () => {

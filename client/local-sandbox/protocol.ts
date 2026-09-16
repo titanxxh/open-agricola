@@ -25,6 +25,7 @@ export type LocalGameConfig = {
   enableThroughTheSeasons?: boolean
   enableFarmersOfTheMoor?: boolean
   allowIncompleteFarmersOfTheMoorMinorDeal?: boolean
+  enableSnakeOpening?: boolean
   seed?: number
 }
 

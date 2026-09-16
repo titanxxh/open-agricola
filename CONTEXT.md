@@ -29,8 +29,12 @@ _Avoid_: 房间连接、WebSocket version、React state
 _Avoid_: 当前行动玩家、本轮已冻结顺序
 
 **Round Work Order（本轮工作顺序）**:
-Preparation 开始时按 Start Player Marker 冻结的本轮普通放人顺序。随后在 work phase 前发生的标记转移不改变该顺序；Roman Pot 等本轮顺序消费者必须读取同一冻结结果。
+Preparation 开始时按 Start Player Marker 冻结的本轮普通放人顺序。随后在 work phase 前发生的标记转移不改变该顺序；Roman Pot 等本轮顺序消费者必须读取同一冻结结果。唯一例外是 Snake Opening 在第 1 回合的反转。
 _Avoid_: Start Player Marker、`currentPlayerIndex`、`roundActionOrder`
+
+**Snake Opening（蛇形开局）**:
+多人局可选的 Game Variant：每名玩家开局 3 食物（含起始玩家）；第 1 回合工作阶段的轮转从 Round Work Order 末位首次要绕回首位时反转，此后该回合剩余的全部放置按反向顺序进行，第 2 回合起恢复正向。单人局启用时不产生任何效果。
+_Avoid_: 让子、每回合反转、只反转第二人后再恢复、把反转套用到 Before-Harvest Reaction Window 或其他非工作阶段顺序
 
 **Work Placement Chronology（工作阶段放人时序）**:
 当前 Work Phase 内实际发生的人员放置先后。起始玩家标记转移不会重排已发生的放置，额外或连续放置保留其真实位置；新 Work Phase 重新开始。

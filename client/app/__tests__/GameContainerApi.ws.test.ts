@@ -14,6 +14,7 @@ import {
   buildSelectableOccupationIds,
   devResourceKeysForState,
   allowIncompleteFarmersOfTheMoorMinorDealFromQuery,
+  enableSnakeOpeningFromQuery,
   enableThroughTheSeasonsFromQuery,
   farmCommitErrorMessageKey,
   getCurrentlySelectableRoomKeys,
@@ -126,6 +127,12 @@ describe('GameContainerApi WS player identity', () => {
     expect(allowIncompleteFarmersOfTheMoorMinorDealFromQuery('?allowIncompleteFarmersOfTheMoorMinorDeal=true')).toBe(true)
     expect(allowIncompleteFarmersOfTheMoorMinorDealFromQuery('?allowIncompleteFarmersOfTheMoorMinorDeal=1')).toBe(false)
     expect(allowIncompleteFarmersOfTheMoorMinorDealFromQuery('?page=game')).toBe(false)
+  })
+
+  it('parses the Snake opening room option from query', () => {
+    expect(enableSnakeOpeningFromQuery('?page=game&transport=ws&enableSnakeOpening=true')).toBe(true)
+    expect(enableSnakeOpeningFromQuery('?page=game&transport=ws&enableSnakeOpening=1')).toBe(false)
+    expect(enableSnakeOpeningFromQuery('?page=game&transport=ws')).toBe(false)
   })
 
   it('includes FoM resources in the dev resource picker only for Farmers of the Moor games', () => {

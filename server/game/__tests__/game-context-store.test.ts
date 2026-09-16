@@ -35,7 +35,8 @@ const createDb = () => {
       enable_community_deck INTEGER NOT NULL,
       enable_parent_cards INTEGER NOT NULL,
       enable_through_the_seasons INTEGER NOT NULL,
-      enable_farmers_of_the_moor INTEGER NOT NULL
+      enable_farmers_of_the_moor INTEGER NOT NULL,
+      enable_snake_opening INTEGER NOT NULL DEFAULT 0
     );
     CREATE TABLE game_result_players (
       room_id TEXT NOT NULL,
@@ -95,11 +96,12 @@ const insertCompleted = (
   db: Database.Database,
   roomId: string,
   replayStatus: 'available' | 'legacy_no_replay',
+  options: { snakeOpening?: boolean } = {},
 ) => {
   insertContext(db, roomId, 'completed', { replayStatus })
   db.prepare(`
-    INSERT INTO game_results VALUES (?, 10, 20, 14, 2, 1, 0, 1, 0)
-  `).run(roomId)
+    INSERT INTO game_results VALUES (?, 10, 20, 14, 2, 1, 0, 1, 0, ?)
+  `).run(roomId, options.snakeOpening ? 1 : 0)
   db.prepare(`
     INSERT INTO game_result_players VALUES (?, 0, 'p1', 'u1', 'Alice', 42)
   `).run(roomId)
@@ -170,7 +172,7 @@ describe('GameContextStore', () => {
     db.prepare('INSERT INTO game_replays VALUES (?, 1, ?, ?, ?, 4, 0, ?, 1, NULL)')
       .run('active-room', 'viewer-1', 'game-1', 'recording', '[]')
     insertCompleted(db, 'completed-room', 'available')
-    insertCompleted(db, 'legacy-room', 'legacy_no_replay')
+    insertCompleted(db, 'legacy-room', 'legacy_no_replay', { snakeOpening: true })
     insertContext(db, 'expired-room', 'expired')
     insertContext(db, 'removed-room', 'removed', { removalReason: 'private detail' })
     const store = new GameContextStore(db, () => 1_000)
@@ -209,6 +211,7 @@ describe('GameContextStore', () => {
         enableParentCards: false,
         enableThroughTheSeasons: true,
         enableFarmersOfTheMoor: false,
+        enableSnakeOpening: false,
         players: [
           { playerIndex: 0, displayName: 'Alice', score: 42 },
           { playerIndex: 1, displayName: 'Bob', score: 35 },
@@ -227,6 +230,7 @@ describe('GameContextStore', () => {
       ok: true,
       lifecycle: 'completed',
       replayStatus: 'legacy_no_replay',
+      result: { enableSnakeOpening: true },
     })
     expect(store.resolve('expired-room')).toEqual({
       ok: true,
