@@ -286,13 +286,16 @@ const createRootScope = (classify: ModuleClassifier): Scope => ({
   classify,
 })
 
-/** `require('x')` through an unshadowed loader binding, or `await import('x')`. */
+const INTEROP_HELPERS = new Set(['__importStar', '__importDefault', '__toESM', '_interopRequireWildcard', '_interopRequireDefault'])
+
+/** `require('x')` through an unshadowed loader binding, `await import('x')`, or either wrapped in a transpiler interop helper. */
 const moduleRequestSpecifier = (expression: ts.Expression | undefined, scope: Scope): string | null => {
   if (!expression) return null
   let current = unwrapExpression(expression)
   if (ts.isAwaitExpression(current)) current = unwrapExpression(current.expression)
   if (!ts.isCallExpression(current)) return null
   const callee = unwrapExpression(current.expression)
+  if (ts.isIdentifier(callee) && INTEROP_HELPERS.has(callee.text)) return moduleRequestSpecifier(current.arguments[0], scope)
   const isLoader = ts.isIdentifier(callee) && scope.moduleLoaders.has(callee.text)
   if (!isLoader && callee.kind !== ts.SyntaxKind.ImportKeyword) return null
   const argument = current.arguments[0] && unwrapExpression(current.arguments[0])
@@ -358,6 +361,8 @@ const bindModuleRequest = (judge: Scope, into: Scope, name: ts.BindingName, init
     if (judge.logStoreClassNamespaces.has(source.text)) into.logStoreClassNamespaces.add(name.text)
     if (judge.logCacheWriterNamespaces.has(source.text)) into.logCacheWriterNamespaces.add(name.text)
     if (judge.requireFactoryNamespaces.has(source.text)) into.requireFactoryNamespaces.add(name.text)
+    if (judge.requireFactories.has(source.text)) into.requireFactories.add(name.text)
+    if (judge.moduleLoaders.has(source.text)) into.moduleLoaders.add(name.text)
   }
   if (ts.isIdentifier(name) && isCreateRequireCall(initializer, judge)) into.moduleLoaders.add(name.text)
 }
@@ -365,12 +370,12 @@ const bindModuleRequest = (judge: Scope, into: Scope, name: ts.BindingName, init
 const isVarDeclarationList = (list: ts.VariableDeclarationList): boolean =>
   (list.flags & (ts.NodeFlags.Let | ts.NodeFlags.Const | ts.NodeFlags.Using | ts.NodeFlags.AwaitUsing)) === 0
 
-/** `var` declarations nested in blocks and control flow, excluding nested functions and classes, hoist to the function. */
-const collectHoistedVarStatements = (node: ts.Node, out: ts.VariableStatement[]): void => {
+/** `var` declarations nested in blocks, control flow and loop heads, excluding nested functions and classes, hoist to the function. */
+const collectHoistedVarDeclarations = (node: ts.Node, out: ts.VariableDeclaration[]): void => {
   ts.forEachChild(node, (child) => {
     if (ts.isFunctionLike(child) || ts.isClassLike(child)) return
-    if (ts.isVariableStatement(child) && isVarDeclarationList(child.declarationList)) out.push(child)
-    collectHoistedVarStatements(child, out)
+    if (ts.isVariableDeclarationList(child) && isVarDeclarationList(child)) out.push(...child.declarations)
+    collectHoistedVarDeclarations(child, out)
   })
 }
 
@@ -403,25 +408,21 @@ const precollectScopeBindings = (
   scope: Scope,
   statements: readonly ts.Statement[],
   sourceFile: ts.SourceFile,
-  hoistedVars: readonly ts.VariableStatement[] = [],
+  hoistedVars: readonly ts.VariableDeclaration[] = [],
 ): void => {
-  const declarations = [...statements, ...hoistedVars]
-  for (const statement of declarations) {
-    const names: string[] = []
-    if (ts.isVariableStatement(statement)) {
-      for (const declaration of statement.declarationList.declarations) collectBindingNames(declaration.name, names)
-    }
+  const declarations: ts.VariableDeclaration[] = [...hoistedVars]
+  const names: string[] = []
+  for (const statement of statements) {
+    if (ts.isVariableStatement(statement)) declarations.push(...statement.declarationList.declarations)
     if ((ts.isFunctionDeclaration(statement) || ts.isClassDeclaration(statement)) && statement.name) {
       names.push(statement.name.text)
     }
-    for (const name of names) shadowName(scope, name)
   }
+  for (const declaration of declarations) collectBindingNames(declaration.name, names)
+  for (const name of names) shadowName(scope, name)
   for (const statement of statements) bindImportStatement(scope, scope, statement)
-  for (const statement of declarations) {
-    if (!ts.isVariableStatement(statement)) continue
-    for (const declaration of statement.declarationList.declarations) {
-      if (declaration.initializer) bindDeclaration(scope, scope, declaration, sourceFile)
-    }
+  for (const declaration of declarations) {
+    if (declaration.initializer) bindDeclaration(scope, scope, declaration, sourceFile)
   }
 }
 
@@ -782,6 +783,7 @@ const scanFile = (repoRoot: string, fullPath: string): DirectSessionLogViolation
       scope = forkScope(scope)
       chain = [...chain, scope]
       if (ts.isFunctionLike(node)) {
+        if (ts.isFunctionExpression(node) && node.name) shadowName(scope, node.name.text)
         for (const parameter of node.parameters) {
           const names: string[] = []
           collectBindingNames(parameter.name, names)
@@ -792,9 +794,9 @@ const scanFile = (repoRoot: string, fullPath: string): DirectSessionLogViolation
         }
       }
       if (ts.isSourceFile(node) || ts.isBlock(node) || ts.isModuleBlock(node)) {
-        const hoistedVars: ts.VariableStatement[] = []
-        if (isFunctionBody(node)) collectHoistedVarStatements(node, hoistedVars)
-        precollectScopeBindings(scope, node.statements, sourceFile, hoistedVars.filter((statement) => statement.parent !== node))
+        const hoistedVars: ts.VariableDeclaration[] = []
+        if (isFunctionBody(node)) collectHoistedVarDeclarations(node, hoistedVars)
+        precollectScopeBindings(scope, node.statements, sourceFile, hoistedVars)
       }
       if (ts.isCaseBlock(node)) {
         precollectScopeBindings(scope, node.clauses.flatMap((clause) => [...clause.statements]), sourceFile)
