@@ -5,16 +5,14 @@ import type {
   CardResourceStats,
   CropStack,
   FarmTilePosition,
-  GameState,
   PlayerState,
   Resource,
 } from '../../../shared/contract/types'
 import { formatResources } from '../../utils/format'
 import { emptyResources } from '../../../shared/contract/state-constants'
 import type { ParentCardId } from '../../../shared/parents'
-import {
-  getPlayerPanelSupplySummary,
-  type PlayerPanelSupplySummary,
+import type {
+  PlayerPanelSupplySummary,
 } from '../../../shared/domain/player-panel-summary'
 import { isFarmyardBorderEdge, positionKey } from '../../../shared/domain/farm'
 import type { AnimalReorgState, ExtraSowTarget, PendingSowCrop } from '../../types/ui'
@@ -442,7 +440,7 @@ export type FarmBoardView = {
   currentPlayer: PlayerState
   displayPlayer: PlayerState
   activePlayerId?: string
-  playerPanelSummary?: PlayerPanelSupplySummary
+  playerPanelSummary: PlayerPanelSupplySummary
   devMode: boolean
   currentStartPlayerId: string
   nextStartPlayerId: string
@@ -927,7 +925,7 @@ export const FarmBoard = ({ view, actions, inlineCardStats = false }: FarmBoardP
   } = actions
   const activeFarmPlayerId = activePlayerId ?? currentPlayer.id
   const canInteractHand = displayPlayer.id === activeFarmPlayerId && isInteractive
-  const summary = playerPanelSummary ?? getPlayerPanelSupplySummary({ players } as GameState, displayPlayer)
+  const summary = playerPanelSummary
   const gridColumns = Math.max(1, farmGridColumns)
   const farmGridRows = Math.max(1, Math.ceil(farmCells.length / gridColumns))
   const farmGridStyle: CSSProperties & { '--farm-grid-ratio': string } = {

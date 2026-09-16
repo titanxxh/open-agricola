@@ -18,7 +18,7 @@
  */
 
 import communityExamples from '../../docs/community-card-examples.md?raw'
-import { cardEffectHooks } from '../../shared/cards/card-effects'
+import { cardEffectHooks } from '../../shared/projections/card-effect-hooks'
 import { cardEffectHookMeta } from '../../shared/custom-code/sandbox-hook-meta'
 import { sandboxListenerActions } from '../../shared/custom-code/sandbox-listener-actions'
 import { sandboxListenerPhases, sandboxListenerPhaseMeta } from '../../shared/custom-code/sandbox-listener-phases'

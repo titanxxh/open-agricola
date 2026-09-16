@@ -25,7 +25,7 @@ export function buildSyncPayload(
 ): GameSyncPayload {
   const ctx = { engineStack: core.getEngineStack() }
   const defs = core.getCustomCardDefs()
-  const canonicalState = serializedState ?? serializeState(resp.state, ctx)
+  const canonicalState = serializedState ?? core.withCtx(() => serializeState(resp.state, ctx))
   const base: GameSyncPayload = {
     state: mode === 'debug'
       ? canonicalState

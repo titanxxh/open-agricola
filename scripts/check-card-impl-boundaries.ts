@@ -3,6 +3,8 @@ import fs from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import ts from 'typescript'
+import { walkSourceFiles, parseSource } from './source-files'
+import { isTestFile } from './architecture-policy.mjs'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
@@ -38,8 +40,7 @@ export function checkFieldStorageBoundaries(files: string[]): CardImplBoundaryVi
   const violations: CardImplBoundaryViolation[] = []
   for (const file of files) {
     if (isFarmyardFieldOwner(file)) continue
-    const sourceText = fs.readFileSync(file, 'utf8')
-    const sourceFile = ts.createSourceFile(file, sourceText, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS)
+    const sourceFile = parseSource(file)
     const visit = (node: ts.Node): void => {
       if (isFieldsAccess(node)) {
         const { line } = sourceFile.getLineAndCharacterOfPosition(node.getStart(sourceFile))
@@ -105,6 +106,7 @@ function propertyNameText(name: ts.PropertyName): string | null {
 }
 
 const CARD_SOURCE_FACTORIES = new Set([
+  'defineMajorCard',
   'defineMinorCard',
   'defineOccupationCard',
   'definePlayerActionCard',
@@ -323,25 +325,34 @@ export function checkCardImplBoundaries(
   runtimeCards?: readonly RuntimeCardImpl[],
 ): CardImplBoundaryResult {
   const violations: CardImplBoundaryViolation[] = []
+  const scopeErrors: string[] = []
   let cardSourcesChecked = 0
   let listenerHandlersChecked = 0
   let trailingListenerHandlersChecked = 0
   const cardImplSourceIds = new Set<string>()
   for (const file of files) {
-    const sourceText = fs.readFileSync(file, 'utf8')
-    const sourceFile = ts.createSourceFile(file, sourceText, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS)
+    const sourceFile = parseSource(file)
     const cardId = cardIdFromFile(file)
     const aliases = collectConstCardAliases(sourceFile, cardId)
     const reaches = collectReachCardIds(sourceFile, aliases)
 
-    let hasCardSource = false
+    let sourcesInFile = 0
     const countScope = (node: ts.Node): void => {
-      if (isCardSourceDeclaration(node, cardId)) hasCardSource = true
-      if (isCardImplSourceDeclaration(node, cardId)) cardImplSourceIds.add(cardId)
+      if (ts.isVariableDeclaration(node) && ts.isIdentifier(node.name)) {
+        const id = node.name.text
+        if (isCardSourceDeclaration(node, id)) {
+          sourcesInFile += 1
+          cardSourcesChecked += 1
+        }
+        if (isCardImplSourceDeclaration(node, id)) {
+          if (cardImplSourceIds.has(id)) scopeErrors.push('duplicate Card Source: ' + id)
+          cardImplSourceIds.add(id)
+        }
+      }
       ts.forEachChild(node, countScope)
     }
     countScope(sourceFile)
-    if (hasCardSource) cardSourcesChecked += 1
+    if (sourcesInFile === 0) scopeErrors.push('found 0 Card Sources for 1 production card files')
 
     const visit = (node: ts.Node): void => {
       if (
@@ -385,11 +396,7 @@ export function checkCardImplBoundaries(
 
     visit(sourceFile)
   }
-  const scopeErrors: string[] = []
   if (files.length === 0) scopeErrors.push('no production card files scanned')
-  if (files.length > 0 && cardSourcesChecked !== files.length) {
-    scopeErrors.push(`found ${cardSourcesChecked} Card Sources for ${files.length} production card files`)
-  }
   if (runtimeCards !== undefined) {
     if (runtimeCards.length === 0) scopeErrors.push('no production card implementations scanned')
     const runtimeCardIds = new Set(runtimeCards.map((card) => card.cardId))
@@ -437,37 +444,30 @@ export function checkCardImplBoundaries(
   }
 }
 
+const cardDirectories = ['A', 'B', 'C', 'D', 'E', 'M', 'major', 'community', 'helpers', '__stubs__']
+
 export function walkProductionCardFiles(repoRoot: string): string[] {
-  const files: string[] = []
-  for (const deck of ['A', 'B', 'C', 'D', 'E', 'M']) {
-    const dir = path.join(repoRoot, 'shared', 'cards', deck)
-    if (!fs.existsSync(dir)) continue
-    for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
-      if (
-        entry.isFile()
-        && entry.name.endsWith('.ts')
-        && !entry.name.endsWith('.test.ts')
-        && NON_MAJOR_CARD_ID_RE.test(path.basename(entry.name, '.ts'))
-      ) {
-        files.push(path.join(dir, entry.name))
-      }
+  const cardsRoot = path.join(repoRoot, 'shared/cards')
+  for (const directory of cardDirectories) fs.readdirSync(path.join(cardsRoot, directory))
+  return walkSourceFiles(cardsRoot).filter(file => {
+    if (isTestFile(file)) return false
+    const source = parseSource(file)
+    let hasSource = false
+    const visit = (node: ts.Node): void => {
+      if (ts.isVariableDeclaration(node) && ts.isIdentifier(node.name) && isCardSourceDeclaration(node, node.name.text)) hasSource = true
+      ts.forEachChild(node, visit)
     }
-  }
-  return files
+    visit(source)
+    if (hasSource && !file.endsWith('.ts')) throw new Error('unsupported Card Source extension: ' + file)
+    return hasSource || NON_MAJOR_CARD_ID_RE.test(cardIdFromFile(file))
+  })
 }
 
 export function walkProductionFieldBoundaryFiles(repoRoot: string): string[] {
-  const files: string[] = []
-  for (const dirName of ['A', 'B', 'C', 'D', 'E', 'M', 'major', 'community', 'helpers']) {
-    const dir = path.join(repoRoot, 'shared', 'cards', dirName)
-    if (!fs.existsSync(dir)) continue
-    for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
-      if (entry.isFile() && entry.name.endsWith('.ts') && !entry.name.endsWith('.test.ts')) {
-        files.push(path.join(dir, entry.name))
-      }
-    }
-  }
-  return files.sort()
+  const cardsRoot = path.join(repoRoot, 'shared/cards')
+  for (const directory of cardDirectories) fs.readdirSync(path.join(cardsRoot, directory))
+  return walkSourceFiles(cardsRoot).filter(file => !isTestFile(file) && !path.relative(cardsRoot, file).startsWith('__stubs__/'))
+
 }
 
 async function runCli(): Promise<void> {
@@ -476,11 +476,17 @@ async function runCli(): Promise<void> {
   const files = walkProductionCardFiles(repoRoot)
   const fieldBoundaryFiles = walkProductionFieldBoundaryFiles(repoRoot)
   const { ALL_CARD_IMPLS } = await import('../shared/cards/register-all')
-  const runtimeCards = files.flatMap((file): RuntimeCardImpl[] => {
-    const cardId = cardIdFromFile(file)
-    const impl = ALL_CARD_IMPLS[cardId]
-    return impl ? [{ cardId, file, listeners: impl.listeners }] : []
-  })
+  const sourceFilesById = new Map<string, string>()
+  for (const file of files) {
+    const visit = (node: ts.Node): void => {
+      if (ts.isVariableDeclaration(node) && ts.isIdentifier(node.name) && isCardSourceDeclaration(node, node.name.text)) sourceFilesById.set(node.name.text, file)
+      ts.forEachChild(node, visit)
+    }
+    visit(parseSource(file))
+  }
+  const runtimeCards = Object.entries(ALL_CARD_IMPLS).map(([cardId, impl]): RuntimeCardImpl => ({
+    cardId, file: sourceFilesById.get(cardId) ?? cardId, listeners: impl.listeners,
+  }))
   const result = checkCardImplBoundaries(files, runtimeCards)
   if (fieldBoundaryFiles.length === 0) result.scopeErrors.push('no production field-boundary files scanned')
   result.violations.push(...checkFieldStorageBoundaries(fieldBoundaryFiles))

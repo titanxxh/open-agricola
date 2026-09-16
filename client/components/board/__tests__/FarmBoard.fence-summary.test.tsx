@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { getPlayerPanelSupplySummary } from '../../../../shared/domain/player-panel-summary'
 import { renderToStaticMarkup } from 'react-dom/server'
 import type { FenceSegment, GameState, PlayerState, Resource } from '../../../../shared/contract/types'
 import { FarmBoard, type FarmBoardProps } from '../FarmBoard'
@@ -97,6 +98,7 @@ const farmBoardProps = (
       players: state.players,
       currentPlayer,
       displayPlayer,
+      playerPanelSummary: getPlayerPanelSupplySummary(state, displayPlayer),
       devMode: false,
       currentStartPlayerId: '',
       nextStartPlayerId: '',

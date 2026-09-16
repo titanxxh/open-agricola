@@ -18,7 +18,7 @@ Violating any invariant below is an architecture bug:
 - **Weak client:** the frontend renders, collects input, and manages temporary local UI state. It never adjudicates rules.
 - **Command-driven:** the frontend sends intent. The backend validates, executes, commits state, produces logs, and broadcasts.
 - **One domain implementation:** actions, engine, cards, rounds, harvest, and scoring live in `shared/` and are reused by both frontend and backend.
-- **Physical three-layer boundary:** ESLint `no-restricted-imports` enforces `shared/` ⇄ `server/` ⇄ `client/` as CI errors.
+- **Physical three-layer boundary:** ESLint `architecture/imports` enforces `shared/` ⇄ `server/` ⇄ `client/` as CI errors.
 - **Card-local closure:** card effects stay in their card files instead of spreading into core paths.
 - **Supply tokens are payment resources:** player supply limits such as fences and stables must not be hard-coded as 15 or 4. Read them through supply-token helpers or the payment-resource pipeline.
 
@@ -106,8 +106,8 @@ e2e-tests/     Playwright browser tests
 `eslint.config.js` enforces the three layers:
 
 - `client/{app,components,services,hooks,contexts,utils}/**` cannot import `shared/session`, `shared/engine`, Card Source, generated card catalogs, or per-card implementation modules. UI metadata must come from `public/cards-manifest.json` through `client/services/card-meta`.
-- `client/sandbox/**` has full access.
-- Additional `no-restricted-syntax` rules prevent literal dynamic imports of `shared/session/...`, `shared/engine/...`, and card implementation bootstrap modules.
+- Privileged entries are the exact Workshop sandbox entry and isolated local worker listed in `scripts/architecture-policy.mjs`; no directory-wide exemption exists.
+- One resolved-import rule checks static imports, re-exports, literal dynamic imports, and require calls without flat-config overrides.
 - Every violation is a CI error.
 
 ---
@@ -1096,7 +1096,7 @@ Runtime cross-card identity and capability queries must use typed `CardDefinitio
 
 Registered generic metadata currently includes `preventsHandDiscard`, `fireplaceIdentity`, `cookingHearthIdentity`, `ovenIdentity`, `firewoodBuildTrigger`, `potteryIdentity`, `animalHolder`, `blocksHouseAnimalZones`, and `waresSalesmanGains`. These fields belong to Card Source `meta` and may project into catalog and manifest, but add no frontend behavior. In OA, `ovenIdentity` represents oven-family identity and includes upgrades or minors such as Oven Installation for Oven Damper-style scoring. This intentional project abstraction does not require every such card to provide a baking exchange or trigger Firewood. An upgrade may retain scoring identity while opting out of build-trigger semantics with `firewoodBuildTrigger:false`. Migrated paths include B146 and C35 hand-discard prevention, B153 major-identity scoring, C75 and A27 fireplace, hearth, and oven triggers, B31 pottery identity, E144 wares-gain options, D86 animal-holder occupation filtering, D12 house-animal-zone blocking, and M72 oven-family scoring.
 
-`check:card-impl-boundaries` is part of `pnpm run check:architecture`, the canonical local architecture verification command used by both manual CI workflows. Runtime reads of another non-Major card ID in production `shared/cards/A-E/M/*.ts` must migrate to a generic capability, action-context provenance, Harvest outcome, breeding-threshold modifier, synthetic occupancy, trigger snapshot, or another extension point. `Major_*`, `reaches`, `allowedPurchases`, and prerequisite candidate lists are explicit exceptions. `--warn-only` is available for an intentional temporary audit but is not an integration-validation path.
+`check:card-impl-boundaries` is part of `pnpm run check:architecture`, the canonical local architecture verification command used by both manual CI workflows. Runtime reads of another non-Major card ID in production Card Sources, including nested ordinary, M, major, and community layouts must migrate to a generic capability, action-context provenance, Harvest outcome, breeding-threshold modifier, synthetic occupancy, trigger snapshot, or another extension point. `Major_*`, `reaches`, `allowedPurchases`, and prerequisite candidate lists are explicit exceptions. `--warn-only` is available for an intentional temporary audit but is not an integration-validation path.
 
 When printed card text names another ordinary card, the source card may declare it as a named printed target. Its ID must appear in `reaches` or equivalent declarative metadata, and runtime may inspect only public facts such as existence, owner, or played status. The source must not inspect the target's private implementation state in `cardStates`, `counters`, or `extraData`, or simulate branches of the target's ability. A checker exception must bind one exact source-target pair and allowed read shape; a broad allowlist cannot bypass this boundary.
 
@@ -1446,8 +1446,8 @@ Version one adds no metrics backend. Structured logs and health state must expos
 | Bundle | Entry | Paths | Constraint |
 |---|---|---|---|
 | `client-app` | `client/main.tsx` | `client/{app,components,services,hooks,contexts,utils}/` | Uses WebSocket. From `shared/*`, imports only `contract`, `domain`, and `i18n`. Card display uses manifest-backed `card-meta` plus `custom-card-metadata`. |
-| `client-sandbox` | `client/sandbox/index.tsx` | `client/sandbox/` | Lazy-loads Workshop sandbox UI; rules still execute through the backend sandbox path. This is the only frontend directory allowed to import complete `shared/*`. |
-| `local-sandbox-worker` | lazily created `client/local-sandbox/worker.ts` | `client/local-sandbox/` | Browser-mode engine Worker for Workshop playtesting. Its four Worker-side files may import complete `shared/*` under ESLint S6c. Main-bundle `local-transport`, `persistence`, and `workshop-launch` use type-only shared imports, keeping the engine out of the main bundle. |
+| `client-sandbox` | `client/sandbox/index.tsx` | `client/sandbox/` | Lazy-loads Workshop sandbox UI; rules still execute through the backend sandbox path. Permissions apply only to the exact entry and files in `scripts/architecture-policy.mjs`; the directory has no blanket exemption. |
+| `local-sandbox-worker` | lazily created `client/local-sandbox/worker.ts` | `client/local-sandbox/` | Browser-mode engine Worker for Workshop playtesting. Its four Worker-side files may import complete `shared/*` through exact file permissions. Main-bundle `local-transport`, `persistence`, and `workshop-launch` use type-only shared imports, keeping the engine out of the main bundle. |
 | `replay-viewer` | `replay-viewer/src/main.tsx` | `replay-viewer/` | Has no login, cookies, WebSocket, or command sending. It reads only public Replay JSON and reuses display filtering and board projection compiled at archive time. |
 
 Strict main-bundle budgets in `scripts/check-bundle-size.ts` are 550 KB raw and 170 KB gzip.
@@ -1493,8 +1493,8 @@ With `VITE_SANDBOX_EXECUTOR=browser`, Workshop playtesting runs entirely in the 
 Important rules in `eslint.config.js` are:
 
 - `client/{app,components,services,hooks,contexts,utils}/**` cannot import `shared/session`, `shared/engine`, Card Sources, generated card catalog, or per-card implementations. UI metadata must use `public/cards-manifest.json` and `client/services/card-meta`.
-- `client/sandbox/**` has complete access.
-- `no-restricted-syntax` blocks dynamic string imports of `shared/session/...`, `shared/engine/...`, and card implementation-bootstrap literals.
+- Privileged entries and Worker-side files are explicitly named in `scripts/architecture-policy.mjs`; ordinary pages and Replay Viewer have no rule-runtime exceptions.
+- TypeScript resolution normalizes relative import paths; runtime graph checks reject nonliteral dependencies, production imports into excluded source files, missing source roots, parse errors, and stale permissions. Module URLs must name an authorized entry; Vite closure checks retain virtual-module edges.
 - `package.json` declares `sideEffects` as the bundler tree-shaking baseline.
 - A violation is a CI error.
 
@@ -1533,19 +1533,29 @@ GameContextRouter
 | Session | `server/__tests__/*.test.ts` | Instantiate `GameSession`, call `takeAction`, and assert `resp.state`, `pending`, `interaction`, and `ok` | Yes, in slow project; one card per `[A-E][0-9]*-session.test.ts` file |
 | E2E | `e2e-tests/*.spec.ts` | Playwright with two browser windows for multiplayer paths | Manual or workflow |
 
+#### Authoritative display projections
+
+`serializeState` derives `lockedFarmTileKeys`, `playerPanelSummary`, and `moorSpecialActionAvailability` on each serialized player. Sync and persistence activate the owning Session context before executing hooks. Live UI, local-worker UI, and Replay read these snapshot-only values; rehydration removes them from authoritative PlayerState. Pure perspective filtering lives in `shared/projections/serialized-state.ts` and does not import rule runtime. Existing historical Replay Viewer builds and payloads remain immutable; new fields are additive and new Viewer builds consume them.
+
+Action definitions are assembled once in `shared/actions/index.ts`. Seasonal internal actions capture the complete resolver during construction; recursive replacement, alternative and before-flow doability still resolve base, internal, and ad-hoc actions. Major metadata queries, gain configuration, navigation and LLM streaming have independent modules to avoid reverse imports.
+
 #### Architecture fitness coverage
 
 | Invariant | Executable coverage | Boundary |
 |---|---|---|
-| Physical `shared` / `server` / `client` layering | ESLint `no-restricted-imports` errors | Tests have explicit exemptions; this checks imports, not runtime ownership. |
+| Physical `shared` / `server` / `client` layering | ESLint `architecture/imports` errors | Tests have explicit exemptions; this checks imports, not runtime ownership. |
 | Card Source scope and cross-card references | `pnpm run check:card-impl-boundaries` | TypeScript AST checks production Card Source files and same-file card-ID literals or top-level const aliases. `Major_*`, `reaches`, purchase candidates, and prerequisite candidates are explicit exceptions. It does not follow cross-file dataflow. Empty or mismatched source scope fails. |
+| Runtime dependency cycles | `pnpm run check:dependencies` | Every runtime SCC, including self-cycles and literal dynamic-import cycles, fails. There is no cycle baseline. Explicit type-only declarations erase; inline type specifiers still load a module under verbatimModuleSyntax. |
+| Browser and Replay isolation | `pnpm run check:browser-boundaries` | Checks transitive closures from both production entries using the source graph and real Vite module graphs. Metadata permissions are exact files with reasons; new Worker entries and unauthorized sandbox imports fail. Missing entry evidence fails. |
+| Compile-time architecture contracts | `pnpm run check:architecture-types` | `tsconfig.architecture.json` runs a real no-emit TypeScript program over policy and checker tests, including positive and negative type assertions. Vitest alone is not type evidence. |
+| Scan completeness | no-DSL, test-project coverage, Card Source and field-boundary checks | Required roots and parseable sources are mandatory. Card declarations and all registered implementations are independently compared; major files may declare multiple cards. Parents use their separate metadata/runtime model. |
 | Trailing listener snapshots | `pnpm run check:card-impl-boundaries` | Handlers are enumerated from resolved `ALL_CARD_IMPLS`, whose IDs must match every production Card Source declaring `impl`. Direct `improvements` / `minorPlayed` / `occupationPlayed` length reads fail in `during`, `immediatelyAfter`, and `after`; non-trailing reads and membership checks remain valid. The check parses the resolved handler body only and does not follow helper calls or derived values. Empty, incomplete, or unparseable runtime scope fails. Runtime diagnostics identify the card and listener without claiming an original source line. |
 | Listener state purity | Behavior tests and code review | Handlers must remain state-pure flow builders, but no whole-program TypeScript mutation proof is claimed. `check:card-impl-boundaries` does not enforce this invariant. |
 | Generated catalog matches Card Sources | `pnpm run check:generated-cards-sync` | Structural source/catalog equality without a hard-coded card count. |
 | `GameSession` owns the server command boundary | `CONTEXT.md`, ADR-0014, review, and three-layer import errors | This is ownership, not a claim that only one source file contains assignments. No whole-program mutation proof is attempted. |
 | Canonical architecture wiring | `pnpm run check:architecture` and `scripts/__tests__/ci-card-impl-boundaries.test.ts` | Both CI workflows are manual-only and call the aggregator once; trusted local full CI is the current merge evidence. |
 
-`vitest.config` has several fast subprojects, `fast-shared`, `fast-cards`, `fast-card-runtime`, `fast-client`, `fast-server`, `fast-scripts`, and `fast-tests`, plus `slow` and `llm`. `pnpm test:fast` first runs `check:test-project-coverage`, ensuring new fast projects cover the former fast-file set without duplication. CI defaults to `pnpm test:fast`; use `pnpm test:slow` for per-card session tests, `pnpm run test:e2e` with frontend and backend running, and `pnpm exec vitest run <file>` for one file.
+`vitest.config` has several fast subprojects, `fast-shared`, `fast-cards`, `fast-card-runtime`, `fast-client`, `fast-server`, `fast-scripts`, and `fast-tests`, plus `slow` and `llm`. `pnpm test:fast` first runs `check:test-project-coverage`, independently discovering repository tests and checking that each belongs to exactly one fast, slow, or LLM project. CI defaults to `pnpm test:fast`; use `pnpm test:slow` for per-card session tests, `pnpm run test:e2e` with frontend and backend running, and `pnpm exec vitest run <file>` for one file.
 
 ### 13.2 Backend-boundary test entry points
 
@@ -1616,7 +1626,7 @@ Production acceptance requires two real site accounts to complete one game. Duri
 
 1. **Backend authority:** rules live in `shared/` and `server/`; the frontend does not adjudicate.
 2. **Physical three-layer boundary:** `shared/` to `server/` to `client/`, enforced as an ESLint CI error.
-3. **Two client bundles:** `client-app` does not import `shared/{engine,session,actions,cards,custom-code,draft}`; `client/sandbox` has complete access.
+3. **Two client bundles:** `client-app` does not import `shared/{engine,session,actions,cards,custom-code,draft}`; sandbox and Worker permissions are restricted to the exact entries and files in `scripts/architecture-policy.mjs`.
 4. **WebSocket game path:** `/ws` receives `ClientCommand` and emits `StateUpdateEnvelope`; Game Context, Replay, and Bug Report use versioned HTTP product APIs.
 5. **`InteractionState` is the only frontend interaction truth:** `stateId` is `idle`, `wait`, or `gameover`; `wait` branches on `request.kind`.
 6. **The node tree is the only state machine:** the `PendingAction` union is gone. `engine.peekPendingEnvelope()` and the pending host derive what execution is waiting for.

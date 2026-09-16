@@ -2,7 +2,7 @@ import type { Locale } from '../../../shared/i18n'
 import { t } from '../../../shared/i18n'
 import type { ActionSpace, PlayerState } from '../../../shared/contract/types'
 import type { SeasonId, ThroughTheSeasonsState } from '../../../shared/seasons/types'
-import { seasonActionIdBySeason } from '../../../shared/seasons/action-spaces'
+import { seasonActionIdBySeason } from '../../../shared/projections/season-actions'
 
 type Props = {
   locale: Locale

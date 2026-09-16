@@ -343,6 +343,7 @@ export function ReplayBoard({
             locale={locale}
             cards={state.farmersOfTheMoor.specialActionCards}
             currentPlayerId={currentPlayer.id}
+            availability={currentPlayer.moorSpecialActionAvailability}
             canTakeSpecialAction={() => false}
             selected={null}
             onTakeAction={noOp}

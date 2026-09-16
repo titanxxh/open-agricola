@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { readdirSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
-import { internalActionDefinitions } from '../../internal-actions'
+import { internalActionDefinitions } from '../../index'
 import { ALLOWED_EFFECT_FILES } from '../../../../scripts/check-effects-file-list'
 
 const effectsDir = join(process.cwd(), 'shared/actions/effects')

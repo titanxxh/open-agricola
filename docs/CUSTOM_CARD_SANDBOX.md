@@ -145,7 +145,7 @@ Common hallucinated fields that do not exist are `space.params`, `space.target`,
 
 ## 3. Recognized hook, phase, and scope allowlists
 
-The marked blocks below are machine checked against `cardEffectHooks` in `shared/cards/card-effects.ts`, `sandboxListenerPhases` in `shared/custom-code/sandbox-listener-phases.ts`, and `sandboxListenerScopes` in `shared/custom-code/sandbox-listener-scopes.ts`. Do not alter marker formatting; `pnpm run check:prompt-sync` will fail.
+The marked blocks below are machine checked against `cardEffectHooks` in `shared/projections/card-effect-hooks.ts`, `sandboxListenerPhases` in `shared/custom-code/sandbox-listener-phases.ts`, and `sandboxListenerScopes` in `shared/custom-code/sandbox-listener-scopes.ts`. Do not alter marker formatting; `pnpm run check:prompt-sync` will fail.
 
 ### 3.1 Hooks available under `CARD_IMPL.effect`
 
@@ -663,7 +663,7 @@ The local sandbox is a dry run for multiplayer play. Semantic divergence would b
 
 ### 9.2 After hook, phase, scope, or denylist source changes
 
-- A change to `cardEffectHooks` in `shared/cards/card-effects.ts` updates the section 3.1 block.
+- A change to `cardEffectHooks` in `shared/projections/card-effect-hooks.ts` updates the section 3.1 block.
 - A change to `sandboxListenerPhases` in `shared/custom-code/sandbox-listener-phases.ts` updates section 3.2.
 - A change to `sandboxListenerScopes` in `shared/custom-code/sandbox-listener-scopes.ts` updates section 3.4.
 - A change to `DENIED_IDENTIFIERS` or `DENIED_PROPERTY_ACCESS` in `shared/custom-code/ast-validator.ts` updates sections 5.1 or 5.2.

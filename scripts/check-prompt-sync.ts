@@ -38,7 +38,7 @@ const __dirname = path.dirname(__filename)
 const REPO_ROOT = path.resolve(__dirname, '..')
 
 const SOURCES = {
-  cardEffects: 'shared/cards/card-effects.ts',
+  cardEffects: 'shared/projections/card-effect-hooks.ts',
   sandboxListenerActions: 'shared/custom-code/sandbox-listener-actions.ts',
   sandboxListenerPhases: 'shared/custom-code/sandbox-listener-phases.ts',
   sandboxListenerScopes: 'shared/custom-code/sandbox-listener-scopes.ts',

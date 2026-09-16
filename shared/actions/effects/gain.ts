@@ -1,7 +1,7 @@
 import type { ActionDefinition, ActionSpace, GameState, PlayerState, Resource } from '../../contract/types'
 import type { EventSink, ResourceLocation } from '../../contract/events'
 import { addCardResourceGained } from '../../cards/helpers/card-state'
-import { gainConfigByActionId } from '../factories/gain'
+import { gainConfigByActionId } from '../gain-config'
 import { trackWorkPhaseBuildingResources } from '../../session/work-phase-resources'
 import {
   addResourcesFromBoard,

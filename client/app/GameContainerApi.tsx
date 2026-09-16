@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
 import { useAuth } from '../contexts/AuthContext'
 import { useLocale } from '../contexts/LocaleContext'
-import { setPage } from './PageRouter'
+import { setPage } from '../utils/platform-page-url'
 import type { ActionSpace, FarmTilePosition, InteractionCommand, PlayerState, Resource } from '../../shared/contract/types'
 import { t, type Locale } from '../../shared/i18n'
 import {
@@ -17,7 +17,7 @@ import { isBrowserSandbox, readLocalSandboxConfig } from '../local-sandbox/works
 import { createDebouncedSaver, loadResumable, openLocalGameStore } from '../local-sandbox/persistence'
 import type { GameSyncPayload } from '../../shared/contract/protocol/game'
 import type { MoorSpecialActionCardState, MoorSpecialActionId } from '../../shared/moor/types'
-import { isMoorTerrainAction } from '../../shared/moor/special-actions'
+import { isMoorTerrainAction } from '../../shared/projections/moor-special-actions'
 import { playerCanBuildPalisades } from '../utils/player-palisades'
 import { DevPanel } from '../components/dev/DevPanel'
 import { ActionBoard } from '../components/board/ActionBoard'
@@ -1886,6 +1886,7 @@ export const GameContainerApi = () => {
             locale={locale}
             cards={state.farmersOfTheMoor.specialActionCards}
             currentPlayerId={currentPlayer.id}
+            availability={currentPlayer.moorSpecialActionAvailability}
             canTakeSpecialAction={canTakeSpecialAction}
             selected={selectedSpecialAction}
             onTakeAction={takeSpecialAction}

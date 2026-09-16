@@ -6,7 +6,7 @@ import { reapAction } from '../actions/effects/reap'
 import { sowAction } from '../actions/effects/sow'
 import { isActionDoableInFlowContext } from '../actions/flow'
 import { getActionDefinition } from '../actions/index'
-import { summerBreadOrSellAction, summerBreadOrSellFlow, summerSourceCard } from './internal-actions'
+import { summerBreadOrSellFlow, summerSourceCard } from './internal-actions'
 import { PaymentSolver } from '../actions/payment'
 import { isThroughTheSeasonsSeason, romanticEveningCost } from './rules'
 import { seasonIds, type SeasonId } from './types'
@@ -25,12 +25,8 @@ const emptyResources: Resource = {
   begging: 0,
 }
 
-export const seasonActionIdBySeason: Record<SeasonId, string> = {
-  winter: 'season-winter-romantic-evening',
-  spring: 'season-spring-animal-and-fruit',
-  summer: 'season-summer-farmers-market',
-  autumn: 'season-autumn-thanksgiving',
-}
+import { seasonActionIdBySeason } from '../projections/season-actions'
+export { seasonActionIdBySeason, seasonActionIds } from '../projections/season-actions'
 
 const seasonActionNameBySeason: Record<SeasonId, string> = {
   winter: 'actions.season-winter-romantic-evening.name',
@@ -171,11 +167,11 @@ const summerFarmersMarketFlow = (
   if (canUseFlowChildAction(state, player, space, plowAction, summerSourceCard)) {
     children.push(summerPlowLeaf())
   }
-  const breadOrSell = summerBreadOrSellFlow(state, player, space)
+  const breadOrSell = summerBreadOrSellFlow(state, player, space, getActionDefinition)
   if (breadOrSell?.type === 'xor') {
     children.push({
       type: 'leaf',
-      actionId: summerBreadOrSellAction.id,
+      actionId: 'season-summer-bread-or-sell',
       sourceCard: summerSourceCard,
       choiceLabelKey: 'actions.season-summer-farmers-market.option-bread-or-sell',
     })
@@ -334,5 +330,3 @@ export const createSeasonActionSpaces = (playerCount?: number): ActionSpace[] =>
       takenBy: [],
       blockedBy: [],
     }))
-
-export const seasonActionIds = Object.values(seasonActionIdBySeason)

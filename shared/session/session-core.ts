@@ -31,7 +31,7 @@ import type { ActionDetailParts, PublicEventCancellation } from '../contract/pro
 import { authoritativeCommandKey, canonicalJson } from '../contract/authoritative-command.ts'
 import type { PrivateGameEvent } from '../contract/private-events.ts'
 import { actionDefinitions, getActionDefinition } from '../actions/index.ts'
-import { internalActionDefinitions } from '../actions/internal-actions.ts'
+import { internalActionDefinitions } from '../actions/index.ts'
 import { seasonActionDefinitions } from '../seasons/action-spaces.ts'
 import { registerThroughTheSeasonsCardListeners } from '../seasons/card-listeners.ts'
 import { registerThroughTheSeasonsHooks } from '../seasons/hooks.ts'

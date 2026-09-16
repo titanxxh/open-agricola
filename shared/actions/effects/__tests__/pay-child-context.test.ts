@@ -14,7 +14,7 @@ import { HookDispatcher } from '../../../engine/dispatcher'
 import { LogStore } from '../../../engine/log-store'
 import { ActionNode, SequenceNode } from '../../../engine/nodes'
 import { ActionRegistry } from '../../../engine/registry'
-import { internalActionDefinitions } from '../../internal-actions'
+import { internalActionDefinitions } from '../../index'
 
 const CARD_ID = 'B065_GrainDepot'
 

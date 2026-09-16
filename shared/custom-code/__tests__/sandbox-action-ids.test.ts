@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { actionDefinitions } from '../../actions'
-import { internalActionDefinitions } from '../../actions/internal-actions'
+import { internalActionDefinitions } from '../../actions/index'
 import { SANDBOX_ALLOWED_ACTION_IDS } from '../sandbox-action-ids'
 import { sandboxListenerActions } from '../sandbox-listener-actions'
 

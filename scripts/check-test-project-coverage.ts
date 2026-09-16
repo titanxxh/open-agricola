@@ -1,12 +1,19 @@
 #!/usr/bin/env tsx
+import fs from 'node:fs'
+import path from 'node:path'
 import { globSync } from 'glob'
 import {
-  FAST_EXCLUDE,
+  BASE_EXCLUDE,
+  SLOW_INCLUDE,
+  SHARED_EXCLUDE,
+  LLM_INCLUDE,
   FAST_PROJECT_GLOBS,
-  LEGACY_FAST_INCLUDE,
 } from './test-project-globs'
 
 const cwd = process.cwd()
+for (const root of ['shared', 'server', 'client', 'scripts', 'tests', 'e2e-tests', 'replay-viewer']) {
+  if (!fs.statSync(path.join(cwd, root)).isDirectory()) throw new Error('missing test discovery root: ' + root)
+}
 
 const expand = (include: string[], exclude: string[]): string[] => {
   const files = new Set<string>()
@@ -23,25 +30,25 @@ const expand = (include: string[], exclude: string[]): string[] => {
   return [...files].sort()
 }
 
-const legacy = new Set(expand(LEGACY_FAST_INCLUDE, FAST_EXCLUDE))
+const discovered = new Set(expand(['**/*.{test,spec}.{ts,tsx,js,jsx,mts,mjs,cts,cjs}'], [...BASE_EXCLUDE, 'e2e-tests/**', 'scripts/test-actions.spec.ts', 'scripts/__tests__/fixtures/**']))
 const byProject = new Map<string, string[]>()
 const union = new Set<string>()
 
-for (const project of FAST_PROJECT_GLOBS) {
+for (const project of [...FAST_PROJECT_GLOBS, { name: 'slow', include: SLOW_INCLUDE, exclude: SHARED_EXCLUDE }, { name: 'llm', include: LLM_INCLUDE, exclude: BASE_EXCLUDE }]) {
   for (const file of expand(project.include, project.exclude)) {
     union.add(file)
     byProject.set(file, [...(byProject.get(file) ?? []), project.name])
   }
 }
 
-const missing = [...legacy].filter((file) => !union.has(file)).sort()
-const extra = [...union].filter((file) => !legacy.has(file)).sort()
+const missing = [...discovered].filter((file) => !union.has(file)).sort()
+const extra = [...union].filter((file) => !discovered.has(file)).sort()
 const duplicates = [...byProject.entries()]
   .filter(([, projects]) => projects.length > 1)
   .sort(([a], [b]) => a.localeCompare(b))
 
 if (missing.length === 0 && extra.length === 0 && duplicates.length === 0) {
-  console.log(`[check:test-project-coverage] ok (${legacy.size} fast test files)`)
+  console.log(`[check:test-project-coverage] ok (${discovered.size} test files across fast, slow and llm)`)
   process.exit(0)
 }
 

@@ -2,27 +2,14 @@
 // Public API for the LLM service. Re-exports types and provides the
 // dispatcher (streamChat, generateCardArt). Card-extraction helpers and the
 // localStorage-backed config helpers live in card-utils.ts.
-import type { ChatMessage, LlmConfig, ReferenceImage, ProviderId } from './types'
+import type { LlmConfig, ReferenceImage, ProviderId } from './types'
 import { getProvider, PROVIDERS, listModelsFor } from './registry'
-import { openaiCompatStreamChat, openaiCompatGenerateImage } from './openai-compat'
+import { openaiCompatGenerateImage } from './openai-compat'
 
 export type { ProviderId, LlmConfig, ChatMessage, ReferenceImage, ProviderDef, Capabilities, ModelDef } from './types'
 export { PROVIDERS, getProvider, listModelsFor, defaultModelFor } from './registry'
 
-export async function* streamChat(
-  messages: ChatMessage[],
-  systemPrompt: string,
-  config: LlmConfig,
-): AsyncGenerator<string> {
-  const def = getProvider(config.provider)
-  if (def.streamChat) {
-    yield* def.streamChat(messages, systemPrompt, config)
-    return
-  }
-  const baseUrl = config.baseUrl ?? def.baseUrl
-  if (!baseUrl) throw new Error(`Provider ${config.provider} has no baseUrl`)
-  yield* openaiCompatStreamChat(messages, systemPrompt, config, baseUrl, { maxTokens: def.maxOutputTokens })
-}
+export { streamChat } from './stream-chat'
 
 export async function generateCardArt(
   prompt: string,

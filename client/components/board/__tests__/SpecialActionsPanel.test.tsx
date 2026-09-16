@@ -32,6 +32,7 @@ describe('SpecialActionsPanel', () => {
         locale="en"
         cards={cards}
         currentPlayerId="p1"
+        availability={{ [cards[0]!.id]: { cardUsable: true }, [cards[1]!.id]: { cardUsable: true } }}
         canTakeSpecialAction={() => true}
         selected={null}
         onTakeAction={onTake}
@@ -55,15 +56,16 @@ describe('SpecialActionsPanel', () => {
     expect(onTake).toHaveBeenCalledWith('moor-special-hiring-fair', 'hiring-fair')
   })
 
-  it('marks own face-up and face-down cards unavailable', () => {
+  it('uses authoritative card usability independently of location', () => {
     render(
       <SpecialActionsPanel
         locale="en"
         cards={[
-          { ...cards[0]!, location: { kind: 'playerFaceUp', playerId: 'p1' } },
-          { ...cards[1]!, location: { kind: 'playerFaceDown', playerId: 'p2' } },
+          { ...cards[0]!, location: { kind: 'market' } },
+          { ...cards[1]!, location: { kind: 'playerFaceUp', playerId: 'p1' } },
         ]}
         currentPlayerId="p1"
+        availability={{ [cards[0]!.id]: { cardUsable: false }, [cards[1]!.id]: { cardUsable: true } }}
         canTakeSpecialAction={() => true}
         selected={null}
         onTakeAction={() => {}}
@@ -71,6 +73,6 @@ describe('SpecialActionsPanel', () => {
     )
 
     expect(screen.getByRole('button', { name: /Cut Peat/ })).toBeDisabled()
-    expect(screen.getByRole('button', { name: /Hiring Fair/ })).toBeDisabled()
+    expect(screen.getByRole('button', { name: /Hiring Fair/ })).toBeEnabled()
   })
 })

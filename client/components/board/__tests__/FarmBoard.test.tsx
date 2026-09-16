@@ -4,7 +4,7 @@ import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { renderToStaticMarkup } from 'react-dom/server'
 
-import type { PlayerState, Resource } from '../../../../shared/contract/types'
+import type { GameState, PlayerState, Resource } from '../../../../shared/contract/types'
 import { FarmBoard, type FarmBoardProps } from '../FarmBoard'
 import {
   __resetCardsManifestCache,
@@ -56,6 +56,8 @@ afterAll(() => {
 })
 
 afterEach(() => cleanup())
+
+import { getPlayerPanelSupplySummary } from '../../../../shared/domain/player-panel-summary'
 
 const resources = (): Resource => ({
   wood: 0,
@@ -121,6 +123,7 @@ const createFarmBoardProps = (
     players: [player],
     currentPlayer: player,
     displayPlayer: player,
+    playerPanelSummary: getPlayerPanelSupplySummary({ players: [player] } as GameState, player),
     devMode: false,
     currentStartPlayerId: '',
     nextStartPlayerId: '',

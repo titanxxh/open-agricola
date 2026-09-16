@@ -30,11 +30,10 @@ import {
 } from '../../shared/cards/helpers/card-state'
 import { readAllPublicCardMarkers, type PublicCardMarkerEntry } from '../../shared/cards/helpers/public-card-markers'
 import { getWorkerHeldOnCard } from '../../shared/cards/helpers/card-held-workers'
-import { collectLockedFarmTileKeys } from '../../shared/cards/card-effects'
 import {
   M084_BOG_PONY_ID,
   readBogPonyLyingHorseCountFromExtraData,
-} from '../../shared/cards/M/M084_BogPony-state'
+} from '../../shared/projections/bog-pony-state'
 import { getLeftBoardActionSpaceId } from '../../shared/cards/helpers/round-action-topology'
 import type { ParentCardId } from '../../shared/parents'
 import type { AnimalReorgState, ExtraSowTarget, PendingAnimalReorg, PendingSowCrop } from '../types/ui'
@@ -157,7 +156,7 @@ export type FarmBoardProjection = {
 }
 
 export type FarmBoardProjectionInput = {
-  displayPlayer: PlayerState | null | undefined
+  displayPlayer: (PlayerState & { lockedFarmTileKeys?: readonly string[] }) | null | undefined
   interaction: ClientInteractionState
   farmInteraction?: InteractionFarmSelection | null
   selectionInteraction: InteractionSelection | null | undefined
@@ -731,7 +730,7 @@ export const buildFarmBoardProjection = ({
   const farmCardDisplayMap = buildFarmCardDisplayMap(displayPlayer, animalReorg)
   const borrowedPlayedCardDisplays = buildBorrowedPlayedCardDisplays(state, displayPlayer, animalReorg)
   const reorgRemaining = buildReorgRemaining(state, pendingAnimalReorg, animalReorg)
-  const lockedTileKeys = displayPlayer ? collectLockedFarmTileKeys(displayPlayer) : new Set<string>()
+  const lockedTileKeys = new Set(displayPlayer?.lockedFarmTileKeys ?? [])
   const publicCardMarkers = displayPlayer ? readAllPublicCardMarkers(displayPlayer) : []
   const farmTerrainMarkerMap = buildFarmTerrainMarkerMap(displayPlayer)
   const terrainMap = buildFarmTerrainMap(displayPlayer)

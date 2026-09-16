@@ -121,7 +121,7 @@ const findCardPassedReferences = (): string[] => {
   return matches
 }
 
-const publicEventFixtureMatrix = {
+const publicEventFixtureMatrix: Partial<PublicEventFixtureMatrix> = {
   'resource.moved': {
     log: {
       mapped: { ...base, type: 'resource.moved', resources: { wood: 1 }, from: { kind: 'supply' }, to: { kind: 'player', playerId: 'p1' }, reason: 'gain' },
@@ -166,15 +166,15 @@ const publicEventFixtureMatrix = {
   },
   'resource.paid': {
     notification: {
-      mapped: { ...base, type: 'resource.paid', resources: { wood: 1 }, paymentFor: 'room' },
+      mapped: { ...base, type: 'resource.paid', resources: { wood: 1 }, paymentFor: 'construct' },
       silent: { ...base, id: 'paid-empty-notification', seq: 2, type: 'resource.paid', resources: {}, paymentFor: 'bonus', bonusSources: ['A001_Test'] },
     },
     highlight: {
-      mapped: { ...base, type: 'resource.paid', sourceActionId: 'construct', resources: { wood: 1 }, paymentFor: 'room' },
+      mapped: { ...base, type: 'resource.paid', sourceActionId: 'construct', resources: { wood: 1 }, paymentFor: 'construct' },
       silent: { ...base, id: 'paid-no-action', seq: 2, type: 'resource.paid', resources: { wood: 1 }, paymentFor: 'bonus' },
     },
     resourceAnimation: {
-      mapped: { ...base, type: 'resource.paid', resources: { wood: 1 }, paymentFor: 'room' },
+      mapped: { ...base, type: 'resource.paid', resources: { wood: 1 }, paymentFor: 'construct' },
       silent: { ...base, id: 'paid-no-actor', seq: 2, actorPlayerId: undefined, type: 'resource.paid', resources: { wood: 1 }, paymentFor: 'bonus' },
     },
   },

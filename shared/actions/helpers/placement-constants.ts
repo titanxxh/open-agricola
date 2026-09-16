@@ -1,1 +1,1 @@
-export const OCCUPIED_SPACE_CHOICE_PREFIX = 'allow-occupied:'
+export { OCCUPIED_SPACE_CHOICE_PREFIX } from '../../contract/placement-constants'

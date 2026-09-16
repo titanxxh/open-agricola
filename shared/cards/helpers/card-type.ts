@@ -1,7 +1,7 @@
 import type { PlayerState } from '../../contract/types'
 import { getRegisteredMinorImprovement, getRegisteredOccupation } from '../registry-display'
 import type { CardDefinition, CardType } from '../../contract/cards'
-import { getMajorCard } from '../major'
+import { getMajorCardMetadata as getMajorCard } from '../major/metadata'
 
 /**
  * Card-type helpers — mirror of the reference's PlayerCard::hasType($type) and

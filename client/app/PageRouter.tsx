@@ -11,7 +11,7 @@ import { AppShellLoadScreen } from './AppShellLoadScreen'
 import { getGameLoadProgress } from './game-load-progress'
 import { isHotseatSetupQuery } from './game-setup-query'
 import { SandboxAppLazy } from '../sandbox'
-import { buildPlatformPageUrl, type PlatformPage } from '../utils/platform-page-url'
+import { setPage, type PlatformPage } from '../utils/platform-page-url'
 import '../App.css'
 
 const GameContainerApiLazy = lazy(() =>
@@ -26,12 +26,6 @@ function getPage(): PlatformPage {
   if (params.get('room') || params.get('transport') === 'ws') return 'game'
   if (isHotseatSetupQuery(window.location.search)) return 'game'
   return 'lobby'
-}
-
-export function setPage(page: PlatformPage, extraParams?: Record<string, string>) {
-  const newUrl = buildPlatformPageUrl(page, extraParams)
-  window.history.pushState(null, '', newUrl)
-  window.dispatchEvent(new PopStateEvent('popstate'))
 }
 
 export function PageRouter() {

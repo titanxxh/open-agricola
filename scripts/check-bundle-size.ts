@@ -100,7 +100,7 @@ if (process.argv[1] && process.argv[1].endsWith('check-bundle-size.ts')) {
   const strict = !loose // strict by default; --loose disables enforcement
   if (!fs.existsSync(assetsDir)) {
     console.warn(`[check-bundle-size] no dist/assets/ — run "pnpm run build" first`)
-    process.exit(0)
+    process.exit(1)
   }
   const chunks = listAllChunks(assetsDir)
   console.log('[check-bundle-size] chunks:')
@@ -113,7 +113,7 @@ if (process.argv[1] && process.argv[1].endsWith('check-bundle-size.ts')) {
   const workshop = findWorkshopChunk(assetsDir)
   if (!main) {
     console.warn('[check-bundle-size] no JS chunks found')
-    process.exit(0)
+    process.exit(1)
   }
 
   const MAIN_RAW = limitKb('MAIN_RAW_LIMIT_KB', 1024)

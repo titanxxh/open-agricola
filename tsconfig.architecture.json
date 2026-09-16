@@ -1,0 +1,21 @@
+{
+  "extends": "./tsconfig.app.json",
+  "compilerOptions": {
+    "types": ["node", "vite/client"],
+    "allowJs": true,
+    "noUnusedLocals": false,
+    "noUnusedParameters": false
+  },
+  "include": [
+    "shared/cards/__tests__/provenance-result-audit.test.ts",
+    "shared/events/__tests__/event-mapping-policy.test.ts",
+    "shared/session/__tests__/interaction-command-policy.test.ts",
+    "shared/cards/__tests__/card-source.test.ts",
+    "shared/contract/__tests__/prompt-keys.test.ts",
+    "scripts/__tests__/check-dependencies.test.ts",
+    "scripts/__tests__/check-browser-boundaries.test.ts",
+    "scripts/__tests__/check-card-impl-boundaries.test.ts",
+    "scripts/__tests__/check-no-dsl.test.ts"
+  ],
+  "exclude": []
+}

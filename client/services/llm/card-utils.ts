@@ -3,7 +3,7 @@
 // art-prompt builder. All of these are independent of which provider is
 // actually called — they consume the public streamChat() and any LlmConfig.
 import type { ChatMessage, LlmConfig } from './types'
-import { streamChat } from './index'
+import { streamChat } from './stream-chat'
 
 /**
  * Extract card metadata from a TypeScript code block in LLM response.
