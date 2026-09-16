@@ -1,4 +1,4 @@
-import { mkdtempSync, mkdirSync, writeFileSync } from 'node:fs'
+import { mkdtempSync, mkdirSync, symlinkSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { describe, expect, it } from 'vitest'
@@ -11,6 +11,41 @@ const writeFixture = (root: string, rel: string): void => {
 }
 
 describe('check-effects-file-list', () => {
+  it.each([
+    'unexpected.mjs',
+    'unexpected.js',
+    'unexpected.mts',
+    'unexpected.cjs',
+    'unexpected.tsx',
+    'unexpected.json',
+    'notes.md',
+  ])('fails when %s appears at the top level regardless of extension', (file) => {
+    const effectsDir = mkdtempSync(path.join(tmpdir(), 'effects-file-list-'))
+    for (const allowed of ALLOWED_EFFECT_FILES) writeFixture(effectsDir, allowed)
+    writeFixture(effectsDir, file)
+
+    expect(checkEffectsFileList(effectsDir)).toEqual({
+      actualFiles: [...ALLOWED_EFFECT_FILES, file].sort((a, b) => a.localeCompare(b)),
+      extraFiles: [file],
+      missingFiles: [],
+      ok: false,
+    })
+  })
+
+  it('fails instead of passing when the effects directory is missing', () => {
+    const effectsDir = path.join(mkdtempSync(path.join(tmpdir(), 'effects-file-list-')), 'effects')
+
+    expect(() => checkEffectsFileList(effectsDir)).toThrow('missing effects directory')
+  })
+
+  it('fails on top-level symlinks instead of skipping them', () => {
+    const effectsDir = mkdtempSync(path.join(tmpdir(), 'effects-file-list-'))
+    for (const allowed of ALLOWED_EFFECT_FILES) writeFixture(effectsDir, allowed)
+    symlinkSync(path.join(effectsDir, 'pay.ts'), path.join(effectsDir, 'linked.ts'))
+
+    expect(() => checkEffectsFileList(effectsDir)).toThrow('symlink')
+  })
+
   it('passes when top-level production effect files match the allow-list', () => {
     const effectsDir = mkdtempSync(path.join(tmpdir(), 'effects-file-list-'))
     for (const file of ALLOWED_EFFECT_FILES) writeFixture(effectsDir, file)

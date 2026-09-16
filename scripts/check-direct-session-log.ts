@@ -2,6 +2,7 @@ import fs from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import ts from 'typescript'
+import { parseSource, walkSourceFiles } from './source-files'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
@@ -19,26 +20,49 @@ export type DirectSessionLogViolation = {
 }
 
 const SCAN_DIRS = ['shared', 'server', 'scripts']
-const SCAN_EXTS = new Set(['.ts', '.tsx'])
-const SKIP_DIRS = new Set(['node_modules', 'dist', '.git'])
-const SKIP_FILE_PATTERNS = [
-  /^scripts\/check-direct-session-log\.ts$/,
-  /^scripts\/__tests__\/check-direct-session-log\.test\.ts$/,
-]
 
-const allowedLogStoreConstructorFiles = new Set([
-  'shared/session/session-core.ts',
-])
+type FunctionException = { functions: readonly string[]; reason: string }
 
-const allowedLogAppendFunctionsByFile: Record<string, readonly string[]> = {
-  'shared/engine/engine.ts': ['flushEventTransaction'],
-  'shared/engine/engine-proceed.ts': ['appendDerivedLogsForEventOnlyResult'],
-  'shared/engine/engine-resolve.ts': ['appendDerivedLogsForEventOnlyResult'],
+const skippedFiles: Record<string, string> = {
+  'scripts/check-direct-session-log.ts': 'The guard itself spells out the forbidden write patterns',
+  'scripts/__tests__/check-direct-session-log.test.ts': 'Regression fixtures contain forbidden writes as source strings',
 }
 
-const allowedLogCacheWriterFunctionsByFile: Record<string, readonly string[]> = {
-  'shared/events/append.ts': ['appendImmediateEvents'],
-  'shared/session/session-core.ts': ['flushEngineLog'],
+const allowedLogStoreConstructorFiles: Record<string, string> = {
+  'shared/session/session-core.ts': 'GameCore owns the single engine LogStore',
+}
+
+const allowedLogAppendFunctionsByFile: Record<string, FunctionException> = {
+  'shared/engine/engine.ts': {
+    functions: ['flushEventTransaction'],
+    reason: 'Flushes mapper output of committed events into the engine LogStore',
+  },
+  'shared/engine/engine-proceed.ts': {
+    functions: ['appendDerivedLogsForEventOnlyResult'],
+    reason: 'Appends mapper output for event-only proceed results',
+  },
+  'shared/engine/engine-resolve.ts': {
+    functions: ['appendDerivedLogsForEventOnlyResult'],
+    reason: 'Appends mapper output for event-only resolve results',
+  },
+}
+
+const allowedLogCacheWriterFunctionsByFile: Record<string, FunctionException> = {
+  'shared/events/append.ts': {
+    functions: ['appendImmediateEvents'],
+    reason: 'Writes mapper output of immediate events into the log cache',
+  },
+  'shared/session/session-core.ts': {
+    functions: ['flushEngineLog'],
+    reason: 'Flushes engine LogStore entries into the log cache',
+  },
+}
+
+const allowedStateLogWriteFunctionsByFile: Record<string, FunctionException> = {
+  'shared/events/log-cache.ts': {
+    functions: ['prependDerivedLogEntries'],
+    reason: 'The named log cache writer is the only state.log mutation site',
+  },
 }
 
 const MAPPER_ASSIGNMENT_SOURCE = String.raw`\b(?:const|let)\s+([A-Za-z_$][\w$]*)\s*(?::[^=]+)?=\s*eventsToLogEntries\s*\(`
@@ -50,18 +74,12 @@ type FunctionBlock = {
   source: string
 }
 
-const walkDir = (dir: string, repoRoot: string, out: string[]): void => {
-  if (!fs.existsSync(dir)) return
-  for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
-    if (SKIP_DIRS.has(entry.name)) continue
-    const full = path.join(dir, entry.name)
-    if (entry.isDirectory()) {
-      walkDir(full, repoRoot, out)
-      continue
-    }
-    if (SCAN_EXTS.has(path.extname(entry.name))) out.push(full)
-  }
-}
+const scanRootFiles = (repoRoot: string): string[] =>
+  SCAN_DIRS.flatMap((dir) => {
+    const full = path.join(repoRoot, dir)
+    if (!fs.statSync(full, { throwIfNoEntry: false })?.isDirectory()) throw new Error(`missing scan root: ${dir}`)
+    return walkSourceFiles(full)
+  })
 
 const lineNumberForIndex = (source: string, index: number): number =>
   source.slice(0, index).split('\n').length
@@ -76,10 +94,9 @@ const allowedTestLogCacheWriterCall = (file: string): boolean =>
   file.includes('/__tests__/') || file.endsWith('.test.ts')
 
 const findFunctionBlock = (
-  source: string,
+  sourceFile: ts.SourceFile,
   functionName: string,
 ): FunctionBlock | null => {
-  const sourceFile = ts.createSourceFile('scan.ts', source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS)
   let block: FunctionBlock | null = null
   const fromBody = (body: ts.Block): FunctionBlock => ({
     start: body.getStart(sourceFile),
@@ -109,11 +126,11 @@ const findFunctionBlock = (
   return block
 }
 
-const allowedLogStoreAppendBlocks = (rel: string, source: string): FunctionBlock[] => {
-  const allowedFunctions = allowedLogAppendFunctionsByFile[rel]
+const allowedLogStoreAppendBlocks = (rel: string, sourceFile: ts.SourceFile): FunctionBlock[] => {
+  const allowedFunctions = allowedLogAppendFunctionsByFile[rel]?.functions
   if (!allowedFunctions) return []
   return allowedFunctions.flatMap((functionName) => {
-    const block = findFunctionBlock(source, functionName)
+    const block = findFunctionBlock(sourceFile, functionName)
     if (!block) return []
     const mapperAssignment = mapperAssignmentRegex().exec(block.source)
     return mapperAssignment ? [block] : []
@@ -444,7 +461,6 @@ const isObjectAssignStateLogWrite = (
 
 const isAllowedLogStoreAppend = (
   call: ts.CallExpression,
-  source: string,
   sourceFile: ts.SourceFile,
   blocks: readonly FunctionBlock[],
 ): boolean =>
@@ -467,13 +483,12 @@ const isAllowedLogStoreAppend = (
 const isAllowedLogCacheWriterCall = (
   rel: string,
   call: ts.CallExpression,
-  source: string,
   sourceFile: ts.SourceFile,
 ): boolean => {
-  const allowedFunctions = allowedLogCacheWriterFunctionsByFile[rel]
+  const allowedFunctions = allowedLogCacheWriterFunctionsByFile[rel]?.functions
   if (!allowedFunctions) return false
   return allowedFunctions.some((functionName) => {
-    const block = findFunctionBlock(source, functionName)
+    const block = findFunctionBlock(sourceFile, functionName)
     const matchIndex = call.expression.getStart(sourceFile)
     if (!block || matchIndex < block.start || matchIndex >= block.end) return false
     const localCallIndex = matchIndex - block.start
@@ -509,18 +524,21 @@ const isAllowedLogCacheWriterCall = (
   })
 }
 
-const isAllowedStateLogWrite = (rel: string, node: ts.Node, source: string, sourceFile: ts.SourceFile): boolean => {
-  if (rel !== 'shared/events/log-cache.ts') return false
-  const block = findFunctionBlock(source, 'prependDerivedLogEntries')
+const isAllowedStateLogWrite = (rel: string, node: ts.Node, sourceFile: ts.SourceFile): boolean => {
+  const allowedFunctions = allowedStateLogWriteFunctionsByFile[rel]?.functions
+  if (!allowedFunctions) return false
   const index = node.getStart(sourceFile)
-  return !!block && index >= block.start && index < block.end
+  return allowedFunctions.some((functionName) => {
+    const block = findFunctionBlock(sourceFile, functionName)
+    return !!block && index >= block.start && index < block.end
+  })
 }
 
 const scanFile = (repoRoot: string, fullPath: string): DirectSessionLogViolation[] => {
   const rel = path.relative(repoRoot, fullPath).replaceAll(path.sep, '/')
-  if (SKIP_FILE_PATTERNS.some((pattern) => pattern.test(rel))) return []
-  const source = fs.readFileSync(fullPath, 'utf8')
-  const sourceFile = ts.createSourceFile(rel, source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS)
+  if (skippedFiles[rel]) return []
+  const sourceFile = parseSource(fullPath)
+  const source = sourceFile.text
   const violations: DirectSessionLogViolation[] = []
   const {
     logStoreClassNames,
@@ -533,7 +551,7 @@ const scanFile = (repoRoot: string, fullPath: string): DirectSessionLogViolation
     violations.push({ file: rel, line, kind, text: lineText(source, line) })
   }
 
-  const allowedBlocks = allowedLogStoreAppendBlocks(rel, source)
+  const allowedBlocks = allowedLogStoreAppendBlocks(rel, sourceFile)
   const visit = (
     node: ts.Node,
     stateLikeNames: ReadonlySet<string>,
@@ -712,7 +730,7 @@ const scanFile = (repoRoot: string, fullPath: string): DirectSessionLogViolation
       }
     }
 
-    if (!isAllowedStateLogWrite(rel, node, source, sourceFile)) {
+    if (!isAllowedStateLogWrite(rel, node, sourceFile)) {
       if ((ts.isBinaryExpression(node)
           && ts.isAssignmentOperator(node.operatorToken.kind)
           && isStateLogMutationTarget(node.left, scopedStateLikeNames, scopedStateLogAliases))
@@ -730,7 +748,7 @@ const scanFile = (repoRoot: string, fullPath: string): DirectSessionLogViolation
         logStoreClassNamespaces,
         scopedLogStoreConstructorAliases,
       )
-      && !allowedLogStoreConstructorFiles.has(rel)
+      && !allowedLogStoreConstructorFiles[rel]
       && !allowedTestLogStoreConstructor(rel)) {
       addViolation(node, 'log-store-constructor')
     }
@@ -738,7 +756,7 @@ const scanFile = (repoRoot: string, fullPath: string): DirectSessionLogViolation
     if (ts.isCallExpression(node)) {
       const calleeName = accessName(node.expression)
       const receiver = accessReceiver(node.expression)
-      if (!isAllowedStateLogWrite(rel, node, source, sourceFile)
+      if (!isAllowedStateLogWrite(rel, node, sourceFile)
         && calleeName
         && LOG_MUTATORS.has(calleeName)
         && receiver
@@ -746,7 +764,7 @@ const scanFile = (repoRoot: string, fullPath: string): DirectSessionLogViolation
           || isStateLogReceiverText(receiver, scopedStateLikeNames, sourceFile))) {
         addViolation(node, 'state-log-write')
       }
-      if (!isAllowedStateLogWrite(rel, node, source, sourceFile)
+      if (!isAllowedStateLogWrite(rel, node, sourceFile)
         && isObjectAssignCall(node)
         && !!node.arguments[0]
         && (isStateLogMutationTarget(node.arguments[0]!, scopedStateLikeNames, scopedStateLogAliases)
@@ -756,7 +774,7 @@ const scanFile = (repoRoot: string, fullPath: string): DirectSessionLogViolation
       if (calleeName === 'append'
         && receiver
         && isLogStoreExpression(receiver, scopedLogStoreAliases)
-        && !isAllowedLogStoreAppend(node, source, sourceFile, allowedBlocks)) {
+        && !isAllowedLogStoreAppend(node, sourceFile, allowedBlocks)) {
         addViolation(node, 'log-store-append')
       }
       if (cacheWriterCallName(
@@ -767,7 +785,7 @@ const scanFile = (repoRoot: string, fullPath: string): DirectSessionLogViolation
       )
         && rel !== 'shared/events/log-cache.ts'
         && !allowedTestLogCacheWriterCall(rel)
-        && !isAllowedLogCacheWriterCall(rel, node, source, sourceFile)) {
+        && !isAllowedLogCacheWriterCall(rel, node, sourceFile)) {
         addViolation(node, 'log-cache-writer-call')
       }
     }
@@ -786,14 +804,38 @@ const scanFile = (repoRoot: string, fullPath: string): DirectSessionLogViolation
   return violations
 }
 
-export const findDirectSessionLogViolations = (repoRoot: string): DirectSessionLogViolation[] => {
-  const files: string[] = []
-  for (const dir of SCAN_DIRS) walkDir(path.join(repoRoot, dir), repoRoot, files)
-  return files.flatMap((file) => scanFile(repoRoot, file))
-}
+export const findDirectSessionLogViolations = (repoRoot: string): DirectSessionLogViolation[] =>
+  scanRootFiles(repoRoot).flatMap((file) => scanFile(repoRoot, file))
+
+type ExceptionSite = { file: string; functionName?: string; reason: string }
+
+const exceptionSites = (): ExceptionSite[] => [
+  ...Object.entries(skippedFiles).map(([file, reason]) => ({ file, reason })),
+  ...Object.entries(allowedLogStoreConstructorFiles).map(([file, reason]) => ({ file, reason })),
+  ...[allowedLogAppendFunctionsByFile, allowedLogCacheWriterFunctionsByFile, allowedStateLogWriteFunctionsByFile]
+    .flatMap((table) => Object.entries(table))
+    .flatMap(([file, { functions, reason }]) => functions.map((functionName) => ({ file, functionName, reason }))),
+]
+
+export const findStaleDirectSessionLogExceptions = (repoRoot: string): string[] =>
+  exceptionSites().flatMap(({ file, functionName, reason }) => {
+    const full = path.join(repoRoot, file)
+    const label = functionName ? `${file}#${functionName}` : file
+    const exists = fs.statSync(full, { throwIfNoEntry: false })?.isFile() ?? false
+    const stale = !reason
+      || !exists
+      || (!!functionName && !findFunctionBlock(parseSource(full), functionName))
+    return stale ? [`stale direct session log exception: ${label}`] : []
+  })
 
 if (process.argv[1] && process.argv[1].endsWith('check-direct-session-log.ts')) {
   const repoRoot = path.resolve(__dirname, '..')
+  const staleExceptions = findStaleDirectSessionLogExceptions(repoRoot)
+  if (staleExceptions.length > 0) {
+    console.error(`[check-direct-session-log] ${staleExceptions.length} stale exceptions:`)
+    for (const entry of staleExceptions) console.error(`  ${entry}`)
+    process.exit(1)
+  }
   const violations = findDirectSessionLogViolations(repoRoot)
   if (violations.length === 0) {
     console.log('[check-direct-session-log] no direct session log writes found')

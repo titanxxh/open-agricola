@@ -2,18 +2,13 @@ import { describe, expect, it } from 'vitest'
 import { readdirSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { internalActionDefinitions } from '../../index'
-import { ALLOWED_EFFECT_FILES } from '../../../../scripts/check-effects-file-list'
+import { checkEffectsFileList } from '../../../../scripts/check-effects-file-list'
 
 const effectsDir = join(process.cwd(), 'shared/actions/effects')
 
 describe('effects architecture guard', () => {
   it('keeps top-level effects limited to the approved files', () => {
-    const files = readdirSync(effectsDir, { withFileTypes: true })
-      .filter((entry) => entry.isFile() && entry.name.endsWith('.ts'))
-      .map((entry) => entry.name)
-      .sort()
-
-    expect(files).toEqual([...ALLOWED_EFFECT_FILES].sort())
+    expect(checkEffectsFileList(effectsDir)).toMatchObject({ extraFiles: [], missingFiles: [], ok: true })
   })
 
   it('keeps action registrations limited to the approved ids', () => {
