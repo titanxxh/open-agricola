@@ -1,5 +1,6 @@
 import path from 'node:path'
 import fs from 'node:fs'
+import { execFileSync } from 'node:child_process'
 import { isBuiltin } from 'node:module'
 import { fileURLToPath } from 'node:url'
 import ts from 'typescript'
@@ -8,6 +9,44 @@ import { importViolation, isSourceFile, isTestFile, normalizePath, resolveImport
 
 export type DependencyEdge = { from: string; to: string; typeOnly: boolean; dynamic: boolean }
 export const runtimeRoots = ['shared', 'server', 'client', 'replay-viewer/src']
+
+const knownRoots = new Set(['shared', 'server', 'client', 'replay-viewer', 'scripts', 'tests', 'e2e-tests'])
+const artifacts = new Set(['node_modules', '.git', '.worktree', 'dist', 'data', 'output', 'public', 'docs', 'coverage', 'playwright-report', 'test-results', '.codex', '.agents'])
+
+/**
+ * Top-level entries that git ignores (`.gitignore`, `.git/info/exclude`, global
+ * excludes). `git check-ignore` exits 1 when nothing matches and 128 outside a
+ * checkout; both fall back to "nothing ignored" so the plain scan still applies.
+ * Tracked paths are never reported as ignored, so a committed directory keeps
+ * failing the classification even if a later ignore rule matches it.
+ */
+const gitIgnoredEntries = (root: string, names: readonly string[]): Set<string> => {
+  if (names.length === 0) return new Set()
+  const output = ((): string => {
+    try {
+      return execFileSync('git', ['check-ignore', '-z', '--stdin'], {
+        cwd: root,
+        encoding: 'utf8',
+        input: names.join('\0') + '\0',
+        stdio: ['pipe', 'pipe', 'ignore'],
+      })
+    } catch (error) {
+      const stdout = (error as { stdout?: unknown }).stdout
+      return typeof stdout === 'string' ? stdout : ''
+    }
+  })()
+  return new Set(output.split('\0').filter(Boolean))
+}
+
+/** Top-level directories holding sources that belong to no known root and are not git-ignored. */
+export function unclassifiedSourceRoots(root: string): string[] {
+  const candidates = fs.readdirSync(root, { withFileTypes: true })
+    .filter(entry => entry.isDirectory() && !knownRoots.has(entry.name) && !artifacts.has(entry.name))
+    .map(entry => entry.name)
+    .sort()
+  const ignored = gitIgnoredEntries(root, candidates)
+  return candidates.filter(name => !ignored.has(name) && walkSourceFiles(path.join(root, name)).length > 0)
+}
 
 const isImportMetaUrl = (node: ts.Node | undefined): boolean =>
   !!node && ts.isPropertyAccessExpression(node) && node.name.text === 'url'
@@ -20,12 +59,7 @@ export function readDependencies(root: string, roots = runtimeRoots): { edges: D
   const errors: string[] = []
   const workerEntries = new Set<string>()
   if (roots === runtimeRoots) {
-    const knownRoots = new Set(['shared', 'server', 'client', 'replay-viewer', 'scripts', 'tests', 'e2e-tests'])
-    const artifacts = new Set(['node_modules', '.git', '.worktree', 'dist', 'data', 'output', 'public', 'docs', 'coverage', 'playwright-report', 'test-results', '.codex', '.agents'])
-    for (const entry of fs.readdirSync(root, { withFileTypes: true })) {
-      if (!entry.isDirectory() || knownRoots.has(entry.name) || artifacts.has(entry.name)) continue
-      if (walkSourceFiles(path.join(root, entry.name)).length) errors.push('unclassified source root: ' + entry.name)
-    }
+    for (const name of unclassifiedSourceRoots(root)) errors.push('unclassified source root: ' + name)
     for (const file of [...browserDataFiles.keys(), ...workerFiles, ...privilegedRoots.keys()]) {
       if (!fs.existsSync(path.join(root, file))) errors.push('stale architecture permission: ' + file)
     }

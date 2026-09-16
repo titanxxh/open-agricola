@@ -1,9 +1,10 @@
+import { execFileSync } from 'node:child_process'
 import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
 import { ESLint } from 'eslint'
-import { dependencyCycles, readDependencies } from '../check-dependencies'
+import { dependencyCycles, readDependencies, unclassifiedSourceRoots } from '../check-dependencies'
 import { importViolation } from '../architecture-policy.mjs'
 
 const roots: string[] = []
@@ -89,6 +90,64 @@ describe('resolved architecture dependencies', () => {
   it.each(['Worker', 'window.Worker', 'globalThis.SharedWorker', 'WorkerAlias'])('rejects unregistered module URLs through %s', constructor => {
     const root = fixture({ 'client/probe.ts': "new " + constructor + "(new URL('./other.ts', import.meta.url))" })
     expect(readDependencies(root, ['client']).errors).toContain('client/probe.ts: unknown worker entry client/other.ts')
+  })
+
+  describe('unclassified source roots', () => {
+    const gitFixture = (files: Record<string, string>) => {
+      const root = fixture(files)
+      execFileSync('git', ['init', '-q'], { cwd: root })
+      return root
+    }
+
+    it('ignores top-level directories excluded by .gitignore or .git/info/exclude', () => {
+      const root = gitFixture({
+        '.gitignore': 'tooling/\n',
+        '.scratch/a.ts': 'export const a = 1',
+        'tooling/b.ts': 'export const b = 1',
+        'shared/c.ts': 'export const c = 1',
+      })
+      fs.appendFileSync(path.join(root, '.git/info/exclude'), '.scratch/\n')
+      expect(unclassifiedSourceRoots(root)).toEqual([])
+    })
+
+    it('still reports directories that git does not ignore', () => {
+      const root = gitFixture({
+        '.gitignore': 'tooling/\n',
+        'tooling/b.ts': 'export const b = 1',
+        'extra/c.ts': 'export const c = 1',
+        'tracked/d.ts': 'export const d = 1',
+        'empty/readme.md': 'no sources here',
+      })
+      execFileSync('git', ['add', 'tracked/d.ts'], { cwd: root })
+      expect(unclassifiedSourceRoots(root)).toEqual(['extra', 'tracked'])
+    })
+
+    it('keeps a tracked directory even when a later ignore rule matches it', () => {
+      const root = gitFixture({ 'tracked/d.ts': 'export const d = 1' })
+      execFileSync('git', ['add', 'tracked/d.ts'], { cwd: root })
+      fs.writeFileSync(path.join(root, '.gitignore'), 'tracked/\n')
+      expect(unclassifiedSourceRoots(root)).toEqual(['tracked'])
+    })
+
+    it('falls back to the plain directory scan outside a git checkout', () => {
+      const root = fixture({ '.scratch/a.ts': 'export const a = 1', 'extra/c.ts': 'export const c = 1' })
+      expect(unclassifiedSourceRoots(root)).toEqual(['.scratch', 'extra'])
+    })
+
+    it('feeds the same classification into readDependencies', () => {
+      const root = gitFixture({
+        'shared/a.ts': 'export const a = 1',
+        'server/index.ts': 'export const s = 1',
+        'client/main.ts': 'export const c = 1',
+        'replay-viewer/src/main.ts': 'export const r = 1',
+        '.scratch/probe.ts': 'export const p = 1',
+        'extra/probe.ts': 'export const e = 1',
+      })
+      fs.appendFileSync(path.join(root, '.git/info/exclude'), '.scratch/\n')
+      const { errors } = readDependencies(root)
+      expect(errors).toContain('unclassified source root: extra')
+      expect(errors).not.toContain('unclassified source root: .scratch')
+    })
   })
 
   it('restricts worker permissions to exact files and allows erased contracts', () => {
