@@ -8,7 +8,7 @@ import { defineConfig, globalIgnores } from 'eslint/config'
 import { architectureImportRule } from './scripts/architecture-policy.mjs'
 
 export default defineConfig([
-  globalIgnores(['dist', '**/.build/**', '.worktree/**', 'scripts/__tests__/fixtures/**', 'public/**']),
+  globalIgnores(['dist', '**/.build/**', '.worktree/**', '.scratch/**', '.gitnexus/**', 'scripts/__tests__/fixtures/**', 'public/**']),
   {
     files: ['**/*.{ts,tsx}'],
     extends: [

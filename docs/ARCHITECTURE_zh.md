@@ -1522,7 +1522,7 @@ GameContextRouter
 |---|---|---|
 | `shared` / `server` / `client` 物理分层 | ESLint `architecture/imports` error | 测试目录有显式豁免；只检查 import，不证明 runtime ownership。 |
 | Card Source scope 与跨卡引用 | `pnpm run check:card-impl-boundaries` | TypeScript AST 检查生产 Card Source 文件及同文件卡牌 ID 字面量或顶层 const 别名。`Major_*`、`reaches`、购买候选和前置候选是显式例外；不追踪跨文件数据流。source scope 为空或不匹配时失败。 |
-| 运行时循环依赖 | `pnpm run check:dependencies` | 所有运行时 SCC、自环和字面量动态导入环都会失败，不保留循环基线。显式 type-only 声明被擦除；verbatimModuleSyntax 下的行内 type specifier 仍加载模块。 |
+| 运行时循环依赖 | `pnpm run check:dependencies` | 所有运行时 SCC、自环和字面量动态导入环都会失败，不保留循环基线。显式 type-only 声明被擦除；verbatimModuleSyntax 下的行内 type specifier 仍加载模块。其他含源码的顶层目录报 `unclassified source root`，但 `git check-ignore` 判定为忽略的未跟踪目录（`.gitignore`、`.git/info/exclude`）除外；已跟踪目录始终计入。 |
 | 浏览器与回放隔离 | `pnpm run check:browser-boundaries` | 同时检查两个生产入口的源码传递依赖和真实 Vite 模块图。元数据权限精确到文件并附原因；新增 Worker 入口、越权进入沙盒和入口证据缺失都会失败。 |
 | 架构类型契约 | `pnpm run check:architecture-types` | `tsconfig.architecture.json` 对策略与检查器测试执行真正的 no-emit 类型检查，包括正反类型断言；Vitest 运行成功不等于类型通过。 |
 | 扫描完整性 | no-DSL、test-project coverage、Card Source 与 field-boundary 检查 | 根目录和语法必须有效；源码声明与全部已注册实现独立比对，支持 major 文件多声明。Parents 保持独立的元数据/运行时模型。 |
