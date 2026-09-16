@@ -389,6 +389,112 @@ describe('check-direct-session-log', () => {
     ])
   })
 
+  it('hoists aliases derived from module namespaces for earlier closures', () => {
+    const root = createRoot()
+    writeFixture(root, 'server/hoisted-alias.ts', [
+      "import * as Events from '../shared/events'",
+      "import * as Engine from '../shared/engine'",
+      'export function bad(state: any, entries: any[]) {',
+      '  const run = () => [write(state, entries), new Store(), other(state, entries)]',
+      '  const write = Events.prependDerivedLogEntries',
+      '  const Store = Engine.LogStore',
+      '  const { prependDerivedLogEntries: other } = Events',
+      '  return run()',
+      '}',
+    ].join('\n'))
+
+    expect(findDirectSessionLogViolations(root)).toEqual([
+      expect.objectContaining({ file: 'server/hoisted-alias.ts', line: 4, kind: 'log-cache-writer-call' }),
+      expect.objectContaining({ file: 'server/hoisted-alias.ts', line: 4, kind: 'log-store-constructor' }),
+      expect.objectContaining({ file: 'server/hoisted-alias.ts', line: 4, kind: 'log-cache-writer-call' }),
+    ])
+  })
+
+  it('forks a lexical scope for switch case blocks', () => {
+    const root = createRoot()
+    writeFixture(root, 'server/switch.cjs', [
+      "const Events = require('../shared/events')",
+      'function bad(state, entries, mode, stub) {',
+      '  switch (mode) {',
+      '    case 1:',
+      '      const Events = stub',
+      '      consume(Events)',
+      '      break',
+      '  }',
+      '  Events.prependDerivedLogEntries(state, entries)',
+      '}',
+      'module.exports = { bad }',
+    ].join('\n'))
+
+    expect(findDirectSessionLogViolations(root)).toEqual([
+      expect.objectContaining({ file: 'server/switch.cjs', line: 9, kind: 'log-cache-writer-call' }),
+    ])
+  })
+
+  it('ignores a shadowed require binding but follows createRequire', () => {
+    const root = createRoot()
+    writeFixture(root, 'server/shadowed-require.cjs', [
+      'function ok(require, state, entries) {',
+      "  const Events = require('../shared/events')",
+      '  Events.prependDerivedLogEntries(state, entries)',
+      '}',
+      'module.exports = { ok }',
+    ].join('\n'))
+    writeFixture(root, 'server/created-require.mjs', [
+      "import { createRequire } from 'node:module'",
+      'const require = createRequire(import.meta.url)',
+      "const Events = require('../shared/events')",
+      'export function bad(state, entries) {',
+      '  Events.prependDerivedLogEntries(state, entries)',
+      '}',
+    ].join('\n'))
+
+    expect(findDirectSessionLogViolations(root)).toEqual([
+      expect.objectContaining({ file: 'server/created-require.mjs', line: 5, kind: 'log-cache-writer-call' }),
+    ])
+  })
+
+  it('binds destructuring assignments from module requests', () => {
+    const root = createRoot()
+    writeFixture(root, 'server/destructure-assign.mts', [
+      'let write: any',
+      'let Store: any',
+      ";({ prependDerivedLogEntries: write } = require('../shared/events'))",
+      ";({ LogStore: Store } = await import('../shared/engine'))",
+      'export function bad(state: any, entries: any[]) {',
+      '  write(state, entries)',
+      '  return new Store()',
+      '}',
+    ].join('\n'))
+
+    expect(findDirectSessionLogViolations(root)).toEqual([
+      expect.objectContaining({ file: 'server/destructure-assign.mts', line: 6, kind: 'log-cache-writer-call' }),
+      expect.objectContaining({ file: 'server/destructure-assign.mts', line: 7, kind: 'log-store-constructor' }),
+    ])
+  })
+
+  it('recognises inline module-request receivers without a binding', () => {
+    const root = createRoot()
+    writeFixture(root, 'server/inline.cjs', [
+      'function bad(state, entries) {',
+      "  require('../shared/events').prependDerivedLogEntries(state, entries)",
+      "  return new (require('../shared/engine').LogStore)()",
+      '}',
+      'async function badDynamic(state, entries) {',
+      "  ;(await import('../shared/events')).prependDerivedLogEntries(state, entries)",
+      "  return new ((await import('../shared/engine')).LogStore)()",
+      '}',
+      'module.exports = { bad, badDynamic }',
+    ].join('\n'))
+
+    expect(findDirectSessionLogViolations(root)).toEqual([
+      expect.objectContaining({ file: 'server/inline.cjs', line: 2, kind: 'log-cache-writer-call' }),
+      expect.objectContaining({ file: 'server/inline.cjs', line: 3, kind: 'log-store-constructor' }),
+      expect.objectContaining({ file: 'server/inline.cjs', line: 6, kind: 'log-cache-writer-call' }),
+      expect.objectContaining({ file: 'server/inline.cjs', line: 7, kind: 'log-store-constructor' }),
+    ])
+  })
+
   it.each([
     'server/cache.test.cjs',
     'server/cache.spec.mts',

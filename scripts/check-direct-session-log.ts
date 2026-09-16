@@ -236,29 +236,6 @@ const isEngineModule = (specifier: string): boolean => {
       || normalized.endsWith('/engine'))
 }
 
-const moduleRequestSpecifier = (expression: ts.Expression | undefined): string | null => {
-  if (!expression) return null
-  let current = unwrapExpression(expression)
-  if (ts.isAwaitExpression(current)) current = unwrapExpression(current.expression)
-  if (!ts.isCallExpression(current)) return null
-  const callee = unwrapExpression(current.expression)
-  const isRequire = ts.isIdentifier(callee) && callee.text === 'require'
-  if (!isRequire && callee.kind !== ts.SyntaxKind.ImportKeyword) return null
-  const argument = current.arguments[0] && unwrapExpression(current.arguments[0])
-  return argument && ts.isStringLiteralLike(argument) ? argument.text : null
-}
-
-const moduleMemberRequest = (
-  expression: ts.Expression | undefined,
-): { specifier: string; member: string } | null => {
-  if (!expression) return null
-  const current = unwrapExpression(expression)
-  const receiver = accessReceiver(current)
-  const member = accessName(current)
-  const specifier = receiver ? moduleRequestSpecifier(receiver) : null
-  return specifier && member ? { specifier, member } : null
-}
-
 type Scope = {
   stateLikeNames: Set<string>
   stateLogAliases: Set<string>
@@ -269,6 +246,7 @@ type Scope = {
   logStoreClassNamespaces: Set<string>
   logCacheWriterNames: Set<string>
   logCacheWriterNamespaces: Set<string>
+  moduleLoaders: Set<string>
 }
 
 const forkScope = (scope: Scope): Scope =>
@@ -276,6 +254,50 @@ const forkScope = (scope: Scope): Scope =>
 
 const shadowName = (scope: Scope, name: string): void => {
   for (const names of Object.values(scope)) names.delete(name)
+}
+
+const createRootScope = (): Scope => ({
+  stateLikeNames: new Set(['state']),
+  stateLogAliases: new Set(),
+  logStoreAliases: new Set(),
+  logCacheWriterAliases: new Set(),
+  logStoreConstructorAliases: new Set(),
+  logStoreClassNames: new Set(['LogStore']),
+  logStoreClassNamespaces: new Set(),
+  logCacheWriterNames: new Set(),
+  logCacheWriterNamespaces: new Set(),
+  moduleLoaders: new Set(['require']),
+})
+
+/** `require('x')` through an unshadowed loader binding, or `await import('x')`. */
+const moduleRequestSpecifier = (expression: ts.Expression | undefined, scope: Scope): string | null => {
+  if (!expression) return null
+  let current = unwrapExpression(expression)
+  if (ts.isAwaitExpression(current)) current = unwrapExpression(current.expression)
+  if (!ts.isCallExpression(current)) return null
+  const callee = unwrapExpression(current.expression)
+  const isLoader = ts.isIdentifier(callee) && scope.moduleLoaders.has(callee.text)
+  if (!isLoader && callee.kind !== ts.SyntaxKind.ImportKeyword) return null
+  const argument = current.arguments[0] && unwrapExpression(current.arguments[0])
+  return argument && ts.isStringLiteralLike(argument) ? argument.text : null
+}
+
+/** `require('x').member`, `(await import('x')).member` or `require('x')['member']`. */
+const moduleMemberRequest = (
+  expression: ts.Expression | undefined,
+  scope: Scope,
+): { specifier: string; member: string } | null => {
+  if (!expression) return null
+  const current = unwrapExpression(expression)
+  const receiver = accessReceiver(current)
+  const member = accessName(current)
+  const specifier = receiver ? moduleRequestSpecifier(receiver, scope) : null
+  return specifier && member ? { specifier, member } : null
+}
+
+const isCreateRequireCall = (expression: ts.Expression): boolean => {
+  const current = unwrapExpression(expression)
+  return ts.isCallExpression(current) && expressionName(current.expression) === 'createRequire'
 }
 
 const bindModuleNamespace = (scope: Scope, localName: string, specifier: string): void => {
@@ -289,7 +311,7 @@ const bindModuleMember = (scope: Scope, importedName: string, localName: string,
 }
 
 const bindModuleRequest = (scope: Scope, name: ts.BindingName, initializer: ts.Expression): void => {
-  const specifier = moduleRequestSpecifier(initializer)
+  const specifier = moduleRequestSpecifier(initializer, scope)
   if (specifier && ts.isIdentifier(name)) bindModuleNamespace(scope, name.text, specifier)
   if (specifier && ts.isObjectBindingPattern(name)) {
     for (const element of name.elements) {
@@ -298,30 +320,20 @@ const bindModuleRequest = (scope: Scope, name: ts.BindingName, initializer: ts.E
       if (importedName) bindModuleMember(scope, importedName, element.name.text, specifier)
     }
   }
-  const member = moduleMemberRequest(initializer)
+  const member = moduleMemberRequest(initializer, scope)
   if (member && ts.isIdentifier(name)) bindModuleMember(scope, member.member, name.text, member.specifier)
   const source = unwrapExpression(initializer)
   if (ts.isIdentifier(source) && ts.isIdentifier(name)) {
     if (scope.logStoreClassNamespaces.has(source.text)) scope.logStoreClassNamespaces.add(name.text)
     if (scope.logCacheWriterNamespaces.has(source.text)) scope.logCacheWriterNamespaces.add(name.text)
   }
+  if (ts.isIdentifier(name) && isCreateRequireCall(initializer)) scope.moduleLoaders.add(name.text)
 }
 
-const createRootScope = (): Scope => ({
-  stateLikeNames: new Set(['state']),
-  stateLogAliases: new Set(),
-  logStoreAliases: new Set(),
-  logCacheWriterAliases: new Set(),
-  logStoreConstructorAliases: new Set(),
-  logStoreClassNames: new Set(['LogStore']),
-  logStoreClassNamespaces: new Set(),
-  logCacheWriterNames: new Set(),
-  logCacheWriterNamespaces: new Set(),
-})
-
 /**
- * Every local declaration of a scope shadows inherited names before any closure in it is visited, and module
- * bindings are hoisted the same way, so closures declared before the binding still resolve it.
+ * Every local declaration of a scope shadows inherited names before any closure in it is visited, and every
+ * declared provenance (module bindings and aliases derived from them) is hoisted the same way, so closures
+ * declared before the binding still resolve it.
  */
 const precollectScopeBindings = (scope: Scope, statements: readonly ts.Statement[], sourceFile: ts.SourceFile): void => {
   for (const statement of statements) {
@@ -353,13 +365,7 @@ const precollectScopeBindings = (scope: Scope, statements: readonly ts.Statement
     }
     if (ts.isVariableStatement(statement)) {
       for (const declaration of statement.declarationList.declarations) {
-        if (!declaration.initializer) continue
-        bindModuleRequest(scope, declaration.name, declaration.initializer)
-        if (ts.isIdentifier(declaration.name)
-          && (includesGameStateType(declaration.type, sourceFile)
-            || isGameStateExpression(declaration.initializer, sourceFile))) {
-          scope.stateLikeNames.add(declaration.name.text)
-        }
+        if (declaration.initializer) bindDeclaration(scope, declaration, sourceFile)
       }
     }
   }
@@ -451,34 +457,17 @@ const isLogStoreBindingSource = (
     && (ts.isThis(current) || (ts.isIdentifier(current) && current.text === 'int'))
 }
 
-const isLogStoreConstructorExpression = (
-  expression: ts.Expression,
-  logStoreClassNames: ReadonlySet<string>,
-  logStoreClassNamespaces: ReadonlySet<string>,
-  logStoreConstructorAliases: ReadonlySet<string>,
-): boolean => {
+const isLogStoreConstructorExpression = (expression: ts.Expression, scope: Scope): boolean => {
   const current = unwrapExpression(expression)
-  if (ts.isIdentifier(current)) return logStoreClassNames.has(current.text) || logStoreConstructorAliases.has(current.text)
+  if (ts.isIdentifier(current)) {
+    return scope.logStoreClassNames.has(current.text) || scope.logStoreConstructorAliases.has(current.text)
+  }
+  if (accessName(current) !== 'LogStore') return false
   const receiver = accessReceiver(current)
   const unwrappedReceiver = receiver && unwrapExpression(receiver)
-  return accessName(current) === 'LogStore'
-    && !!unwrappedReceiver
-    && ts.isIdentifier(unwrappedReceiver)
-    && logStoreClassNamespaces.has(unwrappedReceiver.text)
-}
-
-const isLogStoreConstructorAliasSource = (
-  expression: ts.Expression,
-  logStoreClassNames: ReadonlySet<string>,
-  logStoreClassNamespaces: ReadonlySet<string>,
-  logStoreConstructorAliases: ReadonlySet<string>,
-): boolean => {
-  return isLogStoreConstructorExpression(
-    expression,
-    logStoreClassNames,
-    logStoreClassNamespaces,
-    logStoreConstructorAliases,
-  )
+  if (unwrappedReceiver && ts.isIdentifier(unwrappedReceiver)) return scope.logStoreClassNamespaces.has(unwrappedReceiver.text)
+  const inlineSpecifier = receiver ? moduleRequestSpecifier(receiver, scope) : null
+  return inlineSpecifier !== null && isEngineModule(inlineSpecifier)
 }
 
 const isMapperEntryExpression = (expression: ts.Expression | undefined, variableName: string): boolean => {
@@ -489,24 +478,79 @@ const isMapperEntryExpression = (expression: ts.Expression | undefined, variable
     && (unwrapExpression(current.expression) as ts.Identifier).text === variableName
 }
 
-const cacheWriterCallName = (
-  expression: ts.Expression,
-  logCacheWriterNames: ReadonlySet<string>,
-  logCacheWriterNamespaces: ReadonlySet<string>,
-  logCacheWriterAliases: ReadonlySet<string> = new Set(),
-): string | null => {
+const cacheWriterCallName = (expression: ts.Expression, scope: Scope): string | null => {
   const current = unwrapExpression(expression)
-  if (ts.isIdentifier(current) && logCacheWriterAliases.has(current.text)) return current.text
-  if (ts.isIdentifier(current) && logCacheWriterNames.has(current.text)) return current.text
+  if (ts.isIdentifier(current)) {
+    return scope.logCacheWriterAliases.has(current.text) || scope.logCacheWriterNames.has(current.text) ? current.text : null
+  }
+  if (accessName(current) !== 'prependDerivedLogEntries') return null
   const receiver = accessReceiver(current)
   const unwrappedReceiver = receiver && unwrapExpression(receiver)
-  if (accessName(current) === 'prependDerivedLogEntries'
-    && unwrappedReceiver
-    && ts.isIdentifier(unwrappedReceiver)
-    && logCacheWriterNamespaces.has(unwrappedReceiver.text)) {
-    return accessName(current)
+  if (unwrappedReceiver && ts.isIdentifier(unwrappedReceiver)) {
+    return scope.logCacheWriterNamespaces.has(unwrappedReceiver.text) ? 'prependDerivedLogEntries' : null
   }
-  return null
+  const inlineSpecifier = receiver ? moduleRequestSpecifier(receiver, scope) : null
+  return inlineSpecifier !== null && isLogCacheModule(inlineSpecifier) ? 'prependDerivedLogEntries' : null
+}
+
+const bindDeclaration = (scope: Scope, declaration: ts.VariableDeclaration, sourceFile: ts.SourceFile): void => {
+  const initializer = declaration.initializer
+  if (!initializer) return
+  const name = declaration.name
+  bindModuleRequest(scope, name, initializer)
+  if (ts.isIdentifier(name)) {
+    if (includesGameStateType(declaration.type, sourceFile) || isGameStateExpression(initializer, sourceFile)) {
+      scope.stateLikeNames.add(name.text)
+    }
+    if (isStateLogExpression(initializer, scope.stateLikeNames)) scope.stateLogAliases.add(name.text)
+    if (isLogStoreExpression(initializer, scope.logStoreAliases)) scope.logStoreAliases.add(name.text)
+    if (cacheWriterCallName(initializer, scope)) scope.logCacheWriterAliases.add(name.text)
+    if (isLogStoreConstructorExpression(initializer, scope)) scope.logStoreConstructorAliases.add(name.text)
+    return
+  }
+  if (!ts.isObjectBindingPattern(name)) return
+  const stateLike = isStateLikeExpression(initializer, scope.stateLikeNames)
+  const source = unwrapExpression(initializer)
+  const namespace = ts.isIdentifier(source) ? source.text : null
+  for (const element of name.elements) {
+    if (!ts.isIdentifier(element.name)) continue
+    const sourceName = element.propertyName ? propertyNameText(element.propertyName) : element.name.text
+    if (!sourceName) continue
+    if (stateLike && sourceName === 'log') scope.stateLogAliases.add(element.name.text)
+    if (isLogStoreBindingSource(initializer, sourceName)) scope.logStoreAliases.add(element.name.text)
+    if (sourceName === 'prependDerivedLogEntries' && namespace && scope.logCacheWriterNamespaces.has(namespace)) {
+      scope.logCacheWriterAliases.add(element.name.text)
+    }
+    if (sourceName === 'LogStore' && namespace && scope.logStoreClassNamespaces.has(namespace)) {
+      scope.logStoreConstructorAliases.add(element.name.text)
+    }
+  }
+}
+
+const bindAssignment = (scope: Scope, target: ts.Identifier, right: ts.Expression): void => {
+  bindModuleRequest(scope, target, right)
+  if (isStateLogExpression(right, scope.stateLikeNames)) scope.stateLogAliases.add(target.text)
+  if (isLogStoreExpression(right, scope.logStoreAliases)) scope.logStoreAliases.add(target.text)
+  if (cacheWriterCallName(right, scope)) scope.logCacheWriterAliases.add(target.text)
+  if (isLogStoreConstructorExpression(right, scope)) scope.logStoreConstructorAliases.add(target.text)
+}
+
+const bindObjectAssignment = (scope: Scope, left: ts.Expression, right: ts.Expression): void => {
+  const source = unwrapExpression(right)
+  const namespace = ts.isIdentifier(source) ? source.text : null
+  const specifier = moduleRequestSpecifier(right, scope)
+  for (const name of objectLiteralAliasAssignments(left, 'log')) {
+    if (isStateLikeExpression(right, scope.stateLikeNames)) scope.stateLogAliases.add(name)
+    if (isLogStoreBindingSource(right, 'log')) scope.logStoreAliases.add(name)
+  }
+  for (const name of objectLiteralAliasAssignments(left, 'prependDerivedLogEntries')) {
+    if (namespace && scope.logCacheWriterNamespaces.has(namespace)) scope.logCacheWriterAliases.add(name)
+    if (specifier) bindModuleMember(scope, 'prependDerivedLogEntries', name, specifier)
+  }
+  for (const name of objectLiteralAliasAssignments(left, 'LogStore')) {
+    if (namespace && scope.logStoreClassNamespaces.has(namespace)) scope.logStoreConstructorAliases.add(name)
+    if (specifier) bindModuleMember(scope, 'LogStore', name, specifier)
+  }
 }
 
 const isObjectAssignCall = (call: ts.CallExpression): boolean => {
@@ -655,8 +699,8 @@ const scanFile = (repoRoot: string, fullPath: string): DirectSessionLogViolation
   const allowedBlocks = allowedLogStoreAppendBlocks(rel, sourceFile)
   const visit = (node: ts.Node, inherited: Scope): void => {
     let scope = inherited
-    if (ts.isSourceFile(node) || ts.isBlock(node) || ts.isFunctionLike(node) || ts.isCatchClause(node)
-      || ts.isForStatement(node) || ts.isForInStatement(node) || ts.isForOfStatement(node)) {
+    if (ts.isSourceFile(node) || ts.isBlock(node) || ts.isCaseBlock(node) || ts.isFunctionLike(node)
+      || ts.isCatchClause(node) || ts.isForStatement(node) || ts.isForInStatement(node) || ts.isForOfStatement(node)) {
       scope = forkScope(inherited)
       if (ts.isFunctionLike(node)) {
         for (const parameter of node.parameters) {
@@ -669,135 +713,22 @@ const scanFile = (repoRoot: string, fullPath: string): DirectSessionLogViolation
         }
       }
       if (ts.isSourceFile(node) || ts.isBlock(node)) precollectScopeBindings(scope, node.statements, sourceFile)
+      if (ts.isCaseBlock(node)) {
+        precollectScopeBindings(scope, node.clauses.flatMap((clause) => [...clause.statements]), sourceFile)
+      }
     }
 
     if (ts.isVariableDeclaration(node)) {
       const names: string[] = []
       collectBindingNames(node.name, names)
       for (const name of names) shadowName(scope, name)
-      if (node.initializer) {
-        bindModuleRequest(scope, node.name, node.initializer)
-        if (ts.isIdentifier(node.name)
-          && (includesGameStateType(node.type, sourceFile)
-            || isGameStateExpression(node.initializer, sourceFile))) {
-          scope.stateLikeNames.add(node.name.text)
-        }
-        if (ts.isIdentifier(node.name) && isStateLogExpression(node.initializer, scope.stateLikeNames)) {
-          scope.stateLogAliases.add(node.name.text)
-        }
-        if (ts.isIdentifier(node.name) && isLogStoreExpression(node.initializer, scope.logStoreAliases)) {
-          scope.logStoreAliases.add(node.name.text)
-        }
-        if (ts.isIdentifier(node.name)
-          && cacheWriterCallName(
-            node.initializer,
-            scope.logCacheWriterNames,
-            scope.logCacheWriterNamespaces,
-            scope.logCacheWriterAliases,
-          )) {
-          scope.logCacheWriterAliases.add(node.name.text)
-        }
-        if (ts.isIdentifier(node.name)
-          && isLogStoreConstructorAliasSource(
-            node.initializer,
-            scope.logStoreClassNames,
-            scope.logStoreClassNamespaces,
-            scope.logStoreConstructorAliases,
-          )) {
-          scope.logStoreConstructorAliases.add(node.name.text)
-        }
-        if (ts.isObjectBindingPattern(node.name) && isStateLikeExpression(node.initializer, scope.stateLikeNames)) {
-          for (const element of node.name.elements) {
-            if (ts.isOmittedExpression(element)) continue
-            const property = element.propertyName
-            const bindingName = element.name
-            const sourceName = property ? propertyNameText(property) : ts.isIdentifier(bindingName) ? bindingName.text : null
-            if (sourceName === 'log' && ts.isIdentifier(bindingName)) {
-              scope.stateLogAliases.add(bindingName.text)
-            }
-          }
-        }
-        if (ts.isObjectBindingPattern(node.name)) {
-          const namespace = ts.isIdentifier(unwrapExpression(node.initializer))
-            ? (unwrapExpression(node.initializer) as ts.Identifier).text
-            : null
-          for (const element of node.name.elements) {
-            if (ts.isOmittedExpression(element)) continue
-            const property = element.propertyName
-            const bindingName = element.name
-            if (!ts.isIdentifier(bindingName)) continue
-            const sourceName = property ? propertyNameText(property) : bindingName.text
-            if (sourceName && isLogStoreBindingSource(node.initializer, sourceName)) {
-              scope.logStoreAliases.add(bindingName.text)
-            }
-            if (sourceName === 'prependDerivedLogEntries'
-              && namespace
-              && scope.logCacheWriterNamespaces.has(namespace)) {
-              scope.logCacheWriterAliases.add(bindingName.text)
-            }
-            if (sourceName === 'LogStore'
-              && namespace
-              && scope.logStoreClassNamespaces.has(namespace)) {
-              scope.logStoreConstructorAliases.add(bindingName.text)
-            }
-          }
-        }
-      }
+      bindDeclaration(scope, node, sourceFile)
     }
 
-    if (ts.isBinaryExpression(node)
-      && node.operatorToken.kind === ts.SyntaxKind.EqualsToken
-      && ts.isIdentifier(unwrapExpression(node.left))) {
-      const target = unwrapExpression(node.left) as ts.Identifier
-      bindModuleRequest(scope, target, node.right)
-      if (isStateLogExpression(node.right, scope.stateLikeNames)) {
-        scope.stateLogAliases.add(target.text)
-      }
-      if (isLogStoreExpression(node.right, scope.logStoreAliases)) {
-        scope.logStoreAliases.add(target.text)
-      }
-      if (cacheWriterCallName(
-        node.right,
-        scope.logCacheWriterNames,
-        scope.logCacheWriterNamespaces,
-        scope.logCacheWriterAliases,
-      )) {
-        scope.logCacheWriterAliases.add(target.text)
-      }
-      if (isLogStoreConstructorAliasSource(
-        node.right,
-        scope.logStoreClassNames,
-        scope.logStoreClassNamespaces,
-        scope.logStoreConstructorAliases,
-      )) {
-        scope.logStoreConstructorAliases.add(target.text)
-      }
-    }
-
-    if (ts.isBinaryExpression(node)
-      && node.operatorToken.kind === ts.SyntaxKind.EqualsToken
-      && ts.isObjectLiteralExpression(unwrapExpression(node.left))) {
-      for (const name of objectLiteralAliasAssignments(node.left, 'log')) {
-        if (isStateLikeExpression(node.right, scope.stateLikeNames)) {
-          scope.stateLogAliases.add(name)
-        }
-        if (isLogStoreBindingSource(node.right, 'log')) {
-          scope.logStoreAliases.add(name)
-        }
-      }
-      const namespace = ts.isIdentifier(unwrapExpression(node.right))
-        ? (unwrapExpression(node.right) as ts.Identifier).text
-        : null
-      for (const name of objectLiteralAliasAssignments(node.left, 'prependDerivedLogEntries')) {
-        if (namespace && scope.logCacheWriterNamespaces.has(namespace)) {
-          scope.logCacheWriterAliases.add(name)
-        }
-      }
-      for (const name of objectLiteralAliasAssignments(node.left, 'LogStore')) {
-        if (namespace && scope.logStoreClassNamespaces.has(namespace)) {
-          scope.logStoreConstructorAliases.add(name)
-        }
-      }
+    if (ts.isBinaryExpression(node) && node.operatorToken.kind === ts.SyntaxKind.EqualsToken) {
+      const left = unwrapExpression(node.left)
+      if (ts.isIdentifier(left)) bindAssignment(scope, left, node.right)
+      if (ts.isObjectLiteralExpression(left)) bindObjectAssignment(scope, left, node.right)
     }
 
     if (!isAllowedStateLogWrite(rel, node, sourceFile)) {
@@ -812,12 +743,7 @@ const scanFile = (repoRoot: string, fullPath: string): DirectSessionLogViolation
     }
 
     if (ts.isNewExpression(node)
-      && isLogStoreConstructorExpression(
-        node.expression,
-        scope.logStoreClassNames,
-        scope.logStoreClassNamespaces,
-        scope.logStoreConstructorAliases,
-      )
+      && isLogStoreConstructorExpression(node.expression, scope)
       && !allowedLogStoreConstructorFiles[rel]
       && !allowedTestLogStoreConstructor(rel)) {
       addViolation(node, 'log-store-constructor')
@@ -847,12 +773,7 @@ const scanFile = (repoRoot: string, fullPath: string): DirectSessionLogViolation
         && !isAllowedLogStoreAppend(node, sourceFile, allowedBlocks)) {
         addViolation(node, 'log-store-append')
       }
-      if (cacheWriterCallName(
-        node.expression,
-        scope.logCacheWriterNames,
-        scope.logCacheWriterNamespaces,
-        scope.logCacheWriterAliases,
-      )
+      if (cacheWriterCallName(node.expression, scope)
         && rel !== 'shared/events/log-cache.ts'
         && !allowedTestLogCacheWriterCall(rel)
         && !isAllowedLogCacheWriterCall(rel, node, sourceFile)) {
