@@ -213,6 +213,80 @@ describe('check-direct-session-log', () => {
     ])
   })
 
+  it('resolves module bindings declared after the closures that use them', () => {
+    const root = createRoot()
+    writeFixture(root, 'server/hoisted.cjs', [
+      'function bad(s, e) {',
+      '  Events.prependDerivedLogEntries(s, e)',
+      '  return new Engine.LogStore()',
+      '}',
+      'function outer(s, e) {',
+      '  const run = () => Later.prependDerivedLogEntries(s, e)',
+      "  const Later = require('../shared/events/log-cache')",
+      '  return run',
+      '}',
+      "const Events = require('../shared/events')",
+      "const Engine = require('../shared/engine')",
+      'module.exports = { bad, outer }',
+    ].join('\n'))
+
+    expect(findDirectSessionLogViolations(root)).toEqual([
+      expect.objectContaining({ file: 'server/hoisted.cjs', line: 2, kind: 'log-cache-writer-call' }),
+      expect.objectContaining({ file: 'server/hoisted.cjs', line: 3, kind: 'log-store-constructor' }),
+      expect.objectContaining({ file: 'server/hoisted.cjs', line: 6, kind: 'log-cache-writer-call' }),
+    ])
+  })
+
+  it('only treats engine modules as LogStore sources', () => {
+    const root = createRoot()
+    writeFixture(root, 'server/unrelated.cjs', [
+      "const Database = require('unrelated-database')",
+      "const { LogStore: OtherStore } = require('some-logging-lib')",
+      'function ok() {',
+      '  return [new Database.LogStore(), new OtherStore()]',
+      '}',
+      'module.exports = { ok }',
+    ].join('\n'))
+    writeFixture(root, 'server/unrelated-esm.ts', [
+      "import * as Other from '../shared/other'",
+      "import { LogStore as LibStore } from 'some-logging-lib'",
+      "import * as Engine from '../shared/engine/log-store'",
+      'export function mixed() {',
+      '  return [new Other.LogStore(), new LibStore(), new Engine.LogStore()]',
+      '}',
+    ].join('\n'))
+
+    expect(findDirectSessionLogViolations(root)).toEqual([
+      expect.objectContaining({ file: 'server/unrelated-esm.ts', line: 5, kind: 'log-store-constructor' }),
+    ])
+  })
+
+  it('recognises log-cache and engine modules with any supported source suffix', () => {
+    const root = createRoot()
+    writeFixture(root, 'server/suffixed.mjs', [
+      "import { prependDerivedLogEntries } from '../shared/events/log-cache.js'",
+      "import * as Events from '../shared/events/index.mjs'",
+      'export function bad(state, entries) {',
+      '  prependDerivedLogEntries(state, entries)',
+      '  Events.prependDerivedLogEntries(state, entries)',
+      '}',
+    ].join('\n'))
+    writeFixture(root, 'server/suffixed.cts', [
+      "import Engine = require('../shared/engine/index.cjs')",
+      "import Store = require('../shared/engine/log-store.mts')",
+      'export function bad() {',
+      '  return [new Engine.LogStore(), new Store.LogStore()]',
+      '}',
+    ].join('\n'))
+
+    expect(findDirectSessionLogViolations(root)).toEqual([
+      expect.objectContaining({ file: 'server/suffixed.cts', line: 4, kind: 'log-store-constructor' }),
+      expect.objectContaining({ file: 'server/suffixed.cts', line: 4, kind: 'log-store-constructor' }),
+      expect.objectContaining({ file: 'server/suffixed.mjs', line: 4, kind: 'log-cache-writer-call' }),
+      expect.objectContaining({ file: 'server/suffixed.mjs', line: 5, kind: 'log-cache-writer-call' }),
+    ])
+  })
+
   it.each([
     'server/cache.test.cjs',
     'server/cache.spec.mts',
