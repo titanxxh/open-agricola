@@ -51,5 +51,6 @@ describe('canonical architecture verification wiring', () => {
     expect(workflow.match(/pnpm run check:architecture/g)).toHaveLength(1)
     expect(workflow).not.toContain('pnpm run check:reaches')
     expect(workflow).not.toContain('pnpm run check:card-impl-boundaries')
+    expect(workflow).not.toContain('pnpm run check:prompt-sync')
   })
 })

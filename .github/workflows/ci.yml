@@ -11,24 +11,6 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  check-prompt-sync:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v7
-
-      - uses: actions/setup-node@v7
-        with:
-          node-version: 24
-
-      - name: Enable pnpm
-        run: corepack enable
-
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
-
-      - name: Check prompt sync (strict)
-        run: pnpm run check:prompt-sync -- --strict
-
   llm-cards-record:
     runs-on: ubuntu-latest
     timeout-minutes: 10
