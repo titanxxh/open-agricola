@@ -46,7 +46,7 @@ Put mechanically verifiable constraints that do not require a running game in CI
 
 ### 3.2 Direct Behavior Tests
 
-For a simple immediate effect, call the card's public effect or listener directly and assert the returned `ActionFlow`, resource delta, source card, and non-triggering branches. Use this layer only when the effect does not pass through payment solving, choices or pending state, delayed phases, cross-player behavior, or a multi-step flow.
+For a simple immediate effect, call the card's public effect or listener directly and assert the returned `ActionFlow`, resource delta, source card, and non-triggering branches. Invoke listener handlers through `invokeListenerHandlerUnderGuard` or `guardedListener` from `shared/cards/__tests__/listener-purity-guard.ts` rather than `registration.handler(ctx)`, so the direct test proves the handler only reads state and returns copies; `executeCardListener` and every `GameSession` path are guarded automatically by the Vitest setup. Use this layer only when the effect does not pass through payment solving, choices or pending state, delayed phases, cross-player behavior, or a multi-step flow.
 
 ### 3.3 Session Tests
 

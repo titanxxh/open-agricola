@@ -3,6 +3,7 @@ import type { ActionDefinition } from '../../contract/types'
 import { withActiveRegistry } from '../../cards/active-registry'
 import { CardRegistry } from '../../cards/registry'
 import { collectTriggerCardsAs } from '../../cards/helpers/trigger-snapshot'
+import { resolveAuthoritative } from '../../cards/__tests__/listener-purity-guard'
 import { ActionNode } from '../nodes'
 import { Engine } from '../engine'
 import { EngineTree } from '../tree'
@@ -136,7 +137,7 @@ describe('trailing trigger snapshots', () => {
       actions: [trigger.id],
       phases: ['after'],
       handler: (context) => {
-        if (context.state !== state) return { extraData: { applicable: true } }
+        if (resolveAuthoritative(context.state) !== state) return { extraData: { applicable: true } }
         observed.push({
           snapshot: collectTriggerCardsAs(context, context.player, 'occupation').length,
           live: context.player.occupationPlayed.length,
@@ -230,7 +231,7 @@ describe('trailing trigger snapshots', () => {
       actions: [trigger.id],
       phases: ['after'],
       handler: (context) => {
-        if (context.state !== state) return { extraData: { applicable: true } }
+        if (resolveAuthoritative(context.state) !== state) return { extraData: { applicable: true } }
         seenZones.push(context.ownerCardZone)
       },
     })

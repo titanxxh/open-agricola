@@ -44,7 +44,7 @@ export default mergeConfig(
             name: 'fast-shared',
             include: FAST_SHARED_INCLUDE,
             exclude: FAST_SHARED_EXCLUDE,
-            setupFiles: [],
+            setupFiles: ['./shared/cards/__tests__/setup-listener-purity.ts'],
           },
         },
         {
@@ -53,7 +53,10 @@ export default mergeConfig(
             name: 'fast-cards',
             include: FAST_CARDS_INCLUDE,
             exclude: FAST_EXCLUDE,
-            setupFiles: ['./shared/cards/__tests__/setup-register-all.ts'],
+            setupFiles: [
+              './shared/cards/__tests__/setup-register-all.ts',
+              './shared/cards/__tests__/setup-listener-purity.ts',
+            ],
           },
         },
         {
@@ -62,7 +65,10 @@ export default mergeConfig(
             name: 'fast-card-runtime',
             include: FAST_CARD_RUNTIME_INCLUDE,
             exclude: FAST_EXCLUDE,
-            setupFiles: ['./shared/cards/__tests__/setup-register-all.ts'],
+            setupFiles: [
+              './shared/cards/__tests__/setup-register-all.ts',
+              './shared/cards/__tests__/setup-listener-purity.ts',
+            ],
           },
         },
         {
@@ -83,7 +89,10 @@ export default mergeConfig(
             name: 'fast-server',
             include: FAST_SERVER_INCLUDE,
             exclude: FAST_EXCLUDE,
-            setupFiles: ['./shared/cards/__tests__/setup-register-all.ts'],
+            setupFiles: [
+              './shared/cards/__tests__/setup-register-all.ts',
+              './shared/cards/__tests__/setup-listener-purity.ts',
+            ],
           },
         },
         {
@@ -101,7 +110,10 @@ export default mergeConfig(
             name: 'fast-tests',
             include: FAST_TESTS_INCLUDE,
             exclude: FAST_TESTS_EXCLUDE,
-            setupFiles: ['./shared/cards/__tests__/setup-register-all.ts'],
+            setupFiles: [
+              './shared/cards/__tests__/setup-register-all.ts',
+              './shared/cards/__tests__/setup-listener-purity.ts',
+            ],
           },
         },
         {
@@ -110,7 +122,10 @@ export default mergeConfig(
             name: 'slow',
             include: SLOW_INCLUDE,
             exclude: SHARED_EXCLUDE,
-            setupFiles: ['./shared/cards/__tests__/setup-register-all.ts'],
+            setupFiles: [
+              './shared/cards/__tests__/setup-register-all.ts',
+              './shared/cards/__tests__/setup-listener-purity.ts',
+            ],
             isolate: false,
           },
         },

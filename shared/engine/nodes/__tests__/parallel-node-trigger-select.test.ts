@@ -1,6 +1,7 @@
 import { beforeEach, describe, it, expect } from 'vitest'
 import { CardRegistry } from '../../../cards/registry'
 import { setActiveCardRegistry } from '../../../cards/active-registry'
+import { ListenerPurityViolationError } from '../../../cards/__tests__/listener-purity-guard'
 import { EngineTree } from '../../tree'
 import { ActionNode } from '../action-node'
 import { ParallelNode } from '../parallel-node'
@@ -280,7 +281,7 @@ describe('ParallelNode trigger-select mode', () => {
     expect(evaluation.options).toEqual([])
   })
 
-  it('keeps mutation-only listener triggers selectable', () => {
+  it('rejects a listener that tries to signal applicability by mutating the preview clone', () => {
     const cardRegistry = new CardRegistry()
     cardRegistry.registerListener({
       id: 'listener-a',
@@ -296,21 +297,26 @@ describe('ParallelNode trigger-select mode', () => {
     })
     const node = makeTriggerSelect([makeActivate('a', 'MutationOnlyCard', false)])
 
+    expect(() => evaluateTriggerSelect(node, makeContext(player))).toThrow(ListenerPurityViolationError)
+    expect(player.cardStates).toEqual({})
+  })
+
+  it('hides a listener that returns nothing during preview', () => {
+    const cardRegistry = new CardRegistry()
+    cardRegistry.registerListener({
+      id: 'listener-a',
+      cardIds: ['SilentCard'],
+      handler: () => undefined,
+    })
+    setActiveCardRegistry(cardRegistry)
+    const player = makePlayer({
+      minorPlayed: ['SilentCard'],
+    })
+    const node = makeTriggerSelect([makeActivate('a', 'SilentCard', false)])
+
     const evaluation = evaluateTriggerSelect(node, makeContext(player))
 
-    expect(player.cardStates).toEqual({})
-    expect(evaluation.options).toEqual([
-      {
-        value: 'MutationOnlyCard',
-        labelKey: 'cards.MutationOnlyCard.name',
-        sourceCard: 'MutationOnlyCard',
-      },
-      {
-        value: '__pass__',
-        labelKey: 'ui.interactionSelectTriggerPass',
-        disabled: true,
-      },
-    ])
+    expect(evaluation.options.map((option) => option.value)).not.toContain('SilentCard')
   })
 
   it('keeps pass enabled for optional mutation-only stage activations', () => {

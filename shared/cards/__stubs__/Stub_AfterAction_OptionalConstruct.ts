@@ -1,5 +1,5 @@
 import type { CardListenerRegistration } from '../card-listeners'
-import { incCounter } from './helpers'
+import { observe } from './helpers'
 
 const CARD_ID = 'Stub_AfterAction_OptionalConstruct'
 
@@ -9,7 +9,7 @@ export const listener: CardListenerRegistration = {
   phases: ['after'],
   actions: ['plow'],
   handler: (context) => {
-    incCounter(context.player, CARD_ID, 'observedCount')
+    observe(context.player, CARD_ID)
     return {
       flow: { type: 'leaf', actionId: 'construct', optional: true, promptKey: 'ui.optionalBuildRoom' },
       sourceCard: CARD_ID,

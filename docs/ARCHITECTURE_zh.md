@@ -844,6 +844,15 @@ OA 对齐规则：
 - E148 opponent-scope listener 用 owner-targeted `special-effect` 更新 reserved action spaces / stable；"无空地但需要移除 marker" 这种无收益状态同步可返回 `countCardUse: false`，避免把纯清理计入卡牌 used stats。
 - `countCardUse: false` 只用于 listener 结果需要执行 housekeeping flow、但不应被视为卡牌效果触发的场景；不要用它隐藏真实收益或玩家选择。
 
+**2026-09-16 Listener 纯度门禁：上述不变量已可执行。** `shared/cards/card-listeners.ts` 的 `executeCardListener` 与 `invokeCardCostCandidateTransform` 把每次 handler / `deriveCardCostCandidate` 调用都经过可选的 `CardListenerInvocationInterceptor`；生产环境不设置。所有能触发 listener dispatch 的 Vitest project（`fast-shared`、`fast-cards`、`fast-card-runtime`、`fast-server`、`fast-tests`、`slow`）通过 `setup-listener-purity.ts` 安装 `shared/cards/__tests__/listener-purity-guard.ts`：
+
+- 单次调用期间，guard 把 `state`、`player`、`triggerPlayer`、`ownerPlayer`、`effectPlayer`、`space`、`actionContext`、`params`、`result`、`transactionEvents`、`actionEvents`、`triggerSnapshot`、`extraData` 以深层只读 Proxy 交给 listener。任何赋值、`delete`、`defineProperty`、原型修改、freeze 或数组修改——无论直接、经别名还是在 helper 内部——都会抛出 `ListenerPurityViolationError`，指明卡牌、listener、调用类型、phase、action 与属性路径。抛错前权威值不会被写入，`GameCore` 命令结算会回滚该命令。
+- 返回结果若仍引用受保护对象（例如把 live `cardStates` 过滤后的数组直接作为 `set-extra-data` 的 value），属于 `returned-authoritative-reference` 违规；listener 必须返回副本。
+- Proxy 只存在于该次调用。listener 自己新建的对象不会被包裹，返回的 flow 之后仍可通过 action leaf 修改状态。嵌套的 `executeCardListener` 调用复用外层 Proxy。受保护输入与 listener 外部捕获对象之间的引用同一性不成立；engine 测试用 `resolveAuthoritative`。
+- trigger-select preview 不再把 preview clone 被修改视为 card listener 的适用信号，适用性只来自返回结果。stage card-effect handler 仍对 clone 执行，不在本门禁范围。工坊自定义 listener 在 isolate 内对序列化 context 执行，无法触及权威对象，但同样经过 interceptor。
+- 定点 listener 测试调用 `invokeListenerHandlerUnderGuard` 或用 `guardedListener` 包装 registration，而不是直接调 `registration.handler`，因此 `listener-purity-wave*.test.ts` 与新增单卡测试共用同一 guard，不维护手工 listener 清单。`shared/cards/__stubs__` 的 listener stub 在测试侧 ledger 记录观测，效果以返回 leaf 表达。
+- 覆盖边界：运行时 guard 只证明被执行到的分支。`pnpm run check:card-impl-boundaries` 作为补充，解析 `ALL_CARD_IMPLS` 中每个 handler 与 `deriveCardCostCandidate` 的函数体，对根为 context 参数的显式写入失败，包括同函数内的别名、`??` / `||` / 三元回退、`.find()` 结果、`for...of` 变量和数组回调参数；不跟踪 helper 或跨文件调用。没有例外清单；需要修改状态的 listener 必须把写入迁到 action leaf。
+
 **多 reaction 同 phase 触发**采用 PARALLEL trigger selection：
 
 - action reaction listener、harvest field stage card-effect、before-end card-effect 在同一 owner / phase 下默认进入 `ParallelNode(mode='trigger-select')`。不同 owner 的同一时机 reaction 拆成各自 owner 的 activation/prompt；单 child 可直接展开以减少 UI 噪音；compute / query hook 保持确定性聚合。
@@ -1516,7 +1525,7 @@ GameContextRouter
 
 #### 架构 fitness 覆盖矩阵
 
-`pnpm run check:architecture` 执行架构脚本、契约类型检查、通过 `check:architecture-tests` 运行的现有契约测试，以及 strict 沙盒 prompt/文档同步检查。契约测试覆盖 effect、资源事实来源、事件映射、交互命令、Card Source、PromptKey、LLM prompt 渲染契约和 CI 接线。这些测试保留既有 Vitest project 归属，也会在 `pnpm test` / `pnpm test:fast` 中运行。Bundle 体积预算仍在构建后单独检查；浏览器依赖隔离由架构入口自身保证。
+`pnpm run check:architecture` 执行架构脚本、契约类型检查、通过 `check:architecture-tests` 运行的现有契约测试，以及 strict 沙盒 prompt/文档同步检查。契约测试覆盖 effect、资源事实来源、事件映射、交互命令、Card Source、PromptKey、LLM prompt 渲染契约、CI 接线，以及 listener 纯度 guard（正负例加两人 Session）。这些测试保留既有 Vitest project 归属，也会在 `pnpm test` / `pnpm test:fast` 中运行。Bundle 体积预算仍在构建后单独检查；浏览器依赖隔离由架构入口自身保证。
 
 | 约束 | 可执行覆盖 | 边界 |
 |---|---|---|
@@ -1527,7 +1536,7 @@ GameContextRouter
 | 架构类型契约 | `pnpm run check:architecture-types` | `tsconfig.architecture.json` 对策略与检查器测试执行真正的 no-emit 类型检查，包括正反类型断言；Vitest 运行成功不等于类型通过。 |
 | 扫描完整性 | no-DSL、test-project coverage、Card Source 与 field-boundary 检查 | 根目录和语法必须有效；源码声明与全部已注册实现独立比对，支持 major 文件多声明。Parents 保持独立的元数据/运行时模型。 |
 | trailing listener snapshot | `pnpm run check:card-impl-boundaries` | 从解析后的 `ALL_CARD_IMPLS` 枚举 handler，其 ID 必须覆盖所有声明了 `impl` 的生产 Card Source。`during`、`immediatelyAfter`、`after` 中直接读取 `improvements` / `minorPlayed` / `occupationPlayed` 长度会失败；非 trailing 读取和 membership 检查仍允许。门禁只解析实际 handler 函数体，不跟踪 helper 调用或派生值。runtime scope 为空、不完整或无法解析时失败；runtime 诊断只标识卡牌与 listener，不伪造原始源码行号。 |
-| listener 状态纯净 | 行为测试与代码评审 | handler 必须保持 state-pure flow builder，但不声称存在全程序 TypeScript mutation proof；`check:card-impl-boundaries` 不执行该约束。 |
+| listener 状态纯净 | 所有会 dispatch listener 的 Vitest project 由 setup 安装的运行时 guard，加 `pnpm run check:card-impl-boundaries` | guard 用深层只读 Proxy 包裹每次 `executeCardListener` / `invokeCardCostCandidateTransform` 调用，任何写入或返回 live 引用都失败；只证明被执行的分支。静态扫描解析每个已解析 handler 与 cost-candidate transform，对根为 context 参数的显式写入失败，仅跟踪同函数别名。两者都不跟踪跨文件数据流，不声称全程序 mutation proof。契约测试：`shared/cards/__tests__/listener-purity-guard.test.ts`、`server/__tests__/listener-purity-gate-session.test.ts`。 |
 | 生成目录与 Card Source 一致 | `pnpm run check:generated-cards-sync` | 结构化校验 source/catalog 相等，不硬编码卡牌数量。 |
 | `GameSession` 持有服务端命令边界 | `CONTEXT.md`、ADR-0014、review、三层 import error | 这是 ownership，不表示只有一个源文件包含赋值；不声称完成 whole-program mutation proof。 |
 | canonical 架构接线 | `pnpm run check:architecture` + `scripts/__tests__/ci-card-impl-boundaries.test.ts` | 两份 CI workflow 仅手动触发且各调用一次 aggregator；当前合入证据来自可信本机全量 CI。 |

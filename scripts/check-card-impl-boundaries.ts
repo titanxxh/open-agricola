@@ -5,6 +5,7 @@ import { fileURLToPath } from 'node:url'
 import ts from 'typescript'
 import { walkSourceFiles, parseSource } from './source-files'
 import { isTestFile } from './architecture-policy.mjs'
+import { collectListenerMutationFindings, parseListenerFunction } from './listener-mutation-scan'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
@@ -15,7 +16,7 @@ export type CardImplBoundaryViolation = {
   line?: number
   cardId: string
   referencedCardId?: string
-  kind?: 'cross-card-reference' | 'trailing-live-played-count' | 'direct-field-storage'
+  kind?: 'cross-card-reference' | 'trailing-live-played-count' | 'direct-field-storage' | 'listener-state-mutation'
   message?: string
 }
 
@@ -65,6 +66,7 @@ export type CardImplBoundaryResult = {
   cardSourcesChecked: number
   listenerHandlersChecked: number
   trailingListenerHandlersChecked: number
+  listenerFunctionsMutationScanned: number
   scopeErrors: string[]
 }
 
@@ -79,6 +81,7 @@ export type RuntimeCardImpl = {
     id: string
     phases?: readonly string[]
     handler?: unknown
+    deriveCardCostCandidate?: unknown
   }[]
 }
 
@@ -290,6 +293,23 @@ function collectTrailingPlayedCountViolations(
   return violations
 }
 
+function collectListenerStateMutationViolations(
+  fn: unknown,
+  file: string,
+  cardId: string,
+  listenerId: string,
+  role: 'handler' | 'deriveCardCostCandidate',
+): CardImplBoundaryViolation[] | null {
+  const parsed = parseListenerFunction(fn, file)
+  if (!parsed) return null
+  return collectListenerMutationFindings(parsed).map((finding) => ({
+    file,
+    cardId,
+    kind: 'listener-state-mutation' as const,
+    message: `listener ${listenerId} ${role} writes authoritative state (${finding.kind}): ${finding.text}`,
+  }))
+}
+
 function isInsidePublicPlayedMembershipCheck(node: ts.Node): boolean {
   let cur: ts.Node | undefined = node.parent
   while (cur) {
@@ -329,6 +349,7 @@ export function checkCardImplBoundaries(
   let cardSourcesChecked = 0
   let listenerHandlersChecked = 0
   let trailingListenerHandlersChecked = 0
+  let listenerFunctionsMutationScanned = 0
   const cardImplSourceIds = new Set<string>()
   for (const file of files) {
     const sourceFile = parseSource(file)
@@ -410,6 +431,16 @@ export function checkCardImplBoundaries(
     }
     for (const card of runtimeCards) {
       for (const listener of card.listeners ?? []) {
+        for (const [role, fn] of [['handler', listener.handler], ['deriveCardCostCandidate', listener.deriveCardCostCandidate]] as const) {
+          if (typeof fn !== 'function') continue
+          const mutationViolations = collectListenerStateMutationViolations(fn, card.file, card.cardId, listener.id, role)
+          if (!mutationViolations) {
+            scopeErrors.push(`cannot parse listener ${role} ${card.cardId}:${listener.id}`)
+            continue
+          }
+          listenerFunctionsMutationScanned += 1
+          violations.push(...mutationViolations)
+        }
         if (typeof listener.handler !== 'function') continue
         listenerHandlersChecked += 1
         if (listener.phases && !listener.phases.some((phase) => TRAILING_PHASES.has(phase))) continue
@@ -433,6 +464,9 @@ export function checkCardImplBoundaries(
     if (runtimeCards.length > 0 && trailingListenerHandlersChecked === 0) {
       scopeErrors.push('no trailing card listener handlers scanned')
     }
+    if (runtimeCards.length > 0 && listenerFunctionsMutationScanned === 0) {
+      scopeErrors.push('no card listener functions scanned for state mutation')
+    }
   }
   return {
     violations,
@@ -440,6 +474,7 @@ export function checkCardImplBoundaries(
     cardSourcesChecked,
     listenerHandlersChecked,
     trailingListenerHandlersChecked,
+    listenerFunctionsMutationScanned,
     scopeErrors,
   }
 }
@@ -485,7 +520,14 @@ async function runCli(): Promise<void> {
     visit(parseSource(file))
   }
   const runtimeCards = Object.entries(ALL_CARD_IMPLS).map(([cardId, impl]): RuntimeCardImpl => ({
-    cardId, file: sourceFilesById.get(cardId) ?? cardId, listeners: impl.listeners,
+    cardId,
+    file: sourceFilesById.get(cardId) ?? cardId,
+    listeners: impl.listeners?.map((listener) => ({
+      id: listener.id,
+      phases: listener.phases,
+      handler: listener.handler,
+      deriveCardCostCandidate: listener.deriveCardCostCandidate,
+    })),
   }))
   const result = checkCardImplBoundaries(files, runtimeCards)
   if (fieldBoundaryFiles.length === 0) result.scopeErrors.push('no production field-boundary files scanned')
@@ -499,7 +541,8 @@ async function runCli(): Promise<void> {
     console.log(
       `[check-card-impl-boundaries] checked ${result.filesChecked} Card Sources, `
       + `${fieldBoundaryFiles.length} field-boundary files, ${result.listenerHandlersChecked} listeners, `
-      + `${result.trailingListenerHandlersChecked} trailing listeners; `
+      + `${result.trailingListenerHandlersChecked} trailing listeners, `
+      + `${result.listenerFunctionsMutationScanned} listener functions for state mutation; `
       + 'no boundary violations found',
     )
     process.exit(0)

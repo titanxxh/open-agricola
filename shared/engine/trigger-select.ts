@@ -49,16 +49,6 @@ export const TRIGGER_DISABLED_REASON = 'ui.interactionTriggerUnavailable'
 const cloneJson = <T>(value: T): T =>
   JSON.parse(JSON.stringify(value)) as T
 
-const previewSnapshot = (
-  state: ActionExecutionContext['state'],
-  player: PlayerState,
-): string => JSON.stringify({ state, player })
-
-const mutationOnlyTriggerResult = (sourceCard: string): ActionHookResult => ({
-  sourceCard,
-  extraData: { previewMutation: true },
-})
-
 const clonePlayerForPreview = (player: PlayerState): PlayerState => ({
   ...player,
   resources: { ...player.resources },
@@ -361,16 +351,13 @@ export const evaluateTriggerSelect = (
       ? (() => {
         previewState = preview.previewState
         previewPlayer = preview.effectPlayer
-        const before = previewSnapshot(preview.previewState, preview.effectPlayer)
-        const listenerResult = executeCardListener(listener, preview.listenerContext, {
+        // Card listeners are state-pure flow builders: applicability comes only
+        // from the returned result, never from a mutation of the preview clone.
+        return executeCardListener(listener, preview.listenerContext, {
           ownerPlayerId: preview.ownerPlayerId,
           ownerCardId: entry.cardId,
           ownerCardZone: preview.ownerCardZone,
         })
-        if (!listenerResult && previewSnapshot(preview.previewState, preview.effectPlayer) !== before) {
-          return mutationOnlyTriggerResult(entry.cardId)
-        }
-        return listenerResult
       })()
       : isActivateCardEffectNode(child)
         ? (() => {

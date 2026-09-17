@@ -57,7 +57,9 @@ const afterOwnerUsesAttachedSpace: CardListenerRegistration = {
     const attachments = getActionSpaceAttachments(context.player, CARD_ID)
     const attachment = attachments.find((entry) => entry.spaceId === spaceId)
     if (!attachment) return
-    const remaining = attachments.filter((entry) => entry.spaceId !== spaceId)
+    const remaining = attachments
+      .filter((entry) => entry.spaceId !== spaceId)
+      .map((entry) => ({ spaceId: entry.spaceId, resources: { ...entry.resources } }))
     return {
       flow: {
         type: 'seq',
