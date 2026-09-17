@@ -175,11 +175,41 @@ const collectBindingNames = (name: ts.BindingName, out: string[]): void => {
   }
 }
 
+const sourceRoots = new WeakMap<ts.SourceFile, string>()
+const sourceCheckers = new WeakMap<ts.SourceFile, ts.TypeChecker>()
+
+const resolvedModule = (specifier: string, sourceFile: ts.SourceFile): string | null => {
+  const root = sourceRoots.get(sourceFile)
+  if (!root || !specifier.startsWith('.')) return null
+  return path.relative(root, path.resolve(path.dirname(sourceFile.fileName), specifier))
+    .replaceAll(path.sep, '/').replace(sourceExtensions, '')
+}
+
 const isLogCacheModule = (specifier: string, sourceFile: ts.SourceFile): boolean =>
-  specifier.startsWith('.')
-  && /\/shared\/events(?:\/(?:index|log-cache))?$/.test(
-    path.resolve(path.dirname(sourceFile.fileName), specifier).replaceAll(path.sep, '/').replace(sourceExtensions, ''),
-  )
+  ['shared/events', 'shared/events/index', 'shared/events/log-cache'].includes(resolvedModule(specifier, sourceFile) ?? '')
+
+const sourceChecker = (sourceFile: ts.SourceFile): ts.TypeChecker => {
+  let checker = sourceCheckers.get(sourceFile)
+  if (!checker) {
+    const options = { noResolve: true, noLib: true }
+    const host = ts.createCompilerHost(options)
+    host.getSourceFile = fileName => fileName === sourceFile.fileName ? sourceFile : undefined
+    checker = ts.createProgram([sourceFile.fileName], options, host).getTypeChecker()
+    sourceCheckers.set(sourceFile, checker)
+  }
+  return checker
+}
+
+const isCanonicalMapper = (expression: ts.Expression): boolean => {
+  const sourceFile = expression.getSourceFile()
+  const declarations = sourceChecker(sourceFile).getSymbolAtLocation(unwrapExpression(expression))?.declarations
+  return declarations?.some(declaration => {
+    if (!ts.isImportSpecifier(declaration) || (declaration.propertyName ?? declaration.name).text !== 'eventsToLogEntries') return false
+    const imported = declaration.parent.parent.parent
+    return ts.isImportDeclaration(imported) && ts.isStringLiteralLike(imported.moduleSpecifier)
+      && resolvedModule(imported.moduleSpecifier.text, sourceFile) === 'shared/events/log-mapper'
+  }) ?? false
+}
 
 const requiredModule = (expression: ts.Expression): string | null => {
   const current = unwrapExpression(expression)
@@ -196,10 +226,7 @@ const isLogCacheNamespace = (expression: ts.Expression, namespaces: ReadonlySet<
 }
 
 const isLogStoreModule = (specifier: string, sourceFile: ts.SourceFile): boolean =>
-  specifier.startsWith('.')
-  && /\/shared\/engine(?:\/(?:index|log-store))?$/.test(
-    path.resolve(path.dirname(sourceFile.fileName), specifier).replaceAll(path.sep, '/').replace(sourceExtensions, ''),
-  )
+  ['shared/engine', 'shared/engine/index', 'shared/engine/log-store'].includes(resolvedModule(specifier, sourceFile) ?? '')
 
 const isLogStoreNamespace = (expression: ts.Expression, namespaces: ReadonlySet<string>): boolean => {
   const current = unwrapExpression(expression)
@@ -469,7 +496,8 @@ const findDerivedDeclaration = (
     if (node.getStart() >= before.getStart() || ts.isFunctionLike(node)) return
     if (ts.isVariableDeclaration(node) && ts.isIdentifier(node.name) && node.initializer) {
       const initializer = unwrapExpression(node.initializer)
-      if (ts.isCallExpression(initializer) && initializer.expression.getText() === callee) found = node
+      if (ts.isCallExpression(initializer)
+        && (callee === 'eventsToLogEntries' ? isCanonicalMapper(initializer.expression) : initializer.expression.getText() === callee)) found = node
     }
     ts.forEachChild(node, visit)
   }
@@ -483,13 +511,43 @@ const invocationTarget = (expression: ts.Expression): ts.Expression => {
   return receiver && ['call', 'apply'].includes(accessName(current) ?? '') ? invocationTarget(receiver) : current
 }
 
+type DerivedReference = 'array' | 'entry' | 'object'
+
 const hasDerivedMutation = (block: FunctionBlock, variableName: string): boolean => {
-  const aliases = new Set([variableName])
-  const isDerived = (expression: ts.Expression): boolean => {
+  const aliases = new Map<string, DerivedReference>([[variableName, 'array']])
+  const memberReference = (kind: DerivedReference | undefined, name: string | null): DerivedReference | undefined => {
+    if (kind === 'array') return name === 'length' ? undefined : 'entry'
+    if (kind === 'entry') return name === 'key' || name === 'playerId' ? undefined : 'object'
+    return kind === 'object' ? 'object' : undefined
+  }
+  const reference = (expression: ts.Expression): DerivedReference | undefined => {
     const current = unwrapExpression(expression)
-    if (ts.isIdentifier(current)) return aliases.has(current.text)
-    const receiver = accessReceiver(ts.isCallExpression(current) ? current.expression : current)
-    return !!receiver && isDerived(receiver)
+    if (ts.isIdentifier(current)) return aliases.get(current.text)
+    if (ts.isCallExpression(current)) {
+      const receiver = accessReceiver(current.expression)
+      if (!receiver || reference(receiver) !== 'array') return undefined
+      const method = accessName(current.expression) ?? ''
+      if (['at', 'find', 'pop', 'shift'].includes(method)) return 'entry'
+      if (['filter', 'slice', 'concat', 'toReversed', 'toSorted', 'with'].includes(method)) return 'array'
+      return undefined
+    }
+    const receiver = accessReceiver(current)
+    return receiver ? memberReference(reference(receiver), accessName(current)) : undefined
+  }
+  const isMutationTarget = (expression: ts.Expression): boolean => {
+    const current = unwrapExpression(expression)
+    if (ts.isIdentifier(current)) return current.text === variableName
+    const receiver = accessReceiver(current)
+    return !!receiver && reference(receiver) !== undefined
+  }
+  const bind = (name: ts.BindingName, kind: DerivedReference): void => {
+    if (ts.isIdentifier(name)) { aliases.set(name.text, kind); return }
+    for (const element of name.elements) {
+      if (ts.isOmittedExpression(element)) continue
+      const member = element.dotDotDotToken ? kind : memberReference(kind,
+        ts.isArrayBindingPattern(name) ? null : element.propertyName?.getText() ?? element.name.getText())
+      if (member) bind(element.name, member)
+    }
   }
   let mutated = false
   const visit = (node: ts.Node): void => {
@@ -498,29 +556,37 @@ const hasDerivedMutation = (block: FunctionBlock, variableName: string): boolean
       && node.operatorToken.kind >= ts.SyntaxKind.FirstAssignment
       && node.operatorToken.kind <= ts.SyntaxKind.LastAssignment) {
       const left = unwrapExpression(node.left)
-      if ((ts.isIdentifier(left) ? left.text === variableName : isDerived(left))) mutated = true
-      if (node.operatorToken.kind === ts.SyntaxKind.EqualsToken && isDerived(node.right)) {
-        if (ts.isIdentifier(left)) aliases.add(left.text)
+      if (isMutationTarget(left)) mutated = true
+      const kind = reference(node.right)
+      if (node.operatorToken.kind === ts.SyntaxKind.EqualsToken && kind) {
+        if (ts.isIdentifier(left)) aliases.set(left.text, kind)
         if (ts.isObjectLiteralExpression(left)) {
           for (const property of left.properties) {
-            if (ts.isShorthandPropertyAssignment(property)) aliases.add(property.name.text)
-            if (ts.isPropertyAssignment(property) && ts.isIdentifier(property.initializer)) aliases.add(property.initializer.text)
+            const member = property.name && memberReference(kind, propertyNameText(property.name))
+            if (!member) continue
+            if (ts.isShorthandPropertyAssignment(property)) aliases.set(property.name.text, member)
+            if (ts.isPropertyAssignment(property) && ts.isIdentifier(property.initializer)) aliases.set(property.initializer.text, member)
           }
         }
       }
     }
-    if (ts.isVariableDeclaration(node) && node.initializer && isDerived(node.initializer)) {
-      const names: string[] = []
-      collectBindingNames(node.name, names)
-      for (const name of names) aliases.add(name)
+    if (ts.isVariableDeclaration(node) && node.initializer) {
+      const kind = reference(node.initializer)
+      if (kind) bind(node.name, kind)
     }
-    if ((ts.isDeleteExpression(node) && isDerived(node.expression))
-      || ((ts.isPrefixUnaryExpression(node) || ts.isPostfixUnaryExpression(node)) && isDerived(node.operand))) mutated = true
+    if (ts.isForOfStatement(node) && reference(node.expression) === 'array' && ts.isVariableDeclarationList(node.initializer)) {
+      for (const declaration of node.initializer.declarations) bind(declaration.name, 'entry')
+    }
+    if ((ts.isDeleteExpression(node) && isMutationTarget(node.expression))
+      || ((ts.isPrefixUnaryExpression(node) || ts.isPostfixUnaryExpression(node))
+        && (node.operator === ts.SyntaxKind.PlusPlusToken || node.operator === ts.SyntaxKind.MinusMinusToken)
+        && isMutationTarget(node.operand))) mutated = true
     if (ts.isCallExpression(node)) {
       const target = invocationTarget(node.expression)
-      const receiver = accessReceiver(target)
-      if (receiver && LOG_MUTATORS.has(accessName(target) ?? '') && isDerived(receiver)) mutated = true
-      if (isObjectAssignCall(node) && node.arguments[0] && isDerived(node.arguments[0])) mutated = true
+      const receiver = ['call', 'apply'].includes(accessName(node.expression) ?? '')
+        ? node.arguments[0] : accessReceiver(target)
+      if (receiver && LOG_MUTATORS.has(accessName(target) ?? '') && reference(receiver)) mutated = true
+      if (isObjectAssignCall(node) && node.arguments[0] && reference(node.arguments[0])) mutated = true
     }
     ts.forEachChild(node, visit)
   }
@@ -592,6 +658,7 @@ const isAliasScope = (node: ts.Node): boolean =>
 const scanFile = (repoRoot: string, fullPath: string, hits: Set<LogExemption>): DirectSessionLogViolation[] => {
   const rel = path.relative(repoRoot, fullPath).replaceAll(path.sep, '/')
   const sourceFile = parseSource(fullPath)
+  sourceRoots.set(sourceFile, repoRoot)
   if (SKIP_FILE_PATTERNS.some((pattern) => pattern.test(rel))) return []
   const source = sourceFile.text
   const exemptions = logExemptions.filter(exemption => exemption.file === rel)
@@ -604,9 +671,11 @@ const scanFile = (repoRoot: string, fullPath: string, hits: Set<LogExemption>): 
     logCacheWriterNamespaces,
   } = collectImportedIdentifiers(sourceFile)
   const addViolation = (node: ts.Node, kind: DirectSessionLogViolationKind): void => {
+    let owner = node.parent
+    while (owner && !ts.isFunctionLike(owner)) owner = owner.parent
     const index = node.getStart(sourceFile)
     const match = exemptions.find(({ exemption, block }) =>
-      exemption.kind === kind && block && index >= block.start && index < block.end
+      exemption.kind === kind && block && owner === block.body.parent && index >= block.start && index < block.end
       && ((kind === 'state-log-write' && isAllowedStateLogWrite(node, sourceFile, block))
         || (kind === 'log-store-constructor' && isAllowedLogStoreConstructor(node, sourceFile))
         || (ts.isCallExpression(node)
@@ -766,35 +835,17 @@ const scanFile = (repoRoot: string, fullPath: string, hits: Set<LogExemption>): 
       && node.operatorToken.kind === ts.SyntaxKind.EqualsToken
       && ts.isIdentifier(unwrapExpression(node.left))) {
       const name = (unwrapExpression(node.left) as ts.Identifier).text
-      scopedCacheNamespaces.delete(name)
-      scopedStoreNamespaces.delete(name)
-      if (isLogCacheNamespace(node.right, scopedCacheNamespaces)) scopedCacheNamespaces.add(name)
-      if (isLogStoreNamespace(node.right, scopedStoreNamespaces)) scopedStoreNamespaces.add(name)
-      ;(scopedStateLogAliases as Set<string>).delete(name)
-      ;(scopedLogStoreAliases as Set<string>).delete(name)
-      ;(scopedLogCacheWriterAliases as Set<string>).delete(name)
-      ;(scopedLogStoreConstructorAliases as Set<string>).delete(name)
-      if (isStateLogExpression(node.right, scopedStateLikeNames)) {
-        ;(scopedStateLogAliases as Set<string>).add(name)
-      }
-      if (isStoreValue(node.right)) {
-        ;(scopedLogStoreAliases as Set<string>).add(name)
-      }
-      if (cacheWriterCallName(
-        node.right,
-        logCacheWriterNames,
-        scopedCacheNamespaces,
-        scopedLogCacheWriterAliases,
-      )) {
-        ;(scopedLogCacheWriterAliases as Set<string>).add(name)
-      }
-      if (isLogStoreConstructorAliasSource(
-        node.right,
-        logStoreClassNames,
-        scopedStoreNamespaces,
-        scopedLogStoreConstructorAliases,
-      )) {
-        ;(scopedLogStoreConstructorAliases as Set<string>).add(name)
+      const facts = [
+        [scopedCacheNamespaces, isLogCacheNamespace(node.right, scopedCacheNamespaces)],
+        [scopedStoreNamespaces, isLogStoreNamespace(node.right, scopedStoreNamespaces)],
+        [scopedStateLogAliases, isStateLogMutationTarget(node.right, scopedStateLikeNames, scopedStateLogAliases)],
+        [scopedLogStoreAliases, isStoreValue(node.right)],
+        [scopedLogCacheWriterAliases, !!cacheWriterCallName(node.right, logCacheWriterNames, scopedCacheNamespaces, scopedLogCacheWriterAliases)],
+        [scopedLogStoreConstructorAliases, isLogStoreConstructorAliasSource(node.right, logStoreClassNames, scopedStoreNamespaces, scopedLogStoreConstructorAliases)],
+      ] as const
+      for (const [aliases, sensitive] of facts) {
+        if (sensitive) (aliases as Set<string>).add(name)
+        else (aliases as Set<string>).delete(name)
       }
     }
 
@@ -849,7 +900,8 @@ const scanFile = (repoRoot: string, fullPath: string, hits: Set<LogExemption>): 
     if (ts.isCallExpression(node)) {
       const target = invocationTarget(node.expression)
       const calleeName = accessName(target)
-      const receiver = accessReceiver(target)
+      const receiver = ['call', 'apply'].includes(accessName(node.expression) ?? '')
+        ? node.arguments[0] : accessReceiver(target)
       if (calleeName
         && LOG_MUTATORS.has(calleeName)
         && receiver

@@ -176,6 +176,13 @@ describe('check-direct-session-log', () => {
     ])
   })
 
+  it.each(['let count = entries.length; count--', 'let key = entries[index]!.key; key += "suffix"'])('allows scalar locals derived from entries: %s', (operation) => {
+    const root = createRepoFixture()
+    const file = 'shared/events/log-cache.ts'
+    writeFixture(root, file, readFileSync(path.join(root, file), 'utf8').replace('state.log.unshift', `${operation}; state.log.unshift`))
+    expect(findDirectSessionLogViolations(root)).toEqual([])
+  })
+
   it.each([
     "const { prependDerivedLogEntries: writeLog } = require('../shared/events/log-cache'); writeLog(state, entries)",
     "const cache = require('../shared/events/log-cache.js'); cache.prependDerivedLogEntries(state, entries)",
@@ -196,6 +203,8 @@ describe('check-direct-session-log', () => {
     "const cache = require('../shared/events/log-cache'); for (let cache of []) {} cache.prependDerivedLogEntries(state, entries)",
     "const cache = require('../shared/events/log-cache'); for (let cache = 0; cache < 1; cache++) {} cache.prependDerivedLogEntries(state, entries)",
     "const cache = require('../shared/events/log-cache'); for (let cache in {}) {} cache.prependDerivedLogEntries(state, entries)",
+    "let cache = require('../shared/events/log-cache'); cache = cache; cache.prependDerivedLogEntries(state, entries)",
+    "let write = require('../shared/events/log-cache').prependDerivedLogEntries; write = write; write(state, entries)",
   ])('rejects CommonJS cache writer imports: %s', (source) => {
     const root = createRepoFixture()
     writeFixture(root, 'server/bad.cjs', source)
@@ -253,6 +262,9 @@ describe('check-direct-session-log', () => {
     "const cache = require('./misc/log-cache'); cache.prependDerivedLogEntries(state, entries)",
     "import * as cache from './misc/log-cache'; cache.prependDerivedLogEntries(state, entries)",
     "import { prependDerivedLogEntries } from './misc/log-cache'; prependDerivedLogEntries(state, entries)",
+    "const cache = require('./vendor/shared/events'); cache.prependDerivedLogEntries(state, entries)",
+    "const engine = require('./vendor/shared/engine'); new engine.LogStore()",
+    "const cache = require('../../external/shared/events'); cache.prependDerivedLogEntries(state, entries)",
   ])('keeps unrelated cache modules valid: %s', (source) => {
     const root = createRepoFixture()
     writeFixture(root, 'server/safe.ts', source)
@@ -273,6 +285,38 @@ describe('check-direct-session-log', () => {
     writeFixture(root, 'server/bad.js', `int.log.append.${operation}`)
     expect(findDirectSessionLogViolations(root)).toEqual([
       expect.objectContaining({ file: 'server/bad.js', kind: 'log-store-append' }),
+    ])
+  })
+
+  it.each(['Array.prototype.push.call(state.log, entry)', 'Array.prototype.splice.apply(state.log, [0, 0, entry])'])('rejects borrowed array mutation: %s', (source) => {
+    const root = createRepoFixture()
+    writeFixture(root, 'server/bad.js', source)
+    expect(findDirectSessionLogViolations(root)).toEqual([expect.objectContaining({ kind: 'state-log-write' })])
+  })
+
+  it('does not extend named exemptions into nested functions', () => {
+    const root = createRepoFixture()
+    const file = 'shared/events/append.ts'
+    writeFixture(root, file, readFileSync(path.join(root, file), 'utf8').replace(
+      'prependDerivedLogEntries(state, entries)',
+      'function writeOther(state: any) { prependDerivedLogEntries(state, entries) }; writeOther(otherState)',
+    ))
+    expect(findDirectSessionLogViolations(root)).toEqual([
+      expect.objectContaining({ file, kind: 'log-cache-writer-call' }),
+      expect.objectContaining({ file, kind: 'stale-exemption' }),
+    ])
+  })
+
+  it.each([
+    'const eventsToLogEntries = () => [{ key: "forged" }]',
+    'function eventsToLogEntries() { return [{ key: "forged" }] }',
+  ])('rejects shadowed mapper provenance: %s', (declaration) => {
+    const root = createRepoFixture()
+    const file = 'shared/engine/engine-proceed.ts'
+    writeFixture(root, file, readFileSync(path.join(root, file), 'utf8').replace('  const entries:', `  ${declaration}; const entries:`))
+    expect(findDirectSessionLogViolations(root)).toEqual([
+      expect.objectContaining({ file, kind: 'log-store-append' }),
+      expect.objectContaining({ file, kind: 'stale-exemption' }),
     ])
   })
 
