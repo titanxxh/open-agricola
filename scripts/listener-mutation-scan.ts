@@ -6,9 +6,10 @@ import ts from 'typescript'
  * Scans one resolved card-listener function body for explicit writes whose
  * target chain is rooted in the listener's context parameter: assignments
  * (including compound assignment), `delete`, `++`/`--`, mutating array
- * methods, and `Object.assign` / `Object.defineProperty` / `Object.freeze`
- * style calls. Local aliases declared from context chains (`const p =
- * ctx.player`, destructuring, `??` / `||` / ternary fallbacks, `.find()`
+ * methods, and `Object.assign` / `Object.defineProperty` / `Object.freeze` /
+ * `Reflect.set` style calls. Local aliases declared from context chains
+ * (`const p = ctx.player`, destructuring, `??` / `||` / ternary fallbacks,
+ * `.find()` results, `Object.values()` / `Object.getOwnPropertyDescriptor()`
  * results, `for...of` variables and array callback parameters) are followed
  * inside the same function. It does not follow calls into other functions or
  * files; runtime coverage owns those paths.
@@ -28,15 +29,25 @@ export const LISTENER_CONTEXT_STATE_KEYS = new Set([
   'actionEvents',
   'triggerSnapshot',
   'extraData',
+  'eventQuery',
 ])
 
 const MUTATING_ARRAY_METHODS = new Set(['push', 'pop', 'shift', 'unshift', 'splice', 'sort', 'reverse', 'fill', 'copyWithin'])
-const MUTATING_OBJECT_STATICS = new Set(['assign', 'defineProperty', 'defineProperties', 'setPrototypeOf', 'freeze', 'seal', 'preventExtensions'])
+const MUTATING_STATICS: Record<string, ReadonlySet<string>> = {
+  Object: new Set(['assign', 'defineProperty', 'defineProperties', 'setPrototypeOf', 'freeze', 'seal', 'preventExtensions']),
+  Reflect: new Set(['set', 'deleteProperty', 'defineProperty', 'setPrototypeOf', 'preventExtensions']),
+}
+/** Method calls whose result still refers into the receiver (so the chain root is preserved). */
 const PASSTHROUGH_CALLS = new Set(['find', 'findLast', 'at'])
+/** Static calls whose result still refers into their first argument. */
+const PASSTHROUGH_STATICS: Record<string, ReadonlySet<string>> = {
+  Object: new Set(['values', 'entries', 'getOwnPropertyDescriptor', 'getOwnPropertyDescriptors']),
+  Reflect: new Set(['get', 'getOwnPropertyDescriptor']),
+}
 const ELEMENT_CALLBACK_METHODS = new Set(['forEach', 'map', 'filter', 'find', 'findLast', 'some', 'every', 'flatMap', 'reduce'])
 
 export type ListenerMutationFinding = {
-  kind: 'assign' | 'delete' | 'update' | `array.${string}` | `Object.${string}`
+  kind: 'assign' | 'delete' | 'update' | `array.${string}` | `Object.${string}` | `Reflect.${string}`
   text: string
 }
 
@@ -52,6 +63,15 @@ const unwrap = (node: ts.Expression): ts.Expression => {
     cur = cur.expression
   }
   return cur
+}
+
+/** Returns `Namespace.method` when `callee` is a listed static call such as `Object.assign`. */
+const staticCallName = (callee: ts.Expression, table: Record<string, ReadonlySet<string>>): string | null => {
+  if (!ts.isPropertyAccessExpression(callee)) return null
+  const receiver = unwrap(callee.expression)
+  if (!ts.isIdentifier(receiver)) return null
+  const methods = table[receiver.text]
+  return methods?.has(callee.name.text) ? `${receiver.text}.${callee.name.text}` : null
 }
 
 /** Parses a runtime function through `Function.prototype.toString`. */
@@ -105,6 +125,11 @@ const chainRoot = (expression: ts.Expression): ts.Identifier | null => {
       const callee = unwrap(cur.expression)
       if (ts.isPropertyAccessExpression(callee) && PASSTHROUGH_CALLS.has(callee.name.text)) {
         cur = unwrap(callee.expression)
+        continue
+      }
+      const passthroughStatic = staticCallName(callee, PASSTHROUGH_STATICS)
+      if (passthroughStatic && cur.arguments[0]) {
+        cur = unwrap(cur.arguments[0])
         continue
       }
       return null
@@ -221,15 +246,9 @@ export function collectListenerMutationFindings(fn: ts.FunctionLikeDeclaration):
         if (MUTATING_ARRAY_METHODS.has(callee.name.text) && isAuthoritative(callee.expression)) {
           report(`array.${callee.name.text}`, node)
         }
-        const receiver = unwrap(callee.expression)
-        if (
-          ts.isIdentifier(receiver)
-          && receiver.text === 'Object'
-          && MUTATING_OBJECT_STATICS.has(callee.name.text)
-          && node.arguments[0]
-          && isAuthoritative(node.arguments[0])
-        ) {
-          report(`Object.${callee.name.text}`, node)
+        const mutatingStatic = staticCallName(callee, MUTATING_STATICS)
+        if (mutatingStatic && node.arguments[0] && isAuthoritative(node.arguments[0])) {
+          report(mutatingStatic as ListenerMutationFinding['kind'], node)
         }
       }
     }

@@ -519,6 +519,7 @@ describe('listener state mutation scan', () => {
     ownerPlayer?: Ctx['player']
     space: { id: string; resources: Record<string, number> }
     actionContext?: Record<string, unknown>
+    eventQuery: { find: (type: string) => { resources: Record<string, number> } }
   }
 
   const scan = (fn: unknown, role: 'handler' | 'deriveCardCostCandidate' = 'handler') => {
@@ -559,6 +560,11 @@ describe('listener state mutation scan', () => {
     ['forEach callback element', (ctx) => { ctx.state.players.forEach((entry) => { entry.minorPlayed.length = 0 }) }],
     ['destructured parameter', ({ player }) => { player.resources.wood = 3 }],
     ['action context write', (ctx) => { ctx.actionContext!.skipBeforeTriggers = true }],
+    ['event reached through eventQuery', ({ eventQuery }) => { eventQuery.find('resource.moved').resources.wood = 0 }],
+    ['value reached through a property descriptor', (ctx) => { (Object.getOwnPropertyDescriptor(ctx.state, 'players')!.value as unknown[]).push('x') }],
+    ['element reached through Object.values', (ctx) => { Object.values(ctx.player.cardStates).forEach((entry) => { entry.counters = {} }) }],
+    ['Reflect.set', (ctx) => { Reflect.set(ctx.player.resources, 'wood', 0) }],
+    ['Reflect.deleteProperty on a descriptor value', (ctx) => { Reflect.deleteProperty(Reflect.get(ctx.player, 'cardStates') as object, 'A001_Shelter') }],
   ])('reports %s', (_label, fn) => {
     const messages = mutationMessages(fn)
     expect(messages).toHaveLength(1)

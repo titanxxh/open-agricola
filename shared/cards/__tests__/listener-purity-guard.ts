@@ -7,17 +7,23 @@ import {
 } from '../card-listeners'
 import { getCardListenerSource } from '../card-listener-source'
 import type { ActionHookResult } from '../../actions/hooks'
+import type { EventQuery } from '../../events/query'
 
 /**
  * Test-only listener purity guard.
  *
  * Installed through Vitest setup files, it wraps every card-listener
  * invocation that flows through `executeCardListener` /
- * `invokeCardCostCandidateTransform`. The authoritative inputs listed in
- * `GUARDED_CONTEXT_KEYS` are handed to the listener as deep read-only proxies:
- * any write (assignment, delete, defineProperty, array mutation, freeze) made
- * directly, through an alias, or inside a helper throws a
- * `ListenerPurityViolationError` naming the card, listener, phase and path.
+ * `invokeCardCostCandidateTransform`, and `guardCardImplListeners` rewrites the
+ * registered `handler` / `deriveCardCostCandidate` functions of every loaded
+ * Card Impl in place so direct `registration.handler(ctx)` calls in focused
+ * tests are guarded as well. The authoritative inputs listed in
+ * `GUARDED_CONTEXT_KEYS` are handed to the listener as deep read-only proxies
+ * (including values reached through property descriptors), and `eventQuery`
+ * results are wrapped the same way: any write (assignment, delete,
+ * defineProperty, array mutation, freeze) made directly, through an alias, or
+ * inside a helper throws a `ListenerPurityViolationError` naming the card,
+ * listener, phase and path.
  *
  * Boundaries: only executed listener branches are protected; the proxies exist
  * only for the duration of one invocation, so the flow a listener returns may
@@ -147,6 +153,13 @@ const createReadonlyWrapper = (identity: InvocationIdentity) => {
         if (typeof next === 'function') return next
         return wrap(next, propertyPath(path, key))
       },
+      getOwnPropertyDescriptor(target, key) {
+        const descriptor = Reflect.getOwnPropertyDescriptor(target, key)
+        if (!descriptor || !descriptor.configurable || !('value' in descriptor) || typeof descriptor.value === 'function') {
+          return descriptor
+        }
+        return { ...descriptor, value: wrap(descriptor.value, propertyPath(path, key)) }
+      },
       set(_target, key) {
         throw violation(identity, 'set', propertyPath(path, key))
       },
@@ -189,12 +202,32 @@ const assertNoAuthoritativeReferences = (
   }
 }
 
+type Wrapper = ReturnType<typeof createReadonlyWrapper>
+
+/** Returns an EventQuery whose results (and predicate arguments) are guarded proxies of the frame events. */
+const guardEventQuery = (query: EventQuery, wrap: Wrapper, path: string): EventQuery => {
+  const guardPredicate = <E>(predicate: ((event: E) => boolean) | undefined, method: string) =>
+    predicate ? (event: E) => predicate(wrap(event, `${path}.${method}()`)) : undefined
+  return {
+    has: (type, predicate) => query.has(type, guardPredicate(predicate, 'has')),
+    find: (type, predicate) => wrap(query.find(type, guardPredicate(predicate, 'find')), `${path}.find()`),
+    filter: (type, predicate) =>
+      query.filter(type, guardPredicate(predicate, 'filter')).map((event) => wrap(event, `${path}.filter()`)),
+  } as EventQuery
+}
+
 export const listenerPurityInterceptor: CardListenerInvocationInterceptor = (invocation, invoke) => {
+  // Already guarded by an enclosing invocation (nested executeCardListener, or a
+  // handler rewritten in place and then dispatched through executeCardListener).
+  if (isGuardedProxy(invocation.context.state)) return invoke(invocation.context)
   const identity = describeInvocation(invocation)
   const wrap = createReadonlyWrapper(identity)
   const guarded: Record<string, unknown> = { ...invocation.context }
   for (const key of GUARDED_CONTEXT_KEYS) {
     if (isObject(guarded[key])) guarded[key] = wrap(guarded[key], key)
+  }
+  if (invocation.context.eventQuery) {
+    guarded.eventQuery = guardEventQuery(invocation.context.eventQuery, wrap, 'eventQuery')
   }
   const result = invoke(guarded as unknown as CardListenerContext)
   assertNoAuthoritativeReferences(
@@ -231,3 +264,45 @@ export const guardedListener = (registration: CardListenerRegistration): CardLis
   registration.handler
     ? { ...registration, handler: (context) => invokeListenerHandlerUnderGuard(registration, context) }
     : registration
+
+const guardedInPlace = new WeakSet<CardListenerRegistration>()
+
+export const isListenerGuardedInPlace = (registration: CardListenerRegistration): boolean =>
+  guardedInPlace.has(registration)
+
+/**
+ * Rewrites `handler` and `deriveCardCostCandidate` on the registration itself so
+ * that direct calls such as `impl.listeners[0].handler(ctx)` in focused tests run
+ * under the guard without routing through `executeCardListener`.
+ */
+export const guardListenerRegistrationInPlace = (registration: CardListenerRegistration): void => {
+  if (guardedInPlace.has(registration)) return
+  guardedInPlace.add(registration)
+  const handler = registration.handler
+  if (handler) {
+    registration.handler = (context) =>
+      listenerPurityInterceptor({ kind: 'handler', registration, context }, (guardedContext) => handler(guardedContext))
+  }
+  const derive = registration.deriveCardCostCandidate
+  if (derive) {
+    registration.deriveCardCostCandidate = (context, candidate) =>
+      listenerPurityInterceptor(
+        { kind: 'deriveCardCostCandidate', registration, context, candidate },
+        (guardedContext) => derive(guardedContext, candidate),
+      )
+  }
+}
+
+/** Guards every listener of every loaded Card Impl in place (used by the register-all test setup). */
+export const guardCardImplListeners = (
+  impls: Record<string, { listeners?: readonly CardListenerRegistration[] }>,
+): number => {
+  let guarded = 0
+  for (const impl of Object.values(impls)) {
+    for (const listener of impl.listeners ?? []) {
+      guardListenerRegistrationInPlace(listener)
+      guarded += 1
+    }
+  }
+  return guarded
+}
