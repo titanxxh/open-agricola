@@ -1,7 +1,7 @@
-import fs from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import ts from 'typescript'
+import { parseSource, walkSourceFiles } from './source-files'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
@@ -10,6 +10,7 @@ export type DirectSessionLogViolationKind =
   | 'log-store-constructor'
   | 'log-store-append'
   | 'log-cache-writer-call'
+  | 'stale-exemption'
 
 export type DirectSessionLogViolation = {
   file: string
@@ -19,27 +20,43 @@ export type DirectSessionLogViolation = {
 }
 
 const SCAN_DIRS = ['shared', 'server', 'scripts']
-const SCAN_EXTS = new Set(['.ts', '.tsx'])
-const SKIP_DIRS = new Set(['node_modules', 'dist', '.git'])
 const SKIP_FILE_PATTERNS = [
   /^scripts\/check-direct-session-log\.ts$/,
   /^scripts\/__tests__\/check-direct-session-log\.test\.ts$/,
 ]
 
-const allowedLogStoreConstructorFiles = new Set([
-  'shared/session/session-core.ts',
-])
+const logExemptions = [
+  {
+    file: 'shared/session/session-core.ts', functionName: 'constructor', kind: 'log-store-constructor',
+    reason: 'GameCore owns the engine log store shared by its execution frames.',
+  },
+  {
+    file: 'shared/engine/engine.ts', functionName: 'flushEventTransaction', kind: 'log-store-append',
+    reason: 'Committed engine events are mapped into the session log store.',
+  },
+  {
+    file: 'shared/engine/engine-proceed.ts', functionName: 'appendDerivedLogsForEventOnlyResult', kind: 'log-store-append',
+    reason: 'Event-only proceed results contribute mapper-derived log entries.',
+  },
+  {
+    file: 'shared/engine/engine-resolve.ts', functionName: 'appendDerivedLogsForEventOnlyResult', kind: 'log-store-append',
+    reason: 'Event-only resolve results contribute mapper-derived log entries.',
+  },
+  {
+    file: 'shared/events/append.ts', functionName: 'appendImmediateEvents', kind: 'log-cache-writer-call',
+    reason: 'Immediate public events update the cache through mapper output.',
+  },
+  {
+    file: 'shared/session/session-core.ts', functionName: 'flushEngineLog', kind: 'log-cache-writer-call',
+    reason: 'The session flushes derived engine entries into its visible log cache.',
+  },
+  {
+    file: 'shared/events/log-cache.ts', functionName: 'prependDerivedLogEntries', kind: 'state-log-write',
+    reason: 'The cache writer prepends already-derived entries to GameState.log.',
+  },
+] as const
 
-const allowedLogAppendFunctionsByFile: Record<string, readonly string[]> = {
-  'shared/engine/engine.ts': ['flushEventTransaction'],
-  'shared/engine/engine-proceed.ts': ['appendDerivedLogsForEventOnlyResult'],
-  'shared/engine/engine-resolve.ts': ['appendDerivedLogsForEventOnlyResult'],
-}
-
-const allowedLogCacheWriterFunctionsByFile: Record<string, readonly string[]> = {
-  'shared/events/append.ts': ['appendImmediateEvents'],
-  'shared/session/session-core.ts': ['flushEngineLog'],
-}
+type LogExemption = typeof logExemptions[number]
 
 const MAPPER_ASSIGNMENT_SOURCE = String.raw`\b(?:const|let)\s+([A-Za-z_$][\w$]*)\s*(?::[^=]+)?=\s*eventsToLogEntries\s*\(`
 const mapperAssignmentRegex = (flags = ''): RegExp => new RegExp(MAPPER_ASSIGNMENT_SOURCE, flags)
@@ -50,19 +67,6 @@ type FunctionBlock = {
   source: string
 }
 
-const walkDir = (dir: string, repoRoot: string, out: string[]): void => {
-  if (!fs.existsSync(dir)) return
-  for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
-    if (SKIP_DIRS.has(entry.name)) continue
-    const full = path.join(dir, entry.name)
-    if (entry.isDirectory()) {
-      walkDir(full, repoRoot, out)
-      continue
-    }
-    if (SCAN_EXTS.has(path.extname(entry.name))) out.push(full)
-  }
-}
-
 const lineNumberForIndex = (source: string, index: number): number =>
   source.slice(0, index).split('\n').length
 
@@ -70,16 +74,15 @@ const lineText = (source: string, line: number): string =>
   source.split('\n')[line - 1]?.trim() ?? ''
 
 const allowedTestLogStoreConstructor = (file: string): boolean =>
-  file.includes('/__tests__/') || file.endsWith('.test.ts')
+  file.includes('/__tests__/') || /\.test\.[cm]?[jt]sx?$/.test(file)
 
 const allowedTestLogCacheWriterCall = (file: string): boolean =>
-  file.includes('/__tests__/') || file.endsWith('.test.ts')
+  file.includes('/__tests__/') || /\.test\.[cm]?[jt]sx?$/.test(file)
 
 const findFunctionBlock = (
-  source: string,
+  sourceFile: ts.SourceFile,
   functionName: string,
 ): FunctionBlock | null => {
-  const sourceFile = ts.createSourceFile('scan.ts', source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS)
   let block: FunctionBlock | null = null
   const fromBody = (body: ts.Block): FunctionBlock => ({
     start: body.getStart(sourceFile),
@@ -88,6 +91,10 @@ const findFunctionBlock = (
   })
   const visit = (node: ts.Node): void => {
     if (block) return
+    if (ts.isConstructorDeclaration(node) && functionName === 'constructor' && node.body) {
+      block = fromBody(node.body)
+      return
+    }
     if ((ts.isFunctionDeclaration(node) || ts.isMethodDeclaration(node))
       && node.name?.getText(sourceFile) === functionName
       && node.body) {
@@ -107,17 +114,6 @@ const findFunctionBlock = (
   }
   visit(sourceFile)
   return block
-}
-
-const allowedLogStoreAppendBlocks = (rel: string, source: string): FunctionBlock[] => {
-  const allowedFunctions = allowedLogAppendFunctionsByFile[rel]
-  if (!allowedFunctions) return []
-  return allowedFunctions.flatMap((functionName) => {
-    const block = findFunctionBlock(source, functionName)
-    if (!block) return []
-    const mapperAssignment = mapperAssignmentRegex().exec(block.source)
-    return mapperAssignment ? [block] : []
-  })
 }
 
 const escapedRegExp = (value: string): string =>
@@ -313,7 +309,7 @@ const isLogStoreExpression = (
   const receiver = accessReceiver(current)
   const unwrappedReceiver = receiver && unwrapExpression(receiver)
   return !!unwrappedReceiver
-    && (ts.isThis(unwrappedReceiver)
+    && (unwrappedReceiver.kind === ts.SyntaxKind.ThisKeyword
       || (ts.isIdentifier(unwrappedReceiver) && unwrappedReceiver.text === 'int'))
 }
 
@@ -322,9 +318,9 @@ const isLogStoreBindingSource = (
   propertyName: string,
 ): boolean => {
   const current = unwrapExpression(expression)
-  if (propertyName === 'engineLog') return ts.isThis(current)
+  if (propertyName === 'engineLog') return current.kind === ts.SyntaxKind.ThisKeyword
   return propertyName === 'log'
-    && (ts.isThis(current) || (ts.isIdentifier(current) && current.text === 'int'))
+    && (current.kind === ts.SyntaxKind.ThisKeyword || (ts.isIdentifier(current) && current.text === 'int'))
 }
 
 const isLogStoreConstructorExpression = (
@@ -444,7 +440,6 @@ const isObjectAssignStateLogWrite = (
 
 const isAllowedLogStoreAppend = (
   call: ts.CallExpression,
-  source: string,
   sourceFile: ts.SourceFile,
   blocks: readonly FunctionBlock[],
 ): boolean =>
@@ -467,60 +462,48 @@ const isAllowedLogStoreAppend = (
 const isAllowedLogCacheWriterCall = (
   rel: string,
   call: ts.CallExpression,
-  source: string,
   sourceFile: ts.SourceFile,
+  block: FunctionBlock,
 ): boolean => {
-  const allowedFunctions = allowedLogCacheWriterFunctionsByFile[rel]
-  if (!allowedFunctions) return false
-  return allowedFunctions.some((functionName) => {
-    const block = findFunctionBlock(source, functionName)
-    const matchIndex = call.expression.getStart(sourceFile)
-    if (!block || matchIndex < block.start || matchIndex >= block.end) return false
-    const localCallIndex = matchIndex - block.start
-    const logEntriesArg = call.arguments[1]?.getText(sourceFile).trim()
-    if (rel === 'shared/events/append.ts') {
-      const mapperAssignment = mapperAssignmentRegex().exec(block.source)
-      if (!mapperAssignment?.[1] || mapperAssignment.index >= localCallIndex) return false
-      const prefix = block.source.slice(
-        mapperAssignment.index + mapperAssignment[0].length,
-        localCallIndex,
-      )
-      return logEntriesArg === mapperAssignment[1]
-        && !mapperResultMutationPattern(mapperAssignment[1]).test(prefix)
-    }
-    if (rel === 'shared/session/session-core.ts') {
-      const entriesAssignment = /\bconst\s+entries\s*=\s*this\.engineLog\.all\s*\(\s*\)/.exec(block.source)
-      const toAddAssignment = /\bconst\s+toAdd\s*=\s*entries\.filter\s*\(/.exec(block.source)
-      if (!entriesAssignment || !toAddAssignment || toAddAssignment.index >= localCallIndex) return false
-      const entriesPrefix = block.source.slice(
-        entriesAssignment.index + entriesAssignment[0].length,
-        localCallIndex,
-      )
-      const prefix = block.source.slice(
-        toAddAssignment.index + toAddAssignment[0].length,
-        localCallIndex,
-      )
-      return logEntriesArg === 'toAdd'
-        && entriesAssignment.index < toAddAssignment.index
-        && !mapperResultMutationPattern('entries').test(entriesPrefix)
-        && !mapperResultMutationPattern('toAdd').test(prefix)
-    }
-    return false
-  })
+  const localCallIndex = call.expression.getStart(sourceFile) - block.start
+  const logEntriesArg = call.arguments[1]?.getText(sourceFile).trim()
+  if (rel === 'shared/events/append.ts') {
+    const mapperAssignment = mapperAssignmentRegex().exec(block.source)
+    if (!mapperAssignment?.[1] || mapperAssignment.index >= localCallIndex) return false
+    const prefix = block.source.slice(
+      mapperAssignment.index + mapperAssignment[0].length,
+      localCallIndex,
+    )
+    return logEntriesArg === mapperAssignment[1]
+      && !mapperResultMutationPattern(mapperAssignment[1]).test(prefix)
+  }
+  if (rel === 'shared/session/session-core.ts') {
+    const entriesAssignment = /\bconst\s+entries\s*=\s*this\.engineLog\.all\s*\(\s*\)/.exec(block.source)
+    const toAddAssignment = /\bconst\s+toAdd\s*=\s*entries\.filter\s*\(/.exec(block.source)
+    if (!entriesAssignment || !toAddAssignment || toAddAssignment.index >= localCallIndex) return false
+    const entriesPrefix = block.source.slice(
+      entriesAssignment.index + entriesAssignment[0].length,
+      localCallIndex,
+    )
+    const prefix = block.source.slice(
+      toAddAssignment.index + toAddAssignment[0].length,
+      localCallIndex,
+    )
+    return logEntriesArg === 'toAdd'
+      && entriesAssignment.index < toAddAssignment.index
+      && !mapperResultMutationPattern('entries').test(entriesPrefix)
+      && !mapperResultMutationPattern('toAdd').test(prefix)
+  }
+  return false
 }
 
-const isAllowedStateLogWrite = (rel: string, node: ts.Node, source: string, sourceFile: ts.SourceFile): boolean => {
-  if (rel !== 'shared/events/log-cache.ts') return false
-  const block = findFunctionBlock(source, 'prependDerivedLogEntries')
-  const index = node.getStart(sourceFile)
-  return !!block && index >= block.start && index < block.end
-}
-
-const scanFile = (repoRoot: string, fullPath: string): DirectSessionLogViolation[] => {
+const scanFile = (repoRoot: string, fullPath: string, hits: Set<LogExemption>): DirectSessionLogViolation[] => {
   const rel = path.relative(repoRoot, fullPath).replaceAll(path.sep, '/')
+  const sourceFile = parseSource(fullPath)
   if (SKIP_FILE_PATTERNS.some((pattern) => pattern.test(rel))) return []
-  const source = fs.readFileSync(fullPath, 'utf8')
-  const sourceFile = ts.createSourceFile(rel, source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS)
+  const source = sourceFile.text
+  const exemptions = logExemptions.filter(exemption => exemption.file === rel)
+    .map(exemption => ({ exemption, block: findFunctionBlock(sourceFile, exemption.functionName) }))
   const violations: DirectSessionLogViolation[] = []
   const {
     logStoreClassNames,
@@ -529,11 +512,22 @@ const scanFile = (repoRoot: string, fullPath: string): DirectSessionLogViolation
     logCacheWriterNamespaces,
   } = collectImportedIdentifiers(sourceFile)
   const addViolation = (node: ts.Node, kind: DirectSessionLogViolationKind): void => {
+    const index = node.getStart(sourceFile)
+    const match = exemptions.find(({ exemption, block }) =>
+      exemption.kind === kind && block && index >= block.start && index < block.end
+      && (kind === 'state-log-write' || kind === 'log-store-constructor'
+        || (ts.isCallExpression(node)
+          && (kind === 'log-store-append'
+            ? isAllowedLogStoreAppend(node, sourceFile, [block])
+            : isAllowedLogCacheWriterCall(rel, node, sourceFile, block)))))
+    if (match) {
+      hits.add(match.exemption)
+      return
+    }
     const line = lineNumberForIndex(source, node.getStart(sourceFile))
     violations.push({ file: rel, line, kind, text: lineText(source, line) })
   }
 
-  const allowedBlocks = allowedLogStoreAppendBlocks(rel, source)
   const visit = (
     node: ts.Node,
     stateLikeNames: ReadonlySet<string>,
@@ -559,10 +553,10 @@ const scanFile = (repoRoot: string, fullPath: string): DirectSessionLogViolation
           collectBindingNames(parameter.name, names)
           for (const name of names) {
             ;(scopedStateLikeNames as Set<string>).delete(name)
-            scopedStateLogAliases.delete(name)
-            scopedLogStoreAliases.delete(name)
-            scopedLogCacheWriterAliases.delete(name)
-            scopedLogStoreConstructorAliases.delete(name)
+            ;(scopedStateLogAliases as Set<string>).delete(name)
+            ;(scopedLogStoreAliases as Set<string>).delete(name)
+            ;(scopedLogCacheWriterAliases as Set<string>).delete(name)
+            ;(scopedLogStoreConstructorAliases as Set<string>).delete(name)
           }
           if (ts.isIdentifier(parameter.name) && includesGameStateType(parameter.type, sourceFile)) {
             ;(scopedStateLikeNames as Set<string>).add(parameter.name.text)
@@ -712,15 +706,14 @@ const scanFile = (repoRoot: string, fullPath: string): DirectSessionLogViolation
       }
     }
 
-    if (!isAllowedStateLogWrite(rel, node, source, sourceFile)) {
-      if ((ts.isBinaryExpression(node)
-          && ts.isAssignmentOperator(node.operatorToken.kind)
-          && isStateLogMutationTarget(node.left, scopedStateLikeNames, scopedStateLogAliases))
-        || (ts.isDeleteExpression(node) && isStateLogMutationTarget(node.expression, scopedStateLikeNames, scopedStateLogAliases))
-        || ((ts.isPrefixUnaryExpression(node) || ts.isPostfixUnaryExpression(node))
-          && isStateLogMutationTarget(node.operand, scopedStateLikeNames, scopedStateLogAliases))) {
-        addViolation(node, 'state-log-write')
-      }
+    if ((ts.isBinaryExpression(node)
+        && node.operatorToken.kind >= ts.SyntaxKind.FirstAssignment
+        && node.operatorToken.kind <= ts.SyntaxKind.LastAssignment
+        && isStateLogMutationTarget(node.left, scopedStateLikeNames, scopedStateLogAliases))
+      || (ts.isDeleteExpression(node) && isStateLogMutationTarget(node.expression, scopedStateLikeNames, scopedStateLogAliases))
+      || ((ts.isPrefixUnaryExpression(node) || ts.isPostfixUnaryExpression(node))
+        && isStateLogMutationTarget(node.operand, scopedStateLikeNames, scopedStateLogAliases))) {
+      addViolation(node, 'state-log-write')
     }
 
     if (ts.isNewExpression(node)
@@ -730,7 +723,6 @@ const scanFile = (repoRoot: string, fullPath: string): DirectSessionLogViolation
         logStoreClassNamespaces,
         scopedLogStoreConstructorAliases,
       )
-      && !allowedLogStoreConstructorFiles.has(rel)
       && !allowedTestLogStoreConstructor(rel)) {
       addViolation(node, 'log-store-constructor')
     }
@@ -738,16 +730,14 @@ const scanFile = (repoRoot: string, fullPath: string): DirectSessionLogViolation
     if (ts.isCallExpression(node)) {
       const calleeName = accessName(node.expression)
       const receiver = accessReceiver(node.expression)
-      if (!isAllowedStateLogWrite(rel, node, source, sourceFile)
-        && calleeName
+      if (calleeName
         && LOG_MUTATORS.has(calleeName)
         && receiver
         && (isStateLogMutationTarget(receiver, scopedStateLikeNames, scopedStateLogAliases)
           || isStateLogReceiverText(receiver, scopedStateLikeNames, sourceFile))) {
         addViolation(node, 'state-log-write')
       }
-      if (!isAllowedStateLogWrite(rel, node, source, sourceFile)
-        && isObjectAssignCall(node)
+      if (isObjectAssignCall(node)
         && !!node.arguments[0]
         && (isStateLogMutationTarget(node.arguments[0]!, scopedStateLikeNames, scopedStateLogAliases)
           || isObjectAssignStateLogWrite(node, scopedStateLikeNames))) {
@@ -755,8 +745,7 @@ const scanFile = (repoRoot: string, fullPath: string): DirectSessionLogViolation
       }
       if (calleeName === 'append'
         && receiver
-        && isLogStoreExpression(receiver, scopedLogStoreAliases)
-        && !isAllowedLogStoreAppend(node, source, sourceFile, allowedBlocks)) {
+        && isLogStoreExpression(receiver, scopedLogStoreAliases)) {
         addViolation(node, 'log-store-append')
       }
       if (cacheWriterCallName(
@@ -765,9 +754,7 @@ const scanFile = (repoRoot: string, fullPath: string): DirectSessionLogViolation
         logCacheWriterNamespaces,
         scopedLogCacheWriterAliases,
       )
-        && rel !== 'shared/events/log-cache.ts'
-        && !allowedTestLogCacheWriterCall(rel)
-        && !isAllowedLogCacheWriterCall(rel, node, source, sourceFile)) {
+        && !allowedTestLogCacheWriterCall(rel)) {
         addViolation(node, 'log-cache-writer-call')
       }
     }
@@ -787,9 +774,22 @@ const scanFile = (repoRoot: string, fullPath: string): DirectSessionLogViolation
 }
 
 export const findDirectSessionLogViolations = (repoRoot: string): DirectSessionLogViolation[] => {
-  const files: string[] = []
-  for (const dir of SCAN_DIRS) walkDir(path.join(repoRoot, dir), repoRoot, files)
-  return files.flatMap((file) => scanFile(repoRoot, file))
+  const files = SCAN_DIRS.flatMap(dir => {
+    const sources = walkSourceFiles(path.join(repoRoot, dir))
+    if (sources.length === 0) throw new Error(`empty required source root: ${dir}`)
+    return sources
+  })
+  const hits = new Set<LogExemption>()
+  const violations = files.flatMap(file => scanFile(repoRoot, file, hits))
+  for (const exemption of logExemptions) {
+    if (!hits.has(exemption)) violations.push({
+      file: exemption.file,
+      line: 1,
+      kind: 'stale-exemption',
+      text: `${exemption.functionName}: no legal ${exemption.kind} exemption used; ${exemption.reason}`,
+    })
+  }
+  return violations
 }
 
 if (process.argv[1] && process.argv[1].endsWith('check-direct-session-log.ts')) {
