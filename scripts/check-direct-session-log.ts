@@ -91,7 +91,8 @@ const findFunctionBlock = (
   })
   const visit = (node: ts.Node): void => {
     if (block) return
-    if (ts.isConstructorDeclaration(node) && functionName === 'constructor' && node.body) {
+    if (ts.isConstructorDeclaration(node) && functionName === 'constructor' && node.body
+      && ts.isClassDeclaration(node.parent) && node.parent.name?.text === 'GameCore') {
       block = fromBody(node.body)
       return
     }
