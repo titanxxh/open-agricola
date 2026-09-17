@@ -30,6 +30,11 @@ export const LISTENER_CONTEXT_STATE_KEYS = new Set([
   'triggerSnapshot',
   'extraData',
   'eventQuery',
+  'costs',
+  'costTrades',
+  'costBonuses',
+  'paymentResourceProviders',
+  'costAttribution',
 ])
 
 const MUTATING_ARRAY_METHODS = new Set(['push', 'pop', 'shift', 'unshift', 'splice', 'sort', 'reverse', 'fill', 'copyWithin'])
