@@ -1,6 +1,6 @@
-import fs from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { parseSource, sourceExtensions, walkSourceFiles } from './source-files'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
@@ -40,11 +40,9 @@ const sorted = (values: readonly string[]): string[] =>
   [...values].sort((a, b) => a.localeCompare(b))
 
 export const checkEffectsFileList = (effectsDir: string): EffectsFileListCheck => {
-  const actualFiles = fs.existsSync(effectsDir)
-    ? sorted(fs.readdirSync(effectsDir, { withFileTypes: true })
-      .filter((entry) => entry.isFile() && entry.name.endsWith('.ts'))
-      .map((entry) => entry.name))
-    : []
+  const files = walkSourceFiles(effectsDir, sourceExtensions, false)
+  for (const file of files) parseSource(file)
+  const actualFiles = sorted(files.map(file => path.basename(file)))
   const allowedFiles = sorted(ALLOWED_EFFECT_FILES)
   const actualSet = new Set(actualFiles)
   const allowedSet = new Set(allowedFiles)
@@ -69,7 +67,7 @@ if (process.argv[1] && process.argv[1].endsWith('check-effects-file-list.ts')) {
     process.exit(0)
   }
 
-  console.error('[check-effects-file-list] top-level shared/actions/effects/*.ts files do not match the allow-list')
+  console.error('[check-effects-file-list] top-level shared/actions/effects source files do not match the allow-list')
   console.error(`  scanned: ${path.relative(repoRoot, effectsDir)}`)
   if (result.missingFiles.length > 0) {
     console.error(`  missing allowed files: ${result.missingFiles.join(', ')}`)

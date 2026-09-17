@@ -1527,6 +1527,15 @@ GameContextRouter
 
 `pnpm run check:architecture` 执行架构脚本、契约类型检查、通过 `check:architecture-tests` 运行的现有契约测试，以及 strict 沙盒 prompt/文档同步检查。契约测试覆盖 effect、资源事实来源、事件映射、交互命令、Card Source、PromptKey、LLM prompt 渲染契约、CI 接线，以及 listener 纯度 guard（正负例加两人 Session）。这些测试保留既有 Vitest project 归属，也会在 `pnpm test` / `pnpm test:fast` 中运行。Bundle 体积预算仍在构建后单独检查；浏览器依赖隔离由架构入口自身保证。
 
+架构检查必须尽可能简单。目的是拦住 agent 和开发者编写代码时常见的架构误用，不是防御刻意构造的绕过，也不证明任意 JavaScript 都安全。优先使用源码发现、文件清单、导入边界和小范围语法检查；报错应直接指向修法，维护成本应与实际防止的错误相称。运行时安全边界与行为测试各自承担独立职责。
+
+旧日志与 effect 扫描器按以下范围实现：
+
+- 复用 `scripts/source-files.ts` 发现并解析所有受支持扩展名。日志必需根 `shared`、`server`、`scripts` 必须存在且包含源码；缺根、空根、解析错误或不支持的文件系统条目应失败，不能显示为无违规。
+- 沿用已有日志写入识别规则。每条具名生产例外记录原因，并要求实际命中这些规则识别出的写入；文件删除、函数改名、写入消失都使例外失效。命中只验证例外仍在使用，不证明函数全部行为合法。
+- effect 清单只限制顶层生产文件，架构测试复用同一检查器；`internal/` 和测试目录不新增固定清单。
+- 本次覆盖修复不增加符号或数据流引擎、复杂别名传播、回调或继承分析，也不枚举 `bind`/`call`/`apply`、动态导入等绕过方式。测试覆盖受支持的常规写法、仓库真实样例和扫描失败，不建设对抗性语言特性测试集。超出此约定的 review 意见，必须先说明仓库中具体、常见的使用场景，才能扩大检查范围。
+
 | 约束 | 可执行覆盖 | 边界 |
 |---|---|---|
 | `shared` / `server` / `client` 物理分层 | ESLint `architecture/imports` error | 测试目录有显式豁免；只检查 import，不证明 runtime ownership。 |
@@ -1534,7 +1543,7 @@ GameContextRouter
 | 运行时循环依赖 | `pnpm run check:dependencies` | 所有运行时 SCC、自环和字面量动态导入环都会失败，不保留循环基线。显式 type-only 声明被擦除；verbatimModuleSyntax 下的行内 type specifier 仍加载模块。其他含源码的顶层目录报 `unclassified source root`，但 `git check-ignore` 判定为忽略的未跟踪目录（`.gitignore`、`.git/info/exclude`）除外；已跟踪目录始终计入。 |
 | 浏览器与回放隔离 | `pnpm run check:browser-boundaries` | 同时检查两个生产入口的源码传递依赖和真实 Vite 模块图。元数据权限精确到文件并附原因；新增 Worker 入口、越权进入沙盒和入口证据缺失都会失败。 |
 | 架构类型契约 | `pnpm run check:architecture-types` | `tsconfig.architecture.json` 对策略与检查器测试执行真正的 no-emit 类型检查，包括正反类型断言；Vitest 运行成功不等于类型通过。 |
-| 扫描完整性 | no-DSL、test-project coverage、Card Source 与 field-boundary 检查 | 根目录和语法必须有效；源码声明与全部已注册实现独立比对，支持 major 文件多声明。Parents 保持独立的元数据/运行时模型。 |
+| 扫描完整性 | direct session log、effect-file list、no-DSL、test-project coverage、Card Source 与 field-boundary 检查 | 根目录和语法必须有效；源码声明与全部已注册实现独立比对，支持 major 文件多声明。Parents 保持独立的元数据/运行时模型。 |
 | trailing listener snapshot | `pnpm run check:card-impl-boundaries` | 从解析后的 `ALL_CARD_IMPLS` 枚举 handler，其 ID 必须覆盖所有声明了 `impl` 的生产 Card Source。`during`、`immediatelyAfter`、`after` 中直接读取 `improvements` / `minorPlayed` / `occupationPlayed` 长度会失败；非 trailing 读取和 membership 检查仍允许。门禁只解析实际 handler 函数体，不跟踪 helper 调用或派生值。runtime scope 为空、不完整或无法解析时失败；runtime 诊断只标识卡牌与 listener，不伪造原始源码行号。 |
 | listener 状态纯净 | 所有会 dispatch listener 的 Vitest project 由 setup 安装的运行时 guard，加 `pnpm run check:card-impl-boundaries` | guard 用深层只读 Proxy（含属性描述符与 `eventQuery` 结果）包裹每次 `executeCardListener` / `invokeCardCostCandidateTransform` 调用以及每个已加载 Card Impl 的 listener 函数本身，任何写入或返回 live 引用都失败；只证明被执行的分支。静态扫描解析每个已解析 handler 与 cost-candidate transform，对根为 context 参数的显式写入失败，仅跟踪同函数别名。两者都不跟踪跨文件数据流，不声称全程序 mutation proof。契约测试：`shared/cards/__tests__/listener-purity-guard.test.ts`、`server/__tests__/listener-purity-gate-session.test.ts`。 |
 | 生成目录与 Card Source 一致 | `pnpm run check:generated-cards-sync` | 结构化校验 source/catalog 相等，不硬编码卡牌数量。 |
