@@ -8,11 +8,16 @@ import {
   type CardListenerRegistration,
 } from '../card-listeners'
 import { incCounter } from '../__stubs__/helpers'
+import { ALL_CARD_IMPLS } from '../register-all'
+import { createEventQuery } from '../../events/query'
+import { B048_ForestStone_impl } from '../B/B048_ForestStone'
 import {
   ListenerPurityViolationError,
+  guardListenerRegistrationInPlace,
   installListenerPurityGuard,
   invokeListenerHandlerUnderGuard,
   isGuardedProxy,
+  isListenerGuardedInPlace,
   listenerPurityInterceptor,
   resolveAuthoritative,
 } from './listener-purity-guard'
@@ -219,6 +224,101 @@ describe('listener purity guard: rejected writes', () => {
       kind: 'returned-authoritative-reference',
       path: 'result.flow.params.value',
     })
+  })
+
+  it('guards events reached through eventQuery and rejects returning them', () => {
+    const event = { type: 'resource.moved', resources: { wood: 1 }, from: { kind: 'supply' }, to: { kind: 'player', playerId: 'p1' }, reason: 'gain' }
+    const transactionEvents = [event] as unknown as CardListenerContext['transactionEvents']
+    const eventQuery = createEventQuery(transactionEvents)
+
+    expectViolation(
+      () => invokeListenerHandlerUnderGuard(registration((ctx) => {
+        const moved = ctx.eventQuery.find('resource.moved')!
+        ;(moved as { resources: Record<string, number> }).resources.wood = 5
+      }), makeContext({ transactionEvents, eventQuery }).context),
+      { kind: 'set', path: 'eventQuery.find().resources.wood' },
+    )
+    expect(event.resources.wood).toBe(1)
+
+    expectViolation(
+      () => invokeListenerHandlerUnderGuard(registration((ctx) => {
+        ctx.eventQuery.filter('resource.moved', (entry) => {
+          ;(entry as unknown as { reason: string }).reason = 'stolen'
+          return true
+        })
+      }), makeContext({ transactionEvents, eventQuery }).context),
+      { kind: 'set', path: 'eventQuery.filter().reason' },
+    )
+
+    expectViolation(
+      () => invokeListenerHandlerUnderGuard(registration((ctx) => ({
+        extraData: { moved: ctx.eventQuery.filter('resource.moved') },
+      })), makeContext({ transactionEvents, eventQuery }).context),
+      { kind: 'returned-authoritative-reference', path: 'result.extraData.moved[0]' },
+    )
+  })
+
+  it('wraps values reached through property descriptors', () => {
+    const { context, state } = makeContext()
+    expectViolation(
+      () => invokeListenerHandlerUnderGuard(registration((ctx) => {
+        const players = Object.getOwnPropertyDescriptor(ctx.state, 'players')!.value as PlayerState[]
+        players.push(makePlayer('p3'))
+      }), context),
+      { kind: 'set', path: 'state.players[2]' },
+    )
+    expect(state.players).toHaveLength(2)
+
+    expectViolation(
+      () => invokeListenerHandlerUnderGuard(registration((ctx) => ({
+        extraData: { resources: Object.getOwnPropertyDescriptors(ctx.player).resources!.value },
+      })), makeContext().context),
+      { kind: 'returned-authoritative-reference', path: 'result.extraData.resources' },
+    )
+  })
+
+  it('guards registrations rewritten in place so direct handler calls are covered', () => {
+    const { context, player } = makeContext()
+    const direct = registration((ctx) => {
+      ctx.player.resources.wood += 1
+    })
+    guardListenerRegistrationInPlace(direct)
+
+    expect(isListenerGuardedInPlace(direct)).toBe(true)
+    expectViolation(() => direct.handler!(context), { kind: 'set', path: 'player.resources.wood' })
+    expect(player.resources.wood).toBe(2)
+    // Dispatching the rewritten handler through executeCardListener guards it exactly once.
+    expectViolation(() => executeCardListener(direct, context), { kind: 'set', path: 'player.resources.wood' })
+  })
+
+  it('has every loaded Card Impl listener guarded in place by the test setup', () => {
+    const listeners = Object.values(ALL_CARD_IMPLS).flatMap((impl) => impl.listeners ?? [])
+    expect(listeners.length).toBeGreaterThan(600)
+    expect(listeners.every((listener) => isListenerGuardedInPlace(listener))).toBe(true)
+
+    const forestStone = B048_ForestStone_impl.listeners![0]!
+    const owner = makePlayer('p1')
+    owner.cardStates = { B048_ForestStone: { extraData: { foodCount: 2 } } } as PlayerState['cardStates']
+    const space = { id: 'forest', gainPerRound: { wood: 3 } } as unknown as CardListenerContext['space']
+    const ctx = {
+      state: { players: [owner], actionSpaces: [space] } as unknown as GameState,
+      player: owner,
+      triggerPlayer: owner,
+      ownerPlayer: owner,
+      effectPlayer: owner,
+      space,
+      actionId: 'collect',
+      phase: 'after',
+      result: { type: 'ok', resourcesGained: { wood: 3 } },
+      transactionEvents: [],
+      eventQuery: { all: () => [] } as unknown as CardListenerContext['eventQuery'],
+    } as CardListenerContext
+    const before = JSON.stringify(owner)
+
+    const result = forestStone.handler!(ctx)
+
+    expect(result?.flow).toBeDefined()
+    expect(JSON.stringify(owner)).toBe(before)
   })
 
   it('guards deriveCardCostCandidate transforms too', () => {

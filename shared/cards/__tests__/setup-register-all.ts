@@ -1,6 +1,7 @@
 import { CardRegistry } from '../registry'
 import { setActiveCardRegistry } from '../active-registry'
 import { ensureCatalogLookupsInstalled } from '../install-catalog-lookups'
+import { guardCardImplListeners } from './listener-purity-guard'
 
 ensureCatalogLookupsInstalled()
 
@@ -13,6 +14,10 @@ const [
   import('../catalog'),
   import('../major'),
 ])
+
+// Direct `impl.listeners[i].handler(ctx)` calls in focused tests bypass
+// executeCardListener, so guard the registered functions themselves.
+guardCardImplListeners(ALL_CARD_IMPLS)
 
 const defaultRegistry = new CardRegistry()
 for (const [cardId, impl] of Object.entries(ALL_CARD_IMPLS)) {
