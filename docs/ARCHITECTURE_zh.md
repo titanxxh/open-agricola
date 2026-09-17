@@ -1525,7 +1525,7 @@ GameContextRouter
 
 #### 架构 fitness 覆盖矩阵
 
-扫描完整性：直接 session log 检查必须复用共享源码发现与解析工具，覆盖全部受支持的源码扩展名。每个必需根目录（`shared`、`server`、`scripts`）必须存在且包含可扫描源码；解析失败或无法可靠扫描的源码必须使检查失败。每条具名生产日志例外必须记录原因，并实际豁免对应的合法操作；文件删除、函数改名或操作消失都使例外失效并导致检查失败，仅保留同名函数不算有效。通用测试文件豁免仍属于类别策略，不要求每个测试文件都命中。缓存写入例外要求通过 `unshift` 前插传入 `entries` 数组中的条目，并拒绝调用前对该数组的直接修改。敏感调用发现覆盖 ES module import 和字面量 CommonJS `require()` 表达式，包括同文件绑定与别名。Effect 文件检查必须拒绝受支持扩展名中的未授权顶层源码，同时保持现有顶层清单范围；`internal/` 与测试目录不新增固定文件清单。
+扫描完整性：直接 session log 检查必须复用共享源码发现与解析工具，覆盖全部受支持的源码扩展名。每个必需根目录（`shared`、`server`、`scripts`）必须存在且包含可扫描源码；解析失败或无法可靠扫描的源码必须使检查失败。每条具名生产日志例外必须记录原因，并实际豁免对应的合法操作；文件删除、函数改名或操作消失都使例外失效并导致检查失败，仅保留同名函数不算有效。通用测试文件豁免仍属于类别策略，不要求每个测试文件都命中。缓存写入例外要求通过 `unshift` 前插传入 `entries` 数组中的条目，并拒绝整个函数内对该数组及条目的直接修改。构造器例外仅允许 `GameCore` 中直接执行 `this.engineLog = new LogStore()` 初始化；新建 store 的别名仍需接受 append 检查。敏感调用发现覆盖 ES module import 和字面量 CommonJS `require()` 表达式，包括同文件绑定、嵌套块对外层变量的赋值、别名和转译生成的逗号表达式调用。`LogStore` 导入必须指向 engine store 或其聚合导出，不将无关依赖视为 engine store。Effect 文件检查必须拒绝受支持扩展名中的未授权顶层源码，同时保持现有顶层清单范围；`internal/` 与测试目录不新增固定文件清单。
 
 `pnpm run check:architecture` 执行架构脚本、契约类型检查、通过 `check:architecture-tests` 运行的现有契约测试，以及 strict 沙盒 prompt/文档同步检查。契约测试覆盖 effect、资源事实来源、事件映射、交互命令、Card Source、PromptKey、LLM prompt 渲染契约、CI 接线，以及 listener 纯度 guard（正负例加两人 Session）。这些测试保留既有 Vitest project 归属，也会在 `pnpm test` / `pnpm test:fast` 中运行。Bundle 体积预算仍在构建后单独检查；浏览器依赖隔离由架构入口自身保证。
 

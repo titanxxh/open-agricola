@@ -161,6 +161,8 @@ describe('check-direct-session-log', () => {
     'state.log.unshift({ key: "forged" })',
     'state.log.unshift(entries[index]!, { key: "forged" })',
     'entries[index]!.key = "forged"; state.log.unshift(entries[index]!)',
+    'state.log.unshift(entries[index]!); entries[index]!.key = "forged"',
+    'state.log.unshift(entries[index]!); Object.assign(entries[index]!, { key: "forged" })',
   ])('rejects an invalid cache-write exemption: %s', (operation) => {
     const root = createRepoFixture()
     const file = 'shared/events/log-cache.ts'
@@ -180,6 +182,12 @@ describe('check-direct-session-log', () => {
     "const cache = require('../shared/events'); const { prependDerivedLogEntries: writeLog } = cache; writeLog(state, entries)",
     "function bad() { const { prependDerivedLogEntries: writeLog } = require('../shared/events/log-cache'); writeLog(state, entries) }",
     "let cache; cache = require('../shared/events/log-cache'); cache.prependDerivedLogEntries(state, entries)",
+    "let cache; if (enabled) { cache = require('../shared/events/log-cache') } cache.prependDerivedLogEntries(state, entries)",
+    "let cache; if (enabled) { if (ready) { cache = require('../shared/events/log-cache') } } cache.prependDerivedLogEntries(state, entries)",
+    "let write; if (enabled) { write = require('../shared/events/log-cache').prependDerivedLogEntries } write(state, entries)",
+    "let write; if (enabled) { ({ prependDerivedLogEntries: write } = require('../shared/events/log-cache')) } write(state, entries)",
+    "const cache = require('../shared/events/log-cache'); (0, cache.prependDerivedLogEntries)(state, entries)",
+    "const cache = require('../shared/events/log-cache'); const write = (0, cache.prependDerivedLogEntries); write(state, entries)",
   ])('rejects CommonJS cache writer imports: %s', (source) => {
     const root = createRepoFixture()
     writeFixture(root, 'server/bad.cjs', source)
@@ -193,6 +201,10 @@ describe('check-direct-session-log', () => {
     "const engine = require('../shared/engine/log-store'); new engine.LogStore()",
     "const Store = require('../shared/engine/log-store').LogStore; new Store()",
     "new (require('../shared/engine/log-store').LogStore)()",
+    "const engine = require('../shared/engine/index.js'); new engine.LogStore()",
+    "const engine = require('../shared/engine'); new engine.LogStore()",
+    "let engine; if (enabled) { engine = require('../shared/engine') } new engine.LogStore()",
+    "let Store; if (enabled) { Store = require('../shared/engine').LogStore } new Store()",
   ])('rejects CommonJS LogStore imports: %s', (source) => {
     const root = createRepoFixture()
     writeFixture(root, 'server/bad.cjs', source)
@@ -209,6 +221,22 @@ describe('check-direct-session-log', () => {
       "const cache = require('../shared/events/log-cache')",
       'function harmless(cache) { cache.prependDerivedLogEntries(state, entries) }',
       '{ const cache = unrelated; cache.prependDerivedLogEntries(state, entries) }',
+      'new unrelated.LogStore()',
+      "const other = require('third-party-library'); new other.LogStore()",
+      "const otherEngine = require('third-party/engine'); new otherEngine.LogStore()",
+      "const { LogStore: Store } = require('third-party-library'); new Store()",
+      "let outer; if (enabled) { const outer = require('../shared/events/log-cache') } outer.prependDerivedLogEntries(state, entries)",
+      "let engine; if (enabled) { const engine = require('../shared/engine') } new engine.LogStore()",
+    ].join('\n'))
+    expect(findDirectSessionLogViolations(root)).toEqual([])
+  })
+
+  it('keeps unrelated ES module LogStore imports valid', () => {
+    const root = createRepoFixture()
+    writeFixture(root, 'server/safe.mjs', [
+      "import * as Other from 'third-party-library'",
+      "import { LogStore } from 'third-party-library'",
+      'new Other.LogStore(); new LogStore()',
     ].join('\n'))
     expect(findDirectSessionLogViolations(root)).toEqual([])
   })
@@ -229,6 +257,32 @@ describe('check-direct-session-log', () => {
     writeFixture(root, file, `${readFileSync(path.join(root, file), 'utf8')}\nconst other = new LogStore()`)
     expect(findDirectSessionLogViolations(root)).toEqual([
       expect.objectContaining({ file, kind: 'log-store-constructor' }),
+    ])
+  })
+
+  it.each([
+    'const local = new LogStore(); local.append(entry); this.engineLog = local',
+    'let local; local = new LogStore(); const alias = local; alias.append(entry); this.engineLog = alias',
+  ])('rejects noncanonical stores inside the session constructor: %s', (operation) => {
+    const root = createRepoFixture()
+    const file = 'shared/session/session-core.ts'
+    const source = readFileSync(path.join(root, file), 'utf8')
+    writeFixture(root, file, source.replace('this.engineLog = new LogStore()', operation))
+    expect(findDirectSessionLogViolations(root)).toEqual([
+      expect.objectContaining({ file, kind: 'log-store-constructor' }),
+      expect.objectContaining({ file, kind: 'log-store-append' }),
+      expect.objectContaining({ file, kind: 'stale-exemption' }),
+    ])
+  })
+
+  it('does not use a different class constructor as the session exemption', () => {
+    const root = createRepoFixture()
+    const file = 'shared/session/session-core.ts'
+    const source = readFileSync(path.join(root, file), 'utf8')
+    writeFixture(root, file, source.replace('class GameCore', 'class Other'))
+    expect(findDirectSessionLogViolations(root)).toEqual([
+      expect.objectContaining({ file, kind: 'log-store-constructor' }),
+      expect.objectContaining({ file, kind: 'stale-exemption' }),
     ])
   })
 

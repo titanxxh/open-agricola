@@ -91,7 +91,8 @@ const findFunctionBlock = (
   })
   const visit = (node: ts.Node): void => {
     if (block) return
-    if (ts.isConstructorDeclaration(node) && functionName === 'constructor' && node.body) {
+    if (ts.isConstructorDeclaration(node) && functionName === 'constructor' && node.body
+      && ts.isClassDeclaration(node.parent) && node.parent.name?.text === 'GameCore') {
       block = fromBody(node.body)
       return
     }
@@ -138,8 +139,9 @@ const unwrapExpression = (expression: ts.Expression): ts.Expression => {
   while (ts.isParenthesizedExpression(current)
     || ts.isNonNullExpression(current)
     || ts.isAsExpression(current)
-    || ts.isTypeAssertionExpression(current)) {
-    current = current.expression
+    || ts.isTypeAssertionExpression(current)
+    || (ts.isBinaryExpression(current) && current.operatorToken.kind === ts.SyntaxKind.CommaToken)) {
+    current = ts.isBinaryExpression(current) ? current.right : current.expression
   }
   return current
 }
@@ -213,9 +215,17 @@ const isLogCacheNamespace = (expression: ts.Expression, namespaces: ReadonlySet<
   return (ts.isIdentifier(current) && namespaces.has(current.text)) || (module !== null && isLogCacheModule(module))
 }
 
+const isLogStoreModule = (specifier: string, sourceFile: ts.SourceFile): boolean =>
+  specifier.startsWith('.')
+  && /\/shared\/engine(?:\/(?:index|log-store))?$/.test(
+    path.resolve(path.dirname(sourceFile.fileName), specifier).replaceAll(path.sep, '/').replace(sourceExtensions, ''),
+  )
+
 const isLogStoreNamespace = (expression: ts.Expression, namespaces: ReadonlySet<string>): boolean => {
   const current = unwrapExpression(expression)
-  return (ts.isIdentifier(current) && namespaces.has(current.text)) || requiredModule(current) !== null
+  const module = requiredModule(current)
+  return (ts.isIdentifier(current) && namespaces.has(current.text))
+    || (module !== null && isLogStoreModule(module, current.getSourceFile()))
 }
 
 const collectImportedIdentifiers = (
@@ -235,7 +245,7 @@ const collectImportedIdentifiers = (
     const clause = statement.importClause
     const namedBindings = clause?.namedBindings
     if (!namedBindings) continue
-    if (ts.isNamespaceImport(namedBindings)) {
+    if (isLogStoreModule(statement.moduleSpecifier.text, sourceFile) && ts.isNamespaceImport(namedBindings)) {
       logStoreClassNamespaces.add(namedBindings.name.text)
     }
     if (isLogCacheModule(statement.moduleSpecifier.text) && ts.isNamespaceImport(namedBindings)) {
@@ -245,7 +255,10 @@ const collectImportedIdentifiers = (
     if (!ts.isNamedImports(namedBindings)) continue
     for (const specifier of namedBindings.elements) {
       const importedName = specifier.propertyName?.text ?? specifier.name.text
-      if (importedName === 'LogStore') logStoreClassNames.add(specifier.name.text)
+      if (importedName === 'LogStore') {
+        if (isLogStoreModule(statement.moduleSpecifier.text, sourceFile)) logStoreClassNames.add(specifier.name.text)
+        else logStoreClassNames.delete(specifier.name.text)
+      }
       if (isLogCacheModule(statement.moduleSpecifier.text) && importedName === 'prependDerivedLogEntries') {
         logCacheWriterNames.add(specifier.name.text)
       }
@@ -517,7 +530,20 @@ const isAllowedStateLogWrite = (node: ts.Node, sourceFile: ts.SourceFile, block:
   && node.expression.getText(sourceFile) === 'state.log.unshift'
   && node.arguments.length === 1
   && isMapperEntryExpression(node.arguments[0], 'entries')
-  && !mapperResultMutationPattern('entries').test(block.source.slice(0, node.getStart(sourceFile) - block.start))
+  && !mapperResultMutationPattern('entries').test(block.source)
+
+const isAllowedLogStoreConstructor = (node: ts.Node, sourceFile: ts.SourceFile): boolean => {
+  const assignment = node.parent
+  return ts.isNewExpression(node)
+    && (node.arguments?.length ?? 0) === 0
+    && ts.isBinaryExpression(assignment)
+    && assignment.operatorToken.kind === ts.SyntaxKind.EqualsToken
+    && assignment.right === node
+    && assignment.left.getText(sourceFile) === 'this.engineLog'
+    && ts.isExpressionStatement(assignment.parent)
+    && ts.isBlock(assignment.parent.parent)
+    && ts.isConstructorDeclaration(assignment.parent.parent.parent)
+}
 
 const scanFile = (repoRoot: string, fullPath: string, hits: Set<LogExemption>): DirectSessionLogViolation[] => {
   const rel = path.relative(repoRoot, fullPath).replaceAll(path.sep, '/')
@@ -537,7 +563,8 @@ const scanFile = (repoRoot: string, fullPath: string, hits: Set<LogExemption>): 
     const index = node.getStart(sourceFile)
     const match = exemptions.find(({ exemption, block }) =>
       exemption.kind === kind && block && index >= block.start && index < block.end
-      && ((kind === 'state-log-write' && isAllowedStateLogWrite(node, sourceFile, block)) || kind === 'log-store-constructor'
+      && ((kind === 'state-log-write' && isAllowedStateLogWrite(node, sourceFile, block))
+        || (kind === 'log-store-constructor' && isAllowedLogStoreConstructor(node, sourceFile))
         || (ts.isCallExpression(node)
           && (kind === 'log-store-append'
             ? isAllowedLogStoreAppend(node, sourceFile, [block])
@@ -595,6 +622,14 @@ const scanFile = (repoRoot: string, fullPath: string, hits: Set<LogExemption>): 
       }
     }
 
+    const isStoreValue = (expression: ts.Expression): boolean => {
+      const current = unwrapExpression(expression)
+      return isLogStoreExpression(current, scopedLogStoreAliases)
+        || (ts.isNewExpression(current) && isLogStoreConstructorExpression(
+          current.expression, logStoreClassNames, scopedStoreNamespaces, scopedLogStoreConstructorAliases,
+        ))
+    }
+
     if (ts.isVariableDeclaration(node)) {
       const names: string[] = []
       collectBindingNames(node.name, names)
@@ -622,7 +657,7 @@ const scanFile = (repoRoot: string, fullPath: string, hits: Set<LogExemption>): 
         if (ts.isIdentifier(node.name) && isStateLogExpression(node.initializer, scopedStateLikeNames)) {
           ;(scopedStateLogAliases as Set<string>).add(node.name.text)
         }
-        if (ts.isIdentifier(node.name) && isLogStoreExpression(node.initializer, scopedLogStoreAliases)) {
+        if (ts.isIdentifier(node.name) && isStoreValue(node.initializer)) {
           ;(scopedLogStoreAliases as Set<string>).add(node.name.text)
         }
         if (ts.isIdentifier(node.name)
@@ -692,7 +727,7 @@ const scanFile = (repoRoot: string, fullPath: string, hits: Set<LogExemption>): 
       if (isStateLogExpression(node.right, scopedStateLikeNames)) {
         ;(scopedStateLogAliases as Set<string>).add(name)
       }
-      if (isLogStoreExpression(node.right, scopedLogStoreAliases)) {
+      if (isStoreValue(node.right)) {
         ;(scopedLogStoreAliases as Set<string>).add(name)
       }
       if (cacheWriterCallName(
@@ -779,7 +814,7 @@ const scanFile = (repoRoot: string, fullPath: string, hits: Set<LogExemption>): 
       }
       if (calleeName === 'append'
         && receiver
-        && isLogStoreExpression(receiver, scopedLogStoreAliases)) {
+        && isStoreValue(receiver)) {
         addViolation(node, 'log-store-append')
       }
       if (cacheWriterCallName(
@@ -803,6 +838,28 @@ const scanFile = (repoRoot: string, fullPath: string, hits: Set<LogExemption>): 
       scopedCacheNamespaces,
       scopedStoreNamespaces,
     ))
+    if (ts.isBlock(node) && !ts.isFunctionLike(node.parent)) {
+      const localNames: string[] = []
+      const collectLocals = (child: ts.Node): void => {
+        if (ts.isBlock(child) || ts.isFunctionLike(child)) return
+        if (ts.isVariableDeclaration(child)) collectBindingNames(child.name, localNames)
+        ts.forEachChild(child, collectLocals)
+      }
+      ts.forEachChild(node, collectLocals)
+      for (const [scoped, outer] of [
+        [scopedCacheNamespaces, cacheNamespaces],
+        [scopedStoreNamespaces, storeNamespaces],
+        [scopedStateLikeNames, stateLikeNames],
+        [scopedStateLogAliases, stateLogAliases],
+        [scopedLogStoreAliases, logStoreAliases],
+        [scopedLogCacheWriterAliases, logCacheWriterAliases],
+        [scopedLogStoreConstructorAliases, logStoreConstructorAliases],
+      ] as const) {
+        for (const name of scoped) {
+          if (!localNames.includes(name)) (outer as Set<string>).add(name)
+        }
+      }
+    }
   }
   visit(sourceFile, new Set(['state']), new Set(), new Set(), new Set(), new Set(), logCacheWriterNamespaces, logStoreClassNamespaces)
 
