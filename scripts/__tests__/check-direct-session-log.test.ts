@@ -154,6 +154,65 @@ describe('check-direct-session-log', () => {
     }))
   })
 
+  it.each([
+    'state.log.pop()',
+    'state.log = []',
+    'state.log.push(entries[index]!)',
+    'state.log.unshift({ key: "forged" })',
+    'state.log.unshift(entries[index]!, { key: "forged" })',
+    'entries[index]!.key = "forged"; state.log.unshift(entries[index]!)',
+  ])('rejects an invalid cache-write exemption: %s', (operation) => {
+    const root = createRepoFixture()
+    const file = 'shared/events/log-cache.ts'
+    const source = readFileSync(path.join(root, file), 'utf8')
+    writeFixture(root, file, source.replace('state.log.unshift(entries[index]!)', operation))
+    expect(findDirectSessionLogViolations(root)).toEqual([
+      expect.objectContaining({ file, kind: 'state-log-write' }),
+      expect.objectContaining({ file, kind: 'stale-exemption' }),
+    ])
+  })
+
+  it.each([
+    "const { prependDerivedLogEntries: writeLog } = require('../shared/events/log-cache'); writeLog(state, entries)",
+    "const cache = require('../shared/events/log-cache.js'); cache.prependDerivedLogEntries(state, entries)",
+    "const writeLog = require('../shared/events/log-cache').prependDerivedLogEntries; writeLog(state, entries)",
+    "require('../shared/events/log-cache')['prependDerivedLogEntries'](state, entries)",
+    "const cache = require('../shared/events'); const { prependDerivedLogEntries: writeLog } = cache; writeLog(state, entries)",
+    "function bad() { const { prependDerivedLogEntries: writeLog } = require('../shared/events/log-cache'); writeLog(state, entries) }",
+    "let cache; cache = require('../shared/events/log-cache'); cache.prependDerivedLogEntries(state, entries)",
+  ])('rejects CommonJS cache writer imports: %s', (source) => {
+    const root = createRepoFixture()
+    writeFixture(root, 'server/bad.cjs', source)
+    expect(findDirectSessionLogViolations(root)).toEqual([
+      expect.objectContaining({ file: 'server/bad.cjs', kind: 'log-cache-writer-call' }),
+    ])
+  })
+
+  it.each([
+    "const { LogStore: Store } = require('../shared/engine/log-store'); new Store()",
+    "const engine = require('../shared/engine/log-store'); new engine.LogStore()",
+    "const Store = require('../shared/engine/log-store').LogStore; new Store()",
+    "new (require('../shared/engine/log-store').LogStore)()",
+  ])('rejects CommonJS LogStore imports: %s', (source) => {
+    const root = createRepoFixture()
+    writeFixture(root, 'server/bad.cjs', source)
+    expect(findDirectSessionLogViolations(root)).toEqual([
+      expect.objectContaining({ file: 'server/bad.cjs', kind: 'log-store-constructor' }),
+    ])
+  })
+
+  it('keeps unrelated and shadowed CommonJS modules valid', () => {
+    const root = createRepoFixture()
+    writeFixture(root, 'server/safe.cjs', [
+      "const unrelated = require('./misc/events')",
+      'unrelated.prependDerivedLogEntries(state, entries)',
+      "const cache = require('../shared/events/log-cache')",
+      'function harmless(cache) { cache.prependDerivedLogEntries(state, entries) }',
+      '{ const cache = unrelated; cache.prependDerivedLogEntries(state, entries) }',
+    ].join('\n'))
+    expect(findDirectSessionLogViolations(root)).toEqual([])
+  })
+
   it('does not count an illegal append as a used exemption', () => {
     const root = createRepoFixture()
     const file = 'shared/engine/engine-proceed.ts'

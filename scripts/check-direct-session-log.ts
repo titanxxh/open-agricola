@@ -1,7 +1,7 @@
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import ts from 'typescript'
-import { parseSource, walkSourceFiles } from './source-files'
+import { parseSource, sourceExtensions, walkSourceFiles } from './source-files'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
@@ -190,16 +190,33 @@ const collectBindingNames = (name: ts.BindingName, out: string[]): void => {
   }
 }
 
-const isLogCacheModule = (specifier: string): boolean =>
-  specifier === './log-cache'
-  || specifier.endsWith('/log-cache')
-  || specifier.endsWith('/log-cache.ts')
-  || specifier === '../events'
-  || specifier === '../events.ts'
-  || specifier.endsWith('/shared/events')
-  || specifier.endsWith('/shared/events.ts')
-  || specifier.endsWith('/shared/events/index')
-  || specifier.endsWith('/shared/events/index.ts')
+const isLogCacheModule = (specifier: string): boolean => {
+  const module = specifier.replace(sourceExtensions, '')
+  return module === './log-cache'
+    || module.endsWith('/log-cache')
+    || module === '../events'
+    || module.endsWith('/shared/events')
+    || module.endsWith('/shared/events/index')
+}
+
+const requiredModule = (expression: ts.Expression): string | null => {
+  const current = unwrapExpression(expression)
+  return ts.isCallExpression(current)
+    && ts.isIdentifier(current.expression) && current.expression.text === 'require'
+    && current.arguments.length === 1 && ts.isStringLiteralLike(current.arguments[0]!)
+    ? current.arguments[0]!.text : null
+}
+
+const isLogCacheNamespace = (expression: ts.Expression, namespaces: ReadonlySet<string>): boolean => {
+  const current = unwrapExpression(expression)
+  const module = requiredModule(current)
+  return (ts.isIdentifier(current) && namespaces.has(current.text)) || (module !== null && isLogCacheModule(module))
+}
+
+const isLogStoreNamespace = (expression: ts.Expression, namespaces: ReadonlySet<string>): boolean => {
+  const current = unwrapExpression(expression)
+  return (ts.isIdentifier(current) && namespaces.has(current.text)) || requiredModule(current) !== null
+}
 
 const collectImportedIdentifiers = (
   sourceFile: ts.SourceFile,
@@ -335,8 +352,7 @@ const isLogStoreConstructorExpression = (
   const unwrappedReceiver = receiver && unwrapExpression(receiver)
   return accessName(current) === 'LogStore'
     && !!unwrappedReceiver
-    && ts.isIdentifier(unwrappedReceiver)
-    && logStoreClassNamespaces.has(unwrappedReceiver.text)
+    && isLogStoreNamespace(unwrappedReceiver, logStoreClassNamespaces)
 }
 
 const isLogStoreConstructorAliasSource = (
@@ -374,8 +390,7 @@ const cacheWriterCallName = (
   const unwrappedReceiver = receiver && unwrapExpression(receiver)
   if (accessName(current) === 'prependDerivedLogEntries'
     && unwrappedReceiver
-    && ts.isIdentifier(unwrappedReceiver)
-    && logCacheWriterNamespaces.has(unwrappedReceiver.text)) {
+    && isLogCacheNamespace(unwrappedReceiver, logCacheWriterNamespaces)) {
     return accessName(current)
   }
   return null
@@ -497,6 +512,13 @@ const isAllowedLogCacheWriterCall = (
   return false
 }
 
+const isAllowedStateLogWrite = (node: ts.Node, sourceFile: ts.SourceFile, block: FunctionBlock): boolean =>
+  ts.isCallExpression(node)
+  && node.expression.getText(sourceFile) === 'state.log.unshift'
+  && node.arguments.length === 1
+  && isMapperEntryExpression(node.arguments[0], 'entries')
+  && !mapperResultMutationPattern('entries').test(block.source.slice(0, node.getStart(sourceFile) - block.start))
+
 const scanFile = (repoRoot: string, fullPath: string, hits: Set<LogExemption>): DirectSessionLogViolation[] => {
   const rel = path.relative(repoRoot, fullPath).replaceAll(path.sep, '/')
   const sourceFile = parseSource(fullPath)
@@ -515,11 +537,11 @@ const scanFile = (repoRoot: string, fullPath: string, hits: Set<LogExemption>): 
     const index = node.getStart(sourceFile)
     const match = exemptions.find(({ exemption, block }) =>
       exemption.kind === kind && block && index >= block.start && index < block.end
-      && (kind === 'state-log-write' || kind === 'log-store-constructor'
+      && ((kind === 'state-log-write' && isAllowedStateLogWrite(node, sourceFile, block)) || kind === 'log-store-constructor'
         || (ts.isCallExpression(node)
           && (kind === 'log-store-append'
             ? isAllowedLogStoreAppend(node, sourceFile, [block])
-            : isAllowedLogCacheWriterCall(rel, node, sourceFile, block)))))
+            : kind === 'log-cache-writer-call' && isAllowedLogCacheWriterCall(rel, node, sourceFile, block)))))
     if (match) {
       hits.add(match.exemption)
       return
@@ -535,13 +557,19 @@ const scanFile = (repoRoot: string, fullPath: string, hits: Set<LogExemption>): 
     logStoreAliases: ReadonlySet<string>,
     logCacheWriterAliases: ReadonlySet<string>,
     logStoreConstructorAliases: ReadonlySet<string>,
+    cacheNamespaces: Set<string>,
+    storeNamespaces: Set<string>,
   ): void => {
+    let scopedCacheNamespaces = cacheNamespaces
+    let scopedStoreNamespaces = storeNamespaces
     let scopedStateLikeNames = stateLikeNames
     let scopedStateLogAliases = stateLogAliases
     let scopedLogStoreAliases = logStoreAliases
     let scopedLogCacheWriterAliases = logCacheWriterAliases
     let scopedLogStoreConstructorAliases = logStoreConstructorAliases
     if (ts.isSourceFile(node) || ts.isBlock(node) || ts.isFunctionLike(node)) {
+      scopedCacheNamespaces = new Set(cacheNamespaces)
+      scopedStoreNamespaces = new Set(storeNamespaces)
       scopedStateLikeNames = new Set(stateLikeNames)
       scopedStateLogAliases = new Set(stateLogAliases)
       scopedLogStoreAliases = new Set(logStoreAliases)
@@ -552,6 +580,8 @@ const scanFile = (repoRoot: string, fullPath: string, hits: Set<LogExemption>): 
           const names: string[] = []
           collectBindingNames(parameter.name, names)
           for (const name of names) {
+            scopedCacheNamespaces.delete(name)
+            scopedStoreNamespaces.delete(name)
             ;(scopedStateLikeNames as Set<string>).delete(name)
             ;(scopedStateLogAliases as Set<string>).delete(name)
             ;(scopedLogStoreAliases as Set<string>).delete(name)
@@ -569,6 +599,8 @@ const scanFile = (repoRoot: string, fullPath: string, hits: Set<LogExemption>): 
       const names: string[] = []
       collectBindingNames(node.name, names)
       for (const name of names) {
+        scopedCacheNamespaces.delete(name)
+        scopedStoreNamespaces.delete(name)
         ;(scopedStateLikeNames as Set<string>).delete(name)
         ;(scopedStateLogAliases as Set<string>).delete(name)
         ;(scopedLogStoreAliases as Set<string>).delete(name)
@@ -576,6 +608,12 @@ const scanFile = (repoRoot: string, fullPath: string, hits: Set<LogExemption>): 
         ;(scopedLogStoreConstructorAliases as Set<string>).delete(name)
       }
       if (node.initializer) {
+        if (ts.isIdentifier(node.name) && isLogCacheNamespace(node.initializer, scopedCacheNamespaces)) {
+          scopedCacheNamespaces.add(node.name.text)
+        }
+        if (ts.isIdentifier(node.name) && isLogStoreNamespace(node.initializer, scopedStoreNamespaces)) {
+          scopedStoreNamespaces.add(node.name.text)
+        }
         if (ts.isIdentifier(node.name)
           && (includesGameStateType(node.type, sourceFile)
             || isGameStateExpression(node.initializer, sourceFile))) {
@@ -591,7 +629,7 @@ const scanFile = (repoRoot: string, fullPath: string, hits: Set<LogExemption>): 
           && cacheWriterCallName(
             node.initializer,
             logCacheWriterNames,
-            logCacheWriterNamespaces,
+            scopedCacheNamespaces,
             scopedLogCacheWriterAliases,
           )) {
           ;(scopedLogCacheWriterAliases as Set<string>).add(node.name.text)
@@ -600,7 +638,7 @@ const scanFile = (repoRoot: string, fullPath: string, hits: Set<LogExemption>): 
           && isLogStoreConstructorAliasSource(
             node.initializer,
             logStoreClassNames,
-            logStoreClassNamespaces,
+            scopedStoreNamespaces,
             scopedLogStoreConstructorAliases,
           )) {
           ;(scopedLogStoreConstructorAliases as Set<string>).add(node.name.text)
@@ -617,9 +655,6 @@ const scanFile = (repoRoot: string, fullPath: string, hits: Set<LogExemption>): 
           }
         }
         if (ts.isObjectBindingPattern(node.name)) {
-          const namespace = ts.isIdentifier(unwrapExpression(node.initializer))
-            ? (unwrapExpression(node.initializer) as ts.Identifier).text
-            : null
           for (const element of node.name.elements) {
             if (ts.isOmittedExpression(element)) continue
             const property = element.propertyName
@@ -630,13 +665,11 @@ const scanFile = (repoRoot: string, fullPath: string, hits: Set<LogExemption>): 
               ;(scopedLogStoreAliases as Set<string>).add(bindingName.text)
             }
             if (sourceName === 'prependDerivedLogEntries'
-              && namespace
-              && logCacheWriterNamespaces.has(namespace)) {
+              && isLogCacheNamespace(node.initializer, scopedCacheNamespaces)) {
               ;(scopedLogCacheWriterAliases as Set<string>).add(bindingName.text)
             }
             if (sourceName === 'LogStore'
-              && namespace
-              && logStoreClassNamespaces.has(namespace)) {
+              && isLogStoreNamespace(node.initializer, scopedStoreNamespaces)) {
               ;(scopedLogStoreConstructorAliases as Set<string>).add(bindingName.text)
             }
           }
@@ -648,6 +681,10 @@ const scanFile = (repoRoot: string, fullPath: string, hits: Set<LogExemption>): 
       && node.operatorToken.kind === ts.SyntaxKind.EqualsToken
       && ts.isIdentifier(unwrapExpression(node.left))) {
       const name = (unwrapExpression(node.left) as ts.Identifier).text
+      scopedCacheNamespaces.delete(name)
+      scopedStoreNamespaces.delete(name)
+      if (isLogCacheNamespace(node.right, scopedCacheNamespaces)) scopedCacheNamespaces.add(name)
+      if (isLogStoreNamespace(node.right, scopedStoreNamespaces)) scopedStoreNamespaces.add(name)
       ;(scopedStateLogAliases as Set<string>).delete(name)
       ;(scopedLogStoreAliases as Set<string>).delete(name)
       ;(scopedLogCacheWriterAliases as Set<string>).delete(name)
@@ -661,7 +698,7 @@ const scanFile = (repoRoot: string, fullPath: string, hits: Set<LogExemption>): 
       if (cacheWriterCallName(
         node.right,
         logCacheWriterNames,
-        logCacheWriterNamespaces,
+        scopedCacheNamespaces,
         scopedLogCacheWriterAliases,
       )) {
         ;(scopedLogCacheWriterAliases as Set<string>).add(name)
@@ -669,7 +706,7 @@ const scanFile = (repoRoot: string, fullPath: string, hits: Set<LogExemption>): 
       if (isLogStoreConstructorAliasSource(
         node.right,
         logStoreClassNames,
-        logStoreClassNamespaces,
+        scopedStoreNamespaces,
         scopedLogStoreConstructorAliases,
       )) {
         ;(scopedLogStoreConstructorAliases as Set<string>).add(name)
@@ -689,18 +726,15 @@ const scanFile = (repoRoot: string, fullPath: string, hits: Set<LogExemption>): 
           ;(scopedLogStoreAliases as Set<string>).add(name)
         }
       }
-      const namespace = ts.isIdentifier(unwrapExpression(node.right))
-        ? (unwrapExpression(node.right) as ts.Identifier).text
-        : null
       for (const name of objectLiteralAliasAssignments(node.left, 'prependDerivedLogEntries')) {
         ;(scopedLogCacheWriterAliases as Set<string>).delete(name)
-        if (namespace && logCacheWriterNamespaces.has(namespace)) {
+        if (isLogCacheNamespace(node.right, scopedCacheNamespaces)) {
           ;(scopedLogCacheWriterAliases as Set<string>).add(name)
         }
       }
       for (const name of objectLiteralAliasAssignments(node.left, 'LogStore')) {
         ;(scopedLogStoreConstructorAliases as Set<string>).delete(name)
-        if (namespace && logStoreClassNamespaces.has(namespace)) {
+        if (isLogStoreNamespace(node.right, scopedStoreNamespaces)) {
           ;(scopedLogStoreConstructorAliases as Set<string>).add(name)
         }
       }
@@ -720,7 +754,7 @@ const scanFile = (repoRoot: string, fullPath: string, hits: Set<LogExemption>): 
       && isLogStoreConstructorExpression(
         node.expression,
         logStoreClassNames,
-        logStoreClassNamespaces,
+        scopedStoreNamespaces,
         scopedLogStoreConstructorAliases,
       )
       && !allowedTestLogStoreConstructor(rel)) {
@@ -751,7 +785,7 @@ const scanFile = (repoRoot: string, fullPath: string, hits: Set<LogExemption>): 
       if (cacheWriterCallName(
         node.expression,
         logCacheWriterNames,
-        logCacheWriterNamespaces,
+        scopedCacheNamespaces,
         scopedLogCacheWriterAliases,
       )
         && !allowedTestLogCacheWriterCall(rel)) {
@@ -766,9 +800,11 @@ const scanFile = (repoRoot: string, fullPath: string, hits: Set<LogExemption>): 
       scopedLogStoreAliases,
       scopedLogCacheWriterAliases,
       scopedLogStoreConstructorAliases,
+      scopedCacheNamespaces,
+      scopedStoreNamespaces,
     ))
   }
-  visit(sourceFile, new Set(['state']), new Set(), new Set(), new Set(), new Set())
+  visit(sourceFile, new Set(['state']), new Set(), new Set(), new Set(), new Set(), logCacheWriterNamespaces, logStoreClassNamespaces)
 
   return violations
 }
