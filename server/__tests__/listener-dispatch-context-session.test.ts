@@ -22,8 +22,10 @@ describe('lazy listener dispatch context', () => {
       player.occupationHand = ['__test_placeholder__']
     })
     owner.minorPlayed.push(CARD_ID)
-    owner.cardStates = owner.cardStates ?? {}
 
+    // Listeners are state-pure, so the dispatch context is observed through a
+    // closure and the owner-targeted effect is a returned special-effect leaf.
+    const observed: Array<{ triggerPlayerId?: string; ownerPlayerId?: string; playerId: string }> = []
     const listener: CardListenerRegistration = {
       id: 'test-context-owner-after-forest',
       cardIds: [CARD_ID],
@@ -32,14 +34,19 @@ describe('lazy listener dispatch context', () => {
       actions: ['place-farmer'],
       handler: (ctx) => {
         if (ctx.space?.id !== 'forest') return
-        const ownerPlayer = ctx.ownerPlayer ?? owner
-        ownerPlayer.cardStates = ownerPlayer.cardStates ?? {}
-        ownerPlayer.cardStates[CARD_ID] = {
-          extraData: {
-            triggerPlayerId: ctx.triggerPlayer?.id,
-            ownerPlayerId: ctx.ownerPlayer?.id,
-            playerId: ctx.player.id,
+        observed.push({
+          triggerPlayerId: ctx.triggerPlayer?.id,
+          ownerPlayerId: ctx.ownerPlayer?.id,
+          playerId: ctx.player.id,
+        })
+        return {
+          flow: {
+            type: 'leaf',
+            actionId: 'special-effect',
+            sourceCard: CARD_ID,
+            params: { kind: 'set-extra-data', key: 'seenForest', value: true },
           },
+          sourceCard: CARD_ID,
         }
       },
     }
@@ -52,10 +59,12 @@ describe('lazy listener dispatch context', () => {
     const resp = session.takeAction(0, 'forest')
 
     expect(resp.ok).toBe(true)
-    expect(resp.state.players[1]!.cardStates?.[CARD_ID]?.extraData).toEqual({
+    expect(observed).toEqual([{
       triggerPlayerId: trigger.id,
       ownerPlayerId: owner.id,
       playerId: trigger.id,
-    })
+    }])
+    expect(resp.state.players[1]!.cardStates?.[CARD_ID]?.extraData?.seenForest).toBe(true)
+    expect(resp.state.players[0]!.cardStates?.[CARD_ID]).toBeUndefined()
   })
 })

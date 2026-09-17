@@ -48,7 +48,7 @@
 
 ### 3.2 直接行为测试
 
-简单即时效果可以直接调用卡牌公开的 effect / listener，断言返回的 `ActionFlow`、资源 delta、来源卡和不触发分支。仅当效果不经过支付求解、选择 / pending、阶段延迟、跨玩家或多步 flow 时使用。
+简单即时效果可以直接调用卡牌公开的 effect / listener，断言返回的 `ActionFlow`、资源 delta、来源卡和不触发分支。仅当效果不经过支付求解、选择 / pending、阶段延迟、跨玩家或多步 flow 时使用。调用 listener handler 时使用 `shared/cards/__tests__/listener-purity-guard.ts` 的 `invokeListenerHandlerUnderGuard` 或 `guardedListener`，而不是直接 `registration.handler(ctx)`，让直接测试同时证明 handler 只读状态并返回副本；`executeCardListener` 与所有 `GameSession` 路径由 Vitest setup 自动加 guard。
 
 ### 3.3 Session 测试
 

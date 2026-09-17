@@ -8,6 +8,7 @@ import { LogStore } from '../../../engine/log-store'
 import { ActionNode } from '../../../engine/nodes'
 import { clearActionHooks } from '../../../actions/hooks'
 import { registerStubCards, clearStubCards } from '../index'
+import { readObservation } from '../helpers'
 import { CARD_ID } from '../Stub_PayGainVp'
 import { internalActionDefinitions } from '../../../actions/index'
 import { computeScores } from '../../../domain/scoring'
@@ -128,7 +129,7 @@ describe('Stub_PayGainVp mechanism', () => {
     expect(player.resources.wood).toBe(4)
     expect(player.resources.grain).toBe(1)
     expect(player.cardStates?.[CARD_ID]?.counters?.bonusVp).toBe(1)
-    expect(player.cardStates?.[CARD_ID]?.counters?.observedCount).toBe(1)
+    expect(readObservation(player, CARD_ID)).toBe(1)
   })
 
   it('skip choice does not change resources', () => {
@@ -170,7 +171,7 @@ describe('Stub_PayGainVp mechanism', () => {
     const player = createPlayer()
     player.minorPlayed = [CARD_ID]
     player.cardStates = {
-      [CARD_ID]: { counters: { bonusVp: 3, observedCount: 3 } },
+      [CARD_ID]: { counters: { bonusVp: 3 } },
     }
     const state = createState(player)
     const scores = computeScores(state)

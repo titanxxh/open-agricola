@@ -1,5 +1,5 @@
 import type { CardListenerRegistration } from '../card-listeners'
-import { incCounter } from './helpers'
+import { observe } from './helpers'
 
 export const CARD_ID = 'Stub_ComputeArgs_ExtraOption'
 
@@ -9,7 +9,7 @@ export const listener: CardListenerRegistration = {
   phases: ['computeArgs'],
   actions: ['improvement-any'],
   handler: (context) => {
-    incCounter(context.player, CARD_ID, 'observedCount')
+    observe(context.player, CARD_ID)
     return {
       extraOptions: [{ value: 'stub-bonus-improvement', labelKey: 'ui.stubBonus' }],
     }

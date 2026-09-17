@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { invokeListenerHandlerUnderGuard } from './listener-purity-guard'
 import type { ActionFlow, GameState, PlayerState } from '../../contract/types'
 import type { CardListenerContext, CardListenerRegistration } from '../card-listeners'
 import { A043_FarmyardManure_impl } from '../A/A043_FarmyardManure'
@@ -107,7 +108,7 @@ const invokePure = (
   ctx: CardListenerContext,
 ) => {
   const before = JSON.stringify(ctx.state)
-  const result = registration.handler(ctx)
+  const result = invokeListenerHandlerUnderGuard(registration, ctx)
   expect(JSON.stringify(ctx.state)).toBe(before)
   return result
 }

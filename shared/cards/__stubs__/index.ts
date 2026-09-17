@@ -1,4 +1,5 @@
 import { CardRegistry } from '../registry'
+import { clearObservations } from './helpers'
 import { requireActiveCardRegistry, setActiveCardRegistry } from '../active-registry'
 
 import { listener as immediatelyAfterGainFlow } from './Stub_ImmediatelyAfter_GainFlow'
@@ -12,7 +13,7 @@ import { effect as onRoundEndFlowEffect } from './Stub_OnRoundEndFlow'
 import { listener as scopeOpponent } from './Stub_Scope_Opponent'
 import { listener as afterActionOptionalConstruct } from './Stub_AfterAction_OptionalConstruct'
 import { afterListener as payGainVpAfter } from './Stub_PayGainVp'
-import { computeCostsListener as cardStorageFence } from './Stub_CardStorage_ConsumeFence'
+import { computeCostsListener as cardStorageFence, consumeListener as cardStorageConsumeFence } from './Stub_CardStorage_ConsumeFence'
 import { listener as computeReplaceDecline } from './Stub_ComputeReplace_Decline'
 import { effect as beforeReturnHomeEffect } from './Stub_BeforeReturnHome'
 import { effect as startReturnHomeEffect } from './Stub_StartReturnHome'
@@ -32,6 +33,7 @@ const allListeners = [
   afterActionOptionalConstruct,
   payGainVpAfter,
   cardStorageFence,
+  cardStorageConsumeFence,
   computeReplaceDecline,
 ]
 
@@ -55,5 +57,6 @@ export const registerStubCards = () => {
 }
 
 export const clearStubCards = () => {
+  clearObservations()
   setActiveCardRegistry(new CardRegistry())
 }

@@ -1,5 +1,5 @@
 import type { CardListenerRegistration } from '../card-listeners'
-import { incCounter } from './helpers'
+import { observe } from './helpers'
 
 export const CARD_ID = 'Stub_ComputeCosts_BuildDiscount'
 
@@ -9,7 +9,7 @@ export const listener: CardListenerRegistration = {
   phases: ['computeCosts'],
   actions: ['construct'],
   handler: (context) => {
-    incCounter(context.player, CARD_ID, 'observedCount')
+    observe(context.player, CARD_ID)
     return { costs: { wood: -1 } }
   },
 }

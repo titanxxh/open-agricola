@@ -1,5 +1,5 @@
 import type { CardListenerRegistration } from '../card-listeners'
-import { incCounter } from './helpers'
+import { observe } from './helpers'
 
 export const CARD_ID = 'Stub_IsDoable_Override'
 
@@ -9,7 +9,7 @@ export const listener: CardListenerRegistration = {
   phases: ['isDoable'],
   actions: ['day-laborer'],
   handler: (context) => {
-    incCounter(context.player, CARD_ID, 'observedCount')
+    observe(context.player, CARD_ID)
     return { doable: true }
   },
 }

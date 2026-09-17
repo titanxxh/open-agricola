@@ -26,7 +26,13 @@ import type {
   Resource,
   Trade,
 } from '../../../contract/types'
-import { buildCardListenerContext, executeCardListener, getMatchingListeners, listenerOwnerOptions } from '../../../cards/card-listeners'
+import {
+  buildCardListenerContext,
+  executeCardListener,
+  getMatchingListeners,
+  invokeCardCostCandidateTransform,
+  listenerOwnerOptions,
+} from '../../../cards/card-listeners'
 import { applyCostOverride, isComplexCost } from './affordability'
 import { closeCandidates, type CandidateTransform } from './candidate-closure'
 import {
@@ -71,8 +77,7 @@ export const resolveCardCostWithModifiersDetailed = (
       cardId,
       actionCardId,
     }
-    const derive = entry.registration.deriveCardCostCandidate
-    if (derive) {
+    if (entry.registration.deriveCardCostCandidate) {
       const builtContext = buildCardListenerContext(
         entry.registration,
         listenerContext,
@@ -81,7 +86,7 @@ export const resolveCardCostWithModifiersDetailed = (
       transforms.push({
         source: entry.registration.id,
         mandatory: entry.registration.cardCostCandidateMandatory === true,
-        apply: (candidate) => derive(builtContext, candidate),
+        apply: (candidate) => invokeCardCostCandidateTransform(entry.registration, builtContext, candidate),
       })
     }
     const result = executeCardListener(entry.registration, listenerContext, listenerOwnerOptions(entry))

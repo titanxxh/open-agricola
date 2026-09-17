@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { guardedListener } from './listener-purity-guard'
 import type { ActionFlow, ActionSpace, GameState, PlayerState, Resource } from '../../contract/types'
 import type { DraftGameEvent } from '../../contract/events'
 import type { CardListenerContext, CardListenerRegistration } from '../card-listeners'
@@ -137,7 +138,7 @@ const listenerById = (
 ): CardListenerRegistration => {
   const listener = listeners?.find((entry) => entry.id === id)
   expect(listener, `listener ${id}`).toBeDefined()
-  return listener!
+  return guardedListener(listener!)
 }
 
 const leafSummary = (leaf: LeafFlow): ExpectedLeaf => ({

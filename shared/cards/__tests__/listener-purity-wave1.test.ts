@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import type { ActionFlow } from '../../contract/types'
 import type { DraftGameEvent } from '../../contract/events'
 import type { CardListenerContext } from '../card-listeners'
+import { guardedListener } from './listener-purity-guard'
 import { A144_Sequestrator_impl } from '../A/A144_Sequestrator'
 import { B048_ForestStone_impl } from '../B/B048_ForestStone'
 import { C148_MudWallower_impl } from '../C/C148_MudWallower'
@@ -176,7 +177,7 @@ const makeD27Context = (
 
 describe('listener purity wave 1', () => {
   it('A144 handler returns storage-clear and trigger-player gain flow without mutating immediately', () => {
-    const listener = A144_Sequestrator_impl.listeners![0]!
+    const listener = guardedListener(A144_Sequestrator_impl.listeners![0]!)
     const ctx = makeA144Context()
     const owner = ctx.state.players[0]!
     const triggerPlayer = ctx.state.players[1]!
@@ -206,7 +207,7 @@ describe('listener purity wave 1', () => {
   })
 
   it('B48 wood handler returns flow without decrementing stored food immediately', () => {
-    const listener = B048_ForestStone_impl.listeners![0]!
+    const listener = guardedListener(B048_ForestStone_impl.listeners![0]!)
     const ctx = makeB48Context(2, { wood: 3 })
     const before = JSON.stringify(ctx.player.cardStates)
 
@@ -234,7 +235,7 @@ describe('listener purity wave 1', () => {
   })
 
   it('B48 wood handler returns no flow when stored food is empty', () => {
-    const listener = B048_ForestStone_impl.listeners![0]!
+    const listener = guardedListener(B048_ForestStone_impl.listeners![0]!)
     const ctx = makeB48Context(0, { wood: 3 })
     const before = JSON.stringify(ctx.player.cardStates)
 
@@ -245,7 +246,7 @@ describe('listener purity wave 1', () => {
   })
 
   it('B48 stone handler returns flow without incrementing stored food immediately', () => {
-    const listener = B048_ForestStone_impl.listeners![1]!
+    const listener = guardedListener(B048_ForestStone_impl.listeners![1]!)
     const ctx = makeB48Context(2, { stone: 1 })
     const before = JSON.stringify(ctx.player.cardStates)
 
@@ -272,7 +273,7 @@ describe('listener purity wave 1', () => {
   })
 
   it('E103 handler returns stack-pop and boar-gain flow without popping stack immediately', () => {
-    const listener = E103_Wolf_impl.listeners![0]!
+    const listener = guardedListener(E103_Wolf_impl.listeners![0]!)
     const ctx = makeE103Context()
     const before = JSON.stringify(ctx.player.cardStates)
 
@@ -284,7 +285,7 @@ describe('listener purity wave 1', () => {
   })
 
   it('E103 handler returns no flow for non-matching gained resource', () => {
-    const listener = E103_Wolf_impl.listeners![0]!
+    const listener = guardedListener(E103_Wolf_impl.listeners![0]!)
     const ctx = makeE103Context(['clay', 'wood', 'grain'], { wood: 1 })
     const before = JSON.stringify(ctx.player.cardStates)
 
@@ -295,7 +296,7 @@ describe('listener purity wave 1', () => {
   })
 
   it('E103 handler returns no flow for an empty stack', () => {
-    const listener = E103_Wolf_impl.listeners![0]!
+    const listener = guardedListener(E103_Wolf_impl.listeners![0]!)
     const ctx = makeE103Context([], { grain: 1 })
     const before = JSON.stringify(ctx.player.cardStates)
 
@@ -306,7 +307,7 @@ describe('listener purity wave 1', () => {
   })
 
   it('C148 handler returns boar flow without resetting counters immediately', () => {
-    const listener = mudWallowerAfterPlaceFarmerListener()
+    const listener = guardedListener(mudWallowerAfterPlaceFarmerListener())
     const ctx = makeC148Context(3, 0)
     const before = JSON.stringify(ctx.player.cardStates)
 
@@ -318,7 +319,7 @@ describe('listener purity wave 1', () => {
   })
 
   it('C148 handler returns no flow and no mutation for non-accumulation spaces', () => {
-    const listener = mudWallowerAfterPlaceFarmerListener()
+    const listener = guardedListener(mudWallowerAfterPlaceFarmerListener())
     const ctx = makeC148Context(0, 0, {})
     const before = JSON.stringify(ctx.player.cardStates)
 
@@ -333,7 +334,7 @@ describe('listener purity wave 1', () => {
     [1, 2],
     [2, 3],
   ])('C148 handler returns counter %i -> %i flow without mutating immediately', (counter, nextCounter) => {
-    const listener = mudWallowerAfterPlaceFarmerListener()
+    const listener = guardedListener(mudWallowerAfterPlaceFarmerListener())
     const ctx = makeC148Context(counter, 2)
     const before = JSON.stringify(ctx.player.cardStates)
 
@@ -360,7 +361,7 @@ describe('listener purity wave 1', () => {
   })
 
   it('C148 handler returns reset, held, infobox, and boar flow on every fourth accumulation space', () => {
-    const listener = mudWallowerAfterPlaceFarmerListener()
+    const listener = guardedListener(mudWallowerAfterPlaceFarmerListener())
     const ctx = makeC148Context(3, 2)
     const before = JSON.stringify(ctx.player.cardStates)
 
@@ -401,7 +402,7 @@ describe('listener purity wave 1', () => {
   })
 
   it('D27 renovation handler returns set-flag flow without mutating immediately', () => {
-    const listener = D027_Retraining_impl.listeners![0]!
+    const listener = guardedListener(D027_Retraining_impl.listeners![0]!)
     const ctx = makeD27Context(false)
     ctx.actionId = 'renovate-house'
     ctx.space = { id: 'renovate-house' } as never
@@ -419,7 +420,7 @@ describe('listener purity wave 1', () => {
   })
 
   it('D27 place-farmer handler returns clear-flag plus optional swap without reserving the board', () => {
-    const listener = D027_Retraining_impl.listeners![1]!
+    const listener = guardedListener(D027_Retraining_impl.listeners![1]!)
     const ctx = makeD27Context(true, ['Major_Joinery'], ['Major_Pottery'])
     const beforePlayer = JSON.stringify(ctx.player)
     const beforeMajors = JSON.stringify(ctx.state.availableMajorImprovements)
@@ -458,7 +459,7 @@ describe('listener purity wave 1', () => {
   })
 
   it('D27 place-farmer handler returns only clear-flag when no swap is available', () => {
-    const listener = D027_Retraining_impl.listeners![1]!
+    const listener = guardedListener(D027_Retraining_impl.listeners![1]!)
     const ctx = makeD27Context(true, ['Major_Joinery'], [])
     const beforePlayer = JSON.stringify(ctx.player)
     const beforeMajors = JSON.stringify(ctx.state.availableMajorImprovements)
@@ -476,7 +477,7 @@ describe('listener purity wave 1', () => {
   })
 
   it('D27 place-farmer handler returns no flow when not flagged', () => {
-    const listener = D027_Retraining_impl.listeners![1]!
+    const listener = guardedListener(D027_Retraining_impl.listeners![1]!)
     const ctx = makeD27Context(false, ['Major_Joinery'], ['Major_Pottery'])
     const beforePlayer = JSON.stringify(ctx.player)
     const beforeMajors = JSON.stringify(ctx.state.availableMajorImprovements)

@@ -76,6 +76,51 @@ export type CardListenerRegistration = {
   handler?: (context: CardListenerContext) => ActionHookResult | void
 }
 
+export type CardListenerInvocation =
+  | { kind: 'handler'; registration: CardListenerRegistration; context: CardListenerContext }
+  | {
+      kind: 'deriveCardCostCandidate'
+      registration: CardListenerRegistration
+      context: CardListenerContext
+      candidate: CardCostCandidate
+    }
+
+/**
+ * Wraps every card-listener invocation (handler and cost-candidate transform).
+ * Production leaves this unset so listeners run directly; test setups install a
+ * purity guard here to prove listeners only read authoritative state.
+ */
+export type CardListenerInvocationInterceptor = <T>(
+  invocation: CardListenerInvocation,
+  invoke: (context: CardListenerContext) => T,
+) => T
+
+let invocationInterceptor: CardListenerInvocationInterceptor | undefined
+
+export const setCardListenerInvocationInterceptor = (
+  interceptor: CardListenerInvocationInterceptor | undefined,
+): void => {
+  invocationInterceptor = interceptor
+}
+
+const invokeCardListener = <T>(
+  invocation: CardListenerInvocation,
+  invoke: (context: CardListenerContext) => T,
+): T => (invocationInterceptor ? invocationInterceptor(invocation, invoke) : invoke(invocation.context))
+
+export const invokeCardCostCandidateTransform = (
+  registration: CardListenerRegistration,
+  context: CardListenerContext,
+  candidate: CardCostCandidate,
+): CardCostCandidate | readonly CardCostCandidate[] | null => {
+  const derive = registration.deriveCardCostCandidate
+  if (!derive) return null
+  return invokeCardListener(
+    { kind: 'deriveCardCostCandidate', registration, context, candidate },
+    (listenerContext) => derive(listenerContext, candidate),
+  )
+}
+
 export const getRegisteredCardListeners = (): CardListenerRegistration[] => {
   const active = getActiveCardRegistry()
   return active ? active.getAllListeners() : []
@@ -342,9 +387,13 @@ export const executeCardListener = (
   context: CardListenerContextInput,
   options?: CardListenerOwnerOptions,
 ): ActionHookResult | undefined => {
-  if (!registration.handler) return undefined
+  const handler = registration.handler
+  if (!handler) return undefined
   const listenerContext = buildCardListenerContext(registration, context, options)
-  const result = registration.handler(listenerContext)
+  const result = invokeCardListener(
+    { kind: 'handler', registration, context: listenerContext },
+    (invocationContext) => handler(invocationContext),
+  )
   const cardId = getCardListenerSource(registration)
     ?? listenerContext.ownerCardId
     ?? registration.cardIds?.find(candidate => candidate.startsWith('CUSTOM_'))
