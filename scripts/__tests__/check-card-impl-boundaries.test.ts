@@ -520,6 +520,8 @@ describe('listener state mutation scan', () => {
     space: { id: string; resources: Record<string, number> }
     actionContext?: Record<string, unknown>
     eventQuery: { find: (type: string) => { resources: Record<string, number> } }
+    costs?: Record<string, number>
+    costBonuses?: Array<{ amount: number }>
   }
 
   const scan = (fn: unknown, role: 'handler' | 'deriveCardCostCandidate' = 'handler') => {
@@ -565,6 +567,8 @@ describe('listener state mutation scan', () => {
     ['element reached through Object.values', (ctx) => { Object.values(ctx.player.cardStates).forEach((entry) => { entry.counters = {} }) }],
     ['Reflect.set', (ctx) => { Reflect.set(ctx.player.resources, 'wood', 0) }],
     ['Reflect.deleteProperty on a descriptor value', (ctx) => { Reflect.deleteProperty(Reflect.get(ctx.player, 'cardStates') as object, 'A001_Shelter') }],
+    ['destructured payment costs', ({ costs }) => { costs!.wood = 0 }],
+    ['forwarded cost bonuses', (ctx) => { ctx.costBonuses!.push({ amount: 1 }) }],
   ])('reports %s', (_label, fn) => {
     const messages = mutationMessages(fn)
     expect(messages).toHaveLength(1)

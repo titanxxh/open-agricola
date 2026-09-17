@@ -198,6 +198,21 @@ describe('listener purity guard: rejected writes', () => {
     )
   })
 
+  it('rejects writes to forwarded payment context objects', () => {
+    const costs = { wood: 2 }
+    const costTrades = [{ from: { wood: 1 }, to: { food: 1 }, sourceId: 'X' }] as unknown as CardListenerContext['costTrades']
+    expectViolation(
+      () => invokeListenerHandlerUnderGuard(registration(({ costs: forwarded }) => { forwarded!.wood = 0 }), makeContext({ costs, costTrades }).context),
+      { kind: 'set', path: 'costs.wood' },
+    )
+    expect(costs.wood).toBe(2)
+    expectViolation(
+      () => invokeListenerHandlerUnderGuard(registration((ctx) => { ctx.costTrades!.pop() }), makeContext({ costs, costTrades }).context),
+      { kind: 'delete', path: 'costTrades[0]' },
+    )
+    expect(costTrades).toHaveLength(1)
+  })
+
   it('rejects writes to the engine action context and to the triggering space', () => {
     expectViolation(
       () => invokeListenerHandlerUnderGuard(registration((ctx) => { ctx.actionContext!.skipBeforeTriggers = true }), makeContext().context),

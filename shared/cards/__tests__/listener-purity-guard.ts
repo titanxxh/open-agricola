@@ -47,6 +47,11 @@ export const GUARDED_CONTEXT_KEYS = [
   'actionEvents',
   'triggerSnapshot',
   'extraData',
+  'costs',
+  'costTrades',
+  'costBonuses',
+  'paymentResourceProviders',
+  'costAttribution',
 ] as const
 
 export type ListenerPurityViolationKind =
