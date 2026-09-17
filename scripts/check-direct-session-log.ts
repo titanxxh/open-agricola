@@ -58,13 +58,10 @@ const logExemptions = [
 
 type LogExemption = typeof logExemptions[number]
 
-const MAPPER_ASSIGNMENT_SOURCE = String.raw`\b(?:const|let)\s+([A-Za-z_$][\w$]*)\s*(?::[^=]+)?=\s*eventsToLogEntries\s*\(`
-const mapperAssignmentRegex = (flags = ''): RegExp => new RegExp(MAPPER_ASSIGNMENT_SOURCE, flags)
-
 type FunctionBlock = {
   start: number
   end: number
-  source: string
+  body: ts.Block
 }
 
 const lineNumberForIndex = (source: string, index: number): number =>
@@ -87,7 +84,7 @@ const findFunctionBlock = (
   const fromBody = (body: ts.Block): FunctionBlock => ({
     start: body.getStart(sourceFile),
     end: body.getEnd(),
-    source: body.getText(sourceFile),
+    body,
   })
   const visit = (node: ts.Node): void => {
     if (block) return
@@ -115,20 +112,6 @@ const findFunctionBlock = (
   }
   visit(sourceFile)
   return block
-}
-
-const escapedRegExp = (value: string): string =>
-  value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
-
-const mapperResultMutationPattern = (variableName: string): RegExp => {
-  const variable = escapedRegExp(variableName)
-  const assignment = String.raw`(?:[-+*/%&|?]{0,2}=(?!=)|\+\+|--)`
-  const propertyChain = String.raw`(?:!?\s*(?:\.\s*[A-Za-z_$][\w$]*|\[[^\]]+\]))+`
-  const entryAccess = String.raw`(?:\[[^\]]+\]|\.\s*at\s*\([^)]*\))\s*!?`
-  const objectAssignTarget = String.raw`${variable}\s*(?:${entryAccess})?(?:${propertyChain})?`
-  return new RegExp(
-    String.raw`\b${variable}\s*(?:${assignment}|${entryAccess}\s*(?:${assignment}|${propertyChain}\s*${assignment})|\.length\s*${assignment}|\.(?:copyWithin|fill|pop|push|reverse|shift|sort|splice|unshift)\s*\()|\bObject\.assign\s*\(\s*${objectAssignTarget}\s*,|\b(?:const|let)\s+([A-Za-z_$][\w$]*)\s*(?::[^=]+)?=\s*${variable}\s*${entryAccess}[\s\S]*?\b\1${propertyChain}\s*${assignment}|\b(?:const|let)\s*\[\s*([A-Za-z_$][\w$]*)[^\]]*\]\s*(?::[^=]+)?=\s*${variable}\b[\s\S]*?\b\2${propertyChain}\s*${assignment}|\b(?:const|let)\s+([A-Za-z_$][\w$]*)\s*(?::[^=]+)?=\s*${variable}\b(?!\s*[.\[])[\s\S]*?\b\3\s*(?:${assignment}|${entryAccess}\s*${assignment}|\.length\s*${assignment}|\.(?:copyWithin|fill|pop|push|reverse|shift|sort|splice|unshift)\s*\()`,
-  )
 }
 
 const LOG_MUTATORS = new Set(['copyWithin', 'fill', 'pop', 'push', 'reverse', 'shift', 'sort', 'splice', 'unshift'])
@@ -192,14 +175,11 @@ const collectBindingNames = (name: ts.BindingName, out: string[]): void => {
   }
 }
 
-const isLogCacheModule = (specifier: string): boolean => {
-  const module = specifier.replace(sourceExtensions, '')
-  return module === './log-cache'
-    || module.endsWith('/log-cache')
-    || module === '../events'
-    || module.endsWith('/shared/events')
-    || module.endsWith('/shared/events/index')
-}
+const isLogCacheModule = (specifier: string, sourceFile: ts.SourceFile): boolean =>
+  specifier.startsWith('.')
+  && /\/shared\/events(?:\/(?:index|log-cache))?$/.test(
+    path.resolve(path.dirname(sourceFile.fileName), specifier).replaceAll(path.sep, '/').replace(sourceExtensions, ''),
+  )
 
 const requiredModule = (expression: ts.Expression): string | null => {
   const current = unwrapExpression(expression)
@@ -212,7 +192,7 @@ const requiredModule = (expression: ts.Expression): string | null => {
 const isLogCacheNamespace = (expression: ts.Expression, namespaces: ReadonlySet<string>): boolean => {
   const current = unwrapExpression(expression)
   const module = requiredModule(current)
-  return (ts.isIdentifier(current) && namespaces.has(current.text)) || (module !== null && isLogCacheModule(module))
+  return (ts.isIdentifier(current) && namespaces.has(current.text)) || (module !== null && isLogCacheModule(module, current.getSourceFile()))
 }
 
 const isLogStoreModule = (specifier: string, sourceFile: ts.SourceFile): boolean =>
@@ -241,6 +221,13 @@ const collectImportedIdentifiers = (
   const logCacheWriterNames = new Set<string>()
   const logCacheWriterNamespaces = new Set<string>()
   for (const statement of sourceFile.statements) {
+    if (ts.isImportEqualsDeclaration(statement) && ts.isExternalModuleReference(statement.moduleReference)) {
+      const specifier = statement.moduleReference.expression
+      if (specifier && ts.isStringLiteralLike(specifier)) {
+        if (isLogCacheModule(specifier.text, sourceFile)) logCacheWriterNamespaces.add(statement.name.text)
+        if (isLogStoreModule(specifier.text, sourceFile)) logStoreClassNamespaces.add(statement.name.text)
+      }
+    }
     if (!ts.isImportDeclaration(statement) || !ts.isStringLiteral(statement.moduleSpecifier)) continue
     const clause = statement.importClause
     const namedBindings = clause?.namedBindings
@@ -248,7 +235,7 @@ const collectImportedIdentifiers = (
     if (isLogStoreModule(statement.moduleSpecifier.text, sourceFile) && ts.isNamespaceImport(namedBindings)) {
       logStoreClassNamespaces.add(namedBindings.name.text)
     }
-    if (isLogCacheModule(statement.moduleSpecifier.text) && ts.isNamespaceImport(namedBindings)) {
+    if (isLogCacheModule(statement.moduleSpecifier.text, sourceFile) && ts.isNamespaceImport(namedBindings)) {
       logCacheWriterNamespaces.add(namedBindings.name.text)
       continue
     }
@@ -259,7 +246,7 @@ const collectImportedIdentifiers = (
         if (isLogStoreModule(statement.moduleSpecifier.text, sourceFile)) logStoreClassNames.add(specifier.name.text)
         else logStoreClassNames.delete(specifier.name.text)
       }
-      if (isLogCacheModule(statement.moduleSpecifier.text) && importedName === 'prependDerivedLogEntries') {
+      if (isLogCacheModule(statement.moduleSpecifier.text, sourceFile) && importedName === 'prependDerivedLogEntries') {
         logCacheWriterNames.add(specifier.name.text)
       }
     }
@@ -361,6 +348,12 @@ const isLogStoreConstructorExpression = (
 ): boolean => {
   const current = unwrapExpression(expression)
   if (ts.isIdentifier(current)) return logStoreClassNames.has(current.text) || logStoreConstructorAliases.has(current.text)
+  if (ts.isClassExpression(current)) {
+    return current.heritageClauses?.some(clause => clause.token === ts.SyntaxKind.ExtendsKeyword
+      && clause.types.some(type => isLogStoreConstructorExpression(
+        type.expression, logStoreClassNames, logStoreClassNamespaces, logStoreConstructorAliases,
+      ))) ?? false
+  }
   const receiver = accessReceiver(current)
   const unwrappedReceiver = receiver && unwrapExpression(receiver)
   return accessName(current) === 'LogStore'
@@ -466,26 +459,85 @@ const isObjectAssignStateLogWrite = (
   && isStateLikeExpression(call.arguments[0]!, stateLikeNames)
   && call.arguments.slice(1).some(objectLiteralWritesLogProperty)
 
+const findDerivedDeclaration = (
+  block: FunctionBlock,
+  before: ts.Node,
+  callee: string,
+): ts.VariableDeclaration | undefined => {
+  let found: ts.VariableDeclaration | undefined
+  const visit = (node: ts.Node): void => {
+    if (node.getStart() >= before.getStart() || ts.isFunctionLike(node)) return
+    if (ts.isVariableDeclaration(node) && ts.isIdentifier(node.name) && node.initializer) {
+      const initializer = unwrapExpression(node.initializer)
+      if (ts.isCallExpression(initializer) && initializer.expression.getText() === callee) found = node
+    }
+    ts.forEachChild(node, visit)
+  }
+  visit(block.body)
+  return found
+}
+
+const invocationTarget = (expression: ts.Expression): ts.Expression => {
+  const current = unwrapExpression(expression)
+  const receiver = accessReceiver(current)
+  return receiver && ['call', 'apply'].includes(accessName(current) ?? '') ? invocationTarget(receiver) : current
+}
+
+const hasDerivedMutation = (block: FunctionBlock, variableName: string): boolean => {
+  const aliases = new Set([variableName])
+  const isDerived = (expression: ts.Expression): boolean => {
+    const current = unwrapExpression(expression)
+    if (ts.isIdentifier(current)) return aliases.has(current.text)
+    const receiver = accessReceiver(ts.isCallExpression(current) ? current.expression : current)
+    return !!receiver && isDerived(receiver)
+  }
+  let mutated = false
+  const visit = (node: ts.Node): void => {
+    if (mutated) return
+    if (ts.isBinaryExpression(node)
+      && node.operatorToken.kind >= ts.SyntaxKind.FirstAssignment
+      && node.operatorToken.kind <= ts.SyntaxKind.LastAssignment) {
+      const left = unwrapExpression(node.left)
+      if ((ts.isIdentifier(left) ? left.text === variableName : isDerived(left))) mutated = true
+      if (node.operatorToken.kind === ts.SyntaxKind.EqualsToken && isDerived(node.right)) {
+        if (ts.isIdentifier(left)) aliases.add(left.text)
+        if (ts.isObjectLiteralExpression(left)) {
+          for (const property of left.properties) {
+            if (ts.isShorthandPropertyAssignment(property)) aliases.add(property.name.text)
+            if (ts.isPropertyAssignment(property) && ts.isIdentifier(property.initializer)) aliases.add(property.initializer.text)
+          }
+        }
+      }
+    }
+    if (ts.isVariableDeclaration(node) && node.initializer && isDerived(node.initializer)) {
+      const names: string[] = []
+      collectBindingNames(node.name, names)
+      for (const name of names) aliases.add(name)
+    }
+    if ((ts.isDeleteExpression(node) && isDerived(node.expression))
+      || ((ts.isPrefixUnaryExpression(node) || ts.isPostfixUnaryExpression(node)) && isDerived(node.operand))) mutated = true
+    if (ts.isCallExpression(node)) {
+      const target = invocationTarget(node.expression)
+      const receiver = accessReceiver(target)
+      if (receiver && LOG_MUTATORS.has(accessName(target) ?? '') && isDerived(receiver)) mutated = true
+      if (isObjectAssignCall(node) && node.arguments[0] && isDerived(node.arguments[0])) mutated = true
+    }
+    ts.forEachChild(node, visit)
+  }
+  visit(block.body)
+  return mutated
+}
+
 const isAllowedLogStoreAppend = (
   call: ts.CallExpression,
-  sourceFile: ts.SourceFile,
-  blocks: readonly FunctionBlock[],
-): boolean =>
-  blocks.some((block) => {
-    const matchIndex = call.expression.getStart(sourceFile)
-    if (matchIndex < block.start || matchIndex >= block.end) return false
-    const localAppendIndex = matchIndex - block.start
-    const mapperAssignments = [...block.source.matchAll(mapperAssignmentRegex('g'))]
-      .filter((match) => match.index < localAppendIndex)
-    const mapperAssignment = mapperAssignments.at(-1)
-    if (!mapperAssignment?.[1]) return false
-    const prefix = block.source.slice(
-      mapperAssignment.index + mapperAssignment[0].length,
-      localAppendIndex,
-    )
-    if (mapperResultMutationPattern(mapperAssignment[1]).test(prefix)) return false
-    return isMapperEntryExpression(call.arguments[0], mapperAssignment[1])
-  })
+  block: FunctionBlock,
+): boolean => {
+  const declaration = findDerivedDeclaration(block, call, 'eventsToLogEntries')
+  if (!declaration || !ts.isIdentifier(declaration.name)) return false
+  return call.arguments.length === 1
+    && isMapperEntryExpression(call.arguments[0], declaration.name.text)
+    && !hasDerivedMutation(block, declaration.name.text)
+}
 
 const isAllowedLogCacheWriterCall = (
   rel: string,
@@ -493,34 +545,21 @@ const isAllowedLogCacheWriterCall = (
   sourceFile: ts.SourceFile,
   block: FunctionBlock,
 ): boolean => {
-  const localCallIndex = call.expression.getStart(sourceFile) - block.start
-  const logEntriesArg = call.arguments[1]?.getText(sourceFile).trim()
+  if (call.arguments.length !== 2) return false
+  const destination = call.arguments[0]?.getText(sourceFile)
+  const logEntriesArg = call.arguments[1]?.getText(sourceFile)
   if (rel === 'shared/events/append.ts') {
-    const mapperAssignment = mapperAssignmentRegex().exec(block.source)
-    if (!mapperAssignment?.[1] || mapperAssignment.index >= localCallIndex) return false
-    const prefix = block.source.slice(
-      mapperAssignment.index + mapperAssignment[0].length,
-      localCallIndex,
-    )
-    return logEntriesArg === mapperAssignment[1]
-      && !mapperResultMutationPattern(mapperAssignment[1]).test(prefix)
+    const declaration = findDerivedDeclaration(block, call, 'eventsToLogEntries')
+    return destination === 'state' && !!declaration && ts.isIdentifier(declaration.name)
+      && logEntriesArg === declaration.name.text && !hasDerivedMutation(block, declaration.name.text)
   }
   if (rel === 'shared/session/session-core.ts') {
-    const entriesAssignment = /\bconst\s+entries\s*=\s*this\.engineLog\.all\s*\(\s*\)/.exec(block.source)
-    const toAddAssignment = /\bconst\s+toAdd\s*=\s*entries\.filter\s*\(/.exec(block.source)
-    if (!entriesAssignment || !toAddAssignment || toAddAssignment.index >= localCallIndex) return false
-    const entriesPrefix = block.source.slice(
-      entriesAssignment.index + entriesAssignment[0].length,
-      localCallIndex,
-    )
-    const prefix = block.source.slice(
-      toAddAssignment.index + toAddAssignment[0].length,
-      localCallIndex,
-    )
-    return logEntriesArg === 'toAdd'
-      && entriesAssignment.index < toAddAssignment.index
-      && !mapperResultMutationPattern('entries').test(entriesPrefix)
-      && !mapperResultMutationPattern('toAdd').test(prefix)
+    const entries = findDerivedDeclaration(block, call, 'this.engineLog.all')
+    const toAdd = findDerivedDeclaration(block, call, 'entries.filter')
+    return destination === 'this.state' && logEntriesArg === 'toAdd'
+      && entries?.name.getText(sourceFile) === 'entries' && toAdd?.name.getText(sourceFile) === 'toAdd'
+      && entries.getStart() < toAdd.getStart()
+      && !hasDerivedMutation(block, 'entries') && !hasDerivedMutation(block, 'toAdd')
   }
   return false
 }
@@ -530,7 +569,7 @@ const isAllowedStateLogWrite = (node: ts.Node, sourceFile: ts.SourceFile, block:
   && node.expression.getText(sourceFile) === 'state.log.unshift'
   && node.arguments.length === 1
   && isMapperEntryExpression(node.arguments[0], 'entries')
-  && !mapperResultMutationPattern('entries').test(block.source)
+  && !hasDerivedMutation(block, 'entries')
 
 const isAllowedLogStoreConstructor = (node: ts.Node, sourceFile: ts.SourceFile): boolean => {
   const assignment = node.parent
@@ -544,6 +583,11 @@ const isAllowedLogStoreConstructor = (node: ts.Node, sourceFile: ts.SourceFile):
     && ts.isBlock(assignment.parent.parent)
     && ts.isConstructorDeclaration(assignment.parent.parent.parent)
 }
+
+const isAliasScope = (node: ts.Node): boolean =>
+  ts.isSourceFile(node) || ts.isBlock(node) || ts.isFunctionLike(node)
+  || ts.isCatchClause(node) || ts.isForStatement(node) || ts.isForOfStatement(node)
+  || ts.isForInStatement(node) || ts.isCaseBlock(node)
 
 const scanFile = (repoRoot: string, fullPath: string, hits: Set<LogExemption>): DirectSessionLogViolation[] => {
   const rel = path.relative(repoRoot, fullPath).replaceAll(path.sep, '/')
@@ -567,7 +611,7 @@ const scanFile = (repoRoot: string, fullPath: string, hits: Set<LogExemption>): 
         || (kind === 'log-store-constructor' && isAllowedLogStoreConstructor(node, sourceFile))
         || (ts.isCallExpression(node)
           && (kind === 'log-store-append'
-            ? isAllowedLogStoreAppend(node, sourceFile, [block])
+            ? isAllowedLogStoreAppend(node, block)
             : kind === 'log-cache-writer-call' && isAllowedLogCacheWriterCall(rel, node, sourceFile, block)))))
     if (match) {
       hits.add(match.exemption)
@@ -594,7 +638,7 @@ const scanFile = (repoRoot: string, fullPath: string, hits: Set<LogExemption>): 
     let scopedLogStoreAliases = logStoreAliases
     let scopedLogCacheWriterAliases = logCacheWriterAliases
     let scopedLogStoreConstructorAliases = logStoreConstructorAliases
-    if (ts.isSourceFile(node) || ts.isBlock(node) || ts.isFunctionLike(node)) {
+    if (isAliasScope(node)) {
       scopedCacheNamespaces = new Set(cacheNamespaces)
       scopedStoreNamespaces = new Set(storeNamespaces)
       scopedStateLikeNames = new Set(stateLikeNames)
@@ -629,6 +673,12 @@ const scanFile = (repoRoot: string, fullPath: string, hits: Set<LogExemption>): 
           current.expression, logStoreClassNames, scopedStoreNamespaces, scopedLogStoreConstructorAliases,
         ))
     }
+
+    if (ts.isClassDeclaration(node) && node.name && node.heritageClauses?.some(
+      clause => clause.token === ts.SyntaxKind.ExtendsKeyword && clause.types.some(type => isLogStoreConstructorExpression(
+        type.expression, logStoreClassNames, scopedStoreNamespaces, scopedLogStoreConstructorAliases,
+      )),
+    )) (scopedLogStoreConstructorAliases as Set<string>).add(node.name.text)
 
     if (ts.isVariableDeclaration(node)) {
       const names: string[] = []
@@ -797,8 +847,9 @@ const scanFile = (repoRoot: string, fullPath: string, hits: Set<LogExemption>): 
     }
 
     if (ts.isCallExpression(node)) {
-      const calleeName = accessName(node.expression)
-      const receiver = accessReceiver(node.expression)
+      const target = invocationTarget(node.expression)
+      const calleeName = accessName(target)
+      const receiver = accessReceiver(target)
       if (calleeName
         && LOG_MUTATORS.has(calleeName)
         && receiver
@@ -818,7 +869,7 @@ const scanFile = (repoRoot: string, fullPath: string, hits: Set<LogExemption>): 
         addViolation(node, 'log-store-append')
       }
       if (cacheWriterCallName(
-        node.expression,
+        target,
         logCacheWriterNames,
         scopedCacheNamespaces,
         scopedLogCacheWriterAliases,
@@ -838,11 +889,12 @@ const scanFile = (repoRoot: string, fullPath: string, hits: Set<LogExemption>): 
       scopedCacheNamespaces,
       scopedStoreNamespaces,
     ))
-    if (ts.isBlock(node) && !ts.isFunctionLike(node.parent)) {
+    if (isAliasScope(node) && !ts.isSourceFile(node) && !ts.isFunctionLike(node) && !ts.isFunctionLike(node.parent)) {
       const localNames: string[] = []
       const collectLocals = (child: ts.Node): void => {
-        if (ts.isBlock(child) || ts.isFunctionLike(child)) return
+        if (isAliasScope(child)) return
         if (ts.isVariableDeclaration(child)) collectBindingNames(child.name, localNames)
+        if (ts.isClassDeclaration(child) && child.name) localNames.push(child.name.text)
         ts.forEachChild(child, collectLocals)
       }
       ts.forEachChild(node, collectLocals)

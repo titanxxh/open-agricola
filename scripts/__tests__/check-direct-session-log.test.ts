@@ -163,6 +163,8 @@ describe('check-direct-session-log', () => {
     'entries[index]!.key = "forged"; state.log.unshift(entries[index]!)',
     'state.log.unshift(entries[index]!); entries[index]!.key = "forged"',
     'state.log.unshift(entries[index]!); Object.assign(entries[index]!, { key: "forged" })',
+    'let alias: any = null; alias = entries[index]!; state.log.unshift(entries[index]!); alias.key = "forged"',
+    'let alias: any = null; alias = entries; state.log.unshift(entries[index]!); alias[index]!.key = "forged"',
   ])('rejects an invalid cache-write exemption: %s', (operation) => {
     const root = createRepoFixture()
     const file = 'shared/events/log-cache.ts'
@@ -188,6 +190,12 @@ describe('check-direct-session-log', () => {
     "let write; if (enabled) { ({ prependDerivedLogEntries: write } = require('../shared/events/log-cache')) } write(state, entries)",
     "const cache = require('../shared/events/log-cache'); (0, cache.prependDerivedLogEntries)(state, entries)",
     "const cache = require('../shared/events/log-cache'); const write = (0, cache.prependDerivedLogEntries); write(state, entries)",
+    "const cache = require('../shared/events/log-cache'); cache.prependDerivedLogEntries.call(undefined, state, entries)",
+    "const cache = require('../shared/events/log-cache'); cache.prependDerivedLogEntries.apply(undefined, [state, entries])",
+    "const cache = require('../shared/events/log-cache'); try {} catch (cache) {} cache.prependDerivedLogEntries(state, entries)",
+    "const cache = require('../shared/events/log-cache'); for (let cache of []) {} cache.prependDerivedLogEntries(state, entries)",
+    "const cache = require('../shared/events/log-cache'); for (let cache = 0; cache < 1; cache++) {} cache.prependDerivedLogEntries(state, entries)",
+    "const cache = require('../shared/events/log-cache'); for (let cache in {}) {} cache.prependDerivedLogEntries(state, entries)",
   ])('rejects CommonJS cache writer imports: %s', (source) => {
     const root = createRepoFixture()
     writeFixture(root, 'server/bad.cjs', source)
@@ -239,6 +247,66 @@ describe('check-direct-session-log', () => {
       'new Other.LogStore(); new LogStore()',
     ].join('\n'))
     expect(findDirectSessionLogViolations(root)).toEqual([])
+  })
+
+  it.each([
+    "const cache = require('./misc/log-cache'); cache.prependDerivedLogEntries(state, entries)",
+    "import * as cache from './misc/log-cache'; cache.prependDerivedLogEntries(state, entries)",
+    "import { prependDerivedLogEntries } from './misc/log-cache'; prependDerivedLogEntries(state, entries)",
+  ])('keeps unrelated cache modules valid: %s', (source) => {
+    const root = createRepoFixture()
+    writeFixture(root, 'server/safe.ts', source)
+    expect(findDirectSessionLogViolations(root)).toEqual([])
+  })
+
+  it.each([
+    ["import cache = require('../shared/events/log-cache'); cache.prependDerivedLogEntries(state, entries)", 'log-cache-writer-call'],
+    ["import engine = require('../shared/engine'); new engine.LogStore()", 'log-store-constructor'],
+  ])('tracks import-equals bindings: %s', (source, kind) => {
+    const root = createRepoFixture()
+    writeFixture(root, 'server/bad.cts', source)
+    expect(findDirectSessionLogViolations(root)).toEqual([expect.objectContaining({ file: 'server/bad.cts', kind })])
+  })
+
+  it.each(['call(int.log, entry)', 'apply(int.log, [entry])'])('rejects indirect append %s', (operation) => {
+    const root = createRepoFixture()
+    writeFixture(root, 'server/bad.js', `int.log.append.${operation}`)
+    expect(findDirectSessionLogViolations(root)).toEqual([
+      expect.objectContaining({ file: 'server/bad.js', kind: 'log-store-append' }),
+    ])
+  })
+
+  it.each(['class Derived extends LogStore {}', 'const Derived = class extends LogStore {}'])('tracks derived stores: %s', (declaration) => {
+    const root = createRepoFixture()
+    writeFixture(root, 'server/bad.ts', `${declaration}; const store = new Derived(); store.append(entry)`)
+    expect(findDirectSessionLogViolations(root)).toEqual([
+      expect.objectContaining({ kind: 'log-store-constructor' }),
+      expect.objectContaining({ kind: 'log-store-append' }),
+    ])
+  })
+
+  it.each([
+    ['shared/events/append.ts', 'prependDerivedLogEntries(state, entries)', 'prependDerivedLogEntries(otherState, entries)'],
+    ['shared/session/session-core.ts', 'prependDerivedLogEntries(this.state, toAdd)', 'prependDerivedLogEntries(otherState, toAdd)'],
+    ['shared/events/append.ts', 'prependDerivedLogEntries(state, entries)', 'prependDerivedLogEntries(state, entries); entries[0]!.key = "forged"'],
+    ['shared/session/session-core.ts', 'prependDerivedLogEntries(this.state, toAdd)', 'prependDerivedLogEntries(this.state, toAdd); toAdd[0]!.key = "forged"'],
+  ])('rejects an invalid derived cache operation in %s: %s', (file, original, replacement) => {
+    const root = createRepoFixture()
+    writeFixture(root, file, readFileSync(path.join(root, file), 'utf8').replace(original, replacement))
+    expect(findDirectSessionLogViolations(root)).toEqual([
+      expect.objectContaining({ file, kind: 'log-cache-writer-call' }),
+      expect.objectContaining({ file, kind: 'stale-exemption' }),
+    ])
+  })
+
+  it.each(['// const entries = eventsToLogEntries(', 'const fake = "const entries = eventsToLogEntries("'])('rejects textual mapper provenance: %s', (fake) => {
+    const root = createRepoFixture()
+    const file = 'shared/engine/engine-proceed.ts'
+    writeFixture(root, file, `const appendDerivedLogsForEventOnlyResult = (int: any, entries: any[]) => {\n${fake}\nint.log.append(entries[0]!)\n}`)
+    expect(findDirectSessionLogViolations(root)).toEqual([
+      expect.objectContaining({ file, kind: 'log-store-append' }),
+      expect.objectContaining({ file, kind: 'stale-exemption' }),
+    ])
   })
 
   it('does not count an illegal append as a used exemption', () => {
@@ -1060,7 +1128,7 @@ describe('check-direct-session-log', () => {
   it('rejects arbitrary derived log cache writer callsites', () => {
     const root = createRepoFixture()
     writeFixture(root, 'shared/cards/A/A001_Bad.ts', [
-      "import { prependDerivedLogEntries } from '../../../events/log-cache'",
+      "import { prependDerivedLogEntries } from '../../events/log-cache'",
       'export function bad(state: any, entries: any[]) {',
       '  prependDerivedLogEntries(state, entries)',
       '}',
