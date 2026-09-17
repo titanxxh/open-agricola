@@ -1,7 +1,7 @@
-import { mkdtempSync, mkdirSync, writeFileSync } from 'node:fs'
+import { mkdtempSync, mkdirSync, readFileSync, renameSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it } from 'vitest'
 import { findDirectSessionLogViolations } from '../check-direct-session-log'
 
 const writeFixture = (root: string, rel: string, content: string): void => {
@@ -10,9 +10,181 @@ const writeFixture = (root: string, rel: string, content: string): void => {
   writeFileSync(full, content)
 }
 
+const fixtureRoots: string[] = []
+afterEach(() => {
+  for (const root of fixtureRoots.splice(0)) rmSync(root, { recursive: true, force: true })
+})
+
+const createRepoFixture = (): string => {
+  const root = mkdtempSync(path.join(tmpdir(), 'direct-session-log-'))
+  fixtureRoots.push(root)
+  writeFixture(root, 'server/index.ts', 'export {}')
+  writeFixture(root, 'scripts/index.ts', 'export {}')
+  writeFixture(root, 'shared/events/log-cache.ts', [
+    'export const prependDerivedLogEntries = (state: any, entries: any[]) => {',
+    '  for (let index = entries.length - 1; index >= 0; index -= 1) {',
+    '    state.log.unshift(entries[index]!)',
+    '  }',
+    '}',
+  ].join('\n'))
+  writeFixture(root, 'shared/events/append.ts', [
+    "import { eventsToLogEntries } from './log-mapper'",
+    "import { prependDerivedLogEntries } from './log-cache'",
+    'export function appendImmediateEvents(state: any, committed: any[]) {',
+    '  const entries: LogEntry[] = eventsToLogEntries(committed, {})',
+    '  prependDerivedLogEntries(state, entries)',
+    '}',
+  ].join('\n'))
+  writeFixture(root, 'shared/session/session-core.ts', [
+    "import { LogStore } from '../engine/index.ts'",
+    "import { prependDerivedLogEntries } from '../events/log-cache.ts'",
+    'export class GameCore {',
+    '  private engineLog: any',
+    '  constructor() { this.engineLog = new LogStore() }',
+    '  private flushEngineLog() {',
+    '    const entries = this.engineLog.all()',
+    "    const toAdd = entries.filter((e) => e.key !== 'log.action')",
+    '    prependDerivedLogEntries(this.state, toAdd)',
+    '  }',
+    '}',
+  ].join('\n'))
+  writeFixture(root, 'shared/engine/engine.ts', [
+    "import { eventsToLogEntries } from '../events/log-mapper'",
+    'export class Engine {',
+    '  flushEventTransaction(context: any = {}) {',
+    '    const entries: LogEntry[] = eventsToLogEntries(committed, {})',
+    '    for (let index = entries.length - 1; index >= 0; index -= 1) {',
+    '      this.log.append(entries[index]!)',
+    '    }',
+    '  }',
+    '}',
+  ].join('\n'))
+  writeFixture(root, 'shared/engine/engine-proceed.ts', [
+    "import { eventsToLogEntries } from '../events/log-mapper'",
+    'const appendDerivedLogsForEventOnlyResult = (int: any, committed: any[]) => {',
+    '  const entries: LogEntry[] = eventsToLogEntries(committed, {})',
+    '  for (let index = entries.length - 1; index >= 0; index -= 1) {',
+    '    int.log.append(entries[index]!)',
+    '  }',
+    '}',
+  ].join('\n'))
+  writeFixture(root, 'shared/engine/engine-resolve.ts', [
+    "import { eventsToLogEntries } from '../events/log-mapper'",
+    'const appendDerivedLogsForEventOnlyResult = (int: any, committed: any[]) => {',
+    '  const entries: LogEntry[] = eventsToLogEntries(committed, {})',
+    '  for (let index = entries.length - 1; index >= 0; index -= 1) {',
+    '    int.log.append(entries[index]!)',
+    '  }',
+    '}',
+  ].join('\n'))
+
+  return root
+}
+
 describe('check-direct-session-log', () => {
+  it.each(['ts', 'tsx', 'mts', 'mtsx', 'cts', 'ctsx', 'js', 'jsx', 'mjs', 'mjsx', 'cjs', 'cjsx'])(
+    'rejects direct writes in .%s sources', (extension) => {
+      const root = createRepoFixture()
+      writeFixture(root, `server/bad.${extension}`, 'state.log.push(entry)')
+      expect(findDirectSessionLogViolations(root)).toEqual([
+        expect.objectContaining({ file: `server/bad.${extension}`, line: 1, kind: 'state-log-write' }),
+      ])
+    },
+  )
+
+  it.each(['jsx', 'tsx', 'mjsx', 'mtsx', 'cjsx', 'ctsx'])('parses .%s JSX and visits embedded writes', (extension) => {
+    const root = createRepoFixture()
+    writeFixture(root, `server/view.${extension}`, 'export const view = <div>{state.log.length}</div>')
+    expect(findDirectSessionLogViolations(root)).toEqual([])
+    writeFixture(root, `server/view.${extension}`, 'export const view = <div>{state.log.push(entry)}</div>')
+    expect(findDirectSessionLogViolations(root)).toEqual([
+      expect.objectContaining({ file: `server/view.${extension}`, kind: 'state-log-write' }),
+    ])
+  })
+
+  it.each(['shared', 'server', 'scripts'])('rejects missing or empty required root %s', (directory) => {
+    const root = createRepoFixture()
+    rmSync(path.join(root, directory), { recursive: true })
+    expect(() => findDirectSessionLogViolations(root)).toThrow()
+    mkdirSync(path.join(root, directory))
+    writeFixture(root, `${directory}/README.md`, 'No sources')
+    expect(() => findDirectSessionLogViolations(root)).toThrow(`empty required source root: ${directory}`)
+  })
+
+  it.each(['server/broken.ts', 'server/broken.mjs', 'scripts/check-direct-session-log.ts'])(
+    'rejects unparseable source even in excluded files: %s', (file) => {
+      const root = createRepoFixture()
+      writeFixture(root, file, 'export function bad( {')
+      expect(() => findDirectSessionLogViolations(root)).toThrow(file)
+    },
+  )
+
+  it.each(['file', 'directory', 'root'])('rejects source %s symlinks', (kind) => {
+    const root = createRepoFixture()
+    if (kind === 'root') {
+      renameSync(path.join(root, 'server'), path.join(root, 'server-target'))
+      symlinkSync(path.join(root, 'server-target'), path.join(root, 'server'))
+    } else {
+      symlinkSync(path.join(root, kind === 'file' ? 'server/index.ts' : 'server'), path.join(root, 'shared/linked'))
+    }
+    expect(() => findDirectSessionLogViolations(root)).toThrow('source symlink')
+  })
+
+  it.each([
+    ['shared/session/session-core.ts', 'constructor', 'this.engineLog = new LogStore()'],
+    ['shared/session/session-core.ts', 'flushEngineLog', 'prependDerivedLogEntries(this.state, toAdd)'],
+    ['shared/events/log-cache.ts', 'prependDerivedLogEntries', 'state.log.unshift(entries[index]!)'],
+    ['shared/events/append.ts', 'appendImmediateEvents', 'prependDerivedLogEntries(state, entries)'],
+    ['shared/engine/engine.ts', 'flushEventTransaction', 'this.log.append(entries[index]!)'],
+    ['shared/engine/engine-proceed.ts', 'appendDerivedLogsForEventOnlyResult', 'int.log.append(entries[index]!)'],
+    ['shared/engine/engine-resolve.ts', 'appendDerivedLogsForEventOnlyResult', 'int.log.append(entries[index]!)'],
+  ])('rejects stale exemption %s:%s', (file, functionName, operation) => {
+    const root = createRepoFixture()
+    const full = path.join(root, file)
+    const original = readFileSync(full, 'utf8')
+    for (const replacement of [original.replace(operation, ''), original.replace(functionName, 'renamed')]) {
+      writeFileSync(full, replacement)
+      expect(findDirectSessionLogViolations(root)).toContainEqual(expect.objectContaining({
+        file, kind: 'stale-exemption', text: expect.stringContaining(`${functionName}: no matching`),
+      }))
+    }
+    rmSync(full)
+    expect(findDirectSessionLogViolations(root)).toContainEqual(expect.objectContaining({
+      file, kind: 'stale-exemption', text: expect.stringContaining(`${functionName}: no matching`),
+    }))
+  })
+
+  it('does not count an illegal append as a used exemption', () => {
+    const root = createRepoFixture()
+    const file = 'shared/engine/engine-proceed.ts'
+    writeFixture(root, file, 'const appendDerivedLogsForEventOnlyResult = (int: any) => { int.log.append(entry) }')
+    expect(findDirectSessionLogViolations(root)).toEqual([
+      expect.objectContaining({ file, kind: 'log-store-append' }),
+      expect.objectContaining({ file, kind: 'stale-exemption' }),
+    ])
+  })
+
+  it('rejects sibling constructors in the session module', () => {
+    const root = createRepoFixture()
+    const file = 'shared/session/session-core.ts'
+    writeFixture(root, file, `${readFileSync(path.join(root, file), 'utf8')}\nconst other = new LogStore()`)
+    expect(findDirectSessionLogViolations(root)).toEqual([
+      expect.objectContaining({ file, kind: 'log-store-constructor' }),
+    ])
+  })
+
+  it.each(['ts', 'tsx', 'mts', 'cts', 'js', 'jsx', 'mjs', 'cjs'])('preserves general .test.%s exemptions', (extension) => {
+    const root = createRepoFixture()
+    writeFixture(root, `server/cache.test.${extension}`, [
+      "import { prependDerivedLogEntries } from '../shared/events/log-cache'",
+      'const log = new LogStore()',
+      'prependDerivedLogEntries(state, entries)',
+    ].join('\n'))
+    expect(findDirectSessionLogViolations(root)).toEqual([])
+  })
+
   it('reports forbidden runtime state.log mutation with file and line', () => {
-    const root = mkdtempSync(path.join(tmpdir(), 'direct-session-log-'))
+    const root = createRepoFixture()
     writeFixture(root, 'shared/cards/A/A001_Bad.ts', [
       'export function bad(state: any) {',
       "  state.log.unshift({ key: 'log.bad' })",
@@ -59,7 +231,7 @@ describe('check-direct-session-log', () => {
       '}',
     ].join('\n'))
 
-    const violations = findDirectSessionLogViolations(root)
+    const violations = findDirectSessionLogViolations(root).filter(v => v.kind !== 'stale-exemption')
 
     expect(violations).toEqual(expect.arrayContaining([
       expect.objectContaining({
@@ -201,69 +373,13 @@ describe('check-direct-session-log', () => {
   })
 
   it('allows mapper-derived cache writer and engine append sites', () => {
-    const root = mkdtempSync(path.join(tmpdir(), 'direct-session-log-'))
-    writeFixture(root, 'shared/events/log-cache.ts', [
-      'export const prependDerivedLogEntries = (state: any, entries: any[]) => {',
-      '  for (let index = entries.length - 1; index >= 0; index -= 1) {',
-      '    state.log.unshift(entries[index]!)',
-      '  }',
-      '}',
-    ].join('\n'))
-    writeFixture(root, 'shared/events/append.ts', [
-      "import { eventsToLogEntries } from './log-mapper'",
-      "import { prependDerivedLogEntries } from './log-cache'",
-      'export function appendImmediateEvents(state: any, committed: any[]) {',
-      '  const entries: LogEntry[] = eventsToLogEntries(committed, {})',
-      '  prependDerivedLogEntries(state, entries)',
-      '}',
-    ].join('\n'))
-    writeFixture(root, 'shared/session/session-core.ts', [
-      "import { LogStore } from '../engine/index.ts'",
-      "import { prependDerivedLogEntries } from '../events/log-cache.ts'",
-      'export class GameCore {',
-      '  private engineLog = new LogStore()',
-      '  private flushEngineLog() {',
-      '    const entries = this.engineLog.all()',
-      "    const toAdd = entries.filter((e) => e.key !== 'log.action')",
-      '    prependDerivedLogEntries(this.state, toAdd)',
-      '  }',
-      '}',
-    ].join('\n'))
-    writeFixture(root, 'shared/engine/engine.ts', [
-      "import { eventsToLogEntries } from '../events/log-mapper'",
-      'export class Engine {',
-      '  flushEventTransaction(context: any = {}) {',
-      '    const entries: LogEntry[] = eventsToLogEntries(committed, {})',
-      '    for (let index = entries.length - 1; index >= 0; index -= 1) {',
-      '      this.log.append(entries[index]!)',
-      '    }',
-      '  }',
-      '}',
-    ].join('\n'))
-    writeFixture(root, 'shared/engine/engine-proceed.ts', [
-      "import { eventsToLogEntries } from '../events/log-mapper'",
-      'const appendDerivedLogsForEventOnlyResult = (int: any, committed: any[]) => {',
-      '  const entries: LogEntry[] = eventsToLogEntries(committed, {})',
-      '  for (let index = entries.length - 1; index >= 0; index -= 1) {',
-      '    int.log.append(entries[index]!)',
-      '  }',
-      '}',
-    ].join('\n'))
-    writeFixture(root, 'shared/engine/engine-resolve.ts', [
-      "import { eventsToLogEntries } from '../events/log-mapper'",
-      'const appendDerivedLogsForEventOnlyResult = (int: any, committed: any[]) => {',
-      '  const entries: LogEntry[] = eventsToLogEntries(committed, {})',
-      '  for (let index = entries.length - 1; index >= 0; index -= 1) {',
-      '    int.log.append(entries[index]!)',
-      '  }',
-      '}',
-    ].join('\n'))
+    const root = createRepoFixture()
 
     expect(findDirectSessionLogViolations(root)).toEqual([])
   })
 
   it('allows appending from nearest mapper output in allowed functions', () => {
-    const root = mkdtempSync(path.join(tmpdir(), 'direct-session-log-'))
+    const root = createRepoFixture()
     writeFixture(root, 'shared/engine/engine-proceed.ts', [
       "import { eventsToLogEntries } from '../events/log-mapper'",
       'const appendDerivedLogsForEventOnlyResult = (int: any, first: any[], second: any[]) => {',
@@ -277,7 +393,7 @@ describe('check-direct-session-log', () => {
   })
 
   it('rejects sibling state.log writers in log-cache module', () => {
-    const root = mkdtempSync(path.join(tmpdir(), 'direct-session-log-'))
+    const root = createRepoFixture()
     writeFixture(root, 'shared/events/log-cache.ts', [
       'export const prependDerivedLogEntries = (state: any, entries: any[]) => {',
       '  state.log.unshift(entries[0])',
@@ -287,7 +403,7 @@ describe('check-direct-session-log', () => {
       '}',
     ].join('\n'))
 
-    const violations = findDirectSessionLogViolations(root)
+    const violations = findDirectSessionLogViolations(root).filter(v => v.kind !== 'stale-exemption')
 
     expect(violations).toEqual(expect.arrayContaining([
       expect.objectContaining({
@@ -299,7 +415,7 @@ describe('check-direct-session-log', () => {
   })
 
   it('reports state.log mutation on variables inferred from state normalizers', () => {
-    const root = mkdtempSync(path.join(tmpdir(), 'direct-session-log-'))
+    const root = createRepoFixture()
     writeFixture(root, 'shared/session/bad-restore.ts', [
       'export function bad(rawWithoutCursor: unknown, raw: any) {',
       '  const restored = rebuildActiveModifiers(normalizeState(rawWithoutCursor as unknown as GameState))',
@@ -311,7 +427,7 @@ describe('check-direct-session-log', () => {
       '}',
     ].join('\n'))
 
-    const violations = findDirectSessionLogViolations(root)
+    const violations = findDirectSessionLogViolations(root).filter(v => v.kind !== 'stale-exemption')
 
     expect(violations).toEqual(expect.arrayContaining([
       expect.objectContaining({
@@ -333,14 +449,14 @@ describe('check-direct-session-log', () => {
   })
 
   it('rejects engine log append without local mapper derivation', () => {
-    const root = mkdtempSync(path.join(tmpdir(), 'direct-session-log-'))
+    const root = createRepoFixture()
     writeFixture(root, 'shared/engine/engine-proceed.ts', [
       'export const bad = (int: any, entry: any) => {',
       '  int.log.append(entry)',
       '}',
     ].join('\n'))
 
-    const violations = findDirectSessionLogViolations(root)
+    const violations = findDirectSessionLogViolations(root).filter(v => v.kind !== 'stale-exemption')
 
     expect(violations).toEqual(expect.arrayContaining([
       expect.objectContaining({
@@ -352,7 +468,7 @@ describe('check-direct-session-log', () => {
   })
 
   it('rejects direct and aliased LogStore append calls', () => {
-    const root = mkdtempSync(path.join(tmpdir(), 'direct-session-log-'))
+    const root = createRepoFixture()
     writeFixture(root, 'shared/session/bad.ts', [
       'export class Bad {',
       '  private engineLog: any',
@@ -371,7 +487,7 @@ describe('check-direct-session-log', () => {
       '}',
     ].join('\n'))
 
-    const violations = findDirectSessionLogViolations(root)
+    const violations = findDirectSessionLogViolations(root).filter(v => v.kind !== 'stale-exemption')
 
     expect(violations).toEqual(expect.arrayContaining([
       expect.objectContaining({
@@ -403,7 +519,7 @@ describe('check-direct-session-log', () => {
   })
 
   it('rejects destructured LogStore append aliases', () => {
-    const root = mkdtempSync(path.join(tmpdir(), 'direct-session-log-'))
+    const root = createRepoFixture()
     writeFixture(root, 'shared/session/bad-destructure.ts', [
       'export function bad(int: any, entry: any) {',
       '  const { log: sink } = int',
@@ -414,7 +530,7 @@ describe('check-direct-session-log', () => {
       '}',
     ].join('\n'))
 
-    const violations = findDirectSessionLogViolations(root)
+    const violations = findDirectSessionLogViolations(root).filter(v => v.kind !== 'stale-exemption')
 
     expect(violations).toEqual(expect.arrayContaining([
       expect.objectContaining({
@@ -431,7 +547,7 @@ describe('check-direct-session-log', () => {
   })
 
   it('reports state.log aliases created by assignment and computed destructuring', () => {
-    const root = mkdtempSync(path.join(tmpdir(), 'direct-session-log-'))
+    const root = createRepoFixture()
     writeFixture(root, 'server/bad-alias.ts', [
       'export function bad(state: any, entry: any) {',
       '  let log: any[] = []',
@@ -445,7 +561,7 @@ describe('check-direct-session-log', () => {
       '}',
     ].join('\n'))
 
-    const violations = findDirectSessionLogViolations(root)
+    const violations = findDirectSessionLogViolations(root).filter(v => v.kind !== 'stale-exemption')
 
     expect(violations).toEqual(expect.arrayContaining([
       expect.objectContaining({
@@ -467,7 +583,7 @@ describe('check-direct-session-log', () => {
   })
 
   it('rejects obsolete completion-query log constructors and direct appends', () => {
-    const root = mkdtempSync(path.join(tmpdir(), 'direct-session-log-'))
+    const root = createRepoFixture()
     writeFixture(root, 'shared/engine/engine.ts', [
       'export class Engine {',
       '  canComplete() {',
@@ -482,11 +598,12 @@ describe('check-direct-session-log', () => {
       expect.objectContaining({ line: 3, kind: 'log-store-constructor' }),
       expect.objectContaining({ line: 4, kind: 'log-store-append' }),
       expect.objectContaining({ line: 6, kind: 'log-store-constructor' }),
+      expect.objectContaining({ file: 'shared/engine/engine.ts', kind: 'stale-exemption' }),
     ])
   })
 
   it('rejects forbidden LogStore constructors outside session core', () => {
-    const root = mkdtempSync(path.join(tmpdir(), 'direct-session-log-'))
+    const root = createRepoFixture()
     writeFixture(root, 'shared/session/bad.ts', [
       "import { LogStore } from '../engine'",
       "import * as Engine from '../engine'",
@@ -503,7 +620,7 @@ describe('check-direct-session-log', () => {
       '}',
     ].join('\n'))
 
-    const violations = findDirectSessionLogViolations(root)
+    const violations = findDirectSessionLogViolations(root).filter(v => v.kind !== 'stale-exemption')
 
     expect(violations).toEqual(expect.arrayContaining([
       expect.objectContaining({
@@ -535,7 +652,7 @@ describe('check-direct-session-log', () => {
   })
 
   it('rejects sibling bad append even when the file has an allowed append function', () => {
-    const root = mkdtempSync(path.join(tmpdir(), 'direct-session-log-'))
+    const root = createRepoFixture()
     writeFixture(root, 'shared/engine/engine-proceed.ts', [
       "import { eventsToLogEntries } from '../events/log-mapper'",
       'const appendDerivedLogsForEventOnlyResult = (int: any, committed: any[]) => {',
@@ -547,7 +664,7 @@ describe('check-direct-session-log', () => {
       '}',
     ].join('\n'))
 
-    const violations = findDirectSessionLogViolations(root)
+    const violations = findDirectSessionLogViolations(root).filter(v => v.kind !== 'stale-exemption')
 
     expect(violations).toEqual([
       expect.objectContaining({
@@ -559,7 +676,7 @@ describe('check-direct-session-log', () => {
   })
 
   it('rejects bad append after same-name call expression', () => {
-    const root = mkdtempSync(path.join(tmpdir(), 'direct-session-log-'))
+    const root = createRepoFixture()
     writeFixture(root, 'shared/engine/engine-proceed.ts', [
       "import { eventsToLogEntries } from '../events/log-mapper'",
       'appendDerivedLogsForEventOnlyResult(int, committed)',
@@ -572,7 +689,7 @@ describe('check-direct-session-log', () => {
       '}',
     ].join('\n'))
 
-    const violations = findDirectSessionLogViolations(root)
+    const violations = findDirectSessionLogViolations(root).filter(v => v.kind !== 'stale-exemption')
 
     expect(violations).toEqual([
       expect.objectContaining({
@@ -584,7 +701,7 @@ describe('check-direct-session-log', () => {
   })
 
   it('rejects allowed function append when argument is not mapper output', () => {
-    const root = mkdtempSync(path.join(tmpdir(), 'direct-session-log-'))
+    const root = createRepoFixture()
     writeFixture(root, 'shared/engine/engine-proceed.ts', [
       "import { eventsToLogEntries } from '../events/log-mapper'",
       'const appendDerivedLogsForEventOnlyResult = (int: any, committed: any[], entry: any) => {',
@@ -593,7 +710,7 @@ describe('check-direct-session-log', () => {
       '}',
     ].join('\n'))
 
-    const violations = findDirectSessionLogViolations(root)
+    const violations = findDirectSessionLogViolations(root).filter(v => v.kind !== 'stale-exemption')
 
     expect(violations).toEqual([
       expect.objectContaining({
@@ -605,7 +722,7 @@ describe('check-direct-session-log', () => {
   })
 
   it('rejects allowed function append when mapper entry is mixed with fallback', () => {
-    const root = mkdtempSync(path.join(tmpdir(), 'direct-session-log-'))
+    const root = createRepoFixture()
     writeFixture(root, 'shared/engine/engine-proceed.ts', [
       "import { eventsToLogEntries } from '../events/log-mapper'",
       'const appendDerivedLogsForEventOnlyResult = (int: any, committed: any[], entry: any) => {',
@@ -614,7 +731,7 @@ describe('check-direct-session-log', () => {
       '}',
     ].join('\n'))
 
-    const violations = findDirectSessionLogViolations(root)
+    const violations = findDirectSessionLogViolations(root).filter(v => v.kind !== 'stale-exemption')
 
     expect(violations).toEqual([
       expect.objectContaining({
@@ -626,7 +743,7 @@ describe('check-direct-session-log', () => {
   })
 
   it('rejects allowed function append after mapper entry alias mutation', () => {
-    const root = mkdtempSync(path.join(tmpdir(), 'direct-session-log-'))
+    const root = createRepoFixture()
     writeFixture(root, 'shared/engine/engine-proceed.ts', [
       "import { eventsToLogEntries } from '../events/log-mapper'",
       'const appendDerivedLogsForEventOnlyResult = (int: any, committed: any[]) => {',
@@ -637,7 +754,7 @@ describe('check-direct-session-log', () => {
       '}',
     ].join('\n'))
 
-    const violations = findDirectSessionLogViolations(root)
+    const violations = findDirectSessionLogViolations(root).filter(v => v.kind !== 'stale-exemption')
 
     expect(violations).toEqual([
       expect.objectContaining({
@@ -649,7 +766,7 @@ describe('check-direct-session-log', () => {
   })
 
   it('rejects allowed function append after typed mapper entry alias mutation', () => {
-    const root = mkdtempSync(path.join(tmpdir(), 'direct-session-log-'))
+    const root = createRepoFixture()
     writeFixture(root, 'shared/engine/engine-proceed.ts', [
       "import { eventsToLogEntries } from '../events/log-mapper'",
       'const appendDerivedLogsForEventOnlyResult = (int: any, committed: any[]) => {',
@@ -660,7 +777,7 @@ describe('check-direct-session-log', () => {
       '}',
     ].join('\n'))
 
-    const violations = findDirectSessionLogViolations(root)
+    const violations = findDirectSessionLogViolations(root).filter(v => v.kind !== 'stale-exemption')
 
     expect(violations).toEqual([
       expect.objectContaining({
@@ -672,7 +789,7 @@ describe('check-direct-session-log', () => {
   })
 
   it('rejects allowed function append after destructured mapper entry alias mutation', () => {
-    const root = mkdtempSync(path.join(tmpdir(), 'direct-session-log-'))
+    const root = createRepoFixture()
     writeFixture(root, 'shared/engine/engine-proceed.ts', [
       "import { eventsToLogEntries } from '../events/log-mapper'",
       'const appendDerivedLogsForEventOnlyResult = (int: any, committed: any[]) => {',
@@ -683,7 +800,7 @@ describe('check-direct-session-log', () => {
       '}',
     ].join('\n'))
 
-    const violations = findDirectSessionLogViolations(root)
+    const violations = findDirectSessionLogViolations(root).filter(v => v.kind !== 'stale-exemption')
 
     expect(violations).toEqual([
       expect.objectContaining({
@@ -695,7 +812,7 @@ describe('check-direct-session-log', () => {
   })
 
   it('rejects allowed function append after nested mapper entry mutation', () => {
-    const root = mkdtempSync(path.join(tmpdir(), 'direct-session-log-'))
+    const root = createRepoFixture()
     writeFixture(root, 'shared/engine/engine-proceed.ts', [
       "import { eventsToLogEntries } from '../events/log-mapper'",
       'const appendDerivedLogsForEventOnlyResult = (int: any, committed: any[]) => {',
@@ -705,7 +822,7 @@ describe('check-direct-session-log', () => {
       '}',
     ].join('\n'))
 
-    const violations = findDirectSessionLogViolations(root)
+    const violations = findDirectSessionLogViolations(root).filter(v => v.kind !== 'stale-exemption')
 
     expect(violations).toEqual([
       expect.objectContaining({
@@ -717,7 +834,7 @@ describe('check-direct-session-log', () => {
   })
 
   it('rejects allowed function append after Object.assign mapper entry mutation', () => {
-    const root = mkdtempSync(path.join(tmpdir(), 'direct-session-log-'))
+    const root = createRepoFixture()
     writeFixture(root, 'shared/engine/engine-proceed.ts', [
       "import { eventsToLogEntries } from '../events/log-mapper'",
       'const appendDerivedLogsForEventOnlyResult = (int: any, committed: any[]) => {',
@@ -727,7 +844,7 @@ describe('check-direct-session-log', () => {
       '}',
     ].join('\n'))
 
-    const violations = findDirectSessionLogViolations(root)
+    const violations = findDirectSessionLogViolations(root).filter(v => v.kind !== 'stale-exemption')
 
     expect(violations).toEqual([
       expect.objectContaining({
@@ -739,7 +856,7 @@ describe('check-direct-session-log', () => {
   })
 
   it('rejects allowed function append after call-chain mapper entry mutation', () => {
-    const root = mkdtempSync(path.join(tmpdir(), 'direct-session-log-'))
+    const root = createRepoFixture()
     writeFixture(root, 'shared/engine/engine-proceed.ts', [
       "import { eventsToLogEntries } from '../events/log-mapper'",
       'const appendDerivedLogsForEventOnlyResult = (int: any, committed: any[]) => {',
@@ -749,7 +866,7 @@ describe('check-direct-session-log', () => {
       '}',
     ].join('\n'))
 
-    const violations = findDirectSessionLogViolations(root)
+    const violations = findDirectSessionLogViolations(root).filter(v => v.kind !== 'stale-exemption')
 
     expect(violations).toEqual([
       expect.objectContaining({
@@ -761,7 +878,7 @@ describe('check-direct-session-log', () => {
   })
 
   it('rejects allowed function append after mapper output mutation', () => {
-    const root = mkdtempSync(path.join(tmpdir(), 'direct-session-log-'))
+    const root = createRepoFixture()
     writeFixture(root, 'shared/engine/engine-proceed.ts', [
       "import { eventsToLogEntries } from '../events/log-mapper'",
       'const appendDerivedLogsForEventOnlyResult = (int: any, committed: any[], entry: any) => {',
@@ -771,7 +888,7 @@ describe('check-direct-session-log', () => {
       '}',
     ].join('\n'))
 
-    const violations = findDirectSessionLogViolations(root)
+    const violations = findDirectSessionLogViolations(root).filter(v => v.kind !== 'stale-exemption')
 
     expect(violations).toEqual([
       expect.objectContaining({
@@ -783,7 +900,7 @@ describe('check-direct-session-log', () => {
   })
 
   it('rejects allowed function append after mapper output alias mutation', () => {
-    const root = mkdtempSync(path.join(tmpdir(), 'direct-session-log-'))
+    const root = createRepoFixture()
     writeFixture(root, 'shared/engine/engine-proceed.ts', [
       "import { eventsToLogEntries } from '../events/log-mapper'",
       'const appendDerivedLogsForEventOnlyResult = (int: any, committed: any[], entry: any) => {',
@@ -794,7 +911,7 @@ describe('check-direct-session-log', () => {
       '}',
     ].join('\n'))
 
-    const violations = findDirectSessionLogViolations(root)
+    const violations = findDirectSessionLogViolations(root).filter(v => v.kind !== 'stale-exemption')
 
     expect(violations).toEqual([
       expect.objectContaining({
@@ -806,7 +923,7 @@ describe('check-direct-session-log', () => {
   })
 
   it('rejects allowed function append after mapper entry mutation', () => {
-    const root = mkdtempSync(path.join(tmpdir(), 'direct-session-log-'))
+    const root = createRepoFixture()
     writeFixture(root, 'shared/engine/engine-proceed.ts', [
       "import { eventsToLogEntries } from '../events/log-mapper'",
       'const appendDerivedLogsForEventOnlyResult = (int: any, committed: any[]) => {',
@@ -816,7 +933,7 @@ describe('check-direct-session-log', () => {
       '}',
     ].join('\n'))
 
-    const violations = findDirectSessionLogViolations(root)
+    const violations = findDirectSessionLogViolations(root).filter(v => v.kind !== 'stale-exemption')
 
     expect(violations).toEqual([
       expect.objectContaining({
@@ -828,7 +945,7 @@ describe('check-direct-session-log', () => {
   })
 
   it('rejects arbitrary derived log cache writer callsites', () => {
-    const root = mkdtempSync(path.join(tmpdir(), 'direct-session-log-'))
+    const root = createRepoFixture()
     writeFixture(root, 'shared/cards/A/A001_Bad.ts', [
       "import { prependDerivedLogEntries } from '../../../events/log-cache'",
       'export function bad(state: any, entries: any[]) {',
@@ -861,7 +978,7 @@ describe('check-direct-session-log', () => {
       '}',
     ].join('\n'))
 
-    const violations = findDirectSessionLogViolations(root)
+    const violations = findDirectSessionLogViolations(root).filter(v => v.kind !== 'stale-exemption')
 
     expect(violations).toEqual(expect.arrayContaining([
       expect.objectContaining({
@@ -903,7 +1020,7 @@ describe('check-direct-session-log', () => {
   })
 
   it('rejects session flush cache writer after derived entries mutation', () => {
-    const root = mkdtempSync(path.join(tmpdir(), 'direct-session-log-'))
+    const root = createRepoFixture()
     writeFixture(root, 'shared/session/session-core.ts', [
       "import { prependDerivedLogEntries } from '../events/log-cache.ts'",
       'export class GameCore {',
@@ -918,7 +1035,7 @@ describe('check-direct-session-log', () => {
       '}',
     ].join('\n'))
 
-    const violations = findDirectSessionLogViolations(root)
+    const violations = findDirectSessionLogViolations(root).filter(v => v.kind !== 'stale-exemption')
 
     expect(violations).toEqual([
       expect.objectContaining({
@@ -930,7 +1047,7 @@ describe('check-direct-session-log', () => {
   })
 
   it('rejects session flush cache writer after nested derived entry mutation', () => {
-    const root = mkdtempSync(path.join(tmpdir(), 'direct-session-log-'))
+    const root = createRepoFixture()
     writeFixture(root, 'shared/session/session-core.ts', [
       "import { prependDerivedLogEntries } from '../events/log-cache.ts'",
       'export class GameCore {',
@@ -945,7 +1062,7 @@ describe('check-direct-session-log', () => {
       '}',
     ].join('\n'))
 
-    const violations = findDirectSessionLogViolations(root)
+    const violations = findDirectSessionLogViolations(root).filter(v => v.kind !== 'stale-exemption')
 
     expect(violations).toEqual([
       expect.objectContaining({
@@ -957,7 +1074,7 @@ describe('check-direct-session-log', () => {
   })
 
   it('rejects session flush cache writer after source entries mutation', () => {
-    const root = mkdtempSync(path.join(tmpdir(), 'direct-session-log-'))
+    const root = createRepoFixture()
     writeFixture(root, 'shared/session/session-core.ts', [
       "import { prependDerivedLogEntries } from '../events/log-cache.ts'",
       'export class GameCore {',
@@ -972,7 +1089,7 @@ describe('check-direct-session-log', () => {
       '}',
     ].join('\n'))
 
-    const violations = findDirectSessionLogViolations(root)
+    const violations = findDirectSessionLogViolations(root).filter(v => v.kind !== 'stale-exemption')
 
     expect(violations).toEqual([
       expect.objectContaining({
@@ -984,7 +1101,7 @@ describe('check-direct-session-log', () => {
   })
 
   it('does not report its own script or fixture strings during repo scan', () => {
-    const root = mkdtempSync(path.join(tmpdir(), 'direct-session-log-'))
+    const root = createRepoFixture()
     writeFixture(root, 'scripts/check-direct-session-log.ts', [
       "const sample = 'state.log.unshift('",
       "const append = '.log.append('",
@@ -998,7 +1115,7 @@ describe('check-direct-session-log', () => {
   })
 
   it('does not report strings, local declarations, unrelated append calls, or shadowed aliases', () => {
-    const root = mkdtempSync(path.join(tmpdir(), 'direct-session-log-'))
+    const root = createRepoFixture()
     writeFixture(root, 'server/misc-events.ts', [
       "import { prependDerivedLogEntries } from '../shared/misc/events'",
       'export function unrelated(state: any, entries: any[]) {',
