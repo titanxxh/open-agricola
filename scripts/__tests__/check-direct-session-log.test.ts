@@ -167,9 +167,16 @@ describe('check-direct-session-log', () => {
   it('rejects sibling constructors in the session module', () => {
     const root = createRepoFixture()
     const file = 'shared/session/session-core.ts'
-    writeFixture(root, file, `${readFileSync(path.join(root, file), 'utf8')}\nconst other = new LogStore()`)
+    const original = readFileSync(path.join(root, file), 'utf8')
+    const sibling = 'class Helper { constructor() { new LogStore() } }\n'
+    writeFixture(root, file, sibling + original)
     expect(findDirectSessionLogViolations(root)).toEqual([
-      expect.objectContaining({ file, kind: 'log-store-constructor' }),
+      expect.objectContaining({ file, line: 1, kind: 'log-store-constructor' }),
+    ])
+    writeFixture(root, file, sibling + original.replace('this.engineLog = new LogStore()', ''))
+    expect(findDirectSessionLogViolations(root)).toEqual([
+      expect.objectContaining({ file, line: 1, kind: 'log-store-constructor' }),
+      expect.objectContaining({ file, kind: 'stale-exemption', text: expect.stringContaining('constructor:') }),
     ])
   })
 
