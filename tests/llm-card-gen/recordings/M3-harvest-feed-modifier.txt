@@ -1,6 +1,7 @@
 ```typescript
 const CARD_ID = 'CUSTOM_HarvestHelper'
 
+// 卡牌定义（必须）
 const CARD_DEF = {
   cardType: 'occupation',
   meta: {
@@ -8,25 +9,32 @@ const CARD_DEF = {
     name: 'Harvest Helper',
     deck: 'CUSTOM',
     number: 0,
-    desc: ['At the start of the feeding phase of each Harvest, gain 1 <FOOD>.'],
+    desc: ['At the start of each Harvest feeding phase, you gain 1 <FOOD> (usable for that feeding).'],
     cost: {},
     vp: 0,
     implemented: true,
     locales: {
       zh: {
         name: '收获助手',
-        desc: ['每次收获的喂养阶段开始时，获得 1 <FOOD>。'],
+        desc: ['每次收获的喂养阶段开始时，你额外获得 1 <FOOD>（可用于本次喂养）。'],
       },
     },
   },
 }
 
+// 卡牌实现
 const CARD_IMPL = {
   effect: {
     id: CARD_ID,
-    onHarvest: (state, player) => {
+    onStartHarvestFeedingPhase: (state, player) => {
       return gainLeaf(CARD_ID, { food: 1 })
     },
   },
 }
 ```
+
+**要点说明：**
+
+- 使用 `onStartHarvestFeedingPhase` hook——它在进入 feeding 阶段后、实际扣除食物前执行，因此这 1 食物能立即用于本次喂养，正好符合「喂养阶段开始时获得，用于本次喂养」的语义（比 `onHarvest` 更精准，后者在收割后、喂食前的 anytime 窗口之前触发）。
+- 该 hook 约每 4-5 轮（收获时）触发一次，每次 1 食物属于较弱收益，作为无费用的职业卡是合理的平衡。
+- 无 listener、无需所有权手动检查，引擎自动处理。

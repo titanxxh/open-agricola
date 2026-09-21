@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it } from 'vitest'
 import { CARD_DESIGNER_SYSTEM_PROMPT } from '../../client/services/llmPrompts'
+import { readCardResourceStats } from '../../shared/cards/helpers/card-state'
 import { markAllWorkersUsed, setActiveWorkerCount } from '../../shared/domain/player'
 import { validateAndCompileCustomCode } from '../custom-code/engine'
 import { GameSession } from '../game/authoritative-session'
@@ -49,12 +50,21 @@ describe('executable Workshop prompt contracts', () => {
       markAllWorkersUsed(state, player)
     })
     session.loadState(state)
+    const scoresBefore = session.getState().scores!
     const response = session.performRoundEnd()
     expect(response.ok).toBe(true)
     expect(response.interaction.stateId).toBe('idle')
     expect(response.state.round).toBe(5)
     expect(response.state.players.map((player) => player.resources.begging)).toEqual([0, 1])
     expect(response.state.players[0]!.resources.food).toBe(0)
+    expect(response.state.log).toContainEqual({
+      key: 'log.cardEffectGain',
+      params: { player: state.players[0]!.name, gain: { food: 1 }, cardId: CARD_ID },
+    })
+    expect(response.scores?.map((score) => score.total)).toEqual([
+      scoresBefore[0]!.total,
+      scoresBefore[1]!.total - 3,
+    ])
     const gains = response.state.events.filter((event) =>
       event.type === 'resource.moved' && event.sourceCardId === CARD_ID)
     expect(gains).toHaveLength(1)
@@ -78,11 +88,29 @@ describe('executable Workshop prompt contracts', () => {
     if (!played) player.minorPlayed = []
     Object.assign(player.resources, { wood: 10, clay: 10, stone: 10, reed: 10 })
     session.loadState(state)
+    const before = session.getState()
+    const resourcesBefore = { ...player.resources }
+    const logBefore = structuredClone(before.state.log)
     let response = session.takeAction(0, 'farm-expansion')
     expect(response.ok).toBe(true)
+    expect(response.state.players[0]).toMatchObject({ rooms: 2, resources: resourcesBefore })
+    expect(response.scores).toEqual(before.scores)
+    expect(response.state.log).toEqual([
+      { key: 'log.placeFarmer', params: { player: player.name, action: 'actions.farm-expansion.name' } },
+      ...logBefore,
+    ])
+    expect(response.interaction).toMatchObject({
+      stateId: 'wait', playerIndex: 0, promptKey: 'ui.interactionFarmExpansionSelect', request: { kind: 'choice' },
+    })
     if (response.interaction.stateId !== 'wait') throw new Error('Expected construction choice')
     const construct = response.interaction.request.options?.find((option) => option.value.includes('construct'))
-    if (construct) response = session.resolveChoice(0, construct.value)
+    expect(construct).toBeDefined()
+    const selectionLog = structuredClone(response.state.log)
+    response = session.resolveChoice(0, construct!.value)
+    expect(response.ok).toBe(true)
+    expect(response.state.players[0]).toMatchObject({ rooms: 2, resources: resourcesBefore })
+    expect(response.scores).toEqual(before.scores)
+    expect(response.state.log).toEqual(selectionLog)
     if (response.interaction.stateId !== 'wait' || response.interaction.request.kind !== 'farm-select') {
       throw new Error('Expected room selection')
     }
@@ -93,5 +121,25 @@ describe('executable Workshop prompt contracts', () => {
     expect(response.state.players[0]!.rooms).toBe(3)
     expect(response.state.players[0]!.resources[houseType]).toBe(10 - cost)
     expect(response.state.players[0]!.resources.reed).toBe(8)
+    expect(response.interaction).toMatchObject({
+      stateId: 'wait', playerIndex: 0, promptKey: 'ui.interactionFarmExpansionSelect', request: { kind: 'choice' },
+    })
+    expect(response.scores?.[0]?.total).toBe(before.scores![0]!.total + { wood: 1, clay: 2, stone: 3 }[houseType])
+    expect(response.scores?.[1]).toEqual(before.scores![1])
+    const paymentLog = response.state.log.find((entry) =>
+      entry.key === 'log.actionDetail' && entry.params?.action === 'actions.farm-expansion.name')
+    expect(paymentLog).toMatchObject({
+      params: { detailParts: { costs: { [houseType]: cost, reed: 2 } } },
+    })
+    expect(response.state.log).toContainEqual(expect.objectContaining({
+      key: 'log.actionDetail',
+      params: expect.objectContaining({ action: 'actions.construct.name', detailParts: { effects: { buildRoom: 1 } } }),
+    }))
+    expect(readCardResourceStats(response.state.players[0]!, CARD_ID)?.saved.clay ?? 0).toBe(5 - cost)
+    if (cost === 4) {
+      expect(paymentLog).toMatchObject({ params: { detailParts: { bonusSources: [CARD_ID] } } })
+    } else {
+      expect(paymentLog).not.toMatchObject({ params: { detailParts: { bonusSources: [CARD_ID] } } })
+    }
   })
 })

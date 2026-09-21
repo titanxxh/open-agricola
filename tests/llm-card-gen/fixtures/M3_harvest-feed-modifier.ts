@@ -52,7 +52,11 @@ const fixture: CardFixture = {
   },
 
   assert(session, _ctx): FixtureResult {
-    const state = session.getState().state as any
+    const state = session.getState().state
+    const gains = state.events.filter((event) => event.type === 'resource.moved' && event.sourceCardId === CARD_ID)
+    if (gains.length !== 1 || gains[0]?.phase !== 'feeding') {
+      return { ok: false, reason: 'expected exactly one card gain during the feeding phase' }
+    }
     const p0Beg = state.players[0].resources.begging
     const p1Beg = state.players[1].resources.begging
     if (p0Beg !== 0) return { ok: false, reason: `expected p0.begging=0 (card grants +1 food, 1+1=2 covers cost), got ${p0Beg}` }
