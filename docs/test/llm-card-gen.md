@@ -16,7 +16,7 @@ tests/llm-card-gen/
     ├── types.ts              # CardFixture = { setup, scenario, assert }
     ├── M1_immediate-gain-with-cost-prereq.ts  # minor + cost + prereq + onBuy gain
     ├── M2_per-action-bonus.ts                 # listener: forest after → wood+1
-    ├── M3_harvest-feed-modifier.ts            # onHarvest: food+1
+    ├── M3_harvest-feed-modifier.ts            # onStartHarvestFeedingPhase: food+1
     ├── M4_endgame-vp.ts                       # computeBonusScore: 每 2 牛 1 分
     ├── M5_cost-reduction.ts                   # computeCosts: renovate-house -1 reed
     ├── M6_cardstate-counter.ts                # cardStates counter（special-effect）
@@ -156,7 +156,7 @@ setActiveWorkerCount(p1, 0)          // 对手零工人，避免轮转
 见 `docs/CUSTOM_CARD_SANDBOX.md` §5.5 / §5.6 / §5.7：
 
 - `listeners[].actions:` 是 leaf actionId（`place-farmer` / `gain` / `collect` 等），不是行动空间 id
-- `harvest-feed` 不是 listener 动作——用 `onHarvest` effect hook
+- `harvest-feed` 不是 listener 动作——喂食阶段开始时的收益用 `onStartHarvestFeedingPhase` effect hook
 - Anytime = `phases: ['anytime']` listener，不用 `actions:` 字段；一次性能力用 `special-effect` 的 `set-flag` + `cardStates.flagged` 闸门
 - `futureMeeplesNode` 没注入沙盒，手写 `params.__futureMeepleRequest` leaf
 - `costs` 只用于简单行动费用；跨所有主要/次要改良候选的资源折扣用 `bonuses`，并设置 `capDiscountAtCost: true`、`optional: false`、`sources: [CARD_ID]`
