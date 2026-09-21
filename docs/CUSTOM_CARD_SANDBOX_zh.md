@@ -151,7 +151,7 @@ const jsonSafe = JSON.parse(JSON.stringify(value ?? null))
 ### 2.2 常见判断与陷阱
 
 - **翻修目标房屋类型**：参考实现升级链固定 `wood → clay → stone`，无分支。`renovate-house` 触发时不要尝试从 `space` 读目标，用 `context.player.houseType` 反推：当前 `'wood'` 表示翻修到泥屋，`'clay'` 表示翻修到石屋。例：石屋翻修折扣 → `if (context.player.houseType !== 'clay') return`（参见 `shared/cards/A/A110_Roughcaster.ts:15,26`）。
-- **建造房屋类型**：`construct` 行动看 `context.choice` 或 `context.actionId`（`'build-clay-room'` / `'build-stone-room'` 等），不是 `space.params`。
+- **建造房屋类型**：监听 `construct`，用 `context.player.houseType`（`wood` / `clay` / `stone`）判断。`context.actionId` 始终是 `construct`；`context.choice` 是交互选择值，不表示房屋材料。
 - **未使用 handler 参数**：项目 `tsconfig.json` 开了 `noUnusedParameters`。如果 handler 不需要 context，把参数前缀 `_` 或省掉。否则 PR CI 报 `TS6133: 'context' is declared but its value is never read`。
 
 ---
@@ -521,7 +521,7 @@ AST validator 还会检查 `CARD_IMPL.effect` 中的键是否在 `cardEffectHook
 }
 ```
 
-特殊行动名 `harvest-feed` **不是** listener 可监听项 —— 收获阶段的 feeding 走直接资源 mutation，不进 listener pipeline。要在 feeding 前补食物，用 effect hook `onHarvest` 返回 `gainLeaf(CARD_ID, { food: N })`。
+特殊行动名 `harvest-feed` **不是** listener 可监听项 —— 收获阶段的 feeding 走直接资源 mutation，不进 listener pipeline。要在喂食阶段开始时补食物，用 `onStartHarvestFeedingPhase` 返回 `gainLeaf(CARD_ID, { food: N })`；flow 在进入 feeding 阶段后、实际扣除食物前完成。`onHarvest` 更早，在收割后的 anytime 窗口之前执行。
 
 ## 5.6 Anytime ability（任意时刻能力）
 

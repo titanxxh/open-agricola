@@ -34,15 +34,21 @@ describe('CARD_DESIGNER_SYSTEM_PROMPT', () => {
     expect(CARD_DESIGNER_SYSTEM_PROMPT).toContain(renderListenerActionList())
   })
 
-  it('steers feeding-start gains away from the recursive harvest hook', () => {
-    expect(CARD_DESIGNER_SYSTEM_PROMPT).toContain('请用 `onHarvest` 返回 `gainLeaf`')
-    expect(CARD_DESIGNER_SYSTEM_PROMPT).toContain('不要从 `onStartHarvestFeedingPhase` 返回 flow')
+  it('uses the feeding-start hook for feeding-start gains', () => {
+    expect(CARD_DESIGNER_SYSTEM_PROMPT).toContain('请用 `onStartHarvestFeedingPhase` 返回 `gainLeaf`')
+    expect(CARD_DESIGNER_SYSTEM_PROMPT).not.toContain('不要从 `onStartHarvestFeedingPhase` 返回 flow')
   })
 
   it('steers accumulating-space listeners to exact action-space ids', () => {
     expect(CARD_DESIGNER_SYSTEM_PROMPT).toContain("资源累积格用 `actions: ['collect']`")
     expect(CARD_DESIGNER_SYSTEM_PROMPT).toContain('用 `context.space?.id` 精确判断')
     expect(CARD_DESIGNER_SYSTEM_PROMPT).toContain('不要假设 `context.result.spaceId` 存在')
+  })
+
+  it('uses the current house type for construction conditions', () => {
+    expect(CARD_DESIGNER_SYSTEM_PROMPT).toContain('建造房屋类型**：监听 `construct`，用 `context.player.houseType`')
+    expect(CARD_DESIGNER_SYSTEM_PROMPT).not.toContain('build-clay-room')
+    expect(CARD_DESIGNER_SYSTEM_PROMPT).not.toContain('build-stone-room')
   })
 
   it('uses the runtime improvement action for purchase discounts', () => {
