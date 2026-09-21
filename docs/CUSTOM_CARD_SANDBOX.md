@@ -138,7 +138,7 @@ Common hallucinated fields that do not exist are `space.params`, `space.target`,
 ### 2.2 Common tests and traps
 
 - **Renovation target:** the upgrade chain is a fixed wood-to-clay-to-stone sequence. During `renovate-house`, infer the target from `context.player.houseType`; current `wood` means clay and current `clay` means stone. A stone-house renovation discount checks `if (context.player.houseType !== 'clay') return`. See `shared/cards/A/A110_Roughcaster.ts`.
-- **Constructed room type:** read `context.choice` or `context.actionId`, such as `build-clay-room` or `build-stone-room`, never `space.params`.
+- **Constructed room type:** listen to `construct` and read `context.player.houseType` (`wood`, `clay`, or `stone`). `context.actionId` stays `construct`; `context.choice` is an interaction choice, not a room material.
 - **Unused handler parameters:** `tsconfig.json` enables `noUnusedParameters`. Omit an unused parameter or prefix it with `_`; otherwise pull-request CI fails with `TS6133`.
 
 ---
@@ -474,7 +474,7 @@ To trigger after a player visits a particular action space, listen on `actions: 
 }
 ```
 
-`harvest-feed` is not a listenable action. Harvest feeding performs direct resource mutation outside the listener pipeline. To add food before feeding, return `gainLeaf(CARD_ID, { food: N })` from the `onHarvest` effect hook.
+`harvest-feed` is not a listenable action. Harvest feeding performs direct resource mutation outside the listener pipeline. For food granted at the start of feeding, return `gainLeaf(CARD_ID, { food: N })` from `onStartHarvestFeedingPhase`. Its flow completes after the feeding phase starts and before food is consumed. `onHarvest` runs earlier, before the post-reap anytime window.
 
 ### 5.6 Anytime abilities
 

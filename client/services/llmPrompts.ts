@@ -207,7 +207,16 @@ ${renderEffectHookTable()}
 
 ${renderAdvancedHookTable()}
 
-如果效果是“喂食阶段开始时获得食物，并用于本次喂食”，请用 \`onHarvest\` 返回 \`gainLeaf\`；不要从 \`onStartHarvestFeedingPhase\` 返回 flow。
+如果效果是“喂食阶段开始时获得食物，并用于本次喂食”，请用 \`onStartHarvestFeedingPhase\` 返回 \`gainLeaf\`。它在进入 feeding 阶段后、实际扣除食物前执行；\`onHarvest\` 更早，在收割后、喂食前的 anytime 窗口之前执行。
+
+\`\`\`typescript
+const CARD_IMPL = {
+  effect: {
+    id: CARD_ID,
+    onStartHarvestFeedingPhase: () => gainLeaf(CARD_ID, { food: 1 }),
+  },
+}
+\`\`\`
 
 ## listener 机制
 
@@ -255,7 +264,7 @@ ${renderListenerActionList()}
 ### 常见判断与陷阱
 
 - **翻修目标房屋类型**：reference 升级链固定 \`wood → clay → stone\`，无分支。\`renovate-house\` 触发时用 \`context.player.houseType\` 反推目标——\`'wood'\` 表示翻修到泥屋，\`'clay'\` 表示翻修到石屋。例：石屋翻修折扣 → \`if (context.player.houseType !== 'clay') return\`。
-- **建造房屋类型**：\`construct\` 行动看 \`context.choice\` 或 \`context.actionId\`（\`'build-clay-room'\` / \`'build-stone-room'\` 等），不是 \`space.params\`。
+- **建造房屋类型**：监听 \`construct\`，用 \`context.player.houseType\` 判断房屋材料（\`wood\` / \`clay\` / \`stone\`）；\`context.actionId\` 始终是 \`construct\`，\`context.choice\` 是交互选择值，不表示房屋材料。
 - **未使用 handler 参数**：项目 TS strict 开了 \`noUnusedParameters\`。如果 handler 不需要 context，把参数前缀 \`_\` 或省掉。
 
 ### handler 返回值
@@ -283,6 +292,26 @@ handler: () => ({
   costAttribution: [{ sourceCard: CARD_ID, costs: { wood: -1 } }],
   sourceCard: CARD_ID,
 })
+\`\`\`
+
+例如，只在建造泥屋房间时减免 1 clay：
+
+\`\`\`typescript
+const CARD_IMPL = {
+  listeners: [{
+    cardIds: [CARD_ID],
+    actions: ['construct'],
+    phases: ['computeCosts'],
+    handler: (context) => {
+      if (context.player.houseType !== 'clay') return
+      return {
+        costs: { clay: -1 },
+        costAttribution: [{ sourceCard: CARD_ID, costs: { clay: -1 } }],
+        sourceCard: CARD_ID,
+      }
+    },
+  }],
+}
 \`\`\`
 
 ### 费用机制边界
