@@ -5899,5 +5899,16 @@
         }
       ]
     }
-  ]
+  ],
+  "owner_phone_check": {
+    "hostname": "openagapi.titanxxh.com",
+    "path": "/api/health",
+    "network": "China Mobile cellular",
+    "proxy_enabled": false,
+    "source": "owner reported in this conversation",
+    "health_result": {
+      "ok": true
+    },
+    "account_login_verified": false
+  }
 }
