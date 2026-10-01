@@ -4,7 +4,7 @@
 #   1. Copy deploy/Caddyfile.example to deploy/Caddyfile
 #   2. Replace domain name in Caddyfile
 #   3. Set CORS_ORIGIN in .env to your GitHub Pages URL
-#   4. Public HTTPS traffic is exposed on host port 8443
+#   4. Public HTTPS traffic is exposed on host port 443 (8443 retained for existing clients)
 #   5. docker compose -f docker-compose.prod.yml up -d --build
 
 services:
@@ -70,6 +70,7 @@ services:
     image: caddy:alpine
     ports:
       - "80:80"
+      - "443:443"
       - "8443:443"
     volumes:
       - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
