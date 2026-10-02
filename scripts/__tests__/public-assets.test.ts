@@ -28,20 +28,22 @@ const createContract = async (files = REQUIRED_FILES): Promise<string> => {
 
 const inventoryFetcher = (
   files = [...REQUIRED_FILES, 'assets/z.jpg'],
-) => vi.fn(async () => new Response(JSON.stringify({
-  truncated: false,
-  tree: files.map(file => ({ path: file, type: 'blob' })),
-})))
+  version = VERSION,
+) => vi.fn<(input: string | URL, init?: RequestInit) => Promise<Response>>(async (input) =>
+  new Response(new URL(input).pathname.endsWith('/asset-version.txt')
+    ? `${version}\n`
+    : JSON.stringify({ version, files })),
+)
 
 describe('public asset contract', () => {
   afterEach(async () => {
     await Promise.all(tempDirs.splice(0).map(dir => rm(dir, { recursive: true, force: true })))
   })
 
-  it('validates the pinned commit tree and returns a commit-addressed base URL', async () => {
+  it('validates deployed Pages metadata without sending GitHub credentials', async () => {
     const rootDir = await createContract()
     const fetcher = inventoryFetcher()
-    const baseUrl = publicAssetBaseUrl(VERSION)
+    const baseUrl = publicAssetBaseUrl()
 
     await expect(loadPublicAssetConfig({
       rootDir,
@@ -52,20 +54,20 @@ describe('public asset contract', () => {
       version: VERSION,
       requiredFiles: REQUIRED_FILES,
     })
-    expect(fetcher).toHaveBeenCalledTimes(1)
-    const [input, init] = fetcher.mock.calls[0]!
-    expect(new URL(input).pathname).toBe(
-      `/repos/titanxxh/open-agricola-assets/git/trees/${VERSION}`,
-    )
-    expect(new URL(input).searchParams.get('recursive')).toBe('1')
-    expect(init?.headers).toMatchObject({
-      Accept: 'application/vnd.github+json',
-      Authorization: 'Bearer test-token',
-      'X-GitHub-Api-Version': '2022-11-28',
-    })
+    expect(fetcher).toHaveBeenCalledTimes(2)
+    expect(fetcher.mock.calls.map(([input]) => new URL(input).pathname)).toEqual([
+      '/open-agricola-assets/asset-version.txt',
+      '/open-agricola-assets/asset-manifest.json',
+    ])
+    for (const [input, init] of fetcher.mock.calls) {
+      expect(new URL(input).origin).toBe('https://titanxxh.github.io')
+      expect(new URL(input).searchParams.get('v')).toBe(VERSION)
+      expect(init?.cache).toBe('no-store')
+      expect(init?.headers).toEqual({ 'cache-control': 'no-cache' })
+    }
   })
 
-  it('fails closed when the pinned commit omits a required asset', async () => {
+  it('fails closed when the deployed manifest omits a required asset', async () => {
     const rootDir = await createContract()
 
     await expect(
@@ -73,15 +75,50 @@ describe('public asset contract', () => {
     ).rejects.toThrow('missing required file: assets/b.webp')
   })
 
-  it('rejects a truncated pinned commit tree', async () => {
+  it('rejects a different Pages deployment version', async () => {
     const rootDir = await createContract()
-    const fetcher = vi.fn(async () => new Response(JSON.stringify({
-      truncated: true,
-      tree: REQUIRED_FILES.map(file => ({ path: file, type: 'blob' })),
-    })))
+    const fetcher = inventoryFetcher(REQUIRED_FILES, '0'.repeat(40))
 
     await expect(loadPublicAssetConfig({ rootDir, fetcher }))
-      .rejects.toThrow('must contain a complete tree')
+      .rejects.toThrow('Pages version does not match')
+  })
+
+  it('rejects an inconsistent manifest version even when the version marker matches', async () => {
+    const rootDir = await createContract()
+    const fetcher = inventoryFetcher()
+      .mockResolvedValueOnce(new Response(`${VERSION}\n`))
+      .mockResolvedValueOnce(new Response(JSON.stringify({
+        version: '0'.repeat(40), files: REQUIRED_FILES,
+      })))
+
+    await expect(loadPublicAssetConfig({ rootDir, fetcher }))
+      .rejects.toThrow('manifest version does not match')
+  })
+
+  it.each([
+    [{ version: VERSION, files: ['assets/../a.png'] }, 'invalid path'],
+    [{ version: VERSION, files: ['assets/a.png', 'assets/a.png'] }, 'duplicate paths'],
+    [{ version: VERSION, files: ['assets/b.webp', 'assets/a.png'] }, 'must be sorted'],
+    [{ version: VERSION, files: REQUIRED_FILES, unexpected: true }, 'Invalid public asset manifest'],
+  ])('rejects malformed deployed manifests', async (manifest, message) => {
+    const rootDir = await createContract()
+    const fetcher = inventoryFetcher()
+      .mockResolvedValueOnce(new Response(`${VERSION}\n`))
+      .mockResolvedValueOnce(new Response(JSON.stringify(manifest)))
+
+    await expect(loadPublicAssetConfig({ rootDir, fetcher })).rejects.toThrow(message)
+  })
+
+  it('rejects invalid JSON and unavailable Pages metadata', async () => {
+    const rootDir = await createContract()
+    const fetcher = inventoryFetcher()
+      .mockResolvedValueOnce(new Response(`${VERSION}\n`))
+      .mockResolvedValueOnce(new Response('<html>Not a manifest</html>'))
+    await expect(loadPublicAssetConfig({ rootDir, fetcher }))
+      .rejects.toThrow('Invalid public asset manifest JSON')
+
+    fetcher.mockResolvedValue(new Response('Not Found', { status: 404 }))
+    await expect(loadPublicAssetConfig({ rootDir, fetcher })).rejects.toThrow('returned 404')
   })
 
   it.each([
@@ -106,7 +143,7 @@ describe('public asset contract', () => {
       fetcher,
       validateRemote: false,
     })).resolves.toEqual({
-      baseUrl: publicAssetBaseUrl(VERSION),
+      baseUrl: publicAssetBaseUrl(),
       version: VERSION,
       requiredFiles: REQUIRED_FILES,
     })
@@ -148,7 +185,7 @@ describe('public asset contract', () => {
   })
 
   it('rewrites CSS asset URLs through the pinned source', () => {
-    const baseUrl = publicAssetBaseUrl(VERSION)
+    const baseUrl = publicAssetBaseUrl()
     expect(rewriteCssPublicAssetUrls(
       "background: url('/assets/a.png')",
       '/',

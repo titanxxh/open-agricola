@@ -1406,7 +1406,7 @@ BUG_REPORT_TOKEN_ENCRYPTION_KEYS
 BUG_REPORT_TOKEN_ACTIVE_KEY_ID
 ```
 
-当前 Durable Room Commit 读取 `REPLAY_NEW_ROOMS_ENABLED`、`REPLAY_VIEWER_BUILD_ID`、`REPLAY_VIEWER_ROOT`、`REPLAY_ASSET_ROOT` 和 `GAME_BUILD_ID`，启用录制时只接受 SQLite 持久化。创建 Room 时持久化录制决定、两个 Build ID 和自定义卡运行时快照；未发布自定义卡要求玩家明确确认永久公开。Viewer Build ID 必须是完整 `manifest.json` 的 SHA-256，清单固定 `index.html` 入口及目录内每个文件的 SHA-256；Build 只保存 Viewer 代码、样式和卡牌 manifest，棋盘图、卡图和字体与主站使用同一固定素材仓 commit，不归档图片历史；校验失败时拒绝创建。自定义卡图在 Step 0 前复制到内容寻址资源目录并把 Replay header 改写为不可变 URL。录制开启的等待局在 Step 0 建立前拒绝游戏写入。未完成局过期时删除未被有效 Bug Report Anchor 保护的 Replay payload；小时级清理会在 evidence 到期后再次裁剪 Segment、空 header 和无引用内容资源。已有 Replay header 不受后续配置变化影响并继续记录，开关开启后恢复出的旧进行局会以 `missingPrefix=true` 建立 Step 0。
+当前 Durable Room Commit 读取 `REPLAY_NEW_ROOMS_ENABLED`、`REPLAY_VIEWER_BUILD_ID`、`REPLAY_VIEWER_ROOT`、`REPLAY_ASSET_ROOT` 和 `GAME_BUILD_ID`，启用录制时只接受 SQLite 持久化。创建 Room 时持久化录制决定、两个 Build ID 和自定义卡运行时快照；未发布自定义卡要求玩家明确确认永久公开。Viewer Build ID 必须是完整 `manifest.json` 的 SHA-256，清单固定 `index.html` 入口及目录内每个文件的 SHA-256；Build 只保存 Viewer 代码、样式和卡牌 manifest，棋盘图、卡图和字体与主站使用同一素材仓 GitHub Pages 当前来源，不归档图片历史。构建时校验 Pages 部署版本/清单与 `public-assets.ref` 一致，运行时版本参数只是缓存键，不是历史快照。Replay CSP 允许图片站 Pages 路径的图片和字体；校验失败时拒绝创建。自定义卡图在 Step 0 前复制到内容寻址资源目录并把 Replay header 改写为不可变 URL。录制开启的等待局在 Step 0 建立前拒绝游戏写入。未完成局过期时删除未被有效 Bug Report Anchor 保护的 Replay payload；小时级清理会在 evidence 到期后再次裁剪 Segment、空 header 和无引用内容资源。已有 Replay header 不受后续配置变化影响并继续记录，开关开启后恢复出的旧进行局会以 `missingPrefix=true` 建立 Step 0。
 
 部署顺序固定为：
 

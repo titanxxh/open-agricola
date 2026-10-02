@@ -19,8 +19,7 @@ MAIN_REPO_DIR="$(cd "$(dirname "$(git -C "$SCRIPT_DIR" rev-parse --path-format=a
 # .env is untracked, so a worktree is created without one. Fall back to the main
 # repo's, the same way persistent dev state is anchored there — otherwise every
 # new worktree silently starts with no GH_TOKEN, no OAuth config and no API
-# bases, and the first symptom is an opaque 403 while fetching the public asset
-# inventory.
+# bases, leaving platform integrations and endpoint configuration incomplete.
 ENV_FILE="$SCRIPT_DIR/.env"
 if [ ! -f "$ENV_FILE" ]; then
   ENV_FILE="$MAIN_REPO_DIR/.env"

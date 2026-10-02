@@ -1,0 +1,3135 @@
+{
+  "checked_date": "2026-10-02",
+  "method": "Globalping HTTPS GET with probe-side DNS and valid-TLS checks, using mainland eyeball-network ASN selectors plus a Singapore control. Different runs can select different probes. HTTP bodies may be truncated: response timings are not full downloads or browser page-load timings. An initial request to nonexistent 18qiufen.webp is excluded; the production asset is 16qiufen.webp. No authenticated gameplay was tested.",
+  "asset_commit": "94c1b4f8864a946c79c66940fb3357b4101cb08c",
+  "measurements": [
+    {
+      "id": "22Fb5d1zJTdBjowix00021EzR",
+      "type": "http",
+      "status": "finished",
+      "createdAt": "2026-10-02T05:05:46.575Z",
+      "target": "titanxxh.github.io",
+      "probesCount": 8,
+      "locations": [
+        {
+          "country": "CN",
+          "asn": 9808,
+          "tags": [
+            "eyeball-network"
+          ],
+          "limit": 3
+        },
+        {
+          "country": "CN",
+          "asn": 4134,
+          "tags": [
+            "eyeball-network"
+          ],
+          "limit": 3
+        },
+        {
+          "country": "CN",
+          "asn": 17621,
+          "tags": [
+            "eyeball-network"
+          ],
+          "limit": 2
+        },
+        {
+          "country": "CN",
+          "asn": 17623,
+          "tags": [
+            "eyeball-network"
+          ]
+        },
+        {
+          "country": "SG"
+        }
+      ],
+      "measurementOptions": {
+        "port": 443,
+        "request": {
+          "method": "GET",
+          "path": "/open-agricola/"
+        }
+      },
+      "name": "homepage",
+      "source": "https://api.globalping.io/v1/measurements/22Fb5d1zJTdBjowix00021EzR",
+      "results": [
+        {
+          "probe": {
+            "continent": "AS",
+            "region": "Eastern Asia",
+            "country": "CN",
+            "state": null,
+            "city": "Guilin",
+            "asn": 9808,
+            "longitude": 110.29,
+            "latitude": 25.28,
+            "network": "China Mobile Communications Group",
+            "tags": [
+              "eyeball-network",
+              "u-shuangzhijinghua"
+            ],
+            "resolvers": [
+              "211.138.240.100",
+              "211.138.245.180"
+            ]
+          },
+          "result": {
+            "status": "finished",
+            "failureSource": null,
+            "resolvedAddress": "185.199.109.153",
+            "statusCode": 200,
+            "statusCodeName": "OK",
+            "timings": {
+              "total": 334,
+              "dns": 41,
+              "tcp": 96,
+              "tls": 99,
+              "firstByte": 98,
+              "download": 0
+            },
+            "truncated": false,
+            "tls_authorized": true,
+            "error_output": null
+          }
+        },
+        {
+          "probe": {
+            "continent": "AS",
+            "region": "Eastern Asia",
+            "country": "CN",
+            "state": null,
+            "city": "Guangzhou",
+            "asn": 9808,
+            "longitude": 113.25,
+            "latitude": 23.12,
+            "network": "China Mobile Communications Group",
+            "tags": [
+              "eyeball-network"
+            ],
+            "resolvers": [
+              "private"
+            ]
+          },
+          "result": {
+            "status": "finished",
+            "failureSource": null,
+            "resolvedAddress": "185.199.109.153",
+            "statusCode": 200,
+            "statusCodeName": "OK",
+            "timings": {
+              "total": 299,
+              "dns": 63,
+              "tcp": 76,
+              "tls": 82,
+              "firstByte": 77,
+              "download": 1
+            },
+            "truncated": false,
+            "tls_authorized": true,
+            "error_output": null
+          }
+        },
+        {
+          "probe": {
+            "continent": "AS",
+            "region": "Eastern Asia",
+            "country": "CN",
+            "state": null,
+            "city": "Taishan",
+            "asn": 9808,
+            "longitude": 112.78,
+            "latitude": 22.25,
+            "network": "China Mobile Communications Group",
+            "tags": [
+              "eyeball-network"
+            ],
+            "resolvers": [
+              "private"
+            ]
+          },
+          "result": {
+            "status": "finished",
+            "failureSource": null,
+            "resolvedAddress": "185.199.110.153",
+            "statusCode": 200,
+            "statusCodeName": "OK",
+            "timings": {
+              "total": 473,
+              "dns": 32,
+              "tcp": 80,
+              "tls": 92,
+              "firstByte": 268,
+              "download": 1
+            },
+            "truncated": false,
+            "tls_authorized": true,
+            "error_output": null
+          }
+        },
+        {
+          "probe": {
+            "continent": "AS",
+            "region": "Eastern Asia",
+            "country": "CN",
+            "state": null,
+            "city": "Dongguan",
+            "asn": 4134,
+            "longitude": 113.75,
+            "latitude": 23.02,
+            "network": "Chinanet Backbone",
+            "tags": [
+              "eyeball-network"
+            ],
+            "resolvers": [
+              "private"
+            ]
+          },
+          "result": {
+            "status": "finished",
+            "failureSource": null,
+            "resolvedAddress": "185.199.109.153",
+            "statusCode": 200,
+            "statusCodeName": "OK",
+            "timings": {
+              "total": 833,
+              "dns": 372,
+              "tcp": 71,
+              "tls": 329,
+              "firstByte": 60,
+              "download": 1
+            },
+            "truncated": false,
+            "tls_authorized": true,
+            "error_output": null
+          }
+        },
+        {
+          "probe": {
+            "continent": "AS",
+            "region": "Eastern Asia",
+            "country": "CN",
+            "state": null,
+            "city": "Shanghai",
+            "asn": 17621,
+            "longitude": 121.46,
+            "latitude": 31.22,
+            "network": "China Unicom Shanghai network",
+            "tags": [
+              "eyeball-network",
+              "u-flxxyz"
+            ],
+            "resolvers": [
+              "private",
+              "private"
+            ]
+          },
+          "result": {
+            "status": "finished",
+            "failureSource": null,
+            "resolvedAddress": "185.199.110.153",
+            "statusCode": 200,
+            "statusCodeName": "OK",
+            "timings": {
+              "total": 997,
+              "dns": 693,
+              "tcp": 100,
+              "tls": 102,
+              "firstByte": 102,
+              "download": 0
+            },
+            "truncated": false,
+            "tls_authorized": true,
+            "error_output": null
+          }
+        },
+        {
+          "probe": {
+            "continent": "AS",
+            "region": "Eastern Asia",
+            "country": "CN",
+            "state": null,
+            "city": "Shanghai",
+            "asn": 17621,
+            "longitude": 121.46,
+            "latitude": 31.22,
+            "network": "China Unicom Shanghai network",
+            "tags": [
+              "eyeball-network"
+            ],
+            "resolvers": [
+              "private",
+              "114.114.114.114",
+              "8.8.8.8"
+            ]
+          },
+          "result": {
+            "status": "finished",
+            "failureSource": null,
+            "resolvedAddress": "185.199.110.153",
+            "statusCode": 200,
+            "statusCodeName": "OK",
+            "timings": {
+              "total": 646,
+              "dns": 126,
+              "tcp": 101,
+              "tls": 105,
+              "firstByte": 311,
+              "download": 3
+            },
+            "truncated": false,
+            "tls_authorized": true,
+            "error_output": null
+          }
+        },
+        {
+          "probe": {
+            "continent": "AS",
+            "region": "Eastern Asia",
+            "country": "CN",
+            "state": null,
+            "city": "Shenzhen",
+            "asn": 17623,
+            "longitude": 114.07,
+            "latitude": 22.55,
+            "network": "China Unicom Shenzen network",
+            "tags": [
+              "eyeball-network",
+              "u-yanranxiaoxi"
+            ],
+            "resolvers": [
+              "private",
+              "private"
+            ]
+          },
+          "result": {
+            "status": "finished",
+            "failureSource": null,
+            "resolvedAddress": "185.199.109.153",
+            "statusCode": 200,
+            "statusCodeName": "OK",
+            "timings": {
+              "total": 664,
+              "dns": 52,
+              "tcp": 189,
+              "tls": 193,
+              "firstByte": 227,
+              "download": 3
+            },
+            "truncated": false,
+            "tls_authorized": true,
+            "error_output": null
+          }
+        },
+        {
+          "probe": {
+            "continent": "AS",
+            "region": "South-eastern Asia",
+            "country": "SG",
+            "state": null,
+            "city": "Singapore",
+            "asn": 59253,
+            "longitude": 103.85,
+            "latitude": 1.29,
+            "network": "LeaseWeb",
+            "tags": [
+              "datacenter-network",
+              "u-JohnFilch123"
+            ],
+            "resolvers": [
+              "private"
+            ]
+          },
+          "result": {
+            "status": "finished",
+            "failureSource": null,
+            "resolvedAddress": "185.199.110.153",
+            "statusCode": 200,
+            "statusCodeName": "OK",
+            "timings": {
+              "total": 248,
+              "dns": 5,
+              "tcp": 1,
+              "tls": 6,
+              "firstByte": 235,
+              "download": 1
+            },
+            "truncated": false,
+            "tls_authorized": true,
+            "error_output": null
+          }
+        }
+      ]
+    },
+    {
+      "id": "26kwR6RHOQYUTiRdh00021EzR",
+      "type": "http",
+      "status": "finished",
+      "createdAt": "2026-10-02T05:05:46.592Z",
+      "target": "titanxxh.github.io",
+      "probesCount": 8,
+      "locations": [
+        {
+          "country": "CN",
+          "asn": 9808,
+          "tags": [
+            "eyeball-network"
+          ],
+          "limit": 3
+        },
+        {
+          "country": "CN",
+          "asn": 4134,
+          "tags": [
+            "eyeball-network"
+          ],
+          "limit": 3
+        },
+        {
+          "country": "CN",
+          "asn": 17621,
+          "tags": [
+            "eyeball-network"
+          ],
+          "limit": 2
+        },
+        {
+          "country": "CN",
+          "asn": 17623,
+          "tags": [
+            "eyeball-network"
+          ]
+        },
+        {
+          "country": "SG"
+        }
+      ],
+      "measurementOptions": {
+        "port": 443,
+        "request": {
+          "method": "GET",
+          "path": "/open-agricola/assets/index-DafwQMKi.js"
+        }
+      },
+      "name": "entry_js",
+      "source": "https://api.globalping.io/v1/measurements/26kwR6RHOQYUTiRdh00021EzR",
+      "results": [
+        {
+          "probe": {
+            "continent": "AS",
+            "region": "Eastern Asia",
+            "country": "CN",
+            "state": null,
+            "city": "Taishan",
+            "asn": 9808,
+            "longitude": 112.78,
+            "latitude": 22.25,
+            "network": "China Mobile Communications Group",
+            "tags": [
+              "eyeball-network"
+            ],
+            "resolvers": [
+              "private"
+            ]
+          },
+          "result": {
+            "status": "finished",
+            "failureSource": null,
+            "resolvedAddress": "185.199.110.153",
+            "statusCode": 200,
+            "statusCodeName": "OK",
+            "timings": {
+              "total": 453,
+              "dns": 9,
+              "tcp": 87,
+              "tls": 95,
+              "firstByte": 262,
+              "download": 0
+            },
+            "truncated": true,
+            "tls_authorized": true,
+            "error_output": null
+          }
+        },
+        {
+          "probe": {
+            "continent": "AS",
+            "region": "Eastern Asia",
+            "country": "CN",
+            "state": null,
+            "city": "Shanghai",
+            "asn": 9808,
+            "longitude": 121.46,
+            "latitude": 31.22,
+            "network": "China Mobile Communications Group",
+            "tags": [
+              "eyeball-network"
+            ],
+            "resolvers": [
+              "private",
+              "private"
+            ]
+          },
+          "result": {
+            "status": "finished",
+            "failureSource": null,
+            "resolvedAddress": "185.199.111.153",
+            "statusCode": 200,
+            "statusCodeName": "OK",
+            "timings": {
+              "total": 376,
+              "dns": 82,
+              "tcp": 86,
+              "tls": 112,
+              "firstByte": 94,
+              "download": 2
+            },
+            "truncated": true,
+            "tls_authorized": true,
+            "error_output": null
+          }
+        },
+        {
+          "probe": {
+            "continent": "AS",
+            "region": "Eastern Asia",
+            "country": "CN",
+            "state": null,
+            "city": "Beijing",
+            "asn": 9808,
+            "longitude": 116.4,
+            "latitude": 39.91,
+            "network": "China Mobile Communications Group",
+            "tags": [
+              "eyeball-network",
+              "u-FengLing02"
+            ],
+            "resolvers": [
+              "211.136.17.107",
+              "211.136.20.203"
+            ]
+          },
+          "result": {
+            "status": "finished",
+            "failureSource": null,
+            "resolvedAddress": "185.199.108.153",
+            "statusCode": 200,
+            "statusCodeName": "OK",
+            "timings": {
+              "total": 327,
+              "dns": 59,
+              "tcp": 73,
+              "tls": 78,
+              "firstByte": 106,
+              "download": 11
+            },
+            "truncated": true,
+            "tls_authorized": true,
+            "error_output": null
+          }
+        },
+        {
+          "probe": {
+            "continent": "AS",
+            "region": "Eastern Asia",
+            "country": "CN",
+            "state": null,
+            "city": "Dongguan",
+            "asn": 4134,
+            "longitude": 113.75,
+            "latitude": 23.02,
+            "network": "Chinanet Backbone",
+            "tags": [
+              "eyeball-network"
+            ],
+            "resolvers": [
+              "private"
+            ]
+          },
+          "result": {
+            "status": "finished",
+            "failureSource": null,
+            "resolvedAddress": "185.199.109.153",
+            "statusCode": 200,
+            "statusCodeName": "OK",
+            "timings": {
+              "total": 735,
+              "dns": 356,
+              "tcp": 64,
+              "tls": 260,
+              "firstByte": 55,
+              "download": 0
+            },
+            "truncated": true,
+            "tls_authorized": true,
+            "error_output": null
+          }
+        },
+        {
+          "probe": {
+            "continent": "AS",
+            "region": "Eastern Asia",
+            "country": "CN",
+            "state": null,
+            "city": "Shanghai",
+            "asn": 17621,
+            "longitude": 121.46,
+            "latitude": 31.22,
+            "network": "China Unicom Shanghai network",
+            "tags": [
+              "eyeball-network"
+            ],
+            "resolvers": [
+              "private",
+              "114.114.114.114",
+              "8.8.8.8"
+            ]
+          },
+          "result": {
+            "status": "finished",
+            "failureSource": null,
+            "resolvedAddress": "185.199.110.153",
+            "statusCode": 200,
+            "statusCodeName": "OK",
+            "timings": {
+              "total": 654,
+              "dns": 111,
+              "tcp": 104,
+              "tls": 113,
+              "firstByte": 311,
+              "download": 15
+            },
+            "truncated": true,
+            "tls_authorized": true,
+            "error_output": null
+          }
+        },
+        {
+          "probe": {
+            "continent": "AS",
+            "region": "Eastern Asia",
+            "country": "CN",
+            "state": null,
+            "city": "Shanghai",
+            "asn": 17621,
+            "longitude": 121.46,
+            "latitude": 31.22,
+            "network": "China Unicom Shanghai network",
+            "tags": [
+              "eyeball-network",
+              "u-flxxyz"
+            ],
+            "resolvers": [
+              "private",
+              "private"
+            ]
+          },
+          "result": {
+            "status": "finished",
+            "failureSource": null,
+            "resolvedAddress": "185.199.109.153",
+            "statusCode": 200,
+            "statusCodeName": "OK",
+            "timings": {
+              "total": 1015,
+              "dns": 703,
+              "tcp": 96,
+              "tls": 100,
+              "firstByte": 103,
+              "download": 13
+            },
+            "truncated": true,
+            "tls_authorized": true,
+            "error_output": null
+          }
+        },
+        {
+          "probe": {
+            "continent": "AS",
+            "region": "Eastern Asia",
+            "country": "CN",
+            "state": null,
+            "city": "Shenzhen",
+            "asn": 17623,
+            "longitude": 114.07,
+            "latitude": 22.55,
+            "network": "China Unicom Shenzen network",
+            "tags": [
+              "eyeball-network",
+              "u-yanranxiaoxi"
+            ],
+            "resolvers": [
+              "private",
+              "private"
+            ]
+          },
+          "result": {
+            "status": "finished",
+            "failureSource": null,
+            "resolvedAddress": "185.199.109.153",
+            "statusCode": 200,
+            "statusCodeName": "OK",
+            "timings": {
+              "total": 685,
+              "dns": 37,
+              "tcp": 187,
+              "tls": 193,
+              "firstByte": 242,
+              "download": 26
+            },
+            "truncated": true,
+            "tls_authorized": true,
+            "error_output": null
+          }
+        },
+        {
+          "probe": {
+            "continent": "AS",
+            "region": "South-eastern Asia",
+            "country": "SG",
+            "state": null,
+            "city": "Singapore",
+            "asn": 31898,
+            "longitude": 103.96,
+            "latitude": 1.38,
+            "network": "Oracle",
+            "tags": [
+              "oci-ap-singapore-1",
+              "oci",
+              "datacenter-network",
+              "u-vincehulei"
+            ],
+            "resolvers": [
+              "private"
+            ]
+          },
+          "result": {
+            "status": "finished",
+            "failureSource": null,
+            "resolvedAddress": "185.199.108.153",
+            "statusCode": 200,
+            "statusCodeName": "OK",
+            "timings": {
+              "total": 316,
+              "dns": 36,
+              "tcp": 1,
+              "tls": 5,
+              "firstByte": 273,
+              "download": 1
+            },
+            "truncated": true,
+            "tls_authorized": true,
+            "error_output": null
+          }
+        }
+      ]
+    },
+    {
+      "id": "2jdfypjZVWMx0YmV400021EzR",
+      "type": "http",
+      "status": "finished",
+      "createdAt": "2026-10-02T05:05:46.588Z",
+      "target": "raw.githubusercontent.com",
+      "probesCount": 8,
+      "locations": [
+        {
+          "country": "CN",
+          "asn": 9808,
+          "tags": [
+            "eyeball-network"
+          ],
+          "limit": 3
+        },
+        {
+          "country": "CN",
+          "asn": 4134,
+          "tags": [
+            "eyeball-network"
+          ],
+          "limit": 3
+        },
+        {
+          "country": "CN",
+          "asn": 17621,
+          "tags": [
+            "eyeball-network"
+          ],
+          "limit": 2
+        },
+        {
+          "country": "CN",
+          "asn": 17623,
+          "tags": [
+            "eyeball-network"
+          ]
+        },
+        {
+          "country": "SG"
+        }
+      ],
+      "measurementOptions": {
+        "port": 443,
+        "request": {
+          "method": "GET",
+          "path": "/titanxxh/open-agricola-assets/94c1b4f8864a946c79c66940fb3357b4101cb08c/assets/parents/portrait/PR01.png"
+        }
+      },
+      "name": "card_image",
+      "source": "https://api.globalping.io/v1/measurements/2jdfypjZVWMx0YmV400021EzR",
+      "results": [
+        {
+          "probe": {
+            "continent": "AS",
+            "region": "Eastern Asia",
+            "country": "CN",
+            "state": null,
+            "city": "Taishan",
+            "asn": 9808,
+            "longitude": 112.78,
+            "latitude": 22.25,
+            "network": "China Mobile Communications Group",
+            "tags": [
+              "eyeball-network"
+            ],
+            "resolvers": [
+              "private"
+            ]
+          },
+          "result": {
+            "status": "failed",
+            "failureSource": "target",
+            "resolvedAddress": null,
+            "statusCode": null,
+            "statusCodeName": null,
+            "timings": {
+              "total": null,
+              "dns": null,
+              "tcp": null,
+              "tls": null,
+              "firstByte": null,
+              "download": null
+            },
+            "truncated": false,
+            "tls_authorized": null,
+            "error_output": "read ECONNRESET"
+          }
+        },
+        {
+          "probe": {
+            "continent": "AS",
+            "region": "Eastern Asia",
+            "country": "CN",
+            "state": null,
+            "city": "Beijing",
+            "asn": 9808,
+            "longitude": 116.4,
+            "latitude": 39.91,
+            "network": "China Mobile Communications Group",
+            "tags": [
+              "eyeball-network",
+              "u-FengLing02"
+            ],
+            "resolvers": [
+              "211.136.17.107",
+              "211.136.20.203"
+            ]
+          },
+          "result": {
+            "status": "finished",
+            "failureSource": null,
+            "resolvedAddress": "185.199.111.133",
+            "statusCode": 200,
+            "statusCodeName": "OK",
+            "timings": {
+              "total": 431,
+              "dns": 3,
+              "tcp": 77,
+              "tls": 82,
+              "firstByte": 265,
+              "download": 4
+            },
+            "truncated": true,
+            "tls_authorized": true,
+            "error_output": null
+          }
+        },
+        {
+          "probe": {
+            "continent": "AS",
+            "region": "Eastern Asia",
+            "country": "CN",
+            "state": null,
+            "city": "Guangzhou",
+            "asn": 9808,
+            "longitude": 113.25,
+            "latitude": 23.12,
+            "network": "China Mobile Communications Group",
+            "tags": [
+              "eyeball-network"
+            ],
+            "resolvers": [
+              "private"
+            ]
+          },
+          "result": {
+            "status": "failed",
+            "failureSource": "target",
+            "resolvedAddress": null,
+            "statusCode": null,
+            "statusCodeName": null,
+            "timings": {
+              "total": null,
+              "dns": null,
+              "tcp": null,
+              "tls": null,
+              "firstByte": null,
+              "download": null
+            },
+            "truncated": false,
+            "tls_authorized": null,
+            "error_output": "read ECONNRESET"
+          }
+        },
+        {
+          "probe": {
+            "continent": "AS",
+            "region": "Eastern Asia",
+            "country": "CN",
+            "state": null,
+            "city": "Dongguan",
+            "asn": 4134,
+            "longitude": 113.75,
+            "latitude": 23.02,
+            "network": "Chinanet Backbone",
+            "tags": [
+              "eyeball-network"
+            ],
+            "resolvers": [
+              "private"
+            ]
+          },
+          "result": {
+            "status": "failed",
+            "failureSource": "target",
+            "resolvedAddress": "185.199.109.133",
+            "statusCode": null,
+            "statusCodeName": null,
+            "timings": {
+              "total": 15000,
+              "dns": 611,
+              "tcp": 59,
+              "tls": 57,
+              "firstByte": null,
+              "download": null
+            },
+            "truncated": false,
+            "tls_authorized": true,
+            "error_output": "Request timed out while waiting for the first response byte."
+          }
+        },
+        {
+          "probe": {
+            "continent": "AS",
+            "region": "Eastern Asia",
+            "country": "CN",
+            "state": null,
+            "city": "Shanghai",
+            "asn": 17621,
+            "longitude": 121.46,
+            "latitude": 31.22,
+            "network": "China Unicom Shanghai network",
+            "tags": [
+              "eyeball-network",
+              "u-flxxyz"
+            ],
+            "resolvers": [
+              "private",
+              "private"
+            ]
+          },
+          "result": {
+            "status": "finished",
+            "failureSource": null,
+            "resolvedAddress": "185.199.108.133",
+            "statusCode": 200,
+            "statusCodeName": "OK",
+            "timings": {
+              "total": 1002,
+              "dns": 686,
+              "tcp": 99,
+              "tls": 102,
+              "firstByte": 102,
+              "download": 13
+            },
+            "truncated": true,
+            "tls_authorized": true,
+            "error_output": null
+          }
+        },
+        {
+          "probe": {
+            "continent": "AS",
+            "region": "Eastern Asia",
+            "country": "CN",
+            "state": null,
+            "city": "Shanghai",
+            "asn": 17621,
+            "longitude": 121.46,
+            "latitude": 31.22,
+            "network": "China Unicom Shanghai network",
+            "tags": [
+              "eyeball-network"
+            ],
+            "resolvers": [
+              "private",
+              "114.114.114.114",
+              "8.8.8.8"
+            ]
+          },
+          "result": {
+            "status": "finished",
+            "failureSource": null,
+            "resolvedAddress": "185.199.111.133",
+            "statusCode": 200,
+            "statusCodeName": "OK",
+            "timings": {
+              "total": 492,
+              "dns": 6,
+              "tcp": 109,
+              "tls": 110,
+              "firstByte": 260,
+              "download": 7
+            },
+            "truncated": true,
+            "tls_authorized": true,
+            "error_output": null
+          }
+        },
+        {
+          "probe": {
+            "continent": "AS",
+            "region": "Eastern Asia",
+            "country": "CN",
+            "state": null,
+            "city": "Shenzhen",
+            "asn": 17623,
+            "longitude": 114.07,
+            "latitude": 22.55,
+            "network": "China Unicom Shenzen network",
+            "tags": [
+              "eyeball-network",
+              "u-yanranxiaoxi"
+            ],
+            "resolvers": [
+              "private",
+              "private"
+            ]
+          },
+          "result": {
+            "status": "finished",
+            "failureSource": null,
+            "resolvedAddress": "185.199.111.133",
+            "statusCode": 200,
+            "statusCodeName": "OK",
+            "timings": {
+              "total": 602,
+              "dns": 7,
+              "tcp": 187,
+              "tls": 194,
+              "firstByte": 188,
+              "download": 26
+            },
+            "truncated": true,
+            "tls_authorized": true,
+            "error_output": null
+          }
+        },
+        {
+          "probe": {
+            "continent": "AS",
+            "region": "South-eastern Asia",
+            "country": "SG",
+            "state": null,
+            "city": "Singapore",
+            "asn": 31898,
+            "longitude": 103.96,
+            "latitude": 1.38,
+            "network": "Oracle",
+            "tags": [
+              "oci-ap-singapore-1",
+              "oci",
+              "datacenter-network",
+              "u-vincehulei"
+            ],
+            "resolvers": [
+              "private"
+            ]
+          },
+          "result": {
+            "status": "finished",
+            "failureSource": null,
+            "resolvedAddress": "185.199.111.133",
+            "statusCode": 200,
+            "statusCodeName": "OK",
+            "timings": {
+              "total": 427,
+              "dns": 2,
+              "tcp": 1,
+              "tls": 6,
+              "firstByte": 417,
+              "download": 1
+            },
+            "truncated": true,
+            "tls_authorized": true,
+            "error_output": null
+          }
+        }
+      ]
+    },
+    {
+      "id": "2AiIfinmNOwL7A0Bf00021EzR",
+      "type": "http",
+      "status": "finished",
+      "createdAt": "2026-10-02T05:05:46.592Z",
+      "target": "openagapi.titanxxh.com",
+      "probesCount": 8,
+      "locations": [
+        {
+          "country": "CN",
+          "asn": 9808,
+          "tags": [
+            "eyeball-network"
+          ],
+          "limit": 3
+        },
+        {
+          "country": "CN",
+          "asn": 4134,
+          "tags": [
+            "eyeball-network"
+          ],
+          "limit": 3
+        },
+        {
+          "country": "CN",
+          "asn": 17621,
+          "tags": [
+            "eyeball-network"
+          ],
+          "limit": 2
+        },
+        {
+          "country": "CN",
+          "asn": 17623,
+          "tags": [
+            "eyeball-network"
+          ]
+        },
+        {
+          "country": "SG"
+        }
+      ],
+      "measurementOptions": {
+        "port": 443,
+        "request": {
+          "method": "GET",
+          "path": "/api/health"
+        }
+      },
+      "name": "backend_health",
+      "source": "https://api.globalping.io/v1/measurements/2AiIfinmNOwL7A0Bf00021EzR",
+      "results": [
+        {
+          "probe": {
+            "continent": "AS",
+            "region": "Eastern Asia",
+            "country": "CN",
+            "state": null,
+            "city": "Guangzhou",
+            "asn": 9808,
+            "longitude": 113.25,
+            "latitude": 23.12,
+            "network": "China Mobile Communications Group",
+            "tags": [
+              "eyeball-network"
+            ],
+            "resolvers": [
+              "private"
+            ]
+          },
+          "result": {
+            "status": "finished",
+            "failureSource": null,
+            "resolvedAddress": "74.208.219.191",
+            "statusCode": 200,
+            "statusCodeName": "OK",
+            "timings": {
+              "total": 1421,
+              "dns": 413,
+              "tcp": 330,
+              "tls": 348,
+              "firstByte": 330,
+              "download": 0
+            },
+            "truncated": false,
+            "tls_authorized": true,
+            "error_output": null
+          }
+        },
+        {
+          "probe": {
+            "continent": "AS",
+            "region": "Eastern Asia",
+            "country": "CN",
+            "state": null,
+            "city": "Shanghai",
+            "asn": 9808,
+            "longitude": 121.46,
+            "latitude": 31.22,
+            "network": "China Mobile Communications Group",
+            "tags": [
+              "eyeball-network"
+            ],
+            "resolvers": [
+              "private",
+              "private"
+            ]
+          },
+          "result": {
+            "status": "finished",
+            "failureSource": null,
+            "resolvedAddress": "74.208.219.191",
+            "statusCode": 200,
+            "statusCodeName": "OK",
+            "timings": {
+              "total": 1454,
+              "dns": 426,
+              "tcp": 321,
+              "tls": 388,
+              "firstByte": 319,
+              "download": 0
+            },
+            "truncated": false,
+            "tls_authorized": true,
+            "error_output": null
+          }
+        },
+        {
+          "probe": {
+            "continent": "AS",
+            "region": "Eastern Asia",
+            "country": "CN",
+            "state": null,
+            "city": "Guilin",
+            "asn": 9808,
+            "longitude": 110.29,
+            "latitude": 25.28,
+            "network": "China Mobile Communications Group",
+            "tags": [
+              "eyeball-network",
+              "u-shuangzhijinghua"
+            ],
+            "resolvers": [
+              "211.138.240.100",
+              "211.138.245.180"
+            ]
+          },
+          "result": {
+            "status": "finished",
+            "failureSource": null,
+            "resolvedAddress": "74.208.219.191",
+            "statusCode": 200,
+            "statusCodeName": "OK",
+            "timings": {
+              "total": 2202,
+              "dns": 293,
+              "tcp": 1319,
+              "tls": 295,
+              "firstByte": 295,
+              "download": 0
+            },
+            "truncated": false,
+            "tls_authorized": true,
+            "error_output": null
+          }
+        },
+        {
+          "probe": {
+            "continent": "AS",
+            "region": "Eastern Asia",
+            "country": "CN",
+            "state": null,
+            "city": "Dongguan",
+            "asn": 4134,
+            "longitude": 113.75,
+            "latitude": 23.02,
+            "network": "Chinanet Backbone",
+            "tags": [
+              "eyeball-network"
+            ],
+            "resolvers": [
+              "private"
+            ]
+          },
+          "result": {
+            "status": "finished",
+            "failureSource": null,
+            "resolvedAddress": "74.208.219.191",
+            "statusCode": 200,
+            "statusCodeName": "OK",
+            "timings": {
+              "total": 773,
+              "dns": 159,
+              "tcp": 205,
+              "tls": 206,
+              "firstByte": 203,
+              "download": 0
+            },
+            "truncated": false,
+            "tls_authorized": true,
+            "error_output": null
+          }
+        },
+        {
+          "probe": {
+            "continent": "AS",
+            "region": "Eastern Asia",
+            "country": "CN",
+            "state": null,
+            "city": "Shanghai",
+            "asn": 17621,
+            "longitude": 121.46,
+            "latitude": 31.22,
+            "network": "China Unicom Shanghai network",
+            "tags": [
+              "eyeball-network"
+            ],
+            "resolvers": [
+              "private",
+              "114.114.114.114",
+              "8.8.8.8"
+            ]
+          },
+          "result": {
+            "status": "finished",
+            "failureSource": null,
+            "resolvedAddress": "74.208.219.191",
+            "statusCode": 200,
+            "statusCodeName": "OK",
+            "timings": {
+              "total": 875,
+              "dns": 75,
+              "tcp": 259,
+              "tls": 278,
+              "firstByte": 263,
+              "download": 0
+            },
+            "truncated": false,
+            "tls_authorized": true,
+            "error_output": null
+          }
+        },
+        {
+          "probe": {
+            "continent": "AS",
+            "region": "Eastern Asia",
+            "country": "CN",
+            "state": null,
+            "city": "Shanghai",
+            "asn": 17621,
+            "longitude": 121.46,
+            "latitude": 31.22,
+            "network": "China Unicom Shanghai network",
+            "tags": [
+              "eyeball-network",
+              "u-flxxyz"
+            ],
+            "resolvers": [
+              "private",
+              "private"
+            ]
+          },
+          "result": {
+            "status": "finished",
+            "failureSource": null,
+            "resolvedAddress": "74.208.219.191",
+            "statusCode": 200,
+            "statusCodeName": "OK",
+            "timings": {
+              "total": 983,
+              "dns": 134,
+              "tcp": 278,
+              "tls": 289,
+              "firstByte": 282,
+              "download": 0
+            },
+            "truncated": false,
+            "tls_authorized": true,
+            "error_output": null
+          }
+        },
+        {
+          "probe": {
+            "continent": "AS",
+            "region": "Eastern Asia",
+            "country": "CN",
+            "state": null,
+            "city": "Shenzhen",
+            "asn": 17623,
+            "longitude": 114.07,
+            "latitude": 22.55,
+            "network": "China Unicom Shenzen network",
+            "tags": [
+              "eyeball-network",
+              "u-yanranxiaoxi"
+            ],
+            "resolvers": [
+              "private",
+              "private"
+            ]
+          },
+          "result": {
+            "status": "finished",
+            "failureSource": null,
+            "resolvedAddress": "74.208.219.191",
+            "statusCode": 200,
+            "statusCodeName": "OK",
+            "timings": {
+              "total": 922,
+              "dns": 173,
+              "tcp": 246,
+              "tls": 256,
+              "firstByte": 247,
+              "download": 0
+            },
+            "truncated": false,
+            "tls_authorized": true,
+            "error_output": null
+          }
+        },
+        {
+          "probe": {
+            "continent": "AS",
+            "region": "South-eastern Asia",
+            "country": "SG",
+            "state": null,
+            "city": "Singapore",
+            "asn": 31898,
+            "longitude": 103.96,
+            "latitude": 1.38,
+            "network": "Oracle",
+            "tags": [
+              "oci-ap-singapore-1",
+              "oci",
+              "datacenter-network",
+              "u-Aoang"
+            ],
+            "resolvers": [
+              "private"
+            ]
+          },
+          "result": {
+            "status": "finished",
+            "failureSource": null,
+            "resolvedAddress": "74.208.219.191",
+            "statusCode": 200,
+            "statusCodeName": "OK",
+            "timings": {
+              "total": 831,
+              "dns": 180,
+              "tcp": 214,
+              "tls": 220,
+              "firstByte": 217,
+              "download": 0
+            },
+            "truncated": false,
+            "tls_authorized": true,
+            "error_output": null
+          }
+        }
+      ]
+    },
+    {
+      "id": "2E8kkoS29ki6MKk5Y00021EzT",
+      "type": "http",
+      "status": "finished",
+      "createdAt": "2026-10-02T05:07:05.226Z",
+      "target": "titanxxh.github.io",
+      "probesCount": 9,
+      "locations": [
+        {
+          "country": "CN",
+          "asn": 9808,
+          "tags": [
+            "eyeball-network"
+          ],
+          "limit": 3
+        },
+        {
+          "country": "CN",
+          "asn": 4134,
+          "tags": [
+            "eyeball-network"
+          ],
+          "limit": 3
+        },
+        {
+          "country": "CN",
+          "asn": 17621,
+          "tags": [
+            "eyeball-network"
+          ],
+          "limit": 2
+        },
+        {
+          "country": "CN",
+          "asn": 17623,
+          "tags": [
+            "eyeball-network"
+          ]
+        },
+        {
+          "country": "SG"
+        }
+      ],
+      "measurementOptions": {
+        "port": 443,
+        "request": {
+          "method": "GET",
+          "path": "/open-agricola/assets/index-Cj71_OYy.css"
+        }
+      },
+      "name": "entry_css",
+      "source": "https://api.globalping.io/v1/measurements/2E8kkoS29ki6MKk5Y00021EzT",
+      "results": [
+        {
+          "probe": {
+            "continent": "AS",
+            "region": "Eastern Asia",
+            "country": "CN",
+            "state": null,
+            "city": "Shanghai",
+            "asn": 9808,
+            "longitude": 121.46,
+            "latitude": 31.22,
+            "network": "China Mobile Communications Group",
+            "tags": [
+              "eyeball-network"
+            ],
+            "resolvers": [
+              "private",
+              "private"
+            ]
+          },
+          "result": {
+            "status": "finished",
+            "failureSource": null,
+            "resolvedAddress": "185.199.111.153",
+            "statusCode": 200,
+            "statusCodeName": "OK",
+            "timings": {
+              "total": 308,
+              "dns": 31,
+              "tcp": 84,
+              "tls": 108,
+              "firstByte": 85,
+              "download": 0
+            },
+            "truncated": true,
+            "tls_authorized": true,
+            "error_output": null
+          }
+        },
+        {
+          "probe": {
+            "continent": "AS",
+            "region": "Eastern Asia",
+            "country": "CN",
+            "state": null,
+            "city": "Taishan",
+            "asn": 9808,
+            "longitude": 112.78,
+            "latitude": 22.25,
+            "network": "China Mobile Communications Group",
+            "tags": [
+              "eyeball-network"
+            ],
+            "resolvers": [
+              "private"
+            ]
+          },
+          "result": {
+            "status": "finished",
+            "failureSource": null,
+            "resolvedAddress": "185.199.110.153",
+            "statusCode": 200,
+            "statusCodeName": "OK",
+            "timings": {
+              "total": 446,
+              "dns": 1,
+              "tcp": 76,
+              "tls": 81,
+              "firstByte": 288,
+              "download": 0
+            },
+            "truncated": true,
+            "tls_authorized": true,
+            "error_output": null
+          }
+        },
+        {
+          "probe": {
+            "continent": "AS",
+            "region": "Eastern Asia",
+            "country": "CN",
+            "state": null,
+            "city": "Beijing",
+            "asn": 9808,
+            "longitude": 116.4,
+            "latitude": 39.91,
+            "network": "China Mobile Communications Group",
+            "tags": [
+              "eyeball-network",
+              "u-FengLing02"
+            ],
+            "resolvers": [
+              "211.136.17.107",
+              "211.136.20.203"
+            ]
+          },
+          "result": {
+            "status": "finished",
+            "failureSource": null,
+            "resolvedAddress": "185.199.108.153",
+            "statusCode": 200,
+            "statusCodeName": "OK",
+            "timings": {
+              "total": 310,
+              "dns": 80,
+              "tcp": 73,
+              "tls": 80,
+              "firstByte": 76,
+              "download": 1
+            },
+            "truncated": true,
+            "tls_authorized": true,
+            "error_output": null
+          }
+        },
+        {
+          "probe": {
+            "continent": "AS",
+            "region": "Eastern Asia",
+            "country": "CN",
+            "state": null,
+            "city": "Xi'an",
+            "asn": 4134,
+            "longitude": 108.93,
+            "latitude": 34.26,
+            "network": "Chinanet Backbone",
+            "tags": [
+              "eyeball-network"
+            ],
+            "resolvers": [
+              "1.1.1.1",
+              "8.8.8.8"
+            ]
+          },
+          "result": {
+            "status": "finished",
+            "failureSource": null,
+            "resolvedAddress": "185.199.108.153",
+            "statusCode": 200,
+            "statusCodeName": "OK",
+            "timings": {
+              "total": 530,
+              "dns": 85,
+              "tcp": 74,
+              "tls": 299,
+              "firstByte": 68,
+              "download": 4
+            },
+            "truncated": true,
+            "tls_authorized": true,
+            "error_output": null
+          }
+        },
+        {
+          "probe": {
+            "continent": "AS",
+            "region": "Eastern Asia",
+            "country": "CN",
+            "state": null,
+            "city": "Dongguan",
+            "asn": 4134,
+            "longitude": 113.75,
+            "latitude": 23.02,
+            "network": "Chinanet Backbone",
+            "tags": [
+              "eyeball-network"
+            ],
+            "resolvers": [
+              "private"
+            ]
+          },
+          "result": {
+            "status": "finished",
+            "failureSource": null,
+            "resolvedAddress": "185.199.111.153",
+            "statusCode": 200,
+            "statusCodeName": "OK",
+            "timings": {
+              "total": 1396,
+              "dns": 1,
+              "tcp": 127,
+              "tls": 1121,
+              "firstByte": 147,
+              "download": 0
+            },
+            "truncated": true,
+            "tls_authorized": true,
+            "error_output": null
+          }
+        },
+        {
+          "probe": {
+            "continent": "AS",
+            "region": "Eastern Asia",
+            "country": "CN",
+            "state": null,
+            "city": "Shanghai",
+            "asn": 17621,
+            "longitude": 121.46,
+            "latitude": 31.22,
+            "network": "China Unicom Shanghai network",
+            "tags": [
+              "eyeball-network",
+              "u-flxxyz"
+            ],
+            "resolvers": [
+              "private",
+              "private"
+            ]
+          },
+          "result": {
+            "status": "finished",
+            "failureSource": null,
+            "resolvedAddress": "185.199.110.153",
+            "statusCode": 200,
+            "statusCodeName": "OK",
+            "timings": {
+              "total": 1081,
+              "dns": 783,
+              "tcp": 98,
+              "tls": 100,
+              "firstByte": 99,
+              "download": 1
+            },
+            "truncated": true,
+            "tls_authorized": true,
+            "error_output": null
+          }
+        },
+        {
+          "probe": {
+            "continent": "AS",
+            "region": "Eastern Asia",
+            "country": "CN",
+            "state": null,
+            "city": "Shanghai",
+            "asn": 17621,
+            "longitude": 121.46,
+            "latitude": 31.22,
+            "network": "China Unicom Shanghai network",
+            "tags": [
+              "eyeball-network"
+            ],
+            "resolvers": [
+              "private",
+              "114.114.114.114",
+              "8.8.8.8"
+            ]
+          },
+          "result": {
+            "status": "finished",
+            "failureSource": null,
+            "resolvedAddress": "185.199.111.153",
+            "statusCode": 200,
+            "statusCodeName": "OK",
+            "timings": {
+              "total": 808,
+              "dns": 2,
+              "tcp": 85,
+              "tls": 167,
+              "firstByte": 289,
+              "download": 265
+            },
+            "truncated": true,
+            "tls_authorized": true,
+            "error_output": null
+          }
+        },
+        {
+          "probe": {
+            "continent": "AS",
+            "region": "Eastern Asia",
+            "country": "CN",
+            "state": null,
+            "city": "Shenzhen",
+            "asn": 17623,
+            "longitude": 114.07,
+            "latitude": 22.55,
+            "network": "China Unicom Shenzen network",
+            "tags": [
+              "eyeball-network",
+              "u-yanranxiaoxi"
+            ],
+            "resolvers": [
+              "private",
+              "private"
+            ]
+          },
+          "result": {
+            "status": "finished",
+            "failureSource": null,
+            "resolvedAddress": "185.199.110.153",
+            "statusCode": 200,
+            "statusCodeName": "OK",
+            "timings": {
+              "total": 564,
+              "dns": 5,
+              "tcp": 183,
+              "tls": 191,
+              "firstByte": 184,
+              "download": 1
+            },
+            "truncated": true,
+            "tls_authorized": true,
+            "error_output": null
+          }
+        },
+        {
+          "probe": {
+            "continent": "AS",
+            "region": "South-eastern Asia",
+            "country": "SG",
+            "state": null,
+            "city": "Singapore",
+            "asn": 16276,
+            "longitude": 103.85,
+            "latitude": 1.29,
+            "network": "OVH",
+            "tags": [
+              "datacenter-network",
+              "u-Aditya-bit26",
+              "u-Aditya-bit26:corehosting",
+              "u-Aditya-bit26:corehostingph"
+            ],
+            "resolvers": [
+              "private"
+            ]
+          },
+          "result": {
+            "status": "finished",
+            "failureSource": null,
+            "resolvedAddress": "185.199.108.153",
+            "statusCode": 200,
+            "statusCodeName": "OK",
+            "timings": {
+              "total": 310,
+              "dns": 39,
+              "tcp": 1,
+              "tls": 4,
+              "firstByte": 266,
+              "download": 0
+            },
+            "truncated": true,
+            "tls_authorized": true,
+            "error_output": null
+          }
+        }
+      ]
+    },
+    {
+      "id": "2XrOpklJDAMDQ1zCq00021EzT",
+      "type": "http",
+      "status": "finished",
+      "createdAt": "2026-10-02T05:07:05.237Z",
+      "target": "raw.githubusercontent.com",
+      "probesCount": 9,
+      "locations": [
+        {
+          "country": "CN",
+          "asn": 9808,
+          "tags": [
+            "eyeball-network"
+          ],
+          "limit": 3
+        },
+        {
+          "country": "CN",
+          "asn": 4134,
+          "tags": [
+            "eyeball-network"
+          ],
+          "limit": 3
+        },
+        {
+          "country": "CN",
+          "asn": 17621,
+          "tags": [
+            "eyeball-network"
+          ],
+          "limit": 2
+        },
+        {
+          "country": "CN",
+          "asn": 17623,
+          "tags": [
+            "eyeball-network"
+          ]
+        },
+        {
+          "country": "SG"
+        }
+      ],
+      "measurementOptions": {
+        "port": 443,
+        "request": {
+          "method": "GET",
+          "path": "/titanxxh/open-agricola-assets/94c1b4f8864a946c79c66940fb3357b4101cb08c/assets/website-bg/16qiufen.webp"
+        }
+      },
+      "name": "background_corrected",
+      "source": "https://api.globalping.io/v1/measurements/2XrOpklJDAMDQ1zCq00021EzT",
+      "results": [
+        {
+          "probe": {
+            "continent": "AS",
+            "region": "Eastern Asia",
+            "country": "CN",
+            "state": null,
+            "city": "Taishan",
+            "asn": 9808,
+            "longitude": 112.78,
+            "latitude": 22.25,
+            "network": "China Mobile Communications Group",
+            "tags": [
+              "eyeball-network"
+            ],
+            "resolvers": [
+              "private"
+            ]
+          },
+          "result": {
+            "status": "failed",
+            "failureSource": "target",
+            "resolvedAddress": null,
+            "statusCode": null,
+            "statusCodeName": null,
+            "timings": {
+              "total": null,
+              "dns": null,
+              "tcp": null,
+              "tls": null,
+              "firstByte": null,
+              "download": null
+            },
+            "truncated": false,
+            "tls_authorized": null,
+            "error_output": "read ECONNRESET"
+          }
+        },
+        {
+          "probe": {
+            "continent": "AS",
+            "region": "Eastern Asia",
+            "country": "CN",
+            "state": null,
+            "city": "Shanghai",
+            "asn": 9808,
+            "longitude": 121.46,
+            "latitude": 31.22,
+            "network": "China Mobile Communications Group",
+            "tags": [
+              "eyeball-network"
+            ],
+            "resolvers": [
+              "private",
+              "private"
+            ]
+          },
+          "result": {
+            "status": "failed",
+            "failureSource": "target",
+            "resolvedAddress": null,
+            "statusCode": null,
+            "statusCodeName": null,
+            "timings": {
+              "total": null,
+              "dns": null,
+              "tcp": null,
+              "tls": null,
+              "firstByte": null,
+              "download": null
+            },
+            "truncated": false,
+            "tls_authorized": null,
+            "error_output": "read ECONNRESET"
+          }
+        },
+        {
+          "probe": {
+            "continent": "AS",
+            "region": "Eastern Asia",
+            "country": "CN",
+            "state": null,
+            "city": "Guilin",
+            "asn": 9808,
+            "longitude": 110.29,
+            "latitude": 25.28,
+            "network": "China Mobile Communications Group",
+            "tags": [
+              "eyeball-network",
+              "u-shuangzhijinghua"
+            ],
+            "resolvers": [
+              "211.138.240.100",
+              "211.138.245.180"
+            ]
+          },
+          "result": {
+            "status": "failed",
+            "failureSource": "target",
+            "resolvedAddress": null,
+            "statusCode": null,
+            "statusCodeName": null,
+            "timings": {
+              "total": null,
+              "dns": null,
+              "tcp": null,
+              "tls": null,
+              "firstByte": null,
+              "download": null
+            },
+            "truncated": false,
+            "tls_authorized": null,
+            "error_output": "read ECONNRESET"
+          }
+        },
+        {
+          "probe": {
+            "continent": "AS",
+            "region": "Eastern Asia",
+            "country": "CN",
+            "state": null,
+            "city": "Dongguan",
+            "asn": 4134,
+            "longitude": 113.75,
+            "latitude": 23.02,
+            "network": "Chinanet Backbone",
+            "tags": [
+              "eyeball-network"
+            ],
+            "resolvers": [
+              "private"
+            ]
+          },
+          "result": {
+            "status": "failed",
+            "failureSource": "target",
+            "resolvedAddress": "185.199.110.133",
+            "statusCode": null,
+            "statusCodeName": null,
+            "timings": {
+              "total": 15000,
+              "dns": 0,
+              "tcp": 67,
+              "tls": 151,
+              "firstByte": null,
+              "download": null
+            },
+            "truncated": false,
+            "tls_authorized": true,
+            "error_output": "Request timed out while waiting for the first response byte."
+          }
+        },
+        {
+          "probe": {
+            "continent": "AS",
+            "region": "Eastern Asia",
+            "country": "CN",
+            "state": null,
+            "city": "Xi'an",
+            "asn": 4134,
+            "longitude": 108.93,
+            "latitude": 34.26,
+            "network": "Chinanet Backbone",
+            "tags": [
+              "eyeball-network"
+            ],
+            "resolvers": [
+              "1.1.1.1",
+              "8.8.8.8"
+            ]
+          },
+          "result": {
+            "status": "failed",
+            "failureSource": "target",
+            "resolvedAddress": "185.199.110.133",
+            "statusCode": null,
+            "statusCodeName": null,
+            "timings": {
+              "total": 15001,
+              "dns": 77,
+              "tcp": 71,
+              "tls": 75,
+              "firstByte": null,
+              "download": null
+            },
+            "truncated": false,
+            "tls_authorized": true,
+            "error_output": "Request timed out while waiting for the first response byte."
+          }
+        },
+        {
+          "probe": {
+            "continent": "AS",
+            "region": "Eastern Asia",
+            "country": "CN",
+            "state": null,
+            "city": "Shanghai",
+            "asn": 17621,
+            "longitude": 121.46,
+            "latitude": 31.22,
+            "network": "China Unicom Shanghai network",
+            "tags": [
+              "eyeball-network",
+              "u-flxxyz"
+            ],
+            "resolvers": [
+              "private",
+              "private"
+            ]
+          },
+          "result": {
+            "status": "finished",
+            "failureSource": null,
+            "resolvedAddress": "185.199.111.133",
+            "statusCode": 200,
+            "statusCodeName": "OK",
+            "timings": {
+              "total": 994,
+              "dns": 686,
+              "tcp": 98,
+              "tls": 99,
+              "firstByte": 99,
+              "download": 12
+            },
+            "truncated": true,
+            "tls_authorized": true,
+            "error_output": null
+          }
+        },
+        {
+          "probe": {
+            "continent": "AS",
+            "region": "Eastern Asia",
+            "country": "CN",
+            "state": null,
+            "city": "Shanghai",
+            "asn": 17621,
+            "longitude": 121.46,
+            "latitude": 31.22,
+            "network": "China Unicom Shanghai network",
+            "tags": [
+              "eyeball-network"
+            ],
+            "resolvers": [
+              "private",
+              "114.114.114.114",
+              "8.8.8.8"
+            ]
+          },
+          "result": {
+            "status": "finished",
+            "failureSource": null,
+            "resolvedAddress": "185.199.111.133",
+            "statusCode": 200,
+            "statusCodeName": "OK",
+            "timings": {
+              "total": 502,
+              "dns": 2,
+              "tcp": 87,
+              "tls": 134,
+              "firstByte": 261,
+              "download": 18
+            },
+            "truncated": true,
+            "tls_authorized": true,
+            "error_output": null
+          }
+        },
+        {
+          "probe": {
+            "continent": "AS",
+            "region": "Eastern Asia",
+            "country": "CN",
+            "state": null,
+            "city": "Shenzhen",
+            "asn": 17623,
+            "longitude": 114.07,
+            "latitude": 22.55,
+            "network": "China Unicom Shenzen network",
+            "tags": [
+              "eyeball-network",
+              "u-yanranxiaoxi"
+            ],
+            "resolvers": [
+              "private",
+              "private"
+            ]
+          },
+          "result": {
+            "status": "finished",
+            "failureSource": null,
+            "resolvedAddress": "185.199.108.133",
+            "statusCode": 200,
+            "statusCodeName": "OK",
+            "timings": {
+              "total": 598,
+              "dns": 3,
+              "tcp": 192,
+              "tls": 198,
+              "firstByte": 193,
+              "download": 12
+            },
+            "truncated": true,
+            "tls_authorized": true,
+            "error_output": null
+          }
+        },
+        {
+          "probe": {
+            "continent": "AS",
+            "region": "South-eastern Asia",
+            "country": "SG",
+            "state": null,
+            "city": "Singapore",
+            "asn": 16276,
+            "longitude": 103.85,
+            "latitude": 1.29,
+            "network": "OVH",
+            "tags": [
+              "datacenter-network",
+              "u-herr-nandez"
+            ],
+            "resolvers": [
+              "private"
+            ]
+          },
+          "result": {
+            "status": "finished",
+            "failureSource": null,
+            "resolvedAddress": "185.199.108.133",
+            "statusCode": 200,
+            "statusCodeName": "OK",
+            "timings": {
+              "total": 462,
+              "dns": 2,
+              "tcp": 1,
+              "tls": 6,
+              "firstByte": 452,
+              "download": 1
+            },
+            "truncated": true,
+            "tls_authorized": true,
+            "error_output": null
+          }
+        }
+      ]
+    },
+    {
+      "id": "2zaL3NFDQwAuXWMCy00021EzT",
+      "type": "http",
+      "status": "finished",
+      "createdAt": "2026-10-02T05:07:05.248Z",
+      "target": "raw.githubusercontent.com",
+      "probesCount": 9,
+      "locations": [
+        {
+          "country": "CN",
+          "asn": 9808,
+          "tags": [
+            "eyeball-network"
+          ],
+          "limit": 3
+        },
+        {
+          "country": "CN",
+          "asn": 4134,
+          "tags": [
+            "eyeball-network"
+          ],
+          "limit": 3
+        },
+        {
+          "country": "CN",
+          "asn": 17621,
+          "tags": [
+            "eyeball-network"
+          ],
+          "limit": 2
+        },
+        {
+          "country": "CN",
+          "asn": 17623,
+          "tags": [
+            "eyeball-network"
+          ]
+        },
+        {
+          "country": "SG"
+        }
+      ],
+      "measurementOptions": {
+        "port": 443,
+        "request": {
+          "method": "GET",
+          "path": "/titanxxh/open-agricola-assets/94c1b4f8864a946c79c66940fb3357b4101cb08c/assets/parents/portrait/PR01.png"
+        }
+      },
+      "name": "card_image_repeat",
+      "source": "https://api.globalping.io/v1/measurements/2zaL3NFDQwAuXWMCy00021EzT",
+      "results": [
+        {
+          "probe": {
+            "continent": "AS",
+            "region": "Eastern Asia",
+            "country": "CN",
+            "state": null,
+            "city": "Shanghai",
+            "asn": 9808,
+            "longitude": 121.46,
+            "latitude": 31.22,
+            "network": "China Mobile Communications Group",
+            "tags": [
+              "eyeball-network"
+            ],
+            "resolvers": [
+              "private",
+              "private"
+            ]
+          },
+          "result": {
+            "status": "failed",
+            "failureSource": "target",
+            "resolvedAddress": null,
+            "statusCode": null,
+            "statusCodeName": null,
+            "timings": {
+              "total": null,
+              "dns": null,
+              "tcp": null,
+              "tls": null,
+              "firstByte": null,
+              "download": null
+            },
+            "truncated": false,
+            "tls_authorized": null,
+            "error_output": "read ECONNRESET"
+          }
+        },
+        {
+          "probe": {
+            "continent": "AS",
+            "region": "Eastern Asia",
+            "country": "CN",
+            "state": null,
+            "city": "Guangzhou",
+            "asn": 9808,
+            "longitude": 113.25,
+            "latitude": 23.12,
+            "network": "China Mobile Communications Group",
+            "tags": [
+              "eyeball-network"
+            ],
+            "resolvers": [
+              "private"
+            ]
+          },
+          "result": {
+            "status": "failed",
+            "failureSource": "target",
+            "resolvedAddress": null,
+            "statusCode": null,
+            "statusCodeName": null,
+            "timings": {
+              "total": null,
+              "dns": null,
+              "tcp": null,
+              "tls": null,
+              "firstByte": null,
+              "download": null
+            },
+            "truncated": false,
+            "tls_authorized": null,
+            "error_output": "read ECONNRESET"
+          }
+        },
+        {
+          "probe": {
+            "continent": "AS",
+            "region": "Eastern Asia",
+            "country": "CN",
+            "state": null,
+            "city": "Guilin",
+            "asn": 9808,
+            "longitude": 110.29,
+            "latitude": 25.28,
+            "network": "China Mobile Communications Group",
+            "tags": [
+              "eyeball-network",
+              "u-shuangzhijinghua"
+            ],
+            "resolvers": [
+              "211.138.240.100",
+              "211.138.245.180"
+            ]
+          },
+          "result": {
+            "status": "failed",
+            "failureSource": "target",
+            "resolvedAddress": null,
+            "statusCode": null,
+            "statusCodeName": null,
+            "timings": {
+              "total": null,
+              "dns": null,
+              "tcp": null,
+              "tls": null,
+              "firstByte": null,
+              "download": null
+            },
+            "truncated": false,
+            "tls_authorized": null,
+            "error_output": "read ECONNRESET"
+          }
+        },
+        {
+          "probe": {
+            "continent": "AS",
+            "region": "Eastern Asia",
+            "country": "CN",
+            "state": null,
+            "city": "Xi'an",
+            "asn": 4134,
+            "longitude": 108.93,
+            "latitude": 34.26,
+            "network": "Chinanet Backbone",
+            "tags": [
+              "eyeball-network"
+            ],
+            "resolvers": [
+              "1.1.1.1",
+              "8.8.8.8"
+            ]
+          },
+          "result": {
+            "status": "failed",
+            "failureSource": "target",
+            "resolvedAddress": "185.199.108.133",
+            "statusCode": null,
+            "statusCodeName": null,
+            "timings": {
+              "total": 15000,
+              "dns": 86,
+              "tcp": 74,
+              "tls": 79,
+              "firstByte": null,
+              "download": null
+            },
+            "truncated": false,
+            "tls_authorized": true,
+            "error_output": "Request timed out while waiting for the first response byte."
+          }
+        },
+        {
+          "probe": {
+            "continent": "AS",
+            "region": "Eastern Asia",
+            "country": "CN",
+            "state": null,
+            "city": "Dongguan",
+            "asn": 4134,
+            "longitude": 113.75,
+            "latitude": 23.02,
+            "network": "Chinanet Backbone",
+            "tags": [
+              "eyeball-network"
+            ],
+            "resolvers": [
+              "private"
+            ]
+          },
+          "result": {
+            "status": "failed",
+            "failureSource": "target",
+            "resolvedAddress": "185.199.109.133",
+            "statusCode": null,
+            "statusCodeName": null,
+            "timings": {
+              "total": 15001,
+              "dns": 1,
+              "tcp": null,
+              "tls": null,
+              "firstByte": null,
+              "download": null
+            },
+            "truncated": false,
+            "tls_authorized": null,
+            "error_output": "Request timed out while establishing the TCP connection."
+          }
+        },
+        {
+          "probe": {
+            "continent": "AS",
+            "region": "Eastern Asia",
+            "country": "CN",
+            "state": null,
+            "city": "Shanghai",
+            "asn": 17621,
+            "longitude": 121.46,
+            "latitude": 31.22,
+            "network": "China Unicom Shanghai network",
+            "tags": [
+              "eyeball-network",
+              "u-flxxyz"
+            ],
+            "resolvers": [
+              "private",
+              "private"
+            ]
+          },
+          "result": {
+            "status": "finished",
+            "failureSource": null,
+            "resolvedAddress": "185.199.109.133",
+            "statusCode": 200,
+            "statusCodeName": "OK",
+            "timings": {
+              "total": 1050,
+              "dns": 741,
+              "tcp": 97,
+              "tls": 100,
+              "firstByte": 99,
+              "download": 13
+            },
+            "truncated": true,
+            "tls_authorized": true,
+            "error_output": null
+          }
+        },
+        {
+          "probe": {
+            "continent": "AS",
+            "region": "Eastern Asia",
+            "country": "CN",
+            "state": null,
+            "city": "Shanghai",
+            "asn": 17621,
+            "longitude": 121.46,
+            "latitude": 31.22,
+            "network": "China Unicom Shanghai network",
+            "tags": [
+              "eyeball-network"
+            ],
+            "resolvers": [
+              "private",
+              "114.114.114.114",
+              "8.8.8.8"
+            ]
+          },
+          "result": {
+            "status": "finished",
+            "failureSource": null,
+            "resolvedAddress": "185.199.108.133",
+            "statusCode": 200,
+            "statusCodeName": "OK",
+            "timings": {
+              "total": 359,
+              "dns": 2,
+              "tcp": 88,
+              "tls": 133,
+              "firstByte": 134,
+              "download": 2
+            },
+            "truncated": true,
+            "tls_authorized": true,
+            "error_output": null
+          }
+        },
+        {
+          "probe": {
+            "continent": "AS",
+            "region": "Eastern Asia",
+            "country": "CN",
+            "state": null,
+            "city": "Shenzhen",
+            "asn": 17623,
+            "longitude": 114.07,
+            "latitude": 22.55,
+            "network": "China Unicom Shenzen network",
+            "tags": [
+              "eyeball-network",
+              "u-yanranxiaoxi"
+            ],
+            "resolvers": [
+              "private",
+              "private"
+            ]
+          },
+          "result": {
+            "status": "finished",
+            "failureSource": null,
+            "resolvedAddress": "185.199.109.133",
+            "statusCode": 200,
+            "statusCodeName": "OK",
+            "timings": {
+              "total": 622,
+              "dns": 3,
+              "tcp": 195,
+              "tls": 202,
+              "firstByte": 195,
+              "download": 27
+            },
+            "truncated": true,
+            "tls_authorized": true,
+            "error_output": null
+          }
+        },
+        {
+          "probe": {
+            "continent": "AS",
+            "region": "South-eastern Asia",
+            "country": "SG",
+            "state": null,
+            "city": "Singapore",
+            "asn": 31898,
+            "longitude": 103.96,
+            "latitude": 1.38,
+            "network": "Oracle",
+            "tags": [
+              "oci-ap-singapore-1",
+              "oci",
+              "datacenter-network"
+            ],
+            "resolvers": [
+              "private"
+            ]
+          },
+          "result": {
+            "status": "finished",
+            "failureSource": null,
+            "resolvedAddress": "185.199.109.133",
+            "statusCode": 200,
+            "statusCodeName": "OK",
+            "timings": {
+              "total": 20,
+              "dns": 10,
+              "tcp": 1,
+              "tls": 6,
+              "firstByte": 2,
+              "download": 1
+            },
+            "truncated": true,
+            "tls_authorized": true,
+            "error_output": null
+          }
+        }
+      ]
+    },
+    {
+      "id": "2mcHR830K7mpcIKU700021Ezr",
+      "type": "http",
+      "status": "finished",
+      "createdAt": "2026-10-02T05:31:15.371Z",
+      "target": "titanxxh.github.io",
+      "probesCount": 10,
+      "locations": [
+        {
+          "country": "CN",
+          "asn": 9808,
+          "tags": [
+            "eyeball-network"
+          ],
+          "limit": 3
+        },
+        {
+          "country": "CN",
+          "asn": 4134,
+          "tags": [
+            "eyeball-network"
+          ],
+          "limit": 3
+        },
+        {
+          "country": "CN",
+          "asn": 17621,
+          "tags": [
+            "eyeball-network"
+          ],
+          "limit": 2
+        },
+        {
+          "country": "CN",
+          "asn": 17623,
+          "tags": [
+            "eyeball-network"
+          ]
+        },
+        {
+          "country": "SG"
+        }
+      ],
+      "measurementOptions": {
+        "port": 443,
+        "request": {
+          "method": "GET",
+          "path": "/open-agricola-assets/assets/website-bg/16qiufen.webp"
+        }
+      },
+      "name": "existing_pages_background",
+      "source": "https://api.globalping.io/v1/measurements/2mcHR830K7mpcIKU700021Ezr",
+      "results": [
+        {
+          "probe": {
+            "continent": "AS",
+            "region": "Eastern Asia",
+            "country": "CN",
+            "state": null,
+            "city": "Taishan",
+            "asn": 9808,
+            "longitude": 112.78,
+            "latitude": 22.25,
+            "network": "China Mobile Communications Group",
+            "tags": [
+              "eyeball-network"
+            ],
+            "resolvers": [
+              "private"
+            ]
+          },
+          "result": {
+            "status": "finished",
+            "failureSource": null,
+            "resolvedAddress": "185.199.110.153",
+            "statusCode": 200,
+            "statusCodeName": "OK",
+            "timings": {
+              "total": 445,
+              "dns": 3,
+              "tcp": 74,
+              "tls": 80,
+              "firstByte": 280,
+              "download": 8
+            },
+            "truncated": true,
+            "tls_authorized": true,
+            "error_output": null
+          }
+        },
+        {
+          "probe": {
+            "continent": "AS",
+            "region": "Eastern Asia",
+            "country": "CN",
+            "state": null,
+            "city": "Guilin",
+            "asn": 9808,
+            "longitude": 110.29,
+            "latitude": 25.28,
+            "network": "China Mobile Communications Group",
+            "tags": [
+              "eyeball-network",
+              "u-shuangzhijinghua"
+            ],
+            "resolvers": [
+              "211.138.240.100",
+              "211.138.245.180"
+            ]
+          },
+          "result": {
+            "status": "finished",
+            "failureSource": null,
+            "resolvedAddress": "185.199.109.153",
+            "statusCode": 200,
+            "statusCodeName": "OK",
+            "timings": {
+              "total": 392,
+              "dns": 98,
+              "tcp": 93,
+              "tls": 94,
+              "firstByte": 94,
+              "download": 13
+            },
+            "truncated": true,
+            "tls_authorized": true,
+            "error_output": null
+          }
+        },
+        {
+          "probe": {
+            "continent": "AS",
+            "region": "Eastern Asia",
+            "country": "CN",
+            "state": null,
+            "city": "Guangzhou",
+            "asn": 9808,
+            "longitude": 113.25,
+            "latitude": 23.12,
+            "network": "China Mobile Communications Group",
+            "tags": [
+              "eyeball-network"
+            ],
+            "resolvers": [
+              "private"
+            ]
+          },
+          "result": {
+            "status": "finished",
+            "failureSource": null,
+            "resolvedAddress": "185.199.111.153",
+            "statusCode": 200,
+            "statusCodeName": "OK",
+            "timings": {
+              "total": 317,
+              "dns": 1,
+              "tcp": 74,
+              "tls": 79,
+              "firstByte": 157,
+              "download": 6
+            },
+            "truncated": true,
+            "tls_authorized": true,
+            "error_output": null
+          }
+        },
+        {
+          "probe": {
+            "continent": "AS",
+            "region": "Eastern Asia",
+            "country": "CN",
+            "state": null,
+            "city": "Xi'an",
+            "asn": 4134,
+            "longitude": 108.93,
+            "latitude": 34.26,
+            "network": "Chinanet Backbone",
+            "tags": [
+              "eyeball-network"
+            ],
+            "resolvers": [
+              "1.1.1.1",
+              "8.8.8.8"
+            ]
+          },
+          "result": {
+            "status": "finished",
+            "failureSource": null,
+            "resolvedAddress": "185.199.108.153",
+            "statusCode": 200,
+            "statusCodeName": "OK",
+            "timings": {
+              "total": 406,
+              "dns": 83,
+              "tcp": 76,
+              "tls": 83,
+              "firstByte": 153,
+              "download": 11
+            },
+            "truncated": true,
+            "tls_authorized": true,
+            "error_output": null
+          }
+        },
+        {
+          "probe": {
+            "continent": "AS",
+            "region": "Eastern Asia",
+            "country": "CN",
+            "state": null,
+            "city": "Guilin",
+            "asn": 4134,
+            "longitude": 110.29,
+            "latitude": 25.28,
+            "network": "China Telecom",
+            "tags": [
+              "eyeball-network",
+              "u-shuangzhijinghua"
+            ],
+            "resolvers": [
+              "202.103.224.68",
+              "202.103.225.68"
+            ]
+          },
+          "result": {
+            "status": "finished",
+            "failureSource": null,
+            "resolvedAddress": "185.199.111.153",
+            "statusCode": 200,
+            "statusCodeName": "OK",
+            "timings": {
+              "total": 525,
+              "dns": 61,
+              "tcp": 80,
+              "tls": 187,
+              "firstByte": 82,
+              "download": 115
+            },
+            "truncated": true,
+            "tls_authorized": true,
+            "error_output": null
+          }
+        },
+        {
+          "probe": {
+            "continent": "AS",
+            "region": "Eastern Asia",
+            "country": "CN",
+            "state": null,
+            "city": "Dongguan",
+            "asn": 4134,
+            "longitude": 113.75,
+            "latitude": 23.02,
+            "network": "Chinanet Backbone",
+            "tags": [
+              "eyeball-network"
+            ],
+            "resolvers": [
+              "private"
+            ]
+          },
+          "result": {
+            "status": "finished",
+            "failureSource": null,
+            "resolvedAddress": "185.199.111.153",
+            "statusCode": 200,
+            "statusCodeName": "OK",
+            "timings": {
+              "total": 440,
+              "dns": 0,
+              "tcp": 58,
+              "tls": 61,
+              "firstByte": 250,
+              "download": 71
+            },
+            "truncated": true,
+            "tls_authorized": true,
+            "error_output": null
+          }
+        },
+        {
+          "probe": {
+            "continent": "AS",
+            "region": "Eastern Asia",
+            "country": "CN",
+            "state": null,
+            "city": "Shanghai",
+            "asn": 17621,
+            "longitude": 121.46,
+            "latitude": 31.22,
+            "network": "China Unicom Shanghai network",
+            "tags": [
+              "eyeball-network"
+            ],
+            "resolvers": [
+              "private",
+              "114.114.114.114",
+              "8.8.8.8"
+            ]
+          },
+          "result": {
+            "status": "finished",
+            "failureSource": null,
+            "resolvedAddress": "185.199.108.153",
+            "statusCode": 200,
+            "statusCodeName": "OK",
+            "timings": {
+              "total": 745,
+              "dns": 210,
+              "tcp": 98,
+              "tls": 105,
+              "firstByte": 318,
+              "download": 14
+            },
+            "truncated": true,
+            "tls_authorized": true,
+            "error_output": null
+          }
+        },
+        {
+          "probe": {
+            "continent": "AS",
+            "region": "Eastern Asia",
+            "country": "CN",
+            "state": null,
+            "city": "Shanghai",
+            "asn": 17621,
+            "longitude": 121.46,
+            "latitude": 31.22,
+            "network": "China Unicom Shanghai network",
+            "tags": [
+              "eyeball-network",
+              "u-flxxyz"
+            ],
+            "resolvers": [
+              "private",
+              "private"
+            ]
+          },
+          "result": {
+            "status": "finished",
+            "failureSource": null,
+            "resolvedAddress": "185.199.110.153",
+            "statusCode": 200,
+            "statusCodeName": "OK",
+            "timings": {
+              "total": 981,
+              "dns": 693,
+              "tcp": 89,
+              "tls": 93,
+              "firstByte": 94,
+              "download": 12
+            },
+            "truncated": true,
+            "tls_authorized": true,
+            "error_output": null
+          }
+        },
+        {
+          "probe": {
+            "continent": "AS",
+            "region": "Eastern Asia",
+            "country": "CN",
+            "state": null,
+            "city": "Shenzhen",
+            "asn": 17623,
+            "longitude": 114.07,
+            "latitude": 22.55,
+            "network": "China Unicom Shenzen network",
+            "tags": [
+              "eyeball-network",
+              "u-yanranxiaoxi"
+            ],
+            "resolvers": [
+              "private",
+              "private"
+            ]
+          },
+          "result": {
+            "status": "finished",
+            "failureSource": null,
+            "resolvedAddress": "185.199.109.153",
+            "statusCode": 200,
+            "statusCodeName": "OK",
+            "timings": {
+              "total": 720,
+              "dns": 8,
+              "tcp": 190,
+              "tls": 197,
+              "firstByte": 313,
+              "download": 12
+            },
+            "truncated": true,
+            "tls_authorized": true,
+            "error_output": null
+          }
+        },
+        {
+          "probe": {
+            "continent": "AS",
+            "region": "South-eastern Asia",
+            "country": "SG",
+            "state": null,
+            "city": "Singapore",
+            "asn": 59253,
+            "longitude": 103.85,
+            "latitude": 1.29,
+            "network": "LeaseWeb",
+            "tags": [
+              "datacenter-network",
+              "u-forest479"
+            ],
+            "resolvers": [
+              "private"
+            ]
+          },
+          "result": {
+            "status": "finished",
+            "failureSource": null,
+            "resolvedAddress": "185.199.110.153",
+            "statusCode": 200,
+            "statusCodeName": "OK",
+            "timings": {
+              "total": 304,
+              "dns": 23,
+              "tcp": 1,
+              "tls": 18,
+              "firstByte": 262,
+              "download": 0
+            },
+            "truncated": true,
+            "tls_authorized": true,
+            "error_output": null
+          }
+        }
+      ]
+    }
+  ],
+  "asset_inventory": {
+    "source": "https://api.github.com/repos/titanxxh/open-agricola-assets/git/trees/94c1b4f8864a946c79c66940fb3357b4101cb08c?recursive=1",
+    "tree_truncated": false,
+    "required_files": 1132,
+    "found_files": 1132,
+    "total_bytes": 117711722,
+    "largest_file_bytes": 514646
+  },
+  "existing_pages_asset_comparison": {
+    "pages_url": "https://titanxxh.github.io/open-agricola-assets/assets/website-bg/16qiufen.webp",
+    "raw_url": "https://raw.githubusercontent.com/titanxxh/open-agricola-assets/94c1b4f8864a946c79c66940fb3357b4101cb08c/assets/website-bg/16qiufen.webp",
+    "bytes": 227578,
+    "sha256_both": "284936d8bb2e5147edde5d9a5ffc48906da2ad70e94c7c3f52500c4473d27114",
+    "commit_addressed_pages_path_status": 404,
+    "scope": "One existing unversioned Pages image, not acceptance of every required file or immutable historical versions."
+  },
+  "source_correction": {
+    "runtime_base_url": "https://titanxxh.github.io/open-agricola-assets/",
+    "deployed_asset_version": "8675d8a6dc3950b616c64043f0d7809f7abc3a3e",
+    "publishing_contract": "Current files only; ?v=commit invalidates caches, not an immutable historical snapshot. Build checks deployed Pages version marker and manifest.",
+    "live_asset_verification": {
+      "files": 1132,
+      "bytes": 117711722,
+      "method": "Asset repository scripts/assets.mjs verify; every live file downloaded and compared byte-for-byte with origin/main commit."
+    },
+    "local_validation": {
+      "launcher": "./restart-local.sh --players 2",
+      "e2e_passed": 2,
+      "fast_test_files_passed": 749,
+      "fast_tests_passed": 8032,
+      "fast_tests_skipped": 2,
+      "fast_tests_todo": 1,
+      "lint_errors": 0,
+      "lint_warnings": 456,
+      "production_build": "VITE_BASE_PATH=/open-agricola/ pnpm run build",
+      "new_replay_viewer_build_id": "99dd9785d48a9cf34e747c717b3d6a8ed84eafc012f2aecf66f055acdc3d6aeb",
+      "raw_asset_urls_in_main_and_new_viewer_builds": 0,
+      "browser_card_frame_decoded": true,
+      "browser_carlito_font_loaded": true,
+      "browser_raw_requests": 0
+    },
+    "frontend_or_backend_deployment_performed": false
+  }
+}

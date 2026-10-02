@@ -105,13 +105,14 @@ describe('production deployment config', () => {
     expect(replayViewer).not.toContain('BGA_IMAGE_DIR')
   })
 
-  it('uses commit-addressed public assets in both frontend builds', () => {
+  it('uses Pages public assets in both frontend builds', () => {
     const publicAssets = readFileSync('scripts/public-assets.ts', 'utf8')
     const site = readFileSync('vite.config.ts', 'utf8')
     const replayViewer = readFileSync('replay-viewer/vite.config.ts', 'utf8')
     expect(publicAssets).toContain(
-      'raw.githubusercontent.com/titanxxh/open-agricola-assets/',
+      'https://titanxxh.github.io/open-agricola-assets/',
     )
+    expect(publicAssets).not.toContain('raw.githubusercontent.com')
     expect(site).toContain('publicAssetUrls(publicAssets')
     expect(replayViewer).toContain('loadPublicAssetConfig')
     expect(replayViewer).toContain('publicAssetUrls(publicAssets')
