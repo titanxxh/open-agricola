@@ -1,5 +1,13 @@
 export type WorkshopCardType = 'minor' | 'occupation'
 
+export type WorkshopDraftErrorCode =
+  | 'conflict'
+  | 'live_edit_blocked'
+  | 'forbidden'
+  | 'invalid'
+  | 'not_found'
+  | 'not_ready'
+
 export type WorkshopDraftContract = {
   cardId: string
   cardType: WorkshopCardType

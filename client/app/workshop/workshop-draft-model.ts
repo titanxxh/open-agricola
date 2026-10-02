@@ -2,6 +2,7 @@ import type {
   WorkshopAbilityCandidateContract,
   WorkshopArtCandidateContract,
   WorkshopDraftContract,
+  WorkshopDraftErrorCode,
   WorkshopWorkspaceContract,
 } from '../../../shared/contract/workshop'
 
@@ -54,7 +55,7 @@ export type WorkshopDraftState = {
   sandboxPassedAt: number | null
   stage: WorkshopStage
   session: WorkshopSessionState
-  save: { status: WorkshopSaveStatus; error?: string; savedAt?: number }
+  save: { status: WorkshopSaveStatus; error?: string; errorCode?: WorkshopDraftErrorCode; savedAt?: number }
   conflict: {
     server: WorkshopWorkspaceDto
     local: WorkshopLocalRecovery
@@ -210,7 +211,7 @@ export type WorkshopDraftAction =
   | { type: 'sessionChanged'; session: Partial<WorkshopSessionState> }
   | { type: 'stageChanged'; stage: WorkshopStage }
   | { type: 'saving' }
-  | { type: 'saveFailed'; status: 'offline' | 'error'; error: string }
+  | { type: 'saveFailed'; status: 'offline' | 'error'; error: string; errorCode?: WorkshopDraftErrorCode }
   | { type: 'checkpointSaved'; workspace: WorkshopWorkspaceDto }
   | {
       type: 'conflictDetected'
@@ -394,7 +395,14 @@ export const workshopDraftReducer = (
     case 'saving':
       return { ...state, save: { status: 'saving' } }
     case 'saveFailed':
-      return { ...state, save: { status: action.status, error: action.error } }
+      return {
+        ...state,
+        save: {
+          status: action.status,
+          error: action.error,
+          ...(action.errorCode ? { errorCode: action.errorCode } : {}),
+        },
+      }
     case 'checkpointSaved':
       return applyWorkspace(state, action.workspace)
     case 'conflictDetected':

@@ -504,6 +504,121 @@ describe('useWorkshopDraft', () => {
     expect(result.current.state?.conflict?.local.draft.name).toBe('Local work')
   })
 
+  it('keeps rejected live edits through unpublish and saves them without a draft conflict', async () => {
+    const liveWorkspace = { ...workspace(1), reviewStatus: 'approved' as const, live: true }
+    let finishUnpublish: ((response: Response) => void) | undefined
+    const savedDrafts: WorkshopClientDraft[] = []
+    let live = true
+    const apiFetch = vi.fn(async (path: string, init?: RequestInit) => {
+      if (!init) return Response.json({ ok: true, workspace: liveWorkspace })
+      const body = JSON.parse(String(init.body))
+      expect(body.baseRevision).toBe(1)
+      if (path.endsWith('/unpublish')) {
+        return new Promise<Response>(resolve => { finishUnpublish = resolve })
+      }
+      if (live) return Response.json({
+        ok: false,
+        code: 'live_edit_blocked',
+        error: 'Card is live; unpublish it before editing',
+        current: liveWorkspace,
+      }, { status: 409 })
+      savedDrafts.push(body.draft)
+      return Response.json({
+        ok: true,
+        workspace: { ...workspace(2), draft: body.draft },
+      })
+    })
+    const { result } = renderHook(() => useWorkshopDraft({ cardId: 'card-1', apiFetch }))
+    await waitFor(() => expect(result.current.state?.live).toBe(true))
+    act(() => result.current.updateDraft(draft('Rejected live edits')))
+
+    await act(async () => { expect(await result.current.checkpoint()).toBe(false) })
+    expect(result.current.state?.save).toEqual({
+      status: 'error',
+      error: 'Card is live; unpublish it before editing',
+      errorCode: 'live_edit_blocked',
+    })
+    expect(result.current.state?.conflict).toBeNull()
+    expect(result.current.state?.draft.name).toBe('Rejected live edits')
+    expect(localStorage.getItem(workshopDraftStorageKey('card-1')))
+      .toContain('Rejected live edits')
+
+    let unpublishing: Promise<boolean> | undefined
+    act(() => { unpublishing = result.current.unpublishDraft() })
+    await waitFor(() => expect(finishUnpublish).toBeDefined())
+    act(() => result.current.updateDraft(draft('Typed while unpublishing')))
+    live = false
+    finishUnpublish!(Response.json({
+      ok: true,
+      workspace: { ...liveWorkspace, live: false },
+    }))
+    await act(async () => { expect(await unpublishing).toBe(true) })
+    expect(result.current.state?.live).toBe(false)
+    expect(result.current.state?.draft.name).toBe('Typed while unpublishing')
+    expect(result.current.state?.save.status).toBe('dirty')
+    await act(async () => { expect(await result.current.checkpoint()).toBe(true) })
+    expect(savedDrafts.map(saved => saved.name)).toEqual(['Typed while unpublishing'])
+    expect(result.current.state?.save.status).toBe('saved')
+    expect(localStorage.getItem(workshopDraftStorageKey('card-1'))).toBeNull()
+  })
+
+  it('preserves rejected live edits when unpublishing without further typing', async () => {
+    const liveWorkspace = { ...workspace(1), reviewStatus: 'approved' as const, live: true }
+    const apiFetch = vi.fn(async (path: string, init?: RequestInit) => {
+      if (!init) return Response.json({ ok: true, workspace: liveWorkspace })
+      if (path.endsWith('/unpublish')) return Response.json({
+        ok: true,
+        workspace: { ...liveWorkspace, live: false },
+      })
+      return Response.json({
+        ok: false,
+        code: 'live_edit_blocked',
+        error: 'Card is live; unpublish it before editing',
+        current: liveWorkspace,
+      }, { status: 409 })
+    })
+    const { result } = renderHook(() => useWorkshopDraft({ cardId: 'card-1', apiFetch }))
+    await waitFor(() => expect(result.current.state?.live).toBe(true))
+    act(() => result.current.updateDraft(draft('Unsaved live edits')))
+    await act(async () => { expect(await result.current.checkpoint()).toBe(false) })
+    await act(async () => { expect(await result.current.unpublishDraft()).toBe(true) })
+    expect(result.current.state?.draft.name).toBe('Unsaved live edits')
+    expect(result.current.state?.save.status).toBe('dirty')
+    expect(localStorage.getItem(workshopDraftStorageKey('card-1'))).toContain('Unsaved live edits')
+  })
+
+  it('does not treat same-revision card ID rejection as a draft conflict', async () => {
+    const apiFetch = vi.fn(async (_path: string, init?: RequestInit) => init
+      ? Response.json({ ok: false, error: 'Card id already exists', current: workspace(1) }, { status: 409 })
+      : Response.json({ ok: true, workspace: workspace(1) }))
+    const { result } = renderHook(() => useWorkshopDraft({ cardId: 'card-1', apiFetch }))
+    await waitFor(() => expect(result.current.state?.baseRevision).toBe(1))
+    act(() => result.current.updateDraft(draft('Local work')))
+    await act(async () => { expect(await result.current.checkpoint()).toBe(false) })
+    expect(result.current.state?.save).toEqual({ status: 'error', error: 'Card id already exists' })
+    expect(result.current.state?.conflict).toBeNull()
+    expect(result.current.state?.draft.name).toBe('Local work')
+  })
+
+  it('requires conflict resolution when a live rejection also has a newer server revision', async () => {
+    const apiFetch = vi.fn(async (_path: string, init?: RequestInit) => init
+      ? Response.json({
+          ok: false,
+          code: 'live_edit_blocked',
+          error: 'Card is live; unpublish it before editing',
+          current: { ...workspace(2, 'Other tab work'), live: true },
+        }, { status: 409 })
+      : Response.json({ ok: true, workspace: workspace(1) }))
+    const { result } = renderHook(() => useWorkshopDraft({ cardId: 'card-1', apiFetch }))
+    await waitFor(() => expect(result.current.state?.baseRevision).toBe(1))
+    act(() => result.current.updateDraft(draft('Local work')))
+    await act(async () => { expect(await result.current.checkpoint()).toBe(false) })
+    expect(result.current.state?.save.status).toBe('conflict')
+    expect(result.current.state?.conflict?.local.draft.name).toBe('Local work')
+    await act(async () => { expect(await result.current.unpublishDraft()).toBe(false) })
+    expect(apiFetch).toHaveBeenCalledTimes(2)
+  })
+
   it('keeps stage navigation available when a checkpoint fails', async () => {
     const apiFetch = vi.fn(async (_path: string, init?: RequestInit) => {
       if (!init) {

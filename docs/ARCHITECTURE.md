@@ -1356,6 +1356,8 @@ Public Replay APIs return versioned JSON and never expose SQLite gzip or BLOB en
 
 These modules provide the Workshop and Sandbox backend for custom-card upload, compilation, and pull-request integration. SQLite tables `sandbox_settings` and `sandbox_cards` persist sandbox configuration: `playerCount`, `deckIds`, Through the Seasons, Farmers of the Moor, whether a game may start with too few FoM minor improvements, and Snake Opening. `POST /api/game/new-sandbox` reads these settings and passes `playerCount`, `deckIds`, `customCardIds`, and variant flags to `createInitialState()` for unified handling.
 
+Workshop draft errors expose a typed `code` from `shared/contract/workshop.ts`. The live-edit guard returns `live_edit_blocked` with HTTP `409`; clients distinguish an unchanged-revision restriction from a server revision mismatch and preserve unsaved edits when unpublishing.
+
 ### 11.7 Database
 
 `server/db.ts` owns the SQLite connection through `better-sqlite3`, built for the Node 24 ABI. Existing tables include `rooms`, `users`, `sandbox_settings`, `sandbox_cards`, `custom_cards`, and `pr_proposals`.

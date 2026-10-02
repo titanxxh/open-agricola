@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useReducer, useRef, useState } from 'react'
+import type { WorkshopDraftErrorCode } from '../../../shared/contract/workshop'
 import {
   createWorkshopDraftState,
   resolveWorkshopRecovery,
@@ -22,6 +23,7 @@ type WorkspaceResponse = {
   current?: WorkshopWorkspaceDto
   versionId?: string
   error?: string
+  code?: WorkshopDraftErrorCode
 }
 
 type HookAction = WorkshopDraftAction | { type: 'reset' }
@@ -234,7 +236,7 @@ export const useWorkshopDraft = ({
         },
       )
       const payload = await response.json() as WorkspaceResponse
-      if (response.status === 409 && payload.current) {
+      if (response.status === 409 && payload.current && payload.current.revision !== baseRevision) {
         const latest = stateRef.current ?? current
         dispatch({
           type: 'conflictDetected',
@@ -252,6 +254,7 @@ export const useWorkshopDraft = ({
           type: 'saveFailed',
           status: 'error',
           error: payload.error ?? `Request failed (${response.status})`,
+          errorCode: payload.code,
         })
         return false
       }
@@ -413,7 +416,7 @@ export const useWorkshopDraft = ({
         },
       )
       const payload = await response.json() as WorkspaceResponse
-      if (response.status === 409 && payload.current) {
+      if (response.status === 409 && payload.current && payload.current.revision !== current.baseRevision) {
         const latest = stateRef.current ?? current
         dispatch({
           type: 'conflictDetected',
@@ -427,6 +430,7 @@ export const useWorkshopDraft = ({
           type: 'saveFailed',
           status: 'error',
           error: payload.error ?? `Request failed (${response.status})`,
+          errorCode: payload.code,
         })
         return false
       }
@@ -486,7 +490,7 @@ export const useWorkshopDraft = ({
         },
       )
       const payload = await response.json() as WorkspaceResponse
-      if (response.status === 409 && payload.current) {
+      if (response.status === 409 && payload.current && payload.current.revision !== current.baseRevision) {
         dispatch({
           type: 'conflictDetected',
           server: payload.current,
@@ -521,6 +525,7 @@ export const useWorkshopDraft = ({
           type: 'saveFailed',
           status: 'error',
           error: payload.error ?? `Request failed (${response.status})`,
+          errorCode: payload.code,
         })
         return null
       }
@@ -569,7 +574,7 @@ export const useWorkshopDraft = ({
         },
       )
       const payload = await response.json() as WorkspaceResponse
-      if (response.status === 409 && payload.current) {
+      if (response.status === 409 && payload.current && payload.current.revision !== current.baseRevision) {
         dispatch({
           type: 'conflictDetected',
           server: payload.current,
@@ -582,6 +587,7 @@ export const useWorkshopDraft = ({
           type: 'saveFailed',
           status: 'error',
           error: payload.error ?? `Request failed (${response.status})`,
+          errorCode: payload.code,
         })
         return null
       }
@@ -633,7 +639,7 @@ export const useWorkshopDraft = ({
         },
       )
       const payload = await response.json() as WorkspaceResponse
-      if (response.status === 409 && payload.current) {
+      if (response.status === 409 && payload.current && payload.current.revision !== baseRevision) {
         dispatch({
           type: 'conflictDetected',
           server: payload.current,
@@ -646,6 +652,7 @@ export const useWorkshopDraft = ({
           type: 'saveFailed',
           status: 'error',
           error: payload.error ?? `Request failed (${response.status})`,
+          errorCode: payload.code,
         })
         return false
       }
@@ -658,10 +665,9 @@ export const useWorkshopDraft = ({
         workspace: payload.workspace,
       })
       // Keep the local draft when the author had unsaved edits BEFORE the
-      // request (dirty/conflict — the very edits that motivated unpublishing)
+      // request (including a rejected save that motivated unpublishing)
       // or typed while it was in flight.
-      const hadLocalEdits = current.save.status === 'dirty'
-        || current.save.status === 'conflict'
+      const hadLocalEdits = current.save.status !== 'saved'
         || (latest !== null && latest.draft !== current.draft)
       const next = latest && hadLocalEdits
         ? {
@@ -754,7 +760,7 @@ export const useWorkshopDraft = ({
         },
       )
       const payload = await response.json() as WorkspaceResponse
-      if (response.status === 409 && payload.current) {
+      if (response.status === 409 && payload.current && payload.current.revision !== current.baseRevision) {
         dispatch({
           type: 'conflictDetected',
           server: payload.current,
@@ -767,6 +773,7 @@ export const useWorkshopDraft = ({
           type: 'saveFailed',
           status: 'error',
           error: payload.error ?? `Request failed (${response.status})`,
+          errorCode: payload.code,
         })
         return false
       }

@@ -6,6 +6,7 @@ import type {
   WorkshopArtCandidateContract,
   WorkshopCardType,
   WorkshopDraftContract,
+  WorkshopDraftErrorCode,
   WorkshopWorkspaceContract,
 } from '../shared/contract/workshop'
 import { workshopCardJsonFromDefinition } from './workshop-draft-validation.ts'
@@ -53,12 +54,7 @@ export type PublishedWorkshopCard = {
   githubPrLastSyncedAt: number | null
 }
 
-export type WorkshopDraftErrorCode =
-  | 'conflict'
-  | 'forbidden'
-  | 'invalid'
-  | 'not_found'
-  | 'not_ready'
+export type { WorkshopDraftErrorCode } from '../shared/contract/workshop'
 
 export class WorkshopDraftError extends Error {
   readonly code: WorkshopDraftErrorCode
@@ -410,7 +406,7 @@ export function checkpointDraft(
     }
     if (current.live) {
       throw new WorkshopDraftError(
-        'conflict',
+        'live_edit_blocked',
         'Card is live; unpublish it before editing',
         current,
       )

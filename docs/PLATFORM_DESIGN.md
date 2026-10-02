@@ -525,6 +525,8 @@ Every ability-source validation writes the isolated-vm-extracted `CARD_DEF` snap
 
 Ordinary editing creates checkpoints only on stage change, in-site navigation, or explicit save; it creates no Draft Version. Refresh and crash recovery use a synchronously written localStorage copy. If its revision matches, it recovers as unsynchronized. If the server revision advanced, the user chooses the complete server or complete local draft.
 
+Workshop draft errors include a machine-readable `code`. Saving a live card returns `409` with `code: 'live_edit_blocked'`; the editor asks the author to unpublish and retains local edits through that action. A `409` opens whole-draft conflict resolution only when the returned server revision differs from the request's `baseRevision`. Same-revision rejections display their actual reason instead.
+
 A Draft Version serializes only final card content and provenance for adopted candidates in each section. Image provenance retains the user's subject at the same level so image regeneration remains possible after restoration. Temporary `_draft` fields, unadopted candidates, complete generation-result copies, and working conversations do not enter versions.
 
 ---

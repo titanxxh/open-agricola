@@ -1333,6 +1333,8 @@ POST   /api/v1/github-app/webhook
 
 Workshop / Sandbox 后端（自定义卡上传、编译、PR 集成）。沙盒配置由 SQLite 表 `sandbox_settings` / `sandbox_cards` 持久化，覆盖 `playerCount`、`deckIds`、Through the Seasons、Farmers of the Moor、FoM 小改良不足时是否允许开局，以及 Snake Opening；`POST /api/game/new-sandbox` 读取这些配置并把 `playerCount` / `deckIds` / `customCardIds` / variant flags 交给 `createInitialState()` 统一处理。
 
+Workshop 草稿错误公开 `shared/contract/workshop.ts` 定义的类型化 `code`。上线编辑限制返回 HTTP `409` 和 `live_edit_blocked`；客户端区分版本未变的限制与服务器版本不匹配，并在下架时保留未保存的修改。
+
 ### 11.7 数据库
 
 `server/db.ts` —— SQLite 连接（`better-sqlite3`，按 Node 24 ABI 编译）。表：`rooms` / `users` / `sandbox_settings` / `sandbox_cards` / `custom_cards` / `pr_proposals` 等。

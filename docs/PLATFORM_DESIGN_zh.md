@@ -552,6 +552,8 @@ WorkshopPage
 
 普通编辑只在切换阶段、站内离开或显式保存时创建检查点，不创建 Draft Version。刷新或崩溃恢复依赖同步写入的 localStorage 副本；同 revision 恢复为未同步状态，服务器 revision 已前进则要求用户选择整份服务器稿或整份本机稿。
 
+Workshop 草稿错误包含机器可读的 `code`。保存已上线卡牌返回 `409` 和 `code: 'live_edit_blocked'`；编辑器提示作者先下架，并在下架过程中保留本机修改。仅当返回的服务器 revision 与请求的 `baseRevision` 不同时，`409` 才进入整份草稿冲突选择；同 revision 的拒绝直接显示实际原因。
+
 Draft Version 只序列化最终卡牌内容和各分区已采用候选的 provenance；图片 provenance 同层保留用户输入的 subject，确保恢复版本后仍可重新生成。临时 `_draft` 表单字段、未采用候选、完整生成结果副本和工作对话不进入版本。
 
 ---
