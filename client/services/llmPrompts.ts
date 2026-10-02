@@ -83,6 +83,23 @@ export function renderListenerActionList(): string {
   return sandboxListenerActions.join('、')
 }
 
+/** Accumulating action spaces in a 2-player game; llmPrompts.test.ts checks them against the engine. */
+export const twoPlayerAccumulatingSpaces = [
+  { id: 'forest', label: '木材' },
+  { id: 'clay-pit', label: '黏土' },
+  { id: 'reed-bank', label: '芦苇' },
+  { id: 'fishing', label: '食物' },
+  { id: 'western-quarry', label: '石料' },
+  { id: 'eastern-quarry', label: '石料' },
+  { id: 'sheep-market', label: '羊' },
+  { id: 'pig-market', label: '野猪' },
+  { id: 'cattle-market', label: '牛' },
+] as const
+
+function renderTwoPlayerAccumulatingSpaceList(): string {
+  return twoPlayerAccumulatingSpaces.map(({ id, label }) => `\`${id}\`（${label}）`).join('、')
+}
+
 function renderActionIdTable(): string {
   const rows = SANDBOX_ALLOWED_ACTION_IDS.map((id) => {
     const meta = sandboxActionIdMeta[id]
@@ -237,7 +254,7 @@ ${renderScopeTable()}
 
 ${renderListenerActionList()}
 
-如果用户提到具体行动格 ID（如 \`forest\`、\`clay-pit\`、\`reed-bank\`、\`traveling-players\`），通常监听对应行动类型（资源累积格用 \`actions: ['collect']\`），并用 \`context.space?.id\` 精确判断；不要假设 \`context.result.spaceId\` 存在。
+资源累积格用 \`actions: ['collect']\` 监听：所有累积格（木材、黏土、芦苇、石料、食物、羊、野猪、牛）被拿取时都会触发 \`collect\`，监听它本身就表示"从累积格拿取"，**不要**再写行动格 ID 白名单来判断"是不是累积格"——累积格 ID 随人数变化（如 4 人局 \`hollow-4\`、5–6 人局 \`grove-56\`），白名单必然漏格。只有卡牌点名某个特定行动格时，才用 \`context.space?.id\` 精确判断。2 人局累积格 ID：${renderTwoPlayerAccumulatingSpaceList()}；不要自己拼造不存在的 ID（例如没有 \`stone-pit\`，石料累积格是 \`western-quarry\` / \`eastern-quarry\`）。不要假设 \`context.result.spaceId\` 存在。
 
 ### handler 的 context 字段
 
