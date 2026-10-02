@@ -278,8 +278,9 @@ const serveViewerFile = (
       "default-src 'none'",
       "script-src 'self'",
       "style-src 'self' 'unsafe-inline'",
-      "img-src 'self' data: https://titanxxh.github.io/open-agricola-assets/",
-      "font-src 'self' https://titanxxh.github.io/open-agricola-assets/",
+      // Existing rooms keep their immutable Viewer, including its asset source.
+      "img-src 'self' data: https://titanxxh.github.io/open-agricola-assets/ https://raw.githubusercontent.com/titanxxh/open-agricola-assets/",
+      "font-src 'self' https://titanxxh.github.io/open-agricola-assets/ https://raw.githubusercontent.com/titanxxh/open-agricola-assets/",
       "connect-src 'self'",
       "frame-ancestors *",
       "base-uri 'none'",
