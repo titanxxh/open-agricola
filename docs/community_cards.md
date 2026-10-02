@@ -12,6 +12,7 @@
 <!-- community-card-entries:begin -->
 | Card ID | Name | Type | Author | PR  |
 | ------- | ---- | ---- | ------ | --- |
+| CUSTOM_Gleaner | Gleaner | occupation | @titanxxh | #928 |
 <!-- community-card-entries:end -->
 
 

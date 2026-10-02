@@ -539,6 +539,7 @@ import { C178_OnSiteReverend } from './C/C178_OnSiteReverend'
 import { C179_BovinePioneer } from './C/C179_BovinePioneer'
 import { C180_Trapper } from './C/C180_Trapper'
 import { CUSTOM_FixtureHarvester } from './community/CUSTOM_FixtureHarvester'
+import { CUSTOM_Gleaner } from './community/CUSTOM_Gleaner'
 import { D001_ZigzagHarrow } from './D/D001_ZigzagHarrow'
 import { D002_DwellingPlan } from './D/D002_DwellingPlan'
 import { D003_Furrows } from './D/D003_Furrows'
@@ -1554,6 +1555,7 @@ export const ALL_CARD_IMPLS: Readonly<Record<string, CardImpl>> = {
   'C179_BovinePioneer': C179_BovinePioneer.impl,
   'C180_Trapper': C180_Trapper.impl,
   'CUSTOM_FixtureHarvester': CUSTOM_FixtureHarvester.impl,
+  'CUSTOM_Gleaner': CUSTOM_Gleaner.impl,
   'D001_ZigzagHarrow': D001_ZigzagHarrow.impl,
   'D002_DwellingPlan': D002_DwellingPlan.impl,
   'D003_Furrows': D003_Furrows.impl,
