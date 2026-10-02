@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest'
-import { CARD_DESIGNER_SYSTEM_PROMPT, renderActionIdList, renderListenerActionList } from '../llmPrompts'
+import {
+  CARD_DESIGNER_SYSTEM_PROMPT,
+  renderActionIdList,
+  renderListenerActionList,
+  twoPlayerAccumulatingSpaces,
+} from '../llmPrompts'
+import { createActionSpaces } from '../../../shared/actions'
 import { cardEffectHooks } from '../../../shared/cards/card-effects'
 import { sandboxListenerActions } from '../../../shared/custom-code/sandbox-listener-actions'
 import { sandboxListenerPhases } from '../../../shared/custom-code/sandbox-listener-phases'
@@ -43,6 +49,19 @@ describe('CARD_DESIGNER_SYSTEM_PROMPT', () => {
     expect(CARD_DESIGNER_SYSTEM_PROMPT).toContain("资源累积格用 `actions: ['collect']`")
     expect(CARD_DESIGNER_SYSTEM_PROMPT).toContain('用 `context.space?.id` 精确判断')
     expect(CARD_DESIGNER_SYSTEM_PROMPT).toContain('不要假设 `context.result.spaceId` 存在')
+  })
+
+  it('lists exactly the engine 2-player accumulating spaces and steers away from id whitelists', () => {
+    const engineIds = createActionSpaces(2)
+      .filter((space) => Object.values(space.gainPerRound).some((amount) => (amount ?? 0) > 0))
+      .map((space) => space.id)
+      .sort()
+    expect(twoPlayerAccumulatingSpaces.map((space) => space.id).sort()).toEqual(engineIds)
+    for (const { id } of twoPlayerAccumulatingSpaces) {
+      expect(CARD_DESIGNER_SYSTEM_PROMPT).toContain(`\`${id}\``)
+    }
+    expect(CARD_DESIGNER_SYSTEM_PROMPT).toContain('**不要**再写行动格 ID 白名单')
+    expect(engineIds).not.toContain('stone-pit')
   })
 
   it('uses the current house type for construction conditions', () => {
