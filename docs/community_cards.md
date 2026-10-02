@@ -12,6 +12,7 @@
 <!-- community-card-entries:begin -->
 | Card ID | Name | Type | Author | PR  |
 | ------- | ---- | ---- | ------ | --- |
+| CUSTOM_MedievalMallet | Medieval Mallet | minor | @titanxxh | #704 |
 <!-- community-card-entries:end -->
 
 
