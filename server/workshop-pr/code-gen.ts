@@ -49,6 +49,13 @@ export function scanUsedHelpers(source: string): Set<string> {
   return used
 }
 
+function usesAnyType(source: string): boolean {
+  const sf = ts.createSourceFile('x.ts', source, ts.ScriptTarget.ES2022, true, ts.ScriptKind.TS)
+  const visit = (node: ts.Node): boolean =>
+    node.kind === ts.SyntaxKind.AnyKeyword || (ts.forEachChild(node, visit) ?? false)
+  return visit(sf)
+}
+
 // ---------------------------------------------------------------------------
 // C-13: Main card file generator
 // ---------------------------------------------------------------------------
@@ -409,7 +416,8 @@ function normalizeWorkshopEffectCode(
   const unusedParamsTransformer: ts.TransformerFactory<ts.SourceFile> = (context) => {
     const { factory } = context
     const visit: ts.Visitor = (node) => {
-      if (ts.isArrowFunction(node) || ts.isFunctionExpression(node)) {
+      if (ts.isArrowFunction(node) || ts.isFunctionExpression(node) || ts.isFunctionDeclaration(node)) {
+        if (!node.body) return node
         const visitedBody = ts.visitNode(node.body, visit) as ts.ConciseBody
         let changed = visitedBody !== node.body
         const newParams = node.parameters.map((p) => {
@@ -440,6 +448,18 @@ function normalizeWorkshopEffectCode(
             visitedBody,
           )
         }
+        if (ts.isFunctionDeclaration(node)) {
+          return factory.updateFunctionDeclaration(
+            node,
+            node.modifiers,
+            node.asteriskToken,
+            node.name,
+            node.typeParameters,
+            newParams,
+            node.type,
+            visitedBody as ts.Block,
+          )
+        }
         return factory.updateFunctionExpression(
           node,
           node.modifiers,
@@ -456,7 +476,96 @@ function normalizeWorkshopEffectCode(
     return (node) => ts.visitNode(node, visit) as ts.SourceFile
   }
 
-  const result = ts.transform(sf, [transformer, unusedParamsTransformer])
+  // Third pass: workshop code is untyped sandbox JS, checked at runtime rather
+  // than against the engine's types. Emit every untyped parameter as `any`
+  // (TS7006 under the upstream strict build, including callbacks on values
+  // the sandbox documents loosely such as `context.result?.resourcesGained`),
+  // and give top-level helpers an `any` return so a returned `{ type: 'seq' }`
+  // literal is not widened to `string` before it reaches a listener's `flow`.
+  const helperTypingTransformer: ts.TransformerFactory<ts.SourceFile> = (context) => {
+    const { factory } = context
+    const anyType = () => factory.createKeywordTypeNode(ts.SyntaxKind.AnyKeyword)
+    const typeParams = (params: ts.NodeArray<ts.ParameterDeclaration>) => params.map((p) =>
+      p.type
+        ? p
+        : factory.updateParameterDeclaration(
+            p, p.modifiers, p.dotDotDotToken, p.name, p.questionToken, anyType(), p.initializer,
+          ))
+    const visit: ts.Visitor = (node) => {
+      const visited = ts.visitEachChild(node, visit, context)
+      if (ts.isArrowFunction(visited)) {
+        return factory.updateArrowFunction(
+          visited, visited.modifiers, visited.typeParameters, typeParams(visited.parameters),
+          visited.type, visited.equalsGreaterThanToken, visited.body,
+        )
+      }
+      if (ts.isFunctionExpression(visited)) {
+        return factory.updateFunctionExpression(
+          visited, visited.modifiers, visited.asteriskToken, visited.name, visited.typeParameters,
+          typeParams(visited.parameters), visited.type, visited.body,
+        )
+      }
+      if (ts.isFunctionDeclaration(visited)) {
+        return factory.updateFunctionDeclaration(
+          visited, visited.modifiers, visited.asteriskToken, visited.name, visited.typeParameters,
+          typeParams(visited.parameters), visited.type, visited.body,
+        )
+      }
+      if (ts.isMethodDeclaration(visited)) {
+        return factory.updateMethodDeclaration(
+          visited, visited.modifiers, visited.asteriskToken, visited.name, visited.questionToken,
+          visited.typeParameters, typeParams(visited.parameters), visited.type, visited.body,
+        )
+      }
+      return visited
+    }
+    const withAnyReturn = (expr: ts.Expression): ts.Expression => {
+      if (ts.isArrowFunction(expr) && !expr.type) {
+        return factory.updateArrowFunction(
+          expr, expr.modifiers, expr.typeParameters, expr.parameters,
+          anyType(), expr.equalsGreaterThanToken, expr.body,
+        )
+      }
+      if (ts.isFunctionExpression(expr) && !expr.type) {
+        return factory.updateFunctionExpression(
+          expr, expr.modifiers, expr.asteriskToken, expr.name, expr.typeParameters,
+          expr.parameters, anyType(), expr.body,
+        )
+      }
+      return expr
+    }
+    const typeHelperReturn = (stmt: ts.Statement): ts.Statement => {
+      if (!isWorkshopHelperStatement(stmt)) return stmt
+      if (ts.isFunctionDeclaration(stmt) && !stmt.type) {
+        return factory.updateFunctionDeclaration(
+          stmt, stmt.modifiers, stmt.asteriskToken, stmt.name, stmt.typeParameters,
+          stmt.parameters, anyType(), stmt.body,
+        )
+      }
+      if (ts.isVariableStatement(stmt)) {
+        return factory.updateVariableStatement(
+          stmt,
+          stmt.modifiers,
+          factory.updateVariableDeclarationList(
+            stmt.declarationList,
+            stmt.declarationList.declarations.map((decl) =>
+              decl.initializer
+                ? factory.updateVariableDeclaration(
+                    decl, decl.name, decl.exclamationToken, decl.type, withAnyReturn(decl.initializer),
+                  )
+                : decl),
+          ),
+        )
+      }
+      return stmt
+    }
+    return (node) => {
+      const typed = ts.visitEachChild(node, visit, context)
+      return factory.updateSourceFile(typed, typed.statements.map(typeHelperReturn))
+    }
+  }
+
+  const result = ts.transform(sf, [transformer, unusedParamsTransformer, helperTypingTransformer])
   try {
     const printed = ts.createPrinter({ newLine: ts.NewLineKind.LineFeed })
       .printFile(result.transformed[0]!)
@@ -528,6 +637,56 @@ export function extractCardDefSource(source: string): string {
   return printStatements(sf, stmts)
 }
 
+const CARD_BLOCK_NAMES = new Set(['CARD_ID', 'CARD_DEF', 'CARD_IMPL'])
+
+function declaredNames(stmt: ts.Statement): string[] {
+  if (
+    (ts.isFunctionDeclaration(stmt) || ts.isTypeAliasDeclaration(stmt) || ts.isInterfaceDeclaration(stmt))
+    && stmt.name
+  ) {
+    return [stmt.name.text]
+  }
+  if (ts.isVariableStatement(stmt)) {
+    return stmt.declarationList.declarations.flatMap((decl) =>
+      ts.isIdentifier(decl.name) ? [decl.name.text] : [])
+  }
+  return []
+}
+
+/**
+ * Top-level constants, functions and types the workshop author defined next
+ * to the CARD_ID / CARD_DEF / CARD_IMPL blocks. Top-level expression
+ * statements are sandbox-only and never emitted.
+ */
+function isWorkshopHelperStatement(stmt: ts.Statement): boolean {
+  if (
+    !ts.isFunctionDeclaration(stmt)
+    && !ts.isVariableStatement(stmt)
+    && !ts.isTypeAliasDeclaration(stmt)
+    && !ts.isInterfaceDeclaration(stmt)
+  ) {
+    return false
+  }
+  const names = declaredNames(stmt)
+  return names.length > 0 && names.every((name) => !CARD_BLOCK_NAMES.has(name))
+}
+
+/** Identifiers a statement reads, excluding property names (`a.name`, `{ name: v }`). */
+function referencedNames(stmt: ts.Statement): Set<string> {
+  const names = new Set<string>()
+  const visit = (node: ts.Node): void => {
+    if (ts.isIdentifier(node)) {
+      const parent = node.parent
+      const isPropertyName = (ts.isPropertyAccessExpression(parent) && parent.name === node)
+        || (ts.isPropertyAssignment(parent) && parent.name === node)
+      if (!isPropertyName) names.add(node.text)
+    }
+    ts.forEachChild(node, visit)
+  }
+  visit(stmt)
+  return names
+}
+
 export function extractCardImplSource(source: string): string {
   const sf = ts.createSourceFile(
     'in.ts',
@@ -539,9 +698,26 @@ export function extractCardImplSource(source: string): string {
   const cardId = findTopLevelConst(sf, 'CARD_ID')
   const cardImpl = findTopLevelConst(sf, 'CARD_IMPL')
   if (!cardImpl) return 'const CARD_IMPL = {}'
-  const stmts: ts.Statement[] = []
-  if (cardId) stmts.push(cardId)
-  stmts.push(cardImpl)
+
+  // Keep only helpers reachable from CARD_IMPL so the upstream build's
+  // noUnusedLocals check does not fail on sandbox leftovers.
+  const helperByName = new Map<string, ts.Statement>()
+  for (const stmt of sf.statements) {
+    if (!isWorkshopHelperStatement(stmt)) continue
+    for (const name of declaredNames(stmt)) helperByName.set(name, stmt)
+  }
+  const kept = new Set<ts.Statement>()
+  const pending: ts.Statement[] = [cardImpl]
+  while (pending.length > 0) {
+    for (const name of referencedNames(pending.pop()!)) {
+      const helper = helperByName.get(name)
+      if (!helper || kept.has(helper)) continue
+      kept.add(helper)
+      pending.push(helper)
+    }
+  }
+
+  const stmts = sf.statements.filter((stmt) => stmt === cardId || stmt === cardImpl || kept.has(stmt))
   return printStatements(sf, stmts)
 }
 
@@ -624,13 +800,6 @@ export function generateCardSourceFile(
   wcard: WorkshopCardForGen & { card_json?: string },
   ctx: { githubLogin: string; iso: string; artUrl?: string | null },
 ): string {
-  const used = scanUsedHelpers(wcard.effect_code)
-  const helperImports = Array.from(used)
-    .map((h) => HELPER_IMPORTS[h])
-    .filter((x): x is string => !!x)
-    .sort()
-    .join('\n')
-
   const locales = readLocalesFromCardJson(wcard.card_json)
   const normalised = normalizeWorkshopEffectCode(wcard.effect_code, wcard.card_id, {
     locales,
@@ -643,12 +812,24 @@ export function generateCardSourceFile(
     : `const CARD_ID = '${wcard.card_id}'\n${cardImplSource}`
   const factory = cardSourceFactory(wcard.card_type)
 
+  // Scan the emitted impl, not the raw sandbox source: helpers that were
+  // pruned as unreachable must not leave unused imports behind.
+  const used = scanUsedHelpers(cardImplWithId)
+  const helperImports = Array.from(used)
+    .map((h) => HELPER_IMPORTS[h])
+    .filter((x): x is string => !!x)
+    .sort()
+    .join('\n')
+  const lintDirective = usesAnyType(cardImplWithId)
+    ? '/* eslint-disable @typescript-eslint/no-explicit-any -- workshop helpers are untyped sandbox code */\n\n'
+    : ''
+
   return `// Generated from Open Agricola workshop. Do not hand-edit.
 // Workshop card: ${wcard.card_id}
 // Author: ${wcard.author_name ?? 'unknown'} (github: @${ctx.githubLogin})
 // Submitted: ${ctx.iso}
 
-${cardSourceImport(wcard.card_type)}
+${lintDirective}${cardSourceImport(wcard.card_type)}
 import type { CardImpl } from '../registry'
 ${helperImports ? '\n' + helperImports : ''}
 

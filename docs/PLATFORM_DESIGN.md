@@ -489,6 +489,8 @@ Necessary normalization prevents a sandbox-valid card from failing pull-request 
 - Add the `CardImpl` context type to `CARD_IMPL`, preventing listener phase and action literals from widening to `string[]`.
 - Give a listener without `id` the stable `{cardId}-listener-{n}`.
 - Convert `prerequisite: { occupation: N }` into supported `prerequisite: 'N Occupations'` plus `occupationPrerequisites: { min: N }`.
+- Keep the top-level helper constants, functions, and types that `CARD_IMPL` reaches, in source order; drop unreachable helpers and top-level expression statements.
+- Emit untyped parameters as `any` and give top-level helper functions an `any` return, with a file-level `no-explicit-any` lint exemption, because sandbox code is untyped JavaScript checked at runtime.
 - Update `register-all.ts`; `pnpm run generate:register-all` generates base, major, and community metadata into `catalog.generated.ts` and `major/generated.ts`.
 
 ### D6. Card detail, version history, and editor hydration
