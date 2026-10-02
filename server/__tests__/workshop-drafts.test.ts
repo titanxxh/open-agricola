@@ -980,7 +980,7 @@ describe('workshop draft aggregate', () => {
         cardJson: { ...baseDraft().cardJson, desc: ['edited'] },
       }),
     })).toThrowError(expect.objectContaining<Partial<WorkshopDraftError>>({
-      code: 'conflict',
+      code: 'live_edit_blocked',
       message: expect.stringContaining('unpublish'),
     }))
 

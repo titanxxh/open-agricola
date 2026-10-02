@@ -1117,7 +1117,11 @@ const CARD_IMPL = {}
         draft: changedDraft,
       }, 'tok-alice'), blockedRes)
       expect(blockedRes.statusCode).toBe(409)
-      expect(JSON.parse(blockedRes.body).error).toContain('unpublish')
+      expect(JSON.parse(blockedRes.body)).toMatchObject({
+        code: 'live_edit_blocked',
+        error: expect.stringContaining('unpublish'),
+        current: { revision: workspace.revision, live: true },
+      })
 
       const publicListRes = mockRes()
       await handleWorkshopRoute(mockReq('GET', '/api/workshop/cards'), publicListRes)

@@ -2136,6 +2136,7 @@ export function AiCardDesigner({
         minute: '2-digit',
       }).format(controllerState.save.savedAt)
     : null
+  const liveEditBlocked = controllerState?.save.errorCode === 'live_edit_blocked'
   const saveStatus = saving || controllerState?.save.status === 'saving'
     ? (locale === 'zh' ? '正在保存' : 'Saving')
     : !currentCardDbId
@@ -2145,7 +2146,9 @@ export function AiCardDesigner({
       : controllerState?.save.status === 'offline'
         ? (locale === 'zh' ? '离线，已保存在本机' : 'Offline, saved locally')
         : controllerState?.save.status === 'error'
-          ? (locale === 'zh' ? '同步失败' : 'Sync failed')
+          ? liveEditBlocked
+            ? (locale === 'zh' ? '请先下架' : 'Unpublish to edit')
+            : (locale === 'zh' ? '同步失败' : 'Sync failed')
         : controllerState?.save.status === 'conflict'
           ? (locale === 'zh' ? '需要选择草稿版本' : 'Draft choice required')
           : syncedTime
@@ -2369,12 +2372,23 @@ export function AiCardDesigner({
         >
           <span>
             {controllerError
-              ?? controllerState?.save.error
-              ?? (locale === 'zh' ? '修改已保存在本机。' : 'Changes are saved on this device.')}
+              ?? (liveEditBlocked
+                ? (locale === 'zh'
+                    ? '卡牌已上线，请先下架后继续编辑。未保存的修改已保存在本机。'
+                    : 'This card is live. Unpublish it to continue editing. Unsaved changes are saved on this device.')
+                : controllerState?.save.error
+                  ?? (locale === 'zh' ? '修改已保存在本机。' : 'Changes are saved on this device.'))}
           </span>
           {controllerState && (
-            <button type="button" className="aicw-button" onClick={() => { void retryCheckpoint() }}>
-              {locale === 'zh' ? '重试保存' : 'Retry save'}
+            <button
+              type="button"
+              className="aicw-button"
+              onClick={() => { void (liveEditBlocked ? unpublishDraft() : retryCheckpoint()) }}
+              disabled={saving}
+            >
+              {liveEditBlocked
+                ? (locale === 'zh' ? '下架后继续编辑' : 'Unpublish to continue editing')
+                : (locale === 'zh' ? '重试保存' : 'Retry save')}
             </button>
           )}
         </section>

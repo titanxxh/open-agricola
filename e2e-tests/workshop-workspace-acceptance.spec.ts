@@ -36,6 +36,7 @@ type Workspace = {
   id: string
   authorId: string
   revision: number
+  live: boolean
   status: string
   draft: Draft
   publishedVersionId: string | null
@@ -1469,6 +1470,62 @@ const scenarioErrors = async ({
   await expectAccessibleWorkspace(page)
 }
 
+const scenarioLiveEditBlocked = async ({
+  page,
+  request,
+  account,
+  variant,
+}: ScenarioContext) => {
+  const workspace = await createDraft(request, account)
+  withDatabase(database => {
+    approveCurrentDraft(database, { cardId: workspace.id, authorId: workspace.authorId })
+    publish(database, {
+      cardId: workspace.id,
+      authorId: workspace.authorId,
+      baseRevision: workspace.revision,
+    })
+  }, false)
+  await openEditor(page, workspace.id)
+  const nameInput = page.getByLabel(text(variant.locale, '英文卡牌名', 'Card name'))
+  const localName = unique('Edited live card')
+  await nameInput.fill(localName)
+  const saveButton = page.locator('.aicw-header-actions').getByRole('button', {
+    name: text(variant.locale, '保存草稿', 'Save draft'),
+  })
+  await saveButton.click()
+
+  const recovery = page.locator('.aicw-recovery')
+  await expect(recovery).toContainText(text(
+    variant.locale,
+    '卡牌已上线，请先下架后继续编辑。未保存的修改已保存在本机。',
+    'This card is live. Unpublish it to continue editing. Unsaved changes are saved on this device.',
+  ))
+  await expect(page.locator('.aicw-conflict')).toHaveCount(0)
+  const blocked = await loadWorkspace(request, account, workspace.id)
+  expect(blocked.live).toBe(true)
+  expect(blocked.revision).toBe(workspace.revision)
+  expect(blocked.draft.name).toBe(workspace.draft.name)
+  expect(await page.evaluate(
+    key => localStorage.getItem(key),
+    `open-agricola-workshop-draft:${workspace.id}`,
+  )).toContain(localName)
+
+  await recovery.getByRole('button', {
+    name: text(variant.locale, '下架后继续编辑', 'Unpublish to continue editing'),
+  }).click()
+  await expect(recovery).toHaveCount(0)
+  await expect(nameInput).toHaveValue(localName)
+  await expect(page.locator('.aicw-save-state')).toContainText(
+    text(variant.locale, '有未保存修改', 'Unsaved changes'),
+  )
+  await saveButton.click()
+  await expectSaved(page, variant.locale)
+  const saved = await loadWorkspace(request, account, workspace.id)
+  expect(saved.live).toBe(false)
+  expect(saved.draft.name).toBe(localName)
+  expect(saved.revision).toBe(workspace.revision + 1)
+}
+
 const scenarios: Array<{
   title: string
   run: (context: ScenarioContext) => Promise<void>
@@ -1484,6 +1541,7 @@ const scenarios: Array<{
   { title: '08 validation sandbox and PR handoff', run: scenarioHandoff },
   { title: '09 author privacy and public projection', run: scenarioPrivacy, llm: true },
   { title: '10 loading errors and retry', run: scenarioErrors, llm: true },
+  { title: '11 live card edit restriction and unpublish', run: scenarioLiveEditBlocked },
 ]
 
 test.describe('AI card workspace acceptance matrix', () => {

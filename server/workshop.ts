@@ -74,6 +74,7 @@ const sendWorkshopDraftError = (res: ServerResponse, error: unknown): boolean =>
   if (!(error instanceof WorkshopDraftError)) return false
   const status = {
     conflict: 409,
+    live_edit_blocked: 409,
     forbidden: 403,
     invalid: 400,
     not_found: 404,
@@ -81,6 +82,7 @@ const sendWorkshopDraftError = (res: ServerResponse, error: unknown): boolean =>
   }[error.code]
   sendJson(res, status, {
     ok: false,
+    code: error.code,
     error: error.message,
     ...(error.current ? { current: error.current } : {}),
   })
