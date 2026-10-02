@@ -60,6 +60,8 @@ Sandbox source is designed to save, preview, and run in Workshop. After submissi
 | `const CARD_IMPL = { ... }` | `const CARD_IMPL: CardImpl = { ... }` | Contextually types listener action and phase literals instead of widening them to `string[]` |
 | Listener without `id` | Adds `{cardId}-listener-{n}` | Registration and ordering require a stable ID |
 | `prerequisite: { occupation: 2 }` | `prerequisite: '2 Occupations'` plus `occupationPrerequisites: { min: 2 }` | Repository `prerequisite` is printed copy; structured validation uses `occupationPrerequisites` |
+| Top-level helper constants, functions, and types | Kept in source order when `CARD_IMPL` reaches them directly or through another helper; unreachable helpers and top-level expression statements are dropped | `CARD_IMPL` calls them at runtime, and `noUnusedLocals` rejects leftovers |
+| Untyped parameters | Emitted as `any`; top-level helper functions also return `any`, and the file gets a `no-explicit-any` lint exemption | Sandbox code is untyped JavaScript checked at runtime; the strict build rejects implicit `any` and a returned `{ type: 'seq' }` widened to `string` |
 
 The generator also produces:
 
@@ -93,7 +95,7 @@ It also patches:
 
 The generator creates no generic smoke test. Add a direct behavior test for a simple immediate effect. Payment, choice or pending, delay, cross-player behavior, and multistep flows require a dedicated `GameSession` scenario written by the author, reviewer, or LLM.
 
-Sandbox users continue to write only `CARD_DEF` and `CARD_IMPL`; backend `code-gen.ts` owns the formal module shape.
+Sandbox users continue to write `CARD_DEF` and `CARD_IMPL`, plus any top-level helpers `CARD_IMPL` calls; backend `code-gen.ts` owns the formal module shape.
 
 ---
 

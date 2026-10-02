@@ -516,6 +516,8 @@ WorkshopPage
 - `CARD_IMPL` 会补上 `CardImpl` 上下文类型，避免 listener phase/action 字面量退化成 `string[]`。
 - 缺失 `id` 的 listener 会补稳定 id：`{cardId}-listener-{n}`。
 - `prerequisite: { occupation: N }` 会转为仓库支持的 `prerequisite: 'N Occupations'` + `occupationPrerequisites: { min: N }`。
+- `CARD_IMPL` 引用到的顶层辅助常量、函数和类型按原顺序保留；引用不到的辅助和顶层表达式语句丢弃。
+- 未标注类型的参数一律输出为 `any`，顶层辅助函数返回值也标为 `any`，文件加 `no-explicit-any` 的 lint 豁免，因为沙盒代码是运行时校验的无类型 JavaScript。
 - 同步更新 `register-all.ts`；基础牌、major、community metadata 由 `pnpm run generate:register-all` 生成到 `catalog.generated.ts` / `major/generated.ts`。
 
 ### D6. 卡牌详情、版本历史和编辑回填

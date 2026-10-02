@@ -66,6 +66,8 @@
 | `const CARD_IMPL = { ... }`       | `const CARD_IMPL: CardImpl = { ... }`                                   | 给 listener/action/phase 提供上下文类型，避免字面量数组变成 `string[]`            |
 | `listeners: [{ ... }]` 缺 `id`     | 自动补 `{cardId}-listener-{n}`                                             | listener 排序和注册要求稳定 id                                           |
 | `prerequisite: { occupation: 2 }` | `prerequisite: '2 Occupations'` + `occupationPrerequisites: { min: 2 }` | 仓库正式卡牌类型中 `prerequisite` 是印刷文本，结构化校验走 `occupationPrerequisites` |
+| 顶层辅助常量、函数和类型 | `CARD_IMPL` 直接或经其他辅助间接引用到的按原顺序保留；引用不到的辅助和顶层表达式语句丢弃 | `CARD_IMPL` 运行时要调用它们，`noUnusedLocals` 不允许遗留未用声明 |
+| 未标注类型的参数 | 一律输出为 `any`；顶层辅助函数返回值也标为 `any`，文件加 `no-explicit-any` 的 lint 豁免 | 沙盒代码是运行时校验的无类型 JavaScript；严格构建不接受隐式 `any`，也不接受返回的 `{ type: 'seq' }` 被放宽成 `string` |
 
 
 生成器还会同步输出：
@@ -104,7 +106,7 @@ pnpm run build
 生成器不创建通用 smoke test。简单即时效果补直接行为测试；支付、选择 / pending、延迟、跨玩家和多步 flow 由作者、reviewer 或 LLM 编写专属 `GameSession` 场景。
 
 **用户在沙盒里不需要关心正式模块形态**：继续按 `CARD_DEF + CARD_IMPL`
-两个常量写就行。后端 `code-gen.ts` 负责规范化到单 Card Source。
+两个常量写，`CARD_IMPL` 用到的顶层辅助函数照常写在旁边即可。后端 `code-gen.ts` 负责规范化到单 Card Source。
 
 ---
 
