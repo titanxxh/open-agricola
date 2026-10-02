@@ -528,7 +528,7 @@ pnpm dlx gh-pages -d dist
 
 ### 主站图片资源
 
-`public-assets.ref` 固定图片仓的 Git commit，`public-assets.required.json` 声明主站需要的全部路径。构建和默认本地启动读取该 commit 的 GitHub tree；响应无效、tree 不完整或缺少必需路径时立即失败。测试配置只读取本地契约，不依赖网络。运行时从 `raw.githubusercontent.com/titanxxh/open-agricola-assets/<commit>/` 读取对应 commit 的图片，主站和不可变 Replay Viewer 使用同一固定来源，图片本身不再打进主站 Pages artifact。
+`public-assets.ref` 固定图片仓的 Git commit，`public-assets.required.json` 声明主站需要的全部路径。构建和默认本地启动读取图片站的 `asset-version.txt` 和 `asset-manifest.json`；两者都必须与 `public-assets.ref` 一致，且清单必须包含所有必需路径。元数据不可达、响应无效、版本不一致或缺少文件都会使启动/构建失败。请求只访问公共 Pages 地址，不携带 GitHub API 凭据。测试配置只读取本地契约，不依赖网络。新构建统一从 `https://titanxxh.github.io/open-agricola-assets/assets/...` 加载公共图片和字体，并用 `?v=<public-assets.ref>` 更新缓存。主站、初始 HTML 背景预加载、生成的 CSS 和不可变 Replay Viewer 对所有访客使用同一 Pages 来源，Replay CSP 允许该图片站路径的图片和字体。不按地域分流，也不在运行时回退 raw。公共资源本身不再打进主站 Pages artifact。图片仓按既有设计只发布当前文件，查询参数是缓存键，不是历史文件快照。
 
 本地修改图片时可全量切到一个资产仓 checkout：
 
@@ -538,7 +538,46 @@ PUBLIC_ASSET_LOCAL_DIR=../open-agricola-assets pnpm dev
 
 启动前会检查全部必需文件；缺少任一文件即失败，不会混用或回退到远端。该覆盖仅用于本地开发服务器，CI 和生产构建不接受它。
 
-更新图片时先在 `open-agricola-assets` 发布并验证 commit-addressed raw URL，再把主仓 `public-assets.ref` 更新为该 commit，并同步 `public-assets.required.json`；随后再走主仓的正常 Release。旧版本通过 Git 历史中的 commit 继续读取原图片，不需要在当前目录保留旧文件。
+更新公共资源时先把 `open-agricola-assets` 发布到图片仓 Pages，等待其 workflow 将所有线上文件与该 commit 逐一校验，再把主仓 `public-assets.ref` 更新为线上 `asset-version.txt`，同步 `public-assets.required.json`，随后走主仓正常 Release。只修改文档的图片仓 commit 也会改变部署版本标记。当前已核验的 Pages 部署为 `8675d8a6dc3950b616c64043f0d7809f7abc3a3e`。旧 Viewer Build 保留代码，但公共卡图/字体跟随图片站当前文件；只有以后明确要求时才归档公共图片历史。
+
+2026-10-02 本地验证逐一下载并核对全部 1,132 个线上文件（117,711,722 字节），通过 `./restart-local.sh --players 2` 重启，背景预加载和 Replay E2E 均通过，并在 Replay CSP 下实际解码 Pages 卡框图片、加载 Carlito 字体。Fast 测试通过 749 个文件 / 8,032 项；lint 为零 error（456 warning），生产前端构建通过。主站和新 Viewer 产物均无 raw 资源 URL。这些检查不代表前端发布或后端部署；生产上线需同时包含新前端、Viewer Build 和支持 Pages 的 Replay CSP。[验证记录](performance/frontend-route-measurements-2026-10-02.json)。
+
+### 中国大陆前端访问（核验日期：2026-10-02）
+
+下列测量描述资源来源修正前的前端：HTML/JS/CSS 来自 `titanxxh.github.io`，公共资源来自 `raw.githubusercontent.com`。线上入口 bundle `index-DafwQMKi.js` 已包含 `https://openagapi.titanxxh.com`；上文关于旧前端变量的记录描述的是 2026-10-01 的状态，不代表当前 bundle。
+
+**UTC+8 13:05–13:07** 的 Globalping HTTPS GET 使用探针自身 DNS，选择大陆用户网络并加新加坡对照。每个请求实际返回的大陆探针略有差异：移动三个（AS9808）、电信一个或两个（AS4134）、联通三个（AS17621 两个，AS17623 一个）。[归一化证据](performance/frontend-route-measurements-2026-10-02.json)保存精确 URL、探针信息、错误、TLS 结果与原始测量 ID。
+
+| 生产目标 | 移动 | 电信 | 联通 |
+|---|---|---|---|
+| [首页](https://api.globalping.io/v1/measurements/22Fb5d1zJTdBjowix00021EzR) | 3/3 HTTP 200 | 1/1 HTTP 200 | 3/3 HTTP 200 |
+| [入口 JS](https://api.globalping.io/v1/measurements/26kwR6RHOQYUTiRdh00021EzR) / [CSS](https://api.globalping.io/v1/measurements/2E8kkoS29ki6MKk5Y00021EzT) | 各 3/3 | JS 1/1；CSS 2/2 | 各 3/3 |
+| [固定版本卡图，首测](https://api.globalping.io/v1/measurements/2jdfypjZVWMx0YmV400021EzR) | 1/3；两次 `ECONNRESET` | 0/1；15 秒超时 | 3/3 HTTP 200 |
+| [同一卡图，复测](https://api.globalping.io/v1/measurements/2zaL3NFDQwAuXWMCy00021EzT) / [当前背景图](https://api.globalping.io/v1/measurements/2XrOpklJDAMDQ1zCq00021EzT) | 各 0/3；`ECONNRESET` | 各 0/2；15 秒超时 | 各 3/3 |
+| [新后端健康接口](https://api.globalping.io/v1/measurements/2AiIfinmNOwL7A0Bf00021EzR) | 3/3 HTTP 200 | 1/1 HTTP 200 | 3/3 HTTP 200 |
+
+所有新加坡对照均返回 HTTP 200，成功响应的 TLS 校验均通过。大陆探针的 Pages 首页响应耗时为 0.30–1.00 秒；测量服务可能截断响应体，因此这**不是**完整下载或浏览器整页加载时间。本轮确认了移动和电信的资源链路失败，同时所测 Pages 入口仍可达；不能据此确定连接重置的原因、全网封锁、长期稳定性、浏览器完整渲染或已认证多人对局成功。
+
+本次来源修正让所有新主站和 Replay Viewer 构建使用已有图片仓 Pages，通过部署门禁校验其当前版本与完整必需文件清单，不新增 commit 目录或公共资源历史副本。`PUBLIC_ASSET_LOCAL_DIR` 仍只适用于开发。若 Pages 后续也无法通过同样检查，再评估独立托管镜像或前端构建。
+
+只换自定义域名 CNAME，仍然指向 [GitHub Pages 托管](https://docs.github.com/en/pages/configuring-a-custom-domain-for-your-github-pages-site/managing-a-custom-domain-for-your-github-pages-site)。Cloudflare [DNS-only 记录](https://developers.cloudflare.com/dns/proxy-status/)仍让流量直达源站，普通代理也不等于独立的 [China Network](https://developers.cloudflare.com/china-network/)。任何新交付链路都应在三网验证，再测试密码登录、已认证 WSS、对局及重连，才能接受大陆访问能力。
+
+#### 以后可选的镜像分流
+
+整个站点的镜像可以用自有入口域名配合[智能 DNS](https://www.alibabacloud.com/help/en/dns/pubz-intelligent-analysis)，让大陆请求解析到镜像，其他请求解析到海外部署。判断通常依据递归 DNS 的出口 IP，EDNS Client Subnet 可以改善准确性。这是近似地域分流，不能精确识别每个访问者。两端都必须支持该入口域名、有效 TLS 和一致的路径。DNS 不能改写域名、URL 路径或 HTML 中的资源地址；现有 `github.io` 和 `raw.githubusercontent.com` 域名的 DNS 也不由 owner 控制。
+
+所有新构建目前对所有访客使用图片仓 Pages。以后若需要独立镜像，可以在自有后端增加小接口，按请求 IP 返回允许的资源地址。浏览器可短时缓存选择结果，用小资源检测可达性，失败时回退，并提供手动覆盖。这个可选分流尚未实现。IP 判断反映实际网络出口，包括代理；归属地不能证明选中主机可达。运行时切换需要覆盖 CSS 字体、初始 HTML 背景预加载、普通图片 helper 和 Replay Viewer；只改 `publicAssetUrl()` 不够，因为 CSS URL 在构建时固定。两条链路都应遵循所选择的公共资源发布约定。
+
+另一个方案是在 HTTP 入口按国家重定向：Cloudflare 的[国家规则](https://developers.cloudflare.com/rules/url-forwarding/examples/redirect-country-subdomains/)使用 `ip.src.country`。这种[重定向要求入口流量经过代理](https://developers.cloudflare.com/rules/url-forwarding/single-redirects/create-dashboard/)，用户必须先能访问该入口才能被跳转。Pages 内纯浏览器检测同样依赖站点先加载成功。整站跳转需要保留应用路径、查询参数和 URL fragment，并处理按 origin 隔离的浏览器存储、后端 CORS 与公开链接配置。两端部署保持同一 release，并保留手动备用链接。
+
+#### 镜像托管选项（核验日期：2026-10-02）
+
+给大陆访客使用的镜像不一定部署在大陆机房；最终域名及交付链路需要通过大陆网络验证。固定版本图片仓的[完整 tree](https://api.github.com/repos/titanxxh/open-agricola-assets/git/trees/94c1b4f8864a946c79c66940fb3357b4101cb08c?recursive=1)包含全部 1,132 个必需文件，共 117,711,722 字节（约 112 MiB）。本地 checkout 不完整，不能作为容量或完整性基准。
+
+- **GitHub Pages 图片镜像：**现有 `https://titanxxh.github.io/open-agricola-assets/assets/website-bg/16qiufen.webp` 在 **UTC+8 13:31 的九个大陆探针上全部返回 HTTP 200：移动、电信、联通各三个**，新加坡对照也成功。[测量记录](https://api.globalping.io/v1/measurements/2mcHR830K7mpcIKU700021Ezr)。本地完整下载的 SHA-256 与固定 commit 的 raw 文件一致。对应的 `<commit>/assets/...` Pages URL 返回 404。本次来源修正遵循图片仓已有的只保留当前文件约定，以已发布版本标记和清单校验代替新增 commit 目录。此前托管调研本身未部署或切换应用。[Pages 限制](https://docs.github.com/en/pages/getting-started-with-github-pages/github-pages-limits)是单站发布体积 1 GB、每月流量软限制 100 GB。保留的 commit 版本都计入站点容量。它改变了交付域名，但仍共用 GitHub 服务商，不属于独立容灾。
+- **现有后端主机：**通过 Caddy 或 Nginx 静态提供固定版本资源的完整副本。没有新增服务器租金，但需验证磁盘、流量及对对局的影响。当前健康接口成功只证明入口可达，不能证明镜像吞吐。
+- **腾讯 EdgeOne Makers/Pages：**[当前免费版](https://pages.edgeone.ai/document/limits-and-quotas)提供总部署存储 5 GB、单项目 20,000 文件、单文件 25 MB、每月 500 次构建，支持自定义域名和免费 TLS 证书。[域名规则](https://pages.edgeone.ai/document/domain-overview)要求大陆用户使用默认 project/deployment 域名时通过预览链接访问，三小时后失效。因此长期公开镜像需要自己的域名。大陆或包含大陆的全球加速要求 ICP 备案；不含大陆的全球加速无需备案，但没有大陆节点，仍需实测线路。不能把独立 EdgeOne CDN Free 套餐的宣传直接套用到 Makers，也不能承诺未来额度固定。
+- **Cloudflare Pages/R2：**[Pages](https://developers.cloudflare.com/pages/platform/limits/)免费版支持 20,000 文件、单文件 25 MiB。[R2 Standard](https://developers.cloudflare.com/r2/pricing/)每月含 10 GB-month 存储、一百万 Class A 与一千万 Class B 操作，出口流量不收费；超过存储或操作免费额度会计费。两种免费产品都不能证明大陆稳定可达，也不等于独立 China Network。
 
 ---
 
