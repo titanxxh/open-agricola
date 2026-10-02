@@ -216,6 +216,10 @@ describe('public replay routes', () => {
     expect(first.headers['Content-Security-Policy']).toContain(
       "font-src 'self' https://titanxxh.github.io/open-agricola-assets/",
     )
+    expect(first.headers['Content-Security-Policy']).toContain(
+      'https://raw.githubusercontent.com/titanxxh/open-agricola-assets/',
+    )
+    expect(first.headers['Content-Security-Policy']).toContain("script-src 'self';")
     expect(first.headers['Content-Security-Policy']).not.toContain(
       "script-src 'self' https:",
     )
