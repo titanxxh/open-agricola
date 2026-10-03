@@ -41,6 +41,10 @@ vi.mock('../../contexts/LocaleContext', () => {
     'platform.startHotseat': 'Start Hotseat Game',
     'platform.hotseatHint': 'Play every seat on one device.',
     'platform.snakeOpening': 'Snake opening',
+    'platform.enableParentCards': 'Enable Parent Cards expansion',
+    'platform.enableThroughTheSeasons': 'Enable Through the Seasons expansion',
+    'platform.enableFarmersOfTheMoor': 'Enable Farmers of the Moor expansion',
+    'platform.allowIncompleteFarmersOfTheMoorMinorDeal': 'Allow an incomplete Farmers of the Moor minor improvement pool',
     'platform.snakeOpeningHint': 'Every player starts with 3 food. In round 1, each player’s second person is placed in reverse turn order.',
     'platform.cancel': 'Cancel',
     'platform.joinGame': 'Join Game',
@@ -136,7 +140,7 @@ describe('LobbyPage player count selection', () => {
 
     expect(screen.getByText('Play every seat on one device.')).toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: '4 Players' }))
-    fireEvent.click(screen.getByLabelText('启用 Farmers of the Moor 扩展'))
+    fireEvent.click(screen.getByLabelText('Enable Farmers of the Moor expansion'))
     fireEvent.click(screen.getByRole('button', { name: 'Start Hotseat Game' }))
 
     // Hotseat is an ordinary room, flagged so one device can hold every seat.
@@ -189,7 +193,7 @@ describe('LobbyPage player count selection', () => {
 
     render(<LobbyPage />)
     fireEvent.click(screen.getByRole('button', { name: 'Create Multiplayer Game' }))
-    fireEvent.click(screen.getByLabelText('启用 Through the Seasons 扩展'))
+    fireEvent.click(screen.getByLabelText('Enable Through the Seasons expansion'))
     fireEvent.click(screen.getByRole('button', { name: 'Create Game' }))
 
     expect(setPage).toHaveBeenCalledWith('game', {
@@ -205,10 +209,10 @@ describe('LobbyPage player count selection', () => {
 
     render(<LobbyPage />)
     fireEvent.click(screen.getByRole('button', { name: 'Create Multiplayer Game' }))
-    fireEvent.click(screen.getByLabelText('启用 Parent Cards 扩展'))
-    fireEvent.click(screen.getByLabelText('启用 Through the Seasons 扩展'))
-    fireEvent.click(screen.getByLabelText('启用 Farmers of the Moor 扩展'))
-    fireEvent.click(screen.getByLabelText('允许 Farmers of the Moor 小改良池不完整'))
+    fireEvent.click(screen.getByLabelText('Enable Parent Cards expansion'))
+    fireEvent.click(screen.getByLabelText('Enable Through the Seasons expansion'))
+    fireEvent.click(screen.getByLabelText('Enable Farmers of the Moor expansion'))
+    fireEvent.click(screen.getByLabelText('Allow an incomplete Farmers of the Moor minor improvement pool'))
     fireEvent.click(screen.getByRole('button', { name: 'Create Game' }))
 
     expect(setPage).toHaveBeenCalledWith('game', {

@@ -386,7 +386,7 @@ export function LobbyPage() {
                   checked={enableParentCards}
                   onChange={(e) => setEnableParentCards(e.target.checked)}
                 />
-                <span>启用 Parent Cards 扩展</span>
+                <span>{t('platform.enableParentCards')}</span>
               </label>
               <label className="community-deck-toggle">
                 <input
@@ -394,7 +394,7 @@ export function LobbyPage() {
                   checked={enableThroughTheSeasons}
                   onChange={(e) => setEnableThroughTheSeasons(e.target.checked)}
                 />
-                <span>启用 Through the Seasons 扩展</span>
+                <span>{t('platform.enableThroughTheSeasons')}</span>
               </label>
               <label className="community-deck-toggle">
                 <input
@@ -405,7 +405,7 @@ export function LobbyPage() {
                     if (!e.target.checked) setAllowIncompleteFarmersOfTheMoorMinorDeal(false)
                   }}
                 />
-                <span>启用 Farmers of the Moor 扩展</span>
+                <span>{t('platform.enableFarmersOfTheMoor')}</span>
               </label>
               {enableFarmersOfTheMoor && (
                 <label className="community-deck-toggle">
@@ -414,7 +414,7 @@ export function LobbyPage() {
                     checked={allowIncompleteFarmersOfTheMoorMinorDeal}
                     onChange={(e) => setAllowIncompleteFarmersOfTheMoorMinorDeal(e.target.checked)}
                   />
-                  <span>允许 Farmers of the Moor 小改良池不完整</span>
+                  <span>{t('platform.allowIncompleteFarmersOfTheMoorMinorDeal')}</span>
                 </label>
               )}
               <div className="player-select-actions">

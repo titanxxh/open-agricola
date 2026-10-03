@@ -89,7 +89,7 @@ const seasonResourceAdjustments: SeasonResourceAdjustment[] = [
   {
     className: 'winter-basic',
     accumulation: true,
-    items: [{ icon: 'wood', text: '-1' }, { icon: 'reed', text: '-1' }],
+    items: [{ icon: 'clay', text: '-1' }, { icon: 'reed', text: '-1' }],
   },
   {
     className: 'winter-plow',

@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { describe, expect, it, vi } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { PlayerTabs, type PlayerSummary } from '../PlayerTabs'
@@ -9,7 +9,23 @@ const PLAYERS: PlayerSummary[] = [
   { id: 'p2', name: 'AI', score: 9, isYou: false, isCurrent: false, color: '#ccbbaa' },
 ]
 
+afterEach(() => vi.unstubAllGlobals())
+
 describe('PlayerTabs', () => {
+  it.each([false, true])('removes floating-point tails in player scores (mobile: %s)', (mobile) => {
+    vi.stubGlobal('matchMedia', vi.fn(() => ({
+      matches: mobile,
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+    })))
+    const { container } = render(<PlayerTabs players={[
+      { ...PLAYERS[0]!, score: -15.899999999999999 },
+      { ...PLAYERS[1]!, score: -0.75 },
+    ]} active="p1" onChange={() => {}} />)
+    expect(container.textContent).toContain('-15.9')
+    expect(container.textContent).not.toContain('-15.899999999999999')
+    if (!mobile) expect(container.textContent).toContain('-0.75')
+  })
   it('renders one tab per player', () => {
     render(<PlayerTabs players={PLAYERS} active="p1" onChange={() => {}} />)
     expect(screen.getAllByRole('tab')).toHaveLength(2)

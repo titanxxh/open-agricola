@@ -266,17 +266,21 @@ describe('ScoringPad', () => {
     expect(oldMiserRow?.textContent).toContain('0')
   })
 
-  it('renders parent card fractional scores without integer coercion', () => {
+  it.each([
+    { cardId: 'PR10', score: 0.7, total: -15.899999999999999, expectedScore: '+0.7', expectedTotal: '-15.9' },
+    { cardId: 'PR01', score: -0.75, total: -14.75, expectedScore: '-0.75', expectedTotal: '-14.75' },
+    { cardId: 'PR02', score: -0.25, total: -14.25, expectedScore: '-0.25', expectedTotal: '-14.25' },
+  ])('renders $cardId fractional scores without integer coercion or floating-point tails', ({ cardId, score, total, expectedScore, expectedTotal }) => {
     const scores = [
       {
         playerId: 'p1',
         playerName: 'Player 1',
-        total: -2.3,
+        total,
         categories: [
           {
             key: 'parentCards',
-            total: 0.7,
-            entries: [{ type: 'parentCard', cardId: 'PR10', score: 0.7 }],
+            total: score,
+            entries: [{ type: 'parentCard', cardId, score }],
           },
         ],
       },
@@ -287,10 +291,10 @@ describe('ScoringPad', () => {
 
     expect(screen.getByText('Parent Cards')).toBeTruthy()
     const parentRow = scoringRowContaining(container, 'Parent Cards')
-    expect(parentRow?.textContent).toContain('+0.7')
-    const pr10Row = scoringRowContaining(container, 'PR10')
-    expect(pr10Row?.textContent).toContain('+0.7')
-    expect(screen.getByText('-2.3')).toBeTruthy()
+    expect(parentRow?.textContent).toContain(expectedScore)
+    const cardRow = scoringRowContaining(container, cardId)
+    expect(cardRow?.textContent).toContain(expectedScore)
+    expect(screen.getByText(expectedTotal)).toBeTruthy()
   })
 
   it('uses the action log card reference affordance for card bonus child labels', () => {

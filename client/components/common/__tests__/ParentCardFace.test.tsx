@@ -5,6 +5,7 @@ import { cleanup, render, screen } from '@testing-library/react'
 import { afterEach, describe, expect, it } from 'vitest'
 
 import { ParentCardFace } from '../ParentCardFace'
+import { parentCards } from '../../../../shared/parents'
 
 afterEach(() => cleanup())
 
@@ -38,7 +39,7 @@ describe('ParentCardFace', () => {
     )
   })
 
-  it('localizes mother card chrome while preserving the English rule text', () => {
+  it('localizes mother card chrome and rule text', () => {
     render(createElement(ParentCardFace, { id: 'PR10', locale: 'zh' }))
 
     expect(screen.getByRole('img', { name: '母亲 PR10' })).toBeInTheDocument()
@@ -48,21 +49,21 @@ describe('ParentCardFace', () => {
     expect(screen.getByText('获得 1 木材')).toBeInTheDocument()
     expect(screen.getByText('+0.7 分')).toBeInTheDocument()
     expect(screen.getByText(
-      'Place 1 wood on round space 1. At the start of that round, you get the wood.',
+      '在第 1 回合格上放置 1 木材。该回合开始时，获得这些资源。',
     )).toBeInTheDocument()
   })
 
-  it('localizes father card chrome while preserving the English rule summaries', () => {
+  it('localizes father card chrome and rule summaries', () => {
     const { container } = render(createElement(ParentCardFace, { id: 'PS08', locale: 'zh' }))
 
     expect(screen.getByRole('img', { name: '父亲 PS08' })).toBeInTheDocument()
     expect(screen.getByRole('heading', { name: '父亲 PS08' })).toBeInTheDocument()
     expect(screen.getByText('父亲')).toBeInTheDocument()
     expect(container.querySelector('[data-kind="condition"]')?.textContent).toBe(
-      '条件at most 7 / 5 / 3 unused farmyard spaces left',
+      '条件至多 7 / 5 / 3 个未使用农场格',
     )
     expect(container.querySelector('[data-kind="reward"]')?.textContent).toBe(
-      '奖励get 1 grain / 1 vegetable / both 1 grain and 1 vegetable',
+      '奖励获得 1 谷物 / 蔬菜 / 谷物和 1 蔬菜',
     )
   })
 
@@ -73,6 +74,31 @@ describe('ParentCardFace', () => {
 
     rerender(createElement(ParentCardFace, { id: 'PR01', locale: 'zh' }))
     expect(screen.getByText('建造 1 个畜栏')).toBeInTheDocument()
+    expect(screen.getByText(/可以免费建造这些畜栏/)).toBeInTheDocument()
+    expect(screen.getByText('-0.75 分')).toBeInTheDocument()
+  })
+
+  it.each(parentCards)('renders the complete rule text of $id in Chinese', (card) => {
+    const { container } = render(<ParentCardFace id={card.id} locale="zh" />)
+    const rules = container.querySelector('.parent-card-face__text, .parent-card-face__father-lines')
+    expect(rules?.textContent).toMatch(/[\u4e00-\u9fff]/)
+    expect(rules?.textContent).not.toMatch(/[a-z]/i)
+  })
+
+  it('keeps all three Chinese draw rewards and highlights the completed tier', () => {
+    const { container } = render(<ParentCardFace id="PS03" locale="zh" completedTier={3} />)
+    expect(container.querySelector('[data-kind="reward"]')).toHaveTextContent(
+      '抽取 3 张小改良卡，保留 / 抽取 3 张职业卡，保留 / 分别抽取 3 张小改良卡和 3 张职业卡，各保留 1 张',
+    )
+    expect(container.querySelector('[data-kind="reward"] .is-completed')).toHaveTextContent(
+      '分别抽取 3 张小改良卡和 3 张职业卡，各保留',
+    )
+  })
+
+  it('preserves the completed tier highlights in Chinese', () => {
+    const { container } = render(<ParentCardFace id="PS01" locale="zh" completedTier={2} />)
+    expect(Array.from(container.querySelectorAll('.is-completed'), (element) => element.textContent))
+      .toEqual(['3', '2'])
   })
 
   it('renders father requirements and rewards as compact slash summaries', () => {

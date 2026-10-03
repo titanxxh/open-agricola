@@ -20,6 +20,17 @@ const ROWS: PlayerScoreRow[] = [
 ]
 
 describe('ScorePanel', () => {
+  it.each([
+    [-15.899999999999999, '-15.9'],
+    [0.1 + 0.2, '0.3'],
+    [-0.75, '-0.75'],
+    [-0.25, '-0.25'],
+    [0, '0'],
+  ])('formats total %s without floating-point tails', (total, expected) => {
+    const { container } = render(<ScorePanel locale="zh" rows={[{ ...ROWS[0]!, total }]} />)
+    expect(container.querySelector('.score-panel__total')?.textContent).toBe(expected)
+  })
+
   it('keeps score categories visible without emoji glyphs', () => {
     const { container } = render(<ScorePanel locale="en" rows={ROWS} />)
     const firstRow = container.querySelector('.score-panel__row')
