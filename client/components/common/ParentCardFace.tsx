@@ -170,7 +170,7 @@ export function ParentCardFace({
             </div>
           </div>
         )}
-        {infobox ? <div className="card-infobox parent-card-infobox">{infobox}</div> : null}
+        {infobox ? <div className="card-infobox parent-card-infobox">{infobox === 'Completed' ? t(locale, 'ui.parentCard.completed') : infobox}</div> : null}
       </div>
     </article>
   )

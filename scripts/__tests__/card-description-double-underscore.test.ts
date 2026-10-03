@@ -67,6 +67,15 @@ const ALLOWED_DOUBLE_UNDERSCORE_LABELS = new Set([
   'Wish for Children',
 ] as const)
 
+const ALLOWED_CHINESE_DOUBLE_UNDERSCORE_LABELS = new Set([
+  ...Object.values(zh.actions).flatMap((action) => 'name' in action ? [action.name] : []),
+  ...Object.values(zh.improvements).map((card) => card.name),
+  ...Object.values(zh.minorImprovements).map((card) => card.name),
+  ...Object.values(zh.occupations).map((card) => card.name),
+  '大改良', '小改良', '翻修', '采石场', '建造木房',
+  '家庭增长（需要空房）', '无须房间的家庭增长',
+])
+
 const REQUIRED_DOUBLE_UNDERSCORE_REFERENCES = [
   'Animal Market',
   'Bake Bread',
@@ -179,7 +188,8 @@ describe('card description double-underscore markup', () => {
     ].flatMap(([locale, dictionary]) =>
       translatedDescriptions(dictionary).flatMap(({ path, desc }) =>
         doubleUnderscoreLabels(desc)
-          .filter((label) => !ALLOWED_DOUBLE_UNDERSCORE_LABELS.has(label))
+          .filter((label) => !ALLOWED_DOUBLE_UNDERSCORE_LABELS.has(label) &&
+            !(locale === 'zh' && ALLOWED_CHINESE_DOUBLE_UNDERSCORE_LABELS.has(label)))
           .map((label) => `${locale}.${path}: __${label}__ in ${desc}`),
       ),
     )
@@ -222,5 +232,7 @@ describe('card description double-underscore markup', () => {
   it('documents labels that should not use double underscores', () => {
     expect(ALLOWED_DOUBLE_UNDERSCORE_LABELS.has('1 <WOOD>')).toBe(false)
     expect(ALLOWED_DOUBLE_UNDERSCORE_LABELS.has('7 in draft mode')).toBe(false)
+    expect(ALLOWED_CHINESE_DOUBLE_UNDERSCORE_LABELS.has('家庭成员')).toBe(false)
+    expect(ALLOWED_CHINESE_DOUBLE_UNDERSCORE_LABELS.has('1 <WOOD>')).toBe(false)
   })
 })

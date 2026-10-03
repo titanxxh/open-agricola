@@ -1037,7 +1037,7 @@ describe('eventsToLogEntries', () => {
         gainedTo: { kind: 'player', playerId: 'p1' },
       },
     ] satisfies GameEvent[]
-    expect(eventsToLogEntries(events, { playerNames: { p1: 'Alice' } })[0]?.params?.action).toBe('exchange')
+    expect(eventsToLogEntries(events, { playerNames: { p1: 'Alice' } })[0]?.params?.action).toBe('actions.exchange.name')
   })
 
   it('maps farm and phase events to legacy log entries', () => {

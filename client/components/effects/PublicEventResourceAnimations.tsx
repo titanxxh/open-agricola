@@ -111,7 +111,7 @@ export const PublicEventResourceAnimations = ({
           {resourcesForDisplay(animation).map(({ key, amount }) => (
             <span key={key} className={`resource-chip resource-${key}`} title={t(locale, `resources.${key}`)}>
               <span className={`res-icon res-icon-${key}`} />
-              <span className="resource-chip-count">+{amount}</span>
+              <span className="resource-chip-count">{animation.to.kind === 'supply' ? '−' : '+'}{amount}</span>
             </span>
           ))}
         </div>

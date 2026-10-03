@@ -52,6 +52,16 @@ const resources = (): Resource => ({
   begging: 0,
 })
 
+it('localizes the infirmary restriction in the Chinese action board', () => {
+  const player = createPlayer('p1', '玩家 1', 'red')
+  const html = renderToStaticMarkup(<ActionBoard locale="zh"
+    baseActions={[createAction('moor-infirmary', 'actions.moor-infirmary.name')]}
+    roundSlots={[]} currentPlayer={player} players={[player]} futureMeeples={[]}
+    canTakeAction={() => true} takeAction={vi.fn()} currentRound={1} devMode={false} />)
+  expect(html).toContain('仅限生病的家庭成员')
+  expect(html).not.toContain('Sick workers only')
+})
+
 const createPlayer = (id: string, name: string, color: PlayerState['color']): PlayerState => ({
   id,
   name,

@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from 'vitest'
 import { fireEvent, render, screen } from '@testing-library/react'
 import type { ActionLogTimelineBucket } from '../../../app/action-log-timeline'
 import type { GameEvent } from '../../../../shared/contract/events'
+import { eventsToLogEntries } from '../../../../shared/events/log-mapper'
 import { ActionLog } from '../ActionLog'
 
 const replayEvent = (id: string, seq: number): GameEvent => ({
@@ -373,6 +374,25 @@ describe('ActionLog', () => {
     expect(text).toContain('已拒绝')
     expect(text).not.toContain('actions.forest.name')
     expect(text).not.toContain('replacement')
+  })
+
+  it('renders seasonal payments and internal trigger actions in Chinese', () => {
+    const triggers = ['pay', 'breed', 'improvement', 'take-from-card'].map((triggerActionId, index) => ({
+      schemaVersion: 1 as const, id: `trigger-${index}`, seq: index + 1, round: 1,
+      phase: 'work' as const, visibility: 'public' as const, type: 'card.triggered' as const,
+      cardId: 'through-the-seasons:spring', actorPlayerId: 'p1', triggerActionId,
+    }))
+    const { container } = render(<ActionLog locale="zh" currentRound={1} log={[
+      ...eventsToLogEntries(triggers, { playerNames: { p1: '玩家 1' } }),
+      { key: 'log.cardEffectPay', params: { player: '玩家 1', cardId: 'through-the-seasons:winter', cost: { wood: 1 } } },
+    ]} />)
+    expect(container.textContent).toContain('春季')
+    expect(container.textContent).toContain('冬季')
+    expect(container.textContent).toContain('支付资源')
+    expect(container.textContent).toContain('繁殖')
+    expect(container.textContent).toContain('改良')
+    expect(container.textContent).toContain('从卡牌取资源')
+    expect(container.textContent).not.toMatch(/through-the-seasons:|\(pay\)|\(breed\)|\(improvement\)/)
   })
 
   it('localizes future worker room types and worker return destinations', () => {

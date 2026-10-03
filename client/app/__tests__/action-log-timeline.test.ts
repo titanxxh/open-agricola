@@ -113,6 +113,19 @@ const replayEntryForEvent = (
 })
 
 describe('buildActionLogTimelineRows', () => {
+  it('omits non-harvest breeding metadata from the Chinese action log', () => {
+    const event: GameEvent = {
+      schemaVersion: 1, id: 'spring-breed', seq: 4, round: 1, phase: 'work',
+      visibility: 'public', type: 'farm.animalBred', actorPlayerId: 'p1',
+      sourceActionId: 'breed', sourceCardId: 'through-the-seasons:spring',
+      source: 'cardEffect', animals: { sheep: 1 },
+    }
+    expect(buildActionLogTimelineRows({
+      entries: [replayEntryForEvent(event, 1)], stateLog: [], currentRound: 1,
+      locale: 'zh', playerNames: { p1: '玩家 1' },
+    })).toEqual([])
+  })
+
   it('does not keep timeline-local state log identity rules', () => {
     const source = readFileSync(fileURLToPath(new URL('../action-log-timeline.ts', import.meta.url)), 'utf8')
 
@@ -628,7 +641,7 @@ describe('buildActionLogTimelineRows', () => {
       row.kind === 'stateLog' && row.logEntry.key === 'log.playMinorImprovement')).toBe(false)
   })
 
-  it('uses a structured fallback for replayable silent events without logs or notifications', () => {
+  it('keeps silent replayable events out of the player-facing log', () => {
     const event = silentReplayableEvent('evt-silent-replayable', 3)
     const buckets = buildActionLogTimelineRows({
       entries: [replayEntryForEvent(event, 1)],
@@ -639,15 +652,7 @@ describe('buildActionLogTimelineRows', () => {
       actionNames: {},
     })
 
-    const row = buckets.flatMap((bucket) => bucket.rows)[0]
-
-    expect(row).toMatchObject({
-      kind: 'event',
-      logEntry: null,
-      replayable: true,
-    })
-    expect(row?.label).toContain('resource.moved')
-    expect(row?.label).toContain('seq=3')
+    expect(buckets).toEqual([])
   })
 
   it('omits metadata-only replay entries without logs or notifications', () => {

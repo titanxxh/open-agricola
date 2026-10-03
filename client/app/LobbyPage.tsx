@@ -8,6 +8,7 @@ import { DonateWidgets } from '../components/common/DonateWidgets'
 import { Section } from '../components/common/Section'
 import { EmptyState } from '../components/common/EmptyState'
 import { API_BASE } from '../config'
+import { isDevModeAllowedFromQuery } from './game-container-helpers'
 
 type RoomSummary = {
   id: string
@@ -116,6 +117,11 @@ export function LobbyPage() {
       transport: 'ws',
       maxPlayers: String(selectedMaxPlayers),
       ...(selectMode === 'hotseat' ? { hotseat: '1' } : {}),
+    }
+    const query = new URLSearchParams(window.location.search)
+    if (selectMode === 'hotseat' && isDevModeAllowedFromQuery(window.location.search) && query.get('player')) {
+      params.player = query.get('player')!
+      params.devMode = '1'
     }
     if (draftMode !== 'none') {
       params.draftMode = draftMode

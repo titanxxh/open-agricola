@@ -22,11 +22,8 @@ const seasonLabelKey: Record<SeasonId, string> = {
   autumn: 'ui.seasons.autumn',
 }
 
-const seasonToken: Record<SeasonId, string> = {
-  winter: 'W',
-  spring: 'Sp',
-  summer: 'S',
-  autumn: 'A',
+const englishSeasonToken: Record<SeasonId, string> = {
+  winter: 'W', spring: 'Sp', summer: 'S', autumn: 'A',
 }
 
 type SeasonIconKind =
@@ -264,7 +261,7 @@ export const SeasonsBoard = ({
           <span className="seasons-board__route-arrow seasons-board__route-arrow--autumn-winter">➜</span>
         </div>
         <div className={`seasons-board__token seasons-board__token--${currentSeason}`} aria-hidden="true">
-          {seasonToken[currentSeason]}
+          {locale === 'zh' ? t(locale, `ui.seasons.short.${currentSeason}`) : englishSeasonToken[currentSeason]}
         </div>
         {seasonOrder.map((season) => {
           const action = actionById.get(seasonActionIdBySeason[season])

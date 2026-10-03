@@ -108,6 +108,20 @@ describe('GameContainerApi WS player identity', () => {
     expect(isDevModeAllowedFromQuery('?page=game&devMode=1')).toBe(false)
   })
 
+  it('keeps dev hotseat identity through creation and reload, only when shortcuts are enabled', () => {
+    const query = '?page=game&transport=ws&hotseat=1&player=p1&devMode=1'
+    vi.stubEnv('DEV', true)
+    expect(isDevModeAllowedFromQuery(query)).toBe(true)
+    expect(isDevModeAllowedFromQuery(`${query}&room=abc123`)).toBe(true)
+    expect(isDevModeAllowedFromQuery(query.replace('&player=p1', ''))).toBe(false)
+    vi.stubEnv('DEV', false)
+    vi.stubEnv('VITE_ENABLE_DEV_AUTH_SHORTCUTS', '0')
+    expect(isDevModeAllowedFromQuery(query)).toBe(false)
+    vi.stubEnv('VITE_ENABLE_DEV_AUTH_SHORTCUTS', '1')
+    expect(isDevModeAllowedFromQuery(query)).toBe(true)
+    vi.unstubAllEnvs()
+  })
+
   it('parses websocket room maxPlayers from query as a 2-6 range', () => {
     expect(maxPlayersFromQuery('?page=game&transport=ws&maxPlayers=6')).toBe(6)
     expect(maxPlayersFromQuery('?page=game&transport=ws&maxPlayers=5')).toBe(5)

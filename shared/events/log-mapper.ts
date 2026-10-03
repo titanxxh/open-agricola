@@ -146,6 +146,15 @@ const MOOR_SPECIAL_ACTION_IDS = new Set([
 ])
 
 const BUILT_IN_LEAF_ACTION_NAMES: Record<string, string> = {
+  pay: 'actions.pay.name',
+  breed: 'actions.breed.name',
+  improvement: 'actions.improvement.name',
+  sow: 'actions.sow.name',
+  reap: 'actions.reap.name',
+  exchange: 'actions.exchange.name',
+  'bake-bread': 'actions.bake-bread.name',
+  'family-growth': 'actions.family-growth.name',
+  occupation: 'actions.lessons.name',
   construct: 'actions.construct.name',
   fence: 'actions.fencing.name',
   plow: 'actions.plow.name',
