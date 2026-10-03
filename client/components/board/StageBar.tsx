@@ -38,7 +38,7 @@ export function StageBar({ currentRound, totalRounds = 14, locale = 'zh' }: Prop
               aria-label={label}
               title={label}
             >
-              {isHarvest ? <span className="res-icon res-icon-grain" aria-hidden /> : r}
+              {isHarvest ? <span className="res-icon res-icon-harvest" aria-hidden /> : r}
             </div>
           )
         })}
