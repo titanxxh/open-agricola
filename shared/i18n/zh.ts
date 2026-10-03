@@ -2453,7 +2453,7 @@ export const zh = {
     sandboxPlayerCountOption: '{count} 人局',
     sandboxDecks: '默认牌组',
     sandboxVariants: '扩展',
-    sandboxVariantThroughTheSeasons: 'Through the Seasons',
+    sandboxVariantThroughTheSeasons: '四季',
     sandboxVariantFarmersOfTheMoor: '沼泽农夫',
     sandboxAllowIncompleteFarmersOfTheMoorMinorDeal: '允许沼泽农夫小改良池不完整',
     sandboxVariantSnakeOpening: '蛇形开局',
