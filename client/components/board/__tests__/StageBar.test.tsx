@@ -24,7 +24,7 @@ describe('StageBar', () => {
   it('identifies harvest rounds by a sprite shape and localized accessible name', () => {
     const { container } = render(<StageBar currentRound={1} locale="en" />)
     const harvest = screen.getByRole('listitem', { name: 'Round 4 harvest' })
-    expect(harvest.querySelector('.res-icon-grain')).toBeInTheDocument()
+    expect(harvest.querySelector('.res-icon-harvest')).toBeInTheDocument()
     expect(container.textContent).not.toMatch(/\p{Extended_Pictographic}/u)
   })
 })

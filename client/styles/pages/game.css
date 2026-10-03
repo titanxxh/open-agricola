@@ -4101,6 +4101,7 @@
 .res-icon-bonusVp,
 .res-icon-score { width: 0.8em; height: 0.8em; background-position: 45.5793% 21.7988%; background-size: 2560%; }
 /* Action-specific icons from meeples.png */
+.res-icon-harvest   { width:1.25em; height:1em; background-position:8.62866% 21.8543%; background-size:2027.72%; }
 .res-icon-arrow     { width:0.4em; height:0.3em;  background-position:98.3359% 21.45%;    background-size:3150.77%; }
 /* Exchange-rate arrows that carry the "1×" / "2×" badge (the reference
  * meeple-arrow-1x / meeple-arrow-2x on meeples.png). */
