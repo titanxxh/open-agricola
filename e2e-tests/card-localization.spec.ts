@@ -40,6 +40,7 @@ for (const locale of ['zh', 'en'] as const) {
     await expect(page.getByTestId('workshop-root')).toBeVisible()
     await page.getByRole('button', { name: locale === 'zh' ? '调整配置' : 'Adjust config', exact: true }).click()
     const modal = page.locator('.ws-reset-modal')
+    await expect(modal.getByRole('checkbox', { name: locale === 'zh' ? '四季' : 'Through the Seasons', exact: true })).toBeVisible()
     await modal.getByRole('checkbox', { name: locale === 'zh' ? '沼泽农夫' : 'Farmers of the Moor', exact: true }).check()
     await expect(modal.getByRole('checkbox', { name: locale === 'zh'
       ? '允许沼泽农夫小改良池不完整' : 'Allow incomplete Farmers of the Moor minor pool', exact: true })).toBeVisible()
