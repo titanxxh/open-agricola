@@ -2,8 +2,54 @@ import { describe, expect, it } from 'vitest'
 
 import { t } from '..'
 import { zh } from '../zh'
+import { catalogCardDefinitions } from '../../cards/catalog.generated'
 
 describe('zh platform translations', () => {
+  it('places every A-E card in its numbered translation section and translates its face', () => {
+    type Face = { name?: string; description?: string; rules?: string; prerequisite?: string }
+    const sections: Record<'minorImprovements' | 'occupations', Record<string, Face>> = {
+      minorImprovements: zh.minorImprovements,
+      occupations: zh.occupations,
+    }
+    for (const [section, faces] of Object.entries(sections)) {
+      for (const id of Object.keys(faces)) {
+        const number = /^[A-E](\d{3})_/.exec(id)?.[1]
+        if (number) expect(section, id).toBe(Number(number) <= 84 ? 'minorImprovements' : 'occupations')
+      }
+    }
+    const missing: string[] = []
+    for (const card of catalogCardDefinitions.filter((card) => /^[A-E]\d{3}_/.test(card.id))) {
+      const section: keyof typeof sections = card.number <= 84 ? 'minorImprovements' : 'occupations'
+      const wrongSection = section === 'occupations' ? 'minorImprovements' : 'occupations'
+      expect(sections[wrongSection]?.[card.id], `${card.id} is in the wrong section`).toBeUndefined()
+      const translation = sections[section]?.[card.id]
+      if (!translation?.name || !translation.description) missing.push(card.id)
+      else {
+        expect(translation.name, card.id).toMatch(/[\u4e00-\u9fff]/)
+        expect(translation.description, card.id).toMatch(/[\u4e00-\u9fff]/)
+        if (card.rules?.length) expect(translation.rules, `${card.id}.rules`).toBeTruthy()
+        if (typeof card.prerequisite === 'string') expect(translation.prerequisite, `${card.id}.prerequisite`).toBeTruthy()
+      }
+    }
+    expect(missing).toEqual([])
+  })
+
+  it('uses Chinese action and card references in Chinese card text', () => {
+    const untranslated: string[] = []
+    const visit = (value: unknown, key: string) => {
+      if (typeof value === 'string') {
+        for (const reference of value.matchAll(/__([^_]+)__/g)) {
+          if (/[a-z]/i.test(reference[1])) untranslated.push(`${key}: ${reference[1]}`)
+        }
+      } else if (value && typeof value === 'object') {
+        for (const [child, entry] of Object.entries(value)) visit(entry, `${key}.${child}`)
+      }
+    }
+    visit(zh.minorImprovements, 'minorImprovements')
+    visit(zh.occupations, 'occupations')
+    expect(untranslated).toEqual([])
+  })
+
   it('uses drafting terminology for draft game setup', () => {
     expect(zh.platform.draftModeSimultaneous).toBe('轮抽')
     expect(zh.platform.draftPoolSizeLabel).toBe('轮抽池大小')

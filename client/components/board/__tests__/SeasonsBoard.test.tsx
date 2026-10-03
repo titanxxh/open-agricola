@@ -61,6 +61,15 @@ const createPlayer = (id: string, name: string, color: PlayerState['color']): Pl
 })
 
 describe('SeasonsBoard', () => {
+  it.each([['winter', '冬'], ['spring', '春'], ['summer', '夏'], ['autumn', '秋']] as const)(
+    'localizes the %s season token', (season, label) => {
+      const { container } = render(<SeasonsBoard locale="zh"
+        throughTheSeasons={{ startSeason: season, currentSeason: season }}
+        seasonActions={[]} players={[]} canTakeAction={() => false} takeAction={vi.fn()} />)
+      expect(container.querySelector('.seasons-board__token')).toHaveTextContent(label)
+    },
+  )
+
   it('renders all season actions and dispatches only the available current season action', () => {
     const takeAction = vi.fn()
     const actions = [

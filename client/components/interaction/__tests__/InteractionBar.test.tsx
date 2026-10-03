@@ -360,6 +360,26 @@ describe('InteractionBar', () => {
     expect(html).toContain('via')
   })
 
+  it('localizes seasonal sources in the choice subtitle and payment preview', () => {
+    const html = renderBarHtml((input) => {
+      input.locale = 'zh'
+      input.pending.choice = {
+        ...pendingChoice,
+        sourceCard: 'through-the-seasons:spring',
+        options: [{
+          value: 'payment', labelKey: 'prompt.selectPaymentOption',
+          effectPreview: {
+            kind: 'payment', resourcesPaid: { wood: 1 },
+            sourceCards: ['through-the-seasons:autumn'],
+          },
+        }],
+      }
+    })
+    expect(html).toContain('由 春季 触发')
+    expect(html).toContain('秋季')
+    expect(html).not.toContain('through-the-seasons:')
+  })
+
   it('renders waiting state while keeping scoring available', () => {
     const showScoring = vi.fn()
     renderBar((input) => {

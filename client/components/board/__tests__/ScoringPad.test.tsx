@@ -130,12 +130,13 @@ const scoringRowContaining = (container: HTMLElement, text: string) =>
   )
 
 describe('ScoringPad', () => {
-  it('falls back to a readable card name when card translation is missing', () => {
+  it('localizes occupation bonus labels using the occupation translation section', () => {
     const html = renderToStaticMarkup(
       <ScoringPad locale="zh" scores={mockScores} players={mockPlayers} onClose={() => {}} />,
     )
 
-    expect(html).toContain('Adoptive Parents')
+    expect(html).toContain('养父母')
+    expect(html).not.toContain('Adoptive Parents')
     expect(html).not.toContain('occupations.A092_AdoptiveParents.name')
   })
 

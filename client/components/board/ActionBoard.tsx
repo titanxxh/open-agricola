@@ -227,7 +227,7 @@ const ACTION_ICON_DESC: Record<string, string[]> = {
   'corral-6':           ['+1<sheep>/<pig>/<cattle>'],
   'side-job-6':         ['[Pay] 1<wood><arrow><barn>', '[and/or]', '<bread>'],
   'improvement-6':      ['R1-4: 1<minor>', 'R5+: 1<major>/<minor>'],
-  'moor-infirmary':     ['+1<food>', '[Sick workers only]'],
+  'moor-infirmary':     ['+1<food>', '[ui.infirmarySickWorkersOnly]'],
   'moor-resource-market-12': ['+1<food>+1<stone>'],
   // Round actions
   'fencing':            ['1<wood><arrow><fence-icon>'],
@@ -322,7 +322,7 @@ function renderTextToken(key: number, token: string, actionId?: string): React.R
     : <span key={key}>{token}</span>
 }
 
-function renderIconDesc(templates: string[], actionId?: string): React.ReactNode {
+function renderIconDesc(templates: string[], locale: Locale, actionId?: string): React.ReactNode {
   return templates.map((tpl, i) => {
     const parts: React.ReactNode[] = []
     let rest = tpl
@@ -338,7 +338,7 @@ function renderIconDesc(templates: string[], actionId?: string): React.ReactNode
       // Match [text] brackets
       const textMatch = rest.match(/^\[([^\]]*)\]/)
       if (textMatch) {
-        parts.push(<span key={key++} className="text">{textMatch[1]}</span>)
+        parts.push(<span key={key++} className="text">{t(locale, textMatch[1])}</span>)
         rest = rest.slice(textMatch[0].length)
         continue
       }
@@ -935,12 +935,12 @@ export const ActionBoard = ({
     const id = info.actionId
     if (!id) return null
     const tipDesc = ACTION_TOOLTIP_DESC[id]
-    if (tipDesc?.length) return renderIconDesc(tipDesc, id)
+    if (tipDesc?.length) return renderIconDesc(tipDesc, locale, id)
     const action = info.action
     if (action && ACCUMULATE_DIR[id] && hasGainPerRound(action)) {
       return renderGainDisplay(action)
     }
-    if (ACTION_ICON_DESC[id]?.length) return renderIconDesc(ACTION_ICON_DESC[id], id)
+    if (ACTION_ICON_DESC[id]?.length) return renderIconDesc(ACTION_ICON_DESC[id], locale, id)
     return info.descKey ? t(locale, info.descKey) : null
   }
 
@@ -1012,7 +1012,7 @@ export const ActionBoard = ({
                     {accDir && hasGainPerRound(space)
                       ? renderGainDisplay(space)
                       : ACTION_ICON_DESC[space.id]?.length
-                        ? renderIconDesc(ACTION_ICON_DESC[space.id], space.id)
+                        ? renderIconDesc(ACTION_ICON_DESC[space.id], locale, space.id)
                         : t(locale, space.descriptionKey)}
                   </div>
                   <div className="action-footer" />
@@ -1075,7 +1075,7 @@ export const ActionBoard = ({
                         {accDir && hasGainPerRound(action)
                           ? renderGainDisplay(action)
                           : ACTION_ICON_DESC[action.id]?.length
-                            ? renderIconDesc(ACTION_ICON_DESC[action.id], action.id)
+                            ? renderIconDesc(ACTION_ICON_DESC[action.id], locale, action.id)
                             : t(locale, action.descriptionKey)}
                       </div>
                       <div className="action-footer" />
@@ -1145,7 +1145,7 @@ export const ActionBoard = ({
                       <h4 className="action-header">{t(locale, space.nameKey)}</h4>
                       <div className="action-desc">
                         {ACTION_ICON_DESC[space.id]?.length
-                          ? renderIconDesc(ACTION_ICON_DESC[space.id], space.id)
+                          ? renderIconDesc(ACTION_ICON_DESC[space.id], locale, space.id)
                           : t(locale, space.descriptionKey)}
                       </div>
                       <div className="action-footer" />

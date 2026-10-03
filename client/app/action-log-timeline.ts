@@ -184,26 +184,9 @@ const splitReplayIndependentStateLogRows = (
   return foundReplayDerived ? { leading, trailing } : { leading: [], trailing: leading }
 }
 
-const structuredEventSummary = (
-  event: GameEvent,
-  playerNames: Record<string, string>,
-  actionNames?: Record<string, string>,
-): string => {
-  const parts: string[] = [event.type]
-  if (event.actorPlayerId) parts.push(`actor=${playerNames[event.actorPlayerId] ?? event.actorPlayerId}`)
-  if (event.targetPlayerId) parts.push(`target=${playerNames[event.targetPlayerId] ?? event.targetPlayerId}`)
-  if (event.sourceActionId) parts.push(`action=${actionNames?.[event.sourceActionId] ?? event.sourceActionId}`)
-  if (event.sourceCardId) parts.push(`card=${event.sourceCardId}`)
-  if ('cardId' in event && typeof event.cardId === 'string') parts.push(`cardId=${event.cardId}`)
-  parts.push(`seq=${event.seq}`)
-  return parts.join(' · ')
-}
-
 const eventLabel = (
   entry: ReplayTimelineEntry,
   locale: Locale,
-  playerNames: Record<string, string>,
-  actionNames?: Record<string, string>,
   contextualLogRow?: LogPresentationRow,
 ): { logEntry: LogEntry | null; label: string } => {
   if (!entry.event) return { logEntry: null, label: locale === 'zh' ? 'archive 缺口' : 'Archive gap' }
@@ -213,9 +196,9 @@ const eventLabel = (
   const [notification] = collectPublicEventFeedback([entry.event], locale).notifications
   if (notification) return { logEntry: null, label: notification.message }
 
-  if (!entry.replayable) return { logEntry: null, label: '' }
-
-  return { logEntry: null, label: structuredEventSummary(entry.event, playerNames, actionNames) }
+  // Replayability does not imply a player-facing log row. Silent events remain
+  // available to the replay controller without exposing internal event data.
+  return { logEntry: null, label: '' }
 }
 
 const mergeBuckets = (rows: ActionLogTimelineRow[]): ActionLogTimelineBucket[] => {
@@ -250,11 +233,9 @@ export const buildActionLogTimelineRows = ({
       const { logEntry, label } = eventLabel(
         entry,
         locale,
-        playerNames,
-        actionNames,
         contextualLogEntries.get(entry.key),
       )
-      if (!entry.replayable && !logEntry && !label) return []
+      if (!logEntry && !label) return []
       return [{
         kind: 'event',
         key: entry.key,

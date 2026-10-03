@@ -16,6 +16,13 @@ describe('PlayerCard dual-type rendering (alsoCountsAs)', () => {
     clearCustomCardMetadata()
   })
 
+  it('renders translated prerequisites with the same markup as the card description', () => {
+    const html = renderToStaticMarkup(<PlayerCard locale="zh" cardId="A003_PaperKnife" cardType="minor" />)
+    expect(html).toContain('手中有3张职业牌')
+    expect(html).not.toContain('__职业__')
+    expect(html).not.toContain('3 Occupations in Hand')
+  })
+
   it('marks D060_LargePottery with data-also-counts-as="major"', () => {
     const html = renderToStaticMarkup(
       <PlayerCard locale="en" cardId="D060_LargePottery" cardType="minor" />,

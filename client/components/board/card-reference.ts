@@ -2,14 +2,9 @@ import type { Locale } from '../../../shared/i18n'
 import { t } from '../../../shared/i18n'
 import { getCardMeta } from '../../services/card-meta'
 import type { CardType } from '../common/PlayerCard'
+import { getAnyCardDisplayName } from '../common/cardText'
 
 export type CardRef = { id: string; type: CardType; name: string }
-
-const humanizeCardId = (id: string): string =>
-  id
-    .replace(/_/g, ' ')
-    .replace(/([a-z])([A-Z])/g, '$1 $2')
-    .trim()
 
 export const resolveCardRef = (locale: Locale, id: string): CardRef | null => {
   const tryKey = (prefix: string, type: CardRef['type']) => {
@@ -41,4 +36,4 @@ export const resolveCardRef = (locale: Locale, id: string): CardRef | null => {
 }
 
 export const resolveCardDisplayName = (locale: Locale, id: string) =>
-  resolveCardRef(locale, id)?.name ?? humanizeCardId(id)
+  resolveCardRef(locale, id)?.name ?? getAnyCardDisplayName(locale, id)

@@ -174,7 +174,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const resp = await fetch(`${API_BASE}${path}`, { ...init, credentials: 'include', headers })
     if (resp.status === 401) {
       const devUser = devShortcutUserFromLocation()
-      setState({ user: devUser, loading: false })
+      setState((previous) => {
+        // Dev identities have no cookie session. Keep their object stable so
+        // user-dependent lobby effects do not issue another request on every 401.
+        if (devUser && previous.user?.id === devUser.id && !previous.loading) return previous
+        return { user: devUser, loading: false }
+      })
     }
     return resp
   }, [])

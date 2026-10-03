@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import type { GameState } from '../../../shared/contract/types'
 import type { DraftPickPayload, DraftStageKind, DraftState } from '../../../shared/draft/types'
-import type { Locale } from '../../../shared/i18n'
+import { t, type Locale } from '../../../shared/i18n'
 import { DraftPoolRow } from './DraftPoolRow'
 import { DraftHistoryPanel } from './DraftHistoryPanel'
 
@@ -127,25 +127,18 @@ export function DraftOverlay({ state, meId, locale, onSubmit }: Props) {
 
   const showOccupations = vm.stage === 'standard' || vm.stage === 'occupation'
   const showMinors = vm.stage === 'standard' || vm.stage === 'farmersOfTheMoorMinor' || vm.stage === 'publishedMinor'
-  const promptText =
-    vm.stage === 'occupation'
-      ? 'Pick 1 occupation, then confirm.'
-      : vm.stage === 'farmersOfTheMoorMinor'
-        ? 'Pick 1 Farmers of the Moor minor improvement, then confirm.'
-        : vm.stage === 'publishedMinor'
-          ? 'Pick 1 minor improvement, then confirm.'
-          : 'Pick 1 occupation + 1 minor improvement, then confirm.'
+  const promptText = t(locale, `ui.draft.prompt.${vm.stage}`)
 
   return (
-    <div className="draft-overlay" role="dialog" aria-label="Card draft">
+    <div className="draft-overlay" role="dialog" aria-label={t(locale, 'ui.draft.dialog')}>
       <div className="draft-overlay-panel">
         <header className="draft-overlay-header">
           <h2 className="draft-overlay-title">
-            Draft — Round {vm.round} / {vm.totalRounds}
+            {t(locale, 'ui.draft.title', { round: vm.round, total: vm.totalRounds })}
           </h2>
           <div className="draft-overlay-status" data-already-submitted={vm.alreadySubmitted ? '1' : '0'}>
             {vm.alreadySubmitted
-              ? `Waiting for other players (${vm.submittedCount}/${vm.seatCount})…`
+              ? t(locale, 'ui.draft.waitingForOthers', { submitted: vm.submittedCount, seats: vm.seatCount })
               : promptText}
           </div>
         </header>
@@ -154,7 +147,7 @@ export function DraftOverlay({ state, meId, locale, onSubmit }: Props) {
           <>
             {showOccupations && (
               <section className="draft-section" data-section="occ">
-                <h3 className="draft-section-title">Occupations</h3>
+                <h3 className="draft-section-title">{t(locale, 'ui.draft.occupations')}</h3>
                 <DraftPoolRow
                   kind="occ"
                   ids={vm.myPool.occ}
@@ -166,7 +159,7 @@ export function DraftOverlay({ state, meId, locale, onSubmit }: Props) {
             )}
             {showMinors && (
               <section className="draft-section" data-section="minor">
-                <h3 className="draft-section-title">Minor improvements</h3>
+                <h3 className="draft-section-title">{t(locale, 'ui.draft.minorImprovements')}</h3>
                 <DraftPoolRow
                   kind="minor"
                   ids={vm.myPool.minor}
@@ -183,14 +176,14 @@ export function DraftOverlay({ state, meId, locale, onSubmit }: Props) {
                 disabled={!canSubmit}
                 onClick={handleConfirm}
               >
-                Confirm picks
+                {t(locale, 'ui.draft.confirm')}
               </button>
             </div>
           </>
         )}
 
         <section className="draft-section draft-section-kept">
-          <h3 className="draft-section-title">Already kept</h3>
+          <h3 className="draft-section-title">{t(locale, 'ui.draft.kept')}</h3>
           <DraftHistoryPanel
             occIds={vm.myKept.occ}
             minorIds={vm.myKept.minor}

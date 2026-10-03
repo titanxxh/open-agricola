@@ -192,6 +192,22 @@ export const en = {
         },
       },
     },
+    infirmarySickWorkersOnly: 'Sick workers only',
+    draft: {
+      dialog: 'Card draft',
+      title: 'Draft — Round {round} / {total}',
+      prompt: {
+        standard: 'Pick 1 occupation + 1 minor improvement, then confirm.',
+        occupation: 'Pick 1 occupation, then confirm.',
+        farmersOfTheMoorMinor: 'Pick 1 Farmers of the Moor minor improvement, then confirm.',
+        publishedMinor: 'Pick 1 minor improvement, then confirm.',
+      },
+      occupations: 'Occupations',
+      minorImprovements: 'Minor improvements',
+      confirm: 'Confirm picks',
+      kept: 'Already kept',
+      waitingForOthers: 'Waiting for other players ({submitted}/{seats})…',
+    },
     parentSelection: {
       dialog: 'Parent Cards selection',
       title: 'Parent Cards',
@@ -205,6 +221,7 @@ export const en = {
       alreadyDrafted: 'Already drafted',
     },
     parentCard: {
+      completed: 'Completed',
       mother: 'Mother',
       father: 'Father',
       kindMother: 'mother',

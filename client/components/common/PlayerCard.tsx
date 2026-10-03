@@ -193,6 +193,12 @@ export const PlayerCard = ({
       const translated = t(locale, key)
       return translated === key ? fallbackRules : translated
     }
+    const localizePrerequisite = (i18nKey: string): string | undefined => {
+      const key = `${i18nKey}.prerequisite`
+      const translated = t(locale, key)
+      const fallback = localized?.prerequisite ?? meta.prerequisite
+      return translated !== key ? translated : typeof fallback === 'string' ? fallback : undefined
+    }
     if (cardType === 'major') {
       const rawCost = (meta.cost ?? {}) as PaymentResourceMap | ComplexCost
       const { baseCost } = extractMajorDisplayCost(rawCost)
@@ -224,7 +230,7 @@ export const PlayerCard = ({
         deck: meta.deck,
         category: meta.category,
         vp: meta.vp,
-        prerequisite: localized?.prerequisite ?? meta.prerequisite,
+        prerequisite: localizePrerequisite(i18nKey),
         players: meta.players,
         isCookery: meta.isCookery,
         isBaking: meta.isBaking,
@@ -247,7 +253,7 @@ export const PlayerCard = ({
         cost: { ...emptyResources, ...(meta.cost ?? {}) },
         deck: meta.deck,
         category: meta.category,
-        prerequisite: localized?.prerequisite ?? meta.prerequisite,
+        prerequisite: localizePrerequisite(i18nKey),
         players: meta.players,
         isCookery: meta.isCookery,
         isBaking: meta.isBaking,
@@ -402,7 +408,7 @@ export const PlayerCard = ({
         
         {prerequisiteText && (
           <div className="card-prerequisite">
-            <div className="prerequisite-text">{prerequisiteText}</div>
+            <div className="prerequisite-text"><ResourceText text={prerequisiteText} /></div>
           </div>
         )}
 

@@ -3,6 +3,7 @@ import { cleanup, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { AuthProvider, useAuth } from '../AuthContext'
+import { useEffect } from 'react'
 
 afterEach(() => {
   cleanup()
@@ -220,5 +221,23 @@ describe('AuthProvider', () => {
     expect(await screen.findByText('p1')).toBeInTheDocument()
     await clicker.click(screen.getByRole('button', { name: 'load' }))
     await waitFor(() => expect(screen.getByText('p1')).toBeInTheDocument())
+  })
+
+  it('does not repeatedly fetch dev lobby data after an unauthenticated cookie response', async () => {
+    window.history.pushState(null, '', '/?player=p1&devMode=1')
+    const fetchMock = vi.fn(async () => new Response(JSON.stringify({ ok: false }), { status: 401 }))
+    vi.stubGlobal('fetch', fetchMock)
+    function Probe() {
+      const { user, apiFetch } = useAuth()
+      useEffect(() => {
+        // Bound a possible loop so a regression fails without hanging the test.
+        if (user && fetchMock.mock.calls.length < 3) void apiFetch('/api/rooms/my')
+      }, [user, apiFetch])
+      return <div>{user?.username ?? 'anonymous'}</div>
+    }
+    render(<AuthProvider><Probe /></AuthProvider>)
+    await screen.findByText('p1')
+    await waitFor(() => expect(fetchMock).toHaveBeenCalled())
+    expect(fetchMock).toHaveBeenCalledTimes(1)
   })
 })

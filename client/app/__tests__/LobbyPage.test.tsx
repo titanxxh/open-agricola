@@ -102,6 +102,18 @@ describe('LobbyPage my active games', () => {
 })
 
 describe('LobbyPage player count selection', () => {
+  it('preserves the development identity when starting a hotseat game', () => {
+    window.history.replaceState(null, '', '/?player=p1&devMode=1')
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({ ok: true, rooms: [] }))))
+    render(<LobbyPage />)
+    fireEvent.click(screen.getByRole('button', { name: 'Local Hotseat' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Start Hotseat Game' }))
+    expect(setPage).toHaveBeenCalledWith('game', expect.objectContaining({
+      hotseat: '1', player: 'p1', devMode: '1',
+    }))
+    window.history.replaceState(null, '', '/')
+  })
+
   it('uses the Open Agricola wordmark as the home link', () => {
     vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({ ok: true, rooms: [] }))))
 

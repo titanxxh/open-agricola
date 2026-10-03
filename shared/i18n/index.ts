@@ -5,9 +5,7 @@ export type Locale = 'zh' | 'en'
 
 const dictionaries = { zh, en }
 
-type Dictionary = typeof zh
-
-const getValue = (dict: Dictionary, path: string): string => {
+const getValue = (dict: Record<string, unknown>, path: string): string => {
   const parts = path.split('.')
   let current: unknown = dict
   for (const part of parts) {

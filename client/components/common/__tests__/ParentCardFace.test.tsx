@@ -10,6 +10,14 @@ import { parentCards } from '../../../../shared/parents'
 afterEach(() => cleanup())
 
 describe('ParentCardFace', () => {
+  it('localizes the server completion infobox without changing the completed tier', () => {
+    const { container, rerender } = render(<ParentCardFace id="PS01" locale="zh" infobox="Completed" completedTier={2} />)
+    expect(container.querySelector('.parent-card-infobox')).toHaveTextContent('已完成')
+    expect(container.querySelector('.parent-card-infobox')).not.toHaveTextContent('Completed')
+    rerender(<ParentCardFace id="PS01" locale="en" infobox="Completed" completedTier={2} />)
+    expect(container.querySelector('.parent-card-infobox')).toHaveTextContent('Completed')
+  })
+
   it('preserves mother and father card chrome and rule text in English', () => {
     const { container, rerender } = render(createElement(ParentCardFace, {
       id: 'PR10',

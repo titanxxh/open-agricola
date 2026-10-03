@@ -13,7 +13,10 @@ const joinCardNames = (locale: Locale, names: string[]) =>
 
 const resolveMaybeTranslationKey = (locale: Locale, value: string): string => {
   const translated = t(locale, value)
-  return translated === value ? value : translated
+  if (translated !== value) return translated
+  const actionKey = `actions.${value}.name`
+  const actionName = t(locale, actionKey)
+  return actionName === actionKey ? value : actionName
 }
 
 const houseTypeLabel = (locale: Locale, type: PlayerState['houseType']) => {

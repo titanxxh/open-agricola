@@ -38,6 +38,19 @@ afterEach(() => {
 })
 
 describe('PublicEventResourceAnimations', () => {
+  it('shows a minus for payments and exchanges leaving the player resources', () => {
+    const animations: PublicEventResourceAnimation[] = [
+      { id: 'payment', kind: 'payment', resources: { wood: 1 }, from: { kind: 'playerResources', playerId: 'p1' }, to: { kind: 'supply' } },
+      { id: 'exchange-pay', kind: 'exchange', resources: { grain: 2 }, from: { kind: 'playerResources', playerId: 'p1' }, to: { kind: 'supply' } },
+      { id: 'exchange-gain', kind: 'exchange', resources: { food: 4 }, from: { kind: 'supply' }, to: { kind: 'playerResources', playerId: 'p1' } },
+    ]
+    render(<><div className="player-resources-compact" data-player-resource-anchor="p1" />
+      <PublicEventResourceAnimations animations={animations} displayPlayerId="p1" locale="zh" /></>)
+    expect(screen.getByTestId('public-event-resource-animation-payment')).toHaveTextContent('−1')
+    expect(screen.getByTestId('public-event-resource-animation-exchange-pay')).toHaveTextContent('−2')
+    expect(screen.getByTestId('public-event-resource-animation-exchange-gain')).toHaveTextContent('+4')
+  })
+
   it('renders visible animation chips for resolvable action and player anchors', () => {
     vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function () {
       const element = this as HTMLElement

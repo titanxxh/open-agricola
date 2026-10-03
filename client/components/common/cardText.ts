@@ -44,6 +44,9 @@ export const getCardDisplayName = (
   cardType: CardType | null,
   cardId: string,
 ): string => {
+  const season = /^through-the-seasons:(winter|spring|summer|autumn)$/.exec(cardId)?.[1]
+  if (season) return t(locale, `ui.seasons.${season}`)
+
   if (cardType === 'occupation') {
     const key = `occupations.${cardId}.name`
     const translated = t(locale, key)
