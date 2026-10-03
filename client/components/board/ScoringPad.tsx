@@ -14,6 +14,7 @@ import { getAnyCardDisplayName, getCardDisplayName } from '../common/cardText'
 import { ResourceLine } from '../common/ResourceLine'
 import { resolveCardRef } from './card-reference'
 import { LogCardLink } from './log-rendering'
+import { formatScore as formatScoreValue } from '../../utils/format-score'
 
 type Props = {
   locale: Locale
@@ -66,7 +67,7 @@ const categoryLabelKey: Record<ScoreCategoryResult['key'], string> = {
 }
 
 const formatScore = (value: number) =>
-  value > 0 ? `+${value}` : value === 0 ? '0' : `${value}`
+  formatScoreValue(value, true)
 
 type ScoringRow =
   | { id: string; type: 'category'; key: ScoreCategoryResult['key'] }

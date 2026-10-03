@@ -1,5 +1,6 @@
 import { useEffect, useState, type CSSProperties } from 'react'
 import { SelectButton } from '../common/SelectButton'
+import { formatScore } from '../../utils/format-score'
 
 export interface PlayerSummary {
   id: string
@@ -41,7 +42,7 @@ export function PlayerTabs({ players, active, onChange }: Props) {
         onChange={onChange}
         options={players.map((p) => ({
           value: p.id,
-          label: `${p.isYou ? '☆ ' : ''}${p.name} · ${p.score ?? 0}`,
+          label: `${p.isYou ? '☆ ' : ''}${p.name} · ${formatScore(p.score ?? 0)}`,
         }))}
       />
     )
@@ -73,7 +74,7 @@ export function PlayerTabs({ players, active, onChange }: Props) {
           <span className="player-tabs__name">
             {p.isYou && <span aria-label="you">☆</span>} {p.name}
           </span>
-          {p.score !== undefined && <span className="player-tabs__score">{p.score}</span>}
+          {p.score !== undefined && <span className="player-tabs__score">{formatScore(p.score)}</span>}
         </button>
       ))}
     </div>

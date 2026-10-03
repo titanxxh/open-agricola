@@ -6,6 +6,7 @@ import type {
 import { getParentCardDefinition } from '../../../shared/parents'
 import { t, type Locale } from '../../../shared/i18n'
 import { resolveParentCardAssetUrls } from '../../services/parent-assets'
+import { getFatherRequirementText, getFatherRewardText, getMotherCardText } from './parentCardText'
 
 type FatherCompletedTier = 1 | 2 | 3
 
@@ -146,7 +147,7 @@ export function ParentCardFace({
           </div>
         ) : null}
         {isMother ? (
-          <p className="parent-card-face__text">{card.text}</p>
+          <p className="parent-card-face__text">{getMotherCardText(locale, card)}</p>
         ) : (
           <div className="parent-card-face__father-lines">
             <div className="parent-card-face__father-line" data-kind="condition">
@@ -154,7 +155,7 @@ export function ParentCardFace({
                 {t(locale, 'ui.parentCard.requirement')}
               </span>
               <SlashSummary
-                values={card.rewards.map((reward) => reward.requirementText)}
+                values={card.rewards.map((reward) => getFatherRequirementText(locale, card, reward))}
                 completedTier={completedTier}
               />
             </div>
@@ -163,7 +164,7 @@ export function ParentCardFace({
                 {t(locale, 'ui.parentCard.reward')}
               </span>
               <SlashSummary
-                values={card.rewards.map((reward) => compactRewardText(reward.rewardText))}
+                values={card.rewards.map((reward) => compactRewardText(getFatherRewardText(locale, card, reward)))}
                 completedTier={completedTier}
               />
             </div>

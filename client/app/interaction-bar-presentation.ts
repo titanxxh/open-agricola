@@ -8,6 +8,7 @@ import type {
 import type { Locale } from '../../shared/i18n'
 import { t } from '../../shared/i18n'
 import { getAnyCardDisplayName, translateCardText } from '../components/common/cardText'
+import { getParentFatherOptionText } from '../components/common/parentCardText'
 import type { AnimalReorgState, PendingAnimalReorg, PendingChoice } from '../types/ui'
 
 export type BorrowedFenceSourceControls = {
@@ -224,6 +225,8 @@ const getOptionalActionName = (
   option: ActionChoiceOption | undefined,
 ): string | null => {
   if (!option) return null
+  const parentLabel = getParentFatherOptionText(locale, option)
+  if (parentLabel) return parentLabel
   switch (option.effectPreview?.kind) {
     case 'payment':
       return translateCardText(locale, 'actions.pay.name')

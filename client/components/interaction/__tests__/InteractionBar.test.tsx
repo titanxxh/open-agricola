@@ -5,6 +5,7 @@ import { renderToStaticMarkup } from 'react-dom/server'
 import { fireEvent, render, screen } from '@testing-library/react'
 
 import type { AnytimeAction } from '../../../../shared/contract/types'
+import { getParentCardDefinition } from '../../../../shared/parents'
 import type { PendingChoice } from '../../../types/ui'
 import {
   buildInteractionBarActions,
@@ -129,6 +130,52 @@ const renderBarHtml = (
 ) => renderToStaticMarkup(buildBar(configure, actionOverrides))
 
 describe('InteractionBar', () => {
+  it.each(['PS01', 'PS03', 'PS04'])('localizes the offered %s father tier and preserves its choice value', (fatherId) => {
+    const card = getParentCardDefinition(fatherId)
+    if (card?.kind !== 'father') throw new Error('expected a father card')
+    const reward = card.rewards[1]
+    const value = fatherId === 'PS04' ? `${fatherId}:2:wood,clay` : `${fatherId}:2`
+    const labelParams = { tier: 2, requirement: reward.requirementText, reward: reward.rewardText }
+    const resolveChoice = vi.fn()
+    const { container } = renderBar((input) => {
+      input.locale = 'zh'
+      input.pending.choice = {
+        ...pendingChoice,
+        promptKey: 'ui.cards.parentFatherComplete.prompt',
+        options: [{
+          value,
+          sourceCard: fatherId,
+          labelKey: 'ui.cards.parentFatherComplete.tier',
+          labelParams,
+          ...(fatherId === 'PS03' ? {} : {
+            descriptionPreview: {
+              kind: 'action',
+              labelKey: 'ui.cards.parentFatherComplete.tier',
+              labelParams,
+              effectPreview: {
+                kind: 'resourceExchange',
+                resourcesGained: fatherId === 'PS04' ? { wood: 1, clay: 1 } : { stone: 2 },
+              },
+            },
+          }),
+        }],
+      }
+    }, { resolveChoice })
+    const button = screen.getByRole('button', { name: /第 2 档/ })
+    const expected = {
+      PS01: '至少 3 块田 -> 获得 2 石料',
+      PS03: '至少 2 种动物 -> 抽取 3 张职业卡，保留 1 张',
+      PS04: '至少 4 只同类动物 -> 自选 2 种不同建材，各获得 1 份',
+    }[fatherId]
+    expect(button).toHaveTextContent(expected!)
+    expect(button.textContent).not.toMatch(/fields|animals|immediately|occupation/)
+    if (fatherId === 'PS04') {
+      expect(container.querySelector('[data-resource="wood"]')).toBeInTheDocument()
+      expect(container.querySelector('[data-resource="clay"]')).toBeInTheDocument()
+    }
+    fireEvent.click(button)
+    expect(resolveChoice).toHaveBeenCalledWith(value)
+  })
   it('confirms heating with selected fuel and wood conversion', () => {
     const confirmHeating = vi.fn()
     renderBar((input) => {

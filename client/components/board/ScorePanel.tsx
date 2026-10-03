@@ -1,4 +1,5 @@
 import { t, type Locale } from '../../../shared/i18n'
+import { formatScore } from '../../utils/format-score'
 
 export interface PlayerScoreRow {
   id: string
@@ -37,22 +38,22 @@ export function ScorePanel({ locale, rows }: Props) {
             className={`score-panel__row${row.isYou ? ' is-you' : ''}`}
           >
             <span className="score-panel__name">{row.name}</span>
-            <span className="score-panel__total">{row.total}</span>
+            <span className="score-panel__total">{formatScore(row.total)}</span>
             <div className="score-panel__breakdown">
               <span className="score-chip" title={labels.fields}>
-                <span className="res-icon res-icon-field" aria-hidden /> {labels.fields} {row.breakdown.fields}
+                <span className="res-icon res-icon-field" aria-hidden /> {labels.fields} {formatScore(row.breakdown.fields)}
               </span>
               <span className="score-chip" title={labels.animals}>
-                <span className="res-icon res-icon-sheep" aria-hidden /> {labels.animals} {row.breakdown.animals}
+                <span className="res-icon res-icon-sheep" aria-hidden /> {labels.animals} {formatScore(row.breakdown.animals)}
               </span>
               <span className="score-chip" title={labels.cardBonusVp}>
-                <span className="res-icon res-icon-score" aria-hidden /> {labels.cardBonusVp} {row.breakdown.cardBonusVp}
+                <span className="res-icon res-icon-score" aria-hidden /> {labels.cardBonusVp} {formatScore(row.breakdown.cardBonusVp)}
               </span>
               <span className="score-chip" title={labels.family}>
-                <span className="res-icon res-icon-child" aria-hidden /> {labels.family} {row.breakdown.family}
+                <span className="res-icon res-icon-child" aria-hidden /> {labels.family} {formatScore(row.breakdown.family)}
               </span>
               <span className="score-chip" title={labels.cards}>
-                <span className="res-icon res-icon-minor" aria-hidden /> {labels.cards} {row.breakdown.cards}
+                <span className="res-icon res-icon-minor" aria-hidden /> {labels.cards} {formatScore(row.breakdown.cards)}
               </span>
             </div>
           </li>

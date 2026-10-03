@@ -14,6 +14,7 @@ import type {
 } from '../../../shared/contract/types'
 import { AnytimeBar } from './AnytimeBar'
 import { getAnyCardDisplayName, translateCardText } from '../common/cardText'
+import { getParentFatherOptionText } from '../common/parentCardText'
 import { ResourceQuantitySelectPanel } from './ResourceQuantitySelectPanel'
 import { ResourceBatchExchangePanel } from './ResourceBatchExchangePanel'
 import type {
@@ -218,8 +219,9 @@ const renderEffectPreview = (
 const renderDescriptionAction = (
   locale: Locale,
   preview: Extract<ChoiceDescriptionPreview, { kind: 'action' }>,
+  labelOverride?: string,
 ): ReactNode => {
-  const label = translateCardText(
+  const label = labelOverride ?? translateCardText(
     locale,
     preview.labelKey,
     preview.labelParams as Record<string, string | number> | undefined,
@@ -238,8 +240,9 @@ const renderDescriptionAction = (
 const renderDescriptionPreview = (
   locale: Locale,
   preview: ChoiceDescriptionPreview,
+  labelOverride?: string,
 ): ReactNode => {
-  if (preview.kind === 'action') return renderDescriptionAction(locale, preview)
+  if (preview.kind === 'action') return renderDescriptionAction(locale, preview, labelOverride)
   return (
     <>
       {preview.parts.map((part, index) => (
@@ -274,6 +277,8 @@ const renderOptionLabel = (
   locale: Locale,
   option: ActionChoiceOption,
 ): ReactNode => {
+  const parentLabel = getParentFatherOptionText(locale, option)
+  if (parentLabel) return renderResourceAwareText(parentLabel)
   if (
     option.labelKey === 'prompt.selectPaymentOption' &&
     option.labelParams &&
@@ -364,7 +369,7 @@ const renderOptionContent = (
     return (
       <span className="interaction-option-stack">
         <span className="interaction-option-main">
-          {renderDescriptionPreview(locale, option.descriptionPreview)}
+          {renderDescriptionPreview(locale, option.descriptionPreview, getParentFatherOptionText(locale, option))}
         </span>
       </span>
     )
