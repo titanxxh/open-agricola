@@ -1,3 +1,4 @@
+import { captureStateWithHistory } from './history-streams'
 // Catalog-dependent state helpers (server-facing).
 //
 // For the client-safe slice (pure data, no catalog), see `./state-constants`.
@@ -618,6 +619,9 @@ export const normalizeState = (raw: GameState): GameState => {
   ensureParentMotherScheduleLogs(normalizedState)
   return normalizedState
 }
+
+/** Undo snapshots copy core fields and share immutable history versions. */
+export const cloneStateWithHistory = (state: GameState): GameState => normalizeState(captureStateWithHistory(state))
 
 export const cloneState = (state: GameState): GameState => {
   let raw: GameState

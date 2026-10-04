@@ -1,4 +1,4 @@
-import { ROOM_HISTORY_SCHEMA } from '../room-history-store'
+import { ROOM_HISTORY_SCHEMA, ROOM_RECOVERY_SCHEMA } from '../room-history-store'
 import Database from 'better-sqlite3'
 import { describe, expect, it, beforeEach } from 'vitest'
 import { SqliteRoomPersistence } from '../sqlite-adapter.ts'
@@ -133,6 +133,7 @@ const setupDb = (options?: Database.Options) => {
     );
   `)
   db.exec(ROOM_HISTORY_SCHEMA)
+  db.exec(ROOM_RECOVERY_SCHEMA)
   return db
 }
 
