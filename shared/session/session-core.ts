@@ -387,7 +387,9 @@ export type SessionPrivateCursor = Omit<SessionCommandCheckpoint, 'state'> & {
 const cloneCommandValue = <T>(value: T): T => {
   if (Array.isArray(value)) return value.map(entry => cloneCommandValue(entry)) as T
   if (!value || typeof value !== 'object') return value
-  return Object.fromEntries(Object.entries(value).map(([key, entry]) => [key, cloneCommandValue(entry)])) as T
+  const copied: Record<string, unknown> = {}
+  for (const key of Object.keys(value)) copied[key] = cloneCommandValue((value as Record<string, unknown>)[key])
+  return copied as T
 }
 
 const serializableCheckpoints = new WeakMap<SessionCommandCheckpoint, SessionCommandCheckpoint>()

@@ -9,15 +9,23 @@ import { getHistoryRecordIdentity, historyBranch, historyStreamKeys, inheritHist
 export const HISTORY_WINDOW_GROUPS = 20
 export class HistoryBranchChangedError extends Error {}
 type HistorySource = Pick<GameState, 'log' | 'events' | 'publicEventArchive' | 'players'>
+type HistoryDescription = { branchId: string; groups: string[] }
+const descriptions = new WeakMap<object, { events: object; archive: object; value: HistoryDescription }>()
 
-export const describeHistory = (state: HistorySource): { branchId: string; groups: string[] } => {
-  const heads = historyStreamKeys.map(kind => historyBranch(state[kind], kind, state).head?.id ?? 'empty')
+export const describeHistory = (state: HistorySource): HistoryDescription => {
+  const branches = historyStreamKeys.map(kind => historyBranch(state[kind], kind, state))
+  const [log, events, archive] = branches
+  const cached = descriptions.get(log!)
+  if (cached?.events === events && cached.archive === archive) return cached.value
+  const heads = branches.map(branch => branch.head?.id ?? 'empty')
   const groups = new Set<string>()
   for (const record of [...state.publicEventArchive, ...state.events, ...[...state.log].reverse()]) {
     const identity = getHistoryRecordIdentity(record)
     if (identity) groups.add(identity.operationGroupId)
   }
-  return { branchId: heads.join('.'), groups: [...groups] }
+  const value = { branchId: heads.join('.'), groups: [...groups] }
+  descriptions.set(log!, { events: events!, archive: archive!, value })
+  return value
 }
 
 
