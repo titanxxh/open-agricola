@@ -468,7 +468,8 @@ const maskDraftPoolForViewer = (
  *   - `gameSeed`, for every viewer: hands, draft pools and the round-card
  *     order all follow from it (ADR-0020).
  *   - Unrevealed Round Cards: their `roundActionOrder` entries and the
- *     `actionId` of goods scheduled on them become `null`.
+ *     `actionId` of goods scheduled on them become `null`. A card is revealed
+ *     once its round starts or a card effect reveals it.
  *
  * Pass `viewerPlayerId = null` (or an unknown id) to produce a spectator
  * view where every player's hand and pool is masked.
@@ -590,9 +591,15 @@ export const filterSerializedStateForPlayer = (
   )
   const filteredEvents = filterHiddenHandEvents(base.events, hiddenRefs, seqView)
   const filteredPublicEventArchive = filterHiddenHandArchive(base.publicEventArchive, hiddenRefs, seqView)
-  // A round card is revealed when its round starts. `round` is already 1 during
-  // the draft and Parent Selection, before round 1 has begun.
-  const isRevealed = (round: number): boolean => base.phase === 'playing' && round <= base.round
+  // A round card is revealed when its round starts, or when a card effect
+  // reveals it and says so with a public `action.revealed` event. `round` is
+  // already 1 during the draft and Parent Selection, before round 1 has begun.
+  const revealedByEffect = new Set(base.events.flatMap((event) =>
+    event.type === 'action.revealed' && base.roundActionOrder[event.roundSlot - 1] === event.actionId
+      ? [event.roundSlot]
+      : []))
+  const isRevealed = (round: number): boolean =>
+    (base.phase === 'playing' && round <= base.round) || revealedByEffect.has(round)
   const { gameSeed: _gameSeed, ...withoutSeed } = base
   return {
     ...withoutSeed,

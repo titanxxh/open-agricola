@@ -176,7 +176,7 @@ Undo 与 provisional scope rollback 的 runtime `publicEventCancellations` 是�
 
 Game Seed 是服务端私有的（ADR-0020）。未给种子时，`gameSeed` 是宽种子：128 位随机十六进制串，其随机流来自计数器模式的 HMAC-SHA256，每种用途一条带标签的流。Explicit Seed 是数字，沿用原生成器，让测试、开发房和调试接口可复现；它不提供任何保护。普通牌堆和父母选择的种子独立于 `gameSeed`，同样是宽种子。两条路径都在 `shared/utils/rng.ts`。
 
-viewer 投影 `filterSerializedStateForPlayer` 对所有座位和旁观者去掉 `gameSeed`，并把每张 Unrevealed Round Card 在 `roundActionOrder` 中的条目、以及预放在它上面的资源的 `actionId` 置为 `null`。轮次行动卡在该轮开始时翻开；进入 `playing` 阶段之前一张都不翻。实时同步、Bug Report 取证和 Replay 座位视角共用这一个投影。`dev-viewer` 同步模式只用于开发房的实时同步，保留完整的行动卡顺序，但仍不下发种子；`debug` 仍是全量状态，用于热座房和开发房的全开读取。
+viewer 投影 `filterSerializedStateForPlayer` 对所有座位和旁观者去掉 `gameSeed`，并把每张 Unrevealed Round Card 在 `roundActionOrder` 中的条目、以及预放在它上面的资源的 `actionId` 置为 `null`。轮次行动卡在该轮开始时翻开；进入 `playing` 阶段之前一张都不翻。卡牌效果可以提前翻开某一张，投影以公开的 `action.revealed` 事件为准。实时同步、Bug Report 取证和 Replay 座位视角共用这一个投影。`dev-viewer` 同步模式只用于开发房的实时同步，保留完整的行动卡顺序，但仍不下发种子；`debug` 仍是全量状态，用于热座房和开发房的全开读取。
 
 `SerializedGameState` 是 `GameState` 的公共网络与 Replay 形态，其中 `engineStack` 始终为空。`PersistedSessionSnapshot` 分开保存权威 `state`、公共 `frame` 和服务端私有 `sessionCursor`；私有 cursor 包含跨进程恢复所需的 Engine 数据、history 和 provisional continuation 元数据，绝不进入玩家或旁观者 payload。交互请求走独立的 viewer-safe pending 协议，避免其他玩家的 choice 数据泄漏。同步版本号和房间连接 **不进** `GameState`。
 
