@@ -2,7 +2,7 @@
 
 ## Result
 
-The 2 CPU / 2 GiB launch limit is 30 ordinary in-memory Rooms. The production Durable Room Commit path passes all thresholds at 30 Rooms and exceeds the action-latency threshold at 35 Rooms. This probe used built-in cards and did not include the two-Worker topology of executable Workshop Rooms; those Rooms are separately capped at 15 until that topology is measured.
+The 2 CPU / 2 GiB launch limit remains 30 ordinary in-memory Rooms. The completed optimization group passes its frozen latency/CPU/write gates and the 30-Room capacity checks below. The original production Durable Room Commit probe passed at 30 Rooms and exceeded the action-latency threshold at 35 Rooms; the current optimization probe revalidates 30 Rooms. This probe used built-in cards and did not include the two-Worker topology of executable Workshop Rooms; those Rooms are separately capped at 15 until that topology is measured.
 
 ## Follow-up optimization objectives
 
@@ -14,7 +14,7 @@ Use fresh Rooms from a baseline that includes [PR #945](https://github.com/titan
 
 Before implementation, measure repeated runs of that baseline and freeze the minimum improvement and permitted variation. Determine these thresholds from baseline variation rather than the old Issue percentages; do not revise them after observing the optimized results. Use the same complete command transcript for both versions, including the actor and structured input, rather than dynamically choosing whichever action is available.
 
-These are acceptance objectives for future work. The measurements below belong to the earlier capacity probe; they do not establish the benefits of these follow-up optimizations.
+The completed group is assessed below against these unchanged objectives. The original capacity measurements are retained separately for context.
 
 ### Frozen optimization baseline (Issue #947)
 
@@ -24,7 +24,44 @@ The source is `85d19405` (after PR #945). Raw runs, workload hashes, exact invoc
 
 Independent syscall tracing, excluding database preparation and final close, measured 39,318,816 bytes for the two-player workload and 139,895,504 bytes for four players. DB/WAL writes were byte-identical across normal runs and corroborated by the separate trace. Logical snapshot bytes are measured in the traced run only; tracing and extra snapshot measurement do not contribute to the latency/CPU samples used for acceptance. These frozen values must not be relaxed after optimized results are observed.
 
-## Environment
+### Completed optimization group (Issues #947–#955)
+
+The combined implementation passes the original frozen group thresholds. Five fresh-process runs of the unchanged command fixtures and timing harness used Node 24.19.0 and the same 2 CPU / 2 GiB limits. Normal timing runs exclude syscall tracing and extra logical-byte measurement. The measured production source is `636d46bf`, rebased on `6c34b054`; the subsequent trace-parser and documentation changes do not alter that production source.
+
+| Players | CPU before → after | CPU reduction | p50 before → after | p95 before → after | p99 before → after | DB/WAL written before → after | Write reduction |
+| ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| 2 | 2687.1 → 2216.8ms | 17.5% | 13.38 → 10.12ms | 32.58 → 24.24ms | 50.62 → 40.54ms | 39,318,816 → 21,768,392 bytes | 44.6% |
+| 4 | 7177.0 → 5220.3ms | 27.3% | 21.28 → 14.35ms | 47.44 → 31.93ms | 58.36 → 41.27ms | 139,895,504 → 55,037,752 bytes | 60.7% |
+
+Actual cumulative DB/WAL writes come from a separate path-filtered `strace` run, parsed by `scripts/bench/room-write-trace.ts`. The parser counts completed and resumed writes only inside one complete marker pair per workload and rejects truncated traces. Its totals match the frozen baseline trace and the final trace. SQLite temporary-file writes are separate: 389,500 bytes for two players and 569,900 for four. The traced logical snapshot totals are 29,411,391 and 102,062,391 bytes; these are neither write-volume reductions nor latency samples. Normal `processWrittenBytes` also includes temporary writes; tracing markers add 32 bytes in the independent run.
+
+Main introduced raw `playerId`, `playerRefs` and generated-name provenance during implementation, changing the raw Frame chain relative to `85d19405`. Every final, window-disabled control and CPU-after command matches the Hash and commit classification of an independent **unoptimized `6c34b054`** reference. That reference adds only the identical frozen harness/fixtures and two resource-limit exports. Historical optimization stages continue to match the frozen original chain. The original performance baseline and acceptance thresholds are unchanged, and exact saved Frames remain verified before presentation.
+
+The raw artifact reports every stage and its permitted-regression results. Intermediate commit samples have tail-latency regressions; comparisons with the old Frame stage also cross later correctness and main changes, so they are not reported as universally passing standalone slices. This delivery is one combined PR. The final window-only comparison uses the same corrected production source, with only the two envelope calls changed to `windowed=false`, and five alternating final/control pairs. Its two-player CPU/p99 changes are +0.32%/+1.12%, within the frozen allowance; four-player CPU/p99 improve 4.73%/2.72%. All its other regression checks pass. The earlier window-control p99 regression and all abandoned measurements remain in the diagnostic data.
+
+Separate synchronous-entry CPU attribution identifies the rule/commit savings and additional presentation work; it is not mixed with acceptance timing:
+
+| Players | Rule CPU before → after | Commit CPU before → after | Broadcast CPU before → after |
+| ---: | ---: | ---: | ---: |
+| 2 | 1570.3 → 1154.5ms | 971.3 → 803.7ms | 168.7 → 256.8ms |
+| 4 | 2935.2 → 1726.0ms | 3237.1 → 2495.5ms | 814.4 → 1138.8ms |
+
+Attribution includes all process threads during each synchronous public entry point. Restart/recovery and loop overhead are reported separately. Broadcast CPU is higher in the final path, which includes history/identity presentation and inherited main privacy changes; aggregate CPU and action-to-broadcast latency meet the frozen gates. Network transport remains excluded by the in-process committed socket sinks.
+
+The production Durable Room Commit capacity path also passes at 30 ordinary Rooms. The long run uses 15 seconds of warmup and 60 seconds of measurement; the late-state run uses 1 and 5 seconds. Both retain the original seed/trajectory and workload rate; the current sampled serialized states are 139,167 and 165,888 bytes (46 and 16 commands remaining).
+
+| 30-Room probe | Accepted commands | Action p99 | Event-loop p99 | Peak RSS | Result |
+| :--- | ---: | ---: | ---: | ---: | :--- |
+| Long run | 843 | 54.36ms | 44.60ms | 294.5 MiB | PASS |
+| Late state | 98 | 52.74ms | 45.78ms | 290.3 MiB | PASS |
+
+Keep the ordinary Room cap at **30** and executable Workshop cap at **15**. This capacity probe uses built-in cards and does not establish a larger executable Workshop limit. Recovery, privacy and history behavior are also covered by Session/adapter/Worker tests and real Room browser paging, cancellation and rename/reconnect checks.
+
+Local verification passed after restart and real browser checks: 1,454 full-suite files / 13,624 tests, 764 fast-suite files / 8,225 tests, lint with zero errors, architecture and i18n gates, app and immutable Viewer builds, bundle budgets, community consistency and deterministic LLM recordings.
+
+Raw results, fixture/harness hashes, source references, unchanged thresholds, controlled patch and exact invocations are retained in [`room-optimization-results.json`](room-optimization-results.json); the baseline remains [`room-optimization-baseline.json`](room-optimization-baseline.json).
+
+## Original capacity environment
 
 - Source: working tree based on `2d2a5ef1`
 - Node: 22.22.2

@@ -22,7 +22,7 @@ Players retain access to the complete history. Real-time presentation uses a bou
 
 Store the latest committed raw Frame as `frameWithoutStreams` plus exact references to the original versions of `log`, `events` and `publicEventArchive`. The small body retains every other Frame field, including derived display values, constant keys, scores and future additive fields. Accept some duplication of smaller core fields in this first representation rather than introducing general object-graph deduplication or a full-frame gzip copy.
 
-Restore by joining these Room-owned saved values and checking the existing canonical Frame Hash. Do not call current rules or `serializeState` to recalculate old derived values, and do not read historical Replay payload. Original per-entry log parameters and name values must remain reproducible; a single current-name map cannot reconstruct the mixed name history in existing raw logs. Identity metadata and branch references stay outside the raw Replay Frame.
+Restore by joining these Room-owned saved values and checking the existing canonical Frame Hash. Do not call current rules or `serializeState` to recalculate old derived values, and do not read historical Replay payload. Original per-entry log parameters and name values must remain reproducible; a single current-name map cannot reconstruct the mixed name history in existing raw logs. Room record/group identities and History Branch references stay outside the raw Replay Frame. Existing log participant identity fields remain part of the exact raw Frame.
 
 Keep the complete logical Frame for Replay encoding, Worker IPC and the existing runtime snapshot consumers. Only its Room persistence representation changes. Verify the original raw Frame before applying viewer filtering, the History Window or current-name and anonymization projections; no Replay schema change is required by this storage representation.
 
@@ -32,7 +32,7 @@ An inverse-state journal would need to capture every rule mutation, observation 
 
 The internal history identity is distinct from a reusable event sequence. Undo followed by a different action, same-length state replacement, player rename, cancellation and nested scope recovery must remain distinguishable. Missing recovery records or inconsistent references are errors; the implementation must not silently substitute another branch.
 
-This is an agreed design for future implementation, not a claim that the optimizations or their measured benefits are complete. Performance acceptance is maintained in [Replay Room Capacity](../performance/replay-room-capacity.md).
+Issues #947–#955 implement this representation and its completed-group acceptance. Raw measurements and unchanged performance gates are maintained in [Replay Room Capacity](../performance/replay-room-capacity.md).
 
 ## Implementation sequence and validation
 
