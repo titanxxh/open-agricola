@@ -130,6 +130,44 @@ describe('game seed and round cards in sync payloads', () => {
     }
   })
 
+  it('shows a round card that a card effect reveals early', () => {
+    // B023 Final Scenario: "Reveal the action space card for round 14. Only you
+    // can use it until round 14 starts." Bought in round 5 through the session.
+    const setup = (withCard: boolean): GameSession => {
+      const session = newSession(946)
+      const state = session.getState().state
+      state.round = 5
+      const owner = state.players[0]!
+      owner.resources.clay = owner.rooms + 5
+      owner.resources.reed = 5
+      if (withCard) owner.minorHand = ['B023_FinalScenario']
+      session.loadState(state)
+      if (withCard) session.devPlayCard(0, 'B023_FinalScenario')
+      return session
+    }
+
+    const bought = setup(true)
+    const round14 = bought.state.roundActionOrder[13]
+    for (const viewer of [bought.state.players[0]!.id, bought.state.players[1]!.id, null]) {
+      const visible = stateFor(bought, viewer).roundActionOrder
+      expect(revealedRounds(visible)).toEqual([1, 2, 3, 4, 5, 14])
+      expect(visible[13]).toBe(round14)
+    }
+    expect(bought.state.events).toContainEqual(
+      expect.objectContaining({ type: 'action.revealed', actionId: round14, roundSlot: 14 }),
+    )
+
+    // Without the card nothing beyond the current round is shown.
+    const untouched = setup(false)
+    expect(revealedRounds(stateFor(untouched, untouched.state.players[1]!.id).roundActionOrder))
+      .toEqual([1, 2, 3, 4, 5])
+
+    // The reveal follows the public event: once it is gone, so is the card.
+    bought.state.events = bought.state.events.filter((event) => event.type !== 'action.revealed')
+    expect(revealedRounds(stateFor(bought, bought.state.players[1]!.id).roundActionOrder))
+      .toEqual([1, 2, 3, 4, 5])
+  })
+
   it('hides which card goods are scheduled on until that round is revealed', () => {
     const session = newSession(946)
     const [p1, p2] = session.state.players

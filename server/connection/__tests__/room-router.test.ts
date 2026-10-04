@@ -596,6 +596,38 @@ describe('handleCreateRoom', () => {
     expect(ctx.persistence.load(ctx.currentRoom!.id)?.serialized?.state.gameSeed).toBe(777)
   })
 
+  it('sends an ordinary room the round card that a card effect revealed', () => {
+    const ctx = newCtx()
+    ctx.currentUserId = 'u1'
+    dispatch(ctx, { type: 'createRoom', maxPlayers: 2 })
+    markRoomStarted(ctx)
+    const session = ctx.currentRoom!.session
+    const state = session.getState().state
+    state.round = 5
+    for (const player of state.players) {
+      player.minorHand = ['__test_placeholder__']
+      player.occupationHand = ['__test_placeholder__']
+    }
+    const owner = state.players[0]!
+    owner.resources.clay = owner.rooms + 5
+    owner.resources.reed = 5
+    owner.minorHand = ['B023_FinalScenario']
+    session.loadState(state)
+    session.devPlayCard(0, 'B023_FinalScenario')
+
+    dispatch(ctx, { type: 'getState', requestId: 'state-1' })
+
+    const update = sentMessagesOf(ctx).find((message) => message.requestId === 'state-1') as {
+      payload: { state: { roundActionOrder: (string | null)[]; gameSeed?: unknown } }
+    }
+    const order = update.payload.state.roundActionOrder
+    expect(order.map((actionId) => actionId !== null)).toEqual([
+      true, true, true, true, true, false, false, false, false, false, false, false, false, true,
+    ])
+    expect(order[13]).toBe(session.state.roundActionOrder[13])
+    expect(update.payload.state).not.toHaveProperty('gameSeed')
+  })
+
   it('rejects loadGame outside dev rooms', () => {
     const ctx = newCtx()
     ctx.currentUserId = 'u1'
