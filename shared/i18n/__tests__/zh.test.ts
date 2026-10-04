@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
 import { t } from '..'
+import { en } from '../en'
 import { zh } from '../zh'
 import { catalogCardDefinitions } from '../../cards/catalog.generated'
 
@@ -33,6 +34,36 @@ describe('zh platform translations', () => {
       }
     }
     expect(missing).toEqual([])
+  })
+
+  it('gives cards with different English names different Chinese names', () => {
+    type Named = { name?: string }
+    const english = new Map<string, string>(catalogCardDefinitions.map((card) => [card.id, card.name]))
+    for (const [id, face] of Object.entries(en.improvements as Record<string, Named>)) {
+      if (face.name) english.set(id, face.name)
+    }
+    const owners = new Map<string, Set<string>>()
+    for (const faces of [zh.minorImprovements, zh.occupations, zh.improvements] as Array<Record<string, Named>>) {
+      for (const [id, face] of Object.entries(faces)) {
+        if (!face.name) continue
+        const names = owners.get(face.name) ?? new Set<string>()
+        names.add((english.get(id) ?? id).toLowerCase())
+        owners.set(face.name, names)
+      }
+    }
+    const collisions = [...owners]
+      .filter(([, names]) => names.size > 1)
+      .map(([name, names]) => `${name}: ${[...names].join(' / ')}`)
+    expect(collisions).toEqual([])
+  })
+
+  it('labels player action cards with the name on the card face', () => {
+    type Named = { name?: string }
+    const faces: Record<string, Named> = { ...zh.minorImprovements, ...zh.occupations }
+    const mismatched = Object.entries(zh.cards as Record<string, Named>)
+      .filter(([id, label]) => label.name && faces[id]?.name && label.name !== faces[id]!.name)
+      .map(([id, label]) => `${id}: ${label.name} / ${faces[id]!.name}`)
+    expect(mismatched).toEqual([])
   })
 
   it('uses Chinese action and card references in Chinese card text', () => {
