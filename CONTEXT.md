@@ -350,6 +350,14 @@ _Avoid_: 跳过未完成义务、仅返还资源、撤销其他玩家已确认�
 恢复当前 Rule Action 的起点；若 Protected Observation 之后的强制续行只能使用安全恢复点，则回到保留原观察结果的选择。
 _Avoid_: 撤销整个 Turn、重掷或重新抽取、无条件越过撤销边界
 
+**Undo History（撤销历史）**:
+当前会话中供普通 Undo Step 和 Undo Action 恢复允许的先前状态的记录，受玩家确认与 Protected Observation 等撤销边界约束；Active Game Recovery 保留原有撤销范围。它不等同于永久 Game Replay Archive，也不代表 Provisional Continuation Scope 的系统回退权限。
+_Avoid_: Replay Step、Public Event Archive、把普通撤销与暂定作用域回退混为一谈
+
+**History Branch（历史分支）**:
+活动会话在特定恢复点所对应的有序历史版本；撤销后重做可以共享此前记录，但后续历史属于不同分支。分支身份不等同于事件展示序号或历史条数。
+_Avoid_: 用事件序号代表永久历史身份、仅按长度识别历史版本、Replay Segment
+
 **Engine**:
 节点树执行层，核心包括 `Engine`、`EngineStack`、`engineProceed`、`engineResolve`、`BaseNode`、`ActionNode`、`OrNode`、`XorNode`、`ParallelNode`。
 _Avoid_: 新建并行状态机
@@ -752,6 +760,10 @@ _Avoid_: 直接写 UI log 当规则事实
 写入 `GameState.events` 的公开规则事实，用于派生日志、动画提示、审计和 replay。
 _Avoid_: 直接写 state.log
 
+**Public Event Archive（公开事件归档）**:
+记录一局游戏中公开事件被提交和被取消的沿革，撤销或系统回退也保留相应记录，完整整局历史须可供玩家按需查阅。它不等同于当前仍有效的 Public Event 集合，也不是按 Replay Step 固定完整权威状态的 Game Replay Archive。
+_Avoid_: 当前有效事件列表、Game Replay Archive、把归档视为全部事件正文的副本
+
 **Public Event Presentation**:
 从 **Public Event** 派生 transient 展示提示，包括 notification、highlight、resource animation、card pass animation 和 replay cue；只描述要展示什么，不处理 DOM 定位。
 _Avoid_: 前端调用点各自解释 public event payload
@@ -773,8 +785,13 @@ _Avoid_: 正式房间的 Game Seed、可分享种子
 _Avoid_: Blocked Action Space、前端隐藏格、未解锁行动格
 
 **Action Log**:
-`GameState.log` 是 UI 缓存，由 public events mapper 派生；规则代码不把它当事实来源。
+由 Public Event 派生的对局行动展示缓存，完整整局历史须可供玩家按需查阅；规则代码不把它当事实来源。
+历史姓名按当局玩家身份展示：活动局使用当前显示名，完赛后使用该局 Replay Participant 的显示名，并遵循账号删除后的匿名化规则。
 _Avoid_: 业务代码直接写 log
+
+**History Window（历史展示窗口）**:
+实时同步展示的近期完整操作组集合，具有有界大小；更早记录属于同一局的可按需查阅历史。展示窗口不决定规则、撤销或 Game Replay Archive 保留哪些事实。
+_Avoid_: 裁剪权威规则历史、删除旧事件、把窗口边界当撤销边界
 
 **Workshop**:
 自定义卡和 AI 卡牌设计区域，覆盖卡牌生成、LLM 服务、卡牌美术、工坊 PR 和自定义卡上传。

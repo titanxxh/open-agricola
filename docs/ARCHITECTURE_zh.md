@@ -700,6 +700,8 @@ trigger frame 必须随 trailing `activate-card` node 持久化：`ActivateCardA
 
 当前事件覆盖已包括资源主干（collect/gain/pay/exchange）、农场主干（sow/plow/construct/stables/fencing/reap/breed/reorganize）、worker 放置/返家/新生儿、round/work/return-home/harvest phase、action reveal/accumulate、future meeple、legacy action detail 以及 `special-effect` mutation 分支。`state.log` 作为 UI 缓存保留，由事件 mapper 和 session cache writer 派生；业务代码不再通过旧日志字段记录规则事实。
 
+**Issue #942 的费用预览优化计划：**基于现有查询纯度契约，移除 `previewComputeCosts` 的全量状态克隆。把仅测试启用的纯度保护扩展到通用 `computeCosts` hook，并验证重复预览不改变权威状态、事件、RNG 或私有 cursor，费用、可用性和真实支付行为保持一致。允许状态变更的执行阶段沿用现有语义。纯度门禁只证明已执行分支，不宣称整程序变更安全。
+
 `sourceCard` 兜底：`ActionHookResult.flow` 顶层 `sourceCard` 递归补到缺失 child leaf；组合 pending / leaf request 写入 `PendingEnvelope.sourceCard`，`GameCore` 透传到 `interaction`。
 
 ### 7.5.1 Public ActionNode 执行顺序
@@ -1233,6 +1235,14 @@ server/game/
 `roomId` 唯一标识一局游戏：`newGame` 先创建新 `GameSession` 和 UUID，再把在线座位、人数、custom cards、已持久化变体开关及所有连接引用切到新 Room 记录；旧 id 永不复用。首个 `waiting → playing` 转换写入不可变 `started_at`。只有权威 `gameOver` 会在单个 SQLite 事务内写入 `game_results` / `game_result_players` 标量摘要并删除 `rooms.state_json`；TTL、解散、删号和未完成重开只删除可恢复快照，把永久 Game Context 置为 `expired`，不产生结果。归档写失败会回滚，最终全量状态继续保留用于恢复或重试。
 
 `RoomPersistenceCheckpoint` 继续处理等待态、未启用 Replay 的 Room 和非 SQLite adapter。SQLite Replay Room 的成功游戏命令改走 Durable Room Commit：同一事务先写 Room snapshot 与 Replay Step，提交后才广播；WebSocket 关闭时不再为这种 Room 补写旧 checkpoint。
+
+**Issues #938–#940 的恢复约束：**活动恢复必须保留普通 Undo History 和嵌套暂定作用域的回退检查点。恢复权威会话及继续提交所需的 RoomCommitter 基准帧，必须独立于历史 Replay payload；可以核对 Replay head 元数据，但不能要求解码 Replay checkpoint 或 delta。参见 ADR-0011 §11 和 ADR-0015。
+
+**Issues #938–#940 的存储优化计划：**仅 SQLite 采用增量物理布局；JSON 和内存适配器继续保存和恢复逻辑完整快照。共享 Session 改动必须在各适配器及 Workshop 执行路径中保留相同的普通撤销与暂定作用域回退行为。
+
+[ADR-0020](adr/0020-room-owned-history-branches-and-recovery-snapshots.md) 定义计划中的共同表示：较小的核心快照加上 Room 独立拥有的不可变 History Branch 引用，统一覆盖普通 history 和全部嵌套检查点。捕获阶段必须避免先展开完整历史，再交给 SQLite 拆分。规则与 Workshop 输入保持逻辑完整；实时历史展示采用有界的完整操作组窗口，整局历史仍可在现有 viewer 过滤下按需读取。
+
+对于 #938，最新 Frame 保存全部非历史字段及精确历史版本引用；恢复时仅用已保存的 Room 记录拼出原始完整 Frame，先校验 Hash 再做展示，不重算派生字段或历史姓名。运行时 Frame 与 Replay schema 保持现有完整形状。原始值和姓名展示投影的边界见 ADR-0020。
 
 ### 11.3 Game Context、Replay 与 Bug Report
 

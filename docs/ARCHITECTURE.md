@@ -707,6 +707,8 @@ A card must not use its host `onBuy` flow to compensate for another trailing lis
 
 Current events cover the resource spine of collect, gain, pay, and exchange; the farm spine of sow, plow, construct, stables, fencing, reap, breed, and reorganize; worker placement, return home, and newborns; round, work, return-home, and harvest phases; action reveal and accumulation; future meeples; legacy action detail; and `special-effect` mutation branches. `state.log` remains a UI cache derived by the event mapper and session cache writer. Business code no longer records rules facts through legacy log fields.
 
+**Planned cost-preview optimization for Issue #942:** remove the full-state clone from `previewComputeCosts` under the existing query-purity contract. Extend the test-only purity protection to generic `computeCosts` hooks, and verify that repeated previews preserve authoritative state, events, RNG and private cursor while retaining the same costs, availability and real payment behavior. Mutation-capable execution phases retain their existing semantics. The purity gate proves executed branches; it does not claim whole-program mutation safety.
+
 As a `sourceCard` fallback, a top-level `ActionHookResult.flow.sourceCard` is recursively copied to child leaves that lack it. Compound pending requests and leaf requests write `PendingEnvelope.sourceCard`, and `GameCore` forwards it to `interaction`.
 
 #### 7.5.1 Public `ActionNode` execution order
@@ -1255,6 +1257,14 @@ The fixed persistent development rooms are `dev2` through `dev6`. Development ro
 `roomId` uniquely identifies one game. `newGame` first creates a new `GameSession` and UUID, then switches online seats, player count, custom cards, persisted variant flags, and all connection references to the new Room record. It never reuses the old ID. The first `waiting -> playing` transition writes immutable `started_at`. Only authoritative `gameOver` writes scalar summaries to `game_results` and `game_result_players` and deletes `rooms.state_json` in one SQLite transaction. TTL expiry, room dissolution, account deletion, and restart of an unfinished game delete only the recoverable snapshot and mark permanent Game Context as `expired`; they produce no result. An archive-write failure rolls back and retains the full final state for recovery or retry.
 
 `RoomPersistenceCheckpoint` continues to serve waiting rooms, rooms without Replay, and non-SQLite adapters. A successful command in a SQLite Replay Room uses Durable Room Commit, writing the Room snapshot and Replay Step in one transaction before broadcast. WebSocket close no longer performs an old checkpoint write for such a Room.
+
+**Recovery constraint for Issues #938–#940:** active recovery must preserve ordinary Undo History and nested provisional rollback checkpoints. Restoring the authoritative session and the RoomCommitter baseline needed to continue committing must remain independent of historical Replay payload. Recovery may verify Replay head metadata, but must not require decoding Replay checkpoints or deltas. See ADR-0011 §11 and ADR-0015.
+
+**Planned storage optimization for Issues #938–#940:** only SQLite adopts an incremental physical layout. JSON and memory adapters continue to save and restore logically complete snapshots. Shared Session changes must preserve the same ordinary undo and provisional rollback behavior across adapters and Workshop execution paths.
+
+[ADR-0020](adr/0020-room-owned-history-branches-and-recovery-snapshots.md) specifies the planned common representation: smaller core snapshots plus Room-owned immutable History Branch references, applied to ordinary history and every nested checkpoint. Capture must avoid expanding the full histories before SQLite splits them. Rule and Workshop inputs remain logically complete. Real-time history presentation uses a bounded window of complete operation groups, with the full history available on demand under existing viewer filtering.
+
+For #938, persist the latest Frame as all its non-history fields plus exact history-version references. Restore the complete original raw Frame from saved Room records and verify its Hash before presentation; do not recompute derived fields or historical names. The runtime Frame and Replay schema retain their existing complete shape. See ADR-0020 for the raw-value and name-projection boundary.
 
 ### 11.3 Game Context, Replay, and Bug Report
 

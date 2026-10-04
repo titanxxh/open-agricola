@@ -2,6 +2,7 @@
 
 - Status: Accepted
 - Date: 2026-07-26
+- Amended: 2026-10-04
 
 ## Context
 
@@ -19,7 +20,7 @@ Game Replay Archive 必须永久精确播放正常完赛的对局，同时支持
 8. Replay header 分别保存 `schemaVersion`、内容寻址的 `viewerBuildId` 和用于诊断的 `gameBuildId`，三者在 Room 创建时锁定。部署新版本后，最新版后端继续按存量 Room 的原 schema 写入直至该局结束；新 Room 使用新 schema。正式上线后的历史 payload 不迁移、不批量重写，也不执行历史后端或规则代码。
 9. 每个 Replay Viewer Build 是永久保留的不可变只读前端构建，在无登录凭据的沙箱中解释对应 schema。缺失或损坏时明确报告不可用，不用最新版 Viewer 强行读取。正式上线前的试验版本和数据可以删除；上线后，只要仍有 Replay 引用，对应 Viewer Build 就不得删除。
 10. 每局只保存一条包含全部隐藏规则状态的权威链，不按玩家复制。进行局恢复由最新版后端按已认证座位过滤；正常完赛后，历史 Replay Viewer 可按任一座位视角隐藏信息，也可全开显示。
-11. 活动 Room 的现有完整快照仍是恢复源，不从 Replay delta 链恢复活动会话。每个成功 Step 必须在向玩家广播前，用同一 SQLite 事务更新 Room 快照并追加 Replay 行；失败时暂停该 Room 并重试，不能继续生成后续 Step。
+11. Active Room recovery must remain independent of historical Replay payload. This includes the authoritative state, private session cursor, ordinary Undo History, provisional rollback checkpoints, and the RoomCommitter baseline required to continue committing. Replay head metadata may still be checked for the committed Step and Frame Hash, but recovering play must not require decoding Replay checkpoints or deltas. Every successful Step updates the Room recovery snapshot and appends its Replay row in the same SQLite transaction before broadcast; failure pauses that Room for retry and prevents subsequent Steps. This clarifies the recovery boundary for Issues #938–#940.
 12. 重试写入相同 `roomId + stepNo + frameHash` 视为幂等成功；相同 Step 出现不同 hash 是一致性错误，必须暂停 Room。`gameOver` 用一个事务写最终 Frame、写 Game Result Archive、标记 Replay completed 并删除活动 Room；失败则全部回滚，保留 Room 与 recording 链重试，不复制或重压整条 Replay。
 13. Bug Report Anchor 固定为 `roomId + stepNo + frameHash`。进行局锚定点击时最新已持久化 Step，结束局锚定当前播放 Step，初始阶段使用 Step 0。
 14. delta 应用失败或 Frame Hash 不匹配时不得静默修复或覆盖原始数据。目标 Replay Segment 标记为损坏并显示不可用区间；播放可从下一完整 checkpoint 恢复。
