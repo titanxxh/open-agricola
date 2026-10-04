@@ -976,7 +976,6 @@ export class GameCore {
     ) {
       this.continueCurrentFutureMeepleActions()
     }
-    if (isFreshState) this.bindInitialLogPlayerIds()
   }
 
   /**
@@ -1629,19 +1628,6 @@ export class GameCore {
   /** Update a player's display name in the game state (called after WS join). */
   updatePlayerName(playerIndex: number, name: string): void {
     setupPhase.updatePlayerName(this.state.players[playerIndex], name)
-  }
-
-  private bindInitialLogPlayerIds(): void {
-    const playerIdsByName = new Map<string, string | null>()
-    for (const player of this.state.players) {
-      playerIdsByName.set(player.name, playerIdsByName.has(player.name) ? null : player.id)
-    }
-    this.state.log = this.state.log.map(entry => {
-      if (entry.playerId) return entry
-      const playerName = entry.params?.player
-      const playerId = typeof playerName === 'string' ? playerIdsByName.get(playerName) : undefined
-      return playerId ? { ...entry, playerId } : entry
-    })
   }
 
   private engineDeps() {

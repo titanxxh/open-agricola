@@ -64,11 +64,11 @@ describe('Room-owned history recovery', () => {
     const db = database()
     const persistence = new SqliteRoomPersistence(db)
     const game = session()
-    game.state.log = [{ key: 'log.placeFarmer', playerId: 'p1', params: { player: 'Before', action: 'forest' } }]
+    game.loadState({ ...game.state, log: [{ key: 'log.placeFarmer', playerId: 'p1', params: { player: 'Before', action: 'forest' } }] })
     const first = serializeSessionSnapshot(game.state, game)
     persistence.save('r', first, meta)
     game.updatePlayerName(0, 'After')
-    game.state.log = [{ key: 'log.placeFarmer', playerId: 'p1', params: { player: 'After', action: 'reed-bank' } }]
+    game.loadState({ ...game.state, log: [{ key: 'log.placeFarmer', playerId: 'p1', params: { player: 'After', action: 'reed-bank' } }] })
     const second = serializeSessionSnapshot(game.state, game)
     persistence.save('r', second, meta)
     expect(persistence.load('r')!.serialized!.state.log).toEqual([{ key: 'log.placeFarmer', playerId: 'p1', params: { player: 'After', action: 'reed-bank' } }])

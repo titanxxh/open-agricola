@@ -61,7 +61,7 @@ describe('complete operation-group Room history pages', () => {
   it('projects both participant roles after rename while retaining raw parameter versions and rejecting stale branches', () => {
     const session = setup()
     session.state.players.forEach(player => { player.name = 'Same' })
-    session.state.log = [{ key: 'transfer', params: { fromPlayer: 'Same', fromPlayerId: 'p1', toPlayer: 'Same', toPlayerId: 'p2' } }]
+    session.loadState({ ...session.state, log: [{ key: 'transfer', params: { fromPlayer: 'Same', fromPlayerId: 'p1', toPlayer: 'Same', toPlayerId: 'p2' } }] })
     const raw = session.withCtx(() => serializeState(session.state, {}))
     const branch = describeHistory(raw).branchId
     session.updatePlayerName(0, 'Left')
@@ -83,7 +83,7 @@ describe('complete operation-group Room history pages', () => {
     const visible: GameEvent = { schemaVersion: 1, id: 'visible-gain', seq: 201, round: 1, phase: session.state.roundPhase,
       type: 'resource.moved', visibility: 'public', actorPlayerId: owner.id, resources: { wood: 1 },
       from: { kind: 'supply' }, to: { kind: 'player', playerId: owner.id }, reason: 'gain' }
-    session.state.log = [{ key: 'card', params: { card: 'D036_BreedRegistry' } }, ...session.state.log]
+    session.loadState({ ...session.state, log: [{ key: 'card', params: { card: 'D036_BreedRegistry' } }, ...session.state.log] })
     session.state.publicEventArchive = [...session.state.publicEventArchive, {
       schemaVersion: 1, id: 'cancel-hidden', packetSeq: 200, type: 'publicEvents.canceled', reason: 'undoStep',
       previousMaxSeq: 201, nextMaxSeq: 199, canceledEventIds: [hidden.id, visible.id], canceledSeqs: [200, 201], canceledEvents: [hidden, visible],
@@ -124,7 +124,7 @@ describe('complete operation-group Room history pages', () => {
       const session = setup()
       addActions(session, 28)
       const [left, right] = session.state.players
-      session.state.log = [{ key: 'transfer', params: { fromPlayer: left!.name, toPlayer: right!.name } }, ...session.state.log]
+      session.loadState({ ...session.state, log: [{ key: 'transfer', params: { fromPlayer: left!.name, toPlayer: right!.name } }, ...session.state.log] })
       serializeSessionSnapshot(session.state, session) // capture roles before names change
       session.updatePlayerName(0, 'Renamed left')
       session.updatePlayerName(1, 'Renamed right')
