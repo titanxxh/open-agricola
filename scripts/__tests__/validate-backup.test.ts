@@ -112,6 +112,7 @@ describe('backup validation', () => {
   it('runs target migrations and validates room, replay, and viewer recovery', () => {
     const { db } = createFixture()
     db.exec(`
+      ALTER TABLE game_result_players DROP COLUMN name_is_default;
       DROP TABLE github_webhook_events;
       ALTER TABLE workshop_cards DROP COLUMN review_commit_sha;
       ALTER TABLE workshop_cards DROP COLUMN review_version_id;
@@ -122,7 +123,7 @@ describe('backup validation', () => {
       formatVersion: 1,
       ...metadata,
       sourceDatabaseSchemaVersion: 26,
-      targetDatabaseSchemaVersion: 30,
+      targetDatabaseSchemaVersion: 31,
       replaySchemaVersions: [1],
       roomCount: 1,
       replayCount: 1,

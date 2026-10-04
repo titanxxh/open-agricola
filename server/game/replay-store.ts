@@ -32,6 +32,7 @@ type ReplayHeaderRow = {
 type ReplayParticipantRow = {
   player_index: number
   display_name: string
+  name_is_default: number
 }
 
 type ReplaySegmentRow = {
@@ -153,11 +154,11 @@ export const projectReplayParticipantNames = (
                   : key === 'toPlayer'
                     ? 'toPlayerId'
                     : 'playerId'
-                const playerId = typeof params[idKey] === 'string'
+                const playerId = entry.playerRefs?.[key] ?? (typeof params[idKey] === 'string'
                   ? params[idKey]
                   : (key === 'player' || key === 'playerName')
                       ? entry.playerId
-                      : undefined
+                      : undefined)
                 params[key] = (
                   playerId ? namesByPlayerId.get(playerId) : undefined
                 ) ?? replacements.get(params[key]) ?? (
@@ -264,7 +265,7 @@ export class ReplayStore {
 
   private participants(roomId: string): ReplayParticipantRow[] {
     return this.db.prepare(`
-      SELECT player_index, display_name
+      SELECT player_index, display_name, name_is_default
       FROM game_result_players
       WHERE room_id = ?
       ORDER BY player_index
@@ -350,6 +351,7 @@ export class ReplayStore {
       participants: participants.map((participant) => ({
         playerIndex: participant.player_index,
         displayName: participant.display_name,
+        ...(participant.name_is_default === 1 ? { nameIsDefault: true } : {}),
       })),
       segments,
       steps,

@@ -136,7 +136,7 @@ describe('workshop draft migration', () => {
     const { getDb } = await import('../db.ts')
     const db = getDb()
 
-    expect(db.prepare('SELECT MAX(version) AS version FROM schema_version').get()).toEqual({ version: 30 })
+    expect(db.prepare('SELECT MAX(version) AS version FROM schema_version').get()).toEqual({ version: 31 })
     expect(db.prepare(`
       SELECT review_commit_sha, review_version_id FROM workshop_cards WHERE id = 'draft'
     `).get()).toEqual({ review_commit_sha: null, review_version_id: null })
@@ -216,6 +216,7 @@ describe('workshop draft migration', () => {
     seed.exec(`
       CREATE TABLE schema_version (version INTEGER PRIMARY KEY);
       INSERT INTO schema_version (version) VALUES (27);
+      CREATE TABLE game_result_players (display_name TEXT NOT NULL);
       CREATE TABLE workshop_cards (
         id TEXT PRIMARY KEY,
         draft_generation_json TEXT NOT NULL,

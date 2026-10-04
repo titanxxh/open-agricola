@@ -1,5 +1,6 @@
 import type { GameEvent } from '../../shared/contract/events'
 import type { LogEntry } from '../../shared/contract/types'
+import { resolveLogPlayerNames } from '../../shared/events/log-player-names'
 import {
   buildLogPresentationPlan,
   type EventLogMapperContext,
@@ -248,7 +249,9 @@ export const buildActionLogTimelineRows = ({
         strikethrough: entry.status === 'canceled',
       }]
     })
-  const visibleStateLog = splitReplayIndependentStateLogRows(stateLog, contextualLogEntries)
+  const visibleStateLog = splitReplayIndependentStateLogRows(
+    stateLog.map((entry) => resolveLogPlayerNames(entry, playerNames)), contextualLogEntries,
+  )
   const leadingStateLog = groupStateLog(visibleStateLog.leading, currentRound)
   const leadingStateLogRows = leadingStateLog.buckets
     .flatMap((bucket) => bucket.rows)

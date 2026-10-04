@@ -59,6 +59,7 @@ describe('executable Workshop prompt contracts', () => {
     expect(response.state.players[0]!.resources.food).toBe(0)
     expect(response.state.log).toContainEqual({
       key: 'log.cardEffectGain',
+      playerId: state.players[0]!.id,
       params: { player: state.players[0]!.name, gain: { food: 1 }, cardId: CARD_ID },
     })
     expect(response.scores?.map((score) => score.total)).toEqual([
@@ -96,7 +97,7 @@ describe('executable Workshop prompt contracts', () => {
     expect(response.state.players[0]).toMatchObject({ rooms: 2, resources: resourcesBefore })
     expect(response.scores).toEqual(before.scores)
     expect(response.state.log).toEqual([
-      { key: 'log.placeFarmer', params: { player: player.name, action: 'actions.farm-expansion.name' } },
+      { key: 'log.placeFarmer', playerId: player.id, params: { player: player.name, action: 'actions.farm-expansion.name' } },
       ...logBefore,
     ])
     expect(response.interaction).toMatchObject({

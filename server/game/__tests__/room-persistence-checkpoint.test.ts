@@ -3,7 +3,7 @@ import { GameSession } from '../authoritative-session.ts'
 import type { Room } from '../room.ts'
 import { snapshotToRoom } from '../room.ts'
 import { InMemoryRoomPersistence } from '../persistence/memory-adapter.ts'
-import { createRoomPersistenceCheckpoint } from '../room-persistence-checkpoint.ts'
+import { buildGameResult, createRoomPersistenceCheckpoint } from '../room-persistence-checkpoint.ts'
 
 const room = (id = 'r1'): Room => {
   const session = new GameSession()
@@ -49,6 +49,19 @@ const schedulerHarness = () => {
 }
 
 describe('Room Persistence Checkpoint', () => {
+  it('archives default-name provenance while preserving a colliding numeric account name', () => {
+    const r = room()
+    r.session = new GameSession(936, undefined, { playerCount: 2, playerNames: ['Player 2'] })
+    for (const player of r.session.state.players) {
+      player.minorHand = ['__test_placeholder__']
+      player.occupationHand = ['__test_placeholder__']
+    }
+    r.startedAt = 1
+    const result = buildGameResult(r, 2)
+    expect(result.players[0]).toMatchObject({ displayName: 'Player 2' })
+    expect(result.players[0]!.nameIsDefault).not.toBe(true)
+    expect(result.players[1]).toMatchObject({ displayName: 'Player 2', nameIsDefault: true })
+  })
   it('persists creation state immediately while delaying later state serialization', () => {
     const persistence = new InMemoryRoomPersistence()
     const save = vi.spyOn(persistence, 'save')

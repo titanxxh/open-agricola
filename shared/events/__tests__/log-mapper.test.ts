@@ -52,7 +52,7 @@ describe('eventsToLogEntries', () => {
     expect(plan.rows).toEqual([
       expect.objectContaining({
         logEntry: {
-          key: 'log.playMinorImprovement',
+          key: 'log.playMinorImprovement', playerId: 'p1',
           params: {
             player: 'Alice',
             improvements: 'D020_TurnwrestPlow',
@@ -286,7 +286,7 @@ describe('eventsToLogEntries', () => {
     })
     expect(eventsToLogEntries(events, { playerNames: { p1: 'Alice' } })).toEqual([
       {
-        key: 'log.playMinorImprovement',
+        key: 'log.playMinorImprovement', playerId: 'p1',
         params: {
           player: 'Alice',
           improvements: 'A002_Second',
@@ -294,7 +294,7 @@ describe('eventsToLogEntries', () => {
         },
       },
       {
-        key: 'log.playMinorImprovement',
+        key: 'log.playMinorImprovement', playerId: 'p1',
         params: {
           player: 'Alice',
           improvements: 'A001_First',
@@ -518,7 +518,7 @@ describe('eventsToLogEntries', () => {
 
     expect(eventsToLogEntries(events, { playerNames: { p1: 'Alice' } })).toEqual([
       {
-        key: 'log.reapDetail',
+        key: 'log.reapDetail', playerId: 'p1',
         params: { player: 'Alice', resources: { grain: 1 } },
       },
     ])
@@ -582,7 +582,7 @@ describe('eventsToLogEntries', () => {
 
     expect(eventsToLogEntries(events, { playerNames: { p1: 'Alice' } })).toEqual([
       {
-        key: 'log.playMinorImprovement',
+        key: 'log.playMinorImprovement', playerId: 'p1',
         params: {
           player: 'Alice',
           improvements: 'D020_TurnwrestPlow',
@@ -846,11 +846,11 @@ describe('eventsToLogEntries', () => {
     ] satisfies GameEvent[]
     expect(eventsToLogEntries(events, { playerNames: { p1: 'Alice' }, actionNames: { round14: 'Round 14 Action' } })).toEqual([
       {
-        key: 'log.actionExclusiveUseCleared',
+        key: 'log.actionExclusiveUseCleared', playerId: 'p1',
         params: { player: 'Alice', action: 'Round 14 Action', cardId: 'B023_FinalScenario' },
       },
       {
-        key: 'log.actionExclusiveUseSet',
+        key: 'log.actionExclusiveUseSet', playerId: 'p1',
         params: { player: 'Alice', action: 'Round 14 Action', cardId: 'B023_FinalScenario' },
       },
       {
@@ -919,7 +919,7 @@ describe('eventsToLogEntries', () => {
         params: { target: 'roundCard', round: 7, resources: { stone: 1 } },
       },
       {
-        key: 'log.resourceAccumulated',
+        key: 'log.resourceAccumulated', playerId: 'p1',
         params: { target: 'card', cardId: 'B048_ForestStone', player: 'Alice', resources: { food: 2 } },
       },
       {
@@ -996,7 +996,7 @@ describe('eventsToLogEntries', () => {
 
     expect(eventsToLogEntries([event], { playerNames: { p1: 'Alice' } })).toEqual([
       {
-        key: 'log.salterFutureFood',
+        key: 'log.salterFutureFood', playerId: 'p1',
         params: {
           player: 'Alice',
           cardId: 'B157_Salter',
@@ -1140,11 +1140,11 @@ describe('eventsToLogEntries', () => {
       actionNames: { forest: 'Forest', fence: 'Fences' },
     })).toEqual([
       {
-        key: 'log.reorganizeDiscard',
+        key: 'log.reorganizeDiscard', playerId: 'p1',
         params: { player: 'Alice', resources: { sheep: 2 } },
       },
       {
-        key: 'log.harvestBreedDetail',
+        key: 'log.harvestBreedDetail', playerId: 'p1',
         params: { player: 'Alice', resources: { sheep: 1 } },
       },
       { key: 'log.harvestPhaseReap' },
@@ -1157,8 +1157,8 @@ describe('eventsToLogEntries', () => {
           detailParts: { effects: { fencing: 1 } },
         },
       },
-      { key: 'log.sow', params: { player: 'Alice' } },
-      { key: 'log.placeFarmer', params: { player: 'Alice', action: 'Forest' } },
+      { key: 'log.sow', playerId: 'p1', params: { player: 'Alice' } },
+      { key: 'log.placeFarmer', playerId: 'p1', params: { player: 'Alice', action: 'Forest' } },
       { key: 'log.enterRound', params: { round: 3 } },
     ])
   })
@@ -1212,7 +1212,7 @@ describe('eventsToLogEntries', () => {
 
     expect(eventsToLogEntries(events, { playerNames: { p1: 'Alice' } })).toEqual([
       {
-        key: 'log.cardGrantedAction',
+        key: 'log.cardGrantedAction', playerId: 'p1',
         params: {
           player: 'Alice',
           actionId: 'construct',
@@ -1339,10 +1339,10 @@ describe('eventsToLogEntries', () => {
       'log.cardTriggered',
     ])
     expect(entries).toEqual([
-      { key: 'log.cardPassed', params: { fromPlayer: 'Alice', toPlayer: 'Bob', cardId: 'A004_Passed' } },
-      { key: 'log.cardDestroyed', params: { player: 'Alice', cardId: 'A003_Destroyed' } },
-      { key: 'log.cardReturnedToBoard', params: { player: 'Alice', cardId: 'A002_FromBoard' } },
-      { key: 'log.cardSwappedWithBoard', params: { player: 'Alice', fromCardId: 'A001_FromHand', toCardId: 'A002_FromBoard' } },
+      { key: 'log.cardPassed', playerRefs: { fromPlayer: 'p1', toPlayer: 'p2' }, params: { fromPlayer: 'Alice', toPlayer: 'Bob', cardId: 'A004_Passed' } },
+      { key: 'log.cardDestroyed', playerId: 'p1', params: { player: 'Alice', cardId: 'A003_Destroyed' } },
+      { key: 'log.cardReturnedToBoard', playerId: 'p1', params: { player: 'Alice', cardId: 'A002_FromBoard' } },
+      { key: 'log.cardSwappedWithBoard', playerId: 'p1', params: { player: 'Alice', fromCardId: 'A001_FromHand', toCardId: 'A002_FromBoard' } },
       { key: 'log.cardStackChanged', params: { cardId: 'B048_ForestStone', resources: { wood: 2 }, delta: 2, reason: 'store' } },
       { key: 'log.cardInfoboxChanged', params: { cardId: 'B048_ForestStone', text: '2 wood' } },
       { key: 'log.cardTriggered', params: { cardId: 'B048_ForestStone', triggerAction: 'Forest', replacement: true, optional: true, declined: true } },
@@ -1467,14 +1467,14 @@ describe('eventsToLogEntries', () => {
     expect(entries).toEqual([
       { key: 'log.returnHomeStarted' },
       { key: 'log.workStarted' },
-      { key: 'log.workerPromoted', params: { player: 'Alice' } },
+      { key: 'log.workerPromoted', playerId: 'p1', params: { player: 'Alice' } },
       { key: 'log.workerReturned', params: { destination: 'home' } },
-      { key: 'log.futureMeepleResolved', params: { player: 'Alice', cardId: 'B157_Salter', round: 6, roomType: 'clay', resources: { food: 2 } } },
-      { key: 'log.futureMeepleRemoved', params: { player: 'Alice', cardId: 'B157_Salter', rounds: '6, 7' } },
-      { key: 'log.farmAnimalMoved', params: { player: 'Alice', animals: { sheep: 2, cattle: 1 } } },
-      { key: 'log.farmFenceConsumed', params: { player: 'Alice', count: 3 } },
-      { key: 'log.farmCropRemoved', params: { player: 'Alice', crops: { vegetable: 1 } } },
-      { key: 'log.farmCropAdded', params: { player: 'Alice', crops: { grain: 3 } } },
+      { key: 'log.futureMeepleResolved', playerId: 'p1', params: { player: 'Alice', cardId: 'B157_Salter', round: 6, roomType: 'clay', resources: { food: 2 } } },
+      { key: 'log.futureMeepleRemoved', playerId: 'p1', params: { player: 'Alice', cardId: 'B157_Salter', rounds: '6, 7' } },
+      { key: 'log.farmAnimalMoved', playerId: 'p1', params: { player: 'Alice', animals: { sheep: 2, cattle: 1 } } },
+      { key: 'log.farmFenceConsumed', playerId: 'p1', params: { player: 'Alice', count: 3 } },
+      { key: 'log.farmCropRemoved', playerId: 'p1', params: { player: 'Alice', crops: { vegetable: 1 } } },
+      { key: 'log.farmCropAdded', playerId: 'p1', params: { player: 'Alice', crops: { grain: 3 } } },
     ])
   })
 

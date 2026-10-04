@@ -89,6 +89,7 @@ const setupDb = (options?: Database.Options) => {
       player_index INTEGER NOT NULL,
       game_player_id TEXT NOT NULL,
       user_id TEXT,
+      name_is_default INTEGER NOT NULL DEFAULT 0,
       display_name TEXT NOT NULL,
       score INTEGER NOT NULL,
       PRIMARY KEY (room_id, player_index)
@@ -208,6 +209,20 @@ describe('SqliteRoomPersistence', () => {
     expect(db.prepare(`
       SELECT user_id FROM game_result_players WHERE room_id = ? AND player_index = 0
     `).get('r1')).toEqual({ user_id: 'new-user' })
+  })
+
+  it('archives default-name provenance separately from an identical supplied name', () => {
+    p.save('r1', STATE, META)
+    expect(p.complete({ ...RESULT, players: [
+      { ...RESULT.players[0], displayName: 'Player 2' },
+      { ...RESULT.players[1], displayName: 'Player 2', nameIsDefault: true },
+    ] })).toEqual({ ok: true, archived: true })
+    expect(db.prepare(`
+      SELECT display_name, name_is_default FROM game_result_players ORDER BY player_index
+    `).all()).toEqual([
+      { display_name: 'Player 2', name_is_default: 0 },
+      { display_name: 'Player 2', name_is_default: 1 },
+    ])
   })
 
   it('listRestorable excludes finished + excluded ids + stale rows (and prunes them)', () => {

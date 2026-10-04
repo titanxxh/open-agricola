@@ -355,6 +355,7 @@ describe('event mapping policy', () => {
       'shared/events/__tests__/public-event-presentation.test.ts',
       'client/app/__tests__/public-event-notifications.test.ts',
       'client/app/__tests__/GameContainerApi.ws.test.ts',
+      'client/components/board/__tests__/ActionLog.test.tsx',
     ]
     const unexpectedEmitters = findCardPassedReferences()
       .filter((line) => !allowedFiles.some((path) => line.startsWith(`${path}:`)))

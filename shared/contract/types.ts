@@ -483,6 +483,8 @@ export type LogEntry = {
   key: string
   params?: Record<string, unknown>
   playerId?: string
+  /** Identity for additional player-name parameters such as fromPlayer/toPlayer. */
+  playerRefs?: Record<string, string>
 }
 
 export type PlayerParentCards = {

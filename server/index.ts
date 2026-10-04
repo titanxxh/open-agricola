@@ -225,7 +225,7 @@ const bugReportRuntime = bugReportStore
     }
   : null
 
-const createCompletedReplayFixture = () => {
+const createCompletedReplayFixture = (defaultNames = false) => {
   const viewerBuildId = process.env.REPLAY_VIEWER_BUILD_ID ?? ''
   if (!viewerBuildExists(REPLAY_VIEWER_ROOT, viewerBuildId)) {
     throw new Error('Replay viewer build is unavailable')
@@ -233,7 +233,7 @@ const createCompletedReplayFixture = () => {
   const roomId = `replay-${randomUUID()}`
   const session = new GameSession(42, undefined, {
     playerCount: 2,
-    playerNames: ['Alice', 'Bob'],
+    playerNames: defaultNames ? ['Player 2'] : ['Alice', 'Bob'],
   })
   const capture = (): JsonValue => {
     const payload = session.buildSyncPayload(session.getState(), null, 'debug')
@@ -314,8 +314,8 @@ const createCompletedReplayFixture = () => {
     const scores = session.getState().scores ?? []
     const insertPlayer = db.prepare(`
       INSERT INTO game_result_players (
-        room_id, player_index, game_player_id, user_id, display_name, score
-      ) VALUES (?, ?, ?, NULL, ?, ?)
+        room_id, player_index, game_player_id, user_id, display_name, score, name_is_default
+      ) VALUES (?, ?, ?, NULL, ?, ?, ?)
     `)
     session.state.players.forEach((player, playerIndex) => insertPlayer.run(
       roomId,
@@ -323,6 +323,7 @@ const createCompletedReplayFixture = () => {
       player.id,
       player.name,
       scores.find((score) => score.playerId === player.id)?.total ?? 0,
+      player.nameIsDefault === true ? 1 : 0,
     ))
   })()
   return {
@@ -742,13 +743,13 @@ const server = createServer(async (req, res) => {
     return
   }
 
-  if (req.url === '/api/test/replays/completed' && req.method === 'POST') {
+  if ((req.url === '/api/test/replays/completed' || req.url === '/api/test/replays/completed?defaultNames=1') && req.method === 'POST') {
     if (process.env.NODE_ENV === 'production' || process.env.ENABLE_AUTH_TEST_HELPERS !== '1') {
       sendJson(res, 404, { error: 'Not found' })
       return
     }
     try {
-      sendJson(res, 201, createCompletedReplayFixture())
+      sendJson(res, 201, createCompletedReplayFixture(req.url.includes('defaultNames=1')))
     } catch (error) {
       sendJson(res, 503, {
         ok: false,

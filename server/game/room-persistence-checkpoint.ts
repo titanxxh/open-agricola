@@ -48,6 +48,8 @@ export const buildGameResult = (room: Room, finishedAt: number): GameResult => {
       gamePlayerId: score.playerId,
       userId: seatOwners.get(playerIndex) ?? null,
       displayName: score.playerName,
+      ...(state.players.find((player) => player.id === score.playerId)?.nameIsDefault
+        ? { nameIsDefault: true } : {}),
       score: score.total,
     })),
   }

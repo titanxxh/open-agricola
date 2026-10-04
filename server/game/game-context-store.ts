@@ -39,6 +39,7 @@ type ResultRow = {
 type ResultPlayerRow = {
   player_index: number
   display_name: string
+  name_is_default: number
   score: number
 }
 
@@ -229,7 +230,7 @@ export class GameContextStore {
       }
     }
     const players = this.db.prepare(`
-      SELECT player_index, display_name, score
+      SELECT player_index, display_name, score, name_is_default
       FROM game_result_players
       WHERE room_id = ?
       ORDER BY player_index
@@ -254,6 +255,7 @@ export class GameContextStore {
         players: players.map((player) => ({
           playerIndex: player.player_index,
           displayName: player.display_name,
+          ...(player.name_is_default === 1 ? { nameIsDefault: true } : {}),
           score: player.score,
         })),
       },

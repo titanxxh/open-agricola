@@ -21,6 +21,7 @@ describe('replay migration', () => {
     const seed = new Database(path)
     seed.pragma('foreign_keys = ON')
     seed.exec(`
+      CREATE TABLE game_result_players (display_name TEXT NOT NULL);
       CREATE TABLE schema_version (version INTEGER PRIMARY KEY);
       INSERT INTO schema_version VALUES (20);
       CREATE TABLE oauth_states (
@@ -66,7 +67,7 @@ describe('replay migration', () => {
     const db = getDb()
 
     expect(db.prepare('SELECT MAX(version) AS version FROM schema_version').get()).toEqual({
-      version: 30,
+      version: 31,
     })
     expect([
       'bug_report_attempts',

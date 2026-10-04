@@ -12,6 +12,23 @@ const createReplay = async (request: APIRequestContext) => {
   }
 }
 
+test('completed results and replay localize generated names while preserving an identical account name', async ({ page, request }) => {
+  await page.addInitScript(() => localStorage.setItem('open-agricola-locale-v2', 'zh'))
+  const response = await request.post(`${backend}/api/test/replays/completed?defaultNames=1`)
+  expect(response.status()).toBe(201)
+  const { roomId } = await response.json() as { roomId: string }
+  await page.goto(`/?context=${roomId}`, { waitUntil: 'domcontentloaded' })
+  await expect(page.locator('.replay-results li').nth(0)).toContainText('Player 2')
+  await expect(page.locator('.replay-results li').nth(1)).toContainText('玩家 2')
+  await expect(page.locator('.replay-results li').nth(1)).not.toContainText('Player 2')
+  await page.getByRole('button', { name: /玩家 2/ }).click()
+  const replay = page.frameLocator('iframe')
+  await expect(replay.locator('.replay-header select option[value="p1"]')).toHaveText('Player 2')
+  await expect(replay.locator('.replay-header select option[value="p2"]')).toHaveText('玩家 2')
+  await replay.locator('button[data-player="p2"]').click()
+  await expect(replay.locator('button[data-player="p2"]')).toContainText('玩家 2')
+})
+
 test('anonymous completed replay supports perspectives, playback, layout, and anchors', async ({
   page,
   request,

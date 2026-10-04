@@ -63,6 +63,7 @@ const setupSqlite = (): RoomPersistence => {
     CREATE TABLE game_result_players (
       room_id TEXT NOT NULL REFERENCES game_results(room_id) ON DELETE CASCADE,
       player_index INTEGER NOT NULL, game_player_id TEXT NOT NULL, user_id TEXT,
+      name_is_default INTEGER NOT NULL DEFAULT 0,
       display_name TEXT NOT NULL, score INTEGER NOT NULL,
       PRIMARY KEY (room_id, player_index));
     CREATE TABLE game_contexts (
