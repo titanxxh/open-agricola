@@ -3,6 +3,7 @@ import { t } from '../../../shared/i18n'
 import type { ActionSpace, PlayerState } from '../../../shared/contract/types'
 import type { SeasonId, ThroughTheSeasonsState } from '../../../shared/seasons/types'
 import { seasonActionIdBySeason } from '../../../shared/projections/season-actions'
+import { getPlayerDisplayName } from '../../utils/player-name'
 
 type Props = {
   locale: Locale
@@ -301,7 +302,7 @@ export const SeasonsBoard = ({
               </span>
               {occupant ? (
                 <span className="seasons-board__worker" data-player-color={occupant.color}>
-                  {occupant.name}
+                  {getPlayerDisplayName(locale, occupant.name, players.indexOf(occupant), occupant.nameIsDefault)}
                 </span>
               ) : null}
             </button>

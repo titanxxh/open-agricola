@@ -10,6 +10,7 @@ import { t } from '../../shared/i18n'
 import { isFarmyardBorderEdge, positionKey } from '../../shared/domain/farm'
 import type { PendingSowCrop } from '../types/ui'
 import { useFarmSelection } from '../hooks/useFarmSelection'
+import { getPlayerDisplayName } from '../utils/player-name'
 import { farmCommitErrorMessageKey, type FarmCommitType } from './game-container-helpers'
 import type { InteractionPresentationPlan, InteractionSubmitDraft } from './interaction-presentation'
 
@@ -34,7 +35,7 @@ export type FarmSelectionDraftPresentationInput = {
   interactionPresentationPlan: InteractionPresentationPlan
   locale: Locale
   displayPlayer?: (Pick<PlayerState, 'resources'> & Partial<Pick<PlayerState, 'farmyardExtensions'>>) | null
-  players?: readonly Pick<PlayerState, 'id' | 'name' | 'color'>[]
+  players?: readonly Pick<PlayerState, 'id' | 'name' | 'color' | 'nameIsDefault'>[]
 }
 
 export type FarmSelectionDraftPresentation = ReturnType<typeof useFarmSelectionDraftPresentation>
@@ -276,7 +277,7 @@ export const useFarmSelectionDraftPresentation = ({
         const donor = players.find((player) => player.id === playerId)
         return {
           playerId,
-          name: donor?.name ?? playerId,
+          name: donor ? getPlayerDisplayName(locale, donor.name, players.indexOf(donor), donor.nameIsDefault) : playerId,
           color: donor?.color ?? 'black',
           cap,
           allocated: Object.values(farmDraft.pendingFenceSources).filter((id) => id === playerId).length,
@@ -293,6 +294,7 @@ export const useFarmSelectionDraftPresentation = ({
     farmDraft.selectedFenceSourcePlayerId,
     farmDraft.setSelectedFenceSourcePlayerId,
     isBorrowedFenceSelection,
+    locale,
     players,
   ])
 

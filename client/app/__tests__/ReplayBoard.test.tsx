@@ -14,7 +14,7 @@ afterEach(() => {
 
 describe('replay setup phases', () => {
   it('renders draft pools and submissions with perspective filtering', () => {
-    const state = createInitialState(42, { playerCount: 2 })
+    const state = createInitialState(42, { playerCount: 2, playerNames: ['Player 2'] })
     const p1 = state.players[0]!.id
     const p2 = state.players[1]!.id
     state.phase = 'draft'
@@ -52,6 +52,9 @@ describe('replay setup phases', () => {
       <ReplayBoard frame={frameForPerspective(frame, 'open')} locale="en" perspective="open" />,
     )
     expect(screen.getAllByLabelText('B001').length).toBeGreaterThan(0)
+    view.rerender(<ReplayBoard frame={frameForPerspective(frame, 'open')} locale="zh" perspective="open" />)
+    expect(screen.getByRole('heading', { name: 'Player 2', exact: true })).toBeVisible()
+    expect(screen.getByRole('heading', { name: '玩家 2', exact: true })).toBeVisible()
   })
 
   it('renders Parent Card candidates and recorded submissions', () => {

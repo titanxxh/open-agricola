@@ -234,6 +234,7 @@ describe('GameContextRouter', () => {
   })
 
   it('shows completed results without mounting the active app', async () => {
+    localeContext.locale = 'zh'
     window.history.replaceState(null, '', '/?context=completed-room')
     stubResponse({
       ok: true,
@@ -250,8 +251,8 @@ describe('GameContextRouter', () => {
         enableThroughTheSeasons: false,
         enableFarmersOfTheMoor: false,
         players: [
-          { playerIndex: 0, displayName: 'Alice', score: 42 },
-          { playerIndex: 1, displayName: 'Bob', score: 35 },
+          { playerIndex: 0, displayName: 'Player 2', score: 42 },
+          { playerIndex: 1, displayName: 'Player 2', nameIsDefault: true, score: 35 },
         ],
       },
     })
@@ -259,7 +260,8 @@ describe('GameContextRouter', () => {
     render(<GameContextRouter><div>active app</div></GameContextRouter>)
 
     expect(await screen.findByText('platform.gameContext.completedTitle')).toBeVisible()
-    expect(screen.getByText('Alice: platform.gameContext.score')).toBeVisible()
+    expect(screen.getByText('Player 2: platform.gameContext.score')).toBeVisible()
+    expect(screen.getByText('玩家 2: platform.gameContext.score')).toBeVisible()
     expect(screen.queryByText('active app')).not.toBeInTheDocument()
   })
 

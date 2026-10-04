@@ -921,13 +921,15 @@ describe('FarmBoard', () => {
   })
 
   it('renders borrowed played-card animal zones from other players outside reorg', () => {
-    const owner = createPlayer('p1', 'Owner', 'red')
+    const owner = createPlayer('p1', 'Player 1', 'red')
     const viewer = createPlayer('p2', 'Viewer', 'blue')
+    owner.nameIsDefault = true
     owner.minorPlayed = ['M033_NightPasture']
 
     const html = renderToStaticMarkup(
       <FarmBoard
         {...createFarmBoardProps(viewer, {
+          locale: 'zh',
           players: [owner, viewer],
           currentPlayer: viewer,
           displayPlayer: viewer,
@@ -941,7 +943,7 @@ describe('FarmBoard', () => {
               cardType: 'minor',
               ownerPlayerId: 'p1',
               animalOwnerPlayerId: 'p2',
-              displayOwnerName: 'Owner',
+              displayOwnerName: 'Player 1',
               displaySource: 'borrowed-played-card',
               isReorgDraft: false,
             },
@@ -951,6 +953,8 @@ describe('FarmBoard', () => {
     )
 
     expect(html).toContain('played-cards-by-others')
+    expect(html).toContain('borrowed-played-card-owner">玩家 1')
+    expect(html).not.toContain('borrowed-played-card-owner">Player 1')
     expect(html).toContain('data-id="M033_NightPasture"')
     expect(html).toContain('0/1')
     expect(html).not.toContain('played-card-reorg')
