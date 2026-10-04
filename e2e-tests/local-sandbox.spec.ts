@@ -63,7 +63,7 @@ test.describe('browser-local sandbox', () => {
     await seedAndOpen(page)
     const playerAHeader = page.locator('.farm-header', { hasText: '玩家 1' }).first()
 
-    // devSetResources through the local worker (adds to PlayerA's wood: 0 -> 88).
+    // devSetResources through the local worker (adds to the first player's wood: 0 -> 88).
     await addWoodToPlayerA(page, 88)
     await expect(playerAHeader).toContainText('88')
 

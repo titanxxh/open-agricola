@@ -92,8 +92,8 @@ test('D159 public multi-player sale supports cooking and a chosen buyer', async 
   }
   await expect.poll(async () => (await state(pages[3]!)).interaction.request?.kind).toBe('confirm-player-switch')
   await pages[3]!.locator('.interaction-bar').getByRole('button', { name: /Confirm/i }).click()
-  await expect(pages[0]!.locator('.interaction-bar').getByRole('button', { name: 'PlayerC', exact: true })).toBeVisible()
-  await pages[0]!.locator('.interaction-bar').getByRole('button', { name: 'PlayerC', exact: true }).click()
+  await expect(pages[0]!.locator('.interaction-bar').getByRole('button', { name: 'Player 3', exact: true })).toBeVisible()
+  await pages[0]!.locator('.interaction-bar').getByRole('button', { name: 'Player 3', exact: true }).click()
   for (const page of pages) {
     await expect.poll(async () => (await state(page)).state.players[0]!.resources.reed).toBe(0)
     await expect.poll(async () => (await state(page)).state.players[2]!.resources.reed).toBe(1)
