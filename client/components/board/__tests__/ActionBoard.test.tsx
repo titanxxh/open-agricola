@@ -111,6 +111,30 @@ const expectActionStyle = (
 }
 
 describe('ActionBoard', () => {
+  it('localizes raw owner names in card actions, exclusive markers, and future resource labels', () => {
+    const first = createPlayer('p1', 'Player 1', 'red')
+    const second = createPlayer('p2', 'Player 2', 'blue')
+    second.minorPlayed = ['D023_PioneeringSpirit']
+    const action = {
+      ...createAction('sheep-market', 'actions.sheep-market.name'),
+      exclusiveUse: { playerId: 'p1', sourceCardId: 'B023_FinalScenario', untilRound: 14 },
+    }
+    const html = renderToStaticMarkup(
+      <ActionBoard locale="zh"
+        baseActions={[createAction('D023_PioneeringSpirit', 'cards.D023_PioneeringSpirit.name')]}
+        roundSlots={[{ round: 3, action }]}
+        currentPlayer={first} players={[first, second]}
+        futureMeeples={[{ id: 'fm', cardId: 'A074_StableTree', playerId: 'p2', round: 3,
+          actionId: 'sheep-market', resources: { wood: 1 } }]}
+        canTakeAction={() => true} takeAction={vi.fn()} currentRound={3} devMode={false} />,
+    )
+    expect(html).toContain('title="玩家 2: 木材"')
+    expect(html).toMatch(/action-exclusive-use[^>]*>玩家 1</)
+    expect(html).toMatch(/player-action-card-owner[^>]*>玩家 2</)
+    expect(html).not.toContain('Player 1')
+    expect(html).not.toContain('Player 2')
+  })
+
   it('renders non-card dynamic action spaces as clickable action buttons', () => {
     vi.stubGlobal('ResizeObserver', class {
       observe() {}

@@ -199,10 +199,11 @@ describe('AiCardDesigner AI config header', () => {
       card_json: {
         ...existingCard.card_json,
         desc: ['When you build a room, the cost is reduced by 2 wood.'],
+        rules: ['Source supplemental ruling.'],
         prerequisite: '1 occupation',
         locales: {
-          zh: { name: '中世纪木槌', desc: ['建造房间时，费用减少 2 木材。'], prerequisite: '1 张职业' },
-          en: { name: 'Medieval Mallet', desc: ['When you build a room, the cost is reduced by 2 wood.'], prerequisite: '1 occupation' },
+          zh: { name: '中世纪木槌', desc: ['建造房间时，费用减少 2 木材。'], rules: ['中文补充规则。'], prerequisite: '1 张职业' },
+          en: { name: 'Medieval Mallet', desc: ['When you build a room, the cost is reduced by 2 wood.'], rules: [], prerequisite: '1 occupation' },
         },
       },
     }
@@ -227,10 +228,12 @@ describe('AiCardDesigner AI config header', () => {
     expect(preview().querySelector('.card-title')).toHaveTextContent('中世纪木槌')
     expect(preview().querySelector('.card-desc')).toHaveTextContent('建造房间时，费用减少 2 木材。')
     expect(preview()).toHaveTextContent('1 张职业')
+    expect(preview().querySelector('.card-rules')).toHaveTextContent('中文补充规则。')
     await userEvent.click(screen.getByRole('button', { name: 'Switch preview language' }))
     expect(preview().querySelector('.card-title')).toHaveTextContent('Medieval Mallet')
     expect(preview().querySelector('.card-desc')).toHaveTextContent('When you build a room')
     expect(preview()).toHaveTextContent('1 occupation')
+    expect(preview().querySelector('.card-rules')).toHaveTextContent('Source supplemental ruling.')
   })
 
   it('shows and copies the card ID below the live preview', async () => {

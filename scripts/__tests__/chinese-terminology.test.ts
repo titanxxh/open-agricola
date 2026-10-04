@@ -4,7 +4,7 @@ import { describe, expect, it } from 'vitest'
 import { zh } from '../../shared/i18n/zh'
 import { flattenDictionary } from '../i18n/flatten-dictionary'
 
-const inconsistentTerms = /大改良|重大改进|小发展|小改进/g
+const inconsistentTerms = /大改良|大型改良|大型或小型改良|大[／/]小改良|重大改进|小发展|小改进|小型改良/g
 
 describe('Chinese improvement terminology', () => {
   it('uses only the canonical terms in the Chinese dictionary', () => {

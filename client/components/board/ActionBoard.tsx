@@ -3,7 +3,7 @@ import type { Locale } from '../../../shared/i18n'
 import { t } from '../../../shared/i18n'
 import type { ActionSpace, FutureMeeple, FutureMeepleResourceMap, PlayerState } from '../../../shared/contract/types'
 import { PlayerCard } from '../common/PlayerCard'
-import { translateCardText } from '../common/cardText'
+import { getAnyCardDisplayName, translateCardText } from '../common/cardText'
 import { getCardMeta } from '../../services/card-meta'
 import { getPlayerDisplayName } from '../../utils/player-name'
 import { ACTION_ICON_DESC, ACTION_TOOLTIP_DESC, ACTION_TOOLTIP_TEXT } from './action-descriptions'
@@ -508,6 +508,10 @@ export const ActionBoard = ({
   const [scale, setScale] = useState(1)
   const [precisionMode, setPrecisionMode] = useState(false)
   const [tooltip, setTooltip] = useState<TooltipInfo | null>(null)
+  const playerDisplayName = (player: Pick<PlayerState, 'id' | 'name'>): string => {
+    const index = players.findIndex((candidate) => candidate.id === player.id)
+    return getPlayerDisplayName(locale, player.name, index >= 0 ? index : undefined)
+  }
   const playerCount = getBoardPlayerCount(players)
   const boardClassName = `action-board action-board--${playerCount}p`
   const boardWidth = playerCount === 2
@@ -591,16 +595,16 @@ export const ActionBoard = ({
         <span
           key={`${item.player?.id ?? 'none'}-${item.resource}-${i}`}
           className={`res-icon res-icon-${getFutureResourceIconClass(item.resource)}`}
-          title={item.player ? `${item.player.name}: ${label}` : undefined}
-          aria-label={item.player ? `${item.player.name}: ${label}` : undefined}
+          title={item.player ? `${playerDisplayName(item.player)}: ${label}` : undefined}
+          aria-label={item.player ? `${playerDisplayName(item.player)}: ${label}` : undefined}
           data-owner-player={item.player?.id}
-          data-owner-label={item.player ? `${item.player.name}: ${label}` : undefined}
+          data-owner-label={item.player ? `${playerDisplayName(item.player)}: ${label}` : undefined}
           onMouseEnter={(e) => {
             if (!item.player) return
             const rect = (e.currentTarget as HTMLElement).getBoundingClientRect()
             setTooltip({
               kind: 'resource',
-              title: item.player.name,
+              title: playerDisplayName(item.player),
               description: label,
               x: rect.right + 8,
               y: rect.top - 8,
@@ -646,7 +650,8 @@ export const ActionBoard = ({
     const owner = actionSpaceReservations.get(space.id)
     if (!owner) return null
     return (
-      <div className="lazybones-stable-marker" data-player-color={owner.color} title={`${owner.name}: Lazybones`}>
+      <div className="lazybones-stable-marker" data-player-color={owner.color}
+        title={`${playerDisplayName(owner)}: ${getAnyCardDisplayName(locale, 'E148_Lazybones')}`}>
         <span className="res-icon res-icon-barn" />
       </div>
     )
@@ -663,15 +668,15 @@ export const ActionBoard = ({
             <span
               key={`${item.id}-${item.resource}-${itemIndex}-${index}`}
               className={`res-icon res-icon-${getFutureResourceIconClass(item.resource)}`}
-              title={`${item.name}: ${label}`}
-              aria-label={`${item.name}: ${label}`}
+              title={`${playerDisplayName(item)}: ${label}`}
+              aria-label={`${playerDisplayName(item)}: ${label}`}
               data-owner-player={item.id}
-              data-owner-label={`${item.name}: ${label}`}
+              data-owner-label={`${playerDisplayName(item)}: ${label}`}
               onMouseEnter={(e) => {
                 const rect = (e.currentTarget as HTMLElement).getBoundingClientRect()
                 setTooltip({
                   kind: 'resource',
-                  title: item.name,
+                  title: playerDisplayName(item),
                   description: label,
                   x: rect.right + 8,
                   y: rect.top - 8,
@@ -691,7 +696,7 @@ export const ActionBoard = ({
     const owner = playerById.get(exclusive.playerId)
     return (
       <div className="action-exclusive-use" data-player-color={owner?.color}>
-        {owner?.name ?? exclusive.playerId}
+        {owner ? playerDisplayName(owner) : exclusive.playerId}
       </div>
     )
   }
@@ -1095,7 +1100,7 @@ export const ActionBoard = ({
                   {renderExclusiveUseMarker(space)}
                   {owner && (
                     <div className="player-action-card-owner" data-player-color={owner.color}>
-                      {owner.name}
+                      {playerDisplayName(owner)}
                     </div>
                   )}
                 </div>
