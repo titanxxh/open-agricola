@@ -104,6 +104,19 @@ export type ActionHookRegistration = {
 
 const actionHooks: ActionHookRegistration[] = []
 
+/** Production invokes hooks directly; tests may protect query inputs. */
+export type ActionHookInvocationInterceptor = (
+  registration: ActionHookRegistration,
+  context: ActionHookContext,
+  invoke: ActionHookHandler,
+) => ActionHookResult | void
+
+let invocationInterceptor: ActionHookInvocationInterceptor | undefined
+
+export const setActionHookInvocationInterceptor = (interceptor: ActionHookInvocationInterceptor | undefined): void => {
+  invocationInterceptor = interceptor
+}
+
 export const registerActionHook = (registration: ActionHookRegistration) => {
   actionHooks.push(registration)
 }
@@ -164,7 +177,9 @@ export const runActionHooks = (context: ActionHookContextInput) => {
   const hookContext = normalizeActionHookContext(context)
   const results: ActionHookResult[] = []
   getOrderedHooks(hookContext).forEach((registration) => {
-    const result = registration.handler(hookContext)
+    const result = invocationInterceptor
+      ? invocationInterceptor(registration, hookContext, registration.handler)
+      : registration.handler(hookContext)
     if (result) {
       results.push(result)
     }

@@ -38,17 +38,6 @@ export type ComputeReplaceResult = {
   sourceCard?: string
 }
 
-const cloneValue = <T>(value: T): T => {
-  if (typeof structuredClone === 'function') {
-    try {
-      return structuredClone(value)
-    } catch {
-      return JSON.parse(JSON.stringify(value)) as T
-    }
-  }
-  return JSON.parse(JSON.stringify(value)) as T
-}
-
 export class HookDispatcher {
   private previewComputeCosts(context: ActionExecutionContext & { actionId: string }) {
     const computeContext = { ...context, phase: 'computeCosts' as const }
@@ -58,20 +47,7 @@ export class HookDispatcher {
     ) {
       return []
     }
-    const clonedState = cloneValue(context.state)
-    const clonedPlayer =
-      clonedState.players?.find((player) => player.id === context.player.id) ??
-      cloneValue(context.player)
-    const clonedSpace =
-      clonedState.actionSpaces?.find((space) => space.id === context.space.id) ??
-      cloneValue(context.space)
-    if (!clonedPlayer || !clonedSpace) return []
-    return this.computeCosts({
-      ...context,
-      state: clonedState,
-      player: clonedPlayer,
-      space: clonedSpace,
-    })
+    return this.computeCosts(context)
   }
 
   private applyCostPreviewDoable(

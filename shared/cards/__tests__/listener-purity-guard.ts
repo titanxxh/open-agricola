@@ -6,7 +6,7 @@ import {
   type CardListenerRegistration,
 } from '../card-listeners'
 import { getCardListenerSource } from '../card-listener-source'
-import type { ActionHookResult } from '../../actions/hooks'
+import { setActionHookInvocationInterceptor, type ActionHookContext, type ActionHookResult } from '../../actions/hooks'
 import type { EventQuery } from '../../events/query'
 
 /**
@@ -247,7 +247,18 @@ export const listenerPurityInterceptor: CardListenerInvocationInterceptor = (inv
 /** Installs the guard on every card-listener invocation; returns an uninstall function. */
 export const installListenerPurityGuard = (): (() => void) => {
   setCardListenerInvocationInterceptor(listenerPurityInterceptor)
-  return () => setCardListenerInvocationInterceptor(undefined)
+  setActionHookInvocationInterceptor((registration, context, invoke) => {
+    if (context.phase !== 'computeCosts') return invoke(context)
+    return listenerPurityInterceptor({
+      kind: 'handler',
+      registration: { id: registration.id, cardIds: ['<action hook>'] },
+      context,
+    }, guarded => invoke(guarded as ActionHookContext))
+  })
+  return () => {
+    setCardListenerInvocationInterceptor(undefined)
+    setActionHookInvocationInterceptor(undefined)
+  }
 }
 
 /**
