@@ -1,4 +1,3 @@
-import { applyHistoryWindow } from '../../shared/session/history-window'
 import { importRecoveryCatalog, snapshotForWorker } from '../../shared/session/recovery-catalog'
 import { Worker } from 'node:worker_threads'
 import path from 'node:path'
@@ -103,8 +102,7 @@ export const buildSessionSyncPayload = (
 ): GameSyncPayload => {
   const payloads = payloadsByResponse.get(response)
   if (!payloads) {
-    const payload = session.buildSyncPayload(response, viewerPlayerId, mode)
-    return windowed && mode === 'viewer' ? applyHistoryWindow(response.state, payload, viewerPlayerId) : payload
+    return session.buildSyncPayload(response, viewerPlayerId, mode, undefined, windowed)
   }
   if (mode === 'debug') return payloads.debug
   const source = windowed ? payloads.windows : payloads

@@ -856,6 +856,8 @@ function handleDissolveRoom(ctx: ConnectionCtx, msg: Extract<ClientCommand, { ty
 
 function handleGetHistory(ctx: ConnectionCtx, msg: Extract<ClientCommand, { type: 'getHistory' }>): void {
   const room = requireRoom(ctx, msg.requestId); if (!room) return
+  const blocked = ctx.committer?.blockedError(room.id)
+  if (blocked) { sendCommandError(ctx, `room saving is paused: ${blocked}`, msg.requestId); return }
   if (msg.cursor !== undefined && (typeof msg.cursor !== 'string' || msg.cursor.length > 1024)) {
     sendCommandError(ctx, 'invalid history cursor', msg.requestId); return
   }

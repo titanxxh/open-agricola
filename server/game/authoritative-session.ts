@@ -38,7 +38,8 @@ export class GameSession extends GameCore {
     viewerPlayerId: string | null,
     mode: SyncPayloadMode = 'viewer',
     serializedState?: SerializedGameState,
+    windowed = false,
   ): GameSyncPayload {
-    return buildSyncPayload(this, resp, viewerPlayerId, mode, serializedState)
+    return buildSyncPayload(this, resp, viewerPlayerId, mode, serializedState, windowed)
   }
 }

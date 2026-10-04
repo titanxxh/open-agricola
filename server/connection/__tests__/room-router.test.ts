@@ -1364,6 +1364,15 @@ describe('authenticated Room history reads', () => {
     expect(room.session.createSessionPrivateCursor()).toEqual(cursor)
   })
 
+  it('does not expose an uncommitted history while durable saving is paused', async () => {
+    const ctx = newCtx()
+    dispatch(ctx, { type: 'createRoom', maxPlayers: 2 })
+    Object.assign(ctx, { committer: { blockedError: () => 'disk full' } })
+    await dispatch(ctx, { type: 'getHistory', requestId: 'paused-history' })
+    expect(sentMessagesOf(ctx)).toContainEqual(expect.objectContaining({ type: 'error', error: 'room saving is paused: disk full', requestId: 'paused-history' }))
+    expect(sentTypesOf(ctx)).not.toContain('historyPage')
+  })
+
   it('rejects history reads from a replaced seat and from outside a Room', async () => {
     const ctx = newCtx()
     await dispatch(ctx, { type: 'getHistory', requestId: 'outside' })
