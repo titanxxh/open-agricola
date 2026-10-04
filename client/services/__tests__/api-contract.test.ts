@@ -35,7 +35,6 @@ const createState = (): GameState => ({
     },
   ],
   log: [],
-  roundStartSnapshot: null,
   roundActionOrder: Array.from({ length: 14 }).map(() => null),
   gameSeed: 1,
   availableMajorImprovements: [],
@@ -60,8 +59,8 @@ describe('serializeState contract', () => {
   })
 
   it('sets roundStartSnapshot to null', () => {
-    const state = createState()
-    state.roundStartSnapshot = createState()
+    // A state restored from an older save can still carry the removed field.
+    const state = { ...createState(), roundStartSnapshot: createState() }
     const serialized = serializeState(state, emptyCtx())
     expect(serialized.roundStartSnapshot).toBeNull()
   })

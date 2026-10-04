@@ -30,7 +30,7 @@ const makePlayer = (workers: Worker[]): PlayerState => ({
 
 const emptyState = (players: PlayerState[]): GameState => ({
   round: 1, roundPhase: 'work', currentPlayerIndex: 0, players,
-  actionSpaces: [], log: [], roundStartSnapshot: null, roundActionOrder: [],
+  actionSpaces: [], log: [], roundActionOrder: [],
   gameSeed: 0, availableMajorImprovements: [], futureMeeples: [], pendingFutureMeeples: [],
   gameOver: false, workPhaseObtainedResources: {},
 } as unknown as GameState)

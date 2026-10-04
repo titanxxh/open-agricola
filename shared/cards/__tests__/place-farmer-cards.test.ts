@@ -88,7 +88,6 @@ describe('PlaceFarmer card listeners', () => {
       players: [],
       actionSpaces: [],
       log: [],
-      roundStartSnapshot: null,
       roundActionOrder: [],
       gameSeed: 0,
       availableMajorImprovements: [],

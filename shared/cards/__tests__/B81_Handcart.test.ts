@@ -59,7 +59,7 @@ const createState = (...players: PlayerState[]): GameState =>
         resources: { wood: 0, clay: 3, reed: 0, stone: 0, food: 0, grain: 0, vegetable: 0, sheep: 0, boar: 0, cattle: 0, begging: 0 },
       }),
     ],
-    log: [], roundStartSnapshot: null,
+    log: [],
     roundActionOrder: Array.from({ length: 14 }).map(() => null),
     gameSeed: 1, availableMajorImprovements: [],
     events: [], nextEventSeq: 1,

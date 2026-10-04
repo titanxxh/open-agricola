@@ -50,7 +50,7 @@ const createState = (player: PlayerState, occupiedSpaces: number): GameState => 
   }
   return {
     round: 3, currentPlayerIndex: 0, players: [player],
-    actionSpaces: spaces, log: [], roundStartSnapshot: null,
+    actionSpaces: spaces, log: [],
     roundActionOrder: Array.from({ length: 14 }).map((_, index) => `space-${index}`),
     gameSeed: 1, availableMajorImprovements: [],
     futureMeeples: [], pendingFutureMeeples: [],

@@ -112,7 +112,6 @@ const state = (...players: PlayerState[]): GameState =>
     nextEventSeq: 1,
     publicEventArchive: [],
     nextPublicEventArchivePacketSeq: 1,
-    roundStartSnapshot: null,
     roundActionOrder: Array.from({ length: 14 }).map(() => null),
     gameSeed: 1,
     availableMajorImprovements: [],

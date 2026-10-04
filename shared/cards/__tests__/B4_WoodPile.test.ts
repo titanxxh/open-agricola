@@ -35,7 +35,7 @@ const makeState = (player: PlayerState): GameState =>
       // accumulation occupied by a different player
       { id: 'fishing', gainPerRound: { food: 1 }, resources: {}, takenBy: [{ playerId: 'p2', workerId: 'wA' }] },
     ],
-    log: [], roundStartSnapshot: null,
+    log: [],
     roundActionOrder: Array.from({ length: 14 }).map(() => null),
     gameSeed: 1, availableMajorImprovements: [],
     futureMeeples: [], pendingFutureMeeples: [],

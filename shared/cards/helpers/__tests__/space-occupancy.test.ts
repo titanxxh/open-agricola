@@ -7,7 +7,7 @@ const mkState = (takenBy: WorkerRef[]): GameState => ({
   actionSpaces: [mkActionSpace({ id: 'farmland', takenBy })],
   players: [],
   round: 1, roundPhase: 'work', currentPlayerIndex: 0,
-  log: [], roundStartSnapshot: null, roundActionOrder: [],
+  log: [], roundActionOrder: [],
   gameSeed: 0, availableMajorImprovements: [], futureMeeples: [],
   pendingFutureMeeples: [], gameOver: false, workPhaseObtainedResources: {},
 } as unknown as GameState)

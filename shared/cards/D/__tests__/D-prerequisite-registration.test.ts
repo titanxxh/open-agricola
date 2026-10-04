@@ -40,7 +40,7 @@ const createState = (round: number, player: PlayerState): GameState =>
   ({
     round, currentPlayerIndex: 0, players: [player],
     actionSpaces: [],
-    log: [], roundStartSnapshot: null,
+    log: [],
     roundActionOrder: Array.from({ length: 14 }).map(() => null),
     gameSeed: 1, availableMajorImprovements: [],
     futureMeeples: [], pendingFutureMeeples: [],

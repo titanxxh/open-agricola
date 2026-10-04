@@ -13,7 +13,6 @@ const createState = (): GameState => ({
   players: [],
   actionSpaces: [],
   log: [],
-  roundStartSnapshot: null,
   roundActionOrder: [],
   gameSeed: 1,
   availableMajorImprovements: ['Major_Fireplace1'],

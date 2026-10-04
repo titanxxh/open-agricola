@@ -195,7 +195,6 @@ const createState = (player: PlayerState, round = 5): GameState => ({
   players: [player],
   actionSpaces: [],
   log: [],
-  roundStartSnapshot: null,
   roundActionOrder: [],
   gameSeed: 1,
   availableMajorImprovements: ['Major_Basket', 'Major_Joinery', 'Major_ClayOven'],

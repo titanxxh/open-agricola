@@ -63,7 +63,7 @@ const createSpace = (id: string): ActionSpace => ({
 
 const mkState = (player: PlayerState): GameState => ({
   round: 5, roundPhase: 'work', currentPlayerIndex: 0, players: [player],
-  actionSpaces: [], log: [], roundStartSnapshot: null,
+  actionSpaces: [], log: [],
   roundActionOrder: Array.from({ length: 14 }).map(() => null),
   gameSeed: 1, availableMajorImprovements: [],
   events: [], nextEventSeq: 1,

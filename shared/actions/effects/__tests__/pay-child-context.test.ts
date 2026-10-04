@@ -25,7 +25,6 @@ const createState = () =>
     players: [],
     actionSpaces: [],
     log: [],
-    roundStartSnapshot: null,
     roundActionOrder: Array.from({ length: 14 }).map(() => null),
     gameSeed: 1,
     availableMajorImprovements: [],

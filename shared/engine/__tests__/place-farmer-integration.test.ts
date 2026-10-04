@@ -17,7 +17,6 @@ const createState = (overrides: Partial<GameState> = {}): GameState => ({
   players: [],
   actionSpaces: createActionSpaces(),
   log: [],
-  roundStartSnapshot: null,
   roundActionOrder: Array.from({ length: 14 }).map(() => null),
   gameSeed: 1,
   availableMajorImprovements: [],

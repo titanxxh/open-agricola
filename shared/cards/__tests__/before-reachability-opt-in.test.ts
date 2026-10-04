@@ -73,7 +73,6 @@ const state = (p: PlayerState): GameState => ({
   players: [p],
   actionSpaces: [],
   log: [],
-  roundStartSnapshot: null,
   roundActionOrder: ['fencing', 'grain-utilization', 'bake-bread', 'major-improvement'],
   gameSeed: 1,
   availableMajorImprovements: [],

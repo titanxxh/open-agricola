@@ -38,7 +38,7 @@ const createPlayer = (id = 'p1'): PlayerState => ({
 
 const createState = (...players: PlayerState[]): GameState => ({
   round: 14, currentPlayerIndex: 0, players,
-  actionSpaces: [], log: [], roundStartSnapshot: null,
+  actionSpaces: [], log: [],
   roundActionOrder: Array.from({ length: 14 }).map(() => null),
   gameSeed: 1, availableMajorImprovements: [],
   futureMeeples: [], pendingFutureMeeples: [],

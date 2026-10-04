@@ -46,7 +46,7 @@ const createState = (players: PlayerState[], round = 3): GameState =>
     actionSpaces: [
       createSpace('clay-pit', { gainPerRound: { clay: 1 } }),
     ],
-    log: [], roundStartSnapshot: null,
+    log: [],
     roundActionOrder: Array.from({ length: 14 }).map(() => null),
     gameSeed: 1, availableMajorImprovements: [],
     futureMeeples: [], pendingFutureMeeples: [],

@@ -18,7 +18,7 @@ const createPlayer = (overrides: Partial<PlayerState> = {}): PlayerState => ({
 
 const createState = (player: PlayerState, round = 5): GameState => ({
   round,currentPlayerIndex:0,players:[player],actionSpaces:[],log:[],
-  roundStartSnapshot:null,roundActionOrder:Array.from({length:14}).map(()=>null),
+  roundActionOrder:Array.from({length:14}).map(()=>null),
   gameSeed:1,availableMajorImprovements:[],futureMeeples:[],pendingFutureMeeples:[],gameOver:false,
 } as GameState)
 

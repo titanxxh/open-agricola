@@ -48,7 +48,7 @@ const createState = (...players: PlayerState[]): GameState =>
       createSpace('fencing', { takenBy: [{ playerId: 'p1', workerId: '1' }] }),
       createSpace('major-improvement', { takenBy: [] }),
     ],
-    log: [], roundStartSnapshot: null,
+    log: [],
     // Stage 1 actions in positions 1-4
     roundActionOrder: [
       'sheep-market', 'grain-utilization', 'fencing', 'major-improvement',

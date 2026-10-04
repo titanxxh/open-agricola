@@ -45,7 +45,7 @@ const createState = (...players: PlayerState[]): GameState =>
   ({
     round: 5, currentPlayerIndex: 0, players,
     actionSpaces: [],
-    log: [], roundStartSnapshot: null,
+    log: [],
     roundActionOrder: [
       'sheep-market', 'grain-utilization', 'fencing', 'major-improvement',
       'wish-children', 'western-quarry', 'house-redevelopment',

@@ -16,7 +16,6 @@ const makeState = (): GameState => ({
   nextEventSeq: 1,
   publicEventArchive: [],
   nextPublicEventArchivePacketSeq: 1,
-  roundStartSnapshot: null,
   roundActionOrder: [],
   gameSeed: 1,
   availableMajorImprovements: [],

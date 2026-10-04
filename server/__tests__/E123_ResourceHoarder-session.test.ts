@@ -104,7 +104,7 @@ describe('E123_ResourceHoarder session', () => {
     })
     const state: GameState = {
       round: 5, currentPlayerIndex: 0, players: [player],
-      actionSpaces: [], log: [], roundStartSnapshot: null,
+      actionSpaces: [], log: [],
       roundActionOrder: Array.from({ length: 14 }).map(() => null),
       gameSeed: 1, availableMajorImprovements: [],
       futureMeeples: [], pendingFutureMeeples: [],
@@ -140,7 +140,7 @@ describe('E123_ResourceHoarder session', () => {
     })
     const state: GameState = {
       round: 5, currentPlayerIndex: 0, players: [player],
-      actionSpaces: [], log: [], roundStartSnapshot: null,
+      actionSpaces: [], log: [],
       roundActionOrder: Array.from({ length: 14 }).map(() => null),
       gameSeed: 1, availableMajorImprovements: [],
       futureMeeples: [], pendingFutureMeeples: [],
@@ -170,7 +170,7 @@ describe('E123_ResourceHoarder session', () => {
     })
     const state: GameState = {
       round: 5, currentPlayerIndex: 0, players: [player],
-      actionSpaces: [], log: [], roundStartSnapshot: null,
+      actionSpaces: [], log: [],
       roundActionOrder: Array.from({ length: 14 }).map(() => null),
       gameSeed: 1, availableMajorImprovements: [],
       futureMeeples: [], pendingFutureMeeples: [],
@@ -205,7 +205,7 @@ describe('E123_ResourceHoarder session', () => {
     })
     const state: GameState = {
       round: 5, currentPlayerIndex: 0, players: [player],
-      actionSpaces: [], log: [], roundStartSnapshot: null,
+      actionSpaces: [], log: [],
       roundActionOrder: Array.from({ length: 14 }).map(() => null),
       gameSeed: 1, availableMajorImprovements: [],
       futureMeeples: [], pendingFutureMeeples: [],
@@ -238,7 +238,7 @@ describe('E123_ResourceHoarder session', () => {
     })
     const state: GameState = {
       round: 5, currentPlayerIndex: 0, players: [player],
-      actionSpaces: [], log: [], roundStartSnapshot: null,
+      actionSpaces: [], log: [],
       roundActionOrder: Array.from({ length: 14 }).map(() => null),
       gameSeed: 1, availableMajorImprovements: [],
       futureMeeples: [], pendingFutureMeeples: [],
@@ -270,7 +270,7 @@ describe('E123_ResourceHoarder session', () => {
     })
     const state: GameState = {
       round: 5, currentPlayerIndex: 0, players: [player],
-      actionSpaces: [], log: [], roundStartSnapshot: null,
+      actionSpaces: [], log: [],
       roundActionOrder: Array.from({ length: 14 }).map(() => null),
       gameSeed: 1, availableMajorImprovements: [],
       futureMeeples: [], pendingFutureMeeples: [],
@@ -301,7 +301,7 @@ describe('E123_ResourceHoarder session', () => {
     })
     const state: GameState = {
       round: 5, currentPlayerIndex: 0, players: [player],
-      actionSpaces: [], log: [], roundStartSnapshot: null,
+      actionSpaces: [], log: [],
       roundActionOrder: Array.from({ length: 14 }).map(() => null),
       gameSeed: 1, availableMajorImprovements: [],
       futureMeeples: [], pendingFutureMeeples: [],

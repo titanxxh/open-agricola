@@ -623,7 +623,6 @@ export type GameState = {
   nextEventSeq: number
   publicEventArchive: PublicEventArchivePacket[]
   nextPublicEventArchivePacketSeq: number
-  roundStartSnapshot: GameState | null
   roundActionOrder: (string | null)[]
   gameSeed: number
   /** Monotonic counter incremented every time a card consumes randomness. */

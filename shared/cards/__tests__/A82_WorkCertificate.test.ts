@@ -43,7 +43,7 @@ const accumSpace = (id: string, resource: 'wood' | 'clay' | 'reed' | 'stone', co
 const createState = (player: PlayerState, spaces: ActionSpace[]): GameState =>
   ({
     round: 1, currentPlayerIndex: 0, players: [player],
-    actionSpaces: spaces, log: [], roundStartSnapshot: null,
+    actionSpaces: spaces, log: [],
     roundActionOrder: Array.from({ length: 14 }).map(() => null),
     gameSeed: 1, availableMajorImprovements: [],
     futureMeeples: [], pendingFutureMeeples: [],
