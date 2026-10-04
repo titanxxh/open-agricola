@@ -6,6 +6,7 @@ import { harvestRounds } from '../../../shared/contract/state-constants'
 import { BrandMark } from '../common/BrandMark'
 import { LocaleSwitcher } from '../common/LocaleSwitcher'
 import { snakeOpeningPlacementOrders } from './snake-opening-orders'
+import { getPlayerDisplayName } from '../../utils/player-name'
 
 const PHASES_NORMAL: RoundPhase[] = ['preparation', 'work', 'returning-home']
 const PHASES_HARVEST: RoundPhase[] = ['preparation', 'work', 'returning-home', 'harvest', 'field', 'feeding', 'breeding']
@@ -49,7 +50,8 @@ export const GameHeader = ({
   const snakePopoverId = useId()
   const isHarvestRound = harvestRounds.includes(state.round)
   const phases = isHarvestRound ? PHASES_HARVEST : PHASES_NORMAL
-  const snakeOrders = shouldShowSnakeOpeningPill(state) ? snakeOpeningPlacementOrders(state) : null
+  const snakeOrders = shouldShowSnakeOpeningPill(state) ? snakeOpeningPlacementOrders(state, locale) : null
+  const currentPlayerIndex = state.players?.findIndex((player) => player.id === currentPlayer.id) ?? -1
 
   useEffect(() => {
     if (!menuOpen) return
@@ -116,7 +118,9 @@ export const GameHeader = ({
         ) : isMyTurn ? (
           <span className="status-badge your-turn">{locale === 'zh' ? '你的回合' : 'Your Turn'}</span>
         ) : (
-          <span className="status-badge waiting-turn">{currentPlayer.name}</span>
+          <span className="status-badge waiting-turn">
+            {getPlayerDisplayName(locale, currentPlayer.name, currentPlayerIndex >= 0 ? currentPlayerIndex : undefined)}
+          </span>
         )}
         <div className="header-actions" ref={menuContainerRef}>
           <LocaleSwitcher className="header-locale-select" />

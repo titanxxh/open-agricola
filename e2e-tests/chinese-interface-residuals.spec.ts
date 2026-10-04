@@ -89,7 +89,9 @@ for (const { label, desc, expected } of [
         card_json: {
           id: cardId, name: 'Medieval Mallet', card_type: 'minor', deck: 'CUSTOM', number: 0,
           desc: ['When you build a room, the cost is reduced by 2 wood.'], cost: {}, vp: 0,
-          locales: { zh: { name: '中世纪木槌', desc, prerequisite: '1 张职业' } },
+          rules: ['Source supplemental ruling.'],
+          locales: { zh: { name: '中世纪木槌', desc,
+            rules: label === 'complete locale' ? ['中文补充规则。'] : [], prerequisite: '1 张职业' } },
         },
       },
     })
@@ -100,6 +102,9 @@ for (const { label, desc, expected } of [
     await expect(preview.locator('.card-title')).toHaveText('中世纪木槌')
     await expect(preview.locator('.card-desc')).toContainText(expected)
     await expect(preview).toContainText('1 张职业')
+    await expect(preview.locator('.card-rules')).toContainText(
+      label === 'complete locale' ? '中文补充规则。' : 'Source supplemental ruling.',
+    )
     if (label === 'complete locale') await expect(preview).not.toContainText('When you build a room')
     await page.goto(`${FRONTEND_URL}/?page=workshop&view=sandbox`)
     await page.locator('.ws-sandbox').getByRole('button', { name: '开始沙盒测试', exact: true }).click()
@@ -116,8 +121,12 @@ for (const { label, desc, expected } of [
 for (const locale of ['zh', 'en'] as const) {
   test(`${locale} localizes action templates and tooltips and describes round editing accurately`, async ({ page, request }) => {
     await page.addInitScript((value) => localStorage.setItem('open-agricola-locale-v2', value), locale)
-    await postJson(request, `${BACKEND_URL}/api/game/new`, { seed: 936, maxPlayers: 6 })
+    await postJson(request, `${BACKEND_URL}/api/game/new`, { seed: 936, maxPlayers: 6, enableSnakeOpening: true })
     await page.goto(`${FRONTEND_URL}/?page=game&player=p1&embedded=1&devMode=1`)
+    await page.locator('.header-snake-pill').hover()
+    const opening = page.locator('.header-snake-popover')
+    await expect(opening).toContainText(locale === 'zh' ? '玩家 1 → 玩家 2' : 'Player 1 → Player 2')
+    if (locale === 'zh') await expect(opening).not.toContainText(/Player [1-6]/)
     const panel = page.locator('.dev-panel')
     await panel.locator('.dev-field', { hasText: locale === 'zh' ? '目标回合' : 'Target Round' })
       .getByRole('spinbutton').fill('14')

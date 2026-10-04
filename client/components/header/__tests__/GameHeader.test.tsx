@@ -4,6 +4,7 @@ import { fireEvent, render, screen } from '@testing-library/react'
 import { renderToStaticMarkup } from 'react-dom/server'
 
 import type { GameState, PlayerState } from '../../../../shared/contract/types'
+import type { Locale } from '../../../../shared/i18n'
 import { LocaleProvider } from '../../../contexts/LocaleContext'
 import { GameHeader } from '../GameHeader'
 import { snakeOpeningPlacementOrders } from '../snake-opening-orders'
@@ -38,12 +39,12 @@ const snakeOpeningState = (overrides: Partial<GameState> = {}): GameState => ({
   ...overrides,
 } as unknown as GameState)
 
-const renderHeader = (headerState: GameState) => render(
+const renderHeader = (headerState: GameState, locale: Locale = 'en') => render(
   <LocaleProvider>
     <GameHeader
-      locale="en"
+      locale={locale}
       state={headerState}
-      currentPlayer={currentPlayer}
+      currentPlayer={headerState.players?.[1] ?? currentPlayer}
       devMode={false}
       setDevMode={() => {}}
       myPlayerName="Alice"
@@ -54,23 +55,46 @@ const renderHeader = (headerState: GameState) => render(
 
 describe('snakeOpeningPlacementOrders', () => {
   it('walks the Round Work Order from the round first player and reverses it for the second placement', () => {
-    expect(snakeOpeningPlacementOrders(snakeOpeningState())).toEqual({
+    expect(snakeOpeningPlacementOrders(snakeOpeningState(), 'en')).toEqual({
       first: ['Bob', 'Cara', 'Alice'],
       second: ['Alice', 'Cara', 'Bob'],
     })
   })
 
   it('falls back to seat order when the round first player is unknown', () => {
-    expect(snakeOpeningPlacementOrders(snakeOpeningState({ roundFirstPlayerId: undefined }))).toEqual({
+    expect(snakeOpeningPlacementOrders(snakeOpeningState({ roundFirstPlayerId: undefined }), 'en')).toEqual({
       first: ['Alice', 'Bob', 'Cara'],
       second: ['Cara', 'Bob', 'Alice'],
     })
-    expect(snakeOpeningPlacementOrders(snakeOpeningState({ roundFirstPlayerId: 'ghost' })).first)
+    expect(snakeOpeningPlacementOrders(snakeOpeningState({ roundFirstPlayerId: 'ghost' }), 'en').first)
       .toEqual(['Alice', 'Bob', 'Cara'])
+  })
+
+  it('localizes generated and empty names using original seats while preserving account names', () => {
+    const game = snakeOpeningState()
+    game.players[0]!.name = 'Player 1'
+    game.players[1]!.name = ''
+    game.players[2]!.name = 'PlayerF'
+    expect(snakeOpeningPlacementOrders(game, 'zh')).toEqual({
+      first: ['玩家 2', 'PlayerF', '玩家 1'],
+      second: ['玩家 1', 'PlayerF', '玩家 2'],
+    })
+    expect(snakeOpeningPlacementOrders(game, 'en').first).toEqual(['Player 2', 'PlayerF', 'Player 1'])
   })
 })
 
 describe('GameHeader snake opening pill', () => {
+  it('localizes the waiting turn and snake orders in Chinese', () => {
+    const game = snakeOpeningState()
+    game.players[0]!.name = 'Player 1'
+    game.players[1]!.name = 'Player 2'
+    game.players[2]!.name = 'PlayerF'
+    const { container } = renderHeader(game, 'zh')
+    expect(container.querySelector('.waiting-turn')).toHaveTextContent('玩家 2')
+    expect(screen.getByRole('tooltip')).toHaveTextContent('玩家 2 → PlayerF → 玩家 1')
+    expect(screen.getByRole('tooltip')).toHaveTextContent('玩家 1 → PlayerF → 玩家 2')
+  })
+
   it('shows the round-1 pill with both placement orders when the variant is enabled', () => {
     renderHeader(snakeOpeningState())
 

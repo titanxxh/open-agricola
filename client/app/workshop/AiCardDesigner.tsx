@@ -174,9 +174,10 @@ export type ExtractedCard = {
     cost: Record<string, number>
     vp: number
     desc: string[]
+    rules?: string[]
     prerequisite?: string
     modifiers?: unknown[]
-    locales?: Record<string, { name: string; desc: string[]; prerequisite?: string }>
+    locales?: Record<string, CardLocaleEntry>
   }
   sourceCode?: string
 }
@@ -1466,6 +1467,7 @@ function sampleN<T>(arr: T[], n: number): T[] {
 type CardLocaleEntry = {
   name: string
   desc: string[]
+  rules?: string[]
   prerequisite?: string
 }
 
@@ -1497,6 +1499,9 @@ const draftToExtracted = (draft: WorkshopClientDraft): ExtractedCard => {
       desc: Array.isArray(cardJson.desc)
         ? cardJson.desc.filter((value): value is string => typeof value === 'string')
         : [],
+      rules: Array.isArray(cardJson.rules)
+        ? cardJson.rules.filter((value): value is string => typeof value === 'string')
+        : undefined,
       prerequisite: typeof cardJson.prerequisite === 'string'
         ? cardJson.prerequisite
         : undefined,
@@ -1689,6 +1694,9 @@ export function AiCardDesigner({
         desc: Array.isArray(cardJson.desc)
           ? cardJson.desc.filter((value): value is string => typeof value === 'string')
           : [],
+        rules: Array.isArray(cardJson.rules)
+          ? cardJson.rules.filter((value): value is string => typeof value === 'string')
+          : undefined,
         prerequisite: typeof cardJson.prerequisite === 'string'
           ? cardJson.prerequisite
           : undefined,
@@ -1736,6 +1744,7 @@ export function AiCardDesigner({
     deck: 'CUSTOM',
     number: 0,
     desc: extracted?.card.desc ?? [],
+    ...(extracted?.card.rules ? { rules: extracted.card.rules } : {}),
     cost: parseWorkshopCostInput(costInput),
     vp: extracted?.card.vp ?? 0,
     prerequisite: prerequisite || undefined,
@@ -2188,6 +2197,7 @@ export function AiCardDesigner({
     number: 0,
     type: cardType,
     locales: cardLocales,
+    rules: extracted?.card.rules,
     desc: descriptionLines.length > 0
       ? descriptionLines
       : [locale === 'zh' ? '能力说明会在采用代码后显示。' : 'Ability text appears after code is adopted.'],
