@@ -65,6 +65,7 @@ type PendingCommit = {
   commit: ReplayCommit
   frame: JsonValue
   encoded: EncodedReplayFrame
+  cursorHash: string
   retryIndex: number
   error: string
   timer: unknown | null
@@ -466,7 +467,7 @@ export class RoomCommitter {
         createdAt,
       },
     }
-    return this.persist(room, commit, frame, encoded, options.onReady)
+    return this.persist(room, commit, frame, encoded, frameHash(serialized.sessionCursor), options.onReady)
   }
 
   commit(
@@ -527,7 +528,7 @@ export class RoomCommitter {
         ? { result: buildGameResult(room, createdAt) }
         : {}),
     }
-    return this.persist(room, commit, frame, encoded, onCommitted)
+    return this.persist(room, commit, frame, encoded, cursorHash, onCommitted)
   }
 
   shutdown(): void {
@@ -606,6 +607,7 @@ export class RoomCommitter {
     commit: ReplayCommit,
     frame: JsonValue,
     encoded: EncodedReplayFrame,
+    cursorHash: string,
     onCommitted?: (result: Extract<RoomCommitResult, { kind: 'committed' }>) => void,
   ): RoomCommitResult {
     try {
@@ -613,7 +615,7 @@ export class RoomCommitter {
       if (persisted.kind === 'conflict') {
         return this.blockPermanently(room.id, persisted.error)
       }
-      return this.acceptCommit(room, commit, frame, encoded)
+      return this.acceptCommit(room, commit, frame, encoded, cursorHash)
     } catch (error) {
       const message = errorMessage(error)
       const pending: PendingCommit = {
@@ -621,6 +623,7 @@ export class RoomCommitter {
         commit,
         frame,
         encoded,
+        cursorHash,
         retryIndex: 0,
         error: message,
         timer: null,
@@ -645,6 +648,7 @@ export class RoomCommitter {
     commit: ReplayCommit,
     frame: JsonValue,
     encoded: EncodedReplayFrame,
+    cursorHash: string,
   ): Extract<RoomCommitResult, { kind: 'committed' }> {
     room.version = commit.step.roomVersion
     this.knownReplayIds.add(room.id)
@@ -654,7 +658,7 @@ export class RoomCommitter {
       this.heads.set(room.id, {
         frame,
         frameHash: encoded.frameHash,
-        cursorHash: frameHash(commit.serialized.sessionCursor),
+        cursorHash,
         stepNo: commit.step.stepNo,
         roomVersion: commit.step.roomVersion,
         checkpointStepNo: encoded.checkpointStepNo,
@@ -691,6 +695,7 @@ export class RoomCommitter {
         pending.commit,
         pending.frame,
         pending.encoded,
+        pending.cursorHash,
       )
       pending.onCommitted?.(result)
       pending.waiters.forEach((waiter) => waiter())
