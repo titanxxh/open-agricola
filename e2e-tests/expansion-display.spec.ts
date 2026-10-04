@@ -11,8 +11,7 @@ test.describe('Expansion display', () => {
       const { state } = await getJson(request, `${BACKEND_URL}/api/game/state`)
       state.phase = 'playing'
       state.currentPlayerIndex = 0
-      state.players.forEach((player: { name: string; minorHand: string[]; occupationHand: string[] }, index: number) => {
-        player.name = `Player ${index + 1}`
+      state.players.forEach((player: { name: string; minorHand: string[]; occupationHand: string[] }) => {
         player.minorHand = ['__test_placeholder__']
         player.occupationHand = ['__test_placeholder__']
       })

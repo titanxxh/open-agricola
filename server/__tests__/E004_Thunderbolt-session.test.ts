@@ -116,7 +116,7 @@ describe('E004 Thunderbolt native session', () => {
     expect(response.state.log).toEqual(expect.arrayContaining([
       expect.objectContaining({
         key: 'log.farmCropRemoved',
-        params: expect.objectContaining({ player: 'PlayerA', crops: { grain: 3 } }),
+        params: expect.objectContaining({ player: 'Player 1', crops: { grain: 3 } }),
       }),
     ]))
     expect(response.state.log.length).toBeGreaterThan(logCount)
@@ -240,9 +240,9 @@ describe('E004 Thunderbolt native session', () => {
     expect(response.state.log).toEqual(expect.arrayContaining([
       expect.objectContaining({
         key: 'log.farmCropRemoved',
-        params: expect.objectContaining({ player: 'PlayerA', crops: { grain: 2 } }),
+        params: expect.objectContaining({ player: 'Player 1', crops: { grain: 2 } }),
       }),
-      expect.objectContaining({ key: 'log.sow', params: { player: 'PlayerA' } }),
+      expect.objectContaining({ key: 'log.sow', params: { player: 'Player 1' } }),
     ]))
     expect(response.state.log.length).toBeGreaterThan(logCount)
     expect(response.interaction.stateId).toBe('wait')
@@ -284,7 +284,7 @@ describe('E004 Thunderbolt native session', () => {
     expect(response.state.log).toEqual(expect.arrayContaining([
       expect.objectContaining({
         key: 'log.farmCropRemoved',
-        params: expect.objectContaining({ player: 'PlayerA', crops: { grain: 1 } }),
+        params: expect.objectContaining({ player: 'Player 1', crops: { grain: 1 } }),
       }),
     ]))
     expect(response.state.log.length).toBeGreaterThan(logCount)

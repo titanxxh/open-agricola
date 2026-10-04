@@ -54,14 +54,14 @@ test.describe('browser-local sandbox', () => {
   test('boots locally with zero server calls and both seats visible', async ({ page }) => {
     const gameApiCalls = await seedAndOpen(page)
     // Debug viewer renders every seat — a single player drives all of them.
-    await expect(page.locator('.farm-header', { hasText: 'PlayerA' }).first()).toBeVisible()
-    await expect(page.locator('.farm-header', { hasText: 'PlayerB' }).first()).toBeVisible()
+    await expect(page.locator('.farm-header', { hasText: '玩家 1' }).first()).toBeVisible()
+    await expect(page.locator('.farm-header', { hasText: '玩家 2' }).first()).toBeVisible()
     expect(gameApiCalls, `unexpected server calls: ${gameApiCalls.join(', ')}`).toEqual([])
   })
 
   test('dev panel dispatches through the worker and IndexedDB resumes after reload', async ({ page }) => {
     await seedAndOpen(page)
-    const playerAHeader = page.locator('.farm-header', { hasText: 'PlayerA' }).first()
+    const playerAHeader = page.locator('.farm-header', { hasText: '玩家 1' }).first()
 
     // devSetResources through the local worker (adds to PlayerA's wood: 0 -> 88).
     await addWoodToPlayerA(page, 88)
@@ -75,6 +75,6 @@ test.describe('browser-local sandbox', () => {
     // The board comes back from the persisted snapshot with the wood intact.
     await expect(page.locator('.action-board, [class*="ActionBoard"]').first())
       .toBeVisible({ timeout: 30_000 })
-    await expect(page.locator('.farm-header', { hasText: 'PlayerA' }).first()).toContainText('88')
+    await expect(page.locator('.farm-header', { hasText: '玩家 1' }).first()).toContainText('88')
   })
 })

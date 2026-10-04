@@ -10,7 +10,7 @@ export type PrivateEventNotification = {
 const cardTypeLabel = (cardType: 'minor' | 'occupation' | 'mixed', locale: Locale): string => {
   if (locale === 'zh') {
     if (cardType === 'occupation') return '职业'
-    if (cardType === 'minor') return '小改进'
+    if (cardType === 'minor') return '小改良'
     return '卡牌'
   }
   if (cardType === 'occupation') return 'occupation'

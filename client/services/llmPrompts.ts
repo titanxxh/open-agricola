@@ -170,7 +170,7 @@ const CARD_IMPL = {
 **关键规则：**
 - CARD_ID 必须以 "CUSTOM_" 开头，英文驼峰
 - deck 固定 'CUSTOM'，number 固定 0，implemented 固定 true
-- 职业卡用 \`cardType: 'occupation'\`，小发展卡用 \`cardType: 'minor'\`
+- 职业卡用 \`cardType: 'occupation'\`，小改良卡用 \`cardType: 'minor'\`
 - ❌ 禁止 \`import\` / \`export\` / \`require\` / \`registerCardEffect\` / \`registerCardListener\`
 - ❌ 禁止 \`class\`、generator、\`with\`、\`eval\`、\`Function\`、\`fetch\` 等
 - ✅ 引擎自动处理所有权检查——**不需要**手动检查 \`player.minorPlayed.includes(CARD_ID)\`
@@ -481,7 +481,7 @@ player.pastures.length       // 牧场数
 player.fenceSegments.length  // 栅栏段数（不是 fences）
 player.rooms                 // 房间数
 player.houseType             // 'wood' | 'clay' | 'stone'
-player.minorPlayed           // 已打出小发展卡 ID 数组
+player.minorPlayed           // 已打出小改良卡 ID 数组
 player.occupationPlayed      // 已打出职业卡 ID 数组
 player.improvements          // 已建主要改良 ID 数组
 player.cardStates            // { [cardId]: { counters?, flagged?, infobox?, stack?, extraData? } }

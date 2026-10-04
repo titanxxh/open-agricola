@@ -4,7 +4,7 @@ import { renderToStaticMarkup } from 'react-dom/server'
 import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 
-import { LocaleProvider } from '../../../contexts/LocaleContext'
+import { LocaleProvider, useLocale } from '../../../contexts/LocaleContext'
 import {
   AiCardDesigner,
   CARD_ART_BADGE_RATIO,
@@ -189,7 +189,48 @@ describe('AiCardDesigner AI config header', () => {
     )
     expect(preview?.querySelector('.card-frame')).not.toBeNull()
     expect(preview?.querySelector('.card-cost .card-res-icon.wood')).not.toBeNull()
+    expect(preview?.querySelector('.card-desc')).toHaveTextContent('建造石屋')
     expect(container.querySelector('.aicw-preview-pane .aicw-card')).toBeNull()
+  })
+
+  it('resolves localized preview descriptions and prerequisites when switching languages', async () => {
+    const localizedCard: ApiCard = {
+      ...existingCard,
+      card_json: {
+        ...existingCard.card_json,
+        desc: ['When you build a room, the cost is reduced by 2 wood.'],
+        prerequisite: '1 occupation',
+        locales: {
+          zh: { name: '中世纪木槌', desc: ['建造房间时，费用减少 2 木材。'], prerequisite: '1 张职业' },
+          en: { name: 'Medieval Mallet', desc: ['When you build a room, the cost is reduced by 2 wood.'], prerequisite: '1 occupation' },
+        },
+      },
+    }
+    const apiFetch = vi.fn(async (path: string) => {
+      const response = await apiFetchForExistingCard(path)
+      const payload = await response.json()
+      if (payload.workspace) payload.workspace.draft.cardJson = localizedCard.card_json
+      return new Response(JSON.stringify(payload))
+    })
+    const SwitchLanguage = () => {
+      const { locale, setLocale } = useLocale()
+      return <button onClick={() => setLocale(locale === 'zh' ? 'en' : 'zh')}>Switch preview language</button>
+    }
+    const { container } = render(
+      <LocaleProvider>
+        <SwitchLanguage />
+        <AiCardDesigner initialCard={localizedCard} onClose={() => {}} apiFetch={apiFetch} />
+      </LocaleProvider>,
+    )
+    await waitFor(() => expect(screen.queryByText('正在恢复草稿…')).not.toBeInTheDocument())
+    const preview = () => container.querySelector('.aicw-preview-pane .player-card')!
+    expect(preview().querySelector('.card-title')).toHaveTextContent('中世纪木槌')
+    expect(preview().querySelector('.card-desc')).toHaveTextContent('建造房间时，费用减少 2 木材。')
+    expect(preview()).toHaveTextContent('1 张职业')
+    await userEvent.click(screen.getByRole('button', { name: 'Switch preview language' }))
+    expect(preview().querySelector('.card-title')).toHaveTextContent('Medieval Mallet')
+    expect(preview().querySelector('.card-desc')).toHaveTextContent('When you build a room')
+    expect(preview()).toHaveTextContent('1 occupation')
   })
 
   it('shows and copies the card ID below the live preview', async () => {
@@ -440,7 +481,7 @@ describe('AiCardDesigner AI config header', () => {
 
     const resent = providerBodies[1]!.messages.at(-1)!.content
     expect(resent).toContain('卡牌 ID: CUSTOM_MedievalMallet')
-    expect(resent).toContain('卡牌类型: 小发展卡 (Minor Improvement)')
+    expect(resent).toContain('卡牌类型: 小改良卡 (Minor Improvement)')
     expect(resent).toContain('卡牌名称: 中世纪木槌')
     expect(resent).toContain('前置条件: 2职业')
     expect(resent).toContain('消耗资源: 2木')

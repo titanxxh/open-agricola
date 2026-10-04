@@ -306,7 +306,7 @@ describe('C146 — multi-select pairs (onBuy)', () => {
       expect.objectContaining({
         key: 'log.cardResourcePairsStored',
         params: expect.objectContaining({
-          player: 'PlayerA',
+          player: 'Player 1',
           cardId: CARD_ID,
           pairs: [{ wood: 1, clay: 1 }, { clay: 1, stone: 1 }, { reed: 1, stone: 1 }],
         }),
