@@ -1,4 +1,7 @@
 import { expect, test, type Locator, type Page } from '@playwright/test'
+import { readFileSync } from 'node:fs'
+import { LOCAL_PUBLIC_ASSET_BASE_URL, publicAssetBaseUrl } from '../scripts/public-assets'
+import { FRONTEND_URL } from './fixtures'
 
 const sandboxSettings = {
   player_count: 2,
@@ -83,7 +86,9 @@ test('button-styled links stay undecorated across interaction states', async ({ 
 
 test('the first seasonal background request uses the runtime asset path', async ({ page }) => {
   await mockPlatformApis(page)
-  const assetUrl = 'https://titanxxh.github.io/open-agricola-assets/assets/website-bg/summer-1.webp?v=8675d8a6dc3950b616c64043f0d7809f7abc3a3e'
+  const version = readFileSync(new URL('../public-assets.ref', import.meta.url), 'utf8').trim()
+  const baseUrl = process.env.PUBLIC_ASSET_LOCAL_DIR ? LOCAL_PUBLIC_ASSET_BASE_URL : publicAssetBaseUrl()
+  const assetUrl = `${baseUrl}assets/website-bg/summer-1.webp?v=${version}`
   const seasonalRequests: string[] = []
   page.on('request', (request) => {
     const pathname = new URL(request.url()).pathname
@@ -95,7 +100,7 @@ test('the first seasonal background request uses the runtime asset path', async 
     page.evaluate(() => document.documentElement.style.getPropertyValue('--bg-monthly')),
   ).toContain(assetUrl)
 
-  expect(seasonalRequests[0]).toBe('/open-agricola-assets/assets/website-bg/summer-1.webp')
+  expect(seasonalRequests[0]).toBe(new URL(assetUrl, FRONTEND_URL).pathname)
   await expect(page.locator('link[rel="preload"][as="image"]')).toHaveAttribute(
     'href',
     assetUrl,
