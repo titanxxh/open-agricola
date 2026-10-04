@@ -1,20 +1,19 @@
-import { createHash, randomUUID } from 'node:crypto'
+import { createHash } from 'node:crypto'
 import type Database from 'better-sqlite3'
-import { historyBranch, materializeHistoryBranch, registerRestoredHistoryNode, historyStreamKeys, type HistoryNode, type HistoryRecordIdentity, type HistoryStreamKind } from '../../../shared/session/history-streams'
+import { historyBranch, materializeHistoryBranch, recoveryRecordId, registerRecoveryRecordId, registerRestoredHistoryNode, historyStreamKeys, type HistoryNode, type HistoryRecordIdentity, type HistoryStreamKind } from '../../../shared/session/history-streams'
 import type { PersistedSessionSnapshot } from '../../../shared/session/serialization'
-import type { HistoryEntry, SessionPrivateCursor } from '../../../shared/session/session-core'
+import type { HistoryEntry, SessionPrivateCursor, SessionCommandCheckpoint } from '../../../shared/session/session-core'
 import type { GameState } from '../../../shared/contract/types'
 
 type Reference = { kind: HistoryStreamKind; head: string | null; length: number; branch: string }
 type StoredState = Record<string, unknown> & { historyStreams: Reference[] }
-type StoredCursor = Omit<SessionPrivateCursor, 'history'> & { undoHistory?: string[] }
+type StoredCursor = Omit<SessionPrivateCursor, 'history' | 'provisionalContinuationScopes'> & { undoHistory?: string[]; provisionalContinuationScopes?: Array<Omit<SessionPrivateCursor['provisionalContinuationScopes'][number], 'checkpoint'> & { checkpointRef: string }> }
 type StoredSnapshot = { roomHistoryVersion: 1; state: StoredState; frame: PersistedSessionSnapshot['frame']; sessionCursor: StoredCursor }
 type NodeRow = { node_id: string; kind: HistoryStreamKind; previous_id: string | null; length: number; record_json: string; identity_json: string; checksum: string }
-export type RecoveryNode = { id: string; kind: 'undo'; json: string }
+export type RecoveryNode = { id: string; kind: 'undo' | 'checkpoint'; json: string }
 export type PackedRoomSnapshot = { json: string; nodes: HistoryNode[]; recoveryNodes: RecoveryNode[] }
 export class RoomHistoryCorruptionError extends Error {}
 const checksum = (row: object): string => createHash('sha256').update(JSON.stringify(row)).digest('hex')
-const recoveryIds = new WeakMap<object, string>()
 
 export const ROOM_HISTORY_SCHEMA = `CREATE TABLE room_history_nodes (
   room_id TEXT NOT NULL REFERENCES rooms(id) ON DELETE CASCADE,
@@ -67,16 +66,29 @@ export class RoomHistoryStore {
       return { ...body, historyStreams: references }
     }
     const packUndo = (entry: HistoryEntry): string => {
-      let id = recoveryIds.get(entry)
-      if (!id) { id = randomUUID(); recoveryIds.set(entry, id) }
+      const id = recoveryRecordId(entry)
       if (!known.has(id) && !pending.has(id)) {
         pending.add(id)
         recoveryNodes.push({ id, kind: 'undo', json: JSON.stringify({ ...entry, state: packState(entry.state) }) })
       }
       return id
     }
-    const { history = [], ...runtime } = snapshot.sessionCursor
-    const stored: StoredSnapshot = { roomHistoryVersion: 1, state: packState(snapshot.state), frame: snapshot.frame, sessionCursor: { ...runtime, ...('history' in snapshot.sessionCursor ? { undoHistory: history.map(packUndo) } : {}) } }
+    const packCheckpoint = (checkpoint: SessionCommandCheckpoint): string => {
+      const id = recoveryRecordId(checkpoint)
+      if (!known.has(id) && !pending.has(id)) {
+        pending.add(id)
+        const { state, history, ...body } = checkpoint
+        recoveryNodes.push({ id, kind: 'checkpoint', json: JSON.stringify({ ...body, state: packState(state), undoHistory: history.map(packUndo) }) })
+      }
+      return id
+    }
+    const { history = [], provisionalContinuationScopes, ...runtime } = snapshot.sessionCursor
+    const stored: StoredSnapshot = { roomHistoryVersion: 1, state: packState(snapshot.state), frame: snapshot.frame, sessionCursor: {
+      ...runtime,
+      ...('history' in snapshot.sessionCursor ? { undoHistory: history.map(packUndo) } : {}),
+      ...(provisionalContinuationScopes ? { provisionalContinuationScopes: provisionalContinuationScopes.map(({ checkpoint, ...scope }) => ({ ...scope, checkpointRef: packCheckpoint(checkpoint) })) } : {}),
+    } }
+
     return { json: JSON.stringify(stored), nodes, recoveryNodes }
   }
   write(roomId: string, nodes: HistoryNode[], recoveryNodes: RecoveryNode[] = []): void {
@@ -97,6 +109,12 @@ export class RoomHistoryStore {
   }
   forget(roomId: string): void { this.durable.delete(roomId) }
   restore(roomId: string, json: string): PersistedSessionSnapshot {
+    try { return this.restoreRecords(roomId, json) } catch (error) {
+      if (error instanceof RoomHistoryCorruptionError) throw error
+      throw new RoomHistoryCorruptionError(`Invalid Room recovery for ${roomId}`, { cause: error })
+    }
+  }
+  private restoreRecords(roomId: string, json: string): PersistedSessionSnapshot {
     const stored = JSON.parse(json) as StoredSnapshot | PersistedSessionSnapshot
     if (!('roomHistoryVersion' in stored)) return stored
     if (stored.roomHistoryVersion !== 1) throw new RoomHistoryCorruptionError(`Unsupported Room history for ${roomId}`)
@@ -105,6 +123,7 @@ export class RoomHistoryStore {
     const restoreState = (body: StoredState): PersistedSessionSnapshot['state'] => {
       const state = { ...body } as unknown as GameState & { historyStreams?: Reference[] }
       if (!Array.isArray(body.historyStreams)) throw new RoomHistoryCorruptionError(`Missing Room history references for ${roomId}`)
+      if (Array.isArray(body.players) && body.players.length > 0 && body.historyStreams.length !== 3) throw new RoomHistoryCorruptionError(`Incomplete Room history for ${roomId}`)
       const kinds = new Set<HistoryStreamKind>()
       for (const reference of body.historyStreams) {
         if (kinds.has(reference.kind) || !historyStreamKeys.includes(reference.kind) || reference.branch !== `${reference.kind}:${reference.head ?? 'empty'}` || !Number.isSafeInteger(reference.length) || reference.length < 0) throw new RoomHistoryCorruptionError(`Invalid Room history branch for ${roomId}`)
@@ -126,7 +145,7 @@ export class RoomHistoryStore {
           }
           let previous = id ? cache.get(id)! : null
           for (const row of chain.reverse()) {
-            if (row.length !== (previous?.length ?? 0) + 1) throw new RoomHistoryCorruptionError(`Mismatched Room history length for ${roomId}`)
+            if ((previous && previous.kind !== row.kind) || row.length !== (previous?.length ?? 0) + 1) throw new RoomHistoryCorruptionError(`Mismatched Room history length for ${roomId}`)
             const restored: HistoryNode = { id: row.node_id, kind: row.kind, previous, length: row.length, value: JSON.parse(row.record_json) as object, identity: JSON.parse(row.identity_json) as HistoryRecordIdentity }
             registerRestoredHistoryNode(restored)
             cache.set(restored.id, restored)
@@ -140,17 +159,39 @@ export class RoomHistoryStore {
       delete state.historyStreams
       return state as PersistedSessionSnapshot['state']
     }
+    const undoCache = new Map<string, HistoryEntry>()
     const restoreUndo = (id: string): HistoryEntry => {
+      const cached = undoCache.get(id)
+      if (cached) return cached
       const row = this.selectRecovery.get(roomId, id) as { kind: string; body_json: string; checksum: string } | undefined
       if (!row || row.kind !== 'undo' || row.checksum !== checksum({ node_id: id, kind: row.kind, body_json: row.body_json })) throw new RoomHistoryCorruptionError(`Missing or corrupt Room undo ${roomId}/${id}`)
       const body = JSON.parse(row.body_json) as Omit<HistoryEntry, 'state'> & { state: StoredState }
       const entry = { ...body, state: restoreState(body.state) } as HistoryEntry
-      recoveryIds.set(entry, id)
+      registerRecoveryRecordId(entry, id)
+      undoCache.set(id, entry)
       restoredRecovery.push({ id, kind: 'undo', json: row.body_json })
       return entry
     }
-    const { undoHistory, ...runtime } = stored.sessionCursor
-    const snapshot = { state: restoreState(stored.state), frame: stored.frame, sessionCursor: { ...runtime, ...(undoHistory ? { history: undoHistory.map(restoreUndo) } : {}) } as SessionPrivateCursor }
+    const checkpointCache = new Map<string, SessionCommandCheckpoint>()
+    const restoreCheckpoint = (id: string): SessionCommandCheckpoint => {
+      const cached = checkpointCache.get(id)
+      if (cached) return cached
+      const row = this.selectRecovery.get(roomId, id) as { kind: string; body_json: string; checksum: string } | undefined
+      if (!row || row.kind !== 'checkpoint' || row.checksum !== checksum({ node_id: id, kind: row.kind, body_json: row.body_json })) throw new RoomHistoryCorruptionError(`Missing or corrupt Room checkpoint ${roomId}/${id}`)
+      const { state, undoHistory, ...body } = JSON.parse(row.body_json) as Omit<SessionCommandCheckpoint, 'state' | 'history'> & { state: StoredState; undoHistory: string[] }
+      const checkpoint = { ...body, state: restoreState(state), history: undoHistory.map(restoreUndo) } as SessionCommandCheckpoint
+      registerRecoveryRecordId(checkpoint, id)
+      checkpointCache.set(id, checkpoint)
+      restoredRecovery.push({ id, kind: 'checkpoint', json: row.body_json })
+      return checkpoint
+    }
+    const { undoHistory, provisionalContinuationScopes, ...runtime } = stored.sessionCursor
+    const snapshot = { state: restoreState(stored.state), frame: stored.frame, sessionCursor: {
+      ...runtime,
+      ...(undoHistory ? { history: undoHistory.map(restoreUndo) } : {}),
+      ...(provisionalContinuationScopes ? { provisionalContinuationScopes: provisionalContinuationScopes.map(({ checkpointRef, ...scope }) => ({ ...scope, checkpoint: restoreCheckpoint(checkpointRef) })) } : {}),
+    } as SessionPrivateCursor }
+
     this.accept(roomId, [...cache.values()], restoredRecovery)
     return snapshot
   }

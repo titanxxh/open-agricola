@@ -1,3 +1,4 @@
+import { importRecoveryCatalog, snapshotForWorker } from '../../shared/session/recovery-catalog'
 import { Worker } from 'node:worker_threads'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -246,6 +247,7 @@ export class CustomSessionExecutor {
   }
 
   private applyWorkerState(message: WorkerState): SessionResponse {
+    importRecoveryCatalog(message.snapshot)
     this.lastSnapshot = message.snapshot
     this.lastScores = message.response.scores
     this.lastPayloads = message.payloads
@@ -303,7 +305,7 @@ export class CustomSessionExecutor {
       ...(!this.workerInitialized
         ? {
           init: {
-              snapshot: this.initialSerialized(),
+              snapshot: snapshotForWorker(this.initialSerialized()),
               cardWarnings: [...this.session.cardWarnings],
               customCards: this.customCards,
             },

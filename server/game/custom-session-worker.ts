@@ -1,3 +1,4 @@
+import { importRecoveryCatalog, snapshotForWorker } from '../../shared/session/recovery-catalog'
 import { parentPort } from 'node:worker_threads'
 import type { GameSyncPayload } from '../../shared/contract/protocol/game.ts'
 import type { CustomCardData } from '../../shared/cards/session-card-context.ts'
@@ -86,7 +87,7 @@ const dispatch = (method: CustomSessionMethod, args: unknown[]): { response: Ses
 
 const buildResult = (response: SessionResponse) => {
   if (!session) throw new Error('custom session worker is not initialized')
-  const snapshot = serializeSessionSnapshot(response.state, session)
+  const snapshot = snapshotForWorker(serializeSessionSnapshot(response.state, session))
   const serialized = snapshot.frame
   const debug = session.buildSyncPayload(response, null, 'debug', serialized)
   const spectator = session.buildSyncPayload(response, null, 'viewer', serialized)
@@ -108,6 +109,7 @@ parentPort?.on('message', (request: Request) => {
   try {
     if (request.init) {
       customCards = request.init.customCards
+      importRecoveryCatalog(request.init.snapshot)
       restore(request.init.snapshot, request.init.cardWarnings)
     }
     if (!session) throw new Error('custom session worker is not initialized')

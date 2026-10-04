@@ -86,7 +86,7 @@ describe('account invite migration', () => {
     vi.resetModules()
     const { getDb } = await import('../db.ts')
     const db = getDb()
-    expect(db.prepare('SELECT MAX(version) AS version FROM schema_version').get()).toEqual({ version: 31 })
+    expect(db.prepare('SELECT MAX(version) AS version FROM schema_version').get()).toEqual({ version: 33 })
     expect(db.prepare('SELECT id, use_count, max_uses FROM account_invites ORDER BY id').all()).toEqual([
       { id: 'unused', use_count: 0, max_uses: 1 },
       { id: 'used', use_count: 1, max_uses: 1 },

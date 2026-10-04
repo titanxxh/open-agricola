@@ -114,5 +114,56 @@ describe('Room-owned history recovery', () => {
     db.close()
   })
 
+  it('atomically stores provisional checkpoints and resumes a protected cross-player payment flow', () => {
+    const db = database()
+    let fail = true
+    const persistence = new SqliteRoomPersistence({
+      transaction: db.transaction.bind(db),
+      prepare: (sql: string) => {
+        const statement = db.prepare(sql)
+        if (!sql.includes('INSERT INTO room_recovery_nodes')) return statement
+        return new Proxy(statement, { get(target, key) {
+          if (key === 'run') return (...args: unknown[]) => {
+            if (fail && (args[0] as { kind: string }).kind === 'checkpoint') throw new Error('checkpoint write failed')
+            return Reflect.apply(target.run, target, args)
+          }
+          const value = Reflect.get(target, key)
+          return typeof value === 'function' ? value.bind(target) : value
+        } })
+      },
+    })
+    const game = session()
+    game.state.round = 6
+    game.state.players[0]!.houseType = 'clay'
+    game.state.players[0]!.minorPlayed = ['D014_HammerCrusher']
+    Object.assign(game.state.players[0]!.resources, { clay: 5, reed: 2, stone: 2 })
+    game.state.players[1]!.occupationPlayed = ['D128_BuildingTycoon']
+    game.loadState(game.state)
+    let response = game.takeAction(0, 'house-redevelopment')
+    if (response.interaction.stateId !== 'wait' || response.interaction.request.kind !== 'choice') throw new Error('Expected construct choice')
+    response = game.resolveChoice(0, response.interaction.request.options.find(option => option.value !== '__skip__')!.value)
+    if (response.interaction.stateId !== 'wait' || response.interaction.request.kind !== 'farm-select') throw new Error('Expected room choice')
+    response = game.commitSelectionChoice(0, { rooms: [response.interaction.request.farm.selectableTiles[0]!] })
+    while (response.interaction.stateId === 'wait' && response.interaction.request.kind === 'confirm-player-switch') {
+      response = game.resolveChoice(response.interaction.playerIndex, 'confirm')
+    }
+    expect(response.interaction).toMatchObject({ stateId: 'wait', playerIndex: 1, sourceCard: 'D128_BuildingTycoon' })
+    const snapshot = serializeSessionSnapshot(game.state, game)
+    expect(() => persistence.save('r', snapshot, meta)).toThrow('checkpoint write failed')
+    expect(persistence.load('r')).toBeNull()
+    fail = false
+    persistence.save('r', snapshot, meta)
+    const restored = new GameSession(rehydrateState(persistence.load('r')!.serialized!))
+    expect(restored.getState()).toEqual(game.getState())
+    expect(restored.undoStep().ok).toBe(false)
+    response = restored.resolveChoice(1, '__skip__')
+    while (response.interaction.stateId === 'wait' && response.interaction.request.kind === 'confirm-player-switch') {
+      response = restored.resolveChoice(response.interaction.playerIndex, 'confirm')
+    }
+    expect(response.ok).toBe(true)
+    expect(response.state.players[0]).toMatchObject({ rooms: 2, resources: { clay: 7, reed: 3, stone: 2 } })
+    expect(response.state.log.filter(entry => entry.key === 'log.provisionalContinuationRollback')).toHaveLength(1)
+    db.close()
+  })
 
 })

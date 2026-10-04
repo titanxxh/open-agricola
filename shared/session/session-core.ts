@@ -1,4 +1,4 @@
-import { beginHistoryOperation, captureStateWithHistory } from './history-streams'
+import { beginHistoryOperation, captureStateWithHistory, copyHistoryRecordIdentity, historyBranch, materializeHistoryBranch } from './history-streams'
 import { cloneStateWithHistory } from './state-bootstrap'
 import { canStartBefore, evaluateFlowDoable, isActionDoableInFlowContext, isFlowDerivedDoable } from '../actions/flow'
 import type {
@@ -383,15 +383,6 @@ export type SessionPrivateCursor = Omit<SessionCommandCheckpoint, 'state'> & {
 }
 
 
-const cloneCommandValue = <T>(value: T): T => {
-  if (Array.isArray(value)) return value.map((entry) => cloneCommandValue(entry)) as T
-  if (!value || typeof value !== 'object') return value
-  return Object.fromEntries(
-    Object.entries(value as Record<string, unknown>)
-      .map(([key, entry]) => [key, cloneCommandValue(entry)]),
-  ) as T
-}
-
 const preservePlayerDisplayNames = (current: GameState, restored: GameState): GameState => {
   const currentPlayers = new Map(current.players.map((player) => [player.id, player]))
   const names = new Map(current.players.map((player) => [player.id, player.name]))
@@ -404,7 +395,7 @@ const preservePlayerDisplayNames = (current: GameState, restored: GameState): Ga
   }
   restored.log = restored.log.map(entry => {
     const name = entry.playerId ? names.get(entry.playerId) : undefined
-    return name !== undefined && entry.params ? { ...entry, params: { ...entry.params, player: name } } : entry
+    return name !== undefined && entry.params ? copyHistoryRecordIdentity(entry, { ...entry, params: { ...entry.params, player: name } }) : entry
   })
   return restored
 }
@@ -983,14 +974,15 @@ export class GameCore {
   }
 
   createSessionPrivateCursor(): SessionPrivateCursor {
-    const { state: _state, ...runtime } = this.createCommandCheckpoint()
-    const { history, ...smallRuntime } = runtime
-    return { ...JSON.parse(JSON.stringify({
-      ...smallRuntime,
-      provisionalContinuationScopes: this.provisionalContinuationScopes,
-      failedAuthoritativeCommands: this.failedAuthoritativeCommands,
+    return {
+      ...this.captureCommandRuntime(),
+      provisionalContinuationScopes: this.provisionalContinuationScopes.map(scope => ({
+        ...scope,
+        failedCommandsAtCheckpoint: scope.failedCommandsAtCheckpoint.map(entry => ({ ...entry })),
+      })),
+      failedAuthoritativeCommands: this.failedAuthoritativeCommands.map(entry => ({ ...entry })),
       nextProvisionalScopeId: this.nextProvisionalScopeId,
-    })), history: history.slice() } as SessionPrivateCursor
+    }
   }
 
   restoreSessionPrivateCursor(cursor: SessionPrivateCursor): void {
@@ -999,22 +991,20 @@ export class GameCore {
       failedAuthoritativeCommands,
       nextProvisionalScopeId,
       ...runtime
-    } = structuredClone(cursor)
+    } = { ...cursor, provisionalContinuationScopes: cursor.provisionalContinuationScopes.map(scope => ({ ...scope })) }
     this.restoreCommandCheckpoint({ state: this.state, ...runtime })
-    this.provisionalContinuationScopes = provisionalContinuationScopes
-    this.failedAuthoritativeCommands = failedAuthoritativeCommands
+    this.provisionalContinuationScopes = provisionalContinuationScopes.map(scope => ({ ...scope, failedCommandsAtCheckpoint: scope.failedCommandsAtCheckpoint.map(entry => ({ ...entry })) }))
+    this.failedAuthoritativeCommands = failedAuthoritativeCommands.map(entry => ({ ...entry }))
     this.nextProvisionalScopeId = nextProvisionalScopeId
   }
 
-  createCommandCheckpoint(): SessionCommandCheckpoint {
+  private captureCommandRuntime(): Omit<SessionCommandCheckpoint, 'state'> {
     return this.withCtx(() => ({
-      state: cloneCommandValue(this.state),
       engineStackCursor: structuredClone(this.engineStack.toCursor()),
       history: this.history.slice(),
       actionStartIndex: this.actionStartIndex,
       actionStartPlayerSnapshot: this.actionStartPlayerSnapshot
-        ? this.clonePlayer(this.actionStartPlayerSnapshot)
-        : null,
+        ? this.clonePlayer(this.actionStartPlayerSnapshot) : null,
       actionResultDetailsSinceFlush: structuredClone(this.actionResultDetailsSinceFlush),
       responsePrivateEvents: structuredClone(this.responsePrivateEvents),
       deferPrivateEventDrainDepth: this.deferPrivateEventDrainDepth,
@@ -1025,12 +1015,16 @@ export class GameCore {
     }))
   }
 
+  createCommandCheckpoint(): SessionCommandCheckpoint {
+    return { state: captureStateWithHistory(this.state), ...this.captureCommandRuntime() }
+  }
+
   restoreCommandCheckpoint(checkpoint: SessionCommandCheckpoint): void {
     this.withCtx(() => {
       if (!commandValuesEqual(this.state, checkpoint.state)) {
         this.state = preservePlayerDisplayNames(
           this.state,
-          cloneCommandValue(checkpoint.state),
+          captureStateWithHistory(checkpoint.state),
         )
         for (const space of this.state.actionSpaces) {
           const definition = this.registry.get(space.id)
@@ -1046,11 +1040,11 @@ export class GameCore {
       if (checkpoint.engineStackCursor.frames.length > 0) {
         this.restoreEngineStackFromCursor(checkpoint.engineStackCursor)
       }
-      this.history = checkpoint.history
+      this.history = checkpoint.history.slice()
       this.actionStartIndex = checkpoint.actionStartIndex
-      this.actionStartPlayerSnapshot = checkpoint.actionStartPlayerSnapshot
-      this.actionResultDetailsSinceFlush = checkpoint.actionResultDetailsSinceFlush
-      this.responsePrivateEvents = checkpoint.responsePrivateEvents
+      this.actionStartPlayerSnapshot = checkpoint.actionStartPlayerSnapshot ? this.clonePlayer(checkpoint.actionStartPlayerSnapshot) : null
+      this.actionResultDetailsSinceFlush = structuredClone(checkpoint.actionResultDetailsSinceFlush)
+      this.responsePrivateEvents = structuredClone(checkpoint.responsePrivateEvents)
       this.deferPrivateEventDrainDepth = checkpoint.deferPrivateEventDrainDepth
       this.nextActionToken = checkpoint.nextActionToken
       this.turnOwnerPlayerIndex = checkpoint.turnOwnerPlayerIndex
@@ -1220,6 +1214,7 @@ export class GameCore {
         return this.respond(false, 'command unavailable until game state changes')
       }
       beginHistoryOperation(this.state, type === 'action' || type === 'anytime' || type === 'specialAction')
+      if (type === 'undoStep' || type === 'undoAction') assertPublicEventArchiveCanAppend(this.state)
       const settlement = this.createActiveCommandSettlement(command)
       this.activeCommandSettlement = settlement
       this.commandSettlementDepth = 1
@@ -1622,7 +1617,7 @@ export class GameCore {
     setupPhase.updatePlayerName(player, name)
     if (!previousName || !player || previousName === player.name) return
     this.state.log = this.state.log.map(entry => entry.playerId === player.id && entry.params
-      ? { ...entry, params: { ...entry.params, player: player.name } } : entry)
+      ? copyHistoryRecordIdentity(entry, { ...entry, params: { ...entry.params, player: player.name } }) : entry)
   }
 
   private bindInitialLogPlayerIds(): void {
@@ -2535,13 +2530,13 @@ export class GameCore {
   private capturePublicEventArchive(): PublicEventArchiveSnapshot {
     assertPublicEventArchiveCanAppend(this.state)
     return {
-      publicEventArchive: JSON.parse(JSON.stringify(this.state.publicEventArchive ?? [])) as GameState['publicEventArchive'],
+      publicEventArchive: materializeHistoryBranch(historyBranch(this.state.publicEventArchive, 'publicEventArchive', this.state)) as GameState['publicEventArchive'],
       nextPublicEventArchivePacketSeq: this.state.nextPublicEventArchivePacketSeq ?? 1,
     }
   }
 
   private restorePublicEventArchive(snapshot: PublicEventArchiveSnapshot): void {
-    this.state.publicEventArchive = JSON.parse(JSON.stringify(snapshot.publicEventArchive)) as GameState['publicEventArchive']
+    this.state.publicEventArchive = snapshot.publicEventArchive
     this.state.nextPublicEventArchivePacketSeq = snapshot.nextPublicEventArchivePacketSeq
   }
 
@@ -2577,7 +2572,7 @@ export class GameCore {
     if (!result) return {}
     const archiveState = {
       ...this.state,
-      publicEventArchive: JSON.parse(JSON.stringify(archiveBeforeAppend.publicEventArchive)) as GameState['publicEventArchive'],
+      publicEventArchive: archiveBeforeAppend.publicEventArchive,
       nextPublicEventArchivePacketSeq: archiveBeforeAppend.nextPublicEventArchivePacketSeq,
     } as GameState
     try {

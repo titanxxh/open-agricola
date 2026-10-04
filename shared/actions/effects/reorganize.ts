@@ -1,3 +1,4 @@
+import { copyHistoryRecordIdentity } from '../../session/history-streams'
 import { syncHarvestBreedPlacement } from '../../domain/harvest-breed-placement'
 import type {
   ActionDefinition,
@@ -469,12 +470,16 @@ export const reorganizeAction: ActionDefinition = {
     const after = animalTotals(ctx.state, ctx.player)
     const summary = ctx.state.harvestBreedSummary?.[ctx.player.id]
     if (placement && summary) {
+      const previousResources = summary.resources
+      summary.resources = { ...previousResources }
       for (const animal of animalKeysForState(ctx.state)) {
         if ((after[animal] ?? 0) < (placement.minimums[animal] ?? Infinity)) {
           delete summary.resources[animal]
           delete placement.minimums[animal]
         }
       }
+      ctx.state.events = ctx.state.events.map(event => event.type === 'farm.animalBred' && event.animals === previousResources
+        ? copyHistoryRecordIdentity(event, { ...event, animals: { ...summary.resources } }) : event)
       placement.animalCounts = after
       summary.animalTypes = Object.keys(summary.resources).length
       summary.animalCount = sumAnimalCounts(summary.resources)

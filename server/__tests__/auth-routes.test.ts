@@ -41,7 +41,7 @@ vi.mock('../oauth/providers.ts', () => ({
   exchangeOAuthCode: vi.fn(),
 }))
 
-vi.mock('../db.ts', () => {
+vi.mock('../db.ts', async () => {
   const db = new Database(':memory:')
   db.pragma('foreign_keys = ON')
   db.exec(`
@@ -310,6 +310,9 @@ vi.mock('../db.ts', () => {
       created_at INTEGER NOT NULL
     );
   `)
+  const { ROOM_HISTORY_SCHEMA, ROOM_RECOVERY_SCHEMA } = await import('../game/persistence/room-history-store')
+  db.exec(ROOM_HISTORY_SCHEMA)
+  db.exec(ROOM_RECOVERY_SCHEMA)
   return { getDb: () => db, cleanExpiredSessions: () => {} }
 })
 

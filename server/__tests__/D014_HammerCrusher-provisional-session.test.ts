@@ -1,3 +1,6 @@
+import Database from 'better-sqlite3'
+import { runMigrations } from '../db'
+import { SqliteRoomPersistence } from '../game/persistence/sqlite-adapter'
 import { describe, expect, it } from 'vitest'
 import { GameSession, type SessionResponse } from '../game/authoritative-session'
 import { setWorkersAtHome } from '../../shared/domain/player'
@@ -344,7 +347,12 @@ describe('D014 Hammer Crusher provisional continuation', () => {
 
     const snapshot = serializeSessionSnapshot(session.state, session)
     expect(snapshot.frame.engineStack.frames).toEqual([])
-    const restoredState = rehydrateState(JSON.parse(JSON.stringify(snapshot)))
+    const db = new Database(':memory:')
+    runMigrations(db, () => {})
+    const persistence = new SqliteRoomPersistence(db)
+    persistence.save('nested', snapshot, { createdBy: null, maxPlayers: 2, customCardDbIds: [], status: 'playing', players: [] })
+    const restoredState = rehydrateState(persistence.load('nested')!.serialized!)
+    db.close()
     const restored = setup({ buildingTycoon: false, clay: 0, reed: 0 })
     registerNestedConstructHelper(restored, { clay: 3, reed: 1 })
     restored.loadState(restoredState.state)

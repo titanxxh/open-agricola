@@ -1,3 +1,4 @@
+import type { RecoveryHistoryCatalog } from './recovery-catalog'
 import { captureStateWithHistory } from './history-streams'
 import type {
   ActionSpace,
@@ -88,6 +89,7 @@ export type PersistedSessionSnapshot = {
   state: SerializedAuthoritativeGameState
   frame: SerializedGameState
   sessionCursor: SessionPrivateCursor
+  historyCatalog?: RecoveryHistoryCatalog
 }
 
 export type SessionCursorSource = {
