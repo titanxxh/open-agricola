@@ -4,6 +4,7 @@ import { emptyResources } from '../../shared/contract/state-constants'
 import type { Locale } from '../../shared/i18n'
 import { t } from '../../shared/i18n'
 import { ResourceLine } from '../components/common/ResourceLine'
+import { translateCardText } from '../components/common/cardText'
 import type { AnytimeExchangeOption } from './anytime-exchange-ui'
 import type { HarvestFeedOption } from './hooks/use-harvest-flow'
 import type { PendingChoice } from '../types/ui'
@@ -254,7 +255,7 @@ export const ExchangeOverlayPresentation = ({
     return (
       <ExchangeModal
         title={t(locale, 'ui.exchangeCenterTitle')}
-        subtitle={t(locale, pendingChoice.promptKey ?? 'ui.interactionChooseOne')}
+        subtitle={translateCardText(locale, pendingChoice.promptKey ?? 'ui.interactionChooseOne')}
       >
         <div className="exchange-options">
           {draft.anytime.options.map((option) => (
@@ -308,7 +309,7 @@ export const ExchangeOverlayPresentation = ({
     return (
       <ExchangeModal
         title={t(locale, 'ui.bakeBreadTitle')}
-        subtitle={t(locale, pendingChoice.promptKey ?? 'ui.interactionChooseOne')}
+        subtitle={translateCardText(locale, pendingChoice.promptKey ?? 'ui.interactionChooseOne')}
       >
         <div className="exchange-options">
           {draft.bake.options.map((option) => {

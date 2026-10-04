@@ -1,8 +1,8 @@
 import type { Locale } from '../../../shared/i18n'
 import { t } from '../../../shared/i18n'
-import { getCardMeta } from '../../services/card-meta'
+import { getCardMeta, type CardMeta } from '../../services/card-meta'
 
-type CardType = 'occupation' | 'minor' | 'major'
+export type CardType = 'occupation' | 'minor' | 'major'
 
 const cardNameKeyPattern =
   /^(occupations|minorImprovements|improvements|cards)\.([^.]+)\.name$/
@@ -43,30 +43,49 @@ export const getCardDisplayName = (
   locale: Locale,
   cardType: CardType | null,
   cardId: string,
+  meta = getCardMeta(cardId),
 ): string => {
   const season = /^through-the-seasons:(winter|spring|summer|autumn)$/.exec(cardId)?.[1]
   if (season) return t(locale, `ui.seasons.${season}`)
 
-  if (cardType === 'occupation') {
-    const key = `occupations.${cardId}.name`
-    const translated = t(locale, key)
-    if (translated !== key) return translated
-    const meta = getCardMeta(cardId)
-    return meta?.name || humanizeCardId(cardId)
-  }
-  if (cardType === 'minor') {
-    const key = `minorImprovements.${cardId}.name`
-    const translated = t(locale, key)
-    if (translated !== key) return translated
-    const meta = getCardMeta(cardId)
-    return meta?.name || humanizeCardId(cardId)
-  }
-  if (cardType === 'major') {
-    const key = `improvements.${cardId}.name`
+  const prefixes = cardType === 'occupation' ? ['occupations']
+    : cardType === 'minor' ? ['minorImprovements']
+      : cardType === 'major' ? ['improvements']
+        : ['improvements', 'minorImprovements', 'occupations']
+  for (const prefix of prefixes) {
+    const key = `${prefix}.${cardId}.name`
     const translated = t(locale, key)
     if (translated !== key) return translated
   }
-  return humanizeCardId(cardId)
+  const localized = meta?.locales?.[locale]?.name
+  if (localized) return localized
+  const legacyKey = `cards.${cardId}.name`
+  const legacyName = t(locale, legacyKey)
+  if (legacyName !== legacyKey) return legacyName
+  return meta?.name || humanizeCardId(cardId)
+}
+
+export const getCardDisplayText = (
+  locale: Locale,
+  cardType: CardType,
+  cardId: string,
+  meta: CardMeta,
+) => {
+  const prefix = cardType === 'occupation' ? 'occupations'
+    : cardType === 'minor' ? 'minorImprovements' : 'improvements'
+  const localized = meta.locales?.[locale]
+  const field = (name: string, fallback: string): string => {
+    const key = `${prefix}.${cardId}.${name}`
+    const translated = t(locale, key)
+    return translated === key ? fallback : translated
+  }
+  const prerequisite = localized?.prerequisite ?? meta.prerequisite
+  return {
+    name: getCardDisplayName(locale, cardType, cardId, meta),
+    description: field('description', (localized?.desc ?? meta.desc ?? []).join('\n')),
+    rules: field('rules', (localized?.rules ?? meta.rules ?? []).join('\n')),
+    prerequisite: field('prerequisite', typeof prerequisite === 'string' ? prerequisite : '') || undefined,
+  }
 }
 
 export const translateCardText = (
@@ -74,9 +93,10 @@ export const translateCardText = (
   key: string,
   params?: Record<string, string | number>,
 ): string => {
-  const translated = t(locale, key, params)
-  if (translated !== key) return translated
-
+  const resolveNames = (text: string) => text.replace(
+    /\{card:([^{}\s]+)\}/g,
+    (_reference, cardId: string) => getAnyCardDisplayName(locale, cardId),
+  )
   const nameMatch = cardNameKeyPattern.exec(key)
   if (nameMatch) {
     const [, prefix, cardId] = nameMatch
@@ -91,11 +111,14 @@ export const translateCardText = (
     return getCardDisplayName(locale, cardType, cardId)
   }
 
+  const translated = t(locale, key, params)
+  if (translated !== key) return resolveNames(translated)
+
   const anytimeMatch = cardAnytimeKeyPattern.exec(key)
   if (anytimeMatch) {
     const [, cardId] = anytimeMatch
     return getCardDisplayName(locale, inferCardType(cardId), cardId)
   }
 
-  return translated
+  return resolveNames(translated)
 }

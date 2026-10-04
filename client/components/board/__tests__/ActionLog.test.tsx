@@ -377,7 +377,7 @@ describe('ActionLog', () => {
   })
 
   it('renders seasonal payments and internal trigger actions in Chinese', () => {
-    const triggers = ['pay', 'breed', 'improvement', 'take-from-card'].map((triggerActionId, index) => ({
+    const triggers = ['pay', 'breed', 'improvement', 'take-from-card', 'occupation'].map((triggerActionId, index) => ({
       schemaVersion: 1 as const, id: `trigger-${index}`, seq: index + 1, round: 1,
       phase: 'work' as const, visibility: 'public' as const, type: 'card.triggered' as const,
       cardId: 'through-the-seasons:spring', actorPlayerId: 'p1', triggerActionId,
@@ -392,6 +392,8 @@ describe('ActionLog', () => {
     expect(container.textContent).toContain('繁殖')
     expect(container.textContent).toContain('改良')
     expect(container.textContent).toContain('从卡牌取资源')
+    expect(container.textContent).toContain('打出职业')
+    expect(container.textContent).not.toContain('课程')
     expect(container.textContent).not.toMatch(/through-the-seasons:|\(pay\)|\(breed\)|\(improvement\)/)
   })
 

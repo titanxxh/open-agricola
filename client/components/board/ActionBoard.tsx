@@ -3,6 +3,7 @@ import type { Locale } from '../../../shared/i18n'
 import { t } from '../../../shared/i18n'
 import type { ActionSpace, FutureMeeple, FutureMeepleResourceMap, PlayerState } from '../../../shared/contract/types'
 import { PlayerCard } from '../common/PlayerCard'
+import { translateCardText } from '../common/cardText'
 import { getCardMeta } from '../../services/card-meta'
 
 const BOARD_W_2P = 830
@@ -796,7 +797,7 @@ export const ActionBoard = ({
     if (!blocker) return ''
     const source = baseActions.find((candidate) => candidate.id === blocker.sourceSpaceId)
       ?? roundSlots.find((slot) => slot.action?.id === blocker.sourceSpaceId)?.action
-    const sourceName = source ? t(locale, source.nameKey) : blocker.sourceSpaceId
+    const sourceName = source ? translateCardText(locale, source.nameKey) : blocker.sourceSpaceId
     return `Blocked by ${sourceName}`
   }
 
@@ -980,7 +981,7 @@ export const ActionBoard = ({
             const blocked = isBlocked(space)
             const canTake = !blocked && canTakeAction(space, currentPlayer)
             const hasFarmer = space.takenBy.length > 0
-            const label = blocked ? `${t(locale, space.nameKey)} (${blockedLabel(space)})` : undefined
+            const label = blocked ? `${translateCardText(locale, space.nameKey)} (${blockedLabel(space)})` : undefined
             return (
               <div
                 key={space.id}
@@ -1007,7 +1008,7 @@ export const ActionBoard = ({
                   disabled={!canTake}
                   aria-label={label}
                 >
-                  <h4 className="action-header">{t(locale, space.nameKey)}</h4>
+                  <h4 className="action-header">{translateCardText(locale, space.nameKey)}</h4>
                   <div className="action-desc">
                     {accDir && hasGainPerRound(space)
                       ? renderGainDisplay(space)
@@ -1038,7 +1039,7 @@ export const ActionBoard = ({
             const blocked = action ? isBlocked(action) : false
             const canTake = action ? !blocked && canTakeAction(action, currentPlayer) : false
             const hasFarmer = action ? action.takenBy.length > 0 : false
-            const label = action && blocked ? `${t(locale, action.nameKey)} (${blockedLabel(action)})` : undefined
+            const label = action && blocked ? `${translateCardText(locale, action.nameKey)} (${blockedLabel(action)})` : undefined
             return (
               <div
                 key={`r-${slot.round}`}
@@ -1070,7 +1071,7 @@ export const ActionBoard = ({
                       disabled={!canTake}
                       aria-label={label}
                     >
-                      <h4 className="action-header">{t(locale, action.nameKey)}</h4>
+                      <h4 className="action-header">{translateCardText(locale, action.nameKey)}</h4>
                       <div className="action-desc">
                         {accDir && hasGainPerRound(action)
                           ? renderGainDisplay(action)
@@ -1142,7 +1143,7 @@ export const ActionBoard = ({
                       onClick={() => takeAction(space)}
                       disabled={!canTake}
                     >
-                      <h4 className="action-header">{t(locale, space.nameKey)}</h4>
+                      <h4 className="action-header">{translateCardText(locale, space.nameKey)}</h4>
                       <div className="action-desc">
                         {ACTION_ICON_DESC[space.id]?.length
                           ? renderIconDesc(ACTION_ICON_DESC[space.id], locale, space.id)
@@ -1209,7 +1210,7 @@ export const ActionBoard = ({
                 className="tooltip-action-card"
                 data-action-id={tooltip.actionId}
               >
-                <h4 className="action-header">{t(locale, tooltip.nameKey!)}</h4>
+                <h4 className="action-header">{translateCardText(locale, tooltip.nameKey!)}</h4>
                 <div className="action-desc">{renderTooltipBody(tooltip)}</div>
               </div>
               <div className="tooltip-text">
@@ -1226,7 +1227,7 @@ export const ActionBoard = ({
             </>
           ) : (
             <div className="tooltip-text">
-              <strong>{tooltip.kind === 'action' ? t(locale, tooltip.nameKey!) : tooltip.title}</strong>
+              <strong>{tooltip.kind === 'action' ? translateCardText(locale, tooltip.nameKey!) : tooltip.title}</strong>
               {tooltip.kind === 'action' && tooltip.leftActionName && (
                 <p className="tooltip-left-action">
                   {t(locale, 'ui.leftActionSpace', { action: tooltip.leftActionName })}

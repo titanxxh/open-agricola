@@ -13,7 +13,7 @@ import type {
   PlayerState,
 } from '../../shared/contract/types'
 import type { Locale } from '../../shared/i18n'
-import { t } from '../../shared/i18n'
+import { translateCardText } from '../components/common/cardText'
 import {
   getAdjacentTilesForEdge,
   getFarmyardBounds,
@@ -653,7 +653,7 @@ export const buildActionBoardProjection = ({
       actionSpaces: boardActionSpaces,
     }, action.id)
     const leftAction = leftActionId ? actionById.get(leftActionId) : undefined
-    if (leftAction) leftActionNames.set(action.id, t(locale, leftAction.nameKey))
+    if (leftAction) leftActionNames.set(action.id, translateCardText(locale, leftAction.nameKey))
   }
 
   return {

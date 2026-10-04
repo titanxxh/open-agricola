@@ -199,6 +199,26 @@ describe('ActionBoard', () => {
     expect(takeAction).toHaveBeenCalledWith(expect.objectContaining({ id: 'D023_PioneeringSpirit' }))
   })
 
+  it('uses the canonical name in a card action without loaded metadata', () => {
+    const player = createPlayer('p1', 'PlayerA', 'red')
+    const html = renderToStaticMarkup(
+      <ActionBoard
+        locale="zh"
+        baseActions={[createAction('A039_Chapel', 'cards.A039_Chapel.name')]}
+        roundSlots={[]}
+        currentPlayer={player}
+        players={[player]}
+        futureMeeples={[]}
+        canTakeAction={() => true}
+        takeAction={vi.fn()}
+        currentRound={1}
+        devMode={false}
+      />,
+    )
+    expect(html).toContain('>小教堂</h4>')
+    expect(html).not.toContain('>教堂</h4>')
+  })
+
   it('renders owner-labeled action-space resource attachments from projected display data', () => {
     const playerA = createPlayer('p1', 'PlayerA', 'red')
     const playerB = createPlayer('p2', 'PlayerB', 'blue')

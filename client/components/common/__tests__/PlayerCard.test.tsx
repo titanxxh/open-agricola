@@ -9,11 +9,65 @@ import {
 import { loadCardsManifest } from '../../../services/card-meta'
 import { publicAssetUrl } from '../../../utils/public-asset-url'
 import { zh } from '../../../../shared/i18n/zh'
+import { getAnyCardDisplayName, translateCardText } from '../cardText'
+import { resolveCardDisplayName, resolveCardRef } from '../../board/card-reference'
 // Cards-manifest is preloaded by `client/__tests__/setup-card-manifest.ts`.
 
 describe('PlayerCard dual-type rendering (alsoCountsAs)', () => {
   beforeEach(() => {
     clearCustomCardMetadata()
+  })
+
+  it('uses the same card-local name in the face, trigger label, prompt, and log', () => {
+    registerCustomCardMetadata({
+      cardType: 'minor',
+      cardJson: {
+        id: 'CUSTOM_LocalName', name: 'English name', deck: 'CUSTOM', number: 0,
+        desc: ['English description.'], implemented: true,
+        locales: { zh: { name: '统一卡名', desc: ['中文说明。'] } },
+      },
+    })
+    const html = renderToStaticMarkup(<PlayerCard locale="zh" cardId="CUSTOM_LocalName" cardType="minor" />)
+    expect(html).toContain('统一卡名')
+    expect(getAnyCardDisplayName('zh', 'CUSTOM_LocalName')).toBe('统一卡名')
+    expect(resolveCardDisplayName('zh', 'CUSTOM_LocalName')).toBe('统一卡名')
+    expect(translateCardText('zh', '{card:CUSTOM_LocalName}：继续？')).toBe('统一卡名：继续？')
+    expect(getAnyCardDisplayName('en', 'CUSTOM_LocalName')).toBe('English name')
+  })
+
+  it('uses the translated Moor major description on its face', () => {
+    const html = renderToStaticMarkup(<PlayerCard locale="zh" cardId="Major_Moor_HeatingOven" cardType="major" />)
+    expect(html).toContain('需要供暖的房间数减少1间。')
+    expect(html).toContain('res-icon-fuel')
+    expect(html).not.toContain('Gain 2 fuel')
+  })
+
+  it('resolves the Hammer Crusher prompt from the same card name as the face', () => {
+    expect(translateCardText('zh', 'ui.interactionHammerCrusherBuild')).toBe('锤碎机：建造房间？')
+    expect(translateCardText('en', 'ui.interactionHammerCrusherBuild')).toBe('Hammer Crusher: Build rooms?')
+  })
+
+  it.each([
+    ['D023_PioneeringSpirit', '开拓精神'],
+    ['A039_Chapel', '小教堂'],
+  ])('uses the canonical name instead of the old cards namespace alias for %s', (id, name) => {
+    expect(translateCardText('zh', `cards.${id}.name`)).toBe(name)
+    expect(getAnyCardDisplayName('zh', id)).toBe(name)
+  })
+
+  it('uses metadata card type when an old translation is in the wrong section', () => {
+    expect(resolveCardRef('en', 'A106_SlurrySpreader')?.type).toBe('occupation')
+    expect(resolveCardRef('en', 'A162_ForestTallyman')?.type).toBe('occupation')
+    expect(resolveCardRef('zh', 'D023_PioneeringSpirit')?.type).toBe('minor')
+  })
+
+  it.each(['zh', 'en'] as const)('renders boar icons without stray brackets in %s', (locale) => {
+    for (const id of ['B179_WildBoarHunter', 'B180_GameTeaser', 'C180_Trapper', 'D180_PartTimeWorker', 'M115_OakBark']) {
+      const html = renderToStaticMarkup(<PlayerCard locale={locale} cardId={id} cardType={id.startsWith('M') ? 'minor' : 'occupation'} />)
+      expect(html, id).toContain('res-icon-boar')
+      expect(html, id).not.toContain('&lt;')
+      expect(html, id).not.toContain('&gt;')
+    }
   })
 
   it('renders translated prerequisites with the same markup as the card description', () => {

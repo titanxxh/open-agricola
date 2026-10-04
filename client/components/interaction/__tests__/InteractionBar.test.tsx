@@ -130,6 +130,22 @@ const renderBarHtml = (
 ) => renderToStaticMarkup(buildBar(configure, actionOverrides))
 
 describe('InteractionBar', () => {
+  it.each(['zh', 'en'] as const)('resolves card references in the %s trigger prompt and anytime button', (locale) => {
+    const html = renderBarHtml((input) => {
+      input.locale = locale
+      input.pending.choice = {
+        ...pendingChoice,
+        promptKey: 'ui.interactionHammerCrusherBuild',
+        sourceCard: 'D014_HammerCrusher',
+      }
+      input.controls.anytimeActions = [{ id: 'mandoline', labelKey: 'cards.C046_Mandoline.anytime' }]
+    })
+    expect(html).toContain(locale === 'zh' ? '锤碎机：建造房间？' : 'Hammer Crusher: Build rooms?')
+    expect(html).toContain(locale === 'zh' ? '多功能切菜器' : 'Mandoline')
+    expect(html).not.toContain('碎锤')
+    expect(html).not.toContain('{card:')
+  })
+
   it.each(['PS01', 'PS03', 'PS04'])('localizes the offered %s father tier and preserves its choice value', (fatherId) => {
     const card = getParentCardDefinition(fatherId)
     if (card?.kind !== 'father') throw new Error('expected a father card')

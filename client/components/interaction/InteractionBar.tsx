@@ -39,7 +39,7 @@ const clampWhole = (value: number, min: number, max: number): number =>
 
 const renderInteractionText = (locale: Locale, text: InteractionBarText): string => {
   if (text.text !== undefined) return text.text
-  return text.key ? t(locale, text.key, text.params) : ''
+  return text.key ? translateCardText(locale, text.key, text.params) : ''
 }
 
 const AnimalCountLine = ({

@@ -57,7 +57,7 @@ export const M115_OakBark = defineMinorCard({
     number: 115,
     category: "BUILDING_RESOURCE_PROVIDER",
     desc: [
-        "When you play this card, you immediately get 2 <WOOD>. Each time you turn <<PIG>>, <CATTLE>, or <HORSE> into <FOOD>, you get 1 additional <WOOD> for each of these animals that you turn."
+        "When you play this card, you immediately get 2 <WOOD>. Each time you turn <PIG>, <CATTLE>, or <HORSE> into <FOOD>, you get 1 additional <WOOD> for each of these animals that you turn."
     ],
     cost: {
         "vegetable": 1

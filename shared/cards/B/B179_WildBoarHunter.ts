@@ -27,7 +27,7 @@ export const B179_WildBoarHunter = defineOccupationCard({
     deck: 'B',
     number: 179,
     category: 'LIVESTOCK_PROVIDER',
-    desc: ['In the returning home phase of each round, if at least 3 <WOOD> accumulation spaces are occupied, you can pay 1 <WOOD> to get 1 <<PIG>>.'],
+    desc: ['In the returning home phase of each round, if at least 3 <WOOD> accumulation spaces are occupied, you can pay 1 <WOOD> to get 1 <PIG>.'],
     cost: {},
     players: '5+',
   },

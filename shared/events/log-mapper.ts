@@ -154,7 +154,7 @@ const BUILT_IN_LEAF_ACTION_NAMES: Record<string, string> = {
   exchange: 'actions.exchange.name',
   'bake-bread': 'actions.bake-bread.name',
   'family-growth': 'actions.family-growth.name',
-  occupation: 'actions.lessons.name',
+  occupation: 'actions.occupation.name',
   construct: 'actions.construct.name',
   fence: 'actions.fencing.name',
   plow: 'actions.plow.name',

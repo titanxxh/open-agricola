@@ -72,6 +72,8 @@ const ALLOWED_CHINESE_DOUBLE_UNDERSCORE_LABELS = new Set([
   ...Object.values(zh.improvements).map((card) => card.name),
   ...Object.values(zh.minorImprovements).map((card) => card.name),
   ...Object.values(zh.occupations).map((card) => card.name),
+  ...['cut-peat', 'fell-trees', 'slash-and-burn', 'horse-market', 'hiring-fair', 'black-market', 'illicit-work']
+    .map((id) => zh.moor.specialActions[id as keyof typeof zh.moor.specialActions]),
   '大改良', '小改良', '翻修', '采石场', '建造木房',
   '家庭增长（需要空房）', '无须房间的家庭增长',
 ])

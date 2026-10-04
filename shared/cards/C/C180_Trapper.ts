@@ -50,7 +50,7 @@ export const C180_Trapper = defineOccupationCard({
     deck: 'C',
     number: 180,
     category: 'LIVESTOCK_PROVIDER',
-    desc: ['Each time after you use a <WOOD> accumulation space, if this is the 2nd/3rd/4th occupied <WOOD> accumulation space that round, you can buy 1 <SHEEP>/<<PIG>>/<CATTLE> for 1 <FOOD>.'],
+    desc: ['Each time after you use a <WOOD> accumulation space, if this is the 2nd/3rd/4th occupied <WOOD> accumulation space that round, you can buy 1 <SHEEP>/<PIG>/<CATTLE> for 1 <FOOD>.'],
     cost: {},
     players: '5+',
   },

@@ -21,7 +21,7 @@ describe('Chinese draft overlay', () => {
   it.each([
     ['standard', '选择 1 张职业和 1 张小改良'],
     ['occupation', '选择 1 张职业'],
-    ['farmersOfTheMoorMinor', '选择 1 张泥沼小改良'],
+    ['farmersOfTheMoorMinor', '选择 1 张沼泽农夫小改良'],
     ['publishedMinor', '选择 1 张小改良'],
   ] as const)('localizes the %s stage', (stage, prompt) => {
     const { container } = render(<DraftOverlay state={draftState(stage)} meId="p1" locale="zh" onSubmit={vi.fn()} />)

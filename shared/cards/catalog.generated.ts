@@ -2349,7 +2349,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "number": 156,
     "category": "GOODS_PROVIDER",
     "desc": [
-      "Each time another player uses a <REED>, <STONE>, <SHEEP>, or <<PIG>> accumulation space, you can pay them 1 <FOOD> to get 1 good of the respective type from the general supply."
+      "Each time another player uses a <REED>, <STONE>, <SHEEP>, or <PIG> accumulation space, you can pay them 1 <FOOD> to get 1 good of the respective type from the general supply."
     ],
     "cost": {},
     "players": "4+",
@@ -5425,7 +5425,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "number": 179,
     "category": "LIVESTOCK_PROVIDER",
     "desc": [
-      "In the returning home phase of each round, if at least 3 <WOOD> accumulation spaces are occupied, you can pay 1 <WOOD> to get 1 <<PIG>>."
+      "In the returning home phase of each round, if at least 3 <WOOD> accumulation spaces are occupied, you can pay 1 <WOOD> to get 1 <PIG>."
     ],
     "cost": {},
     "players": "5+",
@@ -5438,7 +5438,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "number": 180,
     "category": "LIVESTOCK_PROVIDER",
     "desc": [
-      "Each time you take 1/2/3 <FOOD> from a <FOOD> accumulation space, you also get 1 <CATTLE>/<<PIG>>/<SHEEP>."
+      "Each time you take 1/2/3 <FOOD> from a <FOOD> accumulation space, you also get 1 <CATTLE>/<PIG>/<SHEEP>."
     ],
     "cost": {},
     "players": "5+",
@@ -8146,7 +8146,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "number": 180,
     "category": "LIVESTOCK_PROVIDER",
     "desc": [
-      "Each time after you use a <WOOD> accumulation space, if this is the 2nd/3rd/4th occupied <WOOD> accumulation space that round, you can buy 1 <SHEEP>/<<PIG>>/<CATTLE> for 1 <FOOD>."
+      "Each time after you use a <WOOD> accumulation space, if this is the 2nd/3rd/4th occupied <WOOD> accumulation space that round, you can buy 1 <SHEEP>/<PIG>/<CATTLE> for 1 <FOOD>."
     ],
     "cost": {},
     "players": "5+",
@@ -11112,7 +11112,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "number": 180,
     "category": "LIVESTOCK_PROVIDER",
     "desc": [
-      "Each time you use an accumulation space with exactly 2/4/6 goods on it, you can leave 1/2/3 goods on the space. If you do, you get 1 <SHEEP>/<<PIG>>/<CATTLE>."
+      "Each time you use an accumulation space with exactly 2/4/6 goods on it, you can leave 1/2/3 goods on the space. If you do, you get 1 <SHEEP>/<PIG>/<CATTLE>."
     ],
     "cost": {},
     "players": "5+",
@@ -15590,7 +15590,7 @@ export const catalogCardDefinitions: readonly GeneratedCatalogCardDefinition[] =
     "number": 115,
     "category": "BUILDING_RESOURCE_PROVIDER",
     "desc": [
-      "When you play this card, you immediately get 2 <WOOD>. Each time you turn <<PIG>>, <CATTLE>, or <HORSE> into <FOOD>, you get 1 additional <WOOD> for each of these animals that you turn."
+      "When you play this card, you immediately get 2 <WOOD>. Each time you turn <PIG>, <CATTLE>, or <HORSE> into <FOOD>, you get 1 additional <WOOD> for each of these animals that you turn."
     ],
     "cost": {
       "vegetable": 1
