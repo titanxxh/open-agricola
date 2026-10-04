@@ -11,6 +11,7 @@ if (!input || !output) throw new Error('usage: room-write-trace.ts <strace.log> 
 // original workload and file kind until that thread resumes the same syscall.
 const totals: Record<string, WriteTotals> = {}
 const pending = new Map<string, { workload: string; kind: WriteKind }>()
+const completed = new Set<string>()
 let active: string | undefined
 const lines = createInterface({ input: createReadStream(input), crlfDelay: Infinity })
 for await (const line of lines) {
@@ -21,8 +22,16 @@ for await (const line of lines) {
   if (saved) pending.delete(pendingKey)
   const marker = /OA_TRACE_(BEGIN|END) ([24])/.exec(line)
   if (marker) {
-    active = marker[1] === 'BEGIN' ? marker[2] : undefined
-    if (active) totals[active] ??= { db: 0, wal: 0, sqliteTemp: 0, calls: 0 }
+    const workload = marker[2]!
+    if (marker[1] === 'BEGIN') {
+      if (active || totals[workload]) throw new Error('Repeated or overlapping workload markers')
+      active = workload
+      totals[workload] = { db: 0, wal: 0, sqliteTemp: 0, calls: 0 }
+    } else {
+      if (active !== workload) throw new Error('Mismatched workload end marker')
+      completed.add(workload)
+      active = undefined
+    }
     continue
   }
   const database = /(pwrite64|write|writev)\(\d+<[^>]+\/probe\.db(-wal)?>/.exec(line)
@@ -42,5 +51,5 @@ for await (const line of lines) {
   totals[write.workload]!.calls++
 }
 if (pending.size) throw new Error('Trace ended with unfinished database writes')
-if (Object.keys(totals).sort().join(',') !== '2,4') throw new Error('Expected both workload markers')
+if (active || [...completed].sort().join(',') !== '2,4') throw new Error('Expected both completed workload marker pairs')
 writeFileSync(output, `${JSON.stringify(totals, null, 2)}\n`)
