@@ -1,13 +1,10 @@
+import { getHistoryParticipantRoles, registerHistoryRecordIdentity, type HistoryRecordIdentity } from '../projections/history-record-identity'
+export { getHistoryRecordIdentity, inheritHistoryRecordIdentity, registerHistoryParticipantRoles, type HistoryRecordIdentity } from '../projections/history-record-identity'
 import { isHistoryParticipantNameKey } from '../projections/history-names'
 import type { GameState } from '../contract/types'
 
 export const historyStreamKeys = ['log', 'events', 'publicEventArchive'] as const
 export type HistoryStreamKind = typeof historyStreamKeys[number]
-export type HistoryRecordIdentity = {
-  recordId: string
-  operationGroupId: string
-  participantRoles: Record<string, string>
-}
 export type HistoryNode = {
   id: string
   kind: HistoryStreamKind
@@ -79,9 +76,11 @@ export const historyBranch = (values: readonly object[], kind: HistoryStreamKind
     if (!record) {
       const value = copyJson(entry)
       freeze(value)
-      record = { value, identity: { recordId: identifier(), operationGroupId: groups.get(state) ?? identifier(), participantRoles: { ...roles(entry, state), ...roleHints.get(entry) } }, links: new Map() }
+      record = { value, identity: { recordId: identifier(), operationGroupId: groups.get(state) ?? identifier(), participantRoles: { ...roles(entry, state), ...getHistoryParticipantRoles(entry) } }, links: new Map() }
       records.set(entry, record)
       records.set(value, record)
+      registerHistoryRecordIdentity(entry, record.identity)
+      registerHistoryRecordIdentity(value, record.identity)
     }
     const parentKey = `${kind}:${head?.id ?? ''}`
     let node = record.links.get(parentKey)
@@ -114,6 +113,7 @@ export const registerRestoredHistoryNode = (node: HistoryNode): void => {
   const record = records.get(node.value) ?? { value: node.value, identity: node.identity, links: new Map<string, HistoryNode>() }
   record.links.set(`${node.kind}:${node.previous?.id ?? ''}`, node)
   records.set(node.value, record)
+  registerHistoryRecordIdentity(node.value, node.identity)
 }
 
 /** Copy the small body; captured histories remain immutable, exact logical arrays. */
@@ -147,16 +147,9 @@ export const copyHistoryRecordIdentity = <T extends object>(source: T, target: T
     const version = { value, identity: record.identity, links: new Map<string, HistoryNode>() }
     records.set(target, version)
     records.set(value, version)
+    registerHistoryRecordIdentity(target, version.identity)
+    registerHistoryRecordIdentity(value, version.identity)
   }
   return target
 }
 
-const identityHints = new WeakMap<object, HistoryRecordIdentity>()
-const roleHints = new WeakMap<object, Record<string, string>>()
-export const getHistoryRecordIdentity = (value: object): HistoryRecordIdentity | undefined => records.get(value)?.identity ?? identityHints.get(value)
-export const inheritHistoryRecordIdentity = <T extends object>(source: object, target: T): T => {
-  const identity = getHistoryRecordIdentity(source)
-  if (identity) identityHints.set(target, identity)
-  return target
-}
-export const registerHistoryParticipantRoles = (value: object, roles: Record<string, string>): void => { roleHints.set(value, roles) }

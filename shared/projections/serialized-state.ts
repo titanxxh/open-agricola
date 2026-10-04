@@ -1,4 +1,4 @@
-import { inheritHistoryRecordIdentity } from '../session/history-streams'
+import { inheritHistoryRecordIdentity } from './history-record-identity'
 import type { CardStates, PlayerState, LogEntry } from '../contract/types'
 import type { GameEvent, PublicEventArchivePacket } from '../contract/events'
 import type { PublicEventCancellation } from '../contract/protocol/game'
