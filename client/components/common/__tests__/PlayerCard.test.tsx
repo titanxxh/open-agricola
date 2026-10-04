@@ -11,6 +11,7 @@ import { publicAssetUrl } from '../../../utils/public-asset-url'
 import { zh } from '../../../../shared/i18n/zh'
 import { getAnyCardDisplayName, translateCardText } from '../cardText'
 import { resolveCardDisplayName, resolveCardRef } from '../../board/card-reference'
+import { ActionLog } from '../../board/ActionLog'
 // Cards-manifest is preloaded by `client/__tests__/setup-card-manifest.ts`.
 
 describe('PlayerCard dual-type rendering (alsoCountsAs)', () => {
@@ -40,6 +41,27 @@ describe('PlayerCard dual-type rendering (alsoCountsAs)', () => {
     expect(html).toContain('需要供暖的房间数减少1间。')
     expect(html).toContain('res-icon-fuel')
     expect(html).not.toContain('Gain 2 fuel')
+  })
+
+  it('renders card-local Chinese names and default player names in actual log rows', () => {
+    registerCustomCardMetadata({
+      cardType: 'minor',
+      cardJson: {
+        id: 'CUSTOM_LocalLogName', name: 'Gleaner', deck: 'CUSTOM', number: 0,
+        desc: ['Gain 1 wood.'], implemented: true,
+        locales: { zh: { name: '拾穗者', desc: ['获得1木材。'] } },
+      },
+    })
+    const html = renderToStaticMarkup(
+      <ActionLog locale="zh" currentRound={1} log={[{
+        key: 'log.cardEffectGain',
+        params: { player: 'Player 1', cardId: 'CUSTOM_LocalLogName', gain: { wood: 1 } },
+      }]} />,
+    )
+    expect(html).toContain('拾穗者')
+    expect(html).toContain('玩家 1')
+    expect(html).not.toContain('Gleaner')
+    expect(html).not.toContain('Player 1')
   })
 
   it('resolves the Hammer Crusher prompt from the same card name as the face', () => {

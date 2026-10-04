@@ -5,6 +5,7 @@ import type { ActionSpace, FutureMeeple, FutureMeepleResourceMap, PlayerState } 
 import { PlayerCard } from '../common/PlayerCard'
 import { translateCardText } from '../common/cardText'
 import { getCardMeta } from '../../services/card-meta'
+import { getPlayerDisplayName } from '../../utils/player-name'
 
 const BOARD_W_2P = 830
 const BOARD_W_WITH_SIDE = 1000
@@ -831,7 +832,7 @@ export const ActionBoard = ({
           <div
             key={entry.key}
             className="action-farmer-stack"
-            title={entry.player.name}
+            title={getPlayerDisplayName(locale, entry.player.name, players.indexOf(entry.player))}
           >
             <div className={`action-farmer action-farmer-${entry.player.color}${entry.isNewbornOnly ? ' child' : ''}`} />
           </div>

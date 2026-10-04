@@ -49,7 +49,7 @@ export function PlayerTabs({ players, active, onChange }: Props) {
   }
 
   return (
-    <div role="tablist" className="player-tabs">
+    <div role="tablist" className={`player-tabs${players.length >= 6 ? ' player-tabs--many' : ''}`}>
       {players.map((p) => (
         <button
           key={p.id}
@@ -71,7 +71,7 @@ export function PlayerTabs({ players, active, onChange }: Props) {
           <span className="player-tabs__avatar" aria-hidden>
             {p.name.slice(0, 1).toUpperCase()}
           </span>
-          <span className="player-tabs__name">
+          <span className="player-tabs__name" title={p.name}>
             {p.isYou && <span aria-label="you">☆</span>} {p.name}
           </span>
           {p.score !== undefined && <span className="player-tabs__score">{formatScore(p.score)}</span>}

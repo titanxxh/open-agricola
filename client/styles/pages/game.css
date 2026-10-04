@@ -5644,6 +5644,25 @@ details[open] .ai-prompt-summary::before { transform: rotate(90deg); }
   font-weight: 700;
   box-shadow: var(--btn-emboss-secondary);
 }
+.player-tabs--many {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+.player-tabs--many .player-tabs__tab {
+  min-width: 0;
+  gap: 6px;
+  padding: 6px 8px;
+}
+.player-tabs__name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.player-tabs__avatar,
+.player-tabs__score {
+  flex-shrink: 0;
+}
 .player-tabs__tab.is-current-turn {
   border-width: 2px;
   border-color: var(--color-accent-strong);

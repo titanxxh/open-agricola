@@ -13,6 +13,7 @@ test('dev lobby creates a hotseat room and preserves identity after reload', asy
   await page.getByRole('button', { name: '开始热座对局', exact: true }).click()
   const handoff = page.getByRole('dialog', { name: 'Hotseat handoff' })
   await expect(handoff).toBeVisible({ timeout: 15000 })
+  await expect(handoff).not.toContainText(/Player \d/)
   const url = new URL(page.url())
   expect(url.searchParams.get('player')).toBe('p1')
   expect(url.searchParams.get('devMode')).toBe('1')
@@ -27,7 +28,8 @@ test('dev lobby creates a hotseat room and preserves identity after reload', asy
   await page.locator('.action-card-holder[data-action-id="forest"]').click()
   await page.getByRole('button', { name: '确认切换', exact: true }).click()
   await expect(handoff).toBeVisible({ timeout: 15000 })
-  await expect(handoff).not.toContainText('Player 1')
+  await expect(handoff).not.toContainText(/Player \d/)
+  await expect(handoff).toContainText('PlayerB')
 })
 
 for (const [stage, prompt] of [
@@ -113,10 +115,26 @@ test('completed fathers and the infirmary restriction have Chinese labels', asyn
     player.minorHand = ['__test_placeholder__']
     player.occupationHand = ['__test_placeholder__']
   }
+  const sickPlayer = state.players[1]
+  const sickWorkers = sickPlayer.workers.filter((worker: { isActive: boolean }) => worker.isActive)
+  sickPlayer.sickWorkerIds = sickWorkers.map((worker: { id: string }) => worker.id)
+  const infirmary = state.actionSpaces.find((space: { id: string }) => space.id === 'moor-infirmary')
+  infirmary.takenBy = sickWorkers.map((worker: { id: string; isActive: boolean }) => {
+    worker.isActive = false
+    return { playerId: sickPlayer.id, workerId: worker.id }
+  })
   expect((await postJson(request, `${BACKEND_URL}/api/game/load`, { state })).ok).toBe(true)
   await page.goto(sandboxUrl)
   await expect(page.locator('.parent-card-infobox')).toHaveText('已完成')
-  await expect(page.locator('[data-action-id="moor-infirmary"]')).toContainText('仅限生病的家庭成员')
+  const infirmaryCard = page.locator('[data-action-id="moor-infirmary"]')
+  const restriction = infirmaryCard.getByText('仅限病人', { exact: true })
+  await expect(restriction).toBeVisible()
+  await expect(infirmaryCard.locator('.action-farmer-stack')).toHaveCount(2)
+  const textBox = await restriction.boundingBox()
+  const workerBox = await infirmaryCard.locator('.action-farmer-stack').first().boundingBox()
+  expect(textBox).not.toBeNull()
+  expect(workerBox).not.toBeNull()
+  expect(textBox!.y + textBox!.height).toBeLessThanOrEqual(workerBox!.y)
   await expect(page.locator('.game-layout')).not.toContainText(/Completed|Sick workers only/)
 })
 

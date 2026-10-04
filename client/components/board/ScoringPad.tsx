@@ -15,6 +15,7 @@ import { ResourceLine } from '../common/ResourceLine'
 import { resolveCardRef } from './card-reference'
 import { LogCardLink } from './log-rendering'
 import { formatScore as formatScoreValue } from '../../utils/format-score'
+import { getPlayerDisplayName } from '../../utils/player-name'
 
 type Props = {
   locale: Locale
@@ -213,9 +214,9 @@ export const ScoringPad = ({ locale, scores, players, onClose, showDraftHistory 
               <div className="scoring-cell scoring-label">
                 {t(locale, 'ui.scoringItem')}
               </div>
-              {scores.map((player) => (
+              {scores.map((player, index) => (
                 <div key={`head-${player.playerId}`} className="scoring-cell scoring-player-name">
-                  {player.playerName}
+                  {getPlayerDisplayName(locale, player.playerName, index)}
                 </div>
               ))}
             </div>
@@ -348,8 +349,8 @@ const StatsTab = ({ locale, players }: { locale: Locale; players: PlayerState[] 
       <div className="scoring-grid">
         <div className="scoring-row scoring-header-row" style={{ gridTemplateColumns }}>
           <div className="scoring-cell scoring-label">{t(locale, 'ui.scoringItem')}</div>
-          {players.map((p) => (
-            <div key={`stats-head-${p.id}`} className="scoring-cell scoring-player-name">{p.name}</div>
+          {players.map((p, index) => (
+            <div key={`stats-head-${p.id}`} className="scoring-cell scoring-player-name">{getPlayerDisplayName(locale, p.name, index)}</div>
           ))}
         </div>
         {STATS_ROWS.map((row) => (
@@ -390,10 +391,10 @@ const DraftTab = ({ locale, players }: { locale: Locale; players: PlayerState[] 
       gap: '16px',
     }}
   >
-    {players.map((player) => (
+    {players.map((player, index) => (
       <div key={`draft-col-${player.id}`} className="scoring-draft-column">
         <div className="scoring-draft-header">
-          {player.name}
+          {getPlayerDisplayName(locale, player.name, index)}
           <span className="scoring-draft-subheader">
             {' '}— {t(locale, 'ui.draftHistoryHeader')}
           </span>

@@ -193,6 +193,7 @@ export const en = {
       },
     },
     infirmarySickWorkersOnly: 'Sick workers only',
+    defaultPlayerName: 'Player {number}',
     draft: {
       dialog: 'Card draft',
       title: 'Draft — Round {round} / {total}',

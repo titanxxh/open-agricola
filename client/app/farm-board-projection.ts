@@ -14,6 +14,7 @@ import type {
 } from '../../shared/contract/types'
 import type { Locale } from '../../shared/i18n'
 import { translateCardText } from '../components/common/cardText'
+import { getPlayerDisplayName } from '../utils/player-name'
 import {
   getAdjacentTilesForEdge,
   getFarmyardBounds,
@@ -595,9 +596,9 @@ const buildReorgRemaining = (
   }, emptyAnimalTotals())
 }
 
-const playerDisplay = (player: PlayerState): ActionBoardPlayerDisplay => ({
+const playerDisplay = (locale: Locale, player: PlayerState, playerIndex: number): ActionBoardPlayerDisplay => ({
   id: player.id,
-  name: player.name,
+  name: getPlayerDisplayName(locale, player.name, playerIndex),
   color: player.color,
 })
 
@@ -612,7 +613,7 @@ export const buildActionBoardProjection = ({
   const actionSpaceAttachments = new Map<string, ActionSpaceAttachmentDisplay[]>()
 
   for (const player of players) {
-    const owner = playerDisplay(player)
+    const owner = playerDisplay(locale, player, players.indexOf(player))
     for (const cardState of Object.values(player.cardStates ?? {})) {
       const reservedSpaces = cardState?.extraData?.[RESERVED_ACTION_SPACES_KEY]
       if (Array.isArray(reservedSpaces)) {

@@ -3,6 +3,42 @@ import { BACKEND_URL, FRONTEND_URL, getJson, postJson } from './fixtures'
 
 test.describe('Expansion display', () => {
   for (const locale of ['zh', 'en'] as const) {
+    test(`${locale} keeps six default player names on two equal rows`, async ({ page, request }) => {
+      await page.addInitScript((value) => {
+        localStorage.setItem('open-agricola-locale-v2', value)
+      }, locale)
+      await postJson(request, `${BACKEND_URL}/api/game/new`, { seed: 933, maxPlayers: 6 })
+      const { state } = await getJson(request, `${BACKEND_URL}/api/game/state`)
+      state.phase = 'playing'
+      state.currentPlayerIndex = 0
+      state.players.forEach((player: { name: string; minorHand: string[]; occupationHand: string[] }, index: number) => {
+        player.name = `Player ${index + 1}`
+        player.minorHand = ['__test_placeholder__']
+        player.occupationHand = ['__test_placeholder__']
+      })
+      expect((await postJson(request, `${BACKEND_URL}/api/game/load`, { state })).ok).toBe(true)
+      await page.goto(`${FRONTEND_URL}/?page=game&player=p1&embedded=1&devMode=1`)
+      const tabs = page.locator('.player-tabs--many .player-tabs__tab')
+      await expect(tabs).toHaveCount(6)
+      const boxes = await tabs.evaluateAll((elements) => elements.map((element) => {
+        const box = element.getBoundingClientRect()
+        const name = element.querySelector('.player-tabs__name')!
+        return { top: box.top, width: box.width, whiteSpace: getComputedStyle(name).whiteSpace }
+      }))
+      expect(new Set(boxes.map((box) => Math.round(box.top))).size).toBe(2)
+      expect(boxes.slice(0, 3).every((box) => box.top === boxes[0].top)).toBe(true)
+      expect(boxes.slice(3).every((box) => box.top === boxes[3].top)).toBe(true)
+      expect(Math.max(...boxes.map((box) => box.width)) - Math.min(...boxes.map((box) => box.width))).toBeLessThan(1)
+      expect(boxes.every((box) => box.whiteSpace === 'nowrap')).toBe(true)
+      for (let index = 0; index < 6; index++) {
+        await expect(tabs.nth(index)).toContainText(`${locale === 'zh' ? '玩家' : 'Player'} ${index + 1}`)
+      }
+      if (locale === 'zh') await expect(page.locator('.game-layout')).not.toContainText(/Player \d/)
+      await page.getByRole('button', { name: locale === 'zh' ? '计分板' : 'Scoring Pad', exact: true }).click()
+      await expect(page.locator('.scoring-pad .scoring-player-name').last())
+        .toHaveText(`${locale === 'zh' ? '玩家' : 'Player'} 6`)
+    })
+
     test(`${locale} localizes the lobby expansion toggles`, async ({ page }) => {
       await page.addInitScript((value) => {
         localStorage.setItem('open-agricola-locale-v2', value)

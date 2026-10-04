@@ -7,6 +7,7 @@ import type {
 } from '../../shared/contract/types'
 import type { Locale } from '../../shared/i18n'
 import { t } from '../../shared/i18n'
+import { getPlayerDisplayName } from '../utils/player-name'
 import { getAnyCardDisplayName, translateCardText } from '../components/common/cardText'
 import { getParentFatherOptionText } from '../components/common/parentCardText'
 import type { AnimalReorgState, PendingAnimalReorg, PendingChoice } from '../types/ui'
@@ -291,8 +292,7 @@ const buildBodyModel = (input: InteractionBarPresentationInput): InteractionBarB
     return {
       kind: 'playerSwitch',
       title: textKey('ui.interactionPlayerSwitchPrompt', {
-        player: playerNames[pending.playerSwitch.toPlayerIndex] ??
-          `Player ${pending.playerSwitch.toPlayerIndex + 1}`,
+        player: getPlayerDisplayName(input.locale, playerNames[pending.playerSwitch.toPlayerIndex], pending.playerSwitch.toPlayerIndex),
       }),
     }
   }
