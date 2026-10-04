@@ -1378,7 +1378,11 @@ export const GameContainerApi = () => {
     const playerIndex = state.currentPlayerIndex
     const current = state.players[playerIndex]
     if (!current || current.id !== devPlayerId) return
-    const clone = JSON.parse(JSON.stringify(state)) as import('../../shared/contract/types').GameState
+    // Load back the full state, not this seat's projection: the projection has
+    // masked hands and no Game Seed, and the server would fill both in afresh.
+    const clone = JSON.parse(JSON.stringify(
+      (await transport.getState({ unredacted: true })).state,
+    )) as import('../../shared/contract/types').GameState
     const cp = clone.players.find((p) => p.id === devPlayerId)
     if (!cp) return
     cp.resources.wood = Math.max(0, 6)

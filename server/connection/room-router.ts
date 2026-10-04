@@ -1134,6 +1134,8 @@ function handleNewGame(ctx: ConnectionCtx, msg: Extract<ClientCommand, { type: '
 
 function handleLoadGame(ctx: ConnectionCtx, msg: Extract<ClientCommand, { type: 'loadGame' }>): void | Promise<void> {
   const room = requireWritableRoom(ctx, msg.requestId); if (!room) return
+  // Replacing the authoritative state is a dev command like the others below.
+  if (!assertDevCommandAllowed(ctx, room, msg.requestId)) return
   return useSessionResponse(
     executeRoomSession(room, 'loadState', [msg.state], () => room.session.loadState(msg.state)),
     (resp) => publishCommandResponse(ctx, room, resp, msg, 'reconnect'),

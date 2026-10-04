@@ -114,6 +114,22 @@ describe('game seed and round cards in sync payloads', () => {
     expect(session.state.roundActionOrder).toEqual(order)
   })
 
+  it('reveals no round card while the draft or Parent Selection is still running', () => {
+    for (const options of [
+      { draftMode: 'simultaneous' as const, draftPoolSize: 7 },
+      { enableParentCards: true },
+    ]) {
+      const session = new GameSession(946, undefined, { playerCount: 2, ...options })
+
+      expect(session.state.phase).not.toBe('playing')
+      expect(session.state.round).toBe(1)
+      for (const viewer of [session.state.players[0]!.id, session.state.players[1]!.id, null]) {
+        expect(revealedRounds(stateFor(session, viewer).roundActionOrder)).toEqual([])
+      }
+      expect(stateFor(session, null, 'dev-viewer').roundActionOrder).toEqual(session.state.roundActionOrder)
+    }
+  })
+
   it('hides which card goods are scheduled on until that round is revealed', () => {
     const session = newSession(946)
     const [p1, p2] = session.state.players
