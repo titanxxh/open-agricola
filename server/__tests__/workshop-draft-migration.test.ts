@@ -136,7 +136,7 @@ describe('workshop draft migration', () => {
     const { getDb } = await import('../db.ts')
     const db = getDb()
 
-    expect(db.prepare('SELECT MAX(version) AS version FROM schema_version').get()).toEqual({ version: 31 })
+    expect(db.prepare('SELECT MAX(version) AS version FROM schema_version').get()).toEqual({ version: 33 })
     expect(db.prepare(`
       SELECT review_commit_sha, review_version_id FROM workshop_cards WHERE id = 'draft'
     `).get()).toEqual({ review_commit_sha: null, review_version_id: null })

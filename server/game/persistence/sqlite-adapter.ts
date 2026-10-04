@@ -574,8 +574,9 @@ export class SqliteRoomPersistence implements RoomPersistence {
       const row = this.loadRoom.get(id) as RoomRow | undefined
       if (!row) return null
       const players = this.loadPlayers.all(id) as RoomMeta['players']
-      const snapshot = toSnapshot(row, players)
-      snapshot.serialized = row.state_json ? this.history.restore(id, row.state_json) : null
+      const serialized = row.state_json ? this.history.restore(id, row.state_json) : null
+      const snapshot = toSnapshot({ ...row, state_json: null }, players)
+      snapshot.serialized = serialized
       return snapshot
     } catch (err) {
       if (err instanceof RoomHistoryCorruptionError) throw err
@@ -698,8 +699,9 @@ export class SqliteRoomPersistence implements RoomPersistence {
       const snapshots: RoomSnapshot[] = []
       for (const { row, players } of groupedRows.values()) {
         try {
-          const snapshot = toSnapshot(row, players)
-          snapshot.serialized = row.state_json ? this.history.restore(row.id, row.state_json) : null
+          const serialized = row.state_json ? this.history.restore(row.id, row.state_json) : null
+          const snapshot = toSnapshot({ ...row, state_json: null }, players)
+          snapshot.serialized = serialized
           snapshots.push(snapshot)
         } catch (err) {
           if (err instanceof RoomHistoryCorruptionError) throw err

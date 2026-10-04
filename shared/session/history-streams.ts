@@ -106,11 +106,35 @@ export const registerRestoredHistoryNode = (node: HistoryNode): void => {
 
 /** Copy the small body; captured histories remain immutable, exact logical arrays. */
 export const captureStateWithHistory = <T extends Pick<GameState, 'log' | 'events' | 'publicEventArchive' | 'players'>>(state: T): T => {
-  const { log, events, publicEventArchive, ...body } = state
-  return {
-    ...copyJson(body),
-    log: materializeHistoryBranch(historyBranch(log, 'log', state)),
-    events: materializeHistoryBranch(historyBranch(events, 'events', state)),
-    publicEventArchive: materializeHistoryBranch(historyBranch(publicEventArchive, 'publicEventArchive', state)),
-  } as T
+  const { log: _log, events: _events, publicEventArchive: _archive, ...body } = state
+  const copied = copyJson(body) as Record<string, unknown>
+  return Object.fromEntries(Object.keys(state).flatMap(key => {
+    if (historyStreamKeys.includes(key as HistoryStreamKind)) {
+      const kind = key as HistoryStreamKind
+      return [[kind, materializeHistoryBranch(historyBranch(state[kind], kind, state))]]
+    }
+    return Object.hasOwn(copied, key) ? [[key, copied[key]]] : []
+  })) as T
+}
+
+const recoveryIdentities = new WeakMap<object, string>()
+export const recoveryRecordId = (value: object): string => {
+  let id = recoveryIdentities.get(value)
+  if (!id) { id = identifier(); recoveryIdentities.set(value, id) }
+  return id
+}
+export const registerRecoveryRecordId = (value: object, id: string): void => { recoveryIdentities.set(value, id) }
+export const registerHistoryBranch = (values: readonly object[], branch: HistoryBranch): void => { branches.set(values, branch) }
+
+/** A renamed raw parameter version retains the record's original operation and roles. */
+export const copyHistoryRecordIdentity = <T extends object>(source: T, target: T): T => {
+  const record = records.get(source)
+  if (record) {
+    const value = copyJson(target)
+    freeze(value)
+    const version = { value, identity: record.identity, links: new Map<string, HistoryNode>() }
+    records.set(target, version)
+    records.set(value, version)
+  }
+  return target
 }

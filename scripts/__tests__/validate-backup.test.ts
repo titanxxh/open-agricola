@@ -111,8 +111,12 @@ describe('backup validation', () => {
 
   it('runs target migrations and validates room, replay, and viewer recovery', () => {
     const { db } = createFixture()
+    const logicalSnapshot = new SqliteRoomPersistence(db).load('room-1')!.serialized
+    db.prepare("UPDATE rooms SET state_json = ? WHERE id = 'room-1'").run(JSON.stringify(logicalSnapshot))
     db.exec(`
       ALTER TABLE game_result_players DROP COLUMN name_is_default;
+      DROP TABLE room_recovery_nodes;
+      DROP TABLE room_history_nodes;
       DROP TABLE github_webhook_events;
       ALTER TABLE workshop_cards DROP COLUMN review_commit_sha;
       ALTER TABLE workshop_cards DROP COLUMN review_version_id;
@@ -123,7 +127,7 @@ describe('backup validation', () => {
       formatVersion: 1,
       ...metadata,
       sourceDatabaseSchemaVersion: 26,
-      targetDatabaseSchemaVersion: 31,
+      targetDatabaseSchemaVersion: 33,
       replaySchemaVersions: [1],
       roomCount: 1,
       replayCount: 1,
