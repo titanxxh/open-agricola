@@ -590,8 +590,9 @@ export const filterSerializedStateForPlayer = (
   )
   const filteredEvents = filterHiddenHandEvents(base.events, hiddenRefs, seqView)
   const filteredPublicEventArchive = filterHiddenHandArchive(base.publicEventArchive, hiddenRefs, seqView)
-  // A round card is revealed when its round starts.
-  const isRevealed = (round: number): boolean => round <= base.round
+  // A round card is revealed when its round starts. `round` is already 1 during
+  // the draft and Parent Selection, before round 1 has begun.
+  const isRevealed = (round: number): boolean => base.phase === 'playing' && round <= base.round
   const { gameSeed: _gameSeed, ...withoutSeed } = base
   return {
     ...withoutSeed,

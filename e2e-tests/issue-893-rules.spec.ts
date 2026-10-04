@@ -43,12 +43,9 @@ test('D159 public multi-player sale supports cooking and a chosen buyer', async 
     await captureState(page)
     return page
   }))
-  await pages[0]!.goto('/?player=p1&transport=ws&maxPlayers=4&devMode=1')
-  const room = pages[0]!.locator('.ws-invite-roomid strong')
-  await expect(room).toBeVisible({ timeout: 30000 })
-  const roomId = await room.textContent()
-  for (const index of [1, 2, 3]) {
-    await pages[index]!.goto(`/?player=p${index + 1}&transport=ws&room=${roomId}&devMode=1`)
+  // `loadGame` is a dev command, so the scenarios are staged in the four-player dev room.
+  for (const index of [0, 1, 2, 3]) {
+    await pages[index]!.goto(`/?player=p${index + 1}&transport=ws&room=dev4&devMode=1`)
   }
   for (const page of pages) await expect(page.locator('.game-layout')).toBeVisible({ timeout: 30000 })
   const created = await request.post(`${BACKEND_URL}/api/game/new`, { data: { seed: 893159, playerCount: 4, maxPlayers: 4 } })

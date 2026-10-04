@@ -582,6 +582,10 @@ describe('handleCreateRoom', () => {
     const ctx = newCtx()
     ctx.currentUserId = 'u1'
     dispatch(ctx, { type: 'createRoom', maxPlayers: 2 })
+    const devRoom = ctx.currentRoom!
+    ctx.registry.delete(devRoom.id)
+    devRoom.id = 'dev2-00000000-0000-4000-8000-000000000000'
+    ctx.registry.set(devRoom)
     markRoomStarted(ctx)
     const loaded = JSON.parse(JSON.stringify(ctx.currentRoom!.session.getState().state)) as GameState
     loaded.gameSeed = 777
@@ -590,6 +594,28 @@ describe('handleCreateRoom', () => {
 
     ctx.checkpoint.flushAll()
     expect(ctx.persistence.load(ctx.currentRoom!.id)?.serialized?.state.gameSeed).toBe(777)
+  })
+
+  it('rejects loadGame outside dev rooms', () => {
+    const ctx = newCtx()
+    ctx.currentUserId = 'u1'
+    dispatch(ctx, { type: 'createRoom', maxPlayers: 2 })
+    markRoomStarted(ctx)
+    const session = ctx.currentRoom!.session
+    const seedBefore = session.state.gameSeed
+    const forged = JSON.parse(JSON.stringify(session.getState().state)) as GameState
+    forged.gameSeed = 777
+    forged.players[0]!.resources.wood = 99
+
+    dispatch(ctx, { type: 'loadGame', state: forged, requestId: 'load-1' })
+
+    expect(sentMessagesOf(ctx)).toContainEqual({
+      type: 'error',
+      error: 'dev commands disabled for this room',
+      requestId: 'load-1',
+    })
+    expect(ctx.currentRoom!.session.state.gameSeed).toBe(seedBefore)
+    expect(ctx.currentRoom!.session.state.players[0]!.resources.wood).toBe(0)
   })
 
   it('exports unredacted state only from development rooms', () => {
