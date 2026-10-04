@@ -547,7 +547,7 @@ function handleCreateRoom(ctx: ConnectionCtx, msg: Extract<ClientCommand, { type
   ctx.currentPlayerIndex = 0
   const name = typeof (msg as Record<string, unknown>).name === 'string'
     ? (msg as Record<string, unknown>).name as string
-    : 'Player 1'
+    : ''
   room.players.push({ ws: ctx.ws, playerIndex: 0, name, userId: ctx.currentUserId })
   if (room.customSessionExecutor) void room.customSessionExecutor.updatePlayerNames([[0, name]])
   else room.session.updatePlayerName(0, name)
@@ -705,9 +705,10 @@ function handleJoinRoom(ctx: ConnectionCtx, msg: Extract<ClientCommand, { type: 
   ctx.currentPlayerIndex = seat.playerIndex
   const requestedName = typeof (msg as Record<string, unknown>).name === 'string'
     ? (msg as Record<string, unknown>).name as string
-    : `Player ${ctx.currentPlayerIndex + 1}`
+    : ''
+  const currentPlayer = room.session.state.players[ctx.currentPlayerIndex]
   const name = wasPlaying
-    ? room.session.state.players[ctx.currentPlayerIndex]?.name ?? requestedName
+    ? currentPlayer?.nameIsDefault ? '' : currentPlayer?.name ?? requestedName
     : requestedName
   const replacedPlayer = seat.replacedExistingPlayer
     ? room.players.find(

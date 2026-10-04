@@ -13,7 +13,8 @@ test('dev lobby creates a hotseat room and preserves identity after reload', asy
   await page.getByRole('button', { name: '开始热座对局', exact: true }).click()
   const handoff = page.getByRole('dialog', { name: 'Hotseat handoff' })
   await expect(handoff).toBeVisible({ timeout: 15000 })
-  await expect(handoff).not.toContainText(/(?:Player|player)(?: [1-6]|[A-F])/)
+  // The dev account supplies this name explicitly; preserve it like a real numeric account name.
+  await expect(handoff).toContainText('请把设备交给 Player 1。')
   const url = new URL(page.url())
   expect(url.searchParams.get('player')).toBe('p1')
   expect(url.searchParams.get('devMode')).toBe('1')
@@ -23,6 +24,7 @@ test('dev lobby creates a hotseat room and preserves identity after reload', asy
   await expect(page.locator('.game-layout')).toBeVisible()
   await page.reload()
   await expect(handoff).toBeVisible({ timeout: 15000 })
+  await expect(handoff).toContainText('请把设备交给 Player 1。')
   await handoff.getByRole('button').click()
   await expect(page.locator('.game-layout')).toBeVisible()
   await page.locator('.action-card-holder[data-action-id="forest"]').click()

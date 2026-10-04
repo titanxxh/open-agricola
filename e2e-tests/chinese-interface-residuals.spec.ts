@@ -26,6 +26,30 @@ const signIn = async (page: Page, request: APIRequestContext, displayName = '录
   return cookie
 }
 
+test('WebSocket default names remain localized through development joins and reload', async ({ page, browser }) => {
+  await page.addInitScript(() => localStorage.setItem('open-agricola-locale-v2', 'zh'))
+  await page.goto(`${FRONTEND_URL}/?page=game&transport=ws&room=dev2&player=p1&devMode=1`, { waitUntil: 'domcontentloaded' })
+  const guestContext = await browser.newContext()
+  try {
+    await guestContext.addInitScript(() => localStorage.setItem('open-agricola-locale-v2', 'zh'))
+    const guest = await guestContext.newPage()
+    await guest.goto(`${FRONTEND_URL}/?page=game&transport=ws&room=dev2&player=p2&devMode=1`, { waitUntil: 'domcontentloaded' })
+    for (const connected of [page, guest]) {
+      const game = connected.locator('.game-layout')
+      await expect(game).toBeVisible()
+      await expect(game).toContainText('玩家 1')
+      await expect(game).toContainText('玩家 2')
+      await expect(game).not.toContainText(/(?:Player|player)(?: [1-6]|[A-F])/)
+    }
+    await expect(guest.locator('.waiting-turn')).toHaveText('玩家 1')
+    await guest.reload({ waitUntil: 'domcontentloaded' })
+    await expect(guest.locator('.waiting-turn')).toHaveText('玩家 1')
+    await expect(guest.locator('.game-layout')).not.toContainText(/(?:Player|player)(?: [1-6]|[A-F])/)
+  } finally {
+    await guestContext.close()
+  }
+})
+
 for (const displayName of ['录制玩家', 'PlayerF', 'Player 6']) {
   test(`authenticated six-player hotseat preserves ${displayName} and localizes generated names`, async ({ page, request }) => {
     await page.addInitScript(() => localStorage.setItem('open-agricola-locale-v2', 'zh'))
