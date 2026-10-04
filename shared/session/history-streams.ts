@@ -120,13 +120,8 @@ export const registerRestoredHistoryNode = (node: HistoryNode): void => {
 export const captureStateWithHistory = <T extends Pick<GameState, 'log' | 'events' | 'publicEventArchive' | 'players'>>(state: T, cloneBody: <V>(value: V) => V = copyJson): T => {
   const { log: _log, events: _events, publicEventArchive: _archive, ...body } = state
   const copied = cloneBody(body) as Record<string, unknown>
-  return Object.fromEntries(Object.keys(state).flatMap(key => {
-    if (historyStreamKeys.includes(key as HistoryStreamKind)) {
-      const kind = key as HistoryStreamKind
-      return [[kind, materializeHistoryBranch(historyBranch(state[kind], kind, state))]]
-    }
-    return Object.hasOwn(copied, key) ? [[key, copied[key]]] : []
-  })) as T
+  for (const kind of historyStreamKeys) copied[kind] = materializeHistoryBranch(historyBranch(state[kind], kind, state))
+  return copied as T
 }
 
 const recoveryIdentities = new WeakMap<object, string>()
@@ -152,4 +147,3 @@ export const copyHistoryRecordIdentity = <T extends object>(source: T, target: T
   }
   return target
 }
-

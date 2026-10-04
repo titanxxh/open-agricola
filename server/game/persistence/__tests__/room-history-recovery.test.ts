@@ -26,6 +26,25 @@ const database = () => {
 }
 
 describe('Room-owned history recovery', () => {
+  it('preserves own prototype-named keys and undefined values through command rollback', () => {
+    const game = session()
+    const data = JSON.parse('{"__proto__":{"marker":true}}') as Record<string, unknown>
+    data.missing = undefined
+    game.state.players[0]!.cardStates.A075_LumberMill = { extraData: data }
+    const checkpoint = game.createCommandCheckpoint()
+    const captured = checkpoint.state.players[0]!.cardStates.A075_LumberMill!.extraData!
+    expect(Object.hasOwn(captured, '__proto__')).toBe(true)
+    expect(Object.hasOwn(captured, 'missing')).toBe(true)
+    expect(Object.getPrototypeOf(captured)).toBe(Object.prototype)
+    game.state.players[0]!.cardStates.A075_LumberMill!.extraData = { changed: true }
+    game.restoreCommandCheckpoint(checkpoint)
+    const restored = game.state.players[0]!.cardStates.A075_LumberMill!.extraData!
+    expect(restored).toEqual(data)
+    expect(Object.hasOwn(restored, '__proto__')).toBe(true)
+    expect(Object.hasOwn(restored, 'missing')).toBe(true)
+    expect(Object.getPrototypeOf(restored)).toBe(Object.prototype)
+  })
+
   it('rolls back new history and the Room when a history record write fails, then retries the frozen snapshot', () => {
     const db = database()
     let fail = false
