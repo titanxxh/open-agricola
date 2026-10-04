@@ -388,7 +388,11 @@ const cloneCommandValue = <T>(value: T): T => {
   if (Array.isArray(value)) return value.map(entry => cloneCommandValue(entry)) as T
   if (!value || typeof value !== 'object') return value
   const copied: Record<string, unknown> = {}
-  for (const key of Object.keys(value)) copied[key] = cloneCommandValue((value as Record<string, unknown>)[key])
+  for (const key of Object.keys(value)) {
+    const entry = cloneCommandValue((value as Record<string, unknown>)[key])
+    if (key === '__proto__') Object.defineProperty(copied, key, { value: entry, writable: true, enumerable: true, configurable: true })
+    else copied[key] = entry
+  }
   return copied as T
 }
 
