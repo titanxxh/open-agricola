@@ -14,7 +14,7 @@ const command = async (page: Page, body: Record<string, unknown>) => {
   await page.evaluate(({ body, requestId }) => (window as AuditWindow).auditSocket.send(JSON.stringify({ ...body, requestId })), { body, requestId })
   await expect.poll(() => page.evaluate(id => (window as AuditWindow).auditMessages.some(message => 'requestId' in message && message.requestId === id), requestId)).toBe(true)
   const result = await page.evaluate(id => (window as AuditWindow).auditMessages.find(message => 'requestId' in message && message.requestId === id), requestId)
-  expect(result?.type).toBe('stateUpdate')
+  expect(result?.type, JSON.stringify(result)).toBe('stateUpdate')
   if (result?.type === 'stateUpdate') expect(result.payload.ok, result.payload.error).toBe(true)
 }
 
@@ -60,13 +60,6 @@ test('real Room history loads earlier groups, preserves cancellation markers and
   const room = await p1.locator('.ws-invite-roomid strong').textContent()
   await p2.goto(`/?player=p2&transport=ws&room=${room}`)
   for (const page of pages) await expect(page.locator('.game-layout')).toBeVisible({ timeout: 30000 })
-  const initial = await request.post(`${BACKEND_URL}/api/game/new`, { data: { seed: 563, playerCount: 2 } })
-  const game = (await initial.json()).state
-  game.players.forEach((player: { name: string; minorHand: string[]; occupationHand: string[]; resources: { food: number } }, index: number) => {
-    player.name = `History${index}`
-    player.minorHand = ['__test_placeholder__']; player.occupationHand = ['__test_placeholder__']; player.resources.food = 100
-  })
-  await command(p1, { type: 'loadGame', state: game })
   for (let index = 0; index < 28; index++) {
     let current = await snapshot(p1)
     while (current.interaction.stateId === 'wait') {
