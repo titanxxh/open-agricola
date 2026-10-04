@@ -4,7 +4,9 @@ import { join } from 'node:path'
 import { tmpdir } from 'node:os'
 import { JsonRoomPersistence } from '../game/persistence/json-adapter'
 import { InMemoryRoomPersistence } from '../game/persistence/memory-adapter'
+import { eventsToLogEntries } from '../../shared/events/log-mapper'
 import type { GameEvent } from '../../shared/contract/events'
+import { withRoomParticipantNames } from '../connection/history-presentation'
 import { GameSession } from '../game/authoritative-session'
 import { rehydrateState, serializeSessionSnapshot, serializeState } from '../../shared/session/serialization'
 import { buildRoomHistoryPage, describeHistory, HISTORY_WINDOW_GROUPS, HistoryBranchChangedError } from '../../shared/session/history-window'
@@ -77,6 +79,47 @@ describe('complete operation-group Room history pages', () => {
     addActions(session, 1)
     expect(() => buildRoomHistoryPage(session.withCtx(() => serializeState(session.state, {})), 'p1', JSON.stringify({ branchId: branch, beforeGroup: 'old' }))).toThrow(HistoryBranchChangedError)
   })
+  it('retains explicit playerRefs with duplicate names through JSON recovery and name projection', () => {
+    const session = setup()
+    session.state.players.forEach(player => { player.name = 'Same' })
+    session.loadState({ ...session.state, log: [{ key: 'log.cardPassed',
+      playerRefs: { fromPlayer: 'p1', toPlayer: 'p2' },
+      params: { fromPlayer: 'Same', toPlayer: 'Same', cardId: 'A075_HouseExtension' } }] })
+    const saved = JSON.parse(JSON.stringify(serializeSessionSnapshot(session.state, session)))
+    const restarted = new GameSession(rehydrateState(saved))
+    restarted.updatePlayerName(0, 'Left')
+    restarted.updatePlayerName(1, 'Right')
+    const raw = restarted.withCtx(() => serializeState(restarted.state, {}))
+    expect(buildRoomHistoryPage(raw, 'p1').log[0]).toMatchObject({ params: { fromPlayer: 'Left', toPlayer: 'Right' } })
+    expect(raw.log[0]!.params).toMatchObject({ fromPlayer: 'Same', toPlayer: 'Same' })
+  })
+
+  it('gives explicit semantic actor identity precedence over ambiguous event hints', () => {
+    const session = setup()
+    session.state.players.forEach(player => { player.name = 'Same' })
+    const event: GameEvent = { schemaVersion: 1, id: 'renovated', seq: 1, round: 1, phase: 'work',
+      type: 'farm.renovated', visibility: 'public', actorPlayerId: 'p1', playerId: 'p2',
+      sourceActionId: 'renovate-house', from: 'wood', to: 'clay', rooms: [{ row: 0, col: 0 }] }
+    session.loadState({ ...session.state, log: eventsToLogEntries([event], { playerNames: { p1: 'Same', p2: 'Same' } }) })
+    serializeSessionSnapshot(session.state, session)
+    session.updatePlayerName(0, 'Actor')
+    session.updatePlayerName(1, 'Target')
+    const raw = session.withCtx(() => serializeState(session.state, {}))
+    expect(raw.log[0]).toMatchObject({ playerId: 'p1', params: { player: 'Same' } })
+    expect(buildRoomHistoryPage(raw, 'p1').log[0]).toMatchObject({ params: { player: 'Actor' } })
+  })
+
+  it('keeps generated name provenance for empty connection names and marks chosen names literal', () => {
+    const session = setup()
+    session.updatePlayerName(0, '')
+    const raw = session.withCtx(() => serializeState(session.state, {}))
+    const generated = withRoomParticipantNames({ players: [{ playerIndex: 0, name: '' }] }, raw)
+    expect(generated.players[0]).toMatchObject({ name: 'Player 1', nameIsDefault: true })
+    const chosen = withRoomParticipantNames({ players: [{ playerIndex: 0, name: 'Player 6' }] }, raw)
+    expect(chosen.players[0]).toMatchObject({ name: 'Player 6', nameIsDefault: false })
+    expect(raw.players[0]).toMatchObject({ name: 'Player 1', nameIsDefault: true })
+  })
+
   it('filters hidden canceled events before paging and binds cursors to the viewer', () => {
     const session = setup()
     addActions(session, 28)

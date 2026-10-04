@@ -409,7 +409,6 @@ const serializableCheckpoint = (checkpoint: SessionCommandCheckpoint): SessionCo
 
 const preservePlayerDisplayNames = (current: GameState, restored: GameState): GameState => {
   const currentPlayers = new Map(current.players.map((player) => [player.id, player]))
-  const names = new Map(current.players.map((player) => [player.id, player.name]))
   for (const player of restored.players) {
     const currentPlayer = currentPlayers.get(player.id)
     if (currentPlayer) {

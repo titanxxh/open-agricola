@@ -991,7 +991,7 @@ export function runMigrations(
       version: 32,
       sql: ROOM_HISTORY_SCHEMA,
     },
-    { version: 32, sql: ROOM_RECOVERY_SCHEMA },
+    { version: 33, sql: ROOM_RECOVERY_SCHEMA },
   ]
 
   const insert = db.prepare('INSERT INTO schema_version (version) VALUES (?)')

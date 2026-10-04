@@ -58,8 +58,16 @@ const roles = (value: object, state: Pick<GameState, 'players'>): Record<string,
     }
   }
   visit(value, '')
-  const actor = (value as { playerId?: string }).playerId
-  if (actor) result['params.player'] = actor
+  Object.assign(result, getHistoryParticipantRoles(value))
+  // Semantic references on the raw log take precedence over inferred event/name hints.
+  const log = value as { playerId?: string; playerRefs?: Record<string, string> }
+  if (log.playerId) {
+    result['params.player'] = log.playerId
+    result['params.playerName'] = log.playerId
+  }
+  for (const [key, playerId] of Object.entries(log.playerRefs ?? {})) {
+    if (ids.has(playerId) && isHistoryParticipantNameKey(key)) result[`params.${key}`] = playerId
+  }
   return result
 }
 
@@ -76,7 +84,7 @@ export const historyBranch = (values: readonly object[], kind: HistoryStreamKind
     if (!record) {
       const value = copyJson(entry)
       freeze(value)
-      record = { value, identity: { recordId: identifier(), operationGroupId: groups.get(state) ?? identifier(), participantRoles: { ...roles(entry, state), ...getHistoryParticipantRoles(entry) } }, links: new Map() }
+      record = { value, identity: { recordId: identifier(), operationGroupId: groups.get(state) ?? identifier(), participantRoles: roles(entry, state) }, links: new Map() }
       records.set(entry, record)
       records.set(value, record)
       registerHistoryRecordIdentity(entry, record.identity)
