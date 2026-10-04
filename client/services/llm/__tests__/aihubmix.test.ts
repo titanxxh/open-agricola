@@ -54,7 +54,7 @@ describe('aihubmixGenerateImage', () => {
       text: async () => 'Unauthorized',
     })
     await expect(aihubmixProvider.generateImage!('x', baseConfig))
-      .rejects.toThrow(/AiHubMix API error 401/)
+      .rejects.toMatchObject({ message: expect.stringMatching(/AiHubMix API error 401/) })
   })
 
   it('returns null when the response has no inline image part', async () => {
