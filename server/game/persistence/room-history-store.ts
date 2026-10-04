@@ -1,3 +1,4 @@
+import { frameHash, type JsonValue } from '../replay-codec'
 import { createHash } from 'node:crypto'
 import type Database from 'better-sqlite3'
 import { historyBranch, materializeHistoryBranch, recoveryRecordId, registerRecoveryRecordId, registerRestoredHistoryNode, historyStreamKeys, type HistoryNode, type HistoryRecordIdentity, type HistoryStreamKind } from '../../../shared/session/history-streams'
@@ -8,7 +9,7 @@ import type { GameState } from '../../../shared/contract/types'
 type Reference = { kind: HistoryStreamKind; head: string | null; length: number; branch: string }
 type StoredState = Record<string, unknown> & { historyStreams: Reference[] }
 type StoredCursor = Omit<SessionPrivateCursor, 'history' | 'provisionalContinuationScopes'> & { undoHistory?: string[]; provisionalContinuationScopes?: Array<Omit<SessionPrivateCursor['provisionalContinuationScopes'][number], 'checkpoint'> & { checkpointRef: string }> }
-type StoredSnapshot = { roomHistoryVersion: 1; state: StoredState; frame: PersistedSessionSnapshot['frame']; sessionCursor: StoredCursor }
+type StoredSnapshot = { roomHistoryVersion: 1; state: StoredState; frameWithoutStreams: StoredState; rawFrameHash: string; sessionCursor: StoredCursor }
 type NodeRow = { node_id: string; kind: HistoryStreamKind; previous_id: string | null; length: number; record_json: string; identity_json: string; checksum: string }
 export type RecoveryNode = { id: string; kind: 'undo' | 'checkpoint'; json: string }
 export type PackedRoomSnapshot = { json: string; nodes: HistoryNode[]; recoveryNodes: RecoveryNode[] }
@@ -42,13 +43,13 @@ export class RoomHistoryStore {
       VALUES (@roomId, @node_id, @kind, @body_json, @checksum) ON CONFLICT(room_id, node_id) DO NOTHING`)
     this.selectRecovery = db.prepare('SELECT kind, body_json, checksum FROM room_recovery_nodes WHERE room_id = ? AND node_id = ?')
   }
-  prepare(roomId: string, snapshot: PersistedSessionSnapshot): PackedRoomSnapshot {
+  prepare(roomId: string, snapshot: PersistedSessionSnapshot, expectedFrameHash?: string): PackedRoomSnapshot {
     if (!('state' in snapshot)) return { json: JSON.stringify(snapshot), nodes: [], recoveryNodes: [] }
     const nodes: HistoryNode[] = []
     const recoveryNodes: RecoveryNode[] = []
     const known = this.durable.get(roomId) ?? new Set<string>()
     const pending = new Set<string>()
-    const packState = (state: PersistedSessionSnapshot['state']): StoredState => {
+    const packState = (state: Pick<GameState, 'log' | 'events' | 'publicEventArchive' | 'players'>): StoredState => {
       const references: Reference[] = []
       for (const kind of historyStreamKeys) {
         const values = state[kind]
@@ -83,7 +84,7 @@ export class RoomHistoryStore {
       return id
     }
     const { history = [], provisionalContinuationScopes, ...runtime } = snapshot.sessionCursor
-    const stored: StoredSnapshot = { roomHistoryVersion: 1, state: packState(snapshot.state), frame: snapshot.frame, sessionCursor: {
+    const stored: StoredSnapshot = { roomHistoryVersion: 1, state: packState(snapshot.state), frameWithoutStreams: packState(snapshot.frame), rawFrameHash: expectedFrameHash ?? frameHash(snapshot.frame as unknown as JsonValue), sessionCursor: {
       ...runtime,
       ...('history' in snapshot.sessionCursor ? { undoHistory: history.map(packUndo) } : {}),
       ...(provisionalContinuationScopes ? { provisionalContinuationScopes: provisionalContinuationScopes.map(({ checkpoint, ...scope }) => ({ ...scope, checkpointRef: packCheckpoint(checkpoint) })) } : {}),
@@ -186,7 +187,9 @@ export class RoomHistoryStore {
       return checkpoint
     }
     const { undoHistory, provisionalContinuationScopes, ...runtime } = stored.sessionCursor
-    const snapshot = { state: restoreState(stored.state), frame: stored.frame, sessionCursor: {
+    const frame = restoreState(stored.frameWithoutStreams) as unknown as PersistedSessionSnapshot['frame']
+    if (frameHash(frame as unknown as JsonValue) !== stored.rawFrameHash) throw new RoomHistoryCorruptionError(`Room Frame hash mismatch for ${roomId}`)
+    const snapshot = { state: restoreState(stored.state), frame, sessionCursor: {
       ...runtime,
       ...(undoHistory ? { history: undoHistory.map(restoreUndo) } : {}),
       ...(provisionalContinuationScopes ? { provisionalContinuationScopes: provisionalContinuationScopes.map(({ checkpointRef, ...scope }) => ({ ...scope, checkpoint: restoreCheckpoint(checkpointRef) })) } : {}),

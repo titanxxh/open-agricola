@@ -165,5 +165,36 @@ describe('Room-owned history recovery', () => {
     expect(response.state.log.filter(entry => entry.key === 'log.provisionalContinuationRollback')).toHaveLength(1)
     db.close()
   })
+  it('atomically stores exact Frame-only history versions and future derived fields', () => {
+    const db = database()
+    let fail = true
+    const persistence = new SqliteRoomPersistence({
+      transaction: db.transaction.bind(db),
+      prepare: (sql: string) => {
+        const statement = db.prepare(sql)
+        if (!sql.includes('INSERT INTO room_history_nodes')) return statement
+        return new Proxy(statement, { get(target, key) {
+          if (key === 'run') return (...args: unknown[]) => {
+            if (fail && (args[0] as { record_json: string }).record_json.includes('frameOnlyCapture')) throw new Error('Frame history write failed')
+            return Reflect.apply(target.run, target, args)
+          }
+          const value = Reflect.get(target, key)
+          return typeof value === 'function' ? value.bind(target) : value
+        } })
+      },
+    })
+    const game = session()
+    const snapshot = serializeSessionSnapshot(game.state, game)
+    snapshot.frame.log = [{ key: 'frameOnlyCapture', playerId: 'p1', params: { player: 'Original mixed name' } }]
+    Object.assign(snapshot.frame, { futureProjection: { exactValue: 1234 }, scores: [{ playerId: 'p1', total: -7 }] })
+    expect(() => persistence.save('r', snapshot, meta)).toThrow('Frame history write failed')
+    expect(persistence.load('r')).toBeNull()
+    fail = false
+    persistence.save('r', snapshot, meta)
+    game.updatePlayerName(0, 'Current display name')
+    expect(persistence.loadReplayFrame('r')).toEqual(snapshot.frame)
+    expect(persistence.load('r')!.serialized!.frame).toEqual(snapshot.frame)
+    db.close()
+  })
 
 })

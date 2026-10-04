@@ -1020,6 +1020,31 @@ describe('RoomCommitter', () => {
     })
   })
 
+  it('recovers and commits from the Room head despite corrupt Replay payload', () => {
+    const room = makeRoom()
+    const first = createCommitter()
+    first.prepareRoom(room, { missingPrefix: false })
+    first.commit(room, room.session.devSetResources(0, { food: 7 }), actionIntent!, 0)
+    db.exec("UPDATE game_replay_steps SET payload_gzip = X'ff'")
+    const restored = snapshotToRoom(persistence.load(room.id)!)
+    const recovered = createCommitter({ enabled: false })
+    expect(recovered.prepareRoom(restored, { missingPrefix: true })).toMatchObject({ kind: 'committed', stepNo: 1 })
+    expect(recovered.commit(restored, restored.session.devSetResources(1, { food: 8 }), actionIntent!, 1))
+      .toMatchObject({ kind: 'committed', stepNo: 2 })
+  })
+
+  it('permanently blocks a corrupt Room history reference without scheduling storage retries', () => {
+    const room = makeRoom()
+    createCommitter().prepareRoom(room, { missingPrefix: false })
+    const restored = snapshotToRoom(persistence.load(room.id)!)
+    db.exec("DELETE FROM room_history_nodes")
+    const { scheduler, tasks } = fakeScheduler()
+    const recovered = createCommitter({ scheduler })
+    expect(recovered.prepareRoom(restored, { missingPrefix: true })).toMatchObject({ kind: 'blocked', error: expect.stringContaining('Missing Room history') })
+    expect(tasks).toHaveLength(0)
+    expect(recovered.blockedError(room.id)).toContain('Missing Room history')
+  })
+
   it('pauses and retries persisted replay-frame reads', () => {
     const room = makeRoom()
     const firstCommitter = createCommitter()

@@ -603,7 +603,7 @@ export class SqliteRoomPersistence implements RoomPersistence {
 
   commitReplay(commit: ReplayCommit): ReplayCommitResult {
     try {
-      const packed = this.history.prepare(commit.roomId, commit.serialized)
+      const packed = this.history.prepare(commit.roomId, commit.serialized, commit.step.frameHash)
       const result = this.commitReplayTransaction(commit, packed)
       if (result.kind === 'committed') {
         if (commit.result) this.history.forget(commit.roomId)
