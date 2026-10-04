@@ -6,6 +6,7 @@ describe('bug report migration', () => {
   it('upgrades a v24 database with bug-report security state', () => {
     const db = new Database(':memory:')
     db.exec(`
+      CREATE TABLE game_result_players (display_name TEXT NOT NULL);
       CREATE TABLE schema_version (version INTEGER PRIMARY KEY);
       INSERT INTO schema_version VALUES (24);
       CREATE TABLE oauth_states (
@@ -55,7 +56,7 @@ describe('bug report migration', () => {
     runMigrations(db)
 
     expect(db.prepare('SELECT MAX(version) AS version FROM schema_version').get())
-      .toEqual({ version: 30 })
+      .toEqual({ version: 31 })
     expect((db.pragma('table_info(oauth_states)') as Array<{ name: string }>)
       .map(({ name }) => name)).toEqual(expect.arrayContaining([
       'pkce_verifier_ciphertext',

@@ -43,6 +43,7 @@ const createDb = () => {
       player_index INTEGER NOT NULL,
       game_player_id TEXT NOT NULL,
       user_id TEXT,
+      name_is_default INTEGER NOT NULL DEFAULT 0,
       display_name TEXT NOT NULL,
       score INTEGER NOT NULL
     );
@@ -103,10 +104,10 @@ const insertCompleted = (
     INSERT INTO game_results VALUES (?, 10, 20, 14, 2, 1, 0, 1, 0, ?)
   `).run(roomId, options.snakeOpening ? 1 : 0)
   db.prepare(`
-    INSERT INTO game_result_players VALUES (?, 0, 'p1', 'u1', 'Alice', 42)
+    INSERT INTO game_result_players (room_id, player_index, game_player_id, user_id, display_name, score) VALUES (?, 0, 'p1', 'u1', 'Alice', 42)
   `).run(roomId)
   db.prepare(`
-    INSERT INTO game_result_players VALUES (?, 1, 'p2', 'u2', 'Bob', 35)
+    INSERT INTO game_result_players (room_id, player_index, game_player_id, user_id, display_name, score) VALUES (?, 1, 'p2', 'u2', 'Bob', 35)
   `).run(roomId)
   if (replayStatus === 'available') {
     db.prepare(`
@@ -161,6 +162,19 @@ afterEach(() => {
 })
 
 describe('GameContextStore', () => {
+  it('retains generated-name provenance in public completed results', () => {
+    const db = createDb()
+    insertCompleted(db, 'default-names', 'available')
+    db.prepare("UPDATE game_result_players SET display_name = 'Player 2', name_is_default = player_index").run()
+    expect(new GameContextStore(db).resolve('default-names')).toMatchObject({
+      ok: true,
+      result: { players: [
+        { playerIndex: 0, displayName: 'Player 2' },
+        { playerIndex: 1, displayName: 'Player 2', nameIsDefault: true },
+      ] },
+    })
+    db.close()
+  })
   it('resolves every lifecycle without exposing internal user ids', () => {
     const db = createDb()
     insertContext(db, 'active-room', 'active', {

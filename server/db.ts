@@ -982,6 +982,10 @@ export function runMigrations(
         }
       },
     },
+    {
+      version: 31,
+      sql: 'ALTER TABLE game_result_players ADD COLUMN name_is_default INTEGER NOT NULL DEFAULT 0;',
+    },
   ]
 
   const insert = db.prepare('INSERT INTO schema_version (version) VALUES (?)')

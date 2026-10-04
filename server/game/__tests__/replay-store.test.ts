@@ -18,6 +18,18 @@ it('clears generated-name provenance when a replay identity replaces the seat na
   expect(initial.players[0]).toMatchObject({ name: 'Player 1', nameIsDefault: true })
 })
 
+it('projects both named roles by player identity when archived names collide', () => {
+  const initial = { ...createInitialState(936, { playerCount: 2, playerNames: ['Player 2'] }),
+    log: [{ key: 'log.cardPassed', playerRefs: { fromPlayer: 'p1', toPlayer: 'p2' },
+      params: { fromPlayer: 'Player 2', toPlayer: 'Player 2', cardId: 'A001' } }],
+  }
+  const projected = projectReplayParticipantNames(initial, new Map([[0, 'Deleted player (seat 1)'], [1, 'Player 2']]))
+  expect(projected.log?.[0]?.params).toEqual({
+    fromPlayer: 'Deleted player (seat 1)', toPlayer: 'Player 2', cardId: 'A001',
+  })
+  expect(initial.log[0].params?.fromPlayer).toBe('Player 2')
+})
+
 const cachedIdentityFields = {
   scores: [{ playerId: 'p1', playerName: 'wood', total: 0 }],
   log: [{
@@ -119,6 +131,7 @@ describe('ReplayStore', () => {
       CREATE TABLE game_result_players (
         room_id TEXT NOT NULL,
         player_index INTEGER NOT NULL,
+        name_is_default INTEGER NOT NULL DEFAULT 0,
         display_name TEXT NOT NULL
       );
     `)
@@ -129,9 +142,9 @@ describe('ReplayStore', () => {
         cardType: 'minor',
         cardJson: { id: 'CUSTOM_1', name: 'Custom', deck: 'X', number: 1 },
       }]))
-    db.prepare('INSERT INTO game_result_players VALUES (?, 0, ?)')
+    db.prepare('INSERT INTO game_result_players (room_id, player_index, display_name) VALUES (?, 0, ?)')
       .run('room-1', 'wood')
-    db.prepare('INSERT INTO game_result_players VALUES (?, 1, ?)')
+    db.prepare('INSERT INTO game_result_players (room_id, player_index, display_name) VALUES (?, 1, ?)')
       .run('room-1', 'Bob')
 
     const encoded0 = encodeReplayFrame({
@@ -259,6 +272,14 @@ describe('ReplayStore', () => {
       commandType: 'action',
       intent: { spaceId: 'forest' },
     })
+  })
+
+  it('retains generated-name provenance in replay participants', () => {
+    db.prepare("UPDATE game_result_players SET display_name = 'Player 2', name_is_default = player_index").run()
+    expect(store.manifest('room-1')).toMatchObject({ participants: [
+      { playerIndex: 0, displayName: 'Player 2' },
+      { playerIndex: 1, displayName: 'Player 2', nameIsDefault: true },
+    ] })
   })
 
   it('requires an exact step and frame hash for anchor evidence', () => {

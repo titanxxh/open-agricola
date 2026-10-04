@@ -1,3 +1,4 @@
+import { getPlayerDisplayName } from '../../client/utils/player-name'
 import { useEffect, useMemo, useState } from 'react'
 import type { ClientInteractionState } from '../../shared/contract/protocol/game'
 import type { GameState } from '../../shared/contract/types'
@@ -153,12 +154,12 @@ function ReplayParentSelectionPhase({
     <section className="replay-setup" data-phase="parent-selection" aria-label={text.parent}>
       <header><h2>{text.parent}</h2></header>
       <div className="replay-setup__players">
-        {state.players.map((player) => {
+        {state.players.map((player, index) => {
           const candidates = selection.candidates[player.id]
           const submission = selection.submissions[player.id]
           return (
             <article key={player.id}>
-              <h3>{player.name}</h3>
+              <h3>{getPlayerDisplayName(locale, player.name, index, player.nameIsDefault)}</h3>
               <h4>{text.mothers}</h4>
               <SetupCards
                 ids={(candidates?.mother ?? []) as readonly string[]}
@@ -367,7 +368,7 @@ export function ReplayBoard({
         <PlayerTabs
           players={state.players.map((player, index) => ({
             id: player.id,
-            name: player.name,
+            name: getPlayerDisplayName(locale, player.name, index, player.nameIsDefault),
             color: player.color,
             isYou: player.id === perspectivePlayerId,
             isCurrent: index === state.currentPlayerIndex,

@@ -47,6 +47,7 @@ export type GameResultPlayer = {
   gamePlayerId: string
   userId: string | null
   displayName: string
+  nameIsDefault?: boolean
   score: number
 }
 

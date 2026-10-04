@@ -206,6 +206,7 @@ const mapResourceAccumulated = (
   if (event.to.kind === 'card') {
     return {
       key: 'log.resourceAccumulated',
+      playerId: event.to.playerId,
       params: {
         target: 'card',
         cardId: event.to.cardId,
@@ -308,6 +309,7 @@ const mapResourceMoved = (
   if (event.reason === 'harvest' || event.reason === 'reap') {
     return {
       key: event.reason === 'reap' ? 'log.reapDetail' : 'log.harvestReapDetail',
+      playerId: event.to.playerId,
       params: {
         player: playerName(ctx, event.to.playerId),
         resources: gain,
@@ -318,6 +320,7 @@ const mapResourceMoved = (
   if (event.reason === 'cardEffect') {
     return {
       key: 'log.cardEffectGain',
+      playerId: event.to.playerId,
       params: {
         player: playerName(ctx, event.to.playerId),
         gain,
@@ -344,11 +347,13 @@ const mapWorkerPlaced = (event: WorkerPlacedEvent, ctx: EventLogMapperContext): 
   if (event.sourceActionId === 'family-growth') {
     return {
       key: 'log.familyGrowth',
+      playerId: event.actorPlayerId,
       params: { player: playerName(ctx, event.actorPlayerId) },
     }
   }
   return {
     key: 'log.placeFarmer',
+    playerId: event.actorPlayerId,
     params: {
       player: playerName(ctx, event.actorPlayerId),
       action: actionName(ctx, event.sourceActionId ?? event.spaceId),
@@ -379,6 +384,7 @@ const mapHarvestPhaseStarted = (event: HarvestPhaseStartedEvent): LogEntry => {
 
 const mapHarvestHeated = (event: HarvestHeatedEvent, ctx: EventLogMapperContext): LogEntry => ({
   key: 'log.harvestHeatingDetail',
+  playerId: event.playerId,
   params: {
     player: playerName(ctx, event.playerId),
     required: event.required,
@@ -397,6 +403,7 @@ const mapFutureMeepleQueued = (
   if (!sourceSummary) return null
   return {
     key: sourceSummary.key,
+    playerId: event.playerId,
     params: {
       player: playerName(ctx, event.playerId),
       ...sourceSummary.params,
@@ -435,6 +442,7 @@ const mapFutureMeepleResolved = (
   ctx: EventLogMapperContext,
 ): LogEntry => ({
   key: 'log.futureMeepleResolved',
+  playerId: event.playerId,
   params: {
     player: playerName(ctx, event.playerId),
     cardId: event.cardId,
@@ -467,6 +475,7 @@ const mapCardResourcePairsStored = (
   ctx: EventLogMapperContext,
 ): LogEntry => ({
   key: 'log.cardResourcePairsStored',
+  playerId: event.targetPlayerId,
   params: {
     player: playerName(ctx, event.targetPlayerId),
     cardId: event.cardId,
@@ -487,6 +496,7 @@ const mapCardSwappedWithBoard = (
   ctx: EventLogMapperContext,
 ): LogEntry => ({
   key: 'log.cardSwappedWithBoard',
+  playerId: event.playerId,
   params: {
     player: playerName(ctx, event.playerId),
     fromCardId: event.fromPlayerCardId,
@@ -499,6 +509,7 @@ const mapCardReturnedToBoard = (
   ctx: EventLogMapperContext,
 ): LogEntry => ({
   key: 'log.cardReturnedToBoard',
+  playerId: event.playerId,
   params: {
     player: playerName(ctx, event.playerId),
     cardId: event.cardId,
@@ -507,6 +518,7 @@ const mapCardReturnedToBoard = (
 
 const mapCardDestroyed = (event: CardDestroyedEvent, ctx: EventLogMapperContext): LogEntry => ({
   key: 'log.cardDestroyed',
+  playerId: event.playerId ?? event.actorPlayerId,
   params: {
     player: playerName(ctx, event.playerId ?? event.actorPlayerId),
     cardId: event.cardId,
@@ -515,6 +527,7 @@ const mapCardDestroyed = (event: CardDestroyedEvent, ctx: EventLogMapperContext)
 
 const mapCardPassed = (event: CardPassedEvent, ctx: EventLogMapperContext): LogEntry => ({
   key: 'log.cardPassed',
+  playerRefs: { fromPlayer: event.fromPlayerId, toPlayer: event.toPlayerId },
   params: {
     fromPlayer: playerName(ctx, event.fromPlayerId),
     toPlayer: playerName(ctx, event.toPlayerId),
@@ -524,6 +537,7 @@ const mapCardPassed = (event: CardPassedEvent, ctx: EventLogMapperContext): LogE
 
 const mapFarmCropAdded = (event: FarmCropAddedEvent, ctx: EventLogMapperContext): LogEntry => ({
   key: 'log.farmCropAdded',
+  playerId: event.actorPlayerId ?? event.targetPlayerId,
   params: {
     player: playerName(ctx, event.actorPlayerId ?? event.targetPlayerId),
     crops: cropsToResources(event.crops),
@@ -532,6 +546,7 @@ const mapFarmCropAdded = (event: FarmCropAddedEvent, ctx: EventLogMapperContext)
 
 const mapFarmCropRemoved = (event: FarmCropRemovedEvent, ctx: EventLogMapperContext): LogEntry => ({
   key: 'log.farmCropRemoved',
+  playerId: event.actorPlayerId ?? event.targetPlayerId,
   params: {
     player: playerName(ctx, event.actorPlayerId ?? event.targetPlayerId),
     crops: cropsToResources(event.crops),
@@ -543,6 +558,7 @@ const mapFarmFenceConsumed = (
   ctx: EventLogMapperContext,
 ): LogEntry => ({
   key: 'log.farmFenceConsumed',
+  playerId: event.actorPlayerId ?? event.targetPlayerId,
   params: {
     player: playerName(ctx, event.actorPlayerId ?? event.targetPlayerId),
     count: event.count,
@@ -551,6 +567,7 @@ const mapFarmFenceConsumed = (
 
 const mapFarmAnimalMoved = (event: FarmAnimalMovedEvent, ctx: EventLogMapperContext): LogEntry => ({
   key: 'log.farmAnimalMoved',
+  playerId: event.actorPlayerId ?? event.targetPlayerId,
   params: {
     player: playerName(ctx, event.actorPlayerId ?? event.targetPlayerId),
     animals: resourceSuffix(event.animals),
@@ -562,6 +579,7 @@ const mapFutureMeepleRemoved = (
   ctx: EventLogMapperContext,
 ): LogEntry => ({
   key: 'log.futureMeepleRemoved',
+  playerId: event.playerId,
   params: {
     player: playerName(ctx, event.playerId),
     cardId: event.cardId,
@@ -578,6 +596,7 @@ const mapWorkerReturned = (event: WorkerReturnedEvent): LogEntry => ({
 
 const mapWorkerPromoted = (event: WorkerPromotedEvent, ctx: EventLogMapperContext): LogEntry => ({
   key: 'log.workerPromoted',
+  playerId: event.playerId,
   params: {
     player: playerName(ctx, event.playerId),
   },
@@ -658,6 +677,7 @@ const mapCardPlayed = (
   if (event.cardType === 'occupation') {
     return {
       key: 'log.playOccupation',
+      playerId: event.actorPlayerId,
       params: {
         player: playerName(ctx, event.actorPlayerId),
         occupations: event.cardId,
@@ -668,6 +688,7 @@ const mapCardPlayed = (
   }
   return {
     key: event.cardType === 'major' ? 'log.playImprovement' : 'log.playMinorImprovement',
+    playerId: event.actorPlayerId,
     params: {
       player: playerName(ctx, event.actorPlayerId),
       improvements: event.cardId,
@@ -835,6 +856,7 @@ export const buildLogPresentationPlan = (
       if (event.type === 'turn.skipped') {
         return presentationRows(event, [{
           key: 'log.playerSkipped',
+          playerId: event.playerId,
           params: { playerName: playerName(ctx, event.playerId) },
         }])
       }
@@ -842,6 +864,7 @@ export const buildLogPresentationPlan = (
       if (event.type === 'action.granted') {
         return presentationRows(event, [{
           key: 'log.cardGrantedAction',
+          playerId: event.playerId ?? event.actorPlayerId ?? event.targetPlayerId,
           params: {
             player: playerName(ctx, event.playerId ?? event.actorPlayerId ?? event.targetPlayerId),
             actionId: event.actionId,
@@ -853,6 +876,7 @@ export const buildLogPresentationPlan = (
       if (event.type === 'startPlayer.changed') {
         return presentationRows(event, [{
           key: 'log.startPlayer',
+          playerId: event.playerId,
           params: { player: playerName(ctx, event.playerId) },
         }])
       }
@@ -882,16 +906,17 @@ export const buildLogPresentationPlan = (
       }
 
       if (event.type === 'harvest.reapSkipped') {
-        return presentationRows(event, [{ key: 'log.harvestReapSkipped', params: { player: playerName(ctx, event.playerId) } }])
+        return presentationRows(event, [{ key: 'log.harvestReapSkipped', playerId: event.playerId, params: { player: playerName(ctx, event.playerId) } }])
       }
 
       if (event.type === 'harvest.reapNothing') {
-        return presentationRows(event, [{ key: 'log.harvestReapNothing', params: { player: playerName(ctx, event.playerId) } }])
+        return presentationRows(event, [{ key: 'log.harvestReapNothing', playerId: event.playerId, params: { player: playerName(ctx, event.playerId) } }])
       }
 
       if (event.type === 'harvest.feedConverted') {
         return presentationRows(event, [{
           key: 'log.harvestFeedConvert',
+          playerId: event.playerId,
           params: {
             player: playerName(ctx, event.playerId),
             source: event.source,
@@ -949,6 +974,7 @@ export const buildLogPresentationPlan = (
       if (event.type === 'farm.sown') {
         return presentationRows(event, [{
           key: 'log.sow',
+          playerId: event.actorPlayerId,
           params: { player: playerName(ctx, event.actorPlayerId) },
         }])
       }
@@ -1008,6 +1034,7 @@ export const buildLogPresentationPlan = (
         if (event.source !== 'harvest') return []
         return presentationRows(event, [{
           key: 'log.harvestBreedDetail',
+          playerId: event.actorPlayerId,
           params: {
             player: playerName(ctx, event.actorPlayerId),
             resources: positiveResources(event.animals),
@@ -1018,6 +1045,7 @@ export const buildLogPresentationPlan = (
       if (event.type === 'farm.animalDiscarded') {
         return presentationRows(event, [{
           key: 'log.reorganizeDiscard',
+          playerId: event.actorPlayerId,
           params: {
             player: playerName(ctx, event.actorPlayerId),
             resources: positiveResources(event.animals),
@@ -1052,6 +1080,7 @@ export const buildLogPresentationPlan = (
         if (event.paymentFor === 'feeding' || event.paymentFor === 'begging') {
           return presentationRows(event, [{
             key: 'log.harvestFeedDetail',
+            playerId: event.actorPlayerId,
             params: {
               player: playerName(ctx, event.actorPlayerId),
               resources: event.resources,
@@ -1072,6 +1101,7 @@ export const buildLogPresentationPlan = (
         return presentationRows(event, [
           {
             key: 'log.cardEffectPay',
+            playerId: event.actorPlayerId,
             params: {
               player: playerName(ctx, event.actorPlayerId),
               cost,
@@ -1094,6 +1124,7 @@ export const buildLogPresentationPlan = (
       if (event.type === 'action.exclusiveUseSet') {
         return presentationRows(event, [{
           key: 'log.actionExclusiveUseSet',
+          playerId: event.playerId,
           params: {
             player: playerName(ctx, event.playerId),
             action: actionName(ctx, event.actionId),
@@ -1105,6 +1136,7 @@ export const buildLogPresentationPlan = (
       if (event.type === 'action.exclusiveUseCleared') {
         return presentationRows(event, [{
           key: 'log.actionExclusiveUseCleared',
+          playerId: event.playerId,
           params: {
             player: playerName(ctx, event.playerId),
             action: actionName(ctx, event.actionId),

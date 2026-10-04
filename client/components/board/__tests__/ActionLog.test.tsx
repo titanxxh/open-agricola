@@ -4,7 +4,28 @@ import { fireEvent, render, screen } from '@testing-library/react'
 import type { ActionLogTimelineBucket } from '../../../app/action-log-timeline'
 import type { GameEvent } from '../../../../shared/contract/events'
 import { eventsToLogEntries } from '../../../../shared/events/log-mapper'
+import { buildActionLogTimelineRows } from '../../../app/action-log-timeline'
 import { ActionLog } from '../ActionLog'
+
+it('localizes both ends of a pass by identity and deduplicates the snapshot against its event', () => {
+  const event: GameEvent = {
+    schemaVersion: 1, id: 'pass', seq: 1, round: 1, phase: 'work', visibility: 'public',
+    type: 'card.passed', actorPlayerId: 'p1', fromPlayerId: 'p1', toPlayerId: 'p2', cardId: 'A001_Shelter',
+  }
+  const log = eventsToLogEntries([event], { playerNames: { p1: 'Player 2', p2: 'Player 2' } })
+  const playerNames = { p1: 'Player 2', p2: '玩家 2' }
+  const timelineBuckets = buildActionLogTimelineRows({
+    entries: [{ key: 'pass', kind: 'event', packetSeq: 1, packetLocalIndex: 0, event,
+      status: 'active', payloadSource: 'currentEvents', replayable: true }],
+    stateLog: log, currentRound: 1, locale: 'zh', playerNames,
+  })
+  const { container } = render(<ActionLog locale="zh" log={log} currentRound={1}
+    playerNames={playerNames} timelineBuckets={timelineBuckets} />)
+  expect(container.querySelectorAll('li')).toHaveLength(1)
+  expect(container).toHaveTextContent('Player 2')
+  expect(container).toHaveTextContent('玩家 2')
+  expect(log[0]!.params!.toPlayer).toBe('Player 2')
+})
 
 it('resolves snapshot log names by player identity when account and generated names collide', () => {
   const log = [

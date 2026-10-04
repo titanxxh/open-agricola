@@ -181,6 +181,7 @@ vi.mock('../db.ts', () => {
       player_index INTEGER NOT NULL,
       game_player_id TEXT NOT NULL,
       user_id TEXT,
+      name_is_default INTEGER NOT NULL DEFAULT 0,
       display_name TEXT NOT NULL,
       score INTEGER NOT NULL,
       PRIMARY KEY (room_id, player_index)

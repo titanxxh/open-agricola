@@ -560,7 +560,8 @@ export function deleteAccount(userId: string): { ok: true } {
     db.prepare(`
       UPDATE game_result_players
       SET user_id = NULL,
-          display_name = 'Deleted player (seat ' || (player_index + 1) || ')'
+          display_name = 'Deleted player (seat ' || (player_index + 1) || ')',
+          name_is_default = 0
       WHERE user_id = ?
     `).run(userId)
 

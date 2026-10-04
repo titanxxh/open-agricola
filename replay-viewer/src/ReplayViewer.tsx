@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import { getPlayerDisplayName } from '../../client/utils/player-name'
 import type { Locale } from '../../shared/i18n'
 import type {
   ReportedEvidence,
@@ -308,10 +309,13 @@ function ArchiveReplayViewer() {
       : null,
     [current, perspective],
   )
+  const participantName = (playerIndex: number): string => {
+    const player = manifest?.participants.find((candidate) => candidate.playerIndex === playerIndex)
+    return getPlayerDisplayName(locale, player?.displayName, playerIndex, player?.nameIsDefault)
+  }
   const actor = current?.playerIndex === null || current?.playerIndex === undefined
     ? '—'
-    : manifest?.participants.find((player) => player.playerIndex === current.playerIndex)
-      ?.displayName ?? `P${current.playerIndex + 1}`
+    : participantName(current.playerIndex)
   const visibleIntent = current && perspective
     ? intentForPerspective(current, perspective)
     : undefined
@@ -355,7 +359,7 @@ function ArchiveReplayViewer() {
             >
               {manifest.participants.map((player) => (
                 <option key={player.playerIndex} value={`p${player.playerIndex + 1}`}>
-                  {player.displayName}
+                  {participantName(player.playerIndex)}
                 </option>
               ))}
               <option value="open">{text.open}</option>
@@ -426,8 +430,7 @@ function ArchiveReplayViewer() {
                 <small>
                   {step.playerIndex === null
                     ? 'SYSTEM'
-                    : manifest.participants.find((player) => player.playerIndex === step.playerIndex)
-                      ?.displayName ?? `P${step.playerIndex + 1}`}
+                    : participantName(step.playerIndex)}
                 </small>
               </button>
             </li>

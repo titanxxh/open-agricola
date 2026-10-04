@@ -302,9 +302,9 @@ export class SqliteRoomPersistence implements RoomPersistence {
     `)
     this.insertResultPlayer = db.prepare(`
       INSERT INTO game_result_players (
-        room_id, player_index, game_player_id, user_id, display_name, score
+        room_id, player_index, game_player_id, user_id, display_name, score, name_is_default
       ) VALUES (
-        @roomId, @playerIndex, @gamePlayerId, @userId, @displayName, @score
+        @roomId, @playerIndex, @gamePlayerId, @userId, @displayName, @score, @nameIsDefault
       )
     `)
     this.pruneRooms = db.prepare(`
@@ -450,6 +450,7 @@ export class SqliteRoomPersistence implements RoomPersistence {
           ...player,
           roomId: result.roomId,
           userId: userIds.get(player.playerIndex) ?? player.userId,
+          nameIsDefault: player.nameIsDefault === true ? 1 : 0,
         })
       }
     }

@@ -14,6 +14,7 @@ export type ReplayJsonValue =
 export type ReplayParticipant = {
   playerIndex: number
   displayName: string
+  nameIsDefault?: boolean
 }
 
 export type ReplaySegmentDescriptor = {

@@ -8,6 +8,7 @@ import { ResourceLine } from '../common/ResourceLine'
 import { ResourceText } from '../common/ResourceText'
 import { getCardDisplayText, translateCardText } from '../common/cardText'
 import { getCardMeta } from '../../services/card-meta'
+import { resolveLogPlayerNames } from '../../../shared/events/log-player-names'
 import { resolveCardDisplayName, resolveCardRef, type CardRef } from './card-reference'
 
 const joinCardNames = (locale: Locale, names: string[]) =>
@@ -328,10 +329,7 @@ export const prepareLogEntry = (
   playerNames: Readonly<Record<string, string>> = {},
 ): PreparedLogEntry => {
   const cardIds = collectReferencedCardIds(entry.params)
-  const params = entry.params ? { ...entry.params } : undefined
-  if (params && entry.playerId && typeof params.player === 'string') {
-    params.player = playerNames[entry.playerId] ?? params.player
-  }
+  const params = resolveLogPlayerNames(entry, playerNames).params
   const richParams: Record<string, ReactNode> = {}
   if (params && typeof params.action === 'string') {
     params.action = resolveMaybeTranslationKey(locale, params.action)

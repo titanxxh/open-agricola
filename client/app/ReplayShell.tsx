@@ -9,6 +9,7 @@ import { BrandMark } from '../components/common/BrandMark'
 import { LocaleSwitcher } from '../components/common/LocaleSwitcher'
 import { API_BASE } from '../config'
 import { useLocale } from '../contexts/LocaleContext'
+import { getPlayerDisplayName } from '../utils/player-name'
 import { BugReportBar } from './BugReportBar'
 import { verifyReplayViewerBuild } from './replay-viewer-build'
 import '../styles/pages/replay.css'
@@ -270,7 +271,7 @@ export function ReplayShell({
         <ol className="replay-results">
           {context.result.players.map((player) => (
             <li key={player.playerIndex}>
-              <span>{player.displayName}</span>
+              <span>{getPlayerDisplayName(locale, player.displayName, player.playerIndex, player.nameIsDefault)}</span>
               <strong>{t('platform.gameContext.score', { score: player.score })}</strong>
             </li>
           ))}
@@ -301,13 +302,13 @@ export function ReplayShell({
         <ol className="replay-results">
           {context.result.players.map((player) => (
             <li key={player.playerIndex}>
-              <span>{player.displayName}</span>
+              <span>{getPlayerDisplayName(locale, player.displayName, player.playerIndex, player.nameIsDefault)}</span>
               <strong>{t('platform.gameContext.score', { score: player.score })}</strong>
               <button
                 type="button"
                 onClick={() => choosePerspective(`p${player.playerIndex + 1}`)}
               >
-                {t('platform.gameContext.watchAs', { player: player.displayName })}
+                {t('platform.gameContext.watchAs', { player: getPlayerDisplayName(locale, player.displayName, player.playerIndex, player.nameIsDefault) })}
               </button>
             </li>
           ))}

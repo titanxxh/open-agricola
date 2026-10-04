@@ -29,6 +29,7 @@ export type CompletedGameContextDescriptor = {
     players: Array<{
       playerIndex: number
       displayName: string
+      nameIsDefault?: boolean
       score: number
     }>
   }
