@@ -1,4 +1,4 @@
-# 20. Active Rooms share immutable history across recovery snapshots
+# 21. Active Rooms share immutable history across recovery snapshots
 
 - Status: Accepted
 - Date: 2026-10-04

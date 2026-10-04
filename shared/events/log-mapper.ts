@@ -1,4 +1,4 @@
-import { registerHistoryParticipantRoles } from '../session/history-streams'
+import { registerHistoryParticipantRoles } from '../projections/history-record-identity'
 import type {
   ActionDetailLoggedEvent,
   ActionAccumulatedEvent,
