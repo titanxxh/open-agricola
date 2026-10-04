@@ -4,6 +4,18 @@
 
 The 2 CPU / 2 GiB launch limit is 30 ordinary in-memory Rooms. The production Durable Room Commit path passes all thresholds at 30 Rooms and exceeds the action-latency threshold at 35 Rooms. This probe used built-in cards and did not include the two-Worker topology of executable Workshop Rooms; those Rooms are separately capped at 15 until that topology is measured.
 
+## Follow-up optimization objectives
+
+Work on Issues [#938](https://github.com/titanxxh/open-agricola/issues/938), [#939](https://github.com/titanxxh/open-agricola/issues/939), [#940](https://github.com/titanxxh/open-agricola/issues/940), [#941](https://github.com/titanxxh/open-agricola/issues/941), and [#942](https://github.com/titanxxh/open-agricola/issues/942) must demonstrate both lower action-to-broadcast latency and CPU cost, and lower cumulative persistence write volume under the same workload. Snapshot size alone does not satisfy these objectives.
+
+Assess these improvements across the completed group of changes. An individual slice may improve only one objective, provided the other metrics do not regress beyond the baseline's measured variation and the existing capacity and recovery requirements remain satisfied.
+
+Use fresh Rooms from a baseline that includes [PR #945](https://github.com/titanxxh/open-agricola/pull/945). Compare before and after with the same runtime, SQLite settings, resource limits, and command workload. Keep the existing Room capacity limits until the corresponding production-path probe justifies changing them.
+
+Before implementation, measure repeated runs of that baseline and freeze the minimum improvement and permitted variation. Determine these thresholds from baseline variation rather than the old Issue percentages; do not revise them after observing the optimized results. Use the same complete command transcript for both versions, including the actor and structured input, rather than dynamically choosing whichever action is available.
+
+These are acceptance objectives for future work. The measurements below belong to the earlier capacity probe; they do not establish the benefits of these follow-up optimizations.
+
 ## Environment
 
 - Source: working tree based on `2d2a5ef1`
