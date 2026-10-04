@@ -1,5 +1,4 @@
 import type { CardStates, PlayerState, LogEntry } from '../contract/types'
-import { revealedRoundSlots } from '../contract/state-constants'
 import type { GameEvent, PublicEventArchivePacket } from '../contract/events'
 import type { PublicEventCancellation } from '../contract/protocol/game'
 import type { SerializedGameState, SerializedParentSelectionCandidates, SerializedParentSelectionSubmission, SerializedParentSelectionState } from '../session/serialization'
@@ -591,20 +590,19 @@ export const filterSerializedStateForPlayer = (
   )
   const filteredEvents = filterHiddenHandEvents(base.events, hiddenRefs, seqView)
   const filteredPublicEventArchive = filterHiddenHandArchive(base.publicEventArchive, hiddenRefs, seqView)
-  const roundSlotRevealed = options.revealRoundCards
-    ? null
-    : revealedRoundSlots(base.round)
+  // A round card is revealed when its round starts.
+  const isRevealed = (round: number): boolean => round <= base.round
   const { gameSeed: _gameSeed, ...withoutSeed } = base
   return {
     ...withoutSeed,
-    ...(roundSlotRevealed
-      ? {
+    ...(options.revealRoundCards
+      ? {}
+      : {
           roundActionOrder: base.roundActionOrder.map((actionId, index) =>
-            roundSlotRevealed[index] ? actionId : null),
+            isRevealed(index + 1) ? actionId : null),
           futureMeeples: base.futureMeeples.map((meeple) =>
-            roundSlotRevealed[meeple.round - 1] ? meeple : { ...meeple, actionId: null }),
-        }
-      : {}),
+            isRevealed(meeple.round) ? meeple : { ...meeple, actionId: null }),
+        }),
     nextEventSeq: seqView?.nextEventSeq ?? base.nextEventSeq,
     nextPublicEventArchivePacketSeq: seqView
       ? filteredPublicEventArchive.length + 1

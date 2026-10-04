@@ -270,9 +270,9 @@ describe('WS broadcast per-viewer filter', () => {
     for (const envelope of [initialP1, initialP2]) {
       const { state } = envelope.payload
       expect(state).not.toHaveProperty('gameSeed')
-      // Round 1 is open and round 14 is the only card of its stage; the rest stay face down.
+      // Only round 1 has started; every later round card stays face down.
       expect(state.roundActionOrder.map((actionId) => actionId !== null)).toEqual([
-        true, false, false, false, false, false, false, false, false, false, false, false, false, true,
+        true, false, false, false, false, false, false, false, false, false, false, false, false, false,
       ])
     }
     expect(initialP1.payload.state.roundActionOrder).toEqual(initialP2.payload.state.roundActionOrder)

@@ -67,26 +67,6 @@ export const roundStageActions: Record<number, string[]> = {
 /** Every round card. The set and each card's stage are public; the order inside a stage is not. */
 export const roundCardActionIds: readonly string[] = Object.values(roundStageActions).flat()
 
-/**
- * Which round slots a player may know. A slot is revealed once its round has
- * started, and also when it is the only slot of its stage still face down,
- * because the remaining card of a stage can be deduced from public knowledge.
- */
-export const revealedRoundSlots = (round: number): boolean[] => {
-  const revealed: boolean[] = []
-  let start = 0
-  for (const { count } of roundStageSlots) {
-    const faceDown: number[] = []
-    for (let index = start; index < start + count; index += 1) {
-      revealed[index] = index < round
-      if (!revealed[index]) faceDown.push(index)
-    }
-    if (faceDown.length === 1) revealed[faceDown[0]!] = true
-    start += count
-  }
-  return revealed
-}
-
 export const createRoundOpenById = (order: (string | null)[]) =>
   new Map(
     order

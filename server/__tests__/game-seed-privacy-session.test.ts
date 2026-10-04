@@ -96,20 +96,19 @@ describe('game seed and round cards in sync payloads', () => {
 
     for (const viewer of [p1!.id, p2!.id, null]) {
       const visible = stateFor(session, viewer).roundActionOrder
-      expect(revealedRounds(visible)).toEqual([1, 14])
+      expect(revealedRounds(visible)).toEqual([1])
       expect(visible[0]).toBe(order[0])
-      expect(visible[13]).toBe(order[13])
     }
 
     playToRound(session, 2)
-    expect(revealedRounds(stateFor(session, p1!.id).roundActionOrder)).toEqual([1, 2, 14])
+    expect(revealedRounds(stateFor(session, p1!.id).roundActionOrder)).toEqual([1, 2])
     expect(stateFor(session, p2!.id).roundActionOrder[1]).toBe(order[1])
 
-    // Round 3 leaves one stage-1 card face down, which is then deducible.
+    // Round 4 stays face down even though it is the last stage-1 card left.
     playToRound(session, 3)
     const atRoundThree = stateFor(session, p2!.id).roundActionOrder
-    expect(revealedRounds(atRoundThree)).toEqual([1, 2, 3, 4, 14])
-    expect(atRoundThree.slice(0, 4)).toEqual(order.slice(0, 4))
+    expect(revealedRounds(atRoundThree)).toEqual([1, 2, 3])
+    expect(atRoundThree.slice(0, 3)).toEqual(order.slice(0, 3))
 
     // The authoritative order itself is untouched.
     expect(session.state.roundActionOrder).toEqual(order)
