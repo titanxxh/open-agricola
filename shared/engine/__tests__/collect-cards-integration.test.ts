@@ -83,7 +83,6 @@ const createState = (space: ActionSpace, player: PlayerState): GameState => ({
   players: [player],
   actionSpaces: [space],
   log: [],
-  roundStartSnapshot: null,
   roundActionOrder: [],
   gameSeed: 1,
   availableMajorImprovements: [],

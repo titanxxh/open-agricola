@@ -45,7 +45,7 @@ const createState = (...players: PlayerState[]): GameState =>
     actionSpaces: [
       createSpace('major-improvement', { takenBy: [{ playerId: 'p2', workerId: '1' }] }),
     ],
-    log: [], roundStartSnapshot: null,
+    log: [],
     roundActionOrder: Array.from({ length: 14 }).map(() => null),
     gameSeed: 1, availableMajorImprovements: [],
     futureMeeples: [], pendingFutureMeeples: [],

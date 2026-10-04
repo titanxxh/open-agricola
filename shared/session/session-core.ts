@@ -774,9 +774,6 @@ export class GameCore {
     this.state = finalizeDraft(this.state)
     startParentSelectionIfNeeded(this.state, this.parentSelectionSeed)
     ensureParentMotherScheduleLogs(this.state)
-    // Refresh round-start snapshot so that subsequent takeAction / undo logic
-    // sees the post-draft hands rather than the initial empty-handed snapshot.
-    this.state.roundStartSnapshot = this.buildRoundSnapshot(this.state)
     if (this.state.phase === 'playing') this.continueBeforeStartOfTurn(0, 0, true)
   }
   /** @internal Round phase — read the captured pre-action player snapshot. */
@@ -2774,15 +2771,6 @@ export class GameCore {
     )
   }
 
-  private buildRoundSnapshot(state: GameState): GameState {
-    const snapshot = cloneState(state)
-    // workers return home at round start — just clear action space occupancy.
-    snapshot.actionSpaces.forEach((space) => { space.takenBy = [] })
-    clearAllLinkedSpaceBlocks(snapshot)
-    snapshot.roundStartSnapshot = null
-    return snapshot
-  }
-
   private buildActionDetailParts(before: PlayerState, player: PlayerState) {
     const gains: Resource = { ...emptyResources }
     const costs: Resource = { ...emptyResources }
@@ -3730,7 +3718,6 @@ export class GameCore {
         previousIdx,
       )
     }
-    this.state.roundStartSnapshot = this.buildRoundSnapshot(this.state)
     this.engineStack.clear()
     this.history = []
     this.actionStartIndex = null
@@ -5150,9 +5137,6 @@ export class GameCore {
     }
     this.state = rebuildActiveModifiers(normalizeState(nextState))
     this.syncDynamicActionSpaces()
-    if (!this.state.roundStartSnapshot) {
-      this.state.roundStartSnapshot = this.buildRoundSnapshot(this.state)
-    }
     this.engineStack.clear()
     this.history = []
     this.actionStartIndex = null

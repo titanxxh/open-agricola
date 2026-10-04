@@ -61,9 +61,11 @@ export type SerializedParentSelectionState = {
 
 export type SerializedGameState = Omit<
   GameState,
-  'actionSpaces' | 'roundStartSnapshot' | 'players' | 'parentSelection'
+  'actionSpaces' | 'players' | 'parentSelection'
 > & {
   actionSpaces: SerializedActionSpace[]
+  // Always null. GameState no longer has this field; the key stays in the
+  // serialized frame so Replay Frame hashes and the sync payload are unchanged.
   roundStartSnapshot: null
   engineStack: EngineStackCursor
   players: SerializedPlayerState[]
@@ -74,12 +76,8 @@ export type SerializeStateContext = {
   engineStack?: unknown
 }
 
-export type SerializedAuthoritativeGameState = Omit<
-  GameState,
-  'actionSpaces' | 'roundStartSnapshot'
-> & {
+export type SerializedAuthoritativeGameState = Omit<GameState, 'actionSpaces'> & {
   actionSpaces: SerializedActionSpace[]
-  roundStartSnapshot: SerializedAuthoritativeGameState | null
 }
 
 export type PersistedSessionSnapshot = {

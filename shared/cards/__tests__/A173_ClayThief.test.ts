@@ -59,7 +59,6 @@ const state = (owner: PlayerState, hollowClay: number): GameState => ({
   players: [owner],
   actionSpaces: [space('hollow-56', hollowClay), space('hollow', 3)],
   log: [],
-  roundStartSnapshot: null,
   roundActionOrder: [],
   futureMeeples: [],
   pendingFutureMeeples: [],

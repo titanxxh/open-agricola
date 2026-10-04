@@ -68,7 +68,6 @@ export const makeEventTestState = (): GameState => {
     log: [],
     events: [],
     nextEventSeq: 1,
-    roundStartSnapshot: null,
     roundActionOrder: [],
     gameSeed: 1,
     availableMajorImprovements: [],

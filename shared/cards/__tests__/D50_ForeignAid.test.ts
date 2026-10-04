@@ -52,7 +52,7 @@ const createState = (...players: PlayerState[]): GameState =>
       createSpace('urgent-wish-children'),
       createSpace('farm-redevelopment'),
     ],
-    log: [], roundStartSnapshot: null,
+    log: [],
     roundActionOrder: [
       'sheep-market', 'grain-utilization', 'fencing', 'major-improvement',
       'wish-children', 'western-quarry', 'house-redevelopment',

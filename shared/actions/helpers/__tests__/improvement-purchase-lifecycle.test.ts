@@ -57,7 +57,6 @@ const makeState = (players: PlayerState[]): GameState => ({
   players,
   actionSpaces: [],
   log: [],
-  roundStartSnapshot: null,
   roundActionOrder: [],
   gameSeed: 1,
   availableMajorImprovements: ['Major_CookingHearth1'],

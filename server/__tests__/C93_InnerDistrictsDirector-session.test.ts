@@ -49,7 +49,7 @@ const createState = (player: PlayerState): GameState => {
   const clayPitSpace = createSpace('clay-pit')
   return {
     round: 1, currentPlayerIndex: 0, players: [player],
-    actionSpaces: [forestSpace, clayPitSpace], log: [], roundStartSnapshot: null,
+    actionSpaces: [forestSpace, clayPitSpace], log: [],
     roundActionOrder: Array.from({ length: 14 }).map(() => null),
     gameSeed: 1, availableMajorImprovements: [],
     futureMeeples: [], pendingFutureMeeples: [],

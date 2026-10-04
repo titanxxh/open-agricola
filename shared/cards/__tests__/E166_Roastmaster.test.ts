@@ -40,7 +40,7 @@ const createState = (player: PlayerState, fishingFood: number, travelingPlayersF
   const tp = createSpace('traveling-players', travelingPlayersFood)
   return {
     round: 1, currentPlayerIndex: 0, players: [player],
-    actionSpaces: [fishing, tp], log: [], roundStartSnapshot: null,
+    actionSpaces: [fishing, tp], log: [],
     roundActionOrder: Array.from({ length: 14 }).map(() => null),
     gameSeed: 1, availableMajorImprovements: [],
     futureMeeples: [], pendingFutureMeeples: [],

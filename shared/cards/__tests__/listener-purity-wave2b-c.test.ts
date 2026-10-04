@@ -149,7 +149,6 @@ const state = (
     players,
     actionSpaces: [],
     log: [],
-    roundStartSnapshot: null,
     roundActionOrder: Array.from({ length: 14 }, () => null),
     gameSeed: 1,
     rngTick: 0,

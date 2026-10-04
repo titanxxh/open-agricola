@@ -38,7 +38,6 @@ const stateFor = (round: number, occupiedIds: string[] = [], playerCount = 5): G
     'farm-supplies-6',
   ].map((id) => space(id, occupiedIds.includes(id))),
   log: [],
-  roundStartSnapshot: null,
   roundActionOrder: [...order],
   gameSeed: 1,
   availableMajorImprovements: [],

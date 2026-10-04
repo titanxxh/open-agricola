@@ -56,18 +56,6 @@ describe('event state bootstrap', () => {
     expect(state.nextPublicEventArchivePacketSeq).toBe(2)
   })
 
-  it('preserves initial event state in the round start snapshot', () => {
-    const state = createInitialState(1, {
-      playerCount: 2,
-      playerNames: ['Alice', 'Bob'],
-    })
-
-    expect(state.roundStartSnapshot?.events).toEqual([
-      expect.objectContaining({ type: 'game.started', seq: 1 }),
-    ])
-    expect(state.roundStartSnapshot?.nextEventSeq).toBe(2)
-  })
-
   it('drops malformed public event archive packets and advances packet seq', () => {
     const state = createInitialState(1)
     const valid = {
@@ -442,7 +430,6 @@ describe('event state bootstrap', () => {
     const rehydrated = rehydrateState({
       ...raw,
       actionSpaces: [],
-      roundStartSnapshot: null,
       engineStack: { frames: [] },
     } as never).state
 

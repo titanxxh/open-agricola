@@ -746,12 +746,6 @@ const createInitialPlayers = (
   })
 }
 
-const createRoundSnapshot = (state: GameState): GameState => {
-  const snapshot = cloneState(state)
-  snapshot.roundStartSnapshot = null
-  return snapshot
-}
-
 export const createInitialState = (
   seed?: number,
   extraMinorIdsOrOptions: string[] | InitialStateOptions = [],
@@ -941,7 +935,6 @@ export const createInitialState = (
       lastEventSeq: 1,
     }],
     nextPublicEventArchivePacketSeq: 2,
-    roundStartSnapshot: null,
     roundActionOrder,
     gameSeed,
     availableMajorImprovements: getVisibleMajorImprovementIds(majorImprovementSupply) ?? [...standardMajorImprovementIds],
@@ -972,6 +965,5 @@ export const createInitialState = (
   } else {
     startParentSelectionIfNeeded(initialState, parentSelectionSeed)
   }
-  initialState.roundStartSnapshot = createRoundSnapshot(initialState)
   return initialState
 }

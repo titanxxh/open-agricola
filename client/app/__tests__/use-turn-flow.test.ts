@@ -50,7 +50,6 @@ const createState = (): GameState => ({
   players: [createPlayer('p1'), createPlayer('p2'), createPlayer('p3')],
   actionSpaces: [],
   log: [],
-  roundStartSnapshot: null,
   roundActionOrder: [
     'sheep-market',
     'grain-utilization',

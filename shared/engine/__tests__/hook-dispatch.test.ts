@@ -117,7 +117,6 @@ describe('Hook dispatch merge order', () => {
       players: [player],
       actionSpaces: [],
       log: [],
-      roundStartSnapshot: null,
       roundActionOrder: [],
       gameSeed: 1,
       availableMajorImprovements: [],
@@ -173,7 +172,6 @@ describe('Hook dispatch merge order', () => {
       players: [player],
       actionSpaces: [],
       log: [],
-      roundStartSnapshot: null,
       roundActionOrder: [],
       gameSeed: 1,
       availableMajorImprovements: [],
@@ -218,7 +216,7 @@ describe('Hook dispatch merge order', () => {
     const state = {
       round: 1, currentPlayerIndex: 0,
       players: [player], actionSpaces: [], log: [],
-      roundStartSnapshot: null, roundActionOrder: [],
+      roundActionOrder: [],
       gameSeed: 1, availableMajorImprovements: [],
       futureMeeples: [], pendingFutureMeeples: [], gameOver: false,
     } as GameState
@@ -256,7 +254,7 @@ describe('Hook dispatch merge order', () => {
     const state = {
       round: 1, currentPlayerIndex: 0,
       players: [player], actionSpaces: [], log: [],
-      roundStartSnapshot: null, roundActionOrder: [],
+      roundActionOrder: [],
       gameSeed: 1, availableMajorImprovements: [],
       futureMeeples: [], pendingFutureMeeples: [], gameOver: false,
     } as GameState
@@ -308,7 +306,7 @@ describe('Hook dispatch merge order', () => {
     const state = {
       round: 1, currentPlayerIndex: 0,
       players: [player], actionSpaces: [], log: [],
-      roundStartSnapshot: null, roundActionOrder: [],
+      roundActionOrder: [],
       gameSeed: 1, availableMajorImprovements: [],
       futureMeeples: [], pendingFutureMeeples: [], gameOver: false,
     } as GameState
@@ -351,7 +349,7 @@ describe('Hook dispatch merge order', () => {
     const state = {
       round: 1, currentPlayerIndex: 0,
       players: [player], actionSpaces: [], log: [],
-      roundStartSnapshot: null, roundActionOrder: [],
+      roundActionOrder: [],
       gameSeed: 1, availableMajorImprovements: [],
       futureMeeples: [], pendingFutureMeeples: [], gameOver: false,
     } as GameState
@@ -396,7 +394,7 @@ describe('Card listener scope filtering', () => {
     const state = {
       round: 1, currentPlayerIndex: 0,
       players: [p1, p2], actionSpaces: [], log: [],
-      roundStartSnapshot: null, roundActionOrder: [],
+      roundActionOrder: [],
       gameSeed: 1, availableMajorImprovements: [],
       futureMeeples: [], pendingFutureMeeples: [], gameOver: false,
     } as GameState
@@ -452,7 +450,7 @@ describe('Card listener scope filtering', () => {
     const state = {
       round: 1, currentPlayerIndex: 0,
       players: [p1, p2], actionSpaces: [], log: [],
-      roundStartSnapshot: null, roundActionOrder: [],
+      roundActionOrder: [],
       gameSeed: 1, availableMajorImprovements: [],
       futureMeeples: [], pendingFutureMeeples: [], gameOver: false,
     } as GameState
@@ -514,7 +512,7 @@ describe('Card listener scope filtering', () => {
     const state = {
       round: 1, currentPlayerIndex: 0,
       players: [p1, p2], actionSpaces: [], log: [],
-      roundStartSnapshot: null, roundActionOrder: [],
+      roundActionOrder: [],
       gameSeed: 1, availableMajorImprovements: [],
       futureMeeples: [], pendingFutureMeeples: [], gameOver: false,
     } as GameState
@@ -575,7 +573,7 @@ describe('Multiple hooks overriding doable', () => {
     const state = {
       round: 1, currentPlayerIndex: 0,
       players: [player], actionSpaces: [], log: [],
-      roundStartSnapshot: null, roundActionOrder: [],
+      roundActionOrder: [],
       gameSeed: 1, availableMajorImprovements: [],
       futureMeeples: [], pendingFutureMeeples: [], gameOver: false,
     } as GameState
@@ -613,7 +611,7 @@ describe('Cost preview doable', () => {
     const state = {
       round: 1, currentPlayerIndex: 0,
       players: [player], actionSpaces: [], log: [],
-      roundStartSnapshot: null, roundActionOrder: [],
+      roundActionOrder: [],
       gameSeed: 1, availableMajorImprovements: [],
       futureMeeples: [], pendingFutureMeeples: [], gameOver: false,
     } as GameState
@@ -642,7 +640,7 @@ describe('Cost preview doable', () => {
     const state = {
       round: 1, currentPlayerIndex: 0,
       players: [player], actionSpaces: [], log: [],
-      roundStartSnapshot: null, roundActionOrder: [],
+      roundActionOrder: [],
       gameSeed: 1, availableMajorImprovements: [],
       futureMeeples: [], pendingFutureMeeples: [], gameOver: false,
     } as GameState
@@ -672,7 +670,7 @@ describe('Cost preview doable', () => {
     const state = {
       round: 1, currentPlayerIndex: 0,
       players: [player], actionSpaces: [], log: [],
-      roundStartSnapshot: null, roundActionOrder: [],
+      roundActionOrder: [],
       gameSeed: 1, availableMajorImprovements: [],
       futureMeeples: [], pendingFutureMeeples: [], gameOver: false,
     } as GameState
