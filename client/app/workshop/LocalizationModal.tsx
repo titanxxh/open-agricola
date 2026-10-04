@@ -5,6 +5,7 @@ import { useLocale } from '../../contexts/LocaleContext'
 type CardLocaleContent = {
   name: string
   desc: string[]
+  rules?: string[]
   prerequisite?: string
 }
 
@@ -94,9 +95,10 @@ export function LocalizationModal({
         const updated: CardLocales = {
           ...locales,
           [currentLang]: {
+            ...locales[currentLang],
             name: currentContent.name,
             desc: currentContent.desc,
-            ...(currentContent.prerequisite ? { prerequisite: currentContent.prerequisite } : {}),
+            prerequisite: currentContent.prerequisite || undefined,
           },
         }
         for (const lang of missing) {
@@ -112,9 +114,10 @@ export function LocalizationModal({
           )
           if (cancelled) return
           updated[lang] = {
+            ...locales[lang],
             name: result.name,
             desc: result.desc,
-            ...(result.prerequisite ? { prerequisite: result.prerequisite } : {}),
+            prerequisite: result.prerequisite || undefined,
           }
         }
         if (!cancelled) onSave(updated)
@@ -175,18 +178,20 @@ export function LocalizationModal({
     const updated = { ...locales }
     if (targetName.trim() || targetDesc.trim()) {
       updated[targetLang] = {
+        ...locales[targetLang],
         name: targetName.trim(),
         desc: targetDesc.split('\n').filter(l => l.trim()),
-        ...(targetPrerequisite.trim() ? { prerequisite: targetPrerequisite.trim() } : {}),
+        prerequisite: targetPrerequisite.trim() || undefined,
       }
     } else {
       delete updated[targetLang]
     }
     // Also store the current language content
     updated[currentLang] = {
+      ...locales[currentLang],
       name: currentContent.name,
       desc: currentContent.desc,
-      ...(currentContent.prerequisite ? { prerequisite: currentContent.prerequisite } : {}),
+      prerequisite: currentContent.prerequisite || undefined,
     }
     onSave(updated)
   }

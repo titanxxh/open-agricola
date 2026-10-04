@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { getMinorImprovementCard, getOccupationCard } from '../../cards/catalog'
-import { createInitialState, defaultSandboxPlayerNames } from '../state-bootstrap'
+import { createInitialState } from '../state-bootstrap'
 
 describe('sandbox initial state options', () => {
   it('uses the same generated names for unnamed hotseat and sandbox seats', () => {
@@ -8,21 +8,27 @@ describe('sandbox initial state options', () => {
     expect(state.players.map((player) => player.name)).toEqual([
       'PlayerF', 'Player 2', 'Player 3', 'Player 4', 'Player 5', 'Player 6',
     ])
+    expect(state.players.map((player) => player.nameIsDefault)).toEqual([false, true, true, true, true, true])
+  })
+  it('distinguishes a numeric account name from generated seat names', () => {
+    const state = createInitialState(42, { playerCount: 2, playerNames: ['Player 6'] })
+    expect(state.players[0]).toMatchObject({ name: 'Player 6', nameIsDefault: false })
+    expect(state.players[1]).toMatchObject({ name: 'Player 2', nameIsDefault: true })
   })
   it('supports configurable player count and sandbox player names', () => {
     const state = createInitialState(42, {
       playerCount: 4,
-      playerNames: [...defaultSandboxPlayerNames],
+      playerNames: ['Player 6', 'Alice', 'Bob', 'Cara'],
     })
 
     expect(state.players).toHaveLength(4)
-    expect(state.players.map((player) => player.name)).toEqual(['Player 1', 'Player 2', 'Player 3', 'Player 4'])
+    expect(state.players.map((player) => player.name)).toEqual(['Player 6', 'Alice', 'Bob', 'Cara'])
+    expect(state.players.every((player) => player.nameIsDefault === false)).toBe(true)
   })
 
   it('supports six stable sandbox players without changing the first four seats', () => {
     const state = createInitialState(42, {
       playerCount: 6,
-      playerNames: [...defaultSandboxPlayerNames],
     })
 
     expect(state.players).toHaveLength(6)

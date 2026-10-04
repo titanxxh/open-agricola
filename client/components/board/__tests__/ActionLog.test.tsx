@@ -6,6 +6,43 @@ import type { GameEvent } from '../../../../shared/contract/events'
 import { eventsToLogEntries } from '../../../../shared/events/log-mapper'
 import { ActionLog } from '../ActionLog'
 
+it('resolves snapshot log names by player identity when account and generated names collide', () => {
+  const log = [
+    { key: 'log.takeAction', playerId: 'p1', params: { player: 'Player 6', action: '森林' } },
+    { key: 'log.takeAction', playerId: 'p6', params: { player: 'Player 6', action: '捕鱼' } },
+  ]
+  const { container } = render(<ActionLog locale="zh" log={log} currentRound={1}
+    playerNames={{ p1: 'Player 6', p6: '玩家 6' }} />)
+  expect(container).toHaveTextContent('Player 6 选择 森林')
+  expect(container).toHaveTextContent('玩家 6 选择 捕鱼')
+  expect(log[1]!.params.player).toBe('Player 6')
+})
+
+it('retains the identity of an appended mother schedule even when names collide', () => {
+  const log = eventsToLogEntries([{
+    schemaVersion: 1, id: 'mother6', seq: 1, round: 1, phase: 'work', visibility: 'public',
+    actorPlayerId: 'p6', type: 'parent.motherScheduled', playerId: 'p6', cardId: 'PR12',
+    targetRound: 1, reward: 'clay',
+  }], { playerNames: { p1: 'Player 6', p6: 'Player 6' } })
+  const { container } = render(<ActionLog locale="zh" log={log} currentRound={1}
+    playerNames={{ p1: 'Player 6', p6: '玩家 6' }} />)
+  expect(container).toHaveTextContent('玩家 6 的 PR12')
+  expect(container).not.toHaveTextContent('Player 6')
+})
+
+it('retains the receiving player identity in action detail logs when names collide', () => {
+  const log = eventsToLogEntries([{
+    schemaVersion: 1, id: 'receive6', seq: 1, round: 1, phase: 'preparation', visibility: 'public',
+    actorPlayerId: 'p6', type: 'resource.moved', sourceActionId: 'receive', sourceCardId: 'PR11',
+    resources: { food: 1 }, from: { kind: 'roundCard', round: 1 },
+    to: { kind: 'player', playerId: 'p6' }, reason: 'receive',
+  }], { playerNames: { p1: 'Player 6', p6: 'Player 6' } })
+  const { container } = render(<ActionLog locale="zh" log={log} currentRound={1}
+    playerNames={{ p1: 'Player 6', p6: '玩家 6' }} />)
+  expect(container).toHaveTextContent('玩家 6 选择 接收')
+  expect(container).not.toHaveTextContent('Player 6')
+})
+
 const replayEvent = (id: string, seq: number): GameEvent => ({
   schemaVersion: 1,
   id,

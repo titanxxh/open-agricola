@@ -508,9 +508,9 @@ export const ActionBoard = ({
   const [scale, setScale] = useState(1)
   const [precisionMode, setPrecisionMode] = useState(false)
   const [tooltip, setTooltip] = useState<TooltipInfo | null>(null)
-  const playerDisplayName = (player: Pick<PlayerState, 'id' | 'name'>): string => {
+  const playerDisplayName = (player: Pick<PlayerState, 'id' | 'name' | 'nameIsDefault'>): string => {
     const index = players.findIndex((candidate) => candidate.id === player.id)
-    return getPlayerDisplayName(locale, player.name, index >= 0 ? index : undefined)
+    return getPlayerDisplayName(locale, player.name, index >= 0 ? index : undefined, player.nameIsDefault)
   }
   const playerCount = getBoardPlayerCount(players)
   const boardClassName = `action-board action-board--${playerCount}p`
@@ -742,7 +742,7 @@ export const ActionBoard = ({
           <div
             key={entry.key}
             className="action-farmer-stack"
-            title={getPlayerDisplayName(locale, entry.player.name, players.indexOf(entry.player))}
+            title={playerDisplayName(entry.player)}
           >
             <div className={`action-farmer action-farmer-${entry.player.color}${entry.isNewbornOnly ? ' child' : ''}`} />
           </div>

@@ -53,8 +53,9 @@ describe('PlayerCard dual-type rendering (alsoCountsAs)', () => {
       },
     })
     const html = renderToStaticMarkup(
-      <ActionLog locale="zh" currentRound={1} log={[{
+      <ActionLog locale="zh" currentRound={1} playerNames={{ p1: '玩家 1' }} log={[{
         key: 'log.cardEffectGain',
+        playerId: 'p1',
         params: { player: 'Player 1', cardId: 'CUSTOM_LocalLogName', gain: { wood: 1 } },
       }]} />,
     )

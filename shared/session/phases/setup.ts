@@ -46,5 +46,6 @@ export const updatePlayerName = (
 ): void => {
   if (player && name.trim()) {
     player.name = name.trim()
+    player.nameIsDefault = false
   }
 }

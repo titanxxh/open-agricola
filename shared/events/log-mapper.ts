@@ -233,6 +233,7 @@ const actionDetailLog = (
   extraParams: Record<string, unknown> = {},
 ): LogEntry => ({
   key: 'log.actionDetail',
+  ...(playerId ? { playerId } : {}),
   params: {
     player: playerName(ctx, playerId),
     action: actionName(ctx, actionId),
@@ -715,6 +716,7 @@ const mapParentMotherScheduled = (
   ctx: EventLogMapperContext,
 ): LogEntry => ({
   key: 'log.parentMotherScheduled',
+  playerId: event.playerId,
   params: {
     player: playerName(ctx, event.playerId),
     cardId: event.cardId,

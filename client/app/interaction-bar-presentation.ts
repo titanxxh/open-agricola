@@ -60,6 +60,7 @@ export type InteractionBarResourceBatchExchangeSelect = {
 
 export type InteractionBarPresentationInput = {
   locale: Locale
+  /** Display names already resolved from each seat's authoritative name provenance. */
   playerNames: string[]
   isInteractive: boolean
   pending: {

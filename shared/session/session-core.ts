@@ -392,9 +392,14 @@ const cloneCommandValue = <T>(value: T): T => {
 }
 
 const preservePlayerDisplayNames = (current: GameState, restored: GameState): GameState => {
+  const currentPlayers = new Map(current.players.map((player) => [player.id, player]))
   const names = new Map(current.players.map((player) => [player.id, player.name]))
   for (const player of restored.players) {
-    player.name = names.get(player.id) ?? player.name
+    const currentPlayer = currentPlayers.get(player.id)
+    if (currentPlayer) {
+      player.name = currentPlayer.name
+      player.nameIsDefault = currentPlayer.nameIsDefault
+    }
   }
   for (const entry of restored.log) {
     const name = entry.playerId ? names.get(entry.playerId) : undefined
@@ -438,7 +443,7 @@ const ruleStateKey = (state: GameState): string => {
   return canonicalJson({
     ...rules,
     events: rules.events.filter((event) => event.type !== 'continuation.restored'),
-    players: rules.players.map(({ name: _name, ...player }) => player),
+    players: rules.players.map(({ name: _name, nameIsDefault: _nameIsDefault, ...player }) => player),
   })
 }
 
@@ -1624,6 +1629,7 @@ export class GameCore {
       playerIdsByName.set(player.name, playerIdsByName.has(player.name) ? null : player.id)
     }
     for (const entry of this.state.log) {
+      if (entry.playerId) continue
       const playerName = entry.params?.player
       if (typeof playerName !== 'string') continue
       const playerId = playerIdsByName.get(playerName)

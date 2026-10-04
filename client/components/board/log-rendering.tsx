@@ -8,7 +8,6 @@ import { ResourceLine } from '../common/ResourceLine'
 import { ResourceText } from '../common/ResourceText'
 import { getCardDisplayText, translateCardText } from '../common/cardText'
 import { getCardMeta } from '../../services/card-meta'
-import { getPlayerDisplayName } from '../../utils/player-name'
 import { resolveCardDisplayName, resolveCardRef, type CardRef } from './card-reference'
 
 const joinCardNames = (locale: Locale, names: string[]) =>
@@ -326,11 +325,12 @@ const isRecord = (value: unknown): value is Record<string, unknown> =>
 export const prepareLogEntry = (
   entry: GameState['log'][number],
   locale: Locale,
+  playerNames: Readonly<Record<string, string>> = {},
 ): PreparedLogEntry => {
   const cardIds = collectReferencedCardIds(entry.params)
   const params = entry.params ? { ...entry.params } : undefined
-  for (const key of ['player', 'fromPlayer', 'toPlayer', 'actplayer']) {
-    if (params && typeof params[key] === 'string') params[key] = getPlayerDisplayName(locale, params[key])
+  if (params && entry.playerId && typeof params.player === 'string') {
+    params.player = playerNames[entry.playerId] ?? params.player
   }
   const richParams: Record<string, ReactNode> = {}
   if (params && typeof params.action === 'string') {

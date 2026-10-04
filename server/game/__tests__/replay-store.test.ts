@@ -7,7 +7,16 @@ import {
   frameHash,
   type JsonValue,
 } from '../replay-codec.ts'
-import { ReplayStore } from '../replay-store.ts'
+import { projectReplayParticipantNames, ReplayStore } from '../replay-store.ts'
+import { createInitialState } from '../../../shared/session/state-bootstrap'
+
+it('clears generated-name provenance when a replay identity replaces the seat name', () => {
+  const initial = createInitialState(936, { playerCount: 2 })
+  const projected = projectReplayParticipantNames(initial, new Map([[0, 'Player 6']]))
+  expect(projected.players[0]).toMatchObject({ name: 'Player 6', nameIsDefault: false })
+  expect(projected.players[1]).toMatchObject({ name: 'Player 2', nameIsDefault: true })
+  expect(initial.players[0]).toMatchObject({ name: 'Player 1', nameIsDefault: true })
+})
 
 const cachedIdentityFields = {
   scores: [{ playerId: 'p1', playerName: 'wood', total: 0 }],
