@@ -1,11 +1,14 @@
 import type { LogEntry } from '../contract/types'
 
+export const isHistoryParticipantNameKey = (key: string): boolean => ['player', 'playerName', 'fromPlayer', 'toPlayer'].includes(key)
+export const isHistoryParticipantNamePath = (path: string): boolean => path.startsWith('params.') && isHistoryParticipantNameKey(path.split('.').at(-1)!)
+
 /** Identity-based names are presentation only; exact saved parameters remain unchanged. */
 export const projectHistoryLogNames = (entry: LogEntry, roles: Record<string, string> | undefined, names: Record<string, string>): LogEntry => {
   let projected: LogEntry | undefined
   for (const [path, playerId] of Object.entries(roles ?? {})) {
     const keys = path.split('.')
-    if (keys[0] !== 'params' || !['player', 'playerName', 'fromPlayer', 'toPlayer'].includes(keys.at(-1)!) || names[playerId] === undefined) continue
+    if (!isHistoryParticipantNamePath(path) || names[playerId] === undefined) continue
     const parentKeys = keys.slice(0, -1)
     const parent = (value: LogEntry): Record<string, unknown> | undefined => {
       let target = value as unknown as Record<string, unknown>

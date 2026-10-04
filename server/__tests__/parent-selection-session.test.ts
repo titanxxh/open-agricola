@@ -257,7 +257,7 @@ describe('Parent Card selection setup', () => {
 
     const p1Mother = session.state.players[0]!.parentCards.mother
     const p2Mother = session.state.players[1]!.parentCards.mother
-    const logsFor = (cardId: string | null) => session.state.log.filter((entry) =>
+    const logsFor = (cardId: string | null) => session.buildSyncPayload(session.getState(), 'p1').state.log.filter((entry) =>
       entry.params?.cardId === cardId ||
       (cardId === p1Mother && entry.key === 'log.actionDetail'),
     )

@@ -1,4 +1,4 @@
-import { beginHistoryOperation, captureStateWithHistory, historyBranch, materializeHistoryBranch } from './history-streams'
+import { beginHistoryOperation, captureStateWithHistory, historyBranch, materializeHistoryBranch, recoveryRecordId, registerRecoveryRecordId } from './history-streams'
 import { cloneStateWithHistory } from './state-bootstrap'
 import { canStartBefore, evaluateFlowDoable, isActionDoableInFlowContext, isFlowDerivedDoable } from '../actions/flow'
 import type {
@@ -382,6 +382,24 @@ export type SessionPrivateCursor = Omit<SessionCommandCheckpoint, 'state'> & {
   nextProvisionalScopeId: number
 }
 
+
+/** Preserve in-memory command value shape while sharing the immutable histories. */
+const cloneCommandValue = <T>(value: T): T => {
+  if (Array.isArray(value)) return value.map(entry => cloneCommandValue(entry)) as T
+  if (!value || typeof value !== 'object') return value
+  return Object.fromEntries(Object.entries(value).map(([key, entry]) => [key, cloneCommandValue(entry)])) as T
+}
+
+const serializableCheckpoints = new WeakMap<SessionCommandCheckpoint, SessionCommandCheckpoint>()
+const serializableCheckpoint = (checkpoint: SessionCommandCheckpoint): SessionCommandCheckpoint => {
+  let saved = serializableCheckpoints.get(checkpoint)
+  if (!saved) {
+    saved = { ...checkpoint, state: captureStateWithHistory(checkpoint.state) }
+    registerRecoveryRecordId(saved, recoveryRecordId(checkpoint))
+    serializableCheckpoints.set(checkpoint, saved)
+  }
+  return saved
+}
 
 const preservePlayerDisplayNames = (current: GameState, restored: GameState): GameState => {
   const currentPlayers = new Map(current.players.map((player) => [player.id, player]))
@@ -975,6 +993,7 @@ export class GameCore {
       ...this.captureCommandRuntime(),
       provisionalContinuationScopes: this.provisionalContinuationScopes.map(scope => ({
         ...scope,
+        checkpoint: serializableCheckpoint(scope.checkpoint),
         failedCommandsAtCheckpoint: scope.failedCommandsAtCheckpoint.map(entry => ({ ...entry })),
       })),
       failedAuthoritativeCommands: this.failedAuthoritativeCommands.map(entry => ({ ...entry })),
@@ -1013,7 +1032,7 @@ export class GameCore {
   }
 
   createCommandCheckpoint(): SessionCommandCheckpoint {
-    return { state: captureStateWithHistory(this.state), ...this.captureCommandRuntime() }
+    return { state: captureStateWithHistory(this.state, cloneCommandValue), ...this.captureCommandRuntime() }
   }
 
   restoreCommandCheckpoint(checkpoint: SessionCommandCheckpoint): void {
@@ -1021,7 +1040,7 @@ export class GameCore {
       if (!commandValuesEqual(this.state, checkpoint.state)) {
         this.state = preservePlayerDisplayNames(
           this.state,
-          captureStateWithHistory(checkpoint.state),
+          captureStateWithHistory(checkpoint.state, cloneCommandValue),
         )
         for (const space of this.state.actionSpaces) {
           const definition = this.registry.get(space.id)

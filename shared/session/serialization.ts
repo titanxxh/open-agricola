@@ -1,3 +1,4 @@
+import { importRecoveryCatalog } from './recovery-catalog'
 import type { RecoveryHistoryCatalog } from './recovery-catalog'
 import { captureStateWithHistory } from './history-streams'
 import type {
@@ -240,6 +241,7 @@ export const rehydrateState = (
   input: SerializedGameState | PersistedSessionSnapshot,
 ): RehydratedState => {
   const persisted = 'state' in input && 'frame' in input && 'sessionCursor' in input ? input : null
+  if (persisted) importRecoveryCatalog(persisted)
   const raw = (persisted?.state ?? input) as SerializedGameState
   const templates = [
     ...createActionSpaces(raw.players?.length),

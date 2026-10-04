@@ -1,3 +1,4 @@
+import { isHistoryParticipantNameKey } from '../projections/history-names'
 import type { GameState } from '../contract/types'
 
 export const historyStreamKeys = ['log', 'events', 'publicEventArchive'] as const
@@ -52,7 +53,7 @@ const roles = (value: object, state: Pick<GameState, 'players'>): Record<string,
         const nameKey = key.slice(0, -2)
         if (typeof (entry as Record<string, unknown>)[nameKey] === 'string') result[path ? `${path}.${nameKey}` : nameKey] = child
       }
-      if (typeof child === 'string' && ['player', 'playerName', 'fromPlayer', 'toPlayer'].includes(key)) {
+      if (typeof child === 'string' && isHistoryParticipantNameKey(key)) {
         const id = uniqueNames.get(child)
         if (id) result[childPath] = id
       }
@@ -116,9 +117,9 @@ export const registerRestoredHistoryNode = (node: HistoryNode): void => {
 }
 
 /** Copy the small body; captured histories remain immutable, exact logical arrays. */
-export const captureStateWithHistory = <T extends Pick<GameState, 'log' | 'events' | 'publicEventArchive' | 'players'>>(state: T): T => {
+export const captureStateWithHistory = <T extends Pick<GameState, 'log' | 'events' | 'publicEventArchive' | 'players'>>(state: T, cloneBody: <V>(value: V) => V = copyJson): T => {
   const { log: _log, events: _events, publicEventArchive: _archive, ...body } = state
-  const copied = copyJson(body) as Record<string, unknown>
+  const copied = cloneBody(body) as Record<string, unknown>
   return Object.fromEntries(Object.keys(state).flatMap(key => {
     if (historyStreamKeys.includes(key as HistoryStreamKind)) {
       const kind = key as HistoryStreamKind

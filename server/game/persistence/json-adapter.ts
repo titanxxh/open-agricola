@@ -1,3 +1,4 @@
+import { exportRecoveryCatalog } from '../../../shared/session/recovery-catalog'
 import {
   existsSync,
   mkdirSync,
@@ -71,7 +72,10 @@ export class JsonRoomPersistence implements RoomPersistence {
     if (serialized === null) return
     try {
       mkdirSync(this.dir, { recursive: true })
-      writeFileSync(this.fileFor(id), JSON.stringify(serialized, null, 0), 'utf-8')
+      // JSON duplicates aliases, so describe every path rather than only the first alias.
+      const historyCatalog = exportRecoveryCatalog(serialized, false)
+      const snapshot = historyCatalog.nodes.length || historyCatalog.recoveries.length ? { ...serialized, historyCatalog } : serialized
+      writeFileSync(this.fileFor(id), JSON.stringify(snapshot, null, 0), 'utf-8')
     } catch (err) {
       console.warn('[json-adapter] save failed:', err)
     }

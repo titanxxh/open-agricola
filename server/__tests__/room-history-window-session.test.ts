@@ -1,7 +1,12 @@
 import { describe, expect, it } from 'vitest'
+import { mkdtempSync, rmSync } from 'node:fs'
+import { join } from 'node:path'
+import { tmpdir } from 'node:os'
+import { JsonRoomPersistence } from '../game/persistence/json-adapter'
+import { InMemoryRoomPersistence } from '../game/persistence/memory-adapter'
 import type { GameEvent } from '../../shared/contract/events'
 import { GameSession } from '../game/authoritative-session'
-import { serializeState } from '../../shared/session/serialization'
+import { rehydrateState, serializeSessionSnapshot, serializeState } from '../../shared/session/serialization'
 import { buildRoomHistoryPage, describeHistory, HISTORY_WINDOW_GROUPS, HistoryBranchChangedError } from '../../shared/session/history-window'
 import { frameHash, type JsonValue } from '../game/replay-codec'
 
@@ -110,6 +115,35 @@ describe('complete operation-group Room history pages', () => {
     expect(pages.toReversed().flatMap(page => page.publicEventArchive)).toEqual(session.buildSyncPayload(session.getState(), 'p1').state.publicEventArchive)
     const ids = pages.flatMap(page => page.window.archiveRecords.map(record => record.recordId))
     expect(new Set(ids).size).toBe(ids.length)
+  })
+
+  it.each(['json', 'memory'])('retains groups, exact raw values and renamed participant roles through %s recovery', (adapter) => {
+    const dir = mkdtempSync(join(tmpdir(), 'oa-history-page-'))
+    try {
+      const persistence = adapter === 'json' ? new JsonRoomPersistence(dir) : new InMemoryRoomPersistence()
+      const session = setup()
+      addActions(session, 28)
+      const [left, right] = session.state.players
+      session.state.log = [{ key: 'transfer', params: { fromPlayer: left!.name, toPlayer: right!.name } }, ...session.state.log]
+      serializeSessionSnapshot(session.state, session) // capture roles before names change
+      session.updatePlayerName(0, 'Renamed left')
+      session.updatePlayerName(1, 'Renamed right')
+      const saved = serializeSessionSnapshot(session.state, session)
+      const before = buildRoomHistoryPage(saved.frame, 'p1')
+      persistence.save('page-room', saved, { createdBy: null, maxPlayers: 2, status: 'playing', players: [], customCardDbIds: [] })
+      const loaded = persistence.load('page-room')!.serialized!
+      expect(frameHash(loaded.frame as unknown as JsonValue)).toBe(frameHash(saved.frame as unknown as JsonValue))
+      const restarted = new GameSession(rehydrateState(loaded))
+      const raw = restarted.withCtx(() => serializeState(restarted.state, {}))
+      const page = buildRoomHistoryPage(raw, 'p1')
+      expect(page.window).toEqual(before.window)
+      expect(page.log[0]).toMatchObject({ params: { fromPlayer: 'Renamed left', toPlayer: 'Renamed right' } })
+      expect(page.window.operationGroupIds).toHaveLength(20)
+      expect(page.window.nextCursor).toBeTruthy()
+      expect(restarted.state.log[0]).toEqual(saved.state.log[0])
+      const older = buildRoomHistoryPage(raw, 'p1', page.window.nextCursor!)
+      expect(page.log.length + older.log.length).toBe(raw.log.length)
+    } finally { rmSync(dir, { recursive: true, force: true }) }
   })
 
 })

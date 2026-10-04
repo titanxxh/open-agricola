@@ -1240,7 +1240,7 @@ server/game/
 
 **Room 历史与恢复（Issues #947–#954）：** SQLite 把不可变历史节点存入 `room_history_nodes`，把普通撤销和嵌套检查点的共享记录存入 `room_recovery_nodes`（迁移 31–32）。`shared/session/history-streams.ts` 捕获较小的核心主体和不可变分支，避免复制完整历史数组；`RoomHistoryStore` 在现有 Room/Replay 事务内只写新节点。写入失败不会把未提交 ID 加入持久缓存。引用缺失、校验和错误或原始 Frame Hash 不符均停止恢复。JSON 和内存适配器保留逻辑完整快照以及相同的重启、撤销语义。
 
-最新保存的 Frame 包含全部非历史字段、精确历史引用和原始规范 Hash。恢复时拼接已存值并校验 Hash，不读取 Replay payload，也不按当前规则重算。规则、Workshop、Worker IPC、Replay 和调试快照保留完整逻辑历史。Worker IPC 在原始 Frame 之外携带恢复身份目录，让记录、操作组和检查点身份跨消息保持一致。普通撤销、命令回退、嵌套暂定作用域及 Protected Observation 保持既有行为；见 [ADR-0020](adr/0020-room-owned-history-branches-and-recovery-snapshots.md)。
+最新保存的 Frame 包含全部非历史字段、精确历史引用和原始规范 Hash。恢复时拼接已存值并校验 Hash，不读取 Replay payload，也不按当前规则重算。规则、Workshop、Worker IPC、Replay 和调试快照保留完整逻辑历史。Worker IPC 在原始 Frame 之外携带恢复身份目录，让记录、操作组和检查点身份跨消息保持一致。JSON 快照为每个序列化别名路径保存同一目录，让这些身份在重启后继续保留。普通撤销、命令回退、嵌套暂定作用域及 Protected Observation 保持既有行为；见 [ADR-0020](adr/0020-room-owned-history-branches-and-recovery-snapshots.md)。
 
 WebSocket 的玩家快照包含 `historyWindow`：最近 **20 个完整操作组**、稳定记录 ID、绑定观察者的分支 ID，以及可选的旧页游标。`getHistory` / `historyPage` 复用活动座位授权（包括拒绝已被替换的连接），先对完整历史做 viewer 过滤，再分页，隐藏手牌事件与取消 payload 同样过滤。读取不写 Room，也不推进版本。HTTP、本地及调试 payload 保持完整。客户端按需加载旧操作组，分支或观察者变化时清空缓存；过期游标返回 `history_branch_changed`，触发新窗口读取。记录身份独立于可复用事件序号。操作者及其他参与者姓名按稳定身份投影，改名不再重写原始历史参数。完赛 Replay 沿用归档参与者名与现有匿名化投影。Replay schema、原始 Frame Hash 链及不可变 Viewer Build 保持不变。
 
