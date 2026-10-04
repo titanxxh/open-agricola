@@ -55,7 +55,7 @@ describe('LocalGameTransport', () => {
     await transport.devSetResources(0, { food: 8 })
 
     swallowNext = true
-    await expect(transport.takeAction(0, 'meeting-place')).rejects.toThrow(/timed out/)
+    await expect(transport.takeAction(0, 'meeting-place')).rejects.toMatchObject({ message: expect.stringMatching(/timed out/) })
     swallowNext = false
 
     await new Promise((resolve) => setTimeout(resolve, 50))
@@ -77,7 +77,7 @@ describe('LocalGameTransport', () => {
       timeoutMs: 20,
       workerFactory: () => new FakeWorker(() => true),
     })
-    await expect(transport.start()).rejects.toThrow(/timed out/)
+    await expect(transport.start()).rejects.toMatchObject({ message: expect.stringMatching(/timed out/) })
     transport.destroy()
   })
 
@@ -86,7 +86,7 @@ describe('LocalGameTransport', () => {
       timeoutMs: 5_000,
       workerFactory: () => new FakeWorker(() => false, { failOnStart: true }),
     })
-    await expect(transport.start()).rejects.toThrow(/worker failed to load/)
+    await expect(transport.start()).rejects.toMatchObject({ message: expect.stringMatching(/worker failed to load/) })
     transport.destroy()
   })
 
@@ -102,7 +102,7 @@ describe('LocalGameTransport', () => {
     swallow = true
     const first = transport.takeAction(0, 'meeting-place') // swallowed → stays in flight
     const firstSettled = first.catch(() => 'rejected')
-    await expect(transport.takeAction(0, 'grove')).rejects.toThrow(/in flight/)
+    await expect(transport.takeAction(0, 'grove')).rejects.toMatchObject({ message: expect.stringMatching(/in flight/) })
 
     // getState is a read and must not be blocked by the in-flight guard.
     await expect(transport.getState()).resolves.toBeTruthy()
@@ -122,7 +122,7 @@ describe('LocalGameTransport', () => {
       schemaVersion: 999,
       config: CONFIG,
       serializedState: {} as never,
-    })).rejects.toThrow(/schema/)
+    })).rejects.toMatchObject({ message: expect.stringMatching(/schema/) })
 
     await transport.start() // fallback
     expect(workers).toHaveLength(2)
