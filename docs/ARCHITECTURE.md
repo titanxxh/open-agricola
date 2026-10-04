@@ -1006,7 +1006,9 @@ The target state removes `shared/cards-display/` and generates no shadow display
 
 Card faces, trigger labels, log previews, and replay rendering share the display helpers in `client/components/common/cardText.ts`. Names and individual text fields use the canonical translation section, then `meta.locales[locale]`, then source metadata (names additionally support legacy `cards.<id>.name` aliases before the source fallback). Card-owned prompts and buttons reference names with `{card:<id>}`, resolved by `translateCardText`, rather than copying translated names into each string. These references affect presentation only and never execute rules.
 
-Generated `Player N` names are localized at the presentation boundary through `client/utils/player-name.ts`, including handoffs, player tabs, scores, and log text. User-chosen names and authoritative player state remain unchanged.
+Within metadata locales, empty or whitespace-only descriptions, supplemental rules, and prerequisites fall back to their source fields independently. A translated name can therefore coexist with a source description while a draft translation is incomplete.
+
+Hotseat and both sandbox executors initialize unnamed seats with the same `Player N` convention. Those generated names are localized at the presentation boundary through `client/utils/player-name.ts`, including handoffs, player tabs, scores, and log text. Other names, including account names such as `PlayerA` or `playerF`, are rendered literally. Presentation does not mutate authoritative name values.
 
 `impl` is the Card Impl and contains `modifiers`, `listeners`, `effect`, `prerequisiteCheck`, helper calls, and `reaches`. Modifiers belong to the implementation, not Card Display. Builders may statically extract `reaches` and project it at the top level of the manifest, but it does not belong in `meta`.
 

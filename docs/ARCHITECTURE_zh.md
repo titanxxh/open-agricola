@@ -985,7 +985,9 @@ export const A123_FrameBuilder = defineOccupationCard({
 
 卡面、触发标签、日志预览和回放渲染共用 `client/components/common/cardText.ts` 的显示 helper。卡名和各个文本字段依次读取规范翻译分区、`meta.locales[locale]`、源码元数据；卡名在源码回退前还支持旧的 `cards.<id>.name` 别名。卡牌专属追问和按钮使用 `{card:<id>}` 引用卡名，由 `translateCardText` 解析，不再向各个字符串复制译名。这些引用只影响显示，不执行规则。
 
-自动生成的 `Player N` 名称在显示边界通过 `client/utils/player-name.ts` 本地化，覆盖交接提示、玩家条、分数和日志文字。用户填写的名称和权威玩家状态保持不变。
+元数据译文中的描述、补充规则和前置条件为空或仅有空白时，各自回退到对应的源码字段。因此，草稿翻译尚未完成时，已翻译的卡名可以与源码描述同时显示。
+
+热座和两种沙盒执行器对未命名座位统一初始化为 `Player N`。这些自动生成的名称在显示边界通过 `client/utils/player-name.ts` 本地化，覆盖交接提示、玩家条、分数和日志文字。其他名称，包括 `PlayerA` 或 `playerF` 这样的账号名，均按原文显示。显示层不修改权威状态中的名称值。
 
 `impl` 是 Card Impl：包含 `modifiers`、`listeners`、`effect`、`prerequisiteCheck`、helper 调用和 `reaches`。modifier 属于 impl，不属于 Card Display。`reaches` 可由构建器静态提取并投影到 manifest 顶层，但不放进 `meta`。
 

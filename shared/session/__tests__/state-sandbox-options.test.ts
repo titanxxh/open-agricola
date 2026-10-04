@@ -3,6 +3,12 @@ import { getMinorImprovementCard, getOccupationCard } from '../../cards/catalog'
 import { createInitialState, defaultSandboxPlayerNames } from '../state-bootstrap'
 
 describe('sandbox initial state options', () => {
+  it('uses the same generated names for unnamed hotseat and sandbox seats', () => {
+    const state = createInitialState(42, { playerCount: 6, playerNames: ['PlayerF'] })
+    expect(state.players.map((player) => player.name)).toEqual([
+      'PlayerF', 'Player 2', 'Player 3', 'Player 4', 'Player 5', 'Player 6',
+    ])
+  })
   it('supports configurable player count and sandbox player names', () => {
     const state = createInitialState(42, {
       playerCount: 4,
