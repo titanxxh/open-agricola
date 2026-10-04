@@ -9,6 +9,7 @@ import {
   positionKey,
 } from '../../shared/domain/farm'
 import { useGameSync } from '../hooks/useGameSync'
+import { useRoomHistory } from '../hooks/useRoomHistory'
 import { HttpGameTransport, WsGameTransport, type GameTransport } from '../services/gameTransport'
 import { isHotseatSetupQuery, parseDraftParamsFromQuery } from './game-setup-query'
 import { LocalGameTransport } from '../local-sandbox/local-transport'
@@ -495,8 +496,9 @@ export const GameContainerApi = () => {
     isLocalMode,
     user?.id ?? 'anon',
   )
-  const { state, interaction, scores, pastureCapacities, historyLength, hasActionStartSnapshot, actionAvailability, cardAvailability, privateEvents, applySnapshot } =
+  const { state, interaction, scores, pastureCapacities, historyLength, hasActionStartSnapshot, actionAvailability, cardAvailability, privateEvents, historyWindow, applySnapshot } =
     useGameSync()
+  const roomHistory = useRoomHistory(transport, state, historyWindow)
   const privateEventNotificationBatchSeqRef = useRef(0)
   const privateEventNotificationTimersRef = useRef<number[]>([])
   const [privateEventNotifications, setPrivateEventNotifications] = useState<PrivateEventNotification[]>([])
@@ -997,9 +999,9 @@ export const GameContainerApi = () => {
     replayFeedback,
   } = useMemo(
     () => buildReplayActionLogPresentation({
-      events: state?.events ?? [],
-      publicEventArchive: state?.publicEventArchive ?? [],
-      stateLog: state?.log ?? [],
+      events: roomHistory.events,
+      publicEventArchive: roomHistory.publicEventArchive,
+      stateLog: roomHistory.log,
       currentRound: state?.round ?? 1,
       locale,
       playerNames,
@@ -1013,9 +1015,9 @@ export const GameContainerApi = () => {
       playerNames,
       replayFilter,
       selectedReplayKey,
-      state?.events,
-      state?.log,
-      state?.publicEventArchive,
+      roomHistory.events,
+      roomHistory.log,
+      roomHistory.publicEventArchive,
       state?.round,
     ],
   )
@@ -2022,7 +2024,9 @@ export const GameContainerApi = () => {
               <Section collapsible defaultCollapsed locale={locale} title={t(locale, 'ui.actionLog')} variant="parchment">
                 <ActionLog
                   locale={locale}
-                  log={state.log}
+                  log={roomHistory.log}
+                  history={historyWindow ? roomHistory : undefined}
+                  limit={historyWindow ? Number.MAX_SAFE_INTEGER : undefined}
                   playerNames={playerNames}
                   currentRound={state.round ?? 1}
                   timelineBuckets={actionLogTimelineBuckets}
@@ -2043,7 +2047,9 @@ export const GameContainerApi = () => {
               <ScorePanel locale={locale} rows={scoreRows} />
               <ActionLog
                 locale={locale}
-                log={state.log}
+                log={roomHistory.log}
+                  history={historyWindow ? roomHistory : undefined}
+                  limit={historyWindow ? Number.MAX_SAFE_INTEGER : undefined}
                 playerNames={playerNames}
                 currentRound={state.round ?? 1}
                 timelineBuckets={actionLogTimelineBuckets}

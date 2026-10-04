@@ -1,3 +1,4 @@
+import type { HistoryWindow } from './history'
 import type { InteractionState, PlayerState, Resource } from '../../contract/types'
 import type { SerializedGameState } from '../../session/serialization'
 import type { PlayerScoreSummary } from '../../domain'
@@ -70,6 +71,7 @@ export type ClientInteractionState = InteractionState | RedactedPrivatePromptInt
 
 export type GameSyncPayload = {
   state: SerializedGameState
+  historyWindow?: HistoryWindow
   interaction: ClientInteractionState
   privateEvents?: RuntimePrivateGameEvent[]
   publicEventCancellations?: PublicEventCancellation[]

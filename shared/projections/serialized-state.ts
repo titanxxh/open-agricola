@@ -1,3 +1,4 @@
+import { inheritHistoryRecordIdentity } from '../session/history-streams'
 import type { CardStates, PlayerState, LogEntry } from '../contract/types'
 import type { GameEvent, PublicEventArchivePacket } from '../contract/events'
 import type { PublicEventCancellation } from '../contract/protocol/game'
@@ -300,7 +301,7 @@ const filterParentSelectionForPlayer = (
 }
 
 const remapEventSeq = (event: GameEvent, seqView: VisibleEventSeqView | null): GameEvent =>
-  !seqView ? event : ({ ...event, seq: seqView.eventSeqByKey.get(gameEventRefKey(event)) ?? event.seq } as GameEvent)
+  !seqView ? event : inheritHistoryRecordIdentity(event, { ...event, seq: seqView.eventSeqByKey.get(gameEventRefKey(event)) ?? event.seq } as GameEvent)
 
 const filterHiddenHandEvents = (
   events: readonly GameEvent[],
@@ -332,7 +333,7 @@ const filterHiddenHandArchive = (
         }))
       if (visible.length === 0) continue
       const eventSeqs = visible.map((event) => event.seq)
-      filtered.push({
+      filtered.push(inheritHistoryRecordIdentity(packet, {
         ...packet,
         id: seqView ? String(packetSeq) : packet.id,
         packetSeq: seqView ? packetSeq : packet.packetSeq,
@@ -340,7 +341,7 @@ const filterHiddenHandArchive = (
         eventSeqs,
         firstEventSeq: eventSeqs[0]!,
         lastEventSeq: eventSeqs[eventSeqs.length - 1]!,
-      })
+      }))
       packetSeq += 1
       continue
     }
@@ -348,7 +349,7 @@ const filterHiddenHandArchive = (
       .filter((event) => !isHiddenCanceledEvent(event, packet.packetSeq, hiddenRefs))
       .map((event) => remapEventSeq(event, seqView))
     if (canceledEvents.length === 0) continue
-    filtered.push({
+    filtered.push(inheritHistoryRecordIdentity(packet, {
       ...packet,
       id: seqView ? String(packetSeq) : packet.id,
       packetSeq: seqView ? packetSeq : packet.packetSeq,
@@ -357,7 +358,7 @@ const filterHiddenHandArchive = (
       canceledEvents,
       canceledEventIds: canceledEvents.map((event) => event.id),
       canceledSeqs: canceledEvents.map((event) => event.seq),
-    })
+    }))
     packetSeq += 1
   }
   return filtered

@@ -324,6 +324,7 @@ export class SqliteRoomPersistence implements RoomPersistence {
             AND game_contexts.expires_at <= ?
         )
         AND id NOT IN (SELECT value FROM json_each(?))
+      RETURNING id
     `)
     this.restoreRooms = db.prepare(`
       SELECT rooms.id, rooms.created_by, rooms.state_json, rooms.max_players, rooms.status,
@@ -663,6 +664,7 @@ export class SqliteRoomPersistence implements RoomPersistence {
   complete(result: GameResult): RoomCompletionResult {
     try {
       this.completeRoom(result)
+      this.history.forget(result.roomId)
       return { ok: true, archived: true }
     } catch (err) {
       const error = err instanceof Error ? err.message : String(err)
@@ -704,7 +706,7 @@ export class SqliteRoomPersistence implements RoomPersistence {
           snapshot.serialized = serialized
           snapshots.push(snapshot)
         } catch (err) {
-          if (err instanceof RoomHistoryCorruptionError) throw err
+          // Keep the corrupt Room in storage for diagnosis; only this Room is unavailable.
           console.warn(`[sqlite-adapter] failed to restore room ${row.id}:`, err)
         }
       }
@@ -719,7 +721,8 @@ export class SqliteRoomPersistence implements RoomPersistence {
   private pruneStale(opts: RestoreOptions): void {
     try {
       const excludeIds = opts.excludeIds ?? []
-      this.pruneRooms.run(opts.now, JSON.stringify(excludeIds))
+      const expired = this.pruneRooms.all(opts.now, JSON.stringify(excludeIds)) as Array<{ id: string }>
+      expired.forEach(room => this.history.forget(room.id))
     } catch (err) {
       console.warn('[sqlite-adapter] pruneStale failed:', err)
     }

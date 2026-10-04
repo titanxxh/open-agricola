@@ -16,7 +16,7 @@ describe('buildEnvelope', () => {
     const session = new GameSession()
     const resp = session.withCtx(() => session.getState())
     const env = buildEnvelope({
-      room: { id: 'r1', session },
+      room: { id: 'r1', session, players: [] },
       resp,
       viewerPlayerId: null,
       version: 7,
@@ -35,12 +35,24 @@ describe('buildEnvelope', () => {
     expect((env.payload.state as { engineStack?: unknown }).engineStack).toBeDefined()
   })
 
+  it('projects reconnect names without mutating raw history or the private cursor', () => {
+    const session = new GameSession(563, undefined, { playerCount: 2 })
+    session.state.log = [{ key: 'transfer', playerId: 'p1', params: { player: session.state.players[0]!.name, toPlayer: session.state.players[1]!.name, toPlayerId: 'p2' } }]
+    const response = session.getState()
+    const cursor = session.createSessionPrivateCursor()
+    const log = JSON.parse(JSON.stringify(session.state.log))
+    const envelope = buildEnvelope({ room: { id: 'r1', session, players: [{ playerIndex: 0, name: 'Renamed actor' }, { playerIndex: 1, name: 'Renamed recipient' }] as never }, resp: response, viewerPlayerId: 'p1', version: 1, cause: 'reconnect', emittedAt: 0 })
+    expect(envelope.payload.state.log[0]).toMatchObject({ params: { player: 'Renamed actor', toPlayer: 'Renamed recipient' } })
+    expect(session.state.log).toEqual(log)
+    expect(session.createSessionPrivateCursor()).toEqual(cursor)
+  })
+
   it('redacts state for the given viewer id', () => {
     const session = new GameSession()
     const resp = session.withCtx(() => session.getState())
     const player0Id = resp.state.players[0]!.id
     const env = buildEnvelope({
-      room: { id: 'r1', session },
+      room: { id: 'r1', session, players: [] },
       resp,
       viewerPlayerId: player0Id,
       version: 1,
@@ -78,7 +90,7 @@ describe('buildEnvelope', () => {
     }
 
     const target = buildEnvelope({
-      room: { id: 'r1', session },
+      room: { id: 'r1', session, players: [] },
       resp: waitResp,
       viewerPlayerId: p0.id,
       version: 1,
@@ -86,7 +98,7 @@ describe('buildEnvelope', () => {
       emittedAt: 0,
     })
     const other = buildEnvelope({
-      room: { id: 'r1', session },
+      room: { id: 'r1', session, players: [] },
       resp: waitResp,
       viewerPlayerId: p1.id,
       version: 1,
@@ -94,7 +106,7 @@ describe('buildEnvelope', () => {
       emittedAt: 0,
     })
     const observer = buildEnvelope({
-      room: { id: 'r1', session },
+      room: { id: 'r1', session, players: [] },
       resp: waitResp,
       viewerPlayerId: null,
       version: 1,
@@ -145,7 +157,7 @@ describe('buildEnvelope', () => {
     }
 
     const target = buildEnvelope({
-      room: { id: 'r1', session },
+      room: { id: 'r1', session, players: [] },
       resp: waitResp,
       viewerPlayerId: p0.id,
       version: 1,
@@ -153,7 +165,7 @@ describe('buildEnvelope', () => {
       emittedAt: 0,
     })
     const other = buildEnvelope({
-      room: { id: 'r1', session },
+      room: { id: 'r1', session, players: [] },
       resp: waitResp,
       viewerPlayerId: p1.id,
       version: 1,
@@ -197,7 +209,7 @@ describe('buildEnvelope', () => {
     }
 
     const p0Env = buildEnvelope({
-      room: { id: 'r1', session },
+      room: { id: 'r1', session, players: [] },
       resp: eventResp,
       viewerPlayerId: p0.id,
       version: 1,
@@ -205,7 +217,7 @@ describe('buildEnvelope', () => {
       emittedAt: 0,
     })
     const p1Env = buildEnvelope({
-      room: { id: 'r1', session },
+      room: { id: 'r1', session, players: [] },
       resp: eventResp,
       viewerPlayerId: p1.id,
       version: 1,
@@ -213,7 +225,7 @@ describe('buildEnvelope', () => {
       emittedAt: 0,
     })
     const observer = buildEnvelope({
-      room: { id: 'r1', session },
+      room: { id: 'r1', session, players: [] },
       resp: eventResp,
       viewerPlayerId: null,
       version: 1,
@@ -244,7 +256,7 @@ describe('buildEnvelope', () => {
     const p1 = resp.state.players[1]!
 
     const active = buildEnvelope({
-      room: { id: 'r1', session },
+      room: { id: 'r1', session, players: [] },
       resp,
       viewerPlayerId: p0.id,
       version: 1,
@@ -252,7 +264,7 @@ describe('buildEnvelope', () => {
       emittedAt: 0,
     })
     const other = buildEnvelope({
-      room: { id: 'r1', session },
+      room: { id: 'r1', session, players: [] },
       resp,
       viewerPlayerId: p1.id,
       version: 1,
@@ -260,7 +272,7 @@ describe('buildEnvelope', () => {
       emittedAt: 0,
     })
     const observer = buildEnvelope({
-      room: { id: 'r1', session },
+      room: { id: 'r1', session, players: [] },
       resp,
       viewerPlayerId: null,
       version: 1,
@@ -352,7 +364,7 @@ describe('buildEnvelope', () => {
     const p1 = resp.state.players[1]!
 
     const owner = buildEnvelope({
-      room: { id: 'r1', session },
+      room: { id: 'r1', session, players: [] },
       resp,
       viewerPlayerId: p0.id,
       version: 1,
@@ -360,7 +372,7 @@ describe('buildEnvelope', () => {
       emittedAt: 0,
     })
     const other = buildEnvelope({
-      room: { id: 'r1', session },
+      room: { id: 'r1', session, players: [] },
       resp,
       viewerPlayerId: p1.id,
       version: 1,
@@ -368,7 +380,7 @@ describe('buildEnvelope', () => {
       emittedAt: 0,
     })
     const observer = buildEnvelope({
-      room: { id: 'r1', session },
+      room: { id: 'r1', session, players: [] },
       resp,
       viewerPlayerId: null,
       version: 1,
@@ -407,7 +419,7 @@ describe('buildEnvelope', () => {
     }
 
     const p1 = buildEnvelope({
-      room: { id: 'r1', session },
+      room: { id: 'r1', session, players: [] },
       resp,
       viewerPlayerId: 'p1',
       version: 1,
@@ -415,7 +427,7 @@ describe('buildEnvelope', () => {
       emittedAt: 0,
     })
     const observer = buildEnvelope({
-      room: { id: 'r1', session },
+      room: { id: 'r1', session, players: [] },
       resp,
       viewerPlayerId: null,
       version: 1,

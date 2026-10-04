@@ -340,7 +340,7 @@ describe('handleCreateRoom', () => {
     expect(ctx.currentRoom!.session.state.parentSelection).toBeNull()
     expect(ctx.currentRoom!.session.state.players.every((player) => player.parentCards.mother)).toBe(true)
     expect(ctx.currentRoom!.session.state.players[0]!.name).toBe('Alice')
-    expect(ctx.currentRoom!.session.state.log.some((entry) => entry.params?.player === 'PlayerA')).toBe(false)
+    expect(ctx.currentRoom!.session.buildSyncPayload(ctx.currentRoom!.session.getState(), 'p1').state.log.some((entry) => entry.params?.player === 'PlayerA')).toBe(false)
   })
 
   it('preserves completed simultaneous draft settings across restore and newGame', () => {
@@ -391,7 +391,7 @@ describe('handleCreateRoom', () => {
       name: 'Bob',
     })
 
-    const loggedPlayerNames = host.currentRoom!.session.state.log
+    const loggedPlayerNames = host.currentRoom!.session.buildSyncPayload(host.currentRoom!.session.getState(), 'p1').state.log
       .map((entry) => entry.params?.player)
       .filter((player): player is string => typeof player === 'string')
     expect(new Set(loggedPlayerNames)).toEqual(new Set(['PlayerB', 'Bob']))
@@ -1347,5 +1347,30 @@ describe('unknown command', () => {
     const ctx = newCtx()
     dispatch(ctx, { type: 'no-such-cmd' as never } as never)
     expect(sentTypesOf(ctx)).toContain('error')
+  })
+})
+
+describe('authenticated Room history reads', () => {
+  it('returns a viewer-filtered page to the active seat without advancing the Room', async () => {
+    const ctx = newCtx()
+    ctx.currentUserId = 'history-user'
+    dispatch(ctx, { type: 'createRoom', maxPlayers: 2, name: 'History actor' })
+    const room = ctx.currentRoom!
+    const version = room.version
+    const cursor = room.session.createSessionPrivateCursor()
+    await dispatch(ctx, { type: 'getHistory', requestId: 'history-1' })
+    expect(sentMessagesOf(ctx)).toContainEqual(expect.objectContaining({ type: 'historyPage', requestId: 'history-1', roomId: room.id, page: expect.objectContaining({ log: expect.any(Array), events: expect.any(Array), publicEventArchive: expect.any(Array) }) }))
+    expect(room.version).toBe(version)
+    expect(room.session.createSessionPrivateCursor()).toEqual(cursor)
+  })
+
+  it('rejects history reads from a replaced seat and from outside a Room', async () => {
+    const ctx = newCtx()
+    await dispatch(ctx, { type: 'getHistory', requestId: 'outside' })
+    expect(sentMessagesOf(ctx)).toContainEqual(expect.objectContaining({ type: 'error', error: 'not in a room', requestId: 'outside' }))
+    dispatch(ctx, { type: 'createRoom', maxPlayers: 2 })
+    ctx.currentRoom!.players[0]!.ws = fakeWs() as never
+    await dispatch(ctx, { type: 'getHistory', requestId: 'replaced' })
+    expect(sentMessagesOf(ctx)).toContainEqual(expect.objectContaining({ type: 'error', code: 'seat_replaced', requestId: 'replaced' }))
   })
 })

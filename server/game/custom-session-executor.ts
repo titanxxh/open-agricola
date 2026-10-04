@@ -1,3 +1,4 @@
+import { applyHistoryWindow } from '../../shared/session/history-window'
 import { importRecoveryCatalog, snapshotForWorker } from '../../shared/session/recovery-catalog'
 import { Worker } from 'node:worker_threads'
 import path from 'node:path'
@@ -72,6 +73,7 @@ type WorkerPayloads = {
   debug: GameSyncPayload
   spectator: GameSyncPayload
   viewers: Record<string, GameSyncPayload>
+  windows: { spectator: GameSyncPayload; viewers: Record<string, GameSyncPayload> }
 }
 
 type WorkerState = {
@@ -97,13 +99,18 @@ export const buildSessionSyncPayload = (
   response: SessionResponse,
   viewerPlayerId: string | null,
   mode: SyncPayloadMode = 'viewer',
+  windowed = false,
 ): GameSyncPayload => {
   const payloads = payloadsByResponse.get(response)
-  if (!payloads) return session.buildSyncPayload(response, viewerPlayerId, mode)
+  if (!payloads) {
+    const payload = session.buildSyncPayload(response, viewerPlayerId, mode)
+    return windowed && mode === 'viewer' ? applyHistoryWindow(response.state, payload, viewerPlayerId) : payload
+  }
   if (mode === 'debug') return payloads.debug
-  const viewer = viewerPlayerId ? payloads.viewers[viewerPlayerId] ?? payloads.spectator : payloads.spectator
+  const source = windowed ? payloads.windows : payloads
+  const viewer = viewerPlayerId ? source.viewers[viewerPlayerId] ?? source.spectator : source.spectator
   if (mode !== 'dev-viewer') return viewer
-  // The Worker precomputes ordinary viewer payloads; restore what a dev room keeps visible.
+  // Dev rooms reveal Round Cards while keeping the seed private and history windowed.
   return {
     ...viewer,
     state: {
@@ -241,6 +248,7 @@ export class CustomSessionExecutor {
         spectator: failed(this.lastPayloads.spectator),
         viewers: Object.fromEntries(Object.entries(this.lastPayloads.viewers)
           .map(([playerId, payload]) => [playerId, failed(payload)])),
+        windows: { spectator: failed(this.lastPayloads.windows.spectator), viewers: Object.fromEntries(Object.entries(this.lastPayloads.windows.viewers).map(([id, payload]) => [id, failed(payload)])) },
       })
     }
     return response

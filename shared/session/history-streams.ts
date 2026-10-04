@@ -47,7 +47,11 @@ const roles = (value: object, state: Pick<GameState, 'players'>): Record<string,
     if (!entry || typeof entry !== 'object') return
     for (const [key, child] of Object.entries(entry)) {
       const childPath = path ? `${path}.${key}` : key
-      if (typeof child === 'string' && /(?:playerId|PlayerId)$/.test(key) && ids.has(child)) result[childPath] = child
+      if (typeof child === 'string' && /(?:playerId|PlayerId)$/.test(key) && ids.has(child)) {
+        result[childPath] = child
+        const nameKey = key.slice(0, -2)
+        if (typeof (entry as Record<string, unknown>)[nameKey] === 'string') result[path ? `${path}.${nameKey}` : nameKey] = child
+      }
       if (typeof child === 'string' && ['player', 'playerName', 'fromPlayer', 'toPlayer'].includes(key)) {
         const id = uniqueNames.get(child)
         if (id) result[childPath] = id
@@ -62,6 +66,7 @@ const roles = (value: object, state: Pick<GameState, 'players'>): Record<string,
 }
 
 export const historyBranch = (values: readonly object[], kind: HistoryStreamKind, state: Pick<GameState, 'players'>): HistoryBranch => {
+  if (!groups.has(state)) groups.set(state, identifier())
   const cached = branches.get(values)
   if (cached?.kind === kind) return cached
   let head: HistoryNode | null = null
@@ -73,7 +78,7 @@ export const historyBranch = (values: readonly object[], kind: HistoryStreamKind
     if (!record) {
       const value = copyJson(entry)
       freeze(value)
-      record = { value, identity: { recordId: identifier(), operationGroupId: groups.get(state) ?? identifier(), participantRoles: roles(entry, state) }, links: new Map() }
+      record = { value, identity: { recordId: identifier(), operationGroupId: groups.get(state) ?? identifier(), participantRoles: { ...roles(entry, state), ...roleHints.get(entry) } }, links: new Map() }
       records.set(entry, record)
       records.set(value, record)
     }
@@ -144,3 +149,13 @@ export const copyHistoryRecordIdentity = <T extends object>(source: T, target: T
   }
   return target
 }
+
+const identityHints = new WeakMap<object, HistoryRecordIdentity>()
+const roleHints = new WeakMap<object, Record<string, string>>()
+export const getHistoryRecordIdentity = (value: object): HistoryRecordIdentity | undefined => records.get(value)?.identity ?? identityHints.get(value)
+export const inheritHistoryRecordIdentity = <T extends object>(source: object, target: T): T => {
+  const identity = getHistoryRecordIdentity(source)
+  if (identity) identityHints.set(target, identity)
+  return target
+}
+export const registerHistoryParticipantRoles = (value: object, roles: Record<string, string>): void => { roleHints.set(value, roles) }

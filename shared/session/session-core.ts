@@ -1,4 +1,4 @@
-import { beginHistoryOperation, captureStateWithHistory, copyHistoryRecordIdentity, historyBranch, materializeHistoryBranch } from './history-streams'
+import { beginHistoryOperation, captureStateWithHistory, historyBranch, materializeHistoryBranch } from './history-streams'
 import { cloneStateWithHistory } from './state-bootstrap'
 import { canStartBefore, evaluateFlowDoable, isActionDoableInFlowContext, isFlowDerivedDoable } from '../actions/flow'
 import type {
@@ -393,10 +393,7 @@ const preservePlayerDisplayNames = (current: GameState, restored: GameState): Ga
       player.nameIsDefault = currentPlayer.nameIsDefault
     }
   }
-  restored.log = restored.log.map(entry => {
-    const name = entry.playerId ? names.get(entry.playerId) : undefined
-    return name !== undefined && entry.params ? copyHistoryRecordIdentity(entry, { ...entry, params: { ...entry.params, player: name } }) : entry
-  })
+
   return restored
 }
 
@@ -1213,7 +1210,7 @@ export class GameCore {
       if (this.isFailedAuthoritativeCommand(command)) {
         return this.respond(false, 'command unavailable until game state changes')
       }
-      beginHistoryOperation(this.state, type === 'action' || type === 'anytime' || type === 'specialAction')
+      beginHistoryOperation(this.state, (type === 'action' || type === 'anytime' || type === 'specialAction') && this.engineStack.depth() === 0)
       if (type === 'undoStep' || type === 'undoAction') assertPublicEventArchiveCanAppend(this.state)
       const settlement = this.createActiveCommandSettlement(command)
       this.activeCommandSettlement = settlement
@@ -1612,12 +1609,7 @@ export class GameCore {
 
   /** Update a player's display name in the game state (called after WS join). */
   updatePlayerName(playerIndex: number, name: string): void {
-    const player = this.state.players[playerIndex]
-    const previousName = player?.name
-    setupPhase.updatePlayerName(player, name)
-    if (!previousName || !player || previousName === player.name) return
-    this.state.log = this.state.log.map(entry => entry.playerId === player.id && entry.params
-      ? copyHistoryRecordIdentity(entry, { ...entry, params: { ...entry.params, player: player.name } }) : entry)
+    setupPhase.updatePlayerName(this.state.players[playerIndex], name)
   }
 
   private bindInitialLogPlayerIds(): void {
