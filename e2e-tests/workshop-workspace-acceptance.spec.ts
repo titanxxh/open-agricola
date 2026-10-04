@@ -340,6 +340,8 @@ const expectAccessibleWorkspace = async (page: Page) => {
   await expect(activeStage).toBeFocused()
   await page.keyboard.press('Enter')
   await expect(activeStage).toHaveAttribute('aria-current', 'step')
+  // Scan the settled stage, rather than an intermediate frame of its fade-in.
+  await expect(page.locator('.aicw-stage-content')).toHaveCSS('opacity', '1')
   const overflow = await page.evaluate(() => ({
     document: document.documentElement.scrollWidth - document.documentElement.clientWidth,
     shell: (() => {
