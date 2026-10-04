@@ -161,6 +161,105 @@ describe('SqliteRoomPersistence', () => {
     expect(p.load('nope')).toBeNull()
   })
 
+  describe('membership writes', () => {
+    const players = [{ userId: 'u1', playerIndex: 0 }, { userId: 'u2', playerIndex: 1 }]
+    const memberRows = () => db.prepare(`
+      SELECT user_id, player_index, joined_at FROM room_players
+      WHERE room_id = 'r1' ORDER BY player_index
+    `).all()
+    const seatUpdates = () => db.prepare('SELECT user_id, old_index, new_index FROM seat_updates').all()
+
+    beforeEach(() => {
+      db.exec(`
+        CREATE TABLE seat_updates (user_id TEXT, old_index INTEGER, new_index INTEGER);
+        CREATE TRIGGER record_seat_update AFTER UPDATE OF player_index ON room_players
+        BEGIN
+          INSERT INTO seat_updates VALUES (NEW.user_id, OLD.player_index, NEW.player_index);
+        END;
+      `)
+      p.save('r1', STATE, { ...META, players })
+      db.prepare("UPDATE room_players SET joined_at = ? WHERE room_id = 'r1'").run(NOW)
+    })
+
+    it('does not UPDATE unchanged indices or refresh joined_at when saving the room', () => {
+      const members = memberRows()
+      db.prepare("UPDATE rooms SET updated_at = 0 WHERE id = 'r1'").run()
+
+      p.save('r1', STATE, { ...META, players })
+
+      expect(seatUpdates()).toEqual([])
+      expect(memberRows()).toEqual(members)
+      expect(p.load('r1')?.meta.players).toEqual(players)
+      expect(db.prepare("SELECT version FROM rooms WHERE id = 'r1'").get()).toEqual({ version: 2 })
+      expect(p.load('r1')!.updatedAt).toBeGreaterThan(0)
+    })
+
+    it('updates a moved member exactly once and preserves its joined_at', () => {
+      const moved = [{ userId: 'u2', playerIndex: 1 }, { userId: 'u1', playerIndex: 2 }]
+
+      p.save('r1', STATE, { ...META, maxPlayers: 3, players: moved })
+
+      expect(seatUpdates()).toEqual([{ user_id: 'u1', old_index: 0, new_index: 2 }])
+      expect(memberRows()).toEqual([
+        { user_id: 'u2', player_index: 1, joined_at: NOW },
+        { user_id: 'u1', player_index: 2, joined_at: NOW },
+      ])
+      expect(p.load('r1')?.meta.players).toEqual(moved)
+    })
+
+    it('keeps the existing swap and replacement membership behavior', () => {
+      p.save('r1', STATE, { ...META, players: [
+        { userId: 'u1', playerIndex: 1 },
+        { userId: 'u2', playerIndex: 0 },
+      ] })
+
+      expect(p.load('r1')?.meta.players).toEqual([
+        { userId: 'u2', playerIndex: 0 },
+        { userId: 'u1', playerIndex: 1 },
+      ])
+      expect(seatUpdates()).toEqual([{ user_id: 'u1', old_index: 0, new_index: 1 }])
+      // clearReplacedSeat deletes/reinserts the displaced member during swaps;
+      // the surviving moved member retains its original join timestamp.
+      expect(memberRows()).toEqual([
+        { user_id: 'u2', player_index: 0, joined_at: expect.any(Number) },
+        { user_id: 'u1', player_index: 1, joined_at: NOW },
+      ])
+
+      p.save('r1', STATE, { ...META, players: [
+        { userId: 'u3', playerIndex: 0 },
+        { userId: 'u1', playerIndex: 1 },
+      ] })
+
+      expect(p.load('r1')?.meta.players).toEqual([
+        { userId: 'u3', playerIndex: 0 },
+        { userId: 'u1', playerIndex: 1 },
+      ])
+      expect(seatUpdates()).toEqual([{ user_id: 'u1', old_index: 0, new_index: 1 }])
+    })
+
+    it('rolls back actual moves, displaced members and update counters on a later failure', () => {
+      const before = p.load('r1')
+      const members = memberRows()
+      db.exec(`
+        CREATE TRIGGER reject_member BEFORE INSERT ON room_players
+        WHEN NEW.user_id = 'reject'
+        BEGIN
+          SELECT RAISE(ABORT, 'rejected member');
+        END;
+      `)
+
+      expect(() => p.save('r1', STATE, { ...META, maxPlayers: 3, players: [
+        { userId: 'u1', playerIndex: 2 },
+        { userId: 'reject', playerIndex: 1 },
+      ] })).toThrow('rejected member')
+
+      expect(seatUpdates()).toEqual([])
+      expect(memberRows()).toEqual(members)
+      expect(p.load('r1')).toEqual(before)
+      expect(db.prepare("SELECT version FROM rooms WHERE id = 'r1'").get()).toEqual({ version: 1 })
+    })
+  })
+
   it('discard removes the row + cascades room_players without a result', () => {
     p.save('r1', STATE, META)
     expect(p.load('r1')).not.toBeNull()

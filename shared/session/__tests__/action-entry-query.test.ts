@@ -23,7 +23,7 @@ describe('computeActionEntryAvailability', () => {
     calls = 0
 
     computeActionEntryAvailability(state, player, {
-      isActionDoable: (_space, baseDoable) => baseDoable,
+      isActionDoable: (_space, baseDoable) => baseDoable(),
     })
 
     expect(callsPerPlacementScan).toBeGreaterThan(0)

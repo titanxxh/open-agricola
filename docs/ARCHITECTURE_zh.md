@@ -731,7 +731,7 @@ Card listener 区域默认只匹配已打出卡：`zones` 省略等价于 `['pla
 
 ### 7.5.2 当前步骤准入、before 与 blocked 恢复
 
-行动格可用性与权威入口共用 `GameCore.applyIsDoableCheck()` 和 flow 准入 helper。原子判断携带 params、sourceCard、actionContext、owner、目标行动格、实际费用修正与替代行动信息。当前步骤可执行，或适用的 before 可以开始，就允许尝试；不保证整条流程能够完成。SEQ 检查下一步，OR/XOR 检查是否有分支可以开始。显式 veto 和放人限制仍然有效。查询不消费资源、触发、事件或私有 cursor。
+行动格可用性与权威入口共用 `GameCore.applyIsDoableCheck()` 和 flow 准入 helper。原子判断携带 params、sourceCard、actionContext、owner、目标行动格、实际费用修正与替代行动信息。当前步骤可执行，或适用的 before 可以开始，就允许尝试；不保证整条流程能够完成。SEQ 检查下一步，OR/XOR 检查是否有分支可以开始。显式 veto 和放人限制仍然有效。入口 helper 延迟求值基础判定，只对带自定义判定的 strict 复合行动执行这次前置检查。flow 查询中，叶子的基础回退只在没有 `costPreview` 时执行；复合流程遍历和 strict gate 保持原有顺序。每次查询仍基于完整的当前状态执行适用的 hook 与费用预览，不缓存可用性结果。查询不消费资源、触发、事件或私有 cursor。
 
 引擎在状态变化后重新评估 before 候选，每次 activation 只消费一次。已接受的根行动和必选续行会向复合后代传播义务。选中分支不能返回父选择以逃过未履行的义务；明确 optional 节点在接受前仍可跳过。必选叶节点或复合节点不可执行时产生 `engine-blocked`；普通失败保留先前效果，等待玩家显式 `undoStep` 或 `undoAction`。无效结构化提交恢复命令检查点并保留原交互。
 
@@ -880,7 +880,7 @@ OA 对齐规则：
 
 **2026-09-01 Mandatory post-host continuation 修订：** mandatory `afterHostCommit` continuation 会把义务传播到每层动态 descendant。任一 descendant 不可执行时进入 `engine-blocked`；`undoStep` 保持普通撤销语义，`undoAction` 作为整个 Rule Action 的回退。若 host choice 来自 Protected Observation 发布后创建的 pending interaction，Session 会在这个已发布的交互 checkpoint 建立 scope。显式 `undoAction` 会回到同一交互和同一缓存结果，撤销 host、支付与 follow-up，记住失败命令并保留 sibling option。它不会恢复到观察之前、重掷结果、按卡牌 ID 分支或改变支付顺序。
 
-随机与隐藏信息通用原语把 observation 报告给当前 settlement；dev 命令把任意隐藏手牌移到公开区域前，也必须先报告这次公开。只有所有仍 active 的 ancestor 都 guarded 时命令才可发布；同一命令已经完成的 host 不再参与 gate，仍 active 的未 guarded ancestor 则会把 GameState、Engine/Session cursor、事件、隐藏区域和 RNG 一并恢复到命令入口。Strict replacement probe 对每个 alternative leaf 使用与 direct action 相同的 `isDoable` hook 与 listener pipeline。规范化失败命令会保留到规则相关状态真正变化。集合语义的命令字段，包括 `commitSelection` 农场元素和动物重整的 `choice.payload.zones`，按与数组顺序无关的方式规范化。耗尽 optional flow 后自动执行的拒绝使用嵌套命令 settlement，因为解析 `__skip__` 仍可能执行后续效果。成功的 provisional 命令，以及需要持久化失败记忆的拒绝命令，携带内部 durable-transition 标记；即使公开 Frame hash 未变化，`RoomCommitter` 仍记录 Replay Step；同时它独立哈希私有 `sessionCursor`，因此普通 cursor-only 转换也会持久化，且不会把 cursor 暴露到 Replay Frame。durable rejection 的错误只发送给提交 socket，其他玩家收到同一已提交版本的无错快照。恢复完成后，公开日志会按原因区分“该选择会破坏必做后续”和“随机或隐藏信息结果暂时不能公开”，解释拒绝原因，并说明在规则状态变化前不能重试。持久化明确分离 authoritative `state`、公开/回放 `frame` 和私有 `sessionCursor`：scope ancestry、rollback checkpoint、guard 与失败记忆可在恢复后继续，但不会进入 Replay Frame；只有同时匹配当前规则状态与 pending interaction 的命令键会作为 `rejectedCommandKeys` 投影给该交互的接收者，由共享客户端提交路径对所有 request kind 禁用精确重试。Scope abort 会追加自身明确的 rollback log 和一个新的恢复 Frame，不重写旧 Step。详见 ADR 0015。
+随机与隐藏信息通用原语把 observation 报告给当前 settlement；dev 命令把任意隐藏手牌移到公开区域前，也必须先报告这次公开。只有所有仍 active 的 ancestor 都 guarded 时命令才可发布；同一命令已经完成的 host 不再参与 gate，仍 active 的未 guarded ancestor 则会把 GameState、Engine/Session cursor、事件、隐藏区域和 RNG 一并恢复到命令入口。Strict replacement probe 对每个 alternative leaf 使用与 direct action 相同的 `isDoable` hook 与 listener pipeline。规范化失败命令会保留到规则相关状态真正变化。集合语义的命令字段，包括 `commitSelection` 农场元素和动物重整的 `choice.payload.zones`，按与数组顺序无关的方式规范化。耗尽 optional flow 后自动执行的拒绝使用嵌套命令 settlement，因为解析 `__skip__` 仍可能执行后续效果。成功的 provisional 命令，以及需要持久化失败记忆的拒绝命令，携带内部 durable-transition 标记；即使公开 Frame hash 未变化，`RoomCommitter` 仍记录 Replay Step。其他公开 Frame 未变化的命令，会将私有 `sessionCursor` 与独立持有的基准做等价于 canonical JSON 的比较；cursor-only 转换仍会持久化，且不会把 cursor 暴露到 Replay Frame。公开 Frame 变化或设置 `durableTransition` 时跳过私有比较；公开 Frame 的哈希方式保持不变。durable rejection 的错误只发送给提交 socket，其他玩家收到同一已提交版本的无错快照。恢复完成后，公开日志会按原因区分“该选择会破坏必做后续”和“随机或隐藏信息结果暂时不能公开”，解释拒绝原因，并说明在规则状态变化前不能重试。持久化明确分离 authoritative `state`、公开/回放 `frame` 和私有 `sessionCursor`：scope ancestry、rollback checkpoint、guard 与失败记忆可在恢复后继续，但不会进入 Replay Frame；只有同时匹配当前规则状态与 pending interaction 的命令键会作为 `rejectedCommandKeys` 投影给该交互的接收者，由共享客户端提交路径对所有 request kind 禁用精确重试。Scope abort 会追加自身明确的 rollback log 和一个新的恢复 Frame，不重写旧 Step。详见 ADR 0015。
 
 ### 7.8 farm-type 提交
 
@@ -1210,7 +1210,7 @@ server/connection/
 - `room-router` 负责验证、座位授权和调用 `GameSession`，不直接写 `GameState`。
 - `payload-validation.ts` 纯校验（`validateResourcePayload` / `validateSingleTilePayload` / `validateMultiTilePayload`），返合法/规范化结果，不写 `GameSession`。
 - ADR-0014 实施后，Room 的 `ready | blocked` 写入状态门必须位于命令入口；不增加通用异步命令队列。Durable Room Commit 同步完成，保存重试只能在 Room blocked 时运行。
-- 规则命令 `resp.ok=false` 只回发起连接，不增加 `roomVersion` 或 Replay Step，也不向其他座位广播错误。
+- 规则命令 `resp.ok=false` 且没有 `durableTransition` 标记时，只回发起连接，不增加 `roomVersion` 或 Replay Step。durable rejection 仍提交；其错误只回发起连接，其他座位收到同一已提交版本的无错快照（ADR 0015）。
 
 ### 11.2 server/game/ — Room + GameSession
 
@@ -1234,13 +1234,19 @@ server/game/
 
 `roomId` 唯一标识一局游戏：`newGame` 先创建新 `GameSession` 和 UUID，再把在线座位、人数、custom cards、已持久化变体开关及所有连接引用切到新 Room 记录；旧 id 永不复用。首个 `waiting → playing` 转换写入不可变 `started_at`。只有权威 `gameOver` 会在单个 SQLite 事务内写入 `game_results` / `game_result_players` 标量摘要并删除 `rooms.state_json`；TTL、解散、删号和未完成重开只删除可恢复快照，把永久 Game Context 置为 `expired`，不产生结果。归档写失败会回滚，最终全量状态继续保留用于恢复或重试。
 
-`RoomPersistenceCheckpoint` 继续处理等待态、未启用 Replay 的 Room 和非 SQLite adapter。SQLite Replay Room 的成功游戏命令改走 Durable Room Commit：同一事务先写 Room snapshot 与 Replay Step，提交后才广播；WebSocket 关闭时不再为这种 Room 补写旧 checkpoint。
+`RoomPersistenceCheckpoint` 继续处理等待态、未启用 Replay 的 Room 和非 SQLite adapter。SQLite Replay Room 中需要持久化的游戏命令，包括 durable rejection，走 Durable Room Commit：同一事务先写 Room snapshot 与 Replay Step，提交后才广播；WebSocket 关闭时不再为这种 Room 补写旧 checkpoint。
 
 **Issues #938–#940 的恢复约束：**活动恢复必须保留普通 Undo History 和嵌套暂定作用域的回退检查点。恢复权威会话及继续提交所需的 RoomCommitter 基准帧，必须独立于历史 Replay payload；可以核对 Replay head 元数据，但不能要求解码 Replay checkpoint 或 delta。参见 ADR-0011 §11 和 ADR-0015。
 
 **Room 历史与恢复（Issues #947–#954）：** SQLite 把不可变历史节点存入 `room_history_nodes`，把普通撤销和嵌套检查点的共享记录存入 `room_recovery_nodes`（迁移 32–33）。`shared/session/history-streams.ts` 捕获较小的核心主体和不可变分支，避免复制完整历史数组；`RoomHistoryStore` 在现有 Room/Replay 事务内只写新节点。写入失败不会把未提交 ID 加入持久缓存。引用缺失、校验和错误或原始 Frame Hash 不符均停止恢复。JSON 和内存适配器保留逻辑完整快照以及相同的重启、撤销语义。
 
-最新保存的 Frame 包含全部非历史字段、精确历史引用和原始规范 Hash。恢复时拼接已存值并校验 Hash，不读取 Replay payload，也不按当前规则重算。规则、Workshop、Worker IPC、Replay 和调试快照保留完整逻辑历史。Worker IPC 在原始 Frame 之外携带恢复身份目录，让记录、操作组和检查点身份跨消息保持一致。JSON 快照为每个序列化别名路径保存同一目录，让这些身份在重启后继续保留。普通撤销、命令回退、嵌套暂定作用域及 Protected Observation 保持既有行为；见 [ADR-0021](adr/0021-room-owned-history-branches-and-recovery-snapshots.md)。
+**快照所有权（Issue #941）：** `serializeSessionSnapshot` 只捕获并冻结一次权威核心数据。独立的 `state` 与 `frame` 视图共享不可变的嵌套核心值和历史记录；玩家展示字段在当前 session 上下文中计算并单独复制。每次玩家序列化只计算一次动物区，供四个展示投影使用；结果只存在于本次调用，不跨查询或命令缓存。Frame 常量键、行动格执行字段的剥离及序列化键顺序保持不变。`rehydrateState` 在规范化或执行规则前复制较小的核心主体，也覆盖 Worker IPC 保留别名但移除对象冻结的情况，因此恢复后的规则写入不会改动任一已保存视图。
+
+`RoomCommitter` 直接接收原生快照新捕获的 Frame，并单独复制终局 scores。Worker 快照仍由外部缓存，因此继续复制其较小的 Frame 主体，同时复用不可变历史。已提交的 diff 基准和失败重试保留这份捕获的 Frame 及编码 payload。SQLite 写入内部 Room history 第 2 版：一份打包后的 `state`、相对于同一已保存 state 的结构差异 `frameDelta`，以及原始 Frame Hash。差异保留 Frame 的全部变化，包括派生值、常量、移除的执行字段、scores、未来字段及独立捕获的历史引用。第 1 版 `frameWithoutStreams` 记录仍可读取。这只改变 Room 存储；JSON 和内存适配器、Worker IPC、Replay 保持原有逻辑快照格式。
+
+打包后的最新快照、undo 和 checkpoint 主体，仅在完整封装比原始 JSON 更小时使用 level-1 gzip/base64 JSON 封装；历史节点记录不压缩。恢复记录的校验和覆盖实际编码文本，读取仍接受原始 JSON 主体。最新快照封装仅保留大厅轮到谁查询所需的 SQL 字段；恢复和本地重启工具均解码完整主体。编码不会展开已引用的历史。
+
+恢复时将已保存的 Frame 差异应用于较小 state 主体的独立副本，拼接精确历史引用，再校验原始规范 Frame Hash；不读取 Replay payload，也不按当前规则重算。规则、Workshop、Worker IPC、Replay 和调试快照保留完整逻辑历史。Worker IPC 在原始 Frame 之外携带恢复身份目录，让记录、操作组和检查点身份跨消息保持一致。JSON 快照为每个序列化别名路径保存同一目录，让这些身份在重启后继续保留。普通撤销、命令回退、嵌套暂定作用域及 Protected Observation 保持既有行为；见 [ADR-0021](adr/0021-room-owned-history-branches-and-recovery-snapshots.md)。
 
 WebSocket 的玩家快照包含 `historyWindow`：最近 **20 个完整操作组**、稳定记录 ID、绑定观察者的分支 ID，以及可选的旧页游标。`getHistory` / `historyPage` 复用活动座位授权（包括拒绝已被替换的连接），先对完整历史做 viewer 过滤，再分页，隐藏手牌事件与取消 payload 同样过滤。读取不写 Room，也不推进版本。HTTP、本地及调试 payload 保持完整。客户端按需加载旧操作组，分支或观察者变化时清空缓存；过期游标返回 `history_branch_changed`，触发新窗口读取。记录身份独立于可复用事件序号。操作者及其他参与者姓名按稳定身份投影，改名不再重写原始历史参数。完赛 Replay 沿用归档参与者名与现有匿名化投影。在相同规则与运行时源码下，这些存储和展示改动保持 Replay schema、原始 Frame Hash 链及不可变 Viewer Build 不变。
 
@@ -1286,7 +1292,7 @@ ClientCommand
   → Broadcaster：提交成功后生成各座位遮蔽 envelope 并发送
 ```
 
-- `resp.ok=false` 绕过提交并只回发起者。成功命令只有在公开 Frame Hash 与私有权威 session-cursor hash 都未变化时才返回 `unchanged`；cursor-only 转换仍持久化 Room snapshot，并记录公开 Frame 可重复的 Step。重连和补拉不创建 Step。
+- `resp.ok=false` 且没有 `durableTransition` 标记时，绕过提交并只回发起者。成功命令只有在公开 Frame Hash 与私有权威 session cursor 都未变化且没有 `durableTransition` 标记时才返回 `unchanged`；cursor-only 转换仍持久化 Room snapshot，并记录公开 Frame 可重复的 Step。`durableTransition` 强制记录 Step，包括保留回滚结果与失败记忆的 durable rejection（ADR 0015）；其错误只回提交 socket，其他玩家收到同一已提交版本的无错快照。重连和补拉不创建 Step。
 - Replay Step 使用 Room 全局单调 `stepNo`，与 `roomVersion` 分离。多个玩家在同一交互阶段提交时仍串行占用连续 Step；最后一次提交触发的自动引擎结算包含在该 Step 内，规则结果不得依赖提交到达顺序。
 - Step 0 在第一个互动命令前建立。classic deal 已包含在 Frame 中；互动 draft、Parent Selection 和显式多人提交从 Step 1 起记录。
 - 终局 Frame 额外归档权威 `PlayerScoreSummary[]`；历史 Viewer 在 `gameOver` Step 复用只读 `ScoringPad` 展示分类、卡牌加分与总分。
@@ -1628,7 +1634,7 @@ pnpm run build              # tsc + vite build
 - codec round-trip、最多 15 delta、提前 checkpoint、Hash mismatch 和损坏 Segment 后续恢复；
 - snapshot + Step 原子事务、gameOver 原子完成、相同 Hash 幂等、不同 Hash 阻断、数据库故障暂停与重启恢复；
 - 两个同时提交玩家得到连续 `stepNo`，最后提交触发结算且交换到达顺序不改变结果；
-- `ok=false` 和 unchanged 只回发起者；提交成功前任何座位都收不到未落盘状态；
+- 普通 `ok=false` 和 unchanged 只回发起者；durable rejection 提交后才向其他座位发送无错快照；提交成功前任何座位都收不到未落盘状态；
 - active Room 双座位恢复、座位替换、他人隐藏信息遮蔽、暂停期间重连等待；
 - completed/expired/removed/unknown resolver、无登录公开 Replay、Anchor mismatch、缓存与错误码；
 - 桌面 auto 时间线布局、手机 auto 棋盘布局、手动 URL 覆盖、视角选择、播放/暂停/前后步/跳转、键盘和 axe；
@@ -1658,9 +1664,9 @@ pnpm run build              # tsc + vite build
 13. **前端不做乐观提交**：等 `stateUpdate` 到达再改 UI。
 14. **ActionFlow 对齐 参考实现小代数**：卡牌 DSL 只暴露 `leaf / seq / parallel / xor / or` + metadata；runtime-only node 不进入卡牌 flow。
 15. **listener handler 不改 state**：listener / preview / doable 路径只 build flow 或返回结构化结果；状态修改必须落在 action leaf 执行阶段。
-16. **Durable Room Commit**：成功且改变公开 Frame 或私有权威 session cursor 的命令先原子写 Room snapshot + Replay Step，随后才按座位视角发送。
+16. **Durable Room Commit**：成功且改变公开 Frame 或 Private Session Cursor 的命令，以及任何带 `durableTransition` 标记的响应，先原子写 Room snapshot + Replay Step，随后才按座位视角发送。
 17. **Replay 全局 Step**：多人同时提交仍占用连续 `stepNo`；自动结算属于最后触发输入，结果不得依赖到达顺序。
-18. **失败不扩散**：`resp.ok=false` 只回发起者；持久化失败冻结同一 Frame 并阻断 Room，不覆盖或继续推进。
+18. **失败不扩散**：命令错误只回发起者；durable rejection 仍向其他座位发送已提交版本的无错快照。持久化失败冻结同一 Frame 并阻断 Room，不覆盖或继续推进。
 19. **30 Room 上限**：单实例统计普通 `waiting + playing` Room；只拒绝新建，不影响恢复。
 20. **历史 Viewer 不可变**：Room 锁定 schema/build，完成回放由 credentialless 只读 Viewer 读取，不执行历史规则代码。
 

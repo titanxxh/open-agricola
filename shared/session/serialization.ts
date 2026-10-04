@@ -123,10 +123,9 @@ const serializeAnimalZone = (zone: AnimalZone): InteractionAnimalReorgZone => {
 }
 
 const collectBorrowedPlayedCardAnimalZones = (
-  state: GameState,
-  player: PlayerState,
+  zones: readonly AnimalZone[],
 ): InteractionAnimalReorgZone[] =>
-  computeAnimalZones(player, state)
+  zones
     .filter((zone) =>
       zone.zoneType === 'card' &&
       !zone.farmPosition &&
@@ -135,20 +134,18 @@ const collectBorrowedPlayedCardAnimalZones = (
     .map(serializeAnimalZone)
 
 const collectPastureCapacities = (
-  state: GameState,
-  player: PlayerState,
+  zones: readonly AnimalZone[],
 ): Record<string, number> =>
   Object.fromEntries(
-    computeAnimalZones(player, state)
+    zones
       .filter((zone) => zone.zoneType === 'pasture')
       .map((zone) => [zone.id, zone.capacity]),
   )
 
 const collectPlayedCardAnimalZones = (
-  state: GameState,
-  player: PlayerState,
+  zones: readonly AnimalZone[],
 ): InteractionAnimalReorgZone[] =>
-  computeAnimalZones(player, state)
+  zones
     .filter((zone) =>
       zone.zoneType === 'card' &&
       !zone.farmPosition &&
@@ -157,12 +154,39 @@ const collectPlayedCardAnimalZones = (
     .map(serializeAnimalZone)
 
 const collectFarmCardAnimalZones = (
-  state: GameState,
-  player: PlayerState,
+  zones: readonly AnimalZone[],
 ): InteractionAnimalReorgZone[] =>
-  computeAnimalZones(player, state)
+  zones
     .filter((zone) => zone.zoneType === 'card' && !!zone.farmPosition)
     .map(serializeAnimalZone)
+
+type SerializedPlayerDisplayFields = Omit<SerializedPlayerState, keyof PlayerState>
+
+const serializePlayerDisplayFields = (
+  state: GameState,
+  player: PlayerState,
+): SerializedPlayerDisplayFields => {
+  const moorSpecialActionAvailability = Object.fromEntries((state.farmersOfTheMoor?.specialActionCards ?? []).map(card => [
+    card.id, {
+      cardUsable: isMoorSpecialActionCardUsableByPlayer(card, player.id),
+      ...Object.fromEntries(card.actions.map(actionId => [actionId, canTakeVisibleMoorSpecialAction(state, player, card, actionId)])),
+    },
+  ]))
+  const lockedFarmTileKeys = [...collectLockedFarmTileKeys(player)].sort()
+  const playerPanelSummary = getPlayerPanelSupplySummary(state, player)
+  const specialStables = collectBuiltSpecialStables(player)
+  const zones = computeAnimalZones(player, state)
+  return {
+    moorSpecialActionAvailability,
+    lockedFarmTileKeys,
+    playerPanelSummary,
+    specialStables,
+    playedCardAnimalZones: collectPlayedCardAnimalZones(zones),
+    farmCardAnimalZones: collectFarmCardAnimalZones(zones),
+    borrowedPlayedCardAnimalZones: collectBorrowedPlayedCardAnimalZones(zones),
+    pastureCapacities: collectPastureCapacities(zones),
+  }
+}
 
 export const serializeState = (
   state: GameState,
@@ -174,19 +198,7 @@ export const serializeState = (
     roundStartSnapshot: null,
     players: players.map((player) => ({
       ...player,
-      moorSpecialActionAvailability: Object.fromEntries((state.farmersOfTheMoor?.specialActionCards ?? []).map(card => [
-        card.id, {
-          cardUsable: isMoorSpecialActionCardUsableByPlayer(card, player.id),
-          ...Object.fromEntries(card.actions.map(actionId => [actionId, canTakeVisibleMoorSpecialAction(state, player, card, actionId)])),
-        },
-      ])),
-      lockedFarmTileKeys: [...collectLockedFarmTileKeys(player)].sort(),
-      playerPanelSummary: getPlayerPanelSupplySummary(state, player),
-      specialStables: collectBuiltSpecialStables(player),
-      playedCardAnimalZones: collectPlayedCardAnimalZones(state, player),
-      farmCardAnimalZones: collectFarmCardAnimalZones(state, player),
-      borrowedPlayedCardAnimalZones: collectBorrowedPlayedCardAnimalZones(state, player),
-      pastureCapacities: collectPastureCapacities(state, player),
+      ...serializePlayerDisplayFields(state, player),
     })),
     actionSpaces: actionSpaces.map(
       // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -196,14 +208,38 @@ export const serializeState = (
   }
 }
 
+/** The two snapshot views share only owned, immutable core values. */
+const freezeSnapshotCore = (value: unknown): void => {
+  if (!value || typeof value !== 'object' || Object.isFrozen(value)) return
+  Object.values(value).forEach(freezeSnapshotCore)
+  Object.freeze(value)
+}
+
 export const serializeSessionSnapshot = (
   state: GameState,
   session: SessionCursorSource,
-): PersistedSessionSnapshot => ({
-  state: captureStateWithHistory(state) as SerializedAuthoritativeGameState,
-  frame: session.withCtx(() => captureStateWithHistory(serializeState(state, {}))),
-  sessionCursor: session.createSessionPrivateCursor(),
-})
+): PersistedSessionSnapshot => {
+  const captured = captureStateWithHistory(state)
+  freezeSnapshotCore(captured)
+  const displays = session.withCtx(() => JSON.parse(JSON.stringify(
+    state.players.map(player => serializePlayerDisplayFields(state, player)),
+  )) as SerializedPlayerDisplayFields[])
+  const { actionSpaces, players, ...rest } = captured
+  return {
+    state: captured as SerializedAuthoritativeGameState,
+    frame: {
+      ...rest,
+      roundStartSnapshot: null,
+      players: players.map((player, index) => ({ ...player, ...displays[index]! })),
+      actionSpaces: actionSpaces.map(
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
+        ({ canBeExecutedByPlayer, execute, resolveChoice, flow, ...space }) => space,
+      ),
+      engineStack: { frames: [] },
+    },
+    sessionCursor: session.createSessionPrivateCursor(),
+  }
+}
 
 export const filterPublicEventCancellationsForPlayer = (
   state: GameState,
@@ -242,7 +278,7 @@ export const rehydrateState = (
 ): RehydratedState => {
   const persisted = 'state' in input && 'frame' in input && 'sessionCursor' in input ? input : null
   if (persisted) importRecoveryCatalog(persisted)
-  const raw = (persisted?.state ?? input) as SerializedGameState
+  const raw = captureStateWithHistory((persisted?.state ?? input) as SerializedGameState)
   const templates = [
     ...createActionSpaces(raw.players?.length),
     ...(raw.enableThroughTheSeasons ? createSeasonActionSpaces(raw.players?.length) : []),

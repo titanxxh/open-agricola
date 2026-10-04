@@ -1,15 +1,19 @@
-import { frameHash, type JsonValue } from '../replay-codec'
+import { applyReplayDelta, createReplayDelta, frameHash, type JsonValue, type ReplayDeltaOperation } from '../replay-codec'
 import { createHash } from 'node:crypto'
 import type Database from 'better-sqlite3'
 import { historyBranch, materializeHistoryBranch, recoveryRecordId, registerRecoveryRecordId, registerRestoredHistoryNode, historyStreamKeys, type HistoryNode, type HistoryRecordIdentity, type HistoryStreamKind } from '../../../shared/session/history-streams'
 import type { PersistedSessionSnapshot } from '../../../shared/session/serialization'
 import type { HistoryEntry, SessionPrivateCursor, SessionCommandCheckpoint } from '../../../shared/session/session-core'
 import type { GameState } from '../../../shared/contract/types'
+import { encodeRoomBody, parseRoomBody } from './room-body-codec'
 
 type Reference = { kind: HistoryStreamKind; head: string | null; length: number; branch: string }
 type StoredState = Record<string, unknown> & { historyStreams: Reference[] }
 type StoredCursor = Omit<SessionPrivateCursor, 'history' | 'provisionalContinuationScopes'> & { undoHistory?: string[]; provisionalContinuationScopes?: Array<Omit<SessionPrivateCursor['provisionalContinuationScopes'][number], 'checkpoint'> & { checkpointRef: string }> }
-type StoredSnapshot = { roomHistoryVersion: 1; state: StoredState; frameWithoutStreams: StoredState; rawFrameHash: string; sessionCursor: StoredCursor }
+type StoredSnapshot = { state: StoredState; rawFrameHash: string; sessionCursor: StoredCursor } & (
+  | { roomHistoryVersion: 1; frameWithoutStreams: StoredState }
+  | { roomHistoryVersion: 2; frameDelta: ReplayDeltaOperation[] }
+)
 type NodeRow = { node_id: string; kind: HistoryStreamKind; previous_id: string | null; length: number; record_json: string; identity_json: string; checksum: string }
 export type RecoveryNode = { id: string; kind: 'undo' | 'checkpoint'; json: string }
 export type PackedRoomSnapshot = { json: string; nodes: HistoryNode[]; recoveryNodes: RecoveryNode[] }
@@ -70,7 +74,7 @@ export class RoomHistoryStore {
       const id = recoveryRecordId(entry)
       if (!known.has(id) && !pending.has(id)) {
         pending.add(id)
-        recoveryNodes.push({ id, kind: 'undo', json: JSON.stringify({ ...entry, state: packState(entry.state) }) })
+        recoveryNodes.push({ id, kind: 'undo', json: encodeRoomBody(JSON.stringify({ ...entry, state: packState(entry.state) })) })
       }
       return id
     }
@@ -79,18 +83,38 @@ export class RoomHistoryStore {
       if (!known.has(id) && !pending.has(id)) {
         pending.add(id)
         const { state, history, ...body } = checkpoint
-        recoveryNodes.push({ id, kind: 'checkpoint', json: JSON.stringify({ ...body, state: packState(state), undoHistory: history.map(packUndo) }) })
+        recoveryNodes.push({ id, kind: 'checkpoint', json: encodeRoomBody(JSON.stringify({ ...body, state: packState(state), undoHistory: history.map(packUndo) })) })
       }
       return id
     }
     const { history = [], provisionalContinuationScopes, ...runtime } = snapshot.sessionCursor
-    const stored: StoredSnapshot = { roomHistoryVersion: 1, state: packState(snapshot.state), frameWithoutStreams: packState(snapshot.frame), rawFrameHash: expectedFrameHash ?? frameHash(snapshot.frame as unknown as JsonValue), sessionCursor: {
+    const state = packState(snapshot.state)
+    const frame = packState(snapshot.frame)
+    // Both views retain their exact history references. Shared captured core values
+    // stop delta traversal at Object.is; only the Frame's differences are repeated.
+    const frameDelta = createReplayDelta(state as JsonValue, frame as JsonValue)
+    const stored: StoredSnapshot = { roomHistoryVersion: 2, state, frameDelta, rawFrameHash: expectedFrameHash ?? frameHash(snapshot.frame as unknown as JsonValue), sessionCursor: {
       ...runtime,
       ...('history' in snapshot.sessionCursor ? { undoHistory: history.map(packUndo) } : {}),
       ...(provisionalContinuationScopes ? { provisionalContinuationScopes: provisionalContinuationScopes.map(({ checkpoint, ...scope }) => ({ ...scope, checkpointRef: packCheckpoint(checkpoint) })) } : {}),
     } }
 
-    return { json: JSON.stringify(stored), nodes, recoveryNodes }
+    const lastFrame = snapshot.sessionCursor.engineStackCursor?.frames.at(-1)
+    // The lobby reads only these turn fields directly with SQLite json_extract.
+    // Recovery always uses the complete encoded body, never this query projection.
+    const queryFields = {
+      state: {
+        phase: snapshot.state.phase,
+        gameOver: snapshot.state.gameOver,
+        currentPlayerIndex: snapshot.state.currentPlayerIndex,
+      },
+      sessionCursor: {
+        engineStackCursor: {
+          frames: lastFrame ? [{ ownerPlayerIndex: lastFrame.ownerPlayerIndex }] : [],
+        },
+      },
+    }
+    return { json: encodeRoomBody(JSON.stringify(stored), queryFields), nodes, recoveryNodes }
   }
   write(roomId: string, nodes: HistoryNode[], recoveryNodes: RecoveryNode[] = []): void {
     for (const node of nodes) {
@@ -116,9 +140,9 @@ export class RoomHistoryStore {
     }
   }
   private restoreRecords(roomId: string, json: string): PersistedSessionSnapshot {
-    const stored = JSON.parse(json) as StoredSnapshot | PersistedSessionSnapshot
+    const stored = parseRoomBody(json) as StoredSnapshot | PersistedSessionSnapshot
     if (!('roomHistoryVersion' in stored)) return stored
-    if (stored.roomHistoryVersion !== 1) throw new RoomHistoryCorruptionError(`Unsupported Room history for ${roomId}`)
+    if (stored.roomHistoryVersion !== 1 && stored.roomHistoryVersion !== 2) throw new RoomHistoryCorruptionError(`Unsupported Room history for ${roomId}`)
     const cache = new Map<string, HistoryNode>()
     const restoredRecovery: RecoveryNode[] = []
     const restoreState = (body: StoredState): PersistedSessionSnapshot['state'] => {
@@ -166,7 +190,7 @@ export class RoomHistoryStore {
       if (cached) return cached
       const row = this.selectRecovery.get(roomId, id) as { kind: string; body_json: string; checksum: string } | undefined
       if (!row || row.kind !== 'undo' || row.checksum !== checksum({ node_id: id, kind: row.kind, body_json: row.body_json })) throw new RoomHistoryCorruptionError(`Missing or corrupt Room undo ${roomId}/${id}`)
-      const body = JSON.parse(row.body_json) as Omit<HistoryEntry, 'state'> & { state: StoredState }
+      const body = parseRoomBody(row.body_json) as Omit<HistoryEntry, 'state'> & { state: StoredState }
       const entry = { ...body, state: restoreState(body.state) } as HistoryEntry
       registerRecoveryRecordId(entry, id)
       undoCache.set(id, entry)
@@ -179,7 +203,7 @@ export class RoomHistoryStore {
       if (cached) return cached
       const row = this.selectRecovery.get(roomId, id) as { kind: string; body_json: string; checksum: string } | undefined
       if (!row || row.kind !== 'checkpoint' || row.checksum !== checksum({ node_id: id, kind: row.kind, body_json: row.body_json })) throw new RoomHistoryCorruptionError(`Missing or corrupt Room checkpoint ${roomId}/${id}`)
-      const { state, undoHistory, ...body } = JSON.parse(row.body_json) as Omit<SessionCommandCheckpoint, 'state' | 'history'> & { state: StoredState; undoHistory: string[] }
+      const { state, undoHistory, ...body } = parseRoomBody(row.body_json) as Omit<SessionCommandCheckpoint, 'state' | 'history'> & { state: StoredState; undoHistory: string[] }
       const checkpoint = { ...body, state: restoreState(state), history: undoHistory.map(restoreUndo) } as SessionCommandCheckpoint
       registerRecoveryRecordId(checkpoint, id)
       checkpointCache.set(id, checkpoint)
@@ -187,7 +211,10 @@ export class RoomHistoryStore {
       return checkpoint
     }
     const { undoHistory, provisionalContinuationScopes, ...runtime } = stored.sessionCursor
-    const frame = restoreState(stored.frameWithoutStreams) as unknown as PersistedSessionSnapshot['frame']
+    const frameBody = stored.roomHistoryVersion === 1
+      ? stored.frameWithoutStreams
+      : applyReplayDelta(stored.state as JsonValue, stored.frameDelta) as StoredState
+    const frame = restoreState(frameBody) as unknown as PersistedSessionSnapshot['frame']
     if (frameHash(frame as unknown as JsonValue) !== stored.rawFrameHash) throw new RoomHistoryCorruptionError(`Room Frame hash mismatch for ${roomId}`)
     const snapshot = { state: restoreState(stored.state), frame, sessionCursor: {
       ...runtime,

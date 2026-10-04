@@ -1,5 +1,6 @@
 import { createHash } from 'node:crypto'
 import { gunzipSync, gzipSync } from 'node:zlib'
+import { isCapturedHistoryRecord } from '../../shared/session/history-streams.ts'
 
 export type JsonValue =
   | null
@@ -21,6 +22,10 @@ export type EncodedReplayFrame = {
   frameHash: string
 }
 
+// Cache records, not growing history arrays: retained encodings then scale with
+// live record content instead of duplicating every historical array prefix.
+const canonicalHistoryRecords = new WeakMap<object, string>()
+
 const canonical = (value: unknown, inArray: boolean): string | undefined => {
   if (value === null) return 'null'
   if (typeof value === 'string' || typeof value === 'boolean') return JSON.stringify(value)
@@ -29,13 +34,20 @@ const canonical = (value: unknown, inArray: boolean): string | undefined => {
     return `[${value.map((entry) => canonical(entry, true) ?? 'null').join(',')}]`
   }
   if (typeof value === 'object') {
-    const fields = Object.keys(value)
-      .sort()
-      .flatMap((key) => {
-        const encoded = canonical((value as Record<string, unknown>)[key], false)
-        return encoded === undefined ? [] : [`${JSON.stringify(key)}:${encoded}`]
-      })
-    return `{${fields.join(',')}}`
+    const cacheable = isCapturedHistoryRecord(value)
+    const cached = cacheable ? canonicalHistoryRecords.get(value) : undefined
+    if (cached !== undefined) return cached
+    let encodedObject = '{'
+    let separator = ''
+    for (const key of Object.keys(value).sort()) {
+      const encoded = canonical((value as Record<string, unknown>)[key], false)
+      if (encoded === undefined) continue
+      encodedObject += `${separator}${JSON.stringify(key)}:${encoded}`
+      separator = ','
+    }
+    const encoded = `${encodedObject}}`
+    if (cacheable) canonicalHistoryRecords.set(value, encoded)
+    return encoded
   }
   if (typeof value === 'bigint') throw new TypeError('BigInt is not JSON serializable')
   return inArray ? 'null' : undefined
@@ -61,6 +73,7 @@ const buildDelta = (
   path: string,
   operations: ReplayDeltaOperation[],
 ): void => {
+  if (Object.is(before, after)) return
   if (Array.isArray(before) && Array.isArray(after)) {
     const sharedLength = Math.min(before.length, after.length)
     for (let index = 0; index < sharedLength; index += 1) {
@@ -78,9 +91,9 @@ const buildDelta = (
     const keys = [...new Set([...Object.keys(before), ...Object.keys(after)])].sort()
     for (const key of keys) {
       const childPath = `${path}/${escapePointer(key)}`
-      if (!(key in before)) {
+      if (!Object.hasOwn(before, key)) {
         operations.push({ op: 'add', path: childPath, value: structuredClone(after[key]!) })
-      } else if (!(key in after)) {
+      } else if (!Object.hasOwn(after, key)) {
         operations.push({ op: 'remove', path: childPath })
       } else {
         buildDelta(before[key]!, after[key]!, childPath, operations)
@@ -88,7 +101,6 @@ const buildDelta = (
     }
     return
   }
-  if (Object.is(before, after)) return
   operations.push({ op: 'replace', path, value: structuredClone(after) })
 }
 
@@ -135,7 +147,7 @@ export const applyReplayDelta = (
     for (const part of parts.slice(0, -1)) {
       if (Array.isArray(parent)) {
         parent = parent[arrayIndex(part, parent.length, false)]!
-      } else if (isObject(parent) && part in parent) {
+      } else if (isObject(parent) && Object.hasOwn(parent, part)) {
         parent = parent[part]!
       } else {
         throw new Error('JSON pointer does not exist')
@@ -149,13 +161,15 @@ export const applyReplayDelta = (
       else parent[index] = structuredClone(operation.value)
     } else if (isObject(parent)) {
       if (operation.op === 'remove') {
-        if (!(key in parent)) throw new Error('JSON pointer does not exist')
+        if (!Object.hasOwn(parent, key)) throw new Error('JSON pointer does not exist')
         delete parent[key]
       } else {
-        if (operation.op === 'replace' && !(key in parent)) {
+        if (operation.op === 'replace' && !Object.hasOwn(parent, key)) {
           throw new Error('JSON pointer does not exist')
         }
-        parent[key] = structuredClone(operation.value)
+        Object.defineProperty(parent, key, {
+          value: structuredClone(operation.value), enumerable: true, configurable: true, writable: true,
+        })
       }
     } else {
       throw new Error('JSON pointer parent is not a container')

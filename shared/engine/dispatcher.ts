@@ -53,10 +53,10 @@ export class HookDispatcher {
   private applyCostPreviewDoable(
     context: ActionExecutionContext & { actionId: string },
     action: ActionDefinition,
-    initialDoable: boolean,
+    initialDoable: boolean | (() => boolean),
   ) {
     const preview = action.costPreview
-    if (!preview) return initialDoable
+    if (!preview) return typeof initialDoable === 'function' ? initialDoable() : initialDoable
     if (preview.isStructurallyPossible && !preview.isStructurallyPossible(context)) {
       return false
     }
@@ -113,7 +113,7 @@ export class HookDispatcher {
   applyIsDoable(
     context: ActionExecutionContext & { actionId: string },
     action: ActionDefinition,
-    initialDoable: boolean,
+    initialDoable: boolean | (() => boolean),
     canStartBefore?: () => boolean,
   ) {
     let doable = this.applyCostPreviewDoable(context, action, initialDoable)

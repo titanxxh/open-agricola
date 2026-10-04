@@ -279,6 +279,7 @@ export class SqliteRoomPersistence implements RoomPersistence {
       VALUES (@roomId, @userId, @playerIndex, @now)
       ON CONFLICT(room_id, user_id) DO UPDATE SET
         player_index = excluded.player_index
+      WHERE room_players.player_index IS NOT excluded.player_index
     `)
     this.clearReplacedSeat = db.prepare(`
       DELETE FROM room_players

@@ -290,19 +290,52 @@ const connectedTileSets = (
   const cacheKey = `${size}:${all.map((tile) => `${tile.row}-${tile.col}`).join('|')}`
   const cached = connectedTileSetCache.get(cacheKey)
   if (cached) return cached
+  const indexes = new Map(all.map((tile, index) => [`${tile.row}-${tile.col}`, index]))
+  const adjacent = all.map(tile => [
+    indexes.get(`${tile.row - 1}-${tile.col}`),
+    indexes.get(`${tile.row + 1}-${tile.col}`),
+    indexes.get(`${tile.row}-${tile.col - 1}`),
+    indexes.get(`${tile.row}-${tile.col + 1}`),
+  ].filter((index): index is number => index !== undefined))
+  const selected = new Uint8Array(all.length)
+  const visited = new Uint32Array(all.length)
+  const queue = new Uint32Array(all.length)
+  let generation = 0
+  const selectedConnected = (first: number): boolean => {
+    generation = (generation + 1) >>> 0
+    if (generation === 0) {
+      visited.fill(0)
+      generation = 1
+    }
+    visited[first] = generation
+    queue[0] = first
+    let count = 1
+    for (let cursor = 0; cursor < count; cursor += 1) {
+      for (const neighbor of adjacent[queue[cursor]!]!) {
+        if (!selected[neighbor] || visited[neighbor] === generation) continue
+        visited[neighbor] = generation
+        queue[count++] = neighbor
+      }
+    }
+    return count === size
+  }
   const results: Array<Array<{ row: number; col: number }>> = []
-  const choose = (start: number, picked: Array<{ row: number; col: number }>) => {
+  const choose = (start: number, picked: Array<{ row: number; col: number }>, first: number) => {
     if (picked.length === size) {
-      if (connected(picked)) results.push([...picked])
+      // Reuse the traversal buffers for nontrivial candidates; no board-size
+      // bitmask or per-candidate Set, coordinate strings or neighbor objects.
+      if (picked.length <= 1 ? connected(picked) : selectedConnected(first)) results.push([...picked])
       return
     }
-    for (let index = start; index < all.length; index += 1) {
+    for (let index = start; index <= all.length - (size - picked.length); index += 1) {
+      selected[index] = 1
       picked.push(all[index]!)
-      choose(index + 1, picked)
+      choose(index + 1, picked, first < 0 ? index : first)
       picked.pop()
+      selected[index] = 0
     }
   }
-  choose(0, [])
+  choose(0, [], -1)
   connectedTileSetCache.set(cacheKey, results)
   return results
 }

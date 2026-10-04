@@ -18,6 +18,7 @@ import Database from 'better-sqlite3'
 import WebSocket from 'ws'
 import { GameSession } from '../../server/game/authoritative-session'
 import { serializeSessionSnapshot } from '../../shared/session/serialization'
+import { encodeRoomBody } from '../../server/game/persistence/room-body-codec'
 import type { ClientCommand, ServerEvent } from '../../shared/contract/protocol/ws'
 
 const scriptPath = resolve(import.meta.dirname, '../../restart-local.sh')
@@ -92,7 +93,7 @@ afterEach(async () => {
   tempDirs.length = 0
 })
 
-describe('restart-local saved variant preflight', () => {
+describe.each(['raw', 'compressed'] as const)('restart-local saved variant preflight (%s)', (format) => {
   it.each(['parents', 'parents-seasons-moor', 'disabled', 'missing-father'] as const)(
     'preserves current snapshots and correctly checks %s without resetting data', (mode) => {
       const root = mkdtempSync(join(tmpdir(), 'oa-restart-snapshot-'))
@@ -101,8 +102,10 @@ describe('restart-local saved variant preflight', () => {
       const nodeBin = join(root, 'node_modules/.bin')
       mkdirSync(bin, { recursive: true })
       mkdirSync(nodeBin, { recursive: true })
+      mkdirSync(join(root, 'server/game/persistence'), { recursive: true })
       execFileSync('git', ['init', '-q'], { cwd: root })
       writeFileSync(join(root, 'restart-local.sh'), readFileSync(scriptPath))
+      writeFileSync(join(root, 'server/game/persistence/room-body-codec.ts'), readFileSync(resolve('server/game/persistence/room-body-codec.ts')))
       symlinkSync(resolve('node_modules/better-sqlite3'), join(root, 'node_modules/better-sqlite3'))
       writeExecutable(join(nodeBin, 'tsx'), '#!/bin/bash\nexit 0\n')
       writeExecutable(join(nodeBin, 'vite'), '#!/bin/bash\nexit 0\n')
@@ -122,7 +125,10 @@ describe('restart-local saved variant preflight', () => {
             player.minorHand = player.occupationHand = ['__test_placeholder__']
           }
           if (mode === 'missing-father') session.state.players[0]!.parentCards.father = null
-          db.prepare('INSERT INTO rooms VALUES (?, ?)').run(`dev${playerCount}`, JSON.stringify(serializeSessionSnapshot(session.state, session)))
+          const json = JSON.stringify(serializeSessionSnapshot(session.state, session))
+          const body = format === 'compressed' ? encodeRoomBody(json) : json
+          if (format === 'compressed') expect(JSON.parse(body).roomBodyEncoding).toBe('gzip-base64-v1')
+          db.prepare('INSERT INTO rooms VALUES (?, ?)').run(`dev${playerCount}`, body)
         }
         const before = db.prepare('SELECT * FROM rooms ORDER BY id').all()
         for (let attempt = 0; attempt < 2; attempt++) {

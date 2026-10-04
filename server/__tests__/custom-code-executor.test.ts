@@ -14,6 +14,8 @@ import { registerExecutorBackedCustomCard } from '../custom-code/runtime.ts'
 import { GameSession } from '../game/authoritative-session.ts'
 import { workshopCardJsonFromDefinition } from '../workshop-draft-validation.ts'
 import { compileCardCode } from '../../shared/custom-code/compiler.ts'
+import { serializeSessionSnapshot } from '../../shared/session/serialization.ts'
+import { stabilizeRandomHands } from './_helpers/stabilize-random-hands.ts'
 
 const makeCardData = (compiledCode: string, codeManifest: CustomCardData['codeManifest']): CustomCardData => ({
   cardType: 'minor',
@@ -518,5 +520,37 @@ const CARD_IMPL = {
       capacity: state.round,
       cardId: 'CUSTOM_ExecutorCard',
     })])
+  })
+
+  it('preserves an animal-zone display warning without exposing sandbox mutations', () => {
+    const compiled = validateAndCompileCustomCode(`
+const CARD_ID = 'CUSTOM_ExecutorCard'
+const CARD_DEF = MinorImprovement({ id: CARD_ID, name: 'Executor Card' })
+const CARD_IMPL = {
+  effect: {
+    id: CARD_ID,
+    onComputeAnimalZones: (player: any) => {
+      player.resources.food = 999
+      throw new Error('zone display failed')
+    },
+  },
+}
+    `, 'CUSTOM_ExecutorCard')
+    expect(compiled.valid).toBe(true)
+    if (!compiled.valid) return
+    const session = new GameSession(42, [makeCardData(compiled.compiledCode, compiled.manifest)], { playerCount: 2 })
+    try {
+      stabilizeRandomHands(session.state.players)
+      session.state.players[0]!.minorPlayed = ['CUSTOM_ExecutorCard']
+      const before = JSON.stringify(session.state)
+
+      const snapshot = serializeSessionSnapshot(session.state, session)
+
+      expect(snapshot.frame.players[0]!.playedCardAnimalZones).toEqual([])
+      expect(JSON.stringify(session.state)).toBe(before)
+      expect(session.cardWarnings).toEqual([expect.stringContaining('zone display failed')])
+    } finally {
+      session.dispose()
+    }
   })
 })

@@ -1018,7 +1018,7 @@ describe('auth routes', () => {
     expect((res.json.user as { username: string }).username).toBe('meuser')
   })
 
-  it('my-rooms flags rooms waiting on the caller and sorts them first', async () => {
+  it.each(['raw', 'compressed'] as const)('my-rooms flags rooms waiting on the caller and sorts them first (%s)', async encoding => {
     const user = await createLocalUserForTests('lobbyuser', 'password123', 'Lobby User')
     const token = createSession(user.id)
     const db = getDb()
@@ -1029,14 +1029,47 @@ describe('auth routes', () => {
     const insertPlayer = db.prepare(
       'INSERT INTO room_players (room_id, user_id, player_index, joined_at) VALUES (?, ?, ?, ?)',
     )
+    const { GameSession } = await import('../game/authoritative-session')
+    const { serializeSessionSnapshot } = await import('../../shared/session/serialization')
+    const { RoomHistoryStore } = await import('../game/persistence/room-history-store')
+    const { stabilizeRandomHands } = await import('./_helpers/stabilize-random-hands')
+    const game = new GameSession(563, undefined, { playerCount: 2 })
+    const captured = (() => {
+      try {
+        stabilizeRandomHands(game.state.players)
+        Object.assign(game.state.players[0]!.resources, { wood: 10, reed: 10 })
+        game.loadState(game.state)
+        expect(game.takeAction(0, 'farm-expansion').ok).toBe(true)
+        return serializeSessionSnapshot(game.state, game)
+      } finally {
+        game.dispose()
+      }
+    })()
+    const pendingFrame = captured.sessionCursor.engineStackCursor.frames.at(-1)!
+    expect(pendingFrame).toBeDefined()
+    const store = new RoomHistoryStore(db)
     const persisted = (
       state: Record<string, unknown>,
       frames: Array<{ ownerPlayerIndex: number }> = [],
-    ) => JSON.stringify({
-      state,
-      frame: state,
-      sessionCursor: { engineStackCursor: { frames } },
-    })
+    ) => {
+      if (encoding === 'raw') return JSON.stringify({
+        state,
+        frame: state,
+        sessionCursor: { engineStackCursor: { frames } },
+      })
+      const packed = store.prepare('my-rooms-fixture', {
+        ...captured,
+        state: { ...captured.state, ...state },
+        sessionCursor: {
+          ...captured.sessionCursor,
+          engineStackCursor: {
+            frames: frames.map(frame => ({ ...pendingFrame, ...frame })),
+          },
+        },
+      })
+      expect(JSON.parse(packed.json)).toMatchObject({ roomBodyEncoding: 'gzip-base64-v1' })
+      return packed.json
+    }
     insertRoom.run('room-their-turn', user.id, persisted({ phase: 'playing', currentPlayerIndex: 0 }), 'playing', 1, 600)
     insertPlayer.run('room-their-turn', user.id, 1, 1)
     insertRoom.run('room-my-turn', user.id, persisted({ phase: 'playing', currentPlayerIndex: 1 }), 'playing', 1, 100)
