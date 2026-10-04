@@ -207,10 +207,12 @@ function ActiveParentSelectionOverlay({
 
 export function ParentSelectionOverlay({ state, meId, locale = 'en', onSubmit }: Props) {
   if (state.phase !== 'parent-selection' || !state.parentSelection) return null
+  // A new selection deals new candidates, which resets the overlay's local choice.
+  const candidates = state.parentSelection.candidates[meId]
 
   return (
     <ActiveParentSelectionOverlay
-      key={`${meId}:${state.gameSeed}`}
+      key={`${meId}:${candidates ? [...candidates.mother, ...candidates.father].join(',') : ''}`}
       state={state}
       meId={meId}
       locale={locale}

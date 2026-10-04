@@ -191,6 +191,12 @@ describe('GameContainerApi WS player identity', () => {
       baseActions: [forest],
       seasonActions: [winter],
     })
+    // An Unrevealed Round Card arrives as null in the order; it must not turn into a base action.
+    const cattle = makeSpace('cattle-market')
+    expect(splitBoardActionSpaces([forest, sheep, cattle, winter], ['sheep-market', null])).toEqual({
+      baseActions: [forest],
+      seasonActions: [winter],
+    })
   })
 
   it('maps failed farm commits to local interaction error messages', () => {

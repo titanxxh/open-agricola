@@ -1,10 +1,11 @@
+import type { GameSeed } from '../contract/types'
 import type { FarmersOfTheMoorState, MoorStartCardId } from './types'
 import { dealMoorStartCards, isMoorStartCardId } from './start-cards'
 import { createMoorSpecialActionCards, normalizeMoorSpecialActionCards } from './special-action-cards'
 
 export const createFarmersOfTheMoorState = (
   playerIds: readonly string[],
-  seed: number,
+  seed: GameSeed,
 ): FarmersOfTheMoorState => ({
   complexity: 'iii',
   startCardByPlayerId: dealMoorStartCards(playerIds, seed),
@@ -14,7 +15,7 @@ export const createFarmersOfTheMoorState = (
 export const normalizeFarmersOfTheMoorState = (
   raw: unknown,
   playerIds: readonly string[],
-  seed: number,
+  seed: GameSeed,
 ): FarmersOfTheMoorState => {
   const fallback = createFarmersOfTheMoorState(playerIds, seed)
   if (!raw || typeof raw !== 'object') return fallback

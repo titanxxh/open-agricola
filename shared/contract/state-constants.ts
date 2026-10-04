@@ -46,6 +46,47 @@ export const extendedResourceKeyList: (keyof Resource)[] = [
 
 export const harvestRounds = [4, 7, 9, 11, 13, 14]
 
+export const roundStageSlots = [
+  { stage: 1, count: 4 },
+  { stage: 2, count: 3 },
+  { stage: 3, count: 2 },
+  { stage: 4, count: 2 },
+  { stage: 5, count: 2 },
+  { stage: 6, count: 1 },
+]
+
+export const roundStageActions: Record<number, string[]> = {
+  1: ['sheep-market', 'grain-utilization', 'fencing', 'major-improvement'],
+  2: ['wish-children', 'western-quarry', 'house-redevelopment'],
+  3: ['vegetable-seeds', 'pig-market'],
+  4: ['eastern-quarry', 'cattle-market'],
+  5: ['cultivation', 'urgent-wish-children'],
+  6: ['farm-redevelopment'],
+}
+
+/** Every round card. The set and each card's stage are public; the order inside a stage is not. */
+export const roundCardActionIds: readonly string[] = Object.values(roundStageActions).flat()
+
+/**
+ * Which round slots a player may know. A slot is revealed once its round has
+ * started, and also when it is the only slot of its stage still face down,
+ * because the remaining card of a stage can be deduced from public knowledge.
+ */
+export const revealedRoundSlots = (round: number): boolean[] => {
+  const revealed: boolean[] = []
+  let start = 0
+  for (const { count } of roundStageSlots) {
+    const faceDown: number[] = []
+    for (let index = start; index < start + count; index += 1) {
+      revealed[index] = index < round
+      if (!revealed[index]) faceDown.push(index)
+    }
+    if (faceDown.length === 1) revealed[faceDown[0]!] = true
+    start += count
+  }
+  return revealed
+}
+
 export const createRoundOpenById = (order: (string | null)[]) =>
   new Map(
     order

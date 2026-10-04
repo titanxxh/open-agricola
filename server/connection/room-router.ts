@@ -1036,7 +1036,8 @@ function handleNewGame(ctx: ConnectionCtx, msg: Extract<ClientCommand, { type: '
   let created: ReturnType<typeof createIsolatedGameSession>
   try {
     created = createIsolatedGameSession(
-      typeof msg.seed === 'number' ? msg.seed : undefined,
+      // Only a dev room may pick its Explicit Seed (ADR-0020).
+      typeof msg.seed === 'number' && isDevRoom(room.id) ? msg.seed : undefined,
       customCards.length > 0 ? customCards : undefined,
       {
         playerCount: room.maxPlayers,

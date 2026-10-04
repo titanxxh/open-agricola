@@ -1,4 +1,4 @@
-import { extendedResourceKeyList, resourceKeyList } from '../../shared/contract/state-constants'
+import { extendedResourceKeyList, resourceKeyList, roundCardActionIds } from '../../shared/contract/state-constants'
 import { OCCUPIED_SPACE_CHOICE_PREFIX } from '../../shared/contract/placement-constants'
 import { seasonActionIds } from '../../shared/projections/season-actions'
 import type { ActionChoiceOption, ActionSpace, FarmTilePosition, GameState, PlayerState, Resource } from '../../shared/contract/types'
@@ -369,7 +369,8 @@ export const splitBoardActionSpaces = (
   roundActionOrder: readonly (string | null | undefined)[] | null | undefined,
 ): { baseActions: ActionSpace[]; seasonActions: ActionSpace[] } => {
   if (!actionSpaces || !roundActionOrder) return { baseActions: [], seasonActions: [] }
-  const roundIds = new Set(roundActionOrder.filter((id): id is string => !!id))
+  // Unrevealed Round Cards arrive as null, so the order alone no longer names every round card.
+  const roundIds = new Set([...roundCardActionIds, ...roundActionOrder.filter((id): id is string => !!id)])
   const seasonIds = new Set(seasonActionIds)
   return {
     baseActions: actionSpaces.filter((space) => !roundIds.has(space.id) && !seasonIds.has(space.id)),

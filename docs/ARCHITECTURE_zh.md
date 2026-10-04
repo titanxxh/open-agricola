@@ -144,7 +144,7 @@ ESLint 三层强制（`eslint.config.js`）：
   publicEventArchive: PublicEventArchivePacket[],
   nextPublicEventArchivePacketSeq: number,
   roundActionOrder: (string|null)[],
-  gameSeed: number,
+  gameSeed: number | string,          // 指定种子 | 宽种子，永不下发给 viewer
   availableMajorImprovements: string[],
   futureMeeples, pendingFutureMeeples,
   workPhaseObtainedResources: Record<string, Partial<Resource>>,
@@ -173,6 +173,10 @@ ESLint 三层强制（`eslint.config.js`）：
 Undo 与 provisional scope rollback 的 runtime `publicEventCancellations` 是同步响应 metadata，不写入 `GameState.events`，也只出现在当前恢复 response。恢复如果移除了已提交 public events，HTTP/WS payload 会带 `publicEventCancellations`，客户端用它清理当前 transient public feedback 并把 public event cursor 对齐到恢复后的 snapshot；普通 reconnect/getState 不重放旧 cancellation。持久化取消历史保存在 `publicEventArchive` 的 `publicEvents.canceled` packet。进入 per-viewer payload 前，runtime cancellation 必须与同一 viewer 的 `publicEventArchive` 使用同一套隐藏事件过滤和 seq remap。
 
 首版只允许 `visibility: 'public'` 的规则事件进入 `GameState.events`。私有 prompt、手牌、draft、living-hand 等 per-recipient 信息不写入公共事件流，仍通过 snapshot/privacy/pending 通道处理。`privateEvents` 是独立的 per-viewer 同步附加层：只描述当前快照中目标玩家可见的私有提示和私有手牌/draft 更新（例如 `private.promptShown`、`private.handChanged`、`private.draftUpdated`），由客户端消费为短暂 UI 通知，不进入公共 replay 事件流，也不作为规则来源。卡牌效果导致的手牌变化通过 runtime-only response buffer 发出 `private.handChanged`，不写入 `ActionExecutionResult`、engine snapshot/history 或 `GameState.events`。
+
+Game Seed 是服务端私有的（ADR-0020）。未给种子时，`gameSeed` 是宽种子：128 位随机十六进制串，其随机流来自计数器模式的 HMAC-SHA256，每种用途一条带标签的流。Explicit Seed 是数字，沿用原生成器，让测试、开发房和调试接口可复现；它不提供任何保护。普通牌堆和父母选择的种子独立于 `gameSeed`，同样是宽种子。两条路径都在 `shared/utils/rng.ts`。
+
+viewer 投影 `filterSerializedStateForPlayer` 对所有座位和旁观者去掉 `gameSeed`，并把每张 Unrevealed Round Card 在 `roundActionOrder` 中的条目、以及预放在它上面的资源的 `actionId` 置为 `null`。轮次行动卡在该轮开始时翻开；如果它是所在阶段最后一张未翻开的卡，则提前翻开。实时同步、Bug Report 取证和 Replay 座位视角共用这一个投影。`dev-viewer` 同步模式只用于开发房的实时同步，保留完整的行动卡顺序，但仍不下发种子；`debug` 仍是全量状态，用于热座房和开发房的全开读取。
 
 `SerializedGameState` 是 `GameState` 的公共网络与 Replay 形态，其中 `engineStack` 始终为空。`PersistedSessionSnapshot` 分开保存权威 `state`、公共 `frame` 和服务端私有 `sessionCursor`；私有 cursor 包含跨进程恢复所需的 Engine 数据、history 和 provisional continuation 元数据，绝不进入玩家或旁观者 payload。交互请求走独立的 viewer-safe pending 协议，避免其他玩家的 choice 数据泄漏。同步版本号和房间连接 **不进** `GameState`。
 
@@ -220,6 +224,7 @@ type ClientCommand = (
 
 注意：
 
+- `newGame.seed` 只在开发房生效。其他 Room 忽略它并抽取宽种子（ADR-0020）。
 - 没有独立的 `reorg` / `feed` / `nextPlayer` / `confirmPlayerSwitch` 命令。这些等待形态全部归并到 `choice` 命令，由 `payload` 携带具体形状（按 `InteractionRequest.kind` 决定）。
 - `commitSelection` 只为 farm-position / occupation-hand / resource-quantity / resource-batch-exchange 这类带结构化 payload 的定向选择保留单独入口。farm-position 可通过 `validPositionGroups` 表达服务端校验的合法坐标组合，例如 FoM Farmyard Extension 的相邻二格选择。可选位置还可携带 `sourceCard`、`cardFieldSlot` 与 `groupKey`：选择上限按不同 group 计数，服务端在执行效果前把同组提交规范化为一个位置；前端把卡牌来源的虚拟位置渲染到已打出卡牌的对应槽上，而不扩张农场网格。
 - `enableParentCards: true` 启用父母牌；同时传 `draftParents: false` 时直接为每位玩家发一对父母牌，不进入 `parent-selection`。该选择保存在房间元数据中，`newGame` 与后端重启后继续沿用。
@@ -1179,7 +1184,7 @@ UI 文案 key 与多语言资源；`PromptKey` 在 `shared/contract/prompt-keys.
 
 ### 10.4 shared/utils/
 
-通用工具（深拷贝、ID、math 等），无业务规则。
+通用工具（深拷贝、ID、math 等），无业务规则。`rng.ts` 提供带种子的随机流：Explicit Seed 走数字生成器，宽种子走 HMAC-SHA256 流；后者基于 `@noble/hashes`，因为规则代码也在浏览器 Worker 中运行，而平台的哈希接口是异步的。
 
 ---
 

@@ -144,7 +144,7 @@ Selected fields:
   publicEventArchive: PublicEventArchivePacket[],
   nextPublicEventArchivePacketSeq: number,
   roundActionOrder: (string|null)[],
-  gameSeed: number,
+  gameSeed: number | string,          // Explicit Seed | wide seed, never sent to viewers
   availableMajorImprovements: string[],
   futureMeeples, pendingFutureMeeples,
   workPhaseObtainedResources: Record<string, Partial<Resource>>,
@@ -175,6 +175,10 @@ The client Action Log consumes `publicEventArchive` as a read-only replay timeli
 Runtime `publicEventCancellations` for undo and provisional scope rollback is response metadata. It is not added to `GameState.events` and appears only in the current restoration response. When restoration removes committed public events, HTTP and WebSocket payloads include the cancellations. The client uses them to clear current transient feedback and align its public-event cursor with the restored snapshot. Reconnect and `getState` do not replay old cancellations. Persistent cancellation history remains in `publicEvents.canceled` packets. Before entering a per-viewer payload, runtime cancellation and that viewer's `publicEventArchive` use the same hidden-event filtering and sequence remapping.
 
 Initially, only rules events with `visibility: 'public'` may enter `GameState.events`. Private prompts, hands, draft state, and living-hand information remain in snapshot, privacy, and pending channels. `privateEvents` is a separate per-viewer synchronization layer describing private prompts and hand or draft changes visible in the current snapshot, such as `private.promptShown`, `private.handChanged`, and `private.draftUpdated`. The client consumes them as transient UI notifications. They never enter the public replay stream or become rule sources. Card-driven hand changes emit through a runtime-only response buffer, not `ActionExecutionResult`, engine snapshots, history, or `GameState.events`.
+
+Game Seed is server-private (ADR-0020). When no seed is given, `gameSeed` is a wide seed: a 128-bit random hex string whose random streams come from HMAC-SHA256 in counter mode, one labelled stream per use. An Explicit Seed is a number that keeps the original generator, so tests, dev rooms, and debug endpoints stay reproducible; it protects nothing. The ordinary-deck and parent-selection seeds are independent of `gameSeed` and equally wide. `shared/utils/rng.ts` owns both paths.
+
+The viewer projection `filterSerializedStateForPlayer` drops `gameSeed` for every seat and spectator, and returns `null` for each Unrevealed Round Card in `roundActionOrder` and in the `actionId` of goods scheduled on it. A round card is revealed when its round starts, or earlier when it is the last face-down card of its stage. Live sync, Bug Report evidence, and the Replay seat perspective share this projection. The `dev-viewer` sync mode, used only for live sync to a dev room, keeps the round-card order visible and still withholds the seed; `debug` remains the full state for hotseat rooms and the dev-room unredacted read.
 
 `SerializedGameState` is the public network and Replay representation of `GameState`; its `engineStack` is always empty. `PersistedSessionSnapshot` separately stores authoritative `state`, public `frame`, and a server-private `sessionCursor`. The private cursor contains engine restoration data, history, and provisional continuation metadata for cross-process recovery, and never enters a player or spectator payload. Interaction requests use a separate viewer-safe pending protocol so another player's choice data cannot leak through the cursor. Synchronization versions and room connections do not belong in `GameState`.
 
@@ -222,6 +226,7 @@ type ClientCommand = (
 
 Important boundaries:
 
+- `newGame.seed` is honored only in a dev room. Any other Room ignores it and draws a wide seed (ADR-0020).
 - There are no separate `reorg`, `feed`, `nextPlayer`, or `confirmPlayerSwitch` commands. Every such wait shape is sent through `choice`, with `payload` determined by `InteractionRequest.kind`.
 - `commitSelection` remains separate only for structured targeted selections such as farm-position, occupation-hand, resource-quantity, and resource-batch-exchange. Farm-position may use `validPositionGroups` for server-validated coordinate sets, including the adjacent two-space Farmers of the Moor Farmyard Extension. A selectable position may also carry `sourceCard`, `cardFieldSlot`, and `groupKey`: selection limits count distinct groups, and the backend canonicalizes multiple submitted positions from one group to one position before applying the effect. The client renders card-sourced virtual positions on the matching played-card slot instead of extending the farm grid.
 - `enableParentCards: true` enables Parent Cards. With `draftParents: false`, each player receives a parent pair directly without entering `parent-selection`. Room metadata persists this choice across `newGame` and backend restarts.
@@ -1201,7 +1206,7 @@ UI copy keys and localized resources. `PromptKey` is centralized in `shared/cont
 
 ### 10.4 `shared/utils/`
 
-Generic helpers such as deep cloning, IDs, and math. It contains no business rules.
+Generic helpers such as deep cloning, IDs, and math. It contains no business rules. `rng.ts` holds the seeded random streams: the numeric generator for an Explicit Seed and the HMAC-SHA256 stream for a wide seed, built on `@noble/hashes` because the rules also run in a browser Worker where the platform hash API is asynchronous.
 
 ---
 

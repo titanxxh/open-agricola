@@ -4,7 +4,7 @@ import type {
   ParentSelectionSubmission,
 } from '../contract/types'
 import { appendImmediateEvents, type ImmediateEventDraft } from '../events/append'
-import { createRng, createSeed, shuffleWithRng } from '../utils/rng'
+import { createSeededRng, resolveSeed, shuffleWithRng, type GameSeed } from '../utils/rng'
 import {
   FATHER_PARENT_CARD_IDS,
   MOTHER_PARENT_CARD_IDS,
@@ -17,16 +17,17 @@ import { queueSelectedMotherRewards } from './mother-rewards'
 
 const dealParentIds = <T extends string>(
   ids: readonly T[],
-  seed: number,
+  seed: GameSeed,
+  label: string,
   salt: number,
-): T[] => shuffleWithRng([...ids], createRng(seed + salt)) as T[]
+): T[] => shuffleWithRng([...ids], createSeededRng(seed, label, (value) => value + salt)) as T[]
 
 export const createParentSelectionState = (
   playerIds: readonly string[],
-  seed: number,
+  seed: GameSeed,
 ): ParentSelectionState => {
-  const mothers = dealParentIds(MOTHER_PARENT_CARD_IDS, seed, 0x510001)
-  const fathers = dealParentIds(FATHER_PARENT_CARD_IDS, seed, 0x520001)
+  const mothers = dealParentIds(MOTHER_PARENT_CARD_IDS, seed, 'parent-mothers', 0x510001)
+  const fathers = dealParentIds(FATHER_PARENT_CARD_IDS, seed, 'parent-fathers', 0x520001)
   const candidates: ParentSelectionState['candidates'] = {}
   const submissions: ParentSelectionState['submissions'] = {}
   playerIds.forEach((playerId, index) => {
@@ -39,13 +40,13 @@ export const createParentSelectionState = (
   return { candidates, submissions }
 }
 
-export const startParentSelectionIfNeeded = (state: GameState, seed?: number): void => {
+export const startParentSelectionIfNeeded = (state: GameState, seed?: GameSeed): void => {
   if (!state.enableParentCards || state.parentSelection || state.phase !== 'playing') return
   const alreadySelected = state.players.every(
     (player) => player.parentCards.mother && player.parentCards.father,
   )
   if (alreadySelected) return
-  const selectionSeed = typeof seed === 'number' && Number.isFinite(seed) ? Math.floor(seed) : createSeed()
+  const selectionSeed = resolveSeed(seed)
   state.parentSelection = createParentSelectionState(
     state.players.map((player) => player.id),
     selectionSeed,
@@ -54,15 +55,15 @@ export const startParentSelectionIfNeeded = (state: GameState, seed?: number): v
   completeParentSelectionIfReady(state)
 }
 
-export const dealParentCardsIfNeeded = (state: GameState, seed?: number): void => {
+export const dealParentCardsIfNeeded = (state: GameState, seed?: GameSeed): void => {
   if (!state.enableParentCards || state.parentSelection) return
   const alreadySelected = state.players.every(
     (player) => player.parentCards.mother && player.parentCards.father,
   )
   if (alreadySelected) return
-  const dealSeed = typeof seed === 'number' && Number.isFinite(seed) ? Math.floor(seed) : createSeed()
-  const mothers = dealParentIds(MOTHER_PARENT_CARD_IDS, dealSeed, 0x510001)
-  const fathers = dealParentIds(FATHER_PARENT_CARD_IDS, dealSeed, 0x520001)
+  const dealSeed = resolveSeed(seed)
+  const mothers = dealParentIds(MOTHER_PARENT_CARD_IDS, dealSeed, 'parent-mothers', 0x510001)
+  const fathers = dealParentIds(FATHER_PARENT_CARD_IDS, dealSeed, 'parent-fathers', 0x520001)
   state.players.forEach((player, index) => {
     const mother = mothers[index]
     const father = fathers[index]

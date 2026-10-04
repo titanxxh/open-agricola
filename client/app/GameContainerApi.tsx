@@ -712,7 +712,7 @@ export const GameContainerApi = () => {
   const canUndoStep = allowedCommands.includes('undoStep')
   const canUndoAction = allowedCommands.includes('undoAction')
   const gameOverScoringKey = state?.gameOver
-    ? `${state.gameSeed}:${state.round}:${state.nextEventSeq}`
+    ? `${bugReportRoomId ?? state.gameSeed ?? ''}:${state.round}:${state.nextEventSeq}`
     : null
   const shouldShowScoringPad =
     showScoringPad || (gameOverScoringKey !== null && dismissedGameOverScoringKey !== gameOverScoringKey)

@@ -264,6 +264,33 @@ describe('WS broadcast per-viewer filter', () => {
     expect(p2AsP2.occupationHand).not.toEqual(p2AsP1.occupationHand)
   })
 
+  it('withholds the game seed and unrevealed round cards from both seats', async () => {
+    const { initialP1, initialP2 } = await openTwoPlayerRoom()
+
+    for (const envelope of [initialP1, initialP2]) {
+      const { state } = envelope.payload
+      expect(state).not.toHaveProperty('gameSeed')
+      // Round 1 is open and round 14 is the only card of its stage; the rest stay face down.
+      expect(state.roundActionOrder.map((actionId) => actionId !== null)).toEqual([
+        true, false, false, false, false, false, false, false, false, false, false, false, false, true,
+      ])
+    }
+    expect(initialP1.payload.state.roundActionOrder).toEqual(initialP2.payload.state.roundActionOrder)
+  })
+
+  it('a dev room keeps the round-card order but still withholds the seed', async () => {
+    const { initialP1, initialP2 } = await joinTwoPlayerDevRoom()
+
+    for (const envelope of [initialP1, initialP2]) {
+      const { state } = envelope.payload
+      expect(state).not.toHaveProperty('gameSeed')
+      expect(state.roundActionOrder).toHaveLength(14)
+      expect(state.roundActionOrder.every((actionId) => typeof actionId === 'string')).toBe(true)
+    }
+    // Per-seat redaction is unchanged: the opponent's hand is still masked.
+    expect(initialP1.payload.state.players[1]!.occupationHand.every((card) => card === '?')).toBe(true)
+  })
+
   it('action broadcast keeps per-viewer filtering', async () => {
     const { p1, p2, initialP1 } = await openTwoPlayerRoom()
 

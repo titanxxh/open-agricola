@@ -148,7 +148,7 @@ Commit 标题规范：`feat: ...` / `fix: ...` / `refactor: ...` / `docs: ...`�
 
 - **不要 commit `docs/superpowers/*`**：superpowers skill 产出的 spec / plan / working notes 不进 git。这是会话/PR 中间产物，污染 git history。即使 brainstorming / executing-plans skill 默认要求 commit spec，**违反默认行为，等用户明确要求才 commit**。每次 `git add` 必须显式排除 `docs/superpowers/`。
 - **`./restart-local.sh` 不仅是"启动方式"**：它是本地开发 / 运行 / 测试的统一入口。每次代码改完，先重启，再用浏览器 / Playwright / 命令行验真实行为，再考虑 `pnpm test:fast` 等单元测试。
-- **Session 测试里卡牌不要随机，必须显式设置 hand**：`new GameSession()` 不传 seed 时 `createSeed()` 用 `Math.random()`（`shared/utils/rng.ts:1`），每次跑都给玩家发不同 7 张 minor / 7 张 occupation。Hand 内容会影响 `improvement-any` / `minor-improvement` / `wrapOptional(...)` 等节点的"是否 doable / 是 single auto-resolve 还是 multi-option wait"判定 → 测试断言对应的等待节点 / option 数随机生效，整体跑时偶发 fail。修法：setup 里显式覆盖所有玩家的 `minorHand` + `occupationHand`，最简洁用占位 id `['__test_placeholder__']`（在 `getMinorImprovement` 返回 undefined，被 buyable 列表过滤），既能避免 `normalizeState()` 因为空 hand 触发 re-deal，又让"任意可买 minor"的路径稳定为空。注意：放任 `player.minorHand = []` **不**等于 placeholder——它会触发 re-deal 重新发随机 7 张。
+- **Session 测试里卡牌不要随机，必须显式设置 hand**：`new GameSession()` 不传 seed 时 `createSeed()` 抽取随机的宽种子（`shared/utils/rng.ts`），每次跑都给玩家发不同 7 张 minor / 7 张 occupation。Hand 内容会影响 `improvement-any` / `minor-improvement` / `wrapOptional(...)` 等节点的"是否 doable / 是 single auto-resolve 还是 multi-option wait"判定 → 测试断言对应的等待节点 / option 数随机生效，整体跑时偶发 fail。修法：setup 里显式覆盖所有玩家的 `minorHand` + `occupationHand`，最简洁用占位 id `['__test_placeholder__']`（在 `getMinorImprovement` 返回 undefined，被 buyable 列表过滤），既能避免 `normalizeState()` 因为空 hand 触发 re-deal，又让"任意可买 minor"的路径稳定为空。注意：放任 `player.minorHand = []` **不**等于 placeholder——它会触发 re-deal 重新发随机 7 张。
 
 ## Docs Map
 
