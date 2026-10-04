@@ -3,6 +3,19 @@ import type { GameEvent } from '../../contract/events'
 import { buildLogPresentationPlan, eventsToLogEntries } from '../log-mapper'
 
 describe('eventsToLogEntries', () => {
+  it('labels a card occupation leaf as playing an occupation rather than using Lessons', () => {
+    const events = [{
+      schemaVersion: 1, id: 'occupation', seq: 1, round: 1, phase: 'work',
+      type: 'card.triggered', visibility: 'public', actorPlayerId: 'p1',
+      cardId: 'A003_PaperKnife', triggerActionId: 'occupation',
+    }] satisfies GameEvent[]
+    expect(eventsToLogEntries(events, { playerNames: { p1: 'Alice' } }))
+      .toEqual([expect.objectContaining({
+        key: 'log.cardTriggered',
+        params: expect.objectContaining({ triggerAction: 'actions.occupation.name' }),
+      })])
+  })
+
   it('builds a presentation plan with source identity and consumed payment refs', () => {
     const events = [
       {

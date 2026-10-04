@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react'
 import { t, type Locale } from '../../../shared/i18n'
 import type { Resource } from '../../../shared/contract/types'
+import { translateCardText } from '../common/cardText'
 
 type ResourceKey = keyof Resource
 
@@ -50,7 +51,7 @@ export const ResourceQuantitySelectPanel = ({
   return (
     <div className="resource-quantity-select-panel interaction-resource-quantity-panel">
       <div className="interaction-title">
-        {promptKey ? t(locale, promptKey) : t(locale, 'ui.interactionResourceQuantitySelect')}
+        {translateCardText(locale, promptKey ?? 'ui.interactionResourceQuantitySelect')}
       </div>
       <div className="resource-quantity-grid">
         {entries.map(([key, max]) => (

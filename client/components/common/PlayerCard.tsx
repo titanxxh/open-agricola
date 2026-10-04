@@ -8,8 +8,9 @@ import { getCardMeta, type CardMeta } from '../../services/card-meta'
 import { publicAssetUrl } from '../../utils/public-asset-url'
 import { CardWithCopy } from './CardWithCopy'
 import { ResourceText } from './ResourceText'
+import { getCardDisplayText, type CardType } from './cardText'
 
-export type CardType = 'major' | 'minor' | 'occupation'
+export type { CardType } from './cardText'
 
 const CATEGORY_LABELS: Record<string, Record<string, string>> = {
   en: {
@@ -186,26 +187,15 @@ export const PlayerCard = ({
   const cardData = useMemo(() => {
     const meta = cardMeta ?? getCardMeta(cardId)
     if (!meta) return null
-    const localized = meta.locales?.[locale]
-    const fallbackRules = (localized?.rules ?? meta.rules ?? []).join('\n')
-    const localizeRules = (i18nKey: string): string => {
-      const key = `${i18nKey}.rules`
-      const translated = t(locale, key)
-      return translated === key ? fallbackRules : translated
-    }
-    const localizePrerequisite = (i18nKey: string): string | undefined => {
-      const key = `${i18nKey}.prerequisite`
-      const translated = t(locale, key)
-      const fallback = localized?.prerequisite ?? meta.prerequisite
-      return translated !== key ? translated : typeof fallback === 'string' ? fallback : undefined
+    const display = {
+      ...getCardDisplayText(locale, cardType, cardId, meta),
+      altCosts: cardType === 'minor' ? meta.altCosts : undefined,
     }
     if (cardType === 'major') {
       const rawCost = (meta.cost ?? {}) as PaymentResourceMap | ComplexCost
       const { baseCost } = extractMajorDisplayCost(rawCost)
       return {
-        name: t(locale, `improvements.${cardId}.name`),
-        description: (meta.desc ?? []).join('\n'),
-        rules: localizeRules(`improvements.${cardId}`),
+        ...display,
         cost: { ...emptyResources, ...baseCost },
         category: meta.category,
         returnCards: meta.returnCards,
@@ -215,22 +205,12 @@ export const PlayerCard = ({
         artUrl: meta.artUrl,
       }
     } else if (cardType === 'minor') {
-      const i18nKey = `minorImprovements.${cardId}`
-      const i18nName = t(locale, `${i18nKey}.name`)
-      const i18nDesc = t(locale, `${i18nKey}.description`)
-      const hasI18n = i18nName !== `${i18nKey}.name`
       return {
-        name: hasI18n ? i18nName : localized?.name ?? meta.name,
-        description: hasI18n && i18nDesc !== `${i18nKey}.description`
-          ? i18nDesc
-          : (localized?.desc ?? meta.desc ?? []).join('\n'),
-        rules: localizeRules(i18nKey),
+        ...display,
         cost: { ...emptyResources, ...(meta.cost ?? {}) },
-        altCosts: meta.altCosts,
         deck: meta.deck,
         category: meta.category,
         vp: meta.vp,
-        prerequisite: localizePrerequisite(i18nKey),
         players: meta.players,
         isCookery: meta.isCookery,
         isBaking: meta.isBaking,
@@ -240,20 +220,11 @@ export const PlayerCard = ({
         artUrl: meta.artUrl,
       }
     } else {
-      const i18nKey = `occupations.${cardId}`
-      const i18nName = t(locale, `${i18nKey}.name`)
-      const i18nDesc = t(locale, `${i18nKey}.description`)
-      const hasI18n = i18nName !== `${i18nKey}.name`
       return {
-        name: hasI18n ? i18nName : localized?.name ?? meta.name,
-        description: hasI18n && i18nDesc !== `${i18nKey}.description`
-          ? i18nDesc
-          : (localized?.desc ?? meta.desc ?? []).join('\n'),
-        rules: localizeRules(i18nKey),
+        ...display,
         cost: { ...emptyResources, ...(meta.cost ?? {}) },
         deck: meta.deck,
         category: meta.category,
-        prerequisite: localizePrerequisite(i18nKey),
         players: meta.players,
         isCookery: meta.isCookery,
         isBaking: meta.isBaking,

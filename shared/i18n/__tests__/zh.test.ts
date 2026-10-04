@@ -5,7 +5,7 @@ import { zh } from '../zh'
 import { catalogCardDefinitions } from '../../cards/catalog.generated'
 
 describe('zh platform translations', () => {
-  it('places every A-E card in its numbered translation section and translates its face', () => {
+  it('places every A-E and Moor card in its translation section and translates its face', () => {
     type Face = { name?: string; description?: string; rules?: string; prerequisite?: string }
     const sections: Record<'minorImprovements' | 'occupations', Record<string, Face>> = {
       minorImprovements: zh.minorImprovements,
@@ -18,8 +18,9 @@ describe('zh platform translations', () => {
       }
     }
     const missing: string[] = []
-    for (const card of catalogCardDefinitions.filter((card) => /^[A-E]\d{3}_/.test(card.id))) {
-      const section: keyof typeof sections = card.number <= 84 ? 'minorImprovements' : 'occupations'
+    for (const card of catalogCardDefinitions.filter((card) => /^[A-EM]\d{3}_/.test(card.id))) {
+      const section: keyof typeof sections = card.kind === 'occupation' || card.playerActionCardType === 'occupation'
+        ? 'occupations' : 'minorImprovements'
       const wrongSection = section === 'occupations' ? 'minorImprovements' : 'occupations'
       expect(sections[wrongSection]?.[card.id], `${card.id} is in the wrong section`).toBeUndefined()
       const translation = sections[section]?.[card.id]
@@ -69,6 +70,8 @@ describe('zh platform translations', () => {
         'No extra custom cards are selected yet. You can still start with the default decks, or click "Reset Sandbox" to configure more cards.',
       ],
       ['platform.startSandbox', '开始沙盒测试', 'Start Sandbox'],
+      ['platform.sandboxVariantFarmersOfTheMoor', '沼泽农夫', 'Farmers of the Moor'],
+      ['platform.sandboxAllowIncompleteFarmersOfTheMoorMinorDeal', '允许沼泽农夫小改良池不完整', 'Allow incomplete Farmers of the Moor minor pool'],
     ] as const
 
     for (const [key, chinese, english] of terms) {

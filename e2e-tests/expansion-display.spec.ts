@@ -14,9 +14,9 @@ test.describe('Expansion display', () => {
       await expect(page.getByRole('checkbox', { name: locale === 'zh'
         ? '启用四季扩展' : 'Enable Through the Seasons expansion', exact: true })).toBeVisible()
       await page.getByRole('checkbox', { name: locale === 'zh'
-        ? '启用泥沼扩展' : 'Enable Farmers of the Moor expansion', exact: true }).check()
+        ? '启用沼泽农夫扩展' : 'Enable Farmers of the Moor expansion', exact: true }).check()
       await expect(page.getByRole('checkbox', { name: locale === 'zh'
-        ? '允许泥沼扩展小改良池不完整' : 'Allow an incomplete Farmers of the Moor minor improvement pool', exact: true })).toBeVisible()
+        ? '允许沼泽农夫小改良池不完整' : 'Allow an incomplete Farmers of the Moor minor improvement pool', exact: true })).toBeVisible()
     })
 
     test(`${locale} displays winter clay, localized parent rules and clean fractional scores`, async ({ page, request }) => {

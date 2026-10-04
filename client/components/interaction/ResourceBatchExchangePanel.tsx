@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { t, type Locale } from '../../../shared/i18n'
 import type { Resource } from '../../../shared/contract/types'
+import { translateCardText } from '../common/cardText'
 
 type ResourceKey = keyof Resource
 
@@ -65,7 +66,7 @@ export const ResourceBatchExchangePanel = ({
   return (
     <div className="resource-batch-exchange-panel interaction-resource-quantity-panel">
       <div className="interaction-title">
-        {promptKey ? t(locale, promptKey) : t(locale, 'ui.interactionSleightOfHand')}
+        {translateCardText(locale, promptKey ?? 'ui.interactionSleightOfHand')}
       </div>
       <div className="resource-quantity-grid">
         {discardEntries.map(([key, max]) => (

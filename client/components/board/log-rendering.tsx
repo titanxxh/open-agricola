@@ -6,13 +6,15 @@ import type { ActionDetailParts } from '../../../shared/contract/protocol/game'
 import { PlayerCard } from '../common/PlayerCard'
 import { ResourceLine } from '../common/ResourceLine'
 import { ResourceText } from '../common/ResourceText'
+import { getCardDisplayText, translateCardText } from '../common/cardText'
+import { getCardMeta } from '../../services/card-meta'
 import { resolveCardDisplayName, resolveCardRef, type CardRef } from './card-reference'
 
 const joinCardNames = (locale: Locale, names: string[]) =>
   locale === 'zh' ? names.join('、') : names.join(', ')
 
 const resolveMaybeTranslationKey = (locale: Locale, value: string): string => {
-  const translated = t(locale, value)
+  const translated = translateCardText(locale, value)
   if (translated !== value) return translated
   const actionKey = `actions.${value}.name`
   const actionName = t(locale, actionKey)
@@ -62,10 +64,8 @@ const resolveAccumulationTarget = (
 }
 
 const resolveCardDesc = (locale: Locale, ref: CardRef): string => {
-  const prefix =
-    ref.type === 'major' ? 'improvements' : ref.type === 'minor' ? 'minorImprovements' : 'occupations'
-  const desc = t(locale, `${prefix}.${ref.id}.description`)
-  return desc.includes('.description') ? '' : desc
+  const meta = getCardMeta(ref.id)
+  return meta ? getCardDisplayText(locale, ref.type, ref.id, meta).description : ''
 }
 
 const escapeRegExp = (value: string): string => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
@@ -92,11 +92,11 @@ const renderRichTemplate = (
   richParams: Record<string, ReactNode>,
 ): ReactNode[] => {
   const entries = Object.entries(richParams)
-  if (entries.length === 0) return [t(locale, key, textParams)]
+  if (entries.length === 0) return [translateCardText(locale, key, textParams)]
 
   const markerEntries = entries.map(([paramKey], index) => [paramKey, `__rich_${index}__`] as const)
   const markerParams = Object.fromEntries(markerEntries)
-  const template = t(locale, key, { ...textParams, ...markerParams })
+  const template = translateCardText(locale, key, { ...textParams, ...markerParams })
   const markerToNode = new Map<string, ReactNode>(
     markerEntries.map(([paramKey, marker]) => [marker, richParams[paramKey]]),
   )

@@ -33,7 +33,7 @@ test('dev lobby creates a hotseat room and preserves identity after reload', asy
 for (const [stage, prompt] of [
   ['standard', '选择 1 张职业和 1 张小改良'],
   ['occupation', '选择 1 张职业'],
-  ['farmersOfTheMoorMinor', '选择 1 张泥沼小改良'],
+  ['farmersOfTheMoorMinor', '选择 1 张沼泽农夫小改良'],
   ['publishedMinor', '选择 1 张小改良'],
 ] as const) {
   test(`Chinese draft renders the ${stage} stage and translated card faces`, async ({ page, request }) => {
@@ -49,6 +49,9 @@ for (const [stage, prompt] of [
       },
       kept: { p1: { occ: [], minor: [] }, p2: { occ: [], minor: [] } },
       pendingPicks: { p1: { occ: null, minor: null }, p2: { occ: null, minor: null } },
+    }
+    if (stage === 'farmersOfTheMoorMinor') {
+      state.draft.pools.p1.minor = ['M015_PeatBurnOff', 'M047_BogForest', 'M065_FireBrigade']
     }
     expect((await postJson(request, `${BACKEND_URL}/api/game/load`, { state })).ok).toBe(true)
     await page.goto(sandboxUrl)

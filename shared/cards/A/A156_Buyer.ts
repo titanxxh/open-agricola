@@ -56,7 +56,7 @@ export const A156_Buyer = defineOccupationCard({
     number: 156,
     category: "GOODS_PROVIDER",
     desc: [
-        "Each time another player uses a <REED>, <STONE>, <SHEEP>, or <<PIG>> accumulation space, you can pay them 1 <FOOD> to get 1 good of the respective type from the general supply.",
+        "Each time another player uses a <REED>, <STONE>, <SHEEP>, or <PIG> accumulation space, you can pay them 1 <FOOD> to get 1 good of the respective type from the general supply.",
       ],
     cost: {},
     players: "4+",
