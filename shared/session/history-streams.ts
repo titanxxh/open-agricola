@@ -19,6 +19,8 @@ export type HistoryBranch = { kind: HistoryStreamKind; head: HistoryNode | null;
 const records = new WeakMap<object, { value: object; identity: HistoryRecordIdentity; links: Map<string, HistoryNode> }>()
 const branches = new WeakMap<object, HistoryBranch>()
 const groups = new WeakMap<object, string>()
+const materialized = new WeakMap<HistoryBranch, object[]>()
+const emptyStreams = new Map<HistoryStreamKind, object[]>()
 const identifier = (): string => crypto.randomUUID()
 const copyJson = <T>(value: T): T => JSON.parse(JSON.stringify(value)) as T
 const freeze = (value: unknown): void => {
@@ -89,11 +91,15 @@ export const historyBranch = (values: readonly object[], kind: HistoryStreamKind
 }
 
 export const materializeHistoryBranch = (branch: HistoryBranch): object[] => {
+  const cached = materialized.get(branch) ?? (!branch.head ? emptyStreams.get(branch.kind) : undefined)
+  if (cached) return cached
   const values: object[] = []
   for (let node = branch.head; node; node = node.previous) values.push(node.value)
   if (branch.kind !== 'log') values.reverse()
   branches.set(values, branch)
   Object.freeze(values)
+  if (branch.head) materialized.set(branch, values)
+  else emptyStreams.set(branch.kind, values)
   return values
 }
 

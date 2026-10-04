@@ -62,7 +62,7 @@ const step0 = (): ReplayCommit => ({
     intentJson: '{}',
     payloadKind: 'checkpoint',
     payloadGzip: Buffer.from('step-0'),
-    frameHash: '0'.repeat(64),
+    frameHash: 'a86755ae3f54757d427a9ad58fc7f1ada412ee0770ff00e27fe40bd67951901a',
     createdAt: 100,
   },
 })
@@ -80,7 +80,7 @@ const nextStep = (): ReplayCommit => ({
     intentJson: '{"spaceId":"forest"}',
     payloadKind: 'delta',
     payloadGzip: Buffer.from('step-1'),
-    frameHash: '1'.repeat(64),
+    frameHash: '89277a17d149f9f933c443e2ec92d03bc5fe8bd74f361dd75224a4c2db03eb7f',
     createdAt: 101,
   },
 })
@@ -120,7 +120,7 @@ describe('SqliteRoomPersistence replay commit', () => {
       latestStepNo: 0,
       roomVersion: 0,
       checkpointStepNo: 0,
-      frameHash: '0'.repeat(64),
+      frameHash: 'a86755ae3f54757d427a9ad58fc7f1ada412ee0770ff00e27fe40bd67951901a',
       missingPrefix: false,
     })
     expect(db.prepare('SELECT payload_gzip FROM game_replay_steps').get()).toEqual({
@@ -233,7 +233,7 @@ describe('SqliteRoomPersistence replay commit', () => {
         'report-1', NULL, 'room-1', 0, 'active',
         0, 0, ?, 'submitted', ?, 100, 100
       )
-    `).run('0'.repeat(64), Date.now() + 60_000)
+    `).run('a86755ae3f54757d427a9ad58fc7f1ada412ee0770ff00e27fe40bd67951901a', Date.now() + 60_000)
 
     persistence.discard('room-1')
 

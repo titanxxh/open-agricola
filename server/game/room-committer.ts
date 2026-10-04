@@ -1,3 +1,4 @@
+import { RoomHistoryCorruptionError } from './persistence/room-history-store'
 import { createHash } from 'node:crypto'
 import { mkdirSync, readFileSync, readdirSync, unlinkSync, writeFileSync } from 'node:fs'
 import { basename, join } from 'node:path'
@@ -384,6 +385,7 @@ export class RoomCommitter {
     try {
       return this.prepareLoadedRoom(room, options, persisted)
     } catch (error) {
+      if (error instanceof RoomHistoryCorruptionError) return this.blockPermanently(room.id, errorMessage(error))
       if (error instanceof ReplayAssetValidationError) {
         return this.blockPermanently(
           room.id,
