@@ -1,4 +1,4 @@
-import { describeHistory, projectHistoryStateNames } from './history-window'
+import { applyHistoryWindow, describeHistory, projectHistoryStateNames } from './history-window'
 /**
  * Shared sync-payload assembly — builds the per-viewer `GameSyncPayload` from a
  * `GameCore` response. Used by the server `GameSession` and the browser-local
@@ -28,6 +28,7 @@ export function buildSyncPayload(
   viewerPlayerId: string | null,
   mode: SyncPayloadMode = 'viewer',
   serializedState?: SerializedGameState,
+  windowed = false,
 ): GameSyncPayload {
   const ctx = { engineStack: core.getEngineStack() }
   const defs = core.getCustomCardDefs()
@@ -36,9 +37,9 @@ export function buildSyncPayload(
   const base: GameSyncPayload = {
     state: mode === 'debug'
       ? canonicalState
-      : projectHistoryStateNames(filterSerializedStateForPlayer(canonicalState, viewerPlayerId, {
+      : filterSerializedStateForPlayer(canonicalState, viewerPlayerId, {
         revealRoundCards: mode === 'dev-viewer',
-      })),
+      }),
     interaction: mode === 'debug'
       ? resp.interaction
       : redactInteractionForViewer(
@@ -79,5 +80,6 @@ export function buildSyncPayload(
   if (mode === 'debug' && core.cardWarnings.length > 0) {
     base.cardWarnings = [...core.cardWarnings]
   }
-  return base
+  const payload = windowed && mode === 'viewer' ? applyHistoryWindow(canonicalState, base, viewerPlayerId) : base
+  return mode === 'viewer' ? { ...payload, state: projectHistoryStateNames(payload.state) } : payload
 }
