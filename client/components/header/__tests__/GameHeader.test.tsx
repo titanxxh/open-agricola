@@ -73,6 +73,7 @@ describe('snakeOpeningPlacementOrders', () => {
   it('localizes generated and empty names using original seats while preserving account names', () => {
     const game = snakeOpeningState()
     game.players[0]!.name = 'Player 1'
+    game.players[0]!.nameIsDefault = true
     game.players[1]!.name = ''
     game.players[2]!.name = 'PlayerF'
     expect(snakeOpeningPlacementOrders(game, 'zh')).toEqual({
@@ -88,11 +89,22 @@ describe('GameHeader snake opening pill', () => {
     const game = snakeOpeningState()
     game.players[0]!.name = 'Player 1'
     game.players[1]!.name = 'Player 2'
+    game.players[0]!.nameIsDefault = true
+    game.players[1]!.nameIsDefault = true
     game.players[2]!.name = 'PlayerF'
     const { container } = renderHeader(game, 'zh')
     expect(container.querySelector('.waiting-turn')).toHaveTextContent('玩家 2')
     expect(screen.getByRole('tooltip')).toHaveTextContent('玩家 2 → PlayerF → 玩家 1')
     expect(screen.getByRole('tooltip')).toHaveTextContent('玩家 1 → PlayerF → 玩家 2')
+  })
+
+  it('preserves a numeric account name in the waiting badge and both orders', () => {
+    const game = snakeOpeningState()
+    game.players[1]!.name = 'Player 6'
+    game.players[1]!.nameIsDefault = false
+    const { container } = renderHeader(game, 'zh')
+    expect(container.querySelector('.waiting-turn')).toHaveTextContent('Player 6')
+    expect(screen.getByRole('tooltip')).toHaveTextContent('Player 6 → Cara → Alice')
   })
 
   it('shows the round-1 pill with both placement orders when the variant is enabled', () => {

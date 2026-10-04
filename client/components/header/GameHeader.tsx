@@ -119,7 +119,7 @@ export const GameHeader = ({
           <span className="status-badge your-turn">{locale === 'zh' ? '你的回合' : 'Your Turn'}</span>
         ) : (
           <span className="status-badge waiting-turn">
-            {getPlayerDisplayName(locale, currentPlayer.name, currentPlayerIndex >= 0 ? currentPlayerIndex : undefined)}
+            {getPlayerDisplayName(locale, currentPlayer.name, currentPlayerIndex >= 0 ? currentPlayerIndex : undefined, currentPlayer.nameIsDefault)}
           </span>
         )}
         <div className="header-actions" ref={menuContainerRef}>

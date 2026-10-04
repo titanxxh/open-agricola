@@ -114,6 +114,8 @@ describe('ActionBoard', () => {
   it('localizes raw owner names in card actions, exclusive markers, and future resource labels', () => {
     const first = createPlayer('p1', 'Player 1', 'red')
     const second = createPlayer('p2', 'Player 2', 'blue')
+    first.nameIsDefault = true
+    second.nameIsDefault = true
     second.minorPlayed = ['D023_PioneeringSpirit']
     const action = {
       ...createAction('sheep-market', 'actions.sheep-market.name'),

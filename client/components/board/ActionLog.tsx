@@ -14,6 +14,7 @@ import type {
 interface Props {
   locale: Locale
   log: GameState['log']
+  playerNames?: Readonly<Record<string, string>>
   currentRound: number
   /** Cap entries (newest first) to keep the panel snappy. Default: 80. */
   limit?: number
@@ -122,6 +123,7 @@ function LogIcon({ icon }: { icon: LogIconKey }) {
 export function ActionLog({
   locale,
   log,
+  playerNames = {},
   currentRound,
   limit = 80,
   timelineBuckets,
@@ -233,10 +235,12 @@ export function ActionLog({
             <ul className="action-log__list">
               {bucket.rows.map((row) => {
                 const entry = row.logEntry
-                const prepared = entry ? prepareLogEntry(entry, locale) : null
+                const prepared = entry ? prepareLogEntry(entry, locale, playerNames) : null
                 const plainText = prepared?.plainText ?? row.label
                 const playerName =
-                  typeof entry?.params?.player === 'string' ? entry.params.player : ''
+                  entry?.playerId && playerNames[entry.playerId] !== undefined
+                    ? playerNames[entry.playerId]!
+                    : typeof entry?.params?.player === 'string' ? entry.params.player : ''
                 return (
                   <li
                     key={row.key}

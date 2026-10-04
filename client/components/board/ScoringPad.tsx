@@ -214,11 +214,15 @@ export const ScoringPad = ({ locale, scores, players, onClose, showDraftHistory 
               <div className="scoring-cell scoring-label">
                 {t(locale, 'ui.scoringItem')}
               </div>
-              {scores.map((player, index) => (
-                <div key={`head-${player.playerId}`} className="scoring-cell scoring-player-name">
-                  {getPlayerDisplayName(locale, player.playerName, index)}
-                </div>
-              ))}
+              {scores.map((player) => {
+                const index = players.findIndex((statePlayer) => statePlayer.id === player.playerId)
+                return (
+                  <div key={`head-${player.playerId}`} className="scoring-cell scoring-player-name">
+                    {getPlayerDisplayName(locale, player.playerName, index >= 0 ? index : undefined,
+                      players[index]?.nameIsDefault)}
+                  </div>
+                )
+              })}
             </div>
             {rows.map((row) => {
               const rowLabel: ReactNode =
@@ -350,7 +354,7 @@ const StatsTab = ({ locale, players }: { locale: Locale; players: PlayerState[] 
         <div className="scoring-row scoring-header-row" style={{ gridTemplateColumns }}>
           <div className="scoring-cell scoring-label">{t(locale, 'ui.scoringItem')}</div>
           {players.map((p, index) => (
-            <div key={`stats-head-${p.id}`} className="scoring-cell scoring-player-name">{getPlayerDisplayName(locale, p.name, index)}</div>
+            <div key={`stats-head-${p.id}`} className="scoring-cell scoring-player-name">{getPlayerDisplayName(locale, p.name, index, p.nameIsDefault)}</div>
           ))}
         </div>
         {STATS_ROWS.map((row) => (
@@ -394,7 +398,7 @@ const DraftTab = ({ locale, players }: { locale: Locale; players: PlayerState[] 
     {players.map((player, index) => (
       <div key={`draft-col-${player.id}`} className="scoring-draft-column">
         <div className="scoring-draft-header">
-          {getPlayerDisplayName(locale, player.name, index)}
+          {getPlayerDisplayName(locale, player.name, index, player.nameIsDefault)}
           <span className="scoring-draft-subheader">
             {' '}— {t(locale, 'ui.draftHistoryHeader')}
           </span>

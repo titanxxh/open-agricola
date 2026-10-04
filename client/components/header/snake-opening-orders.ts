@@ -13,7 +13,7 @@ export const snakeOpeningPlacementOrders = (
 ): { first: string[]; second: string[] } => {
   const players = state.players ?? []
   const startIndex = Math.max(0, players.findIndex((player) => player.id === state.roundFirstPlayerId))
-  const names = players.map((player, index) => getPlayerDisplayName(locale, player.name, index))
+  const names = players.map((player, index) => getPlayerDisplayName(locale, player.name, index, player.nameIsDefault))
   const first = [...names.slice(startIndex), ...names.slice(0, startIndex)]
   return { first, second: [...first].reverse() }
 }

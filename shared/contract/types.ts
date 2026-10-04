@@ -351,6 +351,8 @@ export type FarmyardExtension = {
 export type PlayerState = {
   id: string
   name: string
+  /** True only for an engine-generated seat name; chosen account names stay literal. */
+  nameIsDefault?: boolean
   color: 'red' | 'yellow' | 'blue' | 'black' | 'green' | 'purple'
   resources: Resource
   farmyardExtensions?: FarmyardExtension[]

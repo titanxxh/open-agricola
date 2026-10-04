@@ -67,7 +67,7 @@ export const DevPanel = ({
         <select value={devPlayerId} onChange={(event) => setDevPlayerId(event.target.value)}>
           {players.map((player, index) => (
             <option key={player.id} value={player.id}>
-              {getPlayerDisplayName(locale, player.name, index)}
+              {getPlayerDisplayName(locale, player.name, index, player.nameIsDefault)}
             </option>
           ))}
         </select>

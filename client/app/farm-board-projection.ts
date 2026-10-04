@@ -598,7 +598,7 @@ const buildReorgRemaining = (
 
 const playerDisplay = (locale: Locale, player: PlayerState, playerIndex: number): ActionBoardPlayerDisplay => ({
   id: player.id,
-  name: getPlayerDisplayName(locale, player.name, playerIndex),
+  name: getPlayerDisplayName(locale, player.name, playerIndex, player.nameIsDefault),
   color: player.color,
 })
 

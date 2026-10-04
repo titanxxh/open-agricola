@@ -188,6 +188,7 @@ describe('eventsToLogEntries', () => {
     expect(eventsToLogEntries([event], { playerNames: { p1: 'Alice' } })).toEqual([
       {
         key: 'log.actionDetail',
+        playerId: 'p1',
         params: {
           player: 'Alice',
           action: 'actions.receive.name',
@@ -344,6 +345,7 @@ describe('eventsToLogEntries', () => {
       expect.objectContaining({
         logEntry: {
           key: 'log.actionDetail',
+          playerId: 'p1',
           params: {
             player: 'Alice',
             action: 'Renovate',
@@ -404,6 +406,7 @@ describe('eventsToLogEntries', () => {
       expect.objectContaining({
         logEntry: {
           key: 'log.actionDetail',
+          playerId: 'p1',
           params: {
             player: 'Alice',
             action: 'Build stables',
@@ -487,6 +490,7 @@ describe('eventsToLogEntries', () => {
     expect(eventsToLogEntries(events, { playerNames: { p1: 'Alice' }, actionNames: { forest: 'Forest' } })).toEqual([
       {
         key: 'log.actionDetail',
+        playerId: 'p1',
         params: { player: 'Alice', action: 'Forest', detailParts: { gains: { wood: 2 } } },
       },
     ])
@@ -539,6 +543,7 @@ describe('eventsToLogEntries', () => {
     expect(eventsToLogEntries(events, { playerNames: { p1: 'Alice' }, actionNames: { build: 'Build rooms' } })).toEqual([
       {
         key: 'log.actionDetail',
+        playerId: 'p1',
         params: { player: 'Alice', action: 'Build rooms', detailParts: { costs: { wood: 2 } } },
       },
     ])
@@ -609,6 +614,7 @@ describe('eventsToLogEntries', () => {
     expect(eventsToLogEntries(events, { playerNames: { p1: 'Alice' }, actionNames: { forest: 'Forest' } })).toEqual([
       {
         key: 'log.actionDetail',
+        playerId: 'p1',
         params: {
           player: 'Alice',
           action: 'Forest',
@@ -646,6 +652,7 @@ describe('eventsToLogEntries', () => {
     expect(eventsToLogEntries(events, { playerNames: { p1: 'Alice' }, actionNames: { construct: 'Build rooms' } })).toEqual([
       {
         key: 'log.actionDetail',
+        playerId: 'p1',
         params: {
           player: 'Alice',
           action: 'Build rooms',
@@ -707,6 +714,7 @@ describe('eventsToLogEntries', () => {
     })).toEqual([
       {
         key: 'log.actionDetail',
+        playerId: 'p1',
         params: {
           player: 'Alice',
           action: 'Farm Expansion',
@@ -718,6 +726,7 @@ describe('eventsToLogEntries', () => {
       },
       {
         key: 'log.actionDetail',
+        playerId: 'p1',
         params: {
           player: 'Alice',
           action: 'Farm Expansion',
@@ -771,6 +780,7 @@ describe('eventsToLogEntries', () => {
     })).toEqual([
       {
         key: 'log.actionDetail',
+        playerId: 'p1',
         params: {
           player: 'Alice',
           action: 'Farm Expansion',
@@ -782,6 +792,7 @@ describe('eventsToLogEntries', () => {
       },
       {
         key: 'log.actionDetail',
+        playerId: 'p1',
         params: {
           player: 'Alice',
           action: 'Farm Expansion',
@@ -1139,6 +1150,7 @@ describe('eventsToLogEntries', () => {
       { key: 'log.harvestPhaseReap' },
       {
         key: 'log.actionDetail',
+        playerId: 'p1',
         params: {
           player: 'Alice',
           action: 'Fences',
@@ -1229,6 +1241,7 @@ describe('eventsToLogEntries', () => {
     expect(eventsToLogEntries([event], { playerNames: { p1: 'Alice' } })).toEqual([
       {
         key: 'log.parentMotherScheduled',
+        playerId: 'p1',
         params: { player: 'Alice', cardId: 'PR02', round: 12, reward: 'field' },
       },
     ])

@@ -1008,7 +1008,7 @@ Card faces, trigger labels, log previews, and replay rendering share the display
 
 Within metadata locales, empty or whitespace-only descriptions, supplemental rules, and prerequisites fall back to their source fields independently. A translated name can therefore coexist with a source description while a draft translation is incomplete.
 
-Hotseat and both sandbox executors initialize unnamed seats with the same `Player N` convention. Those generated names are localized at the presentation boundary through `client/utils/player-name.ts`, including handoffs, player tabs, scores, and log text. Other names, including account names such as `PlayerA` or `playerF`, are rendered literally. Presentation does not mutate authoritative name values.
+Hotseat and both sandbox executors initialize unnamed seats with the same `Player N` convention and `PlayerState.nameIsDefault = true`. The presentation boundary in `client/utils/player-name.ts` localizes names using this provenance and the seat index, including handoffs, player tabs, scores, and log text. Supplied names, including account names such as `PlayerA`, `playerF`, or `Player 6`, are rendered literally. Authoritative renaming clears the flag; undo preserves the current name and its provenance together. Replay identity overrides clear generated-name provenance when replacing the name. Presentation does not mutate authoritative name values.
 
 `impl` is the Card Impl and contains `modifiers`, `listeners`, `effect`, `prerequisiteCheck`, helper calls, and `reaches`. Modifiers belong to the implementation, not Card Display. Builders may statically extract `reaches` and project it at the top level of the manifest, but it does not belong in `meta`.
 

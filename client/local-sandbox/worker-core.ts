@@ -20,7 +20,6 @@ import { buildSyncPayload } from '../../shared/session/sync-payload.ts'
 import { rehydrateState, serializeSessionSnapshot } from '../../shared/session/serialization.ts'
 import {
   defaultSandboxDeckIds,
-  defaultSandboxPlayerNames,
   type InitialStateOptions,
 } from '../../shared/session/state-bootstrap.ts'
 import type { CustomCardData } from '../../shared/cards/session-card-context.ts'
@@ -86,7 +85,6 @@ const toInitialStateOptions = (config: LocalGameConfig): InitialStateOptions => 
   return {
     playerCount,
     deckIds: deckIds as InitialStateOptions['deckIds'],
-    playerNames: [...defaultSandboxPlayerNames].slice(0, playerCount),
     enableThroughTheSeasons: config.enableThroughTheSeasons === true,
     enableFarmersOfTheMoor,
     allowIncompleteFarmersOfTheMoorMinorDeal:

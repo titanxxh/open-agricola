@@ -1050,7 +1050,7 @@ export const FarmBoard = ({ view, actions, inlineCardStats = false }: FarmBoardP
     <div className="farm-header">
       <div>
         <h2>{t(locale, 'ui.farmTitle')}</h2>
-        <div className="player-summary">{getPlayerDisplayName(locale, displayPlayer.name, players.findIndex((player) => player.id === displayPlayer.id))}</div>
+        <div className="player-summary">{getPlayerDisplayName(locale, displayPlayer.name, players.findIndex((player) => player.id === displayPlayer.id), displayPlayer.nameIsDefault)}</div>
         <div className="player-resources-compact" data-player-resource-anchor={displayPlayer.id}>
           <span className="res-compact-group">
             <CompactResourceItem iconClass="res-icon-wood" value={displayPlayer.resources.wood} label={`${t(locale, 'resources.wood')}: ${displayPlayer.resources.wood}`} />
@@ -1116,7 +1116,7 @@ export const FarmBoard = ({ view, actions, inlineCardStats = false }: FarmBoardP
               onClick={() => setViewPlayerId(player.id)}
             >
               <span className="player-tab-label">
-                {getPlayerDisplayName(locale, player.name, index)}
+                {getPlayerDisplayName(locale, player.name, index, player.nameIsDefault)}
                 {currentPlayer.id === player.id ? (
                   <span
                     className="turn-marker"

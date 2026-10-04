@@ -129,6 +129,8 @@ export const projectReplayParticipantNames = (
     players: frame.players.map((player, playerIndex) => ({
       ...player,
       name: participantNames.get(playerIndex) ?? player.name,
+      ...(player.nameIsDefault && participantNames.has(playerIndex)
+        && participantNames.get(playerIndex) !== player.name ? { nameIsDefault: false } : {}),
       ...(player.playedCardAnimalZones
         ? { playedCardAnimalZones: projectZones(player.playedCardAnimalZones) }
         : {}),

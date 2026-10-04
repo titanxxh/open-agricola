@@ -14,12 +14,16 @@ it('localizes unnamed and default-named players in switch prompts', () => {
   const input = baseInput()
   input.locale = 'zh'
   input.pending.playerSwitch = { fromPlayerIndex: 0, toPlayerIndex: 1 }
-  for (const names of [[], ['Player 1', 'Player 2']]) {
+  for (const names of [[], ['玩家 1', '玩家 2']]) {
     input.playerNames = names
     expect(buildInteractionBarModel(input).body).toMatchObject({
       kind: 'playerSwitch', title: { params: { player: '玩家 2' } },
     })
   }
+  input.playerNames = ['Alice', 'Player 6']
+  expect(buildInteractionBarModel(input).body).toMatchObject({
+    kind: 'playerSwitch', title: { params: { player: 'Player 6' } },
+  })
 })
 
 beforeAll(async () => {

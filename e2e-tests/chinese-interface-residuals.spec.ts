@@ -26,7 +26,7 @@ const signIn = async (page: Page, request: APIRequestContext, displayName = '录
   return cookie
 }
 
-for (const displayName of ['录制玩家', 'PlayerF']) {
+for (const displayName of ['录制玩家', 'PlayerF', 'Player 6']) {
   test(`authenticated six-player hotseat preserves ${displayName} and localizes generated names`, async ({ page, request }) => {
     await page.addInitScript(() => localStorage.setItem('open-agricola-locale-v2', 'zh'))
     await signIn(page, request, displayName)
@@ -91,7 +91,9 @@ for (const { label, desc, expected } of [
           desc: ['When you build a room, the cost is reduced by 2 wood.'], cost: {}, vp: 0,
           rules: ['Source supplemental ruling.'],
           locales: { zh: { name: '中世纪木槌', desc,
-            rules: label === 'complete locale' ? ['中文补充规则。'] : [], prerequisite: '1 张职业' } },
+            rules: label === 'complete locale' ? ['中文补充规则。'] : [], prerequisite: '1 张职业' },
+          en: { name: 'Medieval Mallet', desc: ['When you build a room, the cost is reduced by 2 wood.'],
+            rules: ['Source supplemental ruling.'] } },
         },
       },
     })
@@ -106,6 +108,27 @@ for (const { label, desc, expected } of [
       label === 'complete locale' ? '中文补充规则。' : 'Source supplemental ruling.',
     )
     if (label === 'complete locale') await expect(preview).not.toContainText('When you build a room')
+    await page.locator('.aicw-stage-rail button').filter({ hasText: '本地化' }).click()
+    await page.getByRole('button', { name: label === 'complete locale' ? '检查本地化' : '开始本地化', exact: true }).click()
+    const localization = page.getByRole('dialog', { name: '本地化', exact: true })
+    await localization.locator('#localization-target-name').fill('编辑后的中世纪木槌')
+    await localization.locator('#localization-target-description').fill('人工编辑的中文描述。')
+    await localization.getByRole('button', { name: '保存', exact: true }).click()
+    await page.locator('.aicw-stage-rail button').filter({ hasText: '基础信息' }).click()
+    await expect.poll(async () => {
+      const response = await request.get(`${BACKEND_URL}/api/workshop/cards/${card.id}/workspace`, {
+        headers: { Cookie: `oa_session=${cookie}` },
+      })
+      return (await response.json()).workspace.draft.cardJson.locales
+    }).toMatchObject({
+      zh: { name: '编辑后的中世纪木槌', rules: label === 'complete locale' ? ['中文补充规则。'] : [] },
+      en: { rules: ['Source supplemental ruling.'] },
+    })
+    await page.reload({ waitUntil: 'domcontentloaded' })
+    await expect(preview.locator('.card-title')).toHaveText('编辑后的中世纪木槌')
+    await expect(preview.locator('.card-rules')).toContainText(
+      label === 'complete locale' ? '中文补充规则。' : 'Source supplemental ruling.',
+    )
     await page.goto(`${FRONTEND_URL}/?page=workshop&view=sandbox`)
     await page.locator('.ws-sandbox').getByRole('button', { name: '开始沙盒测试', exact: true }).click()
     const game = page.frameLocator('.sandbox-embed-frame')

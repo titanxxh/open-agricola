@@ -941,7 +941,7 @@ export const GameContainerApi = () => {
       interactionPresentationPlan.kind === 'harvest-feed' && state
         ? {
             playerIndex: interactionPresentationPlan.playerIndex,
-            playerName: getPlayerDisplayName(locale, state.players[interactionPresentationPlan.playerIndex]?.name, interactionPresentationPlan.playerIndex),
+            playerName: getPlayerDisplayName(locale, state.players[interactionPresentationPlan.playerIndex]?.name, interactionPresentationPlan.playerIndex, state.players[interactionPresentationPlan.playerIndex]?.nameIsDefault),
             remaining: interactionPresentationPlan.remaining,
             foodUsed: interactionPresentationPlan.foodUsed,
           }
@@ -952,7 +952,7 @@ export const GameContainerApi = () => {
     () =>
       interactionPresentationPlan.kind === 'heating' && state
         ? {
-            playerName: getPlayerDisplayName(locale, state.players[interactionPresentationPlan.playerIndex]?.name, interactionPresentationPlan.playerIndex),
+            playerName: getPlayerDisplayName(locale, state.players[interactionPresentationPlan.playerIndex]?.name, interactionPresentationPlan.playerIndex, state.players[interactionPresentationPlan.playerIndex]?.nameIsDefault),
             required: interactionPresentationPlan.required,
             maxFuelPayable: interactionPresentationPlan.maxFuelPayable,
             maxWoodConvertibleToFuel: interactionPresentationPlan.maxWoodConvertibleToFuel,
@@ -988,7 +988,7 @@ export const GameContainerApi = () => {
   }, [actionSpaces])
   const playerNames = useMemo(() => {
     if (!state) return {}
-    return Object.fromEntries(state.players.map((player, index) => [player.id, getPlayerDisplayName(locale, player.name, index)]))
+    return Object.fromEntries(state.players.map((player, index) => [player.id, getPlayerDisplayName(locale, player.name, index, player.nameIsDefault)]))
   }, [locale, state])
   const {
     timelineBuckets: actionLogTimelineBuckets,
@@ -1305,7 +1305,7 @@ export const GameContainerApi = () => {
         const key = fm.actionId ?? fm.cardId
         if (!rec[key]) rec[key] = []
         const player = state.players.find((p) => p.id === fm.playerId)
-        rec[key].push({ playerId: fm.playerId, name: player ? getPlayerDisplayName(locale, player.name, state.players.indexOf(player)) : '', color: player?.color ?? 'red', resources: fm.resources })
+        rec[key].push({ playerId: fm.playerId, name: player ? getPlayerDisplayName(locale, player.name, state.players.indexOf(player), player.nameIsDefault) : '', color: player?.color ?? 'red', resources: fm.resources })
       }
     })
     return rec
@@ -2023,6 +2023,7 @@ export const GameContainerApi = () => {
                 <ActionLog
                   locale={locale}
                   log={state.log}
+                  playerNames={playerNames}
                   currentRound={state.round ?? 1}
                   timelineBuckets={actionLogTimelineBuckets}
                   selectedReplayKey={selectedReplayKey}
@@ -2043,6 +2044,7 @@ export const GameContainerApi = () => {
               <ActionLog
                 locale={locale}
                 log={state.log}
+                playerNames={playerNames}
                 currentRound={state.round ?? 1}
                 timelineBuckets={actionLogTimelineBuckets}
                 selectedReplayKey={selectedReplayKey}

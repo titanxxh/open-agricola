@@ -708,7 +708,8 @@ const createInitialPlayers = (
     const startingFood = snakeOpening || !info.startPlayer ? 3 : 2
     const player: PlayerState = {
       id: info.id,
-      name: playerNames[index] ?? info.name,
+      name: playerNames[index]?.trim() ? playerNames[index]! : info.name,
+      nameIsDefault: !playerNames[index]?.trim(),
       color: info.color,
       resources: enableFarmersOfTheMoor
         ? { ...emptyResources, food: startingFood, fuel: 0, horse: 0 }
