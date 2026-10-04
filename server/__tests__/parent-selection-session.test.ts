@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { GameSession } from '../game/authoritative-session'
-import { serializeStateForPlayer } from '../../shared/session/serialization'
+import { rehydrateState, serializeSessionSnapshot, serializeStateForPlayer } from '../../shared/session/serialization'
+import { snapshotForWorker } from '../../shared/session/recovery-catalog'
 import { emptyResources } from '../../shared/session/state-bootstrap'
 import { markAllWorkersUsed } from '../../shared/domain/player'
 
@@ -248,7 +249,7 @@ describe('Parent Card selection setup', () => {
   })
 
   it('refreshes direct-deal logs by player identity when display names collide', () => {
-    const session = new GameSession(308, undefined, {
+    let session = new GameSession(308, undefined, {
       playerCount: 2,
       enableParentCards: true,
       draftParents: false,
@@ -273,7 +274,8 @@ describe('Parent Card selection setup', () => {
     expect(logsFor(p1Mother).every((entry) => entry.params?.player === 'Carol')).toBe(true)
     expect(logsFor(p2Mother).every((entry) => entry.params?.player === 'Shared')).toBe(true)
 
-    session.loadState(JSON.parse(JSON.stringify(session.state)))
+    const saved = snapshotForWorker(serializeSessionSnapshot(session.state, session))
+    session = new GameSession(rehydrateState(JSON.parse(JSON.stringify(saved))))
     session.updatePlayerName(1, 'Dana')
     expect(logsFor(p1Mother).every((entry) => entry.params?.player === 'Carol')).toBe(true)
     expect(logsFor(p2Mother).every((entry) => entry.params?.player === 'Dana')).toBe(true)

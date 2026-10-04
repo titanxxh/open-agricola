@@ -37,7 +37,7 @@ describe('buildEnvelope', () => {
 
   it('projects reconnect names without mutating raw history or the private cursor', () => {
     const session = new GameSession(563, undefined, { playerCount: 2 })
-    session.state.log = [{ key: 'transfer', playerId: 'p1', params: { player: session.state.players[0]!.name, toPlayer: session.state.players[1]!.name, toPlayerId: 'p2' } }]
+    session.loadState({ ...session.state, log: [{ key: 'transfer', playerId: 'p1', params: { player: session.state.players[0]!.name, toPlayer: session.state.players[1]!.name, toPlayerId: 'p2' } }] })
     const response = session.getState()
     const cursor = session.createSessionPrivateCursor()
     const log = JSON.parse(JSON.stringify(session.state.log))
