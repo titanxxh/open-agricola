@@ -12,7 +12,7 @@ Withholding the seed is not enough on its own. `createSeed()` draws from 10^9 va
 ## Decision
 
 1. Game Seed never enters a viewer projection of an active game, for a seat or a spectator, including the final frame. Full-state sync (hotseat, dev-room debug) and the open perspective of a completed Game Replay Archive are unchanged.
-2. An Unrevealed Round Card is `null` in the viewer projection until its round starts, or until it is the last face-down card of its stage and so already deducible; round 14 is therefore always visible, which the Final Scenario card relies on. The same mask covers the round card named by goods scheduled on a future round. Live sync, Bug Report evidence and the Replay seat perspective share this one projection. Live sync to a dev room is exempt from the round-card mask only; it still withholds the seed.
+2. An Unrevealed Round Card is `null` in the viewer projection until its round starts. The same mask covers the round card named by goods scheduled on a future round. Live sync, Bug Report evidence and the Replay seat perspective share this one projection. Live sync to a dev room is exempt from the round-card mask only; it still withholds the seed.
 3. Outside dev rooms the server ignores a client-supplied seed.
 4. When no seed is given, Game Seed is a random value of at least 128 bits and every random stream derived from it comes from a cryptographic generator, supplied by an audited pure-JavaScript synchronous library because the rules also run in a browser Worker. Sub-streams are separated by label rather than by arithmetic on the seed.
 5. An Explicit Seed is a number and keeps the existing generator with unchanged results. It serves tests, dev rooms and debug endpoints and protects nothing.
