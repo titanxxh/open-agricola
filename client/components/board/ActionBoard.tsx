@@ -6,6 +6,7 @@ import { PlayerCard } from '../common/PlayerCard'
 import { translateCardText } from '../common/cardText'
 import { getCardMeta } from '../../services/card-meta'
 import { getPlayerDisplayName } from '../../utils/player-name'
+import { ACTION_ICON_DESC, ACTION_TOOLTIP_DESC, ACTION_TOOLTIP_TEXT } from './action-descriptions'
 
 const BOARD_W_2P = 830
 const BOARD_W_WITH_SIDE = 1000
@@ -204,102 +205,6 @@ const ACTION_SPRITE: Record<string, string> = {
   'cultivation': '25% 100%',
   'house-redevelopment': '50% 100%',
   'farm-redevelopment': '75% 100%',
-}
-
-const ACTION_ICON_DESC: Record<string, string[]> = {
-  // Base actions
-  'farm-expansion':     ['5<wood>2<reed><arrow><room-wood>', '5<clay>2<reed><arrow><room-clay>', '5<stone>2<reed><arrow><room-stone>', '+', '2<wood> <arrow> <barn>'],
-  'meeting-place':      ['<first> + 1<minor>'],
-  'grain-seeds':        ['+1<grain>'],
-  'farmland':           ['<field>'],
-  'day-laborer':        ['+2<food>'],
-  'lessons':            ['[Pay] 1<food>*', '1<occupation>'],
-  'lessons-3':          ['[Pay] 2<food>', '1<occupation>'],
-  'lessons-4':          ['[Pay] 2<food>*', '1<occupation>'],
-  'resource-market':    ['+1<reed> / <stone> +1<food>'],
-  'resource-market-4':  ['+1<reed>+1<stone>+1<food>'],
-  'lessons-56-2f':      ['[Pay] 2<food>', '1<occupation>'],
-  'lessons-56-variable': ['[Pay] 1/2<food>', '1<occupation>'],
-  'modest-wish-children-56': ['<child>'],
-  'house-building-56':  ['5<wood>2<reed><arrow><room-wood>', '5<clay>2<reed><arrow><room-clay>', '5<stone>2<reed><arrow><room-stone>'],
-  'resource-market-56': ['+1<reed>+1<wood>+1<stone>'],
-  'animal-market-56':   ['1<sheep>+1<food>', '/', '1<pig>', '/', '+1<cattle>-1<food>'],
-  'farm-supplies-6':    ['[Pay] 1<food><arrow><field>', '[and/or]', '[Pay] 1<food><arrow>1<grain>'],
-  'resource-trade-6':   ['+1<food>', '+1<reed>/<stone>', '+1<wood>/<clay>'],
-  'corral-6':           ['+1<sheep>/<pig>/<cattle>'],
-  'side-job-6':         ['[Pay] 1<wood><arrow><barn>', '[and/or]', '<bread>'],
-  'improvement-6':      ['R1-4: 1<minor>', 'R5+: 1<major>/<minor>'],
-  'moor-infirmary':     ['+1<food>', '[ui.infirmarySickWorkersOnly]'],
-  'moor-resource-market-12': ['+1<food>+1<stone>'],
-  // Round actions
-  'fencing':            ['1<wood><arrow><fence-icon>'],
-  'grain-utilization':  ['<sow> + <bread>'],
-  'major-improvement':  ['1<major>/<minor>'],
-  'vegetable-seeds':    ['+1<vegetable>'],
-  'cultivation':        ['<field> + <sow>'],
-  'wish-children':      ['<child> [▷] 1<minor>'],
-  'urgent-wish-children': ['<child-free>'],
-  'house-redevelopment':  ['<upgrade>', '[▷] 1<major>/<minor>'],
-  'farm-redevelopment':   ['<upgrade>', '[▷] 1<wood><arrow><fence-icon>'],
-  'sheep-market':       [],
-  'pig-market':         [],
-  'cattle-market':      [],
-  'western-quarry':     [],
-  'eastern-quarry':     [],
-}
-
-// Detailed icon-description shown inside the hover tooltip card body (the reference `tooltipDesc`).
-// More verbose than ACTION_ICON_DESC (adds [text] labels); falls back to ACTION_ICON_DESC
-// / gain display when an id is absent here.
-const ACTION_TOOLTIP_DESC: Record<string, string[]> = {
-  'fencing':              ['[Build fences]', '1<wood><arrow><fence-icon>'],
-  'grain-utilization':    ['[Sow]', '<sow>', '[and/or]', '[Bake bread]', '<bread>'],
-  'major-improvement':    ['[Build 1 major or play 1 minor improvement]', '1<major>/<minor>'],
-  'cultivation':          ['[Plow a field]', '<field>', '[and/or]', '[Sow]', '<sow>'],
-  'wish-children':        ['<child> [Growth with room only]', '[then]', '1<minor>'],
-  'urgent-wish-children': ['<child-free> [Growth without room]'],
-  'house-redevelopment':  ['[Renovation]', '<upgrade>', '[then]', '1<major>/<minor>'],
-  'farm-redevelopment':   ['[Renovation]', '<upgrade>', '[then]', '[Build fences]', '1<wood><arrow><fence-icon>'],
-}
-
-// Full rule text shown to the right of the tooltip card (the reference `tooltip`).
-// Falls back to the i18n short description when an id is absent here.
-const ACTION_TOOLTIP_TEXT: Record<string, string[]> = {
-  'fencing': [
-    'You can build any number of fences, paying 1 wood for each new fence you build.',
-    'You may fence a stable, or divide an existing pasture into several smaller ones by building fences on the fence spaces inside the pasture.',
-  ],
-  'sheep-market': ['Accumulate 1 sheep each turn.'],
-  'grain-utilization': [
-    'Sow: place 1 grain or vegetable from your supply onto an empty field, then add more from the supply (grain fields hold 3, vegetable fields hold 2).',
-    'Bake bread: turn grain from your supply (not from your fields) into food using a Fireplace, Cooking Hearth or other baking improvement.',
-  ],
-  'major-improvement': ['You can either build 1 major improvement or play 1 minor improvement.'],
-  'western-quarry': ['Accumulate 1 stone each turn.'],
-  'pig-market': ['Accumulate 1 wild boar each turn.'],
-  'vegetable-seeds': ['Gain 1 vegetable.'],
-  'eastern-quarry': ['Accumulate 1 stone each turn.'],
-  'cattle-market': ['Accumulate 1 cattle each turn.'],
-  'wish-children': [
-    'You can only grow your family here if you currently have more rooms than people, regardless of whether those people are still at home or on action spaces.',
-    'You may not skip the family growth only to play a minor improvement.',
-  ],
-  'urgent-wish-children': [
-    'The number of rooms in your house does not matter for this effect.',
-    'Note: if you grow your family here and build a single room later, you will not be able to use "Wish for Children".',
-    'The new room is immediately occupied by the person who did not have a room of their own yet.',
-  ],
-  'cultivation': [
-    'You can plow one field and then immediately sow grain or vegetables in all of your empty fields, including the one you just plowed.',
-  ],
-  'house-redevelopment': [
-    'You may only build a major improvement or play a minor improvement if you renovate first.',
-    'You are not allowed to renovate your house twice in a single action.',
-  ],
-  'farm-redevelopment': [
-    'You can only build fences if you renovate first.',
-    'You are not allowed to renovate twice in a single action.',
-  ],
 }
 
 function getIconLineClassName(actionId?: string): string {
@@ -1220,8 +1125,8 @@ export const ActionBoard = ({
                     {t(locale, 'ui.leftActionSpace', { action: tooltip.leftActionName })}
                   </p>
                 )}
-                {(ACTION_TOOLTIP_TEXT[tooltip.actionId!] ?? [t(locale, tooltip.descKey!)]).map((line, i) => (
-                  <p key={i}>{line}</p>
+                {(ACTION_TOOLTIP_TEXT[tooltip.actionId!] ?? [tooltip.descKey!]).map((key, i) => (
+                  <p key={i}>{t(locale, key)}</p>
                 ))}
                 {renderSupplementalRules(tooltip.action)}
               </div>

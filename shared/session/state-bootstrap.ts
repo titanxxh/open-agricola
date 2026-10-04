@@ -47,6 +47,7 @@ import {
   applyRoundGrowth,
   defaultPlayerColors,
   defaultSandboxDeckIds,
+  defaultSandboxPlayerNames,
   emptyResources,
   generateRoundActionOrder,
   normalizeFenceSegments,
@@ -696,12 +697,12 @@ const createInitialPlayers = (
     color: PlayerState['color']
     startPlayer: boolean
   }> = [
-    { id: 'p1', name: 'PlayerA', color: 'red', startPlayer: true },
-    { id: 'p2', name: 'PlayerB', color: 'blue', startPlayer: false },
-    { id: 'p3', name: 'PlayerC', color: 'black', startPlayer: false },
-    { id: 'p4', name: 'PlayerD', color: 'yellow', startPlayer: false },
-    { id: 'p5', name: 'PlayerE', color: 'green', startPlayer: false },
-    { id: 'p6', name: 'PlayerF', color: 'purple', startPlayer: false },
+    { id: 'p1', name: defaultSandboxPlayerNames[0], color: 'red', startPlayer: true },
+    { id: 'p2', name: defaultSandboxPlayerNames[1], color: 'blue', startPlayer: false },
+    { id: 'p3', name: defaultSandboxPlayerNames[2], color: 'black', startPlayer: false },
+    { id: 'p4', name: defaultSandboxPlayerNames[3], color: 'yellow', startPlayer: false },
+    { id: 'p5', name: defaultSandboxPlayerNames[4], color: 'green', startPlayer: false },
+    { id: 'p6', name: defaultSandboxPlayerNames[5], color: 'purple', startPlayer: false },
   ]
   return base.slice(0, count).map((info, index) => {
     const startingFood = snakeOpening || !info.startPlayer ? 3 : 2

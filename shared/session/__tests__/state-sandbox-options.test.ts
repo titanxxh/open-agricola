@@ -10,7 +10,7 @@ describe('sandbox initial state options', () => {
     })
 
     expect(state.players).toHaveLength(4)
-    expect(state.players.map((player) => player.name)).toEqual(['playerA', 'playerB', 'playerC', 'playerD'])
+    expect(state.players.map((player) => player.name)).toEqual(['Player 1', 'Player 2', 'Player 3', 'Player 4'])
   })
 
   it('supports six stable sandbox players without changing the first four seats', () => {
@@ -21,7 +21,7 @@ describe('sandbox initial state options', () => {
 
     expect(state.players).toHaveLength(6)
     expect(state.players.map((player) => player.id)).toEqual(['p1', 'p2', 'p3', 'p4', 'p5', 'p6'])
-    expect(state.players.map((player) => player.name)).toEqual(['playerA', 'playerB', 'playerC', 'playerD', 'playerE', 'playerF'])
+    expect(state.players.map((player) => player.name)).toEqual(['Player 1', 'Player 2', 'Player 3', 'Player 4', 'Player 5', 'Player 6'])
     expect(state.players.map((player) => player.color)).toEqual(['red', 'blue', 'black', 'yellow', 'green', 'purple'])
     expect(state.players.map((player) => player.startPlayer)).toEqual([true, false, false, false, false, false])
     expect(state.players.every((player) => player.workers.slice(0, 2).every((worker) => worker.isActive))).toBe(true)

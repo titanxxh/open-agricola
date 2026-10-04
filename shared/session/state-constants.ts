@@ -76,7 +76,7 @@ export const normalizeFenceSegments = (
 
 export const defaultSandboxDeckIds = ['A', 'B', 'C', 'D', 'E'] as const
 export type DefaultSandboxDeckId = typeof defaultSandboxDeckIds[number]
-export const defaultSandboxPlayerNames = ['playerA', 'playerB', 'playerC', 'playerD', 'playerE', 'playerF'] as const
+export const defaultSandboxPlayerNames = ['Player 1', 'Player 2', 'Player 3', 'Player 4', 'Player 5', 'Player 6'] as const
 
 export type InitialStateOptions = {
   playerCount?: number

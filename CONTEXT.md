@@ -637,7 +637,7 @@ Future Schedule 中从指定起点开始、长度有限的一段连续轮次；�
 _Avoid_: Exact Future Target、把缺失后缀堆到最后一轮
 
 **Granted Rule Action（授予的规则动作）**:
-卡牌效果直接授予的领域动作，例如 `family-growth`；它不自动包含同名 Action Space 的其他附带动作、占格或小发展机会。
+卡牌效果直接授予的领域动作，例如 `family-growth`；它不自动包含同名 Action Space 的其他附带动作、占格或小改良机会。
 _Avoid_: 展开整个 Action Space、模拟放置工人、继承行动格附带选择
 
 **Action Hook**:

@@ -1046,7 +1046,7 @@ function AbilityPanel({
   ): ChatMessage[] => {
     const typeLabel = cardType === 'occupation'
       ? '职业卡 (Occupation)'
-      : '小发展卡 (Minor Improvement)'
+      : '小改良卡 (Minor Improvement)'
     const contextParts = ['CARD_ID、卡牌类型和卡牌名称必须与当前卡牌完全一致']
     if (cardId.trim()) contextParts.push(`卡牌 ID: ${cardId.trim()}`)
     contextParts.push(`卡牌类型: ${typeLabel}`)
@@ -2187,6 +2187,7 @@ export function AiCardDesigner({
     deck: 'CUSTOM',
     number: 0,
     type: cardType,
+    locales: cardLocales,
     desc: descriptionLines.length > 0
       ? descriptionLines
       : [locale === 'zh' ? '能力说明会在采用代码后显示。' : 'Ability text appears after code is adopted.'],
@@ -2324,7 +2325,7 @@ export function AiCardDesigner({
             {myCards.map(card => (
               <option key={card.id} value={card.id}>
                 {card.name} · {card.card_type === 'minor'
-                  ? (locale === 'zh' ? '小发展' : 'Minor')
+                  ? (locale === 'zh' ? '小改良' : 'Minor')
                   : (locale === 'zh' ? '职业' : 'Occupation')}
               </option>
             ))}
@@ -2488,7 +2489,7 @@ export function AiCardDesigner({
                   <legend>{locale === 'zh' ? '卡牌类型' : 'Card type'}</legend>
                   <div className="ai-card-type-toggle">
                     <button type="button" className={`ai-type-btn${cardType === 'minor' ? ' active' : ''}`} onClick={() => updateCardType('minor')}>
-                      {locale === 'zh' ? '小发展' : 'Minor improvement'}
+                      {locale === 'zh' ? '小改良' : 'Minor improvement'}
                     </button>
                     <button type="button" className={`ai-type-btn${cardType === 'occupation' ? ' active' : ''}`} onClick={() => updateCardType('occupation')}>
                       {locale === 'zh' ? '职业' : 'Occupation'}

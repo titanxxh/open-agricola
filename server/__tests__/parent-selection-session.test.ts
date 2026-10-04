@@ -460,11 +460,11 @@ describe('Parent Card selection setup', () => {
     expect(resp.state.log).toEqual(expect.arrayContaining([
       {
         key: 'log.parentMotherScheduled',
-        params: { player: 'PlayerA', cardId: 'PR02', round: 12, reward: 'field' },
+        params: { player: 'Player 1', cardId: 'PR02', round: 12, reward: 'field' },
       },
       {
         key: 'log.parentMotherScheduled',
-        params: { player: 'PlayerB', cardId: 'PR05', round: 4, reward: 'sheep' },
+        params: { player: 'Player 2', cardId: 'PR05', round: 4, reward: 'sheep' },
       },
     ]))
     expect(resp.state.events).toEqual(expect.arrayContaining([

@@ -353,7 +353,7 @@ describe('ParentSelectionOverlay', () => {
 
     expect(screen.getByRole('heading', { name: '已选卡牌' })).toBeInTheDocument()
     expect(screen.getByText('已选职业（2）')).toBeInTheDocument()
-    expect(screen.getByText('已选小改进（1）')).toBeInTheDocument()
+    expect(screen.getByText('已选小改良（1）')).toBeInTheDocument()
   })
 })
 

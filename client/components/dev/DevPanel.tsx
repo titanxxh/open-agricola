@@ -3,6 +3,7 @@ import type { ChangeEvent } from 'react'
 import type { Locale } from '../../../shared/i18n'
 import { t } from '../../../shared/i18n'
 import type { PlayerState, Resource } from '../../../shared/contract/types'
+import { getPlayerDisplayName } from '../../utils/player-name'
 
 type Props = {
   locale: Locale
@@ -64,9 +65,9 @@ export const DevPanel = ({
       <div className="dev-field">
         <span>{t(locale, 'ui.devPlayer')}</span>
         <select value={devPlayerId} onChange={(event) => setDevPlayerId(event.target.value)}>
-          {players.map((player) => (
+          {players.map((player, index) => (
             <option key={player.id} value={player.id}>
-              {player.name}
+              {getPlayerDisplayName(locale, player.name, index)}
             </option>
           ))}
         </select>
@@ -112,9 +113,10 @@ export const DevPanel = ({
           />
         </div>
         <button className="dev-apply" onClick={applyDevRound}>
-          {t(locale, 'ui.devAdvanceRound')}
+          {t(locale, 'ui.devSetRound')}
         </button>
       </div>
+      <p className="dev-target-hint">{t(locale, 'ui.devSetRoundHint')}</p>
       <div className="dev-row">
         <div className="dev-field">
           <span>{t(locale, 'ui.devCardId')}</span>
