@@ -317,7 +317,7 @@ const useTransportSetup = (
             ws.sendRoomCommand('createRoom', {
               maxPlayers,
               hotseat,
-              name: displayName ?? playerParam ?? 'Player 1',
+              name: displayName ?? '',
               customCardIds,
               enableCommunityDeck,
               enableParentCards,
@@ -356,7 +356,7 @@ const useTransportSetup = (
         }
         setRoomInUrl(resp.roomId)
         playerIndexRef.current = resp.playerIndex
-        const creatorName = displayName ?? playerParam ?? 'Player 1'
+        const creatorName = displayName ?? ''
         waitForPlayers(
           resp.roomId,
           resp.playerIndex,
@@ -415,7 +415,7 @@ const useTransportSetup = (
           ws.sendRoomCommand('joinRoom', {
             roomId: roomId!,
             intent: contextRoomId ? 'resume' : 'join',
-            name: displayName ?? playerParam ?? 'Player 2',
+            name: displayName ?? '',
             requestedPlayerIndex,
           })
         })

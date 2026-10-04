@@ -52,6 +52,36 @@ const markRoomStarted = (ctx: ReturnType<typeof newCtx>) => {
 }
 
 describe('handleCreateRoom', () => {
+  it.each([undefined, 'Player 6'])('preserves name provenance through join, rejoin and rematch for %s', (name) => {
+    const deps = newDeps()
+    const host = newCtx(deps)
+    host.currentUserId = 'u1'
+    dispatch(host, { type: 'createRoom', maxPlayers: 2, name })
+    for (const player of host.currentRoom!.session.state.players) {
+      player.minorHand = ['__test_placeholder__']
+      player.occupationHand = ['__test_placeholder__']
+    }
+    const expectedHost = { name: name ?? 'Player 1', nameIsDefault: name === undefined }
+    expect(host.currentRoom!.session.state.players[0]).toMatchObject(expectedHost)
+
+    const guest = newCtx(deps)
+    guest.currentUserId = 'u2'
+    dispatch(guest, { type: 'joinRoom', roomId: host.currentRoom!.id })
+    expect(host.currentRoom!.status).toBe('playing')
+    expect(host.currentRoom!.session.state.players[0]).toMatchObject(expectedHost)
+    expect(host.currentRoom!.session.state.players[1]).toMatchObject({ name: 'Player 2', nameIsDefault: true })
+
+    const rejoined = newCtx(deps)
+    rejoined.currentUserId = 'u2'
+    dispatch(rejoined, { type: 'joinRoom', roomId: host.currentRoom!.id, requestedPlayerIndex: 1 })
+    expect(rejoined.currentPlayerIndex).toBe(1)
+    expect(rejoined.currentRoom!.session.state.players[1]).toMatchObject({ name: 'Player 2', nameIsDefault: true })
+
+    dispatch(host, { type: 'newGame', seed: 936 })
+    expect(host.currentRoom!.session.state.players[0]).toMatchObject(expectedHost)
+    expect(host.currentRoom!.session.state.players[1]).toMatchObject({ name: 'Player 2', nameIsDefault: true })
+  })
+
   it('creates a room + sets ctx.currentRoom + sends roomCreated', () => {
     const ctx = newCtx()
     ctx.currentUserId = 'u1'
@@ -507,7 +537,7 @@ describe('handleCreateRoom', () => {
     expect(sentMessagesOf(host)).toContainEqual({
       type: 'roomWaiting',
       roomId: host.currentRoom!.id,
-      players: [{ playerIndex: 0, name: 'Player 1' }],
+      players: [{ playerIndex: 0, name: '' }],
       maxPlayers: 2,
     })
     const replacement = newCtx(deps)

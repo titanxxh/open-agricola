@@ -987,7 +987,7 @@ export const A123_FrameBuilder = defineOccupationCard({
 
 元数据译文中的描述、补充规则和前置条件为空或仅有空白时，各自回退到对应的源码字段。因此，草稿翻译尚未完成时，已翻译的卡名可以与源码描述同时显示。
 
-热座和两种沙盒执行器对未命名座位统一初始化为 `Player N`，并设置 `PlayerState.nameIsDefault = true`。显示边界通过 `client/utils/player-name.ts` 根据这个来源标记和座位号本地化，覆盖交接提示、玩家条、分数和日志文字。用户提供的名称，包括 `PlayerA`、`playerF` 或 `Player 6` 这样的账号名，均按原文显示。权威改名会清除默认名标记；撤销同时保留当前名称及其来源。Replay 身份覆盖在替换名称时清除默认名标记。显示层不修改权威状态中的名称值。
+热座和两种沙盒执行器对未命名座位统一初始化为 `Player N`，并设置 `PlayerState.nameIsDefault = true`。显示边界通过 `client/utils/player-name.ts` 根据这个来源标记和座位号本地化，覆盖交接提示、玩家条、分数和日志文字。用户提供的名称，包括 `PlayerA`、`playerF` 或 `Player 6` 这样的账号名，均按原文显示。WebSocket 创建和加入只发送用户提供的昵称；缺少昵称时，房间连接元数据中的名称保持为空，加入、重连和新一局都保留引擎默认名来源。权威改名会清除默认名标记；撤销同时保留当前名称及其来源。Replay 身份覆盖在替换名称时清除默认名标记。显示层不修改权威状态中的名称值。
 
 `impl` 是 Card Impl：包含 `modifiers`、`listeners`、`effect`、`prerequisiteCheck`、helper 调用和 `reaches`。modifier 属于 impl，不属于 Card Display。`reaches` 可由构建器静态提取并投影到 manifest 顶层，但不放进 `meta`。
 
