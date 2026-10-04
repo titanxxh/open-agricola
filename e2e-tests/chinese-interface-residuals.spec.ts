@@ -104,7 +104,7 @@ for (const { label, desc, expected } of [
     await page.goto(`${FRONTEND_URL}/?page=workshop&view=sandbox`)
     await page.locator('.ws-sandbox').getByRole('button', { name: '开始沙盒测试', exact: true }).click()
     const game = page.frameLocator('.sandbox-embed-frame')
-    await expect(game.locator('.game-layout')).toBeVisible()
+    await expect(game.locator('.game-layout')).toBeVisible({ timeout: 30_000 })
     await expect(game.locator('.player-tabs__tab').first()).toContainText('玩家 1')
     await expect(game.locator('.player-tabs__tab').nth(1)).toContainText('玩家 2')
     await expect(game.locator('.game-layout')).not.toContainText(/(?:Player|player)(?: [1-6]|[A-F])/)

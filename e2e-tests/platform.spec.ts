@@ -105,7 +105,7 @@ async function createUserViaOAuth(
 }
 
 async function loginThroughPage(page: Page, username: string, password = PASSWORD) {
-  await page.goto(`${FRONTEND_URL}/?page=login`)
+  await page.goto(`${FRONTEND_URL}/?page=login`, { waitUntil: 'domcontentloaded' })
   await page.fill('#username', username)
   await page.fill('#password', password)
   await page.click('button[type="submit"]')
@@ -121,7 +121,7 @@ async function expectNoHorizontalPageScroll(page: Page) {
 test.describe('Platform: auth', () => {
   test('anonymous auth pages expose a mobile-safe native home brand', async ({ page }) => {
     await page.setViewportSize({ width: 390, height: 844 })
-    await page.goto(`${FRONTEND_URL}/?page=login&room=stale&context=old-game`)
+    await page.goto(`${FRONTEND_URL}/?page=login&room=stale&context=old-game`, { waitUntil: 'domcontentloaded' })
 
     const loginHome = page.getByRole('link', { name: '返回大厅' })
     await expect(loginHome).toContainText('Open Agricola')
@@ -129,7 +129,7 @@ test.describe('Platform: auth', () => {
     await loginHome.click()
     expect(new URL(page.url()).search).toBe('')
 
-    await page.goto(`${FRONTEND_URL}/?page=onboarding`)
+    await page.goto(`${FRONTEND_URL}/?page=onboarding`, { waitUntil: 'domcontentloaded' })
     await expect(page.getByRole('link', { name: '返回大厅' }))
       .toContainText('Open Agricola')
     await expect(page.getByRole('heading', { name: '完成注册' })).toBeVisible()
@@ -141,7 +141,7 @@ test.describe('Platform: auth', () => {
       await new Promise(resolve => setTimeout(resolve, 800))
       await route.continue()
     })
-    await page.goto(`${FRONTEND_URL}/?page=login`)
+    await page.goto(`${FRONTEND_URL}/?page=login`, { waitUntil: 'domcontentloaded' })
     await expect(page.getByRole('progressbar')).toBeVisible()
     await expect(page.getByRole('link', { name: '返回大厅' })).toBeVisible()
     await expect(page.locator('#username')).toBeVisible()
@@ -170,7 +170,7 @@ test.describe('Platform: auth', () => {
     })
     await page.context().addCookies(cookies.map(header => cookieFromSetCookie(header)))
 
-    await page.goto(`${FRONTEND_URL}/?page=onboarding`)
+    await page.goto(`${FRONTEND_URL}/?page=onboarding`, { waitUntil: 'domcontentloaded' })
     await page.fill('#onboarding-username', username)
     await page.fill('#onboarding-password', PASSWORD)
     await page.fill('#onboarding-confirm-password', PASSWORD)
@@ -195,7 +195,7 @@ test.describe('Platform: auth', () => {
     })
     await page.context().addCookies(cookies.map(header => cookieFromSetCookie(header)))
 
-    await page.goto(`${FRONTEND_URL}/?page=onboarding`)
+    await page.goto(`${FRONTEND_URL}/?page=onboarding`, { waitUntil: 'domcontentloaded' })
     await page.fill('#onboarding-username', username)
     await page.fill('#onboarding-password', PASSWORD)
     await page.fill('#onboarding-confirm-password', PASSWORD)
@@ -207,7 +207,7 @@ test.describe('Platform: auth', () => {
   })
 
   test('register tab offers password/email and OAuth registration paths', async ({ page }) => {
-    await page.goto(`${FRONTEND_URL}/?page=login`)
+    await page.goto(`${FRONTEND_URL}/?page=login`, { waitUntil: 'domcontentloaded' })
     await page.getByRole('tab', { name: '注册' }).click()
     const localForm = page.getByRole('form', { name: '使用用户名和邮箱注册' })
     const providerGroup = page.getByRole('group', { name: '其他注册方式' })
@@ -219,7 +219,7 @@ test.describe('Platform: auth', () => {
   })
 
   test('expired onboarding replaces the form and returns to registration', async ({ page }) => {
-    await page.goto(`${FRONTEND_URL}/?page=onboarding`)
+    await page.goto(`${FRONTEND_URL}/?page=onboarding`, { waitUntil: 'domcontentloaded' })
     await page.fill('#onboarding-username', `expired_${RUN_ID}`)
     await page.fill('#onboarding-password', PASSWORD)
     await page.fill('#onboarding-confirm-password', PASSWORD)
@@ -234,7 +234,7 @@ test.describe('Platform: auth', () => {
   test('wrong password is rejected with localized message', async ({ page, request }) => {
     const username = `e2e_badpw_${RUN_ID}`
     await createUserViaOAuth(request, username, { password: PASSWORD })
-    await page.goto(`${FRONTEND_URL}/?page=login`)
+    await page.goto(`${FRONTEND_URL}/?page=login`, { waitUntil: 'domcontentloaded' })
     await page.fill('#username', username)
     await page.fill('#password', 'wrongpass123')
     await page.click('button[type="submit"]')
@@ -252,7 +252,7 @@ test.describe('Platform: auth', () => {
     })
     await page.context().addCookies(cookies.map(header => cookieFromSetCookie(header)))
 
-    await page.goto(`${FRONTEND_URL}/?page=onboarding`)
+    await page.goto(`${FRONTEND_URL}/?page=onboarding`, { waitUntil: 'domcontentloaded' })
     await page.fill('#onboarding-username', username)
     await page.fill('#onboarding-password', PASSWORD)
     await page.fill('#onboarding-confirm-password', PASSWORD)
@@ -285,7 +285,7 @@ test.describe('Platform: auth', () => {
     const { cookies } = await callOAuthHelper(request, auth.provider, auth.profile)
     await page.context().addCookies(cookies.map(header => cookieFromSetCookie(header)))
 
-    await page.goto(`${FRONTEND_URL}/?page=lobby`)
+    await page.goto(`${FRONTEND_URL}/?page=lobby`, { waitUntil: 'domcontentloaded' })
     await expect(page.locator('text=创建多人游戏')).toBeVisible({ timeout: 15000 })
     await expect(page.locator('#onboarding-username')).toHaveCount(0)
   })
@@ -327,14 +327,14 @@ test.describe('Platform: auth', () => {
   })
 
   test('non-fixed devMode url cannot bypass auth', async ({ page }) => {
-    await page.goto(`${FRONTEND_URL}/?page=game&transport=ws&room=abc123&player=p1&devMode=1`)
+    await page.goto(`${FRONTEND_URL}/?page=game&transport=ws&room=abc123&player=p1&devMode=1`, { waitUntil: 'domcontentloaded' })
     await expect(page.locator('#username')).toBeVisible({ timeout: 10000 })
   })
 })
 
 test.describe('Platform: lobby page', () => {
   test('shows login form when not authenticated', async ({ page }) => {
-    await page.goto(`${FRONTEND_URL}/?page=lobby`)
+    await page.goto(`${FRONTEND_URL}/?page=lobby`, { waitUntil: 'domcontentloaded' })
     await expect(page.locator('#username')).toBeVisible({ timeout: 10000 })
   })
 
@@ -342,7 +342,7 @@ test.describe('Platform: lobby page', () => {
     const username = `e2e_lobby_${RUN_ID}`
     await createUserViaOAuth(request, username, { password: 'lobby123' })
     await loginThroughPage(page, username, 'lobby123')
-    await expect(page.locator('text=单人模式')).toBeVisible()
+    await expect(page.getByRole('button', { name: '本地热座', exact: true })).toBeVisible()
     await expect(page.locator('text=进入卡牌工坊')).toBeVisible()
   })
 
@@ -368,7 +368,7 @@ test.describe('Platform: lobby page', () => {
     await createUserViaOAuth(request, username, { password: 'settings123' })
     await loginThroughPage(page, username, 'settings123')
 
-    await page.goto(`${FRONTEND_URL}/?page=settings&room=stale&view=profile&bugReport=draft-e2e`)
+    await page.goto(`${FRONTEND_URL}/?page=settings&room=stale&view=profile&bugReport=draft-e2e`, { waitUntil: 'domcontentloaded' })
     await expect(page.getByRole('heading', { name: '账户设置' })).toBeVisible({ timeout: 15000 })
 
     const homeLink = page.getByRole('link', { name: '返回大厅' })
@@ -377,7 +377,7 @@ test.describe('Platform: lobby page', () => {
     await expectNoHorizontalPageScroll(page)
     await homeLink.click()
 
-    await expect(page.getByText('单人模式')).toBeVisible()
+    await expect(page.getByRole('button', { name: '本地热座', exact: true })).toBeVisible()
     await expect(page.getByRole('link', { name: '返回大厅' })).toBeVisible()
     await expectNoHorizontalPageScroll(page)
     expect(Object.fromEntries(new URL(page.url()).searchParams)).toEqual({
@@ -386,13 +386,17 @@ test.describe('Platform: lobby page', () => {
   })
 })
 
-test.describe('Platform: single-player game', () => {
+test.describe('Platform: local hotseat game', () => {
   test('starts and shows game board', async ({ page, request }) => {
     const username = `e2e_sp_${RUN_ID}`
     await createUserViaOAuth(request, username, { password: 'single123' })
     await loginThroughPage(page, username, 'single123')
 
-    await page.click('text=单人模式')
+    await page.getByRole('button', { name: '本地热座', exact: true }).click()
+    await page.getByRole('button', { name: '开始热座对局', exact: true }).click()
+    const handoff = page.getByRole('dialog', { name: 'Hotseat handoff' })
+    await expect(handoff).toBeVisible()
+    await handoff.getByRole('button').click()
     await expect(page.locator('.header-compact')).toBeVisible({ timeout: 15000 })
     const homeLink = page.getByRole('link', { name: '返回大厅' })
     await expect(homeLink).toContainText('Open Agricola')
@@ -420,7 +424,7 @@ test.describe('Platform: single-player game', () => {
     await expectNoHorizontalPageScroll(page)
     await homeLink.click()
 
-    await expect(page.getByText('单人模式')).toBeVisible()
+    await expect(page.getByRole('button', { name: '本地热座', exact: true })).toBeVisible()
     expect(new URL(page.url()).search).toBe('')
   })
 })
@@ -482,7 +486,7 @@ test.describe('Platform: workshop', () => {
     await expectNoHorizontalPageScroll(page)
     await homeLink.click()
 
-    await expect(page.getByText('单人模式')).toBeVisible()
+    await expect(page.getByRole('button', { name: '本地热座', exact: true })).toBeVisible()
     expect(new URL(page.url()).search).toBe('')
   })
 })

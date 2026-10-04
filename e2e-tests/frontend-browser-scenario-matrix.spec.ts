@@ -120,7 +120,7 @@ const openStandaloneSandbox = async (
   variants: VariantScenario = { seasons: false, moor: false },
 ) => {
   await setLocale(page, locale.locale)
-  await page.goto(`${FRONTEND_URL}/?page=workshop&player=p1&devMode=1&bg=summer-1`)
+  await page.goto(`${FRONTEND_URL}/?page=workshop&player=p1&devMode=1&bg=summer-1`, { waitUntil: 'domcontentloaded' })
   await expect(page.getByTestId('workshop-root')).toBeVisible({ timeout: 30_000 })
   await page.evaluate((nextLocale) => {
     localStorage.setItem('open-agricola-locale-v2', nextLocale)
@@ -128,6 +128,7 @@ const openStandaloneSandbox = async (
   await configureSandbox(page, variants)
   await page.goto(
     `${FRONTEND_URL}/?page=game&player=p1&embedded=1&devMode=1&bg=summer-1&sandboxRun=55000`,
+    { waitUntil: 'domcontentloaded' },
   )
   await expect(page.locator('.game-layout')).toBeVisible({ timeout: 30_000 })
 }
@@ -411,6 +412,7 @@ test.describe('iOS Safari browser smoke @webkit @ios-safari', () => {
     expect(shell.backgroundAttachment).toBe('scroll')
     expect(shell.farmTouchAction).toMatch(/pinch-zoom|manipulation/)
 
+    await page.locator('.action-board-precision-toggle').click()
     await page.locator('[data-action-id="farmland"] button').first().click()
     await expect(page.locator('.action-board')).toBeVisible()
     await expect(page.locator('.farm-grid')).toBeVisible()
