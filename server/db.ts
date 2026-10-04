@@ -1,3 +1,4 @@
+import { ROOM_HISTORY_SCHEMA } from './game/persistence/room-history-store'
 import Database from 'better-sqlite3'
 import { join } from 'node:path'
 import { mkdirSync } from 'node:fs'
@@ -985,6 +986,10 @@ export function runMigrations(
     {
       version: 31,
       sql: 'ALTER TABLE game_result_players ADD COLUMN name_is_default INTEGER NOT NULL DEFAULT 0;',
+    },
+    {
+      version: 32,
+      sql: ROOM_HISTORY_SCHEMA,
     },
   ]
 

@@ -1,3 +1,4 @@
+import { captureStateWithHistory } from './history-streams'
 import type {
   ActionSpace,
   GameSeed,
@@ -196,8 +197,8 @@ export const serializeSessionSnapshot = (
   state: GameState,
   session: SessionCursorSource,
 ): PersistedSessionSnapshot => ({
-  state: JSON.parse(JSON.stringify(state)) as SerializedAuthoritativeGameState,
-  frame: session.withCtx(() => serializeState(state, {})),
+  state: captureStateWithHistory(state) as SerializedAuthoritativeGameState,
+  frame: session.withCtx(() => captureStateWithHistory(serializeState(state, {}))),
   sessionCursor: session.createSessionPrivateCursor(),
 })
 
