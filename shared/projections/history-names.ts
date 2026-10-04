@@ -6,13 +6,20 @@ export const projectHistoryLogNames = (entry: LogEntry, roles: Record<string, st
   for (const [path, playerId] of Object.entries(roles ?? {})) {
     const keys = path.split('.')
     if (keys[0] !== 'params' || !['player', 'playerName', 'fromPlayer', 'toPlayer'].includes(keys.at(-1)!) || names[playerId] === undefined) continue
-    projected ??= JSON.parse(JSON.stringify(entry)) as LogEntry
-    let target = projected as unknown as Record<string, unknown>
-    for (const key of keys.slice(0, -1)) {
-      const child = target[key]
-      if (!child || typeof child !== 'object') { target = {}; break }
-      target = child as Record<string, unknown>
+    const parentKeys = keys.slice(0, -1)
+    const parent = (value: LogEntry): Record<string, unknown> | undefined => {
+      let target = value as unknown as Record<string, unknown>
+      for (const key of parentKeys) {
+        const child = target[key]
+        if (!child || typeof child !== 'object') return undefined
+        target = child as Record<string, unknown>
+      }
+      return target
     }
+    const current = parent(projected ?? entry)
+    if (!current || current[keys.at(-1)!] === names[playerId]) continue
+    projected ??= JSON.parse(JSON.stringify(entry)) as LogEntry
+    const target = parent(projected)!
     target[keys.at(-1)!] = names[playerId]
   }
   return projected ?? entry
