@@ -165,6 +165,44 @@ for (const { label, desc, expected } of [
   })
 }
 
+for (const translated of [
+  { rules: ['只有补充规则译文。'], prerequisite: '' },
+  { rules: [], prerequisite: '1 张职业' },
+]) {
+  test(`manual localization preserves an independent translated field: ${JSON.stringify(translated)}`, async ({ page, request }) => {
+    await page.addInitScript(() => {
+      localStorage.setItem('open-agricola-locale-v2', 'zh')
+      localStorage.removeItem('open-agricola-llm-config')
+    })
+    const cookie = await signIn(page, request)
+    const cardId = `CUSTOM_IndependentLocale_${Date.now()}`
+    const created = await request.post(`${BACKEND_URL}/api/workshop/cards`, {
+      headers: { Cookie: `oa_session=${cookie}` },
+      data: { card_id: cardId, card_type: 'minor', name: 'Independent locale', description: '', status: 'draft',
+        card_json: { id: cardId, name: 'Independent locale', card_type: 'minor', deck: 'CUSTOM', number: 0,
+          desc: ['Source description.'], rules: ['Source ruling.'], cost: {},
+          locales: { zh: { name: '', desc: [], ...translated } } } },
+    })
+    expect(created.ok(), await created.text()).toBe(true)
+    const card = await created.json()
+    await page.goto(`${FRONTEND_URL}/?page=workshop&view=editor&card=${card.id}`, { waitUntil: 'domcontentloaded' })
+    await page.locator('.aicw-stage-rail button').filter({ hasText: '本地化' }).click()
+    await page.getByRole('button', { name: '开始本地化', exact: true }).click()
+    await page.getByRole('dialog', { name: '本地化', exact: true }).getByRole('button', { name: '保存', exact: true }).click()
+    await page.locator('.aicw-stage-rail button').filter({ hasText: '基础信息' }).click()
+    await expect.poll(async () => {
+      const response = await request.get(`${BACKEND_URL}/api/workshop/cards/${card.id}/workspace`, {
+        headers: { Cookie: `oa_session=${cookie}` },
+      })
+      return (await response.json()).workspace.draft.cardJson.locales.zh
+    }).toMatchObject({ name: '', desc: [], rules: translated.rules })
+    await page.reload({ waitUntil: 'domcontentloaded' })
+    const preview = page.locator('.aicw-preview-pane .player-card')
+    await expect(preview.locator('.card-desc')).toContainText('Source description.')
+    await expect(preview).toContainText(translated.prerequisite || translated.rules[0])
+  })
+}
+
 for (const locale of ['zh', 'en'] as const) {
   test(`${locale} localizes action templates and tooltips and describes round editing accurately`, async ({ page, request }) => {
     await page.addInitScript((value) => localStorage.setItem('open-agricola-locale-v2', value), locale)

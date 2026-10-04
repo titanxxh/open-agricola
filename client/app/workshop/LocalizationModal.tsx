@@ -176,7 +176,8 @@ export function LocalizationModal({
 
   const handleSave = () => {
     const updated = { ...locales }
-    if (targetName.trim() || targetDesc.trim()) {
+    if (targetName.trim() || targetDesc.trim() || targetPrerequisite.trim()
+      || locales[targetLang]?.rules?.some((line) => line.trim())) {
       updated[targetLang] = {
         ...locales[targetLang],
         name: targetName.trim(),

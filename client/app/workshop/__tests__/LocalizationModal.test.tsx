@@ -49,4 +49,43 @@ describe('LocalizationModal supplemental rules', () => {
       zh: expect.objectContaining({ name: '自动译名', desc: ['自动描述'], rules: ['已有规则'] }),
     })))
   })
+
+  it.each([
+    { rules: ['独立翻译的补充规则'], prerequisite: '' },
+    { rules: [], prerequisite: '1 张职业' },
+  ])('preserves independently translated fields on manual save: %j', async (fields) => {
+    const onSave = vi.fn()
+    render(<LocaleProvider><LocalizationModal currentContent={current} currentLang="en"
+      locales={{ en: current, zh: { name: '', desc: [], ...fields } }}
+      onSave={onSave} onClose={vi.fn()} /></LocaleProvider>)
+    await userEvent.click(screen.getByRole('button', { name: '保存', exact: true }))
+    expect(onSave).toHaveBeenCalledWith(expect.objectContaining({
+      zh: expect.objectContaining({ name: '', desc: [], rules: fields.rules,
+        prerequisite: fields.prerequisite || undefined }),
+    }))
+  })
+
+  it('removes a target locale after its final editable field is cleared', async () => {
+    const onSave = vi.fn()
+    render(<LocaleProvider><LocalizationModal currentContent={current} currentLang="en"
+      locales={{ en: current, zh: { name: '', desc: [], rules: [], prerequisite: '1 张职业' } }}
+      onSave={onSave} onClose={vi.fn()} /></LocaleProvider>)
+    await userEvent.clear(screen.getByLabelText('前置条件'))
+    await userEvent.click(screen.getByRole('button', { name: '保存', exact: true }))
+    expect(onSave.mock.calls[0]![0]).not.toHaveProperty('zh')
+  })
+
+  it('preserves rules-only translations after automatic translation fails', async () => {
+    vi.mocked(getLlmConfig).mockReturnValue({ provider: 'gemini', apiKey: 'test', model: 'test' })
+    vi.mocked(translateCardContent).mockRejectedValue(new Error('translation unavailable'))
+    const onSave = vi.fn()
+    render(<LocaleProvider><LocalizationModal currentContent={current} currentLang="en"
+      locales={{ en: current, zh: { name: '', desc: [], rules: ['已有规则'] } }}
+      onSave={onSave} onClose={vi.fn()} /></LocaleProvider>)
+    await screen.findByText('translation unavailable')
+    await userEvent.click(screen.getByRole('button', { name: '保存', exact: true }))
+    expect(onSave).toHaveBeenCalledWith(expect.objectContaining({
+      zh: expect.objectContaining({ name: '', desc: [], rules: ['已有规则'] }),
+    }))
+  })
 })
