@@ -192,7 +192,8 @@ export const zh = {
         },
       },
     },
-    infirmarySickWorkersOnly: '仅限生病的家庭成员',
+    infirmarySickWorkersOnly: '仅限病人',
+    defaultPlayerName: '玩家 {number}',
     draft: {
       dialog: '卡牌轮抽',
       title: '轮抽 — 第 {round} / {total} 轮',

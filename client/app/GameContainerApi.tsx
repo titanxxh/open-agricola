@@ -4,6 +4,7 @@ import { useLocale } from '../contexts/LocaleContext'
 import { setPage } from '../utils/platform-page-url'
 import type { ActionSpace, FarmTilePosition, InteractionCommand, PlayerState, Resource } from '../../shared/contract/types'
 import { t, type Locale } from '../../shared/i18n'
+import { getPlayerDisplayName } from '../utils/player-name'
 import {
   positionKey,
 } from '../../shared/domain/farm'
@@ -940,18 +941,18 @@ export const GameContainerApi = () => {
       interactionPresentationPlan.kind === 'harvest-feed' && state
         ? {
             playerIndex: interactionPresentationPlan.playerIndex,
-            playerName: state.players[interactionPresentationPlan.playerIndex]?.name ?? '',
+            playerName: getPlayerDisplayName(locale, state.players[interactionPresentationPlan.playerIndex]?.name, interactionPresentationPlan.playerIndex),
             remaining: interactionPresentationPlan.remaining,
             foodUsed: interactionPresentationPlan.foodUsed,
           }
         : null,
-    [interactionPresentationPlan, state],
+    [interactionPresentationPlan, locale, state],
   )
   const heatingPending = useMemo(
     () =>
       interactionPresentationPlan.kind === 'heating' && state
         ? {
-            playerName: state.players[interactionPresentationPlan.playerIndex]?.name ?? '',
+            playerName: getPlayerDisplayName(locale, state.players[interactionPresentationPlan.playerIndex]?.name, interactionPresentationPlan.playerIndex),
             required: interactionPresentationPlan.required,
             maxFuelPayable: interactionPresentationPlan.maxFuelPayable,
             maxWoodConvertibleToFuel: interactionPresentationPlan.maxWoodConvertibleToFuel,
@@ -962,7 +963,7 @@ export const GameContainerApi = () => {
               }),
           }
         : null,
-    [interactionPresentationPlan, isInteractionSubmitDraftRejected, state],
+    [interactionPresentationPlan, isInteractionSubmitDraftRejected, locale, state],
   )
   const canTakeActionForBoard = useCallback((space: ActionSpace, _player: PlayerState) => {
     if (!state || !currentPlayer || !isInteractive) return false
@@ -987,8 +988,8 @@ export const GameContainerApi = () => {
   }, [actionSpaces])
   const playerNames = useMemo(() => {
     if (!state) return {}
-    return Object.fromEntries(state.players.map((player) => [player.id, player.name ?? player.id]))
-  }, [state])
+    return Object.fromEntries(state.players.map((player, index) => [player.id, getPlayerDisplayName(locale, player.name, index)]))
+  }, [locale, state])
   const {
     timelineBuckets: actionLogTimelineBuckets,
     replaySummary,
@@ -1304,15 +1305,16 @@ export const GameContainerApi = () => {
         const key = fm.actionId ?? fm.cardId
         if (!rec[key]) rec[key] = []
         const player = state.players.find((p) => p.id === fm.playerId)
-        rec[key].push({ playerId: fm.playerId, name: player?.name ?? '', color: player?.color ?? 'red', resources: fm.resources })
+        rec[key].push({ playerId: fm.playerId, name: player ? getPlayerDisplayName(locale, player.name, state.players.indexOf(player)) : '', color: player?.color ?? 'red', resources: fm.resources })
       }
     })
     return rec
-  }, [state])
+  }, [locale, state])
 
   const scoreRows = useMemo(
-    () => buildCompactScoreRows(state, scores, selfPlayer?.id ?? null),
-    [state, scores, selfPlayer?.id],
+    () => buildCompactScoreRows(state, scores, selfPlayer?.id ?? null)
+      .map((row) => ({ ...row, name: playerNames[row.id] })),
+    [state, scores, selfPlayer?.id, playerNames],
   )
 
   const resourceKeys = devResourceKeysForState(state)
@@ -1515,7 +1517,7 @@ export const GameContainerApi = () => {
               <div className="ws-invite-players">
                 {wsStatus.players.map(p => (
                   <div key={p.playerIndex} className="ws-invite-player">
-                    {t(locale, 'platform.playerLabel', { index: String(p.playerIndex + 1), name: p.name })}
+                    {t(locale, 'platform.playerLabel', { index: String(p.playerIndex + 1), name: getPlayerDisplayName(locale, p.name, p.playerIndex) })}
                   </div>
                 ))}
               </div>
@@ -1774,7 +1776,7 @@ export const GameContainerApi = () => {
       : null
   const interactionBarModel = buildInteractionBarModel({
     locale,
-    playerNames: state.players.map((p) => p.name ?? `Player ${p.id}`),
+    playerNames: state.players.map((p) => playerNames[p.id]),
     isInteractive,
     pending: {
       animalReorg: pendingAnimalReorg,
@@ -1965,7 +1967,7 @@ export const GameContainerApi = () => {
           currentPlayer={currentPlayer}
           devMode={devMode}
           setDevMode={setDevMode}
-          myPlayerName={selfPlayer?.name ?? null}
+          myPlayerName={selfPlayer ? playerNames[selfPlayer.id] : null}
           isMyTurn={isMyTurn}
           embedded={isEmbedded}
         />
@@ -1986,7 +1988,7 @@ export const GameContainerApi = () => {
           <PlayerTabs
             players={state.players.map((p, i) => ({
               id: p.id,
-              name: p.name,
+              name: playerNames[p.id],
               // PlayerState has no `score` field — pull live total from
               // computeScores summary (falls back to 0 if unavailable).
               score: scoreRows.find((r) => r.id === p.id)?.total ?? 0,

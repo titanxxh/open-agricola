@@ -8,6 +8,7 @@ import { ResourceLine } from '../common/ResourceLine'
 import { ResourceText } from '../common/ResourceText'
 import { getCardDisplayText, translateCardText } from '../common/cardText'
 import { getCardMeta } from '../../services/card-meta'
+import { getPlayerDisplayName } from '../../utils/player-name'
 import { resolveCardDisplayName, resolveCardRef, type CardRef } from './card-reference'
 
 const joinCardNames = (locale: Locale, names: string[]) =>
@@ -328,6 +329,9 @@ export const prepareLogEntry = (
 ): PreparedLogEntry => {
   const cardIds = collectReferencedCardIds(entry.params)
   const params = entry.params ? { ...entry.params } : undefined
+  for (const key of ['player', 'fromPlayer', 'toPlayer', 'actplayer']) {
+    if (params && typeof params[key] === 'string') params[key] = getPlayerDisplayName(locale, params[key])
+  }
   const richParams: Record<string, ReactNode> = {}
   if (params && typeof params.action === 'string') {
     params.action = resolveMaybeTranslationKey(locale, params.action)

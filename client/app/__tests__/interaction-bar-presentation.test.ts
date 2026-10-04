@@ -10,6 +10,18 @@ import { __resetCardsManifestCache, loadCardsManifest } from '../../services/car
 
 const noop = () => {}
 
+it('localizes unnamed and default-named players in switch prompts', () => {
+  const input = baseInput()
+  input.locale = 'zh'
+  input.pending.playerSwitch = { fromPlayerIndex: 0, toPlayerIndex: 1 }
+  for (const names of [[], ['Player 1', 'Player 2']]) {
+    input.playerNames = names
+    expect(buildInteractionBarModel(input).body).toMatchObject({
+      kind: 'playerSwitch', title: { params: { player: '玩家 2' } },
+    })
+  }
+})
+
 beforeAll(async () => {
   __resetCardsManifestCache()
   vi.stubGlobal('fetch', vi.fn().mockResolvedValue({

@@ -979,6 +979,8 @@ export const A123_FrameBuilder = defineOccupationCard({
 
 卡面、触发标签、日志预览和回放渲染共用 `client/components/common/cardText.ts` 的显示 helper。卡名和各个文本字段依次读取规范翻译分区、`meta.locales[locale]`、源码元数据；卡名在源码回退前还支持旧的 `cards.<id>.name` 别名。卡牌专属追问和按钮使用 `{card:<id>}` 引用卡名，由 `translateCardText` 解析，不再向各个字符串复制译名。这些引用只影响显示，不执行规则。
 
+自动生成的 `Player N` 名称在显示边界通过 `client/utils/player-name.ts` 本地化，覆盖交接提示、玩家条、分数和日志文字。用户填写的名称和权威玩家状态保持不变。
+
 `impl` 是 Card Impl：包含 `modifiers`、`listeners`、`effect`、`prerequisiteCheck`、helper 调用和 `reaches`。modifier 属于 impl，不属于 Card Display。`reaches` 可由构建器静态提取并投影到 manifest 顶层，但不放进 `meta`。
 
 `scripts/build-cards-manifest.ts` 必须用 TypeScript AST 静态提取 `meta`，禁止 runtime import Card Source 或 generated catalog。`meta` 只允许 JSON-like 字面量和同文件简单常量引用；`impl` 可自由写运行时代码。
