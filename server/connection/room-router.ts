@@ -1,3 +1,6 @@
+import { withRoomParticipantNames } from './history-presentation'
+import { buildRoomHistoryPage, HistoryBranchChangedError } from '../../shared/session/history-window'
+import { serializeState } from '../../shared/session/serialization'
 import { randomUUID } from 'node:crypto'
 import type { SessionResponse } from '../game/authoritative-session.ts'
 import {
@@ -185,7 +188,7 @@ const sendCommandError = (
   ctx: ConnectionCtx,
   error: string,
   requestId?: string,
-  code?: GameContextErrorCode | 'seat_replaced',
+  code?: GameContextErrorCode | 'seat_replaced' | 'history_branch_changed',
   lifecycle?: GameContextLifecycle,
 ) => {
   ctx.broadcaster.sendTo(ctx.ws, {
@@ -707,7 +710,7 @@ function handleJoinRoom(ctx: ConnectionCtx, msg: Extract<ClientCommand, { type: 
     ? (msg as Record<string, unknown>).name as string
     : ''
   const currentPlayer = room.session.state.players[ctx.currentPlayerIndex]
-  const name = wasPlaying
+  const name = wasPlaying && typeof msg.name !== 'string'
     ? currentPlayer?.nameIsDefault ? '' : currentPlayer?.name ?? requestedName
     : requestedName
   const replacedPlayer = seat.replacedExistingPlayer
@@ -849,6 +852,22 @@ function handleDissolveRoom(ctx: ConnectionCtx, msg: Extract<ClientCommand, { ty
   const result = ctx.lobby.dissolveRoomById(room.id, ctx.currentUserId)
   if (!result.ok) { sendCommandError(ctx, result.error ?? 'dissolve failed', msg.requestId); return }
   ctx.currentRoom = null
+}
+
+function handleGetHistory(ctx: ConnectionCtx, msg: Extract<ClientCommand, { type: 'getHistory' }>): void {
+  const room = requireRoom(ctx, msg.requestId); if (!room) return
+  if (msg.cursor !== undefined && (typeof msg.cursor !== 'string' || msg.cursor.length > 1024)) {
+    sendCommandError(ctx, 'invalid history cursor', msg.requestId); return
+  }
+  try {
+    const canonical = room.customSessionExecutor?.serializedStateForPersistence()?.frame
+      ?? room.session.withCtx(() => serializeState(room.session.state, {}))
+    const viewerPlayerId = room.session.state.players[ctx.currentPlayerIndex]?.id ?? null
+    const page = buildRoomHistoryPage(withRoomParticipantNames(room, canonical), viewerPlayerId, msg.cursor)
+    ctx.broadcaster.sendTo(ctx.ws, { type: 'historyPage', roomId: room.id, requestId: msg.requestId, page })
+  } catch (error) {
+    sendCommandError(ctx, error instanceof Error ? error.message : String(error), msg.requestId, error instanceof HistoryBranchChangedError ? 'history_branch_changed' : undefined)
+  }
 }
 
 function handleGetState(ctx: ConnectionCtx, msg: Extract<ClientCommand, { type: 'getState' }>): void | Promise<void> {
@@ -1240,6 +1259,7 @@ const handlers: { [K in ClientCommand['type']]: Handler<Extract<ClientCommand, {
   joinRoom: handleJoinRoom,
   dissolveRoom: handleDissolveRoom,
   getState: handleGetState,
+  getHistory: handleGetHistory,
   action: handleAction,
   specialAction: handleSpecialAction,
   choice: handleChoice,

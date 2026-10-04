@@ -1,3 +1,4 @@
+import type { RoomHistoryPage } from './history'
 import type { StateUpdateEnvelope } from './game'
 import type { GameContextErrorCode, GameContextLifecycle } from './game-context'
 import type { DraftMode, DraftPickPayload } from '../../draft/types'
@@ -49,6 +50,7 @@ type ClientCommandBody =
   | { type: 'devPlayCard'; playerIndex: number; cardId: string }
   | { type: 'devCreatePasture'; playerIndex: number }
   | { type: 'getState'; unredacted?: boolean }
+  | { type: 'getHistory'; cursor?: string }
   | {
       type: 'createRoom'
       maxPlayers?: number
@@ -90,11 +92,12 @@ type ClientCommandBody =
 export type ClientCommand = ClientCommandBody & { requestId?: string }
 
 export type ServerEvent =
+  | { type: 'historyPage'; roomId: string; page: RoomHistoryPage; requestId?: string }
   | StateUpdateEnvelope
   | {
       type: 'error'
       error: string
-      code?: GameContextErrorCode | 'seat_replaced'
+      code?: GameContextErrorCode | 'seat_replaced' | 'history_branch_changed'
       lifecycle?: GameContextLifecycle
       requestId?: string
     }

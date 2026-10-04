@@ -1,3 +1,4 @@
+import { applyHistoryWindow } from '../../shared/session/history-window'
 import { importRecoveryCatalog, snapshotForWorker } from '../../shared/session/recovery-catalog'
 import { parentPort } from 'node:worker_threads'
 import type { GameSyncPayload } from '../../shared/contract/protocol/game.ts'
@@ -34,6 +35,7 @@ type Success = {
     debug: GameSyncPayload
     spectator: GameSyncPayload
     viewers: Record<string, GameSyncPayload>
+    windows: { spectator: GameSyncPayload; viewers: Record<string, GameSyncPayload> }
   }
   raw?: unknown
 }
@@ -99,7 +101,7 @@ const buildResult = (response: SessionResponse) => {
   return {
     response: responseWithoutState,
     snapshot,
-    payloads: { debug, spectator, viewers },
+    payloads: { debug, spectator, viewers, windows: { spectator: applyHistoryWindow(response.state, spectator, null), viewers: Object.fromEntries(Object.entries(viewers).map(([id, payload]) => [id, applyHistoryWindow(response.state, payload, id)])) } },
   }
 }
 

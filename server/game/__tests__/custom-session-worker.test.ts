@@ -1,3 +1,4 @@
+import { buildRoomHistoryPage } from '../../../shared/session/history-window'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { CustomCardData } from '../../../shared/cards/session-card-context.ts'
 import { validateAndCompileCustomCode } from '../../custom-code/engine.ts'
@@ -77,6 +78,32 @@ describe('custom session executor', () => {
     const nextRoom = setup(customCard)
     expect(nextRoom.executor.reserveWorkerSlot()).toBe(false)
     expect((await rooms[0]!.executor.execute('getState', [])).ok).toBe(true)
+  }, 20_000)
+
+  it('windows Workshop viewers while keeping full history and stable identities available for reads', async () => {
+    const { session, executor } = setup(card('CUSTOM_History'))
+    session.state.players.forEach(player => { player.resources.food = 100 })
+    session.loadState(session.state)
+    for (let index = 0; index < 24; index++) {
+      let response = await executor.execute('getState', [])
+      while (response.interaction.stateId === 'wait') {
+        const request = response.interaction.request
+        if (request.kind !== 'confirm-next-player' && request.kind !== 'confirm-player-switch') throw new Error(request.kind)
+        response = await executor.execute('resolveChoice', [request.kind === 'confirm-next-player' ? request.nextPlayerIndex : request.fromPlayerIndex, 'confirm'])
+      }
+      const space = ['forest', 'reed-bank', 'fishing', 'day-laborer'].find(id => session.getActionAvailability(session.state.currentPlayerIndex)[id])!
+      expect((await executor.execute('takeAction', [session.state.currentPlayerIndex, space])).ok).toBe(true)
+    }
+    const response = await executor.execute('getState', [])
+    const live = buildSessionSyncPayload(session, response, 'p1', 'viewer', true)
+    const raw = executor.serializedStateForPersistence()!.frame
+    expect(live.historyWindow!.operationGroupIds).toHaveLength(20)
+    expect(raw.events.length).toBeGreaterThan(live.state.events.length)
+    const page = buildRoomHistoryPage(raw, 'p1')
+    expect(page.window).toEqual(live.historyWindow)
+    const older = buildRoomHistoryPage(raw, 'p1', page.window.nextCursor!)
+    expect(older.events.length).toBeGreaterThan(0)
+    expect(older.events.length + live.state.events.length).toBe(raw.events.length)
   }, 20_000)
 
   it('keeps the event loop responsive and rolls back a timed-out command', async () => {

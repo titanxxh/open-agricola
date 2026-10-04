@@ -27,6 +27,7 @@ interface Props {
   onReplayStep?: (direction: 'prev' | 'next') => void
   onReplayPlayPause?: () => void
   onReplayLatest?: () => void
+  history?: { canLoadOlder: boolean; loadOlder: () => Promise<void>; loading: boolean; error: boolean; resetNotice: boolean }
   isReplayPlaying?: boolean
 }
 
@@ -136,6 +137,7 @@ export function ActionLog({
   onReplayPlayPause,
   onReplayLatest,
   isReplayPlaying = false,
+  history,
 }: Props) {
   const isTimelineMode = !!timelineBuckets
   const stateLogBuckets = useMemo(
@@ -280,6 +282,16 @@ export function ActionLog({
           </div>
         ))}
       </div>
+      {history && (
+        <div className="action-log__controls" data-testid="room-history-controls">
+          {history.canLoadOlder && <button type="button" className="action-log__control" disabled={history.loading} onClick={() => { void history.loadOlder() }}>
+            {t(locale, history.loading ? 'ui.historyLoading' : 'ui.historyLoadOlder')}
+          </button>}
+          <span role="status" className="action-log__meta">
+            {history.error ? t(locale, 'ui.historyLoadError') : history.resetNotice ? t(locale, 'ui.historyUpdated') : ''}
+          </span>
+        </div>
+      )}
     </div>
   )
 }

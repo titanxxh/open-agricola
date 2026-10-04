@@ -1,3 +1,4 @@
+import type { HistoryWindow } from '../../shared/contract/protocol/history'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { PlayerScoreSummary } from '../../shared/domain'
 import type { ClientInteractionState, GameSyncPayload, PrivateGameEvent } from '../../shared/contract/protocol/game'
@@ -14,6 +15,7 @@ export const useGameSync = () => {
   const [scores, setScores] = useState<PlayerScoreSummary[] | null>(null)
   const [pastureCapacities, setPastureCapacities] = useState<Record<string, Record<string, number>>>({})
   const [error, setError] = useState<string | null>(null)
+  const [historyWindow, setHistoryWindow] = useState<HistoryWindow | undefined>()
   const [historyLength, setHistoryLength] = useState(0)
   const [hasActionStartSnapshot, setHasActionStartSnapshot] = useState(false)
   const [actionAvailability, setActionAvailability] = useState<Record<string, boolean>>({})
@@ -40,6 +42,7 @@ export const useGameSync = () => {
     setScores(payload.scores ?? null)
     setPastureCapacities(payload.pastureCapacities ?? {})
     setError(payload.ok ? null : (payload.error ?? 'unknown error'))
+    setHistoryWindow(payload.historyWindow)
     setHistoryLength(payload.historyLength ?? 0)
     setHasActionStartSnapshot(payload.hasActionStartSnapshot ?? false)
     setActionAvailability(payload.actionAvailability ?? {})
@@ -54,6 +57,7 @@ export const useGameSync = () => {
     pastureCapacities,
     error,
     historyLength,
+    historyWindow,
     hasActionStartSnapshot,
     actionAvailability,
     cardAvailability,

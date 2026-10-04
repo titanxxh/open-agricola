@@ -1,3 +1,4 @@
+import { registerHistoryParticipantRoles } from '../session/history-streams'
 import type {
   ActionDetailLoggedEvent,
   ActionAccumulatedEvent,
@@ -1156,4 +1157,22 @@ export const buildLogPresentationPlan = (
 }
 
 export const eventsToLogEntries = (events: readonly GameEvent[], ctx: EventLogMapperContext): LogEntry[] =>
-  buildLogPresentationPlan(events, ctx).rows.map((row) => row.logEntry)
+  buildLogPresentationPlan(events, ctx).rows.map(row => {
+    const event = events.find(event => event.id === row.sourceEventRef.id && event.seq === row.sourceEventRef.seq)
+    if (event) {
+      const source = event as unknown as Record<string, unknown>
+      const location = (key: string): string | undefined => (source[key] as { playerId?: string } | undefined)?.playerId
+      const ids = {
+        player: (source.playerId as string | undefined) ?? location('to') ?? location('paidFrom') ?? event.actorPlayerId ?? event.targetPlayerId,
+        playerName: (source.playerId as string | undefined) ?? event.actorPlayerId ?? event.targetPlayerId,
+        fromPlayer: (source.fromPlayerId as string | undefined) ?? location('from') ?? event.actorPlayerId,
+        toPlayer: (source.toPlayerId as string | undefined) ?? location('to') ?? event.targetPlayerId,
+      }
+      const roles: Record<string, string> = {}
+      for (const [key, playerId] of Object.entries(ids)) {
+        if (playerId && typeof row.logEntry.params?.[key] === 'string' && row.logEntry.params[key] === ctx.playerNames[playerId]) roles[`params.${key}`] = playerId
+      }
+      registerHistoryParticipantRoles(row.logEntry, roles)
+    }
+    return row.logEntry
+  })

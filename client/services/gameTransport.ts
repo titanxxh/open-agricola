@@ -1,3 +1,4 @@
+import type { RoomHistoryPage } from '../../shared/contract/protocol/history'
 import type { GameSyncPayload, StateUpdateEnvelope } from '../../shared/contract/protocol/game'
 import type { ClientCommand, ServerEvent } from '../../shared/contract/protocol/ws'
 import type { DraftPickPayload } from '../../shared/draft/types'
@@ -36,6 +37,7 @@ type MoorSpecialActionPayload = {
 
 export interface GameTransport {
   getState(options?: GetStateOptions): Promise<GameSyncPayload>
+  getHistory?(cursor?: string): Promise<RoomHistoryPage>
   takeAction(playerIndex: number, spaceId: string): Promise<GameSyncPayload>
   takeSpecialAction(
     playerIndex: number,
@@ -242,6 +244,7 @@ export class WsGameTransport implements GameTransport {
     resolve: (payload: GameSyncPayload) => void
     reject: (err: Error) => void
   }>()
+  private pendingHistoryResolvers = new Map<string, { resolve: (page: RoomHistoryPage) => void; reject: (error: Error) => void }>()
   private reqCounter = 0
   private readonly wsUrl: string
   roomId: string
@@ -270,6 +273,7 @@ export class WsGameTransport implements GameTransport {
       }
       this.ws.onclose = () => {
         this._connected = false
+        this.rejectPending(new Error('WebSocket disconnected'))
       }
 
       this.ws.onopen = () => {
@@ -294,7 +298,12 @@ export class WsGameTransport implements GameTransport {
           return
         }
 
-        if (msg.type === 'stateUpdate') {
+        if (msg.type === 'historyPage') {
+          if (msg.requestId) {
+            this.pendingHistoryResolvers.get(msg.requestId)?.resolve(msg.page)
+            this.pendingHistoryResolvers.delete(msg.requestId)
+          }
+        } else if (msg.type === 'stateUpdate') {
           const envelope = msg as StateUpdateEnvelope
           this.roomId = envelope.roomId
           this.listeners.forEach((cb) => cb(envelope.payload, envelope.roomId))
@@ -313,6 +322,13 @@ export class WsGameTransport implements GameTransport {
           this.persistenceStatusListeners.forEach((cb) => cb(false))
         } else if (msg.type === 'error') {
           if (msg.requestId) {
+            this.pendingHistoryResolvers.get(msg.requestId)?.reject(Object.assign(new Error(msg.error), { code: msg.code }))
+            this.pendingHistoryResolvers.delete(msg.requestId)
+          } else {
+            this.pendingHistoryResolvers.forEach(pending => pending.reject(new Error(msg.error)))
+            this.pendingHistoryResolvers.clear()
+          }
+          if (msg.requestId) {
             const pending = this.pendingResolvers.get(msg.requestId)
             if (pending) {
               pending.reject(new Error(msg.error))
@@ -326,6 +342,22 @@ export class WsGameTransport implements GameTransport {
           }
         }
       }
+    })
+  }
+
+  private rejectPending(error: Error): void {
+    this.pendingResolvers.forEach(pending => pending.reject(error))
+    this.pendingResolvers.clear()
+    this.pendingHistoryResolvers.forEach(pending => pending.reject(error))
+    this.pendingHistoryResolvers.clear()
+  }
+
+  getHistory(cursor?: string): Promise<RoomHistoryPage> {
+    return new Promise((resolve, reject) => {
+      if (!this.ws || this.ws.readyState !== WebSocket.OPEN) { reject(new Error('WebSocket not connected')); return }
+      const requestId = `history-${++this.reqCounter}`
+      this.pendingHistoryResolvers.set(requestId, { resolve, reject })
+      this.ws.send(JSON.stringify({ type: 'getHistory', cursor, requestId }))
     })
   }
 
@@ -483,7 +515,7 @@ export class WsGameTransport implements GameTransport {
     this.listeners.clear()
     this.persistenceStatusListeners.clear()
     this.persistencePaused = false
-    this.pendingResolvers.clear()
+    this.rejectPending(new Error('Transport destroyed'))
     if (this.ws) {
       this.ws.close()
       this.ws = null
