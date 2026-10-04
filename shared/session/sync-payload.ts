@@ -33,7 +33,7 @@ export function buildSyncPayload(
   const ctx = { engineStack: core.getEngineStack() }
   const defs = core.getCustomCardDefs()
   const canonicalState = serializedState ?? core.withCtx(() => serializeState(resp.state, ctx))
-  if (mode === 'viewer') describeHistory(canonicalState)
+  if (mode !== 'debug') describeHistory(canonicalState)
   const base: GameSyncPayload = {
     state: mode === 'debug'
       ? canonicalState
@@ -80,6 +80,6 @@ export function buildSyncPayload(
   if (mode === 'debug' && core.cardWarnings.length > 0) {
     base.cardWarnings = [...core.cardWarnings]
   }
-  const payload = windowed && mode === 'viewer' ? applyHistoryWindow(canonicalState, base, viewerPlayerId) : base
-  return mode === 'viewer' ? { ...payload, state: projectHistoryStateNames(payload.state) } : payload
+  const payload = windowed && mode !== 'debug' ? applyHistoryWindow(canonicalState, base, viewerPlayerId) : base
+  return mode !== 'debug' ? { ...payload, state: projectHistoryStateNames(payload.state) } : payload
 }

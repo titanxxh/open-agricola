@@ -44,6 +44,10 @@ describe('complete operation-group Room history pages', () => {
     const beforeHash = frameHash(canonical as unknown as JsonValue)
     const beforeCursor = session.createSessionPrivateCursor()
     const full = session.buildSyncPayload(session.getState(), 'p1').state
+    const dev = session.buildSyncPayload(session.getState(), 'p1', 'dev-viewer', undefined, true)
+    expect(dev.historyWindow!.operationGroupIds).toHaveLength(HISTORY_WINDOW_GROUPS)
+    expect(dev.state.roundActionOrder).toEqual(session.state.roundActionOrder)
+    expect(dev.state).not.toHaveProperty('gameSeed')
     const pages = [buildRoomHistoryPage(canonical, 'p1')]
     expect(pages[0]!.window.operationGroupIds).toHaveLength(HISTORY_WINDOW_GROUPS)
     while (pages.at(-1)!.window.nextCursor) pages.push(buildRoomHistoryPage(canonical, 'p1', pages.at(-1)!.window.nextCursor!))

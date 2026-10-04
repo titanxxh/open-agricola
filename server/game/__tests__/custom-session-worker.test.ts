@@ -98,6 +98,10 @@ describe('custom session executor', () => {
     const live = buildSessionSyncPayload(session, response, 'p1', 'viewer', true)
     const raw = executor.serializedStateForPersistence()!.frame
     expect(live.historyWindow!.operationGroupIds).toHaveLength(20)
+    const dev = buildSessionSyncPayload(session, response, 'p1', 'dev-viewer', true)
+    expect(dev.historyWindow).toEqual(live.historyWindow)
+    expect(dev.state.roundActionOrder).toEqual(raw.roundActionOrder)
+    expect(dev.state).not.toHaveProperty('gameSeed')
     expect(raw.events.length).toBeGreaterThan(live.state.events.length)
     const page = buildRoomHistoryPage(raw, 'p1')
     expect(page.window).toEqual(live.historyWindow)
