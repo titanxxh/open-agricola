@@ -1,4 +1,4 @@
-import { ROOM_HISTORY_SCHEMA } from './game/persistence/room-history-store'
+import { ROOM_HISTORY_SCHEMA, ROOM_RECOVERY_SCHEMA } from './game/persistence/room-history-store'
 import Database from 'better-sqlite3'
 import { join } from 'node:path'
 import { mkdirSync } from 'node:fs'
@@ -991,6 +991,7 @@ export function runMigrations(
       version: 32,
       sql: ROOM_HISTORY_SCHEMA,
     },
+    { version: 32, sql: ROOM_RECOVERY_SCHEMA },
   ]
 
   const insert = db.prepare('INSERT INTO schema_version (version) VALUES (?)')

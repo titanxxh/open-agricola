@@ -79,4 +79,40 @@ describe('Room-owned history recovery', () => {
     db.close()
   })
 
+  it('makes ordinary undo reference writes atomic and preserves restart undo', () => {
+    const db = database()
+    let fail = true
+    const persistence = new SqliteRoomPersistence({
+      transaction: db.transaction.bind(db),
+      prepare: (sql: string) => {
+        const statement = db.prepare(sql)
+        if (!sql.includes('INSERT INTO room_recovery_nodes')) return statement
+        return new Proxy(statement, { get(target, key) {
+          if (key === 'run') return (...args: unknown[]) => {
+            if (fail) throw new Error('undo write failed')
+            return Reflect.apply(target.run, target, args)
+          }
+          const value = Reflect.get(target, key)
+          return typeof value === 'function' ? value.bind(target) : value
+        } })
+      },
+    })
+    const game = session()
+    const before = JSON.parse(JSON.stringify(game.getState()))
+    expect(game.takeAction(0, 'farm-expansion').ok).toBe(true)
+    const captured = serializeSessionSnapshot(game.state, game)
+    expect(() => persistence.save('r', captured, meta)).toThrow('undo write failed')
+    expect(persistence.load('r')).toBeNull()
+    fail = false
+    persistence.save('r', captured, meta)
+    const restored = new GameSession(rehydrateState(persistence.load('r')!.serialized!))
+    expect(restored.undoAction().ok).toBe(true)
+    expect(restored.getState().state.players).toEqual(before.state.players)
+    expect(serializeSessionSnapshot(restored.state, restored).state.actionSpaces).toEqual(before.state.actionSpaces)
+    expect(restored.getState().interaction).toEqual(before.interaction)
+    expect(JSON.parse(JSON.stringify(restored.getState().scores))).toEqual(before.scores)
+    db.close()
+  })
+
+
 })

@@ -1,4 +1,4 @@
-import { RoomHistoryStore, RoomHistoryCorruptionError } from './room-history-store'
+import { RoomHistoryStore, RoomHistoryCorruptionError, type PackedRoomSnapshot, type RecoveryNode } from './room-history-store'
 import type { HistoryNode } from '../../../shared/session/history-streams'
 import type Database from 'better-sqlite3'
 import type {
@@ -463,6 +463,7 @@ export class SqliteRoomPersistence implements RoomPersistence {
       values: Record<string, string | number | null>,
       players: RoomMeta['players'],
       nodes: HistoryNode[],
+      recoveryNodes: RecoveryNode[],
     ) => {
       this.upsertActiveContext.run({
         roomId: values.id,
@@ -470,7 +471,7 @@ export class SqliteRoomPersistence implements RoomPersistence {
         now: values.now,
       })
       this.upsertRoom.run(values)
-      this.history.write(String(values.id), nodes)
+      this.history.write(String(values.id), nodes, recoveryNodes)
       savePlayers(String(values.id), Number(values.now), players)
     })
     this.completeRoom = db.transaction((result: GameResult) => {
@@ -482,7 +483,7 @@ export class SqliteRoomPersistence implements RoomPersistence {
       this.completeLegacyContext.run({ roomId: result.roomId, completedAt: result.finishedAt })
       this.deleteRoom.run(result.roomId)
     })
-    this.commitReplayTransaction = db.transaction((commit: ReplayCommit, packed: { json: string; nodes: HistoryNode[] }): ReplayCommitResult => {
+    this.commitReplayTransaction = db.transaction((commit: ReplayCommit, packed: PackedRoomSnapshot): ReplayCommitResult => {
       const existingStep = this.loadReplayStepHash.get(
         commit.roomId,
         commit.step.stepNo,
@@ -539,7 +540,7 @@ export class SqliteRoomPersistence implements RoomPersistence {
       )
       values.stateJson = packed.json
       this.upsertRoom.run(values)
-      this.history.write(commit.roomId, packed.nodes)
+      this.history.write(commit.roomId, packed.nodes, packed.recoveryNodes)
       savePlayers(commit.roomId, commit.step.createdAt, commit.meta.players)
       this.insertReplayStep.run({ roomId: commit.roomId, ...commit.step })
       const advanced = this.advanceReplay.run({
@@ -592,11 +593,11 @@ export class SqliteRoomPersistence implements RoomPersistence {
 
   save(id: string, serialized: PersistedSessionSnapshot | null, meta: RoomMeta): void {
     const now = Date.now()
-    const packed = serialized ? this.history.prepare(id, serialized) : { json: null, nodes: [] }
+    const packed = serialized ? this.history.prepare(id, serialized) : { json: null, nodes: [], recoveryNodes: [] }
     const values = roomValues(id, null, meta, now, null)
     values.stateJson = packed.json
-    this.saveRoom(values, meta.players, packed.nodes)
-    this.history.accept(id, packed.nodes)
+    this.saveRoom(values, meta.players, packed.nodes, packed.recoveryNodes)
+    this.history.accept(id, packed.nodes, packed.recoveryNodes)
   }
 
   commitReplay(commit: ReplayCommit): ReplayCommitResult {
@@ -605,7 +606,7 @@ export class SqliteRoomPersistence implements RoomPersistence {
       const result = this.commitReplayTransaction(commit, packed)
       if (result.kind === 'committed') {
         if (commit.result) this.history.forget(commit.roomId)
-        else this.history.accept(commit.roomId, packed.nodes)
+        else this.history.accept(commit.roomId, packed.nodes, packed.recoveryNodes)
       }
       return result
     } catch (error) {

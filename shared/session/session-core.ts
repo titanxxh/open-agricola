@@ -1,4 +1,5 @@
-import { beginHistoryOperation } from './history-streams'
+import { beginHistoryOperation, captureStateWithHistory } from './history-streams'
+import { cloneStateWithHistory } from './state-bootstrap'
 import { canStartBefore, evaluateFlowDoable, isActionDoableInFlowContext, isFlowDerivedDoable } from '../actions/flow'
 import type {
   DraftGameEvent,
@@ -66,7 +67,6 @@ import type { ReorganizeTrigger } from '../actions/effects/reorganize.ts'
 import {
   createInitialState,
   createRoundOpenById,
-  cloneState,
   emptyResources,
   extendedResourceKeyList,
   harvestRounds,
@@ -984,12 +984,13 @@ export class GameCore {
 
   createSessionPrivateCursor(): SessionPrivateCursor {
     const { state: _state, ...runtime } = this.createCommandCheckpoint()
-    return JSON.parse(JSON.stringify({
-      ...runtime,
+    const { history, ...smallRuntime } = runtime
+    return { ...JSON.parse(JSON.stringify({
+      ...smallRuntime,
       provisionalContinuationScopes: this.provisionalContinuationScopes,
       failedAuthoritativeCommands: this.failedAuthoritativeCommands,
       nextProvisionalScopeId: this.nextProvisionalScopeId,
-    })) as SessionPrivateCursor
+    })), history: history.slice() } as SessionPrivateCursor
   }
 
   restoreSessionPrivateCursor(cursor: SessionPrivateCursor): void {
@@ -2660,7 +2661,7 @@ export class GameCore {
     }
     const frame = this.engineStack.current()
     const entry: HistoryEntry = {
-      state: cloneState(this.state),
+      state: captureStateWithHistory(this.state),
       // Task 10/11: the previous GameCore pending field is gone; derive the
       // snapshot from the pending envelope. S2 Task 13.6 contracted the
       // HistoryEntry pending snapshot down to a single boolean — `undoStep()`
@@ -2688,7 +2689,7 @@ export class GameCore {
   }
 
   private restoreHistory(entry: HistoryEntry) {
-    this.state = preservePlayerDisplayNames(this.state, cloneState(entry.state))
+    this.state = preservePlayerDisplayNames(this.state, cloneStateWithHistory(entry.state))
     // Task 10/11: the previous GameCore pending field was deleted from
     // `GameState`. S2 Task 13.6 collapsed the HistoryEntry pending snapshot to a single boolean
     // (`hadChoicePending`) consumed by `undoStep()`'s `canRestorePriorChoice`
