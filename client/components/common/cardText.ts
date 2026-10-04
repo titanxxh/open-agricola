@@ -65,6 +65,11 @@ export const getCardDisplayName = (
   return meta?.name || humanizeCardId(cardId)
 }
 
+const localizedLinesOrSource = (localized: string[] | undefined, source: string[] | undefined): string => {
+  const text = localized?.join('\n')
+  return text?.trim() ? text : (source ?? []).join('\n')
+}
+
 export const getCardDisplayText = (
   locale: Locale,
   cardType: CardType,
@@ -79,11 +84,11 @@ export const getCardDisplayText = (
     const translated = t(locale, key)
     return translated === key ? fallback : translated
   }
-  const prerequisite = localized?.prerequisite ?? meta.prerequisite
+  const prerequisite = localized?.prerequisite?.trim() ? localized.prerequisite : meta.prerequisite
   return {
     name: getCardDisplayName(locale, cardType, cardId, meta),
-    description: field('description', (localized?.desc ?? meta.desc ?? []).join('\n')),
-    rules: field('rules', (localized?.rules ?? meta.rules ?? []).join('\n')),
+    description: field('description', localizedLinesOrSource(localized?.desc, meta.desc)),
+    rules: field('rules', localizedLinesOrSource(localized?.rules, meta.rules)),
     prerequisite: field('prerequisite', typeof prerequisite === 'string' ? prerequisite : '') || undefined,
   }
 }
