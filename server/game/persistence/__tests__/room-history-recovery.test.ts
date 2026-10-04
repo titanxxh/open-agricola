@@ -5,6 +5,7 @@ import { GameSession } from '../../authoritative-session'
 import { rehydrateState, serializeSessionSnapshot } from '../../../../shared/session/serialization'
 import { SqliteRoomPersistence } from '../sqlite-adapter'
 import { RoomHistoryCorruptionError } from '../room-history-store'
+import { parseRoomBody } from '../room-body-codec'
 import type { RoomMeta } from '../room-persistence'
 
 const meta: RoomMeta = { createdBy: null, maxPlayers: 2, customCardDbIds: [], status: 'playing', players: [] }
@@ -172,7 +173,17 @@ describe('Room-owned history recovery', () => {
     expect(persistence.load('r')).toBeNull()
     fail = false
     persistence.save('r', snapshot, meta)
-    const restored = new GameSession(rehydrateState(persistence.load('r')!.serialized!))
+    const saved = persistence.load('r')!.serialized!
+    expect(saved).toEqual(JSON.parse(JSON.stringify(snapshot)))
+    const checkpoints = db.prepare("SELECT body_json FROM room_recovery_nodes WHERE room_id = 'r' AND kind = 'checkpoint'").all() as { body_json: string }[]
+    expect(checkpoints.length).toBeGreaterThan(0)
+    for (const checkpoint of checkpoints) {
+      expect(JSON.parse(checkpoint.body_json)).toMatchObject({ roomBodyEncoding: 'gzip-base64-v1' })
+      const body = parseRoomBody(checkpoint.body_json) as { state: object }
+      expect(body.state).toHaveProperty('historyStreams')
+      expect(body.state).not.toHaveProperty('log')
+    }
+    const restored = new GameSession(rehydrateState(saved))
     expect(restored.getState()).toEqual(game.getState())
     expect(restored.undoStep().ok).toBe(false)
     response = restored.resolveChoice(1, '__skip__')

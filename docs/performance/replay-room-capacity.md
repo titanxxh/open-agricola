@@ -16,6 +16,66 @@ Before implementation, measure repeated runs of that baseline and freeze the min
 
 The completed group is assessed below against these unchanged objectives. The original capacity measurements are retained separately for context.
 
+### Issue #941 evaluation
+
+The final candidate covers all three agreed directions: private session-cursor change detection, serialization reuse and canonical Replay Frame hashing. Five alternating fresh-process control/candidate pairs and five independent write traces pass all twelve timing, RSS and persistence-write checks; both 30-Room capacity probes also pass. Functional verification also passes; the implementation is ready for review against the unchanged Issue #941 acceptance criteria. The duplicate cursor-hash calculation was already fixed by Issue #948 in PR #957 and is not counted as a new improvement.
+
+The source baseline is `bd43a15bde1ee177dc5820924929bc69810569b3`. Before implementation, five runs of the unchanged 136-command two-player and 277-command four-player fixtures froze the thresholds in [`room-commit-baseline.json`](room-commit-baseline.json). Both versions use Node 24.19.0, a 2 CPU / 2 GiB cgroup and unchanged SQLite WAL, `synchronous=NORMAL` and checkpoint settings. Whole-workload CPU includes recovery; action-to-broadcast latency ends at the in-process committed socket sink and excludes network transport. CPU profiles, syscall tracing and extra logical-byte measurement are separate from acceptance timing.
+
+For each timing metric, the required reduction is the greater of 5% or twice the largest five-run deviation from the baseline median, rounded up to a whole percentage point. RSS and DB/WAL regression allowances are the baseline variation rounded up. These requirements were frozen before candidate measurements and remain unchanged:
+
+| Players | CPU reduction | p50 reduction | p95 reduction | p99 reduction | Maximum RSS regression | Maximum DB/WAL write regression |
+| ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| 2 | 7% | 15% | 24% | 41% | 18% | 1% |
+| 4 | 14% | 8% | 5% | 13% | 19% | 1% |
+
+The following medians come from the five final pairs in `final-pairs.json`; the control column is the contemporaneous baseline population, not the earlier threshold-setting population. Every workload and metric passes independently.
+
+| Players | CPU control → candidate | CPU reduction | p50 control → candidate | p50 reduction | p95 control → candidate | p95 reduction | p99 control → candidate | p99 reduction |
+| ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| 2 | 2276.928 → 1504.781ms | 33.91% | 9.935 → 7.030ms | 29.23% | 24.886 → 15.544ms | 37.54% | 39.841 → 23.182ms | 41.81% |
+| 4 | 5465.851 → 3404.297ms | 37.72% | 14.642 → 9.581ms | 34.56% | 31.904 → 17.594ms | 44.85% | 40.789 → 29.480ms | 27.73% |
+
+The candidate adopts these mechanisms:
+
+- **Private cursor comparison:** retain an owned comparison value with canonical-JSON-equivalent equality. Compare only when the public Frame is unchanged and no durable transition forces a commit. Restore and frozen retries preserve the accepted comparison baseline; Worker-produced mutable values are copied. Public hashes and content-equivalent no-ops retain their existing semantics.
+- **Serialization reuse:** capture the authoritative core once and share its immutable values with the Frame, while detaching derived display values. A freshly serialized native Frame transfers directly to the committer; Worker snapshots still require an ownership copy, and terminal scores are copied separately. SQLite stores the exact Frame overlay against the captured state, then reconstructs and validates the saved raw Frame without current-rule evaluation. Version 2 writes retain version 1 reads. Small stored core/recovery bodies use gzip level 1 only when its complete envelope is smaller; history nodes, public Replay format, checksums and transaction boundaries retain their contracts.
+- **Canonical encoding:** replace the allocation-heavy object traversal with a direct loop and cache canonical strings only for proven immutable captured history records. This still builds the canonical JSON string before hashing; canonical bytes and SHA-256 values remain unchanged. Shared immutable values also allow delta construction to skip identical subtrees.
+
+Supporting refinements avoid discarded generic query work: evaluate an entry's base predicate only when the strict composite path needs it, and evaluate a flow leaf fallback only when no cost preview supplies the answer. Compute animal zones once per player-display serialization for its four projections. Fence enumeration prunes impossible partial subsets and uses local adjacency traversal while preserving candidate order, affordability and hook evaluation. SQLite skips only equal player-index updates. None of these changes introduces a cross-command rules cache or changes database settings. Ownership and storage contracts are documented in [Architecture](../ARCHITECTURE.md) and [ADR 0021](../adr/0021-room-owned-history-branches-and-recovery-snapshots.md).
+
+Session-wide dirty tracking was not adopted: every mutation, reversal, undo and restore would need a reliable invalidation contract. A global catalog index was not adopted because public catalog arrays and identifiers remain mutable. Caching every complete history-array prefix was rejected because it can retain quadratic canonical-string storage; immutable record caching is the bounded reuse seam. Isolated slice measurements remain diagnostic and do not establish standalone acceptance for each mechanism.
+
+Three earlier five-pair attempts failed the unchanged two-player p99 requirement; each passed the other seven timing checks. All their individual reports, paired populations and failed verdicts are retained separately from the final population:
+
+| Attempt | Two-player p99 control → candidate | Reduction | Required |
+| :--- | ---: | ---: | ---: |
+| Frame overlay and lazy queries | 40.674 → 36.994ms | 9.05% | 41% |
+| gzip bodies and unchanged-seat update elision | 40.029 → 25.881ms | 35.35% | 41% |
+| Native Frame transfer and initial fence pruning | 39.458 → 25.730ms | 34.79% | 41% |
+
+Five independent path-filtered syscall traces supply the candidate DB/WAL medians, compared with the frozen write baseline. SQLite temporary-file writes are excluded and reported separately: median 356,700 bytes for two players and 545,300 for four. Logical snapshot size and normal process write counters are not substitutes for these traces. RSS medians come from the untraced final pairs. All four regression guards pass; `final-acceptance.json` records all twelve checks as passing.
+
+| Players | DB/WAL bytes baseline → candidate | Write reduction | RSS bytes control → candidate | RSS reduction |
+| ---: | ---: | ---: | ---: | ---: |
+| 2 | 21,830,168 → 12,460,336 | 42.92% | 231,272,448 → 226,512,896 | 2.06% |
+| 4 | 55,033,128 → 27,826,344 | 49.44% | 282,841,088 → 252,706,816 | 10.65% |
+
+Both production Durable Room Commit capacity probes pass at 30 ordinary Rooms, with the same trajectory and 0.45125 accepted commands per Room per second. The long probe uses 15 seconds of warmup and 60 seconds of measurement; the late-state probe uses 1 and 5 seconds. Their sampled states contain 139,167 and 165,888 bytes, with 46 and 16 commands remaining. The existing gates remain action p99 <= 250ms, event-loop p99 <= 100ms and RSS <= 1.8 GiB.
+
+| 30-Room probe | Accepted commands | Action p99 | Event-loop p99 | Peak RSS | Result |
+| :--- | ---: | ---: | ---: | ---: | :--- |
+| Long run | 843 | 39.834ms | 33.047ms | 318.9 MiB | PASS |
+| Late state | 98 | 44.402ms | 34.734ms | 302.1 MiB | PASS |
+
+Ordinary Rooms remain capped at **30** and executable Workshop Rooms at **15**. These built-in-card probes do not establish a larger Workshop limit.
+
+The complete final Frame/private-cursor/Replay Step trace is byte-identical to the unchanged baseline (94,476,226 bytes), including per-command hashes and commit classification. Focused Session, codec, SQLite recovery, Worker, ownership, query-purity and fence-order tests cover the changed boundaries, including native and Worker frozen retries, private-only transitions, no-ops, undo/rebranch, restart, score isolation and corrupt storage.
+
+After the required local restart, the real Room browser test passed history paging, cancellation markers, undo, rename and reconnect. Final verification passed: 778 fast-suite files / 8,338 tests (2 skipped, 1 todo), lint with zero errors, app build, architecture types, and dependency checks (1,647 files; zero runtime cycles or boundary errors). Six pre-existing asynchronous-error assertion failures also reproduced on the frozen baseline; a separate test-only commit asserts their actual error messages directly, without changing production behavior or benchmark inputs.
+
+[`room-commit-results.json`](room-commit-results.json) retains the raw runs, source and harness hashes, diagnostic slices, three failed paired attempts, exact-trace identity, physical writes, capacity reports and final verdict. The 94 MB raw trace and syscall/profile logs remain local artifacts identified by SHA-256; timing and write reports are embedded in the JSON, with repeated hash/classification arrays represented by lossless `workloadTranscripts` references. Every measured sample is retained. The completed optimization group below remains historical evidence.
+
 ### Frozen optimization baseline (Issue #947)
 
 The fixed workloads contain 136 two-player and 277 four-player commands, including farm choices, payments, undo and process recovery. Their explicit stress preparation (hands, cost occupations and resources) is recorded with each fixture; these are reproducible cost workloads, not a claim about optimal play or ordinary starting resources. Five fresh-process runs on Node 24.19.0 under a 2 CPU / 2 GiB cgroup produced identical raw Frame Hash chains and commit classifications. SQLite uses WAL and `synchronous=NORMAL`.

@@ -4,6 +4,7 @@ import { mkdirSync, readFileSync, readdirSync, unlinkSync, writeFileSync } from 
 import { basename, join } from 'node:path'
 import type { CustomCardDef } from '../../shared/contract/protocol/game.ts'
 import type { ClientCommand } from '../../shared/contract/protocol/ws.ts'
+import { captureStateWithHistory } from '../../shared/session/history-streams.ts'
 import {
   serializeSessionSnapshot,
   type PersistedSessionSnapshot,
@@ -17,6 +18,7 @@ import {
   type JsonValue,
 } from './replay-codec.ts'
 import { buildGameResult } from './room-persistence-checkpoint.ts'
+import { capturePrivateCursor, privateCursorEquals, type PrivateCursorComparison } from './private-cursor-comparison.ts'
 import { toRoomMeta, type Room } from './room.ts'
 import {
   SqliteRoomPersistence,
@@ -48,7 +50,7 @@ export type RoomCommitScheduler = {
 type RoomHead = {
   frame: JsonValue
   frameHash: string
-  cursorHash: string
+  privateCursor: PrivateCursorComparison
   stepNo: number
   roomVersion: number
   checkpointStepNo: number
@@ -66,7 +68,7 @@ type PendingCommit = {
   commit: ReplayCommit
   frame: JsonValue
   encoded: EncodedReplayFrame
-  cursorHash: string
+  privateCursor: PrivateCursorComparison
   retryIndex: number
   error: string
   timer: unknown | null
@@ -171,12 +173,16 @@ const replayFrame = (
   serialized: PersistedSessionSnapshot
   frame: JsonValue
 } => {
-  const serialized = room.customSessionExecutor?.serializedStateForPersistence()
-    ?? serializeSessionSnapshot(room.session.state, room.session)
-  const frame = JSON.parse(JSON.stringify(
-    scores === undefined ? serialized.frame : { ...serialized.frame, scores },
-  )) as JsonValue
-  return { serialized, frame }
+  const workerSnapshot = room.customSessionExecutor?.serializedStateForPersistence()
+  const serialized = workerSnapshot ?? serializeSessionSnapshot(room.session.state, room.session)
+  // Native serialization transfers a fresh, detached Frame. Worker snapshots
+  // remain cached outside the committer and still require an owned body copy.
+  const frame = workerSnapshot
+    ? captureStateWithHistory(scores === undefined ? serialized.frame : { ...serialized.frame, scores })
+    : scores === undefined
+      ? serialized.frame
+      : { ...serialized.frame, scores: JSON.parse(JSON.stringify(scores)) as SessionResponse['scores'] }
+  return { serialized, frame: frame as unknown as JsonValue }
 }
 
 const errorMessage = (error: unknown): string =>
@@ -470,7 +476,7 @@ export class RoomCommitter {
         createdAt,
       },
     }
-    return this.persist(room, commit, frame, encoded, frameHash(serialized.sessionCursor), options.onReady)
+    return this.persist(room, commit, frame, encoded, options.onReady)
   }
 
   commit(
@@ -491,7 +497,6 @@ export class RoomCommitter {
       room,
       response.state.gameOver ? response.scores ?? [] : undefined,
     )
-    const cursorHash = frameHash(serialized.sessionCursor)
     const stepNo = head.stepNo + 1
     const roomVersion = head.roomVersion + 1
     const encoded = encodeReplayFrame({
@@ -501,9 +506,9 @@ export class RoomCommitter {
       previousCheckpointStepNo: head.checkpointStepNo,
     })
     if (
+      response.durableTransition !== true &&
       encoded.frameHash === head.frameHash &&
-      cursorHash === head.cursorHash &&
-      response.durableTransition !== true
+      privateCursorEquals(head.privateCursor, serialized.sessionCursor)
     ) {
       return { kind: 'unchanged' }
     }
@@ -531,7 +536,7 @@ export class RoomCommitter {
         ? { result: buildGameResult(room, createdAt) }
         : {}),
     }
-    return this.persist(room, commit, frame, encoded, cursorHash, onCommitted)
+    return this.persist(room, commit, frame, encoded, onCommitted)
   }
 
   shutdown(): void {
@@ -589,7 +594,7 @@ export class RoomCommitter {
       this.heads.set(room.id, {
         frame,
         frameHash: hash,
-        cursorHash: frameHash(current.sessionCursor),
+        privateCursor: capturePrivateCursor(current.sessionCursor),
         stepNo: persisted.latestStepNo,
         roomVersion: persisted.roomVersion,
         checkpointStepNo: persisted.checkpointStepNo,
@@ -610,15 +615,15 @@ export class RoomCommitter {
     commit: ReplayCommit,
     frame: JsonValue,
     encoded: EncodedReplayFrame,
-    cursorHash: string,
     onCommitted?: (result: Extract<RoomCommitResult, { kind: 'committed' }>) => void,
   ): RoomCommitResult {
+    const privateCursor = capturePrivateCursor(commit.serialized.sessionCursor)
     try {
       const persisted = this.persistence.commitReplay(commit)
       if (persisted.kind === 'conflict') {
         return this.blockPermanently(room.id, persisted.error)
       }
-      return this.acceptCommit(room, commit, frame, encoded, cursorHash)
+      return this.acceptCommit(room, commit, frame, encoded, privateCursor)
     } catch (error) {
       const message = errorMessage(error)
       const pending: PendingCommit = {
@@ -626,7 +631,7 @@ export class RoomCommitter {
         commit,
         frame,
         encoded,
-        cursorHash,
+        privateCursor,
         retryIndex: 0,
         error: message,
         timer: null,
@@ -651,7 +656,7 @@ export class RoomCommitter {
     commit: ReplayCommit,
     frame: JsonValue,
     encoded: EncodedReplayFrame,
-    cursorHash: string,
+    privateCursor: PrivateCursorComparison,
   ): Extract<RoomCommitResult, { kind: 'committed' }> {
     room.version = commit.step.roomVersion
     this.knownReplayIds.add(room.id)
@@ -661,7 +666,7 @@ export class RoomCommitter {
       this.heads.set(room.id, {
         frame,
         frameHash: encoded.frameHash,
-        cursorHash,
+        privateCursor,
         stepNo: commit.step.stepNo,
         roomVersion: commit.step.roomVersion,
         checkpointStepNo: encoded.checkpointStepNo,
@@ -698,7 +703,7 @@ export class RoomCommitter {
         pending.commit,
         pending.frame,
         pending.encoded,
-        pending.cursorHash,
+        pending.privateCursor,
       )
       pending.onCommitted?.(result)
       pending.waiters.forEach((waiter) => waiter())

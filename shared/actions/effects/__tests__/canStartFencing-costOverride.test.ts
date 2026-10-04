@@ -1,9 +1,12 @@
-import { getFarmyardEdgeIds } from '../../../domain/farm'
+import { getFarmyardEdgeIds, getFarmyardTilePositions } from '../../../domain/farm'
 import { describe, expect, it } from 'vitest'
 import { canStartFencing, fenceAction } from '../fencing'
+import { CardRegistry } from '../../../cards/registry'
+import { withActiveRegistry } from '../../../cards/active-registry'
 import type {
   ActionExecutionContext,
   ActionAvailabilityContext,
+  FarmTilePosition,
   FenceSegment,
   GameState,
   InteractionRequest,
@@ -40,7 +43,79 @@ const createOrdinaryFenceSegments = (
     source,
   }))
 
+// Independent bitmask oracle: group connected subsets by size, then by tile
+// index, matching the observable order of the cost queries for each candidate.
+const expectedFenceCandidates = (tiles: FarmTilePosition[]): string[][] => {
+  const subsets: number[][] = []
+  for (let mask = 1; mask < 2 ** tiles.length; mask += 1) {
+    const selected = tiles.flatMap((_, index) => mask & (1 << index) ? [index] : [])
+    const reached = new Set([selected[0]!])
+    const queue = [selected[0]!]
+    for (let cursor = 0; cursor < queue.length; cursor += 1) {
+      const from = tiles[queue[cursor]!]!
+      for (const index of selected) {
+        const to = tiles[index]!
+        if (!reached.has(index) && Math.abs(from.row - to.row) + Math.abs(from.col - to.col) === 1) {
+          reached.add(index)
+          queue.push(index)
+        }
+      }
+    }
+    if (reached.size === selected.length) subsets.push(selected)
+  }
+  subsets.sort((left, right) => {
+    if (left.length !== right.length) return left.length - right.length
+    for (let index = 0; index < left.length; index += 1) {
+      if (left[index] !== right[index]) return left[index]! - right[index]!
+    }
+    return 0
+  })
+  return subsets.map(selected => {
+    const edges = new Set<string>()
+    for (const index of selected) {
+      const { row, col } = tiles[index]!
+      for (const edge of [`H-${row}-${col}`, `H-${row + 1}-${col}`, `V-${row}-${col}`, `V-${row}-${col + 1}`]) {
+        if (!edges.delete(edge)) edges.add(edge)
+      }
+    }
+    return [...edges].sort()
+  })
+}
+
 describe('canStartFencing with costOverride', () => {
+  it.each([0, 1, 0b010101, 0b011011, 0b111111])('preserves ordered connected candidates and affordability with open-tile mask %i', openMask => {
+    const player = createPlayer({ roomTiles: [{ row: 2, col: 0 }, { row: 2, col: 1 }] })
+    const available = [
+      { row: 0, col: 0 }, { row: 0, col: 1 }, { row: 0, col: 2 },
+      { row: 1, col: 0 }, { row: 1, col: 1 }, { row: 1, col: 2 },
+    ].filter((_, index) => openMask & (1 << index))
+    const matches = (left: FarmTilePosition, right: FarmTilePosition) => left.row === right.row && left.col === right.col
+    player.fields = getFarmyardTilePositions(player)
+      .filter(tile => !available.some(open => matches(tile, open)) && !player.roomTiles.some(room => matches(tile, room)))
+      .map(tile => ({ ...tile, stacks: [] }))
+    const expected = expectedFenceCandidates(available)
+    const observed: string[][] = []
+    let surcharge = 1_000
+    const registry = new CardRegistry()
+    registry.registerListener({
+      id: 'test-fence-candidate-order',
+      phases: ['computeCosts'],
+      actions: ['fence'],
+      monotoneFenceCost: true,
+      handler: ({ params }) => {
+        observed.push([...(params?.newFenceEdges as string[])])
+        return { costs: { wood: surcharge } }
+      },
+    })
+    withActiveRegistry(registry, () => {
+      expect(canStartFencing(fakeState, player)).toBe(false)
+      expect(observed).toEqual(expected)
+      surcharge = 0
+      player.resources.wood = 15
+      expect(canStartFencing(fakeState, player)).toBe(available.length > 0)
+    })
+  })
+
   it('returns true when wood + override.wood discount >= 4', () => {
     const player = createPlayer({
       resources: {

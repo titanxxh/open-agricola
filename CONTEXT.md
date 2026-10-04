@@ -120,6 +120,10 @@ _Avoid_: 未知 roomId、Replay Tombstone、正常完赛
 一次玩家可感知的权威状态推进在对局参与者看见前成为可恢复事实的提交点；它同时固定 Room 快照和对应 Replay Step，失败时该 Room 不能继续推进。
 _Avoid_: Room Persistence Checkpoint、延迟保存、WebSocket 广播
 
+**Private Session Cursor（私有会话游标）**:
+恢复同一交互、撤销范围与未完成后续所需的服务端私有会话进度，包括临时回滚位置和失败尝试记忆。它属于可恢复的权威状态，但不属于公开 Replay Frame。
+_Avoid_: Replay Frame、客户端交互草稿、History Window 分页游标
+
 **Game Result Archive**:
 正常完赛后保留的标量摘要，包含 `roomId`、起止时间、回合数、人数、变体开关，以及按 `playerIndex` 对齐的游戏玩家 id、内部用户关联、显示名和最终得分。规则与得分字段不可变，用户关联和显示名可因数据删除而匿名化；归档不包含 `GameState`、手牌或其他隐藏信息。
 _Avoid_: 可恢复房间快照、未完成房间、完整 GameState
@@ -869,7 +873,7 @@ _Avoid_: 永久放弃、全局出局名单
 
 - 一个 **Room** 只持有一局 **GameSession**；`newGame` 创建新 `roomId`。正式录制上线后的正常完赛局成为 **Game Result Archive** 和 **Game Replay Archive**，上线前完成局只有结果摘要，未完成局成为 **Expired Game Context**。
 - **Game Context Link** 按 **Game Context** 生命周期解析为 **Active Game Recovery**、**Game Replay Archive**、**Expired Game Context** 或 **Replay Tombstone**，但不能替代 Room Invite。
-- **GameSession** 产生的成功状态先经过 **Durable Room Commit**，成为可恢复的 Room 快照和 **Replay Step**，随后才按 **RoomPlayer** 视角发送。
+- **GameSession** 产生的权威推进，包括需要保留失败记忆的拒绝结果，先经过 **Durable Room Commit**，成为可恢复的 Room 快照和 **Replay Step**，随后才按 **RoomPlayer** 视角发送。
 - 浏览器通过 **Services** 里的 `WsGameTransport` 发送 **ClientCommand**；**Connection** 层路由到 **GameSession**；**Broadcaster** 构造 **StateUpdateEnvelope** 并广播。
 - **GameState** 描述游戏规则事实；**RoomPlayer** 描述连接席位；两者不要混用。
 - **GameCore.buildInteraction** 从 **GameState**、**EngineStack**、当前 **Pending Envelope** 和 anytime policy 派生 **InteractionState**。

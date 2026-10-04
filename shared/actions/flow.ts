@@ -114,20 +114,25 @@ const applyChildActionDoable = (
     }, resolveAction, nextSeenActionIds)) || canStartAlternative()
   }
 
-  let doable = strictDoable ?? (!isFlowDerivedDoable(action.canBeExecutedByPlayer) && action.canBeExecutedByPlayer.call(
-    context.space,
-    context.state,
-    context.player,
-    childCanBeExecutedContext(context),
-  ))
-  if (!doable && action.flow) {
-    doable = evaluateFlowDoable(action.flow, context, flowDerivedDoableFns.get(action.canBeExecutedByPlayer) ?? resolveAction, nextSeenActionIds)
+  const initialDoable = () => {
+    let doable = strictDoable ?? (!isFlowDerivedDoable(action.canBeExecutedByPlayer) && action.canBeExecutedByPlayer.call(
+      context.space,
+      context.state,
+      context.player,
+      childCanBeExecutedContext(context),
+    ))
+    if (!doable && action.flow) {
+      doable = evaluateFlowDoable(action.flow, context, flowDerivedDoableFns.get(action.canBeExecutedByPlayer) ?? resolveAction, nextSeenActionIds)
+    }
+    return doable
   }
 
   return hooks.applyIsDoable(
     { ...context, actionId },
     action,
-    doable,
+    // A leaf's cost preview replaces its base result. Keep composite traversal
+    // eager so its child hooks and strict gates retain their existing order.
+    action.flow ? initialDoable() : initialDoable,
     () => canStartAlternative() || canStartBefore(actionId, context, resolveAction, nextSeenActionIds),
   )
 }

@@ -704,9 +704,11 @@ export class GameCore {
   listenersVetoIsDoableCheck(player: PlayerState, space: ActionSpace): boolean {
     return this.listenersVetoIsDoable(player, space)
   }
-  applyIsDoableCheck(player: PlayerState, space: ActionSpace, baseDoable: boolean): boolean {
+  applyIsDoableCheck(player: PlayerState, space: ActionSpace, baseDoable: () => boolean): boolean {
     if (this.listenersVetoIsDoable(player, space)) return false
-    if (space.strictCanExecute && space.flow && !isFlowDerivedDoable(space.canBeExecutedByPlayer) && !baseDoable) return false
+    // Only a strict custom predicate needs this preliminary gate; the full flow
+    // query below evaluates ordinary and flow-derived predicates itself.
+    if (space.strictCanExecute && space.flow && !isFlowDerivedDoable(space.canBeExecutedByPlayer) && !baseDoable()) return false
     const resolveAction = (actionId: string) => this.registry.get(actionId)
     if (isActionDoableInFlowContext({ actionId: space.id, action: space, state: this.state, player, space, resolveAction })) return true
     const context = { state: this.state, player, space, actionId: space.id }

@@ -160,10 +160,10 @@ describe('custom session executor', () => {
     expect(session.cardWarnings).toEqual([expect.stringContaining('finite boom')])
   })
 
-  it('rejects a query when a custom-card listener emits a warning', async () => {
+  it.each(['forest', 'collect'])('rejects a query when a custom-card %s listener emits a warning', async (actionId) => {
     const { session, executor } = setup(card(
       'CUSTOM_QueryFailure',
-      "if (context.actionId === 'forest') throw new Error('query boom')",
+      `if (context.actionId === '${actionId}') throw new Error('query boom')`,
       null,
       '',
       'isDoable',
@@ -174,6 +174,23 @@ describe('custom session executor', () => {
 
     expect(JSON.parse(JSON.stringify(session.state))).toEqual(before)
     expect(session.cardWarnings).toEqual([expect.stringContaining('query boom')])
+    expect((await executor.execute('getState', [])).ok).toBe(true)
+  })
+
+  it.each(['computeCosts', 'isDoable'])('rejects a cost-preview query when a custom %s listener warns', async (phase) => {
+    const { session, executor } = setup(card(
+      'CUSTOM_PreviewQueryFailure',
+      "throw new Error('preview query boom')",
+      'plow',
+      '',
+      phase,
+    ))
+    const before = JSON.parse(JSON.stringify(session.state))
+
+    await expect(executor.query('getAvailableActions', [0])).rejects.toThrow('preview query boom')
+
+    expect(JSON.parse(JSON.stringify(session.state))).toEqual(before)
+    expect(session.cardWarnings).toEqual([expect.stringContaining('preview query boom')])
     expect((await executor.execute('getState', [])).ok).toBe(true)
   })
 

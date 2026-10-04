@@ -19,8 +19,41 @@ const branches = new WeakMap<object, HistoryBranch>()
 const groups = new WeakMap<object, string>()
 const materialized = new WeakMap<HistoryBranch, object[]>()
 const emptyStreams = new Map<HistoryStreamKind, object[]>()
+const capturedRecords = new WeakSet<object>()
+const capturedStreams = new WeakSet<object>()
 const identifier = (): string => crypto.randomUUID()
 const copyJson = <T>(value: T): T => JSON.parse(JSON.stringify(value)) as T
+
+/** Captured streams contain deeply frozen JSON records and cannot change in place. */
+export const isCapturedHistoryStream = (value: object): boolean =>
+  capturedStreams.has(value)
+
+/** Only detached, deeply immutable JSON records may retain derived encodings. */
+export const isCapturedHistoryRecord = (value: object): boolean => capturedRecords.has(value)
+
+const isDeeplyFrozenJsonData = (value: unknown, ancestors = new Set<object>()): boolean => {
+  if (value === null || typeof value === 'string' || typeof value === 'boolean') return true
+  if (typeof value === 'number') return Number.isFinite(value)
+  if (typeof value !== 'object' || !Object.isFrozen(value) || ancestors.has(value)) return false
+  ancestors.add(value)
+  if (Array.isArray(value)) {
+    if (Object.getPrototypeOf(value) !== Array.prototype || Object.hasOwn(value, 'map') || Object.hasOwn(value, 'constructor')) return false
+    for (let index = 0; index < value.length; index += 1) {
+      const descriptor = Object.getOwnPropertyDescriptor(value, index)
+      if (!descriptor || !('value' in descriptor) || !isDeeplyFrozenJsonData(descriptor.value, ancestors)) return false
+    }
+  } else {
+    const prototype = Object.getPrototypeOf(value)
+    if (prototype !== Object.prototype && prototype !== null) return false
+    for (const key of Object.keys(value)) {
+      const descriptor = Object.getOwnPropertyDescriptor(value, key)!
+      if (!('value' in descriptor) || !isDeeplyFrozenJsonData(descriptor.value, ancestors)) return false
+    }
+  }
+  ancestors.delete(value)
+  return true
+}
+
 const freeze = (value: unknown): void => {
   if (!value || typeof value !== 'object' || Object.isFrozen(value)) return
   Object.values(value).forEach(freeze)
@@ -84,6 +117,7 @@ export const historyBranch = (values: readonly object[], kind: HistoryStreamKind
     if (!record) {
       const value = copyJson(entry)
       freeze(value)
+      capturedRecords.add(value)
       record = { value, identity: { recordId: identifier(), operationGroupId: groups.get(state) ?? identifier(), participantRoles: roles(entry, state) }, links: new Map() }
       records.set(entry, record)
       records.set(value, record)
@@ -107,10 +141,15 @@ export const materializeHistoryBranch = (branch: HistoryBranch): object[] => {
   const cached = materialized.get(branch) ?? (!branch.head ? emptyStreams.get(branch.kind) : undefined)
   if (cached) return cached
   const values: object[] = []
-  for (let node = branch.head; node; node = node.previous) values.push(node.value)
+  let immutableRecords = true
+  for (let node = branch.head; node; node = node.previous) {
+    values.push(node.value)
+    immutableRecords = immutableRecords && capturedRecords.has(node.value)
+  }
   if (branch.kind !== 'log') values.reverse()
   branches.set(values, branch)
   Object.freeze(values)
+  if (immutableRecords) capturedStreams.add(values)
   if (branch.head) materialized.set(branch, values)
   else emptyStreams.set(branch.kind, values)
   return values
@@ -118,6 +157,9 @@ export const materializeHistoryBranch = (branch: HistoryBranch): object[] => {
 
 export const registerRestoredHistoryNode = (node: HistoryNode): void => {
   freeze(node.value)
+  // Restoration normally supplies JSON-parsed data. Keep externally supplied
+  // shallow-frozen objects and accessors outside the immutable-record boundary.
+  if (isDeeplyFrozenJsonData(node.value)) capturedRecords.add(node.value)
   const record = records.get(node.value) ?? { value: node.value, identity: node.identity, links: new Map<string, HistoryNode>() }
   record.links.set(`${node.kind}:${node.previous?.id ?? ''}`, node)
   records.set(node.value, record)
@@ -153,6 +195,7 @@ export const copyHistoryRecordIdentity = <T extends object>(source: T, target: T
   if (record) {
     const value = copyJson(target)
     freeze(value)
+    capturedRecords.add(value)
     const version = { value, identity: record.identity, links: new Map<string, HistoryNode>() }
     records.set(target, version)
     records.set(value, version)

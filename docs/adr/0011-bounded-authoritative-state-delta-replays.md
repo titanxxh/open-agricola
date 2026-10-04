@@ -10,7 +10,7 @@ Game Replay Archive 必须永久精确播放正常完赛的对局，同时支持
 
 ## Decision
 
-1. Replay Frame 是播放和取证的唯一真相。Step 0 在权威初始状态能够接收第一个互动命令前保存；classic deal 已在 Step 0 内，互动 draft、Parent Selection 和其他多人提交从 Step 1 起记录。之后只有成功且改变权威状态的 ClientCommand 或 choice 生成 Replay Step。失败命令、重连、补拉状态和心跳不记录，成功 undo 作为新 Step 记录。`stepNo` 按 Room 全局串行递增，不依赖 `roomVersion`；多个玩家同时提交时占用连续 Step，最后一份输入触发的自动结算属于该 Step，结算结果不得依赖到达顺序。
+1. Replay Frame 是播放和取证的唯一真相。Step 0 在权威初始状态能够接收第一个互动命令前保存；classic deal 已在 Step 0 内，互动 draft、Parent Selection 和其他多人提交从 Step 1 起记录。之后成功且改变公开 Frame 或 Private Session Cursor 的 ClientCommand 或 choice 生成 Replay Step；只有公开 Frame Hash 与私有游标均未变化且没有 `durableTransition` 标记时才视为 unchanged。带 `durableTransition` 的推进强制记录，包括 [ADR-0015](0015-provisional-cross-player-continuation-resolution.md) 定义的需保留回滚结果与失败记忆的拒绝；仅私有游标变化时，新的 Step 可重复同一公开 Frame。普通失败命令、重连、补拉状态和心跳不记录，成功 undo 作为新 Step 记录。`stepNo` 按 Room 全局串行递增，不依赖 `roomVersion`；多个玩家同时提交时占用连续 Step，最后一份输入触发的自动结算属于该 Step，结算结果不得依赖到达顺序。
 2. Replay Frame 直接复用当局版本未过滤的 `SerializedGameState`，包含 engine cursor、events 和 log，不包含 GameSyncPayload 的 Private Event、private prompt、传输 envelope、运行时函数或 undo 快照。命令只作为 Replay Step Metadata，不参与状态重算。
 3. 每局只有一个 Replay header 和一组按 Step 存储的行，不创建独立 Segment 表。Step 行由 `payloadKind` 区分完整 checkpoint 与 Replay State Delta，`roomId + stepNo` 唯一；逻辑 Replay Segment 从 checkpoint 开始，到下一 checkpoint 前结束。
 4. Step 0 建立完整 checkpoint，正常情况下其后每 16 步建立新 checkpoint，因此任意目标最多应用 15 个 delta。若某一步未压缩 delta JSON 已不小于完整 Frame JSON，则提前保存完整 checkpoint 并开始新 Segment。每个 checkpoint 和 delta 独立 gzip。

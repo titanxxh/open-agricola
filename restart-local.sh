@@ -341,6 +341,7 @@ dev_rooms_without_variant() {
   DB_PATH="$DB_PATH" VARIANT="$variant" node <<'EOF'
 const fs = require('node:fs')
 const Database = require('better-sqlite3')
+const { parseRoomBody } = require('./server/game/persistence/room-body-codec.ts')
 
 const dbPath = process.env.DB_PATH
 if (!dbPath || !fs.existsSync(dbPath)) process.exit(0)
@@ -354,7 +355,7 @@ try {
   const missing = rows.filter((row) => {
     if (!row.state_json) return true
     try {
-      const state = JSON.parse(row.state_json).state
+      const state = parseRoomBody(row.state_json).state
       switch (variant) {
         case 'parents':
           return state.enableParentCards !== true

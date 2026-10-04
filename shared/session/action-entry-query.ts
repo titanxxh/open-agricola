@@ -10,11 +10,11 @@ import { isThroughTheSeasonsSeason } from '../seasons/rules'
 
 type ActionEntryQueryOptions = {
   vetoesAction?: (space: ActionSpace) => boolean
-  isActionDoable?: (space: ActionSpace, baseDoable: boolean) => boolean
+  isActionDoable?: (space: ActionSpace, baseDoable: () => boolean) => boolean
 }
 
 type ActionEntryAvailabilityOptions = {
-  isActionDoable: (space: ActionSpace, baseDoable: boolean) => boolean
+  isActionDoable: (space: ActionSpace, baseDoable: () => boolean) => boolean
 }
 
 export const applyActionPlacement = (
@@ -46,8 +46,8 @@ export const canEnterActionSpace = (
   if (isSpaceBlocked(space)) return false
   if (!canUseExclusiveSpace(space, player, state)) return false
   if (space.strictCanExecute || options.isActionDoable) {
-    const baseDoable = space.canBeExecutedByPlayer(state, player)
-    if (!(options.isActionDoable?.(space, baseDoable) ?? baseDoable)) return false
+    const baseDoable = () => space.canBeExecutedByPlayer(state, player)
+    if (!(options.isActionDoable?.(space, baseDoable) ?? baseDoable())) return false
   }
   if (
     space.id === 'fencing' &&
@@ -77,7 +77,7 @@ export const canProjectActionEntry = (
     const allowed = computeAllowedPlacementSpaces(state, player)
     if (!allowed.some((entry) => entry.spaceId === space.id)) return false
   }
-  return options.isActionDoable(space, space.canBeExecutedByPlayer(state, player))
+  return options.isActionDoable(space, () => space.canBeExecutedByPlayer(state, player))
 }
 
 export const computeActionEntryAvailability = (
