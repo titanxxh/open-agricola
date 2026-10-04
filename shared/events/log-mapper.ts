@@ -1163,7 +1163,7 @@ export const eventsToLogEntries = (events: readonly GameEvent[], ctx: EventLogMa
       const source = event as unknown as Record<string, unknown>
       const location = (key: string): string | undefined => (source[key] as { playerId?: string } | undefined)?.playerId
       const ids = {
-        player: (source.playerId as string | undefined) ?? (event.type === 'resource.moved' ? location('to') : event.type === 'card.resourcePairsStored' ? event.targetPlayerId : event.actorPlayerId ?? event.targetPlayerId),
+        player: (source.playerId as string | undefined) ?? ((event.type === 'resource.moved' || event.type === 'resource.accumulated') ? location('to') : event.type === 'card.resourcePairsStored' ? event.targetPlayerId : event.actorPlayerId ?? event.targetPlayerId),
         playerName: (source.playerId as string | undefined) ?? event.actorPlayerId ?? event.targetPlayerId,
         fromPlayer: (source.fromPlayerId as string | undefined) ?? location('from') ?? event.actorPlayerId,
         toPlayer: (source.toPlayerId as string | undefined) ?? location('to') ?? event.targetPlayerId,

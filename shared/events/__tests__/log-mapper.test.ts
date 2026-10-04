@@ -8,12 +8,14 @@ describe('eventsToLogEntries', () => {
   it('keeps actor and recipient identities distinct when their display names collide', () => {
     const events = [{ schemaVersion: 1, id: 'pay-recipient', seq: 1, round: 1, phase: 'work', type: 'resource.paid', visibility: 'public', actorPlayerId: 'p1', paidFrom: { kind: 'player', playerId: 'p2' }, resources: { wood: 1 }, paymentFor: 'card-effect', sourceCardId: 'A075_LumberMill' },
       { schemaVersion: 1, id: 'target-pairs', seq: 2, round: 1, phase: 'work', type: 'card.resourcePairsStored', visibility: 'public', actorPlayerId: 'p1', targetPlayerId: 'p2', cardId: 'D036_BreedRegistry', pairs: [{ wood: 1 }] },
-    ] as GameEvent[]
+      { schemaVersion: 1, id: 'target-accumulation', seq: 3, round: 1, phase: 'work', type: 'resource.accumulated', visibility: 'public', actorPlayerId: 'p1', to: { kind: 'card', cardId: 'A075_LumberMill', playerId: 'p2' }, resources: { wood: 1 } },
+    ] satisfies GameEvent[]
     const log = eventsToLogEntries(events, { playerNames: { p1: 'Same', p2: 'Same' } })
     historyBranch(log, 'log', { players: [{ id: 'p1', name: 'Same' }, { id: 'p2', name: 'Same' }] as never })
     const projected = log.map(entry => projectHistoryLogNames(entry, getHistoryRecordIdentity(entry)?.participantRoles, { p1: 'Actor', p2: 'Recipient' }))
     expect(projected.find(entry => entry.key === 'log.cardEffectPay')?.params?.player).toBe('Actor')
     expect(projected.find(entry => entry.key === 'log.cardResourcePairsStored')?.params?.player).toBe('Recipient')
+    expect(projected.find(entry => entry.key === 'log.resourceAccumulated')?.params?.player).toBe('Recipient')
   })
 
   it('labels a card occupation leaf as playing an occupation rather than using Lessons', () => {
