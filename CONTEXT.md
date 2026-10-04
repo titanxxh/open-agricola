@@ -760,6 +760,18 @@ _Avoid_: 前端调用点各自解释 public event payload
 只发给特定 viewer 的私有同步附加层，例如私有 prompt、手牌变化、draft 信息；不进入公共事件流或 Game Replay Archive。结束局回放从 Replay Step 和归档规则状态展示手牌、draft 与已接受选择，不复制 Private Event envelope。
 _Avoid_: public event
 
+**Game Seed（对局种子）**:
+决定发牌、轮抽牌池、轮次行动卡顺序和卡牌随机结果的服务端私有值；普通牌堆和父母选择不由它决定。活动对局中它不属于任何座位或旁观者可见的信息，也不能由玩家可见的信息推算出来；它只随正常完赛的 Game Replay Archive 在全开视角下公开。
+_Avoid_: 开局码、可分享种子、房间号
+
+**Explicit Seed（指定种子）**:
+测试、开发房或调试接口明确给出的数字 Game Seed，用于让同一局可重复。它可以被枚举，不提供隐藏信息保护，正式房间不接受它。
+_Avoid_: 正式房间的 Game Seed、可分享种子
+
+**Unrevealed Round Card（未翻开的轮次行动卡）**:
+尚未到达其轮次的轮次行动卡。玩家知道每个阶段有哪些卡，但不知道阶段内的顺序；它在该轮开始时翻开。
+_Avoid_: Blocked Action Space、前端隐藏格、未解锁行动格
+
 **Action Log**:
 `GameState.log` 是 UI 缓存，由 public events mapper 派生；规则代码不把它当事实来源。
 _Avoid_: 业务代码直接写 log
@@ -891,6 +903,7 @@ _Avoid_: 永久放弃、全局出局名单
 - “replay” 可能指活动状态中的 Public Event timeline，也可能指完赛后的 **Game Replay Archive**；涉及持久化、权限或删除时必须使用完整术语。
 - “Game Context Link” 只负责定位既有 **Game Context**；需要让新玩家占座时应明确使用 Room Invite。
 - “reap” 只是收作物动作，不等同于完整 **Harvest**。
+- “seed” 可能指 **Game Seed**、**Explicit Seed**，也可能指普通牌堆、父母选择各自独立的私有种子；后者不由 Game Seed 派生，同一 Game Seed 下可以不同。
 - “snapshot” 是当前同步方式；不要假设存在增量 patch，除非架构文档明确变更。
 - “log” 是 UI 缓存，不是规则事实来源；新增规则事实应先考虑 public event。
 - “player” 可能指 **PlayerState**、`playerIndex`、`playerId`、**RoomPlayer** 或登录 user；跨层传参时必须明确。

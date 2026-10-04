@@ -1,4 +1,4 @@
-import { createRng } from '../../utils/rng'
+import { createSeededRng } from '../../utils/rng'
 import type { GameState, PlayerState, ProtectedObservation } from '../../contract/types'
 import { readCardExtraData, writeCardExtraData } from './card-state'
 
@@ -10,7 +10,8 @@ import { readCardExtraData, writeCardExtraData } from './card-state'
  * this helper once at the moment of randomization, then set
  * `state.pendingUndoBoundary = true` so undo cannot cross the roll.
  *
- * Seed derivation: `gameSeed ^ rngTick`, with rngTick incremented on each new roll.
+ * Seed derivation: one stream per roll, with rngTick incremented on each new roll. An
+ * Explicit Seed keeps `gameSeed ^ rngTick`; a wide seed uses the tick as the stream label.
  * Cached results are keyed by `(cardId, key)` — replay reads the cache without advancing
  * rngTick, so history re-runs produce identical outcomes.
  */
@@ -27,9 +28,9 @@ export const rollAndCacheCardPick = <T>(
   if (candidates.length === 0) {
     throw new Error(`rollAndCacheCardPick: empty candidates for ${cardId}/${key}`)
   }
-  state.rngTick = (state.rngTick ?? 0) + 1
-  const seed = (state.gameSeed ?? 0) ^ state.rngTick
-  const rng = createRng(seed)
+  const rngTick = (state.rngTick ?? 0) + 1
+  state.rngTick = rngTick
+  const rng = createSeededRng(state.gameSeed ?? 0, `card-random:${rngTick}`, (value) => value ^ rngTick)
   const idx = Math.floor(rng() * candidates.length)
   const pick = candidates[idx]!
   writeCardExtraData(player, cardId, key, pick)

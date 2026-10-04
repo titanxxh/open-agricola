@@ -14,7 +14,12 @@ import { privateEventsForViewer } from './interaction-privacy.ts'
 import { redactInteractionForViewer } from './interaction-state-adapter.ts'
 import type { GameCore, SessionResponse } from './session-core.ts'
 
-export type SyncPayloadMode = 'viewer' | 'debug'
+/**
+ * `viewer` redacts for one seat or a spectator. `dev-viewer` is the same
+ * redaction with the round-card order left visible, for dev-room live sync.
+ * `debug` is the full authoritative state.
+ */
+export type SyncPayloadMode = 'viewer' | 'dev-viewer' | 'debug'
 
 export function buildSyncPayload(
   core: GameCore,
@@ -29,7 +34,9 @@ export function buildSyncPayload(
   const base: GameSyncPayload = {
     state: mode === 'debug'
       ? canonicalState
-      : filterSerializedStateForPlayer(canonicalState, viewerPlayerId),
+      : filterSerializedStateForPlayer(canonicalState, viewerPlayerId, {
+        revealRoundCards: mode === 'dev-viewer',
+      }),
     interaction: mode === 'debug'
       ? resp.interaction
       : redactInteractionForViewer(

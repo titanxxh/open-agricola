@@ -100,7 +100,17 @@ export const buildSessionSyncPayload = (
   const payloads = payloadsByResponse.get(response)
   if (!payloads) return session.buildSyncPayload(response, viewerPlayerId, mode)
   if (mode === 'debug') return payloads.debug
-  return viewerPlayerId ? payloads.viewers[viewerPlayerId] ?? payloads.spectator : payloads.spectator
+  const viewer = viewerPlayerId ? payloads.viewers[viewerPlayerId] ?? payloads.spectator : payloads.spectator
+  if (mode !== 'dev-viewer') return viewer
+  // The Worker precomputes ordinary viewer payloads; restore what a dev room keeps visible.
+  return {
+    ...viewer,
+    state: {
+      ...viewer.state,
+      roundActionOrder: payloads.debug.state.roundActionOrder,
+      futureMeeples: payloads.debug.state.futureMeeples,
+    },
+  }
 }
 
 const hasExecutableCards = (customCards: CustomCardData[] | undefined): boolean =>

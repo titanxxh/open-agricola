@@ -11,7 +11,7 @@ import {
   normalizeFarmyardExtensions,
   positionKey,
 } from '../domain/farm'
-import { createRng, createSeed, shuffleWithRng } from '../utils/rng'
+import { createSeed, createSeededRng, resolveSeed, shuffleWithRng, type GameSeed } from '../utils/rng'
 import { createActionSpaces } from '../actions'
 import { majorImprovementIds } from '../cards/major'
 import {
@@ -132,13 +132,16 @@ const resolveFarmersOfTheMoorMinorHandSize = (
 
 const dealFarmersOfTheMoorMinorHands = (
   playerCount: number,
-  seed: number,
+  seed: GameSeed,
   handSize: number,
 ): string[][] => {
   if (handSize <= 0) {
     return Array.from({ length: playerCount }, () => [])
   }
-  const shuffled = shuffleWithRng([...getImplementedFarmersOfTheMoorMinorIds(playerCount)], createRng(seed))
+  const shuffled = shuffleWithRng(
+    [...getImplementedFarmersOfTheMoorMinorIds(playerCount)],
+    createSeededRng(seed, 'moor-minor-deal'),
+  )
   return Array.from({ length: playerCount }, (_, index) =>
     shuffled.slice(index * handSize, index * handSize + handSize),
   )
@@ -146,14 +149,14 @@ const dealFarmersOfTheMoorMinorHands = (
 
 export const dealHands = (
   playerCount: number,
-  seed: number,
+  seed: GameSeed,
   extraMinorIds: string[] = [],
   extraOccupationIds: string[] = [],
   deckIds?: string[],
   handSize = 7,
   enableCommunityDeck = false,
 ) => {
-  const rng = createRng(seed)
+  const rng = createSeededRng(seed, 'deal-hands')
   const allowedDecks = new Set<string>(normalizeDeckIds(deckIds))
   const allow = (players: string | undefined) =>
     cardAllowedForPlayerCount(players, playerCount)
@@ -228,7 +231,7 @@ const cardIdsInDraft = (draft: GameState['draft']): { occupation: Set<string>; m
 
 const createFallbackOrdinaryCardDecks = (
   players: PlayerState[],
-  seed: number,
+  seed: GameSeed,
   draft: GameState['draft'],
   enableCommunityDeck: boolean,
   options: Pick<InitialStateOptions, 'extraMinorIds' | 'extraOccupationIds' | 'deckIds'> = {},
@@ -254,7 +257,7 @@ const createFallbackOrdinaryCardDecks = (
 const normalizeOrdinaryCardDecks = (
   raw: GameState,
   players: PlayerState[],
-  seed: number,
+  seed: GameSeed,
 ): OrdinaryCardDecks => {
   const decks = raw.ordinaryCardDecks
   if (decks && Array.isArray(decks.occupation) && Array.isArray(decks.minor)) {
@@ -267,7 +270,7 @@ const normalizeOrdinaryCardDecks = (
 }
 
 export const normalizeState = (raw: GameState): GameState => {
-  const seed = raw.gameSeed ?? createSeed()
+  const seed = resolveSeed(raw.gameSeed)
   const enableFarmersOfTheMoor = raw.enableFarmersOfTheMoor === true
   const farmersOfTheMoor = enableFarmersOfTheMoor
     ? normalizeFarmersOfTheMoorState(
@@ -634,7 +637,7 @@ const isSnakeOpeningActive = (options: InitialStateOptions): boolean =>
   options.enableSnakeOpening === true && Math.floor(options.playerCount ?? 2) > 1
 
 const createInitialPlayers = (
-  seed: number,
+  seed: GameSeed,
   options: InitialStateOptions = {},
 ): PlayerState[] => {
   const {
@@ -754,10 +757,7 @@ export const createInitialState = (
   const options: InitialStateOptions = Array.isArray(extraMinorIdsOrOptions)
     ? { extraMinorIds: extraMinorIdsOrOptions, extraOccupationIds }
     : extraMinorIdsOrOptions
-  const gameSeed =
-    typeof seed === 'number' && Number.isFinite(seed)
-      ? Math.floor(seed)
-      : createSeed()
+  const gameSeed = resolveSeed(seed)
   const roundActionOrder = generateRoundActionOrder(gameSeed)
   const useDraft = options.draftMode === 'simultaneous'
   const players = createInitialPlayers(gameSeed, options)
@@ -774,14 +774,8 @@ export const createInitialState = (
       player.resources.horse = player.resources.horse ?? 0
     }
   }
-  const ordinaryCardDeckSeed =
-    typeof options.ordinaryCardDeckSeed === 'number' && Number.isFinite(options.ordinaryCardDeckSeed)
-      ? Math.floor(options.ordinaryCardDeckSeed)
-      : createSeed()
-  const parentSelectionSeed =
-    typeof options.parentSelectionSeed === 'number' && Number.isFinite(options.parentSelectionSeed)
-      ? Math.floor(options.parentSelectionSeed)
-      : createSeed()
+  const ordinaryCardDeckSeed = resolveSeed(options.ordinaryCardDeckSeed)
+  const parentSelectionSeed = resolveSeed(options.parentSelectionSeed)
   let ordinaryCardDecks: OrdinaryCardDecks
 
   let phase: GameState['phase'] = 'playing'

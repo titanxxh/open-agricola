@@ -603,6 +603,13 @@ export type SnakeOpeningState = {
   reversed: boolean
 }
 
+/**
+ * Either an Explicit Seed (a number given by a test, a dev room or a debug
+ * endpoint) or a wide seed (a string carrying at least 128 random bits). Only
+ * wide seeds protect hidden information; see ADR-0020.
+ */
+export type GameSeed = number | string
+
 export type GameState = {
   round: number
   /** Top-level game phase. 'draft' while card draft is in progress; 'playing' for the normal game. */
@@ -624,7 +631,7 @@ export type GameState = {
   publicEventArchive: PublicEventArchivePacket[]
   nextPublicEventArchivePacketSeq: number
   roundActionOrder: (string | null)[]
-  gameSeed: number
+  gameSeed: GameSeed
   /** Monotonic counter incremented every time a card consumes randomness. */
   rngTick?: number
   /** One-shot flag: cards set this before emitting a pending-choice that must not be undone across.

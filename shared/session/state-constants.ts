@@ -14,7 +14,7 @@
 
 import type { FenceSegment, FenceSegmentSource, GameState, PlayerState, Resource } from '../contract/types'
 import type { DraftMode } from '../draft/types'
-import { createRng, shuffleWithRng } from '../utils/rng'
+import { createSeededRng, shuffleWithRng, type GameSeed } from '../utils/rng'
 import { tryAddRoomTile } from '../domain/farmyard'
 import { findPlayerById } from '../domain/player'
 import {
@@ -23,6 +23,8 @@ import {
   resourceKeyList,
   harvestRounds,
   createRoundOpenById,
+  roundStageActions,
+  roundStageSlots,
 } from '../contract/state-constants'
 
 export { emptyResources, extendedResourceKeyList, resourceKeyList, harvestRounds, createRoundOpenById }
@@ -72,24 +74,6 @@ export const normalizeFenceSegments = (
     .filter((s): s is FenceSegment => s !== null)
 }
 
-const roundStageSlots = [
-  { stage: 1, count: 4 },
-  { stage: 2, count: 3 },
-  { stage: 3, count: 2 },
-  { stage: 4, count: 2 },
-  { stage: 5, count: 2 },
-  { stage: 6, count: 1 },
-]
-
-const roundStageActions: Record<number, string[]> = {
-  1: ['sheep-market', 'grain-utilization', 'fencing', 'major-improvement'],
-  2: ['wish-children', 'western-quarry', 'house-redevelopment'],
-  3: ['vegetable-seeds', 'pig-market'],
-  4: ['eastern-quarry', 'cattle-market'],
-  5: ['cultivation', 'urgent-wish-children'],
-  6: ['farm-redevelopment'],
-}
-
 export const defaultSandboxDeckIds = ['A', 'B', 'C', 'D', 'E'] as const
 export type DefaultSandboxDeckId = typeof defaultSandboxDeckIds[number]
 export const defaultSandboxPlayerNames = ['playerA', 'playerB', 'playerC', 'playerD', 'playerE', 'playerF'] as const
@@ -122,8 +106,8 @@ export type InitialStateOptions = {
   ordinaryCardDeckSeed?: number
 }
 
-export const generateRoundActionOrder = (seed: number) => {
-  const rng = createRng(seed)
+export const generateRoundActionOrder = (seed: GameSeed) => {
+  const rng = createSeededRng(seed, 'round-action-order')
   const order: (string | null)[] = []
   roundStageSlots.forEach(({ stage, count }) => {
     const pool = roundStageActions[stage] ?? []

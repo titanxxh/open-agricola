@@ -1,5 +1,6 @@
 import type {
   ActionSpace,
+  GameSeed,
   GameState,
   InteractionAnimalReorgZone,
   PlayerState,
@@ -61,8 +62,10 @@ export type SerializedParentSelectionState = {
 
 export type SerializedGameState = Omit<
   GameState,
-  'actionSpaces' | 'players' | 'parentSelection'
+  'actionSpaces' | 'players' | 'parentSelection' | 'gameSeed'
 > & {
+  /** Present in the authoritative frame; withheld from every viewer projection (ADR-0020). */
+  gameSeed?: GameSeed
   actionSpaces: SerializedActionSpace[]
   // Always null. GameState no longer has this field; the key stays in the
   // serialized frame so Replay Frame hashes and the sync payload are unchanged.

@@ -61,6 +61,7 @@
     "check:browser-boundaries": "tsx scripts/check-browser-boundaries.ts"
   },
   "dependencies": {
+    "@noble/hashes": "^2.4.0",
     "better-sqlite3": "^13.0.3",
     "canvas": "^3.2.1",
     "isolated-vm": "^7.0.1",

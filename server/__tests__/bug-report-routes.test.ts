@@ -859,6 +859,8 @@ describe('bug report routes', () => {
       }],
       events: [],
       publicEventArchive: [],
+      roundActionOrder: [],
+      futureMeeples: [],
       ordinaryCardDecks: { occupation: [], minor: [] },
       ordinaryCardDrawChoices: {},
       engineStack: { frames: [] },

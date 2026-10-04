@@ -1,5 +1,5 @@
 import type { WebSocket } from 'ws'
-import type { Room } from '../game/room.ts'
+import { isDevRoom, type Room } from '../game/room.ts'
 import type { SessionResponse } from '../game/authoritative-session.ts'
 import type { RoomPersistenceCheckpoint } from '../game/room-persistence-checkpoint.ts'
 import type { ServerEvent } from '../../shared/contract/protocol/ws.ts'
@@ -18,9 +18,14 @@ const viewerIdForSeat = (resp: SessionResponse, seatIndex: number | undefined): 
  * placeholders and a missing `cardAvailability` make seats other than the first
  * unplayable. Give it the unredacted projection instead — there is nobody on
  * the other end to hide anything from.
+ *
+ * A dev room keeps per-seat redaction but still shows the full round-card
+ * order, which the `devMode` board preview relies on (ADR-0020).
  */
-const projectionModeFor = (room: Room): SyncPayloadMode | undefined =>
-  room.hotseat === true ? 'debug' : undefined
+const projectionModeFor = (room: Room): SyncPayloadMode | undefined => {
+  if (room.hotseat === true) return 'debug'
+  return isDevRoom(room.id) ? 'dev-viewer' : undefined
+}
 
 type RequesterResponse = {
   ws: WebSocket

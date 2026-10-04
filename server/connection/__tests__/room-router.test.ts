@@ -13,6 +13,8 @@ import type { CustomCardData } from '../../../shared/cards/session-card-context.
 
 const fakeWs = () => ({ OPEN: 1, readyState: 1, send: vi.fn(), close: vi.fn() })
 
+const WIDE_SEED = /^[0-9a-f]{32}$/
+
 const newDeps = (persistence = new InMemoryRoomPersistence()) => {
   const registry = new RoomRegistry()
   const checkpoint = createRoomPersistenceCheckpoint({ persistence })
@@ -147,6 +149,35 @@ describe('handleCreateRoom', () => {
     expect(ctx.currentRoom!.session.state.phase).toBe('parent-selection')
   })
 
+  it('ignores a client seed outside dev rooms', () => {
+    const ctx = newCtx()
+    ctx.currentUserId = 'u1'
+    dispatch(ctx, { type: 'createRoom', maxPlayers: 2 })
+    markRoomStarted(ctx)
+    const previousSeed = ctx.currentRoom!.session.state.gameSeed
+
+    dispatch(ctx, { type: 'newGame', seed: 309 })
+
+    const seed = ctx.currentRoom!.session.state.gameSeed
+    expect(seed).toMatch(WIDE_SEED)
+    expect(seed).not.toBe(previousSeed)
+  })
+
+  it('lets a dev room start a new game on an Explicit Seed', () => {
+    const ctx = newCtx()
+    ctx.currentUserId = 'u1'
+    dispatch(ctx, { type: 'createRoom', maxPlayers: 2 })
+    const devRoom = ctx.currentRoom!
+    ctx.registry.delete(devRoom.id)
+    devRoom.id = 'dev2-00000000-0000-4000-8000-000000000000'
+    ctx.registry.set(devRoom)
+    markRoomStarted(ctx)
+
+    dispatch(ctx, { type: 'newGame', seed: 309 })
+
+    expect(ctx.currentRoom!.session.state.gameSeed).toBe(309)
+  })
+
   it('preserves enableParentCards when starting a new game', () => {
     const ctx = newCtx()
     ctx.currentUserId = 'u1'
@@ -155,7 +186,7 @@ describe('handleCreateRoom', () => {
 
     dispatch(ctx, { type: 'newGame', seed: 309 })
 
-    expect(ctx.currentRoom!.session.state.gameSeed).toBe(309)
+    expect(ctx.currentRoom!.session.state.gameSeed).toMatch(WIDE_SEED)
     expect(ctx.currentRoom!.session.state.enableParentCards).toBe(true)
     expect(ctx.currentRoom!.session.state.phase).toBe('parent-selection')
   })
@@ -409,7 +440,7 @@ describe('handleCreateRoom', () => {
     dispatch(ctx, { type: 'newGame', seed: 309 })
 
     ctx.checkpoint.flushAll()
-    expect(ctx.persistence.load(ctx.currentRoom!.id)?.serialized?.state.gameSeed).toBe(309)
+    expect(ctx.persistence.load(ctx.currentRoom!.id)?.serialized?.state.gameSeed).toMatch(WIDE_SEED)
   })
 
   it('moves newGame to a fresh room id and discards the unfinished game', () => {
@@ -428,7 +459,7 @@ describe('handleCreateRoom', () => {
     expect(ctx.registry.has(nextRoomId)).toBe(true)
     expect(ctx.persistence.load(previousRoomId)).toBeNull()
     expect(ctx.persistence.__getResultForTest(previousRoomId)).toBeUndefined()
-    expect(ctx.persistence.load(nextRoomId)?.serialized?.state.gameSeed).toBe(309)
+    expect(ctx.persistence.load(nextRoomId)?.serialized?.state.gameSeed).toMatch(WIDE_SEED)
     expect(sentMessagesOf(ctx)).toContainEqual(expect.objectContaining({
       type: 'stateUpdate',
       roomId: nextRoomId,
@@ -612,7 +643,7 @@ describe('handleCreateRoom', () => {
 
     dispatch(ctx, { type: 'newGame', seed: 309 })
 
-    expect(ctx.currentRoom!.session.state.gameSeed).toBe(309)
+    expect(ctx.currentRoom!.session.state.gameSeed).toMatch(WIDE_SEED)
     expect(ctx.currentRoom!.session.state.enableThroughTheSeasons).toBe(true)
     expect(ctx.currentRoom!.session.state.throughTheSeasons).not.toBeNull()
   })
@@ -656,7 +687,7 @@ describe('handleCreateRoom', () => {
 
     dispatch(ctx, { type: 'newGame', seed: 309 })
 
-    expect(ctx.currentRoom!.session.state.gameSeed).toBe(309)
+    expect(ctx.currentRoom!.session.state.gameSeed).toMatch(WIDE_SEED)
     expect(ctx.currentRoom!.session.state.enableFarmersOfTheMoor).toBe(true)
     expect(ctx.currentRoom!.session.state.farmersOfTheMoor).not.toBeNull()
   })
@@ -689,7 +720,7 @@ describe('handleCreateRoom', () => {
 
     dispatch(ctx, { type: 'newGame', seed: 309 })
 
-    expect(ctx.currentRoom!.session.state.gameSeed).toBe(309)
+    expect(ctx.currentRoom!.session.state.gameSeed).toMatch(WIDE_SEED)
     expect(ctx.currentRoom!.enableSnakeOpening).toBe(true)
     expect(ctx.currentRoom!.session.state.enableSnakeOpening).toBe(true)
     expect(ctx.currentRoom!.session.state.snakeOpening).toEqual({ reversed: false })
@@ -704,7 +735,7 @@ describe('handleCreateRoom', () => {
     dispatch(ctx, { type: 'newGame', seed: 309 })
 
     expect(ctx.currentRoom!.maxPlayers).toBe(6)
-    expect(ctx.currentRoom!.session.state.gameSeed).toBe(309)
+    expect(ctx.currentRoom!.session.state.gameSeed).toMatch(WIDE_SEED)
     expect(ctx.currentRoom!.session.state.players).toHaveLength(6)
   })
 })

@@ -1,4 +1,4 @@
-import { createRng } from '../utils/rng'
+import { createSeededRng, type GameSeed } from '../utils/rng'
 import { createRoundOpenById } from '../contract/state-constants'
 import type { ActionSpace, GameState, Resource } from '../contract/types'
 import { seasonIds, type SeasonId, type ThroughTheSeasonsState } from './types'
@@ -9,8 +9,12 @@ type ResourceKey = keyof Resource
 const isSeasonId = (value: unknown): value is SeasonId =>
   typeof value === 'string' && (seasonIds as readonly string[]).includes(value)
 
-export const createThroughTheSeasonsState = (gameSeed: number): ThroughTheSeasonsState => {
-  const rng = createRng(Math.floor(gameSeed) ^ START_SEASON_SEED_NAMESPACE)
+export const createThroughTheSeasonsState = (gameSeed: GameSeed): ThroughTheSeasonsState => {
+  const rng = createSeededRng(
+    gameSeed,
+    'seasons-start',
+    (value) => Math.floor(value) ^ START_SEASON_SEED_NAMESPACE,
+  )
   const startSeason = seasonIds[Math.floor(rng() * seasonIds.length)] ?? 'winter'
   return {
     startSeason,
@@ -20,7 +24,7 @@ export const createThroughTheSeasonsState = (gameSeed: number): ThroughTheSeason
 
 export const normalizeThroughTheSeasonsState = (
   raw: unknown,
-  gameSeed: number,
+  gameSeed: GameSeed,
 ): ThroughTheSeasonsState => {
   if (raw && typeof raw === 'object') {
     const candidate = raw as Partial<ThroughTheSeasonsState>
