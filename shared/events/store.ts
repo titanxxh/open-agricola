@@ -106,17 +106,17 @@ export class EventStore {
       return { ...event, id: String(seq), seq }
     })
     committed.forEach(validateGameEvent)
-    const eventsLengthBeforeCommit = state.events.length
+    const eventsBeforeCommit = state.events
     const nextEventSeqBeforeCommit = state.nextEventSeq
     const mutableArchiveState = state as GameState & { publicEventArchive: unknown }
     const archiveBeforeCommit = mutableArchiveState.publicEventArchive
     const nextArchivePacketSeqBeforeCommit = state.nextPublicEventArchivePacketSeq
     try {
-      state.events.push(...committed)
+      state.events = [...state.events, ...committed]
       state.nextEventSeq += committed.length
       appendPublicEventCommittedPacket(state, committed)
     } catch (error) {
-      state.events.splice(eventsLengthBeforeCommit)
+      state.events = eventsBeforeCommit
       state.nextEventSeq = nextEventSeqBeforeCommit
       mutableArchiveState.publicEventArchive = archiveBeforeCommit
       state.nextPublicEventArchivePacketSeq = nextArchivePacketSeqBeforeCommit

@@ -1,3 +1,4 @@
+import { ROOM_HISTORY_SCHEMA } from '../room-history-store'
 import Database from 'better-sqlite3'
 import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
@@ -81,6 +82,7 @@ const setupSqlite = (): RoomPersistence => {
       payload_kind TEXT NOT NULL, payload_gzip BLOB NOT NULL, frame_hash TEXT NOT NULL,
       created_at INTEGER NOT NULL, PRIMARY KEY (room_id, step_no));
   `)
+  db.exec(ROOM_HISTORY_SCHEMA)
   return new SqliteRoomPersistence(db)
 }
 

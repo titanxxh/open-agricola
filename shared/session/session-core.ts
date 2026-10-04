@@ -1,3 +1,4 @@
+import { beginHistoryOperation } from './history-streams'
 import { canStartBefore, evaluateFlowDoable, isActionDoableInFlowContext, isFlowDerivedDoable } from '../actions/flow'
 import type {
   DraftGameEvent,
@@ -401,10 +402,10 @@ const preservePlayerDisplayNames = (current: GameState, restored: GameState): Ga
       player.nameIsDefault = currentPlayer.nameIsDefault
     }
   }
-  for (const entry of restored.log) {
+  restored.log = restored.log.map(entry => {
     const name = entry.playerId ? names.get(entry.playerId) : undefined
-    if (name !== undefined && entry.params) entry.params.player = name
-  }
+    return name !== undefined && entry.params ? { ...entry, params: { ...entry.params, player: name } } : entry
+  })
   return restored
 }
 
@@ -1217,6 +1218,7 @@ export class GameCore {
       if (this.isFailedAuthoritativeCommand(command)) {
         return this.respond(false, 'command unavailable until game state changes')
       }
+      beginHistoryOperation(this.state, type === 'action' || type === 'anytime' || type === 'specialAction')
       const settlement = this.createActiveCommandSettlement(command)
       this.activeCommandSettlement = settlement
       this.commandSettlementDepth = 1
@@ -1618,9 +1620,8 @@ export class GameCore {
     const previousName = player?.name
     setupPhase.updatePlayerName(player, name)
     if (!previousName || !player || previousName === player.name) return
-    for (const entry of this.state.log) {
-      if (entry.playerId === player.id && entry.params) entry.params.player = player.name
-    }
+    this.state.log = this.state.log.map(entry => entry.playerId === player.id && entry.params
+      ? { ...entry, params: { ...entry.params, player: player.name } } : entry)
   }
 
   private bindInitialLogPlayerIds(): void {
@@ -1628,13 +1629,12 @@ export class GameCore {
     for (const player of this.state.players) {
       playerIdsByName.set(player.name, playerIdsByName.has(player.name) ? null : player.id)
     }
-    for (const entry of this.state.log) {
-      if (entry.playerId) continue
+    this.state.log = this.state.log.map(entry => {
+      if (entry.playerId) return entry
       const playerName = entry.params?.player
-      if (typeof playerName !== 'string') continue
-      const playerId = playerIdsByName.get(playerName)
-      if (playerId) entry.playerId = playerId
-    }
+      const playerId = typeof playerName === 'string' ? playerIdsByName.get(playerName) : undefined
+      return playerId ? { ...entry, playerId } : entry
+    })
   }
 
   private engineDeps() {
