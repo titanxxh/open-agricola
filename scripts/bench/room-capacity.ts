@@ -182,7 +182,7 @@ const cgroupPath = (): string => {
   return entry ? join('/sys/fs/cgroup', entry.slice(3)) : '/sys/fs/cgroup'
 }
 
-const readCgroupLimits = (): Pick<Environment, 'cgroupCpuCores' | 'cgroupMemoryBytes'> => {
+export const readCgroupLimits = (): Pick<Environment, 'cgroupCpuCores' | 'cgroupMemoryBytes'> => {
   const root = cgroupPath()
   const cpuRaw = readText(join(root, 'cpu.max'))
   const memoryRaw = readText(join(root, 'memory.max'))
@@ -210,7 +210,7 @@ const readCgroupLimits = (): Pick<Environment, 'cgroupCpuCores' | 'cgroupMemoryB
   }
 }
 
-const assertResourceLimits = (
+export const assertResourceLimits = (
   limits: Pick<Environment, 'cgroupCpuCores' | 'cgroupMemoryBytes'>,
   allowUnconstrained: boolean,
 ): void => {
