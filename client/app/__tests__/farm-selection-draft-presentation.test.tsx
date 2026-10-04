@@ -20,6 +20,18 @@ const pendingChoice = {
 }
 
 describe('useFarmSelectionDraftPresentation', () => {
+  it('localizes generated fence donors and updates them when the language changes', () => {
+    const plan: InteractionPresentationPlan = { kind: 'farm-fence-selection', pendingChoice,
+      farm: { farmType: 'fence', selectableEdges: ['H-0-0'],
+        fenceSource: { kind: 'borrowed', donorCaps: { p1: 1, p2: 1 } } } }
+    const { result, rerender } = renderHook(({ locale }: { locale: 'zh' | 'en' }) =>
+      useFarmSelectionDraftPresentation({ interactionPresentationPlan: plan, locale,
+        players: [player('p1', 'Player 2'), { ...player('p2', 'Player 2'), nameIsDefault: true }] }),
+    { initialProps: { locale: 'zh' } })
+    expect(result.current.borrowedFenceSources?.donors.map((donor) => donor.name)).toEqual(['Player 2', '玩家 2'])
+    rerender({ locale: 'en' })
+    expect(result.current.borrowedFenceSources?.donors.map((donor) => donor.name)).toEqual(['Player 2', 'Player 2'])
+  })
   it('owns farm draft controls, submit draft, local errors, borrowed fence donors, and reset', () => {
     const roomPlan: InteractionPresentationPlan = {
       kind: 'farm-room-selection',

@@ -61,6 +61,16 @@ const createPlayer = (id: string, name: string, color: PlayerState['color']): Pl
 })
 
 describe('SeasonsBoard', () => {
+  it.each([true, false])('renders an occupying player by name provenance (%s)', (nameIsDefault) => {
+    const action = createAction('season-winter-romantic-evening', 'actions.season-winter-romantic-evening.name')
+    action.takenBy = [{ playerId: 'p2', workerId: '1' }]
+    const { container } = render(<SeasonsBoard locale="zh"
+      throughTheSeasons={{ startSeason: 'winter', currentSeason: 'winter' }}
+      seasonActions={[action]} players={[createPlayer('p1', 'Player 2', 'red'),
+        { ...createPlayer('p2', 'Player 2', 'blue'), nameIsDefault }]}
+      canTakeAction={() => false} takeAction={vi.fn()} />)
+    expect(container.querySelector('.seasons-board__worker')).toHaveTextContent(nameIsDefault ? '玩家 2' : 'Player 2')
+  })
   it.each([['winter', '冬'], ['spring', '春'], ['summer', '夏'], ['autumn', '秋']] as const)(
     'localizes the %s season token', (season, label) => {
       const { container } = render(<SeasonsBoard locale="zh"

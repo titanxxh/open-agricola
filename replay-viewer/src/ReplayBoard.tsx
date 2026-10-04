@@ -117,7 +117,7 @@ function ReplayDraftPhase({
           const pending = draft.pendingPicks[playerId]
           return (
             <article key={playerId}>
-              <h3>{player?.name ?? playerId}</h3>
+              <h3>{player ? getPlayerDisplayName(locale, player.name, state.players.indexOf(player), player.nameIsDefault) : playerId}</h3>
               <h4>{text.pool}</h4>
               <SetupCards ids={pool.occ} kind="occupation" locale={locale} />
               <SetupCards ids={pool.minor} kind="minor" locale={locale} />

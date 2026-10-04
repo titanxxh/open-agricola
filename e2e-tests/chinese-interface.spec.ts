@@ -7,6 +7,33 @@ test.beforeEach(async ({ page }) => {
   await page.addInitScript(() => localStorage.setItem('open-agricola-locale-v2', 'zh'))
 })
 
+test('season occupants and borrowed card owners localize generated names', async ({ page, request }) => {
+  await postJson(request, `${BACKEND_URL}/api/game/new`, { seed: 936, maxPlayers: 2, enableThroughTheSeasons: true })
+  const { state } = await getJson(request, `${BACKEND_URL}/api/game/state`)
+  state.phase = 'playing'
+  state.currentPlayerIndex = 0
+  for (const player of state.players) {
+    player.minorHand = ['__test_placeholder__']
+    player.occupationHand = ['__test_placeholder__']
+  }
+  state.players[0].name = 'Player 2'
+  state.players[0].nameIsDefault = false
+  state.players[1].minorPlayed = ['M033_NightPasture']
+  state.actionSpaces.find((space: { id: string }) => space.id === 'season-winter-romantic-evening').takenBy = [
+    { playerId: 'p2', workerId: state.players[1].workers[0].id },
+  ]
+  state.players[0].borrowedPlayedCardAnimalZones = [{
+    id: 'card:M033_NightPasture:owner:p2:animalOwner:p1', zoneType: 'card', cardId: 'M033_NightPasture',
+    ownerPlayerId: 'p2', animalOwnerPlayerId: 'p1', displayOwnerName: 'Player 2',
+    displaySource: 'borrowed-played-card', animalType: null, animalCount: 0, capacity: 1,
+  }]
+  expect((await postJson(request, `${BACKEND_URL}/api/game/load`, { state })).ok).toBe(true)
+  await page.goto(sandboxUrl, { waitUntil: 'domcontentloaded' })
+  await expect(page.locator('.seasons-board__worker')).toHaveText('玩家 2')
+  await expect(page.locator('.borrowed-played-card-owner')).toHaveText('玩家 2')
+  await expect(page.locator('.player-tabs__name').first()).toContainText('Player 2')
+})
+
 test('dev lobby creates a hotseat room and preserves identity after reload', async ({ page }) => {
   await page.goto(`${FRONTEND_URL}/?player=p1&devMode=1`)
   await page.getByRole('button', { name: '本地热座', exact: true }).click()

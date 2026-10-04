@@ -225,9 +225,9 @@ const bugReportRuntime = bugReportStore
     }
   : null
 
-const createCompletedReplayFixture = (defaultNames = false) => {
+const createCompletedReplayFixture = (defaultNames = false, recordReplay = true) => {
   const viewerBuildId = process.env.REPLAY_VIEWER_BUILD_ID ?? ''
-  if (!viewerBuildExists(REPLAY_VIEWER_ROOT, viewerBuildId)) {
+  if (recordReplay && !viewerBuildExists(REPLAY_VIEWER_ROOT, viewerBuildId)) {
     throw new Error('Replay viewer build is unavailable')
   }
   const roomId = `replay-${randomUUID()}`
@@ -268,42 +268,44 @@ const createCompletedReplayFixture = (defaultNames = false) => {
       INSERT INTO game_contexts (
         room_id, lifecycle, phase, replay_status, expires_at,
         removal_reason, created_at, updated_at
-      ) VALUES (?, 'completed', NULL, 'available', NULL, NULL, ?, ?)
-    `).run(roomId, now, now)
-    db.prepare(`
-      INSERT INTO game_replays (
-        room_id, schema_version, viewer_build_id, game_build_id, status,
-        latest_step_no, missing_prefix, custom_cards_json, created_at, completed_at
-      ) VALUES (?, ?, ?, ?, 'completed', ?, 0, '[]', ?, ?)
-    `).run(
-      roomId,
-      REPLAY_SCHEMA_VERSION,
-      viewerBuildId,
-      process.env.GAME_BUILD_ID ?? 'test-build',
-      frames.length - 1,
-      now,
-      now,
-    )
-    const insertStep = db.prepare(`
-      INSERT INTO game_replay_steps (
-        room_id, step_no, room_version, checkpoint_step_no, player_index,
-        command_type, intent_json, payload_kind, payload_gzip, frame_hash, created_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `)
-    const commandTypes = ['initial', 'takeAction', 'resolveChoice']
-    encoded.forEach((step, stepNo) => insertStep.run(
-      roomId,
-      stepNo,
-      stepNo,
-      step.checkpointStepNo,
-      stepNo === 0 ? null : stepNo - 1,
-      commandTypes[stepNo],
-      JSON.stringify(stepNo === 0 ? {} : { value: stepNo }),
-      step.payloadKind,
-      step.payloadGzip,
-      step.frameHash,
-      now + stepNo,
-    ))
+      ) VALUES (?, 'completed', NULL, ?, NULL, NULL, ?, ?)
+    `).run(roomId, recordReplay ? 'available' : 'legacy_no_replay', now, now)
+    if (recordReplay) {
+      db.prepare(`
+        INSERT INTO game_replays (
+          room_id, schema_version, viewer_build_id, game_build_id, status,
+          latest_step_no, missing_prefix, custom_cards_json, created_at, completed_at
+        ) VALUES (?, ?, ?, ?, 'completed', ?, 0, '[]', ?, ?)
+      `).run(
+        roomId,
+        REPLAY_SCHEMA_VERSION,
+        viewerBuildId,
+        process.env.GAME_BUILD_ID ?? 'test-build',
+        frames.length - 1,
+        now,
+        now,
+      )
+      const insertStep = db.prepare(`
+        INSERT INTO game_replay_steps (
+          room_id, step_no, room_version, checkpoint_step_no, player_index,
+          command_type, intent_json, payload_kind, payload_gzip, frame_hash, created_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `)
+      const commandTypes = ['initial', 'takeAction', 'resolveChoice']
+      encoded.forEach((step, stepNo) => insertStep.run(
+        roomId,
+        stepNo,
+        stepNo,
+        step.checkpointStepNo,
+        stepNo === 0 ? null : stepNo - 1,
+        commandTypes[stepNo],
+        JSON.stringify(stepNo === 0 ? {} : { value: stepNo }),
+        step.payloadKind,
+        step.payloadGzip,
+        step.frameHash,
+        now + stepNo,
+      ))
+    }
     db.prepare(`
       INSERT INTO game_results (
         room_id, started_at, finished_at, rounds_played, player_count,
@@ -743,13 +745,14 @@ const server = createServer(async (req, res) => {
     return
   }
 
-  if ((req.url === '/api/test/replays/completed' || req.url === '/api/test/replays/completed?defaultNames=1') && req.method === 'POST') {
+  if (req.url?.split('?')[0] === '/api/test/replays/completed' && req.method === 'POST') {
     if (process.env.NODE_ENV === 'production' || process.env.ENABLE_AUTH_TEST_HELPERS !== '1') {
       sendJson(res, 404, { error: 'Not found' })
       return
     }
     try {
-      sendJson(res, 201, createCompletedReplayFixture(req.url.includes('defaultNames=1')))
+      const params = new URLSearchParams(req.url.split('?')[1])
+      sendJson(res, 201, createCompletedReplayFixture(params.get('defaultNames') === '1', params.get('recordReplay') !== '0'))
     } catch (error) {
       sendJson(res, 503, {
         ok: false,

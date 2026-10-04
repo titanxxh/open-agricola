@@ -42,6 +42,7 @@ type CardAnimalDisplay = {
 type BorrowedPlayedCardDisplay = CardAnimalDisplay & {
   cardId: string
   cardType: CardType
+  ownerPlayerId?: string
   displayOwnerName?: string
   isReorgDraft: boolean
 }
@@ -1759,36 +1760,42 @@ export const FarmBoard = ({ view, actions, inlineCardStats = false }: FarmBoardP
         <div className="played-cards-by-others">
           <div className="played-cards-by-others-title">{t(locale, 'ui.playedCardsByOthers')}</div>
           <div className="played-row played-row-by-others">
-            {borrowedPlayedCardDisplays.map((display) => (
-              <div
-                key={display.zoneId}
-                className="played-card-slot borrowed-played-card-slot"
-                data-testid={`borrowed-played-card-${display.zoneId}`}
-              >
-                <PlayerCard
-                  locale={locale}
-                  cardId={display.cardId}
-                  cardType={display.cardType}
-                  devMode={devMode}
-                  disabled
-                />
-                {display.displayOwnerName ? (
-                  <div className="borrowed-played-card-owner">{display.displayOwnerName}</div>
-                ) : null}
-                {display.isReorgDraft
-                  ? renderPlayedCardReorg(display)
-                  : (
-                      <div className="played-card-readonly-animals">
-                        <AnimalCount
-                          count={display.animalCount}
-                          animalType={display.animalType}
-                          animalCounts={display.animalCounts}
-                          capacity={display.capacity}
-                        />
-                      </div>
-                    )}
-              </div>
-            ))}
+            {borrowedPlayedCardDisplays.map((display) => {
+              const owner = players.find((player) => player.id === display.ownerPlayerId)
+              const ownerName = owner
+                ? getPlayerDisplayName(locale, owner.name, players.indexOf(owner), owner.nameIsDefault)
+                : display.displayOwnerName
+              return (
+                <div
+                  key={display.zoneId}
+                  className="played-card-slot borrowed-played-card-slot"
+                  data-testid={`borrowed-played-card-${display.zoneId}`}
+                >
+                  <PlayerCard
+                    locale={locale}
+                    cardId={display.cardId}
+                    cardType={display.cardType}
+                    devMode={devMode}
+                    disabled
+                  />
+                  {ownerName ? (
+                    <div className="borrowed-played-card-owner">{ownerName}</div>
+                  ) : null}
+                  {display.isReorgDraft
+                    ? renderPlayedCardReorg(display)
+                    : (
+                        <div className="played-card-readonly-animals">
+                          <AnimalCount
+                            count={display.animalCount}
+                            animalType={display.animalType}
+                            animalCounts={display.animalCounts}
+                            capacity={display.capacity}
+                          />
+                        </div>
+                      )}
+                </div>
+              )
+            })}
           </div>
         </div>
       ) : null}

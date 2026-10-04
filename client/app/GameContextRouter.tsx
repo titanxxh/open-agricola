@@ -19,6 +19,7 @@ import type {
 } from '../../shared/contract/protocol/replay'
 import { API_BASE } from '../config'
 import { useLocale } from '../contexts/LocaleContext'
+import { getPlayerDisplayName } from '../utils/player-name'
 import { BrandMark } from '../components/common/BrandMark'
 import { GameLoadScreen } from '../components/common/GameLoadScreen'
 import { BugReportBar } from './BugReportBar'
@@ -221,7 +222,7 @@ function CompletedContext({
 }: {
   context: CompletedGameContextDescriptor
 }) {
-  const { t } = useLocale()
+  const { locale, t } = useLocale()
   if (context.replayStatus === 'available') {
     return <ReplayShell context={context} />
   }
@@ -235,7 +236,7 @@ function CompletedContext({
       <ul>
         {context.result.players.map((player) => (
           <li key={player.playerIndex}>
-            {player.displayName}: {t('platform.gameContext.score', { score: player.score })}
+            {getPlayerDisplayName(locale, player.displayName, player.playerIndex, player.nameIsDefault)}: {t('platform.gameContext.score', { score: player.score })}
           </li>
         ))}
       </ul>
