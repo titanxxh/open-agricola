@@ -16,6 +16,14 @@ Before implementation, measure repeated runs of that baseline and freeze the min
 
 These are acceptance objectives for future work. The measurements below belong to the earlier capacity probe; they do not establish the benefits of these follow-up optimizations.
 
+### Frozen optimization baseline (Issue #947)
+
+The fixed workloads contain 136 two-player and 277 four-player commands, including farm choices, payments, undo and process recovery. Their explicit stress preparation (hands, cost occupations and resources) is recorded with each fixture; these are reproducible cost workloads, not a claim about optimal play or ordinary starting resources. Five fresh-process runs on Node 24.19.0 under a 2 CPU / 2 GiB cgroup produced identical raw Frame Hash chains and commit classifications. SQLite uses WAL and `synchronous=NORMAL`.
+
+The source is `85d19405` (after PR #945). Raw runs, workload hashes, exact invocations and thresholds are retained in `room-optimization-baseline.json`; the workload fixtures and recorder are maintained with the benchmark. Before implementation, the group thresholds were frozen at 6% CPU improvement, 7% / 10% / 9% action-to-broadcast p50 / p95 / p99 improvement, and 5% cumulative DB/WAL write reduction. Latency/CPU thresholds are twice the largest observed median-relative variation, rounded up, with a 5% floor. Per-slice regression allowances are 3% CPU, 4% / 5% / 5% latency and 1% writes.
+
+Independent syscall tracing, excluding database preparation and final close, measured 39,318,816 bytes for the two-player workload and 139,895,504 bytes for four players. DB/WAL writes were byte-identical across normal runs and corroborated by the separate trace. Logical snapshot bytes are measured in the traced run only; tracing and extra snapshot measurement do not contribute to the latency/CPU samples used for acceptance. These frozen values must not be relaxed after optimized results are observed.
+
 ## Environment
 
 - Source: working tree based on `2d2a5ef1`
