@@ -1,5 +1,5 @@
 import type { GameState } from '../contract/types'
-import { projectHistoryLogNames } from '../projections/history-names'
+import { projectHistoryLogNames, isHistoryParticipantNamePath } from '../projections/history-names'
 import type { GameSyncPayload } from '../contract/protocol/game'
 import type { HistoryDisplayRecord, RoomHistoryPage } from '../contract/protocol/history'
 import type { SerializedGameState } from './serialization'
@@ -54,7 +54,7 @@ export const historyPageFromFilteredState = (canonical: HistorySource, filtered:
   const metadata = (entry: object, display = false): HistoryDisplayRecord => {
     const identity = getHistoryRecordIdentity(entry)!
     return { recordId: identity.recordId, operationGroupId: identity.operationGroupId,
-      ...(display ? { participantRoles: Object.fromEntries(Object.entries(identity.participantRoles).filter(([path]) => path.startsWith('params.') && ['player', 'playerName', 'fromPlayer', 'toPlayer'].includes(path.split('.').at(-1)!))) } : {}),
+      ...(display ? { participantRoles: Object.fromEntries(Object.entries(identity.participantRoles).filter(([path]) => isHistoryParticipantNamePath(path))) } : {}),
     }
   }
   return { log, events, publicEventArchive, window: {

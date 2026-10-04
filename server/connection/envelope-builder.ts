@@ -9,7 +9,7 @@ import { buildSessionSyncPayload } from '../game/custom-session-executor.ts'
 import type { SyncPayloadMode } from '../../shared/session/sync-payload.ts'
 
 type Args = {
-  room: { id: string; session: GameSession } & Pick<Room, 'players'>
+  room: { id: string; session: GameSession } & Partial<Pick<Room, 'players'>>
   resp: SessionResponse
   viewerPlayerId: string | null
   version: number
