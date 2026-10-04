@@ -10,6 +10,8 @@ export const HISTORY_WINDOW_GROUPS = 20
 export class HistoryBranchChangedError extends Error {}
 type HistorySource = Pick<GameState, 'log' | 'events' | 'publicEventArchive' | 'players'>
 type HistoryDescription = { branchId: string; groups: string[] }
+const displayRecords = new WeakMap<object, HistoryDisplayRecord>()
+const logDisplayRecords = new WeakMap<object, HistoryDisplayRecord>()
 const descriptions = new WeakMap<object, { events: object; archive: object; value: HistoryDescription }>()
 
 export const describeHistory = (state: HistorySource): HistoryDescription => {
@@ -61,9 +63,15 @@ export const historyPageFromFilteredState = (canonical: HistorySource, filtered:
   const publicEventArchive = select(filtered.publicEventArchive)
   const metadata = (entry: object, display = false): HistoryDisplayRecord => {
     const identity = getHistoryRecordIdentity(entry)!
-    return { recordId: identity.recordId, operationGroupId: identity.operationGroupId,
-      ...(display ? { participantRoles: Object.fromEntries(Object.entries(identity.participantRoles).filter(([path]) => isHistoryParticipantNamePath(path))) } : {}),
+    const cache = display ? logDisplayRecords : displayRecords
+    let record = cache.get(identity)
+    if (!record) {
+      record = Object.freeze({ recordId: identity.recordId, operationGroupId: identity.operationGroupId,
+        ...(display ? { participantRoles: Object.freeze(Object.fromEntries(Object.entries(identity.participantRoles).filter(([path]) => isHistoryParticipantNamePath(path)))) } : {}),
+      })
+      cache.set(identity, record)
     }
+    return record
   }
   return { log, events, publicEventArchive, window: {
     branchId, operationGroupIds: selected, nextCursor: start > 0 ? JSON.stringify({ branchId, beforeGroup: ordered[start] }) : null,
